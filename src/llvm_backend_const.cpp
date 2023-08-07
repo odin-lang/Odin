@@ -567,7 +567,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bo
 
 		}
 	} else if (is_type_array(type) && value.kind == ExactValue_String && !is_type_u8(core_array_type(type))) {
-		if (is_type_rune_array(type) && value.kind == ExactValue_String) {
+		if (is_type_rune_array(type)) {
 			i64 count  = type->Array.count;
 			Type *elem = type->Array.elem;
 			LLVMTypeRef et = lb_type(m, elem);
@@ -1036,86 +1036,84 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bo
 			LLVMValueRef *values = gb_alloc_array(temporary_allocator(), LLVMValueRef, value_count);
 			bool *visited = gb_alloc_array(temporary_allocator(), bool, value_count);
 
-			if (cl->elems.count > 0) {
-				if (cl->elems[0]->kind == Ast_FieldValue) {
-					isize elem_count = cl->elems.count;
-					for (isize i = 0; i < elem_count; i++) {
-						ast_node(fv, FieldValue, cl->elems[i]);
-						String name = fv->field->Ident.token.string;
+			if (cl->elems[0]->kind == Ast_FieldValue) {
+				isize elem_count = cl->elems.count;
+				for (isize i = 0; i < elem_count; i++) {
+					ast_node(fv, FieldValue, cl->elems[i]);
+					String name = fv->field->Ident.token.string;
 
-						TypeAndValue tav = fv->value->tav;
-						GB_ASSERT(tav.mode != Addressing_Invalid);
+					TypeAndValue tav = fv->value->tav;
+					GB_ASSERT(tav.mode != Addressing_Invalid);
 
-						Selection sel = lookup_field(type, name, false);
-						GB_ASSERT(!sel.indirect);
+					Selection sel = lookup_field(type, name, false);
+					GB_ASSERT(!sel.indirect);
 
-						Entity *f = type->Struct.fields[sel.index[0]];
-						i32 index = field_remapping[f->Variable.field_index];
-						if (elem_type_can_be_constant(f->type)) {
-							if (sel.index.count == 1) {
-								values[index] = lb_const_value(m, f->type, tav.value, allow_local).value;
+					Entity *f = type->Struct.fields[sel.index[0]];
+					i32 index = field_remapping[f->Variable.field_index];
+					if (elem_type_can_be_constant(f->type)) {
+						if (sel.index.count == 1) {
+							values[index] = lb_const_value(m, f->type, tav.value, allow_local).value;
+							visited[index] = true;
+						} else {
+							if (!visited[index]) {
+								values[index] = lb_const_value(m, f->type, {}, false).value;
 								visited[index] = true;
-							} else {
-								if (!visited[index]) {
-									values[index] = lb_const_value(m, f->type, {}, false).value;
-									visited[index] = true;
-								}
-								unsigned idx_list_len = cast(unsigned)sel.index.count-1;
-								unsigned *idx_list = gb_alloc_array(temporary_allocator(), unsigned, idx_list_len);
+							}
+							unsigned idx_list_len = cast(unsigned)sel.index.count-1;
+							unsigned *idx_list = gb_alloc_array(temporary_allocator(), unsigned, idx_list_len);
 
-								if (lb_is_nested_possibly_constant(type, sel, fv->value)) {
-									bool is_constant = true;
-									Type *cv_type = f->type;
-									for (isize j = 1; j < sel.index.count; j++) {
-										i32 index = sel.index[j];
-										Type *cvt = base_type(cv_type);
+							if (lb_is_nested_possibly_constant(type, sel, fv->value)) {
+								bool is_constant = true;
+								Type *cv_type = f->type;
+								for (isize j = 1; j < sel.index.count; j++) {
+									i32 index = sel.index[j];
+									Type *cvt = base_type(cv_type);
 
-										if (cvt->kind == Type_Struct) {
-											if (cvt->Struct.is_raw_union) {
-												// sanity check which should have been caught by `lb_is_nested_possibly_constant`
-												is_constant = false;
-												break;
-											}
-											cv_type = cvt->Struct.fields[index]->type;
-
-											if (is_type_struct(cvt)) {
-												auto cv_field_remapping = lb_get_struct_remapping(m, cvt);
-												unsigned remapped_index = cast(unsigned)cv_field_remapping[index];
-												idx_list[j-1] = remapped_index;
-											} else {
-												idx_list[j-1] = cast(unsigned)index;
-											}
-										} else if (cvt->kind == Type_Array) {
-											cv_type = cvt->Array.elem;
-
-											idx_list[j-1] = cast(unsigned)index;
-										} else {
-											GB_PANIC("UNKNOWN TYPE: %s", type_to_string(cv_type));
+									if (cvt->kind == Type_Struct) {
+										if (cvt->Struct.is_raw_union) {
+											// sanity check which should have been caught by `lb_is_nested_possibly_constant`
+											is_constant = false;
+											break;
 										}
+										cv_type = cvt->Struct.fields[index]->type;
+
+										if (is_type_struct(cvt)) {
+											auto cv_field_remapping = lb_get_struct_remapping(m, cvt);
+											unsigned remapped_index = cast(unsigned)cv_field_remapping[index];
+											idx_list[j-1] = remapped_index;
+										} else {
+											idx_list[j-1] = cast(unsigned)index;
+										}
+									} else if (cvt->kind == Type_Array) {
+										cv_type = cvt->Array.elem;
+
+										idx_list[j-1] = cast(unsigned)index;
+									} else {
+										GB_PANIC("UNKNOWN TYPE: %s", type_to_string(cv_type));
 									}
-									if (is_constant) {
-										LLVMValueRef elem_value = lb_const_value(m, tav.type, tav.value, allow_local).value;
-										GB_ASSERT(LLVMIsConstant(elem_value));
-										values[index] = LLVMConstInsertValue(values[index], elem_value, idx_list, idx_list_len);
-									}
+								}
+								if (is_constant) {
+									LLVMValueRef elem_value = lb_const_value(m, tav.type, tav.value, allow_local).value;
+									GB_ASSERT(LLVMIsConstant(elem_value));
+									values[index] = LLVMConstInsertValue(values[index], elem_value, idx_list, idx_list_len);
 								}
 							}
 						}
 					}
-				} else {
-					for_array(i, cl->elems) {
-						Entity *f = type->Struct.fields[i];
-						TypeAndValue tav = cl->elems[i]->tav;
-						ExactValue val = {};
-						if (tav.mode != Addressing_Invalid) {
-							val = tav.value;
-						}
-						
-						i32 index = field_remapping[f->Variable.field_index];
-						if (elem_type_can_be_constant(f->type)) {
-							values[index]  = lb_const_value(m, f->type, val, allow_local).value;
-							visited[index] = true;
-						}
+				}
+			} else {
+				for_array(i, cl->elems) {
+					Entity *f = type->Struct.fields[i];
+					TypeAndValue tav = cl->elems[i]->tav;
+					ExactValue val = {};
+					if (tav.mode != Addressing_Invalid) {
+						val = tav.value;
+					}
+
+					i32 index = field_remapping[f->Variable.field_index];
+					if (elem_type_can_be_constant(f->type)) {
+						values[index]  = lb_const_value(m, f->type, val, allow_local).value;
+						visited[index] = true;
 					}
 				}
 			}

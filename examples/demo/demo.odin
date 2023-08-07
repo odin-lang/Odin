@@ -1,3 +1,4 @@
+//+vet !using-stmt !using-param
 package main
 
 import "core:fmt"
@@ -456,6 +457,27 @@ named_proc_return_parameters :: proc() {
 	fmt.println("foo0 =", foo0()) // 123
 	fmt.println("foo1 =", foo1()) // 123
 	fmt.println("foo2 =", foo2()) // 567 321
+}
+
+variadic_procedures :: proc() {
+	fmt.println("\n# variadic procedures")
+	sum :: proc(nums: ..int, init_value:= 0) -> (result: int) {
+		result = init_value
+		for n in nums {
+			result += n
+		}
+		return
+	}
+	fmt.println("sum(()) =", sum())
+	fmt.println("sum(1, 2) =", sum(1, 2))
+	fmt.println("sum(1, 2, 3, 4, 5) =", sum(1, 2, 3, 4, 5))
+	fmt.println("sum(1, 2, 3, 4, 5, init_value = 5) =", sum(1, 2, 3, 4, 5, init_value = 5))
+
+	// pass a slice as varargs
+	odds := []int{1, 3, 5}
+	fmt.println("odds =", odds)
+	fmt.println("sum(..odds) =", sum(..odds))
+	fmt.println("sum(..odds, init_value = 5) =", sum(..odds, init_value = 5))
 }
 
 
@@ -2023,12 +2045,11 @@ relative_data_types :: proc() {
 	fmt.println(ptr^)
 
 	arr := [3]int{1, 2, 3}
-	s := arr[:]
-	rel_slice: #relative(i16) []int
-	rel_slice = s
-	fmt.println(rel_slice)
-	fmt.println(rel_slice[:])
-	fmt.println(rel_slice[1])
+	multi_ptr: #relative(i16) [^]int
+	multi_ptr = &arr[0]
+	fmt.println(multi_ptr)
+	fmt.println(multi_ptr[:3])
+	fmt.println(multi_ptr[1])
 }
 
 or_else_operator :: proc() {
@@ -2462,6 +2483,7 @@ main :: proc() {
 		the_basics()
 		control_flow()
 		named_proc_return_parameters()
+		variadic_procedures()
 		explicit_procedure_overloading()
 		struct_type()
 		union_type()

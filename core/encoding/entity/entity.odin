@@ -184,28 +184,26 @@ decode_xml :: proc(input: string, options := XML_Decode_Options{}, allocator := 
 
 advance :: proc(t: ^Tokenizer) -> (err: Error) {
 	if t == nil { return .Tokenizer_Is_Nil }
-	using t
-
 	#no_bounds_check {
-		if read_offset < len(src) {
-			offset = read_offset
-			r, w   = rune(src[read_offset]), 1
+		if t.read_offset < len(t.src) {
+			t.offset = t.read_offset
+			t.r, t.w   = rune(t.src[t.read_offset]), 1
 			switch {
-			case r == 0:
+			case t.r == 0:
 				return .Illegal_NUL_Character
-			case r >= utf8.RUNE_SELF:
-				r, w = utf8.decode_rune_in_string(src[read_offset:])
-				if r == utf8.RUNE_ERROR && w == 1 {
+			case t.r >= utf8.RUNE_SELF:
+				t.r, t.w = utf8.decode_rune_in_string(t.src[t.read_offset:])
+				if t.r == utf8.RUNE_ERROR && t.w == 1 {
 					return .Illegal_UTF_Encoding
-				} else if r == utf8.RUNE_BOM && offset > 0 {
+				} else if t.r == utf8.RUNE_BOM && t.offset > 0 {
 					return .Illegal_BOM
 				}
 			}
-			read_offset += w
+			t.read_offset += t.w
 			return .None
 		} else {
-			offset = len(src)
-			r = -1
+			t.offset = len(t.src)
+			t.r = -1
 			return
 		}
 	}
@@ -273,26 +271,25 @@ _extract_xml_entity :: proc(t: ^Tokenizer) -> (entity: string, err: Error) {
 		All of these would be in the ASCII range.
 		Even if one is not, it doesn't matter. All characters we need to compare to extract are.
 	*/
-	using t
 
 	length := len(t.src)
 	found  := false
 
 	#no_bounds_check {
-		for read_offset < length {
-			if src[read_offset] == ';' {
+		for t.read_offset < length {
+			if t.src[t.read_offset] == ';' {
+				t.read_offset += 1
 				found = true
-				read_offset += 1
 				break
 			}
-			read_offset += 1
+			t.read_offset += 1
 		}
 	}
 
 	if found {
-		return string(src[offset + 1 : read_offset - 1]), .None
+		return string(t.src[t.offset + 1 : t.read_offset - 1]), .None
 	}
-	return string(src[offset : read_offset]), .Invalid_Entity_Encoding
+	return string(t.src[t.offset : t.read_offset]), .Invalid_Entity_Encoding
 }
 
 /*

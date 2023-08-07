@@ -1,3 +1,4 @@
+//+vet !using-param
 package zlib
 
 /*

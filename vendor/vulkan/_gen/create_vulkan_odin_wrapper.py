@@ -829,9 +829,9 @@ with open("../structs.odin", 'w', encoding='utf-8') as f:
     f.write("""
 import "core:c"
 
+import win32 "core:sys/windows"
+_ :: win32
 when ODIN_OS == .Windows {
-\timport win32 "core:sys/windows"
-
 \tHINSTANCE           :: win32.HINSTANCE
 \tHWND                :: win32.HWND
 \tHMONITOR            :: win32.HMONITOR

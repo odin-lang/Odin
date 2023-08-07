@@ -69,7 +69,6 @@ enum lbAddrKind {
 	lbAddr_SoaVariable,
 
 	lbAddr_RelativePointer,
-	lbAddr_RelativeSlice,
 
 	lbAddr_Swizzle,
 	lbAddr_SwizzleLarge,
@@ -190,23 +189,15 @@ struct lbModule {
 	LLVMPassManagerRef function_pass_managers[lbFunctionPassManager_COUNT];
 };
 
-struct lbGenerator {
+struct lbGenerator : LinkerData {
 	CheckerInfo *info;
 
-	Array<String> output_object_paths;
-	Array<String> output_temp_paths;
-	String   output_base;
-	String   output_name;
 	PtrMap<void *, lbModule *> modules; // key is `AstPackage *` (`void *` is used for future use)
 	PtrMap<LLVMContextRef, lbModule *> modules_through_ctx; 
 	lbModule default_module;
 
 	RecursiveMutex anonymous_proc_lits_mutex;
 	PtrMap<Ast *, lbProcedure *> anonymous_proc_lits; 
-
-	BlockingMutex foreign_mutex;
-	PtrSet<Entity *> foreign_libraries_set;
-	Array<Entity *>  foreign_libraries;
 
 	std::atomic<u32> global_array_index;
 	std::atomic<u32> global_generated_index;
@@ -346,7 +337,9 @@ struct lbProcedure {
 };
 
 
+#ifndef ABI_PKG_NAME_SEPARATOR
 #define ABI_PKG_NAME_SEPARATOR "."
+#endif
 
 
 #if !ODIN_LLVM_MINIMUM_VERSION_14

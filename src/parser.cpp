@@ -1,7 +1,21 @@
 #include "parser_pos.cpp"
 
-// #undef at the bottom of this file
-#define ALLOW_NEWLINE (!build_context.strict_style)
+gb_internal u64 ast_file_vet_flags(AstFile *f) {
+	if (f->vet_flags_set) {
+		return f->vet_flags;
+	}
+	return build_context.vet_flags;
+}
+
+gb_internal bool ast_file_vet_style(AstFile *f) {
+	return (ast_file_vet_flags(f) & VetFlag_Style) != 0;
+}
+
+
+gb_internal bool file_allow_newline(AstFile *f) {
+	bool is_strict = build_context.strict_style || ast_file_vet_style(f);
+	return !is_strict;
+}
 
 gb_internal Token token_end_of_line(AstFile *f, Token tok) {
 	u8 const *start = f->tokenizer.start + tok.pos.offset;
@@ -1567,29 +1581,29 @@ gb_internal void assign_removal_flag_to_semicolon(AstFile *f) {
 	Token *prev_token = &f->tokens[f->prev_token_index];
 	Token *curr_token = &f->tokens[f->curr_token_index];
 	GB_ASSERT(prev_token->kind == Token_Semicolon);
-	if (prev_token->string == ";") {
-		bool ok = false;
-		if (curr_token->pos.line > prev_token->pos.line) {
+	if (prev_token->string != ";") {
+		return;
+	}
+	bool ok = false;
+	if (curr_token->pos.line > prev_token->pos.line) {
+		ok = true;
+	} else if (curr_token->pos.line == prev_token->pos.line) {
+		switch (curr_token->kind) {
+		case Token_CloseBrace:
+		case Token_CloseParen:
+		case Token_EOF:
 			ok = true;
-		} else if (curr_token->pos.line == prev_token->pos.line) {
-			switch (curr_token->kind) {
-			case Token_CloseBrace:
-			case Token_CloseParen:
-			case Token_EOF:
-				ok = true;
-				break;
-			}
-		}
-			
-		if (ok) {
-			if (build_context.strict_style) {
-				syntax_error(*prev_token, "Found unneeded semicolon");
-			} else if (build_context.strict_style_init_only && f->pkg->kind == Package_Init) {
-				syntax_error(*prev_token, "Found unneeded semicolon");
-			}
-			prev_token->flags |= TokenFlag_Remove;
+			break;
 		}
 	}
+	if (!ok) {
+		return;
+	}
+
+	if (build_context.strict_style || (ast_file_vet_flags(f) & VetFlag_Semicolon)) {
+		syntax_error(*prev_token, "Found unneeded semicolon");
+	}
+	prev_token->flags |= TokenFlag_Remove;
 }
 
 gb_internal void expect_semicolon(AstFile *f) {
@@ -2221,7 +2235,11 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 			return parse_check_directive_for_statement(operand, name, StateFlag_no_type_assert);
 		} else if (name.string == "relative") {
 			Ast *tag = ast_basic_directive(f, token, name);
-			tag = parse_call_expr(f, tag);
+			if (f->curr_token.kind != Token_OpenParen) {
+				syntax_error(tag, "expected #relative(<integer type>) <type>");
+			} else {
+				tag = parse_call_expr(f, tag);
+			}
 			Ast *type = parse_type(f);
 			return ast_relative_type(f, tag, type);
 		} else if (name.string == "force_inline" ||
@@ -2748,7 +2766,7 @@ gb_internal Ast *parse_call_expr(AstFile *f, Ast *operand) {
 	isize prev_expr_level = f->expr_level;
 	bool prev_allow_newline = f->allow_newline;
 	f->expr_level = 0;
-	f->allow_newline = ALLOW_NEWLINE;
+	f->allow_newline = file_allow_newline(f);
 
 	open_paren = expect_token(f, Token_OpenParen);
 
@@ -3147,7 +3165,7 @@ gb_internal Ast *parse_expr(AstFile *f, bool lhs) {
 
 gb_internal Array<Ast *> parse_expr_list(AstFile *f, bool lhs) {
 	bool allow_newline = f->allow_newline;
-	f->allow_newline = ALLOW_NEWLINE;
+	f->allow_newline = file_allow_newline(f);
 
 	auto list = array_make<Ast *>(heap_allocator());
 	for (;;) {
@@ -3472,7 +3490,7 @@ gb_internal Ast *parse_results(AstFile *f, bool *diverging) {
 	Ast *list = nullptr;
 	expect_token(f, Token_OpenParen);
 	list = parse_field_list(f, nullptr, FieldFlag_Results, Token_CloseParen, true, false);
-	if (ALLOW_NEWLINE) {
+	if (file_allow_newline(f)) {
 		skip_possible_newline(f);
 	}
 	expect_token_after(f, Token_CloseParen, "parameter list");
@@ -3532,7 +3550,7 @@ gb_internal Ast *parse_proc_type(AstFile *f, Token proc_token) {
 
 	expect_token(f, Token_OpenParen);
 	params = parse_field_list(f, nullptr, FieldFlag_Signature, Token_CloseParen, true, true);
-	if (ALLOW_NEWLINE) {
+	if (file_allow_newline(f)) {
 		skip_possible_newline(f);
 	}
 	expect_token_after(f, Token_CloseParen, "parameter list");
@@ -3754,7 +3772,7 @@ gb_internal bool allow_field_separator(AstFile *f) {
 	}
 	if (token.kind == Token_Semicolon) {
 		bool ok = false;
-		if (ALLOW_NEWLINE && token_is_newline(token)) {
+		if (file_allow_newline(f) && token_is_newline(token)) {
 			TokenKind next = peek_token(f).kind;
 			switch (next) {
 			case Token_CloseBrace:
@@ -3818,7 +3836,7 @@ gb_internal bool check_procedure_name_list(Array<Ast *> const &names) {
 gb_internal Ast *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, TokenKind follow, bool allow_default_parameters, bool allow_typeid_token) {
 	bool prev_allow_newline = f->allow_newline;
 	defer (f->allow_newline = prev_allow_newline);
-	f->allow_newline = ALLOW_NEWLINE;
+	f->allow_newline = file_allow_newline(f);
 
 	Token start_token = f->curr_token;
 
@@ -4169,6 +4187,8 @@ gb_internal Ast *parse_when_stmt(AstFile *f) {
 		syntax_error(f->curr_token, "Expected condition for when statement");
 	}
 
+	bool was_in_when_statement = f->in_when_statement;
+	f->in_when_statement = true;
 	if (allow_token(f, Token_do)) {
 		body = parse_do_body(f, cond ? ast_token(cond) : token, "then when statement");
 	} else {
@@ -4195,6 +4215,7 @@ gb_internal Ast *parse_when_stmt(AstFile *f) {
 			break;
 		}
 	}
+	f->in_when_statement = was_in_when_statement;
 
 	return ast_when_stmt(f, token, cond, body, else_stmt);
 }
@@ -4454,6 +4475,10 @@ gb_internal Ast *parse_import_decl(AstFile *f, ImportDeclKind kind) {
 	} else {
 		s = ast_import_decl(f, token, file_path, import_name, docs, f->line_comment);
 		array_add(&f->imports, s);
+	}
+
+	if (f->in_when_statement) {
+		syntax_error(import_name, "Cannot use 'import' within a 'when' statement. Prefer using the file suffixes (e.g. foo_windows.odin) or '//+build' tags");
 	}
 
 	if (kind != ImportDecl_Standard) {
@@ -4954,7 +4979,6 @@ gb_internal bool init_parser(Parser *p) {
 
 gb_internal void destroy_parser(Parser *p) {
 	GB_ASSERT(p != nullptr);
-	// TODO(bill): Fix memory leak
 	for (AstPackage *pkg : p->packages) {
 		for (AstFile *file : pkg->files) {
 			destroy_ast_file(file);
@@ -4998,7 +5022,6 @@ gb_internal WORKER_TASK_PROC(parser_worker_proc) {
 
 
 gb_internal void parser_add_file_to_process(Parser *p, AstPackage *pkg, FileInfo fi, TokenPos pos) {
-	// TODO(bill): Use a better allocator
 	ImportedFile f = {pkg, fi, pos, p->file_to_process_count++};
 	auto wd = gb_alloc_item(permanent_allocator(), ParserWorkerData);
 	wd->parser = p;
@@ -5528,6 +5551,88 @@ gb_internal bool parse_build_tag(Token token_for_pos, String s) {
 	return any_correct;
 }
 
+gb_internal String vet_tag_get_token(String s, String *out) {
+	s = string_trim_whitespace(s);
+	isize n = 0;
+	while (n < s.len) {
+		Rune rune = 0;
+		isize width = utf8_decode(&s[n], s.len-n, &rune);
+		if (n == 0 && rune == '!') {
+
+		} else if (!rune_is_letter(rune) && !rune_is_digit(rune) && rune != '-') {
+			isize k = gb_max(gb_max(n, width), 1);
+			*out = substring(s, k, s.len);
+			return substring(s, 0, k);
+		}
+		n += width;
+	}
+	out->len = 0;
+	return s;
+}
+
+
+gb_internal u64 parse_vet_tag(Token token_for_pos, String s) {
+	String const prefix = str_lit("+vet");
+	GB_ASSERT(string_starts_with(s, prefix));
+	s = string_trim_whitespace(substring(s, prefix.len, s.len));
+
+	if (s.len == 0) {
+		return VetFlag_All;
+	}
+
+
+	u64 vet_flags = 0;
+	u64 vet_not_flags = 0;
+
+	while (s.len > 0) {
+		String p = string_trim_whitespace(vet_tag_get_token(s, &s));
+		if (p.len == 0) {
+			break;
+		}
+
+		bool is_notted = false;
+		if (p[0] == '!') {
+			is_notted = true;
+			p = substring(p, 1, p.len);
+			if (p.len == 0) {
+				syntax_error(token_for_pos, "Expected a vet flag name after '!'");
+				return build_context.vet_flags;
+			}
+		}
+
+		u64 flag = get_vet_flag_from_name(p);
+		if (flag != VetFlag_NONE) {
+			if (is_notted) {
+				vet_not_flags |= flag;
+			} else {
+				vet_flags     |= flag;
+			}
+		} else {
+			ERROR_BLOCK();
+			syntax_error(token_for_pos, "Invalid vet flag name: %.*s", LIT(p));
+			error_line("\tExpected one of the following\n");
+			error_line("\tunused\n");
+			error_line("\tshadowing\n");
+			error_line("\tusing-stmt\n");
+			error_line("\tusing-param\n");
+			error_line("\textra\n");
+			return build_context.vet_flags;
+		}
+	}
+
+	if (vet_flags == 0 && vet_not_flags == 0) {
+		return build_context.vet_flags;
+	}
+	if (vet_flags == 0 && vet_not_flags != 0) {
+		return build_context.vet_flags &~ vet_not_flags;
+	}
+	if (vet_flags != 0 && vet_not_flags == 0) {
+		return vet_flags;
+	}
+	GB_ASSERT(vet_flags != 0 && vet_not_flags != 0);
+	return vet_flags &~ vet_not_flags;
+}
+
 gb_internal String dir_from_path(String path) {
 	String base_dir = path;
 	for (isize i = path.len-1; i >= 0; i--) {
@@ -5679,6 +5784,9 @@ gb_internal bool parse_file(Parser *p, AstFile *f) {
 						if (!parse_build_tag(tok, lc)) {
 							return false;
 						}
+					} else if (string_starts_with(lc, str_lit("+vet"))) {
+						f->vet_flags = parse_vet_tag(tok, lc);
+						f->vet_flags_set = true;
 					} else if (string_starts_with(lc, str_lit("+ignore"))) {
 							return false;
 					} else if (string_starts_with(lc, str_lit("+private"))) {
@@ -5920,6 +6028,3 @@ gb_internal ParseFileError parse_packages(Parser *p, String init_filename) {
 	return ParseFile_None;
 }
 
-
-
-#undef ALLOW_NEWLINE

@@ -442,19 +442,12 @@ gb_internal LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 		gbString name = type_to_string(type, temporary_allocator());
 		return LLVMDIBuilderCreateTypedef(m->debug_builder, base_integer, name, gb_string_length(name), nullptr, 0, nullptr, cast(u32)(8*type_align_of(type)));
 	}
+	case Type_RelativeMultiPointer: {
+		LLVMMetadataRef base_integer = lb_debug_type(m, type->RelativeMultiPointer.base_integer);
+		gbString name = type_to_string(type, temporary_allocator());
+		return LLVMDIBuilderCreateTypedef(m->debug_builder, base_integer, name, gb_string_length(name), nullptr, 0, nullptr, cast(u32)(8*type_align_of(type)));
+	}
 
-	case Type_RelativeSlice:
-		{
-			unsigned element_count = 0;
-			LLVMMetadataRef elements[2] = {};
-			Type *base_integer = type->RelativeSlice.base_integer;
-			unsigned base_bits = cast(unsigned)(8*type_size_of(base_integer));
-			elements[0] = lb_debug_struct_field(m, str_lit("data_offset"), base_integer, 0);
-			elements[1] = lb_debug_struct_field(m, str_lit("len"), base_integer, base_bits);
-			gbString name = type_to_string(type, temporary_allocator());
-			return LLVMDIBuilderCreateStructType(m->debug_builder, nullptr, name, gb_string_length(name), nullptr, 0, 2*base_bits, base_bits, LLVMDIFlagZero, nullptr, elements, element_count, 0, nullptr, "", 0);
-		}
-		
 	case Type_Matrix: {
 		LLVMMetadataRef subscripts[1] = {};
 		subscripts[0] = LLVMDIBuilderGetOrCreateSubrange(m->debug_builder,

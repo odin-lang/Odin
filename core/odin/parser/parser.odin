@@ -2943,7 +2943,7 @@ parse_call_expr :: proc(p: ^Parser, operand: ^ast.Expr) -> ^ast.Expr {
 
 	seen_ellipsis := false
 	for p.curr_tok.kind != .Close_Paren &&
-	    p.curr_tok.kind != .EOF {
+		p.curr_tok.kind != .EOF {
 
 		if p.curr_tok.kind == .Comma {
 			error(p, p.curr_tok.pos, "expected an expression not ,")

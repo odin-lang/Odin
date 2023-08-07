@@ -4,13 +4,14 @@ import "core:bytes"
 import "core:image"
 
 destroy :: proc(img: ^image.Image) -> bool {
-	if img == nil do return false
+	if img == nil {
+		return false
+	}
 
 	defer free(img)
 	bytes.buffer_destroy(&img.pixels)
 
-	info, ok := img.metadata.(^image.Netpbm_Info)
-	if !ok do return false
+	info := img.metadata.(^image.Netpbm_Info) or_return
 
 	header_destroy(&info.header)
 	free(info)
@@ -19,9 +20,9 @@ destroy :: proc(img: ^image.Image) -> bool {
 	return true
 }
 
-header_destroy :: proc(using header: ^Header) {
-	if format == .P7 && tupltype != "" {
-		delete(tupltype)
-		tupltype = ""
+header_destroy :: proc(header: ^Header) {
+	if header.format == .P7 && header.tupltype != "" {
+		delete(header.tupltype)
+		header.tupltype = ""
 	}
 }

@@ -835,22 +835,22 @@ int_from_arg :: proc(args: []any, arg_index: int) -> (int, int, bool) {
 // - fi: A pointer to an Info structure
 // - verb: The invalid format verb
 //
-fmt_bad_verb :: proc(using fi: ^Info, verb: rune) {
+fmt_bad_verb :: proc(fi: ^Info, verb: rune) {
 	prev_in_bad := fi.in_bad
 	defer fi.in_bad = prev_in_bad
 	fi.in_bad = true
 
-	io.write_string(writer, "%!", &fi.n)
-	io.write_rune(writer, verb, &fi.n)
-	io.write_byte(writer, '(', &fi.n)
-	if arg.id != nil {
-		reflect.write_typeid(writer, arg.id, &fi.n)
-		io.write_byte(writer, '=', &fi.n)
-		fmt_value(fi, arg, 'v')
+	io.write_string(fi.writer, "%!", &fi.n)
+	io.write_rune(fi.writer, verb, &fi.n)
+	io.write_byte(fi.writer, '(', &fi.n)
+	if fi.arg.id != nil {
+		reflect.write_typeid(fi.writer, fi.arg.id, &fi.n)
+		io.write_byte(fi.writer, '=', &fi.n)
+		fmt_value(fi, fi.arg, 'v')
 	} else {
-		io.write_string(writer, "<nil>", &fi.n)
+		io.write_string(fi.writer, "<nil>", &fi.n)
 	}
-	io.write_byte(writer, ')', &fi.n)
+	io.write_byte(fi.writer, ')', &fi.n)
 }
 // Formats a boolean value according to the specified format verb
 //
@@ -859,7 +859,7 @@ fmt_bad_verb :: proc(using fi: ^Info, verb: rune) {
 // - b: The boolean value to format
 // - verb: The format verb
 //
-fmt_bool :: proc(using fi: ^Info, b: bool, verb: rune) {
+fmt_bool :: proc(fi: ^Info, b: bool, verb: rune) {
 	switch verb {
 	case 't', 'v':
 		fmt_string(fi, b ? "true" : "false", 's')
@@ -2535,32 +2535,11 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 
 		fmt_value(fi, absolute_ptr, verb)
 
-	case runtime.Type_Info_Relative_Slice:
+	case runtime.Type_Info_Relative_Multi_Pointer:
 		ptr := reflect.relative_pointer_to_absolute_raw(v.data, info.base_integer.id)
+		absolute_ptr := any{ptr, info.pointer.id}
 
-		if verb == 'p' {
-			fmt_pointer(fi, ptr, 'p')
-		} else if ptr == nil {
-			io.write_string(fi.writer, "[]", &fi.n)
-		} else {
-			len_ptr := uintptr(v.data) + uintptr(info.base_integer.size)
-			len_any := any{rawptr(len_ptr), info.base_integer.id}
-			len, _ := reflect.as_int(len_any)
-			slice_type := reflect.type_info_base(info.slice).variant.(runtime.Type_Info_Slice)
-
-			fi.record_level += 1
-			defer fi.record_level -= 1
-
-			io.write_byte(fi.writer, '[', &fi.n)
-			defer io.write_byte(fi.writer, ']', &fi.n)
-
-			for i in 0..<len {
-				if i > 0 { io.write_string(fi.writer, ", ", &fi.n) }
-
-				data := uintptr(ptr) + uintptr(i*slice_type.elem_size)
-				fmt_arg(fi, any{rawptr(data), slice_type.elem.id}, verb)
-			}
-		}
+		fmt_value(fi, absolute_ptr, verb)
 
 	case runtime.Type_Info_Matrix:
 		fmt_matrix(fi, v, verb, info)

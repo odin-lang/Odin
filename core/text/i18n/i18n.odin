@@ -71,6 +71,8 @@ Error :: enum {
 	TS_File_Expected_Source,
 	TS_File_Expected_Translation,
 	TS_File_Expected_NumerusForm,
+	Bad_Str,
+	Bad_Id,
 
 }
 

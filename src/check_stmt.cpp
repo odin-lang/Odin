@@ -384,7 +384,6 @@ gb_internal Type *check_assignment_variable(CheckerContext *ctx, Operand *lhs, O
 		}
 
 		if (e != nullptr) {
-			// HACK TODO(bill): Should the entities be freed as it's technically a leak
 			rhs->mode = Addressing_Value;
 			rhs->type = e->type;
 			rhs->proc_group = nullptr;
@@ -394,7 +393,7 @@ gb_internal Type *check_assignment_variable(CheckerContext *ctx, Operand *lhs, O
 			ast_node(i, Ident, node);
 			e = scope_lookup(ctx->scope, i->token.string);
 			if (e != nullptr && e->kind == Entity_Variable) {
-				used = (e->flags & EntityFlag_Used) != 0; // TODO(bill): Make backup just in case
+				used = (e->flags & EntityFlag_Used) != 0; // NOTE(bill): Make backup just in case
 			}
 		}
 
@@ -888,7 +887,7 @@ gb_internal void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags
 	check_open_scope(ctx, node);
 	defer (check_close_scope(ctx));
 
-	check_label(ctx, ss->label, node); // TODO(bill): What should the label's "scope" be?
+	check_label(ctx, ss->label, node);
 
 	if (ss->init != nullptr) {
 		check_stmt(ctx, ss->init, 0);
@@ -1125,7 +1124,7 @@ gb_internal void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_
 	check_open_scope(ctx, node);
 	defer (check_close_scope(ctx));
 
-	check_label(ctx, ss->label, node); // TODO(bill): What should the label's "scope" be?
+	check_label(ctx, ss->label, node);
 
 	if (ss->tag->kind != Ast_AssignStmt) {
 		error(ss->tag, "Expected an 'in' assignment for this type switch statement");
@@ -1960,7 +1959,7 @@ gb_internal void check_value_decl_stmt(CheckerContext *ctx, Ast *node, u32 mod_f
 		Token token = ast_token(node);
 		if (vd->type != nullptr && entity_count > 1) {
 			error(token, "'using' can only be applied to one variable of the same type");
-			// TODO(bill): Should a 'continue' happen here?
+			// NOTE(bill): `using` will only be applied to a single declaration
 		}
 
 		for (isize entity_index = 0; entity_index < 1; entity_index++) {
@@ -2294,7 +2293,7 @@ gb_internal void check_for_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 	mod_flags |= Stmt_BreakAllowed | Stmt_ContinueAllowed;
 
 	check_open_scope(ctx, node);
-	check_label(ctx, fs->label, node); // TODO(bill): What should the label's "scope" be?
+	check_label(ctx, fs->label, node);
 
 	if (fs->init != nullptr) {
 		check_stmt(ctx, fs->init, 0);
@@ -2464,6 +2463,12 @@ gb_internal void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) 
 			error(us->token, "Empty 'using' list");
 			return;
 		}
+		if (check_vet_flags(node) & VetFlag_UsingStmt) {
+			ERROR_BLOCK();
+			error(node, "'using' as a statement is not allowed when '-vet' or '-vet-using' is applied");
+			error_line("\t'using' is considered bad practice to use as a statement outside of immediate refactoring\n");
+		}
+
 		for (Ast *expr : us->list) {
 			expr = unparen_expr(expr);
 			Entity *e = nullptr;

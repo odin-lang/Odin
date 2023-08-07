@@ -57,7 +57,7 @@ gb_internal lbValue lb_typeid(lbModule *m, Type *type) {
 	case Type_BitSet:          kind = Typeid_Bit_Set;          break;
 	case Type_SimdVector:      kind = Typeid_Simd_Vector;      break;
 	case Type_RelativePointer: kind = Typeid_Relative_Pointer; break;
-	case Type_RelativeSlice:   kind = Typeid_Relative_Slice;   break;
+	case Type_RelativeMultiPointer: kind = Typeid_Relative_Multi_Pointer; break;
 	case Type_SoaPointer:      kind = Typeid_SoaPointer;       break;
 	}
 
@@ -731,7 +731,6 @@ gb_internal void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup 
 
 				type_set_offsets(t); // NOTE(bill): Just incase the offsets have not been set yet
 				for (isize source_index = 0; source_index < count; source_index++) {
-					// TODO(bill): Order fields in source order not layout order
 					Entity *f = t->Struct.fields[source_index];
 					lbValue tip = lb_type_info(m, f->type);
 					i64 foffset = 0;
@@ -858,12 +857,13 @@ gb_internal void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup 
 				lb_emit_store(p, tag, res);
 			}
 			break;
-		case Type_RelativeSlice:
+
+		case Type_RelativeMultiPointer:
 			{
-				tag = lb_const_ptr_cast(m, variant_ptr, t_type_info_relative_slice_ptr);
+				tag = lb_const_ptr_cast(m, variant_ptr, t_type_info_relative_multi_pointer_ptr);
 				LLVMValueRef vals[2] = {
-					lb_type_info(m, t->RelativeSlice.slice_type).value,
-					lb_type_info(m, t->RelativeSlice.base_integer).value,
+					lb_type_info(m, t->RelativeMultiPointer.pointer_type).value,
+					lb_type_info(m, t->RelativeMultiPointer.base_integer).value,
 				};
 
 				lbValue res = {};
@@ -872,6 +872,7 @@ gb_internal void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup 
 				lb_emit_store(p, tag, res);
 			}
 			break;
+
 		case Type_Matrix: 
 			{
 				tag = lb_const_ptr_cast(m, variant_ptr, t_type_info_matrix_ptr);

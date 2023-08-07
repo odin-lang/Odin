@@ -143,6 +143,7 @@ struct TypeStruct {
 	Type *          soa_elem;
 	i32             soa_count;
 	StructSoaKind   soa_kind;
+	BlockingMutex   mutex; // for settings offsets
 
 	bool            is_polymorphic;
 	bool            are_offsets_set             : 1;
@@ -244,6 +245,7 @@ struct TypeProc {
 	TYPE_KIND(Tuple, struct {                                 \
 		Slice<Entity *> variables; /* Entity_Variable */  \
 		i64 *           offsets;                          \
+		BlockingMutex   mutex; /* for settings offsets */ \
 		bool            are_offsets_being_processed;      \
 		bool            are_offsets_set;                  \
 		bool            is_packed;                        \
@@ -265,8 +267,8 @@ struct TypeProc {
 		Type *pointer_type;                               \
 		Type *base_integer;                               \
 	})                                                        \
-	TYPE_KIND(RelativeSlice, struct {                         \
-		Type *slice_type;                                 \
+	TYPE_KIND(RelativeMultiPointer, struct {                  \
+		Type *pointer_type;                               \
 		Type *base_integer;                               \
 	})                                                        \
 	TYPE_KIND(Matrix, struct {                                \
@@ -347,7 +349,7 @@ enum Typeid_Kind : u8 {
 	Typeid_Bit_Set,
 	Typeid_Simd_Vector,
 	Typeid_Relative_Pointer,
-	Typeid_Relative_Slice,
+	Typeid_Relative_Multi_Pointer,
 	Typeid_Matrix,
 	Typeid_SoaPointer,
 };
@@ -594,6 +596,7 @@ gb_global Type *t_untyped_uninit     = &basic_types[Basic_UntypedUninit];
 
 
 gb_global Type *t_u8_ptr       = nullptr;
+gb_global Type *t_u8_multi_ptr = nullptr;
 gb_global Type *t_int_ptr      = nullptr;
 gb_global Type *t_i64_ptr      = nullptr;
 gb_global Type *t_f64_ptr      = nullptr;
@@ -632,7 +635,7 @@ gb_global Type *t_type_info_map                  = nullptr;
 gb_global Type *t_type_info_bit_set              = nullptr;
 gb_global Type *t_type_info_simd_vector          = nullptr;
 gb_global Type *t_type_info_relative_pointer     = nullptr;
-gb_global Type *t_type_info_relative_slice       = nullptr;
+gb_global Type *t_type_info_relative_multi_pointer = nullptr;
 gb_global Type *t_type_info_matrix               = nullptr;
 gb_global Type *t_type_info_soa_pointer          = nullptr;
 
@@ -661,7 +664,7 @@ gb_global Type *t_type_info_map_ptr              = nullptr;
 gb_global Type *t_type_info_bit_set_ptr          = nullptr;
 gb_global Type *t_type_info_simd_vector_ptr      = nullptr;
 gb_global Type *t_type_info_relative_pointer_ptr = nullptr;
-gb_global Type *t_type_info_relative_slice_ptr   = nullptr;
+gb_global Type *t_type_info_relative_multi_pointer_ptr = nullptr;
 gb_global Type *t_type_info_matrix_ptr           = nullptr;
 gb_global Type *t_type_info_soa_pointer_ptr      = nullptr;
 
@@ -725,7 +728,7 @@ struct TypePath;
 
 gb_internal i64      type_size_of   (Type *t);
 gb_internal i64      type_align_of  (Type *t);
-gb_internal i64      type_offset_of (Type *t, i32 index);
+gb_internal i64      type_offset_of (Type *t, i64 index, Type **field_type_=nullptr);
 gb_internal gbString type_to_string (Type *type, bool shorthand=true);
 gb_internal gbString type_to_string (Type *type, gbAllocator allocator, bool shorthand=true);
 gb_internal i64      type_size_of_internal(Type *t, TypePath *path);
@@ -734,6 +737,7 @@ gb_internal Type *   bit_set_to_int(Type *t);
 gb_internal bool     are_types_identical(Type *x, Type *y);
 
 gb_internal bool  is_type_pointer(Type *t);
+gb_internal bool  is_type_multi_pointer(Type *t);
 gb_internal bool  is_type_soa_pointer(Type *t);
 gb_internal bool  is_type_proc(Type *t);
 gb_internal bool  is_type_slice(Type *t);
@@ -821,6 +825,9 @@ gb_internal void type_path_pop(TypePath *tp) {
 #define FAILURE_ALIGNMENT 0
 
 gb_internal bool type_ptr_set_update(PtrSet<Type *> *s, Type *t) {
+	if (t == nullptr) {
+		return true;
+	}
 	if (ptr_set_exists(s, t)) {
 		return true;
 	}
@@ -829,6 +836,10 @@ gb_internal bool type_ptr_set_update(PtrSet<Type *> *s, Type *t) {
 }
 
 gb_internal bool type_ptr_set_exists(PtrSet<Type *> *s, Type *t) {
+	if (t == nullptr) {
+		return true;
+	}
+
 	if (ptr_set_exists(s, t)) {
 		return true;
 	}
@@ -988,7 +999,7 @@ gb_internal Type *alloc_type_enumerated_array(Type *elem, Type *index, ExactValu
 
 gb_internal Type *alloc_type_slice(Type *elem) {
 	Type *t = alloc_type(Type_Slice);
-	t->Array.elem = elem;
+	t->Slice.elem = elem;
 	return t;
 }
 
@@ -1025,12 +1036,12 @@ gb_internal Type *alloc_type_relative_pointer(Type *pointer_type, Type *base_int
 	return t;
 }
 
-gb_internal Type *alloc_type_relative_slice(Type *slice_type, Type *base_integer) {
-	GB_ASSERT(is_type_slice(slice_type));
+gb_internal Type *alloc_type_relative_multi_pointer(Type *pointer_type, Type *base_integer) {
+	GB_ASSERT(is_type_multi_pointer(pointer_type));
 	GB_ASSERT(is_type_integer(base_integer));
-	Type *t = alloc_type(Type_RelativeSlice);
-	t->RelativeSlice.slice_type   = slice_type;
-	t->RelativeSlice.base_integer = base_integer;
+	Type *t = alloc_type(Type_RelativeMultiPointer);
+	t->RelativeMultiPointer.pointer_type = pointer_type;
+	t->RelativeMultiPointer.base_integer = base_integer;
 	return t;
 }
 
@@ -1541,9 +1552,9 @@ gb_internal bool is_type_relative_pointer(Type *t) {
 	t = base_type(t);
 	return t->kind == Type_RelativePointer;
 }
-gb_internal bool is_type_relative_slice(Type *t) {
+gb_internal bool is_type_relative_multi_pointer(Type *t) {
 	t = base_type(t);
-	return t->kind == Type_RelativeSlice;
+	return t->kind == Type_RelativeMultiPointer;
 }
 
 gb_internal bool is_type_u8_slice(Type *t) {
@@ -1960,7 +1971,7 @@ gb_internal bool is_type_indexable(Type *t) {
 		return true;
 	case Type_EnumeratedArray:
 		return true;
-	case Type_RelativeSlice:
+	case Type_RelativeMultiPointer:
 		return true;
 	case Type_Matrix:
 		return true;
@@ -1979,7 +1990,7 @@ gb_internal bool is_type_sliceable(Type *t) {
 		return true;
 	case Type_EnumeratedArray:
 		return false;
-	case Type_RelativeSlice:
+	case Type_RelativeMultiPointer:
 		return true;
 	case Type_Matrix:
 		return false;
@@ -2185,12 +2196,12 @@ gb_internal bool is_type_polymorphic(Type *t, bool or_specialized=false) {
 		}
 		break;
 
-	case Type_RelativeSlice:
-		if (is_type_polymorphic(t->RelativeSlice.slice_type, or_specialized)) {
+	case Type_RelativeMultiPointer:
+		if (is_type_polymorphic(t->RelativeMultiPointer.pointer_type, or_specialized)) {
 			return true;
 		}
-		if (t->RelativeSlice.base_integer != nullptr &&
-		    is_type_polymorphic(t->RelativeSlice.base_integer, or_specialized)) {
+		if (t->RelativeMultiPointer.base_integer != nullptr &&
+		    is_type_polymorphic(t->RelativeMultiPointer.base_integer, or_specialized)) {
 			return true;
 		}
 		break;
@@ -2248,7 +2259,7 @@ gb_internal bool type_has_nil(Type *t) {
 		return false;
 
 	case Type_RelativePointer:
-	case Type_RelativeSlice:
+	case Type_RelativeMultiPointer:
 		return true;
 	}
 	return false;
@@ -2415,7 +2426,7 @@ gb_internal bool is_type_load_safe(Type *type) {
 		return true;
 
 	case Type_RelativePointer:
-	case Type_RelativeSlice:
+	case Type_RelativeMultiPointer:
 		return true;
 
 	case Type_Pointer:
@@ -2666,7 +2677,6 @@ gb_internal bool are_types_identical_internal(Type *x, Type *y, bool check_tuple
 		    x->Struct.soa_kind == y->Struct.soa_kind &&
 		    x->Struct.soa_count == y->Struct.soa_count &&
 		    are_types_identical(x->Struct.soa_elem, y->Struct.soa_elem)) {
-			// TODO(bill); Fix the custom alignment rule
 			for_array(i, x->Struct.fields) {
 				Entity *xf = x->Struct.fields[i];
 				Entity *yf = y->Struct.fields[i];
@@ -2807,7 +2817,6 @@ gb_internal i64 union_tag_size(Type *u) {
 		return 0;
 	}
 
-	// TODO(bill): Is this an okay approach?
 	i64 max_align = 1;
 
 	if (u->Union.variants.count < 1ull<<8) {
@@ -2817,7 +2826,7 @@ gb_internal i64 union_tag_size(Type *u) {
 	} else if (u->Union.variants.count < 1ull<<32) {
 		max_align = 4;
 	} else {
-		GB_PANIC("how many variants do you have?!");
+		compiler_error("how many variants do you have?! %lld", cast(long long)u->Union.variants.count);
 	}
 
 	for_array(i, u->Union.variants) {
@@ -3081,7 +3090,7 @@ gb_internal Selection lookup_field_with_selection(Type *type_, String field_name
 				mutex_lock(md->mutex);
 				defer (mutex_unlock(md->mutex));
 				for (TypeNameObjCMetadataEntry const &entry : md->value_entries) {
-					GB_ASSERT(entry.entity->kind == Entity_Procedure);
+					GB_ASSERT(entry.entity->kind == Entity_Procedure || entry.entity->kind == Entity_ProcGroup);
 					if (entry.name == field_name) {
 						sel.entity = entry.entity;
 						sel.pseudo_field = true;
@@ -3136,8 +3145,6 @@ gb_internal Selection lookup_field_with_selection(Type *type_, String field_name
 		switch (type->Basic.kind) {
 		case Basic_any: {
 		#if 1
-			// IMPORTANT TODO(bill): Should these members be available to should I only allow them with
-			// `Raw_Any` type?
 			String data_str = str_lit("data");
 			String id_str = str_lit("id");
 			gb_local_persist Entity *entity__any_data = alloc_entity_field(nullptr, make_token_ident(data_str), t_rawptr, false, 0);
@@ -3623,8 +3630,8 @@ gb_internal i64 type_align_of_internal(Type *t, TypePath *path) {
 
 	case Type_RelativePointer:
 		return type_align_of_internal(t->RelativePointer.base_integer, path);
-	case Type_RelativeSlice:
-		return type_align_of_internal(t->RelativeSlice.base_integer, path);
+	case Type_RelativeMultiPointer:
+		return type_align_of_internal(t->RelativeMultiPointer.base_integer, path);
 
 	case Type_SoaPointer:
 		return build_context.int_size;
@@ -3645,28 +3652,35 @@ gb_internal i64 *type_set_offsets_of(Slice<Entity *> const &fields, bool is_pack
 		}
 	} else if (is_packed) {
 		for_array(i, fields) {
-			i64 size = type_size_of(fields[i]->type);
-			offsets[i] = curr_offset;
-			curr_offset += size;
+			if (fields[i]->kind != Entity_Variable) {
+				offsets[i] = -1;
+			} else {
+				i64 size = type_size_of(fields[i]->type);
+				offsets[i] = curr_offset;
+				curr_offset += size;
+			}
 		}
 	} else {
 		for_array(i, fields) {
-			Type *t = fields[i]->type;
-			i64 align = gb_max(type_align_of(t), 1);
-			i64 size  = gb_max(type_size_of( t), 0);
-			curr_offset = align_formula(curr_offset, align);
-			offsets[i] = curr_offset;
-			curr_offset += size;
+			if (fields[i]->kind != Entity_Variable) {
+				offsets[i] = -1;
+			} else {
+				Type *t = fields[i]->type;
+				i64 align = gb_max(type_align_of(t), 1);
+				i64 size  = gb_max(type_size_of( t), 0);
+				curr_offset = align_formula(curr_offset, align);
+				offsets[i] = curr_offset;
+				curr_offset += size;
+			}
 		}
 	}
 	return offsets;
 }
 
 gb_internal bool type_set_offsets(Type *t) {
-	MUTEX_GUARD(&g_type_mutex); // TODO(bill): only per struct
-
 	t = base_type(t);
 	if (t->kind == Type_Struct) {
+		MUTEX_GUARD(&t->Struct.mutex);
 		if (!t->Struct.are_offsets_set) {
 			t->Struct.are_offsets_being_processed = true;
 			t->Struct.offsets = type_set_offsets_of(t->Struct.fields, t->Struct.is_packed, t->Struct.is_raw_union);
@@ -3675,6 +3689,7 @@ gb_internal bool type_set_offsets(Type *t) {
 			return true;
 		}
 	} else if (is_type_tuple(t)) {
+		MUTEX_GUARD(&t->Tuple.mutex);
 		if (!t->Tuple.are_offsets_set) {
 			t->Tuple.are_offsets_being_processed = true;
 			t->Tuple.offsets = type_set_offsets_of(t->Tuple.variables, t->Tuple.is_packed, false);
@@ -3849,7 +3864,6 @@ gb_internal i64 type_size_of_internal(Type *t, TypePath *path) {
 					max = size;
 				}
 			}
-			// TODO(bill): Is this how it should work?
 			return align_formula(max, align);
 		} else {
 			i64 count = 0, size = 0, align = 0;
@@ -3899,59 +3913,100 @@ gb_internal i64 type_size_of_internal(Type *t, TypePath *path) {
 
 	case Type_RelativePointer:
 		return type_size_of_internal(t->RelativePointer.base_integer, path);
-	case Type_RelativeSlice:
-		return 2*type_size_of_internal(t->RelativeSlice.base_integer, path);
+	case Type_RelativeMultiPointer:
+		return type_size_of_internal(t->RelativeMultiPointer.base_integer, path);
 	}
 
 	// Catch all
 	return build_context.ptr_size;
 }
 
-gb_internal i64 type_offset_of(Type *t, i32 index) {
+gb_internal i64 type_offset_of(Type *t, i64 index, Type **field_type_) {
 	t = base_type(t);
-	if (t->kind == Type_Struct) {
+	switch (t->kind) {
+	case Type_Struct:
 		type_set_offsets(t);
 		if (gb_is_between(index, 0, t->Struct.fields.count-1)) {
 			GB_ASSERT(t->Struct.offsets != nullptr);
+			if (field_type_) *field_type_ = t->Struct.fields[index]->type;
 			return t->Struct.offsets[index];
 		}
-	} else if (t->kind == Type_Tuple) {
+		break;
+	case Type_Tuple:
 		type_set_offsets(t);
 		if (gb_is_between(index, 0, t->Tuple.variables.count-1)) {
 			GB_ASSERT(t->Tuple.offsets != nullptr);
-			return t->Tuple.offsets[index];
+			if (field_type_) *field_type_ = t->Tuple.variables[index]->type;
+			i64 offset = t->Tuple.offsets[index];
+			GB_ASSERT(offset >= 0);
+			return offset;
 		}
-	}  else if (t->kind == Type_Basic) {
+		break;
+
+	case Type_Array:
+		GB_ASSERT(0 <= index && index < t->Array.count);
+		return index * type_size_of(t->Array.elem);
+
+	case Type_Basic:
 		if (t->Basic.kind == Basic_string) {
 			switch (index) {
-			case 0: return 0;                      // data
-			case 1: return build_context.int_size; // len
+			case 0:
+				if (field_type_) *field_type_ = t_u8_ptr;
+				return 0;                      // data
+			case 1:
+				if (field_type_) *field_type_ = t_int;
+				return build_context.int_size; // len
 			}
 		} else if (t->Basic.kind == Basic_any) {
 			switch (index) {
-			case 0: return 0;                      // type_info
-			case 1: return build_context.ptr_size; // data
+			case 0:
+				if (field_type_) *field_type_ = t_rawptr;
+				return 0;                      // data
+			case 1:
+				if (field_type_) *field_type_ = t_typeid;
+				return build_context.ptr_size; // id
 			}
 		}
-	} else if (t->kind == Type_Slice) {
+		break;
+	case Type_Slice:
 		switch (index) {
-		case 0: return 0;                        // data
-		case 1: return 1*build_context.int_size; // len
-		case 2: return 2*build_context.int_size; // cap
+		case 0:
+			if (field_type_) *field_type_ = alloc_type_multi_pointer(t->Slice.elem);
+			return 0;                        // data
+		case 1:
+			if (field_type_) *field_type_ = t_int;
+			return 1*build_context.int_size; // len
 		}
-	} else if (t->kind == Type_DynamicArray) {
+		break;
+	case Type_DynamicArray:
 		switch (index) {
-		case 0: return 0;                        // data
-		case 1: return 1*build_context.int_size; // len
-		case 2: return 2*build_context.int_size; // cap
-		case 3: return 3*build_context.int_size; // allocator
+		case 0:
+			if (field_type_) *field_type_ = alloc_type_multi_pointer(t->DynamicArray.elem);
+			return 0;                        // data
+		case 1:
+			if (field_type_) *field_type_ = t_int;
+			return 1*build_context.int_size; // len
+		case 2:
+			if (field_type_) *field_type_ = t_int;
+			return 2*build_context.int_size; // cap
+		case 3:
+			if (field_type_) *field_type_ = t_allocator;
+			return 3*build_context.int_size; // allocator
 		}
-	} else if (t->kind == Type_Union) {
-		/* i64 s = */ type_size_of(t);
-		switch (index) {
-		case -1: return align_formula(t->Union.variant_block_size, build_context.ptr_size); // __type_info
+		break;
+	case Type_Union:
+		if (!is_type_union_maybe_pointer(t)) {
+			/* i64 s = */ type_size_of(t);
+			switch (index) {
+			case -1:
+				if (field_type_) *field_type_ = union_tag_type(t);
+				union_tag_size(t);
+				return t->Union.variant_block_size;
+			}
 		}
+		break;
 	}
+	GB_ASSERT(index == 0);
 	return 0;
 }
 
@@ -3965,8 +4020,10 @@ gb_internal i64 type_offset_of_from_selection(Type *type, Selection sel) {
 		i32 index = sel.index[i];
 		t = base_type(t);
 		offset += type_offset_of(t, index);
-		if (t->kind == Type_Struct && !t->Struct.is_raw_union) {
+		if (t->kind == Type_Struct) {
 			t = t->Struct.fields[index]->type;
+		} else if (t->kind == Type_Array) {
+			t = t->Array.elem;
 		} else {
 			// NOTE(bill): No need to worry about custom types, just need the alignment
 			switch (t->kind) {
@@ -4410,11 +4467,11 @@ gb_internal gbString write_type_to_string(gbString str, Type *type, bool shortha
 		str = gb_string_append_fmt(str, ") ");
 		str = write_type_to_string(str, type->RelativePointer.pointer_type);
 		break;
-	case Type_RelativeSlice:
+	case Type_RelativeMultiPointer:
 		str = gb_string_append_fmt(str, "#relative(");
-		str = write_type_to_string(str, type->RelativeSlice.base_integer);
+		str = write_type_to_string(str, type->RelativePointer.base_integer);
 		str = gb_string_append_fmt(str, ") ");
-		str = write_type_to_string(str, type->RelativeSlice.slice_type);
+		str = write_type_to_string(str, type->RelativePointer.pointer_type);
 		break;
 		
 	case Type_Matrix:

@@ -2,8 +2,6 @@ struct Scope;
 struct Checker;
 struct Type;
 struct DeclInfo;
-struct lbModule;
-struct lbProcedure;
 
 
 #define ENTITY_KINDS \
@@ -183,8 +181,14 @@ struct Entity {
 
 	Entity *    aliased_of;
 
-	lbModule *   code_gen_module;
-	lbProcedure *code_gen_procedure;
+	union {
+		struct lbModule *code_gen_module;
+		struct cgModule *cg_module;
+	};
+	union {
+		struct lbProcedure *code_gen_procedure;
+		struct cgProcedure *cg_procedure;
+	};
 
 	u64         order_in_src;
 	String      deprecated_message;
@@ -287,7 +291,6 @@ gb_internal bool is_entity_kind_exported(EntityKind kind, bool allow_builtin = f
 }
 
 gb_internal bool is_entity_exported(Entity *e, bool allow_builtin = false) {
-	// TODO(bill): Determine the actual exportation rules for imports of entities
 	GB_ASSERT(e != nullptr);
 	if (!is_entity_kind_exported(e->kind, allow_builtin)) {
 		return false;
@@ -401,7 +404,7 @@ gb_internal Entity *alloc_entity_array_elem(Scope *scope, Token token, Type *typ
 	return entity;
 }
 
-gb_internal Entity *alloc_entity_procedure(Scope *scope, Token token, Type *signature_type, u64 tags) {
+gb_internal Entity *alloc_entity_procedure(Scope *scope, Token token, Type *signature_type, u64 tags=0) {
 	Entity *entity = alloc_entity(Entity_Procedure, scope, token, signature_type);
 	entity->Procedure.tags = tags;
 	return entity;
@@ -418,7 +421,7 @@ gb_internal Entity *alloc_entity_import_name(Scope *scope, Token token, Type *ty
 	entity->ImportName.path = path;
 	entity->ImportName.name = name;
 	entity->ImportName.scope = import_scope;
-	entity->state = EntityState_Resolved; // TODO(bill): Is this correct?
+	entity->state = EntityState_Resolved;
 	return entity;
 }
 
@@ -427,7 +430,7 @@ gb_internal Entity *alloc_entity_library_name(Scope *scope, Token token, Type *t
 	Entity *entity = alloc_entity(Entity_LibraryName, scope, token, type);
 	entity->LibraryName.paths = paths;
 	entity->LibraryName.name = name;
-	entity->state = EntityState_Resolved; // TODO(bill): Is this correct?
+	entity->state = EntityState_Resolved;
 	return entity;
 }
 

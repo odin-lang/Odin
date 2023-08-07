@@ -235,7 +235,7 @@ make_slice_error_loc :: #force_inline proc "contextless" (loc := #caller_locatio
 	handle_error(loc, len)
 }
 
-make_dynamic_array_error_loc :: #force_inline proc "contextless" (using loc := #caller_location, len, cap: int) {
+make_dynamic_array_error_loc :: #force_inline proc "contextless" (loc := #caller_location, len, cap: int) {
 	if 0 <= len && len <= cap {
 		return
 	}
@@ -271,18 +271,18 @@ make_map_expr_error_loc :: #force_inline proc "contextless" (loc := #caller_loca
 
 
 
-bounds_check_error_loc :: #force_inline proc "contextless" (using loc := #caller_location, index, count: int) {
-	bounds_check_error(file_path, line, column, index, count)
+bounds_check_error_loc :: #force_inline proc "contextless" (loc := #caller_location, index, count: int) {
+	bounds_check_error(loc.file_path, loc.line, loc.column, index, count)
 }
 
-slice_expr_error_hi_loc :: #force_inline proc "contextless" (using loc := #caller_location, hi: int, len: int) {
-	slice_expr_error_hi(file_path, line, column, hi, len)
+slice_expr_error_hi_loc :: #force_inline proc "contextless" (loc := #caller_location, hi: int, len: int) {
+	slice_expr_error_hi(loc.file_path, loc.line, loc.column, hi, len)
 }
 
-slice_expr_error_lo_hi_loc :: #force_inline proc "contextless" (using loc := #caller_location, lo, hi: int, len: int) {
-	slice_expr_error_lo_hi(file_path, line, column, lo, hi, len)
+slice_expr_error_lo_hi_loc :: #force_inline proc "contextless" (loc := #caller_location, lo, hi: int, len: int) {
+	slice_expr_error_lo_hi(loc.file_path, loc.line, loc.column, lo, hi, len)
 }
 
-dynamic_array_expr_error_loc :: #force_inline proc "contextless" (using loc := #caller_location, low, high, max: int) {
-	dynamic_array_expr_error(file_path, line, column, low, high, max)
+dynamic_array_expr_error_loc :: #force_inline proc "contextless" (loc := #caller_location, low, high, max: int) {
+	dynamic_array_expr_error(loc.file_path, loc.line, loc.column, low, high, max)
 }

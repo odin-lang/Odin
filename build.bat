@@ -51,7 +51,10 @@ set compiler_flags= -nologo -Oi -TP -fp:precise -Gm- -MP -FC -EHsc- -GR- -GF
 set compiler_defines= -DODIN_VERSION_RAW=\"%odin_version_raw%\"
 
 if not exist .git\ goto skip_git_hash
-for /f %%i in ('git rev-parse --short HEAD') do set GIT_SHA=%%i
+for /f "tokens=1,2" %%i IN ('git show "--pretty=%%cd %%h" "--date=format:%%Y-%%m" --no-patch --no-notes HEAD') do (
+	set odin_version_raw=dev-%%i
+	set GIT_SHA=%%j
+)
 if %ERRORLEVEL% equ 0 set compiler_defines=%compiler_defines% -DGIT_SHA=\"%GIT_SHA%\"
 :skip_git_hash
 
@@ -76,6 +79,16 @@ set libs= ^
 	kernel32.lib ^
 	Synchronization.lib ^
 	bin\llvm\windows\LLVM-C.lib
+
+rem DO NOT TOUCH!
+rem THIS TILDE STUFF IS FOR DEVELOPMENT ONLY!
+set tilde_backend=0
+if %tilde_backend% EQU 1 (
+	set libs=%libs% src\tilde\tb.lib
+	set compiler_defines=%compiler_defines% -DODIN_TILDE_BACKEND
+)
+rem DO NOT TOUCH!
+
 
 set linker_flags= -incremental:no -opt:ref -subsystem:console
 

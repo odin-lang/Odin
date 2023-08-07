@@ -125,16 +125,19 @@ Document :: struct {
 
 Element :: struct {
 	ident:   string,
-	value:   string,
+	value:   [dynamic]Value,
 	attribs: Attributes,
 
 	kind: enum {
 		Element = 0,
 		Comment,
 	},
-
 	parent:   Element_ID,
-	children: [dynamic]Element_ID,
+}
+
+Value :: union {
+	string,
+	Element_ID,
 }
 
 Attribute :: struct {
@@ -247,9 +250,6 @@ parse_bytes :: proc(data: []u8, options := DEFAULT_OPTIONS, path := "", error_ha
 
 	err =            .Unexpected_Token
 	element, parent: Element_ID
-
-	tag_is_open   := false
-	first_element := true
 	open: Token
 
 	/*
@@ -275,16 +275,10 @@ parse_bytes :: proc(data: []u8, options := DEFAULT_OPTIONS, path := "", error_ha
 					e.g. <odin - Start of new element.
 				*/
 				element = new_element(doc)
-				tag_is_open = true
-
-				if first_element {
-					/*
-						First element.
-					*/
-					parent   = element
-					first_element = false
+				if element == 0 { // First Element
+					parent = element
 				} else {
-					append(&doc.elements[parent].children, element)
+					append(&doc.elements[parent].value, element)
 				}
 
 				doc.elements[element].parent = parent
@@ -324,7 +318,6 @@ parse_bytes :: proc(data: []u8, options := DEFAULT_OPTIONS, path := "", error_ha
 					expect(t, .Gt) or_return
 					parent      = doc.elements[element].parent
 					element     = parent
-					tag_is_open = false
 
 				case:
 					error(t, t.offset, "Expected close tag, got: %#v\n", end_token)
@@ -344,7 +337,6 @@ parse_bytes :: proc(data: []u8, options := DEFAULT_OPTIONS, path := "", error_ha
 				}
 				parent      = doc.elements[element].parent
 				element     = parent
-				tag_is_open = false
 
 			} else if open.kind == .Exclaim {
 				/*
@@ -392,8 +384,8 @@ parse_bytes :: proc(data: []u8, options := DEFAULT_OPTIONS, path := "", error_ha
 							el := new_element(doc)
 							doc.elements[el].parent = element
 							doc.elements[el].kind   = .Comment
-							doc.elements[el].value  = comment
-							append(&doc.elements[element].children, el)
+							append(&doc.elements[el].value, comment)
+							append(&doc.elements[element].value, el)
 						}
 					}
 
@@ -436,9 +428,6 @@ parse_bytes :: proc(data: []u8, options := DEFAULT_OPTIONS, path := "", error_ha
 			/*
 				End of file.
 			*/
-			if tag_is_open {
-				return doc, .Premature_EOF
-			}
 			break loop
 
 		case:
@@ -450,7 +439,7 @@ parse_bytes :: proc(data: []u8, options := DEFAULT_OPTIONS, path := "", error_ha
 			needs_processing |= .Decode_SGML_Entities in opts.flags
 
 			if !needs_processing {
-				doc.elements[element].value = body_text
+				append(&doc.elements[element].value, body_text)
 				continue
 			}
 
@@ -472,10 +461,10 @@ parse_bytes :: proc(data: []u8, options := DEFAULT_OPTIONS, path := "", error_ha
 
 			decoded, decode_err := entity.decode_xml(body_text, decode_opts)
 			if decode_err == .None {
-				doc.elements[element].value = decoded
+				append(&doc.elements[element].value, decoded)
 				append(&doc.strings_to_free, decoded)
 			} else {
-				doc.elements[element].value = body_text
+				append(&doc.elements[element].value, body_text)
 			}
 		}
 	}
@@ -518,7 +507,7 @@ destroy :: proc(doc: ^Document) {
 
 	for el in doc.elements {
 		delete(el.attribs)
-		delete(el.children)
+		delete(el.value)
 	}
 	delete(doc.elements)
 
@@ -710,6 +699,5 @@ new_element :: proc(doc: ^Document) -> (id: Element_ID) {
 
 	cur := doc.element_count
 	doc.element_count += 1
-
 	return cur
 }

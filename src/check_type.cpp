@@ -1474,6 +1474,12 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 		Type *specialization = nullptr;
 
 		bool is_using = (p->flags&FieldFlag_using) != 0;
+		if ((check_vet_flags(param) & VetFlag_UsingParam) && is_using) {
+			ERROR_BLOCK();
+			error(param, "'using' on a procedure parameter is now allowed when '-vet' or '-vet-using-param' is applied");
+			error_line("\t'using' is considered bad practice to use as a statement/procedure parameter outside of immediate refactoring\n");
+
+		}
 
 		if (type_expr == nullptr) {
 			param_value = handle_parameter_value(ctx, nullptr, &type, default_value, true);
@@ -2772,16 +2778,16 @@ gb_internal bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, T
 
 		Type *relative_type = nullptr;
 		Type *base_type = check_type(ctx, rt->type);
-		if (!is_type_pointer(base_type) && !is_type_slice(base_type)) {
-			error(rt->type, "#relative types can only be a pointer or slice");
+		if (!is_type_pointer(base_type) && !is_type_multi_pointer(base_type)) {
+			error(rt->type, "#relative types can only be a pointer or multi-pointer");
 			relative_type = base_type;
 		} else if (base_integer == nullptr) {
 			relative_type = base_type;
 		} else {
 			if (is_type_pointer(base_type)) {
 				relative_type = alloc_type_relative_pointer(base_type, base_integer);
-			} else if (is_type_slice(base_type)) {
-				relative_type = alloc_type_relative_slice(base_type, base_integer);
+			} else if (is_type_multi_pointer(base_type)) {
+				relative_type = alloc_type_relative_multi_pointer(base_type, base_integer);
 			}
 		}
 		GB_ASSERT(relative_type != nullptr);

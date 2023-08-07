@@ -1406,7 +1406,7 @@ gb_internal bool check_builtin_procedure_directive(CheckerContext *c, Operand *o
 		}
 		return false;
 	} else if (name == "load_or") {
-		warning(call, "'#load_or' is deprecated in favour of '#load(path) or_else default'");
+		error(call, "'#load_or' has now been removed in favour of '#load(path) or_else default'");
 
 		if (ce->args.count != 2) {
 			if (ce->args.count == 0) {
@@ -1748,7 +1748,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			mode = Addressing_Constant;
 			value = exact_value_i64(at->EnumeratedArray.count);
 			type = t_untyped_integer;
-		} else if ((is_type_slice(op_type) || is_type_relative_slice(op_type)) && id == BuiltinProc_len) {
+		} else if (is_type_slice(op_type) && id == BuiltinProc_len) {
 			mode = Addressing_Value;
 		} else if (is_type_dynamic_array(op_type)) {
 			mode = Addressing_Value;
@@ -3691,6 +3691,9 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 					case Type_EnumeratedArray:
 					case Type_SimdVector:
 						operand->type = alloc_type_multi_pointer(base_array_type(base));
+						break;
+					case Type_Matrix:
+						operand->type = alloc_type_multi_pointer(base->Matrix.elem);
 						break;
 					}
 				}

@@ -104,6 +104,8 @@ struct AstFile {
 	Token        package_token;
 	String       package_name;
 
+	u64          vet_flags;
+	bool         vet_flags_set;
 
 	// >= 0: In Expression
 	// <  0: In Control Clause
@@ -114,6 +116,7 @@ struct AstFile {
 	bool         allow_in_expr; // NOTE(bill): in expression are only allowed in certain cases
 	bool         in_foreign_block;
 	bool         allow_type;
+	bool         in_when_statement;
 
 	isize total_file_decl_count;
 	isize delayed_decl_count;

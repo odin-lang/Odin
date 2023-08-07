@@ -87,9 +87,8 @@ import "core:mem"
 import "core:strings"
 
 USE_LINALG :: #config(RAYLIB_USE_LINALG, true)
-when USE_LINALG {
-	import "core:math/linalg"	
-}
+import "core:math/linalg"
+_ :: linalg
 
 MAX_TEXTFORMAT_BUFFERS :: #config(RAYLIB_MAX_TEXTFORMAT_BUFFERS, 4)
 MAX_TEXT_BUFFER_LENGTH :: #config(RAYLIB_MAX_TEXT_BUFFER_LENGTH, 1024)

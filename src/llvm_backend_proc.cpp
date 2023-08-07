@@ -362,7 +362,6 @@ gb_internal lbProcedure *lb_create_dummy_procedure(lbModule *m, String link_name
 
 	Type *pt = p->type;
 	lbCallingConventionKind cc_kind = lbCallingConvention_C;
-	// TODO(bill): Clean up this logic
 	if (!is_arch_wasm()) {
 		cc_kind = lb_calling_convention_map[pt->Proc.calling_convention];
 	}
@@ -1702,7 +1701,6 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 		lbValue v = lb_build_expr(p, ce->args[0]);
 		Type *t = base_type(v.type);
 		if (is_type_pointer(t)) {
-			// IMPORTANT TODO(bill): Should there be a nil pointer check?
 			v = lb_emit_load(p, v);
 			t = type_deref(t);
 		}
@@ -1712,7 +1710,7 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 			return lb_string_len(p, v);
 		} else if (is_type_array(t)) {
 			GB_PANIC("Array lengths are constant");
-		} else if (is_type_slice(t) || is_type_relative_slice(t)) {
+		} else if (is_type_slice(t)) {
 			return lb_slice_len(p, v);
 		} else if (is_type_dynamic_array(t)) {
 			return lb_dynamic_array_len(p, v);
@@ -1730,7 +1728,6 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 		lbValue v = lb_build_expr(p, ce->args[0]);
 		Type *t = base_type(v.type);
 		if (is_type_pointer(t)) {
-			// IMPORTANT TODO(bill): Should there be a nil pointer check?
 			v = lb_emit_load(p, v);
 			t = type_deref(t);
 		}
@@ -1738,7 +1735,7 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 			GB_PANIC("Unreachable");
 		} else if (is_type_array(t)) {
 			GB_PANIC("Array lengths are constant");
-		} else if (is_type_slice(t) || is_type_relative_slice(t)) {
+		} else if (is_type_slice(t)) {
 			return lb_slice_len(p, v);
 		} else if (is_type_dynamic_array(t)) {
 			return lb_dynamic_array_cap(p, v);
@@ -3144,7 +3141,7 @@ gb_internal lbValue lb_build_call_expr(lbProcedure *p, Ast *expr) {
 
 	lbValue res = lb_build_call_expr_internal(p, expr);
 
-	if (ce->optional_ok_one) { // TODO(bill): Minor hack for #optional_ok procedures
+	if (ce->optional_ok_one) {
 		GB_ASSERT(is_type_tuple(res.type));
 		GB_ASSERT(res.type->Tuple.variables.count == 2);
 		return lb_emit_struct_ev(p, res, 0);
@@ -3332,9 +3329,15 @@ gb_internal lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr) {
 		isize param_index = lookup_procedure_parameter(pt, name);
 		GB_ASSERT(param_index >= 0);
 
-		lbValue value = lb_build_expr(p, fv->value);
-		GB_ASSERT(!is_type_tuple(value.type));
-		args[param_index] = value;
+		Entity *e = pt->params->Tuple.variables[param_index];
+		if (e->kind == Entity_TypeName) {
+			lbValue value = lb_const_nil(p->module, e->type);
+			args[param_index] = value;
+		} else {
+			lbValue value = lb_build_expr(p, fv->value);
+			GB_ASSERT(!is_type_tuple(value.type));
+			args[param_index] = value;
+		}
 	}
 
 	TokenPos pos = ast_token(ce->proc).pos;

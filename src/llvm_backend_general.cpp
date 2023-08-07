@@ -103,47 +103,13 @@ gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c) {
 	}
 
 	String init_fullpath = c->parser->init_fullpath;
-
-	if (build_context.out_filepath.len == 0) {
-		gen->output_name = remove_directory_from_path(init_fullpath);
-		gen->output_name = remove_extension_from_path(gen->output_name);
-		gen->output_name = string_trim_whitespace(gen->output_name);
-		if (gen->output_name.len == 0) {
-			gen->output_name = c->info.init_scope->pkg->name;
-		}
-		gen->output_base = gen->output_name;
-	} else {
-		gen->output_name = build_context.out_filepath;
-		gen->output_name = string_trim_whitespace(gen->output_name);
-		if (gen->output_name.len == 0) {
-			gen->output_name = c->info.init_scope->pkg->name;
-		}
-		isize pos = string_extension_position(gen->output_name);
-		if (pos < 0) {
-			gen->output_base = gen->output_name;
-		} else {
-			gen->output_base = substring(gen->output_name, 0, pos);
-		}
-	}
-	gbAllocator ha = heap_allocator();
-	array_init(&gen->output_object_paths, ha);
-	array_init(&gen->output_temp_paths, ha);
-
-	gen->output_base = path_to_full_path(ha, gen->output_base);
-
-	gbString output_file_path = gb_string_make_length(ha, gen->output_base.text, gen->output_base.len);
-	output_file_path = gb_string_appendc(output_file_path, ".obj");
-	defer (gb_string_free(output_file_path));
+	linker_data_init(gen, &c->info, init_fullpath);
 
 	gen->info = &c->info;
 
 	map_init(&gen->modules, gen->info->packages.count*2);
 	map_init(&gen->modules_through_ctx, gen->info->packages.count*2);
 	map_init(&gen->anonymous_proc_lits, 1024);
-
-
-	array_init(&gen->foreign_libraries,       heap_allocator(), 0, 1024);
-	ptr_set_init(&gen->foreign_libraries_set, 1024);
 
 	if (USE_SEPARATE_MODULES) {
 		for (auto const &entry : gen->info->packages) {
@@ -383,9 +349,10 @@ gb_internal lbAddr lb_addr(lbValue addr) {
 	if (addr.type != nullptr && is_type_relative_pointer(type_deref(addr.type))) {
 		GB_ASSERT(is_type_pointer(addr.type));
 		v.kind = lbAddr_RelativePointer;
-	} else if (addr.type != nullptr && is_type_relative_slice(type_deref(addr.type))) {
-		GB_ASSERT(is_type_pointer(addr.type));
-		v.kind = lbAddr_RelativeSlice;
+	} else if (addr.type != nullptr && is_type_relative_multi_pointer(type_deref(addr.type))) {
+		GB_ASSERT(is_type_pointer(addr.type) ||
+		          is_type_multi_pointer(addr.type));
+		v.kind = lbAddr_RelativePointer;
 	}
 	return v;
 }
@@ -458,6 +425,43 @@ gb_internal Type *lb_addr_type(lbAddr const &addr) {
 	return type_deref(addr.addr.type);
 }
 
+
+gb_internal lbValue lb_relative_pointer_to_pointer(lbProcedure *p, lbAddr const &addr) {
+	GB_ASSERT(addr.kind == lbAddr_RelativePointer);
+
+	Type *t = base_type(lb_addr_type(addr));
+	GB_ASSERT(is_type_relative_pointer(t) || is_type_relative_multi_pointer(t));
+
+	Type *pointer_type = nullptr;
+	Type *base_integer = nullptr;
+	if (t->kind == Type_RelativePointer) {
+		pointer_type = t->RelativePointer.pointer_type;
+		base_integer = t->RelativePointer.base_integer;
+	} else if (t->kind == Type_RelativeMultiPointer) {
+		pointer_type = t->RelativeMultiPointer.pointer_type;
+		base_integer = t->RelativeMultiPointer.base_integer;
+	}
+
+	lbValue ptr = lb_emit_conv(p, addr.addr, t_uintptr);
+	lbValue offset = lb_emit_conv(p, ptr, alloc_type_pointer(base_integer));
+	offset = lb_emit_load(p, offset);
+
+	if (!is_type_unsigned(base_integer)) {
+		offset = lb_emit_conv(p, offset, t_i64);
+	}
+	offset = lb_emit_conv(p, offset, t_uintptr);
+	lbValue absolute_ptr = lb_emit_arith(p, Token_Add, ptr, offset, t_uintptr);
+	absolute_ptr = lb_emit_conv(p, absolute_ptr, pointer_type);
+
+	lbValue cond = lb_emit_comp(p, Token_CmpEq, offset, lb_const_nil(p->module, base_integer));
+
+	// NOTE(bill): nil check
+	lbValue nil_ptr = lb_const_nil(p->module, pointer_type);
+	lbValue final_ptr = lb_emit_select(p, cond, nil_ptr, absolute_ptr);
+	return final_ptr;
+}
+
+
 gb_internal lbValue lb_addr_get_ptr(lbProcedure *p, lbAddr const &addr) {
 	if (addr.addr.value == nullptr) {
 		GB_PANIC("Illegal addr -> nullptr");
@@ -468,28 +472,8 @@ gb_internal lbValue lb_addr_get_ptr(lbProcedure *p, lbAddr const &addr) {
 	case lbAddr_Map:
 		return lb_internal_dynamic_map_get_ptr(p, addr.addr, addr.map.key);
 
-	case lbAddr_RelativePointer: {
-		Type *rel_ptr = base_type(lb_addr_type(addr));
-		GB_ASSERT(rel_ptr->kind == Type_RelativePointer);
-
-		lbValue ptr = lb_emit_conv(p, addr.addr, t_uintptr);
-		lbValue offset = lb_emit_conv(p, ptr, alloc_type_pointer(rel_ptr->RelativePointer.base_integer));
-		offset = lb_emit_load(p, offset);
-
-		if (!is_type_unsigned(rel_ptr->RelativePointer.base_integer)) {
-			offset = lb_emit_conv(p, offset, t_i64);
-		}
-		offset = lb_emit_conv(p, offset, t_uintptr);
-		lbValue absolute_ptr = lb_emit_arith(p, Token_Add, ptr, offset, t_uintptr);
-		absolute_ptr = lb_emit_conv(p, absolute_ptr, rel_ptr->RelativePointer.pointer_type);
-
-		lbValue cond = lb_emit_comp(p, Token_CmpEq, offset, lb_const_nil(p->module, rel_ptr->RelativePointer.base_integer));
-
-		// NOTE(bill): nil check
-		lbValue nil_ptr = lb_const_nil(p->module, rel_ptr->RelativePointer.pointer_type);
-		lbValue final_ptr = lb_emit_select(p, cond, nil_ptr, absolute_ptr);
-		return final_ptr;
-	}
+	case lbAddr_RelativePointer:
+		return lb_relative_pointer_to_pointer(p, addr);
 
 	case lbAddr_SoaVariable:
 		// TODO(bill): FIX THIS HACK
@@ -511,6 +495,9 @@ gb_internal lbValue lb_addr_get_ptr(lbProcedure *p, lbAddr const &addr) {
 
 gb_internal lbValue lb_build_addr_ptr(lbProcedure *p, Ast *expr) {
 	lbAddr addr = lb_build_addr(p, expr);
+	if (addr.kind == lbAddr_RelativePointer) {
+		return addr.addr;
+	}
 	return lb_addr_get_ptr(p, addr);
 }
 
@@ -719,9 +706,20 @@ gb_internal void lb_addr_store(lbProcedure *p, lbAddr addr, lbValue value) {
 
 	if (addr.kind == lbAddr_RelativePointer) {
 		Type *rel_ptr = base_type(lb_addr_type(addr));
-		GB_ASSERT(rel_ptr->kind == Type_RelativePointer);
+		GB_ASSERT(rel_ptr->kind == Type_RelativePointer ||
+		          rel_ptr->kind == Type_RelativeMultiPointer);
+		Type *pointer_type = nullptr;
+		Type *base_integer = nullptr;
 
-		value = lb_emit_conv(p, value, rel_ptr->RelativePointer.pointer_type);
+		if (rel_ptr->kind == Type_RelativePointer) {
+			pointer_type = rel_ptr->RelativePointer.pointer_type;
+			base_integer = rel_ptr->RelativePointer.base_integer;
+		} else if (rel_ptr->kind == Type_RelativeMultiPointer) {
+			pointer_type = rel_ptr->RelativeMultiPointer.pointer_type;
+			base_integer = rel_ptr->RelativeMultiPointer.base_integer;
+		}
+
+		value = lb_emit_conv(p, value, pointer_type);
 
 		GB_ASSERT(is_type_pointer(addr.addr.type));
 		lbValue ptr = lb_emit_conv(p, addr.addr, t_uintptr);
@@ -730,54 +728,20 @@ gb_internal void lb_addr_store(lbProcedure *p, lbAddr addr, lbValue value) {
 		offset.value = LLVMBuildSub(p->builder, val_ptr.value, ptr.value, "");
 		offset.type = t_uintptr;
 
-		if (!is_type_unsigned(rel_ptr->RelativePointer.base_integer)) {
+		if (!is_type_unsigned(base_integer)) {
 			offset = lb_emit_conv(p, offset, t_i64);
 		}
-		offset = lb_emit_conv(p, offset, rel_ptr->RelativePointer.base_integer);
+		offset = lb_emit_conv(p, offset, base_integer);
 
-		lbValue offset_ptr = lb_emit_conv(p, addr.addr, alloc_type_pointer(rel_ptr->RelativePointer.base_integer));
+		lbValue offset_ptr = lb_emit_conv(p, addr.addr, alloc_type_pointer(base_integer));
 		offset = lb_emit_select(p,
 			lb_emit_comp(p, Token_CmpEq, val_ptr, lb_const_nil(p->module, t_uintptr)),
-			lb_const_nil(p->module, rel_ptr->RelativePointer.base_integer),
+			lb_const_nil(p->module, base_integer),
 			offset
 		);
 		LLVMBuildStore(p->builder, offset.value, offset_ptr.value);
 		return;
 
-	} else if (addr.kind == lbAddr_RelativeSlice) {
-		Type *rel_ptr = base_type(lb_addr_type(addr));
-		GB_ASSERT(rel_ptr->kind == Type_RelativeSlice);
-
-		value = lb_emit_conv(p, value, rel_ptr->RelativeSlice.slice_type);
-
-		GB_ASSERT(is_type_pointer(addr.addr.type));
-		lbValue ptr = lb_emit_conv(p, lb_emit_struct_ep(p, addr.addr, 0), t_uintptr);
-		lbValue val_ptr = lb_emit_conv(p, lb_slice_elem(p, value), t_uintptr);
-		lbValue offset = {};
-		offset.value = LLVMBuildSub(p->builder, val_ptr.value, ptr.value, "");
-		offset.type = t_uintptr;
-
-		if (!is_type_unsigned(rel_ptr->RelativePointer.base_integer)) {
-			offset = lb_emit_conv(p, offset, t_i64);
-		}
-		offset = lb_emit_conv(p, offset, rel_ptr->RelativePointer.base_integer);
-
-
-		lbValue offset_ptr = lb_emit_conv(p, addr.addr, alloc_type_pointer(rel_ptr->RelativePointer.base_integer));
-		offset = lb_emit_select(p,
-			lb_emit_comp(p, Token_CmpEq, val_ptr, lb_const_nil(p->module, t_uintptr)),
-			lb_const_nil(p->module, rel_ptr->RelativePointer.base_integer),
-			offset
-		);
-		LLVMBuildStore(p->builder, offset.value, offset_ptr.value);
-
-		lbValue len = lb_slice_len(p, value);
-		len = lb_emit_conv(p, len, rel_ptr->RelativePointer.base_integer);
-
-		lbValue len_ptr = lb_emit_struct_ep(p, addr.addr, 1);
-		LLVMBuildStore(p->builder, len.value, len_ptr.value);
-
-		return;
 	} else if (addr.kind == lbAddr_Map) {
 		lb_internal_dynamic_map_set(p, addr.addr, addr.map.type, addr.map.key, value, p->curr_stmt);
 		return;
@@ -1054,67 +1018,43 @@ gb_internal lbValue lb_addr_load(lbProcedure *p, lbAddr const &addr) {
 
 	if (addr.kind == lbAddr_RelativePointer) {
 		Type *rel_ptr = base_type(lb_addr_type(addr));
-		GB_ASSERT(rel_ptr->kind == Type_RelativePointer);
+		Type *base_integer = nullptr;
+		Type *pointer_type = nullptr;
+		GB_ASSERT(rel_ptr->kind == Type_RelativePointer ||
+		          rel_ptr->kind == Type_RelativeMultiPointer);
+
+		if (rel_ptr->kind == Type_RelativePointer) {
+			base_integer = rel_ptr->RelativePointer.base_integer;
+			pointer_type = rel_ptr->RelativePointer.pointer_type;
+		} else if (rel_ptr->kind == Type_RelativeMultiPointer) {
+			base_integer = rel_ptr->RelativeMultiPointer.base_integer;
+			pointer_type = rel_ptr->RelativeMultiPointer.pointer_type;
+		}
 
 		lbValue ptr = lb_emit_conv(p, addr.addr, t_uintptr);
-		lbValue offset = lb_emit_conv(p, ptr, alloc_type_pointer(rel_ptr->RelativePointer.base_integer));
+		lbValue offset = lb_emit_conv(p, ptr, alloc_type_pointer(base_integer));
 		offset = lb_emit_load(p, offset);
 
 
-		if (!is_type_unsigned(rel_ptr->RelativePointer.base_integer)) {
+		if (!is_type_unsigned(base_integer)) {
 			offset = lb_emit_conv(p, offset, t_i64);
 		}
 		offset = lb_emit_conv(p, offset, t_uintptr);
 		lbValue absolute_ptr = lb_emit_arith(p, Token_Add, ptr, offset, t_uintptr);
-		absolute_ptr = lb_emit_conv(p, absolute_ptr, rel_ptr->RelativePointer.pointer_type);
+		absolute_ptr = lb_emit_conv(p, absolute_ptr, pointer_type);
 
-		lbValue cond = lb_emit_comp(p, Token_CmpEq, offset, lb_const_nil(p->module, rel_ptr->RelativePointer.base_integer));
+		lbValue cond = lb_emit_comp(p, Token_CmpEq, offset, lb_const_nil(p->module, base_integer));
 
 		// NOTE(bill): nil check
-		lbValue nil_ptr = lb_const_nil(p->module, rel_ptr->RelativePointer.pointer_type);
+		lbValue nil_ptr = lb_const_nil(p->module, pointer_type);
 		lbValue final_ptr = {};
 		final_ptr.type = absolute_ptr.type;
 		final_ptr.value = LLVMBuildSelect(p->builder, cond.value, nil_ptr.value, absolute_ptr.value, "");
 
-		return lb_emit_load(p, final_ptr);
-
-	} else if (addr.kind == lbAddr_RelativeSlice) {
-		Type *rel_ptr = base_type(lb_addr_type(addr));
-		GB_ASSERT(rel_ptr->kind == Type_RelativeSlice);
-
-		lbValue offset_ptr = lb_emit_struct_ep(p, addr.addr, 0);
-		lbValue ptr = lb_emit_conv(p, offset_ptr, t_uintptr);
-		lbValue offset = lb_emit_load(p, offset_ptr);
-
-
-		if (!is_type_unsigned(rel_ptr->RelativeSlice.base_integer)) {
-			offset = lb_emit_conv(p, offset, t_i64);
+		if (rel_ptr->kind == Type_RelativeMultiPointer) {
+			return final_ptr;
 		}
-		offset = lb_emit_conv(p, offset, t_uintptr);
-		lbValue absolute_ptr = lb_emit_arith(p, Token_Add, ptr, offset, t_uintptr);
-
-		Type *slice_type = base_type(rel_ptr->RelativeSlice.slice_type);
-		GB_ASSERT(rel_ptr->RelativeSlice.slice_type->kind == Type_Slice);
-		Type *slice_elem = slice_type->Slice.elem;
-		Type *slice_elem_ptr = alloc_type_pointer(slice_elem);
-
-		absolute_ptr = lb_emit_conv(p, absolute_ptr, slice_elem_ptr);
-
-		lbValue cond = lb_emit_comp(p, Token_CmpEq, offset, lb_const_nil(p->module, rel_ptr->RelativeSlice.base_integer));
-
-		// NOTE(bill): nil check
-		lbValue nil_ptr = lb_const_nil(p->module, slice_elem_ptr);
-		lbValue data = {};
-		data.type = absolute_ptr.type;
-		data.value = LLVMBuildSelect(p->builder, cond.value, nil_ptr.value, absolute_ptr.value, "");
-
-		lbValue len = lb_emit_load(p, lb_emit_struct_ep(p, addr.addr, 1));
-		len = lb_emit_conv(p, len, t_int);
-
-		lbAddr slice = lb_add_local_generated(p, slice_type, false);
-		lb_fill_slice(p, slice, data, len);
-		return lb_addr_load(p, slice);
-
+		return lb_emit_load(p, final_ptr);
 
 	} else if (addr.kind == lbAddr_Map) {
 		Type *map_type = base_type(type_deref(addr.addr.type));
@@ -1895,8 +1835,8 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 			case Type_SimdVector:
 				return lb_type_internal(m, base);
 
-			// TODO(bill): Deal with this correctly. Can this be named?
 			case Type_Proc:
+				// TODO(bill): Deal with this correctly. Can this be named?
 				return lb_type_internal(m, base);
 
 			case Type_Tuple:
@@ -2173,17 +2113,10 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 
 	case Type_RelativePointer:
 		return lb_type_internal(m, type->RelativePointer.base_integer);
+	case Type_RelativeMultiPointer:
+		return lb_type_internal(m, type->RelativeMultiPointer.base_integer);
 
-	case Type_RelativeSlice:
-		{
-			LLVMTypeRef base_integer = lb_type_internal(m, type->RelativeSlice.base_integer);
 
-			unsigned field_count = 2;
-			LLVMTypeRef *fields = gb_alloc_array(permanent_allocator(), LLVMTypeRef, field_count);
-			fields[0] = base_integer;
-			fields[1] = base_integer;
-			return LLVMStructTypeInContext(ctx, fields, field_count, false);
-		}
 		
 	case Type_Matrix:
 		{
@@ -2869,7 +2802,6 @@ gb_internal lbValue lb_find_value_from_entity(lbModule *m, Entity *e) {
 	if (USE_SEPARATE_MODULES) {
 		lbModule *other_module = lb_module_of_entity(m->gen, e);
 
-		// TODO(bill): correct this logic
 		bool is_external = other_module != m;
 		if (!is_external) {
 			if (e->code_gen_module != nullptr) {
