@@ -1598,6 +1598,58 @@ gb_internal void cg_build_range_stmt_indexed(cgProcedure *p, cgValue expr, Type 
 
 }
 
+gb_internal void cg_build_range_stmt_enum(cgProcedure *p, Type *enum_type, Type *val_type, cgValue *val_, cgValue *idx_, TB_Node **loop_, TB_Node **done_) {
+	Type *t = enum_type;
+	GB_ASSERT(is_type_enum(t));
+	t = base_type(t);
+	Type *core_elem = core_type(t);
+	GB_ASSERT(t->kind == Type_Enum);
+	i64 enum_count = t->Enum.fields.count;
+	cgValue max_count = cg_const_int(p, t_int, enum_count);
+
+	cgValue ti          = cg_type_info(p, t);
+	cgValue variant     = cg_emit_struct_ep(p, ti, 4);
+	cgValue eti_ptr     = cg_emit_conv(p, variant, t_type_info_enum_ptr);
+	cgValue values      = cg_emit_load(p, cg_emit_struct_ep(p, eti_ptr, 2));
+	cgValue values_data = cg_builtin_raw_data(p, values);
+
+	cgAddr offset_ = cg_add_local(p, t_int, nullptr, false);
+	cg_addr_store(p, offset_, cg_const_int(p, t_int, 0));
+
+	TB_Node *loop = cg_control_region(p, "for_enum_loop");
+	cg_emit_goto(p, loop);
+	tb_inst_set_control(p->func, loop);
+
+	TB_Node *body = cg_control_region(p, "for_enum_body");
+	TB_Node *done = cg_control_region(p, "for_enum_done");
+
+	cgValue offset = cg_addr_load(p, offset_);
+	cgValue cond = cg_emit_comp(p, Token_Lt, offset, max_count);
+	cg_emit_if(p, cond, body, done);
+	tb_inst_set_control(p->func, body);
+
+	cgValue val_ptr = cg_emit_ptr_offset(p, values_data, offset);
+	cg_emit_increment(p, offset_.addr);
+
+	cgValue val = {};
+	if (val_type != nullptr) {
+		GB_ASSERT(are_types_identical(enum_type, val_type));
+
+		if (is_type_integer(core_elem)) {
+			cgValue i = cg_emit_load(p, cg_emit_conv(p, val_ptr, t_i64_ptr));
+			val = cg_emit_conv(p, i, t);
+		} else {
+			GB_PANIC("TODO(bill): enum core type %s", type_to_string(core_elem));
+		}
+	}
+
+	if (val_)  *val_  = val;
+	if (idx_)  *idx_  = offset;
+	if (loop_) *loop_ = loop;
+	if (done_) *done_ = done;
+}
+
+
 gb_internal void cg_build_range_stmt(cgProcedure *p, Ast *node) {
 	ast_node(rs, RangeStmt, node);
 
@@ -1640,7 +1692,7 @@ gb_internal void cg_build_range_stmt(cgProcedure *p, Ast *node) {
 	TypeAndValue tav = type_and_value_of_expr(expr);
 
 	if (tav.mode == Addressing_Type) {
-		GB_PANIC("TODO(bill): range statement over enum type");
+		cg_build_range_stmt_enum(p, type_deref(tav.type), val0_type, &val, &key, &loop, &done);
 	} else {
 		Type *expr_type = type_of_expr(expr);
 		Type *et = base_type(type_deref(expr_type));
