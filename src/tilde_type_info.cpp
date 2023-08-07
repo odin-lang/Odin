@@ -328,43 +328,41 @@ gb_internal void cg_setup_type_info_data(cgModule *m) {
 		}
 
 		if (count > 0) {
-			{
-				char const *name = CG_TYPE_INFO_TYPES_NAME;
-				Type *t = alloc_type_array(t_type_info_ptr, count);
-				TB_Global *g = tb_global_create(m->mod, -1, name, nullptr, TB_LINKAGE_PRIVATE);
-				tb_global_set_storage(m->mod, tb_module_get_rdata(m->mod), g, type_size_of(t), 16, count*3);
-				cg_global_type_info_member_types = GlobalTypeInfoData{g, t, t_type_info_ptr, 0};
-			}
-			{
-				char const *name = CG_TYPE_INFO_NAMES_NAME;
-				Type *t = alloc_type_array(t_string, count);
-				TB_Global *g = tb_global_create(m->mod, -1, name, nullptr, TB_LINKAGE_PRIVATE);
-				tb_global_set_storage(m->mod, tb_module_get_rdata(m->mod), g, type_size_of(t), 16, count*3);
-				cg_global_type_info_member_names = GlobalTypeInfoData{g, t, t_string, 0};
-			}
-			{
-				char const *name = CG_TYPE_INFO_OFFSETS_NAME;
-				Type *t = alloc_type_array(t_uintptr, count);
-				TB_Global *g = tb_global_create(m->mod, -1, name, nullptr, TB_LINKAGE_PRIVATE);
-				tb_global_set_storage(m->mod, tb_module_get_rdata(m->mod), g, type_size_of(t), 16, count);
-				cg_global_type_info_member_offsets = GlobalTypeInfoData{g, t, t_uintptr, 0};
-			}
+			char const *name = CG_TYPE_INFO_TYPES_NAME;
+			Type *t = alloc_type_array(t_type_info_ptr, count);
+			TB_Global *g = tb_global_create(m->mod, -1, name, nullptr, TB_LINKAGE_PRIVATE);
+			tb_global_set_storage(m->mod, tb_module_get_rdata(m->mod), g, type_size_of(t), 16, count*3);
+			cg_global_type_info_member_types = GlobalTypeInfoData{g, t, t_type_info_ptr, 0};
+		}
+		if (count > 0 || enum_count > 0) {
+			char const *name = CG_TYPE_INFO_NAMES_NAME;
+			Type *t = alloc_type_array(t_string, (enum_count+count));
+			TB_Global *g = tb_global_create(m->mod, -1, name, nullptr, TB_LINKAGE_PRIVATE);
+			tb_global_set_storage(m->mod, tb_module_get_rdata(m->mod), g, type_size_of(t), 16, (enum_count+count)*3);
+			cg_global_type_info_member_names = GlobalTypeInfoData{g, t, t_string, 0};
+		}
+		if (count > 0) {
+			char const *name = CG_TYPE_INFO_OFFSETS_NAME;
+			Type *t = alloc_type_array(t_uintptr, count);
+			TB_Global *g = tb_global_create(m->mod, -1, name, nullptr, TB_LINKAGE_PRIVATE);
+			tb_global_set_storage(m->mod, tb_module_get_rdata(m->mod), g, type_size_of(t), 16, count);
+			cg_global_type_info_member_offsets = GlobalTypeInfoData{g, t, t_uintptr, 0};
+		}
 
-			{
-				char const *name = CG_TYPE_INFO_USINGS_NAME;
-				Type *t = alloc_type_array(t_bool, count);
-				TB_Global *g = tb_global_create(m->mod, -1, name, nullptr, TB_LINKAGE_PRIVATE);
-				tb_global_set_storage(m->mod, tb_module_get_rdata(m->mod), g, type_size_of(t), 16, count);
-				cg_global_type_info_member_usings = GlobalTypeInfoData{g, t, t_bool, 0};
-			}
+		if (count > 0) {
+			char const *name = CG_TYPE_INFO_USINGS_NAME;
+			Type *t = alloc_type_array(t_bool, count);
+			TB_Global *g = tb_global_create(m->mod, -1, name, nullptr, TB_LINKAGE_PRIVATE);
+			tb_global_set_storage(m->mod, tb_module_get_rdata(m->mod), g, type_size_of(t), 16, count);
+			cg_global_type_info_member_usings = GlobalTypeInfoData{g, t, t_bool, 0};
+		}
 
-			{
-				char const *name = CG_TYPE_INFO_TAGS_NAME;
-				Type *t = alloc_type_array(t_string, count);
-				TB_Global *g = tb_global_create(m->mod, -1, name, nullptr, TB_LINKAGE_PRIVATE);
-				tb_global_set_storage(m->mod, tb_module_get_rdata(m->mod), g, type_size_of(t), 16, count*3);
-				cg_global_type_info_member_tags = GlobalTypeInfoData{g, t, t_string, 0};
-			}
+		if (count > 0) {
+			char const *name = CG_TYPE_INFO_TAGS_NAME;
+			Type *t = alloc_type_array(t_string, count);
+			TB_Global *g = tb_global_create(m->mod, -1, name, nullptr, TB_LINKAGE_PRIVATE);
+			tb_global_set_storage(m->mod, tb_module_get_rdata(m->mod), g, type_size_of(t), 16, count*3);
+			cg_global_type_info_member_tags = GlobalTypeInfoData{g, t, t_string, 0};
 		}
 
 		if (enum_count > 0) {
