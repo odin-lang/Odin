@@ -33,7 +33,7 @@ when ODIN_OS == .Windows {
 	foreign import lib "system:raygui"
 }
 
-VERSION :: "4.0"
+RAYGUI_VERSION :: "4.0"
 
 // Style property
 GuiStyleProp :: struct {
