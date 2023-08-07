@@ -2796,6 +2796,16 @@ cgAddr cg_build_addr_compound_lit(cgProcedure *p, Ast *expr) {
 	return v;
 }
 
+gb_internal cgValue cg_make_soa_pointer(cgProcedure *p, Type *type, cgValue const &addr, cgValue const &index) {
+	cgAddr v = cg_add_local(p, type, nullptr, true);
+	cgValue ptr = cg_emit_struct_ep(p, v.addr, 0);
+	cgValue idx = cg_emit_struct_ep(p, v.addr, 1);
+	cg_emit_store(p, ptr, addr);
+	cg_emit_store(p, idx, cg_emit_conv(p, index, t_int));
+
+	return cg_addr_load(p, v);
+}
+
 gb_internal cgValue cg_build_unary_and(cgProcedure *p, Ast *expr) {
 	ast_node(ue, UnaryExpr, expr);
 	auto tv = type_and_value_of_expr(expr);
@@ -2835,16 +2845,15 @@ gb_internal cgValue cg_build_unary_and(cgProcedure *p, Ast *expr) {
 		// return lb_addr_load(p, res);
 
 	} else if (is_type_soa_pointer(tv.type)) {
-		GB_PANIC("TODO(bill): &soa[i]");
-		// ast_node(ie, IndexExpr, ue_expr);
-		// lbValue addr = lb_build_addr_ptr(p, ie->expr);
-		// lbValue index = lb_build_expr(p, ie->index);
+		ast_node(ie, IndexExpr, ue_expr);
+		cgValue addr = cg_build_addr_ptr(p, ie->expr);
+		cgValue index = cg_build_expr(p, ie->index);
 
-		// if (!build_context.no_bounds_check) {
-		// 	// TODO(bill): soa bounds checking
-		// }
+		if (!build_context.no_bounds_check) {
+			// TODO(bill): soa bounds checking
+		}
 
-		// return lb_make_soa_pointer(p, tv.type, addr, index);
+		return cg_make_soa_pointer(p, tv.type, addr, index);
 	} else if (ue_expr->kind == Ast_CompoundLit) {
 		cgAddr addr = cg_build_addr_compound_lit(p, expr);
 		return addr.addr;

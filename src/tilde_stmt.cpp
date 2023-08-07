@@ -254,6 +254,63 @@ gb_internal cgValue cg_addr_load(cgProcedure *p, cgAddr addr) {
 				return v;
 			}
 		}
+
+	case cgAddr_SoaVariable:
+		{
+			Type *t = type_deref(addr.addr.type);
+			t = base_type(t);
+			GB_ASSERT(t->kind == Type_Struct && t->Struct.soa_kind != StructSoa_None);
+			Type *elem = t->Struct.soa_elem;
+
+			cgValue len = {};
+			if (t->Struct.soa_kind == StructSoa_Fixed) {
+				len = cg_const_int(p, t_int, t->Struct.soa_count);
+			} else {
+				cgValue v = cg_emit_load(p, addr.addr);
+				len = cg_builtin_len(p, v);
+			}
+
+			cgAddr res = cg_add_local(p, elem, nullptr, true);
+
+			// if (addr.soa.index_expr != nullptr && (!cg_is_const(addr.soa.index) || t->Struct.soa_kind != StructSoa_Fixed)) {
+			// 	cg_emit_bounds_check(p, ast_token(addr.soa.index_expr), addr.soa.index, len);
+			// }
+
+			if (t->Struct.soa_kind == StructSoa_Fixed) {
+				for_array(i, t->Struct.fields) {
+					Entity *field = t->Struct.fields[i];
+					Type *base_type = field->type;
+					GB_ASSERT(base_type->kind == Type_Array);
+
+					cgValue dst = cg_emit_struct_ep(p, res.addr, cast(i32)i);
+					cgValue src_ptr = cg_emit_struct_ep(p, addr.addr, cast(i32)i);
+					src_ptr = cg_emit_array_ep(p, src_ptr, addr.soa.index);
+					cgValue src = cg_emit_load(p, src_ptr);
+					cg_emit_store(p, dst, src);
+				}
+			} else {
+				isize field_count = t->Struct.fields.count;
+				if (t->Struct.soa_kind == StructSoa_Slice) {
+					field_count -= 1;
+				} else if (t->Struct.soa_kind == StructSoa_Dynamic) {
+					field_count -= 3;
+				}
+				for (isize i = 0; i < field_count; i++) {
+					Entity *field = t->Struct.fields[i];
+					Type *base_type = field->type;
+					GB_ASSERT(base_type->kind == Type_Pointer);
+
+					cgValue dst = cg_emit_struct_ep(p, res.addr, cast(i32)i);
+					cgValue src_ptr = cg_emit_struct_ep(p, addr.addr, cast(i32)i);
+					cgValue src = cg_emit_load(p, src_ptr);
+					src = cg_emit_ptr_offset(p, src, addr.soa.index);
+					src = cg_emit_load(p, src);
+					cg_emit_store(p, dst, src);
+				}
+			}
+
+			return cg_addr_load(p, res);
+		}
 	}
 	GB_PANIC("TODO(bill): cg_addr_load %p", addr.addr.node);
 	return {};
@@ -562,18 +619,24 @@ gb_internal cgValue cg_emit_struct_ep(cgProcedure *p, cgValue s, i64 index) {
 		return cg_emit_array_epi(p, s, index);
 	case Type_SoaPointer:
 		switch (index) {
-		case 0: result_type = alloc_type_pointer(t->SoaPointer.elem); break;
-		case 1: result_type = t_int; break;
+		case 0:
+			result_type = alloc_type_pointer(t->SoaPointer.elem);
+			offset = 0;
+			break;
+		case 1:
+			result_type = t_int;
+			offset = int_size;
+			break;
 		}
 		break;
 	default:
 	error_case:;
-		GB_PANIC("TODO(bill): struct_gep type: %s, %d", type_to_string(s.type), index);
+		GB_PANIC("TODO(bill): struct_gep type: %s, %lld", type_to_string(s.type), cast(long long)index);
 		break;
 	}
 
-	GB_ASSERT_MSG(result_type != nullptr, "%s %d", type_to_string(t), index);
-	GB_ASSERT(offset >= 0);
+	GB_ASSERT_MSG(result_type != nullptr, "%s %lld", type_to_string(t), cast(long long)index);
+	GB_ASSERT_MSG(offset >= 0, "%s %lld", type_to_string(t), cast(long long)offset);
 
 	GB_ASSERT(s.kind == cgValue_Value);
 	return cg_value(
