@@ -378,3 +378,8 @@ gb_internal cgValue cg_builtin_map_info(cgProcedure *p, Type *map_type);
 gb_internal cgValue cg_builtin_map_cell_info(cgProcedure *p, Type *type);
 gb_internal cgValue cg_emit_source_code_location_as_global(cgProcedure *p, String const &proc_name, TokenPos pos);
 gb_internal cgValue cg_emit_source_code_location_as_global(cgProcedure *p, Ast *node);
+
+
+gb_internal cgValue cg_internal_dynamic_map_get_ptr(cgProcedure *p, cgValue const &map_ptr, cgValue const &key);
+gb_internal void cg_internal_dynamic_map_set(cgProcedure *p, cgValue const &map_ptr, Type *map_type,
+                                             cgValue const &map_key, cgValue const &map_value, Ast *node);

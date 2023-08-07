@@ -2135,15 +2135,14 @@ gb_internal cgValue cg_build_binary_expr(cgProcedure *p, Ast *expr) {
 			switch (rt->kind) {
 			case Type_Map:
 				{
-					GB_PANIC("TODO(bill): in/not_in for maps");
-					// cgValue map_ptr = cg_address_from_load_or_generate_local(p, right);
-					// cgValue key = left;
-					// cgValue ptr = cg_internal_dynamic_map_get_ptr(p, map_ptr, key);
-					// if (be->op.kind == Token_in) {
-					// 	return cg_emit_conv(p, cg_emit_comp_against_nil(p, Token_NotEq, ptr), t_bool);
-					// } else {
-					// 	return cg_emit_conv(p, cg_emit_comp_against_nil(p, Token_CmpEq, ptr), t_bool);
-					// }
+					cgValue map_ptr = cg_address_from_load_or_generate_local(p, right);
+					cgValue key = left;
+					cgValue ptr = cg_internal_dynamic_map_get_ptr(p, map_ptr, key);
+					if (be->op.kind == Token_in) {
+						return cg_emit_conv(p, cg_emit_comp_against_nil(p, Token_NotEq, ptr), t_bool);
+					} else {
+						return cg_emit_conv(p, cg_emit_comp_against_nil(p, Token_CmpEq, ptr), t_bool);
+					}
 				}
 				break;
 			case Type_BitSet:
