@@ -281,7 +281,7 @@ recursive_benaphore_guard :: proc "contextless" (m: ^Recursive_Benaphore) -> boo
 
 
 
-// Once is a data value that will perform exactly on action.
+// Once is a data value that will perform exactly one action.
 // 
 // A Once must not be copied after first use.
 Once :: struct #no_copy {
