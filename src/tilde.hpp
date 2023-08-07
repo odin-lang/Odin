@@ -237,6 +237,9 @@ struct cgModule {
 	PtrMap<Type *, cgProcedure *> map_get_procs;
 	PtrMap<Type *, cgProcedure *> map_set_procs;
 
+	RecursiveMutex map_info_mutex;
+	PtrMap<Type *, TB_Symbol *> map_info_map;
+	PtrMap<Type *, TB_Symbol *> map_cell_info_map;
 
 	// NOTE(bill): no need to protect this with a mutex
 	PtrMap<uintptr, TB_FileID> file_id_map; // Key: AstFile.id (i32 cast to uintptr)
@@ -289,6 +292,7 @@ gb_internal cgValue cg_value(TB_Symbol *  s,    Type *type);
 gb_internal cgValue cg_value(TB_Node *    node, Type *type);
 
 gb_internal cgAddr cg_addr(cgValue const &value);
+gb_internal cgAddr cg_addr_map(cgValue addr, cgValue map_key, Type *map_type, Type *map_result);
 
 gb_internal u64 cg_typeid_as_u64(cgModule *m, Type *type);
 gb_internal cgValue cg_type_info(cgProcedure *p, Type *type);
@@ -370,4 +374,7 @@ gb_internal cgValue cg_handle_param_value(cgProcedure *p, Type *parameter_type, 
 
 gb_internal cgValue cg_builtin_len(cgProcedure *p, cgValue value);
 gb_internal cgValue cg_builtin_raw_data(cgProcedure *p, cgValue const &x);
-
+gb_internal cgValue cg_builtin_map_info(cgProcedure *p, Type *map_type);
+gb_internal cgValue cg_builtin_map_cell_info(cgProcedure *p, Type *type);
+gb_internal cgValue cg_emit_source_code_location_as_global(cgProcedure *p, String const &proc_name, TokenPos pos);
+gb_internal cgValue cg_emit_source_code_location_as_global(cgProcedure *p, Ast *node);

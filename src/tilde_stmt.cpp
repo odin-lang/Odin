@@ -77,7 +77,7 @@ gb_internal void cg_emit_store(cgProcedure *p, cgValue dst, cgValue src, bool is
 	GB_ASSERT(is_type_pointer(dst.type));
 	Type *dst_type = type_deref(dst.type);
 
-	GB_ASSERT_MSG(are_types_identical(dst_type, src.type), "%s vs %s", type_to_string(dst_type), type_to_string(src.type));
+	GB_ASSERT_MSG(are_types_identical(core_type(dst_type), core_type(src.type)), "%s vs %s", type_to_string(dst_type), type_to_string(src.type));
 
 	TB_DataType dt = cg_data_type(dst_type);
 	TB_DataType st = cg_data_type(src.type);
@@ -225,6 +225,35 @@ gb_internal cgValue cg_addr_load(cgProcedure *p, cgAddr addr) {
 	switch (addr.kind) {
 	case cgAddr_Default:
 		return cg_emit_load(p, addr.addr);
+
+	case cgAddr_Map:
+		{
+			Type *map_type = base_type(type_deref(addr.addr.type));
+			GB_ASSERT(map_type->kind == Type_Map);
+			cgAddr v_addr = cg_add_local(p, map_type->Map.value, nullptr, true);
+
+			cgValue ptr = cg_internal_dynamic_map_get_ptr(p, addr.addr, addr.map.key);
+			cgValue ok = cg_emit_conv(p, cg_emit_comp_against_nil(p, Token_NotEq, ptr), t_bool);
+
+			TB_Node *then = cg_control_region(p, "map.get.then");
+			TB_Node *done = cg_control_region(p, "map.get.done");
+			cg_emit_if(p, ok, then, done);
+			tb_inst_set_control(p->func, then);
+			{
+				cgValue value = cg_emit_conv(p, ptr, alloc_type_pointer(map_type->Map.value));
+				value = cg_emit_load(p, value);
+				cg_addr_store(p, v_addr, value);
+			}
+			cg_emit_goto(p, done);
+			tb_inst_set_control(p->func, done);
+
+			cgValue v = cg_addr_load(p, v_addr);
+			if (is_type_tuple(addr.map.result)) {
+				return cg_value_multi2(v, ok, addr.map.result);
+			} else {
+				return v;
+			}
+		}
 	}
 	GB_PANIC("TODO(bill): cg_addr_load %p", addr.addr.node);
 	return {};
@@ -254,7 +283,8 @@ gb_internal void cg_addr_store(cgProcedure *p, cgAddr addr, cgValue value) {
 	} else if (addr.kind == cgAddr_RelativeSlice) {
 		GB_PANIC("TODO(bill): cgAddr_RelativeSlice");
 	} else if (addr.kind == cgAddr_Map) {
-		GB_PANIC("TODO(bill): cgAddr_Map");
+		cg_internal_dynamic_map_set(p, addr.addr, addr.map.type, addr.map.key, value, p->curr_stmt);
+		return;
 	} else if (addr.kind == cgAddr_Context) {
 		cgAddr old_addr = cg_find_or_generate_context_ptr(p);
 
@@ -1096,7 +1126,7 @@ gb_internal void cg_build_return_stmt_internal(cgProcedure *p, Slice<cgValue> co
 		}
 
 	} else {
-		GB_ASSERT(!is_calling_convention_odin(p->type->Proc.calling_convention));
+		GB_ASSERT_MSG(!is_calling_convention_odin(p->type->Proc.calling_convention), "missing %s", proc_calling_convention_strings[p->type->Proc.calling_convention]);
 
 		if (p->return_by_ptr) {
 			Entity *e = tuple->variables[return_count-1];

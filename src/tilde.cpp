@@ -189,6 +189,19 @@ gb_internal cgAddr cg_addr(cgValue const &value) {
 	return addr;
 }
 
+gb_internal cgAddr cg_addr_map(cgValue addr, cgValue map_key, Type *map_type, Type *map_result) {
+	GB_ASSERT(is_type_pointer(addr.type));
+	Type *mt = type_deref(addr.type);
+	GB_ASSERT(is_type_map(mt));
+
+	cgAddr v = {cgAddr_Map, addr};
+	v.map.key    = map_key;
+	v.map.type   = map_type;
+	v.map.result = map_result;
+	return v;
+}
+
+
 gb_internal void cg_set_debug_pos_from_node(cgProcedure *p, Ast *node) {
 	if (node) {
 		TokenPos pos = ast_token(node).pos;
@@ -435,6 +448,8 @@ gb_internal cgModule *cg_module_create(Checker *c) {
 	map_init(&m->hasher_procs);
 	map_init(&m->map_get_procs);
 	map_init(&m->map_set_procs);
+	map_init(&m->map_info_map);
+	map_init(&m->map_cell_info_map);
 
 	array_init(&m->single_threaded_procedure_queue, heap_allocator());
 
@@ -461,6 +476,8 @@ gb_internal void cg_module_destroy(cgModule *m) {
 	map_destroy(&m->hasher_procs);
 	map_destroy(&m->map_get_procs);
 	map_destroy(&m->map_set_procs);
+	map_destroy(&m->map_info_map);
+	map_destroy(&m->map_cell_info_map);
 
 	array_free(&m->single_threaded_procedure_queue);
 
@@ -782,7 +799,6 @@ gb_internal bool cg_generate_code(Checker *c, LinkerData *linker_data) {
 		tb_inst_ret(p->func, 0, nullptr);
 		cg_procedure_end(p);
 	}
-
 
 
 	TB_DebugFormat debug_format = TB_DEBUGFMT_NONE;

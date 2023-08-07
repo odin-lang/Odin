@@ -3416,8 +3416,92 @@ gb_internal cgValue cg_build_expr_internal(cgProcedure *p, Ast *expr) {
 	         token_pos_to_string(token_pos));
 
 	return {};
-
 }
+
+
+gb_internal cgValue cg_map_data_uintptr(cgProcedure *p, cgValue value) {
+	GB_ASSERT(is_type_map(value.type) || are_types_identical(value.type, t_raw_map));
+	cgValue data = cg_emit_struct_ev(p, value, 0);
+	u64 mask_value = 0;
+	if (build_context.ptr_size == 4) {
+		mask_value = 0xfffffffful & ~(MAP_CACHE_LINE_SIZE-1);
+	} else {
+		mask_value = 0xffffffffffffffffull & ~(MAP_CACHE_LINE_SIZE-1);
+	}
+	cgValue mask = cg_const_int(p, t_uintptr, mask_value);
+	return cg_emit_arith(p, Token_And, data, mask, t_uintptr);
+}
+
+gb_internal cgValue cg_gen_map_key_hash(cgProcedure *p, cgValue const &map_ptr, cgValue key, cgValue *key_ptr_) {
+	TEMPORARY_ALLOCATOR_GUARD();
+
+	cgValue key_ptr = cg_address_from_load_or_generate_local(p, key);
+	key_ptr = cg_emit_conv(p, key_ptr, t_rawptr);
+
+	if (key_ptr_) *key_ptr_ = key_ptr;
+
+	Type* key_type = base_type(type_deref(map_ptr.type))->Map.key;
+
+	cgValue hasher = cg_hasher_proc_value_for_type(p, key_type);
+
+	Slice<cgValue> args = {};
+	args = slice_make<cgValue>(temporary_allocator(), 1);
+	args[0] = cg_map_data_uintptr(p, cg_emit_load(p, map_ptr));
+	cgValue seed = cg_emit_runtime_call(p, "map_seed_from_map_data", args);
+
+	args = slice_make<cgValue>(temporary_allocator(), 2);
+	args[0] = key_ptr;
+	args[1] = seed;
+	return cg_emit_call(p, hasher, args);
+}
+
+gb_internal cgValue cg_internal_dynamic_map_get_ptr(cgProcedure *p, cgValue const &map_ptr, cgValue const &key) {
+	TEMPORARY_ALLOCATOR_GUARD();
+
+	Type *map_type = base_type(type_deref(map_ptr.type));
+	GB_ASSERT(map_type->kind == Type_Map);
+
+	cgValue ptr = {};
+	cgValue key_ptr = {};
+	cgValue hash = cg_gen_map_key_hash(p, map_ptr, key, &key_ptr);
+
+	auto args = slice_make<cgValue>(temporary_allocator(), 4);
+	args[0] = cg_emit_transmute(p, map_ptr, t_raw_map_ptr);
+	args[1] = cg_builtin_map_info(p, map_type);
+	args[2] = hash;
+	args[3] = key_ptr;
+
+	ptr = cg_emit_runtime_call(p, "__dynamic_map_get", args);
+
+	return cg_emit_conv(p, ptr, alloc_type_pointer(map_type->Map.value));
+}
+
+
+gb_internal void cg_internal_dynamic_map_set(cgProcedure *p, cgValue const &map_ptr, Type *map_type,
+                                             cgValue const &map_key, cgValue const &map_value, Ast *node) {
+	TEMPORARY_ALLOCATOR_GUARD();
+
+	map_type = base_type(map_type);
+	GB_ASSERT(map_type->kind == Type_Map);
+
+	cgValue key_ptr = {};
+	cgValue hash = cg_gen_map_key_hash(p, map_ptr, map_key, &key_ptr);
+
+	cgValue v = cg_emit_conv(p, map_value, map_type->Map.value);
+	cgValue value_ptr = cg_address_from_load_or_generate_local(p, v);
+
+	auto args = slice_make<cgValue>(temporary_allocator(), 6);
+	args[0] = cg_emit_conv(p, map_ptr, t_raw_map_ptr);
+	args[1] = cg_builtin_map_info(p, map_type);
+	args[2] = hash;
+	args[3] = cg_emit_conv(p, key_ptr, t_rawptr);
+	args[4] = cg_emit_conv(p, value_ptr, t_rawptr);
+	args[5] = cg_emit_source_code_location_as_global(p, node);
+	cg_emit_runtime_call(p, "__dynamic_map_set", args);
+}
+
+
+
 
 gb_internal cgValue cg_build_addr_ptr(cgProcedure *p, Ast *expr) {
 	cgAddr addr = cg_build_addr(p, expr);
@@ -3501,17 +3585,16 @@ gb_internal cgAddr cg_build_addr_index_expr(cgProcedure *p, Ast *expr) {
 	GB_ASSERT_MSG(is_type_indexable(t), "%s %s", type_to_string(t), expr_to_string(expr));
 
 	if (is_type_map(t)) {
-		GB_PANIC("TODO(bill): map indexing");
-		// lbAddr map_addr = lb_build_addr(p, ie->expr);
-		// lbValue key = lb_build_expr(p, ie->index);
-		// key = lb_emit_conv(p, key, t->Map.key);
+		cgAddr map_addr = cg_build_addr(p, ie->expr);
+		cgValue key = cg_build_expr(p, ie->index);
+		key = cg_emit_conv(p, key, t->Map.key);
 
-		// Type *result_type = type_of_expr(expr);
-		// lbValue map_ptr = lb_addr_get_ptr(p, map_addr);
-		// if (is_type_pointer(type_deref(map_ptr.type))) {
-		// 	map_ptr = lb_emit_load(p, map_ptr);
-		// }
-		// return lb_addr_map(map_ptr, key, t, result_type);
+		Type *result_type = type_of_expr(expr);
+		cgValue map_ptr = cg_addr_get_ptr(p, map_addr);
+		if (is_type_pointer(type_deref(map_ptr.type))) {
+			map_ptr = cg_emit_load(p, map_ptr);
+		}
+		return cg_addr_map(map_ptr, key, t, result_type);
 	}
 
 	switch (t->kind) {

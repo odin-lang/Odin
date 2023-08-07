@@ -231,6 +231,76 @@ gb_internal cgValue cg_builtin_mem_copy_non_overlapping(cgProcedure *p, cgValue 
 	return dst;
 }
 
+gb_internal TB_Symbol *cg_builtin_map_cell_info_symbol(cgModule *m, Type *type) {
+	MUTEX_GUARD(&m->map_info_mutex);
+	TB_Symbol **found = map_get(&m->map_cell_info_map, type);
+	if (found) {
+		return *found;
+	}
+	i64 size = 0, len = 0;
+	map_cell_size_and_len(type, &size, &len);
+
+	TB_Global *global = tb_global_create(m->mod, 0, "", cg_debug_type(m, t_map_cell_info), TB_LINKAGE_PRIVATE);
+	tb_global_set_storage(m->mod, tb_module_get_rdata(m->mod), global, type_size_of(t_map_cell_info), type_align_of(t_map_cell_info), 4);
+
+	i64 ptr_size = build_context.ptr_size;
+	void *size_of_type      = tb_global_add_region(m->mod, global, 0*ptr_size, ptr_size);
+	void *align_of_type     = tb_global_add_region(m->mod, global, 1*ptr_size, ptr_size);
+	void *size_of_cell      = tb_global_add_region(m->mod, global, 2*ptr_size, ptr_size);
+	void *elements_per_cell = tb_global_add_region(m->mod, global, 3*ptr_size, ptr_size);
+
+	cg_write_uint_at_ptr(size_of_type,      type_size_of(type),  t_uintptr);
+	cg_write_uint_at_ptr(align_of_type,     type_align_of(type), t_uintptr);
+	cg_write_uint_at_ptr(size_of_cell,      size,                t_uintptr);
+	cg_write_uint_at_ptr(elements_per_cell, len,                 t_uintptr);
+
+	map_set(&m->map_cell_info_map, type, cast(TB_Symbol *)global);
+
+	return cast(TB_Symbol *)global;
+}
+
+
+gb_internal cgValue cg_builtin_map_cell_info(cgProcedure *p, Type *type) {
+	type = core_type(type);
+	TB_Symbol *symbol = cg_builtin_map_cell_info_symbol(p->module, type);
+	TB_Node *node = tb_inst_get_symbol_address(p->func, symbol);
+	return cg_value(node, t_map_cell_info_ptr);
+}
+
+gb_internal cgValue cg_builtin_map_info(cgProcedure *p, Type *map_type) {
+	map_type = base_type(map_type);
+	GB_ASSERT(map_type->kind == Type_Map);
+
+	cgModule *m = p->module;
+	MUTEX_GUARD(&m->map_info_mutex);
+	TB_Global *global = nullptr;
+	TB_Symbol **found = map_get(&m->map_info_map, map_type);
+	if (found) {
+		global = cast(TB_Global *)*found;
+	} else {
+		global = tb_global_create(m->mod, 0, "", cg_debug_type(m, t_map_info), TB_LINKAGE_PRIVATE);
+		tb_global_set_storage(m->mod, tb_module_get_rdata(m->mod), global, type_size_of(t_map_info), type_align_of(t_map_info), 4);
+
+		TB_Symbol *key_cell_info   = cg_builtin_map_cell_info_symbol(m, map_type->Map.key);
+		TB_Symbol *value_cell_info = cg_builtin_map_cell_info_symbol(m, map_type->Map.value);
+		cgProcedure *key_hasher    = cg_hasher_proc_for_type(p->module, map_type->Map.key);
+		cgProcedure *key_equal     = cg_equal_proc_for_type (p->module, map_type->Map.key);
+
+		tb_global_add_symbol_reloc(p->module->mod, global, 0*build_context.ptr_size, key_cell_info);
+		tb_global_add_symbol_reloc(p->module->mod, global, 1*build_context.ptr_size, value_cell_info);
+		tb_global_add_symbol_reloc(p->module->mod, global, 2*build_context.ptr_size, key_hasher->symbol);
+		tb_global_add_symbol_reloc(p->module->mod, global, 3*build_context.ptr_size, key_equal->symbol);
+
+		map_set(&m->map_info_map, map_type, cast(TB_Symbol *)global);
+	}
+
+	GB_ASSERT(global != nullptr);
+	TB_Node *node = tb_inst_get_symbol_address(p->func, cast(TB_Symbol *)global);
+	return cg_value(node, t_map_info_ptr);
+}
+
+
+
 
 gb_internal cgValue cg_build_builtin(cgProcedure *p, BuiltinProcId id, Ast *expr) {
 	ast_node(ce, CallExpr, expr);
@@ -434,6 +504,65 @@ gb_internal cgValue cg_build_builtin(cgProcedure *p, BuiltinProcId id, Ast *expr
 
 	case BuiltinProc_type_hasher_proc:
 		return cg_hasher_proc_value_for_type(p, ce->args[0]->tav.type);
+
+	case BuiltinProc_type_map_cell_info:
+		return cg_builtin_map_cell_info(p, ce->args[0]->tav.type);
+	case BuiltinProc_type_map_info:
+		return cg_builtin_map_info(p, ce->args[0]->tav.type);
+
+	case BuiltinProc_expect:
+		{
+			Type *t = default_type(expr->tav.type);
+			cgValue x = cg_emit_conv(p, cg_build_expr(p, ce->args[0]), t);
+			cgValue y = cg_emit_conv(p, cg_build_expr(p, ce->args[1]), t);
+			gb_unused(y);
+			return x;
+		}
+
+	case BuiltinProc_count_leading_zeros:
+		{
+			cgValue n = cg_build_expr(p, ce->args[0]);
+			n = cg_emit_conv(p, n, default_type(expr->tav.type));
+			GB_ASSERT(n.kind == cgValue_Value);
+			TB_Node *val = tb_inst_clz(p->func, n.node);
+			val = tb_inst_zxt(p->func, val, cg_data_type(n.type));
+			return cg_value(val, n.type);
+		}
+
+
+	case BuiltinProc_count_trailing_zeros:
+		{
+			cgValue n = cg_build_expr(p, ce->args[0]);
+			n = cg_emit_conv(p, n, default_type(expr->tav.type));
+			GB_ASSERT(n.kind == cgValue_Value);
+			TB_Node *val = tb_inst_ctz(p->func, n.node);
+			val = tb_inst_zxt(p->func, val, cg_data_type(n.type));
+			return cg_value(val, n.type);
+		}
+
+	case BuiltinProc_count_ones:
+		{
+			cgValue n = cg_build_expr(p, ce->args[0]);
+			n = cg_emit_conv(p, n, default_type(expr->tav.type));
+			GB_ASSERT(n.kind == cgValue_Value);
+			TB_Node *val = tb_inst_popcount(p->func, n.node);
+			val = tb_inst_zxt(p->func, val, cg_data_type(n.type));
+			return cg_value(val, n.type);
+		}
+
+	case BuiltinProc_count_zeros:
+		{
+			cgValue n = cg_build_expr(p, ce->args[0]);
+			n = cg_emit_conv(p, n, default_type(expr->tav.type));
+			GB_ASSERT(n.kind == cgValue_Value);
+			TB_DataType dt = cg_data_type(n.type);
+			TB_Node *ones = tb_inst_popcount(p->func, n.node);
+			ones = tb_inst_zxt(p->func, ones, dt);
+
+			cgValue size = cg_const_int(p, n.type, 8*type_size_of(n.type));
+			return cg_emit_arith(p, Token_Sub, size, cg_value(ones, n.type), n.type);
+		}
+
 	}
 
 

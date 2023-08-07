@@ -96,7 +96,11 @@ gb_internal cgValue cg_emit_source_code_location_as_global(cgProcedure *p, Strin
 	return cg_lvalue_addr(ptr, t_source_code_location);
 }
 
-
+gb_internal cgValue cg_emit_source_code_location_as_global(cgProcedure *p, Ast *node) {
+	String proc_name = p->name;
+	TokenPos pos = ast_token(node).pos;
+	return cg_emit_source_code_location_as_global(p, proc_name, pos);
+}
 
 gb_internal void cg_write_big_int_at_ptr(void *dst, BigInt const *a, Type *original_type) {
 	GB_ASSERT(build_context.endian_kind == TargetEndian_Little);
@@ -949,7 +953,12 @@ gb_internal cgValue cg_const_value(cgProcedure *p, Type *type, ExactValue const 
 		GB_ASSERT(!TB_IS_VOID_TYPE(dt));
 		// GB_ASSERT(dt.raw != TB_TYPE_I128.raw);
 		if (is_type_unsigned(type)) {
-			u64 i = exact_value_to_u64(value);
+			u64 i = 0;
+			if (value.kind == ExactValue_Integer && value.value_integer.sign) {
+				i = exact_value_to_i64(value);
+			} else {
+				i = exact_value_to_u64(value);
+			}
 			return cg_value(tb_inst_uint(p->func, dt, i), type);
 		} else {
 			i64 i = exact_value_to_i64(value);

@@ -388,7 +388,7 @@ gb_internal WORKER_TASK_PROC(cg_procedure_compile_worker_proc) {
 
 	// emit ir
 	if (
-	    // string_starts_with(p->name, str_lit("bug@main")) ||
+	    string_starts_with(p->name, str_lit("main@")) ||
 	    // p->name == str_lit("runtime@_windows_default_alloc_or_resize") ||
 	    false
 	) { // IR Printing
@@ -398,6 +398,7 @@ gb_internal WORKER_TASK_PROC(cg_procedure_compile_worker_proc) {
 
 		tb_pass_print(passes);
 		fprintf(stdout, "\n");
+		fflush(stdout);
 	}
 	if (false) { // GraphViz printing
 		tb_function_print(p->func, tb_default_print_callback, stdout);
@@ -408,6 +409,7 @@ gb_internal WORKER_TASK_PROC(cg_procedure_compile_worker_proc) {
 	if (emit_asm) {
 		tb_output_print_asm(output, stdout);
 		fprintf(stdout, "\n");
+		fflush(stdout);
 	}
 
 	return 0;
@@ -1018,6 +1020,7 @@ gb_internal cgProcedure *cg_equal_proc_for_type(cgModule *m, Type *type) {
 
 	cgProcedure *p = cg_procedure_create_dummy(m, proc_name, t_equal_proc);
 	map_set(&m->equal_procs, type, p);
+	p->split_returns_index = 2;
 
 	cg_procedure_begin(p);
 
@@ -1168,6 +1171,7 @@ gb_internal cgProcedure *cg_hasher_proc_for_type(cgModule *m, Type *type) {
 
 	cgProcedure *p = cg_procedure_create_dummy(m, proc_name, t_hasher_proc);
 	map_set(&m->hasher_procs, type, p);
+	p->split_returns_index = 2;
 
 	cg_procedure_begin(p);
 	defer (cg_procedure_end(p));
