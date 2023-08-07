@@ -347,7 +347,6 @@ gb_internal Entity *alloc_entity_using_variable(Entity *parent, Token token, Typ
 	entity->using_parent = parent;
 	entity->parent_proc_decl = parent->parent_proc_decl;
 	entity->using_expr = using_expr;
-	GB_ASSERT(using_expr != nullptr);
 	entity->flags |= EntityFlag_Using;
 	entity->flags |= EntityFlag_Used;
 	entity->state = EntityState_Resolved;
