@@ -44,10 +44,10 @@ GuiStyleProp :: struct {
 
 // Gui control state
 GuiState :: enum c.int {
-	STATE_NORMAL = 0,
+    STATE_NORMAL = 0,
     STATE_FOCUSED,
-	STATE_PRESSED,
-	STATE_DISABLED,
+    STATE_PRESSED,
+    STATE_DISABLED,
 }
 
 // Gui control text alignment
