@@ -274,8 +274,8 @@ foreign lib {
     GuiComboBox     :: proc(bounds: Rectangle, text: cstring, active: ^c.int) -> c.int ---                // Combo Box control, returns selected item index
 
     GuiDropdownBox  :: proc(bounds: Rectangle, text: cstring, active: ^c.int, editMode: bool) -> c.int --- // Dropdown Box control, returns selected item
-    GuiSpinner      :: proc(bounds: Rectangle, text: cstring, value: ^c.int, minValue: c.int, maxValue: c.int, editMode: bool) -> c.int --- // Spinner control, returns selected value
-    GuiValueBox     :: proc(bounds: Rectangle, text: cstring, value: ^c.int, minValue: c.int, maxValue: c.int, editMode: bool) -> c.int --- // Value Box control, updates input text with numbers
+    GuiSpinner      :: proc(bounds: Rectangle, text: cstring, value: ^c.int, minValue, maxValue: c.int, editMode: bool) -> c.int --- // Spinner control, returns selected value
+    GuiValueBox     :: proc(bounds: Rectangle, text: cstring, value: ^c.int, minValue, maxValue: c.int, editMode: bool) -> c.int --- // Value Box control, updates input text with numbers
     GuiTextBox      :: proc(bounds: Rectangle, text: cstring, textSize: c.int, editMode: bool) -> c.int --- // Text Box control, updates input text
 
     GuiSlider       :: proc(bounds: Rectangle, textLeft: cstring, textRight: cstring, value: ^f32, minValue: f32, maxValue: f32) -> c.int --- // Slider control, returns selected value
