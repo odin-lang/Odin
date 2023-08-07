@@ -420,7 +420,7 @@ expect_closing_brace_of_field_list :: proc(p: ^Parser) -> tokenizer.Token {
 	if allow_token(p, .Close_Brace) {
 		return token
 	}
-	if allow_token(p, .Semicolon) {
+	if allow_token(p, .Semicolon) && !tokenizer.is_newline(token) {
 		str := tokenizer.token_to_string(token)
 		error(p, end_of_line_pos(p, p.prev_tok), "expected a comma, got %s", str)
 	}
@@ -1836,7 +1836,9 @@ parse_field_list :: proc(p: ^Parser, follow: tokenizer.Token_Kind, allowed_flags
 				return true
 			}
 			if allow_token(p, .Semicolon) {
-				error(p, tok.pos, "expected a comma, got a semicolon")
+				if !tokenizer.is_newline(tok) {
+					error(p, tok.pos, "expected a comma, got a semicolon")
+				}
 				return true
 			}
 			return false
