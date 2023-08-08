@@ -499,6 +499,16 @@ Odin_Build_Mode_Type :: type_of(ODIN_BUILD_MODE)
 Odin_Endian_Type :: type_of(ODIN_ENDIAN)
 
 
+/*
+	// Defined internally by the compiler
+	Odin_Platform_Subtarget_Type :: enum int {
+		Default,
+		iOS,
+	}
+*/
+Odin_Platform_Subtarget_Type :: type_of(ODIN_PLATFORM_TARGET)
+
+
 /////////////////////////////
 // Init Startup Procedures //
 /////////////////////////////
