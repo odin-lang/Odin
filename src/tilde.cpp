@@ -645,7 +645,7 @@ gb_internal String cg_get_entity_name(cgModule *m, Entity *e) {
 #include "tilde_stmt.cpp"
 
 
-gb_internal String cg_filepath_obj_for_module(cgModule *m) {
+gb_internal String cg_filepath_obj_for_module(cgModule *m, bool use_assembly) {
 	String path = concatenate3_strings(permanent_allocator(),
 		build_context.build_paths[BuildPath_Output].basename,
 		STR_LIT("/"),
@@ -663,7 +663,7 @@ gb_internal String cg_filepath_obj_for_module(cgModule *m) {
 
 	String ext = {};
 
-	if (build_context.build_mode == BuildMode_Assembly) {
+	if (use_assembly) {
 		ext = STR_LIT(".S");
 	} else {
 		if (is_arch_wasm()) {
@@ -827,7 +827,7 @@ gb_internal bool cg_generate_code(Checker *c, LinkerData *linker_data) {
 	TB_ExportBuffer export_buffer = tb_module_object_export(m->mod, debug_format);
 	defer (tb_export_buffer_free(export_buffer));
 
-	String filepath_obj = cg_filepath_obj_for_module(m);
+	String filepath_obj = cg_filepath_obj_for_module(m, false);
 	array_add(&linker_data->output_object_paths, filepath_obj);
 	GB_ASSERT(tb_export_buffer_to_file(export_buffer, cast(char const *)filepath_obj.text));
 
