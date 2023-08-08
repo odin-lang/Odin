@@ -1155,7 +1155,7 @@ threading_example :: proc() {
 		threads := make([dynamic]^thread.Thread, 0, len(prefix_table))
 		defer delete(threads)
 
-		for in prefix_table {
+		for _ in prefix_table {
 			if t := thread.create(worker_proc); t != nil {
 				t.init_context = context
 				t.user_index = len(threads)

@@ -1565,7 +1565,7 @@ fmt_bit_set :: proc(fi: ^Info, v: any, name: string = "") {
 // - fi: A pointer to the Info structure where the indents will be written.
 //
 fmt_write_indent :: proc(fi: ^Info) {
-	for in 0..<fi.indent {
+	for _ in 0..<fi.indent {
 		io.write_byte(fi.writer, '\t', &fi.n)
 	}
 }
@@ -1720,7 +1720,7 @@ fmt_struct :: proc(fi: ^Info, v: any, the_verb: rune, info: runtime.Type_Info_St
 	}
 	defer {
 		if hash {
-			for in 0..<indent { io.write_byte(fi.writer, '\t', &fi.n) }
+			for _ in 0..<indent { io.write_byte(fi.writer, '\t', &fi.n) }
 		}
 		io.write_byte(fi.writer, ']' if is_soa else '}', &fi.n)
 	}
@@ -1956,7 +1956,7 @@ fmt_named :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Named) 
 		for x := i; x >= 10; x /= 10 {
 			n -= 1
 		}
-		for in 0..<n {
+		for _ in 0..<n {
 			io.write_byte(fi.writer, '0', &fi.n)
 		}
 		io.write_i64(fi.writer, i, 10, &fi.n)
@@ -1989,7 +1989,7 @@ fmt_named :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Named) 
 			v := v
 			w := len(buf)
 			print := false
-			for in 0..<prec {
+			for _ in 0..<prec {
 				digit := v % 10
 				print = print || digit != 0
 				if print {

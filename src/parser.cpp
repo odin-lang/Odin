@@ -4271,6 +4271,8 @@ gb_internal Ast *parse_for_stmt(AstFile *f) {
 
 		if (f->curr_token.kind == Token_in) {
 			Token in_token = expect_token(f, Token_in);
+			syntax_error(in_token, "Prefer 'for _ in' over 'for in'");
+
 			Ast *rhs = nullptr;
 			bool prev_allow_range = f->allow_range;
 			f->allow_range = true;
@@ -4282,6 +4284,7 @@ gb_internal Ast *parse_for_stmt(AstFile *f) {
 			} else {
 				body = parse_block_stmt(f, false);
 			}
+
 			return ast_range_stmt(f, token, {}, in_token, rhs, body);
 		}
 
