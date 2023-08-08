@@ -123,6 +123,18 @@ struct TargetMetrics {
 	TargetABIKind  abi;
 };
 
+enum Subtarget : u32 {
+	Subtarget_Default,
+	Subtarget_iOS,
+
+	Subtarget_COUNT,
+};
+
+gb_global String subtarget_strings[Subtarget_COUNT] = {
+	str_lit(""),
+	str_lit("ios"),
+};
+
 
 enum QueryDataSetKind {
 	QueryDataSet_Invalid,
@@ -585,6 +597,8 @@ gb_global NamedTargetMetrics named_targets[] = {
 };
 
 gb_global NamedTargetMetrics *selected_target_metrics;
+gb_global Subtarget selected_subtarget;
+
 
 gb_internal TargetOsKind get_target_os_from_string(String str) {
 	for (isize i = 0; i < TargetOs_COUNT; i++) {
@@ -1147,7 +1161,7 @@ gb_internal char *token_pos_to_string(TokenPos const &pos) {
 	return s;
 }
 
-gb_internal void init_build_context(TargetMetrics *cross_target) {
+gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subtarget) {
 	BuildContext *bc = &build_context;
 
 	gb_affinity_init(&bc->affinity);
@@ -1242,6 +1256,21 @@ gb_internal void init_build_context(TargetMetrics *cross_target) {
 
 
 	bc->metrics = *metrics;
+	switch (subtarget) {
+	case Subtarget_Default:
+		break;
+	case Subtarget_iOS:
+		GB_ASSERT(metrics->os == TargetOs_darwin);
+		if (metrics->arch == TargetArch_arm64) {
+			bc->metrics.target_triplet = str_lit("arm64-apple-ios");
+		} else if (metrics->arch == TargetArch_amd64) {
+			bc->metrics.target_triplet = str_lit("x86_64-apple-ios");
+		} else {
+			GB_PANIC("Unknown architecture for darwin");
+		}
+		break;
+	}
+
 	bc->ODIN_OS        = target_os_names[metrics->os];
 	bc->ODIN_ARCH      = target_arch_names[metrics->arch];
 	bc->endian_kind    = target_endians[metrics->arch];
