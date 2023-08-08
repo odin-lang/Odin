@@ -506,7 +506,7 @@ Odin_Endian_Type :: type_of(ODIN_ENDIAN)
 		iOS,
 	}
 */
-Odin_Platform_Subtarget_Type :: type_of(ODIN_PLATFORM_TARGET)
+Odin_Platform_Subtarget_Type :: type_of(ODIN_PLATFORM_SUBTARGET)
 
 
 /////////////////////////////
