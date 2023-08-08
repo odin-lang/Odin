@@ -471,7 +471,7 @@ join_port :: proc(address_or_host: string, port: int, allocator := context.alloc
 		// hostname
 		fmt.sbprintf(&b, "%v:%v", addr_or_host, port)
 	} else {
-		switch in addr {
+		switch _ in addr {
 		case IP4_Address:
 			fmt.sbprintf(&b, "%v:%v", address_to_string(addr), port)
 		case IP6_Address:
@@ -606,7 +606,7 @@ to_string :: proc{address_to_string, endpoint_to_string}
 
 
 family_from_address :: proc(addr: Address) -> Address_Family {
-	switch in addr {
+	switch _ in addr {
 	case IP4_Address: return .IP4
 	case IP6_Address: return .IP6
 	case:

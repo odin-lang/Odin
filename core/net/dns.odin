@@ -96,7 +96,7 @@ resolve :: proc(hostname_and_maybe_port: string) -> (ep4, ep6: Endpoint, err: Ne
 	switch t in target {
 	case Endpoint:
 		// NOTE(tetra): The hostname was actually an IP address; nothing to resolve, so just return it.
-		switch in t.address {
+		switch _ in t.address {
 		case IP4_Address: ep4 = t
 		case IP6_Address: ep6 = t
 		case:             unreachable()
@@ -122,7 +122,7 @@ resolve_ip4 :: proc(hostname_and_maybe_port: string) -> (ep4: Endpoint, err: Net
 	switch t in target {
 	case Endpoint:
 		// NOTE(tetra): The hostname was actually an IP address; nothing to resolve, so just return it.
-		switch in t.address {
+		switch _ in t.address {
 		case IP4_Address:
 			return t, nil
 		case IP6_Address:
@@ -149,7 +149,7 @@ resolve_ip6 :: proc(hostname_and_maybe_port: string) -> (ep6: Endpoint, err: Net
 	switch t in target {
 	case Endpoint:
 		// NOTE(tetra): The hostname was actually an IP address; nothing to resolve, so just return it.
-		switch in t.address {
+		switch _ in t.address {
 		case IP4_Address:
 			err = .Unable_To_Resolve
 			return

@@ -1091,7 +1091,7 @@ parse_attribute :: proc(p: ^Parser, tok: tokenizer.Token, open_kind, close_kind:
 
 parse_foreign_block_decl :: proc(p: ^Parser) -> ^ast.Stmt {
 	decl := parse_stmt(p)
-	#partial switch in decl.derived_stmt {
+	#partial switch _ in decl.derived_stmt {
 	case ^ast.Empty_Stmt, ^ast.Bad_Stmt, ^ast.Bad_Decl:
 		// Ignore
 		return nil

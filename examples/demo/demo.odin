@@ -1354,13 +1354,13 @@ partial_switch :: proc() {
 	{ // union
 		Foo :: union {int, bool}
 		f: Foo = 123
-		switch in f {
+		switch _ in f {
 		case int:  fmt.println("int")
 		case bool: fmt.println("bool")
 		case:
 		}
 
-		#partial switch in f {
+		#partial switch _ in f {
 		case bool: fmt.println("bool")
 		}
 	}

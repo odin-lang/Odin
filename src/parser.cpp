@@ -4382,7 +4382,10 @@ gb_internal Ast *parse_switch_stmt(AstFile *f) {
 		f->expr_level = -1;
 		defer (f->expr_level = prev_level);
 
-		if (allow_token(f, Token_in)) {
+		if (f->curr_token.kind == Token_in) {
+			Token in_token = expect_token(f, Token_in);
+			syntax_error(in_token, "Prefer 'switch _ in' over 'switch in'");
+
 			auto lhs = array_make<Ast *>(heap_allocator(), 0, 1);
 			auto rhs = array_make<Ast *>(heap_allocator(), 0, 1);
 			Token blank_ident = token;
