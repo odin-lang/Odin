@@ -321,7 +321,14 @@ gb_internal void check_type_decl(CheckerContext *ctx, Entity *e, Ast *init_expr,
 			gb_string_free(str);
 			is_distinct = false;
 		}
+	} else {
+		if (is_type_typeid(e->type)) {
+			error(init_expr, "'typeid' cannot be aliased");
+		} else if (is_type_any(e->type)) {
+			error(init_expr, "'any' cannot be aliased");
+		}
 	}
+
 	if (!is_distinct) {
 		e->type = bt;
 		named->Named.base = bt;
