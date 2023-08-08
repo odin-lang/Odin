@@ -1411,12 +1411,13 @@ gb_internal Token expect_token(AstFile *f, TokenKind kind) {
 }
 
 gb_internal Token expect_token_after(AstFile *f, TokenKind kind, char const *msg) {
-	Token prev = f->curr_token;
-	if (prev.kind != kind) {
-		String p = token_to_string(prev);
+	Token prev = f->prev_token;
+	Token curr = f->curr_token;
+	if (curr.kind != kind) {
+		String p = token_to_string(curr);
 		Token token = f->curr_token;
-		if (token_is_newline(prev)) {
-			token = prev;
+		if (token_is_newline(curr)) {
+			token = curr;
 			token.pos.column -= 1;
 			skip_possible_newline(f);
 		}
@@ -1426,7 +1427,13 @@ gb_internal Token expect_token_after(AstFile *f, TokenKind kind, char const *msg
 		             LIT(p));
 	}
 	advance_token(f);
-	return prev;
+
+	if (ast_file_vet_style(f) &&
+	    prev.kind == Token_Comma &&
+	    prev.pos.line == curr.pos.line) {
+		syntax_error(prev, "No need for a trailing comma followed by a %.*s on the same line", LIT(token_strings[kind]));
+	}
+	return curr;
 }
 
 
