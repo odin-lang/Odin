@@ -4339,6 +4339,13 @@ gb_internal Ast *parse_for_stmt(AstFile *f) {
 	}
 
 	cond = convert_stmt_to_expr(f, cond, str_lit("boolean expression"));
+	if (init != nullptr &&
+	    cond == nullptr &&
+	    post == nullptr) {
+		syntax_error(init, "'for init; ; {' without an explicit condition nor post statement is not allowed, please prefer something like 'for init; true; /**/{'");
+	}
+
+
 	return ast_for_stmt(f, token, init, cond, post, body);
 }
 

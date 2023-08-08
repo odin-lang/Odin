@@ -306,10 +306,10 @@ decode_huffman_slowpath :: proc(z: ^$C, t: ^Huffman_Table) -> (r: u16, err: Erro
 	code := u16(compress.peek_bits_lsb(z,16))
 
 	k := int(z_bit_reverse(code, 16))
-	s: u8
 
-	#no_bounds_check for s = HUFFMAN_FAST_BITS+1; ; {
-		if k < t.maxcode[s] {
+	s: u8 = HUFFMAN_FAST_BITS+1
+	for {
+		#no_bounds_check if k < t.maxcode[s] {
 			break
 		}
 		s += 1
