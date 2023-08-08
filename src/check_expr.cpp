@@ -7758,7 +7758,10 @@ gb_internal void add_constant_switch_case(CheckerContext *ctx, SeenMap *seen, Op
 		multi_map_get_all(seen, key, taps);
 		for (isize i = 0; i < count; i++) {
 			TypeAndToken tap = taps[i];
-			if (!are_types_identical(operand.type, tap.type)) {
+			Operand to = {};
+			to.mode = Addressing_Value;
+			to.type = tap.type;
+			if (!check_is_assignable_to_with_score(ctx, &to, operand.type, nullptr)) {
 				continue;
 			}
 
@@ -7801,20 +7804,8 @@ gb_internal void add_to_seen_map(CheckerContext *ctx, SeenMap *seen, TokenKind u
 				break;
 			}
 
-			bool found = false;
-			for (Entity *f : bt->Enum.fields) {
-				GB_ASSERT(f->kind == Entity_Constant);
-
-				i64 fv = exact_value_to_i64(f->Constant.value);
-				if (fv == vi) {
-					found = true;
-					break;
-				}
-			}
-			if (found) {
-				v.value = exact_value_i64(vi);
-				add_constant_switch_case(ctx, seen, v);
-			}
+			v.value = exact_value_i64(vi);
+			add_constant_switch_case(ctx, seen, v);
 		}
 	} else {
 		add_constant_switch_case(ctx, seen, lhs);
