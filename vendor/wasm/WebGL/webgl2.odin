@@ -1,6 +1,10 @@
 package webgl
 
-foreign import "webgl2"
+when ODIN_OS == .Windows {
+    foreign import "webgl2"
+} else {
+    foreign import "system:webgl2"
+}
 
 import glm "core:math/linalg/glsl"
 
