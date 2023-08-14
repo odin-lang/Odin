@@ -135,7 +135,8 @@ run_with_poly_data3 :: proc(arg1: $T1, arg2: $T2, arg3: $T3, fn: proc(arg1: T1, 
 run_with_poly_data4 :: proc(arg1: $T1, arg2: $T2, arg3: $T3, arg4: $T4, fn: proc(arg1: T1, arg2: T2, arg3: T3, arg4: T4), init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal)
 	where size_of(T1) <= size_of(rawptr),
 	      size_of(T2) <= size_of(rawptr),
-	      size_of(T3) <= size_of(rawptr) {
+	      size_of(T3) <= size_of(rawptr),
+	      size_of(T4) <= size_of(rawptr) {
 	create_and_start_with_poly_data4(arg1, arg2, arg3, arg4, fn, init_context, priority, true)
 }
 
@@ -241,7 +242,8 @@ create_and_start_with_poly_data3 :: proc(arg1: $T1, arg2: $T2, arg3: $T3, fn: pr
 create_and_start_with_poly_data4 :: proc(arg1: $T1, arg2: $T2, arg3: $T3, arg4: $T4, fn: proc(arg1: T1, arg2: T2, arg3: T3, arg4: T4), init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal, self_cleanup := false) -> ^Thread
 	where size_of(T1) <= size_of(rawptr),
 	      size_of(T2) <= size_of(rawptr),
-	      size_of(T3) <= size_of(rawptr) {
+	      size_of(T3) <= size_of(rawptr),
+	      size_of(T4) <= size_of(rawptr) {
 	thread_proc :: proc(t: ^Thread) {
 		fn := cast(proc(T1, T2, T3, T4))t.data
 		assert(t.user_index >= 4)
