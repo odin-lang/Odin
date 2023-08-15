@@ -59,13 +59,14 @@ Memory_Block_Flag :: enum u32 {
 Memory_Block_Flags :: distinct bit_set[Memory_Block_Flag; u32]
 
 
+@(private="file", require_results)
+align_formula :: #force_inline proc "contextless" (size, align: uint) -> uint {
+	result := size + align-1
+	return result - result%align
+}
+
 @(require_results)
 memory_block_alloc :: proc(committed, reserved: uint, flags: Memory_Block_Flags) -> (block: ^Memory_Block, err: Allocator_Error) {
-	align_formula :: proc "contextless" (size, align: uint) -> uint {
-		result := size + align-1
-		return result - result%align
-	}
-	
 	page_size := DEFAULT_PAGE_SIZE
 	assert(mem.is_power_of_two(uintptr(page_size)))
 	committed := committed
@@ -120,6 +121,8 @@ alloc_from_memory_block :: proc(block: ^Memory_Block, min_size, alignment: uint)
 			pmblock := (^Platform_Memory_Block)(block)
 			base_offset := uint(uintptr(pmblock.block.base) - uintptr(pmblock))
 			platform_total_commit := base_offset + block.used + size
+			platform_total_commit = align_formula(platform_total_commit, DEFAULT_PAGE_SIZE)
+			platform_total_commit = min(platform_total_commit, pmblock.reserved)
 
 			assert(pmblock.committed <= pmblock.reserved)
 			assert(pmblock.committed < platform_total_commit)
