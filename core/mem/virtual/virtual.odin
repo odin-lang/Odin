@@ -2,6 +2,8 @@ package mem_virtual
 
 import "core:mem"
 import "core:intrinsics"
+import "core:runtime"
+_ :: runtime
 
 DEFAULT_PAGE_SIZE := uint(4096)
 
@@ -83,7 +85,7 @@ memory_block_alloc :: proc(committed, reserved: uint, flags: Memory_Block_Flags)
 	
 	do_protection := false
 	if .Overflow_Protection in flags { // overflow protection
-		rounded_size := align_formula(uint(reserved), page_size)
+		rounded_size   := reserved
 		total_size     = uint(rounded_size + 2*page_size)
 		base_offset    = uintptr(page_size + rounded_size - uint(reserved))
 		protect_offset = uintptr(page_size + rounded_size)
@@ -92,14 +94,14 @@ memory_block_alloc :: proc(committed, reserved: uint, flags: Memory_Block_Flags)
 	
 	pmblock := platform_memory_alloc(0, total_size) or_return
 	
-	pmblock.block.base = ([^]byte)(uintptr(pmblock) + base_offset)
+	pmblock.block.base = ([^]byte)(pmblock)[base_offset:]
 	platform_memory_commit(pmblock, uint(base_offset) + committed) or_return
 
 	// Should be zeroed
 	assert(pmblock.block.used == 0)
 	assert(pmblock.block.prev == nil)	
 	if do_protection {
-		protect(rawptr(uintptr(pmblock) + protect_offset), page_size, Protect_No_Access)
+		protect(([^]byte)(pmblock)[protect_offset:], page_size, Protect_No_Access)
 	}
 	
 	pmblock.block.committed = committed
@@ -125,7 +127,11 @@ alloc_from_memory_block :: proc(block: ^Memory_Block, min_size, alignment: uint)
 		if block.committed - block.used < size {
 			pmblock := (^Platform_Memory_Block)(block)
 			base_offset := uint(uintptr(pmblock.block.base) - uintptr(pmblock))
-			platform_total_commit := base_offset + block.used + size
+
+			// NOTE(bill): [Heuristic] grow the commit size larger than needed
+			// TODO(bill): determine a better heuristic for this behaviour
+			extra_size := max(size, block.committed>>2)
+			platform_total_commit := base_offset + block.used + extra_size
 			platform_total_commit = align_formula(platform_total_commit, DEFAULT_PAGE_SIZE)
 			platform_total_commit = min(platform_total_commit, pmblock.reserved)
 
@@ -136,8 +142,9 @@ alloc_from_memory_block :: proc(block: ^Memory_Block, min_size, alignment: uint)
 
 			pmblock.committed = platform_total_commit
 			block.committed = pmblock.committed - base_offset
+
 		}
-		return nil
+		return
 	}
 
 	if block == nil {
