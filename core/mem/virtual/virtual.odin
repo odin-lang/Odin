@@ -130,7 +130,7 @@ alloc_from_memory_block :: proc(block: ^Memory_Block, min_size, alignment: uint)
 
 			// NOTE(bill): [Heuristic] grow the commit size larger than needed
 			// TODO(bill): determine a better heuristic for this behaviour
-			extra_size := max(size, block.committed>>2)
+			extra_size := max(size, block.committed>>1)
 			platform_total_commit := base_offset + block.used + extra_size
 			platform_total_commit = align_formula(platform_total_commit, DEFAULT_PAGE_SIZE)
 			platform_total_commit = min(platform_total_commit, pmblock.reserved)
