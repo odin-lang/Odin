@@ -208,7 +208,7 @@ Event :: struct {
 	is_composing: bool,
 	is_trusted:   bool,
 
-	using data: struct #raw_union #align 8 {
+	using data: struct #raw_union #align(8) {
 		scroll: struct {
 			delta: [2]f64,
 		},

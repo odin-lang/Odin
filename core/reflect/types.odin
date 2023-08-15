@@ -580,9 +580,9 @@ write_type_writer :: proc(w: io.Writer, ti: ^Type_Info, n_written: ^int = nil) -
 		if info.is_packed    { io.write_string(w, "#packed ",    &n) or_return }
 		if info.is_raw_union { io.write_string(w, "#raw_union ", &n) or_return }
 		if info.custom_align {
-			io.write_string(w, "#align ",      &n) or_return
+			io.write_string(w, "#align(",      &n) or_return
 			io.write_i64(w, i64(ti.align), 10, &n) or_return
-			io.write_byte(w, ' ',              &n) or_return
+			io.write_string(w, ") ",           &n) or_return
 		}
 		io.write_byte(w, '{', &n) or_return
 		for name, i in info.names {
@@ -598,9 +598,9 @@ write_type_writer :: proc(w: io.Writer, ti: ^Type_Info, n_written: ^int = nil) -
 		if info.no_nil     { io.write_string(w, "#no_nil ", &n)     or_return }
 		if info.shared_nil { io.write_string(w, "#shared_nil ", &n) or_return }
 		if info.custom_align {
-			io.write_string(w, "#align ",      &n) or_return
+			io.write_string(w, "#align(",      &n) or_return
 			io.write_i64(w, i64(ti.align), 10, &n) or_return
-			io.write_byte(w, ' ',              &n) or_return
+			io.write_string(w, ") ",           &n) or_return
 		}
 		io.write_byte(w, '{', &n) or_return
 		for variant, i in info.variants {

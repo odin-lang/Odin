@@ -398,9 +398,9 @@ print_type :: proc "contextless" (ti: ^Type_Info) {
 		if info.is_packed    { print_string("#packed ") }
 		if info.is_raw_union { print_string("#raw_union ") }
 		if info.custom_align {
-			print_string("#align ")
+			print_string("#align(")
 			print_u64(u64(ti.align))
-			print_byte(' ')
+			print_string(") ")
 		}
 		print_byte('{')
 		for name, i in info.names {
@@ -414,8 +414,9 @@ print_type :: proc "contextless" (ti: ^Type_Info) {
 	case Type_Info_Union:
 		print_string("union ")
 		if info.custom_align {
-			print_string("#align ")
+			print_string("#align(")
 			print_u64(u64(ti.align))
+			print_string(") ")
 		}
 		if info.no_nil {
 			print_string("#no_nil ")

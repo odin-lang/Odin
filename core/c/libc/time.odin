@@ -35,12 +35,12 @@ when ODIN_OS == .Windows {
 	clock_t        :: distinct long
 	time_t         :: distinct i64
 
-	timespec :: struct #align 8 {
+	timespec :: struct #align(8) {
 		tv_sec:  time_t,
 		tv_nsec: long,
 	}
 
-	tm :: struct #align 8 {
+	tm :: struct #align(8) {
 		tm_sec, tm_min, tm_hour, tm_mday, tm_mon, tm_year, tm_wday, tm_yday, tm_isdst: int,
 	}
 }

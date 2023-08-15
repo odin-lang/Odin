@@ -2485,6 +2485,13 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 					syntax_error(tag, "Duplicate struct tag '#%.*s'", LIT(tag.string));
 				}
 				align = parse_expr(f, true);
+				if (align && align->kind != Ast_ParenExpr) {
+					ERROR_BLOCK();
+					gbString s = expr_to_string(align);
+					syntax_warning(tag, "#align requires parentheses around the expression");
+					error_line("\tSuggestion: #align(%s)", s);
+					gb_string_free(s);
+				}
 			} else if (tag.string == "raw_union") {
 				if (is_raw_union) {
 					syntax_error(tag, "Duplicate struct tag '#%.*s'", LIT(tag.string));
@@ -2566,6 +2573,13 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 					syntax_error(tag, "Duplicate union tag '#%.*s'", LIT(tag.string));
 				}
 				align = parse_expr(f, true);
+				if (align && align->kind != Ast_ParenExpr) {
+					ERROR_BLOCK();
+					gbString s = expr_to_string(align);
+					syntax_warning(tag, "#align requires parentheses around the expression");
+					error_line("\tSuggestion: #align(%s)", s);
+					gb_string_free(s);
+				}
 			} else if (tag.string == "no_nil") {
 				if (no_nil) {
 					syntax_error(tag, "Duplicate union tag '#%.*s'", LIT(tag.string));
