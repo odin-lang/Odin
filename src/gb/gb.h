@@ -195,7 +195,6 @@ extern "C" {
 		#endif
 	#endif
 
-	#include <malloc.h> // NOTE(bill): _aligned_*()
 	#include <intrin.h>
 #else
 	#include <dlfcn.h>
@@ -814,26 +813,6 @@ GB_DEF isize gb_affinity_thread_count_for_core(gbAffinity *a, isize core);
 
 
 
-////////////////////////////////////////////////////////////////
-//
-// Virtual Memory
-//
-//
-
-typedef struct gbVirtualMemory {
-	void *data;
-	isize size;
-} gbVirtualMemory;
-
-GB_DEF gbVirtualMemory gb_virtual_memory(void *data, isize size);
-GB_DEF gbVirtualMemory gb_vm_alloc      (void *addr, isize size);
-GB_DEF b32             gb_vm_free       (gbVirtualMemory vm);
-GB_DEF gbVirtualMemory gb_vm_trim       (gbVirtualMemory vm, isize lead_size, isize size);
-GB_DEF b32             gb_vm_purge      (gbVirtualMemory vm);
-GB_DEF isize gb_virtual_memory_page_size(isize *alignment_out);
-
-
-
 
 ////////////////////////////////////////////////////////////////
 //
@@ -902,7 +881,6 @@ GB_DEF void *gb_default_resize_align(gbAllocator a, void *ptr, isize old_size, i
 // TODO(bill): Probably use a custom heap allocator system that doesn't depend on malloc/free
 // Base it off TCMalloc or something else? Or something entirely custom?
 GB_DEF gbAllocator gb_heap_allocator(void);
-GB_DEF GB_ALLOCATOR_PROC(gb_heap_allocator_proc);
 
 // NOTE(bill): Yep, I use my own allocator system!
 #ifndef gb_malloc
@@ -965,9 +943,6 @@ GB_DEF GB_RADIX_SORT_PROC(u64);
 // NOTE(bill): Returns index or -1 if not found
 #define gb_binary_search_array(array, count, key, compare_proc) gb_binary_search(array, count, gb_size_of(*(array)), key, compare_proc)
 GB_DEF isize gb_binary_search(void const *base, isize count, isize size, void const *key, gbCompareProc compare_proc);
-
-#define gb_shuffle_array(array, count) gb_shuffle(array, count, gb_size_of(*(array)))
-GB_DEF void gb_shuffle(void *base, isize count, isize size);
 
 #define gb_reverse_array(array, count) gb_reverse(array, count, gb_size_of(*(array)))
 GB_DEF void gb_reverse(void *base, isize count, isize size);
@@ -1173,207 +1148,6 @@ GB_DEF gbString gb_string_trim_space     (gbString str); // Whitespace ` \t\r\n\
 
 
 
-////////////////////////////////////////////////////////////////
-//
-// Fixed Capacity Buffer (POD Types)
-//
-//
-// gbBuffer(Type) works like gbString or gbArray where the actual type is just a pointer to the first
-// element.
-//
-
-typedef struct gbBufferHeader {
-	isize count;
-	isize capacity;
-} gbBufferHeader;
-
-#define gbBuffer(Type) Type *
-
-#define GB_BUFFER_HEADER(x)   (cast(gbBufferHeader *)(x) - 1)
-#define gb_buffer_count(x)    (GB_BUFFER_HEADER(x)->count)
-#define gb_buffer_capacity(x) (GB_BUFFER_HEADER(x)->capacity)
-
-#define gb_buffer_init(x, allocator, cap) do { \
-	void **nx = cast(void **)&(x); \
-	gbBufferHeader *gb__bh = cast(gbBufferHeader *)gb_alloc((allocator), (cap)*gb_size_of(*(x))); \
-	gb__bh->count = 0; \
-	gb__bh->capacity = cap; \
-	*nx = cast(void *)(gb__bh+1); \
-} while (0)
-
-
-#define gb_buffer_free(x, allocator) (gb_free(allocator, GB_BUFFER_HEADER(x)))
-
-#define gb_buffer_append(x, item) do { (x)[gb_buffer_count(x)++] = (item); } while (0)
-
-#define gb_buffer_appendv(x, items, item_count) do { \
-	GB_ASSERT(gb_size_of(*(items)) == gb_size_of(*(x))); \
-	GB_ASSERT(gb_buffer_count(x)+item_count <= gb_buffer_capacity(x)); \
-	gb_memcopy(&(x)[gb_buffer_count(x)], (items), gb_size_of(*(x))*(item_count)); \
-	gb_buffer_count(x) += (item_count); \
-} while (0)
-
-#define gb_buffer_pop(x)   do { GB_ASSERT(gb_buffer_count(x) > 0); gb_buffer_count(x)--; } while (0)
-#define gb_buffer_clear(x) do { gb_buffer_count(x) = 0; } while (0)
-
-
-
-////////////////////////////////////////////////////////////////
-//
-// Dynamic Array (POD Types)
-//
-// NOTE(bill): I know this is a macro hell but C is an old (and shit) language with no proper arrays
-// Also why the fuck not?! It fucking works! And it has custom allocation, which is already better than C++!
-//
-// gbArray(Type) works like gbString or gbBuffer where the actual type is just a pointer to the first
-// element.
-//
-
-
-
-// Available Procedures for gbArray(Type)
-// gb_array_init
-// gb_array_free
-// gb_array_set_capacity
-// gb_array_grow
-// gb_array_append
-// gb_array_appendv
-// gb_array_pop
-// gb_array_clear
-// gb_array_resize
-// gb_array_reserve
-//
-
-#if 0 // Example
-void foo(void) {
-	isize i;
-	int test_values[] = {4, 2, 1, 7};
-	gbAllocator a = gb_heap_allocator();
-	gbArray(int) items;
-
-	gb_array_init(items, a);
-
-	gb_array_append(items, 1);
-	gb_array_append(items, 4);
-	gb_array_append(items, 9);
-	gb_array_append(items, 16);
-
-	items[1] = 3; // Manually set value
-	              // NOTE: No array bounds checking
-
-	for (i = 0; i < items.count; i++)
-		gb_printf("%d\n", items[i]);
-	// 1
-	// 3
-	// 9
-	// 16
-
-	gb_array_clear(items);
-
-	gb_array_appendv(items, test_values, gb_count_of(test_values));
-	for (i = 0; i < items.count; i++)
-		gb_printf("%d\n", items[i]);
-	// 4
-	// 2
-	// 1
-	// 7
-
-	gb_array_free(items);
-}
-#endif
-
-typedef struct gbArrayHeader {
-	gbAllocator allocator;
-	isize       count;
-	isize       capacity;
-} gbArrayHeader;
-
-// NOTE(bill): This thing is magic!
-#define gbArray(Type) Type *
-
-#ifndef GB_ARRAY_GROW_FORMULA
-#define GB_ARRAY_GROW_FORMULA(x) (2*(x) + 8)
-#endif
-
-GB_STATIC_ASSERT(GB_ARRAY_GROW_FORMULA(0) > 0);
-
-#define GB_ARRAY_HEADER(x)    (cast(gbArrayHeader *)(x) - 1)
-#define gb_array_allocator(x) (GB_ARRAY_HEADER(x)->allocator)
-#define gb_array_count(x)     (GB_ARRAY_HEADER(x)->count)
-#define gb_array_capacity(x)  (GB_ARRAY_HEADER(x)->capacity)
-
-// TODO(bill): Have proper alignment!
-#define gb_array_init_reserve(x, allocator_, cap) do { \
-	void **gb__array_ = cast(void **)&(x); \
-	gbArrayHeader *gb__ah = cast(gbArrayHeader *)gb_alloc(allocator_, gb_size_of(gbArrayHeader)+gb_size_of(*(x))*(cap)); \
-	gb__ah->allocator = allocator_; \
-	gb__ah->count = 0; \
-	gb__ah->capacity = cap; \
-	*gb__array_ = cast(void *)(gb__ah+1); \
-} while (0)
-
-// NOTE(bill): Give it an initial default capacity
-#define gb_array_init(x, allocator) gb_array_init_reserve(x, allocator, GB_ARRAY_GROW_FORMULA(0))
-
-#define gb_array_free(x) do { \
-	gbArrayHeader *gb__ah = GB_ARRAY_HEADER(x); \
-	gb_free(gb__ah->allocator, gb__ah); \
-} while (0)
-
-#define gb_array_set_capacity(x, capacity) do { \
-	if (x) { \
-		void **gb__array_ = cast(void **)&(x); \
-		*gb__array_ = gb__array_set_capacity((x), (capacity), gb_size_of(*(x))); \
-	} \
-} while (0)
-
-// NOTE(bill): Do not use the thing below directly, use the macro
-GB_DEF void *gb__array_set_capacity(void *array, isize capacity, isize element_size);
-
-
-// TODO(bill): Decide on a decent growing formula for gbArray
-#define gb_array_grow(x, min_capacity) do { \
-	isize new_capacity = GB_ARRAY_GROW_FORMULA(gb_array_capacity(x)); \
-	if (new_capacity < (min_capacity)) \
-		new_capacity = (min_capacity); \
-	gb_array_set_capacity(x, new_capacity); \
-} while (0)
-
-
-#define gb_array_append(x, item) do { \
-	if (gb_array_capacity(x) < gb_array_count(x)+1) \
-		gb_array_grow(x, 0); \
-	(x)[gb_array_count(x)++] = (item); \
-} while (0)
-
-#define gb_array_appendv(x, items, item_count) do { \
-	gbArrayHeader *gb__ah = GB_ARRAY_HEADER(x); \
-	GB_ASSERT(gb_size_of((items)[0]) == gb_size_of((x)[0])); \
-	if (gb__ah->capacity < gb__ah->count+(item_count)) \
-		gb_array_grow(x, gb__ah->count+(item_count)); \
-	gb_memcopy(&(x)[gb__ah->count], (items), gb_size_of((x)[0])*(item_count));\
-	gb__ah->count += (item_count); \
-} while (0)
-
-
-
-#define gb_array_pop(x)   do { GB_ASSERT(GB_ARRAY_HEADER(x)->count > 0); GB_ARRAY_HEADER(x)->count--; } while (0)
-#define gb_array_clear(x) do { GB_ARRAY_HEADER(x)->count = 0; } while (0)
-
-#define gb_array_resize(x, new_count) do { \
-	if (GB_ARRAY_HEADER(x)->capacity < (new_count)) \
-		gb_array_grow(x, (new_count)); \
-	GB_ARRAY_HEADER(x)->count = (new_count); \
-} while (0)
-
-
-#define gb_array_reserve(x, new_capacity) do { \
-	if (GB_ARRAY_HEADER(x)->capacity < (new_capacity)) \
-		gb_array_set_capacity(x, new_capacity); \
-} while (0)
-
-
-
 
 
 ////////////////////////////////////////////////////////////////
@@ -1399,163 +1173,6 @@ GB_EXTERN u64 gb_murmur64(void const *data, isize len);
 
 GB_EXTERN u32 gb_murmur32_seed(void const *data, isize len, u32 seed);
 GB_EXTERN u64 gb_murmur64_seed(void const *data, isize len, u64 seed);
-
-
-////////////////////////////////////////////////////////////////
-//
-// Instantiated Hash Table
-//
-// This is an attempt to implement a templated hash table
-// NOTE(bill): The key is aways a u64 for simplicity and you will _probably_ _never_ need anything bigger.
-//
-// Hash table type and function declaration, call: GB_TABLE_DECLARE(PREFIX, NAME, N, VALUE)
-// Hash table function definitions, call: GB_TABLE_DEFINE(NAME, N, VALUE)
-//
-//     PREFIX  - a prefix for function prototypes e.g. extern, static, etc.
-//     NAME    - Name of the Hash Table
-//     FUNC    - the name will prefix function names
-//     VALUE   - the type of the value to be stored
-//
-// NOTE(bill): I really wish C had decent metaprogramming capabilities (and no I don't mean C++'s templates either)
-//
-
-typedef struct gbHashTableFindResult {
-	isize hash_index;
-	isize entry_prev;
-	isize entry_index;
-} gbHashTableFindResult;
-
-#define GB_TABLE(PREFIX, NAME, FUNC, VALUE) \
-	GB_TABLE_DECLARE(PREFIX, NAME, FUNC, VALUE); \
-	GB_TABLE_DEFINE(NAME, FUNC, VALUE);
-
-#define GB_TABLE_DECLARE(PREFIX, NAME, FUNC, VALUE) \
-typedef struct GB_JOIN2(NAME,Entry) { \
-	u64 key; \
-	isize next; \
-	VALUE value; \
-} GB_JOIN2(NAME,Entry); \
-\
-typedef struct NAME { \
-	gbArray(isize) hashes; \
-	gbArray(GB_JOIN2(NAME,Entry)) entries; \
-} NAME; \
-\
-PREFIX void                  GB_JOIN2(FUNC,init)       (NAME *h, gbAllocator a); \
-PREFIX void                  GB_JOIN2(FUNC,destroy)    (NAME *h); \
-PREFIX VALUE *               GB_JOIN2(FUNC,get)        (NAME *h, u64 key); \
-PREFIX void                  GB_JOIN2(FUNC,set)        (NAME *h, u64 key, VALUE value); \
-PREFIX void                  GB_JOIN2(FUNC,grow)       (NAME *h); \
-PREFIX void                  GB_JOIN2(FUNC,rehash)     (NAME *h, isize new_count); \
-
-
-
-
-
-#define GB_TABLE_DEFINE(NAME, FUNC, VALUE) \
-void GB_JOIN2(FUNC,init)(NAME *h, gbAllocator a) { \
-	gb_array_init(h->hashes,  a); \
-	gb_array_init(h->entries, a); \
-} \
-\
-void GB_JOIN2(FUNC,destroy)(NAME *h) { \
-	if (h->entries) gb_array_free(h->entries); \
-	if (h->hashes)  gb_array_free(h->hashes); \
-} \
-\
-gb_internal isize GB_JOIN2(FUNC,_add_entry)(NAME *h, u64 key) { \
-	isize index; \
-	GB_JOIN2(NAME,Entry) e = {0}; \
-	e.key = key; \
-	e.next = -1; \
-	index = gb_array_count(h->entries); \
-	gb_array_append(h->entries, e); \
-	return index; \
-} \
-\
-gb_internal gbHashTableFindResult GB_JOIN2(FUNC,_find)(NAME *h, u64 key) { \
-	gbHashTableFindResult r = {-1, -1, -1}; \
-	if (gb_array_count(h->hashes) > 0) { \
-		r.hash_index  = key % gb_array_count(h->hashes); \
-		r.entry_index = h->hashes[r.hash_index]; \
-		while (r.entry_index >= 0) { \
-			if (h->entries[r.entry_index].key == key) \
-				return r; \
-			r.entry_prev = r.entry_index; \
-			r.entry_index = h->entries[r.entry_index].next; \
-		} \
-	} \
-	return r; \
-} \
-\
-gb_internal b32 GB_JOIN2(FUNC,_full)(NAME *h) { \
-	return 0.75f * gb_array_count(h->hashes) < gb_array_count(h->entries); \
-} \
-\
-void GB_JOIN2(FUNC,grow)(NAME *h) { \
-	isize new_count = GB_ARRAY_GROW_FORMULA(gb_array_count(h->entries)); \
-	GB_JOIN2(FUNC,rehash)(h, new_count); \
-} \
-\
-void GB_JOIN2(FUNC,rehash)(NAME *h, isize new_count) { \
-	isize i, j; \
-	NAME nh = {0}; \
-	GB_JOIN2(FUNC,init)(&nh, gb_array_allocator(h->hashes)); \
-	gb_array_resize(nh.hashes, new_count); \
-	gb_array_reserve(nh.entries, gb_array_count(h->entries)); \
-	for (i = 0; i < new_count; i++) \
-		nh.hashes[i] = -1; \
-	for (i = 0; i < gb_array_count(h->entries); i++) { \
-		GB_JOIN2(NAME,Entry) *e; \
-		gbHashTableFindResult fr; \
-		if (gb_array_count(nh.hashes) == 0) \
-			GB_JOIN2(FUNC,grow)(&nh); \
-		e = &h->entries[i]; \
-		fr = GB_JOIN2(FUNC,_find)(&nh, e->key); \
-		j = GB_JOIN2(FUNC,_add_entry)(&nh, e->key); \
-		if (fr.entry_prev < 0) \
-			nh.hashes[fr.hash_index] = j; \
-		else \
-			nh.entries[fr.entry_prev].next = j; \
-		nh.entries[j].next = fr.entry_index; \
-		nh.entries[j].value = e->value; \
-		if (GB_JOIN2(FUNC,_full)(&nh)) \
-			GB_JOIN2(FUNC,grow)(&nh); \
-	} \
-	GB_JOIN2(FUNC,destroy)(h); \
-	h->hashes  = nh.hashes; \
-	h->entries = nh.entries; \
-} \
-\
-VALUE *GB_JOIN2(FUNC,get)(NAME *h, u64 key) { \
-	isize index = GB_JOIN2(FUNC,_find)(h, key).entry_index; \
-	if (index >= 0) \
-		return &h->entries[index].value; \
-	return NULL; \
-} \
-\
-void GB_JOIN2(FUNC,set)(NAME *h, u64 key, VALUE value) { \
-	isize index; \
-	gbHashTableFindResult fr; \
-	if (gb_array_count(h->hashes) == 0) \
-		GB_JOIN2(FUNC,grow)(h); \
-	fr = GB_JOIN2(FUNC,_find)(h, key); \
-	if (fr.entry_index >= 0) { \
-		index = fr.entry_index; \
-	} else { \
-		index = GB_JOIN2(FUNC,_add_entry)(h, key); \
-		if (fr.entry_prev >= 0) { \
-			h->entries[fr.entry_prev].next = index; \
-		} else { \
-			h->hashes[fr.hash_index] = index; \
-		} \
-	} \
-	h->entries[index].value = value; \
-	if (GB_JOIN2(FUNC,_full)(h)) \
-		GB_JOIN2(FUNC,grow)(h); \
-} \
-
-
 
 
 ////////////////////////////////////////////////////////////////
@@ -1724,19 +1341,6 @@ GB_DEF char *gb_bprintf_va (char const *fmt, va_list va);            // NOTE(bil
 GB_DEF isize gb_snprintf   (char *str, isize n, char const *fmt, ...) GB_PRINTF_ARGS(3);
 GB_DEF isize gb_snprintf_va(char *str, isize n, char const *fmt, va_list va);
 
-////////////////////////////////////////////////////////////////
-//
-// DLL Handling
-//
-//
-
-typedef void *gbDllHandle;
-typedef void (*gbDllProc)(void);
-
-GB_DEF gbDllHandle gb_dll_load        (char const *filepath);
-GB_DEF void        gb_dll_unload      (gbDllHandle dll);
-GB_DEF gbDllProc   gb_dll_proc_address(gbDllHandle dll, char const *proc_name);
-
 
 ////////////////////////////////////////////////////////////////
 //
@@ -1748,29 +1352,6 @@ GB_DEF u64  gb_rdtsc       (void);
 GB_DEF f64  gb_time_now    (void); // NOTE(bill): This is only for relative time e.g. game loops
 GB_DEF u64  gb_utc_time_now(void); // NOTE(bill): Number of microseconds since 1601-01-01 UTC
 GB_DEF void gb_sleep_ms    (u32 ms);
-
-
-////////////////////////////////////////////////////////////////
-//
-// Miscellany
-//
-//
-
-typedef struct gbRandom {
-	u32 offsets[8];
-	u32 value;
-} gbRandom;
-
-// NOTE(bill): Generates from numerous sources to produce a decent pseudo-random seed
-GB_DEF void  gb_random_init          (gbRandom *r);
-GB_DEF u32   gb_random_gen_u32       (gbRandom *r);
-GB_DEF u32   gb_random_gen_u32_unique(gbRandom *r);
-GB_DEF u64   gb_random_gen_u64       (gbRandom *r); // NOTE(bill): (gb_random_gen_u32() << 32) | gb_random_gen_u32()
-GB_DEF isize gb_random_gen_isize     (gbRandom *r);
-GB_DEF i64   gb_random_range_i64     (gbRandom *r, i64 lower_inc, i64 higher_inc);
-GB_DEF isize gb_random_range_isize   (gbRandom *r, isize lower_inc, isize higher_inc);
-GB_DEF f64   gb_random_range_f64     (gbRandom *r, f64 lower_inc, f64 higher_inc);
-
 
 
 
@@ -3413,102 +2994,9 @@ gb_inline u32 gb_thread_current_id(void) {
 
 
 
-
+gb_internal gbAllocator heap_allocator(void); // this is defined in common_memory.cpp
 gb_inline gbAllocator gb_heap_allocator(void) {
-	gbAllocator a;
-	a.proc = gb_heap_allocator_proc;
-	a.data = NULL;
-	return a;
-}
-
-GB_ALLOCATOR_PROC(gb_heap_allocator_proc) {
-	void *ptr = NULL;
-	gb_unused(allocator_data);
-	gb_unused(old_size);
-// TODO(bill): Throughly test!
-	switch (type) {
-#if defined(GB_COMPILER_MSVC)
-	case gbAllocation_Alloc:
-		ptr = _aligned_malloc(size, alignment);
-		if (flags & gbAllocatorFlag_ClearToZero) {
-			gb_zero_size(ptr, size);
-		}
-		break;
-	case gbAllocation_Free:
-		_aligned_free(old_memory);
-		break;
-	case gbAllocation_Resize:
-		ptr = _aligned_realloc(old_memory, size, alignment);
-		break;
-
-#elif defined(GB_SYSTEM_LINUX)
-	// TODO(bill): *nix version that's decent
-	case gbAllocation_Alloc: {
-		ptr = aligned_alloc(alignment, (size + alignment - 1) & ~(alignment - 1));
-		gb_zero_size(ptr, size);
-	} break;
-
-	case gbAllocation_Free: {
-		free(old_memory);
-	} break;
-
-	case gbAllocation_Resize:
-		if (size == 0) {
-			free(old_memory);
-			break;
-		}
-		if (!old_memory) {
-			ptr = aligned_alloc(alignment, (size + alignment - 1) & ~(alignment - 1));
-			gb_zero_size(ptr, size);
-			break;
-		}
-		if (size <= old_size) {
-			ptr = old_memory;
-			break;
-		}
-
-		ptr = aligned_alloc(alignment, (size + alignment - 1) & ~(alignment - 1));
-		gb_memmove(ptr, old_memory, old_size);
-		gb_zero_size(cast(u8 *)ptr + old_size, gb_max(size-old_size, 0));
-		break;
-#else
-	// TODO(bill): *nix version that's decent
-	case gbAllocation_Alloc: {
-		posix_memalign(&ptr, alignment, size);
-		gb_zero_size(ptr, size);
-	} break;
-
-	case gbAllocation_Free: {
-		free(old_memory);
-	} break;
-
-	case gbAllocation_Resize: {
-		if (size == 0) {
-			free(old_memory);
-			break;
-		}
-		if (!old_memory) {
-			posix_memalign(&ptr, alignment, size);
-			gb_zero_size(ptr, size);
-			break;
-		}
-		if (size <= old_size) {
-			ptr = old_memory;
-			break;
-		}
-
-		posix_memalign(&ptr, alignment, size);
-		gb_memmove(ptr, old_memory, old_size);
-		gb_zero_size(cast(u8 *)ptr + old_size, gb_max(size-old_size, 0));
-
-	} break;
-#endif
-
-	case gbAllocation_FreeAll:
-		break;
-	}
-
-	return ptr;
+	return heap_allocator();
 }
 
 
@@ -3760,132 +3248,6 @@ isize gb_affinity_thread_count_for_core(gbAffinity *a, isize core) {
 
 
 
-
-
-
-
-////////////////////////////////////////////////////////////////
-//
-// Virtual Memory
-//
-//
-
-gbVirtualMemory gb_virtual_memory(void *data, isize size) {
-	gbVirtualMemory vm;
-	vm.data = data;
-	vm.size = size;
-	return vm;
-}
-
-
-#if defined(GB_SYSTEM_WINDOWS)
-gb_inline gbVirtualMemory gb_vm_alloc(void *addr, isize size) {
-	gbVirtualMemory vm;
-	GB_ASSERT(size > 0);
-	vm.data = VirtualAlloc(addr, size, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
-	vm.size = size;
-	return vm;
-}
-
-gb_inline b32 gb_vm_free(gbVirtualMemory vm) {
-	MEMORY_BASIC_INFORMATION info;
-	while (vm.size > 0) {
-		if (VirtualQuery(vm.data, &info, gb_size_of(info)) == 0)
-			return false;
-		if (info.BaseAddress != vm.data ||
-		    info.AllocationBase != vm.data ||
-		    info.State != MEM_COMMIT || info.RegionSize > cast(usize)vm.size) {
-			return false;
-		}
-		if (VirtualFree(vm.data, 0, MEM_RELEASE) == 0)
-			return false;
-		vm.data = gb_pointer_add(vm.data, info.RegionSize);
-		vm.size -= info.RegionSize;
-	}
-	return true;
-}
-
-gb_inline gbVirtualMemory gb_vm_trim(gbVirtualMemory vm, isize lead_size, isize size) {
-	gbVirtualMemory new_vm = {0};
-	void *ptr;
-	GB_ASSERT(vm.size >= lead_size + size);
-
-	ptr = gb_pointer_add(vm.data, lead_size);
-
-	gb_vm_free(vm);
-	new_vm = gb_vm_alloc(ptr, size);
-	if (new_vm.data == ptr)
-		return new_vm;
-	if (new_vm.data)
-		gb_vm_free(new_vm);
-	return new_vm;
-}
-
-gb_inline b32 gb_vm_purge(gbVirtualMemory vm) {
-	VirtualAlloc(vm.data, vm.size, MEM_RESET, PAGE_READWRITE);
-	// NOTE(bill): Can this really fail?
-	return true;
-}
-
-isize gb_virtual_memory_page_size(isize *alignment_out) {
-	SYSTEM_INFO info;
-	GetSystemInfo(&info);
-	if (alignment_out) *alignment_out = info.dwAllocationGranularity;
-	return info.dwPageSize;
-}
-
-#else
-
-#ifndef MAP_ANONYMOUS
-#define MAP_ANONYMOUS MAP_ANON
-#endif
-
-gb_inline gbVirtualMemory gb_vm_alloc(void *addr, isize size) {
-	gbVirtualMemory vm;
-	GB_ASSERT(size > 0);
-	vm.data = mmap(addr, size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
-	vm.size = size;
-	return vm;
-}
-
-gb_inline b32 gb_vm_free(gbVirtualMemory vm) {
-	munmap(vm.data, vm.size);
-	return true;
-}
-
-gb_inline gbVirtualMemory gb_vm_trim(gbVirtualMemory vm, isize lead_size, isize size) {
-	void *ptr;
-	isize trail_size;
-	GB_ASSERT(vm.size >= lead_size + size);
-
-	ptr = gb_pointer_add(vm.data, lead_size);
-	trail_size = vm.size - lead_size - size;
-
-	if (lead_size != 0)
-		gb_vm_free(gb_virtual_memory(vm.data, lead_size));
-	if (trail_size != 0)
-		gb_vm_free(gb_virtual_memory(ptr, trail_size));
-	return gb_virtual_memory(ptr, size);
-
-}
-
-gb_inline b32 gb_vm_purge(gbVirtualMemory vm) {
-	int err = madvise(vm.data, vm.size, MADV_DONTNEED);
-	return err != 0;
-}
-
-isize gb_virtual_memory_page_size(isize *alignment_out) {
-	// TODO(bill): Is this always true?
-	isize result = cast(isize)sysconf(_SC_PAGE_SIZE);
-	if (alignment_out) *alignment_out = result;
-	return result;
-}
-
-#endif
-
-
-
-
 ////////////////////////////////////////////////////////////////
 //
 // Custom Allocation
@@ -4064,19 +3426,6 @@ gb_inline isize gb_binary_search(void const *base, isize count, isize size, void
 	}
 
 	return -1;
-}
-
-void gb_shuffle(void *base, isize count, isize size) {
-	u8 *a;
-	isize i, j;
-	gbRandom random; gb_random_init(&random);
-
-	a = cast(u8 *)base + (count-1) * size;
-	for (i = count; i > 1; i--) {
-		j = cast(usize)gb_random_gen_u64(&random) % i;
-		gb_memswap(a, cast(u8 *)base + j*size, size);
-		a -= size;
-	}
 }
 
 void gb_reverse(void *base, isize count, isize size) {
@@ -5101,45 +4450,6 @@ isize gb_utf8_encode_rune(u8 buf[4], Rune r) {
 
 
 
-
-////////////////////////////////////////////////////////////////
-//
-// gbArray
-//
-//
-
-
-gb_no_inline void *gb__array_set_capacity(void *array, isize capacity, isize element_size) {
-	gbArrayHeader *h = GB_ARRAY_HEADER(array);
-
-	GB_ASSERT(element_size > 0);
-
-	if (capacity == h->capacity)
-		return array;
-
-	if (capacity < h->count) {
-		if (h->capacity < capacity) {
-			isize new_capacity = GB_ARRAY_GROW_FORMULA(h->capacity);
-			if (new_capacity < capacity)
-				new_capacity = capacity;
-			gb__array_set_capacity(array, new_capacity, element_size);
-		}
-		h->count = capacity;
-	}
-
-	{
-		isize size = gb_size_of(gbArrayHeader) + element_size*capacity;
-		gbArrayHeader *nh = cast(gbArrayHeader *)gb_alloc(h->allocator, size);
-		gb_memmove(nh, h, gb_size_of(gbArrayHeader) + element_size*h->count);
-		nh->allocator = h->allocator;
-		nh->count     = h->count;
-		nh->capacity  = capacity;
-		gb_free(h->allocator, h);
-		return nh+1;
-	}
-}
-
-
 ////////////////////////////////////////////////////////////////
 //
 // Hashing functions
@@ -6126,7 +5436,7 @@ gb_inline b32 gb_file_copy(char const *existing_filename, char const *new_filena
 	}
 
 	size_t bsize = stat_existing.st_blksize > BUFSIZ ? stat_existing.st_blksize : BUFSIZ;
-	char *buf = (char *)malloc(bsize);
+	char *buf = (char *)gb_malloc(bsize);
 	if (buf == NULL) {
 		close(new_fd);
 		close(existing_fd);
@@ -6147,7 +5457,7 @@ gb_inline b32 gb_file_copy(char const *existing_filename, char const *new_filena
 		}
 	}
 	
-	free(buf);
+	gb_free(buf);
 	close(new_fd);
 	close(existing_fd);
 
@@ -6818,33 +6128,6 @@ gb_no_inline isize gb_snprintf_va(char *text, isize max_len, char const *fmt, va
 
 ////////////////////////////////////////////////////////////////
 //
-// DLL Handling
-//
-//
-
-#if defined(GB_SYSTEM_WINDOWS)
-
-gbDllHandle gb_dll_load(char const *filepath) {
-	return cast(gbDllHandle)LoadLibraryA(filepath);
-}
-gb_inline void      gb_dll_unload      (gbDllHandle dll)                        { FreeLibrary(cast(HMODULE)dll); }
-gb_inline gbDllProc gb_dll_proc_address(gbDllHandle dll, char const *proc_name) { return cast(gbDllProc)GetProcAddress(cast(HMODULE)dll, proc_name); }
-
-#else // POSIX
-
-gbDllHandle gb_dll_load(char const *filepath) {
-	// TODO(bill): Should this be RTLD_LOCAL?
-	return cast(gbDllHandle)dlopen(filepath, RTLD_LAZY|RTLD_GLOBAL);
-}
-
-gb_inline void      gb_dll_unload      (gbDllHandle dll)                        { dlclose(dll); }
-gb_inline gbDllProc gb_dll_proc_address(gbDllHandle dll, char const *proc_name) { return cast(gbDllProc)dlsym(dll, proc_name); }
-
-#endif
-
-
-////////////////////////////////////////////////////////////////
-//
 // Time
 //
 //
@@ -6978,170 +6261,6 @@ gb_inline gbDllProc gb_dll_proc_address(gbDllHandle dll, char const *proc_name) 
 
 #endif
 
-
-
-////////////////////////////////////////////////////////////////
-//
-// Miscellany
-//
-//
-
-gb_global i32 gb__random_shared_counter;
-
-gb_internal u32 gb__get_noise_from_time(void) {
-	u32 accum = 0;
-	f64 start, remaining, end, curr = 0;
-	u64 interval = 100000ll;
-
-	start     = gb_time_now();
-	remaining = (interval - cast(u64)(interval*start)%interval) / cast(f64)interval;
-	end       = start + remaining;
-
-	do {
-		curr = gb_time_now();
-		accum += cast(u32)curr;
-	} while (curr >= end);
-	return accum;
-}
-
-// NOTE(bill): Partly from http://preshing.com/20121224/how-to-generate-a-sequence-of-unique-random-integers/
-// But the generation is even more random-er-est
-
-gb_internal gb_inline u32 gb__permute_qpr(u32 x) {
-	gb_local_persist u32 const prime = 4294967291; // 2^32 - 5
-	if (x >= prime) {
-		return x;
-	} else {
-		u32 residue = cast(u32)(cast(u64) x * x) % prime;
-		if (x <= prime / 2) {
-			return residue;
-		} else {
-			return prime - residue;
-		}
-	}
-}
-
-gb_internal gb_inline u32 gb__permute_with_offset(u32 x, u32 offset) {
-	return (gb__permute_qpr(x) + offset) ^ 0x5bf03635;
-}
-
-
-void gb_random_init(gbRandom *r) {
-	u64 time, tick;
-	isize i, j;
-	u32 x = 0;
-	r->value = 0;
-
-	r->offsets[0] = gb__get_noise_from_time();
-	r->offsets[1] = gb__random_shared_counter++; // doesn't matter if it's not thread safe
-	r->offsets[2] = gb_thread_current_id();
-	r->offsets[3] = gb_thread_current_id() * 3 + 1;
-	time = gb_utc_time_now();
-	r->offsets[4] = cast(u32)(time >> 32);
-	r->offsets[5] = cast(u32)time;
-	r->offsets[6] = gb__get_noise_from_time();
-	tick = gb_rdtsc();
-	r->offsets[7] = cast(u32)(tick ^ (tick >> 32));
-
-	for (j = 0; j < 4; j++) {
-		for (i = 0; i < gb_count_of(r->offsets); i++) {
-			r->offsets[i] = x = gb__permute_with_offset(x, r->offsets[i]);
-		}
-	}
-}
-
-u32 gb_random_gen_u32(gbRandom *r) {
-	u32 x = r->value;
-	u32 carry = 1;
-	isize i;
-	for (i = 0; i < gb_count_of(r->offsets); i++) {
-		x = gb__permute_with_offset(x, r->offsets[i]);
-		if (carry > 0) {
-			carry = ++r->offsets[i] ? 0 : 1;
-		}
-	}
-
-	r->value = x;
-	return x;
-}
-
-u32 gb_random_gen_u32_unique(gbRandom *r) {
-	u32 x = r->value;
-	isize i;
-	r->value++;
-	for (i = 0; i < gb_count_of(r->offsets); i++) {
-		x = gb__permute_with_offset(x, r->offsets[i]);
-	}
-
-	return x;
-}
-
-u64 gb_random_gen_u64(gbRandom *r) {
-	return ((cast(u64)gb_random_gen_u32(r)) << 32) | gb_random_gen_u32(r);
-}
-
-
-isize gb_random_gen_isize(gbRandom *r) {
-	u64 u = gb_random_gen_u64(r);
-	return *cast(isize *)&u;
-}
-
-
-
-
-i64 gb_random_range_i64(gbRandom *r, i64 lower_inc, i64 higher_inc) {
-	u64 u = gb_random_gen_u64(r);
-	i64 i = *cast(i64 *)&u;
-	i64 diff = higher_inc-lower_inc+1;
-	i %= diff;
-	i += lower_inc;
-	return i;
-}
-
-isize gb_random_range_isize(gbRandom *r, isize lower_inc, isize higher_inc) {
-	u64 u = gb_random_gen_u64(r);
-	isize i = *cast(isize *)&u;
-	isize diff = higher_inc-lower_inc+1;
-	i %= diff;
-	i += lower_inc;
-	return i;
-}
-
-// NOTE(bill): Semi-cc'ed from gb_math to remove need for fmod and math.h
-f64 gb__copy_sign64(f64 x, f64 y) {
-	i64 ix, iy;
-	ix = *(i64 *)&x;
-	iy = *(i64 *)&y;
-
-	ix &= 0x7fffffffffffffff;
-	ix |= iy & 0x8000000000000000;
-	return *cast(f64 *)&ix;
-}
-
-f64 gb__floor64    (f64 x)        { return cast(f64)((x >= 0.0) ? cast(i64)x : cast(i64)(x-0.9999999999999999)); }
-f64 gb__ceil64     (f64 x)        { return cast(f64)((x < 0) ? cast(i64)x : (cast(i64)x)+1); }
-f64 gb__round64    (f64 x)        { return cast(f64)((x >= 0.0) ? gb__floor64(x + 0.5) : gb__ceil64(x - 0.5)); }
-f64 gb__remainder64(f64 x, f64 y) { return x - (gb__round64(x/y)*y); }
-f64 gb__abs64      (f64 x)        { return x < 0 ? -x : x; }
-f64 gb__sign64     (f64 x)        { return x < 0 ? -1.0 : +1.0; }
-
-f64 gb__mod64(f64 x, f64 y) {
-	f64 result;
-	y = gb__abs64(y);
-	result = gb__remainder64(gb__abs64(x), y);
-	if (gb__sign64(result)) result += y;
-	return gb__copy_sign64(result, x);
-}
-
-
-f64 gb_random_range_f64(gbRandom *r, f64 lower_inc, f64 higher_inc) {
-	u64 u = gb_random_gen_u64(r);
-	f64 f = *cast(f64 *)&u;
-	f64 diff = higher_inc-lower_inc+1.0;
-	f = gb__mod64(f, diff);
-	f += lower_inc;
-	return f;
-}
 
 
 
