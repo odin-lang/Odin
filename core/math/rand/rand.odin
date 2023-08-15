@@ -348,14 +348,14 @@ Possible Output:
 @(require_results) int127 :: proc(r: ^Rand = nil) -> (val: i128) { return i128(uint128(r) << 1 >> 1) }
 
 /*
-Generates a random 31 bit value in the range `(0, n]` using the provided random number generator. If no generator is provided the global random number generator will be used.  
+Generates a random 31 bit value in the range `[0, n)` using the provided random number generator. If no generator is provided the global random number generator will be used.
 
 Inputs:
 - n: The upper bound of the generated number, this value is exclusive
 - r: The random number generator to use, or nil for the global generator
 
 Returns:
-- val: A random 31 bit value in the range `(0, n]`
+- val: A random 31 bit value in the range `[0, n)`
 
 WARNING: Panics if n is less than 0
 
@@ -393,14 +393,14 @@ int31_max :: proc(n: i32, r: ^Rand = nil) -> (val: i32) {
 	return v % n
 }
 /*
-Generates a random 63 bit value in the range `(0, n]` using the provided random number generator. If no generator is provided the global random number generator will be used.  
+Generates a random 63 bit value in the range `[0, n)` using the provided random number generator. If no generator is provided the global random number generator will be used.
 
 Inputs:
 - n: The upper bound of the generated number, this value is exclusive
 - r: The random number generator to use, or nil for the global generator
 
 Returns:
-- val: A random 63 bit value in the range `(0, n]`
+- val: A random 63 bit value in the range `[0, n)`
 
 WARNING: Panics if n is less than 0
 
@@ -438,14 +438,14 @@ int63_max :: proc(n: i64, r: ^Rand = nil) -> (val: i64) {
 	return v % n
 }
 /*
-Generates a random 127 bit value in the range `(0, n]` using the provided random number generator. If no generator is provided the global random number generator will be used.  
+Generates a random 127 bit value in the range `[0, n)` using the provided random number generator. If no generator is provided the global random number generator will be used.
 
 Inputs:
 - n: The upper bound of the generated number, this value is exclusive
 - r: The random number generator to use, or nil for the global generator
 
 Returns:
-- val: A random 127 bit value in the range `(0, n]`
+- val: A random 127 bit value in the range `[0, n)`
 
 WARNING: Panics if n is less than 0
 
@@ -483,14 +483,14 @@ int127_max :: proc(n: i128, r: ^Rand = nil) -> (val: i128) {
 	return v % n
 }
 /*
-Generates a random integer value in the range `(0, n]` using the provided random number generator. If no generator is provided the global random number generator will be used.  
+Generates a random integer value in the range `[0, n)` using the provided random number generator. If no generator is provided the global random number generator will be used.
 
 Inputs:
 - n: The upper bound of the generated number, this value is exclusive
 - r: The random number generator to use, or nil for the global generator
 
 Returns:
-- val: A random integer value in the range `(0, n]`
+- val: A random integer value in the range `[0, n)`
 
 WARNING: Panics if n is less than 0
 
