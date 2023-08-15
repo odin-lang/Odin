@@ -34,9 +34,9 @@ Inputs:
 Returns:
 - err: An allocator error if one occured, `nil` otherwise
 */
-intern_init :: proc(m: ^Intern, allocator := context.allocator, map_allocator := context.allocator) -> (err: mem.Allocator_Error) {
+intern_init :: proc(m: ^Intern, allocator := context.allocator, map_allocator := context.allocator, loc := #caller_location) -> (err: mem.Allocator_Error) {
 	m.allocator = allocator
-	m.entries = make(map[string]^Intern_Entry, 16, map_allocator) or_return
+	m.entries = make(map[string]^Intern_Entry, 16, map_allocator, loc) or_return
     return nil
 }
 /*
