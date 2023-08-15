@@ -135,11 +135,12 @@ _random_u64 :: proc(r: ^Rand) -> u64 {
 		}
 	}
 
+
 	old_state := r.state
 	r.state = old_state * 6364136223846793005 + (r.inc|1)
-	word := (((old_state >> 59) + 5) ~ old_state) * 12605985483714917081
-	rot := (word >> 43) ~ word
-	return (word >> rot) | (word << ((-rot) & 63))
+	xor_shifted := (((old_state >> 59) + 5) ~ old_state) * 12605985483714917081
+	rot := (old_state >> 59)
+	return (xor_shifted >> rot) | (xor_shifted << ((-rot) & 63))
 }
 
 /*
