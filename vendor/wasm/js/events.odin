@@ -1,6 +1,8 @@
 //+build js wasm32, js wasm64p32
 package wasm_js_interface
 
+import "core:runtime"
+
 foreign import dom_lib "odin_dom"
 
 Event_Kind :: enum u32 {
@@ -343,7 +345,18 @@ do_event_callback :: proc(user_data: rawptr, callback: proc(e: Event)) {
 			user_data = user_data,
 			callback  = callback,
 		}
+
+
 		init_event_raw(&event)
+
+		if event.kind == .Key_Up || event.kind == .Key_Down || event.kind == .Key_Press {
+			key := transmute(^runtime.Raw_String) &event.key.key
+			key.data = &event.key._key_buf[0]
+
+			code := transmute(^runtime.Raw_String) &event.key.code
+			code.data = &event.key._code_buf[0] 
+		}
+
 		callback(event)
 	}
 }

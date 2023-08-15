@@ -99,6 +99,11 @@ class WasmMemoryInterface {
 	storeF64(addr, value)  { this.mem.setFloat64(addr, value, true); }
 	storeInt(addr, value)  { this.mem.setInt32  (addr, value, true); }
 	storeUint(addr, value) { this.mem.setUint32 (addr, value, true); }
+
+	storeString(addr, value) {
+		const bytes = this.loadBytes(addr, value.length);
+		new TextEncoder("utf-8").encodeInto(value, bytes);
+	}
 };
 
 class WebGLInterface {
@@ -1384,6 +1389,7 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 
 				wmi.storeUint(off(W), event_temp_data.id_ptr);
 				wmi.storeUint(off(W), event_temp_data.id_len);
+				wmi.storeUint(off(W), 0); // padding
 
 				wmi.storeF64(off(8), e.timeStamp*1e-3);
 
@@ -1417,8 +1423,14 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 					wmi.storeI16(off(2), e.button);
 					wmi.storeU16(off(2), e.buttons);
 				} else if (e instanceof KeyboardEvent) {
-					let keyOffset = off(W*2, W);
-					let codeOffet = off(W*2, W);
+					// NOTE: we set string data pointers on the 
+					// native side, so skip those for now and
+					// set only string length
+					const keyPtr = off(W);
+					wmi.storeI32(off(W), e.key.length);
+					const codePtr = off(W);
+					wmi.storeI32(off(W), e.code.length);
+
 					wmi.storeU8(off(1), e.location);
 
 					wmi.storeU8(off(1), !!e.ctrlKey);
@@ -1427,6 +1439,9 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 					wmi.storeU8(off(1), !!e.metaKey);
 
 					wmi.storeU8(off(1), !!e.repeat);
+
+					wmi.storeString(off(16, 1), e.key);
+					wmi.storeString(off(16, 1), e.code);
 				} else if (e instanceof WheelEvent) {
 					wmi.storeF64(off(8), e.deltaX);
 					wmi.storeF64(off(8), e.deltaY);
