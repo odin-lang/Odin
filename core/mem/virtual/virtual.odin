@@ -69,7 +69,12 @@ align_formula :: #force_inline proc "contextless" (size, align: uint) -> uint {
 memory_block_alloc :: proc(committed, reserved: uint, flags: Memory_Block_Flags) -> (block: ^Memory_Block, err: Allocator_Error) {
 	page_size := DEFAULT_PAGE_SIZE
 	assert(mem.is_power_of_two(uintptr(page_size)))
+
 	committed := committed
+	reserved  := reserved
+
+	committed = align_formula(committed, page_size)
+	reserved  = align_formula(reserved, page_size)
 	committed = clamp(committed, 0, reserved)
 	
 	total_size     := uint(reserved + size_of(Platform_Memory_Block))
