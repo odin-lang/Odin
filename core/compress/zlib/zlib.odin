@@ -147,15 +147,7 @@ grow_buffer :: proc(buf: ^[dynamic]u8) -> (err: compress.Error) {
 		Double until we reach the maximum allowed.
 	*/
 	new_size := min(len(buf) << 1, compress.COMPRESS_OUTPUT_ALLOCATE_MAX)
-	resize(buf, new_size)
-	if len(buf) != new_size {
-		/*
-			Resize failed.
-		*/
-		return .Resize_Failed
-	}
-
-	return nil
+	return resize(buf, new_size)
 }
 
 /*
@@ -182,7 +174,7 @@ write_byte :: #force_inline proc(z: ^$C, c: u8) -> (err: io.Error) #no_bounds_ch
 }
 
 @(optimization_mode="speed")
-repl_byte :: proc(z: ^$C, count: u16, c: u8) -> (err: io.Error) 	#no_bounds_check {
+repl_byte :: proc(z: ^$C, count: u16, c: u8) -> (err: io.Error) #no_bounds_check {
 	/*
 		TODO(Jeroen): Once we have a magic ring buffer, we can just peek/write into it
 		without having to worry about wrapping, so no need for a temp allocation to give to
@@ -510,8 +502,8 @@ inflate_raw :: proc(z: ^$C, expected_output_size := -1, allocator := context.all
 		/*
 			Try to pre-allocate the output buffer.
 		*/
-		reserve(&z.output.buf, expected_output_size)
-		resize (&z.output.buf, expected_output_size)
+		reserve(&z.output.buf, expected_output_size) or_return
+		resize (&z.output.buf, expected_output_size) or_return
 	}
 
 	if len(z.output.buf) != expected_output_size {
@@ -654,7 +646,7 @@ inflate_raw :: proc(z: ^$C, expected_output_size := -1, allocator := context.all
 	}
 
 	if int(z.bytes_written) != len(z.output.buf) {
-		resize(&z.output.buf, int(z.bytes_written))
+		resize(&z.output.buf, int(z.bytes_written)) or_return
 	}
 
 	return nil

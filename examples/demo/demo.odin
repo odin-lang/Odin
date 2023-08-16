@@ -560,7 +560,7 @@ struct_type :: proc() {
 	{
 		// Structs can tagged with different memory layout and alignment requirements:
 
-		a :: struct #align 4   {} // align to 4 bytes
+		a :: struct #align(4)  {} // align to 4 bytes
 		b :: struct #packed    {} // remove padding between fields
 		c :: struct #raw_union {} // all fields share the same offset (0). This is the same as C's union
 	}

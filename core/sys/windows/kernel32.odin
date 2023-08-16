@@ -886,7 +886,7 @@ WIN32_MEMORY_REGION_INFORMATION_u_s :: struct {
 	Bitfield: ULONG,
 }
 WIN32_MEMORY_REGION_INFORMATION_u_s_Bitfield :: distinct ULONG
-/*bit_field #align align_of(ULONG) {
+/*bit_field #align(align_of(ULONG)) {
 	Private        : 1-0,
 	MappedDataFile : 2-1,
 	MappedImage    : 3-2,

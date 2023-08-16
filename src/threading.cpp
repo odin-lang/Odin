@@ -276,12 +276,12 @@ gb_internal void semaphore_wait(Semaphore *s) {
 
 	struct BlockingMutex {
 		#if defined(HAS_VALGRIND)
-		BlockingMutex() {
-			VALGRIND_HG_MUTEX_INIT_POST(this, 0);
-		}
-		~BlockingMutex() {
-			VALGRIND_HG_MUTEX_DESTROY_PRE(this);
-		}
+		// BlockingMutex() {
+		// 	VALGRIND_HG_MUTEX_INIT_POST(this, 0);
+		// }
+		// ~BlockingMutex() {
+		// 	VALGRIND_HG_MUTEX_DESTROY_PRE(this);
+		// }
 		#endif
 		i32 state_;
 
