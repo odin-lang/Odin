@@ -456,7 +456,7 @@ int_max :: proc(n: int, r: ^Rand = nil) -> (val: int) {
 
 /*
 Generates a random double floating point value in the range `0 to 1` using the provided random number generator. If no generator is provided the global random number generator will be used.  
-Due to floating point precision there is no guaruntee if the upper and lower bounds are inclusive/exclusive with the exact floating point value.  
+Due to floating point precision there is no guarantee if the upper and lower bounds are inclusive/exclusive with the exact floating point value.  
 
 Inputs:
 - r: The random number generator to use, or nil for the global generator
@@ -482,7 +482,7 @@ Example:
 
 /*
 Generates a random single floating point value in the range `0 to 1` using the provided random number generator. If no generator is provided the global random number generator will be used.  
-Due to floating point precision there is no guaruntee if the upper and lower bounds are inclusive/exclusive with the exact floating point value.  
+Due to floating point precision there is no guarantee if the upper and lower bounds are inclusive/exclusive with the exact floating point value.  
 
 Inputs:
 - r: The random number generator to use, or nil for the global generator
@@ -508,7 +508,7 @@ Example:
 
 /*
 Generates a random double floating point value in the range `low to high` using the provided random number generator. If no generator is provided the global random number generator will be used.  
-Due to floating point precision there is no guaruntee if the upper and lower bounds are inclusive/exclusive with the exact floating point value.  
+Due to floating point precision there is no guarantee if the upper and lower bounds are inclusive/exclusive with the exact floating point value.  
 
 Inputs:
 - low: The lower bounds of the value
@@ -536,7 +536,7 @@ Example:
 
 /*
 Generates a random single floating point value in the range `low to high` using the provided random number generator. If no generator is provided the global random number generator will be used.  
-Due to floating point precision there is no guaruntee if the upper and lower bounds are inclusive/exclusive with the exact floating point value.  
+Due to floating point precision there is no guarantee if the upper and lower bounds are inclusive/exclusive with the exact floating point value.  
 
 Inputs:
 - low: The lower bounds of the value
