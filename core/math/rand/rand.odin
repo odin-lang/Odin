@@ -454,13 +454,14 @@ int_max :: proc(n: int, r: ^Rand = nil) -> (val: int) {
 }
 
 /*
-Generates a random double floating point value in the range `(0, 1]` using the provided random number generator. If no generator is provided the global random number generator will be used.  
+Generates a random double floating point value in the range `0 to 1` using the provided random number generator. If no generator is provided the global random number generator will be used.  
+Due to floating point precision there is no guarantee if the upper and lower bounds are inclusive/exclusive with the exact floating point value.  
 
 Inputs:
 - r: The random number generator to use, or nil for the global generator
 
 Returns:
-- val: A random double floating point value in the range `(0, 1]`
+- val: A random double floating point value in the range `0 to 1`
 
 Example:
 	import "core:math/rand"
@@ -479,13 +480,14 @@ Example:
 @(require_results) float64 :: proc(r: ^Rand = nil) -> (val: f64) { return f64(int63_max(1<<53, r)) / (1 << 53) }
 
 /*
-Generates a random single floating point value in the range `(0, 1]` using the provided random number generator. If no generator is provided the global random number generator will be used.  
+Generates a random single floating point value in the range `0 to 1` using the provided random number generator. If no generator is provided the global random number generator will be used.  
+Due to floating point precision there is no guarantee if the upper and lower bounds are inclusive/exclusive with the exact floating point value.  
 
 Inputs:
 - r: The random number generator to use, or nil for the global generator
 
 Returns:
-- val: A random single floating point value in the range `(0, 1]`
+- val: A random single floating point value in the range `0 to 1`
 
 Example:
 	import "core:math/rand"
@@ -504,7 +506,8 @@ Example:
 @(require_results) float32 :: proc(r: ^Rand = nil) -> (val: f32) { return f32(float64(r)) }
 
 /*
-Generates a random double floating point value in the range `(low, high]` using the provided random number generator. If no generator is provided the global random number generator will be used.  
+Generates a random double floating point value in the range `low to high` using the provided random number generator. If no generator is provided the global random number generator will be used.  
+Due to floating point precision there is no guarantee if the upper and lower bounds are inclusive/exclusive with the exact floating point value.  
 
 Inputs:
 - low: The lower bounds of the value, this value is inclusive
@@ -512,7 +515,7 @@ Inputs:
 - r: The random number generator to use, or nil for the global generator
 
 Returns:
-- val: A random double floating point value in the range `(low, high]`
+- val: A random double floating point value in the range `low to high`
 
 Example:
 	import "core:math/rand"
@@ -531,7 +534,8 @@ Example:
 @(require_results) float64_range :: proc(low, high: f64, r: ^Rand = nil) -> (val: f64) { return (high-low)*float64(r) + low }
 
 /*
-Generates a random single floating point value in the range `(low, high]` using the provided random number generator. If no generator is provided the global random number generator will be used.  
+Generates a random single floating point value in the range `low to high` using the provided random number generator. If no generator is provided the global random number generator will be used.  
+Due to floating point precision there is no guarantee if the upper and lower bounds are inclusive/exclusive with the exact floating point value.  
 
 Inputs:
 - low: The lower bounds of the value, this value is inclusive
@@ -539,7 +543,7 @@ Inputs:
 - r: The random number generator to use, or nil for the global generator
 
 Returns:
-- val: A random single floating point value in the range `(low, high]`
+- val: A random single floating point value in the range `low to high`
 
 Example:
 	import "core:math/rand"
@@ -559,6 +563,7 @@ Example:
 
 /*
 Fills a byte slice with random values using the provided random number generator. If no generator is provided the global random number generator will be used.  
+Due to floating point precision there is no guarantee if the upper and lower bounds are inclusive/exclusive with the exact floating point value.  
 
 Inputs:
 - p: The byte slice to fill
