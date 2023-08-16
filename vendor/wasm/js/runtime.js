@@ -1423,13 +1423,11 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 					wmi.storeI16(off(2), e.button);
 					wmi.storeU16(off(2), e.buttons);
 				} else if (e instanceof KeyboardEvent) {
-					// NOTE: we set string data pointers on the 
-					// native side, so skip those for now and
-					// set only string length
-					const keyPtr = off(W);
-					wmi.storeI32(off(W), e.key.length);
-					const codePtr = off(W);
-					wmi.storeI32(off(W), e.code.length);
+					// Note: those strigs are constructed
+					// on the native side from buffers that
+					// are filled later, so skip them 
+					const keyPtr  = off(W*2, W);
+					const codePtr = off(W*2, W);
 
 					wmi.storeU8(off(1), e.location);
 
@@ -1440,6 +1438,8 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 
 					wmi.storeU8(off(1), !!e.repeat);
 
+					wmi.storeI32(off(W), e.key.length)
+					wmi.storeI32(off(W), e.code.length)
 					wmi.storeString(off(16, 1), e.key);
 					wmi.storeString(off(16, 1), e.code);
 				} else if (e instanceof WheelEvent) {
