@@ -348,14 +348,14 @@ Possible Output:
 @(require_results) int127 :: proc(r: ^Rand = nil) -> (val: i128) { return i128(uint128(r) << 1 >> 1) }
 
 /*
-Generates a random 31 bit value in the range `(0, n]` using the provided random number generator. If no generator is provided the global random number generator will be used.  
+Generates a random 31 bit value in the range `[0, n)` using the provided random number generator. If no generator is provided the global random number generator will be used.  
 
 Inputs:
 - n: The upper bound of the generated number, this value is exclusive
 - r: The random number generator to use, or nil for the global generator
 
 Returns:
-- val: A random 31 bit value in the range `(0, n]`
+- val: A random 31 bit value in the range `[0, n)`
 
 WARNING: Panics if n is less than 0
 
@@ -393,14 +393,14 @@ int31_max :: proc(n: i32, r: ^Rand = nil) -> (val: i32) {
 	return v % n
 }
 /*
-Generates a random 63 bit value in the range `(0, n]` using the provided random number generator. If no generator is provided the global random number generator will be used.  
+Generates a random 63 bit value in the range `[0, n)` using the provided random number generator. If no generator is provided the global random number generator will be used.  
 
 Inputs:
 - n: The upper bound of the generated number, this value is exclusive
 - r: The random number generator to use, or nil for the global generator
 
 Returns:
-- val: A random 63 bit value in the range `(0, n]`
+- val: A random 63 bit value in the range `[0, n)`
 
 WARNING: Panics if n is less than 0
 
@@ -438,14 +438,14 @@ int63_max :: proc(n: i64, r: ^Rand = nil) -> (val: i64) {
 	return v % n
 }
 /*
-Generates a random 127 bit value in the range `(0, n]` using the provided random number generator. If no generator is provided the global random number generator will be used.  
+Generates a random 127 bit value in the range `[0, n)` using the provided random number generator. If no generator is provided the global random number generator will be used.  
 
 Inputs:
 - n: The upper bound of the generated number, this value is exclusive
 - r: The random number generator to use, or nil for the global generator
 
 Returns:
-- val: A random 127 bit value in the range `(0, n]`
+- val: A random 127 bit value in the range `[0, n)`
 
 WARNING: Panics if n is less than 0
 
@@ -483,14 +483,14 @@ int127_max :: proc(n: i128, r: ^Rand = nil) -> (val: i128) {
 	return v % n
 }
 /*
-Generates a random integer value in the range `(0, n]` using the provided random number generator. If no generator is provided the global random number generator will be used.  
+Generates a random integer value in the range `[0, n)` using the provided random number generator. If no generator is provided the global random number generator will be used.  
 
 Inputs:
 - n: The upper bound of the generated number, this value is exclusive
 - r: The random number generator to use, or nil for the global generator
 
 Returns:
-- val: A random integer value in the range `(0, n]`
+- val: A random integer value in the range `[0, n)`
 
 WARNING: Panics if n is less than 0
 
@@ -525,13 +525,14 @@ int_max :: proc(n: int, r: ^Rand = nil) -> (val: int) {
 }
 
 /*
-Generates a random double floating point value in the range `(0, 1]` using the provided random number generator. If no generator is provided the global random number generator will be used.  
+Generates a random double floating point value in the range `0 to 1` using the provided random number generator. If no generator is provided the global random number generator will be used.  
+Due to floating point precision there is no guaruntee if the upper and lower bounds are inclusive/exclusive with the exact floating point value.  
 
 Inputs:
 - r: The random number generator to use, or nil for the global generator
 
 Returns:
-- val: A random double floating point value in the range `(0, 1]`
+- val: A random double floating point value in the range `0 to 1`
 
 Example:
 	import "core:math/rand"
@@ -554,13 +555,14 @@ Possible Output:
 @(require_results) float64 :: proc(r: ^Rand = nil) -> (val: f64) { return f64(int63_max(1<<53, r)) / (1 << 53) }
 
 /*
-Generates a random single floating point value in the range `(0, 1]` using the provided random number generator. If no generator is provided the global random number generator will be used.  
+Generates a random single floating point value in the range `0 to 1` using the provided random number generator. If no generator is provided the global random number generator will be used.  
+Due to floating point precision there is no guaruntee if the upper and lower bounds are inclusive/exclusive with the exact floating point value.  
 
 Inputs:
 - r: The random number generator to use, or nil for the global generator
 
 Returns:
-- val: A random single floating point value in the range `(0, 1]`
+- val: A random single floating point value in the range `0 to 1`
 
 Example:
 	import "core:math/rand"
@@ -583,15 +585,16 @@ Possible Output:
 @(require_results) float32 :: proc(r: ^Rand = nil) -> (val: f32) { return f32(float64(r)) }
 
 /*
-Generates a random double floating point value in the range `(low, high]` using the provided random number generator. If no generator is provided the global random number generator will be used.  
+Generates a random double floating point value in the range `low to high` using the provided random number generator. If no generator is provided the global random number generator will be used.  
+Due to floating point precision there is no guaruntee if the upper and lower bounds are inclusive/exclusive with the exact floating point value.  
 
 Inputs:
-- low: The lower bounds of the value, this value is inclusive
-- high: The upper bounds of the value, this value is exclusive
+- low: The lower bounds of the value
+- high: The upper bounds of the value
 - r: The random number generator to use, or nil for the global generator
 
 Returns:
-- val: A random double floating point value in the range `(low, high]`
+- val: A random double floating point value in the range `low to high`
 
 Example:
 	import "core:math/rand"
@@ -613,15 +616,16 @@ Possible Output:
 */
 @(require_results) float64_range :: proc(low, high: f64, r: ^Rand = nil) -> (val: f64) { return (high-low)*float64(r) + low }
 /*
-Generates a random single floating point value in the range `(low, high]` using the provided random number generator. If no generator is provided the global random number generator will be used.  
+Generates a random single floating point value in the range `low to high` using the provided random number generator. If no generator is provided the global random number generator will be used.  
+Due to floating point precision there is no guaruntee if the upper and lower bounds are inclusive/exclusive with the exact floating point value.  
 
 Inputs:
-- low: The lower bounds of the value, this value is inclusive
-- high: The upper bounds of the value, this value is exclusive
+- low: The lower bounds of the value
+- high: The upper bounds of the value
 - r: The random number generator to use, or nil for the global generator
 
 Returns:
-- val: A random single floating point value in the range `(low, high]`
+- val: A random single floating point value in the range `low to high`
 
 Example:
 	import "core:math/rand"
