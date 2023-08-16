@@ -231,7 +231,7 @@ gb_internal lbValue lb_equal_proc_for_type(lbModule *m, Type *type) {
 			ok = lb_emit_conv(p, ok, t_bool);
 			LLVMBuildRet(p->builder, ok.value);
 		} else {
-			lbBlock *block_false = lb_create_block(p, "bfalse");
+			lbBlock *block_false  = lb_create_block(p, "bfalse");
 			lbBlock *block_switch = lb_create_block(p, "bswitch");
 
 			lbValue left_tag  = lb_emit_load(p, lb_emit_union_tag_ptr(p, lhs));
@@ -241,8 +241,23 @@ gb_internal lbValue lb_equal_proc_for_type(lbModule *m, Type *type) {
 			lb_emit_if(p, tag_eq, block_switch, block_false);
 
 			lb_start_block(p, block_switch);
-			LLVMValueRef v_switch = LLVMBuildSwitch(p->builder, left_tag.value, block_false->block, cast(unsigned)type->Union.variants.count);
 
+			unsigned variant_count = cast(unsigned)type->Union.variants.count;
+			if (type->Union.kind != UnionType_no_nil) {
+				variant_count += 1;
+			}
+			LLVMValueRef v_switch = LLVMBuildSwitch(p->builder, left_tag.value, block_false->block, variant_count);
+
+			if (type->Union.kind != UnionType_no_nil) {
+				lbBlock *case_block = lb_create_block(p, "bcase");
+				lb_start_block(p, case_block);
+
+				lbValue case_tag = lb_const_int(p->module, union_tag_type(type), 0);
+
+				LLVMBuildRet(p->builder, LLVMConstInt(lb_type(m, t_bool), 1, false));
+
+				LLVMAddCase(v_switch, case_tag.value, case_block->block);
+			}
 
 			for (Type *v : type->Union.variants) {
 				lbBlock *case_block = lb_create_block(p, "bcase");
