@@ -7025,6 +7025,14 @@ WaylandSurfaceCreateInfoKHR :: struct {
 	surface: ^wl_surface,
 }
 
+XcbSurfaceCreateInfoKHR :: struct {
+	sType:      StructureType,
+	pNext:      rawptr,
+	flags:      XcbSurfaceCreateFlagsKHR,
+	connection: ^xcb_connection_t,
+	window:     u32,
+}
+
 VideoH264SpsVuiFlags :: struct {
 	bit_field: u32,
 }
@@ -7400,9 +7408,10 @@ VideoDecodeH265ReferenceInfo :: struct {
 
 // Opaque structs
 
-wl_surface   :: struct {} // Opaque struct defined by Wayland
-wl_display   :: struct {} // Opaque struct defined by Wayland
-IOSurfaceRef :: struct {} // Opaque struct defined by Apple’s CoreGraphics framework
+wl_surface       :: struct {} // Opaque struct defined by Wayland
+wl_display       :: struct {} // Opaque struct defined by Wayland
+IOSurfaceRef     :: struct {} // Opaque struct defined by Apple’s CoreGraphics framework
+xcb_connection_t :: struct {} // Opaque struct defined by XCB
 // Aliases
 PhysicalDeviceVariablePointerFeatures                       :: PhysicalDeviceVariablePointersFeatures
 PhysicalDeviceShaderDrawParameterFeatures                   :: PhysicalDeviceShaderDrawParametersFeatures

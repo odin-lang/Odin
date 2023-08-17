@@ -952,6 +952,9 @@ EXT_METAL_OBJECTS_EXTENSION_NAME                          :: "VK_EXT_metal_objec
 KHR_wayland_surface                                       :: 1
 KHR_WAYLAND_SURFACE_SPEC_VERSION                          :: 6
 KHR_WAYLAND_SURFACE_EXTENSION_NAME                        :: "VK_KHR_wayland_surface"
+KHR_xcb_surface                                           :: 1
+KHR_XCB_SURFACE_SPEC_VERSION                              :: 6
+KHR_XCB_SURFACE_EXTENSION_NAME                            :: "VK_KHR_xcb_surface"
 
 // Handles types
 Instance       :: distinct Handle
