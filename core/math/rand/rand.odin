@@ -5,6 +5,7 @@ Package core:math/rand implements various random number generators
 package rand
 
 import "core:intrinsics"
+import "core:math"
 import "core:mem"
 
 Rand :: struct {
@@ -454,14 +455,13 @@ int_max :: proc(n: int, r: ^Rand = nil) -> (val: int) {
 }
 
 /*
-Generates a random double floating point value in the range `0 to 1` using the provided random number generator. If no generator is provided the global random number generator will be used.  
-Due to floating point precision there is no guarantee if the upper and lower bounds are inclusive/exclusive with the exact floating point value.  
+Generates a random double floating point value in the range `[0, 1)` using the provided random number generator. If no generator is provided the global random number generator will be used.
 
 Inputs:
 - r: The random number generator to use, or nil for the global generator
 
 Returns:
-- val: A random double floating point value in the range `0 to 1`
+- val: A random double floating point value in the range `[0, 1)`
 
 Example:
 	import "core:math/rand"
@@ -480,14 +480,13 @@ Example:
 @(require_results) float64 :: proc(r: ^Rand = nil) -> (val: f64) { return f64(int63_max(1<<53, r)) / (1 << 53) }
 
 /*
-Generates a random single floating point value in the range `0 to 1` using the provided random number generator. If no generator is provided the global random number generator will be used.  
-Due to floating point precision there is no guarantee if the upper and lower bounds are inclusive/exclusive with the exact floating point value.  
+Generates a random single floating point value in the range `[0, 1)` using the provided random number generator. If no generator is provided the global random number generator will be used.
 
 Inputs:
 - r: The random number generator to use, or nil for the global generator
 
 Returns:
-- val: A random single floating point value in the range `0 to 1`
+- val: A random single floating point value in the range `[0, 1)`
 
 Example:
 	import "core:math/rand"
@@ -503,11 +502,12 @@ Example:
 
 
 */
-@(require_results) float32 :: proc(r: ^Rand = nil) -> (val: f32) { return f32(float64(r)) }
+@(require_results) float32 :: proc(r: ^Rand = nil) -> (val: f32) { return f32(int31_max(1<<24, r)) / (1 << 24) }
 
 /*
-Generates a random double floating point value in the range `low to high` using the provided random number generator. If no generator is provided the global random number generator will be used.  
-Due to floating point precision there is no guarantee if the upper and lower bounds are inclusive/exclusive with the exact floating point value.  
+Generates a random double floating point value in the range `[low, high)` using the provided random number generator. If no generator is provided the global random number generator will be used.
+
+WARNING: Panics if `high < low`
 
 Inputs:
 - low: The lower bounds of the value, this value is inclusive
@@ -515,7 +515,7 @@ Inputs:
 - r: The random number generator to use, or nil for the global generator
 
 Returns:
-- val: A random double floating point value in the range `low to high`
+- val: A random double floating point value in the range [low, high)
 
 Example:
 	import "core:math/rand"
@@ -531,11 +531,17 @@ Example:
 
 
 */
-@(require_results) float64_range :: proc(low, high: f64, r: ^Rand = nil) -> (val: f64) { return (high-low)*float64(r) + low }
+@(require_results) float64_range :: proc(low, high: f64, r: ^Rand = nil) -> (val: f64) {
+	assert(low <= high, "low must be lower than or equal to high")
+	val = (high-low)*float64(r) + low
+	if val >= high {
+		val = max(low, high * (1 - math.F64_EPSILON))
+	}
+	return
+}
 
 /*
-Generates a random single floating point value in the range `low to high` using the provided random number generator. If no generator is provided the global random number generator will be used.  
-Due to floating point precision there is no guarantee if the upper and lower bounds are inclusive/exclusive with the exact floating point value.  
+Generates a random single floating point value in the range `[low, high)` using the provided random number generator. If no generator is provided the global random number generator will be used.
 
 Inputs:
 - low: The lower bounds of the value, this value is inclusive
@@ -543,7 +549,9 @@ Inputs:
 - r: The random number generator to use, or nil for the global generator
 
 Returns:
-- val: A random single floating point value in the range `low to high`
+- val: A random single floating point value in the range [low, high)
+
+WARNING: Panics if `high < low`
 
 Example:
 	import "core:math/rand"
@@ -559,7 +567,14 @@ Example:
 
 
 */
-@(require_results) float32_range :: proc(low, high: f32, r: ^Rand = nil) -> (val: f32) { return (high-low)*float32(r) + low }
+@(require_results) float32_range :: proc(low, high: f32, r: ^Rand = nil) -> (val: f32) {
+	assert(low <= high, "low must be lower than or equal to high")
+	val = (high-low)*float32(r) + low
+	if val >= high {
+		val = max(low, high * (1 - math.F32_EPSILON))
+	}
+	return
+}
 
 /*
 Fills a byte slice with random values using the provided random number generator. If no generator is provided the global random number generator will be used.  
