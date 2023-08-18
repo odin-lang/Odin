@@ -2,10 +2,11 @@ package rand
 
 import "core:sys/unix"
 
-_system_random :: proc() -> u32 {
+@(require_results)
+_system_random :: proc() -> u64 {
 	for {
-		value: u32
-		ret := unix.sys_getrandom(([^]u8)(&value), 4, 0)
+		value: u64
+		ret := unix.sys_getrandom(([^]u8)(&value), size_of(value), 0)
 		if ret < 0 {
 			switch ret {
 			case -4: // EINTR

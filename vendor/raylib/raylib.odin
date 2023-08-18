@@ -87,9 +87,8 @@ import "core:mem"
 import "core:strings"
 
 USE_LINALG :: #config(RAYLIB_USE_LINALG, true)
-when USE_LINALG {
-	import "core:math/linalg"	
-}
+import "core:math/linalg"
+_ :: linalg
 
 MAX_TEXTFORMAT_BUFFERS :: #config(RAYLIB_MAX_TEXTFORMAT_BUFFERS, 4)
 MAX_TEXT_BUFFER_LENGTH :: #config(RAYLIB_MAX_TEXT_BUFFER_LENGTH, 1024)
@@ -1133,7 +1132,7 @@ foreign lib {
 
 	SetGesturesEnabled     :: proc(flags: Gestures) ---          // Enable a set of gestures using flags
 	IsGestureDetected      :: proc(gesture: Gesture) -> bool --- // Check if a gesture have been detected
-	GetGestureDetected     :: proc() -> Gesture ---              // Get latest detected gesture
+	GetGestureDetected     :: proc() -> Gestures ---             // Get latest detected gesture
 	GetGestureHoldDuration :: proc() -> f32 ---                  // Get gesture hold time in milliseconds
 	GetGestureDragVector   :: proc() -> Vector2 ---              // Get gesture drag vector
 	GetGestureDragAngle    :: proc() -> f32 ---                  // Get gesture drag angle

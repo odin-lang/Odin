@@ -80,7 +80,9 @@ gb_internal Slice<T> slice_make(gbAllocator const &allocator, isize count) {
 	GB_ASSERT(count >= 0);
 	Slice<T> s = {};
 	s.data = gb_alloc_array(allocator, T, count);
-	GB_ASSERT(s.data != nullptr);
+	if (count > 0) {
+		GB_ASSERT(s.data != nullptr);
+	}
 	s.count = count;
 	return s;
 }
@@ -157,6 +159,17 @@ gb_internal void slice_copy(Slice<T> *slice, Slice<T> const &data, isize offset,
 
 template <typename T>
 gb_internal gb_inline Slice<T> slice(Slice<T> const &array, isize lo, isize hi) {
+	GB_ASSERT(0 <= lo && lo <= hi && hi <= array.count);
+	Slice<T> out = {};
+	isize len = hi-lo;
+	if (len > 0) {
+		out.data = array.data+lo;
+		out.count = len;
+	}
+	return out;
+}
+template <typename T>
+gb_internal gb_inline Slice<T> slice(Array<T> const &array, isize lo, isize hi) {
 	GB_ASSERT(0 <= lo && lo <= hi && hi <= array.count);
 	Slice<T> out = {};
 	isize len = hi-lo;

@@ -7,6 +7,7 @@ on:
 
 jobs:
   build_windows:
+    if: github.repository == 'odin-lang/Odin'
     runs-on: windows-2022
     steps:
       - uses: actions/checkout@v1
@@ -37,6 +38,7 @@ jobs:
           name: windows_artifacts
           path: dist
   build_ubuntu:
+    if: github.repository == 'odin-lang/Odin'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
@@ -61,13 +63,14 @@ jobs:
           name: ubuntu_artifacts
           path: dist
   build_macos:
+    if: github.repository == 'odin-lang/Odin'
     runs-on: macOS-latest
     steps:
       - uses: actions/checkout@v1
       - name: Download LLVM and setup PATH
         run: |
-          brew install llvm@11
-          echo "/usr/local/opt/llvm@11/bin" >> $GITHUB_PATH
+          brew install llvm@13
+          echo "/usr/local/opt/llvm@13/bin" >> $GITHUB_PATH
           TMP_PATH=$(xcrun --show-sdk-path)/user/include
           echo "CPATH=$TMP_PATH" >> $GITHUB_ENV
       - name: build odin

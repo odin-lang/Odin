@@ -35,14 +35,12 @@ enum TargetArchKind : u16 {
 	TargetArch_arm32,
 	TargetArch_arm64,
 	TargetArch_wasm32,
-	TargetArch_wasm64,
+	TargetArch_wasm64p32,
 
 	TargetArch_COUNT,
 };
 
 enum TargetEndianKind : u8 {
-	TargetEndian_Invalid,
-
 	TargetEndian_Little,
 	TargetEndian_Big,
 
@@ -81,11 +79,10 @@ gb_global String target_arch_names[TargetArch_COUNT] = {
 	str_lit("arm32"),
 	str_lit("arm64"),
 	str_lit("wasm32"),
-	str_lit("wasm64"),
+	str_lit("wasm64p32"),
 };
 
 gb_global String target_endian_names[TargetEndian_COUNT] = {
-	str_lit(""),
 	str_lit("little"),
 	str_lit("big"),
 };
@@ -97,7 +94,8 @@ gb_global String target_abi_names[TargetABI_COUNT] = {
 };
 
 gb_global TargetEndianKind target_endians[TargetArch_COUNT] = {
-	TargetEndian_Invalid,
+	TargetEndian_Little,
+	TargetEndian_Little,
 	TargetEndian_Little,
 	TargetEndian_Little,
 	TargetEndian_Little,
@@ -116,12 +114,25 @@ gb_global String const ODIN_VERSION = str_lit(ODIN_VERSION_RAW);
 struct TargetMetrics {
 	TargetOsKind   os;
 	TargetArchKind arch;
-	isize          word_size;
+	isize          ptr_size;
+	isize          int_size;
 	isize          max_align;
 	isize          max_simd_align;
 	String         target_triplet;
 	String         target_data_layout;
 	TargetABIKind  abi;
+};
+
+enum Subtarget : u32 {
+	Subtarget_Default,
+	Subtarget_iOS,
+
+	Subtarget_COUNT,
+};
+
+gb_global String subtarget_strings[Subtarget_COUNT] = {
+	str_lit(""),
+	str_lit("ios"),
 };
 
 
@@ -217,6 +228,43 @@ enum BuildPath : u8 {
 	BuildPathCOUNT,
 };
 
+enum VetFlags : u64 {
+	VetFlag_NONE       = 0,
+	VetFlag_Unused     = 1u<<0, // 1
+	VetFlag_Shadowing  = 1u<<1, // 2
+	VetFlag_UsingStmt  = 1u<<2, // 4
+	VetFlag_UsingParam = 1u<<3, // 8
+	VetFlag_Style      = 1u<<4, // 16
+	VetFlag_Semicolon  = 1u<<5, // 32
+
+	VetFlag_Extra     = 1u<<16,
+
+	VetFlag_All = VetFlag_Unused|VetFlag_Shadowing|VetFlag_UsingStmt, // excluding extra
+
+	VetFlag_Using = VetFlag_UsingStmt|VetFlag_UsingParam,
+};
+
+u64 get_vet_flag_from_name(String const &name) {
+	if (name == "unused") {
+		return VetFlag_Unused;
+	} else if (name == "shadowing") {
+		return VetFlag_Shadowing;
+	} else if (name == "using-stmt") {
+		return VetFlag_UsingStmt;
+	} else if (name == "using-param") {
+		return VetFlag_UsingParam;
+	} else if (name == "style") {
+		return VetFlag_Style;
+	} else if (name == "semicolon") {
+		return VetFlag_Semicolon;
+	} else if (name == "extra") {
+		return VetFlag_Extra;
+	}
+	return VetFlag_NONE;
+}
+
+
+
 // This stores the information for the specify architecture of this build
 struct BuildContext {
 	// Constants
@@ -237,9 +285,10 @@ struct BuildContext {
 	TargetEndianKind endian_kind;
 
 	// In bytes
-	i64    word_size;      // Size of a pointer, must be >= 4
-	i64    max_align;      // max alignment, must be >= 1 (and typically >= word_size)
-	i64    max_simd_align; // max alignment, must be >= 1 (and typically >= word_size)
+	i64    ptr_size;       // Size of a pointer, must be >= 4
+	i64    int_size;       // Size of a int/uint, must be >= 4
+	i64    max_align;      // max alignment, must be >= 1 (and typically >= ptr_size)
+	i64    max_simd_align; // max alignment, must be >= 1 (and typically >= ptr_size)
 
 	CommandKind command_kind;
 	String command;
@@ -254,6 +303,8 @@ struct BuildContext {
 	String out_filepath;
 	String resource_filepath;
 	String pdb_filepath;
+
+	u64 vet_flags;
 
 	bool   has_resource;
 	String link_flags;
@@ -280,15 +331,12 @@ struct BuildContext {
 	bool   no_entry_point;
 	bool   no_thread_local;
 	bool   use_lld;
-	bool   vet;
-	bool   vet_extra;
 	bool   cross_compiling;
 	bool   different_os;
 	bool   keep_object_files;
 	bool   disallow_do;
 
 	bool   strict_style;
-	bool   strict_style_init_only;
 
 	bool   ignore_warnings;
 	bool   warnings_as_errors;
@@ -309,7 +357,7 @@ struct BuildContext {
 	
 	bool   copy_file_contents;
 
-	bool   disallow_rtti;
+	bool   no_rtti;
 
 	bool   dynamic_map_calls;
 
@@ -317,6 +365,8 @@ struct BuildContext {
 	bool   disable_red_zone;
 
 	isize max_error_count;
+
+	bool tilde_backend;
 
 
 	u32 cmd_doc_flags;
@@ -361,13 +411,13 @@ gb_internal isize MAX_ERROR_COLLECTOR_COUNT(void) {
 gb_global TargetMetrics target_windows_i386 = {
 	TargetOs_windows,
 	TargetArch_i386,
-	4, 4, 8,
+	4, 4, 4, 8,
 	str_lit("i386-pc-windows-msvc"),
 };
 gb_global TargetMetrics target_windows_amd64 = {
 	TargetOs_windows,
 	TargetArch_amd64,
-	8, 8, 16,
+	8, 8, 8, 16,
 	str_lit("x86_64-pc-windows-msvc"),
 	str_lit("e-m:w-i64:64-f80:128-n8:16:32:64-S128"),
 };
@@ -375,21 +425,21 @@ gb_global TargetMetrics target_windows_amd64 = {
 gb_global TargetMetrics target_linux_i386 = {
 	TargetOs_linux,
 	TargetArch_i386,
-	4, 4, 8,
+	4, 4, 4, 8,
 	str_lit("i386-pc-linux-gnu"),
 
 };
 gb_global TargetMetrics target_linux_amd64 = {
 	TargetOs_linux,
 	TargetArch_amd64,
-	8, 8, 16,
+	8, 8, 8, 16,
 	str_lit("x86_64-pc-linux-gnu"),
 	str_lit("e-m:w-i64:64-f80:128-n8:16:32:64-S128"),
 };
 gb_global TargetMetrics target_linux_arm64 = {
 	TargetOs_linux,
 	TargetArch_arm64,
-	8, 8, 16,
+	8, 8, 8, 16,
 	str_lit("aarch64-linux-elf"),
 	str_lit("e-m:o-p:32:32-Fi8-i64:64-v128:64:128-a:0:32-n32-S64"),
 };
@@ -397,7 +447,7 @@ gb_global TargetMetrics target_linux_arm64 = {
 gb_global TargetMetrics target_linux_arm32 = {
 	TargetOs_linux,
 	TargetArch_arm32,
-	4, 4, 8,
+	4, 4, 4, 8,
 	str_lit("arm-linux-gnu"),
 	str_lit("e-m:o-p:32:32-Fi8-i64:64-v128:64:128-a:0:32-n32-S64"),
 };
@@ -405,7 +455,7 @@ gb_global TargetMetrics target_linux_arm32 = {
 gb_global TargetMetrics target_darwin_amd64 = {
 	TargetOs_darwin,
 	TargetArch_amd64,
-	8, 8, 16,
+	8, 8, 8, 16,
 	str_lit("x86_64-apple-darwin"),
 	str_lit("e-m:o-i64:64-f80:128-n8:16:32:64-S128"),
 };
@@ -413,7 +463,7 @@ gb_global TargetMetrics target_darwin_amd64 = {
 gb_global TargetMetrics target_darwin_arm64 = {
 	TargetOs_darwin,
 	TargetArch_arm64,
-	8, 8, 16,
+	8, 8, 8, 16,
 	str_lit("arm64-apple-macosx11.0.0"),
 	str_lit("e-m:o-i64:64-i128:128-n32:64-S128"),
 };
@@ -421,14 +471,14 @@ gb_global TargetMetrics target_darwin_arm64 = {
 gb_global TargetMetrics target_freebsd_i386 = {
 	TargetOs_freebsd,
 	TargetArch_i386,
-	4, 4, 8,
+	4, 4, 4, 8,
 	str_lit("i386-unknown-freebsd-elf"),
 };
 
 gb_global TargetMetrics target_freebsd_amd64 = {
 	TargetOs_freebsd,
 	TargetArch_amd64,
-	8, 8, 16,
+	8, 8, 8, 16,
 	str_lit("x86_64-unknown-freebsd-elf"),
 	str_lit("e-m:w-i64:64-f80:128-n8:16:32:64-S128"),
 };
@@ -436,7 +486,7 @@ gb_global TargetMetrics target_freebsd_amd64 = {
 gb_global TargetMetrics target_openbsd_amd64 = {
 	TargetOs_openbsd,
 	TargetArch_amd64,
-	8, 8, 16,
+	8, 8, 8, 16,
 	str_lit("x86_64-unknown-openbsd-elf"),
 	str_lit("e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"),
 };
@@ -444,7 +494,7 @@ gb_global TargetMetrics target_openbsd_amd64 = {
 gb_global TargetMetrics target_essence_amd64 = {
 	TargetOs_essence,
 	TargetArch_amd64,
-	8, 8, 16,
+	8, 8, 8, 16,
 	str_lit("x86_64-pc-none-elf"),
 };
 
@@ -452,7 +502,7 @@ gb_global TargetMetrics target_essence_amd64 = {
 gb_global TargetMetrics target_freestanding_wasm32 = {
 	TargetOs_freestanding,
 	TargetArch_wasm32,
-	4, 8, 16,
+	4, 4, 8, 16,
 	str_lit("wasm32-freestanding-js"),
 	str_lit("e-m:e-p:32:32-i64:64-n32:64-S128"),
 };
@@ -460,7 +510,7 @@ gb_global TargetMetrics target_freestanding_wasm32 = {
 gb_global TargetMetrics target_js_wasm32 = {
 	TargetOs_js,
 	TargetArch_wasm32,
-	4, 8, 16,
+	4, 4, 8, 16,
 	str_lit("wasm32-js-js"),
 	str_lit("e-m:e-p:32:32-i64:64-n32:64-S128"),
 };
@@ -468,24 +518,42 @@ gb_global TargetMetrics target_js_wasm32 = {
 gb_global TargetMetrics target_wasi_wasm32 = {
 	TargetOs_wasi,
 	TargetArch_wasm32,
-	4, 8, 16,
+	4, 4, 8, 16,
 	str_lit("wasm32-wasi-js"),
 	str_lit("e-m:e-p:32:32-i64:64-n32:64-S128"),
 };
 
 
-gb_global TargetMetrics target_js_wasm64 = {
-	TargetOs_js,
-	TargetArch_wasm64,
-	8, 8, 16,
-	str_lit("wasm64-js-js"),
-	str_lit(""),
+gb_global TargetMetrics target_freestanding_wasm64p32 = {
+	TargetOs_freestanding,
+	TargetArch_wasm64p32,
+	4, 8, 8, 16,
+	str_lit("wasm32-freestanding-js"),
+	str_lit("e-m:e-p:32:32-i64:64-n32:64-S128"),
 };
+
+gb_global TargetMetrics target_js_wasm64p32 = {
+	TargetOs_js,
+	TargetArch_wasm64p32,
+	4, 8, 8, 16,
+	str_lit("wasm32-js-js"),
+	str_lit("e-m:e-p:32:32-i64:64-n32:64-S128"),
+};
+
+gb_global TargetMetrics target_wasi_wasm64p32 = {
+	TargetOs_wasi,
+	TargetArch_wasm32,
+	4, 8, 8, 16,
+	str_lit("wasm32-wasi-js"),
+	str_lit("e-m:e-p:32:32-i64:64-n32:64-S128"),
+};
+
+
 
 gb_global TargetMetrics target_freestanding_amd64_sysv = {
 	TargetOs_freestanding,
 	TargetArch_amd64,
-	8, 8, 16,
+	8, 8, 8, 16,
 	str_lit("x86_64-pc-none-gnu"),
 	str_lit("e-m:w-i64:64-f80:128-n8:16:32:64-S128"),
 	TargetABI_SysV,
@@ -501,25 +569,36 @@ struct NamedTargetMetrics {
 gb_global NamedTargetMetrics named_targets[] = {
 	{ str_lit("darwin_amd64"),        &target_darwin_amd64   },
 	{ str_lit("darwin_arm64"),        &target_darwin_arm64   },
+
 	{ str_lit("essence_amd64"),       &target_essence_amd64  },
+
 	{ str_lit("linux_i386"),          &target_linux_i386     },
 	{ str_lit("linux_amd64"),         &target_linux_amd64    },
 	{ str_lit("linux_arm64"),         &target_linux_arm64    },
 	{ str_lit("linux_arm32"),         &target_linux_arm32    },
+
 	{ str_lit("windows_i386"),        &target_windows_i386   },
 	{ str_lit("windows_amd64"),       &target_windows_amd64  },
+
 	{ str_lit("freebsd_i386"),        &target_freebsd_i386   },
 	{ str_lit("freebsd_amd64"),       &target_freebsd_amd64  },
+
 	{ str_lit("openbsd_amd64"),       &target_openbsd_amd64  },
+
 	{ str_lit("freestanding_wasm32"), &target_freestanding_wasm32 },
 	{ str_lit("wasi_wasm32"),         &target_wasi_wasm32 },
 	{ str_lit("js_wasm32"),           &target_js_wasm32 },
-	// { str_lit("js_wasm64"),           &target_js_wasm64 },
+
+	{ str_lit("freestanding_wasm64p32"), &target_freestanding_wasm64p32 },
+	{ str_lit("js_wasm64p32"),           &target_js_wasm64p32 },
+	{ str_lit("wasi_wasm64p32"),         &target_wasi_wasm64p32 },
 
 	{ str_lit("freestanding_amd64_sysv"), &target_freestanding_amd64_sysv },
 };
 
 gb_global NamedTargetMetrics *selected_target_metrics;
+gb_global Subtarget selected_subtarget;
+
 
 gb_internal TargetOsKind get_target_os_from_string(String str) {
 	for (isize i = 0; i < TargetOs_COUNT; i++) {
@@ -623,7 +702,7 @@ gb_internal bool find_library_collection_path(String name, String *path) {
 gb_internal bool is_arch_wasm(void) {
 	switch (build_context.metrics.arch) {
 	case TargetArch_wasm32:
-	case TargetArch_wasm64:
+	case TargetArch_wasm64p32:
 		return true;
 	}
 	return false;
@@ -641,7 +720,7 @@ gb_internal bool is_arch_x86(void) {
 gb_internal bool allow_check_foreign_filepath(void) {
 	switch (build_context.metrics.arch) {
 	case TargetArch_wasm32:
-	case TargetArch_wasm64:
+	case TargetArch_wasm64p32:
 		return false;
 	}
 	return true;
@@ -1082,7 +1161,7 @@ gb_internal char *token_pos_to_string(TokenPos const &pos) {
 	return s;
 }
 
-gb_internal void init_build_context(TargetMetrics *cross_target) {
+gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subtarget) {
 	BuildContext *bc = &build_context;
 
 	gb_affinity_init(&bc->affinity);
@@ -1164,16 +1243,39 @@ gb_internal void init_build_context(TargetMetrics *cross_target) {
 
 	GB_ASSERT(metrics->os != TargetOs_Invalid);
 	GB_ASSERT(metrics->arch != TargetArch_Invalid);
-	GB_ASSERT(metrics->word_size > 1);
+	GB_ASSERT(metrics->ptr_size > 1);
+	GB_ASSERT(metrics->int_size  > 1);
 	GB_ASSERT(metrics->max_align > 1);
 	GB_ASSERT(metrics->max_simd_align > 1);
 
+	GB_ASSERT(metrics->int_size >= metrics->ptr_size);
+	if (metrics->int_size > metrics->ptr_size) {
+		GB_ASSERT(metrics->int_size == 2*metrics->ptr_size);
+	}
+
+
 
 	bc->metrics = *metrics;
+	switch (subtarget) {
+	case Subtarget_Default:
+		break;
+	case Subtarget_iOS:
+		GB_ASSERT(metrics->os == TargetOs_darwin);
+		if (metrics->arch == TargetArch_arm64) {
+			bc->metrics.target_triplet = str_lit("arm64-apple-ios");
+		} else if (metrics->arch == TargetArch_amd64) {
+			bc->metrics.target_triplet = str_lit("x86_64-apple-ios");
+		} else {
+			GB_PANIC("Unknown architecture for darwin");
+		}
+		break;
+	}
+
 	bc->ODIN_OS        = target_os_names[metrics->os];
 	bc->ODIN_ARCH      = target_arch_names[metrics->arch];
 	bc->endian_kind    = target_endians[metrics->arch];
-	bc->word_size      = metrics->word_size;
+	bc->ptr_size       = metrics->ptr_size;
+	bc->int_size       = metrics->int_size;
 	bc->max_align      = metrics->max_align;
 	bc->max_simd_align = metrics->max_simd_align;
 	bc->link_flags  = str_lit(" ");
@@ -1192,8 +1294,8 @@ gb_internal void init_build_context(TargetMetrics *cross_target) {
 	if (bc->metrics.os == TargetOs_freestanding) {
 		bc->no_entry_point = true;
 	} else {
-		if (bc->disallow_rtti) {
-			gb_printf_err("-disallow-rtti is only allowed on freestanding targets\n");
+		if (bc->no_rtti) {
+			gb_printf_err("-no-rtti is only allowed on freestanding targets\n");
 			gb_exit(1);
 		}
 	}
@@ -1257,9 +1359,9 @@ gb_internal void init_build_context(TargetMetrics *cross_target) {
 		// link_flags = gb_string_appendc(link_flags, "--export-all ");
 		// link_flags = gb_string_appendc(link_flags, "--export-table ");
 		link_flags = gb_string_appendc(link_flags, "--allow-undefined ");
-		if (bc->metrics.arch == TargetArch_wasm64) {
-			link_flags = gb_string_appendc(link_flags, "-mwasm64 ");
-		}
+		// if (bc->metrics.arch == TargetArch_wasm64) {
+		// 	link_flags = gb_string_appendc(link_flags, "-mwasm64 ");
+		// }
 		if (bc->no_entry_point) {
 			link_flags = gb_string_appendc(link_flags, "--no-entry ");
 		}
@@ -1501,13 +1603,23 @@ gb_internal bool init_build_paths(String init_filename) {
 	} else if (is_arch_wasm()) {
 		output_extension = STR_LIT("wasm");
 	} else if (build_context.build_mode == BuildMode_Executable) {
-		// By default use a .bin executable extension.
-		output_extension = STR_LIT("bin");
+		// By default use no executable extension.
+		output_extension = make_string(nullptr, 0);
+		String const single_file_extension = str_lit(".odin");
 
 		if (build_context.metrics.os == TargetOs_windows) {
 			output_extension = STR_LIT("exe");
 		} else if (build_context.cross_compiling && selected_target_metrics->metrics == &target_essence_amd64) {
-			output_extension = make_string(nullptr, 0);
+			// Do nothing: we don't want the .bin extension
+			// when cross compiling
+		} else if (path_is_directory(last_path_element(bc->build_paths[BuildPath_Main_Package].basename))) {
+			// Add .bin extension to avoid collision
+			// with package directory name
+			output_extension = STR_LIT("bin");
+		} else if (string_ends_with(init_filename, single_file_extension) && path_is_directory(remove_extension_from_path(init_filename))) {
+			// Add bin extension if compiling single-file package
+			// with same output name as a directory
+			output_extension = STR_LIT("bin");
 		}
 	} else if (build_context.build_mode == BuildMode_DynamicLibrary) {
 		// By default use a .so shared library extension.
@@ -1618,6 +1730,14 @@ gb_internal bool init_build_paths(String init_filename) {
 		gb_printf_err("Output path %.*s is a directory.\n", LIT(output_file));
 		return false;
 	}
+
+	if (!write_directory(bc->build_paths[BuildPath_Output].basename)) {
+		String output_file = path_to_string(ha, bc->build_paths[BuildPath_Output]);
+		defer (gb_free(ha, output_file.text));
+		gb_printf_err("No write permissions for output path: %.*s\n", LIT(output_file));
+		return false;
+	}
+
 
 	if (bc->target_features_string.len != 0) {
 		enable_target_feature({}, bc->target_features_string);

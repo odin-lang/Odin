@@ -10,6 +10,11 @@ UTF_MAX    :: 4
 SURROGATE_MIN :: 0xd800
 SURROGATE_MAX :: 0xdfff
 
+// A high/leading surrogate is in range SURROGATE_MIN..SURROGATE_HIGH_MAX,
+// A low/trailing surrogate is in range SURROGATE_LOW_MIN..SURROGATE_MAX.
+SURROGATE_HIGH_MAX :: 0xdbff
+SURROGATE_LOW_MIN  :: 0xdc00
+
 T1 :: 0b0000_0000
 TX :: 0b1000_0000
 T2 :: 0b1100_0000
@@ -54,7 +59,7 @@ accept_sizes := [256]u8{
 	0xf5..=0xff = 0xf1,
 }
 
-encode_rune :: proc(c: rune) -> ([4]u8, int) {
+encode_rune :: proc "contextless" (c: rune) -> ([4]u8, int) {
 	r := c
 
 	buf: [4]u8
@@ -95,10 +100,10 @@ decode_rune :: proc{
 	decode_rune_in_string,
 	decode_rune_in_bytes,
 }
-decode_rune_in_string :: #force_inline proc(s: string) -> (rune, int) {
+decode_rune_in_string :: #force_inline proc "contextless" (s: string) -> (rune, int) {
 	return decode_rune_in_bytes(transmute([]u8)s)
 }
-decode_rune_in_bytes :: proc(s: []u8) -> (rune, int) {
+decode_rune_in_bytes :: proc "contextless" (s: []u8) -> (rune, int) {
 	n := len(s)
 	if n < 1 {
 		return RUNE_ERROR, 0
@@ -135,7 +140,7 @@ decode_rune_in_bytes :: proc(s: []u8) -> (rune, int) {
 	return rune(s0&MASK4)<<18 | rune(b1&MASKX)<<12 | rune(b2&MASKX)<<6 | rune(b3&MASKX), 4
 }
 
-string_to_runes :: proc(s: string, allocator := context.allocator) -> (runes: []rune) {
+string_to_runes :: proc "odin" (s: string, allocator := context.allocator) -> (runes: []rune) {
 	n := rune_count_in_string(s)
 
 	runes = make([]rune, n, allocator)
@@ -147,7 +152,7 @@ string_to_runes :: proc(s: string, allocator := context.allocator) -> (runes: []
 	return
 }
 
-runes_to_string :: proc(runes: []rune, allocator := context.allocator) -> string {
+runes_to_string :: proc "odin" (runes: []rune, allocator := context.allocator) -> string {
 	byte_count := 0
 	for r in runes {
 		_, w := encode_rune(r)
@@ -171,10 +176,10 @@ decode_last_rune :: proc{
 	decode_last_rune_in_bytes,
 }
 
-decode_last_rune_in_string :: #force_inline proc(s: string) -> (rune, int) {
+decode_last_rune_in_string :: #force_inline proc "contextless" (s: string) -> (rune, int) {
 	return decode_last_rune_in_bytes(transmute([]u8)s)
 }
-decode_last_rune_in_bytes :: proc(s: []u8) -> (rune, int) {
+decode_last_rune_in_bytes :: proc "contextless" (s: []u8) -> (rune, int) {
 	r: rune
 	size: int
 	start, end, limit: int
@@ -206,7 +211,7 @@ decode_last_rune_in_bytes :: proc(s: []u8) -> (rune, int) {
 	return r, size
 }
 
-rune_at_pos :: proc(s: string, pos: int) -> rune {
+rune_at_pos :: proc "contextless" (s: string, pos: int) -> rune {
 	if pos < 0 {
 		return RUNE_ERROR
 	}
@@ -221,7 +226,7 @@ rune_at_pos :: proc(s: string, pos: int) -> rune {
 	return RUNE_ERROR
 }
 
-rune_string_at_pos :: proc(s: string, pos: int) -> string {
+rune_string_at_pos :: proc "contextless" (s: string, pos: int) -> string {
 	if pos < 0 {
 		return ""
 	}
@@ -237,14 +242,14 @@ rune_string_at_pos :: proc(s: string, pos: int) -> string {
 	return ""
 }
 
-rune_at :: proc(s: string, byte_index: int) -> rune {
+rune_at :: proc "contextless" (s: string, byte_index: int) -> rune {
 	r, _ := decode_rune_in_string(s[byte_index:])
 	return r
 }
 
 // Returns the byte position of rune at position pos in s with an optional start byte position.
 // Returns -1 if it runs out of the string.
-rune_offset :: proc(s: string, pos: int, start: int = 0) -> int {
+rune_offset :: proc "contextless" (s: string, pos: int, start: int = 0) -> int {
 	if pos < 0 {
 		return -1
 	}
@@ -259,7 +264,7 @@ rune_offset :: proc(s: string, pos: int, start: int = 0) -> int {
 	return -1
 }
 
-valid_rune :: proc(r: rune) -> bool {
+valid_rune :: proc "contextless" (r: rune) -> bool {
 	if r < 0 {
 		return false
 	} else if SURROGATE_MIN <= r && r <= SURROGATE_MAX {
@@ -270,7 +275,7 @@ valid_rune :: proc(r: rune) -> bool {
 	return true
 }
 
-valid_string :: proc(s: string) -> bool {
+valid_string :: proc "contextless" (s: string) -> bool {
 	n := len(s)
 	for i := 0; i < n; {
 		si := s[i]
@@ -303,7 +308,7 @@ valid_string :: proc(s: string) -> bool {
 	return true
 }
 
-rune_start :: #force_inline proc(b: u8) -> bool {
+rune_start :: #force_inline proc "contextless" (b: u8) -> bool {
 	return b&0xc0 != 0x80
 }
 
@@ -315,7 +320,7 @@ rune_count :: proc{
 rune_count_in_string :: #force_inline proc(s: string) -> int {
 	return rune_count_in_bytes(transmute([]u8)s)
 }
-rune_count_in_bytes :: proc(s: []u8) -> int {
+rune_count_in_bytes :: proc "contextless" (s: []u8) -> int {
 	count := 0
 	n := len(s)
 
@@ -354,7 +359,7 @@ rune_count_in_bytes :: proc(s: []u8) -> int {
 }
 
 
-rune_size :: proc(r: rune) -> int {
+rune_size :: proc "contextless" (r: rune) -> int {
 	switch {
 	case r < 0:          return -1
 	case r <= 1<<7  - 1: return 1
@@ -375,7 +380,7 @@ full_rune :: proc{
 
 // full_rune_in_bytes reports if the bytes in b begin with a full utf-8 encoding of a rune or not
 // An invalid encoding is considered a full rune since it will convert as an error rune of width 1 (RUNE_ERROR)
-full_rune_in_bytes :: proc(b: []byte) -> bool {
+full_rune_in_bytes :: proc "contextless" (b: []byte) -> bool {
 	n := len(b)
 	if n == 0 {
 		return false
@@ -395,7 +400,7 @@ full_rune_in_bytes :: proc(b: []byte) -> bool {
 
 // full_rune_in_string reports if the bytes in s begin with a full utf-8 encoding of a rune or not
 // An invalid encoding is considered a full rune since it will convert as an error rune of width 1 (RUNE_ERROR)
-full_rune_in_string :: proc(s: string) -> bool {
+full_rune_in_string :: proc "contextless" (s: string) -> bool {
 	return full_rune_in_bytes(transmute([]byte)s)
 }
 

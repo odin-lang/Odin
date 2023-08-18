@@ -1,3 +1,4 @@
+//+vet !using-param
 package zlib
 
 /*
@@ -146,15 +147,7 @@ grow_buffer :: proc(buf: ^[dynamic]u8) -> (err: compress.Error) {
 		Double until we reach the maximum allowed.
 	*/
 	new_size := min(len(buf) << 1, compress.COMPRESS_OUTPUT_ALLOCATE_MAX)
-	resize(buf, new_size)
-	if len(buf) != new_size {
-		/*
-			Resize failed.
-		*/
-		return .Resize_Failed
-	}
-
-	return nil
+	return resize(buf, new_size)
 }
 
 /*
@@ -181,7 +174,7 @@ write_byte :: #force_inline proc(z: ^$C, c: u8) -> (err: io.Error) #no_bounds_ch
 }
 
 @(optimization_mode="speed")
-repl_byte :: proc(z: ^$C, count: u16, c: u8) -> (err: io.Error) 	#no_bounds_check {
+repl_byte :: proc(z: ^$C, count: u16, c: u8) -> (err: io.Error) #no_bounds_check {
 	/*
 		TODO(Jeroen): Once we have a magic ring buffer, we can just peek/write into it
 		without having to worry about wrapping, so no need for a temp allocation to give to
@@ -305,10 +298,10 @@ decode_huffman_slowpath :: proc(z: ^$C, t: ^Huffman_Table) -> (r: u16, err: Erro
 	code := u16(compress.peek_bits_lsb(z,16))
 
 	k := int(z_bit_reverse(code, 16))
-	s: u8
 
-	#no_bounds_check for s = HUFFMAN_FAST_BITS+1; ; {
-		if k < t.maxcode[s] {
+	s: u8 = HUFFMAN_FAST_BITS+1
+	for {
+		#no_bounds_check if k < t.maxcode[s] {
 			break
 		}
 		s += 1
@@ -471,7 +464,7 @@ inflate_from_context :: proc(using ctx: ^compress.Context_Memory_Input, raw := f
 	}
 
 	// Parse ZLIB stream without header.
-	inflate_raw(z=ctx, expected_output_size=expected_output_size) or_return
+	inflate_raw(ctx, expected_output_size=expected_output_size) or_return
 
 	if !raw {
 		compress.discard_to_next_byte_lsb(ctx)
@@ -509,8 +502,8 @@ inflate_raw :: proc(z: ^$C, expected_output_size := -1, allocator := context.all
 		/*
 			Try to pre-allocate the output buffer.
 		*/
-		reserve(&z.output.buf, expected_output_size)
-		resize (&z.output.buf, expected_output_size)
+		reserve(&z.output.buf, expected_output_size) or_return
+		resize (&z.output.buf, expected_output_size) or_return
 	}
 
 	if len(z.output.buf) != expected_output_size {
@@ -653,7 +646,7 @@ inflate_raw :: proc(z: ^$C, expected_output_size := -1, allocator := context.all
 	}
 
 	if int(z.bytes_written) != len(z.output.buf) {
-		resize(&z.output.buf, int(z.bytes_written))
+		resize(&z.output.buf, int(z.bytes_written)) or_return
 	}
 
 	return nil
@@ -665,7 +658,7 @@ inflate_from_byte_array :: proc(input: []u8, buf: ^bytes.Buffer, raw := false, e
 	ctx.input_data = input
 	ctx.output = buf
 
-	return inflate_from_context(ctx=&ctx, raw=raw, expected_output_size=expected_output_size)
+	return inflate_from_context(&ctx, raw=raw, expected_output_size=expected_output_size)
 }
 
 inflate_from_byte_array_raw :: proc(input: []u8, buf: ^bytes.Buffer, raw := false, expected_output_size := -1) -> (err: Error) {
@@ -674,7 +667,7 @@ inflate_from_byte_array_raw :: proc(input: []u8, buf: ^bytes.Buffer, raw := fals
 	ctx.input_data = input
 	ctx.output = buf
 
-	return inflate_raw(z=&ctx, expected_output_size=expected_output_size)
+	return inflate_raw(&ctx, expected_output_size=expected_output_size)
 }
 
 inflate :: proc{inflate_from_context, inflate_from_byte_array}

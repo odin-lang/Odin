@@ -81,7 +81,7 @@ pool_destroy :: proc(pool: ^Pool) {
 	delete(pool.tasks)
 	delete(pool.tasks_done)
 
-	for t in &pool.threads {
+	for &t in pool.threads {
 		destroy(t)
 	}
 

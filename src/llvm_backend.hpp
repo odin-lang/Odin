@@ -69,7 +69,6 @@ enum lbAddrKind {
 	lbAddr_SoaVariable,
 
 	lbAddr_RelativePointer,
-	lbAddr_RelativeSlice,
 
 	lbAddr_Swizzle,
 	lbAddr_SwizzleLarge,
@@ -164,7 +163,7 @@ struct lbModule {
 	PtrMap<Type *, lbProcedure *> map_get_procs;
 	PtrMap<Type *, lbProcedure *> map_set_procs;
 
-	u32 nested_type_name_guid;
+	std::atomic<u32> nested_type_name_guid;
 
 	Array<lbProcedure *> procedures_to_generate;
 	Array<Entity *> global_procedures_and_types_to_create;
@@ -190,23 +189,15 @@ struct lbModule {
 	LLVMPassManagerRef function_pass_managers[lbFunctionPassManager_COUNT];
 };
 
-struct lbGenerator {
+struct lbGenerator : LinkerData {
 	CheckerInfo *info;
 
-	Array<String> output_object_paths;
-	Array<String> output_temp_paths;
-	String   output_base;
-	String   output_name;
 	PtrMap<void *, lbModule *> modules; // key is `AstPackage *` (`void *` is used for future use)
 	PtrMap<LLVMContextRef, lbModule *> modules_through_ctx; 
 	lbModule default_module;
 
-	BlockingMutex anonymous_proc_lits_mutex;
+	RecursiveMutex anonymous_proc_lits_mutex;
 	PtrMap<Ast *, lbProcedure *> anonymous_proc_lits; 
-
-	BlockingMutex foreign_mutex;
-	PtrSet<Entity *> foreign_libraries_set;
-	Array<Entity *>  foreign_libraries;
 
 	std::atomic<u32> global_array_index;
 	std::atomic<u32> global_generated_index;
@@ -346,6 +337,10 @@ struct lbProcedure {
 };
 
 
+#ifndef ABI_PKG_NAME_SEPARATOR
+#define ABI_PKG_NAME_SEPARATOR "."
+#endif
+
 
 #if !ODIN_LLVM_MINIMUM_VERSION_14
 #define LLVMConstGEP2(Ty__, ConstantVal__, ConstantIndices__, NumIndices__) LLVMConstGEP(ConstantVal__, ConstantIndices__, NumIndices__)
@@ -477,7 +472,7 @@ gb_internal String lb_get_const_string(lbModule *m, lbValue value);
 
 gb_internal lbValue lb_generate_local_array(lbProcedure *p, Type *elem_type, i64 count, bool zero_init=true);
 gb_internal lbValue lb_generate_global_array(lbModule *m, Type *elem_type, i64 count, String prefix, i64 id);
-gb_internal lbValue lb_gen_map_key_hash(lbProcedure *p, lbValue key, Type *key_type, lbValue *key_ptr_);
+gb_internal lbValue lb_gen_map_key_hash(lbProcedure *p, lbValue const &map_ptr, lbValue key, lbValue *key_ptr_);
 gb_internal lbValue lb_gen_map_cell_info_ptr(lbModule *m, Type *type);
 gb_internal lbValue lb_gen_map_info_ptr(lbModule *m, Type *map_type);
 
@@ -539,11 +534,13 @@ gb_internal void lb_mem_copy_non_overlapping(lbProcedure *p, lbValue dst, lbValu
 gb_internal LLVMValueRef lb_mem_zero_ptr_internal(lbProcedure *p, LLVMValueRef ptr, LLVMValueRef len, unsigned alignment, bool is_volatile);
 
 gb_internal gb_inline i64 lb_max_zero_init_size(void) {
-	return cast(i64)(4*build_context.word_size);
+	return cast(i64)(4*build_context.int_size);
 }
 
 gb_internal LLVMTypeRef OdinLLVMGetArrayElementType(LLVMTypeRef type);
 gb_internal LLVMTypeRef OdinLLVMGetVectorElementType(LLVMTypeRef type);
+
+gb_internal String lb_filepath_ll_for_module(lbModule *m);
 
 #define LB_STARTUP_RUNTIME_PROC_NAME   "__$startup_runtime"
 #define LB_CLEANUP_RUNTIME_PROC_NAME   "__$cleanup_runtime"

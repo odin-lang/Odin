@@ -1,4 +1,4 @@
-//+build wasm32
+//+build wasm32, wasm64p32
 package runtime
 
 @(private="file")
@@ -8,7 +8,7 @@ ti_int :: struct #raw_union {
 }
 
 @(link_name="__ashlti3", linkage="strong")
-__ashlti3 :: proc "c" (a: i128, b_: u32) -> i128 {
+__ashlti3 :: proc "contextless" (a: i128, b_: u32) -> i128 {
 	bits_in_dword :: size_of(u32)*8
 	b := u32(b_)
 	
@@ -29,7 +29,7 @@ __ashlti3 :: proc "c" (a: i128, b_: u32) -> i128 {
 
 
 @(link_name="__multi3", linkage="strong")
-__multi3 :: proc "c" (a, b: i128) -> i128 {
+__multi3 :: proc "contextless" (a, b: i128) -> i128 {
 	x, y, r: ti_int
 	
 	x.all = a

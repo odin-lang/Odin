@@ -27,12 +27,12 @@ gb_internal bool is_operand_value(Operand o) {
 gb_internal bool is_operand_nil(Operand o) {
 	return o.mode == Addressing_Value && o.type == t_untyped_nil;
 }
-gb_internal bool is_operand_undef(Operand o) {
-	return o.mode == Addressing_Value && o.type == t_untyped_undef;
+gb_internal bool is_operand_uninit(Operand o) {
+	return o.mode == Addressing_Value && o.type == t_untyped_uninit;
 }
 
 gb_internal bool check_rtti_type_disallowed(Token const &token, Type *type, char const *format) {
-	if (build_context.disallow_rtti && type) {
+	if (build_context.no_rtti && type) {
 		if (is_type_any(type)) {
 			gbString t = type_to_string(type);
 			error(token, format, t);
@@ -285,17 +285,6 @@ gb_internal Scope *create_scope_from_package(CheckerContext *c, AstPackage *pkg)
 }
 
 gb_internal void destroy_scope(Scope *scope) {
-	for (auto const &entry : scope->elements) {
-		Entity *e = entry.value;
-		if (e->kind == Entity_Variable) {
-			if (!(e->flags & EntityFlag_Used)) {
-#if 0
-				warning(e->token, "Unused variable '%.*s'", LIT(e->token.string));
-#endif
-			}
-		}
-	}
-
 	for (Scope *child = scope->head_child; child != nullptr; child = child->next) {
 		destroy_scope(child);
 	}
@@ -532,6 +521,28 @@ GB_COMPARE_PROC(entity_variable_pos_cmp) {
 }
 
 
+
+gb_internal u64 check_vet_flags(CheckerContext *c) {
+	AstFile *file = c->file;
+	if (file == nullptr &&
+	    c->curr_proc_decl &&
+	    c->curr_proc_decl->proc_lit) {
+		file = c->curr_proc_decl->proc_lit->file();
+	}
+	if (file && file->vet_flags_set) {
+		return file->vet_flags;
+	}
+	return build_context.vet_flags;
+}
+
+gb_internal u64 check_vet_flags(Ast *node) {
+	AstFile *file = node->file();
+	if (file && file->vet_flags_set) {
+		return file->vet_flags;
+	}
+	return build_context.vet_flags;
+}
+
 enum VettedEntityKind {
 	VettedEntity_Invalid,
 
@@ -651,6 +662,9 @@ gb_internal bool check_vet_unused(Checker *c, Entity *e, VettedEntity *ve) {
 		case Entity_Variable:
 			if (e->scope->flags & (ScopeFlag_Global|ScopeFlag_Type|ScopeFlag_File)) {
 				return false;
+			} else if (e->flags & EntityFlag_Static) {
+				// ignore these for the time being
+				return false;
 			}
 		case Entity_ImportName:
 		case Entity_LibraryName:
@@ -663,9 +677,9 @@ gb_internal bool check_vet_unused(Checker *c, Entity *e, VettedEntity *ve) {
 	return false;
 }
 
-gb_internal void check_scope_usage(Checker *c, Scope *scope) {
-	bool vet_unused = true;
-	bool vet_shadowing = true;
+gb_internal void check_scope_usage(Checker *c, Scope *scope, u64 vet_flags) {
+	bool vet_unused = (vet_flags & VetFlag_Unused) != 0;
+	bool vet_shadowing = (vet_flags & (VetFlag_Shadowing|VetFlag_Using)) != 0;
 
 	Array<VettedEntity> vetted_entities = {};
 	array_init(&vetted_entities, heap_allocator());
@@ -699,15 +713,17 @@ gb_internal void check_scope_usage(Checker *c, Scope *scope) {
 
 		if (ve.kind == VettedEntity_Shadowed_And_Unused) {
 			error(e->token, "'%.*s' declared but not used, possibly shadows declaration at line %d", LIT(name), other->token.pos.line);
-		} else if (build_context.vet) {
+		} else if (vet_flags) {
 			switch (ve.kind) {
 			case VettedEntity_Unused:
-				error(e->token, "'%.*s' declared but not used", LIT(name));
+				if (vet_flags & VetFlag_Unused) {
+					error(e->token, "'%.*s' declared but not used", LIT(name));
+				}
 				break;
 			case VettedEntity_Shadowed:
-				if (e->flags&EntityFlag_Using) {
+				if ((vet_flags & (VetFlag_Shadowing|VetFlag_Using)) != 0 && e->flags&EntityFlag_Using) {
 					error(e->token, "Declaration of '%.*s' from 'using' shadows declaration at line %d", LIT(name), other->token.pos.line);
-				} else {
+				} else if ((vet_flags & (VetFlag_Shadowing)) != 0) {
 					error(e->token, "Declaration of '%.*s' shadows declaration at line %d", LIT(name), other->token.pos.line);
 				}
 				break;
@@ -734,7 +750,7 @@ gb_internal void check_scope_usage(Checker *c, Scope *scope) {
 		if (child->flags & (ScopeFlag_Proc|ScopeFlag_Type|ScopeFlag_File)) {
 			// Ignore these
 		} else {
-			check_scope_usage(c, child);
+			check_scope_usage(c, child, vet_flags);
 		}
 	}
 }
@@ -912,6 +928,13 @@ gb_internal Type *add_global_type_name(Scope *scope, String const &type_name, Ty
 	return named_type;
 }
 
+gb_internal i64 odin_compile_timestamp(void) {
+	i64 us_after_1601 = cast(i64)gb_utc_time_now();
+	i64 us_after_1970 = us_after_1601 - 11644473600000000ll;
+	i64 ns_after_1970 = us_after_1970*1000ll;
+	return ns_after_1970;
+}
+
 
 gb_internal void init_universal(void) {
 	BuildContext *bc = &build_context;
@@ -944,7 +967,6 @@ gb_internal void init_universal(void) {
 	add_global_bool_constant("true",  true);
 	add_global_bool_constant("false", false);
 
-	// TODO(bill): Set through flags in the compiler
 	add_global_string_constant("ODIN_VENDOR",  bc->ODIN_VENDOR);
 	add_global_string_constant("ODIN_VERSION", bc->ODIN_VERSION);
 	add_global_string_constant("ODIN_ROOT",    bc->ODIN_ROOT);
@@ -971,13 +993,13 @@ gb_internal void init_universal(void) {
 
 	{
 		GlobalEnumValue values[TargetArch_COUNT] = {
-			{"Unknown", TargetArch_Invalid},
-			{"amd64",   TargetArch_amd64},
-			{"i386",    TargetArch_i386},
-			{"arm32",   TargetArch_arm32},
-			{"arm64",   TargetArch_arm64},
-			{"wasm32",  TargetArch_wasm32},
-			{"wasm64",  TargetArch_wasm64},
+			{"Unknown",   TargetArch_Invalid},
+			{"amd64",     TargetArch_amd64},
+			{"i386",      TargetArch_i386},
+			{"arm32",     TargetArch_arm32},
+			{"arm64",     TargetArch_arm64},
+			{"wasm32",    TargetArch_wasm32},
+			{"wasm64p32", TargetArch_wasm64p32},
 		};
 
 		auto fields = add_global_enum_type(str_lit("Odin_Arch_Type"), values, gb_count_of(values));
@@ -1000,8 +1022,6 @@ gb_internal void init_universal(void) {
 
 	{
 		GlobalEnumValue values[TargetEndian_COUNT] = {
-			{"Unknown", TargetEndian_Invalid},
-
 			{"Little",  TargetEndian_Little},
 			{"Big",     TargetEndian_Big},
 		};
@@ -1009,6 +1029,16 @@ gb_internal void init_universal(void) {
 		auto fields = add_global_enum_type(str_lit("Odin_Endian_Type"), values, gb_count_of(values));
 		add_global_enum_constant(fields, "ODIN_ENDIAN", target_endians[bc->metrics.arch]);
 		add_global_string_constant("ODIN_ENDIAN_STRING", target_endian_names[target_endians[bc->metrics.arch]]);
+	}
+
+	{
+		GlobalEnumValue values[Subtarget_COUNT] = {
+			{"Default", Subtarget_Default},
+			{"iOS",     Subtarget_iOS},
+		};
+
+		auto fields = add_global_enum_type(str_lit("Odin_Platform_Subtarget_Type"), values, gb_count_of(values));
+		add_global_enum_constant(fields, "ODIN_PLATFORM_SUBTARGET", selected_subtarget);
 	}
 
 	{
@@ -1046,10 +1076,12 @@ gb_internal void init_universal(void) {
 	add_global_bool_constant("ODIN_TEST",                     bc->command_kind == Command_test);
 	add_global_bool_constant("ODIN_NO_ENTRY_POINT",           bc->no_entry_point);
 	add_global_bool_constant("ODIN_FOREIGN_ERROR_PROCEDURES", bc->ODIN_FOREIGN_ERROR_PROCEDURES);
-	add_global_bool_constant("ODIN_DISALLOW_RTTI",            bc->disallow_rtti);
+	add_global_bool_constant("ODIN_NO_RTTI",            bc->no_rtti);
 
 	add_global_bool_constant("ODIN_VALGRIND_SUPPORT",         bc->ODIN_VALGRIND_SUPPORT);
+	add_global_bool_constant("ODIN_TILDE",                    bc->tilde_backend);
 
+	add_global_constant("ODIN_COMPILE_TIMESTAMP", t_untyped_integer, exact_value_i64(odin_compile_timestamp()));
 
 
 // Builtin Procedures
@@ -1116,6 +1148,7 @@ gb_internal void init_universal(void) {
 
 
 	t_u8_ptr       = alloc_type_pointer(t_u8);
+	t_u8_multi_ptr = alloc_type_multi_pointer(t_u8);
 	t_int_ptr      = alloc_type_pointer(t_int);
 	t_i64_ptr      = alloc_type_pointer(t_i64);
 	t_f64_ptr      = alloc_type_pointer(t_f64);
@@ -1455,7 +1488,6 @@ gb_internal void add_type_and_value(CheckerContext *ctx, Ast *expr, AddressingMo
 	if (ctx->decl) {
 		mutex = &ctx->decl->type_and_value_mutex;
 	} else if (ctx->pkg) {
-		// TODO(bill): is a per package mutex is a good idea here?
 		mutex = &ctx->pkg->type_and_value_mutex;
 	}
 
@@ -1583,29 +1615,27 @@ gb_internal void add_entity_use(CheckerContext *c, Ast *identifier, Entity *enti
 	if (entity == nullptr) {
 		return;
 	}
-	if (identifier != nullptr) {
-		if (identifier->kind != Ast_Ident) {
-			return;
-		}
-		Ast *empty_ident = nullptr;
-		entity->identifier.compare_exchange_strong(empty_ident, identifier);
-
-		identifier->Ident.entity = entity;
-
-		String dmsg = entity->deprecated_message;
-		if (dmsg.len > 0) {
-			warning(identifier, "%.*s is deprecated: %.*s", LIT(entity->token.string), LIT(dmsg));
-		}
-		String wmsg = entity->warning_message;
-		if (wmsg.len > 0) {
-			warning(identifier, "%.*s: %.*s", LIT(entity->token.string), LIT(wmsg));
-		}
-	}
-	entity->flags |= EntityFlag_Used;
 	add_declaration_dependency(c, entity);
+	entity->flags |= EntityFlag_Used;
 	if (entity_has_deferred_procedure(entity)) {
 		Entity *deferred = entity->Procedure.deferred_procedure.entity;
 		add_entity_use(c, nullptr, deferred);
+	}
+	if (identifier == nullptr || identifier->kind != Ast_Ident) {
+		return;
+	}
+	Ast *empty_ident = nullptr;
+	entity->identifier.compare_exchange_strong(empty_ident, identifier);
+
+	identifier->Ident.entity = entity;
+
+	String dmsg = entity->deprecated_message;
+	if (dmsg.len > 0) {
+		warning(identifier, "%.*s is deprecated: %.*s", LIT(entity->token.string), LIT(dmsg));
+	}
+	String wmsg = entity->warning_message;
+	if (wmsg.len > 0) {
+		warning(identifier, "%.*s: %.*s", LIT(entity->token.string), LIT(wmsg));
 	}
 }
 
@@ -1733,7 +1763,7 @@ gb_internal void add_implicit_entity(CheckerContext *c, Ast *clause, Entity *e) 
 
 gb_internal void add_type_info_type_internal(CheckerContext *c, Type *t);
 gb_internal void add_type_info_type(CheckerContext *c, Type *t) {
-	if (build_context.disallow_rtti) {
+	if (build_context.no_rtti) {
 		return;
 	}
 	if (t == nullptr) {
@@ -1949,9 +1979,9 @@ gb_internal void add_type_info_type_internal(CheckerContext *c, Type *t) {
 		add_type_info_type_internal(c, bt->RelativePointer.base_integer);
 		break;
 
-	case Type_RelativeSlice:
-		add_type_info_type_internal(c, bt->RelativeSlice.slice_type);
-		add_type_info_type_internal(c, bt->RelativeSlice.base_integer);
+	case Type_RelativeMultiPointer:
+		add_type_info_type_internal(c, bt->RelativeMultiPointer.pointer_type);
+		add_type_info_type_internal(c, bt->RelativeMultiPointer.base_integer);
 		break;
 
 	case Type_Matrix:
@@ -2190,9 +2220,9 @@ gb_internal void add_min_dep_type_info(Checker *c, Type *t) {
 		add_min_dep_type_info(c, bt->RelativePointer.base_integer);
 		break;
 
-	case Type_RelativeSlice:
-		add_min_dep_type_info(c, bt->RelativeSlice.slice_type);
-		add_min_dep_type_info(c, bt->RelativeSlice.base_integer);
+	case Type_RelativeMultiPointer:
+		add_min_dep_type_info(c, bt->RelativeMultiPointer.pointer_type);
+		add_min_dep_type_info(c, bt->RelativeMultiPointer.base_integer);
 		break;
 
 	case Type_Matrix:
@@ -2312,7 +2342,9 @@ gb_internal void generate_minimum_dependency_set(Checker *c, Entity *start) {
 		str_lit("memory_equal"),
 		str_lit("memory_compare"),
 		str_lit("memory_compare_zero"),
+	);
 
+	FORCE_ADD_RUNTIME_ENTITIES(!build_context.tilde_backend,
 		// Extended data type internal procedures
 		str_lit("umodti3"),
 		str_lit("udivti3"),
@@ -2334,7 +2366,7 @@ gb_internal void generate_minimum_dependency_set(Checker *c, Entity *start) {
 		str_lit("__multi3"),
 	);
 
-	FORCE_ADD_RUNTIME_ENTITIES(!build_context.disallow_rtti,
+	FORCE_ADD_RUNTIME_ENTITIES(!build_context.no_rtti,
 		// Odin types
 		str_lit("Type_Info"),
 
@@ -2558,9 +2590,6 @@ gb_internal Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInf
 		}
 	}
 
-	// TODO(bill): This could be multithreaded to improve performance
-	// This means that the entity graph node set will have to be thread safe
-
 	TIME_SECTION("generate_entity_dependency_graph: Calculate edges for graph M - Part 2");
 	auto G = array_make<EntityGraphNode *>(allocator, 0, M.count);
 
@@ -2781,7 +2810,7 @@ gb_internal void init_core_type_info(Checker *c) {
 	t_type_info_bit_set          = find_core_type(c, str_lit("Type_Info_Bit_Set"));
 	t_type_info_simd_vector      = find_core_type(c, str_lit("Type_Info_Simd_Vector"));
 	t_type_info_relative_pointer = find_core_type(c, str_lit("Type_Info_Relative_Pointer"));
-	t_type_info_relative_slice   = find_core_type(c, str_lit("Type_Info_Relative_Slice"));
+	t_type_info_relative_multi_pointer = find_core_type(c, str_lit("Type_Info_Relative_Multi_Pointer"));
 	t_type_info_matrix           = find_core_type(c, str_lit("Type_Info_Matrix"));
 	t_type_info_soa_pointer      = find_core_type(c, str_lit("Type_Info_Soa_Pointer"));
 
@@ -2810,7 +2839,7 @@ gb_internal void init_core_type_info(Checker *c) {
 	t_type_info_bit_set_ptr          = alloc_type_pointer(t_type_info_bit_set);
 	t_type_info_simd_vector_ptr      = alloc_type_pointer(t_type_info_simd_vector);
 	t_type_info_relative_pointer_ptr = alloc_type_pointer(t_type_info_relative_pointer);
-	t_type_info_relative_slice_ptr   = alloc_type_pointer(t_type_info_relative_slice);
+	t_type_info_relative_multi_pointer_ptr = alloc_type_pointer(t_type_info_relative_multi_pointer);
 	t_type_info_matrix_ptr           = alloc_type_pointer(t_type_info_matrix);
 	t_type_info_soa_pointer_ptr      = alloc_type_pointer(t_type_info_soa_pointer);
 }
@@ -2937,6 +2966,60 @@ gb_internal DECL_ATTRIBUTE_PROC(foreign_block_decl_attribute) {
 	return false;
 }
 
+gb_internal DECL_ATTRIBUTE_PROC(proc_group_attribute) {
+	if (name == ATTRIBUTE_USER_TAG_NAME) {
+		ExactValue ev = check_decl_attribute_value(c, value);
+		if (ev.kind != ExactValue_String) {
+			error(elem, "Expected a string value for '%.*s'", LIT(name));
+		}
+		return true;
+	} else if (name == "objc_name") {
+		ExactValue ev = check_decl_attribute_value(c, value);
+		if (ev.kind == ExactValue_String) {
+			if (string_is_valid_identifier(ev.value_string)) {
+				ac->objc_name = ev.value_string;
+			} else {
+				error(elem, "Invalid identifier for '%.*s', got '%.*s'", LIT(name), LIT(ev.value_string));
+			}
+		} else {
+			error(elem, "Expected a string value for '%.*s'", LIT(name));
+		}
+		return true;
+	} else if (name == "objc_is_class_method") {
+		ExactValue ev = check_decl_attribute_value(c, value);
+		if (ev.kind == ExactValue_Bool) {
+			ac->objc_is_class_method = ev.value_bool;
+		} else {
+			error(elem, "Expected a boolean value for '%.*s'", LIT(name));
+		}
+		return true;
+	} else if (name == "objc_type") {
+		if (value == nullptr) {
+			error(elem, "Expected a type for '%.*s'", LIT(name));
+		} else {
+			Type *objc_type = check_type(c, value);
+			if (objc_type != nullptr) {
+				if (!has_type_got_objc_class_attribute(objc_type)) {
+					gbString t = type_to_string(objc_type);
+					error(value, "'%.*s' expected a named type with the attribute @(obj_class=<string>), got type %s", LIT(name), t);
+					gb_string_free(t);
+				} else {
+					ac->objc_type = objc_type;
+				}
+			}
+		}
+		return true;
+	} else if (name == "require_results") {
+		if (value != nullptr) {
+			error(elem, "Expected no value for '%.*s'", LIT(name));
+		}
+		ac->require_results = true;
+		return true;
+	}
+	return false;
+}
+
+
 gb_internal DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 	if (name == ATTRIBUTE_USER_TAG_NAME) {
 		ExactValue ev = check_decl_attribute_value(c, value);
@@ -3009,7 +3092,7 @@ gb_internal DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 			check_expr(c, &o, value);
 			Entity *e = entity_of_node(o.expr);
 			if (e != nullptr && e->kind == Entity_Procedure) {
-				warning(elem, "'%.*s' is deprecated, please use one of the following instead: 'deferred_none', 'deferred_in', 'deferred_out'", LIT(name));
+				error(elem, "'%.*s' is not allowed any more, please use one of the following instead: 'deferred_none', 'deferred_in', 'deferred_out'", LIT(name));
 				if (ac->deferred_procedure.entity != nullptr) {
 					error(elem, "Previous usage of a 'deferred_*' attribute");
 				}
@@ -3469,6 +3552,19 @@ gb_internal void check_decl_attributes(CheckerContext *c, Array<Ast *> const &at
 	StringSet set = {};
 	defer (string_set_destroy(&set));
 
+	bool is_runtime = false;
+	if (c->scope && c->scope->file && (c->scope->flags & ScopeFlag_File) &&
+	    c->scope->file->pkg &&
+	    c->scope->file->pkg->kind == Package_Runtime) {
+		is_runtime = true;
+	} else if (c->scope && c->scope->parent &&
+		(c->scope->flags & ScopeFlag_Proc) &&
+		(c->scope->parent->flags & ScopeFlag_File) &&
+		c->scope->parent->file->pkg &&
+		c->scope->parent->file->pkg->kind == Package_Runtime) {
+		is_runtime = true;
+	}
+
 	for_array(i, attributes) {
 		Ast *attr = attributes[i];
 		if (attr->kind != Ast_Attribute) continue;
@@ -3504,9 +3600,14 @@ gb_internal void check_decl_attributes(CheckerContext *c, Array<Ast *> const &at
 				continue;
 			}
 
+			if (name == "builtin" && is_runtime) {
+				continue;
+			}
+
 			if (!proc(c, elem, name, value, ac)) {
 				if (!build_context.ignore_unknown_attributes) {
 					error(elem, "Unknown attribute element name '%.*s'", LIT(name));
+					error_line("\tDid you forget to use build flag '-ignore-unknown-attributes'?\n");
 				}
 			}
 		}
@@ -3663,9 +3764,9 @@ gb_internal void check_builtin_attributes(CheckerContext *ctx, Entity *e, Array<
 					error(value, "'builtin' cannot have a field value");
 				}
 				// Remove the builtin tag
-				attr->Attribute.elems[k] = attr->Attribute.elems[attr->Attribute.elems.count-1];
-				attr->Attribute.elems.count -= 1;
-				k--;
+				// attr->Attribute.elems[k] = attr->Attribute.elems[attr->Attribute.elems.count-1];
+				// attr->Attribute.elems.count -= 1;
+				// k--;
 
 				mutex_unlock(&ctx->info->builtin_mutex);
 			}
@@ -3874,6 +3975,13 @@ gb_internal void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 						cc = ProcCC_CDecl;
 						if (c->foreign_context.default_cc > 0) {
 							cc = c->foreign_context.default_cc;
+						} else if (is_arch_wasm()) {
+							begin_error_block();
+							error(init, "For wasm related targets, it is required that you either define the"
+							            " @(default_calling_convention=<string>) on the foreign block or"
+							            " explicitly assign it on the procedure signature");
+							error_line("\tSuggestion: when dealing with normal Odin code (e.g. js_wasm32), use \"contextless\"; when dealing with Emscripten like code, use \"c\"\n");
+							end_error_block();
 						}
 					}
 					e->Procedure.link_prefix = c->foreign_context.link_prefix;
@@ -4483,7 +4591,7 @@ gb_internal DECL_ATTRIBUTE_PROC(foreign_import_decl_attribute) {
 		if (value != nullptr) {
 			error(elem, "Expected no parameter for '%.*s'", LIT(name));
 		} else if (name == "force") {
-			warning(elem, "'force' is deprecated and is identical to 'require'");
+			error(elem, "'force' was replaced with 'require'");
 		}
 		ac->require_declaration = true;
 		return true;
@@ -5881,7 +5989,11 @@ gb_internal void check_parsed_files(Checker *c) {
 	TIME_SECTION("check scope usage");
 	for (auto const &entry : c->info.files) {
 		AstFile *f = entry.value;
-		check_scope_usage(c, f->scope);
+		u64 vet_flags = build_context.vet_flags;
+		if (f->vet_flags_set) {
+			vet_flags = f->vet_flags;
+		}
+		check_scope_usage(c, f->scope, vet_flags);
 	}
 
 	TIME_SECTION("add basic type information");
@@ -5999,7 +6111,7 @@ gb_internal void check_parsed_files(Checker *c) {
 		while (mpsc_dequeue(&c->info.intrinsics_entry_point_usage, &node)) {
 			if (c->info.entry_point == nullptr && node != nullptr) {
 				if (node->file()->pkg->kind != Package_Runtime) {
-					warning(node, "usage of intrinsics.__entry_point will be a no-op");
+					error(node, "usage of intrinsics.__entry_point will be a no-op");
 				}
 			}
 		}

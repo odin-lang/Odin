@@ -203,6 +203,7 @@ BuiltinProc__type_begin,
 	BuiltinProc_type_elem_type,
 
 	BuiltinProc_type_convert_variants_to_pointers,
+	BuiltinProc_type_merge,
 
 BuiltinProc__type_simple_boolean_begin,
 	BuiltinProc_type_is_boolean,
@@ -501,6 +502,7 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("type_core_type"),            1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_elem_type"),            1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_convert_variants_to_pointers"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("type_merge"),                2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT(""), 0, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_boolean"),           1, false, Expr_Expr, BuiltinProcPkg_intrinsics},

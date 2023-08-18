@@ -53,7 +53,7 @@ save_to_buffer  :: proc(output: ^bytes.Buffer, img: ^Image, options := Options{}
 	// Calculate and allocate maximum size. We'll reclaim space to actually written output at the end.
 	max_size := pixels * (img.channels + 1) + size_of(image.QOI_Header) + size_of(u64be)
 
-	if !resize(&output.buf, max_size) {
+	if resize(&output.buf, max_size) != nil {
 		return .Unable_To_Allocate_Or_Resize
 	}
 
@@ -233,7 +233,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 
 	bytes_needed := image.compute_buffer_size(int(header.width), int(header.height), img.channels, 8)
 
-	if !resize(&img.pixels.buf, bytes_needed) {
+	if resize(&img.pixels.buf, bytes_needed) != nil {
 	 	return img, .Unable_To_Allocate_Or_Resize
 	}
 
@@ -299,7 +299,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 					if length := int(data & 63) + 1; (length * img.channels) > len(pixels) {
 						return img, .Corrupt
 					} else {
-						#no_bounds_check for in 0..<length {
+						#no_bounds_check for _ in 0..<length {
 							copy(pixels, pix[:img.channels])
 							pixels = pixels[img.channels:]
 						}

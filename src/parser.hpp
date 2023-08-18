@@ -104,6 +104,8 @@ struct AstFile {
 	Token        package_token;
 	String       package_name;
 
+	u64          vet_flags;
+	bool         vet_flags_set;
 
 	// >= 0: In Expression
 	// <  0: In Control Clause
@@ -114,6 +116,7 @@ struct AstFile {
 	bool         allow_in_expr; // NOTE(bill): in expression are only allowed in certain cases
 	bool         in_foreign_block;
 	bool         allow_type;
+	bool         in_when_statement;
 
 	isize total_file_decl_count;
 	isize delayed_decl_count;
@@ -356,6 +359,20 @@ enum UnionTypeKind : u8 {
 	UnionType_Normal     = 0,
 	UnionType_no_nil     = 2,
 	UnionType_shared_nil = 3,
+
+	UnionType_COUNT
+};
+
+gb_global char const *union_type_kind_strings[UnionType_COUNT] = {
+	"(normal)",
+	"#maybe",
+	"#no_nil",
+	"#shared_nil",
+};
+
+struct AstSplitArgs {
+	Slice<Ast *> positional;
+	Slice<Ast *> named;
 };
 
 #define AST_KINDS \
@@ -364,7 +381,7 @@ enum UnionTypeKind : u8 {
 		Entity *entity; \
 	}) \
 	AST_KIND(Implicit,       "implicit",        Token) \
-	AST_KIND(Undef,          "undef",           Token) \
+	AST_KIND(Uninit,         "uninitialized value", Token) \
 	AST_KIND(BasicLit,       "basic literal",   struct { \
 		Token token; \
 	}) \
@@ -433,6 +450,7 @@ AST_KIND(_ExprBegin,  "",  bool) \
 		ProcInlining inlining; \
 		bool         optional_ok_one; \
 		bool         was_selector; \
+		AstSplitArgs *split_args; \
 	}) \
 	AST_KIND(FieldValue,      "field value",              struct { Token eq; Ast *field, *value; }) \
 	AST_KIND(EnumFieldValue,  "enum field value",         struct { \
@@ -520,6 +538,7 @@ AST_KIND(_ComplexStmtBegin, "", bool) \
 		Token in_token; \
 		Ast *expr; \
 		Ast *body; \
+		bool reverse; \
 	}) \
 	AST_KIND(UnrollRangeStmt, "#unroll range statement", struct { \
 		Scope *scope; \

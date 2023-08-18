@@ -199,6 +199,9 @@ struct DeclInfo {
 	BlockingMutex type_and_value_mutex;
 
 	Array<BlockLabel> labels;
+
+	// NOTE(bill): this is to prevent a race condition since these procedure literals can be created anywhere at any time
+	struct lbModule *code_gen_module;
 };
 
 // ProcInfo stores the information needed for checking a procedure
@@ -384,8 +387,6 @@ struct CheckerInfo {
 	BlockingMutex foreign_mutex; // NOT recursive
 	StringMap<Entity *> foreigns;
 
-	// NOTE(bill): These are actually MPSC queues
-	// TODO(bill): Convert them to be MPSC queues
 	MPSCQueue<Entity *> definition_queue;
 	MPSCQueue<Entity *> entity_queue;
 	MPSCQueue<Entity *> required_global_variable_queue;
@@ -445,6 +446,9 @@ struct CheckerContext {
 
 	Ast *assignment_lhs_hint;
 };
+
+gb_internal u64 check_vet_flags(CheckerContext *c);
+gb_internal u64 check_vet_flags(Ast *node);
 
 
 struct Checker {

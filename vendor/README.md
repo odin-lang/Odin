@@ -6,9 +6,9 @@ Its use is similar to that of `core:` packages, which would be available in any 
 
 Presently, the `vendor:` collection comprises the following packages:
 
-## microui
+## microui (Port)
 
-A tiny, portable, immediate-mode UI library written in Odin. (Ported from [rxi/microui](https://github.com/rxi/microui).)
+A tiny, portable, immediate-mode UI library written in Odin. [rxi/microui](https://github.com/rxi/microui)
 
 This package is available under the MIT license. See `LICENSE` for more details.
 
@@ -158,4 +158,12 @@ Includes full bindings.
 
 Used in: [bgfx](https://github.com/bkaradzic/bgfx), [Filament](https://github.com/google/filament), [gltfpack](https://github.com/zeux/meshoptimizer/tree/master/gltf), [raylib](https://github.com/raysan5/raylib), [Unigine](https://developer.unigine.com/en/docs/2.14.1/third_party?rlang=cpp#cgltf), and more!
 
-See also LICENCE in `cgltf` directory itself.
+Se also LICENCE in `cgltf` directory itself.
+
+## nanovg (Port)
+
+[NanoVG](https://github.com/memononen/nanovg) is a small antialiased vector graphics rendering library for OpenGL. It has lean API modeled after HTML5 canvas API. It is aimed to be a practical and fun toolset for building scalable user interfaces and visualizations.
+
+## fontstash (Port)
+
+[Font stash](https://github.com/memononen/fontstash) is a light-weight online font texture atlas builder. It uses stb_truetype to render fonts on demand to a texture atlas.

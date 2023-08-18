@@ -3,56 +3,126 @@ package math
 
 import "core:intrinsics"
 
-@(default_calling_convention="none")
+@(default_calling_convention="none", private="file")
 foreign _ {
-	@(link_name="llvm.sin.f16")
-	sin_f16 :: proc(θ: f16) -> f16 ---
-	@(link_name="llvm.sin.f32")
-	sin_f32 :: proc(θ: f32) -> f32 ---
-	@(link_name="llvm.sin.f64")
-	sin_f64 :: proc(θ: f64) -> f64 ---
+	@(link_name="llvm.sin.f16", require_results)
+	_sin_f16 :: proc(θ: f16) -> f16 ---
+	@(link_name="llvm.sin.f32", require_results)
+	_sin_f32 :: proc(θ: f32) -> f32 ---
+	@(link_name="llvm.sin.f64", require_results)
+	_sin_f64 :: proc(θ: f64) -> f64 ---
 
-	@(link_name="llvm.cos.f16")
-	cos_f16 :: proc(θ: f16) -> f16 ---
-	@(link_name="llvm.cos.f32")
-	cos_f32 :: proc(θ: f32) -> f32 ---
-	@(link_name="llvm.cos.f64")
-	cos_f64 :: proc(θ: f64) -> f64 ---
+	@(link_name="llvm.cos.f16", require_results)
+	_cos_f16 :: proc(θ: f16) -> f16 ---
+	@(link_name="llvm.cos.f32", require_results)
+	_cos_f32 :: proc(θ: f32) -> f32 ---
+	@(link_name="llvm.cos.f64", require_results)
+	_cos_f64 :: proc(θ: f64) -> f64 ---
 
-	@(link_name="llvm.pow.f16")
-	pow_f16 :: proc(x, power: f16) -> f16 ---
-	@(link_name="llvm.pow.f32")
-	pow_f32 :: proc(x, power: f32) -> f32 ---
-	@(link_name="llvm.pow.f64")
-	pow_f64 :: proc(x, power: f64) -> f64 ---
+	@(link_name="llvm.pow.f16", require_results)
+	_pow_f16 :: proc(x, power: f16) -> f16 ---
+	@(link_name="llvm.pow.f32", require_results)
+	_pow_f32 :: proc(x, power: f32) -> f32 ---
+	@(link_name="llvm.pow.f64", require_results)
+	_pow_f64 :: proc(x, power: f64) -> f64 ---
 
-	@(link_name="llvm.fmuladd.f16")
-	fmuladd_f16 :: proc(a, b, c: f16) -> f16 ---
-	@(link_name="llvm.fmuladd.f32")
-	fmuladd_f32 :: proc(a, b, c: f32) -> f32 ---
-	@(link_name="llvm.fmuladd.f64")
-	fmuladd_f64 :: proc(a, b, c: f64) -> f64 ---
+	@(link_name="llvm.fmuladd.f16", require_results)
+	_fmuladd_f16 :: proc(a, b, c: f16) -> f16 ---
+	@(link_name="llvm.fmuladd.f32", require_results)
+	_fmuladd_f32 :: proc(a, b, c: f32) -> f32 ---
+	@(link_name="llvm.fmuladd.f64", require_results)
+	_fmuladd_f64 :: proc(a, b, c: f64) -> f64 ---
 
-	@(link_name="llvm.exp.f16")
-	exp_f16 :: proc(x: f16) -> f16 ---
-	@(link_name="llvm.exp.f32")
-	exp_f32 :: proc(x: f32) -> f32 ---
-	@(link_name="llvm.exp.f64")
-	exp_f64 :: proc(x: f64) -> f64 ---
+	@(link_name="llvm.exp.f16", require_results)
+	_exp_f16 :: proc(x: f16) -> f16 ---
+	@(link_name="llvm.exp.f32", require_results)
+	_exp_f32 :: proc(x: f32) -> f32 ---
+	@(link_name="llvm.exp.f64", require_results)
+	_exp_f64 :: proc(x: f64) -> f64 ---
 }
 
+@(require_results)
+sin_f16 :: proc "contextless" (θ: f16) -> f16 {
+	return _sin_f16(θ)
+}
+@(require_results)
+sin_f32 :: proc "contextless" (θ: f32) -> f32 {
+	return _sin_f32(θ)
+}
+@(require_results)
+sin_f64 :: proc "contextless" (θ: f64) -> f64 {
+	return _sin_f64(θ)
+}
+
+@(require_results)
+cos_f16 :: proc "contextless" (θ: f16) -> f16 {
+	return _cos_f16(θ)
+}
+@(require_results)
+cos_f32 :: proc "contextless" (θ: f32) -> f32 {
+	return _cos_f32(θ)
+}
+@(require_results)
+cos_f64 :: proc "contextless" (θ: f64) -> f64 {
+	return _cos_f64(θ)
+}
+
+@(require_results)
+pow_f16 :: proc "contextless" (x, power: f16) -> f16 {
+	return _pow_f16(x, power)
+}
+@(require_results)
+pow_f32 :: proc "contextless" (x, power: f32) -> f32 {
+	return _pow_f32(x, power)
+}
+@(require_results)
+pow_f64 :: proc "contextless" (x, power: f64) -> f64 {
+	return _pow_f64(x, power)
+}
+
+@(require_results)
+fmuladd_f16 :: proc "contextless" (a, b, c: f16) -> f16 {
+	return _fmuladd_f16(a, b, c)
+}
+@(require_results)
+fmuladd_f32 :: proc "contextless" (a, b, c: f32) -> f32 {
+	return _fmuladd_f32(a, b, c)
+}
+@(require_results)
+fmuladd_f64 :: proc "contextless" (a, b, c: f64) -> f64 {
+	return _fmuladd_f64(a, b, c)
+}
+
+@(require_results)
+exp_f16 :: proc "contextless" (x: f16) -> f16 {
+	return _exp_f16(x)
+}
+@(require_results)
+exp_f32 :: proc "contextless" (x: f32) -> f32 {
+	return _exp_f32(x)
+}
+@(require_results)
+exp_f64 :: proc "contextless" (x: f64) -> f64 {
+	return _exp_f64(x)
+}
+
+
+@(require_results)
 sqrt_f16 :: proc "contextless" (x: f16) -> f16 {
 	return intrinsics.sqrt(x)
 }
+@(require_results)
 sqrt_f32 :: proc "contextless" (x: f32) -> f32 {
 	return intrinsics.sqrt(x)
 }
+@(require_results)
 sqrt_f64 :: proc "contextless" (x: f64) -> f64 {
 	return intrinsics.sqrt(x)
 }
 
 
 
+@(require_results)
 ln_f64 :: proc "contextless" (x: f64) -> f64 {
 	// The original C code, the long comment, and the constants
 	// below are from FreeBSD's /usr/src/lib/msun/src/e_log.c
@@ -154,14 +224,14 @@ ln_f64 :: proc "contextless" (x: f64) -> f64 {
 	return k*LN2_HI - ((hfsq - (s*(hfsq+R) + k*LN2_LO)) - f)
 }
 
-ln_f16 :: proc "contextless" (x: f16) -> f16 { return #force_inline f16(ln_f64(f64(x))) }
-ln_f32 :: proc "contextless" (x: f32) -> f32 { return #force_inline f32(ln_f64(f64(x))) }
-ln_f16le :: proc "contextless" (x: f16le) -> f16le { return #force_inline f16le(ln_f64(f64(x))) }
-ln_f16be :: proc "contextless" (x: f16be) -> f16be { return #force_inline f16be(ln_f64(f64(x))) }
-ln_f32le :: proc "contextless" (x: f32le) -> f32le { return #force_inline f32le(ln_f64(f64(x))) }
-ln_f32be :: proc "contextless" (x: f32be) -> f32be { return #force_inline f32be(ln_f64(f64(x))) }
-ln_f64le :: proc "contextless" (x: f64le) -> f64le { return #force_inline f64le(ln_f64(f64(x))) }
-ln_f64be :: proc "contextless" (x: f64be) -> f64be { return #force_inline f64be(ln_f64(f64(x))) }
+@(require_results) ln_f16   :: proc "contextless" (x: f16)   -> f16   { return #force_inline f16(ln_f64(f64(x))) }
+@(require_results) ln_f32   :: proc "contextless" (x: f32)   -> f32   { return #force_inline f32(ln_f64(f64(x))) }
+@(require_results) ln_f16le :: proc "contextless" (x: f16le) -> f16le { return #force_inline f16le(ln_f64(f64(x))) }
+@(require_results) ln_f16be :: proc "contextless" (x: f16be) -> f16be { return #force_inline f16be(ln_f64(f64(x))) }
+@(require_results) ln_f32le :: proc "contextless" (x: f32le) -> f32le { return #force_inline f32le(ln_f64(f64(x))) }
+@(require_results) ln_f32be :: proc "contextless" (x: f32be) -> f32be { return #force_inline f32be(ln_f64(f64(x))) }
+@(require_results) ln_f64le :: proc "contextless" (x: f64le) -> f64le { return #force_inline f64le(ln_f64(f64(x))) }
+@(require_results) ln_f64be :: proc "contextless" (x: f64be) -> f64be { return #force_inline f64be(ln_f64(f64(x))) }
 ln :: proc{
 	ln_f16, ln_f16le, ln_f16be,
 	ln_f32, ln_f32le, ln_f32be,

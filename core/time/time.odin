@@ -59,28 +59,30 @@ sleep :: proc "contextless" (d: Duration) {
 	_sleep(d)
 }
 
-stopwatch_start :: proc "contextless" (using stopwatch: ^Stopwatch) {
-	if !running {
-		_start_time = tick_now()
-		running = true
+stopwatch_start :: proc "contextless" (stopwatch: ^Stopwatch) {
+	if !stopwatch.running {
+		stopwatch._start_time = tick_now()
+		stopwatch.running = true
 	}
 }
 
-stopwatch_stop :: proc "contextless" (using stopwatch: ^Stopwatch) {
-	if running {
-		_accumulation += tick_diff(_start_time, tick_now())
-		running = false
+stopwatch_stop :: proc "contextless" (stopwatch: ^Stopwatch) {
+	if stopwatch.running {
+		stopwatch._accumulation += tick_diff(stopwatch._start_time, tick_now())
+		stopwatch.running = false
 	}
 }
 
-stopwatch_reset :: proc "contextless" (using stopwatch: ^Stopwatch) {
-	_accumulation = {}
-	running = false
+stopwatch_reset :: proc "contextless" (stopwatch: ^Stopwatch) {
+	stopwatch._accumulation = {}
+	stopwatch.running = false
 }
 
-stopwatch_duration :: proc "contextless" (using stopwatch: Stopwatch) -> Duration {
-	if !running { return _accumulation }
-	return _accumulation + tick_diff(_start_time, tick_now())
+stopwatch_duration :: proc "contextless" (stopwatch: Stopwatch) -> Duration {
+	if !stopwatch.running {
+		return stopwatch._accumulation
+	}
+	return stopwatch._accumulation + tick_diff(stopwatch._start_time, tick_now())
 }
 
 diff :: proc "contextless" (start, end: Time) -> Duration {
@@ -171,9 +173,9 @@ day :: proc "contextless" (t: Time) -> (day: int) {
 }
 
 weekday :: proc "contextless" (t: Time) -> (weekday: Weekday) {
-    abs := _time_abs(t)
-    sec := (abs + u64(Weekday.Monday) * SECONDS_PER_DAY) % SECONDS_PER_WEEK
-    return Weekday(int(sec) / SECONDS_PER_DAY)
+	abs := _time_abs(t)
+	sec := (abs + u64(Weekday.Monday) * SECONDS_PER_DAY) % SECONDS_PER_WEEK
+	return Weekday(int(sec) / SECONDS_PER_DAY)
 }
 
 clock :: proc { clock_from_time, clock_from_duration, clock_from_stopwatch }

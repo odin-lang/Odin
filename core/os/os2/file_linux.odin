@@ -13,6 +13,8 @@ _File :: struct {
 	name: string,
 	fd: int,
 	allocator: runtime.Allocator,
+
+	stream: io.Stream,
 }
 
 _stdin : File = {
@@ -75,6 +77,10 @@ _new_file :: proc(fd: uintptr, _: string) -> ^File {
 	file.impl.fd = int(fd)
 	file.impl.allocator = _file_allocator()
 	file.impl.name = _get_full_path(file.impl.fd, file.impl.allocator)
+	file.impl.stream = {
+		data = file,
+		procedure = _file_stream_proc,
+	}
 	return file
 }
 
@@ -108,7 +114,7 @@ _name :: proc(f: ^File) -> string {
 	return f.impl.name if f != nil else ""
 }
 
-_seek :: proc(f: ^File, offset: i64, whence: Seek_From) -> (ret: i64, err: Error) {
+_seek :: proc(f: ^File, offset: i64, whence: io.Seek_From) -> (ret: i64, err: Error) {
 	res := unix.sys_lseek(f.impl.fd, offset, int(whence))
 	if res < 0 {
 		return -1, _get_platform_error(int(res))
@@ -116,18 +122,18 @@ _seek :: proc(f: ^File, offset: i64, whence: Seek_From) -> (ret: i64, err: Error
 	return res, nil
 }
 
-_read :: proc(f: ^File, p: []byte) -> (n: int, err: Error) {
+_read :: proc(f: ^File, p: []byte) -> (i64, Error) {
 	if len(p) == 0 {
 		return 0, nil
 	}
-	n = unix.sys_read(f.impl.fd, &p[0], len(p))
+	n := unix.sys_read(f.impl.fd, &p[0], len(p))
 	if n < 0 {
 		return -1, _get_platform_error(n)
 	}
-	return n, nil
+	return i64(n), nil
 }
 
-_read_at :: proc(f: ^File, p: []byte, offset: i64) -> (n: int, err: Error) {
+_read_at :: proc(f: ^File, p: []byte, offset: i64) -> (n: i64, err: Error) {
 	if offset < 0 {
 		return 0, .Invalid_Offset
 	}
@@ -138,30 +144,25 @@ _read_at :: proc(f: ^File, p: []byte, offset: i64) -> (n: int, err: Error) {
 		if m < 0 {
 			return -1, _get_platform_error(m)
 		}
-		n += m
+		n += i64(m)
 		b = b[m:]
 		offset += i64(m)
 	}
 	return
 }
 
-_read_from :: proc(f: ^File, r: io.Reader) -> (n: i64, err: Error) {
-	//TODO
-	return
-}
-
-_write :: proc(f: ^File, p: []byte) -> (n: int, err: Error) {
+_write :: proc(f: ^File, p: []byte) -> (i64, Error) {
 	if len(p) == 0 {
 		return 0, nil
 	}
-	n = unix.sys_write(f.impl.fd, &p[0], uint(len(p)))
+	n := unix.sys_write(f.impl.fd, &p[0], uint(len(p)))
 	if n < 0 {
 		return -1, _get_platform_error(n)
 	}
-	return int(n), nil
+	return i64(n), nil
 }
 
-_write_at :: proc(f: ^File, p: []byte, offset: i64) -> (n: int, err: Error) {
+_write_at :: proc(f: ^File, p: []byte, offset: i64) -> (n: i64, err: Error) {
 	if offset < 0 {
 		return 0, .Invalid_Offset
 	}
@@ -172,15 +173,10 @@ _write_at :: proc(f: ^File, p: []byte, offset: i64) -> (n: int, err: Error) {
 		if m < 0 {
 			return -1, _get_platform_error(m)
 		}
-		n += m
+		n += i64(m)
 		b = b[m:]
 		offset += i64(m)
 	}
-	return
-}
-
-_write_to :: proc(f: ^File, w: io.Writer) -> (n: i64, err: Error) {
-	//TODO
 	return
 }
 
@@ -371,3 +367,49 @@ _is_dir_fd :: proc(fd: int) -> bool {
 	}
 	return unix.S_ISDIR(s.mode)
 }
+
+
+@(private="package")
+_file_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, offset: i64, whence: io.Seek_From) -> (n: i64, err: io.Error) {
+	f := (^File)(stream_data)
+	ferr: Error
+	i: int
+	switch mode {
+	case .Read:
+		n, ferr = _read(f, p)
+		err = error_to_io_error(ferr)
+		return
+	case .Read_At:
+		n, ferr = _read_at(f, p, offset)
+		err = error_to_io_error(ferr)
+		return
+	case .Write:
+		n, ferr = _write(f, p)
+		err = error_to_io_error(ferr)
+		return
+	case .Write_At:
+		n, ferr = _write_at(f, p, offset)
+		err = error_to_io_error(ferr)
+		return
+	case .Seek:
+		n, ferr = _seek(f, offset, whence)
+		err = error_to_io_error(ferr)
+		return
+	case .Size:
+		n, ferr = _file_size(f)
+		err = error_to_io_error(ferr)
+		return
+	case .Flush:
+		ferr = _flush(f)
+		err = error_to_io_error(ferr)
+		return
+	case .Close, .Destroy:
+		ferr = _close(f)
+		err = error_to_io_error(ferr)
+		return
+	case .Query:
+		return io.query_utility({.Read, .Read_At, .Write, .Write_At, .Seek, .Size, .Flush, .Close, .Destroy, .Query})
+	}
+	return 0, .Empty
+}
+

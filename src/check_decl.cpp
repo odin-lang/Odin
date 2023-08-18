@@ -7,13 +7,15 @@ gb_internal Type *check_init_variable(CheckerContext *ctx, Entity *e, Operand *o
 		e->type == t_invalid) {
 
 		if (operand->mode == Addressing_Builtin) {
+			ERROR_BLOCK();
 			gbString expr_str = expr_to_string(operand->expr);
 
-			// TODO(bill): is this a good enough error message?
 			error(operand->expr,
-				  "Cannot assign built-in procedure '%s' in %.*s",
-				  expr_str,
-				  LIT(context_name));
+			      "Cannot assign built-in procedure '%s' in %.*s",
+			      expr_str,
+			      LIT(context_name));
+
+			error_line("\tBuilt-in procedures are implemented by the compiler and might not be actually instantiated procedure\n");
 
 			operand->mode = Addressing_Invalid;
 
@@ -70,13 +72,12 @@ gb_internal Type *check_init_variable(CheckerContext *ctx, Entity *e, Operand *o
 		// NOTE(bill): Use the type of the operand
 		Type *t = operand->type;
 		if (is_type_untyped(t)) {
-			if (t == t_invalid || is_type_untyped_nil(t)) {
-				error(e->token, "Invalid use of untyped nil in %.*s", LIT(context_name));
+			if (is_type_untyped_uninit(t)) {
+				error(e->token, "Invalid use of --- in %.*s", LIT(context_name));
 				e->type = t_invalid;
 				return nullptr;
-			}
-			if (t == t_invalid || is_type_untyped_undef(t)) {
-				error(e->token, "Invalid use of --- in %.*s", LIT(context_name));
+			} else if (t == t_invalid || is_type_untyped_nil(t)) {
+				error(e->token, "Invalid use of untyped nil in %.*s", LIT(context_name));
 				e->type = t_invalid;
 				return nullptr;
 			}
@@ -123,7 +124,7 @@ gb_internal void check_init_variables(CheckerContext *ctx, Entity **lhs, isize l
 	// an extra allocation
 	TEMPORARY_ALLOCATOR_GUARD();
 	auto operands = array_make<Operand>(temporary_allocator(), 0, 2*lhs_count);
-	check_unpack_arguments(ctx, lhs, lhs_count, &operands, inits, true, false);
+	check_unpack_arguments(ctx, lhs, lhs_count, &operands, inits, UnpackFlag_AllowOk|UnpackFlag_AllowUndef);
 
 	isize rhs_count = operands.count;
 	isize max = gb_min(lhs_count, rhs_count);
@@ -160,9 +161,8 @@ gb_internal void check_init_constant(CheckerContext *ctx, Entity *e, Operand *op
 	}
 
 	if (operand->mode != Addressing_Constant) {
-		// TODO(bill): better error
 		gbString str = expr_to_string(operand->expr);
-		error(operand->expr, "'%s' is not a constant", str);
+		error(operand->expr, "'%s' is not a compile-time known constant", str);
 		gb_string_free(str);
 		if (e->type == nullptr) {
 			e->type = t_invalid;
@@ -321,7 +321,14 @@ gb_internal void check_type_decl(CheckerContext *ctx, Entity *e, Ast *init_expr,
 			gb_string_free(str);
 			is_distinct = false;
 		}
+	} else {
+		if (is_type_typeid(e->type)) {
+			error(init_expr, "'typeid' cannot be aliased");
+		} else if (is_type_any(e->type)) {
+			error(init_expr, "'any' cannot be aliased");
+		}
 	}
+
 	if (!is_distinct) {
 		e->type = bt;
 		named->Named.base = bt;
@@ -355,31 +362,7 @@ gb_internal void check_type_decl(CheckerContext *ctx, Entity *e, Ast *init_expr,
 
 	// using decl
 	if (decl->is_using) {
-		warning(init_expr, "'using' an enum declaration is not allowed, prefer using implicit selector expressions e.g. '.A'");
-		#if 1
-		// NOTE(bill): Must be an enum declaration
-		if (te->kind == Ast_EnumType) {
-			Scope *parent = e->scope;
-			if (parent->flags&ScopeFlag_File) {
-				// NOTE(bill): Use package scope
-				parent = parent->parent;
-			}
-
-			Type *t = base_type(e->type);
-			if (t->kind == Type_Enum) {
-				for (Entity *f : t->Enum.fields) {
-					if (f->kind != Entity_Constant) {
-						continue;
-					}
-					String name = f->token.string;
-					if (is_blank_ident(name)) {
-						continue;
-					}
-					add_entity(ctx, parent, nullptr, f);
-				}
-			}
-		}
-		#endif
+		error(init_expr, "'using' an enum declaration is not allowed, prefer using implicit selector expressions e.g. '.A'");
 	}
 }
 
@@ -758,6 +741,66 @@ gb_internal String handle_link_name(CheckerContext *ctx, Token token, String lin
 	return link_name;
 }
 
+gb_internal void check_objc_methods(CheckerContext *ctx, Entity *e, AttributeContext const &ac) {
+	if (!(ac.objc_name.len || ac.objc_is_class_method || ac.objc_type)) {
+		return;
+	}
+	if (ac.objc_name.len == 0 && ac.objc_is_class_method) {
+		error(e->token, "@(objc_name) is required with @(objc_is_class_method)");
+	} else if (ac.objc_type == nullptr) {
+		error(e->token, "@(objc_name) requires that @(objc_type) to be set");
+	} else if (ac.objc_name.len == 0 && ac.objc_type) {
+		error(e->token, "@(objc_name) is required with @(objc_type)");
+	} else {
+		Type *t = ac.objc_type;
+		if (t->kind == Type_Named) {
+			Entity *tn = t->Named.type_name;
+
+			GB_ASSERT(tn->kind == Entity_TypeName);
+
+			if (tn->scope != e->scope) {
+				error(e->token, "@(objc_name) attribute may only be applied to procedures and types within the same scope");
+			} else {
+				mutex_lock(&global_type_name_objc_metadata_mutex);
+				defer (mutex_unlock(&global_type_name_objc_metadata_mutex));
+
+				if (!tn->TypeName.objc_metadata) {
+					tn->TypeName.objc_metadata = create_type_name_obj_c_metadata();
+				}
+				auto *md = tn->TypeName.objc_metadata;
+				mutex_lock(md->mutex);
+				defer (mutex_unlock(md->mutex));
+
+				if (!ac.objc_is_class_method) {
+					bool ok = true;
+					for (TypeNameObjCMetadataEntry const &entry : md->value_entries) {
+						if (entry.name == ac.objc_name) {
+							error(e->token, "Previous declaration of @(objc_name=\"%.*s\")", LIT(ac.objc_name));
+							ok = false;
+							break;
+						}
+					}
+					if (ok) {
+						array_add(&md->value_entries, TypeNameObjCMetadataEntry{ac.objc_name, e});
+					}
+				} else {
+					bool ok = true;
+					for (TypeNameObjCMetadataEntry const &entry : md->type_entries) {
+						if (entry.name == ac.objc_name) {
+							error(e->token, "Previous declaration of @(objc_name=\"%.*s\")", LIT(ac.objc_name));
+							ok = false;
+							break;
+						}
+					}
+					if (ok) {
+						array_add(&md->type_entries, TypeNameObjCMetadataEntry{ac.objc_name, e});
+					}
+				}
+			}
+		}
+	}
+}
+
 gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 	GB_ASSERT(e->type == nullptr);
 	if (d->proc_lit->kind != Ast_ProcLit) {
@@ -841,62 +884,7 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 	}
 	e->Procedure.optimization_mode = cast(ProcedureOptimizationMode)ac.optimization_mode;
 
-	if (ac.objc_name.len || ac.objc_is_class_method || ac.objc_type) {
-		if (ac.objc_name.len == 0 && ac.objc_is_class_method) {
-			error(e->token, "@(objc_name) is required with @(objc_is_class_method)");
-		} else if (ac.objc_type == nullptr) {
-			error(e->token, "@(objc_name) requires that @(objc_type) to be set");
-		} else if (ac.objc_name.len == 0 && ac.objc_type) {
-			error(e->token, "@(objc_name) is required with @(objc_type)");
-		} else {
-			Type *t = ac.objc_type;
-			if (t->kind == Type_Named) {
-				Entity *tn = t->Named.type_name;
-
-				GB_ASSERT(tn->kind == Entity_TypeName);
-
-				if (tn->scope != e->scope) {
-					error(e->token, "@(objc_name) attribute may only be applied to procedures and types within the same scope");
-				} else {
-					mutex_lock(&global_type_name_objc_metadata_mutex);
-					defer (mutex_unlock(&global_type_name_objc_metadata_mutex));
-
-					if (!tn->TypeName.objc_metadata) {
-						tn->TypeName.objc_metadata = create_type_name_obj_c_metadata();
-					}
-					auto *md = tn->TypeName.objc_metadata;
-					mutex_lock(md->mutex);
-					defer (mutex_unlock(md->mutex));
-
-					if (!ac.objc_is_class_method) {
-						bool ok = true;
-						for (TypeNameObjCMetadataEntry const &entry : md->value_entries) {
-							if (entry.name == ac.objc_name) {
-								error(e->token, "Previous declaration of @(objc_name=\"%.*s\")", LIT(ac.objc_name));
-								ok = false;
-								break;
-							}
-						}
-						if (ok) {
-							array_add(&md->value_entries, TypeNameObjCMetadataEntry{ac.objc_name, e});
-						}
-					} else {
-						bool ok = true;
-						for (TypeNameObjCMetadataEntry const &entry : md->type_entries) {
-							if (entry.name == ac.objc_name) {
-								error(e->token, "Previous declaration of @(objc_name=\"%.*s\")", LIT(ac.objc_name));
-								ok = false;
-								break;
-							}
-						}
-						if (ok) {
-							array_add(&md->type_entries, TypeNameObjCMetadataEntry{ac.objc_name, e});
-						}
-					}
-				}
-			}
-		}
-	}
+	check_objc_methods(ctx, e, ac);
 
 	if (ac.require_target_feature.len != 0 && ac.enable_target_feature.len != 0) {
 		error(e->token, "Attributes @(require_target_feature=...) and @(enable_target_feature=...) cannot be used together");
@@ -951,6 +939,7 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 
 	if (ac.require_declaration) {
 		e->flags |= EntityFlag_Require;
+		pl->inlining = ProcInlining_no_inline;
 	}
 
 
@@ -1059,7 +1048,7 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 		auto *fp = &ctx->info->foreigns;
 		StringHashKey key = string_hash_string(name);
 		Entity **found = string_map_get(fp, key);
-		if (found) {
+		if (found && e != *found) {
 			Entity *f = *found;
 			TokenPos pos = f->token.pos;
 			Type *this_type = base_type(e->type);
@@ -1241,7 +1230,7 @@ gb_internal void check_global_variable_decl(CheckerContext *ctx, Entity *&e, Ast
 	check_rtti_type_disallowed(e->token, e->type, "A variable declaration is using a type, %s, which has been disallowed");
 }
 
-gb_internal void check_proc_group_decl(CheckerContext *ctx, Entity *&pg_entity, DeclInfo *d) {
+gb_internal void check_proc_group_decl(CheckerContext *ctx, Entity *pg_entity, DeclInfo *d) {
 	GB_ASSERT(pg_entity->kind == Entity_ProcGroup);
 	auto *pge = &pg_entity->ProcGroup;
 	String proc_group_name = pg_entity->token.string;
@@ -1365,6 +1354,11 @@ gb_internal void check_proc_group_decl(CheckerContext *ctx, Entity *&pg_entity, 
 			}
 		}
 	}
+
+	AttributeContext ac = {};
+	check_decl_attributes(ctx, d->attributes, proc_group_attribute, &ac);
+	check_objc_methods(ctx, pg_entity, ac);
+
 
 }
 
@@ -1626,7 +1620,7 @@ gb_internal bool check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *de
 	}
 	check_close_scope(ctx);
 
-	check_scope_usage(ctx->checker, ctx->scope);
+	check_scope_usage(ctx->checker, ctx->scope, check_vet_flags(body));
 
 	add_deps_from_child_to_parent(decl);
 

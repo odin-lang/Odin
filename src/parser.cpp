@@ -1,7 +1,21 @@
 #include "parser_pos.cpp"
 
-// #undef at the bottom of this file
-#define ALLOW_NEWLINE (!build_context.strict_style)
+gb_internal u64 ast_file_vet_flags(AstFile *f) {
+	if (f->vet_flags_set) {
+		return f->vet_flags;
+	}
+	return build_context.vet_flags;
+}
+
+gb_internal bool ast_file_vet_style(AstFile *f) {
+	return (ast_file_vet_flags(f) & VetFlag_Style) != 0;
+}
+
+
+gb_internal bool file_allow_newline(AstFile *f) {
+	bool is_strict = build_context.strict_style || ast_file_vet_style(f);
+	return !is_strict;
+}
 
 gb_internal Token token_end_of_line(AstFile *f, Token tok) {
 	u8 const *start = f->tokenizer.start + tok.pos.offset;
@@ -115,7 +129,7 @@ gb_internal Ast *clone_ast(Ast *node, AstFile *f) {
 		n->Ident.entity = nullptr;
 		break;
 	case Ast_Implicit:       break;
-	case Ast_Undef:          break;
+	case Ast_Uninit:         break;
 	case Ast_BasicLit:       break;
 	case Ast_BasicDirective: break;
 
@@ -646,9 +660,9 @@ gb_internal Ast *ast_implicit(AstFile *f, Token token) {
 	result->Implicit = token;
 	return result;
 }
-gb_internal Ast *ast_undef(AstFile *f, Token token) {
-	Ast *result = alloc_ast_node(f, Ast_Undef);
-	result->Undef = token;
+gb_internal Ast *ast_uninit(AstFile *f, Token token) {
+	Ast *result = alloc_ast_node(f, Ast_Uninit);
+	result->Uninit = token;
 	return result;
 }
 
@@ -666,7 +680,11 @@ gb_internal ExactValue exact_value_from_token(AstFile *f, Token const &token) {
 		}
 		break;
 	}
-	return exact_value_from_basic_literal(token.kind, s);
+	ExactValue value = exact_value_from_basic_literal(token.kind, s);
+	if (value.kind == ExactValue_Invalid) {
+		syntax_error(token, "Invalid token literal");
+	}
+	return value;
 }
 
 gb_internal String string_value_from_token(AstFile *f, Token const &token) {
@@ -1152,7 +1170,7 @@ gb_internal Ast *ast_foreign_block_decl(AstFile *f, Token token, Ast *foreign_li
 	result->ForeignBlockDecl.body            = body;
 	result->ForeignBlockDecl.docs            = docs;
 
-	result->ForeignBlockDecl.attributes.allocator = heap_allocator();
+	result->ForeignBlockDecl.attributes.allocator = ast_allocator(f);
 	return result;
 }
 
@@ -1173,7 +1191,7 @@ gb_internal Ast *ast_value_decl(AstFile *f, Array<Ast *> const &names, Ast *type
 	result->ValueDecl.docs       = docs;
 	result->ValueDecl.comment    = comment;
 
-	result->ValueDecl.attributes.allocator = heap_allocator();
+	result->ValueDecl.attributes.allocator = ast_allocator(f);
 	return result;
 }
 
@@ -1205,7 +1223,7 @@ gb_internal Ast *ast_foreign_import_decl(AstFile *f, Token token, Array<Token> f
 	result->ForeignImportDecl.library_name = library_name;
 	result->ForeignImportDecl.docs         = docs;
 	result->ForeignImportDecl.comment      = comment;
-	result->ForeignImportDecl.attributes.allocator = heap_allocator();
+	result->ForeignImportDecl.attributes.allocator = ast_allocator(f);
 
 	return result;
 }
@@ -1255,7 +1273,7 @@ gb_internal Token consume_comment(AstFile *f, isize *end_line_) {
 
 gb_internal CommentGroup *consume_comment_group(AstFile *f, isize n, isize *end_line_) {
 	Array<Token> list = {};
-	list.allocator = heap_allocator();
+	list.allocator = ast_allocator(f);
 	isize end_line = f->curr_token.pos.line;
 	if (f->curr_token_index == 1 &&
 	    f->prev_token.kind == Token_Comment &&
@@ -1393,12 +1411,13 @@ gb_internal Token expect_token(AstFile *f, TokenKind kind) {
 }
 
 gb_internal Token expect_token_after(AstFile *f, TokenKind kind, char const *msg) {
-	Token prev = f->curr_token;
-	if (prev.kind != kind) {
-		String p = token_to_string(prev);
+	Token prev = f->prev_token;
+	Token curr = f->curr_token;
+	if (curr.kind != kind) {
+		String p = token_to_string(curr);
 		Token token = f->curr_token;
-		if (token_is_newline(prev)) {
-			token = prev;
+		if (token_is_newline(curr)) {
+			token = curr;
 			token.pos.column -= 1;
 			skip_possible_newline(f);
 		}
@@ -1408,7 +1427,13 @@ gb_internal Token expect_token_after(AstFile *f, TokenKind kind, char const *msg
 		             LIT(p));
 	}
 	advance_token(f);
-	return prev;
+
+	if (ast_file_vet_style(f) &&
+	    prev.kind == Token_Comma &&
+	    prev.pos.line == curr.pos.line) {
+		syntax_error(prev, "No need for a trailing comma followed by a %.*s on the same line", LIT(token_strings[kind]));
+	}
+	return curr;
 }
 
 
@@ -1563,29 +1588,29 @@ gb_internal void assign_removal_flag_to_semicolon(AstFile *f) {
 	Token *prev_token = &f->tokens[f->prev_token_index];
 	Token *curr_token = &f->tokens[f->curr_token_index];
 	GB_ASSERT(prev_token->kind == Token_Semicolon);
-	if (prev_token->string == ";") {
-		bool ok = false;
-		if (curr_token->pos.line > prev_token->pos.line) {
+	if (prev_token->string != ";") {
+		return;
+	}
+	bool ok = false;
+	if (curr_token->pos.line > prev_token->pos.line) {
+		ok = true;
+	} else if (curr_token->pos.line == prev_token->pos.line) {
+		switch (curr_token->kind) {
+		case Token_CloseBrace:
+		case Token_CloseParen:
+		case Token_EOF:
 			ok = true;
-		} else if (curr_token->pos.line == prev_token->pos.line) {
-			switch (curr_token->kind) {
-			case Token_CloseBrace:
-			case Token_CloseParen:
-			case Token_EOF:
-				ok = true;
-				break;
-			}
-		}
-			
-		if (ok) {
-			if (build_context.strict_style) {
-				syntax_error(*prev_token, "Found unneeded semicolon");
-			} else if (build_context.strict_style_init_only && f->pkg->kind == Package_Init) {
-				syntax_error(*prev_token, "Found unneeded semicolon");
-			}
-			prev_token->flags |= TokenFlag_Remove;
+			break;
 		}
 	}
+	if (!ok) {
+		return;
+	}
+
+	if (build_context.strict_style || (ast_file_vet_flags(f) & VetFlag_Semicolon)) {
+		syntax_error(*prev_token, "Found unneeded semicolon");
+	}
+	prev_token->flags |= TokenFlag_Remove;
 }
 
 gb_internal void expect_semicolon(AstFile *f) {
@@ -1703,7 +1728,7 @@ gb_internal Ast *strip_or_return_expr(Ast *node) {
 gb_internal Ast *parse_value(AstFile *f);
 
 gb_internal Array<Ast *> parse_element_list(AstFile *f) {
-	auto elems = array_make<Ast *>(heap_allocator());
+	auto elems = array_make<Ast *>(ast_allocator(f));
 
 	while (f->curr_token.kind != Token_CloseBrace &&
 	       f->curr_token.kind != Token_EOF) {
@@ -1734,7 +1759,7 @@ gb_internal CommentGroup *consume_line_comment(AstFile *f) {
 }
 
 gb_internal Array<Ast *> parse_enum_field_list(AstFile *f) {
-	auto elems = array_make<Ast *>(heap_allocator());
+	auto elems = array_make<Ast *>(ast_allocator(f));
 
 	while (f->curr_token.kind != Token_CloseBrace &&
 	       f->curr_token.kind != Token_EOF) {
@@ -1924,7 +1949,7 @@ gb_internal Ast *convert_stmt_to_body(AstFile *f, Ast *stmt) {
 	GB_ASSERT(is_ast_stmt(stmt) || is_ast_decl(stmt));
 	Token open = ast_token(stmt);
 	Token close = ast_token(stmt);
-	auto stmts = array_make<Ast *>(heap_allocator(), 0, 1);
+	auto stmts = array_make<Ast *>(ast_allocator(f), 0, 1);
 	array_add(&stmts, stmt);
 	return ast_block_stmt(f, stmts, open, close);
 }
@@ -2072,7 +2097,7 @@ gb_internal Ast *parse_check_directive_for_statement(Ast *s, Token const &tag_to
 }
 
 gb_internal Array<Ast *> parse_union_variant_list(AstFile *f) {
-	auto variants = array_make<Ast *>(heap_allocator());
+	auto variants = array_make<Ast *>(ast_allocator(f));
 	while (f->curr_token.kind != Token_CloseBrace &&
 	       f->curr_token.kind != Token_EOF) {
 		Ast *type = parse_type(f);
@@ -2092,8 +2117,8 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 	case Token_Ident:
 		return parse_ident(f);
 
-	case Token_Undef:
-		return ast_undef(f, expect_token(f, Token_Undef));
+	case Token_Uninit:
+		return ast_uninit(f, expect_token(f, Token_Uninit));
 
 	case Token_context:
 		return ast_implicit(f, expect_token(f, Token_context));
@@ -2217,7 +2242,11 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 			return parse_check_directive_for_statement(operand, name, StateFlag_no_type_assert);
 		} else if (name.string == "relative") {
 			Ast *tag = ast_basic_directive(f, token, name);
-			tag = parse_call_expr(f, tag);
+			if (f->curr_token.kind != Token_OpenParen) {
+				syntax_error(tag, "expected #relative(<integer type>) <type>");
+			} else {
+				tag = parse_call_expr(f, tag);
+			}
 			Ast *type = parse_type(f);
 			return ast_relative_type(f, tag, type);
 		} else if (name.string == "force_inline" ||
@@ -2234,7 +2263,7 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 		if (f->curr_token.kind == Token_OpenBrace) { // ProcGroup
 			Token open = expect_token(f, Token_OpenBrace);
 
-			auto args = array_make<Ast *>(heap_allocator());
+			auto args = array_make<Ast *>(ast_allocator(f));
 
 			while (f->curr_token.kind != Token_CloseBrace &&
 			       f->curr_token.kind != Token_EOF) {
@@ -2292,7 +2321,7 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 
 		skip_possible_newline_for_literal(f);
 
-		if (allow_token(f, Token_Undef)) {
+		if (allow_token(f, Token_Uninit)) {
 			if (where_token.kind != Token_Invalid) {
 				syntax_error(where_token, "'where' clauses are not allowed on procedure literals without a defined body (replaced with ---)");
 			}
@@ -2456,6 +2485,13 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 					syntax_error(tag, "Duplicate struct tag '#%.*s'", LIT(tag.string));
 				}
 				align = parse_expr(f, true);
+				if (align && align->kind != Ast_ParenExpr) {
+					ERROR_BLOCK();
+					gbString s = expr_to_string(align);
+					syntax_warning(tag, "#align requires parentheses around the expression");
+					error_line("\tSuggestion: #align(%s)", s);
+					gb_string_free(s);
+				}
 			} else if (tag.string == "raw_union") {
 				if (is_raw_union) {
 					syntax_error(tag, "Duplicate struct tag '#%.*s'", LIT(tag.string));
@@ -2537,6 +2573,13 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 					syntax_error(tag, "Duplicate union tag '#%.*s'", LIT(tag.string));
 				}
 				align = parse_expr(f, true);
+				if (align && align->kind != Ast_ParenExpr) {
+					ERROR_BLOCK();
+					gbString s = expr_to_string(align);
+					syntax_warning(tag, "#align requires parentheses around the expression");
+					error_line("\tSuggestion: #align(%s)", s);
+					gb_string_free(s);
+				}
 			} else if (tag.string == "no_nil") {
 				if (no_nil) {
 					syntax_error(tag, "Duplicate union tag '#%.*s'", LIT(tag.string));
@@ -2639,7 +2682,7 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 		Array<Ast *> param_types = {};
 		Ast *return_type = nullptr;
 		if (allow_token(f, Token_OpenParen)) {
-			param_types = array_make<Ast *>(heap_allocator());
+			param_types = array_make<Ast *>(ast_allocator(f));
 			while (f->curr_token.kind != Token_CloseParen && f->curr_token.kind != Token_EOF) {
 				Ast *t = parse_type(f);
 				array_add(&param_types, t);
@@ -2737,20 +2780,20 @@ gb_internal bool is_literal_type(Ast *node) {
 }
 
 gb_internal Ast *parse_call_expr(AstFile *f, Ast *operand) {
-	auto args = array_make<Ast *>(heap_allocator());
+	auto args = array_make<Ast *>(ast_allocator(f));
 	Token open_paren, close_paren;
 	Token ellipsis = {};
 
 	isize prev_expr_level = f->expr_level;
 	bool prev_allow_newline = f->allow_newline;
 	f->expr_level = 0;
-	f->allow_newline = ALLOW_NEWLINE;
+	f->allow_newline = file_allow_newline(f);
 
 	open_paren = expect_token(f, Token_OpenParen);
 
+	bool seen_ellipsis = false;
 	while (f->curr_token.kind != Token_CloseParen &&
-	       f->curr_token.kind != Token_EOF &&
-	       ellipsis.pos.line == 0) {
+	       f->curr_token.kind != Token_EOF) {
 		if (f->curr_token.kind == Token_Comma) {
 			syntax_error(f->curr_token, "Expected an expression not ,");
 		} else if (f->curr_token.kind == Token_Eq) {
@@ -2773,10 +2816,14 @@ gb_internal Ast *parse_call_expr(AstFile *f, Ast *operand) {
 
 			Ast *value = parse_value(f);
 			arg = ast_field_value(f, arg, value, eq);
-
-
+		} else if (seen_ellipsis) {
+			syntax_error(arg, "Positional arguments are not allowed after '..'");
 		}
 		array_add(&args, arg);
+
+		if (ellipsis.pos.line != 0) {
+			seen_ellipsis = true;
+		}
 
 		if (!allow_field_separator(f)) {
 			break;
@@ -3139,9 +3186,9 @@ gb_internal Ast *parse_expr(AstFile *f, bool lhs) {
 
 gb_internal Array<Ast *> parse_expr_list(AstFile *f, bool lhs) {
 	bool allow_newline = f->allow_newline;
-	f->allow_newline = ALLOW_NEWLINE;
+	f->allow_newline = file_allow_newline(f);
 
-	auto list = array_make<Ast *>(heap_allocator());
+	auto list = array_make<Ast *>(ast_allocator(f));
 	for (;;) {
 		Ast *e = parse_expr(f, lhs);
 		array_add(&list, e);
@@ -3166,7 +3213,7 @@ gb_internal Array<Ast *> parse_rhs_expr_list(AstFile *f) {
 }
 
 gb_internal Array<Ast *> parse_ident_list(AstFile *f, bool allow_poly_names) {
-	auto list = array_make<Ast *>(heap_allocator());
+	auto list = array_make<Ast *>(ast_allocator(f));
 
 	for (;;) {
 		array_add(&list, parse_ident(f, allow_poly_names));
@@ -3219,7 +3266,7 @@ gb_internal Ast *parse_foreign_block(AstFile *f, Token token) {
 	}
 	Token open = {};
 	Token close = {};
-	auto decls = array_make<Ast *>(heap_allocator());
+	auto decls = array_make<Ast *>(ast_allocator(f));
 
 	bool prev_in_foreign_block = f->in_foreign_block;
 	defer (f->in_foreign_block = prev_in_foreign_block);
@@ -3289,7 +3336,7 @@ gb_internal Ast *parse_value_decl(AstFile *f, Array<Ast *> names, CommentGroup *
 	}
 
 	if (values.data == nullptr) {
-		values.allocator = heap_allocator();
+		values.allocator = ast_allocator(f);
 	}
 
 	CommentGroup *end_comment = f->lead_comment;
@@ -3361,7 +3408,7 @@ gb_internal Ast *parse_simple_stmt(AstFile *f, u32 flags) {
 			Ast *expr = parse_expr(f, true);
 			f->allow_range = prev_allow_range;
 
-			auto rhs = array_make<Ast *>(heap_allocator(), 0, 1);
+			auto rhs = array_make<Ast *>(ast_allocator(f), 0, 1);
 			array_add(&rhs, expr);
 
 			return ast_assign_stmt(f, token, lhs, rhs);
@@ -3454,7 +3501,7 @@ gb_internal Ast *parse_results(AstFile *f, bool *diverging) {
 	if (f->curr_token.kind != Token_OpenParen) {
 		Token begin_token = f->curr_token;
 		Array<Ast *> empty_names = {};
-		auto list = array_make<Ast *>(heap_allocator(), 0, 1);
+		auto list = array_make<Ast *>(ast_allocator(f), 0, 1);
 		Ast *type = parse_type(f);
 		Token tag = {};
 		array_add(&list, ast_field(f, empty_names, type, nullptr, 0, tag, nullptr, nullptr));
@@ -3464,7 +3511,7 @@ gb_internal Ast *parse_results(AstFile *f, bool *diverging) {
 	Ast *list = nullptr;
 	expect_token(f, Token_OpenParen);
 	list = parse_field_list(f, nullptr, FieldFlag_Results, Token_CloseParen, true, false);
-	if (ALLOW_NEWLINE) {
+	if (file_allow_newline(f)) {
 		skip_possible_newline(f);
 	}
 	expect_token_after(f, Token_CloseParen, "parameter list");
@@ -3524,7 +3571,7 @@ gb_internal Ast *parse_proc_type(AstFile *f, Token proc_token) {
 
 	expect_token(f, Token_OpenParen);
 	params = parse_field_list(f, nullptr, FieldFlag_Signature, Token_CloseParen, true, true);
-	if (ALLOW_NEWLINE) {
+	if (file_allow_newline(f)) {
 		skip_possible_newline(f);
 	}
 	expect_token_after(f, Token_CloseParen, "parameter list");
@@ -3698,7 +3745,7 @@ struct AstAndFlags {
 };
 
 gb_internal Array<Ast *> convert_to_ident_list(AstFile *f, Array<AstAndFlags> list, bool ignore_flags, bool allow_poly_names) {
-	auto idents = array_make<Ast *>(heap_allocator(), 0, list.count);
+	auto idents = array_make<Ast *>(ast_allocator(f), 0, list.count);
 	// Convert to ident list
 	isize i = 0;
 	for (AstAndFlags const &item : list) {
@@ -3744,8 +3791,18 @@ gb_internal bool allow_field_separator(AstFile *f) {
 	if (allow_token(f, Token_Comma)) {
 		return true;
 	}
-	if (ALLOW_NEWLINE && token.kind == Token_Semicolon) {
-		if (!token_is_newline(token)) {
+	if (token.kind == Token_Semicolon) {
+		bool ok = false;
+		if (file_allow_newline(f) && token_is_newline(token)) {
+			TokenKind next = peek_token(f).kind;
+			switch (next) {
+			case Token_CloseBrace:
+			case Token_CloseParen:
+				ok = true;
+				break;
+			}
+		}
+		if (!ok) {
 			String p = token_to_string(token);
 			syntax_error(token_end_of_line(f, f->prev_token), "Expected a comma, got a %.*s", LIT(p));
 		}
@@ -3758,7 +3815,7 @@ gb_internal bool allow_field_separator(AstFile *f) {
 gb_internal Ast *parse_struct_field_list(AstFile *f, isize *name_count_) {
 	Token start_token = f->curr_token;
 
-	auto decls = array_make<Ast *>(heap_allocator());
+	auto decls = array_make<Ast *>(ast_allocator(f));
 
 	isize total_name_count = 0;
 
@@ -3800,16 +3857,15 @@ gb_internal bool check_procedure_name_list(Array<Ast *> const &names) {
 gb_internal Ast *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, TokenKind follow, bool allow_default_parameters, bool allow_typeid_token) {
 	bool prev_allow_newline = f->allow_newline;
 	defer (f->allow_newline = prev_allow_newline);
-	f->allow_newline = ALLOW_NEWLINE;
+	f->allow_newline = file_allow_newline(f);
 
 	Token start_token = f->curr_token;
 
 	CommentGroup *docs = f->lead_comment;
 
-	auto params = array_make<Ast *>(heap_allocator());
+	auto params = array_make<Ast *>(ast_allocator(f));
 
-	auto list = array_make<AstAndFlags>(heap_allocator());
-	defer (array_free(&list));
+	auto list = array_make<AstAndFlags>(temporary_allocator());
 
 	bool allow_poly_names = allow_typeid_token;
 
@@ -3985,7 +4041,7 @@ gb_internal Ast *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_fl
 			token.string = str_lit("");
 		}
 
-		auto names = array_make<Ast *>(heap_allocator(), 1);
+		auto names = array_make<Ast *>(ast_allocator(f), 1);
 		token.pos = ast_token(type).pos;
 		names[0] = ast_ident(f, token);
 		u32 flags = check_field_prefixes(f, list.count, allowed_flags, item.flags);
@@ -4151,6 +4207,8 @@ gb_internal Ast *parse_when_stmt(AstFile *f) {
 		syntax_error(f->curr_token, "Expected condition for when statement");
 	}
 
+	bool was_in_when_statement = f->in_when_statement;
+	f->in_when_statement = true;
 	if (allow_token(f, Token_do)) {
 		body = parse_do_body(f, cond ? ast_token(cond) : token, "then when statement");
 	} else {
@@ -4177,6 +4235,7 @@ gb_internal Ast *parse_when_stmt(AstFile *f) {
 			break;
 		}
 	}
+	f->in_when_statement = was_in_when_statement;
 
 	return ast_when_stmt(f, token, cond, body, else_stmt);
 }
@@ -4194,7 +4253,7 @@ gb_internal Ast *parse_return_stmt(AstFile *f) {
 		return ast_bad_stmt(f, token, f->curr_token);
 	}
 
-	auto results = array_make<Ast *>(heap_allocator());
+	auto results = array_make<Ast *>(ast_allocator(f));
 
 	while (f->curr_token.kind != Token_Semicolon && f->curr_token.kind != Token_CloseBrace) {
 		Ast *arg = parse_expr(f, false);
@@ -4232,6 +4291,8 @@ gb_internal Ast *parse_for_stmt(AstFile *f) {
 
 		if (f->curr_token.kind == Token_in) {
 			Token in_token = expect_token(f, Token_in);
+			syntax_error(in_token, "Prefer 'for _ in' over 'for in'");
+
 			Ast *rhs = nullptr;
 			bool prev_allow_range = f->allow_range;
 			f->allow_range = true;
@@ -4243,6 +4304,7 @@ gb_internal Ast *parse_for_stmt(AstFile *f) {
 			} else {
 				body = parse_block_stmt(f, false);
 			}
+
 			return ast_range_stmt(f, token, {}, in_token, rhs, body);
 		}
 
@@ -4297,6 +4359,13 @@ gb_internal Ast *parse_for_stmt(AstFile *f) {
 	}
 
 	cond = convert_stmt_to_expr(f, cond, str_lit("boolean expression"));
+	if (init != nullptr &&
+	    cond == nullptr &&
+	    post == nullptr) {
+		syntax_error(init, "'for init; ; {' without an explicit condition nor post statement is not allowed, please prefer something like 'for init; true; /**/{'");
+	}
+
+
 	return ast_for_stmt(f, token, init, cond, post, body);
 }
 
@@ -4333,16 +4402,19 @@ gb_internal Ast *parse_switch_stmt(AstFile *f) {
 	Ast *body = nullptr;
 	Token open, close;
 	bool is_type_switch = false;
-	auto list = array_make<Ast *>(heap_allocator());
+	auto list = array_make<Ast *>(ast_allocator(f));
 
 	if (f->curr_token.kind != Token_OpenBrace) {
 		isize prev_level = f->expr_level;
 		f->expr_level = -1;
 		defer (f->expr_level = prev_level);
 
-		if (allow_token(f, Token_in)) {
-			auto lhs = array_make<Ast *>(heap_allocator(), 0, 1);
-			auto rhs = array_make<Ast *>(heap_allocator(), 0, 1);
+		if (f->curr_token.kind == Token_in) {
+			Token in_token = expect_token(f, Token_in);
+			syntax_error(in_token, "Prefer 'switch _ in' over 'switch in'");
+
+			auto lhs = array_make<Ast *>(ast_allocator(f), 0, 1);
+			auto rhs = array_make<Ast *>(ast_allocator(f), 0, 1);
 			Token blank_ident = token;
 			blank_ident.kind = Token_Ident;
 			blank_ident.string = str_lit("_");
@@ -4438,6 +4510,10 @@ gb_internal Ast *parse_import_decl(AstFile *f, ImportDeclKind kind) {
 		array_add(&f->imports, s);
 	}
 
+	if (f->in_when_statement) {
+		syntax_error(import_name, "Cannot use 'import' within a 'when' statement. Prefer using the file suffixes (e.g. foo_windows.odin) or '//+build' tags");
+	}
+
 	if (kind != ImportDecl_Standard) {
 		syntax_error(import_name, "'using import' is not allowed, please use the import name explicitly");
 	}
@@ -4471,7 +4547,7 @@ gb_internal Ast *parse_foreign_decl(AstFile *f) {
 		}
 		Array<Token> filepaths = {};
 		if (allow_token(f, Token_OpenBrace)) {
-			array_init(&filepaths, heap_allocator());
+			array_init(&filepaths, ast_allocator(f));
 
 			while (f->curr_token.kind != Token_CloseBrace &&
 			       f->curr_token.kind != Token_EOF) {
@@ -4485,7 +4561,7 @@ gb_internal Ast *parse_foreign_decl(AstFile *f) {
 			}
 			expect_closing_brace_of_field_list(f);
 		} else {
-			filepaths = array_make<Token>(heap_allocator(), 0, 1);
+			filepaths = array_make<Token>(ast_allocator(f), 0, 1);
 			Token path = expect_token(f, Token_String);
 			array_add(&filepaths, path);
 		}
@@ -4509,20 +4585,20 @@ gb_internal Ast *parse_foreign_decl(AstFile *f) {
 	return ast_bad_decl(f, token, f->curr_token);
 }
 
-gb_internal Ast *parse_attribute(AstFile *f, Token token, TokenKind open_kind, TokenKind close_kind) {
+gb_internal Ast *parse_attribute(AstFile *f, Token token, TokenKind open_kind, TokenKind close_kind, CommentGroup *docs) {
 	Array<Ast *> elems = {};
 	Token open = {};
 	Token close = {};
 
 	if (f->curr_token.kind == Token_Ident) {
-		elems = array_make<Ast *>(heap_allocator(), 0, 1);
+		elems = array_make<Ast *>(ast_allocator(f), 0, 1);
 		Ast *elem = parse_ident(f);
 		array_add(&elems, elem);
 	} else {
 		open = expect_token(f, open_kind);
 		f->expr_level++;
 		if (f->curr_token.kind != close_kind) {
-			elems = array_make<Ast *>(heap_allocator());
+			elems = array_make<Ast *>(ast_allocator(f));
 			while (f->curr_token.kind != close_kind &&
 			       f->curr_token.kind != Token_EOF) {
 				Ast *elem = nullptr;
@@ -4550,6 +4626,9 @@ gb_internal Ast *parse_attribute(AstFile *f, Token token, TokenKind open_kind, T
 
 	Ast *decl = parse_stmt(f);
 	if (decl->kind == Ast_ValueDecl) {
+		if (decl->ValueDecl.docs == nullptr && docs != nullptr) {
+			decl->ValueDecl.docs = docs;
+		}
 		array_add(&decl->ValueDecl.attributes, attribute);
 	} else if (decl->kind == Ast_ForeignBlockDecl) {
 		array_add(&decl->ForeignBlockDecl.attributes, attribute);
@@ -4698,8 +4777,9 @@ gb_internal Ast *parse_stmt(AstFile *f) {
 	} break;
 
 	case Token_At: {
+		CommentGroup *docs = f->lead_comment;
 		Token token = expect_token(f, Token_At);
-		return parse_attribute(f, token, Token_OpenParen, Token_CloseParen);
+		return parse_attribute(f, token, Token_OpenParen, Token_CloseParen, docs);
 	}
 
 	case Token_Hash: {
@@ -4749,6 +4829,17 @@ gb_internal Ast *parse_stmt(AstFile *f) {
 			return stmt;
 		} else if (tag == "unroll") {
 			return parse_unrolled_for_loop(f, name);
+		} else if (tag == "reverse") {
+			Ast *for_stmt = parse_for_stmt(f);
+			if (for_stmt->kind == Ast_RangeStmt) {
+				if (for_stmt->RangeStmt.reverse) {
+					syntax_error(token, "#reverse already applied to a 'for in' statement");
+				}
+				for_stmt->RangeStmt.reverse = true;
+			} else {
+				syntax_error(token, "#reverse can only be applied to a 'for in' statement");
+			}
+			return for_stmt;
 		} else if (tag == "include") {
 			syntax_error(token, "#include is not a valid import declaration kind. Did you mean 'import'?");
 			s = ast_bad_stmt(f, token, f->curr_token);
@@ -4804,7 +4895,7 @@ gb_internal Ast *parse_stmt(AstFile *f) {
 }
 
 gb_internal Array<Ast *> parse_stmt_list(AstFile *f) {
-	auto list = array_make<Ast *>(heap_allocator());
+	auto list = array_make<Ast *>(ast_allocator(f));
 
 	while (f->curr_token.kind != Token_case &&
 	       f->curr_token.kind != Token_CloseBrace &&
@@ -4862,7 +4953,7 @@ gb_internal ParseFileError init_ast_file(AstFile *f, String const &fullpath, Tok
 	token_cap = ((token_cap + pow2_cap-1)/pow2_cap) * pow2_cap;
 
 	isize init_token_cap = gb_max(token_cap, 16);
-	array_init(&f->tokens, heap_allocator(), 0, gb_max(init_token_cap, 16));
+	array_init(&f->tokens, ast_allocator(f), 0, gb_max(init_token_cap, 16));
 
 	if (err == TokenizerInit_Empty) {
 		Token token = {Token_EOF};
@@ -4897,8 +4988,8 @@ gb_internal ParseFileError init_ast_file(AstFile *f, String const &fullpath, Tok
 	f->prev_token = f->tokens[f->prev_token_index];
 	f->curr_token = f->tokens[f->curr_token_index];
 
-	array_init(&f->comments, heap_allocator(), 0, 0);
-	array_init(&f->imports,  heap_allocator(), 0, 0);
+	array_init(&f->comments, ast_allocator(f), 0, 0);
+	array_init(&f->imports,  ast_allocator(f), 0, 0);
 
 	f->curr_proc = nullptr;
 
@@ -4915,13 +5006,12 @@ gb_internal void destroy_ast_file(AstFile *f) {
 gb_internal bool init_parser(Parser *p) {
 	GB_ASSERT(p != nullptr);
 	string_set_init(&p->imported_files);
-	array_init(&p->packages, heap_allocator());
+	array_init(&p->packages, permanent_allocator());
 	return true;
 }
 
 gb_internal void destroy_parser(Parser *p) {
 	GB_ASSERT(p != nullptr);
-	// TODO(bill): Fix memory leak
 	for (AstPackage *pkg : p->packages) {
 		for (AstFile *file : pkg->files) {
 			destroy_ast_file(file);
@@ -4965,7 +5055,6 @@ gb_internal WORKER_TASK_PROC(parser_worker_proc) {
 
 
 gb_internal void parser_add_file_to_process(Parser *p, AstPackage *pkg, FileInfo fi, TokenPos pos) {
-	// TODO(bill): Use a better allocator
 	ImportedFile f = {pkg, fi, pos, p->file_to_process_count++};
 	auto wd = gb_alloc_item(permanent_allocator(), ParserWorkerData);
 	wd->parser = p;
@@ -4982,10 +5071,9 @@ gb_internal WORKER_TASK_PROC(foreign_file_worker_proc) {
 
 	String fullpath = string_trim_whitespace(imp->fi.fullpath); // Just in case
 
-	char *c_str = alloc_cstring(heap_allocator(), fullpath);
-	defer (gb_free(heap_allocator(), c_str));
+	char *c_str = alloc_cstring(temporary_allocator(), fullpath);
 
-	gbFileContents fc = gb_file_read_contents(heap_allocator(), true, c_str);
+	gbFileContents fc = gb_file_read_contents(permanent_allocator(), true, c_str);
 	foreign_file.source.text = (u8 *)fc.data;
 	foreign_file.source.len = fc.size;
 
@@ -5027,8 +5115,8 @@ gb_internal AstPackage *try_add_import_path(Parser *p, String path, String const
 	AstPackage *pkg = gb_alloc_item(permanent_allocator(), AstPackage);
 	pkg->kind = kind;
 	pkg->fullpath = path;
-	array_init(&pkg->files, heap_allocator());
-	pkg->foreign_files.allocator = heap_allocator();
+	array_init(&pkg->files, permanent_allocator());
+	pkg->foreign_files.allocator = permanent_allocator();
 
 	// NOTE(bill): Single file initial package
 	if (kind == Package_Init && string_ends_with(path, FILE_EXT)) {
@@ -5208,7 +5296,6 @@ gb_internal bool determine_path_from_string(BlockingMutex *file_mutex, Ast *node
 
 	// NOTE(bill): if file_mutex == nullptr, this means that the code is used within the semantics stage
 
-	gbAllocator a = heap_allocator();
 	String collection_name = {};
 
 	isize colon_pos = -1;
@@ -5309,7 +5396,7 @@ gb_internal bool determine_path_from_string(BlockingMutex *file_mutex, Ast *node
 	if (has_windows_drive) {
 		*path = file_str;
 	} else {
-		String fullpath = string_trim_whitespace(get_fullpath_relative(a, base_dir, file_str));
+		String fullpath = string_trim_whitespace(get_fullpath_relative(permanent_allocator(), base_dir, file_str));
 		*path = fullpath;
 	}
 	return true;
@@ -5495,6 +5582,88 @@ gb_internal bool parse_build_tag(Token token_for_pos, String s) {
 	return any_correct;
 }
 
+gb_internal String vet_tag_get_token(String s, String *out) {
+	s = string_trim_whitespace(s);
+	isize n = 0;
+	while (n < s.len) {
+		Rune rune = 0;
+		isize width = utf8_decode(&s[n], s.len-n, &rune);
+		if (n == 0 && rune == '!') {
+
+		} else if (!rune_is_letter(rune) && !rune_is_digit(rune) && rune != '-') {
+			isize k = gb_max(gb_max(n, width), 1);
+			*out = substring(s, k, s.len);
+			return substring(s, 0, k);
+		}
+		n += width;
+	}
+	out->len = 0;
+	return s;
+}
+
+
+gb_internal u64 parse_vet_tag(Token token_for_pos, String s) {
+	String const prefix = str_lit("+vet");
+	GB_ASSERT(string_starts_with(s, prefix));
+	s = string_trim_whitespace(substring(s, prefix.len, s.len));
+
+	if (s.len == 0) {
+		return VetFlag_All;
+	}
+
+
+	u64 vet_flags = 0;
+	u64 vet_not_flags = 0;
+
+	while (s.len > 0) {
+		String p = string_trim_whitespace(vet_tag_get_token(s, &s));
+		if (p.len == 0) {
+			break;
+		}
+
+		bool is_notted = false;
+		if (p[0] == '!') {
+			is_notted = true;
+			p = substring(p, 1, p.len);
+			if (p.len == 0) {
+				syntax_error(token_for_pos, "Expected a vet flag name after '!'");
+				return build_context.vet_flags;
+			}
+		}
+
+		u64 flag = get_vet_flag_from_name(p);
+		if (flag != VetFlag_NONE) {
+			if (is_notted) {
+				vet_not_flags |= flag;
+			} else {
+				vet_flags     |= flag;
+			}
+		} else {
+			ERROR_BLOCK();
+			syntax_error(token_for_pos, "Invalid vet flag name: %.*s", LIT(p));
+			error_line("\tExpected one of the following\n");
+			error_line("\tunused\n");
+			error_line("\tshadowing\n");
+			error_line("\tusing-stmt\n");
+			error_line("\tusing-param\n");
+			error_line("\textra\n");
+			return build_context.vet_flags;
+		}
+	}
+
+	if (vet_flags == 0 && vet_not_flags == 0) {
+		return build_context.vet_flags;
+	}
+	if (vet_flags == 0 && vet_not_flags != 0) {
+		return build_context.vet_flags &~ vet_not_flags;
+	}
+	if (vet_flags != 0 && vet_not_flags == 0) {
+		return vet_flags;
+	}
+	GB_ASSERT(vet_flags != 0 && vet_not_flags != 0);
+	return vet_flags &~ vet_not_flags;
+}
+
 gb_internal String dir_from_path(String path) {
 	String base_dir = path;
 	for (isize i = path.len-1; i >= 0; i--) {
@@ -5646,6 +5815,9 @@ gb_internal bool parse_file(Parser *p, AstFile *f) {
 						if (!parse_build_tag(tok, lc)) {
 							return false;
 						}
+					} else if (string_starts_with(lc, str_lit("+vet"))) {
+						f->vet_flags = parse_vet_tag(tok, lc);
+						f->vet_flags_set = true;
 					} else if (string_starts_with(lc, str_lit("+ignore"))) {
 							return false;
 					} else if (string_starts_with(lc, str_lit("+private"))) {
@@ -5682,7 +5854,7 @@ gb_internal bool parse_file(Parser *p, AstFile *f) {
 	f->pkg_decl = pd;
 
 	if (f->error_count == 0) {
-		auto decls = array_make<Ast *>(heap_allocator());
+		auto decls = array_make<Ast *>(ast_allocator(f));
 
 		while (f->curr_token.kind != Token_EOF) {
 			Ast *stmt = parse_stmt(f);
@@ -5710,7 +5882,7 @@ gb_internal bool parse_file(Parser *p, AstFile *f) {
 	f->time_to_parse = cast(f64)(end-start)/cast(f64)time_stamp__freq();
 
 	for (int i = 0; i < AstDelayQueue_COUNT; i++) {
-		array_init(f->delayed_decls_queues+i, heap_allocator(), 0, f->delayed_decl_count);
+		array_init(f->delayed_decls_queues+i, ast_allocator(f), 0, f->delayed_decl_count);
 	}
 
 
@@ -5806,7 +5978,7 @@ gb_internal ParseFileError process_imported_file(Parser *p, ImportedFile importe
 gb_internal ParseFileError parse_packages(Parser *p, String init_filename) {
 	GB_ASSERT(init_filename.text[init_filename.len] == 0);
 
-	String init_fullpath = path_to_full_path(heap_allocator(), init_filename);
+	String init_fullpath = path_to_full_path(permanent_allocator(), init_filename);
 	if (!path_is_directory(init_fullpath)) {
 		String const ext = str_lit(".odin");
 		if (!string_ends_with(init_fullpath, ext)) {
@@ -5821,9 +5993,7 @@ gb_internal ParseFileError parse_packages(Parser *p, String init_filename) {
 		if ((build_context.command_kind & Command__does_build) &&
 		    build_context.build_mode == BuildMode_Executable) {
 			String short_path = filename_from_path(path);
-			char *cpath = alloc_cstring(heap_allocator(), short_path);
-			defer (gb_free(heap_allocator(), cpath));
-
+			char *cpath = alloc_cstring(temporary_allocator(), short_path);
 			if (gb_file_exists(cpath)) {
 			    	error_line("Please specify the executable name with -out:<string> as a directory exists with the same name in the current working directory");
 			    	return ParseFile_DirectoryAlreadyExists;
@@ -5835,7 +6005,7 @@ gb_internal ParseFileError parse_packages(Parser *p, String init_filename) {
 	{ // Add these packages serially and then process them parallel
 		TokenPos init_pos = {};
 		{
-			String s = get_fullpath_core(heap_allocator(), str_lit("runtime"));
+			String s = get_fullpath_core(permanent_allocator(), str_lit("runtime"));
 			try_add_import_path(p, s, s, init_pos, Package_Runtime);
 		}
 
@@ -5843,13 +6013,13 @@ gb_internal ParseFileError parse_packages(Parser *p, String init_filename) {
 		p->init_fullpath = init_fullpath;
 
 		if (build_context.command_kind == Command_test) {
-			String s = get_fullpath_core(heap_allocator(), str_lit("testing"));
+			String s = get_fullpath_core(permanent_allocator(), str_lit("testing"));
 			try_add_import_path(p, s, s, init_pos, Package_Normal);
 		}
 		
 
 		for (String const &path : build_context.extra_packages) {
-			String fullpath = path_to_full_path(heap_allocator(), path); // LEAK?
+			String fullpath = path_to_full_path(permanent_allocator(), path); // LEAK?
 			if (!path_is_directory(fullpath)) {
 				String const ext = str_lit(".odin");
 				if (!string_ends_with(fullpath, ext)) {
@@ -5887,6 +6057,3 @@ gb_internal ParseFileError parse_packages(Parser *p, String init_filename) {
 	return ParseFile_None;
 }
 
-
-
-#undef ALLOW_NEWLINE

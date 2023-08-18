@@ -35,8 +35,8 @@ Returns:
 - res: The new Builder
 - err: An optional allocator error if one occured, `nil` otherwise
 */
-builder_make_none :: proc(allocator := context.allocator) -> (res: Builder, err: mem.Allocator_Error) #optional_allocator_error {
-	return Builder{buf=make([dynamic]byte, allocator) or_return }, nil
+builder_make_none :: proc(allocator := context.allocator, loc := #caller_location) -> (res: Builder, err: mem.Allocator_Error) #optional_allocator_error {
+	return Builder{buf=make([dynamic]byte, allocator, loc) or_return }, nil
 }
 /*
 Produces a Builder with a specified length and cap of max(16,len) byte buffer
@@ -51,8 +51,8 @@ Returns:
 - res: The new Builder
 - err: An optional allocator error if one occured, `nil` otherwise
 */
-builder_make_len :: proc(len: int, allocator := context.allocator) -> (res: Builder, err: mem.Allocator_Error) #optional_allocator_error {
-	return Builder{buf=make([dynamic]byte, len, allocator) or_return }, nil
+builder_make_len :: proc(len: int, allocator := context.allocator, loc := #caller_location) -> (res: Builder, err: mem.Allocator_Error) #optional_allocator_error {
+	return Builder{buf=make([dynamic]byte, len, allocator, loc) or_return }, nil
 }
 /*
 Produces a Builder with a specified length and cap
@@ -68,8 +68,8 @@ Returns:
 - res: The new Builder
 - err: An optional allocator error if one occured, `nil` otherwise
 */
-builder_make_len_cap :: proc(len, cap: int, allocator := context.allocator) -> (res: Builder, err: mem.Allocator_Error) #optional_allocator_error {
-	return Builder{buf=make([dynamic]byte, len, cap, allocator) or_return }, nil
+builder_make_len_cap :: proc(len, cap: int, allocator := context.allocator, loc := #caller_location) -> (res: Builder, err: mem.Allocator_Error) #optional_allocator_error {
+	return Builder{buf=make([dynamic]byte, len, cap, allocator, loc) or_return }, nil
 }
 /*
 Produces a String Builder
@@ -116,8 +116,8 @@ Returns:
 - res: A pointer to the initialized Builder
 - err: An optional allocator error if one occured, `nil` otherwise
 */
-builder_init_none :: proc(b: ^Builder, allocator := context.allocator) -> (res: ^Builder, err: mem.Allocator_Error) #optional_allocator_error {
-	b.buf = make([dynamic]byte, allocator) or_return
+builder_init_none :: proc(b: ^Builder, allocator := context.allocator, loc := #caller_location) -> (res: ^Builder, err: mem.Allocator_Error) #optional_allocator_error {
+	b.buf = make([dynamic]byte, allocator, loc) or_return
 	return b, nil
 }
 /*
@@ -135,8 +135,8 @@ Returns:
 - res: A pointer to the initialized Builder
 - err: An optional allocator error if one occured, `nil` otherwise
 */
-builder_init_len :: proc(b: ^Builder, len: int, allocator := context.allocator) -> (res: ^Builder, err: mem.Allocator_Error) #optional_allocator_error {
-	b.buf = make([dynamic]byte, len, allocator) or_return
+builder_init_len :: proc(b: ^Builder, len: int, allocator := context.allocator, loc := #caller_location) -> (res: ^Builder, err: mem.Allocator_Error) #optional_allocator_error {
+	b.buf = make([dynamic]byte, len, allocator, loc) or_return
 	return b, nil
 }
 /*
@@ -153,8 +153,8 @@ Returns:
 - res: A pointer to the initialized Builder
 - err: An optional allocator error if one occured, `nil` otherwise
 */
-builder_init_len_cap :: proc(b: ^Builder, len, cap: int, allocator := context.allocator) -> (res: ^Builder, err: mem.Allocator_Error) #optional_allocator_error {
-	b.buf = make([dynamic]byte, len, cap, allocator) or_return
+builder_init_len_cap :: proc(b: ^Builder, len, cap: int, allocator := context.allocator, loc := #caller_location) -> (res: ^Builder, err: mem.Allocator_Error) #optional_allocator_error {
+	b.buf = make([dynamic]byte, len, cap, allocator, loc) or_return
 	return b, nil
 }
 // Overload simple `builder_init_*` with or without len / ap parameters
@@ -164,36 +164,27 @@ builder_init :: proc{
 	builder_init_len_cap,
 }
 @(private)
-_builder_stream_vtable_obj := io.Stream_VTable{
-	impl_write = proc(s: io.Stream, p: []byte) -> (n: int, err: io.Error) {
-		b := (^Builder)(s.stream_data)
-		n = write_bytes(b, p)
-		if n < len(p) {
+_builder_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, offset: i64, whence: io.Seek_From) -> (n: i64, err: io.Error) {
+	b := (^Builder)(stream_data)
+	#partial switch mode {
+	case .Write:
+		n = i64(write_bytes(b, p))
+		if n < i64(len(p)) {
 			err = .EOF
 		}
 		return
-	},
-	impl_write_byte = proc(s: io.Stream, c: byte) -> (err: io.Error) {
-		b := (^Builder)(s.stream_data)
-		n := write_byte(b, c)
-		if n == 0 {
-			err = .EOF
-		}
+	case .Size:
+		n = i64(len(b.buf))
 		return
-	},
-	impl_size = proc(s: io.Stream) -> i64 {
-		b := (^Builder)(s.stream_data)
-		return i64(len(b.buf))
-	},
-	impl_destroy = proc(s: io.Stream) -> io.Error {
-		b := (^Builder)(s.stream_data)
+	case .Destroy:
 		builder_destroy(b)
-		return .None
-	},
+		return
+	case .Query:
+		return io.query_utility({.Write, .Size, .Destroy, .Query})
+	}
+	return 0, .Empty
 }
-// NOTE(dweiler): Work around a miscompilation bug on Linux still.
-@(private)
-_builder_stream_vtable := &_builder_stream_vtable_obj
+
 /*
 Returns an io.Stream from a Builder
 
@@ -204,7 +195,7 @@ Returns:
 - res: the io.Stream
 */
 to_stream :: proc(b: ^Builder) -> (res: io.Stream) {
-	return io.Stream{stream_vtable=_builder_stream_vtable, stream_data=b}
+	return io.Stream{procedure=_builder_stream_proc, data=b}
 }
 /*
 Returns an io.Writer from a Builder

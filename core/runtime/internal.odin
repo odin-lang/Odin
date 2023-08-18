@@ -3,7 +3,7 @@ package runtime
 import "core:intrinsics"
 
 @(private="file")
-IS_WASM :: ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64
+IS_WASM :: ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32
 
 @(private)
 RUNTIME_LINKAGE :: "strong" when (
@@ -11,7 +11,7 @@ RUNTIME_LINKAGE :: "strong" when (
 	ODIN_BUILD_MODE == .Dynamic ||
 	!ODIN_NO_CRT) &&
 	!IS_WASM) else "internal"
-RUNTIME_REQUIRE :: true
+RUNTIME_REQUIRE :: !ODIN_TILDE
 
 
 @(private)
@@ -218,10 +218,18 @@ memory_equal :: proc "contextless" (x, y: rawptr, n: int) -> bool {
 	case n == 0: return true
 	case x == y: return true
 	}
-	
 	a, b := ([^]byte)(x), ([^]byte)(y)
 	length := uint(n)
+
+	for i := uint(0); i < length; i += 1 {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 	
+/*
+
 	when size_of(uint) == 8 {
 		if word_length := length >> 3; word_length != 0 {
 			for _ in 0..<word_length {
@@ -276,6 +284,7 @@ memory_equal :: proc "contextless" (x, y: rawptr, n: int) -> bool {
 
 		return true
 	}
+*/
 
 }
 memory_compare :: proc "contextless" (a, b: rawptr, n: int) -> int #no_bounds_check {
@@ -500,6 +509,42 @@ string_decode_rune :: #force_inline proc "contextless" (s: string) -> (rune, int
 	return rune(s0&MASK4)<<18 | rune(b1&MASKX)<<12 | rune(b2&MASKX)<<6 | rune(b3&MASKX), 4
 }
 
+string_decode_last_rune :: proc "contextless" (s: string) -> (rune, int) {
+	RUNE_ERROR :: '\ufffd'
+	RUNE_SELF  :: 0x80
+	UTF_MAX    :: 4
+
+	r: rune
+	size: int
+	start, end, limit: int
+
+	end = len(s)
+	if end == 0 {
+		return RUNE_ERROR, 0
+	}
+	start = end-1
+	r = rune(s[start])
+	if r < RUNE_SELF {
+		return r, 1
+	}
+
+	limit = max(end - UTF_MAX, 0)
+
+	for start-=1; start >= limit; start-=1 {
+		if (s[start] & 0xc0) != RUNE_SELF {
+			break
+		}
+	}
+
+	start = max(start, 0)
+	r, size = string_decode_rune(s[start:end])
+	if start+size != end {
+		return RUNE_ERROR, 1
+	}
+	return r, size
+}
+
+
 abs_f16 :: #force_inline proc "contextless" (x: f16) -> f16 {
 	return -x if x < 0 else x
 }
@@ -530,16 +575,37 @@ max_f64 :: #force_inline proc "contextless" (a, b: f64) -> f64 {
 }
 
 abs_complex32 :: #force_inline proc "contextless" (x: complex32) -> f16 {
-	r, i := real(x), imag(x)
-	return f16(intrinsics.sqrt(f32(r*r + i*i)))
+	p, q := abs(real(x)), abs(imag(x))
+	if p < q {
+		p, q = q, p
+	}
+	if p == 0 {
+		return 0
+	}
+	q = q / p
+	return p * f16(intrinsics.sqrt(f32(1 + q*q)))
 }
 abs_complex64 :: #force_inline proc "contextless" (x: complex64) -> f32 {
-	r, i := real(x), imag(x)
-	return intrinsics.sqrt(r*r + i*i)
+	p, q := abs(real(x)), abs(imag(x))
+	if p < q {
+		p, q = q, p
+	}
+	if p == 0 {
+		return 0
+	}
+	q = q / p
+	return p * intrinsics.sqrt(1 + q*q)
 }
 abs_complex128 :: #force_inline proc "contextless" (x: complex128) -> f64 {
-	r, i := real(x), imag(x)
-	return intrinsics.sqrt(r*r + i*i)
+	p, q := abs(real(x)), abs(imag(x))
+	if p < q {
+		p, q = q, p
+	}
+	if p == 0 {
+		return 0
+	}
+	q = q / p
+	return p * intrinsics.sqrt(1 + q*q)
 }
 abs_quaternion64 :: #force_inline proc "contextless" (x: quaternion64) -> f16 {
 	r, i, j, k := real(x), imag(x), jmag(x), kmag(x)

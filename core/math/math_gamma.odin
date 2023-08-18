@@ -65,7 +65,7 @@ package math
 // The polynomial is valid for 33 <= x <= 172; larger values are only used
 // in reciprocal and produce denormalized floats. The lower precision there
 // masks any imprecision in the polynomial.
-@(private="file")
+@(private="file", require_results)
 stirling :: proc "contextless" (x: f64) -> (f64, f64) {
 	@(static) gamS := [?]f64{
 		+7.87311395793093628397e-04,
@@ -93,6 +93,7 @@ stirling :: proc "contextless" (x: f64) -> (f64, f64) {
 	return y1, SQRT_TWO_PI * w * y2
 }
 
+@(require_results)
 gamma_f64 :: proc "contextless" (x: f64) -> f64 {
 	is_neg_int :: proc "contextless" (x: f64) -> bool {
 		if x < 0 {
@@ -210,14 +211,14 @@ gamma_f64 :: proc "contextless" (x: f64) -> f64 {
 }
 
 
-gamma_f16   :: proc "contextless" (x: f16)   -> f16   { return f16(gamma_f64(f64(x))) }
-gamma_f16le :: proc "contextless" (x: f16le) -> f16le { return f16le(gamma_f64(f64(x))) }
-gamma_f16be :: proc "contextless" (x: f16be) -> f16be { return f16be(gamma_f64(f64(x))) }
-gamma_f32   :: proc "contextless" (x: f32)   -> f32   { return f32(gamma_f64(f64(x))) }
-gamma_f32le :: proc "contextless" (x: f32le) -> f32le { return f32le(gamma_f64(f64(x))) }
-gamma_f32be :: proc "contextless" (x: f32be) -> f32be { return f32be(gamma_f64(f64(x))) }
-gamma_f64le :: proc "contextless" (x: f64le) -> f64le { return f64le(gamma_f64(f64(x))) }
-gamma_f64be :: proc "contextless" (x: f64be) -> f64be { return f64be(gamma_f64(f64(x))) }
+@(require_results) gamma_f16   :: proc "contextless" (x: f16)   -> f16   { return f16(gamma_f64(f64(x))) }
+@(require_results) gamma_f16le :: proc "contextless" (x: f16le) -> f16le { return f16le(gamma_f64(f64(x))) }
+@(require_results) gamma_f16be :: proc "contextless" (x: f16be) -> f16be { return f16be(gamma_f64(f64(x))) }
+@(require_results) gamma_f32   :: proc "contextless" (x: f32)   -> f32   { return f32(gamma_f64(f64(x))) }
+@(require_results) gamma_f32le :: proc "contextless" (x: f32le) -> f32le { return f32le(gamma_f64(f64(x))) }
+@(require_results) gamma_f32be :: proc "contextless" (x: f32be) -> f32be { return f32be(gamma_f64(f64(x))) }
+@(require_results) gamma_f64le :: proc "contextless" (x: f64le) -> f64le { return f64le(gamma_f64(f64(x))) }
+@(require_results) gamma_f64be :: proc "contextless" (x: f64be) -> f64be { return f64be(gamma_f64(f64(x))) }
 
 gamma :: proc{
 	gamma_f16, gamma_f16le, gamma_f16be,

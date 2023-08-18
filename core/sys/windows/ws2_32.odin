@@ -50,7 +50,7 @@ Example Load:
 		bytes: u32
 		guid_accept_ex := WSAID_ACCEPTEX
 		rc := WSAIoctl(listener, SIO_GET_EXTENSION_FUNCTION_POINTER, &guid_accept_ex, size_of(guid_accept_ex),
-			fn_acceptex, size_of(fn_acceptex), &bytes, nil,	nil,)
+			fn_acceptex, size_of(fn_acceptex), &bytes, nil,	nil)
 		assert(rc != windows.SOCKET_ERROR)
 	}
 */
@@ -206,4 +206,14 @@ foreign ws2_32 {
 		optval: ^c_char,
 		optlen: ^c_int,
 	) -> c_int ---
+	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-ntohl)
+	ntohl :: proc(netlong: c_ulong) -> c_ulong ---
+	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-ntohs)
+	ntohs :: proc(netshort: c_ushort) -> c_ushort ---
+	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-htonl)
+	@(deprecated="Use endian specific integers instead, https://odin-lang.org/docs/overview/#basic-types")
+	htonl :: proc(hostlong: c_ulong) -> c_ulong ---
+	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-htons)
+	@(deprecated="Use endian specific integers instead, https://odin-lang.org/docs/overview/#basic-types")
+	htons :: proc(hostshort: c_ushort) -> c_ushort ---
 }

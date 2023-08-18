@@ -5,9 +5,14 @@ _INTEGER_DIGITS :: "0123456789abcdefghijklmnopqrstuvwxyz"
 @(private="file")
 _INTEGER_DIGITS_VAR := _INTEGER_DIGITS
 
-when !ODIN_DISALLOW_RTTI {
+when !ODIN_NO_RTTI {
 	print_any_single :: proc "contextless" (arg: any) {
 		x := arg
+		if x.data == nil {
+			print_string("nil")
+			return
+		}
+
 		if loc, ok := x.(Source_Code_Location); ok {
 			print_caller_location(loc)
 			return
@@ -48,6 +53,7 @@ when !ODIN_DISALLOW_RTTI {
 		case int:     print_int(v)
 		case uint:    print_uint(v)
 		case uintptr: print_uintptr(v)
+		case rawptr:  print_uintptr(uintptr(v))
 
 		case bool: print_string("true" if v else "false")
 		case b8:   print_string("true" if v else "false")
@@ -58,7 +64,7 @@ when !ODIN_DISALLOW_RTTI {
 		case:
 			ti := type_info_of(x.id)
 			#partial switch v in ti.variant {
-			case Type_Info_Pointer:
+			case Type_Info_Pointer, Type_Info_Multi_Pointer:
 				print_uintptr((^uintptr)(x.data)^)
 				return
 			}
@@ -67,7 +73,9 @@ when !ODIN_DISALLOW_RTTI {
 		}
 	}
 	println_any :: proc "contextless" (args: ..any) {
+		context = default_context()
 		loop: for arg, i in args {
+			assert(arg.id != nil)
 			if i != 0 {
 				print_string(" ")
 			}
@@ -215,26 +223,26 @@ print_uint    :: proc "contextless" (x: uint)    { print_u64(u64(x)) }
 print_uintptr :: proc "contextless" (x: uintptr) { print_u64(u64(x)) }
 print_int     :: proc "contextless" (x: int)     { print_i64(i64(x)) }
 
-print_caller_location :: proc "contextless" (using loc: Source_Code_Location) {
-	print_string(file_path)
+print_caller_location :: proc "contextless" (loc: Source_Code_Location) {
+	print_string(loc.file_path)
 	when ODIN_ERROR_POS_STYLE == .Default {
 		print_byte('(')
-		print_u64(u64(line))
+		print_u64(u64(loc.line))
 		print_byte(':')
-		print_u64(u64(column))
+		print_u64(u64(loc.column))
 		print_byte(')')
 	} else when ODIN_ERROR_POS_STYLE == .Unix {
 		print_byte(':')
-		print_u64(u64(line))
+		print_u64(u64(loc.line))
 		print_byte(':')
-		print_u64(u64(column))
+		print_u64(u64(loc.column))
 		print_byte(':')
 	} else {
 		#panic("unhandled ODIN_ERROR_POS_STYLE")
 	}
 }
 print_typeid :: proc "contextless" (id: typeid) {
-	when ODIN_DISALLOW_RTTI {
+	when ODIN_NO_RTTI {
 		if id == nil {
 			print_string("nil")
 		} else {
@@ -390,9 +398,9 @@ print_type :: proc "contextless" (ti: ^Type_Info) {
 		if info.is_packed    { print_string("#packed ") }
 		if info.is_raw_union { print_string("#raw_union ") }
 		if info.custom_align {
-			print_string("#align ")
+			print_string("#align(")
 			print_u64(u64(ti.align))
-			print_byte(' ')
+			print_string(") ")
 		}
 		print_byte('{')
 		for name, i in info.names {
@@ -406,8 +414,9 @@ print_type :: proc "contextless" (ti: ^Type_Info) {
 	case Type_Info_Union:
 		print_string("union ")
 		if info.custom_align {
-			print_string("#align ")
+			print_string("#align(")
 			print_u64(u64(ti.align))
+			print_string(") ")
 		}
 		if info.no_nil {
 			print_string("#no_nil ")
@@ -463,11 +472,11 @@ print_type :: proc "contextless" (ti: ^Type_Info) {
 		print_string(") ")
 		print_type(info.pointer)
 
-	case Type_Info_Relative_Slice:
+	case Type_Info_Relative_Multi_Pointer:
 		print_string("#relative(")
 		print_type(info.base_integer)
 		print_string(") ")
-		print_type(info.slice)
+		print_type(info.pointer)
 		
 	case Type_Info_Matrix:
 		print_string("matrix[")

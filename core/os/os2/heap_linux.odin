@@ -124,7 +124,7 @@ Allocation_Header :: struct #raw_union {
 	requested: u64,
 }
 
-Region_Header :: struct #align 16 {
+Region_Header :: struct #align(16) {
 	next_region:   ^Region,  // points to next region in global_heap (linked list)
 	local_addr:    ^^Region, // tracks region ownership via address of _local_region
 	reset_addr:    ^^Region, // tracks old local addr for reset

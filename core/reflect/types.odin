@@ -165,9 +165,9 @@ are_types_identical :: proc(a, b: ^Type_Info) -> bool {
 		y := b.variant.(Type_Info_Relative_Pointer) or_return
 		return x.base_integer == y.base_integer && x.pointer == y.pointer
 
-	case Type_Info_Relative_Slice:
-		y := b.variant.(Type_Info_Relative_Slice) or_return
-		return x.base_integer == y.base_integer && x.slice == y.slice
+	case Type_Info_Relative_Multi_Pointer:
+		y := b.variant.(Type_Info_Relative_Multi_Pointer) or_return
+		return x.base_integer == y.base_integer && x.pointer == y.pointer
 		
 	case Type_Info_Matrix:
 		y := b.variant.(Type_Info_Matrix) or_return
@@ -383,12 +383,11 @@ is_relative_pointer :: proc(info: ^Type_Info) -> bool {
 	return ok
 }
 @(require_results)
-is_relative_slice :: proc(info: ^Type_Info) -> bool {
+is_relative_multi_pointer :: proc(info: ^Type_Info) -> bool {
 	if info == nil { return false }
-	_, ok := type_info_base(info).variant.(Type_Info_Relative_Slice)
+	_, ok := type_info_base(info).variant.(Type_Info_Relative_Multi_Pointer)
 	return ok
 }
-
 
 
 
@@ -581,9 +580,9 @@ write_type_writer :: proc(w: io.Writer, ti: ^Type_Info, n_written: ^int = nil) -
 		if info.is_packed    { io.write_string(w, "#packed ",    &n) or_return }
 		if info.is_raw_union { io.write_string(w, "#raw_union ", &n) or_return }
 		if info.custom_align {
-			io.write_string(w, "#align ",      &n) or_return
+			io.write_string(w, "#align(",      &n) or_return
 			io.write_i64(w, i64(ti.align), 10, &n) or_return
-			io.write_byte(w, ' ',              &n) or_return
+			io.write_string(w, ") ",           &n) or_return
 		}
 		io.write_byte(w, '{', &n) or_return
 		for name, i in info.names {
@@ -599,9 +598,9 @@ write_type_writer :: proc(w: io.Writer, ti: ^Type_Info, n_written: ^int = nil) -
 		if info.no_nil     { io.write_string(w, "#no_nil ", &n)     or_return }
 		if info.shared_nil { io.write_string(w, "#shared_nil ", &n) or_return }
 		if info.custom_align {
-			io.write_string(w, "#align ",      &n) or_return
+			io.write_string(w, "#align(",      &n) or_return
 			io.write_i64(w, i64(ti.align), 10, &n) or_return
-			io.write_byte(w, ' ',              &n) or_return
+			io.write_string(w, ") ",           &n) or_return
 		}
 		io.write_byte(w, '{', &n) or_return
 		for variant, i in info.variants {
@@ -652,11 +651,11 @@ write_type_writer :: proc(w: io.Writer, ti: ^Type_Info, n_written: ^int = nil) -
 		io.write_string(w, ") ",         &n) or_return
 		write_type(w, info.pointer,      &n) or_return
 
-	case Type_Info_Relative_Slice:
+	case Type_Info_Relative_Multi_Pointer:
 		io.write_string(w, "#relative(", &n) or_return
 		write_type(w, info.base_integer, &n) or_return
 		io.write_string(w, ") ",         &n) or_return
-		write_type(w, info.slice,        &n) or_return
+		write_type(w, info.pointer,      &n) or_return
 		
 	case Type_Info_Matrix:
 		io.write_string(w, "matrix[",               &n) or_return

@@ -36,7 +36,7 @@ destroy :: proc(img: ^Image) {
 	bytes.buffer_destroy(&img.pixels)
 
 	if v, ok := img.metadata.(^image.PNG_Info); ok {
-		for chunk in &v.chunks {
+		for chunk in v.chunks {
 			delete(chunk.data)
 		}
 		delete(v.chunks)
@@ -80,11 +80,10 @@ time :: proc(c: image.PNG_Chunk) -> (res: tIME, ok: bool) {
 }
 
 core_time :: proc(c: image.PNG_Chunk) -> (t: coretime.Time, ok: bool) {
-	if png_time, png_ok := time(c); png_ok {
-		using png_time
+	if t, png_ok := time(c); png_ok {
 		return coretime.datetime_to_time(
-			int(year), int(month), int(day),
-			int(hour), int(minute), int(second),
+			int(t.year), int(t.month),  int(t.day),
+			int(t.hour), int(t.minute), int(t.second),
 		)
 	} else {
 		return {}, false
@@ -99,7 +98,7 @@ text :: proc(c: image.PNG_Chunk) -> (res: Text, ok: bool) {
 	case .tEXt:
 		ok = true
 
-		fields := bytes.split(s=c.data, sep=[]u8{0}, allocator=context.temp_allocator)
+		fields := bytes.split(c.data, sep=[]u8{0}, allocator=context.temp_allocator)
 		if len(fields) == 2 {
 			res.keyword = strings.clone(string(fields[0]))
 			res.text    = strings.clone(string(fields[1]))
@@ -110,7 +109,7 @@ text :: proc(c: image.PNG_Chunk) -> (res: Text, ok: bool) {
 	case .zTXt:
 		ok = true
 
-		fields := bytes.split_n(s=c.data, sep=[]u8{0}, n=3, allocator=context.temp_allocator)
+		fields := bytes.split_n(c.data, sep=[]u8{0}, n=3, allocator=context.temp_allocator)
 		if len(fields) != 3 || len(fields[1]) != 0 {
 			// Compression method must be 0=Deflate, which thanks to the split above turns
 			// into an empty slice
@@ -199,7 +198,7 @@ text_destroy :: proc(text: Text) {
 iccp :: proc(c: image.PNG_Chunk) -> (res: iCCP, ok: bool) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD(ignore = context.temp_allocator == context.allocator)
 
-	fields := bytes.split_n(s=c.data, sep=[]u8{0}, n=3, allocator=context.temp_allocator)
+	fields := bytes.split_n(c.data, sep=[]u8{0}, n=3, allocator=context.temp_allocator)
 
 	if len(fields[0]) < 1 || len(fields[0]) > 79 {
 		// Invalid profile name
@@ -263,7 +262,7 @@ splt :: proc(c: image.PNG_Chunk) -> (res: sPLT, ok: bool) {
 	}
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD(ignore = context.temp_allocator == context.allocator)
 
-	fields := bytes.split_n(s=c.data, sep=[]u8{0}, n=2, allocator=context.temp_allocator)
+	fields := bytes.split_n(c.data, sep=[]u8{0}, n=2, allocator=context.temp_allocator)
 	if len(fields) != 2 {
 		return
 	}

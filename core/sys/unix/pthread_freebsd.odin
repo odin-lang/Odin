@@ -4,7 +4,7 @@ package unix
 import "core:c"
 
 pthread_t :: distinct u64
-// pthread_t :: struct #align 16 { x: u64 }
+// pthread_t :: struct #align(16) { x: u64 }
 
 PTHREAD_COND_T_SIZE :: 8
 
@@ -27,32 +27,32 @@ when size_of(int) == 8 {
 	PTHREAD_BARRIER_T_SIZE :: 20
 }
 
-pthread_cond_t :: struct #align 16 {
+pthread_cond_t :: struct #align(16) {
 	_: [PTHREAD_COND_T_SIZE] c.char,
 }
-pthread_mutex_t :: struct #align 16 {
+pthread_mutex_t :: struct #align(16) {
 	_: [PTHREAD_MUTEX_T_SIZE] c.char,
 }
-pthread_rwlock_t :: struct #align 16 {
+pthread_rwlock_t :: struct #align(16) {
 	_: [PTHREAD_RWLOCK_T_SIZE] c.char,
 }
-pthread_barrier_t :: struct #align 16 {
+pthread_barrier_t :: struct #align(16) {
 	_: [PTHREAD_BARRIER_T_SIZE] c.char,
 }
 
-pthread_attr_t :: struct #align 16 {
+pthread_attr_t :: struct #align(16) {
 	_: [PTHREAD_ATTR_T_SIZE] c.char,
 }
-pthread_condattr_t :: struct #align 16 {
+pthread_condattr_t :: struct #align(16) {
 	_: [PTHREAD_CONDATTR_T_SIZE] c.char,
 }
-pthread_mutexattr_t :: struct #align 16 {
+pthread_mutexattr_t :: struct #align(16) {
 	_: [PTHREAD_MUTEXATTR_T_SIZE] c.char,
 }
-pthread_rwlockattr_t :: struct #align 16 {
+pthread_rwlockattr_t :: struct #align(16) {
 	_: [PTHREAD_RWLOCKATTR_T_SIZE] c.char,
 }
-pthread_barrierattr_t :: struct #align 16 {
+pthread_barrierattr_t :: struct #align(16) {
 	_: [PTHREAD_BARRIERATTR_T_SIZE] c.char,
 }
 

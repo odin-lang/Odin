@@ -268,9 +268,9 @@ _set_option :: proc(s: Any_Socket, option: Socket_Option, value: any, loc := #ca
 			t, ok := value.(time.Duration)
 			if !ok do panic("set_option() value must be a time.Duration here", loc)
 
-			nanos := time.duration_nanoseconds(t)
-			timeval_value.nanoseconds = int(nanos % 1e9)
-			timeval_value.seconds = (nanos - i64(timeval_value.nanoseconds)) / 1e9
+			micros := i64(time.duration_microseconds(t))
+			timeval_value.microseconds = int(micros % 1e6)
+			timeval_value.seconds = (micros - i64(timeval_value.microseconds)) / 1e6
 
 			ptr = &timeval_value
 			len = size_of(timeval_value)
@@ -303,8 +303,25 @@ _set_option :: proc(s: Any_Socket, option: Socket_Option, value: any, loc := #ca
 
 @(private)
 _set_blocking :: proc(socket: Any_Socket, should_block: bool) -> (err: Network_Error) {
-	// TODO: Implement
-	unimplemented()
+	socket := any_socket_to_socket(socket)
+
+	flags, getfl_err := os.fcntl(int(socket), os.F_GETFL, 0)
+	if getfl_err != os.ERROR_NONE {
+		return Set_Blocking_Error(getfl_err)
+	}
+
+	if should_block {
+		flags &= ~int(os.O_NONBLOCK)
+	} else {
+		flags |= int(os.O_NONBLOCK)
+	}
+
+	_, setfl_err := os.fcntl(int(socket), os.F_SETFL, flags)
+	if setfl_err != os.ERROR_NONE {
+		return Set_Blocking_Error(setfl_err)
+	}
+
+	return nil
 }
 
 @private

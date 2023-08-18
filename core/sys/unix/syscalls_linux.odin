@@ -1985,6 +1985,23 @@ MADV_KEEPONFORK  :: 19
 MADV_HWPOISON    :: 100
 
 
+// poll events
+POLLIN         :: 0x0001
+POLLPRI        :: 0x0002
+POLLOUT        :: 0x0004
+POLLERR        :: 0x0008
+POLLHUP        :: 0x0010
+POLLNVAL       :: 0x0020
+POLLRDNORM     :: 0x0040
+POLLRDBAND     :: 0x0080
+POLLWRNORM     :: 0x0100
+POLLWRBAND     :: 0x0200
+POLLMSG        :: 0x0400
+POLLREMOVE     :: 0x1000
+POLLRDHUP      :: 0x2000
+POLLFREE       :: 0x4000
+POLL_BUSY_LOOP :: 0x8000
+
 // perf event data
 Perf_Sample :: struct #raw_union {
 	period:    u64,
@@ -2574,6 +2591,23 @@ sys_rt_sigtimedwait :: proc "contextless" (uthese: ^sigset_t, uinfo: ^siginfo_t,
 // NOTE: pidfd_open is fairly new, so be prepared to handle ENOSYS
 sys_pidfd_open :: proc "contextless" (pid: int, flags: uint) -> int {
 	return int(intrinsics.syscall(SYS_pidfd_open, uintptr(pid), uintptr(flags)))
+}
+
+sys_poll :: proc "contextless" (fds: rawptr, nfds: uint, timeout: int) -> int {
+	// NOTE: specialcased here because `arm64` does not have `poll`
+	when ODIN_ARCH == .arm64 {
+		seconds := i64(timeout / 1_000)
+		nanoseconds := i64((timeout % 1000) * 1_000_000)
+		timeout_spec := timespec{seconds, nanoseconds}
+		
+		return int(intrinsics.syscall(SYS_ppoll, uintptr(fds), uintptr(nfds), uintptr(&timeout_spec), uintptr(0), uintptr(8)))
+	} else {
+		return int(intrinsics.syscall(SYS_poll, uintptr(fds), uintptr(nfds), uintptr(timeout)))
+	}
+}
+
+sys_ppoll :: proc "contextless" (fds: rawptr, nfds: uint, timeout: rawptr, sigmask: rawptr, sigsetsize: uint) -> int {
+	return int(intrinsics.syscall(SYS_ppoll, uintptr(fds), uintptr(nfds), uintptr(timeout), uintptr(sigmask), uintptr(sigsetsize)))
 }
 
 get_errno :: proc "contextless" (res: int) -> i32 {

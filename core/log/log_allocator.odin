@@ -38,60 +38,60 @@ log_allocator_proc :: proc(allocator_data: rawptr, mode: runtime.Allocator_Mode,
 		switch mode {
 		case .Alloc:
 			logf(
-				level=la.level,
-				fmt_str = "%s%s>>> ALLOCATOR(mode=.Alloc, size=%d, alignment=%d)",
-				args = {la.prefix, padding, size, alignment},
+				la.level,
+				"%s%s>>> ALLOCATOR(mode=.Alloc, size=%d, alignment=%d)",
+				la.prefix, padding, size, alignment,
 				location = location,
 			)
 		case .Alloc_Non_Zeroed:
 			logf(
-				level=la.level,
-				fmt_str = "%s%s>>> ALLOCATOR(mode=.Alloc_Non_Zeroed, size=%d, alignment=%d)",
-				args = {la.prefix, padding, size, alignment},
+				la.level,
+				"%s%s>>> ALLOCATOR(mode=.Alloc_Non_Zeroed, size=%d, alignment=%d)",
+				la.prefix, padding, size, alignment,
 				location = location,
 			)
 		case .Free:
 			if old_size != 0 {
 				logf(
-					level=la.level,
-					fmt_str = "%s%s<<< ALLOCATOR(mode=.Free, ptr=%p, size=%d)",
-					args = {la.prefix, padding, old_memory, old_size},
+					la.level,
+					"%s%s<<< ALLOCATOR(mode=.Free, ptr=%p, size=%d)",
+					la.prefix, padding, old_memory, old_size,
 					location = location,
 				)
 			} else {
 				logf(
-					level=la.level,
-					fmt_str = "%s%s<<< ALLOCATOR(mode=.Free, ptr=%p)",
-					args = {la.prefix, padding, old_memory},
+					la.level,
+					"%s%s<<< ALLOCATOR(mode=.Free, ptr=%p)",
+					la.prefix, padding, old_memory,
 					location = location,
 				)
 			}
 		case .Free_All:
 			logf(
-				level=la.level,
-				fmt_str = "%s%s<<< ALLOCATOR(mode=.Free_All)",
-				args = {la.prefix, padding},
+				la.level,
+				"%s%s<<< ALLOCATOR(mode=.Free_All)",
+				la.prefix, padding,
 				location = location,
 			)
 		case .Resize:
 			logf(
-				level=la.level,
-				fmt_str = "%s%s>>> ALLOCATOR(mode=.Resize, ptr=%p, old_size=%d, size=%d, alignment=%d)",
-				args = {la.prefix, padding, old_memory, old_size, size, alignment},
+				la.level,
+				"%s%s>>> ALLOCATOR(mode=.Resize, ptr=%p, old_size=%d, size=%d, alignment=%d)",
+				la.prefix, padding, old_memory, old_size, size, alignment,
 				location = location,
 			)
 		case .Query_Features:
 			logf(
-				level=la.level,
-				fmt_str = "%s%ALLOCATOR(mode=.Query_Features)",
-				args = {la.prefix, padding},
+				la.level,
+				"%s%ALLOCATOR(mode=.Query_Features)",
+				la.prefix, padding,
 				location = location,
 			)
 		case .Query_Info:
 			logf(
-				level=la.level,
-				fmt_str = "%s%ALLOCATOR(mode=.Query_Info)",
-				args = {la.prefix, padding},
+				la.level,
+				"%s%ALLOCATOR(mode=.Query_Info)",
+				la.prefix, padding,
 				location = location,
 			)
 		}
@@ -103,9 +103,9 @@ log_allocator_proc :: proc(allocator_data: rawptr, mode: runtime.Allocator_Mode,
 		defer la.locked = false
 		if err != nil {
 			logf(
-				level=la.level,
-				fmt_str = "%s%ALLOCATOR ERROR=%v",
-				args = {la.prefix, padding, error},
+				la.level,
+				"%s%ALLOCATOR ERROR=%v",
+				la.prefix, padding, error,
 				location = location,
 			)
 		}

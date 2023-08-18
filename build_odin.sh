@@ -8,16 +8,19 @@ set -eu
 : ${ODIN_VERSION=dev-$(date +"%Y-%m")}
 : ${GIT_SHA=}
 
-CPPFLAGS="$CPPFLAGS -DODIN_VERSION_RAW=\"$ODIN_VERSION\""
 CXXFLAGS="$CXXFLAGS -std=c++14"
 LDFLAGS="$LDFLAGS -pthread -lm -lstdc++"
 
-if [ -d ".git" ]; then
-	GIT_SHA=$(git rev-parse --short HEAD || :)
-	if [ "$GIT_SHA" ]; then
+if [ -d ".git" ] && [ $(which git) ]; then
+	versionTag=( $(git show --pretty='%cd %h' --date=format:%Y-%m --no-patch --no-notes HEAD) )
+	if [ $? -eq 0 ]; then
+		ODIN_VERSION="dev-${versionTag[0]}"
+		GIT_SHA="${versionTag[1]}"
 		CPPFLAGS="$CPPFLAGS -DGIT_SHA=\"$GIT_SHA\""
 	fi
 fi
+
+CPPFLAGS="$CPPFLAGS -DODIN_VERSION_RAW=\"$ODIN_VERSION\""
 
 DISABLED_WARNINGS="-Wno-switch -Wno-macro-redefined -Wno-unused-value"
 OS=$(uname)
@@ -135,7 +138,14 @@ build_odin() {
 		EXTRAFLAGS="-O3"
 		;;
 	release-native)
-		EXTRAFLAGS="-O3 -march=native"
+		local ARCH=$(uname -m)
+        	if [ "${ARCH}" == "arm64" ]; then
+            		# Use preferred flag for Arm (ie arm64 / aarch64 / etc)
+            		EXTRAFLAGS="-O3 -mcpu=native"
+        	else
+            		# Use preferred flag for x86 / amd64
+            		EXTRAFLAGS="-O3 -march=native"
+        	fi
 		;;
 	nightly)
 		EXTRAFLAGS="-DNIGHTLY -O3"

@@ -16,6 +16,11 @@ file_and_urls = [
     ("vulkan_macos.h",   'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vulkan_macos.h',   False),
     ("vulkan_ios.h",     'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vulkan_ios.h',     False),
     ("vulkan_wayland.h", 'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vulkan_wayland.h', False),
+    # Vulkan Video
+    ("vulkan_video_codec_h264std.h", 'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vk_video/vulkan_video_codec_h264std.h', False),
+    ("vulkan_video_codec_h265std.h", 'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vk_video/vulkan_video_codec_h265std.h', False),
+    ("vulkan_video_codec_h264std_decode.h", 'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vk_video/vulkan_video_codec_h264std_decode.h', False),
+    ("vulkan_video_codec_h265std_decode.h", 'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vk_video/vulkan_video_codec_h265std_decode.h', False),
 ]
 
 for file, url, _ in file_and_urls:
@@ -37,11 +42,15 @@ def no_vk(t):
     t = t.replace('PFN_', 'Proc')
     t = t.replace('PFN_', 'Proc')
     t = t.replace('VK_', '')
+    # Vulkan Video
+    t = t.replace('STD_', '')
+    t = t.replace('Std', '')
     return t
 
 OPAQUE_STRUCTS = """
-wl_surface :: struct {} // Opaque struct defined by Wayland
-wl_display :: struct {} // Opaque struct defined by Wayland
+wl_surface   :: struct {} // Opaque struct defined by Wayland
+wl_display   :: struct {} // Opaque struct defined by Wayland
+IOSurfaceRef :: struct {} // Opaque struct defined by Apple’s CoreGraphics framework
 """ 
 
 def convert_type(t, prev_name, curr_name):
@@ -56,6 +65,7 @@ def convert_type(t, prev_name, curr_name):
         'int64_t':     'i64',
         'int':         'c.int',
         'uint8_t':     'u8',
+        'int8_t':     'i8',
         "uint16_t":    'u16',
         "char":        "byte",
         "void":        "void",
@@ -70,6 +80,7 @@ def convert_type(t, prev_name, curr_name):
         "const void* const *": "[^]rawptr",
         "const AccelerationStructureGeometryKHR* const*": "^[^]AccelerationStructureGeometryKHR",
         "const AccelerationStructureBuildRangeInfoKHR* const*": "^[^]AccelerationStructureBuildRangeInfoKHR",
+        "const MicromapUsageEXT* const*": "^[^]MicromapUsageEXT",
         "struct BaseOutStructure": "BaseOutStructure",
         "struct BaseInStructure":  "BaseInStructure",
         "struct wl_display": "wl_display",
@@ -261,6 +272,12 @@ def parse_constants(f):
     for name, value in allowed_data:
         f.write("{}{} :: {}\n".format(name, "".rjust(max_len-len(name)), value))
 
+    f.write("\n// Vulkan Video Constants\n")
+    vulkan_video_data = re.findall(r"#define STD_(\w+)\s*(.*?)U?\n", src, re.S)
+    max_len = max(len(name) for name, value in vulkan_video_data)
+    for name, value in vulkan_video_data:
+        f.write("{}{} :: {}\n".format(name, "".rjust(max_len-len(name)), value))
+
     f.write("\n// Vendor Constants\n")
     fixes = '|'.join(ext_suffixes)
     inner = r"((?:(?:" + fixes + r")\w+)|(?:\w+" + fixes + r"))"
@@ -284,6 +301,7 @@ def parse_enums(f):
     f.write("// Enums\n")
 
     data = re.findall(r"typedef enum Vk(\w+) {(.+?)} \w+;", src, re.S)
+    data += re.findall(r"typedef enum Std(\w+) {(.+?)} \w+;", src, re.S)
 
     data.sort(key=lambda x: x[0])
 
@@ -384,7 +402,16 @@ def parse_enums(f):
                         used_flags.append('.'+flags[i])
                     else:
                         used_flags.append('{}({})'.format(enum_name, i))
-            s = "{enum_name}s_{n} :: {enum_name}s{{".format(enum_name=enum_name, n=n)
+            # Make sure the 's' is after Flags and not the extension name.
+            ext_suffix = ''
+            for suffix in ext_suffixes:
+                if not enum_name.endswith(suffix):
+                    continue
+
+                ext_suffix = suffix
+                enum_name = remove_suffix(enum_name, ext_suffix)
+                break
+            s = "{enum_name}s{ext_suffix}_{n} :: {enum_name}s{ext_suffix}{{".format(enum_name=enum_name, ext_suffix=ext_suffix, n=n)
             s += ', '.join(used_flags)
             s += "}\n"
             f.write(s)
@@ -402,10 +429,97 @@ def parse_enums(f):
         f.write("{} :: distinct bit_set[{}; Flags]\n".format(flag.ljust(max_len), flag_name))
         f.write("{} :: enum u32 {{}}\n".format(flag_name.ljust(max_len)))
 
+def parse_fake_enums(f):
+    data = re.findall(r"static const Vk(\w+FlagBits2) VK_(\w+?) = (\w+);", src, re.S)
+    
+    data.sort(key=lambda x: x[0])
 
+    fake_enums = {}
+
+    for type_name, name, value in data:
+        if type_name in fake_enums:
+            fake_enums[type_name].append((name,value))
+        else:
+            fake_enums[type_name] = [(name, value)]
+
+    for name in fake_enums.keys():
+        flags_name = name.replace("FlagBits", "Flags")
+        enum_name = name.replace("FlagBits", "Flag")
+        f.write("{} :: distinct bit_set[{}; Flags64]\n".format(flags_name, enum_name))
+        f.write("{} :: enum Flags64 {{\n".format(name.replace("FlagBits", "Flag")))
+
+        prefix = to_snake_case(name).upper()
+        suffix = None
+        for ext in ext_suffixes:
+            prefix_new = remove_suffix(prefix, "_"+ext)
+            assert suffix is None
+            if prefix_new != prefix:
+                suffix = "_"+ext
+                prefix = prefix_new
+                break
+
+
+        prefix = prefix.replace("_FLAG_BITS2", "_2")
+        prefix += "_"
+
+        ff = []
+
+        groups = []
+        flags = {}
+
+        names_and_values = fake_enums[name]
+
+        for name, value in names_and_values:
+            value = value.replace("ULL", "")
+            n = fix_enum_name(name, prefix, suffix, True)
+            try:
+                v = fix_enum_value(value, prefix, suffix, True)
+            except FlagError as e:
+                v = int(str(e))
+                groups.append((n, v))
+                continue
+            except IgnoreFlagError as e:
+                groups.append((n, 0))
+                continue
+
+            if n == v:
+                continue
+            try:
+                flags[int(v)] = n
+            except ValueError as e:
+                pass
+
+            if v == "NONE":
+                continue
+
+            ff.append((n, v))
+        
+        max_flag_value = max([int(v) for n, v in ff if is_int(v)] + [0])
+        max_group_value = max([int(v) for n, v in groups if is_int(v)] + [0])
+        if max_flag_value < max_group_value:
+            if (1<<max_flag_value)+1 < max_group_value:
+                ff.append(('_MAX', 31))
+                flags[31] = '_MAX'
+                pass
+
+        max_len = max([len(n) for n, v in ff] + [0])
+
+        flag_names = set([n for n, v in ff])
+
+        for n, v in ff:
+            if not is_int(v) and v not in flag_names:
+                print("Ignoring", n, "=", v)
+                continue
+            f.write("\t{} = {},".format(n.ljust(max_len), v))
+            if n == "_MAX":
+                f.write(" // Needed for the *_ALL bit set")
+            f.write("\n")
+
+        f.write("}\n\n")
 
 def parse_structs(f):
     data = re.findall(r"typedef (struct|union) Vk(\w+?) {(.+?)} \w+?;", src, re.S)
+    data += re.findall(r"typedef (struct|union) Std(\w+?) {(.+?)} \w+?;", src, re.S)
 
     for _type, name, fields in data:
         fields = re.findall(r"\s+(.+?)\s+([_a-zA-Z0-9[\]]+);", fields)
@@ -417,6 +531,18 @@ def parse_structs(f):
         prev_name = ""
         ffields = []
         for type_, fname in fields:
+
+            # If the typename has a colon in it, then it is a C bit field.
+            if ":" in type_:
+                bit_field = type_.split(' ')
+                # Get rid of empty spaces
+                bit_field = list(filter(bool, bit_field))
+                # [type, typename, :] 
+                assert len(bit_field) == 3, "Failed to parse the bit field!"
+                bit_field_type = do_type(bit_field[0], prev_name, fname)
+                f.write("\tbit_field: {},{}\n".format(bit_field_type, comment or ""))
+                break
+
             if '[' in fname:
                 fname, type_ = parse_array(fname, type_)
             comment = None
@@ -430,7 +556,7 @@ def parse_structs(f):
             ffields.append(tuple([n, t, comment]))
             prev_name = fname
 
-        max_len = max(len(n) for n, _, _ in ffields)
+        max_len = max([len(n) for n, _, _ in ffields], default=0)
 
         for n, t, comment in ffields:
             k = max_len-len(n)+len(t)
@@ -450,6 +576,10 @@ def parse_structs(f):
             continue
         name = name.replace("FlagBits", "Flag")
         _type = _type.replace("FlagBits", "Flag")
+
+        if name.endswith("Flag2") or name.endswith("Flags2"):
+            continue
+
         aliases.append((name, _type))
 
     max_len = max([len(n) for n, _ in aliases] + [0])
@@ -660,27 +790,28 @@ SetProcAddressType :: #type proc(p: rawptr, name: cstring)
 RemoteAddressNV :: distinct rawptr // Declared inline before MemoryGetRemoteAddressInfoNV
 
 // Base constants
-LOD_CLAMP_NONE                :: 1000.0
-REMAINING_MIP_LEVELS          :: ~u32(0)
-REMAINING_ARRAY_LAYERS        :: ~u32(0)
-WHOLE_SIZE                    :: ~u64(0)
-ATTACHMENT_UNUSED             :: ~u32(0)
-TRUE                          :: 1
-FALSE                         :: 0
-QUEUE_FAMILY_IGNORED          :: ~u32(0)
-SUBPASS_EXTERNAL              :: ~u32(0)
-MAX_PHYSICAL_DEVICE_NAME_SIZE :: 256
-UUID_SIZE                     :: 16
-MAX_MEMORY_TYPES              :: 32
-MAX_MEMORY_HEAPS              :: 16
-MAX_EXTENSION_NAME_SIZE       :: 256
-MAX_DESCRIPTION_SIZE          :: 256
-MAX_DEVICE_GROUP_SIZE         :: 32
-LUID_SIZE_KHX                 :: 8
-LUID_SIZE                     :: 8
-MAX_QUEUE_FAMILY_EXTERNAL     :: ~u32(1)
-MAX_GLOBAL_PRIORITY_SIZE_EXT  :: 16
-QUEUE_FAMILY_EXTERNAL         :: MAX_QUEUE_FAMILY_EXTERNAL
+LOD_CLAMP_NONE                        :: 1000.0
+REMAINING_MIP_LEVELS                  :: ~u32(0)
+REMAINING_ARRAY_LAYERS                :: ~u32(0)
+WHOLE_SIZE                            :: ~u64(0)
+ATTACHMENT_UNUSED                     :: ~u32(0)
+TRUE                                  :: 1
+FALSE                                 :: 0
+QUEUE_FAMILY_IGNORED                  :: ~u32(0)
+SUBPASS_EXTERNAL                      :: ~u32(0)
+MAX_PHYSICAL_DEVICE_NAME_SIZE         :: 256
+MAX_SHADER_MODULE_IDENTIFIER_SIZE_EXT :: 32
+UUID_SIZE                             :: 16
+MAX_MEMORY_TYPES                      :: 32
+MAX_MEMORY_HEAPS                      :: 16
+MAX_EXTENSION_NAME_SIZE               :: 256
+MAX_DESCRIPTION_SIZE                  :: 256
+MAX_DEVICE_GROUP_SIZE                 :: 32
+LUID_SIZE_KHX                         :: 8
+LUID_SIZE                             :: 8
+MAX_QUEUE_FAMILY_EXTERNAL             :: ~u32(1)
+MAX_GLOBAL_PRIORITY_SIZE_EXT          :: 16
+QUEUE_FAMILY_EXTERNAL                 :: MAX_QUEUE_FAMILY_EXTERNAL
 
 """[1::])
     parse_constants(f)
@@ -691,15 +822,16 @@ with open("../enums.odin", 'w', encoding='utf-8') as f:
     f.write(BASE)
     f.write("\n")
     parse_enums(f)
+    parse_fake_enums(f)
     f.write("\n\n")
 with open("../structs.odin", 'w', encoding='utf-8') as f:
     f.write(BASE)
     f.write("""
 import "core:c"
 
+import win32 "core:sys/windows"
+_ :: win32
 when ODIN_OS == .Windows {
-\timport win32 "core:sys/windows"
-
 \tHINSTANCE           :: win32.HINSTANCE
 \tHWND                :: win32.HWND
 \tHMONITOR            :: win32.HMONITOR
@@ -725,6 +857,12 @@ when ODIN_OS == .Windows {
 }
 
 CAMetalLayer :: struct {}
+
+MTLBuffer_id       :: rawptr
+MTLTexture_id      :: rawptr
+MTLSharedEvent_id  :: rawptr
+MTLDevice_id       :: rawptr
+MTLCommandQueue_id :: rawptr
 
 /********************************/
 """)

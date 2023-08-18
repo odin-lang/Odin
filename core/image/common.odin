@@ -634,7 +634,7 @@ alpha_add_if_missing :: proc(img: ^Image, alpha_key := Alpha_Key{}, allocator :=
 	buf := bytes.Buffer{}
 
 	// Can we allocate the return buffer?
-	if !resize(&buf.buf, bytes_wanted) {
+	if resize(&buf.buf, bytes_wanted) != nil {
 		delete(buf.buf)
 		return false
 	}
@@ -826,7 +826,7 @@ alpha_drop_if_present :: proc(img: ^Image, options := Options{}, alpha_key := Al
 	buf := bytes.Buffer{}
 
 	// Can we allocate the return buffer?
-	if !resize(&buf.buf, bytes_wanted) {
+	if resize(&buf.buf, bytes_wanted) != nil {
 		delete(buf.buf)
 		return false
 	}
@@ -1075,7 +1075,7 @@ apply_palette_rgb :: proc(img: ^Image, palette: [256]RGB_Pixel, allocator := con
 	// Can we allocate the return buffer?
 	buf := bytes.Buffer{}
 	bytes_wanted := compute_buffer_size(img.width, img.height, 3, 8)
-	if !resize(&buf.buf, bytes_wanted) {
+	if resize(&buf.buf, bytes_wanted) != nil {
 		delete(buf.buf)
 		return false
 	}
@@ -1112,7 +1112,7 @@ apply_palette_rgba :: proc(img: ^Image, palette: [256]RGBA_Pixel, allocator := c
 	// Can we allocate the return buffer?
 	buf := bytes.Buffer{}
 	bytes_wanted := compute_buffer_size(img.width, img.height, 4, 8)
-	if !resize(&buf.buf, bytes_wanted) {
+	if resize(&buf.buf, bytes_wanted) != nil {
 		delete(buf.buf)
 		return false
 	}
@@ -1147,7 +1147,7 @@ expand_grayscale :: proc(img: ^Image, allocator := context.allocator) -> (ok: bo
 	// Can we allocate the return buffer?
 	buf := bytes.Buffer{}
 	bytes_wanted := compute_buffer_size(img.width, img.height, img.channels + 2, img.depth)
-	if !resize(&buf.buf, bytes_wanted) {
+	if resize(&buf.buf, bytes_wanted) != nil {
 		delete(buf.buf)
 		return false
 	}

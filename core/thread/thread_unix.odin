@@ -2,32 +2,24 @@
 // +private
 package thread
 
-import "core:runtime"
 import "core:intrinsics"
 import "core:sync"
 import "core:sys/unix"
 
 CAS :: intrinsics.atomic_compare_exchange_strong
 
-Thread_State :: enum u8 {
-	Started,
-	Joined,
-	Done,
-}
-
 // NOTE(tetra): Aligned here because of core/unix/pthread_linux.odin/pthread_t.
 // Also see core/sys/darwin/mach_darwin.odin/semaphore_t.
-Thread_Os_Specific :: struct #align 16 {
+Thread_Os_Specific :: struct #align(16) {
 	unix_thread: unix.pthread_t, // NOTE: very large on Darwin, small on Linux.
 	cond:        sync.Cond,
 	mutex:       sync.Mutex,
-	flags:       bit_set[Thread_State; u8],
 }
 //
 // Creates a thread which will run the given procedure.
 // It then waits for `start` to be called.
 //
-_create :: proc(procedure: Thread_Proc, priority := Thread_Priority.Normal) -> ^Thread {
+_create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 	__linux_thread_entry_proc :: proc "c" (t: rawptr) -> rawptr {
 		t := (^Thread)(t)
 
@@ -35,8 +27,6 @@ _create :: proc(procedure: Thread_Proc, priority := Thread_Priority.Normal) -> ^
 			// We need to give the thread a moment to start up before we enable cancellation.
 			can_set_thread_cancel_state := unix.pthread_setcancelstate(unix.PTHREAD_CANCEL_DISABLE, nil) == 0
 		}
-
-		context = runtime.default_context()
 
 		sync.lock(&t.mutex)
 
@@ -46,9 +36,6 @@ _create :: proc(procedure: Thread_Proc, priority := Thread_Priority.Normal) -> ^
 			sync.wait(&t.cond, &t.mutex)
 		}
 
-		init_context := t.init_context
-		context =	init_context.? or_else runtime.default_context()
-
 		when ODIN_OS != .Darwin {
 			// Enable thread's cancelability.
 			if can_set_thread_cancel_state {
@@ -57,14 +44,27 @@ _create :: proc(procedure: Thread_Proc, priority := Thread_Priority.Normal) -> ^
 			}
 		}
 
-		t.procedure(t)
+		{
+			init_context := t.init_context
+
+			// NOTE(tetra, 2023-05-31): Must do this AFTER thread.start() is called, so that the user can set the init_context, etc!
+			// Here on Unix, we start the OS thread in a running state, and so we manually have it wait on a condition
+			// variable above. We must perform that waiting BEFORE we select the context!
+			context = _select_context_for_thread(init_context)
+			defer _maybe_destroy_default_temp_allocator(init_context)
+
+			t.procedure(t)
+		}
 
 		intrinsics.atomic_store(&t.flags, t.flags + { .Done })
 
 		sync.unlock(&t.mutex)
 
-		if init_context == nil && context.temp_allocator.data == &runtime.global_default_temp_allocator_data {
-			runtime.default_temp_allocator_destroy(auto_cast context.temp_allocator.data)
+		if .Self_Cleanup in t.flags {
+			t.unix_thread = {}
+			// NOTE(ftphikari): It doesn't matter which context 'free' received, right?
+			context = {}
+			free(t, t.creation_allocator)
 		}
 
 		return nil

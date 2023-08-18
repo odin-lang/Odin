@@ -1,6 +1,11 @@
+
+/*
+Package core:math/rand implements various random number generators
+*/
 package rand
 
 import "core:intrinsics"
+import "core:mem"
 
 Rand :: struct {
 	state: u64,
@@ -12,24 +17,103 @@ Rand :: struct {
 @(private)
 global_rand := create(u64(intrinsics.read_cycle_counter()))
 
+/*
+Sets the seed used by the global random number generator.
+
+Inputs:
+- seed: The seed value
+
+Example:
+	import "core:math/rand"
+	import "core:fmt"
+
+	set_global_seed_example :: proc() {
+		rand.set_global_seed(1)
+		fmt.println(rand.uint64())
+	}
+
+*/
 set_global_seed :: proc(seed: u64) {
 	init(&global_rand, seed)
 }
 
-create :: proc(seed: u64) -> Rand {
+/*
+Creates a new random number generator.
+
+Inputs:
+- seed: The seed value to create the random number generator with
+
+Returns:
+- res: The created random number generator
+
+Example:
+	import "core:math/rand"
+	import "core:fmt"
+
+	create_example :: proc() {
+		my_rand := rand.create(1)
+		fmt.println(rand.uint64(&my_rand))
+	}
+
+*/
+@(require_results)
+create :: proc(seed: u64) -> (res: Rand) {
 	r: Rand
 	init(&r, seed)
 	return r
 }
 
+
+/*
+Initialises a random number generator.
+
+Inputs:
+- r: The random number generator to initialise
+- seed: The seed value to initialise this random number generator
+
+Example:
+	import "core:math/rand"
+	import "core:fmt"
+
+	init_example :: proc() {
+		my_rand: rand.Rand
+		rand.init(&my_rand, 1)
+		fmt.println(rand.uint64(&my_rand))
+	}
+
+*/
 init :: proc(r: ^Rand, seed: u64) {
 	r.state = 0
 	r.inc = (seed << 1) | 1
-	_random(r)
+	_random_u64(r)
 	r.state += seed
-	_random(r)
+	_random_u64(r)
 }
 
+/*
+Initialises a random number generator to use the system random number generator.  
+The system random number generator is platform specific.  
+On `linux` refer to the `getrandom` syscall.  
+On `darwin` refer to `getentropy`.  
+On `windows` refer to `BCryptGenRandom`.
+
+All other platforms wi
+
+Inputs:
+- r: The random number generator to use the system random number generator
+
+WARNING: Panics if the system is not either `windows`, `darwin` or `linux`
+
+Example:
+	import "core:math/rand"
+	import "core:fmt"
+
+	init_as_system_example :: proc() {
+		my_rand: rand.Rand
+		rand.init_as_system(&my_rand)
+		fmt.println(rand.uint64(&my_rand))
+	}
+*/
 init_as_system :: proc(r: ^Rand) {
 	if !#defined(_system_random) {
 		panic(#procedure + " is not supported on this platform yet")
@@ -40,11 +124,9 @@ init_as_system :: proc(r: ^Rand) {
 }
 
 @(private)
-_random :: proc(r: ^Rand) -> u32 {
+_random_u64 :: proc(r: ^Rand) -> u64 {
 	r := r
 	if r == nil {
-		// NOTE(bill, 2020-09-07): Do this so that people can
-		// enforce the global random state if necessary with `nil`
 		r = &global_rand
 	}
 	when #defined(_system_random) {
@@ -53,34 +135,188 @@ _random :: proc(r: ^Rand) -> u32 {
 		}
 	}
 
+
 	old_state := r.state
 	r.state = old_state * 6364136223846793005 + (r.inc|1)
-	xor_shifted := u32(((old_state>>18) ~ old_state) >> 27)
-	rot := u32(old_state >> 59)
-	return (xor_shifted >> rot) | (xor_shifted << ((-rot) & 31))
+	xor_shifted := (((old_state >> 59) + 5) ~ old_state) * 12605985483714917081
+	rot := (old_state >> 59)
+	return (xor_shifted >> rot) | (xor_shifted << ((-rot) & 63))
 }
 
-uint32 :: proc(r: ^Rand = nil) -> u32 { return _random(r) }
+/*
+Generates a random 32 bit value using the provided random number generator. If no generator is provided the global random number generator will be used.
 
-uint64 :: proc(r: ^Rand = nil) -> u64 {
-	a := u64(_random(r))
-	b := u64(_random(r))
-	return (a<<32) | b
+Inputs:
+- r: The random number generator to use, or nil for the global generator
+
+Returns:
+- val: A random unsigned 32 bit value
+
+Example:
+	import "core:math/rand"
+	import "core:fmt"
+
+	uint32_example :: proc() {
+		// Using the global random number generator
+		fmt.println(rand.uint32())
+		// Using local random number generator
+		my_rand := rand.create(1)
+		fmt.println(rand.uint32(&my_rand))
+	}
+*/
+@(require_results)
+uint32 :: proc(r: ^Rand = nil) -> (val: u32) { return u32(_random_u64(r)) }
+
+/*
+Generates a random 64 bit value using the provided random number generator. If no generator is provided the global random number generator will be used.
+
+Inputs:
+- r: The random number generator to use, or nil for the global generator
+
+Returns:
+- val: A random unsigned 64 bit value
+
+Example:
+	import "core:math/rand"
+	import "core:fmt"
+
+	uint64_example :: proc() {
+		// Using the global random number generator
+		fmt.println(rand.uint64())
+		// Using local random number generator
+		my_rand := rand.create(1)
+		fmt.println(rand.uint64(&my_rand))
+	}
+*/
+@(require_results)
+uint64 :: proc(r: ^Rand = nil) -> (val: u64) { return _random_u64(r) }
+
+/*
+Generates a random 128 bit value using the provided random number generator. If no generator is provided the global random number generator will be used.
+
+Inputs:
+- r: The random number generator to use, or nil for the global generator
+
+Returns:
+- val: A random unsigned 128 bit value
+
+Example:
+	import "core:math/rand"
+	import "core:fmt"
+
+	uint128_example :: proc() {
+		// Using the global random number generator
+		fmt.println(rand.uint128())
+		// Using local random number generator
+		my_rand := rand.create(1)
+		fmt.println(rand.uint128(&my_rand))
+	}
+*/
+@(require_results)
+uint128 :: proc(r: ^Rand = nil) -> (val: u128) {
+	a := u128(_random_u64(r))
+	b := u128(_random_u64(r))
+	return (a<<64) | b
 }
 
-uint128 :: proc(r: ^Rand = nil) -> u128 {
-	a := u128(_random(r))
-	b := u128(_random(r))
-	c := u128(_random(r))
-	d := u128(_random(r))
-	return (a<<96) | (b<<64) | (c<<32) | d
-}
+/*
+Generates a random 31 bit value using the provided random number generator. If no generator is provided the global random number generator will be used.  
+The sign bit will always be set to 0, thus all generated numbers will be positive.
 
-int31  :: proc(r: ^Rand = nil) -> i32  { return i32(uint32(r) << 1 >> 1) }
-int63  :: proc(r: ^Rand = nil) -> i64  { return i64(uint64(r) << 1 >> 1) }
-int127 :: proc(r: ^Rand = nil) -> i128 { return i128(uint128(r) << 1 >> 1) }
+Inputs:
+- r: The random number generator to use, or nil for the global generator
 
-int31_max :: proc(n: i32, r: ^Rand = nil) -> i32 {
+Returns:
+- val: A random 31 bit value
+
+Example:
+	import "core:math/rand"
+	import "core:fmt"
+
+	int31_example :: proc() {
+		// Using the global random number generator
+		fmt.println(rand.int31())
+		// Using local random number generator
+		my_rand := rand.create(1)
+		fmt.println(rand.int31(&my_rand))
+	}
+*/
+@(require_results) int31  :: proc(r: ^Rand = nil) -> (val: i32)  { return i32(uint32(r) << 1 >> 1) }
+
+/*
+Generates a random 63 bit value using the provided random number generator. If no generator is provided the global random number generator will be used.  
+The sign bit will always be set to 0, thus all generated numbers will be positive.
+
+Inputs:
+- r: The random number generator to use, or nil for the global generator
+
+Returns:
+- val: A random 63 bit value
+
+Example:
+	import "core:math/rand"
+	import "core:fmt"
+
+	int63_example :: proc() {
+		// Using the global random number generator
+		fmt.println(rand.int63())
+		// Using local random number generator
+		my_rand := rand.create(1)
+		fmt.println(rand.int63(&my_rand))
+	}
+*/
+@(require_results) int63  :: proc(r: ^Rand = nil) -> (val: i64)  { return i64(uint64(r) << 1 >> 1) }
+
+/*
+Generates a random 127 bit value using the provided random number generator. If no generator is provided the global random number generator will be used.  
+The sign bit will always be set to 0, thus all generated numbers will be positive.
+
+Inputs:
+- r: The random number generator to use, or nil for the global generator
+
+Returns:
+- val: A random 127 bit value
+
+Example:
+	import "core:math/rand"
+	import "core:fmt"
+
+	int127_example :: proc() {
+		// Using the global random number generator
+		fmt.println(rand.int127())
+		// Using local random number generator
+		my_rand := rand.create(1)
+		fmt.println(rand.int127(&my_rand))
+	}
+*/
+@(require_results) int127 :: proc(r: ^Rand = nil) -> (val: i128) { return i128(uint128(r) << 1 >> 1) }
+
+/*
+Generates a random 31 bit value in the range `[0, n)` using the provided random number generator. If no generator is provided the global random number generator will be used.
+
+Inputs:
+- n: The upper bound of the generated number, this value is exclusive
+- r: The random number generator to use, or nil for the global generator
+
+Returns:
+- val: A random 31 bit value in the range `[0, n)`
+
+WARNING: Panics if n is less than 0
+
+Example:
+	import "core:math/rand"
+	import "core:fmt"
+
+	int31_max_example :: proc() {
+		// Using the global random number generator
+		fmt.println(rand.int31_max(16))
+		// Using local random number generator
+		my_rand := rand.create(1)
+		fmt.println(rand.int31_max(1024, &my_rand))
+	}
+*/
+@(require_results)
+int31_max :: proc(n: i32, r: ^Rand = nil) -> (val: i32) {
 	if n <= 0 {
 		panic("Invalid argument to int31_max")
 	}
@@ -95,7 +331,34 @@ int31_max :: proc(n: i32, r: ^Rand = nil) -> i32 {
 	return v % n
 }
 
-int63_max :: proc(n: i64, r: ^Rand = nil) -> i64 {
+/*
+Generates a random 63 bit value in the range `[0, n)` using the provided random number generator. If no generator is provided the global random number generator will be used.
+
+Inputs:
+- n: The upper bound of the generated number, this value is exclusive
+- r: The random number generator to use, or nil for the global generator
+
+Returns:
+- val: A random 63 bit value in the range `[0, n)`
+
+WARNING: Panics if n is less than 0
+
+Example:
+	import "core:math/rand"
+	import "core:fmt"
+
+	int63_max_example :: proc() {
+		// Using the global random number generator
+		fmt.println(rand.int63_max(16))
+		// Using local random number generator
+		my_rand := rand.create(1)
+		fmt.println(rand.int63_max(1024, &my_rand))
+	}
+
+
+*/
+@(require_results)
+int63_max :: proc(n: i64, r: ^Rand = nil) -> (val: i64) {
 	if n <= 0 {
 		panic("Invalid argument to int63_max")
 	}
@@ -110,7 +373,34 @@ int63_max :: proc(n: i64, r: ^Rand = nil) -> i64 {
 	return v % n
 }
 
-int127_max :: proc(n: i128, r: ^Rand = nil) -> i128 {
+/*
+Generates a random 127 bit value in the range `[0, n)` using the provided random number generator. If no generator is provided the global random number generator will be used.
+
+Inputs:
+- n: The upper bound of the generated number, this value is exclusive
+- r: The random number generator to use, or nil for the global generator
+
+Returns:
+- val: A random 127 bit value in the range `[0, n)`
+
+WARNING: Panics if n is less than 0
+
+Example:
+	import "core:math/rand"
+	import "core:fmt"
+
+	int127_max_example :: proc() {
+		// Using the global random number generator
+		fmt.println(rand.int127_max(16))
+		// Using local random number generator
+		my_rand := rand.create(1)
+		fmt.println(rand.int127_max(1024, &my_rand))
+	}
+
+
+*/
+@(require_results)
+int127_max :: proc(n: i128, r: ^Rand = nil) -> (val: i128) {
 	if n <= 0 {
 		panic("Invalid argument to int127_max")
 	}
@@ -125,7 +415,34 @@ int127_max :: proc(n: i128, r: ^Rand = nil) -> i128 {
 	return v % n
 }
 
-int_max :: proc(n: int, r: ^Rand = nil) -> int {
+/*
+Generates a random integer value in the range `[0, n)` using the provided random number generator. If no generator is provided the global random number generator will be used.
+
+Inputs:
+- n: The upper bound of the generated number, this value is exclusive
+- r: The random number generator to use, or nil for the global generator
+
+Returns:
+- val: A random integer value in the range `[0, n)`
+
+WARNING: Panics if n is less than 0
+
+Example:
+	import "core:math/rand"
+	import "core:fmt"
+
+	int_max_example :: proc() {
+		// Using the global random number generator
+		fmt.println(rand.int_max(16))
+		// Using local random number generator
+		my_rand := rand.create(1)
+		fmt.println(rand.int_max(1024, &my_rand))
+	}
+
+
+*/
+@(require_results)
+int_max :: proc(n: int, r: ^Rand = nil) -> (val: int) {
 	if n <= 0 {
 		panic("Invalid argument to int_max")
 	}
@@ -136,14 +453,140 @@ int_max :: proc(n: int, r: ^Rand = nil) -> int {
 	}
 }
 
-// Uniform random distribution [0, 1)
-float64 :: proc(r: ^Rand = nil) -> f64 { return f64(int63_max(1<<53, r)) / (1 << 53) }
-// Uniform random distribution [0, 1)
-float32 :: proc(r: ^Rand = nil) -> f32 { return f32(float64(r)) }
+/*
+Generates a random double floating point value in the range `0 to 1` using the provided random number generator. If no generator is provided the global random number generator will be used.  
+Due to floating point precision there is no guarantee if the upper and lower bounds are inclusive/exclusive with the exact floating point value.  
 
-float64_range :: proc(lo, hi: f64, r: ^Rand = nil) -> f64 { return (hi-lo)*float64(r) + lo }
-float32_range :: proc(lo, hi: f32, r: ^Rand = nil) -> f32 { return (hi-lo)*float32(r) + lo }
+Inputs:
+- r: The random number generator to use, or nil for the global generator
 
+Returns:
+- val: A random double floating point value in the range `0 to 1`
+
+Example:
+	import "core:math/rand"
+	import "core:fmt"
+
+	float64_example :: proc() {
+		// Using the global random number generator
+		fmt.println(rand.float64())
+		// Using local random number generator
+		my_rand := rand.create(1)
+		fmt.println(rand.float64(&my_rand))
+	}
+
+
+*/
+@(require_results) float64 :: proc(r: ^Rand = nil) -> (val: f64) { return f64(int63_max(1<<53, r)) / (1 << 53) }
+
+/*
+Generates a random single floating point value in the range `0 to 1` using the provided random number generator. If no generator is provided the global random number generator will be used.  
+Due to floating point precision there is no guarantee if the upper and lower bounds are inclusive/exclusive with the exact floating point value.  
+
+Inputs:
+- r: The random number generator to use, or nil for the global generator
+
+Returns:
+- val: A random single floating point value in the range `0 to 1`
+
+Example:
+	import "core:math/rand"
+	import "core:fmt"
+
+	float32_example :: proc() {
+		// Using the global random number generator
+		fmt.println(rand.float32())
+		// Using local random number generator
+		my_rand := rand.create(1)
+		fmt.println(rand.float32(&my_rand))
+	}
+
+
+*/
+@(require_results) float32 :: proc(r: ^Rand = nil) -> (val: f32) { return f32(float64(r)) }
+
+/*
+Generates a random double floating point value in the range `low to high` using the provided random number generator. If no generator is provided the global random number generator will be used.  
+Due to floating point precision there is no guarantee if the upper and lower bounds are inclusive/exclusive with the exact floating point value.  
+
+Inputs:
+- low: The lower bounds of the value, this value is inclusive
+- high: The upper bounds of the value, this value is exclusive
+- r: The random number generator to use, or nil for the global generator
+
+Returns:
+- val: A random double floating point value in the range `low to high`
+
+Example:
+	import "core:math/rand"
+	import "core:fmt"
+
+	float64_range_example :: proc() {
+		// Using the global random number generator
+		fmt.println(rand.float64_range(-10, 300))
+		// Using local random number generator
+		my_rand := rand.create(1)
+		fmt.println(rand.float64_range(600, 900, &my_rand))
+	}
+
+
+*/
+@(require_results) float64_range :: proc(low, high: f64, r: ^Rand = nil) -> (val: f64) { return (high-low)*float64(r) + low }
+
+/*
+Generates a random single floating point value in the range `low to high` using the provided random number generator. If no generator is provided the global random number generator will be used.  
+Due to floating point precision there is no guarantee if the upper and lower bounds are inclusive/exclusive with the exact floating point value.  
+
+Inputs:
+- low: The lower bounds of the value, this value is inclusive
+- high: The upper bounds of the value, this value is exclusive
+- r: The random number generator to use, or nil for the global generator
+
+Returns:
+- val: A random single floating point value in the range `low to high`
+
+Example:
+	import "core:math/rand"
+	import "core:fmt"
+
+	float32_range_example :: proc() {
+		// Using the global random number generator
+		fmt.println(rand.float32_range(-10, 300))
+		// Using local random number generator
+		my_rand := rand.create(1)
+		fmt.println(rand.float32_range(600, 900, &my_rand))
+	}
+
+
+*/
+@(require_results) float32_range :: proc(low, high: f32, r: ^Rand = nil) -> (val: f32) { return (high-low)*float32(r) + low }
+
+/*
+Fills a byte slice with random values using the provided random number generator. If no generator is provided the global random number generator will be used.  
+Due to floating point precision there is no guarantee if the upper and lower bounds are inclusive/exclusive with the exact floating point value.  
+
+Inputs:
+- p: The byte slice to fill
+- r: The random number generator to use, or nil for the global generator
+
+Returns:
+- n: The number of bytes generated
+
+Example:
+	import "core:math/rand"
+	import "core:fmt"
+
+	read_example :: proc() {
+		// Using the global random number generator
+		data: [8]byte
+		n := rand.read(data[:])
+		fmt.println(n)
+		fmt.println(data)
+	}
+
+
+*/
+@(require_results)
 read :: proc(p: []byte, r: ^Rand = nil) -> (n: int) {
 	pos := i8(0)
 	val := i64(0)
@@ -159,18 +602,73 @@ read :: proc(p: []byte, r: ^Rand = nil) -> (n: int) {
 	return
 }
 
-// perm returns a slice of n ints in a pseudo-random permutation of integers in the range [0, n)
-perm :: proc(n: int, r: ^Rand = nil, allocator := context.allocator) -> []int {
-	m := make([]int, n, allocator)
+/*
+Creates a slice of `int` filled with random values using the provided random number generator. If no generator is provided the global random number generator will be used.  
+
+*Allocates Using Provided Allocator*
+
+Inputs:
+- n: The size of the created slice
+- r: The random number generator to use, or nil for the global generator
+- allocator: (default: context.allocator)
+
+Returns:
+- res: A slice filled with random values
+- err: An allocator error if one occured, `nil` otherwise
+
+Example:
+	import "core:math/rand"
+	import "core:mem"
+	import "core:fmt"
+
+	perm_example :: proc() -> (err: mem.Allocator_Error) {
+		// Using the global random number generator and using the context allocator
+		data := rand.perm(4) or_return
+		fmt.println(data)
+		defer delete(data, context.allocator)
+
+		// Using local random number generator and temp allocator
+		my_rand := rand.create(1)
+		data_tmp := rand.perm(4, &my_rand, context.temp_allocator) or_return
+		fmt.println(data_tmp)
+
+		return
+	}
+
+
+*/
+@(require_results)
+perm :: proc(n: int, r: ^Rand = nil, allocator := context.allocator) -> (res: []int, err: mem.Allocator_Error) #optional_allocator_error {
+	m := make([]int, n, allocator) or_return
 	for i := 0; i < n; i += 1 {
 		j := int_max(i+1, r)
 		m[i] = m[j]
 		m[j] = i
 	}
-	return m
+	return m, {}
 }
 
+/*
+Randomizes the ordering of elements for the provided slice. If no generator is provided the global random number generator will be used.  
 
+Inputs:
+- array: The slice to randomize
+- r: The random number generator to use, or nil for the global generator
+
+Example:
+	import "core:math/rand"
+	import "core:fmt"
+
+	shuffle_example :: proc() {
+		// Using the global random number generator
+		data: [4]int = { 1, 2, 3, 4 }
+		fmt.println(data) // the contents are in order
+		rand.shuffle(data[:])
+		fmt.println(data) // the contents have been shuffled
+	}
+
+
+*/
 shuffle :: proc(array: $T/[]$E, r: ^Rand = nil) {
 	n := i64(len(array))
 	if n < 2 {
@@ -183,7 +681,35 @@ shuffle :: proc(array: $T/[]$E, r: ^Rand = nil) {
 	}
 }
 
-// Returns a random element from the given slice
+/*
+Returns a random element from the provided slice. If no generator is provided the global random number generator will be used.  
+
+Inputs:
+- array: The slice to choose an element from
+- r: The random number generator to use, or nil for the global generator
+
+Returns:
+- res: A random element from `array`
+
+Example:
+	import "core:math/rand"
+	import "core:fmt"
+
+	choice_example :: proc() {
+		// Using the global random number generator
+		data: [4]int = { 1, 2, 3, 4 }
+		fmt.println(rand.choice(data[:]))
+		fmt.println(rand.choice(data[:]))
+		fmt.println(rand.choice(data[:]))
+		fmt.println(rand.choice(data[:]))
+	}
+
+
+	2
+	4
+
+*/
+@(require_results)
 choice :: proc(array: $T/[]$E, r: ^Rand = nil) -> (res: E) {
 	n := i64(len(array))
 	if n < 1 {

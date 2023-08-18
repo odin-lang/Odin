@@ -69,7 +69,7 @@ hash_stream :: proc(s: io.Stream) -> ([DIGEST_SIZE]byte, bool) {
     defer delete(buf)
     i := 1
     for i > 0 {
-        i, _ = s->impl_read(buf)
+        i, _ = io.read(s, buf)
         if i > 0 {
             botan.hash_update(ctx, len(buf) == 0 ? nil : &buf[0], uint(i))
         } 

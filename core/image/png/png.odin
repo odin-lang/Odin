@@ -11,6 +11,7 @@
 // package png implements a PNG image reader
 //
 // The PNG specification is at https://www.w3.org/TR/PNG/.
+//+vet !using-stmt
 package png
 
 import "core:compress"
@@ -444,15 +445,14 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 			img.width  = int(header.width)
 			img.height = int(header.height)
 
-			using header
 			h := image.PNG_IHDR{
-				width              = width,
-				height             = height,
-				bit_depth          = bit_depth,
-				color_type         = color_type,
-				compression_method = compression_method,
-				filter_method      = filter_method,
-				interlace_method   = interlace_method,
+				width              = header.width,
+				height             = header.height,
+				bit_depth          = header.bit_depth,
+				color_type         = header.color_type,
+				compression_method = header.compression_method,
+				filter_method      = header.filter_method,
+				interlace_method   = header.interlace_method,
 			}
 			info.header = h
 
@@ -731,7 +731,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 		// We need to create a new image buffer
 		dest_raw_size := compute_buffer_size(int(header.width), int(header.height), out_image_channels, 8)
 		t := bytes.Buffer{}
-		if !resize(&t.buf, dest_raw_size) {
+		if resize(&t.buf, dest_raw_size) != nil {
 			return {}, .Unable_To_Allocate_Or_Resize
 		}
 
@@ -812,7 +812,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 		// We need to create a new image buffer
 		dest_raw_size := compute_buffer_size(int(header.width), int(header.height), out_image_channels, 16)
 		t := bytes.Buffer{}
-		if !resize(&t.buf, dest_raw_size) {
+		if resize(&t.buf, dest_raw_size) != nil {
 			return {}, .Unable_To_Allocate_Or_Resize
 		}
 
@@ -1011,7 +1011,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 		// We need to create a new image buffer
 		dest_raw_size := compute_buffer_size(int(header.width), int(header.height), out_image_channels, 8)
 		t := bytes.Buffer{}
-		if !resize(&t.buf, dest_raw_size) {
+		if resize(&t.buf, dest_raw_size) != nil {
 			return {}, .Unable_To_Allocate_Or_Resize
 		}
 
@@ -1522,7 +1522,7 @@ defilter :: proc(img: ^Image, filter_bytes: ^bytes.Buffer, header: ^image.PNG_IH
 	bytes_per_channel := depth == 16 ? 2 : 1
 
 	num_bytes := compute_buffer_size(width, height, channels, depth == 16 ? 16 : 8)
-	if !resize(&img.pixels.buf, num_bytes) {
+	if resize(&img.pixels.buf, num_bytes) != nil {
 		return .Unable_To_Allocate_Or_Resize
 	}
 
@@ -1564,7 +1564,7 @@ defilter :: proc(img: ^Image, filter_bytes: ^bytes.Buffer, header: ^image.PNG_IH
 			if x > 0 && y > 0 {
 				temp: bytes.Buffer
 				temp_len := compute_buffer_size(x, y, channels, depth == 16 ? 16 : 8)
-				if !resize(&temp.buf, temp_len) {
+				if resize(&temp.buf, temp_len) != nil {
 					return .Unable_To_Allocate_Or_Resize
 				}
 

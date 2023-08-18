@@ -10,13 +10,13 @@ Sync              :: distinct u32
 TransformFeedback :: distinct u32
 VertexArrayObject :: distinct u32
 
-IsWebGL2Supported :: proc "c" () -> bool {
+IsWebGL2Supported :: proc "contextless" () -> bool {
 	major, minor: i32
 	GetWebGLVersion(&major, &minor)
 	return major >= 2
 }
 
-@(default_calling_convention="c")
+@(default_calling_convention="contextless")
 foreign webgl2 {
 	/* Buffer objects */
 	CopyBufferSubData :: proc(readTarget, writeTarget: Enum, readOffset, writeOffset: int, size: int) ---	
@@ -110,7 +110,7 @@ foreign webgl2 {
 
 GetActiveUniformBlockName :: proc(program: Program, uniformBlockIndex: i32, buf: []byte) -> string {
 	foreign webgl2 {
-		_GetActiveUniformBlockName :: proc(program: Program, uniformBlockIndex: i32, buf: []byte, length: ^int) ---
+		_GetActiveUniformBlockName :: proc "contextless" (program: Program, uniformBlockIndex: i32, buf: []byte, length: ^int) ---
 	}
 	n: int
 	_GetActiveUniformBlockName(program, uniformBlockIndex, buf, &n)
@@ -118,65 +118,65 @@ GetActiveUniformBlockName :: proc(program: Program, uniformBlockIndex: i32, buf:
 }
 
 
-Uniform1uiv :: proc "c" (location: i32, v: u32) {
+Uniform1uiv :: proc "contextless" (location: i32, v: u32) {
 	Uniform1ui(location, v)
 }
-Uniform2uiv :: proc "c" (location: i32, v: glm.uvec2) {
+Uniform2uiv :: proc "contextless" (location: i32, v: glm.uvec2) {
 	Uniform2ui(location, v.x, v.y)
 }
-Uniform3uiv :: proc "c" (location: i32, v: glm.uvec3) {
+Uniform3uiv :: proc "contextless" (location: i32, v: glm.uvec3) {
 	Uniform3ui(location, v.x, v.y, v.z)
 }
-Uniform4uiv :: proc "c" (location: i32, v: glm.uvec4) {
+Uniform4uiv :: proc "contextless" (location: i32, v: glm.uvec4) {
 	Uniform4ui(location, v.x, v.y, v.z, v.w)
 }
 
-UniformMatrix3x2fv :: proc "c" (location: i32, m: glm.mat3x2) {
+UniformMatrix3x2fv :: proc "contextless" (location: i32, m: glm.mat3x2) {
 	foreign webgl2 {
-		_UniformMatrix3x2fv :: proc "c" (location: i32, addr: [^]f32) ---
+		_UniformMatrix3x2fv :: proc "contextless" (location: i32, addr: [^]f32) ---
 	}
 	array := matrix_flatten(m)
 	_UniformMatrix3x2fv(location, &array[0])
 }
-UniformMatrix4x2fv :: proc "c" (location: i32, m: glm.mat4x2) {
+UniformMatrix4x2fv :: proc "contextless" (location: i32, m: glm.mat4x2) {
 	foreign webgl2 {
-		_UniformMatrix4x2fv :: proc "c" (location: i32, addr: [^]f32) ---
+		_UniformMatrix4x2fv :: proc "contextless" (location: i32, addr: [^]f32) ---
 	}
 	array := matrix_flatten(m)
 	_UniformMatrix4x2fv(location, &array[0])
 }
-UniformMatrix2x3fv :: proc "c" (location: i32, m: glm.mat2x3) {
+UniformMatrix2x3fv :: proc "contextless" (location: i32, m: glm.mat2x3) {
 	foreign webgl2 {
-		_UniformMatrix2x3fv :: proc "c" (location: i32, addr: [^]f32) ---
+		_UniformMatrix2x3fv :: proc "contextless" (location: i32, addr: [^]f32) ---
 	}
 	array := matrix_flatten(m)
 	_UniformMatrix2x3fv(location, &array[0])
 }
-UniformMatrix4x3fv :: proc "c" (location: i32, m: glm.mat4x3) {
+UniformMatrix4x3fv :: proc "contextless" (location: i32, m: glm.mat4x3) {
 	foreign webgl2 {
-		_UniformMatrix4x3fv :: proc "c" (location: i32, addr: [^]f32) ---
+		_UniformMatrix4x3fv :: proc "contextless" (location: i32, addr: [^]f32) ---
 	}
 	array := matrix_flatten(m)
 	_UniformMatrix4x3fv(location, &array[0])
 }
-UniformMatrix2x4fv :: proc "c" (location: i32, m: glm.mat2x4) {
+UniformMatrix2x4fv :: proc "contextless" (location: i32, m: glm.mat2x4) {
 	foreign webgl2 {
-		_UniformMatrix2x4fv :: proc "c" (location: i32, addr: [^]f32) ---
+		_UniformMatrix2x4fv :: proc "contextless" (location: i32, addr: [^]f32) ---
 	}
 	array := matrix_flatten(m)
 	_UniformMatrix2x4fv(location, &array[0])
 }
-UniformMatrix3x4fv :: proc "c" (location: i32, m: glm.mat3x4) {
+UniformMatrix3x4fv :: proc "contextless" (location: i32, m: glm.mat3x4) {
 	foreign webgl2 {
-		_UniformMatrix3x4fv :: proc "c" (location: i32, addr: [^]f32) ---
+		_UniformMatrix3x4fv :: proc "contextless" (location: i32, addr: [^]f32) ---
 	}
 	array := matrix_flatten(m)
 	_UniformMatrix3x4fv(location, &array[0])
 }
 
-VertexAttribI4iv :: proc "c" (index: i32, v: glm.ivec4) {
+VertexAttribI4iv :: proc "contextless" (index: i32, v: glm.ivec4) {
 	VertexAttribI4i(index, v.x, v.y, v.z, v.w)
 }
-VertexAttribI4uiv :: proc "c" (index: i32, v: glm.uvec4) {
+VertexAttribI4uiv :: proc "contextless" (index: i32, v: glm.uvec4) {
 	VertexAttribI4ui(index, v.x, v.y, v.z, v.w)
 }

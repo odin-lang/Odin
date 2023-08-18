@@ -71,6 +71,8 @@ Error :: enum {
 	TS_File_Expected_Source,
 	TS_File_Expected_Translation,
 	TS_File_Expected_NumerusForm,
+	Bad_Str,
+	Bad_Id,
 
 }
 
@@ -170,8 +172,8 @@ destroy :: proc(catalog: ^Translation = ACTIVE, allocator := context.allocator) 
 		return
 	}
 
-	for section in &catalog.k_v {
-		for key in &catalog.k_v[section] {
+	for section in catalog.k_v {
+		for key in catalog.k_v[section] {
 			delete(catalog.k_v[section][key])
 		}
 		delete(catalog.k_v[section])

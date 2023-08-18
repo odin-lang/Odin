@@ -87,7 +87,7 @@ MAP_CACHE_LINE_SIZE :: 1 << MAP_CACHE_LINE_LOG2
 //
 // In the optimal case, len(Map_Cell(T){}.data) = 1 so the cell array can be treated
 // as a regular array of T, which is the case for hashes.
-Map_Cell :: struct($T: typeid) #align MAP_CACHE_LINE_SIZE {
+Map_Cell :: struct($T: typeid) #align(MAP_CACHE_LINE_SIZE) {
 	data: [MAP_CACHE_LINE_SIZE / size_of(T) when 0 < size_of(T) && size_of(T) < MAP_CACHE_LINE_SIZE else 1]T,
 }
 
@@ -184,7 +184,7 @@ map_cell_index_static :: #force_inline proc "contextless" (cells: [^]Map_Cell($T
 // len() for map
 @(require_results)
 map_len :: #force_inline proc "contextless" (m: Raw_Map) -> int {
-	return m.len
+	return int(m.len)
 }
 
 // cap() for map
@@ -207,8 +207,8 @@ map_load_factor :: #force_inline proc "contextless" (log2_capacity: uintptr) -> 
 }
 
 @(require_results)
-map_resize_threshold :: #force_inline proc "contextless" (m: Raw_Map) -> int {
-	return int(map_load_factor(map_log2_cap(m)))
+map_resize_threshold :: #force_inline proc "contextless" (m: Raw_Map) -> uintptr {
+	return map_load_factor(map_log2_cap(m))
 }
 
 // The data stores the log2 capacity in the lower six bits. This is primarily
@@ -251,6 +251,26 @@ map_hash_is_valid :: #force_inline proc "contextless" (hash: Map_Hash) -> bool {
 	return (hash != 0) & (hash & TOMBSTONE_MASK == 0)
 }
 
+@(require_results)
+map_seed :: #force_inline proc "contextless" (m: Raw_Map) -> uintptr {
+	return map_seed_from_map_data(map_data(m))
+}
+
+// splitmix for uintptr
+@(require_results)
+map_seed_from_map_data :: #force_inline proc "contextless" (data: uintptr) -> uintptr {
+	when size_of(uintptr) == size_of(u64) {
+		mix := data + 0x9e3779b97f4a7c15
+		mix = (mix ~ (mix >> 30)) * 0xbf58476d1ce4e5b9
+		mix = (mix ~ (mix >> 27)) * 0x94d049bb133111eb
+		return mix ~ (mix >> 31)
+	} else {
+		mix := data + 0x9e3779b9
+		mix = (mix ~ (mix >> 16)) * 0x21f0aaad
+		mix = (mix ~ (mix >> 15)) * 0x735a2d97
+		return mix ~ (mix >> 15)
+	}
+}
 
 // Computes the desired position in the array. This is just index % capacity,
 // but a procedure as there's some math involved here to recover the capacity.
@@ -394,32 +414,24 @@ map_insert_hash_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^
 	tk := map_cell_index_dynamic(sk, info.ks, 1)
 	tv := map_cell_index_dynamic(sv, info.vs, 1)
 
-
-	for {
-		hp := &hs[pos]
-		element_hash := hp^
+	swap_loop: for {
+		element_hash := hs[pos]
 
 		if map_hash_is_empty(element_hash) {
 			k_dst := map_cell_index_dynamic(ks, info.ks, pos)
 			v_dst := map_cell_index_dynamic(vs, info.vs, pos)
 			intrinsics.mem_copy_non_overlapping(rawptr(k_dst), rawptr(k), size_of_k)
 			intrinsics.mem_copy_non_overlapping(rawptr(v_dst), rawptr(v), size_of_v)
-			hp^ = h
+			hs[pos] = h
 
 			return result if result != 0 else v_dst
 		}
 
+		if map_hash_is_deleted(element_hash) {
+			break swap_loop
+		}
+
 		if probe_distance := map_probe_distance(m^, element_hash, pos); distance > probe_distance {
-			if map_hash_is_deleted(element_hash) {
-				k_dst := map_cell_index_dynamic(ks, info.ks, pos)
-				v_dst := map_cell_index_dynamic(vs, info.vs, pos)
-				intrinsics.mem_copy_non_overlapping(rawptr(k_dst), rawptr(k), size_of_k)
-				intrinsics.mem_copy_non_overlapping(rawptr(v_dst), rawptr(v), size_of_v)
-				hp^ = h
-
-				return result if result != 0 else v_dst
-			}
-
 			if result == 0 {
 				result = map_cell_index_dynamic(vs, info.vs, pos)
 			}
@@ -436,10 +448,107 @@ map_insert_hash_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^
 			intrinsics.mem_copy_non_overlapping(rawptr(vp), rawptr(tv), size_of_v)
 
 			th := h
-			h = hp^
-			hp^ = th
+			h = hs[pos]
+			hs[pos] = th
 
 			distance = probe_distance
+		}
+
+		pos = (pos + 1) & mask
+		distance += 1
+	}
+
+	// backward shift loop
+	hs[pos] = 0
+	look_ahead: uintptr = 1
+	for {
+		la_pos := (pos + look_ahead) & mask
+		element_hash := hs[la_pos]
+
+		if map_hash_is_deleted(element_hash) {
+			look_ahead += 1
+			hs[la_pos] = 0
+			continue
+		}
+
+		k_dst := map_cell_index_dynamic(ks, info.ks, pos)
+		v_dst := map_cell_index_dynamic(vs, info.vs, pos)
+
+		if map_hash_is_empty(element_hash) {
+			intrinsics.mem_copy_non_overlapping(rawptr(k_dst), rawptr(k), size_of_k)
+			intrinsics.mem_copy_non_overlapping(rawptr(v_dst), rawptr(v), size_of_v)
+			hs[pos] = h
+
+			return result if result != 0 else v_dst
+		}
+
+		k_src := map_cell_index_dynamic(ks, info.ks, la_pos)
+		v_src := map_cell_index_dynamic(vs, info.vs, la_pos)
+		probe_distance := map_probe_distance(m^, element_hash, la_pos)
+
+		if probe_distance < look_ahead {
+			// probed can be made ideal while placing saved (ending condition)
+			if result == 0 {
+				result = v_dst
+			}
+			intrinsics.mem_copy_non_overlapping(rawptr(k_dst), rawptr(k), size_of_k)
+			intrinsics.mem_copy_non_overlapping(rawptr(v_dst), rawptr(v), size_of_v)
+			hs[pos] = h
+
+			// This will be an ideal move
+			pos = (la_pos - probe_distance) & mask
+			look_ahead -= probe_distance
+
+			// shift until we hit ideal/empty
+			for probe_distance != 0 {
+				k_dst = map_cell_index_dynamic(ks, info.ks, pos)
+				v_dst = map_cell_index_dynamic(vs, info.vs, pos)
+
+				intrinsics.mem_copy_non_overlapping(rawptr(k_dst), rawptr(k_src), size_of_k)
+				intrinsics.mem_copy_non_overlapping(rawptr(v_dst), rawptr(v_src), size_of_v)
+				hs[pos] = element_hash
+				hs[la_pos] = 0
+
+				pos = (pos + 1) & mask
+				la_pos = (la_pos + 1) & mask
+				look_ahead = (la_pos - pos) & mask
+				element_hash = hs[la_pos]
+				if map_hash_is_empty(element_hash) {
+					return
+				}
+
+				probe_distance = map_probe_distance(m^, element_hash, la_pos)
+				if probe_distance == 0 {
+					return
+				}
+				// can be ideal?
+				if probe_distance < look_ahead {
+					pos = (la_pos - probe_distance) & mask
+				}
+				k_src = map_cell_index_dynamic(ks, info.ks, la_pos)
+				v_src = map_cell_index_dynamic(vs, info.vs, la_pos)
+			}
+			return
+		} else if distance < probe_distance - look_ahead {
+			// shift back probed
+			intrinsics.mem_copy_non_overlapping(rawptr(k_dst), rawptr(k_src), size_of_k)
+			intrinsics.mem_copy_non_overlapping(rawptr(v_dst), rawptr(v_src), size_of_v)
+			hs[pos] = element_hash
+			hs[la_pos] = 0
+		} else {
+			// place saved, save probed
+			if result == 0 {
+				result = v_dst
+			}
+			intrinsics.mem_copy_non_overlapping(rawptr(k_dst), rawptr(k), size_of_k)
+			intrinsics.mem_copy_non_overlapping(rawptr(v_dst), rawptr(v), size_of_v)
+			hs[pos] = h
+
+			intrinsics.mem_copy_non_overlapping(rawptr(k), rawptr(k_src), size_of_k)
+			intrinsics.mem_copy_non_overlapping(rawptr(v), rawptr(v_src), size_of_v)
+			h = hs[la_pos]
+			hs[la_pos] = 0
+			distance = probe_distance - look_ahead
 		}
 
 		pos = (pos + 1) & mask
@@ -503,6 +612,7 @@ map_reserve_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_
 		}
 		k := map_cell_index_dynamic(ks, info.ks, i)
 		v := map_cell_index_dynamic(vs, info.vs, i)
+		hash = info.key_hasher(rawptr(k), map_seed(resized))
 		_ = map_insert_hash_dynamic(&resized, info, hash, k, v)
 		// Only need to do this comparison on each actually added pair, so do not
 		// fold it into the for loop comparator as a micro-optimization.
@@ -550,6 +660,7 @@ map_shrink_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_I
 
 		k := map_cell_index_dynamic(ks, info.ks, i)
 		v := map_cell_index_dynamic(vs, info.vs, i)
+		hash = info.key_hasher(rawptr(k), map_seed(shrunk))
 		_ = map_insert_hash_dynamic(&shrunk, info, hash, k, v)
 		// Only need to do this comparison on each actually added pair, so do not
 		// fold it into the for loop comparator as a micro-optimization.
@@ -581,7 +692,7 @@ map_lookup_dynamic :: proc "contextless" (m: Raw_Map, #no_alias info: ^Map_Info,
 	if map_len(m) == 0 {
 		return 0, false
 	}
-	h := info.key_hasher(rawptr(k), 0)
+	h := info.key_hasher(rawptr(k), map_seed(m))
 	p := map_desired_position(m, h)
 	d := uintptr(0)
 	c := (uintptr(1) << map_log2_cap(m)) - 1
@@ -604,7 +715,7 @@ map_exists_dynamic :: proc "contextless" (m: Raw_Map, #no_alias info: ^Map_Info,
 	if map_len(m) == 0 {
 		return false
 	}
-	h := info.key_hasher(rawptr(k), 0)
+	h := info.key_hasher(rawptr(k), map_seed(m))
 	p := map_desired_position(m, h)
 	d := uintptr(0)
 	c := (uintptr(1) << map_log2_cap(m)) - 1
@@ -635,50 +746,19 @@ map_erase_dynamic :: #force_inline proc "contextless" (#no_alias m: ^Raw_Map, #n
 	m.len -= 1
 	ok = true
 
-	{ // coalesce tombstones
-		// HACK NOTE(bill): This is an ugly bodge but it is coalescing the tombstone slots
-		// TODO(bill): we should do backward shift deletion and not rely on tombstone slots
-		mask := (uintptr(1)<<map_log2_cap(m^)) - 1
-		curr_index := uintptr(index)
+	mask := (uintptr(1)<<map_log2_cap(m^)) - 1
+	curr_index := uintptr(index)
+	next_index := (curr_index + 1) & mask
 
-		// TODO(bill): determine a good value for this empirically
-		// if we do not implement backward shift deletion
-		PROBE_COUNT :: 8
-		for _ in 0..<PROBE_COUNT {
-			next_index := (curr_index + 1) & mask
-			if next_index == index {
-				// looped around
-				break
-			}
-
-			// if the next element is empty or has zero probe distance, then any lookup
-			// will always fail on the next, so we can clear both of them
-			hash := hs[next_index]
-			if map_hash_is_empty(hash) || map_probe_distance(m^, hash, next_index) == 0 {
-				hs[curr_index] = 0
-				return
-			}
-
-			// now the next element will have a probe count of at least one,
-			// so it can use the delete slot instead
-			hs[curr_index] = hs[next_index]
-
-			mem_copy_non_overlapping(
-				rawptr(map_cell_index_dynamic(ks, info.ks, curr_index)),
-				rawptr(map_cell_index_dynamic(ks, info.ks, next_index)),
-				int(info.ks.size_of_type),
-			)
-			mem_copy_non_overlapping(
-				rawptr(map_cell_index_dynamic(vs, info.vs, curr_index)),
-				rawptr(map_cell_index_dynamic(vs, info.vs, next_index)),
-				int(info.vs.size_of_type),
-			)
-
-			curr_index = next_index
-		}
-
+	// if the next element is empty or has zero probe distance, then any lookup
+	// will always fail on the next, so we can clear both of them
+	hash := hs[next_index]
+	if map_hash_is_empty(hash) || map_probe_distance(m^, hash, next_index) == 0 {
+		hs[curr_index] = 0
+	} else {
 		hs[curr_index] |= TOMBSTONE_MASK
 	}
+
 	return
 }
 
@@ -711,7 +791,7 @@ map_get :: proc "contextless" (m: $T/map[$K]$V, key: K) -> (stored_key: K, store
 	info := intrinsics.type_map_info(T)
 	key := key
 
-	h := info.key_hasher(&key, 0)
+	h := info.key_hasher(&key, map_seed(rm))
 	pos := map_desired_position(rm, h)
 	distance := uintptr(0)
 	mask := (uintptr(1) << map_log2_cap(rm)) - 1
@@ -762,15 +842,15 @@ __dynamic_map_get :: proc "contextless" (#no_alias m: ^Raw_Map, #no_alias info: 
 }
 
 // IMPORTANT: USED WITHIN THE COMPILER
-__dynamic_map_check_grow :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, loc := #caller_location) -> Allocator_Error {
+__dynamic_map_check_grow :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, loc := #caller_location) -> (err: Allocator_Error, has_grown: bool) {
 	if m.len >= map_resize_threshold(m^) {
-		return map_grow_dynamic(m, info, loc)
+		return map_grow_dynamic(m, info, loc), true
 	}
-	return nil
+	return nil, false
 }
 
 __dynamic_map_set_without_hash :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, key, value: rawptr, loc := #caller_location) -> rawptr {
-	return __dynamic_map_set(m, info, info.key_hasher(key, 0), key, value, loc)
+	return __dynamic_map_set(m, info, info.key_hasher(key, map_seed(m^)), key, value, loc)
 }
 
 
@@ -781,8 +861,13 @@ __dynamic_map_set :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_In
 		return found
 	}
 
-	if __dynamic_map_check_grow(m, info, loc) != nil {
+	hash := hash
+	err, has_grown := __dynamic_map_check_grow(m, info, loc)
+	if err != nil {
 		return nil
+	}
+	if has_grown {
+		hash = info.key_hasher(key, map_seed(m^))
 	}
 
 	result := map_insert_hash_dynamic(m, info, hash, uintptr(key), uintptr(value))

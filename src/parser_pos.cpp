@@ -2,7 +2,7 @@ gb_internal Token ast_token(Ast *node) {
 	switch (node->kind) {
 	case Ast_Ident:          return node->Ident.token;
 	case Ast_Implicit:       return node->Implicit;
-	case Ast_Undef:          return node->Undef;
+	case Ast_Uninit:         return node->Uninit;
 	case Ast_BasicLit:       return node->BasicLit.token;
 	case Ast_BasicDirective: return node->BasicDirective.token;
 	case Ast_ProcGroup:      return node->ProcGroup.token;
@@ -37,11 +37,15 @@ gb_internal Token ast_token(Ast *node) {
 			return ast_token(node->ImplicitSelectorExpr.selector);
 		}
 		return node->ImplicitSelectorExpr.token;
-	case Ast_IndexExpr:          return node->IndexExpr.open;
-	case Ast_MatrixIndexExpr:    return node->MatrixIndexExpr.open;
-	case Ast_SliceExpr:          return node->SliceExpr.open;
+	case Ast_IndexExpr:          return ast_token(node->IndexExpr.expr);
+	case Ast_MatrixIndexExpr:    return ast_token(node->MatrixIndexExpr.expr);
+	case Ast_SliceExpr:          return ast_token(node->SliceExpr.expr);
 	case Ast_Ellipsis:           return node->Ellipsis.token;
-	case Ast_FieldValue:         return node->FieldValue.eq;
+	case Ast_FieldValue:
+		if (node->FieldValue.field) {
+			return ast_token(node->FieldValue.field);
+		}
+		return node->FieldValue.eq;
 	case Ast_EnumFieldValue:     return ast_token(node->EnumFieldValue.name);
 	case Ast_DerefExpr:          return node->DerefExpr.op;
 	case Ast_TernaryIfExpr:      return ast_token(node->TernaryIfExpr.x);
@@ -137,7 +141,7 @@ Token ast_end_token(Ast *node) {
 		return empty_token;
 	case Ast_Ident:          return node->Ident.token;
 	case Ast_Implicit:       return node->Implicit;
-	case Ast_Undef:          return node->Undef;
+	case Ast_Uninit:         return node->Uninit;
 	case Ast_BasicLit:       return node->BasicLit.token;
 	case Ast_BasicDirective: return node->BasicDirective.token;
 	case Ast_ProcGroup:      return node->ProcGroup.close;

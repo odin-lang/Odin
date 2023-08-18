@@ -77,12 +77,16 @@ clone_node :: proc(node: ^Node) -> ^Node {
 		align = elem.align
 	}
 
-	#partial switch in node.derived {
+	#partial switch _ in node.derived {
 	case ^Package, ^File:
 		panic("Cannot clone this node type")
 	}
 
-	res := cast(^Node)mem.alloc(size, align)
+	res := cast(^Node)(mem.alloc(size, align) or_else nil)
+	if res == nil {
+		// allocation failure
+		return nil
+	}
 	src: rawptr = node
 	if node.derived != nil {
 		src = (^rawptr)(&node.derived)^

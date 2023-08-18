@@ -162,11 +162,11 @@ Type_Info_Simd_Vector :: struct {
 	count:      int,
 }
 Type_Info_Relative_Pointer :: struct {
-	pointer:      ^Type_Info,
+	pointer:      ^Type_Info, // ^T
 	base_integer: ^Type_Info,
 }
-Type_Info_Relative_Slice :: struct {
-	slice:        ^Type_Info,
+Type_Info_Relative_Multi_Pointer :: struct {
+	pointer:      ^Type_Info, // [^]T
 	base_integer: ^Type_Info,
 }
 Type_Info_Matrix :: struct {
@@ -219,7 +219,7 @@ Type_Info :: struct {
 		Type_Info_Bit_Set,
 		Type_Info_Simd_Vector,
 		Type_Info_Relative_Pointer,
-		Type_Info_Relative_Slice,
+		Type_Info_Relative_Multi_Pointer,
 		Type_Info_Matrix,
 		Type_Info_Soa_Pointer,
 	},
@@ -252,12 +252,12 @@ Typeid_Kind :: enum u8 {
 	Bit_Set,
 	Simd_Vector,
 	Relative_Pointer,
-	Relative_Slice,
+	Relative_Multi_Pointer,
 	Matrix,
 }
 #assert(len(Typeid_Kind) < 32)
 
-// Typeid_Bit_Field :: bit_field #align align_of(uintptr) {
+// Typeid_Bit_Field :: bit_field #align(align_of(uintptr)) {
 // 	index:    8*size_of(uintptr) - 8,
 // 	kind:     5, // Typeid_Kind
 // 	named:    1,
@@ -425,7 +425,7 @@ Raw_Map :: struct {
 	// Map_Hash directly, though for consistency sake it's written as if it were
 	// an array of Map_Cell(Map_Hash).
 	data:      uintptr,   // 8-bytes on 64-bits, 4-bytes on 32-bits
-	len:       int,       // 8-bytes on 64-bits, 4-bytes on 32-bits
+	len:       uintptr,   // 8-bytes on 64-bits, 4-bytes on 32-bits
 	allocator: Allocator, // 16-bytes on 64-bits, 8-bytes on 32-bits
 }
 
@@ -471,7 +471,7 @@ Odin_OS_Type :: type_of(ODIN_OS)
 		arm32,
 		arm64,
 		wasm32,
-		wasm64,
+		wasm64p32,
 	}
 */
 Odin_Arch_Type :: type_of(ODIN_ARCH)
@@ -497,6 +497,16 @@ Odin_Build_Mode_Type :: type_of(ODIN_BUILD_MODE)
 	}
 */
 Odin_Endian_Type :: type_of(ODIN_ENDIAN)
+
+
+/*
+	// Defined internally by the compiler
+	Odin_Platform_Subtarget_Type :: enum int {
+		Default,
+		iOS,
+	}
+*/
+Odin_Platform_Subtarget_Type :: type_of(ODIN_PLATFORM_SUBTARGET)
 
 
 /////////////////////////////
@@ -566,7 +576,7 @@ __type_info_of :: proc "contextless" (id: typeid) -> ^Type_Info #no_bounds_check
 	return &type_table[n]
 }
 
-when !ODIN_DISALLOW_RTTI {
+when !ODIN_NO_RTTI {
 	typeid_base :: proc "contextless" (id: typeid) -> typeid {
 		ti := type_info_of(id)
 		ti = type_info_base(ti)
