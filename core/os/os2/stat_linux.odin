@@ -25,10 +25,11 @@ _fstat_internal :: proc(fd: int, allocator: runtime.Allocator) -> (File_Info, Er
 		size = s.size,
 		mode = 0,
 		is_dir = unix.S_ISDIR(s.mode),
-		modification_time = time.Time {s.modified.seconds},
-		access_time = time.Time {s.last_access.seconds},
+		modification_time = time.Time {s.modified.tv_sec * i64(time.Second) + s.modified.tv_nsec},
+		access_time = time.Time {s.last_access.tv_sec * i64(time.Second) + s.last_access.tv_nsec},
 		creation_time = time.Time{0}, // regular stat does not provide this
 	}
+	fi.creation_time = fi.modification_time
 
 	fi.name = filepath.base(fi.fullpath)
 	return fi, nil

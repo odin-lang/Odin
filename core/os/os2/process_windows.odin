@@ -38,8 +38,16 @@ _get_ppid :: proc() -> int {
 
 Process_Attributes_OS_Specific :: struct{}
 
-_find_process :: proc(pid: int) -> (^Process, Error) {
+_process_find :: proc(pid: int) -> (^Process, Error) {
 	return nil, nil
+}
+
+_process_get_state :: proc(p: Process) -> (Process_State, Error) {
+	return Process_State{}, nil
+}
+
+_process_get_attributes :: proc(p: Process) -> (Process_Attributes, Error) {
+	return Process_Attributes{}, nil
 }
 
 _process_start :: proc(name: string, argv: []string, attr: ^Process_Attributes) -> (Process, Error) {
@@ -54,10 +62,10 @@ _process_kill :: proc(p: ^Process) -> Error {
 	return nil
 }
 
-_process_signal :: proc(p: ^Process, sig: Signal) -> Error {
+_process_signal :: proc(sig: Signal, handler: Signal_Handler) -> Error {
 	return nil
 }
 
-_process_wait :: proc(p: ^Process) -> (Process_State, Error) {
-	return {}, nil
+_process_wait :: proc(p: ^Process, t: time.Duration) -> (Process_State, Error) {
+	return Process_State{}, nil
 }

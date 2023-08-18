@@ -1,6 +1,7 @@
 package unix
 
 import "core:intrinsics"
+import "core:c"
 
 // Linux has inconsistent system call numbering across architectures,
 // for largely historical reasons.  This attempts to provide a unified
@@ -675,8 +676,6 @@ when ODIN_ARCH == .amd64 {
 	SYS_landlock_create_ruleset : uintptr : 444
 	SYS_landlock_add_rule : uintptr : 445
 	SYS_landlock_restrict_self : uintptr : 446
-	
-	SIGCHLD :: 17
 } else when ODIN_ARCH == .i386 {
 	SYS_restart_syscall : uintptr : 0
 	SYS_exit : uintptr : 1
@@ -1727,11 +1726,6 @@ X_OK :: 1 // Test for execute permission
 W_OK :: 2 // Test for write permission
 R_OK :: 4 // Test for read permission
 
-File_Time :: struct {
-	seconds:     i64,
-	nanoseconds: i64,
-}
-
 Stat :: struct {
 	device_id:     u64, // ID of device containing file
 	serial:        u64, // File serial number
@@ -1745,13 +1739,210 @@ Stat :: struct {
 	block_size:    i64, // Optimal bllocksize for I/O
 	blocks:        i64, // Number of 512-byte blocks allocated
 
-	last_access:   File_Time, // Time of last access
-	modified:      File_Time, // Time of last modification
-	status_change: File_Time, // Time of last status change
+	last_access:   timespec, // Time of last access
+	modified:      timespec, // Time of last modification
+	status_change: timespec, // Time of last status change
 
 	_reserve1,
 	_reserve2,
 	_reserve3:     i64,
+}
+
+// signal numbers
+SIG_COUNT :: 64
+SIGHUP    :: 1
+SIGINT    :: 2
+SIGQUIT   :: 3
+SIGILL    :: 4
+SIGTRAP   :: 5
+SIGABRT   :: 6
+SIGIOT    :: SIGABRT
+SIGBUS    :: 7
+SIGFPE    :: 8
+SIGKILL   :: 9
+SIGUSR1   :: 10
+SIGSEGV   :: 11
+SIGUSR2   :: 12
+SIGPIPE   :: 13
+SIGALRM   :: 14
+SIGTERM   :: 15
+SIGSTKFLT :: 16
+SIGCHLD   :: 17
+SIGCONT   :: 18
+SIGSTOP   :: 19
+SIGTSTP   :: 20
+SIGTTIN   :: 21
+SIGTTOU   :: 22
+SIGURG    :: 23
+SIGXCPU   :: 24
+SIGXFSZ   :: 25
+SIGVTALRM :: 26
+SIGPROF   :: 27
+SIGWINCH  :: 28
+SIGIO     :: 29
+SIGPOLL   :: SIGIO
+SIGPWR    :: 30
+SIGSYS    :: 31
+
+// NOTE: The kernel defines SIGRTMIN as a constant, however,
+//       libc moves this around as a variable since the first
+//       2-3 real-time signals are used for the pthread
+//       implementation. It is recommended that users (of libc)
+//       do SIGRTMIN+x for real-time signals. Obviously, that
+//       that will not work here.
+SIGRTMIN  :: 32
+SIGRTMAX  :: SIG_COUNT
+
+// sa_flags
+SA_NOCLDSTOP      :: 0x00000001
+SA_NOCLDWAIT      :: 0x00000002
+SA_SIGINFO        :: 0x00000004
+SA_UNSUPPORTED    :: 0x00000400
+SA_EXPOSE_TAGBITS :: 0x00000800
+SA_RESTORER       :: 0x04000000
+SA_ONSTACK        :: 0x08000000
+SA_RESTART        :: 0x10000000
+SA_NODEFER        :: 0x40000000
+SA_RESETHAND      :: 0x80000000
+SA_NOMASK         :: SA_NODEFER
+SA_ONESHOT        :: SA_RESETHAND
+
+// special signal handler
+SIG_DFL :: uintptr(0)
+SIG_IGN :: uintptr(1)
+SIG_ERR :: ~uintptr(0) // -1
+
+// In the kernel, clock_t in _sigchld is i64 aligned to 4 on i386.
+// We cannot align primitives, so we just pack the struct when i386.
+when ODIN_ARCH == .i386 {
+	_Sigchld :: struct #packed {
+		_pid: i32,
+		_uid: i32,
+		si_status: i32,
+		si_utime: i64,
+		si_stime: i64,
+	}
+} else {
+	_Sigchld :: struct {
+		_pid: i32,
+		_uid: i32,
+		si_status: i32,
+		si_utime: i64,
+		si_stime: i64,
+	}
+}
+
+sigval_t :: struct #raw_union {
+	si_int: i32,
+	si_ptr: rawptr,
+}
+
+SIGINFO_SIZE :: 128
+
+// In the kernel, this struct is defined followed by macros
+// that allow the user to access the members as if it were a
+// giant struct without the unions. Here, we can actually
+// access the desired names with the `using _` convention.
+siginfo_t :: struct #align size_of(rawptr) {
+	si_signo: i32,
+	si_errno: i32,
+	si_code:  i32,
+	// _: i32 here on 64 bit
+	using _: struct #raw_union { // _sifields
+		_pad: [SIGINFO_SIZE - 2 * size_of(i32) - size_of(rawptr)]u8,
+		using _: struct {  // kill
+			si_pid: i32,
+			si_uid: i32,
+		},
+		using _: struct {  // timer
+			si_timerid: i32,
+			si_overrun: i32,
+			si_value: sigval_t,
+			si_sys_private: i32,
+		},
+		using _: struct {  // rt
+			_rt_pid: i32,
+			_rt_uid: i32,
+			using _: sigval_t,  // si_int, si_ptr
+		},
+		using _: _Sigchld,  // si_status, si_utime, si_stime
+		using _: struct {  // sigfault
+			si_addr: rawptr,
+			using _: struct #raw_union {
+				si_trapno: i32,
+				si_addr_lsb: i16,
+				using _: struct {  // addr_bnd
+					_dummy_bnd: [align_of(rawptr)]u8,
+					si_lower: rawptr,
+					si_upper: rawptr,
+				},
+				using _: struct {  // addr_pkey
+					_dummy_pkey: [align_of(rawptr)]u8,
+					si_pkey: u32,
+				},
+				using _: struct {  // perf
+					perf_data: c.ulong,
+					perf_type: u32,
+					perf_flags: u32,
+				},
+			},
+		},
+		using _: struct {  // sigpoll
+			si_band: c.long,
+			si_fd: i32,
+		},
+		using _: struct {  // sigsys
+			si_call_addr: rawptr,
+			si_syscall: i32,
+			si_arch: u32,
+		},
+	},
+}
+
+sighandler_t      :: #type proc "c" (sig: c.int)
+sighandler_info_t :: #type proc "c" (sig: c.int, info: ^siginfo_t, ucontext: rawptr)
+sigrestore_t      :: #type proc "c" () -> !
+sigset_t          :: u64
+
+Sigaction :: struct {
+	using _ :  struct #raw_union  {
+		sa_handler:   sighandler_t,
+		sa_sigaction: sighandler_info_t,
+		sa_special:   uintptr,
+	},
+	sa_flags:    c.ulong,
+	sa_restorer: sigrestore_t,
+	sa_mask:     sigset_t,
+}
+
+// wait options
+WNOHANG     :: 0x00000001
+WUNTRACED   :: 0x00000002
+WSTOPPED    :: WUNTRACED
+WEXITED     :: 0x00000004
+WCONTINUED  :: 0x00000008
+WNOWAIT     :: 0x01000000
+__WNOTHREAD :: 0x20000000
+__WALL      :: 0x40000000
+__WCLONE    :: 0x80000000
+
+Rusage :: struct {
+	ru_utime:    timeval, // user time used
+	ru_stime:    timeval, // system time used
+	ru_maxrss:   c.long,  // maximum resident set size
+	ru_ixrss:    c.long,  // integral shared memory size
+	ru_idrss:    c.long,  // integral unshared data size
+	ru_isrss:    c.long,  // integral unshared stack size
+	ru_minflt:   c.long,  // page reclaims
+	ru_majflt:   c.long,  // page faults
+	ru_nswap:    c.long,  // swaps
+	ru_inblock:  c.long,  // block input operations
+	ru_oublock:  c.long,  // block output operations
+	ru_msgsnd:   c.long,  // messages sent
+	ru_msgrcv:   c.long,  // messages received
+	ru_nsignals: c.long,  // signals received
+	ru_nvcsw:    c.long,  // voluntary context switches
+	ru_nivcsw:   c.long,  // involuntary "
 }
 
 // mmap flags
@@ -1943,12 +2134,14 @@ Perf_Flag :: enum u64 {
 	Sigtrap        = 37,
 }
 
-sys_exit :: proc "contextless" (exit_code: int) {
+sys_exit :: proc "contextless" (exit_code: int) -> ! {
 	intrinsics.syscall(SYS_exit, uintptr(exit_code))
+	unreachable()
 }
 
-sys_exit_group :: proc "contextless" (exit_code: int) {
+sys_exit_group :: proc "contextless" (exit_code: int) -> ! {
 	intrinsics.syscall(SYS_exit_group, uintptr(exit_code))
+	unreachable()
 }
 
 sys_getuid :: proc "contextless" () -> int {
@@ -2235,6 +2428,21 @@ sys_fork :: proc "contextless" () -> int {
 	}
 }
 
+sys_wait4 :: proc "contextless" (pid: int, wstatus: ^i32, options: int, rusage: ^Rusage) -> int {
+	return int(intrinsics.syscall(SYS_wait4, uintptr(pid), uintptr(wstatus), uintptr(options), uintptr(rusage)))
+}
+
+// first arg to sys_waitid
+Waitid_Which :: enum {
+	P_ALL,
+	P_PID,
+	P_PGID,
+	P_PIDFD,
+}
+sys_waitid :: proc "contextless" (which: Waitid_Which, id: int, siginfo: ^siginfo_t, options: int, rusage: ^Rusage) -> int {
+	return int(intrinsics.syscall(SYS_waitid, uintptr(which), uintptr(id), uintptr(siginfo), uintptr(options), uintptr(rusage)))
+}
+
 sys_pipe2 :: proc "contextless" (fds: rawptr, flags: int) -> int {
 	return int(intrinsics.syscall(SYS_pipe2, uintptr(fds), uintptr(flags)))
 }
@@ -2245,6 +2453,10 @@ sys_dup2 :: proc "contextless" (oldfd: int, newfd: int) -> int {
 	} else {
 		return int(intrinsics.syscall(SYS_dup3, uintptr(oldfd), uintptr(newfd), 0))
 	}
+}
+
+sys_kill :: proc "contextless" (pid, sig: int) -> int {
+	return int(intrinsics.syscall(SYS_kill, uintptr(pid), uintptr(sig)))
 }
 
 sys_ioctl :: proc "contextless" (fd, cmd, arg: uint) -> int {
@@ -2324,6 +2536,44 @@ sys_personality :: proc(persona: u64) -> int {
 
 sys_fcntl :: proc "contextless" (fd: int, cmd: int, arg: int) -> int {
 	return int(intrinsics.syscall(SYS_fcntl, uintptr(fd), uintptr(cmd), uintptr(arg)))
+}
+
+sys_rt_sigreturn :: proc "c" () -> ! {
+	intrinsics.syscall(SYS_rt_sigreturn)
+	unreachable()
+}
+
+sys_rt_sigaction :: proc "contextless" (sig: int, act, oact: ^Sigaction, sigsetsize: uint = size_of(sigset_t)) -> int {
+	// install sa_restorer if it wasn't defined
+	// NOTE: As far as I can tell, this is required for i386 and amd64. Looking
+	//       at the kernel source, it appears to be ignored for arm archs.
+	when ODIN_ARCH == .i386 || ODIN_ARCH == .amd64 {
+		act.sa_flags |= SA_RESTORER
+	}
+	if act != nil && act.sa_restorer == nil {
+		if act.sa_flags & SA_RESTORER != 0 {
+			act.sa_restorer = sys_rt_sigreturn
+		}
+	}
+	return int(intrinsics.syscall(SYS_rt_sigaction, uintptr(sig), uintptr(act), uintptr(oact), uintptr(sigsetsize)))
+}
+
+Sigprocmask_How :: enum {
+	SIG_BLOCK,
+	SIG_UNBLOCK,
+	SIG_SETMASK,
+}
+sys_rt_sigprocmask :: proc "contextless" (how: Sigprocmask_How, set, oldset: ^sigset_t, sigsetsize: uint = size_of(sigset_t)) -> int {
+	return int(intrinsics.syscall(SYS_rt_sigprocmask, uintptr(how), uintptr(set), uintptr(oldset), uintptr(sigsetsize)))
+}
+
+sys_rt_sigtimedwait :: proc "contextless" (uthese: ^sigset_t, uinfo: ^siginfo_t, uts: ^timespec, sigsetsize: uint = size_of(sigset_t)) -> int {
+	return int(intrinsics.syscall(SYS_rt_sigtimedwait, uintptr(uthese), uintptr(uinfo), uintptr(uts), uintptr(sigsetsize)))
+}
+
+// NOTE: pidfd_open is fairly new, so be prepared to handle ENOSYS
+sys_pidfd_open :: proc "contextless" (pid: int, flags: uint) -> int {
+	return int(intrinsics.syscall(SYS_pidfd_open, uintptr(pid), uintptr(flags)))
 }
 
 get_errno :: proc "contextless" (res: int) -> i32 {

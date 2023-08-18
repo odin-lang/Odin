@@ -20,21 +20,21 @@ _stdin : File = {
 		name = "/proc/self/fd/0",
 		fd = 0,
 		allocator = _file_allocator(),
-	}
+	},
 }
 _stdout : File = {
 	impl = {
 		name = "/proc/self/fd/1",
 		fd = 1,
 		allocator = _file_allocator(),
-	}
+	},
 }
 _stderr : File = {
 	impl = {
 		name = "/proc/self/fd/2",
 		fd = 2,
 		allocator = _file_allocator(),
-	}
+	},
 }
 
 _file_allocator :: proc() -> runtime.Allocator {
@@ -90,6 +90,10 @@ _destroy :: proc(f: ^File) -> Error {
 
 _close :: proc(f: ^File) -> Error {
 	res := unix.sys_close(f.impl.fd)
+	if res == -unix.EBADF { // avoid possible double free
+		return _get_platform_error(res)
+	}
+	_destroy(f) or_return
 	return _ok_or_error(res)
 }
 
@@ -265,12 +269,6 @@ _read_link :: proc(name: string, allocator: runtime.Allocator) -> (string, Error
 	return _read_link_cstr(name_cstr, allocator)
 }
 
-_unlink :: proc(name: string) -> Error {
-	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
-	name_cstr := strings.clone_to_cstring(name, context.temp_allocator)
-	return _ok_or_error(unix.sys_unlink(name_cstr))
-}
-
 _chdir :: proc(name: string) -> Error {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	name_cstr := strings.clone_to_cstring(name, context.temp_allocator)
@@ -313,7 +311,7 @@ _fchown :: proc(f: ^File, uid, gid: int) -> Error {
 _chtimes :: proc(name: string, atime, mtime: time.Time) -> Error {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	name_cstr := strings.clone_to_cstring(name, context.temp_allocator)
-	times := [2]unix.File_Time {
+	times := [2]unix.timespec {
 		{ atime._nsec, 0 },
 		{ mtime._nsec, 0 },
 	}
@@ -321,7 +319,7 @@ _chtimes :: proc(name: string, atime, mtime: time.Time) -> Error {
 }
 
 _fchtimes :: proc(f: ^File, atime, mtime: time.Time) -> Error {
-	times := [2]unix.File_Time {
+	times := [2]unix.timespec {
 		{ atime._nsec, 0 },
 		{ mtime._nsec, 0 },
 	}

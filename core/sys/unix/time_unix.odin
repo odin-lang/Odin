@@ -16,9 +16,14 @@ foreign libc {
 	nanosleep     :: proc(requested, remaining: ^timespec) -> c.int ---
 }
 
+timeval :: struct {
+	tv_sec:  c.long, // seconds
+	tv_usec: c.long, // microseconds
+}
+
 timespec :: struct {
-	tv_sec:  i64, // seconds
-	tv_nsec: i64, // nanoseconds
+	tv_sec:  c.long, // seconds
+	tv_nsec: c.long, // nanoseconds
 }
 
 when ODIN_OS == .OpenBSD {

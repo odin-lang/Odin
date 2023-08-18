@@ -2,10 +2,11 @@ package os2
 
 import "core:sync"
 import "core:time"
+import "core:c"
 
 args: []string = _alloc_command_line_arguments()
 
-exit :: proc "contextless" (code: int) {
+exit :: proc "contextless" (code: int) -> ! {
 	_exit(code)
 }
 
@@ -59,14 +60,38 @@ Process_State :: struct {
 	sys:         rawptr,
 }
 
-Signal :: #type proc()
+//Signal :: #type proc()
 
-Kill:      Signal = nil
-Interrupt: Signal = nil
+Signal :: enum {
+	Abort,
+	Floating_Point_Exception,
+	Illegal_Instruction,
+	Interrupt,
+	Segmentation_Fault,
+	Termination,
+}
 
+Signal_Handler_Proc :: #type proc "c" (c.int)
+Signal_Handler_Special :: enum {
+	Default,
+	Ignore,
+}
 
-find_process :: proc(pid: int) -> (^Process, Error) {
-	return _find_process(pid)
+Signal_Handler :: union {
+	Signal_Handler_Proc,
+	Signal_Handler_Special,
+}
+
+process_find :: proc(pid: int) -> (^Process, Error) {
+	return _process_find(pid)
+}
+
+process_get_state :: proc(p: Process) -> (Process_State, Error) {
+	return _process_get_state(p)
+}
+
+process_get_attributes :: proc(p: Process) -> (Process_Attributes, Error) {
+	return _process_get_attributes(p)
 }
 
 process_start :: proc(name: string, argv: []string, attr: ^Process_Attributes = nil) -> (Process, Error) {
@@ -81,14 +106,10 @@ process_kill :: proc(p: ^Process) -> Error {
 	return _process_kill(p)
 }
 
-process_signal :: proc(p: ^Process, sig: Signal) -> Error {
-	return _process_signal(p, sig)
+process_signal :: proc(sig: Signal, h: Signal_Handler) -> Error {
+	return _process_signal(sig, h)
 }
 
-process_wait :: proc(p: ^Process) -> (Process_State, Error) {
-	return _process_wait(p)
+process_wait :: proc(p: ^Process, t: time.Duration = time.MAX_DURATION) -> (Process_State, Error) {
+	return _process_wait(p, t)
 }
-
-
-
-
