@@ -15,7 +15,7 @@ gb_internal TB_Node *cg_control_region(cgProcedure *p, char const *name) {
 	n = -1 + gb_snprintf(new_name, n+11, "%.*s_%u", cast(int)n, name, p->control_regions.count);
 
 	TB_Node *region = tb_inst_region(p->func);
-	tb_inst_set_region_name(region, n, new_name);
+	tb_inst_set_region_name(p->module->mod, region, n, new_name);
 
 	GB_ASSERT(p->scope_index >= 0);
 	array_add(&p->control_regions, cgControlRegion{region, p->scope_index});
@@ -808,7 +808,7 @@ gb_internal cgAddr cg_add_local(cgProcedure *p, Type *type, Entity *e, bool zero
 		// NOTE(bill): for debugging purposes only
 		String name = e->token.string;
 		TB_DebugType *debug_type = cg_debug_type(p->module, type);
-		tb_node_append_attrib(local, tb_function_attrib_variable(p->func, name.len, cast(char const *)name.text, debug_type));
+		tb_function_attrib_variable(p->func, local, nullptr, name.len, cast(char const *)name.text, debug_type);
 	}
 
 	if (zero_init) {
@@ -842,7 +842,7 @@ gb_internal cgAddr cg_add_global(cgProcedure *p, Type *type, Entity *e) {
 		// NOTE(bill): for debugging purposes only
 		String name = e->token.string;
 		TB_DebugType *debug_type = cg_debug_type(p->module, type);
-		tb_node_append_attrib(local, tb_function_attrib_variable(p->func, name.len, cast(char const *)name.text, debug_type));
+		tb_function_attrib_variable(p->func, local, nullptr, name.len, cast(char const *)name.text, debug_type);
 	}
 
 	cgAddr addr = cg_addr(cg_value(local, alloc_type_pointer(type)));
@@ -2414,8 +2414,7 @@ gb_internal void cg_build_type_switch_stmt(cgProcedure *p, Ast *node) {
 
 			cg_add_entity(p->module, case_entity, ptr);
 			String name = case_entity->token.string;
-			TB_Attrib *dbg = tb_function_attrib_variable(p->func, name.len, cast(char const *)name.text, cg_debug_type(p->module, ct));
-			tb_node_append_attrib(ptr.node, dbg);
+			tb_function_attrib_variable(p->func, ptr.node, nullptr, name.len, cast(char const *)name.text, cg_debug_type(p->module, ct));
 		} else {
 			if (case_entity->flags & EntityFlag_Value) {
 				// by value
@@ -2547,7 +2546,7 @@ gb_internal void cg_build_mutable_value_decl(cgProcedure *p, Ast *node) {
 				    		// NOTE(bill): for debugging purposes only
 				    		String name = e->token.string;
 				    		TB_DebugType *debug_type = cg_debug_type(p->module, e->type);
-				    		tb_node_append_attrib(ptr, tb_function_attrib_variable(p->func, name.len, cast(char const *)name.text, debug_type));
+						tb_function_attrib_variable(p->func, ptr, nullptr, name.len, cast(char const *)name.text, debug_type);
 				    	}
 
 					cgAddr addr = cg_addr(inits[i]);

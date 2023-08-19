@@ -68,6 +68,8 @@ TB_API void tb_arena_realign(TB_Arena* restrict arena);
 
 TB_API bool tb_arena_is_empty(TB_Arena* arena);
 
+TB_API size_t tb_arena_current_size(TB_Arena* arena);
+
 // savepoints
 TB_API TB_ArenaSavepoint tb_arena_save(TB_Arena* arena);
 TB_API void tb_arena_restore(TB_Arena* arena, TB_ArenaSavepoint sp);

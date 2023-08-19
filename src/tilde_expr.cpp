@@ -55,7 +55,7 @@ gb_internal cgAddr cg_find_or_generate_context_ptr(cgProcedure *p) {
 	GB_ASSERT(pt->Proc.calling_convention != ProcCC_Odin);
 
 	cgAddr c = cg_add_local(p, t_context, nullptr, true);
-	tb_node_append_attrib(c.addr.node, tb_function_attrib_variable(p->func, -1, "context", cg_debug_type(p->module, t_context)));
+	tb_function_attrib_variable(p->func, c.addr.node, nullptr, -1, "context", cg_debug_type(p->module, t_context));
 	c.kind = cgAddr_Context;
 	// lb_emit_init_context(p, c);
 	cg_push_context_onto_stack(p, c);

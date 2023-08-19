@@ -45,7 +45,7 @@ gb_internal TB_DebugType *cg_debug_type_internal_record(cgModule *m, Type *type,
 				map_set(&m->debug_type_map, type, record);
 			}
 
-			TB_DebugType **fields = tb_debug_record_begin(record, bt->Struct.fields.count);
+			TB_DebugType **fields = tb_debug_record_begin(m->mod, record, bt->Struct.fields.count);
 			for_array(i, bt->Struct.fields) {
 				Entity *e = bt->Struct.fields[i];
 				Type *type = e->type;
@@ -82,7 +82,7 @@ gb_internal TB_DebugType *cg_debug_type_internal_record(cgModule *m, Type *type,
 					record_count += 1;
 				}
 			}
-			TB_DebugType **fields = tb_debug_record_begin(record, record_count);
+			TB_DebugType **fields = tb_debug_record_begin(m->mod, record, record_count);
 			for_array(i, bt->Tuple.variables) {
 				Entity *e = bt->Tuple.variables[i];
 				if (e->kind != Entity_Variable) {
@@ -120,7 +120,7 @@ gb_internal TB_DebugType *cg_debug_type_internal_record(cgModule *m, Type *type,
 			if (is_type_union_maybe_pointer(bt)) {
 				// NO TAG
 				GB_ASSERT(variant_count == 1);
-				TB_DebugType **fields = tb_debug_record_begin(record, variant_count);
+				TB_DebugType **fields = tb_debug_record_begin(m->mod, record, variant_count);
 				TB_DebugType *variant_type = cg_debug_type(m, bt->Union.variants[0]);
 				fields[0] = tb_debug_create_field(m->mod, variant_type, -1, "v0", 0);
 				tb_debug_record_end(
@@ -129,7 +129,7 @@ gb_internal TB_DebugType *cg_debug_type_internal_record(cgModule *m, Type *type,
 					cast(TB_CharUnits)type_align_of(type)
 				);
 			} else {
-				TB_DebugType **fields = tb_debug_record_begin(record, variant_count+1);
+				TB_DebugType **fields = tb_debug_record_begin(m->mod, record, variant_count+1);
 				for_array(i, bt->Union.variants) {
 					Type *v = bt->Union.variants[i];
 					TB_DebugType *variant_type = cg_debug_type(m, v);
@@ -214,7 +214,7 @@ gb_internal TB_DebugType *cg_debug_type_internal(cgModule *m, Type *type) {
 				TB_CharUnits elem_size = cast(TB_CharUnits)type_size_of(et);
 				TB_DebugType *elem = cg_debug_type(m, et);
 
-				TB_DebugType **fields = tb_debug_record_begin(record, 2);
+				TB_DebugType **fields = tb_debug_record_begin(m->mod, record, 2);
 				fields[0] = tb_debug_create_field(m->mod, elem, -1, "real", 0*elem_size);
 				fields[1] = tb_debug_create_field(m->mod, elem, -1, "imag", 1*elem_size);
 
@@ -232,7 +232,7 @@ gb_internal TB_DebugType *cg_debug_type_internal(cgModule *m, Type *type) {
 				TB_DebugType *elem = cg_debug_type(m, et);
 
 				// @QuaternionLayout
-				TB_DebugType **fields = tb_debug_record_begin(record, 4);
+				TB_DebugType **fields = tb_debug_record_begin(m->mod, record, 4);
 				fields[0] = tb_debug_create_field(m->mod, elem, -1, "imag", 0*elem_size);
 				fields[1] = tb_debug_create_field(m->mod, elem, -1, "jmag", 1*elem_size);
 				fields[2] = tb_debug_create_field(m->mod, elem, -1, "kmag", 2*elem_size);
@@ -253,7 +253,7 @@ gb_internal TB_DebugType *cg_debug_type_internal(cgModule *m, Type *type) {
 				String name = basic_types[type->Basic.kind].Basic.name;
 				TB_DebugType *record = tb_debug_create_struct(m->mod, name.len, cast(char const *)name.text);
 				// @QuaternionLayout
-				TB_DebugType **fields = tb_debug_record_begin(record, 2);
+				TB_DebugType **fields = tb_debug_record_begin(m->mod, record, 2);
 				fields[0] = tb_debug_create_field(m->mod, cg_debug_type(m, t_u8_ptr), -1, "data", 0*int_size);
 				fields[1] = tb_debug_create_field(m->mod, cg_debug_type(m, t_int),    -1, "len",  1*int_size);
 
@@ -268,7 +268,7 @@ gb_internal TB_DebugType *cg_debug_type_internal(cgModule *m, Type *type) {
 				String name = basic_types[type->Basic.kind].Basic.name;
 				TB_DebugType *record = tb_debug_create_struct(m->mod, name.len, cast(char const *)name.text);
 				// @QuaternionLayout
-				TB_DebugType **fields = tb_debug_record_begin(record, 2);
+				TB_DebugType **fields = tb_debug_record_begin(m->mod, record, 2);
 				fields[0] = tb_debug_create_field(m->mod, cg_debug_type(m, t_rawptr), -1, "data", 0*ptr_size);
 				fields[1] = tb_debug_create_field(m->mod, cg_debug_type(m, t_typeid), -1, "id",   1*ptr_size);
 
@@ -317,7 +317,7 @@ gb_internal TB_DebugType *cg_debug_type_internal(cgModule *m, Type *type) {
 		{
 			String name = {};
 			TB_DebugType *record = tb_debug_create_struct(m->mod, name.len, cast(char const *)name.text);
-			TB_DebugType **fields = tb_debug_record_begin(record, 2);
+			TB_DebugType **fields = tb_debug_record_begin(m->mod, record, 2);
 			fields[0] = tb_debug_create_field(m->mod, cg_debug_type(m, alloc_type_pointer(type->Slice.elem)), -1, "data", 0*int_size);
 			fields[1] = tb_debug_create_field(m->mod, cg_debug_type(m, t_int),    -1, "len",  1*int_size);
 
@@ -328,7 +328,7 @@ gb_internal TB_DebugType *cg_debug_type_internal(cgModule *m, Type *type) {
 		{
 			String name = {};
 			TB_DebugType *record = tb_debug_create_struct(m->mod, name.len, cast(char const *)name.text);
-			TB_DebugType **fields = tb_debug_record_begin(record, 4);
+			TB_DebugType **fields = tb_debug_record_begin(m->mod, record, 4);
 			fields[0] = tb_debug_create_field(m->mod, cg_debug_type(m, alloc_type_pointer(type->Slice.elem)), -1, "data", 0*int_size);
 			fields[1] = tb_debug_create_field(m->mod, cg_debug_type(m, t_int),       -1, "len",        1*int_size);
 			fields[2] = tb_debug_create_field(m->mod, cg_debug_type(m, t_int),       -1, "cap",        2*int_size);
@@ -468,7 +468,7 @@ gb_internal TB_DebugType *cg_debug_type_internal(cgModule *m, Type *type) {
 		{
 			String name = {};
 			TB_DebugType *record = tb_debug_create_struct(m->mod, name.len, cast(char const *)name.text);
-			TB_DebugType **fields = tb_debug_record_begin(record, 2);
+			TB_DebugType **fields = tb_debug_record_begin(m->mod, record, 2);
 			fields[0] = tb_debug_create_field(m->mod, cg_debug_type(m, alloc_type_pointer(type->SoaPointer.elem)), -1, "ptr", 0*int_size);
 			fields[1] = tb_debug_create_field(m->mod, cg_debug_type(m, t_int), -1, "offset",  1*int_size);
 

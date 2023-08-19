@@ -243,7 +243,7 @@ struct cgModule {
 	PtrMap<Type *, TB_Symbol *> map_cell_info_map;
 
 	// NOTE(bill): no need to protect this with a mutex
-	PtrMap<uintptr, TB_FileID> file_id_map; // Key: AstFile.id (i32 cast to uintptr)
+	PtrMap<uintptr, TB_SourceFile *> file_id_map; // Key: AstFile.id (i32 cast to uintptr)
 
 	std::atomic<u32> nested_type_name_guid;
 	std::atomic<u32> const_nil_guid;

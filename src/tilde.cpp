@@ -213,9 +213,9 @@ gb_internal cgAddr cg_addr_soa_variable(cgValue addr, cgValue index, Ast *index_
 gb_internal void cg_set_debug_pos_from_node(cgProcedure *p, Ast *node) {
 	if (node) {
 		TokenPos pos = ast_token(node).pos;
-		TB_FileID *file_id = map_get(&p->module->file_id_map, cast(uintptr)pos.file_id);
-		if (file_id) {
-			tb_inst_set_location(p->func, *file_id, pos.line);
+		TB_SourceFile **file = map_get(&p->module->file_id_map, cast(uintptr)pos.file_id);
+		if (file) {
+			tb_inst_set_location(p->func, *file, pos.line, pos.column);
 		}
 	}
 }
@@ -464,8 +464,9 @@ gb_internal cgModule *cg_module_create(Checker *c) {
 
 	for_array(id, global_files) {
 		if (AstFile *f = global_files[id]) {
-			char const *path = alloc_cstring(permanent_allocator(), f->fullpath);
-			map_set(&m->file_id_map, cast(uintptr)id, tb_file_create(m->mod, path));
+			char const *path = alloc_cstring(temporary_allocator(), f->fullpath);
+			TB_SourceFile *file = tb_get_source_file(m->mod, path);
+			map_set(&m->file_id_map, cast(uintptr)id, file);
 		}
 	}
 
