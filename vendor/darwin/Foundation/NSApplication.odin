@@ -1018,5 +1018,5 @@ Application_nextEvent :: proc "c" (
 
 @(objc_type = Application, objc_name = "sendEvent")
 Application_sendEvent :: proc "c" (self: ^Application, event: ^Event) {
-	msgSend(nil, self, "sendEvent", event)
+	msgSend(Event, self, "sendEvent", event)
 }
