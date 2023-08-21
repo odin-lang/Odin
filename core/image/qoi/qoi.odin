@@ -299,7 +299,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 					if length := int(data & 63) + 1; (length * img.channels) > len(pixels) {
 						return img, .Corrupt
 					} else {
-						#no_bounds_check for in 0..<length {
+						#no_bounds_check for _ in 0..<length {
 							copy(pixels, pix[:img.channels])
 							pixels = pixels[img.channels:]
 						}

@@ -1032,6 +1032,16 @@ gb_internal void init_universal(void) {
 	}
 
 	{
+		GlobalEnumValue values[Subtarget_COUNT] = {
+			{"Default", Subtarget_Default},
+			{"iOS",     Subtarget_iOS},
+		};
+
+		auto fields = add_global_enum_type(str_lit("Odin_Platform_Subtarget_Type"), values, gb_count_of(values));
+		add_global_enum_constant(fields, "ODIN_PLATFORM_SUBTARGET", selected_subtarget);
+	}
+
+	{
 		GlobalEnumValue values[ErrorPosStyle_COUNT] = {
 			{"Default", ErrorPosStyle_Default},
 			{"Unix",    ErrorPosStyle_Unix},
@@ -1069,6 +1079,7 @@ gb_internal void init_universal(void) {
 	add_global_bool_constant("ODIN_NO_RTTI",            bc->no_rtti);
 
 	add_global_bool_constant("ODIN_VALGRIND_SUPPORT",         bc->ODIN_VALGRIND_SUPPORT);
+	add_global_bool_constant("ODIN_TILDE",                    bc->tilde_backend);
 
 	add_global_constant("ODIN_COMPILE_TIMESTAMP", t_untyped_integer, exact_value_i64(odin_compile_timestamp()));
 
@@ -1137,6 +1148,7 @@ gb_internal void init_universal(void) {
 
 
 	t_u8_ptr       = alloc_type_pointer(t_u8);
+	t_u8_multi_ptr = alloc_type_multi_pointer(t_u8);
 	t_int_ptr      = alloc_type_pointer(t_int);
 	t_i64_ptr      = alloc_type_pointer(t_i64);
 	t_f64_ptr      = alloc_type_pointer(t_f64);
@@ -1603,29 +1615,27 @@ gb_internal void add_entity_use(CheckerContext *c, Ast *identifier, Entity *enti
 	if (entity == nullptr) {
 		return;
 	}
-	if (identifier != nullptr) {
-		if (identifier->kind != Ast_Ident) {
-			return;
-		}
-		Ast *empty_ident = nullptr;
-		entity->identifier.compare_exchange_strong(empty_ident, identifier);
-
-		identifier->Ident.entity = entity;
-
-		String dmsg = entity->deprecated_message;
-		if (dmsg.len > 0) {
-			warning(identifier, "%.*s is deprecated: %.*s", LIT(entity->token.string), LIT(dmsg));
-		}
-		String wmsg = entity->warning_message;
-		if (wmsg.len > 0) {
-			warning(identifier, "%.*s: %.*s", LIT(entity->token.string), LIT(wmsg));
-		}
-	}
-	entity->flags |= EntityFlag_Used;
 	add_declaration_dependency(c, entity);
+	entity->flags |= EntityFlag_Used;
 	if (entity_has_deferred_procedure(entity)) {
 		Entity *deferred = entity->Procedure.deferred_procedure.entity;
 		add_entity_use(c, nullptr, deferred);
+	}
+	if (identifier == nullptr || identifier->kind != Ast_Ident) {
+		return;
+	}
+	Ast *empty_ident = nullptr;
+	entity->identifier.compare_exchange_strong(empty_ident, identifier);
+
+	identifier->Ident.entity = entity;
+
+	String dmsg = entity->deprecated_message;
+	if (dmsg.len > 0) {
+		warning(identifier, "%.*s is deprecated: %.*s", LIT(entity->token.string), LIT(dmsg));
+	}
+	String wmsg = entity->warning_message;
+	if (wmsg.len > 0) {
+		warning(identifier, "%.*s: %.*s", LIT(entity->token.string), LIT(wmsg));
 	}
 }
 
@@ -1969,9 +1979,9 @@ gb_internal void add_type_info_type_internal(CheckerContext *c, Type *t) {
 		add_type_info_type_internal(c, bt->RelativePointer.base_integer);
 		break;
 
-	case Type_RelativeSlice:
-		add_type_info_type_internal(c, bt->RelativeSlice.slice_type);
-		add_type_info_type_internal(c, bt->RelativeSlice.base_integer);
+	case Type_RelativeMultiPointer:
+		add_type_info_type_internal(c, bt->RelativeMultiPointer.pointer_type);
+		add_type_info_type_internal(c, bt->RelativeMultiPointer.base_integer);
 		break;
 
 	case Type_Matrix:
@@ -2210,9 +2220,9 @@ gb_internal void add_min_dep_type_info(Checker *c, Type *t) {
 		add_min_dep_type_info(c, bt->RelativePointer.base_integer);
 		break;
 
-	case Type_RelativeSlice:
-		add_min_dep_type_info(c, bt->RelativeSlice.slice_type);
-		add_min_dep_type_info(c, bt->RelativeSlice.base_integer);
+	case Type_RelativeMultiPointer:
+		add_min_dep_type_info(c, bt->RelativeMultiPointer.pointer_type);
+		add_min_dep_type_info(c, bt->RelativeMultiPointer.base_integer);
 		break;
 
 	case Type_Matrix:
@@ -2332,7 +2342,9 @@ gb_internal void generate_minimum_dependency_set(Checker *c, Entity *start) {
 		str_lit("memory_equal"),
 		str_lit("memory_compare"),
 		str_lit("memory_compare_zero"),
+	);
 
+	FORCE_ADD_RUNTIME_ENTITIES(!build_context.tilde_backend,
 		// Extended data type internal procedures
 		str_lit("umodti3"),
 		str_lit("udivti3"),
@@ -2798,7 +2810,7 @@ gb_internal void init_core_type_info(Checker *c) {
 	t_type_info_bit_set          = find_core_type(c, str_lit("Type_Info_Bit_Set"));
 	t_type_info_simd_vector      = find_core_type(c, str_lit("Type_Info_Simd_Vector"));
 	t_type_info_relative_pointer = find_core_type(c, str_lit("Type_Info_Relative_Pointer"));
-	t_type_info_relative_slice   = find_core_type(c, str_lit("Type_Info_Relative_Slice"));
+	t_type_info_relative_multi_pointer = find_core_type(c, str_lit("Type_Info_Relative_Multi_Pointer"));
 	t_type_info_matrix           = find_core_type(c, str_lit("Type_Info_Matrix"));
 	t_type_info_soa_pointer      = find_core_type(c, str_lit("Type_Info_Soa_Pointer"));
 
@@ -2827,7 +2839,7 @@ gb_internal void init_core_type_info(Checker *c) {
 	t_type_info_bit_set_ptr          = alloc_type_pointer(t_type_info_bit_set);
 	t_type_info_simd_vector_ptr      = alloc_type_pointer(t_type_info_simd_vector);
 	t_type_info_relative_pointer_ptr = alloc_type_pointer(t_type_info_relative_pointer);
-	t_type_info_relative_slice_ptr   = alloc_type_pointer(t_type_info_relative_slice);
+	t_type_info_relative_multi_pointer_ptr = alloc_type_pointer(t_type_info_relative_multi_pointer);
 	t_type_info_matrix_ptr           = alloc_type_pointer(t_type_info_matrix);
 	t_type_info_soa_pointer_ptr      = alloc_type_pointer(t_type_info_soa_pointer);
 }

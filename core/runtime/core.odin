@@ -162,11 +162,11 @@ Type_Info_Simd_Vector :: struct {
 	count:      int,
 }
 Type_Info_Relative_Pointer :: struct {
-	pointer:      ^Type_Info,
+	pointer:      ^Type_Info, // ^T
 	base_integer: ^Type_Info,
 }
-Type_Info_Relative_Slice :: struct {
-	slice:        ^Type_Info,
+Type_Info_Relative_Multi_Pointer :: struct {
+	pointer:      ^Type_Info, // [^]T
 	base_integer: ^Type_Info,
 }
 Type_Info_Matrix :: struct {
@@ -219,7 +219,7 @@ Type_Info :: struct {
 		Type_Info_Bit_Set,
 		Type_Info_Simd_Vector,
 		Type_Info_Relative_Pointer,
-		Type_Info_Relative_Slice,
+		Type_Info_Relative_Multi_Pointer,
 		Type_Info_Matrix,
 		Type_Info_Soa_Pointer,
 	},
@@ -252,12 +252,12 @@ Typeid_Kind :: enum u8 {
 	Bit_Set,
 	Simd_Vector,
 	Relative_Pointer,
-	Relative_Slice,
+	Relative_Multi_Pointer,
 	Matrix,
 }
 #assert(len(Typeid_Kind) < 32)
 
-// Typeid_Bit_Field :: bit_field #align align_of(uintptr) {
+// Typeid_Bit_Field :: bit_field #align(align_of(uintptr)) {
 // 	index:    8*size_of(uintptr) - 8,
 // 	kind:     5, // Typeid_Kind
 // 	named:    1,
@@ -497,6 +497,16 @@ Odin_Build_Mode_Type :: type_of(ODIN_BUILD_MODE)
 	}
 */
 Odin_Endian_Type :: type_of(ODIN_ENDIAN)
+
+
+/*
+	// Defined internally by the compiler
+	Odin_Platform_Subtarget_Type :: enum int {
+		Default,
+		iOS,
+	}
+*/
+Odin_Platform_Subtarget_Type :: type_of(ODIN_PLATFORM_SUBTARGET)
 
 
 /////////////////////////////

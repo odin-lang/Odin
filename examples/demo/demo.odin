@@ -459,6 +459,27 @@ named_proc_return_parameters :: proc() {
 	fmt.println("foo2 =", foo2()) // 567 321
 }
 
+variadic_procedures :: proc() {
+	fmt.println("\n# variadic procedures")
+	sum :: proc(nums: ..int, init_value:= 0) -> (result: int) {
+		result = init_value
+		for n in nums {
+			result += n
+		}
+		return
+	}
+	fmt.println("sum(()) =", sum())
+	fmt.println("sum(1, 2) =", sum(1, 2))
+	fmt.println("sum(1, 2, 3, 4, 5) =", sum(1, 2, 3, 4, 5))
+	fmt.println("sum(1, 2, 3, 4, 5, init_value = 5) =", sum(1, 2, 3, 4, 5, init_value = 5))
+
+	// pass a slice as varargs
+	odds := []int{1, 3, 5}
+	fmt.println("odds =", odds)
+	fmt.println("sum(..odds) =", sum(..odds))
+	fmt.println("sum(..odds, init_value = 5) =", sum(..odds, init_value = 5))
+}
+
 
 explicit_procedure_overloading :: proc() {
 	fmt.println("\n# explicit procedure overloading")
@@ -539,7 +560,7 @@ struct_type :: proc() {
 	{
 		// Structs can tagged with different memory layout and alignment requirements:
 
-		a :: struct #align 4   {} // align to 4 bytes
+		a :: struct #align(4)  {} // align to 4 bytes
 		b :: struct #packed    {} // remove padding between fields
 		c :: struct #raw_union {} // all fields share the same offset (0). This is the same as C's union
 	}
@@ -1134,7 +1155,7 @@ threading_example :: proc() {
 		threads := make([dynamic]^thread.Thread, 0, len(prefix_table))
 		defer delete(threads)
 
-		for in prefix_table {
+		for _ in prefix_table {
 			if t := thread.create(worker_proc); t != nil {
 				t.init_context = context
 				t.user_index = len(threads)
@@ -1333,13 +1354,13 @@ partial_switch :: proc() {
 	{ // union
 		Foo :: union {int, bool}
 		f: Foo = 123
-		switch in f {
+		switch _ in f {
 		case int:  fmt.println("int")
 		case bool: fmt.println("bool")
 		case:
 		}
 
-		#partial switch in f {
+		#partial switch _ in f {
 		case bool: fmt.println("bool")
 		}
 	}
@@ -2024,12 +2045,11 @@ relative_data_types :: proc() {
 	fmt.println(ptr^)
 
 	arr := [3]int{1, 2, 3}
-	s := arr[:]
-	rel_slice: #relative(i16) []int
-	rel_slice = s
-	fmt.println(rel_slice)
-	fmt.println(rel_slice[:])
-	fmt.println(rel_slice[1])
+	multi_ptr: #relative(i16) [^]int
+	multi_ptr = &arr[0]
+	fmt.println(multi_ptr)
+	fmt.println(multi_ptr[:3])
+	fmt.println(multi_ptr[1])
 }
 
 or_else_operator :: proc() {
@@ -2463,6 +2483,7 @@ main :: proc() {
 		the_basics()
 		control_flow()
 		named_proc_return_parameters()
+		variadic_procedures()
 		explicit_procedure_overloading()
 		struct_type()
 		union_type()

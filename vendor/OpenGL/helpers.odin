@@ -5,7 +5,9 @@ package vendor_gl
 import "core:os"
 import "core:fmt"
 import "core:strings"
+import "core:runtime"
 _ :: fmt
+_ :: runtime
 
 Shader_Type :: enum i32 {
 	NONE = 0x0000,
@@ -47,8 +49,6 @@ get_last_error_message :: proc() -> (compile_message: string, compile_type: Shad
 // except for calling differently named GL functions
 // it's a bit ugly looking, but meh
 when GL_DEBUG {
-	import "core:runtime"
-	
 	@private
 	check_error :: proc(
 		id: u32, type: Shader_Type, status: u32,

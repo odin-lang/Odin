@@ -411,7 +411,7 @@ gb_internal void error_line_va(char const *fmt, va_list va) {
 
 gb_internal void error_no_newline_va(TokenPos const &pos, char const *fmt, va_list va) {
 	mutex_lock(&global_error_collector.mutex);
-	global_error_collector.count++;
+	global_error_collector.count.fetch_add(1);
 	// NOTE(bill): Duplicate error, skip it
 	if (pos.line == 0) {
 		error_out_coloured("Error: ", TerminalStyle_Normal, TerminalColour_Red);
@@ -425,7 +425,7 @@ gb_internal void error_no_newline_va(TokenPos const &pos, char const *fmt, va_li
 		error_out_va(fmt, va);
 	}
 	mutex_unlock(&global_error_collector.mutex);
-	if (global_error_collector.count > MAX_ERROR_COLLECTOR_COUNT()) {
+	if (global_error_collector.count.load() > MAX_ERROR_COLLECTOR_COUNT()) {
 		gb_exit(1);
 	}
 }

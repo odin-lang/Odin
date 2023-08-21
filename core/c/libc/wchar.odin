@@ -98,7 +98,7 @@ foreign libc {
 }
 
 // Large enough and aligned enough for any wide-spread in-use libc.
-mbstate_t :: struct #align 16 { _: [32]char, }
+mbstate_t :: struct #align(16) { _: [32]char, }
 
 // Odin does not have default argument promotion so the need for a separate type
 // here isn't necessary, though make it distinct just to be safe.

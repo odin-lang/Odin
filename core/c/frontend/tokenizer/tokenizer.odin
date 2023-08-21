@@ -127,7 +127,7 @@ advance_rune :: proc(t: ^Tokenizer) {
 }
 
 advance_rune_n :: proc(t: ^Tokenizer, n: int) {
-	for in 0..<n {
+	for _ in 0..<n {
 		advance_rune(t)
 	}
 }

@@ -18,7 +18,7 @@ foreign _ {
 // strictly conformant C implementation is 16 on the platforms we care about.
 // The choice of 4096 bytes for storage of this type is more than enough on all
 // relevant platforms.
-va_list :: struct #align 16 {
+va_list :: struct #align(16) {
 	_: [4096]u8,
 }
 

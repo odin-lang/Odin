@@ -1,9 +1,8 @@
 package objc_Foundation
 
+import "core:c"
+_ :: c
 when ODIN_OS == .Darwin {
-	import "core:c"
-	_ :: c
-
 	#assert(size_of(c.long)  == size_of(int))
 	#assert(size_of(c.ulong) == size_of(uint))
 }

@@ -200,7 +200,7 @@ peek :: proc(s: ^Scanner, n := 0) -> (ch: rune) {
 	ch = s.ch
 	if n > 0 {
 		prev_s := s^
-		for in 0..<n {
+		for _ in 0..<n {
 			next(s)
 		}
 		ch = s.ch
@@ -214,7 +214,7 @@ peek :: proc(s: ^Scanner, n := 0) -> (ch: rune) {
 peek_token :: proc(s: ^Scanner, n := 0) -> (tok: rune) {
 	assert(n >= 0)
 	prev_s := s^
-	for in 0..<n {
+	for _ in 0..<n {
 		tok = scan(s)
 	}
 	tok = scan(s)
