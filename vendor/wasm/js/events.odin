@@ -209,7 +209,7 @@ Event :: struct {
 	is_composing: bool,
 	is_trusted:   bool,
 
-	using data: struct #raw_union #align 8 {
+	using data: struct #raw_union #align(8) {
 		scroll: struct {
 			delta: [2]f64,
 		},
@@ -233,6 +233,8 @@ Event :: struct {
 
 			repeat: bool,
 
+			_key_len:  int,
+			_code_len: int,
 			_key_buf:  [KEYBOARD_MAX_KEY_SIZE]byte,
 			_code_buf: [KEYBOARD_MAX_KEY_SIZE]byte,
 		},
@@ -343,7 +345,15 @@ do_event_callback :: proc(user_data: rawptr, callback: proc(e: Event)) {
 			user_data = user_data,
 			callback  = callback,
 		}
+
+
 		init_event_raw(&event)
+
+		if event.kind == .Key_Up || event.kind == .Key_Down || event.kind == .Key_Press {
+			event.key.key = string(event.key._key_buf[:event.key._key_len]) 
+			event.key.code = string(event.key._code_buf[:event.key._code_len]) 
+		}
+
 		callback(event)
 	}
 }

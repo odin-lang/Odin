@@ -133,7 +133,7 @@ arena_alloc :: proc(arena: ^Arena, size: uint, alignment: uint, loc := #caller_l
 	return
 }
 
-// Resets the memory of a Static or Buffer arena to a specific `pos`ition (offset) and zeroes the previously used memory.
+// Resets the memory of a Static or Buffer arena to a specific `position` (offset) and zeroes the previously used memory.
 arena_static_reset_to :: proc(arena: ^Arena, pos: uint, loc := #caller_location) -> bool {
 	sync.mutex_guard(&arena.mutex)
 

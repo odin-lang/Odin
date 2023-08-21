@@ -87,7 +87,7 @@ MAP_CACHE_LINE_SIZE :: 1 << MAP_CACHE_LINE_LOG2
 //
 // In the optimal case, len(Map_Cell(T){}.data) = 1 so the cell array can be treated
 // as a regular array of T, which is the case for hashes.
-Map_Cell :: struct($T: typeid) #align MAP_CACHE_LINE_SIZE {
+Map_Cell :: struct($T: typeid) #align(MAP_CACHE_LINE_SIZE) {
 	data: [MAP_CACHE_LINE_SIZE / size_of(T) when 0 < size_of(T) && size_of(T) < MAP_CACHE_LINE_SIZE else 1]T,
 }
 

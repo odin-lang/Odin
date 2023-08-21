@@ -416,7 +416,7 @@ rel :: proc(base_path, target_path: string, allocator := context.allocator) -> (
 		}
 		buf := make([]byte, size)
 		n := copy(buf, "..")
-		for in 0..<seps {
+		for _ in 0..<seps {
 			buf[n] = SEPARATOR
 			copy(buf[n+1:], "..")
 			n += 3

@@ -113,8 +113,11 @@ _buffer_grow :: proc(b: ^Buffer, n: int) -> int {
 	if i, ok := _buffer_try_grow(b, n); ok {
 		return i
 	}
+
 	if b.buf == nil && n <= SMALL_BUFFER_SIZE {
-		b.buf = make([dynamic]byte, n, SMALL_BUFFER_SIZE)
+		// Fixes #2756 by preserving allocator if already set on Buffer via init_buffer_allocator
+		reserve(&b.buf, SMALL_BUFFER_SIZE)
+		resize(&b.buf, n)
 		return 0
 	}
 

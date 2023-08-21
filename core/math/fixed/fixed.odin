@@ -29,12 +29,12 @@ Fixed52_12 :: distinct Fixed(i64, 12)
 
 
 init_from_f64 :: proc(x: ^$T/Fixed($Backing, $Fraction_Width), val: f64) {
-	i, f := math.modf(val)
+	i, f := math.modf(math.abs(val))
 	x.i  = Backing(f * (1<<Fraction_Width))
 	x.i &= 1<<Fraction_Width - 1
 	x.i |= Backing(i) << Fraction_Width
+	if val < 0 do x.i *= -1
 }
-
 
 init_from_parts :: proc(x: ^$T/Fixed($Backing, $Fraction_Width), integer, fraction: Backing) {
 	i, f := math.modf(val)
@@ -44,9 +44,11 @@ init_from_parts :: proc(x: ^$T/Fixed($Backing, $Fraction_Width), integer, fracti
 }
 
 to_f64 :: proc(x: $T/Fixed($Backing, $Fraction_Width)) -> f64 {
-	res := f64(x.i >> Fraction_Width)
-	res += f64(x.i & (1<<Fraction_Width-1)) / f64(1<<Fraction_Width)
-	return res
+	sign := -1.0 if x.i < 0 else 1.0
+	num := math.abs(x.i)
+	res := f64(num >> Fraction_Width)
+	res += f64(num & (1<<Fraction_Width-1)) / f64(1<<Fraction_Width)
+	return res * sign
 }
 
 

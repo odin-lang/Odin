@@ -595,7 +595,7 @@ Output:
 	a...b...c
 
 */
-join :: proc(a: []string, sep: string, allocator := context.allocator) -> (res: string, err: mem.Allocator_Error) #optional_allocator_error {
+join :: proc(a: []string, sep: string, allocator := context.allocator, loc := #caller_location) -> (res: string, err: mem.Allocator_Error) #optional_allocator_error {
 	if len(a) == 0 {
 		return "", nil
 	}
@@ -605,7 +605,7 @@ join :: proc(a: []string, sep: string, allocator := context.allocator) -> (res: 
 		n += len(s)
 	}
 
-	b := make([]byte, n, allocator) or_return
+	b := make([]byte, n, allocator, loc) or_return
 	i := copy(b, a[0])
 	for s in a[1:] {
 		i += copy(b[i:], sep)
@@ -659,7 +659,7 @@ Output:
 	abc
 
 */
-concatenate :: proc(a: []string, allocator := context.allocator) -> (res: string, err: mem.Allocator_Error) #optional_allocator_error {
+concatenate :: proc(a: []string, allocator := context.allocator, loc := #caller_location) -> (res: string, err: mem.Allocator_Error) #optional_allocator_error {
 	if len(a) == 0 {
 		return "", nil
 	}
@@ -668,7 +668,7 @@ concatenate :: proc(a: []string, allocator := context.allocator) -> (res: string
 	for s in a {
 		n += len(s)
 	}
-	b := make([]byte, n, allocator) or_return
+	b := make([]byte, n, allocator, loc) or_return
 	i := 0
 	for s in a {
 		i += copy(b[i:], s)
@@ -724,7 +724,7 @@ Output:
 	example
 
 */
-cut :: proc(s: string, rune_offset := int(0), rune_length := int(0), allocator := context.allocator) -> (res: string, err: mem.Allocator_Error) #optional_allocator_error {
+cut :: proc(s: string, rune_offset := int(0), rune_length := int(0), allocator := context.allocator, loc := #caller_location) -> (res: string, err: mem.Allocator_Error) #optional_allocator_error {
 	s := s; rune_length := rune_length
 	context.allocator = allocator
 
@@ -752,7 +752,7 @@ cut :: proc(s: string, rune_offset := int(0), rune_length := int(0), allocator :
 	// But we do know it's bounded by the number of runes * 4 bytes,
 	// and can be no more than the size of the input string.
 	bytes_needed := min(rune_length * 4, len(s))
-	buf := make([]u8, bytes_needed) or_return
+	buf := make([]u8, bytes_needed, allocator, loc) or_return
 
 	byte_offset := 0
 	for i := 0; i < rune_count; i += 1 {
@@ -796,7 +796,7 @@ Returns:
 - err: An optional allocator error if one occured, `nil` otherwise
 */
 @private
-_split :: proc(s_, sep: string, sep_save, n_: int, allocator := context.allocator) -> (res: []string, err: mem.Allocator_Error) {
+_split :: proc(s_, sep: string, sep_save, n_: int, allocator := context.allocator, loc := #caller_location) -> (res: []string, err: mem.Allocator_Error) {
 	s, n := s_, n_
 
 	if n == 0 {
@@ -809,7 +809,7 @@ _split :: proc(s_, sep: string, sep_save, n_: int, allocator := context.allocato
 			n = l
 		}
 
-		res := make([]string, n, allocator) or_return
+		res := make([]string, n, allocator, loc) or_return
 		for i := 0; i < n-1; i += 1 {
 			_, w := utf8.decode_rune_in_string(s)
 			res[i] = s[:w]
@@ -825,7 +825,7 @@ _split :: proc(s_, sep: string, sep_save, n_: int, allocator := context.allocato
 		n = count(s, sep) + 1
 	}
 
-	res = make([]string, n, allocator) or_return
+	res = make([]string, n, allocator, loc) or_return
 
 	n -= 1
 
@@ -1965,14 +1965,14 @@ Output:
 	abcabc
 
 */
-repeat :: proc(s: string, count: int, allocator := context.allocator) -> (res: string, err: mem.Allocator_Error) #optional_allocator_error {
+repeat :: proc(s: string, count: int, allocator := context.allocator, loc := #caller_location) -> (res: string, err: mem.Allocator_Error) #optional_allocator_error {
 	if count < 0 {
 		panic("strings: negative repeat count")
 	} else if count > 0 && (len(s)*count)/count != len(s) {
 		panic("strings: repeat count will cause an overflow")
 	}
 
-	b := make([]byte, len(s)*count, allocator) or_return
+	b := make([]byte, len(s)*count, allocator, loc) or_return
 	i := copy(b, s)
 	for i < len(b) { // 2^N trick to reduce the need to copy
 		copy(b[i:], b[:i])
@@ -2052,7 +2052,7 @@ Output:
 	zzzz true
 
 */
-replace :: proc(s, old, new: string, n: int, allocator := context.allocator) -> (output: string, was_allocation: bool) {
+replace :: proc(s, old, new: string, n: int, allocator := context.allocator, loc := #caller_location) -> (output: string, was_allocation: bool) {
 	if old == new || n == 0 {
 		was_allocation = false
 		output = s
@@ -2068,7 +2068,7 @@ replace :: proc(s, old, new: string, n: int, allocator := context.allocator) -> 
 	}
 
 
-	t := make([]byte, len(s) + byte_count*(len(new) - len(old)), allocator)
+	t := make([]byte, len(s) + byte_count*(len(new) - len(old)), allocator, loc)
 	was_allocation = true
 
 	w := 0
@@ -2637,7 +2637,7 @@ Output:
 	["testing", "this", "out", "nice", "done", "last"]
 
 */
-split_multi :: proc(s: string, substrs: []string, allocator := context.allocator) -> (res: []string, err: mem.Allocator_Error) #optional_allocator_error #no_bounds_check {
+split_multi :: proc(s: string, substrs: []string, allocator := context.allocator, loc := #caller_location) -> (res: []string, err: mem.Allocator_Error) #optional_allocator_error #no_bounds_check {
 	if s == "" || len(substrs) <= 0 {
 		return nil, nil
 	}
@@ -2660,7 +2660,7 @@ split_multi :: proc(s: string, substrs: []string, allocator := context.allocator
 		it = it[i+w:]
 	}
 
-	results := make([dynamic]string, 0, n, allocator) or_return
+	results := make([dynamic]string, 0, n, allocator, loc) or_return
 	{
 		it := s
 		for len(it) > 0 {
@@ -2825,10 +2825,10 @@ Output:
 	abcxyz zyxcba
 
 */
-reverse :: proc(s: string, allocator := context.allocator) -> (res: string, err: mem.Allocator_Error) #optional_allocator_error {
+reverse :: proc(s: string, allocator := context.allocator, loc := #caller_location) -> (res: string, err: mem.Allocator_Error) #optional_allocator_error {
 	str := s
 	n := len(str)
-	buf := make([]byte, n) or_return
+	buf := make([]byte, n, allocator, loc) or_return
 	i := n
 
 	for len(str) > 0 {
@@ -3107,7 +3107,7 @@ Returns:
 - res: A slice of substrings of the input string, or an empty slice if the input string only contains white space
 - err: An optional allocator error if one occured, `nil` otherwise
 */
-fields :: proc(s: string, allocator := context.allocator) -> (res: []string, err: mem.Allocator_Error) #optional_allocator_error #no_bounds_check {
+fields :: proc(s: string, allocator := context.allocator, loc := #caller_location) -> (res: []string, err: mem.Allocator_Error) #optional_allocator_error #no_bounds_check {
 	n := 0
 	was_space := 1
 	set_bits := u8(0)
@@ -3129,7 +3129,7 @@ fields :: proc(s: string, allocator := context.allocator) -> (res: []string, err
 		return nil, nil
 	}
 
-	a := make([]string, n, allocator) or_return
+	a := make([]string, n, allocator, loc) or_return
 	na := 0
 	field_start := 0
 	i := 0
@@ -3171,8 +3171,8 @@ Returns:
 - res: A slice of substrings of the input string, or an empty slice if all code points in the input string satisfy the predicate or if the input string is empty
 - err: An optional allocator error if one occured, `nil` otherwise
 */
-fields_proc :: proc(s: string, f: proc(rune) -> bool, allocator := context.allocator) -> (res: []string, err: mem.Allocator_Error) #optional_allocator_error #no_bounds_check {
-	substrings := make([dynamic]string, 0, 32, allocator) or_return
+fields_proc :: proc(s: string, f: proc(rune) -> bool, allocator := context.allocator, loc := #caller_location) -> (res: []string, err: mem.Allocator_Error) #optional_allocator_error #no_bounds_check {
+	substrings := make([dynamic]string, 0, 32, allocator, loc) or_return
 
 	start, end := -1, -1
 	for r, offset in s {
@@ -3252,7 +3252,7 @@ Returns:
 
 NOTE: This implementation is a single-row-version of the Wagner–Fischer algorithm, based on C code by Martin Ettl.
 */
-levenshtein_distance :: proc(a, b: string, allocator := context.allocator) -> (res: int, err: mem.Allocator_Error) #optional_allocator_error {
+levenshtein_distance :: proc(a, b: string, allocator := context.allocator, loc := #caller_location) -> (res: int, err: mem.Allocator_Error) #optional_allocator_error {
 	LEVENSHTEIN_DEFAULT_COSTS: []int : {
 		0,   1,   2,   3,   4,   5,   6,   7,   8,   9,
 		10,  11,  12,  13,  14,  15,  16,  17,  18,  19,
@@ -3275,7 +3275,7 @@ levenshtein_distance :: proc(a, b: string, allocator := context.allocator) -> (r
 	costs: []int
 
 	if n + 1 > len(LEVENSHTEIN_DEFAULT_COSTS) {
-		costs = make([]int, n + 1, allocator) or_return
+		costs = make([]int, n + 1, allocator, loc) or_return
 		for k in 0..=n {
 			costs[k] = k
 		}

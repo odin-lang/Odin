@@ -856,8 +856,8 @@ gb_internal i64 check_distance_between_types(CheckerContext *c, Operand *operand
 		}
 	}
 
-	if (is_type_relative_slice(dst)) {
-		i64 score = check_distance_between_types(c, operand, dst->RelativeSlice.slice_type);
+	if (is_type_relative_multi_pointer(dst)) {
+		i64 score = check_distance_between_types(c, operand, dst->RelativeMultiPointer.pointer_type);
 		if (score >= 0) {
 			return score+2;
 		}
@@ -1005,8 +1005,8 @@ gb_internal AstPackage *get_package_of_type(Type *type) {
 		case Type_RelativePointer:
 			type = type->RelativePointer.pointer_type;
 			continue;
-		case Type_RelativeSlice:
-			type = type->RelativeSlice.slice_type;
+		case Type_RelativeMultiPointer:
+			type = type->RelativeMultiPointer.pointer_type;
 			continue;
 		}
 		return nullptr;
@@ -5092,27 +5092,6 @@ gb_internal bool check_identifier_exists(Scope *s, Ast *node, bool nested = fals
 	return false;
 }
 
-gb_internal isize add_dependencies_from_unpacking(CheckerContext *c, Entity **lhs, isize lhs_count, isize tuple_index, isize tuple_count) {
-	if (lhs != nullptr && c->decl != nullptr) {
-		for (isize j = 0; (tuple_index + j) < lhs_count && j < tuple_count; j++) {
-			Entity *e = lhs[tuple_index + j];
-			if (e != nullptr) {
-				DeclInfo *decl = decl_info_of_entity(e);
-				if (decl != nullptr) {
-					rw_mutex_shared_lock(&decl->deps_mutex);
-					rw_mutex_lock(&c->decl->deps_mutex);
-					for (Entity *dep : decl->deps) {
-						ptr_set_add(&c->decl->deps, dep);
-					}
-					rw_mutex_unlock(&c->decl->deps_mutex);
-					rw_mutex_shared_unlock(&decl->deps_mutex);
-				}
-			}
-		}
-	}
-	return tuple_count;
-}
-
 gb_internal bool check_no_copy_assignment(Operand const &o, String const &context) {
 	if (o.type && is_type_no_copy(o.type)) {
 		Ast *expr = unparen_expr(o.expr);
@@ -5220,6 +5199,31 @@ enum UnpackFlag : u32 {
 
 
 gb_internal bool check_unpack_arguments(CheckerContext *ctx, Entity **lhs, isize lhs_count, Array<Operand> *operands, Slice<Ast *> const &rhs_arguments, UnpackFlags flags) {
+	auto const &add_dependencies_from_unpacking = [](CheckerContext *c, Entity **lhs, isize lhs_count, isize tuple_index, isize tuple_count) -> isize {
+		if (lhs == nullptr || c->decl == nullptr) {
+			return tuple_count;
+		}
+		for (isize j = 0; (tuple_index + j) < lhs_count && j < tuple_count; j++) {
+			Entity *e = lhs[tuple_index + j];
+			if (e == nullptr) {
+				continue;
+			}
+			DeclInfo *decl = decl_info_of_entity(e);
+			if (decl == nullptr) {
+				continue;
+			}
+			rw_mutex_shared_lock(&decl->deps_mutex);
+			rw_mutex_lock(&c->decl->deps_mutex);
+			for (Entity *dep : decl->deps) {
+				ptr_set_add(&c->decl->deps, dep);
+			}
+			rw_mutex_unlock(&c->decl->deps_mutex);
+			rw_mutex_shared_unlock(&decl->deps_mutex);
+		}
+		return tuple_count;
+	};
+
+
 	bool allow_ok    = (flags & UnpackFlag_AllowOk) != 0;
 	bool is_variadic = (flags & UnpackFlag_IsVariadic) != 0;
 	bool allow_undef = (flags & UnpackFlag_AllowUndef) != 0;
@@ -5474,6 +5478,8 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 
 	auto variadic_operands = slice(slice_from_array(positional_operands), positional_operand_count, positional_operands.count);
 
+	bool named_variadic_param = false;
+
 	if (named_operands.count != 0) {
 		GB_ASSERT(ce->split_args->named.count == named_operands.count);
 		for_array(i, ce->split_args->named) {
@@ -5498,6 +5504,9 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 				}
 				err = CallArgumentError_ParameterNotFound;
 				continue;
+			}
+			if (pt->variadic && param_index == pt->variadic_index) {
+				named_variadic_param = true;
 			}
 			if (visited[param_index]) {
 				if (show_error) {
@@ -5700,11 +5709,6 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 				}
 				continue;
 			}
-
-			if (param_is_variadic) {
-				continue;
-			}
-
 			score += eval_param_and_score(c, o, e->type, err, param_is_variadic, e, show_error);
 		}
 	}
@@ -7154,6 +7158,7 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 				c->decl->defer_used += 1;
 			}
 		}
+		add_entity_use(c, operand->expr, initial_entity);
 	}
 
 	if (operand->mode != Addressing_ProcGroup) {
@@ -7361,11 +7366,11 @@ gb_internal bool check_set_index_data(Operand *o, Type *t, bool indirection, i64
 		}
 		return true;
 
-	case Type_RelativeSlice:
+	case Type_RelativeMultiPointer:
 		{
-			Type *slice_type = base_type(t->RelativeSlice.slice_type);
-			GB_ASSERT(slice_type->kind == Type_Slice);
-			o->type = slice_type->Slice.elem;
+			Type *pointer_type = base_type(t->RelativeMultiPointer.pointer_type);
+			GB_ASSERT(pointer_type->kind == Type_MultiPointer);
+			o->type = pointer_type->MultiPointer.elem;
 			if (o->mode != Addressing_Constant) {
 				o->mode = Addressing_Variable;
 			}
@@ -7753,7 +7758,10 @@ gb_internal void add_constant_switch_case(CheckerContext *ctx, SeenMap *seen, Op
 		multi_map_get_all(seen, key, taps);
 		for (isize i = 0; i < count; i++) {
 			TypeAndToken tap = taps[i];
-			if (!are_types_identical(operand.type, tap.type)) {
+			Operand to = {};
+			to.mode = Addressing_Value;
+			to.type = tap.type;
+			if (!check_is_assignable_to_with_score(ctx, &to, operand.type, nullptr)) {
 				continue;
 			}
 
@@ -7796,20 +7804,8 @@ gb_internal void add_to_seen_map(CheckerContext *ctx, SeenMap *seen, TokenKind u
 				break;
 			}
 
-			bool found = false;
-			for (Entity *f : bt->Enum.fields) {
-				GB_ASSERT(f->kind == Entity_Constant);
-
-				i64 fv = exact_value_to_i64(f->Constant.value);
-				if (fv == vi) {
-					found = true;
-					break;
-				}
-			}
-			if (found) {
-				v.value = exact_value_i64(vi);
-				add_constant_switch_case(ctx, seen, v);
-			}
+			v.value = exact_value_i64(vi);
+			add_constant_switch_case(ctx, seen, v);
 		}
 	} else {
 		add_constant_switch_case(ctx, seen, lhs);
@@ -9497,14 +9493,14 @@ gb_internal ExprKind check_index_expr(CheckerContext *c, Operand *o, Ast *node, 
 
 	if (is_const) {
 		if (is_type_array(t)) {
-			// OKay
+			// Okay
 		} else if (is_type_slice(t)) {
 			// Okay
 		} else if (is_type_enumerated_array(t)) {
 			// Okay
 		} else if (is_type_string(t)) {
 			// Okay
-		} else if (is_type_relative_slice(t)) {
+		} else if (is_type_relative_multi_pointer(t)) {
 			// Okay
 		} else if (is_type_matrix(t)) {
 			// Okay
@@ -9642,17 +9638,9 @@ gb_internal ExprKind check_slice_expr(CheckerContext *c, Operand *o, Ast *node, 
 		}
 		break;
 
-	case Type_RelativeSlice:
+	case Type_RelativeMultiPointer:
 		valid = true;
-		o->type = t->RelativeSlice.slice_type;
-		if (o->mode != Addressing_Variable) {
-			gbString str = expr_to_string(node);
-			error(node, "Cannot relative slice '%s', as value is not addressable", str);
-			gb_string_free(str);
-			o->mode = Addressing_Invalid;
-			o->expr = node;
-			return kind;
-		}
+		o->type = type_deref(o->type);
 		break;
 
 	case Type_EnumeratedArray:
@@ -9731,7 +9719,18 @@ gb_internal ExprKind check_slice_expr(CheckerContext *c, Operand *o, Ast *node, 
 			x[i:n] -> []T
 		*/
 		o->type = alloc_type_slice(t->MultiPointer.elem);
+	} else if (t->kind == Type_RelativeMultiPointer && se->high != nullptr) {
+		/*
+			x[:]   -> [^]T
+			x[i:]  -> [^]T
+			x[:n]  -> []T
+			x[i:n] -> []T
+		*/
+		Type *pointer_type = base_type(t->RelativeMultiPointer.pointer_type);
+		GB_ASSERT(pointer_type->kind == Type_MultiPointer);
+		o->type = alloc_type_slice(pointer_type->MultiPointer.elem);
 	}
+
 
 	o->mode = Addressing_Value;
 

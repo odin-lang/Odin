@@ -8,35 +8,35 @@ _ :: intrinsics
 
 Type_Info :: runtime.Type_Info
 
-Type_Info_Named            :: runtime.Type_Info_Named
-Type_Info_Integer          :: runtime.Type_Info_Integer
-Type_Info_Rune             :: runtime.Type_Info_Rune
-Type_Info_Float            :: runtime.Type_Info_Float
-Type_Info_Complex          :: runtime.Type_Info_Complex
-Type_Info_Quaternion       :: runtime.Type_Info_Quaternion
-Type_Info_String           :: runtime.Type_Info_String
-Type_Info_Boolean          :: runtime.Type_Info_Boolean
-Type_Info_Any              :: runtime.Type_Info_Any
-Type_Info_Type_Id          :: runtime.Type_Info_Type_Id
-Type_Info_Pointer          :: runtime.Type_Info_Pointer
-Type_Info_Multi_Pointer    :: runtime.Type_Info_Multi_Pointer
-Type_Info_Procedure        :: runtime.Type_Info_Procedure
-Type_Info_Array            :: runtime.Type_Info_Array
-Type_Info_Enumerated_Array :: runtime.Type_Info_Enumerated_Array
-Type_Info_Dynamic_Array    :: runtime.Type_Info_Dynamic_Array
-Type_Info_Slice            :: runtime.Type_Info_Slice
-Type_Info_Parameters       :: runtime.Type_Info_Parameters
-Type_Info_Tuple            :: runtime.Type_Info_Parameters
-Type_Info_Struct           :: runtime.Type_Info_Struct
-Type_Info_Union            :: runtime.Type_Info_Union
-Type_Info_Enum             :: runtime.Type_Info_Enum
-Type_Info_Map              :: runtime.Type_Info_Map
-Type_Info_Bit_Set          :: runtime.Type_Info_Bit_Set
-Type_Info_Simd_Vector      :: runtime.Type_Info_Simd_Vector
-Type_Info_Relative_Pointer :: runtime.Type_Info_Relative_Pointer
-Type_Info_Relative_Slice   :: runtime.Type_Info_Relative_Slice
-Type_Info_Matrix           :: runtime.Type_Info_Matrix
-Type_Info_Soa_Pointer      :: runtime.Type_Info_Soa_Pointer
+Type_Info_Named                  :: runtime.Type_Info_Named
+Type_Info_Integer                :: runtime.Type_Info_Integer
+Type_Info_Rune                   :: runtime.Type_Info_Rune
+Type_Info_Float                  :: runtime.Type_Info_Float
+Type_Info_Complex                :: runtime.Type_Info_Complex
+Type_Info_Quaternion             :: runtime.Type_Info_Quaternion
+Type_Info_String                 :: runtime.Type_Info_String
+Type_Info_Boolean                :: runtime.Type_Info_Boolean
+Type_Info_Any                    :: runtime.Type_Info_Any
+Type_Info_Type_Id                :: runtime.Type_Info_Type_Id
+Type_Info_Pointer                :: runtime.Type_Info_Pointer
+Type_Info_Multi_Pointer          :: runtime.Type_Info_Multi_Pointer
+Type_Info_Procedure              :: runtime.Type_Info_Procedure
+Type_Info_Array                  :: runtime.Type_Info_Array
+Type_Info_Enumerated_Array       :: runtime.Type_Info_Enumerated_Array
+Type_Info_Dynamic_Array          :: runtime.Type_Info_Dynamic_Array
+Type_Info_Slice                  :: runtime.Type_Info_Slice
+Type_Info_Parameters             :: runtime.Type_Info_Parameters
+Type_Info_Tuple                  :: runtime.Type_Info_Parameters
+Type_Info_Struct                 :: runtime.Type_Info_Struct
+Type_Info_Union                  :: runtime.Type_Info_Union
+Type_Info_Enum                   :: runtime.Type_Info_Enum
+Type_Info_Map                    :: runtime.Type_Info_Map
+Type_Info_Bit_Set                :: runtime.Type_Info_Bit_Set
+Type_Info_Simd_Vector            :: runtime.Type_Info_Simd_Vector
+Type_Info_Relative_Pointer       :: runtime.Type_Info_Relative_Pointer
+Type_Info_Relative_Multi_Pointer :: runtime.Type_Info_Relative_Multi_Pointer
+Type_Info_Matrix                 :: runtime.Type_Info_Matrix
+Type_Info_Soa_Pointer            :: runtime.Type_Info_Soa_Pointer
 
 Type_Info_Enum_Value :: runtime.Type_Info_Enum_Value
 
@@ -69,7 +69,7 @@ Type_Kind :: enum {
 	Bit_Set,
 	Simd_Vector,
 	Relative_Pointer,
-	Relative_Slice,
+	Relative_Multi_Pointer,
 	Matrix,
 	Soa_Pointer,
 }
@@ -80,34 +80,34 @@ type_kind :: proc(T: typeid) -> Type_Kind {
 	ti := type_info_of(T)
 	if ti != nil {
 		switch _ in ti.variant {
-		case Type_Info_Named:            return .Named
-		case Type_Info_Integer:          return .Integer
-		case Type_Info_Rune:             return .Rune
-		case Type_Info_Float:            return .Float
-		case Type_Info_Complex:          return .Complex
-		case Type_Info_Quaternion:       return .Quaternion
-		case Type_Info_String:           return .String
-		case Type_Info_Boolean:          return .Boolean
-		case Type_Info_Any:              return .Any
-		case Type_Info_Type_Id:          return .Type_Id
-		case Type_Info_Pointer:          return .Pointer
-		case Type_Info_Multi_Pointer:    return .Multi_Pointer
-		case Type_Info_Procedure:        return .Procedure
-		case Type_Info_Array:            return .Array
-		case Type_Info_Enumerated_Array: return .Enumerated_Array
-		case Type_Info_Dynamic_Array:    return .Dynamic_Array
-		case Type_Info_Slice:            return .Slice
-		case Type_Info_Parameters:       return .Tuple
-		case Type_Info_Struct:           return .Struct
-		case Type_Info_Union:            return .Union
-		case Type_Info_Enum:             return .Enum
-		case Type_Info_Map:              return .Map
-		case Type_Info_Bit_Set:          return .Bit_Set
-		case Type_Info_Simd_Vector:      return .Simd_Vector
-		case Type_Info_Relative_Pointer: return .Relative_Pointer
-		case Type_Info_Relative_Slice:   return .Relative_Slice
-		case Type_Info_Matrix:           return .Matrix
-		case Type_Info_Soa_Pointer:      return .Soa_Pointer
+		case Type_Info_Named:                  return .Named
+		case Type_Info_Integer:                return .Integer
+		case Type_Info_Rune:                   return .Rune
+		case Type_Info_Float:                  return .Float
+		case Type_Info_Complex:                return .Complex
+		case Type_Info_Quaternion:             return .Quaternion
+		case Type_Info_String:                 return .String
+		case Type_Info_Boolean:                return .Boolean
+		case Type_Info_Any:                    return .Any
+		case Type_Info_Type_Id:                return .Type_Id
+		case Type_Info_Pointer:                return .Pointer
+		case Type_Info_Multi_Pointer:          return .Multi_Pointer
+		case Type_Info_Procedure:              return .Procedure
+		case Type_Info_Array:                  return .Array
+		case Type_Info_Enumerated_Array:       return .Enumerated_Array
+		case Type_Info_Dynamic_Array:          return .Dynamic_Array
+		case Type_Info_Slice:                  return .Slice
+		case Type_Info_Parameters:             return .Tuple
+		case Type_Info_Struct:                 return .Struct
+		case Type_Info_Union:                  return .Union
+		case Type_Info_Enum:                   return .Enum
+		case Type_Info_Map:                    return .Map
+		case Type_Info_Bit_Set:                return .Bit_Set
+		case Type_Info_Simd_Vector:            return .Simd_Vector
+		case Type_Info_Relative_Pointer:       return .Relative_Pointer
+		case Type_Info_Relative_Multi_Pointer: return .Relative_Multi_Pointer
+		case Type_Info_Matrix:                 return .Matrix
+		case Type_Info_Soa_Pointer:            return .Soa_Pointer
 		}
 
 	}
@@ -1457,8 +1457,6 @@ equal :: proc(a, b: any, including_indirect_array_recursion := false, recursion_
 		return equal(va, vb, including_indirect_array_recursion, recursion_level+1) 
 	case Type_Info_Map:
 		return false
-	case Type_Info_Relative_Slice:
-		return false
 	case 
 		Type_Info_Boolean,
 		Type_Info_Integer, 
@@ -1474,6 +1472,7 @@ equal :: proc(a, b: any, including_indirect_array_recursion := false, recursion_
 		Type_Info_Enum,
 		Type_Info_Simd_Vector,
 		Type_Info_Relative_Pointer,
+		Type_Info_Relative_Multi_Pointer,
 		Type_Info_Soa_Pointer,
 		Type_Info_Matrix:
 		return runtime.memory_compare(a.data, b.data, t.size) == 0

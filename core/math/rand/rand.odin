@@ -1,9 +1,11 @@
+
 /*
 Package core:math/rand implements various random number generators
 */
 package rand
 
 import "core:intrinsics"
+import "core:math"
 import "core:mem"
 
 Rand :: struct {
@@ -31,10 +33,6 @@ Example:
 		fmt.println(rand.uint64())
 	}
 
-Possible Output:
-
-	10
-
 */
 set_global_seed :: proc(seed: u64) {
 	init(&global_rand, seed)
@@ -58,10 +56,6 @@ Example:
 		fmt.println(rand.uint64(&my_rand))
 	}
 
-Possible Output:
-
-	10
-
 */
 @(require_results)
 create :: proc(seed: u64) -> (res: Rand) {
@@ -69,6 +63,7 @@ create :: proc(seed: u64) -> (res: Rand) {
 	init(&r, seed)
 	return r
 }
+
 
 /*
 Initialises a random number generator.
@@ -87,17 +82,13 @@ Example:
 		fmt.println(rand.uint64(&my_rand))
 	}
 
-Possible Output:
-
-	10
-
 */
 init :: proc(r: ^Rand, seed: u64) {
 	r.state = 0
 	r.inc = (seed << 1) | 1
-	_random(r)
+	_random_u64(r)
 	r.state += seed
-	_random(r)
+	_random_u64(r)
 }
 
 /*
@@ -123,11 +114,6 @@ Example:
 		rand.init_as_system(&my_rand)
 		fmt.println(rand.uint64(&my_rand))
 	}
-
-Possible Output:
-
-	10
-
 */
 init_as_system :: proc(r: ^Rand) {
 	if !#defined(_system_random) {
@@ -139,11 +125,9 @@ init_as_system :: proc(r: ^Rand) {
 }
 
 @(private)
-_random :: proc(r: ^Rand) -> u32 {
+_random_u64 :: proc(r: ^Rand) -> u64 {
 	r := r
 	if r == nil {
-		// NOTE(bill, 2020-09-07): Do this so that people can
-		// enforce the global random state if necessary with `nil`
 		r = &global_rand
 	}
 	when #defined(_system_random) {
@@ -152,11 +136,12 @@ _random :: proc(r: ^Rand) -> u32 {
 		}
 	}
 
+
 	old_state := r.state
 	r.state = old_state * 6364136223846793005 + (r.inc|1)
-	xor_shifted := u32(((old_state>>18) ~ old_state) >> 27)
-	rot := u32(old_state >> 59)
-	return (xor_shifted >> rot) | (xor_shifted << ((-rot) & 31))
+	xor_shifted := (((old_state >> 59) + 5) ~ old_state) * 12605985483714917081
+	rot := (old_state >> 59)
+	return (xor_shifted >> rot) | (xor_shifted << ((-rot) & 63))
 }
 
 /*
@@ -179,15 +164,9 @@ Example:
 		my_rand := rand.create(1)
 		fmt.println(rand.uint32(&my_rand))
 	}
-
-Possible Output:
-
-	10
-	389
-
 */
 @(require_results)
-uint32 :: proc(r: ^Rand = nil) -> (val: u32) { return _random(r) }
+uint32 :: proc(r: ^Rand = nil) -> (val: u32) { return u32(_random_u64(r)) }
 
 /*
 Generates a random 64 bit value using the provided random number generator. If no generator is provided the global random number generator will be used.
@@ -209,19 +188,9 @@ Example:
 		my_rand := rand.create(1)
 		fmt.println(rand.uint64(&my_rand))
 	}
-
-Possible Output:
-
-	10
-	389
-
 */
 @(require_results)
-uint64 :: proc(r: ^Rand = nil) -> (val: u64) {
-	a := u64(_random(r))
-	b := u64(_random(r))
-	return (a<<32) | b
-}
+uint64 :: proc(r: ^Rand = nil) -> (val: u64) { return _random_u64(r) }
 
 /*
 Generates a random 128 bit value using the provided random number generator. If no generator is provided the global random number generator will be used.
@@ -243,20 +212,12 @@ Example:
 		my_rand := rand.create(1)
 		fmt.println(rand.uint128(&my_rand))
 	}
-
-Possible Output:
-
-	10
-	389
-
 */
 @(require_results)
 uint128 :: proc(r: ^Rand = nil) -> (val: u128) {
-	a := u128(_random(r))
-	b := u128(_random(r))
-	c := u128(_random(r))
-	d := u128(_random(r))
-	return (a<<96) | (b<<64) | (c<<32) | d
+	a := u128(_random_u64(r))
+	b := u128(_random_u64(r))
+	return (a<<64) | b
 }
 
 /*
@@ -280,14 +241,9 @@ Example:
 		my_rand := rand.create(1)
 		fmt.println(rand.int31(&my_rand))
 	}
-
-Possible Output:
-
-	10
-	389
-
 */
 @(require_results) int31  :: proc(r: ^Rand = nil) -> (val: i32)  { return i32(uint32(r) << 1 >> 1) }
+
 /*
 Generates a random 63 bit value using the provided random number generator. If no generator is provided the global random number generator will be used.  
 The sign bit will always be set to 0, thus all generated numbers will be positive.
@@ -309,14 +265,9 @@ Example:
 		my_rand := rand.create(1)
 		fmt.println(rand.int63(&my_rand))
 	}
-
-Possible Output:
-
-	10
-	389
-
 */
 @(require_results) int63  :: proc(r: ^Rand = nil) -> (val: i64)  { return i64(uint64(r) << 1 >> 1) }
+
 /*
 Generates a random 127 bit value using the provided random number generator. If no generator is provided the global random number generator will be used.  
 The sign bit will always be set to 0, thus all generated numbers will be positive.
@@ -338,24 +289,18 @@ Example:
 		my_rand := rand.create(1)
 		fmt.println(rand.int127(&my_rand))
 	}
-
-Possible Output:
-
-	10
-	389
-
 */
 @(require_results) int127 :: proc(r: ^Rand = nil) -> (val: i128) { return i128(uint128(r) << 1 >> 1) }
 
 /*
-Generates a random 31 bit value in the range `(0, n]` using the provided random number generator. If no generator is provided the global random number generator will be used.  
+Generates a random 31 bit value in the range `[0, n)` using the provided random number generator. If no generator is provided the global random number generator will be used.
 
 Inputs:
 - n: The upper bound of the generated number, this value is exclusive
 - r: The random number generator to use, or nil for the global generator
 
 Returns:
-- val: A random 31 bit value in the range `(0, n]`
+- val: A random 31 bit value in the range `[0, n)`
 
 WARNING: Panics if n is less than 0
 
@@ -370,12 +315,6 @@ Example:
 		my_rand := rand.create(1)
 		fmt.println(rand.int31_max(1024, &my_rand))
 	}
-
-Possible Output:
-
-	6
-	500
-
 */
 @(require_results)
 int31_max :: proc(n: i32, r: ^Rand = nil) -> (val: i32) {
@@ -392,15 +331,16 @@ int31_max :: proc(n: i32, r: ^Rand = nil) -> (val: i32) {
 	}
 	return v % n
 }
+
 /*
-Generates a random 63 bit value in the range `(0, n]` using the provided random number generator. If no generator is provided the global random number generator will be used.  
+Generates a random 63 bit value in the range `[0, n)` using the provided random number generator. If no generator is provided the global random number generator will be used.
 
 Inputs:
 - n: The upper bound of the generated number, this value is exclusive
 - r: The random number generator to use, or nil for the global generator
 
 Returns:
-- val: A random 63 bit value in the range `(0, n]`
+- val: A random 63 bit value in the range `[0, n)`
 
 WARNING: Panics if n is less than 0
 
@@ -416,10 +356,6 @@ Example:
 		fmt.println(rand.int63_max(1024, &my_rand))
 	}
 
-Possible Output:
-
-	6
-	500
 
 */
 @(require_results)
@@ -437,15 +373,16 @@ int63_max :: proc(n: i64, r: ^Rand = nil) -> (val: i64) {
 	}
 	return v % n
 }
+
 /*
-Generates a random 127 bit value in the range `(0, n]` using the provided random number generator. If no generator is provided the global random number generator will be used.  
+Generates a random 127 bit value in the range `[0, n)` using the provided random number generator. If no generator is provided the global random number generator will be used.
 
 Inputs:
 - n: The upper bound of the generated number, this value is exclusive
 - r: The random number generator to use, or nil for the global generator
 
 Returns:
-- val: A random 127 bit value in the range `(0, n]`
+- val: A random 127 bit value in the range `[0, n)`
 
 WARNING: Panics if n is less than 0
 
@@ -461,10 +398,6 @@ Example:
 		fmt.println(rand.int127_max(1024, &my_rand))
 	}
 
-Possible Output:
-
-	6
-	500
 
 */
 @(require_results)
@@ -482,15 +415,16 @@ int127_max :: proc(n: i128, r: ^Rand = nil) -> (val: i128) {
 	}
 	return v % n
 }
+
 /*
-Generates a random integer value in the range `(0, n]` using the provided random number generator. If no generator is provided the global random number generator will be used.  
+Generates a random integer value in the range `[0, n)` using the provided random number generator. If no generator is provided the global random number generator will be used.
 
 Inputs:
 - n: The upper bound of the generated number, this value is exclusive
 - r: The random number generator to use, or nil for the global generator
 
 Returns:
-- val: A random integer value in the range `(0, n]`
+- val: A random integer value in the range `[0, n)`
 
 WARNING: Panics if n is less than 0
 
@@ -506,10 +440,6 @@ Example:
 		fmt.println(rand.int_max(1024, &my_rand))
 	}
 
-Possible Output:
-
-	6
-	500
 
 */
 @(require_results)
@@ -525,13 +455,13 @@ int_max :: proc(n: int, r: ^Rand = nil) -> (val: int) {
 }
 
 /*
-Generates a random double floating point value in the range `(0, 1]` using the provided random number generator. If no generator is provided the global random number generator will be used.  
+Generates a random double floating point value in the range `[0, 1)` using the provided random number generator. If no generator is provided the global random number generator will be used.
 
 Inputs:
 - r: The random number generator to use, or nil for the global generator
 
 Returns:
-- val: A random double floating point value in the range `(0, 1]`
+- val: A random double floating point value in the range `[0, 1)`
 
 Example:
 	import "core:math/rand"
@@ -545,22 +475,18 @@ Example:
 		fmt.println(rand.float64(&my_rand))
 	}
 
-Possible Output:
-
-	0.043
-	0.511
 
 */
 @(require_results) float64 :: proc(r: ^Rand = nil) -> (val: f64) { return f64(int63_max(1<<53, r)) / (1 << 53) }
 
 /*
-Generates a random single floating point value in the range `(0, 1]` using the provided random number generator. If no generator is provided the global random number generator will be used.  
+Generates a random single floating point value in the range `[0, 1)` using the provided random number generator. If no generator is provided the global random number generator will be used.
 
 Inputs:
 - r: The random number generator to use, or nil for the global generator
 
 Returns:
-- val: A random single floating point value in the range `(0, 1]`
+- val: A random single floating point value in the range `[0, 1)`
 
 Example:
 	import "core:math/rand"
@@ -574,16 +500,14 @@ Example:
 		fmt.println(rand.float32(&my_rand))
 	}
 
-Possible Output:
-
-	0.043
-	0.511
 
 */
-@(require_results) float32 :: proc(r: ^Rand = nil) -> (val: f32) { return f32(float64(r)) }
+@(require_results) float32 :: proc(r: ^Rand = nil) -> (val: f32) { return f32(int31_max(1<<24, r)) / (1 << 24) }
 
 /*
-Generates a random double floating point value in the range `(low, high]` using the provided random number generator. If no generator is provided the global random number generator will be used.  
+Generates a random double floating point value in the range `[low, high)` using the provided random number generator. If no generator is provided the global random number generator will be used.
+
+WARNING: Panics if `high < low`
 
 Inputs:
 - low: The lower bounds of the value, this value is inclusive
@@ -591,7 +515,7 @@ Inputs:
 - r: The random number generator to use, or nil for the global generator
 
 Returns:
-- val: A random double floating point value in the range `(low, high]`
+- val: A random double floating point value in the range [low, high)
 
 Example:
 	import "core:math/rand"
@@ -605,15 +529,19 @@ Example:
 		fmt.println(rand.float64_range(600, 900, &my_rand))
 	}
 
-Possible Output:
-
-	15.312
-	673.130
 
 */
-@(require_results) float64_range :: proc(low, high: f64, r: ^Rand = nil) -> (val: f64) { return (high-low)*float64(r) + low }
+@(require_results) float64_range :: proc(low, high: f64, r: ^Rand = nil) -> (val: f64) {
+	assert(low <= high, "low must be lower than or equal to high")
+	val = (high-low)*float64(r) + low
+	if val >= high {
+		val = max(low, high * (1 - math.F64_EPSILON))
+	}
+	return
+}
+
 /*
-Generates a random single floating point value in the range `(low, high]` using the provided random number generator. If no generator is provided the global random number generator will be used.  
+Generates a random single floating point value in the range `[low, high)` using the provided random number generator. If no generator is provided the global random number generator will be used.
 
 Inputs:
 - low: The lower bounds of the value, this value is inclusive
@@ -621,7 +549,9 @@ Inputs:
 - r: The random number generator to use, or nil for the global generator
 
 Returns:
-- val: A random single floating point value in the range `(low, high]`
+- val: A random single floating point value in the range [low, high)
+
+WARNING: Panics if `high < low`
 
 Example:
 	import "core:math/rand"
@@ -635,16 +565,20 @@ Example:
 		fmt.println(rand.float32_range(600, 900, &my_rand))
 	}
 
-Possible Output:
-
-	15.312
-	673.130
 
 */
-@(require_results) float32_range :: proc(low, high: f32, r: ^Rand = nil) -> (val: f32) { return (high-low)*float32(r) + low }
+@(require_results) float32_range :: proc(low, high: f32, r: ^Rand = nil) -> (val: f32) {
+	assert(low <= high, "low must be lower than or equal to high")
+	val = (high-low)*float32(r) + low
+	if val >= high {
+		val = max(low, high * (1 - math.F32_EPSILON))
+	}
+	return
+}
 
 /*
 Fills a byte slice with random values using the provided random number generator. If no generator is provided the global random number generator will be used.  
+Due to floating point precision there is no guarantee if the upper and lower bounds are inclusive/exclusive with the exact floating point value.  
 
 Inputs:
 - p: The byte slice to fill
@@ -665,10 +599,6 @@ Example:
 		fmt.println(data)
 	}
 
-Possible Output:
-
-	8
-	[32, 4, 59, 7, 1, 2, 2, 119]
 
 */
 @(require_results)
@@ -720,10 +650,6 @@ Example:
 		return
 	}
 
-Possible Output:
-
-	[7201011, 3, 9123, 231131]
-	[19578, 910081, 131, 7]
 
 */
 @(require_results)
@@ -756,10 +682,6 @@ Example:
 		fmt.println(data) // the contents have been shuffled
 	}
 
-Possible Output:
-
-	[1, 2, 3, 4]
-	[2, 4, 3, 1]
 
 */
 shuffle :: proc(array: $T/[]$E, r: ^Rand = nil) {
@@ -798,10 +720,6 @@ Example:
 	}
 
 
-Possible Output:
-
-	3
-	2
 	2
 	4
 

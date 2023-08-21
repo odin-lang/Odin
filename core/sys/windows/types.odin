@@ -1709,6 +1709,12 @@ MONITORINFO :: struct {
 }
 LPMONITORINFO :: ^MONITORINFO
 
+CCHDEVICENAME :: 32
+MONITORINFOEXW :: struct {
+	using _: MONITORINFO,
+	szDevice: [CCHDEVICENAME]WCHAR,
+}
+
 // SetWindowsHook() codes
 WH_MIN             :: -1
 WH_MSGFILTER       :: -1

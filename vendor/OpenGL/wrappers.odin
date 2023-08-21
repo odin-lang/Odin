@@ -2,6 +2,11 @@ package vendor_gl
 
 #assert(size_of(bool) == size_of(u8))
 
+import "core:runtime"
+import "core:fmt"
+_ :: runtime
+_ :: fmt
+
 when !GL_DEBUG {
 	// VERSION_1_0
 	CullFace               :: proc "c" (mode: u32)                                                                                         {        impl_CullFace(mode)                                                                         }
@@ -756,9 +761,6 @@ when !GL_DEBUG {
 	MultiDrawElementsIndirectCount :: proc "c" (mode: i32, type: i32, indirect: [^]DrawElementsIndirectCommand, drawcount: i32, maxdrawcount, stride: i32)      { impl_MultiDrawElementsIndirectCount(mode, type, indirect, drawcount, maxdrawcount, stride)             }
 	PolygonOffsetClamp             :: proc "c" (factor, units, clamp: f32)                                                                                      { impl_PolygonOffsetClamp(factor, units, clamp)                                                          }
 } else {
-	import "core:runtime"
-	import "core:fmt"
-
 	debug_helper :: proc"c"(from_loc: runtime.Source_Code_Location, num_ret: int, args: ..any, loc := #caller_location) {
 		context = runtime.default_context()
 

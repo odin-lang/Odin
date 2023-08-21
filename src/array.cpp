@@ -168,6 +168,17 @@ gb_internal gb_inline Slice<T> slice(Slice<T> const &array, isize lo, isize hi) 
 	}
 	return out;
 }
+template <typename T>
+gb_internal gb_inline Slice<T> slice(Array<T> const &array, isize lo, isize hi) {
+	GB_ASSERT(0 <= lo && lo <= hi && hi <= array.count);
+	Slice<T> out = {};
+	isize len = hi-lo;
+	if (len > 0) {
+		out.data = array.data+lo;
+		out.count = len;
+	}
+	return out;
+}
 
 
 template <typename T>

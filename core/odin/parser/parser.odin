@@ -420,7 +420,7 @@ expect_closing_brace_of_field_list :: proc(p: ^Parser) -> tokenizer.Token {
 	if allow_token(p, .Close_Brace) {
 		return token
 	}
-	if allow_token(p, .Semicolon) {
+	if allow_token(p, .Semicolon) && !tokenizer.is_newline(token) {
 		str := tokenizer.token_to_string(token)
 		error(p, end_of_line_pos(p, p.prev_tok), "expected a comma, got %s", str)
 	}
@@ -1091,7 +1091,7 @@ parse_attribute :: proc(p: ^Parser, tok: tokenizer.Token, open_kind, close_kind:
 
 parse_foreign_block_decl :: proc(p: ^Parser) -> ^ast.Stmt {
 	decl := parse_stmt(p)
-	#partial switch in decl.derived_stmt {
+	#partial switch _ in decl.derived_stmt {
 	case ^ast.Empty_Stmt, ^ast.Bad_Stmt, ^ast.Bad_Decl:
 		// Ignore
 		return nil
@@ -1836,7 +1836,9 @@ parse_field_list :: proc(p: ^Parser, follow: tokenizer.Token_Kind, allowed_flags
 				return true
 			}
 			if allow_token(p, .Semicolon) {
-				error(p, tok.pos, "expected a comma, got a semicolon")
+				if !tokenizer.is_newline(tok) {
+					error(p, tok.pos, "expected a comma, got a semicolon")
+				}
 				return true
 			}
 			return false
@@ -2941,9 +2943,9 @@ parse_call_expr :: proc(p: ^Parser, operand: ^ast.Expr) -> ^ast.Expr {
 	p.expr_level += 1
 	open := expect_token(p, .Open_Paren)
 
+	seen_ellipsis := false
 	for p.curr_tok.kind != .Close_Paren &&
-	    p.curr_tok.kind != .EOF &&
-	    ellipsis.pos.line == 0 {
+		p.curr_tok.kind != .EOF {
 
 		if p.curr_tok.kind == .Comma {
 			error(p, p.curr_tok.pos, "expected an expression not ,")
@@ -2972,9 +2974,15 @@ parse_call_expr :: proc(p: ^Parser, operand: ^ast.Expr) -> ^ast.Expr {
 			fv.value = value
 
 			arg = fv
+		} else if seen_ellipsis {
+			error(p, arg.pos, "Positional arguments are not allowed after '..'")
 		}
 
 		append(&args, arg)
+
+		if ellipsis.pos.line != 0 {
+			seen_ellipsis = true
+		}
 
 		if !allow_token(p, .Comma) {
 			break

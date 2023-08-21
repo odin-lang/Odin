@@ -31,7 +31,7 @@ when ODIN_NO_CRT && ODIN_OS == .Windows {
 		if ptr != nil && len != 0 {
 			b := byte(val)
 			p := ([^]byte)(ptr)
-			for i in 0..<len {
+			for i := 0; i < len; i += 1 {
 				p[i] = b
 			}
 		}
@@ -75,7 +75,7 @@ when ODIN_NO_CRT && ODIN_OS == .Windows {
 		if ptr != nil && len != 0 {
 			b := byte(val)
 			p := ([^]byte)(ptr)
-			for i in 0..<len {
+			for i := 0; i < len; i += 1 {
 				p[i] = b
 			}
 		}

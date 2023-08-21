@@ -149,6 +149,9 @@ ID3DInclude_VTable :: struct {
 	Close: proc "stdcall" (this: ^ID3DInclude, pData: rawptr) -> HRESULT,
 }
 
+// Default file includer
+D3DCOMPILE_STANDARD_FILE_INCLUDE :: (^ID3DInclude)(uintptr(1))
+
 
 ID3D11Module :: struct #raw_union {
 	#subtype iunknown: IUnknown,

@@ -1565,7 +1565,7 @@ fmt_bit_set :: proc(fi: ^Info, v: any, name: string = "") {
 // - fi: A pointer to the Info structure where the indents will be written.
 //
 fmt_write_indent :: proc(fi: ^Info) {
-	for in 0..<fi.indent {
+	for _ in 0..<fi.indent {
 		io.write_byte(fi.writer, '\t', &fi.n)
 	}
 }
@@ -1720,7 +1720,7 @@ fmt_struct :: proc(fi: ^Info, v: any, the_verb: rune, info: runtime.Type_Info_St
 	}
 	defer {
 		if hash {
-			for in 0..<indent { io.write_byte(fi.writer, '\t', &fi.n) }
+			for _ in 0..<indent { io.write_byte(fi.writer, '\t', &fi.n) }
 		}
 		io.write_byte(fi.writer, ']' if is_soa else '}', &fi.n)
 	}
@@ -1956,7 +1956,7 @@ fmt_named :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Named) 
 		for x := i; x >= 10; x /= 10 {
 			n -= 1
 		}
-		for in 0..<n {
+		for _ in 0..<n {
 			io.write_byte(fi.writer, '0', &fi.n)
 		}
 		io.write_i64(fi.writer, i, 10, &fi.n)
@@ -1989,7 +1989,7 @@ fmt_named :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Named) 
 			v := v
 			w := len(buf)
 			print := false
-			for in 0..<prec {
+			for _ in 0..<prec {
 				digit := v % 10
 				print = print || digit != 0
 				if print {
@@ -2535,32 +2535,11 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 
 		fmt_value(fi, absolute_ptr, verb)
 
-	case runtime.Type_Info_Relative_Slice:
+	case runtime.Type_Info_Relative_Multi_Pointer:
 		ptr := reflect.relative_pointer_to_absolute_raw(v.data, info.base_integer.id)
+		absolute_ptr := any{ptr, info.pointer.id}
 
-		if verb == 'p' {
-			fmt_pointer(fi, ptr, 'p')
-		} else if ptr == nil {
-			io.write_string(fi.writer, "[]", &fi.n)
-		} else {
-			len_ptr := uintptr(v.data) + uintptr(info.base_integer.size)
-			len_any := any{rawptr(len_ptr), info.base_integer.id}
-			len, _ := reflect.as_int(len_any)
-			slice_type := reflect.type_info_base(info.slice).variant.(runtime.Type_Info_Slice)
-
-			fi.record_level += 1
-			defer fi.record_level -= 1
-
-			io.write_byte(fi.writer, '[', &fi.n)
-			defer io.write_byte(fi.writer, ']', &fi.n)
-
-			for i in 0..<len {
-				if i > 0 { io.write_string(fi.writer, ", ", &fi.n) }
-
-				data := uintptr(ptr) + uintptr(i*slice_type.elem_size)
-				fmt_arg(fi, any{rawptr(data), slice_type.elem.id}, verb)
-			}
-		}
+		fmt_value(fi, absolute_ptr, verb)
 
 	case runtime.Type_Info_Matrix:
 		fmt_matrix(fi, v, verb, info)

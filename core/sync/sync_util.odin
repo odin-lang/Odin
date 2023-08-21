@@ -88,6 +88,7 @@ wait :: proc{
 	atomic_cond_wait,
 	atomic_sema_wait,
 	futex_wait,
+	wait_group_wait,
 }
 
 wait_with_timeout :: proc{
@@ -96,6 +97,7 @@ wait_with_timeout :: proc{
 	atomic_cond_wait_with_timeout,
 	atomic_sema_wait_with_timeout,
 	futex_wait_with_timeout,
+	wait_group_wait_with_timeout,
 }
 
 post :: proc{

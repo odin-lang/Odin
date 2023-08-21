@@ -1983,7 +1983,7 @@ gb_internal void check_value_decl_stmt(CheckerContext *ctx, Ast *node, u32 mod_f
 				for (auto const &entry : scope->elements) {
 					Entity *f = entry.value;
 					if (f->kind == Entity_Variable) {
-						Entity *uvar = alloc_entity_using_variable(e, f->token, f->type, nullptr);
+						Entity *uvar = alloc_entity_using_variable(e, f->token, f->type, e->identifier);
 						uvar->flags |= (e->flags & EntityFlag_Value);
 						Entity *prev = scope_insert(ctx->scope, uvar);
 						if (prev != nullptr) {

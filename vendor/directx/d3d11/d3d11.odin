@@ -3551,6 +3551,8 @@ PARAMETER_DESC :: struct {
 	FirstOutComponent: u32,
 }
 
+ID3D11ShaderReflectionType_UUID_STRING :: "6E6FFA6A-9BAE-4613-A51E-91652D508C21"
+ID3D11ShaderReflectionType_UUID := &IID{0x6E6FFA6A, 0x9BAE, 0x4613, {0xA5, 0x1E, 0x91, 0x65, 0x2D, 0x50, 0x8C, 0x21}}
 IShaderReflectionType :: struct {
 	using vtable: ^IShaderReflectionType_VTable,
 }
@@ -3568,6 +3570,8 @@ IShaderReflectionType_VTable :: struct {
 	ImplementsInterface:  proc "stdcall" (this: ^IShaderReflectionType, pBase: ^IShaderReflectionType) -> HRESULT,
 }
 
+ID3D11ShaderReflectionVariable_UUID_STRING :: "51F23923-F3E5-4BD1-91CB-606177D8DB4C"
+ID3D11ShaderReflectionVariable_UUID := &IID{0x51F23923, 0xF3E5, 0x4BD1, {0x91, 0xCB, 0x60, 0x61, 0x77, 0xD8, 0xDB, 0x4C}}
 IShaderReflectionVariable :: struct {
 	using vtable: ^IShaderReflectionVariable_VTable,
 }
@@ -3578,6 +3582,8 @@ IShaderReflectionVariable_VTable :: struct {
 	GetInterfaceSlot: proc "stdcall" (this: ^IShaderReflectionVariable, uArrayIndex: u32) -> u32,
 }
 
+ID3D11ShaderReflectionConstantBuffer_UUID_STRING :: "EB62D63D-93DD-4318-8AE8-C6F83AD371B8"
+ID3D11ShaderReflectionConstantBuffer_UUID := &IID{0xEB62D63D, 0x93DD, 0x4318, {0x8A, 0xE8, 0xC6, 0xF8, 0x3A, 0xD3, 0x71, 0xB8}}
 IShaderReflectionConstantBuffer :: struct {
 	using vtable: ^IShaderReflectionConstantBuffer_VTable,
 }
@@ -3588,6 +3594,8 @@ IShaderReflectionConstantBuffer_VTable :: struct {
 }
 
 
+ID3D11ShaderReflection_UUID_STRING :: "8D536CA1-0CCA-4956-A837-786963755584"
+ID3D11ShaderReflection_UUID := &IID{0x8D536CA1, 0x0CCA, 0x4956, {0xA8, 0x37, 0x78, 0x69, 0x63, 0x75, 0x55, 0x84}}
 IShaderReflection :: struct #raw_union {
 	#subtype iunknown: IUnknown,
 	using id3d11shaderreflection_vtable: ^IShaderReflection_VTable,
@@ -3616,6 +3624,8 @@ IShaderReflection_VTable :: struct {
 }
 
 
+ID3D11LibraryReflection_UUID_STRING :: "54384F1B-5B3E-4BB7-AE01-60BA3097CBB6"
+ID3D11LibraryReflection_UUID := &IID{0x54384F1B, 0x5B3E, 0x4BB7, {0xAE, 0x1, 0x60, 0xBA, 0x30, 0x97, 0xCD, 0xB6}}
 ILibraryReflection :: struct #raw_union {
 	#subtype iunknown: IUnknown,
 	using id3d11libraryreflection_vtable: ^ILibraryReflection_VTable,
@@ -3626,6 +3636,8 @@ ILibraryReflection_VTable :: struct {
 	GetFunctionByIndex: proc "stdcall" (this: ^ILibraryReflection, FunctionIndex: i32) -> ^IFunctionReflection,
 }
 
+ID3D11FunctionReflection_UUID_STRING :: "207BCECB-D683-4A06-A8A3-9B149B9F73A4"
+ID3D11FunctionReflection_UUID := &IID{0x207BCECB, 0xD683, 0x4A06, {0xA8, 0xA3, 0x9B, 0x14, 0x9B, 0x9F, 0x73, 0xA4}}
 IFunctionReflection :: struct {
 	using vtable: ^IFunctionReflection_VTable,
 }
@@ -3639,6 +3651,8 @@ IFunctionReflection_VTable :: struct {
 	GetFunctionParameter:         proc "stdcall" (this: ^IFunctionReflection, ParameterIndex: i32) -> ^IFunctionParameterReflection,
 }
 
+ID3D11FunctionParameterReflection_UUID_STRING :: "42757488-334F-47FE-982E-1A65D08CC462"
+ID3D11FunctionParameterReflection_UUID := &IID{0x42757488, 0x334f, 0x47FE, {0x98, 0x2E, 0x1A, 0x65, 0xD0, 0x8C, 0xC4, 0x62}}
 IFunctionParameterReflection :: struct {
 	using vtable: ^IFunctionParameterReflection_VTable,
 }
