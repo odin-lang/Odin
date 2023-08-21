@@ -23,7 +23,6 @@ foreign Foundation {
 	object_getIndexedIvars   :: proc(obj: id) -> rawptr ---
 }
 
-
 @(objc_class="NSZone")
 Zone :: struct {using _: Object}
 
@@ -63,7 +62,6 @@ objc_object_internals :: struct {
 	isa: ^objc_class_internals,
 }
 
-
 objc_class_internals :: struct {
 	isa:           Class,
 	super_class:   Class,
@@ -79,3 +77,4 @@ objc_class_internals :: struct {
 	protocols:     rawptr,
 
 }
+

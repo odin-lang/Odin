@@ -30,6 +30,7 @@ WindowStyleFlag :: enum NS.UInteger {
 	NonactivatingPanel     = 7,
 	HUDWindow              = 13,
 }
+
 WindowStyleMask :: distinct bit_set[WindowStyleFlag; NS.UInteger]
 WindowStyleMaskBorderless             :: WindowStyleMask{}
 WindowStyleMaskTitled                 :: WindowStyleMask{.Titled}
@@ -44,6 +45,12 @@ WindowStyleMaskUtilityWindow          :: WindowStyleMask{.UtilityWindow}
 WindowStyleMaskDocModalWindow         :: WindowStyleMask{.DocModalWindow}
 WindowStyleMaskNonactivatingPanel     :: WindowStyleMask{.NonactivatingPanel}
 WindowStyleMaskHUDWindow              :: WindowStyleMask{.HUDWindow}
+
+Depth :: enum NS.UInteger {
+	onehundredtwentyeightBitRGB  = 544,
+	sixtyfourBitRGB = 528,
+	twentyfourBitRGB = 520,
+}
 
 BackingStoreType :: enum NS.UInteger {
 	Retained    = 0,
@@ -124,6 +131,7 @@ WindowDelegateTemplate :: struct {
 	windowDidExitVersionBrowser:                                         proc(notification: ^Notification),
 }
 
+@(objc_class="NSWindowDelegate")
 WindowDelegate :: struct { using _: Object }
 _WindowDelegateInternal :: struct {
 	using _: WindowDelegateTemplate,
@@ -555,9 +563,6 @@ window_delegate_register_and_alloc :: proc(template: WindowDelegateTemplate, cla
 	return cast(^WindowDelegate)del
 }
 
-@(objc_class="NSColor")
-Color :: struct {using _: Object}
-
 @(objc_class="CALayer")
 Layer :: struct { using _: NS.Object }
 
@@ -589,6 +594,10 @@ View :: struct {using _: Responder}
 View_initWithFrame :: proc "c" (self: ^View, frame: Rect) -> ^View {
 	return msgSend(^View, self, "initWithFrame:", frame)
 }
+@(objc_type=View, objc_name="bounds")
+View_bounds :: proc "c" (self: ^View) -> Rect {
+	return msgSend(Rect, self, "bounds")
+}
 @(objc_type=View, objc_name="layer")
 View_layer :: proc "c" (self: ^View) -> ^Layer {
 	return msgSend(^Layer, self, "layer")
@@ -615,7 +624,7 @@ Window_alloc :: proc "c" () -> ^Window {
 }
 
 @(objc_type=Window, objc_name="initWithContentRect")
-Window_initWithContentRect :: proc (self: ^Window, contentRect: Rect, styleMask: WindowStyleMask, backing: BackingStoreType, doDefer: bool) -> ^Window {
+Window_initWithContentRect :: proc (self: ^Window, contentRect: Rect, styleMask: WindowStyleMask, backing: BackingStoreType, doDefer: BOOL) -> ^Window {
 	self := self
 	// HACK: due to a compiler bug, the generated calling code does not
 	// currently work for this message. Has to do with passing a struct along
