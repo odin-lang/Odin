@@ -388,8 +388,7 @@ gb_internal WORKER_TASK_PROC(cg_procedure_compile_worker_proc) {
 
 	// emit ir
 	if (
-	    string_starts_with(p->name, str_lit("main@")) ||
-	    // p->name == str_lit("runtime@_windows_default_alloc_or_resize") ||
+	    // string_starts_with(p->name, str_lit("main@")) ||
 	    false
 	) { // IR Printing
 		TB_Arena *arena = cg_arena();
@@ -1100,25 +1099,25 @@ gb_internal cgProcedure *cg_equal_proc_for_type(cgModule *m, Type *type) {
 				entry_count += 1;
 			}
 
-			size_t entry_index = 0;
+			size_t entry_offset = 0;
 
 			TB_SwitchEntry *keys = gb_alloc_array(temporary_allocator(), TB_SwitchEntry, entry_count);
 			if (type->Union.kind != UnionType_no_nil) {
 				TB_Node *region = cg_control_region(p, "bcase");
-				keys[entry_index].key   = 0;
-				keys[entry_index].value = region;
-				entry_index += 1;
+				keys[entry_offset].key   = 0;
+				keys[entry_offset].value = region;
+				entry_offset += 1;
 
 				tb_inst_set_control(p->func, region);
 				cgValue ok = cg_const_bool(p, t_bool, true);
 				cg_build_return_stmt_internal_single(p, ok);
 			}
 
-			for (size_t i = entry_index; i < entry_count; i++) {
+			for (isize i = 0; i < type->Union.variants.count; i++) {
 				TB_Node *region = cg_control_region(p, "bcase");
 				Type *variant = type->Union.variants[i];
-				keys[i].key = union_variant_index(type, variant);
-				keys[i].value = region;
+				keys[entry_offset+i].key = union_variant_index(type, variant);
+				keys[entry_offset+i].value = region;
 
 				tb_inst_set_control(p->func, region);
 				Type *vp = alloc_type_pointer(variant);

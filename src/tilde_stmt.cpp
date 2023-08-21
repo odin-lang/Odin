@@ -958,7 +958,6 @@ gb_internal void cg_emit_defer_stmts(cgProcedure *p, cgDeferExitKind kind, TB_No
 
 gb_internal void cg_scope_open(cgProcedure *p, Scope *scope) {
 	// TODO(bill): debug scope information
-
 	p->scope_index += 1;
 	array_add(&p->scope_stack, scope);
 }
