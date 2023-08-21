@@ -5555,11 +5555,7 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 					o.expr->Ident.token.pos = ast_token(variadic_operands[0].expr).pos;
 
 					Entity *vt = pt->params->Tuple.variables[pt->variadic_index];
-					if (is_type_polymorphic(vt->type)) {
-						o.type = alloc_type_slice(default_type(variadic_operands[0].type));
-					} else {
-						o.type = vt->type;
-					}
+					o.type = vt->type;
 				} else {
 					dummy_argument_count += 1;
 					o.type = t_untyped_nil;
@@ -5707,6 +5703,10 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 				} else {
 					score += assign_score_function(MAXIMUM_TYPE_DISTANCE);
 				}
+				continue;
+			}
+
+			if (param_is_variadic) {
 				continue;
 			}
 			score += eval_param_and_score(c, o, e->type, err, param_is_variadic, e, show_error);
