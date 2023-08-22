@@ -4505,6 +4505,23 @@ gb_internal String get_invalid_import_name(String input) {
 	return input;
 }
 
+gb_internal DECL_ATTRIBUTE_PROC(import_decl_attribute) {
+	if (name == ATTRIBUTE_USER_TAG_NAME) {
+		ExactValue ev = check_decl_attribute_value(c, value);
+		if (ev.kind != ExactValue_String) {
+			error(elem, "Expected a string value for '%.*s'", LIT(name));
+		}
+		return true;
+	} else if (name == "require") {
+		if (value != nullptr) {
+			error(elem, "Expected no parameter for '%.*s'", LIT(name));
+		}
+		ac->require_declaration = true;
+		return true;
+	}
+	return false;
+}
+
 gb_internal void check_add_import_decl(CheckerContext *ctx, Ast *decl) {
 	if (decl->state_flags & StateFlag_BeenHandled) return;
 	decl->state_flags |= StateFlag_BeenHandled;
@@ -4553,10 +4570,12 @@ gb_internal void check_add_import_decl(CheckerContext *ctx, Ast *decl) {
 		force_use = true;
 	}
 
-	// NOTE(bill, 2019-05-19): If the directory path is not a valid entity name, force the user to assign a custom one
-	// if (import_name.len == 0 || import_name == "_") {
-	// 	import_name = scope->pkg->name;
-	// }
+	AttributeContext ac = {};
+	check_decl_attributes(ctx, id->attributes, import_decl_attribute, &ac);
+	if (ac.require_declaration) {
+		force_use = true;
+	}
+
 
 	if (import_name.len == 0) {
 		String invalid_name = id->fullpath;

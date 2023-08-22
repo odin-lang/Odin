@@ -617,6 +617,7 @@ AST_KIND(_DeclBegin,      "", bool) \
 		Token    relpath;       \
 		String   fullpath;      \
 		Token    import_name;   \
+		Array<Ast *> attributes;  \
 		CommentGroup *docs;     \
 		CommentGroup *comment;  \
 	}) \
