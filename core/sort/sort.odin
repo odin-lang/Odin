@@ -259,7 +259,7 @@ _quick_sort :: proc(it: Interface, a, b, max_depth: int) {
 
 	a, b, max_depth := a, b, max_depth
 
-	if b-a > 12 { // only use shell sort for lengths <= 12
+	for b-a > 12 { // only use shell sort for lengths <= 12
 		if max_depth == 0 {
 			heap_sort(it, a, b)
 			return
