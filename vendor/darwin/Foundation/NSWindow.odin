@@ -3,11 +3,16 @@ package objc_Foundation
 import "core:strings"
 import "core:runtime"
 import "core:intrinsics"
-import NS "vendor:darwin/Foundation"
 
 Rect :: struct {
 	using origin: Point,
 	using size: Size,
+}
+
+Depth :: enum UInteger {
+	onehundredtwentyeightBitRGB = 544,
+	sixtyfourBitRGB             = 528,
+	twentyfourBitRGB            = 520,
 }
 
 when size_of(Float) == 8 {
@@ -16,7 +21,7 @@ when size_of(Float) == 8 {
 	_RECT_ENCODING :: "{NSRect="+_POINT_ENCODING+_SIZE_ENCODING+"}"
 }
 
-WindowStyleFlag :: enum NS.UInteger {
+WindowStyleFlag :: enum UInteger {
 	Titled                 = 0,
 	Closable               = 1,
 	Miniaturizable         = 2,
@@ -30,7 +35,7 @@ WindowStyleFlag :: enum NS.UInteger {
 	NonactivatingPanel     = 7,
 	HUDWindow              = 13,
 }
-WindowStyleMask :: distinct bit_set[WindowStyleFlag; NS.UInteger]
+WindowStyleMask :: distinct bit_set[WindowStyleFlag; UInteger]
 WindowStyleMaskBorderless             :: WindowStyleMask{}
 WindowStyleMaskTitled                 :: WindowStyleMask{.Titled}
 WindowStyleMaskClosable               :: WindowStyleMask{.Closable}
@@ -45,7 +50,7 @@ WindowStyleMaskDocModalWindow         :: WindowStyleMask{.DocModalWindow}
 WindowStyleMaskNonactivatingPanel     :: WindowStyleMask{.NonactivatingPanel}
 WindowStyleMaskHUDWindow              :: WindowStyleMask{.HUDWindow}
 
-BackingStoreType :: enum NS.UInteger {
+BackingStoreType :: enum UInteger {
 	Retained    = 0,
 	Nonretained = 1,
 	Buffered    = 2,
@@ -124,7 +129,8 @@ WindowDelegateTemplate :: struct {
 	windowDidExitVersionBrowser:                                         proc(notification: ^Notification),
 }
 
-WindowDelegate :: struct { using _: Object }
+
+WindowDelegate :: struct { using _: Object } // This is not the same as NSWindowDelegate
 _WindowDelegateInternal :: struct {
 	using _: WindowDelegateTemplate,
 	_context: runtime.Context,
@@ -555,11 +561,8 @@ window_delegate_register_and_alloc :: proc(template: WindowDelegateTemplate, cla
 	return cast(^WindowDelegate)del
 }
 
-@(objc_class="NSColor")
-Color :: struct {using _: Object}
-
 @(objc_class="CALayer")
-Layer :: struct { using _: NS.Object }
+Layer :: struct { using _: Object }
 
 @(objc_type=Layer, objc_name="contentsScale")
 Layer_contentsScale :: proc "c" (self: ^Layer) -> Float {
@@ -589,6 +592,10 @@ View :: struct {using _: Responder}
 View_initWithFrame :: proc "c" (self: ^View, frame: Rect) -> ^View {
 	return msgSend(^View, self, "initWithFrame:", frame)
 }
+@(objc_type=View, objc_name="bounds")
+View_bounds :: proc "c" (self: ^View) -> Rect {
+	return msgSend(Rect, self, "bounds")
+}
 @(objc_type=View, objc_name="layer")
 View_layer :: proc "c" (self: ^View) -> ^Layer {
 	return msgSend(^Layer, self, "layer")
@@ -615,7 +622,7 @@ Window_alloc :: proc "c" () -> ^Window {
 }
 
 @(objc_type=Window, objc_name="initWithContentRect")
-Window_initWithContentRect :: proc (self: ^Window, contentRect: Rect, styleMask: WindowStyleMask, backing: BackingStoreType, doDefer: bool) -> ^Window {
+Window_initWithContentRect :: proc (self: ^Window, contentRect: Rect, styleMask: WindowStyleMask, backing: BackingStoreType, doDefer: BOOL) -> ^Window {
 	self := self
 	// HACK: due to a compiler bug, the generated calling code does not
 	// currently work for this message. Has to do with passing a struct along
@@ -650,39 +657,39 @@ Window_setFrame :: proc "c" (self: ^Window, frame: Rect) {
 	msgSend(nil, self, "setFrame:", frame)
 }
 @(objc_type=Window, objc_name="opaque")
-Window_opaque :: proc "c" (self: ^Window) -> NS.BOOL {
-	return msgSend(NS.BOOL, self, "opaque")
+Window_opaque :: proc "c" (self: ^Window) -> BOOL {
+	return msgSend(BOOL, self, "opaque")
 }
 @(objc_type=Window, objc_name="setOpaque")
-Window_setOpaque :: proc "c" (self: ^Window, ok: NS.BOOL) {
+Window_setOpaque :: proc "c" (self: ^Window, ok: BOOL) {
 	msgSend(nil, self, "setOpaque:", ok)
 }
 @(objc_type=Window, objc_name="backgroundColor")
-Window_backgroundColor :: proc "c" (self: ^Window) -> ^NS.Color {
-	return msgSend(^NS.Color, self, "backgroundColor")
+Window_backgroundColor :: proc "c" (self: ^Window) -> ^Color {
+	return msgSend(^Color, self, "backgroundColor")
 }
 @(objc_type=Window, objc_name="setBackgroundColor")
-Window_setBackgroundColor :: proc "c" (self: ^Window, color: ^NS.Color) {
+Window_setBackgroundColor :: proc "c" (self: ^Window, color: ^Color) {
 	msgSend(nil, self, "setBackgroundColor:", color)
 }
 @(objc_type=Window, objc_name="makeKeyAndOrderFront")
-Window_makeKeyAndOrderFront :: proc "c" (self: ^Window, key: ^NS.Object) {
+Window_makeKeyAndOrderFront :: proc "c" (self: ^Window, key: ^Object) {
 	msgSend(nil, self, "makeKeyAndOrderFront:", key)
 }
 @(objc_type=Window, objc_name="setTitle")
-Window_setTitle :: proc "c" (self: ^Window, title: ^NS.String) {
+Window_setTitle :: proc "c" (self: ^Window, title: ^String) {
 	msgSend(nil, self, "setTitle:", title)
 }
 @(objc_type=Window, objc_name="setTitlebarAppearsTransparent")
-Window_setTitlebarAppearsTransparent :: proc "c" (self: ^Window, ok: NS.BOOL) {
+Window_setTitlebarAppearsTransparent :: proc "c" (self: ^Window, ok: BOOL) {
 	msgSend(nil, self, "setTitlebarAppearsTransparent:", ok)
 }
 @(objc_type=Window, objc_name="setMovable")
-Window_setMovable :: proc "c" (self: ^Window, ok: NS.BOOL) {
+Window_setMovable :: proc "c" (self: ^Window, ok: BOOL) {
 	msgSend(nil, self, "setMovable:", ok)
 }
 @(objc_type=Window, objc_name="setMovableByWindowBackground")
-Window_setMovableByWindowBackground :: proc "c" (self: ^Window, ok: NS.BOOL) {
+Window_setMovableByWindowBackground :: proc "c" (self: ^Window, ok: BOOL) {
 	msgSend(nil, self, "setMovableByWindowBackground:", ok)
 }
 @(objc_type=Window, objc_name="setStyleMask")
