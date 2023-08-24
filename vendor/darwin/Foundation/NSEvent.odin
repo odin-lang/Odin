@@ -9,7 +9,7 @@ EventMask :: distinct bit_set[EventType; UInteger]
 EventMaskAny :: ~EventMask{}
 
 when size_of(UInteger) == 4 {
-	// We don't support a 32-bit darwin system but this is mostly to shut up -vet for the time being
+	// We don't support a 32-bit darwin system but this is mostly to shut up the type checker for the time being
 	EventType :: enum UInteger {
 		LeftMouseDown      = 1,
 		LeftMouseUp        = 2,
