@@ -10,11 +10,10 @@ RunLoopMode :: ^String
 
 @(link_prefix="NS")
 foreign Foundation {
-	CommonRunLoopMode:        RunLoopMode
+	RunLoopCommonModes:       RunLoopMode
 	DefaultRunLoopMode:       RunLoopMode
 	EventTrackingRunLoopMode: RunLoopMode
 	ModalPanelRunLoopMode:    RunLoopMode
-	TrackingRunLoopMode:      RunLoopMode
 }
 
 ActivationPolicy :: enum UInteger {
