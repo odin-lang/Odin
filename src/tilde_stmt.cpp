@@ -15,7 +15,7 @@ gb_internal TB_Node *cg_control_region(cgProcedure *p, char const *name) {
 	n = -1 + gb_snprintf(new_name, n+11, "%.*s_%u", cast(int)n, name, p->control_regions.count);
 
 	TB_Node *region = tb_inst_region(p->func);
-	tb_inst_set_region_name(p->module->mod, region, n, new_name);
+	tb_inst_set_region_name(p->func, region, n, new_name);
 
 	GB_ASSERT(p->scope_index >= 0);
 	array_add(&p->control_regions, cgControlRegion{region, p->scope_index});
