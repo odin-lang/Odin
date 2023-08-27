@@ -1621,9 +1621,10 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 	print_usage_line(0, "");
 
 	if (check) {
-		print_usage_line(1, "-file");
+		print_usage_line(1, "-file <file path>");
 		print_usage_line(2, "Tells `%.*s %.*s` to treat the given file as a self-contained package.", LIT(arg0), LIT(command));
 		print_usage_line(2, "This means that `<dir>/a.odin` won't have access to `<dir>/b.odin`'s contents.");
+		print_usage_line(2, "Alternatively, use `%.*s %.*s-file` <file path>", LIT(arg0));	
 		print_usage_line(0, "");
 	}
 
@@ -1642,7 +1643,7 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 	}
 
 	if (run_or_build) {
-		print_usage_line(1, "-out:<filepath>");
+		print_usage_line(1, "-out:<file path>");
 		print_usage_line(2, "Set the file name of the outputted executable");
 		print_usage_line(2, "Example: -out:foo.exe");
 		print_usage_line(0, "");
@@ -1705,7 +1706,7 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 	}
 
 	if (check) {
-		print_usage_line(1, "-collection:<name>=<filepath>");
+		print_usage_line(1, "-collection:<name>=<file path>");
 		print_usage_line(2, "Defines a library collection used for imports");
 		print_usage_line(2, "Example: -collection:shared=dir/to/shared");
 		print_usage_line(2, "Usage in Code:");
@@ -1936,13 +1937,13 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 		print_usage_line(2, "Ignores the Visual Studio search for library paths");
 		print_usage_line(0, "");
 
-		print_usage_line(1, "-resource:<filepath>");
+		print_usage_line(1, "-resource:<file path>");
 		print_usage_line(2, "[Windows only]");
 		print_usage_line(2, "Defines the resource file for the executable");
 		print_usage_line(2, "Example: -resource:path/to/file.rc");
 		print_usage_line(0, "");
 
-		print_usage_line(1, "-pdb-name:<filepath>");
+		print_usage_line(1, "-pdb-name:<file path>");
 		print_usage_line(2, "[Windows only]");
 		print_usage_line(2, "Defines the generated PDB name when -debug is enabled");
 		print_usage_line(2, "Example: -pdb-name:different.pdb");
@@ -2322,7 +2323,8 @@ int main(int arg_count, char const **arg_ptr) {
 	isize  last_non_run_arg = args.count;
 
 	bool run_output = false;
-	if (command == "run" || command == "test") {
+	bool single_file_package = false;
+	if (command == "run" || command == "test" || command == "run-file" || command == "test-file") {
 		if (args.count < 3) {
 			usage(args[0]);
 			return 1;
@@ -2330,6 +2332,9 @@ int main(int arg_count, char const **arg_ptr) {
 		build_context.command_kind = Command_run;
 		if (command == "test") {
 			build_context.command_kind = Command_test;
+		}
+		if (command == "run-file" || command == "test-file") {
+			single_file_package = true;
 		}
 
 		Array<String> run_args = array_make<String>(heap_allocator(), 0, arg_count);
@@ -2351,14 +2356,18 @@ int main(int arg_count, char const **arg_ptr) {
 		init_filename = args[2];
 		run_output = true;
 
-	} else if (command == "build") {
+	} else if (command == "build" || command == "build-file") {
 		if (args.count < 3) {
 			usage(args[0]);
 			return 1;
 		}
 		build_context.command_kind = Command_build;
 		init_filename = args[2];
-	} else if (command == "check") {
+
+		if (command == "build-file") {
+			single_file_package = true;
+		}
+	} else if (command == "check" || command == "check-file") {
 		if (args.count < 3) {
 			usage(args[0]);
 			return 1;
@@ -2366,6 +2375,10 @@ int main(int arg_count, char const **arg_ptr) {
 		build_context.command_kind = Command_check;
 		build_context.no_output_files = true;
 		init_filename = args[2];
+
+		if (command == "check-file") {
+			single_file_package = true;
+		}
 	} else if (command == "strip-semicolon") {
 		if (args.count < 3) {
 			usage(args[0]);
@@ -2444,12 +2457,14 @@ int main(int arg_count, char const **arg_ptr) {
 	if (init_filename.len > 0 && !build_context.show_help) {
 		// The command must be build, run, test, check, or another that takes a directory or filename.
 		if (!path_is_directory(init_filename)) {
-			// Input package is a filename. We allow this only if `-file` was given, otherwise we exit with an error message.
-			bool single_file_package = false;
-			for_array(i, args) {
-				if (i >= 3 && i <= last_non_run_arg && args[i] == "-file") {
-					single_file_package = true;
-					break;
+			// Input package is a filename. We allow this only if `run-file` or `-file` was given, otherwise we exit with an error message.
+			// We already checked for `run-file`.
+			if (!single_file_package) {
+				for_array(i, args) {
+					if (i >= 3 && i <= last_non_run_arg && args[i] == "-file") {
+						single_file_package = true;
+						break;
+					}
 				}
 			}
 
