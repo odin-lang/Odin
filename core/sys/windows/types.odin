@@ -2475,9 +2475,9 @@ OVERLAPPED :: struct {
 }
 
 OVERLAPPED_ENTRY :: struct {
-	lpCompletionKey:            c_ulong,
+	lpCompletionKey:            ULONG_PTR,
 	lpOverlapped:               ^OVERLAPPED,
-	Internal:                   c_ulong,
+	Internal:                   ULONG_PTR,
 	dwNumberOfBytesTransferred: DWORD,
 }
 
