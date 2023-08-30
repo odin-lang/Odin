@@ -612,6 +612,10 @@ View_wantsLayer :: proc "c" (self: ^View) -> BOOL {
 View_setWantsLayer :: proc "c" (self: ^View, wantsLayer: BOOL) {
 	msgSend(nil, self, "setWantsLayer:", wantsLayer)
 }
+@(objc_type=View, objc_name="convertPointFromView")
+View_convertPointFromView :: proc "c" (self: ^View, point: Point, view: ^View) -> Point {
+	return msgSend(Point, self, "convertPoint:fromView:", point, view)
+}
 
 @(objc_class="NSWindow")
 Window :: struct {using _: Responder}
@@ -703,4 +707,8 @@ Window_close :: proc "c" (self: ^Window) {
 @(objc_type=Window, objc_name="setDelegate")
 Window_setDelegate :: proc "c" (self: ^Window, delegate: ^WindowDelegate) {
 	msgSend(nil, self, "setDelegate:", delegate)
+}
+@(objc_type=Window, objc_name="backingScaleFactor")
+Window_backingScaleFactor :: proc "c" (self: ^Window) -> Float {
+	return msgSend(Float, self, "backingScaleFactor")
 }
