@@ -1,3 +1,4 @@
+//+build windows
 package directx_dxc
 import win32 "core:sys/windows"
 import dxgi "vendor:directx/dxgi"
