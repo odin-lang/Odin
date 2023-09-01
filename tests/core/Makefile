@@ -57,3 +57,6 @@ c_libc_test:
 
 net_test:
 	$(ODIN) run net -out:test_core_net
+
+fmt_test:
+	$(ODIN) run fmt -out:test_core_fmt

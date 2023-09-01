@@ -337,6 +337,8 @@ Kilobyte :: 1024 * Byte
 Megabyte :: 1024 * Kilobyte
 Gigabyte :: 1024 * Megabyte
 Terabyte :: 1024 * Gigabyte
+Petabyte :: 1024 * Terabyte
+Exabyte  :: 1024 * Petabyte
 
 // Logging stuff
 
