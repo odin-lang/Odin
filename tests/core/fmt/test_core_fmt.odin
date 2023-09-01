@@ -51,7 +51,7 @@ test_fmt_memory :: proc(t: ^testing.T) {
 	check(t, "3.000 mb", "%#.3m", mem.Megabyte * 3)
 	check(t, "3.50 gb",  "%#m",   u32(mem.Gigabyte * 3.5))
 	check(t, "001tb",    "%5.0m", mem.Terabyte)
-	check(t, "-001tb",   "%5.0m", -mem.Terabyte)
+	check(t, "-01tb",    "%5.0m", -mem.Terabyte)
 	check(t, "2.50 pb",  "%#5.m", uint(mem.Petabyte * 2.5))
 	check(t, "1.00 EB",  "%#M",   mem.Exabyte)
 	check(t, "255 B",    "%#M",   u8(255))
