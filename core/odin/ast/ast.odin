@@ -419,6 +419,7 @@ Range_Stmt :: struct {
 	in_pos:    tokenizer.Pos,
 	expr:      ^Expr,
 	body:      ^Stmt,
+	reverse:   bool,
 }
 
 Inline_Range_Stmt :: struct {
