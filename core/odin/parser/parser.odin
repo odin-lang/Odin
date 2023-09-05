@@ -1666,9 +1666,6 @@ is_token_field_prefix :: proc(p: ^Parser) -> ast.Field_Flag {
 	case .Using:
 		advance_token(p)
 		return .Using
-	case .Auto_Cast:
-		advance_token(p)
-		return .Auto_Cast
 	case .Hash:
 		tok: tokenizer.Token
 		advance_token(p)
