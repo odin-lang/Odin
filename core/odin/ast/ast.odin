@@ -553,6 +553,27 @@ unparen_expr :: proc(expr: ^Expr) -> (val: ^Expr) {
 	return
 }
 
+strip_or_return_expr :: proc(expr: ^Expr) -> (val: ^Expr) {
+	val = expr
+	if expr == nil {
+		return
+	}
+	for {
+		inner: ^Expr
+		#partial switch e in val.derived {
+		case ^Or_Return_Expr:
+			inner = e.expr
+		case ^Paren_Expr:
+			inner = e.expr
+		}
+		if inner == nil {
+			break
+		}
+		val = inner
+	}
+	return
+}
+
 Field_Flags :: distinct bit_set[Field_Flag]
 
 Field_Flag :: enum {
