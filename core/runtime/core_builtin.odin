@@ -601,14 +601,15 @@ assign_at_elems :: proc(array: ^$T/[dynamic]$E, index: int, args: ..E, loc := #c
 
 @builtin
 assign_at_elem_string :: proc(array: ^$T/[dynamic]$E/u8, index: int, arg: string, loc := #caller_location) -> (ok: bool, err: Allocator_Error) #no_bounds_check #optional_allocator_error {
-	if len(args) == 0 {
+	new_size := index + len(arg)
+	if len(arg) == 0 {
 		ok = true
-	} else if index+len(args) < len(array) {
-		copy(array[index:], args)
+	} else if new_size < len(array) {
+		copy(array[index:], arg)
 		ok = true
 	} else {
-		resize(array, index+1+len(args), loc) or_return
-		copy(array[index:], args)
+		resize(array, new_size, loc) or_return
+		copy(array[index:], arg)
 		ok = true
 	}
 	return

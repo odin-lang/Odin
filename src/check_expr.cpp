@@ -629,6 +629,9 @@ gb_internal i64 check_distance_between_types(CheckerContext *c, Operand *operand
 
 	if (operand->mode == Addressing_Type) {
 		if (is_type_typeid(type)) {
+			if (is_type_polymorphic(operand->type)) {
+				return -1;
+			}
 			add_type_info_type(c, operand->type);
 			return 4;
 		}
@@ -1118,10 +1121,17 @@ gb_internal void check_assignment(CheckerContext *c, Operand *operand, Type *typ
 			      LIT(context_name));
 			break;
 		case Addressing_Type:
-			error(operand->expr,
-			      "Cannot assign '%s' which is a type in %.*s",
-			      op_type_str,
-			      LIT(context_name));
+			if (is_type_polymorphic(operand->type)) {
+				error(operand->expr,
+				      "Cannot assign '%s' which is a polymorphic type in %.*s",
+				      op_type_str,
+				      LIT(context_name));
+			} else {
+				error(operand->expr,
+				      "Cannot assign '%s' which is a type in %.*s",
+				      op_type_str,
+				      LIT(context_name));
+			}
 			break;
 		default:
 			// TODO(bill): is this a good enough error message?
@@ -7927,7 +7937,7 @@ gb_internal ExprKind check_ternary_if_expr(CheckerContext *c, Operand *o, Ast *n
 
 	// NOTE(bill, 2023-01-30): Allow for expression like this:
 	//     x: union{f32} = f32(123) if cond else nil
-	if (type_hint && !is_type_any(type_hint) && !ternary_compare_types(x.type, y.type)) {
+	if (type_hint && !is_type_any(type_hint)) {
 		if (check_is_assignable_to(c, &x, type_hint) && check_is_assignable_to(c, &y, type_hint)) {
 			check_cast(c, &x, type_hint);
 			check_cast(c, &y, type_hint);

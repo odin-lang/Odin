@@ -416,6 +416,9 @@ struct TB_Node {
     uint16_t input_count; // number of node inputs
     uint16_t extra_count; // number of bytes for extra operand data
 
+    // local to the TB_Passes
+    uint32_t lattice_id;
+
     TB_Attrib* attribs;
     TB_Node** inputs;
 
@@ -429,8 +432,9 @@ struct TB_Node {
 
 // this represents switch (many targets), if (one target) and goto (only default) logic.
 typedef struct { // TB_BRANCH
-    // avoid empty structs with flexible members
-    int64_t _;
+    size_t succ_count;
+    TB_Node** succ;
+
     int64_t keys[];
 } TB_NodeBranch;
 
@@ -463,11 +467,6 @@ typedef struct {
 typedef struct {
     TB_CharUnits size, align;
 } TB_NodeLocal;
-
-typedef struct {
-    TB_SourceFile* file;
-    int line, column;
-} TB_NodeLine;
 
 typedef struct {
     float value;
@@ -510,12 +509,6 @@ typedef struct {
     // immediate dominator (can be approximate)
     int dom_depth;
     TB_Node* dom;
-
-    size_t succ_count;
-    TB_Node** succ;
-
-    size_t proj_count;
-    TB_Node** projs;
 } TB_NodeRegion;
 
 typedef struct TB_MultiOutput {
@@ -649,6 +642,22 @@ TB_API TB_Assembly* tb_output_get_asm(TB_FunctionOutput* out);
 TB_API TB_Safepoint* tb_safepoint_get(TB_Function* f, uint32_t relative_ip);
 
 ////////////////////////////////
+// JIT compilation
+////////////////////////////////
+typedef struct TB_JIT TB_JIT;
+
+// passing 0 to jit_heap_capacity will default to 4MiB
+TB_API TB_JIT* tb_jit_begin(TB_Module* m, size_t jit_heap_capacity);
+TB_API void* tb_jit_place_function(TB_JIT* jit, TB_Function* f);
+TB_API void* tb_jit_place_global(TB_JIT* jit, TB_Global* g);
+TB_API void tb_jit_end(TB_JIT* jit);
+
+TB_API void* tb_jit_get_code_ptr(TB_Function* f);
+
+// Generates a 2MiB stack
+TB_API void* tb_jit_stack_create(size_t* out_size);
+
+////////////////////////////////
 // Exporter
 ////////////////////////////////
 // Export buffers are generated in chunks because it's easier, usually the
@@ -716,18 +725,8 @@ TB_API void tb_linker_append_object(TB_Linker* l, TB_Slice obj_name, TB_Slice co
 TB_API void tb_linker_append_library(TB_Linker* l, TB_Slice ar_name, TB_Slice content);
 
 ////////////////////////////////
-// JIT compilation
+// Symbols
 ////////////////////////////////
-typedef struct TB_JITContext TB_JITContext;
-
-// passing 0 to jit_heap_capacity will default to 4MiB
-TB_API TB_JITContext* tb_module_begin_jit(TB_Module* m, size_t jit_heap_capacity);
-TB_API void* tb_module_apply_function(TB_JITContext* jit, TB_Function* f);
-TB_API void* tb_module_apply_global(TB_JITContext* jit, TB_Global* g);
-// fixes page permissions, applies missing relocations
-TB_API void tb_module_ready_jit(TB_JITContext* jit);
-TB_API void tb_module_end_jit(TB_JITContext* jit);
-
 #define TB_FOR_FUNCTIONS(it, module) for (TB_Function* it = tb_first_function(module); it != NULL; it = tb_next_function(it))
 TB_API TB_Function* tb_first_function(TB_Module* m);
 TB_API TB_Function* tb_next_function(TB_Function* f);
@@ -889,7 +888,6 @@ TB_API void tb_inst_reset_location(TB_Function* f);
 TB_API TB_Function* tb_function_create(TB_Module* m, ptrdiff_t len, const char* name, TB_Linkage linkage, TB_ComdatType comdat);
 
 TB_API TB_Arena* tb_function_get_arena(TB_Function* f);
-TB_API void* tb_function_get_jit_pos(TB_Function* f);
 
 // if len is -1, it's null terminated
 TB_API void tb_symbol_set_name(TB_Symbol* s, ptrdiff_t len, const char* name);
@@ -909,7 +907,7 @@ TB_API TB_Node* tb_inst_get_control(TB_Function* f);
 TB_API TB_Node* tb_inst_region(TB_Function* f);
 
 // if len is -1, it's null terminated
-TB_API void tb_inst_set_region_name(TB_Module* m, TB_Node* n, ptrdiff_t len, const char* name);
+TB_API void tb_inst_set_region_name(TB_Function* f, TB_Node* n, ptrdiff_t len, const char* name);
 
 TB_API void tb_inst_unreachable(TB_Function* f);
 TB_API void tb_inst_debugbreak(TB_Function* f);
@@ -1048,7 +1046,7 @@ TB_API TB_Node* tb_inst_syscall(TB_Function* f, TB_DataType dt, TB_Node* syscall
 TB_API TB_MultiOutput tb_inst_call(TB_Function* f, TB_FunctionPrototype* proto, TB_Node* target, size_t param_count, TB_Node** params);
 
 // Managed
-TB_API TB_Node* tb_inst_safepoint(TB_Function* f, size_t param_count, TB_Node** params);
+TB_API TB_Node* tb_inst_safepoint(TB_Function* f, TB_Node* poke_site, size_t param_count, TB_Node** params);
 
 TB_API TB_Node* tb_inst_incomplete_phi(TB_Function* f, TB_DataType dt, TB_Node* region, size_t preds);
 TB_API bool tb_inst_add_phi_operand(TB_Function* f, TB_Node* phi, TB_Node* region, TB_Node* val);

@@ -1094,8 +1094,11 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bo
 								}
 								if (is_constant) {
 									LLVMValueRef elem_value = lb_const_value(m, tav.type, tav.value, allow_local).value;
-									GB_ASSERT(LLVMIsConstant(elem_value));
-									values[index] = LLVMConstInsertValue(values[index], elem_value, idx_list, idx_list_len);
+									if (LLVMIsConstant(elem_value)) {
+										values[index] = LLVMConstInsertValue(values[index], elem_value, idx_list, idx_list_len);
+									} else {
+										is_constant = false;
+									}
 								}
 							}
 						}

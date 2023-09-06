@@ -159,7 +159,7 @@ writer_write_rune :: proc(b: ^Writer, r: rune) -> (size: int, err: io.Error) {
 	return
 }
 
-// writer_write writes a string into the buffer
+// writer_write_string writes a string into the buffer
 // It returns the number of bytes written
 // If n < len(p), it will return an error explaining why the write is short
 writer_write_string :: proc(b: ^Writer, s: string) -> (int, io.Error) {
