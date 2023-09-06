@@ -10,11 +10,10 @@ RunLoopMode :: ^String
 
 @(link_prefix="NS")
 foreign Foundation {
-	CommonRunLoopMode:        RunLoopMode
+	RunLoopCommonModes:       RunLoopMode
 	DefaultRunLoopMode:       RunLoopMode
 	EventTrackingRunLoopMode: RunLoopMode
 	ModalPanelRunLoopMode:    RunLoopMode
-	TrackingRunLoopMode:      RunLoopMode
 }
 
 ActivationPolicy :: enum UInteger {
@@ -123,6 +122,10 @@ Application_nextEventMatchingMask :: proc "c" (self: ^Application, mask: EventMa
 @(objc_type=Application, objc_name="sendEvent")
 Application_sendEvent :: proc "c" (self: ^Application, event: ^Event) {
 	msgSend(Event, self, "sendEvent:", event)
+}
+@(objc_type=Application, objc_name="updateWindows")
+Application_updateWindows :: proc "c" (self: ^Application) {
+	msgSend(nil, self, "updateWindows")
 }
 
 

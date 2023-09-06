@@ -92,8 +92,6 @@ TCP_Recv_Error :: enum c.int {
 	Not_Socket                = win.WSAENOTSOCK,
 	Shutdown                  = win.WSAESHUTDOWN,
 	Would_Block               = win.WSAEWOULDBLOCK,
-
-	// TODO: not functionally different from Reset; merge?
 	Aborted                   = win.WSAECONNABORTED, 
 	Timeout                   = win.WSAETIMEDOUT,
 
@@ -107,11 +105,8 @@ TCP_Recv_Error :: enum c.int {
 UDP_Recv_Error :: enum c.int {
 	None                      = 0,
 	Network_Subsystem_Failure = win.WSAENETDOWN,
-
-	// TODO: not functionally different from Reset; merge?
-	// UDP packets are limited in size, and the length of the incoming message exceeded it.
-	Aborted                   = win.WSAECONNABORTED, 
-	Truncated                 = win.WSAEMSGSIZE,
+	Aborted                   = win.WSAECONNABORTED,
+	Buffer_Too_Small          = win.WSAEMSGSIZE,     // The buffer is too small to fit the entire message, and the message was truncated. When this happens, the rest of message is lost.
 	Remote_Not_Listening      = win.WSAECONNRESET,   // The machine at the remote endpoint doesn't have the given port open to receiving UDP data.
 	Shutdown                  = win.WSAESHUTDOWN,
 	Broadcast_Disabled        = win.WSAEACCES,       // A broadcast address was specified, but the .Broadcast socket option isn't set.
@@ -133,7 +128,6 @@ UDP_Recv_Error :: enum c.int {
 TCP_Send_Error :: enum c.int {
 	None                      = 0,
 	
-	// TODO: not functionally different from Reset; merge?
 	Aborted                   = win.WSAECONNABORTED, 
 	Not_Connected             = win.WSAENOTCONN,
 	Shutdown                  = win.WSAESHUTDOWN,
@@ -159,10 +153,9 @@ UDP_Send_Error :: enum c.int {
 	None                      = 0,
 	Network_Subsystem_Failure = win.WSAENETDOWN,
 
-	// TODO: not functionally different from Reset; merge?
-	Aborted                   = win.WSAECONNABORTED, // UDP packets are limited in size, and len(buf) exceeded it.
-	Message_Too_Long          = win.WSAEMSGSIZE,     // The machine at the remote endpoint doesn't have the given port open to receiving UDP data.
-	Remote_Not_Listening      = win.WSAECONNRESET,
+	Aborted                   = win.WSAECONNABORTED,
+	Message_Too_Long          = win.WSAEMSGSIZE, 	 // The message is larger than the maximum UDP packet size.
+	Remote_Not_Listening      = win.WSAECONNRESET,   // The machine at the remote endpoint doesn't have the given port open to receiving UDP data.
 	Shutdown                  = win.WSAESHUTDOWN,    // A broadcast address was specified, but the .Broadcast socket option isn't set.
 	Broadcast_Disabled        = win.WSAEACCES,
 	Bad_Buffer                = win.WSAEFAULT,       // Connection is broken due to keepalive activity detecting a failure during the operation.

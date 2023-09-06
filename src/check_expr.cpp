@@ -7927,7 +7927,7 @@ gb_internal ExprKind check_ternary_if_expr(CheckerContext *c, Operand *o, Ast *n
 
 	// NOTE(bill, 2023-01-30): Allow for expression like this:
 	//     x: union{f32} = f32(123) if cond else nil
-	if (type_hint && !is_type_any(type_hint) && !ternary_compare_types(x.type, y.type)) {
+	if (type_hint && !is_type_any(type_hint)) {
 		if (check_is_assignable_to(c, &x, type_hint) && check_is_assignable_to(c, &y, type_hint)) {
 			check_cast(c, &x, type_hint);
 			check_cast(c, &y, type_hint);

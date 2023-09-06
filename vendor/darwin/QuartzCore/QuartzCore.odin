@@ -55,7 +55,14 @@ MetalLayer_framebufferOnly :: proc "c" (self: ^MetalLayer) -> NS.BOOL {
 MetalLayer_setFramebufferOnly :: proc "c" (self: ^MetalLayer, ok: NS.BOOL) {
 	msgSend(nil, self, "setFramebufferOnly:", ok)
 }
-
+@(objc_type=MetalLayer, objc_name="maximumDrawableCount")
+MetalLayer_maximumDrawableCount :: proc "c" (self: ^MetalLayer) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "maximumDrawableCount")
+}
+@(objc_type=MetalLayer, objc_name="setMaximumDrawableCount")
+MetalLayer_setMaximumDrawableCount :: proc "c" (self: ^MetalLayer, count: NS.UInteger) {
+	msgSend(nil, self, "setMaximumDrawableCount:", count)
+}
 
 @(objc_type=MetalLayer, objc_name="drawableSize")
 MetalLayer_drawableSize :: proc "c" (self: ^MetalLayer) -> NS.Size {
@@ -65,7 +72,22 @@ MetalLayer_drawableSize :: proc "c" (self: ^MetalLayer) -> NS.Size {
 MetalLayer_setDrawableSize :: proc "c" (self: ^MetalLayer, drawableSize: NS.Size) {
 	msgSend(nil, self, "setDrawableSize:", drawableSize)
 }
-
+@(objc_type=MetalLayer, objc_name="displaySyncEnabled")
+MetalLayer_displaySyncEnabled :: proc "c" (self: ^MetalLayer) -> NS.BOOL {
+	return msgSend(NS.BOOL, self, "displaySyncEnabled")
+}
+@(objc_type=MetalLayer, objc_name="setDisplaySyncEnabled")
+MetalLayer_setDisplaySyncEnabled :: proc "c" (self: ^MetalLayer, enabled: NS.BOOL) {
+	msgSend(nil, self, "setDisplaySyncEnabled:", enabled)
+}
+@(objc_type=MetalLayer, objc_name="presentsWithTransaction")
+MetalLayer_presentsWithTransaction :: proc "c" (self: ^MetalLayer) -> NS.BOOL {
+	return msgSend(NS.BOOL, self, "presentsWithTransaction")
+}
+@(objc_type=MetalLayer, objc_name="setPresentsWithTransaction")
+MetalLayer_setPresentsWithTransaction :: proc "c" (self: ^MetalLayer, enabled: NS.BOOL) {
+	msgSend(nil, self, "setPresentsWithTransaction:", enabled)
+}
 
 @(objc_type=MetalLayer, objc_name="frame")
 MetalLayer_frame :: proc "c" (self: ^MetalLayer) -> NS.Rect {
@@ -96,3 +118,10 @@ MetalDrawable_layer :: proc "c" (self: ^MetalDrawable) -> ^MetalLayer {
 MetalDrawable_texture :: proc "c" (self: ^MetalDrawable) -> ^MTL.Texture {
 	return msgSend(^MTL.Texture, self, "texture")
 }
+
+DrawablePresentedHandler :: ^NS.Block
+@(objc_type=MetalDrawable, objc_name="addPresentedHandler")
+MetalDrawable_addPresentedHandler :: proc "c" (self: ^MetalDrawable, block: DrawablePresentedHandler) {
+	msgSend(nil, self, "addPresentedHandler:", block)
+}
+
