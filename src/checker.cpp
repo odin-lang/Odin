@@ -1922,6 +1922,12 @@ gb_internal void add_type_info_type_internal(CheckerContext *c, Type *t) {
 		for_array(i, bt->Union.variants) {
 			add_type_info_type_internal(c, bt->Union.variants[i]);
 		}
+		if (bt->Union.scope != nullptr) {
+			for (auto const &entry : bt->Union.scope->elements) {
+				Entity *e = entry.value;
+				add_type_info_type_internal(c, e->type);
+			}
+		}
 		break;
 
 	case Type_Struct:
@@ -2265,7 +2271,6 @@ gb_internal void add_dependency_to_set(Checker *c, Entity *entity) {
 	if (decl == nullptr) {
 		return;
 	}
-
 	for (Type *t : decl->type_info_deps) {
 		add_min_dep_type_info(c, t);
 	}
