@@ -1212,6 +1212,7 @@ gb_internal Ast *ast_import_decl(AstFile *f, Token token, Token relpath, Token i
 	result->ImportDecl.import_name = import_name;
 	result->ImportDecl.docs        = docs;
 	result->ImportDecl.comment     = comment;
+	result->ImportDecl.attributes.allocator = ast_allocator(f);
 	return result;
 }
 
@@ -4634,7 +4635,9 @@ gb_internal Ast *parse_attribute(AstFile *f, Token token, TokenKind open_kind, T
 		array_add(&decl->ForeignBlockDecl.attributes, attribute);
 	} else if (decl->kind == Ast_ForeignImportDecl) {
 		array_add(&decl->ForeignImportDecl.attributes, attribute);
-	}else {
+	} else if (decl->kind == Ast_ImportDecl) {
+		array_add(&decl->ImportDecl.attributes, attribute);
+	} else {
 		syntax_error(decl, "Expected a value or foreign declaration after an attribute, got %.*s", LIT(ast_strings[decl->kind]));
 		return ast_bad_stmt(f, token, f->curr_token);
 	}

@@ -48,6 +48,11 @@ global_block_descriptor := Block_Descriptor{
 	size     = size_of(Internal_Block_Literal),
 }
 
+foreign import libSystem "system:System.framework"
+foreign libSystem {
+	_NSConcreteGlobalBlock: ^intrinsics.objc_class
+}
+
 @(private="file")
 Block_createInternal :: proc "c" (is_global: bool, user_data: rawptr, user_proc: proc "c" (user_data: rawptr)) -> ^Block {
 	// Set to true on blocks that have captures (and thus are not true
@@ -66,9 +71,8 @@ Block_createInternal :: proc "c" (is_global: bool, user_data: rawptr, user_proc:
 
 	extraBytes :: size_of(Internal_Block_Literal) - size_of(Internal_Block_Literal_Base)
 
-	cls := intrinsics.objc_find_class("NSConcreteGlobalBlock")
-	bl := (^Internal_Block_Literal)(AllocateObject(cls, extraBytes, nil))
-	bl.isa = cls
+	bl := (^Internal_Block_Literal)(AllocateObject(_NSConcreteGlobalBlock, extraBytes, nil))
+	bl.isa = _NSConcreteGlobalBlock
 	bl.flags = BLOCK_IS_GLOBAL if is_global else 0
 	bl.invoke = proc "c" (bl: ^Internal_Block_Literal) {
 		bl.user_proc(bl.user_data)

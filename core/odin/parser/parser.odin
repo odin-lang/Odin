@@ -1431,6 +1431,18 @@ parse_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 			return es
 		case "unroll":
 			return parse_unrolled_for_loop(p, tag)
+		case "reverse":
+			stmt := parse_for_stmt(p)
+
+			if range, is_range := stmt.derived.(^ast.Range_Stmt); is_range {
+				if range.reverse {
+					error(p, range.pos, "#reverse already applied to a 'for in' statement")
+				}
+				range.reverse = true
+			} else {
+				error(p, range.pos, "#reverse can only be applied to a 'for in' statement")
+			}
+			return stmt
 		case "include":
 			error(p, tag.pos, "#include is not a valid import declaration kind. Did you meant 'import'?")
 			return ast.new(ast.Bad_Stmt, tok.pos, end_pos(tag))

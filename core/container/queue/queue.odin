@@ -56,7 +56,7 @@ space :: proc(q: $Q/Queue($T)) -> int {
 
 // Reserve enough space for at least the specified capacity
 reserve :: proc(q: ^$Q/Queue($T), capacity: int) -> runtime.Allocator_Error {
-	if uint(capacity) > q.len {
+	if capacity > space(q^) {
 		return _grow(q, uint(capacity)) 
 	}
 	return nil

@@ -17,9 +17,7 @@ when ODIN_OS == .Windows {
 		"cmark_static.lib",
 	}
 } else when ODIN_OS == .Linux {
-	foreign import lib {
-		"libcmark.a",
-	}
+	foreign import lib "system:cmark"
 }
 
 Option :: enum c.int {
