@@ -132,6 +132,7 @@ foreign kernel32 {
 	SetThreadPriority :: proc(thread: HANDLE, priority: c_int) -> BOOL ---
 	GetExitCodeThread :: proc(thread: HANDLE, exit_code: ^DWORD) -> BOOL ---
 	TerminateThread :: proc(thread: HANDLE, exit_code: DWORD) -> BOOL ---
+	SuspendThread :: proc(hThread: HANDLE) -> DWORD ---
 
 	GetProcessAffinityMask :: proc(
 		hProcess: HANDLE,
