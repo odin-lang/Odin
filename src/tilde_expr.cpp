@@ -1193,6 +1193,9 @@ gb_internal cgValue cg_emit_conv(cgProcedure *p, cgValue value, Type *t) {
 		GB_ASSERT(is_type_typed(st));
 
 		data = cg_emit_conv(p, data, t_rawptr);
+		if (p->name == "main@main") {
+			GB_PANIC("HERE %s %llu", type_to_string(st), cg_typeid_as_u64(p->module, value.type));
+		}
 
 		cgValue id = cg_typeid(p, st);
 		cgValue data_ptr = cg_emit_struct_ep(p, result.addr, 0);

@@ -118,6 +118,11 @@ gb_internal u64 cg_typeid_as_u64(cgModule *m, Type *type) {
 		data |= (special  &~ (1ull<<1))  << 62ull; // special
 		data |= (reserved &~ (1ull<<1))  << 63ull; // reserved
 	}
+
+	if (type == t_string) {
+		gb_printf_err("%llu\n", data);
+	}
+
 	return data;
 }
 
@@ -449,7 +454,7 @@ gb_internal void cg_setup_type_info_data(cgModule *m) {
 		u32 flags = type_info_flags_of_type(t);
 		u64 id    = cg_typeid_as_u64(m, t);
 
-		void *size_ptr  = tb_global_add_region(m->mod,  global, offset+size_offset, build_context.int_size);
+		void *size_ptr  = tb_global_add_region(m->mod, global, offset+size_offset,  build_context.int_size);
 		void *align_ptr = tb_global_add_region(m->mod, global, offset+align_offset, build_context.int_size);
 		void *flags_ptr = tb_global_add_region(m->mod, global, offset+flags_offset, 4);
 		void *id_ptr    = tb_global_add_region(m->mod, global, offset+id_offset,    build_context.ptr_size);

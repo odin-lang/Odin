@@ -373,9 +373,9 @@ gb_internal WORKER_TASK_PROC(cg_procedure_compile_worker_proc) {
 
 	// optimization passes
 	if (false) {
-		tb_pass_peephole(opt);
+		tb_pass_peephole(opt, TB_PEEPHOLE_ALL);
 		tb_pass_mem2reg(opt);
-		tb_pass_peephole(opt);
+		tb_pass_peephole(opt, TB_PEEPHOLE_ALL);
 	}
 
 	bool emit_asm = false;
@@ -572,7 +572,7 @@ gb_internal cgValue cg_emit_call(cgProcedure * p, cgValue value, Slice<cgValue> 
 			TB_CharUnits size = cast(TB_CharUnits)type_size_of(return_type);
 			TB_CharUnits align = cast(TB_CharUnits)gb_max(type_align_of(return_type), 16);
 			TB_Node *local = tb_inst_local(p->func, size, align);
-			tb_inst_memzero(p->func, local, tb_inst_uint(p->func, TB_TYPE_INT, size), align, false);
+			tb_inst_memzero(p->func, local, tb_inst_uint(p->func, TB_TYPE_INT, size), align);
 			params[param_index++] = local;
 		}
 	}
@@ -626,7 +626,7 @@ gb_internal cgValue cg_emit_call(cgProcedure * p, cgValue value, Slice<cgValue> 
 			TB_CharUnits align = cast(TB_CharUnits)gb_max(type_align_of(result), 16);
 			TB_Node *local = tb_inst_local(p->func, size, align);
 			// TODO(bill): Should this need to be zeroed any way?
-			tb_inst_memzero(p->func, local, tb_inst_uint(p->func, TB_TYPE_INT, size), align, false);
+			tb_inst_memzero(p->func, local, tb_inst_uint(p->func, TB_TYPE_INT, size), align);
 			params[param_index++] = local;
 		}
 	}
