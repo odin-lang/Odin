@@ -35,8 +35,8 @@ Floating-point, complex numbers, and quaternions:
 	%F    synonym for %f
 	%h    hexadecimal (lower-case) representation with 0h prefix (0h01234abcd)
 	%H    hexadecimal (upper-case) representation with 0H prefix (0h01234ABCD)
-	%m    number of bytes in the best unit of measurement, e.g. 123.45mb
-	%M    number of bytes in the best unit of measurement, e.g. 123.45MB
+	%m    number of bytes in the best unit of measurement, e.g. 123.45mib
+	%M    number of bytes in the best unit of measurement, e.g. 123.45MiB
 String and slice of bytes
 	%s    the uninterpreted bytes of the string or slice
 	%q    a double-quoted string safely escaped with Odin syntax
