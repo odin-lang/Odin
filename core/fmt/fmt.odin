@@ -1049,8 +1049,8 @@ _fmt_int_128 :: proc(fi: ^Info, u: u128, base: int, is_signed: bool, bit_size: i
 	_pad(fi, s)
 }
 // Units of measurements:
-__MEMORY_LOWER := " b kb mb gb tb pb eb"
-__MEMORY_UPPER := " B KB MB GB TB PB EB"
+__MEMORY_LOWER := " b kib mib gib tib pib eib"
+__MEMORY_UPPER := " B KiB MiB GiB TiB PiB EiB"
 // Formats an integer value as bytes with the best representation.
 //
 // Inputs:
@@ -1069,13 +1069,13 @@ _fmt_memory :: proc(fi: ^Info, u: u64, is_signed: bool, bit_size: int, units: st
 	div, off, unit_len := 1, 0, 1
 	for n := abs; n >= mem.Kilobyte; n /= mem.Kilobyte {
 		div *= mem.Kilobyte
-		off += 3
+		off += 4
 
 		// First iteration is slightly different because you go from
 		// units of length 1 to units of length 2.
 		if unit_len == 1 {
 			off = 2
-			unit_len  = 2
+			unit_len  = 3
 		}
 	}
 
