@@ -20,7 +20,7 @@ List :: struct {
 
 
 Node :: struct {
-	next, prev: ^Node,
+	prev, next: ^Node,
 }
 
 push_front :: proc(list: ^List, node: ^Node) {
