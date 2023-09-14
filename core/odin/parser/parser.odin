@@ -1666,9 +1666,6 @@ is_token_field_prefix :: proc(p: ^Parser) -> ast.Field_Flag {
 	case .Using:
 		advance_token(p)
 		return .Using
-	case .Auto_Cast:
-		advance_token(p)
-		return .Auto_Cast
 	case .Hash:
 		tok: tokenizer.Token
 		advance_token(p)
@@ -2153,7 +2150,7 @@ parse_inlining_operand :: proc(p: ^Parser, lhs: bool, tok: tokenizer.Token) -> ^
 		}
 	}
 
-	#partial switch e in ast.unparen_expr(expr).derived_expr {
+	#partial switch e in ast.strip_or_return_expr(expr).derived_expr {
 	case ^ast.Proc_Lit:
 		if e.inlining != .None && e.inlining != pi {
 			error(p, expr.pos, "both 'inline' and 'no_inline' cannot be applied to a procedure literal")

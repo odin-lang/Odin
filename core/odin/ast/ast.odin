@@ -553,6 +553,27 @@ unparen_expr :: proc(expr: ^Expr) -> (val: ^Expr) {
 	return
 }
 
+strip_or_return_expr :: proc(expr: ^Expr) -> (val: ^Expr) {
+	val = expr
+	if expr == nil {
+		return
+	}
+	for {
+		inner: ^Expr
+		#partial switch e in val.derived {
+		case ^Or_Return_Expr:
+			inner = e.expr
+		case ^Paren_Expr:
+			inner = e.expr
+		}
+		if inner == nil {
+			break
+		}
+		val = inner
+	}
+	return
+}
+
 Field_Flags :: distinct bit_set[Field_Flag]
 
 Field_Flag :: enum {
@@ -563,7 +584,7 @@ Field_Flag :: enum {
 	Using,
 	No_Alias,
 	C_Vararg,
-	Auto_Cast,
+	Const,
 	Any_Int,
 	Subtype,
 	By_Ptr,
@@ -582,7 +603,7 @@ field_flag_strings := [Field_Flag]string{
 	.Using              = "using",
 	.No_Alias           = "#no_alias",
 	.C_Vararg           = "#c_vararg",
-	.Auto_Cast          = "auto_cast",
+	.Const              = "#const",
 	.Any_Int            = "#any_int",
 	.Subtype            = "#subtype",
 	.By_Ptr             = "#by_ptr",
@@ -596,6 +617,7 @@ field_flag_strings := [Field_Flag]string{
 field_hash_flag_strings := []struct{key: string, flag: Field_Flag}{
 	{"no_alias", .No_Alias},
 	{"c_vararg", .C_Vararg},
+	{"const",    .Const},
 	{"any_int",  .Any_Int},
 	{"subtype",  .Subtype},
 	{"by_ptr",   .By_Ptr},
@@ -616,7 +638,7 @@ Field_Flags_Signature :: Field_Flags{
 	.Using,
 	.No_Alias,
 	.C_Vararg,
-	.Auto_Cast,
+	.Const,
 	.Any_Int,
 	.By_Ptr,
 	.Default_Parameters,
