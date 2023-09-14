@@ -1048,6 +1048,65 @@ _fmt_int_128 :: proc(fi: ^Info, u: u128, base: int, is_signed: bool, bit_size: i
 	fi.zero = false
 	_pad(fi, s)
 }
+// Units of measurements:
+__MEMORY_LOWER := " b kib mib gib tib pib eib"
+__MEMORY_UPPER := " B KiB MiB GiB TiB PiB EiB"
+// Formats an integer value as bytes with the best representation.
+//
+// Inputs:
+// - fi: A pointer to an Info structure
+// - u: The integer value to format
+// - is_signed: A boolean indicating if the integer is signed
+// - bit_size: The bit size of the integer
+// - digits: A string containing the digits for formatting
+//
+_fmt_memory :: proc(fi: ^Info, u: u64, is_signed: bool, bit_size: int, units: string) {
+	abs, neg := strconv.is_integer_negative(u, is_signed, bit_size)
+
+	// Default to a precision of 2, but if less than a kb, 0
+	prec := fi.prec if (fi.prec_set || abs < mem.Kilobyte) else 2
+
+	div, off, unit_len := 1, 0, 1
+	for n := abs; n >= mem.Kilobyte; n /= mem.Kilobyte {
+		div *= mem.Kilobyte
+		off += 4
+
+		// First iteration is slightly different because you go from
+		// units of length 1 to units of length 2.
+		if unit_len == 1 {
+			off = 2
+			unit_len  = 3
+		}
+	}
+
+	// If hash, we add a space between the value and the suffix.
+	if fi.hash {
+		unit_len += 1
+	} else {
+		off += 1
+	}
+
+	amt := f64(abs) / f64(div)
+	if neg {
+		amt = -amt
+	}
+
+	buf: [256]byte
+	str := strconv.append_float(buf[:], amt, 'f', prec, 64)
+
+	// Add the unit at the end.
+	copy(buf[len(str):], units[off:off+unit_len])
+	str = string(buf[:len(str)+unit_len])
+	 
+	 if !fi.plus {
+	 	// Strip sign from "+<value>" but not "+Inf".
+	 	if str[0] == '+' && str[1] != 'I' {
+			str = str[1:] 
+		}
+	}
+
+	_pad(fi, str)
+}
 // Hex Values:
 __DIGITS_LOWER := "0123456789abcdefx"
 __DIGITS_UPPER := "0123456789ABCDEFX"
@@ -1096,6 +1155,8 @@ fmt_int :: proc(fi: ^Info, u: u64, is_signed: bool, bit_size: int, verb: rune) {
 			io.write_string(fi.writer, "U+", &fi.n)
 			_fmt_int(fi, u, 16, false, bit_size, __DIGITS_UPPER)
 		}
+	case 'm': _fmt_memory(fi, u, is_signed, bit_size, __MEMORY_LOWER)
+	case 'M': _fmt_memory(fi, u, is_signed, bit_size, __MEMORY_UPPER)
 
 	case:
 		fmt_bad_verb(fi, verb)
