@@ -15,6 +15,7 @@ GUID    :: dxgi.GUID
 IID     :: dxgi.IID
 SIZE_T  :: dxgi.SIZE_T
 BOOL    :: dxgi.BOOL
+UINT    :: dxgi.UINT
 
 RECT :: dxgi.RECT
 SIZE :: dxgi.SIZE
@@ -5145,4 +5146,8 @@ MESSAGE_ID :: enum u32 {
 	END_TRACKED_WORKLOAD_INVALID_ARG,
 	TRACKED_WORKLOAD_DISJOINT_FAILURE,
 	D3D11_5_MESSAGES_END,
+}
+
+CalcSubresource :: #force_inline proc "contextless" (MipSlice: UINT, ArraySlice: UINT, MipLevels: UINT) -> UINT {
+	return MipSlice + ArraySlice * MipLevels
 }
