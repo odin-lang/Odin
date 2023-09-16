@@ -34,3 +34,6 @@ package shoco is an implementation of the shoco short string compressor
 # Compress/Zlib
 Zlib Utility
 
+
+
+for more package docs, go to [here](https://pkg.odin-lang.org/core/)
