@@ -404,7 +404,7 @@ opt_write_key :: proc(w: io.Writer, opt: ^Marshal_Options, name: string) -> (err
 	switch opt.spec {
 	case .JSON, .JSON5:
 		io.write_quoted_string(w, name) or_return
-		io.write_string(w, ": ") or_return
+		io.write_string(w, ": " if opt.pretty else ":") or_return
 
 	case .MJSON:
 		if opt.mjson_keys_use_quotes {
@@ -412,11 +412,11 @@ opt_write_key :: proc(w: io.Writer, opt: ^Marshal_Options, name: string) -> (err
 		} else {
 			io.write_string(w, name) or_return
 		}
-		
+
 		if opt.mjson_keys_use_equal_sign {
-			io.write_string(w, " = ") or_return
+			io.write_string(w, " = " if opt.pretty else "=") or_return
 		} else {
-			io.write_string(w, ": ") or_return
+			io.write_string(w, ": " if opt.pretty else ":") or_return
 		}
 	}	
 
@@ -446,7 +446,7 @@ opt_write_iteration :: proc(w: io.Writer, opt: ^Marshal_Options, iteration: int)
 	switch opt.spec {
 	case .JSON, .JSON5: 
 		if iteration > 0 {
-			io.write_string(w, ", ") or_return
+			io.write_byte(w, ',') or_return
 
 			if opt.pretty {
 				io.write_byte(w, '\n') or_return
@@ -462,7 +462,7 @@ opt_write_iteration :: proc(w: io.Writer, opt: ^Marshal_Options, iteration: int)
 				io.write_byte(w, '\n') or_return
 			} else {
 				// comma separation necessary for non pretty output!
-				io.write_string(w, ", ") or_return
+				io.write_byte(w, ',') or_return
 			}
 		}
 
