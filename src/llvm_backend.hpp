@@ -6,13 +6,7 @@
 #include "llvm-c/Object.h"
 #include "llvm-c/BitWriter.h"
 #include "llvm-c/DebugInfo.h"
-#include "llvm-c/Transforms/AggressiveInstCombine.h"
-#include "llvm-c/Transforms/InstCombine.h"
-#include "llvm-c/Transforms/IPO.h"
-#include "llvm-c/Transforms/PassManagerBuilder.h"
-#include "llvm-c/Transforms/Scalar.h"
-#include "llvm-c/Transforms/Utils.h"
-#include "llvm-c/Transforms/Vectorize.h"
+#include "llvm-c/Transforms/PassBuilder.h"
 #else
 #include <llvm-c/Core.h>
 #include <llvm-c/ExecutionEngine.h>
@@ -169,6 +163,8 @@ struct lbModule {
 	Array<Entity *> global_procedures_and_types_to_create;
 
 	lbProcedure *curr_procedure;
+
+	LLVMBuilderRef const_dummy_builder;
 
 	LLVMDIBuilderRef debug_builder;
 	LLVMMetadataRef debug_compile_unit;

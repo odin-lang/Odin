@@ -168,7 +168,7 @@ gb_internal lbValue lb_equal_proc_for_type(lbModule *m, Type *type) {
 	map_set(&m->equal_procs, type, p);
 	lb_begin_procedure_body(p);
 
-	lb_add_attribute_to_proc(m, p->value, "readonly");
+	// lb_add_attribute_to_proc(m, p->value, "readonly");
 	lb_add_attribute_to_proc(m, p->value, "nounwind");
 
 	LLVMValueRef x = LLVMGetParam(p->value, 0);
@@ -337,7 +337,7 @@ gb_internal lbValue lb_hasher_proc_for_type(lbModule *m, Type *type) {
 	lb_begin_procedure_body(p);
 	defer (lb_end_procedure_body(p));
 
-	lb_add_attribute_to_proc(m, p->value, "readonly");
+	// lb_add_attribute_to_proc(m, p->value, "readonly");
 	lb_add_attribute_to_proc(m, p->value, "nounwind");
 
 	LLVMValueRef x = LLVMGetParam(p->value, 0);
@@ -346,7 +346,7 @@ gb_internal lbValue lb_hasher_proc_for_type(lbModule *m, Type *type) {
 	lbValue seed = {y, t_uintptr};
 
 	lb_add_proc_attribute_at_index(p, 1+0, "nonnull");
-	lb_add_proc_attribute_at_index(p, 1+0, "readonly");
+	// lb_add_proc_attribute_at_index(p, 1+0, "readonly");
 
 	if (is_type_simple_compare(type)) {
 		lbValue res = lb_simple_compare_hash(p, type, data, seed);

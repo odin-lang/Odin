@@ -1,4 +1,4 @@
-/*===------- llvm/Config/llvm-config.h - llvm configuration -------*- C -*-===*/
+/*===------- llvm-c/Config//llvm-config.h - llvm configuration -------*- C -*-===*/
 /*                                                                            */
 /* Part of the LLVM Project, under the Apache License v2.0 with LLVM          */
 /* Exceptions.                                                                */
@@ -66,7 +66,7 @@
 #define LLVM_USE_PERF 0
 
 /* Major version of the LLVM API */
-#define LLVM_VERSION_MAJOR 12
+#define LLVM_VERSION_MAJOR 17
 
 /* Minor version of the LLVM API */
 #define LLVM_VERSION_MINOR 0
@@ -75,7 +75,7 @@
 #define LLVM_VERSION_PATCH 1
 
 /* LLVM version string */
-#define LLVM_VERSION_STRING "12.0.1"
+#define LLVM_VERSION_STRING "17.0.1"
 
 /* Whether LLVM records statistics for use with GetStatistics(),
  * PrintStatistics() or PrintStatisticsJSON()

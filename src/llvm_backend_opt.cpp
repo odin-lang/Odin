@@ -65,6 +65,7 @@ gb_internal void lb_basic_populate_function_pass_manager(LLVMPassManagerRef fpm,
 		return;
 	}
 
+/*
 	if (false && optimization_level <= 0 && build_context.ODIN_DEBUG) {
 		LLVMAddMergedLoadStoreMotionPass(fpm);
 	} else {
@@ -75,6 +76,7 @@ gb_internal void lb_basic_populate_function_pass_manager(LLVMPassManagerRef fpm,
 			LLVMAddEarlyCSEPass(fpm);
 		}
 	}
+*/
 }
 
 gb_internal void lb_populate_function_pass_manager(lbModule *m, LLVMPassManagerRef fpm, bool ignore_memcpy_pass, i32 optimization_level) {
@@ -82,6 +84,7 @@ gb_internal void lb_populate_function_pass_manager(lbModule *m, LLVMPassManagerR
 		return;
 	}
 
+/*
 	if (ignore_memcpy_pass) {
 		lb_basic_populate_function_pass_manager(fpm, optimization_level);
 		return;
@@ -109,6 +112,7 @@ gb_internal void lb_populate_function_pass_manager(lbModule *m, LLVMPassManagerR
 	LLVMAddEarlyCSEPass(fpm);
 	LLVMAddLowerExpectIntrinsicPass(fpm);
 #endif
+*/
 }
 
 gb_internal void lb_populate_function_pass_manager_specific(lbModule *m, LLVMPassManagerRef fpm, i32 optimization_level) {
@@ -116,6 +120,7 @@ gb_internal void lb_populate_function_pass_manager_specific(lbModule *m, LLVMPas
 		return;
 	}
 
+/*
 	if (optimization_level <= 0) {
 		LLVMAddMemCpyOptPass(fpm);
 		lb_basic_populate_function_pass_manager(fpm, optimization_level);
@@ -183,6 +188,7 @@ gb_internal void lb_add_function_simplifcation_passes(LLVMPassManagerRef mpm, i3
 	LLVMAddLoopRerollPass(mpm);
 	LLVMAddAggressiveDCEPass(mpm);
 	LLVMAddCFGSimplificationPass(mpm);
+*/
 }
 
 
@@ -193,7 +199,7 @@ gb_internal void lb_populate_module_pass_manager(LLVMTargetMachineRef target_mac
 	if (optimization_level <= 0 && build_context.ODIN_DEBUG) {
 		return;
 	}
-
+/*
 	LLVMAddAlwaysInlinerPass(mpm);
 	LLVMAddStripDeadPrototypesPass(mpm);
 	LLVMAddAnalysisPasses(target_machine, mpm);
@@ -263,6 +269,7 @@ gb_internal void lb_populate_module_pass_manager(LLVMTargetMachineRef target_mac
 	}
 
 	LLVMAddCFGSimplificationPass(mpm);
+*/
 }
 
 

@@ -75,8 +75,8 @@ gb_internal String lb_get_const_string(lbModule *m, lbValue value) {
 
 	unsigned     ptr_indices[1] = {0};
 	unsigned     len_indices[1] = {1};
-	LLVMValueRef underlying_ptr = LLVMConstExtractValue(value.value, ptr_indices, gb_count_of(ptr_indices));
-	LLVMValueRef underlying_len = LLVMConstExtractValue(value.value, len_indices, gb_count_of(len_indices));
+	LLVMValueRef underlying_ptr = llvm_const_extract_value(m, value.value, ptr_indices, gb_count_of(ptr_indices));
+	LLVMValueRef underlying_len = llvm_const_extract_value(m, value.value, len_indices, gb_count_of(len_indices));
 
 	GB_ASSERT(LLVMGetConstOpcode(underlying_ptr) == LLVMGetElementPtr);
 	underlying_ptr = LLVMGetOperand(underlying_ptr, 0);
@@ -1096,7 +1096,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bo
 								if (is_constant) {
 									LLVMValueRef elem_value = lb_const_value(m, tav.type, tav.value, allow_local).value;
 									if (LLVMIsConstant(elem_value)) {
-										values[index] = LLVMConstInsertValue(values[index], elem_value, idx_list, idx_list_len);
+										values[index] = llvm_const_insert_value(m, values[index], elem_value, idx_list, idx_list_len);
 									} else {
 										is_constant = false;
 									}
