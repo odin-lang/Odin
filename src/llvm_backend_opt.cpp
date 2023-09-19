@@ -55,6 +55,16 @@ gb_internal void lb_populate_function_pass_manager_specific(lbModule *m, LLVMPas
 #define LLVM_ADD_CONSTANT_VALUE_PASS(fpm) 
 #endif
 
+#if LLVM_VERSION_MAJOR == 15 || LLVM_VERSION_MAJOR == 16
+#error "LLVM versions 15 and 16 are not supported"
+#endif
+
+#if LLVM_VERSION_MAJOR >= 17
+#define LB_USE_NEW_PASS_SYSTEM 1
+#else
+#define LB_USE_NEW_PASS_SYSTEM 0
+#endif
+
 gb_internal bool lb_opt_ignore(i32 optimization_level) {
 	optimization_level = gb_clamp(optimization_level, -1, 2);
 	return optimization_level == -1;
@@ -65,7 +75,7 @@ gb_internal void lb_basic_populate_function_pass_manager(LLVMPassManagerRef fpm,
 		return;
 	}
 
-/*
+#if !LB_USE_NEW_PASS_SYSTEM
 	if (false && optimization_level <= 0 && build_context.ODIN_DEBUG) {
 		LLVMAddMergedLoadStoreMotionPass(fpm);
 	} else {
@@ -76,7 +86,7 @@ gb_internal void lb_basic_populate_function_pass_manager(LLVMPassManagerRef fpm,
 			LLVMAddEarlyCSEPass(fpm);
 		}
 	}
-*/
+#endif
 }
 
 gb_internal void lb_populate_function_pass_manager(lbModule *m, LLVMPassManagerRef fpm, bool ignore_memcpy_pass, i32 optimization_level) {
@@ -84,7 +94,7 @@ gb_internal void lb_populate_function_pass_manager(lbModule *m, LLVMPassManagerR
 		return;
 	}
 
-/*
+#if !LB_USE_NEW_PASS_SYSTEM
 	if (ignore_memcpy_pass) {
 		lb_basic_populate_function_pass_manager(fpm, optimization_level);
 		return;
@@ -112,7 +122,7 @@ gb_internal void lb_populate_function_pass_manager(lbModule *m, LLVMPassManagerR
 	LLVMAddEarlyCSEPass(fpm);
 	LLVMAddLowerExpectIntrinsicPass(fpm);
 #endif
-*/
+#endif
 }
 
 gb_internal void lb_populate_function_pass_manager_specific(lbModule *m, LLVMPassManagerRef fpm, i32 optimization_level) {
@@ -120,7 +130,7 @@ gb_internal void lb_populate_function_pass_manager_specific(lbModule *m, LLVMPas
 		return;
 	}
 
-/*
+#if !LB_USE_NEW_PASS_SYSTEM
 	if (optimization_level <= 0) {
 		LLVMAddMemCpyOptPass(fpm);
 		lb_basic_populate_function_pass_manager(fpm, optimization_level);
@@ -153,9 +163,11 @@ gb_internal void lb_populate_function_pass_manager_specific(lbModule *m, LLVMPas
 	LLVMAddEarlyCSEPass(fpm);
 	LLVMAddLowerExpectIntrinsicPass(fpm);
 #endif
+#endif
 }
 
 gb_internal void lb_add_function_simplifcation_passes(LLVMPassManagerRef mpm, i32 optimization_level) {
+#if !LB_USE_NEW_PASS_SYSTEM
 	LLVMAddCFGSimplificationPass(mpm);
 
 	LLVMAddJumpThreadingPass(mpm);
@@ -188,7 +200,7 @@ gb_internal void lb_add_function_simplifcation_passes(LLVMPassManagerRef mpm, i3
 	LLVMAddLoopRerollPass(mpm);
 	LLVMAddAggressiveDCEPass(mpm);
 	LLVMAddCFGSimplificationPass(mpm);
-*/
+#endif
 }
 
 
@@ -199,7 +211,7 @@ gb_internal void lb_populate_module_pass_manager(LLVMTargetMachineRef target_mac
 	if (optimization_level <= 0 && build_context.ODIN_DEBUG) {
 		return;
 	}
-/*
+#if !LB_USE_NEW_PASS_SYSTEM
 	LLVMAddAlwaysInlinerPass(mpm);
 	LLVMAddStripDeadPrototypesPass(mpm);
 	LLVMAddAnalysisPasses(target_machine, mpm);
@@ -269,7 +281,7 @@ gb_internal void lb_populate_module_pass_manager(LLVMTargetMachineRef target_mac
 	}
 
 	LLVMAddCFGSimplificationPass(mpm);
-*/
+#endif
 }
 
 
