@@ -343,7 +343,7 @@ unquote_string :: proc(token: Token, spec: Specification, allocator := context.a
 			i += 1
 			continue
 		}
-		r, w := utf8.decode_rune_in_string(s)
+		r, w := utf8.decode_rune_in_string(s[i:])
 		if r == utf8.RUNE_ERROR && w == 1 {
 			break
 		}
