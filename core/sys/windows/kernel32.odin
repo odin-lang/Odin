@@ -132,6 +132,21 @@ foreign kernel32 {
 	SetThreadPriority :: proc(thread: HANDLE, priority: c_int) -> BOOL ---
 	GetExitCodeThread :: proc(thread: HANDLE, exit_code: ^DWORD) -> BOOL ---
 	TerminateThread :: proc(thread: HANDLE, exit_code: DWORD) -> BOOL ---
+	SuspendThread :: proc(hThread: HANDLE) -> DWORD ---
+
+	GetProcessAffinityMask :: proc(
+		hProcess: HANDLE,
+		lpProcessAffinityMask: PDWORD_PTR,
+		lpSystemAffinityMask: PDWORD_PTR,
+	) -> BOOL ---
+	SetProcessAffinityMask :: proc(
+		hProcess: HANDLE,
+		dwProcessAffinityMask: DWORD_PTR,
+	) -> BOOL ---
+	SetThreadAffinityMask :: proc(
+		hThread: HANDLE,
+		dwThreadAffinityMask: DWORD_PTR,
+	) -> DWORD_PTR ---
 
 	CreateSemaphoreW :: proc(attributes: LPSECURITY_ATTRIBUTES, initial_count, maximum_count: LONG, name: LPCWSTR) -> HANDLE ---
 	ReleaseSemaphore :: proc(semaphore: HANDLE, release_count: LONG, previous_count: ^LONG) -> BOOL ---

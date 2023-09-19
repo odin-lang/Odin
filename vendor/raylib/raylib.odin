@@ -901,7 +901,7 @@ foreign lib {
 	IsWindowMaximized        :: proc() -> bool  ---                             // Check if window is currently maximized (only PLATFORM_DESKTOP)
 	IsWindowFocused          :: proc() -> bool  ---                             // Check if window is currently focused (only PLATFORM_DESKTOP)
 	IsWindowResized          :: proc() -> bool  ---                             // Check if window has been resized last frame
-	IsWindowState            :: proc(flag: ConfigFlag) -> bool  ---             // Check if one specific window flag is enabled
+	IsWindowState            :: proc(flags: ConfigFlags) -> bool  ---           // Check if one specific window flag is enabled
 	SetWindowState           :: proc(flags: ConfigFlags) ---                    // Set window configuration state using flags (only PLATFORM_DESKTOP)
 	ClearWindowState         :: proc(flags: ConfigFlags) ---                    // Clear window configuration state flags
 	ToggleFullscreen         :: proc() ---                                      // Toggle window state: fullscreen/windowed (only PLATFORM_DESKTOP)

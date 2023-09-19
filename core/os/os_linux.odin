@@ -441,7 +441,7 @@ pollfd :: struct {
 sigset_t :: distinct u64
 
 foreign libc {
-	@(link_name="__errno_location") __errno_location    :: proc() -> ^int ---
+	@(link_name="__errno_location") __errno_location    :: proc() -> ^c.int ---
 
 	@(link_name="getpagesize")      _unix_getpagesize   :: proc() -> c.int ---
 	@(link_name="get_nprocs")       _unix_get_nprocs    :: proc() -> c.int ---
@@ -488,7 +488,7 @@ _get_errno :: proc(res: int) -> Errno {
 
 // get errno from libc
 get_last_error :: proc "contextless" () -> int {
-	return __errno_location()^
+	return int(__errno_location()^)
 }
 
 personality :: proc(persona: u64) -> (Errno) {

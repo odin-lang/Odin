@@ -1,19 +1,10 @@
 package directx_dxc
-import win32 "core:sys/windows"
-import dxgi "vendor:directx/dxgi"
-foreign import "dxcompiler.lib"
 
-BOOL            :: dxgi.BOOL
-SIZE_T          :: dxgi.SIZE_T
-ULONG           :: dxgi.ULONG
-CLSID           :: dxgi.GUID
-IID             :: dxgi.IID
-HRESULT         :: dxgi.HRESULT
-IUnknown        :: dxgi.IUnknown
-IUnknown_VTable :: dxgi.IUnknown_VTable
-wstring         :: win32.wstring
-FILETIME        :: win32.FILETIME
-BSTR            :: wstring
+when ODIN_OS == .Windows {
+	foreign import dxcompiler "dxcompiler.lib"
+} else {
+	foreign import dxcompiler "system:dxcompiler"
+}
 
 @(default_calling_convention="c", link_prefix="Dxc")
 foreign dxcompiler {
@@ -33,12 +24,12 @@ IMalloc :: struct #raw_union {
 }
 IMalloc_VTable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
-	Alloc:          proc "stdcall" (this: ^IMalloc, cb: SIZE_T) -> rawptr,
-	Realloc:        proc "stdcall" (this: ^IMalloc, pv: rawptr, cb: SIZE_T) -> rawptr,
-	Free:           proc "stdcall" (this: ^IMalloc, pv: rawptr),
-	GetSize:        proc "stdcall" (this: ^IMalloc, pv: rawptr) -> SIZE_T,
-	DidAlloc:       proc "stdcall" (this: ^IMalloc, pv: rawptr) -> i32,
-	HeapMinimize:   proc "stdcall" (this: ^IMalloc),
+	Alloc:          proc "system" (this: ^IMalloc, cb: SIZE_T) -> rawptr,
+	Realloc:        proc "system" (this: ^IMalloc, pv: rawptr, cb: SIZE_T) -> rawptr,
+	Free:           proc "system" (this: ^IMalloc, pv: rawptr),
+	GetSize:        proc "system" (this: ^IMalloc, pv: rawptr) -> SIZE_T,
+	DidAlloc:       proc "system" (this: ^IMalloc, pv: rawptr) -> i32,
+	HeapMinimize:   proc "system" (this: ^IMalloc),
 }
 
 ISequentialStream :: struct #raw_union {
@@ -47,8 +38,8 @@ ISequentialStream :: struct #raw_union {
 }
 ISequentialStream_VTable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
-	Read:  proc "stdcall" (this: ^ISequentialStream, pv: rawptr, cb: ULONG, pcbRead: ^ULONG) -> HRESULT,
-	Write: proc "stdcall" (this: ^ISequentialStream, pv: rawptr, cb: ULONG, pcbWritten: ^ULONG) -> HRESULT,
+	Read:  proc "system" (this: ^ISequentialStream, pv: rawptr, cb: ULONG, pcbRead: ^ULONG) -> HRESULT,
+	Write: proc "system" (this: ^ISequentialStream, pv: rawptr, cb: ULONG, pcbWritten: ^ULONG) -> HRESULT,
 }
 
 STATSTG :: struct {
@@ -71,15 +62,15 @@ IStream :: struct #raw_union {
 }
 IStream_VTable :: struct {
 	using isequentialstream_vtable: ISequentialStream_VTable,
-	Seek:         proc "stdcall" (this: ^IStream, dlibMove: i64, dwOrigin: u32, plibNewPosition: ^u64) -> HRESULT,
-	SetSize:      proc "stdcall" (this: ^IStream, libNewSize: u64) -> HRESULT,
-	CopyTo:       proc "stdcall" (this: ^IStream, pstm: ^IStream, cb: u64, pcbRead: ^u64, pcbWritten: ^u64) -> HRESULT,
-	Commit:       proc "stdcall" (this: ^IStream, grfCommitFlags: u32) -> HRESULT,
-	Revert:       proc "stdcall" (this: ^IStream) -> HRESULT,
-	LockRegion:   proc "stdcall" (this: ^IStream, libOffset: u64, cb: u64, dwLockType: u32) -> HRESULT,
-	UnlockRegion: proc "stdcall" (this: ^IStream, libOffset: u64, cb: u64, dwLockType: u32) -> HRESULT,
-	Stat:         proc "stdcall" (this: ^IStream, pstatstg: ^STATSTG, grfStatFlag: u32) -> HRESULT,
-	Clone:        proc "stdcall" (this: ^IStream, ppstm: ^^IStream) -> HRESULT,
+	Seek:         proc "system" (this: ^IStream, dlibMove: i64, dwOrigin: u32, plibNewPosition: ^u64) -> HRESULT,
+	SetSize:      proc "system" (this: ^IStream, libNewSize: u64) -> HRESULT,
+	CopyTo:       proc "system" (this: ^IStream, pstm: ^IStream, cb: u64, pcbRead: ^u64, pcbWritten: ^u64) -> HRESULT,
+	Commit:       proc "system" (this: ^IStream, grfCommitFlags: u32) -> HRESULT,
+	Revert:       proc "system" (this: ^IStream) -> HRESULT,
+	LockRegion:   proc "system" (this: ^IStream, libOffset: u64, cb: u64, dwLockType: u32) -> HRESULT,
+	UnlockRegion: proc "system" (this: ^IStream, libOffset: u64, cb: u64, dwLockType: u32) -> HRESULT,
+	Stat:         proc "system" (this: ^IStream, pstatstg: ^STATSTG, grfStatFlag: u32) -> HRESULT,
+	Clone:        proc "system" (this: ^IStream, ppstm: ^^IStream) -> HRESULT,
 }
 
 IBlob_UUID_STRING :: "8BA5FB08-5195-40E2-AC58-0D989C3A0102"
@@ -90,8 +81,8 @@ IBlob :: struct #raw_union {
 }
 IBlob_VTable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
-	GetBufferPointer: proc "stdcall" (this: ^IBlob) -> rawptr,
-	GetBufferSize:    proc "stdcall" (this: ^IBlob) -> SIZE_T,
+	GetBufferPointer: proc "system" (this: ^IBlob) -> rawptr,
+	GetBufferSize:    proc "system" (this: ^IBlob) -> SIZE_T,
 }
 
 IBlobEncoding_UUID_STRRING :: "7241D424-2646-4191-97C0-98E96E42FC68"
@@ -102,7 +93,7 @@ IBlobEncoding :: struct #raw_union {
 }
 IBlobEncoding_VTable :: struct {
 	using idxcblob_vtable: IBlob_VTable,
-	GetEncoding: proc "stdcall" (this: ^IBlobEncoding, pKnown: ^BOOL, pCodePage: ^u32) -> HRESULT,
+	GetEncoding: proc "system" (this: ^IBlobEncoding, pKnown: ^BOOL, pCodePage: ^u32) -> HRESULT,
 }
 
 IBlobUtf16_UUID_STRING :: "A3F84EAB-0FAA-497E-A39C-EE6ED60B2D84"
@@ -113,8 +104,8 @@ IBlobUtf16 :: struct #raw_union {
 }
 IBlobUtf16_VTable :: struct {
 	using idxcblobencoding_vtable: IBlobEncoding_VTable,
-	GetStringPointer: proc "stdcall" (this: ^IBlobUtf16) -> wstring,
-	GetStringLength:  proc "stdcall" (this: ^IBlobUtf16) -> SIZE_T,
+	GetStringPointer: proc "system" (this: ^IBlobUtf16) -> wstring,
+	GetStringLength:  proc "system" (this: ^IBlobUtf16) -> SIZE_T,
 }
 
 IBlobUtf8_UUID_STRING :: "3DA636C9-BA71-4024-A301-30CBF125305B"
@@ -125,8 +116,8 @@ IBlobUtf8 :: struct #raw_union {
 }
 IBlobUtf8_VTable :: struct {
 	using idxcblobencoding_vtable: IBlobEncoding_VTable,
-	GetStringPointer: proc "stdcall" (this: ^IBlobUtf8) -> cstring,
-	GetStringLength:  proc "stdcall" (this: ^IBlobUtf8) -> SIZE_T,
+	GetStringPointer: proc "system" (this: ^IBlobUtf8) -> cstring,
+	GetStringLength:  proc "system" (this: ^IBlobUtf8) -> SIZE_T,
 }
 
 IIncludeHandler_UUID_STRING :: "7F61FC7D-950D-467F-B3E3-3C02FB49187C"
@@ -137,7 +128,7 @@ IIncludeHandler :: struct #raw_union {
 }
 IIncludeHandler_VTable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
-	LoadSource: proc "stdcall" (this: ^IIncludeHandler, pFilename: wstring, ppIncludeSource: ^^IBlob) -> HRESULT,
+	LoadSource: proc "system" (this: ^IIncludeHandler, pFilename: wstring, ppIncludeSource: ^^IBlob) -> HRESULT,
 }
 
 Define :: struct {
@@ -153,11 +144,11 @@ ICompilerArgs :: struct #raw_union {
 }
 ICompilerArgs_VTable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
-	GetArguments:       proc "stdcall" (this: ^ICompilerArgs) -> [^]wstring,
-	GetCount:           proc "stdcall" (this: ^ICompilerArgs) -> u32,
-	AddArguments:       proc "stdcall" (this: ^ICompilerArgs, pArguments: [^]wstring, argCount: u32) -> HRESULT,
-	AddArgumentsUTF8:   proc "stdcall" (this: ^ICompilerArgs, pArguments: [^]cstring, argCount: u32) -> HRESULT,
-	AddDefines:         proc "stdcall" (this: ^ICompilerArgs, pDefines: [^]Define, defineCount: u32) -> HRESULT,
+	GetArguments:       proc "system" (this: ^ICompilerArgs) -> [^]wstring,
+	GetCount:           proc "system" (this: ^ICompilerArgs) -> u32,
+	AddArguments:       proc "system" (this: ^ICompilerArgs, pArguments: [^]wstring, argCount: u32) -> HRESULT,
+	AddArgumentsUTF8:   proc "system" (this: ^ICompilerArgs, pArguments: [^]cstring, argCount: u32) -> HRESULT,
+	AddDefines:         proc "system" (this: ^ICompilerArgs, pDefines: [^]Define, defineCount: u32) -> HRESULT,
 }
 
 ILibrary_UUID_STRING :: "E5204DC7-D18C-4C3C-BDFB-851673980FE7"
@@ -168,16 +159,16 @@ ILibrary :: struct #raw_union {
 }
 ILibrary_VTable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
-	SetMalloc:                        proc "stdcall" (this: ^ILibrary, pMalloc: ^IMalloc) -> HRESULT,
-	CreateBlobFromBlob:               proc "stdcall" (this: ^ILibrary, pBlob: ^IBlob, offset: u32, length: u32, ppResult: ^^IBlob) -> HRESULT,
-	CreateBlobFromFile:               proc "stdcall" (this: ^ILibrary, pFileName: wstring, codePage: ^u32, pBlobEncoding: ^^IBlobEncoding) -> HRESULT,
-	CreateBlobWithEncodingFromPinned: proc "stdcall" (this: ^ILibrary, pText: rawptr, size: u32, codePage: u32, pBlobEncoding: ^^IBlobEncoding) -> HRESULT,
-	CreateBlobWithEncodingOnHeapCopy: proc "stdcall" (this: ^ILibrary, pText: rawptr, size: u32, codePage: u32, pBlobEncoding: ^^IBlobEncoding) -> HRESULT,
-	CreateBlobWithEncodingOnMalloc:   proc "stdcall" (this: ^ILibrary, pText: rawptr, pIMalloc: ^IMalloc, size: u32, codePage: u32, pBlobEncoding: ^^IBlobEncoding) -> HRESULT,
-	CreateIncludeHandler:             proc "stdcall" (this: ^ILibrary, ppResult: ^^IIncludeHandler) -> HRESULT,
-	CreateStreamFromBlobReadOnly:     proc "stdcall" (this: ^ILibrary, pBlob: ^IBlob, ppStream: ^^IStream) -> HRESULT,
-	GetBlobAsUtf8:                    proc "stdcall" (this: ^ILibrary, pBlob: ^IBlob, pBlobEncoding: ^^IBlobEncoding) -> HRESULT,
-	GetBlobAsUtf16:                   proc "stdcall" (this: ^ILibrary, pBlob: ^IBlob, pBlobEncoding: ^^IBlobEncoding) -> HRESULT,
+	SetMalloc:                        proc "system" (this: ^ILibrary, pMalloc: ^IMalloc) -> HRESULT,
+	CreateBlobFromBlob:               proc "system" (this: ^ILibrary, pBlob: ^IBlob, offset: u32, length: u32, ppResult: ^^IBlob) -> HRESULT,
+	CreateBlobFromFile:               proc "system" (this: ^ILibrary, pFileName: wstring, codePage: ^u32, pBlobEncoding: ^^IBlobEncoding) -> HRESULT,
+	CreateBlobWithEncodingFromPinned: proc "system" (this: ^ILibrary, pText: rawptr, size: u32, codePage: u32, pBlobEncoding: ^^IBlobEncoding) -> HRESULT,
+	CreateBlobWithEncodingOnHeapCopy: proc "system" (this: ^ILibrary, pText: rawptr, size: u32, codePage: u32, pBlobEncoding: ^^IBlobEncoding) -> HRESULT,
+	CreateBlobWithEncodingOnMalloc:   proc "system" (this: ^ILibrary, pText: rawptr, pIMalloc: ^IMalloc, size: u32, codePage: u32, pBlobEncoding: ^^IBlobEncoding) -> HRESULT,
+	CreateIncludeHandler:             proc "system" (this: ^ILibrary, ppResult: ^^IIncludeHandler) -> HRESULT,
+	CreateStreamFromBlobReadOnly:     proc "system" (this: ^ILibrary, pBlob: ^IBlob, ppStream: ^^IStream) -> HRESULT,
+	GetBlobAsUtf8:                    proc "system" (this: ^ILibrary, pBlob: ^IBlob, pBlobEncoding: ^^IBlobEncoding) -> HRESULT,
+	GetBlobAsUtf16:                   proc "system" (this: ^ILibrary, pBlob: ^IBlob, pBlobEncoding: ^^IBlobEncoding) -> HRESULT,
 }
 
 IOperationResult_UUID_STRING :: "CEDB484A-D4E9-445A-B991-CA21CA157DC2"
@@ -188,9 +179,9 @@ IOperationResult :: struct #raw_union {
 }
 IOperationResult_VTable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
-	GetStatus:      proc "stdcall" (this: ^IOperationResult, pStatus: ^HRESULT) -> HRESULT,
-	GetResult:      proc "stdcall" (this: ^IOperationResult, ppResult: ^^IBlob) -> HRESULT,
-	GetErrorBuffer: proc "stdcall" (this: ^IOperationResult, ppErrors: ^^IBlobEncoding) -> HRESULT,
+	GetStatus:      proc "system" (this: ^IOperationResult, pStatus: ^HRESULT) -> HRESULT,
+	GetResult:      proc "system" (this: ^IOperationResult, ppResult: ^^IBlob) -> HRESULT,
+	GetErrorBuffer: proc "system" (this: ^IOperationResult, ppErrors: ^^IBlobEncoding) -> HRESULT,
 }
 
 ICompiler_UUID_STRING :: "8C210BF3-011F-4422-8D70-6F9ACB8DB617"
@@ -201,7 +192,7 @@ ICompiler :: struct #raw_union {
 }
 ICompiler_VTable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
-	Compile: proc "stdcall" (
+	Compile: proc "system" (
 		this: ^ICompiler, 
 		pSource: ^Buffer, 
 		pSourceName: wstring,
@@ -213,7 +204,7 @@ ICompiler_VTable :: struct {
 		defineCount: u32,
 		pIncludeHandler: ^IIncludeHandler,
 		ppResult: ^^IOperationResult) -> HRESULT,
-	Preprocess: proc "stdcall" (
+	Preprocess: proc "system" (
 		this: ^ICompiler, 
 		pSource: ^Buffer, 
 		pSourceName: wstring,
@@ -223,7 +214,7 @@ ICompiler_VTable :: struct {
 		defineCount: u32,
 		pIncludeHandler: ^IIncludeHandler,
 		ppResult: ^^IOperationResult) -> HRESULT,
-	Disassemble: proc "stdcall" (this: ^ICompiler, pSource: ^Buffer, ppDisassembly: ^IBlobEncoding) -> HRESULT,
+	Disassemble: proc "system" (this: ^ICompiler, pSource: ^Buffer, ppDisassembly: ^IBlobEncoding) -> HRESULT,
 }
 
 ICompiler2_UUID_STRING :: "A005A9D9-B8BB-4594-B5C9-0E633BEC4D37"
@@ -234,7 +225,7 @@ ICompiler2 :: struct #raw_union {
 }
 ICompiler2_VTable :: struct {
 	using idxccompiler_vtable: ^ICompiler_VTable,
-	CompileWithDebug: proc "stdcall" (
+	CompileWithDebug: proc "system" (
 		this: ^ICompiler2,
 		pSource: ^Buffer, 
 		pSourceName: wstring,
@@ -258,8 +249,8 @@ ILinker :: struct #raw_union {
 }
 ILinker_VTable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
-	RegisterLibrary: proc "stdcall" (this: ^ILinker, pLibName: ^IBlob) -> HRESULT,
-	Link: proc "stdcall" (
+	RegisterLibrary: proc "system" (this: ^ILinker, pLibName: ^IBlob) -> HRESULT,
+	Link: proc "system" (
 		this: ^ILinker,
 		pEntryName: wstring,
 		pTargetProfile: wstring,
@@ -284,19 +275,19 @@ IUtils :: struct #raw_union {
 }
 IUtils_VTable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
-	CreateBlobFromBlob:           proc "stdcall" (this: ^IUtils, pBlob: ^IBlob, offset: u32, length: u32, ppResult: ^^IBlob) -> HRESULT,
-	CreateBlobFromPinned:         proc "stdcall" (this: ^IUtils, pData: rawptr, size: u32, codePage: u32, pBlobEncoding: ^^IBlobEncoding) -> HRESULT,
-	MoveToBlob:                   proc "stdcall" (this: ^IUtils, pData: rawptr, pIMalloc: ^IMalloc, size: u32, codePage: u32, pBlobEncoding: ^^IBlobEncoding) -> HRESULT,
-	CreateBlob:                   proc "stdcall" (this: ^IUtils, pData: rawptr, size: u32, codePage: u32, pBlobEncoding: ^^IBlobEncoding) -> HRESULT,
-	LoadFile:                     proc "stdcall" (this: ^IUtils, pFileName: wstring, pCodePage: ^u32, pBlobEncoding: ^^IBlobEncoding) -> HRESULT,
-	CreateReadOnlyStreamFromBlob: proc "stdcall" (this: ^IUtils, pBlob: ^IBlob, ppStream: ^^IStream) -> HRESULT,
-	CreateDefaultIncludeHandler:  proc "stdcall" (this: ^IUtils, ppResult: ^^IIncludeHandler) -> HRESULT,
-	GetBlobAsUtf8:                proc "stdcall" (this: ^IUtils, pBlob: ^IBlob, pBlobEncoding: ^^IBlobUtf8) -> HRESULT,
-	GetBlobAsUtf16:               proc "stdcall" (this: ^IUtils, pBlob: ^IBlob, pBlobEncoding: ^^IBlobUtf16) -> HRESULT,
-	GetDxilContainerPart:         proc "stdcall" (this: ^IUtils, pShader: ^Buffer, Part: u32, ppPartData: rawptr, pPartSizeInBytes: ^u32) -> HRESULT,
-	CreateReflection:             proc "stdcall" (this: ^IUtils, pData: ^Buffer, iid: ^IID, ppvReflection: rawptr) -> HRESULT,
-	BuildArguments:               proc "stdcall" (this: ^IUtils, pSourceName: wstring, pEntryPoint: wstring, pTargetProfile: wstring, pArguments: [^]wstring, argCount: u32, pDefines: [^]Define, defineCount: u32, ppArgs: ^[^]ICompilerArgs) -> HRESULT,
-	GetPDBContents:               proc "stdcall" (this: ^IUtils, pPDBBlob: ^IBlob, ppHash: ^^IBlob, ppContainer: ^^IBlob) -> HRESULT,
+	CreateBlobFromBlob:           proc "system" (this: ^IUtils, pBlob: ^IBlob, offset: u32, length: u32, ppResult: ^^IBlob) -> HRESULT,
+	CreateBlobFromPinned:         proc "system" (this: ^IUtils, pData: rawptr, size: u32, codePage: u32, pBlobEncoding: ^^IBlobEncoding) -> HRESULT,
+	MoveToBlob:                   proc "system" (this: ^IUtils, pData: rawptr, pIMalloc: ^IMalloc, size: u32, codePage: u32, pBlobEncoding: ^^IBlobEncoding) -> HRESULT,
+	CreateBlob:                   proc "system" (this: ^IUtils, pData: rawptr, size: u32, codePage: u32, pBlobEncoding: ^^IBlobEncoding) -> HRESULT,
+	LoadFile:                     proc "system" (this: ^IUtils, pFileName: wstring, pCodePage: ^u32, pBlobEncoding: ^^IBlobEncoding) -> HRESULT,
+	CreateReadOnlyStreamFromBlob: proc "system" (this: ^IUtils, pBlob: ^IBlob, ppStream: ^^IStream) -> HRESULT,
+	CreateDefaultIncludeHandler:  proc "system" (this: ^IUtils, ppResult: ^^IIncludeHandler) -> HRESULT,
+	GetBlobAsUtf8:                proc "system" (this: ^IUtils, pBlob: ^IBlob, pBlobEncoding: ^^IBlobUtf8) -> HRESULT,
+	GetBlobAsUtf16:               proc "system" (this: ^IUtils, pBlob: ^IBlob, pBlobEncoding: ^^IBlobUtf16) -> HRESULT,
+	GetDxilContainerPart:         proc "system" (this: ^IUtils, pShader: ^Buffer, Part: u32, ppPartData: rawptr, pPartSizeInBytes: ^u32) -> HRESULT,
+	CreateReflection:             proc "system" (this: ^IUtils, pData: ^Buffer, iid: ^IID, ppvReflection: rawptr) -> HRESULT,
+	BuildArguments:               proc "system" (this: ^IUtils, pSourceName: wstring, pEntryPoint: wstring, pTargetProfile: wstring, pArguments: [^]wstring, argCount: u32, pDefines: [^]Define, defineCount: u32, ppArgs: ^[^]ICompilerArgs) -> HRESULT,
+	GetPDBContents:               proc "system" (this: ^IUtils, pPDBBlob: ^IBlob, ppHash: ^^IBlob, ppContainer: ^^IBlob) -> HRESULT,
 }
 
 DXC_OUT_KIND :: enum u32 {
@@ -322,11 +313,11 @@ IResult :: struct #raw_union {
 }
 IResult_VTable :: struct {
 	using idxcoperationresult_vtable: IOperationResult_VTable,
-	HasOutput:        proc "stdcall" (this: ^IResult, dxcOutKind: DXC_OUT_KIND) -> BOOL,
-	GetOutput:        proc "stdcall" (this: ^IResult, dxcOutKind: DXC_OUT_KIND, iid: ^IID, ppvObject: rawptr, ppOutputName: ^^IBlobUtf16) -> HRESULT,
-	GetNumOutputs:    proc "stdcall" (this: ^IResult) -> u32,
-	GetOutputByIndex: proc "stdcall" (this: ^IResult, Index: u32) -> DXC_OUT_KIND,
-	PrimaryOutput:    proc "stdcall" (this: ^IResult) -> DXC_OUT_KIND,
+	HasOutput:        proc "system" (this: ^IResult, dxcOutKind: DXC_OUT_KIND) -> BOOL,
+	GetOutput:        proc "system" (this: ^IResult, dxcOutKind: DXC_OUT_KIND, iid: ^IID, ppvObject: rawptr, ppOutputName: ^^IBlobUtf16) -> HRESULT,
+	GetNumOutputs:    proc "system" (this: ^IResult) -> u32,
+	GetOutputByIndex: proc "system" (this: ^IResult, Index: u32) -> DXC_OUT_KIND,
+	PrimaryOutput:    proc "system" (this: ^IResult) -> DXC_OUT_KIND,
 }
 
 IExtraOutputs_UUID_STRING :: "319B37A2-A5C2-494A-A5DE-4801B2FAF989"
@@ -337,8 +328,8 @@ IExtraOutputs :: struct #raw_union {
 }
 IExtraOutputs_VTable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
-	GetOutputCount: proc "stdcall" (this: ^IExtraOutputs) -> u32,
-	GetOutput:      proc "stdcall" (this: ^IExtraOutputs, uIndex: u32, iid: ^IID, ppvObject: rawptr, ppOutputType: ^^IBlobUtf16, ppOutputName: ^^IBlobUtf16) -> HRESULT,
+	GetOutputCount: proc "system" (this: ^IExtraOutputs) -> u32,
+	GetOutput:      proc "system" (this: ^IExtraOutputs, uIndex: u32, iid: ^IID, ppvObject: rawptr, ppOutputType: ^^IBlobUtf16, ppOutputName: ^^IBlobUtf16) -> HRESULT,
 }
 
 ICompiler3_UUID_STRING :: "228B4687-5A6A-4730-900C-9702B2203F54"
@@ -349,8 +340,8 @@ ICompiler3 :: struct #raw_union {
 }
 ICompiler3_VTable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
-	Compile:     proc "stdcall" (this: ^ICompiler3, pSource: ^Buffer, pArguments: [^]wstring, argCount: u32, pIncludeHandler: ^IIncludeHandler, riid: ^IID, ppResult: rawptr) -> HRESULT,
-	Disassemble: proc "stdcall" (this: ^ICompiler3, pObject: ^Buffer, riid: ^IID, ppResult: rawptr) -> HRESULT,
+	Compile:     proc "system" (this: ^ICompiler3, pSource: ^Buffer, pArguments: [^]wstring, argCount: u32, pIncludeHandler: ^IIncludeHandler, riid: ^IID, ppResult: rawptr) -> HRESULT,
+	Disassemble: proc "system" (this: ^ICompiler3, pObject: ^Buffer, riid: ^IID, ppResult: rawptr) -> HRESULT,
 }
 
 IValidator_UUID_STRING :: "A6E82BD2-1FD7-4826-9811-2857E797F49A"
@@ -361,7 +352,7 @@ IValidator :: struct #raw_union {
 }
 IValidator_VTable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
-	Validate: proc "stdcall" (this: ^IValidator, pShader: ^IBlob, Flags: u32, ppResult: ^^IOperationResult) -> HRESULT,
+	Validate: proc "system" (this: ^IValidator, pShader: ^IBlob, Flags: u32, ppResult: ^^IOperationResult) -> HRESULT,
 }
 
 IValidator2_UUID_STRING :: "458E1FD1-B1B2-4750-A6E1-9C10F03BED92"
@@ -372,7 +363,7 @@ IValidator2 :: struct #raw_union {
 }
 IValidator2_VTable :: struct {
 	using idxcvalidator_vtable: IValidator_VTable,
-	ValidateWithDebug: proc "stdcall" (this: ^IValidator2, pShader: ^IBlob, Flags: u32, pOptDebugBitcode: ^Buffer, ppResult: ^^IOperationResult) -> HRESULT,
+	ValidateWithDebug: proc "system" (this: ^IValidator2, pShader: ^IBlob, Flags: u32, pOptDebugBitcode: ^Buffer, ppResult: ^^IOperationResult) -> HRESULT,
 }
 
 IContainerBuilder_UUID_STRING :: "334B1F50-2292-4B35-99A1-25588D8C17FE"
@@ -383,10 +374,10 @@ IContainerBuilder :: struct #raw_union {
 }
 IContainerBuilder_VTable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
-	Load:               proc "stdcall" (this: ^IContainerBuilder, pDxilContainerHeader: ^IBlob) -> HRESULT,
-	AddPart:            proc "stdcall" (this: ^IContainerBuilder, fourCC: u32, pSource: ^IBlob) -> HRESULT,
-	RemovePart:         proc "stdcall" (this: ^IContainerBuilder, fourCC: u32) -> HRESULT,
-	SerializeContainer: proc "stdcall" (this: ^IContainerBuilder, ppResult: ^^IOperationResult) -> HRESULT,
+	Load:               proc "system" (this: ^IContainerBuilder, pDxilContainerHeader: ^IBlob) -> HRESULT,
+	AddPart:            proc "system" (this: ^IContainerBuilder, fourCC: u32, pSource: ^IBlob) -> HRESULT,
+	RemovePart:         proc "system" (this: ^IContainerBuilder, fourCC: u32) -> HRESULT,
+	SerializeContainer: proc "system" (this: ^IContainerBuilder, ppResult: ^^IOperationResult) -> HRESULT,
 }
 
 IAssembler_UUID_STRING :: "091F7A26-1C1F-4948-904B-E6E3A8A771D5"
@@ -397,7 +388,7 @@ IAssembler :: struct #raw_union {
 }
 IAssembler_VTable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
-	AssembleToContainer: proc "stdcall" (this: ^IAssembler, pShader: ^IBlob, ppResult: ^^IOperationResult) -> HRESULT,
+	AssembleToContainer: proc "system" (this: ^IAssembler, pShader: ^IBlob, ppResult: ^^IOperationResult) -> HRESULT,
 }
 
 IContainerReflection_UUID_STRING :: "D2C21B26-8350-4BDC-976A-331CE6F4C54C"
@@ -408,12 +399,12 @@ IContainerReflection :: struct #raw_union {
 }
 IContainerReflection_VTable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
-	Load:              proc "stdcall" (this: ^IContainerReflection, pContainer: ^IBlob) -> HRESULT,
-	GetPartCount:      proc "stdcall" (this: ^IContainerReflection, pResult: ^u32) -> HRESULT,
-	GetPartKind:       proc "stdcall" (this: ^IContainerReflection, idx: u32, pResult: ^u32) -> HRESULT,
-	GetPartContent:    proc "stdcall" (this: ^IContainerReflection, idx: u32, ppResult: ^^IBlob) -> HRESULT,
-	FindFirstPartKind: proc "stdcall" (this: ^IContainerReflection, kind: u32, pResult: ^u32) -> HRESULT,
-	GetPartReflection: proc "stdcall" (this: ^IContainerReflection, idx: u32, iid: ^IID, ppvObject: rawptr) -> HRESULT,
+	Load:              proc "system" (this: ^IContainerReflection, pContainer: ^IBlob) -> HRESULT,
+	GetPartCount:      proc "system" (this: ^IContainerReflection, pResult: ^u32) -> HRESULT,
+	GetPartKind:       proc "system" (this: ^IContainerReflection, idx: u32, pResult: ^u32) -> HRESULT,
+	GetPartContent:    proc "system" (this: ^IContainerReflection, idx: u32, ppResult: ^^IBlob) -> HRESULT,
+	FindFirstPartKind: proc "system" (this: ^IContainerReflection, kind: u32, pResult: ^u32) -> HRESULT,
+	GetPartReflection: proc "system" (this: ^IContainerReflection, idx: u32, iid: ^IID, ppvObject: rawptr) -> HRESULT,
 }
 
 IOptimizerPass_UUID_STRING :: "AE2CD79F-CC22-453F-9B6B-B124E7A5204C"
@@ -424,11 +415,11 @@ IOptimizerPass :: struct #raw_union {
 }
 IOptimizerPass_VTable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
-	GetOptionName:           proc "stdcall" (this: ^IOptimizerPass, ppResult: ^wstring) -> HRESULT,
-	GetDescription:          proc "stdcall" (this: ^IOptimizerPass, ppResult: ^wstring) -> HRESULT,
-	GetOptionArgCount:       proc "stdcall" (this: ^IOptimizerPass, pCount: ^u32) -> HRESULT,
-	GetOptionArgName:        proc "stdcall" (this: ^IOptimizerPass, argIndex: u32, ppResult: ^wstring) -> HRESULT,
-	GetOptionArgDescription: proc "stdcall" (this: ^IOptimizerPass, argIndex: u32, ppResult: ^wstring) -> HRESULT,
+	GetOptionName:           proc "system" (this: ^IOptimizerPass, ppResult: ^wstring) -> HRESULT,
+	GetDescription:          proc "system" (this: ^IOptimizerPass, ppResult: ^wstring) -> HRESULT,
+	GetOptionArgCount:       proc "system" (this: ^IOptimizerPass, pCount: ^u32) -> HRESULT,
+	GetOptionArgName:        proc "system" (this: ^IOptimizerPass, argIndex: u32, ppResult: ^wstring) -> HRESULT,
+	GetOptionArgDescription: proc "system" (this: ^IOptimizerPass, argIndex: u32, ppResult: ^wstring) -> HRESULT,
 }
 
 IOptimizer_UUID_STRING :: "25740E2E-9CBA-401B-9119-4FB42F39F270"
@@ -439,9 +430,9 @@ IOptimizer :: struct #raw_union {
 }
 IOptimizer_VTable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
-	GetAvailablePassCount: proc "stdcall" (this: ^IOptimizer, pCount: ^u32) -> HRESULT,
-	GetAvailablePass:      proc "stdcall" (this: ^IOptimizer, index: u32, ppResult: ^^IOptimizerPass) -> HRESULT,
-	RunOptimizer:          proc "stdcall" (this: ^IOptimizer, pBlob: ^IBlob, ppOptions: [^]wstring, optionCount: u32, pOutputModule: ^^IBlob, ppOutputText: ^^IBlobEncoding) -> HRESULT,
+	GetAvailablePassCount: proc "system" (this: ^IOptimizer, pCount: ^u32) -> HRESULT,
+	GetAvailablePass:      proc "system" (this: ^IOptimizer, index: u32, ppResult: ^^IOptimizerPass) -> HRESULT,
+	RunOptimizer:          proc "system" (this: ^IOptimizer, pBlob: ^IBlob, ppOptions: [^]wstring, optionCount: u32, pOutputModule: ^^IBlob, ppOutputText: ^^IBlobEncoding) -> HRESULT,
 }
 
 VersionInfoFlags :: enum u32 {
@@ -458,8 +449,8 @@ IVersionInfo :: struct #raw_union {
 }
 IVersionInfo_VTable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
-	GetVersion: proc "stdcall" (this: ^IVersionInfo, pMajor: ^u32, pMinor: ^u32) -> HRESULT,
-	GetFlags:   proc "stdcall" (this: ^IVersionInfo, pFlags: ^VersionInfoFlags) -> HRESULT,
+	GetVersion: proc "system" (this: ^IVersionInfo, pMajor: ^u32, pMinor: ^u32) -> HRESULT,
+	GetFlags:   proc "system" (this: ^IVersionInfo, pFlags: ^VersionInfoFlags) -> HRESULT,
 }
 
 IVersionInfo2_UUID_STRING :: "FB6904C4-42F0-4B62-9C46-983AF7DA7C83"
@@ -470,7 +461,7 @@ IVersionInfo2 :: struct #raw_union {
 }
 IVersionInfo2_VTable :: struct {
 	using idxcversioninfo_vtable: IVersionInfo_VTable,
-	GetCommitInfo: proc "stdcall" (this: ^IVersionInfo2, pCommitCount: ^u32, pCommitHash: ^[^]byte) -> HRESULT,
+	GetCommitInfo: proc "system" (this: ^IVersionInfo2, pCommitCount: ^u32, pCommitHash: ^[^]byte) -> HRESULT,
 }
 
 IVersionInfo3_UUID_STRING :: "5E13E843-9D25-473C-9AD2-03B2D0B44B1E"
@@ -481,7 +472,7 @@ IVersionInfo3 :: struct #raw_union {
 }
 IVersionInfo3_VTable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
-	GetCustomVersionString: proc "stdcall" (this: ^IVersionInfo3, pVersionString: ^cstring) -> HRESULT,
+	GetCustomVersionString: proc "system" (this: ^IVersionInfo3, pVersionString: ^cstring) -> HRESULT,
 }
 
 ArgPair :: struct {
@@ -497,30 +488,30 @@ IPdbUtils :: struct #raw_union {
 }
 IPdbUtils_VTable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
-	Load:                  proc "stdcall" (this: ^IPdbUtils, pPdbOrDxil: ^IBlob) -> HRESULT,
-	GetSourceCount:        proc "stdcall" (this: ^IPdbUtils, pCount: ^u32) -> HRESULT,
-	GetSource:             proc "stdcall" (this: ^IPdbUtils, uIndex: u32, ppResult: ^^IBlobEncoding) -> HRESULT,
-	GetSourceName:         proc "stdcall" (this: ^IPdbUtils, uIndex: u32, pResult: ^BSTR) -> HRESULT,
-	GetFlagCount:          proc "stdcall" (this: ^IPdbUtils, pCount: ^u32) -> HRESULT,
-	GetFlag:               proc "stdcall" (this: ^IPdbUtils, uIndex: u32, pResult: ^BSTR) -> HRESULT,
-	GetArgCount:           proc "stdcall" (this: ^IPdbUtils, pCount: ^u32) -> HRESULT,
-	GetArg:                proc "stdcall" (this: ^IPdbUtils, uIndex: u32, pResult: ^BSTR) -> HRESULT,
-	GetArgPairCount:       proc "stdcall" (this: ^IPdbUtils, pCount: ^u32) -> HRESULT,
-	GetArgPair:            proc "stdcall" (this: ^IPdbUtils, uIndex: u32, pName: ^BSTR, pValue: ^BSTR) -> HRESULT,
-	GetDefineCount:        proc "stdcall" (this: ^IPdbUtils, pCount: ^u32) -> HRESULT,
-	GetDefine:             proc "stdcall" (this: ^IPdbUtils, uIndex: u32, pResult: ^BSTR) -> HRESULT,
-	GetTargetProfile:      proc "stdcall" (this: ^IPdbUtils, pResult: ^BSTR) -> HRESULT,
-	GetEntryPoint:         proc "stdcall" (this: ^IPdbUtils, pResult: ^BSTR) -> HRESULT,
-	GetMainFileName:       proc "stdcall" (this: ^IPdbUtils, pResult: ^BSTR) -> HRESULT,
-	GetHash:               proc "stdcall" (this: ^IPdbUtils, ppResult: ^^IBlob) -> HRESULT,
-	GetName:               proc "stdcall" (this: ^IPdbUtils, pResult: ^BSTR) -> HRESULT,
-	IsFullPDB:             proc "stdcall" (this: ^IPdbUtils) -> BOOL,
-	GetFullPDB:            proc "stdcall" (this: ^IPdbUtils, ppFullPDB: ^^IBlob) -> HRESULT,
-	GetVersionInfo:        proc "stdcall" (this: ^IPdbUtils, ppVersionInfo: ^^IVersionInfo) -> HRESULT,
-	SetCompiler:           proc "stdcall" (this: ^IPdbUtils, pCompiler: ^ICompiler3) -> HRESULT,
-	CompileForFullPDB:     proc "stdcall" (this: ^IPdbUtils, ppResult: ^^IResult) -> HRESULT,
-	OverrideArgs:          proc "stdcall" (this: ^IPdbUtils, pArgPairs: ^ArgPair, uNumArgPairs: u32) -> HRESULT,
-	OverrideRootSignature: proc "stdcall" (this: ^IPdbUtils, pRootSignature: wstring) -> HRESULT,
+	Load:                  proc "system" (this: ^IPdbUtils, pPdbOrDxil: ^IBlob) -> HRESULT,
+	GetSourceCount:        proc "system" (this: ^IPdbUtils, pCount: ^u32) -> HRESULT,
+	GetSource:             proc "system" (this: ^IPdbUtils, uIndex: u32, ppResult: ^^IBlobEncoding) -> HRESULT,
+	GetSourceName:         proc "system" (this: ^IPdbUtils, uIndex: u32, pResult: ^BSTR) -> HRESULT,
+	GetFlagCount:          proc "system" (this: ^IPdbUtils, pCount: ^u32) -> HRESULT,
+	GetFlag:               proc "system" (this: ^IPdbUtils, uIndex: u32, pResult: ^BSTR) -> HRESULT,
+	GetArgCount:           proc "system" (this: ^IPdbUtils, pCount: ^u32) -> HRESULT,
+	GetArg:                proc "system" (this: ^IPdbUtils, uIndex: u32, pResult: ^BSTR) -> HRESULT,
+	GetArgPairCount:       proc "system" (this: ^IPdbUtils, pCount: ^u32) -> HRESULT,
+	GetArgPair:            proc "system" (this: ^IPdbUtils, uIndex: u32, pName: ^BSTR, pValue: ^BSTR) -> HRESULT,
+	GetDefineCount:        proc "system" (this: ^IPdbUtils, pCount: ^u32) -> HRESULT,
+	GetDefine:             proc "system" (this: ^IPdbUtils, uIndex: u32, pResult: ^BSTR) -> HRESULT,
+	GetTargetProfile:      proc "system" (this: ^IPdbUtils, pResult: ^BSTR) -> HRESULT,
+	GetEntryPoint:         proc "system" (this: ^IPdbUtils, pResult: ^BSTR) -> HRESULT,
+	GetMainFileName:       proc "system" (this: ^IPdbUtils, pResult: ^BSTR) -> HRESULT,
+	GetHash:               proc "system" (this: ^IPdbUtils, ppResult: ^^IBlob) -> HRESULT,
+	GetName:               proc "system" (this: ^IPdbUtils, pResult: ^BSTR) -> HRESULT,
+	IsFullPDB:             proc "system" (this: ^IPdbUtils) -> BOOL,
+	GetFullPDB:            proc "system" (this: ^IPdbUtils, ppFullPDB: ^^IBlob) -> HRESULT,
+	GetVersionInfo:        proc "system" (this: ^IPdbUtils, ppVersionInfo: ^^IVersionInfo) -> HRESULT,
+	SetCompiler:           proc "system" (this: ^IPdbUtils, pCompiler: ^ICompiler3) -> HRESULT,
+	CompileForFullPDB:     proc "system" (this: ^IPdbUtils, ppResult: ^^IResult) -> HRESULT,
+	OverrideArgs:          proc "system" (this: ^IPdbUtils, pArgPairs: ^ArgPair, uNumArgPairs: u32) -> HRESULT,
+	OverrideRootSignature: proc "system" (this: ^IPdbUtils, pRootSignature: wstring) -> HRESULT,
 }
 
 
