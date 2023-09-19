@@ -467,7 +467,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bo
 	}
 
 	if (value.kind == ExactValue_Invalid) {
-		return lb_const_nil(m, type);
+		return lb_const_nil(m, original_type);
 	}
 
 	if (value.kind == ExactValue_Procedure) {
@@ -1052,13 +1052,14 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bo
 					i32 index = field_remapping[f->Variable.field_index];
 					if (elem_type_can_be_constant(f->type)) {
 						if (sel.index.count == 1) {
-							values[index] = lb_const_value(m, f->type, tav.value, allow_local).value;
+							values[index]  = lb_const_value(m, f->type, tav.value, allow_local).value;
 							visited[index] = true;
 						} else {
 							if (!visited[index]) {
-								values[index] = lb_const_value(m, f->type, {}, false).value;
+								values[index]  = lb_const_value(m, f->type, {}, false).value;
 								visited[index] = true;
 							}
+
 							unsigned idx_list_len = cast(unsigned)sel.index.count-1;
 							unsigned *idx_list = gb_alloc_array(temporary_allocator(), unsigned, idx_list_len);
 
@@ -1171,7 +1172,6 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bo
 					}
 				}
 				return lb_addr_load(p, v);
-
 			}
 		} else if (is_type_bit_set(type)) {
 			ast_node(cl, CompoundLit, value.value_compound);
