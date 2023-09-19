@@ -8,6 +8,8 @@ Kilobyte :: runtime.Kilobyte
 Megabyte :: runtime.Megabyte
 Gigabyte :: runtime.Gigabyte
 Terabyte :: runtime.Terabyte
+Petabyte :: runtime.Petabyte
+Exabyte  :: runtime.Exabyte
 
 set :: proc "contextless" (data: rawptr, value: byte, len: int) -> rawptr {
 	return runtime.memset(data, i32(value), len)

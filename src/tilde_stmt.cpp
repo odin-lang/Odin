@@ -42,6 +42,8 @@ gb_internal cgValue cg_emit_load(cgProcedure *p, cgValue const &ptr, bool is_vol
 			return cg_lvalue_addr(tb_inst_get_symbol_address(p->func, ptr.symbol), type);
 		}
 	}
+	GB_ASSERT(dt.type != TB_MEMORY);
+	GB_ASSERT(dt.type != TB_TUPLE);
 
 	// use the natural alignment
 	// if people need a special alignment, they can use `intrinsics.unaligned_load`
@@ -118,7 +120,7 @@ gb_internal void cg_emit_store(cgProcedure *p, cgValue dst, cgValue src, bool is
 		// IMPORTANT TODO(bill): needs to be memmove
 		i64 sz = type_size_of(dst_type);
 		TB_Node *count = tb_inst_uint(p->func, TB_TYPE_INT, cast(u64)sz);
-		tb_inst_memcpy(p->func, dst_ptr, src_ptr, count, alignment, is_volatile);
+		tb_inst_memcpy(p->func, dst_ptr, src_ptr, count, alignment/*, is_volatile*/);
 		return;
 	}
 
@@ -159,7 +161,7 @@ gb_internal cgValue cg_address_from_load(cgProcedure *p, cgValue value) {
 		{
 			TB_Node *load_inst = value.node;
 			GB_ASSERT_MSG(load_inst->type == TB_LOAD, "expected a load instruction");
-			TB_Node *ptr = load_inst->inputs[1];
+			TB_Node *ptr = load_inst->inputs[2];
 			return cg_value(ptr, alloc_type_pointer(value.type));
 		}
 	case cgValue_Addr:
@@ -813,9 +815,10 @@ gb_internal cgAddr cg_add_local(cgProcedure *p, Type *type, Entity *e, bool zero
 
 	if (zero_init) {
 		bool is_volatile = false;
+		gb_unused(is_volatile);
 		TB_Node *zero = tb_inst_uint(p->func, TB_TYPE_I8, 0);
 		TB_Node *count = tb_inst_uint(p->func, TB_TYPE_I32, cast(u64)size);
-		tb_inst_memset(p->func, local, zero, count, alignment, is_volatile);
+		tb_inst_memset(p->func, local, zero, count, alignment/*, is_volatile*/);
 	}
 
 	cgAddr addr = cg_addr(cg_value(local, alloc_type_pointer(type)));
@@ -861,7 +864,7 @@ gb_internal cgValue cg_copy_value_to_ptr(cgProcedure *p, cgValue value, Type *or
 		tb_inst_store(p->func, cg_data_type(original_type), copy, value.node, align, false);
 	} else {
 		GB_ASSERT(value.kind == cgValue_Addr);
-		tb_inst_memcpy(p->func, copy, value.node, tb_inst_uint(p->func, TB_TYPE_INT, size), align, false);
+		tb_inst_memcpy(p->func, copy, value.node, tb_inst_uint(p->func, TB_TYPE_INT, size), align);
 	}
 
 	return cg_value(copy, alloc_type_pointer(original_type));
@@ -871,7 +874,7 @@ gb_internal cgValue cg_address_from_load_or_generate_local(cgProcedure *p, cgVal
 	switch (value.kind) {
 	case cgValue_Value:
 		if (value.node->type == TB_LOAD) {
-			TB_Node *ptr = value.node->inputs[1];
+			TB_Node *ptr = value.node->inputs[2];
 			return cg_value(ptr, alloc_type_pointer(value.type));
 		}
 		break;
@@ -1042,7 +1045,7 @@ gb_internal void cg_build_assignment(cgProcedure *p, Array<cgAddr> const &lvals,
 		    	TB_CharUnits size  = cast(TB_CharUnits)type_size_of(type);
 		    	TB_CharUnits align = cast(TB_CharUnits)type_align_of(type);
 		    	TB_Node *copy = tb_inst_local(p->func, size, align);
-		    	tb_inst_memcpy(p->func, copy, init.node, tb_inst_uint(p->func, TB_TYPE_INT, size), align, false);
+		    	tb_inst_memcpy(p->func, copy, init.node, tb_inst_uint(p->func, TB_TYPE_INT, size), align);
 		    	// use the copy instead
 		    	init.node = copy;
 		}
@@ -2399,8 +2402,7 @@ gb_internal void cg_build_type_switch_stmt(cgProcedure *p, Ast *node) {
 				               backing_ptr, // dst
 				               data.node,   // src
 				               tb_inst_uint(p->func, TB_TYPE_INT, size),
-				               cast(TB_CharUnits)align,
-				               false
+				               cast(TB_CharUnits)align
 				);
 
 				ptr = cg_value(backing_ptr, ct_ptr);
@@ -2521,6 +2523,8 @@ gb_internal void cg_build_mutable_value_decl(cgProcedure *p, Ast *node) {
 	}
 
 	TEMPORARY_ALLOCATOR_GUARD();
+
+
 
 	auto inits = array_make<cgValue>(temporary_allocator(), 0, vd->values.count != 0 ? vd->names.count : 0);
 	for (Ast *rhs : vd->values) {
