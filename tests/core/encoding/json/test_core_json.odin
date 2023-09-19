@@ -33,6 +33,7 @@ main :: proc() {
 	marshal_json(&t)
 	unmarshal_json(&t)
 	surrogate(&t)
+	utf8_string_of_multibyte_characters(&t)
 
 	fmt.printf("%v/%v tests successful.\n", TEST_count - TEST_fail, TEST_count)
 	if TEST_fail > 0 {
@@ -358,4 +359,11 @@ surrogate :: proc(t: ^testing.T) {
 	uerr := json.unmarshal(out, &back)
 	expect(t, uerr == nil, fmt.tprintf("Expected `json.unmarshal(%q)` to return a nil error, got %v", string(out), uerr))
 	expect(t, back == input, fmt.tprintf("Expected `json.unmarshal(%q)` to return %q, got %v", string(out), input, uerr))
+}
+
+@test
+utf8_string_of_multibyte_characters :: proc(t: ^testing.T) {
+	_, err := json.parse_string(`"🐛✅"`)
+	msg := fmt.tprintf("Expected `json.parse` to return nil, got %v", err)
+	expect(t, err == nil, msg)
 }
