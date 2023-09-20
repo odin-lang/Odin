@@ -1449,6 +1449,60 @@ gb_internal WORKER_TASK_PROC(lb_llvm_module_pass_worker_proc) {
 	LLVMPassManagerRef module_pass_manager = LLVMCreatePassManager();
 	lb_populate_module_pass_manager(wd->target_machine, module_pass_manager, build_context.optimization_level);
 	LLVMRunPassManager(module_pass_manager, wd->m->mod);
+
+#if LB_USE_NEW_PASS_SYSTEM
+	if (build_context.optimization_level == -1) {
+		// don't do any passes
+		return 0;
+	}
+
+	LLVMPassBuilderOptionsRef pb_options = LLVMCreatePassBuilderOptions();
+	defer (LLVMDisposePassBuilderOptions(pb_options));
+
+	LLVMPassBuilderOptionsSetVerifyEach(pb_options, true);
+
+	int inline_threshold = 0;
+	LLVMPassBuilderOptionsSetInlinerThreshold(pb_options, inline_threshold);
+
+	if (build_context.optimization_level == 2) {
+		LLVMPassBuilderOptionsSetLoopVectorization(pb_options, true);
+		LLVMPassBuilderOptionsSetLoopUnrolling    (pb_options, true);
+		LLVMPassBuilderOptionsSetMergeFunctions   (pb_options, true);
+	}
+
+	gbString passes = gb_string_make_reserve(heap_allocator(), 1024);
+	defer (gb_string_free(passes));
+
+	switch (build_context.optimization_level) {
+	case 0: default:
+		passes = gb_string_appendc(passes, "default<O0>");
+		break;
+	case 1:
+		passes = gb_string_appendc(passes, "default<O1>");
+		break;
+	case 2:
+		passes = gb_string_appendc(passes, "default<O2>");
+		break;
+	}
+	LLVMErrorRef llvm_err = LLVMRunPasses(wd->m->mod, passes, wd->target_machine, pb_options);
+	defer (LLVMConsumeError(llvm_err));
+	if (llvm_err != nullptr) {
+		char *llvm_error = LLVMGetErrorMessage(llvm_err);
+		gb_printf_err("LLVM Error:\n%s\n", llvm_error);
+		LLVMDisposeErrorMessage(llvm_error);
+		llvm_error = nullptr;
+
+		if (build_context.keep_temp_files) {
+			TIME_SECTION("LLVM Print Module to File");
+			String filepath_ll = lb_filepath_ll_for_module(wd->m);
+			if (LLVMPrintModuleToFile(wd->m->mod, cast(char const *)filepath_ll.text, &llvm_error)) {
+				gb_printf_err("LLVM Error: %s\n", llvm_error);
+			}
+		}
+		gb_exit(1);
+		return 1;
+	}
+#endif
 	return 0;
 }
 
