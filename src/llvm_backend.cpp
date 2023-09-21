@@ -1518,9 +1518,7 @@ gb_internal WORKER_TASK_PROC(lb_llvm_module_pass_worker_proc) {
 		passes_str = gb_string_appendc(passes_str, passes[i]);
 	}
 
-	gb_printf_err("LLVMRunPasses [START]\n");
 	LLVMErrorRef llvm_err = LLVMRunPasses(wd->m->mod, passes_str, wd->target_machine, pb_options);
-	gb_printf_err("LLVMRunPasses [END]\n");
 
 	defer (LLVMConsumeError(llvm_err));
 	if (llvm_err != nullptr) {
