@@ -510,6 +510,19 @@ Odin_Endian_Type :: type_of(ODIN_ENDIAN)
 */
 Odin_Platform_Subtarget_Type :: type_of(ODIN_PLATFORM_SUBTARGET)
 
+/*
+	// Defined internally by the compiler
+	Odin_Sanitizer_Flag :: enum u32 {
+		Address = 0,
+		Memory  = 1,
+		Thread  = 2,
+	}
+	Odin_Sanitizer_Flags :: distinct bitset[Odin_Sanitizer_Flag; u32]
+
+	ODIN_SANITIZER_FLAGS // is a constant
+*/
+Odin_Sanitizer_Flags :: type_of(ODIN_SANITIZER_FLAGS)
+
 
 /////////////////////////////
 // Init Startup Procedures //
