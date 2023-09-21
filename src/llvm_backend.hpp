@@ -48,6 +48,20 @@
 #define ODIN_LLVM_MINIMUM_VERSION_14 0
 #endif
 
+#if LLVM_VERSION_MAJOR == 15 || LLVM_VERSION_MAJOR == 16
+#error "LLVM versions 15 and 16 are not supported"
+#endif
+
+#if LLVM_VERSION_MAJOR >= 17
+#define LB_USE_NEW_PASS_SYSTEM 1
+#else
+#define LB_USE_NEW_PASS_SYSTEM 0
+#endif
+
+gb_internal bool lb_use_new_pass_system(void) {
+	return LB_USE_NEW_PASS_SYSTEM;
+}
+
 struct lbProcedure;
 
 struct lbValue {

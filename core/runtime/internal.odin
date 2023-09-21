@@ -13,6 +13,9 @@ RUNTIME_LINKAGE :: "strong" when (
 	!IS_WASM) else "internal"
 RUNTIME_REQUIRE :: !ODIN_TILDE
 
+@(private)
+__float16 :: f16 when __ODIN_LLVM_F16_SUPPORTED else u16
+
 
 @(private)
 byte_slice :: #force_inline proc "contextless" (data: rawptr, len: int) -> []byte #no_bounds_check {
@@ -755,7 +758,7 @@ quo_quaternion256 :: proc "contextless" (q, r: quaternion256) -> quaternion256 {
 }
 
 @(link_name="__truncsfhf2", linkage=RUNTIME_LINKAGE, require=RUNTIME_REQUIRE)
-truncsfhf2 :: proc "c" (value: f32) -> u16 {
+truncsfhf2 :: proc "c" (value: f32) -> __float16 {
 	v: struct #raw_union { i: u32, f: f32 }
 	i, s, e, m: i32
 
@@ -769,7 +772,7 @@ truncsfhf2 :: proc "c" (value: f32) -> u16 {
 
 	if e <= 0 {
 		if e < -10 {
-			return u16(s)
+			return transmute(__float16)u16(s)
 		}
 		m = (m | 0x00800000) >> u32(1 - e)
 
@@ -777,14 +780,14 @@ truncsfhf2 :: proc "c" (value: f32) -> u16 {
 			m += 0x00002000
 		}
 
-		return u16(s | (m >> 13))
+		return transmute(__float16)u16(s | (m >> 13))
 	} else if e == 0xff - (127 - 15) {
 		if m == 0 {
-			return u16(s | 0x7c00) /* NOTE(bill): infinity */
+			return transmute(__float16)u16(s | 0x7c00) /* NOTE(bill): infinity */
 		} else {
 			/* NOTE(bill): NAN */
 			m >>= 13
-			return u16(s | 0x7c00 | m | i32(m == 0))
+			return transmute(__float16)u16(s | 0x7c00 | m | i32(m == 0))
 		}
 	} else {
 		if m & 0x00001000 != 0 {
@@ -804,23 +807,24 @@ truncsfhf2 :: proc "c" (value: f32) -> u16 {
 				intrinsics.volatile_store(&f, g)
 			}
 
-			return u16(s | 0x7c00)
+			return transmute(__float16)u16(s | 0x7c00)
 		}
 
-		return u16(s | (e << 10) | (m >> 13))
+		return transmute(__float16)u16(s | (e << 10) | (m >> 13))
 	}
 }
 
 
 @(link_name="__truncdfhf2", linkage=RUNTIME_LINKAGE, require=RUNTIME_REQUIRE)
-truncdfhf2 :: proc "c" (value: f64) -> u16 {
+truncdfhf2 :: proc "c" (value: f64) -> __float16 {
 	return truncsfhf2(f32(value))
 }
 
 @(link_name="__gnu_h2f_ieee", linkage=RUNTIME_LINKAGE, require=RUNTIME_REQUIRE)
-gnu_h2f_ieee :: proc "c" (value: u16) -> f32 {
+gnu_h2f_ieee :: proc "c" (value_: __float16) -> f32 {
 	fp32 :: struct #raw_union { u: u32, f: f32 }
 
+	value := transmute(u16)value_
 	v: fp32
 	magic, inf_or_nan: fp32
 	magic.u = u32((254 - 15) << 23)
@@ -837,12 +841,12 @@ gnu_h2f_ieee :: proc "c" (value: u16) -> f32 {
 
 
 @(link_name="__gnu_f2h_ieee", linkage=RUNTIME_LINKAGE, require=RUNTIME_REQUIRE)
-gnu_f2h_ieee :: proc "c" (value: f32) -> u16 {
+gnu_f2h_ieee :: proc "c" (value: f32) -> __float16 {
 	return truncsfhf2(value)
 }
 
 @(link_name="__extendhfsf2", linkage=RUNTIME_LINKAGE, require=RUNTIME_REQUIRE)
-extendhfsf2 :: proc "c" (value: u16) -> f32 {
+extendhfsf2 :: proc "c" (value: __float16) -> f32 {
 	return gnu_h2f_ieee(value)
 }
 

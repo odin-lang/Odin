@@ -55,16 +55,6 @@ gb_internal void lb_populate_function_pass_manager_specific(lbModule *m, LLVMPas
 #define LLVM_ADD_CONSTANT_VALUE_PASS(fpm) 
 #endif
 
-#if LLVM_VERSION_MAJOR == 15 || LLVM_VERSION_MAJOR == 16
-#error "LLVM versions 15 and 16 are not supported"
-#endif
-
-#if LLVM_VERSION_MAJOR >= 17
-#define LB_USE_NEW_PASS_SYSTEM 1
-#else
-#define LB_USE_NEW_PASS_SYSTEM 0
-#endif
-
 gb_internal bool lb_opt_ignore(i32 optimization_level) {
 	return optimization_level < 0;
 }

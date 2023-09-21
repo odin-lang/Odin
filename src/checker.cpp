@@ -935,6 +935,7 @@ gb_internal i64 odin_compile_timestamp(void) {
 	return ns_after_1970;
 }
 
+gb_internal bool lb_use_new_pass_system(void);
 
 gb_internal void init_universal(void) {
 	BuildContext *bc = &build_context;
@@ -1082,6 +1083,8 @@ gb_internal void init_universal(void) {
 	add_global_bool_constant("ODIN_TILDE",                    bc->tilde_backend);
 
 	add_global_constant("ODIN_COMPILE_TIMESTAMP", t_untyped_integer, exact_value_i64(odin_compile_timestamp()));
+
+	add_global_bool_constant("__ODIN_LLVM_F16_SUPPORTED", lb_use_new_pass_system());
 
 
 // Builtin Procedures
