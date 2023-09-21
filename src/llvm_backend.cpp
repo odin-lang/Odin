@@ -1478,12 +1478,28 @@ gb_internal WORKER_TASK_PROC(lb_llvm_module_pass_worker_proc) {
 		passes = gb_string_appendc(passes, "default<O0>");
 		break;
 	case 1:
-		passes = gb_string_appendc(passes, "default<O1>");
+		passes = gb_string_appendc(passes, "default<Os>");
 		break;
 	case 2:
 		passes = gb_string_appendc(passes, "default<O2>");
 		break;
 	}
+
+	// asan - Linux, Darwin, Windows
+	// msan - linux
+	// tsan - Linux, Darwin
+	// ubsan - Linux, Darwin, Windows (NOT SUPPORTED WITH LLVM C-API)
+
+	if (build_context.sanitizer_flags & SanitizerFlag_Address) {
+		passes = gb_string_appendc(passes, ",asan");
+	}
+	if (build_context.sanitizer_flags & SanitizerFlag_Memory) {
+		passes = gb_string_appendc(passes, ",msan");
+	}
+	if (build_context.sanitizer_flags & SanitizerFlag_Thread) {
+		passes = gb_string_appendc(passes, ",tsan");
+	}
+
 	LLVMErrorRef llvm_err = LLVMRunPasses(wd->m->mod, passes, wd->target_machine, pb_options);
 	defer (LLVMConsumeError(llvm_err));
 	if (llvm_err != nullptr) {

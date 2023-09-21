@@ -300,6 +300,8 @@ enum BuildFlagKind {
 
 	BuildFlag_Tilde,
 
+	BuildFlag_Sanitize,
+
 #if defined(GB_SYSTEM_WINDOWS)
 	BuildFlag_IgnoreVsSearch,
 	BuildFlag_ResourceFile,
@@ -485,6 +487,8 @@ gb_internal bool parse_build_flags(Array<String> args) {
 #if ALLOW_TILDE
 	add_flag(&build_flags, BuildFlag_Tilde,                   str_lit("tilde"),                     BuildFlagParam_None,    Command__does_build);
 #endif
+
+	add_flag(&build_flags, BuildFlag_Sanitize,                str_lit("sanitize"),                  BuildFlagParam_String,  Command__does_build, true);
 
 #if defined(GB_SYSTEM_WINDOWS)
 	add_flag(&build_flags, BuildFlag_IgnoreVsSearch,          str_lit("ignore-vs-search"),          BuildFlagParam_None,    Command__does_build);
@@ -1192,6 +1196,21 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							break;
 						case BuildFlag_Tilde:
 							build_context.tilde_backend = true;
+							break;
+
+						case BuildFlag_Sanitize:
+							GB_ASSERT(value.kind == ExactValue_String);
+
+							if (str_eq_ignore_case(value.value_string, str_lit("address"))) {
+								build_context.sanitizer_flags |= SanitizerFlag_Address;
+							} else if (str_eq_ignore_case(value.value_string, str_lit("memory"))) {
+								build_context.sanitizer_flags |= SanitizerFlag_Memory;
+							} else if (str_eq_ignore_case(value.value_string, str_lit("thread"))) {
+								build_context.sanitizer_flags |= SanitizerFlag_Thread;
+							} else {
+								gb_printf_err("-sanitize:<string> options are 'address', 'memory', and 'thread'\n");
+								bad_flags = true;
+							}
 							break;
 
 					#if defined(GB_SYSTEM_WINDOWS)
