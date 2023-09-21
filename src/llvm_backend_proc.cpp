@@ -321,6 +321,12 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 		if (build_context.sanitizer_flags & SanitizerFlag_Address) {
 			lb_add_attribute_to_proc(m, p->value, "sanitize_address");
 		}
+		if (build_context.sanitizer_flags & SanitizerFlag_Memory) {
+			lb_add_attribute_to_proc(m, p->value, "sanitize_memory");
+		}
+		if (build_context.sanitizer_flags & SanitizerFlag_Thread) {
+			lb_add_attribute_to_proc(m, p->value, "sanitize_thread");
+		}
 	}
 
 	lbValue proc_value = {p->value, p->type};

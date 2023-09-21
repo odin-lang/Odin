@@ -1747,9 +1747,38 @@ gb_internal bool init_build_paths(String init_filename) {
 		return false;
 	}
 
+	if (build_context.sanitizer_flags & SanitizerFlag_Address) {
+		switch (build_context.metrics.os) {
+		case TargetOs_windows:
+		case TargetOs_linux:
+		case TargetOs_darwin:
+			break;
+		default:
+			gb_printf_err("-sanitize:memory is only supported on windows, linux, and darwin\n");
+			return false;
+		}
+	}
+
 	if (build_context.sanitizer_flags & SanitizerFlag_Memory) {
-		if (build_context.metrics.os != TargetOs_linux) {
+		switch (build_context.metrics.os) {
+		case TargetOs_linux:
+			break;
+		default:
 			gb_printf_err("-sanitize:memory is only supported on linux\n");
+			return false;
+		}
+		if (build_context.metrics.os != TargetOs_linux) {
+			return false;
+		}
+	}
+
+	if (build_context.sanitizer_flags & SanitizerFlag_Thread) {
+		switch (build_context.metrics.os) {
+		case TargetOs_linux:
+		case TargetOs_darwin:
+			break;
+		default:
+			gb_printf_err("-sanitize:thread is only supported on linux and darwin\n");
 			return false;
 		}
 	}
