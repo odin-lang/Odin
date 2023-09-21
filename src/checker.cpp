@@ -858,7 +858,7 @@ gb_internal AstPackage *create_builtin_package(char const *name) {
 	gbAllocator a = permanent_allocator();
 	AstPackage *pkg = gb_alloc_item(a, AstPackage);
 	pkg->name = make_string_c(name);
-	pkg->kind = Package_Normal;
+	pkg->kind = Package_Builtin;
 
 	pkg->scope = create_scope(nullptr, nullptr);
 	pkg->scope->flags |= ScopeFlag_Pkg | ScopeFlag_Global | ScopeFlag_Builtin;

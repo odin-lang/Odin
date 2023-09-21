@@ -152,7 +152,6 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 		lb_add_attribute_to_proc(m, p->value, "noredzone");
 	}
 
-
 	switch (p->inlining) {
 	case ProcInlining_inline:
 		lb_add_attribute_to_proc(m, p->value, "alwaysinline");
@@ -315,6 +314,12 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 			GB_ASSERT(p->debug_info != nullptr);
 			LLVMSetSubprogram(p->value, p->debug_info);
 			lb_set_llvm_metadata(m, p, p->debug_info);
+		}
+	}
+
+	if (p->body && entity->pkg && (entity->pkg->kind == Package_Normal) || (entity->pkg->kind == Package_Init)) {
+		if (build_context.sanitizer_flags & SanitizerFlag_Address) {
+			lb_add_attribute_to_proc(m, p->value, "sanitize_address");
 		}
 	}
 
