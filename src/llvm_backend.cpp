@@ -1025,6 +1025,8 @@ gb_internal lbProcedure *lb_create_startup_type_info(lbModule *m) {
 	LLVMSetLinkage(p->value, LLVMInternalLinkage);
 
 	lb_add_attribute_to_proc(m, p->value, "nounwind");
+	lb_add_attribute_to_proc(m, p->value, "optnone");
+	lb_add_attribute_to_proc(m, p->value, "noinline");
 
 	lb_begin_procedure_body(p);
 
@@ -1086,6 +1088,8 @@ gb_internal lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProc
 
 	lbProcedure *p = lb_create_dummy_procedure(main_module, str_lit(LB_STARTUP_RUNTIME_PROC_NAME), proc_type);
 	p->is_startup = true;
+	lb_add_attribute_to_proc(p->module, p->value, "optnone");
+	lb_add_attribute_to_proc(p->module, p->value, "noinline");
 
 	lb_begin_procedure_body(p);
 
@@ -1189,6 +1193,8 @@ gb_internal lbProcedure *lb_create_cleanup_runtime(lbModule *main_module) { // C
 
 	lbProcedure *p = lb_create_dummy_procedure(main_module, str_lit(LB_CLEANUP_RUNTIME_PROC_NAME), proc_type);
 	p->is_startup = true;
+	lb_add_attribute_to_proc(p->module, p->value, "optnone");
+	lb_add_attribute_to_proc(p->module, p->value, "noinline");
 
 	lb_begin_procedure_body(p);
 
@@ -1396,6 +1402,8 @@ gb_internal WORKER_TASK_PROC(lb_llvm_function_pass_per_module) {
 			lbFunctionPassManagerKind pass_manager_kind = lbFunctionPassManager_default;
 			if (p->flags & lbProcedureFlag_WithoutMemcpyPass) {
 				pass_manager_kind = lbFunctionPassManager_default_without_memcpy;
+				lb_add_attribute_to_proc(p->module, p->value, "optnone");
+				lb_add_attribute_to_proc(p->module, p->value, "noinline");
 			} else {
 				if (p->entity && p->entity->kind == Entity_Procedure) {
 					switch (p->entity->Procedure.optimization_mode) {
@@ -1405,6 +1413,7 @@ gb_internal WORKER_TASK_PROC(lb_llvm_function_pass_per_module) {
 						break;
 					case ProcedureOptimizationMode_Size:
 						pass_manager_kind = lbFunctionPassManager_size;
+						lb_add_attribute_to_proc(p->module, p->value, "optsize");
 						break;
 					case ProcedureOptimizationMode_Speed:
 						pass_manager_kind = lbFunctionPassManager_speed;
@@ -1463,22 +1472,12 @@ gb_internal WORKER_TASK_PROC(lb_llvm_module_pass_worker_proc) {
 	LLVMPassBuilderOptionsRef pb_options = LLVMCreatePassBuilderOptions();
 	defer (LLVMDisposePassBuilderOptions(pb_options));
 
-	LLVMPassBuilderOptionsSetVerifyEach(pb_options, true);
-
-	// int inline_threshold = 0;
-	// LLVMPassBuilderOptionsSetInlinerThreshold(pb_options, inline_threshold);
-
-	if (build_context.optimization_level >= 2) {
-		LLVMPassBuilderOptionsSetLoopVectorization(pb_options, true);
-		LLVMPassBuilderOptionsSetLoopUnrolling    (pb_options, true);
-		LLVMPassBuilderOptionsSetMergeFunctions   (pb_options, true);
-	}
-
 	switch (build_context.optimization_level) {
 	case -1:
 		break;
 	case 0:
-		array_add(&passes, "default<O0>");
+		array_add(&passes, "always-inline");
+		array_add(&passes, "function(annotation-remarks)");
 		break;
 	case 1:
 		array_add(&passes, "default<Os>");
@@ -1506,9 +1505,8 @@ gb_internal WORKER_TASK_PROC(lb_llvm_module_pass_worker_proc) {
 		array_add(&passes, "tsan");
 	}
 
-
 	if (passes.count == 0) {
-		return 0;
+		array_add(&passes, "verify");
 	}
 
 	gbString passes_str = gb_string_make_reserve(heap_allocator(), 1024);
@@ -1520,7 +1518,10 @@ gb_internal WORKER_TASK_PROC(lb_llvm_module_pass_worker_proc) {
 		passes_str = gb_string_appendc(passes_str, passes[i]);
 	}
 
+	gb_printf_err("LLVMRunPasses [START]\n");
 	LLVMErrorRef llvm_err = LLVMRunPasses(wd->m->mod, passes_str, wd->target_machine, pb_options);
+	gb_printf_err("LLVMRunPasses [END]\n");
+
 	defer (LLVMConsumeError(llvm_err));
 	if (llvm_err != nullptr) {
 		char *llvm_error = LLVMGetErrorMessage(llvm_err);
@@ -2546,7 +2547,6 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 
 
 	TIME_SECTION("LLVM Module Verification");
-
 
 	if (!lb_llvm_module_verification(gen, do_threading)) {
 		return false;

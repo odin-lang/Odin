@@ -1056,24 +1056,6 @@ gb_internal void check_bit_set_type(CheckerContext *c, Type *type, Type *named_t
 	} else {
 		Type *elem = check_type_expr(c, bs->elem, nullptr);
 
-		#if 0
-		if (named_type != nullptr && named_type->kind == Type_Named &&
-		    elem->kind == Type_Enum) {
-			// NOTE(bill): Anonymous enumeration
-
-			String prefix = named_type->Named.name;
-			String enum_name = concatenate_strings(heap_allocator(), prefix, str_lit(".enum"));
-
-			Token token = make_token_ident(enum_name);
-
-			Entity *e = alloc_entity_type_name(nullptr, token, nullptr, EntityState_Resolved);
-			Type *named = alloc_type_named(enum_name, elem, e);
-			e->type = named;
-			e->TypeName.is_type_alias = true;
-			elem = named;
-		}
-		#endif
-
 		type->BitSet.elem = elem;
 		if (!is_type_valid_bit_set_elem(elem)) {
 			error(bs->elem, "Expected an enum type for a bit_set");

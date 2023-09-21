@@ -14,17 +14,6 @@ gb_internal bool lb_is_const_or_global(lbValue value) {
 	if (lb_is_const(value)) {
 		return true;
 	}
-	// TODO remove use of LLVMGetElementType
-	#if 0
-	if (LLVMGetValueKind(value.value) == LLVMGlobalVariableValueKind) {
-		LLVMTypeRef t = LLVMGetElementType(LLVMTypeOf(value.value));
-		if (!lb_is_type_kind(t, LLVMPointerTypeKind)) {
-			return false;
-		}
-		LLVMTypeRef elem = LLVMGetElementType(t);
-		return lb_is_type_kind(elem, LLVMFunctionTypeKind);
-	}
-	#endif
 	return false;
 }
 
