@@ -82,9 +82,9 @@ set libs= ^
 
 rem DO NOT TOUCH!
 rem THIS TILDE STUFF IS FOR DEVELOPMENT ONLY!
-set tilde_backend=1
+set tilde_backend=0
 if %tilde_backend% EQU 1 (
-	set libs=%libs% src\tilde\tb.lib onecore.lib
+	set libs=%libs% src\tilde\tb.lib
 	set compiler_defines=%compiler_defines% -DODIN_TILDE_BACKEND
 )
 rem DO NOT TOUCH!
@@ -107,26 +107,10 @@ del *.ilk > NUL 2> NUL
 cl %compiler_settings% "src\main.cpp" "src\libtommath.cpp" /link %linker_settings% -OUT:%exe_name%
 if %errorlevel% neq 0 goto end_of_build
 
-rem call build_vendor.bat
-rem if %errorlevel% neq 0 goto end_of_build
-
-rem if %release_mode% EQU 0 odin run examples/demo
-
-rem %exe_name% check examples/all -show-timings
-rem %exe_name% build examples/demo -show-timings -keep-temp-files
-%exe_name% run examples/bug -show-timings -o:none -sanitize:address
-rem %exe_name% run examples/bug -tilde -debug
-
-
+call build_vendor.bat
 if %errorlevel% neq 0 goto end_of_build
 
-pushd W:\JangaFX\EmberGen\embergen2
-	rem W:\Odin\odin build . -show-timings
-	rem W:\Odin\odin run . -show-timings
-popd
-
-
-rem %exe_name% check examples/all -vet -strict-style -show-timings
+if %release_mode% EQU 0 odin run examples/demo
 
 del *.obj > NUL 2> NUL
 
