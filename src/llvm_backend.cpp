@@ -1453,19 +1453,20 @@ gb_internal WORKER_TASK_PROC(lb_llvm_module_pass_worker_proc) {
 	lb_populate_module_pass_manager(wd->target_machine, module_pass_manager, build_context.optimization_level);
 	LLVMRunPassManager(module_pass_manager, wd->m->mod);
 
+
 #if LB_USE_NEW_PASS_SYSTEM
-	if (build_context.optimization_level == -1) {
-		// don't do any passes
-		return 0;
-	}
+	auto passes = array_make<char const *>(heap_allocator(), 0, 64);
+	defer (array_free(&passes));
+
+
 
 	LLVMPassBuilderOptionsRef pb_options = LLVMCreatePassBuilderOptions();
 	defer (LLVMDisposePassBuilderOptions(pb_options));
 
 	LLVMPassBuilderOptionsSetVerifyEach(pb_options, true);
 
-	int inline_threshold = 0;
-	LLVMPassBuilderOptionsSetInlinerThreshold(pb_options, inline_threshold);
+	// int inline_threshold = 0;
+	// LLVMPassBuilderOptionsSetInlinerThreshold(pb_options, inline_threshold);
 
 	if (build_context.optimization_level >= 2) {
 		LLVMPassBuilderOptionsSetLoopVectorization(pb_options, true);
@@ -1473,21 +1474,20 @@ gb_internal WORKER_TASK_PROC(lb_llvm_module_pass_worker_proc) {
 		LLVMPassBuilderOptionsSetMergeFunctions   (pb_options, true);
 	}
 
-	gbString passes = gb_string_make_reserve(heap_allocator(), 1024);
-	defer (gb_string_free(passes));
-
 	switch (build_context.optimization_level) {
-	case 0: default:
-		passes = gb_string_appendc(passes, "default<O0>");
+	case -1:
+		break;
+	case 0:
+		array_add(&passes, "default<O0>");
 		break;
 	case 1:
-		passes = gb_string_appendc(passes, "default<Os>");
+		array_add(&passes, "default<Os>");
 		break;
 	case 2:
-		passes = gb_string_appendc(passes, "default<O2>");
+		array_add(&passes, "default<O2>");
 		break;
 	case 3:
-		passes = gb_string_appendc(passes, "default<O3>");
+		array_add(&passes, "default<O3>");
 		break;
 	}
 
@@ -1497,16 +1497,25 @@ gb_internal WORKER_TASK_PROC(lb_llvm_module_pass_worker_proc) {
 	// ubsan - Linux, Darwin, Windows (NOT SUPPORTED WITH LLVM C-API)
 
 	if (build_context.sanitizer_flags & SanitizerFlag_Address) {
-		passes = gb_string_appendc(passes, ",asan");
+		array_add(&passes, "asan");
 	}
 	if (build_context.sanitizer_flags & SanitizerFlag_Memory) {
-		passes = gb_string_appendc(passes, ",msan");
+		array_add(&passes, "msan");
 	}
 	if (build_context.sanitizer_flags & SanitizerFlag_Thread) {
-		passes = gb_string_appendc(passes, ",tsan");
+		array_add(&passes, "tsan");
 	}
 
-	LLVMErrorRef llvm_err = LLVMRunPasses(wd->m->mod, passes, wd->target_machine, pb_options);
+	gbString passes_str = gb_string_make_reserve(heap_allocator(), 1024);
+	defer (gb_string_free(passes_str));
+	for_array(i, passes) {
+		if (i != 0) {
+			passes_str = gb_string_appendc(passes_str, ",");
+		}
+		passes_str = gb_string_appendc(passes_str, passes[i]);
+	}
+
+	LLVMErrorRef llvm_err = LLVMRunPasses(wd->m->mod, passes_str, wd->target_machine, pb_options);
 	defer (LLVMConsumeError(llvm_err));
 	if (llvm_err != nullptr) {
 		char *llvm_error = LLVMGetErrorMessage(llvm_err);
