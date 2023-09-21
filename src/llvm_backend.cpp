@@ -1358,6 +1358,7 @@ gb_internal WORKER_TASK_PROC(lb_llvm_function_pass_per_module) {
 		m->function_pass_managers[lbFunctionPassManager_minimal]                = LLVMCreateFunctionPassManagerForModule(m->mod);
 		m->function_pass_managers[lbFunctionPassManager_size]                   = LLVMCreateFunctionPassManagerForModule(m->mod);
 		m->function_pass_managers[lbFunctionPassManager_speed]                  = LLVMCreateFunctionPassManagerForModule(m->mod);
+		m->function_pass_managers[lbFunctionPassManager_aggressive]             = LLVMCreateFunctionPassManagerForModule(m->mod);
 
 		LLVMInitializeFunctionPassManager(m->function_pass_managers[lbFunctionPassManager_default]);
 		LLVMInitializeFunctionPassManager(m->function_pass_managers[lbFunctionPassManager_default_without_memcpy]);
@@ -1368,10 +1369,11 @@ gb_internal WORKER_TASK_PROC(lb_llvm_function_pass_per_module) {
 
 		lb_populate_function_pass_manager(m, m->function_pass_managers[lbFunctionPassManager_default],                false, build_context.optimization_level);
 		lb_populate_function_pass_manager(m, m->function_pass_managers[lbFunctionPassManager_default_without_memcpy], true,  build_context.optimization_level);
-		lb_populate_function_pass_manager_specific(m, m->function_pass_managers[lbFunctionPassManager_none],   -1);
-		lb_populate_function_pass_manager_specific(m, m->function_pass_managers[lbFunctionPassManager_minimal], 0);
-		lb_populate_function_pass_manager_specific(m, m->function_pass_managers[lbFunctionPassManager_size],    1);
-		lb_populate_function_pass_manager_specific(m, m->function_pass_managers[lbFunctionPassManager_speed],   2);
+		lb_populate_function_pass_manager_specific(m, m->function_pass_managers[lbFunctionPassManager_none],      -1);
+		lb_populate_function_pass_manager_specific(m, m->function_pass_managers[lbFunctionPassManager_minimal],    0);
+		lb_populate_function_pass_manager_specific(m, m->function_pass_managers[lbFunctionPassManager_size],       1);
+		lb_populate_function_pass_manager_specific(m, m->function_pass_managers[lbFunctionPassManager_speed],      2);
+		lb_populate_function_pass_manager_specific(m, m->function_pass_managers[lbFunctionPassManager_aggressive], 3);
 
 		LLVMFinalizeFunctionPassManager(m->function_pass_managers[lbFunctionPassManager_default]);
 		LLVMFinalizeFunctionPassManager(m->function_pass_managers[lbFunctionPassManager_default_without_memcpy]);
@@ -1379,6 +1381,7 @@ gb_internal WORKER_TASK_PROC(lb_llvm_function_pass_per_module) {
 		LLVMFinalizeFunctionPassManager(m->function_pass_managers[lbFunctionPassManager_minimal]);
 		LLVMFinalizeFunctionPassManager(m->function_pass_managers[lbFunctionPassManager_size]);
 		LLVMFinalizeFunctionPassManager(m->function_pass_managers[lbFunctionPassManager_speed]);
+		LLVMFinalizeFunctionPassManager(m->function_pass_managers[lbFunctionPassManager_aggressive]);
 	}
 
 	if (m == &m->gen->default_module) {
@@ -1464,7 +1467,7 @@ gb_internal WORKER_TASK_PROC(lb_llvm_module_pass_worker_proc) {
 	int inline_threshold = 0;
 	LLVMPassBuilderOptionsSetInlinerThreshold(pb_options, inline_threshold);
 
-	if (build_context.optimization_level == 2) {
+	if (build_context.optimization_level >= 2) {
 		LLVMPassBuilderOptionsSetLoopVectorization(pb_options, true);
 		LLVMPassBuilderOptionsSetLoopUnrolling    (pb_options, true);
 		LLVMPassBuilderOptionsSetMergeFunctions   (pb_options, true);
@@ -1482,6 +1485,9 @@ gb_internal WORKER_TASK_PROC(lb_llvm_module_pass_worker_proc) {
 		break;
 	case 2:
 		passes = gb_string_appendc(passes, "default<O2>");
+		break;
+	case 3:
+		passes = gb_string_appendc(passes, "default<O3>");
 		break;
 	}
 
@@ -2105,12 +2111,15 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 	// GB_ASSERT_MSG(LLVMTargetHasAsmBackend(target));
 
 	LLVMCodeGenOptLevel code_gen_level = LLVMCodeGenLevelNone;
+	if (!LB_USE_NEW_PASS_SYSTEM) {
+		build_context.optimization_level = gb_clamp(build_context.optimization_level, -1, 2);
+	}
 	switch (build_context.optimization_level) {
-	case 0: code_gen_level = LLVMCodeGenLevelNone;    break;
-	case 1: code_gen_level = LLVMCodeGenLevelLess;    break;
-	case 2: code_gen_level = LLVMCodeGenLevelDefault; break;
-	case 3: code_gen_level = LLVMCodeGenLevelDefault; break; // NOTE(bill): force -opt:3 to be the same as -opt:2
-	// case 3: code_gen_level = LLVMCodeGenLevelAggressive; break;
+	default:/*fallthrough*/
+	case 0: code_gen_level = LLVMCodeGenLevelNone;       break;
+	case 1: code_gen_level = LLVMCodeGenLevelLess;       break;
+	case 2: code_gen_level = LLVMCodeGenLevelDefault;    break;
+	case 3: code_gen_level = LLVMCodeGenLevelAggressive; break;
 	}
 
 	// NOTE(bill): Target Machine Creation

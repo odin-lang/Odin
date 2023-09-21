@@ -66,8 +66,7 @@ gb_internal void lb_populate_function_pass_manager_specific(lbModule *m, LLVMPas
 #endif
 
 gb_internal bool lb_opt_ignore(i32 optimization_level) {
-	optimization_level = gb_clamp(optimization_level, -1, 2);
-	return optimization_level == -1;
+	return optimization_level < 0;
 }
 
 gb_internal void lb_basic_populate_function_pass_manager(LLVMPassManagerRef fpm, i32 optimization_level) {

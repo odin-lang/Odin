@@ -1390,7 +1390,7 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 		bc->optimization_level = -1; // -o:none
 	}
 
-	bc->optimization_level = gb_clamp(bc->optimization_level, -1, 2);
+	bc->optimization_level = gb_clamp(bc->optimization_level, -1, 3);
 
 	// ENFORCE DYNAMIC MAP CALLS
 	bc->dynamic_map_calls = true;

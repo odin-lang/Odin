@@ -664,12 +664,18 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							} else if (value.value_string == "speed") {
 								build_context.custom_optimization_level = true;
 								build_context.optimization_level = 2;
+							} else if (value.value_string == "aggressive" && LB_USE_NEW_PASS_SYSTEM) {
+								build_context.custom_optimization_level = true;
+								build_context.optimization_level = 3;
 							} else {
 								gb_printf_err("Invalid optimization mode for -o:<string>, got %.*s\n", LIT(value.value_string));
 								gb_printf_err("Valid optimization modes:\n");
 								gb_printf_err("\tminimal\n");
 								gb_printf_err("\tsize\n");
 								gb_printf_err("\tspeed\n");
+								if (LB_USE_NEW_PASS_SYSTEM) {
+									gb_printf_err("\taggressive\n");
+								}
 								gb_printf_err("\tnone (useful for -debug builds)\n");
 								bad_flags = true;
 							}
@@ -1668,8 +1674,13 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 
 		print_usage_line(1, "-o:<string>");
 		print_usage_line(2, "Set the optimization mode for compilation");
-		print_usage_line(2, "Accepted values: minimal, size, speed, none");
+		if (LB_USE_NEW_PASS_SYSTEM) {
+			print_usage_line(2, "Accepted values: none, minimal, size, speed, aggressive");
+		} else {
+			print_usage_line(2, "Accepted values: none, minimal, size, speed");
+		}
 		print_usage_line(2, "Example: -o:speed");
+		print_usage_line(2, "The default is -o:minimal");
 		print_usage_line(0, "");
 	}
 
@@ -1944,6 +1955,15 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 
 		print_usage_line(1, "-foreign-error-procedures");
 		print_usage_line(2, "States that the error procedues used in the runtime are defined in a separate translation unit");
+		print_usage_line(0, "");
+
+	}
+
+	if (run_or_build) {
+		print_usage_line(1, "-sanitize:<string>");
+		print_usage_line(1, "Enables sanitization analysis");
+		print_usage_line(1, "Options are 'address', 'memory', and 'thread'");
+		print_usage_line(1, "NOTE: This flag can be used multiple times");
 		print_usage_line(0, "");
 
 	}
