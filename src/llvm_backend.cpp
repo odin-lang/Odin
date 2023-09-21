@@ -1506,6 +1506,11 @@ gb_internal WORKER_TASK_PROC(lb_llvm_module_pass_worker_proc) {
 		array_add(&passes, "tsan");
 	}
 
+
+	if (passes.count == 0) {
+		return 0;
+	}
+
 	gbString passes_str = gb_string_make_reserve(heap_allocator(), 1024);
 	defer (gb_string_free(passes_str));
 	for_array(i, passes) {
