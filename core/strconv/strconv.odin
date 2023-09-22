@@ -925,7 +925,28 @@ parse_f64_prefix :: proc(str: string) -> (value: f64, nr: int, ok: bool) {
 		nd := 0
 		nd_mant := 0
 		decimal_point := 0
-		loop: for ; i < len(s); i += 1 {
+
+		use_trimmed_len := false
+		trimmed_len := len(s)
+
+		// Trim off any trailing zeroes after the decimal point. Makes sure we
+		// don't truncate floats when not needed.
+		loop_trim: for ti := len(s) - 1; ti >= 0 ; ti -= 1 {
+			c := s[ti]
+			switch c {
+				case '.':
+					use_trimmed_len = true
+					trimmed_len -= 1
+					break loop_trim
+
+				case '0':
+					trimmed_len -= 1
+
+				case: break loop_trim
+			}
+		}
+
+		loop: for ; i < (use_trimmed_len ? trimmed_len : len(s)); i += 1 {
 			switch c := s[i]; true {
 			case c == '_':
 				underscores = true
