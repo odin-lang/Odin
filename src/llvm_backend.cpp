@@ -1358,20 +1358,13 @@ gb_internal WORKER_TASK_PROC(lb_llvm_function_pass_per_module) {
 	{
 		GB_ASSERT(m->function_pass_managers[lbFunctionPassManager_default] == nullptr);
 
-		m->function_pass_managers[lbFunctionPassManager_default]                = LLVMCreateFunctionPassManagerForModule(m->mod);
-		m->function_pass_managers[lbFunctionPassManager_default_without_memcpy] = LLVMCreateFunctionPassManagerForModule(m->mod);
-		m->function_pass_managers[lbFunctionPassManager_none]                   = LLVMCreateFunctionPassManagerForModule(m->mod);
-		m->function_pass_managers[lbFunctionPassManager_minimal]                = LLVMCreateFunctionPassManagerForModule(m->mod);
-		m->function_pass_managers[lbFunctionPassManager_size]                   = LLVMCreateFunctionPassManagerForModule(m->mod);
-		m->function_pass_managers[lbFunctionPassManager_speed]                  = LLVMCreateFunctionPassManagerForModule(m->mod);
-		m->function_pass_managers[lbFunctionPassManager_aggressive]             = LLVMCreateFunctionPassManagerForModule(m->mod);
+		for (i32 i = 0; i < lbFunctionPassManager_COUNT; i++) {
+			m->function_pass_managers[i] = LLVMCreateFunctionPassManagerForModule(m->mod);
+		}
 
-		LLVMInitializeFunctionPassManager(m->function_pass_managers[lbFunctionPassManager_default]);
-		LLVMInitializeFunctionPassManager(m->function_pass_managers[lbFunctionPassManager_default_without_memcpy]);
-		LLVMInitializeFunctionPassManager(m->function_pass_managers[lbFunctionPassManager_none]);
-		LLVMInitializeFunctionPassManager(m->function_pass_managers[lbFunctionPassManager_minimal]);
-		LLVMInitializeFunctionPassManager(m->function_pass_managers[lbFunctionPassManager_size]);
-		LLVMInitializeFunctionPassManager(m->function_pass_managers[lbFunctionPassManager_speed]);
+		for (i32 i = 0; i < lbFunctionPassManager_COUNT; i++) {
+			LLVMInitializeFunctionPassManager(m->function_pass_managers[i]);
+		}
 
 		lb_populate_function_pass_manager(m, m->function_pass_managers[lbFunctionPassManager_default],                false, build_context.optimization_level);
 		lb_populate_function_pass_manager(m, m->function_pass_managers[lbFunctionPassManager_default_without_memcpy], true,  build_context.optimization_level);
@@ -1381,13 +1374,9 @@ gb_internal WORKER_TASK_PROC(lb_llvm_function_pass_per_module) {
 		lb_populate_function_pass_manager_specific(m, m->function_pass_managers[lbFunctionPassManager_speed],      2);
 		lb_populate_function_pass_manager_specific(m, m->function_pass_managers[lbFunctionPassManager_aggressive], 3);
 
-		LLVMFinalizeFunctionPassManager(m->function_pass_managers[lbFunctionPassManager_default]);
-		LLVMFinalizeFunctionPassManager(m->function_pass_managers[lbFunctionPassManager_default_without_memcpy]);
-		LLVMFinalizeFunctionPassManager(m->function_pass_managers[lbFunctionPassManager_none]);
-		LLVMFinalizeFunctionPassManager(m->function_pass_managers[lbFunctionPassManager_minimal]);
-		LLVMFinalizeFunctionPassManager(m->function_pass_managers[lbFunctionPassManager_size]);
-		LLVMFinalizeFunctionPassManager(m->function_pass_managers[lbFunctionPassManager_speed]);
-		LLVMFinalizeFunctionPassManager(m->function_pass_managers[lbFunctionPassManager_aggressive]);
+		for (i32 i = 0; i < lbFunctionPassManager_COUNT; i++) {
+			LLVMFinalizeFunctionPassManager(m->function_pass_managers[i]);
+		}
 	}
 
 	if (m == &m->gen->default_module) {
@@ -2536,16 +2525,13 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 		}
 	}
 
-
 	TIME_SECTION("LLVM Function Pass");
 	lb_llvm_function_passes(gen, do_threading && !build_context.ODIN_DEBUG);
 
 	TIME_SECTION("LLVM Module Pass");
 	lb_llvm_module_passes(gen, do_threading);
 
-
 	TIME_SECTION("LLVM Module Verification");
-
 	if (!lb_llvm_module_verification(gen, do_threading)) {
 		return false;
 	}
