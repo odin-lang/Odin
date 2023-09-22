@@ -443,7 +443,7 @@ gb_internal void lb_append_to_compiler_used(lbModule *m, LLVMValueRef func) {
 	}
 
 	LLVMTypeRef Int8PtrTy = LLVMPointerType(LLVMInt8TypeInContext(m->ctx), 0);
-	LLVMTypeRef ATy = LLVMArrayType(Int8PtrTy, operands);
+	LLVMTypeRef ATy = llvm_array_type(Int8PtrTy, operands);
 
 	constants[operands - 1] = LLVMConstBitCast(func, Int8PtrTy);
 	LLVMValueRef initializer = LLVMConstArray(Int8PtrTy, constants, operands);

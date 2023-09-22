@@ -278,6 +278,13 @@ gb_internal lbValue lb_zero(lbModule *m, Type *t) {
 	v.type = t;
 	return v;
 }
+gb_internal LLVMValueRef llvm_const_extract_value(lbModule *m, LLVMValueRef agg, unsigned index) {
+	LLVMValueRef res = agg;
+	GB_ASSERT(LLVMIsConstant(res));
+	res = LLVMBuildExtractValue(m->const_dummy_builder, res, index, "");
+	GB_ASSERT(LLVMIsConstant(res));
+	return res;
+}
 
 gb_internal LLVMValueRef llvm_const_extract_value(lbModule *m, LLVMValueRef agg, unsigned *indices, isize count) {
 	// return LLVMConstExtractValue(value, indices, count);
@@ -289,6 +296,19 @@ gb_internal LLVMValueRef llvm_const_extract_value(lbModule *m, LLVMValueRef agg,
 	}
 	return res;
 }
+
+gb_internal LLVMValueRef llvm_const_insert_value(lbModule *m, LLVMValueRef agg, LLVMValueRef val, unsigned index) {
+	GB_ASSERT(LLVMIsConstant(agg));
+	GB_ASSERT(LLVMIsConstant(val));
+
+	LLVMValueRef extracted_value = val;
+	LLVMValueRef nested = llvm_const_extract_value(m, agg, index);
+	GB_ASSERT(LLVMIsConstant(nested));
+	extracted_value = LLVMBuildInsertValue(m->const_dummy_builder, nested, extracted_value, index, "");
+	GB_ASSERT(LLVMIsConstant(extracted_value));
+	return extracted_value;
+}
+
 
 gb_internal LLVMValueRef llvm_const_insert_value(lbModule *m, LLVMValueRef agg, LLVMValueRef val, unsigned *indices, isize count) {
 	GB_ASSERT(LLVMIsConstant(agg));
@@ -1919,14 +1939,14 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 
 	case Type_Array: {
 		m->internal_type_level += 1;
-		LLVMTypeRef t = LLVMArrayType(lb_type(m, type->Array.elem), cast(unsigned)type->Array.count);
+		LLVMTypeRef t = llvm_array_type(lb_type(m, type->Array.elem), type->Array.count);
 		m->internal_type_level -= 1;
 		return t;
 	}
 
 	case Type_EnumeratedArray: {
 		m->internal_type_level += 1;
-		LLVMTypeRef t = LLVMArrayType(lb_type(m, type->EnumeratedArray.elem), cast(unsigned)type->EnumeratedArray.count);
+		LLVMTypeRef t = llvm_array_type(lb_type(m, type->EnumeratedArray.elem), type->EnumeratedArray.count);
 		m->internal_type_level -= 1;
 		return t;
 	}
@@ -2160,7 +2180,7 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 			m->internal_type_level -= 1;
 			
 			LLVMTypeRef elem = lb_type(m, type->Matrix.elem);
-			LLVMTypeRef t = LLVMArrayType(elem, cast(unsigned)elem_count);
+			LLVMTypeRef t = llvm_array_type(elem, elem_count);
 			
 			m->internal_type_level += 1;
 			return t;

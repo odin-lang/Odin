@@ -1130,14 +1130,14 @@ namespace lbAbiArm64 {
 			return non_struct(c, return_type);
 		} else if (is_homogenous_aggregate(c, return_type, &homo_base_type, &homo_member_count)) {
 			if (is_homogenous_aggregate_small_enough(homo_base_type, homo_member_count)) {
-				return lb_arg_type_direct(return_type, LLVMArrayType(homo_base_type, homo_member_count), nullptr, nullptr);
+				return lb_arg_type_direct(return_type, llvm_array_type(homo_base_type, homo_member_count), nullptr, nullptr);
 			} else {
 				//TODO(Platin): do i need to create stuff that can handle the diffrent return type?
 				//              else this needs a fix in llvm_backend_proc as we would need to cast it to the correct array type
 
 				LB_ABI_MODIFY_RETURN_IF_TUPLE_MACRO();
 
-				//LLVMTypeRef array_type = LLVMArrayType(homo_base_type, homo_member_count);
+				//LLVMTypeRef array_type = llvm_array_type(homo_base_type, homo_member_count);
 				LLVMAttributeRef attr = lb_create_enum_attribute_with_type(c, "sret", return_type);
 				return lb_arg_type_indirect(return_type, attr);
 			}
@@ -1155,7 +1155,7 @@ namespace lbAbiArm64 {
 					cast_type = LLVMInt64TypeInContext(c);
 				} else {
 					unsigned count = cast(unsigned)((size+7)/8);
-					cast_type = LLVMArrayType(LLVMInt64TypeInContext(c), count);
+					cast_type = llvm_array_type(LLVMInt64TypeInContext(c), count);
 				}
 				return lb_arg_type_direct(return_type, cast_type, nullptr, nullptr);
 			} else {
@@ -1180,7 +1180,7 @@ namespace lbAbiArm64 {
 				args[i] = non_struct(c, type);
 			} else if (is_homogenous_aggregate(c, type, &homo_base_type, &homo_member_count)) {
 				if (is_homogenous_aggregate_small_enough(homo_base_type, homo_member_count)) {
-					args[i] = lb_arg_type_direct(type, LLVMArrayType(homo_base_type, homo_member_count), nullptr, nullptr);
+					args[i] = lb_arg_type_direct(type, llvm_array_type(homo_base_type, homo_member_count), nullptr, nullptr);
 				} else {
 					args[i] = lb_arg_type_indirect(type, nullptr);;
 				}
@@ -1198,7 +1198,7 @@ namespace lbAbiArm64 {
 						cast_type = LLVMIntTypeInContext(c, 64);
 					} else {
 						unsigned count = cast(unsigned)((size+7)/8);
-						cast_type = LLVMArrayType(LLVMIntTypeInContext(c, 64), count);
+						cast_type = llvm_array_type(LLVMIntTypeInContext(c, 64), count);
 					}
 					args[i] = lb_arg_type_direct(type, cast_type, nullptr, nullptr);
 				} else {
@@ -1439,10 +1439,10 @@ namespace lbAbiArm32 {
 					args[i] = lb_arg_type_indirect(t, nullptr);
 				} else if (a <= 4) {
 					unsigned n = cast(unsigned)((sz + 3) / 4);
-					args[i] = lb_arg_type_direct(LLVMArrayType(LLVMIntTypeInContext(c, 32), n));
+					args[i] = lb_arg_type_direct(llvm_array_type(LLVMIntTypeInContext(c, 32), n));
 				} else {
 					unsigned n = cast(unsigned)((sz + 7) / 8);
-					args[i] = lb_arg_type_direct(LLVMArrayType(LLVMIntTypeInContext(c, 64), n));
+					args[i] = lb_arg_type_direct(llvm_array_type(LLVMIntTypeInContext(c, 64), n));
 				}
 			}
 		}

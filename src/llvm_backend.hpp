@@ -451,6 +451,7 @@ gb_internal lbValue lb_emit_runtime_call(lbProcedure *p, char const *c_name, Arr
 
 
 gb_internal lbValue lb_emit_ptr_offset(lbProcedure *p, lbValue ptr, lbValue index);
+gb_internal lbValue lb_const_ptr_offset(lbModule *m, lbValue ptr, lbValue index);
 gb_internal lbValue lb_string_elem(lbProcedure *p, lbValue string);
 gb_internal lbValue lb_string_len(lbProcedure *p, lbValue string);
 gb_internal lbValue lb_cstring_len(lbProcedure *p, lbValue value);
@@ -497,6 +498,7 @@ gb_internal lbValue lb_find_value_from_entity(lbModule *m, Entity *e);
 gb_internal void lb_store_type_case_implicit(lbProcedure *p, Ast *clause, lbValue value);
 gb_internal lbAddr lb_store_range_stmt_val(lbProcedure *p, Ast *stmt_val, lbValue value);
 gb_internal lbValue lb_emit_source_code_location_const(lbProcedure *p, String const &procedure, TokenPos const &pos);
+gb_internal lbValue lb_const_source_code_location_const(lbModule *m, String const &procedure, TokenPos const &pos);
 
 gb_internal lbValue lb_handle_param_value(lbProcedure *p, Type *parameter_type, ParameterValue const &param_value, TokenPos const &pos);
 
@@ -552,6 +554,15 @@ gb_internal LLVMTypeRef OdinLLVMGetArrayElementType(LLVMTypeRef type);
 gb_internal LLVMTypeRef OdinLLVMGetVectorElementType(LLVMTypeRef type);
 
 gb_internal String lb_filepath_ll_for_module(lbModule *m);
+
+
+gb_internal LLVMTypeRef llvm_array_type(LLVMTypeRef ElementType, uint64_t ElementCount) {
+#if LB_USE_NEW_PASS_SYSTEM
+	return LLVMArrayType2(ElementType, ElementCount);
+#else
+	return LLVMArrayType(ElementType, cast(unsigned)ElementCount);
+#endif
+}
 
 #define LB_STARTUP_RUNTIME_PROC_NAME   "__$startup_runtime"
 #define LB_CLEANUP_RUNTIME_PROC_NAME   "__$cleanup_runtime"

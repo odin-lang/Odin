@@ -284,19 +284,23 @@ gb_internal lbValue lb_expr_untyped_const_to_typed(lbModule *m, Ast *expr, Type 
 	return lb_const_value(m, t, tv.value);
 }
 
-gb_internal lbValue lb_emit_source_code_location_const(lbProcedure *p, String const &procedure, TokenPos const &pos) {
-	lbModule *m = p->module;
-
+gb_internal lbValue lb_const_source_code_location_const(lbModule *m, String const &procedure, TokenPos const &pos) {
 	LLVMValueRef fields[4] = {};
-	fields[0]/*file*/      = lb_find_or_add_entity_string(p->module, get_file_path_string(pos.file_id)).value;
+	fields[0]/*file*/      = lb_find_or_add_entity_string(m, get_file_path_string(pos.file_id)).value;
 	fields[1]/*line*/      = lb_const_int(m, t_i32, pos.line).value;
 	fields[2]/*column*/    = lb_const_int(m, t_i32, pos.column).value;
-	fields[3]/*procedure*/ = lb_find_or_add_entity_string(p->module, procedure).value;
+	fields[3]/*procedure*/ = lb_find_or_add_entity_string(m, procedure).value;
 
 	lbValue res = {};
 	res.value = llvm_const_named_struct(m, t_source_code_location, fields, gb_count_of(fields));
 	res.type = t_source_code_location;
 	return res;
+}
+
+
+gb_internal lbValue lb_emit_source_code_location_const(lbProcedure *p, String const &procedure, TokenPos const &pos) {
+	lbModule *m = p->module;
+	return lb_const_source_code_location_const(m, procedure, pos);
 }
 
 gb_internal lbValue lb_emit_source_code_location_const(lbProcedure *p, Ast *node) {

@@ -2225,10 +2225,16 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 
 		{ // Add type info data
 			isize max_type_info_count = info->minimum_dependency_type_info_set.count+1;
-			// gb_printf_err("max_type_info_count: %td\n", max_type_info_count);
 			Type *t = alloc_type_array(t_type_info, max_type_info_count);
-			LLVMValueRef g = LLVMAddGlobal(m->mod, lb_type(m, t), LB_TYPE_INFO_DATA_NAME);
-			LLVMSetInitializer(g, LLVMConstNull(lb_type(m, t)));
+
+			// IMPORTANT NOTE(bill): As LLVM does not have a union type, an array of unions cannot be initialized
+			// at compile time without cheating in some way. This means to emulate an array of unions is to use
+			// a giant packed struct of "corrected" data types.
+
+			LLVMTypeRef internal_llvm_type = lb_setup_type_info_data_internal_type(m, max_type_info_count);
+
+			LLVMValueRef g = LLVMAddGlobal(m->mod, internal_llvm_type, LB_TYPE_INFO_DATA_NAME);
+			LLVMSetInitializer(g, LLVMConstNull(internal_llvm_type));
 			LLVMSetLinkage(g, USE_SEPARATE_MODULES ? LLVMExternalLinkage : LLVMInternalLinkage);
 
 			lbValue value = {};
