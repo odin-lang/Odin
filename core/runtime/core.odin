@@ -254,6 +254,7 @@ Typeid_Kind :: enum u8 {
 	Relative_Pointer,
 	Relative_Multi_Pointer,
 	Matrix,
+	Soa_Pointer,
 }
 #assert(len(Typeid_Kind) < 32)
 

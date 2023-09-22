@@ -1025,8 +1025,10 @@ gb_internal lbProcedure *lb_create_startup_type_info(lbModule *m) {
 	LLVMSetLinkage(p->value, LLVMInternalLinkage);
 
 	lb_add_attribute_to_proc(m, p->value, "nounwind");
-	lb_add_attribute_to_proc(m, p->value, "optnone");
-	lb_add_attribute_to_proc(m, p->value, "noinline");
+	if (!LB_USE_GIANT_PACKED_STRUCT) {
+		lb_add_attribute_to_proc(m, p->value, "optnone");
+		lb_add_attribute_to_proc(m, p->value, "noinline");
+	}
 
 	lb_begin_procedure_body(p);
 
@@ -2243,6 +2245,10 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 
 			lb_global_type_info_data_entity = alloc_entity_variable(nullptr, make_token_ident(LB_TYPE_INFO_DATA_NAME), t, EntityState_Resolved);
 			lb_add_entity(m, lb_global_type_info_data_entity, value);
+
+			if (LB_USE_GIANT_PACKED_STRUCT) {
+				lb_make_global_private_const(g);
+			}
 		}
 		{ // Type info member buffer
 			// NOTE(bill): Removes need for heap allocation by making it global memory
@@ -2274,6 +2280,9 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 					LLVMValueRef g = LLVMAddGlobal(m->mod, lb_type(m, t), name);
 					LLVMSetInitializer(g, LLVMConstNull(lb_type(m, t)));
 					LLVMSetLinkage(g, LLVMInternalLinkage);
+					if (LB_USE_GIANT_PACKED_STRUCT) {
+						lb_make_global_private_const(g);
+					}
 					lb_global_type_info_member_types = lb_addr({g, alloc_type_pointer(t)});
 
 				}
@@ -2283,6 +2292,9 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 					LLVMValueRef g = LLVMAddGlobal(m->mod, lb_type(m, t), name);
 					LLVMSetInitializer(g, LLVMConstNull(lb_type(m, t)));
 					LLVMSetLinkage(g, LLVMInternalLinkage);
+					if (LB_USE_GIANT_PACKED_STRUCT) {
+						lb_make_global_private_const(g);
+					}
 					lb_global_type_info_member_names = lb_addr({g, alloc_type_pointer(t)});
 				}
 				{
@@ -2291,6 +2303,9 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 					LLVMValueRef g = LLVMAddGlobal(m->mod, lb_type(m, t), name);
 					LLVMSetInitializer(g, LLVMConstNull(lb_type(m, t)));
 					LLVMSetLinkage(g, LLVMInternalLinkage);
+					if (LB_USE_GIANT_PACKED_STRUCT) {
+						lb_make_global_private_const(g);
+					}
 					lb_global_type_info_member_offsets = lb_addr({g, alloc_type_pointer(t)});
 				}
 
@@ -2300,6 +2315,9 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 					LLVMValueRef g = LLVMAddGlobal(m->mod, lb_type(m, t), name);
 					LLVMSetInitializer(g, LLVMConstNull(lb_type(m, t)));
 					LLVMSetLinkage(g, LLVMInternalLinkage);
+					if (LB_USE_GIANT_PACKED_STRUCT) {
+						lb_make_global_private_const(g);
+					}
 					lb_global_type_info_member_usings = lb_addr({g, alloc_type_pointer(t)});
 				}
 
@@ -2309,6 +2327,9 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 					LLVMValueRef g = LLVMAddGlobal(m->mod, lb_type(m, t), name);
 					LLVMSetInitializer(g, LLVMConstNull(lb_type(m, t)));
 					LLVMSetLinkage(g, LLVMInternalLinkage);
+					if (LB_USE_GIANT_PACKED_STRUCT) {
+						lb_make_global_private_const(g);
+					}
 					lb_global_type_info_member_tags = lb_addr({g, alloc_type_pointer(t)});
 				}
 			}
