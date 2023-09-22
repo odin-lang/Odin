@@ -269,7 +269,6 @@ gb_internal LLVMTypeRef lb_setup_type_info_data_internal_type(lbModule *m, isize
 	return LLVMStructType(element_types, cast(unsigned)max_type_info_count, true);
 }
 
-
 gb_internal void lb_setup_type_info_data_giant_packed_struct(lbModule *m, i64 global_type_info_data_entity_count) { // NOTE(bill): Setup type_info data
 	CheckerInfo *info = m->info;
 
@@ -312,7 +311,7 @@ gb_internal void lb_setup_type_info_data_giant_packed_struct(lbModule *m, i64 gl
 					(name##_values)[i] = LLVMConstNull(elem);                                                      \
 				}                                                                                                      \
 			}                                                                                                              \
-			LLVMSetInitializer(name.addr.value, LLVMConstArray2(elem, name##_values, at->Array.count));                    \
+			LLVMSetInitializer(name.addr.value, llvm_const_array(elem, name##_values, at->Array.count));                    \
 		})
 
 	type_info_allocate_values(lb_global_type_info_member_types);
