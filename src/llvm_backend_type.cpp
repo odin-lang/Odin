@@ -139,35 +139,35 @@ gb_internal lbValue lb_const_array_epi(lbModule *m, lbValue value, isize index) 
 }
 
 
-gb_internal lbValue lb_type_info_member_types_offset(lbModule *m, isize count, isize *offset_=nullptr) {
+gb_internal lbValue lb_type_info_member_types_offset(lbModule *m, isize count, i64 *offset_=nullptr) {
 	GB_ASSERT(m == &m->gen->default_module);
 	if (offset_) *offset_ = lb_global_type_info_member_types_index;
 	lbValue offset = lb_const_array_epi(m, lb_global_type_info_member_types.addr, lb_global_type_info_member_types_index);
 	lb_global_type_info_member_types_index += cast(i32)count;
 	return offset;
 }
-gb_internal lbValue lb_type_info_member_names_offset(lbModule *m, isize count, isize *offset_=nullptr) {
+gb_internal lbValue lb_type_info_member_names_offset(lbModule *m, isize count, i64 *offset_=nullptr) {
 	GB_ASSERT(m == &m->gen->default_module);
 	if (offset_) *offset_ = lb_global_type_info_member_names_index;
 	lbValue offset = lb_const_array_epi(m, lb_global_type_info_member_names.addr, lb_global_type_info_member_names_index);
 	lb_global_type_info_member_names_index += cast(i32)count;
 	return offset;
 }
-gb_internal lbValue lb_type_info_member_offsets_offset(lbModule *m, isize count, isize *offset_=nullptr) {
+gb_internal lbValue lb_type_info_member_offsets_offset(lbModule *m, isize count, i64 *offset_=nullptr) {
 	GB_ASSERT(m == &m->gen->default_module);
 	if (offset_) *offset_ = lb_global_type_info_member_offsets_index;
 	lbValue offset = lb_const_array_epi(m, lb_global_type_info_member_offsets.addr, lb_global_type_info_member_offsets_index);
 	lb_global_type_info_member_offsets_index += cast(i32)count;
 	return offset;
 }
-gb_internal lbValue lb_type_info_member_usings_offset(lbModule *m, isize count, isize *offset_=nullptr) {
+gb_internal lbValue lb_type_info_member_usings_offset(lbModule *m, isize count, i64 *offset_=nullptr) {
 	GB_ASSERT(m == &m->gen->default_module);
 	if (offset_) *offset_ = lb_global_type_info_member_usings_index;
 	lbValue offset = lb_const_array_epi(m, lb_global_type_info_member_usings.addr, lb_global_type_info_member_usings_index);
 	lb_global_type_info_member_usings_index += cast(i32)count;
 	return offset;
 }
-gb_internal lbValue lb_type_info_member_tags_offset(lbModule *m, isize count, isize *offset_=nullptr) {
+gb_internal lbValue lb_type_info_member_tags_offset(lbModule *m, isize count, i64 *offset_=nullptr) {
 	GB_ASSERT(m == &m->gen->default_module);
 	if (offset_) *offset_ = lb_global_type_info_member_tags_index;
 	lbValue offset = lb_const_array_epi(m, lb_global_type_info_member_tags.addr, lb_global_type_info_member_tags_index);
