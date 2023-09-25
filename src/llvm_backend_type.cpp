@@ -175,7 +175,7 @@ gb_internal lbValue lb_type_info_member_tags_offset(lbModule *m, isize count, is
 	return offset;
 }
 
-enum {LB_USE_GIANT_PACKED_STRUCT = true};
+enum {LB_USE_GIANT_PACKED_STRUCT = LB_USE_NEW_PASS_SYSTEM};
 
 gb_internal LLVMTypeRef lb_setup_type_info_data_internal_type(lbModule *m, isize max_type_info_count) {
 	if (!LB_USE_GIANT_PACKED_STRUCT) {
