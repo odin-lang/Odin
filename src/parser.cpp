@@ -4029,7 +4029,9 @@ gb_internal Ast *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_fl
 			if (f->curr_token.kind != Token_Eq) {
 				type = parse_var_type(f, allow_ellipsis, allow_typeid_token);
 				Ast *tt = unparen_expr(type);
-				if (is_signature && !any_polymorphic_names && tt->kind == Ast_TypeidType && tt->TypeidType.specialization != nullptr) {
+				if (is_signature && !any_polymorphic_names &&
+				    tt != nullptr &&
+				    tt->kind == Ast_TypeidType && tt->TypeidType.specialization != nullptr) {
 					syntax_error(type, "Specialization of typeid is not allowed without polymorphic names");
 				}
 			}
