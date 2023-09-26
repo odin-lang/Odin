@@ -613,6 +613,9 @@ gb_internal void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *
 	
 	scope_reserve(ctx->scope, min_field_count);
 
+	rw_mutex_lock(&struct_type->Struct.fields_mutex);
+	defer (rw_mutex_unlock(&struct_type->Struct.fields_mutex));
+
 	if (st->is_raw_union && min_field_count > 1) {
 		struct_type->Struct.is_raw_union = true;
 		context = str_lit("struct #raw_union");
