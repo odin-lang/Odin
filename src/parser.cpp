@@ -5988,6 +5988,16 @@ gb_internal ParseFileError process_imported_file(Parser *p, ImportedFile importe
 		}
 	}
 
+	{
+		String name = file->fullpath;
+		name = remove_directory_from_path(name);
+		name = remove_extension_from_path(name);
+
+		if (string_starts_with(name, str_lit("_"))) {
+			syntax_error(pos, "Files cannot start with '_', got '%.*s'", LIT(file->fullpath));
+		}
+	}
+
 	if (build_context.command_kind == Command_test) {
 		String name = file->fullpath;
 		name = remove_extension_from_path(name);
@@ -5997,6 +6007,7 @@ gb_internal ParseFileError process_imported_file(Parser *p, ImportedFile importe
 			file->flags |= AstFile_IsTest;
 		}
 	}
+
 
 	if (parse_file(p, file)) {
 		MUTEX_GUARD_BLOCK(&pkg->files_mutex) {
