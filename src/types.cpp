@@ -2646,10 +2646,14 @@ gb_internal bool are_types_identical_internal(Type *x, Type *y, bool check_tuple
 		return are_types_identical(x->Slice.elem, y->Slice.elem);
 
 	case Type_BitSet:
-		return are_types_identical(x->BitSet.elem, y->BitSet.elem) &&
-		       are_types_identical(x->BitSet.underlying, y->BitSet.underlying) &&
-		       x->BitSet.lower == y->BitSet.lower &&
-		       x->BitSet.upper == y->BitSet.upper;
+		if (are_types_identical(x->BitSet.elem, y->BitSet.elem) &&
+		    are_types_identical(x->BitSet.underlying, y->BitSet.underlying)) {
+		    	if (is_type_enum(x->BitSet.elem)) {
+		    		return true;
+		    	}
+		    	return x->BitSet.lower == y->BitSet.lower && x->BitSet.upper == y->BitSet.upper;
+		}
+		return false;
 
 
 	case Type_Enum:
