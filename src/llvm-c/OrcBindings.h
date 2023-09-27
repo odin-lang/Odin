@@ -22,10 +22,10 @@
 #ifndef LLVM_C_ORCBINDINGS_H
 #define LLVM_C_ORCBINDINGS_H
 
-#include "Error.h"
-#include "ExternC.h"
-#include "Object.h"
-#include "TargetMachine.h"
+#include "llvm-c/Error.h"
+#include "llvm-c/ExternC.h"
+#include "llvm-c/Object.h"
+#include "llvm-c/TargetMachine.h"
 
 LLVM_C_EXTERN_C_BEGIN
 
