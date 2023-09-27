@@ -1893,7 +1893,7 @@ gb_internal void check_value_decl_stmt(CheckerContext *ctx, Ast *node, u32 mod_f
 		}
 
 		if (is_arch_wasm() && e->Variable.thread_local_model.len != 0) {
-			error(e->token, "@(thread_local) is not supported for this target platform");
+			// error(e->token, "@(thread_local) is not supported for this target platform");
 		}
 
 

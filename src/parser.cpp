@@ -1361,6 +1361,22 @@ gb_internal Token peek_token(AstFile *f) {
 	return {};
 }
 
+gb_internal Token peek_token_n(AstFile *f, isize n) {
+	Token found = {};
+	for (isize i = f->curr_token_index+1; i < f->tokens.count; i++) {
+		Token tok = f->tokens[i];
+		if (tok.kind == Token_Comment) {
+			continue;
+		}
+		found = tok;
+		if (n-- == 0) {
+			return found;
+		}
+	}
+	return {};
+}
+
+
 gb_internal bool skip_possible_newline(AstFile *f) {
 	if (token_is_newline(f->curr_token)) {
 		advance_token(f);
@@ -2206,6 +2222,10 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 			Ast *tag = ast_basic_directive(f, token, name);
 			Ast *original_expr = parse_expr(f, lhs);
 			Ast *expr = unparen_expr(original_expr);
+			if (expr == nullptr) {
+				syntax_error(name, "Expected a compound literal after #%.*s", LIT(name.string));
+				return ast_bad_expr(f, token, name);
+			}
 			switch (expr->kind) {
 			case Ast_ArrayType:
 				syntax_error(expr, "#partial has been replaced with #sparse for non-contiguous enumerated array types");
@@ -3419,6 +3439,18 @@ gb_internal Ast *parse_simple_stmt(AstFile *f, u32 flags) {
 	case Token_Colon:
 		expect_token_after(f, Token_Colon, "identifier list");
 		if ((flags&StmtAllowFlag_Label) && lhs.count == 1) {
+			bool is_partial = false;
+			Token partial_token = {};
+			if (f->curr_token.kind == Token_Hash) {
+				// NOTE(bill): This is purely for error messages
+				Token name = peek_token_n(f, 0);
+				if (name.kind == Token_Ident && name.string == "partial" &&
+				    peek_token_n(f, 1).kind == Token_switch) {
+					partial_token = expect_token(f, Token_Hash);
+					expect_token(f, Token_Ident);
+					is_partial = true;
+				}
+			}
 			switch (f->curr_token.kind) {
 			case Token_OpenBrace: // block statement
 			case Token_if:
@@ -3440,6 +3472,19 @@ gb_internal Ast *parse_simple_stmt(AstFile *f, u32 flags) {
 					break;
 				}
 			#undef _SET_LABEL
+
+				if (is_partial) {
+					switch (stmt->kind) {
+					case Ast_SwitchStmt:
+						stmt->SwitchStmt.partial = true;
+						break;
+					case Ast_TypeSwitchStmt:
+						stmt->TypeSwitchStmt.partial = true;
+						break;
+					}
+					syntax_error(partial_token, "Incorrect use of directive, use '#partial %.*s: switch'", LIT(ast_token(name).string));
+				}
+
 				return stmt;
 			} break;
 			}
@@ -3984,7 +4029,9 @@ gb_internal Ast *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_fl
 			if (f->curr_token.kind != Token_Eq) {
 				type = parse_var_type(f, allow_ellipsis, allow_typeid_token);
 				Ast *tt = unparen_expr(type);
-				if (is_signature && !any_polymorphic_names && tt->kind == Ast_TypeidType && tt->TypeidType.specialization != nullptr) {
+				if (is_signature && !any_polymorphic_names &&
+				    tt != nullptr &&
+				    tt->kind == Ast_TypeidType && tt->TypeidType.specialization != nullptr) {
 					syntax_error(type, "Specialization of typeid is not allowed without polymorphic names");
 				}
 			}
@@ -5941,6 +5988,16 @@ gb_internal ParseFileError process_imported_file(Parser *p, ImportedFile importe
 		}
 	}
 
+	{
+		String name = file->fullpath;
+		name = remove_directory_from_path(name);
+		name = remove_extension_from_path(name);
+
+		if (string_starts_with(name, str_lit("_"))) {
+			syntax_error(pos, "Files cannot start with '_', got '%.*s'", LIT(file->fullpath));
+		}
+	}
+
 	if (build_context.command_kind == Command_test) {
 		String name = file->fullpath;
 		name = remove_extension_from_path(name);
@@ -5950,6 +6007,7 @@ gb_internal ParseFileError process_imported_file(Parser *p, ImportedFile importe
 			file->flags |= AstFile_IsTest;
 		}
 	}
+
 
 	if (parse_file(p, file)) {
 		MUTEX_GUARD_BLOCK(&pkg->files_mutex) {

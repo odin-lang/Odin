@@ -2414,7 +2414,28 @@ gb_internal lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left
 	}
 
 	if (is_type_string(a)) {
-		if (is_type_cstring(a)) {
+		if (is_type_cstring(a) && is_type_cstring(b)) {
+			left  = lb_emit_conv(p, left, t_cstring);
+			right = lb_emit_conv(p, right, t_cstring);
+			char const *runtime_procedure = nullptr;
+			switch (op_kind) {
+			case Token_CmpEq: runtime_procedure = "cstring_eq"; break;
+			case Token_NotEq: runtime_procedure = "cstring_ne"; break;
+			case Token_Lt:    runtime_procedure = "cstring_lt"; break;
+			case Token_Gt:    runtime_procedure = "cstring_gt"; break;
+			case Token_LtEq:  runtime_procedure = "cstring_le"; break;
+			case Token_GtEq:  runtime_procedure = "cstring_gt"; break;
+			}
+			GB_ASSERT(runtime_procedure != nullptr);
+
+			auto args = array_make<lbValue>(permanent_allocator(), 2);
+			args[0] = left;
+			args[1] = right;
+			return lb_emit_runtime_call(p, runtime_procedure, args);
+		}
+
+
+		if (is_type_cstring(a) ^ is_type_cstring(b)) {
 			left  = lb_emit_conv(p, left, t_string);
 			right = lb_emit_conv(p, right, t_string);
 		}

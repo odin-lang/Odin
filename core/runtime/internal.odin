@@ -413,6 +413,48 @@ cstring_to_string :: proc "contextless" (s: cstring) -> string {
 }
 
 
+cstring_eq :: proc "contextless" (lhs, rhs: cstring) -> bool {
+	x := ([^]byte)(lhs)
+	y := ([^]byte)(rhs)
+	if x == y {
+		return true
+	}
+	if (x == nil) ~ (y == nil) {
+		return false
+	}
+	xn := cstring_len(lhs)
+	yn := cstring_len(rhs)
+	if xn != yn {
+		return false
+	}
+	return #force_inline memory_equal(x, y, xn)
+}
+
+cstring_cmp :: proc "contextless" (lhs, rhs: cstring) -> int {
+	x := ([^]byte)(lhs)
+	y := ([^]byte)(rhs)
+	if x == y {
+		return 0
+	}
+	if (x == nil) ~ (y == nil) {
+		return -1 if x == nil else +1
+	}
+	xn := cstring_len(lhs)
+	yn := cstring_len(rhs)
+	ret := memory_compare(x, y, min(xn, yn))
+	if ret == 0 && xn != yn {
+		return -1 if xn < yn else +1
+	}
+	return ret
+}
+
+cstring_ne :: #force_inline proc "contextless" (a, b: cstring) -> bool { return !cstring_eq(a, b) }
+cstring_lt :: #force_inline proc "contextless" (a, b: cstring) -> bool { return cstring_cmp(a, b) < 0 }
+cstring_gt :: #force_inline proc "contextless" (a, b: cstring) -> bool { return cstring_cmp(a, b) > 0 }
+cstring_le :: #force_inline proc "contextless" (a, b: cstring) -> bool { return cstring_cmp(a, b) <= 0 }
+cstring_ge :: #force_inline proc "contextless" (a, b: cstring) -> bool { return cstring_cmp(a, b) >= 0 }
+
+
 complex32_eq :: #force_inline proc "contextless"  (a, b: complex32)  -> bool { return real(a) == real(b) && imag(a) == imag(b) }
 complex32_ne :: #force_inline proc "contextless"  (a, b: complex32)  -> bool { return real(a) != real(b) || imag(a) != imag(b) }
 

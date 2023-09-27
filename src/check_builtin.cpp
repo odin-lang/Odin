@@ -2120,7 +2120,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			return false;
 		}
 		Type *t = o.type;
-		if (t == nullptr || t == t_invalid || is_type_asm_proc(o.type) || is_type_polymorphic(operand->type)) {
+		if (t == nullptr || t == t_invalid || is_type_asm_proc(t) || is_type_polymorphic(t)) {
 			error(ce->args[0], "Invalid argument for '%.*s'", LIT(builtin_name));
 			return false;
 		}

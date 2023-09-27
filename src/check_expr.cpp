@@ -2462,8 +2462,9 @@ gb_internal void add_comparison_procedures_for_fields(CheckerContext *c, Type *t
 			add_package_dependency(c, "runtime", "quaternion256_ne");
 			break;
 		case Basic_cstring:
-			add_package_dependency(c, "runtime", "cstring_to_string");
-			/*fallthrough*/
+			add_package_dependency(c, "runtime", "cstring_eq");
+			add_package_dependency(c, "runtime", "cstring_ne");
+			break;
 		case Basic_string:
 			add_package_dependency(c, "runtime", "string_eq");
 			add_package_dependency(c, "runtime", "string_ne");
@@ -2621,7 +2622,16 @@ gb_internal void check_comparison(CheckerContext *c, Ast *node, Operand *x, Oper
 			if (!is_type_untyped(x->type)) size = gb_max(size, type_size_of(x->type));
 			if (!is_type_untyped(y->type)) size = gb_max(size, type_size_of(y->type));
 
-			if (is_type_string(x->type) || is_type_string(y->type)) {
+			if (is_type_cstring(x->type) && is_type_cstring(y->type)) {
+				switch (op) {
+				case Token_CmpEq: add_package_dependency(c, "runtime", "cstring_eq"); break;
+				case Token_NotEq: add_package_dependency(c, "runtime", "cstring_ne"); break;
+				case Token_Lt:    add_package_dependency(c, "runtime", "cstring_lt"); break;
+				case Token_Gt:    add_package_dependency(c, "runtime", "cstring_gt"); break;
+				case Token_LtEq:  add_package_dependency(c, "runtime", "cstring_le"); break;
+				case Token_GtEq:  add_package_dependency(c, "runtime", "cstring_gt"); break;
+				}
+			} else if (is_type_string(x->type) || is_type_string(y->type)) {
 				switch (op) {
 				case Token_CmpEq: add_package_dependency(c, "runtime", "string_eq"); break;
 				case Token_NotEq: add_package_dependency(c, "runtime", "string_ne"); break;

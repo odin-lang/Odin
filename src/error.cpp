@@ -356,7 +356,9 @@ gb_internal void error_out_coloured(char const *str, TerminalStyle style, Termin
 
 gb_internal void error_va(TokenPos const &pos, TokenPos end, char const *fmt, va_list va) {
 	global_error_collector.count.fetch_add(1);
-
+	if (global_error_collector.count > MAX_ERROR_COLLECTOR_COUNT()) {
+		gb_exit(1);
+	}
 	mutex_lock(&global_error_collector.mutex);
 	// NOTE(bill): Duplicate error, skip it
 	if (pos.line == 0) {
@@ -372,11 +374,10 @@ gb_internal void error_va(TokenPos const &pos, TokenPos end, char const *fmt, va
 		error_out_va(fmt, va);
 		error_out("\n");
 		show_error_on_line(pos, end);
+	} else {
+		global_error_collector.count.fetch_sub(1);
 	}
 	mutex_unlock(&global_error_collector.mutex);
-	if (global_error_collector.count > MAX_ERROR_COLLECTOR_COUNT()) {
-		gb_exit(1);
-	}
 }
 
 gb_internal void warning_va(TokenPos const &pos, TokenPos end, char const *fmt, va_list va) {
@@ -410,8 +411,11 @@ gb_internal void error_line_va(char const *fmt, va_list va) {
 }
 
 gb_internal void error_no_newline_va(TokenPos const &pos, char const *fmt, va_list va) {
-	mutex_lock(&global_error_collector.mutex);
 	global_error_collector.count.fetch_add(1);
+	if (global_error_collector.count.load() > MAX_ERROR_COLLECTOR_COUNT()) {
+		gb_exit(1);
+	}
+	mutex_lock(&global_error_collector.mutex);
 	// NOTE(bill): Duplicate error, skip it
 	if (pos.line == 0) {
 		error_out_coloured("Error: ", TerminalStyle_Normal, TerminalColour_Red);
@@ -425,15 +429,15 @@ gb_internal void error_no_newline_va(TokenPos const &pos, char const *fmt, va_li
 		error_out_va(fmt, va);
 	}
 	mutex_unlock(&global_error_collector.mutex);
-	if (global_error_collector.count.load() > MAX_ERROR_COLLECTOR_COUNT()) {
-		gb_exit(1);
-	}
 }
 
 
 gb_internal void syntax_error_va(TokenPos const &pos, TokenPos end, char const *fmt, va_list va) {
+	global_error_collector.count.fetch_add(1);
+	if (global_error_collector.count > MAX_ERROR_COLLECTOR_COUNT()) {
+		gb_exit(1);
+	}
 	mutex_lock(&global_error_collector.mutex);
-	global_error_collector.count++;
 	// NOTE(bill): Duplicate error, skip it
 	if (global_error_collector.prev != pos) {
 		global_error_collector.prev = pos;
@@ -447,16 +451,14 @@ gb_internal void syntax_error_va(TokenPos const &pos, TokenPos end, char const *
 		error_out_va(fmt, va);
 		error_out("\n");
 	}
-
 	mutex_unlock(&global_error_collector.mutex);
-	if (global_error_collector.count > MAX_ERROR_COLLECTOR_COUNT()) {
-		gb_exit(1);
-	}
 }
 
 gb_internal void syntax_error_with_verbose_va(TokenPos const &pos, TokenPos end, char const *fmt, va_list va) {
 	global_error_collector.count.fetch_add(1);
-
+	if (global_error_collector.count > MAX_ERROR_COLLECTOR_COUNT()) {
+		gb_exit(1);
+	}
 	mutex_lock(&global_error_collector.mutex);
 	// NOTE(bill): Duplicate error, skip it
 	if (pos.line == 0) {
@@ -474,9 +476,6 @@ gb_internal void syntax_error_with_verbose_va(TokenPos const &pos, TokenPos end,
 		show_error_on_line(pos, end);
 	}
 	mutex_unlock(&global_error_collector.mutex);
-	if (global_error_collector.count > MAX_ERROR_COLLECTOR_COUNT()) {
-		gb_exit(1);
-	}
 }
 
 
@@ -578,7 +577,3 @@ gb_internal void compiler_error(char const *fmt, ...) {
 	GB_DEBUG_TRAP();
 	gb_exit(1);
 }
-
-
-
-
