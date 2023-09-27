@@ -33,6 +33,10 @@ Example:
 		fmt.println(rand.uint64())
 	}
 
+Possible Output:
+
+	10
+
 */
 set_global_seed :: proc(seed: u64) {
 	init(&global_rand, seed)
@@ -55,6 +59,10 @@ Example:
 		my_rand := rand.create(1)
 		fmt.println(rand.uint64(&my_rand))
 	}
+
+Possible Output:
+
+	10
 
 */
 @(require_results)
@@ -82,6 +90,10 @@ Example:
 		fmt.println(rand.uint64(&my_rand))
 	}
 
+Possible Output:
+
+	10
+
 */
 init :: proc(r: ^Rand, seed: u64) {
 	r.state = 0
@@ -98,7 +110,7 @@ On `linux` refer to the `getrandom` syscall.
 On `darwin` refer to `getentropy`.  
 On `windows` refer to `BCryptGenRandom`.
 
-All other platforms wi
+All other platforms are not supported
 
 Inputs:
 - r: The random number generator to use the system random number generator
@@ -114,6 +126,11 @@ Example:
 		rand.init_as_system(&my_rand)
 		fmt.println(rand.uint64(&my_rand))
 	}
+
+Possible Output:
+
+	10
+
 */
 init_as_system :: proc(r: ^Rand) {
 	if !#defined(_system_random) {
@@ -164,6 +181,12 @@ Example:
 		my_rand := rand.create(1)
 		fmt.println(rand.uint32(&my_rand))
 	}
+
+Possible Output:
+
+	10
+	389
+
 */
 @(require_results)
 uint32 :: proc(r: ^Rand = nil) -> (val: u32) { return u32(_random_u64(r)) }
@@ -188,6 +211,12 @@ Example:
 		my_rand := rand.create(1)
 		fmt.println(rand.uint64(&my_rand))
 	}
+
+Possible Output:
+
+	10
+	389
+
 */
 @(require_results)
 uint64 :: proc(r: ^Rand = nil) -> (val: u64) { return _random_u64(r) }
@@ -212,6 +241,12 @@ Example:
 		my_rand := rand.create(1)
 		fmt.println(rand.uint128(&my_rand))
 	}
+
+Possible Output:
+
+	10
+	389
+
 */
 @(require_results)
 uint128 :: proc(r: ^Rand = nil) -> (val: u128) {
@@ -241,6 +276,12 @@ Example:
 		my_rand := rand.create(1)
 		fmt.println(rand.int31(&my_rand))
 	}
+
+Possible Output:
+
+	10
+	389
+
 */
 @(require_results) int31  :: proc(r: ^Rand = nil) -> (val: i32)  { return i32(uint32(r) << 1 >> 1) }
 
@@ -265,6 +306,12 @@ Example:
 		my_rand := rand.create(1)
 		fmt.println(rand.int63(&my_rand))
 	}
+
+Possible Output:
+
+	10
+	389
+
 */
 @(require_results) int63  :: proc(r: ^Rand = nil) -> (val: i64)  { return i64(uint64(r) << 1 >> 1) }
 
@@ -289,6 +336,12 @@ Example:
 		my_rand := rand.create(1)
 		fmt.println(rand.int127(&my_rand))
 	}
+
+Possible Output:
+
+	10
+	389
+
 */
 @(require_results) int127 :: proc(r: ^Rand = nil) -> (val: i128) { return i128(uint128(r) << 1 >> 1) }
 
@@ -315,6 +368,12 @@ Example:
 		my_rand := rand.create(1)
 		fmt.println(rand.int31_max(1024, &my_rand))
 	}
+
+Possible Output:
+
+	6
+	500
+
 */
 @(require_results)
 int31_max :: proc(n: i32, r: ^Rand = nil) -> (val: i32) {
@@ -356,6 +415,10 @@ Example:
 		fmt.println(rand.int63_max(1024, &my_rand))
 	}
 
+Possible Output:
+
+	6
+	500
 
 */
 @(require_results)
@@ -398,6 +461,10 @@ Example:
 		fmt.println(rand.int127_max(1024, &my_rand))
 	}
 
+Possible Output:
+
+	6
+	500
 
 */
 @(require_results)
@@ -440,6 +507,10 @@ Example:
 		fmt.println(rand.int_max(1024, &my_rand))
 	}
 
+Possible Output:
+
+	6
+	500
 
 */
 @(require_results)
@@ -475,6 +546,10 @@ Example:
 		fmt.println(rand.float64(&my_rand))
 	}
 
+Possible Output:
+
+	0.043
+	0.511
 
 */
 @(require_results) float64 :: proc(r: ^Rand = nil) -> (val: f64) { return f64(int63_max(1<<53, r)) / (1 << 53) }
@@ -500,6 +575,10 @@ Example:
 		fmt.println(rand.float32(&my_rand))
 	}
 
+Possible Output:
+
+	0.043
+	0.511
 
 */
 @(require_results) float32 :: proc(r: ^Rand = nil) -> (val: f32) { return f32(int31_max(1<<24, r)) / (1 << 24) }
@@ -529,6 +608,10 @@ Example:
 		fmt.println(rand.float64_range(600, 900, &my_rand))
 	}
 
+Possible Output:
+
+	15.312
+	673.130
 
 */
 @(require_results) float64_range :: proc(low, high: f64, r: ^Rand = nil) -> (val: f64) {
@@ -565,6 +648,10 @@ Example:
 		fmt.println(rand.float32_range(600, 900, &my_rand))
 	}
 
+Possible Output:
+
+	15.312
+	673.130
 
 */
 @(require_results) float32_range :: proc(low, high: f32, r: ^Rand = nil) -> (val: f32) {
@@ -599,6 +686,10 @@ Example:
 		fmt.println(data)
 	}
 
+Possible Output:
+
+	8
+	[32, 4, 59, 7, 1, 2, 2, 119]
 
 */
 @(require_results)
@@ -650,6 +741,10 @@ Example:
 		return
 	}
 
+Possible Output:
+
+	[7201011, 3, 9123, 231131]
+	[19578, 910081, 131, 7]
 
 */
 @(require_results)
@@ -682,6 +777,10 @@ Example:
 		fmt.println(data) // the contents have been shuffled
 	}
 
+Possible Output:
+
+	[1, 2, 3, 4]
+	[2, 4, 3, 1]
 
 */
 shuffle :: proc(array: $T/[]$E, r: ^Rand = nil) {
@@ -719,7 +818,10 @@ Example:
 		fmt.println(rand.choice(data[:]))
 	}
 
+Possible Output:
 
+	3
+	2
 	2
 	4
 
