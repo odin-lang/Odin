@@ -1101,11 +1101,9 @@ gb_internal void odin_doc_write_docs(OdinDocWriter *w) {
 		case Package_Init:
 			pkg_flags |= OdinDocPkgFlag_Init;
 			break;
-		}
-		if (pkg->name == "builtin") {
+		case Package_Builtin:
 			pkg_flags |= OdinDocPkgFlag_Builtin;
-		} else if (pkg->name == "intrinsics") {
-			pkg_flags |= OdinDocPkgFlag_Builtin;
+			break;
 		}
 
 		OdinDocPkg doc_pkg = {};

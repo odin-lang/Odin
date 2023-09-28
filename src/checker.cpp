@@ -858,7 +858,7 @@ gb_internal AstPackage *create_builtin_package(char const *name) {
 	gbAllocator a = permanent_allocator();
 	AstPackage *pkg = gb_alloc_item(a, AstPackage);
 	pkg->name = make_string_c(name);
-	pkg->kind = Package_Normal;
+	pkg->kind = Package_Builtin;
 
 	pkg->scope = create_scope(nullptr, nullptr);
 	pkg->scope->flags |= ScopeFlag_Pkg | ScopeFlag_Global | ScopeFlag_Builtin;
@@ -935,6 +935,7 @@ gb_internal i64 odin_compile_timestamp(void) {
 	return ns_after_1970;
 }
 
+gb_internal bool lb_use_new_pass_system(void);
 
 gb_internal void init_universal(void) {
 	BuildContext *bc = &build_context;
@@ -1082,6 +1083,35 @@ gb_internal void init_universal(void) {
 	add_global_bool_constant("ODIN_TILDE",                    bc->tilde_backend);
 
 	add_global_constant("ODIN_COMPILE_TIMESTAMP", t_untyped_integer, exact_value_i64(odin_compile_timestamp()));
+
+	add_global_bool_constant("__ODIN_LLVM_F16_SUPPORTED", lb_use_new_pass_system());
+
+	{
+		GlobalEnumValue values[3] = {
+			{"Address", 0},
+			{"Memory",  1},
+			{"Thread",  2},
+		};
+
+		Type *enum_type = nullptr;
+		auto flags = add_global_enum_type(str_lit("Odin_Sanitizer_Flag"), values, gb_count_of(values), &enum_type);
+		Type *bit_set_type = alloc_type_bit_set();
+		bit_set_type->BitSet.elem = enum_type;
+		bit_set_type->BitSet.underlying = t_u32;
+		bit_set_type->BitSet.lower = 0;
+		bit_set_type->BitSet.upper = 2;
+		type_size_of(bit_set_type);
+
+		String type_name = str_lit("Odin_Sanitizer_Flags");
+		Scope *scope = create_scope(nullptr, builtin_pkg->scope);
+		Entity *entity = alloc_entity_type_name(scope, make_token_ident(type_name), nullptr, EntityState_Resolved);
+
+		Type *named_type = alloc_type_named(type_name, bit_set_type, entity);
+		set_base_type(named_type, bit_set_type);
+
+		add_global_constant("ODIN_SANITIZER_FLAGS", named_type, exact_value_u64(bc->sanitizer_flags));
+	}
+
 
 
 // Builtin Procedures

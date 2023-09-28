@@ -300,6 +300,8 @@ enum BuildFlagKind {
 
 	BuildFlag_Tilde,
 
+	BuildFlag_Sanitize,
+
 #if defined(GB_SYSTEM_WINDOWS)
 	BuildFlag_IgnoreVsSearch,
 	BuildFlag_ResourceFile,
@@ -410,7 +412,6 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_SingleFile,              str_lit("file"),                      BuildFlagParam_None,    Command__does_build | Command__does_check);
 	add_flag(&build_flags, BuildFlag_OutFile,                 str_lit("out"),                       BuildFlagParam_String,  Command__does_build | Command_test);
 	add_flag(&build_flags, BuildFlag_OptimizationMode,        str_lit("o"),                         BuildFlagParam_String,  Command__does_build);
-	add_flag(&build_flags, BuildFlag_OptimizationMode,        str_lit("O"),                         BuildFlagParam_String,  Command__does_build);
 	add_flag(&build_flags, BuildFlag_ShowTimings,             str_lit("show-timings"),              BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_ShowMoreTimings,         str_lit("show-more-timings"),         BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_ExportTimings,           str_lit("export-timings"),            BuildFlagParam_String,  Command__does_check);
@@ -485,6 +486,8 @@ gb_internal bool parse_build_flags(Array<String> args) {
 #if ALLOW_TILDE
 	add_flag(&build_flags, BuildFlag_Tilde,                   str_lit("tilde"),                     BuildFlagParam_None,    Command__does_build);
 #endif
+
+	add_flag(&build_flags, BuildFlag_Sanitize,                str_lit("sanitize"),                  BuildFlagParam_String,  Command__does_build, true);
 
 #if defined(GB_SYSTEM_WINDOWS)
 	add_flag(&build_flags, BuildFlag_IgnoreVsSearch,          str_lit("ignore-vs-search"),          BuildFlagParam_None,    Command__does_build);
@@ -660,12 +663,18 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							} else if (value.value_string == "speed") {
 								build_context.custom_optimization_level = true;
 								build_context.optimization_level = 2;
+							} else if (value.value_string == "aggressive" && LB_USE_NEW_PASS_SYSTEM) {
+								build_context.custom_optimization_level = true;
+								build_context.optimization_level = 3;
 							} else {
 								gb_printf_err("Invalid optimization mode for -o:<string>, got %.*s\n", LIT(value.value_string));
 								gb_printf_err("Valid optimization modes:\n");
 								gb_printf_err("\tminimal\n");
 								gb_printf_err("\tsize\n");
 								gb_printf_err("\tspeed\n");
+								if (LB_USE_NEW_PASS_SYSTEM) {
+									gb_printf_err("\taggressive\n");
+								}
 								gb_printf_err("\tnone (useful for -debug builds)\n");
 								bad_flags = true;
 							}
@@ -1194,6 +1203,21 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							build_context.tilde_backend = true;
 							break;
 
+						case BuildFlag_Sanitize:
+							GB_ASSERT(value.kind == ExactValue_String);
+
+							if (str_eq_ignore_case(value.value_string, str_lit("address"))) {
+								build_context.sanitizer_flags |= SanitizerFlag_Address;
+							} else if (str_eq_ignore_case(value.value_string, str_lit("memory"))) {
+								build_context.sanitizer_flags |= SanitizerFlag_Memory;
+							} else if (str_eq_ignore_case(value.value_string, str_lit("thread"))) {
+								build_context.sanitizer_flags |= SanitizerFlag_Thread;
+							} else {
+								gb_printf_err("-sanitize:<string> options are 'address', 'memory', and 'thread'\n");
+								bad_flags = true;
+							}
+							break;
+
 					#if defined(GB_SYSTEM_WINDOWS)
 						case BuildFlag_IgnoreVsSearch: {
 							GB_ASSERT(value.kind == ExactValue_Invalid);
@@ -1649,8 +1673,13 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 
 		print_usage_line(1, "-o:<string>");
 		print_usage_line(2, "Set the optimization mode for compilation");
-		print_usage_line(2, "Accepted values: minimal, size, speed, none");
+		if (LB_USE_NEW_PASS_SYSTEM) {
+			print_usage_line(2, "Accepted values: none, minimal, size, speed, aggressive");
+		} else {
+			print_usage_line(2, "Accepted values: none, minimal, size, speed");
+		}
 		print_usage_line(2, "Example: -o:speed");
+		print_usage_line(2, "The default is -o:minimal");
 		print_usage_line(0, "");
 	}
 
@@ -1925,6 +1954,15 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 
 		print_usage_line(1, "-foreign-error-procedures");
 		print_usage_line(2, "States that the error procedues used in the runtime are defined in a separate translation unit");
+		print_usage_line(0, "");
+
+	}
+
+	if (run_or_build) {
+		print_usage_line(1, "-sanitize:<string>");
+		print_usage_line(1, "Enables sanitization analysis");
+		print_usage_line(1, "Options are 'address', 'memory', and 'thread'");
+		print_usage_line(1, "NOTE: This flag can be used multiple times");
 		print_usage_line(0, "");
 
 	}

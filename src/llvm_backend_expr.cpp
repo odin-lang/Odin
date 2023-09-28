@@ -4292,7 +4292,7 @@ gb_internal lbAddr lb_build_addr_compound_lit(lbProcedure *p, Ast *expr) {
 				unsigned len_index = lb_convert_struct_index(p->module, type, 1);
 				if (lb_is_const(slice)) {
 					unsigned indices[1] = {len_index};
-					count.value = LLVMConstExtractValue(slice.value, indices, gb_count_of(indices));
+					count.value = llvm_const_extract_value(p->module, slice.value, indices, gb_count_of(indices));
 				} else {
 					count.value = LLVMBuildExtractValue(p->builder, slice.value, len_index, "");
 				}

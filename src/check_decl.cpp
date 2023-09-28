@@ -1336,10 +1336,6 @@ gb_internal void check_proc_group_decl(CheckerContext *ctx, Entity *pg_entity, D
 				is_invalid = true;
 				break;
 			case ProcOverload_Polymorphic:
-				#if 0
-				error(p->token, "Overloaded procedure '%.*s' has a polymorphic counterpart in the procedure group '%.*s' which is not allowed", LIT(name), LIT(proc_group_name));
-				is_invalid = true;
-				#endif
 				break;
 			case ProcOverload_ParamCount:
 			case ProcOverload_ParamTypes:

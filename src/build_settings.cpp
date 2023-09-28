@@ -264,6 +264,14 @@ u64 get_vet_flag_from_name(String const &name) {
 }
 
 
+enum SanitizerFlags : u32 {
+	SanitizerFlag_NONE = 0,
+	SanitizerFlag_Address = 1u<<0,
+	SanitizerFlag_Memory  = 1u<<1,
+	SanitizerFlag_Thread  = 1u<<2,
+};
+
+
 
 // This stores the information for the specify architecture of this build
 struct BuildContext {
@@ -305,6 +313,7 @@ struct BuildContext {
 	String pdb_filepath;
 
 	u64 vet_flags;
+	u32 sanitizer_flags;
 
 	bool   has_resource;
 	String link_flags;
@@ -1381,7 +1390,7 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 		bc->optimization_level = -1; // -o:none
 	}
 
-	bc->optimization_level = gb_clamp(bc->optimization_level, -1, 2);
+	bc->optimization_level = gb_clamp(bc->optimization_level, -1, 3);
 
 	// ENFORCE DYNAMIC MAP CALLS
 	bc->dynamic_map_calls = true;
@@ -1736,6 +1745,42 @@ gb_internal bool init_build_paths(String init_filename) {
 		defer (gb_free(ha, output_file.text));
 		gb_printf_err("No write permissions for output path: %.*s\n", LIT(output_file));
 		return false;
+	}
+
+	if (build_context.sanitizer_flags & SanitizerFlag_Address) {
+		switch (build_context.metrics.os) {
+		case TargetOs_windows:
+		case TargetOs_linux:
+		case TargetOs_darwin:
+			break;
+		default:
+			gb_printf_err("-sanitize:address is only supported on windows, linux, and darwin\n");
+			return false;
+		}
+	}
+
+	if (build_context.sanitizer_flags & SanitizerFlag_Memory) {
+		switch (build_context.metrics.os) {
+		case TargetOs_linux:
+			break;
+		default:
+			gb_printf_err("-sanitize:memory is only supported on linux\n");
+			return false;
+		}
+		if (build_context.metrics.os != TargetOs_linux) {
+			return false;
+		}
+	}
+
+	if (build_context.sanitizer_flags & SanitizerFlag_Thread) {
+		switch (build_context.metrics.os) {
+		case TargetOs_linux:
+		case TargetOs_darwin:
+			break;
+		default:
+			gb_printf_err("-sanitize:thread is only supported on linux and darwin\n");
+			return false;
+		}
 	}
 
 

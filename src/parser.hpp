@@ -60,6 +60,7 @@ enum PackageKind {
 	Package_Normal,
 	Package_Runtime,
 	Package_Init,
+	Package_Builtin,
 };
 
 struct ImportedFile {

@@ -168,7 +168,7 @@ gb_internal lbValue lb_equal_proc_for_type(lbModule *m, Type *type) {
 	map_set(&m->equal_procs, type, p);
 	lb_begin_procedure_body(p);
 
-	lb_add_attribute_to_proc(m, p->value, "readonly");
+	// lb_add_attribute_to_proc(m, p->value, "readonly");
 	lb_add_attribute_to_proc(m, p->value, "nounwind");
 
 	LLVMValueRef x = LLVMGetParam(p->value, 0);
@@ -337,7 +337,7 @@ gb_internal lbValue lb_hasher_proc_for_type(lbModule *m, Type *type) {
 	lb_begin_procedure_body(p);
 	defer (lb_end_procedure_body(p));
 
-	lb_add_attribute_to_proc(m, p->value, "readonly");
+	// lb_add_attribute_to_proc(m, p->value, "readonly");
 	lb_add_attribute_to_proc(m, p->value, "nounwind");
 
 	LLVMValueRef x = LLVMGetParam(p->value, 0);
@@ -346,7 +346,7 @@ gb_internal lbValue lb_hasher_proc_for_type(lbModule *m, Type *type) {
 	lbValue seed = {y, t_uintptr};
 
 	lb_add_proc_attribute_at_index(p, 1+0, "nonnull");
-	lb_add_proc_attribute_at_index(p, 1+0, "readonly");
+	// lb_add_proc_attribute_at_index(p, 1+0, "readonly");
 
 	if (is_type_simple_compare(type)) {
 		lbValue res = lb_simple_compare_hash(p, type, data, seed);
@@ -1025,6 +1025,10 @@ gb_internal lbProcedure *lb_create_startup_type_info(lbModule *m) {
 	LLVMSetLinkage(p->value, LLVMInternalLinkage);
 
 	lb_add_attribute_to_proc(m, p->value, "nounwind");
+	if (!LB_USE_GIANT_PACKED_STRUCT) {
+		lb_add_attribute_to_proc(m, p->value, "optnone");
+		lb_add_attribute_to_proc(m, p->value, "noinline");
+	}
 
 	lb_begin_procedure_body(p);
 
@@ -1086,6 +1090,8 @@ gb_internal lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProc
 
 	lbProcedure *p = lb_create_dummy_procedure(main_module, str_lit(LB_STARTUP_RUNTIME_PROC_NAME), proc_type);
 	p->is_startup = true;
+	lb_add_attribute_to_proc(p->module, p->value, "optnone");
+	lb_add_attribute_to_proc(p->module, p->value, "noinline");
 
 	lb_begin_procedure_body(p);
 
@@ -1189,6 +1195,8 @@ gb_internal lbProcedure *lb_create_cleanup_runtime(lbModule *main_module) { // C
 
 	lbProcedure *p = lb_create_dummy_procedure(main_module, str_lit(LB_CLEANUP_RUNTIME_PROC_NAME), proc_type);
 	p->is_startup = true;
+	lb_add_attribute_to_proc(p->module, p->value, "optnone");
+	lb_add_attribute_to_proc(p->module, p->value, "noinline");
 
 	lb_begin_procedure_body(p);
 
@@ -1352,33 +1360,25 @@ gb_internal WORKER_TASK_PROC(lb_llvm_function_pass_per_module) {
 	{
 		GB_ASSERT(m->function_pass_managers[lbFunctionPassManager_default] == nullptr);
 
-		m->function_pass_managers[lbFunctionPassManager_default]                = LLVMCreateFunctionPassManagerForModule(m->mod);
-		m->function_pass_managers[lbFunctionPassManager_default_without_memcpy] = LLVMCreateFunctionPassManagerForModule(m->mod);
-		m->function_pass_managers[lbFunctionPassManager_none]                   = LLVMCreateFunctionPassManagerForModule(m->mod);
-		m->function_pass_managers[lbFunctionPassManager_minimal]                = LLVMCreateFunctionPassManagerForModule(m->mod);
-		m->function_pass_managers[lbFunctionPassManager_size]                   = LLVMCreateFunctionPassManagerForModule(m->mod);
-		m->function_pass_managers[lbFunctionPassManager_speed]                  = LLVMCreateFunctionPassManagerForModule(m->mod);
+		for (i32 i = 0; i < lbFunctionPassManager_COUNT; i++) {
+			m->function_pass_managers[i] = LLVMCreateFunctionPassManagerForModule(m->mod);
+		}
 
-		LLVMInitializeFunctionPassManager(m->function_pass_managers[lbFunctionPassManager_default]);
-		LLVMInitializeFunctionPassManager(m->function_pass_managers[lbFunctionPassManager_default_without_memcpy]);
-		LLVMInitializeFunctionPassManager(m->function_pass_managers[lbFunctionPassManager_none]);
-		LLVMInitializeFunctionPassManager(m->function_pass_managers[lbFunctionPassManager_minimal]);
-		LLVMInitializeFunctionPassManager(m->function_pass_managers[lbFunctionPassManager_size]);
-		LLVMInitializeFunctionPassManager(m->function_pass_managers[lbFunctionPassManager_speed]);
+		for (i32 i = 0; i < lbFunctionPassManager_COUNT; i++) {
+			LLVMInitializeFunctionPassManager(m->function_pass_managers[i]);
+		}
 
 		lb_populate_function_pass_manager(m, m->function_pass_managers[lbFunctionPassManager_default],                false, build_context.optimization_level);
 		lb_populate_function_pass_manager(m, m->function_pass_managers[lbFunctionPassManager_default_without_memcpy], true,  build_context.optimization_level);
-		lb_populate_function_pass_manager_specific(m, m->function_pass_managers[lbFunctionPassManager_none],   -1);
-		lb_populate_function_pass_manager_specific(m, m->function_pass_managers[lbFunctionPassManager_minimal], 0);
-		lb_populate_function_pass_manager_specific(m, m->function_pass_managers[lbFunctionPassManager_size],    1);
-		lb_populate_function_pass_manager_specific(m, m->function_pass_managers[lbFunctionPassManager_speed],   2);
+		lb_populate_function_pass_manager_specific(m, m->function_pass_managers[lbFunctionPassManager_none],      -1);
+		lb_populate_function_pass_manager_specific(m, m->function_pass_managers[lbFunctionPassManager_minimal],    0);
+		lb_populate_function_pass_manager_specific(m, m->function_pass_managers[lbFunctionPassManager_size],       1);
+		lb_populate_function_pass_manager_specific(m, m->function_pass_managers[lbFunctionPassManager_speed],      2);
+		lb_populate_function_pass_manager_specific(m, m->function_pass_managers[lbFunctionPassManager_aggressive], 3);
 
-		LLVMFinalizeFunctionPassManager(m->function_pass_managers[lbFunctionPassManager_default]);
-		LLVMFinalizeFunctionPassManager(m->function_pass_managers[lbFunctionPassManager_default_without_memcpy]);
-		LLVMFinalizeFunctionPassManager(m->function_pass_managers[lbFunctionPassManager_none]);
-		LLVMFinalizeFunctionPassManager(m->function_pass_managers[lbFunctionPassManager_minimal]);
-		LLVMFinalizeFunctionPassManager(m->function_pass_managers[lbFunctionPassManager_size]);
-		LLVMFinalizeFunctionPassManager(m->function_pass_managers[lbFunctionPassManager_speed]);
+		for (i32 i = 0; i < lbFunctionPassManager_COUNT; i++) {
+			LLVMFinalizeFunctionPassManager(m->function_pass_managers[i]);
+		}
 	}
 
 	if (m == &m->gen->default_module) {
@@ -1393,6 +1393,8 @@ gb_internal WORKER_TASK_PROC(lb_llvm_function_pass_per_module) {
 			lbFunctionPassManagerKind pass_manager_kind = lbFunctionPassManager_default;
 			if (p->flags & lbProcedureFlag_WithoutMemcpyPass) {
 				pass_manager_kind = lbFunctionPassManager_default_without_memcpy;
+				lb_add_attribute_to_proc(p->module, p->value, "optnone");
+				lb_add_attribute_to_proc(p->module, p->value, "noinline");
 			} else {
 				if (p->entity && p->entity->kind == Entity_Procedure) {
 					switch (p->entity->Procedure.optimization_mode) {
@@ -1402,6 +1404,7 @@ gb_internal WORKER_TASK_PROC(lb_llvm_function_pass_per_module) {
 						break;
 					case ProcedureOptimizationMode_Size:
 						pass_manager_kind = lbFunctionPassManager_size;
+						lb_add_attribute_to_proc(p->module, p->value, "optsize");
 						break;
 					case ProcedureOptimizationMode_Speed:
 						pass_manager_kind = lbFunctionPassManager_speed;
@@ -1449,6 +1452,83 @@ gb_internal WORKER_TASK_PROC(lb_llvm_module_pass_worker_proc) {
 	LLVMPassManagerRef module_pass_manager = LLVMCreatePassManager();
 	lb_populate_module_pass_manager(wd->target_machine, module_pass_manager, build_context.optimization_level);
 	LLVMRunPassManager(module_pass_manager, wd->m->mod);
+
+
+#if LB_USE_NEW_PASS_SYSTEM
+	auto passes = array_make<char const *>(heap_allocator(), 0, 64);
+	defer (array_free(&passes));
+
+
+
+	LLVMPassBuilderOptionsRef pb_options = LLVMCreatePassBuilderOptions();
+	defer (LLVMDisposePassBuilderOptions(pb_options));
+
+	switch (build_context.optimization_level) {
+	case -1:
+		break;
+	case 0:
+		array_add(&passes, "always-inline");
+		array_add(&passes, "function(annotation-remarks)");
+		break;
+	case 1:
+		array_add(&passes, "default<Os>");
+		break;
+	case 2:
+		array_add(&passes, "default<O2>");
+		break;
+	case 3:
+		array_add(&passes, "default<O3>");
+		break;
+	}
+
+	// asan - Linux, Darwin, Windows
+	// msan - linux
+	// tsan - Linux, Darwin
+	// ubsan - Linux, Darwin, Windows (NOT SUPPORTED WITH LLVM C-API)
+
+	if (build_context.sanitizer_flags & SanitizerFlag_Address) {
+		array_add(&passes, "asan");
+	}
+	if (build_context.sanitizer_flags & SanitizerFlag_Memory) {
+		array_add(&passes, "msan");
+	}
+	if (build_context.sanitizer_flags & SanitizerFlag_Thread) {
+		array_add(&passes, "tsan");
+	}
+
+	if (passes.count == 0) {
+		array_add(&passes, "verify");
+	}
+
+	gbString passes_str = gb_string_make_reserve(heap_allocator(), 1024);
+	defer (gb_string_free(passes_str));
+	for_array(i, passes) {
+		if (i != 0) {
+			passes_str = gb_string_appendc(passes_str, ",");
+		}
+		passes_str = gb_string_appendc(passes_str, passes[i]);
+	}
+
+	LLVMErrorRef llvm_err = LLVMRunPasses(wd->m->mod, passes_str, wd->target_machine, pb_options);
+
+	defer (LLVMConsumeError(llvm_err));
+	if (llvm_err != nullptr) {
+		char *llvm_error = LLVMGetErrorMessage(llvm_err);
+		gb_printf_err("LLVM Error:\n%s\n", llvm_error);
+		LLVMDisposeErrorMessage(llvm_error);
+		llvm_error = nullptr;
+
+		if (build_context.keep_temp_files) {
+			TIME_SECTION("LLVM Print Module to File");
+			String filepath_ll = lb_filepath_ll_for_module(wd->m);
+			if (LLVMPrintModuleToFile(wd->m->mod, cast(char const *)filepath_ll.text, &llvm_error)) {
+				gb_printf_err("LLVM Error: %s\n", llvm_error);
+			}
+		}
+		gb_exit(1);
+		return 1;
+	}
+#endif
 	return 0;
 }
 
@@ -2035,12 +2115,15 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 	// GB_ASSERT_MSG(LLVMTargetHasAsmBackend(target));
 
 	LLVMCodeGenOptLevel code_gen_level = LLVMCodeGenLevelNone;
+	if (!LB_USE_NEW_PASS_SYSTEM) {
+		build_context.optimization_level = gb_clamp(build_context.optimization_level, -1, 2);
+	}
 	switch (build_context.optimization_level) {
-	case 0: code_gen_level = LLVMCodeGenLevelNone;    break;
-	case 1: code_gen_level = LLVMCodeGenLevelLess;    break;
-	case 2: code_gen_level = LLVMCodeGenLevelDefault; break;
-	case 3: code_gen_level = LLVMCodeGenLevelDefault; break; // NOTE(bill): force -opt:3 to be the same as -opt:2
-	// case 3: code_gen_level = LLVMCodeGenLevelAggressive; break;
+	default:/*fallthrough*/
+	case 0: code_gen_level = LLVMCodeGenLevelNone;       break;
+	case 1: code_gen_level = LLVMCodeGenLevelLess;       break;
+	case 2: code_gen_level = LLVMCodeGenLevelDefault;    break;
+	case 3: code_gen_level = LLVMCodeGenLevelAggressive; break;
 	}
 
 	// NOTE(bill): Target Machine Creation
@@ -2144,10 +2227,16 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 
 		{ // Add type info data
 			isize max_type_info_count = info->minimum_dependency_type_info_set.count+1;
-			// gb_printf_err("max_type_info_count: %td\n", max_type_info_count);
 			Type *t = alloc_type_array(t_type_info, max_type_info_count);
-			LLVMValueRef g = LLVMAddGlobal(m->mod, lb_type(m, t), LB_TYPE_INFO_DATA_NAME);
-			LLVMSetInitializer(g, LLVMConstNull(lb_type(m, t)));
+
+			// IMPORTANT NOTE(bill): As LLVM does not have a union type, an array of unions cannot be initialized
+			// at compile time without cheating in some way. This means to emulate an array of unions is to use
+			// a giant packed struct of "corrected" data types.
+
+			LLVMTypeRef internal_llvm_type = lb_setup_type_info_data_internal_type(m, max_type_info_count);
+
+			LLVMValueRef g = LLVMAddGlobal(m->mod, internal_llvm_type, LB_TYPE_INFO_DATA_NAME);
+			LLVMSetInitializer(g, LLVMConstNull(internal_llvm_type));
 			LLVMSetLinkage(g, USE_SEPARATE_MODULES ? LLVMExternalLinkage : LLVMInternalLinkage);
 
 			lbValue value = {};
@@ -2156,6 +2245,10 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 
 			lb_global_type_info_data_entity = alloc_entity_variable(nullptr, make_token_ident(LB_TYPE_INFO_DATA_NAME), t, EntityState_Resolved);
 			lb_add_entity(m, lb_global_type_info_data_entity, value);
+
+			if (LB_USE_GIANT_PACKED_STRUCT) {
+				lb_make_global_private_const(g);
+			}
 		}
 		{ // Type info member buffer
 			// NOTE(bill): Removes need for heap allocation by making it global memory
@@ -2180,50 +2273,63 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 				}
 			}
 
-			if (count > 0) {
-				{
-					char const *name = LB_TYPE_INFO_TYPES_NAME;
-					Type *t = alloc_type_array(t_type_info_ptr, count);
-					LLVMValueRef g = LLVMAddGlobal(m->mod, lb_type(m, t), name);
-					LLVMSetInitializer(g, LLVMConstNull(lb_type(m, t)));
-					LLVMSetLinkage(g, LLVMInternalLinkage);
-					lb_global_type_info_member_types = lb_addr({g, alloc_type_pointer(t)});
+			{
+				char const *name = LB_TYPE_INFO_TYPES_NAME;
+				Type *t = alloc_type_array(t_type_info_ptr, count);
+				LLVMValueRef g = LLVMAddGlobal(m->mod, lb_type(m, t), name);
+				LLVMSetInitializer(g, LLVMConstNull(lb_type(m, t)));
+				LLVMSetLinkage(g, LLVMInternalLinkage);
+				if (LB_USE_GIANT_PACKED_STRUCT) {
+					lb_make_global_private_const(g);
+				}
+				lb_global_type_info_member_types = lb_addr({g, alloc_type_pointer(t)});
 
+			}
+			{
+				char const *name = LB_TYPE_INFO_NAMES_NAME;
+				Type *t = alloc_type_array(t_string, count);
+				LLVMValueRef g = LLVMAddGlobal(m->mod, lb_type(m, t), name);
+				LLVMSetInitializer(g, LLVMConstNull(lb_type(m, t)));
+				LLVMSetLinkage(g, LLVMInternalLinkage);
+				if (LB_USE_GIANT_PACKED_STRUCT) {
+					lb_make_global_private_const(g);
 				}
-				{
-					char const *name = LB_TYPE_INFO_NAMES_NAME;
-					Type *t = alloc_type_array(t_string, count);
-					LLVMValueRef g = LLVMAddGlobal(m->mod, lb_type(m, t), name);
-					LLVMSetInitializer(g, LLVMConstNull(lb_type(m, t)));
-					LLVMSetLinkage(g, LLVMInternalLinkage);
-					lb_global_type_info_member_names = lb_addr({g, alloc_type_pointer(t)});
+				lb_global_type_info_member_names = lb_addr({g, alloc_type_pointer(t)});
+			}
+			{
+				char const *name = LB_TYPE_INFO_OFFSETS_NAME;
+				Type *t = alloc_type_array(t_uintptr, count);
+				LLVMValueRef g = LLVMAddGlobal(m->mod, lb_type(m, t), name);
+				LLVMSetInitializer(g, LLVMConstNull(lb_type(m, t)));
+				LLVMSetLinkage(g, LLVMInternalLinkage);
+				if (LB_USE_GIANT_PACKED_STRUCT) {
+					lb_make_global_private_const(g);
 				}
-				{
-					char const *name = LB_TYPE_INFO_OFFSETS_NAME;
-					Type *t = alloc_type_array(t_uintptr, count);
-					LLVMValueRef g = LLVMAddGlobal(m->mod, lb_type(m, t), name);
-					LLVMSetInitializer(g, LLVMConstNull(lb_type(m, t)));
-					LLVMSetLinkage(g, LLVMInternalLinkage);
-					lb_global_type_info_member_offsets = lb_addr({g, alloc_type_pointer(t)});
-				}
+				lb_global_type_info_member_offsets = lb_addr({g, alloc_type_pointer(t)});
+			}
 
-				{
-					char const *name = LB_TYPE_INFO_USINGS_NAME;
-					Type *t = alloc_type_array(t_bool, count);
-					LLVMValueRef g = LLVMAddGlobal(m->mod, lb_type(m, t), name);
-					LLVMSetInitializer(g, LLVMConstNull(lb_type(m, t)));
-					LLVMSetLinkage(g, LLVMInternalLinkage);
-					lb_global_type_info_member_usings = lb_addr({g, alloc_type_pointer(t)});
+			{
+				char const *name = LB_TYPE_INFO_USINGS_NAME;
+				Type *t = alloc_type_array(t_bool, count);
+				LLVMValueRef g = LLVMAddGlobal(m->mod, lb_type(m, t), name);
+				LLVMSetInitializer(g, LLVMConstNull(lb_type(m, t)));
+				LLVMSetLinkage(g, LLVMInternalLinkage);
+				if (LB_USE_GIANT_PACKED_STRUCT) {
+					lb_make_global_private_const(g);
 				}
+				lb_global_type_info_member_usings = lb_addr({g, alloc_type_pointer(t)});
+			}
 
-				{
-					char const *name = LB_TYPE_INFO_TAGS_NAME;
-					Type *t = alloc_type_array(t_string, count);
-					LLVMValueRef g = LLVMAddGlobal(m->mod, lb_type(m, t), name);
-					LLVMSetInitializer(g, LLVMConstNull(lb_type(m, t)));
-					LLVMSetLinkage(g, LLVMInternalLinkage);
-					lb_global_type_info_member_tags = lb_addr({g, alloc_type_pointer(t)});
+			{
+				char const *name = LB_TYPE_INFO_TAGS_NAME;
+				Type *t = alloc_type_array(t_string, count);
+				LLVMValueRef g = LLVMAddGlobal(m->mod, lb_type(m, t), name);
+				LLVMSetInitializer(g, LLVMConstNull(lb_type(m, t)));
+				LLVMSetLinkage(g, LLVMInternalLinkage);
+				if (LB_USE_GIANT_PACKED_STRUCT) {
+					lb_make_global_private_const(g);
 				}
+				lb_global_type_info_member_tags = lb_addr({g, alloc_type_pointer(t)});
 			}
 		}
 	}
@@ -2444,17 +2550,13 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 		}
 	}
 
-
 	TIME_SECTION("LLVM Function Pass");
 	lb_llvm_function_passes(gen, do_threading && !build_context.ODIN_DEBUG);
 
 	TIME_SECTION("LLVM Module Pass");
 	lb_llvm_module_passes(gen, do_threading);
 
-
 	TIME_SECTION("LLVM Module Verification");
-
-
 	if (!lb_llvm_module_verification(gen, do_threading)) {
 		return false;
 	}
@@ -2496,6 +2598,21 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 	}
 	if (!lb_llvm_object_generation(gen, do_threading)) {
 		return false;
+	}
+
+
+	if (build_context.sanitizer_flags & SanitizerFlag_Address) {
+		auto paths = array_make<String>(heap_allocator(), 0, 1);
+		if (build_context.metrics.os == TargetOs_windows) {
+			String path = concatenate_strings(permanent_allocator(), build_context.ODIN_ROOT, str_lit("\\bin\\llvm\\windows\\clang_rt.asan-x86_64.lib"));
+			array_add(&paths, path);
+		}
+		Entity *lib = alloc_entity_library_name(nullptr, make_token_ident("asan_lib"), nullptr, slice_from_array(paths), str_lit("asan_lib"));
+		array_add(&gen->foreign_libraries, lib);
+	}
+	if (build_context.sanitizer_flags & SanitizerFlag_Memory) {
+	}
+	if (build_context.sanitizer_flags & SanitizerFlag_Thread) {
 	}
 
 	gb_sort_array(gen->foreign_libraries.data, gen->foreign_libraries.count, foreign_library_cmp);

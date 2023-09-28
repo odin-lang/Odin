@@ -3683,18 +3683,7 @@ gb_internal void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Typ
 		ExactValue b = y->value;
 
 		if (!is_type_constant_type(x->type)) {
-		#if 0
-			gbString xt = type_to_string(x->type);
-			gbString err_str = expr_to_string(node);
-			error(op, "Invalid type, '%s', for constant binary expression '%s'", xt, err_str);
-			gb_string_free(err_str);
-			gb_string_free(xt);
-			x->mode = Addressing_Invalid;
-		#else
-			// NOTE(bill, 2021-04-21): The above is literally a useless error message.
-			// Why did I add it in the first place?!
 			x->mode = Addressing_Value;
-		#endif
 			return;
 		}
 

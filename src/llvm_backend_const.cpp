@@ -14,17 +14,6 @@ gb_internal bool lb_is_const_or_global(lbValue value) {
 	if (lb_is_const(value)) {
 		return true;
 	}
-	// TODO remove use of LLVMGetElementType
-	#if 0
-	if (LLVMGetValueKind(value.value) == LLVMGlobalVariableValueKind) {
-		LLVMTypeRef t = LLVMGetElementType(LLVMTypeOf(value.value));
-		if (!lb_is_type_kind(t, LLVMPointerTypeKind)) {
-			return false;
-		}
-		LLVMTypeRef elem = LLVMGetElementType(t);
-		return lb_is_type_kind(elem, LLVMFunctionTypeKind);
-	}
-	#endif
 	return false;
 }
 
@@ -75,8 +64,8 @@ gb_internal String lb_get_const_string(lbModule *m, lbValue value) {
 
 	unsigned     ptr_indices[1] = {0};
 	unsigned     len_indices[1] = {1};
-	LLVMValueRef underlying_ptr = LLVMConstExtractValue(value.value, ptr_indices, gb_count_of(ptr_indices));
-	LLVMValueRef underlying_len = LLVMConstExtractValue(value.value, len_indices, gb_count_of(len_indices));
+	LLVMValueRef underlying_ptr = llvm_const_extract_value(m, value.value, ptr_indices, gb_count_of(ptr_indices));
+	LLVMValueRef underlying_len = llvm_const_extract_value(m, value.value, len_indices, gb_count_of(len_indices));
 
 	GB_ASSERT(LLVMGetConstOpcode(underlying_ptr) == LLVMGetElementPtr);
 	underlying_ptr = LLVMGetOperand(underlying_ptr, 0);
@@ -295,19 +284,23 @@ gb_internal lbValue lb_expr_untyped_const_to_typed(lbModule *m, Ast *expr, Type 
 	return lb_const_value(m, t, tv.value);
 }
 
-gb_internal lbValue lb_emit_source_code_location_const(lbProcedure *p, String const &procedure, TokenPos const &pos) {
-	lbModule *m = p->module;
-
+gb_internal lbValue lb_const_source_code_location_const(lbModule *m, String const &procedure, TokenPos const &pos) {
 	LLVMValueRef fields[4] = {};
-	fields[0]/*file*/      = lb_find_or_add_entity_string(p->module, get_file_path_string(pos.file_id)).value;
+	fields[0]/*file*/      = lb_find_or_add_entity_string(m, get_file_path_string(pos.file_id)).value;
 	fields[1]/*line*/      = lb_const_int(m, t_i32, pos.line).value;
 	fields[2]/*column*/    = lb_const_int(m, t_i32, pos.column).value;
-	fields[3]/*procedure*/ = lb_find_or_add_entity_string(p->module, procedure).value;
+	fields[3]/*procedure*/ = lb_find_or_add_entity_string(m, procedure).value;
 
 	lbValue res = {};
 	res.value = llvm_const_named_struct(m, t_source_code_location, fields, gb_count_of(fields));
 	res.type = t_source_code_location;
 	return res;
+}
+
+
+gb_internal lbValue lb_emit_source_code_location_const(lbProcedure *p, String const &procedure, TokenPos const &pos) {
+	lbModule *m = p->module;
+	return lb_const_source_code_location_const(m, procedure, pos);
 }
 
 gb_internal lbValue lb_emit_source_code_location_const(lbProcedure *p, Ast *node) {
@@ -1096,7 +1089,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bo
 								if (is_constant) {
 									LLVMValueRef elem_value = lb_const_value(m, tav.type, tav.value, allow_local).value;
 									if (LLVMIsConstant(elem_value)) {
-										values[index] = LLVMConstInsertValue(values[index], elem_value, idx_list, idx_list_len);
+										values[index] = llvm_const_insert_value(m, values[index], elem_value, idx_list, idx_list_len);
 									} else {
 										is_constant = false;
 									}

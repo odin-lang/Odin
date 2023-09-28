@@ -314,6 +314,14 @@ gb_internal void array_add(Array<T> *array, T const &t) {
 	array->count++;
 }
 
+gb_internal void array_add(Array<char const *> *array, char const *t) {
+	if (array->capacity < array->count+1) {
+		array__grow(array, 0);
+	}
+	array->data[array->count] = t;
+	array->count++;
+}
+
 template <typename T>
 gb_internal T *array_add_and_get(Array<T> *array) {
 	if (array->count < array->capacity) {

@@ -90,6 +90,8 @@ gb_internal void lb_init_module(lbModule *m, Checker *c) {
 	map_init(&m->map_cell_info_map, 0);
 	map_init(&m->exact_value_compound_literal_addr_map, 1024);
 
+	m->const_dummy_builder = LLVMCreateBuilderInContext(m->ctx);
+
 }
 
 gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c) {
@@ -276,11 +278,60 @@ gb_internal lbValue lb_zero(lbModule *m, Type *t) {
 	v.type = t;
 	return v;
 }
+gb_internal LLVMValueRef llvm_const_extract_value(lbModule *m, LLVMValueRef agg, unsigned index) {
+	LLVMValueRef res = agg;
+	GB_ASSERT(LLVMIsConstant(res));
+	res = LLVMBuildExtractValue(m->const_dummy_builder, res, index, "");
+	GB_ASSERT(LLVMIsConstant(res));
+	return res;
+}
+
+gb_internal LLVMValueRef llvm_const_extract_value(lbModule *m, LLVMValueRef agg, unsigned *indices, isize count) {
+	// return LLVMConstExtractValue(value, indices, count);
+	LLVMValueRef res = agg;
+	GB_ASSERT(LLVMIsConstant(res));
+	for (isize i = 0; i < count; i++) {
+		res = LLVMBuildExtractValue(m->const_dummy_builder, res, indices[i], "");
+		GB_ASSERT(LLVMIsConstant(res));
+	}
+	return res;
+}
+
+gb_internal LLVMValueRef llvm_const_insert_value(lbModule *m, LLVMValueRef agg, LLVMValueRef val, unsigned index) {
+	GB_ASSERT(LLVMIsConstant(agg));
+	GB_ASSERT(LLVMIsConstant(val));
+
+	LLVMValueRef extracted_value = val;
+	LLVMValueRef nested = llvm_const_extract_value(m, agg, index);
+	GB_ASSERT(LLVMIsConstant(nested));
+	extracted_value = LLVMBuildInsertValue(m->const_dummy_builder, nested, extracted_value, index, "");
+	GB_ASSERT(LLVMIsConstant(extracted_value));
+	return extracted_value;
+}
+
+
+gb_internal LLVMValueRef llvm_const_insert_value(lbModule *m, LLVMValueRef agg, LLVMValueRef val, unsigned *indices, isize count) {
+	GB_ASSERT(LLVMIsConstant(agg));
+	GB_ASSERT(LLVMIsConstant(val));
+	GB_ASSERT(count > 0);
+
+	LLVMValueRef extracted_value = val;
+	for (isize i = count-1; i >= 0; i--) {
+		LLVMValueRef nested = llvm_const_extract_value(m, agg, indices, i);
+		GB_ASSERT(LLVMIsConstant(nested));
+		extracted_value = LLVMBuildInsertValue(m->const_dummy_builder, nested, extracted_value, indices[i], "");
+	}
+	GB_ASSERT(LLVMIsConstant(extracted_value));
+	return extracted_value;
+}
+
+
+
 
 gb_internal LLVMValueRef llvm_cstring(lbModule *m, String const &str) {
 	lbValue v = lb_find_or_add_entity_string(m, str);
 	unsigned indices[1] = {0};
-	return LLVMConstExtractValue(v.value, indices, gb_count_of(indices));
+	return llvm_const_extract_value(m, v.value, indices, gb_count_of(indices));
 }
 
 gb_internal bool lb_is_instr_terminating(LLVMValueRef instr) {
@@ -1888,14 +1939,14 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 
 	case Type_Array: {
 		m->internal_type_level += 1;
-		LLVMTypeRef t = LLVMArrayType(lb_type(m, type->Array.elem), cast(unsigned)type->Array.count);
+		LLVMTypeRef t = llvm_array_type(lb_type(m, type->Array.elem), type->Array.count);
 		m->internal_type_level -= 1;
 		return t;
 	}
 
 	case Type_EnumeratedArray: {
 		m->internal_type_level += 1;
-		LLVMTypeRef t = LLVMArrayType(lb_type(m, type->EnumeratedArray.elem), cast(unsigned)type->EnumeratedArray.count);
+		LLVMTypeRef t = llvm_array_type(lb_type(m, type->EnumeratedArray.elem), type->EnumeratedArray.count);
 		m->internal_type_level -= 1;
 		return t;
 	}
@@ -2129,7 +2180,7 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 			m->internal_type_level -= 1;
 			
 			LLVMTypeRef elem = lb_type(m, type->Matrix.elem);
-			LLVMTypeRef t = LLVMArrayType(elem, cast(unsigned)elem_count);
+			LLVMTypeRef t = llvm_array_type(elem, elem_count);
 			
 			m->internal_type_level += 1;
 			return t;
