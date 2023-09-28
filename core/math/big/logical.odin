@@ -22,43 +22,43 @@ package math_big
 /*
 	2's complement `and`, returns `dest = a & b;`
 */
-int_and :: proc(dest, a, b: ^Int, allocator := context.allocator) -> (err: Error) {
+int_bit_and :: proc(dest, a, b: ^Int, allocator := context.allocator) -> (err: Error) {
 	assert_if_nil(dest, a, b)
 	context.allocator = allocator
 
 	internal_clear_if_uninitialized(a, b) or_return
 	return #force_inline internal_int_and(dest, a, b)
 }
-and :: proc { int_and, }
+bit_and :: proc { int_bit_and, }
 
 /*
 	2's complement `or`, returns `dest = a | b;`
 */
-int_or :: proc(dest, a, b: ^Int, allocator := context.allocator) -> (err: Error) {
+int_bit_or :: proc(dest, a, b: ^Int, allocator := context.allocator) -> (err: Error) {
 	assert_if_nil(dest, a, b)
 	context.allocator = allocator
 
 	internal_clear_if_uninitialized(a, b) or_return
 	return #force_inline internal_int_or(dest, a, b)
 }
-or :: proc { int_or, }
+bit_or :: proc { int_bit_or, }
 
 /*
 	2's complement `xor`, returns `dest = a ^ b;`
 */
-int_xor :: proc(dest, a, b: ^Int, allocator := context.allocator) -> (err: Error) {
+int_bit_xor :: proc(dest, a, b: ^Int, allocator := context.allocator) -> (err: Error) {
 	assert_if_nil(dest, a, b)
 	context.allocator = allocator
 
 	internal_clear_if_uninitialized(a, b) or_return
 	return #force_inline internal_int_xor(dest, a, b)
 }
-xor :: proc { int_xor, }
+bit_xor :: proc { int_bit_xor, }
 
 /*
 	dest = ~src
 */
-int_complement :: proc(dest, src: ^Int, allocator := context.allocator) -> (err: Error) {
+int_bit_complement :: proc(dest, src: ^Int, allocator := context.allocator) -> (err: Error) {
 	/*
 		Check that `src` and `dest` are usable.
 	*/
@@ -68,7 +68,7 @@ int_complement :: proc(dest, src: ^Int, allocator := context.allocator) -> (err:
 	internal_clear_if_uninitialized(dest, src) or_return
 	return #force_inline internal_int_complement(dest, src)
 }
-complement :: proc { int_complement, }
+bit_complement :: proc { int_bit_complement, }
 
 /*
 	quotient, remainder := numerator >> bits;
