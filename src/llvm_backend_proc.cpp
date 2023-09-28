@@ -1345,15 +1345,15 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 			}
 		}
 		break;
-	case BuiltinProc_simd_and:
-	case BuiltinProc_simd_or:
-	case BuiltinProc_simd_xor:
-	case BuiltinProc_simd_and_not:
+	case BuiltinProc_simd_bit_and:
+	case BuiltinProc_simd_bit_or:
+	case BuiltinProc_simd_bit_xor:
+	case BuiltinProc_simd_bit_and_not:
 		switch (builtin_id) {
-		case BuiltinProc_simd_and: op_code = LLVMAnd; break;
-		case BuiltinProc_simd_or:  op_code = LLVMOr;  break;
-		case BuiltinProc_simd_xor: op_code = LLVMXor; break;
-		case BuiltinProc_simd_and_not:
+		case BuiltinProc_simd_bit_and: op_code = LLVMAnd; break;
+		case BuiltinProc_simd_bit_or:  op_code = LLVMOr;  break;
+		case BuiltinProc_simd_bit_xor: op_code = LLVMXor; break;
+		case BuiltinProc_simd_bit_and_not:
 			op_code = LLVMAnd;
 			arg1.value = LLVMBuildNot(p->builder, arg1.value, "");
 			break;

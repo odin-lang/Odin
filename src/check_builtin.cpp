@@ -471,10 +471,10 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 	// Integer only
 	case BuiltinProc_simd_add_sat:
 	case BuiltinProc_simd_sub_sat:
-	case BuiltinProc_simd_and:
-	case BuiltinProc_simd_or:
-	case BuiltinProc_simd_xor:
-	case BuiltinProc_simd_and_not:
+	case BuiltinProc_simd_bit_and:
+	case BuiltinProc_simd_bit_or:
+	case BuiltinProc_simd_bit_xor:
+	case BuiltinProc_simd_bit_and_not:
 		{
 			Operand x = {};
 			Operand y = {};

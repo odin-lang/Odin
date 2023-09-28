@@ -215,10 +215,10 @@ simd_shr_masked :: proc(a: #simd[N]T, b: #simd[N]Unsigned_Integer) -> #simd[N]T 
 simd_add_sat :: proc(a, b: #simd[N]T) -> #simd[N]T ---
 simd_sub_sat :: proc(a, b: #simd[N]T) -> #simd[N]T ---
 
-simd_and     :: proc(a, b: #simd[N]T) -> #simd[N]T ---
-simd_or      :: proc(a, b: #simd[N]T) -> #simd[N]T ---
-simd_xor     :: proc(a, b: #simd[N]T) -> #simd[N]T ---
-simd_and_not :: proc(a, b: #simd[N]T) -> #simd[N]T ---
+simd_bit_and     :: proc(a, b: #simd[N]T) -> #simd[N]T ---
+simd_bit_or      :: proc(a, b: #simd[N]T) -> #simd[N]T ---
+simd_bit_xor     :: proc(a, b: #simd[N]T) -> #simd[N]T ---
+simd_bit_and_not :: proc(a, b: #simd[N]T) -> #simd[N]T ---
 
 simd_neg  :: proc(a: #simd[N]T) -> #simd[N]T ---
 

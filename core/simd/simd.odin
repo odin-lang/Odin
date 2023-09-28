@@ -77,10 +77,10 @@ shr_masked :: intrinsics.simd_shr_masked
 add_sat :: intrinsics.simd_add_sat
 sub_sat :: intrinsics.simd_sub_sat
 
-and     :: intrinsics.simd_and
-or      :: intrinsics.simd_or
-xor     :: intrinsics.simd_xor
-and_not :: intrinsics.simd_and_not
+bit_and     :: intrinsics.simd_bit_and
+bit_or      :: intrinsics.simd_bit_or
+bit_xor     :: intrinsics.simd_bit_xor
+bit_and_not :: intrinsics.simd_bit_and_not
 
 neg :: intrinsics.simd_neg
 

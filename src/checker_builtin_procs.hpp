@@ -139,10 +139,10 @@ BuiltinProc__simd_begin,
 	BuiltinProc_simd_add_sat, // saturation arithmetic
 	BuiltinProc_simd_sub_sat, // saturation arithmetic
 
-	BuiltinProc_simd_and,
-	BuiltinProc_simd_or,
-	BuiltinProc_simd_xor,
-	BuiltinProc_simd_and_not,
+	BuiltinProc_simd_bit_and,
+	BuiltinProc_simd_bit_or,
+	BuiltinProc_simd_bit_xor,
+	BuiltinProc_simd_bit_and_not,
 
 	BuiltinProc_simd_neg,
 	BuiltinProc_simd_abs,
@@ -442,10 +442,10 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("simd_add_sat"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("simd_sub_sat"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
-	{STR_LIT("simd_and"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
-	{STR_LIT("simd_or"),  2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
-	{STR_LIT("simd_xor"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
-	{STR_LIT("simd_and_not"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_bit_and"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_bit_or"),  2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_bit_xor"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_bit_and_not"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("simd_neg"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
