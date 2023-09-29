@@ -36,6 +36,9 @@ gb_internal gbString get_file_line_as_string(TokenPos const &pos, i32 *offset_) 
 
 	u8 *start = file->tokenizer.start;
 	u8 *end = file->tokenizer.end;
+	if (start == end) {
+		return nullptr;
+	}
 	isize len = end-start;
 	if (len < offset) {
 		return nullptr;
