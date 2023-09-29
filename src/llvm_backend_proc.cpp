@@ -873,7 +873,6 @@ gb_internal lbValue lb_emit_call_internal(lbProcedure *p, lbValue value, lbValue
 						// NOTE(bill): LLVM's newer `ptr` only type system seems to fail at times
 						// I don't know why...
 						args[i] = LLVMBuildPointerCast(p->builder, args[i], param_type, "");
-						gb_printf_err("%s\n", LLVMPrintValueToString(args[i]));
 						arg_type = param_type;
 						continue;
 					}
