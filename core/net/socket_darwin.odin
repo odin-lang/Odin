@@ -23,6 +23,7 @@ import "core:os"
 import "core:time"
 
 Socket_Option :: enum c.int {
+	Broadcast                 = c.int(os.SO_BROADCAST),
 	Reuse_Address             = c.int(os.SO_REUSEADDR),
 	Keep_Alive                = c.int(os.SO_KEEPALIVE),
 	Out_Of_Bounds_Data_Inline = c.int(os.SO_OOBINLINE),
@@ -238,6 +239,7 @@ _set_option :: proc(s: Any_Socket, option: Socket_Option, value: any, loc := #ca
 
 	switch option {
 	case
+		.Broadcast,
 		.Reuse_Address,
 		.Keep_Alive,
 		.Out_Of_Bounds_Data_Inline,
@@ -358,6 +360,29 @@ _sockaddr_to_endpoint :: proc(native_addr: ^os.SOCKADDR_STORAGE_LH) -> (ep: Endp
 			port = port,
 		}
 	case u8(os.AF_INET6):
+		addr := cast(^os.sockaddr_in6) native_addr
+		port := int(addr.sin6_port)
+		ep = Endpoint {
+			address = IP6_Address(transmute([8]u16be) addr.sin6_addr),
+			port = port,
+		}
+	case:
+		panic("native_addr is neither IP4 or IP6 address")
+	}
+	return
+}
+
+@(private)
+_sockaddr_basic_to_endpoint :: proc(native_addr: ^os.SOCKADDR) -> (ep: Endpoint) {
+	switch u16(native_addr.family) {
+	case u16(os.AF_INET):
+		addr := cast(^os.sockaddr_in) native_addr
+		port := int(addr.sin_port)
+		ep = Endpoint {
+			address = IP4_Address(transmute([4]byte) addr.sin_addr),
+			port = port,
+		}
+	case u16(os.AF_INET6):
 		addr := cast(^os.sockaddr_in6) native_addr
 		port := int(addr.sin6_port)
 		ep = Endpoint {
