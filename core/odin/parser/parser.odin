@@ -3190,6 +3190,23 @@ parse_atom_expr :: proc(p: ^Parser, value: ^ast.Expr, lhs: bool) -> (operand: ^a
 
 			operand = oe
 
+		case .Or_Break, .Or_Continue:
+			token := advance_token(p)
+			label: ^ast.Ident
+
+			end := end_pos(token)
+			if p.curr_tok.kind == .Ident {
+				end = end_pos(p.curr_tok)
+				label = parse_ident(p)
+			}
+
+			oe := ast.new(ast.Or_Branch_Expr, operand.pos, end)
+			oe.expr  = operand
+			oe.token = token
+			oe.label = label
+
+			operand = oe
+
 		case .Open_Brace:
 			if !is_lhs && is_literal_type(operand) && p.expr_level >= 0 {
 				operand = parse_literal_value(p, operand)

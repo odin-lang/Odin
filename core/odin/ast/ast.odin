@@ -284,6 +284,13 @@ Or_Return_Expr :: struct {
 	token: tokenizer.Token,
 }
 
+Or_Branch_Expr :: struct {
+	using node: Expr,
+	expr:  ^Expr,
+	token: tokenizer.Token,
+	label: ^Expr,
+}
+
 Type_Assertion :: struct {
 	using node: Expr,
 	expr:  ^Expr,
@@ -562,6 +569,8 @@ strip_or_return_expr :: proc(expr: ^Expr) -> (val: ^Expr) {
 		inner: ^Expr
 		#partial switch e in val.derived {
 		case ^Or_Return_Expr:
+			inner = e.expr
+		case ^Or_Branch_Expr:
 			inner = e.expr
 		case ^Paren_Expr:
 			inner = e.expr
@@ -860,6 +869,7 @@ Any_Node :: union {
 	^Ternary_When_Expr,
 	^Or_Else_Expr,
 	^Or_Return_Expr,
+	^Or_Branch_Expr,
 	^Type_Assertion,
 	^Type_Cast,
 	^Auto_Cast,
@@ -943,6 +953,7 @@ Any_Expr :: union {
 	^Ternary_When_Expr,
 	^Or_Else_Expr,
 	^Or_Return_Expr,
+	^Or_Branch_Expr,
 	^Type_Assertion,
 	^Type_Cast,
 	^Auto_Cast,

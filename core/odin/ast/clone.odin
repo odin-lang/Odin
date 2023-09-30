@@ -147,8 +147,8 @@ clone_node :: proc(node: ^Node) -> ^Node {
 		r.expr = clone(r.expr)
 		r.index = clone(r.index)
 	case ^Matrix_Index_Expr:
-		r.expr = clone(r.expr)
-		r.row_index = clone(r.row_index)
+		r.expr         = clone(r.expr)
+		r.row_index    = clone(r.row_index)
 		r.column_index = clone(r.column_index)
 	case ^Deref_Expr:
 		r.expr = clone(r.expr)
@@ -175,6 +175,9 @@ clone_node :: proc(node: ^Node) -> ^Node {
 		r.y    = clone(r.y)
 	case ^Or_Return_Expr:
 		r.expr = clone(r.expr)
+	case ^Or_Branch_Expr:
+		r.expr  = clone(r.expr)
+		r.label = clone(r.label)
 	case ^Type_Assertion:
 		r.expr = clone(r.expr)
 		r.type = clone(r.type)
