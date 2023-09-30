@@ -3327,38 +3327,28 @@ gb_internal lbValue lb_build_expr_internal(lbProcedure *p, Ast *expr) {
 			}
 		}
 
+		GB_ASSERT(block != nullptr);
+
 		lbValue lhs = {};
 		lbValue rhs = {};
 		lb_emit_try_lhs_rhs(p, be->expr, tv, &lhs, &rhs);
-
 		Type *type = default_type(tv.type);
+		if (lhs.value) {
+			lhs = lb_emit_conv(p, lhs, type);
+		} else if (type != nullptr && type != t_invalid) {
+			lhs = lb_const_nil(p->module, type);
+		}
 
 		lbBlock *then  = lb_create_block(p, "or_branch.then");
-		lbBlock *done  = lb_create_block(p, "or_branch.done"); // NOTE(bill): Append later
 		lbBlock *else_ = lb_create_block(p, "or_branch.else");
 
 		lb_emit_if(p, lb_emit_try_has_value(p, rhs), then, else_);
+		lb_start_block(p, else_);
+		lb_emit_defer_stmts(p, lbDeferExit_Branch, block);
+		lb_emit_jump(p, block);
 		lb_start_block(p, then);
 
-		lbValue res = {};
-		if (lhs.value) {
-			res = lb_emit_conv(p, lhs, type);
-		}
-
-		lb_emit_jump(p, done);
-		lb_start_block(p, else_);
-
-		if (lhs.value) {
-			res = lb_const_nil(p->module, type);
-		}
-
-		if (block != nullptr) {
-			lb_emit_defer_stmts(p, lbDeferExit_Branch, block);
-		}
-		lb_emit_jump(p, block);
-		lb_start_block(p, done);
-
-		return res;
+		return lhs;
 	case_end;
 
 	case_ast_node(ta, TypeAssertion, expr);
