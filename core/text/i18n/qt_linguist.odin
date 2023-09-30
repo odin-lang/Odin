@@ -30,7 +30,7 @@ TS_XML_Options := xml.Options{
 parse_qt_linguist_from_bytes :: proc(data: []byte, options := DEFAULT_PARSE_OPTIONS, pluralizer: proc(int) -> int = nil, allocator := context.allocator) -> (translation: ^Translation, err: Error) {
 	context.allocator = allocator
 
-	get_str :: proc(val: xml.Value, intern: ^strings.Intern = nil) -> (str: string, err: Error) {
+	get_str :: proc(val: xml.Value, intern: ^strings.Intern) -> (str: string, err: Error) {
 		v, ok := val.(string)
 		if ok {
 			if intern != nil {
