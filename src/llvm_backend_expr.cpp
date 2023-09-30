@@ -3305,6 +3305,62 @@ gb_internal lbValue lb_build_expr_internal(lbProcedure *p, Ast *expr) {
 		return lb_emit_or_return(p, oe->expr, tv);
 	case_end;
 
+	case_ast_node(be, OrBranchExpr, expr);
+		lbBlock *block = nullptr;
+
+		if (be->label != nullptr) {
+			lbBranchBlocks bb = lb_lookup_branch_blocks(p, be->label);
+			switch (be->token.kind) {
+			case Token_or_break:    block = bb.break_;    break;
+			case Token_or_continue: block = bb.continue_; break;
+			}
+		} else {
+			for (lbTargetList *t = p->target_list; t != nullptr && block == nullptr; t = t->prev) {
+				if (t->is_block) {
+					continue;
+				}
+
+				switch (be->token.kind) {
+				case Token_or_break:    block = t->break_;    break;
+				case Token_or_continue: block = t->continue_; break;
+				}
+			}
+		}
+
+		lbValue lhs = {};
+		lbValue rhs = {};
+		lb_emit_try_lhs_rhs(p, be->expr, tv, &lhs, &rhs);
+
+		Type *type = default_type(tv.type);
+
+		lbBlock *then  = lb_create_block(p, "or_branch.then");
+		lbBlock *done  = lb_create_block(p, "or_branch.done"); // NOTE(bill): Append later
+		lbBlock *else_ = lb_create_block(p, "or_branch.else");
+
+		lb_emit_if(p, lb_emit_try_has_value(p, rhs), then, else_);
+		lb_start_block(p, then);
+
+		lbValue res = {};
+		if (lhs.value) {
+			res = lb_emit_conv(p, lhs, type);
+		}
+
+		lb_emit_jump(p, done);
+		lb_start_block(p, else_);
+
+		if (lhs.value) {
+			res = lb_const_nil(p->module, type);
+		}
+
+		if (block != nullptr) {
+			lb_emit_defer_stmts(p, lbDeferExit_Branch, block);
+		}
+		lb_emit_jump(p, block);
+		lb_start_block(p, done);
+
+		return res;
+	case_end;
+
 	case_ast_node(ta, TypeAssertion, expr);
 		TokenPos pos = ast_token(expr).pos;
 		lbValue e = lb_build_expr(p, ta->expr);

@@ -533,8 +533,13 @@ gb_internal Ast *ast_tag_expr(AstFile *f, Token token, Token name, Ast *expr) {
 gb_internal Ast *ast_unary_expr(AstFile *f, Token op, Ast *expr) {
 	Ast *result = alloc_ast_node(f, Ast_UnaryExpr);
 
-	if (expr && expr->kind == Ast_OrReturnExpr) {
+	if (expr) switch (expr->kind) {
+	case Ast_OrReturnExpr:
 		syntax_error_with_verbose(expr, "'or_return' within an unary expression not wrapped in parentheses (...)");
+		break;
+	case Ast_OrBranchExpr:
+		syntax_error_with_verbose(expr, "'or_%.*s' within an unary expression not wrapped in parentheses (...)", LIT(expr->OrBranchExpr.token.string));
+		break;
 	}
 
 	result->UnaryExpr.op = op;
@@ -555,11 +560,22 @@ gb_internal Ast *ast_binary_expr(AstFile *f, Token op, Ast *left, Ast *right) {
 		right = ast_bad_expr(f, op, op);
 	}
 
-	if (left->kind == Ast_OrReturnExpr) {
+
+	if (left) switch (left->kind) {
+	case Ast_OrReturnExpr:
 		syntax_error_with_verbose(left, "'or_return' within a binary expression not wrapped in parentheses (...)");
+		break;
+	case Ast_OrBranchExpr:
+		syntax_error_with_verbose(left, "'or_%.*s' within a binary expression not wrapped in parentheses (...)", LIT(left->OrBranchExpr.token.string));
+		break;
 	}
-	if (right->kind == Ast_OrReturnExpr) {
+	if (right) switch (right->kind) {
+	case Ast_OrReturnExpr:
 		syntax_error_with_verbose(right, "'or_return' within a binary expression not wrapped in parentheses (...)");
+		break;
+	case Ast_OrBranchExpr:
+		syntax_error_with_verbose(right, "'or_%.*s' within a binary expression not wrapped in parentheses (...)", LIT(right->OrBranchExpr.token.string));
+		break;
 	}
 
 	result->BinaryExpr.op = op;
@@ -797,6 +813,14 @@ gb_internal Ast *ast_or_return_expr(AstFile *f, Ast *expr, Token const &token) {
 	Ast *result = alloc_ast_node(f, Ast_OrReturnExpr);
 	result->OrReturnExpr.expr = expr;
 	result->OrReturnExpr.token = token;
+	return result;
+}
+
+gb_internal Ast *ast_or_branch_expr(AstFile *f, Ast *expr, Token const &token, Ast *label) {
+	Ast *result = alloc_ast_node(f, Ast_OrBranchExpr);
+	result->OrBranchExpr.expr = expr;
+	result->OrBranchExpr.token = token;
+	result->OrBranchExpr.label = label;
 	return result;
 }
 
@@ -1477,19 +1501,20 @@ gb_internal Token expect_operator(AstFile *f) {
 		// okay
 	} else if (prev.kind == Token_if || prev.kind == Token_when) {
 		// okay
-	} else if (prev.kind == Token_or_else || prev.kind == Token_or_return) {
+	} else if (prev.kind == Token_or_else || prev.kind == Token_or_return ||
+	           prev.kind == Token_or_break || prev.kind == Token_or_continue) {
 		// okay
 	} else if (!gb_is_between(prev.kind, Token__OperatorBegin+1, Token__OperatorEnd-1)) {
 		String p = token_to_string(prev);
-		syntax_error(f->curr_token, "Expected an operator, got '%.*s'",
+		syntax_error(prev, "Expected an operator, got '%.*s'",
 		             LIT(p));
 	} else if (!f->allow_range && is_token_range(prev)) {
 		String p = token_to_string(prev);
-		syntax_error(f->curr_token, "Expected an non-range operator, got '%.*s'",
+		syntax_error(prev, "Expected an non-range operator, got '%.*s'",
 		             LIT(p));
 	}
-	if (f->curr_token.kind == Token_Ellipsis) {
-		syntax_warning(f->curr_token, "'..' for ranges has now been deprecated, prefer '..='");
+	if (prev.kind == Token_Ellipsis) {
+		syntax_warning(prev, "'..' for ranges has now been deprecated, prefer '..='");
 		f->tokens[f->curr_token_index].flags |= TokenFlag_Replace;
 	}
 	
@@ -1736,6 +1761,8 @@ gb_internal Ast *strip_or_return_expr(Ast *node) {
 		}
 		if (node->kind == Ast_OrReturnExpr) {
 			node = node->OrReturnExpr.expr;
+		} else if (node->kind == Ast_OrBranchExpr) {
+			node = node->OrBranchExpr.expr;
 		} else if (node->kind == Ast_ParenExpr) {
 			node = node->ParenExpr.expr;
 		} else {
@@ -2869,8 +2896,16 @@ gb_internal Ast *parse_call_expr(AstFile *f, Ast *operand) {
 }
 
 gb_internal void parse_check_or_return(Ast *operand, char const *msg) {
-	if (operand && operand->kind == Ast_OrReturnExpr) {
+	if (operand == nullptr) {
+		return;
+	}
+	switch (operand->kind) {
+	case Ast_OrReturnExpr:
 		syntax_error_with_verbose(operand, "'or_return' use within %s is not wrapped in parentheses (...)", msg);
+		break;
+	case Ast_OrBranchExpr:
+		syntax_error_with_verbose(operand, "'or_%.*s' use within %s is not wrapped in parentheses (...)", msg, LIT(operand->OrBranchExpr.token.string));
+		break;
 	}
 }
 
@@ -3002,6 +3037,18 @@ gb_internal Ast *parse_atom_expr(AstFile *f, Ast *operand, bool lhs) {
 
 		case Token_or_return:
 			operand = ast_or_return_expr(f, operand, expect_token(f, Token_or_return));
+			break;
+
+		case Token_or_break:
+		case Token_or_continue:
+			{
+				Token token = advance_token(f);
+				Ast *label = nullptr;
+				if (f->curr_token.kind == Token_Ident) {
+					label = parse_ident(f);
+				}
+				operand = ast_or_branch_expr(f, operand, token, label);
+			}
 			break;
 
 		case Token_OpenBrace:

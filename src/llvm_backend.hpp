@@ -535,6 +535,7 @@ gb_internal void lb_mem_zero_ptr(lbProcedure *p, LLVMValueRef ptr, Type *type, u
 
 gb_internal void lb_emit_init_context(lbProcedure *p, lbAddr addr);
 
+gb_internal lbBranchBlocks lb_lookup_branch_blocks(lbProcedure *p, Ast *ident);
 
 gb_internal lbStructFieldRemapping lb_get_struct_remapping(lbModule *m, Type *t);
 gb_internal LLVMTypeRef lb_type_padding_filler(lbModule *m, i64 padding, i64 padding_align);
@@ -554,6 +555,7 @@ gb_internal LLVMTypeRef OdinLLVMGetArrayElementType(LLVMTypeRef type);
 gb_internal LLVMTypeRef OdinLLVMGetVectorElementType(LLVMTypeRef type);
 
 gb_internal String lb_filepath_ll_for_module(lbModule *m);
+
 
 
 gb_internal LLVMTypeRef llvm_array_type(LLVMTypeRef ElementType, uint64_t ElementCount) {

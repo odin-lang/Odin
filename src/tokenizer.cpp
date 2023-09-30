@@ -116,6 +116,8 @@ TOKEN_KIND(Token__KeywordBegin, ""), \
 	TOKEN_KIND(Token_context,     "context"),     \
 	TOKEN_KIND(Token_or_else,     "or_else"),     \
 	TOKEN_KIND(Token_or_return,   "or_return"),   \
+	TOKEN_KIND(Token_or_break,    "or_break"),    \
+	TOKEN_KIND(Token_or_continue, "or_continue"), \
 	TOKEN_KIND(Token_asm,         "asm"),         \
 	TOKEN_KIND(Token_matrix,      "matrix"),      \
 TOKEN_KIND(Token__KeywordEnd, ""), \
@@ -1072,6 +1074,8 @@ semicolon_check:;
 	case Token_fallthrough:
 	case Token_return:
 	case Token_or_return:
+	case Token_or_break:
+	case Token_or_continue:
 		/*fallthrough*/
 	case Token_Integer:
 	case Token_Float:

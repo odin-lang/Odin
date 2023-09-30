@@ -435,6 +435,7 @@ struct CheckerContext {
 #define MAX_INLINE_FOR_DEPTH 1024ll
 	i64 inline_for_depth;
 
+	u32        stmt_flags;
 	bool       in_enum_type;
 	bool       collect_delayed_decls;
 	bool       allow_polymorphic_types;

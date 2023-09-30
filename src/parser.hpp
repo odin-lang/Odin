@@ -464,6 +464,7 @@ AST_KIND(_ExprBegin,  "",  bool) \
 	AST_KIND(TernaryWhenExpr, "ternary when expression",  struct { Ast *x, *cond, *y; }) \
 	AST_KIND(OrElseExpr,      "or_else expression",       struct { Ast *x; Token token; Ast *y; }) \
 	AST_KIND(OrReturnExpr,    "or_return expression",     struct { Ast *expr; Token token; }) \
+	AST_KIND(OrBranchExpr,    "or branch expression",     struct { Ast *expr; Token token; Ast *label; }) \
 	AST_KIND(TypeAssertion, "type assertion", struct { \
 		Ast *expr; \
 		Token dot; \

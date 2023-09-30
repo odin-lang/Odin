@@ -102,7 +102,12 @@ gb_internal void check_stmt_list(CheckerContext *ctx, Slice<Ast *> const &stmts,
 			new_flags |= Stmt_FallthroughAllowed;
 		}
 
+		u32 prev_stmt_flags = ctx->stmt_flags;
+		ctx->stmt_flags = new_flags;
+
 		check_stmt(ctx, n, new_flags);
+
+		ctx->stmt_flags = prev_stmt_flags;
 
 		if (i+1 < max_non_constant_declaration) {
 			switch (n->kind) {
