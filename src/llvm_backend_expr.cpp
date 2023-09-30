@@ -3513,8 +3513,15 @@ gb_internal lbAddr lb_build_addr_from_entity(lbProcedure *p, Entity *e, Ast *exp
 	if (e->kind == Entity_Constant) {
 		Type *t = default_type(type_of_expr(expr));
 		lbValue v = lb_const_value(p->module, t, e->Constant.value);
-		lbAddr g = lb_add_global_generated(p->module, t, v);
-		return g;
+		if (LLVMIsConstant(v.value)) {
+			lbAddr g = lb_add_global_generated(p->module, t, v);
+			return g;
+		}
+		GB_ASSERT(LLVMIsALoadInst(v.value));
+		lbValue ptr = {};
+		ptr.value = LLVMGetOperand(v.value, 0);
+		ptr.type = alloc_type_pointer(t);
+		return lb_addr(ptr);
 	}
 
 
