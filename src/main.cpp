@@ -257,7 +257,6 @@ enum BuildFlagKind {
 	BuildFlag_VetUsingParam,
 	BuildFlag_VetStyle,
 	BuildFlag_VetSemicolon,
-	BuildFlag_VetExtra,
 
 	BuildFlag_IgnoreUnknownAttributes,
 	BuildFlag_ExtraLinkerFlags,
@@ -445,7 +444,6 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_VetUsingParam,           str_lit("vet-using-param"),           BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_VetStyle,                str_lit("vet-style"),                 BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_VetSemicolon,            str_lit("vet-semicolon"),             BuildFlagParam_None,    Command__does_check);
-	add_flag(&build_flags, BuildFlag_VetExtra,                str_lit("vet-extra"),                 BuildFlagParam_None,    Command__does_check);
 
 	add_flag(&build_flags, BuildFlag_IgnoreUnknownAttributes, str_lit("ignore-unknown-attributes"), BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_ExtraLinkerFlags,        str_lit("extra-linker-flags"),        BuildFlagParam_String,  Command__does_build);
@@ -1024,12 +1022,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							build_context.show_debug_messages = true;
 							break;
 						case BuildFlag_Vet:
-							if (build_context.vet_flags & VetFlag_Extra) {
-								build_context.vet_flags |= VetFlag_All;
-							} else {
-								build_context.vet_flags &= ~VetFlag_Extra;
-								build_context.vet_flags |= VetFlag_All;
-							}
+							build_context.vet_flags |= VetFlag_All;
 							break;
 
 						case BuildFlag_VetUnused:     build_context.vet_flags |= VetFlag_Unused;     break;
@@ -1038,10 +1031,6 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_VetUsingParam: build_context.vet_flags |= VetFlag_UsingParam; break;
 						case BuildFlag_VetStyle:      build_context.vet_flags |= VetFlag_Style;      break;
 						case BuildFlag_VetSemicolon:  build_context.vet_flags |= VetFlag_Semicolon;  break;
-
-						case BuildFlag_VetExtra:
-							build_context.vet_flags = VetFlag_All | VetFlag_Extra;
-							break;
 
 						case BuildFlag_IgnoreUnknownAttributes:
 							build_context.ignore_unknown_attributes = true;
@@ -1845,11 +1834,6 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 
 		print_usage_line(1, "-vet-semicolon");
 		print_usage_line(2, "Errs on unneeded semicolons");
-		print_usage_line(0, "");
-
-		print_usage_line(1, "-vet-extra");
-		print_usage_line(2, "Do even more checks than standard vet on the code");
-		print_usage_line(2, "To treat the extra warnings as errors, use -warnings-as-errors");
 		print_usage_line(0, "");
 	}
 

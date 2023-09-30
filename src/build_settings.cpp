@@ -237,9 +237,7 @@ enum VetFlags : u64 {
 	VetFlag_Style      = 1u<<4, // 16
 	VetFlag_Semicolon  = 1u<<5, // 32
 
-	VetFlag_Extra     = 1u<<16,
-
-	VetFlag_All = VetFlag_Unused|VetFlag_Shadowing|VetFlag_UsingStmt, // excluding extra
+	VetFlag_All = VetFlag_Unused|VetFlag_Shadowing|VetFlag_UsingStmt,
 
 	VetFlag_Using = VetFlag_UsingStmt|VetFlag_UsingParam,
 };
@@ -257,8 +255,6 @@ u64 get_vet_flag_from_name(String const &name) {
 		return VetFlag_Style;
 	} else if (name == "semicolon") {
 		return VetFlag_Semicolon;
-	} else if (name == "extra") {
-		return VetFlag_Extra;
 	}
 	return VetFlag_NONE;
 }
