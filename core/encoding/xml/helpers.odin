@@ -21,13 +21,13 @@ find_child_by_ident :: proc(doc: ^Document, parent_id: Element_ID, ident: string
 			/*
 				Skip commments. They have no name.
 			*/
-			if child.kind  != .Element                { continue }
+			if child.kind != .Element { continue }
 
 			/*
 				If the ident matches and it's the nth such child, return it.
 			*/
 			if child.ident == ident {
-				if count == nth                       { return child_id, true }
+				if count == nth { return child_id, true }
 				count += 1
 			}
 		}

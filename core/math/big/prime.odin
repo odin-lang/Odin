@@ -1214,7 +1214,6 @@ internal_random_prime :: proc(a: ^Int, size_in_bits: int, trials: int, flags := 
 		trials = number_of_rabin_miller_trials(size_in_bits)
 	}
 
-	res: bool
 	RANDOM_PRIME_ITERATIONS_USED = 0
 
 	for {
@@ -1251,11 +1250,7 @@ internal_random_prime :: proc(a: ^Int, size_in_bits: int, trials: int, flags := 
 		/*
 			Is it prime?
 		*/
-		res = internal_int_is_prime(a, trials)                       or_return
-
-		if (!res) {
-			continue
-		}
+		internal_int_is_prime(a, trials) or_return or_continue
 
 		if .Safe in flags {
 			/*
@@ -1267,9 +1262,10 @@ internal_random_prime :: proc(a: ^Int, size_in_bits: int, trials: int, flags := 
 			/*
 				Is it prime?
 			*/
-			res = internal_int_is_prime(a, trials)                   or_return
+			if internal_int_is_prime(a, trials) or_return {
+				break
+			}
 		}
-		if res { break }
 	}
 
 	if .Safe in flags {

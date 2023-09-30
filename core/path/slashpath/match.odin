@@ -93,10 +93,7 @@ scan_chunk :: proc(pattern: string) -> (star: bool, chunk, rest: string) {
 		case ']':
 			in_range = false
 		case '*':
-			if !in_range {
-				break scan_loop
-			}
-
+			in_range or_break scan_loop
 		}
 	}
 	return star, pattern[:i], pattern[i:]

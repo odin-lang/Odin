@@ -45,15 +45,22 @@ _get_dns_records_os :: proc(hostname: string, type: DNS_Record_Type, allocator :
 
 	count := 0
 	for r := rec; r != nil; r = r.pNext {
-		if r.wType != u16(type) do continue // NOTE(tetra): Should never happen, but...
+		if r.wType != u16(type) {
+			// NOTE(tetra): Should never happen, but...
+			continue
+		}
 		count += 1
 	}
 
 	recs := make([dynamic]DNS_Record, 0, count)
-	if recs == nil do return nil, .System_Error // return no results if OOM.
+	if recs == nil {
+		return nil, .System_Error // return no results if OOM.
+	}
 
 	for r := rec; r != nil; r = r.pNext {
-		if r.wType != u16(type) do continue // NOTE(tetra): Should never happen, but...
+		if r.wType != u16(type) {
+			continue // NOTE(tetra): Should never happen, but...
+		}
 
 		base_record := DNS_Record_Base{
 			record_name = strings.clone(string(r.pName)),

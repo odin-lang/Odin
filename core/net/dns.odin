@@ -247,23 +247,19 @@ get_dns_records_from_nameservers :: proc(hostname: string, type: DNS_Record_Type
 		}
 		defer close(conn)
 
-		_, send_err := send(conn, dns_packet[:], name_server)
-		if send_err != nil {
-			continue
-		}
+		_ = send(conn, dns_packet[:], name_server) or_continue
 
-		set_err := set_option(conn, .Receive_Timeout, time.Second * 1)
-		if set_err != nil {
+		if set_option(conn, .Receive_Timeout, time.Second * 1) != nil {
 			return nil, .Connection_Error
 		}
 
-		recv_sz, _, recv_err := recv_udp(conn, dns_response_buf[:])
-		if recv_err == UDP_Recv_Error.Timeout {
-			continue
-		} else if recv_err != nil {
-			continue
-		}
-
+		// recv_sz, _, recv_err := recv_udp(conn, dns_response_buf[:])
+		// if recv_err == UDP_Recv_Error.Timeout {
+		// 	continue
+		// } else if recv_err != nil {
+		// 	continue
+		// }
+		recv_sz, _ := recv_udp(conn, dns_response_buf[:]) or_continue
 		if recv_sz == 0 {
 			continue
 		}
@@ -429,11 +425,9 @@ load_hosts :: proc(hosts_file_path: string, allocator := context.allocator) -> (
 		}
 
 		for hostname in splits[1:] {
-			if len(hostname) == 0 {
-				continue
+			if len(hostname) != 0 {
+				append(&_hosts, DNS_Host_Entry{hostname, addr})
 			}
-
-			append(&_hosts, DNS_Host_Entry{hostname, addr})
 		}
 	}
 
@@ -833,11 +827,9 @@ parse_response :: proc(response: []u8, filter: DNS_Record_Type = nil, allocator 
 		}
 
 		rec := parse_record(response, &cur_idx, filter) or_return
-		if rec == nil {
-			continue
+		if rec != nil {
+			append(&_records, rec)
 		}
-
-		append(&_records, rec)
 	}
 
 	for _ in 0..<authority_count {
@@ -846,11 +838,9 @@ parse_response :: proc(response: []u8, filter: DNS_Record_Type = nil, allocator 
 		}
 
 		rec := parse_record(response, &cur_idx, filter) or_return
-		if rec == nil {
-			continue
+		if rec != nil {
+			append(&_records, rec)
 		}
-
-		append(&_records, rec)
 	}
 
 	for _ in 0..<additional_count {
@@ -859,11 +849,9 @@ parse_response :: proc(response: []u8, filter: DNS_Record_Type = nil, allocator 
 		}
 
 		rec := parse_record(response, &cur_idx, filter) or_return
-		if rec == nil {
-			continue
+		if rec != nil {
+			append(&_records, rec)
 		}
-
-		append(&_records, rec)
 	}
 
 	return _records[:], true

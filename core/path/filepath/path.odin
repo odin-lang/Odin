@@ -392,9 +392,8 @@ rel :: proc(base_path, target_path: string, allocator := context.allocator) -> (
 		for ti < tl && target[ti] != SEPARATOR {
 			ti += 1
 		}
-		if !strings.equal_fold(target[t0:ti], base[b0:bi]) {
-			break
-		}
+		strings.equal_fold(target[t0:ti], base[b0:bi]) or_break
+
 		if bi < bl {
 			bi += 1
 		}

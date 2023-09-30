@@ -755,9 +755,8 @@ _parse_int :: proc(s: string, offset: int) -> (result: int, new_offset: int, ok:
 	new_offset = offset
 	for new_offset < len(s) {
 		c := s[new_offset]
-		if !is_digit(c) {
-			break
-		}
+		is_digit(c) or_break
+
 		new_offset += 1
 
 		result *= 10
@@ -2555,9 +2554,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 			ks, vs, hs, _, _ := runtime.map_kvh_data_dynamic(m^, info.map_info)
 			j := 0
 			for bucket_index in 0..<map_cap {
-				if !runtime.map_hash_is_valid(hs[bucket_index]) {
-					continue
-				}
+				runtime.map_hash_is_valid(hs[bucket_index]) or_continue
 
 				if j > 0 {
 					io.write_string(fi.writer, ", ", &fi.n)

@@ -1053,9 +1053,7 @@ parse_attribute :: proc(p: ^Parser, tok: tokenizer.Token, open_kind, close_kind:
 			}
 			append(&elems, elem)
 
-			if !allow_token(p, .Comma) {
-				break
-			}
+			allow_token(p, .Comma) or_break
 		}
 		p.expr_level -= 1
 		close = expect_token_after(p, close_kind, "attribute")
@@ -1174,9 +1172,7 @@ parse_foreign_decl :: proc(p: ^Parser) -> ^ast.Decl {
 				path := expect_token(p, .String)
 				append(&fullpaths, path.text)
 
-				if !allow_token(p, .Comma) {
-					break
-				}
+				allow_token(p, .Comma) or_break
 			}
 			expect_token(p, .Close_Brace)
 		} else {
@@ -1961,9 +1957,7 @@ parse_field_list :: proc(p: ^Parser, follow: tokenizer.Token_Kind, allowed_flags
 
 		eaf := Expr_And_Flags{param, prefix_flags}
 		append(&list, eaf)
-		if !allow_token(p, .Comma) {
-			break
-		}
+		allow_token(p, .Comma) or_break
 	}
 
 	if p.curr_tok.kind != .Colon {
@@ -2011,10 +2005,7 @@ parse_field_list :: proc(p: ^Parser, follow: tokenizer.Token_Kind, allowed_flags
 			names = parse_ident_list(p, allow_poly_names)
 
 			total_name_count += len(names)
-			ok := handle_field(p, &seen_ellipsis, &fields, docs, names, allowed_flags, set_flags)
-			if !ok {
-				break
-			}
+			handle_field(p, &seen_ellipsis, &fields, docs, names, allowed_flags, set_flags) or_break
 		}
 	}
 
@@ -2361,9 +2352,7 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 				elem := parse_expr(p, false)
 				append(&args, elem)
 
-				if !allow_token(p, .Comma) {
-					break
-				}
+				allow_token(p, .Comma) or_break
 			}
 
 			close := expect_token(p, .Close_Brace)
@@ -2696,9 +2685,7 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 			if _, ok := type.derived.(^ast.Bad_Expr); !ok {
 				append(&variants, type)
 			}
-			if !allow_token(p, .Comma) {
-				break
-			}
+			allow_token(p, .Comma) or_break
 		}
 
 		close := expect_closing_brace_of_field_list(p)
@@ -2916,9 +2903,7 @@ parse_elem_list :: proc(p: ^Parser) -> []^ast.Expr {
 
 		append(&elems, elem)
 
-		if !allow_token(p, .Comma) {
-			break
-		}
+		allow_token(p, .Comma) or_break
 	}
 
 	return elems[:]
@@ -2993,9 +2978,7 @@ parse_call_expr :: proc(p: ^Parser, operand: ^ast.Expr) -> ^ast.Expr {
 			seen_ellipsis = true
 		}
 
-		if !allow_token(p, .Comma) {
-			break
-		}
+		allow_token(p, .Comma) or_break
 	}
 
 	close := expect_token_after(p, .Close_Paren, "argument list")

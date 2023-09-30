@@ -91,10 +91,7 @@ parse_qt_linguist_from_bytes :: proc(data: []byte, options := DEFAULT_PARSE_OPTI
 		// Find messages in section.
 		nth: int
 		for {
-			message_id, message_found := xml.find_child_by_ident(ts, child_id, "message", nth)
-			if !message_found {
-				break
-			}
+			message_id := xml.find_child_by_ident(ts, child_id, "message", nth) or_break
 
 			numerus_tag, _ := xml.find_attribute_val_by_key(ts, message_id, "numerus")
 			has_plurals := numerus_tag == "yes"
@@ -131,10 +128,7 @@ parse_qt_linguist_from_bytes :: proc(data: []byte, options := DEFAULT_PARSE_OPTI
 
 				num_plurals: int
 				for {
-					numerus_id, numerus_found := xml.find_child_by_ident(ts, translation_id, "numerusform", num_plurals)
-					if !numerus_found {
-						break
-					}
+					numerus_id := xml.find_child_by_ident(ts, translation_id, "numerusform", num_plurals) or_break
 					num_plurals += 1
 				}
 
@@ -145,10 +139,7 @@ parse_qt_linguist_from_bytes :: proc(data: []byte, options := DEFAULT_PARSE_OPTI
 
 				num_plurals = 0
 				for {
-					numerus_id, numerus_found := xml.find_child_by_ident(ts, translation_id, "numerusform", num_plurals)
-					if !numerus_found {
-						break
-					}
+					numerus_id := xml.find_child_by_ident(ts, translation_id, "numerusform", num_plurals) or_break
 					numerus := get_str(ts.elements[numerus_id].value[0]) or_return
 					numerus, _ = strings.intern_get(&translation.intern, numerus)
 					section[source][num_plurals] = numerus

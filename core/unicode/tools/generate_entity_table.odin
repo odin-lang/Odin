@@ -86,44 +86,40 @@ generate_encoding_entity_table :: proc() {
 
 			nth := 0
 			for {
-				character_entity, entity_ok := xml.find_child_by_ident(char, "entity", nth)
-				if !entity_ok { break }
-
-				nth   += 1
-				if name, name_ok := xml.find_attribute_val_by_key(character_entity, "id"); name_ok {
-
-					if len(name) == 0 {
-						/*
-							Invalid name. Skip.
-						*/
-						continue
-					}
-
-					if name == "\"\"" {
-						printf("%#v\n", char)
-						printf("%#v\n", character_entity)
-					}
-
-					if len(name) > max_name_length { longest_name  = name }
-					if len(name) < min_name_length { shortest_name = name }
-
-					min_name_length = min(min_name_length, len(name))
-					max_name_length = max(max_name_length, len(name))
-
-					e := Entity{
-						name        = name,
-						codepoint   = rune(codepoint),
-						description = description,
-					}
-
-					if _, seen := entity_map[name]; seen {
-						continue
-					}
-
-					entity_map[name] = e
-					append(&names, name)
-					count += 1
+				character_entity := xml.find_child_by_ident(char, "entity", nth) or_break
+				nth += 1
+				name := xml.find_attribute_val_by_key(character_entity, "id") or_continue
+				if len(name) == 0 {
+					/*
+						Invalid name. Skip.
+					*/
+					continue
 				}
+
+				if name == "\"\"" {
+					printf("%#v\n", char)
+					printf("%#v\n", character_entity)
+				}
+
+				if len(name) > max_name_length { longest_name  = name }
+				if len(name) < min_name_length { shortest_name = name }
+
+				min_name_length = min(min_name_length, len(name))
+				max_name_length = max(max_name_length, len(name))
+
+				e := Entity{
+					name        = name,
+					codepoint   = rune(codepoint),
+					description = description,
+				}
+
+				if name in entity_map {
+					continue
+				}
+
+				entity_map[name] = e
+				append(&names, name)
+				count += 1
 			}
 		}
 	}

@@ -551,8 +551,8 @@ unparen_expr :: proc(expr: ^Expr) -> (val: ^Expr) {
 		return
 	}
 	for {
-		e, ok := val.derived.(^Paren_Expr)
-		if !ok || e.expr == nil {
+		e := val.derived.(^Paren_Expr) or_break
+		if e.expr == nil {
 			break
 		}
 		val = e.expr
