@@ -118,9 +118,7 @@ reader_peek :: proc(b: ^Reader, n: int) -> (data: []byte, err: io.Error) {
 	b.last_rune_size = -1
 
 	for b.w-b.r < n && b.w-b.r < len(b.buf) && b.err == nil {
-		if fill_err := _reader_read_new_chunk(b); fill_err != nil {
-			return nil, fill_err
-		}
+		_reader_read_new_chunk(b) or_return
 	}
 
 	if n > len(b.buf) {
@@ -156,9 +154,7 @@ reader_discard :: proc(b: ^Reader, n: int) -> (discarded: int, err: io.Error) {
 	for {
 		skip := reader_buffered(b)
 		if skip == 0 {
-			if fill_err := _reader_read_new_chunk(b); fill_err != nil {
-				return 0, fill_err
-			}
+			_reader_read_new_chunk(b) or_return
 			skip = reader_buffered(b)
 		}
 		skip = min(skip, remaining)
@@ -223,20 +219,18 @@ reader_read :: proc(b: ^Reader, p: []byte) -> (n: int, err: io.Error) {
 
 // reader_read_byte reads and returns a single byte
 // If no byte is available, it return an error
-reader_read_byte :: proc(b: ^Reader) -> (byte, io.Error) {
+reader_read_byte :: proc(b: ^Reader) -> (c: byte, err: io.Error) {
 	b.last_rune_size = -1
 	for b.r == b.w {
 		if b.err != nil {
 			return 0, _reader_consume_err(b)
 		}
-		if err := _reader_read_new_chunk(b); err != nil {
-			return 0, err
-		}
+		_reader_read_new_chunk(b) or_return
 	}
-	c := b.buf[b.r]
+	c = b.buf[b.r]
 	b.r += 1
 	b.last_byte = int(c)
-	return c, nil
+	return
 }
 
 // reader_unread_byte unreads the last byte. Only the most recently read byte can be unread
@@ -264,15 +258,12 @@ reader_read_rune :: proc(b: ^Reader) -> (r: rune, size: int, err: io.Error) {
 	    !utf8.full_rune(b.buf[b.r:b.w]) &&
 	    b.err == nil &&
 	    b.w-b.w < len(b.buf) {
-		if err = _reader_read_new_chunk(b); err != nil {
-			return
-		}
+		_reader_read_new_chunk(b) or_return
 	}
 
 	b.last_rune_size = -1
 	if b.r == b.w {
-		err = _reader_consume_err(b)
-		return
+		return 0, 0, _reader_consume_err(b)
 	}
 	r, size = rune(b.buf[b.r]), 1
 	if r >= utf8.RUNE_SELF {
@@ -305,27 +296,20 @@ reader_write_to :: proc(b: ^Reader, w: io.Writer) -> (n: i64, err: io.Error) {
 		return i64(n), err
 	}
 
-	n, err = write_buf(b, w)
-	if err != nil {
-		return
-	}
+	n = write_buf(b, w) or_return
 
 	m: i64
 	if b.w-b.r < len(b.buf) {
-		if err = _reader_read_new_chunk(b); err != nil {
-			return
-		}
+		_reader_read_new_chunk(b) or_return
 	}
 
 	for b.r < b.w {
 		m, err = write_buf(b, w)
-		n += m
+		n += m // this needs to be done before returning
 		if err != nil {
 			return
 		}
-		if err = _reader_read_new_chunk(b); err != nil {
-			return
-		}
+		_reader_read_new_chunk(b) or_return
 	}
 
 	if b.err == .EOF {
@@ -403,9 +387,7 @@ reader_read_slice :: proc(b: ^Reader, delim: byte) -> (line: []byte, err: io.Err
 
 		s = b.w - b.r
 
-		if err = _reader_read_new_chunk(b); err != nil {
-			break
-		}
+		_reader_read_new_chunk(b) or_break
 	}
 
 	if i := len(line)-1; i >= 0 {

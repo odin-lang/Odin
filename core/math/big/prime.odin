@@ -1163,7 +1163,7 @@ internal_int_prime_next_prime :: proc(a: ^Int, trials: int, bbs_style: bool, all
 
 		/*
 			If we didn't pass the sieve and step == MP_MAX then skip test */
-		if (y && (step >= ((1 << _DIGIT_BITS) - kstep))) { continue }
+		if y && (step >= ((1 << _DIGIT_BITS) - kstep)) { continue }
 
 		if internal_int_is_prime(a, trials) or_return { break }
 	}

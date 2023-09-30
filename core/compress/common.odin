@@ -216,24 +216,16 @@ read_slice_from_stream :: #force_inline proc(z: ^Context_Stream_Input, size: int
 	// TODO: REMOVE ALL USE OF context.temp_allocator here
 	// the is literally no need for it
 	b := make([]u8, size, context.temp_allocator)
-	_, e := io.read(z.input, b[:])
-	if e == .None {
-		return b, .None
-	}
-
-	return []u8{}, e
+	_ = io.read(z.input, b[:]) or_return
+	return b, nil
 }
 
 read_slice :: proc{read_slice_from_memory, read_slice_from_stream}
 
 @(optimization_mode="speed")
 read_data :: #force_inline proc(z: ^$C, $T: typeid) -> (res: T, err: io.Error) {
-	b, e := read_slice(z, size_of(T))
-	if e == .None {
-		return (^T)(&b[0])^, .None
-	}
-
-	return T{}, e
+	b := read_slice(z, size_of(T)) or_return
+	return (^T)(&b[0])^, nil
 }
 
 @(optimization_mode="speed")
@@ -250,12 +242,8 @@ read_u8_from_memory :: #force_inline proc(z: ^Context_Memory_Input) -> (res: u8,
 
 @(optimization_mode="speed")
 read_u8_from_stream :: #force_inline proc(z: ^Context_Stream_Input) -> (res: u8, err: io.Error) {
-	b, e := read_slice_from_stream(z, 1)
-	if e == .None {
-		return b[0], .None
-	}
-
-	return 0, e
+	b := read_slice_from_stream(z, 1) or_return
+	return b[0], nil
 }
 
 read_u8 :: proc{read_u8_from_memory, read_u8_from_stream}
@@ -320,12 +308,9 @@ peek_data_from_stream :: #force_inline proc(z: ^Context_Stream_Input, $T: typeid
 	size :: size_of(T)
 
 	// Get current position to read from.
-	curr, e1 := z.input->impl_seek(0, .Current)
-	if e1 != .None {
-		return T{}, e1
-	}
-	r, e2 := io.to_reader_at(z.input)
-	if !e2 {
+	curr := z.input->impl_seek(0, .Current) or_return
+	r, e1 := io.to_reader_at(z.input)
+	if !e1 {
 		return T{}, .Empty
 	}
 	when size <= 128 {
@@ -333,8 +318,8 @@ peek_data_from_stream :: #force_inline proc(z: ^Context_Stream_Input, $T: typeid
 	} else {
 		b := make([]u8, size, context.temp_allocator)
 	}
-	_, e3 := io.read_at(r, b[:], curr)
-	if e3 != .None {
+	_, e2 := io.read_at(r, b[:], curr)
+	if e2 != .None {
 		return T{}, .Empty
 	}
 
@@ -347,16 +332,9 @@ peek_data_at_offset_from_stream :: #force_inline proc(z: ^Context_Stream_Input, 
 	size :: size_of(T)
 
 	// Get current position to return to.
-	cur_pos, e1 := z.input->impl_seek(0, .Current)
-	if e1 != .None {
-		return T{}, e1
-	}
-
+	cur_pos := z.input->impl_seek(0, .Current) or_return
 	// Seek to offset.
-	pos, e2 := z.input->impl_seek(offset, .Start)
-	if e2 != .None {
-		return T{}, e2
-	}
+	pos := z.input->impl_seek(offset, .Start) or_return
 
 	r, e3 := io.to_reader_at(z.input)
 	if !e3 {
@@ -465,7 +443,7 @@ peek_bits_lsb_from_memory :: #force_inline proc(z: ^Context_Memory_Input, width:
 	if z.num_bits < u64(width) {
 		refill_lsb(z)
 	}
-	return u32(z.code_buffer & ~(~u64(0) << width))
+	return u32(z.code_buffer &~ (~u64(0) << width))
 }
 
 @(optimization_mode="speed")
@@ -473,7 +451,7 @@ peek_bits_lsb_from_stream :: #force_inline proc(z: ^Context_Stream_Input, width:
 	if z.num_bits < u64(width) {
 		refill_lsb(z)
 	}
-	return u32(z.code_buffer & ~(~u64(0) << width))
+	return u32(z.code_buffer &~ (~u64(0) << width))
 }
 
 peek_bits_lsb :: proc{peek_bits_lsb_from_memory, peek_bits_lsb_from_stream}
@@ -481,13 +459,13 @@ peek_bits_lsb :: proc{peek_bits_lsb_from_memory, peek_bits_lsb_from_stream}
 @(optimization_mode="speed")
 peek_bits_no_refill_lsb_from_memory :: #force_inline proc(z: ^Context_Memory_Input, width: u8) -> u32 {
 	assert(z.num_bits >= u64(width))
-	return u32(z.code_buffer & ~(~u64(0) << width))
+	return u32(z.code_buffer &~ (~u64(0) << width))
 }
 
 @(optimization_mode="speed")
 peek_bits_no_refill_lsb_from_stream :: #force_inline proc(z: ^Context_Stream_Input, width: u8) -> u32 {
 	assert(z.num_bits >= u64(width))
-	return u32(z.code_buffer & ~(~u64(0) << width))
+	return u32(z.code_buffer &~ (~u64(0) << width))
 }
 
 peek_bits_no_refill_lsb :: proc{peek_bits_no_refill_lsb_from_memory, peek_bits_no_refill_lsb_from_stream}
