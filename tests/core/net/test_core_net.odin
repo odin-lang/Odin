@@ -17,6 +17,7 @@ import "core:net"
 import "core:strconv"
 import "core:time"
 import "core:thread"
+import "core:os"
 
 _, _ :: time, thread
 
@@ -73,6 +74,10 @@ main :: proc() {
 	fmt.printf("%v/%v tests successful.\n", TEST_count - TEST_fail, TEST_count)
 
 	print_tracking_allocator_report()
+
+	if TEST_fail > 0 {
+		os.exit(1)
+	}
 }
 
 @test
