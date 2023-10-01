@@ -2810,7 +2810,7 @@ gb_internal bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, T
 					}
 				}
 
-				if (!is_sparse && t->EnumeratedArray.count > bt->Enum.fields.count) {
+				if (!is_sparse && t->EnumeratedArray.count > bt->Enum.fields.count && bt->Enum.fields.count > 0) {
 					error(e, "Non-contiguous enumeration used as an index in an enumerated array");
 					long long ea_count   = cast(long long)t->EnumeratedArray.count;
 					long long enum_count = cast(long long)bt->Enum.fields.count;
