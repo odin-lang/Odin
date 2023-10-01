@@ -2797,7 +2797,7 @@ gb_internal bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, T
 				Type *bt = base_type(index);
 				GB_ASSERT(bt->kind == Type_Enum);
 
-				Type *t = alloc_type_enumerated_array(elem, index, bt->Enum.min_value, bt->Enum.max_value, Token_Invalid);
+				Type *t = alloc_type_enumerated_array(elem, index, bt->Enum.min_value, bt->Enum.max_value, bt->Enum.fields.count, Token_Invalid);
 
 				bool is_sparse = false;
 				if (at->tag != nullptr) {
