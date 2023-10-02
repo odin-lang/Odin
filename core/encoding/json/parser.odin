@@ -265,6 +265,8 @@ parse_object_body :: proc(p: ^Parser, end_token: Token_Kind) -> (obj: Object, er
 		}
 
 		insert_success := runtime.map_insert(&obj, key, elem)
+		// NOTE(gonz): we'd rather check specifically for an allocation error here but
+		// `map_insert` doesn't differentiate; we can only check for `nil`
 		if insert_success == nil {
 			return nil, .Out_Of_Memory
 		}
