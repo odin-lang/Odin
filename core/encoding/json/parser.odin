@@ -3,6 +3,7 @@ package json
 import "core:mem"
 import "core:unicode/utf8"
 import "core:unicode/utf16"
+import "core:runtime"
 import "core:strconv"
 
 Parser :: struct {
@@ -263,13 +264,10 @@ parse_object_body :: proc(p: ^Parser, end_token: Token_Kind) -> (obj: Object, er
 			return
 		}
 
-		if len(obj) == cap(obj) {
-			reserve_error := reserve(&obj, max(1, cap(obj) * 2))
-			if reserve_error != nil {
-				return nil, .Out_Of_Memory
-			}
+		insert_success := runtime.map_insert(&obj, key, elem)
+		if insert_success == nil {
+			return nil, .Out_Of_Memory
 		}
-		obj[key] = elem
 		
 		if parse_comma(p) {
 			break
