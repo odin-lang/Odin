@@ -3,7 +3,6 @@ package json
 import "core:mem"
 import "core:unicode/utf8"
 import "core:unicode/utf16"
-import "core:runtime"
 import "core:strconv"
 
 Parser :: struct {
