@@ -152,9 +152,9 @@ aprintln :: proc(args: ..any, sep := " ") -> string {
 //
 // 	Returns: A formatted string. The returned string must be freed accordingly.
 //
-aprintf :: proc(fmt: string, args: ..any) -> string {
+aprintf :: proc(fmt: string, args: ..any, allocator := context.allocator) -> string {
 	str: strings.Builder
-	strings.builder_init(&str)
+	strings.builder_init(&str, allocator)
 	sbprintf(&str, fmt, ..args)
 	return strings.to_string(str)
 }
