@@ -263,6 +263,12 @@ parse_object_body :: proc(p: ^Parser, end_token: Token_Kind) -> (obj: Object, er
 			return
 		}
 
+		if len(obj) == cap(obj) {
+			reserve_error := reserve(&obj, max(1, cap(obj) * 2))
+			if reserve_error != nil {
+				return nil, .Out_Of_Memory
+			}
+		}
 		obj[key] = elem
 		
 		if parse_comma(p) {
