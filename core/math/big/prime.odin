@@ -1250,7 +1250,10 @@ internal_random_prime :: proc(a: ^Int, size_in_bits: int, trials: int, flags := 
 		/*
 			Is it prime?
 		*/
-		internal_int_is_prime(a, trials) or_return or_continue
+		res := internal_int_is_prime(a, trials) or_return
+		if !res {
+			continue
+		}
 
 		if .Safe in flags {
 			/*
@@ -1262,9 +1265,10 @@ internal_random_prime :: proc(a: ^Int, size_in_bits: int, trials: int, flags := 
 			/*
 				Is it prime?
 			*/
-			if internal_int_is_prime(a, trials) or_return {
-				break
-			}
+			res = internal_int_is_prime(a, trials) or_return
+		}
+		if res {
+			break
 		}
 	}
 
