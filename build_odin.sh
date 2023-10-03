@@ -36,26 +36,15 @@ config_darwin() {
 	local ARCH=$(uname -m)
 	: ${LLVM_CONFIG=llvm-config}
 
-	# allow for arm only llvm's with version 13
-	if [ "${ARCH}" == "arm64" ]; then
-		MIN_LLVM_VERSION=("13.0.0")
-	else
-		# allow for x86 / amd64 all llvm versions beginning from 11
-		MIN_LLVM_VERSION=("11.1.0")
-	fi
-
+	MIN_LLVM_VERSION=("17.0.1")
 	if [ $(version $($LLVM_CONFIG --version)) -lt $(version $MIN_LLVM_VERSION) ]; then
-		if [ "${ARCH}" == "arm64" ]; then
-			panic "Requirement: llvm-config must be base version 13 for arm64"
-		else
-			panic "Requirement: llvm-config must be base version greater than 11 for amd64/x86"
-		fi
+		panic "Requirement: llvm-config must be base version greater than 16"
 	fi
 
-	MAX_LLVM_VERSION=("14.999.999")
+	MAX_LLVM_VERSION=("17.999.999")
 	if [ $(version $($LLVM_CONFIG --version)) -gt $(version $MAX_LLVM_VERSION) ]; then
 		echo "Tried to use " $(which $LLVM_CONFIG) "version" $($LLVM_CONFIG --version)
-		panic "Requirement: llvm-config must be base version smaller than 15"
+		panic "Requirement: llvm-config must be base version smaller than 18"
 	fi
 
 	LDFLAGS="$LDFLAGS -liconv -ldl -framework System"

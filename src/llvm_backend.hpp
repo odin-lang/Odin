@@ -1,12 +1,12 @@
-#if defined(GB_SYSTEM_WINDOWS)
-#include "llvm-c/Core.h"
-#include "llvm-c/ExecutionEngine.h"
-#include "llvm-c/Target.h"
-#include "llvm-c/Analysis.h"
-#include "llvm-c/Object.h"
-#include "llvm-c/BitWriter.h"
-#include "llvm-c/DebugInfo.h"
-#include "llvm-c/Transforms/PassBuilder.h"
+#if defined(GB_SYSTEM_WINDOWS) || defined(GB_SYSTEM_OSX)
+#include <llvm-c/Core.h>
+#include <llvm-c/ExecutionEngine.h>
+#include <llvm-c/Target.h>
+#include <llvm-c/Analysis.h>
+#include <llvm-c/Object.h>
+#include <llvm-c/BitWriter.h>
+#include <llvm-c/DebugInfo.h>
+#include <llvm-c/Transforms/PassBuilder.h>
 #else
 #include <llvm-c/Core.h>
 #include <llvm-c/ExecutionEngine.h>
@@ -156,8 +156,8 @@ struct lbModule {
 
 	RwMutex values_mutex;
 
-	PtrMap<Entity *, lbValue> values;           
-	PtrMap<Entity *, lbAddr>  soa_values;       
+	PtrMap<Entity *, lbValue> values;
+	PtrMap<Entity *, lbAddr>  soa_values;
 	StringMap<lbValue>  members;
 	StringMap<lbProcedure *> procedures;
 	PtrMap<LLVMValueRef, Entity *> procedure_values;
@@ -165,7 +165,7 @@ struct lbModule {
 
 	StringMap<LLVMValueRef> const_strings;
 
-	PtrMap<Type *, struct lbFunctionType *> function_type_map; 
+	PtrMap<Type *, struct lbFunctionType *> function_type_map;
 
 	PtrMap<Type *, lbProcedure *> equal_procs;
 	PtrMap<Type *, lbProcedure *> hasher_procs;
@@ -185,7 +185,7 @@ struct lbModule {
 	LLVMMetadataRef debug_compile_unit;
 
 	RecursiveMutex debug_values_mutex;
-	PtrMap<void *, LLVMMetadataRef> debug_values; 
+	PtrMap<void *, LLVMMetadataRef> debug_values;
 
 	Array<lbIncompleteDebugType> debug_incomplete_types;
 
@@ -204,11 +204,11 @@ struct lbGenerator : LinkerData {
 	CheckerInfo *info;
 
 	PtrMap<void *, lbModule *> modules; // key is `AstPackage *` (`void *` is used for future use)
-	PtrMap<LLVMContextRef, lbModule *> modules_through_ctx; 
+	PtrMap<LLVMContextRef, lbModule *> modules_through_ctx;
 	lbModule default_module;
 
 	RecursiveMutex anonymous_proc_lits_mutex;
-	PtrMap<Ast *, lbProcedure *> anonymous_proc_lits; 
+	PtrMap<Ast *, lbProcedure *> anonymous_proc_lits;
 
 	std::atomic<u32> global_array_index;
 	std::atomic<u32> global_generated_index;

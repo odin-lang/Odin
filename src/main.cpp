@@ -86,11 +86,11 @@ gb_global Timings global_timings = {0};
 
 #if defined(GB_SYSTEM_OSX)
 	#include <llvm/Config/llvm-config.h>
-	#if LLVM_VERSION_MAJOR < 11
-	#error LLVM Version 11+ is required => "brew install llvm@11"
+	#if LLVM_VERSION_MAJOR < 17
+	#error LLVM Version 17+ is required => "brew install llvm"
 	#endif
-	#if LLVM_VERSION_MAJOR > 14
-	#error LLVM Version 11..=14 is required => "brew install llvm@14"
+	#if LLVM_VERSION_MAJOR > 18
+	#error LLVM Version 11..=18 is required => "brew install llvm@17"
 	#endif
 #endif
 
