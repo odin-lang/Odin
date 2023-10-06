@@ -97,9 +97,9 @@ _enumerate_interfaces :: proc(allocator := context.allocator) -> (interfaces: []
  			state |= {.Up}
  		}
 
- 		if .DORMANT in ifaddr.flags {
+ 		/*if .DORMANT in ifaddr.flags {
  			state |= {.Dormant}
- 		}
+ 		}*/
 
  		if .LOOPBACK in ifaddr.flags {
  			state |= {.Loopback}

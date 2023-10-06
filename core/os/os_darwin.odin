@@ -365,15 +365,6 @@ SIOCGIFFLAG :: enum c.int {
 	NOARP          = 7,  /* No address resolution protocol.  */
 	PROMISC        = 8,  /* Receive all packets.  */
 	ALL_MULTI      = 9,  /* Receive all multicast packets. Unimplemented. */
-	MASTER         = 10, /* Master of a load balancer.  */
-	SLAVE          = 11, /* Slave of a load balancer.  */
-	MULTICAST      = 12, /* Supports multicast.  */
-	PORTSEL        = 13, /* Can set media type.  */
-	AUTOMEDIA      = 14, /* Auto media select active.  */
-	DYNAMIC        = 15, /* Dialup device with changing addresses.  */
-	LOWER_UP       = 16,
-	DORMANT        = 17,
-	ECHO           = 18,
 }
 SIOCGIFFLAGS :: bit_set[SIOCGIFFLAG; c.int]
 
