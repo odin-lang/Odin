@@ -1423,7 +1423,7 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 					wmi.storeI16(off(2), e.button);
 					wmi.storeU16(off(2), e.buttons);
 				} else if (e instanceof KeyboardEvent) {
-					// Note: those strigs are constructed
+					// Note: those strings are constructed
 					// on the native side from buffers that
 					// are filled later, so skip them 
 					const keyPtr  = off(W*2, W);
