@@ -9,6 +9,10 @@ function getElement(name) {
 	return undefined;
 }
 
+function stripNewline(str) {
+    return str.replace(/\n$/, ' ')
+}
+
 class WasmMemoryInterface {
 	constructor() {
 		this.memory = null;
