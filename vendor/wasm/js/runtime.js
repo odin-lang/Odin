@@ -77,7 +77,7 @@ class WasmMemoryInterface {
 
 	loadString(ptr, len) {
 		const bytes = this.loadBytes(ptr, len);
-		return new TextDecoder("utf-8").decode(bytes);
+		return new TextDecoder().decode(bytes);
 	}
 
 	storeU8(addr, value)  { this.mem.setUint8  (addr, value, true); }
@@ -102,7 +102,7 @@ class WasmMemoryInterface {
 
 	storeString(addr, value) {
 		const bytes = this.loadBytes(addr, value.length);
-		new TextEncoder("utf-8").encodeInto(value, bytes);
+		new TextEncoder().encodeInto(value, bytes);
 	}
 };
 
@@ -570,7 +570,7 @@ class WebGLInterface {
 				if (buf_len > 0 && buf_ptr) {
 					let n = Math.min(buf_len, log.length);
 					log = log.substring(0, n);
-					this.mem.loadBytes(buf_ptr, buf_len).set(new TextEncoder("utf-8").encode(log))
+					this.mem.loadBytes(buf_ptr, buf_len).set(new TextEncoder().encode(log))
 
 					this.mem.storeInt(length_ptr, n);
 				}
@@ -583,7 +583,7 @@ class WebGLInterface {
 				if (buf_len > 0 && buf_ptr) {
 					let n = Math.min(buf_len, log.length);
 					log = log.substring(0, n);
-					this.mem.loadBytes(buf_ptr, buf_len).set(new TextEncoder("utf-8").encode(log))
+					this.mem.loadBytes(buf_ptr, buf_len).set(new TextEncoder().encode(log))
 
 					this.mem.storeInt(length_ptr, n);
 				}
@@ -1149,7 +1149,7 @@ class WebGLInterface {
 
 				let n = Math.min(buf_len, name.length);
 				name = name.substring(0, n);
-				this.mem.loadBytes(buf_ptr, buf_len).set(new TextEncoder("utf-8").encode(name))
+				this.mem.loadBytes(buf_ptr, buf_len).set(new TextEncoder().encode(name))
 				this.mem.storeInt(length_ptr, n);
 			},
 			UniformBlockBinding: (program, uniformBlockIndex, uniformBlockBinding) => {
@@ -1342,14 +1342,14 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 				}
 			},
 
-			sqrt:    (x) => Math.sqrt(x),
-			sin:     (x) => Math.sin(x),
-			cos:     (x) => Math.cos(x),
-			pow:     (x, power) => Math.pow(x, power),
+			sqrt:    Math.sqrt,
+			sin:     Math.sin,
+			cos:     Math.cos,
+			pow:     Math.pow,
 			fmuladd: (x, y, z) => x*y + z,
-			ln:      (x) => Math.log(x),
-			exp:     (x) => Math.exp(x),
-			ldexp:   (x) => Math.ldexp(x),
+			ln:      Math.log,
+			exp:     Math.exp,
+			ldexp:   (x, exp) => x * Math.pow(2, exp),
 		},
 		"odin_dom": {
 			init_event_raw: (ep) => {
@@ -1569,7 +1569,7 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 					if (buf_len > 0 && buf_ptr) {
 						let n = Math.min(buf_len, str.length);
 						str = str.substring(0, n);
-						this.mem.loadBytes(buf_ptr, buf_len).set(new TextEncoder("utf-8").encode(str))
+						this.mem.loadBytes(buf_ptr, buf_len).set(new TextEncoder().encode(str))
 						return n;
 					}
 				}
