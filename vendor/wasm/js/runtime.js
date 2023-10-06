@@ -47,8 +47,8 @@ class WasmMemoryInterface {
 	}
 
 
-	loadU8(addr) { return this.mem.getUint8  (addr, true); }
-	loadI8(addr) { return this.mem.getInt8   (addr, true); }
+	loadU8(addr)  { return this.mem.getUint8  (addr); }
+	loadI8(addr)  { return this.mem.getInt8   (addr); }
 	loadU16(addr) { return this.mem.getUint16 (addr, true); }
 	loadI16(addr) { return this.mem.getInt16  (addr, true); }
 	loadU32(addr) { return this.mem.getUint32 (addr, true); }
@@ -80,8 +80,8 @@ class WasmMemoryInterface {
 		return new TextDecoder().decode(bytes);
 	}
 
-	storeU8(addr, value)  { this.mem.setUint8  (addr, value, true); }
-	storeI8(addr, value)  { this.mem.setInt8   (addr, value, true); }
+	storeU8(addr, value)  { this.mem.setUint8  (addr, value); }
+	storeI8(addr, value)  { this.mem.setInt8   (addr, value); }
 	storeU16(addr, value) { this.mem.setUint16 (addr, value, true); }
 	storeI16(addr, value) { this.mem.setInt16  (addr, value, true); }
 	storeU32(addr, value) { this.mem.setUint32 (addr, value, true); }
