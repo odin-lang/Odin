@@ -10,7 +10,7 @@ function getElement(name) {
 }
 
 function stripNewline(str) {
-    return str.replace(/\n$/, ' ')
+    return str.replace(/\n/, ' ')
 }
 
 class WasmMemoryInterface {
