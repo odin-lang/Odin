@@ -983,7 +983,7 @@ gb_internal Type *alloc_type_matrix(Type *elem, i64 row_count, i64 column_count,
 }
 
 
-gb_internal Type *alloc_type_enumerated_array(Type *elem, Type *index, ExactValue const *min_value, ExactValue const *max_value, TokenKind op) {
+gb_internal Type *alloc_type_enumerated_array(Type *elem, Type *index, ExactValue const *min_value, ExactValue const *max_value, isize count, TokenKind op) {
 	Type *t = alloc_type(Type_EnumeratedArray);
 	t->EnumeratedArray.elem = elem;
 	t->EnumeratedArray.index = index;
@@ -993,7 +993,11 @@ gb_internal Type *alloc_type_enumerated_array(Type *elem, Type *index, ExactValu
 	gb_memmove(t->EnumeratedArray.max_value, max_value, gb_size_of(ExactValue));
 	t->EnumeratedArray.op = op;
 
-	t->EnumeratedArray.count = 1 + exact_value_to_i64(exact_value_sub(*max_value, *min_value));
+	if (count == 0) {
+		t->EnumeratedArray.count = 0;
+	} else {
+		t->EnumeratedArray.count = 1 + exact_value_to_i64(exact_value_sub(*max_value, *min_value));
+	}
 	return t;
 }
 
