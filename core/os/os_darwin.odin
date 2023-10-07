@@ -354,6 +354,30 @@ in6_addr :: struct #packed {
 	s6_addr: [16]u8,
 }
 
+SIOCGIFFLAG :: enum c.int {
+	UP             = 0,  /* Interface is up.  */
+	BROADCAST      = 1,  /* Broadcast address valid.  */
+	DEBUG          = 2,  /* Turn on debugging.  */
+	LOOPBACK       = 3,  /* Is a loopback net.  */
+	POINT_TO_POINT = 4,  /* Interface is point-to-point link.  */
+	NO_TRAILERS    = 5,  /* Avoid use of trailers.  */
+	RUNNING        = 6,  /* Resources allocated.  */
+	NOARP          = 7,  /* No address resolution protocol.  */
+	PROMISC        = 8,  /* Receive all packets.  */
+	ALL_MULTI      = 9,  /* Receive all multicast packets. Unimplemented. */
+}
+SIOCGIFFLAGS :: bit_set[SIOCGIFFLAG; c.int]
+
+ifaddrs :: struct {
+	next:              ^ifaddrs,
+	name:              cstring,
+	flags:             SIOCGIFFLAGS,
+	address:           ^SOCKADDR,
+	netmask:           ^SOCKADDR,
+	broadcast_or_dest: ^SOCKADDR,  // Broadcast or Point-to-Point address
+	data:              rawptr,     // Address-specific data.
+}
+
 Timeval :: struct {
 	seconds: i64,
 	microseconds: int,
@@ -473,6 +497,9 @@ foreign libc {
 	@(link_name="sendto")           _unix_sendto        :: proc(socket: int, buffer: rawptr, buffer_len: c.size_t, flags: int, addr: rawptr, addr_len: socklen_t) -> c.ssize_t ---
 	@(link_name="send")             _unix_send          :: proc(socket: int, buffer: rawptr, buffer_len: c.size_t, flags: int) -> c.ssize_t ---
 	@(link_name="shutdown")         _unix_shutdown      :: proc(socket: int, how: int) -> int ---
+
+	@(link_name="getifaddrs")       _getifaddrs         :: proc(ifap: ^^ifaddrs) -> (c.int) ---
+	@(link_name="freeifaddrs")      _freeifaddrs        :: proc(ifa: ^ifaddrs) ---
 
 	@(link_name="exit")    _unix_exit :: proc(status: c.int) -> ! ---
 }
