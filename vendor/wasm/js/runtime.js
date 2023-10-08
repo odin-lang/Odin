@@ -558,7 +558,9 @@ class WebGLInterface {
 			},
 
 
-
+			GetParameter: (pname) => {
+				return this.ctx.getParameter(pname);
+			},
 			GetProgramParameter: (program, pname) => {
 				return this.ctx.getProgramParameter(this.programs[program], pname)
 			},
