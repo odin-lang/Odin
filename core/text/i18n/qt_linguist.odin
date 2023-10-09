@@ -30,9 +30,12 @@ TS_XML_Options := xml.Options{
 parse_qt_linguist_from_bytes :: proc(data: []byte, options := DEFAULT_PARSE_OPTIONS, pluralizer: proc(int) -> int = nil, allocator := context.allocator) -> (translation: ^Translation, err: Error) {
 	context.allocator = allocator
 
-	get_str :: proc(val: xml.Value) -> (str: string, err: Error) {
+	get_str :: proc(val: xml.Value, intern: ^strings.Intern) -> (str: string, err: Error) {
 		v, ok := val.(string)
 		if ok {
+			if intern != nil {
+				v, _ = strings.intern_get(intern, v)
+			}
 			return v, .None
 		}
 		return "", .Bad_Str
@@ -79,8 +82,7 @@ parse_qt_linguist_from_bytes :: proc(data: []byte, options := DEFAULT_PARSE_OPTI
 
 		section_name, _ := strings.intern_get(&translation.intern, "")
 		if !options.merge_sections {
-			value_text := get_str(ts.elements[section_name_id].value[0]) or_return
-			section_name, _ = strings.intern_get(&translation.intern, value_text)
+			section_name = get_str(ts.elements[section_name_id].value[0], &translation.intern) or_return
 		}
 
 		if section_name not_in translation.k_v {
@@ -108,13 +110,11 @@ parse_qt_linguist_from_bytes :: proc(data: []byte, options := DEFAULT_PARSE_OPTI
 				return translation, .TS_File_Expected_Translation
 			}
 
-			source    := get_str(ts.elements[source_id].value[0]) or_return
-			source, _  = strings.intern_get(&translation.intern, source)
+			source := get_str(ts.elements[source_id].value[0], &translation.intern) or_return
 
 			xlat := ""
 			if !has_plurals {
-				xlat    = get_str(ts.elements[translation_id].value[0]) or_return
-				xlat, _ = strings.intern_get(&translation.intern, xlat)
+				xlat = get_str(ts.elements[translation_id].value[0], &translation.intern) or_return
 			}
 
 			if source in section {
@@ -140,8 +140,7 @@ parse_qt_linguist_from_bytes :: proc(data: []byte, options := DEFAULT_PARSE_OPTI
 				num_plurals = 0
 				for {
 					numerus_id := xml.find_child_by_ident(ts, translation_id, "numerusform", num_plurals) or_break
-					numerus := get_str(ts.elements[numerus_id].value[0]) or_return
-					numerus, _ = strings.intern_get(&translation.intern, numerus)
+					numerus := get_str(ts.elements[numerus_id].value[0], &translation.intern) or_return
 					section[source][num_plurals] = numerus
 
 					num_plurals += 1

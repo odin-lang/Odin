@@ -17,6 +17,7 @@ import "core:net"
 import "core:strconv"
 import "core:time"
 import "core:thread"
+import "core:os"
 
 _, _ :: time, thread
 
@@ -73,6 +74,10 @@ main :: proc() {
 	fmt.printf("%v/%v tests successful.\n", TEST_count - TEST_fail, TEST_count)
 
 	print_tracking_allocator_report()
+
+	if TEST_fail > 0 {
+		os.exit(1)
+	}
 }
 
 @test
@@ -516,25 +521,61 @@ client_sends_server_data :: proc(t: ^testing.T) {
 URL_Test :: struct {
 	scheme, host, path: string,
 	queries: map[string]string,
-	url: string,
+	url: []string,
 }
 
 @test
 split_url_test :: proc(t: ^testing.T) {
 	test_cases := []URL_Test{
-		{ "http", "example.com", "/", {}, "http://example.com" },
-		{ "https", "odin-lang.org", "/", {}, "https://odin-lang.org" },
-		{ "https", "odin-lang.org", "/docs/", {}, "https://odin-lang.org/docs/" },
-		{ "https", "odin-lang.org", "/docs/overview", {}, "https://odin-lang.org/docs/overview" },
-		{ "http", "example.com", "/", {"a" = "b"}, "http://example.com?a=b" },
-		{ "http", "example.com", "/", {"a" = ""}, "http://example.com?a" },
-		{ "http", "example.com", "/", {"a" = "b", "c" = "d"}, "http://example.com?a=b&c=d" },
-		{ "http", "example.com", "/", {"a" = "", "c" = "d"}, "http://example.com?a&c=d" },
-		{ "http", "example.com", "/example", {"a" = "", "b" = ""}, "http://example.com/example?a&b" },
+		{
+			"http", "example.com", "/",
+			{},
+			{"http://example.com"},
+		},
+		{
+			"https", "odin-lang.org", "/",
+			{},
+			{"https://odin-lang.org"},
+		},
+		{
+			"https", "odin-lang.org", "/docs/",
+			{},
+			{"https://odin-lang.org/docs/"},
+		},
+		{
+			"https", "odin-lang.org", "/docs/overview",
+			{},
+			{"https://odin-lang.org/docs/overview"},
+		},
+		{
+			"http", "example.com", "/",
+			{"a" = "b"},
+			{"http://example.com?a=b"},
+		},
+		{
+			"http", "example.com", "/",
+			{"a" = ""},
+			{"http://example.com?a"},
+		},
+		{
+			"http", "example.com", "/",
+			{"a" = "b", "c" = "d"},
+			{"http://example.com?a=b&c=d"},
+		},
+		{
+			"http", "example.com", "/",
+			{"a" = "", "c" = "d"},
+			{"http://example.com?a&c=d"},
+		},
+		{
+			"http", "example.com", "/example",
+			{"a" = "", "b" = ""},
+			{"http://example.com/example?a&b"},
+		},
 	}
 
 	for test in test_cases {
-		scheme, host, path, queries := net.split_url(test.url)
+		scheme, host, path, queries := net.split_url(test.url[0])
 		defer {
 			delete(queries)
 			delete(test.queries)
@@ -560,15 +601,51 @@ split_url_test :: proc(t: ^testing.T) {
 @test
 join_url_test :: proc(t: ^testing.T) {
 	test_cases := []URL_Test{
-		{ "http", "example.com", "", {}, "http://example.com" },
-		{ "https", "odin-lang.org", "", {}, "https://odin-lang.org" },
-		{ "https", "odin-lang.org", "docs/", {}, "https://odin-lang.org/docs/" },
-		{ "https", "odin-lang.org", "/docs/overview", {}, "https://odin-lang.org/docs/overview" },
-		{ "http", "example.com", "", {"a" = "b"}, "http://example.com?a=b" },
-		{ "http", "example.com", "", {"a" = ""}, "http://example.com?a" },
-		{ "http", "example.com", "", {"a" = "b", "c" = "d"}, "http://example.com?a=b&c=d" },
-		{ "http", "example.com", "", {"a" = "", "c" = "d"}, "http://example.com?a&c=d" },
-		{ "http", "example.com", "example", {"a" = "", "b" = ""}, "http://example.com/example?a&b" },
+		{
+			"http", "example.com", "/",
+			{},
+			{"http://example.com/"},
+		},
+		{
+			"https", "odin-lang.org", "/",
+			{},
+			{"https://odin-lang.org/"},
+		},
+		{
+			"https", "odin-lang.org", "/docs/",
+			{},
+			{"https://odin-lang.org/docs/"},
+		},
+		{
+			"https", "odin-lang.org", "/docs/overview",
+			{},
+			{"https://odin-lang.org/docs/overview"},
+		},
+		{
+			"http", "example.com", "/",
+			{"a" = "b"},
+			{"http://example.com/?a=b"},
+		},
+		{
+			"http", "example.com", "/",
+			{"a" = ""},
+			{"http://example.com/?a"},
+		},
+		{
+			"http", "example.com", "/",
+			{"a" = "b", "c" = "d"},
+			{"http://example.com/?a=b&c=d", "http://example.com/?c=d&a=b"},
+		},
+		{
+			"http", "example.com", "/",
+			{"a" = "", "c" = "d"},
+			{"http://example.com/?a&c=d", "http://example.com/?c=d&a"},
+		},
+		{
+			"http", "example.com", "/example",
+			{"a" = "", "b" = ""},
+			{"http://example.com/example?a&b", "http://example.com/example?b&a"},
+		},
 	}
 
 	for test in test_cases {
@@ -577,9 +654,11 @@ join_url_test :: proc(t: ^testing.T) {
 			delete(url)
 			delete(test.queries)
 		}
-
-		okay := url == test.url
-		msg := fmt.tprintf("Expected `net.join_url` to return %s, got %s", test.url, url)
-		expect(t, okay, msg)
+		pass := false
+		for test_url in test.url {
+			pass |= url == test_url
+		}
+		msg := fmt.tprintf("Expected `net.join_url` to return one of %s, got %s", test.url, url)
+		expect(t, pass, msg)
 	}
 }
