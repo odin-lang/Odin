@@ -122,12 +122,14 @@ Compiler_Flag :: enum {
 
     // Do something different with these?
     Ignore_Warnings,
-    Warning_As_Errors,
+    Warnings_As_Errors,
     Terse_Errors,
     //
 
     Foreign_Error_Procedures,
     Ignore_Vs_Search,
+    No_Entry_Point,
+    Show_System_Calls,
 }
 
 Compiler_Flags :: bit_set[Compiler_Flag]
@@ -192,3 +194,18 @@ Command :: struct {
     command: Command_Proc,
 }
 
+Default_Target_Mode :: enum {
+    Release,
+    Debug,
+}
+
+Default_Target :: struct {
+    platform: Platform,
+    mode: Default_Target_Mode,
+}
+
+
+Project :: struct($Target: typeid) {
+    targets: [dynamic]Target,
+    configure_target_proc: proc(project: Project(Target), target: Target) -> Config, // There should be a way to skip a target. Maybe(Config)?
+}
