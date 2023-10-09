@@ -5848,6 +5848,8 @@ gb_internal void check_deferred_procedures(Checker *c) {
 }
 
 gb_internal void check_unique_package_names(Checker *c) {
+	ERROR_BLOCK();
+
 	StringMap<AstPackage *> pkgs = {}; // Key: package name
 	string_map_init(&pkgs, 2*c->info.packages.count);
 	defer (string_map_destroy(&pkgs));
