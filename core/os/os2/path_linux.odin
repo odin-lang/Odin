@@ -219,4 +219,3 @@ _get_full_path :: proc(fd: int, allocator: runtime.Allocator) -> string {
 	}
 	return fullpath
 }
-

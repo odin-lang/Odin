@@ -46,7 +46,9 @@ Process :: struct {
 Process_Attributes :: struct {
 	dir: string,
 	env: []string,
-	files: []^File,
+	stdin: ^File,
+	stdout: ^File,
+	stderr: ^File,
 	sys: ^Process_Attributes_OS_Specific,
 }
 
@@ -59,8 +61,6 @@ Process_State :: struct {
 	user_time:   time.Duration,
 	sys:         rawptr,
 }
-
-//Signal :: #type proc()
 
 Signal :: enum {
 	Abort,
@@ -82,7 +82,14 @@ Signal_Handler :: union {
 	Signal_Handler_Special,
 }
 
-process_find :: proc(pid: int) -> (^Process, Error) {
+Process_Flag :: enum {
+	Pipe_Stdin,
+	Pipe_Stdout,
+	Pipe_Stderr,
+}
+Process_Flags :: bit_set[Process_Flag]
+
+process_find :: proc(pid: int) -> (Process, Error) {
 	return _process_find(pid)
 }
 
@@ -90,12 +97,8 @@ process_get_state :: proc(p: Process) -> (Process_State, Error) {
 	return _process_get_state(p)
 }
 
-process_get_attributes :: proc(p: Process) -> (Process_Attributes, Error) {
-	return _process_get_attributes(p)
-}
-
-process_start :: proc(name: string, argv: []string, attr: ^Process_Attributes = nil) -> (Process, Error) {
-	return _process_start(name, argv, attr)
+process_start :: proc(name: string, argv: []string, flags: Process_Flags, attr: ^Process_Attributes = nil) -> (Process, Error) {
+	return _process_start(name, argv, flags, attr)
 }
 
 process_release :: proc(p: ^Process) -> Error {

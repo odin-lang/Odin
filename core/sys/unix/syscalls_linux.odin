@@ -1807,11 +1807,6 @@ SA_RESETHAND      :: 0x80000000
 SA_NOMASK         :: SA_NODEFER
 SA_ONESHOT        :: SA_RESETHAND
 
-// special signal handler
-SIG_DFL :: uintptr(0)
-SIG_IGN :: uintptr(1)
-SIG_ERR :: ~uintptr(0) // -1
-
 // In the kernel, clock_t in _sigchld is i64 aligned to 4 on i386.
 // We cannot align primitives, so we just pack the struct when i386.
 when ODIN_ARCH == .i386 {
@@ -1843,7 +1838,7 @@ SIGINFO_SIZE :: 128
 // that allow the user to access the members as if it were a
 // giant struct without the unions. Here, we can actually
 // access the desired names with the `using _` convention.
-siginfo_t :: struct #align size_of(rawptr) {
+siginfo_t :: struct #align(size_of(rawptr)) {
 	si_signo: i32,
 	si_errno: i32,
 	si_code:  i32,
@@ -1903,6 +1898,11 @@ sighandler_t      :: #type proc "c" (sig: c.int)
 sighandler_info_t :: #type proc "c" (sig: c.int, info: ^siginfo_t, ucontext: rawptr)
 sigrestore_t      :: #type proc "c" () -> !
 sigset_t          :: u64
+
+// special signal handler
+SIG_DFL :: uintptr(0)
+SIG_IGN :: uintptr(1)
+SIG_ERR :: ~uintptr(0) // -1
 
 Sigaction :: struct {
 	using _ :  struct #raw_union  {
@@ -2301,6 +2301,10 @@ sys_access :: proc "contextless" (path: cstring, mask: int) -> int {
 	}
 }
 
+sys_faccessat :: proc "contextless" (dfd: int, path: cstring, mask: int) -> int {
+	return int(intrinsics.syscall(SYS_faccessat, uintptr(dfd), uintptr(rawptr(path)), uintptr(mask)))
+}
+
 sys_getcwd :: proc "contextless" (buf: rawptr, size: uint) -> int {
 	return int(intrinsics.syscall(SYS_getcwd, uintptr(buf), uintptr(size)))
 }
@@ -2431,6 +2435,10 @@ sys_fsync :: proc "contextless" (fd: int) -> int {
 
 sys_getdents64 :: proc "contextless" (fd: int, dirent: rawptr, count: int) -> int {
 	return int(intrinsics.syscall(SYS_getdents64, uintptr(fd), uintptr(dirent), uintptr(count)))
+}
+
+sys_execveat :: proc "contextless" (dfd: int, filename: cstring, argv, envp: [^]cstring, flags: int) -> int {
+	return int(intrinsics.syscall(SYS_execveat, uintptr(dfd), uintptr(rawptr(filename)), uintptr(argv), uintptr(envp), uintptr(flags)))
 }
 
 sys_execve :: proc "contextless" (filename: cstring, argv, envp: [^]cstring) -> int {
