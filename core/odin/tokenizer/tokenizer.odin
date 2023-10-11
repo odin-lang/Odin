@@ -724,7 +724,7 @@ scan :: proc(t: ^Tokenizer) -> Token {
 		case .Ident, .Context, .Typeid, .Break, .Continue, .Fallthrough, .Return,
 		     .Integer, .Float, .Imag, .Rune, .String, .Undef,
 		     .Question, .Pointer, .Close_Paren, .Close_Bracket, .Close_Brace,
-		     .Increment, .Decrement, .Or_Return:
+		     .Increment, .Decrement, .Or_Return, .Or_Break, .Or_Continue:
 			/*fallthrough*/
 			t.insert_semicolon = true
 		case:
