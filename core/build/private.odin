@@ -2,6 +2,9 @@ package build
 
 import "core:unicode/utf8"
 import "core:runtime"
+import "core:os"
+import "core:fmt"
+import "core:strings"
 
 // continuation byte?
 _is_cont :: proc(b: byte) -> bool {
@@ -53,11 +56,30 @@ _match :: proc(pattern, str: string) -> bool {
     return false
 }
 
+_display_command_help :: proc(main_project: ^Project, opts: Build_Options) {
+    fmt.printf("%s build system\n", main_project.name)
+        fmt.printf("\tSyntax: %s <flags> <configuration name>", os.args[0])
+        fmt.printf("\tAvailable Configurations:\n")
+        for project in _build_ctx.projects do if opts.display_external_configs || project == main_project {
+            for target in project.targets {
+                config := project->configure_target_proc(target)
+                prefixed_name := strings.concatenate({project.config_prefix, config.name}, context.temp_allocator)
+                fmt.printf("\t\t%s\n", prefixed_name)
+            }
+        }
+        fmt.printf("\tFlags (Devenv flags don't build the configuration when specified)")
+        fmt.printf("\t\t-help <optional config name>\n")
+        fmt.printf("\t\t\tDisplays build system help. Cannot be used with other flags. [WIP] Specifying a config name will give you information about the config. \n")
+        fmt.printf("\t\t-ols\n")
+            fmt.printf("\t\t\tDevenv: Generates an ols.json for the configuration. \n")
+        fmt.printf("\t\t-vscode\n")
+            fmt.printf("\t\t\t[WIP] Devenv, Editor: Generates .vscode/launch.json configuration for debugging. \n")
+        fmt.printf("\t\t-build-pre-launch")
+            fmt.printf("\t\t\t[WIP] Devenv: Generates a pre launch command to build the project before debugging. Effectively runs `%s <config name>` before launching the debugger. Requires an editor flag like -vscode", os.args[0])
+        fmt.printf("\t\t-debug-build-system:\"<args>\"")
+            fmt.printf("\t\t\t[WIP] Devenv: Includes the build system as a debugging target. Requires an editor flag")
+}
 
-
-
-
-// Note: Cannot index a constant???
 _compiler_flag_to_arg := [Compiler_Flag]string {
     .Debug = "-debug",
     .Disable_Assert = "-disable-assert",

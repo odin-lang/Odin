@@ -7,13 +7,14 @@ Build_Command_Type :: enum {
     Build,
     Dev_Setup,
     Display_Help,
-    Build_Dependencies,
 }
 
 Build_Options :: struct {
     command_type: Build_Command_Type,
-    config_name: string, // Config.name, empty or `all`
+    config_name: string, // Config.name
     dev_env: Dev_Env,
+    display_external_configs: bool,
+    default_config_name: string,
 }
 
 Define_Val :: union #no_nil {
@@ -75,8 +76,6 @@ Vet_Flag :: enum {
 }
 
 Vet_Flags :: bit_set[Vet_Flag]
-
-DEFAULT_VET :: Vet_Flags{.Unused, .Shadowing, .Using_Stmt}
 
 Subsystem_Kind :: enum {
     Default,
@@ -204,8 +203,24 @@ Default_Target :: struct {
     mode: Default_Target_Mode,
 }
 
+Configure_Target_Proc :: #type proc(project: ^Project, target: ^Target) -> Config
 
-Project :: struct($Target: typeid) {
-    targets: [dynamic]Target,
-    configure_target_proc: proc(project: Project(Target), target: Target) -> Config, // There should be a way to skip a target. Maybe(Config)?
+/*
+    Can be used as-is or via a subtype
+*/
+Target :: struct {
+    name: string,
+    platform: Platform,
+    project: ^Project,
+}
+
+Project :: struct {
+    name: string,
+    targets: [dynamic]^Target,
+    config_prefix: string,
+    configure_target_proc: Configure_Target_Proc,
+}
+
+Build_Context :: struct {
+    projects: [dynamic]^Project,
 }

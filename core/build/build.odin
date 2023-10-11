@@ -186,7 +186,7 @@ default_build_options :: proc() -> (o: Build_Options) {
 }
 
 /*
-    output.exe <config-name|all> // build 1 target or all
+    output.exe <config-name|*> // build 1 target or all
     output.exe -devenv:<editor> <config-name> // Setup the devenv without building. If no editor is specified, it will just generate ols.json
     output.exe help
 */
@@ -244,10 +244,13 @@ syscall_command :: proc($cmd: string) -> Command {
     }
 }
 
+/*
 add_target :: #force_inline proc(project: ^Project($Target), target: Target) {
     append(&project.targets, target)
 }
+*/
 
+/*
 display_command_help :: proc(project: Project($Target)) {
     fmt.printf("Possible usages:\n")
     fmt.printf("%s <configuration name|all> -> builds the specified configuration or all targets\n", os.args[0])
@@ -258,7 +261,9 @@ display_command_help :: proc(project: Project($Target)) {
         fmt.printf("\t%s\n", config.name)
     }
 }
+*/
 
+/*
 build_project :: proc(project: Project($Target), options: Build_Options) {
     switch options.command_type {
         case .Invalid: {}
@@ -304,4 +309,49 @@ build_project :: proc(project: Project($Target), options: Build_Options) {
         }
     }
     
+}
+*/
+
+add_target :: proc(project: ^Project, target: ^Target) {
+    append(&project.targets, target)
+    target.project = project
+}
+
+add_project :: proc(project: ^Project) {
+    append(&_build_ctx.projects, project)
+}
+
+run :: proc(main_project: ^Project, opts: Build_Options) {
+    assert(len(_build_ctx.projects) != 0, "No projects were added. Use build.add_project to add one.")
+    opts := opts
+    if opts.config_name == "" do opts.config_name = opts.default_config_name
+
+    switch opts.command_type {
+    case .Build:
+        for project in _build_ctx.projects {
+            if opts.display_external_configs || main_project == project {
+                found_config := false
+                for target in project.targets {
+                    config := project->configure_target_proc(target)
+                    prefixed_name := strings.concatenate({project.config_prefix, config.name}, context.temp_allocator)
+                    if _match(opts.config_name, prefixed_name) {
+                        found_config = true
+                        build_package(config)
+                    }
+        
+                    if !found_config {
+                        fmt.eprintf("Could not find configuration %s\n", opts.config_name)
+                    }
+                }
+            }
+        }
+    
+    case .Dev_Setup:
+    
+    case .Display_Help:
+        _display_command_help(main_project, opts)
+    
+    case .Invalid: fallthrough
+    case: fmt.eprintf("Invalid command type\n")
+    }
 }
