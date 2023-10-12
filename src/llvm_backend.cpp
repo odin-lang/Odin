@@ -2602,17 +2602,37 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 
 
 	if (build_context.sanitizer_flags & SanitizerFlag_Address) {
-		auto paths = array_make<String>(heap_allocator(), 0, 1);
 		if (build_context.metrics.os == TargetOs_windows) {
+			auto paths = array_make<String>(heap_allocator(), 0, 1);
 			String path = concatenate_strings(permanent_allocator(), build_context.ODIN_ROOT, str_lit("\\bin\\llvm\\windows\\clang_rt.asan-x86_64.lib"));
 			array_add(&paths, path);
+			Entity *lib = alloc_entity_library_name(nullptr, make_token_ident("asan_lib"), nullptr, slice_from_array(paths), str_lit("asan_lib"));
+			array_add(&gen->foreign_libraries, lib);
+		} else if (build_context.metrics.os == TargetOs_darwin || build_context.metrics.os == TargetOs_linux) {
+			if (!build_context.extra_linker_flags.text) {
+				build_context.extra_linker_flags = str_lit("-fsanitize=address");
+			} else {
+				build_context.extra_linker_flags = concatenate_strings(permanent_allocator(), build_context.extra_linker_flags, str_lit(" -fsanitize=address"));
+			}
 		}
-		Entity *lib = alloc_entity_library_name(nullptr, make_token_ident("asan_lib"), nullptr, slice_from_array(paths), str_lit("asan_lib"));
-		array_add(&gen->foreign_libraries, lib);
 	}
 	if (build_context.sanitizer_flags & SanitizerFlag_Memory) {
+		if (build_context.metrics.os == TargetOs_darwin || build_context.metrics.os == TargetOs_linux) {
+			if (!build_context.extra_linker_flags.text) {
+				build_context.extra_linker_flags = str_lit("-fsanitize=memory");
+			} else {
+				build_context.extra_linker_flags = concatenate_strings(permanent_allocator(), build_context.extra_linker_flags, str_lit(" -fsanitize=memory"));
+			}
+		}
 	}
 	if (build_context.sanitizer_flags & SanitizerFlag_Thread) {
+		if (build_context.metrics.os == TargetOs_darwin || build_context.metrics.os == TargetOs_linux) {
+			if (!build_context.extra_linker_flags.text) {
+				build_context.extra_linker_flags = str_lit("-fsanitize=thread");
+			} else {
+				build_context.extra_linker_flags = concatenate_strings(permanent_allocator(), build_context.extra_linker_flags, str_lit(" -fsanitize=thread"));
+			}
+		}
 	}
 
 	gb_sort_array(gen->foreign_libraries.data, gen->foreign_libraries.count, foreign_library_cmp);

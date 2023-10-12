@@ -52,7 +52,7 @@ config_darwin() {
 		fi
 	fi
 
-	MAX_LLVM_VERSION=("14.999.999")
+	MAX_LLVM_VERSION=("17.999.999")
 	if [ $(version $($LLVM_CONFIG --version)) -gt $(version $MAX_LLVM_VERSION) ]; then
 		echo "Tried to use " $(which $LLVM_CONFIG) "version" $($LLVM_CONFIG --version)
 		panic "Requirement: llvm-config must be base version smaller than 15"
@@ -102,6 +102,8 @@ config_linux() {
 			LLVM_CONFIG=llvm-config-11-64
 		elif [ -x "$(command -v llvm-config-14)" ]; then
 			LLVM_CONFIG=llvm-config-14
+		elif [ -x "$(command -v llvm-config-17)" ]; then
+			LLVM_CONFIG=llvm-config-17
 		else
 			panic "Unable to find LLVM-config"
 		fi
@@ -113,7 +115,7 @@ config_linux() {
 		panic "Requirement: llvm-config must be base version greater than 11"
 	fi
 
-	MAX_LLVM_VERSION=("14.999.999")
+	MAX_LLVM_VERSION=("17.999.999")
 	if [ $(version $($LLVM_CONFIG --version)) -gt $(version $MAX_LLVM_VERSION) ]; then
 		echo "Tried to use " $(which $LLVM_CONFIG) "version" $($LLVM_CONFIG --version)
 		panic "Requirement: llvm-config must be base version smaller than 15"
