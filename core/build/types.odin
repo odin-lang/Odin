@@ -12,9 +12,26 @@ Build_Command_Type :: enum {
 Build_Options :: struct {
     command_type: Build_Command_Type,
     config_name: string, // Config.name
-    dev_env: Dev_Env,
+    dev_opts: Dev_Options,
     display_external_configs: bool,
     default_config_name: string,
+}
+
+Editor :: enum {
+    VSCode,
+}
+Editors :: bit_set[Editor]
+
+Dev_Flag :: enum {
+    Generate_OLS,
+    Build_Pre_Launch,
+    Debug_Build_System,
+}
+Dev_Flags :: bit_set[Dev_Flag]
+
+Dev_Options :: struct {
+    flags: Dev_Flags,
+    editors: Editors,
 }
 
 Define_Val :: union #no_nil {
@@ -35,7 +52,8 @@ Config :: struct {
     platform: Platform,
 
     src_path: string,
-    out_path: string,
+    out_dir: string,
+    out_file: string,
     pdb_name: string,
     rc_path: string,
 
@@ -166,11 +184,6 @@ Timings_Export :: struct {
     filename: Maybe(string),
 }
 
-Dev_Env :: enum {
-    None,
-    VSCode,
-    // TODO: Add more IDEs/editors
-}
 
 Collection :: struct {
     name, path: string,

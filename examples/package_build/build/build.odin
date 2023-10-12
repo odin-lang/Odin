@@ -2,6 +2,7 @@ package src_build
 
 import "core:build"
 import "core:os"
+import "core:strings"
 
 Mode :: enum {
     Debug,
@@ -33,8 +34,14 @@ config_target :: proc(project: ^build.Project, target: ^build.Target) -> (config
     target := cast(^Target)target
     config.name = target.name 
     config.platform = target.platform
+    config.out_file = "demo.exe" if target.platform.os == .Windows else "demo.out"
+    config.out_dir = strings.concatenate({"out/", target.name})
+    config.build_mode = .EXE
+    config.src_path = "src"
 
-    config.defines["HELLOPE_DEFINES"] = 23 // works with bools, ints, strings
+    config.defines["DEFINED_INT"] = 99
+    config.defines["DEFINED_STRING"] = "Hellope #config"
+    config.defines["DEFINED_BOOL"] = true
     
     switch target.mode {
     case .Debug:
@@ -45,6 +52,8 @@ config_target :: proc(project: ^build.Project, target: ^build.Target) -> (config
         config.flags += {.Disable_Assert}
         config.opt = .Speed
     }
+
+    
 
     return config
 }

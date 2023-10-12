@@ -58,7 +58,7 @@ _match :: proc(pattern, str: string) -> bool {
 
 _display_command_help :: proc(main_project: ^Project, opts: Build_Options) {
     fmt.printf("%s build system\n", main_project.name)
-        fmt.printf("\tSyntax: %s <flags> <configuration name>", os.args[0])
+        fmt.printf("\tSyntax: %s <flags> <configuration name>\n", os.args[0])
         fmt.printf("\tAvailable Configurations:\n")
         for project in _build_ctx.projects do if opts.display_external_configs || project == main_project {
             for target in project.targets {
@@ -67,17 +67,17 @@ _display_command_help :: proc(main_project: ^Project, opts: Build_Options) {
                 fmt.printf("\t\t%s\n", prefixed_name)
             }
         }
-        fmt.printf("\tFlags (Devenv flags don't build the configuration when specified)")
+        fmt.printf("\tFlags (Devenv flags don't build the configuration when specified)\n")
         fmt.printf("\t\t-help <optional config name>\n")
-        fmt.printf("\t\t\tDisplays build system help. Cannot be used with other flags. [WIP] Specifying a config name will give you information about the config. \n")
+        fmt.printf("\t\t\tDisplays build system help. Cannot be used with other flags. \n\t\t\t[WIP] Specifying a config name will give you information about the config. \n")
         fmt.printf("\t\t-ols\n")
             fmt.printf("\t\t\tDevenv: Generates an ols.json for the configuration. \n")
         fmt.printf("\t\t-vscode\n")
             fmt.printf("\t\t\t[WIP] Devenv, Editor: Generates .vscode/launch.json configuration for debugging. \n")
-        fmt.printf("\t\t-build-pre-launch")
-            fmt.printf("\t\t\t[WIP] Devenv: Generates a pre launch command to build the project before debugging. Effectively runs `%s <config name>` before launching the debugger. Requires an editor flag like -vscode", os.args[0])
-        fmt.printf("\t\t-debug-build-system:\"<args>\"")
-            fmt.printf("\t\t\t[WIP] Devenv: Includes the build system as a debugging target. Requires an editor flag")
+        fmt.printf("\t\t-build-pre-launch\n")
+            fmt.printf("\t\t\t[WIP] Devenv: Generates a pre launch command to build the project before debugging. \n\t\t\tEffectively runs `%s <config name>` before launching the debugger. Requires an editor flag like -vscode\n", os.args[0])
+        fmt.printf("\t\t-debug-build-system:\"<args>\"\n")
+            fmt.printf("\t\t\t[WIP] Devenv: Includes the build system as a debugging target. Requires an editor flag\n")
 }
 
 _compiler_flag_to_arg := [Compiler_Flag]string {

@@ -109,18 +109,20 @@ _config_to_args :: proc(sb: ^strings.Builder, config: Config) {
         write_string(sb, " ")
     }
 
-    sbprintf(sb, `-out:"%s"`, config.out_path)
+    // Todo(Dragos): clean up the path before passing it here?
+    sbprintf(sb, `-out:"%s/%s"`, config.out_dir, config.out_file)
 }
 
 
 build_package :: proc(config: Config) {
     config_output_dirs: {
-        dir := filepath.dir(config.out_path, context.temp_allocator) 
-        slashDir, _ := filepath.to_slash(dir, context.temp_allocator)
-        dirs := strings.split_after(slashDir, "/", context.temp_allocator)
+        //dir := filepath.dir(config.out_path, context.temp_allocator) 
+        // Note(Dragos): I wrote this a while ago. Is there a better way?
+        slash_dir, _ := filepath.to_slash(config.out_dir, context.temp_allocator)
+        dirs := strings.split_after(slash_dir, "/", context.temp_allocator)
         for _, i in dirs {
-            newDir := strings.concatenate(dirs[0 : i + 1], context.temp_allocator)
-            os.make_directory(newDir)
+            new_dir := strings.concatenate(dirs[0 : i + 1], context.temp_allocator)
+            os.make_directory(new_dir)
         }
     }
     
@@ -151,6 +153,10 @@ build_package :: proc(config: Config) {
    
 }
 
+_generate_devenv :: proc(config: Config, opts: Dev_Options) {
+    if .Generate_OLS in opts.flags do generate_ols(config)
+}
+
 generate_ols :: proc(config: Config) {
     argsBuilder := strings.builder_make()
     _config_to_args(&argsBuilder, config)
@@ -159,6 +165,9 @@ generate_ols :: proc(config: Config) {
     for name, path in config.collections {
         append(&settings.collections, Collection{name = name, path = path})
     }
+    append(&settings.collections, Collection{name = "core", path = strings.concatenate({ODIN_ROOT, "core"})})
+    append(&settings.collections, Collection{name = "vendor", path = strings.concatenate({ODIN_ROOT, "vendor"})})
+
     settings.checker_args = args
     marshalOpts: json.Marshal_Options
     marshalOpts.pretty = true
@@ -182,57 +191,6 @@ default_language_server_settings :: proc(allocator := context.allocator) -> (set
 default_build_options :: proc() -> (o: Build_Options) {
     o.command_type = .Build
     o.config_name = "*"
-    return
-}
-
-/*
-    output.exe <config-name|*> // build 1 target or all
-    output.exe -devenv:<editor> <config-name> // Setup the devenv without building. If no editor is specified, it will just generate ols.json
-    output.exe help
-*/
-build_options_make_from_args :: proc(args: []string) -> (o: Build_Options) {
-    if len(args) == 0 {
-        o.command_type = .Display_Help
-        return
-    }
-    command := args[0] 
-    switch {
-        case strings.has_prefix(command, "-devenv"): {
-            o.command_type = .Dev_Setup
-            components := strings.split(command, ":", context.temp_allocator)
-            if len(components) == 2 {
-                switch components[1] {
-                    case "vscode": {
-                        o.dev_env = .VSCode 
-                    }
-                    case: {
-                        o.dev_env = .None 
-                        o.command_type = .Invalid
-                    }
-                }
-            } else {
-                o.dev_env = .None
-            }
-        }
-
-        case: {
-            o.command_type = .Build
-        }
-    }
-
-    #partial switch o.command_type {
-        case .Build: {
-            assert(len(args) == 1, "Expected 1 argument for build command")
-            o.config_name = args[0] 
-        }
-        
-        case .Dev_Setup: {
-            assert(len(args) == 2, "Expected 1 argument for devenv command")
-            o.config_name = args[1]
-        }
-    }
-
-    assert(o.command_type != .Invalid, "Invalid arguments")
     return
 }
 
@@ -312,6 +270,53 @@ build_project :: proc(project: Project($Target), options: Build_Options) {
 }
 */
 
+build_options_make_from_args :: proc(args: []string) -> (o: Build_Options) {
+    command := args[0]
+    args := args[1:]
+    if len(args) == 0 {
+        o.command_type = .Build
+        return
+    }
+    
+    display_help := false
+    build_project := true
+    config_name := ""
+    for i in 0..<len(args) {
+        arg := args[i]
+         
+        if arg[0] == '-' do switch {
+        case arg == "-help":
+            display_help = true
+            build_project = false
+        case arg == "-ols":
+            build_project = false
+            o.dev_opts.flags += {.Generate_OLS}
+        case arg == "-vscode":
+            build_project = false
+            o.dev_opts.editors += {.VSCode} 
+        case arg == "-build-pre-launch":
+            build_project = false
+        case strings.has_prefix(arg, "-debug-build-system"):
+            build_project = false
+            fmt.eprintf("Flag %s not implemented\n", arg)
+        case: 
+            fmt.eprintf("Invalid flag %s\n", arg)
+            return
+        } else {
+            config_name = arg
+        }
+    }
+
+    if display_help {
+        o.command_type = .Display_Help
+    } else if build_project {
+        o.command_type = .Build
+    } else {
+        o.command_type = .Dev_Setup
+    }
+    return
+}
+
 add_target :: proc(project: ^Project, target: ^Target) {
     append(&project.targets, target)
     target.project = project
@@ -347,6 +352,23 @@ run :: proc(main_project: ^Project, opts: Build_Options) {
         }
     
     case .Dev_Setup:
+        for project in _build_ctx.projects {
+            if opts.display_external_configs || main_project == project {
+                found_config := false
+                for target in project.targets {
+                    config := project->configure_target_proc(target)
+                    prefixed_name := strings.concatenate({project.config_prefix, config.name}, context.temp_allocator)
+                    if _match(opts.config_name, prefixed_name) {
+                        found_config = true
+                        _generate_devenv(config, opts.dev_opts)
+                    }
+        
+                    if !found_config {
+                        fmt.eprintf("Could not find configuration %s\n", opts.config_name)
+                    }
+                }
+            }
+        }
     
     case .Display_Help:
         _display_command_help(main_project, opts)
