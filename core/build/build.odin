@@ -8,15 +8,6 @@ import "core:path/filepath"
 import "core:sync"
 import "core:encoding/json"
 
-
-config_make :: proc(allocator := context.allocator) -> (config: Config) {
-    config.defines = make(map[string]Define_Val, 32, allocator)
-    config.collections = make(map[string]string, 16, allocator)
-    config.post_build_commands = make([dynamic]Command, allocator)
-    config.pre_build_commands = make([dynamic]Command, allocator)
-    return
-}
-
 syscall :: proc(cmd: string, echo: bool) -> int {
     cstr := strings.clone_to_cstring(cmd, context.temp_allocator)
     if echo {
@@ -25,12 +16,6 @@ syscall :: proc(cmd: string, echo: bool) -> int {
     return cast(int)libc.system(cstr)
 }
 
-config_delete :: proc(config: Config) {
-    delete(config.defines)
-    delete(config.collections)
-    delete(config.post_build_commands)
-    delete(config.pre_build_commands)
-}
 
 add_post_build_command :: proc(config: ^Config, name: string, cmd: Command_Proc) {
     command := Command {
@@ -48,70 +33,7 @@ add_pre_build_command :: proc(config: ^Config, name: string, cmd: Command_Proc) 
     append(&config.pre_build_commands, command)
 }
 
-_define_to_arg :: proc(sb: ^strings.Builder, name: string, val: Define_Val) {
-    using strings
-    
-    fmt.sbprintf(sb, "-define:%s=", name)
 
-    switch v in val {
-        case bool: {
-            write_string(sb, "true" if v else "false")
-        }
-        case int: {
-            write_int(sb, v)
-        }
-        case string: {
-            fmt.sbprintf(sb, `"%s"`, v)
-        }
-    }
-}
-
-_platform_to_arg :: proc(sb: ^strings.Builder, platform: Platform) {
-    if platform.os != .Unknown {
-        fmt.sbprintf(sb, "-target:%s_%s", _os_to_arg[platform.os], _arch_to_arg[platform.arch])
-    }
-}
-
-_collection_to_arg :: proc(sb: ^strings.Builder, collection: string, path: string) {
-    fmt.sbprintf(sb, `-collection:%s="%s"`, collection, path)
-}
-
-_flags_to_arg :: proc(sb: ^strings.Builder, flags: Compiler_Flags) {
-    for flag in Compiler_Flag do if flag in flags {
-        fmt.sbprintf(sb, "%s ", _compiler_flag_to_arg[flag])
-    }
-}
-
-_config_to_args :: proc(sb: ^strings.Builder, config: Config) {
-    using strings, fmt
-
-    for flag in Vet_Flag do if flag in config.vet {
-        sbprintf(sb, "%s ", _vet_flag_to_arg[flag])
-    }
-
-    sbprintf(sb, "%s ", _build_mode_to_arg[config.build_mode])
-    if config.style != .None {
-        sbprintf(sb, "%s ", _style_mode_to_arg[config.style])
-    }
-    sbprintf(sb, "%s ", _opt_mode_to_arg[config.opt])
-
-    _platform_to_arg(sb, config.platform)
-    write_string(sb, " ")
-    _flags_to_arg(sb, config.flags)
-    // function already returns space
-    for key, val in config.collections {
-        _collection_to_arg(sb, key, val)
-        write_string(sb, " ")
-    }
-
-    for key, val in config.defines {
-        _define_to_arg(sb, key, val)
-        write_string(sb, " ")
-    }
-
-    // Todo(Dragos): clean up the path before passing it here?
-    sbprintf(sb, `-out:"%s/%s"`, config.out_dir, config.out_file)
-}
 
 
 build_package :: proc(config: Config) {
@@ -153,32 +75,6 @@ build_package :: proc(config: Config) {
    
 }
 
-_generate_devenv :: proc(config: Config, opts: Dev_Options) {
-    if .Generate_OLS in opts.flags do generate_ols(config)
-}
-
-generate_ols :: proc(config: Config) {
-    argsBuilder := strings.builder_make()
-    _config_to_args(&argsBuilder, config)
-    args := strings.to_string(argsBuilder)
-    settings := default_language_server_settings(context.temp_allocator)
-    for name, path in config.collections {
-        append(&settings.collections, Collection{name = name, path = path})
-    }
-    append(&settings.collections, Collection{name = "core", path = strings.concatenate({ODIN_ROOT, "core"})})
-    append(&settings.collections, Collection{name = "vendor", path = strings.concatenate({ODIN_ROOT, "vendor"})})
-
-    settings.checker_args = args
-    marshalOpts: json.Marshal_Options
-    marshalOpts.pretty = true
-    if data, err := json.marshal(settings, marshalOpts, context.temp_allocator); err == nil {
-        if file, err := os.open("ols.json", os.O_CREATE | os.O_TRUNC); err == os.ERROR_NONE {
-            os.write_string(file, string(data))
-            os.close(file)
-        }   
-    }
-}
-
 default_language_server_settings :: proc(allocator := context.allocator) -> (settings: Language_Server_Settings) {
     settings.collections = make([dynamic]Collection, allocator)
     settings.enable_document_symbols = true 
@@ -201,74 +97,6 @@ syscall_command :: proc($cmd: string) -> Command {
         return result
     }
 }
-
-/*
-add_target :: #force_inline proc(project: ^Project($Target), target: Target) {
-    append(&project.targets, target)
-}
-*/
-
-/*
-display_command_help :: proc(project: Project($Target)) {
-    fmt.printf("Possible usages:\n")
-    fmt.printf("%s <configuration name|all> -> builds the specified configuration or all targets\n", os.args[0])
-    fmt.printf("%s -devenv:<editor> <configuration name> -> generates project files configured for the given configuration. If no editor is specified, it will generate only ols.json\n", os.args[0]) 
-    fmt.printf("Available Configurations:\n")
-    for target in project.targets {
-        config := project->configure_target_proc(target)
-        fmt.printf("\t%s\n", config.name)
-    }
-}
-*/
-
-/*
-build_project :: proc(project: Project($Target), options: Build_Options) {
-    switch options.command_type {
-        case .Invalid: {}
-
-        case .Build_Dependencies: {
-            
-        }
-            
-        case .Display_Help: {
-           display_command_help(project)
-        }
-
-        case .Build: {
-            foundTarget := false
-            for target in project.targets {
-                config := project->configure_target_proc(target)
-                if patterns.match(options.config_name, config.name) {
-                    foundTarget = true
-                    build_package(config)
-                }
-            }
-
-            if !foundTarget {
-                fmt.printf("Could not find configuration %s\n", options.config_name)
-            }
-            
-        }
-
-        case .Dev_Setup: {
-            foundTarget := false
-                for target in project.targets {
-                    config := project->configure_target_proc(target)
-                    if patterns.match(options.config_name, config.name) {
-                        foundTarget = true
-                        generate_ols(config)
-                        break
-                    }
-                }
-
-                if !foundTarget {
-                    fmt.printf("Could not find configuration %s\n", options.config_name)
-                }
-        }
-    }
-    
-}
-*/
 
 build_options_make_from_args :: proc(args: []string) -> (o: Build_Options) {
     command := args[0]

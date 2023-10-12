@@ -5,6 +5,7 @@ import "core:runtime"
 import "core:os"
 import "core:fmt"
 import "core:strings"
+import "core:encoding/json"
 
 // continuation byte?
 _is_cont :: proc(b: byte) -> bool {
@@ -56,28 +57,151 @@ _match :: proc(pattern, str: string) -> bool {
     return false
 }
 
+_platform_to_arg :: proc(sb: ^strings.Builder, platform: Platform) {
+    if platform.os != .Unknown {
+        fmt.sbprintf(sb, "-target:%s_%s", _os_to_arg[platform.os], _arch_to_arg[platform.arch])
+    }
+}
+
+_collection_to_arg :: proc(sb: ^strings.Builder, collection: string, path: string) {
+    fmt.sbprintf(sb, `-collection:%s="%s"`, collection, path)
+}
+
+_flags_to_arg :: proc(sb: ^strings.Builder, flags: Compiler_Flags) {
+    for flag in Compiler_Flag do if flag in flags {
+        fmt.sbprintf(sb, "%s ", _compiler_flag_to_arg[flag])
+    }
+}
+
+_config_to_args :: proc(sb: ^strings.Builder, config: Config) {
+    using strings, fmt
+
+    for flag in Vet_Flag do if flag in config.vet {
+        sbprintf(sb, "%s ", _vet_flag_to_arg[flag])
+    }
+
+    sbprintf(sb, "%s ", _build_mode_to_arg[config.build_mode])
+    if config.style != .None {
+        sbprintf(sb, "%s ", _style_mode_to_arg[config.style])
+    }
+    sbprintf(sb, "%s ", _opt_mode_to_arg[config.opt])
+
+    _platform_to_arg(sb, config.platform)
+    write_string(sb, " ")
+    _flags_to_arg(sb, config.flags)
+    // function already returns space
+    for key, val in config.collections {
+        _collection_to_arg(sb, key, val)
+        write_string(sb, " ")
+    }
+
+    for key, val in config.defines {
+        _define_to_arg(sb, key, val)
+        write_string(sb, " ")
+    }
+
+    // Todo(Dragos): clean up the path before passing it here?
+    sbprintf(sb, `-out:"%s/%s"`, config.out_dir, config.out_file)
+}
+
+_generate_devenv :: proc(config: Config, opts: Dev_Options) {
+    if .Generate_OLS in opts.flags do _generate_ols(config)
+}
+
+_generate_ols :: proc(config: Config) {
+    argsBuilder := strings.builder_make()
+    _config_to_args(&argsBuilder, config)
+    args := strings.to_string(argsBuilder)
+    settings := default_language_server_settings(context.temp_allocator)
+    for name, path in config.collections {
+        append(&settings.collections, Collection{name = name, path = path})
+    }
+    append(&settings.collections, Collection{name = "core", path = strings.concatenate({ODIN_ROOT, "core"})})
+    append(&settings.collections, Collection{name = "vendor", path = strings.concatenate({ODIN_ROOT, "vendor"})})
+
+    settings.checker_args = args
+    marshalOpts: json.Marshal_Options
+    marshalOpts.pretty = true
+    if data, err := json.marshal(settings, marshalOpts, context.temp_allocator); err == nil {
+        if file, err := os.open("ols.json", os.O_CREATE | os.O_TRUNC); err == os.ERROR_NONE {
+            os.write_string(file, string(data))
+            os.close(file)
+        }   
+    }
+}
+
+_define_to_arg :: proc(sb: ^strings.Builder, name: string, val: Define_Val) {
+    using strings
+    
+    fmt.sbprintf(sb, "-define:%s=", name)
+
+    switch v in val {
+        case bool: {
+            write_string(sb, "true" if v else "false")
+        }
+        case int: {
+            write_int(sb, v)
+        }
+        case string: {
+            fmt.sbprintf(sb, `"%s"`, v)
+        }
+    }
+}
+
+
 _display_command_help :: proc(main_project: ^Project, opts: Build_Options) {
     fmt.printf("%s build system\n", main_project.name)
-        fmt.printf("\tSyntax: %s <flags> <configuration name>\n", os.args[0])
-        fmt.printf("\tAvailable Configurations:\n")
-        for project in _build_ctx.projects do if opts.display_external_configs || project == main_project {
-            for target in project.targets {
-                config := project->configure_target_proc(target)
-                prefixed_name := strings.concatenate({project.config_prefix, config.name}, context.temp_allocator)
-                fmt.printf("\t\t%s\n", prefixed_name)
-            }
+    fmt.printf("\tSyntax: %s <flags> <configuration name>\n", os.args[0])
+    fmt.printf("\tAvailable Configurations:\n")
+    for project in _build_ctx.projects do if opts.display_external_configs || project == main_project {
+        for target in project.targets {
+            config := project->configure_target_proc(target)
+            prefixed_name := strings.concatenate({project.config_prefix, config.name}, context.temp_allocator)
+            fmt.printf("\t\t%s\n", prefixed_name)
         }
-        fmt.printf("\tFlags (Devenv flags don't build the configuration when specified)\n")
-        fmt.printf("\t\t-help <optional config name>\n")
-        fmt.printf("\t\t\tDisplays build system help. Cannot be used with other flags. \n\t\t\t[WIP] Specifying a config name will give you information about the config. \n")
-        fmt.printf("\t\t-ols\n")
-            fmt.printf("\t\t\tDevenv: Generates an ols.json for the configuration. \n")
-        fmt.printf("\t\t-vscode\n")
-            fmt.printf("\t\t\t[WIP] Devenv, Editor: Generates .vscode/launch.json configuration for debugging. \n")
-        fmt.printf("\t\t-build-pre-launch\n")
-            fmt.printf("\t\t\t[WIP] Devenv: Generates a pre launch command to build the project before debugging. \n\t\t\tEffectively runs `%s <config name>` before launching the debugger. Requires an editor flag like -vscode\n", os.args[0])
-        fmt.printf("\t\t-debug-build-system:\"<args>\"\n")
-            fmt.printf("\t\t\t[WIP] Devenv: Includes the build system as a debugging target. Requires an editor flag\n")
+    }
+    fmt.println()
+    fmt.printf("\tFlags \n")
+    
+    fmt.printf("\t\t-help <optional config name>\n")
+    fmt.printf("\t\t\tDisplays build system help. Cannot be used with other flags. \n\t\t\t[WIP] Specifying a config name will give you information about the config. \n")
+    fmt.println()
+
+    fmt.printf("\t\t-ols\n")
+    fmt.printf("\t\t\tGenerates an ols.json for the configuration. \n")
+    fmt.println()
+
+    fmt.printf("\t\t-vscode\n")
+    fmt.printf("\t\t\t[WIP] Generates .vscode/launch.json configuration for debugging. Must be used for other VSCode flags to function. \n")
+    fmt.println()
+
+    fmt.printf("\t\t-build-pre-launch\n")
+    fmt.printf("\t\t\t[WIP] VSCode: Generates a pre launch command to build the project before debugging. \n\t\t\tEffectively runs `%s <config name>` before launching the debugger. Requires an editor flag like -vscode.\n", os.args[0])
+    fmt.println()
+    
+    fmt.printf("\t\t-debug-build-system:\"<args>\"\n")
+    fmt.printf("\t\t\t[WIP] VSCode: Includes the build system as a debugging target. Requires an editor flag.\n")
+    fmt.println()
+
+    fmt.printf("\t\t-cwd-current\n")
+    fmt.printf("\t\t\t[WIP] VSCode: Use the current working directory as the CWD when debugging. Requires an editor flag.\n")
+    fmt.println()
+
+    fmt.printf("\t\t-cwd-out\n")
+    fmt.printf("\t\t\t[WIP] VSCode: Use the output directory as the CWD when debugging. Requires an editor flag.\n")
+    fmt.println()
+
+    fmt.printf("\t\t-launch-args:\"<args>\"\n")
+    fmt.printf("\t\t\t[WIP] VScode: Specify the args sent to the executable when debugging.\n")
+    fmt.println()
+
+    fmt.printf("\t\t-use-vsdbg\n")
+    fmt.printf("\t\t\t[WIP] VSCode: Use the VSCode debugger. \n")
+    fmt.println()
+
+    fmt.printf("\t\t-use-dbg\n")
+    fmt.printf("\t\t\t[WIP] VSCode: Use the GDB/LLDB debugger. \n")
+    fmt.println()
 }
 
 _compiler_flag_to_arg := [Compiler_Flag]string {

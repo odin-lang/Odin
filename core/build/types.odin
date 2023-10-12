@@ -22,6 +22,10 @@ Editor :: enum {
 }
 Editors :: bit_set[Editor]
 
+VSCode_Launch :: struct {
+
+}
+
 Dev_Flag :: enum {
     Generate_OLS,
     Build_Pre_Launch,
