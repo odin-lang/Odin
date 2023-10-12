@@ -55,7 +55,7 @@ config_darwin() {
 	MAX_LLVM_VERSION=("17.999.999")
 	if [ $(version $($LLVM_CONFIG --version)) -gt $(version $MAX_LLVM_VERSION) ]; then
 		echo "Tried to use " $(which $LLVM_CONFIG) "version" $($LLVM_CONFIG --version)
-		panic "Requirement: llvm-config must be base version smaller than 15"
+		panic "Requirement: llvm-config must be base version smaller than 18"
 	fi
 
 	LDFLAGS="$LDFLAGS -liconv -ldl -framework System"
@@ -118,7 +118,7 @@ config_linux() {
 	MAX_LLVM_VERSION=("17.999.999")
 	if [ $(version $($LLVM_CONFIG --version)) -gt $(version $MAX_LLVM_VERSION) ]; then
 		echo "Tried to use " $(which $LLVM_CONFIG) "version" $($LLVM_CONFIG --version)
-		panic "Requirement: llvm-config must be base version smaller than 15"
+		panic "Requirement: llvm-config must be base version smaller than 18"
 	fi
 
 	LDFLAGS="$LDFLAGS -ldl"
