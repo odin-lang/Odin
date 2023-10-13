@@ -82,13 +82,6 @@ Signal_Handler :: union {
 	Signal_Handler_Special,
 }
 
-Process_Flag :: enum {
-	Pipe_Stdin,
-	Pipe_Stdout,
-	Pipe_Stderr,
-}
-Process_Flags :: bit_set[Process_Flag]
-
 process_find :: proc(pid: int) -> (Process, Error) {
 	return _process_find(pid)
 }
@@ -97,8 +90,8 @@ process_get_state :: proc(p: Process) -> (Process_State, Error) {
 	return _process_get_state(p)
 }
 
-process_start :: proc(name: string, argv: []string, flags: Process_Flags = {}, attr: ^Process_Attributes = nil) -> (Process, Error) {
-	return _process_start(name, argv, flags, attr)
+process_start :: proc(name: string, argv: []string, attr: ^Process_Attributes = nil) -> (Process, Error) {
+	return _process_start(name, argv, attr)
 }
 
 process_release :: proc(p: ^Process) -> Error {

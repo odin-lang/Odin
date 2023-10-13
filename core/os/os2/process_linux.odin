@@ -104,15 +104,10 @@ _process_get_state :: proc(p: Process) -> (state: Process_State, err: Error) {
 	return
 }
 
-_process_start :: proc(name: string, argv: []string, flags: Process_Flags, attr: ^Process_Attributes) -> (Process, Error) {
+_process_start :: proc(name: string, argv: []string, attr: ^Process_Attributes) -> (Process, Error) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 
 	child: Process
-
-	// Check if pipes are wanted but attr is nil (so no place for pipe ^File)
-	if attr == nil && flags & {.Pipe_Stdin, .Pipe_Stdout, .Pipe_Stderr} != nil {
-		return child, .Unsupported
-	}
 
 	// TODO
 	//dir_fd := transmute(int)(unix.AT_FDCWD)
@@ -188,44 +183,43 @@ _process_start :: proc(name: string, argv: []string, flags: Process_Flags, attr:
 	stdin_fds: [2]i32
 	stdout_fds: [2]i32
 	stderr_fds: [2]i32
-	stderr_r, stderr_w: ^File
-	if .Pipe_Stdin in flags {
+	if attr != nil && attr.stdin != nil {
 		if res := unix.sys_pipe2(&stdin_fds[0], 0); res < 0 {
 			return child, _get_platform_error(res)
 		}
 	}
-	if .Pipe_Stdout in flags {
+	if attr != nil && attr.stdout != nil {
 		if res := unix.sys_pipe2(&stdout_fds[0], 0); res < 0 {
 			return child, _get_platform_error(res)
 		}
 	}
-	if .Pipe_Stderr in flags {
+	if attr != nil && attr.stderr != nil {
 		if res := unix.sys_pipe2(&stderr_fds[0], 0); res < 0 {
 			return child, _get_platform_error(res)
 		}
 	}
-	res: int
 
+	res: int
 	if res = unix.sys_fork(); res < 0 {
 		return child, _get_platform_error(res)
 	}
 
 	if res == 0 {
 		// in child process now
-		if .Pipe_Stdin in flags {
+		if attr != nil && attr.stdin != nil {
 			if unix.sys_close(int(stdin_fds[1])) < 0 { unix.sys_exit(1) }
 			if unix.sys_dup2(int(stdin_fds[0]), 0) < 0 { unix.sys_exit(1) }
 			if unix.sys_close(int(stdin_fds[0])) < 0 { unix.sys_exit(1) }
 		}
-		if .Pipe_Stdout in flags {
-			if unix.sys_close(int(stdin_fds[0])) < 0 { unix.sys_exit(1) }
-			if unix.sys_dup2(int(stdin_fds[1]), 1) < 0 { unix.sys_exit(1) }
-			if unix.sys_close(int(stdin_fds[1])) < 0 { unix.sys_exit(1) }
+		if attr != nil && attr.stdout != nil {
+			if unix.sys_close(int(stdout_fds[0])) < 0 { unix.sys_exit(1) }
+			if unix.sys_dup2(int(stdout_fds[1]), 1) < 0 { unix.sys_exit(1) }
+			if unix.sys_close(int(stdout_fds[1])) < 0 { unix.sys_exit(1) }
 		}
-		if .Pipe_Stderr in flags {
-			if unix.sys_close(int(stdin_fds[0])) < 0 { unix.sys_exit(1) }
-			if unix.sys_dup2(int(stdin_fds[1]), 2) < 0 { unix.sys_exit(1) }
-			if unix.sys_close(int(stdin_fds[1])) < 0 { unix.sys_exit(1) }
+		if attr != nil && attr.stderr != nil {
+			if unix.sys_close(int(stderr_fds[0])) < 0 { unix.sys_exit(1) }
+			if unix.sys_dup2(int(stderr_fds[1]), 2) < 0 { unix.sys_exit(1) }
+			if unix.sys_close(int(stderr_fds[1])) < 0 { unix.sys_exit(1) }
 		}
 
 		if res = unix.sys_execveat(dir_fd, executable, &cargs[0], env, 0); res < 0 {
@@ -236,17 +230,17 @@ _process_start :: proc(name: string, argv: []string, flags: Process_Flags, attr:
 	}
 
 	// in parent process
-	if .Pipe_Stdin in flags {
+	if attr != nil && attr.stdin != nil {
 		unix.sys_close(int(stdin_fds[0]))
-		attr.stdin = _new_file(uintptr(stdin_fds[1]))
+		_construct_file(attr.stdin, uintptr(stdin_fds[1]))
 	}
-	if .Pipe_Stdout in flags {
+	if attr != nil && attr.stdout != nil {
 		unix.sys_close(int(stdout_fds[1]))
-		attr.stdout = _new_file(uintptr(stdout_fds[0]))
+		_construct_file(attr.stdout, uintptr(stdout_fds[0]))
 	}
-	if .Pipe_Stderr in flags {
+	if attr != nil && attr.stderr != nil {
 		unix.sys_close(int(stderr_fds[1]))
-		attr.stderr = _new_file(uintptr(stderr_fds[0]))
+		_construct_file(attr.stderr, uintptr(stderr_fds[0]))
 	}
 
 	child.pid = res

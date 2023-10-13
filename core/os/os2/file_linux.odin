@@ -74,6 +74,11 @@ _open :: proc(name: string, flags: File_Flags, perm: File_Mode) -> (^File, Error
 
 _new_file :: proc(fd: uintptr, _: string) -> ^File {
 	file := new(File, _file_allocator())
+	_construct_file(file, fd, "")
+	return file
+}
+
+_construct_file :: proc(file: ^File, fd: uintptr, _: string) {
 	file.impl.fd = int(fd)
 	file.impl.allocator = _file_allocator()
 	file.impl.name = _get_full_path(file.impl.fd, file.impl.allocator)
@@ -81,7 +86,6 @@ _new_file :: proc(fd: uintptr, _: string) -> ^File {
 		data = file,
 		procedure = _file_stream_proc,
 	}
-	return file
 }
 
 _destroy :: proc(f: ^File) -> Error {
@@ -418,7 +422,6 @@ _read_entire_pseudo_file_cstring :: proc(name: cstring, allocator := context.all
 _file_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, offset: i64, whence: io.Seek_From) -> (n: i64, err: io.Error) {
 	f := (^File)(stream_data)
 	ferr: Error
-	i: int
 	switch mode {
 	case .Read:
 		n, ferr = _read(f, p)
