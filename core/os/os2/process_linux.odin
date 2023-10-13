@@ -137,7 +137,11 @@ _process_start :: proc(name: string, argv: []string, flags: Process_Flags, attr:
 			}
 		}
 		if !found {
-			return child, .Not_Exist
+			// check in dir to match windows behavior
+			executable = fmt.ctprintf("./%s", name)
+			if unix.sys_faccessat(dir_fd, executable, unix.F_OK) != 0 {
+				return child, .Not_Exist
+			}
 		}
 	} else {
 		executable = strings.clone_to_cstring(name, context.temp_allocator)
