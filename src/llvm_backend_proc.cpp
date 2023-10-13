@@ -891,6 +891,9 @@ gb_internal lbValue lb_emit_call_internal(lbProcedure *p, lbValue value, lbValue
 
 		LLVMValueRef ret = LLVMBuildCall2(p->builder, fnp, fn, args, arg_count, "");
 
+		auto llvm_cc = lb_calling_convention_map[proc_type->Proc.calling_convention];
+		LLVMSetInstructionCallConv(ret, llvm_cc);
+
 		LLVMAttributeIndex param_offset = LLVMAttributeIndex_FirstArgIndex;
 		if (return_ptr.value != nullptr) {
 			param_offset += 1;
