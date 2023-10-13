@@ -2291,6 +2291,23 @@ gb_internal void check_return_stmt(CheckerContext *ctx, Ast *node) {
 			}
 		}
 	}
+
+	for (Operand &o : operands) {
+		if (o.expr == nullptr) {
+			continue;
+		}
+		if (o.expr->kind != Ast_CompoundLit || !is_type_slice(o.type)) {
+			continue;
+		}
+		ast_node(cl, CompoundLit, o.expr);
+		if (cl->elems.count == 0) {
+			continue;
+		}
+		gbString s = type_to_string(o.type);
+		error(o.expr, "It is unsafe to return a compound literal of a slice ('%s') with elements from a procedure, as the contents of the slice uses the current stack frame's memory", s);
+		gb_string_free(s);
+	}
+
 }
 
 gb_internal void check_for_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
