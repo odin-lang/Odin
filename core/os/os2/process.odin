@@ -97,7 +97,7 @@ process_get_state :: proc(p: Process) -> (Process_State, Error) {
 	return _process_get_state(p)
 }
 
-process_start :: proc(name: string, argv: []string, flags: Process_Flags, attr: ^Process_Attributes = nil) -> (Process, Error) {
+process_start :: proc(name: string, argv: []string, flags: Process_Flags = {}, attr: ^Process_Attributes = nil) -> (Process, Error) {
 	return _process_start(name, argv, flags, attr)
 }
 

@@ -1,10 +1,12 @@
 //+private
 package os2
 
+import "core:c"
 import "core:fmt"
 import "core:time"
 import "core:runtime"
 import "core:strings"
+import "core:strconv"
 import "core:sys/unix"
 import "core:path/filepath"
 
@@ -66,9 +68,40 @@ _process_find :: proc(pid: int) -> (Process, Error) {
 	return p, _get_platform_error(dir_fd)
 }
 
-_process_get_state :: proc(p: Process) -> (Process_State, Error) {
-	// TODO
-	return Process_State{}, nil
+_process_get_state :: proc(p: Process) -> (state: Process_State, err: Error) {
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
+
+	stat_name := fmt.ctprintf("/proc/%d/stat", p.pid)
+	stat_buf: []u8
+	stat_buf, err = _read_entire_pseudo_file(stat_name, context.temp_allocator)
+
+	if err != nil {
+		return
+	}
+
+	idx := strings.last_index_byte(string(stat_buf), ')')
+	stats := string(stat_buf[idx + 2:])
+
+	// utime and stime are the 12 and 13th items, respectively
+	// skip the first 11 items here.
+	for i := 0; i < 11; i += 1 {
+		stats = stats[strings.index_byte(stats, ' ') + 1:]
+	}
+
+	idx = strings.index_byte(stats, ' ')
+	utime_str := stats[:idx]
+
+	stats = stats[idx + 1:]
+	stime_str := stats[:strings.index_byte(stats, ' ')]
+
+	utime, _ := strconv.parse_int(utime_str, 10)
+	stime, _ := strconv.parse_int(stime_str, 10)
+
+	// NOTE: Assuming HZ of 100, 1 jiffy == 10 ms
+	state.user_time = time.Duration(utime) * 10 * time.Millisecond
+	state.system_time = time.Duration(stime) * 10 * time.Millisecond
+
+	return
 }
 
 _process_start :: proc(name: string, argv: []string, flags: Process_Flags, attr: ^Process_Attributes) -> (Process, Error) {
@@ -81,7 +114,9 @@ _process_start :: proc(name: string, argv: []string, flags: Process_Flags, attr:
 		return child, .Unsupported
 	}
 
-	dir_fd := transmute(int)(unix.AT_FDCWD)
+	// TODO
+	//dir_fd := transmute(int)(unix.AT_FDCWD)
+	dir_fd := -100
 	if attr != nil && attr.dir != "" {
 		if dir_fd = unix.sys_open("/", _OPENDIR_FLAGS); dir_fd < 0 {
 			return child, _get_platform_error(dir_fd)
@@ -93,14 +128,17 @@ _process_start :: proc(name: string, argv: []string, flags: Process_Flags, attr:
 	if !strings.contains_rune(name, '/') {
 		path_env := get_env("PATH", context.temp_allocator)
 		path_dirs := filepath.split_list(path_env, context.temp_allocator)
+		found: bool
 		for dir in path_dirs {
 			executable = fmt.ctprintf("%s/%s", dir, name)
 			if unix.sys_faccessat(dir_fd, executable, unix.F_OK) == 0 {
+				found = true
 				break
 			}
 		}
-
-		return child, .Not_Exist
+		if !found {
+			return child, .Not_Exist
+		}
 	} else {
 		executable = strings.clone_to_cstring(name, context.temp_allocator)
 	}
@@ -208,7 +246,6 @@ _process_start :: proc(name: string, argv: []string, flags: Process_Flags, attr:
 	}
 
 	child.pid = res
-
 	return child, nil
 }
 
@@ -225,12 +262,12 @@ _process_kill :: proc(p: ^Process) -> Error {
 _process_signal :: proc(sig: Signal, h: Signal_Handler) -> Error {
 	signo: int
 	switch sig {
-	case .Abort:                    signo = 1 << unix.SIGABRT
-	case .Floating_Point_Exception: signo = 1 << unix.SIGFPE
-	case .Illegal_Instruction:      signo = 1 << unix.SIGILL
-	case .Interrupt:                signo = 1 << unix.SIGINT
-	case .Segmentation_Fault:       signo = 1 << unix.SIGSEGV
-	case .Termination:              signo = 1 << unix.SIGTERM
+	case .Abort:                    signo = unix.SIGABRT
+	case .Floating_Point_Exception: signo = unix.SIGFPE
+	case .Illegal_Instruction:      signo = unix.SIGILL
+	case .Interrupt:                signo = unix.SIGINT
+	case .Segmentation_Fault:       signo = unix.SIGSEGV
+	case .Termination:              signo = unix.SIGTERM
 	}
 
 	sigact: unix.Sigaction
@@ -249,60 +286,116 @@ _process_signal :: proc(sig: Signal, h: Signal_Handler) -> Error {
 	return _ok_or_error(unix.sys_rt_sigaction(signo, &sigact, nil))
 }
 
-_process_wait :: proc(p: ^Process, t: time.Duration) -> (Process_State, Error) {
-	state: Process_State = {
-		pid = p.pid,
+_process_wait :: proc(p: ^Process, t: time.Duration) -> (state: Process_State, err: Error) {
+	state.pid = p.pid
+
+	//options: int = unix.WEXITED
+	options: int
+	big_if: if t == 0 {
+		options |= unix.WNOHANG
+	} else if t != time.MAX_DURATION {
+		ts: unix.timespec = {
+			tv_sec = c.long(t / time.Second),
+			tv_nsec = c.long(t % time.Second),
+		}
+
+		@static has_pidfd_open: bool = true
+
+		// sys_pidfd_open is fairly new, so don't error out on ENOSYS
+		pid_fd: int 
+		if has_pidfd_open {
+			pid_fd = unix.sys_pidfd_open(p.pid, 0)
+			if pid_fd < 0 && pid_fd != -unix.ENOSYS {
+				return state, _get_platform_error(pid_fd)
+			}
+		}
+
+		if has_pidfd_open && pid_fd != -unix.ENOSYS {
+			defer unix.sys_close(pid_fd)
+			pollfd: unix.Pollfd = {
+				fd = i32(pid_fd),
+				events = unix.POLLIN,
+			}
+			for {
+				res := unix.sys_ppoll(&pollfd, 1, &ts, nil)
+				if res == -unix.EINTR {
+					continue
+				}
+				if res < 0 {
+					return state, _get_platform_error(res)
+				}
+				if res == 0 {
+					return _process_get_state(p^)
+				}
+				break
+			}
+		} else {
+			has_pidfd_open = false
+			mask: unix.sigset_t = 1 << (unix.SIGCHLD - 1)
+			org_mask : unix.sigset_t
+			res := unix.sys_rt_sigprocmask(.SIG_BLOCK, &mask, &org_mask)
+			if res < 0 {
+				return state, _get_platform_error(res)
+			}
+			defer unix.sys_rt_sigprocmask(.SIG_SETMASK, &org_mask, nil)
+
+			// In case there was a signal handler on SIGCHLD, avoid race
+			// condition by checking wait first.
+			options |= unix.WNOHANG
+			info: unix.Siginfo
+			res = unix.sys_waitid(.P_PID, p.pid, &info, options | unix.WNOWAIT | unix.WEXITED, nil)
+			if res == 0 && info.si_code != 0 {
+				break big_if
+			}
+
+			loop: for {
+				switch res = unix.sys_rt_sigtimedwait(&mask, &info, &ts); res {
+				case -unix.EAGAIN: // timeout
+					return _process_get_state(p^)
+				case -unix.EINVAL:
+					return state, _get_platform_error(res)
+				case -unix.EINTR:
+					continue
+				case:
+					if info.si_pid == i32(p.pid) {
+						break loop
+					}
+				}
+			}
+		}
 	}
 
-	rusage: unix.Rusage
+	state = _process_get_state(p^) or_return
+
 	status: i32
 	res: int
-
-	switch t {
-	case time.MAX_DURATION:
-		res = unix.sys_wait4(p.pid, &status, unix.WEXITED, &rusage)
-	case 0:
-		res = unix.sys_wait4(p.pid, &status, unix.WNOHANG | unix.WEXITED, &rusage)
-		if res == 0 { // nothing to report
-			return state, nil
+	for {
+		res = unix.sys_wait4(p.pid, &status, options, nil)
+		if res == -unix.EINTR {
+			continue
 		}
-	case:
-		// TODO:
-		// unix.sys_pidfd_open
-		// if !ENOSYS
-		//   unix.sys_poll
-		// else
-		//   block SIGCHLD
-		//   unix.sys_rt_sigtimedwait
-		//   unblock SIGCHLD
-		unimplemented("timed wait not yet implemented")
+		if res < 0 {
+			return state, _get_platform_error(res)
+		}
+		break
 	}
 
-	if res < 0 {
-		return state, _get_platform_error(res)
+	if res == 0 {
+		return _process_get_state(p^)
 	}
 
 	state.exited = true
-
-	signo := status & 0x7f
-
+	p.is_done = true
 	// normal exit
-	if signo == 0 {
+	if signo := status & 0x7f; signo == 0 {
 		state.exit_code = int((status >> 8) & 0xff)
 		state.success = state.exit_code == 0
 	}
 
 	// signaled
 	if (status & 0xffff) - 1 < 0xff {
-		// for now, success = false and exit_code = 0
+		// NOTE: for now, success = false and exit_code = 0
 	}
 
-	// TODO: rusage gives us times of all children, not the specifically
-	//       waited on child. Need to parse /proc/<pid>/stat for that.
-	state.user_time = time.Duration(rusage.ru_utime.tv_usec) * time.Microsecond
-	state.user_time += time.Duration(rusage.ru_utime.tv_sec) * time.Second
-	state.system_time = time.Duration(rusage.ru_stime.tv_usec) * time.Microsecond
-	state.system_time += time.Duration(rusage.ru_stime.tv_sec) * time.Second
-
-	return state, nil
+	return
 }

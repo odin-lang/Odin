@@ -1838,7 +1838,7 @@ SIGINFO_SIZE :: 128
 // that allow the user to access the members as if it were a
 // giant struct without the unions. Here, we can actually
 // access the desired names with the `using _` convention.
-siginfo_t :: struct #align(size_of(rawptr)) {
+Siginfo :: struct #align(size_of(rawptr)) {
 	si_signo: i32,
 	si_errno: i32,
 	si_code:  i32,
@@ -1894,8 +1894,16 @@ siginfo_t :: struct #align(size_of(rawptr)) {
 	},
 }
 
+// siginfo SIGCHLD si_codes
+CLD_EXITED    :: 1
+CLD_KILLED    :: 2
+CLD_DUMPED    :: 3
+CLD_TRAPPED   :: 4
+CLD_STOPPED   :: 5
+CLD_CONTINUED :: 6
+
 sighandler_t      :: #type proc "c" (sig: c.int)
-sighandler_info_t :: #type proc "c" (sig: c.int, info: ^siginfo_t, ucontext: rawptr)
+sighandler_info_t :: #type proc "c" (sig: c.int, info: ^Siginfo, ucontext: rawptr)
 sigrestore_t      :: #type proc "c" () -> !
 sigset_t          :: u64
 
@@ -2001,6 +2009,12 @@ POLLREMOVE     :: 0x1000
 POLLRDHUP      :: 0x2000
 POLLFREE       :: 0x4000
 POLL_BUSY_LOOP :: 0x8000
+
+Pollfd :: struct {
+	fd: i32,
+	events: i16,
+	revents: i16,
+}
 
 // perf event data
 Perf_Sample :: struct #raw_union {
@@ -2464,8 +2478,12 @@ Waitid_Which :: enum {
 	P_PGID,
 	P_PIDFD,
 }
-sys_waitid :: proc "contextless" (which: Waitid_Which, id: int, siginfo: ^siginfo_t, options: int, rusage: ^Rusage) -> int {
+sys_waitid :: proc "contextless" (which: Waitid_Which, id: int, siginfo: ^Siginfo, options: int, rusage: ^Rusage) -> int {
 	return int(intrinsics.syscall(SYS_waitid, uintptr(which), uintptr(id), uintptr(siginfo), uintptr(options), uintptr(rusage)))
+}
+
+sys_getrusage :: proc "contextless" (who: int, rusage: ^Rusage) -> int {
+	return int(intrinsics.syscall(SYS_getrusage, uintptr(who), uintptr(rusage)))
 }
 
 sys_pipe2 :: proc "contextless" (fds: rawptr, flags: int) -> int {
@@ -2592,7 +2610,7 @@ sys_rt_sigprocmask :: proc "contextless" (how: Sigprocmask_How, set, oldset: ^si
 	return int(intrinsics.syscall(SYS_rt_sigprocmask, uintptr(how), uintptr(set), uintptr(oldset), uintptr(sigsetsize)))
 }
 
-sys_rt_sigtimedwait :: proc "contextless" (uthese: ^sigset_t, uinfo: ^siginfo_t, uts: ^timespec, sigsetsize: uint = size_of(sigset_t)) -> int {
+sys_rt_sigtimedwait :: proc "contextless" (uthese: ^sigset_t, uinfo: ^Siginfo, uts: ^timespec, sigsetsize: uint = size_of(sigset_t)) -> int {
 	return int(intrinsics.syscall(SYS_rt_sigtimedwait, uintptr(uthese), uintptr(uinfo), uintptr(uts), uintptr(sigsetsize)))
 }
 
@@ -2614,7 +2632,7 @@ sys_poll :: proc "contextless" (fds: rawptr, nfds: uint, timeout: int) -> int {
 	}
 }
 
-sys_ppoll :: proc "contextless" (fds: rawptr, nfds: uint, timeout: rawptr, sigmask: rawptr, sigsetsize: uint) -> int {
+sys_ppoll :: proc "contextless" (fds: rawptr, nfds: uint, timeout: rawptr, sigmask: rawptr, sigsetsize: uint = size_of(sigset_t)) -> int {
 	return int(intrinsics.syscall(SYS_ppoll, uintptr(fds), uintptr(nfds), uintptr(timeout), uintptr(sigmask), uintptr(sigsetsize)))
 }
 

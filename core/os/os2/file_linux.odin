@@ -311,7 +311,9 @@ _chtimes :: proc(name: string, atime, mtime: time.Time) -> Error {
 		{ atime._nsec, 0 },
 		{ mtime._nsec, 0 },
 	}
-	return _ok_or_error(unix.sys_utimensat(transmute(int)(unix.AT_FDCWD), name_cstr, &times, 0))
+	// TODO:
+	//return _ok_or_error(unix.sys_utimensat(transmute(int)(unix.AT_FDCWD), name_cstr, &times, 0))
+	return _ok_or_error(unix.sys_utimensat(-100, name_cstr, &times, 0))
 }
 
 _fchtimes :: proc(f: ^File, atime, mtime: time.Time) -> Error {
@@ -368,6 +370,49 @@ _is_dir_fd :: proc(fd: int) -> bool {
 	return unix.S_ISDIR(s.mode)
 }
 
+/* Certain files in the Linux file system are not actual
+ * files (e.g. everything in /proc/). Therefore, the
+ * read_entire_file procs fail to actually read anything
+ * since these "files" stat to a size of 0.  Here, we just
+ * read until there is nothing left.
+ */
+_read_entire_pseudo_file :: proc { _read_entire_pseudo_file_string, _read_entire_pseudo_file_cstring }
+
+_read_entire_pseudo_file_string :: proc(name: string, allocator := context.allocator) -> ([]u8, Error) {
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
+	name_cstr := strings.clone_to_cstring(name, context.temp_allocator)
+	return _read_entire_pseudo_file_cstring(name_cstr)
+}
+
+_read_entire_pseudo_file_cstring :: proc(name: cstring, allocator := context.allocator) -> ([]u8, Error) {
+	fd := unix.sys_open(name, unix.O_RDONLY)
+	if fd < 0 {
+		return nil, _get_platform_error(fd)
+	}
+	defer unix.sys_close(fd)
+
+	BUF_SIZE_STEP :: 128
+	contents := make([dynamic]u8, 0, BUF_SIZE_STEP, allocator)
+
+	n: int
+	i: int
+	for {
+		resize(&contents, i + BUF_SIZE_STEP)
+		n = unix.sys_read(fd, &contents[i], BUF_SIZE_STEP)
+		if n < 0 {
+			delete(contents)
+			return nil, _get_platform_error(n)
+		}
+		if n < BUF_SIZE_STEP {
+			break
+		}
+		i += BUF_SIZE_STEP
+	}
+
+	resize(&contents, i + n)
+
+	return contents[:], nil
+}
 
 @(private="package")
 _file_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, offset: i64, whence: io.Seek_From) -> (n: i64, err: io.Error) {
