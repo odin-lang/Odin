@@ -47,8 +47,6 @@ if [ -d ".git" ] && [ -n "$(command -v git)" ]; then
 	CPPFLAGS="$CPPFLAGS -DGIT_SHA=\"$GIT_SHA\""
 fi
 
-
-
 if [ $LLVM_VERSION_MAJOR -lt 11 ] ||
 	([ $LLVM_VERSION_MAJOR -gt 14 ] && [ $LLVM_VERSION_MAJOR -lt 17 ]); then
 	error "Invalid LLVM version $LLVM_VERSION: must be 11, 12, 13, 14 or 17"
