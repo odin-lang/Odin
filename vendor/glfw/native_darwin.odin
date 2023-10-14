@@ -9,7 +9,7 @@ when GLFW_SHARED {
     foreign import glfw {"_"}
 } else {
     foreign import glfw {
-        "lib/darwin/libglfw3.a"
+        "lib/darwin/libglfw3.a",
     }
 }
 

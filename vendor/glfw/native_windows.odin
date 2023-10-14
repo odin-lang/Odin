@@ -9,14 +9,14 @@ when GLFW_SHARED {
         "lib/glfw3dll.lib",
         "system:user32.lib",
         "system:gdi32.lib",
-        "system:shell32.lib"
+        "system:shell32.lib",
     }
 } else {
     foreign import glfw {
         "lib/glfw3_mt.lib",
         "system:user32.lib",
         "system:gdi32.lib",
-        "system:shell32.lib"
+        "system:shell32.lib",
     }
 }
 

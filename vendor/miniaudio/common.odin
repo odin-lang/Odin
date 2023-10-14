@@ -2,7 +2,7 @@ package miniaudio
 
 import "core:c"
 
-MINIAUDIO_SHARED :: #config(MINIAUDIO_SHARED)
+MINIAUDIO_SHARED :: #config(MINIAUDIO_SHARED, false)
 
 when MINIAUDIO_SHARED {
 	#panic("Shared linking for miniaudio is not supported yet")
