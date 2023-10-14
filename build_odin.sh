@@ -15,7 +15,7 @@ OS_ARCH="$(uname -m)"
 OS_NAME="$(uname -s)"
 
 if [ -d ".git" ] && [ -n "$(command -v git)" ]; then
-	GIT_SHA=($(git show --pretty='%h'--no-patch --no-notes HEAD))
+	GIT_SHA=($(git show --pretty='%h' --no-patch --no-notes HEAD))
 	CPPFLAGS="$CPPFLAGS -DGIT_SHA=\"$GIT_SHA\""
 fi
 
