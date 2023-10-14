@@ -25,20 +25,20 @@ error() {
 }
 
 if [ -z "$LLVM_CONFIG" ]; then
-	if [ -n "$(command -v llvm-config-17)" ]; then
-		LLVM_CONFIG="llvm-config-17"
-	elif [ -n "$(command -v llvm-config-14)" ]; then
-		LLVM_CONFIG="llvm-config-14"
-	elif [ -n "$(command -v llvm-config-13)" ]; then
-		LLVM_CONFIG="llvm-config-13"
-	elif [ -n "$(command -v llvm-config-12)" ]; then
-		LLVM_CONFIG="llvm-config-12"
-	elif [ -n "$(command -v llvm-config-11)" ]; then
-		LLVM_CONFIG="llvm-config-11"
-	elif [ -n "$(command -v llvm-config)" ]; then
-		LLVM_CONFIG="llvm-config"
+	# darwin, linux, openbsd
+	if   [ -n "$(command -v llvm-config-17)" ]; then LLVM_CONFIG="llvm-config-17"
+	elif [ -n "$(command -v llvm-config-13)" ]; then LLVM_CONFIG="llvm-config-13"
+	elif [ -n "$(command -v llvm-config-12)" ]; then LLVM_CONFIG="llvm-config-12"
+	elif [ -n "$(command -v llvm-config-11)" ]; then LLVM_CONFIG="llvm-config-11"
+	# freebsd
+	elif [ -n "$(command -v llvm-config17)" ]; then  LLVM_CONFIG="llvm-config-17"
+	elif [ -n "$(command -v llvm-config13)" ]; then  LLVM_CONFIG="llvm-config-13"
+	elif [ -n "$(command -v llvm-config12)" ]; then  LLVM_CONFIG="llvm-config-12"
+	elif [ -n "$(command -v llvm-config11)" ]; then  LLVM_CONFIG="llvm-config-11"
+	# fallback
+	elif [ -n "$(command -v llvm-config)" ]; then LLVM_CONFIG="llvm-config"
 	else
-		error "No supported llvm-config version found. Set LLVM_CONFIG to proceed."
+		error "No llvm-config command found. Set LLVM_CONFIG to proceed."
 	fi
 fi
 
