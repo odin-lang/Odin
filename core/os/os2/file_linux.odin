@@ -1,6 +1,7 @@
 //+private
 package os2
 
+import "core:c"
 import "core:io"
 import "core:time"
 import "core:strings"
@@ -22,6 +23,9 @@ _stdin : File = {
 		name = "/proc/self/fd/0",
 		fd = 0,
 		allocator = _file_allocator(),
+		stream = {
+			procedure = _file_stream_proc,
+		},
 	},
 }
 _stdout : File = {
@@ -29,6 +33,9 @@ _stdout : File = {
 		name = "/proc/self/fd/1",
 		fd = 1,
 		allocator = _file_allocator(),
+		stream = {
+			procedure = _file_stream_proc,
+		},
 	},
 }
 _stderr : File = {
@@ -36,7 +43,18 @@ _stderr : File = {
 		name = "/proc/self/fd/2",
 		fd = 2,
 		allocator = _file_allocator(),
+		stream = {
+			procedure = _file_stream_proc,
+		},
 	},
+}
+
+@init
+_standard_stream_init :: proc() {
+	// cannot define these manually because cyclic reference
+	_stdin.impl.stream.data = &_stdin
+	_stdout.impl.stream.data = &_stdout
+	_stderr.impl.stream.data = &_stderr
 }
 
 _file_allocator :: proc() -> runtime.Allocator {
@@ -137,22 +155,16 @@ _read :: proc(f: ^File, p: []byte) -> (i64, Error) {
 	return i64(n), nil
 }
 
-_read_at :: proc(f: ^File, p: []byte, offset: i64) -> (n: i64, err: Error) {
+_read_at :: proc(f: ^File, p: []byte, offset: i64) -> (i64, Error) {
 	if offset < 0 {
 		return 0, .Invalid_Offset
 	}
 
-	b, offset := p, offset
-	for len(b) > 0 {
-		m := unix.sys_pread(f.impl.fd, &b[0], len(b), offset)
-		if m < 0 {
-			return -1, _get_platform_error(m)
-		}
-		n += i64(m)
-		b = b[m:]
-		offset += i64(m)
+	n := unix.sys_pread(f.impl.fd, &p[0], len(p), offset)
+	if n < 0 {
+		return -1, _get_platform_error(n)
 	}
-	return
+	return i64(n), nil
 }
 
 _write :: proc(f: ^File, p: []byte) -> (i64, Error) {
@@ -166,22 +178,16 @@ _write :: proc(f: ^File, p: []byte) -> (i64, Error) {
 	return i64(n), nil
 }
 
-_write_at :: proc(f: ^File, p: []byte, offset: i64) -> (n: i64, err: Error) {
+_write_at :: proc(f: ^File, p: []byte, offset: i64) -> (i64, Error) {
 	if offset < 0 {
 		return 0, .Invalid_Offset
 	}
 
-	b, offset := p, offset
-	for len(b) > 0 {
-		m := unix.sys_pwrite(f.impl.fd, &b[0], len(b), offset)
-		if m < 0 {
-			return -1, _get_platform_error(m)
-		}
-		n += i64(m)
-		b = b[m:]
-		offset += i64(m)
+	n := unix.sys_pwrite(f.impl.fd, &p[0], len(p), offset)
+	if n < 0 {
+		return -1, _get_platform_error(n)
 	}
-	return
+	return i64(n), nil
 }
 
 _file_size :: proc(f: ^File) -> (n: i64, err: Error) {
@@ -251,14 +257,15 @@ _read_link_cstr :: proc(name_cstr: cstring, allocator: runtime.Allocator) -> (st
 	for {
 		rc := unix.sys_readlink(name_cstr, &(buf[0]), bufsz)
 		if rc < 0 {
-			delete(buf)
+			delete(buf, allocator)
 			return "", _get_platform_error(rc)
 		} else if rc == int(bufsz) {
 			bufsz *= 2
-			delete(buf)
+			delete(buf, allocator)
 			buf = make([]byte, bufsz, allocator)
 		} else {
-			return strings.string_from_ptr(&buf[0], rc), nil
+			s := string(buf[:rc])
+			return s, nil
 		}
 	}
 }
@@ -312,8 +319,14 @@ _chtimes :: proc(name: string, atime, mtime: time.Time) -> Error {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	name_cstr := strings.clone_to_cstring(name, context.temp_allocator)
 	times := [2]unix.timespec {
-		{ atime._nsec, 0 },
-		{ mtime._nsec, 0 },
+		{
+			c.long(atime._nsec) / c.long(time.Second),
+			c.long(atime._nsec) % c.long(time.Second),
+		},
+		{
+			c.long(mtime._nsec) / c.long(time.Second),
+			c.long(mtime._nsec) % c.long(time.Second),
+		},
 	}
 	// TODO:
 	//return _ok_or_error(unix.sys_utimensat(transmute(int)(unix.AT_FDCWD), name_cstr, &times, 0))
@@ -322,8 +335,14 @@ _chtimes :: proc(name: string, atime, mtime: time.Time) -> Error {
 
 _fchtimes :: proc(f: ^File, atime, mtime: time.Time) -> Error {
 	times := [2]unix.timespec {
-		{ atime._nsec, 0 },
-		{ mtime._nsec, 0 },
+		{
+			c.long(atime._nsec) / c.long(time.Second),
+			c.long(atime._nsec) % c.long(time.Second),
+		},
+		{
+			c.long(mtime._nsec) / c.long(time.Second),
+			c.long(mtime._nsec) % c.long(time.Second),
+		},
 	}
 	return _ok_or_error(unix.sys_utimensat(f.impl.fd, nil, &times, 0))
 }
@@ -383,8 +402,8 @@ _is_dir_fd :: proc(fd: int) -> bool {
 _read_entire_pseudo_file :: proc { _read_entire_pseudo_file_string, _read_entire_pseudo_file_cstring }
 
 _read_entire_pseudo_file_string :: proc(name: string, allocator := context.allocator) -> ([]u8, Error) {
-	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
-	name_cstr := strings.clone_to_cstring(name, context.temp_allocator)
+	name_cstr := strings.clone_to_cstring(name, allocator)
+	defer delete(name, allocator)
 	return _read_entire_pseudo_file_cstring(name_cstr)
 }
 
