@@ -11,13 +11,27 @@ CPPFLAGS="$CPPFLAGS -DODIN_VERSION_RAW=\"dev-$(date +"%Y-%m")\""
 CXXFLAGS="$CXXFLAGS -std=c++14"
 DISABLED_WARNINGS="-Wno-switch -Wno-macro-redefined -Wno-unused-value"
 LDFLAGS="$LDFLAGS -pthread -lm -lstdc++"
+OS_ARCH="$(uname -m)"
+OS_NAME="$(uname -s)"
+
+if [ -z "$(command -v llvm-config)" ]; then
+	if [ -n "$(command -v llvm-config-17)" ]; then
+		LLVM_CONFIG="llvm-config-17"
+	elif [ -n "$(command -v llvm-config-14)" ]; then
+		LLVM_CONFIG="llvm-config-14"
+	elif [ -n "$(command -v llvm-config-13)" ]; then
+		LLVM_CONFIG="llvm-config-13"
+	elif [ -n "$(command -v llvm-config-12)" ]; then
+		LLVM_CONFIG="llvm-config-12"
+	elif [ -n "$(command -v llvm-config-11)" ]; then
+		LLVM_CONFIG="llvm-config-11"
+	fi
+fi
 
 LLVM_VERSION="$($LLVM_CONFIG --version)"
 LLVM_VERSION_MAJOR="$(echo $LLVM_VERSION | awk -F. '{print $1}')"
 LLVM_VERSION_MINOR="$(echo $LLVM_VERSION | awk -F. '{print $2}')"
 LLVM_VERSION_PATCH="$(echo $LLVM_VERSION | awk -F. '{print $3}')"
-OS_ARCH="$(uname -m)"
-OS_NAME="$(uname -s)"
 
 error() {
 	printf "ERROR: %s\n" "$1"
@@ -28,6 +42,8 @@ if [ -d ".git" ] && [ -n "$(command -v git)" ]; then
 	GIT_SHA=($(git show --pretty='%h'--no-patch --no-notes HEAD))
 	CPPFLAGS="$CPPFLAGS -DGIT_SHA=\"$GIT_SHA\""
 fi
+
+
 
 if [ $LLVM_VERSION_MAJOR -lt 11 ] ||
 	([ $LLVM_VERSION_MAJOR -gt 14 ] && [ $LLVM_VERSION_MAJOR -lt 17 ]); then
