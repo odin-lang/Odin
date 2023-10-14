@@ -3,10 +3,10 @@ package glfw_bindings
 import "core:c"
 import vk "vendor:vulkan"
 
-GLFW_DYNAMIC :: #config(GLFW_DYNAMIC, false)
+GLFW_SHARED :: #config(GLFW_SHARED, false)
 
 when ODIN_OS == .Windows {
-	when GLFW_DYNAMIC {
+	when GLFW_SHARED {
 		foreign import glfw {
 			"../lib/glfw3dll.lib",
 			"system:user32.lib", 
