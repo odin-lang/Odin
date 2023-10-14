@@ -14,6 +14,11 @@ LDFLAGS="$LDFLAGS -pthread -lm -lstdc++"
 OS_ARCH="$(uname -m)"
 OS_NAME="$(uname -s)"
 
+if [ -d ".git" ] && [ -n "$(command -v git)" ]; then
+	GIT_SHA=($(git show --pretty='%h'--no-patch --no-notes HEAD))
+	CPPFLAGS="$CPPFLAGS -DGIT_SHA=\"$GIT_SHA\""
+fi
+
 error() {
 	printf "ERROR: %s\n" "$1"
 	exit 1
@@ -41,11 +46,6 @@ LLVM_VERSION="$($LLVM_CONFIG --version)"
 LLVM_VERSION_MAJOR="$(echo $LLVM_VERSION | awk -F. '{print $1}')"
 LLVM_VERSION_MINOR="$(echo $LLVM_VERSION | awk -F. '{print $2}')"
 LLVM_VERSION_PATCH="$(echo $LLVM_VERSION | awk -F. '{print $3}')"
-
-if [ -d ".git" ] && [ -n "$(command -v git)" ]; then
-	GIT_SHA=($(git show --pretty='%h'--no-patch --no-notes HEAD))
-	CPPFLAGS="$CPPFLAGS -DGIT_SHA=\"$GIT_SHA\""
-fi
 
 if [ $LLVM_VERSION_MAJOR -lt 11 ] ||
 	([ $LLVM_VERSION_MAJOR -gt 14 ] && [ $LLVM_VERSION_MAJOR -lt 17 ]); then
