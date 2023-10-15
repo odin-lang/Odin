@@ -117,10 +117,10 @@ run_demo() {
 	./odin run examples/demo/demo.odin -file
 }
 
-if [[ $# -eq 0 ]]; then
+if [ $# -eq 0 ]; then
 	build_odin debug
 	run_demo
-elif [[ $# -eq 1 ]]; then
+elif [ $# -eq 1 ]; then
 	case $1 in
 	report)
 		[ ! -f "./odin" ] && build_odin debug
