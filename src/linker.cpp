@@ -149,14 +149,20 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 						if (!string_set_update(&asm_files, lib)) {
 							String asm_file = asm_files.entries[i].value;
 							String obj_file = concatenate_strings(permanent_allocator(), asm_file, str_lit(".obj"));
-
+							String obj_format;
+#if defined(GB_ARCH_64_BIT)
+							obj_format = str_lit("win64");
+#elif defined(GB_ARCH_32_BIT)
+							obj_format = str_lit("win32");
+#endif // GB_ARCH_*_BIT
 							result = system_exec_command_line_app("nasm",
 								"\"%.*s\\bin\\nasm\\windows\\nasm.exe\" \"%.*s\" "
-								"-f win64 "
+								"-f \"%.*s\" "
 								"-o \"%.*s\" "
 								"%.*s "
 								"",
 								LIT(build_context.ODIN_ROOT), LIT(asm_file),
+								LIT(obj_format),
 								LIT(obj_file),
 								LIT(build_context.extra_assembler_flags)
 							);
@@ -295,11 +301,15 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 			//                files can be passed with -l:
 			gbString lib_str = gb_string_make(heap_allocator(), "-L/");
 			defer (gb_string_free(lib_str));
-
+			
+			StringSet asm_files = {};
+			string_set_init(&asm_files, 64);
+			defer (string_set_destroy(&asm_files));
+			
 			StringSet libs = {};
 			string_set_init(&libs, 64);
 			defer (string_set_destroy(&libs));
-
+			
 			for (Entity *e : gen->foreign_libraries) {
 				GB_ASSERT(e->kind == Entity_LibraryName);
 				for (String lib : e->LibraryName.paths) {
@@ -307,46 +317,83 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 					if (lib.len == 0) {
 						continue;
 					}
-					if (string_set_update(&libs, lib)) {
-						continue;
-					}
-
-					// NOTE(zangent): Sometimes, you have to use -framework on MacOS.
-					//   This allows you to specify '-f' in a #foreign_system_library,
-					//   without having to implement any new syntax specifically for MacOS.
-					if (build_context.metrics.os == TargetOs_darwin) {
-						if (string_ends_with(lib, str_lit(".framework"))) {
-							// framework thingie
-							String lib_name = lib;
-							lib_name = remove_extension_from_path(lib_name);
-							lib_str = gb_string_append_fmt(lib_str, " -framework %.*s ", LIT(lib_name));
-						} else if (string_ends_with(lib, str_lit(".a")) || string_ends_with(lib, str_lit(".o")) || string_ends_with(lib, str_lit(".dylib"))) {
-							// For:
-							// object
-							// dynamic lib
-							// static libs, absolute full path relative to the file in which the lib was imported from
-							lib_str = gb_string_append_fmt(lib_str, " %.*s ", LIT(lib));
-						} else {
-							// dynamic or static system lib, just link regularly searching system library paths
-							lib_str = gb_string_append_fmt(lib_str, " -l%.*s ", LIT(lib));
+					if (has_asm_extension(lib)) {
+						if (string_set_update(&asm_files, lib)) {
+							continue; // already handled
 						}
-					} else {
-						// NOTE(vassvik): static libraries (.a files) in linux can be linked to directly using the full path,
-						//                since those are statically linked to at link time. shared libraries (.so) has to be
-						//                available at runtime wherever the executable is run, so we make require those to be
-						//                local to the executable (unless the system collection is used, in which case we search
-						//                the system library paths for the library file).
-						if (string_ends_with(lib, str_lit(".a")) || string_ends_with(lib, str_lit(".o"))) {
-							// static libs and object files, absolute full path relative to the file in which the lib was imported from
-							lib_str = gb_string_append_fmt(lib_str, " -l:\"%.*s\" ", LIT(lib));
-						} else if (string_ends_with(lib, str_lit(".so"))) {
-							// dynamic lib, relative path to executable
-							// NOTE(vassvik): it is the user's responsibility to make sure the shared library files are visible
-							//                at runtime to the executable
-							lib_str = gb_string_append_fmt(lib_str, " -l:\"%s/%.*s\" ", cwd, LIT(lib));
+						String asm_file = lib;
+						String obj_file = concatenate_strings(permanent_allocator(), asm_file, str_lit(".o"));
+						String obj_format;
+#if defined(GB_ARCH_64_BIT)
+						if (is_osx) {
+							obj_format = str_lit("macho64");
 						} else {
-							// dynamic or static system lib, just link regularly searching system library paths
-							lib_str = gb_string_append_fmt(lib_str, " -l%.*s ", LIT(lib));
+							obj_format = str_lit("elf64");
+						}
+#elif defined(GB_ARCH_32_BIT)
+						if (is_osx) {
+							obj_format = str_lit("macho32");
+						} else {
+							obj_format = str_lit("elf32");
+						}
+#endif // GB_ARCH_*_BIT
+						// Note(bumbread): I'm assuming nasm is installed on the host machine.
+						// Shipping binaries on unix-likes gets into the weird territorry of
+						// "which version of glibc" is it linked with.
+						result = system_exec_command_line_app("nasm",
+							"nasm \"%.*s\" "
+							"-f \"%.*s\" "
+							"-o \"%.*s\" "
+							"%.*s "
+							"",
+							LIT(asm_file),
+							LIT(obj_format),
+							LIT(obj_file),
+							LIT(build_context.extra_assembler_flags)
+						);						
+						array_add(&gen->output_object_paths, obj_file);
+					} else {
+						if (string_set_update(&libs, lib)) {
+							continue;
+						}
+
+						// NOTE(zangent): Sometimes, you have to use -framework on MacOS.
+						//   This allows you to specify '-f' in a #foreign_system_library,
+						//   without having to implement any new syntax specifically for MacOS.
+						if (build_context.metrics.os == TargetOs_darwin) {
+							if (string_ends_with(lib, str_lit(".framework"))) {
+								// framework thingie
+								String lib_name = lib;
+								lib_name = remove_extension_from_path(lib_name);
+								lib_str = gb_string_append_fmt(lib_str, " -framework %.*s ", LIT(lib_name));
+							} else if (string_ends_with(lib, str_lit(".a")) || string_ends_with(lib, str_lit(".o")) || string_ends_with(lib, str_lit(".dylib"))) {
+								// For:
+								// object
+								// dynamic lib
+								// static libs, absolute full path relative to the file in which the lib was imported from
+								lib_str = gb_string_append_fmt(lib_str, " %.*s ", LIT(lib));
+							} else {
+								// dynamic or static system lib, just link regularly searching system library paths
+								lib_str = gb_string_append_fmt(lib_str, " -l%.*s ", LIT(lib));
+							}
+						} else {
+							// NOTE(vassvik): static libraries (.a files) in linux can be linked to directly using the full path,
+							//                since those are statically linked to at link time. shared libraries (.so) has to be
+							//                available at runtime wherever the executable is run, so we make require those to be
+							//                local to the executable (unless the system collection is used, in which case we search
+							//                the system library paths for the library file).
+							if (string_ends_with(lib, str_lit(".a")) || string_ends_with(lib, str_lit(".o"))) {
+								// static libs and object files, absolute full path relative to the file in which the lib was imported from
+								lib_str = gb_string_append_fmt(lib_str, " -l:\"%.*s\" ", LIT(lib));
+							} else if (string_ends_with(lib, str_lit(".so"))) {
+								// dynamic lib, relative path to executable
+								// NOTE(vassvik): it is the user's responsibility to make sure the shared library files are visible
+								//                at runtime to the executable
+								lib_str = gb_string_append_fmt(lib_str, " -l:\"%s/%.*s\" ", cwd, LIT(lib));
+							} else {
+								// dynamic or static system lib, just link regularly searching system library paths
+								lib_str = gb_string_append_fmt(lib_str, " -l%.*s ", LIT(lib));
+							}
 						}
 					}
 				}
