@@ -9,7 +9,7 @@ _IS_SUPPORTED :: true // NOTE: Times on Darwin are UTC.
 _now :: proc "contextless" () -> Time {
 	time_spec_now: unix.timespec
 	unix.clock_gettime(unix.CLOCK_REALTIME, &time_spec_now)
-	ns := time_spec_now.tv_sec * 1e9 + time_spec_now.tv_nsec
+	ns := i64(time_spec_now.tv_sec * 1e9) + i64(time_spec_now.tv_nsec)
 	return Time{_nsec=ns}
 }
 
@@ -25,7 +25,7 @@ _sleep :: proc "contextless" (d: Duration) {
 _tick_now :: proc "contextless" () -> Tick {
 	t: unix.timespec
 	unix.clock_gettime(unix.CLOCK_MONOTONIC_RAW, &t)
-	return Tick{_nsec = t.tv_sec*1e9 + t.tv_nsec}
+	return Tick{_nsec = i64(t.tv_sec*1e9) + i64(t.tv_nsec)}
 }
 
 _yield :: proc "contextless" () {
