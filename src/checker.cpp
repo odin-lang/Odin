@@ -4733,8 +4733,7 @@ gb_internal void check_add_foreign_import_decl(CheckerContext *ctx, Ast *decl) {
 	}
 
 	if (has_asm_extension(fullpath)) {
-		if (build_context.metrics.arch != TargetArch_amd64 ||
-		    build_context.metrics.os   != TargetOs_windows) {
+		if (build_context.metrics.arch != TargetArch_amd64) {
 			error(decl, "Assembly files are not yet supported on this platform: %.*s_%.*s",
 			      LIT(target_os_names[build_context.metrics.os]), LIT(target_arch_names[build_context.metrics.arch]));
 		}
