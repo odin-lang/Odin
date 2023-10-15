@@ -15,7 +15,7 @@
 #include <llvm-c/Object.h>
 #include <llvm-c/BitWriter.h>
 #include <llvm-c/DebugInfo.h>
-#if LLVM_VERSION_MAJOR >= 17 && (LLVM_VERSION_MINOR > 0 || (LLVM_VERSION_MINOR == 0 && LLVM_VERSION_PATCH > 0))
+#if LLVM_VERSION_MAJOR >= 17
 #include <llvm-c/Transforms/PassBuilder.h>
 #else
 #include <llvm-c/Transforms/AggressiveInstCombine.h>
