@@ -182,7 +182,7 @@ foreign libc {
 	fscanf    :: proc(stream: ^FILE, format: cstring, #c_vararg args: ..any) -> int ---
 	printf    :: proc(format: cstring, #c_vararg args: ..any) -> int ---
 	scanf     :: proc(format: cstring, #c_vararg args: ..any) -> int ---
-	snprintf  :: proc(s: [^]char, format: cstring, #c_vararg args: ..any) -> int ---
+	snprintf  :: proc(s: [^]char, n: size_t, format: cstring, #c_vararg args: ..any) -> int ---
 	sscanf    :: proc(s, format: cstring, #c_vararg args: ..any) -> int ---
 	vfprintf  :: proc(stream: ^FILE, format: cstring, arg: ^va_list) -> int ---
 	vfscanf   :: proc(stream: ^FILE, format: cstring, arg: ^va_list) -> int ---
