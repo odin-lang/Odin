@@ -15,6 +15,9 @@
 #include <llvm-c/Object.h>
 #include <llvm-c/BitWriter.h>
 #include <llvm-c/DebugInfo.h>
+#if LLVM_VERSION_MAJOR >= 17
+#include <llvm-c/Transforms/PassBuilder.h>
+#else
 #include <llvm-c/Transforms/AggressiveInstCombine.h>
 #include <llvm-c/Transforms/InstCombine.h>
 #include <llvm-c/Transforms/IPO.h>
@@ -22,6 +25,7 @@
 #include <llvm-c/Transforms/Scalar.h>
 #include <llvm-c/Transforms/Utils.h>
 #include <llvm-c/Transforms/Vectorize.h>
+#endif
 #endif
 
 #if LLVM_VERSION_MAJOR < 11
