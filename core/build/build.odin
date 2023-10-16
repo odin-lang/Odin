@@ -16,7 +16,6 @@ syscall :: proc(cmd: string, echo: bool) -> int {
     return cast(int)libc.system(cstr)
 }
 
-
 add_post_build_command :: proc(config: ^Config, name: string, cmd: Command_Proc) {
     command := Command {
         name = name,
@@ -32,9 +31,6 @@ add_pre_build_command :: proc(config: ^Config, name: string, cmd: Command_Proc) 
     }
     append(&config.pre_build_commands, command)
 }
-
-
-
 
 build_package :: proc(config: Config) {
     config_output_dirs: {
@@ -98,7 +94,7 @@ syscall_command :: proc($cmd: string) -> Command {
     }
 }
 
-build_options_make_from_args :: proc(args: []string) -> (o: Build_Options) {
+parse_args :: proc(args: []string) -> (o: Build_Options, ok: bool) #optional_ok {
     command := args[0]
     args := args[1:]
     if len(args) == 0 {
@@ -116,25 +112,61 @@ build_options_make_from_args :: proc(args: []string) -> (o: Build_Options) {
         case arg == "-help":
             display_help = true
             build_project = false
+
         case arg == "-ols":
             build_project = false
-            o.dev_opts.flags += {.Generate_OLS}
-        case arg == "-vscode":
-            build_project = false
-            o.dev_opts.editors += {.VSCode} 
+            o.dev_opts.flags += {.Generate_Ols}
         case arg == "-build-pre-launch":
             build_project = false
-        case strings.has_prefix(arg, "-debug-build-system"):
+            o.dev_opts.flags += {.Build_Pre_Launch}
+
+        case arg == "-vscode":
+            build_project = false
+            o.dev_opts.editors += {.VSCode}
+
+        case arg == "-use-cppvsdbg":
+            build_project = false
+            o.dev_opts.vscode_debugger_type = .cppvsdbg
+
+        case arg == "-use-cppdbg":
+            build_project = false
+            o.dev_opts.vscode_debugger_type = .cppdbg
+
+        case arg == "cwd-workspace":
+            build_project = false
+            o.dev_opts.flags += {.Cwd_Workspace}
+
+        case arg == "cwd-out":
+            build_project = false
+            o.dev_opts.flags += {.Cwd_Out}
+
+        case strings.has_prefix(arg, "-cwd"):
             build_project = false
             fmt.eprintf("Flag %s not implemented\n", arg)
+
+        case strings.has_prefix(arg, "-launch-args"):
+            build_project = false
+            fmt.eprintf("Flag %s not implemented\n", arg)
+
+        case strings.has_prefix(arg, "-include-build-system"):
+            build_project = false
+            o.dev_opts.flags += {.Include_Build_System}
+            fmt.eprintf("Flag %s not implemented\n", arg)
+
         case: 
             fmt.eprintf("Invalid flag %s\n", arg)
             return
         } else {
+            if config_name != "" {
+                fmt.eprintf("Config already set to %s and cannot be re-assigned to %s. Cannot have 2 configurations built with the same command (yet). ", config_name, arg)
+                return
+            }
             config_name = arg
+            o.config_name = config_name
         }
     }
 
+    // Note(Dragos): I do not like this approach
     if display_help {
         o.command_type = .Display_Help
     } else if build_project {
@@ -142,7 +174,7 @@ build_options_make_from_args :: proc(args: []string) -> (o: Build_Options) {
     } else {
         o.command_type = .Dev_Setup
     }
-    return
+    return o, true
 }
 
 add_target :: proc(project: ^Project, target: ^Target) {
@@ -161,41 +193,35 @@ run :: proc(main_project: ^Project, opts: Build_Options) {
 
     switch opts.command_type {
     case .Build:
-        for project in _build_ctx.projects {
-            if opts.display_external_configs || main_project == project {
-                found_config := false
-                for target in project.targets {
-                    config := project->configure_target_proc(target)
-                    prefixed_name := strings.concatenate({project.config_prefix, config.name}, context.temp_allocator)
-                    if _match(opts.config_name, prefixed_name) {
-                        found_config = true
-                        build_package(config)
-                    }
-        
-                    if !found_config {
-                        fmt.eprintf("Could not find configuration %s\n", opts.config_name)
-                    }
+        found_config := false
+        for project in _build_ctx.projects do if opts.display_external_configs || main_project == project {
+            for target in project.targets {
+                config := project->configure_target_proc(target)
+                prefixed_name := strings.concatenate({project.config_prefix, config.name}, context.temp_allocator)
+                if _match(opts.config_name, prefixed_name) {
+                    found_config = true
+                    build_package(config)
                 }
             }
         }
+        if !found_config {
+            fmt.eprintf("Could not find configuration %s\n", opts.config_name)
+        }
     
     case .Dev_Setup:
-        for project in _build_ctx.projects {
-            if opts.display_external_configs || main_project == project {
-                found_config := false
-                for target in project.targets {
-                    config := project->configure_target_proc(target)
-                    prefixed_name := strings.concatenate({project.config_prefix, config.name}, context.temp_allocator)
-                    if _match(opts.config_name, prefixed_name) {
-                        found_config = true
-                        _generate_devenv(config, opts.dev_opts)
-                    }
-        
-                    if !found_config {
-                        fmt.eprintf("Could not find configuration %s\n", opts.config_name)
-                    }
+        found_config := false
+        for project in _build_ctx.projects do if opts.display_external_configs || main_project == project  {  
+            for target in project.targets {
+                config := project->configure_target_proc(target)
+                prefixed_name := strings.concatenate({project.config_prefix, config.name}, context.temp_allocator)
+                if _match(opts.config_name, prefixed_name) {
+                    found_config = true
+                    _generate_devenv(config, opts.dev_opts)
                 }
             }
+        }
+        if !found_config {
+            fmt.eprintf("Could not find configuration %s\n", opts.config_name)
         }
     
     case .Display_Help:

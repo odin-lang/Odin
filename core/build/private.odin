@@ -104,31 +104,9 @@ _config_to_args :: proc(sb: ^strings.Builder, config: Config) {
     sbprintf(sb, `-out:"%s/%s"`, config.out_dir, config.out_file)
 }
 
-_generate_devenv :: proc(config: Config, opts: Dev_Options) {
-    if .Generate_OLS in opts.flags do _generate_ols(config)
-}
 
-_generate_ols :: proc(config: Config) {
-    argsBuilder := strings.builder_make()
-    _config_to_args(&argsBuilder, config)
-    args := strings.to_string(argsBuilder)
-    settings := default_language_server_settings(context.temp_allocator)
-    for name, path in config.collections {
-        append(&settings.collections, Collection{name = name, path = path})
-    }
-    append(&settings.collections, Collection{name = "core", path = strings.concatenate({ODIN_ROOT, "core"})})
-    append(&settings.collections, Collection{name = "vendor", path = strings.concatenate({ODIN_ROOT, "vendor"})})
 
-    settings.checker_args = args
-    marshalOpts: json.Marshal_Options
-    marshalOpts.pretty = true
-    if data, err := json.marshal(settings, marshalOpts, context.temp_allocator); err == nil {
-        if file, err := os.open("ols.json", os.O_CREATE | os.O_TRUNC); err == os.ERROR_NONE {
-            os.write_string(file, string(data))
-            os.close(file)
-        }   
-    }
-}
+
 
 _define_to_arg :: proc(sb: ^strings.Builder, name: string, val: Define_Val) {
     using strings
@@ -147,7 +125,6 @@ _define_to_arg :: proc(sb: ^strings.Builder, name: string, val: Define_Val) {
         }
     }
 }
-
 
 _display_command_help :: proc(main_project: ^Project, opts: Build_Options) {
     fmt.printf("%s build system\n", main_project.name)
@@ -176,30 +153,35 @@ _display_command_help :: proc(main_project: ^Project, opts: Build_Options) {
     fmt.println()
 
     fmt.printf("\t\t-build-pre-launch\n")
-    fmt.printf("\t\t\t[WIP] VSCode: Generates a pre launch command to build the project before debugging. \n\t\t\tEffectively runs `%s <config name>` before launching the debugger. Requires an editor flag like -vscode.\n", os.args[0])
+    fmt.printf("\t\t\t[WIP] VSCode: Generates a pre launch command to build the project before debugging. \n\t\t\tEffectively runs `%s <config name>` before launching the debugger.\n", os.args[0])
     fmt.println()
     
-    fmt.printf("\t\t-debug-build-system:\"<args>\"\n")
-    fmt.printf("\t\t\t[WIP] VSCode: Includes the build system as a debugging target. Requires an editor flag.\n")
+    fmt.printf("\t\t-include-build-system:\"<args>\"\n")
+    fmt.printf("\t\t\t[WIP] VSCode: Includes the build system as a debugging target.\n")
     fmt.println()
 
-    fmt.printf("\t\t-cwd-current\n")
-    fmt.printf("\t\t\t[WIP] VSCode: Use the current working directory as the CWD when debugging. Requires an editor flag.\n")
+    fmt.printf("\t\t-cwd-workspace\n")
+    fmt.printf("\t\t\t[WIP] VSCode: Use the workspace directory as the CWD when debugging.\n")
     fmt.println()
 
     fmt.printf("\t\t-cwd-out\n")
-    fmt.printf("\t\t\t[WIP] VSCode: Use the output directory as the CWD when debugging. Requires an editor flag.\n")
+    fmt.printf("\t\t\t[WIP] VSCode: Use the output directory as the CWD when debugging. \n")
     fmt.println()
+
+    fmt.printf("\t\t-cwd:\"<directory>\"\n")
+    fmt.printf("\t\t\t[WIP] VSCode: Use the specified directory as the CWD when debugging. \n")
+    fmt.println()
+
 
     fmt.printf("\t\t-launch-args:\"<args>\"\n")
     fmt.printf("\t\t\t[WIP] VScode: Specify the args sent to the executable when debugging.\n")
     fmt.println()
 
-    fmt.printf("\t\t-use-vsdbg\n")
-    fmt.printf("\t\t\t[WIP] VSCode: Use the VSCode debugger. \n")
+    fmt.printf("\t\t-use-cppvsdbg\n")
+    fmt.printf("\t\t\t[WIP] VSCode: Use the VSCode debugger. Used by default with -vscode. \n")
     fmt.println()
 
-    fmt.printf("\t\t-use-dbg\n")
+    fmt.printf("\t\t-use-cppdbg\n")
     fmt.printf("\t\t\t[WIP] VSCode: Use the GDB/LLDB debugger. \n")
     fmt.println()
 }
@@ -233,6 +215,7 @@ _opt_mode_to_arg := [Opt_Mode]string {
     .Minimal = "-o:minimal",
     .Size = "-o:size",
     .Speed = "-o:speed",
+    .Aggressive = "-:aggressive",
 }
 
 _build_mode_to_arg := [Build_Mode]string {

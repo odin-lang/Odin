@@ -68,7 +68,7 @@ _ :: proc() {
 }
 
 main :: proc() {
-    opts := build.build_options_make_from_args(os.args)
+    opts := build.parse_args(os.args)
     opts.default_config_name = "deb"
     opts.display_external_configs = true
     build.run(&project, opts)

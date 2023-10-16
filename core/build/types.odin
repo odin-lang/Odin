@@ -17,26 +17,7 @@ Build_Options :: struct {
     default_config_name: string,
 }
 
-Editor :: enum {
-    VSCode,
-}
-Editors :: bit_set[Editor]
 
-VSCode_Launch :: struct {
-
-}
-
-Dev_Flag :: enum {
-    Generate_OLS,
-    Build_Pre_Launch,
-    Debug_Build_System,
-}
-Dev_Flags :: bit_set[Dev_Flag]
-
-Dev_Options :: struct {
-    flags: Dev_Flags,
-    editors: Editors,
-}
 
 Define_Val :: union #no_nil {
     bool,
@@ -116,6 +97,7 @@ Opt_Mode :: enum {
     Minimal,
     Speed,
     Size,
+    Aggressive,
 }
 
 Reloc_Mode :: enum {
@@ -187,21 +169,6 @@ Timings_Export :: struct {
     format: Timings_Format,
     filename: Maybe(string),
 }
-
-
-Collection :: struct {
-    name, path: string,
-}
-
-Language_Server_Settings :: struct {
-    collections: [dynamic]Collection,
-    enable_document_symbols: bool,
-    enable_semantic_tokens: bool,
-    enable_hover: bool, 
-    enable_snippets: bool,
-    checker_args: string,
-}
-
 
 Command_Proc :: #type proc(config: Config) -> int
 
