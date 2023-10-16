@@ -7,12 +7,33 @@ import c "core:c/libc"
 
 #assert(size_of(c.int) == size_of(b32))
 
-when ODIN_OS == .Windows {
-	foreign import lib "windows/lua54dll.lib"
-} else when ODIN_OS == .Linux {
-	foreign import lib "linux/liblua54.a"
+LUA_SHARED :: #config(LUA_SHARED, false)
+
+when LUA_SHARED {
+	when ODIN_OS == .Windows {
+		// LUA_SHARED does nothing special on windows
+		foreign import lib "windows/lua54dll.lib"
+	} else when ODIN_OS == .Linux {
+		foreign import lib "linux/liblua54.so"
+	} else {
+		// Note(bumbread): My linux system has a few aliases for this shared object
+		//   lublua5.4.so, liblua.so, lublua.so.5.4, liblua.so.5.4.6. I don't know
+		// who enforces these numbers (probably ld?), and if it can be done in a
+		// unix-generic way, but in any way I think the most sane thing to do is to
+		// keep it close to what linux does and if it breaks, just special case those
+		// operating systems.
+		// Also there was no alias for liblua54.so, that seems to suggest that way
+		// of specifying it isn't portable
+		foreign import lib "system:liblua.so.5.4"
+	}
 } else {
-	foreign import lib "system:liblua54.a"
+	when ODIN_OS == .Windows {
+		foreign import lib "windows/lua54dll.lib"
+	} else when ODIN_OS == .Linux {
+		foreign import lib "linux/liblua54.a"
+	} else {
+		foreign import lib "system:liblua54.a"
+	}
 }
 
 VERSION_MAJOR       :: "5"

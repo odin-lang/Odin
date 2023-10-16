@@ -4,10 +4,20 @@ package glfw
 
 import win32 "core:sys/windows"
 
-when GLFW_DYNAMIC {
-    foreign import glfw { "lib/glfw3dll.lib", "system:user32.lib", "system:gdi32.lib", "system:shell32.lib" }
+when GLFW_SHARED {
+    foreign import glfw {
+        "lib/glfw3dll.lib",
+        "system:user32.lib",
+        "system:gdi32.lib",
+        "system:shell32.lib",
+    }
 } else {
-    foreign import glfw { "lib/glfw3_mt.lib", "system:user32.lib", "system:gdi32.lib", "system:shell32.lib" }
+    foreign import glfw {
+        "lib/glfw3_mt.lib",
+        "system:user32.lib",
+        "system:gdi32.lib",
+        "system:shell32.lib",
+    }
 }
 
 @(default_calling_convention="c", link_prefix="glfw")

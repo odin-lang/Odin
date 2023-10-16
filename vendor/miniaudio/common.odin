@@ -2,6 +2,12 @@ package miniaudio
 
 import "core:c"
 
+MINIAUDIO_SHARED :: #config(MINIAUDIO_SHARED, false)
+
+when MINIAUDIO_SHARED {
+	#panic("Shared linking for miniaudio is not supported yet")
+}
+
 when ODIN_OS == .Windows {
 	foreign import lib "lib/miniaudio.lib"
 } else when ODIN_OS == .Linux {

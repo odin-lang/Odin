@@ -1,7 +1,13 @@
 package vendor_openexr
 
+OPENEXRCORE_SHARED :: #config(OPENEXRCORE_SHARED, false)
+
 when ODIN_OS == .Windows {
-	foreign import lib "OpenEXRCore-3_1.lib"
+	when OPENEXRCORE_SHARED {
+		#panic("Dynamic linking is not supported for OpenEXRCore yet")
+	} else {
+		foreign import lib "OpenEXRCore-3_1.lib"
+	}
 } else {
 	foreign import lib "system:OpenEXRCore-3_1"
 }
