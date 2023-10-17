@@ -21,8 +21,8 @@ VSCode_Request_Type :: enum {
 }
 
 VSCode_Config_Json :: struct {
-    type: VSCode_Debugger_Type,
-    request: VSCode_Request_Type,
+    type: string,
+    request: string,
     preLaunchTask: string,
     name: string,
     program: string,
@@ -47,7 +47,7 @@ VSCode_Tasks_Json :: struct {
 }
 
 _generate_vscode :: proc(config: Config, opts: Dev_Options) {
-    if os.make_directory(".vscode") == os.ERROR_NONE {
+    if os.is_dir(".vscode") || os.make_directory(".vscode") == os.ERROR_NONE {
         launch_file, launch_err := os.open(".vscode/launch.json", os.O_CREATE | os.O_TRUNC)
         tasks_file, tasks_err := os.open(".vscode/tasks.json", os.O_CREATE | os.O_TRUNC)
         if launch_err == os.ERROR_NONE && tasks_err  == os.ERROR_NONE {
@@ -62,21 +62,24 @@ _generate_vscode :: proc(config: Config, opts: Dev_Options) {
             launch_json.version = "0.2.0"
             
             debug_config_json: VSCode_Config_Json
-            if opts.custom_cwd == "" {
+            if opts.custom_cwd != "" {
                 fmt.eprintf("Cannot currently have a custom cwd for vscode.\n")
             } else if .Cwd_Out in opts.flags {
                 debug_config_json.cwd = filepath.join({"%{workspaceFolder}/", config.out_dir}) // Note(Dragos): Test this
             } else if .Cwd_Workspace in opts.flags {
                 debug_config_json.cwd = "${worspaceFolder}"
+            } else {
+                debug_config_json.cwd = "${worspaceFolder}"
             }
 
             debug_config_json.program, _ = filepath.abs(filepath.join({config.out_dir, config.out_file}))
-            debug_config_json.type = opts.vscode_debugger_type
-            debug_config_json.request = .launch
+            debug_config_json.type = "cppvsdbg" if opts.vscode_debugger_type == .cppvsdbg else "cppdbg"
+            debug_config_json.request = "launch"
             debug_config_json.name = config.name
             if opts.launch_args != "" {
                 append(&debug_config_json.args, opts.launch_args)
             }
+
 
             if .Build_Pre_Launch in opts.flags {
                 task_json: VSCode_Task_Json
@@ -87,19 +90,21 @@ _generate_vscode :: proc(config: Config, opts: Dev_Options) {
                 append(&tasks_json.tasks, task_json)
             }
 
+            append(&launch_json.configurations, debug_config_json)
+
             marshal_opts: json.Marshal_Options
             marshal_opts.pretty = true
             
-            if data, err := json.marshal(launch_json, marshal_opts); err != nil {
+            if data, err := json.marshal(launch_json, marshal_opts); err == nil {
                 os.write_string(launch_file, string(data))
             } else {
-                fmt.eprintf("Error serializing launch_json\n")
+                fmt.eprintf("Error serializing launch_json %v\n", err)
             }
 
-            if data, err := json.marshal(tasks_json, marshal_opts); err != nil {
+            if data, err := json.marshal(tasks_json, marshal_opts); err == nil {
                 os.write_string(tasks_file, string(data))
             } else {
-                fmt.eprintf("Error serializing tasks_json\n")
+                fmt.eprintf("Error serializing tasks_json %v\n", err)
             }
 
         } else {

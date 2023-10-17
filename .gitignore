@@ -288,3 +288,5 @@ shared/
 examples/bug/
 build.sh
 !core/debug/
+
+*ols.json*
