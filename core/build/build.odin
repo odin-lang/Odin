@@ -8,7 +8,7 @@ import "core:path/filepath"
 import "core:sync"
 import "core:encoding/json"
 
-syscall :: proc(cmd: string, echo: bool) -> int {
+shell_exec :: proc(cmd: string, echo: bool) -> int {
 	cstr := strings.clone_to_cstring(cmd, context.temp_allocator)
 	if echo {
 		fmt.printf("%s\n", cmd)
