@@ -6,6 +6,7 @@ import "core:os"
 import "core:fmt"
 import "core:strings"
 import "core:encoding/json"
+import "core:path/filepath"
 
 // continuation byte?
 _is_cont :: proc(b: byte) -> bool {
@@ -101,6 +102,14 @@ _config_to_args :: proc(sb: ^strings.Builder, config: Config) {
     }
 
     // Todo(Dragos): clean up the path before passing it here?
+    // Todo(Dragos): Make this better...
+    /*
+    switch {
+    case config.out_dir != "" && config.out_file != "": sbprintf(sb, `-out:"%s/%s"`, config.out_dir, config.out_file)
+    case config.out_dir == "" && config.out_file != "": sbprintf(sb, `-out:"%s"`, config.out_file)
+    }
+    */
+
     sbprintf(sb, `-out:"%s/%s"`, config.out_dir, config.out_file)
 }
 
