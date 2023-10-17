@@ -2,30 +2,60 @@ package raylib
 
 import c "core:c/libc"
 
+RAYGUI_SHARED :: #config(RAYGUI_SHARED, false)
+
 when ODIN_OS == .Windows {
-	foreign import lib {
-		"windows/raygui.lib",
-	}
-} else when ODIN_OS == .Linux  {
-	foreign import lib { 
-		"linux/libraygui.a",
-		// "system:dl",
-		// "system:pthread",
-	}
-} else when ODIN_OS == .Darwin {
-	when ODIN_ARCH == .arm64 {
+	when RAYGUI_SHARED {
 		foreign import lib {
-			"macos-arm64/libraygui.a",
-			// "system:Cocoa.framework",
-			// "system:OpenGL.framework",
-			// "system:IOKit.framework",
+			"windows/rayguidll.lib",
 		}
 	} else {
 		foreign import lib {
-			"macos/libraygui.a",
-			// "system:Cocoa.framework",
-			// "system:OpenGL.framework",
-			// "system:IOKit.framework",
+			"windows/raygui.lib",
+		}
+	}
+} else when ODIN_OS == .Linux  {
+	when RAYGUI_SHARED {
+		// Note(bumbread): can't panic here, because the users might be expecting to
+		// only use raylib. Let's have them get the error at link-time instead..
+		//#panic("Cannot link libraygui.so: not in the vendor collection")
+		// Note(bumbread): unless we import something the rest of the bindings will
+		// make a compile-time error. This is a bit ugly for now, but in the future
+		// raygui probably needs to be in a separate package.
+		foreign import lib {"_"}
+	} else {
+		// #panic("Cannot link libraygui.a: not in the vendor collection")
+		// TODO(bumbread): apparently this one was missing. This might need
+		// to get rebuilt for linux
+		// foreign import lib { 
+		// 	"linux/libraygui.a",
+		// 	// "system:dl",
+		// 	// "system:pthread",
+		// }
+		foreign import lib {"_"}
+	}
+} else when ODIN_OS == .Darwin {
+	when ODIN_ARCH == .arm64 {
+		when RAYGUI_SHARED {
+			// #panic("Cannot link libraygui.450.dylib: not in the vendor collection")
+		} else {
+			foreign import lib {
+				"macos-arm64/libraygui.a",
+				// "system:Cocoa.framework",
+				// "system:OpenGL.framework",
+				// "system:IOKit.framework",
+			}
+		}
+	} else {
+		when RAYGUI_SHARED {
+			// #panic("Cannot link libraygui.450.dylib: not in the vendor collection")
+		} else {
+			foreign import lib {
+				"macos/libraygui.a",
+				// "system:Cocoa.framework",
+				// "system:OpenGL.framework",
+				// "system:IOKit.framework",
+			}
 		}
 	}
 } else {

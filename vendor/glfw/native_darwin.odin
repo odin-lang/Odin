@@ -4,7 +4,14 @@ package glfw
 
 import NS "vendor:darwin/foundation"
 
-foreign import glfw { "lib/darwin/libglfw3.a" }
+when GLFW_SHARED {
+    #panic("Dynamic linking for glfw is not supported for darwin yet")
+    foreign import glfw {"_"}
+} else {
+    foreign import glfw {
+        "lib/darwin/libglfw3.a",
+    }
+}
 
 @(default_calling_convention="c", link_prefix="glfw")
 foreign glfw {

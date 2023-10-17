@@ -3,11 +3,17 @@ package portmidi
 import "core:c"
 import "core:strings"
 
+PORTMIDI_SHARED :: #config(PORTMIDI_SHARED, false)
+
 when ODIN_OS == .Windows {
-	foreign import lib {
-		"portmidi_s.lib",
-		"system:Winmm.lib",
-		"system:Advapi32.lib",
+	when PORTMIDI_SHARED {
+		#panic("Shared linking not supported for portmidi on windows yet")
+	} else {
+		foreign import lib {
+			"portmidi_s.lib",
+			"system:Winmm.lib",
+			"system:Advapi32.lib",
+		}
 	}
 } else {
 	foreign import lib "system:portmidi"

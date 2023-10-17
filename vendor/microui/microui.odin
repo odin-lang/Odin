@@ -28,6 +28,7 @@ import "core:fmt"
 import "core:sort"
 import "core:strings"
 import "core:strconv"
+import "core:math"
 
 COMMAND_LIST_SIZE    :: #config(MICROUI_COMMAND_LIST_SIZE,    256 * 1024)
 ROOT_LIST_SIZE       :: #config(MICROUI_ROOT_LIST_SIZE,       32)
@@ -1063,7 +1064,7 @@ slider :: proc(ctx: ^Context, value: ^Real, low, high: Real, step: Real = 0.0, f
 	if ctx.focus_id == id && ctx.mouse_down_bits == {.LEFT} {
 		v = low + Real(ctx.mouse_pos.x - base.x) * (high - low) / Real(base.w)
 		if step != 0.0 {
-			v = ((v + step/2) / step) * step
+			v = math.floor((v + step/2) / step) * step
 		}
 	}
 	/* clamp and store value, update res */

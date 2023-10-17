@@ -1,7 +1,7 @@
 package glfw
 
 /* Config */
-GLFW_DYNAMIC :: #config(GLFW_DYNAMIC, false)
+GLFW_SHARED :: #config(GLFW_SHARED, false)
 
 /*** Constants ***/
 /* Versions */
