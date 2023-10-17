@@ -39,10 +39,13 @@ import TTF        "vendor:sdl2/ttf"
 
 import vk         "vendor:vulkan"
 
-import NS         "vendor:darwin/Foundation"
-import MTL        "vendor:darwin/Metal"
-import MTK        "vendor:darwin/MetalKit"
-import CA         "vendor:darwin/QuartzCore"
+// NOTE(flysand): Since conditional imports are disabled for now I'll have to just disable these
+// when ODIN_OS == "darwin" {
+//     import NS         "vendor:darwin/Foundation"
+//     import MTL        "vendor:darwin/Metal"
+//     import MTK        "vendor:darwin/MetalKit"
+//     import CA         "vendor:darwin/QuartzCore"
+// }
 
 // NOTE(bill): only one can be checked at a time
 import lua_5_4    "vendor:lua/5.4"
@@ -91,10 +94,10 @@ _ :: TTF
 
 _ :: vk
 
-_ :: NS
-_ :: MTL
-_ :: MTK
-_ :: CA
+// _ :: NS
+// _ :: MTL
+// _ :: MTK
+// _ :: CA
 
 _ :: lua_5_4
 
