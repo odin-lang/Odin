@@ -67,9 +67,9 @@ _generate_vscode :: proc(config: Config, opts: Dev_Options) {
             } else if .Cwd_Out in opts.flags {
                 debug_config_json.cwd = filepath.join({"%{workspaceFolder}/", config.out_dir}) // Note(Dragos): Test this
             } else if .Cwd_Workspace in opts.flags {
-                debug_config_json.cwd = "${worspaceFolder}"
+                debug_config_json.cwd = "${workspaceFolder}"
             } else {
-                debug_config_json.cwd = "${worspaceFolder}"
+                debug_config_json.cwd = "${workspaceFolder}"
             }
 
             debug_config_json.program, _ = filepath.abs(filepath.join({config.out_dir, config.out_file}))
