@@ -477,6 +477,8 @@ foreign libc {
 	@(link_name="free")     _unix_free     :: proc(ptr: rawptr) ---
 	@(link_name="realloc")  _unix_realloc  :: proc(ptr: rawptr, size: int) -> rawptr ---
 	@(link_name="getenv")   _unix_getenv   :: proc(cstring) -> cstring ---
+	@(link_name="putenv")   _unix_putenv   :: proc(cstring) -> c.int ---
+	@(link_name="setenv")   _unix_setenv   :: proc(key: cstring, value: cstring, overwrite: c.int) -> c.int ---
 	@(link_name="getcwd")   _unix_getcwd   :: proc(buf: cstring, len: c.size_t) -> cstring ---
 	@(link_name="chdir")    _unix_chdir    :: proc(buf: cstring) -> c.int ---
 	@(link_name="mkdir")    _unix_mkdir    :: proc(buf: cstring, mode: u16) -> c.int ---
@@ -891,6 +893,28 @@ lookup_env :: proc(key: string, allocator := context.allocator) -> (value: strin
 get_env :: proc(key: string, allocator := context.allocator) -> (value: string) {
 	value, _ = lookup_env(key, allocator)
 	return
+}
+
+set_env :: proc(key, value: string) -> Errno {
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
+	key_cstring := strings.clone_to_cstring(key, context.temp_allocator)
+	value_cstring := strings.clone_to_cstring(value, context.temp_allocator)
+	// NOTE(GoNZooo): `setenv` instead of `putenv` because it copies both key and value more commonly
+	res := _unix_setenv(key_cstring, value_cstring, 1)
+	if res < 0 {
+		return Errno(get_last_error())
+	}
+	return ERROR_NONE
+}
+
+unset_env :: proc(key: string) -> Errno {
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
+	s := strings.clone_to_cstring(key, context.temp_allocator)
+	res := _unix_putenv(s)
+	if res < 0 {
+		return Errno(get_last_error())
+	}
+	return ERROR_NONE
 }
 
 get_current_directory :: proc() -> string {
