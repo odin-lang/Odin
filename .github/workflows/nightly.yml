@@ -26,6 +26,7 @@ jobs:
           rm bin/llvm/windows/LLVM-C.lib
           mkdir dist
           cp odin.exe dist
+          cp LICENSE dist
           cp LLVM-C.dll dist
           cp -r shared dist
           cp -r core dist
@@ -52,6 +53,7 @@ jobs:
         run: |
           mkdir dist
           cp odin dist
+          cp LICENSE dist
           cp libLLVM* dist
           cp -r shared dist
           cp -r core dist
@@ -81,6 +83,7 @@ jobs:
         run: |
           mkdir dist
           cp odin dist
+          cp LICENSE dist
           cp -r shared dist
           cp -r core dist
           cp -r vendor dist
