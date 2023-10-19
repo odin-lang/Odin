@@ -5457,7 +5457,7 @@ gb_inline b32 gb_file_copy(char const *existing_filename, char const *new_filena
 		}
 	}
 	
-	gb_free(buf);
+	gb_mfree(buf);
 	close(new_fd);
 	close(existing_fd);
 
