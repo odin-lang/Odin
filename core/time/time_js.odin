@@ -10,7 +10,7 @@ _now :: proc "contextless" () -> Time {
 	foreign odin_env {
 		time_now :: proc "contextless" () -> i64 ---
 	}
-	return Time{time_now()}
+	return Time{time_now()*1e6}
 }
 
 _sleep :: proc "contextless" (d: Duration) {
@@ -26,7 +26,7 @@ _tick_now :: proc "contextless" () -> Tick {
 	foreign odin_env {
 		tick_now :: proc "contextless" () -> i64 ---
 	}
-	return Tick{tick_now()}
+	return Tick{tick_now()*1e6}
 }
 
 _yield :: proc "contextless" () {
