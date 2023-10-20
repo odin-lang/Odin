@@ -6,7 +6,7 @@ Build_Command_Type :: enum {
 	Invalid,
 	Build,
 	Install,
-	Dev_Setup,
+	Dev,
 	Display_Help,
 }
 

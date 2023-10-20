@@ -184,7 +184,7 @@ settings_init_from_args :: proc(settings: ^Settings, args: []string, allow_custo
 	} else if build_project {
 		settings.command_type = .Install if is_install else .Build
 	} else {
-		settings.command_type = .Dev_Setup
+		settings.command_type = .Dev
 	}
 	return true
 }
@@ -221,7 +221,7 @@ run :: proc(main_project: ^Project, opts: Settings) {
 			return
 		}
 	
-	case .Dev_Setup:
+	case .Dev:
 		found_config := false
 		for project in _build_ctx.projects do if opts.display_external_configs || main_project == project  {  
 			for target in project.targets {
