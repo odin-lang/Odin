@@ -1,0 +1,6 @@
+
+root = true
+
+[*.{odin,c,h,cpp}]
+indent_style = tab
+end_of_line = lf
