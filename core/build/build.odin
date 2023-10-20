@@ -81,9 +81,8 @@ build_package :: proc(config: Config) -> (ok: bool) {
 			return
 		}
 	}
-	command := fmt.ctprintf("odin build %s %s", config.src_path, args)
-	log.infof("%s\n", command)
-	exit_code := libc.system(command)
+	command := fmt.tprintf("odin build %s %s", config.src_path, args)
+	exit_code := shell_exec(command, true)
 	if exit_code != 0 {
 		log.errorf("Build failed with exit code %v\n", exit_code)
 		return
