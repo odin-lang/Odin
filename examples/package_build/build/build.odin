@@ -4,6 +4,8 @@ import "core:build"
 import "core:os"
 import "core:strings"
 
+import build_dep "../dependency/build"
+
 Mode :: enum {
 	Debug,
 	Release,
@@ -53,7 +55,7 @@ config_target :: proc(project: ^build.Project, target: ^build.Target, settings: 
 		config.opt = .Speed
 	}
 
-	
+	//build.add_dependency goes here
 
 	return config
 }
@@ -64,7 +66,6 @@ _ :: proc() {
 	project.name = "Build System Demo"
 	build.add_target(&project, &target_debug)
 	build.add_target(&project, &target_release)
-	build.add_project(&project)
 	project.configure_target_proc = config_target
 }
 
@@ -73,6 +74,6 @@ main :: proc() {
 	settings: build.Settings
 	build.settings_init_from_args(&settings, os.args, {})
 	settings.default_config_name = "deb"
-	settings.display_external_configs = true
+	//settings.display_external_configs = true
 	build.run(&project, settings)
 }

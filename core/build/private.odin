@@ -138,12 +138,15 @@ _display_command_help :: proc(main_project: ^Project, opts: Settings) {
 	fmt.printf("%s build system\n", main_project.name)
 	fmt.printf("\tSyntax: %s <flags> <configuration name>\n", os.args[0])
 	fmt.printf("\tAvailable Configurations:\n")
-	for project in _build_ctx.projects do if opts.display_external_configs || project == main_project {
-		for target in project.targets {
-			config := project->configure_target_proc(target, opts)
-			prefixed_name := strings.concatenate({project.config_prefix, config.name}, context.temp_allocator)
-			fmt.printf("\t\t%s\n", prefixed_name)
-		}
+	for target in main_project.targets {
+		config := main_project->configure_target_proc(target, opts)
+		prefixed_name := strings.concatenate({main_project.config_prefix, config.name}, context.temp_allocator)
+		fmt.printf("\t\t%s\n", prefixed_name)
+	}
+	for project in opts.external_projects do for target in project.targets {
+		config := project->configure_target_proc(target, opts)
+		prefixed_name := strings.concatenate({project.config_prefix, config.name}, context.temp_allocator)
+		fmt.printf("\t\t%s\n", prefixed_name)
 	}
 	fmt.println()
 	fmt.printf("\tFlags \n")

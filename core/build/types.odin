@@ -18,8 +18,12 @@ Settings :: struct {
 	custom_args: [dynamic]string,
 
 	// Configurable in user code. 
-	display_external_configs: bool, // Allow the user to call configs from other build systems imported
+	external_projects: [dynamic]^Project,
 	default_config_name: string,    // Called when no config is specified in the args / config_name
+}
+
+settings_display_additional_projects :: proc(settings: ^Settings, projects: []^Project) {
+	append(&settings.external_projects, ..projects)
 }
 
 
@@ -69,8 +73,12 @@ Target :: struct {
 	name: string,
 	platform: Platform,
 	project: ^Project,
+	root_dir: string,
+	depends: [dynamic]^Target,
 }
 
+// Note(Dragos): If we gots dependencies, then the project should have a #location of sorts, and be appended to paths like the src folder, out dir etc.
+//				That would mean that ALL build systems would EXPECT a certain structure (for example having the build script package as a subfolder of the main project)
 Project :: struct {
 	name: string,
 	targets: [dynamic]^Target,
@@ -89,11 +97,6 @@ Platform :: struct {
 	os: runtime.Odin_OS_Type,
 	arch: runtime.Odin_Arch_Type,
 }
-
-
-
-
-
 
 Vet_Flag :: enum {
 	Unused,

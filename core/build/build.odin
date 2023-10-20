@@ -12,6 +12,7 @@ import "core:slice"
 
 import "core:c/libc" // TODO: remove dependency on libc after core:os2
 
+@(private="file") _context: runtime.Context
 
 @init
 _ :: proc() {
@@ -25,7 +26,7 @@ create_default_context :: proc() -> runtime.Context {
 	return context
 }
 
-default_context :: proc() -> runtime.Context {
+default_context :: #force_inline proc() -> runtime.Context {
 	return _context
 }
 
@@ -205,52 +206,83 @@ settings_init_from_args :: proc(settings: ^Settings, args: []string, custom_flag
 	return true
 }
 
-add_target :: proc(project: ^Project, target: ^Target) {
+add_target :: proc(project: ^Project, target: ^Target, loc := #caller_location) {
 	append(&project.targets, target)
 	target.project = project
+	file_dir := filepath.dir(loc.file_path, context.temp_allocator)
+	root_dir := filepath.join({file_dir, ".."}, context.temp_allocator)
+	target.root_dir = filepath.clean(root_dir) // This effectively makes the build system dependent on being a subfolder of the main project root
 }
 
-add_project :: proc(project: ^Project) {
-	append(&_build_ctx.projects, project)
+Add_Dependency_Error :: enum {
+	None,
+	Circular_Dependency,
+}
+
+find_dependency :: proc(target: ^Target, depend: ^Target) -> bool {
+	// Note(Dragos): is this logic correct?
+	if target == depend {
+		return true
+	}
+	for d in target.depends {
+		return find_dependency(d, depend)
+	}
+	return false
+}
+
+// Note(Dragos): Ideally this should be proc(^Config, ^Target). This needs a rework of the API a tiny bit
+add_dependency :: proc(target: ^Target, depends_on: ^Target) -> (err: Add_Dependency_Error) {
+	if find_dependency(target, depends_on) {
+		return // dependency already present
+	}
+
+	if find_dependency(depends_on, target) {
+		log.errorf("Circular dependency detected for [%s - %s] and [%s - %s]", target.project.name, target.name, depends_on.project.name, depends_on.name)
+		return .Circular_Dependency
+	}
+	
+	append(&target.depends, depends_on)
+
+	return
 }
 
 run :: proc(main_project: ^Project, opts: Settings) {
-	assert(len(_build_ctx.projects) != 0, "No projects were added. Use build.add_project to add one.")
 	opts := opts
 	if opts.config_name == "" do opts.config_name = opts.default_config_name
 
 	switch opts.command_type {
-	case .Build, .Install:
+	case .Build, .Install, .Dev:
 		found_config := false
-		for project in _build_ctx.projects do if opts.display_external_configs || main_project == project {
-			for target in project.targets {
-				config := project->configure_target_proc(target, opts)
-				prefixed_name := strings.concatenate({project.config_prefix, config.name}, context.temp_allocator)
-				if _match(opts.config_name, prefixed_name) {
-					found_config = true
+
+		
+		for target in main_project.targets { // Code duplicate here... Fix this somehow
+			config := main_project->configure_target_proc(target, opts)
+			prefixed_name := strings.concatenate({main_project.config_prefix, config.name}, context.temp_allocator)
+			if _match(opts.config_name, prefixed_name) {
+				found_config = true
+				if opts.command_type == .Dev {
+					_generate_devenv(config, opts.dev_opts)
+				} else {
 					build_package(config)
 				}
 			}
-		}
+		} // Code duplicate here... Fix this somehow
+		for project in opts.external_projects do for target in project.targets {	
+			config := project->configure_target_proc(target, opts)
+			prefixed_name := strings.concatenate({project.config_prefix, config.name}, context.temp_allocator)
+			if _match(opts.config_name, prefixed_name) {
+				found_config = true
+				if opts.command_type == .Dev {
+					_generate_devenv(config, opts.dev_opts)
+				} else {
+					build_package(config)
+				}
+			}
+		} // Code duplicate here... Fix this somehow
+
 		if !found_config {
 			log.errorf("Could not find configuration %s", opts.config_name)
 			return
-		}
-	
-	case .Dev:
-		found_config := false
-		for project in _build_ctx.projects do if opts.display_external_configs || main_project == project  {  
-			for target in project.targets {
-				config := project->configure_target_proc(target, opts)
-				prefixed_name := strings.concatenate({project.config_prefix, config.name}, context.temp_allocator)
-				if _match(opts.config_name, prefixed_name) {
-					found_config = true
-					_generate_devenv(config, opts.dev_opts)
-				}
-			}
-		}
-		if !found_config {
-			log.errorf("Could not find configuration %s", opts.config_name)
 		}
 	
 	case .Display_Help:

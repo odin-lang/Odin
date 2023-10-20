@@ -8,6 +8,7 @@ import "core:strings"
 import "core:encoding/json"
 import "core:path/filepath"
 
+// Important Note(Dragos): We need a system for handling imported dependencies when configuring the devenv because the paths might be goofy. This might also impact odin build... We'll see...
 
 VSCode_Debugger_Type :: enum {
 	cppvsdbg,
