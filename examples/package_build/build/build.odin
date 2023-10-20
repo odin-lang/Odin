@@ -55,7 +55,7 @@ config_target :: proc(project: ^build.Project, target: ^build.Target, settings: 
 		config.opt = .Speed
 	}
 
-	//build.add_dependency(target, &build_dep.target_debug)
+	build.add_dependency(target, &build_dep.target_debug)
 	//build.add_dependency goes here
 
 	return config
