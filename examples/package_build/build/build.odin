@@ -71,7 +71,7 @@ _ :: proc() {
 main :: proc() {
 	context = build.default_context()
 	settings: build.Settings
-	build.settings_init_from_args(&settings, os.args, false)
+	build.settings_init_from_args(&settings, os.args, {})
 	settings.default_config_name = "deb"
 	settings.display_external_configs = true
 	build.run(&project, settings)
