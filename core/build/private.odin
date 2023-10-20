@@ -134,13 +134,13 @@ _define_to_arg :: proc(sb: ^strings.Builder, name: string, val: Define_Val) {
 	}
 }
 
-_display_command_help :: proc(main_project: ^Project, opts: Build_Options) {
+_display_command_help :: proc(main_project: ^Project, opts: Settings) {
 	fmt.printf("%s build system\n", main_project.name)
 	fmt.printf("\tSyntax: %s <flags> <configuration name>\n", os.args[0])
 	fmt.printf("\tAvailable Configurations:\n")
 	for project in _build_ctx.projects do if opts.display_external_configs || project == main_project {
 		for target in project.targets {
-			config := project->configure_target_proc(target)
+			config := project->configure_target_proc(target, opts)
 			prefixed_name := strings.concatenate({project.config_prefix, config.name}, context.temp_allocator)
 			fmt.printf("\t\t%s\n", prefixed_name)
 		}
@@ -223,7 +223,7 @@ _opt_mode_to_arg := [Opt_Mode]string {
 	.Minimal = "-o:minimal",
 	.Size = "-o:size",
 	.Speed = "-o:speed",
-	.Aggressive = "-:aggressive",
+	.Aggressive = "-o:aggressive",
 }
 
 _build_mode_to_arg := [Build_Mode]string {
@@ -272,3 +272,90 @@ _arch_to_arg := [runtime.Odin_Arch_Type]string {
 	.wasm32 = "wasm32",
 	.wasm64p32 = "wasm64p32",
 }
+
+
+
+/*
+parse_args :: proc(args: []string) -> (o: Settings, ok: bool) #optional_ok {
+	command := args[0]
+	args := args[1:]
+	if len(args) == 0 {
+		o.command_type = .Build
+		return
+	}
+	
+	display_help := false
+	build_project := true
+	config_name := ""
+	for i in 0..<len(args) {
+		arg := args[i]
+		 
+		if arg[0] == '-' do switch {
+		case arg == "-help":
+			display_help = true
+			build_project = false
+
+		case arg == "-ols":
+			build_project = false
+			o.dev_opts.flags += {.Generate_Ols}
+		case arg == "-build-pre-launch":
+			build_project = false
+			o.dev_opts.flags += {.Build_Pre_Launch}
+
+		case arg == "-vscode":
+			build_project = false
+			o.dev_opts.editors += {.VSCode}
+
+		case arg == "-use-cppvsdbg":
+			build_project = false
+			o.dev_opts.vscode_debugger_type = .cppvsdbg
+
+		case arg == "-use-cppdbg":
+			build_project = false
+			o.dev_opts.vscode_debugger_type = .cppdbg
+
+		case arg == "cwd-workspace":
+			build_project = false
+			o.dev_opts.flags += {.Cwd_Workspace}
+
+		case arg == "cwd-out":
+			build_project = false
+			o.dev_opts.flags += {.Cwd_Out}
+
+		case strings.has_prefix(arg, "-cwd"):
+			build_project = false
+			fmt.eprintf("Flag %s not implemented\n", arg)
+
+		case strings.has_prefix(arg, "-launch-args"):
+			build_project = false
+			fmt.eprintf("Flag %s not implemented\n", arg)
+
+		case strings.has_prefix(arg, "-include-build-system"):
+			build_project = false
+			o.dev_opts.flags += {.Include_Build_System}
+			fmt.eprintf("Flag %s not implemented\n", arg)
+
+		case: 
+			fmt.eprintf("Invalid flag %s\n", arg)
+			return
+		} else {
+			if config_name != "" {
+				fmt.eprintf("Config already set to %s and cannot be re-assigned to %s. Cannot have 2 configurations built with the same command (yet). ", config_name, arg)
+				return
+			}
+			config_name = arg
+			o.config_name = config_name
+		}
+	}
+
+	// Note(Dragos): I do not like this approach
+	if display_help {
+		o.command_type = .Display_Help
+	} else if build_project {
+		o.command_type = .Build
+	} else {
+		o.command_type = .Dev_Setup
+	}
+	return o, true
+}
+*/

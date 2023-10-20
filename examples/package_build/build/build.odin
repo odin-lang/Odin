@@ -30,7 +30,7 @@ target_release: Target = {
 	mode = .Release,
 }
 
-config_target :: proc(project: ^build.Project, target: ^build.Target) -> (config: build.Config) {
+config_target :: proc(project: ^build.Project, target: ^build.Target, settings: build.Settings) -> (config: build.Config) {
 	target := cast(^Target)target
 	config.name = target.name 
 	config.platform = target.platform
@@ -60,6 +60,7 @@ config_target :: proc(project: ^build.Project, target: ^build.Target) -> (config
 
 @init
 _ :: proc() {
+	context = build.default_context()
 	project.name = "Build System Demo"
 	build.add_target(&project, &target_debug)
 	build.add_target(&project, &target_release)
@@ -68,8 +69,10 @@ _ :: proc() {
 }
 
 main :: proc() {
-	opts := build.parse_args(os.args)
-	opts.default_config_name = "deb"
-	opts.display_external_configs = true
-	build.run(&project, opts)
+	context = build.default_context()
+	settings: build.Settings
+	build.settings_init_from_args(&settings, os.args, false)
+	settings.default_config_name = "deb"
+	settings.display_external_configs = true
+	build.run(&project, settings)
 }

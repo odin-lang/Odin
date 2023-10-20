@@ -1,19 +1,47 @@
 package build
 
 import "core:strings"
-import "core:fmt"
 import "core:os"
-import "core:c/libc"
 import "core:path/filepath"
 import "core:sync"
 import "core:encoding/json"
+import "core:log"
+import "core:runtime"
+import "core:fmt"
+
+import "core:c/libc" // TODO: remove dependency on libc after core:os2
+
+
+@init
+_ :: proc() {
+	_context = create_default_context()
+}
+
+create_default_context :: proc() -> runtime.Context {
+	context = runtime.default_context()
+	context.allocator = context.temp_allocator
+	context.logger = log.create_console_logger(.Debug, {.Level})
+	return context
+}
+
+default_context :: proc() -> runtime.Context {
+	return _context
+}
 
 shell_exec :: proc(cmd: string, echo: bool) -> int {
 	cstr := strings.clone_to_cstring(cmd, context.temp_allocator)
 	if echo {
-		fmt.printf("%s\n", cmd)
+		log.infof("%s\n", cmd)
 	}
 	return cast(int)libc.system(cstr)
+}
+
+shell_command :: proc($cmd: string) -> Command {
+	return proc(config: Config) {
+		cstr := strings.clone_to_cstring(cmd, context.temp_allocator)
+		result := cast(int)libc.system(cstr)
+		return result
+	}
 }
 
 add_post_build_command :: proc(config: ^Config, name: string, cmd: Command_Proc) {
@@ -32,7 +60,7 @@ add_pre_build_command :: proc(config: ^Config, name: string, cmd: Command_Proc) 
 	append(&config.pre_build_commands, command)
 }
 
-build_package :: proc(config: Config) {
+build_package :: proc(config: Config) -> (ok: bool) {
 	config_output_dirs: {
 		//dir := filepath.dir(config.out_path, context.temp_allocator) 
 		// Note(Dragos): I wrote this a while ago. Is there a better way?
@@ -49,61 +77,39 @@ build_package :: proc(config: Config) {
 	args := strings.to_string(argsBuilder)
 	for cmd in config.pre_build_commands {
 		if result := cmd.command(config); result != 0 {
-			fmt.fprintf(os.stderr, "Pre-Build Command '%s' failed with exit code %d\n", cmd.name, result)
+			log.errorf("Pre-Build Command '%s' failed with exit code %d", cmd.name, result)
 			return
 		}
 	}
 	command := fmt.ctprintf("odin build %s %s", config.src_path, args)
-	fmt.printf("%s\n", command)
+	log.infof("%s\n", command)
 	exit_code := libc.system(command)
 	if exit_code != 0 {
-		fmt.printf("Build failed with exit code %v\n", exit_code)
+		log.errorf("Build failed with exit code %v\n", exit_code)
 		return
 	} else {
 		for cmd in config.post_build_commands {
 			if result := cmd.command(config); result != 0 {
-				fmt.fprintf(os.stderr, "Post-Build Command '%s' failed with exit code %d\n", cmd.name, result)
+				log.errorf("Post-Build Command '%s' failed with exit code %d", cmd.name, result)
 				return
 			}
 		}
 	}
 	
-   
+	return true
 }
 
-default_language_server_settings :: proc(allocator := context.allocator) -> (settings: Language_Server_Settings) {
-	settings.collections = make([dynamic]Collection, allocator)
-	settings.enable_document_symbols = true 
-	settings.enable_semantic_tokens = true 
-	settings.enable_hover = true 
-	settings.enable_snippets = true
-	return 
-}
-
-default_build_options :: proc() -> (o: Build_Options) {
-	o.command_type = .Build
-	o.config_name = "*"
-	return
-}
-
-syscall_command :: proc($cmd: string) -> Command {
-	return proc(config: Config) {
-		cstr := strings.clone_to_cstring(cmd, context.temp_allocator)
-		result := cast(int)libc.system(cstr)
-		return result
-	}
-}
-
-parse_args :: proc(args: []string) -> (o: Build_Options, ok: bool) #optional_ok {
+settings_init_from_args :: proc(settings: ^Settings, args: []string, allow_custom_flags := false) -> (ok: bool) {
 	command := args[0]
 	args := args[1:]
 	if len(args) == 0 {
-		o.command_type = .Build
-		return
+		settings.command_type = .Build
+		return true
 	}
 	
 	display_help := false
 	build_project := true
+	is_install := false
 	config_name := ""
 	for i in 0..<len(args) {
 		arg := args[i]
@@ -115,66 +121,73 @@ parse_args :: proc(args: []string) -> (o: Build_Options, ok: bool) #optional_ok 
 
 		case arg == "-ols":
 			build_project = false
-			o.dev_opts.flags += {.Generate_Ols}
+			settings.dev_opts.flags += {.Generate_Ols}
 		case arg == "-build-pre-launch":
 			build_project = false
-			o.dev_opts.flags += {.Build_Pre_Launch}
+			settings.dev_opts.flags += {.Build_Pre_Launch}
 
 		case arg == "-vscode":
 			build_project = false
-			o.dev_opts.editors += {.VSCode}
+			settings.dev_opts.editors += {.VSCode}
 
 		case arg == "-use-cppvsdbg":
 			build_project = false
-			o.dev_opts.vscode_debugger_type = .cppvsdbg
+			settings.dev_opts.vscode_debugger_type = .cppvsdbg
 
 		case arg == "-use-cppdbg":
 			build_project = false
-			o.dev_opts.vscode_debugger_type = .cppdbg
+			settings.dev_opts.vscode_debugger_type = .cppdbg
 
-		case arg == "cwd-workspace":
+		case arg == "-cwd-workspace":
 			build_project = false
-			o.dev_opts.flags += {.Cwd_Workspace}
+			settings.dev_opts.flags += {.Cwd_Workspace}
 
-		case arg == "cwd-out":
+		case arg == "-cwd-out":
 			build_project = false
-			o.dev_opts.flags += {.Cwd_Out}
+			settings.dev_opts.flags += {.Cwd_Out}
+
+		case arg == "-install":
+			is_install = true
 
 		case strings.has_prefix(arg, "-cwd"):
 			build_project = false
-			fmt.eprintf("Flag %s not implemented\n", arg)
+			log.warnf("Flag %s not implemented", arg)
 
 		case strings.has_prefix(arg, "-launch-args"):
 			build_project = false
-			fmt.eprintf("Flag %s not implemented\n", arg)
+			log.warnf("Flag %s not implemented", arg)
 
 		case strings.has_prefix(arg, "-include-build-system"):
 			build_project = false
-			o.dev_opts.flags += {.Include_Build_System}
-			fmt.eprintf("Flag %s not implemented\n", arg)
+			settings.dev_opts.flags += {.Include_Build_System}
+			log.warnf("Flag %s not implemented\n", arg)
 
 		case: 
-			fmt.eprintf("Invalid flag %s\n", arg)
-			return
+			if allow_custom_flags {
+				append(&settings.custom_args, arg)
+			} else {
+				log.errorf("Invalid flag %s and allow_custom_flags is set to false.", arg)
+				return
+			}
 		} else {
 			if config_name != "" {
-				fmt.eprintf("Config already set to %s and cannot be re-assigned to %s. Cannot have 2 configurations built with the same command (yet). ", config_name, arg)
+				log.errorf("Config already set to %s and cannot be re-assigned to %s. Cannot have 2 configurations built with the same command (yet).", config_name, arg)
 				return
 			}
 			config_name = arg
-			o.config_name = config_name
+			settings.config_name = config_name
 		}
 	}
 
 	// Note(Dragos): I do not like this approach
 	if display_help {
-		o.command_type = .Display_Help
+		settings.command_type = .Display_Help
 	} else if build_project {
-		o.command_type = .Build
+		settings.command_type = .Install if is_install else .Build
 	} else {
-		o.command_type = .Dev_Setup
+		settings.command_type = .Dev_Setup
 	}
-	return o, true
+	return true
 }
 
 add_target :: proc(project: ^Project, target: ^Target) {
@@ -186,17 +199,17 @@ add_project :: proc(project: ^Project) {
 	append(&_build_ctx.projects, project)
 }
 
-run :: proc(main_project: ^Project, opts: Build_Options) {
+run :: proc(main_project: ^Project, opts: Settings) {
 	assert(len(_build_ctx.projects) != 0, "No projects were added. Use build.add_project to add one.")
 	opts := opts
 	if opts.config_name == "" do opts.config_name = opts.default_config_name
 
 	switch opts.command_type {
-	case .Build:
+	case .Build, .Install:
 		found_config := false
 		for project in _build_ctx.projects do if opts.display_external_configs || main_project == project {
 			for target in project.targets {
-				config := project->configure_target_proc(target)
+				config := project->configure_target_proc(target, opts)
 				prefixed_name := strings.concatenate({project.config_prefix, config.name}, context.temp_allocator)
 				if _match(opts.config_name, prefixed_name) {
 					found_config = true
@@ -205,14 +218,15 @@ run :: proc(main_project: ^Project, opts: Build_Options) {
 			}
 		}
 		if !found_config {
-			fmt.eprintf("Could not find configuration %s\n", opts.config_name)
+			log.errorf("Could not find configuration %s", opts.config_name)
+			return
 		}
 	
 	case .Dev_Setup:
 		found_config := false
 		for project in _build_ctx.projects do if opts.display_external_configs || main_project == project  {  
 			for target in project.targets {
-				config := project->configure_target_proc(target)
+				config := project->configure_target_proc(target, opts)
 				prefixed_name := strings.concatenate({project.config_prefix, config.name}, context.temp_allocator)
 				if _match(opts.config_name, prefixed_name) {
 					found_config = true
@@ -221,13 +235,13 @@ run :: proc(main_project: ^Project, opts: Build_Options) {
 			}
 		}
 		if !found_config {
-			fmt.eprintf("Could not find configuration %s\n", opts.config_name)
+			log.errorf("Could not find configuration %s", opts.config_name)
 		}
 	
 	case .Display_Help:
 		_display_command_help(main_project, opts)
 	
 	case .Invalid: fallthrough
-	case: fmt.eprintf("Invalid command type\n")
+	case: log.errorf("Invalid command type")
 	}
 }

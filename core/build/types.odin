@@ -5,31 +5,32 @@ import "core:runtime"
 Build_Command_Type :: enum {
 	Invalid,
 	Build,
+	Install,
 	Dev_Setup,
 	Display_Help,
 }
 
-Build_Options :: struct {
+Settings :: struct {
+	// Configurable via settings_init_from_args
 	command_type: Build_Command_Type,
 	config_name: string, // Config.name
 	dev_opts: Dev_Options,
-	display_external_configs: bool,
-	default_config_name: string,
+	custom_args: [dynamic]string,
+
+	// Configurable in user code. 
+	display_external_configs: bool, // Allow the user to call configs from other build systems imported
+	default_config_name: string,    // Called when no config is specified in the args / config_name
 }
 
 
-
-Define_Val :: union #no_nil {
-	bool,
-	int,
-	string,
+// Static lib?
+Build_Mode :: enum {
+	EXE,
+	Shared,
+	OBJ,
+	ASM,
+	LLVM_IR,
 }
-
-Platform :: struct {
-	os: runtime.Odin_OS_Type,
-	arch: runtime.Odin_Arch_Type,
-}
-
 
 Config :: struct {
 	name: string, // Calling `output.exe <config name>` will build only that config
@@ -60,14 +61,39 @@ Config :: struct {
 	collections: map[string]string,
 }
 
-// Static lib?
-Build_Mode :: enum {
-	EXE,
-	Shared,
-	OBJ,
-	ASM,
-	LLVM_IR,
+
+/*
+	Can be used as-is or via a subtype
+*/
+Target :: struct {
+	name: string,
+	platform: Platform,
+	project: ^Project,
 }
+
+Project :: struct {
+	name: string,
+	targets: [dynamic]^Target,
+	config_prefix: string,
+	configure_target_proc: Configure_Target_Proc,
+}
+
+
+Define_Val :: union #no_nil {
+	bool,
+	int,
+	string,
+}
+
+Platform :: struct {
+	os: runtime.Odin_OS_Type,
+	arch: runtime.Odin_Arch_Type,
+}
+
+
+
+
+
 
 Vet_Flag :: enum {
 	Unused,
@@ -177,34 +203,4 @@ Command :: struct {
 	command: Command_Proc,
 }
 
-Default_Target_Mode :: enum {
-	Release,
-	Debug,
-}
-
-Default_Target :: struct {
-	platform: Platform,
-	mode: Default_Target_Mode,
-}
-
-Configure_Target_Proc :: #type proc(project: ^Project, target: ^Target) -> Config
-
-/*
-	Can be used as-is or via a subtype
-*/
-Target :: struct {
-	name: string,
-	platform: Platform,
-	project: ^Project,
-}
-
-Project :: struct {
-	name: string,
-	targets: [dynamic]^Target,
-	config_prefix: string,
-	configure_target_proc: Configure_Target_Proc,
-}
-
-Build_Context :: struct {
-	projects: [dynamic]^Project,
-}
+Configure_Target_Proc :: #type proc(project: ^Project, target: ^Target, settings: Settings) -> Config

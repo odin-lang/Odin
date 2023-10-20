@@ -9,8 +9,6 @@ import "core:encoding/json"
 import "core:path/filepath"
 
 
-
-
 VSCode_Debugger_Type :: enum {
 	cppvsdbg,
 	cppdbg,
@@ -164,7 +162,14 @@ _generate_devenv :: proc(config: Config, opts: Dev_Options) {
 	}
 }
 
-
+default_language_server_settings :: proc(allocator := context.allocator) -> (settings: Language_Server_Settings) {
+	settings.collections = make([dynamic]Collection, allocator)
+	settings.enable_document_symbols = true 
+	settings.enable_semantic_tokens = true 
+	settings.enable_hover = true 
+	settings.enable_snippets = true
+	return 
+}
 
 _generate_ols :: proc(config: Config) {
 	argsBuilder := strings.builder_make()
