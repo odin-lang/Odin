@@ -36,8 +36,9 @@ Build_Mode :: enum {
 	LLVM_IR,
 }
 
+// Note(Dragos): Since Target is standardized now, we can allow the user to call the target name directly. 
 Config :: struct {
-	name: string, // Calling `output.exe <config name>` will build only that config
+	name: string, // Planning to remove this in favor of Target.name
 
 	platform: Platform,
 
@@ -74,7 +75,9 @@ Target :: struct {
 	platform: Platform,
 	project: ^Project,
 	root_dir: string,
+
 	depends: [dynamic]^Target,
+	cached_config: Maybe(Config),
 }
 
 // Note(Dragos): If we gots dependencies, then the project should have a #location of sorts, and be appended to paths like the src folder, out dir etc.

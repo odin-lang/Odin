@@ -62,7 +62,21 @@ add_pre_build_command :: proc(config: ^Config, name: string, cmd: Command_Proc) 
 	append(&config.pre_build_commands, command)
 }
 
-build_package :: proc(config: Config) -> (ok: bool) {
+target_build :: proc(target: ^Target, settings: Settings) -> (ok: bool) {
+	config := target_config(target, settings)
+	// Note(Dragos): This is a check for the new dependency thing
+	config.src_path = filepath.join({target.root_dir, config.src_path}, context.temp_allocator)
+	config.out_dir = filepath.join({target.root_dir, config.out_dir}, context.temp_allocator)
+	config.rc_path = filepath.join({target.root_dir, config.rc_path}, context.temp_allocator)
+	
+	for dep in target.depends {
+		target_build(dep, settings) or_return // Note(Dragos): Recursion breaks my brain a bit. Is THIS ok??
+	}
+	
+	return _build_package(config)
+}
+
+_build_package :: proc(config: Config) -> (ok: bool) {
 	config_output_dirs: {
 		//dir := filepath.dir(config.out_path, context.temp_allocator) 
 		// Note(Dragos): I wrote this a while ago. Is there a better way?
@@ -83,7 +97,7 @@ build_package :: proc(config: Config) -> (ok: bool) {
 			return
 		}
 	}
-	command := fmt.tprintf("odin build %s %s", config.src_path, args)
+	command := fmt.tprintf("odin build \"%s\" %s", config.src_path, args)
 	exit_code := shell_exec(command, true)
 	if exit_code != 0 {
 		log.errorf("Build failed with exit code %v\n", exit_code)
@@ -214,6 +228,12 @@ add_target :: proc(project: ^Project, target: ^Target, loc := #caller_location) 
 	target.root_dir = filepath.clean(root_dir) // This effectively makes the build system dependent on being a subfolder of the main project root
 }
 
+target_config :: proc(target: ^Target, settings: Settings) -> Config {
+	if config, cached := target.cached_config.?; cached do return config
+	target.cached_config = target.project->configure_target_proc(target, settings)
+	#no_type_assert return target.cached_config.?
+}
+
 Add_Dependency_Error :: enum {
 	None,
 	Circular_Dependency,
@@ -221,28 +241,18 @@ Add_Dependency_Error :: enum {
 
 find_dependency :: proc(target: ^Target, depend: ^Target) -> bool {
 	// Note(Dragos): is this logic correct?
-	if target == depend {
-		return true
-	}
-	for d in target.depends {
-		return find_dependency(d, depend)
-	}
+	if target == depend do return true
+	for d in target.depends do return find_dependency(d, depend)
 	return false
 }
 
-// Note(Dragos): Ideally this should be proc(^Config, ^Target). This needs a rework of the API a tiny bit
-add_dependency :: proc(target: ^Target, depends_on: ^Target) -> (err: Add_Dependency_Error) {
-	if find_dependency(target, depends_on) {
-		return // dependency already present
-	}
-
-	if find_dependency(depends_on, target) {
-		log.errorf("Circular dependency detected for [%s - %s] and [%s - %s]", target.project.name, target.name, depends_on.project.name, depends_on.name)
+add_dependency :: proc(target: ^Target, depend: ^Target) -> (err: Add_Dependency_Error) {
+	if find_dependency(target, depend) do return // dependency already present	 
+	if find_dependency(depend, target) {
+		log.errorf("Circular dependency detected for [%s - %s] and [%s - %s]", target.project.name, target.name, depend.project.name, depend.name)
 		return .Circular_Dependency
 	}
-	
-	append(&target.depends, depends_on)
-
+	append(&target.depends, depend)
 	return
 }
 
@@ -256,26 +266,26 @@ run :: proc(main_project: ^Project, opts: Settings) {
 
 		
 		for target in main_project.targets { // Code duplicate here... Fix this somehow
-			config := main_project->configure_target_proc(target, opts)
+			config := target_config(target, opts)
 			prefixed_name := strings.concatenate({main_project.config_prefix, config.name}, context.temp_allocator)
 			if _match(opts.config_name, prefixed_name) {
 				found_config = true
 				if opts.command_type == .Dev {
 					_generate_devenv(config, opts.dev_opts)
 				} else {
-					build_package(config)
+					target_build(target, opts)
 				}
 			}
 		} // Code duplicate here... Fix this somehow
 		for project in opts.external_projects do for target in project.targets {	
-			config := project->configure_target_proc(target, opts)
+			config := target_config(target, opts) // this won't be required once Config.name is purged
 			prefixed_name := strings.concatenate({project.config_prefix, config.name}, context.temp_allocator)
 			if _match(opts.config_name, prefixed_name) {
 				found_config = true
 				if opts.command_type == .Dev {
 					_generate_devenv(config, opts.dev_opts)
 				} else {
-					build_package(config)
+					target_build(target, opts)
 				}
 			}
 		} // Code duplicate here... Fix this somehow
