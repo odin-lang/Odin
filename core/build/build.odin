@@ -204,8 +204,8 @@ settings_init_from_args :: proc(settings: ^Settings, args: []string, custom_flag
 				log.errorf("Config already set to %s and cannot be re-assigned to %s. Cannot have 2 configurations built with the same command (yet).", config_name, arg)
 				return
 			}
-			config_name = arg
-			settings.config_name = config_name
+			config_name = arg // Todo(Dragos): Remove this variable
+			settings.target_name = config_name
 		}
 	}
 
@@ -258,7 +258,7 @@ add_dependency :: proc(target: ^Target, depend: ^Target) -> (err: Add_Dependency
 
 run :: proc(main_project: ^Project, opts: Settings) {
 	opts := opts
-	if opts.config_name == "" do opts.config_name = opts.default_config_name
+	if opts.target_name == "" do opts.target_name = opts.default_target_name
 
 	switch opts.command_type {
 	case .Build, .Install, .Dev:
@@ -267,11 +267,11 @@ run :: proc(main_project: ^Project, opts: Settings) {
 		
 		for target in main_project.targets { // Code duplicate here... Fix this somehow
 			config := target_config(target, opts)
-			prefixed_name := strings.concatenate({main_project.config_prefix, config.name}, context.temp_allocator)
-			if _match(opts.config_name, prefixed_name) {
+			prefixed_name := strings.concatenate({main_project.target_prefix, target.name}, context.temp_allocator)
+			if _match(opts.target_name, prefixed_name) {
 				found_config = true
 				if opts.command_type == .Dev {
-					_generate_devenv(config, opts.dev_opts)
+					_generate_devenv(target, opts, opts.dev_opts)
 				} else {
 					target_build(target, opts)
 				}
@@ -279,11 +279,11 @@ run :: proc(main_project: ^Project, opts: Settings) {
 		} // Code duplicate here... Fix this somehow
 		for project in opts.external_projects do for target in project.targets {	
 			config := target_config(target, opts) // this won't be required once Config.name is purged
-			prefixed_name := strings.concatenate({project.config_prefix, config.name}, context.temp_allocator)
-			if _match(opts.config_name, prefixed_name) {
+			prefixed_name := strings.concatenate({main_project.target_prefix, target.name}, context.temp_allocator)
+			if _match(opts.target_name, prefixed_name) {
 				found_config = true
 				if opts.command_type == .Dev {
-					_generate_devenv(config, opts.dev_opts)
+					_generate_devenv(target, opts, opts.dev_opts)
 				} else {
 					target_build(target, opts)
 				}
@@ -291,7 +291,7 @@ run :: proc(main_project: ^Project, opts: Settings) {
 		} // Code duplicate here... Fix this somehow
 
 		if !found_config {
-			log.errorf("Could not find configuration %s", opts.config_name)
+			log.errorf("Could not find target %s", opts.target_name)
 			return
 		}
 	

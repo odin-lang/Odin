@@ -32,7 +32,6 @@ target_release: Target = {
 
 config_target :: proc(project: ^build.Project, target: ^build.Target, settings: build.Settings) -> (config: build.Config) {
 	target := cast(^Target)target
-	config.name = target.name // this is always like this. Just remove config.name...
 	config.platform = target.platform
 	config.out_file = "demo.exe" if target.platform.os == .Windows else "demo.out"
 	config.out_dir = strings.concatenate({"out/", target.name})
@@ -71,7 +70,7 @@ main :: proc() {
 	context = build.default_context()
 	settings: build.Settings
 	build.settings_init_from_args(&settings, os.args, {})
-	settings.default_config_name = "deb"
+	settings.default_target_name = "deb"
 	//settings.display_external_configs = true
 	build.run(&project, settings)
 }

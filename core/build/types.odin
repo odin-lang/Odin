@@ -13,13 +13,14 @@ Build_Command_Type :: enum {
 Settings :: struct {
 	// Configurable via settings_init_from_args
 	command_type: Build_Command_Type,
-	config_name: string, // Config.name
+	target_name: string,
 	dev_opts: Dev_Options,
 	custom_args: [dynamic]string,
 
 	// Configurable in user code. 
 	external_projects: [dynamic]^Project,
-	default_config_name: string,    // Called when no config is specified in the args / config_name
+	// Note(Dragos): This can be made a ^Target
+	default_target_name: string,    // Called when no config is specified in the args / config_name
 }
 
 settings_display_additional_projects :: proc(settings: ^Settings, projects: []^Project) {
@@ -38,8 +39,6 @@ Build_Mode :: enum {
 
 // Note(Dragos): Since Target is standardized now, we can allow the user to call the target name directly. 
 Config :: struct {
-	name: string, // Planning to remove this in favor of Target.name
-
 	platform: Platform,
 
 	src_path: string,
@@ -73,9 +72,9 @@ Config :: struct {
 Target :: struct {
 	name: string,
 	platform: Platform,
+
 	project: ^Project,
 	root_dir: string,
-
 	depends: [dynamic]^Target,
 	cached_config: Maybe(Config),
 }
@@ -85,7 +84,7 @@ Target :: struct {
 Project :: struct {
 	name: string,
 	targets: [dynamic]^Target,
-	config_prefix: string,
+	target_prefix: string,
 	configure_target_proc: Configure_Target_Proc,
 }
 

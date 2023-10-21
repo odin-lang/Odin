@@ -45,7 +45,9 @@ VSCode_Tasks_Json :: struct {
 	tasks: [dynamic]VSCode_Task_Json,
 }
 
-_generate_vscode :: proc(config: Config, opts: Dev_Options) {
+_generate_vscode :: proc(target: ^Target, settings: Settings, opts: Dev_Options) {
+	config := target_config(target, settings) // Note(Dragos): I really don't like settings being based around
+
 	if os.is_dir(".vscode") || os.make_directory(".vscode") == os.ERROR_NONE {
 		launch_file, launch_err := os.open(".vscode/launch.json", os.O_CREATE | os.O_TRUNC)
 		tasks_file, tasks_err := os.open(".vscode/tasks.json", os.O_CREATE | os.O_TRUNC)
@@ -74,7 +76,7 @@ _generate_vscode :: proc(config: Config, opts: Dev_Options) {
 			debug_config_json.program, _ = filepath.abs(filepath.join({config.out_dir, config.out_file}))
 			debug_config_json.type = "cppvsdbg" if opts.vscode_debugger_type == .cppvsdbg else "cppdbg"
 			debug_config_json.request = "launch"
-			debug_config_json.name = config.name
+			debug_config_json.name = target.name
 			if opts.launch_args != "" {
 				append(&debug_config_json.args, opts.launch_args)
 			}
@@ -85,7 +87,7 @@ _generate_vscode :: proc(config: Config, opts: Dev_Options) {
 				task_json.label = "Build"
 				debug_config_json.preLaunchTask = task_json.label
 				task_json.type = "shell"
-				task_json.command = strings.concatenate({"build ", config.name})
+				task_json.command = strings.concatenate({"build ", target.name})
 				append(&tasks_json.tasks, task_json)
 			}
 
@@ -154,11 +156,12 @@ Dev_Options :: struct {
 	build_system_args: string,
 }
 
-_generate_devenv :: proc(config: Config, opts: Dev_Options) {
+_generate_devenv :: proc(target: ^Target, settings: Settings, opts: Dev_Options) {
+	config := target_config(target, settings)
 	if .Generate_Ols in opts.flags do _generate_ols(config)
 	for editor in Editor do if editor in opts.editors {
 		switch editor {
-		case .VSCode: _generate_vscode(config, opts)
+		case .VSCode: _generate_vscode(target, settings, opts)
 		}
 	}
 }
@@ -172,6 +175,7 @@ default_language_server_settings :: proc(allocator := context.allocator) -> (set
 	return 
 }
 
+// Note(Dragos): With the removal of config.name, we should start passing targets around all the time rather than configs
 _generate_ols :: proc(config: Config) {
 	argsBuilder := strings.builder_make()
 	_config_to_args(&argsBuilder, config)

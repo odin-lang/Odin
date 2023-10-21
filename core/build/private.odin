@@ -140,19 +140,19 @@ _display_command_help :: proc(main_project: ^Project, opts: Settings) {
 	fmt.printf("\tAvailable Configurations:\n")
 	for target in main_project.targets {
 		config := main_project->configure_target_proc(target, opts)
-		prefixed_name := strings.concatenate({main_project.config_prefix, config.name}, context.temp_allocator)
+		prefixed_name := strings.concatenate({main_project.target_prefix, target.name}, context.temp_allocator)
 		fmt.printf("\t\t%s\n", prefixed_name)
 	}
 	for project in opts.external_projects do for target in project.targets {
 		config := project->configure_target_proc(target, opts)
-		prefixed_name := strings.concatenate({project.config_prefix, config.name}, context.temp_allocator)
+		prefixed_name := strings.concatenate({main_project.target_prefix, target.name}, context.temp_allocator)
 		fmt.printf("\t\t%s\n", prefixed_name)
 	}
 	fmt.println()
 	fmt.printf("\tFlags \n")
 	
-	fmt.printf("\t\t-help <optional config name>\n")
-	fmt.printf("\t\t\tDisplays build system help. Cannot be used with other flags. \n\t\t\t[WIP] Specifying a config name will give you information about the config. \n")
+	fmt.printf("\t\t-help <optional target name>\n")
+	fmt.printf("\t\t\tDisplays build system help. Cannot be used with other flags. \n\t\t\t[WIP] Specifying a target name will give you information about the target. \n")
 	fmt.println()
 
 	fmt.printf("\t\t-ols\n")
