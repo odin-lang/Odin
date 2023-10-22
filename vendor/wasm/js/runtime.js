@@ -63,9 +63,8 @@ class WasmMemoryInterface {
 		return lo + hi*4294967296;
 	};
 	loadI64(addr) {
-		// TODO(bill): loadI64 correctly
 		const lo = this.mem.getUint32(addr + 0, true);
-		const hi = this.mem.getUint32(addr + 4, true);
+		const hi = this.mem.getInt32 (addr + 4, true);
 		return lo + hi*4294967296;
 	};
 	loadF32(addr)  { return this.mem.getFloat32(addr, true); }
@@ -95,9 +94,8 @@ class WasmMemoryInterface {
 		this.mem.setUint32(addr + 4, Math.floor(value / 4294967296), true);
 	}
 	storeI64(addr, value) {
-		// TODO(bill): storeI64 correctly
 		this.mem.setUint32(addr + 0, value, true);
-		this.mem.setUint32(addr + 4, Math.floor(value / 4294967296), true);
+		this.mem.setInt32 (addr + 4, Math.floor(value / 4294967296), true);
 	}
 	storeF32(addr, value)  { this.mem.setFloat32(addr, value, true); }
 	storeF64(addr, value)  { this.mem.setFloat64(addr, value, true); }
