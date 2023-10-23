@@ -53,7 +53,7 @@ WindowHint_int :: proc "contextless" (hint: c.int, value: c.int) {
 	glfw.WindowHint(hint, value)
 }
 
-WindowHint_bool :: proc "contextless" (hint: c.int, value: bool) {
+WindowHint_bool :: proc "contextless" (hint: c.int, value: b32) {
 	glfw.WindowHint(hint, cast(c.int) value)
 }
 

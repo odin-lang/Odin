@@ -39,7 +39,7 @@ when ODIN_OS == .Windows {
 /*** Functions ***/
 @(default_calling_convention="c", link_prefix="glfw")
 foreign glfw {
-	Init      :: proc() -> bool ---
+	Init      :: proc() -> b32 ---
 	Terminate :: proc() ---
 	
 	InitHint  :: proc(hint, value: c.int) ---
