@@ -162,7 +162,12 @@ type_is_matrix           :: proc($T: typeid) -> bool ---
 type_has_nil :: proc($T: typeid) -> bool ---
 
 type_is_specialization_of :: proc($T, $S: typeid) -> bool ---
+
 type_is_variant_of :: proc($U, $V: typeid) -> bool where type_is_union(U) ---
+type_union_tag :: proc($U: typeid) -> typeid where type_is_union(U) ---
+type_union_tag_offset :: proc($U: typeid) -> int where type_is_union(U) ---
+type_variant_type_of_of :: proc($U: typeid, $index: int) -> typeid where type_is_union(U) ---
+type_variant_index_of :: proc($U, $V: typeid) -> int where type_is_union(U) ---
 
 type_has_field :: proc($T: typeid, $name: string) -> bool ---
 type_field_type :: proc($T: typeid, $name: string) -> typeid ---

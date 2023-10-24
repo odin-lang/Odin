@@ -262,8 +262,8 @@ BuiltinProc__type_simple_boolean_end,
 	BuiltinProc_type_is_variant_of,
 	BuiltinProc_type_union_tag,
 	BuiltinProc_type_union_tag_offset,
-	BuiltinProc_type_variant_type,
-	BuiltinProc_type_variant_tag,
+	BuiltinProc_type_variant_type_of,
+	BuiltinProc_type_variant_index_of,
 
 	BuiltinProc_type_struct_field_count,
 
@@ -564,8 +564,8 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("type_is_variant_of"),    2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_union_tag"),        1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_union_tag_offset"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
-	{STR_LIT("type_variant_type"),     2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
-	{STR_LIT("type_variant_tag"),      2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("type_variant_type_of"),     2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("type_variant_index_of"),      2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("type_struct_field_count"),   1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
