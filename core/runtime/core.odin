@@ -664,8 +664,10 @@ default_assertion_failure_proc :: proc(prefix, message: string, loc: Source_Code
 	when ODIN_OS == .Freestanding {
 		// Do nothing
 	} else {
-		print_caller_location(loc)
-		print_string(" ")
+		when !ODIN_DISABLE_ASSERT {
+			print_caller_location(loc)
+			print_string(" ")
+		}
 		print_string(prefix)
 		if len(message) > 0 {
 			print_string(": ")
