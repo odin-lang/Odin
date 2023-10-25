@@ -5138,7 +5138,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		}
 		break;
 
-	case BuiltinProc_type_union_tag:
+	case BuiltinProc_type_union_tag_type:
 		{
 			if (operand->mode != Addressing_Type) {
 				error(operand->expr, "Expected a type for '%.*s'", LIT(builtin_name));
