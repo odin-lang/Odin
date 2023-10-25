@@ -1781,11 +1781,11 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			value = exact_value_i64(bt->SimdVector.count);
 			type  = t_untyped_integer;
 		} else if (is_type_union(op_type)) {
-            Type *u = base_type(op_type);
+			Type *u = base_type(op_type);
 			mode  = Addressing_Constant;
 			value = exact_value_i64(u->Union.variants.count);
 			type  = t_untyped_integer;
-        }
+		}
 		if (operand->mode == Addressing_Type && mode != Addressing_Constant) {
 			mode = Addressing_Invalid;
 		}
