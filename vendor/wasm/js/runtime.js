@@ -1352,7 +1352,7 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 
 			rand: Math.random,
 			rand_bytes: (ptr, len) => {
-				const view = new Uint8Array(wasm_memory.buffer, ptr, len)
+				const view = new Uint8Array(wasmMemoryInterface.memory.buffer, ptr, len)
 				crypto.getRandomValues(view)
 			},
 		},
