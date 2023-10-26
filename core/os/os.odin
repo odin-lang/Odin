@@ -63,8 +63,8 @@ read_at_least :: proc(fd: Handle, buf: []byte, min: int) -> (n: int, err: Errno)
 	if len(buf) < min {
 		return 0, -1
 	}
-	for n < min && err == 0 {
-		nn: int
+	nn := max(int)
+	for nn > 0 && n < min && err == 0 {
 		nn, err = read(fd, buf[n:])
 		n += nn
 	}
