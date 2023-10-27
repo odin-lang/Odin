@@ -1780,11 +1780,6 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			mode  = Addressing_Constant;
 			value = exact_value_i64(bt->SimdVector.count);
 			type  = t_untyped_integer;
-		} else if (is_type_union(op_type)) {
-			Type *u = base_type(op_type);
-			mode  = Addressing_Constant;
-			value = exact_value_i64(u->Union.variants.count);
-			type  = t_untyped_integer;
 		}
 		if (operand->mode == Addressing_Type && mode != Addressing_Constant) {
 			mode = Addressing_Invalid;
@@ -2597,7 +2592,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 
 		Type *original_type = operand->type;
 		Type *type = base_type(operand->type);
-		if (operand->mode == Addressing_Type && (is_type_enumerated_array(type) || is_type_union(type))) {
+		if (operand->mode == Addressing_Type && is_type_enumerated_array(type)) {
 			// Okay
 		} else if (!is_type_ordered(type) || !(is_type_numeric(type) || is_type_string(type))) {
 			gbString type_str = type_to_string(original_type);
@@ -2661,14 +2656,6 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				operand->mode  = Addressing_Constant;
 				operand->type  = bt->EnumeratedArray.index;
 				operand->value = *bt->EnumeratedArray.min_value;
-				return true;
-			} else if (is_type_union(type)) {
-				Type *bt = base_type(type);
-				GB_ASSERT(bt->kind == Type_Union);
-				operand->mode  = Addressing_Constant;
-				operand->type  = t_untyped_integer;
-				i64 min_tag = bt->Union.kind == UnionType_no_nil ? 0 : 1;
-				operand->value = exact_value_i64(min_tag);
 				return true;
 			}
 			gbString type_str = type_to_string(original_type);
@@ -2774,7 +2761,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		Type *original_type = operand->type;
 		Type *type = base_type(operand->type);
 
-		if (operand->mode == Addressing_Type && (is_type_enumerated_array(type) || is_type_union(type))) {
+		if (operand->mode == Addressing_Type && is_type_enumerated_array(type)) {
 			// Okay
 		} else if (!is_type_ordered(type) || !(is_type_numeric(type) || is_type_string(type))) {
 			gbString type_str = type_to_string(original_type);
@@ -2843,14 +2830,6 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				operand->mode  = Addressing_Constant;
 				operand->type  = bt->EnumeratedArray.index;
 				operand->value = *bt->EnumeratedArray.max_value;
-				return true;
-			} else if (is_type_union(type)) {
-				Type *bt = base_type(type);
-				GB_ASSERT(bt->kind == Type_Union);
-				operand->mode  = Addressing_Constant;
-				operand->type  = t_untyped_integer;
-				i64 max_tag = (bt->Union.kind == UnionType_no_nil ? 0 : 1) + bt->Union.variants.count - 1;
-				operand->value = exact_value_i64(max_tag);
 				return true;
 			}
 			gbString type_str = type_to_string(original_type);
@@ -5163,7 +5142,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			operand->type = union_tag_type(u);
 		}
 		break;
-		
+
 	case BuiltinProc_type_union_tag_offset:
 		{
 			if (operand->mode != Addressing_Type) {
@@ -5195,6 +5174,58 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			operand->value = exact_value_i64(tag_offset);
 		}
 		break;
+
+	case BuiltinProc_type_union_base_tag_value:
+		{
+			if (operand->mode != Addressing_Type) {
+				error(operand->expr, "Expected a type for '%.*s'", LIT(builtin_name));
+				operand->mode = Addressing_Invalid;
+				operand->type = t_invalid;
+				return false;
+			}
+
+			Type *u = operand->type;
+
+			if (!is_type_union(u)) {
+				error(operand->expr, "Expected a union type for '%.*s'", LIT(builtin_name));
+				operand->mode = Addressing_Invalid;
+				operand->type = t_invalid;
+				return false;
+			}
+
+			u = base_type(u);
+			GB_ASSERT(u->kind == Type_Union);
+			
+			operand->mode = Addressing_Constant;
+			operand->type = t_untyped_integer;
+			operand->value = exact_value_i64(u->Union.kind == UnionType_no_nil ? 0 : 1);
+		} break;
+
+	case BuiltinProc_type_union_variant_count:
+		{
+			if (operand->mode != Addressing_Type) {
+				error(operand->expr, "Expected a type for '%.*s'", LIT(builtin_name));
+				operand->mode = Addressing_Invalid;
+				operand->type = t_invalid;
+				return false;
+			}
+
+			Type *u = operand->type;
+
+			if (!is_type_union(u)) {
+				error(operand->expr, "Expected a union type for '%.*s'", LIT(builtin_name));
+				operand->mode = Addressing_Invalid;
+				operand->type = t_invalid;
+				return false;
+			}
+
+			u = base_type(u);
+			GB_ASSERT(u->kind == Type_Union);
+			
+			operand->mode = Addressing_Constant;
+			operand->type = t_untyped_integer;
+			operand->value = exact_value_i64(u->Union.variants.count);
+		} break;
 
 	case BuiltinProc_type_variant_type_of:
 		{

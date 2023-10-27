@@ -164,9 +164,11 @@ type_has_nil :: proc($T: typeid) -> bool ---
 type_is_specialization_of :: proc($T, $S: typeid) -> bool ---
 
 type_is_variant_of :: proc($U, $V: typeid) -> bool where type_is_union(U) ---
-type_union_tag_type :: proc($U: typeid) -> typeid where type_is_union(U) ---
-type_union_tag_offset :: proc($U: typeid) -> int where type_is_union(U) ---
-type_variant_type_of :: proc($U: typeid, $index: int) -> typeid where type_is_union(U) ---
+type_union_tag_type :: proc($T: typeid) -> typeid where type_is_union(T) ---
+type_union_tag_offset :: proc($T: typeid) -> int where type_is_union(T) ---
+type_union_base_tag_value :: proc($T: typeid) -> int where type_is_union(U) ---
+type_union_variant_count :: proc($T: typeid) -> int where type_is_union(T) ---
+type_variant_type_of :: proc($T: typeid, $index: int) -> typeid where type_is_union(T) ---
 type_variant_index_of :: proc($U, $V: typeid) -> int where type_is_union(U) ---
 
 type_has_field :: proc($T: typeid, $name: string) -> bool ---
