@@ -2247,7 +2247,9 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 			lb_add_entity(m, lb_global_type_info_data_entity, value);
 
 			if (LB_USE_GIANT_PACKED_STRUCT) {
-				lb_make_global_private_const(g);
+				LLVMSetLinkage(g, LLVMPrivateLinkage);
+				LLVMSetUnnamedAddress(g, LLVMGlobalUnnamedAddr);
+				LLVMSetGlobalConstant(g, /*true*/false);
 			}
 		}
 		{ // Type info member buffer
