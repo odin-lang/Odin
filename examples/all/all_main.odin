@@ -50,6 +50,7 @@ import crypto_util      "core:crypto/util"
 import whirlpool        "core:crypto/whirlpool"
 import x25519           "core:crypto/x25519"
 
+import elf              "core:debug/elf"
 import pe               "core:debug/pe"
 
 import dynlib           "core:dynlib"
@@ -176,6 +177,7 @@ _ :: tiger2
 _ :: crypto_util
 _ :: whirlpool
 _ :: x25519
+_ :: elf
 _ :: pe
 _ :: dynlib
 _ :: net
