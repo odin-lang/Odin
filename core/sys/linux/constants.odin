@@ -40,7 +40,7 @@ S_ISFIFO :: #force_inline proc "contextless" (m: Mode) -> bool {return (S_IFFIFO
 
 /// Check the Mode bits to see if the file is a character device
 S_ISCHR  :: #force_inline proc "contextless" (m: Mode) -> bool {return (S_IFCHR  == (m & S_IFMT))}
-    
+	
 /// Check the Mode bits to see if the file is a directory
 S_ISDIR  :: #force_inline proc "contextless" (m: Mode) -> bool {return (S_IFDIR  == (m & S_IFMT))}
 
@@ -70,17 +70,17 @@ R_OK :: Mode{.IROTH}
 
 /// The stats you get by calling `stat`
 STATX_BASIC_STATS :: Statx_Mask {
-    .TYPE,
-    .MODE,
-    .NLINK,
-    .UID,
-    .GID,
-    .ATIME,
-    .MTIME,
-    .CTIME,
-    .INO,
-    .SIZE,
-    .BLOCKS,
+	.TYPE,
+	.MODE,
+	.NLINK,
+	.UID,
+	.GID,
+	.ATIME,
+	.MTIME,
+	.CTIME,
+	.INO,
+	.SIZE,
+	.BLOCKS,
 }
 
 
