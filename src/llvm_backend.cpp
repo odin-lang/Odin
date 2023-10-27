@@ -692,13 +692,19 @@ gb_internal lbValue lb_map_set_proc_for_type(lbModule *m, Type *type) {
 	}
 
 	lbValue map_ptr      = {LLVMGetParam(p->value, 0), t_rawptr};
-	lbValue hash         = {LLVMGetParam(p->value, 1), t_uintptr};
+	lbValue hash_param   = {LLVMGetParam(p->value, 1), t_uintptr};
 	lbValue key_ptr      = {LLVMGetParam(p->value, 2), t_rawptr};
 	lbValue value_ptr    = {LLVMGetParam(p->value, 3), t_rawptr};
 	lbValue location_ptr = {LLVMGetParam(p->value, 4), t_source_code_location_ptr};
 
 	map_ptr = lb_emit_conv(p, map_ptr, alloc_type_pointer(type));
 	key_ptr = lb_emit_conv(p, key_ptr, alloc_type_pointer(type->Map.key));
+
+	LLVM_SET_VALUE_NAME(map_ptr.value,      "map_ptr");
+	LLVM_SET_VALUE_NAME(hash_param.value,   "hash_param");
+	LLVM_SET_VALUE_NAME(key_ptr.value,      "key_ptr");
+	LLVM_SET_VALUE_NAME(value_ptr.value,    "value_ptr");
+	LLVM_SET_VALUE_NAME(location_ptr.value, "location");
 
 	lb_add_proc_attribute_at_index(p, 1+0, "nonnull");
 	lb_add_proc_attribute_at_index(p, 1+0, "noalias");
@@ -719,6 +725,10 @@ gb_internal lbValue lb_map_set_proc_for_type(lbModule *m, Type *type) {
 	lb_add_proc_attribute_at_index(p, 1+4, "noalias");
 	lb_add_proc_attribute_at_index(p, 1+4, "readonly");
 
+	lbAddr hash_addr = lb_add_local_generated(p, t_uintptr, false);
+	lb_addr_store(p, hash_addr, hash_param);
+	LLVM_SET_VALUE_NAME(hash_addr.addr.value, "hash");
+
 	////
 	lbValue found_ptr = {};
 	{
@@ -726,17 +736,19 @@ gb_internal lbValue lb_map_set_proc_for_type(lbModule *m, Type *type) {
 
 		auto args = array_make<lbValue>(temporary_allocator(), 3);
 		args[0] = lb_emit_conv(p, map_ptr, t_rawptr);
-		args[1] = hash;
+		args[1] = lb_addr_load(p, hash_addr);
 		args[2] = key_ptr;
 
 		found_ptr = lb_emit_call(p, map_get_proc, args);
 	}
+	LLVM_SET_VALUE_NAME(found_ptr.value, "found_ptr");
 
 
 	lbBlock *found_block      = lb_create_block(p, "found");
 	lbBlock *check_grow_block = lb_create_block(p, "check-grow");
 	lbBlock *grow_fail_block  = lb_create_block(p, "grow-fail");
 	lbBlock *insert_block     = lb_create_block(p, "insert");
+	lbBlock *check_has_grown_block = lb_create_block(p, "check-has-grown");
 	lbBlock *rehash_block     = lb_create_block(p, "rehash");
 
 	lb_emit_if(p, lb_emit_comp_against_nil(p, Token_NotEq, found_ptr), found_block, check_grow_block);
@@ -749,6 +761,7 @@ gb_internal lbValue lb_map_set_proc_for_type(lbModule *m, Type *type) {
 
 
 	lbValue map_info = lb_gen_map_info_ptr(p->module, type);
+	LLVM_SET_VALUE_NAME(map_info.value, "map_info");
 
 	{
 		auto args = array_make<lbValue>(temporary_allocator(), 3);
@@ -758,16 +771,23 @@ gb_internal lbValue lb_map_set_proc_for_type(lbModule *m, Type *type) {
 		lbValue grow_err_and_has_grown = lb_emit_runtime_call(p, "__dynamic_map_check_grow", args);
 		lbValue grow_err = lb_emit_struct_ev(p, grow_err_and_has_grown, 0);
 		lbValue has_grown = lb_emit_struct_ev(p, grow_err_and_has_grown, 1);
+		LLVM_SET_VALUE_NAME(grow_err.value,  "grow_err");
+		LLVM_SET_VALUE_NAME(has_grown.value, "has_grown");
 
-		lb_emit_if(p, lb_emit_comp_against_nil(p, Token_NotEq, grow_err), grow_fail_block, insert_block);
+		lb_emit_if(p, lb_emit_comp_against_nil(p, Token_NotEq, grow_err), grow_fail_block, check_has_grown_block);
 
 		lb_start_block(p, grow_fail_block);
 		LLVMBuildRet(p->builder, LLVMConstNull(lb_type(m, t_rawptr)));
 
-		lb_emit_if(p, has_grown, grow_fail_block, rehash_block);
+		lb_start_block(p, check_has_grown_block);
+
+		lb_emit_if(p, has_grown, rehash_block, insert_block);
 		lb_start_block(p, rehash_block);
 		lbValue key = lb_emit_load(p, key_ptr);
-		hash = lb_gen_map_key_hash(p, map_ptr, key, nullptr);
+		lbValue new_hash = lb_gen_map_key_hash(p, map_ptr, key, nullptr);
+		LLVM_SET_VALUE_NAME(new_hash.value, "new_hash");
+		lb_addr_store(p, hash_addr, new_hash);
+		lb_emit_jump(p, insert_block);
 	}
 
 	lb_start_block(p, insert_block);
@@ -775,7 +795,7 @@ gb_internal lbValue lb_map_set_proc_for_type(lbModule *m, Type *type) {
 		auto args = array_make<lbValue>(temporary_allocator(), 5);
 		args[0] = lb_emit_conv(p, map_ptr, t_rawptr);
 		args[1] = map_info;
-		args[2] = hash;
+		args[2] = lb_addr_load(p, hash_addr);
 		args[3] = lb_emit_conv(p, key_ptr,   t_uintptr);
 		args[4] = lb_emit_conv(p, value_ptr, t_uintptr);
 
