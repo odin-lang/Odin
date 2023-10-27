@@ -5366,7 +5366,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 
 			Operand op = {};
 			check_expr(c, &op, ce->args[1]);
-			if (op.mode != Addressing_Constant && !is_type_integer(op.type)) {
+			if (op.mode != Addressing_Constant || !is_type_integer(op.type)) {
 				error(op.expr, "Expected a constant integer for the index of procedure parameter value");
 				return false;
 			}
@@ -5425,7 +5425,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 
 			Operand op = {};
 			check_expr(c, &op, ce->args[1]);
-			if (op.mode != Addressing_Constant && !is_type_integer(op.type)) {
+			if (op.mode != Addressing_Constant || !is_type_integer(op.type)) {
 				error(op.expr, "Expected a constant integer for the index of procedure parameter value");
 				return false;
 			}
@@ -5503,7 +5503,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		} else {
 			Operand op = {};
 			check_expr(c, &op, ce->args[1]);
-			if (op.mode != Addressing_Constant && !is_type_integer(op.type)) {
+			if (op.mode != Addressing_Constant || !is_type_integer(op.type)) {
 				error(op.expr, "Expected a constant integer for the index of record parameter value");
 				return false;
 			}
