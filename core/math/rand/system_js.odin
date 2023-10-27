@@ -2,11 +2,13 @@ package rand
 
 foreign import "odin_env"
 foreign odin_env {
-	@(link_name = "rand")
-	rand_f64 :: proc "contextless" () -> f64 ---
+	@(link_name = "rand_bytes")
+	env_rand_bytes :: proc "contextless" (buf: []byte) ---
 }
 
 @(require_results)
 _system_random :: proc() -> u64 {
-	return u64(rand_f64() * 0x1fffffffffffff)
+	buf: [8]u8
+	env_rand_bytes(buf[:])
+	return transmute(u64)buf
 }

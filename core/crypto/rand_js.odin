@@ -6,7 +6,7 @@ foreign odin_env {
 	env_rand_bytes :: proc "contextless" (buf: []byte) ---
 }
 
-_MAX_PER_CALL_BYTES :: 65536
+_MAX_PER_CALL_BYTES :: 65536 // 64kiB
 
 _rand_bytes :: proc(dst: []byte) {
 	dst := dst
