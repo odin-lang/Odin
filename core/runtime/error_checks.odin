@@ -19,8 +19,6 @@ type_assertion_trap :: proc "contextless" () -> ! {
 when ODIN_FOREIGN_ERROR_PROCEDURES {
     foreign {
         bounds_check_error               :: proc "contextless" (file: string, line, column: i32, index, count: int) ---
-        slice_handle_error               :: proc "contextless" (file: string, line, column: i32, lo, hi: int, len: int) -> ! ---
-        multi_pointer_slice_handle_error :: proc "contextless" (file: string, line, column: i32, lo, hi: int) -> ! ---
         multi_pointer_slice_expr_error   :: proc "contextless" (file: string, line, column: i32, lo, hi: int) ---
         slice_expr_error_hi              :: proc "contextless" (file: string, line, column: i32, hi: int, len: int) ---
         slice_expr_error_lo_hi           :: proc "contextless" (file: string, line, column: i32, lo, hi: int, len: int) ---
