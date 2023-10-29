@@ -1500,19 +1500,17 @@ gb_internal WORKER_TASK_PROC(lb_llvm_module_pass_worker_proc) {
 annotation2metadata,
 forceattrs,
 inferattrs,
-
-
 function<eager-inv>(
 	lower-expect,
 	simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;no-switch-range-to-icmp;no-switch-to-lookup;keep-loops;no-hoist-common-insts;no-sink-common-insts;speculate-blocks;simplify-cond-branch>,
-	sroa<modify-cfg>,
 	early-cse<>
 ),
-
+ipsccp,
 called-value-propagation,
 globalopt,
 function<eager-inv>(
 	mem2reg,
+	instcombine<max-iterations=1000;no-use-loop-info>,
 	simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;switch-range-to-icmp;no-switch-to-lookup;keep-loops;no-hoist-common-insts;no-sink-common-insts;speculate-blocks;simplify-cond-branch>
 ),
 require<globals-aa>,
@@ -1526,15 +1524,18 @@ cgscc(
 		inline,
 		function-attrs<skip-non-recursive>,
 		function<eager-inv;no-rerun>(
-			sroa<modify-cfg>,
 			early-cse<memssa>,
 			speculative-execution,
 			jump-threading,
+			correlated-propagation,
 			simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;switch-range-to-icmp;no-switch-to-lookup;keep-loops;no-hoist-common-insts;no-sink-common-insts;speculate-blocks;simplify-cond-branch>,
+			instcombine<max-iterations=1000;no-use-loop-info>,
+			aggressive-instcombine,
 			constraint-elimination,
 			libcalls-shrinkwrap,
 			tailcallelim,
 			simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;switch-range-to-icmp;no-switch-to-lookup;keep-loops;no-hoist-common-insts;no-sink-common-insts;speculate-blocks;simplify-cond-branch>,
+			reassociate,
 			loop-mssa(
 				loop-instsimplify,
 				loop-simplifycfg,
@@ -1544,26 +1545,37 @@ cgscc(
 				simple-loop-unswitch<no-nontrivial;trivial>
 			),
 			simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;switch-range-to-icmp;no-switch-to-lookup;keep-loops;no-hoist-common-insts;no-sink-common-insts;speculate-blocks;simplify-cond-branch>,
-			sroa<modify-cfg>,
+			instcombine<max-iterations=1000;no-use-loop-info>,
+			loop(
+				loop-idiom,
+				indvars,
+				loop-deletion,
+				loop-unroll-full
+			),
 			vector-combine,
 			mldst-motion<no-split-footer-bb>,
 			gvn<>,
+			sccp,
 			bdce,
+			instcombine<max-iterations=1000;no-use-loop-info>,
 			jump-threading,
+			correlated-propagation,
 			adce,
 			memcpyopt,
 			dse,
 			move-auto-init,
-			simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;switch-range-to-icmp;no-switch-to-lookup;keep-loops;hoist-common-insts;sink-common-insts;speculate-blocks;simplify-cond-branch>
+			loop-mssa(
+				licm<allowspeculation>
+			),
+			simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;switch-range-to-icmp;no-switch-to-lookup;keep-loops;hoist-common-insts;sink-common-insts;speculate-blocks;simplify-cond-branch>,
+			instcombine<max-iterations=1000;no-use-loop-info>
 		),
 		function-attrs,
 		function(
 			require<should-not-run-function-passes>
-		)
+		),
 	)
 ),
-
-
 deadargelim,
 globalopt,
 globaldce,
@@ -1579,11 +1591,19 @@ function<eager-inv>(
 	),
 	loop-distribute,
 	inject-tli-mappings,
+	loop-vectorize<no-interleave-forced-only;no-vectorize-forced-only;>,
 	loop-load-elim,
+	instcombine<max-iterations=1000;no-use-loop-info>,
+	simplifycfg<bonus-inst-threshold=1;forward-switch-cond;switch-range-to-icmp;switch-to-lookup;no-keep-loops;hoist-common-insts;sink-common-insts;speculate-blocks;simplify-cond-branch>,
 	slp-vectorizer,
 	vector-combine,
+	instcombine<max-iterations=1000;no-use-loop-info>,
+	loop-unroll<O2>,
 	transform-warning,
-	sroa<preserve-cfg>,
+	instcombine<max-iterations=1000;no-use-loop-info>,
+	loop-mssa(
+		licm<allowspeculation>
+	),
 	alignment-from-assumptions,
 	loop-sink,
 	instsimplify,
@@ -1595,7 +1615,6 @@ globaldce,
 constmerge,
 cg-profile,
 rel-lookup-table-converter,
-
 function(
 	annotation-remarks
 ),
