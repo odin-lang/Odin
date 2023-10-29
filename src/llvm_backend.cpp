@@ -1494,7 +1494,115 @@ gb_internal WORKER_TASK_PROC(lb_llvm_module_pass_worker_proc) {
 		array_add(&passes, "default<Os>");
 		break;
 	case 2:
-		array_add(&passes, "default<O2>");
+		// array_add(&passes, "default<O2>");
+		array_add(&passes, u8R"(
+
+annotation2metadata,
+forceattrs,
+inferattrs,
+
+
+function<eager-inv>(
+	lower-expect,
+	simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;no-switch-range-to-icmp;no-switch-to-lookup;keep-loops;no-hoist-common-insts;no-sink-common-insts;speculate-blocks;simplify-cond-branch>,
+	sroa<modify-cfg>,
+	early-cse<>
+),
+
+called-value-propagation,
+globalopt,
+function<eager-inv>(
+	mem2reg,
+	simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;switch-range-to-icmp;no-switch-to-lookup;keep-loops;no-hoist-common-insts;no-sink-common-insts;speculate-blocks;simplify-cond-branch>
+),
+require<globals-aa>,
+function(
+	invalidate<aa>
+),
+require<profile-summary>,
+cgscc(
+	devirt<4>(
+		inline<only-mandatory>,
+		inline,
+		function-attrs<skip-non-recursive>,
+		function<eager-inv;no-rerun>(
+			sroa<modify-cfg>,
+			early-cse<memssa>,
+			speculative-execution,
+			jump-threading,
+			simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;switch-range-to-icmp;no-switch-to-lookup;keep-loops;no-hoist-common-insts;no-sink-common-insts;speculate-blocks;simplify-cond-branch>,
+			constraint-elimination,
+			libcalls-shrinkwrap,
+			tailcallelim,
+			simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;switch-range-to-icmp;no-switch-to-lookup;keep-loops;no-hoist-common-insts;no-sink-common-insts;speculate-blocks;simplify-cond-branch>,
+			loop-mssa(
+				loop-instsimplify,
+				loop-simplifycfg,
+				licm<no-allowspeculation>,
+				loop-rotate<header-duplication;no-prepare-for-lto>,
+				licm<allowspeculation>,
+				simple-loop-unswitch<no-nontrivial;trivial>
+			),
+			simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;switch-range-to-icmp;no-switch-to-lookup;keep-loops;no-hoist-common-insts;no-sink-common-insts;speculate-blocks;simplify-cond-branch>,
+			sroa<modify-cfg>,
+			vector-combine,
+			mldst-motion<no-split-footer-bb>,
+			gvn<>,
+			bdce,
+			jump-threading,
+			adce,
+			memcpyopt,
+			dse,
+			move-auto-init,
+			simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;switch-range-to-icmp;no-switch-to-lookup;keep-loops;hoist-common-insts;sink-common-insts;speculate-blocks;simplify-cond-branch>
+		),
+		function-attrs,
+		function(
+			require<should-not-run-function-passes>
+		)
+	)
+),
+
+
+deadargelim,
+globalopt,
+globaldce,
+elim-avail-extern,
+rpo-function-attrs,
+recompute-globalsaa,
+function<eager-inv>(
+	float2int,
+	lower-constant-intrinsics,
+	loop(
+		loop-rotate<header-duplication;no-prepare-for-lto>,
+		loop-deletion
+	),
+	loop-distribute,
+	inject-tli-mappings,
+	loop-load-elim,
+	slp-vectorizer,
+	vector-combine,
+	transform-warning,
+	sroa<preserve-cfg>,
+	alignment-from-assumptions,
+	loop-sink,
+	instsimplify,
+	div-rem-pairs,
+	tailcallelim,
+	simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;switch-range-to-icmp;no-switch-to-lookup;keep-loops;no-hoist-common-insts;no-sink-common-insts;speculate-blocks;simplify-cond-branch>
+),
+globaldce,
+constmerge,
+cg-profile,
+rel-lookup-table-converter,
+
+function(
+	annotation-remarks
+),
+verify
+
+
+)");
 		break;
 	case 3:
 		array_add(&passes, "default<O3>");
@@ -1527,6 +1635,19 @@ gb_internal WORKER_TASK_PROC(lb_llvm_module_pass_worker_proc) {
 			passes_str = gb_string_appendc(passes_str, ",");
 		}
 		passes_str = gb_string_appendc(passes_str, passes[i]);
+	}
+	for (isize i = 0; i < gb_string_length(passes_str); /**/) {
+		switch (passes_str[i]) {
+		case ' ':
+		case '\n':
+		case '\t':
+			gb_memmove(&passes_str[i], &passes_str[i+1], gb_string_length(passes_str)-i);
+			GB_STRING_HEADER(passes_str)->length -= 1;
+			continue;
+		default:
+			i += 1;
+			break;
+		}
 	}
 
 	LLVMErrorRef llvm_err = LLVMRunPasses(wd->m->mod, passes_str, wd->target_machine, pb_options);
