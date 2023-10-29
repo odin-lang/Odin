@@ -1503,6 +1503,7 @@ inferattrs,
 function<eager-inv>(
 	lower-expect,
 	simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;no-switch-range-to-icmp;no-switch-to-lookup;keep-loops;no-hoist-common-insts;no-sink-common-insts;speculate-blocks;simplify-cond-branch>,
+	sroa<modify-cfg>,
 	early-cse<>
 ),
 ipsccp,
@@ -1524,6 +1525,7 @@ cgscc(
 		inline,
 		function-attrs<skip-non-recursive>,
 		function<eager-inv;no-rerun>(
+			sroa<modify-cfg>,
 			early-cse<memssa>,
 			speculative-execution,
 			jump-threading,
@@ -1552,6 +1554,7 @@ cgscc(
 				loop-deletion,
 				loop-unroll-full
 			),
+			sroa<modify-cfg>,
 			vector-combine,
 			mldst-motion<no-split-footer-bb>,
 			gvn<>,
@@ -1600,6 +1603,7 @@ function<eager-inv>(
 	instcombine<max-iterations=1000;no-use-loop-info>,
 	loop-unroll<O2>,
 	transform-warning,
+	sroa<preserve-cfg>,
 	instcombine<max-iterations=1000;no-use-loop-info>,
 	loop-mssa(
 		licm<allowspeculation>
@@ -1619,7 +1623,6 @@ function(
 	annotation-remarks
 ),
 verify
-
 
 )");
 		break;
