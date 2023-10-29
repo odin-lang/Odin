@@ -274,7 +274,6 @@ enum BuildFlagKind {
 	BuildFlag_DisallowDo,
 	BuildFlag_DefaultToNilAllocator,
 	BuildFlag_StrictStyle,
-	BuildFlag_ForeignErrorProcedures,
 	BuildFlag_NoRTTI,
 	BuildFlag_DynamicMapCalls,
 
@@ -460,7 +459,6 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_DisallowDo,              str_lit("disallow-do"),               BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_DefaultToNilAllocator,   str_lit("default-to-nil-allocator"),  BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_StrictStyle,             str_lit("strict-style"),              BuildFlagParam_None,    Command__does_check);
-	add_flag(&build_flags, BuildFlag_ForeignErrorProcedures,  str_lit("foreign-error-procedures"),  BuildFlagParam_None,    Command__does_check);
 
 	add_flag(&build_flags, BuildFlag_NoRTTI,                  str_lit("no-rtti"),                   BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_NoRTTI,                  str_lit("disallow-rtti"),             BuildFlagParam_None,    Command__does_check);
@@ -1115,9 +1113,6 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							break;
 						case BuildFlag_DefaultToNilAllocator:
 							build_context.ODIN_DEFAULT_TO_NIL_ALLOCATOR = true;
-							break;
-						case BuildFlag_ForeignErrorProcedures:
-							build_context.ODIN_FOREIGN_ERROR_PROCEDURES = true;
 							break;
 						case BuildFlag_StrictStyle:
 							build_context.strict_style = true;
@@ -1934,10 +1929,6 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 		print_usage_line(2, "Set the maximum number of errors that can be displayed before the compiler terminates");
 		print_usage_line(2, "Must be an integer >0");
 		print_usage_line(2, "If not set, the default max error count is %d", DEFAULT_MAX_ERROR_COLLECTOR_COUNT);
-		print_usage_line(0, "");
-
-		print_usage_line(1, "-foreign-error-procedures");
-		print_usage_line(2, "States that the error procedues used in the runtime are defined in a separate translation unit");
 		print_usage_line(0, "");
 
 	}
