@@ -322,7 +322,11 @@ gb_internal void lb_run_remove_dead_instruction_pass(lbProcedure *p) {
 				// NOTE(bill): Explicit instructions are set here because some instructions could have side effects
 				switch (LLVMGetInstructionOpcode(curr_instr)) {
 				// case LLVMAlloca:
-
+				case LLVMLoad:
+					if (LLVMGetVolatile(curr_instr)) {
+						break;
+					}
+					/*fallthrough*/
 				case LLVMFNeg:
 				case LLVMAdd:
 				case LLVMFAdd:
@@ -342,7 +346,6 @@ gb_internal void lb_run_remove_dead_instruction_pass(lbProcedure *p) {
 				case LLVMAnd:
 				case LLVMOr:
 				case LLVMXor:
-				case LLVMLoad:
 				case LLVMGetElementPtr:
 				case LLVMTrunc:
 				case LLVMZExt:
