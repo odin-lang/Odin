@@ -1,3 +1,4 @@
+//+build darwin
 package objc_QuartzCore
 
 import NS "vendor:darwin/Foundation"
