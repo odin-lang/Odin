@@ -94,7 +94,8 @@ write_f64 :: proc(w: Writer, val: f64, n_written: ^int = nil) -> (n: int, err: E
 		s = s[1:]
 	}
 
-	return write_string(w, string(s), n_written)
+	trimmed_string := strconv.trim_decimal_string(string(s))
+	return write_string(w, trimmed_string, n_written)
 }	
 
 
