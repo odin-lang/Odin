@@ -159,9 +159,9 @@ join :: proc(elems: []string, allocator := context.allocator) -> string {
 	return ""
 }
 
-// ext returns the file name extension used by "path"
-// The extension is the suffix beginning at the file fot in the last slash separated element of "path"
-// The path is empty if there is no dot
+// ext returns the file name extension used by "path".
+// The extension is the suffix beginning at the dot character in the last slash separated element of "path".
+// The path is empty if there is no dot character.
 ext :: proc(path: string, new := false, allocator := context.allocator) -> string {
 	for i := len(path)-1; i >= 0 && !is_separator(path[i]); i -= 1 {
 		if path[i] == '.' {
