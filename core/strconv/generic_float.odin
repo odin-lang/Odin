@@ -422,39 +422,3 @@ decimal_to_float_bits :: proc(d: ^decimal.Decimal, info: ^Float_Info) -> (b: u64
 	b = end(d, mant, exp, info)
 	return
 }
-
-/*
-Given a string such as 0.123000, trim off the trailing zeroes. Note: 0.0000 will be trimmed to just 0.
-
-**Inputs**
-- s: String representing a decimal number
-
-**Returns**
-- A slice of the string with any trailing zeroes removed.
-*/
-trim_decimal_string :: proc "contextless" (s: string) -> string {
-	if len(s) == 0 || s[len(s)-1] != '0' {
-		return s
-	}
-
-	// We have at least one trailing zero. Search backwards and find the rest.
-	trailing_start_idx := len(s)-1
-	trailing_loop: for i := len(s) - 2; i >= 0 ; i -= 1 {
-		switch s[i] {
-			case '0':
-				if trailing_start_idx == i + 1 {
-					trailing_start_idx = i
-				}
-
-			case '.':
-				if trailing_start_idx == i + 1 {
-					// Removes point completely for numbers like 0.000
-					trailing_start_idx = i
-				}
-
-				return s[:trailing_start_idx]
-		}
-	}
-
-	return s
-}

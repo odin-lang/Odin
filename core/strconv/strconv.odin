@@ -925,9 +925,6 @@ parse_f64_prefix :: proc(str: string) -> (value: f64, nr: int, ok: bool) {
 		nd := 0
 		nd_mant := 0
 		decimal_point := 0
-
-		s := trim_decimal_string(s)
-
 		loop: for ; i < len(s); i += 1 {
 			switch c := s[i]; true {
 			case c == '_':
