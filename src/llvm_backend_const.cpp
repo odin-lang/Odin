@@ -94,6 +94,9 @@ gb_internal LLVMValueRef llvm_const_cast(LLVMValueRef val, LLVMTypeRef dst) {
 	LLVMTypeKind kind = LLVMGetTypeKind(dst);
 	switch (kind) {
 	case LLVMPointerTypeKind:
+		if (LB_USE_NEW_PASS_SYSTEM) {
+			return val;
+		}
 		return LLVMConstPointerCast(val, dst);
 	case LLVMStructTypeKind:
 		// GB_PANIC("%s -> %s", LLVMPrintValueToString(val), LLVMPrintTypeToString(dst));
