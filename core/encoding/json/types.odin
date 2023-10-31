@@ -1,5 +1,7 @@
 package json
 
+import "core:strings"
+
 /*
 	JSON 
 		strict JSON
@@ -104,4 +106,29 @@ destroy_value :: proc(value: Value, allocator := context.allocator) {
 	case String:
 		delete(v)
 	}
+}
+
+clone_value :: proc(value: Value, allocator := context.allocator) -> Value {
+	context.allocator = allocator
+
+	#partial switch &v in value {
+	case Object:
+		new_o := make(Object, len(v))
+		for key, elem in v {
+			new_o[strings.clone(key)] = clone_value(elem)
+		}
+		return new_o
+	case Array:
+		len := len(v)
+		new_a := make(Array, len)
+		vv := v
+		for elem, idx in vv {
+			new_a[idx] = clone_value(elem)
+		}
+		return new_a
+	case String:
+		return strings.clone(v)
+	}
+
+	return value
 }
