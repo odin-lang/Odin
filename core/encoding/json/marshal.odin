@@ -275,7 +275,39 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 			map_cap := uintptr(runtime.map_cap(m^))
 			ks, vs, hs, _, _ := runtime.map_kvh_data_dynamic(m^, info.map_info)
 
-			if opt.sort_maps_by_key {
+			if !opt.sort_maps_by_key {
+				i := 0
+				for bucket_index in 0..<map_cap {
+					runtime.map_hash_is_valid(hs[bucket_index]) or_continue
+
+					opt_write_iteration(w, opt, i) or_return
+					i += 1
+
+					key   := rawptr(runtime.map_cell_index_dynamic(ks, info.map_info.ks, bucket_index))
+					value := rawptr(runtime.map_cell_index_dynamic(vs, info.map_info.vs, bucket_index))
+
+					// check for string type
+					{
+						v := any{key, info.key.id}
+						ti := runtime.type_info_base(type_info_of(v.id))
+						a := any{v.data, ti.id}
+						name: string
+
+						#partial switch info in ti.variant {
+						case runtime.Type_Info_String:
+							switch s in a {
+							case string: name = s
+							case cstring: name = string(s)
+							}
+							opt_write_key(w, opt, name) or_return
+
+						case: return .Unsupported_Type
+						}
+					}
+
+					marshal_to_writer(w, any{value, info.value.id}, opt) or_return
+				}
+			} else {
 				Entry :: struct {
 					key: string,
 					value: any,
@@ -317,38 +349,6 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 					opt_write_iteration(w, opt, i) or_return
 					opt_write_key(w, opt, s.key) or_return
 					marshal_to_writer(w, s.value, opt) or_return
-				}
-			} else {
-				i := 0
-				for bucket_index in 0..<map_cap {
-					runtime.map_hash_is_valid(hs[bucket_index]) or_continue
-
-					opt_write_iteration(w, opt, i) or_return
-					i += 1
-
-					key   := rawptr(runtime.map_cell_index_dynamic(ks, info.map_info.ks, bucket_index))
-					value := rawptr(runtime.map_cell_index_dynamic(vs, info.map_info.vs, bucket_index))
-
-					// check for string type
-					{
-						v := any{key, info.key.id}
-						ti := runtime.type_info_base(type_info_of(v.id))
-						a := any{v.data, ti.id}
-						name: string
-
-						#partial switch info in ti.variant {
-						case runtime.Type_Info_String:
-							switch s in a {
-							case string: name = s
-							case cstring: name = string(s)
-							}
-							opt_write_key(w, opt, name) or_return
-
-						case: return .Unsupported_Type
-						}
-					}
-
-					marshal_to_writer(w, any{value, info.value.id}, opt) or_return
 				}
 			}
 		}
