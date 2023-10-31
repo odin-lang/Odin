@@ -28,7 +28,7 @@ foreign shell32 {
 
 	SHGetKnownFolderIDList :: proc(rfid: REFKNOWNFOLDERID, dwFlags: /* KNOWN_FOLDER_FLAG */ DWORD, hToken: HANDLE, ppidl: rawptr) -> HRESULT ---
 	SHSetKnownFolderPath :: proc(rfid: REFKNOWNFOLDERID, dwFlags: /* KNOWN_FOLDER_FLAG */ DWORD, hToken: HANDLE, pszPath: PCWSTR ) -> HRESULT ---
-    SHGetKnownFolderPath :: proc(rfid: REFKNOWNFOLDERID, dwFlags: /* KNOWN_FOLDER_FLAG */ DWORD, hToken: HANDLE, ppszPath: ^LPWSTR) -> HRESULT ---
+	SHGetKnownFolderPath :: proc(rfid: REFKNOWNFOLDERID, dwFlags: /* KNOWN_FOLDER_FLAG */ DWORD, hToken: HANDLE, ppszPath: ^LPWSTR) -> HRESULT ---
 }
 
 APPBARDATA :: struct {
@@ -67,27 +67,27 @@ KNOWNFOLDERID :: GUID
 REFKNOWNFOLDERID :: ^KNOWNFOLDERID
 
 KNOWN_FOLDER_FLAG :: enum u32 {
-    DEFAULT                          = 0x00000000,
+	DEFAULT                          = 0x00000000,
 
 	// if NTDDI_VERSION >= NTDDI_WIN10_RS3
-    FORCE_APP_DATA_REDIRECTION       = 0x00080000,
+	FORCE_APP_DATA_REDIRECTION       = 0x00080000,
 
 	// if NTDDI_VERSION >= NTDDI_WIN10_RS2
-    RETURN_FILTER_REDIRECTION_TARGET = 0x00040000,
-    FORCE_PACKAGE_REDIRECTION        = 0x00020000,
-    NO_PACKAGE_REDIRECTION           = 0x00010000,
-    FORCE_APPCONTAINER_REDIRECTION   = 0x00020000,
+	RETURN_FILTER_REDIRECTION_TARGET = 0x00040000,
+	FORCE_PACKAGE_REDIRECTION        = 0x00020000,
+	NO_PACKAGE_REDIRECTION           = 0x00010000,
+	FORCE_APPCONTAINER_REDIRECTION   = 0x00020000,
 
 	// if NTDDI_VERSION >= NTDDI_WIN7
-    NO_APPCONTAINER_REDIRECTION      = 0x00010000,
+	NO_APPCONTAINER_REDIRECTION      = 0x00010000,
 
-    CREATE                           = 0x00008000,
-    DONT_VERIFY                      = 0x00004000,
-    DONT_UNEXPAND                    = 0x00002000,
-    NO_ALIAS                         = 0x00001000,
-    INIT                             = 0x00000800,
-    DEFAULT_PATH                     = 0x00000400,
-    NOT_PARENT_RELATIVE              = 0x00000200,
-    SIMPLE_IDLIST                    = 0x00000100,
-    ALIAS_ONLY                       = 0x80000000,
+	CREATE                           = 0x00008000,
+	DONT_VERIFY                      = 0x00004000,
+	DONT_UNEXPAND                    = 0x00002000,
+	NO_ALIAS                         = 0x00001000,
+	INIT                             = 0x00000800,
+	DEFAULT_PATH                     = 0x00000400,
+	NOT_PARENT_RELATIVE              = 0x00000200,
+	SIMPLE_IDLIST                    = 0x00000100,
+	ALIAS_ONLY                       = 0x80000000,
 }
