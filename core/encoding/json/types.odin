@@ -119,10 +119,8 @@ clone_value :: proc(value: Value, allocator := context.allocator) -> Value {
 		}
 		return new_o
 	case Array:
-		len := len(v)
-		new_a := make(Array, len)
-		vv := v
-		for elem, idx in vv {
+		new_a := make(Array, len(v))
+		for elem, idx in v {
 			new_a[idx] = clone_value(elem)
 		}
 		return new_a
