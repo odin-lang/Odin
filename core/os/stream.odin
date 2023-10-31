@@ -22,10 +22,12 @@ _file_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, 
             // their own in case an interrupt comes. In such cases we need to
             // manually restart the syscall if EINTR is returned.
     		os_err = close(fd)
-            if os_err == EINTR {
-                continue
-            } else if os_err != ERROR_NONE {
-                err = .Unknown
+            when ODIN_OS == .Linux || ODIN_OS == .OpenBSD || ODIN_OS == .FreeBSD {
+                if os_err == EINTR {
+                    continue
+                } else if os_err != ERROR_NONE {
+                    err = .Unknown
+                }
             }
         }
         break
