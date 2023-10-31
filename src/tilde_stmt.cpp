@@ -1032,22 +1032,22 @@ gb_internal void cg_build_assignment(cgProcedure *p, Array<cgAddr> const &lvals,
 			continue;
 		}
 
-	    	Type *type = cg_addr_type(lval);
+		Type *type = cg_addr_type(lval);
 		if (!cg_addr_is_empty(lval)) {
 			GB_ASSERT_MSG(are_types_identical(init.type, type), "%s = %s", type_to_string(init.type), type_to_string(type));
 		}
 
 		if (init.kind == cgValue_Addr &&
 		    !cg_addr_is_empty(lval)) {
-		    	// NOTE(bill): This is needed for certain constructs such as this:
-		    	// a, b = b, a
-		    	// NOTE(bill): This is a bodge and not necessarily a good way of doing things whatsoever
-		    	TB_CharUnits size  = cast(TB_CharUnits)type_size_of(type);
-		    	TB_CharUnits align = cast(TB_CharUnits)type_align_of(type);
-		    	TB_Node *copy = tb_inst_local(p->func, size, align);
-		    	tb_inst_memcpy(p->func, copy, init.node, tb_inst_uint(p->func, TB_TYPE_INT, size), align);
-		    	// use the copy instead
-		    	init.node = copy;
+			// NOTE(bill): This is needed for certain constructs such as this:
+			// a, b = b, a
+			// NOTE(bill): This is a bodge and not necessarily a good way of doing things whatsoever
+			TB_CharUnits size  = cast(TB_CharUnits)type_size_of(type);
+			TB_CharUnits align = cast(TB_CharUnits)type_align_of(type);
+			TB_Node *copy = tb_inst_local(p->func, size, align);
+			tb_inst_memcpy(p->func, copy, init.node, tb_inst_uint(p->func, TB_TYPE_INT, size), align);
+			// use the copy instead
+			init.node = copy;
 		}
 		inits[i] = init;
 	}

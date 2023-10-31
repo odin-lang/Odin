@@ -2769,7 +2769,7 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 				{
 					GB_ASSERT(arg_count <= 7);
 
-					char asm_string_default[] = "int $0x80";
+					char asm_string_default[] = "int $$0x80";
 					char *asm_string = asm_string_default;
 					gbString constraints = gb_string_make(heap_allocator(), "={eax}");
 
