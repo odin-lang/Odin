@@ -311,13 +311,13 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 					append(&sorted, Entry { key = name, value = any{value, info.value.id}})
 				}
 
-                slice.sort_by(sorted[:], proc(i, j: Entry) -> bool { return i.key < j.key })
+				slice.sort_by(sorted[:], proc(i, j: Entry) -> bool { return i.key < j.key })
 
-                for s, i in sorted {
+				for s, i in sorted {
 					opt_write_iteration(w, opt, i) or_return
 					opt_write_key(w, opt, s.key) or_return
 					marshal_to_writer(w, s.value, opt) or_return
-                }
+				}
 			} else {
 				i := 0
 				for bucket_index in 0..<map_cap {
