@@ -53,7 +53,7 @@ rtti_test :: proc(t: ^testing.T) {
 main :: proc() {
 	t := testing.T{}
 
-	rtti_test(&t)
+	mem_track_test(&t, rtti_test)
 
 	fmt.printf("%v/%v tests successful.\n", TEST_count - TEST_fail, TEST_count)
 	if TEST_fail > 0 {
