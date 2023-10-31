@@ -18,7 +18,7 @@ package net
 		Jeroen van Rijn: Cross platform unification, code style, documentation
 */
 
-any_socket_to_socket :: proc(socket: Any_Socket) -> Socket {
+any_socket_to_socket :: proc "contextless" (socket: Any_Socket) -> Socket {
 	switch s in socket {
 	case TCP_Socket:  return Socket(s)
 	case UDP_Socket:  return Socket(s)
