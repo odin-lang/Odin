@@ -8,7 +8,18 @@ import "core:strings"
 import "core:c"
 import "core:strconv"
 import "core:intrinsics"
-import "core:sys/unix"
+
+// NOTE(flysand): For compatibility we'll make core:os package
+// depend on the old (scheduled for removal) linux package.
+// Seeing that there are plans for os2, I'm imagining that *that*
+// package should inherit the new sys functionality.
+// The reasons for these are as follows:
+//  1. It's very hard to update this package without breaking *a lot* of code.
+//  2. os2 is not stable anyways, so we can break compatibility all we want
+// It might be weird to bring up compatibility when Odin in it's nature isn't
+// all that about compatibility. But we don't want to push experimental changes
+// and have people's code break while it's still work in progress.
+import unix "core:sys/unix"
 
 Handle    :: distinct i32
 Pid       :: distinct i32
