@@ -83,6 +83,9 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 		return
 	}
 
+	// temp guard in case we are sorting map keys, which will use temp allocations
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
+	
 	ti := runtime.type_info_base(type_info_of(v.id))
 	a := any{v.data, ti.id}
 
