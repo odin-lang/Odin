@@ -1398,3 +1398,173 @@ PER_OSF4        :: 0x000f
 PER_HPUX        :: 0x0010
 PER_MASK        :: 0x00ff
 
+/*
+	Bits for access modes for shared memory
+*/
+IPC_Mode_Bits :: enum {
+	WROTH  = 1,
+	RDOTH  = 2,
+	WRGRP  = 4,
+	RDGRP  = 5,
+	WRUSR  = 7,
+	RDUSR  = 8,
+	DEST   = 9,
+	LOCKED = 10,
+}
+
+/*
+	Shared memory flags bits
+*/
+IPC_Flags_Bits :: enum {
+	IPC_CREAT     = 9,
+	IPC_EXCL      = 10,
+	IPC_NOWAIT    = 11,
+	// Semaphore
+	SEM_UNDO      = 9,
+	// Shared memory
+	SHM_HUGETLB   = 11,
+	SHM_NORESERVE = 12,
+	SHM_RDONLY    = 12,
+	SHM_RND       = 13,
+	SHM_REMAP     = 14,
+	SHM_EXEC      = 15,
+	// Message queue
+	MSG_NOERROR   = 12,
+	MSG_EXCEPT    = 13,
+	MSG_COPY      = 14,
+}
+
+/*
+	IPC memory commands
+*/
+IPC_Cmd :: enum i16 {
+	// IPC common
+	IPC_RMID     = 0,
+	IPC_SET      = 1,
+	IPC_STAT     = 2,
+	// Shared memory
+	SHM_LOCK     = 11,
+	SHM_UNLOCK   = 12,
+	SHM_STAT     = 13,
+	SHM_INFO     = 14,
+	SHM_STAT_ANY = 15,
+	// Semaphore
+	GETPID       = 11,
+	GETVAL       = 12,
+	GETALL       = 13,
+	GETNCNT      = 14,
+	GETZCNT      = 15,
+	SETVAL       = 16,
+	SETALL       = 17,
+	SEM_STAT     = 18,
+	SEM_INFO     = 19,
+	SEM_STAT_ANY = 20,
+	// Message queue
+	MSG_STAT     = 11,
+	MSG_INFO     = 12,
+	MSG_STAT_ANY = 13,
+}
+
+/*
+	File locking operation bits
+*/
+FLock_Op_Bits :: enum {
+	SH = 1,
+	EX = 2,
+	NB = 4,
+	UN = 8,
+}
+
+/*
+	ptrace requests
+*/
+PTrace_Request :: enum {
+	TRACEME                = 0,
+	PEEKTEXT               = 1,
+	PEEKDATA               = 2,
+	PEEKUSER               = 3,
+	POKETEXT               = 4,
+	POKEDATA               = 5,
+	POKEUSER               = 6,
+	CONT                   = 7,
+	KILL                   = 8,
+	SINGLESTEP             = 9,
+	GETREGS                = 12,
+	SETREGS                = 13,
+	GETFPREGS              = 14,
+	SETFPREGS              = 15,
+	ATTACH                 = 16,
+	DETACH                 = 17,
+	GETFPXREGS             = 18,
+	SETFPXREGS             = 19,
+	SYSCALL                = 24,
+	GET_THREAD_AREA        = 25,
+	SET_THREAD_AREA        = 26,
+	ARCH_PRCTL             = 30,
+	SYSEMU                 = 31,
+	SYSEMU_SINGLESTEP      = 32,
+	SINGLEBLOCK            = 33,
+	SETOPTIONS             = 0x4200,
+	GETEVENTMSG            = 0x4201,
+	GETSIGINFO             = 0x4202,
+	SETSIGINFO             = 0x4203,
+	GETREGSET              = 0x4204,
+	SETREGSET              = 0x4205,
+	SEIZE                  = 0x4206,
+	INTERRUPT              = 0x4207,
+	LISTEN                 = 0x4208,
+	PEEKSIGINFO            = 0x4209,
+	GETSIGMASK             = 0x420a,
+	SETSIGMASK             = 0x420b,
+	SECCOMP_GET_FILTER     = 0x420c,
+	SECCOMP_GET_METADATA   = 0x420d,
+	GET_SYSCALL_INFO       = 0x420e,
+	GET_RSEQ_CONFIGURATION = 0x420f,
+};
+
+/*
+	ptrace options
+*/
+PTrace_Options_Bits :: enum {
+	TRACESYSGOOD    = 0,
+	TRACEFORK       = 1,
+	TRACEVFORK      = 2,
+	TRACECLONE      = 3,
+	TRACEEXEC       = 4,
+	TRACEVFORKDONE  = 5,
+	TRACEEXIT       = 6,
+	TRACESECCOMP    = 7,
+	EXITKILL        = 20,
+	SUSPEND_SECCOMP = 21,
+}
+
+/*
+	ptrace event codes.
+*/
+PTrace_Event_Code :: enum {
+	EVENT_FORK       = 1,
+	EVENT_VFORK      = 2,
+	EVENT_CLONE      = 3,
+	EVENT_EXEC       = 4,
+	EVENT_VFORK_DONE = 5,
+	EVENT_EXIT       = 6,
+	EVENT_SECCOMP    = 7,
+	EVENT_STOP       = 128,
+}
+
+/*
+	ptrace's get syscall info operation.
+*/
+PTrace_Get_Syscall_Info_Op :: enum u8 {
+	NONE    = 0,
+	ENTRY   = 1,
+	EXIT    = 2,
+	SECCOMP = 3,
+};
+
+/*
+	ptrace's PEEKSIGINFO flags bits
+*/
+PTrace_Peek_Sig_Info_Flags_Bits :: enum {
+	SHARED = 0,
+}

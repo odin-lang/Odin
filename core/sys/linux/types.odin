@@ -26,6 +26,9 @@ Pid_FD :: distinct i32
 /// Used pretty much only in struct Stat64 for 32-bit platforms
 Inode :: distinct u64
 
+/// Shared memory identifiers used by `shm*` calls
+Key :: distinct i32
+
 /// Represents time with nanosecond precision
 Time_Spec :: struct {
 	time_sec:  uint,
@@ -37,6 +40,15 @@ Time_Val :: struct {
 	seconds:      int,
 	microseconds: int,
 }
+
+/*
+	Access and modification times for files
+*/
+UTim_Buf :: struct {
+	actime:  uint,
+	modtime: uint,
+};
+
 
 /// open.2 flags
 Open_Flags :: bit_set[Open_Flags_Bits; u32]
@@ -234,6 +246,13 @@ FLock :: struct {
 	len:    i64,
 	pid:    Pid,
 }
+
+/*
+	File locking operations.
+	Use one of `EX`, `RW` or `UN` to specify the operation, and add `UN` if
+	you need a non-blocking operation.
+*/
+FLock_Op :: bit_set[FLock_Op_Bits; i32]
 
 /// Flags for fcntl_notify
 FD_Notifications :: bit_set[FD_Notifications_Bits; i32]
@@ -496,6 +515,25 @@ Sock_Addr_Any :: struct #raw_union {
 	using ipv6: Sock_Addr_In6,
 }
 
+/*
+	Message header for sendmsg/recvmsg
+*/
+Msg_Hdr :: struct {
+	name:       rawptr,
+	namelen:    i32,
+	iov:        []IO_Vec, // ptr followed by length, abi matches
+	control:    []u8,
+	flags:      Socket_Msg,
+};
+
+/*
+	Multiple message header for sendmmsg/recvmmsg
+*/
+MMsg_Hdr :: struct {
+	hdr: Msg_Hdr,
+	len: u32,
+}
+
 /// Just an alias to make futex-values more visible
 Futex :: u32
 
@@ -564,3 +602,417 @@ RUsage :: struct {
 	nvcsw_word:    int,
 	nivcsw_word:   int,
 }
+
+/*
+	Struct used for IO operations
+*/
+IO_Vec :: struct {
+	base: rawptr,
+	len:  uint,
+}
+
+/*
+	Access mode for shared memory
+*/
+IPC_Mode :: bit_set[IPC_Mode; u32]
+
+/*
+	Flags used by IPC objects
+*/
+IPC_Flags :: bit_set[IPC_Flags_Bits; i16]
+
+/*
+	Permissions for IPC objects
+*/
+IPC_Perm :: struct {
+	key:  Key,
+	uid:  u32,
+	gid:  u32,
+	cuid: u32,
+	cgid: u32,
+	mode: IPC_Mode,
+	seq:  u16,
+	_:    [2 + 2*size_of(int)],
+}
+
+when size_of(int) == 8 || ODIN_ARCH == .i386 {
+	// 32-bit and 64-bit x86, 64-bit arm
+	_Arch_Shmid_DS :: struct {
+		perm:   IPC_Perm,
+		segsz:  uint,
+		atime:  int,
+		dtime:  int,
+		ctime:  int,
+		cpid:   Pid,
+		lpid:   Pid,
+		nattch: uint,
+		_:      [2]uint,
+	}
+} else {
+	// Other 32-bit platforms
+	// NOTE(flysand): I'm not risking assuming it's little endian...
+	_Arch_Shmid_DS :: struct {
+		perm:       IPC_Perm,
+		segsz:      uint,
+		atime:      uint,
+		atime_high: uint,
+		dtime:      uint,
+		dtime_high: uint,
+		ctime:      uint,
+		ctime_high: uint,
+		cpid:       Pid,
+		lpid:       Pid,
+		nattach:    uint,
+		_:          [2]uint,        
+	}
+}
+
+/*
+	SystemV shared memory data.
+*/
+Shmid_DS :: _Arch_Shmid_DS
+
+/*
+	SystemV shared memory info.
+*/
+Shm_Info :: struct {
+	used_ids:       i32
+	shm_tot:        uint,
+	shm_rss:        uint,
+	shm_swp:        uint,
+	swap_attempts:  uint,
+	swap_successes: uint,
+}
+
+/*
+	SystemV semaphore operation.
+*/
+Sem_Buf :: struct {
+	num: u16,
+	op:  IPC_Cmd,
+	flg: IPC_Flags,
+}
+
+when ODIN_ARCH == .i386 {
+	_Arch_Semid_DS :: struct {
+		perm:       IPC_Perm,
+		otime:      uint,
+		otime_high: uint,
+		ctime:      uint,
+		ctime_high: uint,
+		nsems:      uint,
+		_:          [2]uint,
+	}
+else when ODIN_ARCH == .amd64 {
+	_Arch_Semid_DS :: struct {
+		perm:       IPC_Perm,
+		otime:      int,
+		ctime:      int,
+		nsems:      uint,
+		_:          [2]uint,
+	}
+} else when ODIN_ARCH == .amd32 {
+	_Arch_Semid_DS :: struct {
+		perm:       IPC_Perm,
+		otime:      uint,
+		otime_high: uint,
+		ctime:      uint,
+		ctime_high: uint,
+		nsems:      uint,
+		_:          [2]uint,
+	}
+} else when ODIN_ARCH == .amd64 {
+	_Arch_Semid_DS :: struct {
+		perm:       IPC_Perm,
+		otime:      int,
+		ctime:      int,
+		sem_nsems:  uint,
+		__unused3:  uint,
+		__unused4:  uint,
+	}
+}
+
+/*
+	Architecture-specific semaphore data.
+*/
+Semid_DS :: _Arch_Semid_DS
+
+/*
+	Argument for semctl functions
+*/
+Sem_Un :: struct #raw_union {
+	val:   i32,
+	buf:   rawptr,
+	array: u16,
+	__buf: Sem_Info,
+	_:     uintptr,
+}
+
+/*
+	SystenV semaphore info.
+*/
+Sem_Info {
+	map: i32,
+	mni: i32,
+	mns: i32,
+	mnu: i32,
+	msl: i32,
+	opm: i32,
+	ume: i32,
+	usz: i32,
+	vmx: i32,
+	aem: i32,
+}
+
+/*
+	Template for the struct used for sending and receiving messages
+*/
+Msg_Buf :: struct {
+	type: int,
+	text: [0]u8,
+}
+
+/*
+	SystemV message queue data.
+*/
+struct Msqid_DS {
+	perm:   IPC_Perm,
+	stime:  uint,
+	rtime:  uint,
+	ctime:  uint,
+	cbytes: uint,
+	qnum:   uint,
+	qbytes: uint,
+	lspid:  Pid,
+	lrpid:  Pid,
+	_:      [2]uint
+};
+
+/*
+	Interval timer types
+*/
+ITimer_Which :: enum {
+	REAL    = 0,
+	VIRTUAL = 1,
+	PROF    = 2,
+}
+
+/*
+	Interval timer value
+*/
+ITimer_Val :: struct {
+	interval: Time_Val,
+	value:    Time_Val,
+}
+
+when ODIN_ARCH == .arm32 {
+	_Arch_User_Regs :: struct {
+		cpsr:             uint,
+		pc:               uint,
+		lr:               uint,
+		sp:               uint,
+		ip:               uint,
+		fp:               uint,
+		r10:              uint,
+		r9:               uint,
+		r8:               uint,
+		r7:               uint,
+		r6:               uint,
+		r5:               uint,
+		r4:               uint,
+		r3:               uint,
+		r2:               uint,
+		r1:               uint,
+		r0:               uint,
+		ORIG_r0:          uint,
+	}
+	// TODO(flysand): Idk what to do about these, couldn't find their
+	// definitions
+	_Arch_User_FP_Regs :: struct {}
+	_Arch_User_FPX_Regs :: struct {}
+} else when ODIN_ARCH == .arm64 {
+	_Arch_User_Regs :: struct {
+		regs:             [31]uint,
+		sp:               uint,
+		pc:               uint,
+		pstate:           uint,
+	}
+	_Arch_User_FP_Regs :: struct {
+		vregs:            [32]u128,
+		fpsr:             u32,
+		fpcr:             u32,
+		_:                [2]u32
+	}
+	_Arch_User_FPX_Regs :: struct {}
+} else when ODIN_ARCH == .i386 {
+	_Arch_User_Regs :: struct {
+		ebx:              uint,
+		ecx:              uint,
+		edx:              uint,
+		esi:              uint,
+		edi:              uint,
+		ebp:              uint,
+		eax:              uint,
+		xds:              uint,
+		xes:              uint,
+		xfs:              uint,
+		xgs:              uint,
+		orig_eax:         uint,
+		eip:              uint,
+		xcs:              uint,
+		eflags:           uint,
+		esp:              uint,
+		xss:              uint,
+	}
+	// x87 FPU state
+	_Arch_User_FP_Regs :: struct {
+		cwd:              uint,
+		swd:              uint,
+		twd:              uint,
+		fip:              uint,
+		fcs:              uint,
+		foo:              uint,
+		fos:              uint,
+		st_space:         [20]uint,
+	}
+	// FXSR instruction set state
+	_Arch_User_FPX_Regs :: struct {
+		cwd:              u16,
+		swd:              u16,
+		twd:              u16,
+		fop:              u16,
+		fip:              uint,
+		fcs:              uint,
+		foo:              uint,
+		fos:              uint,
+		mxcsr:            uint,
+		_:                uint,
+		st_space:         [32]uint,
+		xmm_space:        [32]uint,
+		padding:          [56]uint,
+	}
+} else when ODIN_ARCH == .amd64 {
+	_Arch_User_Regs {
+		// Callee-preserved, may not be correct if the syscall doesn't need
+		// these registers
+		r15:              uint,
+		r14:              uint,
+		r13:              uint,
+		r12:              uint,
+		rbp:              uint,
+		rbx:              uint,
+		// Always saved
+		r11:              uint,
+		r10:              uint,
+		r9:               uint,
+		r8:               uint,
+		rax:              uint,
+		rcx:              uint,
+		rdx:              uint,
+		rsi:              uint,
+		rdi:              uint,
+		// On syscall entry this is the syscall number, on CPU exception this
+		// is the error code, on hardware interrupt this is its IRQ number
+		orig_rax:         uint,
+		// Return frame for iretq
+		rip:              uint,
+		cs:               uint,
+		eflags:           uint,
+		rsp:              uint,
+		ss:               uint,
+	}
+	// All floating point state
+	_Arch_User_FP_Regs :: struct {
+		cwd:              u16,
+		swd:              u16,
+		twd:              u16,
+		fop:              u16,
+		rip:              uint,
+		rdp:              uint,
+		mxcsr:            u32,
+		mxcsr_mask:       u32,
+		st_space:         [32]u32,
+		xmm_space:        [64]u32,
+		_:                [24]u32;
+	}
+}
+
+/*
+	Architecture-specific registers struct.
+*/
+User_Regs :: _Arch_User_Regs
+
+/*
+	Architecture-specific floating-point registers
+*/
+User_FP_Regs :: _Arch_User_FP_Regs
+
+/*
+	Architecture-specific extended floating-point registers.
+	Currently only used for x86 CPU's.
+*/
+User_FPX_Regs :: _Arch_User_FPX_Regs
+
+/*
+	ptrace options.
+*/
+PTrace_Options :: bit_set[PTrace_Options_Bits; u32]
+
+/*
+	ptrace's PEEKSIGINFO argument.
+*/
+PTrace_Peek_Sig_Info_Args :: struct {
+	off:   u64,
+	flags: PTrace_Peek_Sig_Info_Flags,
+	nr:    i32,
+}
+
+/*
+	ptrace's PEEKSIGINFO flags.
+*/
+PTrace_Peek_Sig_Info_Flags :: bit_set[PTrace_Peek_Sig_Info_Flags_Bits, u32]
+
+/*
+	ptrace's SECCOMP metadata.
+*/
+PTrace_Seccomp_Metadata
+{
+	filter_off: u64,
+	flags:      u64,
+}
+
+/*
+	ptrace's results of GET_SYSCALL_INFO.
+*/
+PTrace_Syscall_Info :: struct {
+	op:                  PTrace_Get_Syscall_Info_Op,
+	arch:                u32, // TODO: AUDIT_ARCH*
+	instruction_pointer: u64,
+	stack_pointer:       u64,
+	using _: struct #raw_union {
+		entry: struct {
+			nr:       u64,
+			args:     [6]u64,
+		},
+		exit: struct {
+			rval:     i64,
+			is_error: b8,
+		},
+		seccomp: struct {
+			nr:       u64,
+			args:     [6]u64,
+			ret_data: u32,
+		},
+	};
+};
+
+/*
+	ptrace's results of GET_RSEQ_CONFIGURATION.
+*/
+PTrace_RSeq_Configuration {
+	rseq_abi_pointer: u64,
+	rseq_abi_size:    u32,
+	signature:        u32,
+	flags:            u32,
+	_:                u32,
+};

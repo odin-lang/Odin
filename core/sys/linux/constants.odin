@@ -83,6 +83,10 @@ STATX_BASIC_STATS :: Statx_Mask {
 	.BLOCKS,
 }
 
+/*
+	Tell `shmget` to create a new key
+*/
+IPC_PRIVATE :: Key(0)
 
 FCntl_Command_DUPFD            :: distinct FCntl_Command
 FCntl_Command_GETFD            :: distinct FCntl_Command
@@ -197,3 +201,82 @@ FUTEX_WAIT_REQUEUE_PI :: Futex_Wait_requeue_Pi_Type(.WAIT_REQUEUE_PI)
 FUTEX_CMP_REQUEUE_PI  :: Futex_Cmp_requeue_Pi_Type(.CMP_REQUEUE_PI)
 FUTEX_LOCK_PI2        :: Futex_Lock_Pi2_Type(.LOCK_PI2)
 
+PTrace_Traceme_Type                :: distinct PTrace_Request
+PTrace_Peek_Type                   :: distinct PTrace_Request
+PTrace_Poke_Type                   :: distinct PTrace_Request
+PTrace_Cont_Type                   :: distinct PTrace_Request
+PTrace_Kill_Type                   :: distinct PTrace_Request
+PTrace_Singlestep_Type             :: distinct PTrace_Request
+PTrace_Getregs_Type                :: distinct PTrace_Request
+PTrace_Setregs_Type                :: distinct PTrace_Request
+PTrace_Getfpregs_Type              :: distinct PTrace_Request
+PTrace_Setfpregs_Type              :: distinct PTrace_Request
+PTrace_Attach_Type                 :: distinct PTrace_Request
+PTrace_Detach_Type                 :: distinct PTrace_Request
+PTrace_Getfpxregs_Type             :: distinct PTrace_Request
+PTrace_Setfpxregs_Type             :: distinct PTrace_Request
+PTrace_Syscall_Type                :: distinct PTrace_Request
+PTrace_Get_Thread_Area_Type        :: distinct PTrace_Request
+PTrace_Set_Thread_Area_Type        :: distinct PTrace_Request
+PTrace_Arch_Prctl_Type             :: distinct PTrace_Request
+PTrace_Sysemu_Type                 :: distinct PTrace_Request
+PTrace_Sysemu_Singlestep_Type      :: distinct PTrace_Request
+PTrace_Singleblock_Type            :: distinct PTrace_Request
+PTrace_Setoptions_Type             :: distinct PTrace_Request
+PTrace_Geteventmsg_Type            :: distinct PTrace_Request
+PTrace_Getsiginfo_Type             :: distinct PTrace_Request
+PTrace_Setsiginfo_Type             :: distinct PTrace_Request
+PTrace_Getregset_Type              :: distinct PTrace_Request
+PTrace_Setregset_Type              :: distinct PTrace_Request
+PTrace_Seize_Type                  :: distinct PTrace_Request
+PTrace_Interrupt_Type              :: distinct PTrace_Request
+PTrace_Listen_Type                 :: distinct PTrace_Request
+PTrace_Peeksiginfo_Type            :: distinct PTrace_Request
+PTrace_Getsigmask_Type             :: distinct PTrace_Request
+PTrace_Setsigmask_Type             :: distinct PTrace_Request
+PTrace_Seccomp_Get_Filter_Type     :: distinct PTrace_Request
+PTrace_Seccomp_Get_Metadata_Type   :: distinct PTrace_Request
+PTrace_Get_Syscall_Info_Type       :: distinct PTrace_Request
+PTrace_Get_RSeq_Configuration_Type :: distinct PTrace_Request
+
+PTRACE_TRACEME                :: PTrace_Traceme_Type(.TRACEME)
+PTRACE_PEEKTEXT               :: PTrace_Peek_Type(.PEEKTEXT)
+PTRACE_PEEKDATA               :: PTrace_Peek_Type(.PEEKDATA)
+PTRACE_PEEKUSER               :: PTrace_Peek_Type(.PEEKUSER)
+PTRACE_POKETEXT               :: PTrace_Poke_Type(.POKETEXT)
+PTRACE_POKEDATA               :: PTrace_Poke_Type(.POKEDATA)
+PTRACE_POKEUSER               :: PTrace_Poke_Type(.POKEUSER)
+PTRACE_CONT                   :: PTrace_Cont_Type(.CONT)
+PTRACE_KILL                   :: PTrace_Kill_Type(.KILL)
+PTRACE_SINGLESTEP             :: PTrace_Singlestep_Type(.SINGLESTEP)
+PTRACE_GETREGS                :: PTrace_Getregs_Type(.GETREGS)
+PTRACE_SETREGS                :: PTrace_Setregs_Type(.SETREGS)
+PTRACE_GETFPREGS              :: PTrace_Getfpregs_Type(.GETFPREGS)
+PTRACE_SETFPREGS              :: PTrace_Setfpregs_Type(.SETFPREGS)
+PTRACE_ATTACH                 :: PTrace_Attach_Type(.ATTACH)
+PTRACE_DETACH                 :: PTrace_Detach_Type(.DETACH)
+PTRACE_GETFPXREGS             :: PTrace_Getfpxregs_Type(.GETFPXREGS)
+PTRACE_SETFPXREGS             :: PTrace_Setfpxregs_Type(.SETFPXREGS)
+PTRACE_SYSCALL                :: PTrace_Syscall_Type(.SYSCALL)
+PTRACE_GET_THREAD_AREA        :: PTrace_Get_Thread_Area_Type(.GET_THREAD_AREA)
+PTRACE_SET_THREAD_AREA        :: PTrace_Set_Thread_Area_Type(.SET_THREAD_AREA)
+PTRACE_ARCH_PRCTL             :: PTrace_Arch_Prctl_Type(.ARCH_PRCTL)
+PTRACE_SYSEMU                 :: PTrace_Sysemu_Type(.SYSEMU)
+PTRACE_SYSEMU_SINGLESTEP      :: PTrace_Sysemu_Singlestep_Type(.SYSEMU_SINGLESTEP)
+PTRACE_SINGLEBLOCK            :: PTrace_Singleblock_Type(.SINGLEBLOCK)
+PTRACE_SETOPTIONS             :: PTrace_Setoptions_Type(.SETOPTIONS)
+PTRACE_GETEVENTMSG            :: PTrace_Geteventmsg_Type(.GETEVENTMSG)
+PTRACE_GETSIGINFO             :: PTrace_Getsiginfo_Type(.GETSIGINFO)
+PTRACE_SETSIGINFO             :: PTrace_Setsiginfo_Type(.SETSIGINFO)
+PTRACE_GETREGSET              :: PTrace_Getregset_Type(.GETREGSET)
+PTRACE_SETREGSET              :: PTrace_Setregset_Type(.SETREGSET)
+PTRACE_SEIZE                  :: PTrace_Seize_Type(.SEIZE)
+PTRACE_INTERRUPT              :: PTrace_Interrupt_Type(.INTERRUPT)
+PTRACE_LISTEN                 :: PTrace_Listen_Type(.LISTEN)
+PTRACE_PEEKSIGINFO            :: PTrace_Peeksiginfo_Type(.PEEKSIGINFO)
+PTRACE_GETSIGMASK             :: PTrace_Getsigmask_Type(.GETSIGMASK)
+PTRACE_SETSIGMASK             :: PTrace_Setsigmask_Type(.SETSIGMASK)
+PTRACE_SECCOMP_GET_FILTER     :: PTrace_Seccomp_Get_Filter_Type(.SECCOMP_GET_FILTER)
+PTRACE_SECCOMP_GET_METADATA   :: PTrace_Seccomp_Get_Metadata_Type(.SECCOMP_GET_METADATA)
+PTRACE_GET_SYSCALL_INFO       :: PTrace_Get_Syscall_Info_Type(.GET_SYSCALL_INFO)
+PTRACE_GET_RSEQ_CONFIGURATION :: PTrace_Get_RSeq_Configuration_Type(.GET_RSEQ_CONFIGURATION)

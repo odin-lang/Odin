@@ -165,7 +165,16 @@ munmap :: proc "contextless" (addr: rawptr, size: uint) -> (Errno) {
 	return Errno(-ret)
 }
 
-// TODO(flysand): brk
+/*
+	Extend the data segment size until the address `addr`. Note: you may be
+	familiar with sbrk(), which is not actually a syscall, so is not
+	implemented here.
+	Available since Linux 1.0.
+*/
+brk :: proc "contextless" (addr: uintptr) -> (Errno) {
+	ret := syscall(SYS_brk, addr)
+	return Errno(-ret)
+}
 
 /// Alter an action taken by a process
 rt_sigaction :: proc "contextless" (sig: Signal, sigaction: ^Sig_Action, old_sigaction: ^Sig_Action) -> Errno {
@@ -179,8 +188,6 @@ rt_sigprocmask :: proc "contextless" (mask_kind: Sig_Mask_Kind, new_set: ^Sig_Se
 	ret := syscall(SYS_rt_sigprocmask, mask_kind, new_set, old_set, size_of(Sig_Set))
 	return Errno(-ret)
 }
-
-// TODO(flysand): rt_sigreturn
 
 // TODO(flysand): ioctl
 
@@ -200,9 +207,23 @@ pwrite :: proc "contextless" (fd: Fd, buf: []$T, offset: i64) -> (int, Errno) {
 	return errno_unwrap(ret, int)
 }
 
-// TODO(flysand): readv
+/*
+	Read the data from file into multiple buffers.
+	Available since Linux 2.0.
+*/
+readv :: proc "contextless" (fd: Fd, iov: []IO_Vec) -> (int, Errno) {
+	ret := syscall(SYS_readv, fd, raw_data(iov), len(iov))
+	return errno_unwrap(ret, int)
+}
 
-// TODO(flysand): writev
+/*
+	Write the data from multiple buffers into a file.
+	Available since Linux 2.0.
+*/
+writev :: proc "contextless" (fd: Fd, iov: []IO_Vec) -> (int, Errno) {
+	ret := syscall(SYS_writev, fd, raw_data(iov), len(iov))
+	return errno_unwrap(ret, int)
+}
 
 /// Check user permissions for a file
 /// If Mode is F_OK, checks whether the file exists
@@ -226,11 +247,18 @@ pipe2 :: proc "contextless" (pipes: ^[2]Fd, flags: Open_Flags) -> (Errno) {
 	return Errno(-ret)
 }
 
-// TODO(flysand): select
+/*
+	Yield the processor.
+	Available since Linux 2.0.
+*/
+sched_yield :: proc "contextless" () {
+	syscall(SYS_sched_yield)
+}
 
-// TODO(flysand): sched_yield
-
-// TODO(flysand): add docs here
+/*
+	Remap a virtual memory address.
+	Available since Linux 2.0.
+*/
 mremap :: proc "contextless" (old_addr: rawptr, old_size: uint, new_size: uint, flags: MRemap_Flags, new_addr: uintptr = 0) -> (rawptr, Errno) {
 	if .FIXED in flags {
 		ret := syscall(SYS_mremap, old_addr, old_size, new_size, transmute(i32) flags, new_addr)
@@ -248,7 +276,14 @@ msync :: proc "contextless" (addr: rawptr, size: uint, flags: MSync_Flags) -> (E
 	return Errno(-ret)
 }
 
-// TODO(flysand): mincore
+/*
+	Determine if pages are resident in memory.
+	Available since Linux 2.4.
+*/
+mincore :: proc "contextless" (addr: rawptr, size: uint, vec: []b8) -> (Errno) {
+	ret := syscall(SYS_mincore, addr, size, raw_data(vec))
+	return Errno(-ret)
+}
 
 /// Give advice about use of memory
 /// Available since Linux 2.4
@@ -257,11 +292,44 @@ madvise :: proc "contextless" (addr: rawptr, size: uint, advice: MAdvice) -> (Er
 	return Errno(-ret)
 }
 
-// TODO(flysand): shmget
+/*
+	Allocate a SystemV shared memory segment.
+	Available since Linux 2.0.
+*/
+shmget :: proc "contextless" (key: Key, size: uint, flags: IPC_Flags) -> (Key, Errno) {
+	ret := syscall(SYS_shmget, key, size, transmute(i16) flags)
+	return errno_unwrap(ret, Key)
+}
 
-// TODO(flysand): shmat
+/*
+	SystemV shared memory segment operations.
+	Available since Linux 2.0.
+*/
+shmat :: proc "contextless" (key: Key, addr: rawptr, flags: IPC_Flags) -> (rawptr, Errno) {
+	ret := syscall(SYS_shmat, key, addr, transmute(i16) flags)
+	return errno_unwrap(ret, Key)
+}
 
-// TODO(flysand): shmctl
+shmctl_ds :: proc "contextless" (key: Key, cmd: IPC_Cmd, buf: ^Shmid_DS) -> (Errno) {
+	ret := syscall(SYS_shmctl, key, cmd, buf)
+	return Errno(-ret)
+}
+
+shmctl_info :: proc "contextless" (key: Key, cmd: IPC_Cmd, buf: ^Shmid_Info) -> (int, Errno) {
+	ret := syscall(SYS_shmctl, key, cmd, buf)
+	return errno_unwrap(ret, int)
+}
+
+shmctl_stat :: proc "contextless" (index: int, cmd: IPC_Cmd, buf: ^Shmid_DS) -> (Key, Errno) {
+	ret := syscall(SYS_shmctl, key, cmd, buf)
+	return errno_unwrap(ret, Key)
+}
+
+/*
+	SystemV shared memory control.
+	Available since Linux 2.0.
+*/
+shmctl :: proc {shmctl_ds, shmctl_info, shmctl_stat}
 
 /// Allocate a new file descriptor that refers to the same file as the one provided
 /// Available since Linux 1.0
@@ -283,15 +351,48 @@ dup2 :: proc "contextless" (old: Fd, new: Fd) -> (Fd, Errno) {
 	}
 }
 
-// TODO(flysand): pause
+/*
+	Wait until the next signal is delivered.
+	Available since Linux 1.0.
+*/
+pause :: proc "contextless" () {
+	syscall(SYS_pause)
+}
 
-// TODO(flysand): nanosleep
+/*
+	High-resolution sleep.
+	Available since Linux 2.0.
+*/
+nanosleep :: proc "contextless" (req: ^Time_Spec, rem: ^Time_Spec) -> (Errno) {
+	ret := syscall(SYS_nanosleep, req, rem)
+	return Errno(-ret)
+}
 
-// TODO(flysand): getitimer
+/*
+	Get the value of an internal timer.
+	Available since Linux 1.0.
+*/
+getitimer :: proc "contextless" (which: ITimer_Which, cur: ^ITimer_Val) -> (Errno) {
+	ret := syscall(SYS_getitimer, cur)
+	return Errno(-ret)
+}
 
-// TODO(flysand): alarm
+/*
+	Set an alarm clock for delivery of a signal.
+	Available since Linux 1.0.
+*/
+alarm :: proc "contextless" (seconds: u32) -> u32 {
+	return cast(u32) syscall(SYS_alarm, seconds)
+}
 
-// TODO(flysand): setitimer
+/*
+	Set the value of an internal timer.
+	Available since Linux 1.0.
+*/
+getitimer :: proc "contextless" (which: ITimer_Which, new: ^ITimer_Val, old: ^ITimer_Val) -> (Errno) {
+	ret := syscall(SYS_getitimer, new, old)
+	return Errno(-ret)
+}
 
 /// Returns the thread group ID of the current process
 /// Note that it doesn't return the pid, despite it's name.
@@ -300,7 +401,20 @@ getpid :: proc "contextless" () -> Pid {
 	return cast(Pid) syscall(SYS_getpid)
 }
 
-// TODO(flysand): sendfile
+/*
+	Transfer the data between file descriptors.
+	Available since Linux 2.2.
+	On 32-bit platforms available since Linux 2.6.
+*/
+sendfile :: proc "contextless" (out: Fd, in: Fd, offset: ^i64, count: uint) -> (int, Errno) {
+	when size_of(int) == 8 {
+		ret := syscall(SYS_sendfile, out, in, offset, count)
+		return errno_unwrap(ret, Errno)
+	} else {
+		ret := syscall(SYS_sendfile64, out, in, offset, count)
+		return errno_unwrap(ret, Errno)
+	}
+}
 
 /// Create a socket file descriptor
 /// Available since Linux 2.0
@@ -377,10 +491,28 @@ recv :: proc {recvfrom, recv_noaddr}
 /// Available since Linux 2.0
 send :: proc {sendto, send_noaddr}
 
-// TODO(flysand): sendmsg
+/*
+	Send a message on a socket.
+	Available since Linux 2.0.
+*/
+sendmsg :: proc "contextless" (sock: Fd, msghdr: ^Msg_Hdr, flags: Socket_Msg) -> (int, Errno) {
+	ret := syscall(SYS_sendmsg, sock, msghdr, transmute(i32) flags)
+	return errno_unwrap(ret, int)
+}
 
-// TODO(flysand): recvmsg
+/*
+	Receive a message on a socket.
+	Available since Linux 2.0.
+*/
+recvmsg :: proc "contextless" (sock: Fd, msghdr: ^Msg_Hdr, flags: Socket_Msg) -> (int, Errno) {
+	ret := syscall(SYS_recvmsg, sock, msghdr, transmute(i32) flags)
+	return errno_unwrap(ret, int)
+}
 
+/*
+	Shutdown a socket.
+	Available since Linux 2.0.
+*/
 shutdown :: proc "contextless" (sock: Fd, how: Shutdown_How) -> (Errno) {
 	ret := syscall(SYS_shutdown, sock, how)
 	return Errno(-ret)
@@ -405,11 +537,34 @@ listen :: proc "contextless" (sock: Fd, queue_len: i32) -> (Errno) {
 	return Errno(-ret)
 }
 
-// TODO(flysand): getsockname
+/*
+	Get socket name (aka it's bound address).
+	Available since Linux 2.0.
+*/
+getsockname :: proc "contextless" (sock: Fd, addr: ^Sock_Addr_Any) -> (Errno) {
+	addr_len := size_of(Sock_Addr_Any)
+	ret := syscall(SYS_getsockname, sock, addr, &addr_len)
+	return Errno(-ret)
+}
 
-// TODO(flysand): getpeername
+/*
+	Get the name of the connected peer socket.
+	Available since Linux 2.0.
+*/
+getpeername :: proc "contextless" (sock: Fd, addr: ^Sock_Addr_Any) -> (Errno) {
+	addr_len := size_of(Sock_Addr_Any)
+	ret := syscall(SYS_getpeername, sock, addr, &addr_len)
+	return Errno(-ret)
+}
 
-// TODO(flysand): socketpair
+/*
+	Create a pair of connected sockets.
+	Available since Linux 2.0.
+*/
+socketpair :: proc "contextless" (domain: Protocol_Family, type: Socket_Type, proto: Protocol, pair: ^[2]Fd) -> (Errno) {
+	ret := syscall(SYS_socketpair, domain, type, proto, pair)
+	return Errno(-ret)
+}
 
 // TODO(flysand): the parameters are the same, maybe there's a way to make it into a single proc, sacrificing type
 // safety slightly
@@ -518,9 +673,32 @@ fork :: proc "contextless" () -> (Pid, Errno) {
 	}
 }
 
-// TODO(flysand): vfork
+/*
+	Create a child process and block parent.
+	Available since Linux 2.2.
+*/
+vfork :: proc "contextless" () -> Pid {
+	when ODIN_ARCH != .arm64 {
+		return Pid(syscall(SYS_vfork))
+	} else {
+		return Pid(syscall(SYS_fork))
+	}
+}
 
-// TODO(flysand): execve
+/*
+	Replace the current process with another program.
+	Available since Linux 1.0.
+	On ARM64 available since Linux 3.19.
+*/
+execve :: proc "contextless" (name: cstring, argv: [^]cstring, envp: [^]cstring) -> (Errno) {
+	when ODIN_ARCH != .arm64 {
+		ret := syscall(SYS_execve, cast(rawptr) name, cast(rawptr) argv, cast(rawptr) envp)
+		return Errno(-ret)
+	} else {
+		ret := syscall(SYS_execveat, AT_FDCWD, cast(rawptr) name, cast(rawptr) argv, cast(rawptr) envp)
+		return Errno(-ret)
+	}
+}
 
 /// Exit the thread with a given exit code
 /// Available since Linux 1.0
@@ -539,7 +717,14 @@ wait4 :: proc "contextless" (pid: Pid, status: ^u32, options: Wait_Options) -> (
 /// See wait4
 waitpid :: wait4
 
-// TODO(flysand): kill
+/*
+	Send signal to a process.
+	Available since Linux 1.0.
+*/
+kill :: proc "contextless" (pid: Pid, signal: Signal) -> (Errno) {
+	ret := syscall(SYS_kill, pid, signal)
+	return Errno(-ret)
+}
 
 /// Get system information
 /// Available since Linux 1.0
@@ -548,21 +733,84 @@ uname :: proc "contextless" (uts_name: ^UTS_Name) -> (Errno) {
 	return Errno(-ret)
 }
 
-// TODO(flysand): semget
+/*
+	Get a SystemV semaphore set identifier.
+	Available since Linux 2.0.
+*/
+semget :: proc "contextless" (key: Key, n: i32, flags: IPC_Flags) -> (Key, Errno) {
+	ret := syscall(SYS_semget, key, n, transmute(i16) flags)
+	return errno_unwrap(ret, Key)
+}
 
-// TODO(flysand): semop
+/*
+	SystemV semaphore operations.
+	Available since Linux 2.0.
+*/
+semop :: proc "contextless" (key: Key, ops: []Sem_Buf) -> (Errno) {
+	ret := syscall(SYS_semop, key, raw_data(ops), len(ops))
+	return Errno(-ret)
+}
 
-// TODO(flysand): semctl
+semctl3 :: proc "contextless" (key: Key, semnum: i32, cmd: IPC_Cmd) -> (int, Errno) {
+	ret := syscall(SYS_semctl, key, semnum, cmd)
+	return errno_unwrap(ret, int)
+}
 
-// TODO(flysand): shmdt
+semctl4 :: proc "contextless" (key: Key, semnum: i32, cmd: IPC_Cmd, semun: Sem_Un) -> (int, Errno) {
+	ret := syscall(SYS_semctl, key, semnum, cmd, semun)
+	return errno_unwrap(ret, int)
+}
 
-// TODO(flysand): msgget
+/*
+	SystemV semaphore control operations.
+	Available since Linux 2.0.
+*/
+semctl :: proc {semctl3, semctl4}
 
-// TODO(flysand): msgsnd
+/*
+	SystemV shared memory operations.
+	Available since Linux 2.0.
+*/
+shmdt :: proc "contextless" (shmaddr: rawptr) -> (Errno) {
+	ret := syscall(SYS_shmdt, shmaddr)
+	return Errno(-ret)
+}
 
-// TODO(flysand): msgrcv
+/*
+	Get SystemV message queue identifier.
+	Available since Linux 2.0.
+*/
+msgget :: proc "contextless" (key: Key, flags: IPC_Flags) -> (Key, Errno) {
+	ret := syscall(SYS_msgget, key, transmute(i16) flags)
+	return errno_unwrap(ret, Key)
+}
 
-// TODO(flysand): msgctl
+/*
+	Send message to a SystemV message queue.
+	Available since Linux 2.0.
+*/
+msgsnd :: proc "contextless" (key: Key, buf: rawptr, size: int, flags: IPC_Flags) -> (Errno) {
+	ret := syscall(SYS_msgsnd, key, buf, size, transmute(i16) flags)
+	return Errno(-ret)
+}
+
+/*
+	Receive a message from a SystemV message queue.
+	Available since Linux 2.0.
+*/
+msgrcv :: proc "contextless" (key: Key, buf: rawptr, size: int, type: uint, flags: IPC_Flags) -> (int, Errno) {
+	ret := syscall(SYS_msgrcv, key, buf, size, type, transmute(i16) flags)
+	return errno_unwrap(ret, int)
+}
+
+/*
+	SystemV message control operations.
+	Available since Linux 2.0.
+*/
+msgctl :: proc "contextless" (key: Key, cmd: IPC_Cmd, buf: ^Msqid_DS) -> (int, Errno) {
+	ret := syscall(SYS_msgctl, key, cmd, buf)
+	return errno_unwrap(ret, int)
+}
 
 fcntl_dupfd :: proc "contextless" (fd: Fd, cmd: FCntl_Command_DUPFD, newfd: Fd) -> (Fd, Errno) {
 	ret := syscall(SYS_fcntl, fd, cmd, newfd)
@@ -726,7 +974,14 @@ fcntl :: proc {
 	fcntl_set_file_rw_hint,
 }
 
-// TODO(flysand): flock
+/*
+	Apply or remove advisory lock on an open file.
+	Available since Linux 2.0.
+*/
+flock :: proc "contextless" (fd: Fd, operation: FLock_Op) -> (Errno) {
+	ret := syscall(SYS_flock, fd, transmute(i32) operation)
+	return Errno(-ret)
+}
 
 /// Sync state of the file with the storage device
 fsync :: proc "contextless" (fd: Fd) -> (Errno) {
@@ -734,7 +989,15 @@ fsync :: proc "contextless" (fd: Fd) -> (Errno) {
 	return Errno(-ret)
 }
 
-// TODO(flysand): fdatasync
+/*
+	Synchronize the state of the file with the storage device. Similar to `fsync`,
+	except does not flush the metadata.
+	Available since Linux 2.0.
+*/
+fdatasync :: proc "contextless" (fd: Fd) -> (Errno) {
+	ret := syscall(SYS_fdatasync, fd)
+	return Errno(-ret)
+}
 
 /// Truncate a file to specified length
 /// On 32-bit architectures available since Linux 2.4
@@ -828,7 +1091,19 @@ rmdir :: proc "contextless" (name: cstring) -> (Errno) {
 	}
 }
 
-// TODO(flysand): creat
+/*
+	Create a file.
+	Available since Linux 1.0.
+	On ARM64 available since Linux 2.6.16.
+*/
+creat :: proc "contextless" (name: cstring, mode: Mode) -> (Errno) {
+	when ODIN_ARCH == .arm64 {
+		return openat(AT_FDCWD, name, {.CREAT, .WRONLY,.TRUNC}, mode)
+	} else {
+		ret := syscall(SYS_creat, cast(rawptr) name, transmute(u32) mode)
+		return Errno(-ret)
+	}
+}
 
 /// Create a hard link on a file
 /// Available since Linux 1.0
@@ -949,9 +1224,23 @@ lchown :: proc "contextless" (name: cstring, uid: Uid, gid: Gid) -> (Errno) {
 	}
 }
 
-// TODO(flysand): umask
+/*
+	Set file mode creation mask.
+	Available since Linux 1.0.
+*/
+umask :: proc "contextless" (mask: Mask) -> Mask {
+	ret := syscall(SYS_umask, transmute(u32) mask)
+	return transmute(u32) cast(u32) ret
+}
 
-// TODO(flysand): gettimeofday
+/*
+	Get current time.
+	Available since Linux 1.0.
+*/
+gettimeofday :: proc "contextless" (tv: ^Time_Val) -> (Errno) {
+	ret := syscall(SYS_gettimeofday, tv)
+	return Errno(-ret)
+}
 
 /// Get limits on resources
 /// Available since Linux 1.0
@@ -980,7 +1269,97 @@ times :: proc "contextless" (tms: ^Tms) -> (Errno) {
 	return Errno(-ret)
 }
 
-// TODO(flysand): ptrace
+ptrace_traceme :: proc "contextless" (rq: PTrace_Traceme_Type) -> (Errno) {
+	ret := syscall(SYS_ptrace, rq)
+	return Errno(-ret)
+}
+
+ptrace_peek :: proc "contextless" (rq: PTrace_Peek_Type, addr: uintptr) -> (uint, Errno) {
+	ret := syscall(SYS_ptrace, rq, addr)
+	return errno_unwrap(rq, uint)
+}
+
+ptrace_poke :: proc "contextless" (rq: PTrace_Poke_Type, addr: uintptr, data: uint) -> (Errno) {
+	ret := syscall(SYS_ptrace, rq, addr, data)
+	return Errno(-ret)
+}
+
+ptrace_getregs :: proc "contextless" (rq: PTrace_Getregs_Type, buf: ^User_Regs) -> (Errno) {
+	ret := syscall(SYS_ptrace, rq, 0, buf)
+	return Errno(-ret)
+}
+
+ptrace_getfpregs :: proc "contextless" (rq: PTrace_Getfpregs_Type, buf: ^User_FP_Regs) -> (Errno) {
+	ret := syscall(SYS_ptrace, rq, 0, buf)
+	return Errno(-ret)
+}
+
+ptrace_getfpxregs :: proc "contextless" (rq: PTrace_Getfpxregs_Type, buf: ^User_FPX_Regs) -> (Errno) {
+	ret := syscall(SYS_ptrace, rq, 0, buf)
+	return Errno(-ret)
+}
+
+ptrace_setregs :: proc "contextless" (rq: PTrace_Setregs_Type, buf: ^User_Regs) -> (Errno) {
+	ret := syscall(SYS_ptrace, rq, 0, buf)
+	return Errno(-ret)
+}
+
+ptrace_setfpregs :: proc "contextless" (rq: PTrace_Setfpregs_Type, buf: ^User_FP_Regs) -> (Errno) {
+	ret := syscall(SYS_ptrace, rq, 0, buf)
+	return Errno(-ret)
+}
+
+ptrace_setfpxregs :: proc "contextless" (rq: PTrace_Setfpxregs_Type, buf: ^User_FPX_Regs) -> (Errno) {
+	ret := syscall(SYS_ptrace, rq, 0, buf)
+	return Errno(-ret)
+}
+
+// TODO(flysand): ptrace_getregset
+// TODO(flysand): ptrace_setregset
+// TODO(flysand): ptrace_setsiginfo
+// TODO(flysand): ptrace_peeksiginfo
+// TODO(flysand): ptrace_getsigmask
+// TODO(flysand): ptrace_setsigmask
+
+ptrace_setoptions :: proc "contextless" (rq: PTrace_Setoptions_Type, options: PTrace_Options) -> (Errno) {
+	ret := syscall(SYS_ptrace, rq, 0, transmute(u32) options)
+	return Errno(-ret)
+}
+
+// TODO(flysand): ptrace_geteventmsg
+// TODO(flysand): ptrace_cont
+// TODO(flysand): ptrace_syscall
+// TODO(flysand): ptrace_singlestep
+// TODO(flysand): ptrace_set_syscall
+// TODO(flysand): ptrace_sysemu
+// TODO(flysand): ptrace_sysemu_singlestep
+// TODO(flysand): ptrace_listen
+// TODO(flysand): ptrace_kill
+// TODO(flysand): ptrace_interrupt
+// TODO(flysand): ptrace_attach
+// TODO(flysand): ptrace_seize
+// TODO(flysand): ptrace_seccomp_get_filter
+// TODO(flysand): ptrace_detach
+// TODO(flysand): ptrace_get_thread_area
+// TODO(flysand): ptrace_set_thread_area
+// TODO(flysand): ptrace_get_syscall_info
+// TODO(flysand): ptrace_setsigmask
+
+/*
+	Trace process
+*/
+ptrace :: proc {
+	ptrace_traceme,
+	peek,
+	ptrace_poke,
+	ptrace_getregs,
+	ptrace_getfpregs,
+	ptrace_getfpxregs,
+	ptrace_setregs,
+	ptrace_setfpregs,
+	ptrace_setfpxregs,
+	ptrace_setoptions,
+}
 
 /// Get real user ID
 /// Available since Linux 1.0
@@ -1186,8 +1565,6 @@ getpgid :: proc "contextless" (pid: Pid) -> (Pid, Errno) {
 	return errno_unwrap(ret, Pid)
 }
 
-// NOTE(flysand): setfsuid and setfsgid are deprecated
-
 /// Get session ID of the calling process
 /// Available since Linux 2.0
 getsid :: proc "contextless" (pid: Pid) -> (Pid, Errno) {
@@ -1234,8 +1611,6 @@ sigaltstack :: proc "contextless" (stack: ^Sig_Stack, old_stack: ^Sig_Stack) -> 
 	return Errno(-ret)
 }
 
-// TODO(flysand): utime
-
 /// Create a special or ordinary file
 /// `mode` parameter contains both the the file mode and the type of the node to create
 ///  ->  Add one of S_IFSOCK, S_IFBLK, S_IFFIFO, S_IFCHR to mode
@@ -1250,8 +1625,6 @@ mknod :: proc "contextless" (name: cstring, mode: Mode, dev: Dev) -> (Errno) {
 		return Errno(-ret)
 	}
 }
-
-// TODO(flysand): uselib
 
 /// Set the process execution domain
 /// Available since Linux 1.2
@@ -1414,15 +1787,9 @@ setdomainname :: proc "contextless" (name: string) -> (Errno) {
 
 // TODO(flysand): ioperm
 
-// TODO(flysand): create_module
-
 // TODO(flysand): init_module
 
 // TODO(flysand): delete_module
-
-// TODO(flysand): get_kernel_syms
-
-// TODO(flysand): query_module
 
 // TODO(flysand): quotactl
 
@@ -1474,9 +1841,14 @@ gettid :: proc "contextless" () -> Pid {
 
 // TODO(flysand): fremovexattr
 
-// TODO(flysand): tkill
-
-// TODO(flysand): time
+/*
+	Get current time in seconds.
+	Available since Linux 1.0.
+*/
+time :: proc "contextless" (tloc: ^uint) -> (Errno) {
+	ret := syscall(SYS_time, tloc)
+	return Errno(-ret)
+}
 
 /// Wait on a futex until it's signaled
 futex_wait :: proc "contextless" (futex: ^Futex, op: Futex_Wait_Type, flags: Futex_Flags, val: u32, timeout: ^Time_Spec = nil) -> (Errno) {
@@ -1592,8 +1964,6 @@ futex :: proc {
 set_tid_address :: proc "contextless" (tidptr: ^u32) {
 	syscall(SYS_set_tid_address, tidptr)
 }
-
-// TODO(flysand): restart_syscall
 
 // TODO(flysand): semtimedop
 
@@ -1847,7 +2217,6 @@ dup3 :: proc "contextless" (old: Fd, new: Fd, flags: Open_Flags) -> (Fd, Errno) 
 
 // TODO(flysand): pwritev
 
-
 /// Send signal information to a thread
 /// Available since Linux 2.2
 rt_tgsigqueueinfo :: proc "contextless" (tgid: Pid, pid: Pid, sig: Signal, si: ^Sig_Info) -> (Errno) {
@@ -1862,7 +2231,14 @@ perf_event_open :: proc "contextless" (attr: ^Perf_Event_Attr, pid: Pid, cpu: in
 	return errno_unwrap(ret, Fd)
 }
 
-// TODO(flysand): recvmmsg
+/*
+	Receive multiple messages from a socket.
+	Available since Linux 2.6.33.
+*/
+recvmmsg :: proc "contextless" (sock: Fd, msg_vec: []MMsg_Hdr, flags: Socket_Msg) -> (int, Errno) {
+	ret := syscall(SYS_recvmmsg, sock, raw_data(msg_vec), len(msg_vec), transmute(i32) flags)
+	return errno_unwrap(ret, int)
+}
 
 // TODO(flysand): fanotify_init
 
@@ -1878,7 +2254,14 @@ perf_event_open :: proc "contextless" (attr: ^Perf_Event_Attr, pid: Pid, cpu: in
 
 // TODO(flysand): syncfs
 
-// TODO(flysand): sendmmsg
+/*
+	Send multiple messages on a socket.
+	Available since Linux 3.0.
+*/
+sendmmsg :: proc "contextless" (sock: Fd, msg_vec: []MMsg_Hdr, flags: Socket_Msg) -> (int, Errno) {
+	ret := syscall(SYS_sendmmsg, sock, raw_data(msg_vec), len(msg_vec), transmute(i32) flags)
+	return errno_unwrap(ret, int)
+}
 
 // TODO(flysand): setns
 
