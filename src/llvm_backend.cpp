@@ -1827,7 +1827,7 @@ cgscc(
 		function-attrs,
 		function(
 			require<should-not-run-function-passes>
-		),
+		)
 	)
 ),
 deadargelim,
