@@ -76,6 +76,8 @@ jobs:
     steps:
       - uses: actions/checkout@v1
       - name: Download LLVM, botan and setup PATH
+        # NOTE(jcmdln): Brew will update everything on install without this
+        env: { HOMEBREW_NO_AUTO_UPDATE: 1}
         run: |
           brew update
           brew install llvm@17 botan
