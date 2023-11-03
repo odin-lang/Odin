@@ -120,9 +120,9 @@ register_user_formatter :: proc(id: typeid, formatter: User_Formatter) -> Regist
 //
 // 	Returns: A formatted string. 
 //
-aprint :: proc(args: ..any, sep := " ") -> string {
+aprint :: proc(args: ..any, sep := " ", allocator := context.allocator) -> string {
 	str: strings.Builder
-	strings.builder_init(&str)
+	strings.builder_init(&str, allocator)
 	sbprint(&str, ..args, sep=sep)
 	return strings.to_string(str)
 }
@@ -136,9 +136,9 @@ aprint :: proc(args: ..any, sep := " ") -> string {
 //
 // 	Returns: A formatted string with a newline character at the end.
 //
-aprintln :: proc(args: ..any, sep := " ") -> string {
+aprintln :: proc(args: ..any, sep := " ", allocator := context.allocator) -> string {
 	str: strings.Builder
-	strings.builder_init(&str)
+	strings.builder_init(&str, allocator)
 	sbprintln(&str, ..args, sep=sep)
 	return strings.to_string(str)
 }
