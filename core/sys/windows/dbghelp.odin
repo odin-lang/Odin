@@ -40,8 +40,8 @@ MINIDUMP_USER_STREAM :: struct {
 }
 
 MINIDUMP_USER_STREAM_INFORMATION :: struct {
-  UserStreamCount: ULONG,
-  UserStreamArray: ^MINIDUMP_USER_STREAM,
+	UserStreamCount: ULONG,
+	UserStreamArray: ^MINIDUMP_USER_STREAM,
 }
 
 MINIDUMP_CALLBACK_ROUTINE :: #type proc "stdcall" (
