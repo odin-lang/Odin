@@ -564,7 +564,7 @@ Sig_Event :: struct {
 	value:  Sig_Val,
 	signo:  i32,
 	notify: i32,
-	using: struct #raw_union {
+	using _: struct #raw_union {
 		_: [SIGEV_PAD_SIZE]u32,
 		thread_id: Pid,
 		using _: struct {
@@ -651,7 +651,7 @@ Msg_Hdr :: struct {
 	iov:        []IO_Vec, // ptr followed by length, abi matches
 	control:    []u8,
 	flags:      Socket_Msg,
-};
+}
 
 /*
 	Multiple message header for sendmmsg/recvmmsg
@@ -754,7 +754,7 @@ IO_Vec :: struct {
 /*
 	Access mode for shared memory
 */
-IPC_Mode :: bit_set[IPC_Mode; u32]
+IPC_Mode :: bit_set[IPC_Mode_Bits; u32]
 
 /*
 	Flags used by IPC objects
@@ -772,7 +772,7 @@ IPC_Perm :: struct {
 	cgid: u32,
 	mode: IPC_Mode,
 	seq:  u16,
-	_:    [2 + 2*size_of(int)],
+	_:    [2 + 2*size_of(int)]u8,
 }
 
 when size_of(int) == 8 || ODIN_ARCH == .i386 {
@@ -816,7 +816,7 @@ Shmid_DS :: _Arch_Shmid_DS
 	SystemV shared memory info.
 */
 Shm_Info :: struct {
-	used_ids:       i32
+	used_ids:       i32,
 	shm_tot:        uint,
 	shm_rss:        uint,
 	shm_swp:        uint,
@@ -843,7 +843,7 @@ when ODIN_ARCH == .i386 {
 		nsems:      uint,
 		_:          [2]uint,
 	}
-else when ODIN_ARCH == .amd64 {
+} else when ODIN_ARCH == .amd64 {
 	_Arch_Semid_DS :: struct {
 		perm:       IPC_Perm,
 		otime:      int,
@@ -891,8 +891,8 @@ Sem_Un :: struct #raw_union {
 /*
 	SystenV semaphore info.
 */
-Sem_Info {
-	map: i32,
+Sem_Info :: struct {
+	semmap: i32,
 	mni: i32,
 	mns: i32,
 	mnu: i32,
@@ -915,7 +915,7 @@ Msg_Buf :: struct {
 /*
 	SystemV message queue data.
 */
-struct Msqid_DS {
+Msqid_DS :: struct {
 	perm:   IPC_Perm,
 	stime:  uint,
 	rtime:  uint,
@@ -925,8 +925,8 @@ struct Msqid_DS {
 	qbytes: uint,
 	lspid:  Pid,
 	lrpid:  Pid,
-	_:      [2]uint
-};
+	_:      [2]uint,
+}
 
 /*
 	Interval timer types
@@ -945,7 +945,7 @@ ITimer_Val :: struct {
 	value:    Time_Val,
 }
 
-ITimer_Spec {
+ITimer_Spec :: struct {
 	interval: Time_Spec,
 	value:    Time_Spec,
 }
@@ -953,7 +953,7 @@ ITimer_Spec {
 /*
 	Flags for POSIX interval timers.
 */
-ITimer_Flags :: bit_set[ITimer_Flags_Bits, u32]
+ITimer_Flags :: bit_set[ITimer_Flags_Bits; u32]
 
 when ODIN_ARCH == .arm32 {
 	_Arch_User_Regs :: struct {
@@ -991,7 +991,7 @@ when ODIN_ARCH == .arm32 {
 		vregs:            [32]u128,
 		fpsr:             u32,
 		fpcr:             u32,
-		_:                [2]u32
+		_:                [2]u32,
 	}
 	_Arch_User_FPX_Regs :: struct {}
 } else when ODIN_ARCH == .i386 {
@@ -1042,7 +1042,7 @@ when ODIN_ARCH == .arm32 {
 		padding:          [56]uint,
 	}
 } else when ODIN_ARCH == .amd64 {
-	_Arch_User_Regs {
+	_Arch_User_Regs :: struct {
 		// Callee-preserved, may not be correct if the syscall doesn't need
 		// these registers
 		r15:              uint,
@@ -1083,7 +1083,23 @@ when ODIN_ARCH == .arm32 {
 		mxcsr_mask:       u32,
 		st_space:         [32]u32,
 		xmm_space:        [64]u32,
-		_:                [24]u32;
+		_:                [24]u32,
+	}
+	// FXSR instruction set state
+	_Arch_User_FPX_Regs :: struct {
+		cwd:              u16,
+		swd:              u16,
+		twd:              u16,
+		fop:              u16,
+		fip:              uint,
+		fcs:              uint,
+		foo:              uint,
+		fos:              uint,
+		mxcsr:            uint,
+		_:                uint,
+		st_space:         [32]uint,
+		xmm_space:        [32]uint,
+		padding:          [56]uint,
 	}
 }
 
@@ -1120,13 +1136,12 @@ PTrace_Peek_Sig_Info_Args :: struct {
 /*
 	ptrace's PEEKSIGINFO flags.
 */
-PTrace_Peek_Sig_Info_Flags :: bit_set[PTrace_Peek_Sig_Info_Flags_Bits, u32]
+PTrace_Peek_Sig_Info_Flags :: bit_set[PTrace_Peek_Sig_Info_Flags_Bits; u32]
 
 /*
 	ptrace's SECCOMP metadata.
 */
-PTrace_Seccomp_Metadata
-{
+PTrace_Seccomp_Metadata :: struct {
 	filter_off: u64,
 	flags:      u64,
 }
@@ -1153,19 +1168,19 @@ PTrace_Syscall_Info :: struct {
 			args:     [6]u64,
 			ret_data: u32,
 		},
-	};
-};
+	},
+}
 
 /*
 	ptrace's results of GET_RSEQ_CONFIGURATION.
 */
-PTrace_RSeq_Configuration {
+PTrace_RSeq_Configuration :: struct {
 	rseq_abi_pointer: u64,
 	rseq_abi_size:    u32,
 	signature:        u32,
 	flags:            u32,
 	_:                u32,
-};
+}
 
 /*
 	Note types for PTRACE_GETREGSET. Mirrors constants in `elf` definition,

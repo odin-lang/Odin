@@ -1629,7 +1629,7 @@ PTrace_Request :: enum {
 	SECCOMP_GET_METADATA   = 0x420d,
 	GET_SYSCALL_INFO       = 0x420e,
 	GET_RSEQ_CONFIGURATION = 0x420f,
-};
+}
 
 /*
 	ptrace options
@@ -1669,7 +1669,7 @@ PTrace_Get_Syscall_Info_Op :: enum u8 {
 	ENTRY   = 1,
 	EXIT    = 2,
 	SECCOMP = 3,
-};
+}
 
 /*
 	ptrace's PEEKSIGINFO flags bits
@@ -1708,7 +1708,7 @@ Splice_Flags_Bits :: enum {
 /*
 	Clock IDs for various system clocks.
 */
-Clock_ID :: enum {
+Clock_Id :: enum {
 	REALTIME           = 0,
 	MONOTONIC          = 1,
 	PROCESS_CPUTIME_ID = 2,

@@ -346,7 +346,7 @@ shmget :: proc "contextless" (key: Key, size: uint, flags: IPC_Flags) -> (Key, E
 */
 shmat :: proc "contextless" (key: Key, addr: rawptr, flags: IPC_Flags) -> (rawptr, Errno) {
 	ret := syscall(SYS_shmat, key, addr, transmute(i16) flags)
-	return errno_unwrap(ret, Key)
+	return errno_unwrap(ret, rawptr, uintptr)
 }
 
 shmctl_ds :: proc "contextless" (key: Key, cmd: IPC_Cmd, buf: ^Shmid_DS) -> (Errno) {
@@ -354,21 +354,16 @@ shmctl_ds :: proc "contextless" (key: Key, cmd: IPC_Cmd, buf: ^Shmid_DS) -> (Err
 	return Errno(-ret)
 }
 
-shmctl_info :: proc "contextless" (key: Key, cmd: IPC_Cmd, buf: ^Shmid_Info) -> (int, Errno) {
+shmctl_info :: proc "contextless" (key: Key, cmd: IPC_Cmd, buf: ^Shm_Info) -> (int, Errno) {
 	ret := syscall(SYS_shmctl, key, cmd, buf)
 	return errno_unwrap(ret, int)
-}
-
-shmctl_stat :: proc "contextless" (index: int, cmd: IPC_Cmd, buf: ^Shmid_DS) -> (Key, Errno) {
-	ret := syscall(SYS_shmctl, key, cmd, buf)
-	return errno_unwrap(ret, Key)
 }
 
 /*
 	SystemV shared memory control.
 	Available since Linux 2.0.
 */
-shmctl :: proc {shmctl_ds, shmctl_info, shmctl_stat}
+shmctl :: proc {shmctl_ds, shmctl_info}
 
 /*
 	Allocate a new file descriptor that refers to the same file as the one provided.
@@ -432,7 +427,7 @@ alarm :: proc "contextless" (seconds: u32) -> u32 {
 	Set the value of an internal timer.
 	Available since Linux 1.0.
 */
-getitimer :: proc "contextless" (which: ITimer_Which, new: ^ITimer_Val, old: ^ITimer_Val) -> (Errno) {
+setitimer :: proc "contextless" (which: ITimer_Which, new: ^ITimer_Val, old: ^ITimer_Val) -> (Errno) {
 	ret := syscall(SYS_getitimer, new, old)
 	return Errno(-ret)
 }
@@ -451,13 +446,13 @@ getpid :: proc "contextless" () -> Pid {
 	Available since Linux 2.2.
 	On 32-bit platforms available since Linux 2.6.
 */
-sendfile :: proc "contextless" (out: Fd, in: Fd, offset: ^i64, count: uint) -> (int, Errno) {
+sendfile :: proc "contextless" (out_fd: Fd, in_fd: Fd, offset: ^i64, count: uint) -> (int, Errno) {
 	when size_of(int) == 8 {
-		ret := syscall(SYS_sendfile, out, in, offset, count)
-		return errno_unwrap(ret, Errno)
+		ret := syscall(SYS_sendfile, out_fd, in_fd, offset, count)
+		return errno_unwrap(ret, int)
 	} else {
-		ret := syscall(SYS_sendfile64, out, in, offset, count)
-		return errno_unwrap(ret, Errno)
+		ret := syscall(SYS_sendfile64, out_fd, in_fd, offset, count)
+		return errno_unwrap(ret, int)
 	}
 }
 
@@ -829,7 +824,7 @@ semctl3 :: proc "contextless" (key: Key, semnum: i32, cmd: IPC_Cmd) -> (int, Err
 	return errno_unwrap(ret, int)
 }
 
-semctl4 :: proc "contextless" (key: Key, semnum: i32, cmd: IPC_Cmd, semun: Sem_Un) -> (int, Errno) {
+semctl4 :: proc "contextless" (key: Key, semnum: i32, cmd: IPC_Cmd, semun: ^Sem_Un) -> (int, Errno) {
 	ret := syscall(SYS_semctl, key, semnum, cmd, semun)
 	return errno_unwrap(ret, int)
 }
@@ -1341,9 +1336,9 @@ lchown :: proc "contextless" (name: cstring, uid: Uid, gid: Gid) -> (Errno) {
 	Set file mode creation mask.
 	Available since Linux 1.0.
 */
-umask :: proc "contextless" (mask: Mask) -> Mask {
+umask :: proc "contextless" (mask: Mode) -> Mode {
 	ret := syscall(SYS_umask, transmute(u32) mask)
-	return transmute(u32) cast(u32) ret
+	return transmute(Mode) cast(u32) ret
 }
 
 /*
@@ -1397,12 +1392,12 @@ ptrace_traceme :: proc "contextless" (rq: PTrace_Traceme_Type) -> (Errno) {
 }
 
 ptrace_peek :: proc "contextless" (rq: PTrace_Peek_Type, pid: Pid, addr: uintptr) -> (uint, Errno) {
-	ret := syscall(SYS_ptrace, rq, pid: Pid, addr, pid)
-	return errno_unwrap(rq, uint)
+	ret := syscall(SYS_ptrace, rq, pid, addr)
+	return errno_unwrap(ret, uint)
 }
 
 ptrace_poke :: proc "contextless" (rq: PTrace_Poke_Type, pid: Pid, addr: uintptr, data: uint) -> (Errno) {
-	ret := syscall(SYS_ptrace, rq, pid: Pid, addr, data)
+	ret := syscall(SYS_ptrace, rq, pid, addr, data)
 	return Errno(-ret)
 }
 
@@ -1436,12 +1431,12 @@ ptrace_setfpxregs :: proc "contextless" (rq: PTrace_Setfpxregs_Type, pid: Pid, b
 	return Errno(-ret)
 }
 
-ptrace_getregset :: proc "contextless" (rq: PTrace_Getgetset_Type, pid: Pid, note: PTrace_Note_Type, buf: ^IO_Vec) -> (Errno) {
+ptrace_getregset :: proc "contextless" (rq: PTrace_Getregset_Type, pid: Pid, note: PTrace_Note_Type, buf: ^IO_Vec) -> (Errno) {
 	ret := syscall(SYS_ptrace, rq, pid, note, buf)
 	return Errno(-ret)
 }
 
-ptrace_setregset :: proc "contextless" (rq: PTrace_Setgetset_Type, pid: Pid, note: PTrace_Note_Type, buf: ^IO_Vec) -> (Errno) {
+ptrace_setregset :: proc "contextless" (rq: PTrace_Setregset_Type, pid: Pid, note: PTrace_Note_Type, buf: ^IO_Vec) -> (Errno) {
 	ret := syscall(SYS_ptrace, rq, pid, note, buf)
 	return Errno(-ret)
 }
@@ -1456,13 +1451,13 @@ ptrace_peeksiginfo :: proc "contextless" (rq: PTrace_Peeksiginfo_Type, pid: Pid,
 	return Errno(-ret)
 }
 
-ptrace_getsigmask :: proc "contextless" (rq: PTrace_Getsigmask, pid: Pid, sigmask: ^Sig_Mask) -> (Errno) {
-	ret := syscall(SYS_ptrace, rq, pid, size_of(Sig_Mask), sigmask)
+ptrace_getsigmask :: proc "contextless" (rq: PTrace_Getsigmask_Type, pid: Pid, sigmask: ^Sig_Set) -> (Errno) {
+	ret := syscall(SYS_ptrace, rq, pid, size_of(Sig_Set), sigmask)
 	return Errno(-ret)
 }
 
-ptrace_setsigmask :: proc "contextless" (rq: PTrace_Setsigmask, pid: Pid, sigmask: ^Sig_Mask) -> (Errno) {
-	ret := syscall(SYS_ptrace, rq, pid, size_of(Sig_Mask), sigmask)
+ptrace_setsigmask :: proc "contextless" (rq: PTrace_Setsigmask_Type, pid: Pid, sigmask: ^Sig_Set) -> (Errno) {
+	ret := syscall(SYS_ptrace, rq, pid, size_of(Sig_Set), sigmask)
 	return Errno(-ret)
 }
 
@@ -1740,10 +1735,10 @@ setregid :: proc "contextless" (real: Gid, effective: Gid) -> (Errno) {
 */
 getgroups :: proc "contextless" (gids: []Gid) -> (int, Errno) {
 	when size_of(int) == 8 {
-		ret := syscall(SYS_getgroups, len(gids), rawptr(gids))
+		ret := syscall(SYS_getgroups, len(gids), raw_data(gids))
 		return errno_unwrap(ret, int)
 	} else {
-		ret := syscall(SYS_getgroups32, len(gids), rawptr(gids))
+		ret := syscall(SYS_getgroups32, len(gids), raw_data(gids))
 		return errno_unwrap(ret, int)
 	}
 }
@@ -1755,10 +1750,10 @@ getgroups :: proc "contextless" (gids: []Gid) -> (int, Errno) {
 */
 setgroups :: proc "contextless" (gids: []Gid) -> (Errno) {
 	when size_of(int) == 8 {
-		ret := syscall(SYS_setgroup, len(gids), rawptr(gids))
+		ret := syscall(SYS_setgroups, len(gids), raw_data(gids))
 		return Errno(-ret)
 	} else {
-		ret := syscall(SYS_setgroup32, len(gids), rawptr(gids))
+		ret := syscall(SYS_setgroups32, len(gids), raw_data(gids))
 		return Errno(-ret)
 	}
 }
