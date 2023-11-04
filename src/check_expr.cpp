@@ -3558,6 +3558,30 @@ gb_internal void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Typ
 		return;
 	}
 
+	switch (op.kind) {
+	case Token_Quo:
+	case Token_Mod:
+	case Token_ModMod:
+	case Token_QuoEq:
+	case Token_ModEq:
+	case Token_ModModEq:
+		if (is_type_integer(y->type) && !is_type_untyped(y->type) &&
+		    is_type_float(x->type)   &&  is_type_untyped(x->type)) {
+		    	char const *suggestion = "\tSuggestion: Try explicitly casting the constant value for clarity";
+
+		    	gbString t = type_to_string(y->type);
+			if (x->value.kind != ExactValue_Invalid) {
+				gbString s = exact_value_to_string(x->value);
+				warning(node, "Dividing an untyped float '%s' by '%s' will perform integer division\n%s", s, t, suggestion);
+				gb_string_free(s);
+			} else {
+				warning(node, "Dividing an untyped float by '%s' will perform integer division\n%s", t, suggestion);
+			}
+			gb_string_free(t);
+		}
+		break;
+	}
+
 	convert_to_typed(c, x, y->type);
 	if (x->mode == Addressing_Invalid) {
 		return;
