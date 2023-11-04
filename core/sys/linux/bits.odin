@@ -1,7 +1,9 @@
 package linux
 
 
-/// Represents an error returned by most of syscalls
+/*
+	Represents an error returned by most of syscalls
+*/
 Errno :: enum i32 {
 	NONE = 0,
 	// Errno-base
@@ -142,8 +144,9 @@ Errno :: enum i32 {
 	EDEADLOCK       = EDEADLK,
 }
 
-
-/// Bits for Open_Flags
+/*
+	Bits for Open_Flags
+*/
 Open_Flags_Bits :: enum {
 	RDONLY    = 0,
 	WRONLY    = 1,
@@ -164,7 +167,9 @@ Open_Flags_Bits :: enum {
 	PATH      = 21,
 }
 
-/// Bits for FD_Flags bitset
+/*
+	Bits for FD_Flags bitset
+*/
 FD_Flags_Bits :: enum {
 	SYMLINK_NOFOLLOW   = 8,
 	REMOVEDIR          = 9,
@@ -177,7 +182,9 @@ FD_Flags_Bits :: enum {
 	RECURSIVE          = 15,
 }
 
-/// The bits for the Mode bitset.
+/*
+	The bits for the Mode bitset.
+*/
 Mode_Bits :: enum {
 	IXOTH  = 0,  // 0o0000001
 	IWOTH  = 1,  // 0o0000002
@@ -197,7 +204,9 @@ Mode_Bits :: enum {
 	IFREG  = 15, // 0o0100000
 }
 
-/// The bits used by the Statx_Mask bitset
+/*
+	The bits used by the Statx_Mask bitset
+*/
 Statx_Mask_Bits :: enum {
 	TYPE         = 0,
 	MODE         = 1,
@@ -215,8 +224,10 @@ Statx_Mask_Bits :: enum {
 	DIOALIGN     = 13,
 }
 
-/// Bits found in Statx_Attr bitset
-/// You should not use these directly
+/*
+	Bits found in Statx_Attr bitset
+	You should not use these directly
+*/
 Statx_Attr_Bits :: enum {
 	COMPRESSED = 2,  // 0x00000004
 	IMMUTABLE  = 4,  // 0x00000010
@@ -229,7 +240,9 @@ Statx_Attr_Bits :: enum {
 	DAX        = 21, // 0x00200000
 }
 
-/// Magic bits for filesystems returned by Stat_FS
+/*
+	Magic bits for filesystems returned by Stat_FS
+*/
 FS_Magic :: enum u32 {
 	ADFS_SUPER_MAGIC      = 0xadf5,
 	AFFS_SUPER_MAGIC      = 0xadff,
@@ -317,7 +330,9 @@ FS_Magic :: enum u32 {
 	_XIAFS_SUPER_MAGIC    = 0x012fd16d,
 }
 
-/// Bits for FS_Flags bitset
+/*
+	Bits for FS_Flags bitset
+*/
 FS_Flags_Bits :: enum {
 	RDONLY       = 0,
 	NOSUID       = 1,
@@ -340,20 +355,26 @@ Seek_Whence :: enum i16 {
 	HOLE = 4,
 }
 
-/// Bits for Close_Range_Flags
+/*
+	Bits for Close_Range_Flags
+*/
 Close_Range_Flags_Bits :: enum {
 	CLOEXEC = 2,
 	UNSHARE = 1,
 }
 
-/// Bits for Rename_Flags
+/*
+	Bits for Rename_Flags
+*/
 Rename_Flags_Bits :: enum {
 	EXCHANGE  = 1,
 	NOREPLACE = 0,
 	WHITEOUT  = 2,
 }
 
-/// Type of the file in a directory entry
+/*
+	Type of the file in a directory entry
+*/
 Dirent_Type :: enum u8 {
 	UNKNOWN = 0,
 	FIFO    = 1,
@@ -366,14 +387,18 @@ Dirent_Type :: enum u8 {
 	WHT     = 14,
 }
 
-/// Type of a lock for fcntl.2
+/*
+	Type of a lock for fcntl(2)
+*/
 FLock_Type :: enum i16 {
 	RDLCK = 0,
 	WRLCK = 1,
 	UNLCK = 2,
 }
 
-/// Bits for FD_Notifications
+/*
+	Bits for FD_Notifications
+*/
 FD_Notifications_Bits :: enum {
 	ACCESS    = 0,
 	MODIFY    = 1,
@@ -384,7 +409,9 @@ FD_Notifications_Bits :: enum {
 	MULTISHOT = 31,
 }
 
-/// Bits for seal
+/*
+	Bits for seal
+*/
 Seal_Bits :: enum {
 	SEAL         = 0,
 	SHRINK       = 1,
@@ -408,14 +435,18 @@ FD_Lease :: enum {
 	UNLCK = 2,
 }
 
-/// Kind of owner for FD_Owner
+/*
+	Kind of owner for FD_Owner
+*/
 F_Owner_Type :: enum i32 {
 	OWNER_TID  = 0,
 	OWNER_PID  = 1,
 	OWNER_PGRP = 2,
 }
 
-/// Command for fcntl.2
+/*
+	Command for fcntl(2)
+*/
 FCntl_Command :: enum {
 	DUPFD             = 0,
 	GETFD             = 1,
@@ -465,7 +496,9 @@ Fd_Poll_Events_Bits :: enum {
 	RDHUP  = 13,
 }
 
-/// Bits for Mem_Protection bitfield
+/*
+	Bits for Mem_Protection bitfield
+*/
 Mem_Protection_Bits :: enum{
 	READ      = 0,
 	WRITE     = 1,
@@ -479,7 +512,9 @@ Mem_Protection_Bits :: enum{
 	GROWSUP   = 25,
 }
 
-/// Bits for Map_Flags
+/*
+	Bits for Map_Flags
+*/
 Map_Flags_Bits :: enum {
 	SHARED          = 0,
 	PRIVATE         = 1,
@@ -504,19 +539,25 @@ Map_Flags_Bits :: enum {
 	UNINITIALIZED   = 26,
 }
 
-/// Bits for MLock_Flags
+/*
+	Bits for MLock_Flags
+*/
 MLock_Flags_Bits :: enum {
 	ONFAULT   = 0,
 }
 
-/// Bits for MSync_Flags
+/*
+	Bits for MSync_Flags
+*/
 MSync_Flags_Bits :: enum {
 	ASYNC      = 0,
 	INVALIDATE = 1,
 	SYNC       = 2,
 }
 
-/// Argument for madvice.2
+/*
+	Argument for madvice(2)
+*/
 MAdvice :: enum {
 	NORMAL           = 0,
 	RANDOM           = 1,
@@ -545,27 +586,35 @@ MAdvice :: enum {
 	SOFT_OFFLINE     = 101,
 }
 
-/// Bits for PKey_Access_Rights
+/*
+	Bits for PKey_Access_Rights
+*/
 PKey_Access_Bits :: enum {
 	DISABLE_ACCESS = 0,
 	DISABLE_WRITE  = 2,
 }
 
-/// Bits for MRemap_Flags
+/*
+	Bits for MRemap_Flags
+*/
 MRemap_Flags_Bits :: enum {
 	MAYMOVE   = 0,
 	FIXED     = 1,
 	DONTUNMAP = 2,
 }
 
-/// Bits for Get_Random_Flags
+/*
+	Bits for Get_Random_Flags
+*/
 Get_Random_Flags_Bits :: enum {
 	RANDOM   = 0,
 	NONBLOCK = 1,
 	INSECURE = 2,
 }
 
-/// Bits for Perf_Flags
+/*
+	Bits for Perf_Flags
+*/
 Perf_Flags_Bits :: enum {
 	FD_NO_GROUP = 0,
 	FD_OUTPUT   = 1,
@@ -573,7 +622,9 @@ Perf_Flags_Bits :: enum {
 	FD_CLOEXEC  = 3,
 }
 
-///  Union tag for Perf_Event_Attr struct
+/*
+	Union tag for Perf_Event_Attr struct
+*/
 Perf_Event_Type :: enum u32 {
 	HARDWARE   = 0,
 	SOFTWARE   = 1,
@@ -633,7 +684,9 @@ Perf_Cap_Flags_Bits :: enum u64 {
 	User_Time_Short    = 5,
 }
 
-/// Specifies the type of the hardware event that you want to get info about
+/*
+	Specifies the type of the hardware event that you want to get info about
+*/
 Perf_Hardware_Id :: enum u64 {
 	CPU_CYCLES              = 0,
 	INSTRUCTIONS            = 1,
@@ -647,7 +700,9 @@ Perf_Hardware_Id :: enum u64 {
 	REF_CPU_CYCLES          = 9,
 }
 
-/// Specifies the cache for the particular cache event that you want to get info about
+/*
+	Specifies the cache for the particular cache event that you want to get info about
+*/
 Perf_Hardware_Cache_Id :: enum u64 {
 	L1D      = 0,
 	L1I      = 1,
@@ -658,20 +713,26 @@ Perf_Hardware_Cache_Id :: enum u64 {
 	NODE     = 6,
 }
 
-/// Specifies the cache op that you want to get info about
+/*
+	Specifies the cache op that you want to get info about
+*/
 Perf_Hardware_Cache_Op_Id :: enum u64 {
 	READ     = 0,
 	WRITE    = 1,
 	PREFETCH = 2,
 }
 
-/// Specifies the cache operation result that you want to get info about
+/*
+	Specifies the cache operation result that you want to get info about
+*/
 Perf_Hardware_Cache_Result_Id :: enum u64 {
 	ACCESS   = 0,
 	MISS     = 1,
 }
 
-/// Specifies the particular software event that you want to get info about
+/*
+	Specifies the particular software event that you want to get info about
+*/
 Perf_Software_Id :: enum u64 {
 	CPU_CLOCK         = 0,
 	TASK_CLOCK        = 1,
@@ -688,7 +749,9 @@ Perf_Software_Id :: enum u64 {
 
 }
 
-/// Specifies which values to include in the sample
+/*
+	Specifies which values to include in the sample
+*/
 Perf_Event_Sample_Type_Bits :: enum {
 	IP              = 0,
 	TID             = 1,
@@ -717,7 +780,9 @@ Perf_Event_Sample_Type_Bits :: enum {
 	WEIGHT_STRUCT   = 24,
 }
 
-/// Describes field sets to include in mmaped page
+/*
+	Describes field sets to include in mmaped page
+*/
 Perf_Read_Format :: enum {
 	TOTAL_TIME_ENABLED = 0,
 	TOTAL_TIME_RUNNING = 1,
@@ -726,7 +791,9 @@ Perf_Read_Format :: enum {
 	LOST               = 4,
 }
 
-/// Chooses the breakpoint type
+/*
+	Chooses the breakpoint type
+*/
 Hardware_Breakpoint_Type :: enum u32 {
 	EMPTY   = 0,
 	R       = 1,
@@ -736,7 +803,9 @@ Hardware_Breakpoint_Type :: enum u32 {
 	INVALID = RW | X,
 }
 
-/// Bits for Branch_Sample_Type
+/*
+	Bits for Branch_Sample_Type
+*/
 Branch_Sample_Type_Bits :: enum {
 	USER       = 0,
 	KERNEL     = 1,
@@ -759,7 +828,9 @@ Branch_Sample_Type_Bits :: enum {
 	PRIV_SAVE  = 18,
 }
 
-/// Represent the type of Id
+/*
+	Represent the type of Id
+*/
 Id_Type :: enum uint {
 	ALL    = 0,
 	PID    = 1,
@@ -767,7 +838,9 @@ Id_Type :: enum uint {
 	PIDFD  = 3,
 }
 
-/// Options for wait syscalls
+/*
+	Options for wait syscalls
+*/
 Wait_Option :: enum {
 	WNOHANG     = 0,
 	WUNTRACED   = 1,
@@ -781,12 +854,16 @@ Wait_Option :: enum {
 	__WCLONE    = 31,
 }
 
-/// Bits for flags for pidfd
+/*
+	Bits for flags for pidfd
+*/
 Pid_FD_Flags_Bits :: enum {
 	NONBLOCK = 11,
 }
 
-/// Priority for process, process group, user
+/*
+	Priority for process, process group, user
+*/
 Priority_Which :: enum i32 {
 	PROCESS = 0,
 	PGRP    = 1,
@@ -849,10 +926,12 @@ Sig_Stack_Flag :: enum i32 {
 	AUTODISARM = 31,
 }
 
-/// Type of socket to create
-///   For TCP you want to use SOCK_STREAM
-///   For UDP you want to use SOCK_DGRAM
-/// Also see Protocol
+/*
+	Type of socket to create
+    - For TCP you want to use SOCK_STREAM
+	- For UDP you want to use SOCK_DGRAM
+	Also see `Protocol`
+*/
 Socket_Type :: enum {
 	STREAM    = 1,
 	DGRAM     = 2,
@@ -863,13 +942,17 @@ Socket_Type :: enum {
 	PACKET    = 10,
 }
 
-/// Bits for Socket_FD_Flags
+/*
+	Bits for Socket_FD_Flags
+*/
 Socket_FD_Flags_Bits :: enum {
 	NONBLOCK  = 14,
 	CLOEXEC   = 25,
 }
 
-/// Protocol family
+/*
+	Protocol family
+*/
 Protocol_Family :: enum u16 {
 	UNSPEC       = 0,
 	LOCAL        = 1,
@@ -922,11 +1005,13 @@ Protocol_Family :: enum u16 {
 	MCTP         = 45,
 }
 
-/// The protocol number according to IANA protocol number list
-/// Full list of protocol numbers:
-///   https://www.iana.org/assignments/protocol-numbers/protocol-numbers.xhtml
-/// Supported by the OS protocols can be queried by reading:
-///   /etc/protocols
+/*
+	The protocol number according to IANA protocol number list
+	Full list of protocol numbers:
+	  https://www.iana.org/assignments/protocol-numbers/protocol-numbers.xhtml
+	Supported by the OS protocols can be queried by reading:
+	  /etc/protocols
+*/
 Protocol :: enum {
 	HOPOPT          = 0,
 	ICMP            = 1,
@@ -1066,7 +1151,9 @@ Protocol :: enum {
 	Reserved        = 255,
 }
 
-/// API Level for get/setsockopt.2
+/*
+	API Level for getsockopt(2)/setsockopt(2)
+*/
 Socket_API_Level :: enum {
 	// Comes from <bits/socket-constants.h>
 	SOCKET          = 1,
@@ -1103,8 +1190,10 @@ Socket_API_Level :: enum {
 	SMC             = 286,
 }
 
-/// If Socket_API_Level == .SOCKET, these are the options
-/// you can specify in get/setsockopt.2
+/*
+	If Socket_API_Level == .SOCKET, these are the options
+	you can specify in getsockopt(2)/setsockopt(2)
+*/
 Socket_Option :: enum {
 	DEBUG                         = 1,
 	REUSEADDR                     = 2,
@@ -1249,7 +1338,9 @@ Socket_TCP_Option :: enum {
 	TX_DELAY             = 37,
 }
 
-/// Bits for Socket_Msg
+/*
+	Bits for Socket_Msg
+*/
 Socket_Msg_Bits :: enum {
 	OOB             = 0,
 	PEEK            = 1,
@@ -1275,14 +1366,18 @@ Socket_Msg_Bits :: enum {
 	CMSG_CLOEXEC    = 30,
 }
 
-/// Argument to shutdown.2
+/*
+	Argument to shutdown(2)
+*/
 Shutdown_How :: enum i32 {
 	RD   = 0,
 	WR   = 1,
 	RDWR = 2,
 }
 
-/// Second argument to futex.2 syscall
+/*
+	Second argument to futex(2) syscall
+*/
 Futex_Op :: enum u32 {
 	WAIT              = 0,
 	WAKE              = 1,
@@ -1300,13 +1395,17 @@ Futex_Op :: enum u32 {
 	LOCK_PI2          = 13,
 }
 
-/// Bits for Futex_Flags
+/*
+	Bits for Futex_Flags
+*/
 Futex_Flags_Bits :: enum {
 	PRIVATE    = 7,
 	REALTIME   = 8,
 }
 
-/// Kind of operation on futex, see FUTEX_WAKE_OP
+/*
+	Kind of operation on futex, see FUTEX_WAKE_OP
+*/
 Futex_Arg_Op :: enum {
 	SET      = 0,  /* uaddr2 =       oparg; */
 	ADD      = 1,  /* uaddr2 +=      oparg; */
@@ -1320,7 +1419,9 @@ Futex_Arg_Op :: enum {
 	PO2_XOR  = 4,  /* uaddr2 ^=   1<<oparg; */
 }
 
-/// Kind of comparison operation on futex, see FUTEX_WAKE_OP
+/*
+	Kind of comparison operation on futex, see FUTEX_WAKE_OP
+*/
 Futex_Cmp_Op :: enum {
 	EQ = 0,  /* if (oldval == cmparg) wake */
 	NE = 1,  /* if (oldval != cmparg) wake */
@@ -1330,7 +1431,9 @@ Futex_Cmp_Op :: enum {
 	GE = 5,  /* if (oldval >= cmparg) wake */
 }
 
-/// The kind of resource limits
+/*
+	The kind of resource limits
+*/
 RLimit_Kind :: enum i32 {
 	CPU        = 0,
 	FSIZE      = 1,
@@ -1351,7 +1454,9 @@ RLimit_Kind :: enum i32 {
 	NLIMITS    = 16,
 }
 
-/// Represents the user of resources
+/*
+	Represents the user of resources
+*/
 RUsage_Who :: enum i32 {
 	CHILDREN = -1,
 	SELF     =  0,
@@ -1359,7 +1464,9 @@ RUsage_Who :: enum i32 {
 	LWP      =  THREAD,
 }
 
-/// Bits for Personality_Flags
+/*
+	Bits for Personality_Flags
+*/
 UNAME26            :: 17
 ADDR_NO_RANDOMIZE  :: 18
 FDPIC_FUNCPTRS     :: 19
@@ -1372,8 +1479,10 @@ WHOLE_SECONDS      :: 25
 STICKY_TIMEOUTS    :: 26
 ADDR_LIMIT_3GB     :: 27
 
-/// Personality type
-/// These go into the bottom 8 bits of the personality value
+/*
+	Personality type
+	These go into the bottom 8 bits of the personality value
+*/
 PER_LINUX       :: 0x0000
 PER_LINUX_32BIT :: 0x0000 | ADDR_LIMIT_32BIT
 PER_LINUX_FDPIC :: 0x0000 | FDPIC_FUNCPTRS

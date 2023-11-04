@@ -1,46 +1,68 @@
 //+build linux
 package linux
 
-/// Represents storage device handle
+/*
+	Type for storage device handle.
+*/
 Dev :: distinct int
 
-/// Represents 32-bit user id
+/*
+	Type for 32-bit User IDs.
+*/
 Uid :: distinct u32
 
-/// Represents 32-bit group id
+/*
+	Type for 32-bit Group IDs.
+*/
 Gid :: distinct u32
 
-/// Process id's
+/*
+	Type for Process IDs, Thread IDs, Thread group ID.
+*/
 Pid :: distinct int
 
-/// Represents pid, pifd, pgid values in general
+/*
+	Type for any of: pid, pidfd, pgid.
+*/
 Id :: distinct uint
 
-/// Represents a file descriptor
+/*
+	Represents a file descriptor.
+*/
 Fd  :: distinct i32
 
-/// Represents a PID file descriptor
+/*
+	Type for PID file descriptors.
+*/
 Pid_FD :: distinct i32
 
-/// Represents 64-bit inode number for files
-/// Used pretty much only in struct Stat64 for 32-bit platforms
+/*
+	Type for 64-bit inode number for files.
+	Used pretty much only in struct Stat64 for 32-bit platforms.
+*/
 Inode :: distinct u64
 
-/// Shared memory identifiers used by `shm*` calls
+/*
+	Shared memory identifiers used by shmget(2) and other calls.
+*/
 Key :: distinct i32
 
 /*
-	Represents timer IDs
+	Represents timer IDs.
 */
 Timer :: distinct i32
 
-/// Represents time with nanosecond precision
+/*
+	Represents time with nanosecond precision.
+*/
 Time_Spec :: struct {
 	time_sec:  uint,
 	time_nsec: uint,
 }
 
-/// Represents time with millisecond precision
+/*
+	Represents time with millisecond precision.
+*/
 Time_Val :: struct {
 	seconds:      int,
 	microseconds: int,
@@ -52,22 +74,31 @@ Time_Val :: struct {
 UTim_Buf :: struct {
 	actime:  uint,
 	modtime: uint,
-};
+}
 
-
-/// open.2 flags
+/*
+	Flags for open(2).
+*/
 Open_Flags :: bit_set[Open_Flags_Bits; u32]
 
-/// Flags for the file descriptor to be passed in some syscalls
+/*
+	Flags for the file descriptors.
+*/
 FD_Flags :: bit_set[FD_Flags_Bits; i32]
 
-/// Represents file's permission and status bits
-/// Example:
-///   When you're passing a value of this type the recommended usage is
-///     sys.Mode{.S_IXOTH, .S_IROTH} | sys.S_IRWXU | sys.S_IRWXG
-///   This would generate a mode that has full permissions for the
-///   file's owner and group, and only "read" and "execute" bits
-///   for others.
+/*
+	Represents file's permission and status bits
+**Example:**
+	When you're passing a value of this type the recommended usage is:
+	
+	```
+	  linux.Mode{.S_IXOTH, .S_IROTH} | linux.S_IRWXU | linux.S_IRWXG
+	```
+	  
+	This would generate a mode that has full permissions for the
+	file's owner and group, and only "read" and "execute" bits
+	for others.
+*/
 Mode :: bit_set[Mode_Bits; u32]
 
 when ODIN_ARCH == .amd64 {
@@ -128,29 +159,38 @@ when ODIN_ARCH == .amd64 {
 	}
 }
 
-/// Represents the file state.
-/// Mirrors struct stat in glibc/linux kernel.
-/// If you're on 32-bit platform, consider using Stat64 instead
+/*
+	Represents the file state.
+	If you're on 32-bit platform, consider using Stat64 instead.
+*/
 Stat :: struct {
 	using _impl_stat: _Arch_Stat,
 }
 
-/// Timestamp type used for Statx struct
+/*
+	Timestamp type used for Statx struct
+*/
 Statx_Timestamp :: struct {
 	sec:  i64,
 	nsec: u32,
 	_:       i32,
 }
 
-/// Query params/results for `statx()`
+/*
+	Query params/results for `statx()`.
+*/
 Statx_Mask :: bit_set[Statx_Mask_Bits; u32]
 
-/// File attributes, returned by statx. This bitset is also
-/// used to specify which attributes are present, not just
-/// their value.
+/*
+	File attributes, returned by statx. This bitset is also
+	used to specify which attributes are present, not just
+	their value.
+*/
 Statx_Attr :: bit_set[Statx_Attr_Bits; u64]
 
-/// The extended Stat struct
+/*
+	The extended Stat struct, the argument to statx(2) syscall.
+*/
 Statx :: struct {
 	mask:                Statx_Mask,
 	blksize:             u32,
@@ -182,7 +222,9 @@ Statx :: struct {
 	_:                   [12]u64,
 }
 
-/// Mount flags for filesystem
+/*
+	Mount flags for filesystem.
+*/
 FS_Flags :: bit_set[FS_Flags_Bits; u32]
 
 when size_of(int) == 8 {
@@ -222,19 +264,28 @@ when size_of(int) == 8 {
 	}
 }
 
+/*
+	Struct for statfs(2).
+*/
 Stat_FS :: struct {
 	using _impl_stat_fs: _Arch_Stat_FS,
 }
 
-/// Flags for close_range.2
+/*
+	Flags for close_range(2).
+*/
 Close_Range_Flags :: bit_set[Close_Range_Flags_Bits; u32]
 
-/// Flags for rename.2
+/*
+	Flags for rename(2).
+*/
 Rename_Flags :: bit_set[Rename_Flags_Bits; u32]
 
-/// Directory entry
-/// Recommended to use this with dirent_iterator()
-/// and dirent_name()
+/*
+	Directory entry record.
+	Recommended iterate these with `dirent_iterator()`,
+	and obtain the name via `dirent_name()`.
+*/
 Dirent :: struct {
 	ino:    Inode,
 	off:    i64,
@@ -243,7 +294,9 @@ Dirent :: struct {
 	name:   [0]u8, // See dirent_name
 }
 
-/// Lock record for fcntl.2
+/*
+	Lock record for fcntl(2).
+*/
 FLock :: struct {
 	type:   FLock_Type,
 	whence: Seek_Whence,
@@ -259,50 +312,76 @@ FLock :: struct {
 */
 FLock_Op :: bit_set[FLock_Op_Bits; i32]
 
-/// Flags for fcntl_notify
+/*
+	Flags for `fcntl_notify()`.
+*/
 FD_Notifications :: bit_set[FD_Notifications_Bits; i32]
 
-/// Seals for fcntl_add_seals
+/*
+	Seals for `fcntl_add_seals()`.
+*/
 Seal :: bit_set[Seal_Bits; i32]
 
-/// Represents owner that receives events on file updates
+/*
+	Represents owner that receives events on file updates.
+*/
 F_Owner :: struct {
 	type: F_Owner_Type,
 	pid:  Pid,
 }
 
-/// Events for ppoll
+/*
+	Events for ppoll(2).
+*/
 Fd_Poll_Events :: bit_set[Fd_Poll_Events_Bits; u16]
 
-/// Struct for ppoll
+/*
+	Struct for ppoll(2).
+*/
 Poll_Fd :: struct {
 	fd:      Fd,
 	events:  Fd_Poll_Events,
 	revents: Fd_Poll_Events,
 }
 
-/// Specifies protection for memory pages
+/*
+	Specifies protection for memory pages.
+*/
 Mem_Protection :: bit_set[Mem_Protection_Bits; i32]
 
-/// Flags for mmap
+/*
+	Flags for mmap.
+*/
 Map_Flags :: bit_set[Map_Flags_Bits; i32]
 
-/// Flags for mlock.2
+/*
+	Flags for mlock(2).
+*/
 MLock_Flags :: bit_set[MLock_Flags_Bits; u32]
 
-/// Flags for msync.2
+/*
+	Flags for msync(2).
+*/
 MSync_Flags :: bit_set[MSync_Flags_Bits; i32]
 
-/// Access rights for pkey_alloc.2
+/*
+	Access rights for pkey_alloc(2).
+*/
 PKey_Access_Rights :: bit_set[PKey_Access_Bits; u32]
 
-/// Flags for mremap.2
+/*
+	Flags for mremap(2).
+*/
 MRemap_Flags :: bit_set[MRemap_Flags_Bits; i32]
 
-/// Flags for getrandom syscall
+/*
+	Flags for getrandom(2) syscall.
+*/
 Get_Random_Flags :: bit_set[Get_Random_Flags_Bits; i32]
 
-/// Flags for perf_event_open syscall
+/*
+	Flags for perf_event_open(2) syscall.
+*/
 Perf_Flags :: bit_set[Perf_Flags_Bits; uint]
 
 Perf_Event_Flags :: distinct bit_set[Perf_Event_Flags_Bits; u64]
@@ -311,10 +390,14 @@ Perf_Cap_Flags :: distinct bit_set[Perf_Cap_Flags_Bits; u64]
 
 Perf_Event_Sample_Type :: bit_set[Perf_Event_Sample_Type_Bits; u64]
 
-/// Specifies which branches to include in branch record
+/*
+	Specifies which branches to include in branch record.
+*/
 Branch_Sample_Type :: bit_set[Branch_Sample_Type_Bits; u64]
 
-/// The struct for perf_event_open
+/*
+	The struct for perf_event_open.
+*/
 Perf_Event_Attr :: struct #packed {
 	type:               Perf_Event_Type,
 	size:               u32,
@@ -358,7 +441,9 @@ Perf_Event_Attr :: struct #packed {
 	_:                  u16,
 }
 
-/// The ring buffer structure when mmaping Perf_Event_Attr
+/*
+	The ring buffer structure when mmaping Perf_Event_Attr.
+*/
 Perf_Event_Mmap_Page :: struct #packed {
 	version:        u32,
 	compat_version: u32,
@@ -393,10 +478,14 @@ Perf_Event_Mmap_Page :: struct #packed {
 
 // TODO(flysand): Its taking too much effort to bind the other data structures related to perf_event_open
 
-/// Options for wait4() and waitpid()
+/*
+	Options for wait4(2) and waitpid(2).
+*/
 Wait_Options :: bit_set[Wait_Option; i32]
 
-/// Flags for pidfd_open.2
+/*
+	Flags for pidfd_open(2).
+*/
 Pid_FD_Flags :: bit_set[Pid_FD_Flags_Bits; i32]
 
 // Note(flysand): these could, in principle be implemented with bitfields,
@@ -503,27 +592,36 @@ Sig_Action :: struct($T: typeid) {
 	mask: Sig_Set,
 }
 
-
-/// Flags for the socket file descriptor
-/// Note, on linux these are technically passed by OR'ing together
-/// with Socket_Type, our wrapper does this under the hood.
+/*
+	Flags for the socket file descriptor.
+	Note, on linux these are technically passed by OR'ing together
+	with Socket_Type, our wrapper does this under the hood.
+*/
 Socket_FD_Flags :: bit_set[Socket_FD_Flags_Bits; int]
 
-/// Address family for the socket
-/// Typically there's one address family for every protocol family
+/*
+	Address family for the socket.
+	Typically there's one address family for every protocol family.
+*/
 Address_Family :: distinct Protocol_Family
 
-/// Flags for the socket for send/recv calls
+/*
+	Flags for the socket for send/recv calls.
+*/
 Socket_Msg :: bit_set[Socket_Msg_Bits; i32]
 
-/// Struct representing IPv4 socket address
+/*
+	Struct representing IPv4 socket address.
+*/
 Sock_Addr_In :: struct #packed {
 	sin_family: Address_Family,
 	sin_port:   u16be,
 	sin_addr:   [4]u8,
 }
 
-/// Struct representing IPv6 socket address
+/*
+	Struct representing IPv6 socket address.
+*/
 Sock_Addr_In6 :: struct #packed {
 	sin6_family:   Address_Family,
 	sin6_port:     u16be,
@@ -532,7 +630,9 @@ Sock_Addr_In6 :: struct #packed {
 	sin6_scope_id: u32,
 }
 
-/// Struct representing an arbitrary socket address
+/*
+	Struct representing an arbitrary socket address.
+*/
 Sock_Addr_Any :: struct #raw_union {
 	using _: struct {
 		family: Address_Family,
@@ -561,13 +661,19 @@ MMsg_Hdr :: struct {
 	len: u32,
 }
 
-/// Just an alias to make futex-values more visible
+/*
+	Just an alias to make futex-values more visible
+*/
 Futex :: u32
 
-/// Flags for the futex (they are kept separately)
+/*
+	Flags for the futex (they are kept separately)
+*/
 Futex_Flags :: bit_set[Futex_Flags_Bits; u32]
 
-/// Times
+/*
+	Times
+*/
 Tms :: struct {
 	tms_utime:  int,
 	tms_stime:  int,
@@ -575,8 +681,10 @@ Tms :: struct {
 	tms_cstime: int,
 }
 
-/// "Unix time-sharing system name", allegedly
-/// Basically system info
+/*
+	"Unix time-sharing system name", allegedly.
+	Basically system info.
+*/
 UTS_Name :: struct {
 	sysname:    [65]u8 `fmt:"s,0"`,
 	nodename:   [65]u8 `fmt:"s,0"`,
@@ -586,7 +694,9 @@ UTS_Name :: struct {
 	domainname: [65]u8 `fmt:"s,0"`,
 }
 
-/// Return buffer for the sysinfo syscall
+/*
+	Return buffer for the sysinfo syscall
+*/
 Sys_Info :: struct {
 	uptime:    int,
 	loads:     [3]int,
@@ -603,14 +713,17 @@ Sys_Info :: struct {
 	_padding:  [20 - (2 * size_of(int)) - size_of(i32)]u8,
 }
 
-/// Resource limit
+/*
+	Resource limit
+*/
 RLimit :: struct {
 	cur: uint,
 	max: uint,
 }
 
-/// Structure representing how much of each resource
-/// got used.
+/*
+	Structure representing how much of each resource got used.
+*/	
 RUsage :: struct {
 	utime:         Time_Val,
 	stime:         Time_Val,
@@ -1088,4 +1201,7 @@ PTrace_Note_Type :: enum {
 	NT_ARM_ZT               = 0x40d,
 }
 
+/*
+	Flags for splice(2) and tee(2) syscalls.
+*/
 Splice_Flags :: bit_set[Splice_Flags_Bits; u32]

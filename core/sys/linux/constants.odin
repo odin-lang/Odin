@@ -1,26 +1,40 @@
 
 package linux
 
-/// Special file descriptor to pass to `*at` functions to specify
-/// that relative paths are relative to current directory
+/*
+	Special file descriptor to pass to `*at` functions to specify
+	that relative paths are relative to current directory.
+*/
 AT_FDCWD :: Fd(-100)
 
-/// Special value to put into timespec for utimensat() to set timestamp to the current time
+/*
+	Special value to put into timespec for utimensat() to set timestamp to the current time.
+*/
 UTIME_NOW  :: uint((1 << 30) - 1)
 
-/// Special value to put into the timespec for utimensat() to leave the corresponding field of the timestamp unchanged
+/*
+	Special value to put into the timespec for utimensat() to leave the corresponding field of the timestamp unchanged.
+*/
 UTIME_OMIT :: uint((1 << 30) - 2)
 
-/// For wait4: Pass this pid to wait for any process
+/*
+	For wait4: Pass this pid to wait for any process.
+*/
 WAIT_ANY    :: Pid(-1)
 
-/// For wait4: Pass this pid to wait for any process in current process group
+/*
+	For wait4: Pass this pid to wait for any process in current process group.
+*/
 WAIT_MYPGRP :: Pid(0)
 
-/// Maximum priority (aka nice value) for the process
+/*
+	Maximum priority (aka nice value) for the process.
+*/
 PRIO_MAX :: 20
 
-/// Minimum priority (aka nice value) for the process
+/*
+	Minimum priority (aka nice value) for the process.
+*/
 PRIO_MIN :: -20
 
 SIGRTMIN :: Signal(32)
@@ -35,40 +49,64 @@ S_IFCHR  :: Mode{.IFCHR}
 S_IFDIR  :: Mode{.IFDIR}
 S_IFREG  :: Mode{.IFREG}
 
-/// Checks the Mode bits to see if the file is a named pipe (FIFO)
+/*
+	Checks the Mode bits to see if the file is a named pipe (FIFO).
+*/
 S_ISFIFO :: #force_inline proc "contextless" (m: Mode) -> bool {return (S_IFFIFO  == (m & S_IFMT))}
 
-/// Check the Mode bits to see if the file is a character device
+/*
+	Check the Mode bits to see if the file is a character device.
+*/
 S_ISCHR  :: #force_inline proc "contextless" (m: Mode) -> bool {return (S_IFCHR  == (m & S_IFMT))}
-	
-/// Check the Mode bits to see if the file is a directory
+
+/*	
+	Check the Mode bits to see if the file is a directory.
+*/
 S_ISDIR  :: #force_inline proc "contextless" (m: Mode) -> bool {return (S_IFDIR  == (m & S_IFMT))}
 
-/// Check the Mode bits to see if the file is a register
+/*
+	Check the Mode bits to see if the file is a register.
+*/
 S_ISREG  :: #force_inline proc "contextless" (m: Mode) -> bool {return (S_IFREG  == (m & S_IFMT))}
 
-/// Check the Mode bits to see if the file is a socket
+/*
+	Check the Mode bits to see if the file is a socket.
+*/
 S_ISSOCK :: #force_inline proc "contextless" (m: Mode) -> bool {return (S_IFSOCK == (m & S_IFMT))}
 
-/// Check the Mode bits to see if the file is a symlink
+/*
+	Check the Mode bits to see if the file is a symlink.
+*/
 S_ISLNK  :: #force_inline proc "contextless" (m: Mode) -> bool {return (S_IFLNK  == (m & S_IFMT))}
 
-/// Check the Mode bits to see if the file is a block device
+/*
+	Check the Mode bits to see if the file is a block device.
+*/
 S_ISBLK  :: #force_inline proc "contextless" (m: Mode) -> bool {return (S_IFBLK  == (m & S_IFMT))}
 
-/// For access.2 syscall family: instruct to check if the file exists
+/*
+	For access.2 syscall family: instruct to check if the file exists.
+*/
 F_OK :: Mode{}
 
-/// For access.2 syscall family: instruct to check if the file is executable
+/*
+	For access.2 syscall family: instruct to check if the file is executable.
+*/
 X_OK :: Mode{.IXOTH}
 
-/// For access.2 syscall family: instruct to check if the file is writeable
+/*
+	For access.2 syscall family: instruct to check if the file is writeable.
+*/
 W_OK :: Mode{.IWOTH}
 
-/// For access.2 syscall family: instruct to check if the file is readable
+/*
+	For access.2 syscall family: instruct to check if the file is readable.
+*/
 R_OK :: Mode{.IROTH}
 
-/// The stats you get by calling `stat`
+/*
+	The stats you get by calling `stat`.
+*/
 STATX_BASIC_STATS :: Statx_Mask {
 	.TYPE,
 	.MODE,
@@ -169,28 +207,44 @@ Futex_Wait_requeue_Pi_Type :: distinct Futex_Op
 Futex_Cmp_requeue_Pi_Type  :: distinct Futex_Op
 Futex_Lock_Pi2_Type        :: distinct Futex_Op
 
-/// Wait on futex wakeup signal
+/*
+	Wait on futex wakeup signal.
+*/
 FUTEX_WAIT            :: Futex_Wait_Type(.WAIT)
 
-/// Wake up other processes waiting on the futex
+/*
+	Wake up other processes waiting on the futex.
+*/
 FUTEX_WAKE            :: Futex_Wake_Type(.WAKE)
 
-/// Not implemented. Basically, since
+/*
+	Not implemented. Basically, since.
+*/
 FUTEX_FD              :: Futex_Fd_Type(.FD)
 
-/// Requeue waiters from one futex to another
+/*
+	Requeue waiters from one futex to another.
+*/
 FUTEX_REQUEUE         :: Futex_Requeue_Type(.REQUEUE)
 
-/// Requeue waiters from one futex to another if the value at mutex matches
+/*
+	Requeue waiters from one futex to another if the value at mutex matches.
+*/
 FUTEX_CMP_REQUEUE     :: Futex_Cmp_Requeue_Type(.CMP_REQUEUE)
 
-/// See man pages, I'm not describing it here
+/*
+	See man pages, I'm not describing it here.
+*/
 FUTEX_WAKE_OP         :: Futex_Wake_Op_Type(.WAKE_OP)
 
-/// Wait on a futex, but the value is a bitset
+/*
+	Wait on a futex, but the value is a bitset.
+*/
 FUTEX_WAIT_BITSET     :: Futex_Wait_Bitset_Type(.WAIT_BITSET)
 
-/// Wait on a futex, but the value is a bitset
+/*
+	Wait on a futex, but the value is a bitset.
+*/
 FUTEX_WAKE_BITSET     :: Futex_Wake_Bitset_Type(.WAKE_BITSET)
 
 // TODO(flysand): Priority inversion futexes
