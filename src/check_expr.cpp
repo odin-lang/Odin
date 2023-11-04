@@ -2768,6 +2768,11 @@ gb_internal void check_shift(CheckerContext *c, Operand *x, Operand *y, Ast *nod
 					gb_string_free(to_type);
 					x->mode = Addressing_Invalid;
 				}
+			} else if (!is_type_integer(x->type)) {
+				gbString x_str = expr_to_string(x->expr);
+				error(node, "Non-integer shifted operand '%s' is not allowed", x_str);
+				gb_string_free(x_str);
+				x->mode = Addressing_Invalid;
 			}
 			// x->value = x_val;
 			return;
