@@ -209,8 +209,9 @@ pow2_f64 :: proc(#any_int exp: int) -> (res: f64) {
 		return transmute(f64)(u64(exp + F64_BIAS) << F64_SHIFT)
 	case exp < -1075:                 // Underflow
 		return f64(0)
-	case exp == -1075:                // Underflow
-		return 0h00000000_00000001
+	case exp == -1075:                // Underflow.
+		// Note that pow(2, -1075) returns 0h1 on Windows and 0h0 on macOS & Linux.
+		return 0h00000000_00000000
 	case exp < -1022:                 // Denormal
 		x := u64(exp + (F64_SHIFT + 1) + F64_BIAS) << F64_SHIFT
 		return f64(1) / (1 << (F64_SHIFT + 1)) * transmute(f64)x
