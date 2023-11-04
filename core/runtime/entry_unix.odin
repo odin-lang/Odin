@@ -21,13 +21,37 @@ when ODIN_BUILD_MODE == .Dynamic {
 		return 0
 	}
 } else when !ODIN_TEST && !ODIN_NO_ENTRY_POINT {
-	@(link_name="main", linkage="strong", require)
-	main :: proc "c" (argc: i32, argv: [^]cstring) -> i32 {
-		args__ = argv[:argc]
-		context = default_context()
-		#force_no_inline _startup_runtime()
-		intrinsics.__entry_point()
-		#force_no_inline _cleanup_runtime()
-		return 0
+	when ODIN_NO_CRT {
+		// NOTE(flysand): We need to start from assembly because we need
+		// to retrieve argc and argv from the stack
+		when ODIN_ARCH == .amd64 {
+			@require foreign import entry "entry_unix_no_crt_amd64.asm"
+		} else when ODIN_ARCH == .i386 {
+			@require foreign import entry "entry_unix_no_crt_i386.asm"
+		}
+		@(link_name="_start_odin", linkage="strong", require)
+		_start_odin :: proc "c" (argc: i32, argv: [^]cstring) -> ! {
+			args__ = argv[:argc]
+			context = default_context()
+			#force_no_inline _startup_runtime()
+			intrinsics.__entry_point()
+			#force_no_inline _cleanup_runtime()
+			when ODIN_ARCH == .amd64 {
+				intrinsics.syscall(/*SYS_exit = */60)
+			} else when ODIN_ARCH == .i386 {
+				intrinsics.syscall(/*SYS_exit = */1)
+			}
+			unreachable()
+		}
+	} else {
+		@(link_name="main", linkage="strong", require)
+		main :: proc "c" (argc: i32, argv: [^]cstring) -> i32 {
+			args__ = argv[:argc]
+			context = default_context()
+			#force_no_inline _startup_runtime()
+			intrinsics.__entry_point()
+			#force_no_inline _cleanup_runtime()
+			return 0
+		}
 	}
 }

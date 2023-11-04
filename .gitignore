@@ -24,6 +24,8 @@ bld/
 ![Cc]ore/[Ll]og/
 tests/documentation/verify/
 tests/documentation/all.odin-doc
+tests/internal/test_map
+tests/internal/test_rtti
 # Visual Studio 2015 cache/options directory
 .vs/
 # Visual Studio Code options directory

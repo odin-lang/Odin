@@ -2,95 +2,60 @@
 //+build linux
 package sync
 
-import "core:c"
 import "core:time"
-import "core:intrinsics"
-import "core:sys/unix"
+import "core:sys/linux"
 
-FUTEX_WAIT :: 0
-FUTEX_WAKE :: 1
-FUTEX_PRIVATE_FLAG :: 128
-
-FUTEX_WAIT_PRIVATE :: (FUTEX_WAIT | FUTEX_PRIVATE_FLAG)
-FUTEX_WAKE_PRIVATE :: (FUTEX_WAKE | FUTEX_PRIVATE_FLAG)
-
-ESUCCESS  :: 0
-EINTR     :: -4
-EAGAIN    :: -11
-EFAULT    :: -14
-EINVAL    :: -22
-ETIMEDOUT :: -110
-
-get_errno :: proc "contextless" (r: int) -> int {
-	if -4096 < r && r < 0 {
-		return r
-	}
-	return 0
-}
-
-internal_futex :: proc "contextless" (f: ^Futex, op: c.int, val: u32, timeout: rawptr) -> int {
-	code := int(intrinsics.syscall(unix.SYS_futex, uintptr(f), uintptr(op), uintptr(val), uintptr(timeout), 0, 0))
-	return get_errno(code)
-}
-
-
-_futex_wait :: proc "contextless" (f: ^Futex, expected: u32) -> bool {
-	err := internal_futex(f, FUTEX_WAIT_PRIVATE | FUTEX_WAIT, expected, nil)
-	switch err {
-	case ESUCCESS, EINTR, EAGAIN, EINVAL:
-		// okay
-	case ETIMEDOUT:
+_futex_wait :: proc "contextless" (futex: ^Futex, expected: u32) -> bool {
+	errno := linux.futex(cast(^linux.Futex) futex, linux.FUTEX_WAIT, {.PRIVATE}, expected)
+	if errno == .ETIMEDOUT {
 		return false
-	case EFAULT: 
-		fallthrough
+	}
+	#partial switch errno {
+	case .NONE, .EINTR, .EAGAIN:
+		return true
 	case:
+		// TODO(flysand): More descriptive panic messages based on the vlaue of `errno`
 		_panic("futex_wait failure")
 	}
-	return true
 }
 
-_futex_wait_with_timeout :: proc "contextless" (f: ^Futex, expected: u32, duration: time.Duration) -> bool {
+_futex_wait_with_timeout :: proc "contextless" (futex: ^Futex, expected: u32, duration: time.Duration) -> bool {
 	if duration <= 0 {
 		return false
 	}
-	
-	timespec_t :: struct {
-		tv_sec:  c.long,
-		tv_nsec: c.long,
-	}
-	
-	err := internal_futex(f, FUTEX_WAIT_PRIVATE | FUTEX_WAIT, expected, &timespec_t{
-		tv_sec  = (c.long)(duration/1e9),
-		tv_nsec = (c.long)(duration%1e9),
+	errno := linux.futex(cast(^linux.Futex) futex, linux.FUTEX_WAIT, {.PRIVATE}, expected, &linux.Time_Spec{
+		time_sec  = cast(uint)(duration/1e9),
+		time_nsec = cast(uint)(duration%1e9),
 	})
-	switch err {
-	case ESUCCESS, EINTR, EAGAIN, EINVAL:
-		// okay
-	case ETIMEDOUT:
+	if errno == .ETIMEDOUT {
 		return false
-	case EFAULT: 
-		fallthrough
+	}
+	#partial switch errno {
+	case .NONE, .EINTR, .EAGAIN:
+		return true
 	case:
 		_panic("futex_wait_with_timeout failure")
 	}
-	return true
 }
 
-
-_futex_signal :: proc "contextless" (f: ^Futex) {
-	err := internal_futex(f, FUTEX_WAKE_PRIVATE | FUTEX_WAKE, 1, nil)
-	switch err {
-	case ESUCCESS, EINVAL, EFAULT:
-		// okay
+_futex_signal :: proc "contextless" (futex: ^Futex) {
+	_, errno := linux.futex(cast(^linux.Futex) futex, linux.FUTEX_WAKE, {.PRIVATE}, 1)
+	#partial switch errno {
+	case .NONE:
+		return
 	case:
 		_panic("futex_wake_single failure")
 	}
 }
-_futex_broadcast :: proc "contextless" (f: ^Futex)  {
-	err := internal_futex(f, FUTEX_WAKE_PRIVATE | FUTEX_WAKE, u32(max(i32)), nil)
-	switch err {
-	case ESUCCESS, EINVAL, EFAULT:
-		// okay
+
+_futex_broadcast :: proc "contextless" (futex: ^Futex)  {
+	// NOTE(flysand): This code was kinda funny and I don't want to remove it, but here I will
+	// record history of what has been in here before
+	//     FUTEX_WAKE_PRIVATE | FUTEX_WAKE
+	_, errno := linux.futex(cast(^linux.Futex) futex, linux.FUTEX_WAKE, {.PRIVATE}, max(i32))
+	#partial switch errno {
+	case .NONE:
+		return
 	case:
 		_panic("_futex_wake_all failure")
 	}

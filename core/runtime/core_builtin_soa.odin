@@ -413,3 +413,16 @@ delete_soa :: proc{
 	delete_soa_slice,
 	delete_soa_dynamic_array,
 }
+
+
+clear_soa_dynamic_array :: proc(array: ^$T/#soa[dynamic]$E) {
+	when intrinsics.type_struct_field_count(E) != 0 {
+		footer := raw_soa_footer(array)
+		footer.len = 0
+	}
+}
+
+@builtin
+clear_soa :: proc{
+	clear_soa_dynamic_array,
+}

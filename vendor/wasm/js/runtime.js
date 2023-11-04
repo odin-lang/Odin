@@ -63,9 +63,8 @@ class WasmMemoryInterface {
 		return lo + hi*4294967296;
 	};
 	loadI64(addr) {
-		// TODO(bill): loadI64 correctly
 		const lo = this.mem.getUint32(addr + 0, true);
-		const hi = this.mem.getUint32(addr + 4, true);
+		const hi = this.mem.getInt32 (addr + 4, true);
 		return lo + hi*4294967296;
 	};
 	loadF32(addr)  { return this.mem.getFloat32(addr, true); }
@@ -95,9 +94,8 @@ class WasmMemoryInterface {
 		this.mem.setUint32(addr + 4, Math.floor(value / 4294967296), true);
 	}
 	storeI64(addr, value) {
-		// TODO(bill): storeI64 correctly
 		this.mem.setUint32(addr + 0, value, true);
-		this.mem.setUint32(addr + 4, Math.floor(value / 4294967296), true);
+		this.mem.setInt32 (addr + 4, Math.floor(value / 4294967296), true);
 	}
 	storeF32(addr, value)  { this.mem.setFloat32(addr, value, true); }
 	storeF64(addr, value)  { this.mem.setFloat64(addr, value, true); }
@@ -1334,14 +1332,9 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 			abort: () => { Module.abort() },
 			evaluate: (str_ptr, str_len) => { eval.call(null, wasmMemoryInterface.loadString(str_ptr, str_len)); },
 
-			time_now: () => {
-				// convert ms to ns
-				return Date.now() * 1e6;
-			},
-			tick_now: () => {
-				// convert ms to ns
-				return performance.now() * 1e6;
-			},
+			// return a bigint to be converted to i64
+			time_now: () => BigInt(Date.now()),
+			tick_now: () => BigInt(performance.now()),
 			time_sleep: (duration_ms) => {
 				if (duration_ms > 0) {
 					// TODO(bill): Does this even make any sense?
@@ -1356,6 +1349,11 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 			ln:      Math.log,
 			exp:     Math.exp,
 			ldexp:   (x, exp) => x * Math.pow(2, exp),
+
+			rand_bytes: (ptr, len) => {
+				const view = new Uint8Array(wasmMemoryInterface.memory.buffer, ptr, len)
+				crypto.getRandomValues(view)
+			},
 		},
 		"odin_dom": {
 			init_event_raw: (ep) => {

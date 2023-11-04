@@ -1069,6 +1069,7 @@ gb_internal lbValue lb_emit_arith(lbProcedure *p, TokenKind op, lbValue lhs, lbV
 			args[1] = rhs;
 
 			switch (type_size_of(ft)) {
+			case 2: return lb_emit_runtime_call(p, "quo_complex32", args);
 			case 4: return lb_emit_runtime_call(p, "quo_complex64", args);
 			case 8: return lb_emit_runtime_call(p, "quo_complex128", args);
 			default: GB_PANIC("Unknown float type"); break;
@@ -1145,6 +1146,7 @@ gb_internal lbValue lb_emit_arith(lbProcedure *p, TokenKind op, lbValue lhs, lbV
 			args[1] = rhs;
 
 			switch (8*type_size_of(ft)) {
+			case 16: return lb_emit_runtime_call(p, "mul_quaternion64", args);
 			case 32: return lb_emit_runtime_call(p, "mul_quaternion128", args);
 			case 64: return lb_emit_runtime_call(p, "mul_quaternion256", args);
 			default: GB_PANIC("Unknown float type"); break;
@@ -1157,6 +1159,7 @@ gb_internal lbValue lb_emit_arith(lbProcedure *p, TokenKind op, lbValue lhs, lbV
 			args[1] = rhs;
 
 			switch (8*type_size_of(ft)) {
+			case 16: return lb_emit_runtime_call(p, "quo_quaternion64", args);
 			case 32: return lb_emit_runtime_call(p, "quo_quaternion128", args);
 			case 64: return lb_emit_runtime_call(p, "quo_quaternion256", args);
 			default: GB_PANIC("Unknown float type"); break;

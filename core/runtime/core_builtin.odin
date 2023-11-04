@@ -817,7 +817,6 @@ assert :: proc(condition: bool, message := "", loc := #caller_location) {
 }
 
 @builtin
-@(disabled=ODIN_DISABLE_ASSERT)
 panic :: proc(message: string, loc := #caller_location) -> ! {
 	p := context.assertion_failure_proc
 	if p == nil {
@@ -827,7 +826,6 @@ panic :: proc(message: string, loc := #caller_location) -> ! {
 }
 
 @builtin
-@(disabled=ODIN_DISABLE_ASSERT)
 unimplemented :: proc(message := "", loc := #caller_location) -> ! {
 	p := context.assertion_failure_proc
 	if p == nil {
