@@ -1274,83 +1274,148 @@ ptrace_traceme :: proc "contextless" (rq: PTrace_Traceme_Type) -> (Errno) {
 	return Errno(-ret)
 }
 
-ptrace_peek :: proc "contextless" (rq: PTrace_Peek_Type, addr: uintptr) -> (uint, Errno) {
-	ret := syscall(SYS_ptrace, rq, addr)
+ptrace_peek :: proc "contextless" (rq: PTrace_Peek_Type, pid: Pid, addr: uintptr) -> (uint, Errno) {
+	ret := syscall(SYS_ptrace, rq, pid: Pid, addr, pid)
 	return errno_unwrap(rq, uint)
 }
 
-ptrace_poke :: proc "contextless" (rq: PTrace_Poke_Type, addr: uintptr, data: uint) -> (Errno) {
-	ret := syscall(SYS_ptrace, rq, addr, data)
+ptrace_poke :: proc "contextless" (rq: PTrace_Poke_Type, pid: Pid, addr: uintptr, data: uint) -> (Errno) {
+	ret := syscall(SYS_ptrace, rq, pid: Pid, addr, data)
 	return Errno(-ret)
 }
 
-ptrace_getregs :: proc "contextless" (rq: PTrace_Getregs_Type, buf: ^User_Regs) -> (Errno) {
-	ret := syscall(SYS_ptrace, rq, 0, buf)
+ptrace_getregs :: proc "contextless" (rq: PTrace_Getregs_Type, pid: Pid, buf: ^User_Regs) -> (Errno) {
+	ret := syscall(SYS_ptrace, rq, pid, 0, buf)
 	return Errno(-ret)
 }
 
-ptrace_getfpregs :: proc "contextless" (rq: PTrace_Getfpregs_Type, buf: ^User_FP_Regs) -> (Errno) {
-	ret := syscall(SYS_ptrace, rq, 0, buf)
+ptrace_getfpregs :: proc "contextless" (rq: PTrace_Getfpregs_Type, pid: Pid, buf: ^User_FP_Regs) -> (Errno) {
+	ret := syscall(SYS_ptrace, rq, pid, 0, buf)
 	return Errno(-ret)
 }
 
-ptrace_getfpxregs :: proc "contextless" (rq: PTrace_Getfpxregs_Type, buf: ^User_FPX_Regs) -> (Errno) {
-	ret := syscall(SYS_ptrace, rq, 0, buf)
+ptrace_getfpxregs :: proc "contextless" (rq: PTrace_Getfpxregs_Type, pid: Pid, buf: ^User_FPX_Regs) -> (Errno) {
+	ret := syscall(SYS_ptrace, rq, pid, 0, buf)
 	return Errno(-ret)
 }
 
-ptrace_setregs :: proc "contextless" (rq: PTrace_Setregs_Type, buf: ^User_Regs) -> (Errno) {
-	ret := syscall(SYS_ptrace, rq, 0, buf)
+ptrace_setregs :: proc "contextless" (rq: PTrace_Setregs_Type, pid: Pid, buf: ^User_Regs) -> (Errno) {
+	ret := syscall(SYS_ptrace, rq, pid, 0, buf)
 	return Errno(-ret)
 }
 
-ptrace_setfpregs :: proc "contextless" (rq: PTrace_Setfpregs_Type, buf: ^User_FP_Regs) -> (Errno) {
-	ret := syscall(SYS_ptrace, rq, 0, buf)
+ptrace_setfpregs :: proc "contextless" (rq: PTrace_Setfpregs_Type, pid: Pid, buf: ^User_FP_Regs) -> (Errno) {
+	ret := syscall(SYS_ptrace, rq, pid, 0, buf)
 	return Errno(-ret)
 }
 
-ptrace_setfpxregs :: proc "contextless" (rq: PTrace_Setfpxregs_Type, buf: ^User_FPX_Regs) -> (Errno) {
-	ret := syscall(SYS_ptrace, rq, 0, buf)
+ptrace_setfpxregs :: proc "contextless" (rq: PTrace_Setfpxregs_Type, pid: Pid, buf: ^User_FPX_Regs) -> (Errno) {
+	ret := syscall(SYS_ptrace, rq, pid, 0, buf)
 	return Errno(-ret)
 }
 
-// TODO(flysand): ptrace_getregset
-// TODO(flysand): ptrace_setregset
-// TODO(flysand): ptrace_setsiginfo
-// TODO(flysand): ptrace_peeksiginfo
-// TODO(flysand): ptrace_getsigmask
-// TODO(flysand): ptrace_setsigmask
-
-ptrace_setoptions :: proc "contextless" (rq: PTrace_Setoptions_Type, options: PTrace_Options) -> (Errno) {
-	ret := syscall(SYS_ptrace, rq, 0, transmute(u32) options)
+ptrace_getregset :: proc "contextless" (rq: PTrace_Getgetset_Type, pid: Pid, note: PTrace_Note_Type, buf: ^IO_Vec) -> (Errno) {
+	ret := syscall(SYS_ptrace, rq, pid, note, buf)
 	return Errno(-ret)
 }
 
-// TODO(flysand): ptrace_geteventmsg
-// TODO(flysand): ptrace_cont
-// TODO(flysand): ptrace_syscall
-// TODO(flysand): ptrace_singlestep
-// TODO(flysand): ptrace_set_syscall
-// TODO(flysand): ptrace_sysemu
-// TODO(flysand): ptrace_sysemu_singlestep
-// TODO(flysand): ptrace_listen
-// TODO(flysand): ptrace_kill
-// TODO(flysand): ptrace_interrupt
-// TODO(flysand): ptrace_attach
-// TODO(flysand): ptrace_seize
+ptrace_setregset :: proc "contextless" (rq: PTrace_Setgetset_Type, pid: Pid, note: PTrace_Note_Type, buf: ^IO_Vec) -> (Errno) {
+	ret := syscall(SYS_ptrace, rq, pid, note, buf)
+	return Errno(-ret)
+}
+
+ptrace_getsiginfo :: proc "contextless" (rq: PTrace_Getsiginfo_Type, pid: Pid, si: ^Sig_Info) -> (Errno) {
+	ret := syscall(SYS_ptrace, rq, pid, si)
+	return Errno(-ret)
+}
+
+ptrace_peeksiginfo :: proc "contextless" (rq: PTrace_Peeksiginfo_Type, pid: Pid, si: ^Sig_Info) -> (Errno) {
+	ret := syscall(SYS_ptrace, rq, pid, si)
+	return Errno(-ret)
+}
+
+ptrace_getsigmask :: proc "contextless" (rq: PTrace_Getsigmask, pid: Pid, sigmask: ^Sig_Mask) -> (Errno) {
+	ret := syscall(SYS_ptrace, rq, pid, size_of(Sig_Mask), sigmask)
+	return Errno(-ret)
+}
+
+ptrace_setsigmask :: proc "contextless" (rq: PTrace_Setsigmask, pid: Pid, sigmask: ^Sig_Mask) -> (Errno) {
+	ret := syscall(SYS_ptrace, rq, pid, size_of(Sig_Mask), sigmask)
+	return Errno(-ret)
+}
+
+ptrace_setoptions :: proc "contextless" (rq: PTrace_Setoptions_Type, pid: Pid, options: PTrace_Options) -> (Errno) {
+	ret := syscall(SYS_ptrace, rq, pid, 0, transmute(u32) options)
+	return Errno(-ret)
+}
+
+ptrace_geteventmsg :: proc "contextless" (rq: PTrace_Geteventmsg_Type, pid: Pid, msg: ^uint) -> (Errno) {
+	ret := syscall(SYS_ptrace, rq, pid, msg)
+	return Errno(-ret)
+}
+
+ptrace_cont :: proc "contextless" (rq: PTrace_Cont_Type, pid: Pid, sig: Signal) -> (Errno) {
+	ret := syscall(SYS_ptrace, rq, pid, sig)
+	return Errno(-ret)
+}
+
+ptrace_singlestep :: proc "contextless" (rq: PTrace_Singlestep_Type, pid: Pid, sig: Signal) -> (Errno) {
+	ret := syscall(SYS_ptrace, rq, pid, sig)
+	return Errno(-ret)
+}
+
+ptrace_syscall :: proc "contextless" (rq: PTrace_Syscall_Type, pid: Pid, sig: Signal) -> (Errno) {
+	ret := syscall(SYS_ptrace, rq, pid, sig)
+	return Errno(-ret)
+}
+
+ptrace_sysemu :: proc "contextless" (rq: PTrace_Sysemu_Type, pid: Pid, sig: Signal) -> (Errno) {
+	ret := syscall(SYS_ptrace, rq, pid, sig)
+	return Errno(-ret)
+}
+
+ptrace_sysemu_singlestep :: proc "contextless" (rq: PTrace_Sysemu_Singlestep_Type, pid: Pid, sig: Signal) -> (Errno) {
+	ret := syscall(SYS_ptrace, rq, pid, sig)
+	return Errno(-ret)
+}
+
+ptrace_listen :: proc "contextless" (rq: PTrace_Listen_Type, pid: Pid) -> (Errno) {
+	ret := syscall(SYS_ptrace, rq, pid)
+	return Errno(-ret)
+}
+
+ptrace_interrupt :: proc "contextless" (rq: PTrace_Interrupt_Type, pid: Pid) -> (Errno) {
+	ret := syscall(SYS_ptrace, rq, pid)
+	return Errno(-ret)
+}
+
+ptrace_attach :: proc "contextless" (rq: PTrace_Attach_Type, pid: Pid) -> (Errno) {
+	ret := syscall(SYS_ptrace, rq, pid)
+	return Errno(-ret)
+}
+
+ptrace_seize :: proc "contextless" (rq: PTrace_Seize_Type, pid: Pid, opt: PTrace_Options) -> (Errno) {
+	ret := syscall(SYS_ptrace, rq, pid, 0, transmute(u32) opt)
+	return Errno(-ret)
+}
+
 // TODO(flysand): ptrace_seccomp_get_filter
-// TODO(flysand): ptrace_detach
+
+ptrace_detach :: proc "contextless" (rq: PTrace_Detach_Type, pid: Pid, sig: Signal) -> (Errno) {
+	ret := syscall(SYS_ptrace, rq, pid, 0, sig)
+	return Errno(-ret)
+}
+
 // TODO(flysand): ptrace_get_thread_area
 // TODO(flysand): ptrace_set_thread_area
 // TODO(flysand): ptrace_get_syscall_info
-// TODO(flysand): ptrace_setsigmask
 
 /*
-	Trace process
+	Trace process.
 */
 ptrace :: proc {
 	ptrace_traceme,
-	peek,
+	ptrace_peek,
 	ptrace_poke,
 	ptrace_getregs,
 	ptrace_getfpregs,
@@ -1358,7 +1423,24 @@ ptrace :: proc {
 	ptrace_setregs,
 	ptrace_setfpregs,
 	ptrace_setfpxregs,
+	ptrace_getregset,
+	ptrace_setregset,
+	ptrace_getsiginfo,
+	ptrace_peeksiginfo,
+	ptrace_getsigmask,
+	ptrace_setsigmask,
 	ptrace_setoptions,
+	ptrace_geteventmsg,
+	ptrace_cont,
+	ptrace_singlestep,
+	ptrace_syscall,
+	ptrace_sysemu,
+	ptrace_sysemu_singlestep,
+	ptrace_listen,
+	ptrace_interrupt,
+	ptrace_attach,
+	ptrace_seize,
+	ptrace_detach,
 }
 
 /// Get real user ID
@@ -1372,7 +1454,15 @@ getuid :: proc "contextless" () -> Uid {
 	}
 }
 
-// TODO(flysand): syslog
+/*
+	Read or clear kernel message ring buffer.
+	Available since Linux 1.0.
+*/
+syslog :: proc "contextless" (act: Syslog_Action, buf: []u8) -> (int, Errno) {
+	ret := syscall(SYS_syslog, act, raw_data(buf), len(buf))
+	return errno_unwrap(ret, int)
+}
+
 
 /// Get real group ID
 /// Available since Linux 1.0
@@ -1498,9 +1588,35 @@ setregid :: proc "contextless" (real: Gid, effective: Gid) -> (Errno) {
 	}
 }
 
-// TODO(flysand): getgroups
+/*
+	Get supplementary group IDs.
+	Available since Linux 1.0.
+	On 32-bit platforms available since Linux 2.4.
+*/
+getgroups :: proc "contextless" (gids: []Gid) -> (int, Errno) {
+	when size_of(int) == 8 {
+		ret := syscall(SYS_getgroups, len(gids), rawptr(gids))
+		return errno_unwrap(ret, int)
+	} else {
+		ret := syscall(SYS_getgroups32, len(gids), rawptr(gids))
+		return errno_unwrap(ret, int)
+	}
+}
 
-// TODO(flysand): setgroups
+/*
+	Set supplementary group IDs.
+	Available since Linux 1.0.
+	On 32-bit platforms available since Linux 2.4.
+*/
+setgroups :: proc "contextless" (gids: []Gid) -> (Errno) {
+	when size_of(int) == 8 {
+		ret := syscall(SYS_setgroup, len(gids), rawptr(gids))
+		return Errno(-ret)
+	} else {
+		ret := syscall(SYS_setgroup32, len(gids), rawptr(gids))
+		return Errno(-ret)
+	}
+}
 
 /// Set real, effective and/or saved user id
 /// If any of the arguments is -1, the corresponding id is not changed
@@ -1969,15 +2085,50 @@ set_tid_address :: proc "contextless" (tidptr: ^u32) {
 
 // TODO(flysand): fadvise64
 
-// TODO(flysand): timer_create
+/*
+	Create POSIX per-process timer.
+	Available since Linux 2.6.
+*/
+timer_create :: proc "contextless" (clock_id: Clock_Id, sigevent: ^Sig_Event, timer: ^Timer) -> (Errno) {
+	ret := syscall(SYS_timer_create, clock_id, sigevent, timer)
+	return Errno(-ret)
+}
 
-// TODO(flysand): timer_settime
+/*
+	Get the state of the POSIX per-process timer.
+	Available since Linux 2.6.
+*/
+timer_gettime :: proc "contextless" (timer: Timer, curr_value: ^ITimer_Spec) -> (Errno) {
+	ret := syscall(SYS_timer_gettime, timer, curr_value)
+	return Errno(-ret)
+}
 
-// TODO(flysand): timer_gettime
+/*
+	Arm/disarm the state of the POSIX per-process timer.
+	Available since Linux 2.6.
+*/
+timer_settime :: proc "contextless" (timer: Timer, flags: ITimer_Flags, #no_alias new_value, old_value: ^ITimer_Spec) -> (Errno) {
+	ret := syscall(SYS_timer_settime, timer, transmute(u32) flags, new_value, old_value)
+	return Errno(-ret)
+}
 
-// TODO(flysand): timer_getoverrun
+/*
+	Get overrun count of the POSIX per-process timer.
+	Available since Linux 2.6.
+*/
+timer_getoverrun :: proc "contextless" (timer: Timer) -> (int, Errno) {
+	ret := syscall(SYS_timer_getoverrun, timer)
+	return errno_unwrap(ret, int)
+}
 
-// TODO(flysand): timer_delete
+/*
+	Delete a POSIX per-process timer.
+	Available since Linux 2.6.
+*/
+timer_delete :: proc "contextless" (timer: Timer) -> (Errno) {
+	ret := syscall(SYS_timer_delete, timer)
+	return Errno(-ret)
+}
 
 // TODO(flysand): clock_settime
 
@@ -1998,7 +2149,14 @@ exit_group :: proc "contextless" (code: i32) -> ! {
 
 // TODO(flysand): epoll_ctl
 
-// TODO(flysand): tgkill
+/*
+	Send a signal to a specific thread in a thread group.
+	Available since Linux 2.6.
+*/
+tgkill :: proc "contextless" (tgid, tid: Pid, sig: Signal) -> (Errno) {
+	ret := syscall(SYS_tgkill, tgid, tid, sig)
+	return Errno(-ret)
+}
 
 // TODO(flysand): utimes
 
@@ -2077,8 +2235,6 @@ fchownat :: proc "contextless" (dirfd: Fd, name: cstring, uid: Uid, gid: Gid) ->
 	ret := syscall(SYS_fchownat, dirfd, cast(rawptr) name, uid, gid)
 	return Errno(-ret)
 }
-
-// TODO(flysand): futimesat
 
 /// Get information about a file at a specific directory
 /// Available since Linux 2.6.16
@@ -2164,9 +2320,23 @@ ppoll :: proc "contextless" (fds: []Poll_Fd, timeout: ^Time_Spec, sigmask: ^Sig_
 
 // TODO(flysand): get_robust_list
 
-// TODO(flysand): splice
+/*
+	Transfer the data between file descriptors.
+	Available since Linux 2.6.17.
+*/
+splice :: proc "contextless" (fd_in: Fd, off_in: ^i64, fd_out: Fd, off_out: ^i64, len: uint, flags: Splice_Flags) -> (int, Errno) {
+	ret := syscall(SYS_splice, fd_in, off_in, fd_out, off_out, len, transmute(u32) flags)
+	return errno_unwrap(ret, int)
+}
 
-// TODO(flysand): tee
+/*
+	Transfer the data between file descriptors.
+	Available since Linux 2.6.16.
+*/
+tee :: proc "contextless" (fd_in: Fd, fd_out: Fd, len: uint, flags: Splice_Flags) -> (int, Errno) {
+	ret := syscall(SYS_tee, fd_in, fd_out, len, transmute(u32) flags)
+	return errno_unwrap(ret, int)
+}
 
 // TODO(flysand): sync_file_range
 
@@ -2299,7 +2469,14 @@ getrandom :: proc "contextless" (buf: []u8, flags: Get_Random_Flags) -> (int, Er
 
 // TODO(flysand): bpf
 
-// TODO(flysand): execveat
+/*
+	Execute program relative to a directory file descriptor.
+	Available since Linux 3.19.
+*/
+execveat :: proc "contextless" (dirfd: Fd, name: cstring, argv: [^]cstring, envp: [^]cstring) -> (Errno) {
+	ret := syscall(SYS_execveat, dirfd, cast(rawptr) name, cast(rawptr) argv, cast(rawptr) envp)
+	return Errno(-ret)
+}
 
 // TODO(flysand): userfaultfd
 

@@ -1568,3 +1568,53 @@ PTrace_Get_Syscall_Info_Op :: enum u8 {
 PTrace_Peek_Sig_Info_Flags_Bits :: enum {
 	SHARED = 0,
 }
+
+/*
+	Syslog actions.
+*/
+Syslog_Action :: enum i32 {
+	CLOSE         = 0,
+	OPEN          = 1,
+	READ          = 2,
+	READ_ALL      = 3,
+	READ_CLEAR    = 4,
+	CLEAR         = 5,
+	CONSOLE_OFF   = 6,
+	CONSOLE_ON    = 7,
+	CONSOLE_LEVEL = 8,
+	SIZE_UNREAD   = 9,
+	SIZE_BUFFER   = 10,
+}
+
+/*
+	Bits for splice flags.
+*/
+Splice_Flags_Bits :: enum {
+	MOVE     = 0x01,
+	NONBLOCK = 0x02,
+	MORE     = 0x04,
+	GIFT     = 0x08,
+}
+
+/*
+	Clock IDs for various system clocks.
+*/
+Clock_ID :: enum {
+	REALTIME           = 0,
+	MONOTONIC          = 1,
+	PROCESS_CPUTIME_ID = 2,
+	THREAD_CPUTIME_ID  = 3,
+	MONOTONIC_RAW      = 4,
+	REALTIME_COARSE    = 5,
+	MONOTONIC_COARSE   = 6,
+	BOOTTIME           = 7,
+	REALTIME_ALARM     = 8,
+	BOOTTIME_ALARM     = 9,
+}
+
+/*
+	Bits for POSIX interval timer flags.
+*/
+ITimer_Flags_Bits :: enum {
+	ABSTIME = 1,
+}

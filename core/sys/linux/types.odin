@@ -29,6 +29,11 @@ Inode :: distinct u64
 /// Shared memory identifiers used by `shm*` calls
 Key :: distinct i32
 
+/*
+	Represents timer IDs
+*/
+Timer :: distinct i32
+
 /// Represents time with nanosecond precision
 Time_Spec :: struct {
 	time_sec:  uint,
@@ -458,6 +463,28 @@ Sig_Info :: struct #packed {
 	},
 }
 
+SIGEV_MAX_SIZE :: 64
+SIGEV_PAD_SIZE :: ((SIGEV_MAX_SIZE-size_of(i32)*2+size_of(Sig_Val))/size_of(i32))
+
+Sig_Val :: struct #raw_union {
+	sival_int: i32,
+	sival_ptr: rawptr,
+}
+
+Sig_Event :: struct {
+	value:  Sig_Val,
+	signo:  i32,
+	notify: i32,
+	using: struct #raw_union {
+		_: [SIGEV_PAD_SIZE]u32,
+		thread_id: Pid,
+		using _: struct {
+			notify_function:  #type proc "c" (val: Sig_Val),
+			notify_attribute: rawptr,
+		},
+	},
+}
+
 Sig_Stack_Flags :: bit_set[Sig_Stack_Flag; i32]
 
 Sig_Stack :: struct {
@@ -805,6 +832,16 @@ ITimer_Val :: struct {
 	value:    Time_Val,
 }
 
+ITimer_Spec {
+	interval: Time_Spec,
+	value:    Time_Spec,
+}
+
+/*
+	Flags for POSIX interval timers.
+*/
+ITimer_Flags :: bit_set[ITimer_Flags_Bits, u32]
+
 when ODIN_ARCH == .arm32 {
 	_Arch_User_Regs :: struct {
 		cpsr:             uint,
@@ -1016,3 +1053,39 @@ PTrace_RSeq_Configuration {
 	flags:            u32,
 	_:                u32,
 };
+
+/*
+	Note types for PTRACE_GETREGSET. Mirrors constants in `elf` definition,
+	files though this enum only contains the constants defined for architectures
+	Odin can compile to.
+*/
+PTrace_Note_Type :: enum {
+	NT_PRSTATUS             = 1,
+	NT_PRFPREG              = 2,
+	NT_PRPSINFO             = 3,
+	NT_TASKSTRUCT           = 4,
+	NT_AUXV                 = 6,
+	NT_SIGINFO              = 0x53494749,
+	NT_FILE                 = 0x46494c45,
+	NT_PRXFPREG             = 0x46e62b7f,
+	NT_386_TLS              = 0x200,
+	NT_386_IOPERM           = 0x201,
+	NT_X86_XSTATE           = 0x202,
+	NT_X86_SHSTK            = 0x204,
+	NT_ARM_VFP              = 0x400,
+	NT_ARM_TLS              = 0x401,
+	NT_ARM_HW_BREAK         = 0x402,
+	NT_ARM_HW_WATCH         = 0x403,
+	NT_ARM_SYSTEM_CALL      = 0x404,
+	NT_ARM_SVE              = 0x405,
+	NT_ARM_PAC_MASK         = 0x406,
+	NT_ARM_PACA_KEYS        = 0x407,
+	NT_ARM_PACG_KEYS        = 0x408,
+	NT_ARM_TAGGED_ADDR_CTRL = 0x409,
+	NT_ARM_PAC_ENABLED_KEYS = 0x40a,
+	NT_ARM_SSVE             = 0x40b,
+	NT_ARM_ZA               = 0x40c,
+	NT_ARM_ZT               = 0x40d,
+}
+
+Splice_Flags :: bit_set[Splice_Flags_Bits; u32]
