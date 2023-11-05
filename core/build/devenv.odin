@@ -194,6 +194,6 @@ _generate_ols :: proc(config: Config) {
 		if file, err := os.open("ols.json", os.O_CREATE | os.O_TRUNC | os.O_RDWR, os.S_IRUSR | os.S_IWUSR); err == os.ERROR_NONE {
 			os.write_string(file, string(data))
 			os.close(file)
-		}   
+		}
 	}
 }
