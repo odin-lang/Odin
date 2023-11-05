@@ -95,9 +95,15 @@ Define_Val :: union #no_nil {
 	string,
 }
 
+Platform_ABI :: enum {
+	Default,
+	SysV,
+}
+
 Platform :: struct {
 	os: runtime.Odin_OS_Type,
 	arch: runtime.Odin_Arch_Type,
+	abi: Platform_ABI,
 }
 
 Vet_Flag :: enum {

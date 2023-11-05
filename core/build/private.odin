@@ -59,7 +59,12 @@ _match :: proc(pattern, str: string) -> bool {
 
 _platform_to_arg :: proc(sb: ^strings.Builder, platform: Platform) {
 	if platform.os != .Unknown {
-		fmt.sbprintf(sb, "-target:%s_%s", _os_to_arg[platform.os], _arch_to_arg[platform.arch])
+		if platform.abi != .Default {
+			fmt.sbprintf(sb, "-target:%s_%s_%s", _os_to_arg[platform.os], _arch_to_arg[platform.arch], _abi_to_arg[platform.abi])
+		} else {
+			fmt.sbprintf(sb, "-target:%s_%s", _os_to_arg[platform.os], _arch_to_arg[platform.arch])
+		}
+		
 	}
 }
 
@@ -274,6 +279,11 @@ _arch_to_arg := [runtime.Odin_Arch_Type]string {
 	.arm64 = "arm64",
 	.wasm32 = "wasm32",
 	.wasm64p32 = "wasm64p32",
+}
+
+_abi_to_arg := [Platform_ABI]string {
+	.Default = "",
+	.SysV = "sysv",
 }
 
 
