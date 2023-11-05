@@ -224,6 +224,7 @@ _compiler_flag_to_arg := [Compiler_Flag]string {
 	.Show_System_Calls = "-show-system-calls",
 	.No_Thread_Local = "-no-thread-local",
 	.Dynamic_Map_Calls = "-dynamic-map-calls",
+	.No_RTTI = "-no-rtti",
 }
 
 _opt_mode_to_arg := [Opt_Mode]string {

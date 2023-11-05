@@ -170,6 +170,8 @@ Compiler_Flag :: enum {
 	Ignore_Vs_Search,
 	No_Entry_Point,
 	Show_System_Calls,
+
+	No_RTTI,
 }
 
 Compiler_Flags :: bit_set[Compiler_Flag]
