@@ -68,6 +68,10 @@ _platform_to_arg :: proc(sb: ^strings.Builder, platform: Platform) {
 	}
 }
 
+_reloc_to_arg :: proc(sb: ^strings.Builder, reloc: Reloc_Mode) {
+	fmt.sbprintf(sb, "-reloc-mode:%s", _reloc_mode_to_arg[reloc])
+}
+
 _collection_to_arg :: proc(sb: ^strings.Builder, collection: string, path: string) {
 	fmt.sbprintf(sb, `-collection:%s="%s"`, collection, path)
 }
@@ -93,8 +97,11 @@ _config_to_args :: proc(sb: ^strings.Builder, config: Config) {
 
 	_platform_to_arg(sb, config.platform)
 	write_string(sb, " ")
+	_reloc_to_arg(sb, config.reloc)
+	write_string(sb, " ")
 	_flags_to_arg(sb, config.flags)
 	// function already returns space
+
 	for key, val in config.collections {
 		_collection_to_arg(sb, key, val)
 		write_string(sb, " ")
@@ -285,6 +292,13 @@ _arch_to_arg := [runtime.Odin_Arch_Type]string {
 _abi_to_arg := [Platform_ABI]string {
 	.Default = "",
 	.SysV = "sysv",
+}
+
+_reloc_mode_to_arg := [Reloc_Mode]string{
+	.Default = "default",
+	.Static = "static",
+	.PIC = "pic",
+	.Dynamic_No_PIC = "dynamic-no-pic",
 }
 
 
