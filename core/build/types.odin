@@ -140,8 +140,8 @@ Opt_Mode :: enum {
 Reloc_Mode :: enum {
 	Default,
 	Static,
-	Pic,
-	Dynamic_No_Pic,
+	PIC,
+	Dynamic_No_PIC,
 }
 
 Compiler_Flag :: enum {
