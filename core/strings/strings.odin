@@ -1430,6 +1430,53 @@ index_byte :: proc(s: string, c: byte) -> (res: int) {
 	return -1
 }
 /*
+Returns the byte offset of the first byte in the string s which is in `cs` that it finds, -1 when not found.
+NOTE: Can't find UTF-8 based runes.
+
+Inputs:
+- s: The input string to search in.
+- cs: The bytes to search for.
+
+Returns:
+- res: The byte offset of the first occurrence of any of `cs` in `s`, or -1 if not found.
+
+Example:
+
+	import "core:fmt"
+	import "core:strings"
+
+	index_byte_any_example :: proc() {
+		fmt.println(strings.index_byte_any("test", {'t'}))
+		fmt.println(strings.index_byte_any("test", {'e'}))
+		fmt.println(strings.index_byte_any("test", {'e', 't'}))
+		fmt.println(strings.index_byte_any("test", {'e', 's'}))
+		fmt.println(strings.index_byte_any("test", {'x'}))
+		fmt.println(strings.index_byte_any("test", {'s', 'x'}))
+		fmt.println(strings.index_byte_any("teäst", {'ä'}))
+	}
+
+Output:
+
+	0
+	1
+	0
+	1
+	-1
+	2
+	-1
+
+*/
+index_byte_any :: proc(s: string, cs: []byte) -> (res: int) {
+	for i := 0; i < len(s); i += 1 {
+		for c in cs {
+			if s[i] == c {
+				return i
+			}
+		}
+	}
+	return -1
+}
+/*
 Returns the byte offset of the last byte `c` in the string `s`, -1 when not found.
 
 Inputs:

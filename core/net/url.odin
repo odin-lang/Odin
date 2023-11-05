@@ -160,6 +160,78 @@ percent_decode :: proc(encoded_string: string, allocator := context.allocator) -
 	return
 }
 
+// For data with content type application/x-www-form-urlencoded
+form_data_encode :: proc(s: string, allocator := context.allocator) -> string {
+	b := strings.builder_make(allocator)
+	strings.builder_grow(&b, len(s) + 16) // NOTE(tetra): A reasonable number to allow for the number of things we need to escape.
+
+	for ch in s {
+		switch ch {
+		case 'A'..='Z', 'a'..='z', '0'..='9', '-', '_', '.', '~':
+			strings.write_rune(&b, ch)
+		case ' ':
+			strings.write_rune(&b, '+')
+		case:
+			bytes, n := utf8.encode_rune(ch)
+			for byte in bytes[:n] {
+				buf: [2]u8 = ---
+				t := strconv.append_int(buf[:], i64(byte), 16)
+				strings.write_rune(&b, '%')
+				strings.write_string(&b, t)
+			}
+		}
+	}
+
+	return strings.to_string(b)
+}
+
+form_data_decode :: proc(encoded_string: string, allocator := context.allocator) -> (decoded_string: string, ok: bool) {
+	b := strings.builder_make(allocator)
+	strings.builder_grow(&b, len(encoded_string))
+	defer if !ok do strings.builder_destroy(&b)
+
+	s := encoded_string
+
+	for len(s) > 0 {
+		i := strings.index_byte_any(s, {'%', '+'})
+		if i == -1 {
+			strings.write_string(&b, s) // no '%'s; the string is already decoded
+			break
+		}
+
+		strings.write_string(&b, s[:i])
+
+		if s[i] == '+' {
+			strings.write_byte(&b, ' ')
+			s = s[i+1:]
+			continue
+		}
+
+		s = s[i:]
+
+		if len(s) == 0 do return // percent without anything after it
+		s = s[1:]
+
+		if s[0] == '%' {
+			strings.write_byte(&b, '%')
+			s = s[1:]
+			continue
+		}
+
+		if len(s) < 2 {
+			return // percent without encoded value
+		}
+
+		val := hex.decode_sequence(s[:2]) or_return
+		strings.write_byte(&b, val)
+		s = s[2:]
+	}
+
+	ok = true
+	decoded_string = strings.to_string(b)
+	return
+}
+
 //
 // TODO: encoding/base64 is broken...
 //
