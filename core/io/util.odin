@@ -115,7 +115,7 @@ trim_decimal_string :: proc "contextless" (s: string) -> string {
 
 	// We have at least one trailing zero. Search backwards and find the rest.
 	trailing_start_idx := len(s)-1
-	trailing_loop: for i := len(s) - 2; i >= 0 ; i -= 1 {
+	for i := len(s) - 2; i >= 0 ; i -= 1 {
 		switch s[i] {
 			case '0':
 				if trailing_start_idx == i + 1 {
