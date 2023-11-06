@@ -45,12 +45,15 @@ VSCode_Tasks_Json :: struct {
 	tasks: [dynamic]VSCode_Task_Json,
 }
 
+S_IRUSR :: 0x0400
+S_IWUSR :: 0x0200
+
 _generate_vscode :: proc(target: ^Target, settings: Settings, opts: Dev_Options) {
 	config := target_config(target, settings) // Note(Dragos): I really don't like settings being based around
 
 	if os.is_dir(".vscode") || os.make_directory(".vscode") == os.ERROR_NONE {
-		launch_file, launch_err := os.open(".vscode/launch.json", os.O_CREATE | os.O_TRUNC | os.O_RDWR, os.S_IRUSR | os.S_IWUSR)
-		tasks_file, tasks_err := os.open(".vscode/tasks.json", os.O_CREATE | os.O_TRUNC | os.O_RDWR, os.S_IRUSR | os.S_IWUSR)
+		launch_file, launch_err := os.open(".vscode/launch.json", os.O_CREATE | os.O_TRUNC | os.O_RDWR, S_IRUSR | S_IWUSR)
+		tasks_file, tasks_err := os.open(".vscode/tasks.json", os.O_CREATE | os.O_TRUNC | os.O_RDWR, S_IRUSR | S_IWUSR)
 		if launch_err == os.ERROR_NONE && tasks_err  == os.ERROR_NONE {
 			defer {
 				os.close(launch_file)
@@ -191,7 +194,7 @@ _generate_ols :: proc(config: Config) {
 	marshalOpts: json.Marshal_Options
 	marshalOpts.pretty = true
 	if data, err := json.marshal(settings, marshalOpts, context.temp_allocator); err == nil {
-		if file, err := os.open("ols.json", os.O_CREATE | os.O_TRUNC | os.O_RDWR, os.S_IRUSR | os.S_IWUSR); err == os.ERROR_NONE {
+		if file, err := os.open("ols.json", os.O_CREATE | os.O_TRUNC | os.O_RDWR, S_IRUSR | S_IWUSR); err == os.ERROR_NONE {
 			os.write_string(file, string(data))
 			os.close(file)
 		}
