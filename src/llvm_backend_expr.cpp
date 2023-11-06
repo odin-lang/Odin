@@ -684,7 +684,8 @@ gb_internal lbValue lb_emit_matrix_flatten(lbProcedure *p, lbValue m, Type *type
 	Type *mt = base_type(m.type);
 	GB_ASSERT(mt->kind == Type_Matrix);
 
-	if (lb_is_matrix_simdable(mt)) {
+	// TODO(bill): Determine why this fails on Windows sometimes
+	if (false && lb_is_matrix_simdable(mt)) {
 		LLVMValueRef vector = lb_matrix_to_trimmed_vector(p, m);
 		return lb_matrix_cast_vector_to_type(p, vector, type);
 	}
@@ -693,12 +694,28 @@ gb_internal lbValue lb_emit_matrix_flatten(lbProcedure *p, lbValue m, Type *type
 
 	i64 row_count = mt->Matrix.row_count;
 	i64 column_count = mt->Matrix.column_count;
+	TEMPORARY_ALLOCATOR_GUARD();
+
+	auto srcs = array_make<lbValue>(temporary_allocator(), 0, row_count*column_count);
+	auto dsts = array_make<lbValue>(temporary_allocator(), 0, row_count*column_count);
+
 	for (i64 j = 0; j < column_count; j++) {
 		for (i64 i = 0; i < row_count; i++) {
 			lbValue src = lb_emit_matrix_ev(p, m, i, j);
-			lbValue dst = lb_emit_array_epi(p, res.addr, i + j*row_count);
-			lb_emit_store(p, dst, src);
+			array_add(&srcs, src);
 		}
+	}
+
+	for (i64 j = 0; j < column_count; j++) {
+		for (i64 i = 0; i < row_count; i++) {
+			lbValue dst = lb_emit_array_epi(p, res.addr, i + j*row_count);
+			array_add(&dsts, dst);
+		}
+	}
+
+	GB_ASSERT(srcs.count == dsts.count);
+	for_array(i, srcs) {
+		lb_emit_store(p, dsts[i], srcs[i]);
 	}
 	return lb_addr_load(p, res);
 }
