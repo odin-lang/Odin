@@ -99,7 +99,7 @@ RAYLIB_SHARED :: #config(RAYLIB_SHARED, false)
 
 when ODIN_OS == .Windows {
 	when RAYLIB_SHARED {
-		@(extra_linker_flags="/NODEFAULTLIB:libcmt")
+		@(extra_linker_flags="/NODEFAULTLIB:msvcrt")
 		foreign import lib {
 			"windows/raylibdll.lib",
 			"system:Winmm.lib",
