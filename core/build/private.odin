@@ -82,47 +82,6 @@ _flags_to_arg :: proc(sb: ^strings.Builder, flags: Compiler_Flags) {
 	}
 }
 
-_config_to_args :: proc(sb: ^strings.Builder, config: Config) {
-	using strings, fmt
-
-	for flag in Vet_Flag do if flag in config.vet {
-		sbprintf(sb, "%s ", _vet_flag_to_arg[flag])
-	}
-
-	sbprintf(sb, "%s ", _build_mode_to_arg[config.build_mode])
-	if config.style != .None {
-		sbprintf(sb, "%s ", _style_mode_to_arg[config.style])
-	}
-	sbprintf(sb, "%s ", _opt_mode_to_arg[config.opt])
-
-	_platform_to_arg(sb, config.platform)
-	write_string(sb, " ")
-	_reloc_to_arg(sb, config.reloc)
-	write_string(sb, " ")
-	_flags_to_arg(sb, config.flags)
-	// function already returns space
-
-	for key, val in config.collections {
-		_collection_to_arg(sb, key, val)
-		write_string(sb, " ")
-	}
-
-	for key, val in config.defines {
-		_define_to_arg(sb, key, val)
-		write_string(sb, " ")
-	}
-
-	// Todo(Dragos): clean up the path before passing it here?
-	// Todo(Dragos): Make this better...
-	/*
-	switch {
-	case config.out_dir != "" && config.out_file != "": sbprintf(sb, `-out:"%s/%s"`, config.out_dir, config.out_file)
-	case config.out_dir == "" && config.out_file != "": sbprintf(sb, `-out:"%s"`, config.out_file)
-	}
-	*/
-
-	sbprintf(sb, `-out:"%s/%s"`, config.out_dir, config.out_file)
-}
 
 
 
@@ -295,8 +254,14 @@ _abi_to_arg := [Platform_ABI]string {
 }
 
 _reloc_mode_to_arg := [Reloc_Mode]string{
-	.Default = "default",
-	.Static = "static",
-	.PIC = "pic",
-	.Dynamic_No_PIC = "dynamic-no-pic",
+	.Default = "-reloc-mode:default",
+	.Static = "-reloc-mode:static",
+	.PIC = "-reloc-mode:pic",
+	.Dynamic_No_PIC = "-reloc-mode:dynamic-no-pic",
+}
+
+_sanitize_to_arg := [Sanitize_Flag]string{
+	.Address = "-sanitize:address",
+	.Memory = "-sanitize:memory",
+	.Thread = "-sanitize:thread",
 }

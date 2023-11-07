@@ -181,7 +181,7 @@ default_language_server_settings :: proc(allocator := context.allocator) -> (set
 // Note(Dragos): With the removal of config.name, we should start passing targets around all the time rather than configs
 _generate_ols :: proc(config: Config) {
 	argsBuilder := strings.builder_make()
-	_config_to_args(&argsBuilder, config)
+	//_config_to_args(&argsBuilder, config)
 	args := strings.to_string(argsBuilder)
 	settings := default_language_server_settings(context.temp_allocator)
 	for name, path in config.collections {

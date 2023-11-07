@@ -30,14 +30,6 @@ default_context :: #force_inline proc() -> runtime.Context {
 	return _context
 }
 
-shell_exec :: proc(cmd: string, echo: bool) -> int {
-	cstr := strings.clone_to_cstring(cmd, context.temp_allocator)
-	if echo {
-		printf_program("%s\n", cmd)
-	}
-	return cast(int)libc.system(cstr)
-}
-
 shell_command :: proc($cmd: string) -> Command {
 	return proc(config: Config) {
 		cstr := strings.clone_to_cstring(cmd, context.temp_allocator)
@@ -73,46 +65,11 @@ target_build :: proc(target: ^Target, settings: Settings) -> (ok: bool) {
 		target_build(dep, settings) or_return // Note(Dragos): Recursion breaks my brain a bit. Is THIS ok??
 	}
 	
-	return _build_package(config)
+	//return _build_package(config)
+	return false
 }
 
-_build_package :: proc(config: Config) -> (ok: bool) {
-	config_output_dirs: {
-		//dir := filepath.dir(config.out_path, context.temp_allocator) 
-		// Note(Dragos): I wrote this a while ago. Is there a better way?
-		slash_dir, _ := filepath.to_slash(config.out_dir, context.temp_allocator)
-		dirs := strings.split_after(slash_dir, "/", context.temp_allocator)
-		for _, i in dirs {
-			new_dir := strings.concatenate(dirs[0 : i + 1], context.temp_allocator)
-			os.make_directory(new_dir)
-		}
-	}
-	
-	argsBuilder := strings.builder_make() 
-	_config_to_args(&argsBuilder, config)
-	args := strings.to_string(argsBuilder)
-	for cmd in config.pre_build_commands {
-		if result := cmd.command(config); result != 0 {
-			printf_error("Pre-Build Command '%s' failed with exit code %d", cmd.name, result)
-			return
-		}
-	}
-	command := fmt.tprintf("odin build \"%s\" %s", config.src_path, args)
-	exit_code := shell_exec(command, true)
-	if exit_code != 0 {
-		printf_error("Build failed with exit code %v\n", exit_code)
-		return
-	} else {
-		for cmd in config.post_build_commands {
-			if result := cmd.command(config); result != 0 {
-				printf_error("Post-Build Command '%s' failed with exit code %d", cmd.name, result)
-				return
-			}
-		}
-	}
-	
-	return true
-}
+
 
 BUILTIN_FLAGS := []string {
 	"-help",

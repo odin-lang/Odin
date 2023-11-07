@@ -118,7 +118,6 @@ Vet_Flag :: enum {
 Vet_Flags :: bit_set[Vet_Flag]
 
 Subsystem_Kind :: enum {
-	Default,
 	Console,
 	Windows,
 }
