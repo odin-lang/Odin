@@ -161,7 +161,7 @@ mprotect :: proc "contextless" (addr: rawptr, size: uint, prot: Mem_Protection) 
 /// Unmap memory
 /// Available since Linux 1.0
 munmap :: proc "contextless" (addr: rawptr, size: uint) -> (Errno) {
-	ret := syscall(SYS_mmap, addr, size)
+	ret := syscall(SYS_munmap, addr, size)
 	return Errno(-ret)
 }
 
