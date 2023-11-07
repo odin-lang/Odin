@@ -11,8 +11,8 @@ import "core:intrinsics"
 	Available since Linux 1.0.
 	Before Linux 3.14, this operation is not atomic (i.e. not thread safe).
 */
-read :: proc "contextless" (fd: Fd, buf: []$T) -> (int, Errno) {
-	ret := syscall(SYS_read, fd, raw_data(buf), len(buf) * size_of(T))
+read :: proc "contextless" (fd: Fd, buf: []u8) -> (int, Errno) {
+	ret := syscall(SYS_read, fd, raw_data(buf), len(buf))
 	return errno_unwrap(ret, int)
 }
 
@@ -28,8 +28,8 @@ read :: proc "contextless" (fd: Fd, buf: []$T) -> (int, Errno) {
 	Available since Linux 1.0
 	Before Linux 3.14 this operation is not atomic (i.e. not thread safe)
 */
-write :: proc "contextless" (fd: Fd, buf: []$T) -> (int, Errno) {
-	ret := syscall(SYS_write, fd, raw_data(buf), len(buf)*size_of(T))
+write :: proc "contextless" (fd: Fd, buf: []u8) -> (int, Errno) {
+	ret := syscall(SYS_write, fd, raw_data(buf), len(buf))
 	return errno_unwrap(ret, int)
 }
 
@@ -145,13 +145,14 @@ poll :: proc "contextless" (fds: []Poll_Fd, timeout: i32) -> (i32, Errno) {
 	Available since Linux 1.0.
 	On 32-bit platforms available since Linux 1.2.
 */
-lseek :: proc "contextless" (fd: Fd, off: i64, whence: Seek_Whence) -> (Errno) {
+lseek :: proc "contextless" (fd: Fd, off: i64, whence: Seek_Whence) -> (i64, Errno) {
 	when size_of(int) == 8 {
 		ret := syscall(SYS_lseek, fd, off, whence)
-		return Errno(-ret)
+		return errno_unwrap(ret, i64)
 	} else {
-		ret := syscall(SYS__llseek, fd, compat64_arg_pair(off), whence)
-		return Errno(-ret)
+		result: i64 ---
+		ret := syscall(SYS__llseek, fd, compat64_arg_pair(off), &result, whence)
+		return result, Errno(-ret)
 	}
 }
 
@@ -223,8 +224,8 @@ rt_sigprocmask :: proc "contextless" (mask_kind: Sig_Mask_Kind, new_set: ^Sig_Se
 	Note, it is not an error to return less bytes than requested.
 	Available since Linux 2.2.
 */
-pread :: proc "contextless" (fd: Fd, buf: []$T, offset: i64) -> (int, Errno) {
-	ret := syscall(SYS_pread64, fd, raw_data(buf), compat64_arg_pair(len(buf)*size_of(T)))
+pread :: proc "contextless" (fd: Fd, buf: []u8, offset: i64) -> (int, Errno) {
+	ret := syscall(SYS_pread64, fd, raw_data(buf), len(buf), compat64_arg_pair(offset))
 	return errno_unwrap(ret, int)
 }
 
@@ -233,8 +234,8 @@ pread :: proc "contextless" (fd: Fd, buf: []$T, offset: i64) -> (int, Errno) {
 	Note, it is not an error to return less bytes than requested.
 	Available since Linux 2.2.
 */
-pwrite :: proc "contextless" (fd: Fd, buf: []$T, offset: i64) -> (int, Errno) {
-	ret := syscall(SYS_pwrite64, fd, raw_data(buf), compat64_arg_pair(len(buf)*size_of(T)))
+pwrite :: proc "contextless" (fd: Fd, buf: []u8, offset: i64) -> (int, Errno) {
+	ret := syscall(SYS_pwrite64, fd, raw_data(buf), len(buf), compat64_arg_pair(offset))
 	return errno_unwrap(ret, int)
 }
 
