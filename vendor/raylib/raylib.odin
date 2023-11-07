@@ -245,12 +245,9 @@ when USE_LINALG {
 }
 
 // Color, 4 components, R8G8B8A8 (32bit)
-Color :: struct {
-	r: u8,                        // Color red value
-	g: u8,                        // Color green value
-	b: u8,                        // Color blue value
-	a: u8,                        // Color alpha value
-}
+//
+// Note: In Raylib this is a struct. But here we use a fixed array, so that .rgba swizzling etc work.
+Color :: distinct [4]u8
 
 // Rectangle type
 Rectangle :: struct {

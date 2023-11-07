@@ -143,7 +143,7 @@ _dial_tcp_from_endpoint :: proc(endpoint: Endpoint, options := default_tcp_optio
 	reuse_addr: b32 = true
 	_ = linux.setsockopt(os_sock, linux.SOL_SOCKET, linux.Socket_Option.REUSEADDR, &reuse_addr)
 	addr := _unwrap_os_addr(endpoint)
-	errno = linux.connect(linux.Fd(tcp_sock), &addr)
+	errno = linux.connect(linux.Fd(os_sock), &addr)
 	if errno != .NONE {
 		return cast(TCP_Socket) os_sock, Dial_Error(errno)
 	}
