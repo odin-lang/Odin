@@ -54,20 +54,7 @@ add_pre_build_command :: proc(config: ^Config, name: string, cmd: Command_Proc) 
 	append(&config.pre_build_commands, command)
 }
 
-target_build :: proc(target: ^Target, settings: Settings) -> (ok: bool) {
-	config := target_config(target, settings)
-	// Note(Dragos): This is a check for the new dependency thing
-	config.src_path = filepath.join({target.root_dir, config.src_path}, context.temp_allocator)
-	config.out_dir = filepath.join({target.root_dir, config.out_dir}, context.temp_allocator)
-	config.rc_path = filepath.join({target.root_dir, config.rc_path}, context.temp_allocator)
-	
-	for dep in target.depends {
-		target_build(dep, settings) or_return // Note(Dragos): Recursion breaks my brain a bit. Is THIS ok??
-	}
-	
-	//return _build_package(config)
-	return false
-}
+
 
 
 
@@ -177,19 +164,6 @@ settings_init_from_args :: proc(settings: ^Settings, args: []string, custom_flag
 	return true
 }
 
-add_target :: proc(project: ^Project, target: ^Target, loc := #caller_location) {
-	append(&project.targets, target)
-	target.project = project
-	file_dir := filepath.dir(loc.file_path, context.temp_allocator)
-	root_dir := filepath.join({file_dir, ".."}, context.temp_allocator)
-	target.root_dir = filepath.clean(root_dir) // This effectively makes the build system dependent on being a subfolder of the main project root
-}
-
-target_config :: proc(target: ^Target, settings: Settings) -> Config {
-	if config, cached := target.cached_config.?; cached do return config
-	target.cached_config = target.project->configure_target_proc(target, settings)
-	#no_type_assert return target.cached_config.?
-}
 
 Add_Dependency_Error :: enum {
 	None,
@@ -213,6 +187,7 @@ add_dependency :: proc(target: ^Target, depend: ^Target) -> (err: Add_Dependency
 	return
 }
 
+/*
 run :: proc(main_project: ^Project, opts: Settings) {
 	opts := opts
 	if opts.target_name == "" do opts.target_name = opts.default_target_name
@@ -258,4 +233,4 @@ run :: proc(main_project: ^Project, opts: Settings) {
 	case .Invalid: fallthrough
 	case: printf_error("Invalid command type")
 	}
-}
+}*/

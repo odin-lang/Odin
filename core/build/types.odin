@@ -69,24 +69,8 @@ Config :: struct {
 /*
 	Can be used as-is or via a subtype
 */
-Target :: struct {
-	name: string,
-	platform: Platform,
 
-	project: ^Project,
-	root_dir: string,
-	depends: [dynamic]^Target,
-	cached_config: Maybe(Config),
-}
 
-// Note(Dragos): If we gots dependencies, then the project should have a #location of sorts, and be appended to paths like the src folder, out dir etc.
-//				That would mean that ALL build systems would EXPECT a certain structure (for example having the build script package as a subfolder of the main project)
-Project :: struct {
-	name: string,
-	targets: [dynamic]^Target,
-	target_prefix: string,
-	configure_target_proc: Configure_Target_Proc,
-}
 
 
 Define_Val :: union #no_nil {

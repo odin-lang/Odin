@@ -105,68 +105,6 @@ _define_to_arg :: proc(sb: ^strings.Builder, name: string, val: Define_Val) {
 	}
 }
 
-_display_command_help :: proc(main_project: ^Project, opts: Settings) {
-	fmt.printf("%s build system\n", main_project.name)
-	fmt.printf("\tSyntax: %s <flags> <configuration name>\n", os.args[0])
-	fmt.printf("\tAvailable Configurations:\n")
-	for target in main_project.targets {
-		config := main_project->configure_target_proc(target, opts)
-		prefixed_name := strings.concatenate({main_project.target_prefix, target.name}, context.temp_allocator)
-		fmt.printf("\t\t%s\n", prefixed_name)
-	}
-	for project in opts.external_projects do for target in project.targets {
-		config := project->configure_target_proc(target, opts)
-		prefixed_name := strings.concatenate({main_project.target_prefix, target.name}, context.temp_allocator)
-		fmt.printf("\t\t%s\n", prefixed_name)
-	}
-	fmt.println()
-	fmt.printf("\tFlags \n")
-	
-	fmt.printf("\t\t-help <optional target name>\n")
-	fmt.printf("\t\t\tDisplays build system help. Cannot be used with other flags. \n\t\t\t[WIP] Specifying a target name will give you information about the target. \n")
-	fmt.println()
-
-	fmt.printf("\t\t-ols\n")
-	fmt.printf("\t\t\tGenerates an ols.json for the configuration. \n")
-	fmt.println()
-
-	fmt.printf("\t\t-vscode\n")
-	fmt.printf("\t\t\t[WIP] Generates .vscode/launch.json configuration for debugging. Must be used for other VSCode flags to function. \n")
-	fmt.println()
-
-	fmt.printf("\t\t-build-pre-launch\n")
-	fmt.printf("\t\t\t[WIP] VSCode: Generates a pre launch command to build the project before debugging. \n\t\t\tEffectively runs `%s <config name>` before launching the debugger.\n", os.args[0])
-	fmt.println()
-	
-	fmt.printf("\t\t-include-build-system:\"<args>\"\n")
-	fmt.printf("\t\t\t[WIP] VSCode: Includes the build system as a debugging target.\n")
-	fmt.println()
-
-	fmt.printf("\t\t-cwd-workspace\n")
-	fmt.printf("\t\t\t[WIP] VSCode: Use the workspace directory as the CWD when debugging.\n")
-	fmt.println()
-
-	fmt.printf("\t\t-cwd-out\n")
-	fmt.printf("\t\t\t[WIP] VSCode: Use the output directory as the CWD when debugging. \n")
-	fmt.println()
-
-	fmt.printf("\t\t-cwd:\"<directory>\"\n")
-	fmt.printf("\t\t\t[WIP] VSCode: Use the specified directory as the CWD when debugging. \n")
-	fmt.println()
-
-
-	fmt.printf("\t\t-launch-args:\"<args>\"\n")
-	fmt.printf("\t\t\t[WIP] VScode: Specify the args sent to the executable when debugging.\n")
-	fmt.println()
-
-	fmt.printf("\t\t-use-cppvsdbg\n")
-	fmt.printf("\t\t\t[WIP] VSCode: Use the VSCode debugger. Used by default with -vscode. \n")
-	fmt.println()
-
-	fmt.printf("\t\t-use-cppdbg\n")
-	fmt.printf("\t\t\t[WIP] VSCode: Use the GDB/LLDB debugger. \n")
-	fmt.println()
-}
 
 _compiler_flag_to_arg := [Compiler_Flag]string {
 	.Debug = "-debug",

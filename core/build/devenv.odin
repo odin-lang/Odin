@@ -48,6 +48,7 @@ VSCode_Tasks_Json :: struct {
 S_IRUSR :: 0x0400
 S_IWUSR :: 0x0200
 
+/*
 _generate_vscode :: proc(target: ^Target, settings: Settings, opts: Dev_Options) {
 	config := target_config(target, settings) // Note(Dragos): I really don't like settings being based around
 
@@ -118,18 +119,68 @@ _generate_vscode :: proc(target: ^Target, settings: Settings, opts: Dev_Options)
 		fmt.eprintf("Error making vscode directory.\n")
 	}
 }
+*/
 
 Collection :: struct {
 	name, path: string,
 }
 
+Language_Server_Option :: enum {
+	Document_Symbols,
+	Semantic_Tokens,
+	Hover,
+	Snippets,
+}
+
+Language_Server_Options :: bit_set[Language_Server_Option]
+
+DEFAULT_OLS_OPTIONS :: Language_Server_Options{
+	.Document_Symbols,
+	.Semantic_Tokens,
+	.Hover,
+	.Snippets,
+}
+
 Language_Server_Settings :: struct {
+	enable_document_symbols: bool,
+	enable_semantic_tokens: bool,
+	enable_hover: bool,
+}
+
+Ols_Json :: struct {
 	collections: [dynamic]Collection,
 	enable_document_symbols: bool,
 	enable_semantic_tokens: bool,
 	enable_hover: bool, 
 	enable_snippets: bool,
 	checker_args: string,
+}
+
+
+
+build_ols_json :: proc(config: Odin_Config, opts: Language_Server_Options, allocator := context.allocator) -> ([]u8, json.Marshal_Error) {
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
+	ols_json: Ols_Json
+	ols_json.collections = make([dynamic]Collection, context.temp_allocator)
+	ols_json.checker_args = build_odin_args(config, context.temp_allocator)
+	ols_json.enable_document_symbols = .Document_Symbols in opts
+	ols_json.enable_semantic_tokens = .Semantic_Tokens in opts
+	ols_json.enable_hover = .Hover in opts
+	ols_json.enable_snippets = .Snippets in opts
+	marshal_opts: json.Marshal_Options
+	marshal_opts.pretty = true
+	data, err := json.marshal(ols_json, marshal_opts, allocator)
+	return data, err
+}
+
+write_ols_json :: proc(target: ^Target, file: string, config: Odin_Config, opts: Language_Server_Options) -> bool {
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
+	
+	data, err := build_ols_json(config, opts, context.temp_allocator)
+	if err != nil {
+		return false
+	}
+	return os.write_entire_file(file, data)
 }
 
 Editor :: enum {
@@ -157,46 +208,4 @@ Dev_Options :: struct {
 	launch_args: string,
 	custom_cwd: string,
 	build_system_args: string,
-}
-
-_generate_devenv :: proc(target: ^Target, settings: Settings, opts: Dev_Options) {
-	config := target_config(target, settings)
-	if .Generate_Ols in opts.flags do _generate_ols(config)
-	for editor in Editor do if editor in opts.editors {
-		switch editor {
-		case .VSCode: _generate_vscode(target, settings, opts)
-		}
-	}
-}
-
-default_language_server_settings :: proc(allocator := context.allocator) -> (settings: Language_Server_Settings) {
-	settings.collections = make([dynamic]Collection, allocator)
-	settings.enable_document_symbols = true 
-	settings.enable_semantic_tokens = true 
-	settings.enable_hover = true 
-	settings.enable_snippets = true
-	return 
-}
-
-// Note(Dragos): With the removal of config.name, we should start passing targets around all the time rather than configs
-_generate_ols :: proc(config: Config) {
-	argsBuilder := strings.builder_make()
-	//_config_to_args(&argsBuilder, config)
-	args := strings.to_string(argsBuilder)
-	settings := default_language_server_settings(context.temp_allocator)
-	for name, path in config.collections {
-		append(&settings.collections, Collection{name = name, path = path})
-	}
-	append(&settings.collections, Collection{name = "core", path = strings.concatenate({ODIN_ROOT, "core"})})
-	append(&settings.collections, Collection{name = "vendor", path = strings.concatenate({ODIN_ROOT, "vendor"})})
-
-	settings.checker_args = args
-	marshal_opts: json.Marshal_Options
-	marshal_opts.pretty = true
-	if data, err := json.marshal(settings, marshal_opts, context.temp_allocator); err == nil {
-		if file, err := os.open("ols.json", os.O_CREATE | os.O_TRUNC | os.O_RDWR, S_IRUSR | S_IWUSR); err == os.ERROR_NONE {
-			os.write_string(file, string(data))
-			os.close(file)
-		}
-	}
 }
