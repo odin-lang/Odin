@@ -2410,9 +2410,9 @@ IGraphicsCommandList_VTable :: struct {
 	DrawIndexedInstanced:               proc "stdcall" (this: ^IGraphicsCommandList, IndexCountPerInstance: u32, InstanceCount: u32, StartIndexLocation: u32, BaseVertexLocation: i32, StartInstanceLocation: u32),
 	Dispatch:                           proc "stdcall" (this: ^IGraphicsCommandList, ThreadGroupCountX: u32, ThreadGroupCountY: u32, ThreadGroupCountZ: u32),
 	CopyBufferRegion:                   proc "stdcall" (this: ^IGraphicsCommandList, pDstBuffer: ^IResource, DstOffset: u64, pSrcBuffer: ^IResource, SrcOffset: u64, NumBytes: u64),
-	CopyTextureRegion:                  proc "stdcall" (this: ^IGraphicsCommandList, pDst: ^TEXTURE_COPY_LOCATION, DstX: u32, DstY: u32, DstZ: u32, pSrc: ^TEXTURE_COPY_LOCATION, pSrcBox: ^BOX),
+	CopyTextureRegion:                  proc "stdcall" (this: ^IGraphicsCommandList, #by_ptr pDst: TEXTURE_COPY_LOCATION, DstX: u32, DstY: u32, DstZ: u32, #by_ptr pSrc: TEXTURE_COPY_LOCATION, pSrcBox: ^BOX),
 	CopyResource:                       proc "stdcall" (this: ^IGraphicsCommandList, pDstResource: ^IResource, pSrcResource: ^IResource),
-	CopyTiles:                          proc "stdcall" (this: ^IGraphicsCommandList, pTiledResource: ^IResource, pTileRegionStartCoordinate: ^TILED_RESOURCE_COORDINATE, pTileRegionSize: ^TILE_REGION_SIZE, pBuffer: ^IResource, BufferStartOffsetInBytes: u64, Flags: TILE_COPY_FLAGS),
+	CopyTiles:                          proc "stdcall" (this: ^IGraphicsCommandList, pTiledResource: ^IResource, #by_ptr pTileRegionStartCoordinate: TILED_RESOURCE_COORDINATE, #by_ptr pTileRegionSize: TILE_REGION_SIZE, pBuffer: ^IResource, BufferStartOffsetInBytes: u64, Flags: TILE_COPY_FLAGS),
 	ResolveSubresource:                 proc "stdcall" (this: ^IGraphicsCommandList, pDstResource: ^IResource, DstSubresource: u32, pSrcResource: ^IResource, SrcSubresource: u32, Format: dxgi.FORMAT),
 	IASetPrimitiveTopology:             proc "stdcall" (this: ^IGraphicsCommandList, PrimitiveTopology: PRIMITIVE_TOPOLOGY),
 	RSSetViewports:                     proc "stdcall" (this: ^IGraphicsCommandList, NumViewports: u32, pViewports: ^VIEWPORT),
@@ -2506,7 +2506,7 @@ ICommandQueue :: struct #raw_union {
 ICommandQueue_VTable :: struct {
 	using id3d12devicechild_vtable: IDeviceChild_VTable,
 	UpdateTileMappings:    proc "stdcall" (this: ^ICommandQueue, pResource: ^IResource, NumResourceRegions: u32, pResourceRegionStartCoordinates: ^TILED_RESOURCE_COORDINATE, pResourceRegionSizes: ^TILE_REGION_SIZE, pHeap: ^IHeap, NumRanges: u32, pRangeFlags: ^TILE_RANGE_FLAGS, pHeapRangeStartOffsets: ^u32, pRangeTileCounts: ^u32, Flags: TILE_MAPPING_FLAGS),
-	CopyTileMappings:      proc "stdcall" (this: ^ICommandQueue, pDstResource: ^IResource, pDstRegionStartCoordinate: ^TILED_RESOURCE_COORDINATE, pSrcResource: ^IResource, pSrcRegionStartCoordinate: ^TILED_RESOURCE_COORDINATE, pRegionSize: ^TILE_REGION_SIZE, Flags: TILE_MAPPING_FLAGS),
+	CopyTileMappings:      proc "stdcall" (this: ^ICommandQueue, pDstResource: ^IResource, #by_ptr pDstRegionStartCoordinate: TILED_RESOURCE_COORDINATE, pSrcResource: ^IResource, #by_ptr pSrcRegionStartCoordinate: TILED_RESOURCE_COORDINATE, #by_ptr pRegionSize: TILE_REGION_SIZE, Flags: TILE_MAPPING_FLAGS),
 	ExecuteCommandLists:   proc "stdcall" (this: ^ICommandQueue, NumCommandLists: u32, ppCommandLists: ^^ICommandList),
 	SetMarker:             proc "stdcall" (this: ^ICommandQueue, Metadata: u32, pData: rawptr, Size: u32),
 	BeginEvent:            proc "stdcall" (this: ^ICommandQueue, Metadata: u32, pData: rawptr, Size: u32),
@@ -2528,29 +2528,29 @@ IDevice :: struct #raw_union {
 IDevice_VTable :: struct {
 	using id3d12object_vtable: IObject_VTable,
 	GetNodeCount:                     proc "stdcall" (this: ^IDevice) -> u32,
-	CreateCommandQueue:               proc "stdcall" (this: ^IDevice, pDesc: ^COMMAND_QUEUE_DESC, riid: ^IID, ppCommandQueue: ^rawptr) -> HRESULT,
+	CreateCommandQueue:               proc "stdcall" (this: ^IDevice, #by_ptr pDesc: COMMAND_QUEUE_DESC, riid: ^IID, ppCommandQueue: ^rawptr) -> HRESULT,
 	CreateCommandAllocator:           proc "stdcall" (this: ^IDevice, type: COMMAND_LIST_TYPE, riid: ^IID, ppCommandAllocator: ^rawptr) -> HRESULT,
-	CreateGraphicsPipelineState:      proc "stdcall" (this: ^IDevice, pDesc: ^GRAPHICS_PIPELINE_STATE_DESC, riid: ^IID, ppPipelineState: ^rawptr) -> HRESULT,
-	CreateComputePipelineState:       proc "stdcall" (this: ^IDevice, pDesc: ^COMPUTE_PIPELINE_STATE_DESC, riid: ^IID, ppPipelineState: ^rawptr) -> HRESULT,
+	CreateGraphicsPipelineState:      proc "stdcall" (this: ^IDevice, #by_ptr pDesc: GRAPHICS_PIPELINE_STATE_DESC, riid: ^IID, ppPipelineState: ^rawptr) -> HRESULT,
+	CreateComputePipelineState:       proc "stdcall" (this: ^IDevice, #by_ptr pDesc: COMPUTE_PIPELINE_STATE_DESC, riid: ^IID, ppPipelineState: ^rawptr) -> HRESULT,
 	CreateCommandList:                proc "stdcall" (this: ^IDevice, nodeMask: u32, type: COMMAND_LIST_TYPE, pCommandAllocator: ^ICommandAllocator, pInitialState: ^IPipelineState, riid: ^IID, ppCommandList: ^rawptr) -> HRESULT,
 	CheckFeatureSupport:              proc "stdcall" (this: ^IDevice, Feature: FEATURE, pFeatureSupportData: rawptr, FeatureSupportDataSize: u32) -> HRESULT,
-	CreateDescriptorHeap:             proc "stdcall" (this: ^IDevice, pDescriptorHeapDesc: ^DESCRIPTOR_HEAP_DESC, riid: ^IID, ppvHeap: ^rawptr) -> HRESULT,
+	CreateDescriptorHeap:             proc "stdcall" (this: ^IDevice, #by_ptr pDescriptorHeapDesc: DESCRIPTOR_HEAP_DESC, riid: ^IID, ppvHeap: ^rawptr) -> HRESULT,
 	GetDescriptorHandleIncrementSize: proc "stdcall" (this: ^IDevice, DescriptorHeapType: DESCRIPTOR_HEAP_TYPE) -> u32,
 	CreateRootSignature:              proc "stdcall" (this: ^IDevice, nodeMask: u32, pBlobWithRootSignature: rawptr, blobLengthInBytes: SIZE_T, riid: ^IID, ppvRootSignature: ^rawptr) -> HRESULT,
-	CreateConstantBufferView:         proc "stdcall" (this: ^IDevice, pDesc: ^CONSTANT_BUFFER_VIEW_DESC, DestDescriptor: CPU_DESCRIPTOR_HANDLE),
-	CreateShaderResourceView:         proc "stdcall" (this: ^IDevice, pResource: ^IResource, pDesc: ^SHADER_RESOURCE_VIEW_DESC, DestDescriptor: CPU_DESCRIPTOR_HANDLE),
-	CreateUnorderedAccessView:        proc "stdcall" (this: ^IDevice, pResource: ^IResource, pCounterResource: ^IResource, pDesc: ^UNORDERED_ACCESS_VIEW_DESC, DestDescriptor: CPU_DESCRIPTOR_HANDLE),
-	CreateRenderTargetView:           proc "stdcall" (this: ^IDevice, pResource: ^IResource, pDesc: ^RENDER_TARGET_VIEW_DESC, DestDescriptor: CPU_DESCRIPTOR_HANDLE),
-	CreateDepthStencilView:           proc "stdcall" (this: ^IDevice, pResource: ^IResource, pDesc: ^DEPTH_STENCIL_VIEW_DESC, DestDescriptor: CPU_DESCRIPTOR_HANDLE),
-	CreateSampler:                    proc "stdcall" (this: ^IDevice, pDesc: ^SAMPLER_DESC, DestDescriptor: CPU_DESCRIPTOR_HANDLE),
+	CreateConstantBufferView:         proc "stdcall" (this: ^IDevice, #by_ptr pDesc: CONSTANT_BUFFER_VIEW_DESC, DestDescriptor: CPU_DESCRIPTOR_HANDLE),
+	CreateShaderResourceView:         proc "stdcall" (this: ^IDevice, pResource: ^IResource, #by_ptr pDesc: SHADER_RESOURCE_VIEW_DESC, DestDescriptor: CPU_DESCRIPTOR_HANDLE),
+	CreateUnorderedAccessView:        proc "stdcall" (this: ^IDevice, pResource: ^IResource, pCounterResource: ^IResource, #by_ptr pDesc: UNORDERED_ACCESS_VIEW_DESC, DestDescriptor: CPU_DESCRIPTOR_HANDLE),
+	CreateRenderTargetView:           proc "stdcall" (this: ^IDevice, pResource: ^IResource, #by_ptr pDesc: RENDER_TARGET_VIEW_DESC, DestDescriptor: CPU_DESCRIPTOR_HANDLE),
+	CreateDepthStencilView:           proc "stdcall" (this: ^IDevice, pResource: ^IResource, #by_ptr pDesc: DEPTH_STENCIL_VIEW_DESC, DestDescriptor: CPU_DESCRIPTOR_HANDLE),
+	CreateSampler:                    proc "stdcall" (this: ^IDevice, #by_ptr pDesc: SAMPLER_DESC, DestDescriptor: CPU_DESCRIPTOR_HANDLE),
 	CopyDescriptors:                  proc "stdcall" (this: ^IDevice, NumDestDescriptorRanges: u32, pDestDescriptorRangeStarts: ^CPU_DESCRIPTOR_HANDLE, pDestDescriptorRangeSizes: ^u32, NumSrcDescriptorRanges: u32, pSrcDescriptorRangeStarts: ^CPU_DESCRIPTOR_HANDLE, pSrcDescriptorRangeSizes: ^u32, DescriptorHeapsType: DESCRIPTOR_HEAP_TYPE),
 	CopyDescriptorsSimple:            proc "stdcall" (this: ^IDevice, NumDescriptors: u32, DestDescriptorRangeStart: CPU_DESCRIPTOR_HANDLE, SrcDescriptorRangeStart: CPU_DESCRIPTOR_HANDLE, DescriptorHeapsType: DESCRIPTOR_HEAP_TYPE),
 	GetResourceAllocationInfo:        proc "stdcall" (this: ^IDevice, RetVal: ^RESOURCE_ALLOCATION_INFO, visibleMask: u32, numResourceDescs: u32, pResourceDescs: ^RESOURCE_DESC),
 	GetCustomHeapProperties:          proc "stdcall" (this: ^IDevice, nodeMask: u32, heapType: HEAP_TYPE) -> HEAP_PROPERTIES,
-	CreateCommittedResource:          proc "stdcall" (this: ^IDevice, pHeapProperties: ^HEAP_PROPERTIES, HeapFlags: HEAP_FLAGS, pDesc: ^RESOURCE_DESC, InitialResourceState: RESOURCE_STATES, pOptimizedClearValue: ^CLEAR_VALUE, riidResource: ^IID, ppvResource: ^rawptr) -> HRESULT,
-	CreateHeap:                       proc "stdcall" (this: ^IDevice, pDesc: ^HEAP_DESC, riid: ^IID, ppvHeap: ^rawptr) -> HRESULT,
-	CreatePlacedResource:             proc "stdcall" (this: ^IDevice, pHeap: ^IHeap, HeapOffset: u64, pDesc: ^RESOURCE_DESC, InitialState: RESOURCE_STATES, pOptimizedClearValue: ^CLEAR_VALUE, riid: ^IID, ppvResource: ^rawptr) -> HRESULT,
-	CreateReservedResource:           proc "stdcall" (this: ^IDevice, pDesc: ^RESOURCE_DESC, InitialState: RESOURCE_STATES, pOptimizedClearValue: ^CLEAR_VALUE, riid: ^IID, ppvResource: ^rawptr) -> HRESULT,
+	CreateCommittedResource:          proc "stdcall" (this: ^IDevice, #by_ptr pHeapProperties: HEAP_PROPERTIES, HeapFlags: HEAP_FLAGS, #by_ptr pDesc: RESOURCE_DESC, InitialResourceState: RESOURCE_STATES, pOptimizedClearValue: ^CLEAR_VALUE, riidResource: ^IID, ppvResource: ^rawptr) -> HRESULT,
+	CreateHeap:                       proc "stdcall" (this: ^IDevice, #by_ptr pDesc: HEAP_DESC, riid: ^IID, ppvHeap: ^rawptr) -> HRESULT,
+	CreatePlacedResource:             proc "stdcall" (this: ^IDevice, pHeap: ^IHeap, HeapOffset: u64, #by_ptr pDesc: RESOURCE_DESC, InitialState: RESOURCE_STATES, pOptimizedClearValue: ^CLEAR_VALUE, riid: ^IID, ppvResource: ^rawptr) -> HRESULT,
+	CreateReservedResource:           proc "stdcall" (this: ^IDevice, #by_ptr pDesc: RESOURCE_DESC, InitialState: RESOURCE_STATES, pOptimizedClearValue: ^CLEAR_VALUE, riid: ^IID, ppvResource: ^rawptr) -> HRESULT,
 	CreateSharedHandle:               proc "stdcall" (this: ^IDevice, pObject: ^IDeviceChild, pAttributes: ^win32.SECURITY_ATTRIBUTES, Access: u32, Name: [^]u16, pHandle: ^HANDLE) -> HRESULT,
 	OpenSharedHandle:                 proc "stdcall" (this: ^IDevice, NTHandle: HANDLE, riid: ^IID, ppvObj: ^rawptr) -> HRESULT,
 	OpenSharedHandleByName:           proc "stdcall" (this: ^IDevice, Name: [^]u16, Access: u32, pNTHandle: ^HANDLE) -> HRESULT,
@@ -2558,10 +2558,10 @@ IDevice_VTable :: struct {
 	Evict:                            proc "stdcall" (this: ^IDevice, NumObjects: u32, ppObjects: ^^IPageable) -> HRESULT,
 	CreateFence:                      proc "stdcall" (this: ^IDevice, InitialValue: u64, Flags: FENCE_FLAGS, riid: ^IID, ppFence: ^rawptr) -> HRESULT,
 	GetDeviceRemovedReason:           proc "stdcall" (this: ^IDevice) -> HRESULT,
-	GetCopyableFootprints:            proc "stdcall" (this: ^IDevice, pResourceDesc: ^RESOURCE_DESC, FirstSubresource: u32, NumSubresources: u32, BaseOffset: u64, pLayouts: ^PLACED_SUBRESOURCE_FOOTPRINT, pNumRows: ^u32, pRowSizeInBytes: ^u64, pTotalBytes: ^u64),
-	CreateQueryHeap:                  proc "stdcall" (this: ^IDevice, pDesc: ^QUERY_HEAP_DESC, riid: ^IID, ppvHeap: ^rawptr) -> HRESULT,
+	GetCopyableFootprints:            proc "stdcall" (this: ^IDevice, #by_ptr pResourceDesc: RESOURCE_DESC, FirstSubresource: u32, NumSubresources: u32, BaseOffset: u64, pLayouts: ^PLACED_SUBRESOURCE_FOOTPRINT, pNumRows: ^u32, pRowSizeInBytes: ^u64, pTotalBytes: ^u64),
+	CreateQueryHeap:                  proc "stdcall" (this: ^IDevice, #by_ptr pDesc: QUERY_HEAP_DESC, riid: ^IID, ppvHeap: ^rawptr) -> HRESULT,
 	SetStablePowerState:              proc "stdcall" (this: ^IDevice, Enable: BOOL) -> HRESULT,
-	CreateCommandSignature:           proc "stdcall" (this: ^IDevice, pDesc: ^COMMAND_SIGNATURE_DESC, pRootSignature: ^IRootSignature, riid: ^IID, ppvCommandSignature: ^rawptr) -> HRESULT,
+	CreateCommandSignature:           proc "stdcall" (this: ^IDevice, #by_ptr pDesc: COMMAND_SIGNATURE_DESC, pRootSignature: ^IRootSignature, riid: ^IID, ppvCommandSignature: ^rawptr) -> HRESULT,
 	GetResourceTiling:                proc "stdcall" (this: ^IDevice, pTiledResource: ^IResource, pNumTilesForEntireResource: ^u32, pPackedMipDesc: ^PACKED_MIP_INFO, pStandardTileShapeForNonPackedMips: ^TILE_SHAPE, pNumSubresourceTilings: ^u32, FirstSubresourceTilingToGet: u32, pSubresourceTilingsForNonPackedMips: ^SUBRESOURCE_TILING),
 	GetAdapterLuid:                   proc "stdcall" (this: ^IDevice) -> LUID,
 }
@@ -2576,8 +2576,8 @@ IPipelineLibrary :: struct #raw_union {
 IPipelineLibrary_VTable :: struct {
 	using id3d12devicechild_vtable: IDeviceChild_VTable,
 	StorePipeline:        proc "stdcall" (this: ^IPipelineLibrary, pName: [^]u16, pPipeline: ^IPipelineState) -> HRESULT,
-	LoadGraphicsPipeline: proc "stdcall" (this: ^IPipelineLibrary, pName: [^]u16, pDesc: ^GRAPHICS_PIPELINE_STATE_DESC, riid: ^IID, ppPipelineState: ^rawptr) -> HRESULT,
-	LoadComputePipeline:  proc "stdcall" (this: ^IPipelineLibrary, pName: [^]u16, pDesc: ^COMPUTE_PIPELINE_STATE_DESC, riid: ^IID, ppPipelineState: ^rawptr) -> HRESULT,
+	LoadGraphicsPipeline: proc "stdcall" (this: ^IPipelineLibrary, pName: [^]u16, #by_ptr pDesc: GRAPHICS_PIPELINE_STATE_DESC, riid: ^IID, ppPipelineState: ^rawptr) -> HRESULT,
+	LoadComputePipeline:  proc "stdcall" (this: ^IPipelineLibrary, pName: [^]u16, #by_ptr pDesc: COMPUTE_PIPELINE_STATE_DESC, riid: ^IID, ppPipelineState: ^rawptr) -> HRESULT,
 	GetSerializedSize:    proc "stdcall" (this: ^IPipelineLibrary) -> SIZE_T,
 	Serialize:            proc "stdcall" (this: ^IPipelineLibrary, pData: rawptr, DataSizeInBytes: SIZE_T) -> HRESULT,
 }
@@ -2591,7 +2591,7 @@ IPipelineLibrary1 :: struct #raw_union {
 }
 IPipelineLibrary1_VTable :: struct {
 	using id3d12pipelinelibrary_vtable: IPipelineLibrary_VTable,
-	LoadPipeline: proc "stdcall" (this: ^IPipelineLibrary1, pName: [^]u16, pDesc: ^PIPELINE_STATE_STREAM_DESC, riid: ^IID, ppPipelineState: ^rawptr) -> HRESULT,
+	LoadPipeline: proc "stdcall" (this: ^IPipelineLibrary1, pName: [^]u16, #by_ptr pDesc: PIPELINE_STATE_STREAM_DESC, riid: ^IID, ppPipelineState: ^rawptr) -> HRESULT,
 }
 
 MULTIPLE_FENCE_WAIT_FLAGS :: distinct bit_set[MULTIPLE_FENCE_WAIT_FLAG; u32]
@@ -2633,7 +2633,7 @@ IDevice2 :: struct #raw_union {
 }
 IDevice2_VTable :: struct {
 	using id3d12device1_vtable: IDevice1_VTable,
-	CreatePipelineState: proc "stdcall" (this: ^IDevice2, pDesc: ^PIPELINE_STATE_STREAM_DESC, riid: ^IID, ppPipelineState: ^rawptr) -> HRESULT,
+	CreatePipelineState: proc "stdcall" (this: ^IDevice2, #by_ptr pDesc: PIPELINE_STATE_STREAM_DESC, riid: ^IID, ppPipelineState: ^rawptr) -> HRESULT,
 }
 
 RESIDENCY_FLAGS :: distinct bit_set[RESIDENCY_FLAG; u32]
@@ -2726,10 +2726,10 @@ IDevice4 :: struct #raw_union {
 IDevice4_VTable :: struct {
 	using id3d12device3_vtable: IDevice3_VTable,
 	CreateCommandList1:             proc "stdcall" (this: ^IDevice4, nodeMask: u32, type: COMMAND_LIST_TYPE, flags: COMMAND_LIST_FLAGS, riid: ^IID, ppCommandList: ^rawptr) -> HRESULT,
-	CreateProtectedResourceSession: proc "stdcall" (this: ^IDevice4, pDesc: ^PROTECTED_RESOURCE_SESSION_DESC, riid: ^IID, ppSession: ^rawptr) -> HRESULT,
-	CreateCommittedResource1:       proc "stdcall" (this: ^IDevice4, pHeapProperties: ^HEAP_PROPERTIES, HeapFlags: HEAP_FLAGS, pDesc: ^RESOURCE_DESC, InitialResourceState: RESOURCE_STATES, pOptimizedClearValue: ^CLEAR_VALUE, pProtectedSession: ^IProtectedResourceSession, riidResource: ^IID, ppvResource: ^rawptr) -> HRESULT,
-	CreateHeap1:                    proc "stdcall" (this: ^IDevice4, pDesc: ^HEAP_DESC, pProtectedSession: ^IProtectedResourceSession, riid: ^IID, ppvHeap: ^rawptr) -> HRESULT,
-	CreateReservedResource1:        proc "stdcall" (this: ^IDevice4, pDesc: ^RESOURCE_DESC, InitialState: RESOURCE_STATES, pOptimizedClearValue: ^CLEAR_VALUE, pProtectedSession: ^IProtectedResourceSession, riid: ^IID, ppvResource: ^rawptr) -> HRESULT,
+	CreateProtectedResourceSession: proc "stdcall" (this: ^IDevice4, #by_ptr pDesc: PROTECTED_RESOURCE_SESSION_DESC, riid: ^IID, ppSession: ^rawptr) -> HRESULT,
+	CreateCommittedResource1:       proc "stdcall" (this: ^IDevice4, #by_ptr pHeapProperties: HEAP_PROPERTIES, HeapFlags: HEAP_FLAGS, #by_ptr pDesc: RESOURCE_DESC, InitialResourceState: RESOURCE_STATES, pOptimizedClearValue: ^CLEAR_VALUE, pProtectedSession: ^IProtectedResourceSession, riidResource: ^IID, ppvResource: ^rawptr) -> HRESULT,
+	CreateHeap1:                    proc "stdcall" (this: ^IDevice4, #by_ptr pDesc: HEAP_DESC, pProtectedSession: ^IProtectedResourceSession, riid: ^IID, ppvHeap: ^rawptr) -> HRESULT,
+	CreateReservedResource1:        proc "stdcall" (this: ^IDevice4, #by_ptr pDesc: RESOURCE_DESC, InitialState: RESOURCE_STATES, pOptimizedClearValue: ^CLEAR_VALUE, pProtectedSession: ^IProtectedResourceSession, riid: ^IID, ppvResource: ^rawptr) -> HRESULT,
 	GetResourceAllocationInfo1:     proc "stdcall" (this: ^IDevice4, RetVal: ^RESOURCE_ALLOCATION_INFO, visibleMask: u32, numResourceDescs: u32, pResourceDescs: ^RESOURCE_DESC, pResourceAllocationInfo1: ^RESOURCE_ALLOCATION_INFO1),
 }
 
@@ -3196,9 +3196,9 @@ IDevice5_VTable :: struct {
 	EnumerateMetaCommands:                          proc "stdcall" (this: ^IDevice5, pNumMetaCommands: ^u32, pDescs: ^META_COMMAND_DESC) -> HRESULT,
 	EnumerateMetaCommandParameters:                 proc "stdcall" (this: ^IDevice5, CommandId: ^GUID, Stage: META_COMMAND_PARAMETER_STAGE, pTotalStructureSizeInBytes: ^u32, pParameterCount: ^u32, pParameterDescs: ^META_COMMAND_PARAMETER_DESC) -> HRESULT,
 	CreateMetaCommand:                              proc "stdcall" (this: ^IDevice5, CommandId: ^GUID, NodeMask: u32, pCreationParametersData: rawptr, CreationParametersDataSizeInBytes: SIZE_T, riid: ^IID, ppMetaCommand: ^rawptr) -> HRESULT,
-	CreateStateObject:                              proc "stdcall" (this: ^IDevice5, pDesc: ^STATE_OBJECT_DESC, riid: ^IID, ppStateObject: ^rawptr) -> HRESULT,
-	GetRaytracingAccelerationStructurePrebuildInfo: proc "stdcall" (this: ^IDevice5, pDesc: ^BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS, pInfo: ^RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO),
-	CheckDriverMatchingIdentifier:                  proc "stdcall" (this: ^IDevice5, SerializedDataType: SERIALIZED_DATA_TYPE, pIdentifierToCheck: ^SERIALIZED_DATA_DRIVER_MATCHING_IDENTIFIER) -> DRIVER_MATCHING_IDENTIFIER_STATUS,
+	CreateStateObject:                              proc "stdcall" (this: ^IDevice5, #by_ptr pDesc: STATE_OBJECT_DESC, riid: ^IID, ppStateObject: ^rawptr) -> HRESULT,
+	GetRaytracingAccelerationStructurePrebuildInfo: proc "stdcall" (this: ^IDevice5, #by_ptr pDesc: BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS, pInfo: ^RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO),
+	CheckDriverMatchingIdentifier:                  proc "stdcall" (this: ^IDevice5, SerializedDataType: SERIALIZED_DATA_TYPE, #by_ptr pIdentifierToCheck: SERIALIZED_DATA_DRIVER_MATCHING_IDENTIFIER) -> DRIVER_MATCHING_IDENTIFIER_STATUS,
 }
 
 AUTO_BREADCRUMB_OP :: enum i32 {
@@ -3506,7 +3506,7 @@ IDevice7 :: struct #raw_union {
 IDevice7_VTable :: struct {
 	using id3d12device6_vtable: IDevice6_VTable,
 	AddToStateObject: proc "stdcall" (this: ^IDevice7, pAddition: ^STATE_OBJECT_DESC, pStateObjectToGrowFrom: ^IStateObject, riid: ^IID, ppNewStateObject: ^rawptr) -> HRESULT,
-	CreateProtectedResourceSession1: proc "stdcall" (this: ^IDevice7, pDesc: ^PROTECTED_RESOURCE_SESSION_DESC1, riid: ^IID, ppSession: ^rawptr) -> HRESULT,
+	CreateProtectedResourceSession1: proc "stdcall" (this: ^IDevice7, #by_ptr pDesc: PROTECTED_RESOURCE_SESSION_DESC1, riid: ^IID, ppSession: ^rawptr) -> HRESULT,
 }
 
 
@@ -3519,10 +3519,10 @@ IDevice8 :: struct #raw_union {
 IDevice8_VTable :: struct {
 	using id3d12device7_vtable: IDevice7_VTable,
 	GetResourceAllocationInfo2:               proc "stdcall" (this: ^IDevice8, RetVal: ^RESOURCE_ALLOCATION_INFO, visibleMask: u32, numResourceDescs: u32, pResourceDescs: ^RESOURCE_DESC1, pResourceAllocationInfo1: ^RESOURCE_ALLOCATION_INFO1),
-	CreateCommittedResource2:                 proc "stdcall" (this: ^IDevice8, pHeapProperties: ^HEAP_PROPERTIES, HeapFlags: HEAP_FLAGS, pDesc: ^RESOURCE_DESC1, InitialResourceState: RESOURCE_STATES, pOptimizedClearValue: ^CLEAR_VALUE, pProtectedSession: ^IProtectedResourceSession, riidResource: ^IID, ppvResource: ^rawptr) -> HRESULT,
-	CreatePlacedResource1:                    proc "stdcall" (this: ^IDevice8, pHeap: ^IHeap, HeapOffset: u64, pDesc: ^RESOURCE_DESC1, InitialState: RESOURCE_STATES, pOptimizedClearValue: ^CLEAR_VALUE, riid: ^IID, ppvResource: ^rawptr) -> HRESULT,
+	CreateCommittedResource2:                 proc "stdcall" (this: ^IDevice8, #by_ptr pHeapProperties: HEAP_PROPERTIES, HeapFlags: HEAP_FLAGS, #by_ptr pDesc: RESOURCE_DESC1, InitialResourceState: RESOURCE_STATES, pOptimizedClearValue: ^CLEAR_VALUE, pProtectedSession: ^IProtectedResourceSession, riidResource: ^IID, ppvResource: ^rawptr) -> HRESULT,
+	CreatePlacedResource1:                    proc "stdcall" (this: ^IDevice8, pHeap: ^IHeap, HeapOffset: u64, #by_ptr pDesc: RESOURCE_DESC1, InitialState: RESOURCE_STATES, pOptimizedClearValue: ^CLEAR_VALUE, riid: ^IID, ppvResource: ^rawptr) -> HRESULT,
 	CreateSamplerFeedbackUnorderedAccessView: proc "stdcall" (this: ^IDevice8, pTargetedResource: ^IResource, pFeedbackResource: ^IResource, DestDescriptor: CPU_DESCRIPTOR_HANDLE),
-	GetCopyableFootprints1:                   proc "stdcall" (this: ^IDevice8, pResourceDesc: ^RESOURCE_DESC1, FirstSubresource: u32, NumSubresources: u32, BaseOffset: u64, pLayouts: ^PLACED_SUBRESOURCE_FOOTPRINT, pNumRows: ^u32, pRowSizeInBytes: ^u64, pTotalBytes: ^u64),
+	GetCopyableFootprints1:                   proc "stdcall" (this: ^IDevice8, #by_ptr pResourceDesc: RESOURCE_DESC1, FirstSubresource: u32, NumSubresources: u32, BaseOffset: u64, pLayouts: ^PLACED_SUBRESOURCE_FOOTPRINT, pNumRows: ^u32, pRowSizeInBytes: ^u64, pTotalBytes: ^u64),
 }
 
 
@@ -3679,11 +3679,11 @@ IGraphicsCommandList4_VTable :: struct {
 	EndRenderPass:                                    proc "stdcall" (this: ^IGraphicsCommandList4),
 	InitializeMetaCommand:                            proc "stdcall" (this: ^IGraphicsCommandList4, pMetaCommand: ^IMetaCommand, pInitializationParametersData: rawptr, InitializationParametersDataSizeInBytes: SIZE_T),
 	ExecuteMetaCommand:                               proc "stdcall" (this: ^IGraphicsCommandList4, pMetaCommand: ^IMetaCommand, pExecutionParametersData: rawptr, ExecutionParametersDataSizeInBytes: SIZE_T),
-	BuildRaytracingAccelerationStructure:             proc "stdcall" (this: ^IGraphicsCommandList4, pDesc: ^BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC, NumPostbuildInfoDescs: u32, pPostbuildInfoDescs: ^RAYTRACING_ACCELERATION_STRUCTURE_POSTBUILD_INFO_DESC),
-	EmitRaytracingAccelerationStructurePostbuildInfo: proc "stdcall" (this: ^IGraphicsCommandList4, pDesc: ^RAYTRACING_ACCELERATION_STRUCTURE_POSTBUILD_INFO_DESC, NumSourceAccelerationStructures: u32, pSourceAccelerationStructureData: ^GPU_VIRTUAL_ADDRESS),
+	BuildRaytracingAccelerationStructure:             proc "stdcall" (this: ^IGraphicsCommandList4, #by_ptr pDesc: BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC, NumPostbuildInfoDescs: u32, pPostbuildInfoDescs: ^RAYTRACING_ACCELERATION_STRUCTURE_POSTBUILD_INFO_DESC),
+	EmitRaytracingAccelerationStructurePostbuildInfo: proc "stdcall" (this: ^IGraphicsCommandList4, #by_ptr pDesc: RAYTRACING_ACCELERATION_STRUCTURE_POSTBUILD_INFO_DESC, NumSourceAccelerationStructures: u32, pSourceAccelerationStructureData: ^GPU_VIRTUAL_ADDRESS),
 	CopyRaytracingAccelerationStructure:              proc "stdcall" (this: ^IGraphicsCommandList4, DestAccelerationStructureData: GPU_VIRTUAL_ADDRESS, SourceAccelerationStructureData: GPU_VIRTUAL_ADDRESS, Mode: RAYTRACING_ACCELERATION_STRUCTURE_COPY_MODE),
 	SetPipelineState1:                                proc "stdcall" (this: ^IGraphicsCommandList4, pStateObject: ^IStateObject),
-	DispatchRays:                                     proc "stdcall" (this: ^IGraphicsCommandList4, pDesc: ^DISPATCH_RAYS_DESC),
+	DispatchRays:                                     proc "stdcall" (this: ^IGraphicsCommandList4, #by_ptr pDesc: DISPATCH_RAYS_DESC),
 }
 
 
@@ -5188,7 +5188,7 @@ IShaderReflectionType :: struct {
 	using id3d12shaderreflectiontype_vtable: ^IShaderReflectionType_VTable,
 }
 IShaderReflectionType_VTable :: struct {
-	GetDesc:              proc "stdcall" (this: ^IShaderReflectionType, pDesc: ^SHADER_TYPE_DESC) -> HRESULT,
+	GetDesc:              proc "stdcall" (this: ^IShaderReflectionType, #by_ptr pDesc: SHADER_TYPE_DESC) -> HRESULT,
 	GetMemberTypeByIndex: proc "stdcall" (this: ^IShaderReflectionType, Index: u32) -> ^IShaderReflectionType,
 	GetMemberTypeByName:  proc "stdcall" (this: ^IShaderReflectionType, Name: cstring) -> ^IShaderReflectionType,
 	GetMemberTypeName:    proc "stdcall" (this: ^IShaderReflectionType, Index: u32) -> cstring,
@@ -5207,7 +5207,7 @@ IShaderReflectionVariable :: struct {
 	using id3d12shaderreflectionvariable_vtable: ^IShaderReflectionVariable_VTable,
 }
 IShaderReflectionVariable_VTable :: struct {
-	GetDesc:          proc "stdcall" (this: ^IShaderReflectionVariable, pDesc: ^SHADER_VARIABLE_DESC) -> HRESULT,
+	GetDesc:          proc "stdcall" (this: ^IShaderReflectionVariable, #by_ptr pDesc: SHADER_VARIABLE_DESC) -> HRESULT,
 	GetType:          proc "stdcall" (this: ^IShaderReflectionVariable) -> ^IShaderReflectionType,
 	GetBuffer:        proc "stdcall" (this: ^IShaderReflectionVariable) -> ^IShaderReflectionConstantBuffer,
 	GetInterfaceSlot: proc "stdcall" (this: ^IShaderReflectionVariable, uArrayIndex: u32) -> u32,
@@ -5219,7 +5219,7 @@ IShaderReflectionConstantBuffer :: struct {
 	using id3d12shaderreflectionconstantbuffer_vtable: ^IShaderReflectionConstantBuffer_VTable,
 }
 IShaderReflectionConstantBuffer_VTable :: struct {
-	GetDesc:            proc "stdcall" (this: ^IShaderReflectionConstantBuffer, pDesc: ^SHADER_BUFFER_DESC) -> HRESULT,
+	GetDesc:            proc "stdcall" (this: ^IShaderReflectionConstantBuffer, #by_ptr pDesc: SHADER_BUFFER_DESC) -> HRESULT,
 	GetVariableByIndex: proc "stdcall" (this: ^IShaderReflectionConstantBuffer, Index: u32) -> ^IShaderReflectionVariable,
 	GetVariableByName:  proc "stdcall" (this: ^IShaderReflectionConstantBuffer, Name: cstring) -> ^IShaderReflectionVariable,
 }
@@ -5232,15 +5232,15 @@ IShaderReflection :: struct #raw_union {
 }
 IShaderReflection_VTable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
-	GetDesc:                       proc "stdcall" (this: ^IShaderReflection, pDesc: ^SHADER_DESC) -> HRESULT,
+	GetDesc:                       proc "stdcall" (this: ^IShaderReflection, #by_ptr pDesc: SHADER_DESC) -> HRESULT,
 	GetConstantBufferByIndex:      proc "stdcall" (this: ^IShaderReflection, Index: u32) -> ^IShaderReflectionConstantBuffer,
 	GetConstantBufferByName:       proc "stdcall" (this: ^IShaderReflection, Name: cstring) -> ^IShaderReflectionConstantBuffer,
-	GetResourceBindingDesc:        proc "stdcall" (this: ^IShaderReflection, ResourceIndex: u32, pDesc: ^SHADER_INPUT_BIND_DESC) -> HRESULT,
-	GetInputParameterDesc:         proc "stdcall" (this: ^IShaderReflection, ParameterIndex: u32, pDesc: ^SIGNATURE_PARAMETER_DESC) -> HRESULT,
-	GetOutputParameterDesc:        proc "stdcall" (this: ^IShaderReflection, ParameterIndex: u32, pDesc: ^SIGNATURE_PARAMETER_DESC) -> HRESULT,
-	GetPatchConstantParameterDesc: proc "stdcall" (this: ^IShaderReflection, ParameterIndex: u32, pDesc: ^SIGNATURE_PARAMETER_DESC) -> HRESULT,
+	GetResourceBindingDesc:        proc "stdcall" (this: ^IShaderReflection, ResourceIndex: u32, #by_ptr pDesc: SHADER_INPUT_BIND_DESC) -> HRESULT,
+	GetInputParameterDesc:         proc "stdcall" (this: ^IShaderReflection, ParameterIndex: u32, #by_ptr pDesc: SIGNATURE_PARAMETER_DESC) -> HRESULT,
+	GetOutputParameterDesc:        proc "stdcall" (this: ^IShaderReflection, ParameterIndex: u32, #by_ptr pDesc: SIGNATURE_PARAMETER_DESC) -> HRESULT,
+	GetPatchConstantParameterDesc: proc "stdcall" (this: ^IShaderReflection, ParameterIndex: u32, #by_ptr pDesc: SIGNATURE_PARAMETER_DESC) -> HRESULT,
 	GetVariableByName:             proc "stdcall" (this: ^IShaderReflection, Name: cstring) -> ^IShaderReflectionVariable,
-	GetResourceBindingDescByName:  proc "stdcall" (this: ^IShaderReflection, Name: cstring, pDesc: ^SHADER_INPUT_BIND_DESC) -> HRESULT,
+	GetResourceBindingDescByName:  proc "stdcall" (this: ^IShaderReflection, Name: cstring, #by_ptr pDesc: SHADER_INPUT_BIND_DESC) -> HRESULT,
 	GetMovInstructionCount:        proc "stdcall" (this: ^IShaderReflection) -> u32,
 	GetMovcInstructionCount:       proc "stdcall" (this: ^IShaderReflection) -> u32,
 	GetConversionInstructionCount: proc "stdcall" (this: ^IShaderReflection) -> u32,
@@ -5261,7 +5261,7 @@ ILibraryReflection :: struct #raw_union {
 }
 ILibraryReflection_VTable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
-	GetDesc:            proc "stdcall" (this: ^ILibraryReflection, pDesc: ^LIBRARY_DESC) -> HRESULT,
+	GetDesc:            proc "stdcall" (this: ^ILibraryReflection, #by_ptr pDesc: LIBRARY_DESC) -> HRESULT,
 	GetFunctionByIndex: proc "stdcall" (this: ^ILibraryReflection, FunctionIndex: i32) -> ^IFunctionReflection,
 }
 
@@ -5271,12 +5271,12 @@ IFunctionReflection :: struct {
 	using id3d12functionreflection_vtable: ^IFunctionReflection_VTable,
 }
 IFunctionReflection_VTable :: struct {
-	GetDesc:                      proc "stdcall" (this: ^IFunctionReflection, pDesc: ^FUNCTION_DESC) -> HRESULT,
+	GetDesc:                      proc "stdcall" (this: ^IFunctionReflection, #by_ptr pDesc: FUNCTION_DESC) -> HRESULT,
 	GetConstantBufferByIndex:     proc "stdcall" (this: ^IFunctionReflection, BufferIndex: u32) -> ^IShaderReflectionConstantBuffer,
 	GetConstantBufferByName:      proc "stdcall" (this: ^IFunctionReflection, Name: cstring) -> ^IShaderReflectionConstantBuffer,
-	GetResourceBindingDesc:       proc "stdcall" (this: ^IFunctionReflection, ResourceIndex: u32, pDesc: ^SHADER_INPUT_BIND_DESC) -> HRESULT,
+	GetResourceBindingDesc:       proc "stdcall" (this: ^IFunctionReflection, ResourceIndex: u32, #by_ptr pDesc: SHADER_INPUT_BIND_DESC) -> HRESULT,
 	GetVariableByName:            proc "stdcall" (this: ^IFunctionReflection, Name: cstring) -> ^IShaderReflectionVariable,
-	GetResourceBindingDescByName: proc "stdcall" (this: ^IFunctionReflection, Name: cstring, pDesc: ^SHADER_INPUT_BIND_DESC) -> HRESULT,
+	GetResourceBindingDescByName: proc "stdcall" (this: ^IFunctionReflection, Name: cstring, #by_ptr pDesc: SHADER_INPUT_BIND_DESC) -> HRESULT,
 	GetFunctionParameter:         proc "stdcall" (this: ^IFunctionReflection, ParameterIndex: i32) -> ^IFunctionParameterReflection,
 }
 
@@ -5286,5 +5286,5 @@ IFunctionParameterReflection :: struct {
 	using id3d12functionparameterreflection_vtable: ^IFunctionParameterReflection_VTable,
 }
 IFunctionParameterReflection_VTable :: struct {
-	GetDesc: proc "stdcall" (this: ^IFunctionParameterReflection, pDesc: ^PARAMETER_DESC) -> HRESULT,
+	GetDesc: proc "stdcall" (this: ^IFunctionParameterReflection, #by_ptr pDesc: PARAMETER_DESC) -> HRESULT,
 }
