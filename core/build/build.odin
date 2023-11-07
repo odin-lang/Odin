@@ -5,10 +5,10 @@ import "core:os"
 import "core:path/filepath"
 import "core:sync"
 import "core:encoding/json"
-import "core:log"
 import "core:runtime"
 import "core:fmt"
 import "core:slice"
+import "core:log"
 
 import "core:c/libc" // TODO: remove dependency on libc after core:os2
 
@@ -33,7 +33,7 @@ default_context :: #force_inline proc() -> runtime.Context {
 shell_exec :: proc(cmd: string, echo: bool) -> int {
 	cstr := strings.clone_to_cstring(cmd, context.temp_allocator)
 	if echo {
-		log.infof("%s\n", cmd)
+		printf_program("%s\n", cmd)
 	}
 	return cast(int)libc.system(cstr)
 }
@@ -93,19 +93,19 @@ _build_package :: proc(config: Config) -> (ok: bool) {
 	args := strings.to_string(argsBuilder)
 	for cmd in config.pre_build_commands {
 		if result := cmd.command(config); result != 0 {
-			log.errorf("Pre-Build Command '%s' failed with exit code %d", cmd.name, result)
+			printf_error("Pre-Build Command '%s' failed with exit code %d", cmd.name, result)
 			return
 		}
 	}
 	command := fmt.tprintf("odin build \"%s\" %s", config.src_path, args)
 	exit_code := shell_exec(command, true)
 	if exit_code != 0 {
-		log.errorf("Build failed with exit code %v\n", exit_code)
+		printf_error("Build failed with exit code %v\n", exit_code)
 		return
 	} else {
 		for cmd in config.post_build_commands {
 			if result := cmd.command(config); result != 0 {
-				log.errorf("Post-Build Command '%s' failed with exit code %d", cmd.name, result)
+				printf_error("Post-Build Command '%s' failed with exit code %d", cmd.name, result)
 				return
 			}
 		}
@@ -146,7 +146,7 @@ settings_init_from_args :: proc(settings: ^Settings, args: []string, custom_flag
 		if arg[0] == '-' {
 			if _, found := slice.linear_search(custom_flags, arg); found {
 				if _, found := slice.linear_search(BUILTIN_FLAGS, arg); found {
-					log.warnf("Flag %s is a builtin flag, but also specified as a custom flag. Builtin behavior will be skipped.")
+					printf_warning("Flag %s is a builtin flag, but also specified as a custom flag. Builtin behavior will be skipped.")
 				}
 				append(&settings.custom_args, arg)
 			} else do switch {
@@ -186,22 +186,22 @@ settings_init_from_args :: proc(settings: ^Settings, args: []string, custom_flag
 		
 				case strings.has_prefix(arg, "-cwd"):
 					build_project = false
-					log.warnf("Flag %s not implemented", arg)
+					printf_warning("Flag %s not implemented", arg)
 		
 				case strings.has_prefix(arg, "-launch-args"):
 					build_project = false
-					log.warnf("Flag %s not implemented", arg)
+					printf_warning("Flag %s not implemented", arg)
 		
 				case strings.has_prefix(arg, "-include-build-system"):
 					build_project = false
 					settings.dev_opts.flags += {.Include_Build_System}
-					log.warnf("Flag %s not implemented\n", arg)
+					printf_warning("Flag %s not implemented\n", arg)
 		
-				case: log.errorf("Invalid flag %s", arg)
+				case: printf_error("Invalid flag %s", arg)
 			}
 		} else {
 			if config_name != "" {
-				log.errorf("Config already set to %s and cannot be re-assigned to %s. Cannot have 2 configurations built with the same command (yet).", config_name, arg)
+				printf_error("Config already set to %s and cannot be re-assigned to %s. Cannot have 2 configurations built with the same command (yet).", config_name, arg)
 				return
 			}
 			config_name = arg // Todo(Dragos): Remove this variable
@@ -249,7 +249,7 @@ find_dependency :: proc(target: ^Target, depend: ^Target) -> bool {
 add_dependency :: proc(target: ^Target, depend: ^Target) -> (err: Add_Dependency_Error) {
 	if find_dependency(target, depend) do return // dependency already present	 
 	if find_dependency(depend, target) {
-		log.errorf("Circular dependency detected for [%s - %s] and [%s - %s]", target.project.name, target.name, depend.project.name, depend.name)
+		printf_error("Circular dependency detected for [%s - %s] and [%s - %s]", target.project.name, target.name, depend.project.name, depend.name)
 		return .Circular_Dependency
 	}
 	append(&target.depends, depend)
@@ -291,7 +291,7 @@ run :: proc(main_project: ^Project, opts: Settings) {
 		} // Code duplicate here... Fix this somehow
 
 		if !found_config {
-			log.errorf("Could not find target %s", opts.target_name)
+			printf_error("Could not find target %s", opts.target_name)
 			return
 		}
 	
@@ -299,6 +299,6 @@ run :: proc(main_project: ^Project, opts: Settings) {
 		_display_command_help(main_project, opts)
 	
 	case .Invalid: fallthrough
-	case: log.errorf("Invalid command type")
+	case: printf_error("Invalid command type")
 	}
 }

@@ -191,9 +191,9 @@ _generate_ols :: proc(config: Config) {
 	append(&settings.collections, Collection{name = "vendor", path = strings.concatenate({ODIN_ROOT, "vendor"})})
 
 	settings.checker_args = args
-	marshalOpts: json.Marshal_Options
-	marshalOpts.pretty = true
-	if data, err := json.marshal(settings, marshalOpts, context.temp_allocator); err == nil {
+	marshal_opts: json.Marshal_Options
+	marshal_opts.pretty = true
+	if data, err := json.marshal(settings, marshal_opts, context.temp_allocator); err == nil {
 		if file, err := os.open("ols.json", os.O_CREATE | os.O_TRUNC | os.O_RDWR, S_IRUSR | S_IWUSR); err == os.ERROR_NONE {
 			os.write_string(file, string(data))
 			os.close(file)
