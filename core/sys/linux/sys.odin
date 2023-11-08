@@ -150,7 +150,7 @@ lseek :: proc "contextless" (fd: Fd, off: i64, whence: Seek_Whence) -> (i64, Err
 		ret := syscall(SYS_lseek, fd, off, whence)
 		return errno_unwrap(ret, i64)
 	} else {
-		result: i64 ---
+		result: i64 = ---
 		ret := syscall(SYS__llseek, fd, compat64_arg_pair(off), &result, whence)
 		return result, Errno(-ret)
 	}
@@ -2586,10 +2586,12 @@ tee :: proc "contextless" (fd_in: Fd, fd_out: Fd, len: uint, flags: Splice_Flags
 
 /*
 	Change file timestamps with nanosecond precision.
+	**utimes** must point to an array of two `Time_Spec`'s. The "utime" is the
+	last access time, the second is last modification time.
 	Available since Linux 2.6.22.
 */
-utimensat :: proc "contextless" (dirfd: Fd, name: cstring, timespec: ^Time_Spec, flags: FD_Flags) -> (Errno) {
-	ret := syscall(SYS_utimensat, dirfd, cast(rawptr) name, timespec, transmute(i32) flags)
+utimensat :: proc "contextless" (dirfd: Fd, name: cstring, utimes: [^]Time_Spec, flags: FD_Flags) -> (Errno) {
+	ret := syscall(SYS_utimensat, dirfd, cast(rawptr) name, utimes, transmute(i32) flags)
 	return Errno(-ret)
 }
 
