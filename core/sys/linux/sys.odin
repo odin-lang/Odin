@@ -754,7 +754,7 @@ vfork :: proc "contextless" () -> Pid {
 	when ODIN_ARCH != .arm64 {
 		return Pid(syscall(SYS_vfork))
 	} else {
-		ret := Pid(syscall(SYS_clone, Signal.SIGCHLD))
+		return Pid(syscall(SYS_clone, Signal.SIGCHLD))
 	}
 }
 
@@ -2179,8 +2179,14 @@ gettid :: proc "contextless" () -> Pid {
 	Available since Linux 1.0.
 */
 time :: proc "contextless" (tloc: ^uint) -> (Errno) {
-	ret := syscall(SYS_time, tloc)
-	return Errno(-ret)
+	when ODIN_ARCH != .arm64 {
+		ret := syscall(SYS_time, tloc)
+		return Errno(-ret)
+	} else {
+		ts: Time_Spec
+		ret := syscall(SYS_clock_gettime, Clock_Id.REALTIME, ts)
+		tloc^ = ts.time_sec
+	}
 }
 
 /*
