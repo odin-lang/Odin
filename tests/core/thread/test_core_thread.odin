@@ -40,13 +40,13 @@ main :: proc() {
 poly_data_test :: proc(_t: ^testing.T) {
 	MAX :: size_of(rawptr) * thread.MAX_USER_ARGUMENTS
 
-	@static t: ^testing.T
-	t = _t
+	@static poly_data_test_t: ^testing.T
+	poly_data_test_t = _t
 
 	b: [MAX]byte = 8
 	t1 := thread.create_and_start_with_poly_data(b, proc(b: [MAX]byte) {
 		b_expect: [MAX]byte = 8
-		expect(t, b == b_expect, "thread poly data not correct")
+		expect(poly_data_test_t, b == b_expect, "thread poly data not correct")
 	}, self_cleanup = true)
 	
 	b1: [3]uintptr = 1
@@ -54,26 +54,26 @@ poly_data_test :: proc(_t: ^testing.T) {
 	t2 := thread.create_and_start_with_poly_data2(b1, b2, proc(b: [3]uintptr, b2: [MAX / 2]byte) {
 		b_expect: [3]uintptr = 1
 		b2_expect: [MAX / 2]byte = 3
-		expect(t, b == b_expect,   "thread poly data not correct")
-		expect(t, b2 == b2_expect, "thread poly data not correct")
+		expect(poly_data_test_t, b == b_expect,   "thread poly data not correct")
+		expect(poly_data_test_t, b2 == b2_expect, "thread poly data not correct")
 	}, self_cleanup = true)
 
 	t3 := thread.create_and_start_with_poly_data3(b1, b2, uintptr(333), proc(b: [3]uintptr, b2: [MAX / 2]byte, b3: uintptr) {
 		b_expect: [3]uintptr = 1
 		b2_expect: [MAX / 2]byte = 3
 
-		expect(t, b == b_expect,   "thread poly data not correct")
-		expect(t, b2 == b2_expect, "thread poly data not correct")
-		expect(t, b3 == 333,       "thread poly data not correct")
+		expect(poly_data_test_t, b == b_expect,   "thread poly data not correct")
+		expect(poly_data_test_t, b2 == b2_expect, "thread poly data not correct")
+		expect(poly_data_test_t, b3 == 333,       "thread poly data not correct")
 	}, self_cleanup = true)
 	
 	t4 := thread.create_and_start_with_poly_data4(uintptr(111), b1, uintptr(333), u8(5), proc(n: uintptr, b: [3]uintptr, n2: uintptr, n4: u8) {
 		b_expect: [3]uintptr = 1
 
-		expect(t, n == 111,        "thread poly data not correct")
-		expect(t, b == b_expect,   "thread poly data not correct")
-		expect(t, n2 == 333,       "thread poly data not correct")
-		expect(t, n4 == 5,         "thread poly data not correct")
+		expect(poly_data_test_t, n == 111,        "thread poly data not correct")
+		expect(poly_data_test_t, b == b_expect,   "thread poly data not correct")
+		expect(poly_data_test_t, n2 == 333,       "thread poly data not correct")
+		expect(poly_data_test_t, n4 == 5,         "thread poly data not correct")
 	}, self_cleanup = true)
 
 	thread.join_multiple(t1, t2, t3, t4)
