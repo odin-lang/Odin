@@ -331,7 +331,8 @@ where
 	T == Sock_Addr_In6 ||
 	T == Sock_Addr_Any
 {
-	ret := syscall(SYS_accept4, sock, addr, size_of(T), transmute(int) sockflags)
+	addr_len: i32 = size_of(T)
+	ret := syscall(SYS_accept4, sock, addr, &addr_len, transmute(int) sockflags)
 	return errno_unwrap(ret, Fd)
 }
 
