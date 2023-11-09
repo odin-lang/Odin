@@ -34,6 +34,7 @@ main :: proc() {
 	t := testing.T{}
 	test_benchmark_runner(&t)
 	test_crc64_vectors(&t)
+	test_wyhash_vectors(&t)
 	test_xxhash_vectors(&t)
 	test_xxhash_large(&t)
 
@@ -397,5 +398,62 @@ test_crc64_vectors :: proc(t: ^testing.T) {
 		expect(t, xz   == expected[1], xz_error)
 		expect(t, iso  == expected[2], iso_error)
 		expect(t, iso2 == expected[3], iso2_error)
+	}
+}
+
+@test
+test_wyhash_vectors :: proc(t: ^testing.T) {
+	vectors := []struct{
+		data:   string,
+		seed:   u64,
+		digest: u64,
+	}{
+		{
+			"",
+			0,
+			0x4c91b2fdb699ff5f,
+		},
+		{
+			"a",
+			1,
+			0x9165230aed21d083,
+		},
+		{
+			"abc",
+			2,
+			0xba31ee45a25cb04f,
+		},
+		{
+			"message digest",
+			3,
+			0x88aaf4cc14f9b6c9,
+		},
+		{
+			"abcdefghijklmnopqrstuvwxyz",
+			4,
+			0x94725703203b71a5,
+		},
+		{
+			"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789",
+			5,
+			0x416be917b4ad661a,
+		},
+		{
+			"12345678901234567890123456789012345678901234567890123456789012345678901234567890",
+			6,
+			0x899dee2a86a08a8b,
+		},
+	}
+
+	fmt.println("Verifying wyhash:")
+
+	for vector in vectors {
+		fmt.println("\tVector:", vector)
+
+		b := transmute([]u8)vector.data
+		h := hash.wyhash(b, vector.seed)
+
+		vec_err := fmt.tprintf("[ wyhash ] Expected: %016x. Got: %016x.", vector.digest, h)
+		expect(t, vector.digest == h, vec_err)
 	}
 }

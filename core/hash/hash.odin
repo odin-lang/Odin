@@ -2,6 +2,7 @@ package hash
 
 import "core:mem"
 import "core:intrinsics"
+import "core:runtime"
 
 @(optimization_mode="speed")
 adler32 :: proc(data: []byte, seed := u32(1)) -> u32 #no_bounds_check {
@@ -293,4 +294,24 @@ sdbm :: proc(data: []byte, seed := u32(0)) -> u32 {
 		hash = u32(b) + (hash<<6) + (hash<<16) - hash
 	}
 	return hash
+}
+
+// The wyhash dynamic secret salt
+Wyhash_Secret :: runtime.Wyhash_Secret
+
+// The wyhash designer chosen default dynamic secret salt
+WYHASH_DEFAULT_SECRET := &runtime._WYHASH_DEFAULT_SECRET
+
+// Calculates the wyhash digest of the byte slice
+//
+// Inputs:
+// - data: The data to hash.
+// - seed: The seed for the hash function.
+// - secret: The dynamic secret salt (default is the values chosen by the designer).
+//
+// Returns: A 64-bit digest.
+//
+wyhash :: proc(data: []byte, seed := u64(0), secret := WYHASH_DEFAULT_SECRET) -> u64 {
+	raw := transmute(runtime.Raw_Slice)data
+	return runtime._wyhash(raw.data, raw.len, seed, secret)
 }
