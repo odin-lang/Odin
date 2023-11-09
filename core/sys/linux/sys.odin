@@ -2186,6 +2186,7 @@ time :: proc "contextless" (tloc: ^uint) -> (Errno) {
 		ts: Time_Spec
 		ret := syscall(SYS_clock_gettime, Clock_Id.REALTIME, ts)
 		tloc^ = ts.time_sec
+		return Errno(-ret)
 	}
 }
 
