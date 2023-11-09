@@ -838,6 +838,7 @@ semop :: proc "contextless" (key: Key, ops: []Sem_Buf) -> (Errno) {
 			time_nsec = 0,
 		}
 		ret := syscall(SYS_semtimedop_time64, key, raw_data(ops), len(ops), &max_timespec)
+		return Errno(-ret)
 	}
 }
 
@@ -2558,8 +2559,6 @@ faccessat :: proc "contextless" (dirfd: Fd, name: cstring, mode: Mode = F_OK) ->
 	ret := syscall(SYS_faccessat, dirfd, cast(rawptr) name, transmute(u32) mode)
 	return errno_unwrap(ret, bool)
 }
-
-// TODO(flysand): pselect6
 
 /*
 	Wait for events on a file descriptor.
