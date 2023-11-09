@@ -15,13 +15,6 @@ import "core:intrinsics"
 // While wyhash32 exists, it is not recommended for use by the designer,
 // and it would add complexity of having to worry about bad seeds.
 // See: https://github.com/wangyi-fudan/wyhash/issues/92
-//
-// TODO/perf:
-// - Someone should figure out if any supported OS runs AArch64 with
-//   strict alignment enabled, and add `_wy_read_8`/`_wy_read_4`
-//   fast-paths as appropriate.
-// - WASM can also do direct reads, but performance is doomed to suck
-//   on that architecture because the multiply is slow.
 
 // This is free and unencumbered software released into the public domain
 // under The Unlicense (http://unlicense.org/)
@@ -69,22 +62,13 @@ _wy_mix :: #force_inline proc "contextless" (A, B: u64) ->u64 {
 @(private)
 _wy_read_8 :: #force_inline proc "contextless" (p: [^]byte, off: int = 0) -> u64 {
 	pp := p[off:]
-	when ODIN_ARCH == .i386 || ODIN_ARCH == .amd64 {
-		return ([^]u64)(pp)[0]
-	} else {
-		return u64(pp[0]) | u64(pp[1])<<8 | u64(pp[2])<<16 | u64(pp[3])<<24 |
-		    u64(pp[4])<<32 | u64(pp[5])<<40 | u64(pp[6])<<48 | u64(pp[7])<<56
-	}
+	return u64(intrinsics.unaligned_load((^u64le)(pp)))
 }
 
 @(private)
 _wy_read_4 :: #force_inline proc "contextless" (p: [^]byte, off: int = 0) -> u64 {
 	pp := p[off:]
-	when ODIN_ARCH == .i386 || ODIN_ARCH == .amd64 {
-		return u64(([^]u32)(pp)[0])
-	} else {
-		return u64(pp[0]) | u64(pp[1])<<8 | u64(pp[2])<<16 | u64(pp[3])<<24
-	}
+	return u64(intrinsics.unaligned_load((^u32le)(pp)))
 }
 
 @(private)
