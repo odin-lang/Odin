@@ -1209,12 +1209,12 @@ rmdir :: proc "contextless" (name: cstring) -> (Errno) {
 	Available since Linux 1.0.
 	On ARM64 available since Linux 2.6.16.
 */
-creat :: proc "contextless" (name: cstring, mode: Mode) -> (Errno) {
+creat :: proc "contextless" (name: cstring, mode: Mode) -> (Fd, Errno) {
 	when ODIN_ARCH == .arm64 {
 		return openat(AT_FDCWD, name, {.CREAT, .WRONLY,.TRUNC}, mode)
 	} else {
 		ret := syscall(SYS_creat, cast(rawptr) name, transmute(u32) mode)
-		return Errno(-ret)
+		return errno_unwrap(ret, Fd)
 	}
 }
 
