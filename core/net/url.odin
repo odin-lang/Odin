@@ -24,7 +24,7 @@ import "core:encoding/hex"
 split_url :: proc(url: string, allocator := context.allocator) -> (scheme, host, path: string, queries: map[string]string) {
 	s := url
 
-	i := strings.last_index(s, "://")
+	i := strings.index(s, "://")
 	if i >= 0 {
 		scheme = s[:i]
 		s = s[i+3:]
