@@ -393,9 +393,14 @@ dup2 :: proc "contextless" (old: Fd, new: Fd) -> (Fd, Errno) {
 /*
 	Wait until the next signal is delivered.
 	Available since Linux 1.0.
+	On ARM64 available since Linux 2.6.16.
 */
 pause :: proc "contextless" () {
-	syscall(SYS_pause)
+	when ODIN_ARCH == .arm64 {
+		syscall(SYS_ppoll, 0, 0, 0, 0)
+	} else {
+		syscall(SYS_pause)
+	}
 }
 
 /*
@@ -421,7 +426,14 @@ getitimer :: proc "contextless" (which: ITimer_Which, cur: ^ITimer_Val) -> (Errn
 	Available since Linux 1.0.
 */
 alarm :: proc "contextless" (seconds: u32) -> u32 {
-	return cast(u32) syscall(SYS_alarm, seconds)
+	when ODIN_ARCH == .arm64 {
+		new := ITimer_Val { value = { seconds = cast(int) seconds } }
+		old := ITimer_Val {}
+		syscall(SYS_setitimer, ITimer_Which.REAL, &new, &old)
+		return u32(old.value.seconds) + u32(new.value.microseconds)
+	} else {
+		return cast(u32) syscall(SYS_alarm, seconds)
+	}
 }
 
 /*
@@ -742,7 +754,7 @@ vfork :: proc "contextless" () -> Pid {
 	when ODIN_ARCH != .arm64 {
 		return Pid(syscall(SYS_vfork))
 	} else {
-		return Pid(syscall(SYS_fork))
+		ret := Pid(syscall(SYS_clone, Signal.SIGCHLD))
 	}
 }
 
@@ -816,8 +828,17 @@ semget :: proc "contextless" (key: Key, n: i32, flags: IPC_Flags) -> (Key, Errno
 	Available since Linux 2.0.
 */
 semop :: proc "contextless" (key: Key, ops: []Sem_Buf) -> (Errno) {
-	ret := syscall(SYS_semop, key, raw_data(ops), len(ops))
-	return Errno(-ret)
+	when ODIN_ARCH != .i386 {
+		ret := syscall(SYS_semop, key, raw_data(ops), len(ops))
+		return Errno(-ret)
+	} else {
+		// Note(flysand): Max time limit, let's not worry about nanoseconds...
+		max_timespec := Time_Spec {
+			time_sec = max(uint),
+			time_nsec = 0,
+		}
+		ret := syscall(SYS_semtimedop_time64, key, raw_data(ops), len(ops), &max_timespec)
+	}
 }
 
 semctl3 :: proc "contextless" (key: Key, semnum: i32, cmd: IPC_Cmd) -> (int, Errno) {

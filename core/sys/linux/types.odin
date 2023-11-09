@@ -851,7 +851,7 @@ when ODIN_ARCH == .i386 {
 		nsems:      uint,
 		_:          [2]uint,
 	}
-} else when ODIN_ARCH == .amd32 {
+} else when ODIN_ARCH == .arm32 {
 	_Arch_Semid_DS :: struct {
 		perm:       IPC_Perm,
 		otime:      uint,
@@ -861,7 +861,7 @@ when ODIN_ARCH == .i386 {
 		nsems:      uint,
 		_:          [2]uint,
 	}
-} else when ODIN_ARCH == .amd64 {
+} else when ODIN_ARCH == .arm64 {
 	_Arch_Semid_DS :: struct {
 		perm:       IPC_Perm,
 		otime:      int,
