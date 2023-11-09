@@ -572,6 +572,11 @@ split_url_test :: proc(t: ^testing.T) {
 			{"a" = "", "b" = ""},
 			{"http://example.com/example?a&b"},
 		},
+		{
+			"https", "example.com", "/callback",
+			{"redirect" = "https://other.com/login"},
+			{"https://example.com/callback?redirect=https://other.com/login"},
+		},
 	}
 
 	for test in test_cases {
