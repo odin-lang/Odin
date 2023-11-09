@@ -883,7 +883,7 @@ __dynamic_map_reserve :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Ma
 
 
 
-// NOTE: the default hashing algorithm derives from fnv64a, with some minor modifications to work for `map` type:
+// NOTE: the default hashing algorithm derives from wyhash, with some minor modifications to work for `map` type:
 //
 //     * Convert a `0` result to `1`
 //         * "empty entry"
@@ -892,17 +892,11 @@ __dynamic_map_reserve :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Ma
 //
 // Both of these modification are necessary for the implementation of the `map`
 
-INITIAL_HASH_SEED :: 0xcbf29ce484222325
-
 HASH_MASK :: 1 << (8*size_of(uintptr) - 1) -1
 
 default_hasher :: #force_inline proc "contextless" (data: rawptr, seed: uintptr, N: int) -> uintptr {
-	h := u64(seed) + INITIAL_HASH_SEED
-	p := ([^]byte)(data)
-	for _ in 0..<N {
-		h = (h ~ u64(p[0])) * 0x100000001b3
-		p = p[1:]
-	}
+	// TODO: Generate a new secret on initialization or something.
+	h := _wyhash(data, N, u64(seed), &_WYHASH_DEFAULT_SECRET)
 	h &= HASH_MASK
 	return uintptr(h) | uintptr(uintptr(h) == 0)
 }
@@ -911,14 +905,12 @@ default_hasher_string :: proc "contextless" (data: rawptr, seed: uintptr) -> uin
 	str := (^[]byte)(data)
 	return default_hasher(raw_data(str^), seed, len(str))
 }
+
 default_hasher_cstring :: proc "contextless" (data: rawptr, seed: uintptr) -> uintptr {
-	h := u64(seed) + INITIAL_HASH_SEED
-	if ptr := (^[^]byte)(data)^; ptr != nil {
-		for ptr[0] != 0 {
-			h = (h ~ u64(ptr[0])) * 0x100000001b3
-			ptr = ptr[1:]
-		}
-	}
-	h &= HASH_MASK
-	return uintptr(h) | uintptr(uintptr(h) == 0)
+	// TODO/perf: len(str) is O(N), and is unavoidable with wyhash.
+	// This is likely insignificant for the typical short key sizes.
+	//
+	// See: https://github.com/wangyi-fudan/wyhash/issues/143
+	str := cstring(data)
+	return default_hasher(data, seed, len(str))
 }
