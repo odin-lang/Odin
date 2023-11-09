@@ -156,7 +156,10 @@ Ols_Json :: struct {
 	checker_args: string,
 }
 
+generate_odin_devenv :: proc(target: ^Target, odin_config: Odin_Config, args: []Arg, loc := #caller_location) -> bool {
 
+	return true
+}
 
 build_ols_json :: proc(config: Odin_Config, opts: Language_Server_Options, allocator := context.allocator) -> ([]u8, json.Marshal_Error) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()

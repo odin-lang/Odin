@@ -20,6 +20,18 @@ Project :: struct {
 	target_prefix: string,
 }
 
+Mode :: enum {
+	Help,
+	Dev,
+    Build,
+}
+
+mode_strings := [Mode]string {
+	.Build = "[Build]",
+	.Help = "[Help]",
+	.Dev = "[Dev]",
+}
+
 Target :: struct {
 	name: string,
 	platform: Platform,
