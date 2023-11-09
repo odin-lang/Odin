@@ -1,7 +1,6 @@
 package runtime
 
 import "core:intrinsics"
-import "core:math/bits"
 
 // wyhash hash function (4.2, WYHASH_CONDOM=2)
 //
@@ -45,7 +44,8 @@ _WYHASH_DEFAULT_SECRET := Wyhash_Secret{
 
 @(private)
 _wy_wide_mul :: #force_inline proc "contextless" (A, B: u64) -> (u64, u64) {
-	hi, lo := bits.mul_u64(A, B)
+	prod_wide := u128(A) * u128(B)
+	hi, lo := u64(prod_wide>>64), u64(prod_wide)
 
 	// This is where the `WYHASH_CONDOM` parameter is applied for the
 	// standard (aka 64-bit) variant.
@@ -68,9 +68,9 @@ _wy_mix :: #force_inline proc "contextless" (A, B: u64) ->u64 {
 
 @(private)
 _wy_read_8 :: #force_inline proc "contextless" (p: [^]byte, off: int = 0) -> u64 {
-	pp := intrinsics.ptr_offset(p, off)
+	pp := p[off:]
 	when ODIN_ARCH == .i386 || ODIN_ARCH == .amd64 {
-		return (transmute([^]u64)(pp))[0]
+		return ([^]u64)(pp)[0]
 	} else {
 		return u64(pp[0]) | u64(pp[1])<<8 | u64(pp[2])<<16 | u64(pp[3])<<24 |
 		    u64(pp[4])<<32 | u64(pp[5])<<40 | u64(pp[6])<<48 | u64(pp[7])<<56
@@ -79,9 +79,9 @@ _wy_read_8 :: #force_inline proc "contextless" (p: [^]byte, off: int = 0) -> u64
 
 @(private)
 _wy_read_4 :: #force_inline proc "contextless" (p: [^]byte, off: int = 0) -> u64 {
-	pp := intrinsics.ptr_offset(p, off)
+	pp := p[off:]
 	when ODIN_ARCH == .i386 || ODIN_ARCH == .amd64 {
-		return u64((transmute([^]u32)(pp))[0])
+		return u64(([^]u32)(pp)[0])
 	} else {
 		return u64(pp[0]) | u64(pp[1])<<8 | u64(pp[2])<<16 | u64(pp[3])<<24
 	}
@@ -101,7 +101,7 @@ _wy_read_3 :: #force_inline proc "contextless" (p: [^]byte, k: int) -> u64 {
 _wyhash :: proc "contextless" (data: rawptr, n: int, seed: u64, secret: ^Wyhash_Secret) -> u64 {
 	p := ([^]byte)(data)
 	seed_ := seed ~ _wy_mix(seed ~ secret[0], secret[1])
-	a, b: u64 = ---, ---
+	a, b: u64
 
 	if intrinsics.expect(n <= 16, true) {
 		if intrinsics.expect(n >= 4, true) {
@@ -122,7 +122,7 @@ _wyhash :: proc "contextless" (data: rawptr, n: int, seed: u64, secret: ^Wyhash_
 				see1 = _wy_mix(_wy_read_8(p, 16) ~ secret[2], _wy_read_8(p, 24) ~ see1)
 				see2 = _wy_mix(_wy_read_8(p, 32) ~ secret[3], _wy_read_8(p, 40) ~ see2)
 
-				p = intrinsics.ptr_offset(p, 48)
+				p = p[48:]
 				i -= 48
 				if intrinsics.expect(i < 48, false) {
 					break
@@ -132,8 +132,8 @@ _wyhash :: proc "contextless" (data: rawptr, n: int, seed: u64, secret: ^Wyhash_
 		}
 		for intrinsics.expect(i > 16, false) {
 			seed_ = _wy_mix(_wy_read_8(p) ~ secret[1], _wy_read_8(p, 8) ~ seed_)
+			p = p[16:]
 			i -= 16
-			p = intrinsics.ptr_offset(p, 16)
 		}
 		a = _wy_read_8(p, i - 16)
 		b = _wy_read_8(p, i - 8)
