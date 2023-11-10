@@ -10,23 +10,6 @@ Build_Command_Type :: enum {
 	Display_Help,
 }
 
-Settings :: struct {
-	// Configurable via settings_init_from_args
-	command_type: Build_Command_Type,
-	target_name: string,
-	custom_args: [dynamic]string,
-
-	// Configurable in user code. 
-	external_projects: [dynamic]^Project,
-	// Note(Dragos): This can be made a ^Target
-	default_target_name: string,    // Called when no config is specified in the args / config_name
-}
-
-settings_display_additional_projects :: proc(settings: ^Settings, projects: []^Project) {
-	append(&settings.external_projects, ..projects)
-}
-
-
 // Static lib?
 Build_Mode :: enum {
 	EXE,

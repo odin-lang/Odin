@@ -36,22 +36,27 @@ Target :: struct {
 	name: string,
 	platform: Platform,
 
-    run: Run_Target_Proc,
+    run_proc: Target_Run_Proc,
 
 	project: ^Project,
 	root_dir: string,
 	depends: [dynamic]^Target,
 }
 
-Run_Target_Proc :: #type proc(target: ^Target, mode: Run_Mode, args: []Arg, loc := #caller_location) -> bool
+Target_Run_Proc :: #type proc(target: ^Target, mode: Run_Mode, args: []Arg, loc := #caller_location) -> bool
 
 
-add_target :: proc(project: ^Project, target: ^Target, loc := #caller_location) {
+add_target :: proc(project: ^Project, target: ^Target, run_proc: Target_Run_Proc, loc := #caller_location) {
 	append(&project.targets, target)
 	target.project = project
+	target.run_proc = run_proc
 	slash_i := 0
+	count := 0
 	#reverse for ch, i in loc.file_path {
 		if ch == '/' || ch == '\\' {
+			count += 1 // first slash is the build package
+		}
+		if count == 2 { // this effectively makes the build system only runnable from the direct subdirectory of it (aka `odin run build` rather than `odin run .`)
 			slash_i = i
 			break
 		}
@@ -60,22 +65,6 @@ add_target :: proc(project: ^Project, target: ^Target, loc := #caller_location) 
 }
 
 run_target :: proc(target: ^Target, mode: Run_Mode, args: []Arg, loc := #caller_location) -> bool {
-	assert(target.run != nil, "Target run proc not found.")
-	return target->run(mode, args, loc)
+	assert(target.run_proc != nil, "Target run proc not found.")
+	return target.run_proc(target, mode, args, loc)
 }
-
-/*
-target_build :: proc(target: ^Target, settings: Settings) -> (ok: bool) {
-	config := target_config(target, settings)
-	// Note(Dragos): This is a check for the new dependency thing
-	config.src_path = filepath.join({target.root_dir, config.src_path}, context.temp_allocator)
-	config.out_dir = filepath.join({target.root_dir, config.out_dir}, context.temp_allocator)
-	config.rc_path = filepath.join({target.root_dir, config.rc_path}, context.temp_allocator)
-	
-	for dep in target.depends {
-		target_build(dep, settings) or_return // Note(Dragos): Recursion breaks my brain a bit. Is THIS ok??
-	}
-	
-	//return _build_package(config)
-	return false
-}*/

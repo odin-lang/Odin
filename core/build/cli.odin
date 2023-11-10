@@ -107,7 +107,7 @@ print_general_help :: proc(info: Cli_Info) {
 	fmt.printf("\tBuiltin Flags - Only 1 [Type] group per call. Groups are incompatible\n")
 	
 	for flag_desc in builtin_flags {
-		fmt.printf("\t\t%s %s", mode_strings[flag_desc.mode], flag_desc.flag)
+		fmt.printf("\t\t%s %s", mode_strings[flag_desc.mode], flag_desc.flag.flag)
 		if flag_desc.flag.key != "" {
 			fmt.printf(":\"%s\"", flag_desc.flag.key)
 		}
@@ -122,7 +122,7 @@ print_general_help :: proc(info: Cli_Info) {
 
 run_cli :: proc(info: Cli_Info, cli_args: []string) -> bool {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
-	args, err := parse_args(cli_args[1:], context.temp_allocator) // cli_args[0] should be the executable
+	args, err := parse_args(cli_args, context.temp_allocator) // cli_args[0] should be the executable
 	target_names_from_args := make_dynamic_array_len_cap([dynamic]string, 0, len(info.project.targets), context.temp_allocator) // This is not fully correct right now
 	filtered_args_by_mode := make([dynamic]Arg, context.temp_allocator)
 	current_mode: Maybe(Run_Mode)
@@ -160,14 +160,22 @@ run_cli :: proc(info: Cli_Info, cli_args: []string) -> bool {
 		for target in info.project.targets {
 			prefixed_name := strings.concatenate({info.project.target_prefix, target.name})
 			if _match(name, prefixed_name) {
-				run_target(target, current_mode.?, args)
+				ok := run_target(target, current_mode.?, args)
+				if !ok {
+					fmt.eprintf("Error running %s mode for target %s\n", current_mode.?, target.name)
+					return false
+				}
 			}
 		}
 	} else { // if no target is specified, use the default target
 		if current_mode.? == .Help {
 			print_general_help(info) // No target + -help is a special case. It doesn't print the help of the default target, only the general help.
 		} else {
-			run_target(info.default_target, current_mode.?, args)
+			ok := run_target(info.default_target, current_mode.?, args)
+			if !ok {
+				fmt.eprintf("Error running %s mode for target %s\n", current_mode.?, info.default_target.name)
+				return false
+			} 
 		}
 	}
 

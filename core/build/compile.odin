@@ -95,9 +95,9 @@ build_odin_args :: proc(config: Odin_Config, allocator := context.allocator) -> 
 	}
 	
 	if config.platform.abi == .Default {
-		fmt.sbprintf(&sb, " -platform:%s_%s", _os_to_arg[config.platform.os], _arch_to_arg[config.platform.arch])
+		fmt.sbprintf(&sb, " -target:%s_%s", _os_to_arg[config.platform.os], _arch_to_arg[config.platform.arch])
 	} else {
-		fmt.sbprintf(&sb, " -platform:%s_%s_%s", _os_to_arg[config.platform.os], _arch_to_arg[config.platform.arch], _abi_to_arg[config.platform.abi])
+		fmt.sbprintf(&sb, " -target:%s_%s_%s", _os_to_arg[config.platform.os], _arch_to_arg[config.platform.arch], _abi_to_arg[config.platform.abi])
 	}
 
 	if config.thread_count > 0 {
@@ -107,54 +107,16 @@ build_odin_args :: proc(config: Odin_Config, allocator := context.allocator) -> 
 	return strings.to_string(sb)
 }
 
-/*
-_build_package :: proc(config: Config) -> (ok: bool) {
-	config_output_dirs: {
-		//dir := filepath.dir(config.out_path, context.temp_allocator) 
-		// Note(Dragos): I wrote this a while ago. Is there a better way?
-		slash_dir, _ := filepath.to_slash(config.out_dir, context.temp_allocator)
-		dirs := strings.split_after(slash_dir, "/", context.temp_allocator)
-		for _, i in dirs {
-			new_dir := strings.concatenate(dirs[0 : i + 1], context.temp_allocator)
-			os.make_directory(new_dir)
-		}
-	}
-	
-	argsBuilder := strings.builder_make() 
-	_config_to_args(&argsBuilder, config)
-	args := strings.to_string(argsBuilder)
-	for cmd in config.pre_build_commands {
-		if result := cmd.command(config); result != 0 {
-			printf_error("Pre-Build Command '%s' failed with exit code %d", cmd.name, result)
-			return
-		}
-	}
-	command := fmt.tprintf("odin build \"%s\" %s", config.src_path, args)
-	exit_code := shell_exec(command, true)
-	if exit_code != 0 {
-		printf_error("Build failed with exit code %v\n", exit_code)
-		return
-	} else {
-		for cmd in config.post_build_commands {
-			if result := cmd.command(config); result != 0 {
-				printf_error("Post-Build Command '%s' failed with exit code %d", cmd.name, result)
-				return
-			}
-		}
-	}
-	
-	return true
-}
-*/
 
 // Runs the odin compiler. If target is not nil, use target.root_dir for configuring paths
 odin :: proc(target: ^Target, command_type: Odin_Command_Type, config: Odin_Config, print_command := true, loc := #caller_location) -> bool {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	config := config
 	if target != nil {
-		config.src_path = filepath.join({target.root_dir, config.src_path}, context.temp_allocator)
+		config.src_path = filepath.join({target.root_dir, config.src_path}, context.temp_allocator) // Note(Dragos): different places might require this type of pathing. Maybe add a build.path(target, str, allocator) proc
+		//config.src_path, _ = filepath.rel(target.root_dir, config.src_path, context.temp_allocator) // Note(Dragos): build.path could be relative
 		config.out_dir = filepath.join({target.root_dir, config.out_dir}, context.temp_allocator)
-		config.rc_path = filepath.join({target.root_dir, config.rc_path}, context.temp_allocator)
+		if config.rc_path != "" do config.rc_path = filepath.join({target.root_dir, config.rc_path}, context.temp_allocator) // Note(Dragos): Yes, this is ridiculous. please make build.path and let the user handle it correctly. silly dragos
 	}
 	cmd: string
 	switch command_type {
@@ -164,9 +126,8 @@ odin :: proc(target: ^Target, command_type: Odin_Command_Type, config: Odin_Conf
 	}
 	make_directory(config.out_dir)
 	args_str := build_odin_args(config, context.temp_allocator)
-	args_str = strings.join({cmd, args_str}, " ", context.temp_allocator)
+	args_str = strings.join({cmd, config.src_path, args_str}, " ", context.temp_allocator)
 	args := split_odin_args(args_str, context.temp_allocator)
-
 	if print_command {
 		fmt.printf("odin %s \"%s\"\n", cmd, config.src_path)
 		for arg in args[1:] { // args[0] is cmd
