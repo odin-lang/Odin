@@ -2532,6 +2532,7 @@ int main(int arg_count, char const **arg_ptr) {
 			if (str == build_context.microarch) {
 				// Found matching microarch
 				print_microarch_list = false;
+				break;
 			}
 		}
 	}
