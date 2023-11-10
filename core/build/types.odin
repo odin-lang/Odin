@@ -14,7 +14,6 @@ Settings :: struct {
 	// Configurable via settings_init_from_args
 	command_type: Build_Command_Type,
 	target_name: string,
-	dev_opts: Dev_Options,
 	custom_args: [dynamic]string,
 
 	// Configurable in user code. 
@@ -37,47 +36,24 @@ Build_Mode :: enum {
 	LLVM_IR,
 }
 
-// Note(Dragos): Since Target is standardized now, we can allow the user to call the target name directly. 
-Config :: struct {
-	platform: Platform,
-
-	src_path: string,
-	out_dir: string,
-	out_file: string,
-	pdb_name: string,
-	rc_path: string,
-
-	thread_count: int,
-	
-	build_mode: Build_Mode,
-	flags: Compiler_Flags,
-	opt: Opt_Mode,
-	vet: Vet_Flags,
-	style: Style_Mode,
-	reloc: Reloc_Mode,
-	sanitize: Sanitize_Flags,
-
-	timings: Timings_Export,
-
-	pre_build_commands: [dynamic]Command,
-	post_build_commands: [dynamic]Command,
-	defines: map[string]Define_Val,
-	collections: map[string]string,
-}
-
 
 /*
 	Can be used as-is or via a subtype
 */
 
 
-
-
 Define_Val :: union #no_nil {
 	bool,
 	int,
 	string,
+	// Todo(Dragos): Add $IDENTIFIER
 }
+
+Define :: struct {
+	name: string,
+	val: Define_Val,
+}
+
 
 Platform_ABI :: enum {
 	Default,
@@ -191,12 +167,3 @@ Timings_Export :: struct {
 	format: Timings_Format,
 	filename: Maybe(string),
 }
-
-Command_Proc :: #type proc(config: Config) -> int
-
-Command :: struct {
-	name: string,
-	command: Command_Proc,
-}
-
-Configure_Target_Proc :: #type proc(project: ^Project, target: ^Target, settings: Settings) -> Config

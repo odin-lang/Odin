@@ -68,7 +68,7 @@ parse_args :: proc(os_args: []string, allocator := context.allocator) -> (args: 
 
 
 Flag_Desc :: struct {
-	mode: Mode,
+	mode: Run_Mode,
 	flag: Flag_Arg,
 	help: string,
 }
@@ -126,21 +126,24 @@ print_general_help :: proc(info: Cli_Info) {
 run_cli :: proc(info: Cli_Info, args: []string) -> bool {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	args, err := parse_args(args, context.temp_allocator)
-	mode: Maybe(Mode)
-	mode_flag: string
+	mode: Maybe(Run_Mode)
+	target_names_from_args := make_dynamic_array_len_cap([dynamic]string, 0, len(info.project.targets), context.temp_allocator) // This is not fully correct right now
 	for arg in args {
 		#partial switch v in arg {
 		case string: 
+			append(&target_names_from_args, v)
 		case Flag_Arg:
-			switch v.flag {
-			case "-help":
-			case "-install":
-			case "-uninstall":
-			case "-ols":
-			case "-vscode":
-			case "-debugger":
+		}
+	}
+
+	for name in target_names_from_args {
+		for target in info.project.targets {
+			prefixed_name := strings.concatenate({info.project.target_prefix, target.name})
+			if _match(name, prefixed_name) {
+				
 			}
 		}
 	}
+
 	return true
 }

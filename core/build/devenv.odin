@@ -193,7 +193,7 @@ Editor :: enum {
 Editors :: bit_set[Editor]
 
 
-Dev_Flag :: enum {
+Odin_Dev_Flag :: enum {
 	Generate_Ols,
 	Build_Pre_Launch,
 	Cwd_Workspace,
@@ -201,11 +201,10 @@ Dev_Flag :: enum {
 	Include_Build_System,
 }
 
-Dev_Flags :: bit_set[Dev_Flag]
+Odin_Dev_Flags :: bit_set[Odin_Dev_Flag]
 
-// Make this a megastruct
-Dev_Options :: struct {
-	flags: Dev_Flags,
+Odin_Dev_Opts :: struct {
+	flags: Odin_Dev_Flags,
 	editors: Editors,
 	vscode_debugger_type: VSCode_Debugger_Type,
 	launch_args: string,

@@ -20,13 +20,13 @@ Project :: struct {
 	target_prefix: string,
 }
 
-Mode :: enum {
+Run_Mode :: enum {
 	Help,
 	Dev,
     Build,
 }
 
-mode_strings := [Mode]string {
+mode_strings := [Run_Mode]string {
 	.Build = "[Build]",
 	.Help = "[Help]",
 	.Dev = "[Dev]",
@@ -36,26 +36,32 @@ Target :: struct {
 	name: string,
 	platform: Platform,
 
-    build: Build_Target_Proc,
+    run: Run_Target_Proc,
 
 	project: ^Project,
 	root_dir: string,
 	depends: [dynamic]^Target,
 }
 
-Build_Target_Proc :: #type proc(target: ^Target, mode: Mode, args: []Arg) -> Target_Error
+Run_Target_Proc :: #type proc(target: ^Target, mode: Run_Mode, args: []Arg, loc := #caller_location) -> bool
 
-Target_Error :: enum {
-    None,
-    Unsupported_Mode,
-}
 
 add_target :: proc(project: ^Project, target: ^Target, loc := #caller_location) {
 	append(&project.targets, target)
 	target.project = project
-	file_dir := filepath.dir(loc.file_path, context.temp_allocator)
-	root_dir := filepath.join({file_dir, ".."}, context.temp_allocator)
-	target.root_dir = filepath.clean(root_dir) // This effectively makes the build system dependent on being a subfolder of the main project root
+	slash_i := 0
+	#reverse for ch, i in loc.file_path {
+		if ch == '/' || ch == '\\' {
+			slash_i = i
+			break
+		}
+	}
+	target.root_dir = loc.file_path[:slash_i]
+}
+
+run_target :: proc(target: ^Target, mode: Run_Mode, args: []Arg, loc := #caller_location) -> bool {
+	assert(target.run != nil, "Target run proc not found.")
+	return target->run(mode, args, loc)
 }
 
 /*

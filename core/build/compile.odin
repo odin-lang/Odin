@@ -30,8 +30,8 @@ Odin_Config :: struct {
 	reloc: Reloc_Mode,
 	sanitize: Sanitize_Flags,
 	timings: Timings_Export,
-	defines: map[string]Define_Val,
-	collections: map[string]string,
+	defines: []Define,
+	collections: []Collection,
 }
 
 split_odin_args :: proc(args: string, allocator := context.allocator) -> []string {
@@ -83,14 +83,14 @@ build_odin_args :: proc(config: Odin_Config, allocator := context.allocator) -> 
 		insert_space(&sb)
 		strings.write_string(&sb, _style_mode_to_arg[config.style])
 	}
-	for key, val in config.collections {
-		fmt.sbprintf(&sb, " -collection:%s=\"%s\"", key, val)
+	for collection in config.collections {
+		fmt.sbprintf(&sb, " -collection:%s=\"%s\"", collection.name, collection.path)
 	}
-	for key, val in config.defines {
-		switch v in val {
-		case string: fmt.sbprintf(&sb, " -define:%s=\"%s\"", key, v)
-		case bool:   fmt.sbprintf(&sb, " -define:%s=%s", key, v)
-		case int:    fmt.sbprintf(&sb, " -define:%s=%s", key, v)
+	for define in config.defines {
+		switch val in define.val {
+		case string: fmt.sbprintf(&sb, " -define:%s=\"%s\"", define.name, val)
+		case bool:   fmt.sbprintf(&sb, " -define:%s=%s", define.name, val)
+		case int:    fmt.sbprintf(&sb, " -define:%s=%s", define.name, val)
 		}
 	}
 	
@@ -147,8 +147,15 @@ _build_package :: proc(config: Config) -> (ok: bool) {
 }
 */
 
-odin :: proc(command_type: Odin_Command_Type, config: Odin_Config, print_command := true, loc := #caller_location) -> bool {
+// Runs the odin compiler. If target is not nil, use target.root_dir for configuring paths
+odin :: proc(target: ^Target, command_type: Odin_Command_Type, config: Odin_Config, print_command := true, loc := #caller_location) -> bool {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
+	config := config
+	if target != nil {
+		config.src_path = filepath.join({target.root_dir, config.src_path}, context.temp_allocator)
+		config.out_dir = filepath.join({target.root_dir, config.out_dir}, context.temp_allocator)
+		config.rc_path = filepath.join({target.root_dir, config.rc_path}, context.temp_allocator)
+	}
 	cmd: string
 	switch command_type {
 	case .Check: cmd = "check"

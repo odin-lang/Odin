@@ -8,6 +8,8 @@ import "core:strings"
 import "core:encoding/json"
 import "core:path/filepath"
 
+import "core:c/libc"
+
 // Creates a directory recursively or does nothing if it exists.
 make_directory :: proc(name: string) {
 	// Note(Dragos): I wrote this a while ago. Is there a better way?
@@ -20,5 +22,10 @@ make_directory :: proc(name: string) {
 }
 
 exec :: proc(file: string, args: []string) -> int {
-	return _exec(file, args)
+	//return _exec(file, args) // Note(Dragos): _exec is not properly implemented. Wait for os2
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
+	cmd := strings.join(args, " ", context.temp_allocator)
+	cmd = strings.join({file, cmd}, " ", context.temp_allocator)
+	cmd_c := strings.clone_to_cstring(cmd, context.temp_allocator)
+	return cast(int)libc.system(cmd_c)
 }
