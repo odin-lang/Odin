@@ -2352,6 +2352,10 @@ gb_internal void lb_add_attribute_to_proc(lbModule *m, LLVMValueRef proc_value, 
 	LLVMAddAttributeAtIndex(proc_value, LLVMAttributeIndex_FunctionIndex, lb_create_enum_attribute(m->ctx, name, value));
 }
 
+gb_internal void lb_add_string_attribute_to_proc(lbModule *m, LLVMValueRef proc_value, char const *name, char const *value) {
+	LLVMAttributeRef attr = LLVMCreateStringAttribute(m->ctx, name, strlen(name), value, strlen(value));
+	LLVMAddAttributeAtIndex(proc_value, LLVMAttributeIndex_FunctionIndex, attr);
+}
 
 
 gb_internal void lb_add_edge(lbBlock *from, lbBlock *to) {

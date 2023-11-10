@@ -315,6 +315,8 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 			LLVMSetSubprogram(p->value, p->debug_info);
 			lb_set_llvm_metadata(m, p, p->debug_info);
 		}
+
+		lb_add_string_attribute_to_proc(m, p->value, "frame-pointer", "all");
 	}
 
 	if (p->body && entity->pkg && ((entity->pkg->kind == Package_Normal) || (entity->pkg->kind == Package_Init))) {
