@@ -73,12 +73,9 @@ Flag_Desc :: struct {
 	help: string,
 }
 
-
 Cli_Info :: struct {
 	project: ^Project, // this can be projects: []^Project
-	additional_flags: []Flag_Desc, // This could be target flags per target
-	additional_projects: []^Project,
-	additional_targets: []^Target,
+	default_target: ^Target,
 }
 
 Cli_Flags_Error :: enum {
@@ -123,25 +120,54 @@ print_general_help :: proc(info: Cli_Info) {
 	}
 }
 
-run_cli :: proc(info: Cli_Info, args: []string) -> bool {
+run_cli :: proc(info: Cli_Info, cli_args: []string) -> bool {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
-	args, err := parse_args(args, context.temp_allocator)
-	mode: Maybe(Run_Mode)
+	args, err := parse_args(cli_args[1:], context.temp_allocator) // cli_args[0] should be the executable
 	target_names_from_args := make_dynamic_array_len_cap([dynamic]string, 0, len(info.project.targets), context.temp_allocator) // This is not fully correct right now
+	filtered_args_by_mode := make([dynamic]Arg, context.temp_allocator)
+	current_mode: Maybe(Run_Mode)
+	last_flag: Flag_Arg
 	for arg in args {
 		#partial switch v in arg {
 		case string: 
 			append(&target_names_from_args, v)
 		case Flag_Arg:
+			flag_found := false
+			for flag_desc in builtin_flags do if flag_desc.flag == v {
+				flag_found = true
+				if current_mode == nil {
+					current_mode = flag_desc.mode
+				}
+				if current_mode != flag_desc.mode {
+					fmt.eprintf("Mode %s set by %s is incompatible with previous mode %s set by previous flag %s. Run `%s -help`` for more details.\n", mode_strings[flag_desc.mode], flag_desc.flag, current_mode.?, last_flag, cli_args[0])
+					return false
+				}
+				last_flag = v
+				append(&filtered_args_by_mode, v)
+				break
+			}
+			if !flag_found {
+				fmt.eprintf("Flag %s does not exist. Run `%s -help` for a list of available flags.\n", v, cli_args[0])
+				return false
+			}
 		}
 	}
 
-	for name in target_names_from_args {
+	if current_mode == nil do current_mode = .Build
+	
+
+	if len(target_names_from_args) > 0 do for name in target_names_from_args {
 		for target in info.project.targets {
 			prefixed_name := strings.concatenate({info.project.target_prefix, target.name})
 			if _match(name, prefixed_name) {
-				
+				run_target(target, current_mode.?, args)
 			}
+		}
+	} else { // if no target is specified, use the default target
+		if current_mode.? == .Help {
+			print_general_help(info) // No target + -help is a special case. It doesn't print the help of the default target, only the general help.
+		} else {
+			run_target(info.default_target, current_mode.?, args)
 		}
 	}
 

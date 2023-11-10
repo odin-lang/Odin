@@ -21,9 +21,9 @@ Project :: struct {
 }
 
 Run_Mode :: enum {
+	Build, // Default Mode
 	Help,
 	Dev,
-    Build,
 }
 
 mode_strings := [Run_Mode]string {
