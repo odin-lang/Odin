@@ -2353,7 +2353,7 @@ gb_internal void lb_add_attribute_to_proc(lbModule *m, LLVMValueRef proc_value, 
 }
 
 gb_internal void lb_add_string_attribute_to_proc(lbModule *m, LLVMValueRef proc_value, char const *name, char const *value) {
-	LLVMAttributeRef attr = LLVMCreateStringAttribute(m->ctx, name, strlen(name), value, strlen(value));
+	LLVMAttributeRef attr = LLVMCreateStringAttribute(m->ctx, name, cast(unsigned)strlen(name), value, cast(unsigned)strlen(value));
 	LLVMAddAttributeAtIndex(proc_value, LLVMAttributeIndex_FunctionIndex, attr);
 }
 
