@@ -2518,6 +2518,13 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 		}
 	}
 
+	// NOTE(Jeroen): Uncomment to get the list of supported microarchitectures.
+	/*
+	if (build_context.microarch == "?") {
+		string_set_add(&build_context.target_features_set, str_lit("+cpuhelp"));
+	}
+	*/
+
 	if (build_context.target_features_set.entries.count != 0) {
 		llvm_features = target_features_set_to_cstring(permanent_allocator(), false);
 	}

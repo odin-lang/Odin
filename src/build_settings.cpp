@@ -82,6 +82,23 @@ gb_global String target_arch_names[TargetArch_COUNT] = {
 	str_lit("wasm64p32"),
 };
 
+gb_global String target_microarch_list[TargetArch_COUNT] = {
+	// TargetArch_Invalid,
+	str_lit("Invalid!"),
+	// TargetArch_amd64,
+	str_lit("alderlake,amdfam10,athlon-fx,athlon64,athlon64-sse3,atom_sse4_2,atom_sse4_2_movbe,barcelona,bdver1,bdver2,bdver3,bdver4,broadwell,btver1,btver2,cannonlake,cascadelake,cooperlake,core-avx-i,core-avx2,core2,core_2_duo_sse4_1,core_2_duo_ssse3,core_2nd_gen_avx,core_3rd_gen_avx,core_4th_gen_avx,core_4th_gen_avx_tsx,core_5th_gen_avx,core_5th_gen_avx_tsx,core_aes_pclmulqdq,core_i7_sse4_2,corei7,corei7-avx,generic,goldmont,goldmont-plus,goldmont_plus,grandridge,graniterapids,graniterapids-d,graniterapids_d,haswell,icelake-client,icelake-server,icelake_client,icelake_server,ivybridge,k8,k8-sse3,knl,knm,meteorlake,mic_avx512,native,nehalem,nocona,opteron,opteron-sse3,penryn,raptorlake,rocketlake,sandybridge,sapphirerapids,sierraforest,silvermont,skx,skylake,skylake-avx512,skylake_avx512,slm,tigerlake,tremont,westmere,x86-64,x86-64-v2 (default),x86-64-v3,x86-64-v4,znver1,znver2,znver3,znver4"),
+	// TargetArch_i386,
+	str_lit("athlon,athlon-4,athlon-mp,athlon-tbird,athlon-xp,atom,bonnell,c3,c3-2,generic (default),geode,i386,i486,i586,i686,k6,k6-2,k6-3,lakemont,native,pentium,pentium-m,pentium-mmx,pentium2,pentium3,pentium3m,pentium4,pentium4m,pentium_4,pentium_4_sse3,pentium_ii,pentium_iii,pentium_iii_no_xmm_regs,pentium_m,pentium_mmx,pentium_pro,pentiumpro,prescott,winchip-c6,winchip2,yonah"),
+	// TargetArch_arm32,
+	str_lit("arm1020e,arm1020t,arm1022e,arm10e,arm10tdmi,arm1136j-s,arm1136jf-s,arm1156t2-s,arm1156t2f-s,arm1176jz-s,arm1176jzf-s,arm710t,arm720t,arm7tdmi,arm7tdmi-s,arm8,arm810,arm9,arm920,arm920t,arm922t,arm926ej-s,arm940t,arm946e-s,arm966e-s,arm968e-s,arm9e,arm9tdmi,cortex-a12,cortex-a15,cortex-a17,cortex-a32,cortex-a35,cortex-a5,cortex-a53,cortex-a55,cortex-a57,cortex-a7,cortex-a710,cortex-a72,cortex-a73,cortex-a75,cortex-a76,cortex-a76ae,cortex-a77,cortex-a78,cortex-a78c,cortex-a8,cortex-a9,cortex-m0,cortex-m0plus,cortex-m1,cortex-m23,cortex-m3,cortex-m33,cortex-m35p,cortex-m4,cortex-m55,cortex-m7,cortex-m85,cortex-r4,cortex-r4f,cortex-r5,cortex-r52,cortex-r7,cortex-r8,cortex-x1,cortex-x1c,cyclone,ep9312,exynos-m3,exynos-m4,exynos-m5,generic (default),iwmmxt,krait,kryo,mpcore,mpcorenovfp,native,neoverse-n1,neoverse-n2,neoverse-v1,sc000,sc300,strongarm,strongarm110,strongarm1100,strongarm1110,swift,xscale"),
+	// TargetArch_arm64,
+	str_lit("a64fx,ampere1,ampere1a,apple-a10,apple-a11,apple-a12,apple-a13,apple-a14,apple-a15,apple-a16,apple-a7,apple-a8,apple-a9,apple-latest,apple-m1,apple-m2,apple-s4,apple-s5,carmel,cortex-a34,cortex-a35,cortex-a510,cortex-a53,cortex-a55,cortex-a57,cortex-a65,cortex-a65ae,cortex-a710,cortex-a715,cortex-a72,cortex-a73,cortex-a75,cortex-a76,cortex-a76ae,cortex-a77,cortex-a78,cortex-a78c,cortex-r82,cortex-x1,cortex-x1c,cortex-x2,cortex-x3,cyclone,exynos-m3,exynos-m4,exynos-m5,falkor,generic (default),kryo,native,neoverse-512tvb,neoverse-e1,neoverse-n1,neoverse-n2,neoverse-v1,neoverse-v2,saphira,thunderx,thunderx2t99,thunderx3t110,thunderxt81,thunderxt83,thunderxt88,tsv110"),
+	// TargetArch_wasm32,
+	str_lit("generic (default)"),
+	// TargetArch_wasm64p32,
+	str_lit("generic (default)"),
+};
+
 gb_global String target_endian_names[TargetEndian_COUNT] = {
 	str_lit("little"),
 	str_lit("big"),
@@ -108,8 +125,6 @@ gb_global TargetEndianKind target_endians[TargetArch_COUNT] = {
 #endif
 
 gb_global String const ODIN_VERSION = str_lit(ODIN_VERSION_RAW);
-
-
 
 struct TargetMetrics {
 	TargetOsKind   os;

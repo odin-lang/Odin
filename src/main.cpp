@@ -2518,6 +2518,45 @@ int main(int arg_count, char const **arg_ptr) {
 	// 	return 1;
 	// }
 
+	// Check chosen microarchitecture. If not found or ?, print list.
+	bool print_microarch_list = true;
+	if (build_context.microarch.len == 0) {
+		// Autodetect, no need to print list.
+		print_microarch_list = false;
+	} else {
+		String march_list = target_microarch_list[build_context.metrics.arch];
+		String_Iterator it = {march_list, 0};
+		for (;;) {
+			String str = string_split_iterator(&it, ',');
+			if (str == "") break;
+			// If it's the entry in the list marked (default), we strip off the suffix before the match.
+			if (string_ends_with(str, str_lit(" (default)"))) {
+				str = substring(str, 0, str.len - 10);
+			}
+			if (str == build_context.microarch) {
+				// Found matching microarch
+				print_microarch_list = false;
+			}
+		}
+	}
+
+	if (print_microarch_list) {
+		if (build_context.microarch != "?") {
+			gb_printf("Unknown microarchitecture '%.*s'.\n", LIT(build_context.microarch));
+		}
+		gb_printf("Possible -microarch values for target %.*s are:\n", LIT(target_arch_names[build_context.metrics.arch]));
+		gb_printf("\n");
+
+		String march_list = target_microarch_list[build_context.metrics.arch];
+		String_Iterator it = {march_list, 0};
+		for (;;) {
+			String str = string_split_iterator(&it, ',');
+			if (str == "") break;
+			gb_printf("\t%.*s\n", LIT(str));
+		}
+		return 0;
+	}
+
 	// Set and check build paths...
 	if (!init_build_paths(init_filename)) {
 		return 1;
