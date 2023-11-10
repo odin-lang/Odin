@@ -282,7 +282,8 @@ Get_Random_Flags :: bit_set[Get_Random_Flags_Bits; i32]
 Perf_Flags :: bit_set[Perf_Flags_Bits; uint]
 
 Perf_Event_Flags :: distinct bit_set[Perf_Event_Flags_Bits; u64]
-Perf_Read_Format_Flags :: distinct bit_set[Perf_Read_Format_Bits; u64]
+
+Perf_Read_Format :: distinct bit_set[Perf_Read_Format_Bits; u64]
 
 Perf_Cap_Flags :: distinct bit_set[Perf_Cap_Flags_Bits; u64]
 
@@ -306,7 +307,7 @@ Perf_Event_Attr :: struct #packed {
 		frequency: u64,
 	},
 	sample_type:        Perf_Event_Sample_Type,
-	read_format:        Perf_Read_Format_Flags,
+	read_format:        Perf_Read_Format,
 	flags:              Perf_Event_Flags,
 	wakeup: struct #raw_union {
 		events:    u32,
