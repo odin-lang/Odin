@@ -93,10 +93,9 @@ _wyhash :: proc "contextless" (data: rawptr, n: int, seed: u64, secret: ^Wyhash_
 			b = (_wy_read_4(p, n - 4) << 32) | _wy_read_4(p, n - 4 - ((n >> 3) <<2))
 		} else if intrinsics.expect(n > 0, true) {
 			a = _wy_read_3(p, n)
-			b = 0
-		} else {
-			a, b = 0, 0
+			// b = 0 (Zero initialized)
 		}
+		// Omit else for n == 0 a, b = 0, 0 (Zero initialized)
 	} else {
 		i := n
 		if intrinsics.expect(i >= 48, false) {
