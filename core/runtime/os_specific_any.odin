@@ -1,4 +1,4 @@
-//+build !freestanding !wasi !windows !js
+//+build !freestanding !wasi !windows !js !linux
 package runtime
 
 import "core:os"
