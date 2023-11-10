@@ -21,6 +21,25 @@
 #include "llvm_backend_stmt.cpp"
 #include "llvm_backend_proc.cpp"
 
+char *get_default_microarchitecture() {
+	char * default_march = "generic";
+	if (build_context.metrics.arch == TargetArch_amd64) {
+		// NOTE(bill): x86-64-v2 is more than enough for everyone
+		//
+		// x86-64: CMOV, CMPXCHG8B, FPU, FXSR, MMX, FXSR, SCE, SSE, SSE2
+		// x86-64-v2: (close to Nehalem) CMPXCHG16B, LAHF-SAHF, POPCNT, SSE3, SSE4.1, SSE4.2, SSSE3
+		// x86-64-v3: (close to Haswell) AVX, AVX2, BMI1, BMI2, F16C, FMA, LZCNT, MOVBE, XSAVE
+		// x86-64-v4: AVX512F, AVX512BW, AVX512CD, AVX512DQ, AVX512VL
+		if (ODIN_LLVM_MINIMUM_VERSION_12) {
+			if (build_context.metrics.os == TargetOs_freestanding) {
+				default_march = "x86-64";
+			} else {
+				default_march = "x86-64-v2";
+			}
+		}
+	}
+	return default_march;
+}
 
 gb_internal void lb_add_foreign_library_path(lbModule *m, Entity *e) {
 	if (e == nullptr) {
@@ -2491,7 +2510,7 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 	}
 
 	char const *host_cpu_name = LLVMGetHostCPUName();
-	char const *llvm_cpu = "generic";
+	char const *llvm_cpu = get_default_microarchitecture();
 	char const *llvm_features = "";
 	if (build_context.microarch.len != 0) {
 		if (build_context.microarch == "native") {
@@ -2501,20 +2520,6 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 		}
 		if (gb_strcmp(llvm_cpu, host_cpu_name) == 0) {
 			llvm_features = LLVMGetHostCPUFeatures();
-		}
-	} else if (build_context.metrics.arch == TargetArch_amd64) {
-		// NOTE(bill): x86-64-v2 is more than enough for everyone
-		//
-		// x86-64: CMOV, CMPXCHG8B, FPU, FXSR, MMX, FXSR, SCE, SSE, SSE2
-		// x86-64-v2: (close to Nehalem) CMPXCHG16B, LAHF-SAHF, POPCNT, SSE3, SSE4.1, SSE4.2, SSSE3
-		// x86-64-v3: (close to Haswell) AVX, AVX2, BMI1, BMI2, F16C, FMA, LZCNT, MOVBE, XSAVE
-		// x86-64-v4: AVX512F, AVX512BW, AVX512CD, AVX512DQ, AVX512VL
-		if (ODIN_LLVM_MINIMUM_VERSION_12) {
-			if (build_context.metrics.os == TargetOs_freestanding) {
-				llvm_cpu = "x86-64";
-			} else {
-				llvm_cpu = "x86-64-v2";
-			}
 		}
 	}
 

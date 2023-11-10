@@ -2529,10 +2529,6 @@ int main(int arg_count, char const **arg_ptr) {
 		for (;;) {
 			String str = string_split_iterator(&it, ',');
 			if (str == "") break;
-			// If it's the entry in the list marked (default), we strip off the suffix before the match.
-			if (string_ends_with(str, str_lit(" (default)"))) {
-				str = substring(str, 0, str.len - 10);
-			}
 			if (str == build_context.microarch) {
 				// Found matching microarch
 				print_microarch_list = false;
@@ -2547,12 +2543,19 @@ int main(int arg_count, char const **arg_ptr) {
 		gb_printf("Possible -microarch values for target %.*s are:\n", LIT(target_arch_names[build_context.metrics.arch]));
 		gb_printf("\n");
 
-		String march_list = target_microarch_list[build_context.metrics.arch];
+		String march_list  = target_microarch_list[build_context.metrics.arch];
 		String_Iterator it = {march_list, 0};
+
+		String default_march = make_string_c(get_default_microarchitecture());
+
 		for (;;) {
 			String str = string_split_iterator(&it, ',');
 			if (str == "") break;
-			gb_printf("\t%.*s\n", LIT(str));
+			if (str == default_march) {
+				gb_printf("\t%.*s (default)\n", LIT(str));
+			} else {
+				gb_printf("\t%.*s\n", LIT(str));
+			}
 		}
 		return 0;
 	}
