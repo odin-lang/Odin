@@ -46,6 +46,8 @@ import nvg       "vendor:nanovg"
 import nvg_gl    "vendor:nanovg/gl"
 import fontstash "vendor:fontstash"
 
+import x11       "vendor:x11"
+
 _ :: botan_bindings
 _ :: botan_blake2b
 _ :: gost
@@ -91,3 +93,5 @@ _ :: lua_5_4
 _ :: nvg
 _ :: nvg_gl
 _ :: fontstash
+
+_ :: x11
