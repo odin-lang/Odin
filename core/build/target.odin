@@ -43,7 +43,6 @@ Target :: struct {
 
 Target_Run_Proc :: #type proc(target: ^Target, mode: Run_Mode, args: []Arg, loc := #caller_location) -> bool
 
-
 add_target :: proc(project: ^Project, target: ^Target, run_proc: Target_Run_Proc, loc := #caller_location) {
 	append(&project.targets, target)
 	target.project = project
@@ -65,4 +64,26 @@ add_target :: proc(project: ^Project, target: ^Target, run_proc: Target_Run_Proc
 run_target :: proc(target: ^Target, mode: Run_Mode, args: []Arg, loc := #caller_location) -> bool {
 	assert(target.run_proc != nil, "Target run proc not found.")
 	return target.run_proc(target, mode, args, loc)
+}
+
+// Returns a path relative to the target root dir. Tries to return the shortest relative path before returning the absolute path
+relpath :: proc(target: ^Target, path: string, allocator := context.allocator) -> (result: string) {
+	is_temp_allocator := allocator == context.temp_allocator
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD(ignore = is_temp_allocator)
+	absolute_path := filepath.join({target.root_dir, path}, context.temp_allocator)
+	relative_path, err := filepath.rel(target.root_dir, absolute_path, context.temp_allocator)
+	result = absolute_path if err != nil else relative_path
+	return strings.clone(result, allocator) if !is_temp_allocator else result
+}
+
+abspath :: proc(target: ^Target, path: string, allocator := context.allocator) -> (result: string) {
+	return filepath.join({target.root_dir, path}, allocator)
+}
+
+trelpath :: proc(target: ^Target, path: string) -> (result: string) {
+	return relpath(target, path, context.temp_allocator)
+}
+
+tabspath :: proc(target: ^Target, path: string) -> (result: string) {
+	return abspath(target, path, context.temp_allocator)
 }

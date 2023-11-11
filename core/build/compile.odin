@@ -1,7 +1,6 @@
 package build
 
 import "core:strings"
-import "core:path/filepath"
 import "core:os"
 import "core:fmt"
 import "core:slice"
@@ -181,7 +180,6 @@ build_odin_args :: proc(config: Odin_Config, allocator := context.allocator) -> 
 	sb := strings.builder_make()
 
 	fmt.sbprintf(&sb, `-out:"%s/%s"`, config.out_dir, config.out_file)
-	
 
 	if config.platform.os == .Windows {
 		if config.pdb_name != "" do fmt.sbprintf(&sb, ` -pdb-name:"%s"`, config.pdb_name)
@@ -246,12 +244,6 @@ build_odin_args :: proc(config: Odin_Config, allocator := context.allocator) -> 
 odin :: proc(target: ^Target, command_type: Odin_Command_Type, config: Odin_Config, print_command := true, loc := #caller_location) -> bool {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	config := config
-	if target != nil {
-		config.src_path = filepath.join({target.root_dir, config.src_path}, context.temp_allocator) // Note(Dragos): different places might require this type of pathing. Maybe add a build.path(target, str, allocator) proc
-		//config.src_path, _ = filepath.rel(target.root_dir, config.src_path, context.temp_allocator) // Note(Dragos): build.path could be relative
-		config.out_dir = filepath.join({target.root_dir, config.out_dir}, context.temp_allocator)
-		if config.rc_path != "" do config.rc_path = filepath.join({target.root_dir, config.rc_path}, context.temp_allocator) // Note(Dragos): Yes, this is ridiculous. please make build.path and let the user handle it correctly. silly dragos
-	}
 	cmd: string
 	switch command_type {
 	case .Check: cmd = "check"
@@ -264,7 +256,7 @@ odin :: proc(target: ^Target, command_type: Odin_Command_Type, config: Odin_Conf
 	args := split_odin_args(args_str, context.temp_allocator)
 	if print_command {
 		fmt.printf("odin %s \"%s\"\n", cmd, config.src_path)
-		for arg in args[1:] { // args[0] is cmd
+		for arg in args[2:] { // args[0] is cmd, arg[1] is package
 			fmt.printf("\t%s\n", arg)
 		}
 	}

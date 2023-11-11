@@ -37,9 +37,12 @@ run_target :: proc(target: ^build.Target, mode: build.Run_Mode, args: []build.Ar
 	target := cast(^Target)target
 	config: build.Odin_Config
 	config.platform = target.platform
-	config.src_path = "src"
 	config.out_file = "demo.exe" if target.platform.os == .Windows else "demo"
-	config.out_dir = fmt.tprintf("out/%s", target.name) // config is a temporary struct
+	
+	config.src_path = build.trelpath(target, "src")
+	config.out_dir = build.trelpath(target, fmt.tprintf("out/%s", target.name))
+	//config.src_path = "src"
+	//config.out_dir = fmt.tprintf("out/%s", target.name)
 	switch target.mode {
 	case .Debug:
 		config.opt = .None
