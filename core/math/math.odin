@@ -203,7 +203,8 @@ pow10_f64 :: proc "contextless" (n: f64) -> f64 {
 	return 0
 }
 
-pow2_f64 :: proc(#any_int exp: int) -> (res: f64) {
+@(require_results)
+pow2_f64 :: proc "contextless" (#any_int exp: int) -> (res: f64) {
 	switch {
 	case exp >= -1022 && exp <= 1023: // Normal
 		return transmute(f64)(u64(exp + F64_BIAS) << F64_SHIFT)
@@ -221,7 +222,8 @@ pow2_f64 :: proc(#any_int exp: int) -> (res: f64) {
 	unreachable()
 }
 
-pow2_f32 :: proc(#any_int exp: int) -> (res: f32) {
+@(require_results)
+pow2_f32 :: proc "contextless" (#any_int exp: int) -> (res: f32) {
 	switch {
 	case exp >= -126 && exp <= 127:  // Normal
 		return transmute(f32)(u32(exp + F32_BIAS) << F32_SHIFT)
@@ -236,7 +238,8 @@ pow2_f32 :: proc(#any_int exp: int) -> (res: f32) {
 	unreachable()
 }
 
-pow2_f16 :: proc(#any_int exp: int) -> (res: f16) {
+@(require_results)
+pow2_f16 :: proc "contextless" (#any_int exp: int) -> (res: f16) {
 	switch {
 	case exp >= -14 && exp <= 15:    // Normal
 		return transmute(f16)(u16(exp + F16_BIAS) << F16_SHIFT)
