@@ -462,7 +462,9 @@ split_port :: proc(endpoint_str: string) -> (addr_or_host: string, port: int, ok
 // Joins an address or hostname with a port.
 join_port :: proc(address_or_host: string, port: int, allocator := context.allocator) -> string {
 	addr_or_host, _, ok := split_port(address_or_host)
-	if !ok do return addr_or_host
+	if !ok {
+		return addr_or_host
+	}
 
 	b := strings.builder_make(allocator)
 

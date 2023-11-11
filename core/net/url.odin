@@ -123,7 +123,9 @@ percent_encode :: proc(s: string, allocator := context.allocator) -> string {
 percent_decode :: proc(encoded_string: string, allocator := context.allocator) -> (decoded_string: string, ok: bool) {
 	b := strings.builder_make(allocator)
 	strings.builder_grow(&b, len(encoded_string))
-	defer if !ok do strings.builder_destroy(&b)
+	defer if !ok {
+		strings.builder_destroy(&b)
+	}
 
 	s := encoded_string
 
@@ -137,7 +139,9 @@ percent_decode :: proc(encoded_string: string, allocator := context.allocator) -
 		strings.write_string(&b, s[:i])
 		s = s[i:]
 
-		if len(s) == 0 do return // percent without anything after it
+		if len(s) == 0 {
+			return // percent without anything after it
+		}
 		s = s[1:]
 
 		if s[0] == '%' {
@@ -177,7 +181,9 @@ base64url_encode :: proc(data: []byte, allocator := context.allocator) -> string
 	}
 	i := len(out)-1;
 	for ; i >= 0; i -= 1 {
-		if out[i] != '=' do break;
+		if out[i] != '=' {
+			break;
+		}
 	}
 	return string(out[:i+1]);
 }
