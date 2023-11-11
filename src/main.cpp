@@ -1876,6 +1876,7 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 		print_usage_line(2, "Examples:");
 		print_usage_line(3, "-microarch:sandybridge");
 		print_usage_line(3, "-microarch:native");
+		print_usage_line(3, "-microarch:? for a list");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-reloc-mode:<string>");
