@@ -12,8 +12,6 @@ import "core:unicode/utf8"
 import "core:unicode"
 import "core:strconv"
 
-// Note(Dragos): If we gots dependencies, then the project should have a #location of sorts, and be appended to paths like the src folder, out dir etc.
-//				That would mean that ALL build systems would EXPECT a certain structure (for example having the build script package as a subfolder of the main project)
 Project :: struct {
 	name: string,
 	targets: [dynamic]^Target,

@@ -5,8 +5,6 @@ import "core:os"
 import "core:strings"
 import "core:fmt"
 
-import build_dep "../dependency/build"
-
 Mode :: enum {
 	Debug,
 	Release,
@@ -23,14 +21,14 @@ target_debug: Target = {
 	target = {
 		name = "dbg",
 		 // Note(Dragos): The nil abi should be changed. Maybe add it to config instead of platform as it's unintuitive and not mentioning it errors
-		platform = {ODIN_OS, ODIN_ARCH, nil},
+		platform = {ODIN_OS, ODIN_ARCH},
 	},
 	mode = .Debug,
 }
 target_release: Target = {
 	target = {
 		name = "rel",
-		platform = {ODIN_OS, ODIN_ARCH, nil},
+		platform = {ODIN_OS, ODIN_ARCH},
 	},
 	mode = .Release,
 }

@@ -15,6 +15,7 @@ Odin_Command_Type :: enum {
 
 Odin_Config :: struct {
 	platform: Platform,
+	abi: Platform_ABI, // Only makes sense for freestanding
 	src_path: string,
 	out_dir: string,
 	out_file: string,
@@ -94,10 +95,10 @@ build_odin_args :: proc(config: Odin_Config, allocator := context.allocator) -> 
 		}
 	}
 	
-	if config.platform.abi == .Default {
+	if config.abi == .Default {
 		fmt.sbprintf(&sb, " -target:%s_%s", _os_to_arg[config.platform.os], _arch_to_arg[config.platform.arch])
 	} else {
-		fmt.sbprintf(&sb, " -target:%s_%s_%s", _os_to_arg[config.platform.os], _arch_to_arg[config.platform.arch], _abi_to_arg[config.platform.abi])
+		fmt.sbprintf(&sb, " -target:%s_%s_%s", _os_to_arg[config.platform.os], _arch_to_arg[config.platform.arch], _abi_to_arg[config.abi])
 	}
 
 	if config.thread_count > 0 {

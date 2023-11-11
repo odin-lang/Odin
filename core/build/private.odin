@@ -57,17 +57,6 @@ _match :: proc(pattern, str: string) -> bool {
 	return false
 }
 
-_platform_to_arg :: proc(sb: ^strings.Builder, platform: Platform) {
-	if platform.os != .Unknown {
-		if platform.abi != .Default {
-			fmt.sbprintf(sb, "-target:%s_%s_%s", _os_to_arg[platform.os], _arch_to_arg[platform.arch], _abi_to_arg[platform.abi])
-		} else {
-			fmt.sbprintf(sb, "-target:%s_%s", _os_to_arg[platform.os], _arch_to_arg[platform.arch])
-		}
-		
-	}
-}
-
 _reloc_to_arg :: proc(sb: ^strings.Builder, reloc: Reloc_Mode) {
 	fmt.sbprintf(sb, "-reloc-mode:%s", _reloc_mode_to_arg[reloc])
 }

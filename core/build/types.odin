@@ -46,7 +46,6 @@ Platform_ABI :: enum {
 Platform :: struct {
 	os: runtime.Odin_OS_Type,
 	arch: runtime.Odin_Arch_Type,
-	abi: Platform_ABI,
 }
 
 Vet_Flag :: enum {
