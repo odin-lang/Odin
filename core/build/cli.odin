@@ -32,7 +32,7 @@ Args_Error :: enum {
 
 // Todo(Dragos): add option to handle ints, floats, bools as strings
 parse_args :: proc(os_args: []string, allocator := context.allocator) -> (args: []Arg, err: Args_Error) {
-	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD(ignore = allocator == context.temp_allocator)
 	context.allocator = allocator
 	args = make([]Arg, len(os_args) - 1)
 	for os_arg, i in os_args[1:] {
