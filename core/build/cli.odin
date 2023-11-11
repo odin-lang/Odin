@@ -86,28 +86,27 @@ builtin_flags := [?]Flag_Desc {
 	{.Help, {"-help", "", ""}, "Displays information about the build system or the target specified."},
 	{.Dev, {"-ols", "", ""}, "Generates an ols.json for the configuration."},
 	{.Dev, {"-vscode", "", ""}, "Generates .vscode folder for debugging."},
-	{.Dev, {"-build-pre-launch", "", ""}, "Runs the build system before debugging."},
-	{.Dev, {"-include-build-system", "<args>", ""}, "Include the build system as a debugging target."},
-	{.Dev, {"-cwd", "<dir>", ""}, "Sets the CWD."},
+	{.Dev, {"-build-pre-launch", "", ""}, "Runs the build system before debugging. (WIP)"},
+	{.Dev, {"-include-build-system", "<args>", ""}, "Include the build system as a debugging target. (WIP)"},
+	{.Dev, {"-cwd", "<dir>", ""}, "Sets the CWD to the specified directory."},
 	{.Dev, {"-cwd-workspace", "", ""}, "Sets the CWD to the root of the build system executable."},
 	{.Dev, {"-cwd-out", "", ""}, "Sets the CWD to the output directory specified in the -out odin flag"},
-	{.Dev, {"-launch-args", "<args>", ""}, "Generates an ols.json for the configuration."},
-	{.Dev, {"-dbg", "<debugger name>", ""}, "Generates an ols.json for the configuration."},
+	{.Dev, {"-launch-args", "<args>", ""}, "The arguments to be sent to the output executable when debugging."},
+	{.Dev, {"-dbg", "<debugger name>", ""}, "Debugger type used. Works with -vscode. Sets the ./vscode/launch.json \"type\" argument"},
 }
 
 print_general_help :: proc(info: Cli_Info) {
-	fmt.printf("%s build system\n", info.project.name)
-	fmt.printf("\tSyntax: %s <flags> <target>\n", filepath.base(os.args[0]))
-	fmt.printf("\tAvailable Targets:\n")
+	fmt.printf("Syntax: %s <flags> <target>\n", filepath.base(os.args[0]))
+	fmt.printf("Available Targets:\n")
 	for target in info.project.targets {
 		prefixed_name := strings.concatenate({info.project.target_prefix, target.name}, context.temp_allocator)
-		fmt.printf("\t\t%s\n", prefixed_name)
+		fmt.printf("\t%s\n", prefixed_name)
 	}
 	fmt.println()
-	fmt.printf("\tBuiltin Flags - Only 1 [Type] group per call. Groups are incompatible\n")
+	fmt.printf("Builtin Flags - Only 1 [Type] group per call. Groups are incompatible\n")
 	
 	for flag_desc in builtin_flags {
-		fmt.printf("\t\t%s %s", mode_strings[flag_desc.mode], flag_desc.flag.flag)
+		fmt.printf("\t%s", flag_desc.flag.flag)
 		if flag_desc.flag.key != "" {
 			fmt.printf(":\"%s\"", flag_desc.flag.key)
 		}
@@ -115,7 +114,7 @@ print_general_help :: proc(info: Cli_Info) {
 			fmt.printf("=\"%s\"", flag_desc.flag.key)
 		}
 		fmt.println()
-		fmt.printf("\t\t\t%s\n", flag_desc.help)
+		fmt.printf("\t\t%s %s\n", mode_strings[flag_desc.mode], flag_desc.help)
 		fmt.println()
 	}
 }
