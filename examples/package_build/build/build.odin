@@ -39,10 +39,10 @@ run_target :: proc(target: ^build.Target, mode: build.Run_Mode, args: []build.Ar
 	config.platform = target.platform
 	config.out_file = "demo.exe" if target.platform.os == .Windows else "demo"
 	
+	// paths must be set with build.relpath / build.abspath in order for them to be relative to the build system root directory (build/../). build.t*path alternatives use context.temp_allocator
 	config.src_path = build.trelpath(target, "src")
 	config.out_dir = build.trelpath(target, fmt.tprintf("out/%s", target.name))
-	//config.src_path = "src"
-	//config.out_dir = fmt.tprintf("out/%s", target.name)
+
 	switch target.mode {
 	case .Debug:
 		config.opt = .None

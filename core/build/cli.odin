@@ -97,7 +97,7 @@ builtin_flags := [?]Flag_Desc {
 
 print_general_help :: proc(info: Cli_Info) {
 	fmt.printf("%s build system\n", info.project.name)
-	fmt.printf("\tSyntax: %s <flags> <target>\n", os.args[0])
+	fmt.printf("\tSyntax: %s <flags> <target>\n", filepath.base(os.args[0]))
 	fmt.printf("\tAvailable Targets:\n")
 	for target in info.project.targets {
 		prefixed_name := strings.concatenate({info.project.target_prefix, target.name}, context.temp_allocator)
