@@ -80,11 +80,13 @@ sort :: proc(sorter: ^$S/Sorter($K)) -> (sorted, cycled: [dynamic]K) {
 		}
 	}
 
-	for root in sorted do for k, _ in relations[root].dependents {
-		relation := &relations[k]
-		relation.dependencies -= 1
-		if relation.dependencies == 0 {
-			append(&sorted, k)
+	for root in sorted {
+		for k, _ in relations[root].dependents {
+			relation := &relations[k]
+			relation.dependencies -= 1
+			if relation.dependencies == 0 {
+				append(&sorted, k)
+			}
 		}
 	}
 

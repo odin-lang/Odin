@@ -33,7 +33,9 @@ init_from_f64 :: proc(x: ^$T/Fixed($Backing, $Fraction_Width), val: f64) {
 	x.i  = Backing(f * (1<<Fraction_Width))
 	x.i &= 1<<Fraction_Width - 1
 	x.i |= Backing(i) << Fraction_Width
-	if val < 0 do x.i *= -1
+	if val < 0 {
+		x.i *= -1
+	}
 }
 
 init_from_parts :: proc(x: ^$T/Fixed($Backing, $Fraction_Width), integer, fraction: Backing) {
