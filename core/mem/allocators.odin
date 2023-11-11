@@ -749,7 +749,9 @@ dynamic_pool_alloc_bytes :: proc(p: ^Dynamic_Pool, bytes: int) -> ([]byte, Alloc
 	n := bytes
 	extra := p.alignment - (n % p.alignment)
 	n += extra
-	if n > p.block_size do return nil, .Invalid_Argument
+	if n > p.block_size {
+		return nil, .Invalid_Argument
+	}
 	if n >= p.out_band_size {
 		assert(p.block_allocator.procedure != nil)
 		memory, err := p.block_allocator.procedure(p.block_allocator.data, Allocator_Mode.Alloc,

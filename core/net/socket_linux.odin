@@ -333,7 +333,9 @@ _set_option :: proc(sock: Any_Socket, option: Socket_Option, value: any, loc := 
 		.Send_Timeout,
 		.Receive_Timeout:
 			t, ok := value.(time.Duration)
-			if !ok do panic("set_option() value must be a time.Duration here", loc)
+			if !ok {
+				panic("set_option() value must be a time.Duration here", loc)
+			}
 
 			micros := cast(i64) (time.duration_microseconds(t))
 			timeval_value.microseconds = cast(int) (micros % 1e6)

@@ -26,7 +26,9 @@ package heap
 make :: proc(data: []$T, less: proc(a, b: T) -> bool) {
 	// amoritize length lookup
 	length := len(data)
-	if length <= 1 do return
+	if length <= 1 {
+		return
+	}
 
 	// start from data parent, no need to consider children
 	for start := (length - 2) / 2; start >= 0; start -= 1 {
@@ -53,7 +55,9 @@ push :: proc(data: []$T, less: proc(a, b: T) -> bool) {
 */
 pop :: proc(data: []$T, less: proc(a, b: T) -> bool) {
 	length := len(data)
-	if length <= 1 do return
+	if length <= 1 {
+		return
+	}
 
 	last := length
 
@@ -206,7 +210,9 @@ sift_up :: proc(data: []$T, less: proc(a, b: T) -> bool) {
 	// amoritize length lookup
 	length := len(data)
 
-	if length <= 1 do return
+	if length <= 1 {
+		return
+	}
 
 	last := length
 	length = (length - 2) / 2
