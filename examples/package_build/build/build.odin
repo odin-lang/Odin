@@ -5,6 +5,8 @@ import "core:os"
 import "core:strings"
 import "core:fmt"
 
+import build_dep "../dependency/build"
+
 Mode :: enum {
 	Debug,
 	Release,
@@ -54,7 +56,7 @@ run_target :: proc(target: ^build.Target, mode: build.Run_Mode, args: []build.Ar
 		build.odin(target, .Build, config) or_return 
 		// Post-build stuff here
 	case .Dev: 
-		return false // mode not implemented
+		return build.generate_odin_devenv(target, config, args)
 	
 	case .Help:
 		return false // mode not implemented
