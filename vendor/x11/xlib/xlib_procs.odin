@@ -44,7 +44,7 @@ foreign xlib {
 	XDefaultDepth      :: proc(display: ^Display) -> i32 ---
 	XDefaultGC         :: proc(display: ^Display, screen_no: i32) -> GC ---
 	XDefaultRootWindow :: proc(display: ^Display) -> Window ---
-	XDefaultScreen     :: proc(display: ^Display) -> ^Screen ---
+	XDefaultScreen     :: proc(display: ^Display) -> i32 ---
 	XDefaultVisual     :: proc(display: ^Display, screen_no: i32) -> ^Visual ---
 	XDefaultScreenOfDisplay ::
 	                      proc(display: ^Display) -> ^Screen ---
