@@ -7,7 +7,7 @@ import "core:reflect"
 import "core:odin/tokenizer"
 _ :: intrinsics
 
-new :: proc($T: typeid, pos, end: tokenizer.Pos) -> ^T {
+new_from_positions :: proc($T: typeid, pos, end: tokenizer.Pos) -> ^T {
 	n, _ := mem.new(T)
 	n.pos = pos
 	n.end = end
@@ -21,6 +21,15 @@ new :: proc($T: typeid, pos, end: tokenizer.Pos) -> ^T {
 		n.derived_stmt = n
 	}
 	return n
+}
+
+new_from_pos_and_end_node :: proc($T: typeid, pos: tokenizer.Pos, end: ^Node) -> ^T {
+	return new(T, pos, end != nil ? end.end : {})
+}
+
+new :: proc {
+	new_from_positions,
+	new_from_pos_and_end_node,
 }
 
 clone :: proc{
