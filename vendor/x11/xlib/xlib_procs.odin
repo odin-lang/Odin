@@ -13,7 +13,7 @@ foreign xlib {
 	// Free data allocated by Xlib
 	XFree              :: proc(ptr: rawptr) ---
 	// Opening/closing a display
-	XOpenDisplay       :: proc(display: ^Display, name: cstring) -> ^Display ---
+	XOpenDisplay       :: proc(name: cstring) -> ^Display ---
 	XCloseDisplay      :: proc(display: ^Display) ---
 	XSetCloseDownMode  :: proc(display: ^Display, mode: CloseMode) ---
 	// Generate a no-op request
