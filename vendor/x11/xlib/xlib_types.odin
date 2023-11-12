@@ -335,7 +335,7 @@ XButtonEvent :: struct {
 	x_root:            i32,
 	y_root:            i32,
 	state:             InputMask,
-	button:            u32,
+	button:            MouseButton,
 	same_screen:       b32,
 }
 

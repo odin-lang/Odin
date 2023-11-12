@@ -68,6 +68,14 @@ BackingStore :: enum i32 {
 	Always     = 2,
 }
 
+MouseButton :: enum i32 {
+	Button1 = 1,
+	Button2 = 2,
+	Button3 = 3,
+	Button4 = 4,
+	Button5 = 5,
+}
+
 EventMask :: bit_set[EventMaskBits; int]
 EventMaskBits :: enum i32 {
 	KeyPress             =  0,
