@@ -1183,7 +1183,7 @@ foreign xlib {
 		display:  ^Display,
 		drawable: Drawable,
 		gc:       GC,
-		image:    XImage,
+		image:    ^XImage,
 		src_x:    i32,
 		src_y:    i32,
 		dst_x:    i32,
