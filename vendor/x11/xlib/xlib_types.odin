@@ -1162,7 +1162,7 @@ XcmsFunctionSet :: struct {
 /* ----  X11/Xutil.h --------------------------------------------------------*/
 
 XSizeHints :: struct {
-	flags:         int,
+	flags:         SizeHints,
 	x:             i32,
 	y:             i32,
 	width:         i32,
@@ -1181,9 +1181,9 @@ XSizeHints :: struct {
 }
 
 XWMHints :: struct {
-	flags:         int,
-	input:         i32,
-	initial_state: i32,
+	flags:         WMHints,
+	input:         b32,
+	initial_state: WMHintState,
 	icon_pixmap:   Pixmap,
 	icon_window:   Window,
 	icon_x:        i32,

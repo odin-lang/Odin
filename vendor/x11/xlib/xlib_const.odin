@@ -17,6 +17,18 @@ AllTemporary    :: 0
 CurrentTime     :: 0
 NoSymbol        :: 0
 
+XA_WM_CLASS          :: Atom(67)
+XA_WM_CLIENT_MACHINE :: Atom(36)
+XA_WM_COMMAND        :: Atom(34)
+XA_WM_HINTS          :: Atom(35)
+XA_WM_ICON_NAME      :: Atom(37)
+XA_WM_ICON_SIZE      :: Atom(38)
+XA_WM_NAME           :: Atom(39)
+XA_WM_NORMAL_HINTS   :: Atom(40)
+XA_WM_SIZE_HINTS     :: Atom(41)
+XA_WM_TRANSIENT_FOR  :: Atom(68)
+XA_WM_ZOOM_HINTS     :: Atom(42)
+
 // NOTE(flysand): Some implementations return Status as enum, other return it
 // as an integer. I will make it a status.
 Status :: enum i32 {
@@ -568,4 +580,46 @@ KeyboardAutoRepeatMode :: enum i32 {
 KeyboardLedMode :: enum i32 {
 	LedModeOff = 0,
 	LedModeOn  = 1,
+}
+
+WMHints :: bit_set[WMHintsBits; uint]
+WMHintsBits :: enum {
+	InputHint        = 0,
+	StateHint        = 1,
+	IconPixmapHint   = 2,
+	IconWindowHint   = 3,
+	IconPositionHint = 4,
+	IconMaskHint     = 5,
+	WindowGroupHint  = 6,
+	XUrgencyHint     = 8,
+}
+
+WMHintState :: enum i32 {
+	WithdrawnState = 0,
+	NormalState    = 1,
+	IconicState    = 3,
+}
+
+AllHints :: WMHints{
+	.InputHint,
+	.StateHint,
+	.IconPixmapHint,
+	.IconWindowHint,
+	.IconPositionHint,
+	.IconMaskHint,
+	.WindowGroupHint,
+}
+
+SizeHints :: bit_set[SizeHintsBits; uint]
+SizeHintsBits :: enum {
+	USPosition  = 0,
+	USSize      = 1,
+	PPosition   = 2,
+	PSize       = 3,
+	PMinSize    = 4,
+	PMaxSize    = 5,
+	PResizeInc  = 6,
+	PAspect     = 7,
+	PBaseSize   = 8,
+	PWinGravity = 9,
 }

@@ -1546,4 +1546,163 @@ foreign xlib {
 	XFreeModifiermap :: proc(modmap: ^XModifierKeymap) ---
 	XSetModifierMapping :: proc(display: ^Display, modmap: ^XModifierKeymap) -> i32 ---
 	XGetModifierMapping :: proc(display: ^Display) -> ^XModifierKeymap ---
+	// Manipulating top-level windows
+	XIconifyWindow :: proc(
+		dipslay:   ^Display,
+		window:    Window,
+		screen_no: i32,
+		) -> Status ---
+	XWithdrawWindow :: proc(
+		dipslay:   ^Display,
+		window:    Window,
+		screen_no: i32,
+		) -> Status ---
+	XReconfigureWMWindow :: proc(
+		dipslay:   ^Display,
+		window:    Window,
+		screen_no: i32,
+		mask:      WindowChangesMask,
+		changes:   ^XWindowChanges,
+		) -> Status ---
+	// Getting and setting the WM_NAME property
+	XSetWMName :: proc(
+		display:   ^Display,
+		window:    Window,
+		prop:      ^XTextProperty
+		) ---
+	XGetWMName :: proc(
+		display: ^Display,
+		window:  Window,
+		prop:    ^XTextProperty,
+		) -> Status ---
+	XStoreName :: proc(
+		display: ^Display,
+		window:  Window,
+		name:    cstring
+		) ---
+	XFetchName :: proc(
+		display: ^Display,
+		window:  Window,
+		name:    ^cstring
+		) -> Status ---
+	XSetWMIconName :: proc(
+		display: ^Display,
+		window:  Window,
+		prop:    ^XTextProperty
+		) ---
+	XGetWMIconName :: proc(
+		display: ^Display,
+		window:  Window,
+		prop:    ^XTextProperty,
+		) -> Status ---
+	XSetIconName :: proc(
+		display: ^Display,
+		window:  Window,
+		name:    cstring,
+		) ---
+	XGetIconName :: proc(
+		display: ^Display,
+		window:  Window,
+		prop:    ^cstring,
+		) -> Status ---
+	// Setting and reading WM_HINTS property
+	XAllocWMHints :: proc() -> ^XWMHints ---
+	XSetWMHints :: proc(
+		display: ^Display,
+		window:  Window,
+		hints:   ^XWMHints,
+		) ---
+	XGetWMHints :: proc(
+		display: ^Display,
+		window:  Window,
+		) -> ^XWMHints ---
+	// Setting and reading MW_NORMAL_HINTS property
+	XAllocSizeHints :: proc() -> ^XSizeHints ---
+	XSetWMNormalHints :: proc(
+		display: ^Display,
+		window:  Window,
+		hints:   ^XSizeHints,
+		) ---
+	XGetWMNormalHints :: proc(
+		display: ^Display,
+		window: Window,
+		hints: ^XSizeHints,
+		flags: ^SizeHints,
+		) -> Status ---
+	XSetWMSizeHints :: proc(
+		display: ^Display,
+		window:  Window,
+		hints:   ^XSizeHints,
+		prop:    Atom,
+		) ---
+	XGetWMSizeHints :: proc(
+		display: ^Display,
+		window:  Window,
+		hints:   ^XSizeHints,
+		masks:   ^SizeHints,
+		prop:    Atom,
+		) -> Status ---
+	// Setting and reading the WM_CLASS property
+	XAllocClassHint :: proc() -> ^XClassHint ---
+	XSetClassHint :: proc(
+		display: ^Display,
+		window:  Window,
+		hint:    ^XClassHint,
+		) ---
+	XGetClassHint :: proc(
+		display: ^Display,
+		window:  Window,
+		hint:    ^XClassHint,
+		) -> Status ---
+	// Setting and reading WM_TRANSIENT_FOR property
+	XSetTransientForHint :: proc(
+		display:     ^Display,
+		window:      Window,
+		prop_window: Window,
+		) ---
+	XGetTransientForHint :: proc(
+		display:     ^Display,
+		window:      Window,
+		prop_window: ^Window,
+		) -> Status ---
+	// Setting and reading the WM_PROTOCOLS property
+	XSetWMProtocols :: proc(
+		display:   ^Display,
+		window:    Window,
+		protocols: [^]Atom,
+		count:     i32,
+		) -> Status ---
+	XGetWMProtocols :: proc(
+		display:   ^Display,
+		window:    Window,
+		protocols: ^[^]Atom,
+		count:     ^i32
+		) -> Status ---
+	// Setting and reading the WM_COLORMAP_WINDOWS property
+	XSetWMColormapWindows :: proc(
+		display:          ^Display,
+		window:           Window,
+		colormap_windows: [^]Window,
+		count:            i32,
+		) -> Status ---
+	XGetWMColormapWindows :: proc(
+		display:          ^Display,
+		window:           Window,
+		colormap_windows: ^[^]Window,
+		count:            ^i32,
+		) -> Status ---
+	// Setting and reading the WM_ICON_SIZE_PROPERTY
+	XAllocIconSize :: proc() -> ^XIconSize ---
+	XSetIconSizes :: proc(
+		display:   ^Display,
+		window:    Window,
+		size_list: [^]XIconSize,
+		count:     i32,
+		) ---
+	XGetIconSizes :: proc(
+		display:   ^Display,
+		window:    Window,
+		size_list: ^[^]XIconSize,
+		count:     ^i32,
+		) -> Status ---
 }
