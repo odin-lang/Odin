@@ -46,7 +46,7 @@ import nvg       "vendor:nanovg"
 import nvg_gl    "vendor:nanovg/gl"
 import fontstash "vendor:fontstash"
 
-import x11       "vendor:x11"
+import xlib       "vendor:x11/xlib"
 
 _ :: botan_bindings
 _ :: botan_blake2b
@@ -94,4 +94,4 @@ _ :: nvg
 _ :: nvg_gl
 _ :: fontstash
 
-_ :: x11
+_ :: xlib
