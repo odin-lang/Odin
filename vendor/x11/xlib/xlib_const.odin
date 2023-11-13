@@ -1,4 +1,4 @@
-
+//+build linux, freebsd, openbsd
 package xlib
 
 // Special values for many types. Most of these constants
