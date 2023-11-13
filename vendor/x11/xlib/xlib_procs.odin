@@ -90,21 +90,21 @@ foreign xlib {
 	XAddConnectionWatch  :: proc(
 		display:   ^Display,
 		procedure: XConnectionWatchProc,
-		data:      rawptr
+		data:      rawptr,
 		) -> Status ---
 	XRemoveConnectionWatch :: proc(
 		display:   ^Display,
 		procedure: XConnectionWatchProc,
-		data:      rawptr
+		data:      rawptr,
 		) -> Status ---
 	XProcessInternalConnections :: proc(
 		display:   ^Display,
-		fd:        i32
+		fd:        i32,
 		) ---
 	XInternalConnectionNumbers :: proc(
 		display:   ^Display,
 		fds:       ^[^]i32,
-		count:     ^i32
+		count:     ^i32,
 		) -> Status ---
 	// Windows functions
 	XVisualIDFromVisual :: proc(visual: ^Visual) -> VisualID ---
@@ -121,7 +121,7 @@ foreign xlib {
 		class:     WindowClass,
 		visual:    ^Visual,
 		attr_mask: WindowAttributeMask,
-		attr:      ^XSetWindowAttributes
+		attr:      ^XSetWindowAttributes,
 		) -> Window ---
 	XCreateSimpleWindow :: proc(
 		display:   ^Display,
@@ -132,7 +132,7 @@ foreign xlib {
 		height:    u32,
 		bordersz:  u32,
 		border:    int,
-		bg:        int
+		bg:        int,
 		) -> Window ---
 	XDestroyWindow     :: proc(display: ^Display, window: Window) ---
 	XDestroySubwindows :: proc(display: ^Display, window: Window) ---
@@ -147,19 +147,19 @@ foreign xlib {
 		display: ^Display,
 		window:  Window,
 		mask:    WindowChangesMask,
-		values:  XWindowChanges
+		values:  XWindowChanges,
 		) ---
 	XMoveWindow :: proc(
 		display: ^Display,
 		window:  Window,
 		x:       i32,
-		y:       i32
+		y:       i32,
 		) ---
 	XResizeWindow :: proc(
 		display: ^Display,
 		window:  Window,
 		width:   u32,
-		height:  u32
+		height:  u32,
 		) ---
 	XMoveResizeWindow :: proc(
 		display: ^Display,
@@ -167,12 +167,12 @@ foreign xlib {
 		x:       i32,
 		y:       i32,
 		width:   u32,
-		height:  u32
+		height:  u32,
 		) ---
 	XSetWindowBorderWidth :: proc(
 		display: ^Display,
 		window:  Window,
-		width:   u32
+		width:   u32,
 		) ---
 	// Window: changing stacking order
 	XRaiseWindow :: proc(display: ^Display, window: Window) ---
@@ -186,31 +186,31 @@ foreign xlib {
 		display:   ^Display,
 		window:    Window,
 		attr_mask: WindowAttributeMask,
-		attr:      XWindowAttributes
+		attr:      XWindowAttributes,
 		) ---
 	XSetWindowBackground :: proc(
 		display:   ^Display,
 		window:    Window,
-		pixel:     uint
+		pixel:     uint,
 		) ---
 	XSetWindowBackgroundMap :: proc(
 		display:   ^Display,
 		window:    Window,
-		pixmap:    Pixmap
+		pixmap:    Pixmap,
 		) ---
 	XSetWindowColormap :: proc(
 		display:   ^Display,
 		window:    Window,
-		colormap:  Colormap
+		colormap:  Colormap,
 		) ---
 	XDefineCursor :: proc(
 		display:   ^Display,
 		window:    Window,
-		cursor:    Cursor
+		cursor:    Cursor,
 		) ---
 	XUndefineCursor :: proc(
 		display:   ^Display,
-		window:    Window
+		window:    Window,
 		) ---
 	// Windows: querying information
 	XQueryTree :: proc(
@@ -219,12 +219,12 @@ foreign xlib {
 		root:      ^Window,
 		parent:    ^Window,
 		children:  ^[^]Window,
-		nchildren: ^u32
+		nchildren: ^u32,
 		) -> Status ---
 	XGetWindowAttributes :: proc(
 		display: ^Display,
 		window:  Window,
-		attr:    XWindowAttributes
+		attr:    XWindowAttributes,
 		) ---
 	XGetGeometry :: proc(
 		display:   ^Display,
@@ -235,7 +235,7 @@ foreign xlib {
 		width:     ^u32,
 		height:    ^u32,
 		border_sz: ^u32,
-		depth:     ^u32
+		depth:     ^u32,
 		) -> Status ---
 	// Windows: translating screen coordinates
 	XTranslateCoordinates :: proc(
@@ -245,7 +245,7 @@ foreign xlib {
 		src_x:      i32,
 		src_y:      i32,
 		dst_x:      ^i32,
-		dst_y:      ^i32
+		dst_y:      ^i32,
 		) -> b32 ---
 	XQueryPointer :: proc(
 		display: ^Display,
@@ -255,29 +255,29 @@ foreign xlib {
 		root_y:  ^i32,
 		x:       ^i32,
 		y:       ^i32,
-		mask:    ^KeyMask
+		mask:    ^KeyMask,
 		) -> b32 ---
 	// Atoms
 	XInternAtom :: proc(
 		display:  ^Display,
 		name:     cstring,
-		existing: b32
+		existing: b32,
 		) -> Atom ---
 	XInternAtoms :: proc(
 		display: ^Display,
 		names:   [^]cstring,
 		count:   i32,
-		atoms:   [^]Atom
+		atoms:   [^]Atom,
 		) -> Status ---
 	XGetAtomName :: proc(
 		display: ^Display,
-		atom:    Atom
+		atom:    Atom,
 		) -> cstring ---
 	XGetAtomNames :: proc(
 		display: ^Display,
 		atoms:   [^]Atom,
 		count:   i32,
-		names:   [^]cstring
+		names:   [^]cstring,
 		) -> Status ---
 	// Windows: Obtaining and changing properties
 	XGetWindowProperty :: proc(
@@ -292,12 +292,12 @@ foreign xlib {
 		act_format:  [^]i32,
 		nitems:      [^]uint,
 		bytes_after: [^]uint,
-		props:       ^rawptr
+		props:       ^rawptr,
 	) -> i32 ---
 	XListProperties :: proc(
 		display:     ^Display,
 		window:      Window,
-		num:         ^i32
+		num:         ^i32,
 		) -> [^]Atom ---
 	XChangeProperty :: proc(
 		display:     ^Display,
@@ -307,30 +307,30 @@ foreign xlib {
 		format:      i32,
 		mode:        i32,
 		data:        rawptr,
-		count:       i32
+		count:       i32,
 		) ---
 	XRotateWindowProperties :: proc(
 		display:     ^Display,
 		window:      Window,
 		props:       [^]Atom,
 		nprops:      i32,
-		npos:        i32
+		npos:        i32,
 		) ---
 	XDeleteProperty :: proc(
 		display:     ^Display,
 		window:      Window,
-		prop:        Atom
+		prop:        Atom,
 		) ---
 	// Selections
 	XSetSelectionOwner :: proc(
 		display:     ^Display,
 		selection:   Atom,
 		owber:       Window,
-		time:        Time
+		time:        Time,
 		) ---
 	XGetSelectionOwner :: proc(
 		display:     ^Display,
-		selection:   Atom
+		selection:   Atom,
 		) -> Window ---
 	XConvertSelection :: proc(
 		display:     ^Display,
@@ -338,7 +338,7 @@ foreign xlib {
 		target:      Atom,
 		property:    Atom,
 		requestor:   Window,
-		time:        Time
+		time:        Time,
 		) ---
 	// Creating and freeing pixmaps
 	XCreatePixmap :: proc(
@@ -346,16 +346,16 @@ foreign xlib {
 		drawable:  Drawable,
 		width:     u32,
 		height:    u32,
-		depth:     u32
+		depth:     u32,
 		) -> Pixmap ---
 	XFreePixmap :: proc(
 		display:   ^Display,
-		pixmap:    Pixmap
+		pixmap:    Pixmap,
 		) ---
 	// Creating recoloring and freeing cursors
 	XCreateFontCursor :: proc(
 		display:   ^Display,
-		shape:     CursorShape
+		shape:     CursorShape,
 		) -> Cursor ---
 	XCreateGlyphCursor :: proc(
 		display:   ^Display,
@@ -364,7 +364,7 @@ foreign xlib {
 		src_char:  u32,
 		mask_char: u32,
 		fg:        ^XColor,
-		bg:        ^XColor
+		bg:        ^XColor,
 		) -> Cursor ---
 	XCreatePixmapCursor :: proc(
 		display:   ^Display,
@@ -373,7 +373,7 @@ foreign xlib {
 		fg:        XColor,
 		bg:        ^XColor,
 		x:         u32,
-		y:         u32
+		y:         u32,
 		) -> Cursor ---
 	XQueryBestCursor :: proc(
 		display:    ^Display,
@@ -381,13 +381,13 @@ foreign xlib {
 		width:      u32,
 		height:     u32,
 		out_width:  ^u32,
-		out_height: ^u32
+		out_height: ^u32,
 		) -> Status ---
 	XRecolorCursor :: proc(
 		display:    ^Display,
 		cursor:     Cursor,
 		fg:         ^XColor,
-		bg:         ^XColor
+		bg:         ^XColor,
 		) ---
 	XFreeCursor :: proc(display: ^Display, cursor: Cursor) ---
 	// Creation/destruction of colormaps
@@ -395,15 +395,15 @@ foreign xlib {
 		display:  ^Display,
 		window:   Window,
 		visual:   Visual,
-		alloc:    ColormapAlloc
+		alloc:    ColormapAlloc,
 		) -> Colormap ---
 	XCopyColormapAndFree :: proc(
 		display:  ^Display,
-		colormap: Colormap
+		colormap: Colormap,
 		) -> Colormap ---
 	XFreeColormap :: proc(
 		display:  ^Display,
-		colormap: Colormap
+		colormap: Colormap,
 		) ---
 	// Mapping color names to values
 	XLookupColor :: proc(
@@ -411,7 +411,7 @@ foreign xlib {
 		colomap:  Colormap,
 		name:     cstring,
 		exact:    ^XColor,
-		screen:   ^XColor
+		screen:   ^XColor,
 		) -> Status ---
 	XcmsLookupColor :: proc(
 		display:  ^Display,
@@ -419,26 +419,26 @@ foreign xlib {
 		name:     cstring,
 		exact:    XcmsColor,
 		screen:   XcmsColor,
-		format:   XcmsColorFormat
+		format:   XcmsColorFormat,
 		) -> Status ---
 	// Allocating and freeing color cells
 	XAllocColor :: proc(
 		display:  ^Display,
 		colormap: Colormap,
-		screen:   ^XColor
+		screen:   ^XColor,
 		) -> Status ---
 	XcmsAllocColor :: proc(
 		display:  ^Display,
 		colormap: Colormap,
 		color:    ^XcmsColor,
-		format:   XcmsColorFormat
+		format:   XcmsColorFormat,
 		) -> Status ---
 	XAllocNamedColor :: proc(
 		display:  ^Display,
 		colormap: Colormap,
 		name:     cstring,
 		screen:   ^XColor,
-		exact:    ^XColor
+		exact:    ^XColor,
 		) -> Status ---
 	XcmsAllocNamedColor :: proc(
 		display:  ^Display,
@@ -446,7 +446,7 @@ foreign xlib {
 		name:     cstring,
 		screen:   ^XcmsColor,
 		exact:    ^XcmsColor,
-		format:   XcmsColorFormat
+		format:   XcmsColorFormat,
 		) -> Status ---
 	XAllocColorCells :: proc(
 		display:  ^Display,
@@ -455,7 +455,7 @@ foreign xlib {
 		pmasks:   [^]uint,
 		np:       u32,
 		pixels:   [^]uint,
-		npixels:  u32
+		npixels:  u32,
 		) -> Status ---
 	XAllocColorPlanes :: proc(
 		display:  ^Display,
@@ -468,74 +468,74 @@ foreign xlib {
 		nblues:   i32,
 		rmask:    [^]uint,
 		gmask:    [^]uint,
-		bmask:    [^]uint
+		bmask:    [^]uint,
 		) -> Status ---
 	XFreeColors :: proc(
 		display:  ^Display,
 		colormap: Colormap,
 		pixels:   [^]uint,
 		npixels:  i32,
-		planes:   uint
+		planes:   uint,
 		) ---
 	// Modifying and querying colormap cells
 	XStoreColor :: proc(
 		display:  ^Display,
 		colormap: Colormap,
-		color:    ^XColor
+		color:    ^XColor,
 		) ---
 	XStoreColors :: proc(
 		display:  ^Display,
 		colormap: Colormap,
 		color:    [^]XColor,
-		ncolors:  i32
+		ncolors:  i32,
 		) ---
 	XcmsStoreColor :: proc(
 		display:  ^Display,
 		colormap: Colormap,
-		color:    ^XcmsColor
+		color:    ^XcmsColor,
 		) -> Status ---
 	XcmsStoreColors :: proc(
 		display:  ^Display,
 		colormap: Colormap,
 		colors:   [^]XcmsColor,
 		ncolors:  XcmsColor,
-		cflags:   [^]b32
+		cflags:   [^]b32,
 		) -> Status ---
 	XStoreNamedColor :: proc(
 		display:  ^Display,
 		colormap: Colormap,
 		name:     cstring,
 		pixel:    uint,
-		flags:    ColorFlags
+		flags:    ColorFlags,
 		) ---
 	XQueryColor :: proc(
 		display:  ^Display,
 		colormap: Colormap,
-		color:    ^XColor
+		color:    ^XColor,
 		) ---
 	XQueryColors :: proc(
 		display:  ^Display,
 		colormap: Colormap,
 		colors:   [^]XColor,
-		ncolors:  i32
+		ncolors:  i32,
 		) ---
 	XcmsQueryColor :: proc(
 		display:  ^Display,
 		colormap: Colormap,
 		color:    ^XcmsColor,
-		format:   XcmsColorFormat
+		format:   XcmsColorFormat,
 		) -> Status ---
 	XcmsQueryColors :: proc(
 		display:  ^Display,
 		colormap: Colormap,
 		color:    [^]XcmsColor,
 		ncolors:  i32,
-		format:   XcmsColorFormat
+		format:   XcmsColorFormat,
 		) -> Status ---
 	// Getting and setting the color conversion context (CCC) of a colormap
 	XcmsCCCOfColormap :: proc(
 		display:  ^Display,
-		colormap: Colormap
+		colormap: Colormap,
 		) -> XcmsCCC ---
 	XcmsSetCCCOfColormap :: proc(
 		display:  ^Display,
@@ -554,17 +554,17 @@ foreign xlib {
 	// Modifying the attributes of color conversion context
 	XcmsSetWhitePoint :: proc(
 		ccc: XcmsCCC,
-		color: ^XcmsColor
+		color: ^XcmsColor,
 		) -> Status ---
 	XcmsSetCompressionProc :: proc(
 		ccc: XcmsCCC,
 		cproc: XcmsCompressionProc,
-		data: rawptr
+		data: rawptr,
 		) -> XcmsCompressionProc ---
 	XcmsSetWhiteAdjustProc :: proc(
 		ccc: XcmsCCC,
 		aproc: XcmsWhiteAdjustProc,
-		data: rawptr
+		data: rawptr,
 		) -> XcmsWhiteAdjustProc ---
 	// Creating and freeing the color conversion context
 	XcmsCreateCCC :: proc(
@@ -575,7 +575,7 @@ foreign xlib {
 		cproc: XcmsCompressionProc,
 		cdata: rawptr,
 		aproc: XcmsWhiteAdjustProc,
-		adata: rawptr
+		adata: rawptr,
 		) -> XcmsCCC ---
 	XcmsFreeCCC :: proc(ccc: XcmsCCC) ---
 	// Converting between colorspaces
@@ -584,7 +584,7 @@ foreign xlib {
 		colors:  [^]XcmsColor,
 		ncolors: u32,
 		format:  XcmsColorFormat,
-		cflags:  [^]b32
+		cflags:  [^]b32,
 		) -> Status ---
 	// Pre-defined gamut compression callbacks
 	XcmsCIELabClipL :: proc(
@@ -592,63 +592,63 @@ foreign xlib {
 		colors:  [^]XcmsColor,
 		ncolors: u32,
 		index:   u32,
-		flags:   [^]b32
+		flags:   [^]b32,
 		) -> Status ---
 	XcmsCIELabClipab :: proc(
 		ctx:     XcmsCCC,
 		colors:  [^]XcmsColor,
 		ncolors: u32,
 		index:   u32,
-		flags:   [^]b32
+		flags:   [^]b32,
 		) -> Status ---
 	XcmsCIELabClipLab :: proc(
 		ctx:     XcmsCCC,
 		colors:  [^]XcmsColor,
 		ncolors: u32,
 		index:   u32,
-		flags:   [^]b32
+		flags:   [^]b32,
 		) -> Status ---
 	XcmsCIELuvClipL :: proc(
 		ctx:     XcmsCCC,
 		colors:  [^]XcmsColor,
 		ncolors: u32,
 		index:   u32,
-		flags:   [^]b32
+		flags:   [^]b32,
 		) -> Status ---
 	XcmsCIELuvClipuv :: proc(
 		ctx:     XcmsCCC,
 		colors:  [^]XcmsColor,
 		ncolors: u32,
 		index:   u32,
-		flags:   [^]b32
+		flags:   [^]b32,
 		) -> Status ---
 	XcmsCIELuvClipLuv :: proc(
 		ctx:     XcmsCCC,
 		colors:  [^]XcmsColor,
 		ncolors: u32,
 		index:   u32,
-		flags:   [^]b32
+		flags:   [^]b32,
 		) -> Status ---
 	XcmsTekHVCClipV :: proc(
 		ctx:     XcmsCCC,
 		colors:  [^]XcmsColor,
 		ncolors: u32,
 		index:   u32,
-		flags:   [^]b32
+		flags:   [^]b32,
 		) -> Status ---
 	XcmsTekHVCClipC :: proc(
 		ctx:     XcmsCCC,
 		colors:  [^]XcmsColor,
 		ncolors: u32,
 		index:   u32,
-		flags:   [^]b32
+		flags:   [^]b32,
 		) -> Status ---
 	XcmsTekHVCClipVC :: proc(
 		ctx:     XcmsCCC,
 		colors:  [^]XcmsColor,
 		ncolors: u32,
 		index:   u32,
-		flags:   [^]b32
+		flags:   [^]b32,
 		) -> Status ---
 	// Pre-defined white-point adjustment procedures
 	XcmsCIELabWhiteShiftColors :: proc(
@@ -658,7 +658,7 @@ foreign xlib {
 		target_format:       XcmsColorFormat,
 		colors:              [^]XcmsColor,
 		ncolors:             u32,
-		compression:         [^]b32
+		compression:         [^]b32,
 		) -> Status ---
 	XcmsCIELuvWhiteShiftColors :: proc(
 		ctx:                 XcmsCCC,
@@ -667,7 +667,7 @@ foreign xlib {
 		target_format:       XcmsColorFormat,
 		colors:              [^]XcmsColor,
 		ncolors:             u32,
-		compression:         [^]b32
+		compression:         [^]b32,
 		) -> Status ---
 	XcmsTekHVCWhiteShiftColors :: proc(
 		ctx:                 XcmsCCC,
@@ -676,136 +676,136 @@ foreign xlib {
 		target_format:       XcmsColorFormat,
 		colors:              [^]XcmsColor,
 		ncolors:             u32,
-		compression:         [^]b32
+		compression:         [^]b32,
 		) -> Status ---
 	// Color querying
 	XcmsQueryBlack :: proc(
 		ccc:    XcmsCCC,
 		format: XcmsColorFormat,
-		color:  ^XcmsColor
+		color:  ^XcmsColor,
 		) -> Status ---
 	XcmsQueryBlue :: proc(
 		ccc:    XcmsCCC,
 		format: XcmsColorFormat,
-		color:  ^XcmsColor
+		color:  ^XcmsColor,
 		) -> Status ---
 	XcmsQueryGreen :: proc(
 		ccc:    XcmsCCC,
 		format: XcmsColorFormat,
-		color:  ^XcmsColor
+		color:  ^XcmsColor,
 		) -> Status ---
 	XcmsQueryRed :: proc(
 		ccc:    XcmsCCC,
 		format: XcmsColorFormat,
-		color:  ^XcmsColor
+		color:  ^XcmsColor,
 		) -> Status ---
 	XcmsQueryWhite :: proc(
 		ccc:    XcmsCCC,
 		format: XcmsColorFormat,
-		color:  ^XcmsColor
+		color:  ^XcmsColor,
 		) -> Status ---
 	// CIELab queries
 	XcmsCIELabQueryMaxC :: proc(
 		ccc:   XcmsCCC,
 		hue:   XcmsFloat,
 		lstar: XcmsFloat,
-		color: ^XcmsColor
+		color: ^XcmsColor,
 		) -> Status ---
 	XcmsCIELabQueryMaxL :: proc(
 		ccc:    XcmsCCC,
 		hue:    XcmsFloat,
 		chroma: XcmsFloat,
-		color:  ^XcmsColor
+		color:  ^XcmsColor,
 		) -> Status ---
 	XcmsCIELabQueryMaxLC :: proc(
 		ccc:    XcmsCCC,
 		hue:    XcmsFloat,
-		color:  ^XcmsColor
+		color:  ^XcmsColor,
 		) -> Status ---
 	XcmsCIELabQueryMinL :: proc(
 		ccc:    XcmsCCC,
 		hue:    XcmsFloat,
 		chroma: XcmsFloat,
-		color:  ^XcmsColor
+		color:  ^XcmsColor,
 		) -> Status ---
 	// CIEluv queries
 	XcmsCIELuvQueryMaxC :: proc(
 		ccc:   XcmsCCC,
 		hue:   XcmsFloat,
 		lstar: XcmsFloat,
-		color: ^XcmsColor
+		color: ^XcmsColor,
 		) -> Status ---
 	XcmsCIELuvQueryMaxL :: proc(
 		ccc:    XcmsCCC,
 		hue:    XcmsFloat,
 		chroma: XcmsFloat,
-		color:  ^XcmsColor
+		color:  ^XcmsColor,
 		) -> Status ---
 	XcmsCIELuvQueryMaxLC :: proc(
 		ccc:   XcmsCCC,
 		hue:   XcmsFloat,
-		color: ^XcmsColor
+		color: ^XcmsColor,
 		) -> Status ---
 	XcmsCIELuvQueryMinL :: proc(
 		ccc:    XcmsCCC,
 		hue:    XcmsFloat,
 		chroma: XcmsFloat,
-		color:  ^XcmsColor
+		color:  ^XcmsColor,
 		) -> Status ---
 	// TexHVX queries
 	XcmsTekHVCQueryMaxC :: proc(
 		ccc:   XcmsCCC,
 		hue:   XcmsFloat,
 		value: XcmsFloat,
-		color: ^XcmsColor
+		color: ^XcmsColor,
 		) -> Status ---
 	XcmsTekHVCQueryMaxV :: proc(
 		ccc:    XcmsCCC,
 		hue:    XcmsFloat,
 		chroma: XcmsFloat,
-		color:  ^XcmsColor
+		color:  ^XcmsColor,
 		) -> Status ---
 	XcmsTekHVCQueryMaxVC :: proc(
 		ccc:    XcmsCCC,
 		hue:    XcmsFloat,
-		color:  ^XcmsColor
+		color:  ^XcmsColor,
 		) -> Status ---
 	XcmsTekHVCQueryMaxVSamples :: proc(
 		ccc:      XcmsCCC,
 		hue:      XcmsFloat,
 		colors:   [^]XcmsColor,
-		nsamples: u32
+		nsamples: u32,
 		) -> Status ---
 	XcmsTekHVCQueryMinV :: proc(
 		ccc:    XcmsCCC,
 		hue:    XcmsFloat,
 		chroma: XcmsFloat,
-		color:  ^XcmsColor
+		color:  ^XcmsColor,
 		) -> Status ---
 	// Graphics context functions
 	XCreateGC :: proc(
 		display:  ^Display,
 		drawable: Drawable,
 		mask:     GCAttributeMask,
-		attr:     ^XGCValues
+		attr:     ^XGCValues,
 		) -> GC ---
 	XCopyGC :: proc(
 		display:  ^Display,
 		src:      GC,
 		dst:      GC,
-		mask:     GCAttributeMask
+		mask:     GCAttributeMask,
 		) ---
 	XChangeGC :: proc(
 		display:  ^Display,
 		gc:       GC,
 		mask:     GCAttributeMask,
-		values:   ^XGCValues
+		values:   ^XGCValues,
 		) ---
 	XGetGCValues :: proc(
 		display:  ^Display,
 		gc:       GC,
 		mask:     GCAttributeMask,
-		values:   ^XGCValues
+		values:   ^XGCValues,
 		) -> Status ---
 	XFreeGC :: proc(display: ^Display, gc: GC) ---
 	XGCContextFromGC :: proc(gc: GC) -> GContext ---
@@ -817,27 +817,27 @@ foreign xlib {
 		fg:      uint,
 		bg:      uint,
 		fn:      GCFunction,
-		pmask:   uint
+		pmask:   uint,
 		) ---
 	XSetForeground :: proc(
 		display: ^Display,
 		gc:      GC,
-		fg:      uint
+		fg:      uint,
 		) ---
 	XSetBackground :: proc(
 		display: ^Display,
 		gc:      GC,
-		bg:      uint
+		bg:      uint,
 		) ---
 	XSetFunction :: proc(
 		display: ^Display,
 		gc:      GC,
-		fn:      GCFunction
+		fn:      GCFunction,
 		) ---
 	XSetPlaneMask :: proc(
 		display: ^Display,
 		gc:      GC,
-		pmask:   uint
+		pmask:   uint,
 		) ---
 	XSetLineAttributes :: proc(
 		display:    ^Display,
@@ -845,24 +845,24 @@ foreign xlib {
 		width:      u32,
 		line_style: LineStyle,
 		cap_style:  CapStyle,
-		join_style: JoinStyle
+		join_style: JoinStyle,
 		) ---
 	XSetDashes :: proc(
 		display:   ^Display,
 		gc:        GC,
 		dash_offs: i32,
 		dash_list: [^]i8,
-		n:         i32
+		n:         i32,
 		) ---
 	XSetFillStyle :: proc(
 		display: ^Display,
 		gc:      GC,
-		style:   FillStyle
+		style:   FillStyle,
 		) ---
 	XSetFillRule :: proc(
 		display: ^Display,
 		gc:      GC,
-		rule:    FillRule
+		rule:    FillRule,
 		) ---
 	XQueryBestSize :: proc(
 		display:    ^Display,
@@ -871,7 +871,7 @@ foreign xlib {
 		width:      u32,
 		height:     u32,
 		out_width:  ^u32,
-		out_height: ^u32
+		out_height: ^u32,
 		) -> Status ---
 	XQueryBestTile :: proc(
 		display:    ^Display,
@@ -879,7 +879,7 @@ foreign xlib {
 		width:      u32,
 		height:     u32,
 		out_width:  ^u32,
-		out_height: ^u32
+		out_height: ^u32,
 		) -> Status ---
 	XQueryBestStripple :: proc(
 		display:    ^Display,
@@ -887,7 +887,7 @@ foreign xlib {
 		width:      u32,
 		height:     u32,
 		out_width:  u32,
-		out_height: u32
+		out_height: u32,
 		) -> Status ---
 	XSetTile       :: proc(display: ^Display, gc: GC, tile: Pixmap) ---
 	XSetStripple   :: proc(display: ^Display, gc: GC, stripple: Pixmap) ---
@@ -902,7 +902,7 @@ foreign xlib {
 		y:        i32,
 		rects:    [^]XRectangle,
 		n:        i32,
-		ordering: i32
+		ordering: i32,
 		) ---
 	XSetArcMode           :: proc(display: ^Display, gc: GC, mode: ArcMode) ---
 	XSetSubwindowMode     :: proc(display: ^Display, gc: GC, mode: SubwindowMode) ---
@@ -915,11 +915,11 @@ foreign xlib {
 		y:       i32, 
 		width:   u32, 
 		height:  u32, 
-		exp:     b32
+		exp:     b32,
 		) ---
 	XClearWindow :: proc(
 		display: ^Display,
-		window: Window
+		window: Window,
 		) ---
 	XCopyArea :: proc(
 		display: ^Display,
@@ -931,7 +931,7 @@ foreign xlib {
 		width:   u32,
 		height:  u32,
 		dst_x:   i32,
-		dst_y:   i32
+		dst_y:   i32,
 		) ---
 	XCopyPlane :: proc(
 		display: ^Display,
@@ -944,7 +944,7 @@ foreign xlib {
 		height:  u32,
 		dst_x:   i32,
 		dst_y:   i32,
-		plane:   uint
+		plane:   uint,
 		) ---
 	// Drawing lines, points, rectangles and arc
 	XDrawPoint :: proc(
@@ -952,7 +952,7 @@ foreign xlib {
 		drawable: Drawable,
 		gc:       GC,
 		x:        i32,
-		y:        i32
+		y:        i32,
 		) ---
 	XDrawPoints :: proc(
 		display:  Display,
@@ -960,7 +960,7 @@ foreign xlib {
 		gc:       GC,
 		point:    [^]XPoint,
 		npoints:  i32,
-		mode:     CoordMode
+		mode:     CoordMode,
 		) ---
 	XDrawLine :: proc(
 		display:  ^Display,
@@ -969,21 +969,21 @@ foreign xlib {
 		x1:       i32,
 		y1:       i32,
 		x2:       i32,
-		y2:       i32
+		y2:       i32,
 		) ---
 	XDrawLines :: proc(
 		display:  ^Display,
 		drawable: Drawable,
 		gc:       GC,
 		points:   [^]XPoint,
-		npoints:  i32
+		npoints:  i32,
 		) ---
 	XDrawSegments :: proc(
 		display:  ^Display,
 		drawable: Drawable,
 		gc:       GC,
 		segs:     [^]XSegment,
-		nsegs:    i32
+		nsegs:    i32,
 		) ---
 	XDrawRectangle :: proc(
 		display:  ^Display,
@@ -992,14 +992,14 @@ foreign xlib {
 		x:        i32,
 		y:        i32,
 		width:    u32,
-		height:   u32
+		height:   u32,
 		) ---
 	XDrawRectangles :: proc(
 		display:  ^Display,
 		drawable: Drawable,
 		gc:       GC,
 		rects:    [^]XRectangle,
-		nrects:   i32
+		nrects:   i32,
 		) ---
 	XDrawArc :: proc(
 		display:  ^Display,
@@ -1010,14 +1010,14 @@ foreign xlib {
 		width:    u32,
 		height:   u32,
 		angle1:   i32,
-		angle2:   i32
+		angle2:   i32,
 		) ---
 	XDrawArcs :: proc(
 		display:  ^Display,
 		drawable: Drawable,
 		gc:       GC,
 		arcs:     [^]XArc,
-		narcs:    i32
+		narcs:    i32,
 		) ---
 	// Filling areas
 	XFillRectangle :: proc(
@@ -1027,14 +1027,14 @@ foreign xlib {
 		x:        i32,
 		y:        i32,
 		width:    u32,
-		height:   u32
+		height:   u32,
 		) ---
 	XFillRectangles :: proc(
 		display:  ^Display,
 		drawable: Drawable,
 		gc:       GC,
 		rects:    [^]XRectangle,
-		nrects:   i32
+		nrects:   i32,
 		) ---
 	XFillPolygon :: proc(
 		display:  ^Display,
@@ -1043,7 +1043,7 @@ foreign xlib {
 		points:   [^]XPoint,
 		npoints:  i32,
 		shape:    Shape,
-		mode:     CoordMode
+		mode:     CoordMode,
 		) ---
 	XFillArc :: proc(
 		display:  ^Display,
@@ -1054,14 +1054,14 @@ foreign xlib {
 		width:    u32,
 		height:   u32,
 		angle1:   i32,
-		angle2:   i32
+		angle2:   i32,
 		) ---
 	XFillArcs :: proc(
 		display:  ^Display,
 		drawable: Drawable,
 		gc:       GC,
 		arcs:     [^]XArc,
-		narcs:    i32
+		narcs:    i32,
 		) ---
 	// Font metrics
 	XLoadFont        :: proc(display: ^Display, name: cstring) -> Font ---
@@ -1077,7 +1077,7 @@ foreign xlib {
 		pat:     cstring,
 		max:     i32,
 		count:   ^i32,
-		info:    ^[^]XFontStruct
+		info:    ^[^]XFontStruct,
 		) -> [^]cstring ---
 	XFreeFontInfo :: proc(names: [^]cstring, info: [^]XFontStruct, count: i32) ---
 	// Computing character string sizes
@@ -1090,7 +1090,7 @@ foreign xlib {
 		direction:   ^FontDirection,
 		ascent:      ^i32,
 		descent:     ^i32,
-		ret:         ^XCharStruct
+		ret:         ^XCharStruct,
 		) ---
 	XTextExtents16 :: proc(
 		font_struct: ^XFontStruct,
@@ -1099,7 +1099,7 @@ foreign xlib {
 		direction:   ^FontDirection,
 		ascent:      ^i32,
 		descent:     ^i32,
-		ret:         ^XCharStruct
+		ret:         ^XCharStruct,
 		) ---
 	XQueryTextExtents :: proc(
 		display:     ^Display,
@@ -1109,7 +1109,7 @@ foreign xlib {
 		direction:   ^FontDirection,
 		ascent:      ^i32,
 		descent:     ^i32,
-		ret:         ^XCharStruct
+		ret:         ^XCharStruct,
 		) ---
 	XQueryTextExtents16 :: proc(
 		display:     ^Display,
@@ -1119,7 +1119,7 @@ foreign xlib {
 		direction:   ^FontDirection,
 		ascent:      ^i32,
 		descent:     ^i32,
-		ret:         ^XCharStruct
+		ret:         ^XCharStruct,
 		) ---
 	// Drawing complex text
 	XDrawText :: proc(
@@ -1129,7 +1129,7 @@ foreign xlib {
 		x:        i32,
 		y:        i32,
 		items:    XTextItem,
-		nitems:   i32
+		nitems:   i32,
 		) ---
 	XDrawText16 :: proc(
 		display:  ^Display,
@@ -1138,7 +1138,7 @@ foreign xlib {
 		x:        i32,
 		y:        i32,
 		items:    XTextItem16,
-		nitems:   i32
+		nitems:   i32,
 		) ---
 	// Drawing text characters
 	XDrawString :: proc(
@@ -1148,7 +1148,7 @@ foreign xlib {
 		x:        i32,
 		y:        i32,
 		string:   [^]u8,
-		length:   i32
+		length:   i32,
 		) ---
 	XDrawString16 :: proc(
 		display:  ^Display,
@@ -1157,7 +1157,7 @@ foreign xlib {
 		x:        i32,
 		y:        i32,
 		string:   [^]XChar2b,
-		length:   i32
+		length:   i32,
 		) ---
 	XDrawImageString :: proc(
 		display:  ^Display,
@@ -1166,7 +1166,7 @@ foreign xlib {
 		x:        i32,
 		y:        i32,
 		string:   [^]u8,
-		length:   i32
+		length:   i32,
 		) ---
 	XDrawImageString16 :: proc(
 		display:  ^Display,
@@ -1175,7 +1175,7 @@ foreign xlib {
 		x:        i32,
 		y:        i32,
 		string:   [^]XChar2b,
-		length:   i32
+		length:   i32,
 		) ---
 	// Transferring images between client and server
 	XInitImage :: proc(image: ^XImage) -> Status ---
@@ -1189,7 +1189,7 @@ foreign xlib {
 		dst_x:    i32,
 		dst_y:    i32,
 		width:    u32,
-		height:   u32
+		height:   u32,
 		) ---
 	XGetImage :: proc(
 		display:  ^Display,
@@ -1199,7 +1199,7 @@ foreign xlib {
 		width:    u32,
 		height:   u32,
 		mask:     uint,
-		format:   ImageFormat
+		format:   ImageFormat,
 		) -> ^XImage ---
 	XGetSubImage :: proc(
 		display:  ^Display,
@@ -1212,7 +1212,7 @@ foreign xlib {
 		format:   ImageFormat,
 		dst:      ^XImage,
 		dst_x:    i32,
-		dst_y:    i32
+		dst_y:    i32,
 		) -> ^XImage ---
 	// Window and session manager functions
 	XReparentWindow :: proc(
@@ -1220,20 +1220,20 @@ foreign xlib {
 		window:  Window,
 		parent:  Window,
 		x:       i32,
-		y:       i32
+		y:       i32,
 		) ---
 	XChangeSaveSet :: proc(
 		display: ^Display,
 		window:  Window,
-		mode:    SaveSetChangeMode
+		mode:    SaveSetChangeMode,
 		) ---
 	XAddToSaveSet :: proc(
 		display: ^Display,
-		window:  Window
+		window:  Window,
 		) ---
 	XRemoveFromSaveSet :: proc(
 		display: ^Display,
-		window:  Window
+		window:  Window,
 		) ---
 	// Managing installed colormaps
 	XInstallColormap        :: proc(display: ^Display, colormap: Colormap) ---
@@ -1254,7 +1254,7 @@ foreign xlib {
 		timeout:   i32,
 		interval:  i32,
 		blanking:  ScreenSaverBlanking,
-		exposures: ScreenSavingExposures
+		exposures: ScreenSavingExposures,
 		) ---
 	XForceScreenSaver    :: proc(display: ^Display, mode: ScreenSaverForceMode) ---
 	XActivateScreenSaver :: proc(display: ^Display) ---
@@ -1264,7 +1264,7 @@ foreign xlib {
 		timeout: ^i32,
 		interval: ^i32,
 		blanking: ^ScreenSaverBlanking,
-		exposures: ^ScreenSavingExposures
+		exposures: ^ScreenSavingExposures,
 		) ---
 	// Controlling host address
 	XAddHost     :: proc(display: ^Display, addr: ^XHostAddress) ---
@@ -1289,58 +1289,58 @@ foreign xlib {
 		display:   ^Display,
 		event:     ^XEvent,
 		predicate: #type proc "c" (display: ^Display, event: ^XEvent, ctx: rawptr) -> b32,
-		ctx:       rawptr
+		ctx:       rawptr,
 		) ---
 	XCheckIfEvent :: proc(
 		display:   ^Display,
 		event:     ^XEvent,
 		predicate: #type proc "c" (display: ^Display, event: ^XEvent, ctx: rawptr) -> b32,
-		arg:       rawptr
+		arg:       rawptr,
 		) -> b32 ---
 	XPeekIfEvent :: proc(
 		display:   ^Display,
 		event:     ^XEvent,
 		predicate: #type proc "c" (display: ^Display, event: ^XEvent, ctx: rawptr) -> b32,
-		ctx:       rawptr
+		ctx:       rawptr,
 		) ---
 	// Selecting events using a window or event mask
 	XWindowEvent :: proc(
 		display:   ^Display,
 		window:    Window,
 		mask:      EventMask,
-		event:     ^XEvent
+		event:     ^XEvent,
 		) ---
 	XCheckWindowEvent :: proc(
 		display:   ^Display,
 		window:    Window,
 		mask:      EventMask,
-		event:     ^XEvent
+		event:     ^XEvent,
 		) -> b32 ---
 	XMaskEvent :: proc(
 		display: ^Display,
 		mask:    EventMask,
-		event:   ^XEvent
+		event:   ^XEvent,
 		) ---
 	XCheckMaskEvent :: proc(
 		display: ^Display,
 		mask:    EventMask,
-		event:   ^XEvent
+		event:   ^XEvent,
 		) -> b32 ---
 	XCheckTypedEvent :: proc(
 		display: ^Display,
 		type:    EventType,
-		event:   ^XEvent
+		event:   ^XEvent,
 		) -> b32 ---
 	XCheckTypedWindowEvent :: proc(
 		display: ^Display,
 		window:  Window,
 		type:    EventType,
-		event:   ^XEvent
+		event:   ^XEvent,
 		) -> b32 ---
 	// Putting events back
 	XPutBackEvent :: proc(
 		display: ^Display,
-		event:   ^XEvent
+		event:   ^XEvent,
 		) ---
 	// Sending events to other applications
 	XSendEvent :: proc(
@@ -1348,7 +1348,7 @@ foreign xlib {
 		window:    Window,
 		propagate: b32,
 		mask:      EventMask,
-		event:     ^XEvent
+		event:     ^XEvent,
 		) -> Status ---
 	// Getting the history of pointer motion
 	XDisplayMotionBufferSize :: proc(display: ^Display) -> uint ---
@@ -1357,26 +1357,26 @@ foreign xlib {
 		window: Window,
 		start: Time,
 		stop: Time,
-		nevents: ^i32
+		nevents: ^i32,
 		) -> [^]XTimeCoord ---
 	// Enabling or disabling synchronization
 	XSetAfterFunction :: proc(
 		display:   ^Display,
-		procedure: #type proc "c" (display: ^Display) -> i32
+		procedure: #type proc "c" (display: ^Display) -> i32,
 		) -> i32 ---
 	XSynchronize :: proc(
 		display: ^Display,
-		onoff: b32
+		onoff: b32,
 		) -> i32 ---
 	// Error handling
 	XSetErrorHandler :: proc(
-		handler: #type proc "c" (display: ^Display, event: ^XErrorEvent) -> i32
+		handler: #type proc "c" (display: ^Display, event: ^XErrorEvent) -> i32,
 		) -> i32 ---
 	XGetErrorText :: proc(
 		display: ^Display,
 		code: i32,
 		buffer: [^]u8,
-		size: i32
+		size: i32,
 		) ---
 	XGetErrorDatabaseText :: proc(
 		display: ^Display,
@@ -1384,11 +1384,11 @@ foreign xlib {
 		message: cstring,
 		default_string: cstring,
 		buffer: [^]u8,
-		size: i32
+		size: i32,
 		) ---
 	XDisplayName :: proc(string: cstring) -> cstring ---
 	XSetIOErrorHandler :: proc(
-		handler: #type proc "c" (display: ^Display) -> i32
+		handler: #type proc "c" (display: ^Display) -> i32,
 		) -> i32 ---
 	// Pointer grabbing
 	XGrabPointer :: proc(
@@ -1400,17 +1400,17 @@ foreign xlib {
 		keyboard_mode: GrabMode,
 		confine_to:    Window,
 		cursor:        Cursor,
-		time:          Time
+		time:          Time,
 		) -> i32 ---
 	XUngrabPointer :: proc(
 		display:       ^Display,
-		time:          Time
+		time:          Time,
 		) -> i32 ---
 	XChangeActivePointerGrab :: proc(
 		display:       ^Display,
 		event_mask:    EventMask,
 		cursor:        Cursor,
-		time:          Time
+		time:          Time,
 		) ---
 	XGrabButton :: proc(
 		display:       ^Display,
@@ -1422,13 +1422,13 @@ foreign xlib {
 		pointer_mode:  GrabMode,
 		keyboard_mode: GrabMode,
 		confine_to:    Window,
-		cursor:        Cursor
+		cursor:        Cursor,
 		) ---
 	XUngrabButton :: proc(
 		display:       ^Display,
 		button:        u32,
 		modifiers:     InputMask,
-		grab_window:   Window
+		grab_window:   Window,
 		) ---
 	XGrabKeyboard :: proc(
 		display:       ^Display,
@@ -1436,11 +1436,11 @@ foreign xlib {
 		owner_events:  b32,
 		pointer_mode:  GrabMode,
 		keyboard_mode: GrabMode,
-		time:          Time
+		time:          Time,
 		) -> i32 ---
 	XUngrabKeyboard :: proc(
 		display:       ^Display,
-		time:          Time
+		time:          Time,
 		) ---
 	XGrabKey :: proc(
 		display:       ^Display,
@@ -1449,13 +1449,13 @@ foreign xlib {
 		grab_window:   Window,
 		owner_events:  b32,
 		pointer_mode:  GrabMode,
-		keyboard_mode: GrabMode
+		keyboard_mode: GrabMode,
 		) ---
 	XUngrabKey :: proc(
 		display:       ^Display,
 		keycode:       i32,
 		modifiers:     InputMask,
-		grab_window:   Window
+		grab_window:   Window,
 		) ---
 	// Resuming event processing
 	XAllowEvents :: proc(display: ^Display, evend_mode: AllowEventsMode, time: Time) ---
@@ -1469,29 +1469,29 @@ foreign xlib {
 		src_width:  u32,
 		src_height: u32,
 		dst_x:      i32,
-		dst_y:      i32
+		dst_y:      i32,
 		) ---
 	// Controlling input focus
 	XSetInputFocus :: proc(
 		display: ^Display,
 		focus: Window,
 		revert_to: FocusRevert,
-		time: Time
+		time: Time,
 		) ---
 	XGetInputFocus :: proc(
 		display: ^Display,
 		focus: ^Window,
-		revert_to: ^FocusRevert
+		revert_to: ^FocusRevert,
 		) ---
 	// Manipulating the keyboard and pointer settings
 	XChangeKeyboardControl :: proc(
 		display: ^Display,
 		mask: KeyboardControlMask,
-		values: ^XKeyboardControl
+		values: ^XKeyboardControl,
 		) ---
 	XGetKeyboardControl :: proc(
 		display: ^Display,
-		values: ^XKeyboardState
+		values: ^XKeyboardState,
 		) ---
 	XAutoRepeatOn  :: proc(display: ^Display) ---
 	XAutoRepeatOff :: proc(display: ^Display) ---
@@ -1505,43 +1505,43 @@ foreign xlib {
 		do_threshold:      b32,
 		accel_numerator:   i32,
 		accel_denominator: i32,
-		threshold:         i32
+		threshold:         i32,
 		) ---
 	XGetPointerControl :: proc(
 		display: ^Display,
 		accel_numerator:   ^i32,
 		accel_denominator: ^i32,
-		threshold:         ^i32
+		threshold:         ^i32,
 		) ---
 	// Manipulating the keyboard encoding
 	XDisplayKeycodes :: proc(
 		display:      ^Display,
 		min_keycodes: ^i32,
-		max_keycodes: ^i32
+		max_keycodes: ^i32,
 		) ---
 	XGetKeyboardMapping :: proc(
 		display:     ^Display,
 		first:       KeyCode,
 		count:       i32,
-		keysyms_per: ^i32
+		keysyms_per: ^i32,
 		) -> ^KeySym ---
 	XChangeKeyboardMapping :: proc(
 		display:     ^Display,
 		first:       KeyCode,
 		keysyms_per: i32,
 		keysyms:     [^]KeySym,
-		num_codes:   i32
+		num_codes:   i32,
 		) ---
 	XNewModifiermap :: proc(max_keys_per_mode: i32) -> ^XModifierKeymap ---
 	XInsertModifiermapEntry :: proc(
 		modmap:        ^XModifierKeymap,
 		keycode_entry: KeyCode,
-		modifier:      i32
+		modifier:      i32,
 		) -> ^XModifierKeymap ---
 	XDeleteModifiermapEntry :: proc(
 		modmap: ^XModifierKeymap,
 		keycode_entry: KeyCode,
-		modifier: i32
+		modifier: i32,
 		) -> ^XModifierKeymap ---
 	XFreeModifiermap :: proc(modmap: ^XModifierKeymap) ---
 	XSetModifierMapping :: proc(display: ^Display, modmap: ^XModifierKeymap) -> i32 ---
@@ -1568,7 +1568,7 @@ foreign xlib {
 	XSetWMName :: proc(
 		display:   ^Display,
 		window:    Window,
-		prop:      ^XTextProperty
+		prop:      ^XTextProperty,
 		) ---
 	XGetWMName :: proc(
 		display: ^Display,
@@ -1578,17 +1578,17 @@ foreign xlib {
 	XStoreName :: proc(
 		display: ^Display,
 		window:  Window,
-		name:    cstring
+		name:    cstring,
 		) ---
 	XFetchName :: proc(
 		display: ^Display,
 		window:  Window,
-		name:    ^cstring
+		name:    ^cstring,
 		) -> Status ---
 	XSetWMIconName :: proc(
 		display: ^Display,
 		window:  Window,
-		prop:    ^XTextProperty
+		prop:    ^XTextProperty,
 		) ---
 	XGetWMIconName :: proc(
 		display: ^Display,
@@ -1676,7 +1676,7 @@ foreign xlib {
 		display:   ^Display,
 		window:    Window,
 		protocols: ^[^]Atom,
-		count:     ^i32
+		count:     ^i32,
 		) -> Status ---
 	// Setting and reading the WM_COLORMAP_WINDOWS property
 	XSetWMColormapWindows :: proc(
@@ -1705,4 +1705,204 @@ foreign xlib {
 		size_list: ^[^]XIconSize,
 		count:     ^i32,
 		) -> Status ---
+	// Using window manager convenience functions
+	XmbSetWMProperties :: proc(
+		display:      ^Display,
+		window:       Window,
+		window_name:  cstring,
+		icon_name:    cstring,
+		argv:         [^]cstring,
+		argc:         i32,
+		normal_hints: ^XSizeHints,
+		wm_hints:     ^XWMHints,
+		class_hints:  ^XClassHint,
+		) ---
+	XSetWMProperties :: proc(
+		display:      ^Display,
+		window:       Window,
+		window_name:  ^XTextProperty,
+		argv:         [^]cstring,
+		argc:         i32,
+		normal_hints: ^XSizeHints,
+		wm_hints:     ^XWMHints,
+		class_hints:  ^XWMHints,
+		) ---
+	// Client to session manager communication
+	XSetCommand :: proc(
+		display: ^Display,
+		window:  Window,
+		argv:    [^]cstring,
+		argc:    i32,
+		) ---
+	XGetCommand :: proc(
+		display: ^Display,
+		window:  Window,
+		argv:    ^[^]cstring,
+		argc:    ^i32,
+		) -> Status ---
+	XSetWMClientMachine :: proc(
+		display: ^Display,
+		window:  Window,
+		prop:    ^XTextProperty,
+		) ---
+	XGetWMClientMachine :: proc(
+		display: ^Display,
+		window:  Window,
+		prop:    ^XTextProperty,
+		) -> Status ---
+	XSetRGBColormaps :: proc(
+		display:  ^Display,
+		window:   Window,
+		colormap: ^XStandardColormap,
+		prop:     Atom,
+		) ---
+	XGetRGBColormaps :: proc(
+		display:  ^Display,
+		window:   Window,
+		colormap: ^[^]XStandardColormap,
+		count:    ^i32,
+		prop:     Atom,
+		) -> Status ---
+	// Keyboard utility functions
+	XLookupKeysym :: proc(
+		event: ^XKeyEvent,
+		index: i32,
+		) -> KeySym ---
+	XKeycodeToKeysym :: proc(
+		display: ^Display,
+		keycode: KeyCode,
+		index: i32,
+		) -> KeySym ---
+	XKeysymToKeycode :: proc(
+		display: ^Display,
+		keysym: KeySym,
+		) -> KeyCode ---
+	XRefreshKeyboardMapping :: proc(event_map: ^XMappingEvent) ---
+	XConvertCase :: proc(
+		keysym: KeySym,
+		lower:  ^KeySym,
+		upper:  ^KeySym,
+		) ---
+	XStringToKeysym :: proc(str: cstring) -> KeySym ---
+	XKeysymToString :: proc(keysym: KeySym) -> cstring ---
+	XLookupString :: proc(
+		event: ^XKeyEvent,
+		buffer: [^]u8,
+		count: i32,
+		keysym: ^KeySym,
+		status: ^XComposeStatus,
+		) -> i32 ---
+	XRebindKeysym :: proc(
+		display: ^Display,
+		keysym: KeySym,
+		list: [^]KeySym,
+		mod_count: i32,
+		string: [^]u8,
+		num_bytes: i32,
+		) ---
+	// Allocating permanent storage
+	XPermalloc :: proc(size: u32) -> rawptr ---
+	// Parsing the window geometry
+	XParseGeometry :: proc(
+		parsestring: cstring,
+		x_ret:       ^i32,
+		y_ret:       ^i32,
+		width:       ^u32,
+		height:      ^u32,
+		) -> i32 ---
+	XWMGeometry :: proc(
+		display:   ^Display,
+		screen_no: i32,
+		user_geom: cstring,
+		def_geom:  cstring,
+		bwidth:    u32,
+		hints:     ^XSizeHints,
+		x_ret:     ^i32,
+		y_ret:     ^i32,
+		w_ret:     ^u32,
+		h_ret:     ^u32,
+		grav:      ^Gravity,
+		) -> i32 ---
+	// Creating, copying and destroying regions
+	XCreateRegion :: proc() -> Region ---
+	XPolygonRegion :: proc(
+		points: [^]XPoint,
+		n:      i32,
+		fill:   FillRule,
+		) -> Region ---
+	XSetRegion :: proc(
+		display: ^Display,
+		gc:      GC,
+		region:  Region,
+		) ---
+	XDestroyRegion :: proc(r: Region) ---
+	// Moving or shrinking regions
+	XOffsetRegion :: proc(region: Region, dx, dy: i32) ---
+	XShrinkRegion :: proc(region: Region, dx, dy: i32) ---
+	// Computing with regions
+	XClipBox :: proc(region: Region, rect: ^XRectangle) ---
+	XIntersectRegion :: proc(sra, srb, ret: Region) ---
+	XUnionRegion :: proc(sra, srb, ret: Region) ---
+	XUnionRectWithRegion :: proc(rect: ^XRectangle, src, dst: Region) ---
+	XSubtractRegion :: proc(sra, srb, ret: Region) ---
+	XXorRegion :: proc(sra, srb, ret: Region) ---
+	XEmptyRegion :: proc(reg: Region) -> b32 ---
+	XEqualRegion :: proc(a,b: Region) -> b32 ---
+	XPointInRegion :: proc(reg: Region, x,y: i32) -> b32 ---
+	XRectInRegion :: proc(reg: Region, x,y: i32, w,h: u32) -> b32 ---
+	// Using cut buffers
+	XStoreBytes :: proc(display: ^Display, bytes: [^]u8, nbytes: i32) ---
+	XStoreBuffer :: proc(display: ^Display, bytes: [^]u8, nbytes: i32, buffer: i32) ---
+	XFetchBytes :: proc(display: ^Display, nbytes: ^i32) -> [^]u8 ---
+	XFetchBuffer :: proc(display: ^Display, nbytes: ^i32, buffer: i32) -> [^]u8 ---
+	// Determining the appropriate visual types
+	XGetVisualInfo :: proc(
+		display: ^Display,
+		mask:    VisualInfoMask,
+		info:    ^XVisualInfo,
+		nret:    ^i32,
+		) -> [^]XVisualInfo ---
+	XMatchVisualInfo :: proc(
+		display:   ^Display,
+		screen_no: i32,
+		depth:     i32,
+		class:     i32,
+		ret:       ^XVisualInfo,
+		) -> Status ---
+	// Manipulating images
+	XCreateImage :: proc(
+		display: ^Display,
+		visual:  ^Visual,
+		depth:   u32,
+		format:  ImageFormat,
+		offset:  i32,
+		data:    rawptr,
+		width:   u32,
+		height:  u32,
+		pad:     i32,
+		stride:  i32,
+		) -> ^XImage ---
+	XGetPixel :: proc(
+		image: ^XImage,
+		x:     i32,
+		y:     i32,
+		) -> uint ---
+	XPutPixel :: proc(
+		image: ^XImage,
+		x:     i32,
+		y:     i32,
+		pixel: uint,
+		) ---
+	XSubImage :: proc(
+		image: ^XImage,
+		x: i32,
+		y: i32,
+		w: u32,
+		h: u32,
+		) -> ^XImage ---
+	XAddPixel :: proc(
+		image: ^XImage,
+		value: int,
+		) ---
+	XDestroyImage :: proc(image: ^XImage) ---
 }

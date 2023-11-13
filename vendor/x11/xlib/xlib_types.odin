@@ -360,7 +360,7 @@ XMotionEvent :: struct {
 	same_screen:       b32,
 }
 
-XPointerMovedEvent :: XMotionEvent;
+XPointerMovedEvent :: XMotionEvent
 
 XCrossingEvent :: struct {
 	type:              EventType,

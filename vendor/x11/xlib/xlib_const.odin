@@ -623,3 +623,29 @@ SizeHintsBits :: enum {
 	PBaseSize   = 8,
 	PWinGravity = 9,
 }
+
+VisualInfoMask :: bit_set[VisualInfoMaskBits; int]
+VisualInfoMaskBits :: enum {
+	VisualIDMask           = 0,
+	VisualScreenMask       = 1,
+	VisualDepthMask        = 2,
+	VisualClassMask        = 3,
+	VisualRedMaskMask      = 4,
+	VisualGreenMaskMask    = 5,
+	VisualBlueMaskMask     = 6,
+	VisualColormapSizeMask = 7,
+	VisualBitsPerRGBMask   = 8,
+}
+
+VisualNoMask  :: VisualInfoMask {}
+VisualAllMask :: VisualInfoMask {
+	.VisualIDMask,
+	.VisualScreenMask,
+	.VisualDepthMask,
+	.VisualClassMask,
+	.VisualRedMaskMask,
+	.VisualGreenMaskMask,
+	.VisualBlueMaskMask,
+	.VisualColormapSizeMask,
+	.VisualBitsPerRGBMask,
+}
