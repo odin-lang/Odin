@@ -1969,6 +1969,16 @@ BITMAPINFO :: struct {
 	bmiColors: [1]RGBQUAD,
 }
 
+BITMAP :: struct {
+	bmType:       LONG,
+	bmWidth:      LONG,
+	bmHeight:     LONG,
+	bmWidthBytes: LONG,
+	bmPlanes:     WORD,
+	bmBitsPixel:  WORD,
+	bmBits:       LPVOID,
+}
+
 // pixel types
 PFD_TYPE_RGBA       :: 0
 PFD_TYPE_COLORINDEX :: 1
