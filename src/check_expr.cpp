@@ -5652,6 +5652,14 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 			} else {
 				if (show_error) {
 					check_assignment(c, o, param_type, str_lit("procedure argument"));
+
+					Type *src = base_type(o->type);
+					Type *dst = base_type(param_type);
+					if (is_type_slice(src) && are_types_identical(src->Slice.elem, dst)) {
+						gbString a = expr_to_string(o->expr);
+						error_line("\tSuggestion: Did you mean to pass the slice into the variadic parameter with ..%s?\n\n", a);
+						gb_string_free(a);
+					}
 				}
 				err = CallArgumentError_WrongTypes;
 			}
