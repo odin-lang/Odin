@@ -34,11 +34,10 @@ Target :: struct {
 	name: string,
 	platform: Platform,
 
-    run_proc: Target_Run_Proc,
+	run_proc: Target_Run_Proc,
 
 	project: ^Project,
 	root_dir: string,
-	depends: [dynamic]^Target,
 }
 
 Target_Run_Proc :: #type proc(target: ^Target, mode: Run_Mode, args: []Arg, loc := #caller_location) -> bool
