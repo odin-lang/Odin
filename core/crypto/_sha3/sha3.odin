@@ -11,7 +11,7 @@ package _sha3
     To use the original Keccak padding, set the is_keccak bool to true, otherwise it will use SHA3 padding.
 */
 
-import "../util"
+import "core:math/bits"
 
 ROUNDS :: 24
 
@@ -38,7 +38,7 @@ keccakf :: proc "contextless" (st: ^[25]u64) {
 		0x8000000000008080, 0x0000000080000001, 0x8000000080008008,
 	}
 
-	keccakf_rotc := [?]i32 {
+	keccakf_rotc := [?]int {
 		1, 3, 6, 10, 15, 21, 28, 36, 45, 55, 2, 14,
 		27, 41, 56, 8, 25, 43, 62, 18, 39, 61, 20, 44,
 	}
@@ -53,18 +53,8 @@ keccakf :: proc "contextless" (st: ^[25]u64) {
 	bc: [5]u64 = ---
 
 	when ODIN_ENDIAN != .Little {
-		v: uintptr = ---
 		for i = 0; i < 25; i += 1 {
-			v := uintptr(&st[i])
-			st[i] =
-				u64((^u8)(v + 0)^ << 0) |
-				u64((^u8)(v + 1)^ << 8) |
-				u64((^u8)(v + 2)^ << 16) |
-				u64((^u8)(v + 3)^ << 24) |
-				u64((^u8)(v + 4)^ << 32) |
-				u64((^u8)(v + 5)^ << 40) |
-				u64((^u8)(v + 6)^ << 48) |
-				u64((^u8)(v + 7)^ << 56)
+			st[i] = bits.byte_swap(st[i])
 		}
 	}
 
@@ -75,7 +65,7 @@ keccakf :: proc "contextless" (st: ^[25]u64) {
 		}
 
 		for i = 0; i < 5; i += 1 {
-			t = bc[(i + 4) % 5] ~ util.ROTL64(bc[(i + 1) % 5], 1)
+			t = bc[(i + 4) % 5] ~ bits.rotate_left64(bc[(i + 1) % 5], 1)
 			for j = 0; j < 25; j += 5 {
 				st[j + i] ~= t
 			}
@@ -86,7 +76,7 @@ keccakf :: proc "contextless" (st: ^[25]u64) {
 		for i = 0; i < 24; i += 1 {
 			j = keccakf_piln[i]
 			bc[0] = st[j]
-			st[j] = util.ROTL64(t, u64(keccakf_rotc[i]))
+			st[j] = bits.rotate_left64(t, keccakf_rotc[i])
 			t = bc[0]
 		}
 
@@ -105,16 +95,7 @@ keccakf :: proc "contextless" (st: ^[25]u64) {
 
 	when ODIN_ENDIAN != .Little {
 		for i = 0; i < 25; i += 1 {
-			v = uintptr(&st[i])
-			t = st[i]
-			(^u8)(v + 0)^ = (t >> 0) & 0xff
-			(^u8)(v + 1)^ = (t >> 8) & 0xff
-			(^u8)(v + 2)^ = (t >> 16) & 0xff
-			(^u8)(v + 3)^ = (t >> 24) & 0xff
-			(^u8)(v + 4)^ = (t >> 32) & 0xff
-			(^u8)(v + 5)^ = (t >> 40) & 0xff
-			(^u8)(v + 6)^ = (t >> 48) & 0xff
-			(^u8)(v + 7)^ = (t >> 56) & 0xff
+			st[i] = bits.byte_swap(st[i])
 		}
 	}
 }
@@ -124,6 +105,7 @@ init :: proc "contextless" (c: ^Sha3_Context) {
 		c.st.q[i] = 0
 	}
 	c.rsiz = 200 - 2 * c.mdlen
+	c.pt = 0
 }
 
 update :: proc "contextless" (c: ^Sha3_Context, data: []byte) {
