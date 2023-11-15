@@ -26,8 +26,13 @@ when ODIN_BUILD_MODE == .Dynamic {
 		// to retrieve argc and argv from the stack
 		when ODIN_ARCH == .amd64 {
 			@require foreign import entry "entry_unix_no_crt_amd64.asm"
+			SYS_exit :: 60
 		} else when ODIN_ARCH == .i386 {
 			@require foreign import entry "entry_unix_no_crt_i386.asm"
+			SYS_exit :: 1
+		} else when ODIN_OS == .Darwin && ODIN_ARCH == .arm64 {
+			@require foreign import entry "entry_unix_no_crt_darwin_arm64.asm"
+			SYS_exit :: 1
 		}
 		@(link_name="_start_odin", linkage="strong", require)
 		_start_odin :: proc "c" (argc: i32, argv: [^]cstring) -> ! {
@@ -36,11 +41,7 @@ when ODIN_BUILD_MODE == .Dynamic {
 			#force_no_inline _startup_runtime()
 			intrinsics.__entry_point()
 			#force_no_inline _cleanup_runtime()
-			when ODIN_ARCH == .amd64 {
-				intrinsics.syscall(/*SYS_exit = */60)
-			} else when ODIN_ARCH == .i386 {
-				intrinsics.syscall(/*SYS_exit = */1)
-			}
+			intrinsics.syscall(SYS_exit, 0)
 			unreachable()
 		}
 	} else {
