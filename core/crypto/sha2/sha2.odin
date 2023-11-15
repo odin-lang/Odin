@@ -11,11 +11,11 @@ package sha2
     and in RFC 3874 <https://datatracker.ietf.org/doc/html/rfc3874>
 */
 
+import "core:encoding/endian"
 import "core:io"
+import "core:math/bits"
 import "core:mem"
 import "core:os"
-
-import "../util"
 
 /*
     High level API
@@ -400,6 +400,9 @@ init :: proc(ctx: ^$T) {
 			ctx.h[7] = 0x5be0cd19137e2179
 		}
 	}
+
+	ctx.tot_len = 0
+	ctx.length = 0
 }
 
 update :: proc(ctx: ^$T, data: []byte) {
@@ -453,21 +456,21 @@ final :: proc(ctx: ^$T, hash: []byte) {
 	mem.set(rawptr(&(ctx.block[ctx.length:])[0]), 0, int(uint(pm_len) - ctx.length))
 	ctx.block[ctx.length] = 0x80
 
-	util.PUT_U32_BE(ctx.block[pm_len - 4:], len_b)
+	endian.unchecked_put_u32be(ctx.block[pm_len - 4:], len_b)
 
 	sha2_transf(ctx, ctx.block[:], uint(block_nb))
 
 	when T == Sha256_Context {
 		if ctx.is224 {
-			for i = 0; i < 7; i += 1 {util.PUT_U32_BE(hash[i << 2:], ctx.h[i])}
+			for i = 0; i < 7; i += 1 {endian.unchecked_put_u32be(hash[i << 2:], ctx.h[i])}
 		} else {
-			for i = 0; i < 8; i += 1 {util.PUT_U32_BE(hash[i << 2:], ctx.h[i])}
+			for i = 0; i < 8; i += 1 {endian.unchecked_put_u32be(hash[i << 2:], ctx.h[i])}
 		}
 	} else when T == Sha512_Context {
 		if ctx.is384 {
-			for i = 0; i < 6; i += 1 {util.PUT_U64_BE(hash[i << 3:], ctx.h[i])}
+			for i = 0; i < 6; i += 1 {endian.unchecked_put_u64be(hash[i << 3:], ctx.h[i])}
 		} else {
-			for i = 0; i < 8; i += 1 {util.PUT_U64_BE(hash[i << 3:], ctx.h[i])}
+			for i = 0; i < 8; i += 1 {endian.unchecked_put_u64be(hash[i << 3:], ctx.h[i])}
 		}
 	}
 }
@@ -495,6 +498,7 @@ Sha512_Context :: struct {
 	is384:   bool,
 }
 
+@(private)
 sha256_k := [64]u32 {
 	0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5,
 	0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
@@ -514,6 +518,7 @@ sha256_k := [64]u32 {
 	0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2,
 }
 
+@(private)
 sha512_k := [80]u64 {
 	0x428a2f98d728ae22, 0x7137449123ef65cd,
 	0xb5c0fbcfec4d3b2f, 0xe9b5dba58189dbbc,
@@ -557,70 +562,67 @@ sha512_k := [80]u64 {
 	0x5fcb6fab3ad6faec, 0x6c44198c4a475817,
 }
 
+@(private)
 SHA256_CH :: #force_inline proc "contextless" (x, y, z: u32) -> u32 {
 	return (x & y) ~ (~x & z)
 }
 
+@(private)
 SHA256_MAJ :: #force_inline proc "contextless" (x, y, z: u32) -> u32 {
 	return (x & y) ~ (x & z) ~ (y & z)
 }
 
+@(private)
 SHA512_CH :: #force_inline proc "contextless" (x, y, z: u64) -> u64 {
 	return (x & y) ~ (~x & z)
 }
 
+@(private)
 SHA512_MAJ :: #force_inline proc "contextless" (x, y, z: u64) -> u64 {
 	return (x & y) ~ (x & z) ~ (y & z)
 }
 
+@(private)
 SHA256_F1 :: #force_inline proc "contextless" (x: u32) -> u32 {
-	return util.ROTR32(x, 2) ~ util.ROTR32(x, 13) ~ util.ROTR32(x, 22)
+	return bits.rotate_left32(x, 30) ~ bits.rotate_left32(x, 19) ~ bits.rotate_left32(x, 10)
 }
 
+@(private)
 SHA256_F2 :: #force_inline proc "contextless" (x: u32) -> u32 {
-	return util.ROTR32(x, 6) ~ util.ROTR32(x, 11) ~ util.ROTR32(x, 25)
+	return bits.rotate_left32(x, 26) ~ bits.rotate_left32(x, 21) ~ bits.rotate_left32(x, 7)
 }
 
+@(private)
 SHA256_F3 :: #force_inline proc "contextless" (x: u32) -> u32 {
-	return util.ROTR32(x, 7) ~ util.ROTR32(x, 18) ~ (x >> 3)
+	return bits.rotate_left32(x, 25) ~ bits.rotate_left32(x, 14) ~ (x >> 3)
 }
 
+@(private)
 SHA256_F4 :: #force_inline proc "contextless" (x: u32) -> u32 {
-	return util.ROTR32(x, 17) ~ util.ROTR32(x, 19) ~ (x >> 10)
+	return bits.rotate_left32(x, 15) ~ bits.rotate_left32(x, 13) ~ (x >> 10)
 }
 
+@(private)
 SHA512_F1 :: #force_inline proc "contextless" (x: u64) -> u64 {
-	return util.ROTR64(x, 28) ~ util.ROTR64(x, 34) ~ util.ROTR64(x, 39)
+	return bits.rotate_left64(x, 36) ~ bits.rotate_left64(x, 30) ~ bits.rotate_left64(x, 25)
 }
 
+@(private)
 SHA512_F2 :: #force_inline proc "contextless" (x: u64) -> u64 {
-	return util.ROTR64(x, 14) ~ util.ROTR64(x, 18) ~ util.ROTR64(x, 41)
+	return bits.rotate_left64(x, 50) ~ bits.rotate_left64(x, 46) ~ bits.rotate_left64(x, 23)
 }
 
+@(private)
 SHA512_F3 :: #force_inline proc "contextless" (x: u64) -> u64 {
-	return util.ROTR64(x, 1) ~ util.ROTR64(x, 8) ~ (x >> 7)
+	return bits.rotate_left64(x, 63) ~ bits.rotate_left64(x, 56) ~ (x >> 7)
 }
 
+@(private)
 SHA512_F4 :: #force_inline proc "contextless" (x: u64) -> u64 {
-	return util.ROTR64(x, 19) ~ util.ROTR64(x, 61) ~ (x >> 6)
+	return bits.rotate_left64(x, 45) ~ bits.rotate_left64(x, 3) ~ (x >> 6)
 }
 
-PACK32 :: #force_inline proc "contextless" (b: []byte, x: ^u32) {
-	x^ = u32(b[3]) | u32(b[2]) << 8 | u32(b[1]) << 16 | u32(b[0]) << 24
-}
-
-PACK64 :: #force_inline proc "contextless" (b: []byte, x: ^u64) {
-	x^ =
-		u64(b[7]) |
-		u64(b[6]) << 8 |
-		u64(b[5]) << 16 |
-		u64(b[4]) << 24 |
-		u64(b[3]) << 32 |
-		u64(b[2]) << 40 |
-		u64(b[1]) << 48 |
-		u64(b[0]) << 56
-}
-
+@(private)
 sha2_transf :: proc(ctx: ^$T, data: []byte, block_nb: uint) {
 	when T == Sha256_Context {
 		w: [64]u32
@@ -644,9 +646,9 @@ sha2_transf :: proc(ctx: ^$T, data: []byte, block_nb: uint) {
 
 		for j = 0; j < 16; j += 1 {
 			when T == Sha256_Context {
-				PACK32(sub_block[j << 2:], &w[j])
+				w[j] = endian.unchecked_get_u32be(sub_block[j << 2:])
 			} else when T == Sha512_Context {
-				PACK64(sub_block[j << 3:], &w[j])
+				w[j] = endian.unchecked_get_u64be(sub_block[j << 3:])
 			}
 		}
 
