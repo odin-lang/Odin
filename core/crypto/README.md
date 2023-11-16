@@ -11,7 +11,6 @@ Please see the chart below for the options.
 | [BLAKE2B](https://datatracker.ietf.org/doc/html/rfc7693)                                                     | &#10004;&#65039; |
 | [BLAKE2S](https://datatracker.ietf.org/doc/html/rfc7693)                                                     | &#10004;&#65039; |
 | [Keccak](https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.202.pdf)                                           | &#10004;&#65039; |
-| [MD4](https://datatracker.ietf.org/doc/html/rfc1320)                                                         | &#10004;&#65039; |
 | [MD5](https://datatracker.ietf.org/doc/html/rfc1321)                                                         | &#10004;&#65039; |
 | [RIPEMD](https://homes.esat.kuleuven.be/~bosselae/ripemd160.html)                                            | &#10004;&#65039; |
 | [SHA-1](https://datatracker.ietf.org/doc/html/rfc3174)                                                       | &#10004;&#65039; |

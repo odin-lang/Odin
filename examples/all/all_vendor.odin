@@ -3,7 +3,6 @@ package all
 import botan_bindings "vendor:botan/bindings"
 import botan_blake2b  "vendor:botan/blake2b"
 import keccak         "vendor:botan/keccak"
-import md4            "vendor:botan/md4"
 import md5            "vendor:botan/md5"
 import ripemd         "vendor:botan/ripemd"
 import sha1           "vendor:botan/sha1"
@@ -48,7 +47,6 @@ import fontstash "vendor:fontstash"
 _ :: botan_bindings
 _ :: botan_blake2b
 _ :: keccak
-_ :: md4
 _ :: md5
 _ :: ripemd
 _ :: sha1

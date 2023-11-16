@@ -10,7 +10,6 @@ Wrappers for hashing algorithms have been added to match the API within the Odin
 |:-------------------------------------------------------------------------------------------------------------|:-----------------|
 | [BLAKE2B](https://datatracker.ietf.org/doc/html/rfc7693)                                                     | &#10004;&#65039; |
 | [Keccak](https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.202.pdf)                                           | &#10004;&#65039; |
-| [MD4](https://datatracker.ietf.org/doc/html/rfc1320)                                                         | &#10004;&#65039; |
 | [MD5](https://datatracker.ietf.org/doc/html/rfc1321)                                                         | &#10004;&#65039; |
 | [RIPEMD-160](https://homes.esat.kuleuven.be/~bosselae/ripemd160.html)                                        | &#10004;&#65039; |
 | [SHA-1](https://datatracker.ietf.org/doc/html/rfc3174)                                                       | &#10004;&#65039; |

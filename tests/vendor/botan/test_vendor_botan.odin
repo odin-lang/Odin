@@ -17,7 +17,6 @@ import "core:fmt"
 import "core:os"
 import "core:strings"
 
-import "vendor:botan/md4"
 import "vendor:botan/md5"
 import "vendor:botan/sha1"
 import "vendor:botan/sha2"
@@ -58,7 +57,6 @@ when ODIN_TEST {
 
 main :: proc() {
     t := testing.T{}
-    test_md4(&t)
     test_md5(&t)
     test_sha1(&t)
     test_sha224(&t)
@@ -104,25 +102,6 @@ hex_string :: proc(bytes: []byte, allocator := context.temp_allocator) -> string
         buf[i * 2 + 1] = lut[bytes[i]      & 0xf]
     }
     return string(buf)
-}
-
-@(test)
-test_md4 :: proc(t: ^testing.T) {
-    // Official test vectors from https://datatracker.ietf.org/doc/html/rfc1320
-    test_vectors := [?]TestHash {
-        TestHash{"31d6cfe0d16ae931b73c59d7e0c089c0", ""},
-        TestHash{"bde52cb31de33e46245e05fbdbd6fb24", "a"},
-        TestHash{"a448017aaf21d8525fc10ae87aa6729d", "abc"},
-        TestHash{"d9130a8164549fe818874806e1c7014b", "message digest"},
-        TestHash{"d79e1c308aa5bbcdeea8ed63df412da9", "abcdefghijklmnopqrstuvwxyz"},
-        TestHash{"043f8582f241db351ce627e153e7f0e4", "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"},
-        TestHash{"e33b4ddc9c38f2199c3e7b164fcc0536", "12345678901234567890123456789012345678901234567890123456789012345678901234567890"},
-    }
-    for v, _ in test_vectors {
-        computed     := md4.hash(v.str)
-        computed_str := hex_string(computed[:])
-        expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
-    }
 }
 
 @(test)

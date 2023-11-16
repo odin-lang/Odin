@@ -28,7 +28,6 @@ import blake2s          "core:crypto/blake2s"
 import chacha20         "core:crypto/chacha20"
 import chacha20poly1305 "core:crypto/chacha20poly1305"
 import keccak           "core:crypto/keccak"
-import md4              "core:crypto/md4"
 import md5              "core:crypto/md5"
 import poly1305         "core:crypto/poly1305"
 import ripemd           "core:crypto/ripemd"
@@ -149,7 +148,6 @@ _ :: blake2s
 _ :: chacha20
 _ :: chacha20poly1305
 _ :: keccak
-_ :: md4
 _ :: md5
 _ :: poly1305
 _ :: ripemd
