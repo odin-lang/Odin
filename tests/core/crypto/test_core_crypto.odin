@@ -32,7 +32,6 @@ import "core:crypto/tiger"
 import "core:crypto/tiger2"
 import "core:crypto/streebog"
 import "core:crypto/sm3"
-import "core:crypto/jh"
 import "core:crypto/siphash"
 import "core:os"
 
@@ -94,10 +93,6 @@ main :: proc() {
 	test_tiger2_160(&t)
 	test_tiger2_192(&t)
 	test_sm3(&t)
-	test_jh_224(&t)
-	test_jh_256(&t)
-	test_jh_384(&t)
-	test_jh_512(&t)
 	test_siphash_2_4(&t)
 
 	// "modern" crypto tests
@@ -752,62 +747,6 @@ test_sm3 :: proc(t: ^testing.T) {
 	}
 	for v, _ in test_vectors {
 		computed     := sm3.hash(v.str)
-		computed_str := hex_string(computed[:])
-		expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
-	}
-}
-
-@(test)
-test_jh_224 :: proc(t: ^testing.T) {
-	test_vectors := [?]TestHash {
-		TestHash{"2c99df889b019309051c60fecc2bd285a774940e43175b76b2626630", ""},
-		TestHash{"e715f969fb61b203a97e494aab92d91a9cec52f0933436b0d63bf722", "a"},
-		TestHash{"c2b1967e635bd55b6a4d36f863ac4a877be302251d68692873007281", "12345678901234567890123456789012345678901234567890123456789012345678901234567890"},
-	}
-	for v, _ in test_vectors {
-		computed     := jh.hash_224(v.str)
-		computed_str := hex_string(computed[:])
-		expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
-	}
-}
-
-@(test)
-test_jh_256 :: proc(t: ^testing.T) {
-	test_vectors := [?]TestHash {
-		TestHash{"46e64619c18bb0a92a5e87185a47eef83ca747b8fcc8e1412921357e326df434", ""},
-		TestHash{"d52c0c130a1bc0ae5136375637a52773e150c71efe1c968df8956f6745b05386", "a"},
-		TestHash{"fc4214867025a8af94c614353b3553b10e561ae749fc18c40e5fd44a7a4ecd1b", "12345678901234567890123456789012345678901234567890123456789012345678901234567890"},
-	}
-	for v, _ in test_vectors {
-		computed     := jh.hash_256(v.str)
-		computed_str := hex_string(computed[:])
-		expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
-	}
-}
-
-@(test)
-test_jh_384 :: proc(t: ^testing.T) {
-	test_vectors := [?]TestHash {
-		TestHash{"2fe5f71b1b3290d3c017fb3c1a4d02a5cbeb03a0476481e25082434a881994b0ff99e078d2c16b105ad069b569315328", ""},
-		TestHash{"77de897ca4fd5dadfbcbd1d8d4ea3c3c1426855e38661325853e92b069f3fe156729f6bbb9a5892c7c18a77f1cb9d0bb", "a"},
-		TestHash{"6f73d9b9b8ed362f8180fb26020725b40bd6ca75b3b947405f26c4c37a885ce028876dc42e379d2faf6146fed3ea0e42", "12345678901234567890123456789012345678901234567890123456789012345678901234567890"},
-	}
-	for v, _ in test_vectors {
-		computed     := jh.hash_384(v.str)
-		computed_str := hex_string(computed[:])
-		expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
-	}
-}
-
-@(test)
-test_jh_512 :: proc(t: ^testing.T) {
-	test_vectors := [?]TestHash {
-		TestHash{"90ecf2f76f9d2c8017d979ad5ab96b87d58fc8fc4b83060f3f900774faa2c8fabe69c5f4ff1ec2b61d6b316941cedee117fb04b1f4c5bc1b919ae841c50eec4f", ""},
-		TestHash{"f12c87e986daff17c481c81a99a39b603ca6bafcd320c5735523b97cb9a26f7681bad62ffad9aad0e21160a05f773fb0d1434ca4cbcb0483f480a171ada1561b", "a"},
-		TestHash{"bafb8e710b35eabeb1a48220c4b0987c2c985b6e73b7b31d164bfb9d67c94d99d7bc43b474a25e647cd6cc36334b6a00a5f2a85fae74907fd2885c6168132fe7", "12345678901234567890123456789012345678901234567890123456789012345678901234567890"},
-	}
-	for v, _ in test_vectors {
-		computed     := jh.hash_512(v.str)
 		computed_str := hex_string(computed[:])
 		expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
 	}

@@ -10,7 +10,6 @@ Please see the chart below for the options.
 |:-------------------------------------------------------------------------------------------------------------|:-----------------|
 | [BLAKE2B](https://datatracker.ietf.org/doc/html/rfc7693)                                                     | &#10004;&#65039; |
 | [BLAKE2S](https://datatracker.ietf.org/doc/html/rfc7693)                                                     | &#10004;&#65039; |
-| [JH](https://www3.ntu.edu.sg/home/wuhj/research/jh/index.html)                                               | &#10004;&#65039; |
 | [Keccak](https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.202.pdf)                                           | &#10004;&#65039; |
 | [MD2](https://datatracker.ietf.org/doc/html/rfc1319)                                                         | &#10004;&#65039; |
 | [MD4](https://datatracker.ietf.org/doc/html/rfc1320)                                                         | &#10004;&#65039; |
