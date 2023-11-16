@@ -10,7 +10,7 @@ package _blake2
     Implementation of the BLAKE2 hashing algorithm, as defined in <https://datatracker.ietf.org/doc/html/rfc7693> and <https://www.blake2.net/>
 */
 
-import "../util"
+import "core:encoding/endian"
 
 BLAKE2S_BLOCK_SIZE :: 64
 BLAKE2S_SIZE :: 32
@@ -65,11 +65,13 @@ Blake2_Tree :: struct {
 	is_last_node:    bool,
 }
 
+@(private)
 BLAKE2S_IV := [8]u32 {
 	0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
 	0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19,
 }
 
+@(private)
 BLAKE2B_IV := [8]u64 {
 	0x6a09e667f3bcc908, 0xbb67ae8584caa73b,
 	0x3c6ef372fe94f82b, 0xa54ff53a5f1d36f1,
@@ -108,7 +110,7 @@ init :: proc(ctx: ^$T) {
 	if ctx.cfg.tree != nil {
 		p[2] = ctx.cfg.tree.(Blake2_Tree).fanout
 		p[3] = ctx.cfg.tree.(Blake2_Tree).max_depth
-		util.PUT_U32_LE(p[4:], ctx.cfg.tree.(Blake2_Tree).leaf_size)
+		endian.unchecked_put_u32le(p[4:], ctx.cfg.tree.(Blake2_Tree).leaf_size)
 		when T == Blake2s_Context {
 			p[8] = byte(ctx.cfg.tree.(Blake2_Tree).node_offset)
 			p[9] = byte(ctx.cfg.tree.(Blake2_Tree).node_offset >> 8)
@@ -119,7 +121,7 @@ init :: proc(ctx: ^$T) {
 			p[14] = ctx.cfg.tree.(Blake2_Tree).node_depth
 			p[15] = ctx.cfg.tree.(Blake2_Tree).inner_hash_size
 		} else when T == Blake2b_Context {
-			util.PUT_U64_LE(p[8:], ctx.cfg.tree.(Blake2_Tree).node_offset)
+			endian.unchecked_put_u64le(p[8:], ctx.cfg.tree.(Blake2_Tree).node_offset)
 			p[16] = ctx.cfg.tree.(Blake2_Tree).node_depth
 			p[17] = ctx.cfg.tree.(Blake2_Tree).inner_hash_size
 		}
@@ -129,10 +131,10 @@ init :: proc(ctx: ^$T) {
 	ctx.size = ctx.cfg.size
 	for i := 0; i < 8; i += 1 {
 		when T == Blake2s_Context {
-			ctx.h[i] = BLAKE2S_IV[i] ~ util.U32_LE(p[i * 4:])
+			ctx.h[i] = BLAKE2S_IV[i] ~ endian.unchecked_get_u32le(p[i * 4:])
 		}
 		when T == Blake2b_Context {
-			ctx.h[i] = BLAKE2B_IV[i] ~ util.U64_LE(p[i * 8:])
+			ctx.h[i] = BLAKE2B_IV[i] ~ endian.unchecked_get_u64le(p[i * 8:])
 		}
 	}
 	if ctx.cfg.tree != nil && ctx.cfg.tree.(Blake2_Tree).is_last_node {
@@ -148,6 +150,8 @@ init :: proc(ctx: ^$T) {
 	if ctx.is_keyed {
 		update(ctx, ctx.padded_key[:])
 	}
+
+	ctx.nx = 0
 }
 
 update :: proc "contextless" (ctx: ^$T, p: []byte) {
@@ -185,6 +189,7 @@ final :: proc "contextless" (ctx: ^$T, hash: []byte) {
 	}
 }
 
+@(private)
 blake2s_final :: proc "contextless" (ctx: ^Blake2s_Context, hash: []byte) {
 	if ctx.is_keyed {
 		for i := 0; i < len(ctx.padded_key); i += 1 {
@@ -205,16 +210,12 @@ blake2s_final :: proc "contextless" (ctx: ^Blake2s_Context, hash: []byte) {
 
 	blocks(ctx, ctx.x[:])
 
-	j := 0
-	for s, _ in ctx.h[:(ctx.size - 1) / 4 + 1] {
-		hash[j + 0] = byte(s >> 0)
-		hash[j + 1] = byte(s >> 8)
-		hash[j + 2] = byte(s >> 16)
-		hash[j + 3] = byte(s >> 24)
-		j += 4
+	for i := 0; i < BLAKE2S_SIZE / 4; i += 1 {
+		endian.unchecked_put_u32le(hash[i * 4:], ctx.h[i])
 	}
 }
 
+@(private)
 blake2b_final :: proc "contextless" (ctx: ^Blake2b_Context, hash: []byte) {
 	if ctx.is_keyed {
 		for i := 0; i < len(ctx.padded_key); i += 1 {
@@ -235,20 +236,12 @@ blake2b_final :: proc "contextless" (ctx: ^Blake2b_Context, hash: []byte) {
 
 	blocks(ctx, ctx.x[:])
 
-	j := 0
-	for s, _ in ctx.h[:(ctx.size - 1) / 8 + 1] {
-		hash[j + 0] = byte(s >> 0)
-		hash[j + 1] = byte(s >> 8)
-		hash[j + 2] = byte(s >> 16)
-		hash[j + 3] = byte(s >> 24)
-		hash[j + 4] = byte(s >> 32)
-		hash[j + 5] = byte(s >> 40)
-		hash[j + 6] = byte(s >> 48)
-		hash[j + 7] = byte(s >> 56)
-		j += 8
+	for i := 0; i < BLAKE2B_SIZE / 8; i += 1 {
+		endian.unchecked_put_u64le(hash[i * 8:], ctx.h[i])
 	}
 }
 
+@(private)
 blocks :: proc "contextless" (ctx: ^$T, p: []byte) {
 	when T == Blake2s_Context {
 		blake2s_blocks(ctx, p)
@@ -258,6 +251,7 @@ blocks :: proc "contextless" (ctx: ^$T, p: []byte) {
 	}
 }
 
+@(private)
 blake2s_blocks :: #force_inline proc "contextless" (ctx: ^Blake2s_Context, p: []byte) {
 	h0, h1, h2, h3, h4, h5, h6, h7 :=
 		ctx.h[0], ctx.h[1], ctx.h[2], ctx.h[3], ctx.h[4], ctx.h[5], ctx.h[6], ctx.h[7]
@@ -276,12 +270,13 @@ blake2s_blocks :: #force_inline proc "contextless" (ctx: ^Blake2s_Context, p: []
 		v13 := BLAKE2S_IV[5] ~ ctx.t[1]
 		v14 := BLAKE2S_IV[6] ~ ctx.f[0]
 		v15 := BLAKE2S_IV[7] ~ ctx.f[1]
-		m: [16]u32
-		j := 0
+
+		m: [16]u32 = ---
 		for i := 0; i < 16; i += 1 {
-			m[i] = u32(p[j]) | u32(p[j + 1]) << 8 | u32(p[j + 2]) << 16 | u32(p[j + 3]) << 24
-			j += 4
+			m[i] = endian.unchecked_get_u32le(p[i * 4:])
 		}
+
+		// Round 1
 		v0 += m[0]
 		v0 += v4
 		v12 ~= v0
@@ -394,6 +389,8 @@ blake2s_blocks :: #force_inline proc "contextless" (ctx: ^Blake2s_Context, p: []
 		v10 += v15
 		v5 ~= v10
 		v5 = v5 << (32 - 7) | v5 >> 7
+
+		// Round 2
 		v0 += m[14]
 		v0 += v4
 		v12 ~= v0
@@ -506,6 +503,8 @@ blake2s_blocks :: #force_inline proc "contextless" (ctx: ^Blake2s_Context, p: []
 		v10 += v15
 		v5 ~= v10
 		v5 = v5 << (32 - 7) | v5 >> 7
+
+		// Round 3
 		v0 += m[11]
 		v0 += v4
 		v12 ~= v0
@@ -618,6 +617,8 @@ blake2s_blocks :: #force_inline proc "contextless" (ctx: ^Blake2s_Context, p: []
 		v10 += v15
 		v5 ~= v10
 		v5 = v5 << (32 - 7) | v5 >> 7
+
+		// Round 4
 		v0 += m[7]
 		v0 += v4
 		v12 ~= v0
@@ -730,6 +731,8 @@ blake2s_blocks :: #force_inline proc "contextless" (ctx: ^Blake2s_Context, p: []
 		v10 += v15
 		v5 ~= v10
 		v5 = v5 << (32 - 7) | v5 >> 7
+
+		// Round 5
 		v0 += m[9]
 		v0 += v4
 		v12 ~= v0
@@ -842,6 +845,8 @@ blake2s_blocks :: #force_inline proc "contextless" (ctx: ^Blake2s_Context, p: []
 		v10 += v15
 		v5 ~= v10
 		v5 = v5 << (32 - 7) | v5 >> 7
+
+		// Round 6
 		v0 += m[2]
 		v0 += v4
 		v12 ~= v0
@@ -954,6 +959,8 @@ blake2s_blocks :: #force_inline proc "contextless" (ctx: ^Blake2s_Context, p: []
 		v10 += v15
 		v5 ~= v10
 		v5 = v5 << (32 - 7) | v5 >> 7
+
+		// Round 7
 		v0 += m[12]
 		v0 += v4
 		v12 ~= v0
@@ -1066,6 +1073,8 @@ blake2s_blocks :: #force_inline proc "contextless" (ctx: ^Blake2s_Context, p: []
 		v10 += v15
 		v5 ~= v10
 		v5 = v5 << (32 - 7) | v5 >> 7
+
+		// Round 8
 		v0 += m[13]
 		v0 += v4
 		v12 ~= v0
@@ -1178,6 +1187,8 @@ blake2s_blocks :: #force_inline proc "contextless" (ctx: ^Blake2s_Context, p: []
 		v10 += v15
 		v5 ~= v10
 		v5 = v5 << (32 - 7) | v5 >> 7
+
+		// Round 9
 		v0 += m[6]
 		v0 += v4
 		v12 ~= v0
@@ -1290,6 +1301,8 @@ blake2s_blocks :: #force_inline proc "contextless" (ctx: ^Blake2s_Context, p: []
 		v10 += v15
 		v5 ~= v10
 		v5 = v5 << (32 - 7) | v5 >> 7
+
+		// Round 10
 		v0 += m[10]
 		v0 += v4
 		v12 ~= v0
@@ -1402,6 +1415,7 @@ blake2s_blocks :: #force_inline proc "contextless" (ctx: ^Blake2s_Context, p: []
 		v10 += v15
 		v5 ~= v10
 		v5 = v5 << (32 - 7) | v5 >> 7
+
 		h0 ~= v0 ~ v8
 		h1 ~= v1 ~ v9
 		h2 ~= v2 ~ v10
@@ -1410,12 +1424,14 @@ blake2s_blocks :: #force_inline proc "contextless" (ctx: ^Blake2s_Context, p: []
 		h5 ~= v5 ~ v13
 		h6 ~= v6 ~ v14
 		h7 ~= v7 ~ v15
+
 		p = p[BLAKE2S_BLOCK_SIZE:]
 	}
 	ctx.h[0], ctx.h[1], ctx.h[2], ctx.h[3], ctx.h[4], ctx.h[5], ctx.h[6], ctx.h[7] =
 		h0, h1, h2, h3, h4, h5, h6, h7
 }
 
+@(private)
 blake2b_blocks :: #force_inline proc "contextless" (ctx: ^Blake2b_Context, p: []byte) {
 	h0, h1, h2, h3, h4, h5, h6, h7 :=
 		ctx.h[0], ctx.h[1], ctx.h[2], ctx.h[3], ctx.h[4], ctx.h[5], ctx.h[6], ctx.h[7]
@@ -1434,20 +1450,13 @@ blake2b_blocks :: #force_inline proc "contextless" (ctx: ^Blake2b_Context, p: []
 		v13 := BLAKE2B_IV[5] ~ ctx.t[1]
 		v14 := BLAKE2B_IV[6] ~ ctx.f[0]
 		v15 := BLAKE2B_IV[7] ~ ctx.f[1]
+
 		m: [16]u64 = ---
-		j := 0
 		for i := 0; i < 16; i += 1 {
-			m[i] =
-				u64(p[j]) |
-				u64(p[j + 1]) << 8 |
-				u64(p[j + 2]) << 16 |
-				u64(p[j + 3]) << 24 |
-				u64(p[j + 4]) << 32 |
-				u64(p[j + 5]) << 40 |
-				u64(p[j + 6]) << 48 |
-				u64(p[j + 7]) << 56
-			j += 8
+			m[i] = endian.unchecked_get_u64le(p[i * 8:])
 		}
+
+		// Round 1
 		v0 += m[0]
 		v0 += v4
 		v12 ~= v0
@@ -1560,6 +1569,8 @@ blake2b_blocks :: #force_inline proc "contextless" (ctx: ^Blake2b_Context, p: []
 		v10 += v15
 		v5 ~= v10
 		v5 = v5 << (64 - 63) | v5 >> 63
+
+		// Round 2
 		v0 += m[14]
 		v0 += v4
 		v12 ~= v0
@@ -1672,6 +1683,8 @@ blake2b_blocks :: #force_inline proc "contextless" (ctx: ^Blake2b_Context, p: []
 		v10 += v15
 		v5 ~= v10
 		v5 = v5 << (64 - 63) | v5 >> 63
+
+		// Round 3
 		v0 += m[11]
 		v0 += v4
 		v12 ~= v0
@@ -1784,6 +1797,8 @@ blake2b_blocks :: #force_inline proc "contextless" (ctx: ^Blake2b_Context, p: []
 		v10 += v15
 		v5 ~= v10
 		v5 = v5 << (64 - 63) | v5 >> 63
+
+		// Round 4
 		v0 += m[7]
 		v0 += v4
 		v12 ~= v0
@@ -1896,6 +1911,8 @@ blake2b_blocks :: #force_inline proc "contextless" (ctx: ^Blake2b_Context, p: []
 		v10 += v15
 		v5 ~= v10
 		v5 = v5 << (64 - 63) | v5 >> 63
+
+		// Round 5
 		v0 += m[9]
 		v0 += v4
 		v12 ~= v0
@@ -2008,6 +2025,8 @@ blake2b_blocks :: #force_inline proc "contextless" (ctx: ^Blake2b_Context, p: []
 		v10 += v15
 		v5 ~= v10
 		v5 = v5 << (64 - 63) | v5 >> 63
+
+		// Round 6
 		v0 += m[2]
 		v0 += v4
 		v12 ~= v0
@@ -2120,6 +2139,8 @@ blake2b_blocks :: #force_inline proc "contextless" (ctx: ^Blake2b_Context, p: []
 		v10 += v15
 		v5 ~= v10
 		v5 = v5 << (64 - 63) | v5 >> 63
+
+		// Round 7
 		v0 += m[12]
 		v0 += v4
 		v12 ~= v0
@@ -2232,6 +2253,8 @@ blake2b_blocks :: #force_inline proc "contextless" (ctx: ^Blake2b_Context, p: []
 		v10 += v15
 		v5 ~= v10
 		v5 = v5 << (64 - 63) | v5 >> 63
+
+		// Round 8
 		v0 += m[13]
 		v0 += v4
 		v12 ~= v0
@@ -2344,6 +2367,8 @@ blake2b_blocks :: #force_inline proc "contextless" (ctx: ^Blake2b_Context, p: []
 		v10 += v15
 		v5 ~= v10
 		v5 = v5 << (64 - 63) | v5 >> 63
+
+		// Round 9
 		v0 += m[6]
 		v0 += v4
 		v12 ~= v0
@@ -2456,6 +2481,8 @@ blake2b_blocks :: #force_inline proc "contextless" (ctx: ^Blake2b_Context, p: []
 		v10 += v15
 		v5 ~= v10
 		v5 = v5 << (64 - 63) | v5 >> 63
+
+		// Round 10
 		v0 += m[10]
 		v0 += v4
 		v12 ~= v0
@@ -2568,6 +2595,8 @@ blake2b_blocks :: #force_inline proc "contextless" (ctx: ^Blake2b_Context, p: []
 		v10 += v15
 		v5 ~= v10
 		v5 = v5 << (64 - 63) | v5 >> 63
+
+		// Round 11
 		v0 += m[0]
 		v0 += v4
 		v12 ~= v0
@@ -2680,6 +2709,8 @@ blake2b_blocks :: #force_inline proc "contextless" (ctx: ^Blake2b_Context, p: []
 		v10 += v15
 		v5 ~= v10
 		v5 = v5 << (64 - 63) | v5 >> 63
+
+		// Round 12
 		v0 += m[14]
 		v0 += v4
 		v12 ~= v0
@@ -2792,6 +2823,7 @@ blake2b_blocks :: #force_inline proc "contextless" (ctx: ^Blake2b_Context, p: []
 		v10 += v15
 		v5 ~= v10
 		v5 = v5 << (64 - 63) | v5 >> 63
+
 		h0 ~= v0 ~ v8
 		h1 ~= v1 ~ v9
 		h2 ~= v2 ~ v10
@@ -2800,6 +2832,7 @@ blake2b_blocks :: #force_inline proc "contextless" (ctx: ^Blake2b_Context, p: []
 		h5 ~= v5 ~ v13
 		h6 ~= v6 ~ v14
 		h7 ~= v7 ~ v15
+
 		p = p[BLAKE2B_BLOCK_SIZE:]
 	}
 	ctx.h[0], ctx.h[1], ctx.h[2], ctx.h[3], ctx.h[4], ctx.h[5], ctx.h[6], ctx.h[7] =
