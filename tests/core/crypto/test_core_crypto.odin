@@ -33,7 +33,6 @@ import "core:crypto/tiger2"
 import "core:crypto/streebog"
 import "core:crypto/sm3"
 import "core:crypto/jh"
-import "core:crypto/haval"
 import "core:crypto/siphash"
 import "core:os"
 
@@ -99,11 +98,6 @@ main :: proc() {
 	test_jh_256(&t)
 	test_jh_384(&t)
 	test_jh_512(&t)
-	test_haval_128(&t)
-	test_haval_160(&t)
-	test_haval_192(&t)
-	test_haval_224(&t)
-	test_haval_256(&t)
 	test_siphash_2_4(&t)
 
 	// "modern" crypto tests
@@ -814,171 +808,6 @@ test_jh_512 :: proc(t: ^testing.T) {
 	}
 	for v, _ in test_vectors {
 		computed     := jh.hash_512(v.str)
-		computed_str := hex_string(computed[:])
-		expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
-	}
-}
-
-@(test)
-test_haval_128 :: proc(t: ^testing.T) {
-	test_vectors_3 := [?]TestHash {
-		TestHash{"c68f39913f901f3ddf44c707357a7d70", ""},
-		TestHash{"0cd40739683e15f01ca5dbceef4059f1", "a"},
-		TestHash{"9e40ed883fb63e985d299b40cda2b8f2", "abc"},
-		TestHash{"3caf4a79e81adcd6d1716bcc1cef4573", "message digest"},
-		TestHash{"dc502247fb3eb8376109eda32d361d82", "abcdefghijklmnopqrstuvwxyz"},
-		TestHash{"44068770868768964d1f2c3bff4aa3d8", "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq"},
-		TestHash{"de5eb3f7d9eb08fae7a07d68e3047ec6", "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"},
-	}
-	for v, _ in test_vectors_3 {
-		computed     := haval.hash_128_3(v.str)
-		computed_str := hex_string(computed[:])
-		expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
-	}
-	test_vectors_4 := [?]TestHash {
-		TestHash{"ee6bbf4d6a46a679b3a856c88538bb98", ""},
-		TestHash{"5cd07f03330c3b5020b29ba75911e17d", "a"},
-	}
-	for v, _ in test_vectors_4 {
-		computed     := haval.hash_128_4(v.str)
-		computed_str := hex_string(computed[:])
-		expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
-	}
-	test_vectors_5 := [?]TestHash {
-		TestHash{"184b8482a0c050dca54b59c7f05bf5dd", ""},
-		TestHash{"f23fbe704be8494bfa7a7fb4f8ab09e5", "a"},
-	}
-	for v, _ in test_vectors_5 {
-		computed     := haval.hash_128_5(v.str)
-		computed_str := hex_string(computed[:])
-		expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
-	}
-}
-
-@(test)
-test_haval_160 :: proc(t: ^testing.T) {
-	test_vectors_3 := [?]TestHash {
-		TestHash{"d353c3ae22a25401d257643836d7231a9a95f953", ""},
-		TestHash{"4da08f514a7275dbc4cece4a347385983983a830", "a"},
-		TestHash{"b21e876c4d391e2a897661149d83576b5530a089", "abc"},
-		TestHash{"43a47f6f1c016207f08be8115c0977bf155346da", "message digest"},
-		TestHash{"eba9fa6050f24c07c29d1834a60900ea4e32e61b", "abcdefghijklmnopqrstuvwxyz"},
-		TestHash{"c30bce448cf8cfe957c141e90c0a063497cdfeeb", "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq"},
-		TestHash{"97dc988d97caae757be7523c4e8d4ea63007a4b9", "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"},
-	}
-	for v, _ in test_vectors_3 {
-		computed     := haval.hash_160_3(v.str)
-		computed_str := hex_string(computed[:])
-		expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
-	}
-	test_vectors_4 := [?]TestHash {
-		TestHash{"1d33aae1be4146dbaaca0b6e70d7a11f10801525", ""},
-		TestHash{"e0a5be29627332034d4dd8a910a1a0e6fe04084d", "a"},
-	}
-	for v, _ in test_vectors_4 {
-		computed     := haval.hash_160_4(v.str)
-		computed_str := hex_string(computed[:])
-		expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
-	}
-	test_vectors_5 := [?]TestHash {
-		TestHash{"255158cfc1eed1a7be7c55ddd64d9790415b933b", ""},
-		TestHash{"f5147df7abc5e3c81b031268927c2b5761b5a2b5", "a"},
-	}
-	for v, _ in test_vectors_5 {
-		computed     := haval.hash_160_5(v.str)
-		computed_str := hex_string(computed[:])
-		expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
-	}
-}
-
-@(test)
-test_haval_192 :: proc(t: ^testing.T) {
-	test_vectors_3 := [?]TestHash {
-		TestHash{"e9c48d7903eaf2a91c5b350151efcb175c0fc82de2289a4e", ""},
-		TestHash{"b359c8835647f5697472431c142731ff6e2cddcacc4f6e08", "a"},
-	}
-	for v, _ in test_vectors_3 {
-		computed     := haval.hash_192_3(v.str)
-		computed_str := hex_string(computed[:])
-		expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
-	}
-	test_vectors_4 := [?]TestHash {
-		TestHash{"4a8372945afa55c7dead800311272523ca19d42ea47b72da", ""},
-		TestHash{"856c19f86214ea9a8a2f0c4b758b973cce72a2d8ff55505c", "a"},
-	}
-	for v, _ in test_vectors_4 {
-		computed     := haval.hash_192_4(v.str)
-		computed_str := hex_string(computed[:])
-		expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
-	}
-	test_vectors_5 := [?]TestHash {
-		TestHash{"4839d0626f95935e17ee2fc4509387bbe2cc46cb382ffe85", ""},
-		TestHash{"5ffa3b3548a6e2cfc06b7908ceb5263595df67cf9c4b9341", "a"},
-	}
-	for v, _ in test_vectors_5 {
-		computed     := haval.hash_192_5(v.str)
-		computed_str := hex_string(computed[:])
-		expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
-	}
-}
-
-@(test)
-test_haval_224 :: proc(t: ^testing.T) {
-	test_vectors_3 := [?]TestHash {
-		TestHash{"c5aae9d47bffcaaf84a8c6e7ccacd60a0dd1932be7b1a192b9214b6d", ""},
-		TestHash{"731814ba5605c59b673e4caae4ad28eeb515b3abc2b198336794e17b", "a"},
-	}
-	for v, _ in test_vectors_3 {
-		computed     := haval.hash_224_3(v.str)
-		computed_str := hex_string(computed[:])
-		expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
-	}
-	test_vectors_4 := [?]TestHash {
-		TestHash{"3e56243275b3b81561750550e36fcd676ad2f5dd9e15f2e89e6ed78e", ""},
-		TestHash{"742f1dbeeaf17f74960558b44f08aa98bdc7d967e6c0ab8f799b3ac1", "a"},
-	}
-	for v, _ in test_vectors_4 {
-		computed     := haval.hash_224_4(v.str)
-		computed_str := hex_string(computed[:])
-		expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
-	}
-	test_vectors_5 := [?]TestHash {
-		TestHash{"4a0513c032754f5582a758d35917ac9adf3854219b39e3ac77d1837e", ""},
-		TestHash{"67b3cb8d4068e3641fa4f156e03b52978b421947328bfb9168c7655d", "a"},
-	}
-	for v, _ in test_vectors_5 {
-		computed     := haval.hash_224_5(v.str)
-		computed_str := hex_string(computed[:])
-		expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
-	}
-}
-
-@(test)
-test_haval_256 :: proc(t: ^testing.T) {
-	test_vectors_3 := [?]TestHash {
-		TestHash{"4f6938531f0bc8991f62da7bbd6f7de3fad44562b8c6f4ebf146d5b4e46f7c17", ""},
-		TestHash{"47c838fbb4081d9525a0ff9b1e2c05a98f625714e72db289010374e27db021d8", "a"},
-	}
-	for v, _ in test_vectors_3 {
-		computed     := haval.hash_256_3(v.str)
-		computed_str := hex_string(computed[:])
-		expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
-	}
-	test_vectors_4 := [?]TestHash {
-		TestHash{"c92b2e23091e80e375dadce26982482d197b1a2521be82da819f8ca2c579b99b", ""},
-		TestHash{"e686d2394a49b44d306ece295cf9021553221db132b36cc0ff5b593d39295899", "a"},
-	}
-	for v, _ in test_vectors_4 {
-		computed     := haval.hash_256_4(v.str)
-		computed_str := hex_string(computed[:])
-		expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
-	}
-	test_vectors_5 := [?]TestHash {
-		TestHash{"be417bb4dd5cfb76c7126f4f8eeb1553a449039307b1a3cd451dbfdc0fbbe330", ""},
-		TestHash{"de8fd5ee72a5e4265af0a756f4e1a1f65c9b2b2f47cf17ecf0d1b88679a3e22f", "a"},
-	}
-	for v, _ in test_vectors_5 {
-		computed     := haval.hash_256_5(v.str)
 		computed_str := hex_string(computed[:])
 		expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
 	}

@@ -27,7 +27,6 @@ import blake2b          "core:crypto/blake2b"
 import blake2s          "core:crypto/blake2s"
 import chacha20         "core:crypto/chacha20"
 import chacha20poly1305 "core:crypto/chacha20poly1305"
-import haval            "core:crypto/haval"
 import jh               "core:crypto/jh"
 import keccak           "core:crypto/keccak"
 import md2              "core:crypto/md2"
@@ -151,7 +150,6 @@ _ :: blake2b
 _ :: blake2s
 _ :: chacha20
 _ :: chacha20poly1305
-_ :: haval
 _ :: jh
 _ :: keccak
 _ :: md2
