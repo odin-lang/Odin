@@ -23,7 +23,6 @@ import "core:crypto/sha3"
 import "core:crypto/keccak"
 import "core:crypto/shake"
 import "core:crypto/whirlpool"
-import "core:crypto/ripemd"
 import "core:crypto/blake2b"
 import "core:crypto/blake2s"
 import "core:crypto/tiger"
@@ -78,10 +77,6 @@ main :: proc() {
 	test_streebog_512(&t)
 	test_blake2b(&t)
 	test_blake2s(&t)
-	test_ripemd_128(&t)
-	test_ripemd_160(&t)
-	test_ripemd_256(&t)
-	test_ripemd_320(&t)
 	test_tiger_128(&t)
 	test_tiger_160(&t)
 	test_tiger_192(&t)
@@ -507,86 +502,6 @@ test_blake2s :: proc(t: ^testing.T) {
 	}
 	for v, _ in test_vectors {
 		computed     := blake2s.hash(v.str)
-		computed_str := hex_string(computed[:])
-		expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
-	}
-}
-
-@(test)
-test_ripemd_128 :: proc(t: ^testing.T) {
-	// Test vectors from
-	// https://homes.esat.kuleuven.be/~bosselae/ripemd160.html
-	test_vectors := [?]TestHash {
-		TestHash{"cdf26213a150dc3ecb610f18f6b38b46", ""},
-		TestHash{"86be7afa339d0fc7cfc785e72f578d33", "a"},
-		TestHash{"c14a12199c66e4ba84636b0f69144c77", "abc"},
-		TestHash{"9e327b3d6e523062afc1132d7df9d1b8", "message digest"},
-		TestHash{"fd2aa607f71dc8f510714922b371834e", "abcdefghijklmnopqrstuvwxyz"},
-		TestHash{"a1aa0689d0fafa2ddc22e88b49133a06", "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq"},
-		TestHash{"d1e959eb179c911faea4624c60c5c702", "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"},
-	}
-	for v, _ in test_vectors {
-		computed     := ripemd.hash_128(v.str)
-		computed_str := hex_string(computed[:])
-		expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
-	}
-}
-
-@(test)
-test_ripemd_160 :: proc(t: ^testing.T) {
-	// Test vectors from
-	// https://homes.esat.kuleuven.be/~bosselae/ripemd160.html
-	test_vectors := [?]TestHash {
-		TestHash{"9c1185a5c5e9fc54612808977ee8f548b2258d31", ""},
-		TestHash{"0bdc9d2d256b3ee9daae347be6f4dc835a467ffe", "a"},
-		TestHash{"8eb208f7e05d987a9b044a8e98c6b087f15a0bfc", "abc"},
-		TestHash{"5d0689ef49d2fae572b881b123a85ffa21595f36", "message digest"},
-		TestHash{"f71c27109c692c1b56bbdceb5b9d2865b3708dbc", "abcdefghijklmnopqrstuvwxyz"},
-		TestHash{"12a053384a9c0c88e405a06c27dcf49ada62eb2b", "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq"},
-		TestHash{"b0e20b6e3116640286ed3a87a5713079b21f5189", "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"},
-	}
-	for v, _ in test_vectors {
-		computed     := ripemd.hash_160(v.str)
-		computed_str := hex_string(computed[:])
-		expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
-	}
-}
-
-@(test)
-test_ripemd_256 :: proc(t: ^testing.T) {
-	// Test vectors from
-	// https://homes.esat.kuleuven.be/~bosselae/ripemd160.html
-	test_vectors := [?]TestHash {
-		TestHash{"02ba4c4e5f8ecd1877fc52d64d30e37a2d9774fb1e5d026380ae0168e3c5522d", ""},
-		TestHash{"f9333e45d857f5d90a91bab70a1eba0cfb1be4b0783c9acfcd883a9134692925", "a"},
-		TestHash{"afbd6e228b9d8cbbcef5ca2d03e6dba10ac0bc7dcbe4680e1e42d2e975459b65", "abc"},
-		TestHash{"87e971759a1ce47a514d5c914c392c9018c7c46bc14465554afcdf54a5070c0e", "message digest"},
-		TestHash{"649d3034751ea216776bf9a18acc81bc7896118a5197968782dd1fd97d8d5133", "abcdefghijklmnopqrstuvwxyz"},
-		TestHash{"3843045583aac6c8c8d9128573e7a9809afb2a0f34ccc36ea9e72f16f6368e3f", "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq"},
-		TestHash{"5740a408ac16b720b84424ae931cbb1fe363d1d0bf4017f1a89f7ea6de77a0b8", "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"},
-	}
-	for v, _ in test_vectors {
-		computed     := ripemd.hash_256(v.str)
-		computed_str := hex_string(computed[:])
-		expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
-	}
-}
-
-@(test)
-test_ripemd_320 :: proc(t: ^testing.T) {
-	// Test vectors from
-	// https://homes.esat.kuleuven.be/~bosselae/ripemd160.html
-	test_vectors := [?]TestHash {
-		TestHash{"22d65d5661536cdc75c1fdf5c6de7b41b9f27325ebc61e8557177d705a0ec880151c3a32a00899b8", ""},
-		TestHash{"ce78850638f92658a5a585097579926dda667a5716562cfcf6fbe77f63542f99b04705d6970dff5d", "a"},
-		TestHash{"de4c01b3054f8930a79d09ae738e92301e5a17085beffdc1b8d116713e74f82fa942d64cdbc4682d", "abc"},
-		TestHash{"3a8e28502ed45d422f68844f9dd316e7b98533fa3f2a91d29f84d425c88d6b4eff727df66a7c0197", "message digest"},
-		TestHash{"cabdb1810b92470a2093aa6bce05952c28348cf43ff60841975166bb40ed234004b8824463e6b009", "abcdefghijklmnopqrstuvwxyz"},
-		TestHash{"d034a7950cf722021ba4b84df769a5de2060e259df4c9bb4a4268c0e935bbc7470a969c9d072a1ac", "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq"},
-		TestHash{"ed544940c86d67f250d232c30b7b3e5770e0c60c8cb9a4cafe3b11388af9920e1b99230b843c86a4", "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"},
-	}
-	for v, _ in test_vectors {
-		computed     := ripemd.hash_320(v.str)
 		computed_str := hex_string(computed[:])
 		expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
 	}

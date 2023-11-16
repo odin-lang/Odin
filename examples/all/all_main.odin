@@ -30,7 +30,6 @@ import chacha20poly1305 "core:crypto/chacha20poly1305"
 import keccak           "core:crypto/keccak"
 import md5              "core:crypto/md5"
 import poly1305         "core:crypto/poly1305"
-import ripemd           "core:crypto/ripemd"
 import sha1             "core:crypto/sha1"
 import sha2             "core:crypto/sha2"
 import sha3             "core:crypto/sha3"
@@ -150,7 +149,6 @@ _ :: chacha20poly1305
 _ :: keccak
 _ :: md5
 _ :: poly1305
-_ :: ripemd
 _ :: sha1
 _ :: sha2
 _ :: sha3
