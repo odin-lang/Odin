@@ -12,10 +12,10 @@ package _blake2
 
 import "../util"
 
-BLAKE2S_BLOCK_SIZE  :: 64
-BLAKE2S_SIZE        :: 32
-BLAKE2B_BLOCK_SIZE  :: 128
-BLAKE2B_SIZE        :: 64
+BLAKE2S_BLOCK_SIZE :: 64
+BLAKE2S_SIZE :: 32
+BLAKE2B_BLOCK_SIZE :: 128
+BLAKE2B_SIZE :: 64
 
 Blake2s_Context :: struct {
 	h:            [8]u32,
@@ -28,7 +28,7 @@ Blake2s_Context :: struct {
 	is_keyed:     bool,
 	size:         byte,
 	is_last_node: bool,
-	cfg:		  Blake2_Config,
+	cfg:          Blake2_Config,
 }
 
 Blake2b_Context :: struct {
@@ -42,15 +42,17 @@ Blake2b_Context :: struct {
 	is_keyed:     bool,
 	size:         byte,
 	is_last_node: bool,
-	cfg:		  Blake2_Config,
+	cfg:          Blake2_Config,
 }
 
 Blake2_Config :: struct {
-    size:   byte,
-	key:    []byte, 
-	salt:   []byte, 
+	size:   byte,
+	key:    []byte,
+	salt:   []byte,
 	person: []byte,
-	tree:   union{Blake2_Tree},
+	tree:   union {
+		Blake2_Tree,
+	},
 }
 
 Blake2_Tree :: struct {
@@ -108,8 +110,8 @@ init :: proc(ctx: ^$T) {
 		p[3] = ctx.cfg.tree.(Blake2_Tree).max_depth
 		util.PUT_U32_LE(p[4:], ctx.cfg.tree.(Blake2_Tree).leaf_size)
 		when T == Blake2s_Context {
-			p[8]  = byte(ctx.cfg.tree.(Blake2_Tree).node_offset)
-			p[9]  = byte(ctx.cfg.tree.(Blake2_Tree).node_offset >> 8)
+			p[8] = byte(ctx.cfg.tree.(Blake2_Tree).node_offset)
+			p[9] = byte(ctx.cfg.tree.(Blake2_Tree).node_offset >> 8)
 			p[10] = byte(ctx.cfg.tree.(Blake2_Tree).node_offset >> 16)
 			p[11] = byte(ctx.cfg.tree.(Blake2_Tree).node_offset >> 24)
 			p[12] = byte(ctx.cfg.tree.(Blake2_Tree).node_offset >> 32)
@@ -142,7 +144,7 @@ init :: proc(ctx: ^$T) {
 		ctx.is_keyed = true
 	}
 	copy(ctx.ih[:], ctx.h[:])
-	copy(ctx.h[:],  ctx.ih[:])
+	copy(ctx.h[:], ctx.ih[:])
 	if ctx.is_keyed {
 		update(ctx, ctx.padded_key[:])
 	}
@@ -229,7 +231,7 @@ blake2b_final :: proc "contextless" (ctx: ^Blake2b_Context, hash: []byte) {
 	ctx.f[0] = 0xffffffffffffffff
 	if ctx.is_last_node {
 		ctx.f[1] = 0xffffffffffffffff
-	} 
+	}
 
 	blocks(ctx, ctx.x[:])
 
@@ -257,16 +259,17 @@ blocks :: proc "contextless" (ctx: ^$T, p: []byte) {
 }
 
 blake2s_blocks :: #force_inline proc "contextless" (ctx: ^Blake2s_Context, p: []byte) {
-	h0, h1, h2, h3, h4, h5, h6, h7 := ctx.h[0], ctx.h[1], ctx.h[2], ctx.h[3], ctx.h[4], ctx.h[5], ctx.h[6], ctx.h[7]
+	h0, h1, h2, h3, h4, h5, h6, h7 :=
+		ctx.h[0], ctx.h[1], ctx.h[2], ctx.h[3], ctx.h[4], ctx.h[5], ctx.h[6], ctx.h[7]
 	p := p
 	for len(p) >= BLAKE2S_BLOCK_SIZE {
 		ctx.t[0] += BLAKE2S_BLOCK_SIZE
 		if ctx.t[0] < BLAKE2S_BLOCK_SIZE {
 			ctx.t[1] += 1
-		} 
+		}
 		v0, v1, v2, v3, v4, v5, v6, v7 := h0, h1, h2, h3, h4, h5, h6, h7
-		v8  := BLAKE2S_IV[0]
-		v9  := BLAKE2S_IV[1]
+		v8 := BLAKE2S_IV[0]
+		v9 := BLAKE2S_IV[1]
 		v10 := BLAKE2S_IV[2]
 		v11 := BLAKE2S_IV[3]
 		v12 := BLAKE2S_IV[4] ~ ctx.t[0]
@@ -1409,17 +1412,19 @@ blake2s_blocks :: #force_inline proc "contextless" (ctx: ^Blake2s_Context, p: []
 		h7 ~= v7 ~ v15
 		p = p[BLAKE2S_BLOCK_SIZE:]
 	}
-	ctx.h[0], ctx.h[1], ctx.h[2], ctx.h[3], ctx.h[4], ctx.h[5], ctx.h[6], ctx.h[7] = h0, h1, h2, h3, h4, h5, h6, h7
+	ctx.h[0], ctx.h[1], ctx.h[2], ctx.h[3], ctx.h[4], ctx.h[5], ctx.h[6], ctx.h[7] =
+		h0, h1, h2, h3, h4, h5, h6, h7
 }
 
 blake2b_blocks :: #force_inline proc "contextless" (ctx: ^Blake2b_Context, p: []byte) {
-	h0, h1, h2, h3, h4, h5, h6, h7 := ctx.h[0], ctx.h[1], ctx.h[2], ctx.h[3], ctx.h[4], ctx.h[5], ctx.h[6], ctx.h[7]
+	h0, h1, h2, h3, h4, h5, h6, h7 :=
+		ctx.h[0], ctx.h[1], ctx.h[2], ctx.h[3], ctx.h[4], ctx.h[5], ctx.h[6], ctx.h[7]
 	p := p
 	for len(p) >= BLAKE2B_BLOCK_SIZE {
 		ctx.t[0] += BLAKE2B_BLOCK_SIZE
 		if ctx.t[0] < BLAKE2B_BLOCK_SIZE {
-			ctx.t[1]+=1
-		} 
+			ctx.t[1] += 1
+		}
 		v0, v1, v2, v3, v4, v5, v6, v7 := h0, h1, h2, h3, h4, h5, h6, h7
 		v8 := BLAKE2B_IV[0]
 		v9 := BLAKE2B_IV[1]
@@ -1431,9 +1436,16 @@ blake2b_blocks :: #force_inline proc "contextless" (ctx: ^Blake2b_Context, p: []
 		v15 := BLAKE2B_IV[7] ~ ctx.f[1]
 		m: [16]u64 = ---
 		j := 0
-		for i := 0; i < 16; i+=1 {
-			m[i] = u64(p[j]) 		   | u64(p[j + 1]) << 8  | u64(p[j + 2]) << 16 | u64(p[j + 3]) << 24 |
-				   u64(p[j + 4]) << 32 | u64(p[j + 5]) << 40 | u64(p[j + 6]) << 48 | u64(p[j + 7]) << 56
+		for i := 0; i < 16; i += 1 {
+			m[i] =
+				u64(p[j]) |
+				u64(p[j + 1]) << 8 |
+				u64(p[j + 2]) << 16 |
+				u64(p[j + 3]) << 24 |
+				u64(p[j + 4]) << 32 |
+				u64(p[j + 5]) << 40 |
+				u64(p[j + 6]) << 48 |
+				u64(p[j + 7]) << 56
 			j += 8
 		}
 		v0 += m[0]
@@ -2790,5 +2802,6 @@ blake2b_blocks :: #force_inline proc "contextless" (ctx: ^Blake2b_Context, p: []
 		h7 ~= v7 ~ v15
 		p = p[BLAKE2B_BLOCK_SIZE:]
 	}
-	ctx.h[0], ctx.h[1], ctx.h[2], ctx.h[3], ctx.h[4], ctx.h[5], ctx.h[6], ctx.h[7] = h0, h1, h2, h3, h4, h5, h6, h7
+	ctx.h[0], ctx.h[1], ctx.h[2], ctx.h[3], ctx.h[4], ctx.h[5], ctx.h[6], ctx.h[7] =
+		h0, h1, h2, h3, h4, h5, h6, h7
 }
