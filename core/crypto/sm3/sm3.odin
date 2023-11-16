@@ -112,9 +112,13 @@ init :: proc(ctx: ^Sm3_Context) {
 
 	ctx.length = 0
 	ctx.bitlength = 0
+
+	ctx.is_initialized = true
 }
 
 update :: proc(ctx: ^Sm3_Context, data: []byte) {
+	assert(ctx.is_initialized)
+
 	data := data
 	ctx.length += u64(len(data))
 
@@ -138,6 +142,8 @@ update :: proc(ctx: ^Sm3_Context, data: []byte) {
 }
 
 final :: proc(ctx: ^Sm3_Context, hash: []byte) {
+	assert(ctx.is_initialized)
+
 	if len(hash) < DIGEST_SIZE {
 		panic("crypto/sm3: invalid destination digest size")
 	}
@@ -160,6 +166,8 @@ final :: proc(ctx: ^Sm3_Context, hash: []byte) {
 	for i := 0; i < DIGEST_SIZE / 4; i += 1 {
 		endian.unchecked_put_u32be(hash[i * 4:], ctx.state[i])
 	}
+
+	ctx.is_initialized = false
 }
 
 /*
@@ -173,6 +181,8 @@ Sm3_Context :: struct {
 	x:         [BLOCK_SIZE]byte,
 	bitlength: u64,
 	length:    u64,
+
+	is_initialized: bool,
 }
 
 @(private)

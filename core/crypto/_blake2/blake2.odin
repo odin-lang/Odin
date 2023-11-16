@@ -29,6 +29,8 @@ Blake2s_Context :: struct {
 	size:         byte,
 	is_last_node: bool,
 	cfg:          Blake2_Config,
+
+	is_initialized: bool,
 }
 
 Blake2b_Context :: struct {
@@ -43,6 +45,8 @@ Blake2b_Context :: struct {
 	size:         byte,
 	is_last_node: bool,
 	cfg:          Blake2_Config,
+
+	is_initialized: bool,
 }
 
 Blake2_Config :: struct {
@@ -152,9 +156,13 @@ init :: proc(ctx: ^$T) {
 	}
 
 	ctx.nx = 0
+
+	ctx.is_initialized = true
 }
 
-update :: proc "contextless" (ctx: ^$T, p: []byte) {
+update :: proc(ctx: ^$T, p: []byte) {
+	assert(ctx.is_initialized)
+
 	p := p
 	when T == Blake2s_Context {
 		block_size :: BLAKE2S_BLOCK_SIZE
@@ -181,6 +189,8 @@ update :: proc "contextless" (ctx: ^$T, p: []byte) {
 }
 
 final :: proc(ctx: ^$T, hash: []byte) {
+	assert(ctx.is_initialized)
+
 	when T == Blake2s_Context {
 		if len(hash) < BLAKE2S_SIZE {
 			panic("crypto/blake2s: invalid destination digest size")
@@ -193,6 +203,8 @@ final :: proc(ctx: ^$T, hash: []byte) {
 		}
 		blake2b_final(ctx, hash)
 	}
+
+	ctx.is_initialized = false
 }
 
 @(private)

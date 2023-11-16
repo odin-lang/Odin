@@ -109,9 +109,13 @@ init :: proc(ctx: ^Md5_Context) {
 
 	ctx.bitlen = 0
 	ctx.datalen = 0
+
+	ctx.is_initialized = true
 }
 
 update :: proc(ctx: ^Md5_Context, data: []byte) {
+	assert(ctx.is_initialized)
+
 	for i := 0; i < len(data); i += 1 {
 		ctx.data[ctx.datalen] = data[i]
 		ctx.datalen += 1
@@ -124,6 +128,8 @@ update :: proc(ctx: ^Md5_Context, data: []byte) {
 }
 
 final :: proc(ctx: ^Md5_Context, hash: []byte) {
+	assert(ctx.is_initialized)
+
 	if len(hash) < DIGEST_SIZE {
 		panic("crypto/md5: invalid destination digest size")
 	}
@@ -155,6 +161,8 @@ final :: proc(ctx: ^Md5_Context, hash: []byte) {
 	for i = 0; i < DIGEST_SIZE / 4; i += 1 {
 		endian.unchecked_put_u32le(hash[i * 4:], ctx.state[i])
 	}
+
+	ctx.is_initialized = false
 }
 
 /*
@@ -168,6 +176,8 @@ Md5_Context :: struct {
 	state:   [4]u32,
 	bitlen:  u64,
 	datalen: u32,
+
+	is_initialized: bool,
 }
 
 /*

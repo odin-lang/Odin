@@ -361,7 +361,7 @@ init :: proc(ctx: ^_sha3.Sha3_Context) {
 	_sha3.init(ctx)
 }
 
-update :: proc "contextless" (ctx: ^_sha3.Sha3_Context, data: []byte) {
+update :: proc(ctx: ^_sha3.Sha3_Context, data: []byte) {
 	_sha3.update(ctx, data)
 }
 

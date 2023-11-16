@@ -114,9 +114,13 @@ init :: proc(ctx: ^Sha1_Context) {
 
 	ctx.datalen = 0
 	ctx.bitlen = 0
+
+	ctx.is_initialized = true
 }
 
 update :: proc(ctx: ^Sha1_Context, data: []byte) {
+	assert(ctx.is_initialized)
+
 	for i := 0; i < len(data); i += 1 {
 		ctx.data[ctx.datalen] = data[i]
 		ctx.datalen += 1
@@ -129,6 +133,8 @@ update :: proc(ctx: ^Sha1_Context, data: []byte) {
 }
 
 final :: proc(ctx: ^Sha1_Context, hash: []byte) {
+	assert(ctx.is_initialized)
+
 	if len(hash) < DIGEST_SIZE {
 		panic("crypto/sha1: invalid destination digest size")
 	}
@@ -160,6 +166,8 @@ final :: proc(ctx: ^Sha1_Context, hash: []byte) {
 	for i = 0; i < DIGEST_SIZE / 4; i += 1 {
 		endian.unchecked_put_u32be(hash[i * 4:], ctx.state[i])
 	}
+
+	ctx.is_initialized = false
 }
 
 /*
@@ -174,6 +182,8 @@ Sha1_Context :: struct {
 	bitlen:  u64,
 	state:   [5]u32,
 	k:       [4]u32,
+
+	is_initialized: bool,
 }
 
 @(private)

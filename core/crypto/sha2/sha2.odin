@@ -387,9 +387,13 @@ init :: proc(ctx: ^$T) {
 
 	ctx.tot_len = 0
 	ctx.length = 0
+
+	ctx.is_initialized = true
 }
 
 update :: proc(ctx: ^$T, data: []byte) {
+	assert(ctx.is_initialized)
+
 	length := uint(len(data))
 	block_nb: uint
 	new_len, rem_len, tmp_len: uint
@@ -427,6 +431,8 @@ update :: proc(ctx: ^$T, data: []byte) {
 }
 
 final :: proc(ctx: ^$T, hash: []byte) {
+	assert(ctx.is_initialized)
+
 	block_nb, pm_len: uint
 	len_b: u64
 
@@ -457,6 +463,8 @@ final :: proc(ctx: ^$T, hash: []byte) {
 			endian.unchecked_put_u64be(hash[i * 8:], ctx.h[i])
 		}
 	}
+
+	ctx.is_initialized = false
 }
 
 /*
@@ -472,6 +480,8 @@ Sha256_Context :: struct {
 	block:   [128]byte,
 	h:       [8]u32,
 	md_bits: int,
+
+	is_initialized: bool,
 }
 
 Sha512_Context :: struct {
@@ -480,6 +490,8 @@ Sha512_Context :: struct {
 	block:   [256]byte,
 	h:       [8]u64,
 	md_bits: int,
+
+	is_initialized: bool,
 }
 
 @(private)

@@ -117,7 +117,7 @@ init :: proc(ctx: ^_blake2.Blake2b_Context) {
 	_blake2.init(ctx)
 }
 
-update :: proc "contextless" (ctx: ^_blake2.Blake2b_Context, data: []byte) {
+update :: proc(ctx: ^_blake2.Blake2b_Context, data: []byte) {
 	_blake2.update(ctx, data)
 }
 

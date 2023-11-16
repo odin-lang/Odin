@@ -24,6 +24,9 @@ Sha3_Context :: struct {
 	rsiz:      int,
 	mdlen:     int,
 	is_keccak: bool,
+
+	is_initialized: bool,
+	is_finalized:   bool, // For SHAKE (unlimited squeeze is allowed)
 }
 
 keccakf :: proc "contextless" (st: ^[25]u64) {
@@ -100,15 +103,21 @@ keccakf :: proc "contextless" (st: ^[25]u64) {
 	}
 }
 
-init :: proc "contextless" (c: ^Sha3_Context) {
+init :: proc(c: ^Sha3_Context) {
 	for i := 0; i < 25; i += 1 {
 		c.st.q[i] = 0
 	}
 	c.rsiz = 200 - 2 * c.mdlen
 	c.pt = 0
+
+	c.is_initialized = true
+	c.is_finalized = false
 }
 
-update :: proc "contextless" (c: ^Sha3_Context, data: []byte) {
+update :: proc(c: ^Sha3_Context, data: []byte) {
+	assert(c.is_initialized)
+	assert(!c.is_finalized)
+
 	j := c.pt
 	for i := 0; i < len(data); i += 1 {
 		c.st.b[j] ~= data[i]
@@ -122,6 +131,8 @@ update :: proc "contextless" (c: ^Sha3_Context, data: []byte) {
 }
 
 final :: proc(c: ^Sha3_Context, hash: []byte) {
+	assert(c.is_initialized)
+
 	if len(hash) < c.mdlen {
 		if c.is_keccak {
 			panic("crypto/keccac: invalid destination digest size")
@@ -139,16 +150,26 @@ final :: proc(c: ^Sha3_Context, hash: []byte) {
 	for i := 0; i < c.mdlen; i += 1 {
 		hash[i] = c.st.b[i]
 	}
+
+	c.is_initialized = false // No more absorb, no more squeeze.
 }
 
-shake_xof :: proc "contextless" (c: ^Sha3_Context) {
+shake_xof :: proc(c: ^Sha3_Context) {
+	assert(c.is_initialized)
+	assert(!c.is_finalized)
+
 	c.st.b[c.pt] ~= 0x1F
 	c.st.b[c.rsiz - 1] ~= 0x80
 	keccakf(&c.st.q)
 	c.pt = 0
+
+	c.is_finalized = true // No more absorb, unlimited squeeze.
 }
 
-shake_out :: proc "contextless" (c: ^Sha3_Context, hash: []byte) {
+shake_out :: proc(c: ^Sha3_Context, hash: []byte) {
+	assert(c.is_initialized)
+	assert(c.is_finalized)
+
 	j := c.pt
 	for i := 0; i < len(hash); i += 1 {
 		if j >= c.rsiz {
