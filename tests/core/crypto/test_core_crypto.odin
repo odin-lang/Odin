@@ -25,8 +25,6 @@ import "core:crypto/shake"
 import "core:crypto/whirlpool"
 import "core:crypto/blake2b"
 import "core:crypto/blake2s"
-import "core:crypto/tiger"
-import "core:crypto/tiger2"
 import "core:crypto/sm3"
 import "core:crypto/siphash"
 import "core:os"
@@ -74,12 +72,6 @@ main :: proc() {
 	test_whirlpool(&t)
 	test_blake2b(&t)
 	test_blake2s(&t)
-	test_tiger_128(&t)
-	test_tiger_160(&t)
-	test_tiger_192(&t)
-	test_tiger2_128(&t)
-	test_tiger2_160(&t)
-	test_tiger2_192(&t)
 	test_sm3(&t)
 	test_siphash_2_4(&t)
 
@@ -471,108 +463,6 @@ test_blake2s :: proc(t: ^testing.T) {
 	}
 	for v, _ in test_vectors {
 		computed     := blake2s.hash(v.str)
-		computed_str := hex_string(computed[:])
-		expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
-	}
-}
-
-@(test)
-test_tiger_128 :: proc(t: ^testing.T) {
-	test_vectors := [?]TestHash {
-		TestHash{"3293ac630c13f0245f92bbb1766e1616", ""},
-		TestHash{"77befbef2e7ef8ab2ec8f93bf587a7fc", "a"},
-		TestHash{"2aab1484e8c158f2bfb8c5ff41b57a52", "abc"},
-		TestHash{"d981f8cb78201a950dcf3048751e441c", "message digest"},
-		TestHash{"1714a472eee57d30040412bfcc55032a", "abcdefghijklmnopqrstuvwxyz"},
-		TestHash{"0f7bf9a19b9c58f2b7610df7e84f0ac3", "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq"},
-		TestHash{"8dcea680a17583ee502ba38a3c368651", "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"},
-		TestHash{"1c14795529fd9f207a958f84c52f11e8", "12345678901234567890123456789012345678901234567890123456789012345678901234567890"},
-		TestHash{"6d12a41e72e644f017b6f0e2f7b44c62", "The quick brown fox jumps over the lazy dog"},
-	}
-	for v, _ in test_vectors {
-		computed     := tiger.hash_128(v.str)
-		computed_str := hex_string(computed[:])
-		expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
-	}
-}
-
-@(test)
-test_tiger_160 :: proc(t: ^testing.T) {
-	test_vectors := [?]TestHash {
-		TestHash{"3293ac630c13f0245f92bbb1766e16167a4e5849", ""},
-		TestHash{"77befbef2e7ef8ab2ec8f93bf587a7fc613e247f", "a"},
-		TestHash{"2aab1484e8c158f2bfb8c5ff41b57a525129131c", "abc"},
-		TestHash{"d981f8cb78201a950dcf3048751e441c517fca1a", "message digest"},
-		TestHash{"1714a472eee57d30040412bfcc55032a0b11602f", "abcdefghijklmnopqrstuvwxyz"},
-		TestHash{"0f7bf9a19b9c58f2b7610df7e84f0ac3a71c631e", "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq"},
-		TestHash{"8dcea680a17583ee502ba38a3c368651890ffbcc", "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"},
-		TestHash{"1c14795529fd9f207a958f84c52f11e887fa0cab", "12345678901234567890123456789012345678901234567890123456789012345678901234567890"},
-		TestHash{"6d12a41e72e644f017b6f0e2f7b44c6285f06dd5", "The quick brown fox jumps over the lazy dog"},
-	}
-	for v, _ in test_vectors {
-		computed     := tiger.hash_160(v.str)
-		computed_str := hex_string(computed[:])
-		expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
-	}
-}
-
-@(test)
-test_tiger_192 :: proc(t: ^testing.T) {
-	test_vectors := [?]TestHash {
-		TestHash{"3293ac630c13f0245f92bbb1766e16167a4e58492dde73f3", ""},
-		TestHash{"77befbef2e7ef8ab2ec8f93bf587a7fc613e247f5f247809", "a"},
-		TestHash{"2aab1484e8c158f2bfb8c5ff41b57a525129131c957b5f93", "abc"},
-		TestHash{"d981f8cb78201a950dcf3048751e441c517fca1aa55a29f6", "message digest"},
-		TestHash{"1714a472eee57d30040412bfcc55032a0b11602ff37beee9", "abcdefghijklmnopqrstuvwxyz"},
-		TestHash{"0f7bf9a19b9c58f2b7610df7e84f0ac3a71c631e7b53f78e", "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq"},
-		TestHash{"8dcea680a17583ee502ba38a3c368651890ffbccdc49a8cc", "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"},
-		TestHash{"1c14795529fd9f207a958f84c52f11e887fa0cabdfd91bfd", "12345678901234567890123456789012345678901234567890123456789012345678901234567890"},
-		TestHash{"6d12a41e72e644f017b6f0e2f7b44c6285f06dd5d2c5b075", "The quick brown fox jumps over the lazy dog"},
-	}
-	for v, _ in test_vectors {
-		computed     := tiger.hash_192(v.str)
-		computed_str := hex_string(computed[:])
-		expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
-	}
-}
-
-@(test)
-test_tiger2_128 :: proc(t: ^testing.T) {
-	test_vectors := [?]TestHash {
-		TestHash{"4441be75f6018773c206c22745374b92", ""},
-		TestHash{"976abff8062a2e9dcea3a1ace966ed9c", "The quick brown fox jumps over the lazy dog"},
-		TestHash{"09c11330283a27efb51930aa7dc1ec62", "The quick brown fox jumps over the lazy cog"},
-	}
-	for v, _ in test_vectors {
-		computed     := tiger2.hash_128(v.str)
-		computed_str := hex_string(computed[:])
-		expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
-	}
-}
-
-@(test)
-test_tiger2_160 :: proc(t: ^testing.T) {
-	test_vectors := [?]TestHash {
-		TestHash{"4441be75f6018773c206c22745374b924aa8313f", ""},
-		TestHash{"976abff8062a2e9dcea3a1ace966ed9c19cb8555", "The quick brown fox jumps over the lazy dog"},
-		TestHash{"09c11330283a27efb51930aa7dc1ec624ff738a8", "The quick brown fox jumps over the lazy cog"},
-	}
-	for v, _ in test_vectors {
-		computed     := tiger2.hash_160(v.str)
-		computed_str := hex_string(computed[:])
-		expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
-	}
-}
-
-@(test)
-test_tiger2_192 :: proc(t: ^testing.T) {
-	test_vectors := [?]TestHash {
-		TestHash{"4441be75f6018773c206c22745374b924aa8313fef919f41", ""},
-		TestHash{"976abff8062a2e9dcea3a1ace966ed9c19cb85558b4976d8", "The quick brown fox jumps over the lazy dog"},
-		TestHash{"09c11330283a27efb51930aa7dc1ec624ff738a8d9bdd3df", "The quick brown fox jumps over the lazy cog"},
-	}
-	for v, _ in test_vectors {
-		computed     := tiger2.hash_192(v.str)
 		computed_str := hex_string(computed[:])
 		expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
 	}

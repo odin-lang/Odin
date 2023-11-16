@@ -35,8 +35,6 @@ import sha2             "core:crypto/sha2"
 import sha3             "core:crypto/sha3"
 import shake            "core:crypto/shake"
 import sm3              "core:crypto/sm3"
-import tiger            "core:crypto/tiger"
-import tiger2           "core:crypto/tiger2"
 import crypto_util      "core:crypto/util"
 import whirlpool        "core:crypto/whirlpool"
 import x25519           "core:crypto/x25519"
@@ -153,8 +151,6 @@ _ :: sha2
 _ :: sha3
 _ :: shake
 _ :: sm3
-_ :: tiger
-_ :: tiger2
 _ :: crypto_util
 _ :: whirlpool
 _ :: x25519
