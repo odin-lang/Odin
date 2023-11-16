@@ -243,43 +243,45 @@ init :: proc(ctx: ^Context, key: []byte, c_rounds, d_rounds: int) {
 	ctx.v1 = 0x646f72616e646f6d ~ ctx.k1
 	ctx.v2 = 0x6c7967656e657261 ~ ctx.k0
 	ctx.v3 = 0x7465646279746573 ~ ctx.k1
+
+	ctx.last_block = 0
+	ctx.total_length = 0
+
 	ctx.is_initialized = true
 }
 
 update :: proc(ctx: ^Context, data: []byte) {
-	assert(ctx.is_initialized, "crypto/siphash: Context is not initialized")
-	ctx.last_block = len(data) / 8 * 8
-	ctx.buf = data
-	i := 0
-	m: u64
-	for i < ctx.last_block {
-		m = endian.unchecked_get_u64le(ctx.buf[i:])
-		i += 8
+	assert(ctx.is_initialized, "crypto/siphash: context is not initialized")
 
-		ctx.v3 ~= m
-		for _ in 0 ..< ctx.c_rounds {
-			_compress(ctx)
+	data := data
+	ctx.total_length += len(data)
+	if ctx.last_block > 0 {
+		n := copy(ctx.buf[ctx.last_block:], data)
+		ctx.last_block += n
+		if ctx.last_block == BLOCK_SIZE {
+			block(ctx, ctx.buf[:])
+			ctx.last_block = 0
 		}
-
-		ctx.v0 ~= m
+		data = data[n:]
+	}
+	if len(data) >= BLOCK_SIZE {
+		n := len(data) &~ (BLOCK_SIZE - 1)
+		block(ctx, data[:n])
+		data = data[n:]
+	}
+	if len(data) > 0 {
+		ctx.last_block = copy(ctx.buf[:], data)
 	}
 }
 
 final :: proc(ctx: ^Context, dst: ^u64) {
-	m: u64
-	for i := len(ctx.buf) - 1; i >= ctx.last_block; i -= 1 {
-		m <<= 8
-		m |= u64(ctx.buf[i] & 0xff)
-	}
-	m |= u64(len(ctx.buf) << 56)
+	assert(ctx.is_initialized, "crypto/siphash: context is not initialized")
 
-	ctx.v3 ~= m
+	tmp: [BLOCK_SIZE]byte
+	copy(tmp[:], ctx.buf[:ctx.last_block])
+	tmp[7] = byte(ctx.total_length & 0xff)
+	block(ctx, tmp[:])
 
-	for _ in 0 ..< ctx.c_rounds {
-		_compress(ctx)
-	}
-
-	ctx.v0 ~= m
 	ctx.v2 ~= 0xff
 
 	for _ in 0 ..< ctx.d_rounds {
@@ -296,19 +298,41 @@ reset :: proc(ctx: ^Context) {
 	ctx.v0, ctx.v1 = 0, 0
 	ctx.v2, ctx.v3 = 0, 0
 	ctx.last_block = 0
+	ctx.total_length = 0
 	ctx.c_rounds = 0
 	ctx.d_rounds = 0
 	ctx.is_initialized = false
 }
+
+BLOCK_SIZE :: 8
 
 Context :: struct {
 	v0, v1, v2, v3: u64, // State values
 	k0, k1:         u64, // Split key
 	c_rounds:       int, // Number of message rounds
 	d_rounds:       int, // Number of finalization rounds
-	buf:            []byte, // Provided data
+	buf:            [BLOCK_SIZE]byte, // Provided data
 	last_block:     int, // Offset from the last block
+	total_length:   int,
 	is_initialized: bool,
+}
+
+@(private)
+block :: proc "contextless" (ctx: ^Context, buf: []byte) {
+	buf := buf
+
+	for len(buf) >= BLOCK_SIZE {
+		m := endian.unchecked_get_u64le(buf)
+
+		ctx.v3 ~= m
+		for _ in 0 ..< ctx.c_rounds {
+			_compress(ctx)
+		}
+
+		ctx.v0 ~= m
+
+		buf = buf[BLOCK_SIZE:]
+	}
 }
 
 @(private)
