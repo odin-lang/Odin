@@ -10,11 +10,11 @@ package md5
     Implementation of the MD5 hashing algorithm, as defined in RFC 1321 <https://datatracker.ietf.org/doc/html/rfc1321>
 */
 
+import "core:encoding/endian"
 import "core:io"
+import "core:math/bits"
 import "core:mem"
 import "core:os"
-
-import "../util"
 
 /*
     High level API
@@ -107,6 +107,9 @@ init :: proc(ctx: ^Md5_Context) {
 	ctx.state[1] = 0xefcdab89
 	ctx.state[2] = 0x98badcfe
 	ctx.state[3] = 0x10325476
+
+	ctx.bitlen = 0
+	ctx.datalen = 0
 }
 
 update :: proc(ctx: ^Md5_Context, data: []byte) {
@@ -122,8 +125,7 @@ update :: proc(ctx: ^Md5_Context, data: []byte) {
 }
 
 final :: proc(ctx: ^Md5_Context, hash: []byte) {
-	i: u32
-	i = ctx.datalen
+	i := ctx.datalen
 
 	if ctx.datalen < 56 {
 		ctx.data[i] = 0x80
@@ -144,26 +146,16 @@ final :: proc(ctx: ^Md5_Context, hash: []byte) {
 	}
 
 	ctx.bitlen += u64(ctx.datalen * 8)
-	ctx.data[56] = byte(ctx.bitlen)
-	ctx.data[57] = byte(ctx.bitlen >> 8)
-	ctx.data[58] = byte(ctx.bitlen >> 16)
-	ctx.data[59] = byte(ctx.bitlen >> 24)
-	ctx.data[60] = byte(ctx.bitlen >> 32)
-	ctx.data[61] = byte(ctx.bitlen >> 40)
-	ctx.data[62] = byte(ctx.bitlen >> 48)
-	ctx.data[63] = byte(ctx.bitlen >> 56)
+	endian.unchecked_put_u64le(ctx.data[56:], ctx.bitlen)
 	transform(ctx, ctx.data[:])
 
-	for i = 0; i < 4; i += 1 {
-		hash[i] = byte(ctx.state[0] >> (i * 8)) & 0x000000ff
-		hash[i + 4] = byte(ctx.state[1] >> (i * 8)) & 0x000000ff
-		hash[i + 8] = byte(ctx.state[2] >> (i * 8)) & 0x000000ff
-		hash[i + 12] = byte(ctx.state[3] >> (i * 8)) & 0x000000ff
+	for i = 0; i < DIGEST_SIZE / 4; i += 1 {
+		endian.unchecked_put_u32le(hash[i * 4:], ctx.state[i])
 	}
 }
 
 /*
-    MD4 implementation
+    MD5 implementation
 */
 
 BLOCK_SIZE :: 64
@@ -176,34 +168,36 @@ Md5_Context :: struct {
 }
 
 /*
-    @note(zh): F, G, H and I, as mentioned in the RFC, have been inlined into FF, GG, HH 
+    @note(zh): F, G, H and I, as mentioned in the RFC, have been inlined into FF, GG, HH
     and II respectively, instead of declaring them separately.
 */
 
+@(private)
 FF :: #force_inline proc "contextless" (a, b, c, d, m: u32, s: int, t: u32) -> u32 {
-	return b + util.ROTL32(a + ((b & c) | (~b & d)) + m + t, s)
+	return b + bits.rotate_left32(a + ((b & c) | (~b & d)) + m + t, s)
 }
 
+@(private)
 GG :: #force_inline proc "contextless" (a, b, c, d, m: u32, s: int, t: u32) -> u32 {
-	return b + util.ROTL32(a + ((b & d) | (c & ~d)) + m + t, s)
+	return b + bits.rotate_left32(a + ((b & d) | (c & ~d)) + m + t, s)
 }
 
+@(private)
 HH :: #force_inline proc "contextless" (a, b, c, d, m: u32, s: int, t: u32) -> u32 {
-	return b + util.ROTL32(a + (b ~ c ~ d) + m + t, s)
+	return b + bits.rotate_left32(a + (b ~ c ~ d) + m + t, s)
 }
 
+@(private)
 II :: #force_inline proc "contextless" (a, b, c, d, m: u32, s: int, t: u32) -> u32 {
-	return b + util.ROTL32(a + (c ~ (b | ~d)) + m + t, s)
+	return b + bits.rotate_left32(a + (c ~ (b | ~d)) + m + t, s)
 }
 
-transform :: proc(ctx: ^Md5_Context, data: []byte) {
-	i, j: u32
+@(private)
+transform :: proc "contextless" (ctx: ^Md5_Context, data: []byte) {
 	m: [DIGEST_SIZE]u32
 
-	for i, j = 0, 0; i < DIGEST_SIZE; i += 1 {
-		m[i] =
-			u32(data[j]) + u32(data[j + 1]) << 8 + u32(data[j + 2]) << 16 + u32(data[j + 3]) << 24
-		j += 4
+	for i := 0; i < DIGEST_SIZE; i += 1 {
+		m[i] = endian.unchecked_get_u32le(data[i * 4:])
 	}
 
 	a := ctx.state[0]
