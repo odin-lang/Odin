@@ -9,6 +9,9 @@ package shake
 
     Interface for the SHAKE hashing algorithm.
     The SHA3 functionality can be found in package sha3.
+
+    TODO: This should provide an incremental squeeze interface, in addition
+    to the one-shot final call.
 */
 
 import "core:io"
