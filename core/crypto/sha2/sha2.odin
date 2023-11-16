@@ -37,7 +37,7 @@ hash_string_224 :: proc(data: string) -> [DIGEST_SIZE_224]byte {
 hash_bytes_224 :: proc(data: []byte) -> [DIGEST_SIZE_224]byte {
 	hash: [DIGEST_SIZE_224]byte
 	ctx: Sha256_Context
-	ctx.is224 = true
+	ctx.md_bits = 224
 	init(&ctx)
 	update(&ctx, data)
 	final(&ctx, hash[:])
@@ -60,7 +60,7 @@ hash_bytes_to_buffer_224 :: proc(data, hash: []byte) {
 		"Size of destination buffer is smaller than the digest size",
 	)
 	ctx: Sha256_Context
-	ctx.is224 = true
+	ctx.md_bits = 224
 	init(&ctx)
 	update(&ctx, data)
 	final(&ctx, hash)
@@ -70,8 +70,8 @@ hash_bytes_to_buffer_224 :: proc(data, hash: []byte) {
 // hash from its contents
 hash_stream_224 :: proc(s: io.Stream) -> ([DIGEST_SIZE_224]byte, bool) {
 	hash: [DIGEST_SIZE_224]byte
-	ctx: Sha512_Context
-	ctx.is384 = false
+	ctx: Sha256_Context
+	ctx.md_bits = 224
 	init(&ctx)
 	buf := make([]byte, 512)
 	defer delete(buf)
@@ -119,7 +119,7 @@ hash_string_256 :: proc(data: string) -> [DIGEST_SIZE_256]byte {
 hash_bytes_256 :: proc(data: []byte) -> [DIGEST_SIZE_256]byte {
 	hash: [DIGEST_SIZE_256]byte
 	ctx: Sha256_Context
-	ctx.is224 = false
+	ctx.md_bits = 256
 	init(&ctx)
 	update(&ctx, data)
 	final(&ctx, hash[:])
@@ -142,7 +142,7 @@ hash_bytes_to_buffer_256 :: proc(data, hash: []byte) {
 		"Size of destination buffer is smaller than the digest size",
 	)
 	ctx: Sha256_Context
-	ctx.is224 = false
+	ctx.md_bits = 256
 	init(&ctx)
 	update(&ctx, data)
 	final(&ctx, hash)
@@ -152,8 +152,8 @@ hash_bytes_to_buffer_256 :: proc(data, hash: []byte) {
 // hash from its contents
 hash_stream_256 :: proc(s: io.Stream) -> ([DIGEST_SIZE_256]byte, bool) {
 	hash: [DIGEST_SIZE_256]byte
-	ctx: Sha512_Context
-	ctx.is384 = false
+	ctx: Sha256_Context
+	ctx.md_bits = 256
 	init(&ctx)
 	buf := make([]byte, 512)
 	defer delete(buf)
@@ -201,7 +201,7 @@ hash_string_384 :: proc(data: string) -> [DIGEST_SIZE_384]byte {
 hash_bytes_384 :: proc(data: []byte) -> [DIGEST_SIZE_384]byte {
 	hash: [DIGEST_SIZE_384]byte
 	ctx: Sha512_Context
-	ctx.is384 = true
+	ctx.md_bits = 384
 	init(&ctx)
 	update(&ctx, data)
 	final(&ctx, hash[:])
@@ -224,7 +224,7 @@ hash_bytes_to_buffer_384 :: proc(data, hash: []byte) {
 		"Size of destination buffer is smaller than the digest size",
 	)
 	ctx: Sha512_Context
-	ctx.is384 = true
+	ctx.md_bits = 384
 	init(&ctx)
 	update(&ctx, data)
 	final(&ctx, hash)
@@ -235,7 +235,7 @@ hash_bytes_to_buffer_384 :: proc(data, hash: []byte) {
 hash_stream_384 :: proc(s: io.Stream) -> ([DIGEST_SIZE_384]byte, bool) {
 	hash: [DIGEST_SIZE_384]byte
 	ctx: Sha512_Context
-	ctx.is384 = true
+	ctx.md_bits = 384
 	init(&ctx)
 	buf := make([]byte, 512)
 	defer delete(buf)
@@ -283,7 +283,7 @@ hash_string_512 :: proc(data: string) -> [DIGEST_SIZE_512]byte {
 hash_bytes_512 :: proc(data: []byte) -> [DIGEST_SIZE_512]byte {
 	hash: [DIGEST_SIZE_512]byte
 	ctx: Sha512_Context
-	ctx.is384 = false
+	ctx.md_bits = 512
 	init(&ctx)
 	update(&ctx, data)
 	final(&ctx, hash[:])
@@ -306,7 +306,7 @@ hash_bytes_to_buffer_512 :: proc(data, hash: []byte) {
 		"Size of destination buffer is smaller than the digest size",
 	)
 	ctx: Sha512_Context
-	ctx.is384 = false
+	ctx.md_bits = 512
 	init(&ctx)
 	update(&ctx, data)
 	final(&ctx, hash)
@@ -317,7 +317,7 @@ hash_bytes_to_buffer_512 :: proc(data, hash: []byte) {
 hash_stream_512 :: proc(s: io.Stream) -> ([DIGEST_SIZE_512]byte, bool) {
 	hash: [DIGEST_SIZE_512]byte
 	ctx: Sha512_Context
-	ctx.is384 = false
+	ctx.md_bits = 512
 	init(&ctx)
 	buf := make([]byte, 512)
 	defer delete(buf)
@@ -360,7 +360,7 @@ hash_512 :: proc {
 
 init :: proc(ctx: ^$T) {
 	when T == Sha256_Context {
-		if ctx.is224 {
+		if ctx.md_bits == 224 {
 			ctx.h[0] = 0xc1059ed8
 			ctx.h[1] = 0x367cd507
 			ctx.h[2] = 0x3070dd17
@@ -380,7 +380,7 @@ init :: proc(ctx: ^$T) {
 			ctx.h[7] = 0x5be0cd19
 		}
 	} else when T == Sha512_Context {
-		if ctx.is384 {
+		if ctx.md_bits == 384 {
 			ctx.h[0] = 0xcbbb9d5dc1059ed8
 			ctx.h[1] = 0x629a292a367cd507
 			ctx.h[2] = 0x9159015a3070dd17
@@ -444,7 +444,6 @@ update :: proc(ctx: ^$T, data: []byte) {
 
 final :: proc(ctx: ^$T, hash: []byte) {
 	block_nb, pm_len, len_b: u32
-	i: i32
 
 	when T == Sha256_Context {CURR_BLOCK_SIZE :: SHA256_BLOCK_SIZE} else when T == Sha512_Context {CURR_BLOCK_SIZE :: SHA512_BLOCK_SIZE}
 
@@ -461,16 +460,12 @@ final :: proc(ctx: ^$T, hash: []byte) {
 	sha2_transf(ctx, ctx.block[:], uint(block_nb))
 
 	when T == Sha256_Context {
-		if ctx.is224 {
-			for i = 0; i < 7; i += 1 {endian.unchecked_put_u32be(hash[i << 2:], ctx.h[i])}
-		} else {
-			for i = 0; i < 8; i += 1 {endian.unchecked_put_u32be(hash[i << 2:], ctx.h[i])}
+		for i := 0; i < ctx.md_bits / 32; i += 1 {
+			endian.unchecked_put_u32be(hash[i * 4:], ctx.h[i])
 		}
 	} else when T == Sha512_Context {
-		if ctx.is384 {
-			for i = 0; i < 6; i += 1 {endian.unchecked_put_u64be(hash[i << 3:], ctx.h[i])}
-		} else {
-			for i = 0; i < 8; i += 1 {endian.unchecked_put_u64be(hash[i << 3:], ctx.h[i])}
+		for i := 0; i < ctx.md_bits / 64; i += 1 {
+			endian.unchecked_put_u64be(hash[i * 8:], ctx.h[i])
 		}
 	}
 }
@@ -487,7 +482,7 @@ Sha256_Context :: struct {
 	length:  uint,
 	block:   [128]byte,
 	h:       [8]u32,
-	is224:   bool,
+	md_bits: int,
 }
 
 Sha512_Context :: struct {
@@ -495,7 +490,7 @@ Sha512_Context :: struct {
 	length:  uint,
 	block:   [256]byte,
 	h:       [8]u64,
-	is384:   bool,
+	md_bits: int,
 }
 
 @(private)
