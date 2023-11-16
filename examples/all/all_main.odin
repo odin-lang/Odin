@@ -36,7 +36,6 @@ import sha3             "core:crypto/sha3"
 import shake            "core:crypto/shake"
 import sm3              "core:crypto/sm3"
 import crypto_util      "core:crypto/util"
-import whirlpool        "core:crypto/whirlpool"
 import x25519           "core:crypto/x25519"
 
 import pe               "core:debug/pe"
@@ -152,7 +151,6 @@ _ :: sha3
 _ :: shake
 _ :: sm3
 _ :: crypto_util
-_ :: whirlpool
 _ :: x25519
 _ :: pe
 _ :: dynlib

@@ -23,7 +23,6 @@ import "vendor:botan/sha2"
 import "vendor:botan/sha3"
 import "vendor:botan/keccak"
 import "vendor:botan/shake"
-import "vendor:botan/whirlpool"
 import "vendor:botan/blake2b"
 import "vendor:botan/sm3"
 import "vendor:botan/siphash"
@@ -66,7 +65,6 @@ main :: proc() {
     // test_shake_128(&t)
     // test_shake_256(&t)
     test_keccak_512(&t)
-    test_whirlpool(&t)
     test_blake2b(&t)
     test_sm3(&t)
     test_siphash_2_4(&t)
@@ -335,32 +333,6 @@ test_keccak_512 :: proc(t: ^testing.T) {
     }
     for v, _ in test_vectors {
         computed     := keccak.hash_512(v.str)
-        computed_str := hex_string(computed[:])
-        expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
-    }
-}
-
-@(test)
-test_whirlpool :: proc(t: ^testing.T) {
-    // Test vectors from 
-    // https://web.archive.org/web/20171129084214/http://www.larc.usp.br/~pbarreto/WhirlpoolPage.html
-    test_vectors := [?]TestHash {
-        TestHash{"19fa61d75522a4669b44e39c1d2e1726c530232130d407f89afee0964997f7a73e83be698b288febcf88e3e03c4f0757ea8964e59b63d93708b138cc42a66eb3", ""},
-        TestHash{"8aca2602792aec6f11a67206531fb7d7f0dff59413145e6973c45001d0087b42d11bc645413aeff63a42391a39145a591a92200d560195e53b478584fdae231a", "a"},
-        TestHash{"33e24e6cbebf168016942df8a7174048f9cebc45cbd829c3b94b401a498acb11c5abcca7f2a1238aaf534371e87a4e4b19758965d5a35a7cad87cf5517043d97", "ab"},
-        TestHash{"4e2448a4c6f486bb16b6562c73b4020bf3043e3a731bce721ae1b303d97e6d4c7181eebdb6c57e277d0e34957114cbd6c797fc9d95d8b582d225292076d4eef5", "abc"},
-        TestHash{"bda164f0b930c43a1bacb5df880b205d15ac847add35145bf25d991ae74f0b72b1ac794f8aacda5fcb3c47038c954742b1857b5856519de4d1e54bfa2fa4eac5", "abcd"},
-        TestHash{"5d745e26ccb20fe655d39c9e7f69455758fbae541cb892b3581e4869244ab35b4fd6078f5d28b1f1a217452a67d9801033d92724a221255a5e377fe9e9e5f0b2", "abcde"},
-        TestHash{"a73e425459567308ba5f9eb2ae23570d0d0575eb1357ecf6ac88d4e0358b0ac3ea2371261f5d4c070211784b525911b9eec0ad968429bb7c7891d341cff4e811", "abcdef"},
-        TestHash{"08b388f68fd3eb51906ac3d3c699b8e9c3ac65d7ceb49d2e34f8a482cbc3082bc401cead90e85a97b8647c948bf35e448740b79659f3bee42145f0bd653d1f25", "abcdefg"},
-        TestHash{"1f1a84d30612820243afe2022712f9dac6d07c4c8bb41b40eacab0184c8d82275da5bcadbb35c7ca1960ff21c90acbae8c14e48d9309e4819027900e882c7ad9", "abcdefgh"},
-        TestHash{"11882bc9a31ac1cf1c41dcd9fd6fdd3ccdb9b017fc7f4582680134f314d7bb49af4c71f5a920bc0a6a3c1ff9a00021bf361d9867fe636b0bc1da1552e4237de4", "abcdefghi"},
-        TestHash{"717163de24809ffcf7ff6d5aba72b8d67c2129721953c252a4ddfb107614be857cbd76a9d5927de14633d6bdc9ddf335160b919db5c6f12cb2e6549181912eef", "abcdefghij"},
-        TestHash{"b97de512e91e3828b40d2b0fdce9ceb3c4a71f9bea8d88e75c4fa854df36725fd2b52eb6544edcacd6f8beddfea403cb55ae31f03ad62a5ef54e42ee82c3fb35", "The quick brown fox jumps over the lazy dog"},
-        TestHash{"c27ba124205f72e6847f3e19834f925cc666d0974167af915bb462420ed40cc50900d85a1f923219d832357750492d5c143011a76988344c2635e69d06f2d38c", "The quick brown fox jumps over the lazy eog"},
-    }
-    for v, _ in test_vectors {
-        computed     := whirlpool.hash(v.str)
         computed_str := hex_string(computed[:])
         expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
     }
