@@ -427,7 +427,8 @@ update :: proc(ctx: ^$T, data: []byte) {
 }
 
 final :: proc(ctx: ^$T, hash: []byte) {
-	block_nb, pm_len, len_b: u32
+	block_nb, pm_len: uint
+	len_b: u64
 
 	if len(hash) * 8 < ctx.md_bits {
 		panic("crypto/sha2: invalid destination digest size")
@@ -437,15 +438,15 @@ final :: proc(ctx: ^$T, hash: []byte) {
 
 	when T == Sha256_Context {block_nb = 1 + ((CURR_BLOCK_SIZE - 9) < (ctx.length % CURR_BLOCK_SIZE) ? 1 : 0)} else when T == Sha512_Context {block_nb = 1 + ((CURR_BLOCK_SIZE - 17) < (ctx.length % CURR_BLOCK_SIZE) ? 1 : 0)}
 
-	len_b = u32(ctx.tot_len + ctx.length) << 3
+	len_b = u64(ctx.tot_len + ctx.length) << 3
 	when T == Sha256_Context {pm_len = block_nb << 6} else when T == Sha512_Context {pm_len = block_nb << 7}
 
-	mem.set(rawptr(&(ctx.block[ctx.length:])[0]), 0, int(uint(pm_len) - ctx.length))
+	mem.set(rawptr(&(ctx.block[ctx.length:])[0]), 0, int(pm_len - ctx.length))
 	ctx.block[ctx.length] = 0x80
 
-	endian.unchecked_put_u32be(ctx.block[pm_len - 4:], len_b)
+	endian.unchecked_put_u64be(ctx.block[pm_len - 8:], len_b)
 
-	sha2_transf(ctx, ctx.block[:], uint(block_nb))
+	sha2_transf(ctx, ctx.block[:], block_nb)
 
 	when T == Sha256_Context {
 		for i := 0; i < ctx.md_bits / 32; i += 1 {
