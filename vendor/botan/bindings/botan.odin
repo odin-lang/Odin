@@ -80,8 +80,6 @@ HASH_MD5            :: "MD5"
 HASH_TIGER_128      :: "Tiger(16,3)"
 HASH_TIGER_160      :: "Tiger(20,3)"
 HASH_TIGER_192      :: "Tiger(24,3)"
-HASH_STREEBOG_256   :: "Streebog-256"
-HASH_STREEBOG_512   :: "Streebog-512"
 HASH_SM3            :: "SM3"
 
 MAC_HMAC_SHA1    :: "HMAC(SHA1)"

@@ -27,7 +27,6 @@ import "core:crypto/blake2b"
 import "core:crypto/blake2s"
 import "core:crypto/tiger"
 import "core:crypto/tiger2"
-import "core:crypto/streebog"
 import "core:crypto/sm3"
 import "core:crypto/siphash"
 import "core:os"
@@ -73,8 +72,6 @@ main :: proc() {
 	test_keccak_384(&t)
 	test_keccak_512(&t)
 	test_whirlpool(&t)
-	test_streebog_256(&t)
-	test_streebog_512(&t)
 	test_blake2b(&t)
 	test_blake2s(&t)
 	test_tiger_128(&t)
@@ -448,34 +445,6 @@ test_whirlpool :: proc(t: ^testing.T) {
 	}
 	for v, _ in test_vectors {
 		computed     := whirlpool.hash(v.str)
-		computed_str := hex_string(computed[:])
-		expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
-	}
-}
-
-@(test)
-test_streebog_256 :: proc(t: ^testing.T) {
-	test_vectors := [?]TestHash {
-		TestHash{"3f539a213e97c802cc229d474c6aa32a825a360b2a933a949fd925208d9ce1bb", ""},
-		TestHash{"3e7dea7f2384b6c5a3d0e24aaa29c05e89ddd762145030ec22c71a6db8b2c1f4", "The quick brown fox jumps over the lazy dog"},
-		TestHash{"36816a824dcbe7d6171aa58500741f2ea2757ae2e1784ab72c5c3c6c198d71da", "The quick brown fox jumps over the lazy dog."},
-	}
-	for v, _ in test_vectors {
-		computed     := streebog.hash_256(v.str)
-		computed_str := hex_string(computed[:])
-		expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
-	}
-}
-
-@(test)
-test_streebog_512 :: proc(t: ^testing.T) {
-	test_vectors := [?]TestHash {
-		TestHash{"8e945da209aa869f0455928529bcae4679e9873ab707b55315f56ceb98bef0a7362f715528356ee83cda5f2aac4c6ad2ba3a715c1bcd81cb8e9f90bf4c1c1a8a", ""},
-		TestHash{"d2b793a0bb6cb5904828b5b6dcfb443bb8f33efc06ad09368878ae4cdc8245b97e60802469bed1e7c21a64ff0b179a6a1e0bb74d92965450a0adab69162c00fe", "The quick brown fox jumps over the lazy dog"},
-		TestHash{"fe0c42f267d921f940faa72bd9fcf84f9f1bd7e9d055e9816e4c2ace1ec83be82d2957cd59b86e123d8f5adee80b3ca08a017599a9fc1a14d940cf87c77df070", "The quick brown fox jumps over the lazy dog."},
-	}
-	for v, _ in test_vectors {
-		computed     := streebog.hash_512(v.str)
 		computed_str := hex_string(computed[:])
 		expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
 	}

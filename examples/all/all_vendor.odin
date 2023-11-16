@@ -10,7 +10,6 @@ import sha3           "vendor:botan/sha3"
 import shake          "vendor:botan/shake"
 import siphash        "vendor:botan/siphash"
 import sm3            "vendor:botan/sm3"
-import streebog       "vendor:botan/streebog"
 import tiger          "vendor:botan/tiger"
 import whirlpool      "vendor:botan/whirlpool"
 
@@ -52,7 +51,6 @@ _ :: sha3
 _ :: shake
 _ :: siphash
 _ :: sm3
-_ :: streebog
 _ :: tiger
 _ :: whirlpool
 
