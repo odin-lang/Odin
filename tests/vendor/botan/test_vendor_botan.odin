@@ -28,7 +28,6 @@ import "vendor:botan/whirlpool"
 import "vendor:botan/ripemd"
 import "vendor:botan/blake2b"
 import "vendor:botan/tiger"
-import "vendor:botan/gost"
 import "vendor:botan/streebog"
 import "vendor:botan/sm3"
 import "vendor:botan/skein512"
@@ -74,7 +73,6 @@ main :: proc() {
     // test_shake_256(&t)
     test_keccak_512(&t)
     test_whirlpool(&t)
-    test_gost(&t)
     test_streebog_256(&t)
     test_streebog_512(&t)
     test_blake2b(&t)
@@ -396,26 +394,6 @@ test_whirlpool :: proc(t: ^testing.T) {
     }
     for v, _ in test_vectors {
         computed     := whirlpool.hash(v.str)
-        computed_str := hex_string(computed[:])
-        expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
-    }
-}
-
-@(test)
-test_gost :: proc(t: ^testing.T) {
-    test_vectors := [?]TestHash {
-        TestHash{"981e5f3ca30c841487830f84fb433e13ac1101569b9c13584ac483234cd656c0", ""},
-        TestHash{"e74c52dd282183bf37af0079c9f78055715a103f17e3133ceff1aacf2f403011", "a"},
-        TestHash{"b285056dbf18d7392d7677369524dd14747459ed8143997e163b2986f92fd42c", "abc"},
-        TestHash{"bc6041dd2aa401ebfa6e9886734174febdb4729aa972d60f549ac39b29721ba0", "message digest"},
-        TestHash{"9004294a361a508c586fe53d1f1b02746765e71b765472786e4770d565830a76", "The quick brown fox jumps over the lazy dog"},
-        TestHash{"73b70a39497de53a6e08c67b6d4db853540f03e9389299d9b0156ef7e85d0f61", "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"},
-        TestHash{"6bc7b38989b28cf93ae8842bf9d752905910a7528a61e5bce0782de43e610c90", "12345678901234567890123456789012345678901234567890123456789012345678901234567890"},
-        TestHash{"2cefc2f7b7bdc514e18ea57fa74ff357e7fa17d652c75f69cb1be7893ede48eb", "This is message, length=32 bytes"},
-        TestHash{"c3730c5cbccacf915ac292676f21e8bd4ef75331d9405e5f1a61dc3130a65011", "Suppose the original message has length = 50 bytes"},
-    }
-    for v, _ in test_vectors {
-        computed     := gost.hash(v.str)
         computed_str := hex_string(computed[:])
         expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
     }

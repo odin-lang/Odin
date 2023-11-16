@@ -2,7 +2,6 @@ package all
 
 import botan_bindings "vendor:botan/bindings"
 import botan_blake2b  "vendor:botan/blake2b"
-import gost           "vendor:botan/gost"
 import keccak         "vendor:botan/keccak"
 import md4            "vendor:botan/md4"
 import md5            "vendor:botan/md5"
@@ -48,7 +47,6 @@ import fontstash "vendor:fontstash"
 
 _ :: botan_bindings
 _ :: botan_blake2b
-_ :: gost
 _ :: keccak
 _ :: md4
 _ :: md5
