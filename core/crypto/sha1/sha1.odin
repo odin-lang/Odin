@@ -10,11 +10,11 @@ package sha1
     Implementation of the SHA1 hashing algorithm, as defined in RFC 3174 <https://datatracker.ietf.org/doc/html/rfc3174>
 */
 
+import "core:encoding/endian"
 import "core:io"
+import "core:math/bits"
 import "core:mem"
 import "core:os"
-
-import "../util"
 
 /*
     High level API
@@ -112,6 +112,9 @@ init :: proc(ctx: ^Sha1_Context) {
 	ctx.k[1] = 0x6ed9eba1
 	ctx.k[2] = 0x8f1bbcdc
 	ctx.k[3] = 0xca62c1d6
+
+	ctx.datalen = 0
+	ctx.bitlen = 0
 }
 
 update :: proc(ctx: ^Sha1_Context, data: []byte) {
@@ -148,22 +151,11 @@ final :: proc(ctx: ^Sha1_Context, hash: []byte) {
 	}
 
 	ctx.bitlen += u64(ctx.datalen * 8)
-	ctx.data[63] = u8(ctx.bitlen)
-	ctx.data[62] = u8(ctx.bitlen >> 8)
-	ctx.data[61] = u8(ctx.bitlen >> 16)
-	ctx.data[60] = u8(ctx.bitlen >> 24)
-	ctx.data[59] = u8(ctx.bitlen >> 32)
-	ctx.data[58] = u8(ctx.bitlen >> 40)
-	ctx.data[57] = u8(ctx.bitlen >> 48)
-	ctx.data[56] = u8(ctx.bitlen >> 56)
+	endian.unchecked_put_u64be(ctx.data[56:], ctx.bitlen)
 	transform(ctx, ctx.data[:])
 
-	for j: u32 = 0; j < 4; j += 1 {
-		hash[j] = u8(ctx.state[0] >> (24 - j * 8)) & 0x000000ff
-		hash[j + 4] = u8(ctx.state[1] >> (24 - j * 8)) & 0x000000ff
-		hash[j + 8] = u8(ctx.state[2] >> (24 - j * 8)) & 0x000000ff
-		hash[j + 12] = u8(ctx.state[3] >> (24 - j * 8)) & 0x000000ff
-		hash[j + 16] = u8(ctx.state[4] >> (24 - j * 8)) & 0x000000ff
+	for i = 0; i < DIGEST_SIZE / 4; i += 1 {
+		endian.unchecked_put_u32be(hash[i * 4:], ctx.state[i])
 	}
 }
 
@@ -181,14 +173,13 @@ Sha1_Context :: struct {
 	k:       [4]u32,
 }
 
-transform :: proc(ctx: ^Sha1_Context, data: []byte) {
-	a, b, c, d, e, i, j, t: u32
+@(private)
+transform :: proc "contextless" (ctx: ^Sha1_Context, data: []byte) {
+	a, b, c, d, e, i, t: u32
 	m: [80]u32
 
-	for i, j = 0, 0; i < 16; i += 1 {
-		m[i] =
-			u32(data[j]) << 24 + u32(data[j + 1]) << 16 + u32(data[j + 2]) << 8 + u32(data[j + 3])
-		j += 4
+	for i = 0; i < 16; i += 1 {
+		m[i] = endian.unchecked_get_u32be(data[i * 4:])
 	}
 	for i < 80 {
 		m[i] = (m[i - 3] ~ m[i - 8] ~ m[i - 14] ~ m[i - 16])
@@ -203,36 +194,36 @@ transform :: proc(ctx: ^Sha1_Context, data: []byte) {
 	e = ctx.state[4]
 
 	for i = 0; i < 20; i += 1 {
-		t = util.ROTL32(a, 5) + ((b & c) ~ (~b & d)) + e + ctx.k[0] + m[i]
+		t = bits.rotate_left32(a, 5) + ((b & c) ~ (~b & d)) + e + ctx.k[0] + m[i]
 		e = d
 		d = c
-		c = util.ROTL32(b, 30)
+		c = bits.rotate_left32(b, 30)
 		b = a
 		a = t
 	}
 	for i < 40 {
-		t = util.ROTL32(a, 5) + (b ~ c ~ d) + e + ctx.k[1] + m[i]
+		t = bits.rotate_left32(a, 5) + (b ~ c ~ d) + e + ctx.k[1] + m[i]
 		e = d
 		d = c
-		c = util.ROTL32(b, 30)
+		c = bits.rotate_left32(b, 30)
 		b = a
 		a = t
 		i += 1
 	}
 	for i < 60 {
-		t = util.ROTL32(a, 5) + ((b & c) ~ (b & d) ~ (c & d)) + e + ctx.k[2] + m[i]
+		t = bits.rotate_left32(a, 5) + ((b & c) ~ (b & d) ~ (c & d)) + e + ctx.k[2] + m[i]
 		e = d
 		d = c
-		c = util.ROTL32(b, 30)
+		c = bits.rotate_left32(b, 30)
 		b = a
 		a = t
 		i += 1
 	}
 	for i < 80 {
-		t = util.ROTL32(a, 5) + (b ~ c ~ d) + e + ctx.k[3] + m[i]
+		t = bits.rotate_left32(a, 5) + (b ~ c ~ d) + e + ctx.k[3] + m[i]
 		e = d
 		d = c
-		c = util.ROTL32(b, 30)
+		c = bits.rotate_left32(b, 30)
 		b = a
 		a = t
 		i += 1
