@@ -55,10 +55,6 @@ hash_string_to_buffer_224 :: proc(data: string, hash: []byte) {
 // computed hash into the second parameter.
 // It requires that the destination buffer is at least as big as the digest size
 hash_bytes_to_buffer_224 :: proc(data, hash: []byte) {
-	assert(
-		len(hash) >= DIGEST_SIZE_224,
-		"Size of destination buffer is smaller than the digest size",
-	)
 	ctx: Sha256_Context
 	ctx.md_bits = 224
 	init(&ctx)
@@ -137,10 +133,6 @@ hash_string_to_buffer_256 :: proc(data: string, hash: []byte) {
 // computed hash into the second parameter.
 // It requires that the destination buffer is at least as big as the digest size
 hash_bytes_to_buffer_256 :: proc(data, hash: []byte) {
-	assert(
-		len(hash) >= DIGEST_SIZE_256,
-		"Size of destination buffer is smaller than the digest size",
-	)
 	ctx: Sha256_Context
 	ctx.md_bits = 256
 	init(&ctx)
@@ -219,10 +211,6 @@ hash_string_to_buffer_384 :: proc(data: string, hash: []byte) {
 // computed hash into the second parameter.
 // It requires that the destination buffer is at least as big as the digest size
 hash_bytes_to_buffer_384 :: proc(data, hash: []byte) {
-	assert(
-		len(hash) >= DIGEST_SIZE_384,
-		"Size of destination buffer is smaller than the digest size",
-	)
 	ctx: Sha512_Context
 	ctx.md_bits = 384
 	init(&ctx)
@@ -301,10 +289,6 @@ hash_string_to_buffer_512 :: proc(data: string, hash: []byte) {
 // computed hash into the second parameter.
 // It requires that the destination buffer is at least as big as the digest size
 hash_bytes_to_buffer_512 :: proc(data, hash: []byte) {
-	assert(
-		len(hash) >= DIGEST_SIZE_512,
-		"Size of destination buffer is smaller than the digest size",
-	)
 	ctx: Sha512_Context
 	ctx.md_bits = 512
 	init(&ctx)
@@ -444,6 +428,10 @@ update :: proc(ctx: ^$T, data: []byte) {
 
 final :: proc(ctx: ^$T, hash: []byte) {
 	block_nb, pm_len, len_b: u32
+
+	if len(hash) * 8 < ctx.md_bits {
+		panic("crypto/sha2: invalid destination digest size")
+	}
 
 	when T == Sha256_Context {CURR_BLOCK_SIZE :: SHA256_BLOCK_SIZE} else when T == Sha512_Context {CURR_BLOCK_SIZE :: SHA512_BLOCK_SIZE}
 

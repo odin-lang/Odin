@@ -49,7 +49,6 @@ hash_string_to_buffer :: proc(data: string, hash: []byte) {
 // computed hash into the second parameter.
 // It requires that the destination buffer is at least as big as the digest size
 hash_bytes_to_buffer :: proc(data, hash: []byte) {
-	assert(len(hash) >= DIGEST_SIZE, "Size of destination buffer is smaller than the digest size")
 	ctx: Sm3_Context
 	init(&ctx)
 	update(&ctx, data)
@@ -139,6 +138,10 @@ update :: proc(ctx: ^Sm3_Context, data: []byte) {
 }
 
 final :: proc(ctx: ^Sm3_Context, hash: []byte) {
+	if len(hash) < DIGEST_SIZE {
+		panic("crypto/sm3: invalid destination digest size")
+	}
+
 	length := ctx.length
 
 	pad: [BLOCK_SIZE]byte

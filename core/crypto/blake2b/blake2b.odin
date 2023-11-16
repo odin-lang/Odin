@@ -53,7 +53,6 @@ hash_string_to_buffer :: proc(data: string, hash: []byte) {
 // computed hash into the second parameter.
 // It requires that the destination buffer is at least as big as the digest size
 hash_bytes_to_buffer :: proc(data, hash: []byte) {
-	assert(len(hash) >= DIGEST_SIZE, "Size of destination buffer is smaller than the digest size")
 	ctx: _blake2.Blake2b_Context
 	cfg: _blake2.Blake2_Config
 	cfg.size = _blake2.BLAKE2B_SIZE
@@ -122,6 +121,6 @@ update :: proc "contextless" (ctx: ^_blake2.Blake2b_Context, data: []byte) {
 	_blake2.update(ctx, data)
 }
 
-final :: proc "contextless" (ctx: ^_blake2.Blake2b_Context, hash: []byte) {
+final :: proc(ctx: ^_blake2.Blake2b_Context, hash: []byte) {
 	_blake2.final(ctx, hash)
 }

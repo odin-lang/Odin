@@ -121,7 +121,13 @@ update :: proc "contextless" (c: ^Sha3_Context, data: []byte) {
 	c.pt = j
 }
 
-final :: proc "contextless" (c: ^Sha3_Context, hash: []byte) {
+final :: proc(c: ^Sha3_Context, hash: []byte) {
+	if len(hash) < c.mdlen {
+		if c.is_keccak {
+			panic("crypto/keccac: invalid destination digest size")
+		}
+		panic("crypto/sha3: invalid destination digest size")
+	}
 	if c.is_keccak {
 		c.st.b[c.pt] ~= 0x01
 	} else {

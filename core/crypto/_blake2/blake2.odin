@@ -180,11 +180,17 @@ update :: proc "contextless" (ctx: ^$T, p: []byte) {
 	ctx.nx += copy(ctx.x[ctx.nx:], p)
 }
 
-final :: proc "contextless" (ctx: ^$T, hash: []byte) {
+final :: proc(ctx: ^$T, hash: []byte) {
 	when T == Blake2s_Context {
+		if len(hash) < BLAKE2S_SIZE {
+			panic("crypto/blake2s: invalid destination digest size")
+		}
 		blake2s_final(ctx, hash)
 	}
 	when T == Blake2b_Context {
+		if len(hash) < BLAKE2B_SIZE {
+			panic("crypto/blake2b: invalid destination digest size")
+		}
 		blake2b_final(ctx, hash)
 	}
 }

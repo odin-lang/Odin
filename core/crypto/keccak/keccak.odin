@@ -56,10 +56,6 @@ hash_string_to_buffer_224 :: proc(data: string, hash: []byte) {
 // computed hash into the second parameter.
 // It requires that the destination buffer is at least as big as the digest size
 hash_bytes_to_buffer_224 :: proc(data, hash: []byte) {
-	assert(
-		len(hash) >= DIGEST_SIZE_224,
-		"Size of destination buffer is smaller than the digest size",
-	)
 	ctx: _sha3.Sha3_Context
 	ctx.mdlen = DIGEST_SIZE_224
 	ctx.is_keccak = true
@@ -141,10 +137,6 @@ hash_string_to_buffer_256 :: proc(data: string, hash: []byte) {
 // computed hash into the second parameter.
 // It requires that the destination buffer is at least as big as the digest size
 hash_bytes_to_buffer_256 :: proc(data, hash: []byte) {
-	assert(
-		len(hash) >= DIGEST_SIZE_256,
-		"Size of destination buffer is smaller than the digest size",
-	)
 	ctx: _sha3.Sha3_Context
 	ctx.mdlen = DIGEST_SIZE_256
 	ctx.is_keccak = true
@@ -226,10 +218,6 @@ hash_string_to_buffer_384 :: proc(data: string, hash: []byte) {
 // computed hash into the second parameter.
 // It requires that the destination buffer is at least as big as the digest size
 hash_bytes_to_buffer_384 :: proc(data, hash: []byte) {
-	assert(
-		len(hash) >= DIGEST_SIZE_384,
-		"Size of destination buffer is smaller than the digest size",
-	)
 	ctx: _sha3.Sha3_Context
 	ctx.mdlen = DIGEST_SIZE_384
 	ctx.is_keccak = true
@@ -311,10 +299,6 @@ hash_string_to_buffer_512 :: proc(data: string, hash: []byte) {
 // computed hash into the second parameter.
 // It requires that the destination buffer is at least as big as the digest size
 hash_bytes_to_buffer_512 :: proc(data, hash: []byte) {
-	assert(
-		len(hash) >= DIGEST_SIZE_512,
-		"Size of destination buffer is smaller than the digest size",
-	)
 	ctx: _sha3.Sha3_Context
 	ctx.mdlen = DIGEST_SIZE_512
 	ctx.is_keccak = true
@@ -381,6 +365,6 @@ update :: proc "contextless" (ctx: ^_sha3.Sha3_Context, data: []byte) {
 	_sha3.update(ctx, data)
 }
 
-final :: proc "contextless" (ctx: ^_sha3.Sha3_Context, hash: []byte) {
+final :: proc(ctx: ^_sha3.Sha3_Context, hash: []byte) {
 	_sha3.final(ctx, hash)
 }

@@ -53,10 +53,6 @@ hash_string_to_buffer_128 :: proc(data: string, hash: []byte) {
 // computed hash into the second parameter.
 // It requires that the destination buffer is at least as big as the digest size
 hash_bytes_to_buffer_128 :: proc(data, hash: []byte) {
-	assert(
-		len(hash) >= DIGEST_SIZE_128,
-		"Size of destination buffer is smaller than the digest size",
-	)
 	ctx: _sha3.Sha3_Context
 	ctx.mdlen = DIGEST_SIZE_128
 	_sha3.init(&ctx)
@@ -138,10 +134,6 @@ hash_string_to_buffer_256 :: proc(data: string, hash: []byte) {
 // computed hash into the second parameter.
 // It requires that the destination buffer is at least as big as the digest size
 hash_bytes_to_buffer_256 :: proc(data, hash: []byte) {
-	assert(
-		len(hash) >= DIGEST_SIZE_256,
-		"Size of destination buffer is smaller than the digest size",
-	)
 	ctx: _sha3.Sha3_Context
 	ctx.mdlen = DIGEST_SIZE_256
 	_sha3.init(&ctx)

@@ -50,7 +50,6 @@ hash_string_to_buffer :: proc(data: string, hash: []byte) {
 // computed hash into the second parameter.
 // It requires that the destination buffer is at least as big as the digest size
 hash_bytes_to_buffer :: proc(data, hash: []byte) {
-	assert(len(hash) >= DIGEST_SIZE, "Size of destination buffer is smaller than the digest size")
 	ctx: Md5_Context
 	init(&ctx)
 	update(&ctx, data)
@@ -125,6 +124,10 @@ update :: proc(ctx: ^Md5_Context, data: []byte) {
 }
 
 final :: proc(ctx: ^Md5_Context, hash: []byte) {
+	if len(hash) < DIGEST_SIZE {
+		panic("crypto/md5: invalid destination digest size")
+	}
+
 	i := ctx.datalen
 
 	if ctx.datalen < 56 {

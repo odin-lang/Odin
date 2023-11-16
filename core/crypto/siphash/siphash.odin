@@ -49,10 +49,6 @@ sum_string_to_buffer_1_3 :: proc(msg, key: string, dst: []byte) {
 // sum_bytes_to_buffer_1_3 will hash the given message with the key and write
 // the computed hash into the provided destination buffer
 sum_bytes_to_buffer_1_3 :: proc(msg, key, dst: []byte) {
-	assert(
-		len(dst) >= DIGEST_SIZE,
-		"crypto/siphash: Destination buffer needs to be at least of size 8",
-	)
 	hash := sum_bytes_1_3(msg, key)
 	_collect_output(dst[:], hash)
 }
@@ -109,10 +105,6 @@ sum_string_to_buffer_2_4 :: proc(msg, key: string, dst: []byte) {
 // sum_bytes_to_buffer_2_4 will hash the given message with the key and write
 // the computed hash into the provided destination buffer
 sum_bytes_to_buffer_2_4 :: proc(msg, key, dst: []byte) {
-	assert(
-		len(dst) >= DIGEST_SIZE,
-		"crypto/siphash: Destination buffer needs to be at least of size 8",
-	)
 	hash := sum_bytes_2_4(msg, key)
 	_collect_output(dst[:], hash)
 }
@@ -187,10 +179,6 @@ sum_string_to_buffer_4_8 :: proc(msg, key: string, dst: []byte) {
 // sum_bytes_to_buffer_4_8 will hash the given message with the key and write
 // the computed hash into the provided destination buffer
 sum_bytes_to_buffer_4_8 :: proc(msg, key, dst: []byte) {
-	assert(
-		len(dst) >= DIGEST_SIZE,
-		"crypto/siphash: Destination buffer needs to be at least of size 8",
-	)
 	hash := sum_bytes_4_8(msg, key)
 	_collect_output(dst[:], hash)
 }
@@ -226,17 +214,18 @@ verify_4_8 :: proc {
 */
 
 init :: proc(ctx: ^Context, key: []byte, c_rounds, d_rounds: int) {
-	assert(len(key) == KEY_SIZE, "crypto/siphash: Invalid key size, want 16")
+	if len(key) != KEY_SIZE {
+		panic("crypto/siphash; invalid key size")
+	}
 	ctx.c_rounds = c_rounds
 	ctx.d_rounds = d_rounds
 	is_valid_setting :=
 		(ctx.c_rounds == 1 && ctx.d_rounds == 3) ||
 		(ctx.c_rounds == 2 && ctx.d_rounds == 4) ||
 		(ctx.c_rounds == 4 && ctx.d_rounds == 8)
-	assert(
-		is_valid_setting,
-		"crypto/siphash: Incorrect rounds set up. Valid pairs are (1,3), (2,4) and (4,8)",
-	)
+	if !is_valid_setting {
+		panic("crypto/siphash: incorrect rounds set up")
+	}
 	ctx.k0 = endian.unchecked_get_u64le(key[:8])
 	ctx.k1 = endian.unchecked_get_u64le(key[8:])
 	ctx.v0 = 0x736f6d6570736575 ~ ctx.k0
@@ -341,7 +330,10 @@ _get_byte :: #force_inline proc "contextless" (byte_num: byte, into: u64) -> byt
 }
 
 @(private)
-_collect_output :: #force_inline proc "contextless" (dst: []byte, hash: u64) {
+_collect_output :: #force_inline proc(dst: []byte, hash: u64) {
+	if len(dst) < DIGEST_SIZE {
+		panic("crypto/siphash: invalid tag size")
+	}
 	dst[0] = _get_byte(7, hash)
 	dst[1] = _get_byte(6, hash)
 	dst[2] = _get_byte(5, hash)
