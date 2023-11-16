@@ -7,7 +7,7 @@ package sha2
     List of contributors:
         zhibog, dotbmp:  Initial implementation.
 
-    Implementation of the SHA2 hashing algorithm, as defined in <https://csrc.nist.gov/csrc/media/publications/fips/180/2/archive/2002-08-01/documents/fips180-2.pdf>
+    Implementation of the SHA2 hashing algorithm, as defined in <https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.180-4.pdf>
     and in RFC 3874 <https://datatracker.ietf.org/doc/html/rfc3874>
 */
 
@@ -25,6 +25,7 @@ DIGEST_SIZE_224 :: 28
 DIGEST_SIZE_256 :: 32
 DIGEST_SIZE_384 :: 48
 DIGEST_SIZE_512 :: 64
+DIGEST_SIZE_512_256 :: 32
 
 // hash_string_224 will hash the given input and return the
 // computed hash
@@ -338,13 +339,92 @@ hash_512 :: proc {
 	hash_string_to_buffer_512,
 }
 
+// hash_string_512_256 will hash the given input and return the
+// computed hash
+hash_string_512_256 :: proc(data: string) -> [DIGEST_SIZE_512_256]byte {
+	return hash_bytes_512_256(transmute([]byte)(data))
+}
+
+// hash_bytes_512_256 will hash the given input and return the
+// computed hash
+hash_bytes_512_256 :: proc(data: []byte) -> [DIGEST_SIZE_512_256]byte {
+	hash: [DIGEST_SIZE_512_256]byte
+	ctx: Sha512_Context
+	ctx.md_bits = 256
+	init(&ctx)
+	update(&ctx, data)
+	final(&ctx, hash[:])
+	return hash
+}
+
+// hash_string_to_buffer_512_256 will hash the given input and assign the
+// computed hash to the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_string_to_buffer_512_256 :: proc(data: string, hash: []byte) {
+	hash_bytes_to_buffer_512_256(transmute([]byte)(data), hash)
+}
+
+// hash_bytes_to_buffer_512_256 will hash the given input and write the
+// computed hash into the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_bytes_to_buffer_512_256 :: proc(data, hash: []byte) {
+	ctx: Sha512_Context
+	ctx.md_bits = 256
+	init(&ctx)
+	update(&ctx, data)
+	final(&ctx, hash)
+}
+
+// hash_stream_512_256 will read the stream in chunks and compute a
+// hash from its contents
+hash_stream_512_256 :: proc(s: io.Stream) -> ([DIGEST_SIZE_512_256]byte, bool) {
+	hash: [DIGEST_SIZE_512_256]byte
+	ctx: Sha512_Context
+	ctx.md_bits = 256
+	init(&ctx)
+	buf := make([]byte, 512)
+	defer delete(buf)
+	read := 1
+	for read > 0 {
+		read, _ = io.read(s, buf)
+		if read > 0 {
+			update(&ctx, buf[:read])
+		}
+	}
+	final(&ctx, hash[:])
+	return hash, true
+}
+
+// hash_file_512_256 will read the file provided by the given handle
+// and compute a hash
+hash_file_512_256 :: proc(hd: os.Handle, load_at_once := false) -> ([DIGEST_SIZE_512_256]byte, bool) {
+	if !load_at_once {
+		return hash_stream_512_256(os.stream_from_handle(hd))
+	} else {
+		if buf, ok := os.read_entire_file(hd); ok {
+			return hash_bytes_512_256(buf[:]), ok
+		}
+	}
+	return [DIGEST_SIZE_512_256]byte{}, false
+}
+
+hash_512_256 :: proc {
+	hash_stream_512_256,
+	hash_file_512_256,
+	hash_bytes_512_256,
+	hash_string_512_256,
+	hash_bytes_to_buffer_512_256,
+	hash_string_to_buffer_512_256,
+}
+
 /*
     Low level API
 */
 
 init :: proc(ctx: ^$T) {
 	when T == Sha256_Context {
-		if ctx.md_bits == 224 {
+		switch ctx.md_bits {
+		case 224:
 			ctx.h[0] = 0xc1059ed8
 			ctx.h[1] = 0x367cd507
 			ctx.h[2] = 0x3070dd17
@@ -353,7 +433,7 @@ init :: proc(ctx: ^$T) {
 			ctx.h[5] = 0x68581511
 			ctx.h[6] = 0x64f98fa7
 			ctx.h[7] = 0xbefa4fa4
-		} else {
+		case 256:
 			ctx.h[0] = 0x6a09e667
 			ctx.h[1] = 0xbb67ae85
 			ctx.h[2] = 0x3c6ef372
@@ -362,9 +442,23 @@ init :: proc(ctx: ^$T) {
 			ctx.h[5] = 0x9b05688c
 			ctx.h[6] = 0x1f83d9ab
 			ctx.h[7] = 0x5be0cd19
+		case:
+			panic("crypto/sha2: invalid digest output length")
 		}
 	} else when T == Sha512_Context {
-		if ctx.md_bits == 384 {
+		switch ctx.md_bits {
+		case 256:
+			// SHA-512/256
+			ctx.h[0] = 0x22312194fc2bf72c
+			ctx.h[1] = 0x9f555fa3c84c64c2
+			ctx.h[2] = 0x2393b86b6f53b151
+			ctx.h[3] = 0x963877195940eabd
+			ctx.h[4] = 0x96283ee2a88effe3
+			ctx.h[5] = 0xbe5e1e2553863992
+			ctx.h[6] = 0x2b0199fc2c85b8aa
+			ctx.h[7] = 0x0eb72ddc81c52ca2
+		case 384:
+			// SHA-384
 			ctx.h[0] = 0xcbbb9d5dc1059ed8
 			ctx.h[1] = 0x629a292a367cd507
 			ctx.h[2] = 0x9159015a3070dd17
@@ -373,7 +467,8 @@ init :: proc(ctx: ^$T) {
 			ctx.h[5] = 0x8eb44a8768581511
 			ctx.h[6] = 0xdb0c2e0d64f98fa7
 			ctx.h[7] = 0x47b5481dbefa4fa4
-		} else {
+		case 512:
+			// SHA-512
 			ctx.h[0] = 0x6a09e667f3bcc908
 			ctx.h[1] = 0xbb67ae8584caa73b
 			ctx.h[2] = 0x3c6ef372fe94f82b
@@ -382,6 +477,8 @@ init :: proc(ctx: ^$T) {
 			ctx.h[5] = 0x9b05688c2b3e6c1f
 			ctx.h[6] = 0x1f83d9abfb41bd6b
 			ctx.h[7] = 0x5be0cd19137e2179
+		case:
+			panic("crypto/sha2: invalid digest output length")
 		}
 	}
 

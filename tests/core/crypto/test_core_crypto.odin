@@ -71,6 +71,7 @@ main :: proc() {
 	test_sha256(&t)
 	test_sha384(&t)
 	test_sha512(&t)
+	test_sha512_256(&t)
 	test_sha3_224(&t)
 	test_sha3_256(&t)
 	test_sha3_384(&t)
@@ -296,6 +297,21 @@ test_sha512 :: proc(t: ^testing.T) {
 	}
 	for v, _ in test_vectors {
 		computed     := sha2.hash_512(v.str)
+		computed_str := hex_string(computed[:])
+		expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
+	}
+}
+
+@(test)
+test_sha512_256 :: proc(t: ^testing.T) {
+	// Test vectors from
+	// https://csrc.nist.gov/csrc/media/projects/cryptographic-standards-and-guidelines/documents/examples/sha_all.pdf
+	test_vectors := [?]TestHash {
+		TestHash{"53048e2681941ef99b2e29b76b4c7dabe4c2d0c634fc6d46e0e2f13107e7af23", "abc"},
+		TestHash{"3928e184fb8690f840da3988121d31be65cb9d3ef83ee6146feac861e19b563a", "abcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmnoijklmnopjklmnopqklmnopqrlmnopqrsmnopqrstnopqrstu"},
+	}
+	for v, _ in test_vectors {
+		computed     := sha2.hash_512_256(v.str)
 		computed_str := hex_string(computed[:])
 		expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
 	}
