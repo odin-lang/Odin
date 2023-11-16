@@ -23,7 +23,6 @@ import list             "core:container/intrusive/list"
 import topological_sort "core:container/topological_sort"
 
 import crypto           "core:crypto"
-import blake            "core:crypto/blake"
 import blake2b          "core:crypto/blake2b"
 import blake2s          "core:crypto/blake2s"
 import chacha20         "core:crypto/chacha20"
@@ -150,7 +149,6 @@ _ :: lru
 _ :: list
 _ :: topological_sort
 _ :: crypto
-_ :: blake
 _ :: blake2b
 _ :: blake2s
 _ :: chacha20

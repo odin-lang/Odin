@@ -8,7 +8,6 @@ Please see the chart below for the options.
 ## Hashing algorithms
 | Algorithm                                                                                                    |                  |
 |:-------------------------------------------------------------------------------------------------------------|:-----------------|
-| [BLAKE](https://web.archive.org/web/20190915215948/https://131002.net/blake)                                 | &#10004;&#65039; |
 | [BLAKE2B](https://datatracker.ietf.org/doc/html/rfc7693)                                                     | &#10004;&#65039; |
 | [BLAKE2S](https://datatracker.ietf.org/doc/html/rfc7693)                                                     | &#10004;&#65039; |
 | [GOST](https://datatracker.ietf.org/doc/html/rfc5831)                                                        | &#10004;&#65039; |
