@@ -13,7 +13,8 @@ package siphash
 */
 
 import "core:crypto"
-import "core:crypto/util"
+import "core:encoding/endian"
+import "core:math/bits"
 
 /*
     High level API
@@ -236,8 +237,8 @@ init :: proc(ctx: ^Context, key: []byte, c_rounds, d_rounds: int) {
 		is_valid_setting,
 		"crypto/siphash: Incorrect rounds set up. Valid pairs are (1,3), (2,4) and (4,8)",
 	)
-	ctx.k0 = util.U64_LE(key[:8])
-	ctx.k1 = util.U64_LE(key[8:])
+	ctx.k0 = endian.unchecked_get_u64le(key[:8])
+	ctx.k1 = endian.unchecked_get_u64le(key[8:])
 	ctx.v0 = 0x736f6d6570736575 ~ ctx.k0
 	ctx.v1 = 0x646f72616e646f6d ~ ctx.k1
 	ctx.v2 = 0x6c7967656e657261 ~ ctx.k0
@@ -252,13 +253,8 @@ update :: proc(ctx: ^Context, data: []byte) {
 	i := 0
 	m: u64
 	for i < ctx.last_block {
-		m = u64(ctx.buf[i] & 0xff)
-		i += 1
-
-		for r in u64(1) ..< 8 {
-			m |= u64(ctx.buf[i] & 0xff) << (r * 8)
-			i += 1
-		}
+		m = endian.unchecked_get_u64le(ctx.buf[i:])
+		i += 8
 
 		ctx.v3 ~= m
 		for _ in 0 ..< ctx.c_rounds {
@@ -315,10 +311,12 @@ Context :: struct {
 	is_initialized: bool,
 }
 
+@(private)
 _get_byte :: #force_inline proc "contextless" (byte_num: byte, into: u64) -> byte {
 	return byte(into >> (((~byte_num) & (size_of(u64) - 1)) << 3))
 }
 
+@(private)
 _collect_output :: #force_inline proc "contextless" (dst: []byte, hash: u64) {
 	dst[0] = _get_byte(7, hash)
 	dst[1] = _get_byte(6, hash)
@@ -330,19 +328,20 @@ _collect_output :: #force_inline proc "contextless" (dst: []byte, hash: u64) {
 	dst[7] = _get_byte(0, hash)
 }
 
+@(private)
 _compress :: #force_inline proc "contextless" (ctx: ^Context) {
 	ctx.v0 += ctx.v1
-	ctx.v1 = util.ROTL64(ctx.v1, 13)
+	ctx.v1 = bits.rotate_left64(ctx.v1, 13)
 	ctx.v1 ~= ctx.v0
-	ctx.v0 = util.ROTL64(ctx.v0, 32)
+	ctx.v0 = bits.rotate_left64(ctx.v0, 32)
 	ctx.v2 += ctx.v3
-	ctx.v3 = util.ROTL64(ctx.v3, 16)
+	ctx.v3 = bits.rotate_left64(ctx.v3, 16)
 	ctx.v3 ~= ctx.v2
 	ctx.v0 += ctx.v3
-	ctx.v3 = util.ROTL64(ctx.v3, 21)
+	ctx.v3 = bits.rotate_left64(ctx.v3, 21)
 	ctx.v3 ~= ctx.v0
 	ctx.v2 += ctx.v1
-	ctx.v1 = util.ROTL64(ctx.v1, 17)
+	ctx.v1 = bits.rotate_left64(ctx.v1, 17)
 	ctx.v1 ~= ctx.v2
-	ctx.v2 = util.ROTL64(ctx.v2, 32)
+	ctx.v2 = bits.rotate_left64(ctx.v2, 32)
 }
