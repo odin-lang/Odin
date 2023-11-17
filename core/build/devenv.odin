@@ -108,6 +108,9 @@ build_ols_json :: proc(config: Odin_Config, opts: Language_Server_Options, alloc
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD(ignore = allocator == context.temp_allocator) // Note(Dragos): Fix issues with this
 	ols_json: Ols_Json
 	ols_json.collections = make([dynamic]Collection, context.temp_allocator)
+	append(&ols_json.collections, ..config.collections)
+	append(&ols_json.collections, Collection{"core", fmt.tprintf("%score", ODIN_ROOT)})
+	append(&ols_json.collections, Collection{"vendor", fmt.tprintf("%svendor", ODIN_ROOT)})
 	ols_json.checker_args = build_odin_args(config, context.temp_allocator)
 	ols_json.enable_document_symbols = .Document_Symbols in opts
 	ols_json.enable_semantic_tokens = .Semantic_Tokens in opts
