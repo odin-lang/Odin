@@ -1,11 +1,14 @@
 # crypto
-A crypto library for the Odin language
+
+A cryptography library for the Odin language
 
 ## Supported
+
 This library offers various algorithms implemented in Odin.
-Please see the chart below for the options.  
+Please see the chart below for some of the options.
 
 ## Hashing algorithms
+
 | Algorithm                                                                                                    |                  |
 |:-------------------------------------------------------------------------------------------------------------|:-----------------|
 | [BLAKE2B](https://datatracker.ietf.org/doc/html/rfc7693)                                                     | &#10004;&#65039; |
@@ -19,65 +22,65 @@ Please see the chart below for the options.
 | legacy/[SHA-1](https://datatracker.ietf.org/doc/html/rfc3174)                                                | &#10004;&#65039; |
 
 #### High level API
-Each hash algorithm contains a procedure group named `hash`, or if the algorithm provides more than one digest size `hash_<size>`\*.  
-Included in these groups are six procedures.
-* `hash_string` - Hash a given string and return the computed hash. Just calls `hash_bytes` internally
-* `hash_bytes` - Hash a given byte slice and return the computed hash
-* `hash_string_to_buffer` - Hash a given string and put the computed hash in the second proc parameter. Just calls `hash_bytes_to_buffer` internally
-* `hash_bytes_to_buffer` - Hash a given string and put the computed hash in the second proc parameter. The destination buffer has to be at least as big as the digest size of the hash
-* `hash_stream` - Takes a stream from io.Stream and returns the computed hash from it
-* `hash_file` - Takes a file handle and returns the computed hash from it. A second optional boolean parameter controls if the file is streamed (this is the default) or read at once (set to true)
 
-\* On some algorithms there is another part to the name, since they might offer control about additional parameters.  
-For instance, `HAVAL` offers different sizes as well as three different round amounts.  
-Computing a 256-bit hash with 3 rounds is therefore achieved by calling `haval.hash_256_3(...)`.
+Each hash algorithm contains a procedure group named `hash`, or if the algorithm provides more than one digest size `hash_<size>`\*.
+Included in these groups are six procedures.
+- `hash_string` - Hash a given string and return the computed hash. Just calls `hash_bytes` internally
+- `hash_bytes` - Hash a given byte slice and return the computed hash
+- `hash_string_to_buffer` - Hash a given string and put the computed hash in the second proc parameter. Just calls `hash_bytes_to_buffer` internally
+- `hash_bytes_to_buffer` - Hash a given string and put the computed hash in the second proc parameter. The destination buffer has to be at least as big as the digest size of the hash
+- `hash_stream` - Takes a stream from io.Stream and returns the computed hash from it
+- `hash_file` - Takes a file handle and returns the computed hash from it. A second optional boolean parameter controls if the file is streamed (this is the default) or read at once (set to true)
+
+\* On some algorithms there is another part to the name, since they might offer control about additional parameters.
+For instance, `SHA-2` offers different sizes.
+Computing a 512-bit hash is therefore achieved by calling `sha2.hash_512(...)`.
 
 #### Low level API
+
 The above mentioned procedures internally call three procedures: `init`, `update` and `final`.
 You may also directly call them, if you wish.
 
 #### Example
+
 ```odin
 package crypto_example
 
 // Import the desired package
-import "core:crypto/md4"
+import "core:crypto/blake2b"
 
 main :: proc() {
     input := "foo"
 
     // Compute the hash, using the high level API
-    computed_hash := md4.hash(input)
+    computed_hash := blake2b.hash(input)
 
     // Variant that takes a destination buffer, instead of returning the computed hash
-    hash := make([]byte, md4.DIGEST_SIZE) // @note: Destination buffer has to be at least as big as the digest size of the hash
-    md4.hash(input, hash[:])
+    hash := make([]byte, sha2.DIGEST_SIZE) // @note: Destination buffer has to be at least as big as the digest size of the hash
+    blake2b.hash(input, hash[:])
 
     // Compute the hash, using the low level API
-    ctx: md4.Md4_Context
-    computed_hash_low: [16]byte
-    md4.init(&ctx)
-    md4.update(&ctx, transmute([]byte)input)
-    md4.final(&ctx, computed_hash_low[:])
+    ctx: blake2b.Context
+    computed_hash_low: [blake2b.DIGEST_SIZE]byte
+    blake2b.init(&ctx)
+    blake2b.update(&ctx, transmute([]byte)input)
+    blake2b.final(&ctx, computed_hash_low[:])
 }
 ```
 For example uses of all available algorithms, please see the tests within `tests/core/crypto`.
 
-#### Thread safety
-The crypto package is not thread-safe at the moment. This may change in the future.
+## Implementation considerations
 
-### Disclaimer
-The algorithms were ported out of curiosity and due to interest in the field.
-We have not had any of the code verified by a third party or tested/fuzzed by any automatic means.
-Wherever we were able to find official test vectors, those were used to verify the implementation.
-We do not recommend using them in a production environment, without any additional testing and/or verification.
+- The crypto packages are not thread-safe.
+- Best-effort is make to mitigate timing side-channels on reasonable
+  architectures. Architectures that are known to be unreasonable include
+  but are not limited to i386, i486, and WebAssembly.
+- Some but not all of the packages attempt to santize sensitive data,
+  however this is not done consistently through the library at the moment.
+  As Thomas Pornin puts it "In general, such memory cleansing is a fool's
+  quest."
+- All of these packages have not received independent third party review.
 
-### ToDo
-* Ciphers (Symmetric, Asymmetric)
-* MACs (Message Authentication Code)
-* CSPRNGs (Cryptographically Secure PseudoRandom Number Generator)
-* KDFs (Key Derivation Function)
-* KEAs (Key Exchange Algorithm)
+## License
 
-### License
 This library is made available under the BSD-3 license.
