@@ -15,7 +15,6 @@ Wrappers for hashing algorithms have been added to match the API within the Odin
 | [SHA-2](https://csrc.nist.gov/csrc/media/publications/fips/180/2/archive/2002-08-01/documents/fips180-2.pdf) | &#10004;&#65039; |
 | [SHA-3](https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.202.pdf)                                            | &#10004;&#65039; |
 | [SHAKE](https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.202.pdf)                                            | &#10004;&#65039; |
-| [Skein-512](https://www.schneier.com/academic/skein/)                                                        | &#10004;&#65039; |
 | [SM3](https://datatracker.ietf.org/doc/html/draft-sca-cfrg-sm3-02)                                           | &#10004;&#65039; |
 | [Streebog](https://datatracker.ietf.org/doc/html/rfc6986)                                                    | &#10004;&#65039; |
 | [Tiger](https://www.cs.technion.ac.il/~biham/Reports/Tiger/)                                                 | &#10004;&#65039; |

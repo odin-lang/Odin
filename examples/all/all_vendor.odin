@@ -9,7 +9,6 @@ import sha2           "vendor:botan/sha2"
 import sha3           "vendor:botan/sha3"
 import shake          "vendor:botan/shake"
 import siphash        "vendor:botan/siphash"
-import skein512       "vendor:botan/skein512"
 import sm3            "vendor:botan/sm3"
 import streebog       "vendor:botan/streebog"
 import tiger          "vendor:botan/tiger"
@@ -52,7 +51,6 @@ _ :: sha2
 _ :: sha3
 _ :: shake
 _ :: siphash
-_ :: skein512
 _ :: sm3
 _ :: streebog
 _ :: tiger

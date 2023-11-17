@@ -83,11 +83,6 @@ HASH_TIGER_192      :: "Tiger(24,3)"
 HASH_STREEBOG_256   :: "Streebog-256"
 HASH_STREEBOG_512   :: "Streebog-512"
 HASH_SM3            :: "SM3"
-HASH_SKEIN_512_256  :: "Skein-512(256)"
-HASH_SKEIN_512_512  :: "Skein-512(512)"
-
-// Not real values from Botan, only used for context setup within the crypto lib
-HASH_SKEIN_512   :: "SKEIN_512"
 
 MAC_HMAC_SHA1    :: "HMAC(SHA1)"
 MAC_HMAC_SHA_224 :: "HMAC(SHA-224)"
