@@ -1,4 +1,4 @@
-package sha3
+package keccak
 
 /*
     Copyright 2021 zhibog
@@ -7,14 +7,14 @@ package sha3
     List of contributors:
         zhibog, dotbmp:  Initial implementation.
 
-    Interface for the SHA3 hashing algorithm. The SHAKE functionality can be found in package shake.
-    If you wish to compute a Keccak hash, you can use the keccak package, it will use the original padding.
+    Interface for the Keccak hashing algorithm.
+    This is done because the padding in the SHA3 standard was changed by the NIST, resulting in a different output.
 */
 
 import "core:io"
 import "core:os"
 
-import "../_sha3"
+import "../../_sha3"
 
 /*
     High level API
@@ -37,6 +37,7 @@ hash_bytes_224 :: proc(data: []byte) -> [DIGEST_SIZE_224]byte {
 	hash: [DIGEST_SIZE_224]byte
 	ctx: Context
 	ctx.mdlen = DIGEST_SIZE_224
+	ctx.is_keccak = true
 	init(&ctx)
 	update(&ctx, data)
 	final(&ctx, hash[:])
@@ -56,6 +57,7 @@ hash_string_to_buffer_224 :: proc(data: string, hash: []byte) {
 hash_bytes_to_buffer_224 :: proc(data, hash: []byte) {
 	ctx: Context
 	ctx.mdlen = DIGEST_SIZE_224
+	ctx.is_keccak = true
 	init(&ctx)
 	update(&ctx, data)
 	final(&ctx, hash)
@@ -67,6 +69,7 @@ hash_stream_224 :: proc(s: io.Stream) -> ([DIGEST_SIZE_224]byte, bool) {
 	hash: [DIGEST_SIZE_224]byte
 	ctx: Context
 	ctx.mdlen = DIGEST_SIZE_224
+	ctx.is_keccak = true
 	init(&ctx)
 
 	buf := make([]byte, 512)
@@ -117,6 +120,7 @@ hash_bytes_256 :: proc(data: []byte) -> [DIGEST_SIZE_256]byte {
 	hash: [DIGEST_SIZE_256]byte
 	ctx: Context
 	ctx.mdlen = DIGEST_SIZE_256
+	ctx.is_keccak = true
 	init(&ctx)
 	update(&ctx, data)
 	final(&ctx, hash[:])
@@ -136,6 +140,7 @@ hash_string_to_buffer_256 :: proc(data: string, hash: []byte) {
 hash_bytes_to_buffer_256 :: proc(data, hash: []byte) {
 	ctx: Context
 	ctx.mdlen = DIGEST_SIZE_256
+	ctx.is_keccak = true
 	init(&ctx)
 	update(&ctx, data)
 	final(&ctx, hash)
@@ -147,6 +152,7 @@ hash_stream_256 :: proc(s: io.Stream) -> ([DIGEST_SIZE_256]byte, bool) {
 	hash: [DIGEST_SIZE_256]byte
 	ctx: Context
 	ctx.mdlen = DIGEST_SIZE_256
+	ctx.is_keccak = true
 	init(&ctx)
 
 	buf := make([]byte, 512)
@@ -197,6 +203,7 @@ hash_bytes_384 :: proc(data: []byte) -> [DIGEST_SIZE_384]byte {
 	hash: [DIGEST_SIZE_384]byte
 	ctx: Context
 	ctx.mdlen = DIGEST_SIZE_384
+	ctx.is_keccak = true
 	init(&ctx)
 	update(&ctx, data)
 	final(&ctx, hash[:])
@@ -216,6 +223,7 @@ hash_string_to_buffer_384 :: proc(data: string, hash: []byte) {
 hash_bytes_to_buffer_384 :: proc(data, hash: []byte) {
 	ctx: Context
 	ctx.mdlen = DIGEST_SIZE_384
+	ctx.is_keccak = true
 	init(&ctx)
 	update(&ctx, data)
 	final(&ctx, hash)
@@ -227,6 +235,7 @@ hash_stream_384 :: proc(s: io.Stream) -> ([DIGEST_SIZE_384]byte, bool) {
 	hash: [DIGEST_SIZE_384]byte
 	ctx: Context
 	ctx.mdlen = DIGEST_SIZE_384
+	ctx.is_keccak = true
 	init(&ctx)
 
 	buf := make([]byte, 512)
@@ -277,6 +286,7 @@ hash_bytes_512 :: proc(data: []byte) -> [DIGEST_SIZE_512]byte {
 	hash: [DIGEST_SIZE_512]byte
 	ctx: Context
 	ctx.mdlen = DIGEST_SIZE_512
+	ctx.is_keccak = true
 	init(&ctx)
 	update(&ctx, data)
 	final(&ctx, hash[:])
@@ -296,6 +306,7 @@ hash_string_to_buffer_512 :: proc(data: string, hash: []byte) {
 hash_bytes_to_buffer_512 :: proc(data, hash: []byte) {
 	ctx: Context
 	ctx.mdlen = DIGEST_SIZE_512
+	ctx.is_keccak = true
 	init(&ctx)
 	update(&ctx, data)
 	final(&ctx, hash)
@@ -307,6 +318,7 @@ hash_stream_512 :: proc(s: io.Stream) -> ([DIGEST_SIZE_512]byte, bool) {
 	hash: [DIGEST_SIZE_512]byte
 	ctx: Context
 	ctx.mdlen = DIGEST_SIZE_512
+	ctx.is_keccak = true
 	init(&ctx)
 
 	buf := make([]byte, 512)
@@ -352,6 +364,7 @@ hash_512 :: proc {
 Context :: _sha3.Sha3_Context
 
 init :: proc(ctx: ^Context) {
+	ctx.is_keccak = true
 	_sha3.init(ctx)
 }
 
