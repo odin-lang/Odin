@@ -86,8 +86,14 @@ BLAKE2B_IV := [8]u64 {
 init :: proc(ctx: ^$T) {
 	when T == Blake2s_Context {
 		block_size :: BLAKE2S_BLOCK_SIZE
+		max_size :: BLAKE2S_SIZE
 	} else when T == Blake2b_Context {
 		block_size :: BLAKE2B_BLOCK_SIZE
+		max_size :: BLAKE2B_SIZE
+	}
+
+	if ctx.cfg.size > max_size {
+		panic("blake2: requested output size exceeeds algorithm max")
 	}
 
 	p := make([]byte, block_size)
@@ -192,13 +198,12 @@ final :: proc(ctx: ^$T, hash: []byte) {
 	assert(ctx.is_initialized)
 
 	when T == Blake2s_Context {
-		if len(hash) < BLAKE2S_SIZE {
+		if len(hash) < int(ctx.cfg.size) {
 			panic("crypto/blake2s: invalid destination digest size")
 		}
 		blake2s_final(ctx, hash)
-	}
-	when T == Blake2b_Context {
-		if len(hash) < BLAKE2B_SIZE {
+	} else when T == Blake2b_Context {
+		if len(hash) < int(ctx.cfg.size) {
 			panic("crypto/blake2b: invalid destination digest size")
 		}
 		blake2b_final(ctx, hash)
@@ -228,9 +233,11 @@ blake2s_final :: proc "contextless" (ctx: ^Blake2s_Context, hash: []byte) {
 
 	blocks(ctx, ctx.x[:])
 
+	dst: [BLAKE2S_SIZE]byte
 	for i := 0; i < BLAKE2S_SIZE / 4; i += 1 {
-		endian.unchecked_put_u32le(hash[i * 4:], ctx.h[i])
+		endian.unchecked_put_u32le(dst[i * 4:], ctx.h[i])
 	}
+	copy(hash, dst[:])
 }
 
 @(private)
@@ -254,17 +261,18 @@ blake2b_final :: proc "contextless" (ctx: ^Blake2b_Context, hash: []byte) {
 
 	blocks(ctx, ctx.x[:])
 
+	dst: [BLAKE2B_SIZE]byte
 	for i := 0; i < BLAKE2B_SIZE / 8; i += 1 {
-		endian.unchecked_put_u64le(hash[i * 8:], ctx.h[i])
+		endian.unchecked_put_u64le(dst[i * 8:], ctx.h[i])
 	}
+	copy(hash, dst[:])
 }
 
 @(private)
 blocks :: proc "contextless" (ctx: ^$T, p: []byte) {
 	when T == Blake2s_Context {
 		blake2s_blocks(ctx, p)
-	}
-	when T == Blake2b_Context {
+	} else when T == Blake2b_Context {
 		blake2b_blocks(ctx, p)
 	}
 }

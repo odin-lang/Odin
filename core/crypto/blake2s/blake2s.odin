@@ -32,16 +32,15 @@ hash_string :: proc(data: string) -> [DIGEST_SIZE]byte {
 // computed hash
 hash_bytes :: proc(data: []byte) -> [DIGEST_SIZE]byte {
 	hash: [DIGEST_SIZE]byte
-	ctx: _blake2.Blake2s_Context
+	ctx: Context
 	cfg: _blake2.Blake2_Config
 	cfg.size = _blake2.BLAKE2S_SIZE
 	ctx.cfg = cfg
-	_blake2.init(&ctx)
-	_blake2.update(&ctx, data)
-	_blake2.final(&ctx, hash[:])
+	init(&ctx)
+	update(&ctx, data)
+	final(&ctx, hash[:])
 	return hash
 }
-
 
 // hash_string_to_buffer will hash the given input and assign the
 // computed hash to the second parameter.
@@ -54,34 +53,36 @@ hash_string_to_buffer :: proc(data: string, hash: []byte) {
 // computed hash into the second parameter.
 // It requires that the destination buffer is at least as big as the digest size
 hash_bytes_to_buffer :: proc(data, hash: []byte) {
-	ctx: _blake2.Blake2s_Context
+	ctx: Context
 	cfg: _blake2.Blake2_Config
 	cfg.size = _blake2.BLAKE2S_SIZE
 	ctx.cfg = cfg
-	_blake2.init(&ctx)
-	_blake2.update(&ctx, data)
-	_blake2.final(&ctx, hash)
+	init(&ctx)
+	update(&ctx, data)
+	final(&ctx, hash)
 }
 
 // hash_stream will read the stream in chunks and compute a
 // hash from its contents
 hash_stream :: proc(s: io.Stream) -> ([DIGEST_SIZE]byte, bool) {
 	hash: [DIGEST_SIZE]byte
-	ctx: _blake2.Blake2s_Context
+	ctx: Context
 	cfg: _blake2.Blake2_Config
 	cfg.size = _blake2.BLAKE2S_SIZE
 	ctx.cfg = cfg
-	_blake2.init(&ctx)
+	init(&ctx)
+
 	buf := make([]byte, 512)
 	defer delete(buf)
+
 	read := 1
 	for read > 0 {
 		read, _ = io.read(s, buf)
 		if read > 0 {
-			_blake2.update(&ctx, buf[:read])
+			update(&ctx, buf[:read])
 		}
 	}
-	_blake2.final(&ctx, hash[:])
+	final(&ctx, hash[:])
 	return hash, true
 }
 
@@ -111,16 +112,16 @@ hash :: proc {
     Low level API
 */
 
-Blake2s_Context :: _blake2.Blake2b_Context
+Context :: _blake2.Blake2s_Context
 
-init :: proc(ctx: ^_blake2.Blake2s_Context) {
+init :: proc(ctx: ^Context) {
 	_blake2.init(ctx)
 }
 
-update :: proc(ctx: ^_blake2.Blake2s_Context, data: []byte) {
+update :: proc(ctx: ^Context, data: []byte) {
 	_blake2.update(ctx, data)
 }
 
-final :: proc(ctx: ^_blake2.Blake2s_Context, hash: []byte) {
+final :: proc(ctx: ^Context, hash: []byte) {
 	_blake2.final(ctx, hash)
 }
