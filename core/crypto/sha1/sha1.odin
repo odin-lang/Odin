@@ -32,7 +32,7 @@ hash_string :: proc(data: string) -> [DIGEST_SIZE]byte {
 // computed hash
 hash_bytes :: proc(data: []byte) -> [DIGEST_SIZE]byte {
 	hash: [DIGEST_SIZE]byte
-	ctx: Sha1_Context
+	ctx: Context
 	init(&ctx)
 	update(&ctx, data)
 	final(&ctx, hash[:])
@@ -50,7 +50,7 @@ hash_string_to_buffer :: proc(data: string, hash: []byte) {
 // computed hash into the second parameter.
 // It requires that the destination buffer is at least as big as the digest size
 hash_bytes_to_buffer :: proc(data, hash: []byte) {
-	ctx: Sha1_Context
+	ctx: Context
 	init(&ctx)
 	update(&ctx, data)
 	final(&ctx, hash)
@@ -60,10 +60,12 @@ hash_bytes_to_buffer :: proc(data, hash: []byte) {
 // hash from its contents
 hash_stream :: proc(s: io.Stream) -> ([DIGEST_SIZE]byte, bool) {
 	hash: [DIGEST_SIZE]byte
-	ctx: Sha1_Context
+	ctx: Context
 	init(&ctx)
+
 	buf := make([]byte, 512)
 	defer delete(buf)
+
 	read := 1
 	for read > 0 {
 		read, _ = io.read(s, buf)
@@ -101,7 +103,7 @@ hash :: proc {
     Low level API
 */
 
-init :: proc(ctx: ^Sha1_Context) {
+init :: proc(ctx: ^Context) {
 	ctx.state[0] = 0x67452301
 	ctx.state[1] = 0xefcdab89
 	ctx.state[2] = 0x98badcfe
@@ -118,7 +120,7 @@ init :: proc(ctx: ^Sha1_Context) {
 	ctx.is_initialized = true
 }
 
-update :: proc(ctx: ^Sha1_Context, data: []byte) {
+update :: proc(ctx: ^Context, data: []byte) {
 	assert(ctx.is_initialized)
 
 	for i := 0; i < len(data); i += 1 {
@@ -132,7 +134,7 @@ update :: proc(ctx: ^Sha1_Context, data: []byte) {
 	}
 }
 
-final :: proc(ctx: ^Sha1_Context, hash: []byte) {
+final :: proc(ctx: ^Context, hash: []byte) {
 	assert(ctx.is_initialized)
 
 	if len(hash) < DIGEST_SIZE {
@@ -176,7 +178,7 @@ final :: proc(ctx: ^Sha1_Context, hash: []byte) {
 
 BLOCK_SIZE :: 64
 
-Sha1_Context :: struct {
+Context :: struct {
 	data:    [BLOCK_SIZE]byte,
 	datalen: u32,
 	bitlen:  u64,
@@ -187,7 +189,7 @@ Sha1_Context :: struct {
 }
 
 @(private)
-transform :: proc "contextless" (ctx: ^Sha1_Context, data: []byte) {
+transform :: proc "contextless" (ctx: ^Context, data: []byte) {
 	a, b, c, d, e, i, t: u32
 	m: [80]u32
 
