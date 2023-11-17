@@ -31,7 +31,7 @@ hash_string :: proc(data: string) -> [DIGEST_SIZE]byte {
 // computed hash
 hash_bytes :: proc(data: []byte) -> [DIGEST_SIZE]byte {
 	hash: [DIGEST_SIZE]byte
-	ctx: Sm3_Context
+	ctx: Context
 	init(&ctx)
 	update(&ctx, data)
 	final(&ctx, hash[:])
@@ -49,7 +49,7 @@ hash_string_to_buffer :: proc(data: string, hash: []byte) {
 // computed hash into the second parameter.
 // It requires that the destination buffer is at least as big as the digest size
 hash_bytes_to_buffer :: proc(data, hash: []byte) {
-	ctx: Sm3_Context
+	ctx: Context
 	init(&ctx)
 	update(&ctx, data)
 	final(&ctx, hash)
@@ -59,10 +59,12 @@ hash_bytes_to_buffer :: proc(data, hash: []byte) {
 // hash from its contents
 hash_stream :: proc(s: io.Stream) -> ([DIGEST_SIZE]byte, bool) {
 	hash: [DIGEST_SIZE]byte
-	ctx: Sm3_Context
+	ctx: Context
 	init(&ctx)
+
 	buf := make([]byte, 512)
 	defer delete(buf)
+
 	read := 1
 	for read > 0 {
 		read, _ = io.read(s, buf)
@@ -100,7 +102,7 @@ hash :: proc {
     Low level API
 */
 
-init :: proc(ctx: ^Sm3_Context) {
+init :: proc(ctx: ^Context) {
 	ctx.state[0] = IV[0]
 	ctx.state[1] = IV[1]
 	ctx.state[2] = IV[2]
@@ -116,7 +118,7 @@ init :: proc(ctx: ^Sm3_Context) {
 	ctx.is_initialized = true
 }
 
-update :: proc(ctx: ^Sm3_Context, data: []byte) {
+update :: proc(ctx: ^Context, data: []byte) {
 	assert(ctx.is_initialized)
 
 	data := data
@@ -141,7 +143,7 @@ update :: proc(ctx: ^Sm3_Context, data: []byte) {
 	}
 }
 
-final :: proc(ctx: ^Sm3_Context, hash: []byte) {
+final :: proc(ctx: ^Context, hash: []byte) {
 	assert(ctx.is_initialized)
 
 	if len(hash) < DIGEST_SIZE {
@@ -176,7 +178,7 @@ final :: proc(ctx: ^Sm3_Context, hash: []byte) {
 
 BLOCK_SIZE :: 64
 
-Sm3_Context :: struct {
+Context :: struct {
 	state:     [8]u32,
 	x:         [BLOCK_SIZE]byte,
 	bitlength: u64,
@@ -192,7 +194,7 @@ IV := [8]u32 {
 }
 
 @(private)
-block :: proc "contextless" (ctx: ^Sm3_Context, buf: []byte) {
+block :: proc "contextless" (ctx: ^Context, buf: []byte) {
 	buf := buf
 
 	w: [68]u32
