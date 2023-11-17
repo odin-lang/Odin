@@ -14,7 +14,7 @@ package vendor_sha1
 import "core:os"
 import "core:io"
 
-import botan "../bindings"
+import botan "../../bindings"
 
 /*
     High level API

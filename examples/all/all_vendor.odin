@@ -2,9 +2,9 @@ package all
 
 import botan_bindings "vendor:botan/bindings"
 import botan_blake2b  "vendor:botan/blake2b"
-import keccak         "vendor:botan/keccak"
-import md5            "vendor:botan/md5"
-import sha1           "vendor:botan/sha1"
+import keccak         "vendor:botan/legacy/keccak"
+import md5            "vendor:botan/legacy/md5"
+import sha1           "vendor:botan/legacy/sha1"
 import sha2           "vendor:botan/sha2"
 import sha3           "vendor:botan/sha3"
 import shake          "vendor:botan/shake"

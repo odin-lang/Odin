@@ -9,13 +9,13 @@ Wrappers for hashing algorithms have been added to match the API within the Odin
 | Algorithm                                                                                                    |                  |
 |:-------------------------------------------------------------------------------------------------------------|:-----------------|
 | [BLAKE2B](https://datatracker.ietf.org/doc/html/rfc7693)                                                     | &#10004;&#65039; |
-| [Keccak](https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.202.pdf)                                           | &#10004;&#65039; |
-| [MD5](https://datatracker.ietf.org/doc/html/rfc1321)                                                         | &#10004;&#65039; |
-| [SHA-1](https://datatracker.ietf.org/doc/html/rfc3174)                                                       | &#10004;&#65039; |
 | [SHA-2](https://csrc.nist.gov/csrc/media/publications/fips/180/2/archive/2002-08-01/documents/fips180-2.pdf) | &#10004;&#65039; |
 | [SHA-3](https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.202.pdf)                                            | &#10004;&#65039; |
 | [SHAKE](https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.202.pdf)                                            | &#10004;&#65039; |
 | [SM3](https://datatracker.ietf.org/doc/html/draft-sca-cfrg-sm3-02)                                           | &#10004;&#65039; |
+| legacy/[Keccak](https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.202.pdf)                                    | &#10004;&#65039; |
+| legacy/[MD5](https://datatracker.ietf.org/doc/html/rfc1321)                                                  | &#10004;&#65039; |
+| legacy/[SHA-1](https://datatracker.ietf.org/doc/html/rfc3174)                                                | &#10004;&#65039; |
 
 #### High level API
 Each hash algorithm contains a procedure group named `hash`, or if the algorithm provides more than one digest size `hash_<size>`.  

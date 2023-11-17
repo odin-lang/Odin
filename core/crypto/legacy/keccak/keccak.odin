@@ -14,7 +14,7 @@ package keccak
 import "core:io"
 import "core:os"
 
-import "../_sha3"
+import "../../_sha3"
 
 /*
     High level API
