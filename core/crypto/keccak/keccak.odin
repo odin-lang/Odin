@@ -16,7 +16,6 @@ import "core:os"
 
 import "../_sha3"
 
-
 /*
     High level API
 */
@@ -36,12 +35,12 @@ hash_string_224 :: proc(data: string) -> [DIGEST_SIZE_224]byte {
 // computed hash
 hash_bytes_224 :: proc(data: []byte) -> [DIGEST_SIZE_224]byte {
 	hash: [DIGEST_SIZE_224]byte
-	ctx: _sha3.Sha3_Context
+	ctx: Context
 	ctx.mdlen = DIGEST_SIZE_224
 	ctx.is_keccak = true
-	_sha3.init(&ctx)
-	_sha3.update(&ctx, data)
-	_sha3.final(&ctx, hash[:])
+	init(&ctx)
+	update(&ctx, data)
+	final(&ctx, hash[:])
 	return hash
 }
 
@@ -56,32 +55,34 @@ hash_string_to_buffer_224 :: proc(data: string, hash: []byte) {
 // computed hash into the second parameter.
 // It requires that the destination buffer is at least as big as the digest size
 hash_bytes_to_buffer_224 :: proc(data, hash: []byte) {
-	ctx: _sha3.Sha3_Context
+	ctx: Context
 	ctx.mdlen = DIGEST_SIZE_224
 	ctx.is_keccak = true
-	_sha3.init(&ctx)
-	_sha3.update(&ctx, data)
-	_sha3.final(&ctx, hash)
+	init(&ctx)
+	update(&ctx, data)
+	final(&ctx, hash)
 }
 
 // hash_stream_224 will read the stream in chunks and compute a
 // hash from its contents
 hash_stream_224 :: proc(s: io.Stream) -> ([DIGEST_SIZE_224]byte, bool) {
 	hash: [DIGEST_SIZE_224]byte
-	ctx: _sha3.Sha3_Context
+	ctx: Context
 	ctx.mdlen = DIGEST_SIZE_224
 	ctx.is_keccak = true
-	_sha3.init(&ctx)
+	init(&ctx)
+
 	buf := make([]byte, 512)
 	defer delete(buf)
+
 	read := 1
 	for read > 0 {
 		read, _ = io.read(s, buf)
 		if read > 0 {
-			_sha3.update(&ctx, buf[:read])
+			update(&ctx, buf[:read])
 		}
 	}
-	_sha3.final(&ctx, hash[:])
+	final(&ctx, hash[:])
 	return hash, true
 }
 
@@ -117,12 +118,12 @@ hash_string_256 :: proc(data: string) -> [DIGEST_SIZE_256]byte {
 // computed hash
 hash_bytes_256 :: proc(data: []byte) -> [DIGEST_SIZE_256]byte {
 	hash: [DIGEST_SIZE_256]byte
-	ctx: _sha3.Sha3_Context
+	ctx: Context
 	ctx.mdlen = DIGEST_SIZE_256
 	ctx.is_keccak = true
-	_sha3.init(&ctx)
-	_sha3.update(&ctx, data)
-	_sha3.final(&ctx, hash[:])
+	init(&ctx)
+	update(&ctx, data)
+	final(&ctx, hash[:])
 	return hash
 }
 
@@ -137,32 +138,34 @@ hash_string_to_buffer_256 :: proc(data: string, hash: []byte) {
 // computed hash into the second parameter.
 // It requires that the destination buffer is at least as big as the digest size
 hash_bytes_to_buffer_256 :: proc(data, hash: []byte) {
-	ctx: _sha3.Sha3_Context
+	ctx: Context
 	ctx.mdlen = DIGEST_SIZE_256
 	ctx.is_keccak = true
-	_sha3.init(&ctx)
-	_sha3.update(&ctx, data)
-	_sha3.final(&ctx, hash)
+	init(&ctx)
+	update(&ctx, data)
+	final(&ctx, hash)
 }
 
 // hash_stream_256 will read the stream in chunks and compute a
 // hash from its contents
 hash_stream_256 :: proc(s: io.Stream) -> ([DIGEST_SIZE_256]byte, bool) {
 	hash: [DIGEST_SIZE_256]byte
-	ctx: _sha3.Sha3_Context
+	ctx: Context
 	ctx.mdlen = DIGEST_SIZE_256
 	ctx.is_keccak = true
-	_sha3.init(&ctx)
+	init(&ctx)
+
 	buf := make([]byte, 512)
 	defer delete(buf)
+
 	read := 1
 	for read > 0 {
 		read, _ = io.read(s, buf)
 		if read > 0 {
-			_sha3.update(&ctx, buf[:read])
+			update(&ctx, buf[:read])
 		}
 	}
-	_sha3.final(&ctx, hash[:])
+	final(&ctx, hash[:])
 	return hash, true
 }
 
@@ -198,12 +201,12 @@ hash_string_384 :: proc(data: string) -> [DIGEST_SIZE_384]byte {
 // computed hash
 hash_bytes_384 :: proc(data: []byte) -> [DIGEST_SIZE_384]byte {
 	hash: [DIGEST_SIZE_384]byte
-	ctx: _sha3.Sha3_Context
+	ctx: Context
 	ctx.mdlen = DIGEST_SIZE_384
 	ctx.is_keccak = true
-	_sha3.init(&ctx)
-	_sha3.update(&ctx, data)
-	_sha3.final(&ctx, hash[:])
+	init(&ctx)
+	update(&ctx, data)
+	final(&ctx, hash[:])
 	return hash
 }
 
@@ -218,32 +221,34 @@ hash_string_to_buffer_384 :: proc(data: string, hash: []byte) {
 // computed hash into the second parameter.
 // It requires that the destination buffer is at least as big as the digest size
 hash_bytes_to_buffer_384 :: proc(data, hash: []byte) {
-	ctx: _sha3.Sha3_Context
+	ctx: Context
 	ctx.mdlen = DIGEST_SIZE_384
 	ctx.is_keccak = true
-	_sha3.init(&ctx)
-	_sha3.update(&ctx, data)
-	_sha3.final(&ctx, hash)
+	init(&ctx)
+	update(&ctx, data)
+	final(&ctx, hash)
 }
 
 // hash_stream_384 will read the stream in chunks and compute a
 // hash from its contents
 hash_stream_384 :: proc(s: io.Stream) -> ([DIGEST_SIZE_384]byte, bool) {
 	hash: [DIGEST_SIZE_384]byte
-	ctx: _sha3.Sha3_Context
+	ctx: Context
 	ctx.mdlen = DIGEST_SIZE_384
 	ctx.is_keccak = true
-	_sha3.init(&ctx)
+	init(&ctx)
+
 	buf := make([]byte, 512)
 	defer delete(buf)
+
 	read := 1
 	for read > 0 {
 		read, _ = io.read(s, buf)
 		if read > 0 {
-			_sha3.update(&ctx, buf[:read])
+			update(&ctx, buf[:read])
 		}
 	}
-	_sha3.final(&ctx, hash[:])
+	final(&ctx, hash[:])
 	return hash, true
 }
 
@@ -279,12 +284,12 @@ hash_string_512 :: proc(data: string) -> [DIGEST_SIZE_512]byte {
 // computed hash
 hash_bytes_512 :: proc(data: []byte) -> [DIGEST_SIZE_512]byte {
 	hash: [DIGEST_SIZE_512]byte
-	ctx: _sha3.Sha3_Context
+	ctx: Context
 	ctx.mdlen = DIGEST_SIZE_512
 	ctx.is_keccak = true
-	_sha3.init(&ctx)
-	_sha3.update(&ctx, data)
-	_sha3.final(&ctx, hash[:])
+	init(&ctx)
+	update(&ctx, data)
+	final(&ctx, hash[:])
 	return hash
 }
 
@@ -299,32 +304,34 @@ hash_string_to_buffer_512 :: proc(data: string, hash: []byte) {
 // computed hash into the second parameter.
 // It requires that the destination buffer is at least as big as the digest size
 hash_bytes_to_buffer_512 :: proc(data, hash: []byte) {
-	ctx: _sha3.Sha3_Context
+	ctx: Context
 	ctx.mdlen = DIGEST_SIZE_512
 	ctx.is_keccak = true
-	_sha3.init(&ctx)
-	_sha3.update(&ctx, data)
-	_sha3.final(&ctx, hash)
+	init(&ctx)
+	update(&ctx, data)
+	final(&ctx, hash)
 }
 
 // hash_stream_512 will read the stream in chunks and compute a
 // hash from its contents
 hash_stream_512 :: proc(s: io.Stream) -> ([DIGEST_SIZE_512]byte, bool) {
 	hash: [DIGEST_SIZE_512]byte
-	ctx: _sha3.Sha3_Context
+	ctx: Context
 	ctx.mdlen = DIGEST_SIZE_512
 	ctx.is_keccak = true
-	_sha3.init(&ctx)
+	init(&ctx)
+
 	buf := make([]byte, 512)
 	defer delete(buf)
+
 	read := 1
 	for read > 0 {
 		read, _ = io.read(s, buf)
 		if read > 0 {
-			_sha3.update(&ctx, buf[:read])
+			update(&ctx, buf[:read])
 		}
 	}
-	_sha3.final(&ctx, hash[:])
+	final(&ctx, hash[:])
 	return hash, true
 }
 
@@ -354,17 +361,17 @@ hash_512 :: proc {
     Low level API
 */
 
-Keccak_Context :: _sha3.Sha3_Context
+Context :: _sha3.Sha3_Context
 
-init :: proc(ctx: ^_sha3.Sha3_Context) {
+init :: proc(ctx: ^Context) {
 	ctx.is_keccak = true
 	_sha3.init(ctx)
 }
 
-update :: proc(ctx: ^_sha3.Sha3_Context, data: []byte) {
+update :: proc(ctx: ^Context, data: []byte) {
 	_sha3.update(ctx, data)
 }
 
-final :: proc(ctx: ^_sha3.Sha3_Context, hash: []byte) {
+final :: proc(ctx: ^Context, hash: []byte) {
 	_sha3.final(ctx, hash)
 }
