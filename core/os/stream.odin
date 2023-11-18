@@ -55,10 +55,12 @@ _file_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, 
 		}
 	}
 	if err == nil && os_err != 0 {
-		switch os_err {
-		case ERROR_HANDLE_EOF: err = .EOF
-		case:                  err = .Unknown
+		when ODIN_OS == .Windows {
+			if os_err == ERROR_HANDLE_EOF {
+				return n, .EOF
+			}
 		}
+		err = .Unknown
 	}
 	return
 }
