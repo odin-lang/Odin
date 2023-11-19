@@ -660,7 +660,7 @@ gb_internal void futex_broadcast(Futex *addr) {
 gb_internal void futex_wait(Futex *addr, Footex val) {
 	for (;;) {
 		int ret = _umtx_op(addr, UMTX_OP_WAIT_UINT, val, 0, NULL);
-		if (ret == 0) {
+		if (ret == -1) {
 			if (errno == ETIMEDOUT || errno == EINTR) {
 				continue;
 			}
