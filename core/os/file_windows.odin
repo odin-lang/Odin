@@ -149,7 +149,7 @@ read_console :: proc(handle: win32.HANDLE, b: []byte) -> (n: int, err: Errno) {
 	return
 }
 
-read :: proc(fd: Handle, data: []byte) -> (int, Errno) {
+read :: proc(fd: Handle, data: []byte) -> (total_read: int, err: Errno) {
 	if len(data) == 0 {
 		return 0, ERROR_NONE
 	}
@@ -158,32 +158,32 @@ read :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 	
 	m: u32
 	is_console := win32.GetConsoleMode(handle, &m)
-
-	single_read_length: win32.DWORD
-	total_read: int
 	length := len(data)
 
 	// NOTE(Jeroen): `length` can't be casted to win32.DWORD here because it'll overflow if > 4 GiB and return 0 if exactly that.
 	to_read := min(i64(length), MAX_RW)
 
-	e: win32.BOOL
 	if is_console {
-		n, err := read_console(handle, data[total_read:][:to_read])
-		total_read += n
+		total_read, err = read_console(handle, data[total_read:][:to_read])
 		if err != 0 {
-			return int(total_read), err
+			return total_read, err
 		}
 	} else {
 		// NOTE(Jeroen): So we cast it here *after* we've ensured that `to_read` is at most MAX_RW (1 GiB)
-		e = win32.ReadFile(handle, &data[total_read], win32.DWORD(to_read), &single_read_length, nil)
+		bytes_read: win32.DWORD
+		if e := win32.ReadFile(handle, &data[total_read], win32.DWORD(to_read), &bytes_read, nil); e {
+			// Successful read can mean two things, including EOF, see:
+			// https://learn.microsoft.com/en-us/windows/win32/fileio/testing-for-the-end-of-a-file
+			if bytes_read == 0 {
+				return 0, ERROR_HANDLE_EOF
+			} else {
+				return int(bytes_read), ERROR_NONE
+			}
+		} else {
+			return 0, Errno(win32.GetLastError())
+		}
 	}
-	if single_read_length <= 0 || !e {
-		err := Errno(win32.GetLastError())
-		return int(total_read), err
-	}
-	total_read += int(single_read_length)
-	
-	return int(total_read), ERROR_NONE
+	return total_read, ERROR_NONE
 }
 
 seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
