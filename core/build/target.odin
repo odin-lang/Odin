@@ -42,7 +42,8 @@ Target :: struct {
 
 Target_Run_Proc :: #type proc(target: ^Target, mode: Run_Mode, args: []Arg, loc := #caller_location) -> bool
 
-add_target :: proc(project: ^Project, target: ^Target, run_proc: Target_Run_Proc, loc := #caller_location) {
+add_target :: proc(project: ^Project, target: ^Target, run_proc: Target_Run_Proc, subdir_count := 1, loc := #caller_location) {
+	assert(subdir_count >=  1, "The build system needs to be in a subdirectory")
 	append(&project.targets, target)
 	target.project = project
 	target.run_proc = run_proc
@@ -52,7 +53,7 @@ add_target :: proc(project: ^Project, target: ^Target, run_proc: Target_Run_Proc
 		if ch == '/' || ch == '\\' {
 			count += 1 // first slash is the build package
 		}
-		if count == 2 { // this effectively makes the build system only runnable from the direct subdirectory of it (aka `odin run build` rather than `odin run .`)
+		if count == subdir_count + 1 {
 			slash_i = i
 			break
 		}
