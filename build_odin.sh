@@ -27,11 +27,13 @@ error() {
 if [ -z "$LLVM_CONFIG" ]; then
 	# darwin, linux, openbsd
 	if   [ -n "$(command -v llvm-config-17)" ]; then LLVM_CONFIG="llvm-config-17"
+	elif [ -n "$(command -v llvm-config-14)" ]; then LLVM_CONFIG="llvm-config-14"
 	elif [ -n "$(command -v llvm-config-13)" ]; then LLVM_CONFIG="llvm-config-13"
 	elif [ -n "$(command -v llvm-config-12)" ]; then LLVM_CONFIG="llvm-config-12"
 	elif [ -n "$(command -v llvm-config-11)" ]; then LLVM_CONFIG="llvm-config-11"
 	# freebsd
 	elif [ -n "$(command -v llvm-config17)" ]; then  LLVM_CONFIG="llvm-config-17"
+	elif [ -n "$(command -v llvm-config14)" ]; then  LLVM_CONFIG="llvm-config-14"
 	elif [ -n "$(command -v llvm-config13)" ]; then  LLVM_CONFIG="llvm-config-13"
 	elif [ -n "$(command -v llvm-config12)" ]; then  LLVM_CONFIG="llvm-config-12"
 	elif [ -n "$(command -v llvm-config11)" ]; then  LLVM_CONFIG="llvm-config-11"
