@@ -27,9 +27,7 @@ _file_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, 
 	case .Read:
 		n_int, os_err = read(fd, p)
 		n = i64(n_int)
-		if os_err != 0 {
-			err = .Unknown
-		}
+
 	case .Read_At:
 		when !(ODIN_OS == .FreeBSD || ODIN_OS == .OpenBSD) {
 			n_int, os_err = read_at(fd, p, offset)
@@ -57,6 +55,11 @@ _file_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, 
 		}
 	}
 	if err == nil && os_err != 0 {
+		when ODIN_OS == .Windows {
+			if os_err == ERROR_HANDLE_EOF {
+				return n, .EOF
+			}
+		}
 		err = .Unknown
 	}
 	return

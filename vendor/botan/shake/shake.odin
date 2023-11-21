@@ -33,11 +33,10 @@ hash_string_128 :: proc(data: string) -> [DIGEST_SIZE_128]byte {
 // computed hash
 hash_bytes_128 :: proc(data: []byte) -> [DIGEST_SIZE_128]byte {
     hash: [DIGEST_SIZE_128]byte
-    ctx: botan.hash_t
-    botan.hash_init(&ctx, botan.HASH_SHAKE_128, 0)
-    botan.hash_update(ctx, len(data) == 0 ? nil : &data[0], uint(len(data)))
-    botan.hash_final(ctx, &hash[0])
-    botan.hash_destroy(ctx)
+    ctx: Context
+    init(&ctx, hash_size = 128)
+    update(&ctx, data)
+    final(&ctx, hash[:])
     return hash
 }
 
@@ -53,31 +52,29 @@ hash_string_to_buffer_128 :: proc(data: string, hash: []byte) {
 // It requires that the destination buffer is at least as big as the digest size
 hash_bytes_to_buffer_128 :: proc(data, hash: []byte) {
     assert(len(hash) >= DIGEST_SIZE_128, "Size of destination buffer is smaller than the digest size")
-    ctx: botan.hash_t
-    botan.hash_init(&ctx, botan.HASH_SHAKE_128, 0)
-    botan.hash_update(ctx, len(data) == 0 ? nil : &data[0], uint(len(data)))
-    botan.hash_final(ctx, &hash[0])
-    botan.hash_destroy(ctx)
+    ctx: Context
+    init(&ctx, hash_size = 128)
+    update(&ctx, data)
+    final(&ctx, hash)
 }
 
 // hash_stream_128 will read the stream in chunks and compute a
 // hash from its contents
 hash_stream_128 :: proc(s: io.Stream) -> ([DIGEST_SIZE_128]byte, bool) {
     hash: [DIGEST_SIZE_128]byte
-    ctx: botan.hash_t
-    botan.hash_init(&ctx, botan.HASH_SHAKE_128, 0)
+    ctx: Context
+    init(&ctx, hash_size = 128)
     buf := make([]byte, 512)
     defer delete(buf)
     i := 1
     for i > 0 {
         i, _ = io.read(s, buf)
         if i > 0 {
-            botan.hash_update(ctx, len(buf) == 0 ? nil : &buf[0], uint(i))
-        } 
+            update(&ctx, buf[:i])
+        }
     }
-    botan.hash_final(ctx, &hash[0])
-    botan.hash_destroy(ctx)
-    return hash, true 
+    final(&ctx, hash[:])
+    return hash, true
 }
 
 // hash_file_128 will read the file provided by the given handle
@@ -112,11 +109,10 @@ hash_string_256 :: proc(data: string) -> [DIGEST_SIZE_256]byte {
 // computed hash
 hash_bytes_256 :: proc(data: []byte) -> [DIGEST_SIZE_256]byte {
     hash: [DIGEST_SIZE_256]byte
-    ctx: botan.hash_t
-    botan.hash_init(&ctx, botan.HASH_SHAKE_256, 0)
-    botan.hash_update(ctx, len(data) == 0 ? nil : &data[0], uint(len(data)))
-    botan.hash_final(ctx, &hash[0])
-    botan.hash_destroy(ctx)
+    ctx: Context
+    init(&ctx, hash_size = 256)
+    update(&ctx, data)
+    final(&ctx, hash[:])
     return hash
 }
 
@@ -132,31 +128,29 @@ hash_string_to_buffer_256 :: proc(data: string, hash: []byte) {
 // It requires that the destination buffer is at least as big as the digest size
 hash_bytes_to_buffer_256 :: proc(data, hash: []byte) {
     assert(len(hash) >= DIGEST_SIZE_256, "Size of destination buffer is smaller than the digest size")
-    ctx: botan.hash_t
-    botan.hash_init(&ctx, botan.HASH_SHAKE_256, 0)
-    botan.hash_update(ctx, len(data) == 0 ? nil : &data[0], uint(len(data)))
-    botan.hash_final(ctx, &hash[0])
-    botan.hash_destroy(ctx)
+    ctx: Context
+    init(&ctx, hash_size = 256)
+    update(&ctx, data)
+    final(&ctx, hash)
 }
 
 // hash_stream_256 will read the stream in chunks and compute a
 // hash from its contents
 hash_stream_256 :: proc(s: io.Stream) -> ([DIGEST_SIZE_256]byte, bool) {
     hash: [DIGEST_SIZE_256]byte
-    ctx: botan.hash_t
-    botan.hash_init(&ctx, botan.HASH_SHAKE_256, 0)
+    ctx: Context
+    init(&ctx, hash_size = 256)
     buf := make([]byte, 512)
     defer delete(buf)
     i := 1
     for i > 0 {
         i, _ = io.read(s, buf)
         if i > 0 {
-            botan.hash_update(ctx, len(buf) == 0 ? nil : &buf[0], uint(i))
-        } 
+            update(&ctx, buf[:i])
+        }
     }
-    botan.hash_final(ctx, &hash[0])
-    botan.hash_destroy(ctx)
-    return hash, true 
+    final(&ctx, hash[:])
+    return hash, true
 }
 
 // hash_file_256 will read the file provided by the given handle
@@ -185,20 +179,20 @@ hash_256 :: proc {
     Low level API
 */
 
-Shake_Context :: botan.hash_t
+Context :: botan.hash_t
 
-init :: proc "contextless" (ctx: ^botan.hash_t, hash_size := 256) {
+init :: proc "contextless" (ctx: ^Context, hash_size := 256) {
     switch hash_size {
         case 128: botan.hash_init(ctx, botan.HASH_SHAKE_128, 0)
         case 256: botan.hash_init(ctx, botan.HASH_SHAKE_256, 0)
     }
 }
 
-update :: proc "contextless" (ctx: ^botan.hash_t, data: []byte) {
+update :: proc "contextless" (ctx: ^Context, data: []byte) {
     botan.hash_update(ctx^, len(data) == 0 ? nil : &data[0], uint(len(data)))
 }
 
-final :: proc "contextless" (ctx: ^botan.hash_t, hash: []byte) {
+final :: proc "contextless" (ctx: ^Context, hash: []byte) {
     botan.hash_final(ctx^, &hash[0])
     botan.hash_destroy(ctx^)
 }

@@ -205,7 +205,7 @@ gb_internal gb_inline isize string_extension_position(String const &str) {
 	isize dot_pos = -1;
 	isize i = str.len;
 	while (i --> 0) {
-		if (str[i] == GB_PATH_SEPARATOR)
+		if (str[i] == '\\' || str[i] == '/')
 			break;
 		if (str[i] == '.') {
 			dot_pos = i;
