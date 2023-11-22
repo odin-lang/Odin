@@ -24,7 +24,7 @@ new_from_positions :: proc($T: typeid, pos, end: tokenizer.Pos) -> ^T {
 }
 
 new_from_pos_and_end_node :: proc($T: typeid, pos: tokenizer.Pos, end: ^Node) -> ^T {
-	return new(T, pos, end != nil ? end.end : {})
+	return new(T, pos, end != nil ? end.end : pos)
 }
 
 new :: proc {
