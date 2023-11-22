@@ -1,0 +1,832 @@
+package cbor
+
+import "core:intrinsics"
+import "core:io"
+import "core:mem"
+import "core:reflect"
+import "core:runtime"
+import "core:strings"
+import "core:unicode/utf8"
+
+// `strings` is only used in poly procs, but -vet thinks it is fully unused.
+_ :: strings
+
+/*
+Unmarshals the given CBOR into the given pointer using reflection.
+Types that require allocation are allocated using the given allocator.
+
+Some temporary allocations are done on the `context.temp_allocator`, but, if you want to,
+this can be set to a "normal" allocator, because the necessary `delete` and `free` calls are still made.
+This is helpful when the CBOR size is so big that you don't want to collect all the temporary allocations until the end.
+*/
+unmarshal :: proc {
+	unmarshal_from_reader,
+	unmarshal_from_string,
+}
+
+// Unmarshals from a reader, see docs on the proc group `Unmarshal` for more info.
+unmarshal_from_reader :: proc(r: io.Reader, ptr: ^$T, allocator := context.allocator) -> Unmarshal_Error {
+	return _unmarshal_any_ptr(r, ptr, allocator=allocator)
+}
+
+// Unmarshals from a string, see docs on the proc group `Unmarshal` for more info.
+unmarshal_from_string :: proc(s: string, ptr: ^$T, allocator := context.allocator) -> Unmarshal_Error {
+	sr: strings.Reader
+	r := strings.to_reader(&sr, s)
+	return _unmarshal_any_ptr(r, ptr, allocator=allocator)
+}
+
+_unmarshal_any_ptr :: proc(r: io.Reader, v: any, hdr: Maybe(Header) = nil, allocator := context.allocator) -> Unmarshal_Error {
+	context.allocator = allocator
+	v := v
+
+	if v == nil || v.id == nil {
+		return .Invalid_Parameter
+	}
+
+	v = reflect.any_base(v)
+	ti := type_info_of(v.id)
+	if !reflect.is_pointer(ti) || ti.id == rawptr {
+		return .Non_Pointer_Parameter
+	}
+	
+	data := any{(^rawptr)(v.data)^, ti.variant.(reflect.Type_Info_Pointer).elem.id}	
+	return _unmarshal_value(r, data, hdr.? or_else (_decode_header(r) or_return))
+}
+
+_unmarshal_value :: proc(r: io.Reader, v: any, hdr: Header) -> (err: Unmarshal_Error) {
+	v := v
+	ti := reflect.type_info_base(type_info_of(v.id))
+
+	// If it's a union with only one variant, then treat it as that variant
+	if u, ok := ti.variant.(reflect.Type_Info_Union); ok && len(u.variants) == 1 {
+		#partial switch hdr {
+		case .Nil, .Undefined, nil: // no-op.
+		case:
+			variant := u.variants[0]
+			v.id = variant.id
+			ti = reflect.type_info_base(variant)
+			if !reflect.is_pointer_internally(variant) {
+				tag := any{rawptr(uintptr(v.data) + u.tag_offset), u.tag_type.id}
+				assert(_assign_int(tag, 1))
+			}
+		}
+	}
+
+	// Allow generic unmarshal by doing it into a `Value`.
+	switch &dst in v {
+	case Value:
+		dst = err_conv(decode(r, hdr)) or_return
+		return
+	}
+	
+	switch hdr {
+	case .U8:
+		decoded := _decode_u8(r) or_return
+		if !_assign_int(v, decoded) { return _unsupported(v, hdr) }
+		return
+
+	case .U16:
+		decoded := _decode_u16(r) or_return
+		if !_assign_int(v, decoded) { return _unsupported(v, hdr) }
+		return
+
+	case .U32:
+		decoded := _decode_u32(r) or_return
+		if !_assign_int(v, decoded) { return _unsupported(v, hdr) }
+		return
+
+	case .U64:
+		decoded := _decode_u64(r) or_return
+		if !_assign_int(v, decoded) { return _unsupported(v, hdr) }
+		return
+
+	case .Neg_U8:
+		decoded := Negative_U8(_decode_u8(r) or_return)
+		
+		switch &dst in v {
+		case Negative_U8:
+			dst = decoded
+			return
+		case Negative_U16:
+			dst = Negative_U16(decoded)
+			return
+		case Negative_U32:
+			dst = Negative_U32(decoded)
+			return
+		case Negative_U64:
+			dst = Negative_U64(decoded)
+			return
+		}
+
+		if reflect.is_unsigned(ti) { return _unsupported(v, hdr) }
+
+		if !_assign_int(v, negative_to_int(decoded)) { return _unsupported(v, hdr) }
+		return
+
+	case .Neg_U16:
+		decoded := Negative_U16(_decode_u16(r) or_return)
+		
+		switch &dst in v {
+		case Negative_U16:
+			dst = decoded
+			return
+		case Negative_U32:
+			dst = Negative_U32(decoded)
+			return
+		case Negative_U64:
+			dst = Negative_U64(decoded)
+			return
+		}
+
+		if reflect.is_unsigned(ti) { return _unsupported(v, hdr) }
+
+		if !_assign_int(v, negative_to_int(decoded)) { return _unsupported(v, hdr) }
+		return
+
+	case .Neg_U32:
+		decoded := Negative_U32(_decode_u32(r) or_return)
+		
+		switch &dst in v {
+		case Negative_U32:
+			dst = decoded
+			return
+		case Negative_U64:
+			dst = Negative_U64(decoded)
+			return
+		}
+
+		if reflect.is_unsigned(ti) { return _unsupported(v, hdr) }
+
+		if !_assign_int(v, negative_to_int(decoded)) { return _unsupported(v, hdr) }
+		return
+
+	case .Neg_U64:
+		decoded := Negative_U64(_decode_u64(r) or_return)
+		
+		switch &dst in v {
+		case Negative_U64:
+			dst = decoded
+			return
+		}
+
+		if reflect.is_unsigned(ti) { return _unsupported(v, hdr) }
+
+		if !_assign_int(v, negative_to_int(decoded)) { return _unsupported(v, hdr) }
+		return
+
+	case .Simple:
+		decoded := _decode_simple(r) or_return
+
+		// NOTE: Because this is a special type and not to be treated as a general integer,
+		// We only put the value of it in fields that are explicitly of type `Simple`.
+		switch &dst in v {
+		case Simple:
+			dst = decoded
+			return
+		case:
+			return _unsupported(v, hdr)
+		}
+
+	case .F16:
+		decoded := _decode_f16(r) or_return
+		if !_assign_float(v, decoded) { return _unsupported(v, hdr) }
+		return
+
+	case .F32:
+		decoded := _decode_f32(r) or_return
+		if !_assign_float(v, decoded) { return _unsupported(v, hdr) }
+		return
+
+	case .F64:
+		decoded := _decode_f64(r) or_return
+		if !_assign_float(v, decoded) { return _unsupported(v, hdr) }
+		return
+
+	case .True:
+		if !_assign_bool(v, true) { return _unsupported(v, hdr) }
+		return
+
+	case .False:
+		if !_assign_bool(v, false) { return _unsupported(v, hdr) }
+		return
+	
+	case .Nil, .Undefined:
+		mem.zero(v.data, ti.size)
+		return
+
+	case .Break:
+		return .Break
+	}
+	
+	maj, add := _header_split(hdr)
+	switch maj {
+	case .Unsigned:
+		decoded := _decode_tiny_u8(add) or_return
+		if !_assign_int(v, decoded) { return _unsupported(v, hdr, add) }
+		return
+
+	case .Negative:
+		decoded := Negative_U8(_decode_tiny_u8(add) or_return)
+
+		switch &dst in v {
+		case Negative_U8:
+			dst = decoded
+			return
+		}
+
+		if reflect.is_unsigned(ti) { return _unsupported(v, hdr, add) }
+
+		if !_assign_int(v, negative_to_int(decoded)) { return _unsupported(v, hdr, add) }
+		return
+
+	case .Other:
+		decoded := _decode_tiny_simple(add) or_return
+
+		 // NOTE: Because this is a special type and not to be treated as a general integer,
+		 // We only put the value of it in fields that are explicitly of type `Simple`.
+		 switch &dst in v {
+		 case Simple:
+			 dst = decoded
+			 return
+		 case:
+		 	return _unsupported(v, hdr, add)
+		 }
+
+	case .Tag:
+		switch &dst in v {
+		case ^Tag:
+			tval := err_conv(_decode_tag_ptr(r, add)) or_return
+			if t, is_tag := tval.(^Tag); is_tag {
+				dst = t
+				return
+			}
+
+			destroy(tval)
+			return .Bad_Tag_Value
+		case Tag:
+			t := err_conv(_decode_tag(r, add)) or_return
+			if t, is_tag := t.?; is_tag {
+				dst = t
+				return
+			}
+
+			return .Bad_Tag_Value
+		}
+
+		nr := err_conv(_decode_tag_nr(r, add)) or_return
+		
+		// Custom tag implementations.
+		if impl, ok := _tag_implementations_nr[nr]; ok {
+			return impl->unmarshal(r, nr, v)
+		} else {
+			// Discard the tag info and unmarshal as its value.
+			return _unmarshal_value(r, v, _decode_header(r) or_return)
+		}
+
+		return _unsupported(v, hdr, add)
+
+	case .Bytes: return _unmarshal_bytes(r, v, ti, hdr, add)
+	case .Text:  return _unmarshal_string(r, v, ti, hdr, add)
+	case .Array: return _unmarshal_array(r, v, ti, hdr, add)
+	case .Map:   return _unmarshal_map(r, v, ti, hdr, add)
+
+	case:        return .Bad_Major
+	}
+}
+
+_unmarshal_bytes :: proc(r: io.Reader, v: any, ti: ^reflect.Type_Info, hdr: Header, add: Add) -> (err: Unmarshal_Error) {
+	#partial switch t in ti.variant {
+	case reflect.Type_Info_String:
+		bytes := err_conv(_decode_bytes(r, add)) or_return
+
+		if t.is_cstring {
+			raw  := (^cstring)(v.data)
+			assert_safe_for_cstring(string(bytes))
+			raw^  = cstring(raw_data(bytes))
+		} else {
+			// String has same memory layout as a slice, so we can directly use it as a slice.
+			raw  := (^mem.Raw_String)(v.data)
+			raw^  = transmute(mem.Raw_String)bytes
+		}
+
+		return
+
+	case reflect.Type_Info_Slice:
+		elem_base := reflect.type_info_base(t.elem)
+
+		if elem_base.id != byte { return _unsupported(v, hdr) }
+
+		bytes := err_conv(_decode_bytes(r, add)) or_return
+		raw   := (^mem.Raw_Slice)(v.data)
+		raw^   = transmute(mem.Raw_Slice)bytes
+		return
+		
+	case reflect.Type_Info_Dynamic_Array:
+		elem_base := reflect.type_info_base(t.elem)
+
+		if elem_base.id != byte { return _unsupported(v, hdr) }
+		
+		bytes         := err_conv(_decode_bytes(r, add)) or_return
+		raw           := (^mem.Raw_Dynamic_Array)(v.data)
+		raw.data       = raw_data(bytes)
+		raw.len        = len(bytes)
+		raw.cap        = len(bytes)
+		raw.allocator  = context.allocator
+		return
+
+	case reflect.Type_Info_Array:
+		elem_base := reflect.type_info_base(t.elem)
+
+		if elem_base.id != byte { return _unsupported(v, hdr) }
+
+		bytes: []byte; {
+			context.allocator = context.temp_allocator
+			bytes = err_conv(_decode_bytes(r, add)) or_return
+		}
+		defer delete(bytes, context.temp_allocator)
+
+		if len(bytes) > t.count { return _unsupported(v, hdr) }
+		
+		// Copy into array type, delete original.
+		slice := ([^]byte)(v.data)[:len(bytes)]
+		n := copy(slice, bytes)
+		assert(n == len(bytes))
+		return
+	}
+
+	return _unsupported(v, hdr)
+}
+
+_unmarshal_string :: proc(r: io.Reader, v: any, ti: ^reflect.Type_Info, hdr: Header, add: Add) -> (err: Unmarshal_Error) {
+	#partial switch t in ti.variant {
+	case reflect.Type_Info_String:
+		text := err_conv(_decode_text(r, add)) or_return
+
+		if t.is_cstring {
+			raw := (^cstring)(v.data)
+
+			assert_safe_for_cstring(text)
+			raw^ = cstring(raw_data(text))
+		} else {
+			raw := (^string)(v.data)
+			raw^ = text
+		}
+		return
+
+	// Enum by its variant name.
+	case reflect.Type_Info_Enum:
+		context.allocator = context.temp_allocator
+		text := err_conv(_decode_text(r, add)) or_return
+		defer delete(text, context.temp_allocator)
+
+		for name, i in t.names {
+			if name == text {
+				if !_assign_int(any{v.data, ti.id}, t.values[i]) { return _unsupported(v, hdr) }
+				return
+			}
+		}
+	
+	case reflect.Type_Info_Rune:
+		context.allocator = context.temp_allocator
+		text := err_conv(_decode_text(r, add)) or_return
+		defer delete(text, context.temp_allocator)
+
+		r := (^rune)(v.data)
+		dr, n := utf8.decode_rune(text)
+		if dr == utf8.RUNE_ERROR || n < len(text) {
+			return _unsupported(v, hdr)
+		}
+
+		r^ = dr
+		return
+	}
+
+	return _unsupported(v, hdr)
+}
+
+_unmarshal_array :: proc(r: io.Reader, v: any, ti: ^reflect.Type_Info, hdr: Header, add: Add) -> (err: Unmarshal_Error) {
+
+	assign_array :: proc(
+		r: io.Reader,
+		da: ^mem.Raw_Dynamic_Array,
+		elemt: ^reflect.Type_Info,
+		_length: Maybe(int),
+		growable := true,
+	) -> (out_of_space: bool, err: Unmarshal_Error) {
+		length, has_length := _length.?
+		for idx: uintptr = 0; !has_length || idx < uintptr(length); idx += 1 {
+			elem_ptr := rawptr(uintptr(da.data) + idx*uintptr(elemt.size))
+			elem     := any{elem_ptr, elemt.id}
+
+			hdr := _decode_header(r) or_return
+			
+			// Double size if out of capacity.
+			if da.cap <= da.len {
+				// Not growable, error out.
+				if !growable { return true, .Out_Of_Memory }
+
+				cap := 2 * da.cap
+				ok := runtime.__dynamic_array_reserve(da, elemt.size, elemt.align, cap)
+ 				
+				// NOTE: Might be lying here, but it is at least an allocator error.
+				if !ok { return false, .Out_Of_Memory }
+			}
+			
+			err = _unmarshal_value(r, elem, hdr)
+			if !has_length && err == .Break { break }
+			if err != nil { return }
+
+			da.len += 1
+		}
+		
+		return false, nil
+	}
+
+	// Allow generically storing the values array.
+	switch &dst in v {
+	case ^Array:
+		dst = err_conv(_decode_array_ptr(r, add)) or_return
+		return
+	case Array:
+		dst = err_conv(_decode_array(r, add)) or_return
+		return
+	}
+
+	#partial switch t in ti.variant {
+	case reflect.Type_Info_Slice:
+		_length, unknown := err_conv(_decode_container_length(r, add)) or_return
+		length := _length.? or_else INITIAL_STREAMED_CONTAINER_CAPACITY
+
+		data := mem.alloc_bytes_non_zeroed(t.elem.size * length, t.elem.align) or_return
+		defer if err != nil { mem.free_bytes(data) }
+
+		da := mem.Raw_Dynamic_Array{raw_data(data), 0, length, context.allocator }
+
+		assign_array(r, &da, t.elem, _length) or_return
+
+		if da.len < da.cap {
+			// Ignoring an error here, but this is not critical to succeed.
+			_ = runtime.__dynamic_array_shrink(&da, t.elem.size, t.elem.align, da.len)
+		}
+
+		raw      := (^mem.Raw_Slice)(v.data)
+		raw.data  = da.data
+		raw.len   = da.len
+		return
+
+	case reflect.Type_Info_Dynamic_Array:
+		_length, unknown := err_conv(_decode_container_length(r, add)) or_return
+		length := _length.? or_else INITIAL_STREAMED_CONTAINER_CAPACITY
+
+		data := mem.alloc_bytes_non_zeroed(t.elem.size * length, t.elem.align) or_return
+		defer if err != nil { mem.free_bytes(data) }
+
+		raw := (^mem.Raw_Dynamic_Array)(v.data)
+		raw.data = raw_data(data) 
+		raw.len = 0
+		raw.cap = length
+		raw.allocator = context.allocator
+
+		_ = assign_array(r, raw, t.elem, _length) or_return
+		return
+
+	case reflect.Type_Info_Array:
+		_length, unknown := err_conv(_decode_container_length(r, add)) or_return
+		length := _length.? or_else t.count
+	
+		if !unknown && length > t.count {
+			return _unsupported(v, hdr)
+		}
+
+		da := mem.Raw_Dynamic_Array{rawptr(v.data), 0, length, context.allocator }
+
+		out_of_space := assign_array(r, &da, t.elem, _length, growable=false) or_return
+		if out_of_space { return _unsupported(v, hdr) }
+		return
+
+	case reflect.Type_Info_Enumerated_Array:
+		_length, unknown := err_conv(_decode_container_length(r, add)) or_return
+		length := _length.? or_else t.count
+	
+		if !unknown && length > t.count {
+			return _unsupported(v, hdr)
+		}
+
+		da := mem.Raw_Dynamic_Array{rawptr(v.data), 0, length, context.allocator }
+
+		out_of_space := assign_array(r, &da, t.elem, _length, growable=false) or_return
+		if out_of_space { return _unsupported(v, hdr) }
+		return
+
+	case reflect.Type_Info_Complex:
+		_length, unknown := err_conv(_decode_container_length(r, add)) or_return
+		length := _length.? or_else 2
+	
+		if !unknown && length > 2 {
+			return _unsupported(v, hdr)
+		}
+
+		da := mem.Raw_Dynamic_Array{rawptr(v.data), 0, 2, context.allocator }
+
+		info: ^runtime.Type_Info
+		switch ti.id {
+		case complex32:  info = type_info_of(f16)
+		case complex64:  info = type_info_of(f32)
+		case complex128: info = type_info_of(f64)
+		case:            unreachable()
+		}
+
+		out_of_space := assign_array(r, &da, info, 2, growable=false) or_return
+		if out_of_space { return _unsupported(v, hdr) }
+		return
+	
+	case reflect.Type_Info_Quaternion:
+		_length, unknown := err_conv(_decode_container_length(r, add)) or_return
+		length := _length.? or_else 4
+	
+		if !unknown && length > 4 {
+			return _unsupported(v, hdr)
+		}
+
+		da := mem.Raw_Dynamic_Array{rawptr(v.data), 0, 4, context.allocator }
+
+		info: ^runtime.Type_Info
+		switch ti.id {
+		case quaternion64:  info = type_info_of(f16)
+		case quaternion128: info = type_info_of(f32)
+		case quaternion256: info = type_info_of(f64)
+		case:            unreachable()
+		}
+
+		out_of_space := assign_array(r, &da, info, 4, growable=false) or_return
+		if out_of_space { return _unsupported(v, hdr) }
+		return
+
+	case: return _unsupported(v, hdr)
+	}
+}
+
+_unmarshal_map :: proc(r: io.Reader, v: any, ti: ^reflect.Type_Info, hdr: Header, add: Add) -> (err: Unmarshal_Error) {
+
+	decode_key :: proc(r: io.Reader, v: any) -> (k: string, err: Unmarshal_Error) {
+		entry_hdr := _decode_header(r) or_return
+		entry_maj, entry_add := _header_split(entry_hdr)
+		#partial switch entry_maj {
+		case .Text:
+			k = err_conv(_decode_text(r, entry_add)) or_return
+			return
+		case .Bytes:
+			bytes := err_conv(_decode_bytes(r, entry_add)) or_return
+			k = string(bytes)
+			return
+		case:
+			err = _unsupported(v, entry_hdr)
+			return
+		}
+	}
+
+	// Allow generically storing the map array.
+	switch &dst in v {
+	case ^Map:
+		dst = err_conv(_decode_map_ptr(r, add)) or_return
+		return
+	case Map:
+		dst = err_conv(_decode_map(r, add)) or_return
+		return
+	}
+
+	#partial switch t in ti.variant {
+	case reflect.Type_Info_Struct:
+		if t.is_raw_union {
+			return _unsupported(v, hdr)
+		}
+
+		length, unknown := err_conv(_decode_container_length(r, add)) or_return
+		fields := reflect.struct_fields_zipped(ti.id)
+	
+		for idx := 0; unknown || idx < length.?; idx += 1 {
+			// Decode key, keys can only be strings.
+			key: string; {
+				context.allocator = context.temp_allocator
+				if keyv, kerr := decode_key(r, v); unknown && kerr == .Break {
+					break
+				} else if kerr != nil {
+					err = kerr
+					return
+				} else {
+					key = keyv
+				}
+			}
+			defer delete(key, context.temp_allocator)
+			
+			// Find matching field.
+			use_field_idx := -1
+			{
+				for field, field_idx in fields {
+					tag_value := string(reflect.struct_tag_get(field.tag, "cbor"))
+					if key == tag_value {
+						use_field_idx = field_idx
+						break
+					}
+
+					if key == field.name {
+						// No break because we want to still check remaining struct tags.
+						use_field_idx = field_idx
+					}
+				}
+				
+				// Skips unused map entries.
+				if use_field_idx < 0 {
+					continue
+				}
+			}
+
+			field  := fields[use_field_idx]
+			name   := field.name
+			ptr    := rawptr(uintptr(v.data) + field.offset)
+			fany   := any{ptr, field.type.id}
+			_unmarshal_value(r, fany, _decode_header(r) or_return) or_return
+		}
+		return
+
+	case reflect.Type_Info_Map:
+		if !reflect.is_string(t.key) {
+			return _unsupported(v, hdr)
+		}
+
+		raw_map := (^mem.Raw_Map)(v.data)
+		if raw_map.allocator.procedure == nil {
+			raw_map.allocator = context.allocator
+		}
+
+		defer if err != nil {
+			_ = runtime.map_free_dynamic(raw_map^, t.map_info)
+		}
+
+		length, unknown := err_conv(_decode_container_length(r, add)) or_return
+		if !unknown {
+			// Reserve space before setting so we can return allocation errors and be efficient on big maps.
+			new_len := uintptr(runtime.map_len(raw_map^)+length.?)
+			runtime.map_reserve_dynamic(raw_map, t.map_info, new_len) or_return
+		}
+		
+		// Temporary memory to unmarshal keys into before inserting them into the map.
+		elem_backing := mem.alloc_bytes_non_zeroed(t.value.size, t.value.align, context.temp_allocator) or_return
+		defer delete(elem_backing, context.temp_allocator)
+
+		map_backing_value := any{raw_data(elem_backing), t.value.id}
+
+		for idx := 0; unknown || idx < length.?; idx += 1 {
+			// Decode key, keys can only be strings.
+			key: string
+			if keyv, kerr := decode_key(r, v); unknown && kerr == .Break {
+				break
+			} else if kerr != nil {
+				err = kerr
+				return
+			} else {
+				key = keyv
+			}
+
+			if unknown {
+				// Reserve space for new element so we can return allocator errors.
+				new_len := uintptr(runtime.map_len(raw_map^)+1)
+				runtime.map_reserve_dynamic(raw_map, t.map_info, new_len) or_return
+			}
+
+			mem.zero_slice(elem_backing)
+			_unmarshal_value(r, map_backing_value, _decode_header(r) or_return) or_return
+
+			key_ptr := rawptr(&key)
+			key_cstr: cstring
+			if reflect.is_cstring(t.key) {
+				assert_safe_for_cstring(key)
+				key_cstr = cstring(raw_data(key))
+				key_ptr = &key_cstr
+			}
+
+			set_ptr := runtime.__dynamic_map_set_without_hash(raw_map, t.map_info, key_ptr, map_backing_value.data)
+			// We already reserved space for it, so this shouldn't fail.
+			assert(set_ptr != nil)
+		}
+		return
+
+		case:
+			return _unsupported(v, hdr)
+	}
+}
+
+_assign_int :: proc(val: any, i: $T) -> bool {
+	v := reflect.any_core(val)
+
+	// NOTE: should under/over flow be checked here? `encoding/json` doesn't, but maybe that is a
+	// less strict encoding?.
+
+	switch &dst in v {
+	case i8:      dst = i8     (i)
+	case i16:     dst = i16    (i)
+	case i16le:   dst = i16le  (i)
+	case i16be:   dst = i16be  (i)
+	case i32:     dst = i32    (i)
+	case i32le:   dst = i32le  (i)
+	case i32be:   dst = i32be  (i)
+	case i64:     dst = i64    (i)
+	case i64le:   dst = i64le  (i)
+	case i64be:   dst = i64be  (i)
+	case i128:    dst = i128   (i)
+	case i128le:  dst = i128le (i)
+	case i128be:  dst = i128be (i)
+	case u8:      dst = u8     (i)
+	case u16:     dst = u16    (i)
+	case u16le:   dst = u16le  (i)
+	case u16be:   dst = u16be  (i)
+	case u32:     dst = u32    (i)
+	case u32le:   dst = u32le  (i)
+	case u32be:   dst = u32be  (i)
+	case u64:     dst = u64    (i)
+	case u64le:   dst = u64le  (i)
+	case u64be:   dst = u64be  (i)
+	case u128:    dst = u128   (i)
+	case u128le:  dst = u128le (i)
+	case u128be:  dst = u128be (i)
+	case int:     dst = int    (i)
+	case uint:    dst = uint   (i)
+	case uintptr: dst = uintptr(i)
+	case:
+		ti := type_info_of(v.id)
+		do_byte_swap := is_bit_set_different_endian_to_platform(ti)
+		#partial switch info in ti.variant {
+		case runtime.Type_Info_Bit_Set:
+			switch ti.size * 8 {
+			case  0:
+			case  8:
+				x := (^u8)(v.data)
+				x^ = u8(i)
+			case 16:
+				x := (^u16)(v.data)
+				x^ = do_byte_swap ? intrinsics.byte_swap(u16(i)) : u16(i)
+			case 32:
+				x := (^u32)(v.data)
+				x^ = do_byte_swap ? intrinsics.byte_swap(u32(i)) : u32(i)
+			case 64:
+				x := (^u64)(v.data)
+				x^ = do_byte_swap ? intrinsics.byte_swap(u64(i)) : u64(i)
+			case:
+				panic("unknown bit_size size")
+			}
+		case:
+			return false
+		}
+	}
+	return true
+}
+
+_assign_float :: proc(val: any, f: $T) -> bool {
+	v := reflect.any_core(val)
+
+	// NOTE: should under/over flow be checked here? `encoding/json` doesn't, but maybe that is a
+	// less strict encoding?.
+
+	switch &dst in v {
+	case f16:     dst = f16  (f)
+	case f16le:   dst = f16le(f)
+	case f16be:   dst = f16be(f)
+	case f32:     dst = f32  (f)
+	case f32le:   dst = f32le(f)
+	case f32be:   dst = f32be(f)
+	case f64:     dst = f64  (f)
+	case f64le:   dst = f64le(f)
+	case f64be:   dst = f64be(f)
+	
+	case complex32:  dst = complex(f16(f), 0)
+	case complex64:  dst = complex(f32(f), 0)
+	case complex128: dst = complex(f64(f), 0)
+	
+	case quaternion64:  dst = quaternion(f16(f), 0, 0, 0)
+	case quaternion128: dst = quaternion(f32(f), 0, 0, 0)
+	case quaternion256: dst = quaternion(f64(f), 0, 0, 0)
+	
+	case: return false
+	}
+	return true
+}
+
+_assign_bool :: proc(val: any, b: bool) -> bool {
+	v := reflect.any_core(val)
+	switch &dst in v {
+	case bool: dst = bool(b)
+	case b8:   dst = b8  (b)
+	case b16:  dst = b16 (b)
+	case b32:  dst = b32 (b)
+	case b64:  dst = b64 (b)
+	case: return false
+	}
+	return true
+}
+
+// Sanity check that the decoder added a nil byte to the end.
+@(private, disabled=ODIN_DISABLE_ASSERT)
+assert_safe_for_cstring :: proc(s: string, loc := #caller_location) {
+	assert(([^]byte)(raw_data(s))[len(s)] == 0, loc = loc)
+}

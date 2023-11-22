@@ -53,6 +53,7 @@ import json             "core:encoding/json"
 import varint           "core:encoding/varint"
 import xml              "core:encoding/xml"
 import endian           "core:encoding/endian"
+import cbor             "core:encoding/cbor"
 
 import fmt              "core:fmt"
 import hash             "core:hash"
@@ -167,6 +168,7 @@ _ :: json
 _ :: varint
 _ :: xml
 _ :: endian
+_ :: cbor
 _ :: fmt
 _ :: hash
 _ :: xxhash

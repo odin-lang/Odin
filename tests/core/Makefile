@@ -55,6 +55,7 @@ encoding_test:
 	$(ODIN) run encoding/json   $(COMMON) -out:test_json
 	$(ODIN) run encoding/varint $(COMMON) -out:test_varint
 	$(ODIN) run encoding/xml    $(COMMON) -out:test_xml
+	$(ODIN) run encoding/cbor   $(COMMON) -out:test_cbor
 
 math_test:
 	$(ODIN) run math $(COMMON) $(COLLECTION) -out:test_core_math
