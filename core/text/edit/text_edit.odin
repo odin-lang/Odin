@@ -1,4 +1,4 @@
-package edit
+package text_edit
 
 /*
 	Based off the articles by rxi:
