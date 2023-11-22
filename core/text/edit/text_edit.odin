@@ -124,7 +124,7 @@ setup_once :: proc(s: ^State, builder: ^strings.Builder) {
 // returns true when the builder had content to be cleared
 // clear builder&selection and the undo|redo stacks
 clear_all :: proc(s: ^State) -> (cleared: bool) {
-	if len(s.builder.buf) > 0 {
+	if s.builder != nil && len(s.builder.buf) > 0 {
 		clear(&s.builder.buf)
 		s.selection = {}
 		cleared = true
