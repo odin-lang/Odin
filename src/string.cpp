@@ -10,6 +10,10 @@ struct String {
 		return text[i];
 	}
 };
+struct String_Iterator {
+	String const &str;
+	isize  pos;
+};
 // NOTE(bill): used for printf style arguments
 #define LIT(x) ((int)(x).len), (x).text
 #if defined(GB_COMPILER_MSVC) && _MSC_VER < 1700
@@ -200,6 +204,26 @@ gb_internal gb_inline String string_trim_starts_with(String const &s, String con
 	return s;
 }
 
+
+gb_internal String string_split_iterator(String_Iterator *it, const char sep) {
+	isize start = it->pos;
+	isize end   = it->str.len;
+
+	if (start == end) {
+		return str_lit("");
+	}
+
+	isize i = start;
+	for (; i < it->str.len; i++) {
+		if (it->str[i] == sep) {
+			String res = substring(it->str, start, i);
+			it->pos += res.len + 1;
+			return res;
+		}
+	}
+	it->pos = end;
+	return substring(it->str, start, end);
+}
 
 gb_internal gb_inline isize string_extension_position(String const &str) {
 	isize dot_pos = -1;
