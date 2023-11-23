@@ -1876,6 +1876,7 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 		print_usage_line(2, "Examples:");
 		print_usage_line(3, "-microarch:sandybridge");
 		print_usage_line(3, "-microarch:native");
+		print_usage_line(3, "-microarch:? for a list");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-reloc-mode:<string>");
@@ -2517,6 +2518,49 @@ int main(int arg_count, char const **arg_ptr) {
 	// 	print_usage_line(0, "%.*s 32-bit is not yet supported for this platform", LIT(args[0]));
 	// 	return 1;
 	// }
+
+	// Check chosen microarchitecture. If not found or ?, print list.
+	bool print_microarch_list = true;
+	if (build_context.microarch.len == 0) {
+		// Autodetect, no need to print list.
+		print_microarch_list = false;
+	} else {
+		String march_list = target_microarch_list[build_context.metrics.arch];
+		String_Iterator it = {march_list, 0};
+		for (;;) {
+			String str = string_split_iterator(&it, ',');
+			if (str == "") break;
+			if (str == build_context.microarch) {
+				// Found matching microarch
+				print_microarch_list = false;
+				break;
+			}
+		}
+	}
+
+	if (print_microarch_list) {
+		if (build_context.microarch != "?") {
+			gb_printf("Unknown microarchitecture '%.*s'.\n", LIT(build_context.microarch));
+		}
+		gb_printf("Possible -microarch values for target %.*s are:\n", LIT(target_arch_names[build_context.metrics.arch]));
+		gb_printf("\n");
+
+		String march_list  = target_microarch_list[build_context.metrics.arch];
+		String_Iterator it = {march_list, 0};
+
+		String default_march = make_string_c(get_default_microarchitecture());
+
+		for (;;) {
+			String str = string_split_iterator(&it, ',');
+			if (str == "") break;
+			if (str == default_march) {
+				gb_printf("\t%.*s (default)\n", LIT(str));
+			} else {
+				gb_printf("\t%.*s\n", LIT(str));
+			}
+		}
+		return 0;
+	}
 
 	// Set and check build paths...
 	if (!init_build_paths(init_filename)) {

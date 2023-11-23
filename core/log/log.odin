@@ -60,9 +60,9 @@ Logger_Proc :: runtime.Logger_Proc
 /*
 Logger :: struct {
 	procedure:    Logger_Proc,
-	data:      	  rawptr,
+	data:         rawptr,
 	lowest_level: Level,
-	options:   	  Logger_Options,
+	options:      Logger_Options,
 }
 */
 Logger :: runtime.Logger

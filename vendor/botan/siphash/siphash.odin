@@ -14,7 +14,7 @@ package vendor_siphash
 */
 
 import "core:crypto"
-import "core:crypto/util"
+import "core:encoding/endian"
 
 import botan "../bindings"
 
@@ -35,7 +35,7 @@ sum_bytes_1_3 :: proc (msg, key: []byte) -> u64 {
     init(&ctx, key[:], 1, 3)
     update(&ctx, msg[:])
     final(&ctx, dst[:])
-    return util.U64_LE(dst[:])
+    return endian.unchecked_get_u64le(dst[:])
 }
 
 // sum_string_to_buffer_1_3 will hash the given message with the key and write
@@ -94,7 +94,7 @@ sum_bytes_2_4 :: proc (msg, key: []byte) -> u64 {
     init(&ctx, key[:])
     update(&ctx, msg[:])
     final(&ctx, dst[:])
-    return util.U64_LE(dst[:])
+    return endian.unchecked_get_u64le(dst[:])
 }
 
 // sum_string_to_buffer_2_4 will hash the given message with the key and write
@@ -172,7 +172,7 @@ sum_bytes_4_8 :: proc (msg, key: []byte) -> u64 {
     init(&ctx, key[:], 4, 8)
     update(&ctx, msg[:])
     final(&ctx, dst[:])
-    return util.U64_LE(dst[:])
+    return endian.unchecked_get_u64le(dst[:])
 }
 
 // sum_string_to_buffer_4_8 will hash the given message with the key and write

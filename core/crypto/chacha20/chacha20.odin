@@ -1,6 +1,6 @@
 package chacha20
 
-import "core:crypto/util"
+import "core:encoding/endian"
 import "core:math/bits"
 import "core:mem"
 
@@ -60,23 +60,23 @@ init :: proc (ctx: ^Context, key, nonce: []byte) {
 	ctx._s[1] = _SIGMA_1
 	ctx._s[2] = _SIGMA_2
 	ctx._s[3] = _SIGMA_3
-	ctx._s[4] = util.U32_LE(k[0:4])
-	ctx._s[5] = util.U32_LE(k[4:8])
-	ctx._s[6] = util.U32_LE(k[8:12])
-	ctx._s[7] = util.U32_LE(k[12:16])
-	ctx._s[8] = util.U32_LE(k[16:20])
-	ctx._s[9] = util.U32_LE(k[20:24])
-	ctx._s[10] = util.U32_LE(k[24:28])
-	ctx._s[11] = util.U32_LE(k[28:32])
+	ctx._s[4] = endian.unchecked_get_u32le(k[0:4])
+	ctx._s[5] = endian.unchecked_get_u32le(k[4:8])
+	ctx._s[6] = endian.unchecked_get_u32le(k[8:12])
+	ctx._s[7] = endian.unchecked_get_u32le(k[12:16])
+	ctx._s[8] = endian.unchecked_get_u32le(k[16:20])
+	ctx._s[9] = endian.unchecked_get_u32le(k[20:24])
+	ctx._s[10] = endian.unchecked_get_u32le(k[24:28])
+	ctx._s[11] = endian.unchecked_get_u32le(k[28:32])
 	ctx._s[12] = 0
 	if !is_xchacha {
-		ctx._s[13] = util.U32_LE(n[0:4])
-		ctx._s[14] = util.U32_LE(n[4:8])
-		ctx._s[15] = util.U32_LE(n[8:12])
+		ctx._s[13] = endian.unchecked_get_u32le(n[0:4])
+		ctx._s[14] = endian.unchecked_get_u32le(n[4:8])
+		ctx._s[15] = endian.unchecked_get_u32le(n[8:12])
 	} else {
 		ctx._s[13] = 0
-		ctx._s[14] = util.U32_LE(n[0:4])
-		ctx._s[15] = util.U32_LE(n[4:8])
+		ctx._s[14] = endian.unchecked_get_u32le(n[0:4])
+		ctx._s[15] = endian.unchecked_get_u32le(n[4:8])
 
 		// The sub-key is stored in the keystream buffer.  While
 		// this will be overwritten in most circumstances, explicitly
@@ -221,114 +221,114 @@ _do_blocks :: proc (ctx: ^Context, dst, src: []byte, nr_blocks: int) {
 			// quarterround(x, 0, 4, 8, 12)
 			x0 += x4
 			x12 ~= x0
-			x12 = util.ROTL32(x12, 16)
+			x12 = bits.rotate_left32(x12, 16)
 			x8 += x12
 			x4 ~= x8
-			x4 = util.ROTL32(x4, 12)
+			x4 = bits.rotate_left32(x4, 12)
 			x0 += x4
 			x12 ~= x0
-			x12 = util.ROTL32(x12, 8)
+			x12 = bits.rotate_left32(x12, 8)
 			x8 += x12
 			x4 ~= x8
-			x4 = util.ROTL32(x4, 7)
+			x4 = bits.rotate_left32(x4, 7)
 
 			// quarterround(x, 1, 5, 9, 13)
 			x1 += x5
 			x13 ~= x1
-			x13 = util.ROTL32(x13, 16)
+			x13 = bits.rotate_left32(x13, 16)
 			x9 += x13
 			x5 ~= x9
-			x5 = util.ROTL32(x5, 12)
+			x5 = bits.rotate_left32(x5, 12)
 			x1 += x5
 			x13 ~= x1
-			x13 = util.ROTL32(x13, 8)
+			x13 = bits.rotate_left32(x13, 8)
 			x9 += x13
 			x5 ~= x9
-			x5 = util.ROTL32(x5, 7)
+			x5 = bits.rotate_left32(x5, 7)
 
 			// quarterround(x, 2, 6, 10, 14)
 			x2 += x6
 			x14 ~= x2
-			x14 = util.ROTL32(x14, 16)
+			x14 = bits.rotate_left32(x14, 16)
 			x10 += x14
 			x6 ~= x10
-			x6 = util.ROTL32(x6, 12)
+			x6 = bits.rotate_left32(x6, 12)
 			x2 += x6
 			x14 ~= x2
-			x14 = util.ROTL32(x14, 8)
+			x14 = bits.rotate_left32(x14, 8)
 			x10 += x14
 			x6 ~= x10
-			x6 = util.ROTL32(x6, 7)
+			x6 = bits.rotate_left32(x6, 7)
 
 			// quarterround(x, 3, 7, 11, 15)
 			x3 += x7
 			x15 ~= x3
-			x15 = util.ROTL32(x15, 16)
+			x15 = bits.rotate_left32(x15, 16)
 			x11 += x15
 			x7 ~= x11
-			x7 = util.ROTL32(x7, 12)
+			x7 = bits.rotate_left32(x7, 12)
 			x3 += x7
 			x15 ~= x3
-			x15 = util.ROTL32(x15, 8)
+			x15 = bits.rotate_left32(x15, 8)
 			x11 += x15
 			x7 ~= x11
-			x7 = util.ROTL32(x7, 7)
+			x7 = bits.rotate_left32(x7, 7)
 
 			// quarterround(x, 0, 5, 10, 15)
 			x0 += x5
 			x15 ~= x0
-			x15 = util.ROTL32(x15, 16)
+			x15 = bits.rotate_left32(x15, 16)
 			x10 += x15
 			x5 ~= x10
-			x5 = util.ROTL32(x5, 12)
+			x5 = bits.rotate_left32(x5, 12)
 			x0 += x5
 			x15 ~= x0
-			x15 = util.ROTL32(x15, 8)
+			x15 = bits.rotate_left32(x15, 8)
 			x10 += x15
 			x5 ~= x10
-			x5 = util.ROTL32(x5, 7)
+			x5 = bits.rotate_left32(x5, 7)
 
 			// quarterround(x, 1, 6, 11, 12)
 			x1 += x6
 			x12 ~= x1
-			x12 = util.ROTL32(x12, 16)
+			x12 = bits.rotate_left32(x12, 16)
 			x11 += x12
 			x6 ~= x11
-			x6 = util.ROTL32(x6, 12)
+			x6 = bits.rotate_left32(x6, 12)
 			x1 += x6
 			x12 ~= x1
-			x12 = util.ROTL32(x12, 8)
+			x12 = bits.rotate_left32(x12, 8)
 			x11 += x12
 			x6 ~= x11
-			x6 = util.ROTL32(x6, 7)
+			x6 = bits.rotate_left32(x6, 7)
 
 			// quarterround(x, 2, 7, 8, 13)
 			x2 += x7
 			x13 ~= x2
-			x13 = util.ROTL32(x13, 16)
+			x13 = bits.rotate_left32(x13, 16)
 			x8 += x13
 			x7 ~= x8
-			x7 = util.ROTL32(x7, 12)
+			x7 = bits.rotate_left32(x7, 12)
 			x2 += x7
 			x13 ~= x2
-			x13 = util.ROTL32(x13, 8)
+			x13 = bits.rotate_left32(x13, 8)
 			x8 += x13
 			x7 ~= x8
-			x7 = util.ROTL32(x7, 7)
+			x7 = bits.rotate_left32(x7, 7)
 
 			// quarterround(x, 3, 4, 9, 14)
 			x3 += x4
 			x14 ~= x3
-			x14 = util.ROTL32(x14, 16)
+			x14 = bits.rotate_left32(x14, 16)
 			x9 += x14
 			x4 ~= x9
-			x4 = util.ROTL32(x4, 12)
+			x4 = bits.rotate_left32(x4, 12)
 			x3 += x4
 			x14 ~= x3
-			x14 = util.ROTL32(x14, 8)
+			x14 = bits.rotate_left32(x14, 8)
 			x9 += x14
 			x4 ~= x9
-			x4 = util.ROTL32(x4, 7)
+			x4 = bits.rotate_left32(x4, 7)
 		}
 
 		x0 += _SIGMA_0
@@ -352,93 +352,48 @@ _do_blocks :: proc (ctx: ^Context, dst, src: []byte, nr_blocks: int) {
 		// this is "use vector operations", support for that is currently
 		// a work in progress/to be designed.
 		//
-		// Until dedicated assembly can be written leverage the fact that
-		// the callers of this routine ensure that src/dst are valid.
+		// In the meantime:
+		// - The caller(s) ensure that src/dst are valid.
+		// - The compiler knows if the target is picky about alignment.
 
-		when ODIN_ARCH == .i386 || ODIN_ARCH == .amd64 {
-			// util.PUT_U32_LE/util.U32_LE are not required on little-endian
-			// systems that also happen to not be strict about aligned
-			// memory access.
-
-			dst_p := transmute(^[16]u32)(&dst[0])
+		#no_bounds_check {
 			if src != nil {
-				src_p := transmute(^[16]u32)(&src[0])
-				dst_p[0] = src_p[0] ~ x0
-				dst_p[1] = src_p[1] ~ x1
-				dst_p[2] = src_p[2] ~ x2
-				dst_p[3] = src_p[3] ~ x3
-				dst_p[4] = src_p[4] ~ x4
-				dst_p[5] = src_p[5] ~ x5
-				dst_p[6] = src_p[6] ~ x6
-				dst_p[7] = src_p[7] ~ x7
-				dst_p[8] = src_p[8] ~ x8
-				dst_p[9] = src_p[9] ~ x9
-				dst_p[10] = src_p[10] ~ x10
-				dst_p[11] = src_p[11] ~ x11
-				dst_p[12] = src_p[12] ~ x12
-				dst_p[13] = src_p[13] ~ x13
-				dst_p[14] = src_p[14] ~ x14
-				dst_p[15] = src_p[15] ~ x15
+				endian.unchecked_put_u32le(dst[0:4], endian.unchecked_get_u32le(src[0:4]) ~ x0)
+				endian.unchecked_put_u32le(dst[4:8], endian.unchecked_get_u32le(src[4:8]) ~ x1)
+				endian.unchecked_put_u32le(dst[8:12], endian.unchecked_get_u32le(src[8:12]) ~ x2)
+				endian.unchecked_put_u32le(dst[12:16], endian.unchecked_get_u32le(src[12:16]) ~ x3)
+				endian.unchecked_put_u32le(dst[16:20], endian.unchecked_get_u32le(src[16:20]) ~ x4)
+				endian.unchecked_put_u32le(dst[20:24], endian.unchecked_get_u32le(src[20:24]) ~ x5)
+				endian.unchecked_put_u32le(dst[24:28], endian.unchecked_get_u32le(src[24:28]) ~ x6)
+				endian.unchecked_put_u32le(dst[28:32], endian.unchecked_get_u32le(src[28:32]) ~ x7)
+				endian.unchecked_put_u32le(dst[32:36], endian.unchecked_get_u32le(src[32:36]) ~ x8)
+				endian.unchecked_put_u32le(dst[36:40], endian.unchecked_get_u32le(src[36:40]) ~ x9)
+				endian.unchecked_put_u32le(dst[40:44], endian.unchecked_get_u32le(src[40:44]) ~ x10)
+				endian.unchecked_put_u32le(dst[44:48], endian.unchecked_get_u32le(src[44:48]) ~ x11)
+				endian.unchecked_put_u32le(dst[48:52], endian.unchecked_get_u32le(src[48:52]) ~ x12)
+				endian.unchecked_put_u32le(dst[52:56], endian.unchecked_get_u32le(src[52:56]) ~ x13)
+				endian.unchecked_put_u32le(dst[56:60], endian.unchecked_get_u32le(src[56:60]) ~ x14)
+				endian.unchecked_put_u32le(dst[60:64], endian.unchecked_get_u32le(src[60:64]) ~ x15)
 				src = src[_BLOCK_SIZE:]
 			} else {
-				dst_p[0] = x0
-				dst_p[1] = x1
-				dst_p[2] = x2
-				dst_p[3] = x3
-				dst_p[4] = x4
-				dst_p[5] = x5
-				dst_p[6] = x6
-				dst_p[7] = x7
-				dst_p[8] = x8
-				dst_p[9] = x9
-				dst_p[10] = x10
-				dst_p[11] = x11
-				dst_p[12] = x12
-				dst_p[13] = x13
-				dst_p[14] = x14
-				dst_p[15] = x15
+				endian.unchecked_put_u32le(dst[0:4], x0)
+				endian.unchecked_put_u32le(dst[4:8], x1)
+				endian.unchecked_put_u32le(dst[8:12], x2)
+				endian.unchecked_put_u32le(dst[12:16], x3)
+				endian.unchecked_put_u32le(dst[16:20], x4)
+				endian.unchecked_put_u32le(dst[20:24], x5)
+				endian.unchecked_put_u32le(dst[24:28], x6)
+				endian.unchecked_put_u32le(dst[28:32], x7)
+				endian.unchecked_put_u32le(dst[32:36], x8)
+				endian.unchecked_put_u32le(dst[36:40], x9)
+				endian.unchecked_put_u32le(dst[40:44], x10)
+				endian.unchecked_put_u32le(dst[44:48], x11)
+				endian.unchecked_put_u32le(dst[48:52], x12)
+				endian.unchecked_put_u32le(dst[52:56], x13)
+				endian.unchecked_put_u32le(dst[56:60], x14)
+				endian.unchecked_put_u32le(dst[60:64], x15)
 			}
 			dst = dst[_BLOCK_SIZE:]
-		} else {
-			#no_bounds_check {
-				if src != nil {
-					util.PUT_U32_LE(dst[0:4], util.U32_LE(src[0:4]) ~ x0)
-					util.PUT_U32_LE(dst[4:8], util.U32_LE(src[4:8]) ~ x1)
-					util.PUT_U32_LE(dst[8:12], util.U32_LE(src[8:12]) ~ x2)
-					util.PUT_U32_LE(dst[12:16], util.U32_LE(src[12:16]) ~ x3)
-					util.PUT_U32_LE(dst[16:20], util.U32_LE(src[16:20]) ~ x4)
-					util.PUT_U32_LE(dst[20:24], util.U32_LE(src[20:24]) ~ x5)
-					util.PUT_U32_LE(dst[24:28], util.U32_LE(src[24:28]) ~ x6)
-					util.PUT_U32_LE(dst[28:32], util.U32_LE(src[28:32]) ~ x7)
-					util.PUT_U32_LE(dst[32:36], util.U32_LE(src[32:36]) ~ x8)
-					util.PUT_U32_LE(dst[36:40], util.U32_LE(src[36:40]) ~ x9)
-					util.PUT_U32_LE(dst[40:44], util.U32_LE(src[40:44]) ~ x10)
-					util.PUT_U32_LE(dst[44:48], util.U32_LE(src[44:48]) ~ x11)
-					util.PUT_U32_LE(dst[48:52], util.U32_LE(src[48:52]) ~ x12)
-					util.PUT_U32_LE(dst[52:56], util.U32_LE(src[52:56]) ~ x13)
-					util.PUT_U32_LE(dst[56:60], util.U32_LE(src[56:60]) ~ x14)
-					util.PUT_U32_LE(dst[60:64], util.U32_LE(src[60:64]) ~ x15)
-					src = src[_BLOCK_SIZE:]
-				} else {
-					util.PUT_U32_LE(dst[0:4], x0)
-					util.PUT_U32_LE(dst[4:8], x1)
-					util.PUT_U32_LE(dst[8:12], x2)
-					util.PUT_U32_LE(dst[12:16], x3)
-					util.PUT_U32_LE(dst[16:20], x4)
-					util.PUT_U32_LE(dst[20:24], x5)
-					util.PUT_U32_LE(dst[24:28], x6)
-					util.PUT_U32_LE(dst[28:32], x7)
-					util.PUT_U32_LE(dst[32:36], x8)
-					util.PUT_U32_LE(dst[36:40], x9)
-					util.PUT_U32_LE(dst[40:44], x10)
-					util.PUT_U32_LE(dst[44:48], x11)
-					util.PUT_U32_LE(dst[48:52], x12)
-					util.PUT_U32_LE(dst[52:56], x13)
-					util.PUT_U32_LE(dst[56:60], x14)
-					util.PUT_U32_LE(dst[60:64], x15)
-				}
-				dst = dst[_BLOCK_SIZE:]
-			}
 		}
 
 		// Increment the counter.  Overflow checking is done upon
@@ -451,141 +406,141 @@ _do_blocks :: proc (ctx: ^Context, dst, src: []byte, nr_blocks: int) {
 }
 
 @(private)
-_hchacha20 :: proc (dst, key, nonce: []byte) {
+_hchacha20 :: proc "contextless" (dst, key, nonce: []byte) {
 	x0, x1, x2, x3 := _SIGMA_0, _SIGMA_1, _SIGMA_2, _SIGMA_3
-	x4 := util.U32_LE(key[0:4])
-	x5 := util.U32_LE(key[4:8])
-	x6 := util.U32_LE(key[8:12])
-	x7 := util.U32_LE(key[12:16])
-	x8 := util.U32_LE(key[16:20])
-	x9 := util.U32_LE(key[20:24])
-	x10 := util.U32_LE(key[24:28])
-	x11 := util.U32_LE(key[28:32])
-	x12 := util.U32_LE(nonce[0:4])
-	x13 := util.U32_LE(nonce[4:8])
-	x14 := util.U32_LE(nonce[8:12])
-	x15 := util.U32_LE(nonce[12:16])
+	x4 := endian.unchecked_get_u32le(key[0:4])
+	x5 := endian.unchecked_get_u32le(key[4:8])
+	x6 := endian.unchecked_get_u32le(key[8:12])
+	x7 := endian.unchecked_get_u32le(key[12:16])
+	x8 := endian.unchecked_get_u32le(key[16:20])
+	x9 := endian.unchecked_get_u32le(key[20:24])
+	x10 := endian.unchecked_get_u32le(key[24:28])
+	x11 := endian.unchecked_get_u32le(key[28:32])
+	x12 := endian.unchecked_get_u32le(nonce[0:4])
+	x13 := endian.unchecked_get_u32le(nonce[4:8])
+	x14 := endian.unchecked_get_u32le(nonce[8:12])
+	x15 := endian.unchecked_get_u32le(nonce[12:16])
 
 	for i := _ROUNDS; i > 0; i = i - 2 {
 		// quarterround(x, 0, 4, 8, 12)
 		x0 += x4
 		x12 ~= x0
-		x12 = util.ROTL32(x12, 16)
+		x12 = bits.rotate_left32(x12, 16)
 		x8 += x12
 		x4 ~= x8
-		x4 = util.ROTL32(x4, 12)
+		x4 = bits.rotate_left32(x4, 12)
 		x0 += x4
 		x12 ~= x0
-		x12 = util.ROTL32(x12, 8)
+		x12 = bits.rotate_left32(x12, 8)
 		x8 += x12
 		x4 ~= x8
-		x4 = util.ROTL32(x4, 7)
+		x4 = bits.rotate_left32(x4, 7)
 
 		// quarterround(x, 1, 5, 9, 13)
 		x1 += x5
 		x13 ~= x1
-		x13 = util.ROTL32(x13, 16)
+		x13 = bits.rotate_left32(x13, 16)
 		x9 += x13
 		x5 ~= x9
-		x5 = util.ROTL32(x5, 12)
+		x5 = bits.rotate_left32(x5, 12)
 		x1 += x5
 		x13 ~= x1
-		x13 = util.ROTL32(x13, 8)
+		x13 = bits.rotate_left32(x13, 8)
 		x9 += x13
 		x5 ~= x9
-		x5 = util.ROTL32(x5, 7)
+		x5 = bits.rotate_left32(x5, 7)
 
 		// quarterround(x, 2, 6, 10, 14)
 		x2 += x6
 		x14 ~= x2
-		x14 = util.ROTL32(x14, 16)
+		x14 = bits.rotate_left32(x14, 16)
 		x10 += x14
 		x6 ~= x10
-		x6 = util.ROTL32(x6, 12)
+		x6 = bits.rotate_left32(x6, 12)
 		x2 += x6
 		x14 ~= x2
-		x14 = util.ROTL32(x14, 8)
+		x14 = bits.rotate_left32(x14, 8)
 		x10 += x14
 		x6 ~= x10
-		x6 = util.ROTL32(x6, 7)
+		x6 = bits.rotate_left32(x6, 7)
 
 		// quarterround(x, 3, 7, 11, 15)
 		x3 += x7
 		x15 ~= x3
-		x15 = util.ROTL32(x15, 16)
+		x15 = bits.rotate_left32(x15, 16)
 		x11 += x15
 		x7 ~= x11
-		x7 = util.ROTL32(x7, 12)
+		x7 = bits.rotate_left32(x7, 12)
 		x3 += x7
 		x15 ~= x3
-		x15 = util.ROTL32(x15, 8)
+		x15 = bits.rotate_left32(x15, 8)
 		x11 += x15
 		x7 ~= x11
-		x7 = util.ROTL32(x7, 7)
+		x7 = bits.rotate_left32(x7, 7)
 
 		// quarterround(x, 0, 5, 10, 15)
 		x0 += x5
 		x15 ~= x0
-		x15 = util.ROTL32(x15, 16)
+		x15 = bits.rotate_left32(x15, 16)
 		x10 += x15
 		x5 ~= x10
-		x5 = util.ROTL32(x5, 12)
+		x5 = bits.rotate_left32(x5, 12)
 		x0 += x5
 		x15 ~= x0
-		x15 = util.ROTL32(x15, 8)
+		x15 = bits.rotate_left32(x15, 8)
 		x10 += x15
 		x5 ~= x10
-		x5 = util.ROTL32(x5, 7)
+		x5 = bits.rotate_left32(x5, 7)
 
 		// quarterround(x, 1, 6, 11, 12)
 		x1 += x6
 		x12 ~= x1
-		x12 = util.ROTL32(x12, 16)
+		x12 = bits.rotate_left32(x12, 16)
 		x11 += x12
 		x6 ~= x11
-		x6 = util.ROTL32(x6, 12)
+		x6 = bits.rotate_left32(x6, 12)
 		x1 += x6
 		x12 ~= x1
-		x12 = util.ROTL32(x12, 8)
+		x12 = bits.rotate_left32(x12, 8)
 		x11 += x12
 		x6 ~= x11
-		x6 = util.ROTL32(x6, 7)
+		x6 = bits.rotate_left32(x6, 7)
 
 		// quarterround(x, 2, 7, 8, 13)
 		x2 += x7
 		x13 ~= x2
-		x13 = util.ROTL32(x13, 16)
+		x13 = bits.rotate_left32(x13, 16)
 		x8 += x13
 		x7 ~= x8
-		x7 = util.ROTL32(x7, 12)
+		x7 = bits.rotate_left32(x7, 12)
 		x2 += x7
 		x13 ~= x2
-		x13 = util.ROTL32(x13, 8)
+		x13 = bits.rotate_left32(x13, 8)
 		x8 += x13
 		x7 ~= x8
-		x7 = util.ROTL32(x7, 7)
+		x7 = bits.rotate_left32(x7, 7)
 
 		// quarterround(x, 3, 4, 9, 14)
 		x3 += x4
 		x14 ~= x3
-		x14 = util.ROTL32(x14, 16)
+		x14 = bits.rotate_left32(x14, 16)
 		x9 += x14
 		x4 ~= x9
-		x4 = util.ROTL32(x4, 12)
+		x4 = bits.rotate_left32(x4, 12)
 		x3 += x4
 		x14 ~= x3
-		x14 = util.ROTL32(x14, 8)
+		x14 = bits.rotate_left32(x14, 8)
 		x9 += x14
 		x4 ~= x9
-		x4 = util.ROTL32(x4, 7)
+		x4 = bits.rotate_left32(x4, 7)
 	}
 
-	util.PUT_U32_LE(dst[0:4], x0)
-	util.PUT_U32_LE(dst[4:8], x1)
-	util.PUT_U32_LE(dst[8:12], x2)
-	util.PUT_U32_LE(dst[12:16], x3)
-	util.PUT_U32_LE(dst[16:20], x12)
-	util.PUT_U32_LE(dst[20:24], x13)
-	util.PUT_U32_LE(dst[24:28], x14)
-	util.PUT_U32_LE(dst[28:32], x15)
+	endian.unchecked_put_u32le(dst[0:4], x0)
+	endian.unchecked_put_u32le(dst[4:8], x1)
+	endian.unchecked_put_u32le(dst[8:12], x2)
+	endian.unchecked_put_u32le(dst[12:16], x3)
+	endian.unchecked_put_u32le(dst[16:20], x12)
+	endian.unchecked_put_u32le(dst[20:24], x13)
+	endian.unchecked_put_u32le(dst[24:28], x14)
+	endian.unchecked_put_u32le(dst[28:32], x15)
 }
