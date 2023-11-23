@@ -2211,9 +2211,14 @@ gb_internal void add_min_dep_type_info(Checker *c, Type *t) {
 				Entity *e = entry.value;
 				switch (bt->Struct.soa_kind) {
 				case StructSoa_Dynamic:
+					add_min_dep_type_info(c, t_type_info_ptr); // append_soa
+
 					add_min_dep_type_info(c, t_allocator);
 					/*fallthrough*/
 				case StructSoa_Slice:
+					add_min_dep_type_info(c, t_int);
+					add_min_dep_type_info(c, t_uint);
+					/*fallthrough*/
 				case StructSoa_Fixed:
 					add_min_dep_type_info(c, alloc_type_pointer(e->type));
 					break;
