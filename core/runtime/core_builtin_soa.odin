@@ -287,7 +287,7 @@ append_soa_elem :: proc(array: ^$T/#soa[dynamic]$E, arg: E, loc := #caller_locat
 	footer := raw_soa_footer(array)
 
 	if size_of(E) > 0 && cap(array)-len(array) > 0 {
-		ti := type_info_of(typeid_of(T))
+		ti := type_info_of(T)
 		ti = type_info_base(ti)
 		si := &ti.variant.(Type_Info_Struct)
 		field_count: uintptr
