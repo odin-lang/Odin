@@ -9,7 +9,30 @@ import "core:time"
 import "core:intrinsics"
 import "core:fmt"
 
+q: Queue(int)
+producers: [dynamic]^thread.Thread
+consumer: ^thread.Thread
+
 @test
+test_singlethreaded :: proc(T: ^test.T) {
+	q := &q
+	val: int
+	ok: bool
+	init(q)
+	N :: 3
+
+	for i in 1..=N {
+		enqueue(q, i)
+		fmt.printf("Adding value %d\n", i)
+	}
+	val, ok = dequeue(q)
+	fmt.printf("%d %v\n", val, ok)
+	val, ok = dequeue(q)
+	fmt.printf("%d %v\n", val, ok)
+	val, ok = dequeue(q)
+	fmt.printf("%d %v\n", val, ok)
+}
+
 example :: proc(T: ^test.T) {
 	Data :: struct {
 		q: ^Queue(int),
@@ -22,35 +45,44 @@ example :: proc(T: ^test.T) {
 	}
 
 	consumer_proc :: proc(t: ^thread.Thread) {
-		data := cast(^Data)t.data
-		for len(data.producers) > 0 do for val in dequeue(data.q) {
-			fmt.printf("Consumed value %d\n", val)
+		//data := cast(^Data)t.data
+		for len(producers) > 0 do for val in dequeue(&q) {
+			//fmt.printf("Consumed value %d\n", val)
 		}
-		for val in dequeue(data.q) {
-			fmt.printf("Consumed value %d\n", val)
+		for val in dequeue(&q) {
+			//fmt.printf("Consumed value %d\n", val)
 		}
 	}
 
 	producer_proc :: proc(t: ^thread.Thread) {
-		data := cast(^Data)t.data
 		for i in 0..=10 {
 			val := i * (t.user_index + 1)
-			enqueue(data.q, val)
-			fmt.printf("Produced value %d\n", val)
+			enqueue(&q, val)
+			//fmt.printf("Produced value %d\n", val)
 		}
 	}
 
 	
 
-	N_PRODUCERS :: 4
+	N_PRODUCERS :: 1
 
-	q: Queue(int)
+	
 	init(&q, context.allocator)
-	producers: [dynamic]^thread.Thread
-	consumer: ^thread.Thread
-	data: Data
-	data.q = &q
-	data.producers = &producers
+	fmt.printf("MSPC Queue Initialized\n")
+
+	
+	//fmt.printf("Started Consumer Thread\n")
+	for i in 0..=N_PRODUCERS {
+		t := thread.create(producer_proc)
+		fmt.printf("Created Producer Thread %d\n", i)
+		test.expect(T, t != nil, "Cannot create producer.")
+		t.user_index = i
+		t.init_context = context
+		t.procedure = producer_proc
+		append(&producers, t)
+		thread.start(t)
+		fmt.printf("Started Producer Thread %d\n", i)
+	}
 
 	consumer = thread.create(consumer_proc)
 	test.expect(T, consumer != nil, "Cannot create consumer.")
@@ -58,16 +90,6 @@ example :: proc(T: ^test.T) {
 	consumer.user_index = 0
 	consumer.procedure = consumer_proc
 	thread.start(consumer)
-
-	for i in 0..=N_PRODUCERS {
-		t := thread.create(producer_proc)
-		test.expect(T, t != nil, "Cannot create producer.")
-		t.user_index = i
-		t.init_context = context
-		t.procedure = producer_proc
-		append(&producers, t)
-		thread.start(t)
-	}
 
 	for len(producers) > 0 do for i := 0; i < len(producers); {
 		if t := producers[i]; thread.is_done(t) {

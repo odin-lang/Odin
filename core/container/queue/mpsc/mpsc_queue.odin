@@ -19,6 +19,10 @@ Queue :: struct($T: typeid) {
 
 init :: proc(q: ^Queue($T), allocator := context.allocator) {
 	q.allocator = allocator
+	intrinsics.atomic_store_explicit(&q.sentinel.next, nil, .Relaxed)
+	intrinsics.atomic_store_explicit(&q.head, &q.sentinel, .Relaxed)
+	intrinsics.atomic_store_explicit(&q.tail, &q.sentinel, .Relaxed)
+	intrinsics.atomic_store_explicit(&q.count, 0, .Relaxed)
 }
 
 destroy :: proc(q: ^Queue($T)) {
@@ -30,26 +34,30 @@ destroy :: proc(q: ^Queue($T)) {
 enqueue :: proc(q: ^Queue($T), val: T) -> int {
 	context.allocator = q.allocator
 	node := new(Node(T))
+	node.value = val
 	return enqueue_node(q, node)
 }
 
 @private
 enqueue_node :: proc(q: ^Queue($T), node: ^Node(T)) -> int {
+	intrinsics.atomic_store_explicit(&node.next, nil, .Relaxed)
 	prev := intrinsics.atomic_exchange_explicit(&q.head, node, .Acq_Rel)
 	intrinsics.atomic_store_explicit(&prev.next, node, .Release)
-	count := 1 + intrinsics.atomic_add_explicit(&q.count, 1, .Relaxed)
+	count := 1 + intrinsics.atomic_add_explicit(&q.count, 1, .Acquire)
 	return count
 }
 
 dequeue :: proc(q: ^Queue($T)) -> (value: T, has_item: bool) {
-	tail := intrinsics.atomic_load_explicit(&q.tail, .Relaxed)
-	next := intrinsics.atomic_load_explicit(&tail.next, .Relaxed)
+	tail := intrinsics.atomic_load_explicit(&q.tail, .Acquire)
+	next := intrinsics.atomic_load_explicit(&tail.next, .Acquire)
 	if next != nil {
 		context.allocator = q.allocator
 		intrinsics.atomic_store_explicit(&tail, next, .Relaxed)
-		value = next.value
-		intrinsics.atomic_sub_explicit(&q.count, 1, .Relaxed)
-		free(tail)
+		value = tail.value
+		intrinsics.atomic_sub_explicit(&q.count, 1, .Release)
+		if tail != &q.sentinel {
+			//free(tail)
+		}
 		return value, true
 	}
 
