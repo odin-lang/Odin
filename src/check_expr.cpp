@@ -2339,7 +2339,7 @@ gb_internal void check_unary_expr(CheckerContext *c, Operand *o, Token op, Ast *
 			ast_node(ue, UnaryExpr, node);
 			if (ast_node_expect(ue->expr, Ast_IndexExpr)) {
 				ast_node(ie, IndexExpr, ue->expr);
-				Type *soa_type = type_of_expr(ie->expr);
+				Type *soa_type = type_deref(type_of_expr(ie->expr));
 				GB_ASSERT(is_type_soa_struct(soa_type));
 				o->type = alloc_type_soa_pointer(soa_type);
 			} else {
@@ -7428,7 +7428,7 @@ gb_internal bool check_set_index_data(Operand *o, Type *t, bool indirection, i64
 				*max_count = t->Struct.soa_count;
 			}
 			o->type = t->Struct.soa_elem;
-			if (o->mode == Addressing_SoaVariable || o->mode == Addressing_Variable) {
+			if (o->mode == Addressing_SoaVariable || o->mode == Addressing_Variable || indirection) {
 				o->mode = Addressing_SoaVariable;
 			} else {
 				o->mode = Addressing_Value;
