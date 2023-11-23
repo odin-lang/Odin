@@ -2304,11 +2304,22 @@ futex :: proc {
 
 // TODO(flysand): lookup_dcookie
 
-// TODO(flysand): epoll_create
-
-// TODO(flysand): epoll_ctl_old
-
-// TODO(flysand): epoll_wait_old
+/*
+	Open an epoll file descriptor.
+	
+	The `size` argument is ignored but must be greater than zero.
+	
+	Available since Linux 2.6.
+*/
+epoll_create :: proc(size: i32 = 1) -> (Fd, Errno) {
+	when ODIN_ARCH != .arm64 {
+		ret := syscall(SYS_epoll_create)
+		return errno_unwrap(ret, Fd)
+	} else {
+		ret := syscall(SYS_epoll_create1, i32(0))
+		return errno_unwrap(ret, Fd)
+	}
+}
 
 // TODO(flysand): remap_file_pages
 
@@ -2387,9 +2398,32 @@ exit_group :: proc "contextless" (code: i32) -> ! {
 	unreachable()
 }
 
-// TODO(flysand): epoll_wait
+/*
+	Wait for an I/O event on an epoll file descriptor.
+	
+	`timeout` is specified in milliseconds.
+	
+	Available since Linux 2.6.
+*/
+epoll_wait :: proc(epfd: Fd, events: [^]EPoll_Event, count: i32, timeout: i32) -> (i32, Errno) {
+	when ODIN_ARCH != .arm64 {
+		ret := syscall(SYS_epoll_wait, epfd, events, count, timeout)
+		return errno_unwrap(ret, i32)
+	} else {
+		// Convert milliseconds to nanosecond timespec
+		ret := syscall(SYS_epoll_pwait, epfd, events, count, timeout, nil)
+		return errno_unwrap(ret, i32)
+	}
+}
 
-// TODO(flysand): epoll_ctl
+/*
+	Control interface for an epoll file descriptor.
+	Available since Linux 2.6.
+*/
+epoll_ctl :: proc(epfd: Fd, op: EPoll_Ctl_Opcode, fd: Fd, event: ^EPoll_Event) -> (Errno) {
+	ret := syscall(SYS_epoll_ctl, epfd, op, fd, event)
+	return Errno(-ret)
+}
 
 /*
 	Send a signal to a specific thread in a thread group.
@@ -2622,7 +2656,14 @@ utimensat :: proc "contextless" (dirfd: Fd, name: cstring, utimes: [^]Time_Spec,
 	return Errno(-ret)
 }
 
-// TODO(flysand): epoll_pwait
+/*
+	Wait for an I/O event on an epoll file descriptor.
+	Available since Linux 2.6.
+*/
+epoll_pwait :: proc(epfd: Fd, events: [^]EPoll_Event, count: i32, timeout: i32, sigmask: ^Sig_Set) -> (i32, Errno) {
+	ret := syscall(SYS_epoll_pwait, epfd, events, count, timeout, sigmask)
+	return errno_unwrap(ret, i32)
+}
 
 // TODO(flysand): signalfd
 
@@ -2642,7 +2683,10 @@ utimensat :: proc "contextless" (dirfd: Fd, name: cstring, utimes: [^]Time_Spec,
 
 // TODO(flysand): eventfd2
 
-// TODO(flysand): epoll_create1
+epoll_create1 :: proc(flags: EPoll_Flags) -> (Fd, Errno) {
+	ret := syscall(SYS_epoll_create1, transmute(i32) flags)
+	return errno_unwrap(ret, Fd)
+}
 
 /*
 	Adjust an existing file descriptor to point to the same file as `old`.
@@ -2859,7 +2903,14 @@ faccessat2 :: proc "contextless" (dirfd: Fd, name: cstring, mode: Mode = F_OK, f
 
 // TODO(flysand): process_madvise
 
-// TODO(flysand): epoll_pwait2
+/*
+	Wait for an I/O event on an epoll file descriptor.
+	Available since Linux 2.6.
+*/
+epoll_pwait2 :: proc(epfd: Fd, events: [^]EPoll_Event, count: i32, timeout: ^Time_Spec, sigmask: ^Sig_Set) -> (i32, Errno) {
+	ret := syscall(SYS_epoll_pwait2, epfd, events, count, timeout, sigmask)
+	return errno_unwrap(ret, i32)
+}
 
 // TODO(flysand): mount_setattr
 

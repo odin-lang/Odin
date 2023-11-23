@@ -1220,3 +1220,20 @@ PTrace_Note_Type :: enum {
 	Flags for splice(2) and tee(2) syscalls.
 */
 Splice_Flags :: bit_set[Splice_Flags_Bits; u32]
+
+/*
+	Flags for epoll_create(2) syscall.
+*/
+EPoll_Flags :: bit_set[EPoll_Flags_Bits; i32]
+
+EPoll_Data :: struct #raw_union {
+	ptr: rawptr,
+	fd:  Fd,
+	u32: u32,
+	u64: u64,
+}
+
+EPoll_Event :: struct #packed {
+	events: EPoll_Event_Kind,
+	data:   EPoll_Data,
+}

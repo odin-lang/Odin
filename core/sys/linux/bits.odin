@@ -1727,3 +1727,34 @@ Clock_Id :: enum {
 ITimer_Flags_Bits :: enum {
 	ABSTIME = 1,
 }
+
+/*
+	Bits for epoll_create(2) flags.
+*/
+EPoll_Flags_Bits :: enum {
+	FDCLOEXEC = 19,
+}
+
+EPoll_Event_Kind :: enum u32 {
+	IN        = 0x001,
+	PRI       = 0x002,
+	OUT       = 0x004,
+	RDNORM    = 0x040,
+	RDBAND    = 0x080,
+	WRNORM    = 0x100,
+	WRBAND    = 0x200,
+	MSG       = 0x400,
+	ERR       = 0x008,
+	HUP       = 0x010,
+	RDHUP     = 0x2000,
+	EXCLUSIVE = 1<<28,
+	WAKEUP    = 1<<29,
+	ONESHOT   = 1<<30,
+	ET        = 1<<31,
+}
+
+EPoll_Ctl_Opcode :: enum i32 {
+	ADD = 1,
+	DEL = 2,
+	MOD = 3,
+}
