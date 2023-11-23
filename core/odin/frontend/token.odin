@@ -301,10 +301,10 @@ token_to_string :: proc(tok: Token) -> string {
 	if is_newline(tok) {
 		return "newline"
 	}
-	return to_string(tok.kind)
+	return token_kind_to_string(tok.kind)
 }
 
-to_string :: proc(kind: Token_Kind) -> string {
+token_kind_to_string :: proc(kind: Token_Kind) -> string {
 	if .Invalid <= kind && kind < .COUNT {
 		return tokens[kind]
 	}

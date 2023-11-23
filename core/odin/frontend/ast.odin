@@ -1,5 +1,7 @@
 package odin_frontend
 
+import "core:sync"
+import "core:intrinsics"
 
 Proc_Tag :: enum {
 	Bounds_Check,
@@ -49,14 +51,90 @@ Package_Kind :: enum {
 
 Package :: struct {
 	using node: Node,
-	kind:     Package_Kind,
-	id:       int,
-	name:     string,
-	fullpath: string,
-	files:    map[string]^File,
 
-	user_data: rawptr,
+	kind: Package_Kind,
+	id: int,
+	name: string,
+	fullpath: string,
+	files: [dynamic]^File, // NOTE(dragos): can this be an array?
+	// TODO(dragos): foreign_files: [dynamic]^ForeignFile
+
+	is_single_file: bool,
+	order: int,
+
+	files_mutex: sync.Mutex,
+	foreign_files_mutex: sync.Mutex,
+	type_and_value_mutex: sync.Mutex,
+	name_mutex: sync.Mutex,
+
+
+	user_data: rawptr, // NOTE(dragos): what's this for?
 }
+
+/*c++
+struct AstFile {
+	i32          id;
+	u32          flags;
+	AstPackage * pkg;
+	Scope *      scope;
+
+	Ast *        pkg_decl;
+
+	String       fullpath;
+	String       filename;
+	String       directory;
+
+	Tokenizer    tokenizer;
+	Array<Token> tokens;
+	isize        curr_token_index;
+	isize        prev_token_index;
+	Token        curr_token;
+	Token        prev_token; // previous non-comment
+	Token        package_token;
+	String       package_name;
+
+	u64          vet_flags;
+	bool         vet_flags_set;
+
+	// >= 0: In Expression
+	// <  0: In Control Clause
+	// NOTE(bill): Used to prevent type literals in control clauses
+	isize        expr_level;
+	bool         allow_newline; // Only valid for expr_level == 0
+	bool         allow_range;   // NOTE(bill): Ranges are only allowed in certain cases
+	bool         allow_in_expr; // NOTE(bill): in expression are only allowed in certain cases
+	bool         in_foreign_block;
+	bool         allow_type;
+	bool         in_when_statement;
+
+	isize total_file_decl_count;
+	isize delayed_decl_count;
+	Slice<Ast *> decls;
+	Array<Ast *> imports; // 'import'
+	isize        directive_count;
+
+	Ast *          curr_proc;
+	isize          error_count;
+	ParseFileError last_error;
+	f64            time_to_tokenize; // seconds
+	f64            time_to_parse;    // seconds
+
+	CommentGroup *lead_comment;     // Comment (block) before the decl
+	CommentGroup *line_comment;     // Comment after the semicolon
+	CommentGroup *docs;             // current docs
+	Array<CommentGroup *> comments; // All the comments!
+
+	// This is effectively a queue but does not require any multi-threading capabilities
+	Array<Ast *> delayed_decls_queues[AstDelayQueue_COUNT];
+
+#define PARSER_MAX_FIX_COUNT 6
+	isize    fix_count;
+	TokenPos fix_prev_pos;
+
+	struct LLVMOpaqueMetadata *llvm_metadata;
+	struct LLVMOpaqueMetadata *llvm_metadata_scope;
+};
+*/
 
 File :: struct {
 	using node: Node,
@@ -439,9 +517,6 @@ Inline_Range_Stmt :: struct {
 	expr:       ^Expr,
 	body:       ^Stmt,
 }
-
-
-
 
 Case_Clause :: struct {
 	using node: Stmt,
@@ -978,7 +1053,6 @@ Any_Expr :: union {
 	^Matrix_Type,
 }
 
-
 Any_Stmt :: union {
 	^Bad_Stmt,
 	^Empty_Stmt,
@@ -1005,4 +1079,20 @@ Any_Stmt :: union {
 	^Import_Decl,
 	^Foreign_Block_Decl,
 	^Foreign_Import_Decl,
+}
+
+new_node :: proc($T: typeid, pos, end: Pos, allocator := context.allocator) -> ^T {
+	n, _ := new(T, allocator)
+	n.pos = pos
+	n.end = end
+	n.derived = n
+	base: ^Node = n // Dummy check
+	_ = base // make -vet happy
+	when intrinsics.type_has_field(T, "derived_expr") {
+		n.derived_expr = n
+	}
+	when intrinsics.type_has_field(T, "derived_stmt") {
+		n.derived_stmt = n
+	}
+	return n
 }

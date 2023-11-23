@@ -4,7 +4,7 @@ import "core:fmt"
 import "core:unicode"
 import "core:unicode/utf8"
 
-Error_Handler :: #type proc(pos: Pos, fmt: string, args: ..any)
+
 
 Flag :: enum {
 	Insert_Semicolon,
@@ -31,7 +31,7 @@ Tokenizer :: struct {
 	error_count: int,
 }
 
-init :: proc(t: ^Tokenizer, src: string, path: string, err: Error_Handler = default_error_handler) {
+tokenizer_init :: proc(t: ^Tokenizer, src: string, path: string, err: Error_Handler = default_error_handler) {
 	t.src = src
 	t.err = err
 	t.ch = ' '
@@ -61,19 +61,7 @@ offset_to_pos :: proc(t: ^Tokenizer, offset: int) -> Pos {
 	}
 }
 
-default_error_handler :: proc(pos: Pos, msg: string, args: ..any) {
-	fmt.eprintf("%s(%d:%d) ", pos.file, pos.line, pos.column)
-	fmt.eprintf(msg, ..args)
-	fmt.eprintf("\n")
-}
 
-error :: proc(t: ^Tokenizer, offset: int, msg: string, args: ..any) {
-	pos := offset_to_pos(t, offset)
-	if t.err != nil {
-		t.err(pos, msg, ..args)
-	}
-	t.error_count += 1
-}
 
 advance_rune :: proc(t: ^Tokenizer) {
 	if t.read_offset < len(t.src) {
