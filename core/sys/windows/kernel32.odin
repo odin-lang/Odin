@@ -172,6 +172,7 @@ foreign kernel32 {
 		TolerableDelay: ULONG,
 	) -> BOOL ---
 	WaitForSingleObject :: proc(hHandle: HANDLE, dwMilliseconds: DWORD) -> DWORD ---
+	WaitForSingleObjectEx :: proc(hHandle: HANDLE, dwMilliseconds: DWORD, bAlterable: BOOL) -> DWORD ---
 	Sleep :: proc(dwMilliseconds: DWORD) ---
 	GetProcessId :: proc(handle: HANDLE) -> DWORD ---
 	CopyFileW :: proc(
@@ -319,6 +320,13 @@ foreign kernel32 {
 		lpHandles: ^HANDLE,
 		bWaitAll: BOOL,
 		dwMilliseconds: DWORD,
+	) -> DWORD ---
+	WaitForMultipleObjectsEx :: proc(
+		nCount: DWORD,
+		lpHandles: ^HANDLE,
+		bWaitAll: BOOL,
+		dwMilliseconds: DWORD,
+		bAlterable: BOOL,
 	) -> DWORD ---
 	CreateNamedPipeW :: proc(
 		lpName: LPCWSTR,
