@@ -5606,9 +5606,6 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 	for (isize i = 0; i < pt->param_count; i++) {
 		if (!visited[i]) {
 			Entity *e = pt->params->Tuple.variables[i];
-			if (is_blank_ident(e->token)) {
-				continue;
-			}
 			if (e->kind == Entity_Variable) {
 				if (e->Variable.param_value.kind != ParameterValue_Invalid) {
 					ordered_operands[i].mode = Addressing_Value;
