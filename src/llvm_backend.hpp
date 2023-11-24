@@ -339,6 +339,8 @@ struct lbProcedure {
 	bool             in_multi_assignment;
 	Array<LLVMValueRef> raw_input_parameters;
 
+	LLVMValueRef temp_callee_return_struct_memory;
+
 	Ast *curr_stmt;
 
 	Array<Scope *>       scope_stack;
