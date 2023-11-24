@@ -2312,17 +2312,17 @@ F32_NORMALIZE  :: 0
 F32_RADIX      :: 2
 F32_ROUNDS     :: 1
 
-F64_DIG        :: 15                       // # of decimal digits of precision
-F64_EPSILON    :: 2.2204460492503131e-016  // smallest such that 1.0+F64_EPSILON != 1.0
-F64_MANT_DIG   :: 53                       // # of bits in mantissa
-F64_MAX        :: 1.7976931348623158e+308  // max value
-F64_MAX_10_EXP :: 308                      // max decimal exponent
-F64_MAX_EXP    :: 1024                     // max binary exponent
-F64_MIN        :: 2.2250738585072014e-308  // min positive value
-F64_MIN_10_EXP :: -307                     // min decimal exponent
-F64_MIN_EXP    :: -1021                    // min binary exponent
-F64_RADIX      :: 2                        // exponent radix
-F64_ROUNDS     :: 1                        // addition rounding: near
+F64_DIG        :: 15                       // Number of representable decimal digits.
+F64_EPSILON    :: 2.2204460492503131e-016  // Smallest number such that `1.0 + F64_EPSILON != 1.0`.
+F64_MANT_DIG   :: 53                       // Number of bits in the mantissa.
+F64_MAX        :: 1.7976931348623158e+308  // Maximum representable value.
+F64_MAX_10_EXP :: 308                      // Maximum base-10 exponent yielding normalized value.
+F64_MAX_EXP    :: 1024                     // One greater than the maximum possible base-2 exponent yielding normalized value.
+F64_MIN        :: 2.2250738585072014e-308  // Minimum positive normalized value.
+F64_MIN_10_EXP :: -307                     // Minimum base-10 exponent yielding normalized value.
+F64_MIN_EXP    :: -1021                    // One greater than the minimum possible base-2 exponent yielding normalized value.
+F64_RADIX      :: 2                        // Exponent radix.
+F64_ROUNDS     :: 1                        // Addition rounding: near.
 
 
 F16_MASK  :: 0x1f
