@@ -203,15 +203,15 @@ gb_internal void usage(String argv0) {
 	print_usage_line(0, "Usage:");
 	print_usage_line(1, "%.*s command [arguments]", LIT(argv0));
 	print_usage_line(0, "Commands:");
-	print_usage_line(1, "build             compile directory of .odin files, as an executable.");
-	print_usage_line(1, "                  one must contain the program's entry point, all must be in the same package.");
-	print_usage_line(1, "run               same as 'build', but also then runs the newly compiled executable.");
-	print_usage_line(1, "check             parse, and type check a directory of .odin files.");
-	print_usage_line(1, "strip-semicolon   parse, type check, and remove unneeded semicolons from the entire program.");
-	print_usage_line(1, "test              build and runs procedures with the attribute @(test) in the initial package.");
-	print_usage_line(1, "doc               generate documentation on a directory of .odin files.");
-	print_usage_line(1, "version           print version.");
-	print_usage_line(1, "report            print information useful to reporting a bug.");
+	print_usage_line(1, "build             Compile directory of .odin files, as an executable.");
+	print_usage_line(1, "                  One must contain the program's entry point, all must be in the same package.");
+	print_usage_line(1, "run               Same as 'build', but also then runs the newly compiled executable.");
+	print_usage_line(1, "check             Parse, and type check a directory of .odin files.");
+	print_usage_line(1, "strip-semicolon   Parse, type check, and remove unneeded semicolons from the entire program.");
+	print_usage_line(1, "test              Build and runs procedures with the attribute @(test) in the initial package.");
+	print_usage_line(1, "doc               Generate documentation on a directory of .odin files.");
+	print_usage_line(1, "version           Print version.");
+	print_usage_line(1, "report            Print information useful to reporting a bug.");
 	print_usage_line(0, "");
 	print_usage_line(0, "For further details on a command, invoke command help:");
 	print_usage_line(1, "e.g. `odin build -help` or `odin help build`");
@@ -1609,7 +1609,7 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 	} else if (command == "test") {
 		print_usage_line(1, "test      Build and runs procedures with the attribute @(test) in the initial package.");
 	} else if (command == "doc") {
-		print_usage_line(1, "doc       generate documentation from a directory of .odin files.");
+		print_usage_line(1, "doc       Generate documentation from a directory of .odin files.");
 		print_usage_line(2, "Examples:");
 		print_usage_line(3, "odin doc .                    # Generate documentation on package in current directory.");
 		print_usage_line(3, "odin doc <dir>                # Generate documentation on package in <dir>.");
