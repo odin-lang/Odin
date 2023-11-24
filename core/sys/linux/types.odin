@@ -283,6 +283,8 @@ Perf_Flags :: bit_set[Perf_Flags_Bits; uint]
 
 Perf_Event_Flags :: distinct bit_set[Perf_Event_Flags_Bits; u64]
 
+Perf_Read_Format :: distinct bit_set[Perf_Read_Format_Bits; u64]
+
 Perf_Cap_Flags :: distinct bit_set[Perf_Cap_Flags_Bits; u64]
 
 Perf_Event_Sample_Type :: bit_set[Perf_Event_Sample_Type_Bits; u64]
