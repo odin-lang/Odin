@@ -85,3 +85,8 @@ echo ---
 echo Running core:container tests
 echo ---
 %PATH_TO_ODIN% run container %COMMON% %COLLECTION% -out:test_core_container.exe || exit /b
+
+echo ---
+echo Running core:thread tests
+echo ---
+%PATH_TO_ODIN% run thread %COMMON% %COLLECTION% -out:test_core_thread.exe || exit /b
