@@ -1945,9 +1945,9 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 
 	if (run_or_build) {
 		print_usage_line(1, "-sanitize:<string>");
-		print_usage_line(1, "Enables sanitization analysis");
-		print_usage_line(1, "Options are 'address', 'memory', and 'thread'");
-		print_usage_line(1, "NOTE: This flag can be used multiple times");
+		print_usage_line(2, "Enables sanitization analysis");
+		print_usage_line(2, "Options are 'address', 'memory', and 'thread'");
+		print_usage_line(2, "NOTE: This flag can be used multiple times");
 		print_usage_line(0, "");
 
 	}
