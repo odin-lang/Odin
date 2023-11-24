@@ -127,7 +127,7 @@ run_cli :: proc(info: Cli_Info, cli_args: []string) -> bool {
 	current_mode: Maybe(Run_Mode)
 	last_flag: Flag_Arg
 	for arg in args {
-		#partial switch v in arg {
+		switch v in arg {
 		case string: 
 			append(&target_names_from_args, v)
 		case Flag_Arg:
