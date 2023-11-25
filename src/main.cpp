@@ -1662,10 +1662,13 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 
 		print_usage_line(1, "-o:<string>");
 		print_usage_line(2, "Set the optimization mode for compilation.");
+		print_usage_line(2, "Available options:");
+		print_usage_line(3, "-o:none");
+		print_usage_line(3, "-o:minimal");
+		print_usage_line(3, "-o:size");
+		print_usage_line(3, "-o:speed");
 		if (LB_USE_NEW_PASS_SYSTEM) {
-			print_usage_line(2, "Accepted values: none, minimal, size, speed, aggressive");
-		} else {
-			print_usage_line(2, "Accepted values: none, minimal, size, speed");
+			print_usage_line(3, "-o:aggressive");
 		}
 		print_usage_line(2, "Example: -o:speed");
 		print_usage_line(2, "The default is -o:minimal.");
@@ -1881,11 +1884,11 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 
 		print_usage_line(1, "-reloc-mode:<string>");
 		print_usage_line(2, "Specifies the reloc mode.");
-		print_usage_line(2, "Options:");
-		print_usage_line(3, "default");
-		print_usage_line(3, "static");
-		print_usage_line(3, "pic");
-		print_usage_line(3, "dynamic-no-pic");
+		print_usage_line(2, "Available options:");
+		print_usage_line(3, "-reloc-mode:default");
+		print_usage_line(3, "-reloc-mode:static");
+		print_usage_line(3, "-reloc-mode:pic");
+		print_usage_line(3, "-reloc-mode:dynamic-no-pic");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-disable-red-zone");
@@ -1925,11 +1928,11 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-error-pos-style:<string>");
-		print_usage_line(2, "Options are 'unix', 'odin' and 'default' (odin).");
-		print_usage_line(2, "'odin'    file/path(45:3)");
-		print_usage_line(2, "'unix'    file/path:45:3:");
+		print_usage_line(2, "Available options:");
+		print_usage_line(3, "-error-pos-style:unix      file/path:45:3:");
+		print_usage_line(3, "-error-pos-style:odin      file/path(45:3)");
+		print_usage_line(3, "-error-pos-style:default   (defaults to 'odin')");
 		print_usage_line(0, "");
-
 
 		print_usage_line(1, "-max-error-count:<integer>");
 		print_usage_line(2, "Set the maximum number of errors that can be displayed before the compiler terminates.");
@@ -1946,7 +1949,10 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 	if (run_or_build) {
 		print_usage_line(1, "-sanitize:<string>");
 		print_usage_line(2, "Enables sanitization analysis.");
-		print_usage_line(2, "Options are 'address', 'memory', and 'thread'.");
+		print_usage_line(2, "Available options:");
+		print_usage_line(3, "-sanitize:address");
+		print_usage_line(3, "-sanitize:memory");
+		print_usage_line(3, "-sanitize:thread");
 		print_usage_line(2, "NOTE: This flag can be used multiple times.");
 		print_usage_line(0, "");
 
@@ -1975,8 +1981,8 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 		print_usage_line(2, "[Windows only]");
 		print_usage_line(2, "Defines the subsystem for the application.");
 		print_usage_line(2, "Available options:");
-		print_usage_line(3, "console");
-		print_usage_line(3, "windows");
+		print_usage_line(3, "-subsystem:console");
+		print_usage_line(3, "-subsystem:windows");
 		print_usage_line(0, "");
 
 		#endif
