@@ -1806,9 +1806,9 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 		print_usage_line(1, "-vet");
 		print_usage_line(2, "Do extra checks on the code.");
 		print_usage_line(2, "Extra checks include:");
-		print_usage_line(2, "-vet-unused");
-		print_usage_line(2, "-vet-shadowing");
-		print_usage_line(2, "-vet-using-stmt");
+		print_usage_line(3, "-vet-unused");
+		print_usage_line(3, "-vet-shadowing");
+		print_usage_line(3, "-vet-using-stmt");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-vet-unused");
