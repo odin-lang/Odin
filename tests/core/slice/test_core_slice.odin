@@ -185,19 +185,21 @@ test_sort_by_indices :: proc(t: ^testing.T) {
 
 @test
 test_binary_search :: proc(t: ^testing.T) {
-	index: int
-	found: bool
 	builder := strings.Builder{}
+	defer strings.builder_destroy(&builder)
 
 	test_search :: proc(t: ^testing.T, b: ^strings.Builder, s: []i32, v: i32) -> (int, bool) {
 		log(t, fmt.sbprintf(b, "Searching for %v in %v", v, s))
-		clear(&b.buf)
+		strings.builder_reset(b)
 		index, found := slice.binary_search(s, v)
 		log(t, fmt.sbprintf(b, "index: %v, found: %v", index, found))
-		clear(&b.buf)
+		strings.builder_reset(b	)
 
 		return index, found
 	}
+
+	index: int
+	found: bool
 
 	s := []i32{0, 1, 1, 1, 1, 2, 3, 5, 8, 13, 21, 34, 55}
 
