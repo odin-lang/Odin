@@ -1,6 +1,7 @@
 package test_core_slice
 
 import "core:slice"
+import "core:strings"
 import "core:testing"
 import "core:fmt"
 import "core:os"
@@ -185,55 +186,58 @@ test_sort_by_indices :: proc(t: ^testing.T) {
 @test
 test_binary_search :: proc(t: ^testing.T) {
 	index: int
-    found: bool
+	found: bool
+	builder := strings.Builder{}
 
-    test_search :: proc(s: []i32, v: i32) -> (int, bool) {
-		fmt.printf("Searching for %v in %v\n", v, s)
+	test_search :: proc(t: ^testing.T, b: ^strings.Builder, s: []i32, v: i32) -> (int, bool) {
+		log(t, fmt.sbprintf(b, "Searching for %v in %v", v, s))
+		clear(&b.buf)
 		index, found := slice.binary_search(s, v)
-		fmt.printf("index: %v\nfound: %v\n", index, found)
+		log(t, fmt.sbprintf(b, "index: %v, found: %v", index, found))
+		clear(&b.buf)
 
 		return index, found
-    }
+	}
 
-    s := []i32{0, 1, 1, 1, 1, 2, 3, 5, 8, 13, 21, 34, 55}
+	s := []i32{0, 1, 1, 1, 1, 2, 3, 5, 8, 13, 21, 34, 55}
 
-	index, found = test_search(s, 13)
-	assert(index == 9, "Expected index to be 9.")
-	assert(found == true, "Expected found to be true.")
+	index, found = test_search(t, &builder, s, 13)
+	expect(t, index == 9, "Expected index to be 9.")
+	expect(t, found == true, "Expected found to be true.")
 
-	index, found = test_search(s, 4)
-	assert(index == 7, "Expected index to be 7.")
-	assert(found == false, "Expected found to be false.")
+	index, found = test_search(t, &builder, s, 4)
+	expect(t, index == 7, "Expected index to be 7.")
+	expect(t, found == false, "Expected found to be false.")
 
-	index, found = test_search(s, 100)
-	assert(index == 13, "Expected index to be 13.")
-	assert(found == false, "Expected found to be false.")
+	index, found = test_search(t, &builder, s, 100)
+	expect(t, index == 13, "Expected index to be 13.")
+	expect(t, found == false, "Expected found to be false.")
 
-	index, found = test_search(s, 1)
-	assert(index >= 1 && index <= 4, "Expected index to be 1, 2, 3, or 4.")
-	assert(found == true, "Expected found to be true.")
+	index, found = test_search(t, &builder, s, 1)
+	expect(t, index >= 1 && index <= 4, "Expected index to be 1, 2, 3, or 4.")
+	expect(t, found == true, "Expected found to be true.")
 
-	index, found = test_search(s, -1)
-	assert(index == 0, "Expected index to be 0.")
-	assert(found == false, "Expected found to be false.")
+	index, found = test_search(t, &builder, s, -1)
+	expect(t, index == 0, "Expected index to be 0.")
+	expect(t, found == false, "Expected found to be false.")
 
 	a := []i32{}
 
-	index, found = test_search(a, 13)
-	assert(index == 0, "Expected index to be 0.")
-	assert(found == false, "Expected found to be false.")
+	index, found = test_search(t, &builder, a, 13)
+	expect(t, index == 0, "Expected index to be 0.")
+	expect(t, found == false, "Expected found to be false.")
 
 	b := []i32{1}
 
-	index, found = test_search(b, 13)
-	assert(index == 1, "Expected index to be 1.")
-	assert(found == false, "Expected found to be false.")
+	index, found = test_search(t, &builder, b, 13)
+	expect(t, index == 1, "Expected index to be 1.")
+	expect(t, found == false, "Expected found to be false.")
 
-	index, found = test_search(b, 1)
-	assert(index == 0, "Expected index to be 0.")
-	assert(found == true, "Expected found to be true.")
+	index, found = test_search(t, &builder, b, 1)
+	expect(t, index == 0, "Expected index to be 0.")
+	expect(t, found == true, "Expected found to be true.")
 
-	index, found = test_search(b, 0)
-	assert(index == 0, "Expected index to be 0.")
-	assert(found == false, "Expected found to be false.")
+	index, found = test_search(t, &builder, b, 0)
+	expect(t, index == 0, "Expected index to be 0.")
+	expect(t, found == false, "Expected found to be false.")
 }
