@@ -1931,7 +1931,7 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 		print_usage_line(2, "Available options:");
 		print_usage_line(3, "-error-pos-style:unix      file/path:45:3:");
 		print_usage_line(3, "-error-pos-style:odin      file/path(45:3)");
-		print_usage_line(3, "-error-pos-style:default   (defaults to 'odin')");
+		print_usage_line(3, "-error-pos-style:default   (Defaults to 'odin'.)");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-max-error-count:<integer>");
