@@ -67,6 +67,11 @@ echo ---
 %PATH_TO_ODIN% run reflect %COMMON% %COLLECTION% -out:test_core_reflect.exe || exit /b
 
 echo ---
+echo Running core:slice tests
+echo ---
+%PATH_TO_ODIN% run slice %COMMON% -out:test_core_slice.exe || exit /b
+
+echo ---
 echo Running core:text/i18n tests
 echo ---
 %PATH_TO_ODIN% run text\i18n %COMMON% -out:test_core_i18n.exe || exit /b
