@@ -210,7 +210,7 @@ gb_internal void usage(String argv0) {
 	print_usage_line(1, "strip-semicolon   Parses, type checks, and removes unneeded semicolons from the entire program.");
 	print_usage_line(1, "test              Builds and runs procedures with the attribute @(test) in the initial package.");
 	print_usage_line(1, "doc               Generates documentation on a directory of .odin files.");
-	print_usage_line(1, "version           prints version");
+	print_usage_line(1, "version           Prints version.");
 	print_usage_line(1, "report            Prints information useful to reporting a bug.");
 	print_usage_line(0, "");
 	print_usage_line(0, "For further details on a command, invoke command help:");
@@ -1607,9 +1607,9 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 		print_usage_line(3, "odin check <dir>                 Type checks package in <dir>.");
 		print_usage_line(3, "odin check filename.odin -file   Type checks single-file package, must contain entry point.");
 	} else if (command == "test") {
-		print_usage_line(1, "test      Builds and runs procedures with the attribute @(test) in the initial package.");
+		print_usage_line(1, "test    Builds and runs procedures with the attribute @(test) in the initial package.");
 	} else if (command == "doc") {
-		print_usage_line(1, "doc       Generates documentation from a directory of .odin files.");
+		print_usage_line(1, "doc     Generates documentation from a directory of .odin files.");
 		print_usage_line(2, "Examples:");
 		print_usage_line(3, "odin doc .                     Generates documentation on package in current directory.");
 		print_usage_line(3, "odin doc <dir>                 Generates documentation on package in <dir>.");
@@ -1735,7 +1735,8 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 		print_usage_line(1, "-define:<name>=<value>");
 		print_usage_line(2, "Defines a scalar boolean, integer or string as global constant.");
 		print_usage_line(2, "Example: -define:SPAM=123");
-		print_usage_line(2, "To use:  #config(SPAM, default_value)");
+		print_usage_line(2, "Usage in code:");
+		print_usage_line(3, "#config(SPAM, default_value)");
 		print_usage_line(0, "");
 	}
 
@@ -1743,16 +1744,16 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 		print_usage_line(1, "-build-mode:<mode>");
 		print_usage_line(2, "Sets the build mode.");
 		print_usage_line(2, "Available options:");
-		print_usage_line(3, "-build-mode:exe         Build as an executable.");
-		print_usage_line(3, "-build-mode:dll         Build as a dynamically linked library.");
-		print_usage_line(3, "-build-mode:shared      Build as a dynamically linked library.");
-		print_usage_line(3, "-build-mode:obj         Build as an object file.");
-		print_usage_line(3, "-build-mode:object      Build as an object file.");
-		print_usage_line(3, "-build-mode:assembly    Build as an assembly file.");
-		print_usage_line(3, "-build-mode:assembler   Build as an assembly file.");
-		print_usage_line(3, "-build-mode:asm         Build as an assembly file.");
-		print_usage_line(3, "-build-mode:llvm-ir     Build as an LLVM IR file.");
-		print_usage_line(3, "-build-mode:llvm        Build as an LLVM IR file.");
+		print_usage_line(3, "-build-mode:exe         Builds as an executable.");
+		print_usage_line(3, "-build-mode:dll         Builds as a dynamically linked library.");
+		print_usage_line(3, "-build-mode:shared      Builds as a dynamically linked library.");
+		print_usage_line(3, "-build-mode:obj         Builds as an object file.");
+		print_usage_line(3, "-build-mode:object      Builds as an object file.");
+		print_usage_line(3, "-build-mode:assembly    Builds as an assembly file.");
+		print_usage_line(3, "-build-mode:assembler   Builds as an assembly file.");
+		print_usage_line(3, "-build-mode:asm         Builds as an assembly file.");
+		print_usage_line(3, "-build-mode:llvm-ir     Builds as an LLVM IR file.");
+		print_usage_line(3, "-build-mode:llvm        Builds as an LLVM IR file.");
 		print_usage_line(0, "");
 	}
 
@@ -1861,7 +1862,7 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 	if (run_or_build) {
 		print_usage_line(1, "-minimum-os-version:<string>");
 		print_usage_line(2, "Sets the minimum OS version targeted by the application.");
-		print_usage_line(2, "e.g. -minimum-os-version:12.0.0");
+		print_usage_line(2, "Example: -minimum-os-version:12.0.0");
 		print_usage_line(2, "(Only used when target is Darwin.)");
 		print_usage_line(0, "");
 
