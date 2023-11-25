@@ -203,15 +203,15 @@ gb_internal void usage(String argv0) {
 	print_usage_line(0, "Usage:");
 	print_usage_line(1, "%.*s command [arguments]", LIT(argv0));
 	print_usage_line(0, "Commands:");
-	print_usage_line(1, "build             Compile directory of .odin files, as an executable.");
+	print_usage_line(1, "build             Compiles directory of .odin files, as an executable.");
 	print_usage_line(1, "                  One must contain the program's entry point, all must be in the same package.");
 	print_usage_line(1, "run               Same as 'build', but also then runs the newly compiled executable.");
-	print_usage_line(1, "check             Parse, and type check a directory of .odin files.");
-	print_usage_line(1, "strip-semicolon   Parse, type check, and remove unneeded semicolons from the entire program.");
-	print_usage_line(1, "test              Build and runs procedures with the attribute @(test) in the initial package.");
-	print_usage_line(1, "doc               Generate documentation on a directory of .odin files.");
-	print_usage_line(1, "version           Print version.");
-	print_usage_line(1, "report            Print information useful to reporting a bug.");
+	print_usage_line(1, "check             Parses, and type checks a directory of .odin files.");
+	print_usage_line(1, "strip-semicolon   Parses, type checks, and removes unneeded semicolons from the entire program.");
+	print_usage_line(1, "test              Builds and runs procedures with the attribute @(test) in the initial package.");
+	print_usage_line(1, "doc               Generates documentation on a directory of .odin files.");
+	print_usage_line(1, "version           prints version");
+	print_usage_line(1, "report            Prints information useful to reporting a bug.");
 	print_usage_line(0, "");
 	print_usage_line(0, "For further details on a command, invoke command help:");
 	print_usage_line(1, "e.g. `odin build -help` or `odin help build`");
@@ -1586,39 +1586,39 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 	print_usage_line(0, "");
 
 	if (command == "build") {
-		print_usage_line(1, "build   Compile directory of .odin files as an executable.");
+		print_usage_line(1, "build   Compiles directory of .odin files as an executable.");
 		print_usage_line(2, "One must contain the program's entry point, all must be in the same package.");
 		print_usage_line(2, "Use `-file` to build a single file instead.");
 		print_usage_line(2, "Examples:");
-		print_usage_line(3, "odin build .                     Build package in current directory.");
-		print_usage_line(3, "odin build <dir>                 Build package in <dir>.");
-		print_usage_line(3, "odin build filename.odin -file   Build single-file package, must contain entry point.");
+		print_usage_line(3, "odin build .                     Builds package in current directory.");
+		print_usage_line(3, "odin build <dir>                 Builds package in <dir>.");
+		print_usage_line(3, "odin build filename.odin -file   Builds single-file package, must contain entry point.");
 	} else if (command == "run") {
 		print_usage_line(1, "run     Same as 'build', but also then runs the newly compiled executable.");
 		print_usage_line(2, "Append an empty flag and then the args, '-- <args>', to specify args for the output.");
 		print_usage_line(2, "Examples:");
-		print_usage_line(3, "odin run .                     Build and run package in current directory.");
-		print_usage_line(3, "odin run <dir>                 Build and run package in <dir>.");
-		print_usage_line(3, "odin run filename.odin -file   Build and run single-file package, must contain entry point.");
+		print_usage_line(3, "odin run .                     Builds and runs package in current directory.");
+		print_usage_line(3, "odin run <dir>                 Builds and runs package in <dir>.");
+		print_usage_line(3, "odin run filename.odin -file   Builds and runs single-file package, must contain entry point.");
 	} else if (command == "check") {
-		print_usage_line(1, "check   Parse and type check directory of .odin files.");
+		print_usage_line(1, "check   Parses and type checks directory of .odin files.");
 		print_usage_line(2, "Examples:");
-		print_usage_line(3, "odin check .                     Type check package in current directory.");
-		print_usage_line(3, "odin check <dir>                 Type check package in <dir>.");
-		print_usage_line(3, "odin check filename.odin -file   Type check single-file package, must contain entry point.");
+		print_usage_line(3, "odin check .                     Type checks package in current directory.");
+		print_usage_line(3, "odin check <dir>                 Type checks package in <dir>.");
+		print_usage_line(3, "odin check filename.odin -file   Type checks single-file package, must contain entry point.");
 	} else if (command == "test") {
-		print_usage_line(1, "test      Build and runs procedures with the attribute @(test) in the initial package.");
+		print_usage_line(1, "test      Builds and runs procedures with the attribute @(test) in the initial package.");
 	} else if (command == "doc") {
-		print_usage_line(1, "doc       Generate documentation from a directory of .odin files.");
+		print_usage_line(1, "doc       Generates documentation from a directory of .odin files.");
 		print_usage_line(2, "Examples:");
-		print_usage_line(3, "odin doc .                     Generate documentation on package in current directory.");
-		print_usage_line(3, "odin doc <dir>                 Generate documentation on package in <dir>.");
-		print_usage_line(3, "odin doc filename.odin -file   Generate documentation on single-file package.");
+		print_usage_line(3, "odin doc .                     Generates documentation on package in current directory.");
+		print_usage_line(3, "odin doc <dir>                 Generates documentation on package in <dir>.");
+		print_usage_line(3, "odin doc filename.odin -file   Generates documentation on single-file package.");
 	} else if (command == "version") {
-		print_usage_line(1, "version   print version");
+		print_usage_line(1, "version   Prints version.");
 	} else if (command == "strip-semicolon") {
 		print_usage_line(1, "strip-semicolon");
-		print_usage_line(2, "Parse and type check .odin file(s) and then remove unneeded semicolons from the entire project.");
+		print_usage_line(2, "Parses and type checks .odin file(s) and then removes unneeded semicolons from the entire project.");
 	}
 
 	bool doc             = command == "doc";
@@ -1642,7 +1642,7 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 
 	if (doc) {
 		print_usage_line(1, "-short");
-		print_usage_line(2, "Show shortened documentation for the packages.");
+		print_usage_line(2, "Shows shortened documentation for the packages.");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-all-packages");
@@ -1656,12 +1656,12 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 
 	if (run_or_build) {
 		print_usage_line(1, "-out:<filepath>");
-		print_usage_line(2, "Set the file name of the outputted executable.");
+		print_usage_line(2, "Sets the file name of the outputted executable.");
 		print_usage_line(2, "Example: -out:foo.exe");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-o:<string>");
-		print_usage_line(2, "Set the optimization mode for compilation.");
+		print_usage_line(2, "Sets the optimization mode for compilation.");
 		print_usage_line(2, "Available options:");
 		print_usage_line(3, "-o:none");
 		print_usage_line(3, "-o:minimal");
@@ -1688,19 +1688,19 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-export-timings:<format>");
-		print_usage_line(2, "Export timings to one of a few formats. Requires `-show-timings` or `-show-more-timings`.");
+		print_usage_line(2, "Exports timings to one of a few formats. Requires `-show-timings` or `-show-more-timings`.");
 		print_usage_line(2, "Available options:");
-		print_usage_line(3, "-export-timings:json   Export compile time stats to JSON.");
-		print_usage_line(3, "-export-timings:csv    Export compile time stats to CSV.");
+		print_usage_line(3, "-export-timings:json   Exports compile time stats to JSON.");
+		print_usage_line(3, "-export-timings:csv    Exports compile time stats to CSV.");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-export-timings-file:<filename>");
-		print_usage_line(2, "Specify the filename for `-export-timings`.");
+		print_usage_line(2, "Specifies the filename for `-export-timings`.");
 		print_usage_line(2, "Example: -export-timings-file:timings.json");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-thread-count:<integer>");
-		print_usage_line(2, "Override the number of threads the compiler will use to compile with.");
+		print_usage_line(2, "Overrides the number of threads the compiler will use to compile with.");
 		print_usage_line(2, "Example: -thread-count:2");
 		print_usage_line(0, "");
 	}
@@ -1764,11 +1764,11 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 
 	if (run_or_build) {
 		print_usage_line(1, "-debug");
-		print_usage_line(2, "Enabled debug information, and defines the global constant ODIN_DEBUG to be 'true'.");
+		print_usage_line(2, "Enables debug information, and defines the global constant ODIN_DEBUG to be 'true'.");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-disable-assert");
-		print_usage_line(2, "Disable the code generation of the built-in run-time 'assert' procedure, and defines the global constant ODIN_DISABLE_ASSERT to be 'true'.");
+		print_usage_line(2, "Disables the code generation of the built-in run-time 'assert' procedure, and defines the global constant ODIN_DISABLE_ASSERT to be 'true'.");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-no-bounds-check");
@@ -1780,11 +1780,11 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-no-thread-local");
-		print_usage_line(2, "Ignore @thread_local attribute, effectively treating the program as if it is single-threaded.");
+		print_usage_line(2, "Ignores @thread_local attribute, effectively treating the program as if it is single-threaded.");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-lld");
-		print_usage_line(2, "Use the LLD linker rather than the default.");
+		print_usage_line(2, "Uses the LLD linker rather than the default.");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-use-separate-modules");
@@ -1797,13 +1797,13 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 
 	if (check) {
 		print_usage_line(1, "-no-threaded-checker");
-		print_usage_line(2, "Disabled multithreading in the semantic checker stage.");
+		print_usage_line(2, "Disables multithreading in the semantic checker stage.");
 		print_usage_line(0, "");
 	}
 
 	if (check) {
 		print_usage_line(1, "-vet");
-		print_usage_line(2, "Do extra checks on the code.");
+		print_usage_line(2, "Does extra checks on the code.");
 		print_usage_line(2, "Extra checks include:");
 		print_usage_line(3, "-vet-unused");
 		print_usage_line(3, "-vet-shadowing");
@@ -1854,7 +1854,7 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 
 	if (test_only) {
 		print_usage_line(1, "-test-name:<string>");
-		print_usage_line(2, "Run specific test only by name.");
+		print_usage_line(2, "Runs specific test only by name.");
 		print_usage_line(0, "");
 	}
 
@@ -1891,11 +1891,11 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-disable-red-zone");
-		print_usage_line(2, "Disable red zone on a supported freestanding target.");
+		print_usage_line(2, "Disables red zone on a supported freestanding target.");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-dynamic-map-calls");
-		print_usage_line(2, "Use dynamic map calls to minimize code generation at the cost of runtime execution.");
+		print_usage_line(2, "Uses dynamic map calls to minimize code generation at the cost of runtime execution.");
 		print_usage_line(0, "");
 	}
 
@@ -1934,7 +1934,7 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-max-error-count:<integer>");
-		print_usage_line(2, "Set the maximum number of errors that can be displayed before the compiler terminates.");
+		print_usage_line(2, "Sets the maximum number of errors that can be displayed before the compiler terminates.");
 		print_usage_line(2, "Must be an integer >0.");
 		print_usage_line(2, "If not set, the default max error count is %d.", DEFAULT_MAX_ERROR_COLLECTOR_COUNT);
 		print_usage_line(0, "");
