@@ -1529,12 +1529,12 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 
 			event_stop_propagation: () => {
 				if (event_temp_data && event_temp_data.event) {
-					event_temp_data.event.eventStopPropagation();
+					event_temp_data.event.stopPropagation();
 				}
 			},
 			event_stop_immediate_propagation: () => {
 				if (event_temp_data && event_temp_data.event) {
-					event_temp_data.event.eventStopImmediatePropagation();
+					event_temp_data.event.stopImmediatePropagation();
 				}
 			},
 			event_prevent_default: () => {
@@ -1548,7 +1548,7 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 				let name = wasmMemoryInterface.loadString(name_ptr, name_len);
 				let options = {
 					bubbles:   (options_bits & (1<<0)) !== 0,
-					cancelabe: (options_bits & (1<<1)) !== 0,
+					cancelable: (options_bits & (1<<1)) !== 0,
 					composed:  (options_bits & (1<<2)) !== 0,
 				};
 
