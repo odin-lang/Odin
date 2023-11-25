@@ -30,6 +30,7 @@ when ODIN_TEST {
 main :: proc() {
 	t := testing.T{}
 	test_sort_with_indices(&t)
+	test_binary_search(&t)
 
 	fmt.printf("%v/%v tests successful.\n", TEST_count - TEST_fail, TEST_count)
 	if TEST_fail > 0 {
@@ -179,4 +180,60 @@ test_sort_by_indices :: proc(t: ^testing.T) {
 			}
 		}
 	}
+}
+
+@test
+test_binary_search :: proc(t: ^testing.T) {
+	index: int
+    found: bool
+
+    test_search :: proc(s: []i32, v: i32) -> (int, bool) {
+		fmt.printf("Searching for %v in %v\n", v, s)
+		index, found := slice.binary_search(s, v)
+		fmt.printf("index: %v\nfound: %v\n", index, found)
+
+		return index, found
+    }
+
+    s := []i32{0, 1, 1, 1, 1, 2, 3, 5, 8, 13, 21, 34, 55}
+
+	index, found = test_search(s, 13)
+	assert(index == 9, "Expected index to be 9.")
+	assert(found == true, "Expected found to be true.")
+
+	index, found = test_search(s, 4)
+	assert(index == 7, "Expected index to be 7.")
+	assert(found == false, "Expected found to be false.")
+
+	index, found = test_search(s, 100)
+	assert(index == 13, "Expected index to be 13.")
+	assert(found == false, "Expected found to be false.")
+
+	index, found = test_search(s, 1)
+	assert(index >= 1 && index <= 4, "Expected index to be 1, 2, 3, or 4.")
+	assert(found == true, "Expected found to be true.")
+
+	index, found = test_search(s, -1)
+	assert(index == 0, "Expected index to be 0.")
+	assert(found == false, "Expected found to be false.")
+
+	a := []i32{}
+
+	index, found = test_search(a, 13)
+	assert(index == 0, "Expected index to be 0.")
+	assert(found == false, "Expected found to be false.")
+
+	b := []i32{1}
+
+	index, found = test_search(b, 13)
+	assert(index == 1, "Expected index to be 1.")
+	assert(found == false, "Expected found to be false.")
+
+	index, found = test_search(b, 1)
+	assert(index == 0, "Expected index to be 0.")
+	assert(found == true, "Expected found to be true.")
+
+	index, found = test_search(b, 0)
+	assert(index == 0, "Expected index to be 0.")
+	assert(found == false, "Expected found to be false.")
 }
