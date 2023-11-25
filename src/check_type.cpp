@@ -1510,7 +1510,7 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 			}
 
 			if (default_value != nullptr) {
-				if (type_expr->kind == Ast_TypeidType) {
+				if (type_expr != nullptr && type_expr->kind == Ast_TypeidType) {
 					error(type_expr, "A type parameter may not have a default value");
 				} else if (is_variadic) {
 					error(type_expr, "A variadic parameter may not have a default value");
