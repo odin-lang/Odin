@@ -1451,11 +1451,11 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 					wmi.storeF64(off(8), e.deltaY);
 					wmi.storeF64(off(8), e.deltaZ);
 					wmi.storeU32(off(4), e.deltaMode);
-				} else if (e instanceof Event) {
-					if ('scrollX' in e) {
-						wmi.storeF64(off(8), e.scrollX);
-						wmi.storeF64(off(8), e.scrollY);
-					}
+				} else if (e.type === 'scroll') {
+					wmi.storeF64(off(8), window.scrollX);
+					wmi.storeF64(off(8), window.scrollY);
+				} else if (e.type === 'visibilitychange') {
+					wmi.storeU8(off(1), !document.hidden);
 				}
 			},
 
