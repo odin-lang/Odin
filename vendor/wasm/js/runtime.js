@@ -1603,7 +1603,7 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 					element.value = value;
 				}
 			},
-			set_element_value_string: (id_ptr, id_len, value_ptr, value_id) => {
+			set_element_value_string: (id_ptr, id_len, value_ptr, value_len) => {
 				let id = wasmMemoryInterface.loadString(id_ptr, id_len);
 				let value = wasmMemoryInterface.loadString(value_ptr, value_len);
 				let element = getElement(id);
