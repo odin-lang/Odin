@@ -1547,9 +1547,9 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 				let id = wasmMemoryInterface.loadString(id_ptr, id_len);
 				let name = wasmMemoryInterface.loadString(name_ptr, name_len);
 				let options = {
-					bubbles:   (options_bits & (1<<0)) !== 0,
+					bubbles:    (options_bits & (1<<0)) !== 0,
 					cancelable: (options_bits & (1<<1)) !== 0,
-					composed:  (options_bits & (1<<2)) !== 0,
+					composed:   (options_bits & (1<<2)) !== 0,
 				};
 
 				let element = getElement(id);
