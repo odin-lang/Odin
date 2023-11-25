@@ -49,7 +49,7 @@ to_bytes :: proc "contextless" (s: []$T) -> []byte {
 	```
 	```
 	small_items := []byte{1, 0, 0, 0, 0, 0, 0, 0,
-	                      2, 0, 0, 0}
+						  2, 0, 0, 0}
 	large_items := slice.reinterpret([]i64, small_items)
 	assert(len(large_items) == 1) // only enough bytes to make 1 x i64; two would need at least 8 bytes.
 	```
@@ -78,7 +78,7 @@ swap_between :: proc(a, b: $T/[]$E) {
 	n := builtin.min(len(a), len(b))
 	if n >= 0 {
 		ptr_swap_overlapping(&a[0], &b[0], size_of(E)*n)
-	}	
+	}
 }
 
 
@@ -119,25 +119,25 @@ linear_search_proc :: proc(array: $A/[]$T, f: proc(T) -> bool) -> (index: int, f
 
 /*
 	Binary search searches the given slice for the given element.
-    If the slice is not sorted, the returned index is unspecified and meaningless.
+	If the slice is not sorted, the returned index is unspecified and meaningless.
 
-    If the value is found then the returned int is the index of the matching element.
-    If there are multiple matches, then any one of the matches could be returned.
+	If the value is found then the returned int is the index of the matching element.
+	If there are multiple matches, then any one of the matches could be returned.
 
-    If the value is not found then the returned int is the index where a matching
-    element could be inserted while maintaining sorted order.
+	If the value is not found then the returned int is the index where a matching
+	element could be inserted while maintaining sorted order.
 
-    # Examples
+	# Examples
 
-    Looks up a series of four elements. The first is found, with a
-    uniquely determined position; the second and third are not
-    found; the fourth could match any position in `[1, 4]`.
+	Looks up a series of four elements. The first is found, with a
+	uniquely determined position; the second and third are not
+	found; the fourth could match any position in `[1, 4]`.
 
-    ```
-    index: int
-    found: bool
+	```
+	index: int
+	found: bool
 
-    s := []i32{0, 1, 1, 1, 1, 2, 3, 5, 8, 13, 21, 34, 55}
+	s := []i32{0, 1, 1, 1, 1, 2, 3, 5, 8, 13, 21, 34, 55}
 
 	index, found = slice.binary_search(s, 13)
 	assert(index == 9 && found == true)
@@ -174,37 +174,37 @@ binary_search_by :: proc(array: $A/[]$T, key: T, f: proc(T, T) -> Ordering) -> (
 	where intrinsics.type_is_ordered(T) #no_bounds_check
 {
 	// INVARIANTS:
-    // - 0 <= left <= (left + size = right) <= len(array)
-    // - f returns .Less    for everything in array[:left]
-    // - f returns .Greater for everything in array[right:]
-    size  := len(array)
-    left  := 0
-    right := size
+	// - 0 <= left <= (left + size = right) <= len(array)
+	// - f returns .Less    for everything in array[:left]
+	// - f returns .Greater for everything in array[right:]
+	size  := len(array)
+	left  := 0
+	right := size
 
-    for left < right {
-        mid := left + size / 2;
+	for left < right {
+		mid := left + size / 2
 
-        // Steps to verify this is in-bounds:
-        // 1. We note that `size` is strictly positive due to the loop condition
-        // 2. Therefore `size/2 < size`
-        // 3. Adding `left` to both sides yields `(left + size/2) < (left + size)`
-        // 4. We know from the invariant that `left + size <= len(array)`
-        // 5. Therefore `left + size/2 < self.len()`
-        cmp := f(key, array[mid])
+		// Steps to verify this is in-bounds:
+		// 1. We note that `size` is strictly positive due to the loop condition
+		// 2. Therefore `size/2 < size`
+		// 3. Adding `left` to both sides yields `(left + size/2) < (left + size)`
+		// 4. We know from the invariant that `left + size <= len(array)`
+		// 5. Therefore `left + size/2 < self.len()`
+		cmp := f(key, array[mid])
 
-        left  = mid + 1 if cmp == .Less    else left
-        right = mid     if cmp == .Greater else right
+		left  = mid + 1 if cmp == .Less    else left
+		right = mid     if cmp == .Greater else right
 
-        switch cmp {
-        	case .Equal:   return mid, true
-        	case .Less:    left  = mid + 1
-        	case .Greater: right = mid
-        }
+		switch cmp {
+			case .Equal:   return mid, true
+			case .Less:    left  = mid + 1
+			case .Greater: right = mid
+		}
 
-        size = right - left;
-    }
+		size = right - left
+	}
 
-    return left, false
+	return left, false
 }
 
 @(require_results)
