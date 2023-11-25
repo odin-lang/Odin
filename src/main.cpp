@@ -1590,30 +1590,30 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 		print_usage_line(2, "One must contain the program's entry point, all must be in the same package.");
 		print_usage_line(2, "Use `-file` to build a single file instead.");
 		print_usage_line(2, "Examples:");
-		print_usage_line(3, "odin build .                    # Build package in current directory.");
-		print_usage_line(3, "odin build <dir>                # Build package in <dir>.");
-		print_usage_line(3, "odin build filename.odin -file  # Build single-file package, must contain entry point.");
+		print_usage_line(3, "odin build .                     Build package in current directory.");
+		print_usage_line(3, "odin build <dir>                 Build package in <dir>.");
+		print_usage_line(3, "odin build filename.odin -file   Build single-file package, must contain entry point.");
 	} else if (command == "run") {
 		print_usage_line(1, "run     Same as 'build', but also then runs the newly compiled executable.");
 		print_usage_line(2, "Append an empty flag and then the args, '-- <args>', to specify args for the output.");
 		print_usage_line(2, "Examples:");
-		print_usage_line(3, "odin run .                    # Build and run package in current directory.");
-		print_usage_line(3, "odin run <dir>                # Build and run package in <dir>.");
-		print_usage_line(3, "odin run filename.odin -file  # Build and run single-file package, must contain entry point.");
+		print_usage_line(3, "odin run .                     Build and run package in current directory.");
+		print_usage_line(3, "odin run <dir>                 Build and run package in <dir>.");
+		print_usage_line(3, "odin run filename.odin -file   Build and run single-file package, must contain entry point.");
 	} else if (command == "check") {
 		print_usage_line(1, "check   Parse and type check directory of .odin files.");
 		print_usage_line(2, "Examples:");
-		print_usage_line(3, "odin check .                    # Type check package in current directory.");
-		print_usage_line(3, "odin check <dir>                # Type check package in <dir>.");
-		print_usage_line(3, "odin check filename.odin -file  # Type check single-file package, must contain entry point.");
+		print_usage_line(3, "odin check .                     Type check package in current directory.");
+		print_usage_line(3, "odin check <dir>                 Type check package in <dir>.");
+		print_usage_line(3, "odin check filename.odin -file   Type check single-file package, must contain entry point.");
 	} else if (command == "test") {
 		print_usage_line(1, "test      Build and runs procedures with the attribute @(test) in the initial package.");
 	} else if (command == "doc") {
 		print_usage_line(1, "doc       Generate documentation from a directory of .odin files.");
 		print_usage_line(2, "Examples:");
-		print_usage_line(3, "odin doc .                    # Generate documentation on package in current directory.");
-		print_usage_line(3, "odin doc <dir>                # Generate documentation on package in <dir>.");
-		print_usage_line(3, "odin doc filename.odin -file  # Generate documentation on single-file package.");
+		print_usage_line(3, "odin doc .                     Generate documentation on package in current directory.");
+		print_usage_line(3, "odin doc <dir>                 Generate documentation on package in <dir>.");
+		print_usage_line(3, "odin doc filename.odin -file   Generate documentation on single-file package.");
 	} else if (command == "version") {
 		print_usage_line(1, "version   print version");
 	} else if (command == "strip-semicolon") {
@@ -1690,8 +1690,8 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 		print_usage_line(1, "-export-timings:<format>");
 		print_usage_line(2, "Export timings to one of a few formats. Requires `-show-timings` or `-show-more-timings`.");
 		print_usage_line(2, "Available options:");
-		print_usage_line(3, "-export-timings:json        Export compile time stats to JSON.");
-		print_usage_line(3, "-export-timings:csv         Export compile time stats to CSV.");
+		print_usage_line(3, "-export-timings:json   Export compile time stats to JSON.");
+		print_usage_line(3, "-export-timings:csv    Export compile time stats to CSV.");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-export-timings-file:<filename>");
@@ -1743,16 +1743,16 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 		print_usage_line(1, "-build-mode:<mode>");
 		print_usage_line(2, "Sets the build mode.");
 		print_usage_line(2, "Available options:");
-		print_usage_line(3, "-build-mode:exe       Build as an executable.");
-		print_usage_line(3, "-build-mode:dll       Build as a dynamically linked library.");
-		print_usage_line(3, "-build-mode:shared    Build as a dynamically linked library.");
-		print_usage_line(3, "-build-mode:obj       Build as an object file.");
-		print_usage_line(3, "-build-mode:object    Build as an object file.");
-		print_usage_line(3, "-build-mode:assembly  Build as an assembly file.");
-		print_usage_line(3, "-build-mode:assembler Build as an assembly file.");
-		print_usage_line(3, "-build-mode:asm       Build as an assembly file.");
-		print_usage_line(3, "-build-mode:llvm-ir   Build as an LLVM IR file.");
-		print_usage_line(3, "-build-mode:llvm      Build as an LLVM IR file.");
+		print_usage_line(3, "-build-mode:exe         Build as an executable.");
+		print_usage_line(3, "-build-mode:dll         Build as a dynamically linked library.");
+		print_usage_line(3, "-build-mode:shared      Build as a dynamically linked library.");
+		print_usage_line(3, "-build-mode:obj         Build as an object file.");
+		print_usage_line(3, "-build-mode:object      Build as an object file.");
+		print_usage_line(3, "-build-mode:assembly    Build as an assembly file.");
+		print_usage_line(3, "-build-mode:assembler   Build as an assembly file.");
+		print_usage_line(3, "-build-mode:asm         Build as an assembly file.");
+		print_usage_line(3, "-build-mode:llvm-ir     Build as an LLVM IR file.");
+		print_usage_line(3, "-build-mode:llvm        Build as an LLVM IR file.");
 		print_usage_line(0, "");
 	}
 
