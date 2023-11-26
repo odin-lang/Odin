@@ -2939,6 +2939,12 @@ gb_internal lbValue lb_build_unary_and(lbProcedure *p, Ast *expr) {
 	} else if (is_type_soa_pointer(tv.type)) {
 		ast_node(ie, IndexExpr, ue_expr);
 		lbValue addr = lb_build_addr_ptr(p, ie->expr);
+
+		if (is_type_pointer(type_deref(addr.type))) {
+			addr = lb_emit_load(p, addr);
+		}
+		GB_ASSERT(is_type_pointer(addr.type));
+
 		lbValue index = lb_build_expr(p, ie->index);
 
 		if (!build_context.no_bounds_check) {

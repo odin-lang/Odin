@@ -2088,6 +2088,8 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		t = default_type(t);
 
 		add_type_info_type(c, t);
+		GB_ASSERT(t_type_info_ptr != nullptr);
+		add_type_info_type(c, t_type_info_ptr);
 
 		if (is_operand_value(o) && is_type_typeid(t)) {
 			add_package_dependency(c, "runtime", "__type_info_of");

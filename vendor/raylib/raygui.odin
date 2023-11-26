@@ -16,23 +16,9 @@ when ODIN_OS == .Windows {
 	}
 } else when ODIN_OS == .Linux  {
 	when RAYGUI_SHARED {
-		// Note(bumbread): can't panic here, because the users might be expecting to
-		// only use raylib. Let's have them get the error at link-time instead..
-		//#panic("Cannot link libraygui.so: not in the vendor collection")
-		// Note(bumbread): unless we import something the rest of the bindings will
-		// make a compile-time error. This is a bit ugly for now, but in the future
-		// raygui probably needs to be in a separate package.
-		foreign import lib {"_"}
+		foreign import lib "linux/libraygui.so"
 	} else {
-		// #panic("Cannot link libraygui.a: not in the vendor collection")
-		// TODO(bumbread): apparently this one was missing. This might need
-		// to get rebuilt for linux
-		// foreign import lib { 
-		// 	"linux/libraygui.a",
-		// 	// "system:dl",
-		// 	// "system:pthread",
-		// }
-		foreign import lib {"_"}
+		foreign import lib "linux/libraygui.a"
 	}
 } else when ODIN_OS == .Darwin {
 	when ODIN_ARCH == .arm64 {
@@ -238,6 +224,7 @@ SCROLLBAR_RIGHT_SIDE :: 1
 
 @(default_calling_convention="c")
 foreign lib {
+	@(link_name="raylib_version") version: cstring
 	// Global gui state control functions
 	
 	GuiEnable           :: proc() ---                                                                         // Enable gui controls (global state)
@@ -293,17 +280,17 @@ foreign lib {
 	// Basic controls set
 	
 	GuiLabel            :: proc(bounds: Rectangle, text: cstring) -> c.int ---                                // Label control, shows text
-	GuiButton           :: proc(bounds: Rectangle, text: cstring) -> c.int ---                                // Button control, returns true when clicked
-	GuiLabelButton      :: proc(bounds: Rectangle, text: cstring) -> c.int ---                                // Label button control, show true when clicked
+	GuiButton           :: proc(bounds: Rectangle, text: cstring) -> bool ---                                 // Button control, returns true when clicked
+	GuiLabelButton      :: proc(bounds: Rectangle, text: cstring) -> bool ---                                // Label button control, show true when clicked
 	GuiToggle           :: proc(bounds: Rectangle, text: cstring, active: ^bool) -> c.int ---                 // Toggle Button control, returns true when active
 	GuiToggleGroup      :: proc(bounds: Rectangle, text: cstring, active: ^c.int) -> c.int ---                // Toggle Group control, returns active toggle index
-	GuiCheckBox         :: proc(bounds: Rectangle, text: cstring, checked: ^bool) -> c.int ---                // Check Box control, returns true when active
+	GuiCheckBox         :: proc(bounds: Rectangle, text: cstring, checked: ^bool) -> bool ---                // Check Box control, returns true when active
 	GuiComboBox         :: proc(bounds: Rectangle, text: cstring, active: ^c.int) -> c.int ---                // Combo Box control, returns selected item index
 	
-	GuiDropdownBox      :: proc(bounds: Rectangle, text: cstring, active: ^c.int, editMode: bool) -> c.int --- // Dropdown Box control, returns selected item
+	GuiDropdownBox      :: proc(bounds: Rectangle, text: cstring, active: ^c.int, editMode: bool) -> bool --- // Dropdown Box control, returns selected item
 	GuiSpinner          :: proc(bounds: Rectangle, text: cstring, value: ^c.int, minValue, maxValue: c.int, editMode: bool) -> c.int --- // Spinner control, returns selected value
 	GuiValueBox         :: proc(bounds: Rectangle, text: cstring, value: ^c.int, minValue, maxValue: c.int, editMode: bool) -> c.int --- // Value Box control, updates input text with numbers
-	GuiTextBox          :: proc(bounds: Rectangle, text: cstring, textSize: c.int, editMode: bool) -> c.int --- // Text Box control, updates input text
+	GuiTextBox          :: proc(bounds: Rectangle, text: cstring, textSize: c.int, editMode: bool) -> bool --- // Text Box control, updates input text
 	
 	GuiSlider           :: proc(bounds: Rectangle, textLeft: cstring, textRight: cstring, value: ^f32, minValue: f32, maxValue: f32) -> c.int --- // Slider control, returns selected value
 	GuiSliderBar        :: proc(bounds: Rectangle, textLeft: cstring, textRight: cstring, value: ^f32, minValue: f32, maxValue: f32) -> c.int --- // Slider Bar control, returns selected value

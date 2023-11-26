@@ -1846,9 +1846,25 @@ gb_internal void lb_build_return_stmt_internal(lbProcedure *p, lbValue res) {
 		LLVMBuildRetVoid(p->builder);
 	} else {
 		LLVMValueRef ret_val = res.value;
-		ret_val = OdinLLVMBuildTransmute(p, ret_val, p->abi_function_type->ret.type);
-		if (p->abi_function_type->ret.cast_type != nullptr) {
-			ret_val = OdinLLVMBuildTransmute(p, ret_val, p->abi_function_type->ret.cast_type);
+		LLVMTypeRef ret_type = p->abi_function_type->ret.type;
+		if (LLVMTypeRef cast_type = p->abi_function_type->ret.cast_type) {
+			ret_type = cast_type;
+		}
+
+		if (LLVMGetTypeKind(ret_type) == LLVMStructTypeKind) {
+			LLVMTypeRef src_type = LLVMTypeOf(ret_val);
+
+			if (p->temp_callee_return_struct_memory == nullptr) {
+				i64 max_align = gb_max(lb_alignof(ret_type), lb_alignof(src_type));
+				p->temp_callee_return_struct_memory = llvm_alloca(p, ret_type, max_align);
+			}
+			// reuse the temp return value memory where possible
+			LLVMValueRef ptr = p->temp_callee_return_struct_memory;
+			LLVMValueRef nptr = LLVMBuildPointerCast(p->builder, ptr, LLVMPointerType(src_type, 0), "");
+			LLVMBuildStore(p->builder, ret_val, nptr);
+			ret_val = LLVMBuildLoad2(p->builder, ret_type, ptr, "");
+		} else {
+			ret_val = OdinLLVMBuildTransmute(p, ret_val, ret_type);
 		}
 
 		lb_emit_defer_stmts(p, lbDeferExit_Return, nullptr);
