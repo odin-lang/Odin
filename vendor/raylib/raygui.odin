@@ -72,6 +72,18 @@ GuiTextAlignment :: enum c.int {
 	TEXT_ALIGN_RIGHT,
 }
 
+GuiTextAlignmentVertical :: enum c.int {
+	TEXT_ALIGN_TOP = 0,
+	TEXT_ALIGN_MIDDLE,
+	TEXT_ALIGN_BOTTOM,
+}
+
+GuiTextWrapMode :: enum c.int {
+	TEXT_WRAP_NONE = 0,
+	TEXT_WRAP_CHAR,
+	TEXT_WRAP_WORD,
+}
+
 // Gui controls
 GuiControl :: enum c.int {
 	// Default -> populates to all controls when set
