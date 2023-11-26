@@ -284,6 +284,7 @@ foreign lib {
 	GuiLabelButton      :: proc(bounds: Rectangle, text: cstring) -> bool ---                                // Label button control, show true when clicked
 	GuiToggle           :: proc(bounds: Rectangle, text: cstring, active: ^bool) -> c.int ---                 // Toggle Button control, returns true when active
 	GuiToggleGroup      :: proc(bounds: Rectangle, text: cstring, active: ^c.int) -> c.int ---                // Toggle Group control, returns active toggle index
+	GuiToggleSlider     :: proc(bounds: Rectangle, text: cstring, active: ^c.int) -> c.int ---
 	GuiCheckBox         :: proc(bounds: Rectangle, text: cstring, checked: ^bool) -> bool ---                // Check Box control, returns true when active
 	GuiComboBox         :: proc(bounds: Rectangle, text: cstring, active: ^c.int) -> c.int ---                // Combo Box control, returns selected item index
 	
