@@ -31,6 +31,8 @@ test_singlethreaded :: proc(T: ^test.T) {
 	fmt.printf("%d %v\n", val, ok)
 	val, ok = dequeue(q)
 	fmt.printf("%d %v\n", val, ok)
+	val, ok = dequeue(q)
+	fmt.printf("%d %v\n", val, ok)
 }
 
 example :: proc(T: ^test.T) {

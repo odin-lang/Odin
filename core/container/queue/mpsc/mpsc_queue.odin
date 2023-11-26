@@ -40,10 +40,13 @@ enqueue :: proc(q: ^Queue($T), val: T) -> int {
 
 @private
 enqueue_node :: proc(q: ^Queue($T), node: ^Node(T)) -> int {
-	intrinsics.atomic_store_explicit(&node.next, nil, .Relaxed)
-	prev := intrinsics.atomic_exchange_explicit(&q.head, node, .Acq_Rel)
-	intrinsics.atomic_store_explicit(&prev.next, node, .Release)
-	count := 1 + intrinsics.atomic_add_explicit(&q.count, 1, .Acquire)
+	intrinsics.atomic_store_explicit(&node.next, nil, .Release)
+    head_ptr := cast(^uintptr) &q.head
+	prev := intrinsics.atomic_exchange_explicit(head_ptr, uintptr(node), .Acq_Rel)
+    prev_node := cast(^Node(T)) prev
+    prev_next_ptr := cast(^uintptr)&prev_node.next
+	intrinsics.atomic_store_explicit(prev_next_ptr, uintptr(node), .Release)
+	count := 1 + intrinsics.atomic_add_explicit(&q.count, 1, .Release)
 	return count
 }
 
@@ -52,8 +55,8 @@ dequeue :: proc(q: ^Queue($T)) -> (value: T, has_item: bool) {
 	next := intrinsics.atomic_load_explicit(&tail.next, .Acquire)
 	if next != nil {
 		context.allocator = q.allocator
-		intrinsics.atomic_store_explicit(&tail, next, .Relaxed)
-		value = tail.value
+		intrinsics.atomic_store_explicit(&q.tail, next, .Release)
+		value = next.value
 		intrinsics.atomic_sub_explicit(&q.count, 1, .Release)
 		if tail != &q.sentinel {
 			//free(tail)
@@ -64,6 +67,3 @@ dequeue :: proc(q: ^Queue($T)) -> (value: T, has_item: bool) {
 	assert(intrinsics.atomic_load_explicit(&q.count, .Acquire) == 0)
 	return {}, false
 }
-
-
-
