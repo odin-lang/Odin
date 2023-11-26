@@ -433,7 +433,7 @@ foreign lib {
 	rlDisableScissorTest     :: proc() ---                           // Disable scissor test
 	rlScissor                :: proc(x, y, width, height: c.int) --- // Scissor test
 	rlEnableWireMode         :: proc() ---                           // Enable wire mode
-	rlEnablePointMode		 :: proc() --- 							 // Enable point mode
+	rlEnablePointMode        :: proc() --- 							 // Enable point mode
 	rlDisableWireMode        :: proc() ---                           // Disable wire and point modes
 	rlSetLineWidth           :: proc(width: f32) ---                 // Set the line drawing width
 	rlGetLineWidth           :: proc() -> f32 ---                    // Get the line drawing width
