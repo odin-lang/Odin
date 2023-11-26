@@ -199,19 +199,19 @@ gb_internal void print_usage_line(i32 indent, char const *fmt, ...) {
 }
 
 gb_internal void usage(String argv0) {
-	print_usage_line(0, "%.*s is a tool for managing Odin source code", LIT(argv0));
+	print_usage_line(0, "%.*s is a tool for managing Odin source code.", LIT(argv0));
 	print_usage_line(0, "Usage:");
 	print_usage_line(1, "%.*s command [arguments]", LIT(argv0));
 	print_usage_line(0, "Commands:");
-	print_usage_line(1, "build             compile directory of .odin files, as an executable.");
-	print_usage_line(1, "                  one must contain the program's entry point, all must be in the same package.");
-	print_usage_line(1, "run               same as 'build', but also then runs the newly compiled executable.");
-	print_usage_line(1, "check             parse, and type check a directory of .odin files");
-	print_usage_line(1, "strip-semicolon   parse, type check, and remove unneeded semicolons from the entire program");
-	print_usage_line(1, "test              build and runs procedures with the attribute @(test) in the initial package");
-	print_usage_line(1, "doc               generate documentation on a directory of .odin files");
-	print_usage_line(1, "version           print version");
-	print_usage_line(1, "report            print information useful to reporting a bug");
+	print_usage_line(1, "build             Compiles directory of .odin files, as an executable.");
+	print_usage_line(1, "                  One must contain the program's entry point, all must be in the same package.");
+	print_usage_line(1, "run               Same as 'build', but also then runs the newly compiled executable.");
+	print_usage_line(1, "check             Parses, and type checks a directory of .odin files.");
+	print_usage_line(1, "strip-semicolon   Parses, type checks, and removes unneeded semicolons from the entire program.");
+	print_usage_line(1, "test              Builds and runs procedures with the attribute @(test) in the initial package.");
+	print_usage_line(1, "doc               Generates documentation on a directory of .odin files.");
+	print_usage_line(1, "version           Prints version.");
+	print_usage_line(1, "report            Prints information useful to reporting a bug.");
 	print_usage_line(0, "");
 	print_usage_line(0, "For further details on a command, invoke command help:");
 	print_usage_line(1, "e.g. `odin build -help` or `odin help build`");
@@ -1580,45 +1580,45 @@ gb_internal void remove_temp_files(lbGenerator *gen) {
 
 
 gb_internal void print_show_help(String const arg0, String const &command) {
-	print_usage_line(0, "%.*s is a tool for managing Odin source code", LIT(arg0));
+	print_usage_line(0, "%.*s is a tool for managing Odin source code.", LIT(arg0));
 	print_usage_line(0, "Usage:");
 	print_usage_line(1, "%.*s %.*s [arguments]", LIT(arg0), LIT(command));
 	print_usage_line(0, "");
 
 	if (command == "build") {
-		print_usage_line(1, "build   Compile directory of .odin files as an executable.");
+		print_usage_line(1, "build   Compiles directory of .odin files as an executable.");
 		print_usage_line(2, "One must contain the program's entry point, all must be in the same package.");
 		print_usage_line(2, "Use `-file` to build a single file instead.");
 		print_usage_line(2, "Examples:");
-		print_usage_line(3, "odin build .                    # Build package in current directory");
-		print_usage_line(3, "odin build <dir>                # Build package in <dir>");
-		print_usage_line(3, "odin build filename.odin -file  # Build single-file package, must contain entry point.");
+		print_usage_line(3, "odin build .                     Builds package in current directory.");
+		print_usage_line(3, "odin build <dir>                 Builds package in <dir>.");
+		print_usage_line(3, "odin build filename.odin -file   Builds single-file package, must contain entry point.");
 	} else if (command == "run") {
 		print_usage_line(1, "run     Same as 'build', but also then runs the newly compiled executable.");
 		print_usage_line(2, "Append an empty flag and then the args, '-- <args>', to specify args for the output.");
 		print_usage_line(2, "Examples:");
-		print_usage_line(3, "odin run .                    # Build and run package in current directory");
-		print_usage_line(3, "odin run <dir>                # Build and run package in <dir>");
-		print_usage_line(3, "odin run filename.odin -file  # Build and run single-file package, must contain entry point.");
+		print_usage_line(3, "odin run .                     Builds and runs package in current directory.");
+		print_usage_line(3, "odin run <dir>                 Builds and runs package in <dir>.");
+		print_usage_line(3, "odin run filename.odin -file   Builds and runs single-file package, must contain entry point.");
 	} else if (command == "check") {
-		print_usage_line(1, "check   Parse and type check directory of .odin files");
+		print_usage_line(1, "check   Parses and type checks directory of .odin files.");
 		print_usage_line(2, "Examples:");
-		print_usage_line(3, "odin check .                    # Type check package in current directory");
-		print_usage_line(3, "odin check <dir>                # Type check package in <dir>");
-		print_usage_line(3, "odin check filename.odin -file  # Type check single-file package, must contain entry point.");
+		print_usage_line(3, "odin check .                     Type checks package in current directory.");
+		print_usage_line(3, "odin check <dir>                 Type checks package in <dir>.");
+		print_usage_line(3, "odin check filename.odin -file   Type checks single-file package, must contain entry point.");
 	} else if (command == "test") {
-		print_usage_line(1, "test      Build and runs procedures with the attribute @(test) in the initial package");
+		print_usage_line(1, "test    Builds and runs procedures with the attribute @(test) in the initial package.");
 	} else if (command == "doc") {
-		print_usage_line(1, "doc       generate documentation from a directory of .odin files");
+		print_usage_line(1, "doc     Generates documentation from a directory of .odin files.");
 		print_usage_line(2, "Examples:");
-		print_usage_line(3, "odin doc .                    # Generate documentation on package in current directory");
-		print_usage_line(3, "odin doc <dir>                # Generate documentation on package in <dir>");
-		print_usage_line(3, "odin doc filename.odin -file  # Generate documentation on single-file package.");
+		print_usage_line(3, "odin doc .                     Generates documentation on package in current directory.");
+		print_usage_line(3, "odin doc <dir>                 Generates documentation on package in <dir>.");
+		print_usage_line(3, "odin doc filename.odin -file   Generates documentation on single-file package.");
 	} else if (command == "version") {
-		print_usage_line(1, "version   print version");
+		print_usage_line(1, "version   Prints version.");
 	} else if (command == "strip-semicolon") {
 		print_usage_line(1, "strip-semicolon");
-		print_usage_line(2, "Parse and type check .odin file(s) and then remove unneeded semicolons from the entire project");
+		print_usage_line(2, "Parses and type checks .odin file(s) and then removes unneeded semicolons from the entire project.");
 	}
 
 	bool doc             = command == "doc";
@@ -1642,237 +1642,240 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 
 	if (doc) {
 		print_usage_line(1, "-short");
-		print_usage_line(2, "Show shortened documentation for the packages");
+		print_usage_line(2, "Shows shortened documentation for the packages.");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-all-packages");
-		print_usage_line(2, "Generates documentation for all packages used in the current project");
+		print_usage_line(2, "Generates documentation for all packages used in the current project.");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-doc-format");
-		print_usage_line(2, "Generates documentation as the .odin-doc format (useful for external tooling)");
+		print_usage_line(2, "Generates documentation as the .odin-doc format (useful for external tooling).");
 		print_usage_line(0, "");
 	}
 
 	if (run_or_build) {
 		print_usage_line(1, "-out:<filepath>");
-		print_usage_line(2, "Set the file name of the outputted executable");
+		print_usage_line(2, "Sets the file name of the outputted executable.");
 		print_usage_line(2, "Example: -out:foo.exe");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-o:<string>");
-		print_usage_line(2, "Set the optimization mode for compilation");
+		print_usage_line(2, "Sets the optimization mode for compilation.");
+		print_usage_line(2, "Available options:");
+		print_usage_line(3, "-o:none");
+		print_usage_line(3, "-o:minimal");
+		print_usage_line(3, "-o:size");
+		print_usage_line(3, "-o:speed");
 		if (LB_USE_NEW_PASS_SYSTEM) {
-			print_usage_line(2, "Accepted values: none, minimal, size, speed, aggressive");
-		} else {
-			print_usage_line(2, "Accepted values: none, minimal, size, speed");
+			print_usage_line(3, "-o:aggressive");
 		}
-		print_usage_line(2, "Example: -o:speed");
-		print_usage_line(2, "The default is -o:minimal");
+		print_usage_line(2, "The default is -o:minimal.");
 		print_usage_line(0, "");
 	}
 
 	if (check) {
 		print_usage_line(1, "-show-timings");
-		print_usage_line(2, "Shows basic overview of the timings of different stages within the compiler in milliseconds");
+		print_usage_line(2, "Shows basic overview of the timings of different stages within the compiler in milliseconds.");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-show-more-timings");
-		print_usage_line(2, "Shows an advanced overview of the timings of different stages within the compiler in milliseconds");
+		print_usage_line(2, "Shows an advanced overview of the timings of different stages within the compiler in milliseconds.");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-show-system-calls");
-		print_usage_line(2, "Prints the whole command and arguments for calls to external tools like linker and assembler");
+		print_usage_line(2, "Prints the whole command and arguments for calls to external tools like linker and assembler.");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-export-timings:<format>");
-		print_usage_line(2, "Export timings to one of a few formats. Requires `-show-timings` or `-show-more-timings`");
+		print_usage_line(2, "Exports timings to one of a few formats. Requires `-show-timings` or `-show-more-timings`.");
 		print_usage_line(2, "Available options:");
-		print_usage_line(3, "-export-timings:json        Export compile time stats to JSON");
-		print_usage_line(3, "-export-timings:csv         Export compile time stats to CSV");
+		print_usage_line(3, "-export-timings:json   Exports compile time stats to JSON.");
+		print_usage_line(3, "-export-timings:csv    Exports compile time stats to CSV.");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-export-timings-file:<filename>");
-		print_usage_line(2, "Specify the filename for `-export-timings`");
+		print_usage_line(2, "Specifies the filename for `-export-timings`.");
 		print_usage_line(2, "Example: -export-timings-file:timings.json");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-thread-count:<integer>");
-		print_usage_line(2, "Override the number of threads the compiler will use to compile with");
+		print_usage_line(2, "Overrides the number of threads the compiler will use to compile with.");
 		print_usage_line(2, "Example: -thread-count:2");
 		print_usage_line(0, "");
 	}
 
 	if (check_only) {
 		print_usage_line(1, "-show-unused");
-		print_usage_line(2, "Shows unused package declarations within the current project");
+		print_usage_line(2, "Shows unused package declarations within the current project.");
 		print_usage_line(0, "");
 		print_usage_line(1, "-show-unused-with-location");
-		print_usage_line(2, "Shows unused package declarations within the current project with the declarations source location");
+		print_usage_line(2, "Shows unused package declarations within the current project with the declarations source location.");
 		print_usage_line(0, "");
 	}
 
 	if (run_or_build) {
 		print_usage_line(1, "-keep-temp-files");
-		print_usage_line(2, "Keeps the temporary files generated during compilation");
+		print_usage_line(2, "Keeps the temporary files generated during compilation.");
 		print_usage_line(0, "");
 	} else if (strip_semicolon) {
 		print_usage_line(1, "-keep-temp-files");
-		print_usage_line(2, "Keeps the temporary files generated during stripping the unneeded semicolons from files");
+		print_usage_line(2, "Keeps the temporary files generated during stripping the unneeded semicolons from files.");
 		print_usage_line(0, "");
 	}
 
 	if (check) {
 		print_usage_line(1, "-collection:<name>=<filepath>");
-		print_usage_line(2, "Defines a library collection used for imports");
+		print_usage_line(2, "Defines a library collection used for imports.");
 		print_usage_line(2, "Example: -collection:shared=dir/to/shared");
 		print_usage_line(2, "Usage in Code:");
 		print_usage_line(3, "import \"shared:foo\"");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-define:<name>=<value>");
-		print_usage_line(2, "Defines a scalar boolean, integer or string as global constant");
+		print_usage_line(2, "Defines a scalar boolean, integer or string as global constant.");
 		print_usage_line(2, "Example: -define:SPAM=123");
-		print_usage_line(2, "To use:  #config(SPAM, default_value)");
+		print_usage_line(2, "Usage in code:");
+		print_usage_line(3, "#config(SPAM, default_value)");
 		print_usage_line(0, "");
 	}
 
 	if (build) {
 		print_usage_line(1, "-build-mode:<mode>");
-		print_usage_line(2, "Sets the build mode");
+		print_usage_line(2, "Sets the build mode.");
 		print_usage_line(2, "Available options:");
-		print_usage_line(3, "-build-mode:exe       Build as an executable");
-		print_usage_line(3, "-build-mode:dll       Build as a dynamically linked library");
-		print_usage_line(3, "-build-mode:shared    Build as a dynamically linked library");
-		print_usage_line(3, "-build-mode:obj       Build as an object file");
-		print_usage_line(3, "-build-mode:object    Build as an object file");
-		print_usage_line(3, "-build-mode:assembly  Build as an assembly file");
-		print_usage_line(3, "-build-mode:assembler Build as an assembly file");
-		print_usage_line(3, "-build-mode:asm       Build as an assembly file");
-		print_usage_line(3, "-build-mode:llvm-ir   Build as an LLVM IR file");
-		print_usage_line(3, "-build-mode:llvm      Build as an LLVM IR file");
+		print_usage_line(3, "-build-mode:exe         Builds as an executable.");
+		print_usage_line(3, "-build-mode:dll         Builds as a dynamically linked library.");
+		print_usage_line(3, "-build-mode:shared      Builds as a dynamically linked library.");
+		print_usage_line(3, "-build-mode:obj         Builds as an object file.");
+		print_usage_line(3, "-build-mode:object      Builds as an object file.");
+		print_usage_line(3, "-build-mode:assembly    Builds as an assembly file.");
+		print_usage_line(3, "-build-mode:assembler   Builds as an assembly file.");
+		print_usage_line(3, "-build-mode:asm         Builds as an assembly file.");
+		print_usage_line(3, "-build-mode:llvm-ir     Builds as an LLVM IR file.");
+		print_usage_line(3, "-build-mode:llvm        Builds as an LLVM IR file.");
 		print_usage_line(0, "");
 	}
 
 	if (check) {
 		print_usage_line(1, "-target:<string>");
-		print_usage_line(2, "Sets the target for the executable to be built in");
+		print_usage_line(2, "Sets the target for the executable to be built in.");
 		print_usage_line(0, "");
 	}
 
 	if (run_or_build) {
 		print_usage_line(1, "-debug");
-		print_usage_line(2, "Enabled debug information, and defines the global constant ODIN_DEBUG to be 'true'");
+		print_usage_line(2, "Enables debug information, and defines the global constant ODIN_DEBUG to be 'true'.");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-disable-assert");
-		print_usage_line(2, "Disable the code generation of the built-in run-time 'assert' procedure, and defines the global constant ODIN_DISABLE_ASSERT to be 'true'");
+		print_usage_line(2, "Disables the code generation of the built-in run-time 'assert' procedure, and defines the global constant ODIN_DISABLE_ASSERT to be 'true'.");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-no-bounds-check");
-		print_usage_line(2, "Disables bounds checking program wide");
+		print_usage_line(2, "Disables bounds checking program wide.");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-no-crt");
-		print_usage_line(2, "Disables automatic linking with the C Run Time");
+		print_usage_line(2, "Disables automatic linking with the C Run Time.");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-no-thread-local");
-		print_usage_line(2, "Ignore @thread_local attribute, effectively treating the program as if it is single-threaded");
+		print_usage_line(2, "Ignores @thread_local attribute, effectively treating the program as if it is single-threaded.");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-lld");
-		print_usage_line(2, "Use the LLD linker rather than the default");
+		print_usage_line(2, "Uses the LLD linker rather than the default.");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-use-separate-modules");
 		print_usage_line(1, "[EXPERIMENTAL]");
-		print_usage_line(2, "The backend generates multiple build units which are then linked together");
-		print_usage_line(2, "Normally, a single build unit is generated for a standard project");
+		print_usage_line(2, "The backend generates multiple build units which are then linked together.");
+		print_usage_line(2, "Normally, a single build unit is generated for a standard project.");
 		print_usage_line(0, "");
 
 	}
 
 	if (check) {
 		print_usage_line(1, "-no-threaded-checker");
-		print_usage_line(2, "Disabled multithreading in the semantic checker stage");
+		print_usage_line(2, "Disables multithreading in the semantic checker stage.");
 		print_usage_line(0, "");
 	}
 
 	if (check) {
 		print_usage_line(1, "-vet");
-		print_usage_line(2, "Do extra checks on the code");
+		print_usage_line(2, "Does extra checks on the code.");
 		print_usage_line(2, "Extra checks include:");
-		print_usage_line(2, "-vet-unused");
-		print_usage_line(2, "-vet-shadowing");
-		print_usage_line(2, "-vet-using-stmt");
+		print_usage_line(3, "-vet-unused");
+		print_usage_line(3, "-vet-shadowing");
+		print_usage_line(3, "-vet-using-stmt");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-vet-unused");
-		print_usage_line(2, "Checks for unused declarations");
+		print_usage_line(2, "Checks for unused declarations.");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-vet-shadowing");
-		print_usage_line(2, "Checks for variable shadowing within procedures");
+		print_usage_line(2, "Checks for variable shadowing within procedures.");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-vet-using-stmt");
-		print_usage_line(2, "Checks for the use of 'using' as a statement");
-		print_usage_line(2, "'using' is considered bad practice outside of immediate refactoring");
+		print_usage_line(2, "Checks for the use of 'using' as a statement.");
+		print_usage_line(2, "'using' is considered bad practice outside of immediate refactoring.");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-vet-using-param");
-		print_usage_line(2, "Checks for the use of 'using' on procedure parameters");
-		print_usage_line(2, "'using' is considered bad practice outside of immediate refactoring");
+		print_usage_line(2, "Checks for the use of 'using' on procedure parameters.");
+		print_usage_line(2, "'using' is considered bad practice outside of immediate refactoring.");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-vet-style");
-		print_usage_line(2, "Errs on missing trailing commas followed by a newline");
-		print_usage_line(2, "Errs on deprecated syntax");
-		print_usage_line(2, "Does not err on unneeded tokens (unlike -strict-style)");
+		print_usage_line(2, "Errs on missing trailing commas followed by a newline.");
+		print_usage_line(2, "Errs on deprecated syntax.");
+		print_usage_line(2, "Does not err on unneeded tokens (unlike -strict-style).");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-vet-semicolon");
-		print_usage_line(2, "Errs on unneeded semicolons");
+		print_usage_line(2, "Errs on unneeded semicolons.");
 		print_usage_line(0, "");
 	}
 
 	if (check) {
 		print_usage_line(1, "-ignore-unknown-attributes");
-		print_usage_line(2, "Ignores unknown attributes");
-		print_usage_line(2, "This can be used with metaprogramming tools");
+		print_usage_line(2, "Ignores unknown attributes.");
+		print_usage_line(2, "This can be used with metaprogramming tools.");
 		print_usage_line(0, "");
 
 		if (command != "test") {
 			print_usage_line(1, "-no-entry-point");
-			print_usage_line(2, "Removes default requirement of an entry point (e.g. main procedure)");
+			print_usage_line(2, "Removes default requirement of an entry point (e.g. main procedure).");
 			print_usage_line(0, "");
 		}
 	}
 
 	if (test_only) {
 		print_usage_line(1, "-test-name:<string>");
-		print_usage_line(2, "Run specific test only by name");
+		print_usage_line(2, "Runs specific test only by name.");
 		print_usage_line(0, "");
 	}
 
 	if (run_or_build) {
 		print_usage_line(1, "-minimum-os-version:<string>");
-		print_usage_line(2, "Sets the minimum OS version targeted by the application");
-		print_usage_line(2, "e.g. -minimum-os-version:12.0.0");
-		print_usage_line(2, "(Only used when target is Darwin)");
+		print_usage_line(2, "Sets the minimum OS version targeted by the application.");
+		print_usage_line(2, "Example: -minimum-os-version:12.0.0");
+		print_usage_line(2, "(Only used when target is Darwin.)");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-extra-linker-flags:<string>");
-		print_usage_line(2, "Adds extra linker specific flags in a string");
+		print_usage_line(2, "Adds extra linker specific flags in a string.");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-extra-assembler-flags:<string>");
-		print_usage_line(2, "Adds extra assembler specific flags in a string");
+		print_usage_line(2, "Adds extra assembler specific flags in a string.");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-microarch:<string>");
-		print_usage_line(2, "Specifies the specific micro-architecture for the build in a string");
+		print_usage_line(2, "Specifies the specific micro-architecture for the build in a string.");
 		print_usage_line(2, "Examples:");
 		print_usage_line(3, "-microarch:sandybridge");
 		print_usage_line(3, "-microarch:native");
@@ -1880,74 +1883,77 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-reloc-mode:<string>");
-		print_usage_line(2, "Specifies the reloc mode");
-		print_usage_line(2, "Options:");
-		print_usage_line(3, "default");
-		print_usage_line(3, "static");
-		print_usage_line(3, "pic");
-		print_usage_line(3, "dynamic-no-pic");
+		print_usage_line(2, "Specifies the reloc mode.");
+		print_usage_line(2, "Available options:");
+		print_usage_line(3, "-reloc-mode:default");
+		print_usage_line(3, "-reloc-mode:static");
+		print_usage_line(3, "-reloc-mode:pic");
+		print_usage_line(3, "-reloc-mode:dynamic-no-pic");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-disable-red-zone");
-		print_usage_line(2, "Disable red zone on a supported freestanding target");
+		print_usage_line(2, "Disables red zone on a supported freestanding target.");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-dynamic-map-calls");
-		print_usage_line(2, "Use dynamic map calls to minimize code generation at the cost of runtime execution");
+		print_usage_line(2, "Uses dynamic map calls to minimize code generation at the cost of runtime execution.");
 		print_usage_line(0, "");
 	}
 
 	if (check) {
 		print_usage_line(1, "-disallow-do");
-		print_usage_line(2, "Disallows the 'do' keyword in the project");
+		print_usage_line(2, "Disallows the 'do' keyword in the project.");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-default-to-nil-allocator");
-		print_usage_line(2, "Sets the default allocator to be the nil_allocator, an allocator which does nothing");
+		print_usage_line(2, "Sets the default allocator to be the nil_allocator, an allocator which does nothing.");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-strict-style");
-		print_usage_line(2, "Errs on unneeded tokens, such as unneeded semicolons");
-		print_usage_line(2, "Errs on missing trailing commas followed by a newline");
-		print_usage_line(2, "Errs on deprecated syntax");
+		print_usage_line(2, "Errs on unneeded tokens, such as unneeded semicolons.");
+		print_usage_line(2, "Errs on missing trailing commas followed by a newline.");
+		print_usage_line(2, "Errs on deprecated syntax.");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-ignore-warnings");
-		print_usage_line(2, "Ignores warning messages");
+		print_usage_line(2, "Ignores warning messages.");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-warnings-as-errors");
-		print_usage_line(2, "Treats warning messages as error messages");
+		print_usage_line(2, "Treats warning messages as error messages.");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-terse-errors");
-		print_usage_line(2, "Prints a terse error message without showing the code on that line and the location in that line");
+		print_usage_line(2, "Prints a terse error message without showing the code on that line and the location in that line.");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-error-pos-style:<string>");
-		print_usage_line(2, "Options are 'unix', 'odin' and 'default' (odin)");
-		print_usage_line(2, "'odin'    file/path(45:3)");
-		print_usage_line(2, "'unix'    file/path:45:3:");
+		print_usage_line(2, "Available options:");
+		print_usage_line(3, "-error-pos-style:unix      file/path:45:3:");
+		print_usage_line(3, "-error-pos-style:odin      file/path(45:3)");
+		print_usage_line(3, "-error-pos-style:default   (Defaults to 'odin'.)");
 		print_usage_line(0, "");
 
-
 		print_usage_line(1, "-max-error-count:<integer>");
-		print_usage_line(2, "Set the maximum number of errors that can be displayed before the compiler terminates");
-		print_usage_line(2, "Must be an integer >0");
-		print_usage_line(2, "If not set, the default max error count is %d", DEFAULT_MAX_ERROR_COLLECTOR_COUNT);
+		print_usage_line(2, "Sets the maximum number of errors that can be displayed before the compiler terminates.");
+		print_usage_line(2, "Must be an integer >0.");
+		print_usage_line(2, "If not set, the default max error count is %d.", DEFAULT_MAX_ERROR_COLLECTOR_COUNT);
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-foreign-error-procedures");
-		print_usage_line(2, "States that the error procedues used in the runtime are defined in a separate translation unit");
+		print_usage_line(2, "States that the error procedures used in the runtime are defined in a separate translation unit.");
 		print_usage_line(0, "");
 
 	}
 
 	if (run_or_build) {
 		print_usage_line(1, "-sanitize:<string>");
-		print_usage_line(1, "Enables sanitization analysis");
-		print_usage_line(1, "Options are 'address', 'memory', and 'thread'");
-		print_usage_line(1, "NOTE: This flag can be used multiple times");
+		print_usage_line(2, "Enables sanitization analysis.");
+		print_usage_line(2, "Available options:");
+		print_usage_line(3, "-sanitize:address");
+		print_usage_line(3, "-sanitize:memory");
+		print_usage_line(3, "-sanitize:thread");
+		print_usage_line(2, "NOTE: This flag can be used multiple times.");
 		print_usage_line(0, "");
 
 	}
@@ -1956,27 +1962,27 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 		#if defined(GB_SYSTEM_WINDOWS)
 		print_usage_line(1, "-ignore-vs-search");
 		print_usage_line(2, "[Windows only]");
-		print_usage_line(2, "Ignores the Visual Studio search for library paths");
+		print_usage_line(2, "Ignores the Visual Studio search for library paths.");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-resource:<filepath>");
 		print_usage_line(2, "[Windows only]");
-		print_usage_line(2, "Defines the resource file for the executable");
+		print_usage_line(2, "Defines the resource file for the executable.");
 		print_usage_line(2, "Example: -resource:path/to/file.rc");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-pdb-name:<filepath>");
 		print_usage_line(2, "[Windows only]");
-		print_usage_line(2, "Defines the generated PDB name when -debug is enabled");
+		print_usage_line(2, "Defines the generated PDB name when -debug is enabled.");
 		print_usage_line(2, "Example: -pdb-name:different.pdb");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-subsystem:<option>");
 		print_usage_line(2, "[Windows only]");
-		print_usage_line(2, "Defines the subsystem for the application");
+		print_usage_line(2, "Defines the subsystem for the application.");
 		print_usage_line(2, "Available options:");
-		print_usage_line(3, "console");
-		print_usage_line(3, "windows");
+		print_usage_line(3, "-subsystem:console");
+		print_usage_line(3, "-subsystem:windows");
 		print_usage_line(0, "");
 
 		#endif

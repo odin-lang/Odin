@@ -718,7 +718,7 @@ Perf_Event_Sample_Type_Bits :: enum {
 }
 
 /// Describes field sets to include in mmaped page
-Perf_Read_Format :: enum {
+Perf_Read_Format_Bits :: enum {
 	TOTAL_TIME_ENABLED = 0,
 	TOTAL_TIME_RUNNING = 1,
 	ID                 = 2,
