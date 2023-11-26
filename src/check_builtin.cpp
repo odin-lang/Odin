@@ -2088,6 +2088,8 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		t = default_type(t);
 
 		add_type_info_type(c, t);
+		GB_ASSERT(t_type_info_ptr != nullptr);
+		add_type_info_type(c, t_type_info_ptr);
 
 		if (is_operand_value(o) && is_type_typeid(t)) {
 			add_package_dependency(c, "runtime", "__type_info_of");
@@ -5114,6 +5116,202 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			operand->mode = Addressing_Constant;
 			operand->type = t_untyped_bool;
 			operand->value = exact_value_bool(is_variant);
+		}
+		break;
+
+	case BuiltinProc_type_union_tag_type:
+		{
+			if (operand->mode != Addressing_Type) {
+				error(operand->expr, "Expected a type for '%.*s'", LIT(builtin_name));
+				operand->mode = Addressing_Invalid;
+				operand->type = t_invalid;
+				return false;
+			}
+
+			Type *u = operand->type;
+
+			if (!is_type_union(u)) {
+				error(operand->expr, "Expected a union type for '%.*s'", LIT(builtin_name));
+				operand->mode = Addressing_Invalid;
+				operand->type = t_invalid;
+				return false;
+			}
+
+			u = base_type(u);
+			GB_ASSERT(u->kind == Type_Union);
+			
+			operand->mode = Addressing_Type;
+			operand->type = union_tag_type(u);
+		}
+		break;
+
+	case BuiltinProc_type_union_tag_offset:
+		{
+			if (operand->mode != Addressing_Type) {
+				error(operand->expr, "Expected a type for '%.*s'", LIT(builtin_name));
+				operand->mode = Addressing_Invalid;
+				operand->type = t_invalid;
+				return false;
+			}
+
+			Type *u = operand->type;
+
+			if (!is_type_union(u)) {
+				error(operand->expr, "Expected a union type for '%.*s'", LIT(builtin_name));
+				operand->mode = Addressing_Invalid;
+				operand->type = t_invalid;
+				return false;
+			}
+
+			u = base_type(u);
+			GB_ASSERT(u->kind == Type_Union);
+			
+			// NOTE(jakubtomsu): forces calculation of variant_block_size
+			type_size_of(u);
+			i64 tag_offset = u->Union.variant_block_size;
+			GB_ASSERT(tag_offset > 0);
+			
+			operand->mode = Addressing_Constant;
+			operand->type = t_untyped_integer;
+			operand->value = exact_value_i64(tag_offset);
+		}
+		break;
+
+	case BuiltinProc_type_union_base_tag_value:
+		{
+			if (operand->mode != Addressing_Type) {
+				error(operand->expr, "Expected a type for '%.*s'", LIT(builtin_name));
+				operand->mode = Addressing_Invalid;
+				operand->type = t_invalid;
+				return false;
+			}
+
+			Type *u = operand->type;
+
+			if (!is_type_union(u)) {
+				error(operand->expr, "Expected a union type for '%.*s'", LIT(builtin_name));
+				operand->mode = Addressing_Invalid;
+				operand->type = t_invalid;
+				return false;
+			}
+
+			u = base_type(u);
+			GB_ASSERT(u->kind == Type_Union);
+			
+			operand->mode = Addressing_Constant;
+			operand->type = t_untyped_integer;
+			operand->value = exact_value_i64(u->Union.kind == UnionType_no_nil ? 0 : 1);
+		} break;
+
+	case BuiltinProc_type_union_variant_count:
+		{
+			if (operand->mode != Addressing_Type) {
+				error(operand->expr, "Expected a type for '%.*s'", LIT(builtin_name));
+				operand->mode = Addressing_Invalid;
+				operand->type = t_invalid;
+				return false;
+			}
+
+			Type *u = operand->type;
+
+			if (!is_type_union(u)) {
+				error(operand->expr, "Expected a union type for '%.*s'", LIT(builtin_name));
+				operand->mode = Addressing_Invalid;
+				operand->type = t_invalid;
+				return false;
+			}
+
+			u = base_type(u);
+			GB_ASSERT(u->kind == Type_Union);
+			
+			operand->mode = Addressing_Constant;
+			operand->type = t_untyped_integer;
+			operand->value = exact_value_i64(u->Union.variants.count);
+		} break;
+
+	case BuiltinProc_type_variant_type_of:
+		{
+			if (operand->mode != Addressing_Type) {
+				error(operand->expr, "Expected a type for '%.*s'", LIT(builtin_name));
+				operand->mode = Addressing_Invalid;
+				operand->type = t_invalid;
+				return false;
+			}
+
+			Type *u = operand->type;
+
+			if (!is_type_union(u)) {
+				error(operand->expr, "Expected a union type for '%.*s'", LIT(builtin_name));
+				operand->mode = Addressing_Invalid;
+				operand->type = t_invalid;
+				return false;
+			}
+
+			u = base_type(u);
+			GB_ASSERT(u->kind == Type_Union);
+			Operand x = {};
+			check_expr_or_type(c, &x, ce->args[1]);
+			if (!is_type_integer(x.type) || x.mode != Addressing_Constant) {
+				error(call, "Expected a constant integer for '%.*s", LIT(builtin_name));
+				operand->mode = Addressing_Type;
+				operand->type = t_invalid;
+				return false;
+			}
+			
+			i64 index = big_int_to_i64(&x.value.value_integer);
+			if (index < 0 || index >= u->Union.variants.count) {
+				error(call, "Variant tag out of bounds index for '%.*s", LIT(builtin_name));
+				operand->mode = Addressing_Type;
+				operand->type = t_invalid;
+				return false;
+			}
+
+			operand->mode = Addressing_Type;
+			operand->type = u->Union.variants[index];
+		}
+		break;
+	
+	case BuiltinProc_type_variant_index_of:
+		{
+			if (operand->mode != Addressing_Type) {
+				error(operand->expr, "Expected a type for '%.*s'", LIT(builtin_name));
+				operand->mode = Addressing_Invalid;
+				operand->type = t_invalid;
+				return false;
+			}
+
+			Type *u = operand->type;
+
+			if (!is_type_union(u)) {
+				error(operand->expr, "Expected a union type for '%.*s'", LIT(builtin_name));
+				operand->mode = Addressing_Invalid;
+				operand->type = t_invalid;
+				return false;
+			}
+
+			Type *v = check_type(c, ce->args[1]);
+			u = base_type(u);
+			GB_ASSERT(u->kind == Type_Union);
+
+			i64 index = -1;			
+			for_array(i, u->Union.variants) {
+				Type *vt = u->Union.variants[i];
+				if (union_variant_index_types_equal(v, vt)) {
+					index = i64(i);
+					break;
+				}
+			}
+			
+			if (index < 0) {
+				error(operand->expr, "Expected a variant type for '%.*s'", LIT(builtin_name));
+				operand->mode = Addressing_Invalid;
+				operand->type = t_invalid;
+				return false;
+			}
+			
+			operand->mode = Addressing_Constant;
+			operand->type = t_untyped_integer;
+			operand->value = exact_value_i64(index);
 		}
 		break;
 

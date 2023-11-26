@@ -172,6 +172,7 @@ foreign kernel32 {
 		TolerableDelay: ULONG,
 	) -> BOOL ---
 	WaitForSingleObject :: proc(hHandle: HANDLE, dwMilliseconds: DWORD) -> DWORD ---
+	WaitForSingleObjectEx :: proc(hHandle: HANDLE, dwMilliseconds: DWORD, bAlterable: BOOL) -> DWORD ---
 	Sleep :: proc(dwMilliseconds: DWORD) ---
 	GetProcessId :: proc(handle: HANDLE) -> DWORD ---
 	CopyFileW :: proc(
@@ -290,6 +291,14 @@ foreign kernel32 {
 		hTemplateFile: HANDLE,
 	) -> HANDLE ---
 
+	GetFileTime :: proc(
+		hFile: HANDLE,
+		lpCreationTime: LPFILETIME,
+		lpLastAccessTime: LPFILETIME,
+		lpLastWriteTime: LPFILETIME,
+	) -> BOOL ---
+	CompareFileTime :: proc(lpFileTime1: LPFILETIME, lpFileTime2: LPFILETIME) -> LONG ---
+
 	FindFirstFileW :: proc(fileName: LPCWSTR, findFileData: LPWIN32_FIND_DATAW) -> HANDLE ---
 	FindNextFileW :: proc(findFile: HANDLE, findFileData: LPWIN32_FIND_DATAW) -> BOOL ---
 	FindClose :: proc(findFile: HANDLE) -> BOOL ---
@@ -320,6 +329,13 @@ foreign kernel32 {
 		bWaitAll: BOOL,
 		dwMilliseconds: DWORD,
 	) -> DWORD ---
+	WaitForMultipleObjectsEx :: proc(
+		nCount: DWORD,
+		lpHandles: ^HANDLE,
+		bWaitAll: BOOL,
+		dwMilliseconds: DWORD,
+		bAlterable: BOOL,
+	) -> DWORD ---
 	CreateNamedPipeW :: proc(
 		lpName: LPCWSTR,
 		dwOpenMode: DWORD,
@@ -346,6 +362,9 @@ foreign kernel32 {
 	LocalReAlloc :: proc(mem: LPVOID, bytes: SIZE_T, flags: UINT) -> LPVOID ---
 	LocalFree :: proc(mem: LPVOID) -> LPVOID ---
 
+	GlobalAlloc :: proc(flags: UINT, bytes: SIZE_T) -> LPVOID ---
+	GlobalReAlloc :: proc(mem: LPVOID, bytes: SIZE_T, flags: UINT) -> LPVOID ---
+	GlobalFree :: proc(mem: LPVOID) -> LPVOID ---
 
 	ReadDirectoryChangesW :: proc(
 		hDirectory: HANDLE,
@@ -414,7 +433,7 @@ foreign kernel32 {
 	GetConsoleWindow :: proc() -> HWND ---
 	GetConsoleScreenBufferInfo :: proc(hConsoleOutput: HANDLE, lpConsoleScreenBufferInfo: PCONSOLE_SCREEN_BUFFER_INFO) -> BOOL ---
 	SetConsoleScreenBufferSize :: proc(hConsoleOutput: HANDLE, dwSize: COORD) -> BOOL ---
-	SetConsoleWindowInfo :: proc(hConsoleOutput: HANDLE, bAbsolute : BOOL, lpConsoleWindow: ^SMALL_RECT) -> BOOL ---
+	SetConsoleWindowInfo :: proc(hConsoleOutput: HANDLE, bAbsolute: BOOL, lpConsoleWindow: ^SMALL_RECT) -> BOOL ---
 	GetConsoleCursorInfo :: proc(hConsoleOutput: HANDLE, lpConsoleCursorInfo: PCONSOLE_CURSOR_INFO) -> BOOL ---
 	SetConsoleCursorInfo :: proc(hConsoleOutput: HANDLE, lpConsoleCursorInfo: PCONSOLE_CURSOR_INFO) -> BOOL ---
 

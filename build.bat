@@ -110,6 +110,7 @@ if %errorlevel% neq 0 goto end_of_build
 call build_vendor.bat
 if %errorlevel% neq 0 goto end_of_build
 
+rem If the demo doesn't run for you and your CPU is more than a decade old, try -microarch:native
 if %release_mode% EQU 0 odin run examples/demo
 
 del *.obj > NUL 2> NUL

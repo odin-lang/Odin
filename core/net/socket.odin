@@ -148,7 +148,29 @@ recv_udp :: proc(socket: UDP_Socket, buf: []byte) -> (bytes_read: int, remote_en
 	return _recv_udp(socket, buf)
 }
 
-recv :: proc{recv_tcp, recv_udp}
+/*
+	Receive data from into a buffer from any socket.
+
+	Note: `remote_endpoint` parameter is non-nil only if the socket type is UDP. On TCP sockets it
+	will always return `nil`.
+*/
+recv_any :: proc(socket: Any_Socket, buf: []byte) -> (
+	bytes_read: int,
+	remote_endpoint: Maybe(Endpoint),
+	err: Network_Error,
+) {
+	switch socktype in socket {
+	case TCP_Socket:
+		bytes_read, err := recv_tcp(socktype, buf)
+		return bytes_read, nil, err
+	case UDP_Socket:
+		bytes_read, endpoint, err := recv_udp(socktype, buf)
+		return bytes_read, endpoint, err
+	case: panic("Not supported")
+	}
+}
+
+recv :: proc{recv_tcp, recv_udp, recv_any}
 
 /*
 	Repeatedly sends data until the entire buffer is sent.
@@ -168,7 +190,20 @@ send_udp :: proc(socket: UDP_Socket, buf: []byte, to: Endpoint) -> (bytes_writte
 	return _send_udp(socket, buf, to)
 }
 
-send :: proc{send_tcp, send_udp}
+send_any :: proc(socket: Any_Socket, buf: []byte, to: Maybe(Endpoint) = nil) -> (
+	bytes_written: int,
+	err: Network_Error,
+) {
+	switch socktype in socket {
+	case TCP_Socket:
+		return send_tcp(socktype, buf)
+	case UDP_Socket:
+		return send_udp(socktype, buf, to.(Endpoint))
+	case: panic("Not supported")
+	}
+}
+
+send :: proc{send_tcp, send_udp, send_any}
 
 shutdown :: proc(socket: Any_Socket, manner: Shutdown_Manner) -> (err: Network_Error) {
 	return _shutdown(socket, manner)
