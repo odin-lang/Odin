@@ -173,6 +173,9 @@ when ODIN_OS == .Windows {
 	foreign import lib "system:raylib"
 }
 
+VERSION_MAJOR :: 5
+VERSION_MINOR :: 0
+VERSION_PATCH :: 0
 VERSION :: "5.0"
 
 PI :: 3.14159265358979323846 
