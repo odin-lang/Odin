@@ -15,6 +15,8 @@ Pos :: struct {
 	column: int, // starting at 1
 }
 
+NO_POS :: Pos{}
+
 pos_compare :: proc(lhs, rhs: Pos) -> int {
 	if lhs.offset != rhs.offset {
 		return -1 if (lhs.offset < rhs.offset) else +1

@@ -2,8 +2,12 @@ package odin_frontend
 
 import "core:sync"
 import "core:fmt"
+import "core:strings"
 
 import "core:intrinsics"
+
+import "core:path/filepath"
+import "core:os"
 
 /*c++
 struct Parser {
@@ -31,9 +35,36 @@ struct Parser {
 };
 */
 
+Imported_File :: struct {
+	pkg: ^Package,
+	fi: os.File_Info,
+	pos: Pos, // import
+	index: int,
+}
+
+Parser :: struct {
+	init_fullpath: string,
+
+	imported_files: map[string]bool,
+	imported_files_mutex: sync.Mutex,
+
+	packages: [dynamic]^Package,
+	packages_mutex: sync.Mutex,
+
+	file_to_process_count: int,
+	total_token_count: int,
+	total_line_count: int,
+
+	file_decl_mutex: sync.Mutex,
+
+	err: Error_Handler,
+	warn: Warning_Handler,
+}
+
+/*
 Parser :: struct {
 	file: ^File,
-	tok: Tokenizer,
+	tokenizer: Tokenizer,
 
 	warn: Warning_Handler,
 	err: Error_Handler,
@@ -61,6 +92,8 @@ Parser :: struct {
 
 	peeking: bool,
 }
+*/
+
 
 MAX_FIX_COUNT :: 10
 
@@ -82,43 +115,89 @@ Import_Decl_Kind :: enum {
 	Using,
 }
 
-parse_file :: proc(p: ^Parser, file: ^File) -> bool {
-	p.file = file
+Parse_File_Error :: enum {
+	None,
+	Wrong_Extension,
+	Invalid_File,
+	Empty_File,
+	Permission,
+	Not_Found,
+	Invalid_Token,
+	General_Error,
+	File_Too_Large,
+	Directory_Already_Exists,
+}
+
+try_add_import_path :: proc(p: ^Parser, path: string, rel_path: string, pos: Pos, kind: Package_Kind = .Normal) -> ^Package {
+	if path in p.imported_files {
+		return nil
+	}
+	map_insert(&p.imported_files, path, true)
+
+	path := strings.clone(path, context.allocator) // Todo(Dragos): Change the allocation strategy around
 	
-	tokenizer_init(&p.tok, file.src, file.fullpath, p.err)
-	if p.tok.ch <= 0 {
-		return true
+	pkg := new_node(Package, NO_POS, NO_POS)
+	pkg.kind = kind
+	pkg.fullpath = path
+	pkg.files = make([dynamic]^File, context.allocator)
+	pkg.foreign_files = make([dynamic]^Foreign_File, context.allocator)
+
+	// Single file initial package
+	if kind == .Init && filepath.ext(path) == ".odin" {
+		fd, err := os.open(path, os.O_RDONLY)
+		fi: os.File_Info
+		if err != 0 {
+			error(p, NO_POS, "Failed to open file %s", path)
+			return nil
+		}
+		fi, err = os.fstat(fd, context.allocator)
+		if err != 0 {
+			error(p, NO_POS, "Failed to get file info of %s", path)
+		}
+
+		pkg.is_single_file = true
+		parser_add_package(p, pkg)
+
 	}
 
-	advance_token(p)
-	unimplemented()
+	return pkg
 }
 
-advance_token :: proc(p: ^Parser) -> Token {
-	p.lead_comment = nil
-	p.line_comment = nil
-	p.prev_tok = p.curr_tok
-	prev := p.prev_tok
-	if next_token0(p) {
-		consume_comment_groups(p, prev)
-	}
-	return prev
+parser_add_file_to_process :: proc(p: ^Parser, pkg: ^Package, fi: os.File_Info, pos: Pos) {
+	f := Imported_File{pkg, fi, pos, p.file_to_process_count + 1}
+	p.file_to_process_count += 1
+	// Todo(Dragos): add worker to pool, or process directly
 }
 
-next_token0 :: proc(p: ^Parser) -> bool {
-	p.curr_tok = scan(&p.tok)
-	if p.curr_tok.kind == .EOF {
-		error(p, p.curr_tok.pos, "token is EOF")
-		return false
-	}
+process_imported_file :: proc(p: ^Parser, imported_file: Imported_File) -> bool {
+	pkg := imported_file.pkg
+	fi := imported_file.fi
+	pos := imported_file.pos
 
+	file := new_node(File, NO_POS, NO_POS, context.allocator)
+	
+	file.pkg = pkg
+	file.id = imported_file.index + 1
+
+	err_pos, file_ok := file_init(file, fi.fullpath)
+	
 	return true
 }
 
-consume_comment_groups :: proc(p: ^Parser, prev: Token) {
+file_init :: proc(file: ^File, fullpath: string) -> (err_pos: Pos, ok: bool) {
 	unimplemented()
 }
 
-consume_comment_group :: proc(p: ^Parser, n: int) -> (comments: ^Comment_Group, end_line: int) {
-	unimplemented()
+parser_add_package :: proc(p: ^Parser, pkg: ^Package) {
+	pkg.id = len(p.packages) + 1
+	append(&p.packages, pkg)
+}
+
+parse_packages :: proc(p: ^Parser, init_filename: string) -> bool {
+	if init_fullpath, ok := filepath.abs(init_filename, context.allocator); ok {
+		error(p, Pos{}, "Failed to get the fullpath of %s", init_filename)
+		return false
+	}
+	
+	return true
 }

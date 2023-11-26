@@ -57,7 +57,7 @@ Package :: struct {
 	name: string,
 	fullpath: string,
 	files: [dynamic]^File, // NOTE(dragos): can this be an array?
-	// TODO(dragos): foreign_files: [dynamic]^ForeignFile
+	foreign_files: [dynamic]^Foreign_File,
 
 	is_single_file: bool,
 	order: int,
@@ -136,6 +136,7 @@ struct AstFile {
 };
 */
 
+/*
 File :: struct {
 	using node: Node,
 	id: int,
@@ -158,6 +159,24 @@ File :: struct {
 
 	syntax_warning_count: int,
 	syntax_error_count:   int,
+}
+*/
+
+File :: struct {
+	using node: Node,
+	id: int,
+	pkg: ^Package,
+}
+
+Foreign_File_Kind :: enum {
+	Invalid,
+	Source,
+}
+
+Foreign_File :: struct {
+	using node: Node,
+	kind: Foreign_File_Kind,
+	source: string,
 }
 
 
@@ -915,6 +934,7 @@ Matrix_Type :: struct {
 Any_Node :: union {
 	^Package,
 	^File,
+	^Foreign_File,
 	^Comment_Group,
 
 	^Bad_Expr,

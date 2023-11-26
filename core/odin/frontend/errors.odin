@@ -29,15 +29,16 @@ parser_error :: proc(p: ^Parser, pos: Pos, msg: string, args: ..any) {
 	if p.err != nil {
 		p.err(pos, msg, ..args)
 	}
-	p.file.syntax_error_count += 1
-	p.error_count += 1
+	//p.file.syntax_error_count += 1
+	//p.error_count += 1
+	// TODO(Dragos): Modify this
 }
 
 parser_warn :: proc(p: ^Parser, pos: Pos, msg: string, args: ..any) {
 	if p.warn != nil {
 		p.warn(pos, msg, ..args)
 	}
-	p.file.syntax_warning_count += 1
+	//p.file.syntax_warning_count += 1
 }
 
 error :: proc {
