@@ -119,7 +119,7 @@ build_odin() {
 }
 
 run_demo() {
-	./odin run examples/demo/demo.odin -file
+	./odin run examples/demo/demo.odin -file -- Hellope World
 }
 
 if [ $# -eq 0 ]; then
