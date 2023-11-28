@@ -270,6 +270,7 @@ enum BuildFlagKind {
 	BuildFlag_DisableRedZone,
 
 	BuildFlag_TestName,
+	BuildFlag_TestBuildOnly,
 
 	BuildFlag_DisallowDo,
 	BuildFlag_DefaultToNilAllocator,
@@ -456,6 +457,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_DisableRedZone,          str_lit("disable-red-zone"),          BuildFlagParam_None,    Command__does_build);
 
 	add_flag(&build_flags, BuildFlag_TestName,                str_lit("test-name"),                 BuildFlagParam_String,  Command_test);
+	add_flag(&build_flags, BuildFlag_TestBuildOnly,           str_lit("test-build-only"),           BuildFlagParam_None,    Command_test);
 
 	add_flag(&build_flags, BuildFlag_DisallowDo,              str_lit("disallow-do"),               BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_DefaultToNilAllocator,   str_lit("default-to-nil-allocator"),  BuildFlagParam_None,    Command__does_check);
@@ -694,11 +696,12 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							build_context.show_unused_with_location = true;
 							break;
 						}
-						case BuildFlag_ShowMoreTimings:
+						case BuildFlag_ShowMoreTimings: {
 							GB_ASSERT(value.kind == ExactValue_Invalid);
 							build_context.show_timings = true;
 							build_context.show_more_timings = true;
 							break;
+						}
 						case BuildFlag_ExportTimings: {
 							GB_ASSERT(value.kind == ExactValue_String);
 							/*
@@ -916,7 +919,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							break;
 						}
 
-						case BuildFlag_Subtarget:
+						case BuildFlag_Subtarget: {
 							if (selected_target_metrics == nullptr) {
 								gb_printf_err("-target must be set before -subtarget is used\n");
 								bad_flags = true;
@@ -951,6 +954,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 								}
 							}
 							break;
+						}
 
 						case BuildFlag_BuildMode: {
 							GB_ASSERT(value.kind == ExactValue_String);
@@ -1095,11 +1099,12 @@ gb_internal bool parse_build_flags(Array<String> args) {
 									break;
 								}
 								string_set_add(&build_context.test_names, name);
-
-								// NOTE(bill): Allow for multiple -test-name
 								continue;
 							}
 						}
+						case BuildFlag_TestBuildOnly:
+							build_context.test_build_only = true;
+							break;
 						case BuildFlag_DisallowDo:
 							build_context.disallow_do = true;
 							break;
@@ -1856,6 +1861,10 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 	if (test_only) {
 		print_usage_line(1, "-test-name:<string>");
 		print_usage_line(2, "Runs specific test only by name.");
+		print_usage_line(0, "");
+
+		print_usage_line(1, "-test-build-only");
+		print_usage_line(2, "Output the test binary without running tests.");
 		print_usage_line(0, "");
 	}
 
@@ -2697,6 +2706,7 @@ int main(int arg_count, char const **arg_ptr) {
 		show_timings(checker, &global_timings);
 	}
 
+	run_output = run_output && !build_context.test_build_only;
 	if (run_output) {
 		String exe_name = path_to_string(heap_allocator(), build_context.build_paths[BuildPath_Output]);
 		defer (gb_free(heap_allocator(), exe_name.text));
