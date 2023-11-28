@@ -2856,7 +2856,7 @@ internal_int_random :: proc(dest: ^Int, bits: int, r: ^rnd.Rand = nil, allocator
 		dest.digit[digits - 1] &= ((1 << uint(bits)) - 1)
 	}
 	dest.used = digits
-	return nil
+	return internal_clamp(dest)
 }
 internal_random :: proc { internal_int_random, }
 
