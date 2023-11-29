@@ -42,11 +42,18 @@ Imported_File :: struct {
 	index: int,
 }
 
+Collection :: struct {
+	name: string,
+	path: string,
+}
+
 Parser :: struct {
 	init_fullpath: string,
 
 	imported_files: map[string]bool,
 	imported_files_mutex: sync.Mutex,
+
+	collections: [dynamic]Collection,
 
 	packages: [dynamic]^Package,
 	packages_mutex: sync.Mutex,
@@ -60,42 +67,6 @@ Parser :: struct {
 	err: Error_Handler,
 	warn: Warning_Handler,
 }
-
-/*
-Parser :: struct {
-	file: ^File,
-	tokenizer: Tokenizer,
-
-	warn: Warning_Handler,
-	err: Error_Handler,
-
-	prev_tok: Token,
-	curr_tok: Token,
-
-	// >= 0: In Expression
-	// <  0: In Control Clause
-	// NOTE(bill): Used to prevent type literals in control clauses
-	expr_level: int,
-	allow_range: bool,
-	allow_in_expr: bool,
-	in_foreign_block: bool,
-	allow_type: bool,
-
-	lead_comment: ^Comment_Group,
-	line_comment: ^Comment_Group,
-
-	curr_proc: ^Node,
-
-	error_count: int,
-	fix_count: int,
-	fix_prev_pos: Pos,
-
-	peeking: bool,
-}
-*/
-
-
-MAX_FIX_COUNT :: 10
 
 default_parser :: proc() -> Parser {
 	return Parser {
@@ -128,40 +99,40 @@ Parse_File_Error :: enum {
 	Directory_Already_Exists,
 }
 
-try_add_import_path :: proc(p: ^Parser, path: string, rel_path: string, pos: Pos, kind: Package_Kind = .Normal) -> ^Package {
-	if path in p.imported_files {
-		return nil
-	}
-	map_insert(&p.imported_files, path, true)
-
-	path := strings.clone(path, context.allocator) // Todo(Dragos): Change the allocation strategy around
-	
-	pkg := new_node(Package, NO_POS, NO_POS)
-	pkg.kind = kind
-	pkg.fullpath = path
-	pkg.files = make([dynamic]^File, context.allocator)
-	pkg.foreign_files = make([dynamic]^Foreign_File, context.allocator)
-
-	// Single file initial package
-	if kind == .Init && filepath.ext(path) == ".odin" {
-		fd, err := os.open(path, os.O_RDONLY)
-		fi: os.File_Info
-		if err != 0 {
-			error(p, NO_POS, "Failed to open file %s", path)
-			return nil
+collection_path :: proc(p: ^Parser, name: string) -> (path: Maybe(string)) {
+	for collection in p.collections {
+		if collection.name == name {
+			return collection.path
 		}
-		fi, err = os.fstat(fd, context.allocator)
-		if err != 0 {
-			error(p, NO_POS, "Failed to get file info of %s", path)
-		}
-
-		pkg.is_single_file = true
-		parser_add_package(p, pkg)
-
 	}
-
-	return pkg
+	return nil
 }
+
+import_path_to_fullpath :: proc(p: ^Parser, pkg: ^Package, path: string, allocator := context.allocator) -> (fullpath: Maybe(string)) {
+	collection_and_relpath := strings.split(path, ":", context.temp_allocator)
+	switch len(collection_and_relpath) {
+	case 1: // Relative to the package path
+		return filepath.join({pkg.fullpath, collection_and_relpath[0]}, allocator)
+
+	case 2:
+		col_path := collection_path(p, collection_and_relpath[0])
+		if col_path, is_valid := col_path.?; is_valid {
+			return filepath.join({col_path, collection_and_relpath[1]}, allocator)
+		}
+	}
+	return nil
+}
+
+parser_add_collection :: proc(p: ^Parser, name: string, path: string) -> bool {
+	old_path := collection_path(p, name)
+	if old_path, is_valid := old_path.?; is_valid {
+		error(p, NO_POS, "Redaclaration of collection %s to %s. Was %s", name, path, old_path)
+		return false
+	}
+	append(&p.collections, Collection{name, path})
+	return true
+}
+
 
 parser_add_file_to_process :: proc(p: ^Parser, pkg: ^Package, fi: os.File_Info, pos: Pos) {
 	f := Imported_File{pkg, fi, pos, p.file_to_process_count + 1}
@@ -174,7 +145,7 @@ process_imported_file :: proc(p: ^Parser, imported_file: Imported_File) -> bool 
 	fi := imported_file.fi
 	pos := imported_file.pos
 
-	file := new_node(File, NO_POS, NO_POS, context.allocator)
+	file := new(File, context.allocator)
 	
 	file.pkg = pkg
 	file.id = imported_file.index + 1

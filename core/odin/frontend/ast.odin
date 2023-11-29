@@ -43,33 +43,8 @@ Comment_Group :: struct {
 	list: []Token,
 }
 
-Package_Kind :: enum {
-	Normal,
-	Runtime,
-	Init,
-}
-
-Package :: struct {
-	using node: Node,
-
-	kind: Package_Kind,
-	id: int,
-	name: string,
-	fullpath: string,
-	files: [dynamic]^File, // NOTE(dragos): can this be an array?
-	foreign_files: [dynamic]^Foreign_File,
-
-	is_single_file: bool,
-	order: int,
-
-	files_mutex: sync.Mutex,
-	foreign_files_mutex: sync.Mutex,
-	type_and_value_mutex: sync.Mutex,
-	name_mutex: sync.Mutex,
 
 
-	user_data: rawptr, // NOTE(dragos): what's this for?
-}
 
 /*c++
 struct AstFile {
@@ -136,48 +111,9 @@ struct AstFile {
 };
 */
 
-/*
-File :: struct {
-	using node: Node,
-	id: int,
-	pkg: ^Package,
 
-	fullpath: string,
-	src:      string,
 
-	docs: ^Comment_Group,
 
-	pkg_decl:  ^Package_Decl,
-	pkg_token: Token,
-	pkg_name:  string,
-
-	decls:   [dynamic]^Stmt,
-	imports: [dynamic]^Import_Decl,
-	directive_count: int,
-
-	comments: [dynamic]^Comment_Group,
-
-	syntax_warning_count: int,
-	syntax_error_count:   int,
-}
-*/
-
-File :: struct {
-	using node: Node,
-	id: int,
-	pkg: ^Package,
-}
-
-Foreign_File_Kind :: enum {
-	Invalid,
-	Source,
-}
-
-Foreign_File :: struct {
-	using node: Node,
-	kind: Foreign_File_Kind,
-	source: string,
-}
 
 
 // Base Types
@@ -932,11 +868,7 @@ Matrix_Type :: struct {
 
 
 Any_Node :: union {
-	^Package,
-	^File,
-	^Foreign_File,
 	^Comment_Group,
-
 	^Bad_Expr,
 	^Ident,
 	^Implicit,
