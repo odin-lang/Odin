@@ -5,6 +5,7 @@ foreign import gdi32 "system:Gdi32.lib"
 
 @(default_calling_convention="stdcall")
 foreign gdi32 {
+	GetDeviceCaps :: proc(hdc: HDC, index: int) -> c_int ---
 	GetStockObject :: proc(i: c_int) -> HGDIOBJ ---
 	SelectObject :: proc(hdc: HDC, h: HGDIOBJ) -> HGDIOBJ ---
 	DeleteObject :: proc(ho: HGDIOBJ) -> BOOL ---

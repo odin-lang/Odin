@@ -132,7 +132,7 @@ foreign user32 {
 
 	GetKeyState :: proc(nVirtKey: c_int) -> SHORT ---
 	GetAsyncKeyState :: proc(vKey: c_int) -> SHORT ---
-	
+
 	GetKeyboardState :: proc(lpKeyState: PBYTE) -> BOOL ---
 
 	MapVirtualKeyW :: proc(uCode: UINT, uMapType: UINT) -> UINT ---
@@ -155,14 +155,18 @@ foreign user32 {
 	SetCursorPos :: proc(X: c_int, Y: c_int) -> BOOL ---
 	SetCursor :: proc(hCursor: HCURSOR) -> HCURSOR ---
 
+	EnumDisplayDevicesW :: proc (lpDevice: LPCWSTR, iDevNum: DWORD, lpDisplayDevice: PDISPLAY_DEVICEW, dwFlags: DWORD) -> BOOL ---
 	EnumDisplaySettingsW :: proc(lpszDeviceName: LPCWSTR, iModeNum: DWORD, lpDevMode: ^DEVMODEW) -> BOOL ---
 
 	MonitorFromPoint  :: proc(pt: POINT, dwFlags: Monitor_From_Flags) -> HMONITOR ---
 	MonitorFromRect   :: proc(lprc: LPRECT, dwFlags: Monitor_From_Flags) -> HMONITOR ---
 	MonitorFromWindow :: proc(hwnd: HWND, dwFlags: Monitor_From_Flags) -> HMONITOR ---
 	EnumDisplayMonitors :: proc(hdc: HDC, lprcClip: LPRECT, lpfnEnum: Monitor_Enum_Proc, dwData: LPARAM) -> BOOL ---
-	
+
 	EnumWindows :: proc(lpEnumFunc: Window_Enum_Proc, lParam: LPARAM) -> BOOL ---
+
+	IsProcessDPIAware :: proc() -> BOOL ---
+	SetProcessDPIAware :: proc() -> BOOL ---
 
 	SetThreadDpiAwarenessContext :: proc(dpiContext: DPI_AWARENESS_CONTEXT) -> DPI_AWARENESS_CONTEXT ---
 	GetThreadDpiAwarenessContext :: proc() -> DPI_AWARENESS_CONTEXT ---
@@ -471,8 +475,8 @@ WINDOWPLACEMENT :: struct {
 	flags: UINT,
 	showCmd: UINT,
 	ptMinPosition: POINT,
-  	ptMaxPosition: POINT,
-  	rcNormalPosition: RECT,
+	ptMaxPosition: POINT,
+	rcNormalPosition: RECT,
 }
 
 WINDOWINFO :: struct {
@@ -488,3 +492,13 @@ WINDOWINFO :: struct {
 	wCreatorVersion: WORD,
 }
 PWINDOWINFO :: ^WINDOWINFO
+
+DISPLAY_DEVICEW :: struct {
+	cb: DWORD,
+	DeviceName: [32]WCHAR,
+	DeviceString: [128]WCHAR,
+	StateFlags: DWORD,
+	DeviceID: [128]WCHAR,
+	DeviceKey: [128]WCHAR,
+}
+PDISPLAY_DEVICEW :: ^DISPLAY_DEVICEW
