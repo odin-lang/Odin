@@ -475,6 +475,12 @@ append_elem_string :: proc(array: ^$T/[dynamic]$E/u8, arg: $A/string, loc := #ca
 	return append_elems(array, ..args, loc=loc)
 }
 
+// The append_string built-in procedure appends all the elements from the slice to the end of a [dynamic]u8 like type
+@builtin
+append_elem_slice :: proc(array: ^$T/[dynamic]$E/u8, arg: $A/[]E, loc := #caller_location) -> (n: int, err: Allocator_Error) #optional_allocator_error {
+	return append_elems(array, ..args, loc=loc)
+}
+
 
 // The append_string built-in procedure appends multiple strings to the end of a [dynamic]u8 like type
 @builtin
@@ -491,7 +497,7 @@ append_string :: proc(array: ^$T/[dynamic]$E/u8, args: ..string, loc := #caller_
 }
 
 // The append built-in procedure appends elements to the end of a dynamic array
-@builtin append :: proc{append_elem, append_elems, append_elem_string}
+@builtin append :: proc{append_elem, append_elems, append_elem_string, append_elem_slice}
 
 
 @builtin
