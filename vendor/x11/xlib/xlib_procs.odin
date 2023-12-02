@@ -224,7 +224,7 @@ foreign xlib {
 	XGetWindowAttributes :: proc(
 		display: ^Display,
 		window:  Window,
-		attr:    XWindowAttributes,
+		attr:    ^XWindowAttributes,
 		) ---
 	XGetGeometry :: proc(
 		display:   ^Display,
@@ -251,6 +251,7 @@ foreign xlib {
 		display: ^Display,
 		window:  Window,
 		root:    ^Window,
+		child:   ^Window,
 		root_x:  ^i32,
 		root_y:  ^i32,
 		x:       ^i32,
@@ -394,7 +395,7 @@ foreign xlib {
 	XCreateColormap :: proc(
 		display:  ^Display,
 		window:   Window,
-		visual:   Visual,
+		visual:   ^Visual,
 		alloc:    ColormapAlloc,
 		) -> Colormap ---
 	XCopyColormapAndFree :: proc(
