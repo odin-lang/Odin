@@ -325,8 +325,17 @@ close :: proc(fd: Handle) -> Errno {
 	return ERROR_NONE
 }
 
+// If you read or write more than `SSIZE_MAX` bytes, OpenBSD returns `EINVAL`.
+// In practice a read/write call would probably never read/write these big buffers all at once,
+// which is why the number of bytes is returned and why there are procs that will call this in a
+// loop for you.
+// We set a max of 1GB to keep alignment and to be safe.
+@(private)
+MAX_RW :: 1 << 30
+
 read :: proc(fd: Handle, data: []byte) -> (int, Errno) {
-	bytes_read := _unix_read(fd, &data[0], c.size_t(len(data)))
+	to_read    := min(c.size_t(len(data)), MAX_RW)
+	bytes_read := _unix_read(fd, &data[0], to_read)
 	if bytes_read == -1 {
 		return -1, Errno(get_last_error())
 	}
@@ -337,7 +346,9 @@ write :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 	if len(data) == 0 {
 		return 0, ERROR_NONE
 	}
-	bytes_written := _unix_write(fd, &data[0], c.size_t(len(data)))
+
+	to_write      := min(c.size_t(len(data)), MAX_RW)
+	bytes_written := _unix_write(fd, &data[0], to_write)
 	if bytes_written == -1 {
 		return -1, Errno(get_last_error())
 	}
