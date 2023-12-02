@@ -54,6 +54,7 @@ _file_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, 
 			return io.query_utility({.Close, .Flush, .Read, .Read_At, .Write, .Write_At, .Seek, .Size, .Query})
 		}
 	}
+
 	if err == nil && os_err != 0 {
 		when ODIN_OS == .Windows {
 			if os_err == ERROR_HANDLE_EOF {
@@ -62,5 +63,12 @@ _file_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, 
 		}
 		err = .Unknown
 	}
+
+	when ODIN_OS != .Windows {
+		if err == nil && os_err == 0 && n == 0 {
+			err = .EOF
+		}
+	}
+
 	return
 }
