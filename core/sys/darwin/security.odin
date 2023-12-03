@@ -21,4 +21,6 @@ foreign security {
 	
 	// Generates an array of cryptographically secure random bytes.
 	SecRandomCopyBytes :: proc(rnd: SecRandomRef = kSecRandomDefault, count: uint, bytes: [^]byte) -> errSec ---
+
+	SecCopyErrorMessageString :: proc(status: errSec, reserved: rawptr = nil) -> CFStringRef ---
 }
