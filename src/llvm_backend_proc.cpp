@@ -316,7 +316,9 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 			lb_set_llvm_metadata(m, p, p->debug_info);
 		}
 
-		lb_add_string_attribute_to_proc(m, p->value, "frame-pointer", "all");
+		if (build_context.metrics.os == TargetOs_darwin) {
+			lb_add_string_attribute_to_proc(m, p->value, "frame-pointer", "non-leaf");
+		}
 	}
 
 	if (p->body && entity->pkg && ((entity->pkg->kind == Package_Normal) || (entity->pkg->kind == Package_Init))) {
