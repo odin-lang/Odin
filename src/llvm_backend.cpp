@@ -21,8 +21,8 @@
 #include "llvm_backend_stmt.cpp"
 #include "llvm_backend_proc.cpp"
 
-char *get_default_microarchitecture() {
-	char * default_march = "generic";
+String get_default_microarchitecture() {
+	String default_march = str_lit("generic");
 	if (build_context.metrics.arch == TargetArch_amd64) {
 		// NOTE(bill): x86-64-v2 is more than enough for everyone
 		//
@@ -32,9 +32,9 @@ char *get_default_microarchitecture() {
 		// x86-64-v4: AVX512F, AVX512BW, AVX512CD, AVX512DQ, AVX512VL
 		if (ODIN_LLVM_MINIMUM_VERSION_12) {
 			if (build_context.metrics.os == TargetOs_freestanding) {
-				default_march = "x86-64";
+				default_march = str_lit("x86-64");
 			} else {
-				default_march = "x86-64-v2";
+				default_march = str_lit("x86-64-v2");
 			}
 		}
 	}
@@ -2509,16 +2509,16 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 		code_mode = LLVMCodeModelKernel;
 	}
 
-	char const *host_cpu_name = LLVMGetHostCPUName();
-	char const *llvm_cpu = get_default_microarchitecture();
+	String      host_cpu_name = copy_string(permanent_allocator(), make_string_c(LLVMGetHostCPUName()));
+	String      llvm_cpu      = get_default_microarchitecture();
 	char const *llvm_features = "";
 	if (build_context.microarch.len != 0) {
 		if (build_context.microarch == "native") {
 			llvm_cpu = host_cpu_name;
 		} else {
-			llvm_cpu = alloc_cstring(permanent_allocator(), build_context.microarch);
+			llvm_cpu = copy_string(permanent_allocator(), build_context.microarch);
 		}
-		if (gb_strcmp(llvm_cpu, host_cpu_name) == 0) {
+		if (llvm_cpu == host_cpu_name) {
 			llvm_features = LLVMGetHostCPUFeatures();
 		}
 	}
@@ -2578,7 +2578,7 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 
 	for (auto const &entry : gen->modules) {
 		LLVMTargetMachineRef target_machine = LLVMCreateTargetMachine(
-			target, target_triple, llvm_cpu,
+			target, target_triple, (const char *)llvm_cpu.text,
 			llvm_features,
 			code_gen_level,
 			reloc_mode,
