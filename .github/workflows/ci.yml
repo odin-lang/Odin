@@ -3,11 +3,21 @@ on: [push, pull_request, workflow_dispatch]
 
 jobs:
   build_linux:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v4
       - name: Download LLVM, botan
-        run: sudo apt-get install llvm-11 clang-11 libbotan-2-dev botan
+        run: |
+          sudo ln -fs /usr/share/zoneinfo/UTC /etc/localtime
+          sudo apt-get update
+          sudo apt-get install -y --no-install-{recommends,suggests} \
+              git gpg software-properties-common libbotan-2-dev botan
+          sudo wget https://apt.llvm.org/llvm.sh
+          sudo chmod +x llvm.sh
+          sudo ./llvm.sh 17
+          sudo ln -fs /usr/bin/clang-17   /usr/bin/clang
+          sudo ln -fs /usr/bin/clang++-17 /usr/bin/clang++
+          sudo ln -fs /usr/bin/lld-17     /usr/bin/lld
       - name: build odin
         run: ./build_odin.sh release
       - name: Odin version
@@ -25,6 +35,15 @@ jobs:
       - name: Odin run -debug
         run: ./odin run examples/demo -debug
         timeout-minutes: 10
+      - name: Odin run -o:size
+        run: ./odin run examples/demo -o:size
+        timeout-minutes: 5
+      - name: Odin run -o:speed
+        run: ./odin run examples/demo -o:speed
+        timeout-minutes: 5
+      - name: Odin run -o:aggressive
+        run: ./odin run examples/demo -o:aggressive
+        timeout-minutes: 5
       - name: Odin check examples/all
         run: ./odin check examples/all -strict-style
         timeout-minutes: 10
@@ -55,11 +74,13 @@ jobs:
   build_macOS:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v4
       - name: Download LLVM, botan and setup PATH
+        env: { HOMEBREW_NO_AUTO_UPDATE: 1 }
         run: |
-          brew install llvm@13 botan
-          echo "/usr/local/opt/llvm@13/bin" >> $GITHUB_PATH
+          brew update
+          brew install llvm@17 botan
+          echo "/usr/local/opt/llvm@17/bin" >> $GITHUB_PATH
           TMP_PATH=$(xcrun --show-sdk-path)/user/include
           echo "CPATH=$TMP_PATH" >> $GITHUB_ENV
       - name: build odin
@@ -79,6 +100,15 @@ jobs:
       - name: Odin run -debug
         run: ./odin run examples/demo -debug
         timeout-minutes: 10
+      - name: Odin run -o:size
+        run: ./odin run examples/demo -o:size
+        timeout-minutes: 5
+      - name: Odin run -o:speed
+        run: ./odin run examples/demo -o:speed
+        timeout-minutes: 5
+      - name: Odin run -o:aggressive
+        run: ./odin run examples/demo -o:aggressive
+        timeout-minutes: 5
       - name: Odin check examples/all
         run: ./odin check examples/all -strict-style
         timeout-minutes: 10
@@ -101,7 +131,7 @@ jobs:
   build_windows:
     runs-on: windows-2022
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v4
       - name: build Odin
         shell: cmd
         run: |
@@ -130,6 +160,23 @@ jobs:
         run: |
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat
           odin run examples/demo -debug
+      - name: Odin run -o:size
+        shell: cmd
+        run: |
+          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat
+          odin run examples/demo -o:size
+        timeout-minutes: 10
+      - name: Odin run -o:speed
+        shell: cmd
+        run: |
+          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat
+          odin run examples/demo -o:speed
+        timeout-minutes: 10
+      - name: Odin run -o:aggressive
+        shell: cmd
+        run: |
+          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat
+          odin run examples/demo -o:aggressive
         timeout-minutes: 10
       - name: Odin check examples/all
         shell: cmd
