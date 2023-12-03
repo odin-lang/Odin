@@ -512,6 +512,40 @@ min_max :: proc(s: $S/[]$T) -> (min, max: T, ok: bool) where intrinsics.type_is_
 	return
 }
 
+// Find the index of the (first) minimum element in a slice.
+@(require_results)
+min_index :: proc(s: $S/[]$T) -> (min_index: int, ok: bool) where intrinsics.type_is_ordered(T) #optional_ok {
+	if len(s) == 0 {
+		return -1, false
+	}
+	min_index = 0
+	min_value := s[0]
+	for v, i in s[1:] {
+		if v < min_value {
+			min_value = v
+			min_index = i+1
+		}
+	}
+	return min_index, true
+}
+
+// Find the index of the (first) maximum element in a slice.
+@(require_results)
+max_index :: proc(s: $S/[]$T) -> (max_index: int, ok: bool) where intrinsics.type_is_ordered(T) #optional_ok {
+	if len(s) == 0 {
+		return -1, false
+	}
+	max_index = 0
+	max_value := s[0]
+	for v, i in s[1:] {
+		if v > max_value {
+			max_value = v
+			max_index = i+1
+		}
+	}
+	return max_index, true
+}
+
 @(require_results)
 any_of :: proc(s: $S/[]$T, value: T) -> bool where intrinsics.type_is_comparable(T) {
 	for v in s {

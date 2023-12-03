@@ -2544,6 +2544,7 @@ int main(int arg_count, char const **arg_ptr) {
 		}
 	}
 
+	String default_march = get_default_microarchitecture();
 	if (print_microarch_list) {
 		if (build_context.microarch != "?") {
 			gb_printf("Unknown microarchitecture '%.*s'.\n", LIT(build_context.microarch));
@@ -2553,8 +2554,6 @@ int main(int arg_count, char const **arg_ptr) {
 
 		String march_list  = target_microarch_list[build_context.metrics.arch];
 		String_Iterator it = {march_list, 0};
-
-		String default_march = make_string_c(get_default_microarchitecture());
 
 		for (;;) {
 			String str = string_split_iterator(&it, ',');
@@ -2574,6 +2573,7 @@ int main(int arg_count, char const **arg_ptr) {
 	}
 
 	if (build_context.show_debug_messages) {
+		debugf("Selected microarch: %.*s\n", LIT(default_march));
 		for_array(i, build_context.build_paths) {
 			String build_path = path_to_string(heap_allocator(), build_context.build_paths[i]);
 			debugf("build_paths[%ld]: %.*s\n", i, LIT(build_path));
