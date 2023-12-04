@@ -1683,7 +1683,7 @@ MemAllocatorProc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
 		MemFree(old_memory)
 		return nil, nil
 	
-	case .Resize:
+	case .Resize, .Resize_Non_Zeroed:
 		ptr := MemRealloc(old_memory, c.uint(size))
 		if ptr == nil {
 			err = .Out_Of_Memory

@@ -288,7 +288,7 @@ arena_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
 		err = .Mode_Not_Implemented
 	case .Free_All:
 		arena_free_all(arena, location)
-	case .Resize:
+	case .Resize, .Resize_Non_Zeroed:
 		old_data := ([^]byte)(old_memory)
 
 		switch {

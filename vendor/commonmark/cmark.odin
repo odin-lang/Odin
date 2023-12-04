@@ -507,7 +507,7 @@ cmark_allocator_proc :: proc(allocator_data: rawptr, mode: runtime.Allocator_Mod
 	case .Free_All:
 		return nil, .Mode_Not_Implemented
 
-	case .Resize:
+	case .Resize, .Resize_Non_Zeroed:
 		new_ptr := cmark_alloc.realloc(old_memory, c.size_t(size))
 		res = transmute([]byte)runtime.Raw_Slice{new_ptr, size}
 		if size > old_size {

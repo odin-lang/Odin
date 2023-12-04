@@ -80,6 +80,13 @@ log_allocator_proc :: proc(allocator_data: rawptr, mode: runtime.Allocator_Mode,
 				la.prefix, padding, old_memory, old_size, size, alignment,
 				location = location,
 			)
+		case .Resize_Non_Zeroed:
+			logf(
+				la.level,
+				"%s%s>>> ALLOCATOR(mode=.Resize_Non_Zeroed, ptr=%p, old_size=%d, size=%d, alignment=%d)",
+				la.prefix, padding, old_memory, old_size, size, alignment,
+				location = location,
+			)
 		case .Query_Features:
 			logf(
 				la.level,
