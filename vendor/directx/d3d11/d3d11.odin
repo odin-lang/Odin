@@ -3284,9 +3284,9 @@ IVideoContext_VTable :: struct {
 
 IUserDefinedAnnotation_UUID_STRING :: "B2DAAD8B-03D4-4DBF-95EB-32AB4B63D0AB"
 IUserDefinedAnnotation_UUID := &IID{0xB2DAAD8B, 0x03D4, 0x4DBF, {0x95, 0xEB, 0x32, 0xAB, 0x4B, 0x63, 0xD0, 0xAB}}
-IUserDefinedAnnotation :: struct #raw_union{
-#subtype iunknown : IUnknown,
-using id3d11userdefinedannotation_vtable : ^IUserDefinedAnnotation_VTable,
+IUserDefinedAnnotation :: struct #raw_union {
+	#subtype iunknown: IUnknown,
+	using id3d11userdefinedannotation_vtable: ^IUserDefinedAnnotation_VTable,
 }
 IUserDefinedAnnotation_VTable :: struct {
 	using iunknown_vtable : IUnknown_VTable,
