@@ -23,7 +23,9 @@ when ODIN_OS == .Windows {
 } else when ODIN_OS == .Darwin {
 	when ODIN_ARCH == .arm64 {
 		when RAYGUI_SHARED {
-			// #panic("Cannot link libraygui.450.dylib: not in the vendor collection")
+			foreign import lib {
+				"macos-arm64/libraygui.dylib"
+			}
 		} else {
 			foreign import lib {
 				"macos-arm64/libraygui.a",
@@ -34,7 +36,9 @@ when ODIN_OS == .Windows {
 		}
 	} else {
 		when RAYGUI_SHARED {
-			// #panic("Cannot link libraygui.450.dylib: not in the vendor collection")
+			foreign import lib {
+				"macos/libraygui.dylib"
+			}
 		} else {
 			foreign import lib {
 				"macos/libraygui.a",
