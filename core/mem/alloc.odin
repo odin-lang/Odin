@@ -11,6 +11,8 @@ Allocator_Mode :: enum byte {
 	Free_All,
 	Resize,
 	Query_Features,
+	Alloc_Non_Zeroed,
+	Resize_Non_Zeroed,
 }
 */
 

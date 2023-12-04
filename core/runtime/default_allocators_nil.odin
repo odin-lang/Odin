@@ -10,7 +10,7 @@ nil_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 		return nil, .None
 	case .Free_All:
 		return nil, .Mode_Not_Implemented
-	case .Resize:
+	case .Resize, .Resize_Non_Zeroed:
 		if size == 0 {
 			return nil, .None
 		}
@@ -54,6 +54,10 @@ panic_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 	case .Resize:
 		if size > 0 {
 			panic("panic allocator, .Resize called", loc=loc)
+		}
+	case .Resize_Non_Zeroed:
+		if size > 0 {
+			panic("panic allocator, .Alloc_Non_Zeroed called", loc=loc)
 		}
 	case .Free:
 		if old_memory != nil {
