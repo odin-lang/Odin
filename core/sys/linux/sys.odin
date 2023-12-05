@@ -2413,7 +2413,7 @@ epoll_wait :: proc(epfd: Fd, events: [^]EPoll_Event, count: i32, timeout: i32) -
 	} else {
 		// Convert milliseconds to nanosecond timespec
 		timeout_ns := Time_Spec {
-			time_sec = timeout * 1000,
+			time_sec = uint(timeout * 1000),
 			time_nsec = 0,
 		}
 		ret := syscall(SYS_epoll_pwait, epfd, events, count, &timeout_ns, rawptr(nil))
