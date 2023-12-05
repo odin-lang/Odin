@@ -885,6 +885,7 @@ Splits a string into parts based on a separator. If n < count of seperators, the
 Inputs:
 - s: The string to split.
 - sep: The separator string used to split the input string.
+- n: The maximum amount of parts to split the string into.
 - allocator: (default is context.allocator)
 
 Returns:
