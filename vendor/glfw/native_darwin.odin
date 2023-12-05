@@ -15,7 +15,7 @@ when GLFW_SHARED {
 
 @(default_calling_convention="c", link_prefix="glfw")
 foreign glfw {
-    GetCocoaWindow :: proc(window: WindowHandle) -> ^NS.Window ---
+    GetCocoaWindow :: proc(window: ^Window) -> ^NS.Window ---
 }
 
 // TODO:
