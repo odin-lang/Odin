@@ -684,7 +684,8 @@ gb_internal lbValue lb_emit_matrix_flatten(lbProcedure *p, lbValue m, Type *type
 	Type *mt = base_type(m.type);
 	GB_ASSERT(mt->kind == Type_Matrix);
 
-	if (lb_is_matrix_simdable(mt)) {
+	// TODO(bill): Determine why this fails on Windows sometimes
+	if (false && lb_is_matrix_simdable(mt)) {
 		LLVMValueRef vector = lb_matrix_to_trimmed_vector(p, m);
 		return lb_matrix_cast_vector_to_type(p, vector, type);
 	}
@@ -693,12 +694,28 @@ gb_internal lbValue lb_emit_matrix_flatten(lbProcedure *p, lbValue m, Type *type
 
 	i64 row_count = mt->Matrix.row_count;
 	i64 column_count = mt->Matrix.column_count;
+	TEMPORARY_ALLOCATOR_GUARD();
+
+	auto srcs = array_make<lbValue>(temporary_allocator(), 0, row_count*column_count);
+	auto dsts = array_make<lbValue>(temporary_allocator(), 0, row_count*column_count);
+
 	for (i64 j = 0; j < column_count; j++) {
 		for (i64 i = 0; i < row_count; i++) {
 			lbValue src = lb_emit_matrix_ev(p, m, i, j);
-			lbValue dst = lb_emit_array_epi(p, res.addr, i + j*row_count);
-			lb_emit_store(p, dst, src);
+			array_add(&srcs, src);
 		}
+	}
+
+	for (i64 j = 0; j < column_count; j++) {
+		for (i64 i = 0; i < row_count; i++) {
+			lbValue dst = lb_emit_array_epi(p, res.addr, i + j*row_count);
+			array_add(&dsts, dst);
+		}
+	}
+
+	GB_ASSERT(srcs.count == dsts.count);
+	for_array(i, srcs) {
+		lb_emit_store(p, dsts[i], srcs[i]);
 	}
 	return lb_addr_load(p, res);
 }
@@ -1069,6 +1086,7 @@ gb_internal lbValue lb_emit_arith(lbProcedure *p, TokenKind op, lbValue lhs, lbV
 			args[1] = rhs;
 
 			switch (type_size_of(ft)) {
+			case 2: return lb_emit_runtime_call(p, "quo_complex32", args);
 			case 4: return lb_emit_runtime_call(p, "quo_complex64", args);
 			case 8: return lb_emit_runtime_call(p, "quo_complex128", args);
 			default: GB_PANIC("Unknown float type"); break;
@@ -1145,6 +1163,7 @@ gb_internal lbValue lb_emit_arith(lbProcedure *p, TokenKind op, lbValue lhs, lbV
 			args[1] = rhs;
 
 			switch (8*type_size_of(ft)) {
+			case 16: return lb_emit_runtime_call(p, "mul_quaternion64", args);
 			case 32: return lb_emit_runtime_call(p, "mul_quaternion128", args);
 			case 64: return lb_emit_runtime_call(p, "mul_quaternion256", args);
 			default: GB_PANIC("Unknown float type"); break;
@@ -1157,6 +1176,7 @@ gb_internal lbValue lb_emit_arith(lbProcedure *p, TokenKind op, lbValue lhs, lbV
 			args[1] = rhs;
 
 			switch (8*type_size_of(ft)) {
+			case 16: return lb_emit_runtime_call(p, "quo_quaternion64", args);
 			case 32: return lb_emit_runtime_call(p, "quo_quaternion128", args);
 			case 64: return lb_emit_runtime_call(p, "quo_quaternion256", args);
 			default: GB_PANIC("Unknown float type"); break;
@@ -2919,6 +2939,12 @@ gb_internal lbValue lb_build_unary_and(lbProcedure *p, Ast *expr) {
 	} else if (is_type_soa_pointer(tv.type)) {
 		ast_node(ie, IndexExpr, ue_expr);
 		lbValue addr = lb_build_addr_ptr(p, ie->expr);
+
+		if (is_type_pointer(type_deref(addr.type))) {
+			addr = lb_emit_load(p, addr);
+		}
+		GB_ASSERT(is_type_pointer(addr.type));
+
 		lbValue index = lb_build_expr(p, ie->index);
 
 		if (!build_context.no_bounds_check) {

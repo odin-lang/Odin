@@ -203,7 +203,58 @@ pow10_f64 :: proc "contextless" (n: f64) -> f64 {
 	return 0
 }
 
+@(require_results)
+pow2_f64 :: proc "contextless" (#any_int exp: int) -> (res: f64) {
+	switch {
+	case exp >= -1022 && exp <= 1023: // Normal
+		return transmute(f64)(u64(exp + F64_BIAS) << F64_SHIFT)
+	case exp < -1075:                 // Underflow
+		return f64(0)
+	case exp == -1075:                // Underflow.
+		// Note that pow(2, -1075) returns 0h1 on Windows and 0h0 on macOS & Linux.
+		return 0h00000000_00000000
+	case exp < -1022:                 // Denormal
+		x := u64(exp + (F64_SHIFT + 1) + F64_BIAS) << F64_SHIFT
+		return f64(1) / (1 << (F64_SHIFT + 1)) * transmute(f64)x
+	case exp > 1023:                  // Overflow, +Inf
+		return 0h7ff00000_00000000
+	}
+	unreachable()
+}
 
+@(require_results)
+pow2_f32 :: proc "contextless" (#any_int exp: int) -> (res: f32) {
+	switch {
+	case exp >= -126 && exp <= 127:  // Normal
+		return transmute(f32)(u32(exp + F32_BIAS) << F32_SHIFT)
+	case exp < -151:                 // Underflow
+		return f32(0)
+	case exp < -126:                 // Denormal
+		x := u32(exp + (F32_SHIFT + 1) + F32_BIAS) << F32_SHIFT
+		return f32(1) / (1 << (F32_SHIFT + 1)) * transmute(f32)x
+	case exp > 127:                  // Overflow, +Inf
+		return 0h7f80_0000
+	}
+	unreachable()
+}
+
+@(require_results)
+pow2_f16 :: proc "contextless" (#any_int exp: int) -> (res: f16) {
+	switch {
+	case exp >= -14 && exp <= 15:    // Normal
+		return transmute(f16)(u16(exp + F16_BIAS) << F16_SHIFT)
+	case exp < -25:                  // Underflow
+		return 0h0000
+	case exp == -25:                 // Underflow
+		return 0h0001
+	case exp < -14:                  // Denormal
+		x := u16(exp + (F16_SHIFT + 1) + F16_BIAS) << F16_SHIFT
+		return f16(1) / (1 << (F16_SHIFT + 1)) * transmute(f16)x
+	case exp > 15:                   // Overflow, +Inf
+		return 0h7c00
+	}
+	unreachable()
+}
 
 @(require_results)
 ldexp_f64 :: proc "contextless" (val: f64, exp: int) -> f64 {
@@ -2261,17 +2312,17 @@ F32_NORMALIZE  :: 0
 F32_RADIX      :: 2
 F32_ROUNDS     :: 1
 
-F64_DIG        :: 15                       // # of decimal digits of precision
-F64_EPSILON    :: 2.2204460492503131e-016  // smallest such that 1.0+F64_EPSILON != 1.0
-F64_MANT_DIG   :: 53                       // # of bits in mantissa
-F64_MAX        :: 1.7976931348623158e+308  // max value
-F64_MAX_10_EXP :: 308                      // max decimal exponent
-F64_MAX_EXP    :: 1024                     // max binary exponent
-F64_MIN        :: 2.2250738585072014e-308  // min positive value
-F64_MIN_10_EXP :: -307                     // min decimal exponent
-F64_MIN_EXP    :: -1021                    // min binary exponent
-F64_RADIX      :: 2                        // exponent radix
-F64_ROUNDS     :: 1                        // addition rounding: near
+F64_DIG        :: 15                       // Number of representable decimal digits.
+F64_EPSILON    :: 2.2204460492503131e-016  // Smallest number such that `1.0 + F64_EPSILON != 1.0`.
+F64_MANT_DIG   :: 53                       // Number of bits in the mantissa.
+F64_MAX        :: 1.7976931348623158e+308  // Maximum representable value.
+F64_MAX_10_EXP :: 308                      // Maximum base-10 exponent yielding normalized value.
+F64_MAX_EXP    :: 1024                     // One greater than the maximum possible base-2 exponent yielding normalized value.
+F64_MIN        :: 2.2250738585072014e-308  // Minimum positive normalized value.
+F64_MIN_10_EXP :: -307                     // Minimum base-10 exponent yielding normalized value.
+F64_MIN_EXP    :: -1021                    // One greater than the minimum possible base-2 exponent yielding normalized value.
+F64_RADIX      :: 2                        // Exponent radix.
+F64_ROUNDS     :: 1                        // Addition rounding: near.
 
 
 F16_MASK  :: 0x1f

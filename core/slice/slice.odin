@@ -49,7 +49,7 @@ to_bytes :: proc "contextless" (s: []$T) -> []byte {
 	```
 	```
 	small_items := []byte{1, 0, 0, 0, 0, 0, 0, 0,
-	                      2, 0, 0, 0}
+						  2, 0, 0, 0}
 	large_items := slice.reinterpret([]i64, small_items)
 	assert(len(large_items) == 1) // only enough bytes to make 1 x i64; two would need at least 8 bytes.
 	```
@@ -78,7 +78,7 @@ swap_between :: proc(a, b: $T/[]$E) {
 	n := builtin.min(len(a), len(b))
 	if n >= 0 {
 		ptr_swap_overlapping(&a[0], &b[0], size_of(E)*n)
-	}	
+	}
 }
 
 
@@ -117,46 +117,95 @@ linear_search_proc :: proc(array: $A/[]$T, f: proc(T) -> bool) -> (index: int, f
 	return -1, false
 }
 
+/*
+	Binary search searches the given slice for the given element.
+	If the slice is not sorted, the returned index is unspecified and meaningless.
+
+	If the value is found then the returned int is the index of the matching element.
+	If there are multiple matches, then any one of the matches could be returned.
+
+	If the value is not found then the returned int is the index where a matching
+	element could be inserted while maintaining sorted order.
+
+	# Examples
+
+	Looks up a series of four elements. The first is found, with a
+	uniquely determined position; the second and third are not
+	found; the fourth could match any position in `[1, 4]`.
+
+	```
+	index: int
+	found: bool
+
+	s := []i32{0, 1, 1, 1, 1, 2, 3, 5, 8, 13, 21, 34, 55}
+
+	index, found = slice.binary_search(s, 13)
+	assert(index == 9 && found == true)
+
+	index, found = slice.binary_search(s, 4)
+	assert(index == 7 && found == false)
+
+	index, found = slice.binary_search(s, 100)
+	assert(index == 13 && found == false)
+
+	index, found = slice.binary_search(s, 1)
+	assert(index >= 1 && index <= 4 && found == true)
+	```
+
+	For slices of more complex types see: binary_search_by
+*/
 @(require_results)
 binary_search :: proc(array: $A/[]$T, key: T) -> (index: int, found: bool)
-	where intrinsics.type_is_ordered(T) #no_bounds_check {
-
-	n := len(array)
-	switch n {
-	case 0:
-		return -1, false
-	case 1:
-		if array[0] == key {
-			return 0, true
-		}
-		return -1, false
-	}
-
-	lo, hi := 0, n-1
-
-	for array[hi] != array[lo] && key >= array[lo] && key <= array[hi] {
-		when intrinsics.type_is_ordered_numeric(T) {
-			// NOTE(bill): This is technically interpolation search
-			m := lo + int((key - array[lo]) * T(hi - lo) / (array[hi] - array[lo]))
-		} else {
-			m := lo + (hi - lo)/2
-		}
+	where intrinsics.type_is_ordered(T) #no_bounds_check
+{
+	// I would like to use binary_search_by(array, key, cmp) here, but it doesn't like it:
+	// Cannot assign value 'cmp' of type 'proc($E, $E) -> Ordering' to 'proc(i32, i32) -> Ordering' in argument
+	return binary_search_by(array, key, proc(key: T, element: T) -> Ordering {
 		switch {
-		case array[m] < key:
-			lo = m + 1
-		case key < array[m]:
-			hi = m - 1
-		case:
-			return m, true
+			case element < key: return .Less
+			case element > key: return .Greater
+			case:               return .Equal
 		}
-	}
-
-	if key == array[lo] {
-		return lo, true
-	}
-	return -1, false
+	})
 }
 
+@(require_results)
+binary_search_by :: proc(array: $A/[]$T, key: T, f: proc(T, T) -> Ordering) -> (index: int, found: bool)
+	where intrinsics.type_is_ordered(T) #no_bounds_check
+{
+	// INVARIANTS:
+	// - 0 <= left <= (left + size = right) <= len(array)
+	// - f returns .Less    for everything in array[:left]
+	// - f returns .Greater for everything in array[right:]
+	size  := len(array)
+	left  := 0
+	right := size
+
+	for left < right {
+		mid := left + size / 2
+
+		// Steps to verify this is in-bounds:
+		// 1. We note that `size` is strictly positive due to the loop condition
+		// 2. Therefore `size/2 < size`
+		// 3. Adding `left` to both sides yields `(left + size/2) < (left + size)`
+		// 4. We know from the invariant that `left + size <= len(array)`
+		// 5. Therefore `left + size/2 < self.len()`
+		cmp := f(key, array[mid])
+
+		left  = mid + 1 if cmp == .Less    else left
+		right = mid     if cmp == .Greater else right
+
+		switch cmp {
+			case .Equal:   return mid, true
+			case .Less:    left  = mid + 1
+			case .Greater: right = mid
+		}
+
+		size = right - left
+	}
+
+	return left, false
+}
 
 @(require_results)
 equal :: proc(a, b: $T/[]$E) -> bool where intrinsics.type_is_comparable(E) {
@@ -461,6 +510,40 @@ min_max :: proc(s: $S/[]$T) -> (min, max: T, ok: bool) where intrinsics.type_is_
 		}
 	}
 	return
+}
+
+// Find the index of the (first) minimum element in a slice.
+@(require_results)
+min_index :: proc(s: $S/[]$T) -> (min_index: int, ok: bool) where intrinsics.type_is_ordered(T) #optional_ok {
+	if len(s) == 0 {
+		return -1, false
+	}
+	min_index = 0
+	min_value := s[0]
+	for v, i in s[1:] {
+		if v < min_value {
+			min_value = v
+			min_index = i+1
+		}
+	}
+	return min_index, true
+}
+
+// Find the index of the (first) maximum element in a slice.
+@(require_results)
+max_index :: proc(s: $S/[]$T) -> (max_index: int, ok: bool) where intrinsics.type_is_ordered(T) #optional_ok {
+	if len(s) == 0 {
+		return -1, false
+	}
+	max_index = 0
+	max_value := s[0]
+	for v, i in s[1:] {
+		if v > max_value {
+			max_value = v
+			max_index = i+1
+		}
+	}
+	return max_index, true
 }
 
 @(require_results)

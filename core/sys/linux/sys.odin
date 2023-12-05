@@ -185,7 +185,7 @@ mprotect :: proc "contextless" (addr: rawptr, size: uint, prot: Mem_Protection) 
 	Available since Linux 1.0.
 */
 munmap :: proc "contextless" (addr: rawptr, size: uint) -> (Errno) {
-	ret := syscall(SYS_mmap, addr, size)
+	ret := syscall(SYS_munmap, addr, size)
 	return Errno(-ret)
 }
 
@@ -504,7 +504,8 @@ where
 	T == Sock_Addr_In6 ||
 	T == Sock_Addr_Any
 {
-	ret := syscall(SYS_accept4, sock, addr, size_of(T), transmute(int) sockflags)
+	addr_len: i32 = size_of(T)
+	ret := syscall(SYS_accept4, sock, addr, &addr_len, transmute(int) sockflags)
 	return errno_unwrap(ret, Fd)
 }
 

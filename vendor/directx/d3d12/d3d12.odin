@@ -1905,7 +1905,6 @@ DESCRIPTOR_HEAP_TYPE :: enum i32 {
 	SAMPLER     = 1,
 	RTV         = 2,
 	DSV         = 3,
-	NUM_TYPES   = 4,
 }
 
 DESCRIPTOR_HEAP_FLAGS :: distinct bit_set[DESCRIPTOR_HEAP_FLAG; u32]

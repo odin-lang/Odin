@@ -35,7 +35,7 @@ nil_allocator :: proc() -> Allocator {
 when ODIN_OS == .Freestanding {
 	default_allocator_proc :: nil_allocator_proc
 	default_allocator :: nil_allocator
-} 
+}
 
 
 
@@ -78,9 +78,7 @@ panic_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 
 panic_allocator :: proc() -> Allocator {
 	return Allocator{
-		procedure = nil_allocator_proc,
+		procedure = panic_allocator_proc,
 		data = nil,
 	}
 }
-
-

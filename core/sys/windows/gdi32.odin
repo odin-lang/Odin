@@ -10,6 +10,8 @@ foreign gdi32 {
 	DeleteObject :: proc(ho: HGDIOBJ) -> BOOL ---
 	SetBkColor :: proc(hdc: HDC, color: COLORREF) -> COLORREF ---
 
+	CreateCompatibleDC :: proc(hdc: HDC) -> HDC ---
+
 	CreateDIBPatternBrush :: proc(h: HGLOBAL, iUsage: UINT) -> HBRUSH ---
 
 	CreateDIBitmap :: proc(
@@ -81,6 +83,11 @@ foreign gdi32 {
 	GetTextMetricsW :: proc(hdc: HDC, lptm: LPTEXTMETRICW) -> BOOL ---
 
 	CreateSolidBrush :: proc(color: COLORREF) -> HBRUSH ---
+
+	GetObjectW :: proc(h: HANDLE, c: c_int, pv: LPVOID) -> int ---
+	CreateCompatibleBitmap :: proc(hdc: HDC, cx, cy: c_int) -> HBITMAP ---
+	BitBlt :: proc(hdc: HDC, x, y, cx, cy: c_int, hdcSrc: HDC, x1, y1: c_int, rop: DWORD) -> BOOL ---
+	GetDIBits :: proc(hdc: HDC, hbm: HBITMAP, start, cLines: UINT, lpvBits: LPVOID, lpbmi: ^BITMAPINFO, usage: UINT) -> int ---
 }
 
 RGB :: #force_inline proc "contextless" (r, g, b: u8) -> COLORREF {

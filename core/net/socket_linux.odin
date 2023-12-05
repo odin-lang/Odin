@@ -125,7 +125,7 @@ _create_socket :: proc(family: Address_Family, protocol: Socket_Protocol) -> (An
 }
 
 @(private)
-_dial_tcp_from_endpoint :: proc(endpoint: Endpoint, options := default_tcp_options) -> (tcp_sock: TCP_Socket, err: Network_Error) {
+_dial_tcp_from_endpoint :: proc(endpoint: Endpoint, options := default_tcp_options) -> (TCP_Socket, Network_Error) {
 	errno: linux.Errno
 	if endpoint.port == 0 {
 		return 0, .Port_Required
@@ -143,7 +143,7 @@ _dial_tcp_from_endpoint :: proc(endpoint: Endpoint, options := default_tcp_optio
 	reuse_addr: b32 = true
 	_ = linux.setsockopt(os_sock, linux.SOL_SOCKET, linux.Socket_Option.REUSEADDR, &reuse_addr)
 	addr := _unwrap_os_addr(endpoint)
-	errno = linux.connect(linux.Fd(tcp_sock), &addr)
+	errno = linux.connect(linux.Fd(os_sock), &addr)
 	if errno != .NONE {
 		return cast(TCP_Socket) os_sock, Dial_Error(errno)
 	}
@@ -333,7 +333,9 @@ _set_option :: proc(sock: Any_Socket, option: Socket_Option, value: any, loc := 
 		.Send_Timeout,
 		.Receive_Timeout:
 			t, ok := value.(time.Duration)
-			if !ok do panic("set_option() value must be a time.Duration here", loc)
+			if !ok {
+				panic("set_option() value must be a time.Duration here", loc)
+			}
 
 			micros := cast(i64) (time.duration_microseconds(t))
 			timeval_value.microseconds = cast(int) (micros % 1e6)

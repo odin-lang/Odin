@@ -337,20 +337,34 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 							obj_format = str_lit("elf32");
 						}
 #endif // GB_ARCH_*_BIT
-						// Note(bumbread): I'm assuming nasm is installed on the host machine.
-						// Shipping binaries on unix-likes gets into the weird territorry of
-						// "which version of glibc" is it linked with.
-						result = system_exec_command_line_app("nasm",
-							"nasm \"%.*s\" "
-							"-f \"%.*s\" "
-							"-o \"%.*s\" "
-							"%.*s "
-							"",
-							LIT(asm_file),
-							LIT(obj_format),
-							LIT(obj_file),
-							LIT(build_context.extra_assembler_flags)
-						);						
+
+						if (is_osx) {
+							// `as` comes with MacOS.
+							result = system_exec_command_line_app("as",
+								"as \"%.*s\" "
+								"-o \"%.*s\" "
+								"%.*s "
+								"",
+								LIT(asm_file),
+								LIT(obj_file),
+								LIT(build_context.extra_assembler_flags)
+							);
+						} else {
+							// Note(bumbread): I'm assuming nasm is installed on the host machine.
+							// Shipping binaries on unix-likes gets into the weird territorry of
+							// "which version of glibc" is it linked with.
+							result = system_exec_command_line_app("nasm",
+								"nasm \"%.*s\" "
+								"-f \"%.*s\" "
+								"-o \"%.*s\" "
+								"%.*s "
+								"",
+								LIT(asm_file),
+								LIT(obj_format),
+								LIT(obj_file),
+								LIT(build_context.extra_assembler_flags)
+							);						
+						}
 						array_add(&gen->output_object_paths, obj_file);
 					} else {
 						if (string_set_update(&libs, lib)) {

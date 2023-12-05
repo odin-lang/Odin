@@ -109,7 +109,7 @@ remove_range :: proc(array: ^$D/[dynamic]$T, lo, hi: int, loc := #caller_locatio
 
 // `pop` will remove and return the end value of dynamic array `array` and reduces the length of `array` by 1.
 //
-// Note: If the dynamic array as no elements (`len(array) == 0`), this procedure will panic.
+// Note: If the dynamic array has no elements (`len(array) == 0`), this procedure will panic.
 @builtin
 pop :: proc(array: ^$T/[dynamic]$E, loc := #caller_location) -> (res: E) #no_bounds_check {
 	assert(len(array) > 0, loc=loc)

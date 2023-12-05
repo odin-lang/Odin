@@ -2211,9 +2211,14 @@ gb_internal void add_min_dep_type_info(Checker *c, Type *t) {
 				Entity *e = entry.value;
 				switch (bt->Struct.soa_kind) {
 				case StructSoa_Dynamic:
+					add_min_dep_type_info(c, t_type_info_ptr); // append_soa
+
 					add_min_dep_type_info(c, t_allocator);
 					/*fallthrough*/
 				case StructSoa_Slice:
+					add_min_dep_type_info(c, t_int);
+					add_min_dep_type_info(c, t_uint);
+					/*fallthrough*/
 				case StructSoa_Fixed:
 					add_min_dep_type_info(c, alloc_type_pointer(e->type));
 					break;
@@ -4733,7 +4738,7 @@ gb_internal void check_add_foreign_import_decl(CheckerContext *ctx, Ast *decl) {
 	}
 
 	if (has_asm_extension(fullpath)) {
-		if (build_context.metrics.arch != TargetArch_amd64) {
+		if (build_context.metrics.arch != TargetArch_amd64 && build_context.metrics.os != TargetOs_darwin) {
 			error(decl, "Assembly files are not yet supported on this platform: %.*s_%.*s",
 			      LIT(target_os_names[build_context.metrics.os]), LIT(target_arch_names[build_context.metrics.arch]));
 		}
@@ -6091,9 +6096,6 @@ gb_internal void check_parsed_files(Checker *c) {
 	TIME_SECTION("calculate global init order");
 	calculate_global_init_order(c);
 
-	TIME_SECTION("check test procedures");
-	check_test_procedures(c);
-
 	TIME_SECTION("add type info for type definitions");
 	add_type_info_for_type_definitions(c);
 	check_merge_queues_into_arrays(c);
@@ -6103,6 +6105,11 @@ gb_internal void check_parsed_files(Checker *c) {
 
 	TIME_SECTION("generate minimum dependency set");
 	generate_minimum_dependency_set(c, c->info.entry_point);
+
+	// NOTE(laytan): has to be ran after generate_minimum_dependency_set,
+	// because that collects the test procedures.
+	TIME_SECTION("check test procedures");
+	check_test_procedures(c);
 
 	TIME_SECTION("check bodies have all been checked");
 	check_unchecked_bodies(c);

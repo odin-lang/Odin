@@ -116,26 +116,21 @@ run_with_data :: proc(data: rawptr, fn: proc(data: rawptr), init_context: Maybe(
 }
 
 run_with_poly_data :: proc(data: $T, fn: proc(data: T), init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal)
-	where size_of(T) <= size_of(rawptr) {
+	where size_of(T) <= size_of(rawptr) * MAX_USER_ARGUMENTS {
 	create_and_start_with_poly_data(data, fn, init_context, priority, true)
 }
 
 run_with_poly_data2 :: proc(arg1: $T1, arg2: $T2, fn: proc(T1, T2), init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal)
-	where size_of(T1) <= size_of(rawptr),
-	      size_of(T2) <= size_of(rawptr) {
+	where size_of(T1) + size_of(T2) <= size_of(rawptr) * MAX_USER_ARGUMENTS {
 	create_and_start_with_poly_data2(arg1, arg2, fn, init_context, priority, true)
 }
 
 run_with_poly_data3 :: proc(arg1: $T1, arg2: $T2, arg3: $T3, fn: proc(arg1: T1, arg2: T2, arg3: T3), init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal)
-	where size_of(T1) <= size_of(rawptr),
-	      size_of(T2) <= size_of(rawptr),
-	      size_of(T3) <= size_of(rawptr) {
+	where size_of(T1) + size_of(T2) + size_of(T3) <= size_of(rawptr) * MAX_USER_ARGUMENTS {
 	create_and_start_with_poly_data3(arg1, arg2, arg3, fn, init_context, priority, true)
 }
 run_with_poly_data4 :: proc(arg1: $T1, arg2: $T2, arg3: $T3, arg4: $T4, fn: proc(arg1: T1, arg2: T2, arg3: T3, arg4: T4), init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal)
-	where size_of(T1) <= size_of(rawptr),
-	      size_of(T2) <= size_of(rawptr),
-	      size_of(T3) <= size_of(rawptr) {
+	where size_of(T1) + size_of(T2) + size_of(T3) + size_of(T4) <= size_of(rawptr) * MAX_USER_ARGUMENTS {
 	create_and_start_with_poly_data4(arg1, arg2, arg3, arg4, fn, init_context, priority, true)
 }
 
@@ -147,7 +142,9 @@ create_and_start :: proc(fn: proc(), init_context: Maybe(runtime.Context) = nil,
 	}
 	t := create(thread_proc, priority)
 	t.data = rawptr(fn)
-	if self_cleanup do t.flags += {.Self_Cleanup}
+	if self_cleanup {
+		t.flags += {.Self_Cleanup}
+	}
 	t.init_context = init_context
 	start(t)
 	return t
@@ -167,14 +164,16 @@ create_and_start_with_data :: proc(data: rawptr, fn: proc(data: rawptr), init_co
 	t.data = rawptr(fn)
 	t.user_index = 1
 	t.user_args = data
-	if self_cleanup do t.flags += {.Self_Cleanup}
+	if self_cleanup {
+		t.flags += {.Self_Cleanup}
+	}
 	t.init_context = init_context
 	start(t)
 	return t
 }
 
 create_and_start_with_poly_data :: proc(data: $T, fn: proc(data: T), init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal, self_cleanup := false) -> ^Thread
-	where size_of(T) <= size_of(rawptr) {
+	where size_of(T) <= size_of(rawptr) * MAX_USER_ARGUMENTS {
 	thread_proc :: proc(t: ^Thread) {
 		fn := cast(proc(T))t.data
 		assert(t.user_index >= 1)
@@ -184,87 +183,117 @@ create_and_start_with_poly_data :: proc(data: $T, fn: proc(data: T), init_contex
 	t := create(thread_proc, priority)
 	t.data = rawptr(fn)
 	t.user_index = 1
+
 	data := data
-	mem.copy(&t.user_args[0], &data, size_of(data))
-	if self_cleanup do t.flags += {.Self_Cleanup}
+
+	mem.copy(&t.user_args[0], &data, size_of(T))
+
+	if self_cleanup {
+		t.flags += {.Self_Cleanup}
+	}
+
 	t.init_context = init_context
 	start(t)
 	return t
 }
 
 create_and_start_with_poly_data2 :: proc(arg1: $T1, arg2: $T2, fn: proc(T1, T2), init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal, self_cleanup := false) -> ^Thread
-	where size_of(T1) <= size_of(rawptr),
-	      size_of(T2) <= size_of(rawptr) {
+	where size_of(T1) + size_of(T2) <= size_of(rawptr) * MAX_USER_ARGUMENTS {
 	thread_proc :: proc(t: ^Thread) {
 		fn := cast(proc(T1, T2))t.data
 		assert(t.user_index >= 2)
-		arg1 := (^T1)(&t.user_args[0])^
-		arg2 := (^T2)(&t.user_args[1])^
+		
+		user_args := mem.slice_to_bytes(t.user_args[:])
+		arg1 := (^T1)(raw_data(user_args))^
+		arg2 := (^T2)(raw_data(user_args[size_of(T1):]))^
+
 		fn(arg1, arg2)
 	}
 	t := create(thread_proc, priority)
 	t.data = rawptr(fn)
 	t.user_index = 2
+
 	arg1, arg2 := arg1, arg2
-	mem.copy(&t.user_args[0], &arg1, size_of(arg1))
-	mem.copy(&t.user_args[1], &arg2, size_of(arg2))
-	if self_cleanup do t.flags += {.Self_Cleanup}
+	user_args := mem.slice_to_bytes(t.user_args[:])
+
+	n := copy(user_args,     mem.ptr_to_bytes(&arg1))
+	_  = copy(user_args[n:], mem.ptr_to_bytes(&arg2))
+
+	if self_cleanup {
+		t.flags += {.Self_Cleanup}
+	}
+
 	t.init_context = init_context
 	start(t)
 	return t
 }
 
 create_and_start_with_poly_data3 :: proc(arg1: $T1, arg2: $T2, arg3: $T3, fn: proc(arg1: T1, arg2: T2, arg3: T3), init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal, self_cleanup := false) -> ^Thread
-	where size_of(T1) <= size_of(rawptr),
-	      size_of(T2) <= size_of(rawptr),
-	      size_of(T3) <= size_of(rawptr) {
+	where size_of(T1) + size_of(T2) + size_of(T3) <= size_of(rawptr) * MAX_USER_ARGUMENTS {
 	thread_proc :: proc(t: ^Thread) {
 		fn := cast(proc(T1, T2, T3))t.data
 		assert(t.user_index >= 3)
-		arg1 := (^T1)(&t.user_args[0])^
-		arg2 := (^T2)(&t.user_args[1])^
-		arg3 := (^T3)(&t.user_args[2])^
+
+		user_args := mem.slice_to_bytes(t.user_args[:])
+		arg1 := (^T1)(raw_data(user_args))^
+		arg2 := (^T2)(raw_data(user_args[size_of(T1):]))^
+		arg3 := (^T3)(raw_data(user_args[size_of(T1) + size_of(T2):]))^
+
 		fn(arg1, arg2, arg3)
 	}
 	t := create(thread_proc, priority)
 	t.data = rawptr(fn)
 	t.user_index = 3
+
 	arg1, arg2, arg3 := arg1, arg2, arg3
-	mem.copy(&t.user_args[0], &arg1, size_of(arg1))
-	mem.copy(&t.user_args[1], &arg2, size_of(arg2))
-	mem.copy(&t.user_args[2], &arg3, size_of(arg3))
-	if self_cleanup do t.flags += {.Self_Cleanup}
+	user_args := mem.slice_to_bytes(t.user_args[:])
+
+	n := copy(user_args,     mem.ptr_to_bytes(&arg1))
+	n += copy(user_args[n:], mem.ptr_to_bytes(&arg2))
+	_  = copy(user_args[n:], mem.ptr_to_bytes(&arg3))
+
+	if self_cleanup {
+		t.flags += {.Self_Cleanup}
+	}
+
 	t.init_context = init_context
 	start(t)
 	return t
 }
 create_and_start_with_poly_data4 :: proc(arg1: $T1, arg2: $T2, arg3: $T3, arg4: $T4, fn: proc(arg1: T1, arg2: T2, arg3: T3, arg4: T4), init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal, self_cleanup := false) -> ^Thread
-	where size_of(T1) <= size_of(rawptr),
-	      size_of(T2) <= size_of(rawptr),
-	      size_of(T3) <= size_of(rawptr) {
+	where size_of(T1) + size_of(T2) + size_of(T3) + size_of(T4) <= size_of(rawptr) * MAX_USER_ARGUMENTS {
 	thread_proc :: proc(t: ^Thread) {
 		fn := cast(proc(T1, T2, T3, T4))t.data
 		assert(t.user_index >= 4)
-		arg1 := (^T1)(&t.user_args[0])^
-		arg2 := (^T2)(&t.user_args[1])^
-		arg3 := (^T3)(&t.user_args[2])^
-		arg4 := (^T4)(&t.user_args[3])^
+
+		user_args := mem.slice_to_bytes(t.user_args[:])
+		arg1 := (^T1)(raw_data(user_args))^
+		arg2 := (^T2)(raw_data(user_args[size_of(T1):]))^
+		arg3 := (^T3)(raw_data(user_args[size_of(T1) + size_of(T2):]))^
+		arg4 := (^T4)(raw_data(user_args[size_of(T1) + size_of(T2) + size_of(T3):]))^
+
 		fn(arg1, arg2, arg3, arg4)
 	}
 	t := create(thread_proc, priority)
 	t.data = rawptr(fn)
 	t.user_index = 4
+
 	arg1, arg2, arg3, arg4 := arg1, arg2, arg3, arg4
-	mem.copy(&t.user_args[0], &arg1, size_of(arg1))
-	mem.copy(&t.user_args[1], &arg2, size_of(arg2))
-	mem.copy(&t.user_args[2], &arg3, size_of(arg3))
-	mem.copy(&t.user_args[3], &arg4, size_of(arg4))
-	if self_cleanup do t.flags += {.Self_Cleanup}
+	user_args := mem.slice_to_bytes(t.user_args[:])
+
+	n := copy(user_args,     mem.ptr_to_bytes(&arg1))
+	n += copy(user_args[n:], mem.ptr_to_bytes(&arg2))
+	n += copy(user_args[n:], mem.ptr_to_bytes(&arg3))
+	_  = copy(user_args[n:], mem.ptr_to_bytes(&arg4))
+
+	if self_cleanup {
+		t.flags += {.Self_Cleanup}
+	}
+
 	t.init_context = init_context
 	start(t)
 	return t
 }
-
 
 _select_context_for_thread :: proc(init_context: Maybe(runtime.Context)) -> runtime.Context {
 	ctx, ok := init_context.?

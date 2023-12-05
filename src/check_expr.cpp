@@ -2339,7 +2339,7 @@ gb_internal void check_unary_expr(CheckerContext *c, Operand *o, Token op, Ast *
 			ast_node(ue, UnaryExpr, node);
 			if (ast_node_expect(ue->expr, Ast_IndexExpr)) {
 				ast_node(ie, IndexExpr, ue->expr);
-				Type *soa_type = type_of_expr(ie->expr);
+				Type *soa_type = type_deref(type_of_expr(ie->expr));
 				GB_ASSERT(is_type_soa_struct(soa_type));
 				o->type = alloc_type_soa_pointer(soa_type);
 			} else {
@@ -2768,6 +2768,11 @@ gb_internal void check_shift(CheckerContext *c, Operand *x, Operand *y, Ast *nod
 					gb_string_free(to_type);
 					x->mode = Addressing_Invalid;
 				}
+			} else if (!is_type_integer(x->type)) {
+				gbString x_str = expr_to_string(x->expr);
+				error(node, "Non-integer shifted operand '%s' is not allowed", x_str);
+				gb_string_free(x_str);
+				x->mode = Addressing_Invalid;
 			}
 			// x->value = x_val;
 			return;
@@ -3556,6 +3561,30 @@ gb_internal void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Typ
 	if (token_is_shift(op.kind)) {
 		check_shift(c, x, y, node, type_hint);
 		return;
+	}
+
+	switch (op.kind) {
+	case Token_Quo:
+	case Token_Mod:
+	case Token_ModMod:
+	case Token_QuoEq:
+	case Token_ModEq:
+	case Token_ModModEq:
+		if (is_type_integer(y->type) && !is_type_untyped(y->type) &&
+		    is_type_float(x->type)   &&  is_type_untyped(x->type)) {
+		    	char const *suggestion = "\tSuggestion: Try explicitly casting the constant value for clarity";
+
+		    	gbString t = type_to_string(y->type);
+			if (x->value.kind != ExactValue_Invalid) {
+				gbString s = exact_value_to_string(x->value);
+				warning(node, "Dividing an untyped float '%s' by '%s' will perform integer division\n%s", s, t, suggestion);
+				gb_string_free(s);
+			} else {
+				warning(node, "Dividing an untyped float by '%s' will perform integer division\n%s", t, suggestion);
+			}
+			gb_string_free(t);
+		}
+		break;
 	}
 
 	convert_to_typed(c, x, y->type);
@@ -5577,9 +5606,6 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 	for (isize i = 0; i < pt->param_count; i++) {
 		if (!visited[i]) {
 			Entity *e = pt->params->Tuple.variables[i];
-			if (is_blank_ident(e->token)) {
-				continue;
-			}
 			if (e->kind == Entity_Variable) {
 				if (e->Variable.param_value.kind != ParameterValue_Invalid) {
 					ordered_operands[i].mode = Addressing_Value;
@@ -5623,6 +5649,14 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 			} else {
 				if (show_error) {
 					check_assignment(c, o, param_type, str_lit("procedure argument"));
+
+					Type *src = base_type(o->type);
+					Type *dst = base_type(param_type);
+					if (is_type_slice(src) && are_types_identical(src->Slice.elem, dst)) {
+						gbString a = expr_to_string(o->expr);
+						error_line("\tSuggestion: Did you mean to pass the slice into the variadic parameter with ..%s?\n\n", a);
+						gb_string_free(a);
+					}
 				}
 				err = CallArgumentError_WrongTypes;
 			}
@@ -7391,7 +7425,7 @@ gb_internal bool check_set_index_data(Operand *o, Type *t, bool indirection, i64
 				*max_count = t->Struct.soa_count;
 			}
 			o->type = t->Struct.soa_elem;
-			if (o->mode == Addressing_SoaVariable || o->mode == Addressing_Variable) {
+			if (o->mode == Addressing_SoaVariable || o->mode == Addressing_Variable || indirection) {
 				o->mode = Addressing_SoaVariable;
 			} else {
 				o->mode = Addressing_Value;

@@ -136,6 +136,7 @@ foreign user32 {
 	GetKeyboardState :: proc(lpKeyState: PBYTE) -> BOOL ---
 
 	MapVirtualKeyW :: proc(uCode: UINT, uMapType: UINT) -> UINT ---
+	ToUnicode :: proc(nVirtKey: UINT, wScanCode: UINT, lpKeyState: ^BYTE, pwszBuff: LPWSTR, cchBuff: c_int, wFlags: UINT) -> c_int ---
 
 	SetWindowsHookExW :: proc(idHook: c_int, lpfn: HOOKPROC, hmod: HINSTANCE, dwThreadId: DWORD) -> HHOOK ---
 	UnhookWindowsHookEx :: proc(hhk: HHOOK) -> BOOL ---
@@ -160,6 +161,8 @@ foreign user32 {
 	MonitorFromRect   :: proc(lprc: LPRECT, dwFlags: Monitor_From_Flags) -> HMONITOR ---
 	MonitorFromWindow :: proc(hwnd: HWND, dwFlags: Monitor_From_Flags) -> HMONITOR ---
 	EnumDisplayMonitors :: proc(hdc: HDC, lprcClip: LPRECT, lpfnEnum: Monitor_Enum_Proc, dwData: LPARAM) -> BOOL ---
+	
+	EnumWindows :: proc(lpEnumFunc: Window_Enum_Proc, lParam: LPARAM) -> BOOL ---
 
 	SetThreadDpiAwarenessContext :: proc(dpiContext: DPI_AWARENESS_CONTEXT) -> DPI_AWARENESS_CONTEXT ---
 	GetThreadDpiAwarenessContext :: proc() -> DPI_AWARENESS_CONTEXT ---
@@ -310,6 +313,7 @@ Monitor_From_Flags :: enum DWORD {
 }
 
 Monitor_Enum_Proc :: #type proc "stdcall" (HMONITOR, HDC, LPRECT, LPARAM) -> BOOL
+Window_Enum_Proc :: #type proc "stdcall" (HWND, LPARAM) -> BOOL
 
 USER_DEFAULT_SCREEN_DPI                    :: 96
 DPI_AWARENESS_CONTEXT                      :: distinct HANDLE

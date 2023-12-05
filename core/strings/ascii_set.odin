@@ -1,4 +1,3 @@
-//+private
 package strings
 
 import "core:unicode/utf8"

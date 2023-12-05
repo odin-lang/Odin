@@ -9,7 +9,12 @@ gb_internal isize lb_type_info_index(CheckerInfo *info, Type *type, bool err_on_
 		}
 	}
 	if (err_on_not_found) {
-		GB_PANIC("NOT FOUND lb_type_info_index %s @ index %td", type_to_string(type), index);
+		gb_printf_err("NOT FOUND lb_type_info_index:\n\t%s\n\t@ index %td\n\tmax count: %u\nFound:\n", type_to_string(type), index, set->count);
+		for (auto const &entry : *set) {
+			isize type_info_index = entry.key;
+			gb_printf_err("\t%s\n", type_to_string(info->type_info_types[type_info_index]));
+		}
+		GB_PANIC("NOT FOUND");
 	}
 	return -1;
 }

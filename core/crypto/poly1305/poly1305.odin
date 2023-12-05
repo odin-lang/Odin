@@ -1,8 +1,8 @@
 package poly1305
 
 import "core:crypto"
-import "core:crypto/util"
 import field "core:crypto/_fiat/field_poly1305"
+import "core:encoding/endian"
 import "core:mem"
 
 KEY_SIZE :: 32
@@ -52,8 +52,8 @@ init :: proc (ctx: ^Context, key: []byte) {
 
 	// r = le_bytes_to_num(key[0..15])
 	// r = clamp(r) (r &= 0xffffffc0ffffffc0ffffffc0fffffff)
-	tmp_lo := util.U64_LE(key[0:8]) & 0x0ffffffc0fffffff
-	tmp_hi := util.U64_LE(key[8:16]) & 0xffffffc0ffffffc
+	tmp_lo := endian.unchecked_get_u64le(key[0:]) & 0x0ffffffc0fffffff
+	tmp_hi := endian.unchecked_get_u64le(key[8:]) & 0xffffffc0ffffffc
 	field.fe_from_u64s(&ctx._r, tmp_lo, tmp_hi)
 
 	// s = le_bytes_to_num(key[16..31])
@@ -151,7 +151,7 @@ _blocks :: proc (ctx: ^Context, msg: []byte, final := false) {
 	data_len := len(data)
 	for data_len >= _BLOCK_SIZE {
 		// n = le_bytes_to_num(msg[((i-1)*16)..*i*16] | [0x01])
-		field.fe_from_bytes(&n, data[:_BLOCK_SIZE], final_byte, false)
+		field.fe_from_bytes(&n, data[:_BLOCK_SIZE], final_byte)
 
 		// a += n
 		field.fe_add(field.fe_relax_cast(&ctx._a), &ctx._a, &n) // _a unreduced
