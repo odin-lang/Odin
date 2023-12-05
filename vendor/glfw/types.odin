@@ -2,13 +2,13 @@ package glfw
 
 import glfw "bindings"
 
-WindowHandle  :: glfw.WindowHandle
-MonitorHandle :: glfw.MonitorHandle
-CursorHandle  :: glfw.CursorHandle
+Window  :: glfw.Window
+Monitor :: glfw.Monitor
+Cursor  :: glfw.Cursor
 
-VidMode :: glfw.VidMode
-GammaRamp :: glfw.GammaRamp
-Image :: glfw.Image
+VidMode      :: glfw.VidMode
+GammaRamp    :: glfw.GammaRamp
+Image        :: glfw.Image
 GamepadState :: glfw.GamepadState
 
 /*** Procedure type declarations ***/

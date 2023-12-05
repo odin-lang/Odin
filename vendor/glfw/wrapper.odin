@@ -20,20 +20,20 @@ GetError :: proc "c" () -> (description: string, code: c.int) {
 }
 
 GetPrimaryMonitor :: glfw.GetPrimaryMonitor
-GetMonitors :: proc "c" () -> []MonitorHandle {
+GetMonitors :: proc "c" () -> []^Monitor {
 	count: c.int
 	monitors := glfw.GetMonitors(&count)
 	return monitors[:count]
 }
-GetMonitorPos :: proc "c" (monitor: MonitorHandle) -> (xpos, ypos: c.int) {
+GetMonitorPos :: proc "c" (monitor: ^Monitor) -> (xpos, ypos: c.int) {
 	glfw.GetMonitorPos(monitor, &xpos, &ypos)
 	return
 }
-GetMonitorPhysicalSize :: proc "c" (monitor: MonitorHandle) -> (widthMM, heightMM: c.int) {
+GetMonitorPhysicalSize :: proc "c" (monitor: ^Monitor) -> (widthMM, heightMM: c.int) {
 	glfw.GetMonitorPhysicalSize(monitor, &widthMM, &heightMM)
 	return
 }
-GetMonitorContentScale :: proc "c" (monitor: MonitorHandle) -> (xscale, yscale: f32) {
+GetMonitorContentScale :: proc "c" (monitor: ^Monitor) -> (xscale, yscale: f32) {
 	glfw.GetMonitorContentScale(monitor, &xscale, &yscale)
 	return
 }
@@ -70,31 +70,31 @@ SwapInterval :: glfw.SwapInterval
 SwapBuffers  :: glfw.SwapBuffers
 
 SetWindowTitle :: glfw.SetWindowTitle
-SetWindowIcon :: proc "c" (window: WindowHandle, images: []Image) {
+SetWindowIcon :: proc "c" (window: ^Window, images: []Image) {
 	glfw.SetWindowIcon(window, c.int(len(images)), raw_data(images))
 }
 SetWindowPos         :: glfw.SetWindowPos
 SetWindowSizeLimits  :: glfw.SetWindowSizeLimits
 SetWindowAspectRatio :: glfw.SetWindowAspectRatio
 SetWindowSize        :: glfw.SetWindowSize
-GetWindowPos :: proc "c" (window: WindowHandle) -> (xpos, ypos: c.int) {
+GetWindowPos :: proc "c" (window: ^Window) -> (xpos, ypos: c.int) {
 	glfw.GetWindowPos(window, &xpos, &ypos)
 	return
 }
-GetWindowSize :: proc "c" (window: WindowHandle) -> (width, height: c.int) {
+GetWindowSize :: proc "c" (window: ^Window) -> (width, height: c.int) {
 	glfw.GetWindowSize(window, &width, &height)
 	return
 }
-GetFramebufferSize :: proc "c" (window: WindowHandle) -> (width, height: c.int) {
+GetFramebufferSize :: proc "c" (window: ^Window) -> (width, height: c.int) {
 	glfw.GetFramebufferSize(window, &width, &height)
 	return
 }
-GetWindowFrameSize :: proc "c" (window: WindowHandle) -> (left, top, right, bottom: c.int) {
+GetWindowFrameSize :: proc "c" (window: ^Window) -> (left, top, right, bottom: c.int) {
 	glfw.GetWindowFrameSize(window, &left, &top, &right, &bottom)
 	return
 }
 
-GetWindowContentScale :: proc "c" (window: WindowHandle) -> (xscale, yscale: f32) {
+GetWindowContentScale :: proc "c" (window: ^Window) -> (xscale, yscale: f32) {
 	glfw.GetWindowContentScale(window, &xscale, &yscale)
 	return
 }
@@ -104,13 +104,13 @@ SetWindowOpacity :: glfw.SetWindowOpacity
 GetVersionString :: proc "c" () -> string {
 	return string(glfw.GetVersionString())
 }
-GetMonitorName :: proc "c" (monitor: MonitorHandle) -> string {
+GetMonitorName :: proc "c" (monitor: ^Monitor) -> string {
 	return string(glfw.GetMonitorName(monitor))
 }
-GetClipboardString :: proc "c" (window: WindowHandle) -> string {
+GetClipboardString :: proc "c" (window: ^Window) -> string {
 	return string(glfw.GetClipboardString(window))
 }
-GetVideoModes :: proc "c" (monitor: MonitorHandle) -> []VidMode {
+GetVideoModes :: proc "c" (monitor: ^Monitor) -> []VidMode {
 	count: c.int
 	modes := glfw.GetVideoModes(monitor, &count)
 	return modes[:count]
@@ -153,7 +153,7 @@ GetInputMode :: glfw.GetInputMode
 SetInputMode :: glfw.SetInputMode
 
 GetMouseButton :: glfw.GetMouseButton
-GetCursorPos :: proc "c" (window: WindowHandle) -> (xpos, ypos: f64) {
+GetCursorPos :: proc "c" (window: ^Window) -> (xpos, ypos: f64) {
 	glfw.GetCursorPos(window, &xpos, &ypos)
 	return
 }

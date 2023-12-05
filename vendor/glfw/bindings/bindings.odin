@@ -47,73 +47,73 @@ foreign glfw {
 	GetVersion :: proc(major, minor, rev: ^c.int) ---
 	GetError   :: proc(description: ^cstring) -> c.int ---
 
-	GetPrimaryMonitor      :: proc() -> MonitorHandle ---
-	GetMonitors            :: proc(count: ^c.int) -> [^]MonitorHandle ---
-	GetMonitorPos          :: proc(monitor: MonitorHandle, xpos, ypos: ^c.int) ---
-	GetMonitorPhysicalSize :: proc(monitor: MonitorHandle, widthMM, heightMM: ^c.int) ---
-	GetMonitorContentScale :: proc(monitor: MonitorHandle, xscale, yscale: ^f32) ---
+	GetPrimaryMonitor      :: proc() -> ^Monitor ---
+	GetMonitors            :: proc(count: ^c.int) -> [^]^Monitor ---
+	GetMonitorPos          :: proc(monitor: ^Monitor, xpos, ypos: ^c.int) ---
+	GetMonitorPhysicalSize :: proc(monitor: ^Monitor, widthMM, heightMM: ^c.int) ---
+	GetMonitorContentScale :: proc(monitor: ^Monitor, xscale, yscale: ^f32) ---
 
-	SetMonitorUserPointer :: proc(monitor: MonitorHandle, pointer: rawptr) ---
-	GetMonitorUserPointer :: proc(monitor: MonitorHandle) -> rawptr ---
+	SetMonitorUserPointer :: proc(monitor: ^Monitor, pointer: rawptr) ---
+	GetMonitorUserPointer :: proc(monitor: ^Monitor) -> rawptr ---
 
-	GetVideoMode :: proc(monitor: MonitorHandle) -> ^VidMode ---
-	SetGamma     :: proc(monitor: MonitorHandle, gamma: f32) ---
-	GetGammaRamp :: proc(monitor: MonitorHandle) -> ^GammaRamp ---
-	SetGammaRamp :: proc(monitor: MonitorHandle, ramp: ^GammaRamp) ---
+	GetVideoMode :: proc(monitor: ^Monitor) -> ^VidMode ---
+	SetGamma     :: proc(monitor: ^Monitor, gamma: f32) ---
+	GetGammaRamp :: proc(monitor: ^Monitor) -> ^GammaRamp ---
+	SetGammaRamp :: proc(monitor: ^Monitor, ramp: ^GammaRamp) ---
 
-	CreateWindow  :: proc(width, height: c.int, title: cstring, monitor: MonitorHandle, share: WindowHandle) -> WindowHandle ---
-	DestroyWindow :: proc(window: WindowHandle) ---
+	CreateWindow  :: proc(width, height: c.int, title: cstring, monitor: ^Monitor, share: ^Window) -> ^Window ---
+	DestroyWindow :: proc(window: ^Window) ---
 
 	WindowHint         :: proc(hint, value: c.int) ---
 	DefaultWindowHints :: proc() ---
 	WindowHintString   :: proc(hint: c.int, value: cstring) ---
-	WindowShouldClose  :: proc(window: WindowHandle) -> b32 ---
+	WindowShouldClose  :: proc(window: ^Window) -> b32 ---
 
 	SwapInterval :: proc(interval: c.int) ---
-	SwapBuffers  :: proc(window: WindowHandle) ---
+	SwapBuffers  :: proc(window: ^Window) ---
 
-	SetWindowTitle       :: proc(window: WindowHandle, title: cstring) ---
-	SetWindowIcon        :: proc(window: WindowHandle, count: c.int, images: [^]Image) ---
-	SetWindowPos         :: proc(window: WindowHandle, xpos, ypos: c.int) ---
-	SetWindowSizeLimits  :: proc(window: WindowHandle, minwidth, minheight, maxwidth, maxheight: c.int) ---
-	SetWindowAspectRatio :: proc(window: WindowHandle, numer, denom: c.int) ---
-	SetWindowSize        :: proc(window: WindowHandle, width, height: c.int) ---
-	GetWindowPos         :: proc(window: WindowHandle, xpos, ypos: ^c.int) ---
-	GetWindowSize        :: proc(window: WindowHandle, width, height: ^c.int) ---
-	GetFramebufferSize   :: proc(window: WindowHandle, width, height: ^c.int) ---
-	GetWindowFrameSize   :: proc(window: WindowHandle, left, top, right, bottom: ^c.int) ---
+	SetWindowTitle       :: proc(window: ^Window, title: cstring) ---
+	SetWindowIcon        :: proc(window: ^Window, count: c.int, images: [^]Image) ---
+	SetWindowPos         :: proc(window: ^Window, xpos, ypos: c.int) ---
+	SetWindowSizeLimits  :: proc(window: ^Window, minwidth, minheight, maxwidth, maxheight: c.int) ---
+	SetWindowAspectRatio :: proc(window: ^Window, numer, denom: c.int) ---
+	SetWindowSize        :: proc(window: ^Window, width, height: c.int) ---
+	GetWindowPos         :: proc(window: ^Window, xpos, ypos: ^c.int) ---
+	GetWindowSize        :: proc(window: ^Window, width, height: ^c.int) ---
+	GetFramebufferSize   :: proc(window: ^Window, width, height: ^c.int) ---
+	GetWindowFrameSize   :: proc(window: ^Window, left, top, right, bottom: ^c.int) ---
 
-	GetWindowContentScale :: proc(window: WindowHandle, xscale, yscale: ^f32) ---
-	GetWindowOpacity      :: proc(window: WindowHandle) -> f32 ---
-	SetWindowOpacity      :: proc(window: WindowHandle, opacity: f32) ---
+	GetWindowContentScale :: proc(window: ^Window, xscale, yscale: ^f32) ---
+	GetWindowOpacity      :: proc(window: ^Window) -> f32 ---
+	SetWindowOpacity      :: proc(window: ^Window, opacity: f32) ---
 
 	GetVersionString     :: proc() -> cstring ---
-	GetMonitorName       :: proc(monitor: MonitorHandle) -> cstring ---
-	GetClipboardString   :: proc(window: WindowHandle) -> cstring ---
-	GetVideoModes        :: proc(monitor: MonitorHandle, count: ^c.int) -> [^]VidMode ---
-	GetKey               :: proc(window: WindowHandle, key: c.int) -> c.int ---
+	GetMonitorName       :: proc(monitor: ^Monitor) -> cstring ---
+	GetClipboardString   :: proc(window: ^Window) -> cstring ---
+	GetVideoModes        :: proc(monitor: ^Monitor, count: ^c.int) -> [^]VidMode ---
+	GetKey               :: proc(window: ^Window, key: c.int) -> c.int ---
 	GetKeyName           :: proc(key, scancode: c.int) -> cstring ---
-	SetWindowShouldClose :: proc(window: WindowHandle, value: b32) ---
+	SetWindowShouldClose :: proc(window: ^Window, value: b32) ---
 	JoystickPresent      :: proc(joy: c.int) -> b32 ---
 	GetJoystickName      :: proc(joy: c.int) -> cstring ---
 	GetKeyScancode       :: proc(key: c.int) -> c.int ---
 
-	IconifyWindow  :: proc(window: WindowHandle) ---
-	RestoreWindow  :: proc(window: WindowHandle) ---
-	MaximizeWindow :: proc(window: WindowHandle) ---
-	ShowWindow     :: proc(window: WindowHandle) ---
-	HideWindow     :: proc(window: WindowHandle) ---
-	FocusWindow    :: proc(window: WindowHandle) ---
+	IconifyWindow  :: proc(window: ^Window) ---
+	RestoreWindow  :: proc(window: ^Window) ---
+	MaximizeWindow :: proc(window: ^Window) ---
+	ShowWindow     :: proc(window: ^Window) ---
+	HideWindow     :: proc(window: ^Window) ---
+	FocusWindow    :: proc(window: ^Window) ---
 
-	RequestWindowAttention :: proc(window: WindowHandle) ---
+	RequestWindowAttention :: proc(window: ^Window) ---
 
-	GetWindowMonitor     :: proc(window: WindowHandle) -> MonitorHandle ---
-	SetWindowMonitor     :: proc(window: WindowHandle, monitor: MonitorHandle, xpos, ypos, width, height, refresh_rate: c.int) ---
-	GetWindowAttrib      :: proc(window: WindowHandle, attrib: c.int) -> c.int ---
-	SetWindowUserPointer :: proc(window: WindowHandle, pointer: rawptr) ---
-	GetWindowUserPointer :: proc(window: WindowHandle) -> rawptr ---
+	GetWindowMonitor     :: proc(window: ^Window) -> ^Monitor ---
+	SetWindowMonitor     :: proc(window: ^Window, monitor: ^Monitor, xpos, ypos, width, height, refresh_rate: c.int) ---
+	GetWindowAttrib      :: proc(window: ^Window, attrib: c.int) -> c.int ---
+	SetWindowUserPointer :: proc(window: ^Window, pointer: rawptr) ---
+	GetWindowUserPointer :: proc(window: ^Window) -> rawptr ---
 
-	SetWindowAttrib :: proc(window: WindowHandle, attrib, value: c.int) ---
+	SetWindowAttrib :: proc(window: ^Window, attrib, value: c.int) ---
 
 	PollEvents        :: proc() ---
 	WaitEvents        :: proc() ---
@@ -121,17 +121,17 @@ foreign glfw {
 	PostEmptyEvent    :: proc() ---
 
 	RawMouseMotionSupported :: proc() -> b32 ---
-	GetInputMode :: proc(window: WindowHandle, mode: c.int) -> c.int ---
-	SetInputMode :: proc(window: WindowHandle, mode, value: c.int) ---
+	GetInputMode :: proc(window: ^Window, mode: c.int) -> c.int ---
+	SetInputMode :: proc(window: ^Window, mode, value: c.int) ---
 
-	GetMouseButton :: proc(window: WindowHandle, button: c.int) -> c.int ---
-	GetCursorPos   :: proc(window: WindowHandle, xpos, ypos: ^f64) ---
-	SetCursorPos   :: proc(window: WindowHandle, xpos, ypos: f64) ---
+	GetMouseButton :: proc(window: ^Window, button: c.int) -> c.int ---
+	GetCursorPos   :: proc(window: ^Window, xpos, ypos: ^f64) ---
+	SetCursorPos   :: proc(window: ^Window, xpos, ypos: f64) ---
 
-	CreateCursor         :: proc(image: ^Image, xhot, yhot: c.int) -> CursorHandle ---
-	DestroyCursor        :: proc(cursor: CursorHandle) ---
-	SetCursor            :: proc(window: WindowHandle, cursor: CursorHandle) ---
-	CreateStandardCursor :: proc(shape: c.int) -> CursorHandle ---
+	CreateCursor         :: proc(image: ^Image, xhot, yhot: c.int) -> ^Cursor ---
+	DestroyCursor        :: proc(cursor: ^Cursor) ---
+	SetCursor            :: proc(window: ^Window, cursor: ^Cursor) ---
+	CreateStandardCursor :: proc(shape: c.int) -> ^Cursor ---
 
 	GetJoystickAxes        :: proc(joy: c.int, count: ^c.int) -> [^]f32 ---
 	GetJoystickButtons     :: proc(joy: c.int, count: ^c.int) -> [^]u8 ---
@@ -144,15 +144,15 @@ foreign glfw {
 	GetGamepadName         :: proc(jid: c.int) -> cstring ---
 	GetGamepadState        :: proc(jid: c.int, state: ^GamepadState) -> c.int ---
 
-	SetClipboardString :: proc(window: WindowHandle, str: cstring) ---
+	SetClipboardString :: proc(window: ^Window, str: cstring) ---
 	
 	SetTime           :: proc(time: f64) ---
 	GetTime           :: proc() -> f64 ---
 	GetTimerValue     :: proc() -> u64 ---
 	GetTimerFrequency :: proc() -> u64 ---
 
-	MakeContextCurrent :: proc(window: WindowHandle) ---
-	GetCurrentContext  :: proc() -> WindowHandle ---
+	MakeContextCurrent :: proc(window: ^Window) ---
+	GetCurrentContext  :: proc() -> ^Window ---
 	GetProcAddress     :: proc(name: cstring) -> rawptr ---
 	ExtensionSupported :: proc(extension: cstring) -> c.int ---
 
@@ -160,28 +160,28 @@ foreign glfw {
 	GetRequiredInstanceExtensions        :: proc(count: ^u32) -> [^]cstring ---
 	GetInstanceProcAddress               :: proc(instance: vk.Instance, procname: cstring) -> rawptr ---
 	GetPhysicalDevicePresentationSupport :: proc(instance: vk.Instance, device: vk.PhysicalDevice, queuefamily: u32) -> c.int ---
-	CreateWindowSurface                  :: proc(instance: vk.Instance, window: WindowHandle, allocator: ^vk.AllocationCallbacks, surface: ^vk.SurfaceKHR) -> vk.Result ---
+	CreateWindowSurface                  :: proc(instance: vk.Instance, window: ^Window, allocator: ^vk.AllocationCallbacks, surface: ^vk.SurfaceKHR) -> vk.Result ---
 	
-	SetWindowIconifyCallback      :: proc(window: WindowHandle, cbfun: WindowIconifyProc)      -> WindowIconifyProc ---
-	SetWindowRefreshCallback      :: proc(window: WindowHandle, cbfun: WindowRefreshProc)      -> WindowRefreshProc ---
-	SetWindowFocusCallback        :: proc(window: WindowHandle, cbfun: WindowFocusProc)        -> WindowFocusProc ---
-	SetWindowCloseCallback        :: proc(window: WindowHandle, cbfun: WindowCloseProc)        -> WindowCloseProc ---
-	SetWindowSizeCallback         :: proc(window: WindowHandle, cbfun: WindowSizeProc)         -> WindowSizeProc ---
-	SetWindowPosCallback          :: proc(window: WindowHandle, cbfun: WindowPosProc)          -> WindowPosProc ---
-	SetFramebufferSizeCallback    :: proc(window: WindowHandle, cbfun: FramebufferSizeProc)    -> FramebufferSizeProc ---
-	SetDropCallback               :: proc(window: WindowHandle, cbfun: DropProc)               -> DropProc ---
-	SetMonitorCallback            :: proc(window: WindowHandle, cbfun: MonitorProc)            -> MonitorProc ---
-	SetWindowMaximizeCallback     :: proc(window: WindowHandle, cbfun: WindowMaximizeProc)     -> WindowMaximizeProc ---
-	SetWindowContentScaleCallback :: proc(window: WindowHandle, cbfun: WindowContentScaleProc) -> WindowContentScaleProc ---
+	SetWindowIconifyCallback      :: proc(window: ^Window, cbfun: WindowIconifyProc)      -> WindowIconifyProc ---
+	SetWindowRefreshCallback      :: proc(window: ^Window, cbfun: WindowRefreshProc)      -> WindowRefreshProc ---
+	SetWindowFocusCallback        :: proc(window: ^Window, cbfun: WindowFocusProc)        -> WindowFocusProc ---
+	SetWindowCloseCallback        :: proc(window: ^Window, cbfun: WindowCloseProc)        -> WindowCloseProc ---
+	SetWindowSizeCallback         :: proc(window: ^Window, cbfun: WindowSizeProc)         -> WindowSizeProc ---
+	SetWindowPosCallback          :: proc(window: ^Window, cbfun: WindowPosProc)          -> WindowPosProc ---
+	SetFramebufferSizeCallback    :: proc(window: ^Window, cbfun: FramebufferSizeProc)    -> FramebufferSizeProc ---
+	SetDropCallback               :: proc(window: ^Window, cbfun: DropProc)               -> DropProc ---
+	SetMonitorCallback            :: proc(window: ^Window, cbfun: MonitorProc)            -> MonitorProc ---
+	SetWindowMaximizeCallback     :: proc(window: ^Window, cbfun: WindowMaximizeProc)     -> WindowMaximizeProc ---
+	SetWindowContentScaleCallback :: proc(window: ^Window, cbfun: WindowContentScaleProc) -> WindowContentScaleProc ---
 
-	SetKeyCallback         :: proc(window: WindowHandle, cbfun: KeyProc)         -> KeyProc ---
-	SetMouseButtonCallback :: proc(window: WindowHandle, cbfun: MouseButtonProc) -> MouseButtonProc ---
-	SetCursorPosCallback   :: proc(window: WindowHandle, cbfun: CursorPosProc)   -> CursorPosProc ---
-	SetScrollCallback      :: proc(window: WindowHandle, cbfun: ScrollProc)      -> ScrollProc ---
-	SetCharCallback        :: proc(window: WindowHandle, cbfun: CharProc)        -> CharProc ---
-	SetCharModsCallback    :: proc(window: WindowHandle, cbfun: CharModsProc)    -> CharModsProc ---
-	SetCursorEnterCallback :: proc(window: WindowHandle, cbfun: CursorEnterProc) -> CursorEnterProc ---
-	SetJoystickCallback    :: proc(window: WindowHandle, cbfun: JoystickProc)    -> JoystickProc ---
+	SetKeyCallback         :: proc(window: ^Window, cbfun: KeyProc)         -> KeyProc ---
+	SetMouseButtonCallback :: proc(window: ^Window, cbfun: MouseButtonProc) -> MouseButtonProc ---
+	SetCursorPosCallback   :: proc(window: ^Window, cbfun: CursorPosProc)   -> CursorPosProc ---
+	SetScrollCallback      :: proc(window: ^Window, cbfun: ScrollProc)      -> ScrollProc ---
+	SetCharCallback        :: proc(window: ^Window, cbfun: CharProc)        -> CharProc ---
+	SetCharModsCallback    :: proc(window: ^Window, cbfun: CharModsProc)    -> CharModsProc ---
+	SetCursorEnterCallback :: proc(window: ^Window, cbfun: CursorEnterProc) -> CursorEnterProc ---
+	SetJoystickCallback    :: proc(window: ^Window, cbfun: JoystickProc)    -> JoystickProc ---
 
 	SetErrorCallback :: proc(cbfun: ErrorProc) -> ErrorProc ---
 }
