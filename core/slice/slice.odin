@@ -171,7 +171,6 @@ binary_search :: proc(array: $A/[]$T, key: T) -> (index: int, found: bool)
 
 @(require_results)
 binary_search_by :: proc(array: $A/[]$T, key: T, f: proc(T, T) -> Ordering) -> (index: int, found: bool)
-	where intrinsics.type_is_ordered(T) #no_bounds_check
 {
 	// INVARIANTS:
 	// - 0 <= left <= (left + size = right) <= len(array)
