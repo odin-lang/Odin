@@ -24,7 +24,7 @@ when ODIN_OS == .Windows {
 	when ODIN_ARCH == .arm64 {
 		when RAYGUI_SHARED {
 			foreign import lib {
-				"macos-arm64/libraygui.dylib"
+				"macos-arm64/libraygui.dylib",
 			}
 		} else {
 			foreign import lib {
@@ -37,7 +37,7 @@ when ODIN_OS == .Windows {
 	} else {
 		when RAYGUI_SHARED {
 			foreign import lib {
-				"macos/libraygui.dylib"
+				"macos/libraygui.dylib",
 			}
 		} else {
 			foreign import lib {
