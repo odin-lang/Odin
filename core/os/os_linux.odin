@@ -272,18 +272,17 @@ when ODIN_ARCH == .arm64 {
 		uid:           u32, // User ID of the file's owner
 		gid:           u32, // Group ID of the file's group
 		rdev:          u64, // Device ID, if device
-		 _padding:     u64,
+		_:             u64, // Padding
 		size:          i64, // Size of the file, in bytes
 		block_size:    i32, // Optimal blocksize for I/O
-		_padding_2:    i32,
+		_:             i32, // Padding
 		blocks:        i64, // Number of 512-byte blocks allocated
 
 		last_access:   Unix_File_Time, // Time of last access
 		modified:      Unix_File_Time, // Time of last modification
 		status_change: Unix_File_Time, // Time of last status change
 
-		_reserve1,
-		_reserve2: i32,
+		_reserved:     [2]i32,
 	}
 	#assert(size_of(OS_Stat) == 128)
 } else {
@@ -294,7 +293,7 @@ when ODIN_ARCH == .arm64 {
 		mode:          u32, // Mode of the file
 		uid:           u32, // User ID of the file's owner
 		gid:           u32, // Group ID of the file's group
-		_padding:      i32, // 32 bits of padding
+		_:             i32, // 32 bits of padding
 		rdev:          u64, // Device ID, if device
 		size:          i64, // Size of the file, in bytes
 		block_size:    i64, // Optimal bllocksize for I/O
@@ -304,9 +303,7 @@ when ODIN_ARCH == .arm64 {
 		modified:      Unix_File_Time, // Time of last modification
 		status_change: Unix_File_Time, // Time of last status change
 
-		_reserve1,
-		_reserve2,
-		_reserve3:     i64,
+		_reserved:     [3]i64,
 	}
 }
 
