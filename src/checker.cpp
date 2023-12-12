@@ -5979,6 +5979,32 @@ gb_internal GB_COMPARE_PROC(fini_procedures_cmp) {
 gb_internal void check_sort_init_and_fini_procedures(Checker *c) {
 	gb_sort_array(c->info.init_procedures.data, c->info.init_procedures.count, init_procedures_cmp);
 	gb_sort_array(c->info.fini_procedures.data, c->info.fini_procedures.count, fini_procedures_cmp);
+
+	// NOTE(bill): remove possible duplicates from the init/fini lists
+	// NOTE(bill): because the arrays are sorted, you only need to check the previous element
+	Entity *prev = nullptr;
+
+	for (isize i = 0; i < c->info.init_procedures.count; /**/) {
+		Entity *curr = c->info.init_procedures[i];
+		if (prev == curr) {
+			array_ordered_remove(&c->info.init_procedures, i);
+		} else {
+			prev = curr;
+			i += 1;
+		}
+	}
+
+	prev = nullptr;
+
+	for (isize i = 0; i < c->info.fini_procedures.count; /**/) {
+		Entity *curr = c->info.fini_procedures[i];
+		if (prev == curr) {
+			array_ordered_remove(&c->info.fini_procedures, i);
+		} else {
+			prev = curr;
+			i += 1;
+		}
+	}
 }
 
 gb_internal void add_type_info_for_type_definitions(Checker *c) {
