@@ -2294,7 +2294,6 @@ gb_internal void add_dependency_to_set(Checker *c, Entity *entity) {
 
 	if (entity->type != nullptr &&
 	    is_type_polymorphic(entity->type)) {
-
 		DeclInfo *decl = decl_info_of_entity(entity);
 		if (decl != nullptr && decl->gen_proc_type == nullptr) {
 			return;
@@ -2346,98 +2345,7 @@ gb_internal void force_add_dependency_entity(Checker *c, Scope *scope, String co
 }
 
 
-
-gb_internal void generate_minimum_dependency_set(Checker *c, Entity *start) {
-	isize entity_count = c->info.entities.count;
-	isize min_dep_set_cap = next_pow2_isize(entity_count*4); // empirically determined factor
-
-	ptr_set_init(&c->info.minimum_dependency_set, min_dep_set_cap);
-	map_init(&c->info.minimum_dependency_type_info_set);
-
-#define FORCE_ADD_RUNTIME_ENTITIES(condition, ...) do {                                              \
-	if (condition) {                                                                             \
-		String entities[] = {__VA_ARGS__};                                                   \
-		for (isize i = 0; i < gb_count_of(entities); i++) {                                  \
-			force_add_dependency_entity(c, c->info.runtime_package->scope, entities[i]); \
-		}                                                                                    \
-	}                                                                                            \
-} while (0)
-
-	// required runtime entities
-	FORCE_ADD_RUNTIME_ENTITIES(true,
-		// Odin types
-		str_lit("Source_Code_Location"),
-		str_lit("Context"),
-		str_lit("Allocator"),
-		str_lit("Logger"),
-
-		// Odin internal procedures
-		str_lit("__init_context"),
-		str_lit("cstring_to_string"),
-		str_lit("_cleanup_runtime"),
-
-		// Pseudo-CRT required procedures
-		str_lit("memset"),
-		str_lit("memcpy"),
-		str_lit("memmove"),
-
-		// Utility procedures
-		str_lit("memory_equal"),
-		str_lit("memory_compare"),
-		str_lit("memory_compare_zero"),
-	);
-
-	FORCE_ADD_RUNTIME_ENTITIES(!build_context.tilde_backend,
-		// Extended data type internal procedures
-		str_lit("umodti3"),
-		str_lit("udivti3"),
-		str_lit("modti3"),
-		str_lit("divti3"),
-		str_lit("fixdfti"),
-		str_lit("fixunsdfti"),
-		str_lit("fixunsdfdi"),
-		str_lit("floattidf"),
-		str_lit("floattidf_unsigned"),
-		str_lit("truncsfhf2"),
-		str_lit("truncdfhf2"),
-		str_lit("gnu_h2f_ieee"),
-		str_lit("gnu_f2h_ieee"),
-		str_lit("extendhfsf2"),
-
-		// WASM Specific
-		str_lit("__ashlti3"),
-		str_lit("__multi3"),
-	);
-
-	FORCE_ADD_RUNTIME_ENTITIES(!build_context.no_rtti,
-		// Odin types
-		str_lit("Type_Info"),
-
-		// Global variables
-		str_lit("type_table"),
-		str_lit("__type_info_of"),
-	);
-
-	FORCE_ADD_RUNTIME_ENTITIES(!build_context.no_entry_point,
-		// Global variables
-		str_lit("args__"),
-	);
-
-	FORCE_ADD_RUNTIME_ENTITIES((build_context.no_crt && !is_arch_wasm()),
-		// NOTE(bill): Only if these exist
-		str_lit("_tls_index"),
-		str_lit("_fltused"),
-	);
-
-	FORCE_ADD_RUNTIME_ENTITIES(!build_context.no_bounds_check,
-		// Bounds checking related procedures
-		str_lit("bounds_check_error"),
-		str_lit("matrix_bounds_check_error"),
-		str_lit("slice_expr_error_hi"),
-		str_lit("slice_expr_error_lo_hi"),
-		str_lit("multi_pointer_slice_expr_error"),
-	);
-
+gb_internal void generate_minimum_dependency_set_internal(Checker *c, Entity *start) {
 	for_array(i, c->info.definitions) {
 		Entity *e = c->info.definitions[i];
 		if (e->scope == builtin_pkg->scope) {
@@ -2580,6 +2488,101 @@ gb_internal void generate_minimum_dependency_set(Checker *c, Entity *start) {
 		start->flags |= EntityFlag_Used;
 		add_dependency_to_set(c, start);
 	}
+}
+
+gb_internal void generate_minimum_dependency_set(Checker *c, Entity *start) {
+	isize entity_count = c->info.entities.count;
+	isize min_dep_set_cap = next_pow2_isize(entity_count*4); // empirically determined factor
+
+	ptr_set_init(&c->info.minimum_dependency_set, min_dep_set_cap);
+	map_init(&c->info.minimum_dependency_type_info_set);
+
+#define FORCE_ADD_RUNTIME_ENTITIES(condition, ...) do {                                              \
+	if (condition) {                                                                             \
+		String entities[] = {__VA_ARGS__};                                                   \
+		for (isize i = 0; i < gb_count_of(entities); i++) {                                  \
+			force_add_dependency_entity(c, c->info.runtime_package->scope, entities[i]); \
+		}                                                                                    \
+	}                                                                                            \
+} while (0)
+
+	// required runtime entities
+	FORCE_ADD_RUNTIME_ENTITIES(true,
+		// Odin types
+		str_lit("Source_Code_Location"),
+		str_lit("Context"),
+		str_lit("Allocator"),
+		str_lit("Logger"),
+
+		// Odin internal procedures
+		str_lit("__init_context"),
+		str_lit("cstring_to_string"),
+		str_lit("_cleanup_runtime"),
+
+		// Pseudo-CRT required procedures
+		str_lit("memset"),
+		str_lit("memcpy"),
+		str_lit("memmove"),
+
+		// Utility procedures
+		str_lit("memory_equal"),
+		str_lit("memory_compare"),
+		str_lit("memory_compare_zero"),
+	);
+
+	FORCE_ADD_RUNTIME_ENTITIES(!build_context.tilde_backend,
+		// Extended data type internal procedures
+		str_lit("umodti3"),
+		str_lit("udivti3"),
+		str_lit("modti3"),
+		str_lit("divti3"),
+		str_lit("fixdfti"),
+		str_lit("fixunsdfti"),
+		str_lit("fixunsdfdi"),
+		str_lit("floattidf"),
+		str_lit("floattidf_unsigned"),
+		str_lit("truncsfhf2"),
+		str_lit("truncdfhf2"),
+		str_lit("gnu_h2f_ieee"),
+		str_lit("gnu_f2h_ieee"),
+		str_lit("extendhfsf2"),
+
+		// WASM Specific
+		str_lit("__ashlti3"),
+		str_lit("__multi3"),
+	);
+
+	FORCE_ADD_RUNTIME_ENTITIES(!build_context.no_rtti,
+		// Odin types
+		str_lit("Type_Info"),
+
+		// Global variables
+		str_lit("type_table"),
+		str_lit("__type_info_of"),
+	);
+
+	FORCE_ADD_RUNTIME_ENTITIES(!build_context.no_entry_point,
+		// Global variables
+		str_lit("args__"),
+	);
+
+	FORCE_ADD_RUNTIME_ENTITIES((build_context.no_crt && !is_arch_wasm()),
+		// NOTE(bill): Only if these exist
+		str_lit("_tls_index"),
+		str_lit("_fltused"),
+	);
+
+	FORCE_ADD_RUNTIME_ENTITIES(!build_context.no_bounds_check,
+		// Bounds checking related procedures
+		str_lit("bounds_check_error"),
+		str_lit("matrix_bounds_check_error"),
+		str_lit("slice_expr_error_hi"),
+		str_lit("slice_expr_error_lo_hi"),
+		str_lit("multi_pointer_slice_expr_error"),
+	);
+
+	generate_minimum_dependency_set_internal(c, start);
+
 
 #undef FORCE_ADD_RUNTIME_ENTITIES
 }
@@ -5309,6 +5312,44 @@ gb_internal void calculate_global_init_order(Checker *c) {
 	}
 }
 
+gb_internal void check_procedure_later_from_entity(Checker *c, Entity *e, char const *from_msg) {
+	if (e == nullptr || e->kind != Entity_Procedure) {
+		return;
+	}
+	if (e->Procedure.is_foreign) {
+		return;
+	}
+	if ((e->flags & EntityFlag_ProcBodyChecked) != 0) {
+		return;
+	}
+	Type *type = base_type(e->type);
+	GB_ASSERT(type->kind == Type_Proc);
+
+	if (is_type_polymorphic(type) && !type->Proc.is_poly_specialized) {
+		return;
+	}
+
+	GB_ASSERT(e->decl_info != nullptr);
+
+	ProcInfo *pi = gb_alloc_item(permanent_allocator(), ProcInfo);
+	pi->file  = e->file;
+	pi->token = e->token;
+	pi->decl  = e->decl_info;
+	pi->type  = e->type;
+
+	Ast *pl = e->decl_info->proc_lit;
+	GB_ASSERT(pl != nullptr);
+	pi->body  = pl->ProcLit.body;
+	pi->tags  = pl->ProcLit.tags;
+	if (pi->body == nullptr) {
+		return;
+	}
+	if (from_msg != nullptr) {
+		debugf("CHECK PROCEDURE LATER [FROM %s]! %.*s :: %s {...}\n", from_msg, LIT(e->token.string), type_to_string(e->type));
+	}
+	check_procedure_later(c, pi);
+}
+
 
 gb_internal bool check_proc_info(Checker *c, ProcInfo *pi, UntypedExprInfoMap *untyped) {
 	if (pi == nullptr) {
@@ -5415,6 +5456,15 @@ gb_internal bool check_proc_info(Checker *c, ProcInfo *pi, UntypedExprInfoMap *u
 
 	add_untyped_expressions(&c->info, ctx.untyped);
 
+	rw_mutex_shared_lock(&ctx.decl->deps_mutex);
+	for (Entity *dep : ctx.decl->deps) {
+		if (dep && dep->kind == Entity_Procedure &&
+		    (dep->flags & EntityFlag_ProcBodyChecked) == 0) {
+			check_procedure_later_from_entity(c, dep, NULL);
+		}
+	}
+	rw_mutex_shared_unlock(&ctx.decl->deps_mutex);
+
 	return true;
 }
 
@@ -5437,30 +5487,7 @@ gb_internal void check_unchecked_bodies(Checker *c) {
 	global_procedure_body_in_worker_queue = false;
 
 	for (Entity *e : c->info.minimum_dependency_set) {
-		if (e == nullptr || e->kind != Entity_Procedure) {
-			continue;
-		}
-		if (e->Procedure.is_foreign) {
-			continue;
-		}
-		if ((e->flags & EntityFlag_ProcBodyChecked) == 0) {
-			GB_ASSERT(e->decl_info != nullptr);
-
-			ProcInfo *pi = gb_alloc_item(permanent_allocator(), ProcInfo);
-			pi->file  = e->file;
-			pi->token = e->token;
-			pi->decl  = e->decl_info;
-			pi->type  = e->type;
-
-			Ast *pl = e->decl_info->proc_lit;
-			GB_ASSERT(pl != nullptr);
-			pi->body  = pl->ProcLit.body;
-			pi->tags  = pl->ProcLit.tags;
-			if (pi->body == nullptr) {
-				continue;
-			}
-			check_procedure_later(c, pi);
-		}
+		check_procedure_later_from_entity(c, e, "check_unchecked_bodies");
 	}
 
 	if (!global_procedure_body_in_worker_queue) {
@@ -6113,6 +6140,9 @@ gb_internal void check_parsed_files(Checker *c) {
 	check_unchecked_bodies(c);
 
 	check_merge_queues_into_arrays(c);
+	thread_pool_wait();
+
+	generate_minimum_dependency_set_internal(c, c->info.entry_point);
 
 
 	TIME_SECTION("check entry point");
