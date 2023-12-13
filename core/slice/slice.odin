@@ -158,15 +158,7 @@ linear_search_proc :: proc(array: $A/[]$T, f: proc(T) -> bool) -> (index: int, f
 binary_search :: proc(array: $A/[]$T, key: T) -> (index: int, found: bool)
 	where intrinsics.type_is_ordered(T) #no_bounds_check
 {
-	// I would like to use binary_search_by(array, key, cmp) here, but it doesn't like it:
-	// Cannot assign value 'cmp' of type 'proc($E, $E) -> Ordering' to 'proc(i32, i32) -> Ordering' in argument
-	return binary_search_by(array, key, proc(key: T, element: T) -> Ordering {
-		switch {
-			case element < key: return .Less
-			case element > key: return .Greater
-			case:               return .Equal
-		}
-	})
+	return binary_search_by(array, key, cmp_proc(T))
 }
 
 @(require_results)
@@ -194,9 +186,9 @@ binary_search_by :: proc(array: $A/[]$T, key: T, f: proc(T, T) -> Ordering) -> (
 		right = mid     if cmp == .Greater else right
 
 		switch cmp {
-			case .Equal:   return mid, true
-			case .Less:    left  = mid + 1
-			case .Greater: right = mid
+		case .Equal:   return mid, true
+		case .Less:    left  = mid + 1
+		case .Greater: right = mid
 		}
 
 		size = right - left
