@@ -326,7 +326,7 @@ gb_internal void cg_addr_store(cgProcedure *p, cgAddr addr, cgValue value) {
 	GB_ASSERT(value.type != nullptr);
 	if (is_type_untyped_uninit(value.type)) {
 		Type *t = cg_addr_type(addr);
-		value = cg_value(tb_inst_poison(p->func), t);
+		value = cg_value(tb_inst_poison(p->func, cg_data_type(t)), t);
 		// TODO(bill): IS THIS EVEN A GOOD IDEA?
 	} else if (is_type_untyped_nil(value.type)) {
 		Type *t = cg_addr_type(addr);
@@ -2481,7 +2481,7 @@ gb_internal void cg_build_mutable_value_decl(cgProcedure *p, Ast *node) {
 			TB_DebugType *debug_type = cg_debug_type(m, e->type);
 			TB_Global *global = tb_global_create(m->mod, mangled_name.len, cast(char const *)mangled_name.text, debug_type, TB_LINKAGE_PRIVATE);
 
-			TB_ModuleSection *section = tb_module_get_data(m->mod);
+			TB_ModuleSectionHandle section = tb_module_get_data(m->mod);
 			if (e->Variable.thread_local_model != "") {
 				section = tb_module_get_tls(m->mod);
 				String model = e->Variable.thread_local_model;

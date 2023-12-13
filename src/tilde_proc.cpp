@@ -95,7 +95,7 @@ gb_internal cgProcedure *cg_procedure_create(cgModule *m, Entity *entity, bool i
 	}
 
 	if (p->symbol == nullptr)  {
-		p->func = tb_function_create(m->mod, link_name.len, cast(char const *)link_name.text, linkage, TB_COMDAT_NONE);
+		p->func = tb_function_create(m->mod, link_name.len, cast(char const *)link_name.text, linkage);
 
 		p->debug_type = cg_debug_type_for_proc(m, p->type);
 		p->proto = tb_prototype_from_dbg(m->mod, p->debug_type);
@@ -148,7 +148,7 @@ gb_internal cgProcedure *cg_procedure_create_dummy(cgModule *m, String const &li
 
 	TB_Linkage linkage = TB_LINKAGE_PRIVATE;
 
-	p->func = tb_function_create(m->mod, link_name.len, cast(char const *)link_name.text, linkage, TB_COMDAT_NONE);
+	p->func = tb_function_create(m->mod, link_name.len, cast(char const *)link_name.text, linkage);
 
 	p->debug_type = cg_debug_type_for_proc(m, p->type);
 	p->proto = tb_prototype_from_dbg(m->mod, p->debug_type);
@@ -224,7 +224,8 @@ gb_internal void cg_procedure_begin(cgProcedure *p) {
 		return;
 	}
 
-	tb_function_set_prototype(p->func, p->proto, cg_arena());
+	TB_ModuleSectionHandle section = tb_module_get_text(p->module->mod);
+	tb_function_set_prototype(p->func, section, p->proto, cg_arena());
 
 	if (p->body == nullptr) {
 		return;
@@ -400,7 +401,7 @@ gb_internal WORKER_TASK_PROC(cg_procedure_compile_worker_proc) {
 		fflush(stdout);
 	}
 	if (false) { // GraphViz printing
-		tb_function_print(p->func, tb_default_print_callback, stdout);
+		tb_pass_print_dot(opt, tb_default_print_callback, stdout);
 	}
 
 	// compile
