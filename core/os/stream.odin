@@ -27,19 +27,31 @@ _file_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, 
 	case .Read:
 		n_int, os_err = read(fd, p)
 		n = i64(n_int)
+		if n == 0 && os_err == 0 {
+			err = .EOF
+		}
 
 	case .Read_At:
 		when !(ODIN_OS == .FreeBSD || ODIN_OS == .OpenBSD) {
 			n_int, os_err = read_at(fd, p, offset)
 			n = i64(n_int)
+			if n == 0 && os_err == 0 {
+				err = .EOF
+			}
 		}
 	case .Write:
 		n_int, os_err = write(fd, p)
 		n = i64(n_int)
+		if n == 0 && os_err == 0 {
+			err = .EOF
+		}
 	case .Write_At:
 		when !(ODIN_OS == .FreeBSD || ODIN_OS == .OpenBSD) {
 			n_int, os_err = write_at(fd, p, offset)
 			n = i64(n_int)
+			if n == 0 && os_err == 0 {
+				err = .EOF
+			}
 		}
 	case .Seek:
 		n, os_err = seek(fd, offset, int(whence))
@@ -63,12 +75,5 @@ _file_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, 
 		}
 		err = .Unknown
 	}
-
-	when ODIN_OS != .Windows {
-		if err == nil && os_err == 0 && n == 0 {
-			err = .EOF
-		}
-	}
-
 	return
 }
