@@ -489,7 +489,7 @@ repeat :: proc(s: $S/[]$U, count: int, allocator := context.allocator) -> (b: S,
 // 'unique' replaces consecutive runs of equal elements with a single copy.
 // The procedures modifies the slice in-place and returns the modified slice.
 @(require_results)
-unique :: proc(s: $S/[]$T) -> S #optional_allocator_error where intrinsics.type_is_comparable(T) #no_bounds_check {
+unique :: proc(s: $S/[]$T) -> S where intrinsics.type_is_comparable(T) #no_bounds_check {
 	if len(s) < 2 {
 		return s
 	}
@@ -507,7 +507,7 @@ unique :: proc(s: $S/[]$T) -> S #optional_allocator_error where intrinsics.type_
 // 'unique_proc' replaces consecutive runs of equal elements with a single copy using a comparison procedure
 // The procedures modifies the slice in-place and returns the modified slice.
 @(require_results)
-unique_proc :: proc(s: $S/[]$T, eq: proc(T, T) -> bool) -> S #optional_allocator_error #no_bounds_check {
+unique_proc :: proc(s: $S/[]$T, eq: proc(T, T) -> bool) -> S #no_bounds_check {
 	if len(s) < 2 {
 		return s
 	}
