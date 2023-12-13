@@ -444,14 +444,35 @@ reduce :: proc(s: $S/[]$U, initializer: $V, f: proc(V, U) -> V) -> V {
 }
 
 @(require_results)
-filter :: proc(s: $S/[]$U, f: proc(U) -> bool, allocator := context.allocator) -> S {
-	r := make([dynamic]U, 0, 0, allocator)
+reduce_reverse :: proc(s: $S/[]$U, initializer: $V, f: proc(V, U) -> V) -> V {
+	r := initializer
+	for i := len(s)-1; i >= 0; i -= 1 {
+		#no_bounds_check r = f(r, s[i])
+	}
+	return r
+}
+
+@(require_results)
+filter :: proc(s: $S/[]$U, f: proc(U) -> bool, allocator := context.allocator) -> (res: S, err: runtime.Allocator_Error) #optional_allocator_error {
+	r := make([dynamic]U, 0, 0, allocator) or_return
 	for v in s {
 		if f(v) {
 			append(&r, v)
 		}
 	}
-	return r[:]
+	return r[:], nil
+}
+
+@(require_results)
+filter_reverse :: proc(s: $S/[]$U, f: proc(U) -> bool, allocator := context.allocator) -> (res: S, err: runtime.Allocator_Error) #optional_allocator_error {
+	r := make([dynamic]U, 0, 0, allocator) or_return
+	for i := len(s)-1; i >= 0; i -= 1 {
+		#no_bounds_check v := s[i]
+		if f(v) {
+			append(&r, v)
+		}
+	}
+	return r[:], nil
 }
 
 @(require_results)
@@ -470,6 +491,24 @@ scanner :: proc (s: $S/[]$U, initializer: $V, f: proc(V, U) -> V, allocator := c
 		q = q[1:]
 	}
 
+	return
+}
+
+
+@(require_results)
+repeat :: proc(s: $S/[]$U, count: int, allocator := context.allocator) -> (b: S, err: runtime.Allocator_Error) #optional_allocator_error {
+	if count < 0 {
+		panic("slice: negative repeat count")
+	} else if count > 0 && (len(s)*count)/count != len(s) {
+		panic("slice: repeat count will cause an overflow")
+	}
+
+	b = make(S, len(s)*count, allocator) or_return
+	i := copy(b, s)
+	for i < len(b) { // 2^N trick to reduce the need to copy
+		copy(b[i:], b[:i])
+		i *= 2
+	}
 	return
 }
 
