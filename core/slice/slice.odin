@@ -163,38 +163,20 @@ binary_search :: proc(array: $A/[]$T, key: T) -> (index: int, found: bool)
 
 @(require_results)
 binary_search_by :: proc(array: $A/[]$T, key: T, f: proc(T, T) -> Ordering) -> (index: int, found: bool) #no_bounds_check {
-	// INVARIANTS:
-	// - 0 <= left <= (left + size = right) <= len(array)
-	// - f returns .Less    for everything in array[:left]
-	// - f returns .Greater for everything in array[right:]
-	size  := len(array)
-	left  := 0
-	right := size
-
+	n := len(array)
+	left, right := 0, n
 	for left < right {
-		mid := left + size / 2
-
-		// Steps to verify this is in-bounds:
-		// 1. We note that `size` is strictly positive due to the loop condition
-		// 2. Therefore `size/2 < size`
-		// 3. Adding `left` to both sides yields `(left + size/2) < (left + size)`
-		// 4. We know from the invariant that `left + size <= len(array)`
-		// 5. Therefore `left + size/2 < self.len()`
-		cmp := f(key, array[mid])
-
-		left  = mid + 1 if cmp == .Less    else left
-		right = mid     if cmp == .Greater else right
-
-		switch cmp {
-		case .Equal:   return mid, true
-		case .Less:    right = mid
-		case .Greater: left  = mid + 1
+		mid := int(uint(left+right) >> 1)
+		if f(array[mid], key) == .Less {
+			left = mid+1
+		} else {
+			// .Equal or .Greater
+			right = mid
 		}
-
-		size = right - left
 	}
-
-	return left, false
+	// left == right
+	// f(array[left-1], key) == .Less (if left > 0)
+	return left, left < n && f(array[left], key) == .Equal
 }
 
 @(require_results)
