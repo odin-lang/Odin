@@ -119,10 +119,6 @@ gb_internal u64 cg_typeid_as_u64(cgModule *m, Type *type) {
 		data |= (reserved &~ (1ull<<1))  << 63ull; // reserved
 	}
 
-	if (type == t_string) {
-		gb_printf_err("%llu\n", data);
-	}
-
 	return data;
 }
 

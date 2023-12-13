@@ -24,7 +24,7 @@ gb_internal TB_Node *cg_control_region(cgProcedure *p, char const *name) {
 }
 
 gb_internal cgValue cg_emit_load(cgProcedure *p, cgValue const &ptr, bool is_volatile) {
-	GB_ASSERT(is_type_pointer(ptr.type));
+	GB_ASSERT_MSG(is_type_pointer(ptr.type), "%s", type_to_string(ptr.type));
 	Type *type = type_deref(ptr.type);
 	TB_DataType dt = cg_data_type(type);
 

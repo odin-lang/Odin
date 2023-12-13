@@ -861,7 +861,6 @@ gb_internal cgValue cg_build_call_expr_internal(cgProcedure *p, Ast *expr) {
 		}
 
 		GB_ASSERT(e->kind == Entity_Variable);
-
 		if (pt->variadic && pt->variadic_index == i) {
 			cgValue variadic_args = cg_const_nil(p, e->type);
 			auto variadic = slice(ce->split_args->positional, pt->variadic_index, ce->split_args->positional.count);
@@ -964,8 +963,8 @@ gb_internal cgValue cg_build_call_expr_internal(cgProcedure *p, Ast *expr) {
 			if (pt->variadic && param_index == pt->variadic_index) {
 				if (!is_c_vararg && args[arg_index].node == nullptr) {
 					args[arg_index++] = cg_const_nil(p, e->type);
+					continue;
 				}
-				continue;
 			}
 
 			cgValue arg = args[arg_index];
