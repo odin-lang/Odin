@@ -591,7 +591,7 @@ assign_at_elems :: proc(array: ^$T/[dynamic]$E, index: int, args: ..E, loc := #c
 		copy(array[index:], args)
 		ok = true
 	} else {
-		resize(array, index+1+len(args), loc) or_return
+		resize(array, index+len(args), loc) or_return
 		copy(array[index:], args)
 		ok = true
 	}
