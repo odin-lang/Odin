@@ -591,7 +591,9 @@ assign_at_elems :: proc(array: ^$T/[dynamic]$E, index: int, args: ..E, loc := #c
 		copy(array[index:], args)
 		ok = true
 	} else {
-		resize(array, index+len(args), loc) or_return
+		new_size := len(array)+len(args)
+		if len(array) == index && len(args) == 0 do new_size += 1
+		resize(array, new_size, loc) or_return
 		copy(array[index:], args)
 		ok = true
 	}
@@ -668,6 +670,7 @@ reserve_dynamic_array :: proc(array: ^$T/[dynamic]$E, capacity: int, loc := #cal
 // Note: Prefer the procedure group `resize`
 @builtin
 resize_dynamic_array :: proc(array: ^$T/[dynamic]$E, length: int, loc := #caller_location) -> Allocator_Error {
+
 	if array == nil {
 		return nil
 	}
