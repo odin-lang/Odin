@@ -5548,6 +5548,9 @@ gb_internal void check_test_procedures(Checker *c) {
 		}
 	}
 
+	gb_sort_array(c->info.testing_procedures.data, c->info.testing_procedures.count, testing_procedures_cmp);
+	remove_neighbouring_duplicate_entires_from_sorted_array(&c->info.testing_procedures);
+
 	for (isize i = 0; i < c->info.testing_procedures.count; /**/) {
 		Entity *e = c->info.testing_procedures[i];
 		String name = e->token.string;
@@ -5975,6 +5978,19 @@ gb_internal GB_COMPARE_PROC(fini_procedures_cmp) {
 	return init_procedures_cmp(b, a);
 }
 
+gb_internal void remove_neighbouring_duplicate_entires_from_sorted_array(Array<Entity *> *array) {
+	Entity *prev = nullptr;
+
+	for (isize i = 0; i < array->count; /**/) {
+		Entity *curr = array->data[i];
+		if (prev == curr) {
+			array_ordered_remove(array, i);
+		} else {
+			prev = curr;
+			i += 1;
+		}
+	}
+}
 
 gb_internal void check_sort_init_and_fini_procedures(Checker *c) {
 	gb_sort_array(c->info.init_procedures.data, c->info.init_procedures.count, init_procedures_cmp);
@@ -5982,29 +5998,8 @@ gb_internal void check_sort_init_and_fini_procedures(Checker *c) {
 
 	// NOTE(bill): remove possible duplicates from the init/fini lists
 	// NOTE(bill): because the arrays are sorted, you only need to check the previous element
-	Entity *prev = nullptr;
-
-	for (isize i = 0; i < c->info.init_procedures.count; /**/) {
-		Entity *curr = c->info.init_procedures[i];
-		if (prev == curr) {
-			array_ordered_remove(&c->info.init_procedures, i);
-		} else {
-			prev = curr;
-			i += 1;
-		}
-	}
-
-	prev = nullptr;
-
-	for (isize i = 0; i < c->info.fini_procedures.count; /**/) {
-		Entity *curr = c->info.fini_procedures[i];
-		if (prev == curr) {
-			array_ordered_remove(&c->info.fini_procedures, i);
-		} else {
-			prev = curr;
-			i += 1;
-		}
-	}
+	remove_neighbouring_duplicate_entires_from_sorted_array(&c->info.init_procedures);
+	remove_neighbouring_duplicate_entires_from_sorted_array(&c->info.fini_procedures);
 }
 
 gb_internal void add_type_info_for_type_definitions(Checker *c) {
