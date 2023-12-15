@@ -83,14 +83,14 @@ log_allocator_proc :: proc(allocator_data: rawptr, mode: runtime.Allocator_Mode,
 		case .Query_Features:
 			logf(
 				la.level,
-				"%s%ALLOCATOR(mode=.Query_Features)",
+				"%s%sALLOCATOR(mode=.Query_Features)",
 				la.prefix, padding,
 				location = location,
 			)
 		case .Query_Info:
 			logf(
 				la.level,
-				"%s%ALLOCATOR(mode=.Query_Info)",
+				"%s%sALLOCATOR(mode=.Query_Info)",
 				la.prefix, padding,
 				location = location,
 			)
@@ -104,8 +104,8 @@ log_allocator_proc :: proc(allocator_data: rawptr, mode: runtime.Allocator_Mode,
 		if err != nil {
 			logf(
 				la.level,
-				"%s%ALLOCATOR ERROR=%v",
-				la.prefix, padding, error,
+				"%s%sALLOCATOR ERROR=%v",
+				la.prefix, padding, err,
 				location = location,
 			)
 		}
