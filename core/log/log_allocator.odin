@@ -39,14 +39,14 @@ log_allocator_proc :: proc(allocator_data: rawptr, mode: runtime.Allocator_Mode,
 		case .Alloc:
 			logf(
 				la.level,
-				"%s%s>>> ALLOCATOR(mode=.Alloc, size=%d, alignment=%d)",
+				"%s%s>>> ALLOCATOR(mode=.Alloc, size=%m, alignment=%d)",
 				la.prefix, padding, size, alignment,
 				location = location,
 			)
 		case .Alloc_Non_Zeroed:
 			logf(
 				la.level,
-				"%s%s>>> ALLOCATOR(mode=.Alloc_Non_Zeroed, size=%d, alignment=%d)",
+				"%s%s>>> ALLOCATOR(mode=.Alloc_Non_Zeroed, size=%m, alignment=%d)",
 				la.prefix, padding, size, alignment,
 				location = location,
 			)
@@ -54,7 +54,7 @@ log_allocator_proc :: proc(allocator_data: rawptr, mode: runtime.Allocator_Mode,
 			if old_size != 0 {
 				logf(
 					la.level,
-					"%s%s<<< ALLOCATOR(mode=.Free, ptr=%p, size=%d)",
+					"%s%s<<< ALLOCATOR(mode=.Free, ptr=%p, size=%m)",
 					la.prefix, padding, old_memory, old_size,
 					location = location,
 				)
@@ -76,7 +76,7 @@ log_allocator_proc :: proc(allocator_data: rawptr, mode: runtime.Allocator_Mode,
 		case .Resize:
 			logf(
 				la.level,
-				"%s%s>>> ALLOCATOR(mode=.Resize, ptr=%p, old_size=%d, size=%d, alignment=%d)",
+				"%s%s>>> ALLOCATOR(mode=.Resize, ptr=%p, old_size=%m, size=%m, alignment=%d)",
 				la.prefix, padding, old_memory, old_size, size, alignment,
 				location = location,
 			)
