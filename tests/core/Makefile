@@ -51,11 +51,14 @@ noise_test:
 	$(ODIN) run math/noise $(COMMON) -out:test_noise
 
 encoding_test:
+<<<<<<< HEAD
 	$(ODIN) run encoding/hxa    $(COMMON) $(COLLECTION) -out:test_hxa
 	$(ODIN) run encoding/json   $(COMMON) -out:test_json
 	$(ODIN) run encoding/varint $(COMMON) -out:test_varint
 	$(ODIN) run encoding/xml    $(COMMON) -out:test_xml
 	$(ODIN) run encoding/cbor   $(COMMON) -out:test_cbor
+	$(ODIN) run encoding/hex    $(COMMON) -out:test_hex
+	$(ODIN) run encoding/base64 $(COMMON) -out:test_base64
 
 math_test:
 	$(ODIN) run math $(COMMON) $(COLLECTION) -out:test_core_math
