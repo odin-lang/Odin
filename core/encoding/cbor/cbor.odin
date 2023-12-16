@@ -1,3 +1,7 @@
+// Package cbor encodes, decodes, marshals and unmarshals types from/into RCF 8949 compatible CBOR binary.
+// Also provided are conversion to and from JSON and the CBOR diagnostic format.
+//
+// You can additionally provide custom CBOR tag implementations for your use cases.
 package cbor
 
 import "core:encoding/json"
@@ -163,7 +167,7 @@ Decode_Data_Error :: enum {
 	Nested_Tag,               // When a tag's value is another tag, this is not allowed.
 	Length_Too_Big,           // When the length of a container (map, array, bytes, string) is more than `max(int)`.
 	Disallowed_Streaming,     // When the `.Disallow_Streaming` flag is set and a streaming header is encountered.
-	Break,
+	Break,                    // When the `break` header was found without any stream to break off.
 }
 
 Encode_Data_Error :: enum {

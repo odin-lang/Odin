@@ -686,8 +686,6 @@ _unmarshal_map :: proc(d: Decoder, v: any, ti: ^reflect.Type_Info, hdr: Header, 
 			return _unsupported(v, hdr)
 		}
 
-		// TODO: shrink excess.
-
 		raw_map := (^mem.Raw_Map)(v.data)
 		if raw_map.allocator.procedure == nil {
 			raw_map.allocator = context.allocator

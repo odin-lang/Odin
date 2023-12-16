@@ -89,7 +89,7 @@ tag_register_number :: proc(impl: Tag_Implementation, nr: Tag_Number, id: string
 
 // Controls initialization of default tag implementations.
 // JS and WASI default to a panic allocator so we don't want to do it on those.
-INITIALIZE_DEFAULT_TAGS :: #config(CBOR_INITIALIZE_DEFAULT_TAGS, ODIN_OS != .JS && ODIN_OS != .WASI)
+INITIALIZE_DEFAULT_TAGS :: #config(CBOR_INITIALIZE_DEFAULT_TAGS, !ODIN_DEFAULT_TO_NIL_ALLOCATOR && ODIN_OS != .JS && ODIN_OS != .WASI)
 
 @(private, init, disabled=!INITIALIZE_DEFAULT_TAGS)
 tags_initialize_defaults :: proc() {
