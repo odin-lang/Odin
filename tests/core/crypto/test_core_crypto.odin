@@ -19,15 +19,36 @@ import "base:runtime"
 import "core:log"
 
 import "core:crypto"
+import chacha_simd128 "core:crypto/_chacha20/simd128"
+import chacha_simd256 "core:crypto/_chacha20/simd256"
 import "core:crypto/chacha20"
 import "core:crypto/chacha20poly1305"
+import "core:crypto/sha2"
 
+@(private = "file")
 _PLAINTEXT_SUNSCREEN_STR := "Ladies and Gentlemen of the class of '99: If I could offer you only one tip for the future, sunscreen would be it."
 
 @(test)
 test_chacha20 :: proc(t: ^testing.T) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 
+	impls := make([dynamic]chacha20.Implementation, 0, 3)
+	defer delete(impls)
+	append(&impls, chacha20.Implementation.Portable)
+	if chacha_simd128.is_performant() {
+		append(&impls, chacha20.Implementation.Simd128)
+	}
+	if chacha_simd256.is_performant() {
+		append(&impls, chacha20.Implementation.Simd256)
+	}
+
+	for impl in impls {
+		test_chacha20_stream(t, impl)
+	}
+	test_chacha20poly1305(t) // TODO: Move into loop.
+}
+
+test_chacha20_stream :: proc(t: ^testing.T, impl: chacha20.Implementation) {
 	// Test cases taken from RFC 8439, and draft-irtf-cfrg-xchacha-03
 	plaintext := transmute([]byte)(_PLAINTEXT_SUNSCREEN_STR)
 
@@ -64,7 +85,7 @@ test_chacha20 :: proc(t: ^testing.T) {
 
 	derived_ciphertext: [114]byte
 	ctx: chacha20.Context = ---
-	chacha20.init(&ctx, key[:], nonce[:])
+	chacha20.init(&ctx, key[:], nonce[:], impl)
 	chacha20.seek(&ctx, 1) // The test vectors start the counter at 1.
 	chacha20.xor_bytes(&ctx, derived_ciphertext[:], plaintext[:])
 
@@ -109,7 +130,7 @@ test_chacha20 :: proc(t: ^testing.T) {
 	}
 	xciphertext_str := string(hex.encode(xciphertext[:], context.temp_allocator))
 
-	chacha20.init(&ctx, xkey[:], xnonce[:])
+	chacha20.init(&ctx, xkey[:], xnonce[:], impl)
 	chacha20.seek(&ctx, 1)
 	chacha20.xor_bytes(&ctx, derived_ciphertext[:], plaintext[:])
 
@@ -121,9 +142,40 @@ test_chacha20 :: proc(t: ^testing.T) {
 		xciphertext_str,
 		derived_ciphertext_str,
 	)
+
+	// Incrementally read 1, 2, 3, ..., 2048 bytes of keystream, and
+	// compare the SHA-512/256 digest with a known value.  Results
+	// and testcase taken from a known good implementation by the
+	// same author as the Odin test case.
+
+	tmp := make([]byte, 2048, context.temp_allocator)
+
+	mem.zero(&key, size_of(key))
+	mem.zero(&nonce, size_of(nonce))
+	chacha20.init(&ctx, key[:], nonce[:], impl)
+
+	h_ctx: sha2.Context_512
+	sha2.init_512_256(&h_ctx)
+
+	for i := 1; i <= 2048; i = i + 1 {
+		chacha20.keystream_bytes(&ctx, tmp[:i])
+		sha2.update(&h_ctx, tmp[:i])
+	}
+
+	digest: [32]byte
+	sha2.final(&h_ctx, digest[:])
+	digest_str := string(hex.encode(digest[:], context.temp_allocator))
+
+	expected_digest_str := "cfd6e949225b854fe04946491e6935ff05ff983d1554bc885bca0ec8082dd5b8"
+	testing.expectf(
+		t,
+		expected_digest_str == digest_str,
+		"Expected %s for keystream digest, but got %s instead",
+		expected_digest_str,
+		digest_str,
+	)
 }
 
-@(test)
 test_chacha20poly1305 :: proc(t: ^testing.T) {
 	plaintext := transmute([]byte)(_PLAINTEXT_SUNSCREEN_STR)
 
