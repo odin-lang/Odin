@@ -38,6 +38,15 @@ TAG_BASE64_ID :: "base64"
 // given content is definitely CBOR.
 TAG_SELF_DESCRIBED_CBOR :: 55799
 
+// A tag that is used to assign a textual type to the object following it.
+// The tag's value must be an array of 2 items, where the first is text (describing the following type)
+// and the second is any valid CBOR value.
+//
+// See the registration: https://datatracker.ietf.org/doc/draft-rundgren-cotx/05/
+//
+// We use this in Odin to marshal and unmarshal unions.
+TAG_OBJECT_TYPE :: 1010
+
 // A tag implementation that handles marshals and unmarshals for the tag it is registered on.
 Tag_Implementation :: struct {
 	data:      rawptr,

@@ -506,8 +506,32 @@ marshal_into_encoder :: proc(e: Encoder, v: any) -> (err: Marshal_Error) {
 		if v.data == nil || tag <= 0 {
 			return _encode_nil(e.writer)
 		}
+
 		id := info.variants[tag-1].id
-		return marshal_into(e, any{v.data, id})
+		if len(info.variants) == 1 {
+			id := info.variants[tag-1].id
+			return marshal_into(e, any{v.data, id})
+		}
+
+		// Encode a non-nil multi-variant union as the `TAG_OBJECT_TYPE`.
+		// Which is a tag of an array, where the first element is the textual id/type of the object
+		// that follows it.
+
+		err_conv(_encode_u16(e, TAG_OBJECT_TYPE, .Tag)) or_return
+		_encode_u8(e.writer, 2, .Array) or_return
+
+		vti := reflect.union_variant_type_info(v)
+		#partial switch vt in vti.variant {
+		case reflect.Type_Info_Named:
+			err_conv(_encode_text(e, vt.name)) or_return
+		case:
+			builder := strings.builder_make(context.temp_allocator) or_return
+			defer strings.builder_destroy(&builder)
+			reflect.write_type(&builder, vti)
+			err_conv(_encode_text(e, strings.to_string(builder))) or_return
+		}
+
+		return marshal_into(e, any{v.data, vti.id})
 
 	case runtime.Type_Info_Enum:
 		return marshal_into(e, any{v.data, info.base.id})

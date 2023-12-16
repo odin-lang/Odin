@@ -8,9 +8,6 @@ import "core:runtime"
 import "core:strings"
 import "core:unicode/utf8"
 
-// `strings` is only used in poly procs, but -vet thinks it is fully unused.
-_ :: strings
-
 /*
 Unmarshals the given CBOR into the given pointer using reflection.
 Types that require allocation are allocated using the given allocator.
@@ -79,7 +76,7 @@ _unmarshal_value :: proc(r: io.Reader, v: any, hdr: Header) -> (err: Unmarshal_E
 		dst = err_conv(decode(r, hdr)) or_return
 		return
 	}
-	
+
 	switch hdr {
 	case .U8:
 		decoded := _decode_u8(r) or_return
@@ -275,10 +272,12 @@ _unmarshal_value :: proc(r: io.Reader, v: any, hdr: Header) -> (err: Unmarshal_E
 		}
 
 		nr := err_conv(_decode_tag_nr(r, add)) or_return
-		
+
 		// Custom tag implementations.
 		if impl, ok := _tag_implementations_nr[nr]; ok {
 			return impl->unmarshal(r, nr, v)
+		} else if nr == TAG_OBJECT_TYPE {
+			return _unmarshal_union(r, v, ti, hdr)
 		} else {
 			// Discard the tag info and unmarshal as its value.
 			return _unmarshal_value(r, v, _decode_header(r) or_return)
@@ -714,6 +713,73 @@ _unmarshal_map :: proc(r: io.Reader, v: any, ti: ^reflect.Type_Info, hdr: Header
 
 		case:
 			return _unsupported(v, hdr)
+	}
+}
+
+// Unmarshal into a union, based on the `TAG_OBJECT_TYPE` tag of the spec, it denotes a tag which
+// contains an array of exactly two elements, the first is a textual representation of the following
+// CBOR value's type.
+_unmarshal_union :: proc(r: io.Reader, v: any, ti: ^reflect.Type_Info, hdr: Header) -> (err: Unmarshal_Error) {
+	#partial switch t in ti.variant {
+	case reflect.Type_Info_Union:
+		idhdr: Header
+		target_name: string
+		{
+			vhdr := _decode_header(r) or_return
+			vmaj, vadd := _header_split(vhdr)
+			if vmaj != .Array {
+				return .Bad_Tag_Value
+			}
+
+			n_items, unknown := err_conv(_decode_container_length(r, vadd)) or_return
+			if unknown || n_items != 2 {
+				return .Bad_Tag_Value
+			}
+			
+			idhdr = _decode_header(r) or_return
+			idmaj, idadd := _header_split(idhdr)
+			if idmaj != .Text {
+				return .Bad_Tag_Value
+			}
+
+			context.allocator = context.temp_allocator
+			target_name = err_conv(_decode_text(r, idadd)) or_return
+		}
+		defer delete(target_name, context.temp_allocator)
+
+		for variant, i in t.variants {
+			tag := i64(i)
+			if !t.no_nil {
+				tag += 1
+			}
+
+			#partial switch vti in variant.variant {
+			case reflect.Type_Info_Named:
+				if vti.name == target_name {
+					reflect.set_union_variant_raw_tag(v, tag)
+					return _unmarshal_value(r, any{v.data, variant.id}, _decode_header(r) or_return)
+				}
+
+			case:
+				builder := strings.builder_make(context.temp_allocator)
+				defer strings.builder_destroy(&builder)
+
+				reflect.write_type(&builder, variant)
+				variant_name := strings.to_string(builder)
+				
+				if variant_name == target_name {
+					reflect.set_union_variant_raw_tag(v, tag)
+					return _unmarshal_value(r, any{v.data, variant.id}, _decode_header(r) or_return)
+				}
+			}
+		}
+
+		// No variant matched.
+		return _unsupported(v, idhdr)
+
+	case:
+		// Not a union.
+		return _unsupported(v, hdr)
 	}
 }
 
