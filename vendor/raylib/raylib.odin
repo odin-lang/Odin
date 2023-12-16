@@ -1189,7 +1189,10 @@ foreign lib {
 	IsMouseButtonPressed  :: proc(button: MouseButton) -> bool ---    // Detect if a mouse button has been pressed once
 	IsMouseButtonDown     :: proc(button: MouseButton) -> bool ---    // Detect if a mouse button is being pressed
 	IsMouseButtonReleased :: proc(button: MouseButton) -> bool ---    // Detect if a mouse button has been released once
-	IsMouseButtonUp       :: proc(button: MouseButton) -> bool ---    // Detect if a mouse button is NOT being pressed
+	// IsMouseButtonUp    :: proc(button: MouseButton) -> bool ---       Detect if a mouse button is NOT being pressed
+	IsMouseButtonUp       :: proc(button: MouseButton) -> bool {      // TODO: remove this when Raylib fixes this bug
+		return !IsMouseButtonDown(button)
+	}
 	GetMouseX             :: proc() -> c.int ---                      // Returns mouse position X
 	GetMouseY             :: proc() -> c.int ---                      // Returns mouse position Y
 	GetMousePosition      :: proc() -> Vector2 ---                    // Returns mouse position XY
