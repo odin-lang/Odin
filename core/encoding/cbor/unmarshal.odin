@@ -15,25 +15,56 @@ Types that require allocation are allocated using the given allocator.
 Some temporary allocations are done on the `context.temp_allocator`, but, if you want to,
 this can be set to a "normal" allocator, because the necessary `delete` and `free` calls are still made.
 This is helpful when the CBOR size is so big that you don't want to collect all the temporary allocations until the end.
+
+Disable streaming/indeterminate lengths with the `.Disallow_Streaming` flag.
+
+Shrink excess bytes in buffers and containers with the `.Shrink_Excess` flag.
+
+Mark the input as trusted input with the `.Trusted_Input` flag, this turns off the safety feature
+of not pre-allocating more than `max_pre_alloc` bytes before reading into the bytes. You should only
+do this when you own both sides of the encoding and are sure there can't be malicious bytes used as
+an input.
 */
 unmarshal :: proc {
 	unmarshal_from_reader,
 	unmarshal_from_string,
 }
 
-// Unmarshals from a reader, see docs on the proc group `Unmarshal` for more info.
-unmarshal_from_reader :: proc(r: io.Reader, ptr: ^$T, allocator := context.allocator) -> Unmarshal_Error {
-	return _unmarshal_any_ptr(r, ptr, allocator=allocator)
+unmarshal_from_reader :: proc(r: io.Reader, ptr: ^$T, flags := Decoder_Flags{}, allocator := context.allocator) -> (err: Unmarshal_Error) {
+	err = unmarshal_from_decoder(Decoder{ DEFAULT_MAX_PRE_ALLOC, flags, r }, ptr, allocator=allocator)
+
+	// Normal EOF does not exist here, we try to read the exact amount that is said to be provided.
+	if err == .EOF { err = .Unexpected_EOF }
+	return
 }
 
 // Unmarshals from a string, see docs on the proc group `Unmarshal` for more info.
-unmarshal_from_string :: proc(s: string, ptr: ^$T, allocator := context.allocator) -> Unmarshal_Error {
+unmarshal_from_string :: proc(s: string, ptr: ^$T, flags := Decoder_Flags{}, allocator := context.allocator) -> (err: Unmarshal_Error) {
 	sr: strings.Reader
 	r := strings.to_reader(&sr, s)
-	return _unmarshal_any_ptr(r, ptr, allocator=allocator)
+
+	err = unmarshal_from_reader(r, ptr, flags, allocator)
+
+	// Normal EOF does not exist here, we try to read the exact amount that is said to be provided.
+	if err == .EOF { err = .Unexpected_EOF }
+	return
 }
 
-_unmarshal_any_ptr :: proc(r: io.Reader, v: any, hdr: Maybe(Header) = nil, allocator := context.allocator) -> Unmarshal_Error {
+unmarshal_from_decoder :: proc(d: Decoder, ptr: ^$T, allocator := context.allocator) -> (err: Unmarshal_Error) {
+	d := d
+	if d.max_pre_alloc <= 0 {
+		d.max_pre_alloc = DEFAULT_MAX_PRE_ALLOC
+	}
+
+	err = _unmarshal_any_ptr(d, ptr, allocator=allocator)
+
+	// Normal EOF does not exist here, we try to read the exact amount that is said to be provided.
+	if err == .EOF { err = .Unexpected_EOF }
+	return
+
+}
+
+_unmarshal_any_ptr :: proc(d: Decoder, v: any, hdr: Maybe(Header) = nil, allocator := context.allocator) -> Unmarshal_Error {
 	context.allocator = allocator
 	v := v
 
@@ -48,12 +79,13 @@ _unmarshal_any_ptr :: proc(r: io.Reader, v: any, hdr: Maybe(Header) = nil, alloc
 	}
 	
 	data := any{(^rawptr)(v.data)^, ti.variant.(reflect.Type_Info_Pointer).elem.id}	
-	return _unmarshal_value(r, data, hdr.? or_else (_decode_header(r) or_return))
+	return _unmarshal_value(d, data, hdr.? or_else (_decode_header(d.reader) or_return))
 }
 
-_unmarshal_value :: proc(r: io.Reader, v: any, hdr: Header) -> (err: Unmarshal_Error) {
+_unmarshal_value :: proc(d: Decoder, v: any, hdr: Header) -> (err: Unmarshal_Error) {
 	v := v
 	ti := reflect.type_info_base(type_info_of(v.id))
+	r := d.reader
 
 	// If it's a union with only one variant, then treat it as that variant
 	if u, ok := ti.variant.(reflect.Type_Info_Union); ok && len(u.variants) == 1 {
@@ -73,7 +105,7 @@ _unmarshal_value :: proc(r: io.Reader, v: any, hdr: Header) -> (err: Unmarshal_E
 	// Allow generic unmarshal by doing it into a `Value`.
 	switch &dst in v {
 	case Value:
-		dst = err_conv(decode(r, hdr)) or_return
+		dst = err_conv(_decode_from_decoder(d, hdr)) or_return
 		return
 	}
 
@@ -253,7 +285,7 @@ _unmarshal_value :: proc(r: io.Reader, v: any, hdr: Header) -> (err: Unmarshal_E
 	case .Tag:
 		switch &dst in v {
 		case ^Tag:
-			tval := err_conv(_decode_tag_ptr(r, add)) or_return
+			tval := err_conv(_decode_tag_ptr(d, add)) or_return
 			if t, is_tag := tval.(^Tag); is_tag {
 				dst = t
 				return
@@ -262,7 +294,7 @@ _unmarshal_value :: proc(r: io.Reader, v: any, hdr: Header) -> (err: Unmarshal_E
 			destroy(tval)
 			return .Bad_Tag_Value
 		case Tag:
-			t := err_conv(_decode_tag(r, add)) or_return
+			t := err_conv(_decode_tag(d, add)) or_return
 			if t, is_tag := t.?; is_tag {
 				dst = t
 				return
@@ -271,33 +303,33 @@ _unmarshal_value :: proc(r: io.Reader, v: any, hdr: Header) -> (err: Unmarshal_E
 			return .Bad_Tag_Value
 		}
 
-		nr := err_conv(_decode_tag_nr(r, add)) or_return
+		nr := err_conv(_decode_uint_as_u64(r, add)) or_return
 
 		// Custom tag implementations.
 		if impl, ok := _tag_implementations_nr[nr]; ok {
-			return impl->unmarshal(r, nr, v)
+			return impl->unmarshal(d, nr, v)
 		} else if nr == TAG_OBJECT_TYPE {
-			return _unmarshal_union(r, v, ti, hdr)
+			return _unmarshal_union(d, v, ti, hdr)
 		} else {
 			// Discard the tag info and unmarshal as its value.
-			return _unmarshal_value(r, v, _decode_header(r) or_return)
+			return _unmarshal_value(d, v, _decode_header(r) or_return)
 		}
 
 		return _unsupported(v, hdr, add)
 
-	case .Bytes: return _unmarshal_bytes(r, v, ti, hdr, add)
-	case .Text:  return _unmarshal_string(r, v, ti, hdr, add)
-	case .Array: return _unmarshal_array(r, v, ti, hdr, add)
-	case .Map:   return _unmarshal_map(r, v, ti, hdr, add)
+	case .Bytes: return _unmarshal_bytes(d, v, ti, hdr, add)
+	case .Text:  return _unmarshal_string(d, v, ti, hdr, add)
+	case .Array: return _unmarshal_array(d, v, ti, hdr, add)
+	case .Map:   return _unmarshal_map(d, v, ti, hdr, add)
 
 	case:        return .Bad_Major
 	}
 }
 
-_unmarshal_bytes :: proc(r: io.Reader, v: any, ti: ^reflect.Type_Info, hdr: Header, add: Add) -> (err: Unmarshal_Error) {
+_unmarshal_bytes :: proc(d: Decoder, v: any, ti: ^reflect.Type_Info, hdr: Header, add: Add) -> (err: Unmarshal_Error) {
 	#partial switch t in ti.variant {
 	case reflect.Type_Info_String:
-		bytes := err_conv(_decode_bytes(r, add)) or_return
+		bytes := err_conv(_decode_bytes(d, add)) or_return
 
 		if t.is_cstring {
 			raw  := (^cstring)(v.data)
@@ -316,7 +348,7 @@ _unmarshal_bytes :: proc(r: io.Reader, v: any, ti: ^reflect.Type_Info, hdr: Head
 
 		if elem_base.id != byte { return _unsupported(v, hdr) }
 
-		bytes := err_conv(_decode_bytes(r, add)) or_return
+		bytes := err_conv(_decode_bytes(d, add)) or_return
 		raw   := (^mem.Raw_Slice)(v.data)
 		raw^   = transmute(mem.Raw_Slice)bytes
 		return
@@ -326,7 +358,7 @@ _unmarshal_bytes :: proc(r: io.Reader, v: any, ti: ^reflect.Type_Info, hdr: Head
 
 		if elem_base.id != byte { return _unsupported(v, hdr) }
 		
-		bytes         := err_conv(_decode_bytes(r, add)) or_return
+		bytes         := err_conv(_decode_bytes(d, add)) or_return
 		raw           := (^mem.Raw_Dynamic_Array)(v.data)
 		raw.data       = raw_data(bytes)
 		raw.len        = len(bytes)
@@ -339,11 +371,9 @@ _unmarshal_bytes :: proc(r: io.Reader, v: any, ti: ^reflect.Type_Info, hdr: Head
 
 		if elem_base.id != byte { return _unsupported(v, hdr) }
 
-		bytes: []byte; {
-			context.allocator = context.temp_allocator
-			bytes = err_conv(_decode_bytes(r, add)) or_return
-		}
-		defer delete(bytes, context.temp_allocator)
+		context.allocator = context.temp_allocator
+		bytes := err_conv(_decode_bytes(d, add)) or_return
+		defer delete(bytes)
 
 		if len(bytes) > t.count { return _unsupported(v, hdr) }
 		
@@ -357,10 +387,10 @@ _unmarshal_bytes :: proc(r: io.Reader, v: any, ti: ^reflect.Type_Info, hdr: Head
 	return _unsupported(v, hdr)
 }
 
-_unmarshal_string :: proc(r: io.Reader, v: any, ti: ^reflect.Type_Info, hdr: Header, add: Add) -> (err: Unmarshal_Error) {
+_unmarshal_string :: proc(d: Decoder, v: any, ti: ^reflect.Type_Info, hdr: Header, add: Add) -> (err: Unmarshal_Error) {
 	#partial switch t in ti.variant {
 	case reflect.Type_Info_String:
-		text := err_conv(_decode_text(r, add)) or_return
+		text := err_conv(_decode_text(d, add)) or_return
 
 		if t.is_cstring {
 			raw := (^cstring)(v.data)
@@ -376,8 +406,8 @@ _unmarshal_string :: proc(r: io.Reader, v: any, ti: ^reflect.Type_Info, hdr: Hea
 	// Enum by its variant name.
 	case reflect.Type_Info_Enum:
 		context.allocator = context.temp_allocator
-		text := err_conv(_decode_text(r, add)) or_return
-		defer delete(text, context.temp_allocator)
+		text := err_conv(_decode_text(d, add)) or_return
+		defer delete(text)
 
 		for name, i in t.names {
 			if name == text {
@@ -388,8 +418,8 @@ _unmarshal_string :: proc(r: io.Reader, v: any, ti: ^reflect.Type_Info, hdr: Hea
 	
 	case reflect.Type_Info_Rune:
 		context.allocator = context.temp_allocator
-		text := err_conv(_decode_text(r, add)) or_return
-		defer delete(text, context.temp_allocator)
+		text := err_conv(_decode_text(d, add)) or_return
+		defer delete(text)
 
 		r := (^rune)(v.data)
 		dr, n := utf8.decode_rune(text)
@@ -404,21 +434,19 @@ _unmarshal_string :: proc(r: io.Reader, v: any, ti: ^reflect.Type_Info, hdr: Hea
 	return _unsupported(v, hdr)
 }
 
-_unmarshal_array :: proc(r: io.Reader, v: any, ti: ^reflect.Type_Info, hdr: Header, add: Add) -> (err: Unmarshal_Error) {
-
+_unmarshal_array :: proc(d: Decoder, v: any, ti: ^reflect.Type_Info, hdr: Header, add: Add) -> (err: Unmarshal_Error) {
 	assign_array :: proc(
-		r: io.Reader,
+		d: Decoder,
 		da: ^mem.Raw_Dynamic_Array,
 		elemt: ^reflect.Type_Info,
-		_length: Maybe(int),
+		length: int,
 		growable := true,
 	) -> (out_of_space: bool, err: Unmarshal_Error) {
-		length, has_length := _length.?
-		for idx: uintptr = 0; !has_length || idx < uintptr(length); idx += 1 {
+		for idx: uintptr = 0; length == -1 || idx < uintptr(length); idx += 1 {
 			elem_ptr := rawptr(uintptr(da.data) + idx*uintptr(elemt.size))
 			elem     := any{elem_ptr, elemt.id}
 
-			hdr := _decode_header(r) or_return
+			hdr := _decode_header(d.reader) or_return
 			
 			// Double size if out of capacity.
 			if da.cap <= da.len {
@@ -432,8 +460,8 @@ _unmarshal_array :: proc(r: io.Reader, v: any, ti: ^reflect.Type_Info, hdr: Head
 				if !ok { return false, .Out_Of_Memory }
 			}
 			
-			err = _unmarshal_value(r, elem, hdr)
-			if !has_length && err == .Break { break }
+			err = _unmarshal_value(d, elem, hdr)
+			if length == -1 && err == .Break { break }
 			if err != nil { return }
 
 			da.len += 1
@@ -445,26 +473,25 @@ _unmarshal_array :: proc(r: io.Reader, v: any, ti: ^reflect.Type_Info, hdr: Head
 	// Allow generically storing the values array.
 	switch &dst in v {
 	case ^Array:
-		dst = err_conv(_decode_array_ptr(r, add)) or_return
+		dst = err_conv(_decode_array_ptr(d, add)) or_return
 		return
 	case Array:
-		dst = err_conv(_decode_array(r, add)) or_return
+		dst = err_conv(_decode_array(d, add)) or_return
 		return
 	}
 
 	#partial switch t in ti.variant {
 	case reflect.Type_Info_Slice:
-		_length, unknown := err_conv(_decode_container_length(r, add)) or_return
-		length := _length.? or_else INITIAL_STREAMED_CONTAINER_CAPACITY
+		length, scap := err_conv(_decode_len_container(d, add)) or_return
 
-		data := mem.alloc_bytes_non_zeroed(t.elem.size * length, t.elem.align) or_return
+		data := mem.alloc_bytes_non_zeroed(t.elem.size * scap, t.elem.align) or_return
 		defer if err != nil { mem.free_bytes(data) }
 
 		da := mem.Raw_Dynamic_Array{raw_data(data), 0, length, context.allocator }
 
-		assign_array(r, &da, t.elem, _length) or_return
+		assign_array(d, &da, t.elem, length) or_return
 
-		if da.len < da.cap {
+		if .Shrink_Excess in d.flags {
 			// Ignoring an error here, but this is not critical to succeed.
 			_ = runtime.__dynamic_array_shrink(&da, t.elem.size, t.elem.align, da.len)
 		}
@@ -475,54 +502,58 @@ _unmarshal_array :: proc(r: io.Reader, v: any, ti: ^reflect.Type_Info, hdr: Head
 		return
 
 	case reflect.Type_Info_Dynamic_Array:
-		_length, unknown := err_conv(_decode_container_length(r, add)) or_return
-		length := _length.? or_else INITIAL_STREAMED_CONTAINER_CAPACITY
+		length, scap := err_conv(_decode_len_container(d, add)) or_return
 
-		data := mem.alloc_bytes_non_zeroed(t.elem.size * length, t.elem.align) or_return
+		data := mem.alloc_bytes_non_zeroed(t.elem.size * scap, t.elem.align) or_return
 		defer if err != nil { mem.free_bytes(data) }
 
-		raw := (^mem.Raw_Dynamic_Array)(v.data)
-		raw.data = raw_data(data) 
-		raw.len = 0
-		raw.cap = length
-		raw.allocator = context.allocator
+		raw           := (^mem.Raw_Dynamic_Array)(v.data)
+		raw.data       = raw_data(data) 
+		raw.len        = 0
+		raw.cap        = length
+		raw.allocator  = context.allocator
 
-		_ = assign_array(r, raw, t.elem, _length) or_return
+		_ = assign_array(d, raw, t.elem, length) or_return
+
+		if .Shrink_Excess in d.flags {
+			// Ignoring an error here, but this is not critical to succeed.
+			_ = runtime.__dynamic_array_shrink(raw, t.elem.size, t.elem.align, raw.len)
+		}
 		return
 
 	case reflect.Type_Info_Array:
-		_length, unknown := err_conv(_decode_container_length(r, add)) or_return
-		length := _length.? or_else t.count
+		_length, scap := err_conv(_decode_len_container(d, add)) or_return
+		length := min(scap, t.count)
 	
-		if !unknown && length > t.count {
+		if length > t.count {
 			return _unsupported(v, hdr)
 		}
 
 		da := mem.Raw_Dynamic_Array{rawptr(v.data), 0, length, context.allocator }
 
-		out_of_space := assign_array(r, &da, t.elem, _length, growable=false) or_return
+		out_of_space := assign_array(d, &da, t.elem, length, growable=false) or_return
 		if out_of_space { return _unsupported(v, hdr) }
 		return
 
 	case reflect.Type_Info_Enumerated_Array:
-		_length, unknown := err_conv(_decode_container_length(r, add)) or_return
-		length := _length.? or_else t.count
+		_length, scap := err_conv(_decode_len_container(d, add)) or_return
+		length := min(scap, t.count)
 	
-		if !unknown && length > t.count {
+		if length > t.count {
 			return _unsupported(v, hdr)
 		}
 
 		da := mem.Raw_Dynamic_Array{rawptr(v.data), 0, length, context.allocator }
 
-		out_of_space := assign_array(r, &da, t.elem, _length, growable=false) or_return
+		out_of_space := assign_array(d, &da, t.elem, length, growable=false) or_return
 		if out_of_space { return _unsupported(v, hdr) }
 		return
 
 	case reflect.Type_Info_Complex:
-		_length, unknown := err_conv(_decode_container_length(r, add)) or_return
-		length := _length.? or_else 2
+		_length, scap := err_conv(_decode_len_container(d, add)) or_return
+		length := min(scap, 2)
 	
-		if !unknown && length > 2 {
+		if length > 2 {
 			return _unsupported(v, hdr)
 		}
 
@@ -536,15 +567,15 @@ _unmarshal_array :: proc(r: io.Reader, v: any, ti: ^reflect.Type_Info, hdr: Head
 		case:            unreachable()
 		}
 
-		out_of_space := assign_array(r, &da, info, 2, growable=false) or_return
+		out_of_space := assign_array(d, &da, info, 2, growable=false) or_return
 		if out_of_space { return _unsupported(v, hdr) }
 		return
 	
 	case reflect.Type_Info_Quaternion:
-		_length, unknown := err_conv(_decode_container_length(r, add)) or_return
-		length := _length.? or_else 4
+		_length, scap := err_conv(_decode_len_container(d, add)) or_return
+		length := min(scap, 4)
 	
-		if !unknown && length > 4 {
+		if length > 4 {
 			return _unsupported(v, hdr)
 		}
 
@@ -558,7 +589,7 @@ _unmarshal_array :: proc(r: io.Reader, v: any, ti: ^reflect.Type_Info, hdr: Head
 		case:            unreachable()
 		}
 
-		out_of_space := assign_array(r, &da, info, 4, growable=false) or_return
+		out_of_space := assign_array(d, &da, info, 4, growable=false) or_return
 		if out_of_space { return _unsupported(v, hdr) }
 		return
 
@@ -566,17 +597,17 @@ _unmarshal_array :: proc(r: io.Reader, v: any, ti: ^reflect.Type_Info, hdr: Head
 	}
 }
 
-_unmarshal_map :: proc(r: io.Reader, v: any, ti: ^reflect.Type_Info, hdr: Header, add: Add) -> (err: Unmarshal_Error) {
-
-	decode_key :: proc(r: io.Reader, v: any) -> (k: string, err: Unmarshal_Error) {
-		entry_hdr := _decode_header(r) or_return
+_unmarshal_map :: proc(d: Decoder, v: any, ti: ^reflect.Type_Info, hdr: Header, add: Add) -> (err: Unmarshal_Error) {
+	r := d.reader
+	decode_key :: proc(d: Decoder, v: any) -> (k: string, err: Unmarshal_Error) {
+		entry_hdr := _decode_header(d.reader) or_return
 		entry_maj, entry_add := _header_split(entry_hdr)
 		#partial switch entry_maj {
 		case .Text:
-			k = err_conv(_decode_text(r, entry_add)) or_return
+			k = err_conv(_decode_text(d, entry_add)) or_return
 			return
 		case .Bytes:
-			bytes := err_conv(_decode_bytes(r, entry_add)) or_return
+			bytes := err_conv(_decode_bytes(d, entry_add)) or_return
 			k = string(bytes)
 			return
 		case:
@@ -588,10 +619,10 @@ _unmarshal_map :: proc(r: io.Reader, v: any, ti: ^reflect.Type_Info, hdr: Header
 	// Allow generically storing the map array.
 	switch &dst in v {
 	case ^Map:
-		dst = err_conv(_decode_map_ptr(r, add)) or_return
+		dst = err_conv(_decode_map_ptr(d, add)) or_return
 		return
 	case Map:
-		dst = err_conv(_decode_map(r, add)) or_return
+		dst = err_conv(_decode_map(d, add)) or_return
 		return
 	}
 
@@ -601,14 +632,15 @@ _unmarshal_map :: proc(r: io.Reader, v: any, ti: ^reflect.Type_Info, hdr: Header
 			return _unsupported(v, hdr)
 		}
 
-		length, unknown := err_conv(_decode_container_length(r, add)) or_return
+		length, scap := err_conv(_decode_len_container(d, add)) or_return
+		unknown := length == -1
 		fields := reflect.struct_fields_zipped(ti.id)
 	
-		for idx := 0; unknown || idx < length.?; idx += 1 {
+		for idx := 0; idx < len(fields) && (unknown || idx < length); idx += 1 {
 			// Decode key, keys can only be strings.
 			key: string; {
 				context.allocator = context.temp_allocator
-				if keyv, kerr := decode_key(r, v); unknown && kerr == .Break {
+				if keyv, kerr := decode_key(d, v); unknown && kerr == .Break {
 					break
 				} else if kerr != nil {
 					err = kerr
@@ -641,11 +673,11 @@ _unmarshal_map :: proc(r: io.Reader, v: any, ti: ^reflect.Type_Info, hdr: Header
 				}
 			}
 
-			field  := fields[use_field_idx]
-			name   := field.name
-			ptr    := rawptr(uintptr(v.data) + field.offset)
-			fany   := any{ptr, field.type.id}
-			_unmarshal_value(r, fany, _decode_header(r) or_return) or_return
+			field := fields[use_field_idx]
+			name  := field.name
+			ptr   := rawptr(uintptr(v.data) + field.offset)
+			fany  := any{ptr, field.type.id}
+			_unmarshal_value(d, fany, _decode_header(r) or_return) or_return
 		}
 		return
 
@@ -653,6 +685,8 @@ _unmarshal_map :: proc(r: io.Reader, v: any, ti: ^reflect.Type_Info, hdr: Header
 		if !reflect.is_string(t.key) {
 			return _unsupported(v, hdr)
 		}
+
+		// TODO: shrink excess.
 
 		raw_map := (^mem.Raw_Map)(v.data)
 		if raw_map.allocator.procedure == nil {
@@ -663,10 +697,11 @@ _unmarshal_map :: proc(r: io.Reader, v: any, ti: ^reflect.Type_Info, hdr: Header
 			_ = runtime.map_free_dynamic(raw_map^, t.map_info)
 		}
 
-		length, unknown := err_conv(_decode_container_length(r, add)) or_return
+		length, scap := err_conv(_decode_len_container(d, add)) or_return
+		unknown := length == -1
 		if !unknown {
 			// Reserve space before setting so we can return allocation errors and be efficient on big maps.
-			new_len := uintptr(runtime.map_len(raw_map^)+length.?)
+			new_len := uintptr(min(scap, runtime.map_len(raw_map^)+length))
 			runtime.map_reserve_dynamic(raw_map, t.map_info, new_len) or_return
 		}
 		
@@ -676,10 +711,10 @@ _unmarshal_map :: proc(r: io.Reader, v: any, ti: ^reflect.Type_Info, hdr: Header
 
 		map_backing_value := any{raw_data(elem_backing), t.value.id}
 
-		for idx := 0; unknown || idx < length.?; idx += 1 {
+		for idx := 0; unknown || idx < length; idx += 1 {
 			// Decode key, keys can only be strings.
 			key: string
-			if keyv, kerr := decode_key(r, v); unknown && kerr == .Break {
+			if keyv, kerr := decode_key(d, v); unknown && kerr == .Break {
 				break
 			} else if kerr != nil {
 				err = kerr
@@ -688,14 +723,14 @@ _unmarshal_map :: proc(r: io.Reader, v: any, ti: ^reflect.Type_Info, hdr: Header
 				key = keyv
 			}
 
-			if unknown {
+			if unknown || idx > scap {
 				// Reserve space for new element so we can return allocator errors.
 				new_len := uintptr(runtime.map_len(raw_map^)+1)
 				runtime.map_reserve_dynamic(raw_map, t.map_info, new_len) or_return
 			}
 
 			mem.zero_slice(elem_backing)
-			_unmarshal_value(r, map_backing_value, _decode_header(r) or_return) or_return
+			_unmarshal_value(d, map_backing_value, _decode_header(r) or_return) or_return
 
 			key_ptr := rawptr(&key)
 			key_cstr: cstring
@@ -709,6 +744,10 @@ _unmarshal_map :: proc(r: io.Reader, v: any, ti: ^reflect.Type_Info, hdr: Header
 			// We already reserved space for it, so this shouldn't fail.
 			assert(set_ptr != nil)
 		}
+	
+		if .Shrink_Excess in d.flags {
+			_, _ = runtime.map_shrink_dynamic(raw_map, t.map_info)
+		}
 		return
 
 		case:
@@ -719,7 +758,8 @@ _unmarshal_map :: proc(r: io.Reader, v: any, ti: ^reflect.Type_Info, hdr: Header
 // Unmarshal into a union, based on the `TAG_OBJECT_TYPE` tag of the spec, it denotes a tag which
 // contains an array of exactly two elements, the first is a textual representation of the following
 // CBOR value's type.
-_unmarshal_union :: proc(r: io.Reader, v: any, ti: ^reflect.Type_Info, hdr: Header) -> (err: Unmarshal_Error) {
+_unmarshal_union :: proc(d: Decoder, v: any, ti: ^reflect.Type_Info, hdr: Header) -> (err: Unmarshal_Error) {
+	r := d.reader
 	#partial switch t in ti.variant {
 	case reflect.Type_Info_Union:
 		idhdr: Header
@@ -731,8 +771,8 @@ _unmarshal_union :: proc(r: io.Reader, v: any, ti: ^reflect.Type_Info, hdr: Head
 				return .Bad_Tag_Value
 			}
 
-			n_items, unknown := err_conv(_decode_container_length(r, vadd)) or_return
-			if unknown || n_items != 2 {
+			n_items, _ := err_conv(_decode_len_container(d, vadd)) or_return
+			if n_items != 2 {
 				return .Bad_Tag_Value
 			}
 			
@@ -743,7 +783,7 @@ _unmarshal_union :: proc(r: io.Reader, v: any, ti: ^reflect.Type_Info, hdr: Head
 			}
 
 			context.allocator = context.temp_allocator
-			target_name = err_conv(_decode_text(r, idadd)) or_return
+			target_name = err_conv(_decode_text(d, idadd)) or_return
 		}
 		defer delete(target_name, context.temp_allocator)
 
@@ -757,7 +797,7 @@ _unmarshal_union :: proc(r: io.Reader, v: any, ti: ^reflect.Type_Info, hdr: Head
 			case reflect.Type_Info_Named:
 				if vti.name == target_name {
 					reflect.set_union_variant_raw_tag(v, tag)
-					return _unmarshal_value(r, any{v.data, variant.id}, _decode_header(r) or_return)
+					return _unmarshal_value(d, any{v.data, variant.id}, _decode_header(r) or_return)
 				}
 
 			case:
@@ -769,7 +809,7 @@ _unmarshal_union :: proc(r: io.Reader, v: any, ti: ^reflect.Type_Info, hdr: Head
 				
 				if variant_name == target_name {
 					reflect.set_union_variant_raw_tag(v, tag)
-					return _unmarshal_value(r, any{v.data, variant.id}, _decode_header(r) or_return)
+					return _unmarshal_value(d, any{v.data, variant.id}, _decode_header(r) or_return)
 				}
 			}
 		}

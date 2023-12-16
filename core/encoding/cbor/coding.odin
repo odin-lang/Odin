@@ -33,14 +33,38 @@ Encoder_Flags :: bit_set[Encoder_Flag]
 
 // Flags for fully deterministic output (if you are not using streaming/indeterminate length).
 ENCODE_FULLY_DETERMINISTIC :: Encoder_Flags{.Deterministic_Int_Size, .Deterministic_Float_Size, .Deterministic_Map_Sorting}
+
 // Flags for the smallest encoding output.
-ENCODE_SMALL               :: Encoder_Flags{.Deterministic_Int_Size, .Deterministic_Float_Size}
-// Flags for the fastest encoding output.
-ENCODE_FAST                :: Encoder_Flags{}
+ENCODE_SMALL :: Encoder_Flags{.Deterministic_Int_Size, .Deterministic_Float_Size}
 
 Encoder :: struct {
 	flags:  Encoder_Flags,
 	writer: io.Writer,
+}
+
+Decoder_Flag :: enum {
+	// Rejects (with an error `.Disallowed_Streaming`) when a streaming CBOR header is encountered.
+	Disallow_Streaming,
+
+	// Pre-allocates buffers and containers with the size that was set in the CBOR header.
+	// This should only be enabled when you control both ends of the encoding, if you don't,
+	// attackers can craft input that causes massive (`max(u64)`) byte allocations for a few bytes of
+	// CBOR.
+	Trusted_Input,
+	
+	// Makes the decoder shrink of excess capacity from allocated buffers/containers before returning.
+	Shrink_Excess,
+}
+
+Decoder_Flags :: bit_set[Decoder_Flag]
+
+Decoder :: struct {
+	// The max amount of bytes allowed to pre-allocate when `.Trusted_Input` is not set on the
+	// flags.
+	max_pre_alloc: int,
+
+	flags:  Decoder_Flags,
+	reader: io.Reader,
 }
 
 /*
@@ -52,28 +76,60 @@ Allocations are done using the given allocator,
 *no* allocations are done on the `context.temp_allocator`.
 
 A value can be (fully and recursively) deallocated using the `destroy` proc in this package.
+
+Disable streaming/indeterminate lengths with the `.Disallow_Streaming` flag.
+
+Shrink excess bytes in buffers and containers with the `.Shrink_Excess` flag.
+
+Mark the input as trusted input with the `.Trusted_Input` flag, this turns off the safety feature
+of not pre-allocating more than `max_pre_alloc` bytes before reading into the bytes. You should only
+do this when you own both sides of the encoding and are sure there can't be malicious bytes used as
+an input.
 */
-decode :: proc {
-	decode_string,
-	decode_reader,
+decode_from :: proc {
+	decode_from_string,
+	decode_from_reader,
+	decode_from_decoder,
 }
+decode :: decode_from
 
 // Decodes the given string as CBOR.
 // See docs on the proc group `decode` for more information.
-decode_string :: proc(s: string, allocator := context.allocator) -> (v: Value, err: Decode_Error) {
+decode_from_string :: proc(s: string, flags: Decoder_Flags = {}, allocator := context.allocator) -> (v: Value, err: Decode_Error) {
 	context.allocator = allocator
-
 	r: strings.Reader
 	strings.reader_init(&r, s)
-	return decode(strings.reader_to_stream(&r), allocator=allocator)
+	return decode_from_reader(strings.reader_to_stream(&r), flags)
 }
 
 // Reads a CBOR value from the given reader.
 // See docs on the proc group `decode` for more information.
-decode_reader :: proc(r: io.Reader, hdr: Header = Header(0), allocator := context.allocator) -> (v: Value, err: Decode_Error) {
+decode_from_reader :: proc(r: io.Reader, flags: Decoder_Flags = {}, allocator := context.allocator) -> (v: Value, err: Decode_Error) {
+	return decode_from_decoder(
+		Decoder{ DEFAULT_MAX_PRE_ALLOC, flags, r },
+		allocator=allocator,
+	)
+}
+
+// Reads a CBOR value from the given decoder.
+// See docs on the proc group `decode` for more information.
+decode_from_decoder :: proc(d: Decoder, allocator := context.allocator) -> (v: Value, err: Decode_Error) {
 	context.allocator = allocator
 	
+	d := d
+	if d.max_pre_alloc <= 0 {
+		d.max_pre_alloc = DEFAULT_MAX_PRE_ALLOC
+	}
+
+	v, err = _decode_from_decoder(d)
+	// Normal EOF does not exist here, we try to read the exact amount that is said to be provided.
+	if err == .EOF { err = .Unexpected_EOF }
+	return
+}
+
+_decode_from_decoder :: proc(d: Decoder, hdr: Header = Header(0)) -> (v: Value, err: Decode_Error) {
 	hdr := hdr
+	r := d.reader
 	if hdr == Header(0) { hdr = _decode_header(r) or_return }
 	switch hdr {
 	case .U8:  return _decode_u8 (r)
@@ -105,11 +161,11 @@ decode_reader :: proc(r: io.Reader, hdr: Header = Header(0), allocator := contex
 	switch maj {
 	case .Unsigned: return _decode_tiny_u8(add)
 	case .Negative: return Negative_U8(_decode_tiny_u8(add) or_return), nil
-	case .Bytes:    return _decode_bytes_ptr(r, add)
-	case .Text:     return _decode_text_ptr(r, add)
-	case .Array:    return _decode_array_ptr(r, add)
-	case .Map:      return _decode_map_ptr(r, add)
-	case .Tag:      return _decode_tag_ptr(r, add)
+	case .Bytes:    return _decode_bytes_ptr(d, add)
+	case .Text:     return _decode_text_ptr(d, add)
+	case .Array:    return _decode_array_ptr(d, add)
+	case .Map:      return _decode_map_ptr(d, add)
+	case .Tag:      return _decode_tag_ptr(d, add)
 	case .Other:    return _decode_tiny_simple(add)
 	case:           return nil, .Bad_Major
 	}
@@ -246,7 +302,7 @@ _encode_u8 :: proc(w: io.Writer, v: u8, major: Major = .Unsigned) -> (err: io.Er
 }
 
 _decode_tiny_u8 :: proc(additional: Add) -> (u8, Decode_Data_Error) {
-	if intrinsics.expect(additional < .One_Byte, true) {
+	if additional < .One_Byte {
 		return u8(additional), nil
 	}
 
@@ -316,64 +372,53 @@ _encode_u64_exact :: proc(w: io.Writer, v: u64, major: Major = .Unsigned) -> (er
 	return
 }
 
-_decode_bytes_ptr :: proc(r: io.Reader, add: Add, type: Major = .Bytes) -> (v: ^Bytes, err: Decode_Error) {
+_decode_bytes_ptr :: proc(d: Decoder, add: Add, type: Major = .Bytes) -> (v: ^Bytes, err: Decode_Error) {
 	v = new(Bytes) or_return
 	defer if err != nil { free(v) }
 
-	v^ = _decode_bytes(r, add, type) or_return
+	v^ = _decode_bytes(d, add, type) or_return
 	return
 }
 
-_decode_bytes :: proc(r: io.Reader, add: Add, type: Major = .Bytes) -> (v: Bytes, err: Decode_Error) {
-	_n_items, length_is_unknown := _decode_container_length(r, add) or_return
+_decode_bytes :: proc(d: Decoder, add: Add, type: Major = .Bytes) -> (v: Bytes, err: Decode_Error) {
+	n, scap := _decode_len_str(d, add) or_return
+	
+	buf := strings.builder_make(0, scap) or_return
+	defer if err != nil { strings.builder_destroy(&buf) }
+	buf_stream := strings.to_stream(&buf)
 
-	n_items := _n_items.? or_else INITIAL_STREAMED_BYTES_CAPACITY
-
-	if length_is_unknown {
-		buf: strings.Builder
-		buf.buf = make([dynamic]byte, 0, n_items) or_return
-		defer if err != nil { strings.builder_destroy(&buf) }
-
-		buf_stream := strings.to_stream(&buf)
-
-		for {
-			header   := _decode_header(r) or_return
+	if n == -1 {
+		indefinite_loop: for {
+			header   := _decode_header(d.reader) or_return
 			maj, add := _header_split(header)
-
 			#partial switch maj {
 			case type:
-				_n_items, length_is_unknown := _decode_container_length(r, add) or_return
-				if length_is_unknown {
+				iter_n, iter_cap := _decode_len_str(d, add) or_return
+				if iter_n == -1 {
 					return nil, .Nested_Indefinite_Length
 				}
-				n_items := i64(_n_items.?)
+				reserve(&buf.buf, len(buf.buf) + iter_cap) or_return
+				io.copy_n(buf_stream, d.reader, i64(iter_n)) or_return
 
-				copied := io.copy_n(buf_stream, r, n_items) or_return
-				assert(copied == n_items)
-					
 			case .Other:
 				if add != .Break { return nil, .Bad_Argument }
-				
-				v = buf.buf[:]
- 				
-				// Write zero byte so this can be converted to cstring.
-				io.write_full(buf_stream, {0}) or_return
-				shrink(&buf.buf) // Ignoring error, this is not critical to succeed.
-				return
+				break indefinite_loop
 
 			case:
 				return nil, .Bad_Major
 			}
 		}
 	} else {
-		v = make([]byte, n_items + 1) or_return // Space for the bytes and a zero byte.
-		defer if err != nil { delete(v) }
-
-		io.read_full(r, v[:n_items]) or_return
-
-		v = v[:n_items] // Take off zero byte.
-		return
+		io.copy_n(buf_stream, d.reader, i64(n)) or_return
 	}
+
+	v = buf.buf[:]
+
+	// Write zero byte so this can be converted to cstring.
+	strings.write_byte(&buf, 0)
+
+	if .Shrink_Excess in d.flags { shrink(&buf.buf) }
+	return
 }
 
 _encode_bytes :: proc(e: Encoder, val: Bytes, major: Major = .Bytes) -> (err: Encode_Error) {
@@ -383,43 +428,41 @@ _encode_bytes :: proc(e: Encoder, val: Bytes, major: Major = .Bytes) -> (err: En
 	return
 }
 
-_decode_text_ptr :: proc(r: io.Reader, add: Add) -> (v: ^Text, err: Decode_Error) {
+_decode_text_ptr :: proc(d: Decoder, add: Add) -> (v: ^Text, err: Decode_Error) {
 	v = new(Text) or_return
 	defer if err != nil { free(v) }
 
-	v^ = _decode_text(r, add) or_return
+	v^ = _decode_text(d, add) or_return
 	return
 }
 
-_decode_text :: proc(r: io.Reader, add: Add) -> (v: Text, err: Decode_Error) {
-	return (Text)(_decode_bytes(r, add, .Text) or_return), nil
+_decode_text :: proc(d: Decoder, add: Add) -> (v: Text, err: Decode_Error) {
+	return (Text)(_decode_bytes(d, add, .Text) or_return), nil
 }
 
 _encode_text :: proc(e: Encoder, val: Text) -> Encode_Error {
     return _encode_bytes(e, transmute([]byte)val, .Text)
 }
 
-_decode_array_ptr :: proc(r: io.Reader, add: Add) -> (v: ^Array, err: Decode_Error) {
+_decode_array_ptr :: proc(d: Decoder, add: Add) -> (v: ^Array, err: Decode_Error) {
 	v = new(Array) or_return
 	defer if err != nil { free(v) }
 
-	v^ = _decode_array(r, add) or_return
+	v^ = _decode_array(d, add) or_return
 	return
 }
 
-_decode_array :: proc(r: io.Reader, add: Add) -> (v: Array, err: Decode_Error) {
-	_n_items, length_is_unknown := _decode_container_length(r, add) or_return
-	n_items := _n_items.? or_else INITIAL_STREAMED_CONTAINER_CAPACITY
-
-	array := make([dynamic]Value, 0, n_items) or_return
+_decode_array :: proc(d: Decoder, add: Add) -> (v: Array, err: Decode_Error) {
+	n, scap := _decode_len_container(d, add) or_return
+	array := make([dynamic]Value, 0, scap) or_return
 	defer if err != nil {
 		for entry in array { destroy(entry) }
 		delete(array)
 	}
 	
-	for i := 0; length_is_unknown || i < n_items; i += 1 {
-		val, verr := decode(r)
-		if length_is_unknown && verr == .Break {
+	for i := 0; n == -1 || i < n; i += 1 {
+		val, verr := _decode_from_decoder(d)
+		if n == -1 && verr == .Break {
 			break
 		} else if verr != nil {
 			err = verr
@@ -428,8 +471,9 @@ _decode_array :: proc(r: io.Reader, add: Add) -> (v: Array, err: Decode_Error) {
 
 		append(&array, val) or_return
 	}
+
+	if .Shrink_Excess in d.flags { shrink(&array) }
 	
-	shrink(&array)
 	v = array[:]
 	return
 }
@@ -443,19 +487,17 @@ _encode_array :: proc(e: Encoder, arr: Array) -> Encode_Error {
     return nil
 }
 
-_decode_map_ptr :: proc(r: io.Reader, add: Add) -> (v: ^Map, err: Decode_Error) {
+_decode_map_ptr :: proc(d: Decoder, add: Add) -> (v: ^Map, err: Decode_Error) {
 	v = new(Map) or_return
 	defer if err != nil { free(v) }
 
-	v^ = _decode_map(r, add) or_return
+	v^ = _decode_map(d, add) or_return
 	return
 }
 
-_decode_map :: proc(r: io.Reader, add: Add) -> (v: Map, err: Decode_Error) {
-	_n_items, length_is_unknown := _decode_container_length(r, add) or_return
-	n_items := _n_items.? or_else INITIAL_STREAMED_CONTAINER_CAPACITY
-	
-	items := make([dynamic]Map_Entry, 0, n_items) or_return
+_decode_map :: proc(d: Decoder, add: Add) -> (v: Map, err: Decode_Error) {
+	n, scap := _decode_len_container(d, add) or_return
+	items := make([dynamic]Map_Entry, 0, scap) or_return
 	defer if err != nil { 
 		for entry in items {
 			destroy(entry.key)
@@ -464,23 +506,24 @@ _decode_map :: proc(r: io.Reader, add: Add) -> (v: Map, err: Decode_Error) {
 		delete(items)
 	}
 
-	for i := 0; length_is_unknown || i < n_items; i += 1 {
-		key, kerr := decode(r)
-		if length_is_unknown && kerr == .Break {
+	for i := 0; n == -1 || i < n; i += 1 {
+		key, kerr := _decode_from_decoder(d)
+		if n == -1 && kerr == .Break {
 			break
 		} else if kerr != nil {
 			return nil, kerr
 		} 
 
-		value := decode(r) or_return
+		value := decode_from_decoder(d) or_return
 
 		append(&items, Map_Entry{
 			key   = key,
 			value = value,
 		}) or_return
 	}
+
+	if .Shrink_Excess in d.flags { shrink(&items) }
 	
-	shrink(&items)
 	v = items[:]
 	return
 }
@@ -537,8 +580,8 @@ _encode_map :: proc(e: Encoder, m: Map) -> (err: Encode_Error) {
     return nil
 }
 
-_decode_tag_ptr :: proc(r: io.Reader, add: Add) -> (v: Value, err: Decode_Error) {
-	tag := _decode_tag(r, add) or_return
+_decode_tag_ptr :: proc(d: Decoder, add: Add) -> (v: Value, err: Decode_Error) {
+	tag := _decode_tag(d, add) or_return
 	if t, ok := tag.?; ok {
 		defer if err != nil { destroy(t.value) }
 		tp := new(Tag) or_return
@@ -547,11 +590,11 @@ _decode_tag_ptr :: proc(r: io.Reader, add: Add) -> (v: Value, err: Decode_Error)
 	}
 
 	// no error, no tag, this was the self described CBOR tag, skip it.
-	return decode(r)
+	return _decode_from_decoder(d)
 }
 
-_decode_tag :: proc(r: io.Reader, add: Add) -> (v: Maybe(Tag), err: Decode_Error) {
-	num := _decode_tag_nr(r, add) or_return
+_decode_tag :: proc(d: Decoder, add: Add) -> (v: Maybe(Tag), err: Decode_Error) {
+	num := _decode_uint_as_u64(d.reader, add) or_return
 
 	// CBOR can be wrapped in a tag that decoders can use to see/check if the binary data is CBOR.
 	// We can ignore it here.
@@ -561,7 +604,7 @@ _decode_tag :: proc(r: io.Reader, add: Add) -> (v: Maybe(Tag), err: Decode_Error
 
 	t := Tag{
 		number = num,
-		value = decode(r) or_return,
+		value = _decode_from_decoder(d) or_return,
 	}
 
 	if nested, ok := t.value.(^Tag); ok {
@@ -572,7 +615,7 @@ _decode_tag :: proc(r: io.Reader, add: Add) -> (v: Maybe(Tag), err: Decode_Error
 	return t, nil
 }
 
-_decode_tag_nr :: proc(r: io.Reader, add: Add) -> (nr: Tag_Number, err: Decode_Error) {
+_decode_uint_as_u64 :: proc(r: io.Reader, add: Add) -> (nr: u64, err: Decode_Error) {
 	#partial switch add {
 	case .One_Byte:    return u64(_decode_u8(r) or_return), nil
 	case .Two_Bytes:   return u64(_decode_u16(r) or_return), nil
@@ -719,30 +762,50 @@ encode_stream_map_entry :: proc(e: Encoder, key: Value, val: Value) -> Encode_Er
     return encode(e, val)
 }
 
-//
-
-_decode_container_length :: proc(r: io.Reader, add: Add) -> (length: Maybe(int), is_unknown: bool, err: Decode_Error) {
-	if add == Add.Length_Unknown { return nil, true, nil }
-	#partial switch add {
-	case .One_Byte:  length = int(_decode_u8(r) or_return)
-	case .Two_Bytes: length = int(_decode_u16(r) or_return)
-	case .Four_Bytes:
-		big_length := _decode_u32(r) or_return
-		if u64(big_length) > u64(max(int)) {
-			err = .Length_Too_Big
-			return
+// For `Bytes` and `Text` strings: Decodes the number of items the header says follows.
+// If the number is not specified -1 is returned and streaming should be initiated.
+// A suitable starting capacity is also returned for a buffer that is allocated up the stack.
+_decode_len_str :: proc(d: Decoder, add: Add) -> (n: int, scap: int, err: Decode_Error) {
+	if add == .Length_Unknown {
+		if .Disallow_Streaming in d.flags {
+			return -1, -1, .Disallowed_Streaming
 		}
-		length = int(big_length)
-	case .Eight_Bytes:
-		big_length := _decode_u64(r) or_return
-		if big_length > u64(max(int)) {
-			err = .Length_Too_Big
-			return
-		}
-		length = int(big_length)
-	case:
-		length = int(_decode_tiny_u8(add) or_return)
+		return -1, INITIAL_STREAMED_BYTES_CAPACITY, nil
 	}
+
+	_n := _decode_uint_as_u64(d.reader, add) or_return
+	if _n > u64(max(int)) { return -1, -1, .Length_Too_Big }
+	n = int(_n)
+
+	scap = n + 1 // Space for zero byte.
+	if .Trusted_Input not_in d.flags {
+		scap = min(d.max_pre_alloc, scap)
+	}
+
+	return
+}
+
+// For `Array` and `Map` types: Decodes the number of items the header says follows.
+// If the number is not specified -1 is returned and streaming should be initiated.
+// A suitable starting capacity is also returned for a buffer that is allocated up the stack.
+_decode_len_container :: proc(d: Decoder, add: Add) -> (n: int, scap: int, err: Decode_Error) {
+	if add == .Length_Unknown {
+		if .Disallow_Streaming in d.flags {
+			return -1, -1, .Disallowed_Streaming
+		}
+		return -1, INITIAL_STREAMED_CONTAINER_CAPACITY, nil
+	}
+
+	_n := _decode_uint_as_u64(d.reader, add) or_return
+	if _n > u64(max(int)) { return -1, -1, .Length_Too_Big }
+	n = int(_n)
+
+	scap = n
+	if .Trusted_Input not_in d.flags {
+		// NOTE: if this is a map it will be twice this.
+		scap = min(d.max_pre_alloc / size_of(Value), scap)
+	}
+
 	return
 }
 

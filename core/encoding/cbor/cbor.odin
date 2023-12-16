@@ -10,8 +10,13 @@ import "core:strings"
 
 // If we are decoding a stream of either a map or list, the initial capacity will be this value.
 INITIAL_STREAMED_CONTAINER_CAPACITY :: 8
+
 // If we are decoding a stream of either text or bytes, the initial capacity will be this value.
-INITIAL_STREAMED_BYTES_CAPACITY     :: 16
+INITIAL_STREAMED_BYTES_CAPACITY :: 16
+
+// The default maximum amount of bytes to allocate on a buffer/container at once to prevent
+// malicious input from causing massive allocations.
+DEFAULT_MAX_PRE_ALLOC :: mem.Kilobyte
 
 // Known/common headers are defined, undefined headers can still be valid.
 // Higher 3 bits is for the major type and lower 5 bits for the additional information.
@@ -157,6 +162,7 @@ Decode_Data_Error :: enum {
 	Nested_Indefinite_Length, // When an streamed/indefinite length container nests another, this is not allowed.
 	Nested_Tag,               // When a tag's value is another tag, this is not allowed.
 	Length_Too_Big,           // When the length of a container (map, array, bytes, string) is more than `max(int)`.
+	Disallowed_Streaming,     // When the `.Disallow_Streaming` flag is set and a streaming header is encountered.
 	Break,
 }
 

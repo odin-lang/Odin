@@ -55,7 +55,7 @@ Tag_Implementation :: struct {
 }
 
 // Procedure responsible for umarshalling the tag out of the reader into the given `any`.
-Tag_Unmarshal_Proc :: #type proc(self: ^Tag_Implementation, r: io.Reader, tag_nr: Tag_Number, v: any) -> Unmarshal_Error
+Tag_Unmarshal_Proc :: #type proc(self: ^Tag_Implementation, d: Decoder, tag_nr: Tag_Number, v: any) -> Unmarshal_Error
 
 // Procedure responsible for marshalling the tag in the given `any` into the given encoder.
 Tag_Marshal_Proc   :: #type proc(self: ^Tag_Implementation, e: Encoder, v: any) -> Marshal_Error
@@ -121,30 +121,30 @@ tags_register_defaults :: proc() {
 //
 // See RFC 8949 section 3.4.2.
 @(private)
-tag_time_unmarshal :: proc(_: ^Tag_Implementation, r: io.Reader, _: Tag_Number, v: any) -> (err: Unmarshal_Error) {
-	hdr := _decode_header(r) or_return
+tag_time_unmarshal :: proc(_: ^Tag_Implementation, d: Decoder, _: Tag_Number, v: any) -> (err: Unmarshal_Error) {
+	hdr := _decode_header(d.reader) or_return
 	#partial switch hdr {
 	case .U8, .U16, .U32, .U64, .Neg_U8, .Neg_U16, .Neg_U32, .Neg_U64:
 		switch &dst in v {
 		case time.Time:
 			i: i64
-			_unmarshal_any_ptr(r, &i, hdr) or_return
+			_unmarshal_any_ptr(d, &i, hdr) or_return
 			dst = time.unix(i64(i), 0)
 			return
 		case:
-			return _unmarshal_value(r, v, hdr)
+			return _unmarshal_value(d, v, hdr)
 		}
 
 	case .F16, .F32, .F64:
 		switch &dst in v {
 		case time.Time:
 			f: f64
-			_unmarshal_any_ptr(r, &f, hdr) or_return
+			_unmarshal_any_ptr(d, &f, hdr) or_return
 			whole, fract := math.modf(f)
 			dst = time.unix(i64(whole), i64(fract * 1e9))
 			return
 		case:
-			return _unmarshal_value(r, v, hdr)
+			return _unmarshal_value(d, v, hdr)
 		}
 
 	case:
@@ -182,8 +182,8 @@ tag_time_marshal :: proc(_: ^Tag_Implementation, e: Encoder, v: any) -> Marshal_
 }
 
 @(private)
-tag_big_unmarshal :: proc(_: ^Tag_Implementation, r: io.Reader, tnr: Tag_Number, v: any) -> (err: Unmarshal_Error) {
-	hdr := _decode_header(r) or_return
+tag_big_unmarshal :: proc(_: ^Tag_Implementation, d: Decoder, tnr: Tag_Number, v: any) -> (err: Unmarshal_Error) {
+	hdr := _decode_header(d.reader) or_return
 	maj, add := _header_split(hdr)
 	if maj != .Bytes {
 		// Only bytes are supported in this tag.
@@ -192,7 +192,7 @@ tag_big_unmarshal :: proc(_: ^Tag_Implementation, r: io.Reader, tnr: Tag_Number,
 
 	switch &dst in v {
 	case big.Int:
-		bytes := err_conv(_decode_bytes(r, add)) or_return
+		bytes := err_conv(_decode_bytes(d, add)) or_return
 		defer delete(bytes)
 
 		if err := big.int_from_bytes_big(&dst, bytes); err != nil {
@@ -246,13 +246,13 @@ tag_big_marshal :: proc(_: ^Tag_Implementation, e: Encoder, v: any) -> Marshal_E
 }
 
 @(private)
-tag_cbor_unmarshal :: proc(_: ^Tag_Implementation, r: io.Reader, _: Tag_Number, v: any) -> Unmarshal_Error {
-	hdr := _decode_header(r) or_return
+tag_cbor_unmarshal :: proc(_: ^Tag_Implementation, d: Decoder, _: Tag_Number, v: any) -> Unmarshal_Error {
+	hdr := _decode_header(d.reader) or_return
 	major, add := _header_split(hdr)
 	#partial switch major {
 	case .Bytes:
 		ti := reflect.type_info_base(type_info_of(v.id))
-		return _unmarshal_bytes(r, v, ti, hdr, add)
+		return _unmarshal_bytes(d, v, ti, hdr, add)
 		
 	case: return .Bad_Tag_Value
 	}
@@ -283,8 +283,8 @@ tag_cbor_marshal :: proc(_: ^Tag_Implementation, e: Encoder, v: any) -> Marshal_
 }
 
 @(private)
-tag_base64_unmarshal :: proc(_: ^Tag_Implementation, r: io.Reader, _: Tag_Number, v: any) -> (err: Unmarshal_Error) {
-	hdr        := _decode_header(r) or_return
+tag_base64_unmarshal :: proc(_: ^Tag_Implementation, d: Decoder, _: Tag_Number, v: any) -> (err: Unmarshal_Error) {
+	hdr        := _decode_header(d.reader) or_return
 	major, add := _header_split(hdr)
 	ti         := reflect.type_info_base(type_info_of(v.id))
 
@@ -294,7 +294,7 @@ tag_base64_unmarshal :: proc(_: ^Tag_Implementation, r: io.Reader, _: Tag_Number
 
 	bytes: string; {
 		context.allocator = context.temp_allocator
-		bytes = string(err_conv(_decode_bytes(r, add)) or_return)
+		bytes = string(err_conv(_decode_bytes(d, add)) or_return)
 	}
 	defer delete(bytes, context.temp_allocator)
 

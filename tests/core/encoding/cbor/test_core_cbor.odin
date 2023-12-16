@@ -4,6 +4,7 @@ import "core:bytes"
 import "core:encoding/cbor"
 import "core:fmt"
 import "core:intrinsics"
+import "core:io"
 import "core:math/big"
 import "core:mem"
 import "core:os"
@@ -61,7 +62,9 @@ main :: proc() {
 	test_marshalling_maybe(&t)
 	test_marshalling_nil_maybe(&t)
 
-	test_cbor_marshalling_union(&t)
+	test_marshalling_union(&t)
+
+	test_lying_length_array(&t)
 
 	test_decode_unsigned(&t)
 	test_encode_unsigned(&t)
@@ -202,7 +205,7 @@ test_marshalling :: proc(t: ^testing.T) {
 		ev(t, err, nil)
 		defer delete(data)
 
-		decoded, derr := cbor.decode_string(string(data))
+		decoded, derr := cbor.decode(string(data))
 		ev(t, derr, nil)
 		defer cbor.destroy(decoded)
 
@@ -398,7 +401,7 @@ test_marshalling_nil_maybe :: proc(t: ^testing.T) {
 }
 
 @(test)
-test_cbor_marshalling_union :: proc(t: ^testing.T) {
+test_marshalling_union :: proc(t: ^testing.T) {
 	My_Distinct :: distinct string
 
 	My_Enum :: enum {
@@ -455,6 +458,14 @@ test_cbor_marshalling_union :: proc(t: ^testing.T) {
 		expect_value(t, uerr, nil)
 		expect_value(t, dest, My_Struct{.Two})
 	}
+}
+
+@(test)
+test_lying_length_array :: proc(t: ^testing.T) {
+	// Input says this is an array of length max(u64), this should not allocate that amount.
+	input := []byte{0x9B, 0x00, 0x00, 0x42, 0xFA, 0x42, 0xFA, 0x42, 0xFA, 0x42}
+	_, err := cbor.decode(string(input))
+	expect_value(t, err, io.Error.Unexpected_EOF) // .Out_Of_Memory would be bad.
 }
 
 @(test)
