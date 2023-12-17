@@ -5,6 +5,7 @@ import "core:fmt"
 import "core:mem"
 import "core:time"
 import "core:crypto"
+import "core:crypto/sha2"
 
 import "core:crypto/chacha20"
 import "core:crypto/chacha20poly1305"
@@ -119,6 +120,34 @@ test_chacha20 :: proc(t: ^testing.T) {
 
 	derived_ciphertext_str = hex_string(derived_ciphertext[:])
 	expect(t, derived_ciphertext_str == xciphertext_str, fmt.tprintf("Expected %s for xor_bytes(plaintext_str), but got %s instead", xciphertext_str, derived_ciphertext_str))
+
+	// Incrementally read 1, 2, 3, ..., 2048 bytes of keystream, and
+	// compare the SHA-512/256 digest with a known value.  Results
+	// and testcase taken from a known good implementation by the
+	// same author as the Odin test case.
+
+	tmp := make([]byte, 2048)
+	defer delete(tmp)
+
+	mem.zero(&key, size_of(key))
+	mem.zero(&nonce, size_of(nonce))
+	chacha20.init(&ctx, key[:], nonce[:])
+
+	h_ctx: sha2.Context_512
+	h_ctx.md_bits = 256
+	sha2.init(&h_ctx)
+
+	for i := 1; i <= 2048; i = i + 1 {
+		chacha20.keystream_bytes(&ctx, tmp[:i])
+		sha2.update(&h_ctx, tmp[:i])
+	}
+
+	digest: [32]byte
+	sha2.final(&h_ctx, digest[:])
+	digest_str := hex_string(digest[:])
+
+	expected_digest_str := "cfd6e949225b854fe04946491e6935ff05ff983d1554bc885bca0ec8082dd5b8"
+	expect(t, expected_digest_str == digest_str, fmt.tprintf("Expected %s for keystream digest, but got %s instead", expected_digest_str, digest_str))
 }
 
 @(test)
