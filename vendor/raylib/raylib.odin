@@ -1189,10 +1189,10 @@ foreign lib {
 	IsMouseButtonPressed  :: proc(button: MouseButton) -> bool ---    // Detect if a mouse button has been pressed once
 	IsMouseButtonDown     :: proc(button: MouseButton) -> bool ---    // Detect if a mouse button is being pressed
 	IsMouseButtonReleased :: proc(button: MouseButton) -> bool ---    // Detect if a mouse button has been released once
+
+	// See IsMouseButtonUp below: This proc is broken is Raylib 5
 	// IsMouseButtonUp    :: proc(button: MouseButton) -> bool ---       Detect if a mouse button is NOT being pressed
-	IsMouseButtonUp       :: proc(button: MouseButton) -> bool {      // TODO: remove this when Raylib fixes this bug
-		return !IsMouseButtonDown(button)
-	}
+	
 	GetMouseX             :: proc() -> c.int ---                      // Returns mouse position X
 	GetMouseY             :: proc() -> c.int ---                      // Returns mouse position Y
 	GetMousePosition      :: proc() -> Vector2 ---                    // Returns mouse position XY
@@ -1709,7 +1709,10 @@ foreign lib {
 	DetachAudioMixedProcessor :: proc(processor: AudioCallback) --- // Detach audio stream processor from the entire audio pipeline
 }
 
-
+// TODO: remove this when Raylib releases a new binary version with this bug fixed
+IsMouseButtonUp :: proc(button: MouseButton) -> bool {
+	return !IsMouseButtonDown(button)
+}
 
 // Text formatting with variables (sprintf style)
 TextFormat :: proc(text: cstring, args: ..any) -> cstring { 
