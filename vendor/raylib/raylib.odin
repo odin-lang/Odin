@@ -1190,8 +1190,10 @@ foreign lib {
 	IsMouseButtonDown     :: proc(button: MouseButton) -> bool ---    // Detect if a mouse button is being pressed
 	IsMouseButtonReleased :: proc(button: MouseButton) -> bool ---    // Detect if a mouse button has been released once
 
-	// See IsMouseButtonUp below: This proc is broken is Raylib 5
-	// IsMouseButtonUp    :: proc(button: MouseButton) -> bool ---       Detect if a mouse button is NOT being pressed
+	when VERSION != "5.0" {
+		#panic("IsMouseButtonUp was broken in Raylib 5.0 but should be fixed in Raylib > 5.1. Remove this panic and the when clause around it and also remove the workaround version of IsMouseButtonUp just after the end of the 'foreign lib {' block ends.")
+		IsMouseButtonUp       :: proc(button: MouseButton) -> bool ---
+	}
 	
 	GetMouseX             :: proc() -> c.int ---                      // Returns mouse position X
 	GetMouseY             :: proc() -> c.int ---                      // Returns mouse position Y
@@ -1709,7 +1711,7 @@ foreign lib {
 	DetachAudioMixedProcessor :: proc(processor: AudioCallback) --- // Detach audio stream processor from the entire audio pipeline
 }
 
-// TODO: remove this when Raylib releases a new binary version with this bug fixed
+// Workaround for broken IsMouseButtonUp in Raylib 5.0. Remove this proc when migrating to Raylib 5.1 or later and re-enable IsMouseButtonUp inside `foreign lib {` block.
 IsMouseButtonUp :: proc(button: MouseButton) -> bool {
 	return !IsMouseButtonDown(button)
 }
