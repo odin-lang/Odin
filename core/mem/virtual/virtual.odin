@@ -68,7 +68,7 @@ align_formula :: #force_inline proc "contextless" (size, align: uint) -> uint {
 }
 
 @(require_results)
-memory_block_alloc :: proc(committed, reserved: uint, alignment: uint, flags: Memory_Block_Flags) -> (block: ^Memory_Block, err: Allocator_Error) {
+memory_block_alloc :: proc(committed, reserved: uint, alignment: uint = 0, flags: Memory_Block_Flags = {}) -> (block: ^Memory_Block, err: Allocator_Error) {
 	page_size := DEFAULT_PAGE_SIZE
 	assert(mem.is_power_of_two(uintptr(page_size)))
 
