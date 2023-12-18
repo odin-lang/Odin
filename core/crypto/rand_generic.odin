@@ -1,4 +1,9 @@
-//+build !linux !windows !openbsd !freebsd !darwin !js
+//+build !linux
+//+build !windows
+//+build !openbsd
+//+build !freebsd
+//+build !darwin
+//+build !js
 package crypto
 
 _rand_bytes :: proc(dst: []byte) {
