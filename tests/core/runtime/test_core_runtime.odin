@@ -28,8 +28,8 @@ when ODIN_TEST {
 main :: proc() {
 	t := testing.T{}
 
-	test_temp_allocator_alignment_boundary(&t)
 	test_temp_allocator_big_alloc_and_alignment(&t)
+	test_temp_allocator_alignment_boundary(&t)
 
 	fmt.printf("%v/%v tests successful.\n", TEST_count - TEST_fail, TEST_count)
 	if TEST_fail > 0 {
