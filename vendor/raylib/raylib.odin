@@ -1191,7 +1191,7 @@ foreign lib {
 	IsMouseButtonReleased :: proc(button: MouseButton) -> bool ---    // Detect if a mouse button has been released once
 
 	when VERSION != "5.0" {
-		#panic("IsMouseButtonUp was broken in Raylib 5.0 but should be fixed in Raylib > 5.1. Remove this panic and the when clause around it and also remove the workaround version of IsMouseButtonUp just after the end of the 'foreign lib {' block ends.")
+		#panic("IsMouseButtonUp was broken in Raylib 5.0 but should be fixed in Raylib > 5.0. Remove this panic and the when clause around it and also remove the workaround version of IsMouseButtonUp just after the end of the 'foreign lib {' block ends.")
 		IsMouseButtonUp       :: proc(button: MouseButton) -> bool ---
 	}
 	
