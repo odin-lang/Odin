@@ -6158,19 +6158,22 @@ gb_internal void check_parsed_files(Checker *c) {
 	TIME_SECTION("generate minimum dependency set");
 	generate_minimum_dependency_set(c, c->info.entry_point);
 
-	// NOTE(laytan): has to be ran after generate_minimum_dependency_set,
-	// because that collects the test procedures.
-	TIME_SECTION("check test procedures");
-	check_test_procedures(c);
-
 	TIME_SECTION("check bodies have all been checked");
 	check_unchecked_bodies(c);
 
 	check_merge_queues_into_arrays(c);
 	thread_pool_wait();
 
+	TIME_SECTION("update minimum dependency set");
 	generate_minimum_dependency_set_internal(c, c->info.entry_point);
 
+	// NOTE(laytan): has to be ran after generate_minimum_dependency_set,
+	// because that collects the test procedures.
+	TIME_SECTION("check test procedures");
+	check_test_procedures(c);
+
+	check_merge_queues_into_arrays(c);
+	thread_pool_wait();
 
 	TIME_SECTION("check entry point");
 	if (build_context.build_mode == BuildMode_Executable && !build_context.no_entry_point && build_context.command_kind != Command_test) {
