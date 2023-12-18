@@ -98,15 +98,15 @@ arena_alloc :: proc(arena: ^Arena, size: uint, alignment: uint, loc := #caller_l
 
 	switch arena.kind {
 	case .Growing:
-		if arena.curr_block == nil || (safe_add(arena.curr_block.used, size) or_else 0) > arena.curr_block.reserved {
-			size = mem.align_forward_uint(size, alignment)
+		needed := mem.align_forward_uint(size, alignment)
+		if arena.curr_block == nil || (safe_add(arena.curr_block.used, needed) or_else 0) > arena.curr_block.reserved {
 			if arena.minimum_block_size == 0 {
 				arena.minimum_block_size = DEFAULT_ARENA_GROWING_MINIMUM_BLOCK_SIZE
 			}
 
-			block_size := max(size, arena.minimum_block_size)
+			block_size := max(needed, arena.minimum_block_size)
 
-			new_block := memory_block_alloc(size, block_size, {}) or_return
+			new_block := memory_block_alloc(needed, block_size, {}) or_return
 			new_block.prev = arena.curr_block
 			arena.curr_block = new_block
 			arena.total_reserved += new_block.reserved
