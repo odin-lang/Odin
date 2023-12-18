@@ -313,7 +313,11 @@ size_t tb_coff_parse_symbol(TB_COFF_Parser* restrict parser, size_t i, TB_Object
         out_sym->name = (TB_Slice){ strlen((const char*) data), data };
     } else {
         // normal inplace string
-        size_t len = strlen((const char*) sym->short_name);
+        size_t len = 1;
+        const char* name = (const char*) sym->short_name;
+        while (len < 8 && name[len] != 0) {
+            len++;
+        }
         out_sym->name = (TB_Slice){ len, sym->short_name };
     }
 

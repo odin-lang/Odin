@@ -381,6 +381,8 @@ struct BuildContext {
 
 	bool   dynamic_map_calls;
 
+	bool obfuscate_source_code_locations;
+
 	RelocMode reloc_mode;
 	bool   disable_red_zone;
 

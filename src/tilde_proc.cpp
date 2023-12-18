@@ -95,7 +95,7 @@ gb_internal cgProcedure *cg_procedure_create(cgModule *m, Entity *entity, bool i
 	}
 
 	if (p->symbol == nullptr)  {
-		p->func = tb_function_create(m->mod, link_name.len, cast(char const *)link_name.text, linkage, TB_COMDAT_NONE);
+		p->func = tb_function_create(m->mod, link_name.len, cast(char const *)link_name.text, linkage);
 
 		p->debug_type = cg_debug_type_for_proc(m, p->type);
 		p->proto = tb_prototype_from_dbg(m->mod, p->debug_type);
@@ -148,7 +148,7 @@ gb_internal cgProcedure *cg_procedure_create_dummy(cgModule *m, String const &li
 
 	TB_Linkage linkage = TB_LINKAGE_PRIVATE;
 
-	p->func = tb_function_create(m->mod, link_name.len, cast(char const *)link_name.text, linkage, TB_COMDAT_NONE);
+	p->func = tb_function_create(m->mod, link_name.len, cast(char const *)link_name.text, linkage);
 
 	p->debug_type = cg_debug_type_for_proc(m, p->type);
 	p->proto = tb_prototype_from_dbg(m->mod, p->debug_type);
@@ -224,7 +224,8 @@ gb_internal void cg_procedure_begin(cgProcedure *p) {
 		return;
 	}
 
-	tb_function_set_prototype(p->func, p->proto, cg_arena());
+	TB_ModuleSectionHandle section = tb_module_get_text(p->module->mod);
+	tb_function_set_prototype(p->func, section, p->proto, cg_arena());
 
 	if (p->body == nullptr) {
 		return;
@@ -400,7 +401,7 @@ gb_internal WORKER_TASK_PROC(cg_procedure_compile_worker_proc) {
 		fflush(stdout);
 	}
 	if (false) { // GraphViz printing
-		tb_function_print(p->func, tb_default_print_callback, stdout);
+		tb_pass_print_dot(opt, tb_default_print_callback, stdout);
 	}
 
 	// compile
@@ -860,7 +861,6 @@ gb_internal cgValue cg_build_call_expr_internal(cgProcedure *p, Ast *expr) {
 		}
 
 		GB_ASSERT(e->kind == Entity_Variable);
-
 		if (pt->variadic && pt->variadic_index == i) {
 			cgValue variadic_args = cg_const_nil(p, e->type);
 			auto variadic = slice(ce->split_args->positional, pt->variadic_index, ce->split_args->positional.count);
@@ -963,8 +963,8 @@ gb_internal cgValue cg_build_call_expr_internal(cgProcedure *p, Ast *expr) {
 			if (pt->variadic && param_index == pt->variadic_index) {
 				if (!is_c_vararg && args[arg_index].node == nullptr) {
 					args[arg_index++] = cg_const_nil(p, e->type);
+					continue;
 				}
-				continue;
 			}
 
 			cgValue arg = args[arg_index];

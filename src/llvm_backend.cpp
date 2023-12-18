@@ -21,8 +21,8 @@
 #include "llvm_backend_stmt.cpp"
 #include "llvm_backend_proc.cpp"
 
-char *get_default_microarchitecture() {
-	char * default_march = "generic";
+String get_default_microarchitecture() {
+	String default_march = str_lit("generic");
 	if (build_context.metrics.arch == TargetArch_amd64) {
 		// NOTE(bill): x86-64-v2 is more than enough for everyone
 		//
@@ -32,9 +32,9 @@ char *get_default_microarchitecture() {
 		// x86-64-v4: AVX512F, AVX512BW, AVX512CD, AVX512DQ, AVX512VL
 		if (ODIN_LLVM_MINIMUM_VERSION_12) {
 			if (build_context.metrics.os == TargetOs_freestanding) {
-				default_march = "x86-64";
+				default_march = str_lit("x86-64");
 			} else {
-				default_march = "x86-64-v2";
+				default_march = str_lit("x86-64-v2");
 			}
 		}
 	}
@@ -2509,16 +2509,16 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 		code_mode = LLVMCodeModelKernel;
 	}
 
-	char const *host_cpu_name = LLVMGetHostCPUName();
-	char const *llvm_cpu = get_default_microarchitecture();
+	String      host_cpu_name = copy_string(permanent_allocator(), make_string_c(LLVMGetHostCPUName()));
+	String      llvm_cpu      = get_default_microarchitecture();
 	char const *llvm_features = "";
 	if (build_context.microarch.len != 0) {
 		if (build_context.microarch == "native") {
 			llvm_cpu = host_cpu_name;
 		} else {
-			llvm_cpu = alloc_cstring(permanent_allocator(), build_context.microarch);
+			llvm_cpu = copy_string(permanent_allocator(), build_context.microarch);
 		}
-		if (gb_strcmp(llvm_cpu, host_cpu_name) == 0) {
+		if (llvm_cpu == host_cpu_name) {
 			llvm_features = LLVMGetHostCPUFeatures();
 		}
 	}
@@ -2578,7 +2578,7 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 
 	for (auto const &entry : gen->modules) {
 		LLVMTargetMachineRef target_machine = LLVMCreateTargetMachine(
-			target, target_triple, llvm_cpu,
+			target, target_triple, (const char *)llvm_cpu.text,
 			llvm_features,
 			code_gen_level,
 			reloc_mode,
@@ -2697,64 +2697,22 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 				}
 			}
 
-			{
-				char const *name = LB_TYPE_INFO_TYPES_NAME;
-				Type *t = alloc_type_array(t_type_info_ptr, count);
+			auto const global_type_info_make = [](lbModule *m, char const *name, Type *elem_type, i64 count) -> lbAddr {
+				Type *t = alloc_type_array(elem_type, count);
 				LLVMValueRef g = LLVMAddGlobal(m->mod, lb_type(m, t), name);
 				LLVMSetInitializer(g, LLVMConstNull(lb_type(m, t)));
 				LLVMSetLinkage(g, LLVMInternalLinkage);
 				if (LB_USE_GIANT_PACKED_STRUCT) {
 					lb_make_global_private_const(g);
 				}
-				lb_global_type_info_member_types = lb_addr({g, alloc_type_pointer(t)});
+				return lb_addr({g, alloc_type_pointer(t)});
+			};
 
-			}
-			{
-				char const *name = LB_TYPE_INFO_NAMES_NAME;
-				Type *t = alloc_type_array(t_string, count);
-				LLVMValueRef g = LLVMAddGlobal(m->mod, lb_type(m, t), name);
-				LLVMSetInitializer(g, LLVMConstNull(lb_type(m, t)));
-				LLVMSetLinkage(g, LLVMInternalLinkage);
-				if (LB_USE_GIANT_PACKED_STRUCT) {
-					lb_make_global_private_const(g);
-				}
-				lb_global_type_info_member_names = lb_addr({g, alloc_type_pointer(t)});
-			}
-			{
-				char const *name = LB_TYPE_INFO_OFFSETS_NAME;
-				Type *t = alloc_type_array(t_uintptr, count);
-				LLVMValueRef g = LLVMAddGlobal(m->mod, lb_type(m, t), name);
-				LLVMSetInitializer(g, LLVMConstNull(lb_type(m, t)));
-				LLVMSetLinkage(g, LLVMInternalLinkage);
-				if (LB_USE_GIANT_PACKED_STRUCT) {
-					lb_make_global_private_const(g);
-				}
-				lb_global_type_info_member_offsets = lb_addr({g, alloc_type_pointer(t)});
-			}
-
-			{
-				char const *name = LB_TYPE_INFO_USINGS_NAME;
-				Type *t = alloc_type_array(t_bool, count);
-				LLVMValueRef g = LLVMAddGlobal(m->mod, lb_type(m, t), name);
-				LLVMSetInitializer(g, LLVMConstNull(lb_type(m, t)));
-				LLVMSetLinkage(g, LLVMInternalLinkage);
-				if (LB_USE_GIANT_PACKED_STRUCT) {
-					lb_make_global_private_const(g);
-				}
-				lb_global_type_info_member_usings = lb_addr({g, alloc_type_pointer(t)});
-			}
-
-			{
-				char const *name = LB_TYPE_INFO_TAGS_NAME;
-				Type *t = alloc_type_array(t_string, count);
-				LLVMValueRef g = LLVMAddGlobal(m->mod, lb_type(m, t), name);
-				LLVMSetInitializer(g, LLVMConstNull(lb_type(m, t)));
-				LLVMSetLinkage(g, LLVMInternalLinkage);
-				if (LB_USE_GIANT_PACKED_STRUCT) {
-					lb_make_global_private_const(g);
-				}
-				lb_global_type_info_member_tags = lb_addr({g, alloc_type_pointer(t)});
-			}
+			lb_global_type_info_member_types   = global_type_info_make(m, LB_TYPE_INFO_TYPES_NAME,   t_type_info_ptr, count);
+			lb_global_type_info_member_names   = global_type_info_make(m, LB_TYPE_INFO_NAMES_NAME,   t_string,        count);
+			lb_global_type_info_member_offsets = global_type_info_make(m, LB_TYPE_INFO_OFFSETS_NAME, t_uintptr,       count);
+			lb_global_type_info_member_usings  = global_type_info_make(m, LB_TYPE_INFO_USINGS_NAME,  t_bool,          count);
+			lb_global_type_info_member_tags    = global_type_info_make(m, LB_TYPE_INFO_TAGS_NAME,    t_string,        count);
 		}
 	}
 

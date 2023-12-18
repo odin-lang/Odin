@@ -3262,7 +3262,7 @@ gb_internal cgValue cg_build_expr_internal(cgProcedure *p, Ast *expr) {
 		if (is_type_untyped(type)) {
 			return cg_value(cast(TB_Node *)nullptr, t_untyped_uninit);
 		}
-		return cg_value(tb_inst_poison(p->func), type);
+		return cg_value(tb_inst_poison(p->func, cg_data_type(type)), type);
 	case_end;
 
 	case_ast_node(de, DerefExpr, expr);

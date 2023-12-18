@@ -51,7 +51,7 @@ arena_init_growing :: proc(arena: ^Arena, reserved: uint = DEFAULT_ARENA_GROWING
 // Initialization of an `Arena` to be a `.Static` variant.
 // A static arena contains a single `Memory_Block` allocated with virtual memory.
 @(require_results)
-arena_init_static :: proc(arena: ^Arena, reserved: uint, commit_size: uint = DEFAULT_ARENA_STATIC_COMMIT_SIZE) -> (err: Allocator_Error) {
+arena_init_static :: proc(arena: ^Arena, reserved: uint = DEFAULT_ARENA_STATIC_RESERVE_SIZE, commit_size: uint = DEFAULT_ARENA_STATIC_COMMIT_SIZE) -> (err: Allocator_Error) {
 	arena.kind           = .Static
 	arena.curr_block     = memory_block_alloc(commit_size, reserved, {}) or_return
 	arena.total_used     = 0
@@ -98,15 +98,15 @@ arena_alloc :: proc(arena: ^Arena, size: uint, alignment: uint, loc := #caller_l
 
 	switch arena.kind {
 	case .Growing:
-		if arena.curr_block == nil || (safe_add(arena.curr_block.used, size) or_else 0) > arena.curr_block.reserved {
-			size = mem.align_forward_uint(size, alignment)
+		needed := mem.align_forward_uint(size, alignment)
+		if arena.curr_block == nil || (safe_add(arena.curr_block.used, needed) or_else 0) > arena.curr_block.reserved {
 			if arena.minimum_block_size == 0 {
 				arena.minimum_block_size = DEFAULT_ARENA_GROWING_MINIMUM_BLOCK_SIZE
 			}
 
-			block_size := max(size, arena.minimum_block_size)
+			block_size := max(needed, arena.minimum_block_size)
 
-			new_block := memory_block_alloc(size, block_size, {}) or_return
+			new_block := memory_block_alloc(needed, block_size, alignment, {}) or_return
 			new_block.prev = arena.curr_block
 			arena.curr_block = new_block
 			arena.total_reserved += new_block.reserved
