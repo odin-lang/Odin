@@ -215,7 +215,7 @@ gb_internal void cg_set_debug_pos_from_node(cgProcedure *p, Ast *node) {
 		TokenPos pos = ast_token(node).pos;
 		TB_SourceFile **file = map_get(&p->module->file_id_map, cast(uintptr)pos.file_id);
 		if (file) {
-			tb_inst_set_location(p->func, *file, pos.line, pos.column);
+			tb_inst_location(p->func, *file, pos.line, pos.column);
 		}
 	}
 }
@@ -373,7 +373,7 @@ gb_internal bool cg_global_variables_create(cgModule *m, Array<cgGlobalVariable>
 		TB_Global *global = tb_global_create(m->mod, name.len, cast(char const *)name.text, debug_type, linkage);
 		cgValue g = cg_value(global, alloc_type_pointer(e->type));
 
-		TB_ModuleSection *section = tb_module_get_data(m->mod);
+		TB_ModuleSectionHandle section = tb_module_get_data(m->mod);
 
 		if (e->Variable.thread_local_model != "") {
 			section = tb_module_get_tls(m->mod);

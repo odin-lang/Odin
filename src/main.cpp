@@ -277,6 +277,7 @@ enum BuildFlagKind {
 	BuildFlag_ForeignErrorProcedures,
 	BuildFlag_NoRTTI,
 	BuildFlag_DynamicMapCalls,
+	BuildFlag_ObfuscateSourceCodeLocations,
 
 	BuildFlag_Compact,
 	BuildFlag_GlobalDefinitions,
@@ -466,6 +467,8 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_NoRTTI,                  str_lit("disallow-rtti"),             BuildFlagParam_None,    Command__does_check);
 
 	add_flag(&build_flags, BuildFlag_DynamicMapCalls,         str_lit("dynamic-map-calls"),         BuildFlagParam_None,    Command__does_check);
+
+	add_flag(&build_flags, BuildFlag_ObfuscateSourceCodeLocations, str_lit("obfuscate-source-code-locations"), BuildFlagParam_None,    Command__does_build);
 
 	add_flag(&build_flags, BuildFlag_Short,                   str_lit("short"),                     BuildFlagParam_None,    Command_doc);
 	add_flag(&build_flags, BuildFlag_AllPackages,             str_lit("all-packages"),              BuildFlagParam_None,    Command_doc);
@@ -1113,6 +1116,11 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_DynamicMapCalls:
 							build_context.dynamic_map_calls = true;
 							break;
+
+						case BuildFlag_ObfuscateSourceCodeLocations:
+							build_context.obfuscate_source_code_locations = true;
+							break;
+
 						case BuildFlag_DefaultToNilAllocator:
 							build_context.ODIN_DEFAULT_TO_NIL_ALLOCATOR = true;
 							break;
@@ -1947,6 +1955,10 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 	}
 
 	if (run_or_build) {
+		print_usage_line(1, "-obfuscate-source-code-locations");
+		print_usage_line(2, "Obfuscate the file and procedure strings, and line and column numbers, stored with a 'runtime.Source_Code_Location' value.");
+		print_usage_line(0, "");
+
 		print_usage_line(1, "-sanitize:<string>");
 		print_usage_line(2, "Enables sanitization analysis.");
 		print_usage_line(2, "Available options:");
@@ -2544,6 +2556,7 @@ int main(int arg_count, char const **arg_ptr) {
 		}
 	}
 
+	String default_march = get_default_microarchitecture();
 	if (print_microarch_list) {
 		if (build_context.microarch != "?") {
 			gb_printf("Unknown microarchitecture '%.*s'.\n", LIT(build_context.microarch));
@@ -2553,8 +2566,6 @@ int main(int arg_count, char const **arg_ptr) {
 
 		String march_list  = target_microarch_list[build_context.metrics.arch];
 		String_Iterator it = {march_list, 0};
-
-		String default_march = make_string_c(get_default_microarchitecture());
 
 		for (;;) {
 			String str = string_split_iterator(&it, ',');
@@ -2574,6 +2585,7 @@ int main(int arg_count, char const **arg_ptr) {
 	}
 
 	if (build_context.show_debug_messages) {
+		debugf("Selected microarch: %.*s\n", LIT(default_march));
 		for_array(i, build_context.build_paths) {
 			String build_path = path_to_string(heap_allocator(), build_context.build_paths[i]);
 			debugf("build_paths[%ld]: %.*s\n", i, LIT(build_path));
