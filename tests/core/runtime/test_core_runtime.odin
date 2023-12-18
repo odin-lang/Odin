@@ -30,6 +30,7 @@ main :: proc() {
 
 	test_temp_allocator_big_alloc_and_alignment(&t)
 	test_temp_allocator_alignment_boundary(&t)
+	test_temp_allocator_returns_correct_size(&t)
 
 	fmt.printf("%v/%v tests successful.\n", TEST_count - TEST_fail, TEST_count)
 	if TEST_fail > 0 {
@@ -56,6 +57,16 @@ test_temp_allocator_big_alloc_and_alignment :: proc(t: ^testing.T) {
 	context.allocator = runtime.arena_allocator(&arena)
 
 	mappy: map[[8]int]int
-    err := reserve(&mappy, 50000)
+	err := reserve(&mappy, 50000)
 	expect_value(t, err, nil)
+}
+
+@(test)
+test_temp_allocator_returns_correct_size :: proc(t: ^testing.T) {
+	arena: runtime.Arena
+	context.allocator = runtime.arena_allocator(&arena)
+
+	bytes, err := mem.alloc_bytes(10, 16)
+	expect_value(t, err, nil)
+	expect_value(t, len(bytes), 10)
 }
