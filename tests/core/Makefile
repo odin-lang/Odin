@@ -20,7 +20,8 @@ all: c_libc_test \
 	 reflect_test \
 	 slice_test \
 	 strings_test \
-	 thread_test
+	 thread_test \
+	 runtime_test
 
 download_test_assets:
 	$(PYTHON) download_assets.py
@@ -84,3 +85,6 @@ fmt_test:
 
 thread_test:
 	$(ODIN) run thread -out:test_core_thread
+
+runtime_test:
+	$(ODIN) run runtime -out:test_core_runtime
