@@ -1191,7 +1191,7 @@ foreign lib {
 	IsMouseButtonReleased :: proc(button: MouseButton) -> bool ---    // Detect if a mouse button has been released once
 
 	when VERSION != "5.0" {
-		#panic("IsMouseButtonUp was broken in Raylib 5.0 but should be fixed in Raylib > 5.0. Remove this panic and the when clause around it and also remove the workaround version of IsMouseButtonUp just after the end of the 'foreign lib {' block ends.")
+		#panic("IsMouseButtonUp was broken in Raylib 5.0 but should be fixed in Raylib > 5.0. Remove this panic and the when block around it and also remove the workaround version of IsMouseButtonUp just after the end of the 'foreign lib {' block.")
 		IsMouseButtonUp       :: proc(button: MouseButton) -> bool ---
 	}
 	
@@ -1711,9 +1711,13 @@ foreign lib {
 	DetachAudioMixedProcessor :: proc(processor: AudioCallback) --- // Detach audio stream processor from the entire audio pipeline
 }
 
-// Workaround for broken IsMouseButtonUp in Raylib 5.0. Remove this proc when migrating to Raylib 5.1 or later and re-enable IsMouseButtonUp inside `foreign lib {` block.
-IsMouseButtonUp :: proc(button: MouseButton) -> bool {
-	return !IsMouseButtonDown(button)
+// Workaround for broken IsMouseButtonUp in Raylib 5.0.
+when VERSION == "5.0" {
+	IsMouseButtonUp :: proc(button: MouseButton) -> bool {
+		return !IsMouseButtonDown(button)
+	}
+} else {
+	#panic("Remove this this when block and everything inside it for Raylib > 5.0. It's just here to fix a bug in Raylib 5.0. See IsMouseButtonUp inside 'foreign lib {' block.")
 }
 
 // Text formatting with variables (sprintf style)
