@@ -106,7 +106,7 @@ arena_alloc :: proc(arena: ^Arena, size: uint, alignment: uint, loc := #caller_l
 
 			block_size := max(needed, arena.minimum_block_size)
 
-			new_block := memory_block_alloc(needed, block_size, {}) or_return
+			new_block := memory_block_alloc(needed, block_size, alignment, {}) or_return
 			new_block.prev = arena.curr_block
 			arena.curr_block = new_block
 			arena.total_reserved += new_block.reserved

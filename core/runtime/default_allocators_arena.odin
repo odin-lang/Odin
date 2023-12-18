@@ -28,11 +28,11 @@ safe_add :: #force_inline proc "contextless" (x, y: uint) -> (uint, bool) {
 }
 
 @(require_results)
-memory_block_alloc :: proc(allocator: Allocator, capacity: uint, loc := #caller_location) -> (block: ^Memory_Block, err: Allocator_Error) {
-	total_size := uint(capacity + size_of(Memory_Block))
-	base_offset    := uintptr(size_of(Memory_Block))
+memory_block_alloc :: proc(allocator: Allocator, capacity: uint, alignment: uint, loc := #caller_location) -> (block: ^Memory_Block, err: Allocator_Error) {
+	total_size  := uint(capacity + max(alignment, size_of(Memory_Block)))
+	base_offset := uintptr(max(alignment, size_of(Memory_Block)))
 
-	min_alignment: int = max(16, align_of(Memory_Block))
+	min_alignment: int = max(16, align_of(Memory_Block), int(alignment))
 	data := mem_alloc(int(total_size), min_alignment, allocator, loc) or_return
 	block = (^Memory_Block)(raw_data(data))
 	end := uintptr(raw_data(data)[len(data):])
@@ -115,7 +115,7 @@ arena_alloc :: proc(arena: ^Arena, size, alignment: uint, loc := #caller_locatio
 			arena.backing_allocator = default_allocator()
 		}
 
-		new_block := memory_block_alloc(arena.backing_allocator, block_size, loc) or_return
+		new_block := memory_block_alloc(arena.backing_allocator, block_size, alignment, loc) or_return
 		new_block.prev = arena.curr_block
 		arena.curr_block = new_block
 		arena.total_capacity += new_block.capacity
@@ -134,7 +134,7 @@ arena_init :: proc(arena: ^Arena, size: uint, backing_allocator: Allocator, loc 
 	arena^ = {}
 	arena.backing_allocator = backing_allocator
 	arena.minimum_block_size = max(size, 1<<12) // minimum block size of 4 KiB
-	new_block := memory_block_alloc(arena.backing_allocator, arena.minimum_block_size, loc) or_return
+	new_block := memory_block_alloc(arena.backing_allocator, arena.minimum_block_size, 0, loc) or_return
 	arena.curr_block = new_block
 	arena.total_capacity += new_block.capacity
 	return nil
