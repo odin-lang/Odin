@@ -284,6 +284,9 @@ paket-files/
 
 # Project Specific
 
+# Python environment
+/.venv
+
 # - Windows
 *.sln
 builds/
@@ -309,6 +312,7 @@ shared/
 *.ll
 
 *.sublime-workspace
+/ols.json
 examples/bug/
 build.sh
 !core/debug/
