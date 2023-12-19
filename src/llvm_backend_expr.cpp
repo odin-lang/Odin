@@ -4105,7 +4105,7 @@ gb_internal lbAddr lb_build_addr_slice_expr(lbProcedure *p, Ast *expr) {
 	}
 
 	case Type_Basic: {
-		GB_ASSERT_MSG(type == t_string, "got %s", type_to_string(type));
+		GB_ASSERT_MSG(are_types_identical(type, t_string), "got %s", type_to_string(type));
 		lbValue len = lb_string_len(p, base);
 		if (high.value == nullptr) high = len;
 
