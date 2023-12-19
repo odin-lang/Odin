@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import urllib
 import urllib.request
 import shutil
 import sys
@@ -42,22 +43,23 @@ PNG_IMAGES         = [
 	"PngSuite.png", "logo-slim.png", "emblem-1024.png"
 ]
 
-def try_download_file(url, out_file):
+def try_download_file(url: str, out_file: str) -> bool:
 	try:
 		with urllib.request.urlopen(url) as response, open(out_file, 'wb') as of:
 			shutil.copyfileobj(response, of)
 			print("... ", out_file)
-	except urllib.error.HTTPError:
-	 	print("Could not download", url)
-	 	return 1	
+	except urllib.request.HTTPError:
+		print("Could not download", url)
+		return False
+	return True
 
-def try_download_and_unpack_zip(suite):
+def try_download_and_unpack_zip(suite: str) -> int|None:
 	url      = ASSETS_BASE_URL.format(suite, "{}.zip".format(suite))
 	out_file = DOWNLOAD_BASE_PATH.format(suite) + "/{}.zip".format(suite)
 
 	print("\tDownloading {} to {}.".format(url, out_file))
 
-	if try_download_file(url, out_file) is not None:
+	if not try_download_file(url, out_file):
 		print("Could not download ZIP file")
 		return 1
 
@@ -73,8 +75,9 @@ def try_download_and_unpack_zip(suite):
 	except:
 		print("Could not extract ZIP file")
 		return 2
+	return None
 
-def main():
+def main() -> int|None:
 	for suite in TEST_SUITES:
 		print("Downloading {} assets".format(suite))
 
@@ -92,8 +95,6 @@ def main():
 
 		# We could fall back on downloading the PNG files individually, but it's slow
 		print("Done downloading {} assets.".format(suite))
-
-
 
 	return 0
 
