@@ -16,6 +16,7 @@ file_and_urls = [
     ("vulkan_macos.h",   'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vulkan_macos.h',   False),
     ("vulkan_ios.h",     'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vulkan_ios.h',     False),
     ("vulkan_wayland.h", 'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vulkan_wayland.h', False),
+    ("vulkan_xcb.h",     'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vulkan_xcb.h',     False),
     # Vulkan Video
     ("vulkan_video_codec_h264std.h", 'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vk_video/vulkan_video_codec_h264std.h', False),
     ("vulkan_video_codec_h265std.h", 'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vk_video/vulkan_video_codec_h265std.h', False),
@@ -48,9 +49,10 @@ def no_vk(t):
     return t
 
 OPAQUE_STRUCTS = """
-wl_surface   :: struct {} // Opaque struct defined by Wayland
-wl_display   :: struct {} // Opaque struct defined by Wayland
-IOSurfaceRef :: struct {} // Opaque struct defined by Apple’s CoreGraphics framework
+wl_surface       :: struct {} // Opaque struct defined by Wayland
+wl_display       :: struct {} // Opaque struct defined by Wayland
+IOSurfaceRef     :: struct {} // Opaque struct defined by Apple’s CoreGraphics framework
+xcb_connection_t :: struct {} // Opaque struct defined by XCB
 """ 
 
 def convert_type(t, prev_name, curr_name):
@@ -85,6 +87,8 @@ def convert_type(t, prev_name, curr_name):
         "struct BaseInStructure":  "BaseInStructure",
         "struct wl_display": "wl_display",
         "struct wl_surface": "wl_surface",
+	"xcb_window_t": "u32",
+	"xcb_visualid_t": "u32",
         'v': '',
     }
 

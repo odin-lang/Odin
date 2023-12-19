@@ -3825,6 +3825,8 @@ WaylandSurfaceCreateFlagsKHR                         :: distinct bit_set[Wayland
 WaylandSurfaceCreateFlagKHR                          :: enum u32 {}
 Win32SurfaceCreateFlagsKHR                           :: distinct bit_set[Win32SurfaceCreateFlagKHR; Flags]
 Win32SurfaceCreateFlagKHR                            :: enum u32 {}
+XcbSurfaceCreateFlagsKHR                             :: distinct bit_set[XcbSurfaceCreateFlagKHR; Flags]
+XcbSurfaceCreateFlagKHR                              :: enum u32 {}
 AccessFlags2 :: distinct bit_set[AccessFlag2; Flags64]
 AccessFlag2 :: enum Flags64 {
 	INDIRECT_COMMAND_READ                     = 0,
