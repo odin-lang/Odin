@@ -53,7 +53,7 @@ def try_download_file(url: str, out_file: str) -> bool:
 		return False
 	return True
 
-def try_download_and_unpack_zip(suite: str) -> int|None:
+def try_download_and_unpack_zip(suite: str):
 	url      = ASSETS_BASE_URL.format(suite, "{}.zip".format(suite))
 	out_file = DOWNLOAD_BASE_PATH.format(suite) + "/{}.zip".format(suite)
 
@@ -77,7 +77,7 @@ def try_download_and_unpack_zip(suite: str) -> int|None:
 		return 2
 	return None
 
-def main() -> int|None:
+def main():
 	for suite in TEST_SUITES:
 		print("Downloading {} assets".format(suite))
 
