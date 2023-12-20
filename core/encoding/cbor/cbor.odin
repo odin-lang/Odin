@@ -238,6 +238,7 @@ negative_u64_to_int :: #force_inline proc(u: Negative_U64) -> i128 {
 // Utility for converting between the different errors when they are subsets of the other.
 err_conv :: proc {
 	encode_to_marshal_err,
+	encode_to_marshal_err_p2,
 	decode_to_unmarshal_err,
 	decode_to_unmarshal_err_p,
 	decode_to_unmarshal_err_p2,
@@ -251,6 +252,10 @@ encode_to_marshal_err :: #force_inline proc(err: Encode_Error) -> Marshal_Error 
 	case Encode_Data_Error:   return e
 	case:                     return nil
 	}
+}
+
+encode_to_marshal_err_p2 :: #force_inline proc(v: $T, v2: $T2, err: Encode_Error) -> (T, T2, Marshal_Error) {
+	return v, v2, err_conv(err)
 }
 
 decode_to_unmarshal_err :: #force_inline proc(err: Decode_Error) -> Unmarshal_Error {

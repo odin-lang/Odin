@@ -4,6 +4,7 @@ import "core:bytes"
 import "core:encoding/endian"
 import "core:intrinsics"
 import "core:io"
+import "core:runtime"
 import "core:slice"
 import "core:strings"
 
@@ -54,6 +55,9 @@ Decoder_Flag :: enum {
 	
 	// Makes the decoder shrink of excess capacity from allocated buffers/containers before returning.
 	Shrink_Excess,
+
+	// Internal flag to do initialization.
+	_In_Progress,
 }
 
 Decoder_Flags :: bit_set[Decoder_Flag]
@@ -117,9 +121,8 @@ decode_from_decoder :: proc(d: Decoder, allocator := context.allocator) -> (v: V
 	context.allocator = allocator
 	
 	d := d
-	if d.max_pre_alloc <= 0 {
-		d.max_pre_alloc = DEFAULT_MAX_PRE_ALLOC
-	}
+
+	DECODE_PROGRESS_GUARD(&d)
 
 	v, err = _decode_from_decoder(d)
 	// Normal EOF does not exist here, we try to read the exact amount that is said to be provided.
@@ -225,21 +228,9 @@ encode_into_writer :: proc(w: io.Writer, v: Value, flags := ENCODE_SMALL) -> Enc
 // See the docs on the proc group `encode_into` for more info.
 encode_into_encoder :: proc(e: Encoder, v: Value) -> Encode_Error {
 	e := e
+
+	ENCODE_PROGRESS_GUARD(&e) or_return
 	
-	outer: bool
-	defer if outer {
-		e.flags &~= {._In_Progress}
-	}
-
-	if ._In_Progress not_in e.flags {
-		outer = true
-		e.flags |= {._In_Progress}
-
-		if .Self_Described_CBOR in e.flags {
-			_encode_u64(e, TAG_SELF_DESCRIBED_CBOR, .Tag) or_return
-		}
-	}
-
 	switch v_spec in v {
 	case u8:           return _encode_u8(e.writer, v_spec, .Unsigned)
 	case u16:          return _encode_u16(e, v_spec, .Unsigned)
@@ -263,6 +254,66 @@ encode_into_encoder :: proc(e: Encoder, v: Value) -> Encode_Error {
 	case Undefined:    return _encode_undefined(e.writer)
 	case:              return nil
 	}
+}
+
+@(deferred_in_out=_decode_progress_end)
+DECODE_PROGRESS_GUARD :: proc(d: ^Decoder) -> (is_begin: bool, tmp: runtime.Arena_Temp) {
+	if ._In_Progress in d.flags {
+		return
+	}
+	is_begin = true
+	
+	incl_elem(&d.flags, Decoder_Flag._In_Progress)
+
+	if context.allocator != context.temp_allocator {
+		tmp = runtime.default_temp_allocator_temp_begin()
+	}
+
+	if d.max_pre_alloc <= 0 {
+		d.max_pre_alloc = DEFAULT_MAX_PRE_ALLOC
+	}
+
+	return
+}
+
+_decode_progress_end :: proc(d: ^Decoder, is_begin: bool, tmp: runtime.Arena_Temp) {
+	if !is_begin {
+		return
+	}
+
+	excl_elem(&d.flags, Decoder_Flag._In_Progress)
+
+	runtime.default_temp_allocator_temp_end(tmp)
+}
+
+@(deferred_in_out=_encode_progress_end)
+ENCODE_PROGRESS_GUARD :: proc(e: ^Encoder) -> (is_begin: bool, tmp: runtime.Arena_Temp, err: Encode_Error) {
+	if ._In_Progress in e.flags {
+		return
+	}
+	is_begin = true
+
+	incl_elem(&e.flags, Encoder_Flag._In_Progress)
+
+	if context.allocator != context.temp_allocator {
+		tmp = runtime.default_temp_allocator_temp_begin()
+	}
+
+	if .Self_Described_CBOR in e.flags {
+		_encode_u64(e^, TAG_SELF_DESCRIBED_CBOR, .Tag) or_return
+	}
+
+	return
+}
+
+_encode_progress_end :: proc(e: ^Encoder, is_begin: bool, tmp: runtime.Arena_Temp, err: Encode_Error) {
+	if !is_begin || err != nil {
+		return
+	}
+
+	excl_elem(&e.flags, Encoder_Flag._In_Progress)
+
+	runtime.default_temp_allocator_temp_end(tmp)
 }
 
 _decode_header :: proc(r: io.Reader) -> (hdr: Header, err: io.Error) {
@@ -514,7 +565,7 @@ _decode_map :: proc(d: Decoder, add: Add) -> (v: Map, err: Decode_Error) {
 			return nil, kerr
 		} 
 
-		value := decode_from_decoder(d) or_return
+		value := _decode_from_decoder(d) or_return
 
 		append(&items, Map_Entry{
 			key   = key,

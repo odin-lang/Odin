@@ -77,21 +77,8 @@ marshal_into_writer :: proc(w: io.Writer, v: any, flags := ENCODE_SMALL) -> Mars
 // See docs on the `marshal_into` proc group for more info.
 marshal_into_encoder :: proc(e: Encoder, v: any) -> (err: Marshal_Error) {
 	e := e
-	
-	init: bool
-	defer if init {
-		e.flags &~= {._In_Progress}
-	}
-	
-	// If not in progress we do initialization and set in progress.
-	if ._In_Progress not_in e.flags {
-		init = true
-		e.flags |= {._In_Progress}
 
-		if .Self_Described_CBOR in e.flags {
-			err_conv(_encode_u64(e, TAG_SELF_DESCRIBED_CBOR, .Tag)) or_return
-		}
-	}
+	err_conv(ENCODE_PROGRESS_GUARD(&e)) or_return
 
 	if v == nil {
 		return _encode_nil(e.writer)
