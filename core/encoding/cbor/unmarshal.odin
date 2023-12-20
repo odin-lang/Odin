@@ -370,9 +370,8 @@ _unmarshal_bytes :: proc(d: Decoder, v: any, ti: ^reflect.Type_Info, hdr: Header
 
 		if elem_base.id != byte { return _unsupported(v, hdr) }
 
-		context.allocator = context.temp_allocator
-		bytes := err_conv(_decode_bytes(d, add)) or_return
-		defer delete(bytes)
+		bytes := err_conv(_decode_bytes(d, add, allocator=context.temp_allocator)) or_return
+		defer delete(bytes, context.temp_allocator)
 
 		if len(bytes) > t.count { return _unsupported(v, hdr) }
 		
@@ -404,9 +403,8 @@ _unmarshal_string :: proc(d: Decoder, v: any, ti: ^reflect.Type_Info, hdr: Heade
 
 	// Enum by its variant name.
 	case reflect.Type_Info_Enum:
-		context.allocator = context.temp_allocator
-		text := err_conv(_decode_text(d, add)) or_return
-		defer delete(text)
+		text := err_conv(_decode_text(d, add, allocator=context.temp_allocator)) or_return
+		defer delete(text, context.temp_allocator)
 
 		for name, i in t.names {
 			if name == text {
@@ -416,9 +414,8 @@ _unmarshal_string :: proc(d: Decoder, v: any, ti: ^reflect.Type_Info, hdr: Heade
 		}
 	
 	case reflect.Type_Info_Rune:
-		context.allocator = context.temp_allocator
-		text := err_conv(_decode_text(d, add)) or_return
-		defer delete(text)
+		text := err_conv(_decode_text(d, add, allocator=context.temp_allocator)) or_return
+		defer delete(text, context.temp_allocator)
 
 		r := (^rune)(v.data)
 		dr, n := utf8.decode_rune(text)
@@ -585,7 +582,7 @@ _unmarshal_array :: proc(d: Decoder, v: any, ti: ^reflect.Type_Info, hdr: Header
 		case quaternion64:  info = type_info_of(f16)
 		case quaternion128: info = type_info_of(f32)
 		case quaternion256: info = type_info_of(f64)
-		case:            unreachable()
+		case:               unreachable()
 		}
 
 		out_of_space := assign_array(d, &da, info, 4, growable=false) or_return
@@ -598,15 +595,15 @@ _unmarshal_array :: proc(d: Decoder, v: any, ti: ^reflect.Type_Info, hdr: Header
 
 _unmarshal_map :: proc(d: Decoder, v: any, ti: ^reflect.Type_Info, hdr: Header, add: Add) -> (err: Unmarshal_Error) {
 	r := d.reader
-	decode_key :: proc(d: Decoder, v: any) -> (k: string, err: Unmarshal_Error) {
+	decode_key :: proc(d: Decoder, v: any, allocator := context.allocator) -> (k: string, err: Unmarshal_Error) {
 		entry_hdr := _decode_header(d.reader) or_return
 		entry_maj, entry_add := _header_split(entry_hdr)
 		#partial switch entry_maj {
 		case .Text:
-			k = err_conv(_decode_text(d, entry_add)) or_return
+			k = err_conv(_decode_text(d, entry_add, allocator)) or_return
 			return
 		case .Bytes:
-			bytes := err_conv(_decode_bytes(d, entry_add)) or_return
+			bytes := err_conv(_decode_bytes(d, entry_add, allocator=allocator)) or_return
 			k = string(bytes)
 			return
 		case:
@@ -637,16 +634,14 @@ _unmarshal_map :: proc(d: Decoder, v: any, ti: ^reflect.Type_Info, hdr: Header, 
 	
 		for idx := 0; idx < len(fields) && (unknown || idx < length); idx += 1 {
 			// Decode key, keys can only be strings.
-			key: string; {
-				context.allocator = context.temp_allocator
-				if keyv, kerr := decode_key(d, v); unknown && kerr == .Break {
-					break
-				} else if kerr != nil {
-					err = kerr
-					return
-				} else {
-					key = keyv
-				}
+			key: string
+			if keyv, kerr := decode_key(d, v, context.temp_allocator); unknown && kerr == .Break {
+				break
+			} else if kerr != nil {
+				err = kerr
+				return
+			} else {
+				key = keyv
 			}
 			defer delete(key, context.temp_allocator)
 			
@@ -779,8 +774,7 @@ _unmarshal_union :: proc(d: Decoder, v: any, ti: ^reflect.Type_Info, hdr: Header
 				return .Bad_Tag_Value
 			}
 
-			context.allocator = context.temp_allocator
-			target_name = err_conv(_decode_text(d, idadd)) or_return
+			target_name = err_conv(_decode_text(d, idadd, context.temp_allocator)) or_return
 		}
 		defer delete(target_name, context.temp_allocator)
 

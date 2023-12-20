@@ -431,7 +431,9 @@ _decode_bytes_ptr :: proc(d: Decoder, add: Add, type: Major = .Bytes) -> (v: ^By
 	return
 }
 
-_decode_bytes :: proc(d: Decoder, add: Add, type: Major = .Bytes) -> (v: Bytes, err: Decode_Error) {
+_decode_bytes :: proc(d: Decoder, add: Add, type: Major = .Bytes, allocator := context.allocator) -> (v: Bytes, err: Decode_Error) {
+	context.allocator = allocator
+
 	n, scap := _decode_len_str(d, add) or_return
 	
 	buf := strings.builder_make(0, scap) or_return
@@ -487,8 +489,8 @@ _decode_text_ptr :: proc(d: Decoder, add: Add) -> (v: ^Text, err: Decode_Error) 
 	return
 }
 
-_decode_text :: proc(d: Decoder, add: Add) -> (v: Text, err: Decode_Error) {
-	return (Text)(_decode_bytes(d, add, .Text) or_return), nil
+_decode_text :: proc(d: Decoder, add: Add, allocator := context.temp_allocator) -> (v: Text, err: Decode_Error) {
+	return (Text)(_decode_bytes(d, add, .Text, allocator) or_return), nil
 }
 
 _encode_text :: proc(e: Encoder, val: Text) -> Encode_Error {

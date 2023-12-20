@@ -293,10 +293,7 @@ tag_base64_unmarshal :: proc(_: ^Tag_Implementation, d: Decoder, _: Tag_Number, 
 		return .Bad_Tag_Value
 	}
 
-	bytes: string; {
-		context.allocator = context.temp_allocator
-		bytes = string(err_conv(_decode_bytes(d, add)) or_return)
-	}
+	bytes := string(err_conv(_decode_bytes(d, add, allocator=context.temp_allocator)) or_return)
 	defer delete(bytes, context.temp_allocator)
 
 	#partial switch t in ti.variant {
