@@ -5,20 +5,41 @@ foreign import user32 "system:User32.lib"
 
 @(default_calling_convention="stdcall")
 foreign user32 {
-	GetClassInfoW :: proc(hInstance: HINSTANCE, lpClassNAme: LPCWSTR, lpWndClass: ^WNDCLASSW) -> BOOL ---
-	GetClassInfoExW :: proc(hInsatnce: HINSTANCE, lpszClass: LPCWSTR, lpwcx: ^WNDCLASSEXW) -> BOOL ---
+	// AdjustWindowRect, // AdjustWindowRectEx
+	// AllowSetForegroundWindow
+	// AnimateWindow
+	// AnyPopup
+	// ArrangeIconicWindows
 
-	GetClassLongW :: proc(hWnd: HWND, nIndex: c_int) -> DWORD ---
-	SetClassLongW :: proc(hWnd: HWND, nIndex: c_int, dwNewLong: LONG) -> DWORD ---
+	// BeginDeferWindowPos
+	// BringWindowToTop
+	// BroadcastSystemMessage, BroadcastSystemMessageA, BroadcastSystemMessageExA, (BroadcastSystemMessageExW), (BroadcastSystemMessageW)
 
-	GetWindowLongW :: proc(hWnd: HWND, nIndex: c_int) -> LONG ---
-	SetWindowLongW :: proc(hWnd: HWND, nIndex: c_int, dwNewLong: LONG) -> LONG ---
+	// CalculatePopupWindowPosition
+	// CallMsgFilterA, CallMsgFilterW
+	// CallNextHookEx
+	CallWindowProcA :: proc(lpPrevWndFunc: WNDPROC, hWnd: HWND, Msg: UINT, wParam: WPARAM, lParam: LPARAM) -> LRESULT ---
+	CallWindowProcW :: proc(lpPrevWndFunc: WNDPROC, hWnd: HWND, Msg: UINT, wParam: WPARAM, lParam: LPARAM) -> LRESULT ---
+	// CascadeWindows
+	// ChangeWindowMessageFilter, ChangeWindowMessageFilterEx
+	// ChildWindowFromPoint, ChildWindowFromPointEx
+	CloseWindow :: proc(hWnd: HWND) -> BOOL ---
+	// CreateMDIWindowA, CreateMDIWindowW
 
-	GetClassNameW :: proc(hWnd: HWND, lpClassName: LPWSTR, nMaxCount: c_int) -> c_int ---
-
-	RegisterClassW :: proc(lpWndClass: ^WNDCLASSW) -> ATOM ---
-	RegisterClassExW :: proc(^WNDCLASSEXW) -> ATOM ---
-	UnregisterClassW :: proc(lpClassName: LPCWSTR, hInstance: HINSTANCE) -> BOOL ---
+	CreateWindowExA :: proc(
+		dwExStyle: DWORD,
+		lpClassName: LPCSTR,
+		lpWindowName: LPCSTR,
+		dwStyle: DWORD,
+		X: c_int,
+		Y: c_int,
+		nWidth: c_int,
+		nHeight: c_int,
+		hWndParent: HWND,
+		hMenu: HMENU,
+		hInstance: HINSTANCE,
+		lpParam: LPVOID,
+	) -> HWND ---
 
 	CreateWindowExW :: proc(
 		dwExStyle: DWORD,
@@ -35,22 +56,117 @@ foreign user32 {
 		lpParam: LPVOID,
 	) -> HWND ---
 
+	// DeferWindowPos
+	// DefFrameProcA, DefFrameProcW
+	// DefMDIChildProcA, DefMDIChildProcW
+	// DefWindowProcA, DefWindowProcW
+	// DeregisterShellHookWindow
 	DestroyWindow :: proc(hWnd: HWND) -> BOOL ---
+
+	// DispatchMessage
+	DispatchMessageA :: proc(lpMsg: ^MSG) -> LRESULT ---
+	DispatchMessageW :: proc(lpMsg: ^MSG) -> LRESULT ---
+
+	// EndDeferWindowPos
+	// EndTask
+	// EnumChildWindows
+	// EnumPropsA, EnumPropsExA, EnumPropsExW, EnumPropsW
+	// EnumThreadWindows, EnumWindows
+
+	FindWindowA :: proc(lpClassName: LPCSTR, lpWindowName: LPCSTR) -> HWND ---
+	FindWindowW :: proc(lpClassName: LPCWSTR, lpWindowName: LPCWSTR) -> HWND ---
+	FindWindowExA :: proc(hWndParent: HWND, hWndChildAfter: HWND, lpszClass: LPCSTR, lpszWindow: LPCSTR) -> HWND ---
+	FindWindowExW :: proc(hWndParent: HWND, hWndChildAfter: HWND, lpszClass: LPCWSTR, lpszWindow: LPCWSTR) -> HWND ---
+
+	// GetAltTabInfoA, GetAltTabInfoW
+	// GetAncestor
+
+	GetClassInfoA :: proc(hInstance: HINSTANCE, lpClassName: LPCSTR, lpWndClass: LPWNDCLASSA) -> BOOL ---
+	GetClassInfoW :: proc(hInstance: HINSTANCE, lpClassNAme: LPCWSTR, lpWndClass: ^WNDCLASSW) -> BOOL ---
+	GetClassInfoExA :: proc(hInstance: HINSTANCE, lpszClass: LPCSTR, lpwcx: LPWNDCLASSEXA) -> BOOL ---
+	GetClassInfoExW :: proc(hInsatnce: HINSTANCE, lpszClass: LPCWSTR, lpwcx: ^WNDCLASSEXW) -> BOOL ---
+    
+	GetClassLongA :: proc(hWnd: HWND, nIndex: i32) -> DWORD ---
+	// GetClassLongPtrA :: proc(hWnd: HWND, nIndex: i32) -> ULONG_PTR ---; @Todo(ema): Define it down conditionally?
+	// GetClassLongPtrW
+	GetClassLongW :: proc(hWnd: HWND, nIndex: c_int) -> DWORD ---
+
+	// GetClassName
+	GetClassNameA :: proc(hWnd: HWND, lpClassName: LPSTR, nMaxCount: int) -> c_int ---
+	GetClassNameW :: proc(hWnd: HWND, lpClassName: LPWSTR, nMaxCount: c_int) -> c_int ---
+
+	// GetClassWord
+	// GetClientRect
+	GetDesktopWindow :: proc() -> HWND ---
+	GetForegroundWindow :: proc() -> HWND ---
+	// GetGUIThreadInfo
+	// GetInputState
+	// GetLastActivePopup
+	// GetLayeredWindowAttributes
+
+	// GetMessage
+	GetMessageA :: proc(lpMsg: LPMSG, hWnd: HWND, wMsgFilterMin: UINT, wMsgFilterMax: UINT) -> BOOL ---
+	// GetMessageExtraInfo
+	// GetMessagePos
+	// GetMessageTime
+	GetMessageW :: proc(lpMsg: ^MSG, hWnd: HWND, wMsgFilterMin: UINT, wMsgFilterMax: UINT) -> BOOL ---
+
+	// GetNextWindow (macro)
+	// GetParent
+	// GetProcessDefaultLayout
+
+	// GetPropA, GetPropW
+	GetQueueStatus :: proc(flags: UINT) -> DWORD ---
+	// GetShellWindow
+	// GetSysColor
+	// GetSystemMetrics
+	// GetTitleBarInfo
+
+	GetTopWindow :: proc(hWnd: HWND) -> HWND ---
+	// GetWindow
+	// GetWindowDisplayAffinity
+	// GetWindowInfo
+	GetWindowLongA :: proc(hWnd : HWND, nIndex : i32) -> i32 ---;
+	GetWindowLongPtrA :: proc(hWnd : HWND, nIndex : i32) -> LONG_PTR ---;
+	GetWindowLongW :: proc(hWnd: HWND, nIndex: c_int) -> LONG ---
+
+
+	// ...
+
+	SetClassLongA :: proc(hWnd: HWND, nIndex: i32, dwNewLong: LONG) -> DWORD ---;
+	SetClassLongPtrA :: proc(hWnd: HWND, nIndex: i32, dwNewLong: LONG_PTR) -> ULONG_PTR ---;
+	SetWindowLongA :: proc(hWnd : HWND, nIndex : i32, dwNewLong : i32) -> i32 ---;
+	SetWindowLongPtrA :: proc(hWnd : HWND, nIndex : i32, dwNewLong : LONG_PTR) -> LONG_PTR ---;
+    
+	// GetClassWord?
+    
+	RegisterClassA :: proc(lpWndClass : ^WNDCLASSA) -> ATOM ---;
+	RegisterClassExA :: proc(unnamedParam1: ^WNDCLASSEXA) -> ATOM ---;
+	UnregisterClassA :: proc(lpClassName: LPCSTR, hInstance: HINSTANCE) -> BOOL ---;
+    
+	SetClassLongW :: proc(hWnd: HWND, nIndex: c_int, dwNewLong: LONG) -> DWORD ---
+	SetWindowLongW :: proc(hWnd: HWND, nIndex: c_int, dwNewLong: LONG) -> LONG ---
+
+	
+
+	RegisterClassW :: proc(lpWndClass: ^WNDCLASSW) -> ATOM ---
+	RegisterClassExW :: proc(^WNDCLASSEXW) -> ATOM ---
+	UnregisterClassW :: proc(lpClassName: LPCWSTR, hInstance: HINSTANCE) -> BOOL ---
 
 	ShowWindow :: proc(hWnd: HWND, nCmdShow: c_int) -> BOOL ---
 	IsWindow :: proc(hWnd: HWND) -> BOOL ---
 	BringWindowToTop :: proc(hWnd: HWND) -> BOOL ---
-	GetTopWindow :: proc(hWnd: HWND) -> HWND ---
+	
 	SetForegroundWindow :: proc(hWnd: HWND) -> BOOL ---
-	GetForegroundWindow :: proc() -> HWND ---
+	
 	UpdateWindow :: proc(hWnd: HWND) -> BOOL ---
 	SetActiveWindow :: proc(hWnd: HWND) -> HWND ---
 	GetActiveWindow :: proc() -> HWND ---
 
-	GetMessageW :: proc(lpMsg: ^MSG, hWnd: HWND, wMsgFilterMin: UINT, wMsgFilterMax: UINT) -> BOOL ---
+	
 
 	TranslateMessage :: proc(lpMsg: ^MSG) -> BOOL ---
-	DispatchMessageW :: proc(lpMsg: ^MSG) -> LRESULT ---
+	
 
 	WaitMessage :: proc() -> BOOL ---
 
@@ -67,15 +183,12 @@ foreign user32 {
 
 	PostQuitMessage :: proc(nExitCode: c_int) ---
 
-	GetQueueStatus :: proc(flags: UINT) -> DWORD ---
+	
 
 	DefWindowProcA :: proc(hWnd: HWND, Msg: UINT, wParam: WPARAM, lParam: LPARAM) -> LRESULT ---
 	DefWindowProcW :: proc(hWnd: HWND, Msg: UINT, wParam: WPARAM, lParam: LPARAM) -> LRESULT ---
 
-	FindWindowA :: proc(lpClassName: LPCSTR, lpWindowName: LPCSTR) -> HWND ---
-	FindWindowW :: proc(lpClassName: LPCWSTR, lpWindowName: LPCWSTR) -> HWND ---
-	FindWindowExA :: proc(hWndParent: HWND, hWndChildAfter: HWND, lpszClass: LPCSTR, lpszWindow: LPCSTR) -> HWND ---
-	FindWindowExW :: proc(hWndParent: HWND, hWndChildAfter: HWND, lpszClass: LPCWSTR, lpszWindow: LPCWSTR) -> HWND ---
+	
 
 	LoadIconA :: proc(hInstance: HINSTANCE, lpIconName: LPCSTR) -> HICON ---
 	LoadIconW :: proc(hInstance: HINSTANCE, lpIconName: LPCWSTR) -> HICON ---
