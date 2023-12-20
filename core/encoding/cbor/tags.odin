@@ -13,29 +13,35 @@ import "core:time"
 // Tags defined in RFC 7049 that we provide implementations for.
 
 // UTC time in seconds, unmarshalled into a `core:time` `time.Time` or integer.
+// Use the struct tag `cbor_tag:"1"` or `cbor_tag:"epoch"` to have your `time.Time` field en/decoded as epoch time.
 TAG_EPOCH_TIME_NR :: 1
 TAG_EPOCH_TIME_ID :: "epoch"
 
 // Using `core:math/big`, big integers are properly encoded and decoded during marshal and unmarshal.
-TAG_UNSIGNED_BIG_NR     :: 2
+// These fields use this tag by default, no struct tag required.
+TAG_UNSIGNED_BIG_NR :: 2
 // Using `core:math/big`, big integers are properly encoded and decoded during marshal and unmarshal.
-TAG_NEGATIVE_BIG_NR     :: 3
+// These fields use this tag by default, no struct tag required.
+TAG_NEGATIVE_BIG_NR :: 3
 
 // TAG_DECIMAL_FRACTION :: 4  // NOTE: We could probably implement this with `math/fixed`.
 
 // Sometimes it is beneficial to carry an embedded CBOR data item that is not meant to be decoded
 // immediately at the time the enclosing data item is being decoded. Tag number 24 (CBOR data item)
 // can be used to tag the embedded byte string as a single data item encoded in CBOR format.
+// Use the struct tag `cbor_tag:"24"` or `cbor_tag:"cbor"` to keep a non-decoded field (string or bytes) of raw CBOR.
 TAG_CBOR_NR :: 24
 TAG_CBOR_ID :: "cbor"
 
 // The contents of this tag are base64 encoded during marshal and decoded during unmarshal.
+// Use the struct tag `cbor_tag:"34"` or `cbor_tag:"base64"` to have your field string or bytes field en/decoded as base64.
 TAG_BASE64_NR :: 34
 TAG_BASE64_ID :: "base64"
 
 // A tag that is used to detect the contents of a binary buffer (like a file) are CBOR.
 // This tag would wrap everything else, decoders can then check for this header and see if the
 // given content is definitely CBOR.
+// Added by the encoder if it has the flag `.Self_Described_CBOR`, decoded by default.
 TAG_SELF_DESCRIBED_CBOR :: 55799
 
 // A tag that is used to assign a textual type to the object following it.
@@ -99,19 +105,14 @@ tags_initialize_defaults :: proc() {
 // Registers tags that have implementations provided by this package.
 // This is done by default and can be controlled with the `CBOR_INITIALIZE_DEFAULT_TAGS` define.
 tags_register_defaults :: proc() {
-	// NOTE: Not registering this the other way around, user can opt-in using the `cbor_tag:"1"` struct
-	// tag instead, it would lose precision and marshalling the `time.Time` struct normally is valid.
-	tag_register_number({nil, tag_time_unmarshal, tag_time_marshal}, TAG_EPOCH_TIME_NR, TAG_EPOCH_TIME_ID)
-	
-	// Use the struct tag `cbor_tag:"34"` to have your field encoded in a base64.
-	tag_register_number({nil, tag_base64_unmarshal, tag_base64_marshal}, TAG_BASE64_NR, TAG_BASE64_ID)
-
-	// Use the struct tag `cbor_tag:"24"` to keep a non-decoded field of raw CBOR.
-	tag_register_number({nil, tag_cbor_unmarshal, tag_cbor_marshal}, TAG_CBOR_NR, TAG_CBOR_ID)
+	tag_register_number({nil, tag_time_unmarshal,   tag_time_marshal},   TAG_EPOCH_TIME_NR, TAG_EPOCH_TIME_ID)
+	tag_register_number({nil, tag_base64_unmarshal, tag_base64_marshal}, TAG_BASE64_NR,     TAG_BASE64_ID)
+	tag_register_number({nil, tag_cbor_unmarshal,   tag_cbor_marshal},   TAG_CBOR_NR,       TAG_CBOR_ID)
 
 	// These following tags are registered at the type level and don't require an opt-in struct tag.
 	// Encoding these types on its own make no sense or no data is lost to encode it.
-
+	
+	// En/Decoding of `big.Int` fields by default.
 	tag_register_type({nil, tag_big_unmarshal, tag_big_marshal}, TAG_UNSIGNED_BIG_NR, big.Int)
 	tag_register_type({nil, tag_big_unmarshal, tag_big_marshal}, TAG_NEGATIVE_BIG_NR, big.Int)
 }
