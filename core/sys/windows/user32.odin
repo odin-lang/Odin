@@ -380,12 +380,12 @@ foreign user32 {
 
 	SendInput :: proc(cInputs: UINT, pInputs: [^]INPUT, cbSize: c_int) -> UINT ---
 
-	FillRect :: proc(hDC: HDC, lprc: ^RECT, hbr: HBRUSH) -> int ---
+	FillRect :: proc(hDC: HDC, lprc: ^RECT, hbr: HBRUSH) -> c_int ---
 	EqualRect :: proc(lprc1: ^RECT, lprc2: ^RECT) -> BOOL ---
 
-	SetWindowRgn :: proc(hWnd: HWND, hRgn: HRGN, bRedraw: BOOL) -> int ---
+	SetWindowRgn :: proc(hWnd: HWND, hRgn: HRGN, bRedraw: BOOL) -> c_int ---
 	CreateRectRgnIndirect :: proc(lprect: ^RECT) -> HRGN ---
-	GetSystemMetricsForDpi :: proc(nIndex: int, dpi: UINT) -> int ---
+	GetSystemMetricsForDpi :: proc(nIndex: int, dpi: UINT) -> c_int ---
 
 	GetSystemMenu :: proc(hWnd: HWND, bRevert: BOOL) -> HMENU ---
 	EnableMenuItem :: proc(hMenu: HMENU, uIDEnableItem: UINT, uEnable: UINT) -> BOOL ---
