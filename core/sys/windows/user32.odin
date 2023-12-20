@@ -17,11 +17,11 @@ foreign user32 {
 	AnyPopup :: proc() -> BOOL ---
 	ArrangeIconicWindows :: proc(hWnd: HWND) -> UINT ---
 
-	BeginDeferWindowPos :: proc(nNumWindows: c_int) -> HDWP ---;
+	BeginDeferWindowPos :: proc(nNumWindows: c_int) -> HDWP ---
 	BringWindowToTop :: proc(hWnd: HWND) -> BOOL ---
-	BroadcastSystemMessage :: proc(flags: DWORD, lpInfo: ^DWORD, Msg: UINT, wParam: WPARAM, lParam: LPARAM) -> c_long ---;
-	BroadcastSystemMessageA :: proc(flags: DWORD, lpInfo: ^DWORD, Msg: UINT, wParam: WPARAM, lParam: LPARAM) -> c_long ---;
-	BroadcastSystemMessageExA :: proc(flags: DWORD, lpInfo: ^DWORD, Msg: UINT, wParam: WPARAM, lParam: LPARAM, pbsmInfo: PBSMINFO) -> c_long ---;
+	BroadcastSystemMessage :: proc(flags: DWORD, lpInfo: ^DWORD, Msg: UINT, wParam: WPARAM, lParam: LPARAM) -> c_long ---
+	BroadcastSystemMessageA :: proc(flags: DWORD, lpInfo: ^DWORD, Msg: UINT, wParam: WPARAM, lParam: LPARAM) -> c_long ---
+	BroadcastSystemMessageExA :: proc(flags: DWORD, lpInfo: ^DWORD, Msg: UINT, wParam: WPARAM, lParam: LPARAM, pbsmInfo: PBSMINFO) -> c_long ---
 	BroadcastSystemMessageExW :: proc(flags: DWORD, lpInfo: LPDWORD, Msg: UINT, wParam: WPARAM, lParam: LPARAM, pbsmInfo: PBSMINFO) -> c_long ---
 	BroadcastSystemMessageW :: proc(flags: DWORD, lpInfo: LPDWORD, Msg: UINT, wParam: WPARAM, lParam: LPARAM) -> c_long ---
 
@@ -291,7 +291,7 @@ foreign user32 {
 	// END OF: High DPI
 	//
 	
-	UpdateWindow :: proc(hWnd: HWND) -> BOOL --- // @Note(ema): This is not in the MSDN function list on user32. Is this not in user32.lib?
+	UpdateWindow :: proc(hWnd: HWND) -> BOOL ---
 	SetActiveWindow :: proc(hWnd: HWND) -> HWND ---
 	GetActiveWindow :: proc() -> HWND ---
 
