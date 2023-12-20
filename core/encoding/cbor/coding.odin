@@ -266,7 +266,7 @@ encode_into_encoder :: proc(e: Encoder, v: Value) -> Encode_Error {
 }
 
 _decode_header :: proc(r: io.Reader) -> (hdr: Header, err: io.Error) {
-	buf: [1]byte
+	buf: [1]byte = ---
 	io.read_full(r, buf[:]) or_return
 	return Header(buf[0]), nil
 }
@@ -276,7 +276,7 @@ _header_split :: proc(hdr: Header) -> (Major, Add) {
 }
 
 _decode_u8 :: proc(r: io.Reader) -> (v: u8, err: io.Error) {
-	byte: [1]byte
+	byte: [1]byte = ---
 	io.read_full(r, byte[:]) or_return
 	return byte[0], nil
 }
@@ -310,7 +310,7 @@ _decode_tiny_u8 :: proc(additional: Add) -> (u8, Decode_Data_Error) {
 }
 
 _decode_u16 :: proc(r: io.Reader) -> (v: u16, err: io.Error) {
-	bytes: [2]byte
+	bytes: [2]byte = ---
 	io.read_full(r, bytes[:]) or_return
 	return endian.unchecked_get_u16be(bytes[:]), nil
 }
@@ -323,7 +323,7 @@ _encode_u16 :: proc(e: Encoder, v: u16, major: Major = .Unsigned) -> Encode_Erro
 }
 
 _encode_u16_exact :: proc(w: io.Writer, v: u16, major: Major = .Unsigned) -> (err: io.Error) {
-	bytes: [3]byte
+	bytes: [3]byte = ---
 	bytes[0] = (u8(major) << 5) | u8(Add.Two_Bytes)
 	endian.unchecked_put_u16be(bytes[1:], v)
 	_, err = io.write_full(w, bytes[:])
@@ -331,7 +331,7 @@ _encode_u16_exact :: proc(w: io.Writer, v: u16, major: Major = .Unsigned) -> (er
 }
 
 _decode_u32 :: proc(r: io.Reader) -> (v: u32, err: io.Error) {
-	bytes: [4]byte
+	bytes: [4]byte = ---
 	io.read_full(r, bytes[:]) or_return
 	return endian.unchecked_get_u32be(bytes[:]), nil
 }
@@ -344,7 +344,7 @@ _encode_u32 :: proc(e: Encoder, v: u32, major: Major = .Unsigned) -> Encode_Erro
 }
 
 _encode_u32_exact :: proc(w: io.Writer, v: u32, major: Major = .Unsigned) -> (err: io.Error) {
-	bytes: [5]byte
+	bytes: [5]byte = ---
 	bytes[0] = (u8(major) << 5) | u8(Add.Four_Bytes)
 	endian.unchecked_put_u32be(bytes[1:], v)
 	_, err = io.write_full(w, bytes[:])
@@ -352,7 +352,7 @@ _encode_u32_exact :: proc(w: io.Writer, v: u32, major: Major = .Unsigned) -> (er
 }
 
 _decode_u64 :: proc(r: io.Reader) -> (v: u64, err: io.Error) {
-	bytes: [8]byte
+	bytes: [8]byte = ---
 	io.read_full(r, bytes[:]) or_return
 	return endian.unchecked_get_u64be(bytes[:]), nil
 }
@@ -365,7 +365,7 @@ _encode_u64 :: proc(e: Encoder, v: u64, major: Major = .Unsigned) -> Encode_Erro
 }
 
 _encode_u64_exact :: proc(w: io.Writer, v: u64, major: Major = .Unsigned) -> (err: io.Error) {
-	bytes: [9]byte
+	bytes: [9]byte = ---
 	bytes[0] = (u8(major) << 5) | u8(Add.Eight_Bytes)
 	endian.unchecked_put_u64be(bytes[1:], v)
 	_, err = io.write_full(w, bytes[:])
@@ -556,7 +556,7 @@ _encode_map :: proc(e: Encoder, m: Map) -> (err: Encode_Error) {
 	for &entry, i in entries {
 		entry.entry = m[i]
 
-		buf := strings.builder_make(0, 8, context.temp_allocator) or_return
+		buf := strings.builder_make(context.temp_allocator) or_return
 		
 		ke := e
 		ke.writer = strings.to_stream(&buf)
@@ -631,7 +631,7 @@ _encode_tag :: proc(e: Encoder, val: Tag) -> Encode_Error {
 }
 
 _decode_simple :: proc(r: io.Reader) -> (v: Simple, err: io.Error) {
-	buf: [1]byte
+	buf: [1]byte = ---
 	io.read_full(r, buf[:]) or_return
 	return Simple(buf[0]), nil
 }
@@ -661,14 +661,14 @@ _decode_tiny_simple :: proc(add: Add) -> (Simple, Decode_Data_Error) {
 }
 
 _decode_f16 :: proc(r: io.Reader) -> (v: f16, err: io.Error) {
-	bytes: [2]byte
+	bytes: [2]byte = ---
 	io.read_full(r, bytes[:]) or_return
 	n := endian.unchecked_get_u16be(bytes[:])
 	return transmute(f16)n, nil
 }
 
 _encode_f16 :: proc(w: io.Writer, v: f16) -> (err: io.Error) {
-	bytes: [3]byte
+	bytes: [3]byte = ---
 	bytes[0] = u8(Header.F16)
 	endian.unchecked_put_u16be(bytes[1:], transmute(u16)v)
 	_, err = io.write_full(w, bytes[:])
@@ -676,7 +676,7 @@ _encode_f16 :: proc(w: io.Writer, v: f16) -> (err: io.Error) {
 }
 
 _decode_f32 :: proc(r: io.Reader) -> (v: f32, err: io.Error) {
-	bytes: [4]byte
+	bytes: [4]byte = ---
 	io.read_full(r, bytes[:]) or_return
 	n := endian.unchecked_get_u32be(bytes[:])
 	return transmute(f32)n, nil
@@ -690,7 +690,7 @@ _encode_f32 :: proc(e: Encoder, v: f32) -> io.Error {
 }
 
 _encode_f32_exact :: proc(w: io.Writer, v: f32) -> (err: io.Error) {
-	bytes: [5]byte
+	bytes: [5]byte = ---
 	bytes[0] = u8(Header.F32)
 	endian.unchecked_put_u32be(bytes[1:], transmute(u32)v)
 	_, err = io.write_full(w, bytes[:])
@@ -698,7 +698,7 @@ _encode_f32_exact :: proc(w: io.Writer, v: f32) -> (err: io.Error) {
 }
 
 _decode_f64 :: proc(r: io.Reader) -> (v: f64, err: io.Error) {
-	bytes: [8]byte
+	bytes: [8]byte = ---
 	io.read_full(r, bytes[:]) or_return
 	n := endian.unchecked_get_u64be(bytes[:])
 	return transmute(f64)n, nil
@@ -712,7 +712,7 @@ _encode_f64 :: proc(e: Encoder, v: f64) -> io.Error {
 }
 
 _encode_f64_exact :: proc(w: io.Writer, v: f64) -> (err: io.Error) {
-	bytes: [9]byte
+	bytes: [9]byte = ---
 	bytes[0] = u8(Header.F64)
 	endian.unchecked_put_u64be(bytes[1:], transmute(u64)v)
 	_, err = io.write_full(w, bytes[:])
