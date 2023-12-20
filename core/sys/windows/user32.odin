@@ -17,25 +17,13 @@ foreign user32 {
 	AnyPopup :: proc() -> BOOL ---
 	ArrangeIconicWindows :: proc(hWnd: HWND) -> UINT ---
 
-	// BeginDeferWindowPos
+	BeginDeferWindowPos :: proc(nNumWindows: c_int) -> HDWP ---;
 	BringWindowToTop :: proc(hWnd: HWND) -> BOOL ---
-	// BroadcastSystemMessage, BroadcastSystemMessageA, BroadcastSystemMessageExA
-	BroadcastSystemMessageExW :: proc(
-		flags: DWORD,
-		lpInfo: LPDWORD,
-		Msg: UINT,
-		wParam: WPARAM,
-		lParam: LPARAM,
-		pbsmInfo: PBSMINFO,
-	) -> c_long ---
-
-	BroadcastSystemMessageW :: proc(
-		flags: DWORD,
-		lpInfo: LPDWORD,
-		Msg: UINT,
-		wParam: WPARAM,
-		lParam: LPARAM,
-	) -> c_long ---
+	BroadcastSystemMessage :: proc(flags: DWORD, lpInfo: ^DWORD, Msg: UINT, wParam: WPARAM, lParam: LPARAM) -> c_long ---;
+	BroadcastSystemMessageA :: proc(flags: DWORD, lpInfo: ^DWORD, Msg: UINT, wParam: WPARAM, lParam: LPARAM) -> c_long ---;
+	BroadcastSystemMessageExA :: proc(flags: DWORD, lpInfo: ^DWORD, Msg: UINT, wParam: WPARAM, lParam: LPARAM, pbsmInfo: PBSMINFO) -> c_long ---;
+	BroadcastSystemMessageExW :: proc(flags: DWORD, lpInfo: LPDWORD, Msg: UINT, wParam: WPARAM, lParam: LPARAM, pbsmInfo: PBSMINFO) -> c_long ---
+	BroadcastSystemMessageW :: proc(flags: DWORD, lpInfo: LPDWORD, Msg: UINT, wParam: WPARAM, lParam: LPARAM) -> c_long ---
 
 	// CalculatePopupWindowPosition
 	// CallMsgFilterA, CallMsgFilterW
