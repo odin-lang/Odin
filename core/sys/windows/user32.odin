@@ -11,12 +11,11 @@ foreign user32 {
 
 	AdjustWindowRect :: proc(lpRect: LPRECT, dwStyle: DWORD, bMenu: BOOL) -> BOOL ---
 	AdjustWindowRectEx :: proc(lpRect: LPRECT, dwStyle: DWORD, bMenu: BOOL, dwExStyle: DWORD) -> BOOL ---
-	AdjustWindowRectExForDpi :: proc(lpRect: LPRECT, dwStyle: DWORD, bMenu: BOOL, dwExStyle: DWORD, dpi: UINT) -> BOOL ---
 
-	// AllowSetForegroundWindow
-	// AnimateWindow
-	// AnyPopup
-	// ArrangeIconicWindows
+	AllowSetForegroundWindow :: proc(dwProcessId: DWORD) -> BOOL ---
+	AnimateWindow :: proc(hWnd: HWND, dwTime: DWORD, dwFlags: DWORD) -> BOOL ---
+	AnyPopup :: proc() -> BOOL ---
+	ArrangeIconicWindows :: proc(hWnd: HWND) -> UINT ---
 
 	// BeginDeferWindowPos
 	BringWindowToTop :: proc(hWnd: HWND) -> BOOL ---
@@ -291,6 +290,17 @@ foreign user32 {
 
 	//
 	// END OF: Windows and Messages
+	//
+
+	//
+	// High DPI
+	//
+
+	AdjustWindowRectExForDpi :: proc(lpRect: LPRECT, dwStyle: DWORD, bMenu: BOOL, dwExStyle: DWORD, dpi: UINT) -> BOOL ---
+	// AreDpiAwarenessContextsEqual
+
+	//
+	// END OF: High DPI
 	//
 	
 	UpdateWindow :: proc(hWnd: HWND) -> BOOL --- // @Note(ema): This is not in the MSDN function list on user32. Is this not in user32.lib?
