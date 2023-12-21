@@ -200,9 +200,33 @@ foreign user32 {
 	// ReplyMessage
 
 	SendMessageA :: proc(hWnd: HWND, Msg: UINT, wParam: WPARAM, lParam: LPARAM) -> LRESULT ---
-	// SendMessageCallbackA, SendMessageCallbackW
-	// SendMessageTimeoutA
 
+	SendMessageCallbackA :: proc(
+		hWnd: HWND,
+		Msg: UINT,
+		wParam: WPARAM,
+		lParam: LPARAM,
+		lpResultCallBack: SENDASYNCPROC,
+		dwData: ULONG_PTR,
+	) -> BOOL ---
+	SendMessageCallbackW :: proc(
+		hWnd: HWND,
+		Msg: UINT,
+		wParam: WPARAM,
+		lParam: LPARAM,
+		lpResultCallBack: SENDASYNCPROC,
+		dwData: ULONG_PTR,
+	) -> BOOL ---
+
+	SendMessageTimeoutA :: proc(
+		hWnd: HWND,
+		Msg: UINT,
+		wParam: WPARAM,
+		lParam: LPARAM,
+		fuFlags,
+		uTimeout: UINT,
+		lpdwResult: ^DWORD_PTR,
+	) -> LRESULT ---
 	SendMessageTimeoutW :: proc(
 		hWnd: HWND,
 		Msg: UINT,
@@ -214,26 +238,36 @@ foreign user32 {
 	) -> LRESULT ---
 
 	SendMessageW :: proc(hWnd: HWND, Msg: UINT, wParam: WPARAM, lParam: LPARAM) -> LRESULT ---
-	// SendNotifyMessageA, SendNotifyMessageW
-	// SetAdditionalForegroundBoostProcesses
+	SendNotifyMessageA :: proc(hWnd: HWND, Msg: UINT, wParam: WPARAM, lParam: LPARAM) -> BOOL ---
+	SendNotifyMessageW :: proc(hWnd: HWND, Msg: UINT, wParam: WPARAM, lParam: LPARAM) -> BOOL ---
+	SetAdditionalForegroundBoostProcesses :: proc(topLevelWindow: HWND, processHandleCount: DWORD, processHandleArray: ^HANDLE) -> BOOL ---
 
 	SetClassLongA :: proc(hWnd: HWND, nIndex: i32, dwNewLong: LONG) -> DWORD ---
 	// SetClassLongPtrA :: proc(hWnd: HWND, nIndex: i32, dwNewLong: LONG_PTR) -> ULONG_PTR ---
 	// SetClassLongPtrW
 	SetClassLongW :: proc(hWnd: HWND, nIndex: c_int, dwNewLong: LONG) -> DWORD ---
 
-	// SetClassWord
-	// SetCoalescableTimer
+	SetClassWord :: proc(hWnd: HWND, nIndex: c_int, wNewWord: WORD) -> WORD ---
+	SetCoalescableTimer :: proc(
+		hWnd: HWND,
+		nIDEvent: UINT_PTR,
+		uElapse: UINT,
+		lpTimerFunc: TIMERPROC,
+		uToleranceDelay: ULONG,
+	) -> UINT_PTR ---
+
 	SetForegroundWindow :: proc(hWnd: HWND) -> BOOL ---
 	SetLayeredWindowAttributes  :: proc(hWnd: HWND, crKey: COLORREF, bAlpha: BYTE, dwFlags: DWORD) -> BOOL ---
-	// SetMessageExtraInfo
-	// SetParent
-	// SetProcessDefaultLayout
-	// SetProcessDPIAware
-	// SetPropA, SetPropW
+	SetMessageExtraInfo :: proc(lParam: LPARAM) -> LPARAM ---
+	SetParent :: proc(hWndChild, hWndNewParent: HWND) -> HWND ---
+	SetProcessDefaultLayout :: proc(dwDefaultLayout: DWORD) -> BOOL ---
+	SetProcessDPIAware :: proc() -> BOOL ---
+	SetPropA :: proc(hWnd: HWND, lpString: LPCSTR, hData: HANDLE) -> BOOL ---
+	SetPropW :: proc(hWnd: HWND, lpString: LPCWSTR, hData: HANDLE) -> BOOL ---
 	SetSysColors :: proc(cElements: c_int, lpaElements: ^INT, lpaRgbValues: ^COLORREF) -> BOOL ---
 	SetTimer :: proc(hWnd: HWND, nIDEvent: UINT_PTR, uElapse: UINT, lpTimerFunc: TIMERPROC) -> UINT_PTR ---
-	// SetWindowDisplayAffinity
+	SetWindowDisplayAffinity :: proc(hWnd: HWND, dwAffinity: DWORD) -> BOOL ---
+
 
 	SetWindowLongA :: proc(hWnd: HWND, nIndex: i32, dwNewLong: i32) -> i32 ---
 	// SetWindowLongPtrA :: proc(hWnd: HWND, nIndex: i32, dwNewLong: LONG_PTR) -> LONG_PTR ---
@@ -251,30 +285,43 @@ foreign user32 {
 		uFlags: UINT,
 	) -> BOOL ---
 
-	// SetWindowsHookExA
+	SetWindowsHookExA :: proc(idHook: c_int, lpfn: HOOKPROC, hmod: HINSTANCE, dwThreadId: DWORD) -> HHOOK ---
 	SetWindowsHookExW :: proc(idHook: c_int, lpfn: HOOKPROC, hmod: HINSTANCE, dwThreadId: DWORD) -> HHOOK ---
-	// SetWindowTextA
+	SetWindowTextA :: proc(hWnd: HWND, lpString: LPCSTR) -> BOOL ---
 	SetWindowTextW :: proc(hWnd: HWND, lpString: LPCWSTR) -> BOOL ---
-	// ShowOwnedPopups
+
+	ShowOwnedPopups :: proc(hWnd: HWND, fShow: BOOL) -> BOOL ---
 	ShowWindow :: proc(hWnd: HWND, nCmdShow: c_int) -> BOOL ---
-	// ShowWindowAsync
-	// SoundSentry
-	// SwitchToThisWindow
-	// SystemParametersInfoA
+	ShowWindowAsync :: proc(hWnd: HWND, nCmdShow: c_int) -> BOOL ---
+
+	SoundSentry :: proc() -> BOOL ---
+	SwitchToThisWindow :: proc(hwnd: HWND, fUnknown: BOOL) ---
+	SystemParametersInfoA :: proc(uiAction, uiParam: UINT, pvParam: PVOID, fWinIni: UINT) -> BOOL ---
 	SystemParametersInfoW :: proc(uiAction, uiParam: UINT, pvParam: PVOID, fWinIni: UINT) -> BOOL ---
 
-	// TileWindows
-	// TranslateMDISysAccel
+	TileWindows :: proc(hwndParent: HWND, wHow: UINT, lpRect: ^RECT, cKids: UINT, lpKids: ^HWND) -> WORD ---
+	TranslateMDISysAccel :: proc(hWndClient: HWND, lpMsg: LPMSG) -> BOOL ---
 	TranslateMessage :: proc(lpMsg: ^MSG) -> BOOL ---
 
 	UnhookWindowsHookEx :: proc(hhk: HHOOK) -> BOOL ---
 	UnregisterClassA :: proc(lpClassName: LPCSTR, hInstance: HINSTANCE) -> BOOL ---
 	UnregisterClassW :: proc(lpClassName: LPCWSTR, hInstance: HINSTANCE) -> BOOL ---
-	// UpdateLayeredWindow
+	UpdateLayeredWindow :: proc(
+		hWnd: HWND,
+		hdcDst: HDC,
+		pptDst: ^POINT,
+		psize: ^SIZE,
+		hdcSrc: HDC,
+		pptSrc: ^POINT,
+		crKey: COLORREF,
+		pblend: ^BLENDFUNCTION,
+		dwFlags: DWORD,
+	) -> BOOL ---
 
 	WaitMessage :: proc() -> BOOL ---
-	// WindowFromPhysicalPoint
-	// WindowFromPoint
+	WindowFromPhysicalPoint :: proc(Point: POINT) -> HWND ---
+	WindowFromPoint :: proc(Point: POINT) -> HWND ---
+
 
 	//
 	// END OF: Windows and Messages
