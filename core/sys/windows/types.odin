@@ -709,6 +709,8 @@ WNDPROC :: #type proc "stdcall" (HWND, UINT, WPARAM, LPARAM) -> LRESULT
 
 HOOKPROC :: #type proc "stdcall" (code: c_int, wParam: WPARAM, lParam: LPARAM) -> LRESULT
 
+SENDASYNCPROC :: #type proc "stdcall" (HWND, UINT, ULONG_PTR, LRESULT)
+
 CWPRETSTRUCT :: struct {
 	lResult: LRESULT,
 	lParam: LPARAM,
