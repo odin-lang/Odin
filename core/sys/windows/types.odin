@@ -298,6 +298,14 @@ REASON_CONTEXT :: struct {
 }
 PREASON_CONTEXT :: ^REASON_CONTEXT
 
+BLENDFUNCTION :: struct {
+  BlendOp: BYTE,
+  BlendFlags: BYTE,
+  SourceConstantAlpha: BYTE,
+  AlphaFormat: BYTE,
+}
+PBLENDFUNCTION :: ^BLENDFUNCTION
+
 // RRF - Registry Routine Flags (for RegGetValue)
 RRF_RT_REG_NONE      :: 0x00000001
 RRF_RT_REG_SZ        :: 0x00000002
