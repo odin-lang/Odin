@@ -1,6 +1,7 @@
 package log
 
 import "core:runtime"
+import "core:fmt"
 
 Log_Allocator_Format :: enum {
 	Bytes, // Actual number of bytes.
@@ -37,7 +38,13 @@ log_allocator_proc :: proc(allocator_data: rawptr, mode: runtime.Allocator_Mode,
                            old_memory: rawptr, old_size: int, location := #caller_location) -> ([]byte, runtime.Allocator_Error)  {
 	la := (^Log_Allocator)(allocator_data)
 
+	if context.logger.procedure == nil || la.level < context.logger.lowest_level {
+		return la.allocator.procedure(la.allocator.data, mode, size, alignment, old_memory, old_size, location)
+	}
+
 	padding := " " if la.prefix != "" else ""
+
+	buf: [256]byte = ---
 
 	if !la.locked {
 		la.locked = true
@@ -45,64 +52,57 @@ log_allocator_proc :: proc(allocator_data: rawptr, mode: runtime.Allocator_Mode,
 
 		switch mode {
 		case .Alloc:
-			fmt: string
+			format: string
 			switch la.size_fmt {
-			case .Bytes: fmt = "%s%s>>> ALLOCATOR(mode=.Alloc, size=%d, alignment=%d)"
-			case .Human: fmt = "%s%s>>> ALLOCATOR(mode=.Alloc, size=%m, alignment=%d)"
+			case .Bytes: format = "%s%s>>> ALLOCATOR(mode=.Alloc, size=%d, alignment=%d)"
+			case .Human: format = "%s%s>>> ALLOCATOR(mode=.Alloc, size=%m, alignment=%d)"
 			}
-			logf(la.level, fmt, la.prefix, padding, size, alignment, location = location)
+			str := fmt.bprintf(buf[:], format, la.prefix, padding, size, alignment)
+			context.logger.procedure(context.logger.data, la.level, str, context.logger.options, location)
+
 		case .Alloc_Non_Zeroed:
-			fmt: string
+			format: string
 			switch la.size_fmt {
-			case .Bytes: fmt = "%s%s>>> ALLOCATOR(mode=.Alloc_Non_Zeroed, size=%d, alignment=%d)"
-			case .Human: fmt = "%s%s>>> ALLOCATOR(mode=.Alloc_Non_Zeroed, size=%m, alignment=%d)"
+			case .Bytes: format = "%s%s>>> ALLOCATOR(mode=.Alloc_Non_Zeroed, size=%d, alignment=%d)"
+			case .Human: format = "%s%s>>> ALLOCATOR(mode=.Alloc_Non_Zeroed, size=%m, alignment=%d)"
 			}
-			logf(la.level, fmt, la.prefix, padding, size, alignment, location = location)
+			str := fmt.bprintf(buf[:], format, la.prefix, padding, size, alignment)
+			context.logger.procedure(context.logger.data, la.level, str, context.logger.options, location)
+
 		case .Free:
 			if old_size != 0 {
-				fmt: string
+				format: string
 				switch la.size_fmt {
-				case .Bytes: fmt = "%s%s<<< ALLOCATOR(mode=.Free, ptr=%p, size=%d)"
-				case .Human: fmt = "%s%s<<< ALLOCATOR(mode=.Free, ptr=%p, size=%m)"
+				case .Bytes: format = "%s%s<<< ALLOCATOR(mode=.Free, ptr=%p, size=%d)"
+				case .Human: format = "%s%s<<< ALLOCATOR(mode=.Free, ptr=%p, size=%m)"
 				}
-				logf(la.level, fmt, la.prefix, padding, old_memory, old_size, location = location)
+				str := fmt.bprintf(buf[:], format, la.prefix, padding, old_memory, old_size)
+				context.logger.procedure(context.logger.data, la.level, str, context.logger.options, location)
 			} else {
-				logf(
-					la.level,
-					"%s%s<<< ALLOCATOR(mode=.Free, ptr=%p)",
-					la.prefix, padding, old_memory,
-					location = location,
-				)
+				str := fmt.bprintf(buf[:], "%s%s<<< ALLOCATOR(mode=.Free, ptr=%p)", la.prefix, padding, old_memory)
+				context.logger.procedure(context.logger.data, la.level, str, context.logger.options, location)
 			}
+
 		case .Free_All:
-			logf(
-				la.level,
-				"%s%s<<< ALLOCATOR(mode=.Free_All)",
-				la.prefix, padding,
-				location = location,
-			)
+			str := fmt.bprintf(buf[:], "%s%s<<< ALLOCATOR(mode=.Free_All)", la.prefix, padding)
+			context.logger.procedure(context.logger.data, la.level, str, context.logger.options, location)
+
 		case .Resize:
-			fmt: string
+			format: string
 			switch la.size_fmt {
-			case .Bytes: fmt = "%s%s>>> ALLOCATOR(mode=.Resize, ptr=%p, old_size=%d, size=%d, alignment=%d)"
-			case .Human: fmt = "%s%s>>> ALLOCATOR(mode=.Resize, ptr=%p, old_size=%m, size=%m, alignment=%d)"
+			case .Bytes: format = "%s%s>>> ALLOCATOR(mode=.Resize, ptr=%p, old_size=%d, size=%d, alignment=%d)"
+			case .Human: format = "%s%s>>> ALLOCATOR(mode=.Resize, ptr=%p, old_size=%m, size=%m, alignment=%d)"
 			}
-			logf(la.level, fmt, la.prefix, padding, old_memory, old_size, size, alignment, location = location)
+			str := fmt.bprintf(buf[:], format, la.prefix, padding, old_memory, old_size, size, alignment)
+			context.logger.procedure(context.logger.data, la.level, str, context.logger.options, location)
 
 		case .Query_Features:
-			logf(
-				la.level,
-				"%s%sALLOCATOR(mode=.Query_Features)",
-				la.prefix, padding,
-				location = location,
-			)
+			str := fmt.bprintf(buf[:], "%s%sALLOCATOR(mode=.Query_Features)", la.prefix, padding)
+			context.logger.procedure(context.logger.data, la.level, str, context.logger.options, location)
+
 		case .Query_Info:
-			logf(
-				la.level,
-				"%s%sALLOCATOR(mode=.Query_Info)",
-				la.prefix, padding,
-				location = location,
-			)
+			str := fmt.bprintf(buf[:], "%s%sALLOCATOR(mode=.Query_Info)", la.prefix, padding)
+			context.logger.procedure(context.logger.data, la.level, str, context.logger.options, location)
 		}
 	}
 
@@ -111,12 +111,8 @@ log_allocator_proc :: proc(allocator_data: rawptr, mode: runtime.Allocator_Mode,
 		la.locked = true
 		defer la.locked = false
 		if err != nil {
-			logf(
-				la.level,
-				"%s%sALLOCATOR ERROR=%v",
-				la.prefix, padding, err,
-				location = location,
-			)
+			str := fmt.bprintf(buf[:], "%s%sALLOCATOR ERROR=%v", la.prefix, padding, err)
+			context.logger.procedure(context.logger.data, la.level, str, context.logger.options, location)
 		}
 	}
 	return data, err
