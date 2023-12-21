@@ -13,7 +13,7 @@ foreign user32 {
 	AdjustWindowRectEx :: proc(lpRect: LPRECT, dwStyle: DWORD, bMenu: BOOL, dwExStyle: DWORD) -> BOOL ---
 
 	AllowSetForegroundWindow :: proc(dwProcessId: DWORD) -> BOOL ---
-	AnimateWindow :: proc(hWnd: HWND, dwTime: DWORD, dwFlags: DWORD) -> BOOL ---
+	AnimateWindow :: proc(hWnd: HWND, dwTime, dwFlags: DWORD) -> BOOL ---
 	AnyPopup :: proc() -> BOOL ---
 	ArrangeIconicWindows :: proc(hWnd: HWND) -> UINT ---
 
@@ -87,16 +87,16 @@ foreign user32 {
 
 	FindWindowA :: proc(lpClassName: LPCSTR, lpWindowName: LPCSTR) -> HWND ---
 	FindWindowW :: proc(lpClassName: LPCWSTR, lpWindowName: LPCWSTR) -> HWND ---
-	FindWindowExA :: proc(hWndParent: HWND, hWndChildAfter: HWND, lpszClass: LPCSTR, lpszWindow: LPCSTR) -> HWND ---
-	FindWindowExW :: proc(hWndParent: HWND, hWndChildAfter: HWND, lpszClass: LPCWSTR, lpszWindow: LPCWSTR) -> HWND ---
+	FindWindowExA :: proc(hWndParent, hWndChildAfter: HWND, lpszClass: LPCSTR, lpszWindow: LPCSTR) -> HWND ---
+	FindWindowExW :: proc(hWndParent, hWndChildAfter: HWND, lpszClass: LPCWSTR, lpszWindow: LPCWSTR) -> HWND ---
 
 	// GetAltTabInfoA, GetAltTabInfoW
 	// GetAncestor
 
 	GetClassInfoA :: proc(hInstance: HINSTANCE, lpClassName: LPCSTR, lpWndClass: LPWNDCLASSA) -> BOOL ---
-	GetClassInfoW :: proc(hInstance: HINSTANCE, lpClassNAme: LPCWSTR, lpWndClass: ^WNDCLASSW) -> BOOL ---
 	GetClassInfoExA :: proc(hInstance: HINSTANCE, lpszClass: LPCSTR, lpwcx: LPWNDCLASSEXA) -> BOOL ---
 	GetClassInfoExW :: proc(hInsatnce: HINSTANCE, lpszClass: LPCWSTR, lpwcx: ^WNDCLASSEXW) -> BOOL ---
+	GetClassInfoW :: proc(hInstance: HINSTANCE, lpClassNAme: LPCWSTR, lpWndClass: ^WNDCLASSW) -> BOOL ---
     
 	GetClassLongA :: proc(hWnd: HWND, nIndex: i32) -> DWORD ---
 	// GetClassLongPtrA :: proc(hWnd: HWND, nIndex: i32) -> ULONG_PTR ---; @Todo(ema): Define it down conditionally?
@@ -104,7 +104,7 @@ foreign user32 {
 	GetClassLongW :: proc(hWnd: HWND, nIndex: c_int) -> DWORD ---
 
 	// GetClassName
-	GetClassNameA :: proc(hWnd: HWND, lpClassName: LPSTR, nMaxCount: int) -> c_int ---
+	GetClassNameA :: proc(hWnd: HWND, lpClassName: LPSTR, nMaxCount: c_int) -> c_int ---
 	GetClassNameW :: proc(hWnd: HWND, lpClassName: LPWSTR, nMaxCount: c_int) -> c_int ---
 
 	// GetClassWord
@@ -117,11 +117,11 @@ foreign user32 {
 	// GetLayeredWindowAttributes
 
 	// GetMessage
-	GetMessageA :: proc(lpMsg: LPMSG, hWnd: HWND, wMsgFilterMin: UINT, wMsgFilterMax: UINT) -> BOOL ---
+	GetMessageA :: proc(lpMsg: ^MSG, hWnd: HWND, wMsgFilterMin, wMsgFilterMax: UINT) -> BOOL ---
 	// GetMessageExtraInfo
 	// GetMessagePos
 	// GetMessageTime
-	GetMessageW :: proc(lpMsg: ^MSG, hWnd: HWND, wMsgFilterMin: UINT, wMsgFilterMax: UINT) -> BOOL ---
+	GetMessageW :: proc(lpMsg: ^MSG, hWnd: HWND, wMsgFilterMin, wMsgFilterMax: UINT) -> BOOL ---
 
 	// GetNextWindow (macro)
 	// GetParent
@@ -138,8 +138,8 @@ foreign user32 {
 	// GetWindow
 	// GetWindowDisplayAffinity
 	GetWindowInfo :: proc(hwnd: HWND, pwi: PWINDOWINFO) -> BOOL ---
-	GetWindowLongA :: proc(hWnd : HWND, nIndex : i32) -> i32 ---;
-	GetWindowLongPtrA :: proc(hWnd : HWND, nIndex : i32) -> LONG_PTR ---;
+	GetWindowLongA :: proc(hWnd: HWND, nIndex: i32) -> i32 ---;
+	GetWindowLongPtrA :: proc(hWnd: HWND, nIndex: i32) -> LONG_PTR ---;
 	GetWindowLongW :: proc(hWnd: HWND, nIndex: c_int) -> LONG ---
 
 	// GetWindowModuleFileNameA, GetWindowModuleFileNameW
@@ -176,8 +176,8 @@ foreign user32 {
 
 	// OpenIcon
 
-	PeekMessageA :: proc(lpMsg: ^MSG, hWnd: HWND, wMsgFilterMin: UINT, wMsgFilterMax: UINT, wRemoveMsg: UINT) -> BOOL ---
-	PeekMessageW :: proc(lpMsg: ^MSG, hWnd: HWND, wMsgFilterMin: UINT, wMsgFilterMax: UINT, wRemoveMsg: UINT) -> BOOL ---
+	PeekMessageA :: proc(lpMsg: ^MSG, hWnd: HWND, wMsgFilterMin, wMsgFilterMax, wRemoveMsg: UINT) -> BOOL ---
+	PeekMessageW :: proc(lpMsg: ^MSG, hWnd: HWND, wMsgFilterMin, wMsgFilterMax, wRemoveMsg: UINT) -> BOOL ---
 	// PhysicalToLogicalPoint
 	PostMessageA :: proc(hWnd: HWND, Msg: UINT, wParam: WPARAM, lParam: LPARAM) -> BOOL ---
 	PostMessageW :: proc(hWnd: HWND, Msg: UINT, wParam: WPARAM, lParam: LPARAM) -> BOOL ---
@@ -188,7 +188,7 @@ foreign user32 {
 	// RealChildWindowFromPoint
 	// RealGetWindowClassA, RealGetWindowClassW
 
-	RegisterClassA :: proc(lpWndClass : ^WNDCLASSA) -> ATOM ---
+	RegisterClassA :: proc(lpWndClass: ^WNDCLASSA) -> ATOM ---
 	RegisterClassExA :: proc(^WNDCLASSEXA) -> ATOM ---
 	RegisterClassExW :: proc(^WNDCLASSEXW) -> ATOM ---
 	RegisterClassW :: proc(lpWndClass: ^WNDCLASSW) -> ATOM ---
@@ -223,7 +223,7 @@ foreign user32 {
 		Msg: UINT,
 		wParam: WPARAM,
 		lParam: LPARAM,
-		fuFlags,
+		fuFlags: UINT,
 		uTimeout: UINT,
 		lpdwResult: ^DWORD_PTR,
 	) -> LRESULT ---
@@ -240,7 +240,7 @@ foreign user32 {
 	SendMessageW :: proc(hWnd: HWND, Msg: UINT, wParam: WPARAM, lParam: LPARAM) -> LRESULT ---
 	SendNotifyMessageA :: proc(hWnd: HWND, Msg: UINT, wParam: WPARAM, lParam: LPARAM) -> BOOL ---
 	SendNotifyMessageW :: proc(hWnd: HWND, Msg: UINT, wParam: WPARAM, lParam: LPARAM) -> BOOL ---
-	SetAdditionalForegroundBoostProcesses :: proc(topLevelWindow: HWND, processHandleCount: DWORD, processHandleArray: ^HANDLE) -> BOOL ---
+	SetAdditionalForegroundBoostProcesses :: proc(topLevelWindow: HWND, processHandleCount: DWORD, processHandleArray: ^HANDLE) -> BOOL --- // @Todo(ema) Should this ptr be a multi-pointer? [^]HANDLE
 
 	SetClassLongA :: proc(hWnd: HWND, nIndex: i32, dwNewLong: LONG) -> DWORD ---
 	// SetClassLongPtrA :: proc(hWnd: HWND, nIndex: i32, dwNewLong: LONG_PTR) -> ULONG_PTR ---
@@ -264,7 +264,7 @@ foreign user32 {
 	SetProcessDPIAware :: proc() -> BOOL ---
 	SetPropA :: proc(hWnd: HWND, lpString: LPCSTR, hData: HANDLE) -> BOOL ---
 	SetPropW :: proc(hWnd: HWND, lpString: LPCWSTR, hData: HANDLE) -> BOOL ---
-	SetSysColors :: proc(cElements: c_int, lpaElements: ^INT, lpaRgbValues: ^COLORREF) -> BOOL ---
+	SetSysColors :: proc(cElements: c_int, lpaElements: ^INT, lpaRgbValues: ^COLORREF) -> BOOL --- // @Todo(ema): Same thing as above. Multi-pointers for these?
 	SetTimer :: proc(hWnd: HWND, nIDEvent: UINT_PTR, uElapse: UINT, lpTimerFunc: TIMERPROC) -> UINT_PTR ---
 	SetWindowDisplayAffinity :: proc(hWnd: HWND, dwAffinity: DWORD) -> BOOL ---
 
@@ -296,10 +296,10 @@ foreign user32 {
 
 	SoundSentry :: proc() -> BOOL ---
 	SwitchToThisWindow :: proc(hwnd: HWND, fUnknown: BOOL) ---
-	SystemParametersInfoA :: proc(uiAction, uiParam: UINT, pvParam: PVOID, fWinIni: UINT) -> BOOL ---
-	SystemParametersInfoW :: proc(uiAction, uiParam: UINT, pvParam: PVOID, fWinIni: UINT) -> BOOL ---
+	SystemParametersInfoA :: proc(uiAction, uiParam: UINT, pvParam: ^VOID, fWinIni: UINT) -> BOOL ---
+	SystemParametersInfoW :: proc(uiAction, uiParam: UINT, pvParam: ^VOID, fWinIni: UINT) -> BOOL ---
 
-	TileWindows :: proc(hwndParent: HWND, wHow: UINT, lpRect: ^RECT, cKids: UINT, lpKids: ^HWND) -> WORD ---
+	TileWindows :: proc(hwndParent: HWND, wHow: UINT, lpRect: ^RECT, cKids: UINT, lpKids: ^HWND) -> WORD --- // @Todo(ema): See todo on multi-pointers...
 	TranslateMDISysAccel :: proc(hWndClient: HWND, lpMsg: LPMSG) -> BOOL ---
 	TranslateMessage :: proc(lpMsg: ^MSG) -> BOOL ---
 
@@ -321,7 +321,6 @@ foreign user32 {
 	WaitMessage :: proc() -> BOOL ---
 	WindowFromPhysicalPoint :: proc(Point: POINT) -> HWND ---
 	WindowFromPoint :: proc(Point: POINT) -> HWND ---
-
 
 	//
 	// END OF: Windows and Messages
@@ -346,7 +345,7 @@ foreign user32 {
 	LoadIconW :: proc(hInstance: HINSTANCE, lpIconName: LPCWSTR) -> HICON ---
 	LoadCursorA :: proc(hInstance: HINSTANCE, lpCursorName: LPCSTR) -> HCURSOR ---
 	LoadCursorW :: proc(hInstance: HINSTANCE, lpCursorName: LPCWSTR) -> HCURSOR ---
-	LoadImageW :: proc(hInst: HINSTANCE, name: LPCWSTR, type: UINT, cx: c_int, cy: c_int, fuLoad: UINT) -> HANDLE ---
+	LoadImageW :: proc(hInst: HINSTANCE, name: LPCWSTR, type: UINT, cx, cy: c_int, fuLoad: UINT) -> HANDLE ---
 
 	ClientToScreen :: proc(hWnd: HWND, lpPoint: LPPOINT) -> BOOL ---
 	ScreenToClient :: proc(hWnd: HWND, lpPoint: LPPOINT) -> BOOL ---
@@ -363,9 +362,9 @@ foreign user32 {
 	CreatePopupMenu :: proc() -> HMENU ---
 	DestroyMenu :: proc(hMenu: HMENU) -> BOOL ---
 	AppendMenuW :: proc(hMenu: HMENU, uFlags: UINT, uIDNewItem: UINT_PTR, lpNewItem: LPCWSTR) -> BOOL ---
-	TrackPopupMenu :: proc(hMenu: HMENU, uFlags: UINT, x: int, y: int, nReserved: int, hWnd: HWND, prcRect: ^RECT) -> i32 ---
+	TrackPopupMenu :: proc(hMenu: HMENU, uFlags: UINT, x, y: c_int, nReserved: c_int, hWnd: HWND, prcRect: ^RECT) -> BOOL ---
 	
-	GetUpdateRect :: proc(hWnd: HWND, lpRect: LPRECT, bErase: BOOL) -> BOOL ---
+	GetUpdateRect :: proc(hWnd: HWND, lpRect: ^RECT, bErase: BOOL) -> BOOL ---
 	ValidateRect :: proc(hWnd: HWND, lpRect: ^RECT) -> BOOL ---
 	InvalidateRect :: proc(hWnd: HWND, lpRect: ^RECT, bErase: BOOL) -> BOOL ---
 
@@ -382,17 +381,17 @@ foreign user32 {
 	
 	GetKeyboardState :: proc(lpKeyState: PBYTE) -> BOOL ---
 
-	MapVirtualKeyW :: proc(uCode: UINT, uMapType: UINT) -> UINT ---
-	ToUnicode :: proc(nVirtKey: UINT, wScanCode: UINT, lpKeyState: ^BYTE, pwszBuff: LPWSTR, cchBuff: c_int, wFlags: UINT) -> c_int ---
+	MapVirtualKeyW :: proc(uCode, uMapType: UINT) -> UINT ---
+	ToUnicode :: proc(nVirtKey, wScanCode: UINT, lpKeyState: ^BYTE, pwszBuff: LPWSTR, cchBuff: c_int, wFlags: UINT) -> c_int ---
 
-	// MessageBoxA :: proc(hWnd: HWND, lpText: LPCSTR, lpCaption: LPCSTR, uType: UINT) -> c_int ---
-	MessageBoxW :: proc(hWnd: HWND, lpText: LPCWSTR, lpCaption: LPCWSTR, uType: UINT) -> c_int ---
+	// MessageBoxA :: proc(hWnd: HWND, lpText: LPCSTR, lpCaption: LPCSTR, uType: UINT) -> c_int --- // @Todo(ema): Why did I comment this out?
+	MessageBoxW :: proc(hWnd: HWND, lpText, lpCaption: LPCWSTR, uType: UINT) -> c_int ---
 	// MessageBoxExA :: proc(hWnd: HWND, lpText: LPCSTR, lpCaption: LPCSTR, uType: UINT, wLanguageId: WORD) -> c_int ---
-	MessageBoxExW :: proc(hWnd: HWND, lpText: LPCWSTR, lpCaption: LPCWSTR, uType: UINT, wLanguageId: WORD) -> c_int ---
+	MessageBoxExW :: proc(hWnd: HWND, lpText, lpCaption: LPCWSTR, uType: UINT, wLanguageId: WORD) -> c_int ---
 
 	ClipCursor :: proc(lpRect: LPRECT) -> BOOL ---
 	GetCursorPos :: proc(lpPoint: LPPOINT) -> BOOL ---
-	SetCursorPos :: proc(X: c_int, Y: c_int) -> BOOL ---
+	SetCursorPos :: proc(X, Y: c_int) -> BOOL ---
 	SetCursor :: proc(hCursor: HCURSOR) -> HCURSOR ---
 
 	EnumDisplaySettingsW :: proc(lpszDeviceName: LPCWSTR, iModeNum: DWORD, lpDevMode: ^DEVMODEW) -> BOOL ---
@@ -423,19 +422,19 @@ foreign user32 {
 	GetRawInputDeviceInfoW :: proc(hDevice: HANDLE, uiCommand: UINT, pData: LPVOID, pcbSize: PUINT) -> UINT ---
 	GetRawInputDeviceList :: proc(pRawInputDeviceList: PRAWINPUTDEVICELIST, puiNumDevices: PUINT, cbSize: UINT) -> UINT ---
 	GetRegisteredRawInputDevices :: proc(pRawInputDevices: PRAWINPUTDEVICE, puiNumDevices: PUINT, cbSize: UINT) -> UINT ---
-	RegisterRawInputDevices :: proc(pRawInputDevices: PCRAWINPUTDEVICE, uiNumDevices: UINT, cbSize: UINT) -> BOOL ---
+	RegisterRawInputDevices :: proc(pRawInputDevices: PCRAWINPUTDEVICE, uiNumDevices: UINT, cbSize: UINT) -> BOOL --- // @Todo(ema): Multi-pointers for these
 
 	SendInput :: proc(cInputs: UINT, pInputs: [^]INPUT, cbSize: c_int) -> UINT ---
 
 	FillRect :: proc(hDC: HDC, lprc: ^RECT, hbr: HBRUSH) -> c_int ---
-	EqualRect :: proc(lprc1: ^RECT, lprc2: ^RECT) -> BOOL ---
+	EqualRect :: proc(lprc1, lprc2: ^RECT) -> BOOL ---
 
 	SetWindowRgn :: proc(hWnd: HWND, hRgn: HRGN, bRedraw: BOOL) -> c_int ---
 	CreateRectRgnIndirect :: proc(lprect: ^RECT) -> HRGN ---
-	GetSystemMetricsForDpi :: proc(nIndex: int, dpi: UINT) -> c_int ---
+	GetSystemMetricsForDpi :: proc(nIndex: c_int, dpi: UINT) -> c_int ---
 
 	GetSystemMenu :: proc(hWnd: HWND, bRevert: BOOL) -> HMENU ---
-	EnableMenuItem :: proc(hMenu: HMENU, uIDEnableItem: UINT, uEnable: UINT) -> BOOL ---
+	EnableMenuItem :: proc(hMenu: HMENU, uIDEnableItem, uEnable: UINT) -> BOOL ---
 }
 
 CreateWindowW :: #force_inline proc "stdcall" (
