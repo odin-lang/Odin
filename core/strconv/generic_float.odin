@@ -2,8 +2,6 @@ package strconv
 
 import "decimal"
 
-import "core:runtime"
-
 Decimal_Slice :: struct {
 	digits:        []byte,
 	count:         int,
