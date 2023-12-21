@@ -541,7 +541,7 @@ struct_type :: proc() {
 		p.x = 1335
 		fmt.println(v)
 
-		// We could write p^.x, however, it is to nice abstract the ability
+		// We could write p^.x, however, it is nice to abstract the ability
 		// to not explicitly dereference the pointer. This is very useful when
 		// refactoring code to use a pointer rather than a value, and vice versa.
 	}
