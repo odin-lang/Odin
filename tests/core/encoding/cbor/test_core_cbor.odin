@@ -799,15 +799,8 @@ test_encode_tags :: proc(t: ^testing.T) {
 
 // Helpers
 
-buf: bytes.Buffer
-stream  := bytes.buffer_to_stream(&buf)
-encoder := cbor.Encoder{cbor.ENCODE_FULLY_DETERMINISTIC, stream}
-
 expect_decoding :: proc(t: ^testing.T, encoded: string, decoded: string, type: typeid, loc := #caller_location) {
-	bytes.buffer_reset(&buf)
-    bytes.buffer_write_string(&buf, encoded)
-
-    res, err := cbor.decode(stream)
+    res, err := cbor.decode(encoded)
 	defer cbor.destroy(res)
 
 	expect_value(t, reflect.union_variant_typeid(res), type, loc)
@@ -820,10 +813,7 @@ expect_decoding :: proc(t: ^testing.T, encoded: string, decoded: string, type: t
 }
 
 expect_tag :: proc(t: ^testing.T, encoded: string, nr: cbor.Tag_Number, value_decoded: string, loc := #caller_location) {
-	bytes.buffer_reset(&buf)
-    bytes.buffer_write_string(&buf, encoded)
-
-	res, err := cbor.decode(stream)
+	res, err := cbor.decode(encoded)
 	defer cbor.destroy(res)
 
 	expect_value(t, err, nil, loc)
@@ -841,10 +831,7 @@ expect_tag :: proc(t: ^testing.T, encoded: string, nr: cbor.Tag_Number, value_de
 }
 
 expect_float :: proc(t: ^testing.T, encoded: string, expected: $T, loc := #caller_location) where intrinsics.type_is_float(T) {
-	bytes.buffer_reset(&buf)
-    bytes.buffer_write_string(&buf, encoded)
-
-    res, err := cbor.decode(stream)
+    res, err := cbor.decode(encoded)
 	defer cbor.destroy(res)
 
 	expect_value(t, reflect.union_variant_typeid(res), typeid_of(T), loc)
@@ -861,6 +848,10 @@ expect_float :: proc(t: ^testing.T, encoded: string, expected: $T, loc := #calle
 		unreachable()
 	}
 }
+
+buf: bytes.Buffer
+stream  := bytes.buffer_to_stream(&buf)
+encoder := cbor.Encoder{cbor.ENCODE_FULLY_DETERMINISTIC, stream}
 
 expect_encoding :: proc(t: ^testing.T, val: cbor.Value, encoded: string, loc := #caller_location) {
 	bytes.buffer_reset(&buf)

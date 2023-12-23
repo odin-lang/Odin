@@ -316,9 +316,8 @@ _encode_progress_end :: proc(e: ^Encoder, is_begin: bool, tmp: runtime.Arena_Tem
 }
 
 _decode_header :: proc(r: io.Reader) -> (hdr: Header, err: io.Error) {
-	buf: [1]byte = ---
-	io.read_full(r, buf[:]) or_return
-	return Header(buf[0]), nil
+	hdr = Header(_decode_u8(r) or_return)
+	return
 }
 
 _header_split :: proc(hdr: Header) -> (Major, Add) {
