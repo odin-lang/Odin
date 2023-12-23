@@ -422,7 +422,13 @@ marshal_into_encoder :: proc(e: Encoder, v: any) -> (err: Marshal_Error) {
 		case Tag: return err_conv(_encode_tag(e, vv))
 		}
 
-		err_conv(_encode_u16(e, u16(len(info.names)), .Map)) or_return
+		field_name :: #force_inline proc(info: runtime.Type_Info_Struct, i: int) -> string {
+			if cbor_name := string(reflect.struct_tag_get(reflect.Struct_Tag(info.tags[i]), "cbor")); cbor_name != "" {
+				return cbor_name
+			} else {
+				return info.names[i]
+			}
+		}
 
 		marshal_entry :: #force_inline proc(e: Encoder, info: runtime.Type_Info_Struct, v: any, name: string, i: int) -> Marshal_Error {
 			err_conv(_encode_text(e, name)) or_return
@@ -448,13 +454,14 @@ marshal_into_encoder :: proc(e: Encoder, v: any) -> (err: Marshal_Error) {
 
 			return marshal_into(e, field_any)
 		}
-
-		field_name :: #force_inline proc(info: runtime.Type_Info_Struct, i: int) -> string {
-			if cbor_name := string(reflect.struct_tag_get(reflect.Struct_Tag(info.tags[i]), "cbor")); cbor_name != "" {
-				return cbor_name
-			} else {
-				return info.names[i]
+		
+		n: u64; {
+			for _, i in info.names {
+				if field_name(info, i) != "-" {
+					n += 1
+				}
 			}
+			err_conv(_encode_u64(e, n, .Map)) or_return
 		}
 
 		if .Deterministic_Map_Sorting in e.flags {
@@ -462,11 +469,16 @@ marshal_into_encoder :: proc(e: Encoder, v: any) -> (err: Marshal_Error) {
 				name:  string,
 				field: int,
 			}
-			entries := make([dynamic]Name, 0, len(info.names), context.temp_allocator) or_return
+			entries := make([dynamic]Name, 0, n, context.temp_allocator) or_return
 			defer delete(entries)
 
 			for name, i in info.names {
-				append(&entries, Name{field_name(info, i), i}) or_return
+				fname := field_name(info, i)
+				if fname == "-" {
+					continue
+				}
+
+				append(&entries, Name{fname, i}) or_return
 			}
 
 			// Sort lexicographic on the bytes of the key.
@@ -479,7 +491,12 @@ marshal_into_encoder :: proc(e: Encoder, v: any) -> (err: Marshal_Error) {
 			}
 		} else {
 			for name, i in info.names {
-				marshal_entry(e, info, v, field_name(info, i), i) or_return
+				fname := field_name(info, i)
+				if fname == "-" {
+					continue
+				}
+
+				marshal_entry(e, info, v, fname, i) or_return
 			}
 		}
 		return

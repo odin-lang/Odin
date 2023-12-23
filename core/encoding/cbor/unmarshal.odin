@@ -650,6 +650,10 @@ _unmarshal_map :: proc(d: Decoder, v: any, ti: ^reflect.Type_Info, hdr: Header, 
 			{
 				for field, field_idx in fields {
 					tag_value := string(reflect.struct_tag_get(field.tag, "cbor"))
+					if tag_value == "-" {
+						continue
+					}
+
 					if key == tag_value {
 						use_field_idx = field_idx
 						break

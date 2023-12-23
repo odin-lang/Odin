@@ -130,6 +130,7 @@ Foo :: struct {
 	small_onetwenty: i128,
 	biggest: big.Int,
 	smallest: big.Int,
+	ignore_this: ^Foo `cbor:"-"`,
 }
 
 FooBar :: enum {
@@ -189,6 +190,7 @@ test_marshalling :: proc(t: ^testing.T) {
 			smallie = cbor.Negative_U64(max(u64)),
 			onetwenty = i128(12345),
 			small_onetwenty = -i128(max(u64)),
+			ignore_this = &Foo{},
 		}
 
 		big.atoi(&f.biggest, "1234567891011121314151617181920")
@@ -343,6 +345,7 @@ test_marshalling :: proc(t: ^testing.T) {
 		ev(t, backf.smallie, f.smallie)
 		ev(t, backf.onetwenty, f.onetwenty)
 		ev(t, backf.small_onetwenty, f.small_onetwenty)
+		ev(t, backf.ignore_this, nil)
 		
 		s_equals, s_err := big.equals(&backf.smallest, &f.smallest)
 		ev(t, s_err, nil)
