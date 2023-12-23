@@ -78,7 +78,7 @@ marshal_into_writer :: proc(w: io.Writer, v: any, flags := ENCODE_SMALL) -> Mars
 marshal_into_encoder :: proc(e: Encoder, v: any) -> (err: Marshal_Error) {
 	e := e
 
-	err_conv(ENCODE_PROGRESS_GUARD(&e)) or_return
+	err_conv(_ENCODE_PROGRESS_GUARD(&e)) or_return
 
 	if v == nil {
 		return _encode_nil(e.writer)

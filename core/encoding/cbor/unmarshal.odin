@@ -53,7 +53,7 @@ unmarshal_from_string :: proc(s: string, ptr: ^$T, flags := Decoder_Flags{}, all
 unmarshal_from_decoder :: proc(d: Decoder, ptr: ^$T, allocator := context.allocator) -> (err: Unmarshal_Error) {
 	d := d
 
-	DECODE_PROGRESS_GUARD(&d)
+	_DECODE_PROGRESS_GUARD(&d)
 
 	err = _unmarshal_any_ptr(d, ptr, allocator=allocator)
 

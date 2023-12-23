@@ -121,7 +121,7 @@ decode_from_decoder :: proc(d: Decoder, allocator := context.allocator) -> (v: V
 	
 	d := d
 
-	DECODE_PROGRESS_GUARD(&d)
+	_DECODE_PROGRESS_GUARD(&d)
 
 	v, err = _decode_from_decoder(d)
 	// Normal EOF does not exist here, we try to read the exact amount that is said to be provided.
@@ -228,7 +228,7 @@ encode_into_writer :: proc(w: io.Writer, v: Value, flags := ENCODE_SMALL) -> Enc
 encode_into_encoder :: proc(e: Encoder, v: Value) -> Encode_Error {
 	e := e
 
-	ENCODE_PROGRESS_GUARD(&e) or_return
+	_ENCODE_PROGRESS_GUARD(&e) or_return
 	
 	switch v_spec in v {
 	case u8:           return _encode_u8(e.writer, v_spec, .Unsigned)
@@ -256,7 +256,7 @@ encode_into_encoder :: proc(e: Encoder, v: Value) -> Encode_Error {
 }
 
 @(deferred_in_out=_decode_progress_end)
-DECODE_PROGRESS_GUARD :: proc(d: ^Decoder) -> (is_begin: bool, tmp: runtime.Arena_Temp) {
+_DECODE_PROGRESS_GUARD :: proc(d: ^Decoder) -> (is_begin: bool, tmp: runtime.Arena_Temp) {
 	if ._In_Progress in d.flags {
 		return
 	}
@@ -286,7 +286,7 @@ _decode_progress_end :: proc(d: ^Decoder, is_begin: bool, tmp: runtime.Arena_Tem
 }
 
 @(deferred_in_out=_encode_progress_end)
-ENCODE_PROGRESS_GUARD :: proc(e: ^Encoder) -> (is_begin: bool, tmp: runtime.Arena_Temp, err: Encode_Error) {
+_ENCODE_PROGRESS_GUARD :: proc(e: ^Encoder) -> (is_begin: bool, tmp: runtime.Arena_Temp, err: Encode_Error) {
 	if ._In_Progress in e.flags {
 		return
 	}

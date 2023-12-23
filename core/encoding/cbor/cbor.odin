@@ -1,14 +1,9 @@
-// Package cbor encodes, decodes, marshals and unmarshals types from/into RCF 8949 compatible CBOR binary.
-// Also provided are conversion to and from JSON and the CBOR diagnostic format.
-//
-// You can additionally provide custom CBOR tag implementations for your use cases.
 package cbor
 
 import "core:encoding/json"
 import "core:intrinsics"
 import "core:io"
 import "core:mem"
-import "core:runtime"
 import "core:strconv"
 import "core:strings"
 
