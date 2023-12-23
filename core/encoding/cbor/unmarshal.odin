@@ -856,12 +856,11 @@ _assign_int :: proc(val: any, i: $T) -> bool {
 	case uintptr: dst = uintptr(i)
 	case:
 		ti := type_info_of(v.id)
-		do_byte_swap := is_bit_set_different_endian_to_platform(ti)
-		#partial switch info in ti.variant {
-		case runtime.Type_Info_Bit_Set:
+		if _, ok := ti.variant.(runtime.Type_Info_Bit_Set); ok {
+			do_byte_swap := !reflect.bit_set_is_big_endian(v)
 			switch ti.size * 8 {
-			case  0:
-			case  8:
+			case 0: // no-op.
+			case 8:
 				x := (^u8)(v.data)
 				x^ = u8(i)
 			case 16:
@@ -876,9 +875,9 @@ _assign_int :: proc(val: any, i: $T) -> bool {
 			case:
 				panic("unknown bit_size size")
 			}
-		case:
-			return false
+			return true
 		}
+		return false
 	}
 	return true
 }

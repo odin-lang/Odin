@@ -541,7 +541,8 @@ marshal_into_encoder :: proc(e: Encoder, v: any) -> (err: Marshal_Error) {
 		return marshal_into(e, any{v.data, info.base.id})
 
 	case runtime.Type_Info_Bit_Set:
-		do_byte_swap := is_bit_set_different_endian_to_platform(info.underlying)
+		// Store bit_set as big endian just like the protocol.
+		do_byte_swap := !reflect.bit_set_is_big_endian(v)
 		switch ti.size * 8 {
 		case  0:
 			return _encode_u8(e.writer, 0)

@@ -251,7 +251,7 @@ test_marshalling :: proc(t: ^testing.T) {
 	],
 	"cstr": "Hellnope",
 	"ennie": 0,
-	"ennieb": 2,
+	"ennieb": 512,
 	"iamint": -256,
 	"important": "!",
 	"my_bytes": h'',
