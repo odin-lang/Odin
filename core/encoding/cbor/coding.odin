@@ -100,10 +100,9 @@ decode :: decode_from
 // Decodes the given string as CBOR.
 // See docs on the proc group `decode` for more information.
 decode_from_string :: proc(s: string, flags: Decoder_Flags = {}, allocator := context.allocator) -> (v: Value, err: Decode_Error) {
-	context.allocator = allocator
 	r: strings.Reader
 	strings.reader_init(&r, s)
-	return decode_from_reader(strings.reader_to_stream(&r), flags)
+	return decode_from_reader(strings.reader_to_stream(&r), flags, allocator)
 }
 
 // Reads a CBOR value from the given reader.
@@ -489,7 +488,7 @@ _decode_text_ptr :: proc(d: Decoder, add: Add) -> (v: ^Text, err: Decode_Error) 
 	return
 }
 
-_decode_text :: proc(d: Decoder, add: Add, allocator := context.temp_allocator) -> (v: Text, err: Decode_Error) {
+_decode_text :: proc(d: Decoder, add: Add, allocator := context.allocator) -> (v: Text, err: Decode_Error) {
 	return (Text)(_decode_bytes(d, add, .Text, allocator) or_return), nil
 }
 
