@@ -195,7 +195,7 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 
 			if (build_context.pdb_filepath != "") {
 				String pdb_path = path_to_string(heap_allocator(), build_context.build_paths[BuildPath_PDB]);
-				link_settings = gb_string_append_fmt(link_settings, " /PDB:%.*s", LIT(pdb_path));
+				link_settings = gb_string_append_fmt(link_settings, " /PDB:\"%.*s\"", LIT(pdb_path));
 			}
 
 			if (build_context.no_crt) {
