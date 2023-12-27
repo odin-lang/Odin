@@ -5548,6 +5548,9 @@ gb_internal void remove_neighbouring_duplicate_entires_from_sorted_array(Array<E
 
 
 gb_internal void check_test_procedures(Checker *c) {
+	gb_sort_array(c->info.testing_procedures.data, c->info.testing_procedures.count, init_procedures_cmp);
+	remove_neighbouring_duplicate_entires_from_sorted_array(&c->info.testing_procedures);
+
 	if (build_context.test_names.entries.count == 0) {
 		return;
 	}
@@ -5565,9 +5568,6 @@ gb_internal void check_test_procedures(Checker *c) {
 			error(tok, "Unable to find the test '%.*s' in 'package %.*s' ", LIT(name), LIT(pkg->name));
 		}
 	}
-
-	gb_sort_array(c->info.testing_procedures.data, c->info.testing_procedures.count, init_procedures_cmp);
-	remove_neighbouring_duplicate_entires_from_sorted_array(&c->info.testing_procedures);
 
 	for (isize i = 0; i < c->info.testing_procedures.count; /**/) {
 		Entity *e = c->info.testing_procedures[i];
