@@ -589,7 +589,7 @@ assign_at_elem :: proc(array: ^$T/[dynamic]$E, index: int, arg: E, loc := #calle
 
 @builtin
 assign_at_elems :: proc(array: ^$T/[dynamic]$E, index: int, args: ..E, loc := #caller_location) -> (ok: bool, err: Allocator_Error) #no_bounds_check #optional_allocator_error {
-	new_size := index + len(arg)
+	new_size := index + len(args)
 	if len(args) == 0 {
 		ok = true
 	} else if new_size < len(array) {
