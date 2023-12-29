@@ -15,31 +15,31 @@ HIWORD :: #force_inline proc "contextless" (x: DWORD) -> WORD {
 }
 
 LOBYTE :: #force_inline proc "contextless" (w: WORD) -> BYTE {
-    return BYTE(w & 0xff)
+	return BYTE(w & 0xff)
 }
 
 HIBYTE :: #force_inline proc "contextless" (w: WORD) -> BYTE {
-    return BYTE(w >> 8)
+	return BYTE(w >> 8)
 }
 
 MAKEWORD :: #force_inline proc "contextless" (a, b: WORD) -> WORD {
-    return (a & 0xff) | (b << 8)
+	return (a & 0xff) | (b << 8)
 }
 
 MAKELONG :: #force_inline proc "contextless" (a, b: LONG) -> LONG {
-    return (a & 0xffff) | (b << 16)
+	return (a & 0xffff) | (b << 16)
 }
 
 MAKEWPARAM :: #force_inline proc "contextless" (l, h: LONG) -> WPARAM {
-    return WPARAM(MAKELONG(l, h))
+	return WPARAM(MAKELONG(l, h))
 }
 
 MAKELPARAM :: #force_inline proc "contextless" (l, h: LONG) -> LPARAM {
-    return LPARAM(MAKELONG(l, h))
+	return LPARAM(MAKELONG(l, h))
 }
 
 MAKELRESULT :: #force_inline proc "contextless" (l, h: LONG) -> LRESULT {
-    return LRESULT(MAKELONG(l, h))
+	return LRESULT(MAKELONG(l, h))
 }
 
 GET_X_LPARAM :: #force_inline proc "contextless" (lp: LPARAM) -> c_int {
