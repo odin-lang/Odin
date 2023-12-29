@@ -522,26 +522,53 @@ def parse_structs(f):
     data += re.findall(r"typedef (struct|union) Std(\w+?) {(.+?)} \w+?;", src, re.S)
 
     for _type, name, fields in data:
-        fields = re.findall(r"\s+(.+?)\s+([_a-zA-Z0-9[\]]+);", fields)
+        fields = re.findall(r"\s+(.+?)[\s:]+([_a-zA-Z0-9[\]]+);", fields)
         f.write("{} :: struct ".format(name))
         if _type == "union":
             f.write("#raw_union ")
         f.write("{\n")
 
+
         prev_name = ""
         ffields = []
         for type_, fname in fields:
 
-            # If the typename has a colon in it, then it is a C bit field.
-            if ":" in type_:
+            # If the field name only has a number in it, then it is a C bit field.
+            if is_int(fname):
+                comment = None
                 bit_field = type_.split(' ')
                 # Get rid of empty spaces
                 bit_field = list(filter(bool, bit_field))
-                # [type, typename, :] 
-                assert len(bit_field) == 3, "Failed to parse the bit field!"
-                bit_field_type = do_type(bit_field[0], prev_name, fname)
-                f.write("\tbit_field: {},{}\n".format(bit_field_type, comment or ""))
-                break
+                # [type, fieldname]
+                assert len(bit_field) == 2, "Failed to parse the bit field!"
+
+
+                bit_field_type = ""
+                # Right now there are only two ways that C bit fields exist in
+                # the header files.
+
+                # First one uses the 8 MOST significant bits for one field, and
+                # 24 bits for the other field.
+                # In the bindings these two fields are merged into one u32.
+                if int(fname) == 24:
+                    prev_name = bit_field[1]
+                    continue
+
+                elif prev_name:
+                    bit_field_type = do_type("uint32_t")
+                    bit_field_name = prev_name + "And" + bit_field[1].capitalize()
+                    comment = " // Most significant byte is {}".format(bit_field[1])
+                    ffields.append(tuple([bit_field_name, bit_field_type, comment]))
+                    prev_name = ""
+                    continue
+                
+                # The second way has many fields that are each 1 bit
+                elif int(fname) == 1:
+                    bit_field_type = do_type(bit_field[0], prev_name, fname)
+                    ffields.append(tuple(["bit_field", bit_field_type, comment]))
+                    break
+                    
+
 
             if '[' in fname:
                 fname, type_ = parse_array(fname, type_)
