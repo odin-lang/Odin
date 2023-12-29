@@ -104,7 +104,7 @@ when ODIN_ARCH == .amd64 {
 	}
 }
 
-@(private, default_calling_convention="c")
+@(private, default_calling_convention="none")
 foreign _ {
 	// SSE 4.2 string and text comparison ops
 	@(link_name="llvm.x86.sse42.pcmpestrm128")
