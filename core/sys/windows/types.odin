@@ -299,10 +299,10 @@ REASON_CONTEXT :: struct {
 PREASON_CONTEXT :: ^REASON_CONTEXT
 
 BLENDFUNCTION :: struct {
-  BlendOp: BYTE,
-  BlendFlags: BYTE,
-  SourceConstantAlpha: BYTE,
-  AlphaFormat: BYTE,
+	BlendOp: BYTE,
+	BlendFlags: BYTE,
+	SourceConstantAlpha: BYTE,
+	AlphaFormat: BYTE,
 }
 PBLENDFUNCTION :: ^BLENDFUNCTION
 
