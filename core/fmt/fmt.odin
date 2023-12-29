@@ -1232,8 +1232,12 @@ _pad :: proc(fi: ^Info, s: string) {
 //
 // NOTE: Can return "NaN", "+Inf", "-Inf", "+<value>", or "-<value>".
 //
-_fmt_float_as :: proc(fi: ^Info, v: f64, bit_size: int, verb: rune, float_fmt: byte) {
-	prec := fi.prec if fi.prec_set else 3
+_fmt_float_as :: proc(fi: ^Info, v: f64, bit_size: int, verb: rune, float_fmt: byte, prec: int) {
+	prec := prec
+	if fi.prec_set {
+		prec = fi.prec
+	}
+
 	buf: [386]byte
 
 	// Can return "NaN", "+Inf", "-Inf", "+<value>", "-<value>".
@@ -1242,7 +1246,7 @@ _fmt_float_as :: proc(fi: ^Info, v: f64, bit_size: int, verb: rune, float_fmt: b
 	if !fi.plus {
 		// Strip sign from "+<value>" but not "+Inf".
 		if str[0] == '+' && str[1] != 'I' {
-			str = str[1:] 
+			str = str[1:]
 		}
 	}
 
@@ -1258,11 +1262,13 @@ _fmt_float_as :: proc(fi: ^Info, v: f64, bit_size: int, verb: rune, float_fmt: b
 //
 fmt_float :: proc(fi: ^Info, v: f64, bit_size: int, verb: rune) {
 	switch verb {
-	case 'f', 'F', 'g', 'G', 'v':
-		_fmt_float_as(fi, v, bit_size, verb, 'f')
+	case 'g', 'G', 'v':
+		_fmt_float_as(fi, v, bit_size, verb, 'g', -1)
+	case 'f', 'F':
+		_fmt_float_as(fi, v, bit_size, verb, 'f', 3)
 	case 'e', 'E':
 		// BUG(): "%.3e" returns "3.000e+00"
-		_fmt_float_as(fi, v, bit_size, verb, 'e')
+		_fmt_float_as(fi, v, bit_size, verb, 'e', 6)
 
 	case 'h', 'H':
 		prev_fi := fi^

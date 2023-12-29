@@ -4417,8 +4417,10 @@ AabbPositionsKHR :: struct {
 }
 
 AccelerationStructureInstanceKHR :: struct {
-	transform:                      TransformMatrixKHR,
-	accelerationStructureReference: u64,
+	transform:                                      TransformMatrixKHR,
+	instanceCustomIndexAndMask:                     u32, // Most significant byte is mask
+	instanceShaderBindingTableRecordOffsetAndFlags: u32, // Most significant byte is flags
+	accelerationStructureReference:                 u64,
 }
 
 PhysicalDeviceRepresentativeFragmentTestFeaturesNV :: struct {
@@ -5436,9 +5438,11 @@ AccelerationStructureMotionInfoNV :: struct {
 }
 
 AccelerationStructureMatrixMotionInstanceNV :: struct {
-	transformT0:                    TransformMatrixKHR,
-	transformT1:                    TransformMatrixKHR,
-	accelerationStructureReference: u64,
+	transformT0:                                    TransformMatrixKHR,
+	transformT1:                                    TransformMatrixKHR,
+	instanceCustomIndexAndMask:                     u32, // Most significant byte is mask
+	instanceShaderBindingTableRecordOffsetAndFlags: u32, // Most significant byte is flags
+	accelerationStructureReference:                 u64,
 }
 
 SRTDataNV :: struct {
@@ -5461,9 +5465,11 @@ SRTDataNV :: struct {
 }
 
 AccelerationStructureSRTMotionInstanceNV :: struct {
-	transformT0:                    SRTDataNV,
-	transformT1:                    SRTDataNV,
-	accelerationStructureReference: u64,
+	transformT0:                                    SRTDataNV,
+	transformT1:                                    SRTDataNV,
+	instanceCustomIndexAndMask:                     u32, // Most significant byte is mask
+	instanceShaderBindingTableRecordOffsetAndFlags: u32, // Most significant byte is flags
+	accelerationStructureReference:                 u64,
 }
 
 AccelerationStructureMotionInstanceDataNV :: struct #raw_union {

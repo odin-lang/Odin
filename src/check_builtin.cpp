@@ -1083,13 +1083,16 @@ gb_internal bool cache_load_file_directive(CheckerContext *c, Ast *call, String 
 	ast_node(bd, BasicDirective, ce->proc);
 	String builtin_name = bd->name.string;
 
-	String base_dir = dir_from_path(get_file_path_string(call->file_id));
+	String path;
+	if (gb_path_is_absolute((char*)original_string.text)) {
+		path = original_string;
+	} else {
+		String base_dir = dir_from_path(get_file_path_string(call->file_id));
 
-	BlockingMutex *ignore_mutex = nullptr;
-	String path = {};
-	bool ok = determine_path_from_string(ignore_mutex, call, base_dir, original_string, &path);
-	gb_unused(ok);
-
+		BlockingMutex *ignore_mutex = nullptr;
+		bool ok = determine_path_from_string(ignore_mutex, call, base_dir, original_string, &path);
+		gb_unused(ok);
+	}
 
 	MUTEX_GUARD(&c->info->load_file_mutex);
 
