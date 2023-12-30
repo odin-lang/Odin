@@ -22,8 +22,8 @@ when GLFW_SHARED {
 
 @(default_calling_convention="c", link_prefix="glfw")
 foreign glfw {
-    GetWin32Adapter :: proc(monitor: MonitorHandle) -> cstring ---
-    GetWin32Monitor :: proc(monitor: MonitorHandle) -> cstring ---
-    GetWin32Window  :: proc(window: WindowHandle) -> win32.HWND ---
-    GetWGLContext   :: proc(window: WindowHandle) -> rawptr ---
+    GetWin32Adapter :: proc(monitor: ^Monitor) -> cstring ---
+    GetWin32Monitor :: proc(monitor: ^Monitor) -> cstring ---
+    GetWin32Window  :: proc(window: ^Window) -> win32.HWND ---
+    GetWGLContext   :: proc(window: ^Window) -> rawptr ---
 }
