@@ -22,7 +22,10 @@ when ODIN_OS == .Windows {
 		}
 	}
 } else when ODIN_OS == .Linux {
-	foreign import glfw "system:glfw"
+	foreign import glfw {
+		"system:glfw3",
+		"system:X11",
+	}
 } else when ODIN_OS == .Darwin {
 	foreign import glfw { 
 		"../lib/darwin/libglfw3.a",
