@@ -216,7 +216,7 @@ tprintf :: proc(fmt: string, args: ..any) -> string {
 // Returns: A formatted string
 //
 bprint :: proc(buf: []byte, args: ..any, sep := " ") -> string {
-	sb := strings.builder_from_bytes(buf[0:len(buf)])
+	sb := strings.builder_from_bytes(buf)
 	return sbprint(&sb, ..args, sep=sep)
 }
 // Creates a formatted string using a supplied buffer as the backing array, appends newline. Writes into the buffer.
@@ -229,7 +229,7 @@ bprint :: proc(buf: []byte, args: ..any, sep := " ") -> string {
 // Returns: A formatted string with a newline character at the end
 //
 bprintln :: proc(buf: []byte, args: ..any, sep := " ") -> string {
-	sb := strings.builder_from_bytes(buf[0:len(buf)])
+	sb := strings.builder_from_bytes(buf)
 	return sbprintln(&sb, ..args, sep=sep)
 }
 // Creates a formatted string using a supplied buffer as the backing array. Writes into the buffer.
@@ -242,7 +242,7 @@ bprintln :: proc(buf: []byte, args: ..any, sep := " ") -> string {
 // Returns: A formatted string
 //
 bprintf :: proc(buf: []byte, fmt: string, args: ..any) -> string {
-	sb := strings.builder_from_bytes(buf[0:len(buf)])
+	sb := strings.builder_from_bytes(buf)
 	return sbprintf(&sb, fmt, ..args)
 }
 // Runtime assertion with a formatted message
