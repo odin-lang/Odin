@@ -1,8 +1,8 @@
 package xml_example
 
+import path "core:path/slashpath"
 import "core:encoding/xml"
 import "core:os"
-import "core:path"
 import "core:mem"
 import "core:strings"
 import "core:strconv"
@@ -25,13 +25,13 @@ Entity :: struct {
 generate_encoding_entity_table :: proc() {
 	using fmt
 
-	filename := path.join(ODIN_ROOT, "tests", "core", "assets", "XML", "unicode.xml")
+	filename := path.join([]string{ODIN_ROOT, "tests", "core", "assets", "XML", "unicode.xml"})
 	defer delete(filename)
 
-	generated_filename := path.join(ODIN_ROOT, "core", "encoding", "entity", "generated.odin")
+	generated_filename := path.join([]string{ODIN_ROOT, "core", "encoding", "entity", "generated.odin"})
 	defer delete(generated_filename)
 
-	doc, err := xml.parse(filename, OPTIONS, Error_Handler)
+	doc, err := xml.load_from_file(filename, OPTIONS, Error_Handler)
 	defer xml.destroy(doc)
 
 	if err != .None {
@@ -48,13 +48,14 @@ generate_encoding_entity_table :: proc() {
 	defer strings.builder_destroy(&generated_buf)
 	w := strings.to_writer(&generated_buf)
 
-	charlist, charlist_ok := xml.find_child_by_ident(doc.root, "charlist")
+	charlist_id, charlist_ok := xml.find_child_by_ident(doc, 0, "charlist")
 	if !charlist_ok {
 		eprintln("Could not locate top-level `<charlist>` tag.")
 		os.exit(1)
 	}
+	charlist := doc.elements[charlist_id]
 
-	printf("Found `<charlist>` with %v children.\n", len(charlist.children))
+	printf("Found `<charlist>` with %v children.\n", len(charlist.value))
 
 	entity_map: map[string]Entity
 	names: [dynamic]string
@@ -65,20 +66,35 @@ generate_encoding_entity_table :: proc() {
 	longest_name:  string
 
 	count := 0
-	for char in charlist.children {
+	for char_un in charlist.value {
+		char_id := char_un.(xml.Element_ID) or_continue
+		char := doc.elements[char_id]
 		if char.ident != "character" {
 			eprintf("Expected `<character>`, got `<%v>`\n", char.ident)
 			os.exit(1)
 		}
 
-		if codepoint_string, ok := xml.find_attribute_val_by_key(char, "dec"); !ok {
+		if codepoint_string, ok := xml.find_attribute_val_by_key(doc, char_id, "dec"); !ok {
 			eprintln("`<character id=\"...\">` attribute not found.")
 			os.exit(1)
 		} else {
 			codepoint := strconv.atoi(codepoint_string)
 
-			desc, desc_ok := xml.find_child_by_ident(char, "description")
-			description   := desc.value if desc_ok else ""
+			desc_id, desc_ok := xml.find_child_by_ident(doc, char_id, "description")
+			desc := doc.elements[desc_id]
+			description := ""
+			if desc_ok && len(desc.value) > 0 {
+				if len(desc.value) > 1 {
+					eprintln("<description> contains more than one child")
+					os.exit(1)
+				}
+				description_ok: bool
+				description, description_ok = desc.value[0].(string)
+				if len(desc.value) > 1 {
+					eprintln("<description> did not contain a string")
+					os.exit(1)
+				}
+			}
 
 			/*
 				For us to be interested in this codepoint, it has to have at least one entity.
@@ -86,9 +102,9 @@ generate_encoding_entity_table :: proc() {
 
 			nth := 0
 			for {
-				character_entity := xml.find_child_by_ident(char, "entity", nth) or_break
+				character_entity := xml.find_child_by_ident(doc, char_id, "entity", nth) or_break
 				nth += 1
-				name := xml.find_attribute_val_by_key(character_entity, "id") or_continue
+				name := xml.find_attribute_val_by_key(doc, character_entity, "id") or_continue
 				if len(name) == 0 {
 					/*
 						Invalid name. Skip.

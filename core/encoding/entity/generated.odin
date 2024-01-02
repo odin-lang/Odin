@@ -79,12 +79,12 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "Afr": 
 				// MATHEMATICAL FRAKTUR CAPITAL A
 				return rune(0x01d504), true
-			case "Agrave": 
-				// LATIN CAPITAL LETTER A WITH GRAVE
-				return rune(0xc0), true
 			case "Agr": 
 				// GREEK CAPITAL LETTER ALPHA
 				return rune(0x0391), true
+			case "Agrave": 
+				// LATIN CAPITAL LETTER A WITH GRAVE
+				return rune(0xc0), true
 			case "Alpha": 
 				// GREEK CAPITAL LETTER ALPHA
 				return rune(0x0391), true
@@ -134,12 +134,12 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "Barv": 
 				// SHORT DOWN TACK WITH OVERBAR
 				return rune(0x2ae7), true
-			case "Barwedl": 
-				// LOGICAL AND WITH DOUBLE OVERBAR
-				return rune(0x2a5e), true
 			case "Barwed": 
 				// PERSPECTIVE
 				return rune(0x2306), true
+			case "Barwedl": 
+				// LOGICAL AND WITH DOUBLE OVERBAR
+				return rune(0x2a5e), true
 			case "Bcy": 
 				// CYRILLIC CAPITAL LETTER BE
 				return rune(0x0411), true
@@ -186,12 +186,12 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "Cacute": 
 				// LATIN CAPITAL LETTER C WITH ACUTE
 				return rune(0x0106), true
-			case "CapitalDifferentialD": 
-				// DOUBLE-STRUCK ITALIC CAPITAL D
-				return rune(0x2145), true
 			case "Cap": 
 				// DOUBLE INTERSECTION
 				return rune(0x22d2), true
+			case "CapitalDifferentialD": 
+				// DOUBLE-STRUCK ITALIC CAPITAL D
+				return rune(0x2145), true
 			case "Cayleys": 
 				// BLACK-LETTER CAPITAL C
 				return rune(0x212d), true
@@ -273,12 +273,12 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "Cscr": 
 				// MATHEMATICAL SCRIPT CAPITAL C
 				return rune(0x01d49e), true
-			case "CupCap": 
-				// EQUIVALENT TO
-				return rune(0x224d), true
 			case "Cup": 
 				// DOUBLE UNION
 				return rune(0x22d3), true
+			case "CupCap": 
+				// EQUIVALENT TO
+				return rune(0x224d), true
 		}
 
 	case 'D':
@@ -400,15 +400,15 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "DoubleVerticalBar": 
 				// PARALLEL TO
 				return rune(0x2225), true
-			case "DownArrowUpArrow": 
-				// DOWNWARDS ARROW LEFTWARDS OF UPWARDS ARROW
-				return rune(0x21f5), true
 			case "DownArrow": 
 				// DOWNWARDS ARROW
 				return rune(0x2193), true
 			case "DownArrowBar": 
 				// DOWNWARDS ARROW TO BAR
 				return rune(0x2913), true
+			case "DownArrowUpArrow": 
+				// DOWNWARDS ARROW LEFTWARDS OF UPWARDS ARROW
+				return rune(0x21f5), true
 			case "DownBreve": 
 				// COMBINING INVERTED BREVE
 				return rune(0x0311), true
@@ -433,12 +433,12 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "DownRightVectorBar": 
 				// RIGHTWARDS HARPOON WITH BARB DOWN TO BAR
 				return rune(0x2957), true
-			case "DownTeeArrow": 
-				// DOWNWARDS ARROW FROM BAR
-				return rune(0x21a7), true
 			case "DownTee": 
 				// DOWN TACK
 				return rune(0x22a4), true
+			case "DownTeeArrow": 
+				// DOWNWARDS ARROW FROM BAR
+				return rune(0x21a7), true
 			case "Downarrow": 
 				// DOWNWARDS DOUBLE ARROW
 				return rune(0x21d3), true
@@ -485,12 +485,12 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "Efr": 
 				// MATHEMATICAL FRAKTUR CAPITAL E
 				return rune(0x01d508), true
-			case "Egrave": 
-				// LATIN CAPITAL LETTER E WITH GRAVE
-				return rune(0xc8), true
 			case "Egr": 
 				// GREEK CAPITAL LETTER EPSILON
 				return rune(0x0395), true
+			case "Egrave": 
+				// LATIN CAPITAL LETTER E WITH GRAVE
+				return rune(0xc8), true
 			case "Element": 
 				// ELEMENT OF
 				return rune(0x2208), true
@@ -512,12 +512,12 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "Epsilon": 
 				// GREEK CAPITAL LETTER EPSILON
 				return rune(0x0395), true
-			case "EqualTilde": 
-				// MINUS TILDE
-				return rune(0x2242), true
 			case "Equal": 
 				// TWO CONSECUTIVE EQUALS SIGNS
 				return rune(0x2a75), true
+			case "EqualTilde": 
+				// MINUS TILDE
+				return rune(0x2242), true
 			case "Equilibrium": 
 				// RIGHTWARDS HARPOON OVER LEFTWARDS HARPOON
 				return rune(0x21cc), true
@@ -604,12 +604,12 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "Gfr": 
 				// MATHEMATICAL FRAKTUR CAPITAL G
 				return rune(0x01d50a), true
-			case "Ggr": 
-				// GREEK CAPITAL LETTER GAMMA
-				return rune(0x0393), true
 			case "Gg": 
 				// VERY MUCH GREATER-THAN
 				return rune(0x22d9), true
+			case "Ggr": 
+				// GREEK CAPITAL LETTER GAMMA
+				return rune(0x0393), true
 			case "Gopf": 
 				// MATHEMATICAL DOUBLE-STRUCK CAPITAL G
 				return rune(0x01d53e), true
@@ -714,12 +714,15 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "Ifr": 
 				// BLACK-LETTER CAPITAL I
 				return rune(0x2111), true
-			case "Igrave": 
-				// LATIN CAPITAL LETTER I WITH GRAVE
-				return rune(0xcc), true
 			case "Igr": 
 				// GREEK CAPITAL LETTER IOTA
 				return rune(0x0399), true
+			case "Igrave": 
+				// LATIN CAPITAL LETTER I WITH GRAVE
+				return rune(0xcc), true
+			case "Im": 
+				// BLACK-LETTER CAPITAL I
+				return rune(0x2111), true
 			case "Imacr": 
 				// LATIN CAPITAL LETTER I WITH MACRON
 				return rune(0x012a), true
@@ -729,15 +732,12 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "Implies": 
 				// RIGHTWARDS DOUBLE ARROW
 				return rune(0x21d2), true
-			case "Im": 
-				// BLACK-LETTER CAPITAL I
-				return rune(0x2111), true
-			case "Integral": 
-				// INTEGRAL
-				return rune(0x222b), true
 			case "Int": 
 				// DOUBLE INTEGRAL
 				return rune(0x222c), true
+			case "Integral": 
+				// INTEGRAL
+				return rune(0x222b), true
 			case "Intersection": 
 				// N-ARY INTERSECTION
 				return rune(0x22c2), true
@@ -864,15 +864,15 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "LeftAngleBracket": 
 				// MATHEMATICAL LEFT ANGLE BRACKET
 				return rune(0x27e8), true
+			case "LeftArrow": 
+				// LEFTWARDS ARROW
+				return rune(0x2190), true
 			case "LeftArrowBar": 
 				// LEFTWARDS ARROW TO BAR
 				return rune(0x21e4), true
 			case "LeftArrowRightArrow": 
 				// LEFTWARDS ARROW OVER RIGHTWARDS ARROW
 				return rune(0x21c6), true
-			case "LeftArrow": 
-				// LEFTWARDS ARROW
-				return rune(0x2190), true
 			case "LeftCeiling": 
 				// LEFT CEILING
 				return rune(0x2308), true
@@ -897,21 +897,21 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "LeftRightVector": 
 				// LEFT BARB UP RIGHT BARB UP HARPOON
 				return rune(0x294e), true
+			case "LeftTee": 
+				// LEFT TACK
+				return rune(0x22a3), true
 			case "LeftTeeArrow": 
 				// LEFTWARDS ARROW FROM BAR
 				return rune(0x21a4), true
 			case "LeftTeeVector": 
 				// LEFTWARDS HARPOON WITH BARB UP FROM BAR
 				return rune(0x295a), true
-			case "LeftTee": 
-				// LEFT TACK
-				return rune(0x22a3), true
-			case "LeftTriangleBar": 
-				// LEFT TRIANGLE BESIDE VERTICAL BAR
-				return rune(0x29cf), true
 			case "LeftTriangle": 
 				// NORMAL SUBGROUP OF
 				return rune(0x22b2), true
+			case "LeftTriangleBar": 
+				// LEFT TRIANGLE BESIDE VERTICAL BAR
+				return rune(0x29cf), true
 			case "LeftTriangleEqual": 
 				// NORMAL SUBGROUP OF OR EQUAL TO
 				return rune(0x22b4), true
@@ -963,12 +963,12 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "Lgr": 
 				// GREEK CAPITAL LETTER LAMDA
 				return rune(0x039b), true
-			case "Lleftarrow": 
-				// LEFTWARDS TRIPLE ARROW
-				return rune(0x21da), true
 			case "Ll": 
 				// VERY MUCH LESS-THAN
 				return rune(0x22d8), true
+			case "Lleftarrow": 
+				// LEFTWARDS TRIPLE ARROW
+				return rune(0x21da), true
 			case "Lmidot": 
 				// LATIN CAPITAL LETTER L WITH MIDDLE DOT
 				return rune(0x013f), true
@@ -1008,25 +1008,25 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "Lstrok": 
 				// LATIN CAPITAL LETTER L WITH STROKE
 				return rune(0x0141), true
-			case "Ltbar": 
-				// DOUBLE NESTED LESS-THAN WITH UNDERBAR
-				return rune(0x2aa3), true
 			case "Lt": 
 				// MUCH LESS-THAN
 				return rune(0x226a), true
+			case "Ltbar": 
+				// DOUBLE NESTED LESS-THAN WITH UNDERBAR
+				return rune(0x2aa3), true
 		}
 
 	case 'M':
 		switch name {
+			case "Map": 
+				// RIGHTWARDS TWO-HEADED ARROW FROM BAR
+				return rune(0x2905), true
 			case "Mapfrom": 
 				// LEFTWARDS DOUBLE ARROW FROM BAR
 				return rune(0x2906), true
 			case "Mapto": 
 				// RIGHTWARDS DOUBLE ARROW FROM BAR
 				return rune(0x2907), true
-			case "Map": 
-				// RIGHTWARDS TWO-HEADED ARROW FROM BAR
-				return rune(0x2905), true
 			case "Mcy": 
 				// CYRILLIC CAPITAL LETTER EM
 				return rune(0x041c), true
@@ -1109,48 +1109,6 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "Nopf": 
 				// DOUBLE-STRUCK CAPITAL N
 				return rune(0x2115), true
-			case "NotDoubleVerticalBar": 
-				// NOT PARALLEL TO
-				return rune(0x2226), true
-			case "NotElement": 
-				// NOT AN ELEMENT OF
-				return rune(0x2209), true
-			case "NotEqualTilde": 
-				// MINUS TILDE with slash
-				return rune(0x2242), true
-			case "NotEqual": 
-				// NOT EQUAL TO
-				return rune(0x2260), true
-			case "NotExists": 
-				// THERE DOES NOT EXIST
-				return rune(0x2204), true
-			case "NotHumpDownHump": 
-				// GEOMETRICALLY EQUIVALENT TO with slash
-				return rune(0x224e), true
-			case "NotHumpEqual": 
-				// DIFFERENCE BETWEEN with slash
-				return rune(0x224f), true
-			case "NotLessGreater": 
-				// NEITHER LESS-THAN NOR GREATER-THAN
-				return rune(0x2278), true
-			case "NotReverseElement": 
-				// DOES NOT CONTAIN AS MEMBER
-				return rune(0x220c), true
-			case "NotTilde": 
-				// NOT TILDE
-				return rune(0x2241), true
-			case "NotTildeEqual": 
-				// NOT ASYMPTOTICALLY EQUAL TO
-				return rune(0x2244), true
-			case "NotTildeFullEqual": 
-				// NEITHER APPROXIMATELY NOR ACTUALLY EQUAL TO
-				return rune(0x2247), true
-			case "NotTildeTilde": 
-				// NOT ALMOST EQUAL TO
-				return rune(0x2249), true
-			case "NotVerticalBar": 
-				// DOES NOT DIVIDE
-				return rune(0x2224), true
 			case "Not": 
 				// DOUBLE STROKE NOT SIGN
 				return rune(0x2aec), true
@@ -1160,48 +1118,72 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "NotCupCap": 
 				// NOT EQUIVALENT TO
 				return rune(0x226d), true
-			case "NotGreaterFullEqual": 
-				// GREATER-THAN OVER EQUAL TO with slash
-				return rune(0x2267), true
-			case "NotGreaterGreater": 
-				// MUCH GREATER THAN with slash
-				return rune(0x226b), true
-			case "NotGreaterSlantEqual": 
-				// GREATER-THAN OR SLANTED EQUAL TO with slash
-				return rune(0x2a7e), true
+			case "NotDoubleVerticalBar": 
+				// NOT PARALLEL TO
+				return rune(0x2226), true
+			case "NotElement": 
+				// NOT AN ELEMENT OF
+				return rune(0x2209), true
+			case "NotEqual": 
+				// NOT EQUAL TO
+				return rune(0x2260), true
+			case "NotEqualTilde": 
+				// MINUS TILDE with slash
+				return rune(0x2242), true
+			case "NotExists": 
+				// THERE DOES NOT EXIST
+				return rune(0x2204), true
 			case "NotGreater": 
 				// NOT GREATER-THAN
 				return rune(0x226f), true
 			case "NotGreaterEqual": 
 				// NEITHER GREATER-THAN NOR EQUAL TO
 				return rune(0x2271), true
+			case "NotGreaterFullEqual": 
+				// GREATER-THAN OVER EQUAL TO with slash
+				return rune(0x2267), true
+			case "NotGreaterGreater": 
+				// MUCH GREATER THAN with slash
+				return rune(0x226b), true
 			case "NotGreaterLess": 
 				// NEITHER GREATER-THAN NOR LESS-THAN
 				return rune(0x2279), true
+			case "NotGreaterSlantEqual": 
+				// GREATER-THAN OR SLANTED EQUAL TO with slash
+				return rune(0x2a7e), true
 			case "NotGreaterTilde": 
 				// NEITHER GREATER-THAN NOR EQUIVALENT TO
 				return rune(0x2275), true
-			case "NotLeftTriangleBar": 
-				// LEFT TRIANGLE BESIDE VERTICAL BAR with slash
-				return rune(0x29cf), true
+			case "NotHumpDownHump": 
+				// GEOMETRICALLY EQUIVALENT TO with slash
+				return rune(0x224e), true
+			case "NotHumpEqual": 
+				// DIFFERENCE BETWEEN with slash
+				return rune(0x224f), true
 			case "NotLeftTriangle": 
 				// NOT NORMAL SUBGROUP OF
 				return rune(0x22ea), true
+			case "NotLeftTriangleBar": 
+				// LEFT TRIANGLE BESIDE VERTICAL BAR with slash
+				return rune(0x29cf), true
 			case "NotLeftTriangleEqual": 
 				// NOT NORMAL SUBGROUP OF OR EQUAL TO
 				return rune(0x22ec), true
-			case "NotLessLess": 
-				// MUCH LESS THAN with slash
-				return rune(0x226a), true
-			case "NotLessSlantEqual": 
-				// LESS-THAN OR SLANTED EQUAL TO with slash
-				return rune(0x2a7d), true
 			case "NotLess": 
 				// NOT LESS-THAN
 				return rune(0x226e), true
 			case "NotLessEqual": 
 				// NEITHER LESS-THAN NOR EQUAL TO
 				return rune(0x2270), true
+			case "NotLessGreater": 
+				// NEITHER LESS-THAN NOR GREATER-THAN
+				return rune(0x2278), true
+			case "NotLessLess": 
+				// MUCH LESS THAN with slash
+				return rune(0x226a), true
+			case "NotLessSlantEqual": 
+				// LESS-THAN OR SLANTED EQUAL TO with slash
+				return rune(0x2a7d), true
 			case "NotLessTilde": 
 				// NEITHER LESS-THAN NOR EQUIVALENT TO
 				return rune(0x2274), true
@@ -1211,21 +1193,24 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "NotNestedLessLess": 
 				// DOUBLE NESTED LESS-THAN with slash
 				return rune(0x2aa1), true
-			case "NotPrecedesEqual": 
-				// PRECEDES ABOVE SINGLE-LINE EQUALS SIGN with slash
-				return rune(0x2aaf), true
 			case "NotPrecedes": 
 				// DOES NOT PRECEDE
 				return rune(0x2280), true
+			case "NotPrecedesEqual": 
+				// PRECEDES ABOVE SINGLE-LINE EQUALS SIGN with slash
+				return rune(0x2aaf), true
 			case "NotPrecedesSlantEqual": 
 				// DOES NOT PRECEDE OR EQUAL
 				return rune(0x22e0), true
-			case "NotRightTriangleBar": 
-				// VERTICAL BAR BESIDE RIGHT TRIANGLE with slash
-				return rune(0x29d0), true
+			case "NotReverseElement": 
+				// DOES NOT CONTAIN AS MEMBER
+				return rune(0x220c), true
 			case "NotRightTriangle": 
 				// DOES NOT CONTAIN AS NORMAL SUBGROUP
 				return rune(0x22eb), true
+			case "NotRightTriangleBar": 
+				// VERTICAL BAR BESIDE RIGHT TRIANGLE with slash
+				return rune(0x29d0), true
 			case "NotRightTriangleEqual": 
 				// DOES NOT CONTAIN AS NORMAL SUBGROUP OR EQUAL
 				return rune(0x22ed), true
@@ -1247,24 +1232,39 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "NotSubsetEqual": 
 				// NEITHER A SUBSET OF NOR EQUAL TO
 				return rune(0x2288), true
-			case "NotSucceedsEqual": 
-				// SUCCEEDS ABOVE SINGLE-LINE EQUALS SIGN with slash
-				return rune(0x2ab0), true
-			case "NotSucceedsTilde": 
-				// SUCCEEDS OR EQUIVALENT TO with slash
-				return rune(0x227f), true
 			case "NotSucceeds": 
 				// DOES NOT SUCCEED
 				return rune(0x2281), true
+			case "NotSucceedsEqual": 
+				// SUCCEEDS ABOVE SINGLE-LINE EQUALS SIGN with slash
+				return rune(0x2ab0), true
 			case "NotSucceedsSlantEqual": 
 				// DOES NOT SUCCEED OR EQUAL
 				return rune(0x22e1), true
+			case "NotSucceedsTilde": 
+				// SUCCEEDS OR EQUIVALENT TO with slash
+				return rune(0x227f), true
 			case "NotSuperset": 
 				// SUPERSET OF with vertical line
 				return rune(0x2283), true
 			case "NotSupersetEqual": 
 				// NEITHER A SUPERSET OF NOR EQUAL TO
 				return rune(0x2289), true
+			case "NotTilde": 
+				// NOT TILDE
+				return rune(0x2241), true
+			case "NotTildeEqual": 
+				// NOT ASYMPTOTICALLY EQUAL TO
+				return rune(0x2244), true
+			case "NotTildeFullEqual": 
+				// NEITHER APPROXIMATELY NOR ACTUALLY EQUAL TO
+				return rune(0x2247), true
+			case "NotTildeTilde": 
+				// NOT ALMOST EQUAL TO
+				return rune(0x2249), true
+			case "NotVerticalBar": 
+				// DOES NOT DIVIDE
+				return rune(0x2224), true
 			case "Nscr": 
 				// MATHEMATICAL SCRIPT CAPITAL N
 				return rune(0x01d4a9), true
@@ -1305,12 +1305,12 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "Ofr": 
 				// MATHEMATICAL FRAKTUR CAPITAL O
 				return rune(0x01d512), true
-			case "Ograve": 
-				// LATIN CAPITAL LETTER O WITH GRAVE
-				return rune(0xd2), true
 			case "Ogr": 
 				// GREEK CAPITAL LETTER OMICRON
 				return rune(0x039f), true
+			case "Ograve": 
+				// LATIN CAPITAL LETTER O WITH GRAVE
+				return rune(0xd2), true
 			case "Omacr": 
 				// LATIN CAPITAL LETTER O WITH MACRON
 				return rune(0x014c), true
@@ -1396,24 +1396,15 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "Popf": 
 				// DOUBLE-STRUCK CAPITAL P
 				return rune(0x2119), true
-			case "Product": 
-				// N-ARY PRODUCT
-				return rune(0x220f), true
-			case "Proportional": 
-				// PROPORTIONAL TO
-				return rune(0x221d), true
-			case "Proportion": 
-				// PROPORTION
-				return rune(0x2237), true
 			case "Pr": 
 				// DOUBLE PRECEDES
 				return rune(0x2abb), true
-			case "PrecedesEqual": 
-				// PRECEDES ABOVE SINGLE-LINE EQUALS SIGN
-				return rune(0x2aaf), true
 			case "Precedes": 
 				// PRECEDES
 				return rune(0x227a), true
+			case "PrecedesEqual": 
+				// PRECEDES ABOVE SINGLE-LINE EQUALS SIGN
+				return rune(0x2aaf), true
 			case "PrecedesSlantEqual": 
 				// PRECEDES OR EQUAL TO
 				return rune(0x227c), true
@@ -1423,6 +1414,15 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "Prime": 
 				// DOUBLE PRIME
 				return rune(0x2033), true
+			case "Product": 
+				// N-ARY PRODUCT
+				return rune(0x220f), true
+			case "Proportion": 
+				// PROPORTION
+				return rune(0x2237), true
+			case "Proportional": 
+				// PROPORTIONAL TO
+				return rune(0x221d), true
 			case "Pscr": 
 				// MATHEMATICAL SCRIPT CAPITAL P
 				return rune(0x01d4ab), true
@@ -1476,15 +1476,15 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "Rcy": 
 				// CYRILLIC CAPITAL LETTER ER
 				return rune(0x0420), true
+			case "Re": 
+				// BLACK-LETTER CAPITAL R
+				return rune(0x211c), true
 			case "ReverseElement": 
 				// CONTAINS AS MEMBER
 				return rune(0x220b), true
 			case "ReverseEquilibrium": 
 				// LEFTWARDS HARPOON OVER RIGHTWARDS HARPOON
 				return rune(0x21cb), true
-			case "Re": 
-				// BLACK-LETTER CAPITAL R
-				return rune(0x211c), true
 			case "ReverseUpEquilibrium": 
 				// DOWNWARDS HARPOON WITH BARB LEFT BESIDE UPWARDS HARPOON WITH BARB RIGHT
 				return rune(0x296f), true
@@ -1500,12 +1500,12 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "RightAngleBracket": 
 				// MATHEMATICAL RIGHT ANGLE BRACKET
 				return rune(0x27e9), true
-			case "RightArrowBar": 
-				// RIGHTWARDS ARROW TO BAR
-				return rune(0x21e5), true
 			case "RightArrow": 
 				// RIGHTWARDS ARROW
 				return rune(0x2192), true
+			case "RightArrowBar": 
+				// RIGHTWARDS ARROW TO BAR
+				return rune(0x21e5), true
 			case "RightArrowLeftArrow": 
 				// RIGHTWARDS ARROW OVER LEFTWARDS ARROW
 				return rune(0x21c4), true
@@ -1527,21 +1527,21 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "RightFloor": 
 				// RIGHT FLOOR
 				return rune(0x230b), true
+			case "RightTee": 
+				// RIGHT TACK
+				return rune(0x22a2), true
 			case "RightTeeArrow": 
 				// RIGHTWARDS ARROW FROM BAR
 				return rune(0x21a6), true
 			case "RightTeeVector": 
 				// RIGHTWARDS HARPOON WITH BARB UP FROM BAR
 				return rune(0x295b), true
-			case "RightTee": 
-				// RIGHT TACK
-				return rune(0x22a2), true
-			case "RightTriangleBar": 
-				// VERTICAL BAR BESIDE RIGHT TRIANGLE
-				return rune(0x29d0), true
 			case "RightTriangle": 
 				// CONTAINS AS NORMAL SUBGROUP
 				return rune(0x22b3), true
+			case "RightTriangleBar": 
+				// VERTICAL BAR BESIDE RIGHT TRIANGLE
+				return rune(0x29d0), true
 			case "RightTriangleEqual": 
 				// CONTAINS AS NORMAL SUBGROUP OR EQUAL TO
 				return rune(0x22b5), true
@@ -1645,6 +1645,9 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "Sqrt": 
 				// SQUARE ROOT
 				return rune(0x221a), true
+			case "Square": 
+				// WHITE SQUARE
+				return rune(0x25a1), true
 			case "SquareIntersection": 
 				// SQUARE CAP
 				return rune(0x2293), true
@@ -1654,9 +1657,6 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "SquareSubsetEqual": 
 				// SQUARE IMAGE OF OR EQUAL TO
 				return rune(0x2291), true
-			case "Square": 
-				// WHITE SQUARE
-				return rune(0x25a1), true
 			case "SquareSuperset": 
 				// SQUARE ORIGINAL OF
 				return rune(0x2290), true
@@ -1699,15 +1699,15 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "Sum": 
 				// N-ARY SUMMATION
 				return rune(0x2211), true
-			case "SupersetEqual": 
-				// SUPERSET OF OR EQUAL TO
-				return rune(0x2287), true
 			case "Sup": 
 				// DOUBLE SUPERSET
 				return rune(0x22d1), true
 			case "Superset": 
 				// SUPERSET OF
 				return rune(0x2283), true
+			case "SupersetEqual": 
+				// SUPERSET OF OR EQUAL TO
+				return rune(0x2287), true
 			case "Supset": 
 				// DOUBLE SUPERSET
 				return rune(0x22d1), true
@@ -1800,12 +1800,12 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "Uacute": 
 				// LATIN CAPITAL LETTER U WITH ACUTE
 				return rune(0xda), true
-			case "Uarrocir": 
-				// UPWARDS TWO-HEADED ARROW FROM SMALL CIRCLE
-				return rune(0x2949), true
 			case "Uarr": 
 				// UPWARDS TWO HEADED ARROW
 				return rune(0x219f), true
+			case "Uarrocir": 
+				// UPWARDS TWO-HEADED ARROW FROM SMALL CIRCLE
+				return rune(0x2949), true
 			case "Ubrcy": 
 				// CYRILLIC CAPITAL LETTER SHORT U
 				return rune(0x040e), true
@@ -1827,12 +1827,12 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "Ufr": 
 				// MATHEMATICAL FRAKTUR CAPITAL U
 				return rune(0x01d518), true
-			case "Ugrave": 
-				// LATIN CAPITAL LETTER U WITH GRAVE
-				return rune(0xd9), true
 			case "Ugr": 
 				// GREEK CAPITAL LETTER UPSILON
 				return rune(0x03a5), true
+			case "Ugrave": 
+				// LATIN CAPITAL LETTER U WITH GRAVE
+				return rune(0xd9), true
 			case "Umacr": 
 				// LATIN CAPITAL LETTER U WITH MACRON
 				return rune(0x016a), true
@@ -1893,12 +1893,12 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "UpperRightArrow": 
 				// NORTH EAST ARROW
 				return rune(0x2197), true
-			case "Upsilon": 
-				// GREEK CAPITAL LETTER UPSILON
-				return rune(0x03a5), true
 			case "Upsi": 
 				// GREEK UPSILON WITH HOOK SYMBOL
 				return rune(0x03d2), true
+			case "Upsilon": 
+				// GREEK CAPITAL LETTER UPSILON
+				return rune(0x03a5), true
 			case "Uring": 
 				// LATIN CAPITAL LETTER U WITH RING ABOVE
 				return rune(0x016e), true
@@ -1924,12 +1924,12 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "Vcy": 
 				// CYRILLIC CAPITAL LETTER VE
 				return rune(0x0412), true
-			case "Vdashl": 
-				// LONG DASH FROM LEFT MEMBER OF DOUBLE VERTICAL
-				return rune(0x2ae6), true
 			case "Vdash": 
 				// FORCES
 				return rune(0x22a9), true
+			case "Vdashl": 
+				// LONG DASH FROM LEFT MEMBER OF DOUBLE VERTICAL
+				return rune(0x2ae6), true
 			case "Vee": 
 				// N-ARY LOGICAL OR
 				return rune(0x22c1), true
@@ -2088,24 +2088,24 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "abreve": 
 				// LATIN SMALL LETTER A WITH BREVE
 				return rune(0x0103), true
+			case "ac": 
+				// INVERTED LAZY S
+				return rune(0x223e), true
 			case "acE": 
 				// INVERTED LAZY S with double underline
 				return rune(0x223e), true
 			case "acd": 
 				// SINE WAVE
 				return rune(0x223f), true
-			case "acute": 
-				// ACUTE ACCENT
-				return rune(0xb4), true
-			case "ac": 
-				// INVERTED LAZY S
-				return rune(0x223e), true
 			case "acirc": 
 				// LATIN SMALL LETTER A WITH CIRCUMFLEX
 				return rune(0xe2), true
 			case "actuary": 
 				// COMBINING ANNUITY SYMBOL
 				return rune(0x20e7), true
+			case "acute": 
+				// ACUTE ACCENT
+				return rune(0xb4), true
 			case "acy": 
 				// CYRILLIC SMALL LETTER A
 				return rune(0x0430), true
@@ -2142,6 +2142,9 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "amp": 
 				// AMPERSAND
 				return rune(0x26), true
+			case "and": 
+				// LOGICAL AND
+				return rune(0x2227), true
 			case "andand": 
 				// TWO INTERSECTING LOGICAL AND
 				return rune(0x2a55), true
@@ -2154,9 +2157,12 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "andv": 
 				// LOGICAL AND WITH MIDDLE STEM
 				return rune(0x2a5a), true
-			case "and": 
-				// LOGICAL AND
-				return rune(0x2227), true
+			case "ang": 
+				// ANGLE
+				return rune(0x2220), true
+			case "ang90": 
+				// RIGHT ANGLE
+				return rune(0x221f), true
 			case "angdnl": 
 				// TURNED ANGLE
 				return rune(0x29a2), true
@@ -2166,12 +2172,15 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "ange": 
 				// ANGLE WITH UNDERBAR
 				return rune(0x29a4), true
-			case "angles": 
-				// ANGLE WITH S INSIDE
-				return rune(0x299e), true
 			case "angle": 
 				// ANGLE
 				return rune(0x2220), true
+			case "angles": 
+				// ANGLE WITH S INSIDE
+				return rune(0x299e), true
+			case "angmsd": 
+				// MEASURED ANGLE
+				return rune(0x2221), true
 			case "angmsdaa": 
 				// MEASURED ANGLE WITH OPEN ARM ENDING IN ARROW POINTING UP AND RIGHT
 				return rune(0x29a8), true
@@ -2196,15 +2205,15 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "angmsdah": 
 				// MEASURED ANGLE WITH OPEN ARM ENDING IN ARROW POINTING LEFT AND DOWN
 				return rune(0x29af), true
-			case "angmsd": 
-				// MEASURED ANGLE
-				return rune(0x2221), true
-			case "angrtvbd": 
-				// MEASURED RIGHT ANGLE WITH DOT
-				return rune(0x299d), true
+			case "angrt": 
+				// RIGHT ANGLE
+				return rune(0x221f), true
 			case "angrtvb": 
 				// RIGHT ANGLE WITH ARC
 				return rune(0x22be), true
+			case "angrtvbd": 
+				// MEASURED RIGHT ANGLE WITH DOT
+				return rune(0x299d), true
 			case "angsph": 
 				// SPHERICAL ANGLE
 				return rune(0x2222), true
@@ -2217,21 +2226,15 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "angzarr": 
 				// RIGHT ANGLE WITH DOWNWARDS ZIGZAG ARROW
 				return rune(0x237c), true
-			case "ang": 
-				// ANGLE
-				return rune(0x2220), true
-			case "ang90": 
-				// RIGHT ANGLE
-				return rune(0x221f), true
-			case "angrt": 
-				// RIGHT ANGLE
-				return rune(0x221f), true
 			case "aogon": 
 				// LATIN SMALL LETTER A WITH OGONEK
 				return rune(0x0105), true
 			case "aopf": 
 				// MATHEMATICAL DOUBLE-STRUCK SMALL A
 				return rune(0x01d552), true
+			case "ap": 
+				// ALMOST EQUAL TO
+				return rune(0x2248), true
 			case "apE": 
 				// APPROXIMATELY EQUAL OR EQUAL TO
 				return rune(0x2a70), true
@@ -2244,18 +2247,15 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "apid": 
 				// TRIPLE TILDE
 				return rune(0x224b), true
-			case "approxeq": 
-				// ALMOST EQUAL OR EQUAL TO
-				return rune(0x224a), true
-			case "approx": 
-				// ALMOST EQUAL TO
-				return rune(0x2248), true
-			case "ap": 
-				// ALMOST EQUAL TO
-				return rune(0x2248), true
 			case "apos": 
 				// APOSTROPHE
 				return rune(0x27), true
+			case "approx": 
+				// ALMOST EQUAL TO
+				return rune(0x2248), true
+			case "approxeq": 
+				// ALMOST EQUAL OR EQUAL TO
+				return rune(0x224a), true
 			case "aring": 
 				// LATIN SMALL LETTER A WITH RING ABOVE
 				return rune(0xe5), true
@@ -2271,18 +2271,18 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "ascr": 
 				// MATHEMATICAL SCRIPT SMALL A
 				return rune(0x01d4b6), true
-			case "astb": 
-				// SQUARED ASTERISK
-				return rune(0x29c6), true
 			case "ast": 
 				// ASTERISK
 				return rune(0x2a), true
-			case "asympeq": 
-				// EQUIVALENT TO
-				return rune(0x224d), true
+			case "astb": 
+				// SQUARED ASTERISK
+				return rune(0x29c6), true
 			case "asymp": 
 				// ALMOST EQUAL TO
 				return rune(0x2248), true
+			case "asympeq": 
+				// EQUIVALENT TO
+				return rune(0x224d), true
 			case "atilde": 
 				// LATIN SMALL LETTER A WITH TILDE
 				return rune(0xe3), true
@@ -2356,12 +2356,12 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "b.eta": 
 				// MATHEMATICAL BOLD SMALL ETA
 				return rune(0x01d6c8), true
-			case "b.gammad": 
-				// MATHEMATICAL BOLD SMALL DIGAMMA
-				return rune(0x01d7cb), true
 			case "b.gamma": 
 				// MATHEMATICAL BOLD SMALL GAMMA
 				return rune(0x01d6c4), true
+			case "b.gammad": 
+				// MATHEMATICAL BOLD SMALL DIGAMMA
+				return rune(0x01d7cb), true
 			case "b.iota": 
 				// MATHEMATICAL BOLD SMALL IOTA
 				return rune(0x01d6ca), true
@@ -2404,12 +2404,12 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "b.rhov": 
 				// MATHEMATICAL BOLD RHO SYMBOL
 				return rune(0x01d6e0), true
-			case "b.sigmav": 
-				// MATHEMATICAL BOLD SMALL FINAL SIGMA
-				return rune(0x01d6d3), true
 			case "b.sigma": 
 				// MATHEMATICAL BOLD SMALL SIGMA
 				return rune(0x01d6d4), true
+			case "b.sigmav": 
+				// MATHEMATICAL BOLD SMALL FINAL SIGMA
+				return rune(0x01d6d3), true
 			case "b.tau": 
 				// MATHEMATICAL BOLD SMALL TAU
 				return rune(0x01d6d5), true
@@ -2440,12 +2440,12 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "backprime": 
 				// REVERSED PRIME
 				return rune(0x2035), true
-			case "backsimeq": 
-				// REVERSED TILDE EQUALS
-				return rune(0x22cd), true
 			case "backsim": 
 				// REVERSED TILDE
 				return rune(0x223d), true
+			case "backsimeq": 
+				// REVERSED TILDE EQUALS
+				return rune(0x22cd), true
 			case "barV": 
 				// DOUBLE DOWN TACK
 				return rune(0x2aea), true
@@ -2479,10 +2479,10 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "bdrhar": 
 				// DOWNWARDS HARPOON WITH BARB RIGHT FROM BAR
 				return rune(0x295d), true
-			case "because": 
+			case "becaus": 
 				// BECAUSE
 				return rune(0x2235), true
-			case "becaus": 
+			case "because": 
 				// BECAUSE
 				return rune(0x2235), true
 			case "bemptyv": 
@@ -2557,6 +2557,9 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "blacksquare": 
 				// BLACK SMALL SQUARE
 				return rune(0x25aa), true
+			case "blacktriangle": 
+				// BLACK UP-POINTING SMALL TRIANGLE
+				return rune(0x25b4), true
 			case "blacktriangledown": 
 				// BLACK DOWN-POINTING SMALL TRIANGLE
 				return rune(0x25be), true
@@ -2566,9 +2569,6 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "blacktriangleright": 
 				// BLACK RIGHT-POINTING SMALL TRIANGLE
 				return rune(0x25b8), true
-			case "blacktriangle": 
-				// BLACK UP-POINTING SMALL TRIANGLE
-				return rune(0x25b4), true
 			case "blank": 
 				// BLANK SYMBOL
 				return rune(0x2422), true
@@ -2590,12 +2590,12 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "bluhar": 
 				// LEFTWARDS HARPOON WITH BARB UP FROM BAR
 				return rune(0x295a), true
-			case "bnequiv": 
-				// IDENTICAL TO with reverse slash
-				return rune(0x2261), true
 			case "bne": 
 				// EQUALS SIGN with reverse slash
 				return rune(0x3d), true
+			case "bnequiv": 
+				// IDENTICAL TO with reverse slash
+				return rune(0x2261), true
 			case "bnot": 
 				// REVERSED NOT SIGN
 				return rune(0x2310), true
@@ -2623,6 +2623,9 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "boxDr": 
 				// BOX DRAWINGS DOWN DOUBLE AND RIGHT SINGLE
 				return rune(0x2553), true
+			case "boxH": 
+				// BOX DRAWINGS DOUBLE HORIZONTAL
+				return rune(0x2550), true
 			case "boxHD": 
 				// BOX DRAWINGS DOUBLE DOWN AND HORIZONTAL
 				return rune(0x2566), true
@@ -2635,9 +2638,6 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "boxHu": 
 				// BOX DRAWINGS UP SINGLE AND HORIZONTAL DOUBLE
 				return rune(0x2567), true
-			case "boxH": 
-				// BOX DRAWINGS DOUBLE HORIZONTAL
-				return rune(0x2550), true
 			case "boxUL": 
 				// BOX DRAWINGS DOUBLE UP AND LEFT
 				return rune(0x255d), true
@@ -2650,6 +2650,9 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "boxUr": 
 				// BOX DRAWINGS UP DOUBLE AND RIGHT SINGLE
 				return rune(0x2559), true
+			case "boxV": 
+				// BOX DRAWINGS DOUBLE VERTICAL
+				return rune(0x2551), true
 			case "boxVH": 
 				// BOX DRAWINGS DOUBLE VERTICAL AND HORIZONTAL
 				return rune(0x256c), true
@@ -2668,9 +2671,6 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "boxVr": 
 				// BOX DRAWINGS VERTICAL DOUBLE AND RIGHT SINGLE
 				return rune(0x255f), true
-			case "boxV": 
-				// BOX DRAWINGS DOUBLE VERTICAL
-				return rune(0x2551), true
 			case "boxbox": 
 				// TWO JOINED SQUARES
 				return rune(0x29c9), true
@@ -2686,15 +2686,15 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "boxdr": 
 				// BOX DRAWINGS LIGHT DOWN AND RIGHT
 				return rune(0x250c), true
-			case "boxhU": 
-				// BOX DRAWINGS UP DOUBLE AND HORIZONTAL SINGLE
-				return rune(0x2568), true
 			case "boxh": 
 				// BOX DRAWINGS LIGHT HORIZONTAL
 				return rune(0x2500), true
 			case "boxhD": 
 				// BOX DRAWINGS DOWN DOUBLE AND HORIZONTAL SINGLE
 				return rune(0x2565), true
+			case "boxhU": 
+				// BOX DRAWINGS UP DOUBLE AND HORIZONTAL SINGLE
+				return rune(0x2568), true
 			case "boxhd": 
 				// BOX DRAWINGS LIGHT DOWN AND HORIZONTAL
 				return rune(0x252c), true
@@ -2722,27 +2722,27 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "boxur": 
 				// BOX DRAWINGS LIGHT UP AND RIGHT
 				return rune(0x2514), true
-			case "boxvL": 
-				// BOX DRAWINGS VERTICAL SINGLE AND LEFT DOUBLE
-				return rune(0x2561), true
-			case "boxvR": 
-				// BOX DRAWINGS VERTICAL SINGLE AND RIGHT DOUBLE
-				return rune(0x255e), true
-			case "boxvl": 
-				// BOX DRAWINGS LIGHT VERTICAL AND LEFT
-				return rune(0x2524), true
-			case "boxvr": 
-				// BOX DRAWINGS LIGHT VERTICAL AND RIGHT
-				return rune(0x251c), true
 			case "boxv": 
 				// BOX DRAWINGS LIGHT VERTICAL
 				return rune(0x2502), true
 			case "boxvH": 
 				// BOX DRAWINGS VERTICAL SINGLE AND HORIZONTAL DOUBLE
 				return rune(0x256a), true
+			case "boxvL": 
+				// BOX DRAWINGS VERTICAL SINGLE AND LEFT DOUBLE
+				return rune(0x2561), true
+			case "boxvR": 
+				// BOX DRAWINGS VERTICAL SINGLE AND RIGHT DOUBLE
+				return rune(0x255e), true
 			case "boxvh": 
 				// BOX DRAWINGS LIGHT VERTICAL AND HORIZONTAL
 				return rune(0x253c), true
+			case "boxvl": 
+				// BOX DRAWINGS LIGHT VERTICAL AND LEFT
+				return rune(0x2524), true
+			case "boxvr": 
+				// BOX DRAWINGS LIGHT VERTICAL AND RIGHT
+				return rune(0x251c), true
 			case "bprime": 
 				// REVERSED PRIME
 				return rune(0x2035), true
@@ -2770,25 +2770,25 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "bsime": 
 				// REVERSED TILDE EQUALS
 				return rune(0x22cd), true
+			case "bsol": 
+				// REVERSE SOLIDUS
+				return rune(0x5c), true
 			case "bsolb": 
 				// SQUARED FALLING DIAGONAL SLASH
 				return rune(0x29c5), true
 			case "bsolhsub": 
 				// REVERSE SOLIDUS PRECEDING SUBSET
 				return rune(0x27c8), true
-			case "bsol": 
-				// REVERSE SOLIDUS
-				return rune(0x5c), true
 			case "btimes": 
 				// SEMIDIRECT PRODUCT WITH BOTTOM CLOSED
 				return rune(0x2a32), true
 			case "bulhar": 
 				// UPWARDS HARPOON WITH BARB LEFT FROM BAR
 				return rune(0x2960), true
-			case "bullet": 
+			case "bull": 
 				// BULLET
 				return rune(0x2022), true
-			case "bull": 
+			case "bullet": 
 				// BULLET
 				return rune(0x2022), true
 			case "bump": 
@@ -2870,12 +2870,12 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "cemptyv": 
 				// EMPTY SET WITH SMALL CIRCLE ABOVE
 				return rune(0x29b2), true
-			case "centerdot": 
-				// MIDDLE DOT
-				return rune(0xb7), true
 			case "cent": 
 				// CENT SIGN
 				return rune(0xa2), true
+			case "centerdot": 
+				// MIDDLE DOT
+				return rune(0xb7), true
 			case "cfr": 
 				// MATHEMATICAL FRAKTUR SMALL C
 				return rune(0x01d520), true
@@ -2891,30 +2891,6 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "chi": 
 				// GREEK SMALL LETTER CHI
 				return rune(0x03c7), true
-			case "circeq": 
-				// RING EQUAL TO
-				return rune(0x2257), true
-			case "circlearrowleft": 
-				// ANTICLOCKWISE OPEN CIRCLE ARROW
-				return rune(0x21ba), true
-			case "circlearrowright": 
-				// CLOCKWISE OPEN CIRCLE ARROW
-				return rune(0x21bb), true
-			case "circledS": 
-				// CIRCLED LATIN CAPITAL LETTER S
-				return rune(0x24c8), true
-			case "circledast": 
-				// CIRCLED ASTERISK OPERATOR
-				return rune(0x229b), true
-			case "circledcirc": 
-				// CIRCLED RING OPERATOR
-				return rune(0x229a), true
-			case "circleddash": 
-				// CIRCLED DASH
-				return rune(0x229d), true
-			case "cire": 
-				// RING EQUAL TO
-				return rune(0x2257), true
 			case "cir": 
 				// WHITE CIRCLE
 				return rune(0x25cb), true
@@ -2927,12 +2903,36 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "circ": 
 				// MODIFIER LETTER CIRCUMFLEX ACCENT
 				return rune(0x02c6), true
+			case "circeq": 
+				// RING EQUAL TO
+				return rune(0x2257), true
+			case "circlearrowleft": 
+				// ANTICLOCKWISE OPEN CIRCLE ARROW
+				return rune(0x21ba), true
+			case "circlearrowright": 
+				// CLOCKWISE OPEN CIRCLE ARROW
+				return rune(0x21bb), true
 			case "circledR": 
 				// REGISTERED SIGN
 				return rune(0xae), true
+			case "circledS": 
+				// CIRCLED LATIN CAPITAL LETTER S
+				return rune(0x24c8), true
+			case "circledast": 
+				// CIRCLED ASTERISK OPERATOR
+				return rune(0x229b), true
+			case "circledcirc": 
+				// CIRCLED RING OPERATOR
+				return rune(0x229a), true
+			case "circleddash": 
+				// CIRCLED DASH
+				return rune(0x229d), true
 			case "cirdarr": 
 				// WHITE CIRCLE WITH DOWN ARROW
 				return rune(0x29ec), true
+			case "cire": 
+				// RING EQUAL TO
+				return rune(0x2257), true
 			case "cirerr": 
 				// ERROR-BARRED WHITE CIRCLE
 				return rune(0x29f2), true
@@ -2960,21 +2960,21 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "clubsuit": 
 				// BLACK CLUB SUIT
 				return rune(0x2663), true
+			case "colon": 
+				// COLON
+				return rune(0x3a), true
 			case "colone": 
 				// COLON EQUALS
 				return rune(0x2254), true
 			case "coloneq": 
 				// COLON EQUALS
 				return rune(0x2254), true
-			case "colon": 
-				// COLON
-				return rune(0x3a), true
-			case "commat": 
-				// COMMERCIAL AT
-				return rune(0x40), true
 			case "comma": 
 				// COMMA
 				return rune(0x2c), true
+			case "commat": 
+				// COMMERCIAL AT
+				return rune(0x40), true
 			case "comp": 
 				// COMPLEMENT
 				return rune(0x2201), true
@@ -3002,12 +3002,12 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "coprod": 
 				// N-ARY COPRODUCT
 				return rune(0x2210), true
-			case "copysr": 
-				// SOUND RECORDING COPYRIGHT
-				return rune(0x2117), true
 			case "copy": 
 				// COPYRIGHT SIGN
 				return rune(0xa9), true
+			case "copysr": 
+				// SOUND RECORDING COPYRIGHT
+				return rune(0x2117), true
 			case "crarr": 
 				// DOWNWARDS ARROW WITH CORNER LEFTWARDS
 				return rune(0x21b5), true
@@ -3141,27 +3141,27 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "daleth": 
 				// DALET SYMBOL
 				return rune(0x2138), true
-			case "darr2": 
-				// DOWNWARDS PAIRED ARROWS
-				return rune(0x21ca), true
 			case "darr": 
 				// DOWNWARDS ARROW
 				return rune(0x2193), true
+			case "darr2": 
+				// DOWNWARDS PAIRED ARROWS
+				return rune(0x21ca), true
 			case "darrb": 
 				// DOWNWARDS ARROW TO BAR
 				return rune(0x2913), true
 			case "darrln": 
 				// DOWNWARDS ARROW WITH HORIZONTAL STROKE
 				return rune(0x2908), true
-			case "dashv": 
-				// LEFT TACK
-				return rune(0x22a3), true
 			case "dash": 
 				// HYPHEN
 				return rune(0x2010), true
 			case "dashV": 
 				// DOUBLE VERTICAL BAR LEFT TURNSTILE
 				return rune(0x2ae3), true
+			case "dashv": 
+				// LEFT TACK
+				return rune(0x22a3), true
 			case "dbkarow": 
 				// RIGHTWARDS TRIPLE DASH ARROW
 				return rune(0x290f), true
@@ -3174,15 +3174,15 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "dcy": 
 				// CYRILLIC SMALL LETTER DE
 				return rune(0x0434), true
-			case "ddarr": 
-				// DOWNWARDS PAIRED ARROWS
-				return rune(0x21ca), true
 			case "dd": 
 				// DOUBLE-STRUCK ITALIC SMALL D
 				return rune(0x2146), true
 			case "ddagger": 
 				// DOUBLE DAGGER
 				return rune(0x2021), true
+			case "ddarr": 
+				// DOWNWARDS PAIRED ARROWS
+				return rune(0x21ca), true
 			case "ddotseq": 
 				// EQUALS SIGN WITH TWO DOTS ABOVE AND TWO DOTS BELOW
 				return rune(0x2a77), true
@@ -3240,18 +3240,18 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "disin": 
 				// ELEMENT OF WITH LONG HORIZONTAL STROKE
 				return rune(0x22f2), true
-			case "divideontimes": 
-				// DIVISION TIMES
-				return rune(0x22c7), true
-			case "divonx": 
-				// DIVISION TIMES
-				return rune(0x22c7), true
 			case "div": 
 				// DIVISION SIGN
 				return rune(0xf7), true
 			case "divide": 
 				// DIVISION SIGN
 				return rune(0xf7), true
+			case "divideontimes": 
+				// DIVISION TIMES
+				return rune(0x22c7), true
+			case "divonx": 
+				// DIVISION TIMES
+				return rune(0x22c7), true
 			case "djcy": 
 				// CYRILLIC SMALL LETTER DJE
 				return rune(0x0452), true
@@ -3273,6 +3273,9 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "dopf": 
 				// MATHEMATICAL DOUBLE-STRUCK SMALL D
 				return rune(0x01d555), true
+			case "dot": 
+				// DOT ABOVE
+				return rune(0x02d9), true
 			case "doteq": 
 				// APPROACHES THE LIMIT
 				return rune(0x2250), true
@@ -3288,9 +3291,6 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "dotsquare": 
 				// SQUARED DOT OPERATOR
 				return rune(0x22a1), true
-			case "dot": 
-				// DOT ABOVE
-				return rune(0x02d9), true
 			case "doublebarwedge": 
 				// PERSPECTIVE
 				return rune(0x2306), true
@@ -3336,12 +3336,12 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "dtdot": 
 				// DOWN RIGHT DIAGONAL ELLIPSIS
 				return rune(0x22f1), true
-			case "dtrif": 
-				// BLACK DOWN-POINTING SMALL TRIANGLE
-				return rune(0x25be), true
 			case "dtri": 
 				// WHITE DOWN-POINTING SMALL TRIANGLE
 				return rune(0x25bf), true
+			case "dtrif": 
+				// BLACK DOWN-POINTING SMALL TRIANGLE
+				return rune(0x25be), true
 			case "dtrilf": 
 				// DOWN-POINTING TRIANGLE WITH LEFT HALF BLACK
 				return rune(0x29e8), true
@@ -3418,21 +3418,24 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "efr": 
 				// MATHEMATICAL FRAKTUR SMALL E
 				return rune(0x01d522), true
+			case "eg": 
+				// DOUBLE-LINE EQUAL TO OR GREATER-THAN
+				return rune(0x2a9a), true
 			case "egr": 
 				// GREEK SMALL LETTER EPSILON
 				return rune(0x03b5), true
+			case "egrave": 
+				// LATIN SMALL LETTER E WITH GRAVE
+				return rune(0xe8), true
 			case "egs": 
 				// SLANTED EQUAL TO OR GREATER-THAN
 				return rune(0x2a96), true
 			case "egsdot": 
 				// SLANTED EQUAL TO OR GREATER-THAN WITH DOT INSIDE
 				return rune(0x2a98), true
-			case "eg": 
-				// DOUBLE-LINE EQUAL TO OR GREATER-THAN
-				return rune(0x2a9a), true
-			case "egrave": 
-				// LATIN SMALL LETTER E WITH GRAVE
-				return rune(0xe8), true
+			case "el": 
+				// DOUBLE-LINE EQUAL TO OR LESS-THAN
+				return rune(0x2a99), true
 			case "elinters": 
 				// ELECTRICAL INTERSECTION
 				return rune(0x23e7), true
@@ -3445,9 +3448,6 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "elsdot": 
 				// SLANTED EQUAL TO OR LESS-THAN WITH DOT INSIDE
 				return rune(0x2a97), true
-			case "el": 
-				// DOUBLE-LINE EQUAL TO OR LESS-THAN
-				return rune(0x2a99), true
 			case "emacr": 
 				// LATIN SMALL LETTER E WITH MACRON
 				return rune(0x0113), true
@@ -3460,15 +3460,15 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "emptyv": 
 				// EMPTY SET
 				return rune(0x2205), true
+			case "emsp": 
+				// EM SPACE
+				return rune(0x2003), true
 			case "emsp13": 
 				// THREE-PER-EM SPACE
 				return rune(0x2004), true
 			case "emsp14": 
 				// FOUR-PER-EM SPACE
 				return rune(0x2005), true
-			case "emsp": 
-				// EM SPACE
-				return rune(0x2003), true
 			case "eng": 
 				// LATIN SMALL LETTER ENG
 				return rune(0x014b), true
@@ -3490,6 +3490,9 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "eplus": 
 				// EQUALS SIGN ABOVE PLUS SIGN
 				return rune(0x2a71), true
+			case "epsi": 
+				// GREEK SMALL LETTER EPSILON
+				return rune(0x03b5), true
 			case "epsilon": 
 				// GREEK SMALL LETTER EPSILON
 				return rune(0x03b5), true
@@ -3499,9 +3502,6 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "epsiv": 
 				// GREEK LUNATE EPSILON SYMBOL
 				return rune(0x03f5), true
-			case "epsi": 
-				// GREEK SMALL LETTER EPSILON
-				return rune(0x03b5), true
 			case "eqcirc": 
 				// RING IN EQUAL TO
 				return rune(0x2256), true
@@ -3714,12 +3714,12 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "gacute": 
 				// LATIN SMALL LETTER G WITH ACUTE
 				return rune(0x01f5), true
-			case "gammad": 
-				// GREEK SMALL LETTER DIGAMMA
-				return rune(0x03dd), true
 			case "gamma": 
 				// GREEK SMALL LETTER GAMMA
 				return rune(0x03b3), true
+			case "gammad": 
+				// GREEK SMALL LETTER DIGAMMA
+				return rune(0x03dd), true
 			case "gap": 
 				// GREATER-THAN OR APPROXIMATE
 				return rune(0x2a86), true
@@ -3753,9 +3753,6 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "geqslant": 
 				// GREATER-THAN OR SLANTED EQUAL TO
 				return rune(0x2a7e), true
-			case "gesl": 
-				// GREATER-THAN slanted EQUAL TO OR LESS-THAN
-				return rune(0x22db), true
 			case "ges": 
 				// GREATER-THAN OR SLANTED EQUAL TO
 				return rune(0x2a7e), true
@@ -3771,6 +3768,9 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "gesdotol": 
 				// GREATER-THAN OR SLANTED EQUAL TO WITH DOT ABOVE LEFT
 				return rune(0x2a84), true
+			case "gesl": 
+				// GREATER-THAN slanted EQUAL TO OR LESS-THAN
+				return rune(0x22db), true
 			case "gesles": 
 				// GREATER-THAN ABOVE SLANTED EQUAL ABOVE LESS-THAN ABOVE SLANTED EQUAL
 				return rune(0x2a94), true
@@ -3813,15 +3813,15 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "gnapprox": 
 				// GREATER-THAN AND NOT APPROXIMATE
 				return rune(0x2a8a), true
-			case "gneqq": 
-				// GREATER-THAN BUT NOT EQUAL TO
-				return rune(0x2269), true
 			case "gne": 
 				// GREATER-THAN AND SINGLE-LINE NOT EQUAL TO
 				return rune(0x2a88), true
 			case "gneq": 
 				// GREATER-THAN AND SINGLE-LINE NOT EQUAL TO
 				return rune(0x2a88), true
+			case "gneqq": 
+				// GREATER-THAN BUT NOT EQUAL TO
+				return rune(0x2269), true
 			case "gnsim": 
 				// GREATER-THAN BUT NOT EQUIVALENT TO
 				return rune(0x22e7), true
@@ -3846,6 +3846,9 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "gsiml": 
 				// GREATER-THAN ABOVE SIMILAR ABOVE LESS-THAN
 				return rune(0x2a90), true
+			case "gt": 
+				// GREATER-THAN SIGN
+				return rune(0x3e), true
 			case "gtcc": 
 				// GREATER-THAN CLOSED BY CURVE
 				return rune(0x2aa7), true
@@ -3885,9 +3888,6 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "gtrsim": 
 				// GREATER-THAN OR EQUIVALENT TO
 				return rune(0x2273), true
-			case "gt": 
-				// GREATER-THAN SIGN
-				return rune(0x3e), true
 			case "gvertneqq": 
 				// GREATER-THAN BUT NOT EQUAL TO - with vertical stroke
 				return rune(0x2269), true
@@ -3913,15 +3913,15 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "hardcy": 
 				// CYRILLIC SMALL LETTER HARD SIGN
 				return rune(0x044a), true
-			case "harrw": 
-				// LEFT RIGHT WAVE ARROW
-				return rune(0x21ad), true
 			case "harr": 
 				// LEFT RIGHT ARROW
 				return rune(0x2194), true
 			case "harrcir": 
 				// LEFT RIGHT ARROW THROUGH SMALL CIRCLE
 				return rune(0x2948), true
+			case "harrw": 
+				// LEFT RIGHT WAVE ARROW
+				return rune(0x21ad), true
 			case "hbar": 
 				// PLANCK CONSTANT OVER TWO PI
 				return rune(0x210f), true
@@ -4031,15 +4031,15 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "igrave": 
 				// LATIN SMALL LETTER I WITH GRAVE
 				return rune(0xec), true
-			case "iiint": 
-				// TRIPLE INTEGRAL
-				return rune(0x222d), true
 			case "ii": 
 				// DOUBLE-STRUCK ITALIC SMALL I
 				return rune(0x2148), true
 			case "iiiint": 
 				// QUADRUPLE INTEGRAL OPERATOR
 				return rune(0x2a0c), true
+			case "iiint": 
+				// TRIPLE INTEGRAL
+				return rune(0x222d), true
 			case "iinfin": 
 				// INCOMPLETE INFINITY
 				return rune(0x29dc), true
@@ -4136,12 +4136,12 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "isindot": 
 				// ELEMENT OF WITH DOT ABOVE
 				return rune(0x22f5), true
-			case "isinsv": 
-				// ELEMENT OF WITH VERTICAL BAR AT END OF HORIZONTAL STROKE
-				return rune(0x22f3), true
 			case "isins": 
 				// SMALL ELEMENT OF WITH VERTICAL BAR AT END OF HORIZONTAL STROKE
 				return rune(0x22f4), true
+			case "isinsv": 
+				// ELEMENT OF WITH VERTICAL BAR AT END OF HORIZONTAL STROKE
+				return rune(0x22f3), true
 			case "isinv": 
 				// ELEMENT OF
 				return rune(0x2208), true
@@ -4195,12 +4195,12 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 
 	case 'k':
 		switch name {
-			case "kappav": 
-				// GREEK KAPPA SYMBOL
-				return rune(0x03f0), true
 			case "kappa": 
 				// GREEK SMALL LETTER KAPPA
 				return rune(0x03ba), true
+			case "kappav": 
+				// GREEK KAPPA SYMBOL
+				return rune(0x03f0), true
 			case "kcedil": 
 				// LATIN SMALL LETTER K WITH CEDILLA
 				return rune(0x0137), true
@@ -4286,42 +4286,42 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "laquo": 
 				// LEFT-POINTING DOUBLE ANGLE QUOTATION MARK
 				return rune(0xab), true
+			case "larr": 
+				// LEFTWARDS ARROW
+				return rune(0x2190), true
 			case "larr2": 
 				// LEFTWARDS PAIRED ARROWS
 				return rune(0x21c7), true
 			case "larrb": 
 				// LEFTWARDS ARROW TO BAR
 				return rune(0x21e4), true
-			case "larrhk": 
-				// LEFTWARDS ARROW WITH HOOK
-				return rune(0x21a9), true
-			case "larrlp": 
-				// LEFTWARDS ARROW WITH LOOP
-				return rune(0x21ab), true
-			case "larrtl": 
-				// LEFTWARDS ARROW WITH TAIL
-				return rune(0x21a2), true
-			case "larr": 
-				// LEFTWARDS ARROW
-				return rune(0x2190), true
 			case "larrbfs": 
 				// LEFTWARDS ARROW FROM BAR TO BLACK DIAMOND
 				return rune(0x291f), true
 			case "larrfs": 
 				// LEFTWARDS ARROW TO BLACK DIAMOND
 				return rune(0x291d), true
+			case "larrhk": 
+				// LEFTWARDS ARROW WITH HOOK
+				return rune(0x21a9), true
+			case "larrlp": 
+				// LEFTWARDS ARROW WITH LOOP
+				return rune(0x21ab), true
 			case "larrpl": 
 				// LEFT-SIDE ARC ANTICLOCKWISE ARROW
 				return rune(0x2939), true
 			case "larrsim": 
 				// LEFTWARDS ARROW ABOVE TILDE OPERATOR
 				return rune(0x2973), true
-			case "latail": 
-				// LEFTWARDS ARROW-TAIL
-				return rune(0x2919), true
+			case "larrtl": 
+				// LEFTWARDS ARROW WITH TAIL
+				return rune(0x21a2), true
 			case "lat": 
 				// LARGER THAN
 				return rune(0x2aab), true
+			case "latail": 
+				// LEFTWARDS ARROW-TAIL
+				return rune(0x2919), true
 			case "late": 
 				// LARGER THAN OR EQUAL TO
 				return rune(0x2aad), true
@@ -4373,12 +4373,12 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "ldot": 
 				// LESS-THAN WITH DOT
 				return rune(0x22d6), true
-			case "ldquor": 
-				// DOUBLE LOW-9 QUOTATION MARK
-				return rune(0x201e), true
 			case "ldquo": 
 				// LEFT DOUBLE QUOTATION MARK
 				return rune(0x201c), true
+			case "ldquor": 
+				// DOUBLE LOW-9 QUOTATION MARK
+				return rune(0x201e), true
 			case "ldrdhar": 
 				// LEFTWARDS HARPOON WITH BARB DOWN ABOVE RIGHTWARDS HARPOON WITH BARB DOWN
 				return rune(0x2967), true
@@ -4391,12 +4391,15 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "ldsh": 
 				// DOWNWARDS ARROW WITH TIP LEFTWARDS
 				return rune(0x21b2), true
-			case "leftarrowtail": 
-				// LEFTWARDS ARROW WITH TAIL
-				return rune(0x21a2), true
+			case "le": 
+				// LESS-THAN OR EQUAL TO
+				return rune(0x2264), true
 			case "leftarrow": 
 				// LEFTWARDS ARROW
 				return rune(0x2190), true
+			case "leftarrowtail": 
+				// LEFTWARDS ARROW WITH TAIL
+				return rune(0x21a2), true
 			case "leftharpoondown": 
 				// LEFTWARDS HARPOON WITH BARB DOWNWARDS
 				return rune(0x21bd), true
@@ -4406,21 +4409,18 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "leftleftarrows": 
 				// LEFTWARDS PAIRED ARROWS
 				return rune(0x21c7), true
-			case "leftrightarrows": 
-				// LEFTWARDS ARROW OVER RIGHTWARDS ARROW
-				return rune(0x21c6), true
 			case "leftrightarrow": 
 				// LEFT RIGHT ARROW
 				return rune(0x2194), true
+			case "leftrightarrows": 
+				// LEFTWARDS ARROW OVER RIGHTWARDS ARROW
+				return rune(0x21c6), true
 			case "leftrightharpoons": 
 				// LEFTWARDS HARPOON OVER RIGHTWARDS HARPOON
 				return rune(0x21cb), true
 			case "leftrightsquigarrow": 
 				// LEFT RIGHT WAVE ARROW
 				return rune(0x21ad), true
-			case "le": 
-				// LESS-THAN OR EQUAL TO
-				return rune(0x2264), true
 			case "leftthreetimes": 
 				// LEFT SEMIDIRECT PRODUCT
 				return rune(0x22cb), true
@@ -4436,21 +4436,6 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "leqslant": 
 				// LESS-THAN OR SLANTED EQUAL TO
 				return rune(0x2a7d), true
-			case "lesg": 
-				// LESS-THAN slanted EQUAL TO OR GREATER-THAN
-				return rune(0x22da), true
-			case "lessdot": 
-				// LESS-THAN WITH DOT
-				return rune(0x22d6), true
-			case "lesseqgtr": 
-				// LESS-THAN EQUAL TO OR GREATER-THAN
-				return rune(0x22da), true
-			case "lessgtr": 
-				// LESS-THAN OR GREATER-THAN
-				return rune(0x2276), true
-			case "lesssim": 
-				// LESS-THAN OR EQUIVALENT TO
-				return rune(0x2272), true
 			case "les": 
 				// LESS-THAN OR SLANTED EQUAL TO
 				return rune(0x2a7d), true
@@ -4466,15 +4451,30 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "lesdotor": 
 				// LESS-THAN OR SLANTED EQUAL TO WITH DOT ABOVE RIGHT
 				return rune(0x2a83), true
+			case "lesg": 
+				// LESS-THAN slanted EQUAL TO OR GREATER-THAN
+				return rune(0x22da), true
 			case "lesges": 
 				// LESS-THAN ABOVE SLANTED EQUAL ABOVE GREATER-THAN ABOVE SLANTED EQUAL
 				return rune(0x2a93), true
 			case "lessapprox": 
 				// LESS-THAN OR APPROXIMATE
 				return rune(0x2a85), true
+			case "lessdot": 
+				// LESS-THAN WITH DOT
+				return rune(0x22d6), true
+			case "lesseqgtr": 
+				// LESS-THAN EQUAL TO OR GREATER-THAN
+				return rune(0x22da), true
 			case "lesseqqgtr": 
 				// LESS-THAN ABOVE DOUBLE-LINE EQUAL ABOVE GREATER-THAN
 				return rune(0x2a8b), true
+			case "lessgtr": 
+				// LESS-THAN OR GREATER-THAN
+				return rune(0x2276), true
+			case "lesssim": 
+				// LESS-THAN OR EQUIVALENT TO
+				return rune(0x2272), true
 			case "lfbowtie": 
 				// BOWTIE WITH LEFT HALF BLACK
 				return rune(0x29d1), true
@@ -4514,24 +4514,24 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "ljcy": 
 				// CYRILLIC SMALL LETTER LJE
 				return rune(0x0459), true
-			case "llarr": 
-				// LEFTWARDS PAIRED ARROWS
-				return rune(0x21c7), true
 			case "ll": 
 				// MUCH LESS-THAN
 				return rune(0x226a), true
+			case "llarr": 
+				// LEFTWARDS PAIRED ARROWS
+				return rune(0x21c7), true
 			case "llcorner": 
 				// BOTTOM LEFT CORNER
 				return rune(0x231e), true
 			case "llhard": 
 				// LEFTWARDS HARPOON WITH BARB DOWN BELOW LONG DASH
 				return rune(0x296b), true
-			case "lltrif": 
-				// BLACK LOWER LEFT TRIANGLE
-				return rune(0x25e3), true
 			case "lltri": 
 				// LOWER LEFT TRIANGLE
 				return rune(0x25fa), true
+			case "lltrif": 
+				// BLACK LOWER LEFT TRIANGLE
+				return rune(0x25e3), true
 			case "lmidot": 
 				// LATIN SMALL LETTER L WITH MIDDLE DOT
 				return rune(0x0140), true
@@ -4550,15 +4550,15 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "lnapprox": 
 				// LESS-THAN AND NOT APPROXIMATE
 				return rune(0x2a89), true
-			case "lneqq": 
-				// LESS-THAN BUT NOT EQUAL TO
-				return rune(0x2268), true
 			case "lne": 
 				// LESS-THAN AND SINGLE-LINE NOT EQUAL TO
 				return rune(0x2a87), true
 			case "lneq": 
 				// LESS-THAN AND SINGLE-LINE NOT EQUAL TO
 				return rune(0x2a87), true
+			case "lneqq": 
+				// LESS-THAN BUT NOT EQUAL TO
+				return rune(0x2268), true
 			case "lnsim": 
 				// LESS-THAN BUT NOT EQUIVALENT TO
 				return rune(0x22e6), true
@@ -4622,19 +4622,19 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "lozf": 
 				// BLACK LOZENGE
 				return rune(0x29eb), true
+			case "lpar": 
+				// LEFT PARENTHESIS
+				return rune(0x28), true
 			case "lpargt": 
 				// SPHERICAL ANGLE OPENING LEFT
 				return rune(0x29a0), true
 			case "lparlt": 
 				// LEFT ARC LESS-THAN BRACKET
 				return rune(0x2993), true
-			case "lpar": 
-				// LEFT PARENTHESIS
-				return rune(0x28), true
-			case "lrarr2": 
+			case "lrarr": 
 				// LEFTWARDS ARROW OVER RIGHTWARDS ARROW
 				return rune(0x21c6), true
-			case "lrarr": 
+			case "lrarr2": 
 				// LEFTWARDS ARROW OVER RIGHTWARDS ARROW
 				return rune(0x21c6), true
 			case "lrcorner": 
@@ -4676,15 +4676,18 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "lsqb": 
 				// LEFT SQUARE BRACKET
 				return rune(0x5b), true
-			case "lsquor": 
-				// SINGLE LOW-9 QUOTATION MARK
-				return rune(0x201a), true
 			case "lsquo": 
 				// LEFT SINGLE QUOTATION MARK
 				return rune(0x2018), true
+			case "lsquor": 
+				// SINGLE LOW-9 QUOTATION MARK
+				return rune(0x201a), true
 			case "lstrok": 
 				// LATIN SMALL LETTER L WITH STROKE
 				return rune(0x0142), true
+			case "lt": 
+				// LESS-THAN SIGN
+				return rune(0x3c), true
 			case "ltcc": 
 				// LESS-THAN CLOSED BY CURVE
 				return rune(0x2aa6), true
@@ -4709,21 +4712,18 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "ltrPar": 
 				// DOUBLE RIGHT ARC LESS-THAN BRACKET
 				return rune(0x2996), true
+			case "ltri": 
+				// WHITE LEFT-POINTING SMALL TRIANGLE
+				return rune(0x25c3), true
 			case "ltrie": 
 				// NORMAL SUBGROUP OF OR EQUAL TO
 				return rune(0x22b4), true
 			case "ltrif": 
 				// BLACK LEFT-POINTING SMALL TRIANGLE
 				return rune(0x25c2), true
-			case "ltri": 
-				// WHITE LEFT-POINTING SMALL TRIANGLE
-				return rune(0x25c3), true
 			case "ltrivb": 
 				// LEFT TRIANGLE BESIDE VERTICAL BAR
 				return rune(0x29cf), true
-			case "lt": 
-				// LESS-THAN SIGN
-				return rune(0x3c), true
 			case "luharb": 
 				// LEFTWARDS HARPOON WITH BARB UP TO BAR
 				return rune(0x2952), true
@@ -4761,15 +4761,15 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "maltese": 
 				// MALTESE CROSS
 				return rune(0x2720), true
-			case "mapstodown": 
-				// DOWNWARDS ARROW FROM BAR
-				return rune(0x21a7), true
-			case "mapsto": 
-				// RIGHTWARDS ARROW FROM BAR
-				return rune(0x21a6), true
 			case "map": 
 				// RIGHTWARDS ARROW FROM BAR
 				return rune(0x21a6), true
+			case "mapsto": 
+				// RIGHTWARDS ARROW FROM BAR
+				return rune(0x21a6), true
+			case "mapstodown": 
+				// DOWNWARDS ARROW FROM BAR
+				return rune(0x21a7), true
 			case "mapstoleft": 
 				// LEFTWARDS ARROW FROM BAR
 				return rune(0x21a4), true
@@ -4851,15 +4851,15 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "mstpos": 
 				// INVERTED LAZY S
 				return rune(0x223e), true
+			case "mu": 
+				// GREEK SMALL LETTER MU
+				return rune(0x03bc), true
 			case "multimap": 
 				// MULTIMAP
 				return rune(0x22b8), true
 			case "mumap": 
 				// MULTIMAP
 				return rune(0x22b8), true
-			case "mu": 
-				// GREEK SMALL LETTER MU
-				return rune(0x03bc), true
 		}
 
 	case 'n':
@@ -4867,11 +4867,11 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "nGg": 
 				// VERY MUCH GREATER-THAN with slash
 				return rune(0x22d9), true
-			case "nGtv": 
-				// MUCH GREATER THAN with slash
-				return rune(0x226b), true
 			case "nGt": 
 				// MUCH GREATER THAN with vertical line
+				return rune(0x226b), true
+			case "nGtv": 
+				// MUCH GREATER THAN with slash
 				return rune(0x226b), true
 			case "nLeftarrow": 
 				// LEFTWARDS DOUBLE ARROW WITH STROKE
@@ -4882,11 +4882,11 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "nLl": 
 				// VERY MUCH LESS-THAN with slash
 				return rune(0x22d8), true
-			case "nLtv": 
-				// MUCH LESS THAN with slash
-				return rune(0x226a), true
 			case "nLt": 
 				// MUCH LESS THAN with vertical line
+				return rune(0x226a), true
+			case "nLtv": 
+				// MUCH LESS THAN with slash
 				return rune(0x226a), true
 			case "nRightarrow": 
 				// RIGHTWARDS DOUBLE ARROW WITH STROKE
@@ -4921,15 +4921,15 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "napprox": 
 				// NOT ALMOST EQUAL TO
 				return rune(0x2249), true
-			case "naturals": 
-				// DOUBLE-STRUCK CAPITAL N
-				return rune(0x2115), true
 			case "natur": 
 				// MUSIC NATURAL SIGN
 				return rune(0x266e), true
 			case "natural": 
 				// MUSIC NATURAL SIGN
 				return rune(0x266e), true
+			case "naturals": 
+				// DOUBLE-STRUCK CAPITAL N
+				return rune(0x2115), true
 			case "nbsp": 
 				// NO-BREAK SPACE
 				return rune(0xa0), true
@@ -4963,33 +4963,24 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "ndash": 
 				// EN DASH
 				return rune(0x2013), true
+			case "ne": 
+				// NOT EQUAL TO
+				return rune(0x2260), true
 			case "neArr": 
 				// NORTH EAST DOUBLE ARROW
 				return rune(0x21d7), true
-			case "nearrow": 
+			case "nearhk": 
+				// NORTH EAST ARROW WITH HOOK
+				return rune(0x2924), true
+			case "nearr": 
 				// NORTH EAST ARROW
 				return rune(0x2197), true
-			case "nearr": 
+			case "nearrow": 
 				// NORTH EAST ARROW
 				return rune(0x2197), true
 			case "nedot": 
 				// APPROACHES THE LIMIT with slash
 				return rune(0x2250), true
-			case "nesim": 
-				// MINUS TILDE with slash
-				return rune(0x2242), true
-			case "nexist": 
-				// THERE DOES NOT EXIST
-				return rune(0x2204), true
-			case "nexists": 
-				// THERE DOES NOT EXIST
-				return rune(0x2204), true
-			case "ne": 
-				// NOT EQUAL TO
-				return rune(0x2260), true
-			case "nearhk": 
-				// NORTH EAST ARROW WITH HOOK
-				return rune(0x2924), true
 			case "neonwarr": 
 				// NORTH EAST ARROW CROSSING NORTH WEST ARROW
 				return rune(0x2931), true
@@ -5002,16 +4993,22 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "nesear": 
 				// NORTH EAST ARROW AND SOUTH EAST ARROW
 				return rune(0x2928), true
+			case "nesim": 
+				// MINUS TILDE with slash
+				return rune(0x2242), true
 			case "neswsarr": 
 				// NORTH EAST AND SOUTH WEST ARROW
 				return rune(0x2922), true
+			case "nexist": 
+				// THERE DOES NOT EXIST
+				return rune(0x2204), true
+			case "nexists": 
+				// THERE DOES NOT EXIST
+				return rune(0x2204), true
 			case "nfr": 
 				// MATHEMATICAL FRAKTUR SMALL N
 				return rune(0x01d52b), true
 			case "ngE": 
-				// GREATER-THAN OVER EQUAL TO with slash
-				return rune(0x2267), true
-			case "ngeqq": 
 				// GREATER-THAN OVER EQUAL TO with slash
 				return rune(0x2267), true
 			case "nge": 
@@ -5020,6 +5017,9 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "ngeq": 
 				// NEITHER GREATER-THAN NOR EQUAL TO
 				return rune(0x2271), true
+			case "ngeqq": 
+				// GREATER-THAN OVER EQUAL TO with slash
+				return rune(0x2267), true
 			case "ngeqslant": 
 				// GREATER-THAN OR SLANTED EQUAL TO with slash
 				return rune(0x2a7e), true
@@ -5047,18 +5047,18 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "nhpar": 
 				// PARALLEL WITH HORIZONTAL STROKE
 				return rune(0x2af2), true
-			case "niv": 
-				// CONTAINS AS MEMBER
-				return rune(0x220b), true
 			case "ni": 
 				// CONTAINS AS MEMBER
 				return rune(0x220b), true
-			case "nisd": 
-				// CONTAINS WITH LONG HORIZONTAL STROKE
-				return rune(0x22fa), true
 			case "nis": 
 				// SMALL CONTAINS WITH VERTICAL BAR AT END OF HORIZONTAL STROKE
 				return rune(0x22fc), true
+			case "nisd": 
+				// CONTAINS WITH LONG HORIZONTAL STROKE
+				return rune(0x22fa), true
+			case "niv": 
+				// CONTAINS AS MEMBER
+				return rune(0x220b), true
 			case "njcy": 
 				// CYRILLIC SMALL LETTER NJE
 				return rune(0x045a), true
@@ -5074,30 +5074,30 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "nldr": 
 				// TWO DOT LEADER
 				return rune(0x2025), true
+			case "nle": 
+				// NEITHER LESS-THAN NOR EQUAL TO
+				return rune(0x2270), true
 			case "nleftarrow": 
 				// LEFTWARDS ARROW WITH STROKE
 				return rune(0x219a), true
 			case "nleftrightarrow": 
 				// LEFT RIGHT ARROW WITH STROKE
 				return rune(0x21ae), true
-			case "nleqq": 
-				// LESS-THAN OVER EQUAL TO with slash
-				return rune(0x2266), true
-			case "nless": 
-				// NOT LESS-THAN
-				return rune(0x226e), true
-			case "nle": 
-				// NEITHER LESS-THAN NOR EQUAL TO
-				return rune(0x2270), true
 			case "nleq": 
 				// NEITHER LESS-THAN NOR EQUAL TO
 				return rune(0x2270), true
+			case "nleqq": 
+				// LESS-THAN OVER EQUAL TO with slash
+				return rune(0x2266), true
 			case "nleqslant": 
 				// LESS-THAN OR SLANTED EQUAL TO with slash
 				return rune(0x2a7d), true
 			case "nles": 
 				// LESS-THAN OR SLANTED EQUAL TO with slash
 				return rune(0x2a7d), true
+			case "nless": 
+				// NOT LESS-THAN
+				return rune(0x226e), true
 			case "nlsim": 
 				// NEITHER LESS-THAN NOR EQUIVALENT TO
 				return rune(0x2274), true
@@ -5119,6 +5119,9 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "nopf": 
 				// MATHEMATICAL DOUBLE-STRUCK SMALL N
 				return rune(0x01d55f), true
+			case "not": 
+				// NOT SIGN
+				return rune(0xac), true
 			case "notin": 
 				// NOT AN ELEMENT OF
 				return rune(0x2209), true
@@ -5149,12 +5152,6 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "notnivc": 
 				// CONTAINS WITH OVERBAR
 				return rune(0x22fd), true
-			case "not": 
-				// NOT SIGN
-				return rune(0xac), true
-			case "npart": 
-				// PARTIAL DIFFERENTIAL with slash
-				return rune(0x2202), true
 			case "npar": 
 				// NOT PARALLEL TO
 				return rune(0x2226), true
@@ -5164,39 +5161,42 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "nparsl": 
 				// DOUBLE SOLIDUS OPERATOR with reverse slash
 				return rune(0x2afd), true
+			case "npart": 
+				// PARTIAL DIFFERENTIAL with slash
+				return rune(0x2202), true
 			case "npolint": 
 				// LINE INTEGRATION NOT INCLUDING THE POLE
 				return rune(0x2a14), true
-			case "nprsim": 
-				// PRECEDES OR EQUIVALENT TO with slash
-				return rune(0x227e), true
 			case "npr": 
 				// DOES NOT PRECEDE
 				return rune(0x2280), true
 			case "nprcue": 
 				// DOES NOT PRECEDE OR EQUAL
 				return rune(0x22e0), true
-			case "nprec": 
-				// DOES NOT PRECEDE
-				return rune(0x2280), true
 			case "npre": 
 				// PRECEDES ABOVE SINGLE-LINE EQUALS SIGN with slash
 				return rune(0x2aaf), true
+			case "nprec": 
+				// DOES NOT PRECEDE
+				return rune(0x2280), true
 			case "npreceq": 
 				// PRECEDES ABOVE SINGLE-LINE EQUALS SIGN with slash
 				return rune(0x2aaf), true
+			case "nprsim": 
+				// PRECEDES OR EQUIVALENT TO with slash
+				return rune(0x227e), true
 			case "nrArr": 
 				// RIGHTWARDS DOUBLE ARROW WITH STROKE
 				return rune(0x21cf), true
-			case "nrarrw": 
-				// RIGHTWARDS WAVE ARROW with slash
-				return rune(0x219d), true
 			case "nrarr": 
 				// RIGHTWARDS ARROW WITH STROKE
 				return rune(0x219b), true
 			case "nrarrc": 
 				// WAVE ARROW POINTING DIRECTLY RIGHT with slash
 				return rune(0x2933), true
+			case "nrarrw": 
+				// RIGHTWARDS WAVE ARROW with slash
+				return rune(0x219d), true
 			case "nrightarrow": 
 				// RIGHTWARDS ARROW WITH STROKE
 				return rune(0x219b), true
@@ -5212,9 +5212,6 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "nsLt": 
 				// DOUBLE NESTED LESS-THAN with slash
 				return rune(0x2aa1), true
-			case "nscsim": 
-				// SUCCEEDS OR EQUIVALENT TO with slash
-				return rune(0x227f), true
 			case "nsc": 
 				// DOES NOT SUCCEED
 				return rune(0x2281), true
@@ -5227,6 +5224,9 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "nscr": 
 				// MATHEMATICAL SCRIPT SMALL N
 				return rune(0x01d4c3), true
+			case "nscsim": 
+				// SUCCEEDS OR EQUIVALENT TO with slash
+				return rune(0x227f), true
 			case "nshortmid": 
 				// DOES NOT DIVIDE
 				return rune(0x2224), true
@@ -5260,9 +5260,6 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "nsqsupe": 
 				// NOT SQUARE ORIGINAL OF OR EQUAL TO
 				return rune(0x22e3), true
-			case "nsubset": 
-				// SUBSET OF with vertical line
-				return rune(0x2282), true
 			case "nsub": 
 				// NOT A SUBSET OF
 				return rune(0x2284), true
@@ -5272,6 +5269,9 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "nsube": 
 				// NEITHER A SUBSET OF NOR EQUAL TO
 				return rune(0x2288), true
+			case "nsubset": 
+				// SUBSET OF with vertical line
+				return rune(0x2282), true
 			case "nsubseteq": 
 				// NEITHER A SUBSET OF NOR EQUAL TO
 				return rune(0x2288), true
@@ -5284,9 +5284,6 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "nsucceq": 
 				// SUCCEEDS ABOVE SINGLE-LINE EQUALS SIGN with slash
 				return rune(0x2ab0), true
-			case "nsupset": 
-				// SUPERSET OF with vertical line
-				return rune(0x2283), true
 			case "nsup": 
 				// NOT A SUPERSET OF
 				return rune(0x2285), true
@@ -5296,6 +5293,9 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "nsupe": 
 				// NEITHER A SUPERSET OF NOR EQUAL TO
 				return rune(0x2289), true
+			case "nsupset": 
+				// SUPERSET OF with vertical line
+				return rune(0x2283), true
 			case "nsupseteq": 
 				// NEITHER A SUPERSET OF NOR EQUAL TO
 				return rune(0x2289), true
@@ -5323,18 +5323,18 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "ntrianglerighteq": 
 				// DOES NOT CONTAIN AS NORMAL SUBGROUP OR EQUAL
 				return rune(0x22ed), true
-			case "numero": 
-				// NUMERO SIGN
-				return rune(0x2116), true
-			case "numsp": 
-				// FIGURE SPACE
-				return rune(0x2007), true
 			case "nu": 
 				// GREEK SMALL LETTER NU
 				return rune(0x03bd), true
 			case "num": 
 				// NUMBER SIGN
 				return rune(0x23), true
+			case "numero": 
+				// NUMERO SIGN
+				return rune(0x2116), true
+			case "numsp": 
+				// FIGURE SPACE
+				return rune(0x2007), true
 			case "nvDash": 
 				// NOT TRUE
 				return rune(0x22ad), true
@@ -5365,12 +5365,12 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "nvle": 
 				// LESS-THAN OR EQUAL TO with vertical line
 				return rune(0x2264), true
-			case "nvltrie": 
-				// NORMAL SUBGROUP OF OR EQUAL TO with vertical line
-				return rune(0x22b4), true
 			case "nvlt": 
 				// LESS-THAN SIGN with vertical line
 				return rune(0x3c), true
+			case "nvltrie": 
+				// NORMAL SUBGROUP OF OR EQUAL TO with vertical line
+				return rune(0x22b4), true
 			case "nvrArr": 
 				// RIGHTWARDS DOUBLE ARROW WITH VERTICAL STROKE
 				return rune(0x2903), true
@@ -5386,10 +5386,10 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "nwarhk": 
 				// NORTH WEST ARROW WITH HOOK
 				return rune(0x2923), true
-			case "nwarrow": 
+			case "nwarr": 
 				// NORTH WEST ARROW
 				return rune(0x2196), true
-			case "nwarr": 
+			case "nwarrow": 
 				// NORTH WEST ARROW
 				return rune(0x2196), true
 			case "nwnear": 
@@ -5531,21 +5531,21 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "oplus": 
 				// CIRCLED PLUS
 				return rune(0x2295), true
-			case "orarr": 
-				// CLOCKWISE OPEN CIRCLE ARROW
-				return rune(0x21bb), true
 			case "or": 
 				// LOGICAL OR
 				return rune(0x2228), true
-			case "orderof": 
-				// SCRIPT SMALL O
-				return rune(0x2134), true
-			case "order": 
-				// SCRIPT SMALL O
-				return rune(0x2134), true
+			case "orarr": 
+				// CLOCKWISE OPEN CIRCLE ARROW
+				return rune(0x21bb), true
 			case "ord": 
 				// LOGICAL OR WITH HORIZONTAL DASH
 				return rune(0x2a5d), true
+			case "order": 
+				// SCRIPT SMALL O
+				return rune(0x2134), true
+			case "orderof": 
+				// SCRIPT SMALL O
+				return rune(0x2134), true
 			case "ordf": 
 				// FEMININE ORDINAL INDICATOR
 				return rune(0xaa), true
@@ -5604,24 +5604,24 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 
 	case 'p':
 		switch name {
-			case "part": 
-				// PARTIAL DIFFERENTIAL
-				return rune(0x2202), true
 			case "par": 
-				// PARALLEL TO
-				return rune(0x2225), true
-			case "parallel": 
 				// PARALLEL TO
 				return rune(0x2225), true
 			case "para": 
 				// PILCROW SIGN
 				return rune(0xb6), true
+			case "parallel": 
+				// PARALLEL TO
+				return rune(0x2225), true
 			case "parsim": 
 				// PARALLEL WITH TILDE OPERATOR
 				return rune(0x2af3), true
 			case "parsl": 
 				// DOUBLE SOLIDUS OPERATOR
 				return rune(0x2afd), true
+			case "part": 
+				// PARTIAL DIFFERENTIAL
+				return rune(0x2202), true
 			case "pcy": 
 				// CYRILLIC SMALL LETTER PE
 				return rune(0x043f), true
@@ -5649,30 +5649,30 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "phgr": 
 				// GREEK SMALL LETTER PHI
 				return rune(0x03c6), true
+			case "phi": 
+				// GREEK SMALL LETTER PHI
+				return rune(0x03c6), true
 			case "phis": 
 				// GREEK PHI SYMBOL
 				return rune(0x03d5), true
 			case "phiv": 
 				// GREEK PHI SYMBOL
 				return rune(0x03d5), true
-			case "phi": 
-				// GREEK SMALL LETTER PHI
-				return rune(0x03c6), true
 			case "phmmat": 
 				// SCRIPT CAPITAL M
 				return rune(0x2133), true
 			case "phone": 
 				// BLACK TELEPHONE
 				return rune(0x260e), true
+			case "pi": 
+				// GREEK SMALL LETTER PI
+				return rune(0x03c0), true
 			case "pitchfork": 
 				// PITCHFORK
 				return rune(0x22d4), true
 			case "piv": 
 				// GREEK PI SYMBOL
 				return rune(0x03d6), true
-			case "pi": 
-				// GREEK SMALL LETTER PI
-				return rune(0x03c0), true
 			case "planck": 
 				// PLANCK CONSTANT OVER TWO PI
 				return rune(0x210f), true
@@ -5682,6 +5682,9 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "plankv": 
 				// PLANCK CONSTANT OVER TWO PI
 				return rune(0x210f), true
+			case "plus": 
+				// PLUS SIGN
+				return rune(0x2b), true
 			case "plusacir": 
 				// PLUS SIGN WITH CIRCUMFLEX ACCENT ABOVE
 				return rune(0x2a23), true
@@ -5712,9 +5715,6 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "plustwo": 
 				// PLUS SIGN WITH SUBSCRIPT TWO
 				return rune(0x2a27), true
-			case "plus": 
-				// PLUS SIGN
-				return rune(0x2b), true
 			case "pm": 
 				// PLUS-MINUS SIGN
 				return rune(0xb1), true
@@ -5727,15 +5727,6 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "pound": 
 				// POUND SIGN
 				return rune(0xa3), true
-			case "prod": 
-				// N-ARY PRODUCT
-				return rune(0x220f), true
-			case "prop": 
-				// PROPORTIONAL TO
-				return rune(0x221d), true
-			case "propto": 
-				// PROPORTIONAL TO
-				return rune(0x221d), true
 			case "pr": 
 				// PRECEDES
 				return rune(0x227a), true
@@ -5748,24 +5739,18 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "prcue": 
 				// PRECEDES OR EQUAL TO
 				return rune(0x227c), true
-			case "prec": 
-				// PRECEDES
-				return rune(0x227a), true
-			case "preccurlyeq": 
-				// PRECEDES OR EQUAL TO
-				return rune(0x227c), true
-			case "precnsim": 
-				// PRECEDES BUT NOT EQUIVALENT TO
-				return rune(0x22e8), true
-			case "precsim": 
-				// PRECEDES OR EQUIVALENT TO
-				return rune(0x227e), true
 			case "pre": 
 				// PRECEDES ABOVE SINGLE-LINE EQUALS SIGN
 				return rune(0x2aaf), true
+			case "prec": 
+				// PRECEDES
+				return rune(0x227a), true
 			case "precapprox": 
 				// PRECEDES ABOVE ALMOST EQUAL TO
 				return rune(0x2ab7), true
+			case "preccurlyeq": 
+				// PRECEDES OR EQUAL TO
+				return rune(0x227c), true
 			case "preceq": 
 				// PRECEDES ABOVE SINGLE-LINE EQUALS SIGN
 				return rune(0x2aaf), true
@@ -5775,12 +5760,18 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "precneqq": 
 				// PRECEDES ABOVE NOT EQUAL TO
 				return rune(0x2ab5), true
-			case "primes": 
-				// DOUBLE-STRUCK CAPITAL P
-				return rune(0x2119), true
+			case "precnsim": 
+				// PRECEDES BUT NOT EQUIVALENT TO
+				return rune(0x22e8), true
+			case "precsim": 
+				// PRECEDES OR EQUIVALENT TO
+				return rune(0x227e), true
 			case "prime": 
 				// PRIME
 				return rune(0x2032), true
+			case "primes": 
+				// DOUBLE-STRUCK CAPITAL P
+				return rune(0x2119), true
 			case "prnE": 
 				// PRECEDES ABOVE NOT EQUAL TO
 				return rune(0x2ab5), true
@@ -5790,6 +5781,9 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "prnsim": 
 				// PRECEDES BUT NOT EQUIVALENT TO
 				return rune(0x22e8), true
+			case "prod": 
+				// N-ARY PRODUCT
+				return rune(0x220f), true
 			case "profalar": 
 				// ALL AROUND-PROFILE
 				return rune(0x232e), true
@@ -5799,6 +5793,12 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "profsurf": 
 				// SEGMENT
 				return rune(0x2313), true
+			case "prop": 
+				// PROPORTIONAL TO
+				return rune(0x221d), true
+			case "propto": 
+				// PROPORTIONAL TO
+				return rune(0x221d), true
 			case "prsim": 
 				// PRECEDES OR EQUIVALENT TO
 				return rune(0x227e), true
@@ -5842,12 +5842,12 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "quatint": 
 				// QUATERNION INTEGRAL OPERATOR
 				return rune(0x2a16), true
-			case "questeq": 
-				// QUESTIONED EQUAL TO
-				return rune(0x225f), true
 			case "quest": 
 				// QUESTION MARK
 				return rune(0x3f), true
+			case "questeq": 
+				// QUESTIONED EQUAL TO
+				return rune(0x225f), true
 			case "quot": 
 				// QUOTATION MARK
 				return rune(0x22), true
@@ -5897,33 +5897,21 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "raquo": 
 				// RIGHT-POINTING DOUBLE ANGLE QUOTATION MARK
 				return rune(0xbb), true
+			case "rarr": 
+				// RIGHTWARDS ARROW
+				return rune(0x2192), true
 			case "rarr2": 
 				// RIGHTWARDS PAIRED ARROWS
 				return rune(0x21c9), true
 			case "rarr3": 
 				// THREE RIGHTWARDS ARROWS
 				return rune(0x21f6), true
-			case "rarrb": 
-				// RIGHTWARDS ARROW TO BAR
-				return rune(0x21e5), true
-			case "rarrhk": 
-				// RIGHTWARDS ARROW WITH HOOK
-				return rune(0x21aa), true
-			case "rarrlp": 
-				// RIGHTWARDS ARROW WITH LOOP
-				return rune(0x21ac), true
-			case "rarrtl": 
-				// RIGHTWARDS ARROW WITH TAIL
-				return rune(0x21a3), true
-			case "rarrw": 
-				// RIGHTWARDS WAVE ARROW
-				return rune(0x219d), true
-			case "rarr": 
-				// RIGHTWARDS ARROW
-				return rune(0x2192), true
 			case "rarrap": 
 				// RIGHTWARDS ARROW ABOVE ALMOST EQUAL TO
 				return rune(0x2975), true
+			case "rarrb": 
+				// RIGHTWARDS ARROW TO BAR
+				return rune(0x21e5), true
 			case "rarrbfs": 
 				// RIGHTWARDS ARROW FROM BAR TO BLACK DIAMOND
 				return rune(0x2920), true
@@ -5933,12 +5921,24 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "rarrfs": 
 				// RIGHTWARDS ARROW TO BLACK DIAMOND
 				return rune(0x291e), true
+			case "rarrhk": 
+				// RIGHTWARDS ARROW WITH HOOK
+				return rune(0x21aa), true
+			case "rarrlp": 
+				// RIGHTWARDS ARROW WITH LOOP
+				return rune(0x21ac), true
 			case "rarrpl": 
 				// RIGHTWARDS ARROW WITH PLUS BELOW
 				return rune(0x2945), true
 			case "rarrsim": 
 				// RIGHTWARDS ARROW ABOVE TILDE OPERATOR
 				return rune(0x2974), true
+			case "rarrtl": 
+				// RIGHTWARDS ARROW WITH TAIL
+				return rune(0x21a3), true
+			case "rarrw": 
+				// RIGHTWARDS WAVE ARROW
+				return rune(0x219d), true
 			case "rarrx": 
 				// RIGHTWARDS ARROW THROUGH X
 				return rune(0x2947), true
@@ -6005,27 +6005,27 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "rdosearr": 
 				// RISING DIAGONAL CROSSING SOUTH EAST ARROW
 				return rune(0x2930), true
-			case "rdquor": 
+			case "rdquo": 
 				// RIGHT DOUBLE QUOTATION MARK
 				return rune(0x201d), true
-			case "rdquo": 
+			case "rdquor": 
 				// RIGHT DOUBLE QUOTATION MARK
 				return rune(0x201d), true
 			case "rdsh": 
 				// DOWNWARDS ARROW WITH TIP RIGHTWARDS
 				return rune(0x21b3), true
-			case "realpart": 
-				// BLACK-LETTER CAPITAL R
-				return rune(0x211c), true
-			case "reals": 
-				// DOUBLE-STRUCK CAPITAL R
-				return rune(0x211d), true
 			case "real": 
 				// BLACK-LETTER CAPITAL R
 				return rune(0x211c), true
 			case "realine": 
 				// SCRIPT CAPITAL R
 				return rune(0x211b), true
+			case "realpart": 
+				// BLACK-LETTER CAPITAL R
+				return rune(0x211c), true
+			case "reals": 
+				// DOUBLE-STRUCK CAPITAL R
+				return rune(0x211d), true
 			case "rect": 
 				// WHITE RECTANGLE
 				return rune(0x25ad), true
@@ -6059,18 +6059,18 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "rharul": 
 				// RIGHTWARDS HARPOON WITH BARB UP ABOVE LONG DASH
 				return rune(0x296c), true
-			case "rhov": 
-				// GREEK RHO SYMBOL
-				return rune(0x03f1), true
 			case "rho": 
 				// GREEK SMALL LETTER RHO
 				return rune(0x03c1), true
-			case "rightarrowtail": 
-				// RIGHTWARDS ARROW WITH TAIL
-				return rune(0x21a3), true
+			case "rhov": 
+				// GREEK RHO SYMBOL
+				return rune(0x03f1), true
 			case "rightarrow": 
 				// RIGHTWARDS ARROW
 				return rune(0x2192), true
+			case "rightarrowtail": 
+				// RIGHTWARDS ARROW WITH TAIL
+				return rune(0x21a3), true
 			case "rightharpoondown": 
 				// RIGHTWARDS HARPOON WITH BARB DOWNWARDS
 				return rune(0x21c1), true
@@ -6101,10 +6101,10 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "risingdotseq": 
 				// IMAGE OF OR APPROXIMATELY EQUAL TO
 				return rune(0x2253), true
-			case "rlarr2": 
+			case "rlarr": 
 				// RIGHTWARDS ARROW OVER LEFTWARDS ARROW
 				return rune(0x21c4), true
-			case "rlarr": 
+			case "rlarr2": 
 				// RIGHTWARDS ARROW OVER LEFTWARDS ARROW
 				return rune(0x21c4), true
 			case "rlhar": 
@@ -6149,12 +6149,12 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "rotimes": 
 				// MULTIPLICATION SIGN IN RIGHT HALF CIRCLE
 				return rune(0x2a35), true
-			case "rpargt": 
-				// RIGHT ARC GREATER-THAN BRACKET
-				return rune(0x2994), true
 			case "rpar": 
 				// RIGHT PARENTHESIS
 				return rune(0x29), true
+			case "rpargt": 
+				// RIGHT ARC GREATER-THAN BRACKET
+				return rune(0x2994), true
 			case "rppolint": 
 				// LINE INTEGRATION WITH RECTANGULAR PATH AROUND POLE
 				return rune(0x2a12), true
@@ -6176,10 +6176,10 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "rsqb": 
 				// RIGHT SQUARE BRACKET
 				return rune(0x5d), true
-			case "rsquor": 
+			case "rsquo": 
 				// RIGHT SINGLE QUOTATION MARK
 				return rune(0x2019), true
-			case "rsquo": 
+			case "rsquor": 
 				// RIGHT SINGLE QUOTATION MARK
 				return rune(0x2019), true
 			case "rthree": 
@@ -6188,15 +6188,15 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "rtimes": 
 				// RIGHT NORMAL FACTOR SEMIDIRECT PRODUCT
 				return rune(0x22ca), true
+			case "rtri": 
+				// WHITE RIGHT-POINTING SMALL TRIANGLE
+				return rune(0x25b9), true
 			case "rtrie": 
 				// CONTAINS AS NORMAL SUBGROUP OR EQUAL TO
 				return rune(0x22b5), true
 			case "rtrif": 
 				// BLACK RIGHT-POINTING SMALL TRIANGLE
 				return rune(0x25b8), true
-			case "rtri": 
-				// WHITE RIGHT-POINTING SMALL TRIANGLE
-				return rune(0x25b9), true
 			case "rtriltri": 
 				// RIGHT TRIANGLE ABOVE LEFT TRIANGLE
 				return rune(0x29ce), true
@@ -6243,12 +6243,12 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "sccue": 
 				// SUCCEEDS OR EQUAL TO
 				return rune(0x227d), true
-			case "scedil": 
-				// LATIN SMALL LETTER S WITH CEDILLA
-				return rune(0x015f), true
 			case "sce": 
 				// SUCCEEDS ABOVE SINGLE-LINE EQUALS SIGN
 				return rune(0x2ab0), true
+			case "scedil": 
+				// LATIN SMALL LETTER S WITH CEDILLA
+				return rune(0x015f), true
 			case "scirc": 
 				// LATIN SMALL LETTER S WITH CIRCUMFLEX
 				return rune(0x015d), true
@@ -6270,12 +6270,12 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "scy": 
 				// CYRILLIC SMALL LETTER ES
 				return rune(0x0441), true
-			case "sdotb": 
-				// SQUARED DOT OPERATOR
-				return rune(0x22a1), true
 			case "sdot": 
 				// DOT OPERATOR
 				return rune(0x22c5), true
+			case "sdotb": 
+				// SQUARED DOT OPERATOR
+				return rune(0x22a1), true
 			case "sdote": 
 				// EQUALS SIGN WITH DOT BELOW
 				return rune(0x2a66), true
@@ -6285,10 +6285,10 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "searhk": 
 				// SOUTH EAST ARROW WITH HOOK
 				return rune(0x2925), true
-			case "searrow": 
+			case "searr": 
 				// SOUTH EAST ARROW
 				return rune(0x2198), true
-			case "searr": 
+			case "searrow": 
 				// SOUTH EAST ARROW
 				return rune(0x2198), true
 			case "sect": 
@@ -6315,12 +6315,12 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "sfgr": 
 				// GREEK SMALL LETTER FINAL SIGMA
 				return rune(0x03c2), true
-			case "sfrown": 
-				// FROWN
-				return rune(0x2322), true
 			case "sfr": 
 				// MATHEMATICAL FRAKTUR SMALL S
 				return rune(0x01d530), true
+			case "sfrown": 
+				// FROWN
+				return rune(0x2322), true
 			case "sgr": 
 				// GREEK SMALL LETTER SIGMA
 				return rune(0x03c3), true
@@ -6420,15 +6420,15 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "softcy": 
 				// CYRILLIC SMALL LETTER SOFT SIGN
 				return rune(0x044c), true
-			case "solbar": 
-				// APL FUNCTIONAL SYMBOL SLASH BAR
-				return rune(0x233f), true
-			case "solb": 
-				// SQUARED RISING DIAGONAL SLASH
-				return rune(0x29c4), true
 			case "sol": 
 				// SOLIDUS
 				return rune(0x2f), true
+			case "solb": 
+				// SQUARED RISING DIAGONAL SLASH
+				return rune(0x29c4), true
+			case "solbar": 
+				// APL FUNCTIONAL SYMBOL SLASH BAR
+				return rune(0x233f), true
 			case "sopf": 
 				// MATHEMATICAL DOUBLE-STRUCK SMALL S
 				return rune(0x01d564), true
@@ -6513,12 +6513,12 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "sstarf": 
 				// STAR OPERATOR
 				return rune(0x22c6), true
-			case "starf": 
-				// BLACK STAR
-				return rune(0x2605), true
 			case "star": 
 				// WHITE STAR
 				return rune(0x2606), true
+			case "starf": 
+				// BLACK STAR
+				return rune(0x2605), true
 			case "stigma": 
 				// GREEK LETTER STIGMA
 				return rune(0x03da), true
@@ -6696,10 +6696,10 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "swarhk": 
 				// SOUTH WEST ARROW WITH HOOK
 				return rune(0x2926), true
-			case "swarrow": 
+			case "swarr": 
 				// SOUTH WEST ARROW
 				return rune(0x2199), true
-			case "swarr": 
+			case "swarrow": 
 				// SOUTH WEST ARROW
 				return rune(0x2199), true
 			case "swnwar": 
@@ -6751,18 +6751,18 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "thermod": 
 				// THERMODYNAMIC
 				return rune(0x29e7), true
-			case "thetasym": 
-				// GREEK THETA SYMBOL
-				return rune(0x03d1), true
-			case "thetas": 
-				// GREEK SMALL LETTER THETA
-				return rune(0x03b8), true
-			case "thetav": 
-				// GREEK THETA SYMBOL
-				return rune(0x03d1), true
 			case "theta": 
 				// GREEK SMALL LETTER THETA
 				return rune(0x03b8), true
+			case "thetas": 
+				// GREEK SMALL LETTER THETA
+				return rune(0x03b8), true
+			case "thetasym": 
+				// GREEK THETA SYMBOL
+				return rune(0x03d1), true
+			case "thetav": 
+				// GREEK THETA SYMBOL
+				return rune(0x03d1), true
 			case "thgr": 
 				// GREEK SMALL LETTER THETA
 				return rune(0x03b8), true
@@ -6790,6 +6790,9 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "timeint": 
 				// INTEGRAL WITH TIMES SIGN
 				return rune(0x2a18), true
+			case "times": 
+				// MULTIPLICATION SIGN
+				return rune(0xd7), true
 			case "timesb": 
 				// SQUARED TIMES
 				return rune(0x22a0), true
@@ -6799,9 +6802,6 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "timesd": 
 				// MULTIPLICATION SIGN WITH DOT ABOVE
 				return rune(0x2a30), true
-			case "times": 
-				// MULTIPLICATION SIGN
-				return rune(0xd7), true
 			case "tint": 
 				// TRIPLE INTEGRAL
 				return rune(0x222d), true
@@ -6817,12 +6817,12 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "topcir": 
 				// DOWN TACK WITH CIRCLE BELOW
 				return rune(0x2af1), true
-			case "topfork": 
-				// PITCHFORK WITH TEE TOP
-				return rune(0x2ada), true
 			case "topf": 
 				// MATHEMATICAL DOUBLE-STRUCK SMALL T
 				return rune(0x01d565), true
+			case "topfork": 
+				// PITCHFORK WITH TEE TOP
+				return rune(0x2ada), true
 			case "tosa": 
 				// SOUTH EAST ARROW AND SOUTH WEST ARROW
 				return rune(0x2929), true
@@ -6835,15 +6835,6 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "triS": 
 				// S IN TRIANGLE
 				return rune(0x29cc), true
-			case "trianglelefteq": 
-				// NORMAL SUBGROUP OF OR EQUAL TO
-				return rune(0x22b4), true
-			case "triangleq": 
-				// DELTA EQUAL TO
-				return rune(0x225c), true
-			case "trianglerighteq": 
-				// CONTAINS AS NORMAL SUBGROUP OR EQUAL TO
-				return rune(0x22b5), true
 			case "triangle": 
 				// WHITE UP-POINTING SMALL TRIANGLE
 				return rune(0x25b5), true
@@ -6853,9 +6844,18 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "triangleleft": 
 				// WHITE LEFT-POINTING SMALL TRIANGLE
 				return rune(0x25c3), true
+			case "trianglelefteq": 
+				// NORMAL SUBGROUP OF OR EQUAL TO
+				return rune(0x22b4), true
+			case "triangleq": 
+				// DELTA EQUAL TO
+				return rune(0x225c), true
 			case "triangleright": 
 				// WHITE RIGHT-POINTING SMALL TRIANGLE
 				return rune(0x25b9), true
+			case "trianglerighteq": 
+				// CONTAINS AS NORMAL SUBGROUP OR EQUAL TO
+				return rune(0x22b5), true
 			case "tribar": 
 				// TRIANGLE WITH UNDERBAR
 				return rune(0x29cb), true
@@ -6926,12 +6926,12 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "uacute": 
 				// LATIN SMALL LETTER U WITH ACUTE
 				return rune(0xfa), true
-			case "uarr2": 
-				// UPWARDS PAIRED ARROWS
-				return rune(0x21c8), true
 			case "uarr": 
 				// UPWARDS ARROW
 				return rune(0x2191), true
+			case "uarr2": 
+				// UPWARDS PAIRED ARROWS
+				return rune(0x21c8), true
 			case "uarrb": 
 				// UPWARDS ARROW TO BAR
 				return rune(0x2912), true
@@ -7043,13 +7043,13 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "uplus": 
 				// MULTISET UNION
 				return rune(0x228e), true
+			case "upsi": 
+				// GREEK SMALL LETTER UPSILON
+				return rune(0x03c5), true
 			case "upsih": 
 				// GREEK UPSILON WITH HOOK SYMBOL
 				return rune(0x03d2), true
 			case "upsilon": 
-				// GREEK SMALL LETTER UPSILON
-				return rune(0x03c5), true
-			case "upsi": 
 				// GREEK SMALL LETTER UPSILON
 				return rune(0x03c5), true
 			case "upuparrows": 
@@ -7073,12 +7073,12 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "uring": 
 				// LATIN SMALL LETTER U WITH RING ABOVE
 				return rune(0x016f), true
-			case "urtrif": 
-				// BLACK UPPER RIGHT TRIANGLE
-				return rune(0x25e5), true
 			case "urtri": 
 				// UPPER RIGHT TRIANGLE
 				return rune(0x25f9), true
+			case "urtrif": 
+				// BLACK UPPER RIGHT TRIANGLE
+				return rune(0x25e5), true
 			case "uscr": 
 				// MATHEMATICAL SCRIPT SMALL U
 				return rune(0x01d4ca), true
@@ -7088,12 +7088,12 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "utilde": 
 				// LATIN SMALL LETTER U WITH TILDE
 				return rune(0x0169), true
-			case "utrif": 
-				// BLACK UP-POINTING SMALL TRIANGLE
-				return rune(0x25b4), true
 			case "utri": 
 				// WHITE UP-POINTING SMALL TRIANGLE
 				return rune(0x25b5), true
+			case "utrif": 
+				// BLACK UP-POINTING SMALL TRIANGLE
+				return rune(0x25b4), true
 			case "uuarr": 
 				// UPWARDS PAIRED ARROWS
 				return rune(0x21c8), true
@@ -7206,12 +7206,12 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "verbar": 
 				// VERTICAL LINE
 				return rune(0x7c), true
-			case "vert3": 
-				// TRIPLE VERTICAL BAR BINARY RELATION
-				return rune(0x2af4), true
 			case "vert": 
 				// VERTICAL LINE
 				return rune(0x7c), true
+			case "vert3": 
+				// TRIPLE VERTICAL BAR BINARY RELATION
+				return rune(0x2af4), true
 			case "vfr": 
 				// MATHEMATICAL FRAKTUR SMALL V
 				return rune(0x01d533), true
@@ -7285,10 +7285,10 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			case "wp": 
 				// SCRIPT CAPITAL P
 				return rune(0x2118), true
-			case "wreath": 
+			case "wr": 
 				// WREATH PRODUCT
 				return rune(0x2240), true
-			case "wr": 
+			case "wreath": 
 				// WREATH PRODUCT
 				return rune(0x2240), true
 			case "wscr": 

@@ -57,62 +57,50 @@ to_title :: proc(r: rune) -> rune {
 	return rune(c)
 }
 
-
 is_lower :: proc(r: rune) -> bool {
-	if r <= MAX_ASCII {
-		return u32(r)-'a' < 26
-	}
-	c := i32(r)
-	p := binary_search(c, to_upper_ranges[:], len(to_upper_ranges)/3, 3)
-	if p >= 0 && to_upper_ranges[p] <= c && c <= to_upper_ranges[p+1] {
-		return true
-	}
-	p = binary_search(c, to_upper_singlets[:], len(to_upper_singlets)/2, 2)
-	if p >= 0 && c == to_upper_singlets[p] {
-		return true
+	if r < RUNE_LIMIT {
+		block := r >> LOG2_BLOCK_SIZE
+		index := r & (BLOCK_SIZE-1)
+		cat := blocks[indices[block]][index]
+		return cat == .Ll
 	}
 	return false
 }
 
 is_upper :: proc(r: rune) -> bool {
-	if r <= MAX_ASCII {
-		return u32(r)-'A' < 26
+	if r < RUNE_LIMIT {
+		block := r >> LOG2_BLOCK_SIZE
+		index := r & (BLOCK_SIZE-1)
+		cat := blocks[indices[block]][index]
+		return cat == .Lu
 	}
-	c := i32(r)
-	p := binary_search(c, to_lower_ranges[:], len(to_lower_ranges)/3, 3)
-	if p >= 0 && to_lower_ranges[p] <= c && c <= to_lower_ranges[p+1] {
-		return true
-	}
-	p = binary_search(c, to_lower_singlets[:], len(to_lower_singlets)/2, 2)
-	if p >= 0 && c == to_lower_singlets[p] {
-		return true
+	return false
+}
+
+is_title :: proc(r: rune) -> bool {
+	if r < RUNE_LIMIT {
+		block := r >> LOG2_BLOCK_SIZE
+		index := r & (BLOCK_SIZE-1)
+		cat := blocks[indices[block]][index]
+		return cat == .Lt
 	}
 	return false
 }
 
 is_alpha :: is_letter
 is_letter :: proc(r: rune) -> bool {
-	if u32(r) <= MAX_LATIN1 {
-		return char_properties[u8(r)]&pLmask != 0
-	}
-	if is_upper(r) || is_lower(r) {
-		return true
-	}
-
-	c := i32(r)
-	p := binary_search(c, alpha_ranges[:], len(alpha_ranges)/2, 2)
-	if p >= 0 && alpha_ranges[p] <= c && c <= alpha_ranges[p+1] {
-		return true
-	}
-	p = binary_search(c, alpha_singlets[:], len(alpha_singlets), 1)
-	if p >= 0 && c == alpha_singlets[p] {
-		return true
+	if r < RUNE_LIMIT {
+		block := r >> LOG2_BLOCK_SIZE
+		index := r & (BLOCK_SIZE-1)
+		cat := blocks[indices[block]][index]
+		return false ||
+			cat == .Lu ||
+			cat == .Ll ||
+			cat == .Lt ||
+			cat == .Lm ||
+			cat == .Lo
 	}
 	return false
-}
-
-is_title :: proc(r: rune) -> bool {
-	return is_upper(r) && is_lower(r)
 }
 
 is_digit :: proc(r: rune) -> bool {
@@ -125,17 +113,13 @@ is_digit :: proc(r: rune) -> bool {
 
 is_white_space :: is_space
 is_space :: proc(r: rune) -> bool {
-	if u32(r) <= MAX_LATIN1 {
-		switch r {
-		case '\t', '\n', '\v', '\f', '\r', ' ', 0x85, 0xa0:
-			return true
-		}
-		return false
-	}
-	c := i32(r)
-	p := binary_search(c, space_ranges[:], len(space_ranges)/2, 2)
-	if p >= 0 && space_ranges[p] <= c && c <= space_ranges[p+1] {
-		return true
+	if r <= RUNE_LIMIT {
+		block := r >> LOG2_BLOCK_SIZE
+		index := r & (BLOCK_SIZE-1)
+		cat := blocks[indices[block]][index]
+		// Note: Tab, CR and LF are control characters, so we handle them
+		// specially. This might be a bit of a dodgy logic.
+		return cat == .Zs || r == '\t' || r == '\r' || r == '\n'
 	}
 	return false
 }
@@ -151,45 +135,69 @@ is_combining :: proc(r: rune) -> bool {
 }
 
 
-
 is_graphic :: proc(r: rune) -> bool {
-	if u32(r) <= MAX_LATIN1 {
-		return char_properties[u8(r)]&pg != 0
+	if r < RUNE_LIMIT {
+		block := r >> LOG2_BLOCK_SIZE
+		index := r & (BLOCK_SIZE-1)
+		cat := blocks[indices[block]][index]
+		return true &&
+			!(.Cc <= cat && cat <= .Cn) &&
+			!(.Zl <= cat && cat <= .Zs)
 	}
 	return false
 }
 
 is_print :: proc(r: rune) -> bool {
-	if u32(r) <= MAX_LATIN1 {
-		return char_properties[u8(r)]&pp != 0
+	if r == ' ' {
+		return true
+	}
+	if r < RUNE_LIMIT {
+		block := r >> LOG2_BLOCK_SIZE
+		index := r & (BLOCK_SIZE-1)
+		cat := blocks[indices[block]][index]
+		return true &&
+			!(.Cc <= cat && cat <= .Cn) &&
+			!(.Zl <= cat && cat <= .Zs)
 	}
 	return false
 }
 
 is_control :: proc(r: rune) -> bool {
-	if u32(r) <= MAX_LATIN1 {
-		return char_properties[u8(r)]&pC != 0
+	if r < RUNE_LIMIT {
+		block := r >> LOG2_BLOCK_SIZE
+		index := r & (BLOCK_SIZE-1)
+		cat := blocks[indices[block]][index]
+		return cat == .Cc
 	}
 	return false
 }
 
 is_number :: proc(r: rune) -> bool {
-	if u32(r) <= MAX_LATIN1 {
-		return char_properties[u8(r)]&pN != 0
+	if r < RUNE_LIMIT {
+		block := r >> LOG2_BLOCK_SIZE
+		index := r & (BLOCK_SIZE-1)
+		cat := blocks[indices[block]][index]
+		return cat == .Nd
 	}
 	return false
 }
 
 is_punct :: proc(r: rune) -> bool {
-	if u32(r) <= MAX_LATIN1 {
-		return char_properties[u8(r)]&pP != 0
+	if r < RUNE_LIMIT {
+		block := r >> LOG2_BLOCK_SIZE
+		index := r & (BLOCK_SIZE-1)
+		cat := blocks[indices[block]][index]
+		return .Pc <= cat && cat <= .Po
 	}
 	return false
 }
 
 is_symbol :: proc(r: rune) -> bool {
-	if u32(r) <= MAX_LATIN1 {
-		return char_properties[u8(r)]&pS != 0
+	if r < RUNE_LIMIT {
+		block := r >> LOG2_BLOCK_SIZE
+		index := r & (BLOCK_SIZE-1)
+		cat := blocks[indices[block]][index]
+		return .Sm <= cat && cat <= .So
 	}
 	return false
 }
