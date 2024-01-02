@@ -2070,31 +2070,31 @@ gb_internal bool check_procedure_type(CheckerContext *ctx, Type *type, Ast *proc
 	type->Proc.diverging            = pt->diverging;
 	type->Proc.optional_ok          = optional_ok;
 
-	if (param_count > 0) {
-		Entity *end = params->Tuple.variables[param_count-1];
-		if (end->flags&EntityFlag_CVarArg) {
+	bool is_polymorphic = false;
+	for (isize i = 0; i < param_count; i++) {
+		Entity *e = params->Tuple.variables[i];
+
+		if (e->kind != Entity_Variable) {
+			is_polymorphic = true;
+		} else if (is_type_polymorphic(e->type)) {
+			is_polymorphic = true;
+		}
+
+		if (e->flags&EntityFlag_CVarArg) {
+			if (i != param_count - 1) {
+				error(e->token, "#c_vararg can only be applied to the last parameter");
+				continue;
+			}
+
 			switch (cc) {
 			default:
 				type->Proc.c_vararg = true;
 				break;
 			case ProcCC_Odin:
 			case ProcCC_Contextless:
-				error(end->token, "Calling convention does not support #c_vararg");
+				error(e->token, "Calling convention does not support #c_vararg");
 				break;
 			}
-		}
-	}
-
-
-	bool is_polymorphic = false;
-	for (isize i = 0; i < param_count; i++) {
-		Entity *e = params->Tuple.variables[i];
-		if (e->kind != Entity_Variable) {
-			is_polymorphic = true;
-			break;
-		} else if (is_type_polymorphic(e->type)) {
-			is_polymorphic = true;
-			break;
 		}
 	}
 	for (isize i = 0; i < result_count; i++) {
