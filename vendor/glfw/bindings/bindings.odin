@@ -181,7 +181,7 @@ foreign glfw {
 	SetCharCallback        :: proc(window: WindowHandle, cbfun: CharProc)        -> CharProc ---
 	SetCharModsCallback    :: proc(window: WindowHandle, cbfun: CharModsProc)    -> CharModsProc ---
 	SetCursorEnterCallback :: proc(window: WindowHandle, cbfun: CursorEnterProc) -> CursorEnterProc ---
-	SetJoystickCallback    :: proc(window: WindowHandle, cbfun: JoystickProc)    -> JoystickProc ---
+	SetJoystickCallback    :: proc(cbfun: JoystickProc)    -> JoystickProc ---
 
 	SetErrorCallback :: proc(cbfun: ErrorProc) -> ErrorProc ---
 }
