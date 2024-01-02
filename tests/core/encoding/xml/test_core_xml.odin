@@ -159,7 +159,7 @@ TESTS :: []TEST{
 	},
 
 	/*
-		Parse the 8.2 MiB unicode.xml for good measure.
+		Parse the 9.08 MiB unicode.xml for good measure.
 	*/
 	{
 		filename  = "XML/unicode.xml",
@@ -170,7 +170,7 @@ TESTS :: []TEST{
 			expected_doctype = "",
 		},
 		err       = .None,
-		crc32     = 0x420dbac5,
+		crc32     = 0x0b6100ab,
 	},
 }
 
