@@ -107,7 +107,7 @@ gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c) {
 	String init_fullpath = c->parser->init_fullpath;
 	linker_data_init(gen, &c->info, init_fullpath);
 
-	#if defined(GB_SYSTEM_OSX) && (LLVM_MAJOR_VERSION < 14)
+	#if defined(GB_SYSTEM_OSX) && (LLVM_VERSION_MAJOR < 14)
 	linker_enable_system_library_linking(gen);
 	#endif
 
