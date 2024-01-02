@@ -7,9 +7,18 @@ struct LinkerData {
 	Array<String> output_temp_paths;
 	String   output_base;
 	String   output_name;
+#if defined(GB_SYSTEM_OSX)
+	b8       needs_system_library_linked;
+#endif
 };
 
 gb_internal i32 system_exec_command_line_app(char const *name, char const *fmt, ...);
+
+#if defined(GB_SYSTEM_OSX)
+gb_internal void linker_enable_system_library_linking(LinkerData *ld) {
+	ld->needs_system_library_linked = 1;
+}
+#endif
 
 gb_internal void linker_data_init(LinkerData *ld, CheckerInfo *info, String const &init_fullpath) {
 	gbAllocator ha = heap_allocator();
@@ -17,6 +26,10 @@ gb_internal void linker_data_init(LinkerData *ld, CheckerInfo *info, String cons
 	array_init(&ld->output_temp_paths,   ha);
 	array_init(&ld->foreign_libraries,   ha, 0, 1024);
 	ptr_set_init(&ld->foreign_libraries_set, 1024);
+
+#if defined(GB_SYSTEM_OSX)
+	ld->needs_system_library_linked = 0;
+#endif 
 
 	if (build_context.out_filepath.len == 0) {
 		ld->output_name = remove_directory_from_path(init_fullpath);
@@ -470,7 +483,12 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 			gbString platform_lib_str = gb_string_make(heap_allocator(), "");
 			defer (gb_string_free(platform_lib_str));
 			if (build_context.metrics.os == TargetOs_darwin) {
-				platform_lib_str = gb_string_appendc(platform_lib_str, "-lSystem -lm -Wl,-syslibroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk -L/usr/local/lib");
+				platform_lib_str = gb_string_appendc(platform_lib_str, "-lm -Wl,-syslibroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk -L/usr/local/lib");
+				#if defined(GB_SYSTEM_OSX)
+				if(gen->needs_system_library_linked == 1) {
+					platform_lib_str = gb_string_appendc(platform_lib_str, " -lSystem ");
+				}
+				#endif
 			} else {
 				platform_lib_str = gb_string_appendc(platform_lib_str, "-lc -lm");
 			}
