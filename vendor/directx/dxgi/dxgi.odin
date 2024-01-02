@@ -40,7 +40,7 @@ IUnknown_VTable :: struct {
 foreign dxgi {
 	CreateDXGIFactory      :: proc(riid: ^IID, ppFactory: ^rawptr) -> HRESULT ---
 	CreateDXGIFactory1     :: proc(riid: ^IID, ppFactory: ^rawptr) -> HRESULT ---
-	CreateDXGIFactory2     :: proc(Flags: u32, riid: ^IID, ppFactory: ^rawptr) -> HRESULT ---
+	CreateDXGIFactory2     :: proc(Flags: CREATE_FACTORY, riid: ^IID, ppFactory: ^rawptr) -> HRESULT ---
 	DXGIGetDebugInterface1 :: proc(Flags: u32, riid: ^IID, pDebug: ^rawptr) -> HRESULT ---
 }
 
@@ -76,10 +76,11 @@ RESOURCE_PRIORITY :: enum u32 {
 	MAXIMUM = 0xc8000000,
 }
 
-MAP :: enum u32 {
-	READ    = 1,
-	WRITE   = 2,
-	DISCARD = 4,
+MAP :: distinct bit_set[MAP_FLAG; u32]
+MAP_FLAG :: enum u32 {
+	READ    = 0,
+	WRITE   = 1,
+	DISCARD = 2,
 }
 
 ENUM_MODES :: distinct bit_set[ENUM_MODE; u32]
@@ -117,9 +118,19 @@ MWA_VALID :: MWA{
 	.NO_PRINT_SCREEN,
 }
 
+SHARED_RESOURCE_RW :: distinct bit_set[SHARED_RESOURCE_RW_FLAG; u32]
+SHARED_RESOURCE_RW_FLAG :: enum u32 {
+	READ  = 31,
+	WRITE = 0,
+}
 SHARED_RESOURCE_READ  :: 0x80000000
 SHARED_RESOURCE_WRITE :: 1
 CREATE_FACTORY_DEBUG  :: 0x1
+
+CREATE_FACTORY :: distinct bit_set[CREATE_FACTORY_FLAG; u32]
+CREATE_FACTORY_FLAG :: enum u32 {
+	DEBUG = 0,
+}
 
 RATIONAL :: struct {
 	Numerator:   u32,
@@ -418,20 +429,21 @@ SWAP_EFFECT :: enum i32 {
 	FLIP_DISCARD    = 4,
 }
 
-SWAP_CHAIN_FLAG :: enum u32 { // TODO: convert to bit_set
-	NONPREROTATED                          = 0x1,
-	ALLOW_MODE_SWITCH                      = 0x2,
-	GDI_COMPATIBLE                         = 0x4,
-	RESTRICTED_CONTENT                     = 0x8,
-	RESTRICT_SHARED_RESOURCE_DRIVER        = 0x10,
-	DISPLAY_ONLY                           = 0x20,
-	FRAME_LATENCY_WAITABLE_OBJECT          = 0x40,
-	FOREGROUND_LAYER                       = 0x80,
-	FULLSCREEN_VIDEO                       = 0x100,
-	YUV_VIDEO                              = 0x200,
-	HW_PROTECTED                           = 0x400,
-	ALLOW_TEARING                          = 0x800,
-	RESTRICTED_TO_ALL_HOLOGRAPHIC_DISPLAYS = 0x1000,
+SWAP_CHAIN :: distinct bit_set[SWAP_CHAIN_FLAG; u32]
+SWAP_CHAIN_FLAG :: enum u32 {
+	NONPREROTATED = 0,
+	ALLOW_MODE_SWITCH,
+	GDI_COMPATIBLE,
+	RESTRICTED_CONTENT,
+	RESTRICT_SHARED_RESOURCE_DRIVER,
+	DISPLAY_ONLY,
+	FRAME_LATENCY_WAITABLE_OBJECT,
+	FOREGROUND_LAYER,
+	FULLSCREEN_VIDEO,
+	YUV_VIDEO,
+	HW_PROTECTED,
+	ALLOW_TEARING,
+	RESTRICTED_TO_ALL_HOLOGRAPHIC_DISPLAYS,
 }
 
 SWAP_CHAIN_DESC :: struct {
@@ -442,7 +454,7 @@ SWAP_CHAIN_DESC :: struct {
 	OutputWindow: HWND,
 	Windowed:     BOOL,
 	SwapEffect:   SWAP_EFFECT,
-	Flags:        u32,
+	Flags:        SWAP_CHAIN,
 }
 
 
@@ -481,8 +493,8 @@ IResource_VTable :: struct {
 	using idxgidevicesubobject_vtable: IDeviceSubObject_VTable,
 	GetSharedHandle:     proc "stdcall" (this: ^IResource, pSharedHandle: ^HANDLE) -> HRESULT,
 	GetUsage:            proc "stdcall" (this: ^IResource, pUsage: ^USAGE) -> HRESULT,
-	SetEvictionPriority: proc "stdcall" (this: ^IResource, EvictionPriority: u32) -> HRESULT,
-	GetEvictionPriority: proc "stdcall" (this: ^IResource, pEvictionPriority: ^u32) -> HRESULT,
+	SetEvictionPriority: proc "stdcall" (this: ^IResource, EvictionPriority: RESOURCE_PRIORITY) -> HRESULT,
+	GetEvictionPriority: proc "stdcall" (this: ^IResource, pEvictionPriority: ^RESOURCE_PRIORITY) -> HRESULT,
 }
 
 IKeyedMutex_UUID_STRING :: "9D8E1289-D7B3-465F-8126-250E349AF85D"
@@ -506,7 +518,7 @@ ISurface :: struct #raw_union {
 ISurface_VTable :: struct {
 	using idxgidevicesubobject_vtable: IDeviceSubObject_VTable,
 	GetDesc: proc "stdcall" (this: ^ISurface, pDesc: ^SURFACE_DESC) -> HRESULT,
-	Map:     proc "stdcall" (this: ^ISurface, pLockedRect: ^MAPPED_RECT, MapFlags: u32) -> HRESULT,
+	Map:     proc "stdcall" (this: ^ISurface, pLockedRect: ^MAPPED_RECT, MapFlags: MAP) -> HRESULT,
 	Unmap:   proc "stdcall" (this: ^ISurface) -> HRESULT,
 }
 
@@ -544,7 +556,7 @@ IOutput :: struct #raw_union {
 IOutput_VTable :: struct {
 	using idxgiobject_vtable: IObject_VTable,
 	GetDesc:                     proc "stdcall" (this: ^IOutput, pDesc: ^OUTPUT_DESC) -> HRESULT,
-	GetDisplayModeList:          proc "stdcall" (this: ^IOutput, EnumFormat: FORMAT, Flags: u32, pNumModes: ^u32, pDesc: ^MODE_DESC) -> HRESULT,
+	GetDisplayModeList:          proc "stdcall" (this: ^IOutput, EnumFormat: FORMAT, Flags: ENUM_MODES, pNumModes: ^u32, pDesc: ^MODE_DESC) -> HRESULT,
 	FindClosestMatchingMode:     proc "stdcall" (this: ^IOutput, pModeToMatch: ^MODE_DESC, pClosestMatch: ^MODE_DESC, pConcernedDevice: ^IUnknown) -> HRESULT,
 	WaitForVBlank:               proc "stdcall" (this: ^IOutput) -> HRESULT,
 	TakeOwnership:               proc "stdcall" (this: ^IOutput, pDevice: ^IUnknown, Exclusive: BOOL) -> HRESULT,
@@ -565,12 +577,12 @@ ISwapChain :: struct #raw_union {
 }
 ISwapChain_VTable :: struct {
 	using idxgidevicesubobject_vtable: IDeviceSubObject_VTable,
-	Present:             proc "stdcall" (this: ^ISwapChain, SyncInterval: u32, Flags: u32) -> HRESULT,
+	Present:             proc "stdcall" (this: ^ISwapChain, SyncInterval: u32, Flags: PRESENT) -> HRESULT,
 	GetBuffer:           proc "stdcall" (this: ^ISwapChain, Buffer: u32, riid: ^IID, ppSurface: ^rawptr) -> HRESULT,
 	SetFullscreenState:  proc "stdcall" (this: ^ISwapChain, Fullscreen: BOOL, pTarget: ^IOutput) -> HRESULT,
 	GetFullscreenState:  proc "stdcall" (this: ^ISwapChain, pFullscreen: ^BOOL, ppTarget: ^^IOutput) -> HRESULT,
 	GetDesc:             proc "stdcall" (this: ^ISwapChain, pDesc: ^SWAP_CHAIN_DESC) -> HRESULT,
-	ResizeBuffers:       proc "stdcall" (this: ^ISwapChain, BufferCount: u32, Width: u32, Height: u32, NewFormat: FORMAT, SwapChainFlags: u32) -> HRESULT,
+	ResizeBuffers:       proc "stdcall" (this: ^ISwapChain, BufferCount: u32, Width: u32, Height: u32, NewFormat: FORMAT, SwapChainFlags: SWAP_CHAIN) -> HRESULT,
 	ResizeTarget:        proc "stdcall" (this: ^ISwapChain, pNewTargetParameters: ^MODE_DESC) -> HRESULT,
 	GetContainingOutput: proc "stdcall" (this: ^ISwapChain, ppOutput: ^^IOutput) -> HRESULT,
 	GetFrameStatistics:  proc "stdcall" (this: ^ISwapChain, pStats: ^FRAME_STATISTICS) -> HRESULT,
@@ -586,7 +598,7 @@ IFactory :: struct #raw_union {
 IFactory_VTable :: struct {
 	using idxgiobject_vtable: IObject_VTable,
 	EnumAdapters:          proc "stdcall" (this: ^IFactory, Adapter: u32, ppAdapter: ^^IAdapter) -> HRESULT,
-	MakeWindowAssociation: proc "stdcall" (this: ^IFactory, WindowHandle: HWND, Flags: u32) -> HRESULT,
+	MakeWindowAssociation: proc "stdcall" (this: ^IFactory, WindowHandle: HWND, Flags: MWA) -> HRESULT,
 	GetWindowAssociation:  proc "stdcall" (this: ^IFactory, pWindowHandle: ^HWND) -> HRESULT,
 	CreateSwapChain:       proc "stdcall" (this: ^IFactory, pDevice: ^IUnknown, pDesc: ^SWAP_CHAIN_DESC, ppSwapChain: ^^ISwapChain) -> HRESULT,
 	CreateSoftwareAdapter: proc "stdcall" (this: ^IFactory, Module: HMODULE, ppAdapter: ^^IAdapter) -> HRESULT,
@@ -622,7 +634,7 @@ ADAPTER_DESC1 :: struct {
 	DedicatedSystemMemory: SIZE_T,
 	SharedSystemMemory:    SIZE_T,
 	AdapterLuid:           LUID,
-	Flags:                 u32,
+	Flags:                 ADAPTER_FLAG,
 }
 
 DISPLAY_COLOR_SPACE :: struct {
@@ -700,7 +712,7 @@ OUTDUPL_POINTER_SHAPE_TYPE :: enum i32 {
 }
 
 OUTDUPL_POINTER_SHAPE_INFO :: struct {
-	Type:    u32,
+	Type:    OUTDUPL_POINTER_SHAPE_TYPE,
 	Width:   u32,
 	Height:  u32,
 	Pitch:   u32,
@@ -765,7 +777,7 @@ IResource1 :: struct #raw_union {
 IResource1_VTable :: struct {
 	using idxgiresource_vtable: IResource_VTable,
 	CreateSubresourceSurface: proc "stdcall" (this: ^IResource1, index: u32, ppSurface: ^^ISurface2) -> HRESULT,
-	CreateSharedHandle:       proc "stdcall" (this: ^IResource1, pAttributes: ^win32.SECURITY_ATTRIBUTES, dwAccess: u32, lpName: ^i16, pHandle: ^HANDLE) -> HRESULT,
+	CreateSharedHandle:       proc "stdcall" (this: ^IResource1, pAttributes: ^win32.SECURITY_ATTRIBUTES, dwAccess: SHARED_RESOURCE_RW, lpName: ^i16, pHandle: ^HANDLE) -> HRESULT,
 }
 OFFER_RESOURCE_PRIORITY :: enum i32 {
 	LOW    = 1,
@@ -813,7 +825,7 @@ SWAP_CHAIN_DESC1 :: struct {
 	Scaling:     SCALING,
 	SwapEffect:  SWAP_EFFECT,
 	AlphaMode:   ALPHA_MODE,
-	Flags:       u32,
+	Flags:       SWAP_CHAIN,
 }
 
 SWAP_CHAIN_FULLSCREEN_DESC :: struct {
@@ -844,7 +856,7 @@ ISwapChain1_VTable :: struct {
 	GetFullscreenDesc:        proc "stdcall" (this: ^ISwapChain1, pDesc: ^SWAP_CHAIN_FULLSCREEN_DESC) -> HRESULT,
 	GetHwnd:                  proc "stdcall" (this: ^ISwapChain1, pHwnd: ^HWND) -> HRESULT,
 	GetCoreWindow:            proc "stdcall" (this: ^ISwapChain1, refiid: ^IID, ppUnk: ^rawptr) -> HRESULT,
-	Present1:                 proc "stdcall" (this: ^ISwapChain1, SyncInterval: u32, PresentFlags: u32, pPresentParameters: ^PRESENT_PARAMETERS) -> HRESULT,
+	Present1:                 proc "stdcall" (this: ^ISwapChain1, SyncInterval: u32, PresentFlags: PRESENT, pPresentParameters: ^PRESENT_PARAMETERS) -> HRESULT,
 	IsTemporaryMonoSupported: proc "stdcall" (this: ^ISwapChain1) -> BOOL,
 	GetRestrictToOutput:      proc "stdcall" (this: ^ISwapChain1, ppRestrictToOutput: ^^IOutput) -> HRESULT,
 	SetBackgroundColor:       proc "stdcall" (this: ^ISwapChain1, pColor: ^RGBA) -> HRESULT,
@@ -899,7 +911,7 @@ ADAPTER_DESC2 :: struct {
 	DedicatedSystemMemory:         SIZE_T,
 	SharedSystemMemory:            SIZE_T,
 	AdapterLuid:                   LUID,
-	Flags:                         u32,
+	Flags:                         ADAPTER_FLAG,
 	GraphicsPreemptionGranularity: GRAPHICS_PREEMPTION_GRANULARITY,
 	ComputePreemptionGranularity:  COMPUTE_PREEMPTION_GRANULARITY,
 }
@@ -924,7 +936,7 @@ IOutput1 :: struct #raw_union {
 }
 IOutput1_VTable :: struct {
 	using idxgioutput_vtable: IOutput_VTable,
-	GetDisplayModeList1:      proc "stdcall" (this: ^IOutput1, EnumFormat: FORMAT, Flags: u32, pNumModes: ^u32, pDesc: ^MODE_DESC1) -> HRESULT,
+	GetDisplayModeList1:      proc "stdcall" (this: ^IOutput1, EnumFormat: FORMAT, Flags: ENUM_MODES, pNumModes: ^u32, pDesc: ^MODE_DESC1) -> HRESULT,
 	FindClosestMatchingMode1: proc "stdcall" (this: ^IOutput1, pModeToMatch: ^MODE_DESC1, pClosestMatch: ^MODE_DESC1, pConcernedDevice: ^IUnknown) -> HRESULT,
 	GetDisplaySurfaceData1:   proc "stdcall" (this: ^IOutput1, pDestination: ^IResource) -> HRESULT,
 	DuplicateOutput:          proc "stdcall" (this: ^IOutput1, pDevice: ^IUnknown, ppOutputDuplication: ^^IOutputDuplication) -> HRESULT,
@@ -985,16 +997,17 @@ IFactory3 :: struct #raw_union {
 }
 IFactory3_VTable :: struct {
 	using idxgifactory2_vtable: IFactory2_VTable,
-	GetCreationFlags: proc "stdcall" (this: ^IFactory3) -> u32,
+	GetCreationFlags: proc "stdcall" (this: ^IFactory3) -> CREATE_FACTORY,
 }
 DECODE_SWAP_CHAIN_DESC :: struct {
-	Flags: u32,
+	Flags: SWAP_CHAIN,
 }
 
-MULTIPLANE_OVERLAY_YCbCr_FLAGS :: enum u32 { // TODO: convert to bit_set
-	NOMINAL_RANGE = 0x1,
-	BT709         = 0x2,
-	xvYCC         = 0x4,
+MULTIPLANE_OVERLAY_YCbCr :: distinct bit_set[MULTIPLANE_OVERLAY_YCbCr_FLAGS; u32]
+MULTIPLANE_OVERLAY_YCbCr_FLAGS :: enum u32 {
+	NOMINAL_RANGE = 0,
+	BT709,
+	xvYCC,
 }
 
 
@@ -1006,15 +1019,15 @@ IDecodeSwapChain :: struct #raw_union {
 }
 IDecodeSwapChain_VTable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
-	PresentBuffer: proc "stdcall" (this: ^IDecodeSwapChain, BufferToPresent: u32, SyncInterval: u32, Flags: u32) -> HRESULT,
+	PresentBuffer: proc "stdcall" (this: ^IDecodeSwapChain, BufferToPresent: u32, SyncInterval: u32, Flags: PRESENT) -> HRESULT,
 	SetSourceRect: proc "stdcall" (this: ^IDecodeSwapChain, pRect: ^RECT) -> HRESULT,
 	SetTargetRect: proc "stdcall" (this: ^IDecodeSwapChain, pRect: ^RECT) -> HRESULT,
 	SetDestSize:   proc "stdcall" (this: ^IDecodeSwapChain, Width: u32, Height: u32) -> HRESULT,
 	GetSourceRect: proc "stdcall" (this: ^IDecodeSwapChain, pRect: ^RECT) -> HRESULT,
 	GetTargetRect: proc "stdcall" (this: ^IDecodeSwapChain, pRect: ^RECT) -> HRESULT,
 	GetDestSize:   proc "stdcall" (this: ^IDecodeSwapChain, pWidth: ^u32, pHeight: ^u32) -> HRESULT,
-	SetColorSpace: proc "stdcall" (this: ^IDecodeSwapChain, ColorSpace: MULTIPLANE_OVERLAY_YCbCr_FLAGS) -> HRESULT,
-	GetColorSpace: proc "stdcall" (this: ^IDecodeSwapChain) -> MULTIPLANE_OVERLAY_YCbCr_FLAGS,
+	SetColorSpace: proc "stdcall" (this: ^IDecodeSwapChain, ColorSpace: MULTIPLANE_OVERLAY_YCbCr) -> HRESULT,
+	GetColorSpace: proc "stdcall" (this: ^IDecodeSwapChain) -> MULTIPLANE_OVERLAY_YCbCr,
 }
 
 IFactoryMedia_UUID_STRING :: "41E7D1F2-A591-4F7B-A2E5-FA9C843E1C12"
@@ -1058,9 +1071,10 @@ ISwapChainMedia_VTable :: struct {
 	SetPresentDuration:          proc "stdcall" (this: ^ISwapChainMedia, Duration: u32) -> HRESULT,
 	CheckPresentDurationSupport: proc "stdcall" (this: ^ISwapChainMedia, DesiredPresentDuration: u32, pClosestSmallerPresentDuration: ^u32, pClosestLargerPresentDuration: ^u32) -> HRESULT,
 }
-OVERLAY_SUPPORT_FLAG :: enum u32 { // TODO: convert to bit_set
-	DIRECT  = 0x1,
-	SCALING = 0x2,
+OVERLAY_SUPPORT :: distinct bit_set[OVERLAY_SUPPORT_FLAG; u32]
+OVERLAY_SUPPORT_FLAG :: enum u32 {
+	DIRECT  = 0,
+	SCALING = 1,
 }
 
 
@@ -1072,11 +1086,12 @@ IOutput3 :: struct #raw_union {
 }
 IOutput3_VTable :: struct {
 	using idxgioutput2_vtable: IOutput2_VTable,
-	CheckOverlaySupport: proc "stdcall" (this: ^IOutput3, EnumFormat: FORMAT, pConcernedDevice: ^IUnknown, pFlags: ^u32) -> HRESULT,
+	CheckOverlaySupport: proc "stdcall" (this: ^IOutput3, EnumFormat: FORMAT, pConcernedDevice: ^IUnknown, pFlags: ^OVERLAY_SUPPORT) -> HRESULT,
 }
-SWAP_CHAIN_COLOR_SPACE_SUPPORT_FLAG :: enum u32 { // TODO: convert to bit_set
-	PRESENT         = 0x1,
-	OVERLAY_PRESENT = 0x2,
+SWAP_CHAIN_COLOR_SPACE_SUPPORT :: distinct bit_set[SWAP_CHAIN_COLOR_SPACE_SUPPORT_FLAG; u32]
+SWAP_CHAIN_COLOR_SPACE_SUPPORT_FLAG :: enum u32 {
+	PRESENT         = 0,
+	OVERLAY_PRESENT = 1,
 }
 
 
@@ -1089,12 +1104,13 @@ ISwapChain3 :: struct #raw_union {
 ISwapChain3_VTable :: struct {
 	using idxgiswapchain2_vtable: ISwapChain2_VTable,
 	GetCurrentBackBufferIndex: proc "stdcall" (this: ^ISwapChain3) -> u32,
-	CheckColorSpaceSupport:    proc "stdcall" (this: ^ISwapChain3, ColorSpace: COLOR_SPACE_TYPE, pColorSpaceSupport: ^u32) -> HRESULT,
+	CheckColorSpaceSupport:    proc "stdcall" (this: ^ISwapChain3, ColorSpace: COLOR_SPACE_TYPE, pColorSpaceSupport: ^SWAP_CHAIN_COLOR_SPACE_SUPPORT) -> HRESULT,
 	SetColorSpace1:            proc "stdcall" (this: ^ISwapChain3, ColorSpace: COLOR_SPACE_TYPE) -> HRESULT,
-	ResizeBuffers1:            proc "stdcall" (this: ^ISwapChain3, BufferCount: u32, Width: u32, Height: u32, Format: FORMAT, SwapChainFlags: u32, pCreationNodeMask: ^u32, ppPresentQueue: ^^IUnknown) -> HRESULT,
+	ResizeBuffers1:            proc "stdcall" (this: ^ISwapChain3, BufferCount: u32, Width: u32, Height: u32, Format: FORMAT, SwapChainFlags: SWAP_CHAIN, pCreationNodeMask: ^u32, ppPresentQueue: ^^IUnknown) -> HRESULT,
 }
-OVERLAY_COLOR_SPACE_SUPPORT_FLAG :: enum u32 { // TODO: convert to bit_set
-	PRESENT = 0x1,
+OVERLAY_COLOR_SPACE_SUPPORT :: distinct bit_set[OVERLAY_COLOR_SPACE_SUPPORT_FLAG; u32]
+OVERLAY_COLOR_SPACE_SUPPORT_FLAG :: enum u32 {
+	PRESENT = 0,
 }
 
 
@@ -1106,7 +1122,7 @@ IOutput4 :: struct #raw_union {
 }
 IOutput4_VTable :: struct {
 	using idxgioutput3_vtable: IOutput3_VTable,
-	CheckOverlayColorSpaceSupport: proc "stdcall" (this: ^IOutput4, Format: FORMAT, ColorSpace: COLOR_SPACE_TYPE, pConcernedDevice: ^IUnknown, pFlags: ^u32) -> HRESULT,
+	CheckOverlayColorSpaceSupport: proc "stdcall" (this: ^IOutput4, Format: FORMAT, ColorSpace: COLOR_SPACE_TYPE, pConcernedDevice: ^IUnknown, pFlags: ^OVERLAY_COLOR_SPACE_SUPPORT) -> HRESULT,
 }
 
 IFactory4_UUID_STRING :: "1BC6EA02-EF36-464F-BF0C-21CA39E5168A"
