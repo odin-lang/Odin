@@ -479,10 +479,6 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 				// This sets a requirement of Mountain Lion and up, but the compiler doesn't work without this limit.
 				if (build_context.minimum_os_version_string.len) {
 					link_settings = gb_string_append_fmt(link_settings, " -mmacosx-version-min=%.*s ", LIT(build_context.minimum_os_version_string));
-				} else if (build_context.metrics.arch == TargetArch_arm64) {
-					link_settings = gb_string_appendc(link_settings, " -mmacosx-version-min=12.0.0  ");
-				} else {
-					link_settings = gb_string_appendc(link_settings, " -mmacosx-version-min=10.12.0 ");
 				}
 				// This points the linker to where the entry point is
 				link_settings = gb_string_appendc(link_settings, " -e _main ");
