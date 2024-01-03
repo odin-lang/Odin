@@ -3385,7 +3385,7 @@ gb_internal lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr) {
 			}
 
 			lbValue arg = args[arg_index];
-			if (arg.value == nullptr) {
+			if (arg.value == nullptr && arg.type == nullptr) {
 				switch (e->kind) {
 				case Entity_TypeName:
 					args[arg_index] = lb_const_nil(p->module, e->type);
