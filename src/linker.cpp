@@ -483,10 +483,13 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 			gbString platform_lib_str = gb_string_make(heap_allocator(), "");
 			defer (gb_string_free(platform_lib_str));
 			if (build_context.metrics.os == TargetOs_darwin) {
-				platform_lib_str = gb_string_appendc(platform_lib_str, "-lm -Wl,-syslibroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk -L/usr/local/lib");
+				platform_lib_str = gb_string_appendc(platform_lib_str, "-Wl,-syslibroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk -L/usr/local/lib");
 				#if defined(GB_SYSTEM_OSX)
-				if(gen->needs_system_library_linked == 1) {
-					platform_lib_str = gb_string_appendc(platform_lib_str, " -lSystem ");
+				if(!build_context.no_crt) {
+					platform_lib_str = gb_string_appendc(platform_lib_str, " -lm ");
+					if(gen->needs_system_library_linked == 1) {
+						platform_lib_str = gb_string_appendc(platform_lib_str, " -lSystem ");
+					}
 				}
 				#endif
 			} else {
