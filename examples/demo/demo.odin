@@ -1514,7 +1514,7 @@ quaternions :: proc() {
 
 	{ // Quaternion operations
 		q := 1 + 2i + 3j + 4k
-		r := quaternion(5, 6, 7, 8)
+		r := quaternion(real=5, imag=6, jmag=7, kmag=8)
 		t := q * r
 		fmt.printf("(%v) * (%v) = %v\n", q, r, t)
 		v := q / r
@@ -1527,8 +1527,10 @@ quaternions :: proc() {
 	{ // The quaternion types
 		q128: quaternion128 // 4xf32
 		q256: quaternion256 // 4xf64
-		q128 = quaternion(1, 0, 0, 0)
-		q256 = 1 // quaternion(1, 0, 0, 0)
+		q128 = quaternion(w=1, x=0, y=0, z=0)
+		q256 = 1 // quaternion(x=0, y=0, z=0, w=1)
+
+		// NOTE: The internal memory layout of a quaternion is xyzw
 	}
 	{ // Built-in procedures
 		q := 1 + 2i + 3j + 4k
