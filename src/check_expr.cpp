@@ -184,6 +184,8 @@ gb_internal void populate_check_did_you_mean_objc_entity(StringSet *set, Entity 
 
 
 gb_internal void check_did_you_mean_objc_entity(String const &name, Entity *e, bool is_type, char const *prefix = "") {
+	if (build_context.terse_errors) { return; }
+
 	ERROR_BLOCK();
 	GB_ASSERT(e->kind == Entity_TypeName);
 	GB_ASSERT(e->TypeName.objc_metadata != nullptr);
@@ -204,6 +206,8 @@ gb_internal void check_did_you_mean_objc_entity(String const &name, Entity *e, b
 }
 
 gb_internal void check_did_you_mean_type(String const &name, Array<Entity *> const &fields, char const *prefix = "") {
+	if (build_context.terse_errors) { return; }
+
 	ERROR_BLOCK();
 
 	DidYouMeanAnswers d = did_you_mean_make(heap_allocator(), fields.count, name);
@@ -217,6 +221,8 @@ gb_internal void check_did_you_mean_type(String const &name, Array<Entity *> con
 
 
 gb_internal void check_did_you_mean_type(String const &name, Slice<Entity *> const &fields, char const *prefix = "") {
+	if (build_context.terse_errors) { return; }
+
 	ERROR_BLOCK();
 
 	DidYouMeanAnswers d = did_you_mean_make(heap_allocator(), fields.count, name);
@@ -229,6 +235,8 @@ gb_internal void check_did_you_mean_type(String const &name, Slice<Entity *> con
 }
 
 gb_internal void check_did_you_mean_scope(String const &name, Scope *scope, char const *prefix = "") {
+	if (build_context.terse_errors) { return; }
+
 	ERROR_BLOCK();
 
 	DidYouMeanAnswers d = did_you_mean_make(heap_allocator(), scope->elements.count, name);
@@ -2203,7 +2211,6 @@ gb_internal bool check_is_expressible(CheckerContext *ctx, Operand *o, Type *typ
 
 		ERROR_BLOCK();
 
-
 		if (is_type_numeric(o->type) && is_type_numeric(type)) {
 			if (!is_type_integer(o->type) && is_type_integer(type)) {
 				error(o->expr, "'%s' truncated to '%s', got %s", a, b, s);
@@ -2264,8 +2271,7 @@ gb_internal void check_old_for_or_switch_value_usage(Ast *expr) {
 	if (e != nullptr && (e->flags & EntityFlag_OldForOrSwitchValue) != 0) {
 		GB_ASSERT(e->kind == Entity_Variable);
 
-		begin_error_block();
-		defer (end_error_block());
+		ERROR_BLOCK();
 
 		if ((e->flags & EntityFlag_ForValue) != 0) {
 			Type *parent_type = type_deref(e->Variable.for_loop_parent_type);
@@ -2309,8 +2315,7 @@ gb_internal void check_unary_expr(CheckerContext *c, Operand *o, Token op, Ast *
 						break;
 					default:
 						{
-							begin_error_block();
-							defer (end_error_block());
+							ERROR_BLOCK();
 							error(op, "Cannot take the pointer address of '%s'", str);
 							if (e != nullptr && (e->flags & EntityFlag_ForValue) != 0) {
 								Type *parent_type = type_deref(e->Variable.for_loop_parent_type);
@@ -3071,7 +3076,7 @@ gb_internal void check_cast(CheckerContext *c, Operand *x, Type *type) {
 
 		x->mode = Addressing_Invalid;
 
-		begin_error_block();
+		ERROR_BLOCK();
 		error(x->expr, "Cannot cast '%s' as '%s' from '%s'", expr_str, to_type, from_type);
 		if (is_const_expr) {
 			gbString val_str = exact_value_to_string(x->value);
@@ -3093,8 +3098,6 @@ gb_internal void check_cast(CheckerContext *c, Operand *x, Type *type) {
 
 		}
 		check_cast_error_suggestion(c, x, type);
-
-		end_error_block();
 
 		return;
 	}
@@ -4047,8 +4050,7 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 		if (check_is_assignable_to(c, operand, elem)) {
 			if (t->Matrix.row_count != t->Matrix.column_count) {
 				operand->mode = Addressing_Invalid;
-				begin_error_block();
-				defer (end_error_block());
+				ERROR_BLOCK();
 				
 				convert_untyped_error(c, operand, target_type);
 				error_line("\tNote: Only a square matrix types can be initialized with a scalar value\n");
@@ -4109,8 +4111,7 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 				target_type = t->Union.variants[first_success_index];
 				break;
 			} else if (valid_count > 1) {
-				begin_error_block();
-				defer (end_error_block());
+				ERROR_BLOCK();
 
 				GB_ASSERT(first_success_index >= 0);
 				operand->mode = Addressing_Invalid;
@@ -4136,8 +4137,7 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 			} else if (is_type_untyped_uninit(operand->type)) {
 				target_type = t_untyped_uninit;
 			} else if (!is_type_untyped_nil(operand->type) || !type_has_nil(target_type)) {
-				begin_error_block();
-				defer (end_error_block());
+				ERROR_BLOCK();
 
 				operand->mode = Addressing_Invalid;
 				convert_untyped_error(c, operand, target_type);
@@ -4714,6 +4714,7 @@ gb_internal Entity *check_selector(CheckerContext *c, Operand *operand, Ast *nod
 			entity = scope_lookup_current(import_scope, entity_name);
 			bool allow_builtin = false;
 			if (!is_entity_declared_for_selector(entity, import_scope, &allow_builtin)) {
+				ERROR_BLOCK();
 				error(node, "'%.*s' is not declared by '%.*s'", LIT(entity_name), LIT(import_name));
 				operand->mode = Addressing_Invalid;
 				operand->expr = node;
@@ -4914,6 +4915,8 @@ gb_internal Entity *check_selector(CheckerContext *c, Operand *operand, Ast *nod
 				error(op_expr, "Type '%s' has no field '%s'", op_str, sel_str);
 			}
 		} else {
+			ERROR_BLOCK();
+
 			error(op_expr, "'%s' of type '%s' has no field '%s'", op_str, type_str, sel_str);
 
 			if (operand->type != nullptr && selector->kind == Ast_Ident) {
@@ -6338,8 +6341,7 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 	};
 
 	if (valids.count == 0) {
-		begin_error_block();
-		defer (end_error_block());
+		ERROR_BLOCK();
 
 		error(operand->expr, "No procedures or ambiguous call for procedure group '%s' that match with the given arguments", expr_name);
 		if (positional_operands.count == 0 && named_operands.count == 0) {
@@ -6429,8 +6431,7 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 
 		data.result_type = t_invalid;
 	} else if (valids.count > 1) {
-		begin_error_block();
-		defer (end_error_block());
+		ERROR_BLOCK();
 
 		error(operand->expr, "Ambiguous procedure group call '%s' that match with the given arguments", expr_name);
 		print_argument_types();
@@ -7649,6 +7650,8 @@ gb_internal ExprKind check_implicit_selector_expr(CheckerContext *c, Operand *o,
 		String name = ise->selector->Ident.token.string;
 
 		if (is_type_enum(th)) {
+			ERROR_BLOCK();
+
 			Type *bt = base_type(th);
 			GB_ASSERT(bt->kind == Type_Enum);
 
@@ -9050,8 +9053,7 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 			}
 
 			if (unhandled.count > 0) {
-				begin_error_block();
-				defer (end_error_block());
+				ERROR_BLOCK();
 
 				if (unhandled.count == 1) {
 					error_no_newline(node, "Unhandled enumerated array case: %.*s", LIT(unhandled[0]->token.string));
@@ -9062,9 +9064,11 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 						error_line("\t%.*s\n", LIT(f->token.string));
 					}
 				}
-				error_line("\n");
 
-				error_line("\tSuggestion: Was '#partial %s{...}' wanted?\n", type_to_string(type));
+				if (!build_context.terse_errors) {
+					error_line("\n");
+					error_line("\tSuggestion: Was '#partial %s{...}' wanted?\n", type_to_string(type));
+				}
 			}
 		}
 
@@ -9688,7 +9692,9 @@ gb_internal ExprKind check_index_expr(CheckerContext *c, Operand *o, Ast *node, 
 		if (index < 0) {
 			gbString str = expr_to_string(o->expr);
 			error(o->expr, "Cannot index a constant '%s'", str);
-			error_line("\tSuggestion: store the constant into a variable in order to index it with a variable index\n");
+			if (!build_context.terse_errors) {
+				error_line("\tSuggestion: store the constant into a variable in order to index it with a variable index\n");
+			}
 			gb_string_free(str);
 			o->mode = Addressing_Invalid;
 			o->expr = node;
@@ -9702,7 +9708,9 @@ gb_internal ExprKind check_index_expr(CheckerContext *c, Operand *o, Ast *node, 
 			if (!success) {
 				gbString str = expr_to_string(o->expr);
 				error(o->expr, "Cannot index a constant '%s' with index %lld", str, cast(long long)index);
-				error_line("\tSuggestion: store the constant into a variable in order to index it with a variable index\n");
+				if (!build_context.terse_errors) {
+					error_line("\tSuggestion: store the constant into a variable in order to index it with a variable index\n");
+				}
 				gb_string_free(str);
 				o->mode = Addressing_Invalid;
 				o->expr = node;
@@ -9890,7 +9898,9 @@ gb_internal ExprKind check_slice_expr(CheckerContext *c, Operand *o, Ast *node, 
 		if (!all_constant) {
 			gbString str = expr_to_string(o->expr);
 			error(o->expr, "Cannot slice '%s' with non-constant indices", str);
-			error_line("\tSuggestion: store the constant into a variable in order to index it with a variable index\n");
+			if (!build_context.terse_errors) {
+				error_line("\tSuggestion: store the constant into a variable in order to index it with a variable index\n");
+			}
 			gb_string_free(str);
 			o->mode = Addressing_Value; // NOTE(bill): Keep subsequent values going without erring
 			o->expr = node;
@@ -10246,14 +10256,14 @@ gb_internal ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast
  			} else {
  				gbString str = expr_to_string(o->expr);
  				gbString typ = type_to_string(o->type);
- 				begin_error_block();
+				ERROR_BLOCK();
 
  				error(o->expr, "Cannot dereference '%s' of type '%s'", str, typ);
  				if (o->type && is_type_multi_pointer(o->type)) {
- 					error_line("\tDid you mean '%s[0]'?\n", str);
+					if (!build_context.terse_errors) {
+	 					error_line("\tDid you mean '%s[0]'?\n", str);
+	 				}
  				}
-
- 				end_error_block();
 
  				gb_string_free(typ);
  				gb_string_free(str);

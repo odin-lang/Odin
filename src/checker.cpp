@@ -4025,12 +4025,11 @@ gb_internal void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 						if (c->foreign_context.default_cc > 0) {
 							cc = c->foreign_context.default_cc;
 						} else if (is_arch_wasm()) {
-							begin_error_block();
+							ERROR_BLOCK();
 							error(init, "For wasm related targets, it is required that you either define the"
 							            " @(default_calling_convention=<string>) on the foreign block or"
 							            " explicitly assign it on the procedure signature");
 							error_line("\tSuggestion: when dealing with normal Odin code (e.g. js_wasm32), use \"contextless\"; when dealing with Emscripten like code, use \"c\"\n");
-							end_error_block();
 						}
 					}
 					e->Procedure.link_prefix = c->foreign_context.link_prefix;
@@ -4077,8 +4076,7 @@ gb_internal void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 
 			if (e->kind != Entity_Procedure) {
 				if (fl != nullptr) {
-					begin_error_block();
-					defer (end_error_block());
+					ERROR_BLOCK();
 
 					AstKind kind = init->kind;
 					error(name, "Only procedures and variables are allowed to be in a foreign block, got %.*s", LIT(ast_strings[kind]));

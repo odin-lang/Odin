@@ -138,11 +138,10 @@ gb_internal void check_init_variables(CheckerContext *ctx, Entity **lhs, isize l
 		}
 
 		if (o->type && is_type_no_copy(o->type)) {
-			begin_error_block();
+			ERROR_BLOCK();
 			if (check_no_copy_assignment(*o, str_lit("initialization"))) {
 				error_line("\tInitialization of a #no_copy type must be either implicitly zero, a constant literal, or a return value from a call expression");
 			}
-			end_error_block();
 		}
 	}
 	if (rhs_count > 0 && lhs_count != rhs_count) {
@@ -1301,8 +1300,8 @@ gb_internal void check_proc_group_decl(CheckerContext *ctx, Entity *pg_entity, D
 				continue;
 			}
 
-			begin_error_block();
-			defer (end_error_block());
+
+			ERROR_BLOCK();
 
 			ProcTypeOverloadKind kind = are_proc_types_overload_safe(p->type, q->type);
 			bool both_have_where_clauses = false;
