@@ -3413,6 +3413,9 @@ gb_internal DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 			error(elem, "Expected a string value for '%.*s'", LIT(name));
 		}
 		return true;
+	} else if (name == "entry_point_only") {
+		ac->entry_point_only = true;
+		return true;
 	}
 	return false;
 }

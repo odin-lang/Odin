@@ -250,6 +250,7 @@ struct Entity {
 			bool    is_export                  : 1;
 			bool    generated_from_polymorphic : 1;
 			bool    target_feature_disabled    : 1;
+			bool    entry_point_only           : 1;
 			String  target_feature;
 		} Procedure;
 		struct {

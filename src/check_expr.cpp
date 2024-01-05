@@ -7195,6 +7195,14 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 			}
 		}
 		add_entity_use(c, operand->expr, initial_entity);
+
+		if (initial_entity->Procedure.entry_point_only) {
+			if (c->curr_proc_decl && c->curr_proc_decl->entity == c->info->entry_point) {
+				// Okay
+			} else {
+				error(operand->expr, "Procedures with the attribute '@(entry_point_only)' can only be called directly from the user-level entry point procedure");
+			}
+		}
 	}
 
 	if (operand->mode != Addressing_ProcGroup) {
