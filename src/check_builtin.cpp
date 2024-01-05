@@ -2328,11 +2328,8 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			break;
 		}
 
-		// quaternion :: proc(real, imag, jmag, kmag: float_type) -> complex_type
-		Operand x = {};
-		Operand y = {};
-		Operand z = {};
-		Operand w = {};
+		// quaternion :: proc(imag, jmag, kmag, real: float_type) -> complex_type
+		Operand xyzw[4] = {};
 
 		// NOTE(bill): Invalid will be the default till fixed
 		operand->type = t_invalid;
@@ -2356,21 +2353,21 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				u32 style = 0;
 
 				if (name == "x") {
-					*index = 1; style = 1;
-				} else if (name == "y") {
-					*index = 2; style = 1;
-				} else if (name == "z") {
-					*index = 3; style = 1;
-				}  else if (name == "w") {
 					*index = 0; style = 1;
+				} else if (name == "y") {
+					*index = 1; style = 1;
+				} else if (name == "z") {
+					*index = 2; style = 1;
+				}  else if (name == "w") {
+					*index = 3; style = 1;
 				} else if (name == "imag") {
-					*index = 1; style = 2;
-				} else if (name == "jmag") {
-					*index = 2; style = 2;
-				} else if (name == "kmag") {
-					*index = 3; style = 2;
-				}  else if (name == "real") {
 					*index = 0; style = 2;
+				} else if (name == "jmag") {
+					*index = 1; style = 2;
+				} else if (name == "kmag") {
+					*index = 2; style = 2;
+				}  else if (name == "real") {
+					*index = 3; style = 2;
 				} else {
 					error(field->field, "Unknown name for '%.*s', expected (w, x, y, z; or real, imag, jmag, kmag), got '%.*s'", LIT(builtin_name), LIT(name));
 					return false;
@@ -2385,9 +2382,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				return o->mode != Addressing_Invalid;
 			};
 
-			// TODO(bill): disallow style mixing
-
-			Operand *refs[4] = {&x, &y, &z, &w};
+			Operand *refs[4] = {&xyzw[0], &xyzw[1], &xyzw[2], &xyzw[3]};
 
 			for (i32 i = 0; i < 4; i++) {
 				i32 index = -1;
@@ -2412,57 +2407,40 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		} else {
 			error(call, "'%.*s' requires that all arguments are named (w, x, y, z; or real, imag, jmag, kmag)", LIT(builtin_name));
 
-			check_expr(c, &x, ce->args[0]);
-			if (x.mode == Addressing_Invalid) {
-				return false;
-			}
-
-			check_expr(c, &y, ce->args[1]);
-			if (y.mode == Addressing_Invalid) {
-				return false;
-			}
-			check_expr(c, &z, ce->args[2]);
-			if (z.mode == Addressing_Invalid) {
-				return false;
-			}
-			check_expr(c, &w, ce->args[3]);
-			if (w.mode == Addressing_Invalid) {
-				return false;
+			for (i32 i = 0; i < 4; i++) {
+				check_expr(c, &xyzw[i], ce->args[i]);
+				if (xyzw[i].mode == Addressing_Invalid) {
+					return false;
+				}
 			}
 		}
-		convert_to_typed(c, &x, y.type); if (x.mode == Addressing_Invalid) return false;
-		convert_to_typed(c, &y, x.type); if (y.mode == Addressing_Invalid) return false;
-		convert_to_typed(c, &z, x.type); if (z.mode == Addressing_Invalid) return false;
-		convert_to_typed(c, &w, x.type); if (w.mode == Addressing_Invalid) return false;
+		convert_to_typed(c, &xyzw[0], xyzw[1].type); if (xyzw[0].mode == Addressing_Invalid) return false;
+		convert_to_typed(c, &xyzw[1], xyzw[0].type); if (xyzw[1].mode == Addressing_Invalid) return false;
+		convert_to_typed(c, &xyzw[2], xyzw[0].type); if (xyzw[2].mode == Addressing_Invalid) return false;
+		convert_to_typed(c, &xyzw[3], xyzw[0].type); if (xyzw[3].mode == Addressing_Invalid) return false;
 
-		if (x.mode == Addressing_Constant &&
-		    y.mode == Addressing_Constant &&
-		    z.mode == Addressing_Constant &&
-		    w.mode == Addressing_Constant) {
-		    	x.value = exact_value_to_float(x.value);
-		    	y.value = exact_value_to_float(y.value);
-		    	z.value = exact_value_to_float(z.value);
-		    	w.value = exact_value_to_float(w.value);
-			if (is_type_numeric(x.type) && x.value.kind == ExactValue_Float) {
-				x.type = t_untyped_float;
+		if (xyzw[0].mode == Addressing_Constant &&
+		    xyzw[1].mode == Addressing_Constant &&
+		    xyzw[2].mode == Addressing_Constant &&
+		    xyzw[3].mode == Addressing_Constant) {
+			for (i32 i = 0; i < 4; i++) {
+				xyzw[i].value = exact_value_to_float(xyzw[i].value);
 			}
-			if (is_type_numeric(y.type) && y.value.kind == ExactValue_Float) {
-				y.type = t_untyped_float;
-			}
-			if (is_type_numeric(z.type) && z.value.kind == ExactValue_Float) {
-				z.type = t_untyped_float;
-			}
-			if (is_type_numeric(w.type) && w.value.kind == ExactValue_Float) {
-				w.type = t_untyped_float;
+			for (i32 i = 0; i < 4; i++) {
+				if (is_type_numeric(xyzw[i].type) && xyzw[i].value.kind == ExactValue_Float) {
+					xyzw[i].type = t_untyped_float;
+				}
 			}
 		}
 
-		if (!(are_types_identical(x.type, y.type) && are_types_identical(x.type, z.type) && are_types_identical(x.type, w.type))) {
-			gbString tx = type_to_string(x.type);
-			gbString ty = type_to_string(y.type);
-			gbString tz = type_to_string(z.type);
-			gbString tw = type_to_string(w.type);
-			error(call, "Mismatched types to 'quaternion', '%s' vs '%s' vs '%s' vs '%s'", tx, ty, tz, tw);
+		if (!(are_types_identical(xyzw[0].type, xyzw[1].type) &&
+		      are_types_identical(xyzw[0].type, xyzw[2].type) &&
+		      are_types_identical(xyzw[0].type, xyzw[3].type))) {
+			gbString tx = type_to_string(xyzw[0].type);
+			gbString ty = type_to_string(xyzw[1].type);
+			gbString tz = type_to_string(xyzw[2].type);
+			gbString tw = type_to_string(xyzw[3].type);
+			error(call, "Mismatched types to 'quaternion', 'x=%s' vs 'y=%s' vs 'z=%s' vs 'w=%s'", tx, ty, tz, tw);
 			gb_string_free(tw);
 			gb_string_free(tz);
 			gb_string_free(ty);
@@ -2470,31 +2448,35 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			return false;
 		}
 
-		if (!is_type_float(x.type)) {
-			gbString s = type_to_string(x.type);
+		if (!is_type_float(xyzw[0].type)) {
+			gbString s = type_to_string(xyzw[0].type);
 			error(call, "Arguments have type '%s', expected a floating point", s);
 			gb_string_free(s);
 			return false;
 		}
-		if (is_type_endian_specific(x.type)) {
-			gbString s = type_to_string(x.type);
+		if (is_type_endian_specific(xyzw[0].type)) {
+			gbString s = type_to_string(xyzw[0].type);
 			error(call, "Arguments with a specified endian are not allow, expected a normal floating point, got '%s'", s);
 			gb_string_free(s);
 			return false;
 		}
 
-		if (x.mode == Addressing_Constant && y.mode == Addressing_Constant && z.mode == Addressing_Constant && w.mode == Addressing_Constant) {
-			f64 r = exact_value_to_float(x.value).value_float;
-			f64 i = exact_value_to_float(y.value).value_float;
-			f64 j = exact_value_to_float(z.value).value_float;
-			f64 k = exact_value_to_float(w.value).value_float;
+
+		operand->mode = Addressing_Value;
+
+		if (xyzw[0].mode == Addressing_Constant &&
+		    xyzw[1].mode == Addressing_Constant &&
+		    xyzw[2].mode == Addressing_Constant &&
+		    xyzw[3].mode == Addressing_Constant) {
+			f64 r = exact_value_to_float(xyzw[3].value).value_float;
+			f64 i = exact_value_to_float(xyzw[0].value).value_float;
+			f64 j = exact_value_to_float(xyzw[1].value).value_float;
+			f64 k = exact_value_to_float(xyzw[2].value).value_float;
 			operand->value = exact_value_quaternion(r, i, j, k);
 			operand->mode = Addressing_Constant;
-		} else {
-			operand->mode = Addressing_Value;
 		}
 
-		BasicKind kind = core_type(x.type)->Basic.kind;
+		BasicKind kind = core_type(xyzw[0].type)->Basic.kind;
 		switch (kind) {
 		case Basic_f16:          operand->type = t_quaternion64;       break;
 		case Basic_f32:          operand->type = t_quaternion128;      break;

@@ -1845,7 +1845,7 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 			}
 			GB_ASSERT(index >= 0);
 
-			xyzw[index] = lb_build_expr(p, ce->args[i]);
+			xyzw[index] = lb_build_expr(p, f->value);
 		}
 
 
