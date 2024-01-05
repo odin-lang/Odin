@@ -2331,6 +2331,8 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		// quaternion :: proc(imag, jmag, kmag, real: float_type) -> complex_type
 		Operand xyzw[4] = {};
 
+		u32 first_index = 0;
+
 		// NOTE(bill): Invalid will be the default till fixed
 		operand->type = t_invalid;
 		operand->mode = Addressing_Invalid;
@@ -2388,10 +2390,10 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				i32 index = -1;
 				Operand o = {};
 				bool ok = check_field(c, &o, ce->args[i], &index);
-				if (!ok) {
+				if (!ok || index < 0) {
 					return false;
 				}
-
+				first_index = cast(u32)index;
 				*refs[index] = o;
 			}
 
@@ -2414,11 +2416,16 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				}
 			}
 		}
-		convert_to_typed(c, &xyzw[0], xyzw[1].type); if (xyzw[0].mode == Addressing_Invalid) return false;
-		convert_to_typed(c, &xyzw[1], xyzw[0].type); if (xyzw[1].mode == Addressing_Invalid) return false;
-		convert_to_typed(c, &xyzw[2], xyzw[0].type); if (xyzw[2].mode == Addressing_Invalid) return false;
-		convert_to_typed(c, &xyzw[3], xyzw[0].type); if (xyzw[3].mode == Addressing_Invalid) return false;
 
+
+		for (u32 i = 0; i < 4; i++ ){
+			u32 j = (i + first_index) % 4;
+			if (j == first_index) {
+				convert_to_typed(c, &xyzw[j], xyzw[(first_index+1)%4].type); if (xyzw[j].mode == Addressing_Invalid) return false;
+			} else {
+				convert_to_typed(c, &xyzw[j], xyzw[first_index].type); if (xyzw[j].mode == Addressing_Invalid) return false;
+			}
+		}
 		if (xyzw[0].mode == Addressing_Constant &&
 		    xyzw[1].mode == Addressing_Constant &&
 		    xyzw[2].mode == Addressing_Constant &&
@@ -2476,7 +2483,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			operand->mode = Addressing_Constant;
 		}
 
-		BasicKind kind = core_type(xyzw[0].type)->Basic.kind;
+		BasicKind kind = core_type(xyzw[first_index].type)->Basic.kind;
 		switch (kind) {
 		case Basic_f16:          operand->type = t_quaternion64;       break;
 		case Basic_f32:          operand->type = t_quaternion128;      break;
