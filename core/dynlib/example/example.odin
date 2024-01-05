@@ -9,7 +9,7 @@ Symbols :: struct {
 	// We use the tag here to override the symbol to look for, namely `bar_sub`.
 	sub: proc "c" (int, int) -> int `dynlib:"bar_sub"`,
 
-	// Exported global (if exporing an i32, the type must be ^i32 because the symbol is a pointer to the export.)
+	// Exported global (if exporting an i32, the type must be ^i32 because the symbol is a pointer to the export.)
 	hellope: ^i32,
 
 	// Handle to free library.
