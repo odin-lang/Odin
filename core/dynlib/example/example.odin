@@ -1,29 +1,3 @@
-//+build ignore
-/*
-Package core:dynlib implements loading of shared libraries/DLLs and their symbols.
-
-The behaviour of dynamically loaded libraries is specific to the target platform of the program.
-For in depth detail on the underlying behaviour please refer to your target platform's documentation.
-*/
-package dynlib
-
-// Example library. Compile using e.g. `odin build lib.odin -file -build-mode:dll`
-```odin
-package library
-
-@(export)
-add :: proc "c" (a, b: int) -> (res: int) {
-	return a + b
-}
-
-sub :: proc "c" (a, b: int) -> (res: int) {
-	return a - b
-}
-```
-*/
-
-// Example host app. Compile using e.g. `odin run example.odin -file`
-```odin
 package example
 
 import "core:dynlib"
@@ -59,4 +33,3 @@ main :: proc() {
 		fmt.println("hellope =", sym.hellope^)
 	}
 }
-```
