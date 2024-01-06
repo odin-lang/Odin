@@ -669,7 +669,7 @@ class WebGLInterface {
 
 
 			ReadnPixels: (x, y, width, height, format, type, bufSize, data) => {
-				this.ctx.readPixels(x, y, width, format, type, this.mem.loadBytes(data, bufSize));
+				this.ctx.readPixels(x, y, width, height, format, type, this.mem.loadBytes(data, bufSize));
 			},
 			RenderbufferStorage: (target, internalformat, width, height) => {
 				this.ctx.renderbufferStorage(target, internalformat, width, height);
