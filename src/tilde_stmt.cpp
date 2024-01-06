@@ -24,7 +24,7 @@ gb_internal TB_Node *cg_control_region(cgProcedure *p, char const *name) {
 }
 
 gb_internal cgValue cg_emit_load(cgProcedure *p, cgValue const &ptr, bool is_volatile) {
-	GB_ASSERT(is_type_pointer(ptr.type));
+	GB_ASSERT_MSG(is_type_pointer(ptr.type), "%s", type_to_string(ptr.type));
 	Type *type = type_deref(ptr.type);
 	TB_DataType dt = cg_data_type(type);
 
@@ -326,7 +326,7 @@ gb_internal void cg_addr_store(cgProcedure *p, cgAddr addr, cgValue value) {
 	GB_ASSERT(value.type != nullptr);
 	if (is_type_untyped_uninit(value.type)) {
 		Type *t = cg_addr_type(addr);
-		value = cg_value(tb_inst_poison(p->func), t);
+		value = cg_value(tb_inst_poison(p->func, cg_data_type(t)), t);
 		// TODO(bill): IS THIS EVEN A GOOD IDEA?
 	} else if (is_type_untyped_nil(value.type)) {
 		Type *t = cg_addr_type(addr);
@@ -1982,16 +1982,25 @@ gb_internal bool cg_switch_stmt_can_be_trivial_jump_table(AstSwitchStmt *ss) {
 	if (ss->tag == nullptr) {
 		return false;
 	}
+	enum { DISALLOW_64_SWITCH = true };
+
 	bool is_typeid = false;
 	TypeAndValue tv = type_and_value_of_expr(ss->tag);
 	if (is_type_integer(core_type(tv.type))) {
-		if (type_size_of(tv.type) > 8) {
+		i64 sz = type_size_of(tv.type);
+		if (sz > 8) {
+			return false;
+		}
+		if (DISALLOW_64_SWITCH && sz == 8) {
 			return false;
 		}
 		// okay
 	} else if (is_type_typeid(tv.type)) {
 		// okay
 		is_typeid = true;
+		if (DISALLOW_64_SWITCH && build_context.ptr_size == 8) {
+			return false;
+		}
 	} else {
 		return false;
 	}
@@ -2481,7 +2490,7 @@ gb_internal void cg_build_mutable_value_decl(cgProcedure *p, Ast *node) {
 			TB_DebugType *debug_type = cg_debug_type(m, e->type);
 			TB_Global *global = tb_global_create(m->mod, mangled_name.len, cast(char const *)mangled_name.text, debug_type, TB_LINKAGE_PRIVATE);
 
-			TB_ModuleSection *section = tb_module_get_data(m->mod);
+			TB_ModuleSectionHandle section = tb_module_get_data(m->mod);
 			if (e->Variable.thread_local_model != "") {
 				section = tb_module_get_tls(m->mod);
 				String model = e->Variable.thread_local_model;

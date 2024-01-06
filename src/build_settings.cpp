@@ -361,6 +361,7 @@ struct BuildContext {
 	bool   ignore_warnings;
 	bool   warnings_as_errors;
 	bool   hide_error_line;
+	bool   terse_errors;
 	bool   has_ansi_terminal_colours;
 
 	bool   ignore_lazy;
@@ -380,6 +381,8 @@ struct BuildContext {
 	bool   no_rtti;
 
 	bool   dynamic_map_calls;
+
+	bool obfuscate_source_code_locations;
 
 	RelocMode reloc_mode;
 	bool   disable_red_zone;

@@ -44,7 +44,13 @@ the_basics :: proc() {
 	fmt.println("\n# the basics")
 
 	{ // The Basics
-		fmt.println("Hellope")
+
+		// os.args holds the path to the current executable and any arguments passed to it.
+		if len(os.args) == 1 {
+			fmt.printf("Hellope from %v.\n", os.args[0])
+		} else {
+			fmt.printf("%v, %v! from %v.\n", os.args[1], os.args[2], os.args[0])
+		}
 
 		// Lexical elements and literals
 		// A comment
@@ -535,7 +541,7 @@ struct_type :: proc() {
 		p.x = 1335
 		fmt.println(v)
 
-		// We could write p^.x, however, it is to nice abstract the ability
+		// We could write p^.x, however, it is nice to abstract the ability
 		// to not explicitly dereference the pointer. This is very useful when
 		// refactoring code to use a pointer rather than a value, and vice versa.
 	}
@@ -1508,7 +1514,7 @@ quaternions :: proc() {
 
 	{ // Quaternion operations
 		q := 1 + 2i + 3j + 4k
-		r := quaternion(5, 6, 7, 8)
+		r := quaternion(real=5, imag=6, jmag=7, kmag=8)
 		t := q * r
 		fmt.printf("(%v) * (%v) = %v\n", q, r, t)
 		v := q / r
@@ -1521,8 +1527,10 @@ quaternions :: proc() {
 	{ // The quaternion types
 		q128: quaternion128 // 4xf32
 		q256: quaternion256 // 4xf64
-		q128 = quaternion(1, 0, 0, 0)
-		q256 = 1 // quaternion(1, 0, 0, 0)
+		q128 = quaternion(w=1, x=0, y=0, z=0)
+		q256 = 1 // quaternion(x=0, y=0, z=0, w=1)
+
+		// NOTE: The internal memory layout of a quaternion is xyzw
 	}
 	{ // Built-in procedures
 		q := 1 + 2i + 3j + 4k

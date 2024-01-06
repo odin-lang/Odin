@@ -1826,24 +1826,41 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 	}
 
 	case BuiltinProc_quaternion: {
-		lbValue real = lb_build_expr(p, ce->args[0]);
-		lbValue imag = lb_build_expr(p, ce->args[1]);
-		lbValue jmag = lb_build_expr(p, ce->args[2]);
-		lbValue kmag = lb_build_expr(p, ce->args[3]);
+		lbValue xyzw[4] = {};
+		for (i32 i = 0; i < 4; i++) {
+			ast_node(f, FieldValue, ce->args[i]);
+			GB_ASSERT(f->field->kind == Ast_Ident);
+			String name = f->field->Ident.token.string;
+			i32 index = -1;
 
-		// @QuaternionLayout
+			// @QuaternionLayout
+			if (name == "x" || name == "imag") {
+				index = 0;
+			} else if (name == "y" || name == "jmag") {
+				index = 1;
+			} else if (name == "z" || name == "kmag") {
+				index = 2;
+			} else if (name == "w" || name == "real") {
+				index = 3;
+			}
+			GB_ASSERT(index >= 0);
+
+			xyzw[index] = lb_build_expr(p, f->value);
+		}
+
+
 		lbAddr dst_addr = lb_add_local_generated(p, tv.type, false);
 		lbValue dst = lb_addr_get_ptr(p, dst_addr);
 
 		Type *ft = base_complex_elem_type(tv.type);
-		real = lb_emit_conv(p, real, ft);
-		imag = lb_emit_conv(p, imag, ft);
-		jmag = lb_emit_conv(p, jmag, ft);
-		kmag = lb_emit_conv(p, kmag, ft);
-		lb_emit_store(p, lb_emit_struct_ep(p, dst, 3), real);
-		lb_emit_store(p, lb_emit_struct_ep(p, dst, 0), imag);
-		lb_emit_store(p, lb_emit_struct_ep(p, dst, 1), jmag);
-		lb_emit_store(p, lb_emit_struct_ep(p, dst, 2), kmag);
+		xyzw[0] = lb_emit_conv(p, xyzw[0], ft);
+		xyzw[1] = lb_emit_conv(p, xyzw[1], ft);
+		xyzw[2] = lb_emit_conv(p, xyzw[2], ft);
+		xyzw[3] = lb_emit_conv(p, xyzw[3], ft);
+		lb_emit_store(p, lb_emit_struct_ep(p, dst, 0), xyzw[0]);
+		lb_emit_store(p, lb_emit_struct_ep(p, dst, 1), xyzw[1]);
+		lb_emit_store(p, lb_emit_struct_ep(p, dst, 2), xyzw[2]);
+		lb_emit_store(p, lb_emit_struct_ep(p, dst, 3), xyzw[3]);
 
 		return lb_emit_load(p, dst);
 	}
@@ -3385,7 +3402,7 @@ gb_internal lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr) {
 			}
 
 			lbValue arg = args[arg_index];
-			if (arg.value == nullptr) {
+			if (arg.value == nullptr && arg.type == nullptr) {
 				switch (e->kind) {
 				case Entity_TypeName:
 					args[arg_index] = lb_const_nil(p->module, e->type);

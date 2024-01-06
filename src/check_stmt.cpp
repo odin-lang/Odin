@@ -1085,8 +1085,7 @@ gb_internal void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags
 		}
 
 		if (unhandled.count > 0) {
-			begin_error_block();
-			defer (end_error_block());
+			ERROR_BLOCK();
 
 			if (unhandled.count == 1) {
 				error_no_newline(node, "Unhandled switch case: %.*s", LIT(unhandled[0]->token.string));
@@ -1813,7 +1812,7 @@ gb_internal void check_value_decl_stmt(CheckerContext *ctx, Ast *node, u32 mod_f
 	}
 
 	if (new_name_count == 0) {
-		begin_error_block();
+		ERROR_BLOCK();
 		error(node, "No new declarations on the left hand side");
 		bool all_underscore = true;
 		for (Ast *name : vd->names) {
@@ -1831,7 +1830,6 @@ gb_internal void check_value_decl_stmt(CheckerContext *ctx, Ast *node, u32 mod_f
 			error_line("\tSuggestion: Try changing the declaration (:=) to an assignment (=)\n");
 		}
 
-		end_error_block();
 	}
 
 	Type *init_type = nullptr;

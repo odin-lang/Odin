@@ -123,6 +123,7 @@ struct AttributeContext {
 	bool    init                : 1;
 	bool    fini                : 1;
 	bool    set_cold            : 1;
+	bool    entry_point_only    : 1;
 	u32 optimization_mode; // ProcedureOptimizationMode
 	i64 foreign_import_priority_index;
 	String extra_linker_flags;
