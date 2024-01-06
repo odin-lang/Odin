@@ -645,7 +645,7 @@ class WebGLInterface {
 
 
 			IsBuffer:       (buffer)       => this.ctx.isBuffer(this.buffers[buffer]),
-			IsEnabled:      (enabled)      => this.ctx.isEnabled(this.enableds[enabled]),
+			IsEnabled:      (cap)          => this.ctx.isEnabled(cap),
 			IsFramebuffer:  (framebuffer)  => this.ctx.isFramebuffer(this.framebuffers[framebuffer]),
 			IsProgram:      (program)      => this.ctx.isProgram(this.programs[program]),
 			IsRenderbuffer: (renderbuffer) => this.ctx.isRenderbuffer(this.renderbuffers[renderbuffer]),
