@@ -10,6 +10,7 @@ Symbols :: struct {
 	sub: proc "c" (int, int) -> int `dynlib:"bar_sub"`,
 
 	// Exported global (if exporting an i32, the type must be ^i32 because the symbol is a pointer to the export.)
+	// If it's not a pointer or procedure type, we'll skip the struct field.
 	hellope: ^i32,
 
 	// Handle to free library.

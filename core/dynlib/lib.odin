@@ -129,7 +129,7 @@ initialize_symbols :: proc(symbol_table: ^$T, library_name: string, symbol_prefi
 	// Buffer to concatenate the prefix + symbol name.
 	prefixed_symbol_buf: [2048]u8 = ---
 
-	proc_ptr: rawptr
+	sym_ptr: rawptr
 	for field_name, i in s.names {
 		// Calculate address of struct member
 		field_ptr := rawptr(uintptr(rawptr(symbol_table)) + uintptr(s.offsets[i]))
@@ -137,6 +137,11 @@ initialize_symbols :: proc(symbol_table: ^$T, library_name: string, symbol_prefi
 		// If we've come across the struct member for the handle, store it and continue scanning for other symbols.
 		if field_name == handle_field_name {
 			(^Library)(field_ptr)^ = handle
+			continue
+		}
+
+		// We're not the library handle, so the field needs to be a pointer type, be it a procedure pointer or an exported global.
+		if !(reflect.is_procedure(s.types[i]) || reflect.is_pointer(s.types[i])) {
 			continue
 		}
 
@@ -156,8 +161,8 @@ initialize_symbols :: proc(symbol_table: ^$T, library_name: string, symbol_prefi
 		}
 
 		// Assign procedure (or global) pointer if found.
-		if proc_ptr, ok = symbol_address(handle, prefixed_name); ok {
-			(^rawptr)(field_ptr)^ = proc_ptr
+		if sym_ptr, ok = symbol_address(handle, prefixed_name); ok {
+			(^rawptr)(field_ptr)^ = sym_ptr
 			count += 1
 		}
 	}
