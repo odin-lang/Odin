@@ -22,3 +22,8 @@ _symbol_address :: proc(library: Library, symbol: string) -> (ptr: rawptr, found
 	found = ptr != nil
 	return
 }
+
+_last_error :: proc() -> string {
+	err := os.dlerror()
+	return "unknown" if err == "" else err
+}

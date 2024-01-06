@@ -34,6 +34,7 @@ Example:
 		LIBRARY_PATH :: "my_library.dll"
 		library, ok := dynlib.load_library(LIBRARY_PATH)
 		if ! ok {
+			fmt.eprintln(dynlib.last_error())
 			return
 		}
 		fmt.println("The library %q was successfully loaded", LIBRARY_PATH)
@@ -58,10 +59,12 @@ Example:
 		LIBRARY_PATH :: "my_library.dll"
 		library, ok := dynlib.load_library(LIBRARY_PATH)
 		if ! ok {
+			fmt.eprintln(dynlib.last_error())
 			return
 		}
 		did_unload := dynlib.unload_library(library)
 		if ! did_unload {
+			fmt.eprintln(dynlib.last_error())
 			return
 		}
 		fmt.println("The library %q was successfully unloaded", LIBRARY_PATH)
@@ -89,11 +92,16 @@ Example:
 		LIBRARY_PATH :: "my_library.dll"
 		library, ok := dynlib.load_library(LIBRARY_PATH)
 		if ! ok {
+			fmt.eprintln(dynlib.last_error())
 			return
 		}
 
 		a, found_a := dynlib.symbol_address(library, "a")
-		if found_a do fmt.printf("The symbol %q was found at the address %v", "a", a)
+		if found_a {
+			fmt.printf("The symbol %q was found at the address %v", "a", a)
+		} else {
+			fmt.eprintln(dynlib.last_error())
+		}
 	}
 */
 symbol_address :: proc(library: Library, symbol: string) -> (ptr: rawptr, found: bool) #optional_ok {
@@ -166,4 +174,11 @@ initialize_symbols :: proc(symbol_table: ^$T, library_name: string, symbol_prefi
 		}
 	}
 	return count, count > 0
+}
+
+/*
+Returns an error message for the last failed procedure call.
+*/
+last_error :: proc() -> string {
+	return _last_error()
 }
