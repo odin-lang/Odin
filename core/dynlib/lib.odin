@@ -108,18 +108,17 @@ Optionally also takes the struct member to assign the library handle to, `__hand
 This allows using one struct to hold library handles and symbol pointers for more than 1 dynamic library.
 
 Returns:
-* -1 if the library could not be loaded.
-* The number of symbols assigned on success.
+* `-1, false` if the library could not be loaded.
+* The number of symbols assigned on success. `ok` = true if `count` > 0
 
 See doc.odin for an example.
 */
-initialize_symbols :: proc(symbol_table: ^$T, library_name: string, symbol_prefix := "", handle_field_name := "__handle") -> (count: int) where intrinsics.type_is_struct(T) {
+initialize_symbols :: proc(symbol_table: ^$T, library_name: string, symbol_prefix := "", handle_field_name := "__handle") -> (count: int, ok: bool) where intrinsics.type_is_struct(T) {
 	assert(symbol_table != nil)
-	ok:     bool
 	handle: Library
 
 	if handle, ok = load_library(library_name); !ok {
-		return -1
+		return -1, false
 	}
 
 	// `symbol_table` must be a struct because of the where clause, so this can't fail.
@@ -166,5 +165,5 @@ initialize_symbols :: proc(symbol_table: ^$T, library_name: string, symbol_prefi
 			count += 1
 		}
 	}
-	return
+	return count, count > 0
 }

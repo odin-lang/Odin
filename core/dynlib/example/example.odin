@@ -24,9 +24,9 @@ main :: proc() {
 	// Load symbols from `lib.dll` into Symbols struct.
 	// Each struct field is prefixed with `foo_` before lookup in the DLL's symbol table.
 	// The library's Handle (to unload) will be stored in `sym._my_lib_handle`. This way you can load multiple DLLs in one struct.
-	count := dynlib.initialize_symbols(&sym, "lib.dll", "foo_", "_my_lib_handle")
+	count, ok := dynlib.initialize_symbols(&sym, "lib.dll", "foo_", "_my_lib_handle")
 	defer dynlib.unload_library(sym._my_lib_handle)
-	fmt.printf("%v symbols loaded from lib.dll (%p).\n", count, sym._my_lib_handle)
+	fmt.printf("ok: %v. %v symbols loaded from lib.dll (%p).\n", ok, count, sym._my_lib_handle)
 
 	if count > 0 {
 		fmt.println("42 + 42 =", sym.add(42, 42))
