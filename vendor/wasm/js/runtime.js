@@ -538,8 +538,8 @@ class WebGLInterface {
 			Flush: () => {
 				this.ctx.flush();
 			},
-			FramebufferRenderBuffer: (target, attachment, renderbuffertarget, renderbuffer) => {
-				this.ctx.framebufferRenderBuffer(target, attachment, renderbuffertarget, this.renderbuffers[renderbuffer]);
+			FramebufferRenderbuffer: (target, attachment, renderbuffertarget, renderbuffer) => {
+				this.ctx.framebufferRenderbuffer(target, attachment, renderbuffertarget, this.renderbuffers[renderbuffer]);
 			},
 			FramebufferTexture2D: (target, attachment, textarget, texture, level) => {
 				this.ctx.framebufferTexture2D(target, attachment, textarget, this.textures[texture], level);
