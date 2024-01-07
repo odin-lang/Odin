@@ -1,4 +1,5 @@
 //+private
+//+no-instrumentation
 package runtime
 
 @require foreign import "system:int64.lib"

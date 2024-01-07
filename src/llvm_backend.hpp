@@ -563,7 +563,7 @@ gb_internal LLVMTypeRef OdinLLVMGetVectorElementType(LLVMTypeRef type);
 
 gb_internal String lb_filepath_ll_for_module(lbModule *m);
 
-
+gb_internal LLVMTypeRef lb_type_internal_for_procedures_raw(lbModule *m, Type *type);
 
 gb_internal LLVMTypeRef llvm_array_type(LLVMTypeRef ElementType, uint64_t ElementCount) {
 #if LB_USE_NEW_PASS_SYSTEM

@@ -1497,8 +1497,6 @@ gb_internal WORKER_TASK_PROC(lb_llvm_module_pass_worker_proc) {
 	auto passes = array_make<char const *>(heap_allocator(), 0, 64);
 	defer (array_free(&passes));
 
-
-
 	LLVMPassBuilderOptionsRef pb_options = LLVMCreatePassBuilderOptions();
 	defer (LLVMDisposePassBuilderOptions(pb_options));
 

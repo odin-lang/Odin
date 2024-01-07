@@ -1,5 +1,6 @@
 //+private
 //+build linux, darwin, freebsd, openbsd
+//+no-instrumentation
 package runtime
 
 import "core:intrinsics"

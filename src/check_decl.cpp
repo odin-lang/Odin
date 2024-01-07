@@ -910,24 +910,24 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 	e->Procedure.entry_point_only = ac.entry_point_only;
 	e->Procedure.is_export = ac.is_export;
 
-	bool no_instrumentation = false;
+	bool has_instrumentation = false;
 	if (pl->body == nullptr) {
-		no_instrumentation = true;
+		has_instrumentation = false;
 		if (ac.no_instrumentation != Instrumentation_Default) {
 			error(e->token, "@(no_instrumentation) is not allowed on foreign procedures");
 		}
 	} else {
-		if (e->file) {
-			no_instrumentation = (e->file->flags & AstFile_NoInstrumentation) != 0;
+		AstFile *file = e->token.pos.file_id ? global_files[e->token.pos.file_id] : nullptr;
+		if (file) {
+			has_instrumentation = (file->flags & AstFile_NoInstrumentation) == 0;
 		}
 
 		switch (ac.no_instrumentation) {
-		case Instrumentation_Enabled:  no_instrumentation = false; break;
+		case Instrumentation_Enabled:  has_instrumentation = true; break;
 		case Instrumentation_Default:  break;
-		case Instrumentation_Disabled: no_instrumentation = true;  break;
+		case Instrumentation_Disabled: has_instrumentation = false;  break;
 		}
 	}
-	e->Procedure.no_instrumentation = no_instrumentation;
 
 	auto const is_valid_instrumentation_call = [](Type *type) -> bool {
 		if (type == nullptr || type->kind != Type_Proc) {
@@ -949,6 +949,9 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 
 	if (ac.instrumentation_enter && ac.instrumentation_exit) {
 		error(e->token, "A procedure cannot be marked with both @(instrumentation_enter) and @(instrumentation_exit)");
+
+		has_instrumentation = false;
+		e->flags |= EntityFlag_Require;
 	} else if (ac.instrumentation_enter) {
 		if (!is_valid_instrumentation_call(e->type)) {
 			gbString s = type_to_string(e->type);
@@ -961,6 +964,9 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 		} else {
 			ctx->info->instrumentation_enter_entity = e;
 		}
+
+		has_instrumentation = false;
+		e->flags |= EntityFlag_Require;
 	} else if (ac.instrumentation_exit) {
 		if (!is_valid_instrumentation_call(e->type)) {
 			gbString s = type_to_string(e->type);
@@ -973,7 +979,13 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 		} else {
 			ctx->info->instrumentation_exit_entity = e;
 		}
+
+		has_instrumentation = false;
+		e->flags |= EntityFlag_Require;
 	}
+
+	e->Procedure.has_instrumentation = has_instrumentation;
+
 
 	e->deprecated_message = ac.deprecated_message;
 	e->warning_message = ac.warning_message;

@@ -1,4 +1,5 @@
 //+private
+//+no-instrumentation
 package runtime
 
 foreign import kernel32 "system:Kernel32.lib"
