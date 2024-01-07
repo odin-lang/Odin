@@ -532,7 +532,7 @@ when ODIN_ARCH == .amd64 {
 }
 
 
-@(private, default_calling_convention="c")
+@(private, default_calling_convention="none")
 foreign _ {
 	@(link_name="llvm.x86.sse.add.ss")
 	addss       :: proc(a, b: __m128) -> __m128 ---

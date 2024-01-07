@@ -1493,7 +1493,7 @@ gb_internal void enable_target_feature(TokenPos pos, String const &target_featur
 }
 
 
-gb_internal char const *target_features_set_to_cstring(gbAllocator allocator, bool with_quotes) {
+gb_internal char const *target_features_set_to_cstring(gbAllocator allocator, bool with_quotes, bool with_plus) {
 	isize len = 0;
 	isize i = 0;
 	for (String const &feature : build_context.target_features_set) {
@@ -1502,6 +1502,7 @@ gb_internal char const *target_features_set_to_cstring(gbAllocator allocator, bo
 		}
 		len += feature.len;
 		if (with_quotes) len += 2;
+		if (with_plus) len += 1;
 		i += 1;
 	}
 	char *features = gb_alloc_array(allocator, char, len+1);
@@ -1513,6 +1514,7 @@ gb_internal char const *target_features_set_to_cstring(gbAllocator allocator, bo
 		}
 
 		if (with_quotes) features[len++] = '"';
+		if (with_plus) features[len++] = '+';
 		gb_memmove(features + len, feature.text, feature.len);
 		len += feature.len;
 		if (with_quotes) features[len++] = '"';

@@ -11,7 +11,7 @@ __rdtscp :: #force_inline proc "c" (aux: ^u32) -> u64 {
 	return rdtscp(aux)
 }
 
-@(private, default_calling_convention="c")
+@(private, default_calling_convention="none")
 foreign _ {
 	@(link_name="llvm.x86.rdtsc")
 	rdtsc  :: proc() -> u64 ---
