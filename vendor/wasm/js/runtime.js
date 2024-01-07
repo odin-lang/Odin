@@ -13,6 +13,8 @@ function stripNewline(str) {
     return str.replace(/\n/, ' ')
 }
 
+const STRING_SIZE = 2*4;
+
 class WasmMemoryInterface {
 	constructor() {
 		this.memory = null;
@@ -204,7 +206,6 @@ class WebGLInterface {
 		}
 	}
 	getSource(shader, strings_ptr, strings_length) {
-		const STRING_SIZE = 2*4;
 		let source = "";
 		for (let i = 0; i < strings_length; i++) {
 			let ptr = this.mem.loadPtr(strings_ptr + i*STRING_SIZE);
