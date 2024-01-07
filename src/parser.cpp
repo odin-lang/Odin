@@ -5919,7 +5919,7 @@ gb_internal bool parse_file(Parser *p, AstFile *f) {
 						f->vet_flags = parse_vet_tag(tok, lc);
 						f->vet_flags_set = true;
 					} else if (string_starts_with(lc, str_lit("+ignore"))) {
-							return false;
+						return false;
 					} else if (string_starts_with(lc, str_lit("+private"))) {
 						f->flags |= AstFile_IsPrivatePkg;
 						String command = string_trim_starts_with(lc, str_lit("+private "));
@@ -5941,6 +5941,8 @@ gb_internal bool parse_file(Parser *p, AstFile *f) {
 						} else {
 							f->flags |= AstFile_IsLazy;
 						}
+					} else if (lc == "+no-instrumentation") {
+						f->flags |= AstFile_NoInstrumentation;
 					} else {
 						warning(tok, "Ignoring unknown tag '%.*s'", LIT(lc));
 					}

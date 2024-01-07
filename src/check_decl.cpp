@@ -909,6 +909,72 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 
 	e->Procedure.entry_point_only = ac.entry_point_only;
 	e->Procedure.is_export = ac.is_export;
+
+	bool no_instrumentation = false;
+	if (pl->body == nullptr) {
+		no_instrumentation = true;
+		if (ac.no_instrumentation != Instrumentation_Default) {
+			error(e->token, "@(no_instrumentation) is not allowed on foreign procedures");
+		}
+	} else {
+		if (e->file) {
+			no_instrumentation = (e->file->flags & AstFile_NoInstrumentation) != 0;
+		}
+
+		switch (ac.no_instrumentation) {
+		case Instrumentation_Enabled:  no_instrumentation = false; break;
+		case Instrumentation_Default:  break;
+		case Instrumentation_Disabled: no_instrumentation = true;  break;
+		}
+	}
+	e->Procedure.no_instrumentation = no_instrumentation;
+
+	auto const is_valid_instrumentation_call = [](Type *type) -> bool {
+		if (type == nullptr || type->kind != Type_Proc) {
+			return false;
+		}
+		if (type->Proc.calling_convention != ProcCC_CDecl) {
+			return false;
+		}
+		if (type->Proc.result_count != 0) {
+			return false;
+		}
+		if (type->Proc.param_count != 2) {
+			return false;
+		}
+		Type *p0 = type->Proc.params->Tuple.variables[0]->type;
+		Type *p1 = type->Proc.params->Tuple.variables[1]->type;
+		return is_type_rawptr(p0) && is_type_rawptr(p1);
+	};
+
+	if (ac.instrumentation_enter && ac.instrumentation_exit) {
+		error(e->token, "A procedure cannot be marked with both @(instrumentation_enter) and @(instrumentation_exit)");
+	} else if (ac.instrumentation_enter) {
+		if (!is_valid_instrumentation_call(e->type)) {
+			gbString s = type_to_string(e->type);
+			error(e->token, "@(instrumentation_enter) procedures must have the type 'proc \"c\" (rawptr, rawptr)', got %s", s);
+			gb_string_free(s);
+		}
+		MUTEX_GUARD(&ctx->info->instrumentation_mutex);
+		if (ctx->info->instrumentation_enter_entity != nullptr) {
+			error(e->token, "@(instrumentation_enter) has already been set");
+		} else {
+			ctx->info->instrumentation_enter_entity = e;
+		}
+	} else if (ac.instrumentation_exit) {
+		if (!is_valid_instrumentation_call(e->type)) {
+			gbString s = type_to_string(e->type);
+			error(e->token, "@(instrumentation_exit) procedures must have the type 'proc \"c\" (rawptr, rawptr)', got %s", s);
+			gb_string_free(s);
+		}
+		MUTEX_GUARD(&ctx->info->instrumentation_mutex);
+		if (ctx->info->instrumentation_exit_entity != nullptr) {
+			error(e->token, "@(instrumentation_exit) has already been set");
+		} else {
+			ctx->info->instrumentation_exit_entity = e;
+		}
+	}
+
 	e->deprecated_message = ac.deprecated_message;
 	e->warning_message = ac.warning_message;
 	ac.link_name = handle_link_name(ctx, e->token, ac.link_name, ac.link_prefix);
