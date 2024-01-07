@@ -395,7 +395,7 @@ class WebGLInterface {
 				this.ctx.copyTexImage2D(target, level, internalformat, x, y, width, height, border);
 			},
 			CopyTexSubImage2D: (target, level, xoffset, yoffset, x, y, width, height) => {
-				this.ctx.copyTexImage2D(target, level, xoffset, yoffset, x, y, width, height);
+				this.ctx.copyTexSubImage2D(target, level, xoffset, yoffset, x, y, width, height);
 			},
 
 
@@ -855,7 +855,7 @@ class WebGLInterface {
 
 			CopyTexSubImage3D: (target, level, xoffset, yoffset, zoffset, x, y, width, height) => {
 				this.assertWebGL2();
-				this.ctx.copyTexImage3D(target, level, xoffset, yoffset, zoffset, x, y, width, height);
+				this.ctx.copyTexSubImage3D(target, level, xoffset, yoffset, zoffset, x, y, width, height);
 			},
 
 			/* Programs and shaders */
@@ -1038,7 +1038,7 @@ class WebGLInterface {
 			},
 			BindSampler: (unit, sampler) => {
 				this.assertWebGL2();
-				this.ctx.bindSampler(unit, this.samplers[Sampler]);
+				this.ctx.bindSampler(unit, this.samplers[sampler]);
 			},
 			SamplerParameteri: (sampler, pname, param) => {
 				this.assertWebGL2();
