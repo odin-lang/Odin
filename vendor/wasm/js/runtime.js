@@ -982,10 +982,10 @@ class WebGLInterface {
 			},
 			DeleteQuery: (id) => {
 				this.assertWebGL2();
-				let obj = this.querys[id];
+				let obj = this.queries[id];
 				if (obj && id != 0) {
 					this.ctx.deleteQuery(obj);
-					this.querys[id] = null;
+					this.queries[id] = null;
 				}
 			},
 			IsQuery: (query) => {
@@ -1083,7 +1083,7 @@ class WebGLInterface {
 			/* Transform Feedback */
 			CreateTransformFeedback: () => {
 				this.assertWebGL2();
-				let transformFeedback = this.ctx.createtransformFeedback();
+				let transformFeedback = this.ctx.createTransformFeedback();
 				let id = this.getNewId(this.transformFeedbacks);
 				transformFeedback.name = id;
 				this.transformFeedbacks[id] = transformFeedback;
