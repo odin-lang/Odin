@@ -791,7 +791,7 @@ class WebGLInterface {
 			/* Framebuffer objects */
 			BlitFramebuffer: (srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, mask, filter) => {
 				this.assertWebGL2();
-				this.ctx.glitFramebuffer(srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, mask, filter);
+				this.ctx.blitFramebuffer(srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, mask, filter);
 			},
 			FramebufferTextureLayer: (target, attachment, texture, level, layer) => {
 				this.assertWebGL2();
@@ -822,7 +822,7 @@ class WebGLInterface {
 
 			TexStorage3D: (target, levels, internalformat, width, height, depth) => {
 				this.assertWebGL2();
-				this.ctx.texStorage3D(target, level, internalformat, width, heigh, depth);
+				this.ctx.texStorage3D(target, levels, internalformat, width, height, depth);
 			},
 			TexImage3D: (target, level, internalformat, width, height, depth, border, format, type, size, data) => {
 				this.assertWebGL2();
