@@ -67,6 +67,18 @@ test_index_any_larger_string_found :: proc(t: ^testing.T) {
 	expect(t, index == 8, "index_any should be 8")
 }
 
+@test
+test_last_index_any_small_string_found :: proc(t: ^testing.T) {
+	index := strings.last_index_any(".", "/:.\"")
+	expect(t, index == 0, "last_index_any should be 0")
+}
+
+@test
+test_last_index_any_small_string_not_found :: proc(t: ^testing.T) {
+	index := strings.last_index_any(".", "/:\"")
+	expect(t, index == -1, "last_index_any should be -1")
+}
+
 Cut_Test :: struct {
 	input:  string,
 	offset: int,
