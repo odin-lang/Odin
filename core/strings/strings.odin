@@ -1792,7 +1792,8 @@ last_index_any :: proc(s, chars: string) -> (res: int) {
 		if r >= utf8.RUNE_SELF {
 			r = utf8.RUNE_ERROR
 		}
-		return index_rune(chars, r)
+		i := index_rune(chars, r)
+		return i if i < 0 else 0
 	}
 	
 	if len(s) > 8 {
