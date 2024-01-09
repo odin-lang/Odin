@@ -385,7 +385,7 @@ gb_internal LLVMValueRef lb_run_instrumentation_pass_insert_call(lbProcedure *p,
 
 	lbValue cc = lb_find_procedure_value_from_entity(m, entity);
 
-	LLVMValueRef args[2] = {};
+	LLVMValueRef args[3] = {};
 	args[0] = p->value;
 
 	LLVMValueRef returnaddress_args[1] = {};
@@ -399,8 +399,14 @@ gb_internal LLVMValueRef lb_run_instrumentation_pass_insert_call(lbProcedure *p,
 	LLVMTypeRef call_type = LLVMIntrinsicGetType(m->ctx, id, nullptr, 0);
 	args[1] = LLVMBuildCall2(dummy_builder, call_type, ip, returnaddress_args, gb_count_of(returnaddress_args), "");
 
+	Token name = {};
+	if (p->entity) {
+		name = p->entity->token;
+	}
+	args[2] = lb_emit_source_code_location_as_global_ptr(p, name.string, name.pos).value;
+
 	LLVMTypeRef fnp = lb_type_internal_for_procedures_raw(p->module, entity->type);
-	return LLVMBuildCall2(dummy_builder, fnp, cc.value, args, 2, "");
+	return LLVMBuildCall2(dummy_builder, fnp, cc.value, args, gb_count_of(args), "");
 }
 
 

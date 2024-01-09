@@ -933,19 +933,22 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 		if (type == nullptr || type->kind != Type_Proc) {
 			return false;
 		}
-		if (type->Proc.calling_convention != ProcCC_CDecl) {
+		if (type->Proc.calling_convention != ProcCC_Contextless) {
 			return false;
 		}
 		if (type->Proc.result_count != 0) {
 			return false;
 		}
-		if (type->Proc.param_count != 2) {
+		if (type->Proc.param_count != 3) {
 			return false;
 		}
 		Type *p0 = type->Proc.params->Tuple.variables[0]->type;
 		Type *p1 = type->Proc.params->Tuple.variables[1]->type;
-		return is_type_rawptr(p0) && is_type_rawptr(p1);
+		Type *p3 = type->Proc.params->Tuple.variables[2]->type;
+		return is_type_rawptr(p0) && is_type_rawptr(p1) && are_types_identical(p3, t_source_code_location);
 	};
+
+	static char const *instrumentation_proc_type_str = "proc \"contextless\" (proc_address: rawptr, call_site_return_address: rawptr, loc: runtime.Source_Code_Location)";
 
 	if (ac.instrumentation_enter && ac.instrumentation_exit) {
 		error(e->token, "A procedure cannot be marked with both @(instrumentation_enter) and @(instrumentation_exit)");
@@ -954,8 +957,9 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 		e->flags |= EntityFlag_Require;
 	} else if (ac.instrumentation_enter) {
 		if (!is_valid_instrumentation_call(e->type)) {
+			init_core_source_code_location(ctx->checker);
 			gbString s = type_to_string(e->type);
-			error(e->token, "@(instrumentation_enter) procedures must have the type 'proc \"c\" (rawptr, rawptr)', got %s", s);
+			error(e->token, "@(instrumentation_enter) procedures must have the type '%s', got %s", instrumentation_proc_type_str, s);
 			gb_string_free(s);
 		}
 		MUTEX_GUARD(&ctx->info->instrumentation_mutex);
@@ -968,9 +972,10 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 		has_instrumentation = false;
 		e->flags |= EntityFlag_Require;
 	} else if (ac.instrumentation_exit) {
+		init_core_source_code_location(ctx->checker);
 		if (!is_valid_instrumentation_call(e->type)) {
 			gbString s = type_to_string(e->type);
-			error(e->token, "@(instrumentation_exit) procedures must have the type 'proc \"c\" (rawptr, rawptr)', got %s", s);
+			error(e->token, "@(instrumentation_exit) procedures must have the type '%s', got %s", instrumentation_proc_type_str, s);
 			gb_string_free(s);
 		}
 		MUTEX_GUARD(&ctx->info->instrumentation_mutex);
