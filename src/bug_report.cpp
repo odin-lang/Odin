@@ -824,6 +824,17 @@ gb_internal void report_os_info() {
 			{"20G624",   {20,  6,  0}, "macOS", {"Big Sur",       {11,  6,  6}}},
 			{"20G630",   {20,  6,  0}, "macOS", {"Big Sur",       {11,  6,  7}}},
 			{"20G730",   {20,  6,  0}, "macOS", {"Big Sur",       {11,  6,  8}}},
+			{"20G817",   {20,  6,  0}, "macOS", {"Big Sur",       {11, 7,   0}}},
+			{"20G918",   {20,  6,  0}, "macOS", {"Big Sur",       {11, 7,   1}}},
+			{"20G1020",  {20,  6,  0}, "macOS", {"Big Sur",       {11, 7,   2}}},
+			{"20G1116",  {20,  6,  0}, "macOS", {"Big Sur",       {11, 7,   3}}},
+			{"20G1120",  {20,  6,  0}, "macOS", {"Big Sur",       {11, 7,   4}}},
+			{"20G1225",  {20,  6,  0}, "macOS", {"Big Sur",       {11, 7,   5}}},
+			{"20G1231",  {20,  6,  0}, "macOS", {"Big Sur",       {11, 7,   6}}},
+			{"20G1345",  {20,  6,  0}, "macOS", {"Big Sur",       {11, 7,   7}}},
+			{"20G1351",  {20,  6,  0}, "macOS", {"Big Sur",       {11, 7,   8}}},
+			{"20G1426",  {20,  6,  0}, "macOS", {"Big Sur",       {11, 7,   9}}},
+			{"20G1427",  {20,  6,  0}, "macOS", {"Big Sur",       {11, 7,  10}}},
 			{"21A344",   {21,  0,  1}, "macOS", {"Monterey",      {12,  0,  0}}},
 			{"21A559",   {21,  1,  0}, "macOS", {"Monterey",      {12,  0,  1}}},
 			{"21C52",    {21,  2,  0}, "macOS", {"Monterey",      {12,  1,  0}}},
@@ -836,6 +847,42 @@ gb_internal void report_os_info() {
 			{"21F2092",  {21,  5,  0}, "macOS", {"Monterey",      {12,  4,  0}}},
 			{"21G72",    {21,  6,  0}, "macOS", {"Monterey",      {12,  5,  0}}},
 			{"21G83",    {21,  6,  0}, "macOS", {"Monterey",      {12,  5,  1}}},
+			{"21G115",   {21,  6,  0}, "macOS", {"Monterey",      {12,  6,  0}}},
+			{"21G217",   {21,  6,  0}, "macOS", {"Monterey",      {12,  6,  1}}},
+			{"21G320",   {21,  6,  0}, "macOS", {"Monterey",      {12,  6,  2}}},
+			{"21G419",   {21,  6,  0}, "macOS", {"Monterey",      {12,  6,  3}}},
+			{"21G526",   {21,  6,  0}, "macOS", {"Monterey",      {12,  6,  4}}},
+			{"21G531",   {21,  6,  0}, "macOS", {"Monterey",      {12,  6,  5}}},
+			{"21G646",   {21,  6,  0}, "macOS", {"Monterey",      {12,  6,  6}}},
+			{"21G651",   {21,  6,  0}, "macOS", {"Monterey",      {12,  6,  7}}},
+			{"21G725",   {21,  6,  0}, "macOS", {"Monterey",      {12,  6,  8}}},
+			{"21G726",   {21,  6,  0}, "macOS", {"Monterey",      {12,  6,  9}}},
+			{"21G816",   {21,  6,  0}, "macOS", {"Monterey",      {12,  7,  0}}},
+			{"21G920",   {21,  6,  0}, "macOS", {"Monterey",      {12,  7,  1}}},
+			{"21G1974",  {21,  6,  0}, "macOS", {"Monterey",      {12,  7,  2}}},
+			{"22A380",   {13,  0,  0}, "macOS", {"Ventura",       {22,  1,  0}}},
+			{"22A400",   {13,  0,  1}, "macOS", {"Ventura",       {22,  1,  0}}},
+			{"22C65",    {13,  1,  0}, "macOS", {"Ventura",       {22,  2,  0}}},
+			{"22D49",    {13,  2,  0}, "macOS", {"Ventura",       {22,  3,  0}}},
+			{"22D68",    {13,  2,  1}, "macOS", {"Ventura",       {22,  3,  0}}},
+			{"22E252",   {13,  3,  0}, "macOS", {"Ventura",       {22,  4,  0}}},
+			{"22E261",   {13,  3,  1}, "macOS", {"Ventura",       {22,  4,  0}}},
+			{"22F66",    {13,  4,  0}, "macOS", {"Ventura",       {22,  5,  0}}},
+			{"22F82",    {13,  4,  1}, "macOS", {"Ventura",       {22,  5,  0}}},
+			{"22E772610a", {13, 4, 1}, "macOS", {"Ventura",       {22,  5,  0}}},
+			{"22F770820d", {13, 4, 1}, "macOS", {"Ventura",       {22,  5,  0}}},
+			{"22G74",    {13,  5,  0}, "macOS", {"Ventura",       {22,  6,  0}}},
+			{"22G90",    {13,  5,  1}, "macOS", {"Ventura",       {22,  6,  0}}},
+			{"22G91",    {13,  5,  2}, "macOS", {"Ventura",       {22,  6,  0}}},
+			{"22G120",   {13,  6,  0}, "macOS", {"Ventura",       {22,  6,  0}}},
+			{"22G313",   {13,  6,  1}, "macOS", {"Ventura",       {22,  6,  0}}},
+			{"22G320",   {13,  6,  2}, "macOS", {"Ventura",       {22,  6,  0}}},
+			{"23A344",   {23,  0,  0}, "macOS", {"Sonoma",        {14,  0,  0}}},
+			{"23B74",    {23,  1,  0}, "macOS", {"Sonoma",        {14,  1,  0}}},
+			{"23B81",    {23,  1,  0}, "macOS", {"Sonoma",        {14,  1,  1}}},
+			{"23B92",    {23,  1,  0}, "macOS", {"Sonoma",        {14,  1,  2}}},
+			{"23C64",    {23,  2,  0}, "macOS", {"Sonoma",        {14,  2,  0}}},
+			{"23C71",    {23,  2,  0}, "macOS", {"Sonoma",        {14,  2,  1}}},
 		};
 
 
@@ -867,36 +914,43 @@ gb_internal void report_os_info() {
 
 		// Scan table for match on BUILD
 		int macos_release_count = sizeof(macos_release_map) / sizeof(macos_release_map[0]);
-		Darwin_To_Release match = {};
-
+		Darwin_To_Release build_match = {};
+		Darwin_To_Release kernel_match = {};
+	
 		for (int build = 0; build < macos_release_count; build++) {
 			Darwin_To_Release rel = macos_release_map[build];
-
+			
 			// Do we have an exact match on the BUILD?
 			if (gb_strcmp(rel.build, (const char *)build_buffer) == 0) {
-				match = rel;
+				build_match = rel;
 				break;
 			}
-
+			
 			// Do we have an exact Darwin match?
 			if (rel.darwin[0] == major && rel.darwin[1] == minor && rel.darwin[2] == patch) {
-				match = rel;
-				break;
+				kernel_match = rel;
 			}
-
+	
 			// Major kernel version needs to match exactly,
 			if (rel.darwin[0] == major) {
 				// No major version match yet.
-				if (!match.os_name) {
-					match = rel;
+				if (!kernel_match.os_name) {
+					kernel_match = rel;
 				}
 				if (minor >= rel.darwin[1]) {
-					match = rel;
+					kernel_match = rel;
 					if (patch >= rel.darwin[2]) {
-						match = rel;
+						kernel_match = rel;
 					}
 				}
 			}
+		}
+	
+		Darwin_To_Release match = {};
+		if(!build_match.build) {
+			match = kernel_match;
+		} else {
+			match = build_match;
 		}
 
 		if (match.os_name) {
