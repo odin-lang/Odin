@@ -388,11 +388,9 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 				x = bits.byte_swap(x)
 			}
 			bit_data = u64(x)
-		case: panic("unknown bit_size size")
+		case: return .Unsupported_Type
 		}
 		io.write_u64(w, bit_data) or_return
-
-		return .Unsupported_Type
 	}
 
 	return
