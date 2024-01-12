@@ -726,6 +726,10 @@ gb_internal bool cg_generate_code(Checker *c, LinkerData *linker_data) {
 
 	linker_data_init(linker_data, info, c->parser->init_fullpath);
 
+	#if defined(GB_SYSTEM_OSX)
+		linker_enable_system_library_linking(linker_data);
+	#endif
+
 	cg_global_arena_init();
 
 	cgModule *m = cg_module_create(c);

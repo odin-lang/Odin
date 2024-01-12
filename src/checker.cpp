@@ -2581,6 +2581,9 @@ gb_internal void generate_minimum_dependency_set(Checker *c, Entity *start) {
 		str_lit("multi_pointer_slice_expr_error"),
 	);
 
+	add_dependency_to_set(c, c->info.instrumentation_enter_entity);
+	add_dependency_to_set(c, c->info.instrumentation_exit_entity);
+
 	generate_minimum_dependency_set_internal(c, start);
 
 
@@ -3413,6 +3416,39 @@ gb_internal DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 			error(elem, "Expected a string value for '%.*s'", LIT(name));
 		}
 		return true;
+	} else if (name == "entry_point_only") {
+		if (value != nullptr) {
+			error(value, "'%.*s' expects no parameter", LIT(name));
+		}
+		ac->entry_point_only = true;
+		return true;
+	} else if (name == "no_instrumentation") {
+		ExactValue ev = check_decl_attribute_value(c, value);
+		if (ev.kind == ExactValue_Invalid) {
+			ac->no_instrumentation = Instrumentation_Disabled;
+		} else if (ev.kind == ExactValue_Bool) {
+			if (ev.value_bool) {
+				ac->no_instrumentation = Instrumentation_Disabled;
+			} else {
+				ac->no_instrumentation = Instrumentation_Enabled;
+			}
+		} else {
+			error(value, "Expected either a boolean or no parameter for '%.*s'", LIT(name));
+			return false;
+		}
+		return true;
+	} else if (name == "instrumentation_enter") {
+		if (value != nullptr) {
+			error(value, "'%.*s' expects no parameter", LIT(name));
+		}
+		ac->instrumentation_enter = true;
+		return true;
+	} else if (name == "instrumentation_exit") {
+		if (value != nullptr) {
+			error(value, "'%.*s' expects no parameter", LIT(name));
+		}
+		ac->instrumentation_exit = true;
+		return true;
 	}
 	return false;
 }
@@ -4022,12 +4058,11 @@ gb_internal void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 						if (c->foreign_context.default_cc > 0) {
 							cc = c->foreign_context.default_cc;
 						} else if (is_arch_wasm()) {
-							begin_error_block();
+							ERROR_BLOCK();
 							error(init, "For wasm related targets, it is required that you either define the"
 							            " @(default_calling_convention=<string>) on the foreign block or"
 							            " explicitly assign it on the procedure signature");
 							error_line("\tSuggestion: when dealing with normal Odin code (e.g. js_wasm32), use \"contextless\"; when dealing with Emscripten like code, use \"c\"\n");
-							end_error_block();
 						}
 					}
 					e->Procedure.link_prefix = c->foreign_context.link_prefix;
@@ -4074,8 +4109,7 @@ gb_internal void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 
 			if (e->kind != Entity_Procedure) {
 				if (fl != nullptr) {
-					begin_error_block();
-					defer (end_error_block());
+					ERROR_BLOCK();
 
 					AstKind kind = init->kind;
 					error(name, "Only procedures and variables are allowed to be in a foreign block, got %.*s", LIT(ast_strings[kind]));
@@ -6214,6 +6248,17 @@ gb_internal void check_parsed_files(Checker *c) {
 	check_merge_queues_into_arrays(c);
 	GB_ASSERT(c->info.entity_queue.count.load(std::memory_order_relaxed) == 0);
 	GB_ASSERT(c->info.definition_queue.count.load(std::memory_order_relaxed) == 0);
+
+	TIME_SECTION("check instrumentation calls");
+	{
+		if ((c->info.instrumentation_enter_entity != nullptr) ^
+		    (c->info.instrumentation_exit_entity  != nullptr)) {
+			Entity *e = c->info.instrumentation_enter_entity;
+			if (!e) e = c->info.instrumentation_exit_entity;
+			error(e->token, "Both @(instrumentation_enter) and @(instrumentation_exit) must be defined");
+		}
+	}
+
 
 	TIME_SECTION("add untyped expression values");
 	// Add untyped expression values

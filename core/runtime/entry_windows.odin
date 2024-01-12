@@ -1,5 +1,6 @@
 //+private
 //+build windows
+//+no-instrumentation
 package runtime
 
 import "core:intrinsics"

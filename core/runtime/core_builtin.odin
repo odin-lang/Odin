@@ -348,7 +348,7 @@ make_multi_pointer :: proc($T: typeid/[^]$E, #any_int len: int, allocator := con
 //
 // Similar to `new`, the first argument is a type, not a value. Unlike new, make's return type is the same as the
 // type of its argument, not a pointer to it.
-// Make uses the specified allocator, default is context.allocator, default is context.allocator
+// Make uses the specified allocator, default is context.allocator.
 @builtin
 make :: proc{
 	make_slice,

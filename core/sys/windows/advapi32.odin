@@ -13,6 +13,11 @@ foreign advapi32 {
 	                         DesiredAccess: DWORD,
 	                         TokenHandle: ^HANDLE) -> BOOL ---
 
+	OpenThreadToken :: proc(ThreadHandle:  HANDLE,
+	                        DesiredAccess: DWORD,
+	                        OpenAsSelf:    BOOL,
+	                        TokenHandle:   ^HANDLE) -> BOOL ---
+
 	CryptAcquireContextW :: proc(hProv: ^HCRYPTPROV, szContainer, szProvider: wstring, dwProvType, dwFlags: DWORD) -> DWORD ---
 	CryptGenRandom       :: proc(hProv: HCRYPTPROV, dwLen: DWORD, buf: LPVOID) -> DWORD ---
 	CryptReleaseContext  :: proc(hProv: HCRYPTPROV, dwFlags: DWORD) -> DWORD ---

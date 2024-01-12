@@ -107,6 +107,10 @@ gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c) {
 	String init_fullpath = c->parser->init_fullpath;
 	linker_data_init(gen, &c->info, init_fullpath);
 
+	#if defined(GB_SYSTEM_OSX) && (LLVM_VERSION_MAJOR < 14)
+	linker_enable_system_library_linking(gen);
+	#endif
+
 	gen->info = &c->info;
 
 	map_init(&gen->modules, gen->info->packages.count*2);
@@ -2344,6 +2348,15 @@ gb_internal LLVMAttributeRef lb_create_enum_attribute(LLVMContextRef ctx, char c
 	return LLVMCreateEnumAttribute(ctx, kind, value);
 }
 
+gb_internal LLVMAttributeRef lb_create_string_attribute(LLVMContextRef ctx, String const &key, String const &value) {
+	LLVMAttributeRef attr = LLVMCreateStringAttribute(
+		ctx,
+		cast(char const *)key.text,   cast(unsigned)key.len,
+		cast(char const *)value.text, cast(unsigned)value.len);
+	return attr;
+}
+
+
 gb_internal void lb_add_proc_attribute_at_index(lbProcedure *p, isize index, char const *name, u64 value) {
 	LLVMAttributeRef attr = lb_create_enum_attribute(p->module->ctx, name, value);
 	GB_ASSERT(attr != nullptr);
@@ -2356,6 +2369,10 @@ gb_internal void lb_add_proc_attribute_at_index(lbProcedure *p, isize index, cha
 
 gb_internal void lb_add_attribute_to_proc(lbModule *m, LLVMValueRef proc_value, char const *name, u64 value=0) {
 	LLVMAddAttributeAtIndex(proc_value, LLVMAttributeIndex_FunctionIndex, lb_create_enum_attribute(m->ctx, name, value));
+}
+gb_internal void lb_add_attribute_to_proc_with_string(lbModule *m, LLVMValueRef proc_value, String const &name, String const &value) {
+	LLVMAttributeRef attr = lb_create_string_attribute(m->ctx, name, value);
+	LLVMAddAttributeAtIndex(proc_value, LLVMAttributeIndex_FunctionIndex, attr);
 }
 
 

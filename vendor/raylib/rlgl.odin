@@ -1,83 +1,84 @@
 /**********************************************************************************************
 *
-*   rlgl v4.5 - A multi-OpenGL abstraction layer with an immediate-mode style API
+*   rlgl v5.0 - A multi-OpenGL abstraction layer with an immediate-mode style API
 *
-*   An abstraction layer for multiple OpenGL versions (1.1, 2.1, 3.3 Core, 4.3 Core, ES 2.0)
-*   that provides a pseudo-OpenGL 1.1 immediate-mode style API (rlVertex, rlTranslate, rlRotate...)
+*   DESCRIPTION:
+*       An abstraction layer for multiple OpenGL versions (1.1, 2.1, 3.3 Core, 4.3 Core, ES 2.0)
+*       that provides a pseudo-OpenGL 1.1 immediate-mode style API (rlVertex, rlTranslate, rlRotate...)
 *
-*   When choosing an OpenGL backend different than OpenGL 1.1, some internal buffer are
-*   initialized on rlglInit() to accumulate vertex data.
+*   ADDITIONAL NOTES:
+*       When choosing an OpenGL backend different than OpenGL 1.1, some internal buffer are
+*       initialized on rlglInit() to accumulate vertex data.
 *
-*   When an internal state change is required all the stored vertex data is renderer in batch,
-*   additionally, rlDrawRenderBatchActive() could be called to force flushing of the batch.
+*       When an internal state change is required all the stored vertex data is renderer in batch,
+*       additionally, rlDrawRenderBatchActive() could be called to force flushing of the batch.
 *
-*   Some additional resources are also loaded for convenience, here the complete list:
-*      - Default batch (RLGL.defaultBatch): RenderBatch system to accumulate vertex data
-*      - Default texture (RLGL.defaultTextureId): 1x1 white pixel R8G8B8A8
-*      - Default shader (RLGL.State.defaultShaderId, RLGL.State.defaultShaderLocs)
+*       Some resources are also loaded for convenience, here the complete list:
+*          - Default batch (RLGL.defaultBatch): RenderBatch system to accumulate vertex data
+*          - Default texture (RLGL.defaultTextureId): 1x1 white pixel R8G8B8A8
+*          - Default shader (RLGL.State.defaultShaderId, RLGL.State.defaultShaderLocs)
 *
-*   Internal buffer (and additional resources) must be manually unloaded calling rlglClose().
-*
+*       Internal buffer (and resources) must be manually unloaded calling rlglClose().
 *
 *   CONFIGURATION:
+*       #define GRAPHICS_API_OPENGL_11
+*       #define GRAPHICS_API_OPENGL_21
+*       #define GRAPHICS_API_OPENGL_33
+*       #define GRAPHICS_API_OPENGL_43
+*       #define GRAPHICS_API_OPENGL_ES2
+*       #define GRAPHICS_API_OPENGL_ES3
+*           Use selected OpenGL graphics backend, should be supported by platform
+*           Those preprocessor defines are only used on rlgl module, if OpenGL version is
+*           required by any other module, use rlGetVersion() to check it
 *
-*   #define GRAPHICS_API_OPENGL_11
-*   #define GRAPHICS_API_OPENGL_21
-*   #define GRAPHICS_API_OPENGL_33
-*   #define GRAPHICS_API_OPENGL_43
-*   #define GRAPHICS_API_OPENGL_ES2
-*       Use selected OpenGL graphics backend, should be supported by platform
-*       Those preprocessor defines are only used on rlgl module, if OpenGL version is
-*       required by any other module, use rlGetVersion() to check it
+*       #define RLGL_IMPLEMENTATION
+*           Generates the implementation of the library into the included file.
+*           If not defined, the library is in header only mode and can be included in other headers
+*           or source files without problems. But only ONE file should hold the implementation.
 *
-*   #define RLGL_IMPLEMENTATION
-*       Generates the implementation of the library into the included file.
-*       If not defined, the library is in header only mode and can be included in other headers
-*       or source files without problems. But only ONE file should hold the implementation.
+*       #define RLGL_RENDER_TEXTURES_HINT
+*           Enable framebuffer objects (fbo) support (enabled by default)
+*           Some GPUs could not support them despite the OpenGL version
 *
-*   #define RLGL_RENDER_TEXTURES_HINT
-*       Enable framebuffer objects (fbo) support (enabled by default)
-*       Some GPUs could not support them despite the OpenGL version
+*       #define RLGL_SHOW_GL_DETAILS_INFO
+*           Show OpenGL extensions and capabilities detailed logs on init
 *
-*   #define RLGL_SHOW_GL_DETAILS_INFO
-*       Show OpenGL extensions and capabilities detailed logs on init
+*       #define RLGL_ENABLE_OPENGL_DEBUG_CONTEXT
+*           Enable debug context (only available on OpenGL 4.3)
 *
-*   #define RLGL_ENABLE_OPENGL_DEBUG_CONTEXT
-*       Enable debug context (only available on OpenGL 4.3)
+*       rlgl capabilities could be customized just defining some internal
+*       values before library inclusion (default values listed):
 *
-*   rlgl capabilities could be customized just defining some internal
-*   values before library inclusion (default values listed):
+*       #define RL_DEFAULT_BATCH_BUFFER_ELEMENTS   8192    // Default internal render batch elements limits
+*       #define RL_DEFAULT_BATCH_BUFFERS              1    // Default number of batch buffers (multi-buffering)
+*       #define RL_DEFAULT_BATCH_DRAWCALLS          256    // Default number of batch draw calls (by state changes: mode, texture)
+*       #define RL_DEFAULT_BATCH_MAX_TEXTURE_UNITS    4    // Maximum number of textures units that can be activated on batch drawing (SetShaderValueTexture())
 *
-*   #define RL_DEFAULT_BATCH_BUFFER_ELEMENTS   8192    // Default internal render batch elements limits
-*   #define RL_DEFAULT_BATCH_BUFFERS              1    // Default number of batch buffers (multi-buffering)
-*   #define RL_DEFAULT_BATCH_DRAWCALLS          256    // Default number of batch draw calls (by state changes: mode, texture)
-*   #define RL_DEFAULT_BATCH_MAX_TEXTURE_UNITS    4    // Maximum number of textures units that can be activated on batch drawing (SetShaderValueTexture())
+*       #define RL_MAX_MATRIX_STACK_SIZE             32    // Maximum size of internal Matrix stack
+*       #define RL_MAX_SHADER_LOCATIONS              32    // Maximum number of shader locations supported
+*       #define RL_CULL_DISTANCE_NEAR              0.01    // Default projection matrix near cull distance
+*       #define RL_CULL_DISTANCE_FAR             1000.0    // Default projection matrix far cull distance
 *
-*   #define RL_MAX_MATRIX_STACK_SIZE             32    // Maximum size of internal Matrix stack
-*   #define RL_MAX_SHADER_LOCATIONS              32    // Maximum number of shader locations supported
-*   #define RL_CULL_DISTANCE_NEAR              0.01    // Default projection matrix near cull distance
-*   #define RL_CULL_DISTANCE_FAR             1000.0    // Default projection matrix far cull distance
+*       When loading a shader, the following vertex attributes and uniform
+*       location names are tried to be set automatically:
 *
-*   When loading a shader, the following vertex attribute and uniform
-*   location names are tried to be set automatically:
-*
-*   #define RL_DEFAULT_SHADER_ATTRIB_NAME_POSITION     "vertexPosition"    // Bound by default to shader location: 0
-*   #define RL_DEFAULT_SHADER_ATTRIB_NAME_TEXCOORD     "vertexTexCoord"    // Bound by default to shader location: 1
-*   #define RL_DEFAULT_SHADER_ATTRIB_NAME_NORMAL       "vertexNormal"      // Bound by default to shader location: 2
-*   #define RL_DEFAULT_SHADER_ATTRIB_NAME_COLOR        "vertexColor"       // Bound by default to shader location: 3
-*   #define RL_DEFAULT_SHADER_ATTRIB_NAME_TANGENT      "vertexTangent"     // Bound by default to shader location: 4
-*   #define RL_DEFAULT_SHADER_UNIFORM_NAME_MVP         "mvp"               // model-view-projection matrix
-*   #define RL_DEFAULT_SHADER_UNIFORM_NAME_VIEW        "matView"           // view matrix
-*   #define RL_DEFAULT_SHADER_UNIFORM_NAME_PROJECTION  "matProjection"     // projection matrix
-*   #define RL_DEFAULT_SHADER_UNIFORM_NAME_MODEL       "matModel"          // model matrix
-*   #define RL_DEFAULT_SHADER_UNIFORM_NAME_NORMAL      "matNormal"         // normal matrix (transpose(inverse(matModelView))
-*   #define RL_DEFAULT_SHADER_UNIFORM_NAME_COLOR       "colDiffuse"        // color diffuse (base tint color, multiplied by texture color)
-*   #define RL_DEFAULT_SHADER_SAMPLER2D_NAME_TEXTURE0  "texture0"          // texture0 (texture slot active 0)
-*   #define RL_DEFAULT_SHADER_SAMPLER2D_NAME_TEXTURE1  "texture1"          // texture1 (texture slot active 1)
-*   #define RL_DEFAULT_SHADER_SAMPLER2D_NAME_TEXTURE2  "texture2"          // texture2 (texture slot active 2)
+*       #define RL_DEFAULT_SHADER_ATTRIB_NAME_POSITION     "vertexPosition"    // Bound by default to shader location: 0
+*       #define RL_DEFAULT_SHADER_ATTRIB_NAME_TEXCOORD     "vertexTexCoord"    // Bound by default to shader location: 1
+*       #define RL_DEFAULT_SHADER_ATTRIB_NAME_NORMAL       "vertexNormal"      // Bound by default to shader location: 2
+*       #define RL_DEFAULT_SHADER_ATTRIB_NAME_COLOR        "vertexColor"       // Bound by default to shader location: 3
+*       #define RL_DEFAULT_SHADER_ATTRIB_NAME_TANGENT      "vertexTangent"     // Bound by default to shader location: 4
+*       #define RL_DEFAULT_SHADER_ATTRIB_NAME_TEXCOORD2    "vertexTexCoord2"   // Bound by default to shader location: 5
+*       #define RL_DEFAULT_SHADER_UNIFORM_NAME_MVP         "mvp"               // model-view-projection matrix
+*       #define RL_DEFAULT_SHADER_UNIFORM_NAME_VIEW        "matView"           // view matrix
+*       #define RL_DEFAULT_SHADER_UNIFORM_NAME_PROJECTION  "matProjection"     // projection matrix
+*       #define RL_DEFAULT_SHADER_UNIFORM_NAME_MODEL       "matModel"          // model matrix
+*       #define RL_DEFAULT_SHADER_UNIFORM_NAME_NORMAL      "matNormal"         // normal matrix (transpose(inverse(matModelView))
+*       #define RL_DEFAULT_SHADER_UNIFORM_NAME_COLOR       "colDiffuse"        // color diffuse (base tint color, multiplied by texture color)
+*       #define RL_DEFAULT_SHADER_SAMPLER2D_NAME_TEXTURE0  "texture0"          // texture0 (texture slot active 0)
+*       #define RL_DEFAULT_SHADER_SAMPLER2D_NAME_TEXTURE1  "texture1"          // texture1 (texture slot active 1)
+*       #define RL_DEFAULT_SHADER_SAMPLER2D_NAME_TEXTURE2  "texture2"          // texture2 (texture slot active 2)
 *
 *   DEPENDENCIES:
-*
 *      - OpenGL libraries (depending on platform and OpenGL version selected)
 *      - GLAD OpenGL extensions loading library (only for OpenGL 3.3 Core, 4.3 Core)
 *
@@ -107,6 +108,8 @@
 package raylib
 
 import "core:c"
+
+RLGL_VERSION :: "4.5"
 
 when ODIN_OS == .Windows {
 	foreign import lib {
@@ -143,7 +146,12 @@ RL_GRAPHICS_API_OPENGL_21  :: true
 RL_GRAPHICS_API_OPENGL_33  :: RL_GRAPHICS_API_OPENGL_21 // default currently
 RL_GRAPHICS_API_OPENGL_ES2 :: false
 RL_GRAPHICS_API_OPENGL_43  :: false
+RL_GRAPHICS_API_OPENGL_ES3 :: false
 
+when RL_GRAPHICS_API_OPENGL_ES3 {
+	RL_GRAPHICS_API_OPENGL_ES2 :: true
+}
+ 
 when !RL_GRAPHICS_API_OPENGL_ES2 {
 	// This is the maximum amount of elements (quads) per batch
 	// NOTE: Be careful with text, every letter maps to a quad
@@ -300,6 +308,7 @@ GlVersion :: enum c.int {
 	OPENGL_33,               // OpenGL 3.3 (GLSL 330)
 	OPENGL_43,               // OpenGL 4.3 (using GLSL 330)
 	OPENGL_ES_20,            // OpenGL ES 2.0 (GLSL 100)
+	OPENGL_ES_30,            // OpenGL ES 3.0 (GLSL 300 es)
 }
 
 
@@ -315,13 +324,13 @@ ShaderAttributeDataType :: enum c.int {
 // NOTE: By default up to 8 color channels defined, but it can be more
 FramebufferAttachType :: enum c.int {
 	COLOR_CHANNEL0 = 0,   // Framebuffer attachment type: color 0
-	COLOR_CHANNEL1,       // Framebuffer attachment type: color 1
-	COLOR_CHANNEL2,       // Framebuffer attachment type: color 2
-	COLOR_CHANNEL3,       // Framebuffer attachment type: color 3
-	COLOR_CHANNEL4,       // Framebuffer attachment type: color 4
-	COLOR_CHANNEL5,       // Framebuffer attachment type: color 5
-	COLOR_CHANNEL6,       // Framebuffer attachment type: color 6
-	COLOR_CHANNEL7,       // Framebuffer attachment type: color 7
+	COLOR_CHANNEL1 = 1,   // Framebuffer attachment type: color 1
+	COLOR_CHANNEL2 = 2,   // Framebuffer attachment type: color 2
+	COLOR_CHANNEL3 = 3,   // Framebuffer attachment type: color 3
+	COLOR_CHANNEL4 = 4,   // Framebuffer attachment type: color 4
+	COLOR_CHANNEL5 = 5,   // Framebuffer attachment type: color 5
+	COLOR_CHANNEL6 = 6,   // Framebuffer attachment type: color 6
+	COLOR_CHANNEL7 = 7,   // Framebuffer attachment type: color 7
 	DEPTH = 100,          // Framebuffer attachment type: depth
 	STENCIL = 200,        // Framebuffer attachment type: stencil
 }
@@ -329,11 +338,11 @@ FramebufferAttachType :: enum c.int {
 // Framebuffer texture attachment type
 FramebufferAttachTextureType :: enum c.int {
 	CUBEMAP_POSITIVE_X = 0, // Framebuffer texture attachment type: cubemap, +X side
-	CUBEMAP_NEGATIVE_X,     // Framebuffer texture attachment type: cubemap, -X side
-	CUBEMAP_POSITIVE_Y,     // Framebuffer texture attachment type: cubemap, +Y side
-	CUBEMAP_NEGATIVE_Y,     // Framebuffer texture attachment type: cubemap, -Y side
-	CUBEMAP_POSITIVE_Z,     // Framebuffer texture attachment type: cubemap, +Z side
-	CUBEMAP_NEGATIVE_Z,     // Framebuffer texture attachment type: cubemap, -Z side
+	CUBEMAP_NEGATIVE_X = 1, // Framebuffer texture attachment type: cubemap, -X side
+	CUBEMAP_POSITIVE_Y = 2, // Framebuffer texture attachment type: cubemap, +Y side
+	CUBEMAP_NEGATIVE_Y = 3, // Framebuffer texture attachment type: cubemap, -Y side
+	CUBEMAP_POSITIVE_Z = 4, // Framebuffer texture attachment type: cubemap, +Z side
+	CUBEMAP_NEGATIVE_Z = 5, // Framebuffer texture attachment type: cubemap, -Z side
 	TEXTURE2D = 100,        // Framebuffer texture attachment type: texture2d
 	RENDERBUFFER = 200,     // Framebuffer texture attachment type: renderbuffer
 }
@@ -411,6 +420,7 @@ foreign lib {
 	rlEnableFramebuffer  :: proc(id: c.uint) ---                                  // Enable render texture (fbo)
 	rlDisableFramebuffer :: proc() ---                                            // Disable render texture (fbo), return to default framebuffer
 	rlActiveDrawBuffers  :: proc(count: c.int) ---                                // Activate multiple draw color buffers
+	rlBlitFramebuffer	 :: proc(srcX, srcY, srcWidth, srcHeight, dstX, dstY, dstWidth, dstHeight, bufferMask: c.int) --- // Blit active framebuffer to main framebuffer
 
 	// General render state
 	rlDisableColorBlend      :: proc() ---                           // Disable color blending
@@ -425,7 +435,8 @@ foreign lib {
 	rlDisableScissorTest     :: proc() ---                           // Disable scissor test
 	rlScissor                :: proc(x, y, width, height: c.int) --- // Scissor test
 	rlEnableWireMode         :: proc() ---                           // Enable wire mode
-	rlDisableWireMode        :: proc() ---                           // Disable wire mode
+	rlEnablePointMode        :: proc() --- 							 // Enable point mode
+	rlDisableWireMode        :: proc() ---                           // Disable wire and point modes
 	rlSetLineWidth           :: proc(width: f32) ---                 // Set the line drawing width
 	rlGetLineWidth           :: proc() -> f32 ---                    // Get the line drawing width
 	rlEnableSmoothLines      :: proc() ---                           // Enable line aliasing

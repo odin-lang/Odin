@@ -70,7 +70,7 @@ outer_product :: builtin.outer_product
 
 @(require_results)
 quaternion_inverse :: proc "contextless" (q: $Q) -> Q where IS_QUATERNION(Q) {
-	return conj(q) * quaternion(1.0/dot(q, q), 0, 0, 0)
+	return conj(q) * quaternion(w=1.0/dot(q, q), x=0, y=0, z=0)
 }
 
 

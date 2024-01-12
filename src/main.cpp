@@ -1160,10 +1160,12 @@ gb_internal bool parse_build_flags(Array<String> args) {
 
 						case BuildFlag_TerseErrors:
 							build_context.hide_error_line = true;
+							build_context.terse_errors = true;
 							break;
 						case BuildFlag_VerboseErrors:
 							gb_printf_err("-verbose-errors is not the default, -terse-errors can now disable it\n");
 							build_context.hide_error_line = false;
+							build_context.terse_errors = false;
 							break;
 
 						case BuildFlag_ErrorPosStyle:
