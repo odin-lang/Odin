@@ -314,3 +314,6 @@ shared/
 examples/bug/
 build.sh
 !core/debug/
+
+# RAD debugger project file
+*.raddbg

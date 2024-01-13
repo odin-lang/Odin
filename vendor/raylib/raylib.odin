@@ -1085,7 +1085,7 @@ foreign lib {
 
 	// Misc. functions
 	TakeScreenshot :: proc(fileName: cstring) ---        // Takes a screenshot of current screen (filename extension defines format)
-	SetConfigFlags :: proc(flags: ConfigFlags) ---       // Setup init configuration flags (view FLAGS)
+	SetConfigFlags :: proc(flags: ConfigFlags) ---       // Setup init configuration flags (view FLAGS). NOTE: This function is expected to be called before window creation
 	OpenURL        :: proc(url: cstring) ---             // Open URL with default system browser (if available)
 
 	// NOTE: Following functions implemented in module [utils]
