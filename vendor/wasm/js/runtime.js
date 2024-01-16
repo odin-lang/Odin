@@ -736,11 +736,11 @@ class WebGLInterface {
 
 			UniformMatrix2fv: (location, addr) => {
 				let array = this.mem.loadF32Array(addr, 2*2);
-				this.ctx.uniformMatrix4fv(this.uniforms[location], false, array);
+				this.ctx.uniformMatrix2fv(this.uniforms[location], false, array);
 			},
 			UniformMatrix3fv: (location, addr) => {
 				let array = this.mem.loadF32Array(addr, 3*3);
-				this.ctx.uniformMatrix4fv(this.uniforms[location], false, array);
+				this.ctx.uniformMatrix3fv(this.uniforms[location], false, array);
 			},
 			UniformMatrix4fv: (location, addr) => {
 				let array = this.mem.loadF32Array(addr, 4*4);
