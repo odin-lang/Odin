@@ -419,16 +419,14 @@ append_elem :: proc(array: ^$T/[dynamic]$E, arg: E, loc := #caller_location) -> 
 		return 1, nil
 	} else {
 		if cap(array) < len(array)+1 {
-			cap := 2 * cap(array) + max(8, 1)
+			cap := 2 * cap(array) + 8
 			err = reserve(array, cap, loc) // do not 'or_return' here as it could be a partial success
 		}
 		if cap(array)-len(array) > 0 {
 			a := (^Raw_Dynamic_Array)(array)
-			when size_of(E) != 0 {
-				data := ([^]E)(a.data)
-				assert(data != nil, loc=loc)
-				data[a.len] = arg
-			}
+			data := ([^]E)(a.data)
+			assert(data != nil, loc=loc)
+			data[a.len] = arg
 			a.len += 1
 			return 1, err
 		}
@@ -459,11 +457,9 @@ append_elems :: proc(array: ^$T/[dynamic]$E, args: ..E, loc := #caller_location)
 		arg_len = min(cap(array)-len(array), arg_len)
 		if arg_len > 0 {
 			a := (^Raw_Dynamic_Array)(array)
-			when size_of(E) != 0 {
-				data := ([^]E)(a.data)
-				assert(data != nil, loc=loc)
-				intrinsics.mem_copy(&data[a.len], raw_data(args), size_of(E) * arg_len)
-			}
+			data := ([^]E)(a.data)
+			assert(data != nil, loc=loc)
+			intrinsics.mem_copy(&data[a.len], raw_data(args), size_of(E) * arg_len)
 			a.len += arg_len
 		}
 		return arg_len, err
