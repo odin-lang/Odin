@@ -582,13 +582,12 @@ gb_global TargetMetrics target_freestanding_amd64_sysv = {
 	TargetABI_SysV,
 };
 
-gb_global TargetMetrics target_freestanding_arm64_sysv = {
+gb_global TargetMetrics target_freestanding_arm64 = {
 	TargetOs_freestanding,
 	TargetArch_arm64,
 	8, 8, 8, 16,
 	str_lit("aarch64-none-elf"),
 	str_lit("e-m:o-p:32:32-Fi8-i64:64-v128:64:128-a:0:32-n32-S64"),
-	TargetABI_SysV,
 };
 
 struct NamedTargetMetrics {
@@ -624,7 +623,7 @@ gb_global NamedTargetMetrics named_targets[] = {
 	{ str_lit("wasi_wasm64p32"),         &target_wasi_wasm64p32 },
 
 	{ str_lit("freestanding_amd64_sysv"), &target_freestanding_amd64_sysv },
-	{ str_lit("freestanding_arm64_sysv"), &target_freestanding_arm64_sysv },
+	{ str_lit("freestanding_arm64"), &target_freestanding_arm64 },
 };
 
 gb_global NamedTargetMetrics *selected_target_metrics;
