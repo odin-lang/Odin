@@ -177,7 +177,7 @@ test_marshalling :: proc(t: ^testing.T) {
 			ennie = .EFoo,
 			ennieb = {.EBar},
 
-			quat = quaternion(16, 17, 18, 19),
+			quat = quaternion(w=16, x=17, y=18, z=19),
 			comp = complex(32, 33),
 
 			important = '!',
