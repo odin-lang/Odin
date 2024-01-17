@@ -2,8 +2,6 @@
 //+private
 package mem_virtual
 
-import "core:os"
-
 foreign import Kernel32 "system:Kernel32.lib"
 
 LPSYSTEM_INFO :: ^SYSTEM_INFO
