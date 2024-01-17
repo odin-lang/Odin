@@ -136,7 +136,7 @@ _protect :: proc "contextless" (data: rawptr, size: uint, flags: Protect_Flags) 
 	if .Write   in flags { pflags |= PROT_WRITE }
 	if .Execute in flags { pflags |= PROT_EXEC  }
 	err := _mprotect(data, size, pflags)
-	return err != 0
+	return err == 0
 }
 
 
