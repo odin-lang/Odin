@@ -40,7 +40,7 @@ _protect :: proc "contextless" (data: rawptr, size: uint, flags: Protect_Flags) 
 	if .Write   in flags { pflags |= {.WRITE} }
 	if .Execute in flags { pflags |= {.EXEC}  }
 	errno := linux.mprotect(data, size, pflags)
-	return errno != .NONE
+	return errno == .NONE
 }
 
 _platform_memory_init :: proc() {
