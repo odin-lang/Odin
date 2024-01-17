@@ -298,6 +298,7 @@ struct BuildContext {
 	bool   ODIN_DEFAULT_TO_NIL_ALLOCATOR; // Whether the default allocator is a "nil" allocator or not (i.e. it does nothing)
 	bool   ODIN_FOREIGN_ERROR_PROCEDURES;
 	bool   ODIN_VALGRIND_SUPPORT;
+	bool   WINDOWS_SUBSYSTEM; // True only for Windows targets with -subsystem:windows
 
 	ErrorPosStyle ODIN_ERROR_POS_STYLE;
 
@@ -1282,8 +1283,6 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 		GB_ASSERT(metrics->int_size == 2*metrics->ptr_size);
 	}
 
-
-
 	bc->metrics = *metrics;
 	switch (subtarget) {
 	case Subtarget_Default:
@@ -1300,14 +1299,14 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 		break;
 	}
 
-	bc->ODIN_OS        = target_os_names[metrics->os];
-	bc->ODIN_ARCH      = target_arch_names[metrics->arch];
-	bc->endian_kind    = target_endians[metrics->arch];
-	bc->ptr_size       = metrics->ptr_size;
-	bc->int_size       = metrics->int_size;
-	bc->max_align      = metrics->max_align;
-	bc->max_simd_align = metrics->max_simd_align;
-	bc->link_flags  = str_lit(" ");
+	bc->ODIN_OS           = target_os_names[metrics->os];
+	bc->ODIN_ARCH         = target_arch_names[metrics->arch];
+	bc->endian_kind       = target_endians[metrics->arch];
+	bc->ptr_size          = metrics->ptr_size;
+	bc->int_size          = metrics->int_size;
+	bc->max_align         = metrics->max_align;
+	bc->max_simd_align    = metrics->max_simd_align;
+	bc->link_flags        = str_lit(" ");
 
 	#if defined(DEFAULT_TO_THREADED_CHECKER)
 	bc->threaded_checker = true;

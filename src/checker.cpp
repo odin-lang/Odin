@@ -973,6 +973,8 @@ gb_internal void init_universal(void) {
 	add_global_string_constant("ODIN_ROOT",    bc->ODIN_ROOT);
 	add_global_string_constant("ODIN_BUILD_PROJECT_NAME", bc->ODIN_BUILD_PROJECT_NAME);
 
+	add_global_bool_constant("WINDOWS_SUBSYSTEM", bc->use_subsystem_windows);
+
 	{
 		GlobalEnumValue values[TargetOs_COUNT] = {
 			{"Unknown",      TargetOs_Invalid},
