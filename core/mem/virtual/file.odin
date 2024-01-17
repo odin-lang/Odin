@@ -2,7 +2,7 @@ package mem_virtual
 
 import "core:os"
 
-Mapped_File_Error :: enum {
+Map_File_Error :: enum {
 	None,
 	Open_Failure,
 	Stat_Failure,
@@ -11,18 +11,18 @@ Mapped_File_Error :: enum {
 	Map_Failure,
 }
 
-Mapped_File_Flag :: enum u32 {
+Map_File_Flag :: enum u32 {
 	Read,
 	Write,
 }
-Mapped_File_Flags :: distinct bit_set[Mapped_File_Flag; u32]
+Map_File_Flags :: distinct bit_set[Map_File_Flag; u32]
 
 map_file :: proc{
 	map_file_from_path,
 	map_file_from_file_descriptor,
 }
 
-map_file_from_path :: proc(filename: string, flags: Mapped_File_Flags) -> (data: []byte, error: Mapped_File_Error) {
+map_file_from_path :: proc(filename: string, flags: Map_File_Flags) -> (data: []byte, error: Map_File_Error) {
 	fd, err := os.open(filename, os.O_RDWR)
 	if err != 0 {
 		return nil, .Open_Failure
@@ -32,7 +32,7 @@ map_file_from_path :: proc(filename: string, flags: Mapped_File_Flags) -> (data:
 	return map_file_from_file_descriptor(uintptr(fd), flags)
 }
 
-map_file_from_file_descriptor :: proc(fd: uintptr, flags: Mapped_File_Flags) -> (data: []byte, error: Mapped_File_Error) {
+map_file_from_file_descriptor :: proc(fd: uintptr, flags: Map_File_Flags) -> (data: []byte, error: Map_File_Error) {
 	size, os_err := os.file_size(os.Handle(fd))
 	if os_err != 0 {
 		return nil, .Stat_Failure

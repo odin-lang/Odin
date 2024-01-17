@@ -23,6 +23,6 @@ _platform_memory_init :: proc() {
 
 }
 
-_map_file :: proc "contextless" (fd: uintptr, size: i64, flags: Mapped_File_Flags) -> (data: []byte, error: Mapped_File_Error) {
+_map_file :: proc "contextless" (fd: uintptr, size: i64, flags: Map_File_Flags) -> (data: []byte, error: Map_File_Error) {
 	return nil, .Map_Failure
 }
