@@ -5,14 +5,14 @@ package sync
 import "core:time"
 
 foreign import Synchronization "system:Synchronization.lib"
-@(default_calling_convention="stdcall")
+@(default_calling_convention="system")
 foreign Synchronization {
 	WakeByAddressSingle :: proc(Address: rawptr) ---
 	WakeByAddressAll    :: proc(Address: rawptr) ---
 }
 
 foreign import Ntdll "system:Ntdll.lib"
-@(default_calling_convention="stdcall")
+@(default_calling_convention="system")
 foreign Ntdll {
 	RtlWaitOnAddress :: proc(Address: rawptr, CompareAddress: rawptr, AddressSize: uint, Timeout: ^i64) -> i32 ---
 	RtlNtStatusToDosError :: proc(status: i32) -> u32 ---
@@ -30,7 +30,7 @@ foreign Ntdll {
 
 	GODDAMN MICROSOFT!
 */
-CustomWaitOnAddress :: proc "stdcall" (Address: rawptr, CompareAddress: rawptr, AddressSize: uint, Timeout: ^i64) -> bool {
+CustomWaitOnAddress :: proc "system" (Address: rawptr, CompareAddress: rawptr, AddressSize: uint, Timeout: ^i64) -> bool {
 	status := RtlWaitOnAddress(Address, CompareAddress, AddressSize, Timeout)
 	if status != 0 {
 		SetLastError(RtlNtStatusToDosError(status))
