@@ -1,4 +1,3 @@
-//+build darwin
 package objc_Foundation
 
 import "core:intrinsics"

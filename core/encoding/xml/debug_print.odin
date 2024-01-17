@@ -1,3 +1,5 @@
+package xml
+
 /*
 	An XML 1.0 / 1.1 parser
 
@@ -9,7 +11,7 @@
 	List of contributors:
 		Jeroen van Rijn: Initial implementation.
 */
-package xml
+
 
 import "core:io"
 import "core:fmt"

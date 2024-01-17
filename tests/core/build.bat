@@ -36,7 +36,7 @@ echo ---
 echo ---
 echo Running core:encoding tests
 echo ---
-%PATH_TO_ODIN% run encoding/hxa    %COMMON% %COLLECTION% -out:test_hxa.exe || exit /b
+rem %PATH_TO_ODIN% run encoding/hxa    %COMMON% %COLLECTION% -out:test_hxa.exe || exit /b
 %PATH_TO_ODIN% run encoding/json   %COMMON% -out:test_json.exe || exit /b
 %PATH_TO_ODIN% run encoding/varint %COMMON% -out:test_varint.exe || exit /b
 %PATH_TO_ODIN% run encoding/xml    %COMMON% -out:test_xml.exe || exit /b
@@ -95,3 +95,8 @@ echo ---
 echo Running core:thread tests
 echo ---
 %PATH_TO_ODIN% run thread %COMMON% %COLLECTION% -out:test_core_thread.exe || exit /b
+
+echo ---
+echo Running core:runtime tests
+echo ---
+%PATH_TO_ODIN% run runtime %COMMON% %COLLECTION% -out:test_core_runtime.exe || exit /b

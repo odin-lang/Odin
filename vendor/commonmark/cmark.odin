@@ -23,6 +23,10 @@ when ODIN_OS == .Windows {
 	}
 } else when ODIN_OS == .Linux {
 	foreign import lib "system:cmark"
+} else when ODIN_OS == .Darwin {
+	foreign import lib "system:cmark"
+} else {
+	foreign import lib "system:cmark"
 }
 
 Option :: enum c.int {

@@ -749,7 +749,7 @@ mul_quaternion64 :: proc "contextless" (q, r: quaternion64) -> quaternion64 {
 	t2 := r0*q2 + r1*q3 + r2*q0 - r3*q1
 	t3 := r0*q3 - r1*q2 + r2*q1 + r3*q0
 
-	return quaternion(t0, t1, t2, t3)
+	return quaternion(w=t0, x=t1, y=t2, z=t3)
 }
 
 mul_quaternion128 :: proc "contextless" (q, r: quaternion128) -> quaternion128 {
@@ -761,7 +761,7 @@ mul_quaternion128 :: proc "contextless" (q, r: quaternion128) -> quaternion128 {
 	t2 := r0*q2 + r1*q3 + r2*q0 - r3*q1
 	t3 := r0*q3 - r1*q2 + r2*q1 + r3*q0
 
-	return quaternion(t0, t1, t2, t3)
+	return quaternion(w=t0, x=t1, y=t2, z=t3)
 }
 
 mul_quaternion256 :: proc "contextless" (q, r: quaternion256) -> quaternion256 {
@@ -773,7 +773,7 @@ mul_quaternion256 :: proc "contextless" (q, r: quaternion256) -> quaternion256 {
 	t2 := r0*q2 + r1*q3 + r2*q0 - r3*q1
 	t3 := r0*q3 - r1*q2 + r2*q1 + r3*q0
 
-	return quaternion(t0, t1, t2, t3)
+	return quaternion(w=t0, x=t1, y=t2, z=t3)
 }
 
 quo_quaternion64 :: proc "contextless" (q, r: quaternion64) -> quaternion64 {
@@ -787,7 +787,7 @@ quo_quaternion64 :: proc "contextless" (q, r: quaternion64) -> quaternion64 {
 	t2 := (r0*q2 - r1*q3 - r2*q0 + r3*q1) * invmag2
 	t3 := (r0*q3 + r1*q2 + r2*q1 - r3*q0) * invmag2
 
-	return quaternion(t0, t1, t2, t3)
+	return quaternion(w=t0, x=t1, y=t2, z=t3)
 }
 
 quo_quaternion128 :: proc "contextless" (q, r: quaternion128) -> quaternion128 {
@@ -801,7 +801,7 @@ quo_quaternion128 :: proc "contextless" (q, r: quaternion128) -> quaternion128 {
 	t2 := (r0*q2 - r1*q3 - r2*q0 + r3*q1) * invmag2
 	t3 := (r0*q3 + r1*q2 + r2*q1 - r3*q0) * invmag2
 
-	return quaternion(t0, t1, t2, t3)
+	return quaternion(w=t0, x=t1, y=t2, z=t3)
 }
 
 quo_quaternion256 :: proc "contextless" (q, r: quaternion256) -> quaternion256 {
@@ -815,7 +815,7 @@ quo_quaternion256 :: proc "contextless" (q, r: quaternion256) -> quaternion256 {
 	t2 := (r0*q2 - r1*q3 - r2*q0 + r3*q1) * invmag2
 	t3 := (r0*q3 + r1*q2 + r2*q1 - r3*q0) * invmag2
 
-	return quaternion(t0, t1, t2, t3)
+	return quaternion(w=t0, x=t1, y=t2, z=t3)
 }
 
 @(link_name="__truncsfhf2", linkage=RUNTIME_LINKAGE, require=RUNTIME_REQUIRE)

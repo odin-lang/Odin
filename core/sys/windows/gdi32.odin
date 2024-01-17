@@ -3,7 +3,7 @@ package sys_windows
 
 foreign import gdi32 "system:Gdi32.lib"
 
-@(default_calling_convention="stdcall")
+@(default_calling_convention="system")
 foreign gdi32 {
 	GetStockObject :: proc(i: c_int) -> HGDIOBJ ---
 	SelectObject :: proc(hdc: HDC, h: HGDIOBJ) -> HGDIOBJ ---

@@ -76,6 +76,8 @@ enum AstFileFlag : u32 {
 
 	AstFile_IsTest    = 1<<3,
 	AstFile_IsLazy    = 1<<4,
+
+	AstFile_NoInstrumentation = 1<<5,
 };
 
 enum AstDelayQueueKind {

@@ -4,9 +4,10 @@ import c "core:c/libc"
 
 #assert(size_of(b32) == size_of(c.int))
 
-when ODIN_OS == .Windows { foreign import lib "../lib/stb_rect_pack.lib" }
-when ODIN_OS == .Linux   { foreign import lib "../lib/stb_rect_pack.a"   }
-when ODIN_OS == .Darwin  { foreign import lib "../lib/darwin/stb_rect_pack.a"   }
+     when ODIN_OS == .Windows { foreign import lib "../lib/stb_rect_pack.lib"      }
+else when ODIN_OS == .Linux   { foreign import lib "../lib/stb_rect_pack.a"        }
+else when ODIN_OS == .Darwin  { foreign import lib "../lib/darwin/stb_rect_pack.a" }
+else                          { foreign import lib "system:stb_rect_pack"          }
 
 Coord :: distinct c.int
 _MAXVAL :: max(Coord)

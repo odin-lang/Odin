@@ -1438,7 +1438,7 @@ parse_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 				}
 				range.reverse = true
 			} else {
-				error(p, range.pos, "#reverse can only be applied to a 'for in' statement")
+				error(p, stmt.pos, "#reverse can only be applied to a 'for in' statement")
 			}
 			return stmt
 		case "include":

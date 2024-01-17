@@ -47,6 +47,8 @@ tests/core/test_linalg_glsl_math
 tests/core/test_noise
 tests/core/test_varint
 tests/core/test_xml
+tests/core/test_core_slice
+tests/core/test_core_thread
 tests/vendor/vendor_botan
 # Visual Studio 2015 cache/options directory
 .vs/
@@ -312,3 +314,6 @@ shared/
 examples/bug/
 build.sh
 !core/debug/
+
+# RAD debugger project file
+*.raddbg

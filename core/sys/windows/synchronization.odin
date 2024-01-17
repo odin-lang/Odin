@@ -3,7 +3,7 @@ package sys_windows
 
 foreign import Synchronization "system:Synchronization.lib"
 
-@(default_calling_convention="stdcall")
+@(default_calling_convention="system")
 foreign Synchronization {
 	WaitOnAddress       :: proc(Address: PVOID, CompareAddress: PVOID, AddressSize: SIZE_T, dwMilliseconds: DWORD) -> BOOL ---
 	WakeByAddressSingle :: proc(Address: PVOID) ---

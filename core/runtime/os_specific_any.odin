@@ -1,4 +1,8 @@
-//+build !freestanding !wasi !windows !js !darwin
+//+build !darwin
+//+build !freestanding
+//+build !js
+//+build !wasi
+//+build !windows
 package runtime
 
 import "core:os"
