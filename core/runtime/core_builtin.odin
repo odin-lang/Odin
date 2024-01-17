@@ -169,9 +169,15 @@ clear :: proc{clear_dynamic_array, clear_map}
 @builtin
 reserve :: proc{reserve_dynamic_array, reserve_map}
 
+@builtin
+non_zero_reserve :: proc{non_zero_reserve_dynamic_array}
+
 // `resize` will try to resize memory of a passed dynamic array or map to the requested element count (setting the `len`, and possibly `cap`).
 @builtin
 resize :: proc{resize_dynamic_array}
+
+@builtin
+non_zero_resize :: proc{non_zero_resize_dynamic_array}
 
 // Shrinks the capacity of a dynamic array or map down to the current length, or the given capacity.
 @builtin
@@ -406,10 +412,7 @@ delete_key :: proc(m: ^$T/map[$K]$V, key: K) -> (deleted_key: K, deleted_value: 
 	return
 }
 
-
-
-@builtin
-append_elem :: proc(array: ^$T/[dynamic]$E, arg: E, loc := #caller_location) -> (n: int, err: Allocator_Error) #optional_allocator_error {
+_append_elem :: #force_inline proc(array: ^$T/[dynamic]$E, arg: E, should_zero: bool, loc := #caller_location) -> (n: int, err: Allocator_Error) #optional_allocator_error {
 	if array == nil {
 		return 0, nil
 	}
@@ -420,7 +423,13 @@ append_elem :: proc(array: ^$T/[dynamic]$E, arg: E, loc := #caller_location) -> 
 	} else {
 		if cap(array) < len(array)+1 {
 			cap := 2 * cap(array) + max(8, 1)
-			err = reserve(array, cap, loc) // do not 'or_return' here as it could be a partial success
+
+			// do not 'or_return' here as it could be a partial success
+			if should_zero {
+				err = reserve(array, cap, loc)
+			} else {
+				err = non_zero_reserve(array, cap, loc) 
+			}
 		}
 		if cap(array)-len(array) > 0 {
 			a := (^Raw_Dynamic_Array)(array)
@@ -437,7 +446,16 @@ append_elem :: proc(array: ^$T/[dynamic]$E, arg: E, loc := #caller_location) -> 
 }
 
 @builtin
-append_elems :: proc(array: ^$T/[dynamic]$E, args: ..E, loc := #caller_location) -> (n: int, err: Allocator_Error) #optional_allocator_error {
+append_elem :: proc(array: ^$T/[dynamic]$E, arg: E, loc := #caller_location) -> (n: int, err: Allocator_Error) #optional_allocator_error {
+	return _append_elem(array, arg, true, loc=loc)
+}
+
+@builtin
+non_zero_append_elem :: proc(array: ^$T/[dynamic]$E, arg: E, loc := #caller_location) -> (n: int, err: Allocator_Error) #optional_allocator_error {
+	return _append_elem(array, arg, false, loc=loc)
+}
+
+_append_elems :: #force_inline proc(array: ^$T/[dynamic]$E, should_zero: bool, loc := #caller_location, args: ..E) -> (n: int, err: Allocator_Error) #optional_allocator_error {
 	if array == nil {
 		return 0, nil
 	}
@@ -454,7 +472,13 @@ append_elems :: proc(array: ^$T/[dynamic]$E, args: ..E, loc := #caller_location)
 	} else {
 		if cap(array) < len(array)+arg_len {
 			cap := 2 * cap(array) + max(8, arg_len)
-			err = reserve(array, cap, loc)  // do not 'or_return' here as it could be a partial success
+
+			// do not 'or_return' here as it could be a partial success
+			if should_zero {
+				err = reserve(array, cap, loc)
+			} else {
+				err = non_zero_reserve(array, cap, loc)
+			}
 		}
 		arg_len = min(cap(array)-len(array), arg_len)
 		if arg_len > 0 {
@@ -470,11 +494,33 @@ append_elems :: proc(array: ^$T/[dynamic]$E, args: ..E, loc := #caller_location)
 	}
 }
 
+@builtin
+append_elems :: proc(array: ^$T/[dynamic]$E, args: ..E, loc := #caller_location) -> (n: int, err: Allocator_Error) #optional_allocator_error {
+	return _append_elems(array, true, loc, ..args)
+}
+
+@builtin
+non_zero_append_elems :: proc(array: ^$T/[dynamic]$E, args: ..E, loc := #caller_location) -> (n: int, err: Allocator_Error) #optional_allocator_error {
+	return _append_elems(array, false, loc, ..args)
+}
+
 // The append_string built-in procedure appends a string to the end of a [dynamic]u8 like type
+_append_elem_string :: proc(array: ^$T/[dynamic]$E/u8, arg: $A/string, should_zero: bool, loc := #caller_location) -> (n: int, err: Allocator_Error) #optional_allocator_error {
+	args := transmute([]E)arg
+	if should_zero { 
+		return append_elems(array, ..args, loc=loc)
+	} else {
+		return non_zero_append_elems(array, ..args, loc=loc)
+	}
+}
+
 @builtin
 append_elem_string :: proc(array: ^$T/[dynamic]$E/u8, arg: $A/string, loc := #caller_location) -> (n: int, err: Allocator_Error) #optional_allocator_error {
-	args := transmute([]E)arg
-	return append_elems(array, ..args, loc=loc)
+	return _append_elem_string(array, arg, true, loc)
+}
+@builtin
+non_zero_append_elem_string :: proc(array: ^$T/[dynamic]$E/u8, arg: $A/string, loc := #caller_location) -> (n: int, err: Allocator_Error) #optional_allocator_error {
+	return _append_elem_string(array, arg, false, loc)
 }
 
 
@@ -494,6 +540,7 @@ append_string :: proc(array: ^$T/[dynamic]$E/u8, args: ..string, loc := #caller_
 
 // The append built-in procedure appends elements to the end of a dynamic array
 @builtin append :: proc{append_elem, append_elems, append_elem_string}
+@builtin non_zero_append :: proc{non_zero_append_elem, non_zero_append_elems, non_zero_append_elem_string}
 
 
 @builtin
@@ -638,8 +685,7 @@ clear_dynamic_array :: proc "contextless" (array: ^$T/[dynamic]$E) {
 // `reserve_dynamic_array` will try to reserve memory of a passed dynamic array or map to the requested element count (setting the `cap`).
 //
 // Note: Prefer the procedure group `reserve`.
-@builtin
-reserve_dynamic_array :: proc(array: ^$T/[dynamic]$E, capacity: int, loc := #caller_location) -> Allocator_Error {
+_reserve_dynamic_array :: #force_inline proc(array: ^$T/[dynamic]$E, capacity: int, should_zero: bool, loc := #caller_location) -> Allocator_Error {
 	if array == nil {
 		return nil
 	}
@@ -658,7 +704,12 @@ reserve_dynamic_array :: proc(array: ^$T/[dynamic]$E, capacity: int, loc := #cal
 	new_size  := capacity * size_of(E)
 	allocator := a.allocator
 
-	new_data := mem_resize(a.data, old_size, new_size, align_of(E), allocator, loc) or_return
+	new_data: []byte
+	if should_zero {
+		new_data = mem_resize(a.data, old_size, new_size, align_of(E), allocator, loc) or_return
+	} else {
+		new_data = non_zero_mem_resize(a.data, old_size, new_size, align_of(E), allocator, loc) or_return
+	}
 	if new_data == nil && new_size > 0 {
 		return .Out_Of_Memory
 	}
@@ -668,11 +719,20 @@ reserve_dynamic_array :: proc(array: ^$T/[dynamic]$E, capacity: int, loc := #cal
 	return nil
 }
 
+@builtin
+reserve_dynamic_array :: proc(array: ^$T/[dynamic]$E, capacity: int, loc := #caller_location) -> Allocator_Error {
+	return _reserve_dynamic_array(array, capacity, true, loc)
+}
+
+@builtin
+non_zero_reserve_dynamic_array :: proc(array: ^$T/[dynamic]$E, capacity: int, loc := #caller_location) -> Allocator_Error {
+	return _reserve_dynamic_array(array, capacity, false, loc)
+}
+
 // `resize_dynamic_array` will try to resize memory of a passed dynamic array or map to the requested element count (setting the `len`, and possibly `cap`).
 //
 // Note: Prefer the procedure group `resize`
-@builtin
-resize_dynamic_array :: proc(array: ^$T/[dynamic]$E, length: int, loc := #caller_location) -> Allocator_Error {
+_resize_dynamic_array :: #force_inline proc(array: ^$T/[dynamic]$E, length: int, should_zero: bool, loc := #caller_location) -> Allocator_Error {
 	if array == nil {
 		return nil
 	}
@@ -692,7 +752,12 @@ resize_dynamic_array :: proc(array: ^$T/[dynamic]$E, length: int, loc := #caller
 	new_size  := length * size_of(E)
 	allocator := a.allocator
 
-	new_data := mem_resize(a.data, old_size, new_size, align_of(E), allocator, loc) or_return
+	new_data : []byte
+	if should_zero {
+		new_data = mem_resize(a.data, old_size, new_size, align_of(E), allocator, loc) or_return
+	} else {
+		new_data = non_zero_mem_resize(a.data, old_size, new_size, align_of(E), allocator, loc) or_return
+	}
 	if new_data == nil && new_size > 0 {
 		return .Out_Of_Memory
 	}
@@ -701,6 +766,16 @@ resize_dynamic_array :: proc(array: ^$T/[dynamic]$E, length: int, loc := #caller
 	a.len = length
 	a.cap = length
 	return nil
+}
+
+@builtin
+resize_dynamic_array :: proc(array: ^$T/[dynamic]$E, length: int, loc := #caller_location) -> Allocator_Error {
+	return _resize_dynamic_array(array, length, true, loc=loc)
+}
+
+@builtin
+non_zero_resize_dynamic_array :: proc(array: ^$T/[dynamic]$E, length: int, loc := #caller_location) -> Allocator_Error {
+	return _resize_dynamic_array(array, length, false, loc=loc)
 }
 
 /*
