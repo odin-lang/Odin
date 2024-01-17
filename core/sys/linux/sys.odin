@@ -1,4 +1,3 @@
-//+build linux
 package linux
 
 import "core:intrinsics"
