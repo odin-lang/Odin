@@ -895,7 +895,7 @@ split_multi_iterator :: proc(s: ^[]byte, substrs: [][]byte, skip_empty := false)
 
 
 
-// scrub scruvs invalid utf-8 characters and replaces them with the replacement string
+// Scrubs invalid utf-8 characters and replaces them with the replacement string
 // Adjacent invalid bytes are only replaced once
 scrub :: proc(s: []byte, replacement: []byte, allocator := context.allocator) -> []byte {
 	str := s
