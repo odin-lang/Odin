@@ -149,7 +149,7 @@ _platform_memory_init :: proc() {
 }
 
 
-_map_file :: proc "contextless" (fd: os.Handle, size: i64, flags: Map_File_Flags) -> (data: []byte, error: Map_File_Error) {
+_map_file :: proc "contextless" (fd: uintptr, size: i64, flags: Map_File_Flags) -> (data: []byte, error: Map_File_Error) {
 	page_flags: u32
 	if flags == {.Read} {
 		page_flags = PAGE_READONLY
