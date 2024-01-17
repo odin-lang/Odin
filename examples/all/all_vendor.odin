@@ -81,3 +81,16 @@ _ :: nvg_gl
 _ :: fontstash
 
 _ :: xlib
+
+
+// NOTE: needed for doc generator
+
+import NS         "vendor:darwin/Foundation"
+import MTL        "vendor:darwin/Metal"
+import MTK        "vendor:darwin/MetalKit"
+import CA         "vendor:darwin/QuartzCore"
+
+_ :: NS
+_ :: MTL
+_ :: MTK
+_ :: CA
