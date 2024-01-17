@@ -61,7 +61,7 @@ _map_file :: proc "contextless" (fd: uintptr, size: i64, flags: Map_File_Flags) 
 
 	flags := linux.Map_Flags{.SHARED}
 	addr, errno := linux.mmap(0, uint(size), prot, flags, linux.Fd(fd), offset=0)
-	if addr == nil || error != nil {
+	if addr == nil || errno != nil {
 		return nil, .Map_Failure
 	}
 	return ([^]byte)(addr)[:size], nil
