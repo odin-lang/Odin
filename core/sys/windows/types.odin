@@ -6,9 +6,9 @@ c_char      :: c.char
 c_uchar     :: c.uchar
 c_int       :: c.int
 c_uint      :: c.uint
-c_long      :: c.long
+c_long      :: i32
 c_longlong  :: c.longlong
-c_ulong     :: c.ulong
+c_ulong     :: u32
 c_ulonglong :: c.ulonglong
 c_short     :: c.short
 c_ushort    :: c.ushort
@@ -2719,16 +2719,17 @@ SECURITY_MAX_SID_SIZE :: 68
 
 // https://docs.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-sid
 SID :: struct #packed {
-	Revision: byte,
-	SubAuthorityCount: byte,
+	Revision:            byte,
+	SubAuthorityCount:   byte,
 	IdentifierAuthority: SID_IDENTIFIER_AUTHORITY,
-	SubAuthority: [15]DWORD, // Array of DWORDs
+	SubAuthority:        [15]DWORD, // Array of DWORDs
 }
 #assert(size_of(SID) == SECURITY_MAX_SID_SIZE)
 
 SID_IDENTIFIER_AUTHORITY :: struct #packed {
 	Value: [6]u8,
 }
+#assert(size_of(SID_IDENTIFIER_AUTHORITY) == 6)
 
 // For NetAPI32
 // https://github.com/tpn/winsdk-10/blob/master/Include/10.0.14393.0/shared/lmerr.h
