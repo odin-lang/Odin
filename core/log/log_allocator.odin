@@ -96,6 +96,15 @@ log_allocator_proc :: proc(allocator_data: rawptr, mode: runtime.Allocator_Mode,
 			str := fmt.bprintf(buf[:], format, la.prefix, padding, old_memory, old_size, size, alignment)
 			context.logger.procedure(context.logger.data, la.level, str, context.logger.options, location)
 
+		case .Resize_Non_Zeroed:
+			format: string
+			switch la.size_fmt {
+			case .Bytes: format = "%s%s>>> ALLOCATOR(mode=.Resize_Non_Zeroed, ptr=%p, old_size=%d, size=%d, alignment=%d)"
+			case .Human: format = "%s%s>>> ALLOCATOR(mode=.Resize_Non_Zeroed, ptr=%p, old_size=%m, size=%m, alignment=%d)"
+			}
+			str := fmt.bprintf(buf[:], format, la.prefix, padding, old_memory, old_size, size, alignment)
+			context.logger.procedure(context.logger.data, la.level, str, context.logger.options, location)
+
 		case .Query_Features:
 			str := fmt.bprintf(buf[:], "%s%sALLOCATOR(mode=.Query_Features)", la.prefix, padding)
 			context.logger.procedure(context.logger.data, la.level, str, context.logger.options, location)

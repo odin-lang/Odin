@@ -19,7 +19,7 @@ when ODIN_DEFAULT_TO_NIL_ALLOCATOR {
 		case .Free_All:
 			return nil, .Mode_Not_Implemented
 
-		case .Resize:
+		case .Resize, .Resize_Non_Zeroed:
 			data, err = _windows_default_resize(old_memory, old_size, size, alignment)
 
 		case .Query_Features:
