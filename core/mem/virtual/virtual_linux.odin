@@ -48,3 +48,21 @@ _platform_memory_init :: proc() {
 	// is power of two
 	assert(DEFAULT_PAGE_SIZE != 0 && (DEFAULT_PAGE_SIZE & (DEFAULT_PAGE_SIZE-1)) == 0)
 }
+
+
+_map_file :: proc "contextless" (fd: uintptr, size: i64, flags: Mapped_File_Flags) -> (data: []byte, error: Mapped_File_Error) {
+	prot: linux.Mem_Protection
+	if .Read in flags {
+		prot += {.READ}
+	}
+	if .Write in flags {
+		prot += {.WRITE}
+	}
+
+	flags := linux.Map_Flags{.SHARED}
+	addr, errno := linux.mmap(0, uint(size), prot, flags, linux.Fd(fd), offset=0)
+	if addr == nil || error != nil {
+		return nil, .Map_Failure
+	}
+	return ([^]byte)(addr)[:size], nil
+}

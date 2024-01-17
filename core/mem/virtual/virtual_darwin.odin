@@ -146,3 +146,20 @@ _platform_memory_init :: proc() {
 	// is power of two
 	assert(DEFAULT_PAGE_SIZE != 0 && (DEFAULT_PAGE_SIZE & (DEFAULT_PAGE_SIZE-1)) == 0)
 }
+
+
+_map_file :: proc "contextless" (fd: uintptr, size: i64, flags: Mapped_File_Flags) -> (data: []byte, error: Mapped_File_Error) {
+	prot, mflags: c.int
+	if .Read in flags {
+		prot |= PROT_READ
+	}
+	if .Write in flags {
+		prot |= PROT_WRITE
+	}
+	mflags |= MAP_SHARED
+	addr := _mmap(nil, c.size_t(size), prot, mflags, i32(fd), 0)
+	if addr == nil {
+		return nil, .Map_Failure
+	}
+	return ([^]byte)(addr)[:size], nil
+}
