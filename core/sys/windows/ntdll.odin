@@ -3,7 +3,7 @@ package sys_windows
 
 foreign import ntdll_lib "system:ntdll.lib"
 
-@(default_calling_convention="stdcall")
+@(default_calling_convention="system")
 foreign ntdll_lib {
 	RtlGetVersion :: proc(lpVersionInformation: ^OSVERSIONINFOEXW) -> NTSTATUS ---
 }

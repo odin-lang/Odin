@@ -124,7 +124,7 @@ HIDP_REPORT_TYPE :: enum c.int {
 HIDP_STATUS_SUCCESS : NTSTATUS : 0x110000
 
 foreign import hid "system:hid.lib"
-@(default_calling_convention="stdcall")
+@(default_calling_convention="system")
 foreign hid {
 	HidP_GetCaps :: proc(PreparsedData: PHIDP_PREPARSED_DATA, Capabilities: PHIDP_CAPS) -> NTSTATUS ---
 	HidP_GetButtonCaps :: proc(ReportType: HIDP_REPORT_TYPE, ButtonCaps: PHIDP_BUTTON_CAPS, ButtonCapsLength: PUSHORT, PreparsedData: PHIDP_PREPARSED_DATA) -> NTSTATUS ---

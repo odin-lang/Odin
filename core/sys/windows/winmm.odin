@@ -5,7 +5,7 @@ foreign import winmm "system:Winmm.lib"
 
 MMRESULT :: UINT
 
-@(default_calling_convention="stdcall")
+@(default_calling_convention="system")
 foreign winmm {
 	timeGetDevCaps  :: proc(ptc: LPTIMECAPS, cbtc: UINT) -> MMRESULT ---
 	timeBeginPeriod :: proc(uPeriod: UINT) -> MMRESULT ---

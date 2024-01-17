@@ -691,13 +691,13 @@ FW_DEMIBOLD   :: FW_SEMIBOLD
 FW_ULTRABOLD  :: FW_EXTRABOLD
 FW_BLACK      :: FW_HEAVY
 
-PTIMERAPCROUTINE :: #type proc "stdcall" (lpArgToCompletionRoutine: LPVOID, dwTimerLowValue, dwTimerHighValue: DWORD)
+PTIMERAPCROUTINE :: #type proc "system" (lpArgToCompletionRoutine: LPVOID, dwTimerLowValue, dwTimerHighValue: DWORD)
 
-TIMERPROC :: #type proc "stdcall" (HWND, UINT, UINT_PTR, DWORD)
+TIMERPROC :: #type proc "system" (HWND, UINT, UINT_PTR, DWORD)
 
-WNDPROC :: #type proc "stdcall" (HWND, UINT, WPARAM, LPARAM) -> LRESULT
+WNDPROC :: #type proc "system" (HWND, UINT, WPARAM, LPARAM) -> LRESULT
 
-HOOKPROC :: #type proc "stdcall" (code: c_int, wParam: WPARAM, lParam: LPARAM) -> LRESULT
+HOOKPROC :: #type proc "system" (code: c_int, wParam: WPARAM, lParam: LPARAM) -> LRESULT
 
 CWPRETSTRUCT :: struct {
 	lResult: LRESULT,
@@ -2324,7 +2324,7 @@ MOUNT_POINT_REPARSE_BUFFER :: struct {
 	PathBuffer: WCHAR,
 }
 
-LPPROGRESS_ROUTINE :: #type proc "stdcall" (
+LPPROGRESS_ROUTINE :: #type proc "system" (
 	TotalFileSize: LARGE_INTEGER,
 	TotalBytesTransferred: LARGE_INTEGER,
 	StreamSize: LARGE_INTEGER,
@@ -2494,7 +2494,7 @@ OVERLAPPED_ENTRY :: struct {
 	dwNumberOfBytesTransferred: DWORD,
 }
 
-LPOVERLAPPED_COMPLETION_ROUTINE :: #type proc "stdcall" (
+LPOVERLAPPED_COMPLETION_ROUTINE :: #type proc "system" (
 	dwErrorCode: DWORD,
 	dwNumberOfBytesTransfered: DWORD,
 	lpOverlapped: LPOVERLAPPED,
@@ -2558,7 +2558,7 @@ EXCEPTION_POINTERS :: struct {
 	ContextRecord: ^CONTEXT,
 }
 
-PVECTORED_EXCEPTION_HANDLER :: #type proc "stdcall" (ExceptionInfo: ^EXCEPTION_POINTERS) -> LONG
+PVECTORED_EXCEPTION_HANDLER :: #type proc "system" (ExceptionInfo: ^EXCEPTION_POINTERS) -> LONG
 
 CONSOLE_READCONSOLE_CONTROL :: struct {
 	nLength: ULONG,
@@ -2613,7 +2613,7 @@ ADDRINFOEXW :: struct {
 	ai_next:      ^ADDRINFOEXW,
 }
 
-LPLOOKUPSERVICE_COMPLETION_ROUTINE :: #type proc "stdcall" (
+LPLOOKUPSERVICE_COMPLETION_ROUTINE :: #type proc "system" (
 	dwErrorCode: DWORD,
 	dwNumberOfBytesTransfered: DWORD,
 	lpOverlapped: LPOVERLAPPED,
@@ -3427,7 +3427,7 @@ IModalWindow :: struct #raw_union {
 }
 IModalWindowVtbl :: struct {
 	using IUnknownVtbl: IUnknownVtbl,
-	Show: proc "stdcall" (this: ^IModalWindow, hwndOwner: HWND) -> HRESULT,
+	Show: proc "system" (this: ^IModalWindow, hwndOwner: HWND) -> HRESULT,
 }
 
 ISequentialStream :: struct #raw_union {
@@ -3436,8 +3436,8 @@ ISequentialStream :: struct #raw_union {
 }
 ISequentialStreamVtbl :: struct {
 	using IUnknownVtbl: IUnknownVtbl,
-	Read:  proc "stdcall" (this: ^ISequentialStream, pv: rawptr, cb: ULONG, pcbRead: ^ULONG) -> HRESULT,
-	Write: proc "stdcall" (this: ^ISequentialStream, pv: rawptr, cb: ULONG, pcbWritten: ^ULONG) -> HRESULT,
+	Read:  proc "system" (this: ^ISequentialStream, pv: rawptr, cb: ULONG, pcbRead: ^ULONG) -> HRESULT,
+	Write: proc "system" (this: ^ISequentialStream, pv: rawptr, cb: ULONG, pcbWritten: ^ULONG) -> HRESULT,
 }
 
 IStream :: struct #raw_union {
@@ -3446,15 +3446,15 @@ IStream :: struct #raw_union {
 }
 IStreamVtbl :: struct {
 	using ISequentialStreamVtbl: ISequentialStreamVtbl,
-	Seek:         proc "stdcall" (this: ^IStream, dlibMove: LARGE_INTEGER, dwOrigin: DWORD, plibNewPosition: ^ULARGE_INTEGER) -> HRESULT,
-	SetSize:      proc "stdcall" (this: ^IStream, libNewSize: ULARGE_INTEGER) -> HRESULT,
-	CopyTo:       proc "stdcall" (this: ^IStream, pstm: ^IStream, cb: ULARGE_INTEGER, pcbRead: ^ULARGE_INTEGER, pcbWritten: ^ULARGE_INTEGER) -> HRESULT,
-	Commit:       proc "stdcall" (this: ^IStream, grfCommitFlags: DWORD) -> HRESULT,
-	Revert:       proc "stdcall" (this: ^IStream) -> HRESULT,
-	LockRegion:   proc "stdcall" (this: ^IStream, libOffset: ULARGE_INTEGER, cb: ULARGE_INTEGER, dwLockType: DWORD) -> HRESULT,
-	UnlockRegion: proc "stdcall" (this: ^IStream, libOffset: ULARGE_INTEGER, cb: ULARGE_INTEGER, dwLockType: DWORD) -> HRESULT,
-	Stat:         proc "stdcall" (this: ^IStream, pstatstg: ^STATSTG, grfStatFlag: DWORD) -> HRESULT,
-	Clone:        proc "stdcall" (this: ^IStream, ppstm: ^^IStream) -> HRESULT,
+	Seek:         proc "system" (this: ^IStream, dlibMove: LARGE_INTEGER, dwOrigin: DWORD, plibNewPosition: ^ULARGE_INTEGER) -> HRESULT,
+	SetSize:      proc "system" (this: ^IStream, libNewSize: ULARGE_INTEGER) -> HRESULT,
+	CopyTo:       proc "system" (this: ^IStream, pstm: ^IStream, cb: ULARGE_INTEGER, pcbRead: ^ULARGE_INTEGER, pcbWritten: ^ULARGE_INTEGER) -> HRESULT,
+	Commit:       proc "system" (this: ^IStream, grfCommitFlags: DWORD) -> HRESULT,
+	Revert:       proc "system" (this: ^IStream) -> HRESULT,
+	LockRegion:   proc "system" (this: ^IStream, libOffset: ULARGE_INTEGER, cb: ULARGE_INTEGER, dwLockType: DWORD) -> HRESULT,
+	UnlockRegion: proc "system" (this: ^IStream, libOffset: ULARGE_INTEGER, cb: ULARGE_INTEGER, dwLockType: DWORD) -> HRESULT,
+	Stat:         proc "system" (this: ^IStream, pstatstg: ^STATSTG, grfStatFlag: DWORD) -> HRESULT,
+	Clone:        proc "system" (this: ^IStream, ppstm: ^^IStream) -> HRESULT,
 }
 
 IPersist :: struct #raw_union {
@@ -3463,7 +3463,7 @@ IPersist :: struct #raw_union {
 }
 IPersistVtbl :: struct {
 	using IUnknownVtbl: IUnknownVtbl,
-	GetClassID: proc "stdcall" (this: ^IPersist, pClassID: ^CLSID) -> HRESULT,
+	GetClassID: proc "system" (this: ^IPersist, pClassID: ^CLSID) -> HRESULT,
 }
 
 IPersistStream :: struct #raw_union {
@@ -3472,10 +3472,10 @@ IPersistStream :: struct #raw_union {
 }
 IPersistStreamVtbl :: struct {
 	using IPersistVtbl: IPersistVtbl,
-	IsDirty:    proc "stdcall" (this: ^IPersistStream) -> HRESULT,
-	Load:       proc "stdcall" (this: ^IPersistStream, pStm: ^IStream) -> HRESULT,
-	Save:       proc "stdcall" (this: ^IPersistStream, pStm: ^IStream, fClearDirty: BOOL) -> HRESULT,
-	GetSizeMax: proc "stdcall" (this: ^IPersistStream, pcbSize: ^ULARGE_INTEGER) -> HRESULT,
+	IsDirty:    proc "system" (this: ^IPersistStream) -> HRESULT,
+	Load:       proc "system" (this: ^IPersistStream, pStm: ^IStream) -> HRESULT,
+	Save:       proc "system" (this: ^IPersistStream, pStm: ^IStream, fClearDirty: BOOL) -> HRESULT,
+	GetSizeMax: proc "system" (this: ^IPersistStream, pcbSize: ^ULARGE_INTEGER) -> HRESULT,
 }
 
 IMoniker :: struct #raw_union {
@@ -3484,21 +3484,21 @@ IMoniker :: struct #raw_union {
 }
 IMonikerVtbl :: struct {
 	using IPersistStreamVtbl: IPersistStreamVtbl,
-	BindToObject:        proc "stdcall" (this: ^IMoniker, pbc: ^IBindCtx, pmkToLeft: ^IMoniker, riidResult: REFIID, ppvResult: ^rawptr) -> HRESULT,
-	BindToStorage:       proc "stdcall" (this: ^IMoniker, pbc: ^IBindCtx, pmkToLeft: ^IMoniker, riid: REFIID, ppvObj: ^rawptr) -> HRESULT,
-	Reduce:              proc "stdcall" (this: ^IMoniker, pbc: ^IBindCtx, dwReduceHowFar: DWORD, ppmkToLeft: ^^IMoniker, ppmkReduced: ^^IMoniker) -> HRESULT,
-	ComposeWith:         proc "stdcall" (this: ^IMoniker, pmkRight: ^IMoniker, fOnlyIfNotGeneric: BOOL, ppmkComposite: ^^IMoniker) -> HRESULT,
-	Enum:                proc "stdcall" (this: ^IMoniker, fForward: BOOL, ppenumMoniker: ^^IEnumMoniker) -> HRESULT,
-	IsEqual:             proc "stdcall" (this: ^IMoniker, pmkOtherMoniker: ^IMoniker) -> HRESULT,
-	Hash:                proc "stdcall" (this: ^IMoniker, pdwHash: ^DWORD) -> HRESULT,
-	IsRunning:           proc "stdcall" (this: ^IMoniker, pbc: ^IBindCtx, pmkToLeft: ^IMoniker, pmkNewlyRunning: ^IMoniker) -> HRESULT,
-	GetTimeOfLastChange: proc "stdcall" (this: ^IMoniker, pbc: ^IBindCtx, pmkToLeft: ^IMoniker, pFileTime: ^FILETIME) -> HRESULT,
-	Inverse:             proc "stdcall" (this: ^IMoniker, ppmk: ^^IMoniker) -> HRESULT,
-	CommonPrefixWith:    proc "stdcall" (this: ^IMoniker, pmkOther: ^IMoniker, ppmkPrefix: ^^IMoniker) -> HRESULT,
-	RelativePathTo:      proc "stdcall" (this: ^IMoniker, pmkOther: ^IMoniker, ppmkRelPath: ^^IMoniker) -> HRESULT,
-	GetDisplayName:      proc "stdcall" (this: ^IMoniker, pbc: ^IBindCtx, pmkToLeft: ^IMoniker, ppszDisplayName: ^LPOLESTR) -> HRESULT,
-	ParseDisplayName:    proc "stdcall" (this: ^IMoniker, pbc: ^IBindCtx, pmkToLeft: ^IMoniker, pszDisplayName: LPOLESTR, pchEaten: ^ULONG, ppmkOut: ^^IMoniker) -> HRESULT,
-	IsSystemMoniker:     proc "stdcall" (this: ^IMoniker, pdwMksys: ^DWORD) -> HRESULT,
+	BindToObject:        proc "system" (this: ^IMoniker, pbc: ^IBindCtx, pmkToLeft: ^IMoniker, riidResult: REFIID, ppvResult: ^rawptr) -> HRESULT,
+	BindToStorage:       proc "system" (this: ^IMoniker, pbc: ^IBindCtx, pmkToLeft: ^IMoniker, riid: REFIID, ppvObj: ^rawptr) -> HRESULT,
+	Reduce:              proc "system" (this: ^IMoniker, pbc: ^IBindCtx, dwReduceHowFar: DWORD, ppmkToLeft: ^^IMoniker, ppmkReduced: ^^IMoniker) -> HRESULT,
+	ComposeWith:         proc "system" (this: ^IMoniker, pmkRight: ^IMoniker, fOnlyIfNotGeneric: BOOL, ppmkComposite: ^^IMoniker) -> HRESULT,
+	Enum:                proc "system" (this: ^IMoniker, fForward: BOOL, ppenumMoniker: ^^IEnumMoniker) -> HRESULT,
+	IsEqual:             proc "system" (this: ^IMoniker, pmkOtherMoniker: ^IMoniker) -> HRESULT,
+	Hash:                proc "system" (this: ^IMoniker, pdwHash: ^DWORD) -> HRESULT,
+	IsRunning:           proc "system" (this: ^IMoniker, pbc: ^IBindCtx, pmkToLeft: ^IMoniker, pmkNewlyRunning: ^IMoniker) -> HRESULT,
+	GetTimeOfLastChange: proc "system" (this: ^IMoniker, pbc: ^IBindCtx, pmkToLeft: ^IMoniker, pFileTime: ^FILETIME) -> HRESULT,
+	Inverse:             proc "system" (this: ^IMoniker, ppmk: ^^IMoniker) -> HRESULT,
+	CommonPrefixWith:    proc "system" (this: ^IMoniker, pmkOther: ^IMoniker, ppmkPrefix: ^^IMoniker) -> HRESULT,
+	RelativePathTo:      proc "system" (this: ^IMoniker, pmkOther: ^IMoniker, ppmkRelPath: ^^IMoniker) -> HRESULT,
+	GetDisplayName:      proc "system" (this: ^IMoniker, pbc: ^IBindCtx, pmkToLeft: ^IMoniker, ppszDisplayName: ^LPOLESTR) -> HRESULT,
+	ParseDisplayName:    proc "system" (this: ^IMoniker, pbc: ^IBindCtx, pmkToLeft: ^IMoniker, pszDisplayName: LPOLESTR, pchEaten: ^ULONG, ppmkOut: ^^IMoniker) -> HRESULT,
+	IsSystemMoniker:     proc "system" (this: ^IMoniker, pdwMksys: ^DWORD) -> HRESULT,
 }
 
 IEnumMoniker :: struct #raw_union {
@@ -3507,10 +3507,10 @@ IEnumMoniker :: struct #raw_union {
 }
 IEnumMonikerVtbl :: struct {
 	using IUnknownVtbl: IUnknownVtbl,
-	Next:  proc "stdcall" (this: ^IEnumMoniker, celt: ULONG, rgelt: ^^IMoniker, pceltFetched: ^ULONG) -> HRESULT,
-	Skip:  proc "stdcall" (this: ^IEnumMoniker, celt: ULONG) -> HRESULT,
-	Reset: proc "stdcall" (this: ^IEnumMoniker) -> HRESULT,
-	Clone: proc "stdcall" (this: ^IEnumMoniker, ppenum: ^^IEnumMoniker) -> HRESULT,
+	Next:  proc "system" (this: ^IEnumMoniker, celt: ULONG, rgelt: ^^IMoniker, pceltFetched: ^ULONG) -> HRESULT,
+	Skip:  proc "system" (this: ^IEnumMoniker, celt: ULONG) -> HRESULT,
+	Reset: proc "system" (this: ^IEnumMoniker) -> HRESULT,
+	Clone: proc "system" (this: ^IEnumMoniker, ppenum: ^^IEnumMoniker) -> HRESULT,
 }
 
 IRunningObjectTable :: struct #raw_union {
@@ -3519,13 +3519,13 @@ IRunningObjectTable :: struct #raw_union {
 }
 IRunningObjectTableVtbl :: struct {
 	using IUnknownVtbl: IUnknownVtbl,
-	Register:            proc "stdcall" (this: ^IRunningObjectTable, grfFlags: DWORD, punkObject: ^IUnknown, pmkObjectName: ^IMoniker, pdwRegister: ^DWORD) -> HRESULT,
-	Revoke:              proc "stdcall" (this: ^IRunningObjectTable, dwRegister: DWORD) -> HRESULT,
-	IsRunning:           proc "stdcall" (this: ^IRunningObjectTable, pmkObjectName: ^IMoniker) -> HRESULT,
-	GetObject:           proc "stdcall" (this: ^IRunningObjectTable, pmkObjectName: ^IMoniker, ppunkObject: ^^IUnknown) -> HRESULT,
-	NoteChangeTime:      proc "stdcall" (this: ^IRunningObjectTable, dwRegister: DWORD, pfiletime: ^FILETIME) -> HRESULT,
-	GetTimeOfLastChange: proc "stdcall" (this: ^IRunningObjectTable, pmkObjectName: ^IMoniker, pfiletime: ^FILETIME) -> HRESULT,
-	EnumRunning:         proc "stdcall" (this: ^IRunningObjectTable, ppenumMoniker: ^^IEnumMoniker) -> HRESULT,
+	Register:            proc "system" (this: ^IRunningObjectTable, grfFlags: DWORD, punkObject: ^IUnknown, pmkObjectName: ^IMoniker, pdwRegister: ^DWORD) -> HRESULT,
+	Revoke:              proc "system" (this: ^IRunningObjectTable, dwRegister: DWORD) -> HRESULT,
+	IsRunning:           proc "system" (this: ^IRunningObjectTable, pmkObjectName: ^IMoniker) -> HRESULT,
+	GetObject:           proc "system" (this: ^IRunningObjectTable, pmkObjectName: ^IMoniker, ppunkObject: ^^IUnknown) -> HRESULT,
+	NoteChangeTime:      proc "system" (this: ^IRunningObjectTable, dwRegister: DWORD, pfiletime: ^FILETIME) -> HRESULT,
+	GetTimeOfLastChange: proc "system" (this: ^IRunningObjectTable, pmkObjectName: ^IMoniker, pfiletime: ^FILETIME) -> HRESULT,
+	EnumRunning:         proc "system" (this: ^IRunningObjectTable, ppenumMoniker: ^^IEnumMoniker) -> HRESULT,
 }
 
 IEnumString :: struct #raw_union {
@@ -3534,10 +3534,10 @@ IEnumString :: struct #raw_union {
 }
 IEnumStringVtbl :: struct {
 	using IUnknownVtbl: IUnknownVtbl,
-	Next:  proc "stdcall" (this: ^IEnumString, celt: ULONG, rgelt: ^LPOLESTR, pceltFetched: ^ULONG) -> HRESULT,
-	Skip:  proc "stdcall" (this: ^IEnumString, celt: ULONG) -> HRESULT,
-	Reset: proc "stdcall" (this: ^IEnumString) -> HRESULT,
-	Clone: proc "stdcall" (this: ^IEnumString, ppenum: ^^IEnumString) -> HRESULT,
+	Next:  proc "system" (this: ^IEnumString, celt: ULONG, rgelt: ^LPOLESTR, pceltFetched: ^ULONG) -> HRESULT,
+	Skip:  proc "system" (this: ^IEnumString, celt: ULONG) -> HRESULT,
+	Reset: proc "system" (this: ^IEnumString) -> HRESULT,
+	Clone: proc "system" (this: ^IEnumString, ppenum: ^^IEnumString) -> HRESULT,
 }
 
 IBindCtx :: struct #raw_union {
@@ -3546,16 +3546,16 @@ IBindCtx :: struct #raw_union {
 }
 IBindCtxVtbl :: struct {
 	using IUnknownVtbl: IUnknownVtbl,
-	RegisterObjectBound:   proc "stdcall" (this: ^IBindCtx, punk: ^IUnknown) -> HRESULT,
-	RevokeObjectBound:     proc "stdcall" (this: ^IBindCtx, punk: ^IUnknown) -> HRESULT,
-	ReleaseBoundObjects:   proc "stdcall" (this: ^IBindCtx) -> HRESULT,
-	SetBindOptions:        proc "stdcall" (this: ^IBindCtx, pbindopts: ^BIND_OPTS) -> HRESULT,
-	GetBindOptions:        proc "stdcall" (this: ^IBindCtx, pbindopts: ^BIND_OPTS) -> HRESULT,
-	GetRunningObjectTable: proc "stdcall" (this: ^IBindCtx, pprot: ^^IRunningObjectTable) -> HRESULT,
-	RegisterObjectParam:   proc "stdcall" (this: ^IBindCtx, pszKey: LPOLESTR, punk: ^IUnknown) -> HRESULT,
-	GetObjectParam:        proc "stdcall" (this: ^IBindCtx, pszKey: LPOLESTR, ppunk: ^^IUnknown) -> HRESULT,
-	EnumObjectParam:       proc "stdcall" (this: ^IBindCtx, ppenum: ^^IEnumString) -> HRESULT,
-	RevokeObjectParam:     proc "stdcall" (this: ^IBindCtx, pszKey: LPOLESTR) -> HRESULT,
+	RegisterObjectBound:   proc "system" (this: ^IBindCtx, punk: ^IUnknown) -> HRESULT,
+	RevokeObjectBound:     proc "system" (this: ^IBindCtx, punk: ^IUnknown) -> HRESULT,
+	ReleaseBoundObjects:   proc "system" (this: ^IBindCtx) -> HRESULT,
+	SetBindOptions:        proc "system" (this: ^IBindCtx, pbindopts: ^BIND_OPTS) -> HRESULT,
+	GetBindOptions:        proc "system" (this: ^IBindCtx, pbindopts: ^BIND_OPTS) -> HRESULT,
+	GetRunningObjectTable: proc "system" (this: ^IBindCtx, pprot: ^^IRunningObjectTable) -> HRESULT,
+	RegisterObjectParam:   proc "system" (this: ^IBindCtx, pszKey: LPOLESTR, punk: ^IUnknown) -> HRESULT,
+	GetObjectParam:        proc "system" (this: ^IBindCtx, pszKey: LPOLESTR, ppunk: ^^IUnknown) -> HRESULT,
+	EnumObjectParam:       proc "system" (this: ^IBindCtx, ppenum: ^^IEnumString) -> HRESULT,
+	RevokeObjectParam:     proc "system" (this: ^IBindCtx, pszKey: LPOLESTR) -> HRESULT,
 }
 
 IEnumShellItems :: struct #raw_union {
@@ -3564,10 +3564,10 @@ IEnumShellItems :: struct #raw_union {
 }
 IEnumShellItemsVtbl :: struct {
 	using IUnknownVtbl: IUnknownVtbl,
-	Next:  proc "stdcall" (this: ^IEnumShellItems, celt: ULONG, rgelt: ^^IShellItem, pceltFetched: ^ULONG) -> HRESULT,
-	Skip:  proc "stdcall" (this: ^IEnumShellItems, celt: ULONG) -> HRESULT,
-	Reset: proc "stdcall" (this: ^IEnumShellItems) -> HRESULT,
-	Clone: proc "stdcall" (this: ^IEnumShellItems, ppenum: ^^IEnumShellItems) -> HRESULT,
+	Next:  proc "system" (this: ^IEnumShellItems, celt: ULONG, rgelt: ^^IShellItem, pceltFetched: ^ULONG) -> HRESULT,
+	Skip:  proc "system" (this: ^IEnumShellItems, celt: ULONG) -> HRESULT,
+	Reset: proc "system" (this: ^IEnumShellItems) -> HRESULT,
+	Clone: proc "system" (this: ^IEnumShellItems, ppenum: ^^IEnumShellItems) -> HRESULT,
 }
 
 IShellItem :: struct #raw_union {
@@ -3576,11 +3576,11 @@ IShellItem :: struct #raw_union {
 }
 IShellItemVtbl :: struct {
 	using IUnknownVtbl: IUnknownVtbl,
-	BindToHandler:  proc "stdcall" (this: ^IShellItem, pbc: ^IBindCtx, bhid: REFGUID, riid: REFIID, ppv: ^rawptr) -> HRESULT,
-	GetParent:      proc "stdcall" (this: ^IShellItem, ppsiFolder: ^^IShellItem) -> HRESULT,
-	GetDisplayName: proc "stdcall" (this: ^IShellItem, sigdnName: SIGDN, ppszName: ^LPWSTR) -> HRESULT,
-	GetAttributes:  proc "stdcall" (this: ^IShellItem, sfgaoMask: SFGAOF, psfgaoAttribs: ^SFGAOF) -> HRESULT,
-	Compare:        proc "stdcall" (this: ^IShellItem, psi: ^IShellItem, hint: SICHINTF, piOrder: ^c_int) -> HRESULT,
+	BindToHandler:  proc "system" (this: ^IShellItem, pbc: ^IBindCtx, bhid: REFGUID, riid: REFIID, ppv: ^rawptr) -> HRESULT,
+	GetParent:      proc "system" (this: ^IShellItem, ppsiFolder: ^^IShellItem) -> HRESULT,
+	GetDisplayName: proc "system" (this: ^IShellItem, sigdnName: SIGDN, ppszName: ^LPWSTR) -> HRESULT,
+	GetAttributes:  proc "system" (this: ^IShellItem, sfgaoMask: SFGAOF, psfgaoAttribs: ^SFGAOF) -> HRESULT,
+	Compare:        proc "system" (this: ^IShellItem, psi: ^IShellItem, hint: SICHINTF, piOrder: ^c_int) -> HRESULT,
 }
 
 IShellItemArray :: struct #raw_union {
@@ -3589,13 +3589,13 @@ IShellItemArray :: struct #raw_union {
 }
 IShellItemArrayVtbl :: struct {
 	using IUnknownVtbl: IUnknownVtbl,
-	BindToHandler:              proc "stdcall" (this: ^IShellItemArray, pbc: ^IBindCtx, bhid: REFGUID, riid: REFIID, ppvOut: ^rawptr) -> HRESULT,
-	GetPropertyStore:           proc "stdcall" (this: ^IShellItemArray, flags: GETPROPERTYSTOREFLAGS, riid: REFIID, ppv: ^rawptr) -> HRESULT,
-	GetPropertyDescriptionList: proc "stdcall" (this: ^IShellItemArray, keyType: REFPROPERTYKEY, riid: REFIID, ppv: ^rawptr) -> HRESULT,
-	GetAttributes:              proc "stdcall" (this: ^IShellItemArray, AttribFlags: SIATTRIBFLAGS, sfgaoMask: SFGAOF, psfgaoAttribs: ^SFGAOF) -> HRESULT,
-	GetCount:                   proc "stdcall" (this: ^IShellItemArray, pdwNumItems: ^DWORD) -> HRESULT,
-	GetItemAt:                  proc "stdcall" (this: ^IShellItemArray, dwIndex: DWORD, ppsi: ^^IShellItem) -> HRESULT,
-	EnumItems:                  proc "stdcall" (this: ^IShellItemArray, ppenumShellItems: ^^IEnumShellItems) -> HRESULT,
+	BindToHandler:              proc "system" (this: ^IShellItemArray, pbc: ^IBindCtx, bhid: REFGUID, riid: REFIID, ppvOut: ^rawptr) -> HRESULT,
+	GetPropertyStore:           proc "system" (this: ^IShellItemArray, flags: GETPROPERTYSTOREFLAGS, riid: REFIID, ppv: ^rawptr) -> HRESULT,
+	GetPropertyDescriptionList: proc "system" (this: ^IShellItemArray, keyType: REFPROPERTYKEY, riid: REFIID, ppv: ^rawptr) -> HRESULT,
+	GetAttributes:              proc "system" (this: ^IShellItemArray, AttribFlags: SIATTRIBFLAGS, sfgaoMask: SFGAOF, psfgaoAttribs: ^SFGAOF) -> HRESULT,
+	GetCount:                   proc "system" (this: ^IShellItemArray, pdwNumItems: ^DWORD) -> HRESULT,
+	GetItemAt:                  proc "system" (this: ^IShellItemArray, dwIndex: DWORD, ppsi: ^^IShellItem) -> HRESULT,
+	EnumItems:                  proc "system" (this: ^IShellItemArray, ppenumShellItems: ^^IEnumShellItems) -> HRESULT,
 }
 
 IFileDialogEvents :: struct #raw_union {
@@ -3604,13 +3604,13 @@ IFileDialogEvents :: struct #raw_union {
 }
 IFileDialogEventsVtbl :: struct {
 	using IUnknownVtbl: IUnknownVtbl,
-	OnFileOk:          proc "stdcall" (this: ^IFileDialogEvents, pfd: ^IFileDialog) -> HRESULT,
-	OnFolderChanging:  proc "stdcall" (this: ^IFileDialogEvents, pfd: ^IFileDialog, psiFolder: ^IShellItem) -> HRESULT,
-	OnFolderChange:    proc "stdcall" (this: ^IFileDialogEvents, pfd: ^IFileDialog) -> HRESULT,
-	OnSelectionChange: proc "stdcall" (this: ^IFileDialogEvents, pfd: ^IFileDialog) -> HRESULT,
-	OnShareViolation:  proc "stdcall" (this: ^IFileDialogEvents, pfd: ^IFileDialog, psi: ^IShellItem, pResponse: ^FDE_SHAREVIOLATION_RESPONSE) -> HRESULT,
-	OnTypeChange:      proc "stdcall" (this: ^IFileDialogEvents, pfd: ^IFileDialog) -> HRESULT,
-	OnOverwrite:       proc "stdcall" (this: ^IFileDialogEvents, pfd: ^IFileDialog, psi: ^IShellItem, pResponse: ^FDE_SHAREVIOLATION_RESPONSE) -> HRESULT,
+	OnFileOk:          proc "system" (this: ^IFileDialogEvents, pfd: ^IFileDialog) -> HRESULT,
+	OnFolderChanging:  proc "system" (this: ^IFileDialogEvents, pfd: ^IFileDialog, psiFolder: ^IShellItem) -> HRESULT,
+	OnFolderChange:    proc "system" (this: ^IFileDialogEvents, pfd: ^IFileDialog) -> HRESULT,
+	OnSelectionChange: proc "system" (this: ^IFileDialogEvents, pfd: ^IFileDialog) -> HRESULT,
+	OnShareViolation:  proc "system" (this: ^IFileDialogEvents, pfd: ^IFileDialog, psi: ^IShellItem, pResponse: ^FDE_SHAREVIOLATION_RESPONSE) -> HRESULT,
+	OnTypeChange:      proc "system" (this: ^IFileDialogEvents, pfd: ^IFileDialog) -> HRESULT,
+	OnOverwrite:       proc "system" (this: ^IFileDialogEvents, pfd: ^IFileDialog, psi: ^IShellItem, pResponse: ^FDE_SHAREVIOLATION_RESPONSE) -> HRESULT,
 }
 
 IShellItemFilter :: struct #raw_union {
@@ -3619,8 +3619,8 @@ IShellItemFilter :: struct #raw_union {
 }
 IShellItemFilterVtbl :: struct {
 	using IUnknownVtbl: IUnknownVtbl,
-	IncludeItem:         proc "stdcall" (this: ^IShellItemFilter, psi: ^IShellItem) -> HRESULT,
-	GetEnumFlagsForItem: proc "stdcall" (this: ^IShellItemFilter, psi: ^IShellItem, pgrfFlags: ^SHCONTF) -> HRESULT,
+	IncludeItem:         proc "system" (this: ^IShellItemFilter, psi: ^IShellItem) -> HRESULT,
+	GetEnumFlagsForItem: proc "system" (this: ^IShellItemFilter, psi: ^IShellItem, pgrfFlags: ^SHCONTF) -> HRESULT,
 }
 
 IFileDialog :: struct #raw_union {
@@ -3629,29 +3629,29 @@ IFileDialog :: struct #raw_union {
 }
 IFileDialogVtbl :: struct {
 	using IModalWindowVtbl: IModalWindowVtbl,
-	SetFileTypes:        proc "stdcall" (this: ^IFileDialog, cFileTypes: UINT, rgFilterSpec: ^COMDLG_FILTERSPEC) -> HRESULT,
-	SetFileTypeIndex:    proc "stdcall" (this: ^IFileDialog, iFileType: UINT) -> HRESULT,
-	GetFileTypeIndex:    proc "stdcall" (this: ^IFileDialog, piFileType: ^UINT) -> HRESULT,
-	Advise:              proc "stdcall" (this: ^IFileDialog, pfde: ^IFileDialogEvents, pdwCookie: ^DWORD) -> HRESULT,
-	Unadvise:            proc "stdcall" (this: ^IFileDialog, dwCookie: DWORD) -> HRESULT,
-	SetOptions:          proc "stdcall" (this: ^IFileDialog, fos: FILEOPENDIALOGOPTIONS) -> HRESULT,
-	GetOptions:          proc "stdcall" (this: ^IFileDialog, pfos: ^FILEOPENDIALOGOPTIONS) -> HRESULT,
-	SetDefaultFolder:    proc "stdcall" (this: ^IFileDialog, psi: ^IShellItem) -> HRESULT,
-	SetFolder:           proc "stdcall" (this: ^IFileDialog, psi: ^IShellItem) -> HRESULT,
-	GetFolder:           proc "stdcall" (this: ^IFileDialog, ppsi: ^^IShellItem) -> HRESULT,
-	GetCurrentSelection: proc "stdcall" (this: ^IFileDialog, ppsi: ^^IShellItem) -> HRESULT,
-	SetFileName:         proc "stdcall" (this: ^IFileDialog, pszName: LPCWSTR) -> HRESULT,
-	GetFileName:         proc "stdcall" (this: ^IFileDialog, pszName: ^LPCWSTR) -> HRESULT,
-	SetTitle:            proc "stdcall" (this: ^IFileDialog, pszTitle: LPCWSTR) -> HRESULT,
-	SetOkButtonLabel:    proc "stdcall" (this: ^IFileDialog, pszText: LPCWSTR) -> HRESULT,
-	SetFileNameLabel:    proc "stdcall" (this: ^IFileDialog, pszLabel: LPCWSTR) -> HRESULT,
-	GetResult:           proc "stdcall" (this: ^IFileDialog, ppsi: ^^IShellItem) -> HRESULT,
-	AddPlace:            proc "stdcall" (this: ^IFileDialog, psi: ^IShellItem, fdap: FDAP) -> HRESULT,
-	SetDefaultExtension: proc "stdcall" (this: ^IFileDialog, pszDefaultExtension: LPCWSTR) -> HRESULT,
-	Close:               proc "stdcall" (this: ^IFileDialog, hr: HRESULT) -> HRESULT,
-	SetClientGuid:       proc "stdcall" (this: ^IFileDialog, guid: REFGUID) -> HRESULT,
-	ClearClientData:     proc "stdcall" (this: ^IFileDialog) -> HRESULT,
-	SetFilter:           proc "stdcall" (this: ^IFileDialog, pFilter: ^IShellItemFilter) -> HRESULT,
+	SetFileTypes:        proc "system" (this: ^IFileDialog, cFileTypes: UINT, rgFilterSpec: ^COMDLG_FILTERSPEC) -> HRESULT,
+	SetFileTypeIndex:    proc "system" (this: ^IFileDialog, iFileType: UINT) -> HRESULT,
+	GetFileTypeIndex:    proc "system" (this: ^IFileDialog, piFileType: ^UINT) -> HRESULT,
+	Advise:              proc "system" (this: ^IFileDialog, pfde: ^IFileDialogEvents, pdwCookie: ^DWORD) -> HRESULT,
+	Unadvise:            proc "system" (this: ^IFileDialog, dwCookie: DWORD) -> HRESULT,
+	SetOptions:          proc "system" (this: ^IFileDialog, fos: FILEOPENDIALOGOPTIONS) -> HRESULT,
+	GetOptions:          proc "system" (this: ^IFileDialog, pfos: ^FILEOPENDIALOGOPTIONS) -> HRESULT,
+	SetDefaultFolder:    proc "system" (this: ^IFileDialog, psi: ^IShellItem) -> HRESULT,
+	SetFolder:           proc "system" (this: ^IFileDialog, psi: ^IShellItem) -> HRESULT,
+	GetFolder:           proc "system" (this: ^IFileDialog, ppsi: ^^IShellItem) -> HRESULT,
+	GetCurrentSelection: proc "system" (this: ^IFileDialog, ppsi: ^^IShellItem) -> HRESULT,
+	SetFileName:         proc "system" (this: ^IFileDialog, pszName: LPCWSTR) -> HRESULT,
+	GetFileName:         proc "system" (this: ^IFileDialog, pszName: ^LPCWSTR) -> HRESULT,
+	SetTitle:            proc "system" (this: ^IFileDialog, pszTitle: LPCWSTR) -> HRESULT,
+	SetOkButtonLabel:    proc "system" (this: ^IFileDialog, pszText: LPCWSTR) -> HRESULT,
+	SetFileNameLabel:    proc "system" (this: ^IFileDialog, pszLabel: LPCWSTR) -> HRESULT,
+	GetResult:           proc "system" (this: ^IFileDialog, ppsi: ^^IShellItem) -> HRESULT,
+	AddPlace:            proc "system" (this: ^IFileDialog, psi: ^IShellItem, fdap: FDAP) -> HRESULT,
+	SetDefaultExtension: proc "system" (this: ^IFileDialog, pszDefaultExtension: LPCWSTR) -> HRESULT,
+	Close:               proc "system" (this: ^IFileDialog, hr: HRESULT) -> HRESULT,
+	SetClientGuid:       proc "system" (this: ^IFileDialog, guid: REFGUID) -> HRESULT,
+	ClearClientData:     proc "system" (this: ^IFileDialog) -> HRESULT,
+	SetFilter:           proc "system" (this: ^IFileDialog, pFilter: ^IShellItemFilter) -> HRESULT,
 }
 
 IFileOpenDialog :: struct #raw_union {
@@ -3660,8 +3660,8 @@ IFileOpenDialog :: struct #raw_union {
 }
 IFileOpenDialogVtbl :: struct {
 	using IFileDialogVtbl: IFileDialogVtbl,
-	GetResults:       proc "stdcall" (this: ^IFileOpenDialog, ppenum: ^^IShellItemArray) -> HRESULT,
-	GetSelectedItems: proc "stdcall" (this: ^IFileOpenDialog, ppsai: ^^IShellItemArray) -> HRESULT,
+	GetResults:       proc "system" (this: ^IFileOpenDialog, ppenum: ^^IShellItemArray) -> HRESULT,
+	GetSelectedItems: proc "system" (this: ^IFileOpenDialog, ppsai: ^^IShellItemArray) -> HRESULT,
 }
 
 IPropertyStore :: struct #raw_union {
@@ -3670,11 +3670,11 @@ IPropertyStore :: struct #raw_union {
 }
 IPropertyStoreVtbl :: struct {
 	using IUnknownVtbl: IUnknownVtbl,
-	GetCount: proc "stdcall" (this: ^IPropertyStore, cProps: ^DWORD) -> HRESULT,
-	GetAt:    proc "stdcall" (this: ^IPropertyStore, iProp: DWORD, pkey: ^PROPERTYKEY) -> HRESULT,
-	GetValue: proc "stdcall" (this: ^IPropertyStore, key: REFPROPERTYKEY, pv: ^PROPVARIANT) -> HRESULT,
-	SetValue: proc "stdcall" (this: ^IPropertyStore, key: REFPROPERTYKEY, propvar: REFPROPVARIANT) -> HRESULT,
-	Commit:   proc "stdcall" (this: ^IPropertyStore) -> HRESULT,
+	GetCount: proc "system" (this: ^IPropertyStore, cProps: ^DWORD) -> HRESULT,
+	GetAt:    proc "system" (this: ^IPropertyStore, iProp: DWORD, pkey: ^PROPERTYKEY) -> HRESULT,
+	GetValue: proc "system" (this: ^IPropertyStore, key: REFPROPERTYKEY, pv: ^PROPVARIANT) -> HRESULT,
+	SetValue: proc "system" (this: ^IPropertyStore, key: REFPROPERTYKEY, propvar: REFPROPVARIANT) -> HRESULT,
+	Commit:   proc "system" (this: ^IPropertyStore) -> HRESULT,
 }
 
 IPropertyDescriptionList :: struct #raw_union {
@@ -3683,8 +3683,8 @@ IPropertyDescriptionList :: struct #raw_union {
 }
 IPropertyDescriptionListVtbl :: struct {
 	using IUnknownVtbl: IUnknownVtbl,
-	GetCount: proc "stdcall" (this: ^IPropertyDescriptionList, pcElem: ^UINT) -> HRESULT,
-	GetAt:    proc "stdcall" (this: ^IPropertyDescriptionList, iElem: UINT, riid: REFIID, ppv: ^rawptr) -> HRESULT,
+	GetCount: proc "system" (this: ^IPropertyDescriptionList, pcElem: ^UINT) -> HRESULT,
+	GetAt:    proc "system" (this: ^IPropertyDescriptionList, iElem: UINT, riid: REFIID, ppv: ^rawptr) -> HRESULT,
 }
 
 IFileOperationProgressSink :: struct #raw_union {
@@ -3693,22 +3693,22 @@ IFileOperationProgressSink :: struct #raw_union {
 }
 IFileOperationProgressSinkVtbl :: struct {
 	using IUnknownVtbl: IUnknownVtbl,
-	StartOperations:  proc "stdcall" (this: ^IFileOperationProgressSink) -> HRESULT,
-	FinishOperations: proc "stdcall" (this: ^IFileOperationProgressSink, hrResult: HRESULT) -> HRESULT,
-	PreRenameItem:    proc "stdcall" (this: ^IFileOperationProgressSink, dwFlags: DWORD, psiItem: ^IShellItem, pszNewName: LPCWSTR) -> HRESULT,
-	PostRenameItem:   proc "stdcall" (this: ^IFileOperationProgressSink, dwFlags: DWORD, psiItem: ^IShellItem, pszNewName: LPCWSTR, hrRename: HRESULT, psiNewlyCreated: ^IShellItem) -> HRESULT,
-	PreMoveItem:      proc "stdcall" (this: ^IFileOperationProgressSink, dwFlags: DWORD, psiItem: ^IShellItem, psiDestinationFolder: ^IShellItem, pszNewName: LPCWSTR) -> HRESULT,
-	PostMoveItem:     proc "stdcall" (this: ^IFileOperationProgressSink, dwFlags: DWORD, psiItem: ^IShellItem, psiDestinationFolder: ^IShellItem, pszNewName: LPCWSTR, hrMove: HRESULT, psiNewlyCreated: ^IShellItem) -> HRESULT,
-	PreCopyItem:      proc "stdcall" (this: ^IFileOperationProgressSink, dwFlags: DWORD, psiItem: ^IShellItem, psiDestinationFolder: ^IShellItem, pszNewName: LPCWSTR) -> HRESULT,
-	PostCopyItem:     proc "stdcall" (this: ^IFileOperationProgressSink, dwFlags: DWORD, psiItem: ^IShellItem, psiDestinationFolder: ^IShellItem, pszNewName: LPCWSTR, hrMove: HRESULT, psiNewlyCreated: ^IShellItem) -> HRESULT,
-	PreDeleteItem:    proc "stdcall" (this: ^IFileOperationProgressSink, dwFlags: DWORD, psiItem: ^IShellItem) -> HRESULT,
-	PostDeleteItem:   proc "stdcall" (this: ^IFileOperationProgressSink, dwFlags: DWORD, psiItem: ^IShellItem, hrDelete: HRESULT, psiNewlyCreated: ^IShellItem) -> HRESULT,
-	PreNewItem:       proc "stdcall" (this: ^IFileOperationProgressSink, dwFlags: DWORD, psiDestinationFolder: ^IShellItem, pszNewName: LPCWSTR) -> HRESULT,
-	PostNewItem:      proc "stdcall" (this: ^IFileOperationProgressSink, dwFlags: DWORD, psiDestinationFolder: ^IShellItem, pszNewName: LPCWSTR, pszTemplateName: LPCWSTR, dwFileAttributes: DWORD, hrNew: HRESULT, psiNewItem: ^IShellItem) -> HRESULT,
-	UpdateProgress:   proc "stdcall" (this: ^IFileOperationProgressSink, iWorkTotal: UINT, iWorkSoFar: UINT) -> HRESULT,
-	ResetTimer:       proc "stdcall" (this: ^IFileOperationProgressSink) -> HRESULT,
-	PauseTimer:       proc "stdcall" (this: ^IFileOperationProgressSink) -> HRESULT,
-	ResumeTimer:      proc "stdcall" (this: ^IFileOperationProgressSink) -> HRESULT,
+	StartOperations:  proc "system" (this: ^IFileOperationProgressSink) -> HRESULT,
+	FinishOperations: proc "system" (this: ^IFileOperationProgressSink, hrResult: HRESULT) -> HRESULT,
+	PreRenameItem:    proc "system" (this: ^IFileOperationProgressSink, dwFlags: DWORD, psiItem: ^IShellItem, pszNewName: LPCWSTR) -> HRESULT,
+	PostRenameItem:   proc "system" (this: ^IFileOperationProgressSink, dwFlags: DWORD, psiItem: ^IShellItem, pszNewName: LPCWSTR, hrRename: HRESULT, psiNewlyCreated: ^IShellItem) -> HRESULT,
+	PreMoveItem:      proc "system" (this: ^IFileOperationProgressSink, dwFlags: DWORD, psiItem: ^IShellItem, psiDestinationFolder: ^IShellItem, pszNewName: LPCWSTR) -> HRESULT,
+	PostMoveItem:     proc "system" (this: ^IFileOperationProgressSink, dwFlags: DWORD, psiItem: ^IShellItem, psiDestinationFolder: ^IShellItem, pszNewName: LPCWSTR, hrMove: HRESULT, psiNewlyCreated: ^IShellItem) -> HRESULT,
+	PreCopyItem:      proc "system" (this: ^IFileOperationProgressSink, dwFlags: DWORD, psiItem: ^IShellItem, psiDestinationFolder: ^IShellItem, pszNewName: LPCWSTR) -> HRESULT,
+	PostCopyItem:     proc "system" (this: ^IFileOperationProgressSink, dwFlags: DWORD, psiItem: ^IShellItem, psiDestinationFolder: ^IShellItem, pszNewName: LPCWSTR, hrMove: HRESULT, psiNewlyCreated: ^IShellItem) -> HRESULT,
+	PreDeleteItem:    proc "system" (this: ^IFileOperationProgressSink, dwFlags: DWORD, psiItem: ^IShellItem) -> HRESULT,
+	PostDeleteItem:   proc "system" (this: ^IFileOperationProgressSink, dwFlags: DWORD, psiItem: ^IShellItem, hrDelete: HRESULT, psiNewlyCreated: ^IShellItem) -> HRESULT,
+	PreNewItem:       proc "system" (this: ^IFileOperationProgressSink, dwFlags: DWORD, psiDestinationFolder: ^IShellItem, pszNewName: LPCWSTR) -> HRESULT,
+	PostNewItem:      proc "system" (this: ^IFileOperationProgressSink, dwFlags: DWORD, psiDestinationFolder: ^IShellItem, pszNewName: LPCWSTR, pszTemplateName: LPCWSTR, dwFileAttributes: DWORD, hrNew: HRESULT, psiNewItem: ^IShellItem) -> HRESULT,
+	UpdateProgress:   proc "system" (this: ^IFileOperationProgressSink, iWorkTotal: UINT, iWorkSoFar: UINT) -> HRESULT,
+	ResetTimer:       proc "system" (this: ^IFileOperationProgressSink) -> HRESULT,
+	PauseTimer:       proc "system" (this: ^IFileOperationProgressSink) -> HRESULT,
+	ResumeTimer:      proc "system" (this: ^IFileOperationProgressSink) -> HRESULT,
 }
 
 IFileSaveDialog :: struct #raw_union {
@@ -3717,11 +3717,11 @@ IFileSaveDialog :: struct #raw_union {
 }
 IFileSaveDialogVtbl :: struct {
 	using IFileDialogVtbl: IFileDialogVtbl,
-	SetSaveAsItem:          proc "stdcall" (this: ^IFileSaveDialog, psi: ^IShellItem) -> HRESULT,
-	SetProperties:          proc "stdcall" (this: ^IFileSaveDialog, pStore: ^IPropertyStore) -> HRESULT,
-	SetCollectedProperties: proc "stdcall" (this: ^IFileSaveDialog, pList: ^IPropertyDescriptionList, fAppendDefault: BOOL) -> HRESULT,
-	GetProperties:          proc "stdcall" (this: ^IFileSaveDialog, ppStore: ^^IPropertyStore) -> HRESULT,
-	ApplyProperties:        proc "stdcall" (this: ^IFileSaveDialog, psi: ^IShellItem, pStore: ^IPropertyStore, hwnd: HWND, pSink: ^IFileOperationProgressSink) -> HRESULT,
+	SetSaveAsItem:          proc "system" (this: ^IFileSaveDialog, psi: ^IShellItem) -> HRESULT,
+	SetProperties:          proc "system" (this: ^IFileSaveDialog, pStore: ^IPropertyStore) -> HRESULT,
+	SetCollectedProperties: proc "system" (this: ^IFileSaveDialog, pList: ^IPropertyDescriptionList, fAppendDefault: BOOL) -> HRESULT,
+	GetProperties:          proc "system" (this: ^IFileSaveDialog, ppStore: ^^IPropertyStore) -> HRESULT,
+	ApplyProperties:        proc "system" (this: ^IFileSaveDialog, psi: ^IShellItem, pStore: ^IPropertyStore, hwnd: HWND, pSink: ^IFileOperationProgressSink) -> HRESULT,
 }
 
 ITaskbarList :: struct #raw_union {
@@ -3730,11 +3730,11 @@ ITaskbarList :: struct #raw_union {
 }
 ITaskbarListVtbl :: struct {
 	using IUnknownVtbl: IUnknownVtbl,
-	HrInit: proc "stdcall" (this: ^ITaskbarList) -> HRESULT,
-	AddTab: proc "stdcall" (this: ^ITaskbarList, hwnd: HWND) -> HRESULT,
-	DeleteTab: proc "stdcall" (this: ^ITaskbarList, hwnd: HWND) -> HRESULT,
-	ActivateTab: proc "stdcall" (this: ^ITaskbarList, hwnd: HWND) -> HRESULT,
-	SetActiveAlt: proc "stdcall" (this: ^ITaskbarList, hwnd: HWND) -> HRESULT,
+	HrInit: proc "system" (this: ^ITaskbarList) -> HRESULT,
+	AddTab: proc "system" (this: ^ITaskbarList, hwnd: HWND) -> HRESULT,
+	DeleteTab: proc "system" (this: ^ITaskbarList, hwnd: HWND) -> HRESULT,
+	ActivateTab: proc "system" (this: ^ITaskbarList, hwnd: HWND) -> HRESULT,
+	SetActiveAlt: proc "system" (this: ^ITaskbarList, hwnd: HWND) -> HRESULT,
 }
 
 ITaskbarList2 :: struct #raw_union {
@@ -3743,7 +3743,7 @@ ITaskbarList2 :: struct #raw_union {
 }
 ITaskbarList2Vtbl :: struct {
 	using ITaskbarListVtbl: ITaskbarListVtbl,
-	MarkFullscreenWindow: proc "stdcall" (this: ^ITaskbarList2, hwnd: HWND, fFullscreen: BOOL) -> HRESULT,
+	MarkFullscreenWindow: proc "system" (this: ^ITaskbarList2, hwnd: HWND, fFullscreen: BOOL) -> HRESULT,
 }
 
 TBPFLAG :: enum c_int {
@@ -3788,18 +3788,18 @@ ITaskbarList3 :: struct #raw_union {
 }
 ITaskbarList3Vtbl :: struct {
 	using ITaskbarList2Vtbl: ITaskbarList2Vtbl,
-	SetProgressValue: proc "stdcall" (this: ^ITaskbarList3, hwnd: HWND, ullCompleted: ULONGLONG, ullTotal: ULONGLONG) -> HRESULT,
-	SetProgressState: proc "stdcall" (this: ^ITaskbarList3, hwnd: HWND, tbpFlags: TBPFLAG) -> HRESULT,
-	RegisterTab: proc "stdcall" (this: ^ITaskbarList3, hwndTab: HWND, hwndMDI: HWND) -> HRESULT,
-	UnregisterTab: proc "stdcall" (this: ^ITaskbarList3, hwndTab: HWND) -> HRESULT,
-	SetTabOrder: proc "stdcall" (this: ^ITaskbarList3, hwndTab: HWND, hwndInsertBefore: HWND) -> HRESULT,
-	SetTabActive: proc "stdcall" (this: ^ITaskbarList3, hwndTab: HWND, hwndMDI: HWND, dwReserved: DWORD) -> HRESULT,
-	ThumbBarAddButtons: proc "stdcall" (this: ^ITaskbarList3, hwnd: HWND, cButtons: UINT, pButton: LPTHUMBBUTTON) -> HRESULT,
-	ThumbBarUpdateButtons: proc "stdcall" (this: ^ITaskbarList3, hwnd: HWND, cButtons: UINT, pButton: LPTHUMBBUTTON) -> HRESULT,
-	ThumbBarSetImageList: proc "stdcall" (this: ^ITaskbarList3, hwnd: HWND, himl: HIMAGELIST) -> HRESULT,
-	SetOverlayIcon: proc "stdcall" (this: ^ITaskbarList3, hwnd: HWND, hIcon: HICON, pszDescription: LPCWSTR) -> HRESULT,
-	SetThumbnailTooltip: proc "stdcall" (this: ^ITaskbarList3, hwnd: HWND, pszTip: LPCWSTR) -> HRESULT,
-	SetThumbnailClip: proc "stdcall" (this: ^ITaskbarList3, hwnd: HWND, prcClip: ^RECT) -> HRESULT,
+	SetProgressValue: proc "system" (this: ^ITaskbarList3, hwnd: HWND, ullCompleted: ULONGLONG, ullTotal: ULONGLONG) -> HRESULT,
+	SetProgressState: proc "system" (this: ^ITaskbarList3, hwnd: HWND, tbpFlags: TBPFLAG) -> HRESULT,
+	RegisterTab: proc "system" (this: ^ITaskbarList3, hwndTab: HWND, hwndMDI: HWND) -> HRESULT,
+	UnregisterTab: proc "system" (this: ^ITaskbarList3, hwndTab: HWND) -> HRESULT,
+	SetTabOrder: proc "system" (this: ^ITaskbarList3, hwndTab: HWND, hwndInsertBefore: HWND) -> HRESULT,
+	SetTabActive: proc "system" (this: ^ITaskbarList3, hwndTab: HWND, hwndMDI: HWND, dwReserved: DWORD) -> HRESULT,
+	ThumbBarAddButtons: proc "system" (this: ^ITaskbarList3, hwnd: HWND, cButtons: UINT, pButton: LPTHUMBBUTTON) -> HRESULT,
+	ThumbBarUpdateButtons: proc "system" (this: ^ITaskbarList3, hwnd: HWND, cButtons: UINT, pButton: LPTHUMBBUTTON) -> HRESULT,
+	ThumbBarSetImageList: proc "system" (this: ^ITaskbarList3, hwnd: HWND, himl: HIMAGELIST) -> HRESULT,
+	SetOverlayIcon: proc "system" (this: ^ITaskbarList3, hwnd: HWND, hIcon: HICON, pszDescription: LPCWSTR) -> HRESULT,
+	SetThumbnailTooltip: proc "system" (this: ^ITaskbarList3, hwnd: HWND, pszTip: LPCWSTR) -> HRESULT,
+	SetThumbnailClip: proc "system" (this: ^ITaskbarList3, hwnd: HWND, prcClip: ^RECT) -> HRESULT,
 }
 
 MEMORYSTATUSEX :: struct {
