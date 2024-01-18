@@ -439,7 +439,7 @@ wprintf :: proc(w: io.Writer, fmt: string, args: ..any, flush := true) -> int {
 	was_prev_index := false
 
 	loop: for i := 0; i < end; /**/ {
-		fi = Info{writer = w, good_arg_index = true, reordered = fi.reordered, n = fi.n}
+		fi = Info{writer = w, good_arg_index = true, reordered = fi.reordered, n = fi.n, space = true}
 
 		prev_i := i
 		for i < end && !(fmt[i] == '%' || fmt[i] == '{' || fmt[i] == '}') {
