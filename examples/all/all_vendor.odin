@@ -81,3 +81,43 @@ _ :: nvg_gl
 _ :: fontstash
 
 _ :: xlib
+
+
+// NOTE: needed for doc generator
+
+import NS  "vendor:darwin/Foundation"
+import MTL "vendor:darwin/Metal"
+import MTK "vendor:darwin/MetalKit"
+import CA  "vendor:darwin/QuartzCore"
+
+_ :: NS
+_ :: MTL
+_ :: MTK
+_ :: CA
+
+
+import D3D11 "vendor:directx/d3d11"
+import D3D12 "vendor:directx/d3d12"
+import DXGI  "vendor:directx/dxgi"
+
+_ :: D3D11
+_ :: D3D12
+_ :: DXGI
+
+
+import cm "vendor:commonmark"
+_ :: cm
+
+
+import stb_easy_font "vendor:stb/easy_font"
+import stbi          "vendor:stb/image"
+import stbrp         "vendor:stb/rect_pack"
+import stbtt         "vendor:stb/truetype"
+import stb_vorbis    "vendor:stb/vorbis"
+
+_ :: stb_easy_font
+_ :: stbi
+_ :: stbrp
+_ :: stbtt
+_ :: stb_vorbis
+

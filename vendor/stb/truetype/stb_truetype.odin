@@ -3,9 +3,10 @@ package stb_truetype
 import c "core:c"
 import stbrp "vendor:stb/rect_pack"
 
-when ODIN_OS == .Windows { foreign import stbtt "../lib/stb_truetype.lib" }
-when ODIN_OS == .Linux   { foreign import stbtt "../lib/stb_truetype.a"   }
-when ODIN_OS == .Darwin  { foreign import stbtt "../lib/darwin/stb_truetype.a"   }
+     when ODIN_OS == .Windows { foreign import stbtt "../lib/stb_truetype.lib"      }
+else when ODIN_OS == .Linux   { foreign import stbtt "../lib/stb_truetype.a"        }
+else when ODIN_OS == .Darwin  { foreign import stbtt "../lib/darwin/stb_truetype.a" }
+else                          { foreign import stbtt "system:stb_truetype"          }
 
 
 ///////////////////////////////////////////////////////////////////////////////

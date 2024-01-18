@@ -582,7 +582,13 @@ gb_global TargetMetrics target_freestanding_amd64_sysv = {
 	TargetABI_SysV,
 };
 
-
+gb_global TargetMetrics target_freestanding_arm64 = {
+	TargetOs_freestanding,
+	TargetArch_arm64,
+	8, 8, 8, 16,
+	str_lit("aarch64-none-elf"),
+	str_lit("e-m:o-p:32:32-Fi8-i64:64-v128:64:128-a:0:32-n32-S64"),
+};
 
 struct NamedTargetMetrics {
 	String name;
@@ -617,6 +623,7 @@ gb_global NamedTargetMetrics named_targets[] = {
 	{ str_lit("wasi_wasm64p32"),         &target_wasi_wasm64p32 },
 
 	{ str_lit("freestanding_amd64_sysv"), &target_freestanding_amd64_sysv },
+	{ str_lit("freestanding_arm64"), &target_freestanding_arm64 },
 };
 
 gb_global NamedTargetMetrics *selected_target_metrics;
@@ -1493,7 +1500,7 @@ gb_internal void enable_target_feature(TokenPos pos, String const &target_featur
 }
 
 
-gb_internal char const *target_features_set_to_cstring(gbAllocator allocator, bool with_quotes) {
+gb_internal char const *target_features_set_to_cstring(gbAllocator allocator, bool with_quotes, bool with_plus) {
 	isize len = 0;
 	isize i = 0;
 	for (String const &feature : build_context.target_features_set) {
@@ -1502,6 +1509,7 @@ gb_internal char const *target_features_set_to_cstring(gbAllocator allocator, bo
 		}
 		len += feature.len;
 		if (with_quotes) len += 2;
+		if (with_plus) len += 1;
 		i += 1;
 	}
 	char *features = gb_alloc_array(allocator, char, len+1);
@@ -1513,6 +1521,7 @@ gb_internal char const *target_features_set_to_cstring(gbAllocator allocator, bo
 		}
 
 		if (with_quotes) features[len++] = '"';
+		if (with_plus) features[len++] = '+';
 		gb_memmove(features + len, feature.text, feature.len);
 		len += feature.len;
 		if (with_quotes) features[len++] = '"';

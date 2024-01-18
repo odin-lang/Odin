@@ -210,7 +210,7 @@ gb_internal void semaphore_wait(Semaphore *s) {
 			original_count = s->count().load(std::memory_order_relaxed);
 		}
 
-		if (!s->count().compare_exchange_strong(original_count, original_count-1, std::memory_order_acquire, std::memory_order_acquire)) {
+		if (s->count().compare_exchange_strong(original_count, original_count-1, std::memory_order_acquire, std::memory_order_acquire)) {
 			return;
 		}
 	}

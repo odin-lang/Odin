@@ -2,7 +2,7 @@
 
 package glfw
 
-import NS "vendor:darwin/foundation"
+import NS "vendor:darwin/Foundation"
 
 when GLFW_SHARED {
     #panic("Dynamic linking for glfw is not supported for darwin yet")

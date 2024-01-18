@@ -37,7 +37,7 @@ when ODIN_ARCH == .amd64 {
 	}
 }
 
-@(private, default_calling_convention="c")
+@(private, default_calling_convention="none")
 foreign _ {
 	@(link_name="llvm.x86.addcarry.32")
 	llvm_addcarry_u32  :: proc(a: u8, b: u32, c: u32) -> (u8, u32) ---

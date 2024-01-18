@@ -909,6 +909,89 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 
 	e->Procedure.entry_point_only = ac.entry_point_only;
 	e->Procedure.is_export = ac.is_export;
+
+	bool has_instrumentation = false;
+	if (pl->body == nullptr) {
+		has_instrumentation = false;
+		if (ac.no_instrumentation != Instrumentation_Default) {
+			error(e->token, "@(no_instrumentation) is not allowed on foreign procedures");
+		}
+	} else {
+		AstFile *file = e->token.pos.file_id ? global_files[e->token.pos.file_id] : nullptr;
+		if (file) {
+			has_instrumentation = (file->flags & AstFile_NoInstrumentation) == 0;
+		}
+
+		switch (ac.no_instrumentation) {
+		case Instrumentation_Enabled:  has_instrumentation = true; break;
+		case Instrumentation_Default:  break;
+		case Instrumentation_Disabled: has_instrumentation = false;  break;
+		}
+	}
+
+	auto const is_valid_instrumentation_call = [](Type *type) -> bool {
+		if (type == nullptr || type->kind != Type_Proc) {
+			return false;
+		}
+		if (type->Proc.calling_convention != ProcCC_Contextless) {
+			return false;
+		}
+		if (type->Proc.result_count != 0) {
+			return false;
+		}
+		if (type->Proc.param_count != 3) {
+			return false;
+		}
+		Type *p0 = type->Proc.params->Tuple.variables[0]->type;
+		Type *p1 = type->Proc.params->Tuple.variables[1]->type;
+		Type *p3 = type->Proc.params->Tuple.variables[2]->type;
+		return is_type_rawptr(p0) && is_type_rawptr(p1) && are_types_identical(p3, t_source_code_location);
+	};
+
+	static char const *instrumentation_proc_type_str = "proc \"contextless\" (proc_address: rawptr, call_site_return_address: rawptr, loc: runtime.Source_Code_Location)";
+
+	if (ac.instrumentation_enter && ac.instrumentation_exit) {
+		error(e->token, "A procedure cannot be marked with both @(instrumentation_enter) and @(instrumentation_exit)");
+
+		has_instrumentation = false;
+		e->flags |= EntityFlag_Require;
+	} else if (ac.instrumentation_enter) {
+		if (!is_valid_instrumentation_call(e->type)) {
+			init_core_source_code_location(ctx->checker);
+			gbString s = type_to_string(e->type);
+			error(e->token, "@(instrumentation_enter) procedures must have the type '%s', got %s", instrumentation_proc_type_str, s);
+			gb_string_free(s);
+		}
+		MUTEX_GUARD(&ctx->info->instrumentation_mutex);
+		if (ctx->info->instrumentation_enter_entity != nullptr) {
+			error(e->token, "@(instrumentation_enter) has already been set");
+		} else {
+			ctx->info->instrumentation_enter_entity = e;
+		}
+
+		has_instrumentation = false;
+		e->flags |= EntityFlag_Require;
+	} else if (ac.instrumentation_exit) {
+		init_core_source_code_location(ctx->checker);
+		if (!is_valid_instrumentation_call(e->type)) {
+			gbString s = type_to_string(e->type);
+			error(e->token, "@(instrumentation_exit) procedures must have the type '%s', got %s", instrumentation_proc_type_str, s);
+			gb_string_free(s);
+		}
+		MUTEX_GUARD(&ctx->info->instrumentation_mutex);
+		if (ctx->info->instrumentation_exit_entity != nullptr) {
+			error(e->token, "@(instrumentation_exit) has already been set");
+		} else {
+			ctx->info->instrumentation_exit_entity = e;
+		}
+
+		has_instrumentation = false;
+		e->flags |= EntityFlag_Require;
+	}
+
+	e->Procedure.has_instrumentation = has_instrumentation;
+
+
 	e->deprecated_message = ac.deprecated_message;
 	e->warning_message = ac.warning_message;
 	ac.link_name = handle_link_name(ctx, e->token, ac.link_name, ac.link_prefix);

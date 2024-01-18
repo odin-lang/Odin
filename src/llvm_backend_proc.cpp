@@ -329,6 +329,18 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 		}
 	}
 
+	if (p->body && entity->Procedure.has_instrumentation) {
+		Entity *instrumentation_enter = m->info->instrumentation_enter_entity;
+		Entity *instrumentation_exit  = m->info->instrumentation_exit_entity;
+		if (instrumentation_enter && instrumentation_exit) {
+			String enter = lb_get_entity_name(m, instrumentation_enter);
+			String exit  = lb_get_entity_name(m, instrumentation_exit);
+
+			lb_add_attribute_to_proc_with_string(m, p->value, make_string_c("instrument-function-entry"), enter);
+			lb_add_attribute_to_proc_with_string(m, p->value, make_string_c("instrument-function-exit"),  exit);
+		}
+	}
+
 	lbValue proc_value = {p->value, p->type};
 	lb_add_entity(m, entity,  proc_value);
 	lb_add_member(m, p->name, proc_value);
