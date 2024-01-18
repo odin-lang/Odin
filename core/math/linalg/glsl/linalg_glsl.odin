@@ -1357,6 +1357,76 @@ not :: proc{
 @(require_results) identity :: proc "c" ($M: typeid/matrix[$N, N]$T) -> M { return 1 }
 
 @(require_results)
+mat3Translate :: proc "c" (v: vec2) -> mat3 {
+	return {
+		1, 0, v.x,
+		0, 1, v.y,
+		0, 0, 1,
+   	}
+}
+@(require_results)
+mat3Scale :: proc "c" (v: vec2) -> mat3 {
+	return {
+		v.x, 0,   0,
+		0,   v.y, 0,
+		0,   0,   1,
+   	}
+}
+@(require_results)
+mat3Rotate :: proc "c" (radians: f32) -> mat3 {
+	c := cos(radians)
+	s := sin(radians)
+	return {
+		 c, s, 0,
+		-s, c, 0,
+		 0, 0, 1,
+	}
+}
+@(require_results)
+mat3Projection :: proc "c" (x, y: f32) -> mat3 {
+	return {
+		2/x, 0,  -1,
+		0,  -2/y, 1,
+		0,   0,   1,
+	}
+}
+
+@(require_results)
+dmat3Translate :: proc "c" (v: dvec2) -> dmat3 {
+	return {
+		1, 0, v.x,
+		0, 1, v.y,
+		0, 0, 1,
+   	}
+}
+@(require_results)
+dmat3Scale :: proc "c" (v: dvec2) -> dmat3 {
+	return {
+		v.x, 0,   0,
+		0,   v.y, 0,
+		0,   0,   1,
+   	}
+}
+@(require_results)
+dmat3Rotate :: proc "c" (radians: f64) -> dmat3 {
+	c := cos(radians)
+	s := sin(radians)
+	return {
+		 c, s, 0,
+		-s, c, 0,
+		 0, 0, 1,
+	}
+}
+@(require_results)
+dmat3Projection :: proc "c" (x, y: f64) -> dmat3 {
+	return {
+		2/x, 0,  -1,
+		0,  -2/y, 1,
+		0,   0,   1,
+	}
+}
+
+@(require_results)
 mat4Perspective :: proc "c" (fovy, aspect, near, far: f32) -> (m: mat4) {
 	tan_half_fovy := tan(0.5 * fovy)
 	m[0, 0] = 1 / (aspect*tan_half_fovy)
