@@ -32,11 +32,11 @@ if [ -z "$LLVM_CONFIG" ]; then
 	elif [ -n "$(command -v llvm-config-12)" ]; then LLVM_CONFIG="llvm-config-12"
 	elif [ -n "$(command -v llvm-config-11)" ]; then LLVM_CONFIG="llvm-config-11"
 	# freebsd
-	elif [ -n "$(command -v llvm-config17)" ]; then  LLVM_CONFIG="llvm-config-17"
-	elif [ -n "$(command -v llvm-config14)" ]; then  LLVM_CONFIG="llvm-config-14"
-	elif [ -n "$(command -v llvm-config13)" ]; then  LLVM_CONFIG="llvm-config-13"
-	elif [ -n "$(command -v llvm-config12)" ]; then  LLVM_CONFIG="llvm-config-12"
-	elif [ -n "$(command -v llvm-config11)" ]; then  LLVM_CONFIG="llvm-config-11"
+	elif [ -n "$(command -v llvm-config17)" ]; then  LLVM_CONFIG="llvm-config17"
+	elif [ -n "$(command -v llvm-config14)" ]; then  LLVM_CONFIG="llvm-config14"
+	elif [ -n "$(command -v llvm-config13)" ]; then  LLVM_CONFIG="llvm-config13"
+	elif [ -n "$(command -v llvm-config12)" ]; then  LLVM_CONFIG="llvm-config12"
+	elif [ -n "$(command -v llvm-config11)" ]; then  LLVM_CONFIG="llvm-config11"
 	# fallback
 	elif [ -n "$(command -v llvm-config)" ]; then LLVM_CONFIG="llvm-config"
 	else
