@@ -21,10 +21,10 @@ page_allocator :: proc() -> mem.Allocator {
 	                  old_memory: rawptr, old_size: int,
 	                  location := #caller_location) -> ([]byte, mem.Allocator_Error) {
 		switch mode {
-		case .Alloc, .Alloc_Non_Zeroed, .Resize_Non_Zeroed:
+		case .Alloc, .Alloc_Non_Zeroed:
 			assert(size % PAGE_SIZE == 0)
 			return page_alloc(size/PAGE_SIZE)
-		case .Resize, .Free, .Free_All, .Query_Info:
+		case .Resize, .Free, .Free_All, .Query_Info, .Resize_Non_Zeroed:
 			return nil, .Mode_Not_Implemented
 		case .Query_Features:
 			set := (^mem.Allocator_Mode_Set)(old_memory)
