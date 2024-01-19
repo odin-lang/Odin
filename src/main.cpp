@@ -1270,16 +1270,43 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						}
 
 						case BuildFlag_Subsystem: {
+							// TODO(Jeroen): Parse optional "[,major[.minor]]"
+
 							GB_ASSERT(value.kind == ExactValue_String);
 							String subsystem = value.value_string;
-							if (str_eq_ignore_case(subsystem, str_lit("console"))) {
-								build_context.use_subsystem_windows = false;
-							} else if (str_eq_ignore_case(subsystem, str_lit("window"))) {
-								build_context.use_subsystem_windows = true;
-							} else if (str_eq_ignore_case(subsystem, str_lit("windows"))) {
-								build_context.use_subsystem_windows = true;
-							} else {
-								gb_printf_err("Invalid -subsystem string, got %.*s, expected either 'console' or 'windows'\n", LIT(subsystem));
+							bool subsystem_found = false;
+							for (int i = 0; i < Windows_Subsystem_COUNT; i++) {
+								if (str_eq_ignore_case(subsystem, windows_subsystem_names[i])) {
+									build_context.ODIN_WINDOWS_SUBSYSTEM = windows_subsystem_names[i];
+									subsystem_found = true;
+									break;
+								}
+							}
+
+							// WINDOW is a hidden alias for WINDOWS. Check it.
+							String subsystem_windows_alias = str_lit("WINDOW");
+							if (!subsystem_found && str_eq_ignore_case(subsystem, subsystem_windows_alias)) {
+								build_context.ODIN_WINDOWS_SUBSYSTEM = windows_subsystem_names[Windows_Subsystem_WINDOWS];
+								subsystem_found = true;
+								break;
+							}
+
+							if (!subsystem_found) {
+								gb_printf_err("Invalid -subsystem string, got %.*s. Expected one of:\n", LIT(subsystem));
+								gb_printf_err("\t");
+								for (int i = 0; i < Windows_Subsystem_COUNT; i++) {
+									if (i > 0) {
+										gb_printf_err(", ");
+									}
+									gb_printf_err("%.*s", LIT(windows_subsystem_names[i]));
+									if (i == Windows_Subsystem_CONSOLE) {
+										gb_printf_err(" (default)");
+									}
+									if (i == Windows_Subsystem_WINDOWS) {
+										gb_printf_err(" (or WINDOW)");
+									}
+								}
+								gb_printf_err("\n");
 								bad_flags = true;
 							}
 							break;
