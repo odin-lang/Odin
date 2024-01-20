@@ -115,17 +115,19 @@ Optionally also takes the struct member to assign the library handle to, `__hand
 
 This allows using one struct to hold library handles and symbol pointers for more than 1 dynamic library.
 
+Loading the same library twice unloads the previous incarnation, allowing for straightforward hot reload support.
+
 Returns:
 * `-1, false` if the library could not be loaded.
 * The number of symbols assigned on success. `ok` = true if `count` > 0
 
 See doc.odin for an example.
 */
-initialize_symbols :: proc(symbol_table: ^$T, library_name: string, symbol_prefix := "", handle_field_name := "__handle") -> (count: int, ok: bool) where intrinsics.type_is_struct(T) {
+initialize_symbols :: proc(symbol_table: ^$T, library_path: string, symbol_prefix := "", handle_field_name := "__handle") -> (count: int, ok: bool) where intrinsics.type_is_struct(T) {
 	assert(symbol_table != nil)
 	handle: Library
 
-	if handle, ok = load_library(library_name); !ok {
+	if handle, ok = load_library(library_path); !ok {
 		return -1, false
 	}
 
@@ -143,6 +145,12 @@ initialize_symbols :: proc(symbol_table: ^$T, library_name: string, symbol_prefi
 
 		// If we've come across the struct member for the handle, store it and continue scanning for other symbols.
 		if field_name == handle_field_name {
+			// We appear to be hot reloading. Unload previous incarnation of the library.
+			if old_handle := (^Library)(field_ptr)^; old_handle != nil {
+				if ok = unload_library(old_handle); !ok {
+					return count, ok
+				}
+			}
 			(^Library)(field_ptr)^ = handle
 			continue
 		}
