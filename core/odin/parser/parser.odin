@@ -1340,6 +1340,7 @@ parse_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 
 		rs := ast.new(ast.Return_Stmt, tok.pos, end)
 		rs.results = results[:]
+		expect_semicolon(p, rs)
 		return rs
 
 	case .Break, .Continue, .Fallthrough:
