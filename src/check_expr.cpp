@@ -7895,7 +7895,7 @@ gb_internal ExprKind check_basic_directive_expr(CheckerContext *c, Operand *o, A
 	} else {
 		if (name == "location") {
 			init_core_source_code_location(c->checker);
-			error(node, "'#%.*s' must be used in a call expression", LIT(name));
+			error(node, "'#location' must be used as a call, i.e. #location(proc), where #location() defaults to the procedure in which it was used.");
 			o->type = t_source_code_location;
 			o->mode = Addressing_Value;
 		} else if (
