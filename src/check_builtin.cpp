@@ -1777,7 +1777,7 @@ gb_internal bool check_builtin_procedure_directive(CheckerContext *c, Operand *o
 		}
 
 		String name = arg->Ident.token.string;
-
+		
 
 		operand->type = def.type;
 		operand->mode = def.mode;
@@ -1793,6 +1793,15 @@ gb_internal bool check_builtin_procedure_directive(CheckerContext *c, Operand *o
 				operand->value = found->Constant.value;
 			}
 		}
+
+		Defineable defineable = {};
+		defineable.name          = name;
+		defineable.default_value = def.value;
+		defineable.pos           = arg->Ident.token.pos;
+
+		MUTEX_GUARD(&c->info->defineables_mutex);
+		array_add(&c->info->defineables, defineable);
+
 	} else {
 		error(call, "Unknown directive call: #%.*s", LIT(name));
 	}

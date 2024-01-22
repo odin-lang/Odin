@@ -376,6 +376,15 @@ struct GenTypesData {
 	RecursiveMutex  mutex;
 };
 
+struct Defineable {
+	String     name;
+	ExactValue default_value;
+	TokenPos   pos;
+
+	String default_value_str;
+	String pos_str;
+};
+
 // CheckerInfo stores all the symbol information for a type-checked program
 struct CheckerInfo {
 	Checker *checker;
@@ -401,6 +410,9 @@ struct CheckerInfo {
 	Array<Entity *> definitions;
 	Array<Entity *> entities;
 	Array<Entity *> required_foreign_imports_through_force;
+
+	BlockingMutex     defineables_mutex;
+	Array<Defineable> defineables;
 
 
 	// Below are accessed within procedures
