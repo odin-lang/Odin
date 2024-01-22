@@ -23,13 +23,15 @@ foreign user32 {
 	BroadcastSystemMessageExW :: proc(flags: DWORD, lpInfo: LPDWORD, Msg: UINT, wParam: WPARAM, lParam: LPARAM, pbsmInfo: PBSMINFO) -> c_long ---
 	BroadcastSystemMessageW :: proc(flags: DWORD, lpInfo: LPDWORD, Msg: UINT, wParam: WPARAM, lParam: LPARAM) -> c_long ---
 
-	// CalculatePopupWindowPosition
-	// CallMsgFilterW
+	CalculatePopupWindowPosition :: proc(anchorPoint: ^POINT, windowSize: ^SIZE, flags: UINT, excludeRect: ^RECT, popupWindowPosition: ^RECT) -> BOOL ---
+	CallMsgFilterW :: proc(lpMsg: LPMSG, nCode: i32) -> BOOL ---
 	CallNextHookEx :: proc(hhk: HHOOK, nCode: c_int, wParam: WPARAM, lParam: LPARAM) -> LRESULT ---
 	CallWindowProcW :: proc(lpPrevWndFunc: WNDPROC, hWnd: HWND, Msg: UINT, wParam: WPARAM, lParam: LPARAM) -> LRESULT ---
-	// CascadeWindows
-	// ChangeWindowMessageFilter, ChangeWindowMessageFilterEx
-	// ChildWindowFromPoint, ChildWindowFromPointEx
+	CascadeWindows :: proc(hwndParent: HWND, wHow: UINT, lpRect: ^RECT, cKids: UINT, lpKids: ^HWND) -> WORD ---
+	ChangeWindowMessageFilter :: proc(message: UINT, dwFlag: DWORD) -> BOOL ---
+	ChangeWindowMessageFilterEx :: proc(hwnd: HWND, message: UINT, action: DWORD, pChangeFilterStruct: ^CHANGEFILTERSTRUCT) -> BOOL ---
+	ChildWindowFromPoint :: proc(hWndParent: HWND, Point: POINT) -> HWND ---
+	ChildWindowFromPointEx :: proc(hwnd: HWND, pt: POINT, flags: UINT) -> HWND ---
 	CloseWindow :: proc(hWnd: HWND) -> BOOL ---
 
 	CreateMDIWindowW :: proc(
@@ -468,6 +470,12 @@ DPI_AWARENESS_CONTEXT_SYSTEM_AWARE         :: DPI_AWARENESS_CONTEXT(~uintptr(1))
 DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE    :: DPI_AWARENESS_CONTEXT(~uintptr(2)) // -3
 DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 :: DPI_AWARENESS_CONTEXT(~uintptr(3)) // -4
 DPI_AWARENESS_CONTEXT_UNAWARE_GDISCALED    :: DPI_AWARENESS_CONTEXT(~uintptr(4)) // -5
+
+CHANGEFILTERSTRUCT :: struct {
+	cbSize: DWORD,
+	ExtStatus: DWORD,
+}
+PCHANGEFILTERSTRUCT :: ^CHANGEFILTERSTRUCT
 
 RAWINPUTHEADER :: struct {
 	dwType: DWORD,
