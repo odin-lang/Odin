@@ -189,7 +189,7 @@ foreign user32 {
 
 	SendMessageW :: proc(hWnd: HWND, Msg: UINT, wParam: WPARAM, lParam: LPARAM) -> LRESULT ---
 	SendNotifyMessageW :: proc(hWnd: HWND, Msg: UINT, wParam: WPARAM, lParam: LPARAM) -> BOOL ---
-	SetAdditionalForegroundBoostProcesses :: proc(topLevelWindow: HWND, processHandleCount: DWORD, processHandleArray: ^HANDLE) -> BOOL --- // @Todo(ema) Should this ptr be a multi-pointer? [^]HANDLE
+	SetAdditionalForegroundBoostProcesses :: proc(topLevelWindow: HWND, processHandleCount: DWORD, processHandleArray: [^]HANDLE) -> BOOL ---
 
 	SetClassLongW :: proc(hWnd: HWND, nIndex: c_int, dwNewLong: LONG) -> DWORD ---
 
@@ -209,7 +209,7 @@ foreign user32 {
 	SetProcessDefaultLayout :: proc(dwDefaultLayout: DWORD) -> BOOL ---
 	SetProcessDPIAware :: proc() -> BOOL ---
 	SetPropW :: proc(hWnd: HWND, lpString: LPCWSTR, hData: HANDLE) -> BOOL ---
-	SetSysColors :: proc(cElements: c_int, lpaElements: ^INT, lpaRgbValues: ^COLORREF) -> BOOL --- // @Todo(ema): Same thing as above. Multi-pointers for these?
+	SetSysColors :: proc(cElements: c_int, lpaElements: [^]INT, lpaRgbValues: [^]COLORREF) -> BOOL ---
 	SetTimer :: proc(hWnd: HWND, nIDEvent: UINT_PTR, uElapse: UINT, lpTimerFunc: TIMERPROC) -> UINT_PTR ---
 	SetWindowDisplayAffinity :: proc(hWnd: HWND, dwAffinity: DWORD) -> BOOL ---
 
@@ -237,7 +237,7 @@ foreign user32 {
 	SwitchToThisWindow :: proc(hwnd: HWND, fUnknown: BOOL) ---
 	SystemParametersInfoW :: proc(uiAction, uiParam: UINT, pvParam: ^VOID, fWinIni: UINT) -> BOOL ---
 
-	TileWindows :: proc(hwndParent: HWND, wHow: UINT, lpRect: ^RECT, cKids: UINT, lpKids: ^HWND) -> WORD --- // @Todo(ema): See todo on multi-pointers...
+	TileWindows :: proc(hwndParent: HWND, wHow: UINT, lpRect: ^RECT, cKids: UINT, lpKids: [^]HWND) -> WORD ---
 	TranslateMDISysAccel :: proc(hWndClient: HWND, lpMsg: LPMSG) -> BOOL ---
 	TranslateMessage :: proc(lpMsg: ^MSG) -> BOOL ---
 
