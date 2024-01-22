@@ -2,7 +2,7 @@ package xml_example
 
 import "core:encoding/xml"
 import "core:os"
-import "core:path"
+import path "core:path/filepath"
 import "core:mem"
 import "core:strings"
 import "core:strconv"
@@ -23,38 +23,38 @@ Entity :: struct {
 }
 
 generate_encoding_entity_table :: proc() {
-	using fmt
-
-	filename := path.join(ODIN_ROOT, "tests", "core", "assets", "XML", "unicode.xml")
+	filename := path.join({ODIN_ROOT, "tests", "core", "assets", "XML", "unicode.xml"})
 	defer delete(filename)
 
-	generated_filename := path.join(ODIN_ROOT, "core", "encoding", "entity", "generated.odin")
+	generated_filename := path.join({ODIN_ROOT, "core", "encoding", "entity", "generated.odin"})
 	defer delete(generated_filename)
 
-	doc, err := xml.parse(filename, OPTIONS, Error_Handler)
+	doc, err := xml.load_from_file(filename, OPTIONS, Error_Handler)
 	defer xml.destroy(doc)
 
 	if err != .None {
-		printf("Load/Parse error: %v\n", err)
+		fmt.printf("Load/Parse error: %v\n", err)
 		if err == .File_Error {
-			printf("\"%v\" not found. Did you run \"tests\\download_assets.py\"?", filename)
+			fmt.printf("\"%v\" not found. Did you run \"tests\\download_assets.py\"?", filename)
 		}
 		os.exit(1)
 	}
 
-	printf("\"%v\" loaded and parsed.\n", filename)
+	fmt.printf("\"%v\" loaded and parsed.\n", filename)
 
 	generated_buf: strings.Builder
 	defer strings.builder_destroy(&generated_buf)
 	w := strings.to_writer(&generated_buf)
 
-	charlist, charlist_ok := xml.find_child_by_ident(doc.root, "charlist")
+	charlist_id, charlist_ok := xml.find_child_by_ident(doc, 0, "charlist")
 	if !charlist_ok {
-		eprintln("Could not locate top-level `<charlist>` tag.")
+		fmt.eprintln("Could not locate top-level `<charlist>` tag.")
 		os.exit(1)
 	}
 
-	printf("Found `<charlist>` with %v children.\n", len(charlist.children))
+	charlist := doc.elements[charlist_id]
+
+	fmt.printf("Found `<charlist>` with %v children.\n", len(charlist.value))
 
 	entity_map: map[string]Entity
 	names: [dynamic]string
@@ -65,20 +65,26 @@ generate_encoding_entity_table :: proc() {
 	longest_name:  string
 
 	count := 0
-	for char in charlist.children {
+	for char_id in charlist.value {
+		id := char_id.(xml.Element_ID)
+		char := doc.elements[id]
+
 		if char.ident != "character" {
-			eprintf("Expected `<character>`, got `<%v>`\n", char.ident)
+			fmt.eprintf("Expected `<character>`, got `<%v>`\n", char.ident)
 			os.exit(1)
 		}
 
-		if codepoint_string, ok := xml.find_attribute_val_by_key(char, "dec"); !ok {
-			eprintln("`<character id=\"...\">` attribute not found.")
+		if codepoint_string, ok := xml.find_attribute_val_by_key(doc, id, "dec"); !ok {
+			fmt.eprintln("`<character id=\"...\">` attribute not found.")
 			os.exit(1)
 		} else {
 			codepoint := strconv.atoi(codepoint_string)
 
-			desc, desc_ok := xml.find_child_by_ident(char, "description")
-			description   := desc.value if desc_ok else ""
+			desc, desc_ok := xml.find_child_by_ident(doc, id, "description")
+			description := ""
+			if len(doc.elements[desc].value) == 1 {
+				description = doc.elements[desc].value[0].(string)
+			}
 
 			/*
 				For us to be interested in this codepoint, it has to have at least one entity.
@@ -86,9 +92,9 @@ generate_encoding_entity_table :: proc() {
 
 			nth := 0
 			for {
-				character_entity := xml.find_child_by_ident(char, "entity", nth) or_break
+				character_entity := xml.find_child_by_ident(doc, id, "entity", nth) or_break
 				nth += 1
-				name := xml.find_attribute_val_by_key(character_entity, "id") or_continue
+				name := xml.find_attribute_val_by_key(doc, character_entity, "id") or_continue
 				if len(name) == 0 {
 					/*
 						Invalid name. Skip.
@@ -97,8 +103,8 @@ generate_encoding_entity_table :: proc() {
 				}
 
 				if name == "\"\"" {
-					printf("%#v\n", char)
-					printf("%#v\n", character_entity)
+					fmt.printf("%#v\n", char)
+					fmt.printf("%#v\n", character_entity)
 				}
 
 				if len(name) > max_name_length { longest_name  = name }
@@ -129,29 +135,27 @@ generate_encoding_entity_table :: proc() {
 	*/
 	slice.sort(names[:])
 
-	printf("Found %v unique `&name;` -> rune mappings.\n", count)
-	printf("Shortest name: %v (%v)\n", shortest_name, min_name_length)
-	printf("Longest name:  %v (%v)\n", longest_name,  max_name_length)
-
-	// println(rune_to_string(1234))
+	fmt.printf("Found %v unique `&name;` -> rune mappings.\n", count)
+	fmt.printf("Shortest name: %v (%v)\n", shortest_name, min_name_length)
+	fmt.printf("Longest name:  %v (%v)\n", longest_name,  max_name_length)
 
 	/*
 		Generate table.
 	*/
-	wprintln(w, "package unicode_entity")
-	wprintln(w, "")
-	wprintln(w, GENERATED)
-	wprintln(w, "")
-	wprintf (w, TABLE_FILE_PROLOG)
-	wprintln(w, "")
+	fmt.wprintln(w, "package unicode_entity")
+	fmt.wprintln(w, "")
+	fmt.wprintln(w, GENERATED)
+	fmt.wprintln(w, "")
+	fmt.wprintf (w, TABLE_FILE_PROLOG)
+	fmt.wprintln(w, "")
 
-	wprintf (w, "// `&%v;`\n", shortest_name)
-	wprintf (w, "XML_NAME_TO_RUNE_MIN_LENGTH :: %v\n", min_name_length)
-	wprintf (w, "// `&%v;`\n", longest_name)
-	wprintf (w, "XML_NAME_TO_RUNE_MAX_LENGTH :: %v\n", max_name_length)
-	wprintln(w, "")
+	fmt.wprintf (w, "// `&%v;`\n", shortest_name)
+	fmt.wprintf (w, "XML_NAME_TO_RUNE_MIN_LENGTH :: %v\n", min_name_length)
+	fmt.wprintf (w, "// `&%v;`\n", longest_name)
+	fmt.wprintf (w, "XML_NAME_TO_RUNE_MAX_LENGTH :: %v\n", max_name_length)
+	fmt.wprintln(w, "")
 
-	wprintln(w,
+	fmt.wprintln(w,
 `
 /*
 	Input:
@@ -181,38 +185,41 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 	for v in names {
 		if rune(v[0]) != prefix {
 			if should_close {
-				wprintln(w, "\t\t}\n")
+				fmt.wprintln(w, "\t\t}\n")
 			}
 
 			prefix = rune(v[0])
-			wprintf (w, "\tcase '%v':\n", prefix)
-			wprintln(w, "\t\tswitch name {")
+			fmt.wprintf (w, "\tcase '%v':\n", prefix)
+			fmt.wprintln(w, "\t\tswitch name {")
 		}
 
 		e := entity_map[v]
 
-		wprintf(w, "\t\t\tcase \"%v\": \n",     e.name)
-		wprintf(w, "\t\t\t\t// %v\n",           e.description)
-		wprintf(w, "\t\t\t\treturn %v, true\n", rune_to_string(e.codepoint))
+		fmt.wprintf(w, "\t\t\tcase \"%v\":", e.name)
+		for i := len(e.name); i < max_name_length; i += 1 {
+			fmt.wprintf(w, " ")
+		}
+		fmt.wprintf(w, " // %v\n", e.description)
+		fmt.wprintf(w, "\t\t\t\treturn %v, true\n", rune_to_string(e.codepoint))
 
 		should_close = true
 	}
-	wprintln(w, "\t\t}")
-	wprintln(w, "\t}")
-	wprintln(w, "\treturn -1, false")
-	wprintln(w, "}\n")
-	wprintln(w, GENERATED)
+	fmt.wprintln(w, "\t\t}")
+	fmt.wprintln(w, "\t}")
+	fmt.wprintln(w, "\treturn -1, false")
+	fmt.wprintln(w, "}\n")
+	fmt.wprintln(w, GENERATED)
 
-	println()
-	println(strings.to_string(generated_buf))
-	println()
+	fmt.println()
+	fmt.println(strings.to_string(generated_buf))
+	fmt.println()
 
 	written := os.write_entire_file(generated_filename, transmute([]byte)strings.to_string(generated_buf))
 
 	if written {
-		fmt.printf("Successfully written generated \"%v\".", generated_filename)
+		fmt.printf("Successfully written generated \"%v\".\n", generated_filename)
 	} else {
-		fmt.printf("Failed to write generated \"%v\".", generated_filename)
+		fmt.printf("Failed to write generated \"%v\".\n", generated_filename)
 	}
 
 	delete(entity_map)
@@ -227,7 +234,7 @@ GENERATED :: `/*
 */`
 
 TABLE_FILE_PROLOG :: `/*
-	This file is generated from "https://www.w3.org/2003/entities/2007xml/unicode.xml".
+	This file is generated from "https://github.com/w3c/xml-entities/blob/gh-pages/unicode.xml".
 	
 	UPDATE:
 		- Ensure the XML file was downloaded using "tests\core\download_assets.py".
@@ -235,15 +242,21 @@ TABLE_FILE_PROLOG :: `/*
 
 	Odin unicode generated tables: https://github.com/odin-lang/Odin/tree/master/core/encoding/entity
 
-		Copyright © 2021 World Wide Web Consortium, (Massachusetts Institute of Technology,
-		European Research Consortium for Informatics and Mathematics, Keio University, Beihang).
+		Copyright David Carlisle 1999-2023
 
-		All Rights Reserved.
+		Use and distribution of this code are permitted under the terms of the
+		W3C Software Notice and License.
+		http://www.w3.org/Consortium/Legal/2002/copyright-software-20021231.html
 
-		This work is distributed under the W3C® Software License [1] in the hope that it will be useful,
-		but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 
-		[1] http://www.w3.org/Consortium/Legal/copyright-software
+
+		This file is a collection of information about how to map
+		Unicode entities to LaTeX, and various SGML/XML entity
+		sets (ISO and MathML/HTML). A Unicode character may be mapped
+		to several entities.
+
+		Originally designed by Sebastian Rahtz in conjunction with
+		Barbara Beeton for the STIX project
 
 	See also: LICENSE_table.md
 */
@@ -265,8 +278,6 @@ is_dotted_name :: proc(name: string) -> (dotted: bool) {
 }
 
 main :: proc() {
-	using fmt
-
 	track: mem.Tracking_Allocator
 	mem.tracking_allocator_init(&track, context.allocator)
 	context.allocator = mem.tracking_allocator(&track)
@@ -274,10 +285,10 @@ main :: proc() {
 	generate_encoding_entity_table()
 
 	if len(track.allocation_map) > 0 {
-		println()
+		fmt.println()
 		for _, v in track.allocation_map {
-			printf("%v Leaked %v bytes.\n", v.location, v.size)
+			fmt.printf("%v Leaked %v bytes.\n", v.location, v.size)
 		}
 	}
-	println("Done and cleaned up!")
+	fmt.println("Done and cleaned up!")
 }

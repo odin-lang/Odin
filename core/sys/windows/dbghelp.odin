@@ -44,7 +44,7 @@ MINIDUMP_USER_STREAM_INFORMATION :: struct {
 	UserStreamArray: ^MINIDUMP_USER_STREAM,
 }
 
-MINIDUMP_CALLBACK_ROUTINE :: #type proc "stdcall" (
+MINIDUMP_CALLBACK_ROUTINE :: #type proc "system" (
 	CallbackParam: PVOID,
 	CallbackInput: ^MINIDUMP_CALLBACK_INPUT,
 	CallbackOutpu: ^MINIDUMP_CALLBACK_OUTPUT,
@@ -228,7 +228,7 @@ MINIDUMP_TYPE :: enum u32 {
 	ValidTypeFlags                 = 0x01ffffff,
 }
 
-@(default_calling_convention = "stdcall")
+@(default_calling_convention = "system")
 foreign Dbghelp {
 	MiniDumpWriteDump :: proc(
 		hProcess:        HANDLE,

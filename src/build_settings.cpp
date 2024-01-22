@@ -56,6 +56,19 @@ enum TargetABIKind : u16 {
 	TargetABI_COUNT,
 };
 
+enum Windows_Subsystem : u8 {
+ 	Windows_Subsystem_BOOT_APPLICATION,
+	Windows_Subsystem_CONSOLE,                 // Default,
+	Windows_Subsystem_EFI_APPLICATION,
+	Windows_Subsystem_EFI_BOOT_SERVICE_DRIVER,
+	Windows_Subsystem_EFI_ROM,
+	Windows_Subsystem_EFI_RUNTIME_DRIVER,
+	Windows_Subsystem_NATIVE,
+	Windows_Subsystem_POSIX,
+	Windows_Subsystem_WINDOWS,
+	Windows_Subsystem_WINDOWSCE,
+	Windows_Subsystem_COUNT,
+};
 
 gb_global String target_os_names[TargetOs_COUNT] = {
 	str_lit(""),
@@ -118,6 +131,19 @@ gb_global TargetEndianKind target_endians[TargetArch_COUNT] = {
 	TargetEndian_Little,
 	TargetEndian_Little,
 	TargetEndian_Little,
+};
+
+gb_global String windows_subsystem_names[Windows_Subsystem_COUNT] = {
+	str_lit("BOOT_APPLICATION"),
+	str_lit("CONSOLE"),                 // Default
+	str_lit("EFI_APPLICATION"),
+	str_lit("EFI_BOOT_SERVICE_DRIVER"),
+	str_lit("EFI_ROM"),
+	str_lit("EFI_RUNTIME_DRIVER"),
+	str_lit("NATIVE"),
+	str_lit("POSIX"),
+	str_lit("WINDOWS"),
+	str_lit("WINDOWSCE"),
 };
 
 #ifndef ODIN_VERSION_RAW
@@ -287,14 +313,15 @@ enum SanitizerFlags : u32 {
 // This stores the information for the specify architecture of this build
 struct BuildContext {
 	// Constants
-	String ODIN_OS;      // target operating system
-	String ODIN_ARCH;    // target architecture
-	String ODIN_VENDOR;  // compiler vendor
-	String ODIN_VERSION; // compiler version
-	String ODIN_ROOT;    // Odin ROOT
-	String ODIN_BUILD_PROJECT_NAME; // Odin main/initial package's directory name
-	bool   ODIN_DEBUG;   // Odin in debug mode
-	bool   ODIN_DISABLE_ASSERT; // Whether the default 'assert' et al is disabled in code or not
+	String ODIN_OS;                       // Target operating system
+	String ODIN_ARCH;                     // Target architecture
+	String ODIN_VENDOR;                   // Compiler vendor
+	String ODIN_VERSION;                  // Compiler version
+	String ODIN_ROOT;                     // Odin ROOT
+	String ODIN_BUILD_PROJECT_NAME;       // Odin main/initial package's directory name
+	String ODIN_WINDOWS_SUBSYSTEM;        // Empty string for non-Windows targets
+	bool   ODIN_DEBUG;                    // Odin in debug mode
+	bool   ODIN_DISABLE_ASSERT;           // Whether the default 'assert' et al is disabled in code or not
 	bool   ODIN_DEFAULT_TO_NIL_ALLOCATOR; // Whether the default allocator is a "nil" allocator or not (i.e. it does nothing)
 	bool   ODIN_FOREIGN_ERROR_PROCEDURES;
 	bool   ODIN_VALGRIND_SUPPORT;
@@ -361,12 +388,12 @@ struct BuildContext {
 	bool   ignore_warnings;
 	bool   warnings_as_errors;
 	bool   hide_error_line;
+	bool   terse_errors;
 	bool   has_ansi_terminal_colours;
 
 	bool   ignore_lazy;
 	bool   ignore_llvm_build;
 
-	bool   use_subsystem_windows;
 	bool   ignore_microsoft_magic;
 	bool   linker_map_file;
 
@@ -581,7 +608,13 @@ gb_global TargetMetrics target_freestanding_amd64_sysv = {
 	TargetABI_SysV,
 };
 
-
+gb_global TargetMetrics target_freestanding_arm64 = {
+	TargetOs_freestanding,
+	TargetArch_arm64,
+	8, 8, 8, 16,
+	str_lit("aarch64-none-elf"),
+	str_lit("e-m:o-p:32:32-Fi8-i64:64-v128:64:128-a:0:32-n32-S64"),
+};
 
 struct NamedTargetMetrics {
 	String name;
@@ -616,6 +649,7 @@ gb_global NamedTargetMetrics named_targets[] = {
 	{ str_lit("wasi_wasm64p32"),         &target_wasi_wasm64p32 },
 
 	{ str_lit("freestanding_amd64_sysv"), &target_freestanding_amd64_sysv },
+	{ str_lit("freestanding_arm64"), &target_freestanding_arm64 },
 };
 
 gb_global NamedTargetMetrics *selected_target_metrics;
@@ -1274,8 +1308,6 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 		GB_ASSERT(metrics->int_size == 2*metrics->ptr_size);
 	}
 
-
-
 	bc->metrics = *metrics;
 	switch (subtarget) {
 	case Subtarget_Default:
@@ -1292,14 +1324,14 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 		break;
 	}
 
-	bc->ODIN_OS        = target_os_names[metrics->os];
-	bc->ODIN_ARCH      = target_arch_names[metrics->arch];
-	bc->endian_kind    = target_endians[metrics->arch];
-	bc->ptr_size       = metrics->ptr_size;
-	bc->int_size       = metrics->int_size;
-	bc->max_align      = metrics->max_align;
-	bc->max_simd_align = metrics->max_simd_align;
-	bc->link_flags  = str_lit(" ");
+	bc->ODIN_OS           = target_os_names[metrics->os];
+	bc->ODIN_ARCH         = target_arch_names[metrics->arch];
+	bc->endian_kind       = target_endians[metrics->arch];
+	bc->ptr_size          = metrics->ptr_size;
+	bc->int_size          = metrics->int_size;
+	bc->max_align         = metrics->max_align;
+	bc->max_simd_align    = metrics->max_simd_align;
+	bc->link_flags        = str_lit(" ");
 
 	#if defined(DEFAULT_TO_THREADED_CHECKER)
 	bc->threaded_checker = true;
@@ -1319,6 +1351,11 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 			gb_printf_err("-no-rtti is only allowed on freestanding targets\n");
 			gb_exit(1);
 		}
+	}
+
+	// Default to subsystem:CONSOLE on Windows targets
+	if (bc->ODIN_WINDOWS_SUBSYSTEM == "" && bc->metrics.os == TargetOs_windows) {
+		bc->ODIN_WINDOWS_SUBSYSTEM = windows_subsystem_names[Windows_Subsystem_CONSOLE];
 	}
 
 	// NOTE(zangent): The linker flags to set the build architecture are different
@@ -1492,7 +1529,7 @@ gb_internal void enable_target_feature(TokenPos pos, String const &target_featur
 }
 
 
-gb_internal char const *target_features_set_to_cstring(gbAllocator allocator, bool with_quotes) {
+gb_internal char const *target_features_set_to_cstring(gbAllocator allocator, bool with_quotes, bool with_plus) {
 	isize len = 0;
 	isize i = 0;
 	for (String const &feature : build_context.target_features_set) {
@@ -1501,6 +1538,7 @@ gb_internal char const *target_features_set_to_cstring(gbAllocator allocator, bo
 		}
 		len += feature.len;
 		if (with_quotes) len += 2;
+		if (with_plus) len += 1;
 		i += 1;
 	}
 	char *features = gb_alloc_array(allocator, char, len+1);
@@ -1512,6 +1550,7 @@ gb_internal char const *target_features_set_to_cstring(gbAllocator allocator, bo
 		}
 
 		if (with_quotes) features[len++] = '"';
+		if (with_plus) features[len++] = '+';
 		gb_memmove(features + len, feature.text, feature.len);
 		len += feature.len;
 		if (with_quotes) features[len++] = '"';

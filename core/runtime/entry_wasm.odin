@@ -1,5 +1,6 @@
 //+private
 //+build wasm32, wasm64p32
+//+no-instrumentation
 package runtime
 
 import "core:intrinsics"

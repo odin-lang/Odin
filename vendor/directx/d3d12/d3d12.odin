@@ -26,7 +26,7 @@ IModuleInstance :: d3d_compiler.ID3D11ModuleInstance
 IBlob           :: d3d_compiler.ID3DBlob
 IModule         :: d3d_compiler.ID3D11Module
 
-@(default_calling_convention="stdcall", link_prefix="D3D12")
+@(default_calling_convention="system", link_prefix="D3D12")
 foreign d3d12 {
 	CreateDevice                             :: proc(pAdapter: ^IUnknown, MinimumFeatureLevel: FEATURE_LEVEL, riid: ^IID, ppDevice: ^rawptr) -> HRESULT ---
 	CreateRootSignatureDeserializer          :: proc(pSrcData: rawptr, SrcDataSizeInBytes: SIZE_T, pRootSignatureDeserializerInterface: ^IID, ppRootSignatureDeserializer: ^rawptr) -> HRESULT ---
@@ -197,8 +197,8 @@ ID3DDestructionNotifier :: struct #raw_union {
 }
 ID3DDestructionNotifier_VTable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
-	RegisterDestructionCallback:   proc "stdcall" (this: ^ID3DDestructionNotifier, callbackFn: PFN_DESTRUCTION_CALLBACK, pData: rawptr, pCallbackID: ^u32) -> HRESULT,
-	UnregisterDestructionCallback: proc "stdcall" (this: ^ID3DDestructionNotifier, callbackID: u32) -> HRESULT,
+	RegisterDestructionCallback:   proc "system" (this: ^ID3DDestructionNotifier, callbackFn: PFN_DESTRUCTION_CALLBACK, pData: rawptr, pCallbackID: ^u32) -> HRESULT,
+	UnregisterDestructionCallback: proc "system" (this: ^ID3DDestructionNotifier, callbackID: u32) -> HRESULT,
 }
 
 SHADER_VARIABLE_CLASS :: enum i32 {
@@ -676,10 +676,10 @@ IObject :: struct #raw_union {
 }
 IObject_VTable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
-	GetPrivateData:          proc "stdcall" (this: ^IObject, guid: ^GUID, pDataSize: ^u32, pData: rawptr) -> HRESULT,
-	SetPrivateData:          proc "stdcall" (this: ^IObject, guid: ^GUID, DataSize: u32, pData: rawptr) -> HRESULT,
-	SetPrivateDataInterface: proc "stdcall" (this: ^IObject, guid: ^GUID, pData: ^IUnknown) -> HRESULT,
-	SetName:                 proc "stdcall" (this: ^IObject, Name: [^]u16) -> HRESULT,
+	GetPrivateData:          proc "system" (this: ^IObject, guid: ^GUID, pDataSize: ^u32, pData: rawptr) -> HRESULT,
+	SetPrivateData:          proc "system" (this: ^IObject, guid: ^GUID, DataSize: u32, pData: rawptr) -> HRESULT,
+	SetPrivateDataInterface: proc "system" (this: ^IObject, guid: ^GUID, pData: ^IUnknown) -> HRESULT,
+	SetName:                 proc "system" (this: ^IObject, Name: [^]u16) -> HRESULT,
 }
 
 
@@ -691,7 +691,7 @@ IDeviceChild :: struct #raw_union {
 }
 IDeviceChild_VTable :: struct {
 	using id3d12object_vtable: IObject_VTable,
-	GetDevice: proc "stdcall" (this: ^IDeviceChild, riid: ^IID, ppvDevice: ^rawptr) -> HRESULT,
+	GetDevice: proc "system" (this: ^IDeviceChild, riid: ^IID, ppvDevice: ^rawptr) -> HRESULT,
 }
 
 
@@ -2096,7 +2096,7 @@ IRootSignatureDeserializer :: struct #raw_union {
 }
 IRootSignatureDeserializer_VTable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
-	GetRootSignatureDesc: proc "stdcall" (this: ^IRootSignatureDeserializer) -> ^ROOT_SIGNATURE_DESC,
+	GetRootSignatureDesc: proc "system" (this: ^IRootSignatureDeserializer) -> ^ROOT_SIGNATURE_DESC,
 }
 
 
@@ -2108,8 +2108,8 @@ IVersionedRootSignatureDeserializer :: struct #raw_union {
 }
 IVersionedRootSignatureDeserializer_VTable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
-	GetRootSignatureDescAtVersion:   proc "stdcall" (this: ^IVersionedRootSignatureDeserializer, convertToVersion: ROOT_SIGNATURE_VERSION, ppDesc: ^^VERSIONED_ROOT_SIGNATURE_DESC) -> HRESULT,
-	GetUnconvertedRootSignatureDesc: proc "stdcall" (this: ^IVersionedRootSignatureDeserializer) -> ^VERSIONED_ROOT_SIGNATURE_DESC,
+	GetRootSignatureDescAtVersion:   proc "system" (this: ^IVersionedRootSignatureDeserializer, convertToVersion: ROOT_SIGNATURE_VERSION, ppDesc: ^^VERSIONED_ROOT_SIGNATURE_DESC) -> HRESULT,
+	GetUnconvertedRootSignatureDesc: proc "system" (this: ^IVersionedRootSignatureDeserializer) -> ^VERSIONED_ROOT_SIGNATURE_DESC,
 }
 
 PFN_SERIALIZE_ROOT_SIGNATURE                     :: #type proc "c" (a0: ^ROOT_SIGNATURE_DESC, a1: ROOT_SIGNATURE_VERSION, a2: ^^IBlob, a3: ^^IBlob) -> HRESULT
@@ -2283,7 +2283,7 @@ IHeap :: struct #raw_union {
 }
 IHeap_VTable :: struct {
 	using id3d12devicechild_vtable: IDeviceChild_VTable,
-	GetDesc: proc "stdcall" (this: ^IHeap) -> HEAP_DESC,
+	GetDesc: proc "system" (this: ^IHeap) -> HEAP_DESC,
 }
 
 
@@ -2295,13 +2295,13 @@ IResource :: struct #raw_union {
 }
 IResource_VTable :: struct {
 	using id3d12devicechild_vtable: IDeviceChild_VTable,
-	Map:                  proc "stdcall" (this: ^IResource, Subresource: u32, pReadRange: ^RANGE, ppData: ^rawptr) -> HRESULT,
-	Unmap:                proc "stdcall" (this: ^IResource, Subresource: u32, pWrittenRange: ^RANGE),
-	GetDesc:              proc "stdcall" (this: ^IResource) -> RESOURCE_DESC,
-	GetGPUVirtualAddress: proc "stdcall" (this: ^IResource) -> GPU_VIRTUAL_ADDRESS,
-	WriteToSubresource:   proc "stdcall" (this: ^IResource, DstSubresource: u32, pDstBox: ^BOX, pSrcData: rawptr, SrcRowPitch: u32, SrcDepthPitch: u32) -> HRESULT,
-	ReadFromSubresource:  proc "stdcall" (this: ^IResource, pDstData: rawptr, DstRowPitch: u32, DstDepthPitch: u32, SrcSubresource: u32, pSrcBox: ^BOX) -> HRESULT,
-	GetHeapProperties:    proc "stdcall" (this: ^IResource, pHeapProperties: ^HEAP_PROPERTIES, pHeapFlags: ^HEAP_FLAGS) -> HRESULT,
+	Map:                  proc "system" (this: ^IResource, Subresource: u32, pReadRange: ^RANGE, ppData: ^rawptr) -> HRESULT,
+	Unmap:                proc "system" (this: ^IResource, Subresource: u32, pWrittenRange: ^RANGE),
+	GetDesc:              proc "system" (this: ^IResource) -> RESOURCE_DESC,
+	GetGPUVirtualAddress: proc "system" (this: ^IResource) -> GPU_VIRTUAL_ADDRESS,
+	WriteToSubresource:   proc "system" (this: ^IResource, DstSubresource: u32, pDstBox: ^BOX, pSrcData: rawptr, SrcRowPitch: u32, SrcDepthPitch: u32) -> HRESULT,
+	ReadFromSubresource:  proc "system" (this: ^IResource, pDstData: rawptr, DstRowPitch: u32, DstDepthPitch: u32, SrcSubresource: u32, pSrcBox: ^BOX) -> HRESULT,
+	GetHeapProperties:    proc "system" (this: ^IResource, pHeapProperties: ^HEAP_PROPERTIES, pHeapFlags: ^HEAP_FLAGS) -> HRESULT,
 }
 
 
@@ -2313,7 +2313,7 @@ ICommandAllocator :: struct #raw_union {
 }
 ICommandAllocator_VTable :: struct {
 	using id3d12devicechild_vtable: IDeviceChild_VTable,
-	Reset: proc "stdcall" (this: ^ICommandAllocator) -> HRESULT,
+	Reset: proc "system" (this: ^ICommandAllocator) -> HRESULT,
 }
 
 
@@ -2325,9 +2325,9 @@ IFence :: struct #raw_union {
 }
 IFence_VTable :: struct {
 	using id3d12devicechild_vtable: IDeviceChild_VTable,
-	GetCompletedValue:    proc "stdcall" (this: ^IFence) -> u64,
-	SetEventOnCompletion: proc "stdcall" (this: ^IFence, Value: u64, hEvent: HANDLE) -> HRESULT,
-	Signal:               proc "stdcall" (this: ^IFence, Value: u64) -> HRESULT,
+	GetCompletedValue:    proc "system" (this: ^IFence) -> u64,
+	SetEventOnCompletion: proc "system" (this: ^IFence, Value: u64, hEvent: HANDLE) -> HRESULT,
+	Signal:               proc "system" (this: ^IFence, Value: u64) -> HRESULT,
 }
 
 
@@ -2339,7 +2339,7 @@ IFence1 :: struct #raw_union {
 }
 IFence1_VTable :: struct {
 	#subtype id3d12fence_vtable: IFence_VTable,
-	GetCreationFlags: proc "stdcall" (this: ^IFence1) -> FENCE_FLAGS,
+	GetCreationFlags: proc "system" (this: ^IFence1) -> FENCE_FLAGS,
 }
 
 
@@ -2351,7 +2351,7 @@ IPipelineState :: struct #raw_union {
 }
 IPipelineState_VTable :: struct {
 	using id3d12devicechild_vtable: IDeviceChild_VTable,
-	GetCachedBlob: proc "stdcall" (this: ^IPipelineState, ppBlob: ^^IBlob) -> HRESULT,
+	GetCachedBlob: proc "system" (this: ^IPipelineState, ppBlob: ^^IBlob) -> HRESULT,
 }
 
 
@@ -2363,9 +2363,9 @@ IDescriptorHeap :: struct #raw_union {
 }
 IDescriptorHeap_VTable :: struct {
 	using id3d12devicechild_vtable: IDeviceChild_VTable,
-	GetDesc:                            proc "stdcall" (this: ^IDescriptorHeap, desc: ^DESCRIPTOR_HEAP_DESC),
-	GetCPUDescriptorHandleForHeapStart: proc "stdcall" (this: ^IDescriptorHeap, handle: ^CPU_DESCRIPTOR_HANDLE),
-	GetGPUDescriptorHandleForHeapStart: proc "stdcall" (this: ^IDescriptorHeap, handle: ^GPU_DESCRIPTOR_HANDLE),
+	GetDesc:                            proc "system" (this: ^IDescriptorHeap, desc: ^DESCRIPTOR_HEAP_DESC),
+	GetCPUDescriptorHandleForHeapStart: proc "system" (this: ^IDescriptorHeap, handle: ^CPU_DESCRIPTOR_HANDLE),
+	GetGPUDescriptorHandleForHeapStart: proc "system" (this: ^IDescriptorHeap, handle: ^GPU_DESCRIPTOR_HANDLE),
 } 
 
 IQueryHeap_UUID_STRING :: "0d9658ae-ed45-469e-a61d-970ec583cab4"
@@ -2390,7 +2390,7 @@ ICommandList :: struct #raw_union {
 }
 ICommandList_VTable :: struct {
 	using id3d12devicechild_vtable: IDeviceChild_VTable,
-	GetType: proc "stdcall" (this: ^ICommandList) -> COMMAND_LIST_TYPE,
+	GetType: proc "system" (this: ^ICommandList) -> COMMAND_LIST_TYPE,
 }
 
 
@@ -2402,57 +2402,57 @@ IGraphicsCommandList :: struct #raw_union {
 }
 IGraphicsCommandList_VTable :: struct {
 	using id3d12commandlist_vtable: ICommandList_VTable,
-	Close:                              proc "stdcall" (this: ^IGraphicsCommandList) -> HRESULT,
-	Reset:                              proc "stdcall" (this: ^IGraphicsCommandList, pAllocator: ^ICommandAllocator, pInitialState: ^IPipelineState) -> HRESULT,
-	ClearState:                         proc "stdcall" (this: ^IGraphicsCommandList, pPipelineState: ^IPipelineState),
-	DrawInstanced:                      proc "stdcall" (this: ^IGraphicsCommandList, VertexCountPerInstance: u32, InstanceCount: u32, StartVertexLocation: u32, StartInstanceLocation: u32),
-	DrawIndexedInstanced:               proc "stdcall" (this: ^IGraphicsCommandList, IndexCountPerInstance: u32, InstanceCount: u32, StartIndexLocation: u32, BaseVertexLocation: i32, StartInstanceLocation: u32),
-	Dispatch:                           proc "stdcall" (this: ^IGraphicsCommandList, ThreadGroupCountX: u32, ThreadGroupCountY: u32, ThreadGroupCountZ: u32),
-	CopyBufferRegion:                   proc "stdcall" (this: ^IGraphicsCommandList, pDstBuffer: ^IResource, DstOffset: u64, pSrcBuffer: ^IResource, SrcOffset: u64, NumBytes: u64),
-	CopyTextureRegion:                  proc "stdcall" (this: ^IGraphicsCommandList, pDst: ^TEXTURE_COPY_LOCATION, DstX: u32, DstY: u32, DstZ: u32, pSrc: ^TEXTURE_COPY_LOCATION, pSrcBox: ^BOX),
-	CopyResource:                       proc "stdcall" (this: ^IGraphicsCommandList, pDstResource: ^IResource, pSrcResource: ^IResource),
-	CopyTiles:                          proc "stdcall" (this: ^IGraphicsCommandList, pTiledResource: ^IResource, pTileRegionStartCoordinate: ^TILED_RESOURCE_COORDINATE, pTileRegionSize: ^TILE_REGION_SIZE, pBuffer: ^IResource, BufferStartOffsetInBytes: u64, Flags: TILE_COPY_FLAGS),
-	ResolveSubresource:                 proc "stdcall" (this: ^IGraphicsCommandList, pDstResource: ^IResource, DstSubresource: u32, pSrcResource: ^IResource, SrcSubresource: u32, Format: dxgi.FORMAT),
-	IASetPrimitiveTopology:             proc "stdcall" (this: ^IGraphicsCommandList, PrimitiveTopology: PRIMITIVE_TOPOLOGY),
-	RSSetViewports:                     proc "stdcall" (this: ^IGraphicsCommandList, NumViewports: u32, pViewports: ^VIEWPORT),
-	RSSetScissorRects:                  proc "stdcall" (this: ^IGraphicsCommandList, NumRects: u32, pRects: ^RECT),
-	OMSetBlendFactor:                   proc "stdcall" (this: ^IGraphicsCommandList, BlendFactor: ^[4]f32),
-	OMSetStencilRef:                    proc "stdcall" (this: ^IGraphicsCommandList, StencilRef: u32),
-	SetPipelineState:                   proc "stdcall" (this: ^IGraphicsCommandList, pPipelineState: ^IPipelineState),
-	ResourceBarrier:                    proc "stdcall" (this: ^IGraphicsCommandList, NumBarriers: u32, pBarriers: ^RESOURCE_BARRIER),
-	ExecuteBundle:                      proc "stdcall" (this: ^IGraphicsCommandList, pCommandList: ^IGraphicsCommandList),
-	SetDescriptorHeaps:                 proc "stdcall" (this: ^IGraphicsCommandList, NumDescriptorHeaps: u32, ppDescriptorHeaps: ^^IDescriptorHeap),
-	SetComputeRootSignature:            proc "stdcall" (this: ^IGraphicsCommandList, pRootSignature: ^IRootSignature),
-	SetGraphicsRootSignature:           proc "stdcall" (this: ^IGraphicsCommandList, pRootSignature: ^IRootSignature),
-	SetComputeRootDescriptorTable:      proc "stdcall" (this: ^IGraphicsCommandList, RootParameterIndex: u32, BaseDescriptor: GPU_DESCRIPTOR_HANDLE),
-	SetGraphicsRootDescriptorTable:     proc "stdcall" (this: ^IGraphicsCommandList, RootParameterIndex: u32, BaseDescriptor: GPU_DESCRIPTOR_HANDLE),
-	SetComputeRoot32BitConstant:        proc "stdcall" (this: ^IGraphicsCommandList, RootParameterIndex: u32, SrcData: u32, DestOffsetIn32BitValues: u32),
-	SetGraphicsRoot32BitConstant:       proc "stdcall" (this: ^IGraphicsCommandList, RootParameterIndex: u32, SrcData: u32, DestOffsetIn32BitValues: u32),
-	SetComputeRoot32BitConstants:       proc "stdcall" (this: ^IGraphicsCommandList, RootParameterIndex: u32, Num32BitValuesToSet: u32, pSrcData: rawptr, DestOffsetIn32BitValues: u32),
-	SetGraphicsRoot32BitConstants:      proc "stdcall" (this: ^IGraphicsCommandList, RootParameterIndex: u32, Num32BitValuesToSet: u32, pSrcData: rawptr, DestOffsetIn32BitValues: u32),
-	SetComputeRootConstantBufferView:   proc "stdcall" (this: ^IGraphicsCommandList, RootParameterIndex: u32, BufferLocation: GPU_VIRTUAL_ADDRESS),
-	SetGraphicsRootConstantBufferView:  proc "stdcall" (this: ^IGraphicsCommandList, RootParameterIndex: u32, BufferLocation: GPU_VIRTUAL_ADDRESS),
-	SetComputeRootShaderResourceView:   proc "stdcall" (this: ^IGraphicsCommandList, RootParameterIndex: u32, BufferLocation: GPU_VIRTUAL_ADDRESS),
-	SetGraphicsRootShaderResourceView:  proc "stdcall" (this: ^IGraphicsCommandList, RootParameterIndex: u32, BufferLocation: GPU_VIRTUAL_ADDRESS),
-	SetComputeRootUnorderedAccessView:  proc "stdcall" (this: ^IGraphicsCommandList, RootParameterIndex: u32, BufferLocation: GPU_VIRTUAL_ADDRESS),
-	SetGraphicsRootUnorderedAccessView: proc "stdcall" (this: ^IGraphicsCommandList, RootParameterIndex: u32, BufferLocation: GPU_VIRTUAL_ADDRESS),
-	IASetIndexBuffer:                   proc "stdcall" (this: ^IGraphicsCommandList, pView: ^INDEX_BUFFER_VIEW),
-	IASetVertexBuffers:                 proc "stdcall" (this: ^IGraphicsCommandList, StartSlot: u32, NumViews: u32, pViews: ^VERTEX_BUFFER_VIEW),
-	SOSetTargets:                       proc "stdcall" (this: ^IGraphicsCommandList, StartSlot: u32, NumViews: u32, pViews: ^STREAM_OUTPUT_BUFFER_VIEW),
-	OMSetRenderTargets:                 proc "stdcall" (this: ^IGraphicsCommandList, NumRenderTargetDescriptors: u32, pRenderTargetDescriptors: ^CPU_DESCRIPTOR_HANDLE, RTsSingleHandleToDescriptorRange: BOOL, pDepthStencilDescriptor: ^CPU_DESCRIPTOR_HANDLE),
-	ClearDepthStencilView:              proc "stdcall" (this: ^IGraphicsCommandList, DepthStencilView: CPU_DESCRIPTOR_HANDLE, ClearFlags: CLEAR_FLAGS, Depth: f32, Stencil: u8, NumRects: u32, pRects: ^RECT),
-	ClearRenderTargetView:              proc "stdcall" (this: ^IGraphicsCommandList, RenderTargetView: CPU_DESCRIPTOR_HANDLE, ColorRGBA: ^[4]f32, NumRects: u32, pRects: ^RECT),
-	ClearUnorderedAccessViewUint:       proc "stdcall" (this: ^IGraphicsCommandList, ViewGPUHandleInCurrentHeap: GPU_DESCRIPTOR_HANDLE, ViewCPUHandle: CPU_DESCRIPTOR_HANDLE, pResource: ^IResource, Values: ^[4]u32, NumRects: u32, pRects: ^RECT),
-	ClearUnorderedAccessViewFloat:      proc "stdcall" (this: ^IGraphicsCommandList, ViewGPUHandleInCurrentHeap: GPU_DESCRIPTOR_HANDLE, ViewCPUHandle: CPU_DESCRIPTOR_HANDLE, pResource: ^IResource, Values: ^[4]f32, NumRects: u32, pRects: ^RECT),
-	DiscardResource:                    proc "stdcall" (this: ^IGraphicsCommandList, pResource: ^IResource, pRegion: ^DISCARD_REGION),
-	BeginQuery:                         proc "stdcall" (this: ^IGraphicsCommandList, pQueryHeap: ^IQueryHeap, Type: QUERY_TYPE, Index: u32),
-	EndQuery:                           proc "stdcall" (this: ^IGraphicsCommandList, pQueryHeap: ^IQueryHeap, Type: QUERY_TYPE, Index: u32),
-	ResolveQueryData:                   proc "stdcall" (this: ^IGraphicsCommandList, pQueryHeap: ^IQueryHeap, Type: QUERY_TYPE, StartIndex: u32, NumQueries: u32, pDestinationBuffer: ^IResource, AlignedDestinationBufferOffset: u64),
-	SetPredication:                     proc "stdcall" (this: ^IGraphicsCommandList, pBuffer: ^IResource, AlignedBufferOffset: u64, Operation: PREDICATION_OP),
-	SetMarker:                          proc "stdcall" (this: ^IGraphicsCommandList, Metadata: u32, pData: rawptr, Size: u32),
-	BeginEvent:                         proc "stdcall" (this: ^IGraphicsCommandList, Metadata: u32, pData: rawptr, Size: u32),
-	EndEvent:                           proc "stdcall" (this: ^IGraphicsCommandList),
-	ExecuteIndirect:                    proc "stdcall" (this: ^IGraphicsCommandList, pCommandSignature: ^ICommandSignature, MaxCommandCount: u32, pArgumentBuffer: ^IResource, ArgumentBufferOffset: u64, pCountBuffer: ^IResource, CountBufferOffset: u64),
+	Close:                              proc "system" (this: ^IGraphicsCommandList) -> HRESULT,
+	Reset:                              proc "system" (this: ^IGraphicsCommandList, pAllocator: ^ICommandAllocator, pInitialState: ^IPipelineState) -> HRESULT,
+	ClearState:                         proc "system" (this: ^IGraphicsCommandList, pPipelineState: ^IPipelineState),
+	DrawInstanced:                      proc "system" (this: ^IGraphicsCommandList, VertexCountPerInstance: u32, InstanceCount: u32, StartVertexLocation: u32, StartInstanceLocation: u32),
+	DrawIndexedInstanced:               proc "system" (this: ^IGraphicsCommandList, IndexCountPerInstance: u32, InstanceCount: u32, StartIndexLocation: u32, BaseVertexLocation: i32, StartInstanceLocation: u32),
+	Dispatch:                           proc "system" (this: ^IGraphicsCommandList, ThreadGroupCountX: u32, ThreadGroupCountY: u32, ThreadGroupCountZ: u32),
+	CopyBufferRegion:                   proc "system" (this: ^IGraphicsCommandList, pDstBuffer: ^IResource, DstOffset: u64, pSrcBuffer: ^IResource, SrcOffset: u64, NumBytes: u64),
+	CopyTextureRegion:                  proc "system" (this: ^IGraphicsCommandList, pDst: ^TEXTURE_COPY_LOCATION, DstX: u32, DstY: u32, DstZ: u32, pSrc: ^TEXTURE_COPY_LOCATION, pSrcBox: ^BOX),
+	CopyResource:                       proc "system" (this: ^IGraphicsCommandList, pDstResource: ^IResource, pSrcResource: ^IResource),
+	CopyTiles:                          proc "system" (this: ^IGraphicsCommandList, pTiledResource: ^IResource, pTileRegionStartCoordinate: ^TILED_RESOURCE_COORDINATE, pTileRegionSize: ^TILE_REGION_SIZE, pBuffer: ^IResource, BufferStartOffsetInBytes: u64, Flags: TILE_COPY_FLAGS),
+	ResolveSubresource:                 proc "system" (this: ^IGraphicsCommandList, pDstResource: ^IResource, DstSubresource: u32, pSrcResource: ^IResource, SrcSubresource: u32, Format: dxgi.FORMAT),
+	IASetPrimitiveTopology:             proc "system" (this: ^IGraphicsCommandList, PrimitiveTopology: PRIMITIVE_TOPOLOGY),
+	RSSetViewports:                     proc "system" (this: ^IGraphicsCommandList, NumViewports: u32, pViewports: ^VIEWPORT),
+	RSSetScissorRects:                  proc "system" (this: ^IGraphicsCommandList, NumRects: u32, pRects: ^RECT),
+	OMSetBlendFactor:                   proc "system" (this: ^IGraphicsCommandList, BlendFactor: ^[4]f32),
+	OMSetStencilRef:                    proc "system" (this: ^IGraphicsCommandList, StencilRef: u32),
+	SetPipelineState:                   proc "system" (this: ^IGraphicsCommandList, pPipelineState: ^IPipelineState),
+	ResourceBarrier:                    proc "system" (this: ^IGraphicsCommandList, NumBarriers: u32, pBarriers: ^RESOURCE_BARRIER),
+	ExecuteBundle:                      proc "system" (this: ^IGraphicsCommandList, pCommandList: ^IGraphicsCommandList),
+	SetDescriptorHeaps:                 proc "system" (this: ^IGraphicsCommandList, NumDescriptorHeaps: u32, ppDescriptorHeaps: ^^IDescriptorHeap),
+	SetComputeRootSignature:            proc "system" (this: ^IGraphicsCommandList, pRootSignature: ^IRootSignature),
+	SetGraphicsRootSignature:           proc "system" (this: ^IGraphicsCommandList, pRootSignature: ^IRootSignature),
+	SetComputeRootDescriptorTable:      proc "system" (this: ^IGraphicsCommandList, RootParameterIndex: u32, BaseDescriptor: GPU_DESCRIPTOR_HANDLE),
+	SetGraphicsRootDescriptorTable:     proc "system" (this: ^IGraphicsCommandList, RootParameterIndex: u32, BaseDescriptor: GPU_DESCRIPTOR_HANDLE),
+	SetComputeRoot32BitConstant:        proc "system" (this: ^IGraphicsCommandList, RootParameterIndex: u32, SrcData: u32, DestOffsetIn32BitValues: u32),
+	SetGraphicsRoot32BitConstant:       proc "system" (this: ^IGraphicsCommandList, RootParameterIndex: u32, SrcData: u32, DestOffsetIn32BitValues: u32),
+	SetComputeRoot32BitConstants:       proc "system" (this: ^IGraphicsCommandList, RootParameterIndex: u32, Num32BitValuesToSet: u32, pSrcData: rawptr, DestOffsetIn32BitValues: u32),
+	SetGraphicsRoot32BitConstants:      proc "system" (this: ^IGraphicsCommandList, RootParameterIndex: u32, Num32BitValuesToSet: u32, pSrcData: rawptr, DestOffsetIn32BitValues: u32),
+	SetComputeRootConstantBufferView:   proc "system" (this: ^IGraphicsCommandList, RootParameterIndex: u32, BufferLocation: GPU_VIRTUAL_ADDRESS),
+	SetGraphicsRootConstantBufferView:  proc "system" (this: ^IGraphicsCommandList, RootParameterIndex: u32, BufferLocation: GPU_VIRTUAL_ADDRESS),
+	SetComputeRootShaderResourceView:   proc "system" (this: ^IGraphicsCommandList, RootParameterIndex: u32, BufferLocation: GPU_VIRTUAL_ADDRESS),
+	SetGraphicsRootShaderResourceView:  proc "system" (this: ^IGraphicsCommandList, RootParameterIndex: u32, BufferLocation: GPU_VIRTUAL_ADDRESS),
+	SetComputeRootUnorderedAccessView:  proc "system" (this: ^IGraphicsCommandList, RootParameterIndex: u32, BufferLocation: GPU_VIRTUAL_ADDRESS),
+	SetGraphicsRootUnorderedAccessView: proc "system" (this: ^IGraphicsCommandList, RootParameterIndex: u32, BufferLocation: GPU_VIRTUAL_ADDRESS),
+	IASetIndexBuffer:                   proc "system" (this: ^IGraphicsCommandList, pView: ^INDEX_BUFFER_VIEW),
+	IASetVertexBuffers:                 proc "system" (this: ^IGraphicsCommandList, StartSlot: u32, NumViews: u32, pViews: ^VERTEX_BUFFER_VIEW),
+	SOSetTargets:                       proc "system" (this: ^IGraphicsCommandList, StartSlot: u32, NumViews: u32, pViews: ^STREAM_OUTPUT_BUFFER_VIEW),
+	OMSetRenderTargets:                 proc "system" (this: ^IGraphicsCommandList, NumRenderTargetDescriptors: u32, pRenderTargetDescriptors: ^CPU_DESCRIPTOR_HANDLE, RTsSingleHandleToDescriptorRange: BOOL, pDepthStencilDescriptor: ^CPU_DESCRIPTOR_HANDLE),
+	ClearDepthStencilView:              proc "system" (this: ^IGraphicsCommandList, DepthStencilView: CPU_DESCRIPTOR_HANDLE, ClearFlags: CLEAR_FLAGS, Depth: f32, Stencil: u8, NumRects: u32, pRects: ^RECT),
+	ClearRenderTargetView:              proc "system" (this: ^IGraphicsCommandList, RenderTargetView: CPU_DESCRIPTOR_HANDLE, ColorRGBA: ^[4]f32, NumRects: u32, pRects: ^RECT),
+	ClearUnorderedAccessViewUint:       proc "system" (this: ^IGraphicsCommandList, ViewGPUHandleInCurrentHeap: GPU_DESCRIPTOR_HANDLE, ViewCPUHandle: CPU_DESCRIPTOR_HANDLE, pResource: ^IResource, Values: ^[4]u32, NumRects: u32, pRects: ^RECT),
+	ClearUnorderedAccessViewFloat:      proc "system" (this: ^IGraphicsCommandList, ViewGPUHandleInCurrentHeap: GPU_DESCRIPTOR_HANDLE, ViewCPUHandle: CPU_DESCRIPTOR_HANDLE, pResource: ^IResource, Values: ^[4]f32, NumRects: u32, pRects: ^RECT),
+	DiscardResource:                    proc "system" (this: ^IGraphicsCommandList, pResource: ^IResource, pRegion: ^DISCARD_REGION),
+	BeginQuery:                         proc "system" (this: ^IGraphicsCommandList, pQueryHeap: ^IQueryHeap, Type: QUERY_TYPE, Index: u32),
+	EndQuery:                           proc "system" (this: ^IGraphicsCommandList, pQueryHeap: ^IQueryHeap, Type: QUERY_TYPE, Index: u32),
+	ResolveQueryData:                   proc "system" (this: ^IGraphicsCommandList, pQueryHeap: ^IQueryHeap, Type: QUERY_TYPE, StartIndex: u32, NumQueries: u32, pDestinationBuffer: ^IResource, AlignedDestinationBufferOffset: u64),
+	SetPredication:                     proc "system" (this: ^IGraphicsCommandList, pBuffer: ^IResource, AlignedBufferOffset: u64, Operation: PREDICATION_OP),
+	SetMarker:                          proc "system" (this: ^IGraphicsCommandList, Metadata: u32, pData: rawptr, Size: u32),
+	BeginEvent:                         proc "system" (this: ^IGraphicsCommandList, Metadata: u32, pData: rawptr, Size: u32),
+	EndEvent:                           proc "system" (this: ^IGraphicsCommandList),
+	ExecuteIndirect:                    proc "system" (this: ^IGraphicsCommandList, pCommandSignature: ^ICommandSignature, MaxCommandCount: u32, pArgumentBuffer: ^IResource, ArgumentBufferOffset: u64, pCountBuffer: ^IResource, CountBufferOffset: u64),
 }
 
 
@@ -2464,12 +2464,12 @@ IGraphicsCommandList1 :: struct #raw_union {
 }
 IGraphicsCommandList1_VTable :: struct {
 	using id3d12graphicscommandlist_vtable: IGraphicsCommandList_VTable,
-	AtomicCopyBufferUINT:     proc "stdcall" (this: ^IGraphicsCommandList1, pDstBuffer: ^IResource, DstOffset: u64, pSrcBuffer: ^IResource, SrcOffset: u64, Dependencies: u32, ppDependentResources: ^^IResource, pDependentSubresourceRanges: ^SUBRESOURCE_RANGE_UINT64),
-	AtomicCopyBufferUINT64:   proc "stdcall" (this: ^IGraphicsCommandList1, pDstBuffer: ^IResource, DstOffset: u64, pSrcBuffer: ^IResource, SrcOffset: u64, Dependencies: u32, ppDependentResources: ^^IResource, pDependentSubresourceRanges: ^SUBRESOURCE_RANGE_UINT64),
-	OMSetDepthBounds:         proc "stdcall" (this: ^IGraphicsCommandList1, Min: f32, Max: f32),
-	SetSamplePositions:       proc "stdcall" (this: ^IGraphicsCommandList1, NumSamplesPerPixel: u32, NumPixels: u32, pSamplePositions: ^SAMPLE_POSITION),
-	ResolveSubresourceRegion: proc "stdcall" (this: ^IGraphicsCommandList1, pDstResource: ^IResource, DstSubresource: u32, DstX: u32, DstY: u32, pSrcResource: ^IResource, SrcSubresource: u32, pSrcRect: ^RECT, Format: dxgi.FORMAT, ResolveMode: RESOLVE_MODE),
-	SetViewInstanceMask:      proc "stdcall" (this: ^IGraphicsCommandList1, Mask: u32),
+	AtomicCopyBufferUINT:     proc "system" (this: ^IGraphicsCommandList1, pDstBuffer: ^IResource, DstOffset: u64, pSrcBuffer: ^IResource, SrcOffset: u64, Dependencies: u32, ppDependentResources: ^^IResource, pDependentSubresourceRanges: ^SUBRESOURCE_RANGE_UINT64),
+	AtomicCopyBufferUINT64:   proc "system" (this: ^IGraphicsCommandList1, pDstBuffer: ^IResource, DstOffset: u64, pSrcBuffer: ^IResource, SrcOffset: u64, Dependencies: u32, ppDependentResources: ^^IResource, pDependentSubresourceRanges: ^SUBRESOURCE_RANGE_UINT64),
+	OMSetDepthBounds:         proc "system" (this: ^IGraphicsCommandList1, Min: f32, Max: f32),
+	SetSamplePositions:       proc "system" (this: ^IGraphicsCommandList1, NumSamplesPerPixel: u32, NumPixels: u32, pSamplePositions: ^SAMPLE_POSITION),
+	ResolveSubresourceRegion: proc "system" (this: ^IGraphicsCommandList1, pDstResource: ^IResource, DstSubresource: u32, DstX: u32, DstY: u32, pSrcResource: ^IResource, SrcSubresource: u32, pSrcRect: ^RECT, Format: dxgi.FORMAT, ResolveMode: RESOLVE_MODE),
+	SetViewInstanceMask:      proc "system" (this: ^IGraphicsCommandList1, Mask: u32),
 }
 
 WRITEBUFFERIMMEDIATE_PARAMETER :: struct {
@@ -2492,7 +2492,7 @@ IGraphicsCommandList2 :: struct #raw_union {
 }
 IGraphicsCommandList2_VTable :: struct {
 	using id3d12graphicscommandlist1_vtable: IGraphicsCommandList1_VTable,
-	WriteBufferImmediate: proc "stdcall" (this: ^IGraphicsCommandList2, Count: u32, pParams: ^WRITEBUFFERIMMEDIATE_PARAMETER, pModes: ^WRITEBUFFERIMMEDIATE_MODE),
+	WriteBufferImmediate: proc "system" (this: ^IGraphicsCommandList2, Count: u32, pParams: ^WRITEBUFFERIMMEDIATE_PARAMETER, pModes: ^WRITEBUFFERIMMEDIATE_MODE),
 }
 
 
@@ -2504,17 +2504,17 @@ ICommandQueue :: struct #raw_union {
 }
 ICommandQueue_VTable :: struct {
 	using id3d12devicechild_vtable: IDeviceChild_VTable,
-	UpdateTileMappings:    proc "stdcall" (this: ^ICommandQueue, pResource: ^IResource, NumResourceRegions: u32, pResourceRegionStartCoordinates: ^TILED_RESOURCE_COORDINATE, pResourceRegionSizes: ^TILE_REGION_SIZE, pHeap: ^IHeap, NumRanges: u32, pRangeFlags: ^TILE_RANGE_FLAGS, pHeapRangeStartOffsets: ^u32, pRangeTileCounts: ^u32, Flags: TILE_MAPPING_FLAGS),
-	CopyTileMappings:      proc "stdcall" (this: ^ICommandQueue, pDstResource: ^IResource, pDstRegionStartCoordinate: ^TILED_RESOURCE_COORDINATE, pSrcResource: ^IResource, pSrcRegionStartCoordinate: ^TILED_RESOURCE_COORDINATE, pRegionSize: ^TILE_REGION_SIZE, Flags: TILE_MAPPING_FLAGS),
-	ExecuteCommandLists:   proc "stdcall" (this: ^ICommandQueue, NumCommandLists: u32, ppCommandLists: ^^ICommandList),
-	SetMarker:             proc "stdcall" (this: ^ICommandQueue, Metadata: u32, pData: rawptr, Size: u32),
-	BeginEvent:            proc "stdcall" (this: ^ICommandQueue, Metadata: u32, pData: rawptr, Size: u32),
-	EndEvent:              proc "stdcall" (this: ^ICommandQueue),
-	Signal:                proc "stdcall" (this: ^ICommandQueue, pFence: ^IFence, Value: u64) -> HRESULT,
-	Wait:                  proc "stdcall" (this: ^ICommandQueue, pFence: ^IFence, Value: u64) -> HRESULT,
-	GetTimestampFrequency: proc "stdcall" (this: ^ICommandQueue, pFrequency: ^u64) -> HRESULT,
-	GetClockCalibration:   proc "stdcall" (this: ^ICommandQueue, pGpuTimestamp: ^u64, pCpuTimestamp: ^u64) -> HRESULT,
-	GetDesc:               proc "stdcall" (this: ^ICommandQueue) -> COMMAND_QUEUE_DESC,
+	UpdateTileMappings:    proc "system" (this: ^ICommandQueue, pResource: ^IResource, NumResourceRegions: u32, pResourceRegionStartCoordinates: ^TILED_RESOURCE_COORDINATE, pResourceRegionSizes: ^TILE_REGION_SIZE, pHeap: ^IHeap, NumRanges: u32, pRangeFlags: ^TILE_RANGE_FLAGS, pHeapRangeStartOffsets: ^u32, pRangeTileCounts: ^u32, Flags: TILE_MAPPING_FLAGS),
+	CopyTileMappings:      proc "system" (this: ^ICommandQueue, pDstResource: ^IResource, pDstRegionStartCoordinate: ^TILED_RESOURCE_COORDINATE, pSrcResource: ^IResource, pSrcRegionStartCoordinate: ^TILED_RESOURCE_COORDINATE, pRegionSize: ^TILE_REGION_SIZE, Flags: TILE_MAPPING_FLAGS),
+	ExecuteCommandLists:   proc "system" (this: ^ICommandQueue, NumCommandLists: u32, ppCommandLists: ^^ICommandList),
+	SetMarker:             proc "system" (this: ^ICommandQueue, Metadata: u32, pData: rawptr, Size: u32),
+	BeginEvent:            proc "system" (this: ^ICommandQueue, Metadata: u32, pData: rawptr, Size: u32),
+	EndEvent:              proc "system" (this: ^ICommandQueue),
+	Signal:                proc "system" (this: ^ICommandQueue, pFence: ^IFence, Value: u64) -> HRESULT,
+	Wait:                  proc "system" (this: ^ICommandQueue, pFence: ^IFence, Value: u64) -> HRESULT,
+	GetTimestampFrequency: proc "system" (this: ^ICommandQueue, pFrequency: ^u64) -> HRESULT,
+	GetClockCalibration:   proc "system" (this: ^ICommandQueue, pGpuTimestamp: ^u64, pCpuTimestamp: ^u64) -> HRESULT,
+	GetDesc:               proc "system" (this: ^ICommandQueue) -> COMMAND_QUEUE_DESC,
 }
 
 
@@ -2526,43 +2526,43 @@ IDevice :: struct #raw_union {
 }
 IDevice_VTable :: struct {
 	using id3d12object_vtable: IObject_VTable,
-	GetNodeCount:                     proc "stdcall" (this: ^IDevice) -> u32,
-	CreateCommandQueue:               proc "stdcall" (this: ^IDevice, pDesc: ^COMMAND_QUEUE_DESC, riid: ^IID, ppCommandQueue: ^rawptr) -> HRESULT,
-	CreateCommandAllocator:           proc "stdcall" (this: ^IDevice, type: COMMAND_LIST_TYPE, riid: ^IID, ppCommandAllocator: ^rawptr) -> HRESULT,
-	CreateGraphicsPipelineState:      proc "stdcall" (this: ^IDevice, pDesc: ^GRAPHICS_PIPELINE_STATE_DESC, riid: ^IID, ppPipelineState: ^rawptr) -> HRESULT,
-	CreateComputePipelineState:       proc "stdcall" (this: ^IDevice, pDesc: ^COMPUTE_PIPELINE_STATE_DESC, riid: ^IID, ppPipelineState: ^rawptr) -> HRESULT,
-	CreateCommandList:                proc "stdcall" (this: ^IDevice, nodeMask: u32, type: COMMAND_LIST_TYPE, pCommandAllocator: ^ICommandAllocator, pInitialState: ^IPipelineState, riid: ^IID, ppCommandList: ^rawptr) -> HRESULT,
-	CheckFeatureSupport:              proc "stdcall" (this: ^IDevice, Feature: FEATURE, pFeatureSupportData: rawptr, FeatureSupportDataSize: u32) -> HRESULT,
-	CreateDescriptorHeap:             proc "stdcall" (this: ^IDevice, pDescriptorHeapDesc: ^DESCRIPTOR_HEAP_DESC, riid: ^IID, ppvHeap: ^rawptr) -> HRESULT,
-	GetDescriptorHandleIncrementSize: proc "stdcall" (this: ^IDevice, DescriptorHeapType: DESCRIPTOR_HEAP_TYPE) -> u32,
-	CreateRootSignature:              proc "stdcall" (this: ^IDevice, nodeMask: u32, pBlobWithRootSignature: rawptr, blobLengthInBytes: SIZE_T, riid: ^IID, ppvRootSignature: ^rawptr) -> HRESULT,
-	CreateConstantBufferView:         proc "stdcall" (this: ^IDevice, pDesc: ^CONSTANT_BUFFER_VIEW_DESC, DestDescriptor: CPU_DESCRIPTOR_HANDLE),
-	CreateShaderResourceView:         proc "stdcall" (this: ^IDevice, pResource: ^IResource, pDesc: ^SHADER_RESOURCE_VIEW_DESC, DestDescriptor: CPU_DESCRIPTOR_HANDLE),
-	CreateUnorderedAccessView:        proc "stdcall" (this: ^IDevice, pResource: ^IResource, pCounterResource: ^IResource, pDesc: ^UNORDERED_ACCESS_VIEW_DESC, DestDescriptor: CPU_DESCRIPTOR_HANDLE),
-	CreateRenderTargetView:           proc "stdcall" (this: ^IDevice, pResource: ^IResource, pDesc: ^RENDER_TARGET_VIEW_DESC, DestDescriptor: CPU_DESCRIPTOR_HANDLE),
-	CreateDepthStencilView:           proc "stdcall" (this: ^IDevice, pResource: ^IResource, pDesc: ^DEPTH_STENCIL_VIEW_DESC, DestDescriptor: CPU_DESCRIPTOR_HANDLE),
-	CreateSampler:                    proc "stdcall" (this: ^IDevice, pDesc: ^SAMPLER_DESC, DestDescriptor: CPU_DESCRIPTOR_HANDLE),
-	CopyDescriptors:                  proc "stdcall" (this: ^IDevice, NumDestDescriptorRanges: u32, pDestDescriptorRangeStarts: ^CPU_DESCRIPTOR_HANDLE, pDestDescriptorRangeSizes: ^u32, NumSrcDescriptorRanges: u32, pSrcDescriptorRangeStarts: ^CPU_DESCRIPTOR_HANDLE, pSrcDescriptorRangeSizes: ^u32, DescriptorHeapsType: DESCRIPTOR_HEAP_TYPE),
-	CopyDescriptorsSimple:            proc "stdcall" (this: ^IDevice, NumDescriptors: u32, DestDescriptorRangeStart: CPU_DESCRIPTOR_HANDLE, SrcDescriptorRangeStart: CPU_DESCRIPTOR_HANDLE, DescriptorHeapsType: DESCRIPTOR_HEAP_TYPE),
-	GetResourceAllocationInfo:        proc "stdcall" (this: ^IDevice, RetVal: ^RESOURCE_ALLOCATION_INFO, visibleMask: u32, numResourceDescs: u32, pResourceDescs: ^RESOURCE_DESC),
-	GetCustomHeapProperties:          proc "stdcall" (this: ^IDevice, nodeMask: u32, heapType: HEAP_TYPE) -> HEAP_PROPERTIES,
-	CreateCommittedResource:          proc "stdcall" (this: ^IDevice, pHeapProperties: ^HEAP_PROPERTIES, HeapFlags: HEAP_FLAGS, pDesc: ^RESOURCE_DESC, InitialResourceState: RESOURCE_STATES, pOptimizedClearValue: ^CLEAR_VALUE, riidResource: ^IID, ppvResource: ^rawptr) -> HRESULT,
-	CreateHeap:                       proc "stdcall" (this: ^IDevice, pDesc: ^HEAP_DESC, riid: ^IID, ppvHeap: ^rawptr) -> HRESULT,
-	CreatePlacedResource:             proc "stdcall" (this: ^IDevice, pHeap: ^IHeap, HeapOffset: u64, pDesc: ^RESOURCE_DESC, InitialState: RESOURCE_STATES, pOptimizedClearValue: ^CLEAR_VALUE, riid: ^IID, ppvResource: ^rawptr) -> HRESULT,
-	CreateReservedResource:           proc "stdcall" (this: ^IDevice, pDesc: ^RESOURCE_DESC, InitialState: RESOURCE_STATES, pOptimizedClearValue: ^CLEAR_VALUE, riid: ^IID, ppvResource: ^rawptr) -> HRESULT,
-	CreateSharedHandle:               proc "stdcall" (this: ^IDevice, pObject: ^IDeviceChild, pAttributes: ^win32.SECURITY_ATTRIBUTES, Access: u32, Name: [^]u16, pHandle: ^HANDLE) -> HRESULT,
-	OpenSharedHandle:                 proc "stdcall" (this: ^IDevice, NTHandle: HANDLE, riid: ^IID, ppvObj: ^rawptr) -> HRESULT,
-	OpenSharedHandleByName:           proc "stdcall" (this: ^IDevice, Name: [^]u16, Access: u32, pNTHandle: ^HANDLE) -> HRESULT,
-	MakeResident:                     proc "stdcall" (this: ^IDevice, NumObjects: u32, ppObjects: ^^IPageable) -> HRESULT,
-	Evict:                            proc "stdcall" (this: ^IDevice, NumObjects: u32, ppObjects: ^^IPageable) -> HRESULT,
-	CreateFence:                      proc "stdcall" (this: ^IDevice, InitialValue: u64, Flags: FENCE_FLAGS, riid: ^IID, ppFence: ^rawptr) -> HRESULT,
-	GetDeviceRemovedReason:           proc "stdcall" (this: ^IDevice) -> HRESULT,
-	GetCopyableFootprints:            proc "stdcall" (this: ^IDevice, pResourceDesc: ^RESOURCE_DESC, FirstSubresource: u32, NumSubresources: u32, BaseOffset: u64, pLayouts: ^PLACED_SUBRESOURCE_FOOTPRINT, pNumRows: ^u32, pRowSizeInBytes: ^u64, pTotalBytes: ^u64),
-	CreateQueryHeap:                  proc "stdcall" (this: ^IDevice, pDesc: ^QUERY_HEAP_DESC, riid: ^IID, ppvHeap: ^rawptr) -> HRESULT,
-	SetStablePowerState:              proc "stdcall" (this: ^IDevice, Enable: BOOL) -> HRESULT,
-	CreateCommandSignature:           proc "stdcall" (this: ^IDevice, pDesc: ^COMMAND_SIGNATURE_DESC, pRootSignature: ^IRootSignature, riid: ^IID, ppvCommandSignature: ^rawptr) -> HRESULT,
-	GetResourceTiling:                proc "stdcall" (this: ^IDevice, pTiledResource: ^IResource, pNumTilesForEntireResource: ^u32, pPackedMipDesc: ^PACKED_MIP_INFO, pStandardTileShapeForNonPackedMips: ^TILE_SHAPE, pNumSubresourceTilings: ^u32, FirstSubresourceTilingToGet: u32, pSubresourceTilingsForNonPackedMips: ^SUBRESOURCE_TILING),
-	GetAdapterLuid:                   proc "stdcall" (this: ^IDevice) -> LUID,
+	GetNodeCount:                     proc "system" (this: ^IDevice) -> u32,
+	CreateCommandQueue:               proc "system" (this: ^IDevice, pDesc: ^COMMAND_QUEUE_DESC, riid: ^IID, ppCommandQueue: ^rawptr) -> HRESULT,
+	CreateCommandAllocator:           proc "system" (this: ^IDevice, type: COMMAND_LIST_TYPE, riid: ^IID, ppCommandAllocator: ^rawptr) -> HRESULT,
+	CreateGraphicsPipelineState:      proc "system" (this: ^IDevice, pDesc: ^GRAPHICS_PIPELINE_STATE_DESC, riid: ^IID, ppPipelineState: ^rawptr) -> HRESULT,
+	CreateComputePipelineState:       proc "system" (this: ^IDevice, pDesc: ^COMPUTE_PIPELINE_STATE_DESC, riid: ^IID, ppPipelineState: ^rawptr) -> HRESULT,
+	CreateCommandList:                proc "system" (this: ^IDevice, nodeMask: u32, type: COMMAND_LIST_TYPE, pCommandAllocator: ^ICommandAllocator, pInitialState: ^IPipelineState, riid: ^IID, ppCommandList: ^rawptr) -> HRESULT,
+	CheckFeatureSupport:              proc "system" (this: ^IDevice, Feature: FEATURE, pFeatureSupportData: rawptr, FeatureSupportDataSize: u32) -> HRESULT,
+	CreateDescriptorHeap:             proc "system" (this: ^IDevice, pDescriptorHeapDesc: ^DESCRIPTOR_HEAP_DESC, riid: ^IID, ppvHeap: ^rawptr) -> HRESULT,
+	GetDescriptorHandleIncrementSize: proc "system" (this: ^IDevice, DescriptorHeapType: DESCRIPTOR_HEAP_TYPE) -> u32,
+	CreateRootSignature:              proc "system" (this: ^IDevice, nodeMask: u32, pBlobWithRootSignature: rawptr, blobLengthInBytes: SIZE_T, riid: ^IID, ppvRootSignature: ^rawptr) -> HRESULT,
+	CreateConstantBufferView:         proc "system" (this: ^IDevice, pDesc: ^CONSTANT_BUFFER_VIEW_DESC, DestDescriptor: CPU_DESCRIPTOR_HANDLE),
+	CreateShaderResourceView:         proc "system" (this: ^IDevice, pResource: ^IResource, pDesc: ^SHADER_RESOURCE_VIEW_DESC, DestDescriptor: CPU_DESCRIPTOR_HANDLE),
+	CreateUnorderedAccessView:        proc "system" (this: ^IDevice, pResource: ^IResource, pCounterResource: ^IResource, pDesc: ^UNORDERED_ACCESS_VIEW_DESC, DestDescriptor: CPU_DESCRIPTOR_HANDLE),
+	CreateRenderTargetView:           proc "system" (this: ^IDevice, pResource: ^IResource, pDesc: ^RENDER_TARGET_VIEW_DESC, DestDescriptor: CPU_DESCRIPTOR_HANDLE),
+	CreateDepthStencilView:           proc "system" (this: ^IDevice, pResource: ^IResource, pDesc: ^DEPTH_STENCIL_VIEW_DESC, DestDescriptor: CPU_DESCRIPTOR_HANDLE),
+	CreateSampler:                    proc "system" (this: ^IDevice, pDesc: ^SAMPLER_DESC, DestDescriptor: CPU_DESCRIPTOR_HANDLE),
+	CopyDescriptors:                  proc "system" (this: ^IDevice, NumDestDescriptorRanges: u32, pDestDescriptorRangeStarts: ^CPU_DESCRIPTOR_HANDLE, pDestDescriptorRangeSizes: ^u32, NumSrcDescriptorRanges: u32, pSrcDescriptorRangeStarts: ^CPU_DESCRIPTOR_HANDLE, pSrcDescriptorRangeSizes: ^u32, DescriptorHeapsType: DESCRIPTOR_HEAP_TYPE),
+	CopyDescriptorsSimple:            proc "system" (this: ^IDevice, NumDescriptors: u32, DestDescriptorRangeStart: CPU_DESCRIPTOR_HANDLE, SrcDescriptorRangeStart: CPU_DESCRIPTOR_HANDLE, DescriptorHeapsType: DESCRIPTOR_HEAP_TYPE),
+	GetResourceAllocationInfo:        proc "system" (this: ^IDevice, RetVal: ^RESOURCE_ALLOCATION_INFO, visibleMask: u32, numResourceDescs: u32, pResourceDescs: ^RESOURCE_DESC),
+	GetCustomHeapProperties:          proc "system" (this: ^IDevice, nodeMask: u32, heapType: HEAP_TYPE) -> HEAP_PROPERTIES,
+	CreateCommittedResource:          proc "system" (this: ^IDevice, pHeapProperties: ^HEAP_PROPERTIES, HeapFlags: HEAP_FLAGS, pDesc: ^RESOURCE_DESC, InitialResourceState: RESOURCE_STATES, pOptimizedClearValue: ^CLEAR_VALUE, riidResource: ^IID, ppvResource: ^rawptr) -> HRESULT,
+	CreateHeap:                       proc "system" (this: ^IDevice, pDesc: ^HEAP_DESC, riid: ^IID, ppvHeap: ^rawptr) -> HRESULT,
+	CreatePlacedResource:             proc "system" (this: ^IDevice, pHeap: ^IHeap, HeapOffset: u64, pDesc: ^RESOURCE_DESC, InitialState: RESOURCE_STATES, pOptimizedClearValue: ^CLEAR_VALUE, riid: ^IID, ppvResource: ^rawptr) -> HRESULT,
+	CreateReservedResource:           proc "system" (this: ^IDevice, pDesc: ^RESOURCE_DESC, InitialState: RESOURCE_STATES, pOptimizedClearValue: ^CLEAR_VALUE, riid: ^IID, ppvResource: ^rawptr) -> HRESULT,
+	CreateSharedHandle:               proc "system" (this: ^IDevice, pObject: ^IDeviceChild, pAttributes: ^win32.SECURITY_ATTRIBUTES, Access: u32, Name: [^]u16, pHandle: ^HANDLE) -> HRESULT,
+	OpenSharedHandle:                 proc "system" (this: ^IDevice, NTHandle: HANDLE, riid: ^IID, ppvObj: ^rawptr) -> HRESULT,
+	OpenSharedHandleByName:           proc "system" (this: ^IDevice, Name: [^]u16, Access: u32, pNTHandle: ^HANDLE) -> HRESULT,
+	MakeResident:                     proc "system" (this: ^IDevice, NumObjects: u32, ppObjects: ^^IPageable) -> HRESULT,
+	Evict:                            proc "system" (this: ^IDevice, NumObjects: u32, ppObjects: ^^IPageable) -> HRESULT,
+	CreateFence:                      proc "system" (this: ^IDevice, InitialValue: u64, Flags: FENCE_FLAGS, riid: ^IID, ppFence: ^rawptr) -> HRESULT,
+	GetDeviceRemovedReason:           proc "system" (this: ^IDevice) -> HRESULT,
+	GetCopyableFootprints:            proc "system" (this: ^IDevice, pResourceDesc: ^RESOURCE_DESC, FirstSubresource: u32, NumSubresources: u32, BaseOffset: u64, pLayouts: ^PLACED_SUBRESOURCE_FOOTPRINT, pNumRows: ^u32, pRowSizeInBytes: ^u64, pTotalBytes: ^u64),
+	CreateQueryHeap:                  proc "system" (this: ^IDevice, pDesc: ^QUERY_HEAP_DESC, riid: ^IID, ppvHeap: ^rawptr) -> HRESULT,
+	SetStablePowerState:              proc "system" (this: ^IDevice, Enable: BOOL) -> HRESULT,
+	CreateCommandSignature:           proc "system" (this: ^IDevice, pDesc: ^COMMAND_SIGNATURE_DESC, pRootSignature: ^IRootSignature, riid: ^IID, ppvCommandSignature: ^rawptr) -> HRESULT,
+	GetResourceTiling:                proc "system" (this: ^IDevice, pTiledResource: ^IResource, pNumTilesForEntireResource: ^u32, pPackedMipDesc: ^PACKED_MIP_INFO, pStandardTileShapeForNonPackedMips: ^TILE_SHAPE, pNumSubresourceTilings: ^u32, FirstSubresourceTilingToGet: u32, pSubresourceTilingsForNonPackedMips: ^SUBRESOURCE_TILING),
+	GetAdapterLuid:                   proc "system" (this: ^IDevice) -> LUID,
 }
 
 
@@ -2574,11 +2574,11 @@ IPipelineLibrary :: struct #raw_union {
 }
 IPipelineLibrary_VTable :: struct {
 	using id3d12devicechild_vtable: IDeviceChild_VTable,
-	StorePipeline:        proc "stdcall" (this: ^IPipelineLibrary, pName: [^]u16, pPipeline: ^IPipelineState) -> HRESULT,
-	LoadGraphicsPipeline: proc "stdcall" (this: ^IPipelineLibrary, pName: [^]u16, pDesc: ^GRAPHICS_PIPELINE_STATE_DESC, riid: ^IID, ppPipelineState: ^rawptr) -> HRESULT,
-	LoadComputePipeline:  proc "stdcall" (this: ^IPipelineLibrary, pName: [^]u16, pDesc: ^COMPUTE_PIPELINE_STATE_DESC, riid: ^IID, ppPipelineState: ^rawptr) -> HRESULT,
-	GetSerializedSize:    proc "stdcall" (this: ^IPipelineLibrary) -> SIZE_T,
-	Serialize:            proc "stdcall" (this: ^IPipelineLibrary, pData: rawptr, DataSizeInBytes: SIZE_T) -> HRESULT,
+	StorePipeline:        proc "system" (this: ^IPipelineLibrary, pName: [^]u16, pPipeline: ^IPipelineState) -> HRESULT,
+	LoadGraphicsPipeline: proc "system" (this: ^IPipelineLibrary, pName: [^]u16, pDesc: ^GRAPHICS_PIPELINE_STATE_DESC, riid: ^IID, ppPipelineState: ^rawptr) -> HRESULT,
+	LoadComputePipeline:  proc "system" (this: ^IPipelineLibrary, pName: [^]u16, pDesc: ^COMPUTE_PIPELINE_STATE_DESC, riid: ^IID, ppPipelineState: ^rawptr) -> HRESULT,
+	GetSerializedSize:    proc "system" (this: ^IPipelineLibrary) -> SIZE_T,
+	Serialize:            proc "system" (this: ^IPipelineLibrary, pData: rawptr, DataSizeInBytes: SIZE_T) -> HRESULT,
 }
 
 
@@ -2590,7 +2590,7 @@ IPipelineLibrary1 :: struct #raw_union {
 }
 IPipelineLibrary1_VTable :: struct {
 	using id3d12pipelinelibrary_vtable: IPipelineLibrary_VTable,
-	LoadPipeline: proc "stdcall" (this: ^IPipelineLibrary1, pName: [^]u16, pDesc: ^PIPELINE_STATE_STREAM_DESC, riid: ^IID, ppPipelineState: ^rawptr) -> HRESULT,
+	LoadPipeline: proc "system" (this: ^IPipelineLibrary1, pName: [^]u16, pDesc: ^PIPELINE_STATE_STREAM_DESC, riid: ^IID, ppPipelineState: ^rawptr) -> HRESULT,
 }
 
 MULTIPLE_FENCE_WAIT_FLAGS :: distinct bit_set[MULTIPLE_FENCE_WAIT_FLAG; u32]
@@ -2618,9 +2618,9 @@ IDevice1 :: struct #raw_union {
 }
 IDevice1_VTable :: struct {
 	using id3d12device_vtable: IDevice_VTable,
-	CreatePipelineLibrary:             proc "stdcall" (this: ^IDevice1, pLibraryBlob: rawptr, BlobLength: SIZE_T, riid: ^IID, ppPipelineLibrary: ^rawptr) -> HRESULT,
-	SetEventOnMultipleFenceCompletion: proc "stdcall" (this: ^IDevice1, ppFences: ^^IFence, pFenceValues: ^u64, NumFences: u32, Flags: MULTIPLE_FENCE_WAIT_FLAGS, hEvent: HANDLE) -> HRESULT,
-	SetResidencyPriority:              proc "stdcall" (this: ^IDevice1, NumObjects: u32, ppObjects: ^^IPageable, pPriorities: ^RESIDENCY_PRIORITY) -> HRESULT,
+	CreatePipelineLibrary:             proc "system" (this: ^IDevice1, pLibraryBlob: rawptr, BlobLength: SIZE_T, riid: ^IID, ppPipelineLibrary: ^rawptr) -> HRESULT,
+	SetEventOnMultipleFenceCompletion: proc "system" (this: ^IDevice1, ppFences: ^^IFence, pFenceValues: ^u64, NumFences: u32, Flags: MULTIPLE_FENCE_WAIT_FLAGS, hEvent: HANDLE) -> HRESULT,
+	SetResidencyPriority:              proc "system" (this: ^IDevice1, NumObjects: u32, ppObjects: ^^IPageable, pPriorities: ^RESIDENCY_PRIORITY) -> HRESULT,
 }
 
 
@@ -2632,7 +2632,7 @@ IDevice2 :: struct #raw_union {
 }
 IDevice2_VTable :: struct {
 	using id3d12device1_vtable: IDevice1_VTable,
-	CreatePipelineState: proc "stdcall" (this: ^IDevice2, pDesc: ^PIPELINE_STATE_STREAM_DESC, riid: ^IID, ppPipelineState: ^rawptr) -> HRESULT,
+	CreatePipelineState: proc "system" (this: ^IDevice2, pDesc: ^PIPELINE_STATE_STREAM_DESC, riid: ^IID, ppPipelineState: ^rawptr) -> HRESULT,
 }
 
 RESIDENCY_FLAGS :: distinct bit_set[RESIDENCY_FLAG; u32]
@@ -2649,9 +2649,9 @@ IDevice3 :: struct #raw_union {
 }
 IDevice3_VTable :: struct {
 	using id3d12device2_vtable: IDevice2_VTable,
-	OpenExistingHeapFromAddress:     proc "stdcall" (this: ^IDevice3, pAddress: rawptr, riid: ^IID, ppvHeap: ^rawptr) -> HRESULT,
-	OpenExistingHeapFromFileMapping: proc "stdcall" (this: ^IDevice3, hFileMapping: HANDLE, riid: ^IID, ppvHeap: ^rawptr) -> HRESULT,
-	EnqueueMakeResident:             proc "stdcall" (this: ^IDevice3, Flags: RESIDENCY_FLAGS, NumObjects: u32, ppObjects: ^^IPageable, pFenceToSignal: ^IFence, FenceValueToSignal: u64) -> HRESULT,
+	OpenExistingHeapFromAddress:     proc "system" (this: ^IDevice3, pAddress: rawptr, riid: ^IID, ppvHeap: ^rawptr) -> HRESULT,
+	OpenExistingHeapFromFileMapping: proc "system" (this: ^IDevice3, hFileMapping: HANDLE, riid: ^IID, ppvHeap: ^rawptr) -> HRESULT,
+	EnqueueMakeResident:             proc "system" (this: ^IDevice3, Flags: RESIDENCY_FLAGS, NumObjects: u32, ppObjects: ^^IPageable, pFenceToSignal: ^IFence, FenceValueToSignal: u64) -> HRESULT,
 }
 
 COMMAND_LIST_FLAGS :: distinct bit_set[COMMAND_LIST_FLAG; u32]
@@ -2680,8 +2680,8 @@ IProtectedSession :: struct #raw_union {
 }
 IProtectedSession_VTable :: struct {
 	using id3d12devicechild_vtable: IDeviceChild_VTable,
-	GetStatusFence:   proc "stdcall" (this: ^IProtectedSession, riid: ^IID, ppFence: ^rawptr) -> HRESULT,
-	GetSessionStatus: proc "stdcall" (this: ^IProtectedSession) -> PROTECTED_SESSION_STATUS,
+	GetStatusFence:   proc "system" (this: ^IProtectedSession, riid: ^IID, ppFence: ^rawptr) -> HRESULT,
+	GetSessionStatus: proc "system" (this: ^IProtectedSession) -> PROTECTED_SESSION_STATUS,
 }
 
 PROTECTED_RESOURCE_SESSION_SUPPORT_FLAGS :: distinct bit_set[PROTECTED_RESOURCE_SESSION_SUPPORT_FLAG; u32]
@@ -2712,7 +2712,7 @@ IProtectedResourceSession :: struct #raw_union {
 }
 IProtectedResourceSession_VTable :: struct {
 	using id3d12protectedsession_vtable: IProtectedSession_VTable,
-	GetDesc: proc "stdcall" (this: ^IProtectedResourceSession) -> PROTECTED_RESOURCE_SESSION_DESC,
+	GetDesc: proc "system" (this: ^IProtectedResourceSession) -> PROTECTED_RESOURCE_SESSION_DESC,
 }
 
 
@@ -2724,12 +2724,12 @@ IDevice4 :: struct #raw_union {
 }
 IDevice4_VTable :: struct {
 	using id3d12device3_vtable: IDevice3_VTable,
-	CreateCommandList1:             proc "stdcall" (this: ^IDevice4, nodeMask: u32, type: COMMAND_LIST_TYPE, flags: COMMAND_LIST_FLAGS, riid: ^IID, ppCommandList: ^rawptr) -> HRESULT,
-	CreateProtectedResourceSession: proc "stdcall" (this: ^IDevice4, pDesc: ^PROTECTED_RESOURCE_SESSION_DESC, riid: ^IID, ppSession: ^rawptr) -> HRESULT,
-	CreateCommittedResource1:       proc "stdcall" (this: ^IDevice4, pHeapProperties: ^HEAP_PROPERTIES, HeapFlags: HEAP_FLAGS, pDesc: ^RESOURCE_DESC, InitialResourceState: RESOURCE_STATES, pOptimizedClearValue: ^CLEAR_VALUE, pProtectedSession: ^IProtectedResourceSession, riidResource: ^IID, ppvResource: ^rawptr) -> HRESULT,
-	CreateHeap1:                    proc "stdcall" (this: ^IDevice4, pDesc: ^HEAP_DESC, pProtectedSession: ^IProtectedResourceSession, riid: ^IID, ppvHeap: ^rawptr) -> HRESULT,
-	CreateReservedResource1:        proc "stdcall" (this: ^IDevice4, pDesc: ^RESOURCE_DESC, InitialState: RESOURCE_STATES, pOptimizedClearValue: ^CLEAR_VALUE, pProtectedSession: ^IProtectedResourceSession, riid: ^IID, ppvResource: ^rawptr) -> HRESULT,
-	GetResourceAllocationInfo1:     proc "stdcall" (this: ^IDevice4, RetVal: ^RESOURCE_ALLOCATION_INFO, visibleMask: u32, numResourceDescs: u32, pResourceDescs: ^RESOURCE_DESC, pResourceAllocationInfo1: ^RESOURCE_ALLOCATION_INFO1),
+	CreateCommandList1:             proc "system" (this: ^IDevice4, nodeMask: u32, type: COMMAND_LIST_TYPE, flags: COMMAND_LIST_FLAGS, riid: ^IID, ppCommandList: ^rawptr) -> HRESULT,
+	CreateProtectedResourceSession: proc "system" (this: ^IDevice4, pDesc: ^PROTECTED_RESOURCE_SESSION_DESC, riid: ^IID, ppSession: ^rawptr) -> HRESULT,
+	CreateCommittedResource1:       proc "system" (this: ^IDevice4, pHeapProperties: ^HEAP_PROPERTIES, HeapFlags: HEAP_FLAGS, pDesc: ^RESOURCE_DESC, InitialResourceState: RESOURCE_STATES, pOptimizedClearValue: ^CLEAR_VALUE, pProtectedSession: ^IProtectedResourceSession, riidResource: ^IID, ppvResource: ^rawptr) -> HRESULT,
+	CreateHeap1:                    proc "system" (this: ^IDevice4, pDesc: ^HEAP_DESC, pProtectedSession: ^IProtectedResourceSession, riid: ^IID, ppvHeap: ^rawptr) -> HRESULT,
+	CreateReservedResource1:        proc "system" (this: ^IDevice4, pDesc: ^RESOURCE_DESC, InitialState: RESOURCE_STATES, pOptimizedClearValue: ^CLEAR_VALUE, pProtectedSession: ^IProtectedResourceSession, riid: ^IID, ppvResource: ^rawptr) -> HRESULT,
+	GetResourceAllocationInfo1:     proc "system" (this: ^IDevice4, RetVal: ^RESOURCE_ALLOCATION_INFO, visibleMask: u32, numResourceDescs: u32, pResourceDescs: ^RESOURCE_DESC, pResourceAllocationInfo1: ^RESOURCE_ALLOCATION_INFO1),
 }
 
 LIFETIME_STATE :: enum i32 {
@@ -2746,7 +2746,7 @@ ILifetimeOwner :: struct #raw_union {
 }
 ILifetimeOwner_VTable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
-	LifetimeStateUpdated: proc "stdcall" (this: ^ILifetimeOwner, NewState: LIFETIME_STATE),
+	LifetimeStateUpdated: proc "system" (this: ^ILifetimeOwner, NewState: LIFETIME_STATE),
 }
 
 
@@ -2758,10 +2758,10 @@ ISwapChainAssistant :: struct #raw_union {
 }
 ISwapChainAssistant_VTable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
-	GetLUID:                           proc "stdcall" (this: ^ISwapChainAssistant) -> LUID,
-	GetSwapChainObject:                proc "stdcall" (this: ^ISwapChainAssistant, riid: ^IID, ppv: ^rawptr) -> HRESULT,
-	GetCurrentResourceAndCommandQueue: proc "stdcall" (this: ^ISwapChainAssistant, riidResource: ^IID, ppvResource: ^rawptr, riidQueue: ^IID, ppvQueue: ^rawptr) -> HRESULT,
-	InsertImplicitSync:                proc "stdcall" (this: ^ISwapChainAssistant) -> HRESULT,
+	GetLUID:                           proc "system" (this: ^ISwapChainAssistant) -> LUID,
+	GetSwapChainObject:                proc "system" (this: ^ISwapChainAssistant, riid: ^IID, ppv: ^rawptr) -> HRESULT,
+	GetCurrentResourceAndCommandQueue: proc "system" (this: ^ISwapChainAssistant, riidResource: ^IID, ppvResource: ^rawptr, riidQueue: ^IID, ppvQueue: ^rawptr) -> HRESULT,
+	InsertImplicitSync:                proc "system" (this: ^ISwapChainAssistant) -> HRESULT,
 }
 
 
@@ -2773,7 +2773,7 @@ ILifetimeTracker :: struct #raw_union {
 }
 ILifetimeTracker_VTable :: struct {
 	using id3d12devicechild_vtable: IDeviceChild_VTable,
-	DestroyOwnedObject: proc "stdcall" (this: ^ILifetimeTracker, pObject: ^IDeviceChild) -> HRESULT,
+	DestroyOwnedObject: proc "system" (this: ^ILifetimeTracker, pObject: ^IDeviceChild) -> HRESULT,
 }
 
 META_COMMAND_PARAMETER_TYPE :: enum i32 {
@@ -2848,10 +2848,10 @@ IStateObjectProperties :: struct #raw_union {
 }
 IStateObjectProperties_VTable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
-	GetShaderIdentifier:  proc "stdcall" (this: ^IStateObjectProperties, pExportName: [^]u16) -> rawptr,
-	GetShaderStackSize:   proc "stdcall" (this: ^IStateObjectProperties, pExportName: [^]u16) -> u64,
-	GetPipelineStackSize: proc "stdcall" (this: ^IStateObjectProperties) -> u64,
-	SetPipelineStackSize: proc "stdcall" (this: ^IStateObjectProperties, PipelineStackSizeInBytes: u64),
+	GetShaderIdentifier:  proc "system" (this: ^IStateObjectProperties, pExportName: [^]u16) -> rawptr,
+	GetShaderStackSize:   proc "system" (this: ^IStateObjectProperties, pExportName: [^]u16) -> u64,
+	GetPipelineStackSize: proc "system" (this: ^IStateObjectProperties) -> u64,
+	SetPipelineStackSize: proc "system" (this: ^IStateObjectProperties, PipelineStackSizeInBytes: u64),
 }
 
 STATE_SUBOBJECT_TYPE :: enum i32 {
@@ -3190,14 +3190,14 @@ IDevice5 :: struct #raw_union {
 }
 IDevice5_VTable :: struct {
 	using id3d12device4_vtable: IDevice4_VTable,
-	CreateLifetimeTracker:                          proc "stdcall" (this: ^IDevice5, pOwner: ^ILifetimeOwner, riid: ^IID, ppvTracker: ^rawptr) -> HRESULT,
-	RemoveDevice:                                   proc "stdcall" (this: ^IDevice5),
-	EnumerateMetaCommands:                          proc "stdcall" (this: ^IDevice5, pNumMetaCommands: ^u32, pDescs: ^META_COMMAND_DESC) -> HRESULT,
-	EnumerateMetaCommandParameters:                 proc "stdcall" (this: ^IDevice5, CommandId: ^GUID, Stage: META_COMMAND_PARAMETER_STAGE, pTotalStructureSizeInBytes: ^u32, pParameterCount: ^u32, pParameterDescs: ^META_COMMAND_PARAMETER_DESC) -> HRESULT,
-	CreateMetaCommand:                              proc "stdcall" (this: ^IDevice5, CommandId: ^GUID, NodeMask: u32, pCreationParametersData: rawptr, CreationParametersDataSizeInBytes: SIZE_T, riid: ^IID, ppMetaCommand: ^rawptr) -> HRESULT,
-	CreateStateObject:                              proc "stdcall" (this: ^IDevice5, pDesc: ^STATE_OBJECT_DESC, riid: ^IID, ppStateObject: ^rawptr) -> HRESULT,
-	GetRaytracingAccelerationStructurePrebuildInfo: proc "stdcall" (this: ^IDevice5, pDesc: ^BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS, pInfo: ^RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO),
-	CheckDriverMatchingIdentifier:                  proc "stdcall" (this: ^IDevice5, SerializedDataType: SERIALIZED_DATA_TYPE, pIdentifierToCheck: ^SERIALIZED_DATA_DRIVER_MATCHING_IDENTIFIER) -> DRIVER_MATCHING_IDENTIFIER_STATUS,
+	CreateLifetimeTracker:                          proc "system" (this: ^IDevice5, pOwner: ^ILifetimeOwner, riid: ^IID, ppvTracker: ^rawptr) -> HRESULT,
+	RemoveDevice:                                   proc "system" (this: ^IDevice5),
+	EnumerateMetaCommands:                          proc "system" (this: ^IDevice5, pNumMetaCommands: ^u32, pDescs: ^META_COMMAND_DESC) -> HRESULT,
+	EnumerateMetaCommandParameters:                 proc "system" (this: ^IDevice5, CommandId: ^GUID, Stage: META_COMMAND_PARAMETER_STAGE, pTotalStructureSizeInBytes: ^u32, pParameterCount: ^u32, pParameterDescs: ^META_COMMAND_PARAMETER_DESC) -> HRESULT,
+	CreateMetaCommand:                              proc "system" (this: ^IDevice5, CommandId: ^GUID, NodeMask: u32, pCreationParametersData: rawptr, CreationParametersDataSizeInBytes: SIZE_T, riid: ^IID, ppMetaCommand: ^rawptr) -> HRESULT,
+	CreateStateObject:                              proc "system" (this: ^IDevice5, pDesc: ^STATE_OBJECT_DESC, riid: ^IID, ppStateObject: ^rawptr) -> HRESULT,
+	GetRaytracingAccelerationStructurePrebuildInfo: proc "system" (this: ^IDevice5, pDesc: ^BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS, pInfo: ^RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO),
+	CheckDriverMatchingIdentifier:                  proc "system" (this: ^IDevice5, SerializedDataType: SERIALIZED_DATA_TYPE, pIdentifierToCheck: ^SERIALIZED_DATA_DRIVER_MATCHING_IDENTIFIER) -> DRIVER_MATCHING_IDENTIFIER_STATUS,
 }
 
 AUTO_BREADCRUMB_OP :: enum i32 {
@@ -3397,9 +3397,9 @@ IDeviceRemovedExtendedDataSettings :: struct #raw_union {
 }
 IDeviceRemovedExtendedDataSettings_VTable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
-	SetAutoBreadcrumbsEnablement: proc "stdcall" (this: ^IDeviceRemovedExtendedDataSettings, Enablement: DRED_ENABLEMENT),
-	SetPageFaultEnablement:       proc "stdcall" (this: ^IDeviceRemovedExtendedDataSettings, Enablement: DRED_ENABLEMENT),
-	SetWatsonDumpEnablement:      proc "stdcall" (this: ^IDeviceRemovedExtendedDataSettings, Enablement: DRED_ENABLEMENT),
+	SetAutoBreadcrumbsEnablement: proc "system" (this: ^IDeviceRemovedExtendedDataSettings, Enablement: DRED_ENABLEMENT),
+	SetPageFaultEnablement:       proc "system" (this: ^IDeviceRemovedExtendedDataSettings, Enablement: DRED_ENABLEMENT),
+	SetWatsonDumpEnablement:      proc "system" (this: ^IDeviceRemovedExtendedDataSettings, Enablement: DRED_ENABLEMENT),
 }
 
 
@@ -3411,7 +3411,7 @@ IDeviceRemovedExtendedDataSettings1 :: struct #raw_union {
 }
 IDeviceRemovedExtendedDataSettings1_VTable :: struct {
 	using id3d12deviceremovedextendeddatasettings_vtable: IDeviceRemovedExtendedDataSettings_VTable,
-	SetBreadcrumbContextEnablement: proc "stdcall" (this: ^IDeviceRemovedExtendedDataSettings1, Enablement: DRED_ENABLEMENT),
+	SetBreadcrumbContextEnablement: proc "system" (this: ^IDeviceRemovedExtendedDataSettings1, Enablement: DRED_ENABLEMENT),
 }
 
 
@@ -3423,8 +3423,8 @@ IDeviceRemovedExtendedData :: struct #raw_union {
 }
 IDeviceRemovedExtendedData_VTable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
-	GetAutoBreadcrumbsOutput:     proc "stdcall" (this: ^IDeviceRemovedExtendedData, pOutput: ^DRED_AUTO_BREADCRUMBS_OUTPUT) -> HRESULT,
-	GetPageFaultAllocationOutput: proc "stdcall" (this: ^IDeviceRemovedExtendedData, pOutput: ^DRED_PAGE_FAULT_OUTPUT) -> HRESULT,
+	GetAutoBreadcrumbsOutput:     proc "system" (this: ^IDeviceRemovedExtendedData, pOutput: ^DRED_AUTO_BREADCRUMBS_OUTPUT) -> HRESULT,
+	GetPageFaultAllocationOutput: proc "system" (this: ^IDeviceRemovedExtendedData, pOutput: ^DRED_PAGE_FAULT_OUTPUT) -> HRESULT,
 }
 
 
@@ -3436,8 +3436,8 @@ IDeviceRemovedExtendedData1 :: struct #raw_union {
 }
 IDeviceRemovedExtendedData1_VTable :: struct {
 	using id3d12deviceremovedextendeddata_vtable: IDeviceRemovedExtendedData_VTable,
-	GetAutoBreadcrumbsOutput1:     proc "stdcall" (this: ^IDeviceRemovedExtendedData1, pOutput: ^DRED_AUTO_BREADCRUMBS_OUTPUT1) -> HRESULT,
-	GetPageFaultAllocationOutput1: proc "stdcall" (this: ^IDeviceRemovedExtendedData1, pOutput: ^DRED_PAGE_FAULT_OUTPUT1) -> HRESULT,
+	GetAutoBreadcrumbsOutput1:     proc "system" (this: ^IDeviceRemovedExtendedData1, pOutput: ^DRED_AUTO_BREADCRUMBS_OUTPUT1) -> HRESULT,
+	GetPageFaultAllocationOutput1: proc "system" (this: ^IDeviceRemovedExtendedData1, pOutput: ^DRED_PAGE_FAULT_OUTPUT1) -> HRESULT,
 }
 
 BACKGROUND_PROCESSING_MODE :: enum i32 {
@@ -3463,7 +3463,7 @@ IDevice6 :: struct #raw_union {
 }
 IDevice6_VTable :: struct {
 	using id3d12device5_vtable: IDevice5_VTable,
-	SetBackgroundProcessingMode: proc "stdcall" (this: ^IDevice6, Mode: BACKGROUND_PROCESSING_MODE, MeasurementsAction: MEASUREMENTS_ACTION, hEventToSignalUponCompletion: HANDLE, pbFurtherMeasurementsDesired: ^BOOL) -> HRESULT,
+	SetBackgroundProcessingMode: proc "system" (this: ^IDevice6, Mode: BACKGROUND_PROCESSING_MODE, MeasurementsAction: MEASUREMENTS_ACTION, hEventToSignalUponCompletion: HANDLE, pbFurtherMeasurementsDesired: ^BOOL) -> HRESULT,
 }
 
 FEATURE_DATA_PROTECTED_RESOURCE_SESSION_TYPE_COUNT :: struct {
@@ -3492,7 +3492,7 @@ IProtectedResourceSession1 :: struct #raw_union {
 }
 IProtectedResourceSession1_VTable :: struct {
 	using id3d12protectedresourcesession_vtable: IProtectedResourceSession_VTable,
-	GetDesc1: proc "stdcall" (this: ^IProtectedResourceSession1) -> PROTECTED_RESOURCE_SESSION_DESC1,
+	GetDesc1: proc "system" (this: ^IProtectedResourceSession1) -> PROTECTED_RESOURCE_SESSION_DESC1,
 }
 
 
@@ -3504,8 +3504,8 @@ IDevice7 :: struct #raw_union {
 }
 IDevice7_VTable :: struct {
 	using id3d12device6_vtable: IDevice6_VTable,
-	AddToStateObject: proc "stdcall" (this: ^IDevice7, pAddition: ^STATE_OBJECT_DESC, pStateObjectToGrowFrom: ^IStateObject, riid: ^IID, ppNewStateObject: ^rawptr) -> HRESULT,
-	CreateProtectedResourceSession1: proc "stdcall" (this: ^IDevice7, pDesc: ^PROTECTED_RESOURCE_SESSION_DESC1, riid: ^IID, ppSession: ^rawptr) -> HRESULT,
+	AddToStateObject: proc "system" (this: ^IDevice7, pAddition: ^STATE_OBJECT_DESC, pStateObjectToGrowFrom: ^IStateObject, riid: ^IID, ppNewStateObject: ^rawptr) -> HRESULT,
+	CreateProtectedResourceSession1: proc "system" (this: ^IDevice7, pDesc: ^PROTECTED_RESOURCE_SESSION_DESC1, riid: ^IID, ppSession: ^rawptr) -> HRESULT,
 }
 
 
@@ -3517,11 +3517,11 @@ IDevice8 :: struct #raw_union {
 }
 IDevice8_VTable :: struct {
 	using id3d12device7_vtable: IDevice7_VTable,
-	GetResourceAllocationInfo2:               proc "stdcall" (this: ^IDevice8, RetVal: ^RESOURCE_ALLOCATION_INFO, visibleMask: u32, numResourceDescs: u32, pResourceDescs: ^RESOURCE_DESC1, pResourceAllocationInfo1: ^RESOURCE_ALLOCATION_INFO1),
-	CreateCommittedResource2:                 proc "stdcall" (this: ^IDevice8, pHeapProperties: ^HEAP_PROPERTIES, HeapFlags: HEAP_FLAGS, pDesc: ^RESOURCE_DESC1, InitialResourceState: RESOURCE_STATES, pOptimizedClearValue: ^CLEAR_VALUE, pProtectedSession: ^IProtectedResourceSession, riidResource: ^IID, ppvResource: ^rawptr) -> HRESULT,
-	CreatePlacedResource1:                    proc "stdcall" (this: ^IDevice8, pHeap: ^IHeap, HeapOffset: u64, pDesc: ^RESOURCE_DESC1, InitialState: RESOURCE_STATES, pOptimizedClearValue: ^CLEAR_VALUE, riid: ^IID, ppvResource: ^rawptr) -> HRESULT,
-	CreateSamplerFeedbackUnorderedAccessView: proc "stdcall" (this: ^IDevice8, pTargetedResource: ^IResource, pFeedbackResource: ^IResource, DestDescriptor: CPU_DESCRIPTOR_HANDLE),
-	GetCopyableFootprints1:                   proc "stdcall" (this: ^IDevice8, pResourceDesc: ^RESOURCE_DESC1, FirstSubresource: u32, NumSubresources: u32, BaseOffset: u64, pLayouts: ^PLACED_SUBRESOURCE_FOOTPRINT, pNumRows: ^u32, pRowSizeInBytes: ^u64, pTotalBytes: ^u64),
+	GetResourceAllocationInfo2:               proc "system" (this: ^IDevice8, RetVal: ^RESOURCE_ALLOCATION_INFO, visibleMask: u32, numResourceDescs: u32, pResourceDescs: ^RESOURCE_DESC1, pResourceAllocationInfo1: ^RESOURCE_ALLOCATION_INFO1),
+	CreateCommittedResource2:                 proc "system" (this: ^IDevice8, pHeapProperties: ^HEAP_PROPERTIES, HeapFlags: HEAP_FLAGS, pDesc: ^RESOURCE_DESC1, InitialResourceState: RESOURCE_STATES, pOptimizedClearValue: ^CLEAR_VALUE, pProtectedSession: ^IProtectedResourceSession, riidResource: ^IID, ppvResource: ^rawptr) -> HRESULT,
+	CreatePlacedResource1:                    proc "system" (this: ^IDevice8, pHeap: ^IHeap, HeapOffset: u64, pDesc: ^RESOURCE_DESC1, InitialState: RESOURCE_STATES, pOptimizedClearValue: ^CLEAR_VALUE, riid: ^IID, ppvResource: ^rawptr) -> HRESULT,
+	CreateSamplerFeedbackUnorderedAccessView: proc "system" (this: ^IDevice8, pTargetedResource: ^IResource, pFeedbackResource: ^IResource, DestDescriptor: CPU_DESCRIPTOR_HANDLE),
+	GetCopyableFootprints1:                   proc "system" (this: ^IDevice8, pResourceDesc: ^RESOURCE_DESC1, FirstSubresource: u32, NumSubresources: u32, BaseOffset: u64, pLayouts: ^PLACED_SUBRESOURCE_FOOTPRINT, pNumRows: ^u32, pRowSizeInBytes: ^u64, pTotalBytes: ^u64),
 }
 
 
@@ -3533,7 +3533,7 @@ IResource1 :: struct #raw_union {
 }
 IResource1_VTable :: struct {
 	using id3d12resource_vtable: IResource_VTable,
-	GetProtectedResourceSession: proc "stdcall" (this: ^IResource1, riid: ^IID, ppProtectedSession: ^rawptr) -> HRESULT,
+	GetProtectedResourceSession: proc "system" (this: ^IResource1, riid: ^IID, ppProtectedSession: ^rawptr) -> HRESULT,
 }
 
 
@@ -3545,7 +3545,7 @@ IResource2 :: struct #raw_union {
 }
 IResource2_VTable :: struct {
 	using id3d12resource1_vtable: IResource1_VTable,
-	GetDesc1: proc "stdcall" (this: ^IResource2) -> RESOURCE_DESC1,
+	GetDesc1: proc "system" (this: ^IResource2) -> RESOURCE_DESC1,
 }
 
 
@@ -3557,7 +3557,7 @@ IHeap1 :: struct #raw_union {
 }
 IHeap1_VTable :: struct {
 	using id3d12heap_vtable: IHeap_VTable,
-	GetProtectedResourceSession: proc "stdcall" (this: ^IHeap1, riid: ^IID, ppProtectedSession: ^rawptr) -> HRESULT,
+	GetProtectedResourceSession: proc "system" (this: ^IHeap1, riid: ^IID, ppProtectedSession: ^rawptr) -> HRESULT,
 }
 
 
@@ -3569,7 +3569,7 @@ IGraphicsCommandList3 :: struct #raw_union {
 }
 IGraphicsCommandList3_VTable :: struct {
 	using id3d12graphicscommandlist2_vtable: IGraphicsCommandList2_VTable,
-	SetProtectedResourceSession: proc "stdcall" (this: ^IGraphicsCommandList3, pProtectedResourceSession: ^IProtectedResourceSession),
+	SetProtectedResourceSession: proc "system" (this: ^IGraphicsCommandList3, pProtectedResourceSession: ^IProtectedResourceSession),
 }
 
 RENDER_PASS_BEGINNING_ACCESS_TYPE :: enum i32 {
@@ -3652,7 +3652,7 @@ IMetaCommand :: struct #raw_union {
 }
 IMetaCommand_VTable :: struct {
 	using id3d12devicechild_vtable: IDeviceChild_VTable,
-	GetRequiredParameterResourceSize: proc "stdcall" (this: ^IMetaCommand, Stage: META_COMMAND_PARAMETER_STAGE, ParameterIndex: u32) -> u64,
+	GetRequiredParameterResourceSize: proc "system" (this: ^IMetaCommand, Stage: META_COMMAND_PARAMETER_STAGE, ParameterIndex: u32) -> u64,
 }
 
 DISPATCH_RAYS_DESC :: struct {
@@ -3674,15 +3674,15 @@ IGraphicsCommandList4 :: struct #raw_union {
 }
 IGraphicsCommandList4_VTable :: struct {
 	using id3d12graphicscommandlist3_vtable: IGraphicsCommandList3_VTable,
-	BeginRenderPass:                                  proc "stdcall" (this: ^IGraphicsCommandList4, NumRenderTargets: u32, pRenderTargets: ^RENDER_PASS_RENDER_TARGET_DESC, pDepthStencil: ^RENDER_PASS_DEPTH_STENCIL_DESC, Flags: RENDER_PASS_FLAGS),
-	EndRenderPass:                                    proc "stdcall" (this: ^IGraphicsCommandList4),
-	InitializeMetaCommand:                            proc "stdcall" (this: ^IGraphicsCommandList4, pMetaCommand: ^IMetaCommand, pInitializationParametersData: rawptr, InitializationParametersDataSizeInBytes: SIZE_T),
-	ExecuteMetaCommand:                               proc "stdcall" (this: ^IGraphicsCommandList4, pMetaCommand: ^IMetaCommand, pExecutionParametersData: rawptr, ExecutionParametersDataSizeInBytes: SIZE_T),
-	BuildRaytracingAccelerationStructure:             proc "stdcall" (this: ^IGraphicsCommandList4, pDesc: ^BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC, NumPostbuildInfoDescs: u32, pPostbuildInfoDescs: ^RAYTRACING_ACCELERATION_STRUCTURE_POSTBUILD_INFO_DESC),
-	EmitRaytracingAccelerationStructurePostbuildInfo: proc "stdcall" (this: ^IGraphicsCommandList4, pDesc: ^RAYTRACING_ACCELERATION_STRUCTURE_POSTBUILD_INFO_DESC, NumSourceAccelerationStructures: u32, pSourceAccelerationStructureData: ^GPU_VIRTUAL_ADDRESS),
-	CopyRaytracingAccelerationStructure:              proc "stdcall" (this: ^IGraphicsCommandList4, DestAccelerationStructureData: GPU_VIRTUAL_ADDRESS, SourceAccelerationStructureData: GPU_VIRTUAL_ADDRESS, Mode: RAYTRACING_ACCELERATION_STRUCTURE_COPY_MODE),
-	SetPipelineState1:                                proc "stdcall" (this: ^IGraphicsCommandList4, pStateObject: ^IStateObject),
-	DispatchRays:                                     proc "stdcall" (this: ^IGraphicsCommandList4, pDesc: ^DISPATCH_RAYS_DESC),
+	BeginRenderPass:                                  proc "system" (this: ^IGraphicsCommandList4, NumRenderTargets: u32, pRenderTargets: ^RENDER_PASS_RENDER_TARGET_DESC, pDepthStencil: ^RENDER_PASS_DEPTH_STENCIL_DESC, Flags: RENDER_PASS_FLAGS),
+	EndRenderPass:                                    proc "system" (this: ^IGraphicsCommandList4),
+	InitializeMetaCommand:                            proc "system" (this: ^IGraphicsCommandList4, pMetaCommand: ^IMetaCommand, pInitializationParametersData: rawptr, InitializationParametersDataSizeInBytes: SIZE_T),
+	ExecuteMetaCommand:                               proc "system" (this: ^IGraphicsCommandList4, pMetaCommand: ^IMetaCommand, pExecutionParametersData: rawptr, ExecutionParametersDataSizeInBytes: SIZE_T),
+	BuildRaytracingAccelerationStructure:             proc "system" (this: ^IGraphicsCommandList4, pDesc: ^BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC, NumPostbuildInfoDescs: u32, pPostbuildInfoDescs: ^RAYTRACING_ACCELERATION_STRUCTURE_POSTBUILD_INFO_DESC),
+	EmitRaytracingAccelerationStructurePostbuildInfo: proc "system" (this: ^IGraphicsCommandList4, pDesc: ^RAYTRACING_ACCELERATION_STRUCTURE_POSTBUILD_INFO_DESC, NumSourceAccelerationStructures: u32, pSourceAccelerationStructureData: ^GPU_VIRTUAL_ADDRESS),
+	CopyRaytracingAccelerationStructure:              proc "system" (this: ^IGraphicsCommandList4, DestAccelerationStructureData: GPU_VIRTUAL_ADDRESS, SourceAccelerationStructureData: GPU_VIRTUAL_ADDRESS, Mode: RAYTRACING_ACCELERATION_STRUCTURE_COPY_MODE),
+	SetPipelineState1:                                proc "system" (this: ^IGraphicsCommandList4, pStateObject: ^IStateObject),
+	DispatchRays:                                     proc "system" (this: ^IGraphicsCommandList4, pDesc: ^DISPATCH_RAYS_DESC),
 }
 
 
@@ -3694,8 +3694,8 @@ ITools :: struct #raw_union {
 }
 ITools_VTable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
-	EnableShaderInstrumentation: proc "stdcall" (this: ^ITools, bEnable: BOOL),
-	ShaderInstrumentationEnabled: proc "stdcall" (this: ^ITools) -> BOOL,
+	EnableShaderInstrumentation: proc "system" (this: ^ITools, bEnable: BOOL),
+	ShaderInstrumentationEnabled: proc "system" (this: ^ITools) -> BOOL,
 }
 
 SUBRESOURCE_DATA :: struct {
@@ -3719,7 +3719,7 @@ IDebug :: struct #raw_union {
 }
 IDebug_VTable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
-	EnableDebugLayer: proc "stdcall" (this: ^IDebug),
+	EnableDebugLayer: proc "system" (this: ^IDebug),
 }
 
 GPU_BASED_VALIDATION_FLAGS :: distinct bit_set[GPU_BASED_VALIDATION_FLAG; u32]
@@ -3736,9 +3736,9 @@ IDebug1 :: struct #raw_union {
 }
 IDebug1_VTable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
-	EnableDebugLayer:                            proc "stdcall" (this: ^IDebug1),
-	SetEnableGPUBasedValidation:                 proc "stdcall" (this: ^IDebug1, Enable: BOOL),
-	SetEnableSynchronizedCommandQueueValidation: proc "stdcall" (this: ^IDebug1, Enable: BOOL),
+	EnableDebugLayer:                            proc "system" (this: ^IDebug1),
+	SetEnableGPUBasedValidation:                 proc "system" (this: ^IDebug1, Enable: BOOL),
+	SetEnableSynchronizedCommandQueueValidation: proc "system" (this: ^IDebug1, Enable: BOOL),
 }
 
 
@@ -3749,7 +3749,7 @@ IDebug2 :: struct #raw_union {
 }
 IDebug2_VTable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
-	SetGPUBasedValidationFlags: proc "stdcall" (this: ^IDebug2, Flags: GPU_BASED_VALIDATION_FLAGS),
+	SetGPUBasedValidationFlags: proc "system" (this: ^IDebug2, Flags: GPU_BASED_VALIDATION_FLAGS),
 }
 
 
@@ -3761,9 +3761,9 @@ IDebug3 :: struct #raw_union {
 }
 IDebug3_VTable :: struct {
 	using id3d12debug_vtable: IDebug_VTable,
-	SetEnableGPUBasedValidation:                 proc "stdcall" (this: ^IDebug3, Enable: BOOL),
-	SetEnableSynchronizedCommandQueueValidation: proc "stdcall" (this: ^IDebug3, Enable: BOOL),
-	SetGPUBasedValidationFlags:                  proc "stdcall" (this: ^IDebug3, Flags: GPU_BASED_VALIDATION_FLAGS),
+	SetEnableGPUBasedValidation:                 proc "system" (this: ^IDebug3, Enable: BOOL),
+	SetEnableSynchronizedCommandQueueValidation: proc "system" (this: ^IDebug3, Enable: BOOL),
+	SetGPUBasedValidationFlags:                  proc "system" (this: ^IDebug3, Flags: GPU_BASED_VALIDATION_FLAGS),
 }
 
 RLDO_FLAGS :: distinct bit_set[RLDO_FLAG; u32]
@@ -3826,9 +3826,9 @@ IDebugDevice1 :: struct #raw_union {
 }
 IDebugDevice1_VTable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
-	SetDebugParameter:       proc "stdcall" (this: ^IDebugDevice1, Type: DEBUG_DEVICE_PARAMETER_TYPE, pData: rawptr, DataSize: u32) -> HRESULT,
-	GetDebugParameter:       proc "stdcall" (this: ^IDebugDevice1, Type: DEBUG_DEVICE_PARAMETER_TYPE, pData: rawptr, DataSize: u32) -> HRESULT,
-	ReportLiveDeviceObjects: proc "stdcall" (this: ^IDebugDevice1, Flags: RLDO_FLAGS) -> HRESULT,
+	SetDebugParameter:       proc "system" (this: ^IDebugDevice1, Type: DEBUG_DEVICE_PARAMETER_TYPE, pData: rawptr, DataSize: u32) -> HRESULT,
+	GetDebugParameter:       proc "system" (this: ^IDebugDevice1, Type: DEBUG_DEVICE_PARAMETER_TYPE, pData: rawptr, DataSize: u32) -> HRESULT,
+	ReportLiveDeviceObjects: proc "system" (this: ^IDebugDevice1, Flags: RLDO_FLAGS) -> HRESULT,
 }
 
 
@@ -3840,9 +3840,9 @@ IDebugDevice :: struct #raw_union {
 }
 IDebugDevice_VTable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
-	SetFeatureMask:          proc "stdcall" (this: ^IDebugDevice, Mask: DEBUG_FEATURE) -> HRESULT,
-	GetFeatureMask:          proc "stdcall" (this: ^IDebugDevice) -> DEBUG_FEATURE,
-	ReportLiveDeviceObjects: proc "stdcall" (this: ^IDebugDevice, Flags: RLDO_FLAGS) -> HRESULT,
+	SetFeatureMask:          proc "system" (this: ^IDebugDevice, Mask: DEBUG_FEATURE) -> HRESULT,
+	GetFeatureMask:          proc "system" (this: ^IDebugDevice) -> DEBUG_FEATURE,
+	ReportLiveDeviceObjects: proc "system" (this: ^IDebugDevice, Flags: RLDO_FLAGS) -> HRESULT,
 }
 
 
@@ -3854,8 +3854,8 @@ IDebugDevice2 :: struct #raw_union {
 }
 IDebugDevice2_VTable :: struct {
 	using id3d12debugdevice_vtable: IDebugDevice_VTable,
-	SetDebugParameter: proc "stdcall" (this: ^IDebugDevice2, Type: DEBUG_DEVICE_PARAMETER_TYPE, pData: rawptr, DataSize: u32) -> HRESULT,
-	GetDebugParameter: proc "stdcall" (this: ^IDebugDevice2, Type: DEBUG_DEVICE_PARAMETER_TYPE, pData: rawptr, DataSize: u32) -> HRESULT,
+	SetDebugParameter: proc "system" (this: ^IDebugDevice2, Type: DEBUG_DEVICE_PARAMETER_TYPE, pData: rawptr, DataSize: u32) -> HRESULT,
+	GetDebugParameter: proc "system" (this: ^IDebugDevice2, Type: DEBUG_DEVICE_PARAMETER_TYPE, pData: rawptr, DataSize: u32) -> HRESULT,
 }
 
 
@@ -3867,7 +3867,7 @@ IDebugCommandQueue :: struct #raw_union {
 }
 IDebugCommandQueue_VTable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
-	AssertResourceState: proc "stdcall" (this: ^IDebugCommandQueue, pResource: ^IResource, Subresource: u32, State: u32) -> BOOL,
+	AssertResourceState: proc "system" (this: ^IDebugCommandQueue, pResource: ^IResource, Subresource: u32, State: u32) -> BOOL,
 }
 
 DEBUG_COMMAND_LIST_PARAMETER_TYPE :: enum i32 {
@@ -3887,9 +3887,9 @@ IDebugCommandList1 :: struct #raw_union {
 }
 IDebugCommandList1_VTable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
-	AssertResourceState: proc "stdcall" (this: ^IDebugCommandList1, pResource: ^IResource, Subresource: u32, State: u32) -> BOOL,
-	SetDebugParameter:   proc "stdcall" (this: ^IDebugCommandList1, Type: DEBUG_COMMAND_LIST_PARAMETER_TYPE, pData: rawptr, DataSize: u32) -> HRESULT,
-	GetDebugParameter:   proc "stdcall" (this: ^IDebugCommandList1, Type: DEBUG_COMMAND_LIST_PARAMETER_TYPE, pData: rawptr, DataSize: u32) -> HRESULT,
+	AssertResourceState: proc "system" (this: ^IDebugCommandList1, pResource: ^IResource, Subresource: u32, State: u32) -> BOOL,
+	SetDebugParameter:   proc "system" (this: ^IDebugCommandList1, Type: DEBUG_COMMAND_LIST_PARAMETER_TYPE, pData: rawptr, DataSize: u32) -> HRESULT,
+	GetDebugParameter:   proc "system" (this: ^IDebugCommandList1, Type: DEBUG_COMMAND_LIST_PARAMETER_TYPE, pData: rawptr, DataSize: u32) -> HRESULT,
 }
 
 
@@ -3901,9 +3901,9 @@ IDebugCommandList :: struct #raw_union {
 }
 IDebugCommandList_VTable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
-	AssertResourceState: proc "stdcall" (this: ^IDebugCommandList, pResource: ^IResource, Subresource: u32, State: u32) -> BOOL,
-	SetFeatureMask: proc "stdcall" (this: ^IDebugCommandList, Mask: DEBUG_FEATURE) -> HRESULT,
-	GetFeatureMask: proc "stdcall" (this: ^IDebugCommandList) -> DEBUG_FEATURE,
+	AssertResourceState: proc "system" (this: ^IDebugCommandList, pResource: ^IResource, Subresource: u32, State: u32) -> BOOL,
+	SetFeatureMask: proc "system" (this: ^IDebugCommandList, Mask: DEBUG_FEATURE) -> HRESULT,
+	GetFeatureMask: proc "system" (this: ^IDebugCommandList) -> DEBUG_FEATURE,
 }
 
 
@@ -3915,8 +3915,8 @@ IDebugCommandList2 :: struct #raw_union {
 }
 IDebugCommandList2_VTable :: struct {
 	using id3d12debugcommandlist_vtable: IDebugCommandList_VTable,
-	SetDebugParameter: proc "stdcall" (this: ^IDebugCommandList2, Type: DEBUG_COMMAND_LIST_PARAMETER_TYPE, pData: rawptr, DataSize: u32) -> HRESULT,
-	GetDebugParameter: proc "stdcall" (this: ^IDebugCommandList2, Type: DEBUG_COMMAND_LIST_PARAMETER_TYPE, pData: rawptr, DataSize: u32) -> HRESULT,
+	SetDebugParameter: proc "system" (this: ^IDebugCommandList2, Type: DEBUG_COMMAND_LIST_PARAMETER_TYPE, pData: rawptr, DataSize: u32) -> HRESULT,
+	GetDebugParameter: proc "system" (this: ^IDebugCommandList2, Type: DEBUG_COMMAND_LIST_PARAMETER_TYPE, pData: rawptr, DataSize: u32) -> HRESULT,
 }
 
 
@@ -3928,10 +3928,10 @@ ISharingContract :: struct #raw_union {
 }
 ISharingContract_VTable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
-	Present:             proc "stdcall" (this: ^ISharingContract, pResource: ^IResource, Subresource: u32, window: HWND),
-	SharedFenceSignal:   proc "stdcall" (this: ^ISharingContract, pFence: ^IFence, FenceValue: u64),
-	BeginCapturableWork: proc "stdcall" (this: ^ISharingContract, guid: ^GUID),
-	EndCapturableWork:   proc "stdcall" (this: ^ISharingContract, guid: ^GUID),
+	Present:             proc "system" (this: ^ISharingContract, pResource: ^IResource, Subresource: u32, window: HWND),
+	SharedFenceSignal:   proc "system" (this: ^ISharingContract, pFence: ^IFence, FenceValue: u64),
+	BeginCapturableWork: proc "system" (this: ^ISharingContract, guid: ^GUID),
+	EndCapturableWork:   proc "system" (this: ^ISharingContract, guid: ^GUID),
 }
 
 MESSAGE_CATEGORY :: enum i32 {
@@ -4834,41 +4834,41 @@ IInfoQueue :: struct #raw_union {
 }
 IInfoQueue_VTable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
-	SetMessageCountLimit:                         proc "stdcall" (this: ^IInfoQueue, MessageCountLimit: u64) -> HRESULT,
-	ClearStoredMessages:                          proc "stdcall" (this: ^IInfoQueue),
-	GetMessageA:                                  proc "stdcall" (this: ^IInfoQueue, MessageIndex: u64, pMessage: ^MESSAGE, pMessageByteLength: ^SIZE_T) -> HRESULT,
-	GetNumMessagesAllowedByStorageFilter:         proc "stdcall" (this: ^IInfoQueue) -> u64,
-	GetNumMessagesDeniedByStorageFilter:          proc "stdcall" (this: ^IInfoQueue) -> u64,
-	GetNumStoredMessages:                         proc "stdcall" (this: ^IInfoQueue) -> u64,
-	GetNumStoredMessagesAllowedByRetrievalFilter: proc "stdcall" (this: ^IInfoQueue) -> u64,
-	GetNumMessagesDiscardedByMessageCountLimit:   proc "stdcall" (this: ^IInfoQueue) -> u64,
-	GetMessageCountLimit:                         proc "stdcall" (this: ^IInfoQueue) -> u64,
-	AddStorageFilterEntries:                      proc "stdcall" (this: ^IInfoQueue, pFilter: ^INFO_QUEUE_FILTER) -> HRESULT,
-	GetStorageFilter:                             proc "stdcall" (this: ^IInfoQueue, pFilter: ^INFO_QUEUE_FILTER, pFilterByteLength: ^SIZE_T) -> HRESULT,
-	ClearStorageFilter:                           proc "stdcall" (this: ^IInfoQueue),
-	PushEmptyStorageFilter:                       proc "stdcall" (this: ^IInfoQueue) -> HRESULT,
-	PushCopyOfStorageFilter:                      proc "stdcall" (this: ^IInfoQueue) -> HRESULT,
-	PushStorageFilter:                            proc "stdcall" (this: ^IInfoQueue, pFilter: ^INFO_QUEUE_FILTER) -> HRESULT,
-	PopStorageFilter:                             proc "stdcall" (this: ^IInfoQueue),
-	GetStorageFilterStackSize:                    proc "stdcall" (this: ^IInfoQueue) -> u32,
-	AddRetrievalFilterEntries:                    proc "stdcall" (this: ^IInfoQueue, pFilter: ^INFO_QUEUE_FILTER) -> HRESULT,
-	GetRetrievalFilter:                           proc "stdcall" (this: ^IInfoQueue, pFilter: ^INFO_QUEUE_FILTER, pFilterByteLength: ^SIZE_T) -> HRESULT,
-	ClearRetrievalFilter:                         proc "stdcall" (this: ^IInfoQueue),
-	PushEmptyRetrievalFilter:                     proc "stdcall" (this: ^IInfoQueue) -> HRESULT,
-	PushCopyOfRetrievalFilter:                    proc "stdcall" (this: ^IInfoQueue) -> HRESULT,
-	PushRetrievalFilter:                          proc "stdcall" (this: ^IInfoQueue, pFilter: ^INFO_QUEUE_FILTER) -> HRESULT,
-	PopRetrievalFilter:                           proc "stdcall" (this: ^IInfoQueue),
-	GetRetrievalFilterStackSize:                  proc "stdcall" (this: ^IInfoQueue) -> u32,
-	AddMessage:                                   proc "stdcall" (this: ^IInfoQueue, Category: MESSAGE_CATEGORY, Severity: MESSAGE_SEVERITY, ID: MESSAGE_ID, pDescription: cstring) -> HRESULT,
-	AddApplicationMessage:                        proc "stdcall" (this: ^IInfoQueue, Severity: MESSAGE_SEVERITY, pDescription: cstring) -> HRESULT,
-	SetBreakOnCategory:                           proc "stdcall" (this: ^IInfoQueue, Category: MESSAGE_CATEGORY, bEnable: BOOL) -> HRESULT,
-	SetBreakOnSeverity:                           proc "stdcall" (this: ^IInfoQueue, Severity: MESSAGE_SEVERITY, bEnable: BOOL) -> HRESULT,
-	SetBreakOnID:                                 proc "stdcall" (this: ^IInfoQueue, ID: MESSAGE_ID, bEnable: BOOL) -> HRESULT,
-	GetBreakOnCategory:                           proc "stdcall" (this: ^IInfoQueue, Category: MESSAGE_CATEGORY) -> BOOL,
-	GetBreakOnSeverity:                           proc "stdcall" (this: ^IInfoQueue, Severity: MESSAGE_SEVERITY) -> BOOL,
-	GetBreakOnID:                                 proc "stdcall" (this: ^IInfoQueue, ID: MESSAGE_ID) -> BOOL,
-	SetMuteDebugOutput:                           proc "stdcall" (this: ^IInfoQueue, bMute: BOOL),
-	GetMuteDebugOutput:                           proc "stdcall" (this: ^IInfoQueue) -> BOOL,
+	SetMessageCountLimit:                         proc "system" (this: ^IInfoQueue, MessageCountLimit: u64) -> HRESULT,
+	ClearStoredMessages:                          proc "system" (this: ^IInfoQueue),
+	GetMessageA:                                  proc "system" (this: ^IInfoQueue, MessageIndex: u64, pMessage: ^MESSAGE, pMessageByteLength: ^SIZE_T) -> HRESULT,
+	GetNumMessagesAllowedByStorageFilter:         proc "system" (this: ^IInfoQueue) -> u64,
+	GetNumMessagesDeniedByStorageFilter:          proc "system" (this: ^IInfoQueue) -> u64,
+	GetNumStoredMessages:                         proc "system" (this: ^IInfoQueue) -> u64,
+	GetNumStoredMessagesAllowedByRetrievalFilter: proc "system" (this: ^IInfoQueue) -> u64,
+	GetNumMessagesDiscardedByMessageCountLimit:   proc "system" (this: ^IInfoQueue) -> u64,
+	GetMessageCountLimit:                         proc "system" (this: ^IInfoQueue) -> u64,
+	AddStorageFilterEntries:                      proc "system" (this: ^IInfoQueue, pFilter: ^INFO_QUEUE_FILTER) -> HRESULT,
+	GetStorageFilter:                             proc "system" (this: ^IInfoQueue, pFilter: ^INFO_QUEUE_FILTER, pFilterByteLength: ^SIZE_T) -> HRESULT,
+	ClearStorageFilter:                           proc "system" (this: ^IInfoQueue),
+	PushEmptyStorageFilter:                       proc "system" (this: ^IInfoQueue) -> HRESULT,
+	PushCopyOfStorageFilter:                      proc "system" (this: ^IInfoQueue) -> HRESULT,
+	PushStorageFilter:                            proc "system" (this: ^IInfoQueue, pFilter: ^INFO_QUEUE_FILTER) -> HRESULT,
+	PopStorageFilter:                             proc "system" (this: ^IInfoQueue),
+	GetStorageFilterStackSize:                    proc "system" (this: ^IInfoQueue) -> u32,
+	AddRetrievalFilterEntries:                    proc "system" (this: ^IInfoQueue, pFilter: ^INFO_QUEUE_FILTER) -> HRESULT,
+	GetRetrievalFilter:                           proc "system" (this: ^IInfoQueue, pFilter: ^INFO_QUEUE_FILTER, pFilterByteLength: ^SIZE_T) -> HRESULT,
+	ClearRetrievalFilter:                         proc "system" (this: ^IInfoQueue),
+	PushEmptyRetrievalFilter:                     proc "system" (this: ^IInfoQueue) -> HRESULT,
+	PushCopyOfRetrievalFilter:                    proc "system" (this: ^IInfoQueue) -> HRESULT,
+	PushRetrievalFilter:                          proc "system" (this: ^IInfoQueue, pFilter: ^INFO_QUEUE_FILTER) -> HRESULT,
+	PopRetrievalFilter:                           proc "system" (this: ^IInfoQueue),
+	GetRetrievalFilterStackSize:                  proc "system" (this: ^IInfoQueue) -> u32,
+	AddMessage:                                   proc "system" (this: ^IInfoQueue, Category: MESSAGE_CATEGORY, Severity: MESSAGE_SEVERITY, ID: MESSAGE_ID, pDescription: cstring) -> HRESULT,
+	AddApplicationMessage:                        proc "system" (this: ^IInfoQueue, Severity: MESSAGE_SEVERITY, pDescription: cstring) -> HRESULT,
+	SetBreakOnCategory:                           proc "system" (this: ^IInfoQueue, Category: MESSAGE_CATEGORY, bEnable: BOOL) -> HRESULT,
+	SetBreakOnSeverity:                           proc "system" (this: ^IInfoQueue, Severity: MESSAGE_SEVERITY, bEnable: BOOL) -> HRESULT,
+	SetBreakOnID:                                 proc "system" (this: ^IInfoQueue, ID: MESSAGE_ID, bEnable: BOOL) -> HRESULT,
+	GetBreakOnCategory:                           proc "system" (this: ^IInfoQueue, Category: MESSAGE_CATEGORY) -> BOOL,
+	GetBreakOnSeverity:                           proc "system" (this: ^IInfoQueue, Severity: MESSAGE_SEVERITY) -> BOOL,
+	GetBreakOnID:                                 proc "system" (this: ^IInfoQueue, ID: MESSAGE_ID) -> BOOL,
+	SetMuteDebugOutput:                           proc "system" (this: ^IInfoQueue, bMute: BOOL),
+	GetMuteDebugOutput:                           proc "system" (this: ^IInfoQueue) -> BOOL,
 }
 
 MESSAGE_CALLBACK_FLAGS :: distinct bit_set[MESSAGE_CALLBACK_FLAG; u32]
@@ -4886,8 +4886,8 @@ IInfoQueue1 :: struct #raw_union {
 }
 IInfoQueue1_VTable :: struct {
 	using idxgiinfoqueue_vtable: IInfoQueue_VTable,
-	RegisterMessageCallback: proc "stdcall" (this: ^IInfoQueue1, CallbackFunc: PFN_MESSAGE_CALLBACK, CallbackFilterFlags: MESSAGE_CALLBACK_FLAGS, pContext: rawptr, pCallbackCookie: ^u32) -> HRESULT,
-	UnregisterMessageCallback: proc "stdcall" (this: ^IInfoQueue1, pCallbackCookie: u32) -> HRESULT,
+	RegisterMessageCallback: proc "system" (this: ^IInfoQueue1, CallbackFunc: PFN_MESSAGE_CALLBACK, CallbackFilterFlags: MESSAGE_CALLBACK_FLAGS, pContext: rawptr, pCallbackCookie: ^u32) -> HRESULT,
+	UnregisterMessageCallback: proc "system" (this: ^IInfoQueue1, pCallbackCookie: u32) -> HRESULT,
 }
 
 PFN_CREATE_DEVICE :: #type proc "c" (a0: ^IUnknown, a1: FEATURE_LEVEL, a2: ^IID, a3: ^rawptr) -> HRESULT
@@ -4926,8 +4926,8 @@ IGraphicsCommandList5 :: struct #raw_union {
 }
 IGraphicsCommandList5_VTable :: struct {
 	using id3d12graphicscommandlist4_vtable: IGraphicsCommandList4_VTable,
-	RSSetShadingRate:      proc "stdcall" (this: ^IGraphicsCommandList5, baseShadingRate: SHADING_RATE, combiners: ^SHADING_RATE_COMBINER),
-	RSSetShadingRateImage: proc "stdcall" (this: ^IGraphicsCommandList5, shadingRateImage: ^IResource),
+	RSSetShadingRate:      proc "system" (this: ^IGraphicsCommandList5, baseShadingRate: SHADING_RATE, combiners: ^SHADING_RATE_COMBINER),
+	RSSetShadingRateImage: proc "system" (this: ^IGraphicsCommandList5, shadingRateImage: ^IResource),
 }
 
 DISPATCH_MESH_ARGUMENTS :: struct {
@@ -4945,7 +4945,7 @@ IGraphicsCommandList6 :: struct #raw_union {
 }
 IGraphicsCommandList6_VTable :: struct {
 	using id3d12graphicscommandlist5_vtable: IGraphicsCommandList5_VTable,
-	DispatchMesh: proc "stdcall" (this: ^IGraphicsCommandList6, ThreadGroupCountX: u32, ThreadGroupCountY: u32, ThreadGroupCountZ: u32),
+	DispatchMesh: proc "system" (this: ^IGraphicsCommandList6, ThreadGroupCountX: u32, ThreadGroupCountY: u32, ThreadGroupCountZ: u32),
 }
 
 SHADER_VERSION_TYPE :: enum u32 {
@@ -5187,17 +5187,17 @@ IShaderReflectionType :: struct {
 	using id3d12shaderreflectiontype_vtable: ^IShaderReflectionType_VTable,
 }
 IShaderReflectionType_VTable :: struct {
-	GetDesc:              proc "stdcall" (this: ^IShaderReflectionType, pDesc: ^SHADER_TYPE_DESC) -> HRESULT,
-	GetMemberTypeByIndex: proc "stdcall" (this: ^IShaderReflectionType, Index: u32) -> ^IShaderReflectionType,
-	GetMemberTypeByName:  proc "stdcall" (this: ^IShaderReflectionType, Name: cstring) -> ^IShaderReflectionType,
-	GetMemberTypeName:    proc "stdcall" (this: ^IShaderReflectionType, Index: u32) -> cstring,
-	IsEqual:              proc "stdcall" (this: ^IShaderReflectionType, pType: ^IShaderReflectionType) -> HRESULT,
-	GetSubType:           proc "stdcall" (this: ^IShaderReflectionType) -> ^IShaderReflectionType,
-	GetBaseClass:         proc "stdcall" (this: ^IShaderReflectionType) -> ^IShaderReflectionType,
-	GetNumInterfaces:     proc "stdcall" (this: ^IShaderReflectionType) -> u32,
-	GetInterfaceByIndex:  proc "stdcall" (this: ^IShaderReflectionType, uIndex: u32) -> ^IShaderReflectionType,
-	IsOfType:             proc "stdcall" (this: ^IShaderReflectionType, pType: ^IShaderReflectionType) -> HRESULT,
-	ImplementsInterface:  proc "stdcall" (this: ^IShaderReflectionType, pBase: ^IShaderReflectionType) -> HRESULT,
+	GetDesc:              proc "system" (this: ^IShaderReflectionType, pDesc: ^SHADER_TYPE_DESC) -> HRESULT,
+	GetMemberTypeByIndex: proc "system" (this: ^IShaderReflectionType, Index: u32) -> ^IShaderReflectionType,
+	GetMemberTypeByName:  proc "system" (this: ^IShaderReflectionType, Name: cstring) -> ^IShaderReflectionType,
+	GetMemberTypeName:    proc "system" (this: ^IShaderReflectionType, Index: u32) -> cstring,
+	IsEqual:              proc "system" (this: ^IShaderReflectionType, pType: ^IShaderReflectionType) -> HRESULT,
+	GetSubType:           proc "system" (this: ^IShaderReflectionType) -> ^IShaderReflectionType,
+	GetBaseClass:         proc "system" (this: ^IShaderReflectionType) -> ^IShaderReflectionType,
+	GetNumInterfaces:     proc "system" (this: ^IShaderReflectionType) -> u32,
+	GetInterfaceByIndex:  proc "system" (this: ^IShaderReflectionType, uIndex: u32) -> ^IShaderReflectionType,
+	IsOfType:             proc "system" (this: ^IShaderReflectionType, pType: ^IShaderReflectionType) -> HRESULT,
+	ImplementsInterface:  proc "system" (this: ^IShaderReflectionType, pBase: ^IShaderReflectionType) -> HRESULT,
 }
 
 IShaderReflectionVariable_UUID_STRING :: "8337A8A6-A216-444A-B2F4-314733A73AEA"
@@ -5206,10 +5206,10 @@ IShaderReflectionVariable :: struct {
 	using id3d12shaderreflectionvariable_vtable: ^IShaderReflectionVariable_VTable,
 }
 IShaderReflectionVariable_VTable :: struct {
-	GetDesc:          proc "stdcall" (this: ^IShaderReflectionVariable, pDesc: ^SHADER_VARIABLE_DESC) -> HRESULT,
-	GetType:          proc "stdcall" (this: ^IShaderReflectionVariable) -> ^IShaderReflectionType,
-	GetBuffer:        proc "stdcall" (this: ^IShaderReflectionVariable) -> ^IShaderReflectionConstantBuffer,
-	GetInterfaceSlot: proc "stdcall" (this: ^IShaderReflectionVariable, uArrayIndex: u32) -> u32,
+	GetDesc:          proc "system" (this: ^IShaderReflectionVariable, pDesc: ^SHADER_VARIABLE_DESC) -> HRESULT,
+	GetType:          proc "system" (this: ^IShaderReflectionVariable) -> ^IShaderReflectionType,
+	GetBuffer:        proc "system" (this: ^IShaderReflectionVariable) -> ^IShaderReflectionConstantBuffer,
+	GetInterfaceSlot: proc "system" (this: ^IShaderReflectionVariable, uArrayIndex: u32) -> u32,
 }
 
 IShaderReflectionConstantBuffer_UUID_STRING :: "C59598B4-48B3-4869-B9B1-B1618B14A8B7"
@@ -5218,9 +5218,9 @@ IShaderReflectionConstantBuffer :: struct {
 	using id3d12shaderreflectionconstantbuffer_vtable: ^IShaderReflectionConstantBuffer_VTable,
 }
 IShaderReflectionConstantBuffer_VTable :: struct {
-	GetDesc:            proc "stdcall" (this: ^IShaderReflectionConstantBuffer, pDesc: ^SHADER_BUFFER_DESC) -> HRESULT,
-	GetVariableByIndex: proc "stdcall" (this: ^IShaderReflectionConstantBuffer, Index: u32) -> ^IShaderReflectionVariable,
-	GetVariableByName:  proc "stdcall" (this: ^IShaderReflectionConstantBuffer, Name: cstring) -> ^IShaderReflectionVariable,
+	GetDesc:            proc "system" (this: ^IShaderReflectionConstantBuffer, pDesc: ^SHADER_BUFFER_DESC) -> HRESULT,
+	GetVariableByIndex: proc "system" (this: ^IShaderReflectionConstantBuffer, Index: u32) -> ^IShaderReflectionVariable,
+	GetVariableByName:  proc "system" (this: ^IShaderReflectionConstantBuffer, Name: cstring) -> ^IShaderReflectionVariable,
 }
 
 IShaderReflection_UUID_STRING :: "5A58797D-A72C-478D-8BA2-EFC6B0EFE88E"
@@ -5231,25 +5231,25 @@ IShaderReflection :: struct #raw_union {
 }
 IShaderReflection_VTable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
-	GetDesc:                       proc "stdcall" (this: ^IShaderReflection, pDesc: ^SHADER_DESC) -> HRESULT,
-	GetConstantBufferByIndex:      proc "stdcall" (this: ^IShaderReflection, Index: u32) -> ^IShaderReflectionConstantBuffer,
-	GetConstantBufferByName:       proc "stdcall" (this: ^IShaderReflection, Name: cstring) -> ^IShaderReflectionConstantBuffer,
-	GetResourceBindingDesc:        proc "stdcall" (this: ^IShaderReflection, ResourceIndex: u32, pDesc: ^SHADER_INPUT_BIND_DESC) -> HRESULT,
-	GetInputParameterDesc:         proc "stdcall" (this: ^IShaderReflection, ParameterIndex: u32, pDesc: ^SIGNATURE_PARAMETER_DESC) -> HRESULT,
-	GetOutputParameterDesc:        proc "stdcall" (this: ^IShaderReflection, ParameterIndex: u32, pDesc: ^SIGNATURE_PARAMETER_DESC) -> HRESULT,
-	GetPatchConstantParameterDesc: proc "stdcall" (this: ^IShaderReflection, ParameterIndex: u32, pDesc: ^SIGNATURE_PARAMETER_DESC) -> HRESULT,
-	GetVariableByName:             proc "stdcall" (this: ^IShaderReflection, Name: cstring) -> ^IShaderReflectionVariable,
-	GetResourceBindingDescByName:  proc "stdcall" (this: ^IShaderReflection, Name: cstring, pDesc: ^SHADER_INPUT_BIND_DESC) -> HRESULT,
-	GetMovInstructionCount:        proc "stdcall" (this: ^IShaderReflection) -> u32,
-	GetMovcInstructionCount:       proc "stdcall" (this: ^IShaderReflection) -> u32,
-	GetConversionInstructionCount: proc "stdcall" (this: ^IShaderReflection) -> u32,
-	GetBitwiseInstructionCount:    proc "stdcall" (this: ^IShaderReflection) -> u32,
-	GetGSInputPrimitive:           proc "stdcall" (this: ^IShaderReflection) -> PRIMITIVE,
-	IsSampleFrequencyShader:       proc "stdcall" (this: ^IShaderReflection) -> BOOL,
-	GetNumInterfaceSlots:          proc "stdcall" (this: ^IShaderReflection) -> u32,
-	GetMinFeatureLevel:            proc "stdcall" (this: ^IShaderReflection, pLevel: ^FEATURE_LEVEL) -> HRESULT,
-	GetThreadGroupSize:            proc "stdcall" (this: ^IShaderReflection, pSizeX: ^u32, pSizeY: ^u32, pSizeZ: ^u32) -> u32,
-	GetRequiresFlags:              proc "stdcall" (this: ^IShaderReflection) -> SHADER_REQUIRES_FLAGS,
+	GetDesc:                       proc "system" (this: ^IShaderReflection, pDesc: ^SHADER_DESC) -> HRESULT,
+	GetConstantBufferByIndex:      proc "system" (this: ^IShaderReflection, Index: u32) -> ^IShaderReflectionConstantBuffer,
+	GetConstantBufferByName:       proc "system" (this: ^IShaderReflection, Name: cstring) -> ^IShaderReflectionConstantBuffer,
+	GetResourceBindingDesc:        proc "system" (this: ^IShaderReflection, ResourceIndex: u32, pDesc: ^SHADER_INPUT_BIND_DESC) -> HRESULT,
+	GetInputParameterDesc:         proc "system" (this: ^IShaderReflection, ParameterIndex: u32, pDesc: ^SIGNATURE_PARAMETER_DESC) -> HRESULT,
+	GetOutputParameterDesc:        proc "system" (this: ^IShaderReflection, ParameterIndex: u32, pDesc: ^SIGNATURE_PARAMETER_DESC) -> HRESULT,
+	GetPatchConstantParameterDesc: proc "system" (this: ^IShaderReflection, ParameterIndex: u32, pDesc: ^SIGNATURE_PARAMETER_DESC) -> HRESULT,
+	GetVariableByName:             proc "system" (this: ^IShaderReflection, Name: cstring) -> ^IShaderReflectionVariable,
+	GetResourceBindingDescByName:  proc "system" (this: ^IShaderReflection, Name: cstring, pDesc: ^SHADER_INPUT_BIND_DESC) -> HRESULT,
+	GetMovInstructionCount:        proc "system" (this: ^IShaderReflection) -> u32,
+	GetMovcInstructionCount:       proc "system" (this: ^IShaderReflection) -> u32,
+	GetConversionInstructionCount: proc "system" (this: ^IShaderReflection) -> u32,
+	GetBitwiseInstructionCount:    proc "system" (this: ^IShaderReflection) -> u32,
+	GetGSInputPrimitive:           proc "system" (this: ^IShaderReflection) -> PRIMITIVE,
+	IsSampleFrequencyShader:       proc "system" (this: ^IShaderReflection) -> BOOL,
+	GetNumInterfaceSlots:          proc "system" (this: ^IShaderReflection) -> u32,
+	GetMinFeatureLevel:            proc "system" (this: ^IShaderReflection, pLevel: ^FEATURE_LEVEL) -> HRESULT,
+	GetThreadGroupSize:            proc "system" (this: ^IShaderReflection, pSizeX: ^u32, pSizeY: ^u32, pSizeZ: ^u32) -> u32,
+	GetRequiresFlags:              proc "system" (this: ^IShaderReflection) -> SHADER_REQUIRES_FLAGS,
 }
 
 ILibraryReflection_UUID_STRING :: "8E349D19-54DB-4A56-9DC9-119D87BDB804"
@@ -5260,8 +5260,8 @@ ILibraryReflection :: struct #raw_union {
 }
 ILibraryReflection_VTable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
-	GetDesc:            proc "stdcall" (this: ^ILibraryReflection, pDesc: ^LIBRARY_DESC) -> HRESULT,
-	GetFunctionByIndex: proc "stdcall" (this: ^ILibraryReflection, FunctionIndex: i32) -> ^IFunctionReflection,
+	GetDesc:            proc "system" (this: ^ILibraryReflection, pDesc: ^LIBRARY_DESC) -> HRESULT,
+	GetFunctionByIndex: proc "system" (this: ^ILibraryReflection, FunctionIndex: i32) -> ^IFunctionReflection,
 }
 
 IFunctionReflection_UUID_STRING :: "1108795C-2772-4BA9-B2A8-D464DC7E2799"
@@ -5270,13 +5270,13 @@ IFunctionReflection :: struct {
 	using id3d12functionreflection_vtable: ^IFunctionReflection_VTable,
 }
 IFunctionReflection_VTable :: struct {
-	GetDesc:                      proc "stdcall" (this: ^IFunctionReflection, pDesc: ^FUNCTION_DESC) -> HRESULT,
-	GetConstantBufferByIndex:     proc "stdcall" (this: ^IFunctionReflection, BufferIndex: u32) -> ^IShaderReflectionConstantBuffer,
-	GetConstantBufferByName:      proc "stdcall" (this: ^IFunctionReflection, Name: cstring) -> ^IShaderReflectionConstantBuffer,
-	GetResourceBindingDesc:       proc "stdcall" (this: ^IFunctionReflection, ResourceIndex: u32, pDesc: ^SHADER_INPUT_BIND_DESC) -> HRESULT,
-	GetVariableByName:            proc "stdcall" (this: ^IFunctionReflection, Name: cstring) -> ^IShaderReflectionVariable,
-	GetResourceBindingDescByName: proc "stdcall" (this: ^IFunctionReflection, Name: cstring, pDesc: ^SHADER_INPUT_BIND_DESC) -> HRESULT,
-	GetFunctionParameter:         proc "stdcall" (this: ^IFunctionReflection, ParameterIndex: i32) -> ^IFunctionParameterReflection,
+	GetDesc:                      proc "system" (this: ^IFunctionReflection, pDesc: ^FUNCTION_DESC) -> HRESULT,
+	GetConstantBufferByIndex:     proc "system" (this: ^IFunctionReflection, BufferIndex: u32) -> ^IShaderReflectionConstantBuffer,
+	GetConstantBufferByName:      proc "system" (this: ^IFunctionReflection, Name: cstring) -> ^IShaderReflectionConstantBuffer,
+	GetResourceBindingDesc:       proc "system" (this: ^IFunctionReflection, ResourceIndex: u32, pDesc: ^SHADER_INPUT_BIND_DESC) -> HRESULT,
+	GetVariableByName:            proc "system" (this: ^IFunctionReflection, Name: cstring) -> ^IShaderReflectionVariable,
+	GetResourceBindingDescByName: proc "system" (this: ^IFunctionReflection, Name: cstring, pDesc: ^SHADER_INPUT_BIND_DESC) -> HRESULT,
+	GetFunctionParameter:         proc "system" (this: ^IFunctionReflection, ParameterIndex: i32) -> ^IFunctionParameterReflection,
 }
 
 IFunctionParameterReflection_UUID_STRING :: "EC25F42D-7006-4F2B-B33E-02CC3375733F"
@@ -5285,5 +5285,5 @@ IFunctionParameterReflection :: struct {
 	using id3d12functionparameterreflection_vtable: ^IFunctionParameterReflection_VTable,
 }
 IFunctionParameterReflection_VTable :: struct {
-	GetDesc: proc "stdcall" (this: ^IFunctionParameterReflection, pDesc: ^PARAMETER_DESC) -> HRESULT,
+	GetDesc: proc "system" (this: ^IFunctionParameterReflection, pDesc: ^PARAMETER_DESC) -> HRESULT,
 }
