@@ -151,16 +151,16 @@ foreign user32 {
 	PostQuitMessage :: proc(nExitCode: c_int) ---
 	PostThreadMessageW :: proc(idThread: DWORD, Msg: UINT, wParam: WPARAM, lParam: LPARAM) -> BOOL ---
 
-	// RealChildWindowFromPoint
-	// RealGetWindowClassW
+	RealChildWindowFromPoint :: proc(hwndParent: HWND, ptParentClientCoords: POINT) -> HWND ---
+	RealGetWindowClassW :: proc(hwnd: HWND, ptszClassName: LPWSTR, cchClassNameMax: UINT) -> UINT ---
 
 	RegisterClassExW :: proc(^WNDCLASSEXW) -> ATOM ---
 	RegisterClassW :: proc(lpWndClass: ^WNDCLASSW) -> ATOM ---
 
-	// RegisterShellHookWindow
+	RegisterShellHookWindow :: proc(hwnd: HWND) -> BOOL ---
 	RegisterWindowMessageW :: proc(lpString: LPCWSTR) -> UINT ---
-	// RemovePropW
-	// ReplyMessage
+	RemovePropW :: proc(hWnd: HWND, lpString: LPCWSTR) -> HANDLE ---
+	ReplyMessage :: proc(lResult: LRESULT) -> BOOL ---
 
 	SendMessageCallbackW :: proc(
 		hWnd: HWND,
