@@ -142,7 +142,7 @@ foreign user32 {
 
 	MoveWindow :: proc(hWnd: HWND, X, Y, hWidth, hHeight: c_int, bRepaint: BOOL) -> BOOL ---
 
-	// OpenIcon
+	OpenIcon :: proc(hWnd: HWND) -> BOOL ---
 
 	PeekMessageW :: proc(lpMsg: ^MSG, hWnd: HWND, wMsgFilterMin, wMsgFilterMax, wRemoveMsg: UINT) -> BOOL ---
 	// PhysicalToLogicalPoint
