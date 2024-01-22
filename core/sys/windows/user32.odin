@@ -69,7 +69,6 @@ foreign user32 {
 	DeregisterShellHookWindow :: proc(hwnd: HWND) -> BOOL ---;
 	DestroyWindow :: proc(hWnd: HWND) -> BOOL ---
 
-	// DispatchMessage
 	DispatchMessageW :: proc(lpMsg: ^MSG) -> LRESULT ---
 
 	EndDeferWindowPos :: proc(hWinPosInfo: HDWP) -> BOOL ---
@@ -89,12 +88,8 @@ foreign user32 {
 	GetClassInfoExW :: proc(hInsatnce: HINSTANCE, lpszClass: LPCWSTR, lpwcx: ^WNDCLASSEXW) -> BOOL ---
 	GetClassInfoW :: proc(hInstance: HINSTANCE, lpClassNAme: LPCWSTR, lpWndClass: ^WNDCLASSW) -> BOOL ---
     
-	// GetClassLongPtrW
 	GetClassLongW :: proc(hWnd: HWND, nIndex: c_int) -> DWORD ---
-
-	// GetClassName
 	GetClassNameW :: proc(hWnd: HWND, lpClassName: LPWSTR, nMaxCount: c_int) -> c_int ---
-
 	GetClassWord :: proc(hWnd: HWND, nIndex: i32) -> WORD ---
 	GetClientRect :: proc(hWnd: HWND, lpRect: LPRECT) -> BOOL ---
 	GetDesktopWindow :: proc() -> HWND ---
@@ -104,13 +99,11 @@ foreign user32 {
 	GetLastActivePopup :: proc(hWnd: HWND) -> HWND ---
 	GetLayeredWindowAttributes :: proc(hwnd: HWND, pcrKey: ^COLORREF, pbAlpha: ^BYTE, pdwFlags: ^DWORD) -> BOOL ---
 
-	// GetMessage
 	GetMessageExtraInfo :: proc() -> LPARAM ---
 	GetMessagePos :: proc() -> DWORD ---
 	GetMessageTime :: proc() -> LONG ---
 	GetMessageW :: proc(lpMsg: ^MSG, hWnd: HWND, wMsgFilterMin, wMsgFilterMax: UINT) -> BOOL ---
 
-	// GetNextWindow (macro)
 	GetParent :: proc(hWnd: HWND) -> HWND ---
 	GetProcessDefaultLayout :: proc(pdwDefaultLayout: ^DWORD) -> BOOL ---
 
@@ -152,8 +145,6 @@ foreign user32 {
 
 	LockSetForegroundWindow :: proc(uLockCode: UINT) -> BOOL ---
 	LogicalToPhysicalPoint :: proc(hWnd: HWND, lpPoint: ^POINT) -> BOOL ---
-
-	// MAKELPARAM macro, MAKELRESULT macro, MAKEWPARAM macro
 
 	MoveWindow :: proc(hWnd: HWND, X, Y, hWidth, hHeight: c_int, bRepaint: BOOL) -> BOOL ---
 
@@ -199,7 +190,6 @@ foreign user32 {
 	SendNotifyMessageW :: proc(hWnd: HWND, Msg: UINT, wParam: WPARAM, lParam: LPARAM) -> BOOL ---
 	SetAdditionalForegroundBoostProcesses :: proc(topLevelWindow: HWND, processHandleCount: DWORD, processHandleArray: ^HANDLE) -> BOOL --- // @Todo(ema) Should this ptr be a multi-pointer? [^]HANDLE
 
-	// SetClassLongPtrW
 	SetClassLongW :: proc(hWnd: HWND, nIndex: c_int, dwNewLong: LONG) -> DWORD ---
 
 	SetClassWord :: proc(hWnd: HWND, nIndex: c_int, wNewWord: WORD) -> WORD ---
@@ -222,7 +212,6 @@ foreign user32 {
 	SetTimer :: proc(hWnd: HWND, nIDEvent: UINT_PTR, uElapse: UINT, lpTimerFunc: TIMERPROC) -> UINT_PTR ---
 	SetWindowDisplayAffinity :: proc(hWnd: HWND, dwAffinity: DWORD) -> BOOL ---
 
-	// 
 	SetWindowLongW :: proc(hWnd: HWND, nIndex: c_int, dwNewLong: LONG) -> LONG ---
 
 	SetWindowPlacement :: proc(hwnd: HWND, lpwndpl: ^WINDOWPLACEMENT) -> BOOL ---
@@ -470,6 +459,8 @@ DPI_AWARENESS_CONTEXT_SYSTEM_AWARE         :: DPI_AWARENESS_CONTEXT(~uintptr(1))
 DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE    :: DPI_AWARENESS_CONTEXT(~uintptr(2)) // -3
 DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 :: DPI_AWARENESS_CONTEXT(~uintptr(3)) // -4
 DPI_AWARENESS_CONTEXT_UNAWARE_GDISCALED    :: DPI_AWARENESS_CONTEXT(~uintptr(4)) // -5
+
+GetNextWindow :: GetWindow
 
 CHANGEFILTERSTRUCT :: struct {
 	cbSize: DWORD,
