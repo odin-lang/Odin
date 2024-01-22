@@ -26,6 +26,7 @@ HMODULE :: distinct HINSTANCE
 HRESULT :: distinct LONG
 HWND :: distinct HANDLE
 HDC :: distinct HANDLE
+HDWP :: distinct HANDLE
 HMONITOR :: distinct HANDLE
 HICON :: distinct HANDLE
 HCURSOR :: distinct HANDLE
