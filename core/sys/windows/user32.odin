@@ -135,8 +135,8 @@ foreign user32 {
 
 	KillTimer :: proc(hWnd: HWND, uIDEvent: UINT_PTR) -> BOOL ---
 
-	// LockSetForegroundWindow
-	// LogicalToPhysicalPoint
+	LockSetForegroundWindow :: proc(uLockCode: UINT) -> BOOL ---
+	LogicalToPhysicalPoint :: proc(hWnd: HWND, lpPoint: ^POINT) -> BOOL ---
 
 	// MAKELPARAM macro, MAKELRESULT macro, MAKEWPARAM macro
 
