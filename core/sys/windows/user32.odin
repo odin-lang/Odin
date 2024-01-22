@@ -58,11 +58,12 @@ foreign user32 {
 	// DispatchMessage
 	DispatchMessageW :: proc(lpMsg: ^MSG) -> LRESULT ---
 
-	// EndDeferWindowPos
-	// EndTask
-	// EnumChildWindows
-	// EnumPropsA, EnumPropsExA, EnumPropsExW, EnumPropsW
-	// EnumThreadWindows
+	EndDeferWindowPos :: proc(hWinPosInfo: HDWP) -> BOOL ---
+	EndTask :: proc(hWnd: HWND, fShutDown: BOOL, fForce: BOOL) -> BOOL ---
+	EnumChildWindows :: proc(hWndParent: HWND, lpEnumFunc: WNDENUMPROC, lParam: LPARAM) -> BOOL ---
+	EnumPropsExW :: proc(hWnd: HWND, lpEnumFunc: PROPENUMPROCEXW, lParam: LPARAM) -> i32 ---
+	EnumPropsW :: proc(hWnd: HWND, lpEnumFunc: PROPENUMPROCW) -> i32 ---
+	EnumThreadWindows :: proc(dwThreadId: DWORD, lpfn: WNDENUMPROC, lParam: LPARAM) -> BOOL ---
 	EnumWindows :: proc(lpEnumFunc: Window_Enum_Proc, lParam: LPARAM) -> BOOL ---
 
 	FindWindowW :: proc(lpClassName: LPCWSTR, lpWindowName: LPCWSTR) -> HWND ---
