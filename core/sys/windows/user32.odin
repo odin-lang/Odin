@@ -146,7 +146,7 @@ foreign user32 {
 	OpenIcon :: proc(hWnd: HWND) -> BOOL ---
 
 	PeekMessageW :: proc(lpMsg: ^MSG, hWnd: HWND, wMsgFilterMin, wMsgFilterMax, wRemoveMsg: UINT) -> BOOL ---
-	// PhysicalToLogicalPoint
+	PhysicalToLogicalPoint :: proc(hWnd: HWND, lpPoint: ^POINT) -> BOOL ---
 	PostMessageW :: proc(hWnd: HWND, Msg: UINT, wParam: WPARAM, lParam: LPARAM) -> BOOL ---
 	PostQuitMessage :: proc(nExitCode: c_int) ---
 	PostThreadMessageW :: proc(idThread: DWORD, Msg: UINT, wParam: WPARAM, lParam: LPARAM) -> BOOL ---
