@@ -445,6 +445,10 @@ Monitor_From_Flags :: enum DWORD {
 Monitor_Enum_Proc :: #type proc "stdcall" (HMONITOR, HDC, LPRECT, LPARAM) -> BOOL
 Window_Enum_Proc :: #type proc "stdcall" (HWND, LPARAM) -> BOOL
 
+WNDENUMPROC :: #type proc "stdcall" (hwnd: HWND, lParam: LPARAM) -> BOOL
+PROPENUMPROCW :: #type proc "stdcall" (unnamedParam1: HWND, unnamedParam2: LPCWSTR, unnamedParam3: HANDLE) -> BOOL
+PROPENUMPROCEXW :: #type proc "stdcall" (unnamedParam1: HWND, unnamedParam2: LPWSTR, unnamedParam3: HANDLE, unnamedParam4: ULONG_PTR) -> BOOL
+
 USER_DEFAULT_SCREEN_DPI                    :: 96
 DPI_AWARENESS_CONTEXT                      :: distinct HANDLE
 DPI_AWARENESS_CONTEXT_UNAWARE              :: DPI_AWARENESS_CONTEXT(~uintptr(0)) // -1
