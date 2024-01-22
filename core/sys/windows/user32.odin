@@ -83,8 +83,8 @@ foreign user32 {
 	FindWindowW :: proc(lpClassName: LPCWSTR, lpWindowName: LPCWSTR) -> HWND ---
 	FindWindowExW :: proc(hWndParent, hWndChildAfter: HWND, lpszClass: LPCWSTR, lpszWindow: LPCWSTR) -> HWND ---
 
-	// GetAltTabInfoW
-	// GetAncestor
+	GetAltTabInfoW :: proc(hwnd: HWND, iItem: i32, pati: ^ALTTABINFO, pszItemText: LPWSTR, cchItemText: UINT) -> BOOL ---
+	GetAncestor :: proc(hwnd: HWND, gaFlags: UINT) -> HWND ---
 
 	GetClassInfoExW :: proc(hInsatnce: HINSTANCE, lpszClass: LPCWSTR, lpwcx: ^WNDCLASSEXW) -> BOOL ---
 	GetClassInfoW :: proc(hInstance: HINSTANCE, lpClassNAme: LPCWSTR, lpWndClass: ^WNDCLASSW) -> BOOL ---
@@ -95,24 +95,24 @@ foreign user32 {
 	// GetClassName
 	GetClassNameW :: proc(hWnd: HWND, lpClassName: LPWSTR, nMaxCount: c_int) -> c_int ---
 
-	// GetClassWord
+	GetClassWord :: proc(hWnd: HWND, nIndex: i32) -> WORD ---
 	GetClientRect :: proc(hWnd: HWND, lpRect: LPRECT) -> BOOL ---
 	GetDesktopWindow :: proc() -> HWND ---
 	GetForegroundWindow :: proc() -> HWND ---
-	// GetGUIThreadInfo
-	// GetInputState
-	// GetLastActivePopup
-	// GetLayeredWindowAttributes
+	GetGUIThreadInfo :: proc(idThread: DWORD, pgui: ^GUITHREADINFO) -> BOOL ---
+	GetInputState :: proc() -> BOOL ---
+	GetLastActivePopup :: proc(hWnd: HWND) -> HWND ---
+	GetLayeredWindowAttributes :: proc(hwnd: HWND, pcrKey: ^COLORREF, pbAlpha: ^BYTE, pdwFlags: ^DWORD) -> BOOL ---
 
 	// GetMessage
-	// GetMessageExtraInfo
-	// GetMessagePos
-	// GetMessageTime
+	GetMessageExtraInfo :: proc() -> LPARAM ---
+	GetMessagePos :: proc() -> DWORD ---
+	GetMessageTime :: proc() -> LONG ---
 	GetMessageW :: proc(lpMsg: ^MSG, hWnd: HWND, wMsgFilterMin, wMsgFilterMax: UINT) -> BOOL ---
 
 	// GetNextWindow (macro)
-	// GetParent
-	// GetProcessDefaultLayout
+	GetParent :: proc(hWnd: HWND) -> HWND ---
+	GetProcessDefaultLayout :: proc(pdwDefaultLayout: ^DWORD) -> BOOL ---
 
 	// GetPropW
 	GetQueueStatus :: proc(flags: UINT) -> DWORD ---
@@ -476,6 +476,32 @@ CHANGEFILTERSTRUCT :: struct {
 	ExtStatus: DWORD,
 }
 PCHANGEFILTERSTRUCT :: ^CHANGEFILTERSTRUCT
+
+ALTTABINFO :: struct {
+	cbSize: DWORD,
+	cItems: i32,
+	cColumns: i32,
+	cRows: i32,
+	iColFocus: i32,
+	iRowFocus: i32,
+	cxItem: i32,
+	cyItem: i32,
+	ptStart: POINT,
+}
+PALTTABINFO :: ^ALTTABINFO
+
+GUITHREADINFO :: struct {
+	cbSize: DWORD,
+	flags: DWORD,
+	hwndActive: HWND,
+	hwndFocus: HWND,
+	hwndCapture: HWND,
+	hwndMenuOwner: HWND,
+	hwndMoveSize: HWND,
+	hwndCaret: HWND,
+	rcCaret: RECT,
+}
+PGUITHREADINFO :: ^GUITHREADINFO
 
 RAWINPUTHEADER :: struct {
 	dwType: DWORD,
