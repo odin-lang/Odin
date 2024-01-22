@@ -128,18 +128,19 @@ foreign user32 {
 	GetWindowThreadProcessId :: proc(hWnd: HWND, lpdwProcessId: ^DWORD) -> DWORD ---
 	GetWindowWord :: proc(hWnd: HWND, nIndex: i32) -> WORD ---
 
-	// InSendMessage
-	// InSendMessageEx
-	// IsChild
-	// IsGUIThread
-	// IsHungAppWindow
-	// IsIconic
-	// IsProcessDPIAware
+	InSendMessage :: proc() -> BOOL ---
+	InSendMessageEx :: proc(lpReserved: ^VOID) -> DWORD ---
+	InternalGetWindowText :: proc(hWnd: HWND, pString: LPWSTR, cchMaxCount: i32) -> i32 ---
+	IsChild :: proc(hWndParent: HWND, hWnd: HWND) -> BOOL ---
+	IsGUIThread :: proc(bConvert: BOOL) -> BOOL ---
+	IsHungAppWindow :: proc(hwnd: HWND) -> BOOL ---
+	IsIconic :: proc(hWnd: HWND) -> BOOL ---
+	IsProcessDPIAware :: proc() -> BOOL ---
 	IsWindow :: proc(hWnd: HWND) -> BOOL ---
-	// IsWindowArranged
-	// IsWindowUnicode
-	// IsWindowVisible
-	// IsZoomed
+	IsWindowArranged :: proc(hwnd: HWND) -> BOOL ---
+	IsWindowUnicode :: proc(hWnd: HWND) -> BOOL ---
+	IsWindowVisible :: proc(hWnd: HWND) -> BOOL ---
+	IsZoomed :: proc(hWnd: HWND) -> BOOL ---
 
 	KillTimer :: proc(hWnd: HWND, uIDEvent: UINT_PTR) -> BOOL ---
 
