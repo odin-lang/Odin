@@ -66,7 +66,7 @@ foreign user32 {
 	DefFrameProcW :: proc(hWnd: HWND, hWndMDIClient: HWND, uMsg: HWND, wParam: WPARAM, lParam: LPARAM) -> LRESULT ---
 	DefMDIChildProcW :: proc(hWnd: HWND, uMsg: UINT, wParam: WPARAM, lParam: LPARAM) -> LRESULT ---
 	DefWindowProcW :: proc(hWnd: HWND, Msg: UINT, wParam: WPARAM, lParam: LPARAM) -> LRESULT ---
-	DeregisterShellHookWindow :: proc(hwnd: HWND) -> BOOL ---;
+	DeregisterShellHookWindow :: proc(hwnd: HWND) -> BOOL ---
 	DestroyWindow :: proc(hWnd: HWND) -> BOOL ---
 
 	DispatchMessageW :: proc(lpMsg: ^MSG) -> LRESULT ---
