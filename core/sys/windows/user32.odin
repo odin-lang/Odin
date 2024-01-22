@@ -114,26 +114,26 @@ foreign user32 {
 	GetParent :: proc(hWnd: HWND) -> HWND ---
 	GetProcessDefaultLayout :: proc(pdwDefaultLayout: ^DWORD) -> BOOL ---
 
-	// GetPropW
+	GetPropW :: proc(hWnd: HWND, lpString: LPCWSTR) -> HANDLE ---
 	GetQueueStatus :: proc(flags: UINT) -> DWORD ---
-	// GetShellWindow
+	GetShellWindow :: proc() -> HWND ---
 	GetSysColor :: proc(nIndex: c_int) -> DWORD ---
 	GetSystemMetrics :: proc(nIndex: c_int) -> c_int ---
-	// GetTitleBarInfo
+	GetTitleBarInfo :: proc(hwnd: HWND, pti: ^TITLEBARINFO) -> BOOL ---
 
 	GetTopWindow :: proc(hWnd: HWND) -> HWND ---
-	// GetWindow
-	// GetWindowDisplayAffinity
+	GetWindow :: proc(hWnd: HWND, uCmd: UINT) -> HWND ---
+	GetWindowDisplayAffinity :: proc(hWnd: HWND, pdwAffinity: ^DWORD) -> BOOL ---
 	GetWindowInfo :: proc(hwnd: HWND, pwi: PWINDOWINFO) -> BOOL ---
 	GetWindowLongW :: proc(hWnd: HWND, nIndex: c_int) -> LONG ---
 
-	// GetWindowModuleFileNameW
+	GetWindowModuleFileNameW :: proc(hwnd: HWND, pszFileName: LPWSTR, cchFileNameMax: UINT) -> UINT ---
 	GetWindowPlacement :: proc(hWnd: HWND, lpwndpl: ^WINDOWPLACEMENT) -> BOOL ---
 	GetWindowRect :: proc(hWnd: HWND, lpRect: LPRECT) -> BOOL ---
 	GetWindowTextLengthW :: proc(hWnd: HWND) -> c_int ---
 	GetWindowTextW :: proc(hWnd: HWND, lpString: LPWSTR, nMaxCount: c_int) -> c_int ---
-	// GetWindowThreadProcessId
-	// GetWindowWord
+	GetWindowThreadProcessId :: proc(hWnd: HWND, lpdwProcessId: ^DWORD) -> DWORD ---
+	GetWindowWord :: proc(hWnd: HWND, nIndex: i32) -> WORD ---
 
 	// InSendMessage
 	// InSendMessageEx
@@ -502,6 +502,22 @@ GUITHREADINFO :: struct {
 	rcCaret: RECT,
 }
 PGUITHREADINFO :: ^GUITHREADINFO
+
+TITLEBARINFO :: struct {
+	cbSize: DWORD,
+	rcTitleBar: RECT,
+	rgstate: [CCHILDREN_TITLEBAR + 1]DWORD,
+}
+PTITLEBARINFO :: ^TITLEBARINFO
+
+CCHILDREN_TITLEBAR  :: 5
+CCHILDREN_SCROLLBAR :: 5
+
+STATE_SYSTEM_FOCUSABLE   :: 0x00100000
+STATE_SYSTEM_INVISIBLE   :: 0x00008000
+STATE_SYSTEM_OFFSCREEN   :: 0x00010000
+STATE_SYSTEM_UNAVAILABLE :: 0x00000001
+STATE_SYSTEM_PRESSED     :: 0x00000008
 
 RAWINPUTHEADER :: struct {
 	dwType: DWORD,
