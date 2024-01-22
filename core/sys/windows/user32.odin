@@ -31,7 +31,19 @@ foreign user32 {
 	// ChangeWindowMessageFilter, ChangeWindowMessageFilterEx
 	// ChildWindowFromPoint, ChildWindowFromPointEx
 	CloseWindow :: proc(hWnd: HWND) -> BOOL ---
-	// CreateMDIWindowW
+
+	CreateMDIWindowW :: proc(
+		lpClassName: LPCWSTR,
+		lpWindowName: LPCWSTR,
+		dwStyle: DWORD,
+		X: i32,
+		Y: i32,
+		nWidth: i32,
+		nHeight: i32,
+		hWndParent: HWND,
+		hInstance: HINSTANCE,
+		lParam: LPARAM
+	) -> HWND ---
 
 	CreateWindowExW :: proc(
 		dwExStyle: DWORD,
