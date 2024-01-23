@@ -95,7 +95,7 @@ gb_internal cgProcedure *cg_procedure_create(cgModule *m, Entity *entity, bool i
 	}
 
 	if (p->symbol == nullptr)  {
-		p->func = tb_function_create(m->mod, link_name.len, cast(char const *)link_name.text, linkage, TB_COMDAT_NONE);
+		p->func = tb_function_create(m->mod, link_name.len, cast(char const *)link_name.text, linkage);
 
 		p->debug_type = cg_debug_type_for_proc(m, p->type);
 		p->proto = tb_prototype_from_dbg(m->mod, p->debug_type);
@@ -148,7 +148,7 @@ gb_internal cgProcedure *cg_procedure_create_dummy(cgModule *m, String const &li
 
 	TB_Linkage linkage = TB_LINKAGE_PRIVATE;
 
-	p->func = tb_function_create(m->mod, link_name.len, cast(char const *)link_name.text, linkage, TB_COMDAT_NONE);
+	p->func = tb_function_create(m->mod, link_name.len, cast(char const *)link_name.text, linkage);
 
 	p->debug_type = cg_debug_type_for_proc(m, p->type);
 	p->proto = tb_prototype_from_dbg(m->mod, p->debug_type);
@@ -224,7 +224,8 @@ gb_internal void cg_procedure_begin(cgProcedure *p) {
 		return;
 	}
 
-	tb_function_set_prototype(p->func, p->proto, cg_arena());
+	TB_ModuleSectionHandle section = tb_module_get_text(p->module->mod);
+	tb_function_set_prototype(p->func, section, p->proto, cg_arena());
 
 	if (p->body == nullptr) {
 		return;
@@ -305,13 +306,12 @@ gb_internal void cg_procedure_begin(cgProcedure *p) {
 				param_ptr_to_use = dummy_param;
 				param_debug_type = tb_debug_create_ptr(p->module->mod, param_debug_type);
 			}
-			tb_node_append_attrib(
+			tb_function_attrib_variable(
+				p->func,
 				param_ptr_to_use,
-				tb_function_attrib_variable(
-					p->func,
-					name.len, cast(char const *)name.text,
-					param_debug_type
-				)
+				nullptr, // parent
+				name.len, cast(char const *)name.text,
+				param_debug_type
 			);
 		}
 		cgAddr addr = cg_addr(local);
@@ -374,9 +374,9 @@ gb_internal WORKER_TASK_PROC(cg_procedure_compile_worker_proc) {
 
 	// optimization passes
 	if (false) {
-		tb_pass_peephole(opt);
+		tb_pass_peephole(opt, TB_PEEPHOLE_ALL);
 		tb_pass_mem2reg(opt);
-		tb_pass_peephole(opt);
+		tb_pass_peephole(opt, TB_PEEPHOLE_ALL);
 	}
 
 	bool emit_asm = false;
@@ -389,8 +389,7 @@ gb_internal WORKER_TASK_PROC(cg_procedure_compile_worker_proc) {
 
 	// emit ir
 	if (
-	    string_starts_with(p->name, str_lit("main@")) ||
-	    // p->name == str_lit("runtime@_windows_default_alloc_or_resize") ||
+	    // string_starts_with(p->name, str_lit("main@")) ||
 	    false
 	) { // IR Printing
 		TB_Arena *arena = cg_arena();
@@ -402,7 +401,7 @@ gb_internal WORKER_TASK_PROC(cg_procedure_compile_worker_proc) {
 		fflush(stdout);
 	}
 	if (false) { // GraphViz printing
-		tb_function_print(p->func, tb_default_print_callback, stdout);
+		tb_pass_print_dot(opt, tb_default_print_callback, stdout);
 	}
 
 	// compile
@@ -574,7 +573,7 @@ gb_internal cgValue cg_emit_call(cgProcedure * p, cgValue value, Slice<cgValue> 
 			TB_CharUnits size = cast(TB_CharUnits)type_size_of(return_type);
 			TB_CharUnits align = cast(TB_CharUnits)gb_max(type_align_of(return_type), 16);
 			TB_Node *local = tb_inst_local(p->func, size, align);
-			tb_inst_memzero(p->func, local, tb_inst_uint(p->func, TB_TYPE_INT, size), align, false);
+			tb_inst_memzero(p->func, local, tb_inst_uint(p->func, TB_TYPE_INT, size), align);
 			params[param_index++] = local;
 		}
 	}
@@ -628,7 +627,7 @@ gb_internal cgValue cg_emit_call(cgProcedure * p, cgValue value, Slice<cgValue> 
 			TB_CharUnits align = cast(TB_CharUnits)gb_max(type_align_of(result), 16);
 			TB_Node *local = tb_inst_local(p->func, size, align);
 			// TODO(bill): Should this need to be zeroed any way?
-			tb_inst_memzero(p->func, local, tb_inst_uint(p->func, TB_TYPE_INT, size), align, false);
+			tb_inst_memzero(p->func, local, tb_inst_uint(p->func, TB_TYPE_INT, size), align);
 			params[param_index++] = local;
 		}
 	}
@@ -862,7 +861,6 @@ gb_internal cgValue cg_build_call_expr_internal(cgProcedure *p, Ast *expr) {
 		}
 
 		GB_ASSERT(e->kind == Entity_Variable);
-
 		if (pt->variadic && pt->variadic_index == i) {
 			cgValue variadic_args = cg_const_nil(p, e->type);
 			auto variadic = slice(ce->split_args->positional, pt->variadic_index, ce->split_args->positional.count);
@@ -965,8 +963,8 @@ gb_internal cgValue cg_build_call_expr_internal(cgProcedure *p, Ast *expr) {
 			if (pt->variadic && param_index == pt->variadic_index) {
 				if (!is_c_vararg && args[arg_index].node == nullptr) {
 					args[arg_index++] = cg_const_nil(p, e->type);
+					continue;
 				}
-				continue;
 			}
 
 			cgValue arg = args[arg_index];
@@ -1097,12 +1095,29 @@ gb_internal cgProcedure *cg_equal_proc_for_type(cgModule *m, Type *type) {
 			cg_emit_if(p, tag_eq, switch_region, false_region);
 
 			size_t entry_count = type->Union.variants.count;
+			if (type->Union.kind != UnionType_no_nil) {
+				entry_count += 1;
+			}
+
+			size_t entry_offset = 0;
+
 			TB_SwitchEntry *keys = gb_alloc_array(temporary_allocator(), TB_SwitchEntry, entry_count);
-			for (size_t i = 0; i < entry_count; i++) {
+			if (type->Union.kind != UnionType_no_nil) {
+				TB_Node *region = cg_control_region(p, "bcase");
+				keys[entry_offset].key   = 0;
+				keys[entry_offset].value = region;
+				entry_offset += 1;
+
+				tb_inst_set_control(p->func, region);
+				cgValue ok = cg_const_bool(p, t_bool, true);
+				cg_build_return_stmt_internal_single(p, ok);
+			}
+
+			for (isize i = 0; i < type->Union.variants.count; i++) {
 				TB_Node *region = cg_control_region(p, "bcase");
 				Type *variant = type->Union.variants[i];
-				keys[i].key = union_variant_index(type, variant);
-				keys[i].value = region;
+				keys[entry_offset+i].key = union_variant_index(type, variant);
+				keys[entry_offset+i].value = region;
 
 				tb_inst_set_control(p->func, region);
 				Type *vp = alloc_type_pointer(variant);

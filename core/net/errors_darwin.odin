@@ -109,12 +109,12 @@ TCP_Recv_Error :: enum c.int {
 }
 
 UDP_Recv_Error :: enum c.int {
-	None           = 0,
-	Truncated      = c.int(os.EMSGSIZE), // The buffer is too small to fit the entire message, and the message was truncated.
-	Not_Socket     = c.int(os.ENOTSOCK), // The so-called socket is not an open socket.
-	Not_Descriptor = c.int(os.EBADF),    // The so-called socket is, in fact, not even a valid descriptor.
-	Bad_Buffer     = c.int(os.EFAULT),   // The buffer did not point to a valid location in memory.
-	Interrupted    = c.int(os.EINTR),    // A signal occurred before any data was transmitted. See signal(7).
+	None             = 0,
+	Buffer_Too_Small = c.int(os.EMSGSIZE), // The buffer is too small to fit the entire message, and the message was truncated. When this happens, the rest of message is lost.
+	Not_Socket       = c.int(os.ENOTSOCK), // The so-called socket is not an open socket.
+	Not_Descriptor   = c.int(os.EBADF),    // The so-called socket is, in fact, not even a valid descriptor.
+	Bad_Buffer       = c.int(os.EFAULT),   // The buffer did not point to a valid location in memory.
+	Interrupted      = c.int(os.EINTR),    // A signal occurred before any data was transmitted. See signal(7).
 
 	// The send timeout duration passed before all data was sent. See Socket_Option.Send_Timeout.
 	// NOTE: No, really. Presumably this means something different for nonblocking sockets...
@@ -122,11 +122,9 @@ UDP_Recv_Error :: enum c.int {
 	Socket_Not_Bound = c.int(os.EINVAL), // The socket must be bound for this operation, but isn't.
 }
 
-// TODO
 TCP_Send_Error :: enum c.int {
 	None                      = 0,
 
-	// TODO: merge with other errors?
 	Aborted                   = c.int(os.ECONNABORTED), 
 	Connection_Closed         = c.int(os.ECONNRESET),
 	Not_Connected             = c.int(os.ENOTCONN),
@@ -151,7 +149,7 @@ TCP_Send_Error :: enum c.int {
 // TODO
 UDP_Send_Error :: enum c.int {
 	None                        = 0,
-	Truncated                   = c.int(os.EMSGSIZE), // The message is too big. No data was sent.
+	Message_Too_Long            = c.int(os.EMSGSIZE), // The message is larger than the maximum UDP packet size. No data was sent.
 
 	// TODO: not sure what the exact circumstances for this is yet
 	Network_Unreachable         = c.int(os.ENETUNREACH),

@@ -613,6 +613,9 @@ gb_internal void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *
 	
 	scope_reserve(ctx->scope, min_field_count);
 
+	rw_mutex_lock(&struct_type->Struct.fields_mutex);
+	defer (rw_mutex_unlock(&struct_type->Struct.fields_mutex));
+
 	if (st->is_raw_union && min_field_count > 1) {
 		struct_type->Struct.is_raw_union = true;
 		context = str_lit("struct #raw_union");
@@ -1055,24 +1058,6 @@ gb_internal void check_bit_set_type(CheckerContext *c, Type *type, Type *named_t
 		type->BitSet.upper = upper;
 	} else {
 		Type *elem = check_type_expr(c, bs->elem, nullptr);
-
-		#if 0
-		if (named_type != nullptr && named_type->kind == Type_Named &&
-		    elem->kind == Type_Enum) {
-			// NOTE(bill): Anonymous enumeration
-
-			String prefix = named_type->Named.name;
-			String enum_name = concatenate_strings(heap_allocator(), prefix, str_lit(".enum"));
-
-			Token token = make_token_ident(enum_name);
-
-			Entity *e = alloc_entity_type_name(nullptr, token, nullptr, EntityState_Resolved);
-			Type *named = alloc_type_named(enum_name, elem, e);
-			e->type = named;
-			e->TypeName.is_type_alias = true;
-			elem = named;
-		}
-		#endif
 
 		type->BitSet.elem = elem;
 		if (!is_type_valid_bit_set_elem(elem)) {
@@ -2085,31 +2070,31 @@ gb_internal bool check_procedure_type(CheckerContext *ctx, Type *type, Ast *proc
 	type->Proc.diverging            = pt->diverging;
 	type->Proc.optional_ok          = optional_ok;
 
-	if (param_count > 0) {
-		Entity *end = params->Tuple.variables[param_count-1];
-		if (end->flags&EntityFlag_CVarArg) {
+	bool is_polymorphic = false;
+	for (isize i = 0; i < param_count; i++) {
+		Entity *e = params->Tuple.variables[i];
+
+		if (e->kind != Entity_Variable) {
+			is_polymorphic = true;
+		} else if (is_type_polymorphic(e->type)) {
+			is_polymorphic = true;
+		}
+
+		if (e->flags&EntityFlag_CVarArg) {
+			if (i != param_count - 1) {
+				error(e->token, "#c_vararg can only be applied to the last parameter");
+				continue;
+			}
+
 			switch (cc) {
 			default:
 				type->Proc.c_vararg = true;
 				break;
 			case ProcCC_Odin:
 			case ProcCC_Contextless:
-				error(end->token, "Calling convention does not support #c_vararg");
+				error(e->token, "Calling convention does not support #c_vararg");
 				break;
 			}
-		}
-	}
-
-
-	bool is_polymorphic = false;
-	for (isize i = 0; i < param_count; i++) {
-		Entity *e = params->Tuple.variables[i];
-		if (e->kind != Entity_Variable) {
-			is_polymorphic = true;
-			break;
-		} else if (is_type_polymorphic(e->type)) {
-			is_polymorphic = true;
-			break;
 		}
 	}
 	for (isize i = 0; i < result_count; i++) {
@@ -2717,14 +2702,13 @@ gb_internal bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, T
 		check_expr_or_type(&c, &o, pt->type);
 		if (o.mode != Addressing_Invalid && o.mode != Addressing_Type) {
 			// NOTE(bill): call check_type_expr again to get a consistent error message
-			begin_error_block();
+			ERROR_BLOCK();
 			elem = check_type_expr(&c, pt->type, nullptr);
 			if (o.mode == Addressing_Variable) {
 				gbString s = expr_to_string(pt->type);
 				error_line("\tSuggestion: ^ is used for pointer types, did you mean '&%s'?\n", s);
 				gb_string_free(s);
 			}
-			end_error_block();
 		} else {
 			elem = o.type;
 		}
@@ -2812,7 +2796,7 @@ gb_internal bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, T
 				Type *bt = base_type(index);
 				GB_ASSERT(bt->kind == Type_Enum);
 
-				Type *t = alloc_type_enumerated_array(elem, index, bt->Enum.min_value, bt->Enum.max_value, Token_Invalid);
+				Type *t = alloc_type_enumerated_array(elem, index, bt->Enum.min_value, bt->Enum.max_value, bt->Enum.fields.count, Token_Invalid);
 
 				bool is_sparse = false;
 				if (at->tag != nullptr) {

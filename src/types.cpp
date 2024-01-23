@@ -143,7 +143,8 @@ struct TypeStruct {
 	Type *          soa_elem;
 	i32             soa_count;
 	StructSoaKind   soa_kind;
-	BlockingMutex   mutex; // for settings offsets
+	RwMutex         fields_mutex;
+	BlockingMutex   offset_mutex; // for settings offsets
 
 	bool            is_polymorphic;
 	bool            are_offsets_set             : 1;
@@ -982,7 +983,7 @@ gb_internal Type *alloc_type_matrix(Type *elem, i64 row_count, i64 column_count,
 }
 
 
-gb_internal Type *alloc_type_enumerated_array(Type *elem, Type *index, ExactValue const *min_value, ExactValue const *max_value, TokenKind op) {
+gb_internal Type *alloc_type_enumerated_array(Type *elem, Type *index, ExactValue const *min_value, ExactValue const *max_value, isize count, TokenKind op) {
 	Type *t = alloc_type(Type_EnumeratedArray);
 	t->EnumeratedArray.elem = elem;
 	t->EnumeratedArray.index = index;
@@ -992,7 +993,11 @@ gb_internal Type *alloc_type_enumerated_array(Type *elem, Type *index, ExactValu
 	gb_memmove(t->EnumeratedArray.max_value, max_value, gb_size_of(ExactValue));
 	t->EnumeratedArray.op = op;
 
-	t->EnumeratedArray.count = 1 + exact_value_to_i64(exact_value_sub(*max_value, *min_value));
+	if (count == 0) {
+		t->EnumeratedArray.count = 0;
+	} else {
+		t->EnumeratedArray.count = 1 + exact_value_to_i64(exact_value_sub(*max_value, *min_value));
+	}
 	return t;
 }
 
@@ -2645,10 +2650,14 @@ gb_internal bool are_types_identical_internal(Type *x, Type *y, bool check_tuple
 		return are_types_identical(x->Slice.elem, y->Slice.elem);
 
 	case Type_BitSet:
-		return are_types_identical(x->BitSet.elem, y->BitSet.elem) &&
-		       are_types_identical(x->BitSet.underlying, y->BitSet.underlying) &&
-		       x->BitSet.lower == y->BitSet.lower &&
-		       x->BitSet.upper == y->BitSet.upper;
+		if (are_types_identical(x->BitSet.elem, y->BitSet.elem) &&
+		    are_types_identical(x->BitSet.underlying, y->BitSet.underlying)) {
+		    	if (is_type_enum(x->BitSet.elem)) {
+		    		return true;
+		    	}
+		    	return x->BitSet.lower == y->BitSet.lower && x->BitSet.upper == y->BitSet.upper;
+		}
+		return false;
 
 
 	case Type_Enum:
@@ -2951,7 +2960,11 @@ gb_internal Selection lookup_field_from_index(Type *type, i64 index) {
 	gbAllocator a = permanent_allocator();
 	isize max_count = 0;
 	switch (type->kind) {
-	case Type_Struct:   max_count = type->Struct.fields.count;   break;
+	case Type_Struct:
+		rw_mutex_shared_lock(&type->Struct.fields_mutex);
+		max_count = type->Struct.fields.count;
+		rw_mutex_shared_unlock(&type->Struct.fields_mutex);
+		break;
 	case Type_Tuple:    max_count = type->Tuple.variables.count; break;
 	}
 
@@ -2960,7 +2973,9 @@ gb_internal Selection lookup_field_from_index(Type *type, i64 index) {
 	}
 
 	switch (type->kind) {
-	case Type_Struct:
+	case Type_Struct: {
+		rw_mutex_shared_lock(&type->Struct.fields_mutex);
+		defer (rw_mutex_shared_unlock(&type->Struct.fields_mutex));
 		for (isize i = 0; i < max_count; i++) {
 			Entity *f = type->Struct.fields[i];
 			if (f->kind == Entity_Variable) {
@@ -2971,7 +2986,8 @@ gb_internal Selection lookup_field_from_index(Type *type, i64 index) {
 				}
 			}
 		}
-		break;
+	} break;
+
 	case Type_Tuple:
 		for (isize i = 0; i < max_count; i++) {
 			Entity *f = type->Tuple.variables[i];
@@ -3024,7 +3040,10 @@ gb_internal Selection lookup_field_with_selection(Type *type_, String field_name
 				}
 			}
 			if (type->kind == Type_Struct) {
-				for_array(i, type->Struct.fields) {
+				rw_mutex_shared_lock(&type->Struct.fields_mutex);
+				isize field_count = type->Struct.fields.count;
+				rw_mutex_shared_unlock(&type->Struct.fields_mutex);
+				if (field_count != 0) for_array(i, type->Struct.fields) {
 					Entity *f = type->Struct.fields[i];
 					if (f->flags&EntityFlag_Using) {
 						sel = lookup_field_with_selection(f->type, field_name, is_type, sel, allow_blank_ident);
@@ -3052,7 +3071,9 @@ gb_internal Selection lookup_field_with_selection(Type *type_, String field_name
 		}
 
 		if (type->kind == Type_Struct) {
+			rw_mutex_shared_lock(&type->Struct.fields_mutex);
 			Scope *s = type->Struct.scope;
+			rw_mutex_shared_unlock(&type->Struct.fields_mutex);
 			if (s != nullptr) {
 				Entity *found = scope_lookup_current(s, field_name);
 				if (found != nullptr && found->kind != Entity_Variable) {
@@ -3100,7 +3121,10 @@ gb_internal Selection lookup_field_with_selection(Type *type_, String field_name
 			}
 		}
 
-		for_array(i, type->Struct.fields) {
+		rw_mutex_shared_lock(&type->Struct.fields_mutex);
+		isize field_count = type->Struct.fields.count;
+		rw_mutex_shared_unlock(&type->Struct.fields_mutex);
+		if (field_count != 0) for_array(i, type->Struct.fields) {
 			Entity *f = type->Struct.fields[i];
 			if (f->kind != Entity_Variable || (f->flags & EntityFlag_Field) == 0) {
 				continue;
@@ -3680,7 +3704,7 @@ gb_internal i64 *type_set_offsets_of(Slice<Entity *> const &fields, bool is_pack
 gb_internal bool type_set_offsets(Type *t) {
 	t = base_type(t);
 	if (t->kind == Type_Struct) {
-		MUTEX_GUARD(&t->Struct.mutex);
+		MUTEX_GUARD(&t->Struct.offset_mutex);
 		if (!t->Struct.are_offsets_set) {
 			t->Struct.are_offsets_being_processed = true;
 			t->Struct.offsets = type_set_offsets_of(t->Struct.fields, t->Struct.is_packed, t->Struct.is_raw_union);

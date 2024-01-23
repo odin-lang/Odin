@@ -55,7 +55,7 @@ gb_internal cgAddr cg_find_or_generate_context_ptr(cgProcedure *p) {
 	GB_ASSERT(pt->Proc.calling_convention != ProcCC_Odin);
 
 	cgAddr c = cg_add_local(p, t_context, nullptr, true);
-	tb_node_append_attrib(c.addr.node, tb_function_attrib_variable(p->func, -1, "context", cg_debug_type(p->module, t_context)));
+	tb_function_attrib_variable(p->func, c.addr.node, nullptr, -1, "context", cg_debug_type(p->module, t_context));
 	c.kind = cgAddr_Context;
 	// lb_emit_init_context(p, c);
 	cg_push_context_onto_stack(p, c);
@@ -1193,6 +1193,9 @@ gb_internal cgValue cg_emit_conv(cgProcedure *p, cgValue value, Type *t) {
 		GB_ASSERT(is_type_typed(st));
 
 		data = cg_emit_conv(p, data, t_rawptr);
+		if (p->name == "main@main") {
+			GB_PANIC("HERE %s %llu", type_to_string(st), cg_typeid_as_u64(p->module, value.type));
+		}
 
 		cgValue id = cg_typeid(p, st);
 		cgValue data_ptr = cg_emit_struct_ep(p, result.addr, 0);
@@ -3259,7 +3262,7 @@ gb_internal cgValue cg_build_expr_internal(cgProcedure *p, Ast *expr) {
 		if (is_type_untyped(type)) {
 			return cg_value(cast(TB_Node *)nullptr, t_untyped_uninit);
 		}
-		return cg_value(tb_inst_poison(p->func), type);
+		return cg_value(tb_inst_poison(p->func, cg_data_type(type)), type);
 	case_end;
 
 	case_ast_node(de, DerefExpr, expr);

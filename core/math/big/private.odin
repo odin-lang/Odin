@@ -1089,7 +1089,7 @@ _private_int_div_school :: proc(quotient, remainder, numerator, denominator: ^In
 		Step 3. for i from n down to (t + 1).
 	*/
 	#no_bounds_check for i := n; i >= (t + 1); i -= 1 {
-		if (i > x.used) { continue }
+		if i > x.used { continue }
 
 		/*
 			step 3.1 if xi == yt then set q{i-t-1} to b-1, otherwise set q{i-t-1} to (xi*b + x{i-1})/yt

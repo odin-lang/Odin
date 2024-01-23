@@ -63,8 +63,8 @@ read_at_least :: proc(fd: Handle, buf: []byte, min: int) -> (n: int, err: Errno)
 	if len(buf) < min {
 		return 0, -1
 	}
-	for n < min && err == 0 {
-		nn: int
+	nn := max(int)
+	for nn > 0 && n < min && err == 0 {
 		nn, err = read(fd, buf[n:])
 		n += nn
 	}
@@ -210,15 +210,15 @@ heap_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
 		}
 	}
 
-	aligned_resize :: proc(p: rawptr, old_size: int, new_size: int, new_alignment: int) -> (new_memory: []byte, err: mem.Allocator_Error) {
+	aligned_resize :: proc(p: rawptr, old_size: int, new_size: int, new_alignment: int, zero_memory := true) -> (new_memory: []byte, err: mem.Allocator_Error) {
 		if p == nil {
 			return nil, nil
 		}
 
-		new_memory = aligned_alloc(new_size, new_alignment, p) or_return
+		new_memory = aligned_alloc(new_size, new_alignment, p, zero_memory) or_return
 
 		// NOTE: heap_resize does not zero the new memory, so we do it
-		if new_size > old_size {
+		if zero_memory && new_size > old_size {
 			new_region := mem.raw_data(new_memory[old_size:])
 			mem.zero(new_region, new_size - old_size)
 		}
@@ -235,16 +235,16 @@ heap_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
 	case .Free_All:
 		return nil, .Mode_Not_Implemented
 
-	case .Resize:
+	case .Resize, .Resize_Non_Zeroed:
 		if old_memory == nil {
-			return aligned_alloc(size, alignment)
+			return aligned_alloc(size, alignment, nil, mode == .Resize)
 		}
-		return aligned_resize(old_memory, old_size, size, alignment)
+		return aligned_resize(old_memory, old_size, size, alignment, mode == .Resize)
 
 	case .Query_Features:
 		set := (^mem.Allocator_Mode_Set)(old_memory)
 		if set != nil {
-			set^ = {.Alloc, .Alloc_Non_Zeroed, .Free, .Resize, .Query_Features}
+			set^ = {.Alloc, .Alloc_Non_Zeroed, .Free, .Resize, .Resize_Non_Zeroed, .Query_Features}
 		}
 		return nil, nil
 

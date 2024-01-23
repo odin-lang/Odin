@@ -7,12 +7,25 @@ import c "core:c/libc"
 
 #assert(size_of(c.int) == size_of(b32))
 
-when ODIN_OS == .Windows {
-	foreign import lib "windows/lua53dll.lib"
-} else when ODIN_OS == .Linux {
-	foreign import lib "linux/liblua53.a"
+LUA_SHARED :: #config(LUA_SHARED, false)
+
+when LUA_SHARED {
+	when ODIN_OS == .Windows {
+		// Does nothing special on windows
+		foreign import lib "windows/lua53dll.lib"
+	} else when ODIN_OS == .Linux {
+		foreign import lib "linux/liblua53.so"
+	} else {
+		foreign import lib "system:liblua.so.5.3"
+	}
 } else {
-	foreign import lib "system:liblua53.a"
+	when ODIN_OS == .Windows {
+		foreign import lib "windows/lua53dll.lib"
+	} else when ODIN_OS == .Linux {
+		foreign import lib "linux/liblua53.a"
+	} else {
+		foreign import lib "system:liblua53.a"
+	}
 }
 
 VERSION_MAJOR       :: "5"

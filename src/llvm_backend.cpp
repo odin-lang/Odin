@@ -21,6 +21,25 @@
 #include "llvm_backend_stmt.cpp"
 #include "llvm_backend_proc.cpp"
 
+String get_default_microarchitecture() {
+	String default_march = str_lit("generic");
+	if (build_context.metrics.arch == TargetArch_amd64) {
+		// NOTE(bill): x86-64-v2 is more than enough for everyone
+		//
+		// x86-64: CMOV, CMPXCHG8B, FPU, FXSR, MMX, FXSR, SCE, SSE, SSE2
+		// x86-64-v2: (close to Nehalem) CMPXCHG16B, LAHF-SAHF, POPCNT, SSE3, SSE4.1, SSE4.2, SSSE3
+		// x86-64-v3: (close to Haswell) AVX, AVX2, BMI1, BMI2, F16C, FMA, LZCNT, MOVBE, XSAVE
+		// x86-64-v4: AVX512F, AVX512BW, AVX512CD, AVX512DQ, AVX512VL
+		if (ODIN_LLVM_MINIMUM_VERSION_12) {
+			if (build_context.metrics.os == TargetOs_freestanding) {
+				default_march = str_lit("x86-64");
+			} else {
+				default_march = str_lit("x86-64-v2");
+			}
+		}
+	}
+	return default_march;
+}
 
 gb_internal void lb_add_foreign_library_path(lbModule *m, Entity *e) {
 	if (e == nullptr) {
@@ -168,7 +187,7 @@ gb_internal lbValue lb_equal_proc_for_type(lbModule *m, Type *type) {
 	map_set(&m->equal_procs, type, p);
 	lb_begin_procedure_body(p);
 
-	lb_add_attribute_to_proc(m, p->value, "readonly");
+	// lb_add_attribute_to_proc(m, p->value, "readonly");
 	lb_add_attribute_to_proc(m, p->value, "nounwind");
 
 	LLVMValueRef x = LLVMGetParam(p->value, 0);
@@ -337,7 +356,7 @@ gb_internal lbValue lb_hasher_proc_for_type(lbModule *m, Type *type) {
 	lb_begin_procedure_body(p);
 	defer (lb_end_procedure_body(p));
 
-	lb_add_attribute_to_proc(m, p->value, "readonly");
+	// lb_add_attribute_to_proc(m, p->value, "readonly");
 	lb_add_attribute_to_proc(m, p->value, "nounwind");
 
 	LLVMValueRef x = LLVMGetParam(p->value, 0);
@@ -346,7 +365,7 @@ gb_internal lbValue lb_hasher_proc_for_type(lbModule *m, Type *type) {
 	lbValue seed = {y, t_uintptr};
 
 	lb_add_proc_attribute_at_index(p, 1+0, "nonnull");
-	lb_add_proc_attribute_at_index(p, 1+0, "readonly");
+	// lb_add_proc_attribute_at_index(p, 1+0, "readonly");
 
 	if (is_type_simple_compare(type)) {
 		lbValue res = lb_simple_compare_hash(p, type, data, seed);
@@ -506,9 +525,9 @@ gb_internal lbValue lb_map_get_proc_for_type(lbModule *m, Type *type) {
 
 	LLVMSetLinkage(p->value, LLVMInternalLinkage);
 	lb_add_attribute_to_proc(m, p->value, "nounwind");
-	// if (build_context.ODIN_DEBUG) {
+	if (build_context.ODIN_DEBUG) {
 		lb_add_attribute_to_proc(m, p->value, "noinline");
-	// }
+	}
 
 	LLVMValueRef x = LLVMGetParam(p->value, 0);
 	LLVMValueRef y = LLVMGetParam(p->value, 1);
@@ -692,13 +711,19 @@ gb_internal lbValue lb_map_set_proc_for_type(lbModule *m, Type *type) {
 	}
 
 	lbValue map_ptr      = {LLVMGetParam(p->value, 0), t_rawptr};
-	lbValue hash         = {LLVMGetParam(p->value, 1), t_uintptr};
+	lbValue hash_param   = {LLVMGetParam(p->value, 1), t_uintptr};
 	lbValue key_ptr      = {LLVMGetParam(p->value, 2), t_rawptr};
 	lbValue value_ptr    = {LLVMGetParam(p->value, 3), t_rawptr};
 	lbValue location_ptr = {LLVMGetParam(p->value, 4), t_source_code_location_ptr};
 
 	map_ptr = lb_emit_conv(p, map_ptr, alloc_type_pointer(type));
 	key_ptr = lb_emit_conv(p, key_ptr, alloc_type_pointer(type->Map.key));
+
+	LLVM_SET_VALUE_NAME(map_ptr.value,      "map_ptr");
+	LLVM_SET_VALUE_NAME(hash_param.value,   "hash_param");
+	LLVM_SET_VALUE_NAME(key_ptr.value,      "key_ptr");
+	LLVM_SET_VALUE_NAME(value_ptr.value,    "value_ptr");
+	LLVM_SET_VALUE_NAME(location_ptr.value, "location");
 
 	lb_add_proc_attribute_at_index(p, 1+0, "nonnull");
 	lb_add_proc_attribute_at_index(p, 1+0, "noalias");
@@ -719,6 +744,10 @@ gb_internal lbValue lb_map_set_proc_for_type(lbModule *m, Type *type) {
 	lb_add_proc_attribute_at_index(p, 1+4, "noalias");
 	lb_add_proc_attribute_at_index(p, 1+4, "readonly");
 
+	lbAddr hash_addr = lb_add_local_generated(p, t_uintptr, false);
+	lb_addr_store(p, hash_addr, hash_param);
+	LLVM_SET_VALUE_NAME(hash_addr.addr.value, "hash");
+
 	////
 	lbValue found_ptr = {};
 	{
@@ -726,17 +755,19 @@ gb_internal lbValue lb_map_set_proc_for_type(lbModule *m, Type *type) {
 
 		auto args = array_make<lbValue>(temporary_allocator(), 3);
 		args[0] = lb_emit_conv(p, map_ptr, t_rawptr);
-		args[1] = hash;
+		args[1] = lb_addr_load(p, hash_addr);
 		args[2] = key_ptr;
 
 		found_ptr = lb_emit_call(p, map_get_proc, args);
 	}
+	LLVM_SET_VALUE_NAME(found_ptr.value, "found_ptr");
 
 
 	lbBlock *found_block      = lb_create_block(p, "found");
 	lbBlock *check_grow_block = lb_create_block(p, "check-grow");
 	lbBlock *grow_fail_block  = lb_create_block(p, "grow-fail");
 	lbBlock *insert_block     = lb_create_block(p, "insert");
+	lbBlock *check_has_grown_block = lb_create_block(p, "check-has-grown");
 	lbBlock *rehash_block     = lb_create_block(p, "rehash");
 
 	lb_emit_if(p, lb_emit_comp_against_nil(p, Token_NotEq, found_ptr), found_block, check_grow_block);
@@ -749,6 +780,7 @@ gb_internal lbValue lb_map_set_proc_for_type(lbModule *m, Type *type) {
 
 
 	lbValue map_info = lb_gen_map_info_ptr(p->module, type);
+	LLVM_SET_VALUE_NAME(map_info.value, "map_info");
 
 	{
 		auto args = array_make<lbValue>(temporary_allocator(), 3);
@@ -758,16 +790,23 @@ gb_internal lbValue lb_map_set_proc_for_type(lbModule *m, Type *type) {
 		lbValue grow_err_and_has_grown = lb_emit_runtime_call(p, "__dynamic_map_check_grow", args);
 		lbValue grow_err = lb_emit_struct_ev(p, grow_err_and_has_grown, 0);
 		lbValue has_grown = lb_emit_struct_ev(p, grow_err_and_has_grown, 1);
+		LLVM_SET_VALUE_NAME(grow_err.value,  "grow_err");
+		LLVM_SET_VALUE_NAME(has_grown.value, "has_grown");
 
-		lb_emit_if(p, lb_emit_comp_against_nil(p, Token_NotEq, grow_err), grow_fail_block, insert_block);
+		lb_emit_if(p, lb_emit_comp_against_nil(p, Token_NotEq, grow_err), grow_fail_block, check_has_grown_block);
 
 		lb_start_block(p, grow_fail_block);
 		LLVMBuildRet(p->builder, LLVMConstNull(lb_type(m, t_rawptr)));
 
-		lb_emit_if(p, has_grown, grow_fail_block, rehash_block);
+		lb_start_block(p, check_has_grown_block);
+
+		lb_emit_if(p, has_grown, rehash_block, insert_block);
 		lb_start_block(p, rehash_block);
 		lbValue key = lb_emit_load(p, key_ptr);
-		hash = lb_gen_map_key_hash(p, map_ptr, key, nullptr);
+		lbValue new_hash = lb_gen_map_key_hash(p, map_ptr, key, nullptr);
+		LLVM_SET_VALUE_NAME(new_hash.value, "new_hash");
+		lb_addr_store(p, hash_addr, new_hash);
+		lb_emit_jump(p, insert_block);
 	}
 
 	lb_start_block(p, insert_block);
@@ -775,7 +814,7 @@ gb_internal lbValue lb_map_set_proc_for_type(lbModule *m, Type *type) {
 		auto args = array_make<lbValue>(temporary_allocator(), 5);
 		args[0] = lb_emit_conv(p, map_ptr, t_rawptr);
 		args[1] = map_info;
-		args[2] = hash;
+		args[2] = lb_addr_load(p, hash_addr);
 		args[3] = lb_emit_conv(p, key_ptr,   t_uintptr);
 		args[4] = lb_emit_conv(p, value_ptr, t_uintptr);
 
@@ -1025,6 +1064,10 @@ gb_internal lbProcedure *lb_create_startup_type_info(lbModule *m) {
 	LLVMSetLinkage(p->value, LLVMInternalLinkage);
 
 	lb_add_attribute_to_proc(m, p->value, "nounwind");
+	if (!LB_USE_GIANT_PACKED_STRUCT) {
+		lb_add_attribute_to_proc(m, p->value, "optnone");
+		lb_add_attribute_to_proc(m, p->value, "noinline");
+	}
 
 	lb_begin_procedure_body(p);
 
@@ -1086,6 +1129,8 @@ gb_internal lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProc
 
 	lbProcedure *p = lb_create_dummy_procedure(main_module, str_lit(LB_STARTUP_RUNTIME_PROC_NAME), proc_type);
 	p->is_startup = true;
+	lb_add_attribute_to_proc(p->module, p->value, "optnone");
+	lb_add_attribute_to_proc(p->module, p->value, "noinline");
 
 	lb_begin_procedure_body(p);
 
@@ -1189,6 +1234,8 @@ gb_internal lbProcedure *lb_create_cleanup_runtime(lbModule *main_module) { // C
 
 	lbProcedure *p = lb_create_dummy_procedure(main_module, str_lit(LB_CLEANUP_RUNTIME_PROC_NAME), proc_type);
 	p->is_startup = true;
+	lb_add_attribute_to_proc(p->module, p->value, "optnone");
+	lb_add_attribute_to_proc(p->module, p->value, "noinline");
 
 	lb_begin_procedure_body(p);
 
@@ -1352,33 +1399,25 @@ gb_internal WORKER_TASK_PROC(lb_llvm_function_pass_per_module) {
 	{
 		GB_ASSERT(m->function_pass_managers[lbFunctionPassManager_default] == nullptr);
 
-		m->function_pass_managers[lbFunctionPassManager_default]                = LLVMCreateFunctionPassManagerForModule(m->mod);
-		m->function_pass_managers[lbFunctionPassManager_default_without_memcpy] = LLVMCreateFunctionPassManagerForModule(m->mod);
-		m->function_pass_managers[lbFunctionPassManager_none]                   = LLVMCreateFunctionPassManagerForModule(m->mod);
-		m->function_pass_managers[lbFunctionPassManager_minimal]                = LLVMCreateFunctionPassManagerForModule(m->mod);
-		m->function_pass_managers[lbFunctionPassManager_size]                   = LLVMCreateFunctionPassManagerForModule(m->mod);
-		m->function_pass_managers[lbFunctionPassManager_speed]                  = LLVMCreateFunctionPassManagerForModule(m->mod);
+		for (i32 i = 0; i < lbFunctionPassManager_COUNT; i++) {
+			m->function_pass_managers[i] = LLVMCreateFunctionPassManagerForModule(m->mod);
+		}
 
-		LLVMInitializeFunctionPassManager(m->function_pass_managers[lbFunctionPassManager_default]);
-		LLVMInitializeFunctionPassManager(m->function_pass_managers[lbFunctionPassManager_default_without_memcpy]);
-		LLVMInitializeFunctionPassManager(m->function_pass_managers[lbFunctionPassManager_none]);
-		LLVMInitializeFunctionPassManager(m->function_pass_managers[lbFunctionPassManager_minimal]);
-		LLVMInitializeFunctionPassManager(m->function_pass_managers[lbFunctionPassManager_size]);
-		LLVMInitializeFunctionPassManager(m->function_pass_managers[lbFunctionPassManager_speed]);
+		for (i32 i = 0; i < lbFunctionPassManager_COUNT; i++) {
+			LLVMInitializeFunctionPassManager(m->function_pass_managers[i]);
+		}
 
 		lb_populate_function_pass_manager(m, m->function_pass_managers[lbFunctionPassManager_default],                false, build_context.optimization_level);
 		lb_populate_function_pass_manager(m, m->function_pass_managers[lbFunctionPassManager_default_without_memcpy], true,  build_context.optimization_level);
-		lb_populate_function_pass_manager_specific(m, m->function_pass_managers[lbFunctionPassManager_none],   -1);
-		lb_populate_function_pass_manager_specific(m, m->function_pass_managers[lbFunctionPassManager_minimal], 0);
-		lb_populate_function_pass_manager_specific(m, m->function_pass_managers[lbFunctionPassManager_size],    1);
-		lb_populate_function_pass_manager_specific(m, m->function_pass_managers[lbFunctionPassManager_speed],   2);
+		lb_populate_function_pass_manager_specific(m, m->function_pass_managers[lbFunctionPassManager_none],      -1);
+		lb_populate_function_pass_manager_specific(m, m->function_pass_managers[lbFunctionPassManager_minimal],    0);
+		lb_populate_function_pass_manager_specific(m, m->function_pass_managers[lbFunctionPassManager_size],       1);
+		lb_populate_function_pass_manager_specific(m, m->function_pass_managers[lbFunctionPassManager_speed],      2);
+		lb_populate_function_pass_manager_specific(m, m->function_pass_managers[lbFunctionPassManager_aggressive], 3);
 
-		LLVMFinalizeFunctionPassManager(m->function_pass_managers[lbFunctionPassManager_default]);
-		LLVMFinalizeFunctionPassManager(m->function_pass_managers[lbFunctionPassManager_default_without_memcpy]);
-		LLVMFinalizeFunctionPassManager(m->function_pass_managers[lbFunctionPassManager_none]);
-		LLVMFinalizeFunctionPassManager(m->function_pass_managers[lbFunctionPassManager_minimal]);
-		LLVMFinalizeFunctionPassManager(m->function_pass_managers[lbFunctionPassManager_size]);
-		LLVMFinalizeFunctionPassManager(m->function_pass_managers[lbFunctionPassManager_speed]);
+		for (i32 i = 0; i < lbFunctionPassManager_COUNT; i++) {
+			LLVMFinalizeFunctionPassManager(m->function_pass_managers[i]);
+		}
 	}
 
 	if (m == &m->gen->default_module) {
@@ -1393,6 +1432,8 @@ gb_internal WORKER_TASK_PROC(lb_llvm_function_pass_per_module) {
 			lbFunctionPassManagerKind pass_manager_kind = lbFunctionPassManager_default;
 			if (p->flags & lbProcedureFlag_WithoutMemcpyPass) {
 				pass_manager_kind = lbFunctionPassManager_default_without_memcpy;
+				lb_add_attribute_to_proc(p->module, p->value, "optnone");
+				lb_add_attribute_to_proc(p->module, p->value, "noinline");
 			} else {
 				if (p->entity && p->entity->kind == Entity_Procedure) {
 					switch (p->entity->Procedure.optimization_mode) {
@@ -1402,6 +1443,7 @@ gb_internal WORKER_TASK_PROC(lb_llvm_function_pass_per_module) {
 						break;
 					case ProcedureOptimizationMode_Size:
 						pass_manager_kind = lbFunctionPassManager_size;
+						lb_add_attribute_to_proc(p->module, p->value, "optsize");
 						break;
 					case ProcedureOptimizationMode_Speed:
 						pass_manager_kind = lbFunctionPassManager_speed;
@@ -1449,6 +1491,471 @@ gb_internal WORKER_TASK_PROC(lb_llvm_module_pass_worker_proc) {
 	LLVMPassManagerRef module_pass_manager = LLVMCreatePassManager();
 	lb_populate_module_pass_manager(wd->target_machine, module_pass_manager, build_context.optimization_level);
 	LLVMRunPassManager(module_pass_manager, wd->m->mod);
+
+
+#if LB_USE_NEW_PASS_SYSTEM
+	auto passes = array_make<char const *>(heap_allocator(), 0, 64);
+	defer (array_free(&passes));
+
+	LLVMPassBuilderOptionsRef pb_options = LLVMCreatePassBuilderOptions();
+	defer (LLVMDisposePassBuilderOptions(pb_options));
+
+	switch (build_context.optimization_level) {
+	case -1:
+		break;
+	case 0:
+		array_add(&passes, "always-inline");
+		array_add(&passes, "function(annotation-remarks)");
+		break;
+	case 1:
+// default<Os>
+// Passes removed: coro, openmp, sroa
+		array_add(&passes, u8R"(
+annotation2metadata,
+forceattrs,
+inferattrs,
+function<eager-inv>(
+	lower-expect,
+	simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;no-switch-range-to-icmp;no-switch-to-lookup;keep-loops;no-hoist-common-insts;no-sink-common-insts;speculate-blocks;simplify-cond-branch>,
+	early-cse<>
+),
+ipsccp,
+called-value-propagation,
+globalopt,
+function<eager-inv>(
+	mem2reg,
+	instcombine<max-iterations=1000;no-use-loop-info>,
+	simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;switch-range-to-icmp;no-switch-to-lookup;keep-loops;no-hoist-common-insts;no-sink-common-insts;speculate-blocks;simplify-cond-branch>),
+	require<globals-aa>,
+	function(
+		invalidate<aa>
+	),
+	require<profile-summary>,
+	cgscc(
+	devirt<4>(
+		inline<only-mandatory>,
+		inline,
+		function-attrs<skip-non-recursive>,
+		function<eager-inv;no-rerun>(
+			early-cse<memssa>,
+			speculative-execution,
+			jump-threading,
+			correlated-propagation,
+			simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;switch-range-to-icmp;no-switch-to-lookup;keep-loops;no-hoist-common-insts;no-sink-common-insts;speculate-blocks;simplify-cond-branch>,
+			instcombine<max-iterations=1000;no-use-loop-info>,
+			aggressive-instcombine,
+			constraint-elimination,
+			tailcallelim,
+			simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;switch-range-to-icmp;no-switch-to-lookup;keep-loops;no-hoist-common-insts;no-sink-common-insts;speculate-blocks;simplify-cond-branch>,
+			reassociate,
+			loop-mssa(
+				loop-instsimplify,
+				loop-simplifycfg,
+				licm<no-allowspeculation>,
+				loop-rotate<header-duplication;no-prepare-for-lto>,
+				licm<allowspeculation>,
+				simple-loop-unswitch<no-nontrivial;trivial>
+			),
+			simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;switch-range-to-icmp;no-switch-to-lookup;keep-loops;no-hoist-common-insts;no-sink-common-insts;speculate-blocks;simplify-cond-branch>,
+			instcombine<max-iterations=1000;no-use-loop-info>,
+			loop(
+				loop-idiom,
+				indvars,
+				loop-deletion,
+				loop-unroll-full
+			),
+			vector-combine,
+			mldst-motion<no-split-footer-bb>,
+			gvn<>,
+			sccp,
+			bdce,
+			instcombine<max-iterations=1000;no-use-loop-info>,
+			jump-threading,
+			correlated-propagation,
+			adce,
+			memcpyopt,
+			dse,
+			move-auto-init,
+			loop-mssa(
+				licm<allowspeculation>
+			),
+			simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;switch-range-to-icmp;no-switch-to-lookup;keep-loops;hoist-common-insts;sink-common-insts;speculate-blocks;simplify-cond-branch>,
+			instcombine<max-iterations=1000;no-use-loop-info>
+		),
+		function-attrs,
+		function(
+			require<should-not-run-function-passes>
+		)
+	)
+),
+deadargelim,
+globalopt,
+globaldce,
+elim-avail-extern,
+rpo-function-attrs,
+recompute-globalsaa,
+function<eager-inv>(
+	float2int,
+	lower-constant-intrinsics,
+	loop(
+		loop-rotate<header-duplication;no-prepare-for-lto>,
+		loop-deletion
+	),
+	loop-distribute,
+	inject-tli-mappings,
+	loop-vectorize<no-interleave-forced-only;no-vectorize-forced-only;>,
+	loop-load-elim,
+	instcombine<max-iterations=1000;no-use-loop-info>,
+	simplifycfg<bonus-inst-threshold=1;forward-switch-cond;switch-range-to-icmp;switch-to-lookup;no-keep-loops;hoist-common-insts;sink-common-insts;speculate-blocks;simplify-cond-branch>,
+	slp-vectorizer,
+	vector-combine,
+	instcombine<max-iterations=1000;no-use-loop-info>,
+	loop-unroll<O2>,
+	transform-warning,
+	instcombine<max-iterations=1000;no-use-loop-info>,
+	loop-mssa(
+		licm<allowspeculation>
+	),
+	alignment-from-assumptions,
+	loop-sink,
+	instsimplify,
+	div-rem-pairs,
+	tailcallelim,
+	simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;switch-range-to-icmp;no-switch-to-lookup;keep-loops;no-hoist-common-insts;no-sink-common-insts;speculate-blocks;simplify-cond-branch>
+),
+globaldce,
+constmerge,
+cg-profile,
+rel-lookup-table-converter,
+function(
+	annotation-remarks
+),
+verify
+)");
+		break;
+// default<O2>
+// Passes removed: coro, openmp, sroa
+	case 2:
+		array_add(&passes, u8R"(
+annotation2metadata,
+forceattrs,
+inferattrs,
+function<eager-inv>(
+	lower-expect,
+	simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;no-switch-range-to-icmp;no-switch-to-lookup;keep-loops;no-hoist-common-insts;no-sink-common-insts;speculate-blocks;simplify-cond-branch>,
+	early-cse<>
+),
+ipsccp,
+called-value-propagation,
+globalopt,
+function<eager-inv>(
+	mem2reg,
+	instcombine<max-iterations=1000;no-use-loop-info>,
+	simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;switch-range-to-icmp;no-switch-to-lookup;keep-loops;no-hoist-common-insts;no-sink-common-insts;speculate-blocks;simplify-cond-branch>
+),
+require<globals-aa>,
+function(
+	invalidate<aa>
+),
+require<profile-summary>,
+cgscc(
+	devirt<4>(
+		inline<only-mandatory>,
+		inline,
+		function-attrs<skip-non-recursive>,
+		function<eager-inv;no-rerun>(
+			early-cse<memssa>,
+			speculative-execution,
+			jump-threading,
+			correlated-propagation,
+			simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;switch-range-to-icmp;no-switch-to-lookup;keep-loops;no-hoist-common-insts;no-sink-common-insts;speculate-blocks;simplify-cond-branch>,
+			instcombine<max-iterations=1000;no-use-loop-info>,
+			aggressive-instcombine,
+			constraint-elimination,
+			libcalls-shrinkwrap,
+			tailcallelim,
+			simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;switch-range-to-icmp;no-switch-to-lookup;keep-loops;no-hoist-common-insts;no-sink-common-insts;speculate-blocks;simplify-cond-branch>,
+			reassociate,
+			loop-mssa(
+				loop-instsimplify,
+				loop-simplifycfg,
+				licm<no-allowspeculation>,
+				loop-rotate<header-duplication;no-prepare-for-lto>,
+				licm<allowspeculation>,
+				simple-loop-unswitch<no-nontrivial;trivial>
+			),
+			simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;switch-range-to-icmp;no-switch-to-lookup;keep-loops;no-hoist-common-insts;no-sink-common-insts;speculate-blocks;simplify-cond-branch>,
+			instcombine<max-iterations=1000;no-use-loop-info>,
+			loop(
+				loop-idiom,
+				indvars,
+				loop-deletion,
+				loop-unroll-full
+			),
+			vector-combine,
+			mldst-motion<no-split-footer-bb>,
+			gvn<>,
+			sccp,
+			bdce,
+			instcombine<max-iterations=1000;no-use-loop-info>,
+			jump-threading,
+			correlated-propagation,
+			adce,
+			memcpyopt,
+			dse,
+			move-auto-init,
+			loop-mssa(
+				licm<allowspeculation>
+			),
+			simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;switch-range-to-icmp;no-switch-to-lookup;keep-loops;hoist-common-insts;sink-common-insts;speculate-blocks;simplify-cond-branch>,
+			instcombine<max-iterations=1000;no-use-loop-info>
+		),
+		function-attrs,
+		function(
+			require<should-not-run-function-passes>
+		)
+	)
+),
+deadargelim,
+globalopt,
+globaldce,
+elim-avail-extern,
+rpo-function-attrs,
+recompute-globalsaa,
+function<eager-inv>(
+	float2int,
+	lower-constant-intrinsics,
+	loop(
+		loop-rotate<header-duplication;no-prepare-for-lto>,
+		loop-deletion
+	),
+	loop-distribute,
+	inject-tli-mappings,
+	loop-vectorize<no-interleave-forced-only;no-vectorize-forced-only;>,
+	loop-load-elim,
+	instcombine<max-iterations=1000;no-use-loop-info>,
+	simplifycfg<bonus-inst-threshold=1;forward-switch-cond;switch-range-to-icmp;switch-to-lookup;no-keep-loops;hoist-common-insts;sink-common-insts;speculate-blocks;simplify-cond-branch>,
+	slp-vectorizer,
+	vector-combine,
+	instcombine<max-iterations=1000;no-use-loop-info>,
+	loop-unroll<O2>,
+	transform-warning,
+	instcombine<max-iterations=1000;no-use-loop-info>,
+	loop-mssa(
+		licm<allowspeculation>
+	),
+	alignment-from-assumptions,
+	loop-sink,
+	instsimplify,
+	div-rem-pairs,
+	tailcallelim,
+	simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;switch-range-to-icmp;no-switch-to-lookup;keep-loops;no-hoist-common-insts;no-sink-common-insts;speculate-blocks;simplify-cond-branch>
+),
+globaldce,
+constmerge,
+cg-profile,
+rel-lookup-table-converter,
+function(
+	annotation-remarks
+),
+verify
+)");
+		break;
+
+	case 3:
+// default<O3>
+// Passes removed: coro, openmp, sroa
+		array_add(&passes, u8R"(
+annotation2metadata,
+forceattrs,
+inferattrs,
+function<eager-inv>(
+	lower-expect,
+	simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;no-switch-range-to-icmp;no-switch-to-lookup;keep-loops;no-hoist-common-insts;no-sink-common-insts;speculate-blocks;simplify-cond-branch>,
+	early-cse<>,
+	callsite-splitting
+),
+ipsccp,
+called-value-propagation,
+globalopt,
+function<eager-inv>(
+	mem2reg,
+	instcombine<max-iterations=1000;no-use-loop-info>,
+	simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;switch-range-to-icmp;no-switch-to-lookup;keep-loops;no-hoist-common-insts;no-sink-common-insts;speculate-blocks;simplify-cond-branch>
+),
+require<globals-aa>,
+function(
+	invalidate<aa>
+),
+require<profile-summary>,
+cgscc(
+	devirt<4>(
+		inline<only-mandatory>,
+		inline,
+		function-attrs<skip-non-recursive>,
+		argpromotion,
+		function<eager-inv;no-rerun>(
+			early-cse<memssa>,
+			speculative-execution,
+			jump-threading,
+			correlated-propagation,
+			simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;switch-range-to-icmp;no-switch-to-lookup;keep-loops;no-hoist-common-insts;no-sink-common-insts;speculate-blocks;simplify-cond-branch>,
+			instcombine<max-iterations=1000;no-use-loop-info>,
+			aggressive-instcombine,
+			constraint-elimination,
+			libcalls-shrinkwrap,
+			tailcallelim,
+			simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;switch-range-to-icmp;no-switch-to-lookup;keep-loops;no-hoist-common-insts;no-sink-common-insts;speculate-blocks;simplify-cond-branch>,
+			reassociate,
+			loop-mssa(
+				loop-instsimplify,
+				loop-simplifycfg,
+				licm<no-allowspeculation>,
+				loop-rotate<header-duplication;no-prepare-for-lto>,
+				licm<allowspeculation>,
+				simple-loop-unswitch<nontrivial;trivial>
+			),
+			simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;switch-range-to-icmp;no-switch-to-lookup;keep-loops;no-hoist-common-insts;no-sink-common-insts;speculate-blocks;simplify-cond-branch>,
+			instcombine<max-iterations=1000;no-use-loop-info>,
+			loop(
+				loop-idiom,
+				indvars,
+				loop-deletion,
+				loop-unroll-full
+			),
+			vector-combine,
+			mldst-motion<no-split-footer-bb>,
+			gvn<>,
+			sccp,
+			bdce,
+			instcombine<max-iterations=1000;no-use-loop-info>,
+			jump-threading,
+			correlated-propagation,
+			adce,
+			memcpyopt,
+			dse,
+			move-auto-init,
+			loop-mssa(
+				licm<allowspeculation>
+			),
+			simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;switch-range-to-icmp;no-switch-to-lookup;keep-loops;hoist-common-insts;sink-common-insts;speculate-blocks;simplify-cond-branch>,
+			instcombine<max-iterations=1000;no-use-loop-info>
+		),
+		function-attrs,
+		function(
+			require<should-not-run-function-passes>
+		)
+	)
+),
+deadargelim,
+globalopt,
+globaldce,
+elim-avail-extern,
+rpo-function-attrs,
+recompute-globalsaa,
+function<eager-inv>(
+	float2int,
+	lower-constant-intrinsics,
+	chr,
+	loop(
+		loop-rotate<header-duplication;no-prepare-for-lto>,
+		loop-deletion
+	),
+	loop-distribute,
+	inject-tli-mappings,
+	loop-vectorize<no-interleave-forced-only;no-vectorize-forced-only;>,
+	loop-load-elim,
+	instcombine<max-iterations=1000;no-use-loop-info>,
+	simplifycfg<bonus-inst-threshold=1;forward-switch-cond;switch-range-to-icmp;switch-to-lookup;no-keep-loops;hoist-common-insts;sink-common-insts;speculate-blocks;simplify-cond-branch>,
+	slp-vectorizer,
+	vector-combine,
+	instcombine<max-iterations=1000;no-use-loop-info>,
+	loop-unroll<O3>,
+	transform-warning,
+	instcombine<max-iterations=1000;no-use-loop-info>,
+	loop-mssa(
+		licm<allowspeculation>
+	),
+	alignment-from-assumptions,
+	loop-sink,
+	instsimplify,
+	div-rem-pairs,
+	tailcallelim,
+	simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;switch-range-to-icmp;no-switch-to-lookup;keep-loops;no-hoist-common-insts;no-sink-common-insts;speculate-blocks;simplify-cond-branch>
+),
+globaldce,
+constmerge,
+cg-profile,
+rel-lookup-table-converter,
+function(
+	annotation-remarks
+),
+verify
+)");
+		break;
+	}
+
+	// asan - Linux, Darwin, Windows
+	// msan - linux
+	// tsan - Linux, Darwin
+	// ubsan - Linux, Darwin, Windows (NOT SUPPORTED WITH LLVM C-API)
+
+	if (build_context.sanitizer_flags & SanitizerFlag_Address) {
+		array_add(&passes, "asan");
+	}
+	if (build_context.sanitizer_flags & SanitizerFlag_Memory) {
+		array_add(&passes, "msan");
+	}
+	if (build_context.sanitizer_flags & SanitizerFlag_Thread) {
+		array_add(&passes, "tsan");
+	}
+
+	if (passes.count == 0) {
+		array_add(&passes, "verify");
+	}
+
+	gbString passes_str = gb_string_make_reserve(heap_allocator(), 1024);
+	defer (gb_string_free(passes_str));
+	for_array(i, passes) {
+		if (i != 0) {
+			passes_str = gb_string_appendc(passes_str, ",");
+		}
+		passes_str = gb_string_appendc(passes_str, passes[i]);
+	}
+	for (isize i = 0; i < gb_string_length(passes_str); /**/) {
+		switch (passes_str[i]) {
+		case ' ':
+		case '\n':
+		case '\t':
+			gb_memmove(&passes_str[i], &passes_str[i+1], gb_string_length(passes_str)-i);
+			GB_STRING_HEADER(passes_str)->length -= 1;
+			continue;
+		default:
+			i += 1;
+			break;
+		}
+	}
+
+	LLVMErrorRef llvm_err = LLVMRunPasses(wd->m->mod, passes_str, wd->target_machine, pb_options);
+
+	defer (LLVMConsumeError(llvm_err));
+	if (llvm_err != nullptr) {
+		char *llvm_error = LLVMGetErrorMessage(llvm_err);
+		gb_printf_err("LLVM Error:\n%s\n", llvm_error);
+		LLVMDisposeErrorMessage(llvm_error);
+		llvm_error = nullptr;
+
+		if (build_context.keep_temp_files) {
+			TIME_SECTION("LLVM Print Module to File");
+			String filepath_ll = lb_filepath_ll_for_module(wd->m);
+			if (LLVMPrintModuleToFile(wd->m->mod, cast(char const *)filepath_ll.text, &llvm_error)) {
+				gb_printf_err("LLVM Error: %s\n", llvm_error);
+			}
+		}
+		gb_exit(1);
+		return 1;
+	}
+#endif
 	return 0;
 }
 
@@ -1996,51 +2503,86 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 	LLVMCodeModel code_mode = LLVMCodeModelDefault;
 	if (is_arch_wasm()) {
 		code_mode = LLVMCodeModelJITDefault;
-	} else if (build_context.metrics.os == TargetOs_freestanding) {
+	} else if (is_arch_x86() && build_context.metrics.os == TargetOs_freestanding) {
 		code_mode = LLVMCodeModelKernel;
 	}
 
-	char const *host_cpu_name = LLVMGetHostCPUName();
-	char const *llvm_cpu = "generic";
+	String      host_cpu_name = copy_string(permanent_allocator(), make_string_c(LLVMGetHostCPUName()));
+	String      llvm_cpu      = get_default_microarchitecture();
 	char const *llvm_features = "";
 	if (build_context.microarch.len != 0) {
 		if (build_context.microarch == "native") {
 			llvm_cpu = host_cpu_name;
 		} else {
-			llvm_cpu = alloc_cstring(permanent_allocator(), build_context.microarch);
+			llvm_cpu = copy_string(permanent_allocator(), build_context.microarch);
 		}
-		if (gb_strcmp(llvm_cpu, host_cpu_name) == 0) {
+		if (llvm_cpu == host_cpu_name) {
 			llvm_features = LLVMGetHostCPUFeatures();
-		}
-	} else if (build_context.metrics.arch == TargetArch_amd64) {
-		// NOTE(bill): x86-64-v2 is more than enough for everyone
-		//
-		// x86-64: CMOV, CMPXCHG8B, FPU, FXSR, MMX, FXSR, SCE, SSE, SSE2
-		// x86-64-v2: (close to Nehalem) CMPXCHG16B, LAHF-SAHF, POPCNT, SSE3, SSE4.1, SSE4.2, SSSE3
-		// x86-64-v3: (close to Haswell) AVX, AVX2, BMI1, BMI2, F16C, FMA, LZCNT, MOVBE, XSAVE
-		// x86-64-v4: AVX512F, AVX512BW, AVX512CD, AVX512DQ, AVX512VL
-		if (ODIN_LLVM_MINIMUM_VERSION_12) {
-			if (build_context.metrics.os == TargetOs_freestanding) {
-				llvm_cpu = "x86-64";
-			} else {
-				llvm_cpu = "x86-64-v2";
-			}
 		}
 	}
 
+	// NOTE(Jeroen): Uncomment to get the list of supported microarchitectures.
+	/*
+	if (build_context.microarch == "?") {
+		string_set_add(&build_context.target_features_set, str_lit("+cpuhelp"));
+	}
+	*/
+
 	if (build_context.target_features_set.entries.count != 0) {
-		llvm_features = target_features_set_to_cstring(permanent_allocator(), false);
+		// Prefix all of the features with a `+`, because we are
+		// enabling additional features.
+		char const *additional_features = target_features_set_to_cstring(permanent_allocator(), false, true);
+
+		String f_string = make_string_c(llvm_features);
+		String a_string = make_string_c(additional_features);
+		isize f_len = f_string.len;
+
+		if (f_len == 0) {
+			// The common case is that llvm_features is empty, so
+			// the target_features_set additions can be used as is.
+			llvm_features = additional_features;
+		} else {
+			// The user probably specified `-microarch:native`, so
+			// llvm_features is populated by LLVM's idea of what
+			// the host CPU supports.
+			//
+			// As far as I can tell, (which is barely better than
+			// wild guessing), a bitset is formed by parsing the
+			// string left to right.
+			//
+			// So, llvm_features + ',' + additonal_features, will
+			// makes the target_features_set override llvm_features.
+
+			char *tmp = gb_alloc_array(permanent_allocator(), char, f_len + 1 + a_string.len + 1);
+			isize len = 0;
+
+			// tmp = f_string
+			gb_memmove(tmp, f_string.text, f_string.len);
+			len += f_string.len;
+			// tmp += ','
+			tmp[len++] = ',';
+			// tmp += a_string
+			gb_memmove(tmp + len, a_string.text, a_string.len);
+			len += a_string.len;
+			// tmp += NUL
+			tmp[len++] = 0;
+
+			llvm_features = tmp;
+		}
 	}
 
 	// GB_ASSERT_MSG(LLVMTargetHasAsmBackend(target));
 
 	LLVMCodeGenOptLevel code_gen_level = LLVMCodeGenLevelNone;
+	if (!LB_USE_NEW_PASS_SYSTEM) {
+		build_context.optimization_level = gb_clamp(build_context.optimization_level, -1, 2);
+	}
 	switch (build_context.optimization_level) {
-	case 0: code_gen_level = LLVMCodeGenLevelNone;    break;
-	case 1: code_gen_level = LLVMCodeGenLevelLess;    break;
-	case 2: code_gen_level = LLVMCodeGenLevelDefault; break;
-	case 3: code_gen_level = LLVMCodeGenLevelDefault; break; // NOTE(bill): force -opt:3 to be the same as -opt:2
-	// case 3: code_gen_level = LLVMCodeGenLevelAggressive; break;
+	default:/*fallthrough*/
+	case 0: code_gen_level = LLVMCodeGenLevelNone;       break;
+	case 1: code_gen_level = LLVMCodeGenLevelLess;       break;
+	case 2: code_gen_level = LLVMCodeGenLevelDefault;    break;
+	case 3: code_gen_level = LLVMCodeGenLevelAggressive; break;
 	}
 
 	// NOTE(bill): Target Machine Creation
@@ -2073,7 +2615,7 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 
 	for (auto const &entry : gen->modules) {
 		LLVMTargetMachineRef target_machine = LLVMCreateTargetMachine(
-			target, target_triple, llvm_cpu,
+			target, target_triple, (const char *)llvm_cpu.text,
 			llvm_features,
 			code_gen_level,
 			reloc_mode,
@@ -2144,10 +2686,16 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 
 		{ // Add type info data
 			isize max_type_info_count = info->minimum_dependency_type_info_set.count+1;
-			// gb_printf_err("max_type_info_count: %td\n", max_type_info_count);
 			Type *t = alloc_type_array(t_type_info, max_type_info_count);
-			LLVMValueRef g = LLVMAddGlobal(m->mod, lb_type(m, t), LB_TYPE_INFO_DATA_NAME);
-			LLVMSetInitializer(g, LLVMConstNull(lb_type(m, t)));
+
+			// IMPORTANT NOTE(bill): As LLVM does not have a union type, an array of unions cannot be initialized
+			// at compile time without cheating in some way. This means to emulate an array of unions is to use
+			// a giant packed struct of "corrected" data types.
+
+			LLVMTypeRef internal_llvm_type = lb_setup_type_info_data_internal_type(m, max_type_info_count);
+
+			LLVMValueRef g = LLVMAddGlobal(m->mod, internal_llvm_type, LB_TYPE_INFO_DATA_NAME);
+			LLVMSetInitializer(g, LLVMConstNull(internal_llvm_type));
 			LLVMSetLinkage(g, USE_SEPARATE_MODULES ? LLVMExternalLinkage : LLVMInternalLinkage);
 
 			lbValue value = {};
@@ -2156,6 +2704,12 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 
 			lb_global_type_info_data_entity = alloc_entity_variable(nullptr, make_token_ident(LB_TYPE_INFO_DATA_NAME), t, EntityState_Resolved);
 			lb_add_entity(m, lb_global_type_info_data_entity, value);
+
+			if (LB_USE_GIANT_PACKED_STRUCT) {
+				LLVMSetLinkage(g, LLVMPrivateLinkage);
+				LLVMSetUnnamedAddress(g, LLVMGlobalUnnamedAddr);
+				LLVMSetGlobalConstant(g, /*true*/false);
+			}
 		}
 		{ // Type info member buffer
 			// NOTE(bill): Removes need for heap allocation by making it global memory
@@ -2180,51 +2734,22 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 				}
 			}
 
-			if (count > 0) {
-				{
-					char const *name = LB_TYPE_INFO_TYPES_NAME;
-					Type *t = alloc_type_array(t_type_info_ptr, count);
-					LLVMValueRef g = LLVMAddGlobal(m->mod, lb_type(m, t), name);
-					LLVMSetInitializer(g, LLVMConstNull(lb_type(m, t)));
-					LLVMSetLinkage(g, LLVMInternalLinkage);
-					lb_global_type_info_member_types = lb_addr({g, alloc_type_pointer(t)});
+			auto const global_type_info_make = [](lbModule *m, char const *name, Type *elem_type, i64 count) -> lbAddr {
+				Type *t = alloc_type_array(elem_type, count);
+				LLVMValueRef g = LLVMAddGlobal(m->mod, lb_type(m, t), name);
+				LLVMSetInitializer(g, LLVMConstNull(lb_type(m, t)));
+				LLVMSetLinkage(g, LLVMInternalLinkage);
+				if (LB_USE_GIANT_PACKED_STRUCT) {
+					lb_make_global_private_const(g);
+				}
+				return lb_addr({g, alloc_type_pointer(t)});
+			};
 
-				}
-				{
-					char const *name = LB_TYPE_INFO_NAMES_NAME;
-					Type *t = alloc_type_array(t_string, count);
-					LLVMValueRef g = LLVMAddGlobal(m->mod, lb_type(m, t), name);
-					LLVMSetInitializer(g, LLVMConstNull(lb_type(m, t)));
-					LLVMSetLinkage(g, LLVMInternalLinkage);
-					lb_global_type_info_member_names = lb_addr({g, alloc_type_pointer(t)});
-				}
-				{
-					char const *name = LB_TYPE_INFO_OFFSETS_NAME;
-					Type *t = alloc_type_array(t_uintptr, count);
-					LLVMValueRef g = LLVMAddGlobal(m->mod, lb_type(m, t), name);
-					LLVMSetInitializer(g, LLVMConstNull(lb_type(m, t)));
-					LLVMSetLinkage(g, LLVMInternalLinkage);
-					lb_global_type_info_member_offsets = lb_addr({g, alloc_type_pointer(t)});
-				}
-
-				{
-					char const *name = LB_TYPE_INFO_USINGS_NAME;
-					Type *t = alloc_type_array(t_bool, count);
-					LLVMValueRef g = LLVMAddGlobal(m->mod, lb_type(m, t), name);
-					LLVMSetInitializer(g, LLVMConstNull(lb_type(m, t)));
-					LLVMSetLinkage(g, LLVMInternalLinkage);
-					lb_global_type_info_member_usings = lb_addr({g, alloc_type_pointer(t)});
-				}
-
-				{
-					char const *name = LB_TYPE_INFO_TAGS_NAME;
-					Type *t = alloc_type_array(t_string, count);
-					LLVMValueRef g = LLVMAddGlobal(m->mod, lb_type(m, t), name);
-					LLVMSetInitializer(g, LLVMConstNull(lb_type(m, t)));
-					LLVMSetLinkage(g, LLVMInternalLinkage);
-					lb_global_type_info_member_tags = lb_addr({g, alloc_type_pointer(t)});
-				}
-			}
+			lb_global_type_info_member_types   = global_type_info_make(m, LB_TYPE_INFO_TYPES_NAME,   t_type_info_ptr, count);
+			lb_global_type_info_member_names   = global_type_info_make(m, LB_TYPE_INFO_NAMES_NAME,   t_string,        count);
+			lb_global_type_info_member_offsets = global_type_info_make(m, LB_TYPE_INFO_OFFSETS_NAME, t_uintptr,       count);
+			lb_global_type_info_member_usings  = global_type_info_make(m, LB_TYPE_INFO_USINGS_NAME,  t_bool,          count);
+			lb_global_type_info_member_tags    = global_type_info_make(m, LB_TYPE_INFO_TAGS_NAME,    t_string,        count);
 		}
 	}
 
@@ -2444,17 +2969,13 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 		}
 	}
 
-
 	TIME_SECTION("LLVM Function Pass");
 	lb_llvm_function_passes(gen, do_threading && !build_context.ODIN_DEBUG);
 
 	TIME_SECTION("LLVM Module Pass");
 	lb_llvm_module_passes(gen, do_threading);
 
-
 	TIME_SECTION("LLVM Module Verification");
-
-
 	if (!lb_llvm_module_verification(gen, do_threading)) {
 		return false;
 	}
@@ -2496,6 +3017,41 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 	}
 	if (!lb_llvm_object_generation(gen, do_threading)) {
 		return false;
+	}
+
+
+	if (build_context.sanitizer_flags & SanitizerFlag_Address) {
+		if (build_context.metrics.os == TargetOs_windows) {
+			auto paths = array_make<String>(heap_allocator(), 0, 1);
+			String path = concatenate_strings(permanent_allocator(), build_context.ODIN_ROOT, str_lit("\\bin\\llvm\\windows\\clang_rt.asan-x86_64.lib"));
+			array_add(&paths, path);
+			Entity *lib = alloc_entity_library_name(nullptr, make_token_ident("asan_lib"), nullptr, slice_from_array(paths), str_lit("asan_lib"));
+			array_add(&gen->foreign_libraries, lib);
+		} else if (build_context.metrics.os == TargetOs_darwin || build_context.metrics.os == TargetOs_linux) {
+			if (!build_context.extra_linker_flags.text) {
+				build_context.extra_linker_flags = str_lit("-fsanitize=address");
+			} else {
+				build_context.extra_linker_flags = concatenate_strings(permanent_allocator(), build_context.extra_linker_flags, str_lit(" -fsanitize=address"));
+			}
+		}
+	}
+	if (build_context.sanitizer_flags & SanitizerFlag_Memory) {
+		if (build_context.metrics.os == TargetOs_darwin || build_context.metrics.os == TargetOs_linux) {
+			if (!build_context.extra_linker_flags.text) {
+				build_context.extra_linker_flags = str_lit("-fsanitize=memory");
+			} else {
+				build_context.extra_linker_flags = concatenate_strings(permanent_allocator(), build_context.extra_linker_flags, str_lit(" -fsanitize=memory"));
+			}
+		}
+	}
+	if (build_context.sanitizer_flags & SanitizerFlag_Thread) {
+		if (build_context.metrics.os == TargetOs_darwin || build_context.metrics.os == TargetOs_linux) {
+			if (!build_context.extra_linker_flags.text) {
+				build_context.extra_linker_flags = str_lit("-fsanitize=thread");
+			} else {
+				build_context.extra_linker_flags = concatenate_strings(permanent_allocator(), build_context.extra_linker_flags, str_lit(" -fsanitize=thread"));
+			}
+		}
 	}
 
 	gb_sort_array(gen->foreign_libraries.data, gen->foreign_libraries.count, foreign_library_cmp);

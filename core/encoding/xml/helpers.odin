@@ -1,3 +1,5 @@
+package xml
+
 /*
 	An XML 1.0 / 1.1 parser
 
@@ -6,7 +8,7 @@
 
 	This file contains helper functions.
 */
-package xml
+
 
 // Find parent's nth child with a given ident.
 find_child_by_ident :: proc(doc: ^Document, parent_id: Element_ID, ident: string, nth := 0) -> (res: Element_ID, found: bool) {
@@ -21,13 +23,13 @@ find_child_by_ident :: proc(doc: ^Document, parent_id: Element_ID, ident: string
 			/*
 				Skip commments. They have no name.
 			*/
-			if child.kind  != .Element                { continue }
+			if child.kind != .Element { continue }
 
 			/*
 				If the ident matches and it's the nth such child, return it.
 			*/
 			if child.ident == ident {
-				if count == nth                       { return child_id, true }
+				if count == nth { return child_id, true }
 				count += 1
 			}
 		}

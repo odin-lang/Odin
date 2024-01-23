@@ -137,9 +137,9 @@ assign_float :: proc(val: any, f: $T) -> bool {
 	case complex64:  dst = complex(f32(f), 0)
 	case complex128: dst = complex(f64(f), 0)
 	
-	case quaternion64:  dst = quaternion(f16(f), 0, 0, 0)
-	case quaternion128: dst = quaternion(f32(f), 0, 0, 0)
-	case quaternion256: dst = quaternion(f64(f), 0, 0, 0)
+	case quaternion64:  dst = quaternion(w=f16(f), x=0, y=0, z=0)
+	case quaternion128: dst = quaternion(w=f32(f), x=0, y=0, z=0)
+	case quaternion256: dst = quaternion(w=f64(f), x=0, y=0, z=0)
 	
 	case: return false
 	}
@@ -201,20 +201,37 @@ unmarshal_string_token :: proc(p: ^Parser, val: any, str: string, ti: ^reflect.T
 unmarshal_value :: proc(p: ^Parser, v: any) -> (err: Unmarshal_Error) {
 	UNSUPPORTED_TYPE := Unsupported_Type_Error{v.id, p.curr_token}
 	token := p.curr_token
-	
+
 	v := v
 	ti := reflect.type_info_base(type_info_of(v.id))
-	// NOTE: If it's a union with only one variant, then treat it as that variant
-	if u, ok := ti.variant.(reflect.Type_Info_Union); ok && len(u.variants) == 1 && token.kind != .Null {
-		variant := u.variants[0]
-		v.id = variant.id
-		ti = reflect.type_info_base(variant)
-		if !reflect.is_pointer_internally(variant) {
-			tag := any{rawptr(uintptr(v.data) + u.tag_offset), u.tag_type.id}
-			assign_int(tag, 1)
+	if u, ok := ti.variant.(reflect.Type_Info_Union); ok && token.kind != .Null {
+		// NOTE: If it's a union with only one variant, then treat it as that variant
+		if len(u.variants) == 1 {
+			variant := u.variants[0]
+			v.id = variant.id
+			ti = reflect.type_info_base(variant)
+			if !reflect.is_pointer_internally(variant) {
+				tag := any{rawptr(uintptr(v.data) + u.tag_offset), u.tag_type.id}
+				assign_int(tag, 1)
+			}
+		} else if v.id != Value {
+			for variant, i in u.variants {
+				variant_any := any{v.data, variant.id}
+				variant_p := p^
+				if err = unmarshal_value(&variant_p, variant_any); err == nil {
+					p^ = variant_p
+
+					raw_tag := i
+					if !u.no_nil { raw_tag += 1 }
+					tag := any{rawptr(uintptr(v.data) + u.tag_offset), u.tag_type.id}
+					assign_int(tag, raw_tag)
+					return
+				}
+			}
+			return UNSUPPORTED_TYPE
 		}
 	}
-	
+
 	switch &dst in v {
 	// Handle json.Value as an unknown type
 	case Value:

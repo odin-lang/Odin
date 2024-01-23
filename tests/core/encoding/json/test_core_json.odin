@@ -4,6 +4,7 @@ import "core:encoding/json"
 import "core:testing"
 import "core:fmt"
 import "core:os"
+import "core:mem/virtual"
 
 TEST_count := 0
 TEST_fail  := 0
@@ -33,6 +34,7 @@ main :: proc() {
 	marshal_json(&t)
 	unmarshal_json(&t)
 	surrogate(&t)
+	utf8_string_of_multibyte_characters(&t)
 
 	fmt.printf("%v/%v tests successful.\n", TEST_count - TEST_fail, TEST_count)
 	if TEST_fail > 0 {
@@ -74,6 +76,49 @@ parse_json :: proc(t: ^testing.T) {
 
 	msg := fmt.tprintf("Expected `json.parse` to return nil, got %v", err)
 	expect(t, err == nil, msg)
+}
+
+@test
+out_of_memory_in_parse_json :: proc(t: ^testing.T) {
+	arena: virtual.Arena
+	arena_buffer: [256]byte
+	arena_init_error := virtual.arena_init_buffer(&arena, arena_buffer[:])
+	testing.expect(t, arena_init_error == nil, fmt.tprintf("Expected arena initialization to not return error, got: %v\n", arena_init_error))
+
+	context.allocator = virtual.arena_allocator(&arena)
+	
+	json_data := `
+	{
+	  "firstName": "John",
+	  "lastName": "Smith",
+	  "isAlive": true,
+	  "age": 27,
+	  "address": {
+		"streetAddress": "21 2nd Street",
+		"city": "New York",
+		"state": "NY",
+		"postalCode": "10021-3100"
+	  },
+	  "phoneNumbers": [
+		{
+		  "type": "home",
+		  "number": "212 555-1234"
+		},
+		{
+		  "type": "office",
+		  "number": "646 555-4567"
+		}
+	  ],
+	  "children": [],
+	  "spouse": null
+	}
+	`
+
+	_, err := json.parse(transmute([]u8)json_data)
+
+	expected_error := json.Error.Out_Of_Memory
+	msg := fmt.tprintf("Expected `json.parse` to fail with %v, got %v", expected_error, err)
+	expect(t, err == json.Error.Out_Of_Memory, msg)
 }
 
 @test
@@ -358,4 +403,11 @@ surrogate :: proc(t: ^testing.T) {
 	uerr := json.unmarshal(out, &back)
 	expect(t, uerr == nil, fmt.tprintf("Expected `json.unmarshal(%q)` to return a nil error, got %v", string(out), uerr))
 	expect(t, back == input, fmt.tprintf("Expected `json.unmarshal(%q)` to return %q, got %v", string(out), input, uerr))
+}
+
+@test
+utf8_string_of_multibyte_characters :: proc(t: ^testing.T) {
+	_, err := json.parse_string(`"🐛✅"`)
+	msg := fmt.tprintf("Expected `json.parse` to return nil, got %v", err)
+	expect(t, err == nil, msg)
 }

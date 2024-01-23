@@ -56,8 +56,7 @@ gb_internal void lb_populate_function_pass_manager_specific(lbModule *m, LLVMPas
 #endif
 
 gb_internal bool lb_opt_ignore(i32 optimization_level) {
-	optimization_level = gb_clamp(optimization_level, -1, 2);
-	return optimization_level == -1;
+	return optimization_level < 0;
 }
 
 gb_internal void lb_basic_populate_function_pass_manager(LLVMPassManagerRef fpm, i32 optimization_level) {
@@ -65,6 +64,7 @@ gb_internal void lb_basic_populate_function_pass_manager(LLVMPassManagerRef fpm,
 		return;
 	}
 
+#if !LB_USE_NEW_PASS_SYSTEM
 	if (false && optimization_level <= 0 && build_context.ODIN_DEBUG) {
 		LLVMAddMergedLoadStoreMotionPass(fpm);
 	} else {
@@ -75,6 +75,7 @@ gb_internal void lb_basic_populate_function_pass_manager(LLVMPassManagerRef fpm,
 			LLVMAddEarlyCSEPass(fpm);
 		}
 	}
+#endif
 }
 
 gb_internal void lb_populate_function_pass_manager(lbModule *m, LLVMPassManagerRef fpm, bool ignore_memcpy_pass, i32 optimization_level) {
@@ -82,6 +83,7 @@ gb_internal void lb_populate_function_pass_manager(lbModule *m, LLVMPassManagerR
 		return;
 	}
 
+#if !LB_USE_NEW_PASS_SYSTEM
 	if (ignore_memcpy_pass) {
 		lb_basic_populate_function_pass_manager(fpm, optimization_level);
 		return;
@@ -109,6 +111,7 @@ gb_internal void lb_populate_function_pass_manager(lbModule *m, LLVMPassManagerR
 	LLVMAddEarlyCSEPass(fpm);
 	LLVMAddLowerExpectIntrinsicPass(fpm);
 #endif
+#endif
 }
 
 gb_internal void lb_populate_function_pass_manager_specific(lbModule *m, LLVMPassManagerRef fpm, i32 optimization_level) {
@@ -116,6 +119,7 @@ gb_internal void lb_populate_function_pass_manager_specific(lbModule *m, LLVMPas
 		return;
 	}
 
+#if !LB_USE_NEW_PASS_SYSTEM
 	if (optimization_level <= 0) {
 		LLVMAddMemCpyOptPass(fpm);
 		lb_basic_populate_function_pass_manager(fpm, optimization_level);
@@ -148,9 +152,11 @@ gb_internal void lb_populate_function_pass_manager_specific(lbModule *m, LLVMPas
 	LLVMAddEarlyCSEPass(fpm);
 	LLVMAddLowerExpectIntrinsicPass(fpm);
 #endif
+#endif
 }
 
 gb_internal void lb_add_function_simplifcation_passes(LLVMPassManagerRef mpm, i32 optimization_level) {
+#if !LB_USE_NEW_PASS_SYSTEM
 	LLVMAddCFGSimplificationPass(mpm);
 
 	LLVMAddJumpThreadingPass(mpm);
@@ -183,6 +189,7 @@ gb_internal void lb_add_function_simplifcation_passes(LLVMPassManagerRef mpm, i3
 	LLVMAddLoopRerollPass(mpm);
 	LLVMAddAggressiveDCEPass(mpm);
 	LLVMAddCFGSimplificationPass(mpm);
+#endif
 }
 
 
@@ -193,7 +200,7 @@ gb_internal void lb_populate_module_pass_manager(LLVMTargetMachineRef target_mac
 	if (optimization_level <= 0 && build_context.ODIN_DEBUG) {
 		return;
 	}
-
+#if !LB_USE_NEW_PASS_SYSTEM
 	LLVMAddAlwaysInlinerPass(mpm);
 	LLVMAddStripDeadPrototypesPass(mpm);
 	LLVMAddAnalysisPasses(target_machine, mpm);
@@ -263,6 +270,7 @@ gb_internal void lb_populate_module_pass_manager(LLVMTargetMachineRef target_mac
 	}
 
 	LLVMAddCFGSimplificationPass(mpm);
+#endif
 }
 
 
@@ -314,7 +322,11 @@ gb_internal void lb_run_remove_dead_instruction_pass(lbProcedure *p) {
 				// NOTE(bill): Explicit instructions are set here because some instructions could have side effects
 				switch (LLVMGetInstructionOpcode(curr_instr)) {
 				// case LLVMAlloca:
-
+				case LLVMLoad:
+					if (LLVMGetVolatile(curr_instr)) {
+						break;
+					}
+					/*fallthrough*/
 				case LLVMFNeg:
 				case LLVMAdd:
 				case LLVMFAdd:
@@ -334,7 +346,6 @@ gb_internal void lb_run_remove_dead_instruction_pass(lbProcedure *p) {
 				case LLVMAnd:
 				case LLVMOr:
 				case LLVMXor:
-				case LLVMLoad:
 				case LLVMGetElementPtr:
 				case LLVMTrunc:
 				case LLVMZExt:
@@ -369,6 +380,86 @@ gb_internal void lb_run_remove_dead_instruction_pass(lbProcedure *p) {
 	}
 }
 
+gb_internal LLVMValueRef lb_run_instrumentation_pass_insert_call(lbProcedure *p, Entity *entity, LLVMBuilderRef dummy_builder) {
+	lbModule *m = p->module;
+
+	lbValue cc = lb_find_procedure_value_from_entity(m, entity);
+
+	LLVMValueRef args[3] = {};
+	args[0] = p->value;
+
+	LLVMValueRef returnaddress_args[1] = {};
+
+	returnaddress_args[0] = LLVMConstInt(LLVMInt32TypeInContext(m->ctx), 0, false);
+
+	char const *instrinsic_name = "llvm.returnaddress";
+	unsigned id = LLVMLookupIntrinsicID(instrinsic_name, gb_strlen(instrinsic_name));
+	GB_ASSERT_MSG(id != 0, "Unable to find %s", instrinsic_name);
+	LLVMValueRef ip = LLVMGetIntrinsicDeclaration(m->mod, id, nullptr, 0);
+	LLVMTypeRef call_type = LLVMIntrinsicGetType(m->ctx, id, nullptr, 0);
+	args[1] = LLVMBuildCall2(dummy_builder, call_type, ip, returnaddress_args, gb_count_of(returnaddress_args), "");
+
+	Token name = {};
+	if (p->entity) {
+		name = p->entity->token;
+	}
+	args[2] = lb_emit_source_code_location_as_global_ptr(p, name.string, name.pos).value;
+
+	LLVMTypeRef fnp = lb_type_internal_for_procedures_raw(p->module, entity->type);
+	return LLVMBuildCall2(dummy_builder, fnp, cc.value, args, gb_count_of(args), "");
+}
+
+
+gb_internal void lb_run_instrumentation_pass(lbProcedure *p) {
+	lbModule *m = p->module;
+	Entity *enter = m->info->instrumentation_enter_entity;
+	Entity *exit  = m->info->instrumentation_exit_entity;
+	if (enter == nullptr || exit == nullptr) {
+		return;
+	}
+	if (!(p->entity &&
+	      p->entity->kind == Entity_Procedure &&
+	      p->entity->Procedure.has_instrumentation)) {
+		return;
+	}
+
+#define LLVM_V_NAME(x) x, cast(unsigned)(gb_count_of(x)-1)
+
+	LLVMBuilderRef dummy_builder = LLVMCreateBuilderInContext(m->ctx);
+	defer (LLVMDisposeBuilder(dummy_builder));
+
+	LLVMBasicBlockRef entry_bb = p->entry_block->block;
+	LLVMPositionBuilder(dummy_builder, entry_bb, LLVMGetFirstInstruction(entry_bb));
+	lb_run_instrumentation_pass_insert_call(p, enter, dummy_builder);
+	LLVMRemoveStringAttributeAtIndex(p->value, LLVMAttributeIndex_FunctionIndex, LLVM_V_NAME("instrument-function-entry"));
+
+	unsigned bb_count = LLVMCountBasicBlocks(p->value);
+	LLVMBasicBlockRef *bbs = gb_alloc_array(temporary_allocator(), LLVMBasicBlockRef, bb_count);
+	LLVMGetBasicBlocks(p->value, bbs);
+	for (unsigned i = 0; i < bb_count; i++) {
+		LLVMBasicBlockRef bb = bbs[i];
+		LLVMValueRef terminator = LLVMGetBasicBlockTerminator(bb);
+		if (terminator == nullptr ||
+		    !LLVMIsAReturnInst(terminator)) {
+			continue;
+		}
+
+		// TODO(bill): getTerminatingMustTailCall()
+		// If T is preceded by a musttail call, that's the real terminator.
+		// if (CallInst *CI = BB.getTerminatingMustTailCall())
+		// 	T = CI;
+
+
+		LLVMPositionBuilderBefore(dummy_builder, terminator);
+		lb_run_instrumentation_pass_insert_call(p, exit, dummy_builder);
+	}
+
+	LLVMRemoveStringAttributeAtIndex(p->value, LLVMAttributeIndex_FunctionIndex, LLVM_V_NAME("instrument-function-exit"));
+
+#undef LLVM_V_NAME
+}
+
+
 
 gb_internal void lb_run_function_pass_manager(LLVMPassManagerRef fpm, lbProcedure *p, lbFunctionPassManagerKind pass_manager_kind) {
 	if (p == nullptr) {
@@ -390,6 +481,7 @@ gb_internal void lb_run_function_pass_manager(LLVMPassManagerRef fpm, lbProcedur
 	    }
 	    break;
 	}
+	lb_run_instrumentation_pass(p);
 
 	LLVMRunFunctionPassManager(fpm, p->value);
 }
@@ -435,7 +527,7 @@ gb_internal void lb_append_to_compiler_used(lbModule *m, LLVMValueRef func) {
 	}
 
 	LLVMTypeRef Int8PtrTy = LLVMPointerType(LLVMInt8TypeInContext(m->ctx), 0);
-	LLVMTypeRef ATy = LLVMArrayType(Int8PtrTy, operands);
+	LLVMTypeRef ATy = llvm_array_type(Int8PtrTy, operands);
 
 	constants[operands - 1] = LLVMConstBitCast(func, Int8PtrTy);
 	LLVMValueRef initializer = LLVMConstArray(Int8PtrTy, constants, operands);
@@ -541,3 +633,5 @@ gb_internal void lb_run_remove_unused_globals_pass(lbModule *m) {
 		}
 	}
 }
+
+

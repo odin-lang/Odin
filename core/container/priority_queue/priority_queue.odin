@@ -140,3 +140,18 @@ remove :: proc(pq: ^$Q/Priority_Queue($T), i: int) -> (value: T, ok: bool) {
 	return
 }
 
+peek_safe :: proc(pq: $Q/Priority_Queue($T), loc := #caller_location) -> (res: T, ok: bool) {
+	if builtin.len(pq.queue) > 0 {
+		return pq.queue[0], true
+	}
+	return
+}
+
+peek :: proc(pq: $Q/Priority_Queue($T), loc := #caller_location) -> (res: T) {
+	assert(condition=builtin.len(pq.queue)>0, loc=loc)
+
+	if builtin.len(pq.queue) > 0 {
+		return pq.queue[0]
+	}
+	return
+}

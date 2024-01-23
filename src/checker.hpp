@@ -103,6 +103,12 @@ struct DeferredProcedure {
 };
 
 
+enum InstrumentationFlag : i32 {
+	Instrumentation_Enabled  = -1,
+	Instrumentation_Default  = 0,
+	Instrumentation_Disabled = +1,
+};
+
 struct AttributeContext {
 	String  link_name;
 	String  link_prefix;
@@ -113,19 +119,23 @@ struct AttributeContext {
 	String  deprecated_message;
 	String  warning_message;
 	DeferredProcedure deferred_procedure;
-	bool    is_export           : 1;
-	bool    is_static           : 1;
-	bool    require_results     : 1;
-	bool    require_declaration : 1;
-	bool    has_disabled_proc   : 1;
-	bool    disabled_proc       : 1;
-	bool    test                : 1;
-	bool    init                : 1;
-	bool    fini                : 1;
-	bool    set_cold            : 1;
+	bool    is_export             : 1;
+	bool    is_static             : 1;
+	bool    require_results       : 1;
+	bool    require_declaration   : 1;
+	bool    has_disabled_proc     : 1;
+	bool    disabled_proc         : 1;
+	bool    test                  : 1;
+	bool    init                  : 1;
+	bool    fini                  : 1;
+	bool    set_cold              : 1;
+	bool    entry_point_only      : 1;
+	bool    instrumentation_enter : 1;
+	bool    instrumentation_exit  : 1;
 	u32 optimization_mode; // ProcedureOptimizationMode
 	i64 foreign_import_priority_index;
 	String extra_linker_flags;
+	InstrumentationFlag no_instrumentation;
 
 	String  objc_class;
 	String  objc_name;
@@ -402,6 +412,10 @@ struct CheckerInfo {
 
 	BlockingMutex all_procedures_mutex;
 	Array<ProcInfo *> all_procedures;
+
+	BlockingMutex instrumentation_mutex;
+	Entity *instrumentation_enter_entity;
+	Entity *instrumentation_exit_entity;
 };
 
 struct CheckerContext {
@@ -435,6 +449,7 @@ struct CheckerContext {
 #define MAX_INLINE_FOR_DEPTH 1024ll
 	i64 inline_for_depth;
 
+	u32        stmt_flags;
 	bool       in_enum_type;
 	bool       collect_delayed_decls;
 	bool       allow_polymorphic_types;

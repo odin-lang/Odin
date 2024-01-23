@@ -126,19 +126,19 @@ _mm_max_ps :: #force_inline proc "c" (a, b: __m128) -> __m128 {
 
 @(require_results, enable_target_feature="sse")
 _mm_and_ps :: #force_inline proc "c" (a, b: __m128) -> __m128 {
-	return transmute(__m128)simd.and(transmute(__m128i)a, transmute(__m128i)b)
+	return transmute(__m128)simd.bit_and(transmute(__m128i)a, transmute(__m128i)b)
 }
 @(require_results, enable_target_feature="sse")
 _mm_andnot_ps :: #force_inline proc "c" (a, b: __m128) -> __m128 {
-	return transmute(__m128)simd.and_not(transmute(__m128i)a, transmute(__m128i)b)
+	return transmute(__m128)simd.bit_and_not(transmute(__m128i)a, transmute(__m128i)b)
 }
 @(require_results, enable_target_feature="sse")
 _mm_or_ps :: #force_inline proc "c" (a, b: __m128) -> __m128 {
-	return transmute(__m128)simd.or(transmute(__m128i)a, transmute(__m128i)b)
+	return transmute(__m128)simd.bit_or(transmute(__m128i)a, transmute(__m128i)b)
 }
 @(require_results, enable_target_feature="sse")
 _mm_xor_ps :: #force_inline proc "c" (a, b: __m128) -> __m128 {
-	return transmute(__m128)simd.xor(transmute(__m128i)a, transmute(__m128i)b)
+	return transmute(__m128)simd.bit_xor(transmute(__m128i)a, transmute(__m128i)b)
 }
 
 
@@ -532,7 +532,7 @@ when ODIN_ARCH == .amd64 {
 }
 
 
-@(private, default_calling_convention="c")
+@(private, default_calling_convention="none")
 foreign _ {
 	@(link_name="llvm.x86.sse.add.ss")
 	addss       :: proc(a, b: __m128) -> __m128 ---

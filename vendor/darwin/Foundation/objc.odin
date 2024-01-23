@@ -1,6 +1,8 @@
 package objc_Foundation
 
 foreign import "system:Foundation.framework"
+// NOTE: Most of our bindings are reliant on Cocoa (everything under appkit) so just unconditionally import it
+@(require) foreign import "system:Cocoa.framework"
 
 import "core:intrinsics"
 import "core:c"

@@ -1,5 +1,5 @@
 /*
-    Package endian implements sa simple translation between bytes and numbers with
+    Package endian implements a simple translation between bytes and numbers with
     specific endian encodings.
 
     buf: [100]u8

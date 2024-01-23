@@ -2,30 +2,50 @@ package raylib
 
 import c "core:c/libc"
 
+RAYGUI_SHARED :: #config(RAYGUI_SHARED, false)
+
 when ODIN_OS == .Windows {
-	foreign import lib {
-		"windows/raygui.lib",
-	}
-} else when ODIN_OS == .Linux  {
-	foreign import lib { 
-		"linux/libraygui.a",
-		// "system:dl",
-		// "system:pthread",
-	}
-} else when ODIN_OS == .Darwin {
-	when ODIN_ARCH == .arm64 {
+	when RAYGUI_SHARED {
 		foreign import lib {
-			"macos-arm64/libraygui.a",
-			// "system:Cocoa.framework",
-			// "system:OpenGL.framework",
-			// "system:IOKit.framework",
+			"windows/rayguidll.lib",
 		}
 	} else {
 		foreign import lib {
-			"macos/libraygui.a",
-			// "system:Cocoa.framework",
-			// "system:OpenGL.framework",
-			// "system:IOKit.framework",
+			"windows/raygui.lib",
+		}
+	}
+} else when ODIN_OS == .Linux  {
+	when RAYGUI_SHARED {
+		foreign import lib "linux/libraygui.so"
+	} else {
+		foreign import lib "linux/libraygui.a"
+	}
+} else when ODIN_OS == .Darwin {
+	when ODIN_ARCH == .arm64 {
+		when RAYGUI_SHARED {
+			foreign import lib {
+				"macos-arm64/libraygui.dylib",
+			}
+		} else {
+			foreign import lib {
+				"macos-arm64/libraygui.a",
+				// "system:Cocoa.framework",
+				// "system:OpenGL.framework",
+				// "system:IOKit.framework",
+			}
+		}
+	} else {
+		when RAYGUI_SHARED {
+			foreign import lib {
+				"macos/libraygui.dylib",
+			}
+		} else {
+			foreign import lib {
+				"macos/libraygui.a",
+				// "system:Cocoa.framework",
+				// "system:OpenGL.framework",
+				// "system:IOKit.framework",
+			}
 		}
 	}
 } else {
@@ -54,6 +74,18 @@ GuiTextAlignment :: enum c.int {
 	TEXT_ALIGN_LEFT = 0,
 	TEXT_ALIGN_CENTER,
 	TEXT_ALIGN_RIGHT,
+}
+
+GuiTextAlignmentVertical :: enum c.int {
+	TEXT_ALIGN_TOP = 0,
+	TEXT_ALIGN_MIDDLE,
+	TEXT_ALIGN_BOTTOM,
+}
+
+GuiTextWrapMode :: enum c.int {
+	TEXT_WRAP_NONE = 0,
+	TEXT_WRAP_CHAR,
+	TEXT_WRAP_WORD,
 }
 
 // Gui controls
@@ -208,6 +240,7 @@ SCROLLBAR_RIGHT_SIDE :: 1
 
 @(default_calling_convention="c")
 foreign lib {
+	@(link_name="raylib_version") version: cstring
 	// Global gui state control functions
 	
 	GuiEnable           :: proc() ---                                                                         // Enable gui controls (global state)
@@ -263,17 +296,18 @@ foreign lib {
 	// Basic controls set
 	
 	GuiLabel            :: proc(bounds: Rectangle, text: cstring) -> c.int ---                                // Label control, shows text
-	GuiButton           :: proc(bounds: Rectangle, text: cstring) -> c.int ---                                // Button control, returns true when clicked
-	GuiLabelButton      :: proc(bounds: Rectangle, text: cstring) -> c.int ---                                // Label button control, show true when clicked
+	GuiButton           :: proc(bounds: Rectangle, text: cstring) -> bool ---                                 // Button control, returns true when clicked
+	GuiLabelButton      :: proc(bounds: Rectangle, text: cstring) -> bool ---                                // Label button control, show true when clicked
 	GuiToggle           :: proc(bounds: Rectangle, text: cstring, active: ^bool) -> c.int ---                 // Toggle Button control, returns true when active
 	GuiToggleGroup      :: proc(bounds: Rectangle, text: cstring, active: ^c.int) -> c.int ---                // Toggle Group control, returns active toggle index
-	GuiCheckBox         :: proc(bounds: Rectangle, text: cstring, checked: ^bool) -> c.int ---                // Check Box control, returns true when active
+	GuiToggleSlider     :: proc(bounds: Rectangle, text: cstring, active: ^c.int) -> c.int ---
+	GuiCheckBox         :: proc(bounds: Rectangle, text: cstring, checked: ^bool) -> bool ---                // Check Box control, returns true when active
 	GuiComboBox         :: proc(bounds: Rectangle, text: cstring, active: ^c.int) -> c.int ---                // Combo Box control, returns selected item index
 	
-	GuiDropdownBox      :: proc(bounds: Rectangle, text: cstring, active: ^c.int, editMode: bool) -> c.int --- // Dropdown Box control, returns selected item
+	GuiDropdownBox      :: proc(bounds: Rectangle, text: cstring, active: ^c.int, editMode: bool) -> bool --- // Dropdown Box control, returns selected item
 	GuiSpinner          :: proc(bounds: Rectangle, text: cstring, value: ^c.int, minValue, maxValue: c.int, editMode: bool) -> c.int --- // Spinner control, returns selected value
 	GuiValueBox         :: proc(bounds: Rectangle, text: cstring, value: ^c.int, minValue, maxValue: c.int, editMode: bool) -> c.int --- // Value Box control, updates input text with numbers
-	GuiTextBox          :: proc(bounds: Rectangle, text: cstring, textSize: c.int, editMode: bool) -> c.int --- // Text Box control, updates input text
+	GuiTextBox          :: proc(bounds: Rectangle, text: cstring, textSize: c.int, editMode: bool) -> bool --- // Text Box control, updates input text
 	
 	GuiSlider           :: proc(bounds: Rectangle, textLeft: cstring, textRight: cstring, value: ^f32, minValue: f32, maxValue: f32) -> c.int --- // Slider control, returns selected value
 	GuiSliderBar        :: proc(bounds: Rectangle, textLeft: cstring, textRight: cstring, value: ^f32, minValue: f32, maxValue: f32) -> c.int --- // Slider Bar control, returns selected value

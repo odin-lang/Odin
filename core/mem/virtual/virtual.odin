@@ -68,7 +68,7 @@ align_formula :: #force_inline proc "contextless" (size, align: uint) -> uint {
 }
 
 @(require_results)
-memory_block_alloc :: proc(committed, reserved: uint, flags: Memory_Block_Flags) -> (block: ^Memory_Block, err: Allocator_Error) {
+memory_block_alloc :: proc(committed, reserved: uint, alignment: uint = 0, flags: Memory_Block_Flags = {}) -> (block: ^Memory_Block, err: Allocator_Error) {
 	page_size := DEFAULT_PAGE_SIZE
 	assert(mem.is_power_of_two(uintptr(page_size)))
 
@@ -79,8 +79,8 @@ memory_block_alloc :: proc(committed, reserved: uint, flags: Memory_Block_Flags)
 	reserved  = align_formula(reserved, page_size)
 	committed = clamp(committed, 0, reserved)
 	
-	total_size     := uint(reserved + size_of(Platform_Memory_Block))
-	base_offset    := uintptr(size_of(Platform_Memory_Block))
+	total_size     := uint(reserved + max(alignment, size_of(Platform_Memory_Block)))
+	base_offset    := uintptr(max(alignment, size_of(Platform_Memory_Block)))
 	protect_offset := uintptr(0)
 	
 	do_protection := false

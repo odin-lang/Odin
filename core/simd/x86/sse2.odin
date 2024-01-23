@@ -281,19 +281,19 @@ _mm_srl_epi64 :: #force_inline proc "c" (a, count: __m128i) -> __m128i {
 
 @(require_results, enable_target_feature="sse2")
 _mm_and_si128 :: #force_inline proc "c" (a, b: __m128i) -> __m128i {
-	return simd.and(a, b)
+	return simd.bit_and(a, b)
 }
 @(require_results, enable_target_feature="sse2")
 _mm_andnot_si128 :: #force_inline proc "c" (a, b: __m128i) -> __m128i {
-	return simd.and_not(b, a)
+	return simd.bit_and_not(b, a)
 }
 @(require_results, enable_target_feature="sse2")
 _mm_or_si128 :: #force_inline proc "c" (a, b: __m128i) -> __m128i {
-	return simd.or(a, b)
+	return simd.bit_or(a, b)
 }
 @(require_results, enable_target_feature="sse2")
 _mm_xor_si128 :: #force_inline proc "c" (a, b: __m128i) -> __m128i {
-	return simd.xor(a, b)
+	return simd.bit_xor(a, b)
 }
 @(require_results, enable_target_feature="sse2")
 _mm_cmpeq_epi8 :: #force_inline proc "c" (a, b: __m128i) -> __m128i {
@@ -1040,7 +1040,7 @@ when ODIN_ARCH == .amd64 {
 }
 
 
-@(private, default_calling_convention="c")
+@(private, default_calling_convention="none")
 foreign _ {
 	@(link_name="llvm.x86.sse2.pause")
 	pause      :: proc() ---

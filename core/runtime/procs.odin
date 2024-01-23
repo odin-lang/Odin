@@ -4,7 +4,7 @@ when ODIN_NO_CRT && ODIN_OS == .Windows {
 	foreign import lib "system:NtDll.lib"
 	
 	@(private="file")
-	@(default_calling_convention="stdcall")
+	@(default_calling_convention="system")
 	foreign lib {
 		RtlMoveMemory :: proc(dst, s: rawptr, length: int) ---
 		RtlFillMemory :: proc(dst: rawptr, length: int, fill: i32) ---
@@ -37,7 +37,18 @@ when ODIN_NO_CRT && ODIN_OS == .Windows {
 		}
 		return ptr
 	}
-	
+
+	@(link_name="bzero", linkage="strong", require)
+	bzero :: proc "c" (ptr: rawptr, len: int) -> rawptr {
+		if ptr != nil && len != 0 {
+			p := ([^]byte)(ptr)
+			for i := 0; i < len; i += 1 {
+				p[i] = 0
+			}
+		}
+		return ptr
+	}
+
 	@(link_name="memmove", linkage="strong", require)
 	memmove :: proc "c" (dst, src: rawptr, len: int) -> rawptr {
 		d, s := ([^]byte)(dst), ([^]byte)(src)

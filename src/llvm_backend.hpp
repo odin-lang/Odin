@@ -6,13 +6,7 @@
 #include "llvm-c/Object.h"
 #include "llvm-c/BitWriter.h"
 #include "llvm-c/DebugInfo.h"
-#include "llvm-c/Transforms/AggressiveInstCombine.h"
-#include "llvm-c/Transforms/InstCombine.h"
-#include "llvm-c/Transforms/IPO.h"
-#include "llvm-c/Transforms/PassManagerBuilder.h"
-#include "llvm-c/Transforms/Scalar.h"
-#include "llvm-c/Transforms/Utils.h"
-#include "llvm-c/Transforms/Vectorize.h"
+#include "llvm-c/Transforms/PassBuilder.h"
 #else
 #include <llvm-c/Core.h>
 #include <llvm-c/ExecutionEngine.h>
@@ -21,6 +15,9 @@
 #include <llvm-c/Object.h>
 #include <llvm-c/BitWriter.h>
 #include <llvm-c/DebugInfo.h>
+#if LLVM_VERSION_MAJOR >= 17
+#include <llvm-c/Transforms/PassBuilder.h>
+#else
 #include <llvm-c/Transforms/AggressiveInstCombine.h>
 #include <llvm-c/Transforms/InstCombine.h>
 #include <llvm-c/Transforms/IPO.h>
@@ -28,6 +25,7 @@
 #include <llvm-c/Transforms/Scalar.h>
 #include <llvm-c/Transforms/Utils.h>
 #include <llvm-c/Transforms/Vectorize.h>
+#endif
 #endif
 
 #if LLVM_VERSION_MAJOR < 11
@@ -53,6 +51,20 @@
 #else
 #define ODIN_LLVM_MINIMUM_VERSION_14 0
 #endif
+
+#if LLVM_VERSION_MAJOR == 15 || LLVM_VERSION_MAJOR == 16
+#error "LLVM versions 15 and 16 are not supported"
+#endif
+
+#if LLVM_VERSION_MAJOR >= 17
+#define LB_USE_NEW_PASS_SYSTEM 1
+#else
+#define LB_USE_NEW_PASS_SYSTEM 0
+#endif
+
+gb_internal bool lb_use_new_pass_system(void) {
+	return LB_USE_NEW_PASS_SYSTEM;
+}
 
 struct lbProcedure;
 
@@ -123,6 +135,7 @@ enum lbFunctionPassManagerKind {
 	lbFunctionPassManager_minimal,
 	lbFunctionPassManager_size,
 	lbFunctionPassManager_speed,
+	lbFunctionPassManager_aggressive,
 
 	lbFunctionPassManager_COUNT
 };
@@ -169,6 +182,8 @@ struct lbModule {
 	Array<Entity *> global_procedures_and_types_to_create;
 
 	lbProcedure *curr_procedure;
+
+	LLVMBuilderRef const_dummy_builder;
 
 	LLVMDIBuilderRef debug_builder;
 	LLVMMetadataRef debug_compile_unit;
@@ -324,6 +339,8 @@ struct lbProcedure {
 	bool             in_multi_assignment;
 	Array<LLVMValueRef> raw_input_parameters;
 
+	LLVMValueRef temp_callee_return_struct_memory;
+
 	Ast *curr_stmt;
 
 	Array<Scope *>       scope_stack;
@@ -440,6 +457,7 @@ gb_internal lbValue lb_emit_runtime_call(lbProcedure *p, char const *c_name, Arr
 
 
 gb_internal lbValue lb_emit_ptr_offset(lbProcedure *p, lbValue ptr, lbValue index);
+gb_internal lbValue lb_const_ptr_offset(lbModule *m, lbValue ptr, lbValue index);
 gb_internal lbValue lb_string_elem(lbProcedure *p, lbValue string);
 gb_internal lbValue lb_string_len(lbProcedure *p, lbValue string);
 gb_internal lbValue lb_cstring_len(lbProcedure *p, lbValue value);
@@ -486,6 +504,7 @@ gb_internal lbValue lb_find_value_from_entity(lbModule *m, Entity *e);
 gb_internal void lb_store_type_case_implicit(lbProcedure *p, Ast *clause, lbValue value);
 gb_internal lbAddr lb_store_range_stmt_val(lbProcedure *p, Ast *stmt_val, lbValue value);
 gb_internal lbValue lb_emit_source_code_location_const(lbProcedure *p, String const &procedure, TokenPos const &pos);
+gb_internal lbValue lb_const_source_code_location_const(lbModule *m, String const &procedure, TokenPos const &pos);
 
 gb_internal lbValue lb_handle_param_value(lbProcedure *p, Type *parameter_type, ParameterValue const &param_value, TokenPos const &pos);
 
@@ -522,6 +541,7 @@ gb_internal void lb_mem_zero_ptr(lbProcedure *p, LLVMValueRef ptr, Type *type, u
 
 gb_internal void lb_emit_init_context(lbProcedure *p, lbAddr addr);
 
+gb_internal lbBranchBlocks lb_lookup_branch_blocks(lbProcedure *p, Ast *ident);
 
 gb_internal lbStructFieldRemapping lb_get_struct_remapping(lbModule *m, Type *t);
 gb_internal LLVMTypeRef lb_type_padding_filler(lbModule *m, i64 padding, i64 padding_align);
@@ -532,6 +552,7 @@ gb_internal LLVMValueRef lb_call_intrinsic(lbProcedure *p, const char *name, LLV
 gb_internal void lb_mem_copy_overlapping(lbProcedure *p, lbValue dst, lbValue src, lbValue len, bool is_volatile=false);
 gb_internal void lb_mem_copy_non_overlapping(lbProcedure *p, lbValue dst, lbValue src, lbValue len, bool is_volatile=false);
 gb_internal LLVMValueRef lb_mem_zero_ptr_internal(lbProcedure *p, LLVMValueRef ptr, LLVMValueRef len, unsigned alignment, bool is_volatile);
+gb_internal LLVMValueRef lb_mem_zero_ptr_internal(lbProcedure *p, LLVMValueRef ptr, usize len, unsigned alignment, bool is_volatile);
 
 gb_internal gb_inline i64 lb_max_zero_init_size(void) {
 	return cast(i64)(4*build_context.int_size);
@@ -541,6 +562,18 @@ gb_internal LLVMTypeRef OdinLLVMGetArrayElementType(LLVMTypeRef type);
 gb_internal LLVMTypeRef OdinLLVMGetVectorElementType(LLVMTypeRef type);
 
 gb_internal String lb_filepath_ll_for_module(lbModule *m);
+
+gb_internal LLVMTypeRef lb_type_internal_for_procedures_raw(lbModule *m, Type *type);
+
+gb_internal lbValue lb_emit_source_code_location_as_global_ptr(lbProcedure *p, String const &procedure, TokenPos const &pos);
+
+gb_internal LLVMTypeRef llvm_array_type(LLVMTypeRef ElementType, uint64_t ElementCount) {
+#if LB_USE_NEW_PASS_SYSTEM
+	return LLVMArrayType2(ElementType, ElementCount);
+#else
+	return LLVMArrayType(ElementType, cast(unsigned)ElementCount);
+#endif
+}
 
 #define LB_STARTUP_RUNTIME_PROC_NAME   "__$startup_runtime"
 #define LB_CLEANUP_RUNTIME_PROC_NAME   "__$cleanup_runtime"

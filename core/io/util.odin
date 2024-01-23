@@ -39,12 +39,12 @@ write_int :: proc(w: Writer, i: int, base: int = 10, n_written: ^int = nil) -> (
 }
 
 write_u128 :: proc(w: Writer, i: u128, base: int = 10, n_written: ^int = nil) -> (n: int, err: Error) {
-	buf: [32]byte
+	buf: [39]byte
 	s := strconv.append_bits_128(buf[:], i, base, false, 128, strconv.digits, nil)
 	return write_string(w, s, n_written)
 }
 write_i128 :: proc(w: Writer, i: i128, base: int = 10, n_written: ^int = nil) -> (n: int, err: Error) {
-	buf: [32]byte
+	buf: [40]byte
 	s := strconv.append_bits_128(buf[:], u128(i), base, true, 128, strconv.digits, nil)
 	return write_string(w, s, n_written)
 }

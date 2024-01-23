@@ -7,6 +7,7 @@ import "core:strconv"
 import "core:strings"
 import "core:reflect"
 import "core:io"
+import "core:slice"
 
 Marshal_Data_Error :: enum {
 	None,
@@ -18,29 +19,40 @@ Marshal_Error :: union #shared_nil {
 	io.Error,
 }
 
-// careful with MJSON maps & non quotes usage as keys without whitespace will lead to bad results
+// careful with MJSON maps & non quotes usage as keys with whitespace will lead to bad results
 Marshal_Options :: struct {
 	// output based on spec
 	spec: Specification,
 
-	// use line breaks & tab|spaces
+	// Use line breaks & tabs/spaces
 	pretty: bool, 
 
-	// spacing
+	// Use spaces for indentation instead of tabs
 	use_spaces: bool,
+
+	// Given use_spaces true, use this many spaces per indent level. 0 means 4 spaces.
 	spaces: int,
 
-	// state
-	indentation: int,
-
-	// option to output uint in JSON5 & MJSON
+	// Output uint as hex in JSON5 & MJSON
 	write_uint_as_hex: bool, 
 
-	// mjson output options
+	// If spec is MJSON and this is true, then keys will be quoted.
+	//
+	// WARNING: If your keys contain whitespace and this is false, then the
+	// output will be bad.
 	mjson_keys_use_quotes: bool,
+
+	// If spec is MJSON and this is true, then use '=' as delimiter between
+	// keys and values, otherwise ':' is used.
 	mjson_keys_use_equal_sign: bool,
 
-	// mjson state
+	// When outputting a map, sort the output by key.
+	//
+	// NOTE: This will temp allocate and sort a list for each map.
+	sort_maps_by_key: bool,
+
+	// Internal state
+	indentation: int,
 	mjson_skipped_first_braces_start: bool,
 	mjson_skipped_first_braces_end: bool,
 }
@@ -50,6 +62,9 @@ marshal :: proc(v: any, opt: Marshal_Options = {}, allocator := context.allocato
 	defer if err != nil {
 		strings.builder_destroy(&b)
 	}
+	
+	// temp guard in case we are sorting map keys, which will use temp allocations
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD(ignore = allocator == context.temp_allocator)
 
 	opt := opt
 	marshal_to_builder(&b, v, &opt) or_return
@@ -263,37 +278,81 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 			map_cap := uintptr(runtime.map_cap(m^))
 			ks, vs, hs, _, _ := runtime.map_kvh_data_dynamic(m^, info.map_info)
 
-			i := 0
-			for bucket_index in 0..<map_cap {
-				if !runtime.map_hash_is_valid(hs[bucket_index]) {
-					continue
-				}
-				opt_write_iteration(w, opt, i) or_return
-				i += 1
+			if !opt.sort_maps_by_key {
+				i := 0
+				for bucket_index in 0..<map_cap {
+					runtime.map_hash_is_valid(hs[bucket_index]) or_continue
 
-				key   := rawptr(runtime.map_cell_index_dynamic(ks, info.map_info.ks, bucket_index))
-				value := rawptr(runtime.map_cell_index_dynamic(vs, info.map_info.vs, bucket_index))
+					opt_write_iteration(w, opt, i) or_return
+					i += 1
 
-				// check for string type
-				{
-					v := any{key, info.key.id}
-					ti := runtime.type_info_base(type_info_of(v.id))
-					a := any{v.data, ti.id}
-					name: string
+					key   := rawptr(runtime.map_cell_index_dynamic(ks, info.map_info.ks, bucket_index))
+					value := rawptr(runtime.map_cell_index_dynamic(vs, info.map_info.vs, bucket_index))
 
-					#partial switch info in ti.variant {
-					case runtime.Type_Info_String:
-						switch s in a {
+					// check for string type
+					{
+						v := any{key, info.key.id}
+						ti := runtime.type_info_base(type_info_of(v.id))
+						a := any{v.data, ti.id}
+						name: string
+
+						#partial switch info in ti.variant {
+						case runtime.Type_Info_String:
+							switch s in a {
 							case string: name = s
 							case cstring: name = string(s)
-						}
-						opt_write_key(w, opt, name) or_return
+							}
+							opt_write_key(w, opt, name) or_return
 
-					case: return .Unsupported_Type
+						case: return .Unsupported_Type
+						}
 					}
+
+					marshal_to_writer(w, any{value, info.value.id}, opt) or_return
+				}
+			} else {
+				Entry :: struct {
+					key: string,
+					value: any,
 				}
 
-				marshal_to_writer(w, any{value, info.value.id}, opt) or_return
+				// If we are sorting the map by key, then we temp alloc an array
+				// and sort it, then output the result.
+				sorted := make([dynamic]Entry, 0, map_cap, context.temp_allocator)
+				for bucket_index in 0..<map_cap {
+					runtime.map_hash_is_valid(hs[bucket_index]) or_continue
+
+					key   := rawptr(runtime.map_cell_index_dynamic(ks, info.map_info.ks, bucket_index))
+					value := rawptr(runtime.map_cell_index_dynamic(vs, info.map_info.vs, bucket_index))
+					name: string
+
+					// check for string type
+					{
+						v := any{key, info.key.id}
+						ti := runtime.type_info_base(type_info_of(v.id))
+						a := any{v.data, ti.id}
+
+						#partial switch info in ti.variant {
+						case runtime.Type_Info_String:
+							switch s in a {
+							case string: name = s
+							case cstring: name = string(s)
+							}
+
+						case: return .Unsupported_Type
+						}
+					}
+
+					append(&sorted, Entry { key = name, value = any{value, info.value.id}})
+				}
+
+				slice.sort_by(sorted[:], proc(i, j: Entry) -> bool { return i.key < j.key })
+
+				for s, i in sorted {
+					opt_write_iteration(w, opt, i) or_return
+					opt_write_key(w, opt, s.key) or_return
+					marshal_to_writer(w, s.value, opt) or_return
+				}
 			}
 		}
 
@@ -404,7 +463,7 @@ opt_write_key :: proc(w: io.Writer, opt: ^Marshal_Options, name: string) -> (err
 	switch opt.spec {
 	case .JSON, .JSON5:
 		io.write_quoted_string(w, name) or_return
-		io.write_string(w, ": ") or_return
+		io.write_string(w, ": " if opt.pretty else ":") or_return
 
 	case .MJSON:
 		if opt.mjson_keys_use_quotes {
@@ -412,11 +471,11 @@ opt_write_key :: proc(w: io.Writer, opt: ^Marshal_Options, name: string) -> (err
 		} else {
 			io.write_string(w, name) or_return
 		}
-		
+
 		if opt.mjson_keys_use_equal_sign {
-			io.write_string(w, " = ") or_return
+			io.write_string(w, " = " if opt.pretty else "=") or_return
 		} else {
-			io.write_string(w, ": ") or_return
+			io.write_string(w, ": " if opt.pretty else ":") or_return
 		}
 	}	
 
@@ -425,8 +484,9 @@ opt_write_key :: proc(w: io.Writer, opt: ^Marshal_Options, name: string) -> (err
 
 // insert start byte and increase indentation on pretty
 opt_write_start :: proc(w: io.Writer, opt: ^Marshal_Options, c: byte) -> (err: io.Error)  {
-	// skip mjson starting braces
-	if opt.spec == .MJSON && !opt.mjson_skipped_first_braces_start {
+	// Skip MJSON starting braces. We make sure to only do this for c == '{',
+	// skipping a starting '[' is not allowed.
+	if opt.spec == .MJSON && !opt.mjson_skipped_first_braces_start && opt.indentation == 0 && c == '{' {
 		opt.mjson_skipped_first_braces_start = true
 		return
 	}
@@ -446,7 +506,7 @@ opt_write_iteration :: proc(w: io.Writer, opt: ^Marshal_Options, iteration: int)
 	switch opt.spec {
 	case .JSON, .JSON5: 
 		if iteration > 0 {
-			io.write_string(w, ", ") or_return
+			io.write_byte(w, ',') or_return
 
 			if opt.pretty {
 				io.write_byte(w, '\n') or_return
@@ -462,7 +522,7 @@ opt_write_iteration :: proc(w: io.Writer, opt: ^Marshal_Options, iteration: int)
 				io.write_byte(w, '\n') or_return
 			} else {
 				// comma separation necessary for non pretty output!
-				io.write_string(w, ", ") or_return
+				io.write_byte(w, ',') or_return
 			}
 		}
 
@@ -474,11 +534,9 @@ opt_write_iteration :: proc(w: io.Writer, opt: ^Marshal_Options, iteration: int)
 
 // decrease indent, write spacing and insert end byte
 opt_write_end :: proc(w: io.Writer, opt: ^Marshal_Options, c: byte) -> (err: io.Error)  {
-	if opt.spec == .MJSON && opt.mjson_skipped_first_braces_start && !opt.mjson_skipped_first_braces_end {
-		if opt.indentation == 0 {
-			opt.mjson_skipped_first_braces_end = true
-			return
-		}
+	if opt.spec == .MJSON && opt.mjson_skipped_first_braces_start && !opt.mjson_skipped_first_braces_end && opt.indentation == 0 && c == '}' {
+		opt.mjson_skipped_first_braces_end = true
+		return
 	}
 
 	opt.indentation -= 1

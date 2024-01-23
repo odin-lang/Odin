@@ -1,8 +1,20 @@
 package objc_Foundation
 
+foreign import "system:Foundation.framework"
+
 import "core:intrinsics"
 import "core:runtime"
 import "core:strings"
+
+RunLoopMode :: ^String
+
+@(link_prefix="NS")
+foreign Foundation {
+	RunLoopCommonModes:       RunLoopMode
+	DefaultRunLoopMode:       RunLoopMode
+	EventTrackingRunLoopMode: RunLoopMode
+	ModalPanelRunLoopMode:    RunLoopMode
+}
 
 ActivationPolicy :: enum UInteger {
 	Regular    = 0,
@@ -87,12 +99,34 @@ Application_run :: proc "c" (self: ^Application) {
 	msgSend(nil, self, "run")
 }
 
-
 @(objc_type=Application, objc_name="terminate")
 Application_terminate :: proc "c" (self: ^Application, sender: ^Object) {
 	msgSend(nil, self, "terminate:", sender)
 }
 
+@(objc_type=Application, objc_name="isRunning")
+Application_isRunning :: proc "c" (self: ^Application) -> BOOL {
+	return msgSend(BOOL, self, "isRunning")
+}
+
+@(objc_type=Application, objc_name="currentEvent")
+Application_currentEvent :: proc "c" (self: ^Application) -> ^Event {
+	return msgSend(^Event, self, "currentEvent")
+}
+
+@(objc_type=Application, objc_name="nextEventMatchingMask")
+Application_nextEventMatchingMask :: proc "c" (self: ^Application, mask: EventMask, expiration: ^Date, in_mode: RunLoopMode, dequeue: BOOL) -> ^Event {
+	return msgSend(^Event, self, "nextEventMatchingMask:untilDate:inMode:dequeue:", mask, expiration, in_mode, dequeue)
+}
+
+@(objc_type=Application, objc_name="sendEvent")
+Application_sendEvent :: proc "c" (self: ^Application, event: ^Event) {
+	msgSend(Event, self, "sendEvent:", event)
+}
+@(objc_type=Application, objc_name="updateWindows")
+Application_updateWindows :: proc "c" (self: ^Application) {
+	msgSend(nil, self, "updateWindows")
+}
 
 
 @(objc_class="NSRunningApplication")

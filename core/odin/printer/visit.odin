@@ -972,6 +972,13 @@ visit_expr :: proc(p: ^Printer, expr: ^ast.Expr, options := List_Options{}) {
 	case ^ast.Or_Return_Expr:
 		visit_expr(p, v.expr)
 		push_generic_token(p, v.token.kind, 1)
+	case ^ast.Or_Branch_Expr:
+		visit_expr(p, v.expr)
+		push_generic_token(p, v.token.kind, 1)
+		if v.label != nil {
+			visit_expr(p, v.label)
+		}
+
 	case ^ast.Selector_Call_Expr:
 		visit_expr(p, v.call.expr)
 		push_generic_token(p, .Open_Paren, 1)

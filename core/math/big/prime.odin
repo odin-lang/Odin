@@ -1163,7 +1163,7 @@ internal_int_prime_next_prime :: proc(a: ^Int, trials: int, bbs_style: bool, all
 
 		/*
 			If we didn't pass the sieve and step == MP_MAX then skip test */
-		if (y && (step >= ((1 << _DIGIT_BITS) - kstep))) { continue }
+		if y && (step >= ((1 << _DIGIT_BITS) - kstep)) { continue }
 
 		if internal_int_is_prime(a, trials) or_return { break }
 	}
@@ -1214,7 +1214,6 @@ internal_random_prime :: proc(a: ^Int, size_in_bits: int, trials: int, flags := 
 		trials = number_of_rabin_miller_trials(size_in_bits)
 	}
 
-	res: bool
 	RANDOM_PRIME_ITERATIONS_USED = 0
 
 	for {
@@ -1251,9 +1250,8 @@ internal_random_prime :: proc(a: ^Int, size_in_bits: int, trials: int, flags := 
 		/*
 			Is it prime?
 		*/
-		res = internal_int_is_prime(a, trials)                       or_return
-
-		if (!res) {
+		res := internal_int_is_prime(a, trials) or_return
+		if !res {
 			continue
 		}
 
@@ -1267,9 +1265,11 @@ internal_random_prime :: proc(a: ^Int, size_in_bits: int, trials: int, flags := 
 			/*
 				Is it prime?
 			*/
-			res = internal_int_is_prime(a, trials)                   or_return
+			res = internal_int_is_prime(a, trials) or_return
 		}
-		if res { break }
+		if res {
+			break
+		}
 	}
 
 	if .Safe in flags {

@@ -44,7 +44,7 @@ _ :: intrinsics
 MAP_LOAD_FACTOR :: 75
 
 // Minimum log2 capacity.
-MAP_MIN_LOG2_CAPACITY :: 6 // 64 elements
+MAP_MIN_LOG2_CAPACITY :: 3 // 8 elements
 
 // Has to be less than 100% though.
 #assert(MAP_LOAD_FACTOR < 100)
@@ -629,7 +629,7 @@ map_reserve_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_
 
 
 @(require_results)
-map_shrink_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, loc := #caller_location) -> Allocator_Error {
+map_shrink_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, loc := #caller_location) -> (did_shrink: bool, err: Allocator_Error) {
 	if m.allocator.procedure == nil {
 		m.allocator = context.allocator
 	}
@@ -639,7 +639,7 @@ map_shrink_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_I
 	// map needs to be within the max load factor.
 	log2_capacity := map_log2_cap(m^)
 	if uintptr(m.len) >= map_load_factor(log2_capacity - 1) {
-		return nil
+		return false, nil
 	}
 
 	shrunk := map_alloc_dynamic(info, log2_capacity - 1, m.allocator) or_return
@@ -672,7 +672,7 @@ map_shrink_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_I
 
 	map_free_dynamic(m^, info, loc) or_return
 	m.data = shrunk.data
-	return nil
+	return true, nil
 }
 
 @(require_results)

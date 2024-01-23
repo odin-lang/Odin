@@ -118,6 +118,7 @@ gb_internal u64 cg_typeid_as_u64(cgModule *m, Type *type) {
 		data |= (special  &~ (1ull<<1))  << 62ull; // special
 		data |= (reserved &~ (1ull<<1))  << 63ull; // reserved
 	}
+
 	return data;
 }
 
@@ -449,7 +450,7 @@ gb_internal void cg_setup_type_info_data(cgModule *m) {
 		u32 flags = type_info_flags_of_type(t);
 		u64 id    = cg_typeid_as_u64(m, t);
 
-		void *size_ptr  = tb_global_add_region(m->mod,  global, offset+size_offset, build_context.int_size);
+		void *size_ptr  = tb_global_add_region(m->mod, global, offset+size_offset,  build_context.int_size);
 		void *align_ptr = tb_global_add_region(m->mod, global, offset+align_offset, build_context.int_size);
 		void *flags_ptr = tb_global_add_region(m->mod, global, offset+flags_offset, 4);
 		void *id_ptr    = tb_global_add_region(m->mod, global, offset+id_offset,    build_context.ptr_size);
@@ -474,6 +475,13 @@ gb_internal void cg_setup_type_info_data(cgModule *m) {
 			// }
 			tag_type = t_type_info_named;
 
+			i64 name_offset = type_offset_of(tag_type, 0);
+			String name = t->Named.type_name->token.string;
+			cg_global_const_string(m, name, t_string, global, offset+name_offset);
+
+			i64 base_offset = type_offset_of(tag_type, 1);
+			cg_global_const_type_info_ptr(m, t->Named.base, global, offset+base_offset);
+
 			if (t->Named.type_name->pkg) {
 				i64 pkg_offset = type_offset_of(tag_type, 2);
 				String pkg_name = t->Named.type_name->pkg->name;
@@ -494,8 +502,6 @@ gb_internal void cg_setup_type_info_data(cgModule *m) {
 			TokenPos pos = t->Named.type_name->token.pos;
 			cg_global_source_code_location_const(m, proc_name, pos, global, offset+loc_offset);
 
-			i64 base_offset = type_offset_of(tag_type, 1);
-			cg_global_const_type_info_ptr(m, t->Named.base, global, offset+base_offset);
 			break;
 		}
 

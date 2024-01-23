@@ -1,8 +1,27 @@
 ODIN=../../odin
 PYTHON=$(shell which python3)
 
-all: download_test_assets image_test compress_test strings_test hash_test crypto_test noise_test encoding_test \
-	 math_test linalg_glsl_math_test filepath_test reflect_test os_exit_test i18n_test match_test c_libc_test net_test
+all: c_libc_test \
+	 compress_test \
+	 crypto_test \
+	 download_test_assets \
+	 encoding_test \
+	 filepath_test \
+	 fmt_test \
+	 hash_test \
+	 i18n_test \
+	 image_test \
+	 linalg_glsl_math_test \
+	 match_test \
+	 math_test \
+	 net_test \
+	 noise_test \
+	 os_exit_test \
+	 reflect_test \
+	 slice_test \
+	 strings_test \
+	 thread_test \
+	 runtime_test
 
 download_test_assets:
 	$(PYTHON) download_assets.py
@@ -43,6 +62,9 @@ filepath_test:
 reflect_test:
 	$(ODIN) run reflect/test_core_reflect.odin -file -collection:tests=.. -out:test_core_reflect
 
+slice_test:
+	$(ODIN) run slice/test_core_slice.odin -file -out:test_core_slice
+
 os_exit_test:
 	$(ODIN) run os/test_core_os_exit.odin -file -out:test_core_os_exit && exit 1 || exit 0
 
@@ -57,3 +79,12 @@ c_libc_test:
 
 net_test:
 	$(ODIN) run net -out:test_core_net
+
+fmt_test:
+	$(ODIN) run fmt -out:test_core_fmt
+
+thread_test:
+	$(ODIN) run thread -out:test_core_thread
+
+runtime_test:
+	$(ODIN) run runtime -out:test_core_runtime

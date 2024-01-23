@@ -139,7 +139,7 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 
 	lb_ensure_abi_function_type(m, p);
 	lb_add_function_type_attributes(p->value, p->abi_function_type, p->abi_function_type->calling_convention);
-	
+
 	if (pt->Proc.diverging) {
 		lb_add_attribute_to_proc(m, p->value, "noreturn");
 	}
@@ -151,7 +151,6 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 	if (!entity->Procedure.is_foreign && build_context.disable_red_zone) {
 		lb_add_attribute_to_proc(m, p->value, "noredzone");
 	}
-
 
 	switch (p->inlining) {
 	case ProcInlining_inline:
@@ -315,6 +314,30 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 			GB_ASSERT(p->debug_info != nullptr);
 			LLVMSetSubprogram(p->value, p->debug_info);
 			lb_set_llvm_metadata(m, p, p->debug_info);
+		}
+	}
+
+	if (p->body && entity->pkg && ((entity->pkg->kind == Package_Normal) || (entity->pkg->kind == Package_Init))) {
+		if (build_context.sanitizer_flags & SanitizerFlag_Address) {
+			lb_add_attribute_to_proc(m, p->value, "sanitize_address");
+		}
+		if (build_context.sanitizer_flags & SanitizerFlag_Memory) {
+			lb_add_attribute_to_proc(m, p->value, "sanitize_memory");
+		}
+		if (build_context.sanitizer_flags & SanitizerFlag_Thread) {
+			lb_add_attribute_to_proc(m, p->value, "sanitize_thread");
+		}
+	}
+
+	if (p->body && entity->Procedure.has_instrumentation) {
+		Entity *instrumentation_enter = m->info->instrumentation_enter_entity;
+		Entity *instrumentation_exit  = m->info->instrumentation_exit_entity;
+		if (instrumentation_enter && instrumentation_exit) {
+			String enter = lb_get_entity_name(m, instrumentation_enter);
+			String exit  = lb_get_entity_name(m, instrumentation_exit);
+
+			lb_add_attribute_to_proc_with_string(m, p->value, make_string_c("instrument-function-entry"), enter);
+			lb_add_attribute_to_proc_with_string(m, p->value, make_string_c("instrument-function-exit"),  exit);
 		}
 	}
 
@@ -853,8 +876,20 @@ gb_internal lbValue lb_emit_call_internal(lbProcedure *p, lbValue value, lbValue
 			for (unsigned i = 0; i < param_count; i++) {
 				LLVMTypeRef param_type = param_types[i];
 				LLVMTypeRef arg_type = LLVMTypeOf(args[i]);
-				// LLVMTypeKind param_kind = LLVMGetTypeKind(param_type);
-				// LLVMTypeKind arg_kind = LLVMGetTypeKind(arg_type);
+				if (LB_USE_NEW_PASS_SYSTEM &&
+				    arg_type != param_type) {
+					LLVMTypeKind arg_kind = LLVMGetTypeKind(arg_type);
+					LLVMTypeKind param_kind = LLVMGetTypeKind(param_type);
+					if (arg_kind == param_kind &&
+					    arg_kind == LLVMPointerTypeKind) {
+						// NOTE(bill): LLVM's newer `ptr` only type system seems to fail at times
+						// I don't know why...
+						args[i] = LLVMBuildPointerCast(p->builder, args[i], param_type, "");
+						arg_type = param_type;
+						continue;
+					}
+				}
+
 				GB_ASSERT_MSG(
 					arg_type == param_type,
 					"Parameter types do not match: %s != %s, argument: %s\n\t%s",
@@ -867,6 +902,9 @@ gb_internal lbValue lb_emit_call_internal(lbProcedure *p, lbValue value, lbValue
 		}
 
 		LLVMValueRef ret = LLVMBuildCall2(p->builder, fnp, fn, args, arg_count, "");
+
+		auto llvm_cc = lb_calling_convention_map[proc_type->Proc.calling_convention];
+		LLVMSetInstructionCallConv(ret, llvm_cc);
 
 		LLVMAttributeIndex param_offset = LLVMAttributeIndex_FirstArgIndex;
 		if (return_ptr.value != nullptr) {
@@ -1321,15 +1359,15 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 			}
 		}
 		break;
-	case BuiltinProc_simd_and:
-	case BuiltinProc_simd_or:
-	case BuiltinProc_simd_xor:
-	case BuiltinProc_simd_and_not:
+	case BuiltinProc_simd_bit_and:
+	case BuiltinProc_simd_bit_or:
+	case BuiltinProc_simd_bit_xor:
+	case BuiltinProc_simd_bit_and_not:
 		switch (builtin_id) {
-		case BuiltinProc_simd_and: op_code = LLVMAnd; break;
-		case BuiltinProc_simd_or:  op_code = LLVMOr;  break;
-		case BuiltinProc_simd_xor: op_code = LLVMXor; break;
-		case BuiltinProc_simd_and_not:
+		case BuiltinProc_simd_bit_and: op_code = LLVMAnd; break;
+		case BuiltinProc_simd_bit_or:  op_code = LLVMOr;  break;
+		case BuiltinProc_simd_bit_xor: op_code = LLVMXor; break;
+		case BuiltinProc_simd_bit_and_not:
 			op_code = LLVMAnd;
 			arg1.value = LLVMBuildNot(p->builder, arg1.value, "");
 			break;
@@ -1800,24 +1838,41 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 	}
 
 	case BuiltinProc_quaternion: {
-		lbValue real = lb_build_expr(p, ce->args[0]);
-		lbValue imag = lb_build_expr(p, ce->args[1]);
-		lbValue jmag = lb_build_expr(p, ce->args[2]);
-		lbValue kmag = lb_build_expr(p, ce->args[3]);
+		lbValue xyzw[4] = {};
+		for (i32 i = 0; i < 4; i++) {
+			ast_node(f, FieldValue, ce->args[i]);
+			GB_ASSERT(f->field->kind == Ast_Ident);
+			String name = f->field->Ident.token.string;
+			i32 index = -1;
 
-		// @QuaternionLayout
+			// @QuaternionLayout
+			if (name == "x" || name == "imag") {
+				index = 0;
+			} else if (name == "y" || name == "jmag") {
+				index = 1;
+			} else if (name == "z" || name == "kmag") {
+				index = 2;
+			} else if (name == "w" || name == "real") {
+				index = 3;
+			}
+			GB_ASSERT(index >= 0);
+
+			xyzw[index] = lb_build_expr(p, f->value);
+		}
+
+
 		lbAddr dst_addr = lb_add_local_generated(p, tv.type, false);
 		lbValue dst = lb_addr_get_ptr(p, dst_addr);
 
 		Type *ft = base_complex_elem_type(tv.type);
-		real = lb_emit_conv(p, real, ft);
-		imag = lb_emit_conv(p, imag, ft);
-		jmag = lb_emit_conv(p, jmag, ft);
-		kmag = lb_emit_conv(p, kmag, ft);
-		lb_emit_store(p, lb_emit_struct_ep(p, dst, 3), real);
-		lb_emit_store(p, lb_emit_struct_ep(p, dst, 0), imag);
-		lb_emit_store(p, lb_emit_struct_ep(p, dst, 1), jmag);
-		lb_emit_store(p, lb_emit_struct_ep(p, dst, 2), kmag);
+		xyzw[0] = lb_emit_conv(p, xyzw[0], ft);
+		xyzw[1] = lb_emit_conv(p, xyzw[1], ft);
+		xyzw[2] = lb_emit_conv(p, xyzw[2], ft);
+		xyzw[3] = lb_emit_conv(p, xyzw[3], ft);
+		lb_emit_store(p, lb_emit_struct_ep(p, dst, 0), xyzw[0]);
+		lb_emit_store(p, lb_emit_struct_ep(p, dst, 1), xyzw[1]);
+		lb_emit_store(p, lb_emit_struct_ep(p, dst, 2), xyzw[2]);
+		lb_emit_store(p, lb_emit_struct_ep(p, dst, 3), xyzw[3]);
 
 		return lb_emit_load(p, dst);
 	}
@@ -2743,7 +2798,7 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 				{
 					GB_ASSERT(arg_count <= 7);
 
-					char asm_string_default[] = "int $0x80";
+					char asm_string_default[] = "int $$0x80";
 					char *asm_string = asm_string_default;
 					gbString constraints = gb_string_make(heap_allocator(), "={eax}");
 
@@ -3359,7 +3414,7 @@ gb_internal lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr) {
 			}
 
 			lbValue arg = args[arg_index];
-			if (arg.value == nullptr) {
+			if (arg.value == nullptr && arg.type == nullptr) {
 				switch (e->kind) {
 				case Entity_TypeName:
 					args[arg_index] = lb_const_nil(p->module, e->type);

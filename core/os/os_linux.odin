@@ -8,7 +8,18 @@ import "core:strings"
 import "core:c"
 import "core:strconv"
 import "core:intrinsics"
-import "core:sys/unix"
+
+// NOTE(flysand): For compatibility we'll make core:os package
+// depend on the old (scheduled for removal) linux package.
+// Seeing that there are plans for os2, I'm imagining that *that*
+// package should inherit the new sys functionality.
+// The reasons for these are as follows:
+//  1. It's very hard to update this package without breaking *a lot* of code.
+//  2. os2 is not stable anyways, so we can break compatibility all we want
+// It might be weird to bring up compatibility when Odin in it's nature isn't
+// all that about compatibility. But we don't want to push experimental changes
+// and have people's code break while it's still work in progress.
+import unix "core:sys/unix"
 
 Handle    :: distinct i32
 Pid       :: distinct i32
@@ -252,26 +263,48 @@ Unix_File_Time :: struct {
 	nanoseconds: i64,
 }
 
-OS_Stat :: struct {
-	device_id:     u64, // ID of device containing file
-	serial:        u64, // File serial number
-	nlink:         u64, // Number of hard links
-	mode:          u32, // Mode of the file
-	uid:           u32, // User ID of the file's owner
-	gid:           u32, // Group ID of the file's group
-	_padding:      i32, // 32 bits of padding
-	rdev:          u64, // Device ID, if device
-	size:          i64, // Size of the file, in bytes
-	block_size:    i64, // Optimal bllocksize for I/O
-	blocks:        i64, // Number of 512-byte blocks allocated
+when ODIN_ARCH == .arm64 {
+	OS_Stat :: struct {
+		device_id:     u64, // ID of device containing file
+		serial:        u64, // File serial number
+		mode:          u32, // Mode of the file
+		nlink:         u32, // Number of hard links
+		uid:           u32, // User ID of the file's owner
+		gid:           u32, // Group ID of the file's group
+		rdev:          u64, // Device ID, if device
+		_:             u64, // Padding
+		size:          i64, // Size of the file, in bytes
+		block_size:    i32, // Optimal blocksize for I/O
+		_:             i32, // Padding
+		blocks:        i64, // Number of 512-byte blocks allocated
 
-	last_access:   Unix_File_Time, // Time of last access
-	modified:      Unix_File_Time, // Time of last modification
-	status_change: Unix_File_Time, // Time of last status change
+		last_access:   Unix_File_Time, // Time of last access
+		modified:      Unix_File_Time, // Time of last modification
+		status_change: Unix_File_Time, // Time of last status change
 
-	_reserve1,
-	_reserve2,
-	_reserve3:     i64,
+		_reserved:     [2]i32,
+	}
+	#assert(size_of(OS_Stat) == 128)
+} else {
+	OS_Stat :: struct {
+		device_id:     u64, // ID of device containing file
+		serial:        u64, // File serial number
+		nlink:         u64, // Number of hard links
+		mode:          u32, // Mode of the file
+		uid:           u32, // User ID of the file's owner
+		gid:           u32, // Group ID of the file's group
+		_:             i32, // 32 bits of padding
+		rdev:          u64, // Device ID, if device
+		size:          i64, // Size of the file, in bytes
+		block_size:    i64, // Optimal bllocksize for I/O
+		blocks:        i64, // Number of 512-byte blocks allocated
+
+		last_access:   Unix_File_Time, // Time of last access
+		modified:      Unix_File_Time, // Time of last modification
+		status_change: Unix_File_Time, // Time of last status change
+
+		_reserved:     [3]i64,
+	}
 }
 
 // NOTE(laleksic, 2021-01-21): Comment and rename these to match OS_Stat above
@@ -441,7 +474,7 @@ pollfd :: struct {
 sigset_t :: distinct u64
 
 foreign libc {
-	@(link_name="__errno_location") __errno_location    :: proc() -> ^int ---
+	@(link_name="__errno_location") __errno_location    :: proc() -> ^c.int ---
 
 	@(link_name="getpagesize")      _unix_getpagesize   :: proc() -> c.int ---
 	@(link_name="get_nprocs")       _unix_get_nprocs    :: proc() -> c.int ---
@@ -488,7 +521,7 @@ _get_errno :: proc(res: int) -> Errno {
 
 // get errno from libc
 get_last_error :: proc "contextless" () -> int {
-	return __errno_location()^
+	return int(__errno_location()^)
 }
 
 personality :: proc(persona: u64) -> (Errno) {

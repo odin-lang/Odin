@@ -8,8 +8,8 @@
 #include "tilde/tb.h"
 #include "tilde/tb_arena.h"
 
-#define TB_TYPE_F16    TB_DataType{ { TB_INT, 0, 16 } }
-#define TB_TYPE_I128   TB_DataType{ { TB_INT, 0, 128 } }
+#define TB_TYPE_F16    TB_DataType{ { TB_INT, 16 } }
+#define TB_TYPE_I128   TB_DataType{ { TB_INT, 128 } }
 #define TB_TYPE_INT    TB_TYPE_INTN(cast(u16)(8*build_context.int_size))
 #define TB_TYPE_INTPTR TB_TYPE_INTN(cast(u16)(8*build_context.ptr_size))
 
@@ -243,7 +243,7 @@ struct cgModule {
 	PtrMap<Type *, TB_Symbol *> map_cell_info_map;
 
 	// NOTE(bill): no need to protect this with a mutex
-	PtrMap<uintptr, TB_FileID> file_id_map; // Key: AstFile.id (i32 cast to uintptr)
+	PtrMap<uintptr, TB_SourceFile *> file_id_map; // Key: AstFile.id (i32 cast to uintptr)
 
 	std::atomic<u32> nested_type_name_guid;
 	std::atomic<u32> const_nil_guid;

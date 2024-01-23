@@ -20,9 +20,9 @@
 #endif
 
 enum {
-    TB_ARENA_SMALL_CHUNK_SIZE  =        4 * 1024,
-    TB_ARENA_MEDIUM_CHUNK_SIZE =      512 * 1024,
-    TB_ARENA_LARGE_CHUNK_SIZE  = 2 * 1024 * 1024,
+    TB_ARENA_SMALL_CHUNK_SIZE  =         4 * 1024,
+    TB_ARENA_MEDIUM_CHUNK_SIZE =       512 * 1024,
+    TB_ARENA_LARGE_CHUNK_SIZE  = 16 * 1024 * 1024,
 
     TB_ARENA_ALIGNMENT = 16,
 };
@@ -60,13 +60,16 @@ TB_API void tb_arena_destroy(TB_Arena* restrict arena);
 TB_API void* tb_arena_unaligned_alloc(TB_Arena* restrict arena, size_t size);
 TB_API void* tb_arena_alloc(TB_Arena* restrict arena, size_t size);
 
-// asserts if ptr+size != watermark
+// return false on failure
+TB_API bool tb_arena_free(TB_Arena* restrict arena, void* ptr, size_t size);
 TB_API void tb_arena_pop(TB_Arena* restrict arena, void* ptr, size_t size);
 
 // in case you wanna mix unaligned and aligned arenas
 TB_API void tb_arena_realign(TB_Arena* restrict arena);
 
 TB_API bool tb_arena_is_empty(TB_Arena* arena);
+
+TB_API size_t tb_arena_current_size(TB_Arena* arena);
 
 // savepoints
 TB_API TB_ArenaSavepoint tb_arena_save(TB_Arena* arena);

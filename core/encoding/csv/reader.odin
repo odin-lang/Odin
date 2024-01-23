@@ -248,7 +248,7 @@ _read_record :: proc(r: ^Reader, dst: ^[dynamic]string, allocator := context.all
 					field_length += 1
 
 				case '\n', '\r':
-					if !is_quoted { break read_loop }
+					is_quoted or_break read_loop
 
 				case r.comma:
 					field_length = 0

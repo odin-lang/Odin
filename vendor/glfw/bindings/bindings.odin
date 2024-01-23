@@ -3,10 +3,10 @@ package glfw_bindings
 import "core:c"
 import vk "vendor:vulkan"
 
-GLFW_DYNAMIC :: #config(GLFW_DYNAMIC, false)
+GLFW_SHARED :: #config(GLFW_SHARED, false)
 
 when ODIN_OS == .Windows {
-	when GLFW_DYNAMIC {
+	when GLFW_SHARED {
 		foreign import glfw {
 			"../lib/glfw3dll.lib",
 			"system:user32.lib", 
@@ -22,15 +22,14 @@ when ODIN_OS == .Windows {
 		}
 	}
 } else when ODIN_OS == .Linux {
-	// TODO: Add the billion-or-so static libs to link to in linux
 	foreign import glfw "system:glfw"
 } else when ODIN_OS == .Darwin {
-	 foreign import glfw { 
-        	"../lib/darwin/libglfw3.a",
-        	"system:Cocoa.framework",
-        	"system:IOKit.framework",
-        	"system:OpenGL.framework",
-    	}
+	foreign import glfw { 
+		"../lib/darwin/libglfw3.a",
+		"system:Cocoa.framework",
+		"system:IOKit.framework",
+		"system:OpenGL.framework",
+	}
 } else {
 	foreign import glfw "system:glfw"
 }
@@ -40,7 +39,7 @@ when ODIN_OS == .Windows {
 /*** Functions ***/
 @(default_calling_convention="c", link_prefix="glfw")
 foreign glfw {
-	Init      :: proc() -> c.int ---
+	Init      :: proc() -> b32 ---
 	Terminate :: proc() ---
 	
 	InitHint  :: proc(hint, value: c.int) ---
@@ -182,7 +181,7 @@ foreign glfw {
 	SetCharCallback        :: proc(window: WindowHandle, cbfun: CharProc)        -> CharProc ---
 	SetCharModsCallback    :: proc(window: WindowHandle, cbfun: CharModsProc)    -> CharModsProc ---
 	SetCursorEnterCallback :: proc(window: WindowHandle, cbfun: CursorEnterProc) -> CursorEnterProc ---
-	SetJoystickCallback    :: proc(window: WindowHandle, cbfun: JoystickProc)    -> JoystickProc ---
+	SetJoystickCallback    :: proc(cbfun: JoystickProc)    -> JoystickProc ---
 
 	SetErrorCallback :: proc(cbfun: ErrorProc) -> ErrorProc ---
 }

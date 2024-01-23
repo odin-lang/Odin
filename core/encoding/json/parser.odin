@@ -263,8 +263,17 @@ parse_object_body :: proc(p: ^Parser, end_token: Token_Kind) -> (obj: Object, er
 			return
 		}
 
-		obj[key] = elem
-		
+		// NOTE(gonz): There are code paths for which this traversal ends up
+		// inserting empty key/values into the object and for those we do not
+		// want to allocate anything
+		if key != "" {
+			reserve_error := reserve(&obj, len(obj) + 1)
+			if reserve_error == mem.Allocator_Error.Out_Of_Memory {
+				return nil, .Out_Of_Memory
+			}
+			obj[key] = elem
+		}
+
 		if parse_comma(p) {
 			break
 		}
@@ -343,7 +352,7 @@ unquote_string :: proc(token: Token, spec: Specification, allocator := context.a
 			i += 1
 			continue
 		}
-		r, w := utf8.decode_rune_in_string(s)
+		r, w := utf8.decode_rune_in_string(s[i:])
 		if r == utf8.RUNE_ERROR && w == 1 {
 			break
 		}

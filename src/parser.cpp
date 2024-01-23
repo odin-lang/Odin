@@ -36,6 +36,9 @@ gb_internal gbString get_file_line_as_string(TokenPos const &pos, i32 *offset_) 
 
 	u8 *start = file->tokenizer.start;
 	u8 *end = file->tokenizer.end;
+	if (start == end) {
+		return nullptr;
+	}
 	isize len = end-start;
 	if (len < offset) {
 		return nullptr;
@@ -530,8 +533,13 @@ gb_internal Ast *ast_tag_expr(AstFile *f, Token token, Token name, Ast *expr) {
 gb_internal Ast *ast_unary_expr(AstFile *f, Token op, Ast *expr) {
 	Ast *result = alloc_ast_node(f, Ast_UnaryExpr);
 
-	if (expr && expr->kind == Ast_OrReturnExpr) {
+	if (expr) switch (expr->kind) {
+	case Ast_OrReturnExpr:
 		syntax_error_with_verbose(expr, "'or_return' within an unary expression not wrapped in parentheses (...)");
+		break;
+	case Ast_OrBranchExpr:
+		syntax_error_with_verbose(expr, "'or_%.*s' within an unary expression not wrapped in parentheses (...)", LIT(expr->OrBranchExpr.token.string));
+		break;
 	}
 
 	result->UnaryExpr.op = op;
@@ -552,11 +560,22 @@ gb_internal Ast *ast_binary_expr(AstFile *f, Token op, Ast *left, Ast *right) {
 		right = ast_bad_expr(f, op, op);
 	}
 
-	if (left->kind == Ast_OrReturnExpr) {
+
+	if (left) switch (left->kind) {
+	case Ast_OrReturnExpr:
 		syntax_error_with_verbose(left, "'or_return' within a binary expression not wrapped in parentheses (...)");
+		break;
+	case Ast_OrBranchExpr:
+		syntax_error_with_verbose(left, "'or_%.*s' within a binary expression not wrapped in parentheses (...)", LIT(left->OrBranchExpr.token.string));
+		break;
 	}
-	if (right->kind == Ast_OrReturnExpr) {
+	if (right) switch (right->kind) {
+	case Ast_OrReturnExpr:
 		syntax_error_with_verbose(right, "'or_return' within a binary expression not wrapped in parentheses (...)");
+		break;
+	case Ast_OrBranchExpr:
+		syntax_error_with_verbose(right, "'or_%.*s' within a binary expression not wrapped in parentheses (...)", LIT(right->OrBranchExpr.token.string));
+		break;
 	}
 
 	result->BinaryExpr.op = op;
@@ -794,6 +813,14 @@ gb_internal Ast *ast_or_return_expr(AstFile *f, Ast *expr, Token const &token) {
 	Ast *result = alloc_ast_node(f, Ast_OrReturnExpr);
 	result->OrReturnExpr.expr = expr;
 	result->OrReturnExpr.token = token;
+	return result;
+}
+
+gb_internal Ast *ast_or_branch_expr(AstFile *f, Ast *expr, Token const &token, Ast *label) {
+	Ast *result = alloc_ast_node(f, Ast_OrBranchExpr);
+	result->OrBranchExpr.expr = expr;
+	result->OrBranchExpr.token = token;
+	result->OrBranchExpr.label = label;
 	return result;
 }
 
@@ -1212,6 +1239,7 @@ gb_internal Ast *ast_import_decl(AstFile *f, Token token, Token relpath, Token i
 	result->ImportDecl.import_name = import_name;
 	result->ImportDecl.docs        = docs;
 	result->ImportDecl.comment     = comment;
+	result->ImportDecl.attributes.allocator = ast_allocator(f);
 	return result;
 }
 
@@ -1360,6 +1388,22 @@ gb_internal Token peek_token(AstFile *f) {
 	return {};
 }
 
+gb_internal Token peek_token_n(AstFile *f, isize n) {
+	Token found = {};
+	for (isize i = f->curr_token_index+1; i < f->tokens.count; i++) {
+		Token tok = f->tokens[i];
+		if (tok.kind == Token_Comment) {
+			continue;
+		}
+		found = tok;
+		if (n-- == 0) {
+			return found;
+		}
+	}
+	return {};
+}
+
+
 gb_internal bool skip_possible_newline(AstFile *f) {
 	if (token_is_newline(f->curr_token)) {
 		advance_token(f);
@@ -1457,19 +1501,20 @@ gb_internal Token expect_operator(AstFile *f) {
 		// okay
 	} else if (prev.kind == Token_if || prev.kind == Token_when) {
 		// okay
-	} else if (prev.kind == Token_or_else || prev.kind == Token_or_return) {
+	} else if (prev.kind == Token_or_else || prev.kind == Token_or_return ||
+	           prev.kind == Token_or_break || prev.kind == Token_or_continue) {
 		// okay
 	} else if (!gb_is_between(prev.kind, Token__OperatorBegin+1, Token__OperatorEnd-1)) {
 		String p = token_to_string(prev);
-		syntax_error(f->curr_token, "Expected an operator, got '%.*s'",
+		syntax_error(prev, "Expected an operator, got '%.*s'",
 		             LIT(p));
 	} else if (!f->allow_range && is_token_range(prev)) {
 		String p = token_to_string(prev);
-		syntax_error(f->curr_token, "Expected an non-range operator, got '%.*s'",
+		syntax_error(prev, "Expected an non-range operator, got '%.*s'",
 		             LIT(p));
 	}
-	if (f->curr_token.kind == Token_Ellipsis) {
-		syntax_warning(f->curr_token, "'..' for ranges has now been deprecated, prefer '..='");
+	if (prev.kind == Token_Ellipsis) {
+		syntax_warning(prev, "'..' for ranges has now been deprecated, prefer '..='");
 		f->tokens[f->curr_token_index].flags |= TokenFlag_Replace;
 	}
 	
@@ -1716,6 +1761,8 @@ gb_internal Ast *strip_or_return_expr(Ast *node) {
 		}
 		if (node->kind == Ast_OrReturnExpr) {
 			node = node->OrReturnExpr.expr;
+		} else if (node->kind == Ast_OrBranchExpr) {
+			node = node->OrBranchExpr.expr;
 		} else if (node->kind == Ast_ParenExpr) {
 			node = node->ParenExpr.expr;
 		} else {
@@ -2205,6 +2252,10 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 			Ast *tag = ast_basic_directive(f, token, name);
 			Ast *original_expr = parse_expr(f, lhs);
 			Ast *expr = unparen_expr(original_expr);
+			if (expr == nullptr) {
+				syntax_error(name, "Expected a compound literal after #%.*s", LIT(name.string));
+				return ast_bad_expr(f, token, name);
+			}
 			switch (expr->kind) {
 			case Ast_ArrayType:
 				syntax_error(expr, "#partial has been replaced with #sparse for non-contiguous enumerated array types");
@@ -2845,8 +2896,16 @@ gb_internal Ast *parse_call_expr(AstFile *f, Ast *operand) {
 }
 
 gb_internal void parse_check_or_return(Ast *operand, char const *msg) {
-	if (operand && operand->kind == Ast_OrReturnExpr) {
+	if (operand == nullptr) {
+		return;
+	}
+	switch (operand->kind) {
+	case Ast_OrReturnExpr:
 		syntax_error_with_verbose(operand, "'or_return' use within %s is not wrapped in parentheses (...)", msg);
+		break;
+	case Ast_OrBranchExpr:
+		syntax_error_with_verbose(operand, "'or_%.*s' use within %s is not wrapped in parentheses (...)", msg, LIT(operand->OrBranchExpr.token.string));
+		break;
 	}
 }
 
@@ -2978,6 +3037,18 @@ gb_internal Ast *parse_atom_expr(AstFile *f, Ast *operand, bool lhs) {
 
 		case Token_or_return:
 			operand = ast_or_return_expr(f, operand, expect_token(f, Token_or_return));
+			break;
+
+		case Token_or_break:
+		case Token_or_continue:
+			{
+				Token token = advance_token(f);
+				Ast *label = nullptr;
+				if (f->curr_token.kind == Token_Ident) {
+					label = parse_ident(f);
+				}
+				operand = ast_or_branch_expr(f, operand, token, label);
+			}
 			break;
 
 		case Token_OpenBrace:
@@ -3418,6 +3489,18 @@ gb_internal Ast *parse_simple_stmt(AstFile *f, u32 flags) {
 	case Token_Colon:
 		expect_token_after(f, Token_Colon, "identifier list");
 		if ((flags&StmtAllowFlag_Label) && lhs.count == 1) {
+			bool is_partial = false;
+			Token partial_token = {};
+			if (f->curr_token.kind == Token_Hash) {
+				// NOTE(bill): This is purely for error messages
+				Token name = peek_token_n(f, 0);
+				if (name.kind == Token_Ident && name.string == "partial" &&
+				    peek_token_n(f, 1).kind == Token_switch) {
+					partial_token = expect_token(f, Token_Hash);
+					expect_token(f, Token_Ident);
+					is_partial = true;
+				}
+			}
 			switch (f->curr_token.kind) {
 			case Token_OpenBrace: // block statement
 			case Token_if:
@@ -3439,6 +3522,19 @@ gb_internal Ast *parse_simple_stmt(AstFile *f, u32 flags) {
 					break;
 				}
 			#undef _SET_LABEL
+
+				if (is_partial) {
+					switch (stmt->kind) {
+					case Ast_SwitchStmt:
+						stmt->SwitchStmt.partial = true;
+						break;
+					case Ast_TypeSwitchStmt:
+						stmt->TypeSwitchStmt.partial = true;
+						break;
+					}
+					syntax_error(partial_token, "Incorrect use of directive, use '#partial %.*s: switch'", LIT(ast_token(name).string));
+				}
+
 				return stmt;
 			} break;
 			}
@@ -3983,7 +4079,9 @@ gb_internal Ast *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_fl
 			if (f->curr_token.kind != Token_Eq) {
 				type = parse_var_type(f, allow_ellipsis, allow_typeid_token);
 				Ast *tt = unparen_expr(type);
-				if (is_signature && !any_polymorphic_names && tt->kind == Ast_TypeidType && tt->TypeidType.specialization != nullptr) {
+				if (is_signature && !any_polymorphic_names &&
+				    tt != nullptr &&
+				    tt->kind == Ast_TypeidType && tt->TypeidType.specialization != nullptr) {
 					syntax_error(type, "Specialization of typeid is not allowed without polymorphic names");
 				}
 			}
@@ -4634,7 +4732,9 @@ gb_internal Ast *parse_attribute(AstFile *f, Token token, TokenKind open_kind, T
 		array_add(&decl->ForeignBlockDecl.attributes, attribute);
 	} else if (decl->kind == Ast_ForeignImportDecl) {
 		array_add(&decl->ForeignImportDecl.attributes, attribute);
-	}else {
+	} else if (decl->kind == Ast_ImportDecl) {
+		array_add(&decl->ImportDecl.attributes, attribute);
+	} else {
 		syntax_error(decl, "Expected a value or foreign declaration after an attribute, got %.*s", LIT(ast_strings[decl->kind]));
 		return ast_bad_stmt(f, token, f->curr_token);
 	}
@@ -5819,7 +5919,7 @@ gb_internal bool parse_file(Parser *p, AstFile *f) {
 						f->vet_flags = parse_vet_tag(tok, lc);
 						f->vet_flags_set = true;
 					} else if (string_starts_with(lc, str_lit("+ignore"))) {
-							return false;
+						return false;
 					} else if (string_starts_with(lc, str_lit("+private"))) {
 						f->flags |= AstFile_IsPrivatePkg;
 						String command = string_trim_starts_with(lc, str_lit("+private "));
@@ -5841,6 +5941,8 @@ gb_internal bool parse_file(Parser *p, AstFile *f) {
 						} else {
 							f->flags |= AstFile_IsLazy;
 						}
+					} else if (lc == "+no-instrumentation") {
+						f->flags |= AstFile_NoInstrumentation;
 					} else {
 						warning(tok, "Ignoring unknown tag '%.*s'", LIT(lc));
 					}
@@ -5938,6 +6040,16 @@ gb_internal ParseFileError process_imported_file(Parser *p, ImportedFile importe
 		}
 	}
 
+	{
+		String name = file->fullpath;
+		name = remove_directory_from_path(name);
+		name = remove_extension_from_path(name);
+
+		if (string_starts_with(name, str_lit("_"))) {
+			syntax_error(pos, "Files cannot start with '_', got '%.*s'", LIT(file->fullpath));
+		}
+	}
+
 	if (build_context.command_kind == Command_test) {
 		String name = file->fullpath;
 		name = remove_extension_from_path(name);
@@ -5947,6 +6059,7 @@ gb_internal ParseFileError process_imported_file(Parser *p, ImportedFile importe
 			file->flags |= AstFile_IsTest;
 		}
 	}
+
 
 	if (parse_file(p, file)) {
 		MUTEX_GUARD_BLOCK(&pkg->files_mutex) {

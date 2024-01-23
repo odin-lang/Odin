@@ -90,6 +90,8 @@ gb_internal void lb_init_module(lbModule *m, Checker *c) {
 	map_init(&m->map_cell_info_map, 0);
 	map_init(&m->exact_value_compound_literal_addr_map, 1024);
 
+	m->const_dummy_builder = LLVMCreateBuilderInContext(m->ctx);
+
 }
 
 gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c) {
@@ -104,6 +106,10 @@ gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c) {
 
 	String init_fullpath = c->parser->init_fullpath;
 	linker_data_init(gen, &c->info, init_fullpath);
+
+	#if defined(GB_SYSTEM_OSX) && (LLVM_VERSION_MAJOR < 14)
+	linker_enable_system_library_linking(gen);
+	#endif
 
 	gen->info = &c->info;
 
@@ -276,11 +282,60 @@ gb_internal lbValue lb_zero(lbModule *m, Type *t) {
 	v.type = t;
 	return v;
 }
+gb_internal LLVMValueRef llvm_const_extract_value(lbModule *m, LLVMValueRef agg, unsigned index) {
+	LLVMValueRef res = agg;
+	GB_ASSERT(LLVMIsConstant(res));
+	res = LLVMBuildExtractValue(m->const_dummy_builder, res, index, "");
+	GB_ASSERT(LLVMIsConstant(res));
+	return res;
+}
+
+gb_internal LLVMValueRef llvm_const_extract_value(lbModule *m, LLVMValueRef agg, unsigned *indices, isize count) {
+	// return LLVMConstExtractValue(value, indices, count);
+	LLVMValueRef res = agg;
+	GB_ASSERT(LLVMIsConstant(res));
+	for (isize i = 0; i < count; i++) {
+		res = LLVMBuildExtractValue(m->const_dummy_builder, res, indices[i], "");
+		GB_ASSERT(LLVMIsConstant(res));
+	}
+	return res;
+}
+
+gb_internal LLVMValueRef llvm_const_insert_value(lbModule *m, LLVMValueRef agg, LLVMValueRef val, unsigned index) {
+	GB_ASSERT(LLVMIsConstant(agg));
+	GB_ASSERT(LLVMIsConstant(val));
+
+	LLVMValueRef extracted_value = val;
+	LLVMValueRef nested = llvm_const_extract_value(m, agg, index);
+	GB_ASSERT(LLVMIsConstant(nested));
+	extracted_value = LLVMBuildInsertValue(m->const_dummy_builder, nested, extracted_value, index, "");
+	GB_ASSERT(LLVMIsConstant(extracted_value));
+	return extracted_value;
+}
+
+
+gb_internal LLVMValueRef llvm_const_insert_value(lbModule *m, LLVMValueRef agg, LLVMValueRef val, unsigned *indices, isize count) {
+	GB_ASSERT(LLVMIsConstant(agg));
+	GB_ASSERT(LLVMIsConstant(val));
+	GB_ASSERT(count > 0);
+
+	LLVMValueRef extracted_value = val;
+	for (isize i = count-1; i >= 0; i--) {
+		LLVMValueRef nested = llvm_const_extract_value(m, agg, indices, i);
+		GB_ASSERT(LLVMIsConstant(nested));
+		extracted_value = LLVMBuildInsertValue(m->const_dummy_builder, nested, extracted_value, indices[i], "");
+	}
+	GB_ASSERT(LLVMIsConstant(extracted_value));
+	return extracted_value;
+}
+
+
+
 
 gb_internal LLVMValueRef llvm_cstring(lbModule *m, String const &str) {
 	lbValue v = lb_find_or_add_entity_string(m, str);
 	unsigned indices[1] = {0};
-	return LLVMConstExtractValue(v.value, indices, gb_count_of(indices));
+	return llvm_const_extract_value(m, v.value, indices, gb_count_of(indices));
 }
 
 gb_internal bool lb_is_instr_terminating(LLVMValueRef instr) {
@@ -911,8 +966,12 @@ gb_internal bool lb_is_type_proc_recursive(Type *t) {
 
 gb_internal void lb_emit_store(lbProcedure *p, lbValue ptr, lbValue value) {
 	GB_ASSERT(value.value != nullptr);
-	Type *a = type_deref(ptr.type);
 
+	if (LLVMIsUndef(value.value)) {
+		return;
+	}
+
+	Type *a = type_deref(ptr.type);
 	if (LLVMIsNull(value.value)) {
 		LLVMTypeRef src_t = llvm_addr_type(p->module, ptr);
 		if (is_type_proc(a)) {
@@ -1277,6 +1336,8 @@ gb_internal void lb_emit_store_union_variant(lbProcedure *p, lbValue parent, lbV
 	Type *pt = base_type(type_deref(parent.type));
 	GB_ASSERT(pt->kind == Type_Union);
 	if (pt->Union.kind == UnionType_shared_nil) {
+		GB_ASSERT(type_size_of(variant_type));
+
 		lbBlock *if_nil     = lb_create_block(p, "shared_nil.if_nil");
 		lbBlock *if_not_nil = lb_create_block(p, "shared_nil.if_not_nil");
 		lbBlock *done       = lb_create_block(p, "shared_nil.done");
@@ -1298,9 +1359,13 @@ gb_internal void lb_emit_store_union_variant(lbProcedure *p, lbValue parent, lbV
 
 
 	} else {
-		lbValue underlying = lb_emit_conv(p, parent, alloc_type_pointer(variant_type));
-
-		lb_emit_store(p, underlying, variant);
+		if (type_size_of(variant_type) == 0) {
+			unsigned alignment = 1;
+			lb_mem_zero_ptr_internal(p, parent.value, pt->Union.variant_block_size, alignment, false);
+		} else {
+			lbValue underlying = lb_emit_conv(p, parent, alloc_type_pointer(variant_type));
+			lb_emit_store(p, underlying, variant);
+		}
 		lb_emit_store_union_variant_tag(p, parent, variant_type);
 	}
 }
@@ -1888,14 +1953,14 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 
 	case Type_Array: {
 		m->internal_type_level += 1;
-		LLVMTypeRef t = LLVMArrayType(lb_type(m, type->Array.elem), cast(unsigned)type->Array.count);
+		LLVMTypeRef t = llvm_array_type(lb_type(m, type->Array.elem), type->Array.count);
 		m->internal_type_level -= 1;
 		return t;
 	}
 
 	case Type_EnumeratedArray: {
 		m->internal_type_level += 1;
-		LLVMTypeRef t = LLVMArrayType(lb_type(m, type->EnumeratedArray.elem), cast(unsigned)type->EnumeratedArray.count);
+		LLVMTypeRef t = llvm_array_type(lb_type(m, type->EnumeratedArray.elem), type->EnumeratedArray.count);
 		m->internal_type_level -= 1;
 		return t;
 	}
@@ -2129,7 +2194,7 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 			m->internal_type_level -= 1;
 			
 			LLVMTypeRef elem = lb_type(m, type->Matrix.elem);
-			LLVMTypeRef t = LLVMArrayType(elem, cast(unsigned)elem_count);
+			LLVMTypeRef t = llvm_array_type(elem, elem_count);
 			
 			m->internal_type_level += 1;
 			return t;
@@ -2283,6 +2348,15 @@ gb_internal LLVMAttributeRef lb_create_enum_attribute(LLVMContextRef ctx, char c
 	return LLVMCreateEnumAttribute(ctx, kind, value);
 }
 
+gb_internal LLVMAttributeRef lb_create_string_attribute(LLVMContextRef ctx, String const &key, String const &value) {
+	LLVMAttributeRef attr = LLVMCreateStringAttribute(
+		ctx,
+		cast(char const *)key.text,   cast(unsigned)key.len,
+		cast(char const *)value.text, cast(unsigned)value.len);
+	return attr;
+}
+
+
 gb_internal void lb_add_proc_attribute_at_index(lbProcedure *p, isize index, char const *name, u64 value) {
 	LLVMAttributeRef attr = lb_create_enum_attribute(p->module->ctx, name, value);
 	GB_ASSERT(attr != nullptr);
@@ -2295,6 +2369,10 @@ gb_internal void lb_add_proc_attribute_at_index(lbProcedure *p, isize index, cha
 
 gb_internal void lb_add_attribute_to_proc(lbModule *m, LLVMValueRef proc_value, char const *name, u64 value=0) {
 	LLVMAddAttributeAtIndex(proc_value, LLVMAttributeIndex_FunctionIndex, lb_create_enum_attribute(m->ctx, name, value));
+}
+gb_internal void lb_add_attribute_to_proc_with_string(lbModule *m, LLVMValueRef proc_value, String const &name, String const &value) {
+	LLVMAttributeRef attr = lb_create_string_attribute(m->ctx, name, value);
+	LLVMAddAttributeAtIndex(proc_value, LLVMAttributeIndex_FunctionIndex, attr);
 }
 
 

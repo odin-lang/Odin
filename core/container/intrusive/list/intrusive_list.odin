@@ -20,10 +20,10 @@ List :: struct {
 
 
 Node :: struct {
-	next, prev: ^Node,
+	prev, next: ^Node,
 }
 
-push_front :: proc(list: ^List, node: ^Node) {
+push_front :: proc "contextless" (list: ^List, node: ^Node) {
 	if list.head != nil {
 		list.head.prev = node
 		node.prev, node.next = nil, list.head
@@ -34,7 +34,7 @@ push_front :: proc(list: ^List, node: ^Node) {
 	}
 }
 
-push_back :: proc(list: ^List, node: ^Node) {
+push_back :: proc "contextless" (list: ^List, node: ^Node) {
 	if list.tail != nil {
 		list.tail.next = node
 		node.prev, node.next = list.tail, nil
@@ -45,7 +45,7 @@ push_back :: proc(list: ^List, node: ^Node) {
 	}
 }
 
-remove :: proc(list: ^List, node: ^Node) {
+remove :: proc "contextless" (list: ^List, node: ^Node) {
 	if node != nil {
 		if node.next != nil {
 			node.next.prev = node.prev
@@ -83,12 +83,34 @@ remove_by_proc :: proc(list: ^List, to_erase: proc(^Node) -> bool) {
 	}
 }
 
+remove_by_proc_contextless :: proc(list: ^List, to_erase: proc "contextless" (^Node) -> bool) {
+	for node := list.head; node != nil; {
+		next := node.next
+		if to_erase(node) {
+			if node.next != nil {
+				node.next.prev = node.prev
+			}
+			if node.prev != nil {
+				node.prev.next = node.next
+			}
+			if list.head == node {
+				list.head = node.next
+			}
+			if list.tail == node {
+				list.tail = node.prev
+			}
+		}
+		node = next
+	}
+}
 
-is_empty :: proc(list: ^List) -> bool {
+
+
+is_empty :: proc "contextless" (list: ^List) -> bool {
 	return list.head == nil
 }
 
-pop_front :: proc(list: ^List) -> ^Node {
+pop_front :: proc "contextless" (list: ^List) -> ^Node {
 	link := list.head
 	if link == nil {
 		return nil
@@ -108,7 +130,7 @@ pop_front :: proc(list: ^List) -> ^Node {
 	return link
 
 }
-pop_back :: proc(list: ^List) -> ^Node {
+pop_back :: proc "contextless" (list: ^List) -> ^Node {
 	link := list.tail
 	if link == nil {
 		return nil
@@ -134,25 +156,25 @@ Iterator :: struct($T: typeid) {
 	offset: uintptr,
 }
 
-iterator_head :: proc(list: List, $T: typeid, $field_name: string) -> Iterator(T)
+iterator_head :: proc "contextless" (list: List, $T: typeid, $field_name: string) -> Iterator(T)
 	where intrinsics.type_has_field(T, field_name),
 	      intrinsics.type_field_type(T, field_name) == Node {
 	return {list.head, offset_of_by_string(T, field_name)}
 }
 
-iterator_tail :: proc(list: List, $T: typeid, $field_name: string) -> Iterator(T)
+iterator_tail :: proc "contextless" (list: List, $T: typeid, $field_name: string) -> Iterator(T)
 	where intrinsics.type_has_field(T, field_name),
 	      intrinsics.type_field_type(T, field_name) == Node {
 	return {list.tail, offset_of_by_string(T, field_name)}
 }
 
-iterator_from_node :: proc(node: ^Node, $T: typeid, $field_name: string) -> Iterator(T)
+iterator_from_node :: proc "contextless" (node: ^Node, $T: typeid, $field_name: string) -> Iterator(T)
 	where intrinsics.type_has_field(T, field_name),
 	      intrinsics.type_field_type(T, field_name) == Node {
 	return {node, offset_of_by_string(T, field_name)}
 }
 
-iterate_next :: proc(it: ^Iterator($T)) -> (ptr: ^T, ok: bool) {
+iterate_next :: proc "contextless" (it: ^Iterator($T)) -> (ptr: ^T, ok: bool) {
 	node := it.curr
 	if node == nil {
 		return nil, false
@@ -162,7 +184,7 @@ iterate_next :: proc(it: ^Iterator($T)) -> (ptr: ^T, ok: bool) {
 	return (^T)(uintptr(node) - it.offset), true
 }
 
-iterate_prev :: proc(it: ^Iterator($T)) -> (ptr: ^T, ok: bool) {
+iterate_prev :: proc "contextless" (it: ^Iterator($T)) -> (ptr: ^T, ok: bool) {
 	node := it.curr
 	if node == nil {
 		return nil, false

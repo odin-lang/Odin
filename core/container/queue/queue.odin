@@ -22,7 +22,9 @@ init :: proc(q: ^$Q/Queue($T), capacity := DEFAULT_CAPACITY, allocator := contex
 	return reserve(q, capacity)
 }
 
-// Procedure to initialize a queue from a fixed backing slice
+// Procedure to initialize a queue from a fixed backing slice.
+// The contents of the `backing` will be overwritten as items are pushed onto the `Queue`.
+// Any previous contents are not available.
 init_from_slice :: proc(q: ^$Q/Queue($T), backing: []T) -> bool {
 	clear(q)
 	q.data = transmute([dynamic]T)runtime.Raw_Dynamic_Array{
@@ -31,6 +33,21 @@ init_from_slice :: proc(q: ^$Q/Queue($T), backing: []T) -> bool {
 		cap = builtin.len(backing),
 		allocator = {procedure=runtime.nil_allocator_proc, data=nil},
 	}
+	return true
+}
+
+// Procedure to initialize a queue from a fixed backing slice.
+// Existing contents are preserved and available on the queue.
+init_with_contents :: proc(q: ^$Q/Queue($T), backing: []T) -> bool {
+	clear(q)
+	q.data = transmute([dynamic]T)runtime.Raw_Dynamic_Array{
+		data = raw_data(backing),
+		len = builtin.len(backing),
+		cap = builtin.len(backing),
+		allocator = {procedure=runtime.nil_allocator_proc, data=nil},
+	}
+	q.len    = len(backing)
+	q.offset = len(backing)
 	return true
 }
 
@@ -56,7 +73,7 @@ space :: proc(q: $Q/Queue($T)) -> int {
 
 // Reserve enough space for at least the specified capacity
 reserve :: proc(q: ^$Q/Queue($T), capacity: int) -> runtime.Allocator_Error {
-	if uint(capacity) > q.len {
+	if capacity > space(q^) {
 		return _grow(q, uint(capacity)) 
 	}
 	return nil

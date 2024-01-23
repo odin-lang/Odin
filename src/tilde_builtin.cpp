@@ -230,7 +230,7 @@ gb_internal cgValue cg_builtin_clamp(cgProcedure *p, Type *t, cgValue const &x, 
 gb_internal cgValue cg_builtin_mem_zero(cgProcedure *p, cgValue const &ptr, cgValue const &len) {
 	GB_ASSERT(ptr.kind == cgValue_Value);
 	GB_ASSERT(len.kind == cgValue_Value);
-	tb_inst_memzero(p->func, ptr.node, len.node, 1, false);
+	tb_inst_memzero(p->func, ptr.node, len.node, 1);
 	return ptr;
 }
 
@@ -239,7 +239,7 @@ gb_internal cgValue cg_builtin_mem_copy(cgProcedure *p, cgValue const &dst, cgVa
 	GB_ASSERT(src.kind == cgValue_Value);
 	GB_ASSERT(len.kind == cgValue_Value);
 	// TODO(bill): This needs to be memmove
-	tb_inst_memcpy(p->func, dst.node, src.node, len.node, 1, false);
+	tb_inst_memcpy(p->func, dst.node, src.node, len.node, 1);
 	return dst;
 }
 
@@ -247,7 +247,7 @@ gb_internal cgValue cg_builtin_mem_copy_non_overlapping(cgProcedure *p, cgValue 
 	GB_ASSERT(dst.kind == cgValue_Value);
 	GB_ASSERT(src.kind == cgValue_Value);
 	GB_ASSERT(len.kind == cgValue_Value);
-	tb_inst_memcpy(p->func, dst.node, src.node, len.node, 1, false);
+	tb_inst_memcpy(p->func, dst.node, src.node, len.node, 1);
 	return dst;
 }
 

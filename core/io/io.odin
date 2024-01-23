@@ -34,7 +34,7 @@ Error :: enum i32 {
 
 	// No_Progress is returned by some implementations of `io.Reader` when many calls
 	// to `read` have failed to return any data or error.
-	// This is usually a signed of a broken `io.Reader` implementation
+	// This is usually a sign of a broken `io.Reader` implementation
 	No_Progress,
 
 	Invalid_Whence,

@@ -162,7 +162,14 @@ type_is_matrix           :: proc($T: typeid) -> bool ---
 type_has_nil :: proc($T: typeid) -> bool ---
 
 type_is_specialization_of :: proc($T, $S: typeid) -> bool ---
+
 type_is_variant_of :: proc($U, $V: typeid) -> bool where type_is_union(U) ---
+type_union_tag_type :: proc($T: typeid) -> typeid where type_is_union(T) ---
+type_union_tag_offset :: proc($T: typeid) -> uintptr where type_is_union(T) ---
+type_union_base_tag_value :: proc($T: typeid) -> int where type_is_union(U) ---
+type_union_variant_count :: proc($T: typeid) -> int where type_is_union(T) ---
+type_variant_type_of :: proc($T: typeid, $index: int) -> typeid where type_is_union(T) ---
+type_variant_index_of :: proc($U, $V: typeid) -> int where type_is_union(U) ---
 
 type_has_field :: proc($T: typeid, $name: string) -> bool ---
 type_field_type :: proc($T: typeid, $name: string) -> typeid ---
@@ -215,10 +222,10 @@ simd_shr_masked :: proc(a: #simd[N]T, b: #simd[N]Unsigned_Integer) -> #simd[N]T 
 simd_add_sat :: proc(a, b: #simd[N]T) -> #simd[N]T ---
 simd_sub_sat :: proc(a, b: #simd[N]T) -> #simd[N]T ---
 
-simd_and     :: proc(a, b: #simd[N]T) -> #simd[N]T ---
-simd_or      :: proc(a, b: #simd[N]T) -> #simd[N]T ---
-simd_xor     :: proc(a, b: #simd[N]T) -> #simd[N]T ---
-simd_and_not :: proc(a, b: #simd[N]T) -> #simd[N]T ---
+simd_bit_and     :: proc(a, b: #simd[N]T) -> #simd[N]T ---
+simd_bit_or      :: proc(a, b: #simd[N]T) -> #simd[N]T ---
+simd_bit_xor     :: proc(a, b: #simd[N]T) -> #simd[N]T ---
+simd_bit_and_not :: proc(a, b: #simd[N]T) -> #simd[N]T ---
 
 simd_neg  :: proc(a: #simd[N]T) -> #simd[N]T ---
 

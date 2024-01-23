@@ -101,12 +101,13 @@ Address :: struct {
 	port: u16,
 }
 
+PacketFlags :: bit_set[PacketFlag; i32]
 PacketFlag :: enum i32 {
-	RELIABLE            = 1 << 0,
-	UNSEQUENCED         = 1 << 1,
-	NO_ALLOCATE         = 1 << 2,
-	UNRELIABLE_FRAGMENT = 1 << 3,
-	FLAG_SENT           = 1 << 8,
+	RELIABLE            = 0,
+	UNSEQUENCED         = 1,
+	NO_ALLOCATE         = 2,
+	UNRELIABLE_FRAGMENT = 3,
+	FLAG_SENT           = 8,
 }
 
 PacketFreeCallback :: proc "c" (packet: ^Packet)
@@ -365,7 +366,7 @@ foreign ENet {
 	address_get_host_ip            :: proc(address: ^Address, hostName: [^]u8, nameLength: uint) -> i32 ---
 	address_get_host               :: proc(address: ^Address, hostName: [^]u8, nameLength: uint) -> i32 ---
 
-	packet_create                  :: proc(data: rawptr, dataLength: uint, flags: PacketFlag) -> ^Packet ---
+	packet_create                  :: proc(data: rawptr, dataLength: uint, flags: PacketFlags) -> ^Packet ---
 	packet_destroy                 :: proc(packet: ^Packet) ---
 	packet_resize                  :: proc(packet: ^Packet, dataLength: uint) -> i32 ---
 	crc32                          :: proc(buffers: [^]Buffer, bufferCount: uint) -> u32 ---

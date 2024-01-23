@@ -462,7 +462,9 @@ split_port :: proc(endpoint_str: string) -> (addr_or_host: string, port: int, ok
 // Joins an address or hostname with a port.
 join_port :: proc(address_or_host: string, port: int, allocator := context.allocator) -> string {
 	addr_or_host, _, ok := split_port(address_or_host)
-	if !ok do return addr_or_host
+	if !ok {
+		return addr_or_host
+	}
 
 	b := strings.builder_make(allocator)
 
@@ -587,7 +589,7 @@ address_to_string :: proc(addr: Address, allocator := context.temp_allocator) ->
 }
 
 // Returns a temporarily-allocated string representation of the endpoint.
-// If there's a port, uses the `[address]:port` format.
+// If there's a port, uses the `ip4address:port` or `[ip6address]:port` format, respectively.
 endpoint_to_string :: proc(ep: Endpoint, allocator := context.temp_allocator) -> string {
 	if ep.port == 0 {
 		return address_to_string(ep.address, allocator)

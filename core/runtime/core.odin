@@ -18,6 +18,7 @@
 // This could change at a later date if the all these data structures are
 // implemented within the compiler rather than in this "preload" file
 //
+//+no-instrumentation
 package runtime
 
 import "core:intrinsics"
@@ -254,6 +255,7 @@ Typeid_Kind :: enum u8 {
 	Relative_Pointer,
 	Relative_Multi_Pointer,
 	Matrix,
+	Soa_Pointer,
 }
 #assert(len(Typeid_Kind) < 32)
 
@@ -305,6 +307,7 @@ Allocator_Mode :: enum byte {
 	Query_Features,
 	Query_Info,
 	Alloc_Non_Zeroed,
+	Resize_Non_Zeroed,
 }
 
 Allocator_Mode_Set :: distinct bit_set[Allocator_Mode]
@@ -337,6 +340,8 @@ Kilobyte :: 1024 * Byte
 Megabyte :: 1024 * Kilobyte
 Gigabyte :: 1024 * Megabyte
 Terabyte :: 1024 * Gigabyte
+Petabyte :: 1024 * Terabyte
+Exabyte  :: 1024 * Petabyte
 
 // Logging stuff
 
@@ -508,6 +513,19 @@ Odin_Endian_Type :: type_of(ODIN_ENDIAN)
 */
 Odin_Platform_Subtarget_Type :: type_of(ODIN_PLATFORM_SUBTARGET)
 
+/*
+	// Defined internally by the compiler
+	Odin_Sanitizer_Flag :: enum u32 {
+		Address = 0,
+		Memory  = 1,
+		Thread  = 2,
+	}
+	Odin_Sanitizer_Flags :: distinct bitset[Odin_Sanitizer_Flag; u32]
+
+	ODIN_SANITIZER_FLAGS // is a constant
+*/
+Odin_Sanitizer_Flags :: type_of(ODIN_SANITIZER_FLAGS)
+
 
 /////////////////////////////
 // Init Startup Procedures //
@@ -648,8 +666,10 @@ default_assertion_failure_proc :: proc(prefix, message: string, loc: Source_Code
 	when ODIN_OS == .Freestanding {
 		// Do nothing
 	} else {
-		print_caller_location(loc)
-		print_string(" ")
+		when !ODIN_DISABLE_ASSERT {
+			print_caller_location(loc)
+			print_string(" ")
+		}
 		print_string(prefix)
 		if len(message) > 0 {
 			print_string(": ")

@@ -2,8 +2,8 @@
 //+private
 package sync
 
-import "core:sys/unix"
+import "core:sys/linux"
 
 _current_thread_id :: proc "contextless" () -> int {
-	return unix.sys_gettid()
+	return cast(int) linux.gettid()
 }

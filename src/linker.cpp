@@ -7,9 +7,18 @@ struct LinkerData {
 	Array<String> output_temp_paths;
 	String   output_base;
 	String   output_name;
+#if defined(GB_SYSTEM_OSX)
+	b8       needs_system_library_linked;
+#endif
 };
 
 gb_internal i32 system_exec_command_line_app(char const *name, char const *fmt, ...);
+
+#if defined(GB_SYSTEM_OSX)
+gb_internal void linker_enable_system_library_linking(LinkerData *ld) {
+	ld->needs_system_library_linked = 1;
+}
+#endif
 
 gb_internal void linker_data_init(LinkerData *ld, CheckerInfo *info, String const &init_fullpath) {
 	gbAllocator ha = heap_allocator();
@@ -17,6 +26,10 @@ gb_internal void linker_data_init(LinkerData *ld, CheckerInfo *info, String cons
 	array_init(&ld->output_temp_paths,   ha);
 	array_init(&ld->foreign_libraries,   ha, 0, 1024);
 	ptr_set_init(&ld->foreign_libraries_set, 1024);
+
+#if defined(GB_SYSTEM_OSX)
+	ld->needs_system_library_linked = 0;
+#endif 
 
 	if (build_context.out_filepath.len == 0) {
 		ld->output_name = remove_directory_from_path(init_fullpath);
@@ -149,14 +162,20 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 						if (!string_set_update(&asm_files, lib)) {
 							String asm_file = asm_files.entries[i].value;
 							String obj_file = concatenate_strings(permanent_allocator(), asm_file, str_lit(".obj"));
-
+							String obj_format;
+#if defined(GB_ARCH_64_BIT)
+							obj_format = str_lit("win64");
+#elif defined(GB_ARCH_32_BIT)
+							obj_format = str_lit("win32");
+#endif // GB_ARCH_*_BIT
 							result = system_exec_command_line_app("nasm",
 								"\"%.*s\\bin\\nasm\\windows\\nasm.exe\" \"%.*s\" "
-								"-f win64 "
+								"-f \"%.*s\" "
 								"-o \"%.*s\" "
 								"%.*s "
 								"",
 								LIT(build_context.ODIN_ROOT), LIT(asm_file),
+								LIT(obj_format),
 								LIT(obj_file),
 								LIT(build_context.extra_assembler_flags)
 							);
@@ -189,7 +208,7 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 
 			if (build_context.pdb_filepath != "") {
 				String pdb_path = path_to_string(heap_allocator(), build_context.build_paths[BuildPath_PDB]);
-				link_settings = gb_string_append_fmt(link_settings, " /PDB:%.*s", LIT(pdb_path));
+				link_settings = gb_string_append_fmt(link_settings, " /PDB:\"%.*s\"", LIT(pdb_path));
 			}
 
 			if (build_context.no_crt) {
@@ -214,7 +233,6 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 			String windows_sdk_bin_path = path_to_string(heap_allocator(), build_context.build_paths[BuildPath_Win_SDK_Bin_Path]);
 			defer (gb_free(heap_allocator(), windows_sdk_bin_path.text));
 
-			char const *subsystem_str = build_context.use_subsystem_windows ? "WINDOWS" : "CONSOLE";
 			if (!build_context.use_lld) { // msvc
 				String res_path = {};
 				defer (gb_free(heap_allocator(), res_path.text));
@@ -246,14 +264,14 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 
 				result = system_exec_command_line_app("msvc-link",
 					"\"%.*slink.exe\" %s %.*s -OUT:\"%.*s\" %s "
-					"/nologo /incremental:no /opt:ref /subsystem:%s "
+					"/nologo /incremental:no /opt:ref /subsystem:%.*s "
 					"%.*s "
 					"%.*s "
 					"%s "
 					"",
 					LIT(vs_exe_path), object_files, LIT(res_path), LIT(output_filename),
 					link_settings,
-					subsystem_str,
+					LIT(build_context.ODIN_WINDOWS_SUBSYSTEM),
 					LIT(build_context.link_flags),
 					LIT(build_context.extra_linker_flags),
 					lib_str
@@ -264,14 +282,14 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 			} else { // lld
 				result = system_exec_command_line_app("msvc-lld-link",
 					"\"%.*s\\bin\\lld-link\" %s -OUT:\"%.*s\" %s "
-					"/nologo /incremental:no /opt:ref /subsystem:%s "
+					"/nologo /incremental:no /opt:ref /subsystem:%.*s "
 					"%.*s "
 					"%.*s "
 					"%s "
 					"",
 					LIT(build_context.ODIN_ROOT), object_files, LIT(output_filename),
 					link_settings,
-					subsystem_str,
+					LIT(build_context.ODIN_WINDOWS_SUBSYSTEM),
 					LIT(build_context.link_flags),
 					LIT(build_context.extra_linker_flags),
 					lib_str
@@ -295,11 +313,15 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 			//                files can be passed with -l:
 			gbString lib_str = gb_string_make(heap_allocator(), "-L/");
 			defer (gb_string_free(lib_str));
-
+			
+			StringSet asm_files = {};
+			string_set_init(&asm_files, 64);
+			defer (string_set_destroy(&asm_files));
+			
 			StringSet libs = {};
 			string_set_init(&libs, 64);
 			defer (string_set_destroy(&libs));
-
+			
 			for (Entity *e : gen->foreign_libraries) {
 				GB_ASSERT(e->kind == Entity_LibraryName);
 				for (String lib : e->LibraryName.paths) {
@@ -307,46 +329,97 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 					if (lib.len == 0) {
 						continue;
 					}
-					if (string_set_update(&libs, lib)) {
-						continue;
-					}
-
-					// NOTE(zangent): Sometimes, you have to use -framework on MacOS.
-					//   This allows you to specify '-f' in a #foreign_system_library,
-					//   without having to implement any new syntax specifically for MacOS.
-					if (build_context.metrics.os == TargetOs_darwin) {
-						if (string_ends_with(lib, str_lit(".framework"))) {
-							// framework thingie
-							String lib_name = lib;
-							lib_name = remove_extension_from_path(lib_name);
-							lib_str = gb_string_append_fmt(lib_str, " -framework %.*s ", LIT(lib_name));
-						} else if (string_ends_with(lib, str_lit(".a")) || string_ends_with(lib, str_lit(".o")) || string_ends_with(lib, str_lit(".dylib"))) {
-							// For:
-							// object
-							// dynamic lib
-							// static libs, absolute full path relative to the file in which the lib was imported from
-							lib_str = gb_string_append_fmt(lib_str, " %.*s ", LIT(lib));
-						} else {
-							// dynamic or static system lib, just link regularly searching system library paths
-							lib_str = gb_string_append_fmt(lib_str, " -l%.*s ", LIT(lib));
+					if (has_asm_extension(lib)) {
+						if (string_set_update(&asm_files, lib)) {
+							continue; // already handled
 						}
-					} else {
-						// NOTE(vassvik): static libraries (.a files) in linux can be linked to directly using the full path,
-						//                since those are statically linked to at link time. shared libraries (.so) has to be
-						//                available at runtime wherever the executable is run, so we make require those to be
-						//                local to the executable (unless the system collection is used, in which case we search
-						//                the system library paths for the library file).
-						if (string_ends_with(lib, str_lit(".a")) || string_ends_with(lib, str_lit(".o"))) {
-							// static libs and object files, absolute full path relative to the file in which the lib was imported from
-							lib_str = gb_string_append_fmt(lib_str, " -l:\"%.*s\" ", LIT(lib));
-						} else if (string_ends_with(lib, str_lit(".so"))) {
-							// dynamic lib, relative path to executable
-							// NOTE(vassvik): it is the user's responsibility to make sure the shared library files are visible
-							//                at runtime to the executable
-							lib_str = gb_string_append_fmt(lib_str, " -l:\"%s/%.*s\" ", cwd, LIT(lib));
+						String asm_file = lib;
+						String obj_file = concatenate_strings(permanent_allocator(), asm_file, str_lit(".o"));
+						String obj_format;
+#if defined(GB_ARCH_64_BIT)
+						if (is_osx) {
+							obj_format = str_lit("macho64");
 						} else {
-							// dynamic or static system lib, just link regularly searching system library paths
-							lib_str = gb_string_append_fmt(lib_str, " -l%.*s ", LIT(lib));
+							obj_format = str_lit("elf64");
+						}
+#elif defined(GB_ARCH_32_BIT)
+						if (is_osx) {
+							obj_format = str_lit("macho32");
+						} else {
+							obj_format = str_lit("elf32");
+						}
+#endif // GB_ARCH_*_BIT
+
+						if (is_osx) {
+							// `as` comes with MacOS.
+							result = system_exec_command_line_app("as",
+								"as \"%.*s\" "
+								"-o \"%.*s\" "
+								"%.*s "
+								"",
+								LIT(asm_file),
+								LIT(obj_file),
+								LIT(build_context.extra_assembler_flags)
+							);
+						} else {
+							// Note(bumbread): I'm assuming nasm is installed on the host machine.
+							// Shipping binaries on unix-likes gets into the weird territorry of
+							// "which version of glibc" is it linked with.
+							result = system_exec_command_line_app("nasm",
+								"nasm \"%.*s\" "
+								"-f \"%.*s\" "
+								"-o \"%.*s\" "
+								"%.*s "
+								"",
+								LIT(asm_file),
+								LIT(obj_format),
+								LIT(obj_file),
+								LIT(build_context.extra_assembler_flags)
+							);						
+						}
+						array_add(&gen->output_object_paths, obj_file);
+					} else {
+						if (string_set_update(&libs, lib)) {
+							continue;
+						}
+
+						// NOTE(zangent): Sometimes, you have to use -framework on MacOS.
+						//   This allows you to specify '-f' in a #foreign_system_library,
+						//   without having to implement any new syntax specifically for MacOS.
+						if (build_context.metrics.os == TargetOs_darwin) {
+							if (string_ends_with(lib, str_lit(".framework"))) {
+								// framework thingie
+								String lib_name = lib;
+								lib_name = remove_extension_from_path(lib_name);
+								lib_str = gb_string_append_fmt(lib_str, " -framework %.*s ", LIT(lib_name));
+							} else if (string_ends_with(lib, str_lit(".a")) || string_ends_with(lib, str_lit(".o")) || string_ends_with(lib, str_lit(".dylib"))) {
+								// For:
+								// object
+								// dynamic lib
+								// static libs, absolute full path relative to the file in which the lib was imported from
+								lib_str = gb_string_append_fmt(lib_str, " %.*s ", LIT(lib));
+							} else {
+								// dynamic or static system lib, just link regularly searching system library paths
+								lib_str = gb_string_append_fmt(lib_str, " -l%.*s ", LIT(lib));
+							}
+						} else {
+							// NOTE(vassvik): static libraries (.a files) in linux can be linked to directly using the full path,
+							//                since those are statically linked to at link time. shared libraries (.so) has to be
+							//                available at runtime wherever the executable is run, so we make require those to be
+							//                local to the executable (unless the system collection is used, in which case we search
+							//                the system library paths for the library file).
+							if (string_ends_with(lib, str_lit(".a")) || string_ends_with(lib, str_lit(".o"))) {
+								// static libs and object files, absolute full path relative to the file in which the lib was imported from
+								lib_str = gb_string_append_fmt(lib_str, " -l:\"%.*s\" ", LIT(lib));
+							} else if (string_ends_with(lib, str_lit(".so"))) {
+								// dynamic lib, relative path to executable
+								// NOTE(vassvik): it is the user's responsibility to make sure the shared library files are visible
+								//                at runtime to the executable
+								lib_str = gb_string_append_fmt(lib_str, " -l:\"%s/%.*s\" ", cwd, LIT(lib));
+							} else {
+								// dynamic or static system lib, just link regularly searching system library paths
+								lib_str = gb_string_append_fmt(lib_str, " -l%.*s ", LIT(lib));
+							}
 						}
 					}
 				}
@@ -409,7 +482,26 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 			gbString platform_lib_str = gb_string_make(heap_allocator(), "");
 			defer (gb_string_free(platform_lib_str));
 			if (build_context.metrics.os == TargetOs_darwin) {
-				platform_lib_str = gb_string_appendc(platform_lib_str, "-lSystem -lm -Wl,-syslibroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk -L/usr/local/lib");
+				platform_lib_str = gb_string_appendc(platform_lib_str, "-Wl,-syslibroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk -L/usr/local/lib");
+
+				// Homebrew's default library path, checking if it exists to avoid linking warnings.
+				if (gb_file_exists("/opt/homebrew/lib")) {
+					platform_lib_str = gb_string_appendc(platform_lib_str, " -L/opt/homebrew/lib");
+				}
+
+				// MacPort's default library path, checking if it exists to avoid linking warnings.
+				if (gb_file_exists("/opt/local/lib")) {
+					platform_lib_str = gb_string_appendc(platform_lib_str, " -L/opt/local/lib");
+				}
+
+				#if defined(GB_SYSTEM_OSX)
+				if(!build_context.no_crt) {
+					platform_lib_str = gb_string_appendc(platform_lib_str, " -lm ");
+					if(gen->needs_system_library_linked == 1) {
+						platform_lib_str = gb_string_appendc(platform_lib_str, " -lSystem ");
+					}
+				}
+				#endif
 			} else {
 				platform_lib_str = gb_string_appendc(platform_lib_str, "-lc -lm");
 			}
@@ -418,10 +510,6 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 				// This sets a requirement of Mountain Lion and up, but the compiler doesn't work without this limit.
 				if (build_context.minimum_os_version_string.len) {
 					link_settings = gb_string_append_fmt(link_settings, " -mmacosx-version-min=%.*s ", LIT(build_context.minimum_os_version_string));
-				} else if (build_context.metrics.arch == TargetArch_arm64) {
-					link_settings = gb_string_appendc(link_settings, " -mmacosx-version-min=12.0.0  ");
-				} else {
-					link_settings = gb_string_appendc(link_settings, " -mmacosx-version-min=10.12.0 ");
 				}
 				// This points the linker to where the entry point is
 				link_settings = gb_string_appendc(link_settings, " -e _main ");

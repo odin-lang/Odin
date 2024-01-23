@@ -3,7 +3,7 @@ package sys_windows
 
 foreign import netapi32 "system:Netapi32.lib"
 
-@(default_calling_convention="stdcall")
+@(default_calling_convention="system")
 foreign netapi32 {
 	NetUserAdd :: proc(
 		servername: wstring,

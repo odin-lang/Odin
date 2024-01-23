@@ -3,7 +3,7 @@ package sys_windows
 
 foreign import "system:Comdlg32.lib"
 
-LPOFNHOOKPROC :: #type proc "stdcall" (hdlg: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> UINT_PTR
+LPOFNHOOKPROC :: #type proc "system" (hdlg: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> UINT_PTR
 
 OPENFILENAMEW :: struct {
 	lStructSize: 	        DWORD,
@@ -31,7 +31,7 @@ OPENFILENAMEW :: struct {
 	FlagsEx:                DWORD,
 }
 
-@(default_calling_convention="stdcall")
+@(default_calling_convention="system")
 foreign Comdlg32 {
 	GetOpenFileNameW     :: proc(arg1: ^OPENFILENAMEW) -> BOOL ---
 	GetSaveFileNameW     :: proc(arg1: ^OPENFILENAMEW) -> BOOL ---

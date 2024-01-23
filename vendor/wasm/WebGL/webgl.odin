@@ -112,6 +112,7 @@ foreign webgl {
 	GetUniformLocation    :: proc(program: Program, name: string) -> i32 ---
 	GetVertexAttribOffset :: proc(index: i32, pname: Enum) -> uintptr ---
 	GetProgramParameter   :: proc(program: Program, pname: Enum) -> i32 ---
+	GetParameter          :: proc(pname: Enum) -> i32 ---
 
 	Hint :: proc(target: Enum, mode: Enum) ---
 	

@@ -13,6 +13,9 @@ RUNTIME_LINKAGE :: "strong" when (
 	!IS_WASM) else "internal"
 RUNTIME_REQUIRE :: !ODIN_TILDE
 
+@(private)
+__float16 :: f16 when __ODIN_LLVM_F16_SUPPORTED else u16
+
 
 @(private)
 byte_slice :: #force_inline proc "contextless" (data: rawptr, len: int) -> []byte #no_bounds_check {
@@ -184,7 +187,7 @@ mem_free_all :: #force_inline proc(allocator := context.allocator, loc := #calle
 	return
 }
 
-mem_resize :: proc(ptr: rawptr, old_size, new_size: int, alignment: int = DEFAULT_ALIGNMENT, allocator := context.allocator, loc := #caller_location) -> (data: []byte, err: Allocator_Error) {
+_mem_resize :: #force_inline proc(ptr: rawptr, old_size, new_size: int, alignment: int = DEFAULT_ALIGNMENT, allocator := context.allocator, should_zero: bool, loc := #caller_location) -> (data: []byte, err: Allocator_Error) {
 	if allocator.procedure == nil {
 		return nil, nil
 	}
@@ -195,15 +198,27 @@ mem_resize :: proc(ptr: rawptr, old_size, new_size: int, alignment: int = DEFAUL
 		}
 		return
 	} else if ptr == nil {
-		return allocator.procedure(allocator.data, .Alloc, new_size, alignment, nil, 0, loc)
+		if should_zero {
+			return allocator.procedure(allocator.data, .Alloc, new_size, alignment, nil, 0, loc)
+		} else {
+			return allocator.procedure(allocator.data, .Alloc_Non_Zeroed, new_size, alignment, nil, 0, loc)
+		}
 	} else if old_size == new_size && uintptr(ptr) % uintptr(alignment) == 0 {
 		data = ([^]byte)(ptr)[:old_size]
 		return
 	}
 
-	data, err = allocator.procedure(allocator.data, .Resize, new_size, alignment, ptr, old_size, loc)
+	if should_zero {
+		data, err = allocator.procedure(allocator.data, .Resize, new_size, alignment, ptr, old_size, loc)
+	} else {
+		data, err = allocator.procedure(allocator.data, .Resize_Non_Zeroed, new_size, alignment, ptr, old_size, loc)
+	}
 	if err == .Mode_Not_Implemented {
-		data, err = allocator.procedure(allocator.data, .Alloc, new_size, alignment, nil, 0, loc)
+		if should_zero {
+			data, err = allocator.procedure(allocator.data, .Alloc, new_size, alignment, nil, 0, loc)
+		} else {
+			data, err = allocator.procedure(allocator.data, .Alloc_Non_Zeroed, new_size, alignment, nil, 0, loc)
+		}
 		if err != nil {
 			return
 		}
@@ -211,6 +226,13 @@ mem_resize :: proc(ptr: rawptr, old_size, new_size: int, alignment: int = DEFAUL
 		_, err = allocator.procedure(allocator.data, .Free, 0, 0, ptr, old_size, loc)
 	}
 	return
+}
+
+mem_resize :: proc(ptr: rawptr, old_size, new_size: int, alignment: int = DEFAULT_ALIGNMENT, allocator := context.allocator, loc := #caller_location) -> (data: []byte, err: Allocator_Error) {
+	return _mem_resize(ptr, old_size, new_size, alignment, allocator, true, loc)
+}
+non_zero_mem_resize :: proc(ptr: rawptr, old_size, new_size: int, alignment: int = DEFAULT_ALIGNMENT, allocator := context.allocator, loc := #caller_location) -> (data: []byte, err: Allocator_Error) {
+	return _mem_resize(ptr, old_size, new_size, alignment, allocator, false, loc)
 }
 
 memory_equal :: proc "contextless" (x, y: rawptr, n: int) -> bool {
@@ -408,6 +430,48 @@ cstring_to_string :: proc "contextless" (s: cstring) -> string {
 	n := cstring_len(s)
 	return transmute(string)Raw_String{ptr, n}
 }
+
+
+cstring_eq :: proc "contextless" (lhs, rhs: cstring) -> bool {
+	x := ([^]byte)(lhs)
+	y := ([^]byte)(rhs)
+	if x == y {
+		return true
+	}
+	if (x == nil) ~ (y == nil) {
+		return false
+	}
+	xn := cstring_len(lhs)
+	yn := cstring_len(rhs)
+	if xn != yn {
+		return false
+	}
+	return #force_inline memory_equal(x, y, xn)
+}
+
+cstring_cmp :: proc "contextless" (lhs, rhs: cstring) -> int {
+	x := ([^]byte)(lhs)
+	y := ([^]byte)(rhs)
+	if x == y {
+		return 0
+	}
+	if (x == nil) ~ (y == nil) {
+		return -1 if x == nil else +1
+	}
+	xn := cstring_len(lhs)
+	yn := cstring_len(rhs)
+	ret := memory_compare(x, y, min(xn, yn))
+	if ret == 0 && xn != yn {
+		return -1 if xn < yn else +1
+	}
+	return ret
+}
+
+cstring_ne :: #force_inline proc "contextless" (a, b: cstring) -> bool { return !cstring_eq(a, b) }
+cstring_lt :: #force_inline proc "contextless" (a, b: cstring) -> bool { return cstring_cmp(a, b) < 0 }
+cstring_gt :: #force_inline proc "contextless" (a, b: cstring) -> bool { return cstring_cmp(a, b) > 0 }
+cstring_le :: #force_inline proc "contextless" (a, b: cstring) -> bool { return cstring_cmp(a, b) <= 0 }
+cstring_ge :: #force_inline proc "contextless" (a, b: cstring) -> bool { return cstring_cmp(a, b) >= 0 }
 
 
 complex32_eq :: #force_inline proc "contextless"  (a, b: complex32)  -> bool { return real(a) == real(b) && imag(a) == imag(b) }
@@ -685,7 +749,7 @@ mul_quaternion64 :: proc "contextless" (q, r: quaternion64) -> quaternion64 {
 	t2 := r0*q2 + r1*q3 + r2*q0 - r3*q1
 	t3 := r0*q3 - r1*q2 + r2*q1 + r3*q0
 
-	return quaternion(t0, t1, t2, t3)
+	return quaternion(w=t0, x=t1, y=t2, z=t3)
 }
 
 mul_quaternion128 :: proc "contextless" (q, r: quaternion128) -> quaternion128 {
@@ -697,7 +761,7 @@ mul_quaternion128 :: proc "contextless" (q, r: quaternion128) -> quaternion128 {
 	t2 := r0*q2 + r1*q3 + r2*q0 - r3*q1
 	t3 := r0*q3 - r1*q2 + r2*q1 + r3*q0
 
-	return quaternion(t0, t1, t2, t3)
+	return quaternion(w=t0, x=t1, y=t2, z=t3)
 }
 
 mul_quaternion256 :: proc "contextless" (q, r: quaternion256) -> quaternion256 {
@@ -709,7 +773,7 @@ mul_quaternion256 :: proc "contextless" (q, r: quaternion256) -> quaternion256 {
 	t2 := r0*q2 + r1*q3 + r2*q0 - r3*q1
 	t3 := r0*q3 - r1*q2 + r2*q1 + r3*q0
 
-	return quaternion(t0, t1, t2, t3)
+	return quaternion(w=t0, x=t1, y=t2, z=t3)
 }
 
 quo_quaternion64 :: proc "contextless" (q, r: quaternion64) -> quaternion64 {
@@ -723,7 +787,7 @@ quo_quaternion64 :: proc "contextless" (q, r: quaternion64) -> quaternion64 {
 	t2 := (r0*q2 - r1*q3 - r2*q0 + r3*q1) * invmag2
 	t3 := (r0*q3 + r1*q2 + r2*q1 - r3*q0) * invmag2
 
-	return quaternion(t0, t1, t2, t3)
+	return quaternion(w=t0, x=t1, y=t2, z=t3)
 }
 
 quo_quaternion128 :: proc "contextless" (q, r: quaternion128) -> quaternion128 {
@@ -737,7 +801,7 @@ quo_quaternion128 :: proc "contextless" (q, r: quaternion128) -> quaternion128 {
 	t2 := (r0*q2 - r1*q3 - r2*q0 + r3*q1) * invmag2
 	t3 := (r0*q3 + r1*q2 + r2*q1 - r3*q0) * invmag2
 
-	return quaternion(t0, t1, t2, t3)
+	return quaternion(w=t0, x=t1, y=t2, z=t3)
 }
 
 quo_quaternion256 :: proc "contextless" (q, r: quaternion256) -> quaternion256 {
@@ -751,11 +815,11 @@ quo_quaternion256 :: proc "contextless" (q, r: quaternion256) -> quaternion256 {
 	t2 := (r0*q2 - r1*q3 - r2*q0 + r3*q1) * invmag2
 	t3 := (r0*q3 + r1*q2 + r2*q1 - r3*q0) * invmag2
 
-	return quaternion(t0, t1, t2, t3)
+	return quaternion(w=t0, x=t1, y=t2, z=t3)
 }
 
 @(link_name="__truncsfhf2", linkage=RUNTIME_LINKAGE, require=RUNTIME_REQUIRE)
-truncsfhf2 :: proc "c" (value: f32) -> u16 {
+truncsfhf2 :: proc "c" (value: f32) -> __float16 {
 	v: struct #raw_union { i: u32, f: f32 }
 	i, s, e, m: i32
 
@@ -769,7 +833,7 @@ truncsfhf2 :: proc "c" (value: f32) -> u16 {
 
 	if e <= 0 {
 		if e < -10 {
-			return u16(s)
+			return transmute(__float16)u16(s)
 		}
 		m = (m | 0x00800000) >> u32(1 - e)
 
@@ -777,14 +841,14 @@ truncsfhf2 :: proc "c" (value: f32) -> u16 {
 			m += 0x00002000
 		}
 
-		return u16(s | (m >> 13))
+		return transmute(__float16)u16(s | (m >> 13))
 	} else if e == 0xff - (127 - 15) {
 		if m == 0 {
-			return u16(s | 0x7c00) /* NOTE(bill): infinity */
+			return transmute(__float16)u16(s | 0x7c00) /* NOTE(bill): infinity */
 		} else {
 			/* NOTE(bill): NAN */
 			m >>= 13
-			return u16(s | 0x7c00 | m | i32(m == 0))
+			return transmute(__float16)u16(s | 0x7c00 | m | i32(m == 0))
 		}
 	} else {
 		if m & 0x00001000 != 0 {
@@ -804,23 +868,24 @@ truncsfhf2 :: proc "c" (value: f32) -> u16 {
 				intrinsics.volatile_store(&f, g)
 			}
 
-			return u16(s | 0x7c00)
+			return transmute(__float16)u16(s | 0x7c00)
 		}
 
-		return u16(s | (e << 10) | (m >> 13))
+		return transmute(__float16)u16(s | (e << 10) | (m >> 13))
 	}
 }
 
 
 @(link_name="__truncdfhf2", linkage=RUNTIME_LINKAGE, require=RUNTIME_REQUIRE)
-truncdfhf2 :: proc "c" (value: f64) -> u16 {
+truncdfhf2 :: proc "c" (value: f64) -> __float16 {
 	return truncsfhf2(f32(value))
 }
 
 @(link_name="__gnu_h2f_ieee", linkage=RUNTIME_LINKAGE, require=RUNTIME_REQUIRE)
-gnu_h2f_ieee :: proc "c" (value: u16) -> f32 {
+gnu_h2f_ieee :: proc "c" (value_: __float16) -> f32 {
 	fp32 :: struct #raw_union { u: u32, f: f32 }
 
+	value := transmute(u16)value_
 	v: fp32
 	magic, inf_or_nan: fp32
 	magic.u = u32((254 - 15) << 23)
@@ -837,12 +902,12 @@ gnu_h2f_ieee :: proc "c" (value: u16) -> f32 {
 
 
 @(link_name="__gnu_f2h_ieee", linkage=RUNTIME_LINKAGE, require=RUNTIME_REQUIRE)
-gnu_f2h_ieee :: proc "c" (value: f32) -> u16 {
+gnu_f2h_ieee :: proc "c" (value: f32) -> __float16 {
 	return truncsfhf2(value)
 }
 
 @(link_name="__extendhfsf2", linkage=RUNTIME_LINKAGE, require=RUNTIME_REQUIRE)
-extendhfsf2 :: proc "c" (value: u16) -> f32 {
+extendhfsf2 :: proc "c" (value: __float16) -> f32 {
 	return gnu_h2f_ieee(value)
 }
 

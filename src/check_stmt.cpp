@@ -102,7 +102,12 @@ gb_internal void check_stmt_list(CheckerContext *ctx, Slice<Ast *> const &stmts,
 			new_flags |= Stmt_FallthroughAllowed;
 		}
 
+		u32 prev_stmt_flags = ctx->stmt_flags;
+		ctx->stmt_flags = new_flags;
+
 		check_stmt(ctx, n, new_flags);
+
+		ctx->stmt_flags = prev_stmt_flags;
 
 		if (i+1 < max_non_constant_declaration) {
 			switch (n->kind) {
@@ -1080,8 +1085,7 @@ gb_internal void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags
 		}
 
 		if (unhandled.count > 0) {
-			begin_error_block();
-			defer (end_error_block());
+			ERROR_BLOCK();
 
 			if (unhandled.count == 1) {
 				error_no_newline(node, "Unhandled switch case: %.*s", LIT(unhandled[0]->token.string));
@@ -1808,7 +1812,7 @@ gb_internal void check_value_decl_stmt(CheckerContext *ctx, Ast *node, u32 mod_f
 	}
 
 	if (new_name_count == 0) {
-		begin_error_block();
+		ERROR_BLOCK();
 		error(node, "No new declarations on the left hand side");
 		bool all_underscore = true;
 		for (Ast *name : vd->names) {
@@ -1826,7 +1830,6 @@ gb_internal void check_value_decl_stmt(CheckerContext *ctx, Ast *node, u32 mod_f
 			error_line("\tSuggestion: Try changing the declaration (:=) to an assignment (=)\n");
 		}
 
-		end_error_block();
 	}
 
 	Type *init_type = nullptr;
@@ -1893,7 +1896,7 @@ gb_internal void check_value_decl_stmt(CheckerContext *ctx, Ast *node, u32 mod_f
 		}
 
 		if (is_arch_wasm() && e->Variable.thread_local_model.len != 0) {
-			error(e->token, "@(thread_local) is not supported for this target platform");
+			// error(e->token, "@(thread_local) is not supported for this target platform");
 		}
 
 
@@ -2286,6 +2289,23 @@ gb_internal void check_return_stmt(CheckerContext *ctx, Ast *node) {
 			}
 		}
 	}
+
+	for (Operand &o : operands) {
+		if (o.expr == nullptr) {
+			continue;
+		}
+		if (o.expr->kind != Ast_CompoundLit || !is_type_slice(o.type)) {
+			continue;
+		}
+		ast_node(cl, CompoundLit, o.expr);
+		if (cl->elems.count == 0) {
+			continue;
+		}
+		gbString s = type_to_string(o.type);
+		error(o.expr, "It is unsafe to return a compound literal of a slice ('%s') with elements from a procedure, as the contents of the slice uses the current stack frame's memory", s);
+		gb_string_free(s);
+	}
+
 }
 
 gb_internal void check_for_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {

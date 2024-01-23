@@ -775,10 +775,9 @@ gsub_with :: proc(
 	haystack := haystack
 
 	for {
-		length, err := find_aux(haystack, pattern, 0, false, &captures)
-
+		length := find_aux(haystack, pattern, 0, false, &captures) or_break
 		// done
-		if length == 0 || err != .OK {
+		if length == 0 {
 			break
 		}
 

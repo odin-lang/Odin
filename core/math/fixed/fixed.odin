@@ -33,7 +33,9 @@ init_from_f64 :: proc(x: ^$T/Fixed($Backing, $Fraction_Width), val: f64) {
 	x.i  = Backing(f * (1<<Fraction_Width))
 	x.i &= 1<<Fraction_Width - 1
 	x.i |= Backing(i) << Fraction_Width
-	if val < 0 do x.i *= -1
+	if val < 0 {
+		x.i *= -1
+	}
 }
 
 init_from_parts :: proc(x: ^$T/Fixed($Backing, $Fraction_Width), integer, fraction: Backing) {
@@ -86,17 +88,19 @@ div_sat :: proc(x, y: $T/Fixed($Backing, $Fraction_Width)) -> (z: T) {
 
 @(require_results)
 floor :: proc(x: $T/Fixed($Backing, $Fraction_Width)) -> Backing {
-	return x.i >> Fraction_Width
+	if x.i >= 0 {
+		return x.i >> Fraction_Width
+	} else {
+		return (x.i - (1 << (Fraction_Width - 1)) + (1 << (Fraction_Width - 2))) >> Fraction_Width
+	}
 }
 @(require_results)
 ceil :: proc(x: $T/Fixed($Backing, $Fraction_Width)) -> Backing {
-	Integer :: 8*size_of(Backing) - Fraction_Width
-	return (x.i + (1 << Integer-1)) >> Fraction_Width
+	return (x.i + (1 << Fraction_Width - 1)) >> Fraction_Width
 }
 @(require_results)
 round :: proc(x: $T/Fixed($Backing, $Fraction_Width)) -> Backing {
-	Integer :: 8*size_of(Backing) - Fraction_Width
-	return (x.i + (1 << (Integer - 1))) >> Fraction_Width
+	return (x.i + (1 << (Fraction_Width - 1))) >> Fraction_Width
 }
 
 

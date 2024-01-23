@@ -56,6 +56,19 @@ enum TargetABIKind : u16 {
 	TargetABI_COUNT,
 };
 
+enum Windows_Subsystem : u8 {
+ 	Windows_Subsystem_BOOT_APPLICATION,
+	Windows_Subsystem_CONSOLE,                 // Default,
+	Windows_Subsystem_EFI_APPLICATION,
+	Windows_Subsystem_EFI_BOOT_SERVICE_DRIVER,
+	Windows_Subsystem_EFI_ROM,
+	Windows_Subsystem_EFI_RUNTIME_DRIVER,
+	Windows_Subsystem_NATIVE,
+	Windows_Subsystem_POSIX,
+	Windows_Subsystem_WINDOWS,
+	Windows_Subsystem_WINDOWSCE,
+	Windows_Subsystem_COUNT,
+};
 
 gb_global String target_os_names[TargetOs_COUNT] = {
 	str_lit(""),
@@ -82,6 +95,23 @@ gb_global String target_arch_names[TargetArch_COUNT] = {
 	str_lit("wasm64p32"),
 };
 
+gb_global String target_microarch_list[TargetArch_COUNT] = {
+	// TargetArch_Invalid,
+	str_lit("Invalid!"),
+	// TargetArch_amd64,
+	str_lit("alderlake,amdfam10,athlon-fx,athlon64,athlon64-sse3,atom_sse4_2,atom_sse4_2_movbe,barcelona,bdver1,bdver2,bdver3,bdver4,broadwell,btver1,btver2,cannonlake,cascadelake,cooperlake,core-avx-i,core-avx2,core2,core_2_duo_sse4_1,core_2_duo_ssse3,core_2nd_gen_avx,core_3rd_gen_avx,core_4th_gen_avx,core_4th_gen_avx_tsx,core_5th_gen_avx,core_5th_gen_avx_tsx,core_aes_pclmulqdq,core_i7_sse4_2,corei7,corei7-avx,generic,goldmont,goldmont-plus,goldmont_plus,grandridge,graniterapids,graniterapids-d,graniterapids_d,haswell,icelake-client,icelake-server,icelake_client,icelake_server,ivybridge,k8,k8-sse3,knl,knm,meteorlake,mic_avx512,native,nehalem,nocona,opteron,opteron-sse3,penryn,raptorlake,rocketlake,sandybridge,sapphirerapids,sierraforest,silvermont,skx,skylake,skylake-avx512,skylake_avx512,slm,tigerlake,tremont,westmere,x86-64,x86-64-v2,x86-64-v3,x86-64-v4,znver1,znver2,znver3,znver4"),
+	// TargetArch_i386,
+	str_lit("athlon,athlon-4,athlon-mp,athlon-tbird,athlon-xp,atom,bonnell,c3,c3-2,generic,geode,i386,i486,i586,i686,k6,k6-2,k6-3,lakemont,native,pentium,pentium-m,pentium-mmx,pentium2,pentium3,pentium3m,pentium4,pentium4m,pentium_4,pentium_4_sse3,pentium_ii,pentium_iii,pentium_iii_no_xmm_regs,pentium_m,pentium_mmx,pentium_pro,pentiumpro,prescott,winchip-c6,winchip2,yonah"),
+	// TargetArch_arm32,
+	str_lit("arm1020e,arm1020t,arm1022e,arm10e,arm10tdmi,arm1136j-s,arm1136jf-s,arm1156t2-s,arm1156t2f-s,arm1176jz-s,arm1176jzf-s,arm710t,arm720t,arm7tdmi,arm7tdmi-s,arm8,arm810,arm9,arm920,arm920t,arm922t,arm926ej-s,arm940t,arm946e-s,arm966e-s,arm968e-s,arm9e,arm9tdmi,cortex-a12,cortex-a15,cortex-a17,cortex-a32,cortex-a35,cortex-a5,cortex-a53,cortex-a55,cortex-a57,cortex-a7,cortex-a710,cortex-a72,cortex-a73,cortex-a75,cortex-a76,cortex-a76ae,cortex-a77,cortex-a78,cortex-a78c,cortex-a8,cortex-a9,cortex-m0,cortex-m0plus,cortex-m1,cortex-m23,cortex-m3,cortex-m33,cortex-m35p,cortex-m4,cortex-m55,cortex-m7,cortex-m85,cortex-r4,cortex-r4f,cortex-r5,cortex-r52,cortex-r7,cortex-r8,cortex-x1,cortex-x1c,cyclone,ep9312,exynos-m3,exynos-m4,exynos-m5,generic,iwmmxt,krait,kryo,mpcore,mpcorenovfp,native,neoverse-n1,neoverse-n2,neoverse-v1,sc000,sc300,strongarm,strongarm110,strongarm1100,strongarm1110,swift,xscale"),
+	// TargetArch_arm64,
+	str_lit("a64fx,ampere1,ampere1a,apple-a10,apple-a11,apple-a12,apple-a13,apple-a14,apple-a15,apple-a16,apple-a7,apple-a8,apple-a9,apple-latest,apple-m1,apple-m2,apple-s4,apple-s5,carmel,cortex-a34,cortex-a35,cortex-a510,cortex-a53,cortex-a55,cortex-a57,cortex-a65,cortex-a65ae,cortex-a710,cortex-a715,cortex-a72,cortex-a73,cortex-a75,cortex-a76,cortex-a76ae,cortex-a77,cortex-a78,cortex-a78c,cortex-r82,cortex-x1,cortex-x1c,cortex-x2,cortex-x3,cyclone,exynos-m3,exynos-m4,exynos-m5,falkor,generic,kryo,native,neoverse-512tvb,neoverse-e1,neoverse-n1,neoverse-n2,neoverse-v1,neoverse-v2,saphira,thunderx,thunderx2t99,thunderx3t110,thunderxt81,thunderxt83,thunderxt88,tsv110"),
+	// TargetArch_wasm32,
+	str_lit("generic"),
+	// TargetArch_wasm64p32,
+	str_lit("generic"),
+};
+
 gb_global String target_endian_names[TargetEndian_COUNT] = {
 	str_lit("little"),
 	str_lit("big"),
@@ -103,13 +133,24 @@ gb_global TargetEndianKind target_endians[TargetArch_COUNT] = {
 	TargetEndian_Little,
 };
 
+gb_global String windows_subsystem_names[Windows_Subsystem_COUNT] = {
+	str_lit("BOOT_APPLICATION"),
+	str_lit("CONSOLE"),                 // Default
+	str_lit("EFI_APPLICATION"),
+	str_lit("EFI_BOOT_SERVICE_DRIVER"),
+	str_lit("EFI_ROM"),
+	str_lit("EFI_RUNTIME_DRIVER"),
+	str_lit("NATIVE"),
+	str_lit("POSIX"),
+	str_lit("WINDOWS"),
+	str_lit("WINDOWSCE"),
+};
+
 #ifndef ODIN_VERSION_RAW
 #define ODIN_VERSION_RAW "dev-unknown-unknown"
 #endif
 
 gb_global String const ODIN_VERSION = str_lit(ODIN_VERSION_RAW);
-
-
 
 struct TargetMetrics {
 	TargetOsKind   os;
@@ -237,9 +278,7 @@ enum VetFlags : u64 {
 	VetFlag_Style      = 1u<<4, // 16
 	VetFlag_Semicolon  = 1u<<5, // 32
 
-	VetFlag_Extra     = 1u<<16,
-
-	VetFlag_All = VetFlag_Unused|VetFlag_Shadowing|VetFlag_UsingStmt, // excluding extra
+	VetFlag_All = VetFlag_Unused|VetFlag_Shadowing|VetFlag_UsingStmt,
 
 	VetFlag_Using = VetFlag_UsingStmt|VetFlag_UsingParam,
 };
@@ -257,25 +296,32 @@ u64 get_vet_flag_from_name(String const &name) {
 		return VetFlag_Style;
 	} else if (name == "semicolon") {
 		return VetFlag_Semicolon;
-	} else if (name == "extra") {
-		return VetFlag_Extra;
 	}
 	return VetFlag_NONE;
 }
+
+
+enum SanitizerFlags : u32 {
+	SanitizerFlag_NONE = 0,
+	SanitizerFlag_Address = 1u<<0,
+	SanitizerFlag_Memory  = 1u<<1,
+	SanitizerFlag_Thread  = 1u<<2,
+};
 
 
 
 // This stores the information for the specify architecture of this build
 struct BuildContext {
 	// Constants
-	String ODIN_OS;      // target operating system
-	String ODIN_ARCH;    // target architecture
-	String ODIN_VENDOR;  // compiler vendor
-	String ODIN_VERSION; // compiler version
-	String ODIN_ROOT;    // Odin ROOT
-	String ODIN_BUILD_PROJECT_NAME; // Odin main/initial package's directory name
-	bool   ODIN_DEBUG;   // Odin in debug mode
-	bool   ODIN_DISABLE_ASSERT; // Whether the default 'assert' et al is disabled in code or not
+	String ODIN_OS;                       // Target operating system
+	String ODIN_ARCH;                     // Target architecture
+	String ODIN_VENDOR;                   // Compiler vendor
+	String ODIN_VERSION;                  // Compiler version
+	String ODIN_ROOT;                     // Odin ROOT
+	String ODIN_BUILD_PROJECT_NAME;       // Odin main/initial package's directory name
+	String ODIN_WINDOWS_SUBSYSTEM;        // Empty string for non-Windows targets
+	bool   ODIN_DEBUG;                    // Odin in debug mode
+	bool   ODIN_DISABLE_ASSERT;           // Whether the default 'assert' et al is disabled in code or not
 	bool   ODIN_DEFAULT_TO_NIL_ALLOCATOR; // Whether the default allocator is a "nil" allocator or not (i.e. it does nothing)
 	bool   ODIN_FOREIGN_ERROR_PROCEDURES;
 	bool   ODIN_VALGRIND_SUPPORT;
@@ -305,6 +351,7 @@ struct BuildContext {
 	String pdb_filepath;
 
 	u64 vet_flags;
+	u32 sanitizer_flags;
 
 	bool   has_resource;
 	String link_flags;
@@ -341,12 +388,12 @@ struct BuildContext {
 	bool   ignore_warnings;
 	bool   warnings_as_errors;
 	bool   hide_error_line;
+	bool   terse_errors;
 	bool   has_ansi_terminal_colours;
 
 	bool   ignore_lazy;
 	bool   ignore_llvm_build;
 
-	bool   use_subsystem_windows;
 	bool   ignore_microsoft_magic;
 	bool   linker_map_file;
 
@@ -360,6 +407,8 @@ struct BuildContext {
 	bool   no_rtti;
 
 	bool   dynamic_map_calls;
+
+	bool obfuscate_source_code_locations;
 
 	RelocMode reloc_mode;
 	bool   disable_red_zone;
@@ -559,7 +608,13 @@ gb_global TargetMetrics target_freestanding_amd64_sysv = {
 	TargetABI_SysV,
 };
 
-
+gb_global TargetMetrics target_freestanding_arm64 = {
+	TargetOs_freestanding,
+	TargetArch_arm64,
+	8, 8, 8, 16,
+	str_lit("aarch64-none-elf"),
+	str_lit("e-m:o-p:32:32-Fi8-i64:64-v128:64:128-a:0:32-n32-S64"),
+};
 
 struct NamedTargetMetrics {
 	String name;
@@ -594,6 +649,7 @@ gb_global NamedTargetMetrics named_targets[] = {
 	{ str_lit("wasi_wasm64p32"),         &target_wasi_wasm64p32 },
 
 	{ str_lit("freestanding_amd64_sysv"), &target_freestanding_amd64_sysv },
+	{ str_lit("freestanding_arm64"), &target_freestanding_arm64 },
 };
 
 gb_global NamedTargetMetrics *selected_target_metrics;
@@ -617,7 +673,6 @@ gb_internal TargetArchKind get_target_arch_from_string(String str) {
 	}
 	return TargetArch_Invalid;
 }
-
 
 gb_internal bool is_excluded_target_filename(String name) {
 	String original_name = name;
@@ -1253,8 +1308,6 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 		GB_ASSERT(metrics->int_size == 2*metrics->ptr_size);
 	}
 
-
-
 	bc->metrics = *metrics;
 	switch (subtarget) {
 	case Subtarget_Default:
@@ -1271,14 +1324,14 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 		break;
 	}
 
-	bc->ODIN_OS        = target_os_names[metrics->os];
-	bc->ODIN_ARCH      = target_arch_names[metrics->arch];
-	bc->endian_kind    = target_endians[metrics->arch];
-	bc->ptr_size       = metrics->ptr_size;
-	bc->int_size       = metrics->int_size;
-	bc->max_align      = metrics->max_align;
-	bc->max_simd_align = metrics->max_simd_align;
-	bc->link_flags  = str_lit(" ");
+	bc->ODIN_OS           = target_os_names[metrics->os];
+	bc->ODIN_ARCH         = target_arch_names[metrics->arch];
+	bc->endian_kind       = target_endians[metrics->arch];
+	bc->ptr_size          = metrics->ptr_size;
+	bc->int_size          = metrics->int_size;
+	bc->max_align         = metrics->max_align;
+	bc->max_simd_align    = metrics->max_simd_align;
+	bc->link_flags        = str_lit(" ");
 
 	#if defined(DEFAULT_TO_THREADED_CHECKER)
 	bc->threaded_checker = true;
@@ -1298,6 +1351,11 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 			gb_printf_err("-no-rtti is only allowed on freestanding targets\n");
 			gb_exit(1);
 		}
+	}
+
+	// Default to subsystem:CONSOLE on Windows targets
+	if (bc->ODIN_WINDOWS_SUBSYSTEM == "" && bc->metrics.os == TargetOs_windows) {
+		bc->ODIN_WINDOWS_SUBSYSTEM = windows_subsystem_names[Windows_Subsystem_CONSOLE];
 	}
 
 	// NOTE(zangent): The linker flags to set the build architecture are different
@@ -1381,10 +1439,12 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 		bc->optimization_level = -1; // -o:none
 	}
 
-	bc->optimization_level = gb_clamp(bc->optimization_level, -1, 2);
+	bc->optimization_level = gb_clamp(bc->optimization_level, -1, 3);
 
-	// ENFORCE DYNAMIC MAP CALLS
-	bc->dynamic_map_calls = true;
+	if (bc->metrics.os != TargetOs_windows) {
+		// ENFORCE DYNAMIC MAP CALLS
+		bc->dynamic_map_calls = true;
+	}
 
 	bc->ODIN_VALGRIND_SUPPORT = false;
 	if (build_context.metrics.os != TargetOs_windows) {
@@ -1469,7 +1529,7 @@ gb_internal void enable_target_feature(TokenPos pos, String const &target_featur
 }
 
 
-gb_internal char const *target_features_set_to_cstring(gbAllocator allocator, bool with_quotes) {
+gb_internal char const *target_features_set_to_cstring(gbAllocator allocator, bool with_quotes, bool with_plus) {
 	isize len = 0;
 	isize i = 0;
 	for (String const &feature : build_context.target_features_set) {
@@ -1478,6 +1538,7 @@ gb_internal char const *target_features_set_to_cstring(gbAllocator allocator, bo
 		}
 		len += feature.len;
 		if (with_quotes) len += 2;
+		if (with_plus) len += 1;
 		i += 1;
 	}
 	char *features = gb_alloc_array(allocator, char, len+1);
@@ -1489,6 +1550,7 @@ gb_internal char const *target_features_set_to_cstring(gbAllocator allocator, bo
 		}
 
 		if (with_quotes) features[len++] = '"';
+		if (with_plus) features[len++] = '+';
 		gb_memmove(features + len, feature.text, feature.len);
 		len += feature.len;
 		if (with_quotes) features[len++] = '"';
@@ -1736,6 +1798,42 @@ gb_internal bool init_build_paths(String init_filename) {
 		defer (gb_free(ha, output_file.text));
 		gb_printf_err("No write permissions for output path: %.*s\n", LIT(output_file));
 		return false;
+	}
+
+	if (build_context.sanitizer_flags & SanitizerFlag_Address) {
+		switch (build_context.metrics.os) {
+		case TargetOs_windows:
+		case TargetOs_linux:
+		case TargetOs_darwin:
+			break;
+		default:
+			gb_printf_err("-sanitize:address is only supported on windows, linux, and darwin\n");
+			return false;
+		}
+	}
+
+	if (build_context.sanitizer_flags & SanitizerFlag_Memory) {
+		switch (build_context.metrics.os) {
+		case TargetOs_linux:
+			break;
+		default:
+			gb_printf_err("-sanitize:memory is only supported on linux\n");
+			return false;
+		}
+		if (build_context.metrics.os != TargetOs_linux) {
+			return false;
+		}
+	}
+
+	if (build_context.sanitizer_flags & SanitizerFlag_Thread) {
+		switch (build_context.metrics.os) {
+		case TargetOs_linux:
+		case TargetOs_darwin:
+			break;
+		default:
+			gb_printf_err("-sanitize:thread is only supported on linux and darwin\n");
+			return false;
+		}
 	}
 
 

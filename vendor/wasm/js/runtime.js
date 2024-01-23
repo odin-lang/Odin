@@ -9,6 +9,10 @@ function getElement(name) {
 	return undefined;
 }
 
+function stripNewline(str) {
+    return str.replace(/\n/, ' ')
+}
+
 class WasmMemoryInterface {
 	constructor() {
 		this.memory = null;
@@ -47,8 +51,8 @@ class WasmMemoryInterface {
 	}
 
 
-	loadU8(addr) { return this.mem.getUint8  (addr, true); }
-	loadI8(addr) { return this.mem.getInt8   (addr, true); }
+	loadU8(addr)  { return this.mem.getUint8  (addr); }
+	loadI8(addr)  { return this.mem.getInt8   (addr); }
 	loadU16(addr) { return this.mem.getUint16 (addr, true); }
 	loadI16(addr) { return this.mem.getInt16  (addr, true); }
 	loadU32(addr) { return this.mem.getUint32 (addr, true); }
@@ -59,9 +63,8 @@ class WasmMemoryInterface {
 		return lo + hi*4294967296;
 	};
 	loadI64(addr) {
-		// TODO(bill): loadI64 correctly
 		const lo = this.mem.getUint32(addr + 0, true);
-		const hi = this.mem.getUint32(addr + 4, true);
+		const hi = this.mem.getInt32 (addr + 4, true);
 		return lo + hi*4294967296;
 	};
 	loadF32(addr)  { return this.mem.getFloat32(addr, true); }
@@ -77,11 +80,11 @@ class WasmMemoryInterface {
 
 	loadString(ptr, len) {
 		const bytes = this.loadBytes(ptr, len);
-		return new TextDecoder("utf-8").decode(bytes);
+		return new TextDecoder().decode(bytes);
 	}
 
-	storeU8(addr, value)  { this.mem.setUint8  (addr, value, true); }
-	storeI8(addr, value)  { this.mem.setInt8   (addr, value, true); }
+	storeU8(addr, value)  { this.mem.setUint8  (addr, value); }
+	storeI8(addr, value)  { this.mem.setInt8   (addr, value); }
 	storeU16(addr, value) { this.mem.setUint16 (addr, value, true); }
 	storeI16(addr, value) { this.mem.setInt16  (addr, value, true); }
 	storeU32(addr, value) { this.mem.setUint32 (addr, value, true); }
@@ -91,9 +94,8 @@ class WasmMemoryInterface {
 		this.mem.setUint32(addr + 4, Math.floor(value / 4294967296), true);
 	}
 	storeI64(addr, value) {
-		// TODO(bill): storeI64 correctly
 		this.mem.setUint32(addr + 0, value, true);
-		this.mem.setUint32(addr + 4, Math.floor(value / 4294967296), true);
+		this.mem.setInt32 (addr + 4, Math.floor(value / 4294967296), true);
 	}
 	storeF32(addr, value)  { this.mem.setFloat32(addr, value, true); }
 	storeF64(addr, value)  { this.mem.setFloat64(addr, value, true); }
@@ -102,7 +104,7 @@ class WasmMemoryInterface {
 
 	storeString(addr, value) {
 		const bytes = this.loadBytes(addr, value.length);
-		new TextEncoder("utf-8").encodeInto(value, bytes);
+		new TextEncoder().encodeInto(value, bytes);
 	}
 };
 
@@ -558,7 +560,9 @@ class WebGLInterface {
 			},
 
 
-
+			GetParameter: (pname) => {
+				return this.ctx.getParameter(pname);
+			},
 			GetProgramParameter: (program, pname) => {
 				return this.ctx.getProgramParameter(this.programs[program], pname)
 			},
@@ -570,7 +574,7 @@ class WebGLInterface {
 				if (buf_len > 0 && buf_ptr) {
 					let n = Math.min(buf_len, log.length);
 					log = log.substring(0, n);
-					this.mem.loadBytes(buf_ptr, buf_len).set(new TextEncoder("utf-8").encode(log))
+					this.mem.loadBytes(buf_ptr, buf_len).set(new TextEncoder().encode(log))
 
 					this.mem.storeInt(length_ptr, n);
 				}
@@ -583,7 +587,7 @@ class WebGLInterface {
 				if (buf_len > 0 && buf_ptr) {
 					let n = Math.min(buf_len, log.length);
 					log = log.substring(0, n);
-					this.mem.loadBytes(buf_ptr, buf_len).set(new TextEncoder("utf-8").encode(log))
+					this.mem.loadBytes(buf_ptr, buf_len).set(new TextEncoder().encode(log))
 
 					this.mem.storeInt(length_ptr, n);
 				}
@@ -1149,7 +1153,7 @@ class WebGLInterface {
 
 				let n = Math.min(buf_len, name.length);
 				name = name.substring(0, n);
-				this.mem.loadBytes(buf_ptr, buf_len).set(new TextEncoder("utf-8").encode(name))
+				this.mem.loadBytes(buf_ptr, buf_len).set(new TextEncoder().encode(name))
 				this.mem.storeInt(length_ptr, n);
 			},
 			UniformBlockBinding: (program, uniformBlockIndex, uniformBlockBinding) => {
@@ -1328,28 +1332,28 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 			abort: () => { Module.abort() },
 			evaluate: (str_ptr, str_len) => { eval.call(null, wasmMemoryInterface.loadString(str_ptr, str_len)); },
 
-			time_now: () => {
-				// convert ms to ns
-				return Date.now() * 1e6;
-			},
-			tick_now: () => {
-				// convert ms to ns
-				return performance.now() * 1e6;
-			},
+			// return a bigint to be converted to i64
+			time_now: () => BigInt(Date.now()),
+			tick_now: () => BigInt(performance.now()),
 			time_sleep: (duration_ms) => {
 				if (duration_ms > 0) {
 					// TODO(bill): Does this even make any sense?
 				}
 			},
 
-			sqrt:    (x) => Math.sqrt(x),
-			sin:     (x) => Math.sin(x),
-			cos:     (x) => Math.cos(x),
-			pow:     (x, power) => Math.pow(x, power),
+			sqrt:    Math.sqrt,
+			sin:     Math.sin,
+			cos:     Math.cos,
+			pow:     Math.pow,
 			fmuladd: (x, y, z) => x*y + z,
-			ln:      (x) => Math.log(x),
-			exp:     (x) => Math.exp(x),
-			ldexp:   (x) => Math.ldexp(x),
+			ln:      Math.log,
+			exp:     Math.exp,
+			ldexp:   (x, exp) => x * Math.pow(2, exp),
+
+			rand_bytes: (ptr, len) => {
+				const view = new Uint8Array(wasmMemoryInterface.memory.buffer, ptr, len)
+				crypto.getRandomValues(view)
+			},
 		},
 		"odin_dom": {
 			init_event_raw: (ep) => {
@@ -1423,7 +1427,7 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 					wmi.storeI16(off(2), e.button);
 					wmi.storeU16(off(2), e.buttons);
 				} else if (e instanceof KeyboardEvent) {
-					// Note: those strigs are constructed
+					// Note: those strings are constructed
 					// on the native side from buffers that
 					// are filled later, so skip them 
 					const keyPtr  = off(W*2, W);
@@ -1569,7 +1573,7 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 					if (buf_len > 0 && buf_ptr) {
 						let n = Math.min(buf_len, str.length);
 						str = str.substring(0, n);
-						this.mem.loadBytes(buf_ptr, buf_len).set(new TextEncoder("utf-8").encode(str))
+						this.mem.loadBytes(buf_ptr, buf_len).set(new TextEncoder().encode(str))
 						return n;
 					}
 				}

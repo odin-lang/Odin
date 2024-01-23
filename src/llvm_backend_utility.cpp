@@ -57,6 +57,10 @@ gb_internal lbValue lb_correct_endianness(lbProcedure *p, lbValue value) {
 	return value;
 }
 
+gb_internal LLVMValueRef lb_mem_zero_ptr_internal(lbProcedure *p, LLVMValueRef ptr, usize len, unsigned alignment, bool is_volatile) {
+	return lb_mem_zero_ptr_internal(p, ptr, LLVMConstInt(lb_type(p->module, t_uint), len, false), alignment, is_volatile);
+}
+
 gb_internal LLVMValueRef lb_mem_zero_ptr_internal(lbProcedure *p, LLVMValueRef ptr, LLVMValueRef len, unsigned alignment, bool is_volatile) {
 	bool is_inlinable = false;
 
@@ -980,12 +984,12 @@ gb_internal LLVMTypeRef lb_type_padding_filler(lbModule *m, i64 padding, i64 pad
 		
 		GB_ASSERT_MSG(elem != nullptr, "Invalid lb_type_padding_filler padding and padding_align: %lld", padding_align);
 		if (len != 1) {
-			return LLVMArrayType(elem, cast(unsigned)len);
+			return llvm_array_type(elem, len);
 		} else {
 			return elem;
 		}
 	} else {
-		return LLVMArrayType(lb_type(m, t_u8), cast(unsigned)padding);
+		return llvm_array_type(lb_type(m, t_u8), padding);
 	}
 }
 
@@ -1434,6 +1438,17 @@ gb_internal lbValue lb_emit_ptr_offset(lbProcedure *p, lbValue ptr, lbValue inde
 	} else {
 		res.value = LLVMBuildGEP2(p->builder, type, ptr.value, indices, 1, "");
 	}
+	return res;
+}
+
+gb_internal lbValue lb_const_ptr_offset(lbModule *m, lbValue ptr, lbValue index) {
+	LLVMValueRef indices[1] = {index.value};
+	lbValue res = {};
+	res.type = ptr.type;
+	LLVMTypeRef type = lb_type(m, type_deref(res.type, true));
+
+	GB_ASSERT(lb_is_const(ptr) && lb_is_const(index));
+	res.value = LLVMConstGEP2(type, ptr.value, indices, 1);
 	return res;
 }
 

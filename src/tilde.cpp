@@ -213,9 +213,9 @@ gb_internal cgAddr cg_addr_soa_variable(cgValue addr, cgValue index, Ast *index_
 gb_internal void cg_set_debug_pos_from_node(cgProcedure *p, Ast *node) {
 	if (node) {
 		TokenPos pos = ast_token(node).pos;
-		TB_FileID *file_id = map_get(&p->module->file_id_map, cast(uintptr)pos.file_id);
-		if (file_id) {
-			tb_inst_set_location(p->func, *file_id, pos.line);
+		TB_SourceFile **file = map_get(&p->module->file_id_map, cast(uintptr)pos.file_id);
+		if (file) {
+			tb_inst_location(p->func, *file, pos.line, pos.column);
 		}
 	}
 }
@@ -373,7 +373,7 @@ gb_internal bool cg_global_variables_create(cgModule *m, Array<cgGlobalVariable>
 		TB_Global *global = tb_global_create(m->mod, name.len, cast(char const *)name.text, debug_type, linkage);
 		cgValue g = cg_value(global, alloc_type_pointer(e->type));
 
-		TB_ModuleSection *section = tb_module_get_data(m->mod);
+		TB_ModuleSectionHandle section = tb_module_get_data(m->mod);
 
 		if (e->Variable.thread_local_model != "") {
 			section = tb_module_get_tls(m->mod);
@@ -464,8 +464,9 @@ gb_internal cgModule *cg_module_create(Checker *c) {
 
 	for_array(id, global_files) {
 		if (AstFile *f = global_files[id]) {
-			char const *path = alloc_cstring(permanent_allocator(), f->fullpath);
-			map_set(&m->file_id_map, cast(uintptr)id, tb_file_create(m->mod, path));
+			char const *path = alloc_cstring(temporary_allocator(), f->fullpath);
+			TB_SourceFile *file = tb_get_source_file(m->mod, path);
+			map_set(&m->file_id_map, cast(uintptr)id, file);
 		}
 	}
 
@@ -724,6 +725,10 @@ gb_internal bool cg_generate_code(Checker *c, LinkerData *linker_data) {
 	CheckerInfo *info = &c->info;
 
 	linker_data_init(linker_data, info, c->parser->init_fullpath);
+
+	#if defined(GB_SYSTEM_OSX)
+		linker_enable_system_library_linking(linker_data);
+	#endif
 
 	cg_global_arena_init();
 

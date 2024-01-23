@@ -146,6 +146,11 @@ walk :: proc(v: ^Visitor, node: ^Node) {
 		walk(v, n.y)
 	case ^Or_Return_Expr:
 		walk(v, n.expr)
+	case ^Or_Branch_Expr:
+		walk(v, n.expr)
+		if n.label != nil {
+			walk(v, n.label)
+		}
 	case ^Type_Assertion:
 		walk(v, n.expr)
 		if n.type != nil {

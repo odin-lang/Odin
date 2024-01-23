@@ -49,7 +49,7 @@ to_bytes :: proc "contextless" (s: []$T) -> []byte {
 	```
 	```
 	small_items := []byte{1, 0, 0, 0, 0, 0, 0, 0,
-	                      2, 0, 0, 0}
+						  2, 0, 0, 0}
 	large_items := slice.reinterpret([]i64, small_items)
 	assert(len(large_items) == 1) // only enough bytes to make 1 x i64; two would need at least 8 bytes.
 	```
@@ -78,7 +78,7 @@ swap_between :: proc(a, b: $T/[]$E) {
 	n := builtin.min(len(a), len(b))
 	if n >= 0 {
 		ptr_swap_overlapping(&a[0], &b[0], size_of(E)*n)
-	}	
+	}
 }
 
 
@@ -117,46 +117,67 @@ linear_search_proc :: proc(array: $A/[]$T, f: proc(T) -> bool) -> (index: int, f
 	return -1, false
 }
 
+/*
+	Binary search searches the given slice for the given element.
+	If the slice is not sorted, the returned index is unspecified and meaningless.
+
+	If the value is found then the returned int is the index of the matching element.
+	If there are multiple matches, then any one of the matches could be returned.
+
+	If the value is not found then the returned int is the index where a matching
+	element could be inserted while maintaining sorted order.
+
+	# Examples
+
+	Looks up a series of four elements. The first is found, with a
+	uniquely determined position; the second and third are not
+	found; the fourth could match any position in `[1, 4]`.
+
+	```
+	index: int
+	found: bool
+
+	s := []i32{0, 1, 1, 1, 1, 2, 3, 5, 8, 13, 21, 34, 55}
+
+	index, found = slice.binary_search(s, 13)
+	assert(index == 9 && found == true)
+
+	index, found = slice.binary_search(s, 4)
+	assert(index == 7 && found == false)
+
+	index, found = slice.binary_search(s, 100)
+	assert(index == 13 && found == false)
+
+	index, found = slice.binary_search(s, 1)
+	assert(index >= 1 && index <= 4 && found == true)
+	```
+
+	For slices of more complex types see: binary_search_by
+*/
 @(require_results)
 binary_search :: proc(array: $A/[]$T, key: T) -> (index: int, found: bool)
-	where intrinsics.type_is_ordered(T) #no_bounds_check {
-
-	n := len(array)
-	switch n {
-	case 0:
-		return -1, false
-	case 1:
-		if array[0] == key {
-			return 0, true
-		}
-		return -1, false
-	}
-
-	lo, hi := 0, n-1
-
-	for array[hi] != array[lo] && key >= array[lo] && key <= array[hi] {
-		when intrinsics.type_is_ordered_numeric(T) {
-			// NOTE(bill): This is technically interpolation search
-			m := lo + int((key - array[lo]) * T(hi - lo) / (array[hi] - array[lo]))
-		} else {
-			m := lo + (hi - lo)/2
-		}
-		switch {
-		case array[m] < key:
-			lo = m + 1
-		case key < array[m]:
-			hi = m - 1
-		case:
-			return m, true
-		}
-	}
-
-	if key == array[lo] {
-		return lo, true
-	}
-	return -1, false
+	where intrinsics.type_is_ordered(T) #no_bounds_check
+{
+	return binary_search_by(array, key, cmp_proc(T))
 }
 
+@(require_results)
+binary_search_by :: proc(array: $A/[]$T, key: T, f: proc(T, T) -> Ordering) -> (index: int, found: bool) #no_bounds_check {
+	n := len(array)
+	left, right := 0, n
+	for left < right {
+		mid := int(uint(left+right) >> 1)
+		if f(array[mid], key) == .Less {
+			left = mid+1
+		} else {
+			// .Equal or .Greater
+			right = mid
+		}
+	}
+	// left == right
+	// f(array[left-1], key) == .Less (if left > 0)
+	return left, left < n && f(array[left], key) == .Equal
+}
 
 @(require_results)
 equal :: proc(a, b: $T/[]$E) -> bool where intrinsics.type_is_comparable(E) {
@@ -274,16 +295,16 @@ concatenate :: proc(a: []$T/[]$E, allocator := context.allocator) -> (res: T, er
 
 // copies a slice into a new slice
 @(require_results)
-clone :: proc(a: $T/[]$E, allocator := context.allocator) -> ([]E, runtime.Allocator_Error) #optional_allocator_error {
-	d, err := make([]E, len(a), allocator)
+clone :: proc(a: $T/[]$E, allocator := context.allocator, loc := #caller_location) -> ([]E, runtime.Allocator_Error) #optional_allocator_error {
+	d, err := make([]E, len(a), allocator, loc)
 	copy(d[:], a)
 	return d, err
 }
 
 
 // copies slice into a new dynamic array
-clone_to_dynamic :: proc(a: $T/[]$E, allocator := context.allocator) -> ([dynamic]E, runtime.Allocator_Error) #optional_allocator_error {
-	d, err := make([dynamic]E, len(a), allocator)
+clone_to_dynamic :: proc(a: $T/[]$E, allocator := context.allocator, loc := #caller_location) -> ([dynamic]E, runtime.Allocator_Error) #optional_allocator_error {
+	d, err := make([dynamic]E, len(a), allocator, loc)
 	copy(d[:], a)
 	return d, err
 }
@@ -397,14 +418,35 @@ reduce :: proc(s: $S/[]$U, initializer: $V, f: proc(V, U) -> V) -> V {
 }
 
 @(require_results)
-filter :: proc(s: $S/[]$U, f: proc(U) -> bool, allocator := context.allocator) -> S {
-	r := make([dynamic]U, 0, 0, allocator)
+reduce_reverse :: proc(s: $S/[]$U, initializer: $V, f: proc(V, U) -> V) -> V {
+	r := initializer
+	for i := len(s)-1; i >= 0; i -= 1 {
+		#no_bounds_check r = f(r, s[i])
+	}
+	return r
+}
+
+@(require_results)
+filter :: proc(s: $S/[]$U, f: proc(U) -> bool, allocator := context.allocator) -> (res: S, err: runtime.Allocator_Error) #optional_allocator_error {
+	r := make([dynamic]U, 0, 0, allocator) or_return
 	for v in s {
 		if f(v) {
 			append(&r, v)
 		}
 	}
-	return r[:]
+	return r[:], nil
+}
+
+@(require_results)
+filter_reverse :: proc(s: $S/[]$U, f: proc(U) -> bool, allocator := context.allocator) -> (res: S, err: runtime.Allocator_Error) #optional_allocator_error {
+	r := make([dynamic]U, 0, 0, allocator) or_return
+	for i := len(s)-1; i >= 0; i -= 1 {
+		#no_bounds_check v := s[i]
+		if f(v) {
+			append(&r, v)
+		}
+	}
+	return r[:], nil
 }
 
 @(require_results)
@@ -424,6 +466,60 @@ scanner :: proc (s: $S/[]$U, initializer: $V, f: proc(V, U) -> V, allocator := c
 	}
 
 	return
+}
+
+
+@(require_results)
+repeat :: proc(s: $S/[]$U, count: int, allocator := context.allocator) -> (b: S, err: runtime.Allocator_Error) #optional_allocator_error {
+	if count < 0 {
+		panic("slice: negative repeat count")
+	} else if count > 0 && (len(s)*count)/count != len(s) {
+		panic("slice: repeat count will cause an overflow")
+	}
+
+	b = make(S, len(s)*count, allocator) or_return
+	i := copy(b, s)
+	for i < len(b) { // 2^N trick to reduce the need to copy
+		copy(b[i:], b[:i])
+		i *= 2
+	}
+	return
+}
+
+// 'unique' replaces consecutive runs of equal elements with a single copy.
+// The procedures modifies the slice in-place and returns the modified slice.
+@(require_results)
+unique :: proc(s: $S/[]$T) -> S where intrinsics.type_is_comparable(T) #no_bounds_check {
+	if len(s) < 2 {
+		return s
+	}
+	i := 1
+	for j in 1..<len(s) {
+		if s[j] != s[j-1] && i != j {
+			s[i] = s[j]
+		}
+		i += 1
+	}
+
+	return s[:i]
+}
+
+// 'unique_proc' replaces consecutive runs of equal elements with a single copy using a comparison procedure
+// The procedures modifies the slice in-place and returns the modified slice.
+@(require_results)
+unique_proc :: proc(s: $S/[]$T, eq: proc(T, T) -> bool) -> S #no_bounds_check {
+	if len(s) < 2 {
+		return s
+	}
+	i := 1
+	for j in 1..<len(s) {
+		if !eq(s[j], s[j-1]) && i != j {
+			s[i] = s[j]
+		}
+		i += 1
+	}
+
+	return s[:i]
 }
 
 
@@ -461,6 +557,40 @@ min_max :: proc(s: $S/[]$T) -> (min, max: T, ok: bool) where intrinsics.type_is_
 		}
 	}
 	return
+}
+
+// Find the index of the (first) minimum element in a slice.
+@(require_results)
+min_index :: proc(s: $S/[]$T) -> (min_index: int, ok: bool) where intrinsics.type_is_ordered(T) #optional_ok {
+	if len(s) == 0 {
+		return -1, false
+	}
+	min_index = 0
+	min_value := s[0]
+	for v, i in s[1:] {
+		if v < min_value {
+			min_value = v
+			min_index = i+1
+		}
+	}
+	return min_index, true
+}
+
+// Find the index of the (first) maximum element in a slice.
+@(require_results)
+max_index :: proc(s: $S/[]$T) -> (max_index: int, ok: bool) where intrinsics.type_is_ordered(T) #optional_ok {
+	if len(s) == 0 {
+		return -1, false
+	}
+	max_index = 0
+	max_value := s[0]
+	for v, i in s[1:] {
+		if v > max_value {
+			max_value = v
+			max_index = i+1
+		}
+	}
+	return max_index, true
 }
 
 @(require_results)

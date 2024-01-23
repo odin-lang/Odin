@@ -3,7 +3,7 @@ package chacha20poly1305
 import "core:crypto"
 import "core:crypto/chacha20"
 import "core:crypto/poly1305"
-import "core:crypto/util"
+import "core:encoding/endian"
 import "core:mem"
 
 KEY_SIZE :: chacha20.KEY_SIZE
@@ -87,8 +87,8 @@ encrypt :: proc (ciphertext, tag, key, nonce, aad, plaintext: []byte) {
 	// mac_data |= num_to_8_le_bytes(aad.length)
 	// mac_data |= num_to_8_le_bytes(ciphertext.length)
 	l_buf := otk[0:16] // Reuse the scratch buffer.
-	util.PUT_U64_LE(l_buf[0:8], u64(aad_len))
-	util.PUT_U64_LE(l_buf[8:16], u64(ciphertext_len))
+	endian.unchecked_put_u64le(l_buf[0:8], u64(aad_len))
+	endian.unchecked_put_u64le(l_buf[8:16], u64(ciphertext_len))
 	poly1305.update(&mac_ctx, l_buf)
 
 	// tag = poly1305_mac(mac_data, otk)
@@ -128,8 +128,8 @@ decrypt :: proc (plaintext, tag, key, nonce, aad, ciphertext: []byte) -> bool {
 	poly1305.update(&mac_ctx, ciphertext)
 	_update_mac_pad16(&mac_ctx, ciphertext_len)
 	l_buf := otk[0:16] // Reuse the scratch buffer.
-	util.PUT_U64_LE(l_buf[0:8], u64(aad_len))
-	util.PUT_U64_LE(l_buf[8:16], u64(ciphertext_len))
+	endian.unchecked_put_u64le(l_buf[0:8], u64(aad_len))
+	endian.unchecked_put_u64le(l_buf[8:16], u64(ciphertext_len))
 	poly1305.update(&mac_ctx, l_buf)
 
 	// tag = poly1305_mac(mac_data, otk)

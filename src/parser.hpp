@@ -60,6 +60,7 @@ enum PackageKind {
 	Package_Normal,
 	Package_Runtime,
 	Package_Init,
+	Package_Builtin,
 };
 
 struct ImportedFile {
@@ -75,6 +76,8 @@ enum AstFileFlag : u32 {
 
 	AstFile_IsTest    = 1<<3,
 	AstFile_IsLazy    = 1<<4,
+
+	AstFile_NoInstrumentation = 1<<5,
 };
 
 enum AstDelayQueueKind {
@@ -463,6 +466,7 @@ AST_KIND(_ExprBegin,  "",  bool) \
 	AST_KIND(TernaryWhenExpr, "ternary when expression",  struct { Ast *x, *cond, *y; }) \
 	AST_KIND(OrElseExpr,      "or_else expression",       struct { Ast *x; Token token; Ast *y; }) \
 	AST_KIND(OrReturnExpr,    "or_return expression",     struct { Ast *expr; Token token; }) \
+	AST_KIND(OrBranchExpr,    "or branch expression",     struct { Ast *expr; Token token; Ast *label; }) \
 	AST_KIND(TypeAssertion, "type assertion", struct { \
 		Ast *expr; \
 		Token dot; \
@@ -617,6 +621,7 @@ AST_KIND(_DeclBegin,      "", bool) \
 		Token    relpath;       \
 		String   fullpath;      \
 		Token    import_name;   \
+		Array<Ast *> attributes;  \
 		CommentGroup *docs;     \
 		CommentGroup *comment;  \
 	}) \
