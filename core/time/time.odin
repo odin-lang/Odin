@@ -66,16 +66,19 @@ stopwatch_start :: proc "contextless" (stopwatch: ^Stopwatch) {
 	}
 }
 
-stopwatch_stop :: proc "contextless" (stopwatch: ^Stopwatch) {
+stopwatch_stop :: proc "contextless" (stopwatch: ^Stopwatch) -> (duration_running: Duration) {
 	if stopwatch.running {
 		stopwatch._accumulation += tick_diff(stopwatch._start_time, tick_now())
 		stopwatch.running = false
 	}
+	return stopwatch._accumulation
 }
 
-stopwatch_reset :: proc "contextless" (stopwatch: ^Stopwatch) {
+stopwatch_reset :: proc "contextless" (stopwatch: ^Stopwatch) -> (duration_running: Duration) {
+	duration_running = stopwatch._accumulation
 	stopwatch._accumulation = {}
 	stopwatch.running = false
+	return duration_running
 }
 
 stopwatch_duration :: proc "contextless" (stopwatch: Stopwatch) -> Duration {
@@ -118,6 +121,18 @@ duration_hours :: proc "contextless" (d: Duration) -> f64 {
 	nsec := d % Hour
 	return f64(hour) + f64(nsec)/(60*60*1e9)
 }
+
+/*
+	Note(Dragos): This is a renaming suggestion to make the Duration conversion naming be on par with the Time conversion. 
+                  Added them as aliases as to not cause breaking changes, and would still allow people to grep/search for duration_* equivalent procs
+	              These is just an idea, so feel free to remove it if it's inconsistent with other core-libs principles.
+*/
+nanoseconds  :: duration_nanoseconds
+microseconds :: duration_microseconds
+milliseconds :: duration_milliseconds
+seconds      :: duration_seconds
+minutes      :: duration_minutes
+hours        :: duration_hours
 
 duration_round :: proc "contextless" (d, m: Duration) -> Duration {
 	_less_than_half :: #force_inline proc "contextless" (x, y: Duration) -> bool {
