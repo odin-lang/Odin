@@ -445,7 +445,7 @@ gb_internal void syntax_error_va(TokenPos const &pos, TokenPos end, char const *
 		error_out_coloured("Syntax Error: ", TerminalStyle_Normal, TerminalColour_Red);
 		error_out_va(fmt, va);
 		error_out("\n");
-		// show_error_on_line(pos, end);
+		show_error_on_line(pos, end);
 	} else if (pos.line == 0) {
 		error_out_coloured("Syntax Error: ", TerminalStyle_Normal, TerminalColour_Red);
 		error_out_va(fmt, va);
@@ -494,7 +494,7 @@ gb_internal void syntax_warning_va(TokenPos const &pos, TokenPos end, char const
 			error_out_coloured("Syntax Warning: ", TerminalStyle_Normal, TerminalColour_Yellow);
 			error_out_va(fmt, va);
 			error_out("\n");
-			// show_error_on_line(pos, end);
+			show_error_on_line(pos, end);
 		} else if (pos.line == 0) {
 			error_out_coloured("Syntax Warning: ", TerminalStyle_Normal, TerminalColour_Yellow);
 			error_out_va(fmt, va);
