@@ -223,7 +223,7 @@ rt_sigprocmask :: proc "contextless" (mask_kind: Sig_Mask_Kind, new_set: ^Sig_Se
 	ioctls.h file to learn more.
 	Available since Linux 1.0.
 */
-ioctl :: proc "contextless" (fd: Fd, request: u64, arg: u64) -> (Errno) {
+ioctl :: proc "contextless" (fd: Fd, request: i32, arg: uintptr) -> (Errno) {
 	ret := syscall(SYS_ioctl, fd, request, arg)
 	return Errno(-ret)
 }

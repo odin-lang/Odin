@@ -12,7 +12,7 @@ STDIN_FILENO :: Fd(0)
 STDOUT_FILENO :: Fd(1)
 
 /*
-	Standard output file descriptor
+	Standard error file descriptor
 */
 STDERR_FILENO :: Fd(2)
 
