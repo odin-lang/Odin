@@ -49,6 +49,7 @@ tests/core/test_varint
 tests/core/test_xml
 tests/core/test_core_slice
 tests/core/test_core_thread
+tests/core/test_core_runtime
 tests/vendor/vendor_botan
 # Visual Studio 2015 cache/options directory
 .vs/
