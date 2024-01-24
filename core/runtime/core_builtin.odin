@@ -172,7 +172,7 @@ reserve :: proc{reserve_dynamic_array, reserve_map}
 @builtin
 non_zero_reserve :: proc{non_zero_reserve_dynamic_array}
 
-// `resize` will try to resize memory of a passed dynamic array or map to the requested element count (setting the `len`, and possibly `cap`).
+// `resize` will try to resize memory of a passed dynamic array to the requested element count (setting the `len`, and possibly `cap`).
 @builtin
 resize :: proc{resize_dynamic_array}
 
