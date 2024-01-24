@@ -27,6 +27,7 @@ import blake2b          "core:crypto/blake2b"
 import blake2s          "core:crypto/blake2s"
 import chacha20         "core:crypto/chacha20"
 import chacha20poly1305 "core:crypto/chacha20poly1305"
+import crypto_hash      "core:crypto/hash"
 import keccak           "core:crypto/legacy/keccak"
 import md5              "core:crypto/legacy/md5"
 import sha1             "core:crypto/legacy/sha1"
@@ -137,6 +138,7 @@ _ :: lru
 _ :: list
 _ :: topological_sort
 _ :: crypto
+_ :: crypto_hash
 _ :: blake2b
 _ :: blake2s
 _ :: chacha20
