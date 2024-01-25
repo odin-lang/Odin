@@ -1756,6 +1756,17 @@ gb_internal bool check_builtin_procedure_directive(CheckerContext *c, Operand *o
 		operand->mode = Addressing_Constant;
 		operand->value = exact_value_bool(is_defined);
 
+		// If the arg is a selector expression we don't add it, `-define` only allows identifiers.
+		if (arg->kind == Ast_Ident) {
+			Defineable defineable    = {};
+			defineable.name          = arg->Ident.token.string;
+			defineable.default_value = exact_value_bool(false);
+			defineable.pos           = arg->Ident.token.pos;
+
+			MUTEX_GUARD(&c->info->defineables_mutex);
+			array_add(&c->info->defineables, defineable);
+		}
+
 	} else if (name == "config") {
 		if (ce->args.count != 2) {
 			error(call, "'#config' expects 2 argument, got %td", ce->args.count);
@@ -1777,7 +1788,7 @@ gb_internal bool check_builtin_procedure_directive(CheckerContext *c, Operand *o
 		}
 
 		String name = arg->Ident.token.string;
-		
+
 
 		operand->type = def.type;
 		operand->mode = def.mode;
@@ -1794,7 +1805,7 @@ gb_internal bool check_builtin_procedure_directive(CheckerContext *c, Operand *o
 			}
 		}
 
-		Defineable defineable = {};
+		Defineable defineable    = {};
 		defineable.name          = name;
 		defineable.default_value = def.value;
 		defineable.pos           = arg->Ident.token.pos;

@@ -822,9 +822,9 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						}
 				   		case BuildFlag_ShowDefineables: {
 							GB_ASSERT(value.kind == ExactValue_Invalid);
-				   			build_context.show_defineables = true;
-				   			break;
-				   		}
+							build_context.show_defineables = true;
+							break;
+						}
 						case BuildFlag_ExportDefineables: {
 							GB_ASSERT(value.kind == ExactValue_String);
 
@@ -1577,6 +1577,28 @@ gb_internal void timings_export_all(Timings *t, Checker *c, bool timings_are_fin
 	gb_printf("Done.\n");
 }
 
+gb_internal void check_defines(BuildContext *bc, Checker *c) {
+	for (auto const &entry : bc->defined_values) {
+		String name = make_string_c(entry.key);
+		ExactValue value = entry.value;
+		GB_ASSERT(value.kind != ExactValue_Invalid);
+		
+		bool found = false;
+		for_array(i, c->info.defineables) {
+			Defineable *def = &c->info.defineables[i];
+			if (def->name == name) {
+				found = true;
+				break;
+			}
+		}
+
+		if (!found) {
+			warning(nullptr, "given -define:%s is unused in the project", name);
+			error_line("\tSuggestion: use the -show-defineables flag for an overview of the possible defines\n");
+		}
+	}
+}
+
 gb_internal void temp_alloc_defineable_strings(Checker *c) {
 	for_array(i, c->info.defineables) {
 		Defineable *def = &c->info.defineables[i];
@@ -2059,11 +2081,11 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-show-defineables");
-		print_usage_line(2, "Shows an overview of all the #config usages in the project.");
+		print_usage_line(2, "Shows an overview of all the #config/#defined usages in the project.");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-export-defineables:<filename>");
-		print_usage_line(2, "Exports an overview of all the #config usages in CSV format to the given file path.");
+		print_usage_line(2, "Exports an overview of all the #config/#defined usages in CSV format to the given file path.");
 		print_usage_line(2, "Example: -export-defineables:defineables.csv");
 		print_usage_line(0, "");
 	}
@@ -3063,6 +3085,7 @@ int main(int arg_count, char const **arg_ptr) {
 	defer (destroy_checker(checker));
 
 	check_parsed_files(checker);
+	check_defines(&build_context, checker);
 	if (any_errors()) {
 		print_all_errors();
 		return 1;

@@ -381,6 +381,7 @@ struct Defineable {
 	ExactValue default_value;
 	TokenPos   pos;
 
+	// These strings are only computed from previous fields when defineables are being shown or exported.
 	String default_value_str;
 	String pos_str;
 };
