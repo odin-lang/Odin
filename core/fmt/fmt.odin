@@ -253,18 +253,24 @@ bprintf :: proc(buf: []byte, fmt: string, args: ..any) -> string {
 // - args: A variadic list of arguments to be formatted
 // - loc: The location of the caller
 //
-// Returns: True if the condition is met, otherwise triggers a runtime assertion with a formatted message
-//
-assertf :: proc(condition: bool, fmt: string, args: ..any, loc := #caller_location) -> bool {
+@(disabled=ODIN_DISABLE_ASSERT)
+assertf :: proc(condition: bool, fmt: string, args: ..any, loc := #caller_location) {
 	if !condition {
-		p := context.assertion_failure_proc
-		if p == nil {
-			p = runtime.default_assertion_failure_proc
+		// NOTE(dragos): We are using the same trick as in builtin.assert
+		// to improve performance to make the CPU not
+		// execute speculatively, making it about an order of
+		// magnitude faster
+		@(cold)
+		internal :: proc(loc: runtime.Source_Code_Location, fmt: string, args: ..any) {
+			p := context.assertion_failure_proc
+			if p == nil {
+				p = runtime.default_assertion_failure_proc
+			}
+			message := tprintf(fmt, ..args)
+			p("Runtime assertion", message, loc)
 		}
-		message := tprintf(fmt, ..args)
-		p("Runtime assertion", message, loc)
+		internal(loc, fmt, ..args)
 	}
-	return condition
 }
 // Runtime panic with a formatted message
 //
