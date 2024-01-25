@@ -820,7 +820,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 
 							break;
 						}
-				   		case BuildFlag_ShowDefineables: {
+						case BuildFlag_ShowDefineables: {
 							GB_ASSERT(value.kind == ExactValue_Invalid);
 							build_context.show_defineables = true;
 							break;
@@ -837,7 +837,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							}
 
 							break;
-				   		}
+						}
 						case BuildFlag_ShowSystemCalls: {
 							GB_ASSERT(value.kind == ExactValue_Invalid);
 							build_context.show_system_calls = true;
@@ -1647,9 +1647,9 @@ gb_internal void export_defineables(Checker *c, String path) {
 }
 
 gb_internal void show_defineables(Checker *c) {
-	int max_name_len    = strlen("Defineable");
-	int max_default_len = strlen("Default Value");
-	int max_pos_len     = strlen("Location");
+	isize max_name_len    = gb_strlen("Defineable");
+	isize max_default_len = gb_strlen("Default Value");
+	isize max_pos_len     = gb_strlen("Location");
 
 	for_array(i, c->info.defineables) {
 		Defineable *def = &c->info.defineables[i];
@@ -1666,14 +1666,17 @@ gb_internal void show_defineables(Checker *c) {
 		}
 	}
 
-	printf("%-*s - %-*s - %-*s\n", max_name_len, "Defineable", max_default_len, "Default Value", max_pos_len, "Location");
+	printf("%-*s - %-*s - %-*s\n",
+		cast(int)max_name_len,    "Defineable",
+		cast(int)max_default_len, "Default Value",
+		cast(int)max_pos_len,     "Location");
 
 	for_array(i, c->info.defineables) {
 		Defineable *def = &c->info.defineables[i];
 		printf("%-*.*s - %-*.*s - %-*.*s\n",
-			max_name_len,    LIT(def->name),
-			max_default_len, LIT(def->default_value_str),
-			max_pos_len,     LIT(def->pos_str));
+			cast(int)max_name_len,    LIT(def->name),
+			cast(int)max_default_len, LIT(def->default_value_str),
+			cast(int)max_pos_len,     LIT(def->pos_str));
 	}
 }
 
