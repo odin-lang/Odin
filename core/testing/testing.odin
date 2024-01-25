@@ -91,6 +91,14 @@ expect :: proc(t: ^T, ok: bool, msg: string = "", loc := #caller_location) -> bo
 	}
 	return ok
 }
+
+expectf :: proc(t: ^T, ok: bool, format: string, args: ..any, loc := #caller_location) -> bool {
+	if !ok {
+		errorf(t, format, args)
+	}
+	return ok
+}
+
 expect_value :: proc(t: ^T, value, expected: $T, loc := #caller_location) -> bool where intrinsics.type_is_comparable(T) {
 	ok := value == expected || reflect.is_nil(value) && reflect.is_nil(expected)
 	if !ok {
