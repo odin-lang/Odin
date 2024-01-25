@@ -80,7 +80,7 @@ logf :: proc(t: ^T, format: string, args: ..any, loc := #caller_location) {
 
 
 // cleanup registers a procedure and user_data, which will be called when the test, and all its subtests, complete
-// cleanup proceduers will be called in LIFO (last added, first called) order.
+// cleanup procedures will be called in LIFO (last added, first called) order.
 cleanup :: proc(t: ^T, procedure: proc(rawptr), user_data: rawptr) {
 	append(&t.cleanups, Internal_Cleanup{procedure, user_data})
 }
