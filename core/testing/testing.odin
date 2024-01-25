@@ -94,7 +94,7 @@ expect :: proc(t: ^T, ok: bool, msg: string = "", loc := #caller_location) -> bo
 
 expectf :: proc(t: ^T, ok: bool, format: string, args: ..any, loc := #caller_location) -> bool {
 	if !ok {
-		errorf(t, format, args)
+		errorf(t, format, args, loc=loc)
 	}
 	return ok
 }
@@ -106,7 +106,6 @@ expect_value :: proc(t: ^T, value, expected: $T, loc := #caller_location) -> boo
 	}
 	return ok
 }
-
 
 
 set_fail_timeout :: proc(t: ^T, duration: time.Duration, loc := #caller_location) {
