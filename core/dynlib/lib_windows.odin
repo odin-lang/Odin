@@ -5,6 +5,7 @@ package dynlib
 import win32 "core:sys/windows"
 import "core:strings"
 import "core:runtime"
+import "core:reflect"
 
 _load_library :: proc(path: string, global_symbols := false) -> (Library, bool) {
 	// NOTE(bill): 'global_symbols' is here only for consistency with POSIX which has RTLD_GLOBAL
@@ -26,4 +27,10 @@ _symbol_address :: proc(library: Library, symbol: string) -> (ptr: rawptr, found
 	ptr = win32.GetProcAddress(cast(win32.HMODULE)library, c_str)
 	found = ptr != nil
 	return
+}
+
+_last_error :: proc() -> string {
+	err := win32.System_Error(win32.GetLastError())
+	err_msg := reflect.enum_string(err)
+	return "unknown" if err_msg == "" else err_msg
 }

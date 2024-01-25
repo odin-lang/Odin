@@ -216,7 +216,7 @@ tprintf :: proc(fmt: string, args: ..any) -> string {
 // Returns: A formatted string
 //
 bprint :: proc(buf: []byte, args: ..any, sep := " ") -> string {
-	sb := strings.builder_from_bytes(buf[0:len(buf)])
+	sb := strings.builder_from_bytes(buf)
 	return sbprint(&sb, ..args, sep=sep)
 }
 // Creates a formatted string using a supplied buffer as the backing array, appends newline. Writes into the buffer.
@@ -229,7 +229,7 @@ bprint :: proc(buf: []byte, args: ..any, sep := " ") -> string {
 // Returns: A formatted string with a newline character at the end
 //
 bprintln :: proc(buf: []byte, args: ..any, sep := " ") -> string {
-	sb := strings.builder_from_bytes(buf[0:len(buf)])
+	sb := strings.builder_from_bytes(buf)
 	return sbprintln(&sb, ..args, sep=sep)
 }
 // Creates a formatted string using a supplied buffer as the backing array. Writes into the buffer.
@@ -242,7 +242,7 @@ bprintln :: proc(buf: []byte, args: ..any, sep := " ") -> string {
 // Returns: A formatted string
 //
 bprintf :: proc(buf: []byte, fmt: string, args: ..any) -> string {
-	sb := strings.builder_from_bytes(buf[0:len(buf)])
+	sb := strings.builder_from_bytes(buf)
 	return sbprintf(&sb, fmt, ..args)
 }
 // Runtime assertion with a formatted message
@@ -253,18 +253,24 @@ bprintf :: proc(buf: []byte, fmt: string, args: ..any) -> string {
 // - args: A variadic list of arguments to be formatted
 // - loc: The location of the caller
 //
-// Returns: True if the condition is met, otherwise triggers a runtime assertion with a formatted message
-//
-assertf :: proc(condition: bool, fmt: string, args: ..any, loc := #caller_location) -> bool {
+@(disabled=ODIN_DISABLE_ASSERT)
+assertf :: proc(condition: bool, fmt: string, args: ..any, loc := #caller_location) {
 	if !condition {
-		p := context.assertion_failure_proc
-		if p == nil {
-			p = runtime.default_assertion_failure_proc
+		// NOTE(dragos): We are using the same trick as in builtin.assert
+		// to improve performance to make the CPU not
+		// execute speculatively, making it about an order of
+		// magnitude faster
+		@(cold)
+		internal :: proc(loc: runtime.Source_Code_Location, fmt: string, args: ..any) {
+			p := context.assertion_failure_proc
+			if p == nil {
+				p = runtime.default_assertion_failure_proc
+			}
+			message := tprintf(fmt, ..args)
+			p("Runtime assertion", message, loc)
 		}
-		message := tprintf(fmt, ..args)
-		p("Runtime assertion", message, loc)
+		internal(loc, fmt, ..args)
 	}
-	return condition
 }
 // Runtime panic with a formatted message
 //
@@ -1232,8 +1238,12 @@ _pad :: proc(fi: ^Info, s: string) {
 //
 // NOTE: Can return "NaN", "+Inf", "-Inf", "+<value>", or "-<value>".
 //
-_fmt_float_as :: proc(fi: ^Info, v: f64, bit_size: int, verb: rune, float_fmt: byte) {
-	prec := fi.prec if fi.prec_set else 3
+_fmt_float_as :: proc(fi: ^Info, v: f64, bit_size: int, verb: rune, float_fmt: byte, prec: int) {
+	prec := prec
+	if fi.prec_set {
+		prec = fi.prec
+	}
+
 	buf: [386]byte
 
 	// Can return "NaN", "+Inf", "-Inf", "+<value>", "-<value>".
@@ -1242,7 +1252,7 @@ _fmt_float_as :: proc(fi: ^Info, v: f64, bit_size: int, verb: rune, float_fmt: b
 	if !fi.plus {
 		// Strip sign from "+<value>" but not "+Inf".
 		if str[0] == '+' && str[1] != 'I' {
-			str = str[1:] 
+			str = str[1:]
 		}
 	}
 
@@ -1258,11 +1268,13 @@ _fmt_float_as :: proc(fi: ^Info, v: f64, bit_size: int, verb: rune, float_fmt: b
 //
 fmt_float :: proc(fi: ^Info, v: f64, bit_size: int, verb: rune) {
 	switch verb {
-	case 'f', 'F', 'g', 'G', 'v':
-		_fmt_float_as(fi, v, bit_size, verb, 'f')
+	case 'g', 'G', 'v':
+		_fmt_float_as(fi, v, bit_size, verb, 'g', -1)
+	case 'f', 'F':
+		_fmt_float_as(fi, v, bit_size, verb, 'f', 3)
 	case 'e', 'E':
 		// BUG(): "%.3e" returns "3.000e+00"
-		_fmt_float_as(fi, v, bit_size, verb, 'e')
+		_fmt_float_as(fi, v, bit_size, verb, 'e', 6)
 
 	case 'h', 'H':
 		prev_fi := fi^

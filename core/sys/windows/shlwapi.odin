@@ -3,7 +3,7 @@ package sys_windows
 
 foreign import shlwapi "system:shlwapi.lib"
 
-@(default_calling_convention="stdcall")
+@(default_calling_convention="system")
 foreign shlwapi {
 	PathFileExistsW    :: proc(pszPath: wstring) -> BOOL ---
 	PathFindExtensionW :: proc(pszPath: wstring) -> wstring ---

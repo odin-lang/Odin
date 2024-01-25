@@ -263,26 +263,48 @@ Unix_File_Time :: struct {
 	nanoseconds: i64,
 }
 
-OS_Stat :: struct {
-	device_id:     u64, // ID of device containing file
-	serial:        u64, // File serial number
-	nlink:         u64, // Number of hard links
-	mode:          u32, // Mode of the file
-	uid:           u32, // User ID of the file's owner
-	gid:           u32, // Group ID of the file's group
-	_padding:      i32, // 32 bits of padding
-	rdev:          u64, // Device ID, if device
-	size:          i64, // Size of the file, in bytes
-	block_size:    i64, // Optimal bllocksize for I/O
-	blocks:        i64, // Number of 512-byte blocks allocated
+when ODIN_ARCH == .arm64 {
+	OS_Stat :: struct {
+		device_id:     u64, // ID of device containing file
+		serial:        u64, // File serial number
+		mode:          u32, // Mode of the file
+		nlink:         u32, // Number of hard links
+		uid:           u32, // User ID of the file's owner
+		gid:           u32, // Group ID of the file's group
+		rdev:          u64, // Device ID, if device
+		_:             u64, // Padding
+		size:          i64, // Size of the file, in bytes
+		block_size:    i32, // Optimal blocksize for I/O
+		_:             i32, // Padding
+		blocks:        i64, // Number of 512-byte blocks allocated
 
-	last_access:   Unix_File_Time, // Time of last access
-	modified:      Unix_File_Time, // Time of last modification
-	status_change: Unix_File_Time, // Time of last status change
+		last_access:   Unix_File_Time, // Time of last access
+		modified:      Unix_File_Time, // Time of last modification
+		status_change: Unix_File_Time, // Time of last status change
 
-	_reserve1,
-	_reserve2,
-	_reserve3:     i64,
+		_reserved:     [2]i32,
+	}
+	#assert(size_of(OS_Stat) == 128)
+} else {
+	OS_Stat :: struct {
+		device_id:     u64, // ID of device containing file
+		serial:        u64, // File serial number
+		nlink:         u64, // Number of hard links
+		mode:          u32, // Mode of the file
+		uid:           u32, // User ID of the file's owner
+		gid:           u32, // Group ID of the file's group
+		_:             i32, // 32 bits of padding
+		rdev:          u64, // Device ID, if device
+		size:          i64, // Size of the file, in bytes
+		block_size:    i64, // Optimal bllocksize for I/O
+		blocks:        i64, // Number of 512-byte blocks allocated
+
+		last_access:   Unix_File_Time, // Time of last access
+		modified:      Unix_File_Time, // Time of last modification
+		status_change: Unix_File_Time, // Time of last status change
+
+		_reserved:     [3]i64,
+	}
 }
 
 // NOTE(laleksic, 2021-01-21): Comment and rename these to match OS_Stat above

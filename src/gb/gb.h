@@ -448,7 +448,7 @@ typedef i32 b32; // NOTE(bill): Prefer this!!!
 		#define gb_inline __forceinline
 		#endif
 	#else
-		#define gb_inline __attribute__ ((__always_inline__))
+		#define gb_inline inline __attribute__ ((__always_inline__))
 	#endif
 #endif
 

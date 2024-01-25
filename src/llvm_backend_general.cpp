@@ -107,6 +107,10 @@ gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c) {
 	String init_fullpath = c->parser->init_fullpath;
 	linker_data_init(gen, &c->info, init_fullpath);
 
+	#if defined(GB_SYSTEM_OSX) && (LLVM_VERSION_MAJOR < 14)
+	linker_enable_system_library_linking(gen);
+	#endif
+
 	gen->info = &c->info;
 
 	map_init(&gen->modules, gen->info->packages.count*2);
@@ -1332,6 +1336,8 @@ gb_internal void lb_emit_store_union_variant(lbProcedure *p, lbValue parent, lbV
 	Type *pt = base_type(type_deref(parent.type));
 	GB_ASSERT(pt->kind == Type_Union);
 	if (pt->Union.kind == UnionType_shared_nil) {
+		GB_ASSERT(type_size_of(variant_type));
+
 		lbBlock *if_nil     = lb_create_block(p, "shared_nil.if_nil");
 		lbBlock *if_not_nil = lb_create_block(p, "shared_nil.if_not_nil");
 		lbBlock *done       = lb_create_block(p, "shared_nil.done");
@@ -1353,9 +1359,13 @@ gb_internal void lb_emit_store_union_variant(lbProcedure *p, lbValue parent, lbV
 
 
 	} else {
-		lbValue underlying = lb_emit_conv(p, parent, alloc_type_pointer(variant_type));
-
-		lb_emit_store(p, underlying, variant);
+		if (type_size_of(variant_type) == 0) {
+			unsigned alignment = 1;
+			lb_mem_zero_ptr_internal(p, parent.value, pt->Union.variant_block_size, alignment, false);
+		} else {
+			lbValue underlying = lb_emit_conv(p, parent, alloc_type_pointer(variant_type));
+			lb_emit_store(p, underlying, variant);
+		}
 		lb_emit_store_union_variant_tag(p, parent, variant_type);
 	}
 }
@@ -2338,6 +2348,15 @@ gb_internal LLVMAttributeRef lb_create_enum_attribute(LLVMContextRef ctx, char c
 	return LLVMCreateEnumAttribute(ctx, kind, value);
 }
 
+gb_internal LLVMAttributeRef lb_create_string_attribute(LLVMContextRef ctx, String const &key, String const &value) {
+	LLVMAttributeRef attr = LLVMCreateStringAttribute(
+		ctx,
+		cast(char const *)key.text,   cast(unsigned)key.len,
+		cast(char const *)value.text, cast(unsigned)value.len);
+	return attr;
+}
+
+
 gb_internal void lb_add_proc_attribute_at_index(lbProcedure *p, isize index, char const *name, u64 value) {
 	LLVMAttributeRef attr = lb_create_enum_attribute(p->module->ctx, name, value);
 	GB_ASSERT(attr != nullptr);
@@ -2350,6 +2369,10 @@ gb_internal void lb_add_proc_attribute_at_index(lbProcedure *p, isize index, cha
 
 gb_internal void lb_add_attribute_to_proc(lbModule *m, LLVMValueRef proc_value, char const *name, u64 value=0) {
 	LLVMAddAttributeAtIndex(proc_value, LLVMAttributeIndex_FunctionIndex, lb_create_enum_attribute(m->ctx, name, value));
+}
+gb_internal void lb_add_attribute_to_proc_with_string(lbModule *m, LLVMValueRef proc_value, String const &name, String const &value) {
+	LLVMAttributeRef attr = lb_create_string_attribute(m->ctx, name, value);
+	LLVMAddAttributeAtIndex(proc_value, LLVMAttributeIndex_FunctionIndex, attr);
 }
 
 

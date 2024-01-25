@@ -7,9 +7,18 @@ struct LinkerData {
 	Array<String> output_temp_paths;
 	String   output_base;
 	String   output_name;
+#if defined(GB_SYSTEM_OSX)
+	b8       needs_system_library_linked;
+#endif
 };
 
 gb_internal i32 system_exec_command_line_app(char const *name, char const *fmt, ...);
+
+#if defined(GB_SYSTEM_OSX)
+gb_internal void linker_enable_system_library_linking(LinkerData *ld) {
+	ld->needs_system_library_linked = 1;
+}
+#endif
 
 gb_internal void linker_data_init(LinkerData *ld, CheckerInfo *info, String const &init_fullpath) {
 	gbAllocator ha = heap_allocator();
@@ -17,6 +26,10 @@ gb_internal void linker_data_init(LinkerData *ld, CheckerInfo *info, String cons
 	array_init(&ld->output_temp_paths,   ha);
 	array_init(&ld->foreign_libraries,   ha, 0, 1024);
 	ptr_set_init(&ld->foreign_libraries_set, 1024);
+
+#if defined(GB_SYSTEM_OSX)
+	ld->needs_system_library_linked = 0;
+#endif 
 
 	if (build_context.out_filepath.len == 0) {
 		ld->output_name = remove_directory_from_path(init_fullpath);
@@ -195,7 +208,7 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 
 			if (build_context.pdb_filepath != "") {
 				String pdb_path = path_to_string(heap_allocator(), build_context.build_paths[BuildPath_PDB]);
-				link_settings = gb_string_append_fmt(link_settings, " /PDB:%.*s", LIT(pdb_path));
+				link_settings = gb_string_append_fmt(link_settings, " /PDB:\"%.*s\"", LIT(pdb_path));
 			}
 
 			if (build_context.no_crt) {
@@ -220,7 +233,6 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 			String windows_sdk_bin_path = path_to_string(heap_allocator(), build_context.build_paths[BuildPath_Win_SDK_Bin_Path]);
 			defer (gb_free(heap_allocator(), windows_sdk_bin_path.text));
 
-			char const *subsystem_str = build_context.use_subsystem_windows ? "WINDOWS" : "CONSOLE";
 			if (!build_context.use_lld) { // msvc
 				String res_path = {};
 				defer (gb_free(heap_allocator(), res_path.text));
@@ -252,14 +264,14 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 
 				result = system_exec_command_line_app("msvc-link",
 					"\"%.*slink.exe\" %s %.*s -OUT:\"%.*s\" %s "
-					"/nologo /incremental:no /opt:ref /subsystem:%s "
+					"/nologo /incremental:no /opt:ref /subsystem:%.*s "
 					"%.*s "
 					"%.*s "
 					"%s "
 					"",
 					LIT(vs_exe_path), object_files, LIT(res_path), LIT(output_filename),
 					link_settings,
-					subsystem_str,
+					LIT(build_context.ODIN_WINDOWS_SUBSYSTEM),
 					LIT(build_context.link_flags),
 					LIT(build_context.extra_linker_flags),
 					lib_str
@@ -270,14 +282,14 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 			} else { // lld
 				result = system_exec_command_line_app("msvc-lld-link",
 					"\"%.*s\\bin\\lld-link\" %s -OUT:\"%.*s\" %s "
-					"/nologo /incremental:no /opt:ref /subsystem:%s "
+					"/nologo /incremental:no /opt:ref /subsystem:%.*s "
 					"%.*s "
 					"%.*s "
 					"%s "
 					"",
 					LIT(build_context.ODIN_ROOT), object_files, LIT(output_filename),
 					link_settings,
-					subsystem_str,
+					LIT(build_context.ODIN_WINDOWS_SUBSYSTEM),
 					LIT(build_context.link_flags),
 					LIT(build_context.extra_linker_flags),
 					lib_str
@@ -337,20 +349,34 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 							obj_format = str_lit("elf32");
 						}
 #endif // GB_ARCH_*_BIT
-						// Note(bumbread): I'm assuming nasm is installed on the host machine.
-						// Shipping binaries on unix-likes gets into the weird territorry of
-						// "which version of glibc" is it linked with.
-						result = system_exec_command_line_app("nasm",
-							"nasm \"%.*s\" "
-							"-f \"%.*s\" "
-							"-o \"%.*s\" "
-							"%.*s "
-							"",
-							LIT(asm_file),
-							LIT(obj_format),
-							LIT(obj_file),
-							LIT(build_context.extra_assembler_flags)
-						);						
+
+						if (is_osx) {
+							// `as` comes with MacOS.
+							result = system_exec_command_line_app("as",
+								"as \"%.*s\" "
+								"-o \"%.*s\" "
+								"%.*s "
+								"",
+								LIT(asm_file),
+								LIT(obj_file),
+								LIT(build_context.extra_assembler_flags)
+							);
+						} else {
+							// Note(bumbread): I'm assuming nasm is installed on the host machine.
+							// Shipping binaries on unix-likes gets into the weird territorry of
+							// "which version of glibc" is it linked with.
+							result = system_exec_command_line_app("nasm",
+								"nasm \"%.*s\" "
+								"-f \"%.*s\" "
+								"-o \"%.*s\" "
+								"%.*s "
+								"",
+								LIT(asm_file),
+								LIT(obj_format),
+								LIT(obj_file),
+								LIT(build_context.extra_assembler_flags)
+							);						
+						}
 						array_add(&gen->output_object_paths, obj_file);
 					} else {
 						if (string_set_update(&libs, lib)) {
@@ -456,7 +482,26 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 			gbString platform_lib_str = gb_string_make(heap_allocator(), "");
 			defer (gb_string_free(platform_lib_str));
 			if (build_context.metrics.os == TargetOs_darwin) {
-				platform_lib_str = gb_string_appendc(platform_lib_str, "-lSystem -lm -Wl,-syslibroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk -L/usr/local/lib");
+				platform_lib_str = gb_string_appendc(platform_lib_str, "-Wl,-syslibroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk -L/usr/local/lib");
+
+				// Homebrew's default library path, checking if it exists to avoid linking warnings.
+				if (gb_file_exists("/opt/homebrew/lib")) {
+					platform_lib_str = gb_string_appendc(platform_lib_str, " -L/opt/homebrew/lib");
+				}
+
+				// MacPort's default library path, checking if it exists to avoid linking warnings.
+				if (gb_file_exists("/opt/local/lib")) {
+					platform_lib_str = gb_string_appendc(platform_lib_str, " -L/opt/local/lib");
+				}
+
+				#if defined(GB_SYSTEM_OSX)
+				if(!build_context.no_crt) {
+					platform_lib_str = gb_string_appendc(platform_lib_str, " -lm ");
+					if(gen->needs_system_library_linked == 1) {
+						platform_lib_str = gb_string_appendc(platform_lib_str, " -lSystem ");
+					}
+				}
+				#endif
 			} else {
 				platform_lib_str = gb_string_appendc(platform_lib_str, "-lc -lm");
 			}
@@ -465,10 +510,6 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 				// This sets a requirement of Mountain Lion and up, but the compiler doesn't work without this limit.
 				if (build_context.minimum_os_version_string.len) {
 					link_settings = gb_string_append_fmt(link_settings, " -mmacosx-version-min=%.*s ", LIT(build_context.minimum_os_version_string));
-				} else if (build_context.metrics.arch == TargetArch_arm64) {
-					link_settings = gb_string_appendc(link_settings, " -mmacosx-version-min=12.0.0  ");
-				} else {
-					link_settings = gb_string_appendc(link_settings, " -mmacosx-version-min=10.12.0 ");
 				}
 				// This points the linker to where the entry point is
 				link_settings = gb_string_appendc(link_settings, " -e _main ");

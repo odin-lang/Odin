@@ -2939,6 +2939,12 @@ gb_internal lbValue lb_build_unary_and(lbProcedure *p, Ast *expr) {
 	} else if (is_type_soa_pointer(tv.type)) {
 		ast_node(ie, IndexExpr, ue_expr);
 		lbValue addr = lb_build_addr_ptr(p, ie->expr);
+
+		if (is_type_pointer(type_deref(addr.type))) {
+			addr = lb_emit_load(p, addr);
+		}
+		GB_ASSERT(is_type_pointer(addr.type));
+
 		lbValue index = lb_build_expr(p, ie->index);
 
 		if (!build_context.no_bounds_check) {
@@ -4099,7 +4105,7 @@ gb_internal lbAddr lb_build_addr_slice_expr(lbProcedure *p, Ast *expr) {
 	}
 
 	case Type_Basic: {
-		GB_ASSERT_MSG(type == t_string, "got %s", type_to_string(type));
+		GB_ASSERT_MSG(are_types_identical(type, t_string), "got %s", type_to_string(type));
 		lbValue len = lb_string_len(p, base);
 		if (high.value == nullptr) high = len;
 

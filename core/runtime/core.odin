@@ -18,6 +18,7 @@
 // This could change at a later date if the all these data structures are
 // implemented within the compiler rather than in this "preload" file
 //
+//+no-instrumentation
 package runtime
 
 import "core:intrinsics"
@@ -306,6 +307,7 @@ Allocator_Mode :: enum byte {
 	Query_Features,
 	Query_Info,
 	Alloc_Non_Zeroed,
+	Resize_Non_Zeroed,
 }
 
 Allocator_Mode_Set :: distinct bit_set[Allocator_Mode]

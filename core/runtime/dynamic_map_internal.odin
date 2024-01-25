@@ -44,7 +44,7 @@ _ :: intrinsics
 MAP_LOAD_FACTOR :: 75
 
 // Minimum log2 capacity.
-MAP_MIN_LOG2_CAPACITY :: 6 // 64 elements
+MAP_MIN_LOG2_CAPACITY :: 3 // 8 elements
 
 // Has to be less than 100% though.
 #assert(MAP_LOAD_FACTOR < 100)

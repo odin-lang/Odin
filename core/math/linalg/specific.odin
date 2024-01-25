@@ -7,96 +7,96 @@ F16_EPSILON :: 1e-3
 F32_EPSILON :: 1e-7
 F64_EPSILON :: 1e-15
 
-Vector2f16 :: distinct [2]f16
-Vector3f16 :: distinct [3]f16
-Vector4f16 :: distinct [4]f16
+Vector2f16 :: [2]f16
+Vector3f16 :: [3]f16
+Vector4f16 :: [4]f16
 
-Matrix1x1f16 :: distinct matrix[1, 1]f16
-Matrix1x2f16 :: distinct matrix[1, 2]f16
-Matrix1x3f16 :: distinct matrix[1, 3]f16
-Matrix1x4f16 :: distinct matrix[1, 4]f16
+Matrix1x1f16 :: matrix[1, 1]f16
+Matrix1x2f16 :: matrix[1, 2]f16
+Matrix1x3f16 :: matrix[1, 3]f16
+Matrix1x4f16 :: matrix[1, 4]f16
 
-Matrix2x1f16 :: distinct matrix[2, 1]f16
-Matrix2x2f16 :: distinct matrix[2, 2]f16
-Matrix2x3f16 :: distinct matrix[2, 3]f16
-Matrix2x4f16 :: distinct matrix[2, 4]f16
+Matrix2x1f16 :: matrix[2, 1]f16
+Matrix2x2f16 :: matrix[2, 2]f16
+Matrix2x3f16 :: matrix[2, 3]f16
+Matrix2x4f16 :: matrix[2, 4]f16
 
-Matrix3x1f16 :: distinct matrix[3, 1]f16
-Matrix3x2f16 :: distinct matrix[3, 2]f16
-Matrix3x3f16 :: distinct matrix[3, 3]f16
-Matrix3x4f16 :: distinct matrix[3, 4]f16
+Matrix3x1f16 :: matrix[3, 1]f16
+Matrix3x2f16 :: matrix[3, 2]f16
+Matrix3x3f16 :: matrix[3, 3]f16
+Matrix3x4f16 :: matrix[3, 4]f16
 
-Matrix4x1f16 :: distinct matrix[4, 1]f16
-Matrix4x2f16 :: distinct matrix[4, 2]f16
-Matrix4x3f16 :: distinct matrix[4, 3]f16
-Matrix4x4f16 :: distinct matrix[4, 4]f16
+Matrix4x1f16 :: matrix[4, 1]f16
+Matrix4x2f16 :: matrix[4, 2]f16
+Matrix4x3f16 :: matrix[4, 3]f16
+Matrix4x4f16 :: matrix[4, 4]f16
 
 Matrix1f16 :: Matrix1x1f16
 Matrix2f16 :: Matrix2x2f16
 Matrix3f16 :: Matrix3x3f16
 Matrix4f16 :: Matrix4x4f16
 
-Vector2f32 :: distinct [2]f32
-Vector3f32 :: distinct [3]f32
-Vector4f32 :: distinct [4]f32
+Vector2f32 :: [2]f32
+Vector3f32 :: [3]f32
+Vector4f32 :: [4]f32
 
-Matrix1x1f32 :: distinct matrix[1, 1]f32
-Matrix1x2f32 :: distinct matrix[1, 2]f32
-Matrix1x3f32 :: distinct matrix[1, 3]f32
-Matrix1x4f32 :: distinct matrix[1, 4]f32
+Matrix1x1f32 :: matrix[1, 1]f32
+Matrix1x2f32 :: matrix[1, 2]f32
+Matrix1x3f32 :: matrix[1, 3]f32
+Matrix1x4f32 :: matrix[1, 4]f32
 
-Matrix2x1f32 :: distinct matrix[2, 1]f32
-Matrix2x2f32 :: distinct matrix[2, 2]f32
-Matrix2x3f32 :: distinct matrix[2, 3]f32
-Matrix2x4f32 :: distinct matrix[2, 4]f32
+Matrix2x1f32 :: matrix[2, 1]f32
+Matrix2x2f32 :: matrix[2, 2]f32
+Matrix2x3f32 :: matrix[2, 3]f32
+Matrix2x4f32 :: matrix[2, 4]f32
 
-Matrix3x1f32 :: distinct matrix[3, 1]f32
-Matrix3x2f32 :: distinct matrix[3, 2]f32
-Matrix3x3f32 :: distinct matrix[3, 3]f32
-Matrix3x4f32 :: distinct matrix[3, 4]f32
+Matrix3x1f32 :: matrix[3, 1]f32
+Matrix3x2f32 :: matrix[3, 2]f32
+Matrix3x3f32 :: matrix[3, 3]f32
+Matrix3x4f32 :: matrix[3, 4]f32
 
-Matrix4x1f32 :: distinct matrix[4, 1]f32
-Matrix4x2f32 :: distinct matrix[4, 2]f32
-Matrix4x3f32 :: distinct matrix[4, 3]f32
-Matrix4x4f32 :: distinct matrix[4, 4]f32
+Matrix4x1f32 :: matrix[4, 1]f32
+Matrix4x2f32 :: matrix[4, 2]f32
+Matrix4x3f32 :: matrix[4, 3]f32
+Matrix4x4f32 :: matrix[4, 4]f32
 
 Matrix1f32 :: Matrix1x1f32
 Matrix2f32 :: Matrix2x2f32
 Matrix3f32 :: Matrix3x3f32
 Matrix4f32 :: Matrix4x4f32
 
-Vector2f64 :: distinct [2]f64
-Vector3f64 :: distinct [3]f64
-Vector4f64 :: distinct [4]f64
+Vector2f64 :: [2]f64
+Vector3f64 :: [3]f64
+Vector4f64 :: [4]f64
 
-Matrix1x1f64 :: distinct matrix[1, 1]f64
-Matrix1x2f64 :: distinct matrix[1, 2]f64
-Matrix1x3f64 :: distinct matrix[1, 3]f64
-Matrix1x4f64 :: distinct matrix[1, 4]f64
+Matrix1x1f64 :: matrix[1, 1]f64
+Matrix1x2f64 :: matrix[1, 2]f64
+Matrix1x3f64 :: matrix[1, 3]f64
+Matrix1x4f64 :: matrix[1, 4]f64
 
-Matrix2x1f64 :: distinct matrix[2, 1]f64
-Matrix2x2f64 :: distinct matrix[2, 2]f64
-Matrix2x3f64 :: distinct matrix[2, 3]f64
-Matrix2x4f64 :: distinct matrix[2, 4]f64
+Matrix2x1f64 :: matrix[2, 1]f64
+Matrix2x2f64 :: matrix[2, 2]f64
+Matrix2x3f64 :: matrix[2, 3]f64
+Matrix2x4f64 :: matrix[2, 4]f64
 
-Matrix3x1f64 :: distinct matrix[3, 1]f64
-Matrix3x2f64 :: distinct matrix[3, 2]f64
-Matrix3x3f64 :: distinct matrix[3, 3]f64
-Matrix3x4f64 :: distinct matrix[3, 4]f64
+Matrix3x1f64 :: matrix[3, 1]f64
+Matrix3x2f64 :: matrix[3, 2]f64
+Matrix3x3f64 :: matrix[3, 3]f64
+Matrix3x4f64 :: matrix[3, 4]f64
 
-Matrix4x1f64 :: distinct matrix[4, 1]f64
-Matrix4x2f64 :: distinct matrix[4, 2]f64
-Matrix4x3f64 :: distinct matrix[4, 3]f64
-Matrix4x4f64 :: distinct matrix[4, 4]f64
+Matrix4x1f64 :: matrix[4, 1]f64
+Matrix4x2f64 :: matrix[4, 2]f64
+Matrix4x3f64 :: matrix[4, 3]f64
+Matrix4x4f64 :: matrix[4, 4]f64
 
 Matrix1f64 :: Matrix1x1f64
 Matrix2f64 :: Matrix2x2f64
 Matrix3f64 :: Matrix3x3f64
 Matrix4f64 :: Matrix4x4f64
 
-Quaternionf16 :: distinct quaternion64
-Quaternionf32 :: distinct quaternion128
-Quaternionf64 :: distinct quaternion256
+Quaternionf16 :: quaternion64
+Quaternionf32 :: quaternion128
+Quaternionf64 :: quaternion256
 
 MATRIX1F16_IDENTITY :: Matrix1f16(1)
 MATRIX2F16_IDENTITY :: Matrix2f16(1)
