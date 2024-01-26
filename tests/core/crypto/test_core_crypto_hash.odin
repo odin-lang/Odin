@@ -339,36 +339,6 @@ test_hash :: proc(t: ^testing.T) {
 			"abcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmnoijklmnopjklmnopqklmnopqrlmnopqrsmnopqrstnopqrstu",
 		},
 
-		// SHAKE-128
-		TestHash{hash.Algorithm.SHAKE_128, "7f9c2ba4e88f827d616045507605853e", ""},
-		TestHash {
-			hash.Algorithm.SHAKE_128,
-			"f4202e3c5852f9182a0430fd8144f0a7",
-			"The quick brown fox jumps over the lazy dog",
-		},
-		TestHash {
-			hash.Algorithm.SHAKE_128,
-			"853f4538be0db9621a6cea659a06c110",
-			"The quick brown fox jumps over the lazy dof",
-		},
-
-		// SHAKE-256
-		TestHash {
-			hash.Algorithm.SHAKE_256,
-			"46b9dd2b0ba88d13233b3feb743eeb243fcd52ea62b81b82b50c27646ed5762f",
-			"",
-		},
-		TestHash {
-			hash.Algorithm.SHAKE_256,
-			"2f671343d9b2e1604dc9dcf0753e5fe15c7c64a0d283cbbf722d411a0e36f6ca",
-			"The quick brown fox jumps over the lazy dog",
-		},
-		TestHash {
-			hash.Algorithm.SHAKE_256,
-			"46b1ebb2e142c38b9ac9081bef72877fe4723959640fa57119b366ce6899d401",
-			"The quick brown fox jumps over the lazy dof",
-		},
-
 		// SM3
 		{
 			hash.Algorithm.SM3,

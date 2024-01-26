@@ -12,11 +12,13 @@ package test_core_crypto
 	Where possible, the official test vectors are used to validate the implementation.
 */
 
+import "core:encoding/hex"
 import "core:fmt"
+import "core:os"
 import "core:testing"
 
 import "core:crypto/siphash"
-import "core:os"
+import "core:crypto/shake"
 
 TEST_count := 0
 TEST_fail := 0
@@ -43,6 +45,7 @@ main :: proc() {
 	t := testing.T{}
 	test_hash(&t)
 
+	test_shake(&t)
 	test_siphash_2_4(&t)
 
 	// "modern" crypto tests
@@ -57,6 +60,81 @@ main :: proc() {
 	fmt.printf("%v/%v tests successful.\n", TEST_count - TEST_fail, TEST_count)
 	if TEST_fail > 0 {
 		os.exit(1)
+	}
+}
+
+TestXOF :: struct {
+	sec_strength: int,
+	output:       string,
+	str:          string,
+}
+
+@(test)
+test_shake :: proc(t: ^testing.T) {
+	test_vectors := [?]TestXOF {
+		// SHAKE128
+		{
+			128,
+			"7f9c2ba4e88f827d616045507605853e",
+			"",
+		},
+		{
+			128,
+			"f4202e3c5852f9182a0430fd8144f0a7",
+			"The quick brown fox jumps over the lazy dog",
+		},
+		{
+			128,
+			"853f4538be0db9621a6cea659a06c110",
+			"The quick brown fox jumps over the lazy dof",
+		},
+
+		// SHAKE256
+		{
+			256,
+			"46b9dd2b0ba88d13233b3feb743eeb243fcd52ea62b81b82b50c27646ed5762f",
+			"",
+		},
+		{
+			256,
+			"2f671343d9b2e1604dc9dcf0753e5fe15c7c64a0d283cbbf722d411a0e36f6ca",
+			"The quick brown fox jumps over the lazy dog",
+		},
+		{
+			256,
+			"46b1ebb2e142c38b9ac9081bef72877fe4723959640fa57119b366ce6899d401",
+			"The quick brown fox jumps over the lazy dof",
+		},
+	}
+	for v in test_vectors {
+		dst := make([]byte, len(v.output)/2, context.temp_allocator)
+
+		data := transmute([]byte)(v.str)
+
+		ctx: shake.Context
+		switch v.sec_strength {
+		case 128:
+			shake.init_128(&ctx)
+		case 256:
+			shake.init_256(&ctx)
+		}
+
+		shake.write(&ctx, data)
+		shake.read(&ctx, dst)
+
+		dst_str := string(hex.encode(dst, context.temp_allocator))
+
+		expect(
+			t,
+			dst_str == v.output,
+			fmt.tprintf(
+				"SHAKE%d: Expected: %s for input of %s, but got %s instead",
+				v.sec_strength,
+				v.output,
+				v.str,
+				dst_str,
+			),
+		)
 	}
 }
 

@@ -4,7 +4,6 @@ import "core:crypto/blake2b"
 import "core:crypto/blake2s"
 import "core:crypto/sha2"
 import "core:crypto/sha3"
-import "core:crypto/shake"
 import "core:crypto/sm3"
 import "core:crypto/legacy/keccak"
 import "core:crypto/legacy/md5"
@@ -26,8 +25,6 @@ Algorithm :: enum {
 	SHA3_256,
 	SHA3_384,
 	SHA3_512,
-	SHAKE_128,
-	SHAKE_256,
 	SM3,
 	Legacy_KECCAK_224,
 	Legacy_KECCAK_256,
@@ -51,8 +48,6 @@ ALGORITHM_NAMES := [Algorithm]string {
 	.SHA3_256          = "SHA3-256",
 	.SHA3_384          = "SHA3-384",
 	.SHA3_512          = "SHA3-512",
-	.SHAKE_128         = "SHAKE-128",
-	.SHAKE_256         = "SHAKE-256",
 	.SM3               = "SM3",
 	.Legacy_KECCAK_224 = "Keccak-224",
 	.Legacy_KECCAK_256 = "Keccak-256",
@@ -76,8 +71,6 @@ DIGEST_SIZES := [Algorithm]int {
 	.SHA3_256          = sha3.DIGEST_SIZE_256,
 	.SHA3_384          = sha3.DIGEST_SIZE_384,
 	.SHA3_512          = sha3.DIGEST_SIZE_512,
-	.SHAKE_128         = shake.DIGEST_SIZE_128,
-	.SHAKE_256         = shake.DIGEST_SIZE_256,
 	.SM3               = sm3.DIGEST_SIZE,
 	.Legacy_KECCAK_224 = keccak.DIGEST_SIZE_224,
 	.Legacy_KECCAK_256 = keccak.DIGEST_SIZE_256,
@@ -96,7 +89,6 @@ Context :: struct {
 		^sha2.Context_256,
 		^sha2.Context_512,
 		^sha3.Context,
-		^shake.Context,
 		^sm3.Context,
 		^keccak.Context,
 		^md5.Context,
@@ -159,14 +151,6 @@ init :: proc(ctx: ^Context, algorithm: Algorithm, allocator := context.allocator
 		impl := new(sha3.Context, allocator)
 		sha3.init_512(impl)
 		ctx._impl = impl
-	case .SHAKE_128:
-		impl := new(shake.Context, allocator)
-		shake.init_128(impl)
-		ctx._impl = impl
-	case .SHAKE_256:
-		impl := new(shake.Context, allocator)
-		shake.init_256(impl)
-		ctx._impl = impl
 	case .SM3:
 		impl := new(sm3.Context, allocator)
 		sm3.init(impl)
@@ -218,8 +202,6 @@ update :: proc(ctx: ^Context, data: []byte) {
 		sha2.update(impl, data)
 	case ^sha3.Context:
 		sha3.update(impl, data)
-	case ^shake.Context:
-		shake.update(impl, data)
 	case ^sm3.Context:
 		sm3.update(impl, data)
 	case ^keccak.Context:
@@ -250,8 +232,6 @@ final :: proc(ctx: ^Context, hash: []byte, finalize_clone: bool = false) {
 		sha2.final(impl, hash, finalize_clone)
 	case ^sha3.Context:
 		sha3.final(impl, hash, finalize_clone)
-	case ^shake.Context:
-		shake.final(impl, hash, finalize_clone)
 	case ^sm3.Context:
 		sm3.final(impl, hash, finalize_clone)
 	case ^keccak.Context:
@@ -304,10 +284,6 @@ clone :: proc(ctx, other: ^Context, allocator := context.allocator) {
 		impl := new(sha3.Context, allocator)
 		sha3.clone(impl, src_impl)
 		ctx._impl = impl
-	case ^shake.Context:
-		impl := new(shake.Context, allocator)
-		shake.clone(impl, src_impl)
-		ctx._impl = impl
 	case ^sm3.Context:
 		impl := new(sm3.Context, allocator)
 		sm3.clone(impl, src_impl)
@@ -347,9 +323,6 @@ reset :: proc(ctx: ^Context) {
 		free(impl, ctx._allocator)
 	case ^sha3.Context:
 		sha3.reset(impl)
-		free(impl, ctx._allocator)
-	case ^shake.Context:
-		shake.reset(impl)
 		free(impl, ctx._allocator)
 	case ^sm3.Context:
 		sm3.reset(impl)
