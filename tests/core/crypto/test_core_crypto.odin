@@ -12,20 +12,20 @@ package test_core_crypto
 	Where possible, the official test vectors are used to validate the implementation.
 */
 
-import "core:testing"
 import "core:fmt"
+import "core:testing"
 
 import "core:crypto/siphash"
 import "core:os"
 
 TEST_count := 0
-TEST_fail  := 0
+TEST_fail := 0
 
 when ODIN_TEST {
-	expect  :: testing.expect
-	log     :: testing.log
+	expect :: testing.expect
+	log :: testing.log
 } else {
-	expect  :: proc(t: ^testing.T, condition: bool, message: string, loc := #caller_location) {
+	expect :: proc(t: ^testing.T, condition: bool, message: string, loc := #caller_location) {
 		TEST_count += 1
 		if !condition {
 			TEST_fail += 1
@@ -60,16 +60,6 @@ main :: proc() {
 	}
 }
 
-hex_string :: proc(bytes: []byte, allocator := context.temp_allocator) -> string {
-	lut: [16]byte = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'}
-	buf := make([]byte, len(bytes) * 2, allocator)
-	for i := 0; i < len(bytes); i += 1 {
-		buf[i * 2 + 0] = lut[bytes[i] >> 4 & 0xf]
-		buf[i * 2 + 1] = lut[bytes[i]      & 0xf]
-	}
-	return string(buf)
-}
-
 @(test)
 test_siphash_2_4 :: proc(t: ^testing.T) {
 	// Test vectors from
@@ -94,19 +84,28 @@ test_siphash_2_4 :: proc(t: ^testing.T) {
 	}
 
 	key: [16]byte
-	for i in 0..<16 {
+	for i in 0 ..< 16 {
 		key[i] = byte(i)
 	}
 
-	for i in 0..<len(test_vectors) {
+	for i in 0 ..< len(test_vectors) {
 		data := make([]byte, i)
-		for j in 0..<i {
+		for j in 0 ..< i {
 			data[j] = byte(j)
 		}
 
-		vector   := test_vectors[i]
+		vector := test_vectors[i]
 		computed := siphash.sum_2_4(data[:], key[:])
 
-		expect(t, computed == vector, fmt.tprintf("Expected: 0x%x for input of %v, but got 0x%x instead", vector, data, computed))
+		expect(
+			t,
+			computed == vector,
+			fmt.tprintf(
+				"Expected: 0x%x for input of %v, but got 0x%x instead",
+				vector,
+				data,
+				computed,
+			),
+		)
 	}
 }
