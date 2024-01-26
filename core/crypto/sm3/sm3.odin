@@ -1,3 +1,9 @@
+/*
+package sm3 implements the SM3 hash algorithm.
+
+See:
+- https://datatracker.ietf.org/doc/html/draft-sca-cfrg-sm3-02
+*/
 package sm3
 
 /*
@@ -6,16 +12,26 @@ package sm3
 
     List of contributors:
         zhibog, dotbmp:  Initial implementation.
-
-    Implementation of the SM3 hashing algorithm, as defined in <https://datatracker.ietf.org/doc/html/draft-sca-cfrg-sm3-02>
 */
 
 import "core:encoding/endian"
 import "core:math/bits"
 import "core:mem"
 
+// DIGEST_SIZE is the SM3 digest size.
 DIGEST_SIZE :: 32
 
+// Context is a SM3 instance.
+Context :: struct {
+	state:     [8]u32,
+	x:         [BLOCK_SIZE]byte,
+	bitlength: u64,
+	length:    u64,
+
+	is_initialized: bool,
+}
+
+// init initializes a Context.
 init :: proc(ctx: ^Context) {
 	ctx.state[0] = IV[0]
 	ctx.state[1] = IV[1]
@@ -32,6 +48,7 @@ init :: proc(ctx: ^Context) {
 	ctx.is_initialized = true
 }
 
+// update adds more data to the Context.
 update :: proc(ctx: ^Context, data: []byte) {
 	assert(ctx.is_initialized)
 
@@ -57,6 +74,11 @@ update :: proc(ctx: ^Context, data: []byte) {
 	}
 }
 
+// final finalizes the Context, writes the digest to hash, and calls
+// reset on the Context.
+//
+// Iff finalize_clone is set, final will work on a copy of the Context,
+// which is useful for for calculating rolling digests.
 final :: proc(ctx: ^Context, hash: []byte, finalize_clone: bool = false) {
 	assert(ctx.is_initialized)
 
@@ -92,10 +114,13 @@ final :: proc(ctx: ^Context, hash: []byte, finalize_clone: bool = false) {
 	}
 }
 
+// clone clones the Context other into ctx.
 clone :: proc(ctx, other: ^Context) {
 	ctx^ = other^
 }
 
+// reset sanitizes the Context.  The Context must be re-initialized to
+// be used again.
 reset :: proc(ctx: ^Context) {
 	if !ctx.is_initialized {
 		return
@@ -108,16 +133,8 @@ reset :: proc(ctx: ^Context) {
     SM3 implementation
 */
 
+@(private)
 BLOCK_SIZE :: 64
-
-Context :: struct {
-	state:     [8]u32,
-	x:         [BLOCK_SIZE]byte,
-	bitlength: u64,
-	length:    u64,
-
-	is_initialized: bool,
-}
 
 @(private)
 IV := [8]u32 {

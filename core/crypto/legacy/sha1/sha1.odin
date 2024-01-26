@@ -1,3 +1,14 @@
+/*
+package sha1 implements the SHA1 hash algorithm.
+
+WARNING: The SHA1 algorithm is known to be insecure and should only be
+used for interoperating with legacy applications.
+
+See:
+- https://eprint.iacr.org/2017/190
+- https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.180-4.pdf
+- https://datatracker.ietf.org/doc/html/rfc3174
+*/
 package sha1
 
 /*
@@ -6,16 +17,27 @@ package sha1
 
     List of contributors:
         zhibog, dotbmp:  Initial implementation.
-
-    Implementation of the SHA1 hashing algorithm, as defined in RFC 3174 <https://datatracker.ietf.org/doc/html/rfc3174>
 */
 
 import "core:encoding/endian"
 import "core:math/bits"
 import "core:mem"
 
+// DIGEST_SIZE is the SHA1 digest size.
 DIGEST_SIZE :: 20
 
+// Context is a SHA1 instance.
+Context :: struct {
+	data:    [BLOCK_SIZE]byte,
+	state:   [5]u32,
+	k:       [4]u32,
+	bitlen:  u64,
+	datalen: u32,
+
+	is_initialized: bool,
+}
+
+// init initializes a Context.
 init :: proc(ctx: ^Context) {
 	ctx.state[0] = 0x67452301
 	ctx.state[1] = 0xefcdab89
@@ -33,6 +55,7 @@ init :: proc(ctx: ^Context) {
 	ctx.is_initialized = true
 }
 
+// update adds more data to the Context.
 update :: proc(ctx: ^Context, data: []byte) {
 	assert(ctx.is_initialized)
 
@@ -47,6 +70,11 @@ update :: proc(ctx: ^Context, data: []byte) {
 	}
 }
 
+// final finalizes the Context, writes the digest to hash, and calls
+// reset on the Context.
+//
+// Iff finalize_clone is set, final will work on a copy of the Context,
+// which is useful for for calculating rolling digests.
 final :: proc(ctx: ^Context, hash: []byte, finalize_clone: bool = false) {
 	assert(ctx.is_initialized)
 
@@ -91,10 +119,13 @@ final :: proc(ctx: ^Context, hash: []byte, finalize_clone: bool = false) {
 	}
 }
 
+// clone clones the Context other into ctx.
 clone :: proc(ctx, other: ^$T) {
 	ctx^ = other^
 }
 
+// reset sanitizes the Context.  The Context must be re-initialized to
+// be used again.
 reset :: proc(ctx: ^$T) {
 	if !ctx.is_initialized {
 		return
@@ -107,17 +138,8 @@ reset :: proc(ctx: ^$T) {
     SHA1 implementation
 */
 
+@(private)
 BLOCK_SIZE :: 64
-
-Context :: struct {
-	data:    [BLOCK_SIZE]byte,
-	state:   [5]u32,
-	k:       [4]u32,
-	bitlen:  u64,
-	datalen: u32,
-
-	is_initialized: bool,
-}
 
 @(private)
 transform :: proc "contextless" (ctx: ^Context, data: []byte) {

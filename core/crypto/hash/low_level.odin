@@ -329,8 +329,8 @@ clone :: proc(ctx, other: ^Context, allocator := context.allocator) {
 	}
 }
 
-// reset sanitizes the Context and frees resources internal to the
-// Context.  The Context must be re-initialized to be used again.
+// reset sanitizes the Context.  The Context must be re-initialized to
+// be used again.
 reset :: proc(ctx: ^Context) {
 	switch impl in ctx._impl {
 	case ^blake2b.Context:

@@ -1,3 +1,10 @@
+/*
+package sha2 implements the SHA2 hash algorithm family.
+
+See:
+- https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.180-4.pdf
+- https://datatracker.ietf.org/doc/html/rfc3874
+*/
 package sha2
 
 /*
@@ -6,41 +13,71 @@ package sha2
 
     List of contributors:
         zhibog, dotbmp:  Initial implementation.
-
-    Implementation of the SHA2 hashing algorithm, as defined in <https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.180-4.pdf>
-    and in RFC 3874 <https://datatracker.ietf.org/doc/html/rfc3874>
 */
 
 import "core:encoding/endian"
 import "core:math/bits"
 import "core:mem"
 
+// DIGEST_SIZE_224 is the SHA-224 digest size.
 DIGEST_SIZE_224 :: 28
+// DIGEST_SIZE_256 is the SHA-256 digest size.
 DIGEST_SIZE_256 :: 32
+// DIGEST_SIZE_384 is the SHA-384 digest size.
 DIGEST_SIZE_384 :: 48
+// DIGEST_SIZE_512 is the SHA-512 digest size.
 DIGEST_SIZE_512 :: 64
+// DIGEST_SIZE_512_256 is the SHA-512/256 digest size.
 DIGEST_SIZE_512_256 :: 32
 
+// Context_256 is a SHA-224 or SHA-256 instance.
+Context_256 :: struct {
+	block:     [SHA256_BLOCK_SIZE]byte,
+	h:         [8]u32,
+	bitlength: u64,
+	length:    u64,
+	md_bits:   int,
+
+	is_initialized: bool,
+}
+
+// Context_512 is a SHA-384, SHA-512 or SHA-512/256 instance.
+Context_512 :: struct {
+	block:     [SHA512_BLOCK_SIZE]byte,
+	h:         [8]u64,
+	bitlength: u64,
+	length:    u64,
+	md_bits:   int,
+
+	is_initialized: bool,
+}
+
+
+// init_224 initializes a Context_256 for SHA-224.
 init_224 :: proc(ctx: ^Context_256) {
 	ctx.md_bits = 224
 	_init(ctx)
 }
 
+// init_256 initializes a Context_256 for SHA-256.
 init_256 :: proc(ctx: ^Context_256) {
 	ctx.md_bits = 256
 	_init(ctx)
 }
 
+// init_384 initializes a Context_512 for SHA-384.
 init_384 :: proc(ctx: ^Context_512) {
 	ctx.md_bits = 384
 	_init(ctx)
 }
 
+// init_512 initializes a Context_512 for SHA-512.
 init_512 :: proc(ctx: ^Context_512) {
 	ctx.md_bits = 512
 	_init(ctx)
 }
 
+// init_512_256 initializes a Context_512 for SHA-512/256.
 init_512_256 :: proc(ctx: ^Context_512) {
 	ctx.md_bits = 256
 	_init(ctx)
@@ -114,6 +151,7 @@ _init :: proc(ctx: ^$T) {
 	ctx.is_initialized = true
 }
 
+// update adds more data to the Context.
 update :: proc(ctx: ^$T, data: []byte) {
 	assert(ctx.is_initialized)
 
@@ -145,6 +183,11 @@ update :: proc(ctx: ^$T, data: []byte) {
 	}
 }
 
+// final finalizes the Context, writes the digest to hash, and calls
+// reset on the Context.
+//
+// Iff finalize_clone is set, final will work on a copy of the Context,
+// which is useful for for calculating rolling digests.
 final :: proc(ctx: ^$T, hash: []byte, finalize_clone: bool = false) {
 	assert(ctx.is_initialized)
 
@@ -203,10 +246,13 @@ final :: proc(ctx: ^$T, hash: []byte, finalize_clone: bool = false) {
 	}
 }
 
+// clone clones the Context other into ctx.
 clone :: proc(ctx, other: ^$T) {
 	ctx^ = other^
 }
 
+// reset sanitizes the Context.  The Context must be re-initialized to
+// be used again.
 reset :: proc(ctx: ^$T) {
 	if !ctx.is_initialized {
 		return
@@ -219,28 +265,10 @@ reset :: proc(ctx: ^$T) {
     SHA2 implementation
 */
 
+@(private)
 SHA256_BLOCK_SIZE :: 64
+@(private)
 SHA512_BLOCK_SIZE :: 128
-
-Context_256 :: struct {
-	block:     [SHA256_BLOCK_SIZE]byte,
-	h:         [8]u32,
-	bitlength: u64,
-	length:    u64,
-	md_bits:   int,
-
-	is_initialized: bool,
-}
-
-Context_512 :: struct {
-	block:     [SHA512_BLOCK_SIZE]byte,
-	h:         [8]u64,
-	bitlength: u64,
-	length:    u64,
-	md_bits:   int,
-
-	is_initialized: bool,
-}
 
 @(private)
 sha256_k := [64]u32 {
