@@ -220,12 +220,13 @@ rt_sigprocmask :: proc "contextless" (mask_kind: Sig_Mask_Kind, new_set: ^Sig_Se
 	Control devices. The ioctl syscall is a bit special because
 	its argument is usually a pointer to some driver-specific structure.
 	The request value is device-specific. Consult your LibC implementation's
-	ioctls.h file to learn more.
+	ioctls.h file to learn more. The returned value of ioctl *may* be an error
+	code value instead of a memory address depending on the request type.
 	Available since Linux 1.0.
 */
-ioctl :: proc "contextless" (fd: Fd, request: i32, arg: uintptr) -> (Errno) {
+ioctl :: proc "contextless" (fd: Fd, request: u64, arg: u64) -> (uintptr) {
 	ret := syscall(SYS_ioctl, fd, request, arg)
-	return Errno(-ret)
+	return uintptr(ret)
 }
 
 /*
