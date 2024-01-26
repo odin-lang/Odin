@@ -642,10 +642,24 @@ stdin:  Handle = 0 // get_std_handle(win32.STD_INPUT_HANDLE);
 stdout: Handle = 1 // get_std_handle(win32.STD_OUTPUT_HANDLE);
 stderr: Handle = 2 // get_std_handle(win32.STD_ERROR_HANDLE);
 
-/* TODO(zangent): Implement these!
-last_write_time :: proc(fd: Handle) -> File_Time {}
-last_write_time_by_name :: proc(name: string) -> File_Time {}
-*/
+last_write_time :: proc(fd: Handle) -> (File_Time, Errno) {
+	s, err := _fstat(fd)
+	if err != ERROR_NONE {
+		return 0, err
+	}
+	modified := s.modified.seconds * 1_000_000_000 + s.modified.nanoseconds
+	return File_Time(modified), ERROR_NONE
+}
+
+last_write_time_by_name :: proc(name: string) -> (File_Time, Errno) {
+	s, err := _stat(name)
+	if err != ERROR_NONE {
+		return 0, err
+	}
+	modified := s.modified.seconds * 1_000_000_000 + s.modified.nanoseconds
+	return File_Time(modified), ERROR_NONE
+}
+
 
 is_path_separator :: proc(r: rune) -> bool {
 	return r == '/'
