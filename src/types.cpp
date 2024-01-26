@@ -825,11 +825,13 @@ gb_internal void type_path_pop(TypePath *tp) {
 #define FAILURE_SIZE      0
 #define FAILURE_ALIGNMENT 0
 
+gb_internal bool type_ptr_set_exists(PtrSet<Type *> *s, Type *t);
+
 gb_internal bool type_ptr_set_update(PtrSet<Type *> *s, Type *t) {
 	if (t == nullptr) {
 		return true;
 	}
-	if (ptr_set_exists(s, t)) {
+	if (type_ptr_set_exists(s, t)) {
 		return true;
 	}
 	ptr_set_add(s, t);
