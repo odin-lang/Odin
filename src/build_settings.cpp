@@ -422,6 +422,7 @@ struct BuildContext {
 	Array<String> extra_packages;
 
 	StringSet test_names;
+	bool      test_all_packages;
 
 	gbAffinity affinity;
 	isize      thread_count;

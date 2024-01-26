@@ -2345,6 +2345,43 @@ gb_internal void force_add_dependency_entity(Checker *c, Scope *scope, String co
 	add_dependency_to_set(c, e);
 }
 
+gb_internal void collect_testing_procedures_of_package(Checker *c, AstPackage *pkg) {
+	AstPackage *testing_package = get_core_package(&c->info, str_lit("testing"));
+	Scope *testing_scope = testing_package->scope;
+	Entity *test_signature = scope_lookup_current(testing_scope, str_lit("Test_Signature"));
+
+	Scope *s = pkg->scope;
+	for (auto const &entry : s->elements) {
+		Entity *e = entry.value;
+		if (e->kind != Entity_Procedure) {
+			continue;
+		}
+
+		if ((e->flags & EntityFlag_Test) == 0) {
+			continue;
+		}
+
+		String name = e->token.string;
+
+		bool is_tester = true;
+
+		Type *t = base_type(e->type);
+		GB_ASSERT(t->kind == Type_Proc);
+		if (are_types_identical(t, base_type(test_signature->type))) {
+			// Good
+		} else {
+			gbString str = type_to_string(t);
+			error(e->token, "Testing procedures must have a signature type of proc(^testing.T), got %s", str);
+			gb_string_free(str);
+			is_tester = false;
+		}
+
+		if (is_tester) {
+			add_dependency_to_set(c, e);
+			array_add(&c->info.testing_procedures, e);
+		}
+	}
+}
 
 gb_internal void generate_minimum_dependency_set_internal(Checker *c, Entity *start) {
 	for_array(i, c->info.definitions) {
@@ -2448,41 +2485,13 @@ gb_internal void generate_minimum_dependency_set_internal(Checker *c, Entity *st
 			}
 		}
 
-
-		Entity *test_signature = scope_lookup_current(testing_scope, str_lit("Test_Signature"));
-
-
 		AstPackage *pkg = c->info.init_package;
-		Scope *s = pkg->scope;
+		collect_testing_procedures_of_package(c, pkg);
 
-		for (auto const &entry : s->elements) {
-			Entity *e = entry.value;
-			if (e->kind != Entity_Procedure) {
-				continue;
-			}
-
-			if ((e->flags & EntityFlag_Test) == 0) {
-				continue;
-			}
-
-			String name = e->token.string;
-
-			bool is_tester = true;
-
-			Type *t = base_type(e->type);
-			GB_ASSERT(t->kind == Type_Proc);
-			if (are_types_identical(t, base_type(test_signature->type))) {
-				// Good
-			} else {
-				gbString str = type_to_string(t);
-				error(e->token, "Testing procedures must have a signature type of proc(^testing.T), got %s", str);
-				gb_string_free(str);
-				is_tester = false;
-			}
-
-			if (is_tester) {
-				add_dependency_to_set(c, e);
-				array_add(&c->info.testing_procedures, e);
+		if (build_context.test_all_packages) {
+			for (auto const &entry : c->info.packages) {
+				AstPackage *pkg = entry.value;
+				collect_testing_procedures_of_package(c, pkg);
 			}
 		}
 	} else if (start != nullptr) {
