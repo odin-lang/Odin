@@ -2702,14 +2702,13 @@ gb_internal bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, T
 		check_expr_or_type(&c, &o, pt->type);
 		if (o.mode != Addressing_Invalid && o.mode != Addressing_Type) {
 			// NOTE(bill): call check_type_expr again to get a consistent error message
-			begin_error_block();
+			ERROR_BLOCK();
 			elem = check_type_expr(&c, pt->type, nullptr);
 			if (o.mode == Addressing_Variable) {
 				gbString s = expr_to_string(pt->type);
 				error_line("\tSuggestion: ^ is used for pointer types, did you mean '&%s'?\n", s);
 				gb_string_free(s);
 			}
-			end_error_block();
 		} else {
 			elem = o.type;
 		}

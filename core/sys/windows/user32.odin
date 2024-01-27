@@ -3,7 +3,7 @@ package sys_windows
 
 foreign import user32 "system:User32.lib"
 
-@(default_calling_convention="stdcall")
+@(default_calling_convention="system")
 foreign user32 {
 	GetClassInfoW :: proc(hInstance: HINSTANCE, lpClassNAme: LPCWSTR, lpWndClass: ^WNDCLASSW) -> BOOL ---
 	GetClassInfoExW :: proc(hInsatnce: HINSTANCE, lpszClass: LPCWSTR, lpwcx: ^WNDCLASSEXW) -> BOOL ---
@@ -236,7 +236,7 @@ foreign user32 {
 	EnableMenuItem :: proc(hMenu: HMENU, uIDEnableItem: UINT, uEnable: UINT) -> BOOL ---
 }
 
-CreateWindowW :: #force_inline proc "stdcall" (
+CreateWindowW :: #force_inline proc "system" (
 	lpClassName: LPCTSTR,
 	lpWindowName: LPCTSTR,
 	dwStyle: DWORD,
@@ -266,7 +266,7 @@ CreateWindowW :: #force_inline proc "stdcall" (
 }
 
 when ODIN_ARCH == .amd64 {
-	@(default_calling_convention="stdcall")
+	@(default_calling_convention="system")
 	foreign user32 {
 		GetClassLongPtrW :: proc(hWnd: HWND, nIndex: c_int) -> ULONG_PTR ---
 		SetClassLongPtrW :: proc(hWnd: HWND, nIndex: c_int, dwNewLong: LONG_PTR) -> ULONG_PTR ---
@@ -312,8 +312,8 @@ Monitor_From_Flags :: enum DWORD {
 	MONITOR_DEFAULTTONEAREST = 0x00000002, // Returns a handle to the display monitor that is nearest to the window
 }
 
-Monitor_Enum_Proc :: #type proc "stdcall" (HMONITOR, HDC, LPRECT, LPARAM) -> BOOL
-Window_Enum_Proc :: #type proc "stdcall" (HWND, LPARAM) -> BOOL
+Monitor_Enum_Proc :: #type proc "system" (HMONITOR, HDC, LPRECT, LPARAM) -> BOOL
+Window_Enum_Proc :: #type proc "system" (HWND, LPARAM) -> BOOL
 
 USER_DEFAULT_SCREEN_DPI                    :: 96
 DPI_AWARENESS_CONTEXT                      :: distinct HANDLE

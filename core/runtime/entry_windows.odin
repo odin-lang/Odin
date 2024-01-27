@@ -1,12 +1,13 @@
 //+private
 //+build windows
+//+no-instrumentation
 package runtime
 
 import "core:intrinsics"
 
 when ODIN_BUILD_MODE == .Dynamic {
 	@(link_name="DllMain", linkage="strong", require)
-	DllMain :: proc "stdcall" (hinstDLL: rawptr, fdwReason: u32, lpReserved: rawptr) -> b32 {
+	DllMain :: proc "system" (hinstDLL: rawptr, fdwReason: u32, lpReserved: rawptr) -> b32 {
 		context = default_context()
 
 		// Populate Windows DLL-specific global
@@ -28,7 +29,7 @@ when ODIN_BUILD_MODE == .Dynamic {
 } else when !ODIN_TEST && !ODIN_NO_ENTRY_POINT {
 	when ODIN_ARCH == .i386 || ODIN_NO_CRT {
 		@(link_name="mainCRTStartup", linkage="strong", require)
-		mainCRTStartup :: proc "stdcall" () -> i32 {
+		mainCRTStartup :: proc "system" () -> i32 {
 			context = default_context()
 			#force_no_inline _startup_runtime()
 			intrinsics.__entry_point()

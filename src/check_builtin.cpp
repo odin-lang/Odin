@@ -1666,7 +1666,12 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 
 	if (ce->args.count > 0) {
 		if (ce->args[0]->kind == Ast_FieldValue) {
-			if (id != BuiltinProc_soa_zip) {
+			switch (id) {
+			case BuiltinProc_soa_zip:
+			case BuiltinProc_quaternion:
+				// okay
+				break;
+			default:
 				error(call, "'field = value' calling is not allowed on built-in procedures");
 				return false;
 			}
@@ -2299,61 +2304,150 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 	}
 
 	case BuiltinProc_quaternion: {
-		// quaternion :: proc(real, imag, jmag, kmag: float_type) -> complex_type
-		Operand x = *operand;
-		Operand y = {};
-		Operand z = {};
-		Operand w = {};
+		bool first_is_field_value = (ce->args[0]->kind == Ast_FieldValue);
+
+		bool fail = false;
+		for (Ast *arg : ce->args) {
+			bool mix = false;
+			if (first_is_field_value) {
+				mix = arg->kind != Ast_FieldValue;
+			} else {
+				mix = arg->kind == Ast_FieldValue;
+			}
+			if (mix) {
+				error(arg, "Mixture of 'field = value' and value elements in the procedure call '%.*s' is not allowed", LIT(builtin_name));
+				fail = true;
+				break;
+			}
+		}
+
+		if (fail) {
+			operand->type = t_untyped_quaternion;
+			operand->mode = Addressing_Constant;
+			operand->value = exact_value_quaternion(0.0, 0.0, 0.0, 0.0);
+			break;
+		}
+
+		// quaternion :: proc(imag, jmag, kmag, real: float_type) -> complex_type
+		Operand xyzw[4] = {};
+
+		u32 first_index = 0;
 
 		// NOTE(bill): Invalid will be the default till fixed
 		operand->type = t_invalid;
 		operand->mode = Addressing_Invalid;
 
-		check_expr(c, &y, ce->args[1]);
-		if (y.mode == Addressing_Invalid) {
-			return false;
-		}
-		check_expr(c, &z, ce->args[2]);
-		if (y.mode == Addressing_Invalid) {
-			return false;
-		}
-		check_expr(c, &w, ce->args[3]);
-		if (y.mode == Addressing_Invalid) {
-			return false;
+		if (first_is_field_value) {
+			u32 fields_set[4] = {}; // 0 unset, 1 xyzw, 2 real/etc
+
+			auto const check_field = [&fields_set, &builtin_name](CheckerContext *c, Operand *o, Ast *arg, i32 *index) -> bool {
+				*index = -1;
+
+				ast_node(field, FieldValue, arg);
+				String name = {};
+				if (field->field->kind == Ast_Ident) {
+					name = field->field->Ident.token.string;
+				} else {
+					error(field->field, "Expected an identifier for field argument");
+					return false;
+				}
+
+				u32 style = 0;
+
+				if (name == "x") {
+					*index = 0; style = 1;
+				} else if (name == "y") {
+					*index = 1; style = 1;
+				} else if (name == "z") {
+					*index = 2; style = 1;
+				}  else if (name == "w") {
+					*index = 3; style = 1;
+				} else if (name == "imag") {
+					*index = 0; style = 2;
+				} else if (name == "jmag") {
+					*index = 1; style = 2;
+				} else if (name == "kmag") {
+					*index = 2; style = 2;
+				}  else if (name == "real") {
+					*index = 3; style = 2;
+				} else {
+					error(field->field, "Unknown name for '%.*s', expected (w, x, y, z; or real, imag, jmag, kmag), got '%.*s'", LIT(builtin_name), LIT(name));
+					return false;
+				}
+
+				if (fields_set[*index]) {
+					error(field->field, "Previously assigned field: '%.*s'", LIT(name));
+				}
+				fields_set[*index] = style;
+
+				check_expr(c, o, field->value);
+				return o->mode != Addressing_Invalid;
+			};
+
+			Operand *refs[4] = {&xyzw[0], &xyzw[1], &xyzw[2], &xyzw[3]};
+
+			for (i32 i = 0; i < 4; i++) {
+				i32 index = -1;
+				Operand o = {};
+				bool ok = check_field(c, &o, ce->args[i], &index);
+				if (!ok || index < 0) {
+					return false;
+				}
+				first_index = cast(u32)index;
+				*refs[index] = o;
+			}
+
+			for (i32 i = 0; i < 4; i++) {
+				GB_ASSERT(fields_set[i]);
+			}
+			for (i32 i = 1; i < 4; i++) {
+				if (fields_set[i] != fields_set[i-1]) {
+					error(call, "Mixture of xyzw and real/etc is not allowed with '%.*s'", LIT(builtin_name));
+					break;
+				}
+			}
+		} else {
+			error(call, "'%.*s' requires that all arguments are named (w, x, y, z; or real, imag, jmag, kmag)", LIT(builtin_name));
+
+			for (i32 i = 0; i < 4; i++) {
+				check_expr(c, &xyzw[i], ce->args[i]);
+				if (xyzw[i].mode == Addressing_Invalid) {
+					return false;
+				}
+			}
 		}
 
-		convert_to_typed(c, &x, y.type); if (x.mode == Addressing_Invalid) return false;
-		convert_to_typed(c, &y, x.type); if (y.mode == Addressing_Invalid) return false;
-		convert_to_typed(c, &z, x.type); if (z.mode == Addressing_Invalid) return false;
-		convert_to_typed(c, &w, x.type); if (w.mode == Addressing_Invalid) return false;
-		if (x.mode == Addressing_Constant &&
-		    y.mode == Addressing_Constant &&
-		    z.mode == Addressing_Constant &&
-		    w.mode == Addressing_Constant) {
-		    	x.value = exact_value_to_float(x.value);
-		    	y.value = exact_value_to_float(y.value);
-		    	z.value = exact_value_to_float(z.value);
-		    	w.value = exact_value_to_float(w.value);
-			if (is_type_numeric(x.type) && x.value.kind == ExactValue_Float) {
-				x.type = t_untyped_float;
+
+		for (u32 i = 0; i < 4; i++ ){
+			u32 j = (i + first_index) % 4;
+			if (j == first_index) {
+				convert_to_typed(c, &xyzw[j], xyzw[(first_index+1)%4].type); if (xyzw[j].mode == Addressing_Invalid) return false;
+			} else {
+				convert_to_typed(c, &xyzw[j], xyzw[first_index].type); if (xyzw[j].mode == Addressing_Invalid) return false;
 			}
-			if (is_type_numeric(y.type) && y.value.kind == ExactValue_Float) {
-				y.type = t_untyped_float;
+		}
+		if (xyzw[0].mode == Addressing_Constant &&
+		    xyzw[1].mode == Addressing_Constant &&
+		    xyzw[2].mode == Addressing_Constant &&
+		    xyzw[3].mode == Addressing_Constant) {
+			for (i32 i = 0; i < 4; i++) {
+				xyzw[i].value = exact_value_to_float(xyzw[i].value);
 			}
-			if (is_type_numeric(z.type) && z.value.kind == ExactValue_Float) {
-				z.type = t_untyped_float;
-			}
-			if (is_type_numeric(w.type) && w.value.kind == ExactValue_Float) {
-				w.type = t_untyped_float;
+			for (i32 i = 0; i < 4; i++) {
+				if (is_type_numeric(xyzw[i].type) && xyzw[i].value.kind == ExactValue_Float) {
+					xyzw[i].type = t_untyped_float;
+				}
 			}
 		}
 
-		if (!(are_types_identical(x.type, y.type) && are_types_identical(x.type, z.type) && are_types_identical(x.type, w.type))) {
-			gbString tx = type_to_string(x.type);
-			gbString ty = type_to_string(y.type);
-			gbString tz = type_to_string(z.type);
-			gbString tw = type_to_string(w.type);
-			error(call, "Mismatched types to 'quaternion', '%s' vs '%s' vs '%s' vs '%s'", tx, ty, tz, tw);
+		if (!(are_types_identical(xyzw[0].type, xyzw[1].type) &&
+		      are_types_identical(xyzw[0].type, xyzw[2].type) &&
+		      are_types_identical(xyzw[0].type, xyzw[3].type))) {
+			gbString tx = type_to_string(xyzw[0].type);
+			gbString ty = type_to_string(xyzw[1].type);
+			gbString tz = type_to_string(xyzw[2].type);
+			gbString tw = type_to_string(xyzw[3].type);
+			error(call, "Mismatched types to 'quaternion', 'x=%s' vs 'y=%s' vs 'z=%s' vs 'w=%s'", tx, ty, tz, tw);
 			gb_string_free(tw);
 			gb_string_free(tz);
 			gb_string_free(ty);
@@ -2361,31 +2455,35 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			return false;
 		}
 
-		if (!is_type_float(x.type)) {
-			gbString s = type_to_string(x.type);
+		if (!is_type_float(xyzw[0].type)) {
+			gbString s = type_to_string(xyzw[0].type);
 			error(call, "Arguments have type '%s', expected a floating point", s);
 			gb_string_free(s);
 			return false;
 		}
-		if (is_type_endian_specific(x.type)) {
-			gbString s = type_to_string(x.type);
+		if (is_type_endian_specific(xyzw[0].type)) {
+			gbString s = type_to_string(xyzw[0].type);
 			error(call, "Arguments with a specified endian are not allow, expected a normal floating point, got '%s'", s);
 			gb_string_free(s);
 			return false;
 		}
 
-		if (x.mode == Addressing_Constant && y.mode == Addressing_Constant && z.mode == Addressing_Constant && w.mode == Addressing_Constant) {
-			f64 r = exact_value_to_float(x.value).value_float;
-			f64 i = exact_value_to_float(y.value).value_float;
-			f64 j = exact_value_to_float(z.value).value_float;
-			f64 k = exact_value_to_float(w.value).value_float;
+
+		operand->mode = Addressing_Value;
+
+		if (xyzw[0].mode == Addressing_Constant &&
+		    xyzw[1].mode == Addressing_Constant &&
+		    xyzw[2].mode == Addressing_Constant &&
+		    xyzw[3].mode == Addressing_Constant) {
+			f64 r = exact_value_to_float(xyzw[3].value).value_float;
+			f64 i = exact_value_to_float(xyzw[0].value).value_float;
+			f64 j = exact_value_to_float(xyzw[1].value).value_float;
+			f64 k = exact_value_to_float(xyzw[2].value).value_float;
 			operand->value = exact_value_quaternion(r, i, j, k);
 			operand->mode = Addressing_Constant;
-		} else {
-			operand->mode = Addressing_Value;
 		}
 
-		BasicKind kind = core_type(x.type)->Basic.kind;
+		BasicKind kind = core_type(xyzw[first_index].type)->Basic.kind;
 		switch (kind) {
 		case Basic_f16:          operand->type = t_quaternion64;       break;
 		case Basic_f32:          operand->type = t_quaternion128;      break;
@@ -3092,7 +3190,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				mix = arg->kind == Ast_FieldValue;
 			}
 			if (mix) {
-				error(arg, "Mixture of 'field = value' and value elements in the procedure call 'soa_zip' is not allowed");
+				error(arg, "Mixture of 'field = value' and value elements in the procedure call '%.*s' is not allowed", LIT(builtin_name));
 				fail = true;
 				break;
 			}

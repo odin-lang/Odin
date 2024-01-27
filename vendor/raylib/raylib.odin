@@ -1085,7 +1085,7 @@ foreign lib {
 
 	// Misc. functions
 	TakeScreenshot :: proc(fileName: cstring) ---        // Takes a screenshot of current screen (filename extension defines format)
-	SetConfigFlags :: proc(flags: ConfigFlags) ---       // Setup init configuration flags (view FLAGS)
+	SetConfigFlags :: proc(flags: ConfigFlags) ---       // Setup init configuration flags (view FLAGS). NOTE: This function is expected to be called before window creation
 	OpenURL        :: proc(url: cstring) ---             // Open URL with default system browser (if available)
 
 	// NOTE: Following functions implemented in module [utils]
@@ -1219,7 +1219,8 @@ foreign lib {
 	//------------------------------------------------------------------------------------
 
 	SetGesturesEnabled     :: proc(flags: Gestures) ---          // Enable a set of gestures using flags
-	IsGestureDetected      :: proc(gesture: Gesture) -> bool --- // Check if a gesture have been detected
+	// IsGestureDetected      :: proc(gesture: Gesture) -> bool --- // Check if a gesture have been detected
+
 	GetGestureDetected     :: proc() -> Gestures ---             // Get latest detected gesture
 	GetGestureHoldDuration :: proc() -> f32 ---                  // Get gesture hold time in milliseconds
 	GetGestureDragVector   :: proc() -> Vector2 ---              // Get gesture drag vector
@@ -1713,12 +1714,22 @@ foreign lib {
 
 // Workaround for broken IsMouseButtonUp in Raylib 5.0.
 when VERSION == "5.0" {
-	IsMouseButtonUp :: proc(button: MouseButton) -> bool {
+	IsMouseButtonUp :: proc "c" (button: MouseButton) -> bool {
 		return !IsMouseButtonDown(button)
 	}
 } else {
 	#panic("Remove this this when block and everything inside it for Raylib > 5.0. It's just here to fix a bug in Raylib 5.0. See IsMouseButtonUp inside 'foreign lib {' block.")
 }
+
+//  Check if a gesture have been detected
+IsGestureDetected :: proc "c" (gesture: Gesture) -> bool {
+	@(default_calling_convention="c")
+	foreign lib {
+		IsGestureDetected :: proc "c" (gesture: Gestures) -> bool ---
+	}
+	return IsGestureDetected({gesture})
+}
+
 
 // Text formatting with variables (sprintf style)
 TextFormat :: proc(text: cstring, args: ..any) -> cstring { 
@@ -1763,7 +1774,7 @@ MemAllocatorProc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
 		MemFree(old_memory)
 		return nil, nil
 	
-	case .Resize:
+	case .Resize, .Resize_Non_Zeroed:
 		ptr := MemRealloc(old_memory, c.uint(size))
 		if ptr == nil {
 			err = .Out_Of_Memory

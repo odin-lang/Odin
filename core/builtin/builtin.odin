@@ -110,7 +110,7 @@ typeid_of    :: proc($T: typeid) -> typeid ---
 swizzle :: proc(x: [N]T, indices: ..int) -> [len(indices)]T ---
 
 complex    :: proc(real, imag: Float) -> Complex_Type ---
-quaternion :: proc(real, imag, jmag, kmag: Float) -> Quaternion_Type ---
+quaternion :: proc(imag, jmag, kmag, real: Float) -> Quaternion_Type --- // fields must be named
 real       :: proc(value: Complex_Or_Quaternion) -> Float ---
 imag       :: proc(value: Complex_Or_Quaternion) -> Float ---
 jmag       :: proc(value: Quaternion) -> Float ---

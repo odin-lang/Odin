@@ -1497,8 +1497,6 @@ gb_internal WORKER_TASK_PROC(lb_llvm_module_pass_worker_proc) {
 	auto passes = array_make<char const *>(heap_allocator(), 0, 64);
 	defer (array_free(&passes));
 
-
-
 	LLVMPassBuilderOptionsRef pb_options = LLVMCreatePassBuilderOptions();
 	defer (LLVMDisposePassBuilderOptions(pb_options));
 
@@ -2505,7 +2503,7 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 	LLVMCodeModel code_mode = LLVMCodeModelDefault;
 	if (is_arch_wasm()) {
 		code_mode = LLVMCodeModelJITDefault;
-	} else if (build_context.metrics.os == TargetOs_freestanding) {
+	} else if (is_arch_x86() && build_context.metrics.os == TargetOs_freestanding) {
 		code_mode = LLVMCodeModelKernel;
 	}
 
@@ -2531,7 +2529,46 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 	*/
 
 	if (build_context.target_features_set.entries.count != 0) {
-		llvm_features = target_features_set_to_cstring(permanent_allocator(), false);
+		// Prefix all of the features with a `+`, because we are
+		// enabling additional features.
+		char const *additional_features = target_features_set_to_cstring(permanent_allocator(), false, true);
+
+		String f_string = make_string_c(llvm_features);
+		String a_string = make_string_c(additional_features);
+		isize f_len = f_string.len;
+
+		if (f_len == 0) {
+			// The common case is that llvm_features is empty, so
+			// the target_features_set additions can be used as is.
+			llvm_features = additional_features;
+		} else {
+			// The user probably specified `-microarch:native`, so
+			// llvm_features is populated by LLVM's idea of what
+			// the host CPU supports.
+			//
+			// As far as I can tell, (which is barely better than
+			// wild guessing), a bitset is formed by parsing the
+			// string left to right.
+			//
+			// So, llvm_features + ',' + additonal_features, will
+			// makes the target_features_set override llvm_features.
+
+			char *tmp = gb_alloc_array(permanent_allocator(), char, f_len + 1 + a_string.len + 1);
+			isize len = 0;
+
+			// tmp = f_string
+			gb_memmove(tmp, f_string.text, f_string.len);
+			len += f_string.len;
+			// tmp += ','
+			tmp[len++] = ',';
+			// tmp += a_string
+			gb_memmove(tmp + len, a_string.text, a_string.len);
+			len += a_string.len;
+			// tmp += NUL
+			tmp[len++] = 0;
+
+			llvm_features = tmp;
+		}
 	}
 
 	// GB_ASSERT_MSG(LLVMTargetHasAsmBackend(target));

@@ -1,4 +1,5 @@
 //+private
+//+no-instrumentation
 package runtime
 
 @require foreign import "system:int64.lib"
@@ -12,7 +13,7 @@ windows_trap_array_bounds :: proc "contextless" () -> ! {
 	EXCEPTION_ARRAY_BOUNDS_EXCEEDED :: 0xC000008C
 
 	foreign kernel32 {
-		RaiseException :: proc "stdcall" (dwExceptionCode, dwExceptionFlags, nNumberOfArguments: DWORD, lpArguments: ^ULONG_PTR) -> ! ---
+		RaiseException :: proc "system" (dwExceptionCode, dwExceptionFlags, nNumberOfArguments: DWORD, lpArguments: ^ULONG_PTR) -> ! ---
 	}
 
 	RaiseException(EXCEPTION_ARRAY_BOUNDS_EXCEEDED, 0, 0, nil)

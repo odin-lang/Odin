@@ -137,9 +137,9 @@ assign_float :: proc(val: any, f: $T) -> bool {
 	case complex64:  dst = complex(f32(f), 0)
 	case complex128: dst = complex(f64(f), 0)
 	
-	case quaternion64:  dst = quaternion(f16(f), 0, 0, 0)
-	case quaternion128: dst = quaternion(f32(f), 0, 0, 0)
-	case quaternion256: dst = quaternion(f64(f), 0, 0, 0)
+	case quaternion64:  dst = quaternion(w=f16(f), x=0, y=0, z=0)
+	case quaternion128: dst = quaternion(w=f32(f), x=0, y=0, z=0)
+	case quaternion256: dst = quaternion(w=f64(f), x=0, y=0, z=0)
 	
 	case: return false
 	}

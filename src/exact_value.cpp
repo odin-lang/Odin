@@ -174,7 +174,7 @@ gb_internal ExactValue exact_value_integer_from_string(String const &string) {
 
 
 
-gb_internal f64 float_from_string(String const &string) {
+gb_internal f64 float_from_string(String const &string, bool *success = nullptr) {
 	if (string.len < 128) {
 		char buf[128] = {};
 		isize n = 0;
@@ -187,7 +187,13 @@ gb_internal f64 float_from_string(String const &string) {
 			buf[n++] = cast(char)c;
 		}
 		buf[n] = 0;
-		return atof(buf);
+
+		char *end_ptr;
+		f64 f = strtod(buf, &end_ptr);
+		if (success != nullptr) {
+			*success = *end_ptr == '\0';
+		}
+		return f;
 	} else {
 		TEMPORARY_ALLOCATOR_GUARD();
 		char *buf = gb_alloc_array(temporary_allocator(), char, string.len+1);
@@ -201,7 +207,13 @@ gb_internal f64 float_from_string(String const &string) {
 			buf[n++] = cast(char)c;
 		}
 		buf[n] = 0;
-		return atof(buf);
+
+		char *end_ptr;
+		f64 f = strtod(buf, &end_ptr);
+		if (success != nullptr) {
+			*success = *end_ptr == '\0';
+		}
+		return f;
 	}
 /*
 	isize i = 0;
@@ -313,7 +325,11 @@ gb_internal ExactValue exact_value_float_from_string(String string) {
 		return exact_value_integer_from_string(string);
 	}
 
-	f64 f = float_from_string(string);
+	bool success;
+	f64 f = float_from_string(string, &success);
+	if (!success) {
+		return {ExactValue_Invalid};
+	}
 	return exact_value_float(f);
 }
 
