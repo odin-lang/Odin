@@ -7,7 +7,6 @@ else                          { foreign import lib "system:cgltf"          }
 
 import "core:c"
 
-
 file_type :: enum c.int {
 	invalid,
 	gltf,
