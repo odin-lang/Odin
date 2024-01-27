@@ -18,8 +18,11 @@ import "core:encoding/endian"
 import "core:math/bits"
 import "core:mem"
 
-// DIGEST_SIZE is the SM3 digest size.
+// DIGEST_SIZE is the SM3 digest size in bytes.
 DIGEST_SIZE :: 32
+
+// BLOCK_SIZE is the SM3 block size in bytes.
+BLOCK_SIZE :: 64
 
 // Context is a SM3 instance.
 Context :: struct {
@@ -132,9 +135,6 @@ reset :: proc(ctx: ^Context) {
 /*
     SM3 implementation
 */
-
-@(private)
-BLOCK_SIZE :: 64
 
 @(private)
 IV := [8]u32 {

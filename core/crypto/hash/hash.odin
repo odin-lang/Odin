@@ -58,10 +58,12 @@ hash_stream :: proc(
 
 	init(&ctx, algorithm, context.temp_allocator)
 
-	_BUFFER_SIZE :: 512
-	buf := make([]byte, _BUFFER_SIZE, context.temp_allocator)
-	defer mem.zero_explicit(raw_data(buf), _BUFFER_SIZE)
-	defer delete(buf)
+	buffer_size := block_size(&ctx) * 4
+	buf := make([]byte, buffer_size, context.temp_allocator)
+	defer {
+		mem.zero_explicit(raw_data(buf), buffer_size)
+		delete(buf, context.temp_allocator)
+	}
 
 	loop: for {
 		n, err := io.read(s, buf)
@@ -103,7 +105,7 @@ hash_file :: proc(
 	if !ok {
 		return nil, io.Error.Unknown
 	}
-	defer delete(buf)
+	defer delete(buf, allocator)
 
 	return hash_bytes(algorithm, buf, allocator), io.Error.None
 }

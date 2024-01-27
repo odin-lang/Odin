@@ -23,8 +23,11 @@ import "core:encoding/endian"
 import "core:math/bits"
 import "core:mem"
 
-// DIGEST_SIZE is the SHA1 digest size.
+// DIGEST_SIZE is the SHA1 digest size in bytes.
 DIGEST_SIZE :: 20
+
+// BLOCK_SIZE is the SHA1 block size in bytes.
+BLOCK_SIZE :: 64
 
 // Context is a SHA1 instance.
 Context :: struct {
@@ -137,9 +140,6 @@ reset :: proc(ctx: ^$T) {
 /*
     SHA1 implementation
 */
-
-@(private)
-BLOCK_SIZE :: 64
 
 @(private)
 transform :: proc "contextless" (ctx: ^Context, data: []byte) {

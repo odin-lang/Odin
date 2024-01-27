@@ -19,20 +19,26 @@ import "core:encoding/endian"
 import "core:math/bits"
 import "core:mem"
 
-// DIGEST_SIZE_224 is the SHA-224 digest size.
+// DIGEST_SIZE_224 is the SHA-224 digest size in bytes.
 DIGEST_SIZE_224 :: 28
-// DIGEST_SIZE_256 is the SHA-256 digest size.
+// DIGEST_SIZE_256 is the SHA-256 digest size in bytes.
 DIGEST_SIZE_256 :: 32
-// DIGEST_SIZE_384 is the SHA-384 digest size.
+// DIGEST_SIZE_384 is the SHA-384 digest size in bytes.
 DIGEST_SIZE_384 :: 48
-// DIGEST_SIZE_512 is the SHA-512 digest size.
+// DIGEST_SIZE_512 is the SHA-512 digest size in bytes.
 DIGEST_SIZE_512 :: 64
-// DIGEST_SIZE_512_256 is the SHA-512/256 digest size.
+// DIGEST_SIZE_512_256 is the SHA-512/256 digest size in bytes.
 DIGEST_SIZE_512_256 :: 32
+
+// BLOCK_SIZE_256 is the SHA-224 and SHA-256 block size in bytes.
+BLOCK_SIZE_256 :: 64
+// BLOCK_SIZE_512 is the SHA-384, SHA-512, and SHA-512/256 block size
+// in bytes.
+BLOCK_SIZE_512 :: 128
 
 // Context_256 is a SHA-224 or SHA-256 instance.
 Context_256 :: struct {
-	block:     [SHA256_BLOCK_SIZE]byte,
+	block:     [BLOCK_SIZE_256]byte,
 	h:         [8]u32,
 	bitlength: u64,
 	length:    u64,
@@ -43,7 +49,7 @@ Context_256 :: struct {
 
 // Context_512 is a SHA-384, SHA-512 or SHA-512/256 instance.
 Context_512 :: struct {
-	block:     [SHA512_BLOCK_SIZE]byte,
+	block:     [BLOCK_SIZE_512]byte,
 	h:         [8]u64,
 	bitlength: u64,
 	length:    u64,
@@ -51,7 +57,6 @@ Context_512 :: struct {
 
 	is_initialized: bool,
 }
-
 
 // init_224 initializes a Context_256 for SHA-224.
 init_224 :: proc(ctx: ^Context_256) {
@@ -156,9 +161,9 @@ update :: proc(ctx: ^$T, data: []byte) {
 	assert(ctx.is_initialized)
 
 	when T == Context_256 {
-		CURR_BLOCK_SIZE :: SHA256_BLOCK_SIZE
+		CURR_BLOCK_SIZE :: BLOCK_SIZE_256
 	} else when T == Context_512 {
-		CURR_BLOCK_SIZE :: SHA512_BLOCK_SIZE
+		CURR_BLOCK_SIZE :: BLOCK_SIZE_512
 	}
 
 	data := data
@@ -205,12 +210,12 @@ final :: proc(ctx: ^$T, hash: []byte, finalize_clone: bool = false) {
 
 	length := ctx.length
 
-	raw_pad: [SHA512_BLOCK_SIZE]byte
+	raw_pad: [BLOCK_SIZE_512]byte
 	when T == Context_256 {
-		CURR_BLOCK_SIZE :: SHA256_BLOCK_SIZE
+		CURR_BLOCK_SIZE :: BLOCK_SIZE_256
 		pm_len := 8 // 64-bits for length
 	} else when T == Context_512 {
-		CURR_BLOCK_SIZE :: SHA512_BLOCK_SIZE
+		CURR_BLOCK_SIZE :: BLOCK_SIZE_512
 		pm_len := 16 // 128-bits for length
 	}
 	pad := raw_pad[:CURR_BLOCK_SIZE]
@@ -264,11 +269,6 @@ reset :: proc(ctx: ^$T) {
 /*
     SHA2 implementation
 */
-
-@(private)
-SHA256_BLOCK_SIZE :: 64
-@(private)
-SHA512_BLOCK_SIZE :: 128
 
 @(private)
 sha256_k := [64]u32 {
@@ -400,12 +400,12 @@ sha2_transf :: proc "contextless" (ctx: ^$T, data: []byte) {
 		w: [64]u32
 		wv: [8]u32
 		t1, t2: u32
-		CURR_BLOCK_SIZE :: SHA256_BLOCK_SIZE
+		CURR_BLOCK_SIZE :: BLOCK_SIZE_256
 	} else when T == Context_512 {
 		w: [80]u64
 		wv: [8]u64
 		t1, t2: u64
-		CURR_BLOCK_SIZE :: SHA512_BLOCK_SIZE
+		CURR_BLOCK_SIZE :: BLOCK_SIZE_512
 	}
 
 	data := data

@@ -27,6 +27,15 @@ DIGEST_SIZE_384 :: 48
 // DIGEST_SIZE_512 is the Keccak-512 digest size.
 DIGEST_SIZE_512 :: 64
 
+// BLOCK_SIZE_224 is the Keccak-224 block size in bytes.
+BLOCK_SIZE_224 :: _sha3.RATE_224
+// BLOCK_SIZE_256 is the Keccak-256 block size in bytes.
+BLOCK_SIZE_256 :: _sha3.RATE_256
+// BLOCK_SIZE_384 is the Keccak-384 block size in bytes.
+BLOCK_SIZE_384 :: _sha3.RATE_384
+// BLOCK_SIZE_512 is the Keccak-512 block size in bytes.
+BLOCK_SIZE_512 :: _sha3.RATE_512
+
 // Context is a Keccak instance.
 Context :: distinct _sha3.Context
 

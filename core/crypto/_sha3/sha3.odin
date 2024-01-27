@@ -16,6 +16,11 @@ import "core:mem"
 
 ROUNDS :: 24
 
+RATE_224 :: 1152 / 8
+RATE_256 :: 1088 / 8
+RATE_384 :: 832 / 8
+RATE_512 :: 576 / 8
+
 Context :: struct {
 	st:        struct #raw_union {
 		b: [200]u8,
@@ -173,7 +178,6 @@ reset :: proc(ctx: ^Context) {
 
 	mem.zero_explicit(ctx, size_of(ctx^))
 }
-
 
 shake_xof :: proc(ctx: ^Context) {
 	assert(ctx.is_initialized)

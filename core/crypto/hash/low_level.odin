@@ -57,7 +57,7 @@ ALGORITHM_NAMES := [Algorithm]string {
 	.Insecure_SHA1     = "SHA-1",
 }
 
-// DIGEST_SIZES is the Algorithm to digest size.
+// DIGEST_SIZES is the Algorithm to digest size in bytes.
 DIGEST_SIZES := [Algorithm]int {
 	.Invalid           = 0,
 	.BLAKE2B           = blake2b.DIGEST_SIZE,
@@ -78,6 +78,29 @@ DIGEST_SIZES := [Algorithm]int {
 	.Legacy_KECCAK_512 = keccak.DIGEST_SIZE_512,
 	.Insecure_MD5      = md5.DIGEST_SIZE,
 	.Insecure_SHA1     = sha1.DIGEST_SIZE,
+}
+
+// BLOCK_SIZES is the Algoritm to block size in bytes.
+BLOCK_SIZES := [Algorithm]int {
+	.Invalid           = 0,
+	.BLAKE2B           = blake2b.BLOCK_SIZE,
+	.BLAKE2S           = blake2s.BLOCK_SIZE,
+	.SHA224            = sha2.BLOCK_SIZE_256,
+	.SHA256            = sha2.BLOCK_SIZE_256,
+	.SHA384            = sha2.BLOCK_SIZE_512,
+	.SHA512            = sha2.BLOCK_SIZE_512,
+	.SHA512_256        = sha2.BLOCK_SIZE_512,
+	.SHA3_224          = sha3.BLOCK_SIZE_224,
+	.SHA3_256          = sha3.BLOCK_SIZE_256,
+	.SHA3_384          = sha3.BLOCK_SIZE_384,
+	.SHA3_512          = sha3.BLOCK_SIZE_512,
+	.SM3               = sm3.BLOCK_SIZE,
+	.Legacy_KECCAK_224 = keccak.BLOCK_SIZE_224,
+	.Legacy_KECCAK_256 = keccak.BLOCK_SIZE_256,
+	.Legacy_KECCAK_384 = keccak.BLOCK_SIZE_384,
+	.Legacy_KECCAK_512 = keccak.BLOCK_SIZE_512,
+	.Insecure_MD5      = md5.BLOCK_SIZE,
+	.Insecure_SHA1     = sha1.BLOCK_SIZE,
 }
 
 // Context is a concrete instantiation of a specific hash algorithm.
@@ -349,7 +372,12 @@ algorithm :: proc(ctx: ^Context) -> Algorithm {
 	return ctx._algo
 }
 
-// digest_size returns the digest size of a Context instance.
+// digest_size returns the digest size of a Context instance in bytes.
 digest_size :: proc(ctx: ^Context) -> int {
 	return DIGEST_SIZES[ctx._algo]
+}
+
+// block_size returns the block size of a Context instance in bytes.
+block_size :: proc(ctx: ^Context) -> int {
+	return BLOCK_SIZES[ctx._algo]
 }

@@ -17,8 +17,11 @@ package blake2s
 
 import "../_blake2"
 
-// DIGEST_SIZE is the BLAKE2s digest size.
+// DIGEST_SIZE is the BLAKE2s digest size in bytes.
 DIGEST_SIZE :: 32
+
+// BLOCK_SIZE is the BLAKE2s block size in bytes.
+BLOCK_SIZE :: _blake2.BLAKE2S_BLOCK_SIZE
 
 // Context is a BLAKE2s instance.
 Context :: _blake2.Blake2s_Context

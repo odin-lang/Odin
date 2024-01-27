@@ -22,8 +22,11 @@ import "core:encoding/endian"
 import "core:math/bits"
 import "core:mem"
 
-// DIGEST_SIZE is the MD5 digest size.
+// DIGEST_SIZE is the MD5 digest size in bytes.
 DIGEST_SIZE :: 16
+
+// BLOCK_SIZE is the MD5 block size in bytes.
+BLOCK_SIZE :: 64
 
 // Context is a MD5 instance.
 Context :: struct {
@@ -130,9 +133,6 @@ reset :: proc(ctx: ^$T) {
 /*
     MD5 implementation
 */
-
-@(private)
-BLOCK_SIZE :: 64
 
 /*
     @note(zh): F, G, H and I, as mentioned in the RFC, have been inlined into FF, GG, HH
