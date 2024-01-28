@@ -2438,7 +2438,7 @@ matrix_type :: proc() {
 
 		// component-wise multiplication
 		// since a * b would be a standard matrix multiplication
-		c6 := hadamard_product(a, b)
+		c6 := intrinsics.hadamard_product(a, b)
 
 
 		fmt.println("a + b",  c0)
@@ -2480,7 +2480,7 @@ matrix_type :: proc() {
 			5, 0, 6, 0,
 			0, 7, 0, 8,
 		}
-		fmt.println("b4", matrix_flatten(b4))
+		fmt.println("b4", intrinsics.matrix_flatten(b4))
 	}
 
 	{ // Casting non-square matrices
