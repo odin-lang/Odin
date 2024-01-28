@@ -538,8 +538,8 @@ test_hash :: proc(t: ^testing.T) {
 
 		// Exercise the rolling digest functionality, which also covers
 		// each implementation's clone routine.
-		ctx: hash.Context
-		hash.init(&ctx, algo, context.temp_allocator)
+		ctx, ctx_clone: hash.Context
+		hash.init(&ctx, algo)
 
 		api_algo := hash.algorithm(&ctx)
 		api_digest_size := hash.digest_size(&ctx)
@@ -565,20 +565,26 @@ test_hash :: proc(t: ^testing.T) {
 		)
 
 		hash.update(&ctx, digest_a)
+		hash.clone(&ctx_clone, &ctx)
 		hash.final(&ctx, digest_a, true)
 		hash.final(&ctx, digest_b)
 
+		digest_c := make([]byte, hash.digest_size(&ctx_clone), context.temp_allocator)
+		hash.final(&ctx_clone, digest_c)
+
 		a_str = string(hex.encode(digest_a, context.temp_allocator))
 		b_str = string(hex.encode(digest_b, context.temp_allocator))
+		c_str := string(hex.encode(digest_c, context.temp_allocator))
 
 		expect(
 			t,
-			a_str == b_str,
+			a_str == b_str && b_str == c_str,
 			fmt.tprintf(
-				"%s/rolling: Expected: %s (first) == %s (second)",
+				"%s/rolling: Expected: %s (first) == %s (second) == %s (third)",
 				algo_name,
 				a_str,
 				b_str,
+				c_str,
 			),
 		)
 	}

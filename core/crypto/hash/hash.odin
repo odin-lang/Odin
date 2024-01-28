@@ -39,7 +39,7 @@ hash_string_to_buffer :: proc(algorithm: Algorithm, data: string, hash: []byte) 
 hash_bytes_to_buffer :: proc(algorithm: Algorithm, data, hash: []byte) {
 	ctx: Context
 
-	init(&ctx, algorithm, context.temp_allocator)
+	init(&ctx, algorithm)
 	update(&ctx, data)
 	final(&ctx, hash)
 }
@@ -56,7 +56,7 @@ hash_stream :: proc(
 ) {
 	ctx: Context
 
-	init(&ctx, algorithm, context.temp_allocator)
+	init(&ctx, algorithm)
 
 	buffer_size := block_size(&ctx) * 4
 	buf := make([]byte, buffer_size, context.temp_allocator)

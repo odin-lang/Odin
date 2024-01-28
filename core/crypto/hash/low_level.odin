@@ -9,7 +9,7 @@ import "core:crypto/legacy/keccak"
 import "core:crypto/legacy/md5"
 import "core:crypto/legacy/sha1"
 
-import "core:mem"
+import "core:reflect"
 
 // Algorithm is the algorithm identifier associated with a given Context.
 Algorithm :: enum {
@@ -107,101 +107,89 @@ BLOCK_SIZES := [Algorithm]int {
 Context :: struct {
 	_algo: Algorithm,
 	_impl: union {
-		^blake2b.Context,
-		^blake2s.Context,
-		^sha2.Context_256,
-		^sha2.Context_512,
-		^sha3.Context,
-		^sm3.Context,
-		^keccak.Context,
-		^md5.Context,
-		^sha1.Context,
+		blake2b.Context,
+		blake2s.Context,
+		sha2.Context_256,
+		sha2.Context_512,
+		sha3.Context,
+		sm3.Context,
+		keccak.Context,
+		md5.Context,
+		sha1.Context,
 	},
-	_allocator: mem.Allocator,
+}
+
+@(private)
+_IMPL_IDS := [Algorithm]typeid {
+	.Invalid           = nil,
+	.BLAKE2B           = typeid_of(blake2b.Context),
+	.BLAKE2S           = typeid_of(blake2s.Context),
+	.SHA224            = typeid_of(sha2.Context_256),
+	.SHA256            = typeid_of(sha2.Context_256),
+	.SHA384            = typeid_of(sha2.Context_512),
+	.SHA512            = typeid_of(sha2.Context_512),
+	.SHA512_256        = typeid_of(sha2.Context_512),
+	.SHA3_224          = typeid_of(sha3.Context),
+	.SHA3_256          = typeid_of(sha3.Context),
+	.SHA3_384          = typeid_of(sha3.Context),
+	.SHA3_512          = typeid_of(sha3.Context),
+	.SM3               = typeid_of(sm3.Context),
+	.Legacy_KECCAK_224 = typeid_of(keccak.Context),
+	.Legacy_KECCAK_256 = typeid_of(keccak.Context),
+	.Legacy_KECCAK_384 = typeid_of(keccak.Context),
+	.Legacy_KECCAK_512 = typeid_of(keccak.Context),
+	.Insecure_MD5      = typeid_of(md5.Context),
+	.Insecure_SHA1     = typeid_of(sha1.Context),
 }
 
 // init initializes a Context with a specific hash Algorithm.
-//
-// Warning: Internal state is allocated, and resources must be freed
-// either implicitly via a call to final, or explicitly via calling reset.
-init :: proc(ctx: ^Context, algorithm: Algorithm, allocator := context.allocator) {
+init :: proc(ctx: ^Context, algorithm: Algorithm) {
 	if ctx._impl != nil {
 		reset(ctx)
 	}
 
+	// Directly specialize the union by setting the type ID (save a copy).
+	reflect.set_union_variant_typeid(
+		ctx._impl,
+		_IMPL_IDS[algorithm],
+	)
 	switch algorithm {
 	case .BLAKE2B:
-		impl := new(blake2b.Context, allocator)
-		blake2b.init(impl)
-		ctx._impl = impl
+		blake2b.init(&ctx._impl.(blake2b.Context))
 	case .BLAKE2S:
-		impl := new(blake2s.Context, allocator)
-		blake2s.init(impl)
-		ctx._impl = impl
+		blake2s.init(&ctx._impl.(blake2s.Context))
 	case .SHA224:
-		impl := new(sha2.Context_256, allocator)
-		sha2.init_224(impl)
-		ctx._impl = impl
+		sha2.init_224(&ctx._impl.(sha2.Context_256))
 	case .SHA256:
-		impl := new(sha2.Context_256, allocator)
-		sha2.init_256(impl)
-		ctx._impl = impl
+		sha2.init_256(&ctx._impl.(sha2.Context_256))
 	case .SHA384:
-		impl := new(sha2.Context_512, allocator)
-		sha2.init_384(impl)
-		ctx._impl = impl
+		sha2.init_384(&ctx._impl.(sha2.Context_512))
 	case .SHA512:
-		impl := new(sha2.Context_512, allocator)
-		sha2.init_512(impl)
-		ctx._impl = impl
+		sha2.init_512(&ctx._impl.(sha2.Context_512))
 	case .SHA512_256:
-		impl := new(sha2.Context_512, allocator)
-		sha2.init_512_256(impl)
-		ctx._impl = impl
+		sha2.init_512_256(&ctx._impl.(sha2.Context_512))
 	case .SHA3_224:
-		impl := new(sha3.Context, allocator)
-		sha3.init_224(impl)
-		ctx._impl = impl
+		sha3.init_224(&ctx._impl.(sha3.Context))
 	case .SHA3_256:
-		impl := new(sha3.Context, allocator)
-		sha3.init_256(impl)
-		ctx._impl = impl
+		sha3.init_256(&ctx._impl.(sha3.Context))
 	case .SHA3_384:
-		impl := new(sha3.Context, allocator)
-		sha3.init_384(impl)
-		ctx._impl = impl
+		sha3.init_384(&ctx._impl.(sha3.Context))
 	case .SHA3_512:
-		impl := new(sha3.Context, allocator)
-		sha3.init_512(impl)
-		ctx._impl = impl
+		sha3.init_512(&ctx._impl.(sha3.Context))
 	case .SM3:
-		impl := new(sm3.Context, allocator)
-		sm3.init(impl)
-		ctx._impl = impl
+		sm3.init(&ctx._impl.(sm3.Context))
 	case .Legacy_KECCAK_224:
-		impl := new(keccak.Context, allocator)
-		keccak.init_224(impl)
-		ctx._impl = impl
+		keccak.init_224(&ctx._impl.(keccak.Context))
 	case .Legacy_KECCAK_256:
-		impl := new(keccak.Context, allocator)
-		keccak.init_256(impl)
-		ctx._impl = impl
+		keccak.init_256(&ctx._impl.(keccak.Context))
 	case .Legacy_KECCAK_384:
-		impl := new(keccak.Context, allocator)
-		keccak.init_384(impl)
-		ctx._impl = impl
+		keccak.init_384(&ctx._impl.(keccak.Context))
 	case .Legacy_KECCAK_512:
-		impl := new(keccak.Context, allocator)
-		keccak.init_512(impl)
-		ctx._impl = impl
+		keccak.init_512(&ctx._impl.(keccak.Context))
 	case .Insecure_MD5:
-		impl := new(md5.Context, allocator)
-		md5.init(impl)
-		ctx._impl = impl
+		md5.init(&ctx._impl.(md5.Context))
 	case .Insecure_SHA1:
-		impl := new(sha1.Context, allocator)
-		sha1.init(impl)
-		ctx._impl = impl
+		sha1.init(&ctx._impl.(sha1.Context))
 	case .Invalid:
 		panic("crypto/hash: uninitialized algorithm")
 	case:
@@ -209,30 +197,29 @@ init :: proc(ctx: ^Context, algorithm: Algorithm, allocator := context.allocator
 	}
 
 	ctx._algo = algorithm
-	ctx._allocator = allocator
 }
 
 // update adds more data to the Context.
 update :: proc(ctx: ^Context, data: []byte) {
-	switch impl in ctx._impl {
-	case ^blake2b.Context:
-		blake2b.update(impl, data)
-	case ^blake2s.Context:
-		blake2s.update(impl, data)
-	case ^sha2.Context_256:
-		sha2.update(impl, data)
-	case ^sha2.Context_512:
-		sha2.update(impl, data)
-	case ^sha3.Context:
-		sha3.update(impl, data)
-	case ^sm3.Context:
-		sm3.update(impl, data)
-	case ^keccak.Context:
-		keccak.update(impl, data)
-	case ^md5.Context:
-		md5.update(impl, data)
-	case ^sha1.Context:
-		sha1.update(impl, data)
+	switch &impl in ctx._impl {
+	case blake2b.Context:
+		blake2b.update(&impl, data)
+	case blake2s.Context:
+		blake2s.update(&impl, data)
+	case sha2.Context_256:
+		sha2.update(&impl, data)
+	case sha2.Context_512:
+		sha2.update(&impl, data)
+	case sha3.Context:
+		sha3.update(&impl, data)
+	case sm3.Context:
+		sm3.update(&impl, data)
+	case keccak.Context:
+		keccak.update(&impl, data)
+	case md5.Context:
+		md5.update(&impl, data)
+	case sha1.Context:
+		sha1.update(&impl, data)
 	case:
 		panic("crypto/hash: uninitialized algorithm")
 	}
@@ -244,25 +231,25 @@ update :: proc(ctx: ^Context, data: []byte) {
 // Iff finalize_clone is set, final will work on a copy of the Context,
 // which is useful for for calculating rolling digests.
 final :: proc(ctx: ^Context, hash: []byte, finalize_clone: bool = false) {
-	switch impl in ctx._impl {
-	case ^blake2b.Context:
-		blake2b.final(impl, hash, finalize_clone)
-	case ^blake2s.Context:
-		blake2s.final(impl, hash, finalize_clone)
-	case ^sha2.Context_256:
-		sha2.final(impl, hash, finalize_clone)
-	case ^sha2.Context_512:
-		sha2.final(impl, hash, finalize_clone)
-	case ^sha3.Context:
-		sha3.final(impl, hash, finalize_clone)
-	case ^sm3.Context:
-		sm3.final(impl, hash, finalize_clone)
-	case ^keccak.Context:
-		keccak.final(impl, hash, finalize_clone)
-	case ^md5.Context:
-		md5.final(impl, hash, finalize_clone)
-	case ^sha1.Context:
-		sha1.final(impl, hash, finalize_clone)
+	switch &impl in ctx._impl {
+	case blake2b.Context:
+		blake2b.final(&impl, hash, finalize_clone)
+	case blake2s.Context:
+		blake2s.final(&impl, hash, finalize_clone)
+	case sha2.Context_256:
+		sha2.final(&impl, hash, finalize_clone)
+	case sha2.Context_512:
+		sha2.final(&impl, hash, finalize_clone)
+	case sha3.Context:
+		sha3.final(&impl, hash, finalize_clone)
+	case sm3.Context:
+		sm3.final(&impl, hash, finalize_clone)
+	case keccak.Context:
+		keccak.final(&impl, hash, finalize_clone)
+	case md5.Context:
+		md5.final(&impl, hash, finalize_clone)
+	case sha1.Context:
+		sha1.final(&impl, hash, finalize_clone)
 	case:
 		panic("crypto/hash: uninitialized algorithm")
 	}
@@ -273,7 +260,7 @@ final :: proc(ctx: ^Context, hash: []byte, finalize_clone: bool = false) {
 }
 
 // clone clones the Context other into ctx.
-clone :: proc(ctx, other: ^Context, allocator := context.allocator) {
+clone :: proc(ctx, other: ^Context) {
 	// XXX/yawning: Maybe these cases should panic, because both cases,
 	// are probably bugs.
 	if ctx == other {
@@ -284,45 +271,30 @@ clone :: proc(ctx, other: ^Context, allocator := context.allocator) {
 	}
 
 	ctx._algo = other._algo
-	ctx._allocator = allocator
 
-	switch src_impl in other._impl {
-	case ^blake2b.Context:
-		impl := new(blake2b.Context, allocator)
-		blake2b.clone(impl, src_impl)
-		ctx._impl = impl
-	case ^blake2s.Context:
-		impl := new(blake2s.Context, allocator)
-		blake2s.clone(impl, src_impl)
-		ctx._impl = impl
-	case ^sha2.Context_256:
-		impl := new(sha2.Context_256, allocator)
-		sha2.clone(impl, src_impl)
-		ctx._impl = impl
-	case ^sha2.Context_512:
-		impl := new(sha2.Context_512, allocator)
-		sha2.clone(impl, src_impl)
-		ctx._impl = impl
-	case ^sha3.Context:
-		impl := new(sha3.Context, allocator)
-		sha3.clone(impl, src_impl)
-		ctx._impl = impl
-	case ^sm3.Context:
-		impl := new(sm3.Context, allocator)
-		sm3.clone(impl, src_impl)
-		ctx._impl = impl
-	case ^keccak.Context:
-		impl := new(keccak.Context, allocator)
-		keccak.clone(impl, src_impl)
-		ctx._impl = impl
-	case ^md5.Context:
-		impl := new(md5.Context, allocator)
-		md5.clone(impl, src_impl)
-		ctx._impl = impl
-	case ^sha1.Context:
-		impl := new(sha1.Context, allocator)
-		sha1.clone(impl, src_impl)
-		ctx._impl = impl
+	reflect.set_union_variant_typeid(
+		ctx._impl,
+		reflect.union_variant_typeid(other._impl),
+	)
+	switch &src_impl in other._impl {
+	case blake2b.Context:
+		blake2b.clone(&ctx._impl.(blake2b.Context), &src_impl)
+	case blake2s.Context:
+		blake2s.clone(&ctx._impl.(blake2s.Context), &src_impl)
+	case sha2.Context_256:
+		sha2.clone(&ctx._impl.(sha2.Context_256), &src_impl)
+	case sha2.Context_512:
+		sha2.clone(&ctx._impl.(sha2.Context_512), &src_impl)
+	case sha3.Context:
+		sha3.clone(&ctx._impl.(sha3.Context), &src_impl)
+	case sm3.Context:
+		sm3.clone(&ctx._impl.(sm3.Context), &src_impl)
+	case keccak.Context:
+		keccak.clone(&ctx._impl.(keccak.Context), &src_impl)
+	case md5.Context:
+		md5.clone(&ctx._impl.(md5.Context), &src_impl)
+	case sha1.Context:
+		sha1.clone(&ctx._impl.(sha1.Context), &src_impl)
 	case:
 		panic("crypto/hash: uninitialized algorithm")
 	}
@@ -331,34 +303,25 @@ clone :: proc(ctx, other: ^Context, allocator := context.allocator) {
 // reset sanitizes the Context.  The Context must be re-initialized to
 // be used again.
 reset :: proc(ctx: ^Context) {
-	switch impl in ctx._impl {
-	case ^blake2b.Context:
-		blake2b.reset(impl)
-		free(impl, ctx._allocator)
-	case ^blake2s.Context:
-		blake2s.reset(impl)
-		free(impl, ctx._allocator)
-	case ^sha2.Context_256:
-		sha2.reset(impl)
-		free(impl, ctx._allocator)
-	case ^sha2.Context_512:
-		sha2.reset(impl)
-		free(impl, ctx._allocator)
-	case ^sha3.Context:
-		sha3.reset(impl)
-		free(impl, ctx._allocator)
-	case ^sm3.Context:
-		sm3.reset(impl)
-		free(impl, ctx._allocator)
-	case ^keccak.Context:
-		keccak.reset(impl)
-		free(impl, ctx._allocator)
-	case ^md5.Context:
-		md5.reset(impl)
-		free(impl, ctx._allocator)
-	case ^sha1.Context:
-		sha1.reset(impl)
-		free(impl, ctx._allocator)
+	switch &impl in ctx._impl {
+	case blake2b.Context:
+		blake2b.reset(&impl)
+	case blake2s.Context:
+		blake2s.reset(&impl)
+	case sha2.Context_256:
+		sha2.reset(&impl)
+	case sha2.Context_512:
+		sha2.reset(&impl)
+	case sha3.Context:
+		sha3.reset(&impl)
+	case sm3.Context:
+		sm3.reset(&impl)
+	case keccak.Context:
+		keccak.reset(&impl)
+	case md5.Context:
+		md5.reset(&impl)
+	case sha1.Context:
+		sha1.reset(&impl)
 	case:
 	// Unlike clone, calling reset repeatedly is fine.
 	}
