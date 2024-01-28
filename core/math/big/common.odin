@@ -6,7 +6,7 @@
 
 package math_big
 
-import "core:intrinsics"
+import "base:intrinsics"
 
 /*
 	TODO: Make the tunables runtime adjustable where practical.

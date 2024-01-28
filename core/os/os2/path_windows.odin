@@ -2,7 +2,7 @@
 package os2
 
 import win32 "core:sys/windows"
-import "core:runtime"
+import "base:runtime"
 import "core:strings"
 
 _Path_Separator      :: '\\'

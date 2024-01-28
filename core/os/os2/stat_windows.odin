@@ -1,7 +1,7 @@
 //+private
 package os2
 
-import "core:runtime"
+import "base:runtime"
 import "core:time"
 import "core:strings"
 import win32 "core:sys/windows"

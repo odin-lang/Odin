@@ -3,7 +3,7 @@
 package sync
 
 import "core:c"
-import "core:intrinsics"
+import "base:intrinsics"
 
 foreign import pthread "System.framework"
 

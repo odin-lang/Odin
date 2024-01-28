@@ -1,7 +1,7 @@
 package container_queue
 
-import "core:builtin"
-import "core:runtime"
+import "base:builtin"
+import "base:runtime"
 _ :: runtime
 
 // Dynamically resizable double-ended queue/ring-buffer

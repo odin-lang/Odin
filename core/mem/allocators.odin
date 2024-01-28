@@ -1,7 +1,7 @@
 package mem
 
-import "core:intrinsics"
-import "core:runtime"
+import "base:intrinsics"
+import "base:runtime"
 import "core:sync"
 
 nil_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,

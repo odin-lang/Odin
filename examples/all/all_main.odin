@@ -94,7 +94,7 @@ import slashpath        "core:path/slashpath"
 import filepath         "core:path/filepath"
 
 import reflect          "core:reflect"
-import runtime          "core:runtime"
+import runtime          "base:runtime"
 import simd             "core:simd"
 import slice            "core:slice"
 import slice_heap       "core:slice/heap"

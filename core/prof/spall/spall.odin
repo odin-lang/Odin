@@ -2,7 +2,7 @@ package spall
 
 import "core:os"
 import "core:time"
-import "core:intrinsics"
+import "base:intrinsics"
 import "core:mem"
 
 // File Format

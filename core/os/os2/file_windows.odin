@@ -4,7 +4,7 @@ package os2
 import "core:io"
 import "core:mem"
 import "core:sync"
-import "core:runtime"
+import "base:runtime"
 import "core:strings"
 import "core:time"
 import "core:unicode/utf16"

@@ -4,7 +4,7 @@ foreign import dl   "system:dl"
 foreign import libc "System.framework"
 foreign import pthread "System.framework"
 
-import "core:runtime"
+import "base:runtime"
 import "core:strings"
 import "core:c"
 

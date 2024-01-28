@@ -1,8 +1,8 @@
 package dynlib
 
-import "core:intrinsics"
+import "base:intrinsics"
 import "core:reflect"
-import "core:runtime"
+import "base:runtime"
 _ :: intrinsics
 _ :: reflect
 _ :: runtime

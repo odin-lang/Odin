@@ -1,7 +1,7 @@
 package os
 
 import "core:sys/wasm/wasi"
-import "core:runtime"
+import "base:runtime"
 
 Handle :: distinct i32
 Errno :: distinct i32

@@ -2,7 +2,7 @@ package math_fixed
 
 import "core:math"
 import "core:strconv"
-import "core:intrinsics"
+import "base:intrinsics"
 _, _, _ :: intrinsics, strconv, math
 
 Fixed :: struct($Backing: typeid, $Fraction_Width: uint)

@@ -3,11 +3,11 @@ package os
 foreign import dl   "system:dl"
 foreign import libc "system:c"
 
-import "core:runtime"
+import "base:runtime"
 import "core:strings"
 import "core:c"
 import "core:strconv"
-import "core:intrinsics"
+import "base:intrinsics"
 
 // NOTE(flysand): For compatibility we'll make core:os package
 // depend on the old (scheduled for removal) linux package.

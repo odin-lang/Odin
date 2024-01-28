@@ -1,6 +1,6 @@
 package objc_Foundation
 
-import "core:intrinsics"
+import "base:intrinsics"
 
 @(private) msgSend :: intrinsics.objc_send
 

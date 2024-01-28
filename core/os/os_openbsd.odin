@@ -4,7 +4,7 @@ foreign import libc "system:c"
 
 import "core:strings"
 import "core:c"
-import "core:runtime"
+import "base:runtime"
 
 Handle    :: distinct i32
 Pid       :: distinct i32

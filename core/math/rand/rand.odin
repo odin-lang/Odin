@@ -4,7 +4,7 @@ Package core:math/rand implements various random number generators
 */
 package rand
 
-import "core:intrinsics"
+import "base:intrinsics"
 import "core:math"
 import "core:mem"
 

@@ -2,7 +2,7 @@
 package wasm_js_interface
 
 import "core:mem"
-import "core:intrinsics"
+import "base:intrinsics"
 
 PAGE_SIZE :: 64 * 1024
 page_alloc :: proc(page_count: int) -> (data: []byte, err: mem.Allocator_Error) {

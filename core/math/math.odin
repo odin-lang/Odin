@@ -1,7 +1,7 @@
 package math
 
-import "core:intrinsics"
-import "core:builtin"
+import "base:intrinsics"
+import "base:builtin"
 _ :: intrinsics
 
 Float_Class :: enum {

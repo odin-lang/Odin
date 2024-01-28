@@ -1,6 +1,6 @@
 package hash
 
-import "core:intrinsics"
+import "base:intrinsics"
 
 @(optimization_mode="speed")
 crc32 :: proc(data: []byte, seed := u32(0)) -> u32 #no_bounds_check {

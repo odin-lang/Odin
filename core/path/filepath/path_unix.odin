@@ -7,7 +7,7 @@ when ODIN_OS == .Darwin {
 	foreign import libc "system:c"
 }
 
-import "core:runtime"
+import "base:runtime"
 import "core:strings"
 
 SEPARATOR :: '/'

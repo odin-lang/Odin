@@ -1,7 +1,7 @@
 package os2
 
 import "core:time"
-import "core:runtime"
+import "base:runtime"
 
 File_Info :: struct {
 	fullpath: string,

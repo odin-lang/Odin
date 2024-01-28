@@ -2,7 +2,7 @@
 //+vet !using-param
 package fontstash
 
-import "core:runtime"
+import "base:runtime"
 import "core:log"
 import "core:os"
 import "core:mem"

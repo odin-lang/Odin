@@ -1,8 +1,8 @@
 package mem_virtual
 
 import "core:mem"
-import "core:intrinsics"
-import "core:runtime"
+import "base:intrinsics"
+import "base:runtime"
 _ :: runtime
 
 DEFAULT_PAGE_SIZE := uint(4096)

@@ -1,6 +1,6 @@
 package objc_Foundation
 
-import "core:intrinsics"
+import "base:intrinsics"
 
 methodSignatureForSelector :: proc "c" (obj: ^Object, selector: SEL) -> rawptr {
 	return msgSend(rawptr, obj, "methodSignatureForSelector:", selector)

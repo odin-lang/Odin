@@ -3,7 +3,7 @@ package os
 foreign import dl "system:dl"
 foreign import libc "system:c"
 
-import "core:runtime"
+import "base:runtime"
 import "core:strings"
 import "core:c"
 

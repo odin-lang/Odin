@@ -28,9 +28,9 @@
 package math_big
 
 import "core:mem"
-import "core:intrinsics"
+import "base:intrinsics"
 import rnd "core:math/rand"
-import "core:builtin"
+import "base:builtin"
 
 /*
 	Low-level addition, unsigned. Handbook of Applied Cryptography, algorithm 14.7.

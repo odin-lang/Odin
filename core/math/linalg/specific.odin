@@ -1,6 +1,6 @@
 package linalg
 
-import "core:builtin"
+import "base:builtin"
 import "core:math"
 
 F16_EPSILON :: 1e-3

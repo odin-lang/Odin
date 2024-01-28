@@ -1,8 +1,8 @@
 package linalg
 
 import "core:math"
-import "core:builtin"
-import "core:intrinsics"
+import "base:builtin"
+import "base:intrinsics"
 
 // Generic
 

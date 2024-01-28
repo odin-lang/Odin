@@ -1,8 +1,8 @@
 // core:math/linalg/hlsl implements a HLSL-like mathematics library plus numerous other utility procedures
 package math_linalg_hlsl
 
-import "core:builtin"
-import "core:intrinsics"
+import "base:builtin"
+import "base:intrinsics"
 
 TAU :: 6.28318530717958647692528676655900576
 PI  :: 3.14159265358979323846264338327950288
