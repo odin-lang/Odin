@@ -246,7 +246,7 @@ AT_REMOVEDIR        :: 0x08
 
 @(default_calling_convention="c")
 foreign libc {
-	@(link_name="__errno")	__errno		:: proc() -> ^int ---
+	@(link_name="__error")	__error		:: proc() -> ^c.int ---
 
 	@(link_name="fork")	_unix_fork	:: proc() -> pid_t ---
 	@(link_name="getthrid")	_unix_getthrid	:: proc() -> int ---
@@ -296,7 +296,7 @@ is_path_separator :: proc(r: rune) -> bool {
 }
 
 get_last_error :: proc "contextless" () -> int {
-	return __errno()^
+	return __error()^
 }
 
 fork :: proc() -> (Pid, Errno) {

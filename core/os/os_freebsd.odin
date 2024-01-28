@@ -255,7 +255,7 @@ W_OK :: 2 // Test for write permission
 R_OK :: 4 // Test for read permission
 
 foreign libc {
-	@(link_name="__error")		__errno_location :: proc() -> ^int ---
+	@(link_name="__error")		__errno_location :: proc() -> ^c.int ---
 
 	@(link_name="open")             _unix_open          :: proc(path: cstring, flags: c.int, mode: c.int) -> Handle ---
 	@(link_name="close")            _unix_close         :: proc(fd: Handle) -> c.int ---
