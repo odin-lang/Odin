@@ -314,6 +314,7 @@ clone_node :: proc(node: ^Node) -> ^Node {
 		case ^Struct_Type:
 			r.poly_params = auto_cast clone(r.poly_params)
 			r.align = clone(r.align)
+			r.field_align = clone(r.field_align)
 			r.fields = auto_cast clone(r.fields)
 		case ^Union_Type:
 			r.poly_params = auto_cast clone(r.poly_params)
