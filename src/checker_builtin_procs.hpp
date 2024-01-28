@@ -34,11 +34,6 @@ enum BuiltinProcId {
 
 	BuiltinProc_soa_zip,
 	BuiltinProc_soa_unzip,
-	
-	BuiltinProc_transpose,
-	BuiltinProc_outer_product,
-	BuiltinProc_hadamard_product,
-	BuiltinProc_matrix_flatten,
 
 	BuiltinProc_unreachable,
 
@@ -48,6 +43,11 @@ enum BuiltinProcId {
 
 	// "Intrinsics"
 	BuiltinProc_is_package_imported,
+
+	BuiltinProc_transpose,
+	BuiltinProc_outer_product,
+	BuiltinProc_hadamard_product,
+	BuiltinProc_matrix_flatten,
 	
 	BuiltinProc_soa_struct,
 
@@ -341,11 +341,6 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 
 	{STR_LIT("soa_zip"),          1, true,  Expr_Expr, BuiltinProcPkg_builtin},
 	{STR_LIT("soa_unzip"),        1, false, Expr_Expr, BuiltinProcPkg_builtin},
-	
-	{STR_LIT("transpose"),        1, false, Expr_Expr, BuiltinProcPkg_builtin},
-	{STR_LIT("outer_product"),    2, false, Expr_Expr, BuiltinProcPkg_builtin},
-	{STR_LIT("hadamard_product"), 2, false, Expr_Expr, BuiltinProcPkg_builtin},
-	{STR_LIT("matrix_flatten"),   1, false, Expr_Expr, BuiltinProcPkg_builtin},
 
 	{STR_LIT("unreachable"),      0, false, Expr_Expr, BuiltinProcPkg_builtin, /*diverging*/true},
 
@@ -356,6 +351,11 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 
 	// "Intrinsics"
 	{STR_LIT("is_package_imported"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+
+	{STR_LIT("transpose"),        1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("outer_product"),    2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("hadamard_product"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("matrix_flatten"),   1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 		
 	{STR_LIT("soa_struct"),  2, false, Expr_Expr, BuiltinProcPkg_intrinsics}, // Type
 

@@ -3835,6 +3835,7 @@ gb_internal void check_builtin_attributes(CheckerContext *ctx, Entity *e, Array<
 	case Entity_ProcGroup:
 	case Entity_Procedure:
 	case Entity_TypeName:
+	case Entity_Constant:
 		// Okay
 		break;
 	default:

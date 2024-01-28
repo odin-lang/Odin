@@ -3,6 +3,15 @@ package runtime
 import "core:intrinsics"
 _ :: intrinsics
 
+@(builtin)
+transpose        :: intrinsics.transpose
+@(builtin)
+outer_product    :: intrinsics.outer_product
+@(builtin)
+hadamard_product :: intrinsics.hadamard_product
+@(builtin)
+matrix_flatten   :: intrinsics.matrix_flatten
+
 
 @(builtin)
 determinant :: proc{
