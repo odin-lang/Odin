@@ -5460,6 +5460,11 @@ gb_internal bool determine_path_from_string(BlockingMutex *file_mutex, Ast *node
 
 
 	if (collection_name.len > 0) {
+		// NOTE(bill): `base:runtime` == `core:runtime`
+		if (collection_name == "core" && string_starts_with(file_str, str_lit("runtime"))) {
+			collection_name = str_lit("base");
+		}
+
 		if (collection_name == "system") {
 			if (node->kind != Ast_ForeignImportDecl) {
 				syntax_error(node, "The library collection 'system' is restrict for 'foreign_library'");
@@ -5488,7 +5493,6 @@ gb_internal bool determine_path_from_string(BlockingMutex *file_mutex, Ast *node
 		}
 #endif
 	}
-
 
 	if (is_package_name_reserved(file_str)) {
 		*path = file_str;
@@ -6133,7 +6137,7 @@ gb_internal ParseFileError parse_packages(Parser *p, String init_filename) {
 	{ // Add these packages serially and then process them parallel
 		TokenPos init_pos = {};
 		{
-			String s = get_fullpath_core(permanent_allocator(), str_lit("runtime"));
+			String s = get_fullpath_base_collection(permanent_allocator(), str_lit("runtime"));
 			try_add_import_path(p, s, s, init_pos, Package_Runtime);
 		}
 
@@ -6141,7 +6145,7 @@ gb_internal ParseFileError parse_packages(Parser *p, String init_filename) {
 		p->init_fullpath = init_fullpath;
 
 		if (build_context.command_kind == Command_test) {
-			String s = get_fullpath_core(permanent_allocator(), str_lit("testing"));
+			String s = get_fullpath_core_collection(permanent_allocator(), str_lit("testing"));
 			try_add_import_path(p, s, s, init_pos, Package_Normal);
 		}
 		

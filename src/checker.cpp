@@ -770,15 +770,17 @@ gb_internal void add_type_info_dependency(CheckerInfo *info, DeclInfo *d, Type *
 	rw_mutex_unlock(&d->type_info_deps_mutex);
 }
 
-gb_internal AstPackage *get_core_package(CheckerInfo *info, String name) {
+
+gb_internal AstPackage *get_runtime_package(CheckerInfo *info) {
+	String name = str_lit("runtime");
 	gbAllocator a = heap_allocator();
-	String path = get_fullpath_core(a, name);
+	String path = get_fullpath_base_collection(a, name);
 	defer (gb_free(a, path.text));
 	auto found = string_map_get(&info->packages, path);
 	if (found == nullptr) {
 		gb_printf_err("Name: %.*s\n", LIT(name));
 		gb_printf_err("Fullpath: %.*s\n", LIT(path));
-		
+
 		for (auto const &entry : info->packages) {
 			gb_printf_err("%.*s\n", LIT(entry.key));
 		}
@@ -787,6 +789,26 @@ gb_internal AstPackage *get_core_package(CheckerInfo *info, String name) {
 	return *found;
 }
 
+gb_internal AstPackage *get_core_package(CheckerInfo *info, String name) {
+	if (name == "runtime") {
+		return get_runtime_package(info);
+	}
+
+	gbAllocator a = heap_allocator();
+	String path = get_fullpath_core_collection(a, name);
+	defer (gb_free(a, path.text));
+	auto found = string_map_get(&info->packages, path);
+	if (found == nullptr) {
+		gb_printf_err("Name: %.*s\n", LIT(name));
+		gb_printf_err("Fullpath: %.*s\n", LIT(path));
+
+		for (auto const &entry : info->packages) {
+			gb_printf_err("%.*s\n", LIT(entry.key));
+		}
+		GB_ASSERT_MSG(found != nullptr, "Missing core package %.*s", LIT(name));
+	}
+	return *found;
+}
 
 gb_internal void add_package_dependency(CheckerContext *c, char const *package_name, char const *name) {
 	String n = make_string_c(name);

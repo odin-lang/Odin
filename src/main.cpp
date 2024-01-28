@@ -2376,6 +2376,7 @@ int main(int arg_count, char const **arg_ptr) {
 	TIME_SECTION("init default library collections");
 	array_init(&library_collections, heap_allocator());
 	// NOTE(bill): 'core' cannot be (re)defined by the user
+	add_library_collection(str_lit("base"), get_fullpath_relative(heap_allocator(), odin_root_dir(), str_lit("base")));
 	add_library_collection(str_lit("core"), get_fullpath_relative(heap_allocator(), odin_root_dir(), str_lit("core")));
 	add_library_collection(str_lit("vendor"), get_fullpath_relative(heap_allocator(), odin_root_dir(), str_lit("vendor")));
 

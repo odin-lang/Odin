@@ -1161,7 +1161,27 @@ gb_internal String get_fullpath_relative(gbAllocator a, String base_dir, String 
 }
 
 
-gb_internal String get_fullpath_core(gbAllocator a, String path) {
+gb_internal String get_fullpath_base_collection(gbAllocator a, String path) {
+	String module_dir = odin_root_dir();
+
+	String base = str_lit("base/");
+
+	isize str_len = module_dir.len + base.len + path.len;
+	u8 *str = gb_alloc_array(heap_allocator(), u8, str_len+1);
+	defer (gb_free(heap_allocator(), str));
+
+	isize i = 0;
+	gb_memmove(str+i, module_dir.text, module_dir.len); i += module_dir.len;
+	gb_memmove(str+i, base.text, base.len);             i += base.len;
+	gb_memmove(str+i, path.text, path.len);             i += path.len;
+	str[i] = 0;
+
+	String res = make_string(str, i);
+	res = string_trim_whitespace(res);
+	return path_to_fullpath(a, res);
+}
+
+gb_internal String get_fullpath_core_collection(gbAllocator a, String path) {
 	String module_dir = odin_root_dir();
 
 	String core = str_lit("core/");
