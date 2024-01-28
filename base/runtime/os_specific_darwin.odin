@@ -4,6 +4,7 @@ package runtime
 
 foreign import libc "system:System.framework"
 
+@(default_calling_convention="c")
 foreign libc {
 	@(link_name="__stderrp")
 	_stderr: rawptr

@@ -4,9 +4,10 @@ package runtime
 
 foreign import libc "system:c"
 
+@(default_calling_convention="c")
 foreign libc {
 	@(link_name="write")
-	_unix_write :: proc(fd: uintptr, buf: rawptr, size: int) -> int ---
+	_unix_write :: proc(fd: i32, buf: rawptr, size: int) -> int ---
 
 	__error :: proc() -> ^i32 ---
 }
