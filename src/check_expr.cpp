@@ -2988,7 +2988,11 @@ gb_internal bool check_is_castable_to(CheckerContext *c, Operand *operand, Type 
 	}
 	// proc <-> proc
 	if (is_type_proc(src) && is_type_proc(dst)) {
-		if (is_type_polymorphic(src) || is_type_polymorphic(dst)) {
+		if (is_type_polymorphic(dst)) {
+			if (is_type_polymorphic(src) &&
+			    operand->mode == Addressing_Variable) {
+				return true;
+			}
 			return false;
 		}
 		return true;
