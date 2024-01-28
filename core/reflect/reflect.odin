@@ -2,8 +2,6 @@ package reflect
 
 import "core:runtime"
 import "core:intrinsics"
-import "core:mem"
-_ :: mem
 _ :: intrinsics
 
 Type_Info :: runtime.Type_Info
@@ -761,7 +759,7 @@ get_union_variant :: proc(a: any) -> any {
 get_union_as_ptr_variants :: proc(val: ^$T) -> (res: intrinsics.type_convert_variants_to_pointers(T)) where intrinsics.type_is_union(T) {
 	ptr := rawptr(val)
 	tag := get_union_variant_raw_tag(val^)
-	mem.copy(&res, &ptr, size_of(ptr))
+	intrinsics.mem_copy(&res, &ptr, size_of(ptr))
 	set_union_variant_raw_tag(res, tag)
 	return
 }
