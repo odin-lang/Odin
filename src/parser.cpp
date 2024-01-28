@@ -5496,10 +5496,10 @@ gb_internal bool determine_path_from_string(BlockingMutex *file_mutex, Ast *node
 
 	if (is_package_name_reserved(file_str)) {
 		*path = file_str;
-		if (collection_name == "core") {
+		if (collection_name == "core" || collection_name == "base") {
 			return true;
 		} else {
-			syntax_error(node, "The package '%.*s' must be imported with the core library collection: 'core:%.*s'", LIT(file_str), LIT(file_str));
+			syntax_error(node, "The package '%.*s' must be imported with the 'base' library collection: 'base:%.*s'", LIT(file_str), LIT(file_str));
 			return false;
 		}
 	}

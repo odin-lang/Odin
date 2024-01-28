@@ -1091,19 +1091,20 @@ gb_internal void init_universal(void) {
 	}
 
 
-	add_global_bool_constant("ODIN_DEBUG",                    bc->ODIN_DEBUG);
-	add_global_bool_constant("ODIN_DISABLE_ASSERT",           bc->ODIN_DISABLE_ASSERT);
-	add_global_bool_constant("ODIN_DEFAULT_TO_NIL_ALLOCATOR", bc->ODIN_DEFAULT_TO_NIL_ALLOCATOR);
-	add_global_bool_constant("ODIN_NO_DYNAMIC_LITERALS",      bc->no_dynamic_literals);
-	add_global_bool_constant("ODIN_NO_CRT",                   bc->no_crt);
-	add_global_bool_constant("ODIN_USE_SEPARATE_MODULES",     bc->use_separate_modules);
-	add_global_bool_constant("ODIN_TEST",                     bc->command_kind == Command_test);
-	add_global_bool_constant("ODIN_NO_ENTRY_POINT",           bc->no_entry_point);
-	add_global_bool_constant("ODIN_FOREIGN_ERROR_PROCEDURES", bc->ODIN_FOREIGN_ERROR_PROCEDURES);
-	add_global_bool_constant("ODIN_NO_RTTI",            bc->no_rtti);
+	add_global_bool_constant("ODIN_DEBUG",                      bc->ODIN_DEBUG);
+	add_global_bool_constant("ODIN_DISABLE_ASSERT",             bc->ODIN_DISABLE_ASSERT);
+	add_global_bool_constant("ODIN_DEFAULT_TO_NIL_ALLOCATOR",   bc->ODIN_DEFAULT_TO_NIL_ALLOCATOR);
+	add_global_bool_constant("ODIN_DEFAULT_TO_PANIC_ALLOCATOR", bc->ODIN_DEFAULT_TO_PANIC_ALLOCATOR);
+	add_global_bool_constant("ODIN_NO_DYNAMIC_LITERALS",        bc->no_dynamic_literals);
+	add_global_bool_constant("ODIN_NO_CRT",                     bc->no_crt);
+	add_global_bool_constant("ODIN_USE_SEPARATE_MODULES",       bc->use_separate_modules);
+	add_global_bool_constant("ODIN_TEST",                       bc->command_kind == Command_test);
+	add_global_bool_constant("ODIN_NO_ENTRY_POINT",             bc->no_entry_point);
+	add_global_bool_constant("ODIN_FOREIGN_ERROR_PROCEDURES",   bc->ODIN_FOREIGN_ERROR_PROCEDURES);
+	add_global_bool_constant("ODIN_NO_RTTI",                    bc->no_rtti);
 
-	add_global_bool_constant("ODIN_VALGRIND_SUPPORT",         bc->ODIN_VALGRIND_SUPPORT);
-	add_global_bool_constant("ODIN_TILDE",                    bc->tilde_backend);
+	add_global_bool_constant("ODIN_VALGRIND_SUPPORT",           bc->ODIN_VALGRIND_SUPPORT);
+	add_global_bool_constant("ODIN_TILDE",                      bc->tilde_backend);
 
 	add_global_constant("ODIN_COMPILE_TIMESTAMP", t_untyped_integer, exact_value_i64(odin_compile_timestamp()));
 

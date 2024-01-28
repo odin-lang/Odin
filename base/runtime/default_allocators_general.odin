@@ -13,6 +13,11 @@ when ODIN_DEFAULT_TO_NIL_ALLOCATOR {
 	// mem.nil_allocator reimplementation
 	default_allocator_proc :: nil_allocator_proc
 	default_allocator :: nil_allocator
+} else when ODIN_DEFAULT_TO_PANIC_ALLOCATOR {
+	_ :: os
+
+	default_allocator_proc :: panic_allocator_proc
+	default_allocator :: panic_allocator
 } else {
 
 	default_allocator_proc :: os.heap_allocator_proc
