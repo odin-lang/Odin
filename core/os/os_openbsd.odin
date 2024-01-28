@@ -296,7 +296,7 @@ is_path_separator :: proc(r: rune) -> bool {
 }
 
 get_last_error :: proc "contextless" () -> int {
-	return __error()^
+	return int(__error()^)
 }
 
 fork :: proc() -> (Pid, Errno) {
