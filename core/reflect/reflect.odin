@@ -513,13 +513,13 @@ struct_fields_zipped :: proc(T: typeid) -> (fields: #soa[]Struct_Field) {
 
 
 @(require_results)
-struct_tag_get :: proc(tag: Struct_Tag, key: string) -> (value: Struct_Tag) {
-	value, _ = struct_tag_lookup(tag, key)
-	return
+struct_tag_get :: proc(tag: Struct_Tag, key: string) -> (value: string) {
+	v, _ := struct_tag_lookup(tag, key)
+	return string(v)
 }
 
 @(require_results)
-struct_tag_lookup :: proc(tag: Struct_Tag, key: string) -> (value: Struct_Tag, ok: bool) {
+struct_tag_lookup :: proc(tag: Struct_Tag, key: string) -> (value: string, ok: bool) {
 	for t := tag; t != ""; /**/ {
 		i := 0
 		for i < len(t) && t[i] == ' ' { // Skip whitespace
@@ -570,7 +570,7 @@ struct_tag_lookup :: proc(tag: Struct_Tag, key: string) -> (value: Struct_Tag, o
 		t = t[i+1:]
 
 		if key == name {
-			return Struct_Tag(val[1:i]), true
+			return val[1:i], true
 		}
 	}
 	return
