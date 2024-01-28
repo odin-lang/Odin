@@ -103,28 +103,6 @@ file_size :: proc(fd: Handle) -> (i64, Errno) {
 }
 
 
-
-heap_alloc :: proc(size: int, zero_memory := true) -> rawptr {
-	return nil
-}
-heap_resize :: proc(ptr: rawptr, new_size: int) -> rawptr {
-	if new_size == 0 {
-		heap_free(ptr)
-		return nil
-	}
-	if ptr == nil {
-		return heap_alloc(new_size)
-	}
-
-	return nil
-}
-heap_free :: proc(ptr: rawptr) {
-	if ptr == nil {
-		return
-	}
-}
-
-
 exit :: proc "contextless" (code: int) -> ! {
 	runtime._cleanup_runtime_contextless()
 	wasi.proc_exit(wasi.exitcode_t(code))

@@ -237,17 +237,6 @@ last_write_time_by_name :: proc(name: string) -> (File_Time, Errno) {
 }
 
 
-
-heap_alloc :: proc(size: int, zero_memory := true) -> rawptr {
-	unimplemented("core:os procedure not supported on JS target")
-}
-heap_resize :: proc(ptr: rawptr, new_size: int) -> rawptr {
-	unimplemented("core:os procedure not supported on JS target")
-}
-heap_free :: proc(ptr: rawptr) {
-	unimplemented("core:os procedure not supported on JS target")
-}
-
 get_page_size :: proc() -> int {
 	unimplemented("core:os procedure not supported on JS target")
 }

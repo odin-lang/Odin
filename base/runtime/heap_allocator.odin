@@ -95,3 +95,16 @@ heap_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 
 	return nil, nil
 }
+
+
+heap_alloc :: proc(size: int, zero_memory := true) -> rawptr {
+	return _heap_alloc(size, zero_memory)
+}
+
+heap_resize :: proc(ptr: rawptr, new_size: int) -> rawptr {
+	return heap_resize(ptr, new_size)
+}
+
+heap_free :: proc(ptr: rawptr) {
+	_heap_free(ptr)
+}

@@ -888,27 +888,6 @@ access :: proc(path: string, mask: int) -> (bool, Errno) {
 	return true, ERROR_NONE
 }
 
-heap_alloc :: proc(size: int, zero_memory := true) -> rawptr {
-	if size <= 0 {
-		return nil
-	}
-	if zero_memory {
-		return _unix_calloc(1, c.size_t(size))
-	} else {
-		return _unix_malloc(c.size_t(size))
-	}
-}
-
-heap_resize :: proc(ptr: rawptr, new_size: int) -> rawptr {
-	// NOTE: _unix_realloc doesn't guarantee new memory will be zeroed on
-	// POSIX platforms. Ensure your caller takes this into account.
-	return _unix_realloc(ptr, c.size_t(new_size))
-}
-
-heap_free :: proc(ptr: rawptr) {
-	_unix_free(ptr)
-}
-
 lookup_env :: proc(key: string, allocator := context.allocator) -> (value: string, found: bool) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD(ignore = context.temp_allocator == allocator)
 	path_str := strings.clone_to_cstring(key, context.temp_allocator)
