@@ -25,12 +25,12 @@ heap_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 
 		allocated_mem: rawptr
 		if old_ptr != nil {
-			original_old_ptr := intrinsics.ptr_offset((^rawptr)(old_ptr), -1)^
+			original_old_ptr := ([^]rawptr)(old_ptr)[-1]
 			allocated_mem = heap_resize(original_old_ptr, space+size_of(rawptr))
 		} else {
 			allocated_mem = heap_alloc(space+size_of(rawptr), zero_memory)
 		}
-		aligned_mem := rawptr(intrinsics.ptr_offset((^u8)(allocated_mem), size_of(rawptr)))
+		aligned_mem := rawptr(([^]u8)(allocated_mem)[size_of(rawptr):])
 
 		ptr := uintptr(aligned_mem)
 		aligned_ptr := (ptr - 1 + uintptr(a)) & -uintptr(a)
@@ -40,14 +40,14 @@ heap_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 		}
 
 		aligned_mem = rawptr(aligned_ptr)
-		intrinsics.ptr_offset((^rawptr)(aligned_mem), -1)^ = allocated_mem
+		([^]rawptr)(aligned_mem)[-1] = allocated_mem
 
 		return byte_slice(aligned_mem, size), nil
 	}
 
 	aligned_free :: proc(p: rawptr) {
 		if p != nil {
-			heap_free(intrinsics.ptr_offset((^rawptr)(p), -1)^)
+			heap_free(([^]rawptr)(p)[-1])
 		}
 	}
 
@@ -102,7 +102,7 @@ heap_alloc :: proc(size: int, zero_memory := true) -> rawptr {
 }
 
 heap_resize :: proc(ptr: rawptr, new_size: int) -> rawptr {
-	return heap_resize(ptr, new_size)
+	return _heap_resize(ptr, new_size)
 }
 
 heap_free :: proc(ptr: rawptr) {
