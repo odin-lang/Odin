@@ -1,4 +1,5 @@
 //+build !darwin
+//+build !linux
 //+build !freestanding
 //+build !js
 //+build !wasi
