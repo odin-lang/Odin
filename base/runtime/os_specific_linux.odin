@@ -14,6 +14,8 @@ _os_write :: proc "contextless" (data: []byte) -> (int, _OS_Errno) {
 		SYS_write :: uintptr(4)
 	}
 
+	stderr :: 2
+
 	ret := int(intrinsics.syscall(SYS_write, uintptr(stderr), uintptr(raw_data(data)), uintptr(len(data))))
 	if ret < 0 && ret > -4096 {
 		return 0, _OS_Errno(-ret)
