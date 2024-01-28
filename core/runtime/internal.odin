@@ -22,50 +22,6 @@ byte_slice :: #force_inline proc "contextless" (data: rawptr, len: int) -> []byt
 	return ([^]byte)(data)[:max(len, 0)]
 }
 
-bswap_16 :: proc "contextless" (x: u16) -> u16 {
-	return x>>8 | x<<8
-}
-
-bswap_32 :: proc "contextless" (x: u32) -> u32 {
-	return x>>24 | (x>>8)&0xff00 | (x<<8)&0xff0000 | x<<24
-}
-
-bswap_64 :: proc "contextless" (x: u64) -> u64 {
-	z := x
-	z = (z & 0x00000000ffffffff) << 32 | (z & 0xffffffff00000000) >> 32
-	z = (z & 0x0000ffff0000ffff) << 16 | (z & 0xffff0000ffff0000) >> 16
-	z = (z & 0x00ff00ff00ff00ff) << 8  | (z & 0xff00ff00ff00ff00) >> 8
-	return z
-}
-
-bswap_128 :: proc "contextless" (x: u128) -> u128 {
-	z := transmute([4]u32)x
-	z[0], z[3] = bswap_32(z[3]), bswap_32(z[0])
-	z[1], z[2] = bswap_32(z[2]), bswap_32(z[1])
-	return transmute(u128)z
-}
-
-bswap_f16 :: proc "contextless" (f: f16) -> f16 {
-	x := transmute(u16)f
-	z := bswap_16(x)
-	return transmute(f16)z
-
-}
-
-bswap_f32 :: proc "contextless" (f: f32) -> f32 {
-	x := transmute(u32)f
-	z := bswap_32(x)
-	return transmute(f32)z
-
-}
-
-bswap_f64 :: proc "contextless" (f: f64) -> f64 {
-	x := transmute(u64)f
-	z := bswap_64(x)
-	return transmute(f64)z
-}
-
-
 is_power_of_two_int :: #force_inline proc(x: int) -> bool {
 	if x <= 0 {
 		return false
@@ -606,36 +562,6 @@ string_decode_last_rune :: proc "contextless" (s: string) -> (rune, int) {
 		return RUNE_ERROR, 1
 	}
 	return r, size
-}
-
-
-abs_f16 :: #force_inline proc "contextless" (x: f16) -> f16 {
-	return -x if x < 0 else x
-}
-abs_f32 :: #force_inline proc "contextless" (x: f32) -> f32 {
-	return -x if x < 0 else x
-}
-abs_f64 :: #force_inline proc "contextless" (x: f64) -> f64 {
-	return -x if x < 0 else x
-}
-
-min_f16 :: #force_inline proc "contextless" (a, b: f16) -> f16 {
-	return a if a < b else b
-}
-min_f32 :: #force_inline proc "contextless" (a, b: f32) -> f32 {
-	return a if a < b else b
-}
-min_f64 :: #force_inline proc "contextless" (a, b: f64) -> f64 {
-	return a if a < b else b
-}
-max_f16 :: #force_inline proc "contextless" (a, b: f16) -> f16 {
-	return a if a > b else b
-}
-max_f32 :: #force_inline proc "contextless" (a, b: f32) -> f32 {
-	return a if a > b else b
-}
-max_f64 :: #force_inline proc "contextless" (a, b: f64) -> f64 {
-	return a if a > b else b
 }
 
 abs_complex32 :: #force_inline proc "contextless" (x: complex32) -> f16 {

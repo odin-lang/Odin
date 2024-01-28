@@ -83,27 +83,13 @@ gb_internal LLVMValueRef lb_mem_zero_ptr_internal(lbProcedure *p, LLVMValueRef p
 		lb_type(p->module, t_rawptr),
 		lb_type(p->module, t_int)
 	};
-	if (true || is_inlinable) {
+	LLVMValueRef args[4] = {};
+	args[0] = LLVMBuildPointerCast(p->builder, ptr, types[0], "");
+	args[1] = LLVMConstInt(LLVMInt8TypeInContext(p->module->ctx), 0, false);
+	args[2] = LLVMBuildIntCast2(p->builder, len, types[1], /*signed*/false, "");
+	args[3] = LLVMConstInt(LLVMInt1TypeInContext(p->module->ctx), is_volatile, false);
 
-		LLVMValueRef args[4] = {};
-		args[0] = LLVMBuildPointerCast(p->builder, ptr, types[0], "");
-		args[1] = LLVMConstInt(LLVMInt8TypeInContext(p->module->ctx), 0, false);
-		args[2] = LLVMBuildIntCast2(p->builder, len, types[1], /*signed*/false, "");
-		args[3] = LLVMConstInt(LLVMInt1TypeInContext(p->module->ctx), is_volatile, false);
-
-		return lb_call_intrinsic(p, name, args, gb_count_of(args), types, gb_count_of(types));
-	} else {
-		lbValue pr = lb_lookup_runtime_procedure(p->module, str_lit("memset"));
-
-		LLVMValueRef args[3] = {};
-		args[0] = LLVMBuildPointerCast(p->builder, ptr, types[0], "");
-		args[1] = LLVMConstInt(LLVMInt32TypeInContext(p->module->ctx), 0, false);
-		args[2] = LLVMBuildIntCast2(p->builder, len, types[1], /*signed*/false, "");
-
-		// We always get the function pointer type rather than the function and there is apparently no way around that?
-		LLVMTypeRef type = lb_type_internal_for_procedures_raw(p->module, pr.type);
-		return LLVMBuildCall2(p->builder, type, pr.value, args, gb_count_of(args), "");
-	}
+	return lb_call_intrinsic(p, name, args, gb_count_of(args), types, gb_count_of(types));
 
 }
 
