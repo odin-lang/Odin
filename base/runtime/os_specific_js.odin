@@ -1,4 +1,5 @@
 //+build js
+//+private
 package runtime
 
 foreign import "odin_env"

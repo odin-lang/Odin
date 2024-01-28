@@ -3,6 +3,7 @@
 //+build !js
 //+build !wasi
 //+build !windows
+//+private
 package runtime
 
 import "core:os"

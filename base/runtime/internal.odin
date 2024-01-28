@@ -1,6 +1,6 @@
 package runtime
 
-import "core:intrinsics"
+import "base:intrinsics"
 
 @(private="file")
 IS_WASM :: ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32
