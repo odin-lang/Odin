@@ -4579,10 +4579,10 @@ gb_internal Array<ImportPathItem> find_import_path(Checker *c, AstPackage *start
 					continue;
 				}
 
-				if (pkg->kind == Package_Runtime) {
-					// NOTE(bill): Allow cyclic imports within the runtime package for the time being
-					continue;
-				}
+				// if (pkg->kind == Package_Runtime) {
+				// 	// NOTE(bill): Allow cyclic imports within the runtime package for the time being
+				// 	continue;
+				// }
 
 				ImportPathItem item = {pkg, decl};
 				if (pkg == end) {
