@@ -383,10 +383,11 @@ gb_internal Ast *clone_ast(Ast *node, AstFile *f) {
 		n->DynamicArrayType.elem = clone_ast(n->DynamicArrayType.elem, f);
 		break;
 	case Ast_StructType:
-		n->StructType.fields = clone_ast_array(n->StructType.fields, f);
+		n->StructType.fields             = clone_ast_array(n->StructType.fields, f);
 		n->StructType.polymorphic_params = clone_ast(n->StructType.polymorphic_params, f);
-		n->StructType.align  = clone_ast(n->StructType.align, f);
-		n->StructType.where_clauses  = clone_ast_array(n->StructType.where_clauses, f);
+		n->StructType.align              = clone_ast(n->StructType.align, f);
+		n->StructType.field_align        = clone_ast(n->StructType.field_align, f);
+		n->StructType.where_clauses      = clone_ast_array(n->StructType.where_clauses, f);
 		break;
 	case Ast_UnionType:
 		n->UnionType.variants = clone_ast_array(n->UnionType.variants, f);
@@ -1125,7 +1126,7 @@ gb_internal Ast *ast_dynamic_array_type(AstFile *f, Token token, Ast *elem) {
 
 gb_internal Ast *ast_struct_type(AstFile *f, Token token, Slice<Ast *> fields, isize field_count,
                      Ast *polymorphic_params, bool is_packed, bool is_raw_union, bool is_no_copy,
-                     Ast *align,
+                     Ast *align, Ast *field_align,
                      Token where_token, Array<Ast *> const &where_clauses) {
 	Ast *result = alloc_ast_node(f, Ast_StructType);
 	result->StructType.token              = token;
@@ -1136,6 +1137,7 @@ gb_internal Ast *ast_struct_type(AstFile *f, Token token, Slice<Ast *> fields, i
 	result->StructType.is_raw_union       = is_raw_union;
 	result->StructType.is_no_copy         = is_no_copy;
 	result->StructType.align              = align;
+	result->StructType.field_align        = field_align;
 	result->StructType.where_token        = where_token;
 	result->StructType.where_clauses      = slice_from_array(where_clauses);
 	return result;
@@ -2507,6 +2509,7 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 		bool is_raw_union       = false;
 		bool no_copy            = false;
 		Ast *align              = nullptr;
+		Ast *field_align        = nullptr;
 
 		if (allow_token(f, Token_OpenParen)) {
 			isize param_count = 0;
@@ -2541,6 +2544,18 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 					gbString s = expr_to_string(align);
 					syntax_warning(tag, "#align requires parentheses around the expression");
 					error_line("\tSuggestion: #align(%s)", s);
+					gb_string_free(s);
+				}
+			} else if (tag.string == "field_align") {
+				if (field_align) {
+					syntax_error(tag, "Duplicate struct tag '#%.*s'", LIT(tag.string));
+				}
+				field_align = parse_expr(f, true);
+				if (field_align && field_align->kind != Ast_ParenExpr) {
+					ERROR_BLOCK();
+					gbString s = expr_to_string(field_align);
+					syntax_warning(tag, "#field_align requires parentheses around the expression");
+					error_line("\tSuggestion: #field_align(%s)", s);
 					gb_string_free(s);
 				}
 			} else if (tag.string == "raw_union") {
@@ -2591,7 +2606,7 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 			decls = fields->FieldList.list;
 		}
 
-		return ast_struct_type(f, token, decls, name_count, polymorphic_params, is_packed, is_raw_union, no_copy, align, where_token, where_clauses);
+		return ast_struct_type(f, token, decls, name_count, polymorphic_params, is_packed, is_raw_union, no_copy, align, field_align, where_token, where_clauses);
 	} break;
 
 	case Token_union: {

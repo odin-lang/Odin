@@ -2547,6 +2547,7 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 
 		poly_params: ^ast.Field_List
 		align:        ^ast.Expr
+		field_align:  ^ast.Expr
 		is_packed:    bool
 		is_raw_union: bool
 		is_no_copy:   bool
@@ -2578,6 +2579,11 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 					error(p, tag.pos, "duplicate struct tag '#%s'", tag.text)
 				}
 				align = parse_expr(p, true)
+			case "field_align":
+				if field_align != nil {
+					error(p, tag.pos, "duplicate struct tag '#%s'", tag.text)
+				}
+				field_align = parse_expr(p, true)
 			case "raw_union":
 				if is_raw_union {
 					error(p, tag.pos, "duplicate struct tag '#%s'", tag.text)
@@ -2620,6 +2626,7 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 		st := ast.new(ast.Struct_Type, tok.pos, end_pos(close))
 		st.poly_params   = poly_params
 		st.align         = align
+		st.field_align   = field_align
 		st.is_packed     = is_packed
 		st.is_raw_union  = is_raw_union
 		st.is_no_copy    = is_no_copy
