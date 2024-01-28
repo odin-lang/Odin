@@ -1475,6 +1475,16 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 			break;
 		}
 	}
+
+	if (bc->metrics.os == TargetOs_freestanding) {
+		bc->ODIN_DEFAULT_TO_NIL_ALLOCATOR = !bc->ODIN_DEFAULT_TO_PANIC_ALLOCATOR;
+	} else if (is_arch_wasm()) {
+		if (bc->metrics.os == TargetOs_js || bc->metrics.os == TargetOs_wasi) {
+			// TODO(bill): Should these even have a default "heap-like" allocator?
+		}
+		bc->ODIN_DEFAULT_TO_PANIC_ALLOCATOR = true;
+		bc->ODIN_DEFAULT_TO_NIL_ALLOCATOR = !bc->ODIN_DEFAULT_TO_PANIC_ALLOCATOR;
+	}
 }
 
 #if defined(GB_SYSTEM_WINDOWS)
@@ -1608,7 +1618,6 @@ gb_internal bool init_build_paths(String init_filename) {
 	} else if (bc->command_kind & Command__does_build) {
 		produces_output_file = true;
 	}
-
 
 	if (build_context.ODIN_DEFAULT_TO_NIL_ALLOCATOR ||
 	    build_context.ODIN_DEFAULT_TO_PANIC_ALLOCATOR) {
