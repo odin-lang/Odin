@@ -1,10 +1,8 @@
 #define GB_WINDOWS_H_INCLUDED
 #include "gb/gb.h"
 
-#if defined(GB_SYSTEM_WINDOWS)
 #include "mimalloc/mimalloc-new-delete.h"
 #include "mimalloc/mimalloc-override.h"
-#endif
 
 #if defined(GB_SYSTEM_UNIX)
 // Required for intrinsics on GCC
