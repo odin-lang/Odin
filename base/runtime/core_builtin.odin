@@ -312,6 +312,7 @@ make_dynamic_array_len :: proc($T: typeid/[dynamic]$E, #any_int len: int, alloca
 @(builtin, require_results)
 make_dynamic_array_len_cap :: proc($T: typeid/[dynamic]$E, #any_int len: int, #any_int cap: int, allocator := context.allocator, loc := #caller_location) -> (array: T, err: Allocator_Error) #optional_allocator_error {
 	make_dynamic_array_error_loc(loc, len, cap)
+	array.allocator = allocator // initialize allocator before just in case it fails to allocate any memory
 	data := mem_alloc_bytes(size_of(E)*cap, align_of(E), allocator, loc) or_return
 	s := Raw_Dynamic_Array{raw_data(data), len, cap, allocator}
 	if data == nil && size_of(E) != 0 {
