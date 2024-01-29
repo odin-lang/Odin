@@ -2,7 +2,7 @@
 // +private
 package thread
 
-import "core:intrinsics"
+import "base:intrinsics"
 import "core:sync"
 import "core:sys/unix"
 

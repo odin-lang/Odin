@@ -1,10 +1,10 @@
 package os
 
 foreign import dl   "system:dl"
-foreign import libc "System.framework"
-foreign import pthread "System.framework"
+foreign import libc "system:System.framework"
+foreign import pthread "system:System.framework"
 
-import "core:runtime"
+import "base:runtime"
 import "core:strings"
 import "core:c"
 
@@ -857,25 +857,6 @@ access :: proc(path: string, mask: int) -> bool {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	cstr := strings.clone_to_cstring(path, context.temp_allocator)
 	return _unix_access(cstr, mask) == 0
-}
-
-heap_alloc :: proc(size: int, zero_memory := true) -> rawptr {
-	if size <= 0 {
-		return nil
-	}
-	if zero_memory {
-		return _unix_calloc(1, size)
-	} else {
-		return _unix_malloc(size)
-	}
-}
-heap_resize :: proc(ptr: rawptr, new_size: int) -> rawptr {
-	// NOTE: _unix_realloc doesn't guarantee new memory will be zeroed on
-	// POSIX platforms. Ensure your caller takes this into account.
-	return _unix_realloc(ptr, new_size)
-}
-heap_free :: proc(ptr: rawptr) {
-	_unix_free(ptr)
 }
 
 lookup_env :: proc(key: string, allocator := context.allocator) -> (value: string, found: bool) {

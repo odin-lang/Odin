@@ -1,6 +1,6 @@
 package runtime
 
-import "core:intrinsics"
+import "base:intrinsics"
 
 @builtin
 Maybe :: union($T: typeid) {T}
@@ -822,39 +822,6 @@ map_insert :: proc(m: ^$T/map[$K]$V, key: K, value: V, loc := #caller_location) 
 	key, value := key, value
 	return (^V)(__dynamic_map_set_without_hash((^Raw_Map)(m), map_info(T), rawptr(&key), rawptr(&value), loc))
 }
-
-
-@builtin
-incl_elem :: proc(s: ^$S/bit_set[$E; $U], elem: E) {
-	s^ |= {elem}
-}
-@builtin
-incl_elems :: proc(s: ^$S/bit_set[$E; $U], elems: ..E) {
-	for elem in elems {
-		s^ |= {elem}
-	}
-}
-@builtin
-incl_bit_set :: proc(s: ^$S/bit_set[$E; $U], other: S) {
-	s^ |= other
-}
-@builtin
-excl_elem :: proc(s: ^$S/bit_set[$E; $U], elem: E) {
-	s^ &~= {elem}
-}
-@builtin
-excl_elems :: proc(s: ^$S/bit_set[$E; $U], elems: ..E) {
-	for elem in elems {
-		s^ &~= {elem}
-	}
-}
-@builtin
-excl_bit_set :: proc(s: ^$S/bit_set[$E; $U], other: S) {
-	s^ &~= other
-}
-
-@builtin incl :: proc{incl_elem, incl_elems, incl_bit_set}
-@builtin excl :: proc{excl_elem, excl_elems, excl_bit_set}
 
 
 @builtin

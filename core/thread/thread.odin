@@ -1,8 +1,8 @@
 package thread
 
-import "core:runtime"
+import "base:runtime"
 import "core:mem"
-import "core:intrinsics"
+import "base:intrinsics"
 
 _ :: intrinsics
 

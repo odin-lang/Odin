@@ -5,7 +5,7 @@ import "core:math"
 import "core:reflect"
 import "core:strconv"
 import "core:strings"
-import "core:runtime"
+import "base:runtime"
 
 Unmarshal_Data_Error :: enum {
 	Invalid_Data,

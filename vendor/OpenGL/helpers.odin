@@ -5,7 +5,7 @@ package vendor_gl
 import "core:os"
 import "core:fmt"
 import "core:strings"
-import "core:runtime"
+import "base:runtime"
 _ :: fmt
 _ :: runtime
 

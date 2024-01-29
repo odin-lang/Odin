@@ -9,8 +9,8 @@
 */
 package xxhash
 
-import "core:intrinsics"
-import "core:runtime"
+import "base:intrinsics"
+import "base:runtime"
 
 mem_copy  :: runtime.mem_copy
 byte_swap :: intrinsics.byte_swap

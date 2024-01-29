@@ -1,6 +1,6 @@
 package log
 
-import "core:runtime"
+import "base:runtime"
 import "core:fmt"
 
 

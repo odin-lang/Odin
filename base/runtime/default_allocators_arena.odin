@@ -1,6 +1,6 @@
 package runtime
 
-import "core:intrinsics"
+import "base:intrinsics"
 
 DEFAULT_ARENA_GROWING_MINIMUM_BLOCK_SIZE :: uint(DEFAULT_TEMP_ALLOCATOR_BACKING_SIZE)
 

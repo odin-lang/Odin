@@ -3,11 +3,11 @@ package os
 foreign import dl   "system:dl"
 foreign import libc "system:c"
 
-import "core:runtime"
+import "base:runtime"
 import "core:strings"
 import "core:c"
 import "core:strconv"
-import "core:intrinsics"
+import "base:intrinsics"
 
 // NOTE(flysand): For compatibility we'll make core:os package
 // depend on the old (scheduled for removal) linux package.
@@ -886,27 +886,6 @@ access :: proc(path: string, mask: int) -> (bool, Errno) {
 		return false, _get_errno(result)
 	}
 	return true, ERROR_NONE
-}
-
-heap_alloc :: proc(size: int, zero_memory := true) -> rawptr {
-	if size <= 0 {
-		return nil
-	}
-	if zero_memory {
-		return _unix_calloc(1, c.size_t(size))
-	} else {
-		return _unix_malloc(c.size_t(size))
-	}
-}
-
-heap_resize :: proc(ptr: rawptr, new_size: int) -> rawptr {
-	// NOTE: _unix_realloc doesn't guarantee new memory will be zeroed on
-	// POSIX platforms. Ensure your caller takes this into account.
-	return _unix_realloc(ptr, c.size_t(new_size))
-}
-
-heap_free :: proc(ptr: rawptr) {
-	_unix_free(ptr)
 }
 
 lookup_env :: proc(key: string, allocator := context.allocator) -> (value: string, found: bool) {

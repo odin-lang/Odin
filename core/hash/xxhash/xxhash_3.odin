@@ -9,7 +9,7 @@
 */
 package xxhash
 
-import "core:intrinsics"
+import "base:intrinsics"
 
 /*
 *************************************************************************

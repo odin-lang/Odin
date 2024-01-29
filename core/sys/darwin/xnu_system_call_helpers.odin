@@ -1,7 +1,7 @@
 package darwin
 
 import "core:c"
-import "core:runtime"
+import "base:runtime"
 
 // this package uses the sys prefix for the proc names to indicate that these aren't native syscalls but directly call such
 sys_write_string ::  proc (fd: c.int, message: string) -> bool {

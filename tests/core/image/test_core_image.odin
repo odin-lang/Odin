@@ -27,7 +27,7 @@ import "core:mem"
 import "core:os"
 import "core:time"
 
-import "core:runtime"
+import "base:runtime"
 
 TEST_SUITE_PATH   :: "assets/PNG"
 

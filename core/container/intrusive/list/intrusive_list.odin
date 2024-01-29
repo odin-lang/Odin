@@ -1,6 +1,6 @@
 package container_intrusive_list
 
-import "core:intrinsics"
+import "base:intrinsics"
 
 // An intrusive doubly-linked list
 //

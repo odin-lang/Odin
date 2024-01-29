@@ -3,7 +3,7 @@
 //+no-instrumentation
 package runtime
 
-import "core:intrinsics"
+import "base:intrinsics"
 
 when ODIN_BUILD_MODE == .Dynamic {
 	@(link_name="_odin_entry_point", linkage="strong", require/*, link_section=".init"*/)

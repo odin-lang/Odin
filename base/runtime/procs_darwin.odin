@@ -3,7 +3,7 @@ package runtime
 
 foreign import "system:Foundation.framework"
 
-import "core:intrinsics"
+import "base:intrinsics"
 
 objc_id :: ^intrinsics.objc_object
 objc_Class :: ^intrinsics.objc_class

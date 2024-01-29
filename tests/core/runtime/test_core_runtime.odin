@@ -1,11 +1,11 @@
 package test_core_runtime
 
 import "core:fmt"
-import "core:intrinsics"
+import "base:intrinsics"
 import "core:mem"
 import "core:os"
 import "core:reflect"
-import "core:runtime"
+import "base:runtime"
 import "core:testing"
 
 TEST_count := 0

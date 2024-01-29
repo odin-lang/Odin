@@ -4581,7 +4581,8 @@ gb_internal bool is_entity_declared_for_selector(Entity *entity, Scope *import_s
 		if (entity->kind == Entity_Builtin) {
 			// NOTE(bill): Builtin's are in the universal scope which is part of every scopes hierarchy
 			// This means that we should just ignore the found result through it
-			*allow_builtin = entity->scope == import_scope || entity->scope != builtin_pkg->scope;
+			*allow_builtin = entity->scope == import_scope ||
+			                 (entity->scope != builtin_pkg->scope && entity->scope != intrinsics_pkg->scope);
 		} else if ((entity->scope->flags&ScopeFlag_Global) == ScopeFlag_Global && (import_scope->flags&ScopeFlag_Global) == 0) {
 			is_declared = false;
 		}

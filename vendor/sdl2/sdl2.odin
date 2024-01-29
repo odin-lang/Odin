@@ -23,7 +23,7 @@ package sdl2
 
 
 import "core:c"
-import "core:intrinsics"
+import "base:intrinsics"
 
 when ODIN_OS == .Windows {
 	foreign import lib "SDL2.lib"

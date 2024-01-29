@@ -22,8 +22,8 @@ import "core:hash"
 import "core:bytes"
 import "core:io"
 import "core:mem"
-import "core:intrinsics"
-import "core:runtime"
+import "base:intrinsics"
+import "base:runtime"
 
 // Limit chunk sizes.
 // By default: IDAT = 8k x 8k x 16-bits + 8k filter bytes.

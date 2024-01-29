@@ -770,15 +770,17 @@ gb_internal void add_type_info_dependency(CheckerInfo *info, DeclInfo *d, Type *
 	rw_mutex_unlock(&d->type_info_deps_mutex);
 }
 
-gb_internal AstPackage *get_core_package(CheckerInfo *info, String name) {
+
+gb_internal AstPackage *get_runtime_package(CheckerInfo *info) {
+	String name = str_lit("runtime");
 	gbAllocator a = heap_allocator();
-	String path = get_fullpath_core(a, name);
+	String path = get_fullpath_base_collection(a, name);
 	defer (gb_free(a, path.text));
 	auto found = string_map_get(&info->packages, path);
 	if (found == nullptr) {
 		gb_printf_err("Name: %.*s\n", LIT(name));
 		gb_printf_err("Fullpath: %.*s\n", LIT(path));
-		
+
 		for (auto const &entry : info->packages) {
 			gb_printf_err("%.*s\n", LIT(entry.key));
 		}
@@ -787,6 +789,26 @@ gb_internal AstPackage *get_core_package(CheckerInfo *info, String name) {
 	return *found;
 }
 
+gb_internal AstPackage *get_core_package(CheckerInfo *info, String name) {
+	if (name == "runtime") {
+		return get_runtime_package(info);
+	}
+
+	gbAllocator a = heap_allocator();
+	String path = get_fullpath_core_collection(a, name);
+	defer (gb_free(a, path.text));
+	auto found = string_map_get(&info->packages, path);
+	if (found == nullptr) {
+		gb_printf_err("Name: %.*s\n", LIT(name));
+		gb_printf_err("Fullpath: %.*s\n", LIT(path));
+
+		for (auto const &entry : info->packages) {
+			gb_printf_err("%.*s\n", LIT(entry.key));
+		}
+		GB_ASSERT_MSG(found != nullptr, "Missing core package %.*s", LIT(name));
+	}
+	return *found;
+}
 
 gb_internal void add_package_dependency(CheckerContext *c, char const *package_name, char const *name) {
 	String n = make_string_c(name);
@@ -1069,19 +1091,20 @@ gb_internal void init_universal(void) {
 	}
 
 
-	add_global_bool_constant("ODIN_DEBUG",                    bc->ODIN_DEBUG);
-	add_global_bool_constant("ODIN_DISABLE_ASSERT",           bc->ODIN_DISABLE_ASSERT);
-	add_global_bool_constant("ODIN_DEFAULT_TO_NIL_ALLOCATOR", bc->ODIN_DEFAULT_TO_NIL_ALLOCATOR);
-	add_global_bool_constant("ODIN_NO_DYNAMIC_LITERALS",      bc->no_dynamic_literals);
-	add_global_bool_constant("ODIN_NO_CRT",                   bc->no_crt);
-	add_global_bool_constant("ODIN_USE_SEPARATE_MODULES",     bc->use_separate_modules);
-	add_global_bool_constant("ODIN_TEST",                     bc->command_kind == Command_test);
-	add_global_bool_constant("ODIN_NO_ENTRY_POINT",           bc->no_entry_point);
-	add_global_bool_constant("ODIN_FOREIGN_ERROR_PROCEDURES", bc->ODIN_FOREIGN_ERROR_PROCEDURES);
-	add_global_bool_constant("ODIN_NO_RTTI",            bc->no_rtti);
+	add_global_bool_constant("ODIN_DEBUG",                      bc->ODIN_DEBUG);
+	add_global_bool_constant("ODIN_DISABLE_ASSERT",             bc->ODIN_DISABLE_ASSERT);
+	add_global_bool_constant("ODIN_DEFAULT_TO_NIL_ALLOCATOR",   bc->ODIN_DEFAULT_TO_NIL_ALLOCATOR);
+	add_global_bool_constant("ODIN_DEFAULT_TO_PANIC_ALLOCATOR", bc->ODIN_DEFAULT_TO_PANIC_ALLOCATOR);
+	add_global_bool_constant("ODIN_NO_DYNAMIC_LITERALS",        bc->no_dynamic_literals);
+	add_global_bool_constant("ODIN_NO_CRT",                     bc->no_crt);
+	add_global_bool_constant("ODIN_USE_SEPARATE_MODULES",       bc->use_separate_modules);
+	add_global_bool_constant("ODIN_TEST",                       bc->command_kind == Command_test);
+	add_global_bool_constant("ODIN_NO_ENTRY_POINT",             bc->no_entry_point);
+	add_global_bool_constant("ODIN_FOREIGN_ERROR_PROCEDURES",   bc->ODIN_FOREIGN_ERROR_PROCEDURES);
+	add_global_bool_constant("ODIN_NO_RTTI",                    bc->no_rtti);
 
-	add_global_bool_constant("ODIN_VALGRIND_SUPPORT",         bc->ODIN_VALGRIND_SUPPORT);
-	add_global_bool_constant("ODIN_TILDE",                    bc->tilde_backend);
+	add_global_bool_constant("ODIN_VALGRIND_SUPPORT",           bc->ODIN_VALGRIND_SUPPORT);
+	add_global_bool_constant("ODIN_TILDE",                      bc->tilde_backend);
 
 	add_global_constant("ODIN_COMPILE_TIMESTAMP", t_untyped_integer, exact_value_i64(odin_compile_timestamp()));
 
@@ -3813,6 +3836,7 @@ gb_internal void check_builtin_attributes(CheckerContext *ctx, Entity *e, Array<
 	case Entity_ProcGroup:
 	case Entity_Procedure:
 	case Entity_TypeName:
+	case Entity_Constant:
 		// Okay
 		break;
 	default:
@@ -4555,10 +4579,10 @@ gb_internal Array<ImportPathItem> find_import_path(Checker *c, AstPackage *start
 					continue;
 				}
 
-				if (pkg->kind == Package_Runtime) {
-					// NOTE(bill): Allow cyclic imports within the runtime package for the time being
-					continue;
-				}
+				// if (pkg->kind == Package_Runtime) {
+				// 	// NOTE(bill): Allow cyclic imports within the runtime package for the time being
+				// 	continue;
+				// }
 
 				ImportPathItem item = {pkg, decl};
 				if (pkg == end) {

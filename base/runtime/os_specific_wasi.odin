@@ -1,4 +1,5 @@
 //+build wasi
+//+private
 package runtime
 
 import "core:sys/wasm/wasi"

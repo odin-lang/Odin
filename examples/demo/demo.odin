@@ -2438,7 +2438,7 @@ matrix_type :: proc() {
 
 		// component-wise multiplication
 		// since a * b would be a standard matrix multiplication
-		c6 := hadamard_product(a, b)
+		c6 := intrinsics.hadamard_product(a, b)
 
 
 		fmt.println("a + b",  c0)
@@ -2480,7 +2480,7 @@ matrix_type :: proc() {
 			5, 0, 6, 0,
 			0, 7, 0, 8,
 		}
-		fmt.println("b4", matrix_flatten(b4))
+		fmt.println("b4", intrinsics.matrix_flatten(b4))
 	}
 
 	{ // Casting non-square matrices
@@ -2519,7 +2519,7 @@ matrix_type :: proc() {
 	// This is because matrices are stored as values (not a reference type), and thus operations on them will
 	// be stored on the stack. Restricting the maximum element count minimizing the possibility of stack overflows.
 
-	// Built-in Procedures (Compiler Level)
+	// 'intrinsics' Procedures (Compiler Level)
 	// 	transpose(m)
 	//		transposes a matrix
 	// 	outer_product(a, b)
@@ -2540,13 +2540,13 @@ matrix_type :: proc() {
 	//	conj(x)
 	//		conjugates the elements of a matrix for complex element types only
 
-	// Built-in Procedures (Runtime Level) (all square matrix procedures)
+	// Procedures in "core:math/linalg" and related (Runtime Level) (all square matrix procedures)
 	// 	determinant(m)
 	// 	adjugate(m)
 	// 	inverse(m)
 	// 	inverse_transpose(m)
 	// 	hermitian_adjoint(m)
-	// 	matrix_trace(m)
+	// 	trace(m)
 	// 	matrix_minor(m)
 }
 

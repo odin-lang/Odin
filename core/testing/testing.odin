@@ -3,7 +3,7 @@ package testing
 import "core:fmt"
 import "core:io"
 import "core:time"
-import "core:intrinsics"
+import "base:intrinsics"
 import "core:reflect"
 
 _ :: reflect // alias reflect to nothing to force visibility for -vet

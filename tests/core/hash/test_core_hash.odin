@@ -7,7 +7,7 @@ import "core:testing"
 import "core:fmt"
 import "core:os"
 import "core:math/rand"
-import "core:intrinsics"
+import "base:intrinsics"
 
 TEST_count := 0
 TEST_fail  := 0

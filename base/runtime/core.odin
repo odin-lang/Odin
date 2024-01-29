@@ -21,7 +21,7 @@
 //+no-instrumentation
 package runtime
 
-import "core:intrinsics"
+import "base:intrinsics"
 
 // NOTE(bill): This must match the compiler's
 Calling_Convention :: enum u8 {

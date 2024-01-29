@@ -2,7 +2,7 @@
 package os2
 
 import win32 "core:sys/windows"
-import "core:runtime"
+import "base:runtime"
 import "core:strings"
 
 _Path_Separator      :: '\\'
@@ -33,7 +33,7 @@ _mkdir_all :: proc(path: string, perm: File_Mode) -> Error {
 
 	dir, err := stat(path, _temp_allocator())
 	if err == nil {
-		if dir.is_dir {
+		if dir.is_directory {
 			return nil
 		}
 		return .Exist
@@ -60,7 +60,7 @@ _mkdir_all :: proc(path: string, perm: File_Mode) -> Error {
 	err = mkdir(path, perm)
 	if err != nil {
 		dir1, err1 := lstat(path, _temp_allocator())
-		if err1 == nil && dir1.is_dir {
+		if err1 == nil && dir1.is_directory {
 			return nil
 		}
 		return err
