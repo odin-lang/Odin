@@ -825,39 +825,6 @@ map_insert :: proc(m: ^$T/map[$K]$V, key: K, value: V, loc := #caller_location) 
 
 
 @builtin
-incl_elem :: proc(s: ^$S/bit_set[$E; $U], elem: E) {
-	s^ |= {elem}
-}
-@builtin
-incl_elems :: proc(s: ^$S/bit_set[$E; $U], elems: ..E) {
-	for elem in elems {
-		s^ |= {elem}
-	}
-}
-@builtin
-incl_bit_set :: proc(s: ^$S/bit_set[$E; $U], other: S) {
-	s^ |= other
-}
-@builtin
-excl_elem :: proc(s: ^$S/bit_set[$E; $U], elem: E) {
-	s^ &~= {elem}
-}
-@builtin
-excl_elems :: proc(s: ^$S/bit_set[$E; $U], elems: ..E) {
-	for elem in elems {
-		s^ &~= {elem}
-	}
-}
-@builtin
-excl_bit_set :: proc(s: ^$S/bit_set[$E; $U], other: S) {
-	s^ &~= other
-}
-
-@builtin incl :: proc{incl_elem, incl_elems, incl_bit_set}
-@builtin excl :: proc{excl_elem, excl_elems, excl_bit_set}
-
-
-@builtin
 card :: proc(s: $S/bit_set[$E; $U]) -> int {
 	when size_of(S) == 1 {
 		return int(intrinsics.count_ones(transmute(u8)s))
