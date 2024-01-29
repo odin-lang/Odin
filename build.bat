@@ -105,7 +105,7 @@ set linker_settings=%libs% %linker_flags%
 del *.pdb > NUL 2> NUL
 del *.ilk > NUL 2> NUL
 
-cl %compiler_settings% "src\mimalloc\src\static.c" "src\main.cpp" "src\libtommath.cpp" /link %linker_settings% -OUT:%exe_name%
+cl %compiler_settings% "src\mimalloc\static.c" "src\main.cpp" "src\libtommath.cpp" /link %linker_settings% -OUT:%exe_name%
 if %errorlevel% neq 0 goto end_of_build
 
 call build_vendor.bat

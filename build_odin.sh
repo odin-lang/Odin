@@ -114,7 +114,7 @@ build_odin() {
 	esac
 
 	set -x
-	$CXX src/mimalloc/src/static.c src/libtommath.cpp src/main.cpp $DISABLED_WARNINGS $CPPFLAGS $CXXFLAGS $EXTRAFLAGS $LDFLAGS -o odin
+	$CXX src/mimalloc/static.c src/libtommath.cpp src/main.cpp $DISABLED_WARNINGS $CPPFLAGS $CXXFLAGS $EXTRAFLAGS $LDFLAGS -o odin
 	set +x
 }
 
