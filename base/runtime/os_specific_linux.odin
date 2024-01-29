@@ -3,7 +3,7 @@ package runtime
 
 import "base:intrinsics"
 
-_os_write :: proc "contextless" (data: []byte) -> (int, _OS_Errno) {
+_stderr_write :: proc "contextless" (data: []byte) -> (int, _OS_Errno) {
 	when ODIN_ARCH == .amd64 {
 		SYS_write :: uintptr(1)
 	} else when ODIN_ARCH == .arm64 {

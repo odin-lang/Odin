@@ -16,7 +16,7 @@ foreign libc {
 	_get_errno :: proc() -> ^i32 ---
 }
 
-_os_write :: proc "contextless" (data: []byte) -> (int, _OS_Errno) {
+_stderr_write :: proc "contextless" (data: []byte) -> (int, _OS_Errno) {
 	ret := _fwrite(raw_data(data), 1, len(data), _stderr)
 	if ret < len(data) {
 		err := _get_errno()

@@ -9,14 +9,14 @@ foreign import kernel32 "system:Kernel32.lib"
 foreign kernel32 {
 	// NOTE(bill): The types are not using the standard names (e.g. DWORD and LPVOID) to just minimizing the dependency
 
-	// os_write
+	// stderr_write
 	GetStdHandle         :: proc(which: u32) -> rawptr ---
 	SetHandleInformation :: proc(hObject: rawptr, dwMask: u32, dwFlags: u32) -> b32 ---
 	WriteFile            :: proc(hFile: rawptr, lpBuffer: rawptr, nNumberOfBytesToWrite: u32, lpNumberOfBytesWritten: ^u32, lpOverlapped: rawptr) -> b32 ---
 	GetLastError         :: proc() -> u32 ---
 }
 
-_os_write :: proc "contextless" (data: []byte) -> (n: int, err: _OS_Errno) #no_bounds_check {
+_stderr_write :: proc "contextless" (data: []byte) -> (n: int, err: _OS_Errno) #no_bounds_check {
 	if len(data) == 0 {
 		return 0, 0
 	}
