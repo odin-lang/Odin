@@ -9,11 +9,13 @@ is_path_separator :: proc(c: byte) -> bool {
 	return _is_path_separator(c)
 }
 
-mkdir :: proc(name: string, perm: File_Mode) -> Error {
+mkdir :: make_directory
+make_directory :: proc(name: string, perm: File_Mode) -> Error {
 	return _mkdir(name, perm)
 }
 
-mkdir_all :: proc(path: string, perm: File_Mode) -> Error {
+mkdir_all :: make_directory_all
+make_directory_all :: proc(path: string, perm: File_Mode) -> Error {
 	return _mkdir_all(path, perm)
 }
 
@@ -22,10 +24,12 @@ remove_all :: proc(path: string) -> Error {
 }
 
 
-
-getwd :: proc(allocator: runtime.Allocator) -> (dir: string, err: Error) {
+getwd :: get_working_directory
+get_working_directory :: proc(allocator: runtime.Allocator) -> (dir: string, err: Error) {
 	return _getwd(allocator)
 }
-setwd :: proc(dir: string) -> (err: Error) {
+
+setwd :: set_working_directory
+set_working_directory :: proc(dir: string) -> (err: Error) {
 	return _setwd(dir)
 }
