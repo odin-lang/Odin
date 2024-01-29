@@ -84,7 +84,7 @@ defined, undefined, or not accessible at all:
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
-#include "../src/prim/windows/etw.h"
+#include "../prim/windows/etw.h"
 
 #define mi_track_init()                           EventRegistermicrosoft_windows_mimalloc();
 #define mi_track_malloc_size(p,reqsize,size,zero) EventWriteETW_MI_ALLOC((UINT64)(p), size)
