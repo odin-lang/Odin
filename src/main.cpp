@@ -2367,6 +2367,9 @@ gb_internal void init_terminal(void) {
 }
 
 int main(int arg_count, char const **arg_ptr) {
+#if defined(MIMALLOC_H)
+	(void)mi_version();
+#endif
 	if (arg_count < 2) {
 		usage(make_string_c(arg_ptr[0]));
 		return 1;

@@ -401,6 +401,44 @@ gb_internal gbAllocator heap_allocator(void) {
 gb_internal std::atomic<isize> total_heap_memory_allocated;
 
 
+#if defined(MIMALLOC_H)
+gb_internal GB_ALLOCATOR_PROC(heap_allocator_proc) {
+	void *ptr = nullptr;
+	gb_unused(allocator_data);
+	gb_unused(old_size);
+
+
+// TODO(bill): Throughly test!
+	switch (type) {
+	case gbAllocation_Alloc:
+		if (size == 0) {
+			return NULL;
+		} else {
+			ptr = mi_zalloc_aligned(size, alignment);
+		}
+		break;
+	case gbAllocation_Free:
+		if (old_memory != nullptr) {
+			mi_free(old_memory);
+		}
+		break;
+	case gbAllocation_Resize:
+		if (old_memory != nullptr && size > 0) {
+			ptr = mi_rezalloc_aligned(old_memory, size, alignment);
+		} else if (old_memory != nullptr) {
+			mi_free(old_memory);
+		} else if (size != 0) {
+			ptr = mi_zalloc_aligned(size, alignment);
+		}
+		break;
+	case gbAllocation_FreeAll:
+		break;
+	}
+
+	return ptr;
+}
+#else
+
 gb_internal GB_ALLOCATOR_PROC(heap_allocator_proc) {
 	void *ptr = nullptr;
 	gb_unused(allocator_data);
@@ -541,7 +579,7 @@ gb_internal GB_ALLOCATOR_PROC(heap_allocator_proc) {
 
 	return ptr;
 }
-
+#endif
 
 template <typename T>
 gb_internal isize resize_array_raw(T **array, gbAllocator const &a, isize old_count, isize new_count, isize custom_alignment=1) {
