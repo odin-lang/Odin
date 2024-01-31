@@ -473,7 +473,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_ObfuscateSourceCodeLocations, str_lit("obfuscate-source-code-locations"), BuildFlagParam_None,    Command__does_build);
 
 	add_flag(&build_flags, BuildFlag_Short,                   str_lit("short"),                     BuildFlagParam_None,    Command_doc);
-	add_flag(&build_flags, BuildFlag_AllPackages,             str_lit("all-packages"),              BuildFlagParam_None,    Command_doc);
+	add_flag(&build_flags, BuildFlag_AllPackages,             str_lit("all-packages"),              BuildFlagParam_None,    Command_doc | Command_test);
 	add_flag(&build_flags, BuildFlag_DocFormat,               str_lit("doc-format"),                BuildFlagParam_None,    Command_doc);
 
 	add_flag(&build_flags, BuildFlag_IgnoreWarnings,          str_lit("ignore-warnings"),           BuildFlagParam_None,    Command_all);
@@ -1149,6 +1149,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							break;
 						case BuildFlag_AllPackages:
 							build_context.cmd_doc_flags |= CmdDocFlag_AllPackages;
+				   			build_context.test_all_packages = true;
 							break;
 						case BuildFlag_DocFormat:
 							build_context.cmd_doc_flags |= CmdDocFlag_DocFormat;
@@ -1907,6 +1908,10 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 	if (test_only) {
 		print_usage_line(1, "-test-name:<string>");
 		print_usage_line(2, "Runs specific test only by name.");
+		print_usage_line(0, "");
+
+		print_usage_line(1, "-all-packages");
+		print_usage_line(2, "Tests all packages imported into the given initial package.");
 		print_usage_line(0, "");
 	}
 
