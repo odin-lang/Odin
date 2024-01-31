@@ -2390,7 +2390,7 @@ gb_internal Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_e
 
 	bool is_polymorphic = is_type_polymorphic(elem);
 
-	if ((!is_polymorphic || soa_kind == StructSoa_Fixed) && !is_type_struct(elem) && !is_type_raw_union(elem) && !(is_type_array(elem) && bt_elem->Array.count <= 4)) {
+	if (!is_polymorphic && !is_type_struct(elem) && !is_type_raw_union(elem) && !(is_type_array(elem) && bt_elem->Array.count <= 4)) {
 		gbString str = type_to_string(elem);
 		error(elem_expr, "Invalid type for an #soa array, expected a struct or array of length 4 or below, got '%s'", str);
 		gb_string_free(str);
@@ -2407,7 +2407,7 @@ gb_internal Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_e
 	case StructSoa_Slice:	extra_field_count = 1; break;
 	case StructSoa_Dynamic:	extra_field_count = 3; break;
 	}
-	if (is_polymorphic && soa_kind != StructSoa_Fixed) {
+	if (is_polymorphic) {
 		field_count = 0;
 
 		soa_struct = alloc_type_struct();
