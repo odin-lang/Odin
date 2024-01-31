@@ -7,9 +7,9 @@ is_package_imported :: proc(package_name: string) -> bool ---
 
 // Matrix Related Procedures
 transpose        :: proc(m: $T/matrix[$R, $C]$E)    -> matrix[C, R]E ---
-outer_product    :: proc(a: $A/[$X]$E, b: $B/[$Y]E) -> matrix[A, B]E ---
+outer_product    :: proc(a: $A/[$X]$E, b: $B/[$Y]E) -> matrix[X, Y]E ---
 hadamard_product :: proc(a, b: $T/matrix[$R, $C]$E) -> T ---
-matrix_flatten   :: proc(m: $T/matrix[$R, $C]$E)    -> [R*E]E ---
+matrix_flatten   :: proc(m: $T/matrix[$R, $C]$E)    -> [R*C]E ---
 
 // Types
 soa_struct :: proc($N: int, $T: typeid) -> type/#soa[N]T
