@@ -117,6 +117,7 @@ foreign webgl {
 	Hint :: proc(target: Enum, mode: Enum) ---
 	
 	IsBuffer       :: proc(buffer: Buffer) -> bool ---
+	IsEnabled      :: proc(cap: Enum) -> bool ---
 	IsFramebuffer  :: proc(framebuffer: Framebuffer) -> bool ---
 	IsProgram      :: proc(program: Program) -> bool ---
 	IsRenderbuffer :: proc(renderbuffer: Renderbuffer) -> bool ---
