@@ -22,5 +22,18 @@ main :: proc() {
 		foo()
     }
 }
+
+// Automatic profiling of every procedure:
+
+@(instrumentation_enter)
+spall_enter :: proc "contextless" (proc_address, call_site_return_address: rawptr, loc: runtime.Source_Code_Location) {
+	spall._buffer_begin(&spall_ctx, &spall_buffer, "", "", loc)
+}
+
+@(instrumentation_exit)
+spall_exit :: proc "contextless" (proc_address, call_site_return_address: rawptr, loc: runtime.Source_Code_Location) {
+	spall._buffer_end(&spall_ctx, &spall_buffer)
+}
+
 */
 package spall
