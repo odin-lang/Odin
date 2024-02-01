@@ -1,15 +1,15 @@
 package fmt
 
+import "base:intrinsics"
+import "base:runtime"
 import "core:math/bits"
 import "core:mem"
 import "core:io"
 import "core:reflect"
-import "base:runtime"
 import "core:strconv"
 import "core:strings"
 import "core:time"
 import "core:unicode/utf8"
-import "base:intrinsics"
 
 // Internal data structure that stores the required information for formatted printing
 Info :: struct {
