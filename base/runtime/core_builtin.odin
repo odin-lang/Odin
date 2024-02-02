@@ -122,7 +122,7 @@ pop :: proc(array: ^$T/[dynamic]$E, loc := #caller_location) -> (res: E) #no_bou
 // `pop_safe` trys to remove and return the end value of dynamic array `array` and reduces the length of `array` by 1.
 // If the operation is not possible, it will return false.
 @builtin
-pop_safe :: proc(array: ^$T/[dynamic]$E) -> (res: E, ok: bool) #no_bounds_check {
+pop_safe :: proc "contextless" (array: ^$T/[dynamic]$E) -> (res: E, ok: bool) #no_bounds_check {
 	if len(array) == 0 {
 		return
 	}
@@ -148,7 +148,7 @@ pop_front :: proc(array: ^$T/[dynamic]$E, loc := #caller_location) -> (res: E) #
 // `pop_front_safe` trys to return and remove the first value of dynamic array `array` and reduces the length of `array` by 1.
 // If the operation is not possible, it will return false.
 @builtin
-pop_front_safe :: proc(array: ^$T/[dynamic]$E) -> (res: E, ok: bool) #no_bounds_check {
+pop_front_safe :: proc "contextless" (array: ^$T/[dynamic]$E) -> (res: E, ok: bool) #no_bounds_check {
 	if len(array) == 0 {
 		return
 	}
@@ -826,7 +826,7 @@ map_insert :: proc(m: ^$T/map[$K]$V, key: K, value: V, loc := #caller_location) 
 
 
 @builtin
-card :: proc(s: $S/bit_set[$E; $U]) -> int {
+card :: proc "contextless" (s: $S/bit_set[$E; $U]) -> int {
 	when size_of(S) == 1 {
 		return int(intrinsics.count_ones(transmute(u8)s))
 	} else when size_of(S) == 2 {

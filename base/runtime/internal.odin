@@ -22,7 +22,7 @@ byte_slice :: #force_inline proc "contextless" (data: rawptr, len: int) -> []byt
 	return ([^]byte)(data)[:max(len, 0)]
 }
 
-is_power_of_two_int :: #force_inline proc(x: int) -> bool {
+is_power_of_two_int :: #force_inline proc "contextless" (x: int) -> bool {
 	if x <= 0 {
 		return false
 	}
@@ -40,7 +40,7 @@ align_forward_int :: #force_inline proc(ptr, align: int) -> int {
 	return p
 }
 
-is_power_of_two_uintptr :: #force_inline proc(x: uintptr) -> bool {
+is_power_of_two_uintptr :: #force_inline proc "contextless" (x: uintptr) -> bool {
 	if x <= 0 {
 		return false
 	}
