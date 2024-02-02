@@ -2567,27 +2567,27 @@ gb_internal void generate_minimum_dependency_set(Checker *c, Entity *start) {
 		str_lit("memmove"),
 	);
 
-	FORCE_ADD_RUNTIME_ENTITIES(!build_context.tilde_backend,
-		// Extended data type internal procedures
-		str_lit("umodti3"),
-		str_lit("udivti3"),
-		str_lit("modti3"),
-		str_lit("divti3"),
-		str_lit("fixdfti"),
-		str_lit("fixunsdfti"),
-		str_lit("fixunsdfdi"),
-		str_lit("floattidf"),
-		str_lit("floattidf_unsigned"),
-		str_lit("truncsfhf2"),
-		str_lit("truncdfhf2"),
-		str_lit("gnu_h2f_ieee"),
-		str_lit("gnu_f2h_ieee"),
-		str_lit("extendhfsf2"),
+	// FORCE_ADD_RUNTIME_ENTITIES(!build_context.tilde_backend,
+	// 	// Extended data type internal procedures
+	// 	str_lit("umodti3"),
+	// 	str_lit("udivti3"),
+	// 	str_lit("modti3"),
+	// 	str_lit("divti3"),
+	// 	str_lit("fixdfti"),
+	// 	str_lit("fixunsdfti"),
+	// 	str_lit("fixunsdfdi"),
+	// 	str_lit("floattidf"),
+	// 	str_lit("floattidf_unsigned"),
+	// 	str_lit("truncsfhf2"),
+	// 	str_lit("truncdfhf2"),
+	// 	str_lit("gnu_h2f_ieee"),
+	// 	str_lit("gnu_f2h_ieee"),
+	// 	str_lit("extendhfsf2"),
 
-		// WASM Specific
-		str_lit("__ashlti3"),
-		str_lit("__multi3"),
-	);
+	// 	// WASM Specific
+	// 	str_lit("__ashlti3"),
+	// 	str_lit("__multi3"),
+	// );
 
 	FORCE_ADD_RUNTIME_ENTITIES(!build_context.no_rtti,
 		// Odin types

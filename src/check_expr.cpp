@@ -3114,6 +3114,25 @@ gb_internal void check_cast(CheckerContext *c, Operand *x, Type *type) {
 			final_type = default_type(x->type);
 		}
 		update_untyped_expr_type(c, x->expr, final_type, true);
+	} else {
+		Type *src = core_type(x->type);
+		Type *dst = core_type(type);
+		if (src != dst) {
+			if (is_type_integer_128bit(src) && is_type_float(dst)) {
+				add_package_dependency(c, "runtime", "floattidf_unsigned");
+				add_package_dependency(c, "runtime", "floattidf");
+			} else if (is_type_integer_128bit(dst) && is_type_float(src)) {
+				add_package_dependency(c, "runtime", "fixunsdfti");
+				add_package_dependency(c, "runtime", "fixunsdfdi");
+			} else if (src == t_f16 && is_type_float(dst)) {
+				add_package_dependency(c, "runtime", "gnu_h2f_ieee");
+				add_package_dependency(c, "runtime", "extendhfsf2");
+			} else if (is_type_float(dst) && dst == t_f16) {
+				add_package_dependency(c, "runtime", "truncsfhf2");
+				add_package_dependency(c, "runtime", "truncdfhf2");
+				add_package_dependency(c, "runtime", "gnu_f2h_ieee");
+			}
+		}
 	}
 
 	x->type = type;
@@ -3734,9 +3753,14 @@ gb_internal void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Typ
 		x->mode = Addressing_Invalid;
 		return;
 	}
-
-	if (op.kind == Token_Quo || op.kind == Token_QuoEq) {
-		Type *bt = base_type(x->type);
+	Type *bt = base_type(x->type);
+	if (op.kind == Token_Mod    || op.kind == Token_ModEq ||
+	    op.kind == Token_ModMod || op.kind == Token_ModModEq) {
+		if (bt->kind == Type_Basic) switch (bt->Basic.kind) {
+		case Basic_u128: add_package_dependency(c, "runtime", "umodti3"); break;
+		case Basic_i128: add_package_dependency(c, "runtime", "modti3");  break;
+		}
+	} else if (op.kind == Token_Quo || op.kind == Token_QuoEq) {
 		if (bt->kind == Type_Basic) switch (bt->Basic.kind) {
 		case Basic_complex32:     add_package_dependency(c, "runtime", "quo_complex32");     break;
 		case Basic_complex64:     add_package_dependency(c, "runtime", "quo_complex64");     break;
@@ -3744,13 +3768,32 @@ gb_internal void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Typ
 		case Basic_quaternion64:  add_package_dependency(c, "runtime", "quo_quaternion64");  break;
 		case Basic_quaternion128: add_package_dependency(c, "runtime", "quo_quaternion128"); break;
 		case Basic_quaternion256: add_package_dependency(c, "runtime", "quo_quaternion256"); break;
+
+		case Basic_u128: add_package_dependency(c, "runtime", "udivti3"); break;
+		case Basic_i128: add_package_dependency(c, "runtime", "divti3");  break;
 		}
 	} else if (op.kind == Token_Mul || op.kind == Token_MulEq) {
-		Type *bt = base_type(x->type);
 		if (bt->kind == Type_Basic) switch (bt->Basic.kind) {
-		case Basic_quaternion64:  add_package_dependency(c, "runtime", "mul_quaternion64"); break;
+		case Basic_quaternion64:  add_package_dependency(c, "runtime", "mul_quaternion64");  break;
 		case Basic_quaternion128: add_package_dependency(c, "runtime", "mul_quaternion128"); break;
 		case Basic_quaternion256: add_package_dependency(c, "runtime", "mul_quaternion256"); break;
+
+
+		case Basic_u128:
+		case Basic_i128:
+			if (is_arch_wasm()) {
+				add_package_dependency(c, "runtime", "__multi3");
+			}
+			break;
+		}
+	} else if (op.kind == Token_Shl || op.kind == Token_ShlEq) {
+		if (bt->kind == Type_Basic) switch (bt->Basic.kind) {
+		case Basic_u128:
+		case Basic_i128:
+			if (is_arch_wasm()) {
+				add_package_dependency(c, "runtime", "__ashlti3");
+			}
+			break;
 		}
 	}
 
