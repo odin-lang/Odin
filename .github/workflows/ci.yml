@@ -3,6 +3,7 @@ on: [push, pull_request, workflow_dispatch]
 
 jobs:
   build_linux:
+    name: Ubuntu Build, Check, and Test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
@@ -56,6 +57,7 @@ jobs:
         run: ./odin check examples/all -vet -strict-style -target:openbsd_amd64
         timeout-minutes: 10
   build_macOS:
+    name: MacOS Build, Check, and Test
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v1
@@ -96,6 +98,7 @@ jobs:
           make
         timeout-minutes: 10
   build_macOS_arm:
+    name: MacOS ARM Build, Check, and Test
     runs-on: macos-14 # This is an arm/m1 runner.
     steps:
       - uses: actions/checkout@v1
@@ -136,6 +139,7 @@ jobs:
           make
         timeout-minutes: 10
   build_windows:
+    name: Windows Build, Check, and Test
     runs-on: windows-2022
     steps:
       - uses: actions/checkout@v1

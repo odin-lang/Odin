@@ -7,6 +7,7 @@ on:
 
 jobs:
   build_windows:
+    name: Windows Build
     if: github.repository == 'odin-lang/Odin'
     runs-on: windows-2022
     steps:
@@ -40,6 +41,7 @@ jobs:
           name: windows_artifacts
           path: dist
   build_ubuntu:
+    name: Ubuntu Build
     if: github.repository == 'odin-lang/Odin'
     runs-on: ubuntu-latest
     steps:
@@ -67,6 +69,7 @@ jobs:
           name: ubuntu_artifacts
           path: dist
   build_macos:
+    name: MacOS Build
     if: github.repository == 'odin-lang/Odin'
     runs-on: macos-latest
     steps:
@@ -97,6 +100,7 @@ jobs:
           name: macos_artifacts
           path: dist
   build_macos_arm:
+    name: MacOS ARM Build
     if: github.repository == 'odin-lang/Odin'
     runs-on: macos-14
     steps:
