@@ -1,9 +1,10 @@
 //+build js
+//+private
 package runtime
 
 foreign import "odin_env"
 
-_os_write :: proc "contextless" (data: []byte) -> (int, _OS_Errno) {
+_stderr_write :: proc "contextless" (data: []byte) -> (int, _OS_Errno) {
 	foreign odin_env {
 		write :: proc "contextless" (fd: u32, p: []byte) ---
 	}

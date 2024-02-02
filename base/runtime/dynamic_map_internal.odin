@@ -1,6 +1,6 @@
 package runtime
 
-import "core:intrinsics"
+import "base:intrinsics"
 _ :: intrinsics
 
 // High performance, cache-friendly, open-addressed Robin Hood hashing hash map

@@ -1,15 +1,15 @@
 package fmt
 
+import "base:intrinsics"
+import "base:runtime"
 import "core:math/bits"
 import "core:mem"
 import "core:io"
 import "core:reflect"
-import "core:runtime"
 import "core:strconv"
 import "core:strings"
 import "core:time"
 import "core:unicode/utf8"
-import "core:intrinsics"
 
 // Internal data structure that stores the required information for formatted printing
 Info :: struct {
@@ -954,23 +954,9 @@ _fmt_int :: proc(fi: ^Info, u: u64, base: int, is_signed: bool, bit_size: int, d
 	start := 0
 
 	flags: strconv.Int_Flags
-	if fi.hash && !fi.zero { flags |= {.Prefix} }
-	if fi.plus             { flags |= {.Plus}   }
+	if fi.hash { flags |= {.Prefix} }
+	if fi.plus { flags |= {.Plus}   }
 	s := strconv.append_bits(buf[start:], u, base, is_signed, bit_size, digits, flags)
-
-	if fi.hash && fi.zero && fi.indent == 0 {
-		c: byte = 0
-		switch base {
-		case 2:  c = 'b'
-		case 8:  c = 'o'
-		case 12: c = 'z'
-		case 16: c = 'x'
-		}
-		if c != 0 {
-			io.write_byte(fi.writer, '0', &fi.n)
-			io.write_byte(fi.writer, c, &fi.n)
-		}
-	}
 
 	prev_zero := fi.zero
 	defer fi.zero = prev_zero

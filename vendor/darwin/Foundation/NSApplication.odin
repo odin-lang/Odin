@@ -2,8 +2,8 @@ package objc_Foundation
 
 foreign import "system:Foundation.framework"
 
-import "core:intrinsics"
-import "core:runtime"
+import "base:intrinsics"
+import "base:runtime"
 import "core:strings"
 
 RunLoopMode :: ^String

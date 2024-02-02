@@ -6,7 +6,7 @@ package thread
 	Made available under Odin's BSD-3 license.
 */
 
-import "core:intrinsics"
+import "base:intrinsics"
 import "core:sync"
 import "core:mem"
 

@@ -1,6 +1,6 @@
 package strings
 
-import "core:runtime"
+import "base:runtime"
 import "core:unicode/utf8"
 import "core:strconv"
 import "core:mem"

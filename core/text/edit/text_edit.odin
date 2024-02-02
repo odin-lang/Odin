@@ -6,7 +6,7 @@ package text_edit
 		* https://rxi.github.io/a_simple_undo_system.html
 */
 
-import "core:runtime"
+import "base:runtime"
 import "core:time"
 import "core:mem"
 import "core:strings"

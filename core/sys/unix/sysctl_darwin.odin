@@ -2,7 +2,7 @@
 package unix
 
 import "core:sys/darwin"
-import "core:intrinsics"
+import "base:intrinsics"
 
 _ :: darwin
 

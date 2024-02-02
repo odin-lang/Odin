@@ -8,7 +8,7 @@ import "core:mem"
 import "core:strconv"
 import "core:strings"
 import "core:unicode"
-import "core:runtime"
+import "base:runtime"
 
 Image        :: image.Image
 Format       :: image.Netpbm_Format

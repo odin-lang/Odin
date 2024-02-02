@@ -2,7 +2,7 @@ package libc
 
 // 7.16 Variable arguments
 
-import "core:intrinsics"
+import "base:intrinsics"
 
 @(private="file")
 @(default_calling_convention="none")

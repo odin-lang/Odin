@@ -1,7 +1,7 @@
 //+private
 package os2
 
-import "core:runtime"
+import "base:runtime"
 
 
 _create_temp :: proc(dir, pattern: string) -> (^File, Error) {

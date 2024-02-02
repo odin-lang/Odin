@@ -2,7 +2,7 @@
 package unix
 
 when ODIN_OS == .Darwin {
-	foreign import libc "System.framework"
+	foreign import libc "system:System.framework"
 } else  {
 	foreign import libc "system:c"
 }

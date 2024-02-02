@@ -1,6 +1,6 @@
 package runtime
 
-import "core:intrinsics"
+import "base:intrinsics"
 
 @builtin
 Maybe :: union($T: typeid) {T}
@@ -122,7 +122,7 @@ pop :: proc(array: ^$T/[dynamic]$E, loc := #caller_location) -> (res: E) #no_bou
 // `pop_safe` trys to remove and return the end value of dynamic array `array` and reduces the length of `array` by 1.
 // If the operation is not possible, it will return false.
 @builtin
-pop_safe :: proc(array: ^$T/[dynamic]$E) -> (res: E, ok: bool) #no_bounds_check {
+pop_safe :: proc "contextless" (array: ^$T/[dynamic]$E) -> (res: E, ok: bool) #no_bounds_check {
 	if len(array) == 0 {
 		return
 	}
@@ -148,7 +148,7 @@ pop_front :: proc(array: ^$T/[dynamic]$E, loc := #caller_location) -> (res: E) #
 // `pop_front_safe` trys to return and remove the first value of dynamic array `array` and reduces the length of `array` by 1.
 // If the operation is not possible, it will return false.
 @builtin
-pop_front_safe :: proc(array: ^$T/[dynamic]$E) -> (res: E, ok: bool) #no_bounds_check {
+pop_front_safe :: proc "contextless" (array: ^$T/[dynamic]$E) -> (res: E, ok: bool) #no_bounds_check {
 	if len(array) == 0 {
 		return
 	}
@@ -312,6 +312,7 @@ make_dynamic_array_len :: proc($T: typeid/[dynamic]$E, #any_int len: int, alloca
 @(builtin, require_results)
 make_dynamic_array_len_cap :: proc($T: typeid/[dynamic]$E, #any_int len: int, #any_int cap: int, allocator := context.allocator, loc := #caller_location) -> (array: T, err: Allocator_Error) #optional_allocator_error {
 	make_dynamic_array_error_loc(loc, len, cap)
+	array.allocator = allocator // initialize allocator before just in case it fails to allocate any memory
 	data := mem_alloc_bytes(size_of(E)*cap, align_of(E), allocator, loc) or_return
 	s := Raw_Dynamic_Array{raw_data(data), len, cap, allocator}
 	if data == nil && size_of(E) != 0 {
@@ -825,40 +826,7 @@ map_insert :: proc(m: ^$T/map[$K]$V, key: K, value: V, loc := #caller_location) 
 
 
 @builtin
-incl_elem :: proc(s: ^$S/bit_set[$E; $U], elem: E) {
-	s^ |= {elem}
-}
-@builtin
-incl_elems :: proc(s: ^$S/bit_set[$E; $U], elems: ..E) {
-	for elem in elems {
-		s^ |= {elem}
-	}
-}
-@builtin
-incl_bit_set :: proc(s: ^$S/bit_set[$E; $U], other: S) {
-	s^ |= other
-}
-@builtin
-excl_elem :: proc(s: ^$S/bit_set[$E; $U], elem: E) {
-	s^ &~= {elem}
-}
-@builtin
-excl_elems :: proc(s: ^$S/bit_set[$E; $U], elems: ..E) {
-	for elem in elems {
-		s^ &~= {elem}
-	}
-}
-@builtin
-excl_bit_set :: proc(s: ^$S/bit_set[$E; $U], other: S) {
-	s^ &~= other
-}
-
-@builtin incl :: proc{incl_elem, incl_elems, incl_bit_set}
-@builtin excl :: proc{excl_elem, excl_elems, excl_bit_set}
-
-
-@builtin
-card :: proc(s: $S/bit_set[$E; $U]) -> int {
+card :: proc "contextless" (s: $S/bit_set[$E; $U]) -> int {
 	when size_of(S) == 1 {
 		return int(intrinsics.count_ones(transmute(u8)s))
 	} else when size_of(S) == 2 {

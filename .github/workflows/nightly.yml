@@ -29,6 +29,7 @@ jobs:
           cp LICENSE dist
           cp LLVM-C.dll dist
           cp -r shared dist
+          cp -r base dist
           cp -r core dist
           cp -r vendor dist
           cp -r bin dist
@@ -56,6 +57,7 @@ jobs:
           cp LICENSE dist
           cp libLLVM* dist
           cp -r shared dist
+          cp -r base dist
           cp -r core dist
           cp -r vendor dist
           cp -r examples dist
@@ -85,6 +87,7 @@ jobs:
           cp odin dist
           cp LICENSE dist
           cp -r shared dist
+          cp -r base dist
           cp -r core dist
           cp -r vendor dist
           cp -r examples dist

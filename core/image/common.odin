@@ -13,7 +13,7 @@ package image
 import "core:bytes"
 import "core:mem"
 import "core:compress"
-import "core:runtime"
+import "base:runtime"
 
 /*
 	67_108_864 pixels max by default.

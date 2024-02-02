@@ -2033,9 +2033,9 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 
 	case BuiltinProc_clamp:
 		return lb_emit_clamp(p, type_of_expr(expr),
-							 lb_build_expr(p, ce->args[0]),
-							 lb_build_expr(p, ce->args[1]),
-							 lb_build_expr(p, ce->args[2]));
+		                     lb_build_expr(p, ce->args[0]),
+		                     lb_build_expr(p, ce->args[1]),
+		                     lb_build_expr(p, ce->args[2]));
 
 
 	case BuiltinProc_soa_zip:

@@ -1,6 +1,6 @@
 package c
 
-import builtin "core:builtin"
+import builtin "base:builtin"
 
 char           :: builtin.u8  // assuming -funsigned-char
 

@@ -4,7 +4,7 @@ foreign import libc "system:c"
 
 import "core:strings"
 import "core:c"
-import "core:runtime"
+import "base:runtime"
 
 Handle    :: distinct i32
 Pid       :: distinct i32
@@ -246,7 +246,7 @@ AT_REMOVEDIR        :: 0x08
 
 @(default_calling_convention="c")
 foreign libc {
-	@(link_name="__errno")	__errno		:: proc() -> ^int ---
+	@(link_name="__error")	__error		:: proc() -> ^c.int ---
 
 	@(link_name="fork")	_unix_fork	:: proc() -> pid_t ---
 	@(link_name="getthrid")	_unix_getthrid	:: proc() -> int ---
@@ -296,7 +296,7 @@ is_path_separator :: proc(r: rune) -> bool {
 }
 
 get_last_error :: proc "contextless" () -> int {
-	return __errno()^
+	return int(__error()^)
 }
 
 fork :: proc() -> (Pid, Errno) {
@@ -613,27 +613,6 @@ access :: proc(path: string, mask: int) -> (bool, Errno) {
 		return false, Errno(get_last_error())
 	}
 	return true, ERROR_NONE
-}
-
-heap_alloc :: proc(size: int, zero_memory := true) -> rawptr {
-	if size <= 0 {
-		return nil
-	}
-	if zero_memory {
-		return _unix_calloc(1, c.size_t(size))
-	} else {
-		return _unix_malloc(c.size_t(size))
-	}
-}
-
-heap_resize :: proc(ptr: rawptr, new_size: int) -> rawptr {
-	// NOTE: _unix_realloc doesn't guarantee new memory will be zeroed on
-	// POSIX platforms. Ensure your caller takes this into account.
-	return _unix_realloc(ptr, c.size_t(new_size))
-}
-
-heap_free :: proc(ptr: rawptr) {
-	_unix_free(ptr)
 }
 
 lookup_env :: proc(key: string, allocator := context.allocator) -> (value: string, found: bool) {

@@ -1,9 +1,7 @@
 package reflect
 
-import "core:runtime"
-import "core:intrinsics"
-import "core:mem"
-_ :: mem
+import "base:runtime"
+import "base:intrinsics"
 _ :: intrinsics
 
 Type_Info :: runtime.Type_Info
@@ -513,13 +511,13 @@ struct_fields_zipped :: proc(T: typeid) -> (fields: #soa[]Struct_Field) {
 
 
 @(require_results)
-struct_tag_get :: proc(tag: Struct_Tag, key: string) -> (value: Struct_Tag) {
-	value, _ = struct_tag_lookup(tag, key)
-	return
+struct_tag_get :: proc(tag: Struct_Tag, key: string) -> (value: string) {
+	v, _ := struct_tag_lookup(tag, key)
+	return string(v)
 }
 
 @(require_results)
-struct_tag_lookup :: proc(tag: Struct_Tag, key: string) -> (value: Struct_Tag, ok: bool) {
+struct_tag_lookup :: proc(tag: Struct_Tag, key: string) -> (value: string, ok: bool) {
 	for t := tag; t != ""; /**/ {
 		i := 0
 		for i < len(t) && t[i] == ' ' { // Skip whitespace
@@ -570,7 +568,7 @@ struct_tag_lookup :: proc(tag: Struct_Tag, key: string) -> (value: Struct_Tag, o
 		t = t[i+1:]
 
 		if key == name {
-			return Struct_Tag(val[1:i]), true
+			return val[1:i], true
 		}
 	}
 	return
@@ -761,7 +759,7 @@ get_union_variant :: proc(a: any) -> any {
 get_union_as_ptr_variants :: proc(val: ^$T) -> (res: intrinsics.type_convert_variants_to_pointers(T)) where intrinsics.type_is_union(T) {
 	ptr := rawptr(val)
 	tag := get_union_variant_raw_tag(val^)
-	mem.copy(&res, &ptr, size_of(ptr))
+	intrinsics.mem_copy(&res, &ptr, size_of(ptr))
 	set_union_variant_raw_tag(res, tag)
 	return
 }

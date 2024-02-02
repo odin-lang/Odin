@@ -1,7 +1,7 @@
 package container_lru
 
-import "core:runtime"
-import "core:intrinsics"
+import "base:runtime"
+import "base:intrinsics"
 _ :: runtime
 _ :: intrinsics
 

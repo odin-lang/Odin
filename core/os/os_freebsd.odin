@@ -3,7 +3,7 @@ package os
 foreign import dl "system:dl"
 foreign import libc "system:c"
 
-import "core:runtime"
+import "base:runtime"
 import "core:strings"
 import "core:c"
 
@@ -255,7 +255,7 @@ W_OK :: 2 // Test for write permission
 R_OK :: 4 // Test for read permission
 
 foreign libc {
-	@(link_name="__error")		__errno_location :: proc() -> ^int ---
+	@(link_name="__error")		__errno_location :: proc() -> ^c.int ---
 
 	@(link_name="open")             _unix_open          :: proc(path: cstring, flags: c.int, mode: c.int) -> Handle ---
 	@(link_name="close")            _unix_close         :: proc(fd: Handle) -> c.int ---
@@ -305,7 +305,7 @@ is_path_separator :: proc(r: rune) -> bool {
 }
 
 get_last_error :: proc "contextless" () -> int {
-	return __errno_location()^
+	return int(__errno_location()^)
 }
 
 open :: proc(path: string, flags: int = O_RDONLY, mode: int = 0) -> (Handle, Errno) {
@@ -615,27 +615,6 @@ access :: proc(path: string, mask: int) -> (bool, Errno) {
 		return false, Errno(get_last_error())
 	}
 	return true, ERROR_NONE
-}
-
-heap_alloc :: proc(size: int, zero_memory := true) -> rawptr {
-	if size <= 0 {
-		return nil
-	}
-	if zero_memory {
-		return _unix_calloc(1, c.size_t(size))
-	} else {
-		return _unix_malloc(c.size_t(size))
-	}
-}
-
-heap_resize :: proc(ptr: rawptr, new_size: int) -> rawptr {
-	// NOTE: _unix_realloc doesn't guarantee new memory will be zeroed on
-	// POSIX platforms. Ensure your caller takes this into account.
-	return _unix_realloc(ptr, c.size_t(new_size))
-}
-
-heap_free :: proc(ptr: rawptr) {
-	_unix_free(ptr)
 }
 
 lookup_env :: proc(key: string, allocator := context.allocator) -> (value: string, found: bool) {

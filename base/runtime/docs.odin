@@ -44,7 +44,7 @@ memcpy
 memove
 
 
-## Procedures required by the LLVM backend
+## Procedures required by the LLVM backend if u128/i128 is used
 umodti3
 udivti3
 modti3
@@ -59,9 +59,10 @@ truncdfhf2
 gnu_h2f_ieee
 gnu_f2h_ieee
 extendhfsf2
+
+## Procedures required by the LLVM backend if f16 is used
 __ashlti3 // wasm specific
 __multi3  // wasm specific
-
 
 
 ## Required an entry point is defined (i.e. 'main')

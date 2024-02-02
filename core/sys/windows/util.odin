@@ -1,8 +1,8 @@
 // +build windows
 package sys_windows
 
-import "core:runtime"
-import "core:intrinsics"
+import "base:runtime"
+import "base:intrinsics"
 
 L :: intrinsics.constant_utf16_cstring
 

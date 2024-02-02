@@ -1,7 +1,7 @@
 package objc_Foundation
 
-import "core:builtin"
-import "core:intrinsics"
+import "base:builtin"
+import "base:intrinsics"
 
 KeyEquivalentModifierFlag :: enum UInteger {
 	CapsLock   = 16, // Set if Caps Lock key is pressed.

@@ -3,7 +3,7 @@
 //+no-instrumentation
 package runtime
 
-import "core:intrinsics"
+import "base:intrinsics"
 
 when !ODIN_TEST && !ODIN_NO_ENTRY_POINT {
 	@(link_name="_start", linkage="strong", require, export)
