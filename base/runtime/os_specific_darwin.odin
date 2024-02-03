@@ -2,25 +2,14 @@
 //+private
 package runtime
 
-foreign import libc "system:System.framework"
-
-@(default_calling_convention="c")
-foreign libc {
-	@(link_name="__stderrp")
-	_stderr: rawptr
-
-	@(link_name="fwrite")
-	_fwrite :: proc(ptr: rawptr, size: uint, nmemb: uint, stream: rawptr) -> uint ---
-
-	@(link_name="__error")
-	_get_errno :: proc() -> ^i32 ---
-}
+import "base:intrinsics"
 
 _stderr_write :: proc "contextless" (data: []byte) -> (int, _OS_Errno) {
-	ret := _fwrite(raw_data(data), 1, len(data), _stderr)
-	if ret < len(data) {
-		err := _get_errno()
-		return int(ret), _OS_Errno(err^ if err != nil else 0)
+	WRITE  :: 0x20000004
+	STDERR :: 2
+	ret := intrinsics.syscall(WRITE, STDERR, uintptr(raw_data(data)), uintptr(len(data)))
+	if ret < 0 {
+		return 0, _OS_Errno(-ret)
 	}
 	return int(ret), 0
 }
