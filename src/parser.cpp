@@ -230,6 +230,10 @@ gb_internal Ast *clone_ast(Ast *node, AstFile *f) {
 	case Ast_OrReturnExpr:
 		n->OrReturnExpr.expr = clone_ast(n->OrReturnExpr.expr, f);
 		break;
+	case Ast_OrBranchExpr:
+		n->OrBranchExpr.label = clone_ast(n->OrBranchExpr.label, f);
+		n->OrBranchExpr.expr  = clone_ast(n->OrBranchExpr.expr, f);
+		break;
 	case Ast_TypeAssertion:
 		n->TypeAssertion.expr = clone_ast(n->TypeAssertion.expr, f);
 		n->TypeAssertion.type = clone_ast(n->TypeAssertion.type, f);
