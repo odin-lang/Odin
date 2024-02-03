@@ -344,7 +344,7 @@ Camera2D :: struct {
 	zoom:     f32,                // Camera zoom (scaling), should be 1.0f by default
 }
 
-// Vertex data definning a mesh
+// Vertex data defining a mesh
 // NOTE: Data stored in CPU memory (and GPU)
 Mesh :: struct {
 	vertexCount:   c.int,         // Number of vertices stored in arrays
