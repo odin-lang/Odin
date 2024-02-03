@@ -1,7 +1,7 @@
 package hash
 
 import "core:mem"
-import "core:intrinsics"
+import "base:intrinsics"
 
 @(optimization_mode="speed")
 adler32 :: proc(data: []byte, seed := u32(1)) -> u32 #no_bounds_check {

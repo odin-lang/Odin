@@ -1,7 +1,7 @@
 //+build !js
 package wasm_js_interface
 
-import "core:runtime"
+import "base:runtime"
 
 
 get_element_value_string :: proc "contextless" (id: string, buf: []byte) -> string {

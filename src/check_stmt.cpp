@@ -1934,7 +1934,7 @@ gb_internal void check_value_decl_stmt(CheckerContext *ctx, Ast *node, u32 mod_f
 				TokenPos pos = f->token.pos;
 				Type *this_type = base_type(e->type);
 				Type *other_type = base_type(f->type);
-				if (!are_types_identical(this_type, other_type)) {
+				if (!signature_parameter_similar_enough(this_type, other_type)) {
 					error(e->token,
 					      "Foreign entity '%.*s' previously declared elsewhere with a different type\n"
 					      "\tat %s",

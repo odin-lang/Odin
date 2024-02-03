@@ -219,13 +219,13 @@ gb_internal void check_struct_fields(CheckerContext *ctx, Ast *node, Slice<Entit
 }
 
 
-gb_internal bool check_custom_align(CheckerContext *ctx, Ast *node, i64 *align_) {
+gb_internal bool check_custom_align(CheckerContext *ctx, Ast *node, i64 *align_, char const *msg) {
 	GB_ASSERT(align_ != nullptr);
 	Operand o = {};
 	check_expr(ctx, &o, node);
 	if (o.mode != Addressing_Constant) {
 		if (o.mode != Addressing_Invalid) {
-			error(node, "#align must be a constant");
+			error(node, "#%s must be a constant", msg);
 		}
 		return false;
 	}
@@ -237,13 +237,13 @@ gb_internal bool check_custom_align(CheckerContext *ctx, Ast *node, i64 *align_)
 			if (v.used > 1) {
 				gbAllocator a = heap_allocator();
 				String str = big_int_to_string(a, &v);
-				error(node, "#align too large, %.*s", LIT(str));
+				error(node, "#%s too large, %.*s", msg, LIT(str));
 				gb_free(a, str.text);
 				return false;
 			}
 			i64 align = big_int_to_i64(&v);
 			if (align < 1 || !gb_is_power_of_two(cast(isize)align)) {
-				error(node, "#align must be a power of 2, got %lld", align);
+				error(node, "#%s must be a power of 2, got %lld", msg, align);
 				return false;
 			}
 			*align_ = align;
@@ -251,7 +251,7 @@ gb_internal bool check_custom_align(CheckerContext *ctx, Ast *node, i64 *align_)
 		}
 	}
 
-	error(node, "#align must be an integer");
+	error(node, "#%s must be an integer", msg);
 	return false;
 }
 
@@ -645,16 +645,26 @@ gb_internal void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *
 		check_struct_fields(ctx, node, &struct_type->Struct.fields, &struct_type->Struct.tags, st->fields, min_field_count, struct_type, context);
 	}
 
-	if (st->align != nullptr) {
-		if (st->is_packed) {
-			syntax_error(st->align, "'#align' cannot be applied with '#packed'");
-			return;
-		}
-		i64 custom_align = 1;
-		if (check_custom_align(ctx, st->align, &custom_align)) {
-			struct_type->Struct.custom_align = custom_align;
-		}
+#define ST_ALIGN(_name) if (st->_name != nullptr) {                                                \
+		if (st->is_packed) {                                                               \
+			syntax_error(st->_name, "'#%s' cannot be applied with '#packed'", #_name); \
+			return;                                                                    \
+		}                                                                                  \
+		i64 align = 1;                                                                     \
+		if (check_custom_align(ctx, st->_name, &align, #_name)) {                          \
+			struct_type->Struct.custom_##_name = align;                                \
+		}                                                                                  \
 	}
+
+	ST_ALIGN(field_align);
+	ST_ALIGN(align);
+	if (struct_type->Struct.custom_align < struct_type->Struct.custom_field_align) {
+		warning(st->align, "#align(%lld) is defined to be less than #field_name(%lld)",
+		        cast(long long)struct_type->Struct.custom_align,
+		        cast(long long)struct_type->Struct.custom_field_align);
+	}
+
+#undef ST_ALIGN
 }
 gb_internal void check_union_type(CheckerContext *ctx, Type *union_type, Ast *node, Array<Operand> *poly_operands, Type *named_type, Type *original_type_for_poly) {
 	GB_ASSERT(is_type_union(union_type));
@@ -746,7 +756,7 @@ gb_internal void check_union_type(CheckerContext *ctx, Type *union_type, Ast *no
 
 	if (ut->align != nullptr) {
 		i64 custom_align = 1;
-		if (check_custom_align(ctx, ut->align, &custom_align)) {
+		if (check_custom_align(ctx, ut->align, &custom_align, "align")) {
 			if (variants.count == 0) {
 				error(ut->align, "An empty union cannot have a custom alignment");
 			} else {
@@ -2380,7 +2390,7 @@ gb_internal Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_e
 
 	bool is_polymorphic = is_type_polymorphic(elem);
 
-	if ((!is_polymorphic || soa_kind == StructSoa_Fixed) && !is_type_struct(elem) && !is_type_raw_union(elem) && !(is_type_array(elem) && bt_elem->Array.count <= 4)) {
+	if (!is_polymorphic && !is_type_struct(elem) && !is_type_raw_union(elem) && !(is_type_array(elem) && bt_elem->Array.count <= 4)) {
 		gbString str = type_to_string(elem);
 		error(elem_expr, "Invalid type for an #soa array, expected a struct or array of length 4 or below, got '%s'", str);
 		gb_string_free(str);
@@ -2397,7 +2407,7 @@ gb_internal Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_e
 	case StructSoa_Slice:	extra_field_count = 1; break;
 	case StructSoa_Dynamic:	extra_field_count = 3; break;
 	}
-	if (is_polymorphic && soa_kind != StructSoa_Fixed) {
+	if (is_polymorphic) {
 		field_count = 0;
 
 		soa_struct = alloc_type_struct();

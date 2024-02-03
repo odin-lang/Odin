@@ -13,6 +13,8 @@ function stripNewline(str) {
     return str.replace(/\n/, ' ')
 }
 
+const STRING_SIZE = 2*4;
+
 class WasmMemoryInterface {
 	constructor() {
 		this.memory = null;
@@ -204,7 +206,6 @@ class WebGLInterface {
 		}
 	}
 	getSource(shader, strings_ptr, strings_length) {
-		const STRING_SIZE = 2*4;
 		let source = "";
 		for (let i = 0; i < strings_length; i++) {
 			let ptr = this.mem.loadPtr(strings_ptr + i*STRING_SIZE);
@@ -395,7 +396,7 @@ class WebGLInterface {
 				this.ctx.copyTexImage2D(target, level, internalformat, x, y, width, height, border);
 			},
 			CopyTexSubImage2D: (target, level, xoffset, yoffset, x, y, width, height) => {
-				this.ctx.copyTexImage2D(target, level, xoffset, yoffset, x, y, width, height);
+				this.ctx.copyTexSubImage2D(target, level, xoffset, yoffset, x, y, width, height);
 			},
 
 
@@ -538,8 +539,8 @@ class WebGLInterface {
 			Flush: () => {
 				this.ctx.flush();
 			},
-			FramebufferRenderBuffer: (target, attachment, renderbuffertarget, renderbuffer) => {
-				this.ctx.framebufferRenderBuffer(target, attachment, renderbuffertarget, this.renderbuffers[renderbuffer]);
+			FramebufferRenderbuffer: (target, attachment, renderbuffertarget, renderbuffer) => {
+				this.ctx.framebufferRenderbuffer(target, attachment, renderbuffertarget, this.renderbuffers[renderbuffer]);
 			},
 			FramebufferTexture2D: (target, attachment, textarget, texture, level) => {
 				this.ctx.framebufferTexture2D(target, attachment, textarget, this.textures[texture], level);
@@ -645,7 +646,7 @@ class WebGLInterface {
 
 
 			IsBuffer:       (buffer)       => this.ctx.isBuffer(this.buffers[buffer]),
-			IsEnabled:      (enabled)      => this.ctx.isEnabled(this.enableds[enabled]),
+			IsEnabled:      (cap)          => this.ctx.isEnabled(cap),
 			IsFramebuffer:  (framebuffer)  => this.ctx.isFramebuffer(this.framebuffers[framebuffer]),
 			IsProgram:      (program)      => this.ctx.isProgram(this.programs[program]),
 			IsRenderbuffer: (renderbuffer) => this.ctx.isRenderbuffer(this.renderbuffers[renderbuffer]),
@@ -669,7 +670,7 @@ class WebGLInterface {
 
 
 			ReadnPixels: (x, y, width, height, format, type, bufSize, data) => {
-				this.ctx.readPixels(x, y, width, format, type, this.mem.loadBytes(data, bufSize));
+				this.ctx.readPixels(x, y, width, height, format, type, this.mem.loadBytes(data, bufSize));
 			},
 			RenderbufferStorage: (target, internalformat, width, height) => {
 				this.ctx.renderbufferStorage(target, internalformat, width, height);
@@ -735,11 +736,11 @@ class WebGLInterface {
 
 			UniformMatrix2fv: (location, addr) => {
 				let array = this.mem.loadF32Array(addr, 2*2);
-				this.ctx.uniformMatrix4fv(this.uniforms[location], false, array);
+				this.ctx.uniformMatrix2fv(this.uniforms[location], false, array);
 			},
 			UniformMatrix3fv: (location, addr) => {
 				let array = this.mem.loadF32Array(addr, 3*3);
-				this.ctx.uniformMatrix4fv(this.uniforms[location], false, array);
+				this.ctx.uniformMatrix3fv(this.uniforms[location], false, array);
 			},
 			UniformMatrix4fv: (location, addr) => {
 				let array = this.mem.loadF32Array(addr, 4*4);
@@ -791,7 +792,7 @@ class WebGLInterface {
 			/* Framebuffer objects */
 			BlitFramebuffer: (srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, mask, filter) => {
 				this.assertWebGL2();
-				this.ctx.glitFramebuffer(srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, mask, filter);
+				this.ctx.blitFramebuffer(srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, mask, filter);
 			},
 			FramebufferTextureLayer: (target, attachment, texture, level, layer) => {
 				this.assertWebGL2();
@@ -822,7 +823,7 @@ class WebGLInterface {
 
 			TexStorage3D: (target, levels, internalformat, width, height, depth) => {
 				this.assertWebGL2();
-				this.ctx.texStorage3D(target, level, internalformat, width, heigh, depth);
+				this.ctx.texStorage3D(target, levels, internalformat, width, height, depth);
 			},
 			TexImage3D: (target, level, internalformat, width, height, depth, border, format, type, size, data) => {
 				this.assertWebGL2();
@@ -855,7 +856,7 @@ class WebGLInterface {
 
 			CopyTexSubImage3D: (target, level, xoffset, yoffset, zoffset, x, y, width, height) => {
 				this.assertWebGL2();
-				this.ctx.copyTexImage3D(target, level, xoffset, yoffset, zoffset, x, y, width, height);
+				this.ctx.copyTexSubImage3D(target, level, xoffset, yoffset, zoffset, x, y, width, height);
 			},
 
 			/* Programs and shaders */
@@ -982,10 +983,10 @@ class WebGLInterface {
 			},
 			DeleteQuery: (id) => {
 				this.assertWebGL2();
-				let obj = this.querys[id];
+				let obj = this.queries[id];
 				if (obj && id != 0) {
 					this.ctx.deleteQuery(obj);
-					this.querys[id] = null;
+					this.queries[id] = null;
 				}
 			},
 			IsQuery: (query) => {
@@ -1038,7 +1039,7 @@ class WebGLInterface {
 			},
 			BindSampler: (unit, sampler) => {
 				this.assertWebGL2();
-				this.ctx.bindSampler(unit, this.samplers[Sampler]);
+				this.ctx.bindSampler(unit, this.samplers[sampler]);
 			},
 			SamplerParameteri: (sampler, pname, param) => {
 				this.assertWebGL2();
@@ -1083,7 +1084,7 @@ class WebGLInterface {
 			/* Transform Feedback */
 			CreateTransformFeedback: () => {
 				this.assertWebGL2();
-				let transformFeedback = this.ctx.createtransformFeedback();
+				let transformFeedback = this.ctx.createTransformFeedback();
 				let id = this.getNewId(this.transformFeedbacks);
 				transformFeedback.name = id;
 				this.transformFeedbacks[id] = transformFeedback;
@@ -1451,11 +1452,11 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 					wmi.storeF64(off(8), e.deltaY);
 					wmi.storeF64(off(8), e.deltaZ);
 					wmi.storeU32(off(4), e.deltaMode);
-				} else if (e instanceof Event) {
-					if ('scrollX' in e) {
-						wmi.storeF64(off(8), e.scrollX);
-						wmi.storeF64(off(8), e.scrollY);
-					}
+				} else if (e.type === 'scroll') {
+					wmi.storeF64(off(8), window.scrollX);
+					wmi.storeF64(off(8), window.scrollY);
+				} else if (e.type === 'visibilitychange') {
+					wmi.storeU8(off(1), !document.hidden);
 				}
 			},
 
@@ -1529,12 +1530,12 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 
 			event_stop_propagation: () => {
 				if (event_temp_data && event_temp_data.event) {
-					event_temp_data.event.eventStopPropagation();
+					event_temp_data.event.stopPropagation();
 				}
 			},
 			event_stop_immediate_propagation: () => {
 				if (event_temp_data && event_temp_data.event) {
-					event_temp_data.event.eventStopImmediatePropagation();
+					event_temp_data.event.stopImmediatePropagation();
 				}
 			},
 			event_prevent_default: () => {
@@ -1547,9 +1548,9 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 				let id = wasmMemoryInterface.loadString(id_ptr, id_len);
 				let name = wasmMemoryInterface.loadString(name_ptr, name_len);
 				let options = {
-					bubbles:   (options_bits & (1<<0)) !== 0,
-					cancelabe: (options_bits & (1<<1)) !== 0,
-					composed:  (options_bits & (1<<2)) !== 0,
+					bubbles:    (options_bits & (1<<0)) !== 0,
+					cancelable: (options_bits & (1<<1)) !== 0,
+					composed:   (options_bits & (1<<2)) !== 0,
 				};
 
 				let element = getElement(id);
@@ -1603,7 +1604,7 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 					element.value = value;
 				}
 			},
-			set_element_value_string: (id_ptr, id_len, value_ptr, value_id) => {
+			set_element_value_string: (id_ptr, id_len, value_ptr, value_len) => {
 				let id = wasmMemoryInterface.loadString(id_ptr, id_len);
 				let value = wasmMemoryInterface.loadString(value_ptr, value_len);
 				let element = getElement(id);

@@ -1,6 +1,6 @@
 package linux
 
-import "core:intrinsics"
+import "base:intrinsics"
 
 
 /*

@@ -1,6 +1,6 @@
 package runtime
 
-import "core:intrinsics"
+import "base:intrinsics"
 _ :: intrinsics
 
 /*
@@ -86,6 +86,7 @@ make_soa_aligned :: proc($T: typeid/#soa[]$E, length: int, alignment: int, alloc
 		return
 	}
 
+	array.allocator = allocator
 	footer := raw_soa_footer(&array)
 	if size_of(E) == 0 {
 		footer.len = length

@@ -123,13 +123,13 @@ encode_rune :: proc "contextless" (c: rune) -> ([4]u8, int) {
 }
 
 print_string :: proc "contextless" (str: string) -> (n: int) {
-	n, _ = os_write(transmute([]byte)str)
+	n, _ = stderr_write(transmute([]byte)str)
 	return
 }
 
 print_strings :: proc "contextless" (args: ..string) -> (n: int) {
 	for str in args {
-		m, err := os_write(transmute([]byte)str)
+		m, err := stderr_write(transmute([]byte)str)
 		n += m
 		if err != 0 {
 			break
@@ -139,7 +139,7 @@ print_strings :: proc "contextless" (args: ..string) -> (n: int) {
 }
 
 print_byte :: proc "contextless" (b: byte) -> (n: int) {
-	n, _ = os_write([]byte{b})
+	n, _ = stderr_write([]byte{b})
 	return
 }
 
@@ -178,7 +178,7 @@ print_rune :: proc "contextless" (r: rune) -> int #no_bounds_check {
 	}
 
 	b, n := encode_rune(r)
-	m, _ := os_write(b[:n])
+	m, _ := stderr_write(b[:n])
 	return m
 }
 
@@ -194,7 +194,7 @@ print_u64 :: proc "contextless" (x: u64) #no_bounds_check {
 	}
 	i -= 1; a[i] = _INTEGER_DIGITS_VAR[u % b]
 
-	os_write(a[i:])
+	stderr_write(a[i:])
 }
 
 
@@ -216,7 +216,7 @@ print_i64 :: proc "contextless" (x: i64) #no_bounds_check {
 		i -= 1; a[i] = '-'
 	}
 
-	os_write(a[i:])
+	stderr_write(a[i:])
 }
 
 print_uint    :: proc "contextless" (x: uint)    { print_u64(u64(x)) }

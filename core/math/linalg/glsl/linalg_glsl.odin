@@ -1,7 +1,8 @@
 // core:math/linalg/glsl implements a GLSL-like mathematics library plus numerous other utility procedures
 package math_linalg_glsl
 
-import "core:builtin"
+import "base:builtin"
+import "base:intrinsics"
 
 TAU :: 6.28318530717958647692528676655900576
 PI  :: 3.14159265358979323846264338327950288
@@ -1838,30 +1839,281 @@ dquatMulDvec3 :: proc "c" (q: dquat, v: dvec3) -> dvec3 {
 
 
 
-@(require_results) inverse_mat2  :: proc "c" (m: mat2)  -> mat2  { return builtin.inverse(m) }
-@(require_results) inverse_mat3  :: proc "c" (m: mat3)  -> mat3  { return builtin.inverse(m) }
-@(require_results) inverse_mat4  :: proc "c" (m: mat4)  -> mat4  { return builtin.inverse(m) }
-@(require_results) inverse_dmat2 :: proc "c" (m: dmat2) -> dmat2 { return builtin.inverse(m) }
-@(require_results) inverse_dmat3 :: proc "c" (m: dmat3) -> dmat3 { return builtin.inverse(m) }
-@(require_results) inverse_dmat4 :: proc "c" (m: dmat4) -> dmat4 { return builtin.inverse(m) }
+@(require_results) inverse_mat2  :: proc "c" (m: mat2)  -> mat2  { return inverse_matrix2x2(m) }
+@(require_results) inverse_mat3  :: proc "c" (m: mat3)  -> mat3  { return inverse_matrix3x3(m) }
+@(require_results) inverse_mat4  :: proc "c" (m: mat4)  -> mat4  { return inverse_matrix4x4(m) }
+@(require_results) inverse_dmat2 :: proc "c" (m: dmat2) -> dmat2 { return inverse_matrix2x2(m) }
+@(require_results) inverse_dmat3 :: proc "c" (m: dmat3) -> dmat3 { return inverse_matrix3x3(m) }
+@(require_results) inverse_dmat4 :: proc "c" (m: dmat4) -> dmat4 { return inverse_matrix4x4(m) }
 @(require_results) inverse_quat  :: proc "c" (q: quat)  -> quat  { return 1/q }
 @(require_results) inverse_dquat :: proc "c" (q: dquat) -> dquat { return 1/q }
 
-inverse :: proc{
-	inverse_mat2,
-	inverse_mat3,
-	inverse_mat4,
-	inverse_dmat2,
-	inverse_dmat3,
-	inverse_dmat4,
-	inverse_quat,
-	inverse_dquat,
+
+transpose :: intrinsics.transpose
+
+
+determinant :: proc{
+	determinant_matrix1x1,
+	determinant_matrix2x2,
+	determinant_matrix3x3,
+	determinant_matrix4x4,
 }
 
-transpose         :: builtin.transpose
-inverse_transpose :: builtin.inverse_transpose
-adjugate          :: builtin.adjugate
-hermitian_adjoint :: builtin.hermitian_adjoint
-minor             :: builtin.matrix_minor
-determinant       :: builtin.determinant
-trace             :: builtin.matrix_trace
+adjugate :: proc{
+	adjugate_matrix1x1,
+	adjugate_matrix2x2,
+	adjugate_matrix3x3,
+	adjugate_matrix4x4,
+}
+
+inverse_transpose :: proc{
+	inverse_transpose_matrix1x1,
+	inverse_transpose_matrix2x2,
+	inverse_transpose_matrix3x3,
+	inverse_transpose_matrix4x4,
+}
+
+
+inverse :: proc{
+	inverse_matrix1x1,
+	inverse_matrix2x2,
+	inverse_matrix3x3,
+	inverse_matrix4x4,
+}
+
+@(require_results)
+hermitian_adjoint :: proc "contextless" (m: $M/matrix[$N, N]$T) -> M where intrinsics.type_is_complex(T), N >= 1 {
+	return conj(transpose(m))
+}
+
+@(require_results)
+trace :: proc "contextless" (m: $M/matrix[$N, N]$T) -> (trace: T) {
+	for i in 0..<N {
+		trace += m[i, i]
+	}
+	return
+}
+
+@(require_results)
+matrix_minor :: proc "contextless" (m: $M/matrix[$N, N]$T, #any_int row, column: int) -> (minor: T) where N > 1 {
+	K :: int(N-1)
+	cut_down: matrix[K, K]T
+	for col_idx in 0..<K {
+		j := col_idx + int(col_idx >= column)
+		for row_idx in 0..<K {
+			i := row_idx + int(row_idx >= row)
+			cut_down[row_idx, col_idx] = m[i, j]
+		}
+	}
+	return determinant(cut_down)
+}
+
+
+
+@(require_results)
+determinant_matrix1x1 :: proc "contextless" (m: $M/matrix[1, 1]$T) -> (det: T) {
+	return m[0, 0]
+}
+
+@(require_results)
+determinant_matrix2x2 :: proc "contextless" (m: $M/matrix[2, 2]$T) -> (det: T) {
+	return m[0, 0]*m[1, 1] - m[0, 1]*m[1, 0]
+}
+@(require_results)
+determinant_matrix3x3 :: proc "contextless" (m: $M/matrix[3, 3]$T) -> (det: T) {
+	a := +m[0, 0] * (m[1, 1] * m[2, 2] - m[1, 2] * m[2, 1])
+	b := -m[0, 1] * (m[1, 0] * m[2, 2] - m[1, 2] * m[2, 0])
+	c := +m[0, 2] * (m[1, 0] * m[2, 1] - m[1, 1] * m[2, 0])
+	return a + b + c
+}
+@(require_results)
+determinant_matrix4x4 :: proc "contextless" (m: $M/matrix[4, 4]$T) -> (det: T) {
+	a := adjugate(m)
+	#no_bounds_check for i in 0..<4 {
+		det += m[0, i] * a[0, i]
+	}
+	return
+}
+
+
+
+
+@(require_results)
+adjugate_matrix1x1 :: proc "contextless" (x: $M/matrix[1, 1]$T) -> (y: M) {
+	y = x
+	return
+}
+
+@(require_results)
+adjugate_matrix2x2 :: proc "contextless" (x: $M/matrix[2, 2]$T) -> (y: M) {
+	y[0, 0] = +x[1, 1]
+	y[0, 1] = -x[1, 0]
+	y[1, 0] = -x[0, 1]
+	y[1, 1] = +x[0, 0]
+	return
+}
+
+@(require_results)
+adjugate_matrix3x3 :: proc "contextless" (m: $M/matrix[3, 3]$T) -> (y: M) {
+	y[0, 0] = +(m[1, 1] * m[2, 2] - m[2, 1] * m[1, 2])
+	y[0, 1] = -(m[1, 0] * m[2, 2] - m[2, 0] * m[1, 2])
+	y[0, 2] = +(m[1, 0] * m[2, 1] - m[2, 0] * m[1, 1])
+	y[1, 0] = -(m[0, 1] * m[2, 2] - m[2, 1] * m[0, 2])
+	y[1, 1] = +(m[0, 0] * m[2, 2] - m[2, 0] * m[0, 2])
+	y[1, 2] = -(m[0, 0] * m[2, 1] - m[2, 0] * m[0, 1])
+	y[2, 0] = +(m[0, 1] * m[1, 2] - m[1, 1] * m[0, 2])
+	y[2, 1] = -(m[0, 0] * m[1, 2] - m[1, 0] * m[0, 2])
+	y[2, 2] = +(m[0, 0] * m[1, 1] - m[1, 0] * m[0, 1])
+	return
+}
+
+
+@(require_results)
+adjugate_matrix4x4 :: proc "contextless" (x: $M/matrix[4, 4]$T) -> (y: M) {
+	for i in 0..<4 {
+		for j in 0..<4 {
+			sign: T = 1 if (i + j) % 2 == 0 else -1
+			y[i, j] = sign * matrix_minor(x, i, j)
+		}
+	}
+	return
+}
+
+@(require_results)
+inverse_transpose_matrix1x1 :: proc "contextless" (x: $M/matrix[1, 1]$T) -> (y: M) {
+	y[0, 0] = 1/x[0, 0]
+	return
+}
+
+@(require_results)
+inverse_transpose_matrix2x2 :: proc "contextless" (x: $M/matrix[2, 2]$T) -> (y: M) {
+	d := x[0, 0]*x[1, 1] - x[0, 1]*x[1, 0]
+	when intrinsics.type_is_integer(T) {
+		y[0, 0] = +x[1, 1] / d
+		y[1, 0] = -x[0, 1] / d
+		y[0, 1] = -x[1, 0] / d
+		y[1, 1] = +x[0, 0] / d
+	} else {
+		id := 1 / d
+		y[0, 0] = +x[1, 1] * id
+		y[1, 0] = -x[0, 1] * id
+		y[0, 1] = -x[1, 0] * id
+		y[1, 1] = +x[0, 0] * id
+	}
+	return
+}
+
+@(require_results)
+inverse_transpose_matrix3x3 :: proc "contextless" (x: $M/matrix[3, 3]$T) -> (y: M) #no_bounds_check {
+	a := adjugate(x)
+	d := determinant(x)
+	when intrinsics.type_is_integer(T) {
+		for i in 0..<3 {
+			for j in 0..<3 {
+				y[i, j] = a[i, j] / d
+			}
+		}
+	} else {
+		id := 1/d
+		for i in 0..<3 {
+			for j in 0..<3 {
+				y[i, j] = a[i, j] * id
+			}
+		}
+	}
+	return
+}
+
+@(require_results)
+inverse_transpose_matrix4x4 :: proc "contextless" (x: $M/matrix[4, 4]$T) -> (y: M) #no_bounds_check {
+	a := adjugate(x)
+	d: T
+	for i in 0..<4 {
+		d += x[0, i] * a[0, i]
+	}
+	when intrinsics.type_is_integer(T) {
+		for i in 0..<4 {
+			for j in 0..<4 {
+				y[i, j] = a[i, j] / d
+			}
+		}
+	} else {
+		id := 1/d
+		for i in 0..<4 {
+			for j in 0..<4 {
+				y[i, j] = a[i, j] * id
+			}
+		}
+	}
+	return
+}
+
+@(require_results)
+inverse_matrix1x1 :: proc "contextless" (x: $M/matrix[1, 1]$T) -> (y: M) {
+	y[0, 0] = 1/x[0, 0]
+	return
+}
+
+@(require_results)
+inverse_matrix2x2 :: proc "contextless" (x: $M/matrix[2, 2]$T) -> (y: M) {
+	d := x[0, 0]*x[1, 1] - x[0, 1]*x[1, 0]
+	when intrinsics.type_is_integer(T) {
+		y[0, 0] = +x[1, 1] / d
+		y[0, 1] = -x[0, 1] / d
+		y[1, 0] = -x[1, 0] / d
+		y[1, 1] = +x[0, 0] / d
+	} else {
+		id := 1 / d
+		y[0, 0] = +x[1, 1] * id
+		y[0, 1] = -x[0, 1] * id
+		y[1, 0] = -x[1, 0] * id
+		y[1, 1] = +x[0, 0] * id
+	}
+	return
+}
+
+@(require_results)
+inverse_matrix3x3 :: proc "contextless" (x: $M/matrix[3, 3]$T) -> (y: M) #no_bounds_check {
+	a := adjugate(x)
+	d := determinant(x)
+	when intrinsics.type_is_integer(T) {
+		for i in 0..<3 {
+			for j in 0..<3 {
+				y[i, j] = a[j, i] / d
+			}
+		}
+	} else {
+		id := 1/d
+		for i in 0..<3 {
+			for j in 0..<3 {
+				y[i, j] = a[j, i] * id
+			}
+		}
+	}
+	return
+}
+
+@(require_results)
+inverse_matrix4x4 :: proc "contextless" (x: $M/matrix[4, 4]$T) -> (y: M) #no_bounds_check {
+	a := adjugate(x)
+	d: T
+	for i in 0..<4 {
+		d += x[0, i] * a[0, i]
+	}
+	when intrinsics.type_is_integer(T) {
+		for i in 0..<4 {
+			for j in 0..<4 {
+				y[i, j] = a[j, i] / d
+			}
+		}
+	} else {
+		id := 1/d
+		for i in 0..<4 {
+			for j in 0..<4 {
+				y[i, j] = a[j, i] * id
+			}
+		}
+	}
+	return
+}
+

@@ -12,7 +12,7 @@ package compress
 
 import "core:io"
 import "core:bytes"
-import "core:runtime"
+import "base:runtime"
 
 /*
 	These settings bound how much compression algorithms will allocate for their output buffer.

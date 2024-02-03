@@ -1,6 +1,6 @@
 package math_cmplx
 
-import "core:builtin"
+import "base:builtin"
 import "core:math"
 
 // The original C code, the long comment, and the constants

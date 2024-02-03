@@ -1,7 +1,7 @@
 package os2
 
 import "core:strings"
-import "core:runtime"
+import "base:runtime"
 
 user_cache_dir :: proc(allocator: runtime.Allocator) -> (dir: string, err: Error) {
 	#partial switch ODIN_OS {

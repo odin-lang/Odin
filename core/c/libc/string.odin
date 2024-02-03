@@ -1,6 +1,6 @@
 package libc
 
-import "core:runtime"
+import "base:runtime"
 
 // 7.24 String handling
 

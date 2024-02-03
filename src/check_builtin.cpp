@@ -4892,8 +4892,10 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			switch (bt->kind) {
 			case Type_Basic:
 				switch (bt->Basic.kind) {
+				case Basic_complex32:  operand->type = t_f16; break;
 				case Basic_complex64:  operand->type = t_f32; break;
 				case Basic_complex128: operand->type = t_f64; break;
+				case Basic_quaternion64:  operand->type = t_f16; break;
 				case Basic_quaternion128: operand->type = t_f32; break;
 				case Basic_quaternion256: operand->type = t_f64; break;
 				}

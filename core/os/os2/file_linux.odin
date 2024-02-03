@@ -4,7 +4,7 @@ package os2
 import "core:io"
 import "core:time"
 import "core:strings"
-import "core:runtime"
+import "base:runtime"
 import "core:sys/unix"
 
 INVALID_HANDLE :: -1

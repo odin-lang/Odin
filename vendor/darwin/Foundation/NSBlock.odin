@@ -1,7 +1,7 @@
 package objc_Foundation
 
-import "core:intrinsics"
-import "core:builtin"
+import "base:intrinsics"
+import "base:builtin"
 import "core:mem"
 
 @(objc_class="NSBlock")

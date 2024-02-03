@@ -5,7 +5,7 @@ package sync
 import "core:c"
 import "core:time"
 
-foreign import System "System.framework"
+foreign import System "system:System.framework"
 
 foreign System {
 	// __ulock_wait is not available on 10.15

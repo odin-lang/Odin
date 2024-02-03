@@ -29,11 +29,11 @@ package xml
 
 import "core:bytes"
 import "core:encoding/entity"
-import "core:intrinsics"
+import "base:intrinsics"
 import "core:mem"
 import "core:os"
 import "core:strings"
-import "core:runtime"
+import "base:runtime"
 
 likely :: intrinsics.expect
 

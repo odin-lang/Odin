@@ -1,6 +1,6 @@
 package linalg
 
-import "core:builtin"
+import "base:builtin"
 import "core:math"
 
 F16_EPSILON :: 1e-3
@@ -1447,16 +1447,16 @@ matrix3_adjoint :: proc{
 
 
 @(require_results)
-matrix3_inverse_transpose_f16 :: proc "contextless" (m: Matrix3f16) -> (inverse_transpose: Matrix3f16) {
-	return builtin.inverse_transpose(m)
+matrix3_inverse_transpose_f16 :: proc "contextless" (m: Matrix3f16) -> (p: Matrix3f16) {
+	return inverse_transpose(m)
 }
 @(require_results)
-matrix3_inverse_transpose_f32 :: proc "contextless" (m: Matrix3f32) -> (inverse_transpose: Matrix3f32) {
-	return builtin.inverse_transpose(m)
+matrix3_inverse_transpose_f32 :: proc "contextless" (m: Matrix3f32) -> (p: Matrix3f32) {
+	return inverse_transpose(m)
 }
 @(require_results)
-matrix3_inverse_transpose_f64 :: proc "contextless" (m: Matrix3f64) -> (inverse_transpose: Matrix3f64) {
-	return builtin.inverse_transpose(m)
+matrix3_inverse_transpose_f64 :: proc "contextless" (m: Matrix3f64) -> (p: Matrix3f64) {
+	return inverse_transpose(m)
 }
 matrix3_inverse_transpose :: proc{
 	matrix3_inverse_transpose_f16,

@@ -1064,6 +1064,11 @@ gb_internal lbProcedure *lb_create_startup_type_info(lbModule *m) {
 	LLVMSetLinkage(p->value, LLVMInternalLinkage);
 
 	lb_add_attribute_to_proc(m, p->value, "nounwind");
+	// lb_add_attribute_to_proc(p->module, p->value, "mustprogress");
+	// lb_add_attribute_to_proc(p->module, p->value, "nofree");
+	// lb_add_attribute_to_proc(p->module, p->value, "norecurse");
+	// lb_add_attribute_to_proc(p->module, p->value, "nosync");
+	// lb_add_attribute_to_proc(p->module, p->value, "willreturn");
 	if (!LB_USE_GIANT_PACKED_STRUCT) {
 		lb_add_attribute_to_proc(m, p->value, "optnone");
 		lb_add_attribute_to_proc(m, p->value, "noinline");

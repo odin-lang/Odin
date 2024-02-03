@@ -273,6 +273,7 @@ enum BuildFlagKind {
 
 	BuildFlag_DisallowDo,
 	BuildFlag_DefaultToNilAllocator,
+	BuildFlag_DefaultToPanicAllocator,
 	BuildFlag_StrictStyle,
 	BuildFlag_ForeignErrorProcedures,
 	BuildFlag_NoRTTI,
@@ -460,6 +461,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 
 	add_flag(&build_flags, BuildFlag_DisallowDo,              str_lit("disallow-do"),               BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_DefaultToNilAllocator,   str_lit("default-to-nil-allocator"),  BuildFlagParam_None,    Command__does_check);
+	add_flag(&build_flags, BuildFlag_DefaultToPanicAllocator, str_lit("default-to-panic-allocator"),BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_StrictStyle,             str_lit("strict-style"),              BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_ForeignErrorProcedures,  str_lit("foreign-error-procedures"),  BuildFlagParam_None,    Command__does_check);
 
@@ -471,7 +473,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_ObfuscateSourceCodeLocations, str_lit("obfuscate-source-code-locations"), BuildFlagParam_None,    Command__does_build);
 
 	add_flag(&build_flags, BuildFlag_Short,                   str_lit("short"),                     BuildFlagParam_None,    Command_doc);
-	add_flag(&build_flags, BuildFlag_AllPackages,             str_lit("all-packages"),              BuildFlagParam_None,    Command_doc);
+	add_flag(&build_flags, BuildFlag_AllPackages,             str_lit("all-packages"),              BuildFlagParam_None,    Command_doc | Command_test);
 	add_flag(&build_flags, BuildFlag_DocFormat,               str_lit("doc-format"),                BuildFlagParam_None,    Command_doc);
 
 	add_flag(&build_flags, BuildFlag_IgnoreWarnings,          str_lit("ignore-warnings"),           BuildFlagParam_None,    Command_all);
@@ -1122,8 +1124,20 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							break;
 
 						case BuildFlag_DefaultToNilAllocator:
+							if (build_context.ODIN_DEFAULT_TO_PANIC_ALLOCATOR) {
+								gb_printf_err("'-default-to-panic-allocator' cannot be used with '-default-to-nil-allocator'\n");
+								bad_flags = true;
+							}
 							build_context.ODIN_DEFAULT_TO_NIL_ALLOCATOR = true;
 							break;
+						case BuildFlag_DefaultToPanicAllocator:
+							if (build_context.ODIN_DEFAULT_TO_NIL_ALLOCATOR) {
+								gb_printf_err("'-default-to-nil-allocator' cannot be used with '-default-to-panic-allocator'\n");
+								bad_flags = true;
+							}
+							build_context.ODIN_DEFAULT_TO_PANIC_ALLOCATOR = true;
+							break;
+
 						case BuildFlag_ForeignErrorProcedures:
 							build_context.ODIN_FOREIGN_ERROR_PROCEDURES = true;
 							break;
@@ -1135,6 +1149,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							break;
 						case BuildFlag_AllPackages:
 							build_context.cmd_doc_flags |= CmdDocFlag_AllPackages;
+				   			build_context.test_all_packages = true;
 							break;
 						case BuildFlag_DocFormat:
 							build_context.cmd_doc_flags |= CmdDocFlag_DocFormat;
@@ -1894,6 +1909,10 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 		print_usage_line(1, "-test-name:<string>");
 		print_usage_line(2, "Runs specific test only by name.");
 		print_usage_line(0, "");
+
+		print_usage_line(1, "-all-packages");
+		print_usage_line(2, "Tests all packages imported into the given initial package.");
+		print_usage_line(0, "");
 	}
 
 	if (run_or_build) {
@@ -2376,6 +2395,7 @@ int main(int arg_count, char const **arg_ptr) {
 	TIME_SECTION("init default library collections");
 	array_init(&library_collections, heap_allocator());
 	// NOTE(bill): 'core' cannot be (re)defined by the user
+	add_library_collection(str_lit("base"), get_fullpath_relative(heap_allocator(), odin_root_dir(), str_lit("base")));
 	add_library_collection(str_lit("core"), get_fullpath_relative(heap_allocator(), odin_root_dir(), str_lit("core")));
 	add_library_collection(str_lit("vendor"), get_fullpath_relative(heap_allocator(), odin_root_dir(), str_lit("vendor")));
 

@@ -2,7 +2,7 @@
 //+build !js
 package fmt
 
-import "core:runtime"
+import "base:runtime"
 import "core:os"
 import "core:io"
 import "core:bufio"

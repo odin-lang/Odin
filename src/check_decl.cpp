@@ -1143,7 +1143,7 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 					      "\tat %s",
 					      LIT(name), token_pos_to_string(pos));
 				}
-			} else if (!are_types_identical(this_type, other_type)) {
+			} else if (!signature_parameter_similar_enough(this_type, other_type)) {
 				error(d->proc_lit,
 				      "Foreign entity '%.*s' previously declared elsewhere with a different type\n"
 				      "\tat %s",
@@ -1284,7 +1284,7 @@ gb_internal void check_global_variable_decl(CheckerContext *ctx, Entity *&e, Ast
 			TokenPos pos = f->token.pos;
 			Type *this_type = base_type(e->type);
 			Type *other_type = base_type(f->type);
-			if (!are_types_identical(this_type, other_type)) {
+			if (!signature_parameter_similar_enough(this_type, other_type)) {
 				error(e->token,
 				      "Foreign entity '%.*s' previously declared elsewhere with a different type\n"
 				      "\tat %s",

@@ -2,7 +2,7 @@ package os2
 
 import "core:io"
 import "core:time"
-import "core:runtime"
+import "base:runtime"
 
 File :: struct {
 	impl: _File,
@@ -156,41 +156,46 @@ read_link :: proc(name: string, allocator: runtime.Allocator) -> (string, Error)
 }
 
 
-chdir :: proc(name: string) -> Error {
+chdir :: change_directory
+change_directory :: proc(name: string) -> Error {
 	return _chdir(name)
 }
 
-chmod :: proc(name: string, mode: File_Mode) -> Error {
+chmod :: change_mode
+change_mode :: proc(name: string, mode: File_Mode) -> Error {
 	return _chmod(name, mode)
 }
-
-chown :: proc(name: string, uid, gid: int) -> Error {
+chown :: change_owner
+change_owner :: proc(name: string, uid, gid: int) -> Error {
 	return _chown(name, uid, gid)
 }
 
-fchdir :: proc(f: ^File) -> Error {
+fchdir :: fchange_directory
+fchange_directory :: proc(f: ^File) -> Error {
 	return _fchdir(f)
 }
-
-fchmod :: proc(f: ^File, mode: File_Mode) -> Error {
+fchmod :: fchange_mode
+fchange_mode :: proc(f: ^File, mode: File_Mode) -> Error {
 	return _fchmod(f, mode)
 }
 
-fchown :: proc(f: ^File, uid, gid: int) -> Error {
+fchown :: fchange_owner
+fchange_owner :: proc(f: ^File, uid, gid: int) -> Error {
 	return _fchown(f, uid, gid)
 }
 
 
-
-lchown :: proc(name: string, uid, gid: int) -> Error {
+lchown :: change_owner_do_not_follow_links
+change_owner_do_not_follow_links :: proc(name: string, uid, gid: int) -> Error {
 	return _lchown(name, uid, gid)
 }
 
-
-chtimes :: proc(name: string, atime, mtime: time.Time) -> Error {
+chtimes :: change_times
+change_times :: proc(name: string, atime, mtime: time.Time) -> Error {
 	return _chtimes(name, atime, mtime)
 }
-fchtimes :: proc(f: ^File, atime, mtime: time.Time) -> Error {
+fchtimes :: fchange_times
+fchange_times :: proc(f: ^File, atime, mtime: time.Time) -> Error {
 	return _fchtimes(f, atime, mtime)
 }
 
@@ -202,7 +207,8 @@ is_file :: proc(path: string) -> bool {
 	return _is_file(path)
 }
 
-is_dir :: proc(path: string) -> bool {
+is_dir :: is_directory
+is_directory :: proc(path: string) -> bool {
 	return _is_dir(path)
 }
 
@@ -213,7 +219,7 @@ copy_file :: proc(dst_path, src_path: string) -> Error {
 
 	info := fstat(src, _file_allocator()) or_return
 	defer file_info_delete(info, _file_allocator())
-	if info.is_dir {
+	if info.is_directory {
 		return .Invalid_File
 	}
 
