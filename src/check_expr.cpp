@@ -3753,12 +3753,15 @@ gb_internal void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Typ
 		x->mode = Addressing_Invalid;
 		return;
 	}
+
+	bool REQUIRE = true;
+
 	Type *bt = base_type(x->type);
 	if (op.kind == Token_Mod    || op.kind == Token_ModEq ||
 	    op.kind == Token_ModMod || op.kind == Token_ModModEq) {
 		if (bt->kind == Type_Basic) switch (bt->Basic.kind) {
-		case Basic_u128: add_package_dependency(c, "runtime", "umodti3"); break;
-		case Basic_i128: add_package_dependency(c, "runtime", "modti3");  break;
+		case Basic_u128: add_package_dependency(c, "runtime", "umodti3", REQUIRE); break;
+		case Basic_i128: add_package_dependency(c, "runtime", "modti3",  REQUIRE); break;
 		}
 	} else if (op.kind == Token_Quo || op.kind == Token_QuoEq) {
 		if (bt->kind == Type_Basic) switch (bt->Basic.kind) {
@@ -3769,8 +3772,8 @@ gb_internal void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Typ
 		case Basic_quaternion128: add_package_dependency(c, "runtime", "quo_quaternion128"); break;
 		case Basic_quaternion256: add_package_dependency(c, "runtime", "quo_quaternion256"); break;
 
-		case Basic_u128: add_package_dependency(c, "runtime", "udivti3"); break;
-		case Basic_i128: add_package_dependency(c, "runtime", "divti3");  break;
+		case Basic_u128: add_package_dependency(c, "runtime", "udivti3", REQUIRE); break;
+		case Basic_i128: add_package_dependency(c, "runtime", "divti3",  REQUIRE); break;
 		}
 	} else if (op.kind == Token_Mul || op.kind == Token_MulEq) {
 		if (bt->kind == Type_Basic) switch (bt->Basic.kind) {
@@ -3782,7 +3785,7 @@ gb_internal void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Typ
 		case Basic_u128:
 		case Basic_i128:
 			if (is_arch_wasm()) {
-				add_package_dependency(c, "runtime", "__multi3");
+				add_package_dependency(c, "runtime", "__multi3", REQUIRE);
 			}
 			break;
 		}
@@ -3791,7 +3794,7 @@ gb_internal void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Typ
 		case Basic_u128:
 		case Basic_i128:
 			if (is_arch_wasm()) {
-				add_package_dependency(c, "runtime", "__ashlti3");
+				add_package_dependency(c, "runtime", "__ashlti3", REQUIRE);
 			}
 			break;
 		}

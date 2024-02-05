@@ -810,13 +810,16 @@ gb_internal AstPackage *get_core_package(CheckerInfo *info, String name) {
 	return *found;
 }
 
-gb_internal void add_package_dependency(CheckerContext *c, char const *package_name, char const *name) {
+gb_internal void add_package_dependency(CheckerContext *c, char const *package_name, char const *name, bool required=false) {
 	String n = make_string_c(name);
 	AstPackage *p = get_core_package(&c->checker->info, make_string_c(package_name));
 	Entity *e = scope_lookup(p->scope, n);
 	GB_ASSERT_MSG(e != nullptr, "%s", name);
 	GB_ASSERT(c->decl != nullptr);
 	e->flags |= EntityFlag_Used;
+	if (required) {
+		e->flags |= EntityFlag_Require;
+	}
 	add_dependency(c->info, c->decl, e);
 }
 
