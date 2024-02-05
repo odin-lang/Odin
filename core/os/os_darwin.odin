@@ -527,6 +527,7 @@ get_last_error_string :: proc() -> string {
 	return cast(string)_darwin_string_error(cast(c.int)get_last_error())
 }
 
+
 open :: proc(path: string, flags: int = O_RDWR, mode: int = 0) -> (Handle, Errno) {
 	isDir := is_dir_path(path)
 	flags := flags
@@ -658,10 +659,24 @@ stdin:  Handle = 0 // get_std_handle(win32.STD_INPUT_HANDLE);
 stdout: Handle = 1 // get_std_handle(win32.STD_OUTPUT_HANDLE);
 stderr: Handle = 2 // get_std_handle(win32.STD_ERROR_HANDLE);
 
-/* TODO(zangent): Implement these!
-last_write_time :: proc(fd: Handle) -> File_Time {}
-last_write_time_by_name :: proc(name: string) -> File_Time {}
-*/
+last_write_time :: proc(fd: Handle) -> (File_Time, Errno) {
+	s, err := _fstat(fd)
+	if err != ERROR_NONE {
+		return 0, err
+	}
+	modified := s.modified.seconds * 1_000_000_000 + s.modified.nanoseconds
+	return File_Time(modified), ERROR_NONE
+}
+
+last_write_time_by_name :: proc(name: string) -> (File_Time, Errno) {
+	s, err := _stat(name)
+	if err != ERROR_NONE {
+		return 0, err
+	}
+	modified := s.modified.seconds * 1_000_000_000 + s.modified.nanoseconds
+	return File_Time(modified), ERROR_NONE
+}
+
 
 is_path_separator :: proc(r: rune) -> bool {
 	return r == '/'
@@ -729,10 +744,14 @@ rename :: proc(old: string, new: string) -> bool {
 	return _unix_rename(old_cstr, new_cstr) != -1
 }
 
-remove :: proc(path: string) -> bool {
+remove :: proc(path: string) -> Errno {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	path_cstr := strings.clone_to_cstring(path, context.temp_allocator)
-	return _unix_remove(path_cstr) != -1
+	res := _unix_remove(path_cstr)
+	if res == -1 {
+		return Errno(get_last_error())
+	}
+	return ERROR_NONE
 }
 
 @private
