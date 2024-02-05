@@ -2425,14 +2425,18 @@ int main(int arg_count, char const **arg_ptr) {
 		Array<String> run_args = array_make<String>(heap_allocator(), 0, arg_count);
 		defer (array_free(&run_args));
 
+		isize run_args_start_idx = -1;
 		for_array(i, args) {
 			if (args[i] == "--") {
-				last_non_run_arg = i;
+				run_args_start_idx = i;
+				break;
 			}
-			if (i <= last_non_run_arg) {
-				continue;
+		}
+		if(run_args_start_idx != -1) {
+			last_non_run_arg = run_args_start_idx;
+			for(isize i = run_args_start_idx+1; i < args.count; ++i) {
+				array_add(&run_args, args[i]);
 			}
-			array_add(&run_args, args[i]);
 		}
 
 		args = array_slice(args, 0, last_non_run_arg);
