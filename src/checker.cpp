@@ -2570,7 +2570,7 @@ gb_internal void generate_minimum_dependency_set(Checker *c, Entity *start) {
 		str_lit("memmove"),
 	);
 
-	// FORCE_ADD_RUNTIME_ENTITIES(is_arch_wasm() && !build_context.tilde_backend,
+	FORCE_ADD_RUNTIME_ENTITIES(is_arch_wasm() && !build_context.tilde_backend,
 	// 	// Extended data type internal procedures
 	// 	str_lit("umodti3"),
 	// 	str_lit("udivti3"),
@@ -2587,10 +2587,10 @@ gb_internal void generate_minimum_dependency_set(Checker *c, Entity *start) {
 	// 	str_lit("gnu_f2h_ieee"),
 	// 	str_lit("extendhfsf2"),
 
-	// 	// WASM Specific
-	// 	str_lit("__ashlti3"),
-	// 	str_lit("__multi3"),
-	// );
+		// WASM Specific
+		str_lit("__ashlti3"),
+		str_lit("__multi3"),
+	);
 
 	FORCE_ADD_RUNTIME_ENTITIES(!build_context.no_rtti,
 		// Odin types
