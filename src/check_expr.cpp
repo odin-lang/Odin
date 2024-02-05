@@ -3118,19 +3118,20 @@ gb_internal void check_cast(CheckerContext *c, Operand *x, Type *type) {
 		Type *src = core_type(x->type);
 		Type *dst = core_type(type);
 		if (src != dst) {
+			bool const REQUIRE = true;
 			if (is_type_integer_128bit(src) && is_type_float(dst)) {
-				add_package_dependency(c, "runtime", "floattidf_unsigned");
-				add_package_dependency(c, "runtime", "floattidf");
+				add_package_dependency(c, "runtime", "floattidf_unsigned", REQUIRE);
+				add_package_dependency(c, "runtime", "floattidf",          REQUIRE);
 			} else if (is_type_integer_128bit(dst) && is_type_float(src)) {
-				add_package_dependency(c, "runtime", "fixunsdfti");
-				add_package_dependency(c, "runtime", "fixunsdfdi");
+				add_package_dependency(c, "runtime", "fixunsdfti",         REQUIRE);
+				add_package_dependency(c, "runtime", "fixunsdfdi",         REQUIRE);
 			} else if (src == t_f16 && is_type_float(dst)) {
-				add_package_dependency(c, "runtime", "gnu_h2f_ieee");
-				add_package_dependency(c, "runtime", "extendhfsf2");
+				add_package_dependency(c, "runtime", "gnu_h2f_ieee",       REQUIRE);
+				add_package_dependency(c, "runtime", "extendhfsf2",        REQUIRE);
 			} else if (is_type_float(dst) && dst == t_f16) {
-				add_package_dependency(c, "runtime", "truncsfhf2");
-				add_package_dependency(c, "runtime", "truncdfhf2");
-				add_package_dependency(c, "runtime", "gnu_f2h_ieee");
+				add_package_dependency(c, "runtime", "truncsfhf2",         REQUIRE);
+				add_package_dependency(c, "runtime", "truncdfhf2",         REQUIRE);
+				add_package_dependency(c, "runtime", "gnu_f2h_ieee",       REQUIRE);
 			}
 		}
 	}
