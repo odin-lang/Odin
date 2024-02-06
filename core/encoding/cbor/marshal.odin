@@ -29,7 +29,7 @@ have to be precomputed, sorted and only then written to the output.
 
 Empty flags will do nothing extra to the value.
 
-The allocations for the `.Deterministic_Map_Sorting` flag are done using the `context.temp_allocator`
+The allocations for the `.Deterministic_Map_Sorting` flag are done using the given `temp_allocator`.
 but are followed by the necessary `delete` and `free` calls if the allocator supports them.
 This is helpful when the CBOR size is so big that you don't want to collect all the temporary
 allocations until the end.
@@ -45,7 +45,7 @@ marshal :: marshal_into
 
 // Marshals the given value into a CBOR byte stream (allocated using the given allocator).
 // See docs on the `marshal_into` proc group for more info.
-marshal_into_bytes :: proc(v: any, flags := ENCODE_SMALL, allocator := context.allocator) -> (bytes: []byte, err: Marshal_Error) {
+marshal_into_bytes :: proc(v: any, flags := ENCODE_SMALL, allocator := context.allocator, temp_allocator := context.temp_allocator) -> (bytes: []byte, err: Marshal_Error) {
 	b, alloc_err := strings.builder_make(allocator)
  	// The builder as a stream also returns .EOF if it ran out of memory so this is consistent.
 	if alloc_err != nil {
@@ -54,7 +54,7 @@ marshal_into_bytes :: proc(v: any, flags := ENCODE_SMALL, allocator := context.a
 
 	defer if err != nil { strings.builder_destroy(&b) }
 
-	if err = marshal_into_builder(&b, v, flags); err != nil {
+	if err = marshal_into_builder(&b, v, flags, temp_allocator); err != nil {
 		return
 	}
 
@@ -63,14 +63,14 @@ marshal_into_bytes :: proc(v: any, flags := ENCODE_SMALL, allocator := context.a
 
 // Marshals the given value into a CBOR byte stream written to the given builder.
 // See docs on the `marshal_into` proc group for more info.
-marshal_into_builder :: proc(b: ^strings.Builder, v: any, flags := ENCODE_SMALL) -> Marshal_Error {
-	return marshal_into_writer(strings.to_writer(b), v, flags)
+marshal_into_builder :: proc(b: ^strings.Builder, v: any, flags := ENCODE_SMALL, temp_allocator := context.temp_allocator) -> Marshal_Error {
+	return marshal_into_writer(strings.to_writer(b), v, flags, temp_allocator)
 }
 
 // Marshals the given value into a CBOR byte stream written to the given writer.
 // See docs on the `marshal_into` proc group for more info.
-marshal_into_writer :: proc(w: io.Writer, v: any, flags := ENCODE_SMALL) -> Marshal_Error {
-	encoder := Encoder{flags, w}
+marshal_into_writer :: proc(w: io.Writer, v: any, flags := ENCODE_SMALL, temp_allocator := context.temp_allocator) -> Marshal_Error {
+	encoder := Encoder{flags, w, temp_allocator}
 	return marshal_into_encoder(encoder, v)
 }
 
@@ -79,7 +79,14 @@ marshal_into_writer :: proc(w: io.Writer, v: any, flags := ENCODE_SMALL) -> Mars
 marshal_into_encoder :: proc(e: Encoder, v: any) -> (err: Marshal_Error) {
 	e := e
 
-	err_conv(_ENCODE_PROGRESS_GUARD(&e)) or_return
+	if e.temp_allocator.procedure == nil {
+		e.temp_allocator = context.temp_allocator
+	}
+
+	if .Self_Described_CBOR in e.flags {
+		err_conv(_encode_u64(e, TAG_SELF_DESCRIBED_CBOR, .Tag)) or_return
+		e.flags &~= { .Self_Described_CBOR }
+	}
 
 	if v == nil {
 		return _encode_nil(e.writer)
@@ -321,7 +328,7 @@ marshal_into_encoder :: proc(e: Encoder, v: any) -> (err: Marshal_Error) {
 
 			switch info.key.id {
 			case string:
-				entries := make([dynamic]Encoded_Entry_Fast(^[]byte), 0, map_cap, context.temp_allocator) or_return
+				entries := make([dynamic]Encoded_Entry_Fast(^[]byte), 0, map_cap, e.temp_allocator) or_return
 				defer delete(entries)
 
 				for bucket_index in 0..<map_cap {
@@ -355,7 +362,7 @@ marshal_into_encoder :: proc(e: Encoder, v: any) -> (err: Marshal_Error) {
 				return
 
 			case cstring:
-				entries := make([dynamic]Encoded_Entry_Fast(^cstring), 0, map_cap, context.temp_allocator) or_return
+				entries := make([dynamic]Encoded_Entry_Fast(^cstring), 0, map_cap, e.temp_allocator) or_return
 				defer delete(entries)
 
 				for bucket_index in 0..<map_cap {
@@ -391,15 +398,15 @@ marshal_into_encoder :: proc(e: Encoder, v: any) -> (err: Marshal_Error) {
 				return
 
 			case:
-				entries := make([dynamic]Encoded_Entry, 0, map_cap, context.temp_allocator) or_return
+				entries := make([dynamic]Encoded_Entry, 0, map_cap, e.temp_allocator) or_return
 				defer delete(entries)
 
 				for bucket_index in 0..<map_cap {
 					runtime.map_hash_is_valid(hs[bucket_index]) or_continue
 
 					key := rawptr(runtime.map_cell_index_dynamic(ks, info.map_info.ks, bucket_index))
-					key_builder := strings.builder_make(0, 8, context.temp_allocator) or_return
-					marshal_into(Encoder{e.flags, strings.to_stream(&key_builder)}, any{ key, info.key.id }) or_return
+					key_builder := strings.builder_make(0, 8, e.temp_allocator) or_return
+					marshal_into(Encoder{e.flags, strings.to_stream(&key_builder), e.temp_allocator}, any{ key, info.key.id }) or_return
 					append(&entries, Encoded_Entry{ &key_builder.buf, bucket_index }) or_return
 				}
 
@@ -470,7 +477,7 @@ marshal_into_encoder :: proc(e: Encoder, v: any) -> (err: Marshal_Error) {
 				name:  string,
 				field: int,
 			}
-			entries := make([dynamic]Name, 0, n, context.temp_allocator) or_return
+			entries := make([dynamic]Name, 0, n, e.temp_allocator) or_return
 			defer delete(entries)
 
 			for name, i in info.names {
@@ -530,7 +537,7 @@ marshal_into_encoder :: proc(e: Encoder, v: any) -> (err: Marshal_Error) {
 		case reflect.Type_Info_Named:
 			err_conv(_encode_text(e, vt.name)) or_return
 		case:
-			builder := strings.builder_make(context.temp_allocator) or_return
+			builder := strings.builder_make(e.temp_allocator) or_return
 			defer strings.builder_destroy(&builder)
 			reflect.write_type(&builder, vti)
 			err_conv(_encode_text(e, strings.to_string(builder))) or_return

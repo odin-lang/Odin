@@ -4,23 +4,21 @@ Also provided are conversion to and from JSON and the CBOR diagnostic format.
 
 **Allocations:**
 
-In general, when in the following table it says allocations are done on the `context.temp_allocator`, these allocations
+In general, when in the following table it says allocations are done on the `temp_allocator`, these allocations
 are still attempted to be deallocated.
-This allows you to use an allocator with freeing implemented as the `context.temp_allocator` which is handy with big CBOR.
+This allows you to use an allocator with freeing implemented as the `temp_allocator` which is handy with big CBOR.
 
-If you use the default `context.temp_allocator` it will be returned back to its state when the process (en/decoding, (un)marshal) started.
-
-- *Encoding*:  If the `.Deterministic_Map_Sorting` flag is set on the encoder, this allocates on `context.temp_allocator`
+- *Encoding*:  If the `.Deterministic_Map_Sorting` flag is set on the encoder, this allocates on the given `temp_allocator`
                some space for the keys of maps in order to sort them and then write them.
                Other than that there are no allocations (only for the final bytes if you use `cbor.encode_into_bytes`.
 
 - *Decoding*:  Allocates everything on the given allocator and input given can be deleted after decoding.
-               *No* allocations are done on the `context.temp_allocator`.
+               *No* temporary allocations are done.
 
 - *Marshal*:   Same allocation strategy as encoding.
 
 - *Unmarshal*: Allocates everything on the given allocator and input given can be deleted after unmarshalling.
-               Some temporary allocations are done on the `context.temp_allocator`.
+               Some temporary allocations are done on the given `temp_allocator`.
 
 **Determinism:**
 

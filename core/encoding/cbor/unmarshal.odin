@@ -13,7 +13,7 @@ import "core:unicode/utf8"
 Unmarshals the given CBOR into the given pointer using reflection.
 Types that require allocation are allocated using the given allocator.
 
-Some temporary allocations are done on the `context.temp_allocator`, but, if you want to,
+Some temporary allocations are done on the given `temp_allocator`, but, if you want to,
 this can be set to a "normal" allocator, because the necessary `delete` and `free` calls are still made.
 This is helpful when the CBOR size is so big that you don't want to collect all the temporary allocations until the end.
 
@@ -31,8 +31,8 @@ unmarshal :: proc {
 	unmarshal_from_string,
 }
 
-unmarshal_from_reader :: proc(r: io.Reader, ptr: ^$T, flags := Decoder_Flags{}, allocator := context.allocator) -> (err: Unmarshal_Error) {
-	err = unmarshal_from_decoder(Decoder{ DEFAULT_MAX_PRE_ALLOC, flags, r }, ptr, allocator=allocator)
+unmarshal_from_reader :: proc(r: io.Reader, ptr: ^$T, flags := Decoder_Flags{}, allocator := context.allocator, temp_allocator := context.temp_allocator) -> (err: Unmarshal_Error) {
+	err = unmarshal_from_decoder(Decoder{ DEFAULT_MAX_PRE_ALLOC, flags, r }, ptr, allocator, temp_allocator)
 
 	// Normal EOF does not exist here, we try to read the exact amount that is said to be provided.
 	if err == .EOF { err = .Unexpected_EOF }
@@ -40,23 +40,21 @@ unmarshal_from_reader :: proc(r: io.Reader, ptr: ^$T, flags := Decoder_Flags{}, 
 }
 
 // Unmarshals from a string, see docs on the proc group `Unmarshal` for more info.
-unmarshal_from_string :: proc(s: string, ptr: ^$T, flags := Decoder_Flags{}, allocator := context.allocator) -> (err: Unmarshal_Error) {
+unmarshal_from_string :: proc(s: string, ptr: ^$T, flags := Decoder_Flags{}, allocator := context.allocator, temp_allocator := context.temp_allocator) -> (err: Unmarshal_Error) {
 	sr: strings.Reader
 	r := strings.to_reader(&sr, s)
 
-	err = unmarshal_from_reader(r, ptr, flags, allocator)
+	err = unmarshal_from_reader(r, ptr, flags, allocator, temp_allocator)
 
 	// Normal EOF does not exist here, we try to read the exact amount that is said to be provided.
 	if err == .EOF { err = .Unexpected_EOF }
 	return
 }
 
-unmarshal_from_decoder :: proc(d: Decoder, ptr: ^$T, allocator := context.allocator) -> (err: Unmarshal_Error) {
+unmarshal_from_decoder :: proc(d: Decoder, ptr: ^$T, allocator := context.allocator, temp_allocator := context.temp_allocator) -> (err: Unmarshal_Error) {
 	d := d
 
-	_DECODE_PROGRESS_GUARD(&d)
-
-	err = _unmarshal_any_ptr(d, ptr, allocator=allocator)
+	err = _unmarshal_any_ptr(d, ptr, nil, allocator, temp_allocator)
 
 	// Normal EOF does not exist here, we try to read the exact amount that is said to be provided.
 	if err == .EOF { err = .Unexpected_EOF }
@@ -64,8 +62,9 @@ unmarshal_from_decoder :: proc(d: Decoder, ptr: ^$T, allocator := context.alloca
 
 }
 
-_unmarshal_any_ptr :: proc(d: Decoder, v: any, hdr: Maybe(Header) = nil, allocator := context.allocator) -> Unmarshal_Error {
+_unmarshal_any_ptr :: proc(d: Decoder, v: any, hdr: Maybe(Header) = nil, allocator := context.allocator, temp_allocator := context.temp_allocator) -> Unmarshal_Error {
 	context.allocator = allocator
+	context.temp_allocator = temp_allocator
 	v := v
 
 	if v == nil || v.id == nil {

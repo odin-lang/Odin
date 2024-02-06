@@ -855,7 +855,7 @@ expect_float :: proc(t: ^testing.T, encoded: string, expected: $T, loc := #calle
 
 buf: bytes.Buffer
 stream  := bytes.buffer_to_stream(&buf)
-encoder := cbor.Encoder{cbor.ENCODE_FULLY_DETERMINISTIC, stream}
+encoder := cbor.Encoder{cbor.ENCODE_FULLY_DETERMINISTIC, stream, {}}
 
 expect_encoding :: proc(t: ^testing.T, val: cbor.Value, encoded: string, loc := #caller_location) {
 	bytes.buffer_reset(&buf)

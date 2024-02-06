@@ -26,9 +26,6 @@ Encoder_Flag :: enum {
 	// NOTE: In order to do this, all keys of a map have to be pre-computed, sorted, and
 	// then written, this involves temporary allocations for the keys and a copy of the map itself.
 	Deterministic_Map_Sorting, 
-	
-	// Internal flag to do initialization.
-	_In_Progress,
 }
 
 Encoder_Flags :: bit_set[Encoder_Flag]
@@ -40,8 +37,9 @@ ENCODE_FULLY_DETERMINISTIC :: Encoder_Flags{.Deterministic_Int_Size, .Determinis
 ENCODE_SMALL :: Encoder_Flags{.Deterministic_Int_Size, .Deterministic_Float_Size}
 
 Encoder :: struct {
-	flags:  Encoder_Flags,
-	writer: io.Writer,
+	flags:          Encoder_Flags,
+	writer:         io.Writer,
+	temp_allocator: runtime.Allocator,
 }
 
 Decoder_Flag :: enum {
@@ -56,9 +54,6 @@ Decoder_Flag :: enum {
 	
 	// Makes the decoder shrink of excess capacity from allocated buffers/containers before returning.
 	Shrink_Excess,
-
-	// Internal flag to do initialization.
-	_In_Progress,
 }
 
 Decoder_Flags :: bit_set[Decoder_Flag]
@@ -122,7 +117,9 @@ decode_from_decoder :: proc(d: Decoder, allocator := context.allocator) -> (v: V
 	
 	d := d
 
-	_DECODE_PROGRESS_GUARD(&d)
+	if d.max_pre_alloc <= 0 {
+		d.max_pre_alloc = DEFAULT_MAX_PRE_ALLOC
+	}
 
 	v, err = _decode_from_decoder(d)
 	// Normal EOF does not exist here, we try to read the exact amount that is said to be provided.
@@ -191,7 +188,7 @@ have to be precomputed, sorted and only then written to the output.
 
 Empty flags will do nothing extra to the value.
 
-The allocations for the `.Deterministic_Map_Sorting` flag are done using the `context.temp_allocator`
+The allocations for the `.Deterministic_Map_Sorting` flag are done using the given temp_allocator.
 but are followed by the necessary `delete` and `free` calls if the allocator supports them.
 This is helpful when the CBOR size is so big that you don't want to collect all the temporary
 allocations until the end.
@@ -206,22 +203,22 @@ encode :: encode_into
 
 // Encodes the CBOR value into binary CBOR allocated on the given allocator.
 // See the docs on the proc group `encode_into` for more info.
-encode_into_bytes :: proc(v: Value, flags := ENCODE_SMALL, allocator := context.allocator) -> (data: []byte, err: Encode_Error) {
+encode_into_bytes :: proc(v: Value, flags := ENCODE_SMALL, allocator := context.allocator, temp_allocator := context.temp_allocator) -> (data: []byte, err: Encode_Error) {
 	b := strings.builder_make(allocator) or_return
-	encode_into_builder(&b, v, flags) or_return
+	encode_into_builder(&b, v, flags, temp_allocator) or_return
 	return b.buf[:], nil
 }
 
 // Encodes the CBOR value into binary CBOR written to the given builder.
 // See the docs on the proc group `encode_into` for more info.
-encode_into_builder :: proc(b: ^strings.Builder, v: Value, flags := ENCODE_SMALL) -> Encode_Error {
-	return encode_into_writer(strings.to_stream(b), v, flags)
+encode_into_builder :: proc(b: ^strings.Builder, v: Value, flags := ENCODE_SMALL, temp_allocator := context.temp_allocator) -> Encode_Error {
+	return encode_into_writer(strings.to_stream(b), v, flags, temp_allocator)
 }
 
 // Encodes the CBOR value into binary CBOR written to the given writer.
 // See the docs on the proc group `encode_into` for more info.
-encode_into_writer :: proc(w: io.Writer, v: Value, flags := ENCODE_SMALL) -> Encode_Error {
-	return encode_into_encoder(Encoder{flags, w}, v)
+encode_into_writer :: proc(w: io.Writer, v: Value, flags := ENCODE_SMALL, temp_allocator := context.temp_allocator) -> Encode_Error {
+	return encode_into_encoder(Encoder{flags, w, temp_allocator}, v)
 }
 
 // Encodes the CBOR value into binary CBOR written to the given encoder.
@@ -229,8 +226,15 @@ encode_into_writer :: proc(w: io.Writer, v: Value, flags := ENCODE_SMALL) -> Enc
 encode_into_encoder :: proc(e: Encoder, v: Value) -> Encode_Error {
 	e := e
 
-	_ENCODE_PROGRESS_GUARD(&e) or_return
-	
+	if e.temp_allocator.procedure == nil {
+		e.temp_allocator = context.temp_allocator
+	}
+
+	if .Self_Described_CBOR in e.flags {
+		_encode_u64(e, TAG_SELF_DESCRIBED_CBOR, .Tag) or_return
+		e.flags &~= { .Self_Described_CBOR }
+	}
+
 	switch v_spec in v {
 	case u8:           return _encode_u8(e.writer, v_spec, .Unsigned)
 	case u16:          return _encode_u16(e, v_spec, .Unsigned)
@@ -254,66 +258,6 @@ encode_into_encoder :: proc(e: Encoder, v: Value) -> Encode_Error {
 	case Undefined:    return _encode_undefined(e.writer)
 	case:              return nil
 	}
-}
-
-@(deferred_in_out=_decode_progress_end)
-_DECODE_PROGRESS_GUARD :: proc(d: ^Decoder) -> (is_begin: bool, tmp: runtime.Arena_Temp) {
-	if ._In_Progress in d.flags {
-		return
-	}
-	is_begin = true
-	
-	d.flags |= { ._In_Progress }
-
-	if context.allocator != context.temp_allocator {
-		tmp = runtime.default_temp_allocator_temp_begin()
-	}
-
-	if d.max_pre_alloc <= 0 {
-		d.max_pre_alloc = DEFAULT_MAX_PRE_ALLOC
-	}
-
-	return
-}
-
-_decode_progress_end :: proc(d: ^Decoder, is_begin: bool, tmp: runtime.Arena_Temp) {
-	if !is_begin {
-		return
-	}
-
-	d.flags &~= { ._In_Progress }
-
-	runtime.default_temp_allocator_temp_end(tmp)
-}
-
-@(deferred_in_out=_encode_progress_end)
-_ENCODE_PROGRESS_GUARD :: proc(e: ^Encoder) -> (is_begin: bool, tmp: runtime.Arena_Temp, err: Encode_Error) {
-	if ._In_Progress in e.flags {
-		return
-	}
-	is_begin = true
-
-	e.flags |= { ._In_Progress }
-
-	if context.allocator != context.temp_allocator {
-		tmp = runtime.default_temp_allocator_temp_begin()
-	}
-
-	if .Self_Described_CBOR in e.flags {
-		_encode_u64(e^, TAG_SELF_DESCRIBED_CBOR, .Tag) or_return
-	}
-
-	return
-}
-
-_encode_progress_end :: proc(e: ^Encoder, is_begin: bool, tmp: runtime.Arena_Temp, err: Encode_Error) {
-	if !is_begin || err != nil {
-		return
-	}
-
-	e.flags &~= { ._In_Progress }
-
-	runtime.default_temp_allocator_temp_end(tmp)
 }
 
 _decode_header :: proc(r: io.Reader) -> (hdr: Header, err: io.Error) {
@@ -602,13 +546,13 @@ _encode_map :: proc(e: Encoder, m: Map) -> (err: Encode_Error) {
 		entry:       Map_Entry,
 	}
 
-	entries := make([]Map_Entry_With_Key, len(m), context.temp_allocator) or_return
-	defer delete(entries, context.temp_allocator)
+	entries := make([]Map_Entry_With_Key, len(m), e.temp_allocator) or_return
+	defer delete(entries, e.temp_allocator)
 
 	for &entry, i in entries {
 		entry.entry = m[i]
 
-		buf := strings.builder_make(context.temp_allocator) or_return
+		buf := strings.builder_make(e.temp_allocator) or_return
 		
 		ke := e
 		ke.writer = strings.to_stream(&buf)
@@ -624,7 +568,7 @@ _encode_map :: proc(e: Encoder, m: Map) -> (err: Encode_Error) {
 
 	for entry in entries {
 		io.write_full(e.writer, entry.encoded_key) or_return
-		delete(entry.encoded_key, context.temp_allocator)
+		delete(entry.encoded_key, e.temp_allocator)
 
 		encode(e, entry.entry.value) or_return
 	}
