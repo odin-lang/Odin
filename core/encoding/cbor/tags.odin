@@ -1,12 +1,13 @@
 package cbor
 
+import "base:runtime"
+
 import "core:encoding/base64"
 import "core:io"
 import "core:math"
 import "core:math/big"
 import "core:mem"
 import "core:reflect"
-import "core:runtime"
 import "core:strings"
 import "core:time"
 

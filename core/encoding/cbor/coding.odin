@@ -1,10 +1,11 @@
 package cbor
 
+import "base:intrinsics"
+import "base:runtime"
+
 import "core:bytes"
 import "core:encoding/endian"
-import "core:intrinsics"
 import "core:io"
-import "core:runtime"
 import "core:slice"
 import "core:strings"
 

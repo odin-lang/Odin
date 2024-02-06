@@ -1,8 +1,9 @@
 package test_encoding_base64
 
+import "base:intrinsics"
+
 import "core:encoding/base64"
 import "core:fmt"
-import "core:intrinsics"
 import "core:os"
 import "core:reflect"
 import "core:testing"

@@ -1,10 +1,11 @@
 package cbor
 
-import "core:intrinsics"
+import "base:intrinsics"
+import "base:runtime"
+
 import "core:io"
 import "core:mem"
 import "core:reflect"
-import "core:runtime"
 import "core:strings"
 import "core:unicode/utf8"
 

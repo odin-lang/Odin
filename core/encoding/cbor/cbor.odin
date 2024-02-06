@@ -1,7 +1,8 @@
 package cbor
 
+import "base:intrinsics"
+
 import "core:encoding/json"
-import "core:intrinsics"
 import "core:io"
 import "core:mem"
 import "core:strconv"

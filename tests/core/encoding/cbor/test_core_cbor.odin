@@ -1,9 +1,10 @@
 package test_encoding_cbor
 
+import "base:intrinsics"
+
 import "core:bytes"
 import "core:encoding/cbor"
 import "core:fmt"
-import "core:intrinsics"
 import "core:io"
 import "core:math/big"
 import "core:mem"
