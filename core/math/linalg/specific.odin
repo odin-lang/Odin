@@ -136,29 +136,6 @@ vector2_orthogonal :: proc "contextless" (v: $V/[2]$E) -> V where !IS_ARRAY(E), 
 }
 
 @(require_results)
-vector2_rotate :: proc(v: [2]$E, angle_radians: E) -> (v2: [2]E) where IS_FLOAT(E) {
-    sin, cos := math.sin(angle_radians), math.cos(angle_radians)
-    v2.x = cos * v.x - sin * v.y
-    v2.y = sin * v.x + cos * v.y
-    return
-}
-
-@(require_results)
-vector2_from_angle :: proc(angle_radians: $E) -> [2]E where IS_FLOAT(E) {
-    return {math.cos(angle_radians), math.sin(angle_radians)}
-}
-
-@(require_results)
-angle_between_vector2 :: proc(v1: [2]$E, v2: [2]E) -> E where IS_FLOAT(E) {
-    return math.atan2(cross(v1, v2), dot(v1, v2))
-}
-
-@(require_results)
-angle_from_vector2 :: proc(v: [2]$E) -> E where IS_FLOAT(E) {
-    return math.atan2(v.y, v.x)
-}
-
-@(require_results)
 vector3_orthogonal :: proc "contextless" (v: $V/[3]$E) -> V where !IS_ARRAY(E), IS_FLOAT(E) {
 	x := abs(v.x)
 	y := abs(v.y)
@@ -182,6 +159,31 @@ vector3_orthogonal :: proc "contextless" (v: $V/[3]$E) -> V where !IS_ARRAY(E), 
 }
 
 orthogonal :: proc{vector2_orthogonal, vector3_orthogonal}
+
+
+
+@(require_results)
+vector2_rotate :: proc(v: [2]$E, angle_radians: E) -> (v2: [2]E) where IS_FLOAT(E) {
+    sin, cos := math.sin(angle_radians), math.cos(angle_radians)
+    v2.x = cos * v.x - sin * v.y
+    v2.y = sin * v.x + cos * v.y
+    return
+}
+
+@(require_results)
+vector2_from_angle :: proc(angle_radians: $E) -> [2]E where IS_FLOAT(E) {
+    return {math.cos(angle_radians), math.sin(angle_radians)}
+}
+
+@(require_results)
+angle_between_vector2 :: proc(v1: [2]$E, v2: [2]E) -> E where IS_FLOAT(E) {
+    return math.atan2(cross(v1, v2), dot(v1, v2))
+}
+
+@(require_results)
+angle_from_vector2 :: proc(v: [2]$E) -> E where IS_FLOAT(E) {
+    return math.atan2(v.y, v.x)
+}
 
 
 
