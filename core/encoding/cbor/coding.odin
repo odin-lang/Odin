@@ -262,7 +262,7 @@ _DECODE_PROGRESS_GUARD :: proc(d: ^Decoder) -> (is_begin: bool, tmp: runtime.Are
 	}
 	is_begin = true
 	
-	incl_elem(&d.flags, Decoder_Flag._In_Progress)
+	d.flags |= { ._In_Progress }
 
 	if context.allocator != context.temp_allocator {
 		tmp = runtime.default_temp_allocator_temp_begin()
@@ -280,7 +280,7 @@ _decode_progress_end :: proc(d: ^Decoder, is_begin: bool, tmp: runtime.Arena_Tem
 		return
 	}
 
-	excl_elem(&d.flags, Decoder_Flag._In_Progress)
+	d.flags &~= { ._In_Progress }
 
 	runtime.default_temp_allocator_temp_end(tmp)
 }
@@ -292,7 +292,7 @@ _ENCODE_PROGRESS_GUARD :: proc(e: ^Encoder) -> (is_begin: bool, tmp: runtime.Are
 	}
 	is_begin = true
 
-	incl_elem(&e.flags, Encoder_Flag._In_Progress)
+	e.flags |= { ._In_Progress }
 
 	if context.allocator != context.temp_allocator {
 		tmp = runtime.default_temp_allocator_temp_begin()
@@ -310,7 +310,7 @@ _encode_progress_end :: proc(e: ^Encoder, is_begin: bool, tmp: runtime.Arena_Tem
 		return
 	}
 
-	excl_elem(&e.flags, Encoder_Flag._In_Progress)
+	e.flags &~= { ._In_Progress }
 
 	runtime.default_temp_allocator_temp_end(tmp)
 }
