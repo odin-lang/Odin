@@ -267,6 +267,31 @@ to_ptr :: proc{vector_to_ptr, matrix_to_ptr}
 
 
 
+vector_angle_between :: proc "contextless" (a, b: $V/[$N]$E) -> E {
+	a0 := normalize0(a)
+	b0 := normalize0(b)
+	return math.acos(dot(a0, b0))
+}
+quaternion64_angle_between :: proc "contextless" (a, b: $Q/quaternion64) -> f16 {
+	c := normalize0(conj(a) * b)
+	return math.acos(c.w)
+}
+quaternion128_angle_between :: proc "contextless" (a, b: $Q/quaternion128) -> f32 {
+	c := normalize0(conj(a) * b)
+	return math.acos(c.w)
+}
+quaternion256_angle_between :: proc "contextless" (a, b: $Q/quaternion256) -> f64 {
+	c := normalize0(conj(a) * b)
+	return math.acos(c.w)
+}
+angle_between :: proc{
+	vector_angle_between,
+	quaternion64_angle_between,
+	quaternion128_angle_between,
+	quaternion256_angle_between,
+}
+
+
 
 // Splines
 
