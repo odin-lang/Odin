@@ -136,7 +136,7 @@ vector2_orthogonal :: proc "contextless" (v: $V/[2]$E) -> V where !IS_ARRAY(E), 
 }
 
 @(require_results)
-vector2_rotate :: proc(v: [2]$E, angle: E) -> (v2: [2]E) where IS_FLOAT(E) {
+vector2_rotate :: proc(v: [2]$E, angle_radians: E) -> (v2: [2]E) where IS_FLOAT(E) {
     sin, cos := math.sin(angle), math.cos(angle)
     v2.x = cos * v.x - sin * v.y
     v2.y = sin * v.x + cos * v.y
@@ -144,7 +144,7 @@ vector2_rotate :: proc(v: [2]$E, angle: E) -> (v2: [2]E) where IS_FLOAT(E) {
 }
 
 @(require_results)
-vector2_from_angle :: proc(angle: $E) -> [2]E where IS_FLOAT(E) {
+vector2_from_angle :: proc(angle_radians: $E) -> [2]E where IS_FLOAT(E) {
     return {math.cos(angle), math.sin(angle)}
 }
 
