@@ -158,8 +158,8 @@ initialize_symbols :: proc(
 		prefixed_name: string
 
 		// Do we have a symbol override tag?
-		if override, tag_ok := reflect.struct_tag_lookup(reflect.Struct_Tag(field.tag), "dynlib"); tag_ok {
-			prefixed_name = string(override)
+		if override, tag_ok := reflect.struct_tag_lookup(field.tag, "dynlib"); tag_ok {
+			prefixed_name = override
 		}
 
 		// No valid symbol override tag found, fall back to `<symbol_prefix>name`.
