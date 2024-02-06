@@ -514,6 +514,31 @@ test_hash :: proc(t: ^testing.T) {
 
 		algo_name := hash.ALGORITHM_NAMES[algo]
 
+		// Ensure that the MAX_(DIGEST_SIZE, BLOCK_SIZE) constants are
+		// still correct.
+		digest_sz := hash.DIGEST_SIZES[algo]
+		block_sz := hash.BLOCK_SIZES[algo]
+		expect(
+			t,
+			digest_sz <= hash.MAX_DIGEST_SIZE,
+			fmt.tprintf(
+				"%s: Digest size %d exceeds max %d",
+				algo_name,
+				digest_sz,
+				hash.MAX_DIGEST_SIZE,
+			),
+		)
+		expect(
+			t,
+			block_sz <= hash.MAX_BLOCK_SIZE,
+			fmt.tprintf(
+				"%s: Block size %d exceeds max %d",
+				algo_name,
+				block_sz,
+				hash.MAX_BLOCK_SIZE,
+			),
+		)
+
 		// Exercise most of the happy-path for the high level interface.
 		rd: bytes.Reader
 		bytes.reader_init(&rd, transmute([]byte)(data_1_000_000_a))

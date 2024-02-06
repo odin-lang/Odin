@@ -6,7 +6,6 @@ See:
 */
 package hmac
 
-import "base:runtime"
 import "core:crypto"
 import "core:crypto/hash"
 import "core:mem"
@@ -26,10 +25,9 @@ sum :: proc(algorithm: hash.Algorithm, dst, msg, key: []byte) {
 // and key over msg and return true iff the tag is valid.  It requires
 // that the tag is correctly sized.
 verify :: proc(algorithm: hash.Algorithm, tag, msg, key: []byte) -> bool {
-	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
-	tag_sz := hash.DIGEST_SIZES[algorithm]
+	tag_buf: [hash.MAX_DIGEST_SIZE]byte
 
-	derived_tag := make([]byte, tag_sz, context.temp_allocator)
+	derived_tag := tag_buf[:hash.DIGEST_SIZES[algorithm]]
 	sum(algorithm, derived_tag, msg, key)
 
 	return crypto.compare_constant_time(derived_tag, tag) == 1
@@ -113,11 +111,12 @@ _O_PAD :: 0x5c
 
 @(private)
 _init_hashes :: proc(ctx: ^Context, algorithm: hash.Algorithm, key: []byte) {
-	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
+	K0_buf: [hash.MAX_BLOCK_SIZE]byte
+	kPad_buf: [hash.MAX_BLOCK_SIZE]byte
 
 	kLen := len(key)
 	B := hash.BLOCK_SIZES[algorithm]
-	K0 := make([]byte, B, context.temp_allocator)
+	K0 := K0_buf[:B]
 	defer mem.zero_explicit(raw_data(K0), B)
 
 	switch {
@@ -148,7 +147,7 @@ _init_hashes :: proc(ctx: ^Context, algorithm: hash.Algorithm, key: []byte) {
 	hash.init(&ctx._o_hash, algorithm)
 	hash.init(&ctx._i_hash, algorithm)
 
-	kPad := make([]byte, B, context.temp_allocator)
+	kPad := kPad_buf[:B]
 	defer mem.zero_explicit(raw_data(kPad), B)
 
 	for v, i in K0 {

@@ -11,6 +11,13 @@ import "core:crypto/legacy/sha1"
 
 import "core:reflect"
 
+// MAX_DIGEST_SIZE is the maximum size digest that can be returned by any
+// of the Algorithms supported via this package.
+MAX_DIGEST_SIZE :: 64
+// MAX_BLOCK_SIZE is the maximum block size used by any of Algorithms
+// supported by this package.
+MAX_BLOCK_SIZE :: sha3.BLOCK_SIZE_224
+
 // Algorithm is the algorithm identifier associated with a given Context.
 Algorithm :: enum {
 	Invalid,

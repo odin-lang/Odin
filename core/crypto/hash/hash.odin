@@ -56,17 +56,13 @@ hash_stream :: proc(
 ) {
 	ctx: Context
 
+	buf: [MAX_BLOCK_SIZE * 4]byte
+	defer mem.zero_explicit(&buf, size_of(buf))
+
 	init(&ctx, algorithm)
 
-	buffer_size := block_size(&ctx) * 4
-	buf := make([]byte, buffer_size, context.temp_allocator)
-	defer {
-		mem.zero_explicit(raw_data(buf), buffer_size)
-		delete(buf, context.temp_allocator)
-	}
-
 	loop: for {
-		n, err := io.read(s, buf)
+		n, err := io.read(s, buf[:])
 		if n > 0 {
 			// XXX/yawning: Can io.read return n > 0 and EOF?
 			update(&ctx, buf[:n])
