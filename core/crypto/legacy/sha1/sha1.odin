@@ -1,3 +1,14 @@
+/*
+package sha1 implements the SHA1 hash algorithm.
+
+WARNING: The SHA1 algorithm is known to be insecure and should only be
+used for interoperating with legacy applications.
+
+See:
+- https://eprint.iacr.org/2017/190
+- https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.180-4.pdf
+- https://datatracker.ietf.org/doc/html/rfc3174
+*/
 package sha1
 
 /*
@@ -6,103 +17,30 @@ package sha1
 
     List of contributors:
         zhibog, dotbmp:  Initial implementation.
-
-    Implementation of the SHA1 hashing algorithm, as defined in RFC 3174 <https://datatracker.ietf.org/doc/html/rfc3174>
 */
 
 import "core:encoding/endian"
-import "core:io"
 import "core:math/bits"
 import "core:mem"
-import "core:os"
 
-/*
-    High level API
-*/
-
+// DIGEST_SIZE is the SHA1 digest size in bytes.
 DIGEST_SIZE :: 20
 
-// hash_string will hash the given input and return the
-// computed hash
-hash_string :: proc(data: string) -> [DIGEST_SIZE]byte {
-	return hash_bytes(transmute([]byte)(data))
+// BLOCK_SIZE is the SHA1 block size in bytes.
+BLOCK_SIZE :: 64
+
+// Context is a SHA1 instance.
+Context :: struct {
+	data:    [BLOCK_SIZE]byte,
+	state:   [5]u32,
+	k:       [4]u32,
+	bitlen:  u64,
+	datalen: u32,
+
+	is_initialized: bool,
 }
 
-// hash_bytes will hash the given input and return the
-// computed hash
-hash_bytes :: proc(data: []byte) -> [DIGEST_SIZE]byte {
-	hash: [DIGEST_SIZE]byte
-	ctx: Context
-	init(&ctx)
-	update(&ctx, data)
-	final(&ctx, hash[:])
-	return hash
-}
-
-// hash_string_to_buffer will hash the given input and assign the
-// computed hash to the second parameter.
-// It requires that the destination buffer is at least as big as the digest size
-hash_string_to_buffer :: proc(data: string, hash: []byte) {
-	hash_bytes_to_buffer(transmute([]byte)(data), hash)
-}
-
-// hash_bytes_to_buffer will hash the given input and write the
-// computed hash into the second parameter.
-// It requires that the destination buffer is at least as big as the digest size
-hash_bytes_to_buffer :: proc(data, hash: []byte) {
-	ctx: Context
-	init(&ctx)
-	update(&ctx, data)
-	final(&ctx, hash)
-}
-
-// hash_stream will read the stream in chunks and compute a
-// hash from its contents
-hash_stream :: proc(s: io.Stream) -> ([DIGEST_SIZE]byte, bool) {
-	hash: [DIGEST_SIZE]byte
-	ctx: Context
-	init(&ctx)
-
-	buf := make([]byte, 512)
-	defer delete(buf)
-
-	read := 1
-	for read > 0 {
-		read, _ = io.read(s, buf)
-		if read > 0 {
-			update(&ctx, buf[:read])
-		}
-	}
-	final(&ctx, hash[:])
-	return hash, true
-}
-
-// hash_file will read the file provided by the given handle
-// and compute a hash
-hash_file :: proc(hd: os.Handle, load_at_once := false) -> ([DIGEST_SIZE]byte, bool) {
-	if !load_at_once {
-		return hash_stream(os.stream_from_handle(hd))
-	} else {
-		if buf, ok := os.read_entire_file(hd); ok {
-			return hash_bytes(buf[:]), ok
-		}
-	}
-	return [DIGEST_SIZE]byte{}, false
-}
-
-hash :: proc {
-	hash_stream,
-	hash_file,
-	hash_bytes,
-	hash_string,
-	hash_bytes_to_buffer,
-	hash_string_to_buffer,
-}
-
-/*
-    Low level API
-*/
-
+// init initializes a Context.
 init :: proc(ctx: ^Context) {
 	ctx.state[0] = 0x67452301
 	ctx.state[1] = 0xefcdab89
@@ -120,6 +58,7 @@ init :: proc(ctx: ^Context) {
 	ctx.is_initialized = true
 }
 
+// update adds more data to the Context.
 update :: proc(ctx: ^Context, data: []byte) {
 	assert(ctx.is_initialized)
 
@@ -134,12 +73,25 @@ update :: proc(ctx: ^Context, data: []byte) {
 	}
 }
 
-final :: proc(ctx: ^Context, hash: []byte) {
+// final finalizes the Context, writes the digest to hash, and calls
+// reset on the Context.
+//
+// Iff finalize_clone is set, final will work on a copy of the Context,
+// which is useful for for calculating rolling digests.
+final :: proc(ctx: ^Context, hash: []byte, finalize_clone: bool = false) {
 	assert(ctx.is_initialized)
 
 	if len(hash) < DIGEST_SIZE {
 		panic("crypto/sha1: invalid destination digest size")
 	}
+
+	ctx := ctx
+	if finalize_clone {
+		tmp_ctx: Context
+		clone(&tmp_ctx, ctx)
+		ctx = &tmp_ctx
+	}
+	defer(reset(ctx))
 
 	i := ctx.datalen
 
@@ -168,25 +120,26 @@ final :: proc(ctx: ^Context, hash: []byte) {
 	for i = 0; i < DIGEST_SIZE / 4; i += 1 {
 		endian.unchecked_put_u32be(hash[i * 4:], ctx.state[i])
 	}
+}
 
-	ctx.is_initialized = false
+// clone clones the Context other into ctx.
+clone :: proc(ctx, other: ^$T) {
+	ctx^ = other^
+}
+
+// reset sanitizes the Context.  The Context must be re-initialized to
+// be used again.
+reset :: proc(ctx: ^$T) {
+	if !ctx.is_initialized {
+		return
+	}
+
+	mem.zero_explicit(ctx, size_of(ctx^))
 }
 
 /*
     SHA1 implementation
 */
-
-BLOCK_SIZE :: 64
-
-Context :: struct {
-	data:    [BLOCK_SIZE]byte,
-	datalen: u32,
-	bitlen:  u64,
-	state:   [5]u32,
-	k:       [4]u32,
-
-	is_initialized: bool,
-}
 
 @(private)
 transform :: proc "contextless" (ctx: ^Context, data: []byte) {
