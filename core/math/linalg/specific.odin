@@ -150,7 +150,7 @@ vector2_from_angle :: proc(angle_radians: $E) -> [2]E where IS_FLOAT(E) {
 
 @(require_results)
 angle_between_vector2 :: proc(v1: [2]$E, v2: [2]E) -> E where IS_FLOAT(E) {
-    return math.atan2(linalg.cross(v1, v2), linalg.dot(v1, v2))
+    return math.atan2(cross(v1, v2), dot(v1, v2))
 }
 
 @(require_results)
