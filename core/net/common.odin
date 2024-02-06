@@ -414,4 +414,3 @@ DNS_Host_Entry :: struct {
 	name: string,
 	addr: Address,
 }
-
