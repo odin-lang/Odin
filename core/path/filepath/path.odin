@@ -356,28 +356,24 @@ Relative_Error :: enum {
 */
 rel :: proc(base_path, target_path: string, allocator := context.allocator) -> (string, Relative_Error) {
 	context.allocator = allocator
-	base_clean, target_clean := clean(base_path), clean(target_path)
-
-	delete_target := true
-	defer {
-		if delete_target {
-			delete(target_clean)
-		}
-		delete(base_clean)
-	}
+	base_clean   := clean(base_path,   allocator)
+	target_clean := clean(target_path, allocator)
+	defer delete(base_clean,   allocator)
+	defer delete(target_clean, allocator)
 
 	if strings.equal_fold(target_clean, base_clean) {
-		return strings.clone("."), .None
+		return strings.clone(".", allocator), .None
 	}
 
-	base_vol, target_vol := volume_name(base_path), volume_name(target_path)
-	base := base_clean[len(base_vol):]
+	base_vol   := volume_name(base_path)
+	target_vol := volume_name(target_path)
+	base   := base_clean  [len(base_vol):]
 	target := target_clean[len(target_vol):]
 	if base == "." {
 		base = ""
 	}
 
-	base_slashed := len(base) > 0 && base[0] == SEPARATOR
+	base_slashed   := len(base)   > 0 && base  [0] == SEPARATOR
 	target_slashed := len(target) > 0 && target[0] == SEPARATOR
 	if base_slashed != target_slashed || !strings.equal_fold(base_vol, target_vol) {
 		return "", .Cannot_Relate
@@ -413,7 +409,7 @@ rel :: proc(base_path, target_path: string, allocator := context.allocator) -> (
 		if tl != t0 {
 			size += 1 + tl - t0
 		}
-		buf := make([]byte, size)
+		buf := make([]byte, size, allocator)
 		n := copy(buf, "..")
 		for _ in 0..<seps {
 			buf[n] = SEPARATOR
@@ -427,8 +423,7 @@ rel :: proc(base_path, target_path: string, allocator := context.allocator) -> (
 		return string(buf), .None
 	}
 
-	delete_target = false
-	return target[t0:], .None
+	return strings.clone(target[t0:], allocator), .None
 }
 
 /*
