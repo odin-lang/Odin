@@ -1,4 +1,5 @@
 //+build linux
+//+no-instrumentation
 package linux
 
 import "base:intrinsics"
