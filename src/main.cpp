@@ -807,9 +807,10 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							}
 
 							gbAllocator a = heap_allocator();
-							String fullpath = path_to_fullpath(a, path);
-							if (!path_is_directory(fullpath)) {
-								gb_printf_err("Library collection '%.*s' path must be a directory, got '%.*s'\n", LIT(name), LIT(fullpath));
+							bool path_ok = false;
+							String fullpath = path_to_fullpath(a, path, &path_ok);
+							if (!path_ok || !path_is_directory(fullpath)) {
+								gb_printf_err("Library collection '%.*s' path must be a directory, got '%.*s'\n", LIT(name), LIT(path_ok ? fullpath : path));
 								gb_free(a, fullpath.text);
 								bad_flags = true;
 								break;
@@ -2395,9 +2396,18 @@ int main(int arg_count, char const **arg_ptr) {
 	TIME_SECTION("init default library collections");
 	array_init(&library_collections, heap_allocator());
 	// NOTE(bill): 'core' cannot be (re)defined by the user
-	add_library_collection(str_lit("base"), get_fullpath_relative(heap_allocator(), odin_root_dir(), str_lit("base")));
-	add_library_collection(str_lit("core"), get_fullpath_relative(heap_allocator(), odin_root_dir(), str_lit("core")));
-	add_library_collection(str_lit("vendor"), get_fullpath_relative(heap_allocator(), odin_root_dir(), str_lit("vendor")));
+
+	auto const &add_collection = [](String const &name) {
+		bool ok = false;
+		add_library_collection(name, get_fullpath_relative(heap_allocator(), odin_root_dir(), name, &ok));
+		if (!ok) {
+			compiler_error("Cannot find the library collection '%.*s'. Is the ODIN_ROOT set up correctly?", LIT(name));
+		}
+	};
+
+	add_collection(str_lit("base"));
+	add_collection(str_lit("core"));
+	add_collection(str_lit("vendor"));
 
 	TIME_SECTION("init args");
 	map_init(&build_context.defined_values);
@@ -2581,7 +2591,7 @@ int main(int arg_count, char const **arg_ptr) {
 	// NOTE(bill): add 'shared' directory if it is not already set
 	if (!find_library_collection_path(str_lit("shared"), nullptr)) {
 		add_library_collection(str_lit("shared"),
-			get_fullpath_relative(heap_allocator(), odin_root_dir(), str_lit("shared")));
+			get_fullpath_relative(heap_allocator(), odin_root_dir(), str_lit("shared"), nullptr));
 	}
 
 	init_build_context(selected_target_metrics ? selected_target_metrics->metrics : nullptr, selected_subtarget);

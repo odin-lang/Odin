@@ -774,7 +774,7 @@ gb_internal void add_type_info_dependency(CheckerInfo *info, DeclInfo *d, Type *
 gb_internal AstPackage *get_runtime_package(CheckerInfo *info) {
 	String name = str_lit("runtime");
 	gbAllocator a = heap_allocator();
-	String path = get_fullpath_base_collection(a, name);
+	String path = get_fullpath_base_collection(a, name, nullptr);
 	defer (gb_free(a, path.text));
 	auto found = string_map_get(&info->packages, path);
 	if (found == nullptr) {
@@ -795,7 +795,7 @@ gb_internal AstPackage *get_core_package(CheckerInfo *info, String name) {
 	}
 
 	gbAllocator a = heap_allocator();
-	String path = get_fullpath_core_collection(a, name);
+	String path = get_fullpath_core_collection(a, name, nullptr);
 	defer (gb_free(a, path.text));
 	auto found = string_map_get(&info->packages, path);
 	if (found == nullptr) {

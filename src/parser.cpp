@@ -5519,7 +5519,8 @@ gb_internal bool determine_path_from_string(BlockingMutex *file_mutex, Ast *node
 	if (has_windows_drive) {
 		*path = file_str;
 	} else {
-		String fullpath = string_trim_whitespace(get_fullpath_relative(permanent_allocator(), base_dir, file_str));
+		bool ok = false;
+		String fullpath = string_trim_whitespace(get_fullpath_relative(permanent_allocator(), base_dir, file_str, &ok));
 		*path = fullpath;
 	}
 	return true;
@@ -6141,7 +6142,11 @@ gb_internal ParseFileError parse_packages(Parser *p, String init_filename) {
 	{ // Add these packages serially and then process them parallel
 		TokenPos init_pos = {};
 		{
-			String s = get_fullpath_base_collection(permanent_allocator(), str_lit("runtime"));
+			bool ok = false;
+			String s = get_fullpath_base_collection(permanent_allocator(), str_lit("runtime"), &ok);
+			if (!ok) {
+				compiler_error("Unable to find The 'base:runtime' package. Is the ODIN_ROOT set up correctly?");
+			}
 			try_add_import_path(p, s, s, init_pos, Package_Runtime);
 		}
 
@@ -6149,7 +6154,11 @@ gb_internal ParseFileError parse_packages(Parser *p, String init_filename) {
 		p->init_fullpath = init_fullpath;
 
 		if (build_context.command_kind == Command_test) {
-			String s = get_fullpath_core_collection(permanent_allocator(), str_lit("testing"));
+			bool ok = false;
+			String s = get_fullpath_core_collection(permanent_allocator(), str_lit("testing"), &ok);
+			if (!ok) {
+				compiler_error("Unable to find The 'core:testing' package. Is the ODIN_ROOT set up correctly?");
+			}
 			try_add_import_path(p, s, s, init_pos, Package_Normal);
 		}
 		

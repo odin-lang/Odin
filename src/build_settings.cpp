@@ -876,7 +876,7 @@ gb_internal String internal_odin_root_dir(void) {
 
 #include <mach-o/dyld.h>
 
-gb_internal String path_to_fullpath(gbAllocator a, String s);
+gb_internal String path_to_fullpath(gbAllocator a, String s, bool *ok_);
 
 gb_internal String internal_odin_root_dir(void) {
 	String path = global_module_path;
@@ -930,7 +930,7 @@ gb_internal String internal_odin_root_dir(void) {
 // NOTE: Linux / Unix is unfinished and not tested very well.
 #include <sys/stat.h>
 
-gb_internal String path_to_fullpath(gbAllocator a, String s);
+gb_internal String path_to_fullpath(gbAllocator a, String s, bool *ok_);
 
 gb_internal String internal_odin_root_dir(void) {
 	String path = global_module_path;
@@ -1091,7 +1091,7 @@ gb_internal String internal_odin_root_dir(void) {
 gb_global BlockingMutex fullpath_mutex;
 
 #if defined(GB_SYSTEM_WINDOWS)
-gb_internal String path_to_fullpath(gbAllocator a, String s) {
+gb_internal String path_to_fullpath(gbAllocator a, String s, bool *ok_) {
 	String result = {};
 
 	String16 string16 = string_to_string16(heap_allocator(), s);
@@ -1117,7 +1117,9 @@ gb_internal String path_to_fullpath(gbAllocator a, String s) {
 				result.text[i] = '/';
 			}
 		}
+		if (ok_) *ok_ = true;
 	} else {
+		if (ok_) *ok_ = false;
 		mutex_unlock(&fullpath_mutex);
 	}
 
@@ -1129,7 +1131,11 @@ gb_internal String path_to_fullpath(gbAllocator a, String s) {
 	mutex_lock(&fullpath_mutex);
 	p = realpath(cast(char *)s.text, 0);
 	mutex_unlock(&fullpath_mutex);
-	if(p == nullptr) return String{};
+	if(p == nullptr) {
+		if (ok_) *ok_ = false;
+		return String{};
+	}
+	if (ok_) *ok_ = true;
 	return make_string_c(p);
 }
 #else
@@ -1137,7 +1143,7 @@ gb_internal String path_to_fullpath(gbAllocator a, String s) {
 #endif
 
 
-gb_internal String get_fullpath_relative(gbAllocator a, String base_dir, String path) {
+gb_internal String get_fullpath_relative(gbAllocator a, String base_dir, String path, bool *ok_) {
 	u8 *str = gb_alloc_array(heap_allocator(), u8, base_dir.len+1+path.len+1);
 	defer (gb_free(heap_allocator(), str));
 
@@ -1159,11 +1165,11 @@ gb_internal String get_fullpath_relative(gbAllocator a, String base_dir, String 
 
 	String res = make_string(str, i);
 	res = string_trim_whitespace(res);
-	return path_to_fullpath(a, res);
+	return path_to_fullpath(a, res, ok_);
 }
 
 
-gb_internal String get_fullpath_base_collection(gbAllocator a, String path) {
+gb_internal String get_fullpath_base_collection(gbAllocator a, String path, bool *ok_) {
 	String module_dir = odin_root_dir();
 
 	String base = str_lit("base/");
@@ -1180,10 +1186,10 @@ gb_internal String get_fullpath_base_collection(gbAllocator a, String path) {
 
 	String res = make_string(str, i);
 	res = string_trim_whitespace(res);
-	return path_to_fullpath(a, res);
+	return path_to_fullpath(a, res, ok_);
 }
 
-gb_internal String get_fullpath_core_collection(gbAllocator a, String path) {
+gb_internal String get_fullpath_core_collection(gbAllocator a, String path, bool *ok_) {
 	String module_dir = odin_root_dir();
 
 	String core = str_lit("core/");
@@ -1200,7 +1206,7 @@ gb_internal String get_fullpath_core_collection(gbAllocator a, String path) {
 
 	String res = make_string(str, i);
 	res = string_trim_whitespace(res);
-	return path_to_fullpath(a, res);
+	return path_to_fullpath(a, res, ok_);
 }
 
 gb_internal bool show_error_line(void) {
