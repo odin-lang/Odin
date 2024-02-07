@@ -907,7 +907,7 @@ gb_internal String internal_odin_root_dir(void) {
 	text = gb_alloc_array(permanent_allocator(), u8, len + 1);
 	gb_memmove(text, &path_buf[0], len);
 
-	path = path_to_fullpath(heap_allocator(), make_string(text, len));
+	path = path_to_fullpath(heap_allocator(), make_string(text, len), nullptr);
 
 	for (i = path.len-1; i >= 0; i--) {
 		u8 c = path[i];
@@ -1072,7 +1072,7 @@ gb_internal String internal_odin_root_dir(void) {
 
 	gb_memmove(text, &path_buf[0], len);
 
-	path = path_to_fullpath(heap_allocator(), make_string(text, len));
+	path = path_to_fullpath(heap_allocator(), make_string(text, len), nullptr);
 	for (i = path.len-1; i >= 0; i--) {
 		u8 c = path[i];
 		if (c == '/' || c == '\\') {
@@ -1126,7 +1126,7 @@ gb_internal String path_to_fullpath(gbAllocator a, String s, bool *ok_) {
 	return result;
 }
 #elif defined(GB_SYSTEM_OSX) || defined(GB_SYSTEM_UNIX)
-gb_internal String path_to_fullpath(gbAllocator a, String s) {
+gb_internal String path_to_fullpath(gbAllocator a, String s, bool *ok_) {
 	char *p;
 	mutex_lock(&fullpath_mutex);
 	p = realpath(cast(char *)s.text, 0);
