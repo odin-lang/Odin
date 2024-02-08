@@ -537,7 +537,10 @@ gb_internal Type *check_record_polymorphic_params(CheckerContext *ctx, Ast *poly
 						e->TypeName.is_type_alias = true;
 						e->flags |= EntityFlag_PolyConst;
 					} else {
-						Type *t = determine_type_from_polymorphic(ctx, type, operand);
+						Type *t = operand.type;
+						if (is_type_proc(type)) {
+							t = determine_type_from_polymorphic(ctx, type, operand);
+						}
 						if (is_type_polymorphic(base_type(t))) {
 							*is_polymorphic_ = true;
 							can_check_fields = false;
