@@ -495,12 +495,12 @@ gb_internal Type *check_record_polymorphic_params(CheckerContext *ctx, Ast *poly
 				type = t_invalid;
 			}
 
-			// if (is_type_polymorphic_type) {
-			// 	gbString str = type_to_string(type);
-			// 	error(params[i], "Parameter types cannot be polymorphic, got %s", str);
-			// 	gb_string_free(str);
-			// 	type = t_invalid;
-			// }
+			if (is_type_polymorphic_type && !is_type_proc(type)) {
+				gbString str = type_to_string(type);
+				error(params[i], "Parameter types cannot be polymorphic, got %s", str);
+				gb_string_free(str);
+				type = t_invalid;
+			}
 
 			if (!is_type_param && check_constant_parameter_value(type, params[i])) {
 				// failed
