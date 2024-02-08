@@ -4093,7 +4093,7 @@ gb_internal i64 type_offset_of_from_selection(Type *type, Selection sel) {
 	return offset;
 }
 
-gb_internal isize check_is_assignable_to_using_subtype(Type *src, Type *dst, isize level = 0, bool src_is_ptr = false) {
+gb_internal isize check_is_assignable_to_using_subtype(Type *src, Type *dst, isize level = 0, bool src_is_ptr = false, bool allow_polymorphic=false) {
 	Type *prev_src = src;
 	src = type_deref(src);
 	if (!src_is_ptr) {
@@ -4105,10 +4105,18 @@ gb_internal isize check_is_assignable_to_using_subtype(Type *src, Type *dst, isi
 		return 0;
 	}
 
+	bool dst_is_polymorphic = is_type_polymorphic(dst);
+
 	for_array(i, src->Struct.fields) {
 		Entity *f = src->Struct.fields[i];
 		if (f->kind != Entity_Variable || (f->flags&EntityFlags_IsSubtype) == 0) {
 			continue;
+		}
+		if (allow_polymorphic && dst_is_polymorphic) {
+			Type *fb = base_type(type_deref(f->type));
+			if (fb->kind == Type_Struct && fb->Struct.polymorphic_parent == dst) {
+				return true;
+			}
 		}
 
 		if (are_types_identical(f->type, dst)) {
@@ -4119,7 +4127,7 @@ gb_internal isize check_is_assignable_to_using_subtype(Type *src, Type *dst, isi
 				return level+1;
 			}
 		}
-		isize nested_level = check_is_assignable_to_using_subtype(f->type, dst, level+1, src_is_ptr);
+		isize nested_level = check_is_assignable_to_using_subtype(f->type, dst, level+1, src_is_ptr, allow_polymorphic);
 		if (nested_level > 0) {
 			return nested_level;
 		}
@@ -4134,6 +4142,13 @@ gb_internal bool is_type_subtype_of(Type *src, Type *dst) {
 	}
 
 	return 0 < check_is_assignable_to_using_subtype(src, dst, 0, is_type_pointer(src));
+}
+gb_internal bool is_type_subtype_of_and_allow_polymorphic(Type *src, Type *dst) {
+	if (are_types_identical(src, dst)) {
+		return true;
+	}
+
+	return 0 < check_is_assignable_to_using_subtype(src, dst, 0, is_type_pointer(src), true);
 }
 
 

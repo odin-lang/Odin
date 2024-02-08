@@ -1,5 +1,6 @@
 gb_internal ParameterValue handle_parameter_value(CheckerContext *ctx, Type *in_type, Type **out_type_, Ast *expr, bool allow_caller_location);
 gb_internal Type *determine_type_from_polymorphic(CheckerContext *ctx, Type *poly_type, Operand const &operand);
+gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is_variadic_, isize *variadic_index_, bool *success_, isize *specialization_count_, Array<Operand> const *operands);
 
 gb_internal void populate_using_array_index(CheckerContext *ctx, Ast *node, AstField *field, Type *t, String name, i32 idx) {
 	t = base_type(t);
@@ -394,7 +395,6 @@ gb_internal Type *check_record_polymorphic_params(CheckerContext *ctx, Ast *poly
                                                   bool *is_polymorphic_,
                                                   Ast *node, Array<Operand> *poly_operands) {
 	Type *polymorphic_params_type = nullptr;
-	bool can_check_fields = true;
 	GB_ASSERT(is_polymorphic_ != nullptr);
 
 	if (polymorphic_params == nullptr) {
@@ -404,6 +404,17 @@ gb_internal Type *check_record_polymorphic_params(CheckerContext *ctx, Ast *poly
 		return polymorphic_params_type;
 	}
 
+
+	// bool is_variadic = false;
+	// isize variadic_index = 0;
+	// bool success = false;
+	// isize specialization_count = 0;
+	// polymorphic_params_type = check_get_params(ctx, ctx->scope, polymorphic_params, &is_variadic, &variadic_index, &success, &specialization_count, poly_operands);
+	// if (success) {
+	// 	return nullptr;
+	// }
+
+	bool can_check_fields = true;
 	ast_node(field_list, FieldList, polymorphic_params);
 	Slice<Ast *> params = field_list->list;
 	if (params.count != 0) {
@@ -565,7 +576,6 @@ gb_internal Type *check_record_polymorphic_params(CheckerContext *ctx, Ast *poly
 	if (!*is_polymorphic_) {
 		*is_polymorphic_ = polymorphic_params != nullptr && poly_operands == nullptr;
 	}
-
 	return polymorphic_params_type;
 }
 

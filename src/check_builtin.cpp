@@ -5686,7 +5686,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				return false;
 			}
 
-			operand->value = exact_value_bool(is_type_subtype_of(op_src.type, op_dst.type));
+			operand->value = exact_value_bool(is_type_subtype_of_and_allow_polymorphic(op_src.type, op_dst.type));
 			operand->mode = Addressing_Constant;
 			operand->type = t_untyped_bool;
 		} break;
