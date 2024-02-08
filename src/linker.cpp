@@ -482,37 +482,33 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 			gbString platform_lib_str = gb_string_make(heap_allocator(), "");
 			defer (gb_string_free(platform_lib_str));
 			if (build_context.metrics.os == TargetOs_darwin) {
-				platform_lib_str = gb_string_appendc(platform_lib_str, "-Wl,-syslibroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk -L/usr/local/lib");
+				platform_lib_str = gb_string_appendc(platform_lib_str, "-Wl,-syslibroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk -L/usr/local/lib ");
 
 				// Homebrew's default library path, checking if it exists to avoid linking warnings.
 				if (gb_file_exists("/opt/homebrew/lib")) {
-					platform_lib_str = gb_string_appendc(platform_lib_str, " -L/opt/homebrew/lib");
+					platform_lib_str = gb_string_appendc(platform_lib_str, "-L/opt/homebrew/lib ");
 				}
 
 				// MacPort's default library path, checking if it exists to avoid linking warnings.
 				if (gb_file_exists("/opt/local/lib")) {
-					platform_lib_str = gb_string_appendc(platform_lib_str, " -L/opt/local/lib");
+					platform_lib_str = gb_string_appendc(platform_lib_str, "-L/opt/local/lib ");
 				}
 
-				#if defined(GB_SYSTEM_OSX)
-				if(!build_context.no_crt) {
-					platform_lib_str = gb_string_appendc(platform_lib_str, " -lm ");
-					if(gen->needs_system_library_linked == 1) {
-						platform_lib_str = gb_string_appendc(platform_lib_str, " -lSystem ");
-					}
-				}
-				#endif
-			} else {
-				platform_lib_str = gb_string_appendc(platform_lib_str, "-lc -lm");
-			}
-
-			if (build_context.metrics.os == TargetOs_darwin) {
 				// This sets a requirement of Mountain Lion and up, but the compiler doesn't work without this limit.
 				if (build_context.minimum_os_version_string.len) {
-					link_settings = gb_string_append_fmt(link_settings, " -mmacosx-version-min=%.*s ", LIT(build_context.minimum_os_version_string));
+					link_settings = gb_string_append_fmt(link_settings, "-mmacosx-version-min=%.*s ", LIT(build_context.minimum_os_version_string));
 				}
 				// This points the linker to where the entry point is
-				link_settings = gb_string_appendc(link_settings, " -e _main ");
+				link_settings = gb_string_appendc(link_settings, "-e _main ");
+			}
+
+			if (!build_context.no_crt) {
+				platform_lib_str = gb_string_appendc(platform_lib_str, "-lm ");
+				if (build_context.metrics.os == TargetOs_darwin) {
+					platform_lib_str = gb_string_appendc(platform_lib_str, "-lSystem ");
+				} else {
+					platform_lib_str = gb_string_appendc(platform_lib_str, "-lc ");
+				}
 			}
 
 			gbString link_command_line = gb_string_make(heap_allocator(), "clang -Wno-unused-command-line-argument ");
