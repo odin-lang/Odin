@@ -25,6 +25,7 @@ HMODULE :: distinct HINSTANCE
 HRESULT :: distinct LONG
 HWND :: distinct HANDLE
 HDC :: distinct HANDLE
+HDWP :: distinct HANDLE
 HMONITOR :: distinct HANDLE
 HICON :: distinct HANDLE
 HCURSOR :: distinct HANDLE
@@ -38,6 +39,7 @@ HKEY :: distinct HANDLE
 HDESK :: distinct HANDLE
 HFONT :: distinct HANDLE
 HRGN :: distinct HANDLE
+HDWP :: distinct HANDLE
 BOOL :: distinct b32
 BYTE :: distinct u8
 BOOLEAN :: distinct b8
@@ -295,6 +297,14 @@ REASON_CONTEXT :: struct {
 	},
 }
 PREASON_CONTEXT :: ^REASON_CONTEXT
+
+BLENDFUNCTION :: struct {
+	BlendOp: BYTE,
+	BlendFlags: BYTE,
+	SourceConstantAlpha: BYTE,
+	AlphaFormat: BYTE,
+}
+PBLENDFUNCTION :: ^BLENDFUNCTION
 
 // RRF - Registry Routine Flags (for RegGetValue)
 RRF_RT_REG_NONE      :: 0x00000001
@@ -698,6 +708,8 @@ TIMERPROC :: #type proc "system" (HWND, UINT, UINT_PTR, DWORD)
 WNDPROC :: #type proc "system" (HWND, UINT, WPARAM, LPARAM) -> LRESULT
 
 HOOKPROC :: #type proc "system" (code: c_int, wParam: WPARAM, lParam: LPARAM) -> LRESULT
+
+SENDASYNCPROC :: #type proc "stdcall" (HWND, UINT, ULONG_PTR, LRESULT)
 
 CWPRETSTRUCT :: struct {
 	lResult: LRESULT,

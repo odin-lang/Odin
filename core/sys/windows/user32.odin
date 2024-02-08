@@ -5,20 +5,47 @@ foreign import user32 "system:User32.lib"
 
 @(default_calling_convention="system")
 foreign user32 {
-	GetClassInfoW :: proc(hInstance: HINSTANCE, lpClassNAme: LPCWSTR, lpWndClass: ^WNDCLASSW) -> BOOL ---
-	GetClassInfoExW :: proc(hInsatnce: HINSTANCE, lpszClass: LPCWSTR, lpwcx: ^WNDCLASSEXW) -> BOOL ---
+	//
+	// Windows and Messages
+	//
 
-	GetClassLongW :: proc(hWnd: HWND, nIndex: c_int) -> DWORD ---
-	SetClassLongW :: proc(hWnd: HWND, nIndex: c_int, dwNewLong: LONG) -> DWORD ---
+	AdjustWindowRect :: proc(lpRect: LPRECT, dwStyle: DWORD, bMenu: BOOL) -> BOOL ---
+	AdjustWindowRectEx :: proc(lpRect: LPRECT, dwStyle: DWORD, bMenu: BOOL, dwExStyle: DWORD) -> BOOL ---
 
-	GetWindowLongW :: proc(hWnd: HWND, nIndex: c_int) -> LONG ---
-	SetWindowLongW :: proc(hWnd: HWND, nIndex: c_int, dwNewLong: LONG) -> LONG ---
+	AllowSetForegroundWindow :: proc(dwProcessId: DWORD) -> BOOL ---
+	AnimateWindow :: proc(hWnd: HWND, dwTime, dwFlags: DWORD) -> BOOL ---
+	AnyPopup :: proc() -> BOOL ---
+	ArrangeIconicWindows :: proc(hWnd: HWND) -> UINT ---
 
-	GetClassNameW :: proc(hWnd: HWND, lpClassName: LPWSTR, nMaxCount: c_int) -> c_int ---
+	BeginDeferWindowPos :: proc(nNumWindows: c_int) -> HDWP ---
+	BringWindowToTop :: proc(hWnd: HWND) -> BOOL ---
+	BroadcastSystemMessage :: proc(flags: DWORD, lpInfo: ^DWORD, Msg: UINT, wParam: WPARAM, lParam: LPARAM) -> c_long ---
+	BroadcastSystemMessageExW :: proc(flags: DWORD, lpInfo: LPDWORD, Msg: UINT, wParam: WPARAM, lParam: LPARAM, pbsmInfo: PBSMINFO) -> c_long ---
+	BroadcastSystemMessageW :: proc(flags: DWORD, lpInfo: LPDWORD, Msg: UINT, wParam: WPARAM, lParam: LPARAM) -> c_long ---
 
-	RegisterClassW :: proc(lpWndClass: ^WNDCLASSW) -> ATOM ---
-	RegisterClassExW :: proc(^WNDCLASSEXW) -> ATOM ---
-	UnregisterClassW :: proc(lpClassName: LPCWSTR, hInstance: HINSTANCE) -> BOOL ---
+	CalculatePopupWindowPosition :: proc(anchorPoint: ^POINT, windowSize: ^SIZE, flags: UINT, excludeRect: ^RECT, popupWindowPosition: ^RECT) -> BOOL ---
+	CallMsgFilterW :: proc(lpMsg: LPMSG, nCode: i32) -> BOOL ---
+	CallNextHookEx :: proc(hhk: HHOOK, nCode: c_int, wParam: WPARAM, lParam: LPARAM) -> LRESULT ---
+	CallWindowProcW :: proc(lpPrevWndFunc: WNDPROC, hWnd: HWND, Msg: UINT, wParam: WPARAM, lParam: LPARAM) -> LRESULT ---
+	CascadeWindows :: proc(hwndParent: HWND, wHow: UINT, lpRect: ^RECT, cKids: UINT, lpKids: ^HWND) -> WORD ---
+	ChangeWindowMessageFilter :: proc(message: UINT, dwFlag: DWORD) -> BOOL ---
+	ChangeWindowMessageFilterEx :: proc(hwnd: HWND, message: UINT, action: DWORD, pChangeFilterStruct: ^CHANGEFILTERSTRUCT) -> BOOL ---
+	ChildWindowFromPoint :: proc(hWndParent: HWND, Point: POINT) -> HWND ---
+	ChildWindowFromPointEx :: proc(hwnd: HWND, pt: POINT, flags: UINT) -> HWND ---
+	CloseWindow :: proc(hWnd: HWND) -> BOOL ---
+
+	CreateMDIWindowW :: proc(
+		lpClassName: LPCWSTR,
+		lpWindowName: LPCWSTR,
+		dwStyle: DWORD,
+		X: i32,
+		Y: i32,
+		nWidth: i32,
+		nHeight: i32,
+		hWndParent: HWND,
+		hInstance: HINSTANCE,
+		lParam: LPARAM
+	) -> HWND ---
 
 	CreateWindowExW :: proc(
 		dwExStyle: DWORD,
@@ -35,58 +62,160 @@ foreign user32 {
 		lpParam: LPVOID,
 	) -> HWND ---
 
+	DeferWindowPos :: proc(hWinPosInfo: HDWP, hWnd: HWND, hWndInsertAfter: HWND, x: i32, y: i32, cx: i32, cy: i32, uFlags: UINT) -> HDWP ---
+	DefFrameProcW :: proc(hWnd: HWND, hWndMDIClient: HWND, uMsg: HWND, wParam: WPARAM, lParam: LPARAM) -> LRESULT ---
+	DefMDIChildProcW :: proc(hWnd: HWND, uMsg: UINT, wParam: WPARAM, lParam: LPARAM) -> LRESULT ---
+	DefWindowProcW :: proc(hWnd: HWND, Msg: UINT, wParam: WPARAM, lParam: LPARAM) -> LRESULT ---
+	DeregisterShellHookWindow :: proc(hwnd: HWND) -> BOOL ---
 	DestroyWindow :: proc(hWnd: HWND) -> BOOL ---
 
-	ShowWindow :: proc(hWnd: HWND, nCmdShow: c_int) -> BOOL ---
-	IsWindow :: proc(hWnd: HWND) -> BOOL ---
-	BringWindowToTop :: proc(hWnd: HWND) -> BOOL ---
-	GetTopWindow :: proc(hWnd: HWND) -> HWND ---
-	SetForegroundWindow :: proc(hWnd: HWND) -> BOOL ---
-	GetForegroundWindow :: proc() -> HWND ---
-	UpdateWindow :: proc(hWnd: HWND) -> BOOL ---
-	SetActiveWindow :: proc(hWnd: HWND) -> HWND ---
-	GetActiveWindow :: proc() -> HWND ---
-
-	GetMessageW :: proc(lpMsg: ^MSG, hWnd: HWND, wMsgFilterMin: UINT, wMsgFilterMax: UINT) -> BOOL ---
-
-	TranslateMessage :: proc(lpMsg: ^MSG) -> BOOL ---
 	DispatchMessageW :: proc(lpMsg: ^MSG) -> LRESULT ---
 
-	WaitMessage :: proc() -> BOOL ---
+	EndDeferWindowPos :: proc(hWinPosInfo: HDWP) -> BOOL ---
+	EndTask :: proc(hWnd: HWND, fShutDown: BOOL, fForce: BOOL) -> BOOL ---
+	EnumChildWindows :: proc(hWndParent: HWND, lpEnumFunc: WNDENUMPROC, lParam: LPARAM) -> BOOL ---
+	EnumPropsExW :: proc(hWnd: HWND, lpEnumFunc: PROPENUMPROCEXW, lParam: LPARAM) -> i32 ---
+	EnumPropsW :: proc(hWnd: HWND, lpEnumFunc: PROPENUMPROCW) -> i32 ---
+	EnumThreadWindows :: proc(dwThreadId: DWORD, lpfn: WNDENUMPROC, lParam: LPARAM) -> BOOL ---
+	EnumWindows :: proc(lpEnumFunc: Window_Enum_Proc, lParam: LPARAM) -> BOOL ---
 
-	PeekMessageA :: proc(lpMsg: ^MSG, hWnd: HWND, wMsgFilterMin: UINT, wMsgFilterMax: UINT, wRemoveMsg: UINT) -> BOOL ---
-	PeekMessageW :: proc(lpMsg: ^MSG, hWnd: HWND, wMsgFilterMin: UINT, wMsgFilterMax: UINT, wRemoveMsg: UINT) -> BOOL ---
+	FindWindowW :: proc(lpClassName: LPCWSTR, lpWindowName: LPCWSTR) -> HWND ---
+	FindWindowExW :: proc(hWndParent, hWndChildAfter: HWND, lpszClass: LPCWSTR, lpszWindow: LPCWSTR) -> HWND ---
 
-	PostMessageA :: proc(hWnd: HWND, Msg: UINT, wParam: WPARAM, lParam: LPARAM) -> BOOL ---
+	GetAltTabInfoW :: proc(hwnd: HWND, iItem: i32, pati: ^ALTTABINFO, pszItemText: LPWSTR, cchItemText: UINT) -> BOOL ---
+	GetAncestor :: proc(hwnd: HWND, gaFlags: UINT) -> HWND ---
+
+	GetClassInfoExW :: proc(hInsatnce: HINSTANCE, lpszClass: LPCWSTR, lpwcx: ^WNDCLASSEXW) -> BOOL ---
+	GetClassInfoW :: proc(hInstance: HINSTANCE, lpClassNAme: LPCWSTR, lpWndClass: ^WNDCLASSW) -> BOOL ---
+    
+	GetClassLongW :: proc(hWnd: HWND, nIndex: c_int) -> DWORD ---
+	GetClassNameW :: proc(hWnd: HWND, lpClassName: LPWSTR, nMaxCount: c_int) -> c_int ---
+	GetClassWord :: proc(hWnd: HWND, nIndex: i32) -> WORD ---
+	GetClientRect :: proc(hWnd: HWND, lpRect: LPRECT) -> BOOL ---
+	GetDesktopWindow :: proc() -> HWND ---
+	GetForegroundWindow :: proc() -> HWND ---
+	GetGUIThreadInfo :: proc(idThread: DWORD, pgui: ^GUITHREADINFO) -> BOOL ---
+	GetInputState :: proc() -> BOOL ---
+	GetLastActivePopup :: proc(hWnd: HWND) -> HWND ---
+	GetLayeredWindowAttributes :: proc(hwnd: HWND, pcrKey: ^COLORREF, pbAlpha: ^BYTE, pdwFlags: ^DWORD) -> BOOL ---
+
+	GetMessageExtraInfo :: proc() -> LPARAM ---
+	GetMessagePos :: proc() -> DWORD ---
+	GetMessageTime :: proc() -> LONG ---
+	GetMessageW :: proc(lpMsg: ^MSG, hWnd: HWND, wMsgFilterMin, wMsgFilterMax: UINT) -> BOOL ---
+
+	GetParent :: proc(hWnd: HWND) -> HWND ---
+	GetProcessDefaultLayout :: proc(pdwDefaultLayout: ^DWORD) -> BOOL ---
+
+	GetPropW :: proc(hWnd: HWND, lpString: LPCWSTR) -> HANDLE ---
+	GetQueueStatus :: proc(flags: UINT) -> DWORD ---
+	GetShellWindow :: proc() -> HWND ---
+	GetSysColor :: proc(nIndex: c_int) -> DWORD ---
+	GetSystemMetrics :: proc(nIndex: c_int) -> c_int ---
+	GetTitleBarInfo :: proc(hwnd: HWND, pti: ^TITLEBARINFO) -> BOOL ---
+
+	GetTopWindow :: proc(hWnd: HWND) -> HWND ---
+	GetWindow :: proc(hWnd: HWND, uCmd: UINT) -> HWND ---
+	GetWindowDisplayAffinity :: proc(hWnd: HWND, pdwAffinity: ^DWORD) -> BOOL ---
+	GetWindowInfo :: proc(hwnd: HWND, pwi: PWINDOWINFO) -> BOOL ---
+	GetWindowLongW :: proc(hWnd: HWND, nIndex: c_int) -> LONG ---
+
+	GetWindowModuleFileNameW :: proc(hwnd: HWND, pszFileName: LPWSTR, cchFileNameMax: UINT) -> UINT ---
+	GetWindowPlacement :: proc(hWnd: HWND, lpwndpl: ^WINDOWPLACEMENT) -> BOOL ---
+	GetWindowRect :: proc(hWnd: HWND, lpRect: LPRECT) -> BOOL ---
+	GetWindowTextLengthW :: proc(hWnd: HWND) -> c_int ---
+	GetWindowTextW :: proc(hWnd: HWND, lpString: LPWSTR, nMaxCount: c_int) -> c_int ---
+	GetWindowThreadProcessId :: proc(hWnd: HWND, lpdwProcessId: ^DWORD) -> DWORD ---
+	GetWindowWord :: proc(hWnd: HWND, nIndex: i32) -> WORD ---
+
+	InSendMessage :: proc() -> BOOL ---
+	InSendMessageEx :: proc(lpReserved: ^VOID) -> DWORD ---
+	InternalGetWindowText :: proc(hWnd: HWND, pString: LPWSTR, cchMaxCount: i32) -> i32 ---
+	IsChild :: proc(hWndParent: HWND, hWnd: HWND) -> BOOL ---
+	IsGUIThread :: proc(bConvert: BOOL) -> BOOL ---
+	IsHungAppWindow :: proc(hwnd: HWND) -> BOOL ---
+	IsIconic :: proc(hWnd: HWND) -> BOOL ---
+	IsProcessDPIAware :: proc() -> BOOL ---
+	IsWindow :: proc(hWnd: HWND) -> BOOL ---
+	IsWindowArranged :: proc(hwnd: HWND) -> BOOL ---
+	IsWindowUnicode :: proc(hWnd: HWND) -> BOOL ---
+	IsWindowVisible :: proc(hWnd: HWND) -> BOOL ---
+	IsZoomed :: proc(hWnd: HWND) -> BOOL ---
+
+	KillTimer :: proc(hWnd: HWND, uIDEvent: UINT_PTR) -> BOOL ---
+
+	LockSetForegroundWindow :: proc(uLockCode: UINT) -> BOOL ---
+	LogicalToPhysicalPoint :: proc(hWnd: HWND, lpPoint: ^POINT) -> BOOL ---
+
+	MoveWindow :: proc(hWnd: HWND, X, Y, hWidth, hHeight: c_int, bRepaint: BOOL) -> BOOL ---
+
+	OpenIcon :: proc(hWnd: HWND) -> BOOL ---
+
+	PeekMessageW :: proc(lpMsg: ^MSG, hWnd: HWND, wMsgFilterMin, wMsgFilterMax, wRemoveMsg: UINT) -> BOOL ---
+	PhysicalToLogicalPoint :: proc(hWnd: HWND, lpPoint: ^POINT) -> BOOL ---
 	PostMessageW :: proc(hWnd: HWND, Msg: UINT, wParam: WPARAM, lParam: LPARAM) -> BOOL ---
-	SendMessageA :: proc(hWnd: HWND, Msg: UINT, wParam: WPARAM, lParam: LPARAM) -> LRESULT ---
-	SendMessageW :: proc(hWnd: HWND, Msg: UINT, wParam: WPARAM, lParam: LPARAM) -> LRESULT ---
-
-	PostThreadMessageA :: proc(idThread: DWORD, Msg: UINT, wParam: WPARAM, lParam: LPARAM) -> BOOL ---
+	PostQuitMessage :: proc(nExitCode: c_int) ---
 	PostThreadMessageW :: proc(idThread: DWORD, Msg: UINT, wParam: WPARAM, lParam: LPARAM) -> BOOL ---
 
-	PostQuitMessage :: proc(nExitCode: c_int) ---
+	RealChildWindowFromPoint :: proc(hwndParent: HWND, ptParentClientCoords: POINT) -> HWND ---
+	RealGetWindowClassW :: proc(hwnd: HWND, ptszClassName: LPWSTR, cchClassNameMax: UINT) -> UINT ---
 
-	GetQueueStatus :: proc(flags: UINT) -> DWORD ---
+	RegisterClassExW :: proc(^WNDCLASSEXW) -> ATOM ---
+	RegisterClassW :: proc(lpWndClass: ^WNDCLASSW) -> ATOM ---
 
-	DefWindowProcA :: proc(hWnd: HWND, Msg: UINT, wParam: WPARAM, lParam: LPARAM) -> LRESULT ---
-	DefWindowProcW :: proc(hWnd: HWND, Msg: UINT, wParam: WPARAM, lParam: LPARAM) -> LRESULT ---
+	RegisterShellHookWindow :: proc(hwnd: HWND) -> BOOL ---
+	RegisterWindowMessageW :: proc(lpString: LPCWSTR) -> UINT ---
+	RemovePropW :: proc(hWnd: HWND, lpString: LPCWSTR) -> HANDLE ---
+	ReplyMessage :: proc(lResult: LRESULT) -> BOOL ---
 
-	FindWindowA :: proc(lpClassName: LPCSTR, lpWindowName: LPCSTR) -> HWND ---
-	FindWindowW :: proc(lpClassName: LPCWSTR, lpWindowName: LPCWSTR) -> HWND ---
-	FindWindowExA :: proc(hWndParent: HWND, hWndChildAfter: HWND, lpszClass: LPCSTR, lpszWindow: LPCSTR) -> HWND ---
-	FindWindowExW :: proc(hWndParent: HWND, hWndChildAfter: HWND, lpszClass: LPCWSTR, lpszWindow: LPCWSTR) -> HWND ---
+	SendMessageCallbackW :: proc(
+		hWnd: HWND,
+		Msg: UINT,
+		wParam: WPARAM,
+		lParam: LPARAM,
+		lpResultCallBack: SENDASYNCPROC,
+		dwData: ULONG_PTR,
+	) -> BOOL ---
 
-	LoadIconA :: proc(hInstance: HINSTANCE, lpIconName: LPCSTR) -> HICON ---
-	LoadIconW :: proc(hInstance: HINSTANCE, lpIconName: LPCWSTR) -> HICON ---
-	LoadCursorA :: proc(hInstance: HINSTANCE, lpCursorName: LPCSTR) -> HCURSOR ---
-	LoadCursorW :: proc(hInstance: HINSTANCE, lpCursorName: LPCWSTR) -> HCURSOR ---
-	LoadImageW :: proc(hInst: HINSTANCE, name: LPCWSTR, type: UINT, cx: c_int, cy: c_int, fuLoad: UINT) -> HANDLE ---
+	SendMessageTimeoutW :: proc(
+		hWnd: HWND,
+		Msg: UINT,
+		wParam: WPARAM,
+		lParam: LPARAM,
+		fuFlags: UINT,
+		uTimeout: UINT,
+		lpdwResult: PDWORD_PTR,
+	) -> LRESULT ---
 
-	GetWindowRect :: proc(hWnd: HWND, lpRect: LPRECT) -> BOOL ---
-	GetClientRect :: proc(hWnd: HWND, lpRect: LPRECT) -> BOOL ---
-	ClientToScreen :: proc(hWnd: HWND, lpPoint: LPPOINT) -> BOOL ---
-	ScreenToClient :: proc(hWnd: HWND, lpPoint: LPPOINT) -> BOOL ---
+	SendMessageW :: proc(hWnd: HWND, Msg: UINT, wParam: WPARAM, lParam: LPARAM) -> LRESULT ---
+	SendNotifyMessageW :: proc(hWnd: HWND, Msg: UINT, wParam: WPARAM, lParam: LPARAM) -> BOOL ---
+	SetAdditionalForegroundBoostProcesses :: proc(topLevelWindow: HWND, processHandleCount: DWORD, processHandleArray: [^]HANDLE) -> BOOL ---
+
+	SetClassLongW :: proc(hWnd: HWND, nIndex: c_int, dwNewLong: LONG) -> DWORD ---
+
+	SetClassWord :: proc(hWnd: HWND, nIndex: c_int, wNewWord: WORD) -> WORD ---
+	SetCoalescableTimer :: proc(
+		hWnd: HWND,
+		nIDEvent: UINT_PTR,
+		uElapse: UINT,
+		lpTimerFunc: TIMERPROC,
+		uToleranceDelay: ULONG,
+	) -> UINT_PTR ---
+
+	SetForegroundWindow :: proc(hWnd: HWND) -> BOOL ---
+	SetLayeredWindowAttributes  :: proc(hWnd: HWND, crKey: COLORREF, bAlpha: BYTE, dwFlags: DWORD) -> BOOL ---
+	SetMessageExtraInfo :: proc(lParam: LPARAM) -> LPARAM ---
+	SetParent :: proc(hWndChild, hWndNewParent: HWND) -> HWND ---
+	SetProcessDefaultLayout :: proc(dwDefaultLayout: DWORD) -> BOOL ---
+	SetProcessDPIAware :: proc() -> BOOL ---
+	SetPropW :: proc(hWnd: HWND, lpString: LPCWSTR, hData: HANDLE) -> BOOL ---
+	SetSysColors :: proc(cElements: c_int, lpaElements: [^]INT, lpaRgbValues: [^]COLORREF) -> BOOL ---
+	SetTimer :: proc(hWnd: HWND, nIDEvent: UINT_PTR, uElapse: UINT, lpTimerFunc: TIMERPROC) -> UINT_PTR ---
+	SetWindowDisplayAffinity :: proc(hWnd: HWND, dwAffinity: DWORD) -> BOOL ---
+
+	SetWindowLongW :: proc(hWnd: HWND, nIndex: c_int, dwNewLong: LONG) -> LONG ---
+
+	SetWindowPlacement :: proc(hwnd: HWND, lpwndpl: ^WINDOWPLACEMENT) -> BOOL ---
 	SetWindowPos :: proc(
 		hWnd: HWND,
 		hWndInsertAfter: HWND,
@@ -96,13 +225,66 @@ foreign user32 {
 		cy: c_int,
 		uFlags: UINT,
 	) -> BOOL ---
-	MoveWindow :: proc(hWnd: HWND, X, Y, hWidth, hHeight: c_int, bRepaint: BOOL) -> BOOL ---
-	GetSystemMetrics :: proc(nIndex: c_int) -> c_int ---
-	AdjustWindowRect :: proc(lpRect: LPRECT, dwStyle: DWORD, bMenu: BOOL) -> BOOL ---
-	AdjustWindowRectEx :: proc(lpRect: LPRECT, dwStyle: DWORD, bMenu: BOOL, dwExStyle: DWORD) -> BOOL ---
-	AdjustWindowRectExForDpi :: proc(lpRect: LPRECT, dwStyle: DWORD, bMenu: BOOL, dwExStyle: DWORD, dpi: UINT) -> BOOL ---
 
-	SystemParametersInfoW :: proc(uiAction, uiParam: UINT, pvParam: PVOID, fWinIni: UINT) -> BOOL ---
+	SetWindowsHookExW :: proc(idHook: c_int, lpfn: HOOKPROC, hmod: HINSTANCE, dwThreadId: DWORD) -> HHOOK ---
+	SetWindowTextW :: proc(hWnd: HWND, lpString: LPCWSTR) -> BOOL ---
+
+	ShowOwnedPopups :: proc(hWnd: HWND, fShow: BOOL) -> BOOL ---
+	ShowWindow :: proc(hWnd: HWND, nCmdShow: c_int) -> BOOL ---
+	ShowWindowAsync :: proc(hWnd: HWND, nCmdShow: c_int) -> BOOL ---
+
+	SoundSentry :: proc() -> BOOL ---
+	SwitchToThisWindow :: proc(hwnd: HWND, fUnknown: BOOL) ---
+	SystemParametersInfoW :: proc(uiAction, uiParam: UINT, pvParam: ^VOID, fWinIni: UINT) -> BOOL ---
+
+	TileWindows :: proc(hwndParent: HWND, wHow: UINT, lpRect: ^RECT, cKids: UINT, lpKids: [^]HWND) -> WORD ---
+	TranslateMDISysAccel :: proc(hWndClient: HWND, lpMsg: LPMSG) -> BOOL ---
+	TranslateMessage :: proc(lpMsg: ^MSG) -> BOOL ---
+
+	UnhookWindowsHookEx :: proc(hhk: HHOOK) -> BOOL ---
+	UnregisterClassW :: proc(lpClassName: LPCWSTR, hInstance: HINSTANCE) -> BOOL ---
+	UpdateLayeredWindow :: proc(
+		hWnd: HWND,
+		hdcDst: HDC,
+		pptDst: ^POINT,
+		psize: ^SIZE,
+		hdcSrc: HDC,
+		pptSrc: ^POINT,
+		crKey: COLORREF,
+		pblend: ^BLENDFUNCTION,
+		dwFlags: DWORD,
+	) -> BOOL ---
+
+	WaitMessage :: proc() -> BOOL ---
+	WindowFromPhysicalPoint :: proc(Point: POINT) -> HWND ---
+	WindowFromPoint :: proc(Point: POINT) -> HWND ---
+
+	//
+	// END OF: Windows and Messages
+	//
+
+	//
+	// High DPI
+	//
+
+	AdjustWindowRectExForDpi :: proc(lpRect: LPRECT, dwStyle: DWORD, bMenu: BOOL, dwExStyle: DWORD, dpi: UINT) -> BOOL ---
+	// AreDpiAwarenessContextsEqual
+
+	//
+	// END OF: High DPI
+	//
+	
+	UpdateWindow :: proc(hWnd: HWND) -> BOOL ---
+	SetActiveWindow :: proc(hWnd: HWND) -> HWND ---
+	GetActiveWindow :: proc() -> HWND ---
+
+	LoadIconW :: proc(hInstance: HINSTANCE, lpIconName: LPCWSTR) -> HICON ---
+	LoadCursorW :: proc(hInstance: HINSTANCE, lpCursorName: LPCWSTR) -> HCURSOR ---
+	LoadImageW :: proc(hInst: HINSTANCE, name: LPCWSTR, type: UINT, cx, cy: c_int, fuLoad: UINT) -> HANDLE ---
+
+	ClientToScreen :: proc(hWnd: HWND, lpPoint: LPPOINT) -> BOOL ---
+	ScreenToClient :: proc(hWnd: HWND, lpPoint: LPPOINT) -> BOOL ---
+	
 	GetMonitorInfoW :: proc(hMonitor: HMONITOR, lpmi: LPMONITORINFO) -> BOOL ---
 
 	GetWindowDC :: proc(hWnd: HWND) -> HDC ---
@@ -115,10 +297,9 @@ foreign user32 {
 	CreatePopupMenu :: proc() -> HMENU ---
 	DestroyMenu :: proc(hMenu: HMENU) -> BOOL ---
 	AppendMenuW :: proc(hMenu: HMENU, uFlags: UINT, uIDNewItem: UINT_PTR, lpNewItem: LPCWSTR) -> BOOL ---
-	TrackPopupMenu :: proc(hMenu: HMENU, uFlags: UINT, x: int, y: int, nReserved: int, hWnd: HWND, prcRect: ^RECT) -> i32 ---
-	RegisterWindowMessageW :: proc(lpString: LPCWSTR) -> UINT ---
-
-	GetUpdateRect :: proc(hWnd: HWND, lpRect: LPRECT, bErase: BOOL) -> BOOL ---
+	TrackPopupMenu :: proc(hMenu: HMENU, uFlags: UINT, x, y: c_int, nReserved: c_int, hWnd: HWND, prcRect: ^RECT) -> BOOL ---
+	
+	GetUpdateRect :: proc(hWnd: HWND, lpRect: ^RECT, bErase: BOOL) -> BOOL ---
 	ValidateRect :: proc(hWnd: HWND, lpRect: ^RECT) -> BOOL ---
 	InvalidateRect :: proc(hWnd: HWND, lpRect: ^RECT, bErase: BOOL) -> BOOL ---
 
@@ -135,24 +316,15 @@ foreign user32 {
 	
 	GetKeyboardState :: proc(lpKeyState: PBYTE) -> BOOL ---
 
-	MapVirtualKeyW :: proc(uCode: UINT, uMapType: UINT) -> UINT ---
-	ToUnicode :: proc(nVirtKey: UINT, wScanCode: UINT, lpKeyState: ^BYTE, pwszBuff: LPWSTR, cchBuff: c_int, wFlags: UINT) -> c_int ---
+	MapVirtualKeyW :: proc(uCode, uMapType: UINT) -> UINT ---
+	ToUnicode :: proc(nVirtKey, wScanCode: UINT, lpKeyState: ^BYTE, pwszBuff: LPWSTR, cchBuff: c_int, wFlags: UINT) -> c_int ---
 
-	SetWindowsHookExW :: proc(idHook: c_int, lpfn: HOOKPROC, hmod: HINSTANCE, dwThreadId: DWORD) -> HHOOK ---
-	UnhookWindowsHookEx :: proc(hhk: HHOOK) -> BOOL ---
-	CallNextHookEx :: proc(hhk: HHOOK, nCode: c_int, wParam: WPARAM, lParam: LPARAM) -> LRESULT ---
-
-	SetTimer :: proc(hWnd: HWND, nIDEvent: UINT_PTR, uElapse: UINT, lpTimerFunc: TIMERPROC) -> UINT_PTR ---
-	KillTimer :: proc(hWnd: HWND, uIDEvent: UINT_PTR) -> BOOL ---
-
-	// MessageBoxA :: proc(hWnd: HWND, lpText: LPCSTR, lpCaption: LPCSTR, uType: UINT) -> c_int ---
-	MessageBoxW :: proc(hWnd: HWND, lpText: LPCWSTR, lpCaption: LPCWSTR, uType: UINT) -> c_int ---
-	// MessageBoxExA :: proc(hWnd: HWND, lpText: LPCSTR, lpCaption: LPCSTR, uType: UINT, wLanguageId: WORD) -> c_int ---
-	MessageBoxExW :: proc(hWnd: HWND, lpText: LPCWSTR, lpCaption: LPCWSTR, uType: UINT, wLanguageId: WORD) -> c_int ---
+	MessageBoxW :: proc(hWnd: HWND, lpText, lpCaption: LPCWSTR, uType: UINT) -> c_int ---
+	MessageBoxExW :: proc(hWnd: HWND, lpText, lpCaption: LPCWSTR, uType: UINT, wLanguageId: WORD) -> c_int ---
 
 	ClipCursor :: proc(lpRect: LPRECT) -> BOOL ---
 	GetCursorPos :: proc(lpPoint: LPPOINT) -> BOOL ---
-	SetCursorPos :: proc(X: c_int, Y: c_int) -> BOOL ---
+	SetCursorPos :: proc(X, Y: c_int) -> BOOL ---
 	SetCursor :: proc(hCursor: HCURSOR) -> HCURSOR ---
 
 	EnumDisplaySettingsW :: proc(lpszDeviceName: LPCWSTR, iModeNum: DWORD, lpDevMode: ^DEVMODEW) -> BOOL ---
@@ -162,8 +334,6 @@ foreign user32 {
 	MonitorFromWindow :: proc(hwnd: HWND, dwFlags: Monitor_From_Flags) -> HMONITOR ---
 	EnumDisplayMonitors :: proc(hdc: HDC, lprcClip: LPRECT, lpfnEnum: Monitor_Enum_Proc, dwData: LPARAM) -> BOOL ---
 	
-	EnumWindows :: proc(lpEnumFunc: Window_Enum_Proc, lParam: LPARAM) -> BOOL ---
-
 	SetThreadDpiAwarenessContext :: proc(dpiContext: DPI_AWARENESS_CONTEXT) -> DPI_AWARENESS_CONTEXT ---
 	GetThreadDpiAwarenessContext :: proc() -> DPI_AWARENESS_CONTEXT ---
 	GetWindowDpiAwarenessContext :: proc(hwnd: HWND) -> DPI_AWARENESS_CONTEXT ---
@@ -171,43 +341,12 @@ foreign user32 {
 	GetDpiForWindow :: proc(hwnd: HWND) -> UINT ---
 	SetProcessDpiAwarenessContext :: proc(value: DPI_AWARENESS_CONTEXT) -> BOOL ---
 
-	BroadcastSystemMessageW :: proc(
-		flags: DWORD,
-		lpInfo: LPDWORD,
-		Msg: UINT,
-		wParam: WPARAM,
-		lParam: LPARAM,
-	) -> c_long ---
-
-	BroadcastSystemMessageExW :: proc(
-		flags: DWORD,
-		lpInfo: LPDWORD,
-		Msg: UINT,
-		wParam: WPARAM,
-		lParam: LPARAM,
-		pbsmInfo: PBSMINFO,
-	) -> c_long ---
-
-	SendMessageTimeoutW :: proc(
-		hWnd: HWND,
-		Msg: UINT,
-		wParam: WPARAM,
-		lParam: LPARAM,
-		fuFlags: UINT,
-		uTimeout: UINT,
-		lpdwResult: PDWORD_PTR,
-	) -> LRESULT ---
-
-	GetSysColor :: proc(nIndex: c_int) -> DWORD ---
 	GetSysColorBrush :: proc(nIndex: c_int) -> HBRUSH ---
-	SetSysColors :: proc(cElements: c_int, lpaElements: ^INT, lpaRgbValues: ^COLORREF) -> BOOL ---
+	
 	MessageBeep :: proc(uType: UINT) -> BOOL ---
 
 	IsDialogMessageW :: proc(hDlg: HWND, lpMsg: LPMSG) -> BOOL ---
-	GetWindowTextLengthW :: proc(hWnd: HWND) -> c_int ---
-	GetWindowTextW :: proc(hWnd: HWND, lpString: LPWSTR, nMaxCount: c_int) -> c_int ---
-	SetWindowTextW :: proc(hWnd: HWND, lpString: LPCWSTR) -> BOOL ---
-	CallWindowProcW :: proc(lpPrevWndFunc: WNDPROC, hWnd: HWND, Msg: UINT, wParam: WPARAM, lParam: LPARAM) -> LRESULT ---
+	
 	EnableWindow :: proc(hWnd: HWND, bEnable: BOOL) -> BOOL ---
 
 	DefRawInputProc :: proc(paRawInput: ^PRAWINPUT, nInput: INT, cbSizeHeader: UINT) -> LRESULT ---
@@ -216,24 +355,19 @@ foreign user32 {
 	GetRawInputDeviceInfoW :: proc(hDevice: HANDLE, uiCommand: UINT, pData: LPVOID, pcbSize: PUINT) -> UINT ---
 	GetRawInputDeviceList :: proc(pRawInputDeviceList: PRAWINPUTDEVICELIST, puiNumDevices: PUINT, cbSize: UINT) -> UINT ---
 	GetRegisteredRawInputDevices :: proc(pRawInputDevices: PRAWINPUTDEVICE, puiNumDevices: PUINT, cbSize: UINT) -> UINT ---
-	RegisterRawInputDevices :: proc(pRawInputDevices: PCRAWINPUTDEVICE, uiNumDevices: UINT, cbSize: UINT) -> BOOL ---
+	RegisterRawInputDevices :: proc(pRawInputDevices: PCRAWINPUTDEVICE, uiNumDevices: UINT, cbSize: UINT) -> BOOL --- // @Todo(ema): Multi-pointers for these
 
 	SendInput :: proc(cInputs: UINT, pInputs: [^]INPUT, cbSize: c_int) -> UINT ---
 
-	SetLayeredWindowAttributes  :: proc(hWnd: HWND, crKey: COLORREF, bAlpha: BYTE, dwFlags: DWORD) -> BOOL ---
+	FillRect :: proc(hDC: HDC, lprc: ^RECT, hbr: HBRUSH) -> c_int ---
+	EqualRect :: proc(lprc1, lprc2: ^RECT) -> BOOL ---
 
-	FillRect :: proc(hDC: HDC, lprc: ^RECT, hbr: HBRUSH) -> int ---
-	EqualRect :: proc(lprc1: ^RECT, lprc2: ^RECT) -> BOOL ---
-
-	GetWindowInfo :: proc(hwnd: HWND, pwi: PWINDOWINFO) -> BOOL ---
-	GetWindowPlacement :: proc(hWnd: HWND, lpwndpl: ^WINDOWPLACEMENT) -> BOOL ---
-	SetWindowPlacement :: proc(hwnd: HWND, lpwndpl: ^WINDOWPLACEMENT) -> BOOL ---
-	SetWindowRgn :: proc(hWnd: HWND, hRgn: HRGN, bRedraw: BOOL) -> int ---
+	SetWindowRgn :: proc(hWnd: HWND, hRgn: HRGN, bRedraw: BOOL) -> c_int ---
 	CreateRectRgnIndirect :: proc(lprect: ^RECT) -> HRGN ---
-	GetSystemMetricsForDpi :: proc(nIndex: int, dpi: UINT) -> int ---
+	GetSystemMetricsForDpi :: proc(nIndex: c_int, dpi: UINT) -> c_int ---
 
 	GetSystemMenu :: proc(hWnd: HWND, bRevert: BOOL) -> HMENU ---
-	EnableMenuItem :: proc(hMenu: HMENU, uIDEnableItem: UINT, uEnable: UINT) -> BOOL ---
+	EnableMenuItem :: proc(hMenu: HMENU, uIDEnableItem, uEnable: UINT) -> BOOL ---
 }
 
 CreateWindowW :: #force_inline proc "system" (
@@ -315,6 +449,10 @@ Monitor_From_Flags :: enum DWORD {
 Monitor_Enum_Proc :: #type proc "system" (HMONITOR, HDC, LPRECT, LPARAM) -> BOOL
 Window_Enum_Proc :: #type proc "system" (HWND, LPARAM) -> BOOL
 
+WNDENUMPROC :: #type proc "stdcall" (hwnd: HWND, lParam: LPARAM) -> BOOL
+PROPENUMPROCW :: #type proc "stdcall" (unnamedParam1: HWND, unnamedParam2: LPCWSTR, unnamedParam3: HANDLE) -> BOOL
+PROPENUMPROCEXW :: #type proc "stdcall" (unnamedParam1: HWND, unnamedParam2: LPWSTR, unnamedParam3: HANDLE, unnamedParam4: ULONG_PTR) -> BOOL
+
 USER_DEFAULT_SCREEN_DPI                    :: 96
 DPI_AWARENESS_CONTEXT                      :: distinct HANDLE
 DPI_AWARENESS_CONTEXT_UNAWARE              :: DPI_AWARENESS_CONTEXT(~uintptr(0)) // -1
@@ -322,6 +460,56 @@ DPI_AWARENESS_CONTEXT_SYSTEM_AWARE         :: DPI_AWARENESS_CONTEXT(~uintptr(1))
 DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE    :: DPI_AWARENESS_CONTEXT(~uintptr(2)) // -3
 DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 :: DPI_AWARENESS_CONTEXT(~uintptr(3)) // -4
 DPI_AWARENESS_CONTEXT_UNAWARE_GDISCALED    :: DPI_AWARENESS_CONTEXT(~uintptr(4)) // -5
+
+GetNextWindow :: GetWindow
+
+CHANGEFILTERSTRUCT :: struct {
+	cbSize: DWORD,
+	ExtStatus: DWORD,
+}
+PCHANGEFILTERSTRUCT :: ^CHANGEFILTERSTRUCT
+
+ALTTABINFO :: struct {
+	cbSize: DWORD,
+	cItems: i32,
+	cColumns: i32,
+	cRows: i32,
+	iColFocus: i32,
+	iRowFocus: i32,
+	cxItem: i32,
+	cyItem: i32,
+	ptStart: POINT,
+}
+PALTTABINFO :: ^ALTTABINFO
+
+GUITHREADINFO :: struct {
+	cbSize: DWORD,
+	flags: DWORD,
+	hwndActive: HWND,
+	hwndFocus: HWND,
+	hwndCapture: HWND,
+	hwndMenuOwner: HWND,
+	hwndMoveSize: HWND,
+	hwndCaret: HWND,
+	rcCaret: RECT,
+}
+PGUITHREADINFO :: ^GUITHREADINFO
+
+TITLEBARINFO :: struct {
+	cbSize: DWORD,
+	rcTitleBar: RECT,
+	rgstate: [CCHILDREN_TITLEBAR + 1]DWORD,
+}
+PTITLEBARINFO :: ^TITLEBARINFO
+
+CCHILDREN_TITLEBAR  :: 5
+CCHILDREN_SCROLLBAR :: 5
+
+STATE_SYSTEM_FOCUSABLE   :: 0x00100000
+STATE_SYSTEM_INVISIBLE   :: 0x00008000
+STATE_SYSTEM_OFFSCREEN   :: 0x00010000
+STATE_SYSTEM_UNAVAILABLE :: 0x00000001
+STATE_SYSTEM_PRESSED     :: 0x00000008
 
 RAWINPUTHEADER :: struct {
 	dwType: DWORD,
