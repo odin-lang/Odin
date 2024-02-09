@@ -53,6 +53,7 @@ foreign user32 {
 	DispatchMessageW :: proc(lpMsg: ^MSG) -> LRESULT ---
 
 	WaitMessage :: proc() -> BOOL ---
+	MsgWaitForMultipleObjects :: proc(nCount: DWORD, pHandles: ^HANDLE, fWaitAll: bool, dwMilliseconds: DWORD, dwWakeMask: DWORD) -> DWORD ---
 
 	PeekMessageA :: proc(lpMsg: ^MSG, hWnd: HWND, wMsgFilterMin: UINT, wMsgFilterMax: UINT, wRemoveMsg: UINT) -> BOOL ---
 	PeekMessageW :: proc(lpMsg: ^MSG, hWnd: HWND, wMsgFilterMin: UINT, wMsgFilterMax: UINT, wRemoveMsg: UINT) -> BOOL ---
