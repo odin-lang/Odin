@@ -679,6 +679,10 @@ gb_global Type *t_allocator_error                = nullptr;
 gb_global Type *t_source_code_location           = nullptr;
 gb_global Type *t_source_code_location_ptr       = nullptr;
 
+gb_global Type *t_load_directory_file            = nullptr;
+gb_global Type *t_load_directory_file_ptr        = nullptr;
+gb_global Type *t_load_directory_file_slice      = nullptr;
+
 gb_global Type *t_map_info                       = nullptr;
 gb_global Type *t_map_cell_info                  = nullptr;
 gb_global Type *t_raw_map                        = nullptr;

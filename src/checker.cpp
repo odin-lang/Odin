@@ -1257,6 +1257,9 @@ gb_internal void init_checker_info(CheckerInfo *i) {
 	mpsc_init(&i->required_global_variable_queue, a); // 1<<10);
 	mpsc_init(&i->required_foreign_imports_through_force_queue, a); // 1<<10);
 	mpsc_init(&i->intrinsics_entry_point_usage, a); // 1<<10); // just waste some memory here, even if it probably never used
+
+	string_map_init(&i->load_directory_cache);
+	map_init(&i->load_directory_map);
 }
 
 gb_internal void destroy_checker_info(CheckerInfo *i) {
@@ -1280,6 +1283,8 @@ gb_internal void destroy_checker_info(CheckerInfo *i) {
 
 	map_destroy(&i->objc_msgSend_types);
 	string_map_destroy(&i->load_file_cache);
+	string_map_destroy(&i->load_directory_cache);
+	map_destroy(&i->load_directory_map);
 }
 
 gb_internal CheckerContext make_checker_context(Checker *c) {
@@ -2957,6 +2962,16 @@ gb_internal void init_core_source_code_location(Checker *c) {
 	t_source_code_location = find_core_type(c, str_lit("Source_Code_Location"));
 	t_source_code_location_ptr = alloc_type_pointer(t_source_code_location);
 }
+
+gb_internal void init_core_load_directory_file(Checker *c) {
+	if (t_load_directory_file != nullptr) {
+		return;
+	}
+	t_load_directory_file = find_core_type(c, str_lit("Load_Directory_File"));
+	t_load_directory_file_ptr = alloc_type_pointer(t_load_directory_file);
+	t_load_directory_file_slice = alloc_type_slice(t_load_directory_file);
+}
+
 
 gb_internal void init_core_map_type(Checker *c) {
 	if (t_map_info != nullptr) {
