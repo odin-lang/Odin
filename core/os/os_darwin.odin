@@ -1118,3 +1118,55 @@ fcntl :: proc(fd: int, cmd: int, arg: int) -> (int, Errno) {
 	}
 	return int(result), ERROR_NONE
 }
+
+copy_file :: proc(src: string, dst: string, overwrite: bool = false) -> Errno {
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
+	src_handle, src_err := open(src)
+	if src_err != ERROR_NONE {
+		return src_err
+	}
+
+	flags := O_WRONLY | O_CREATE
+	if !overwrite {
+		flags |= O_EXCL
+	}
+
+	dst_handle, dst_err := open(dst, flags, 0666)
+	if dst_err != ERROR_NONE {
+		close(src_handle)
+		return dst_err
+	}
+
+	buf, buf_err := make([]u8, 4096, context.temp_allocator)
+	if buf_err != .None {
+		close(src_handle)
+		close(dst_handle)
+		return ENOMEM
+	}
+
+	for {
+		bytes_read, read_err := read(src_handle, buf)
+		if read_err != ERROR_NONE {
+			return read_err
+		} else if (bytes_read == 0) {
+			break;
+		}
+
+		total_written := 0
+		for total_written < bytes_read {
+			bytes_written, write_err := write(dst_handle, buf[total_written:bytes_read])
+			if write_err != ERROR_NONE {
+				close(src_handle)
+				close(dst_handle)
+				return write_err
+			}
+
+			total_written += bytes_written
+		}
+	}
+
+	close(src_handle)
+	close(dst_handle)
+
+	return ERROR_NONE
+}

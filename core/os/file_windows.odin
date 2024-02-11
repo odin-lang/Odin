@@ -612,3 +612,14 @@ pipe :: proc() -> (r, w: Handle, err: Errno) {
 	return
 }
 
+copy_file :: proc(src: string, dst: string, overwrite: bool = false) -> Errno {
+	wide_src := win32.utf8_to_wstring(src)
+	wide_dst := win32.utf8_to_wstring(dst)
+	fail_if_exists : win32.BOOL = !overwrite
+	ok := win32.CopyFileW(wide_src, wide_dst, fail_if_exists)
+	if !ok {
+		return Errno(win32.GetLastError())
+	}
+
+	return ERROR_NONE
+}
