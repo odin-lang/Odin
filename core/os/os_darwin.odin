@@ -1125,6 +1125,7 @@ copy_file :: proc(src: string, dst: string, overwrite: bool = false) -> Errno {
 	if src_err != ERROR_NONE {
 		return src_err
 	}
+	defer close(src_handle)
 
 	flags := O_WRONLY | O_CREATE
 	if !overwrite {
@@ -1133,14 +1134,12 @@ copy_file :: proc(src: string, dst: string, overwrite: bool = false) -> Errno {
 
 	dst_handle, dst_err := open(dst, flags, 0666)
 	if dst_err != ERROR_NONE {
-		close(src_handle)
 		return dst_err
 	}
+	defer close(dst_handle)
 
 	buf, buf_err := make([]u8, 4096, context.temp_allocator)
 	if buf_err != .None {
-		close(src_handle)
-		close(dst_handle)
 		return ENOMEM
 	}
 
@@ -1156,8 +1155,6 @@ copy_file :: proc(src: string, dst: string, overwrite: bool = false) -> Errno {
 		for total_written < bytes_read {
 			bytes_written, write_err := write(dst_handle, buf[total_written:bytes_read])
 			if write_err != ERROR_NONE {
-				close(src_handle)
-				close(dst_handle)
 				return write_err
 			}
 
@@ -1165,8 +1162,6 @@ copy_file :: proc(src: string, dst: string, overwrite: bool = false) -> Errno {
 		}
 	}
 
-	close(src_handle)
-	close(dst_handle)
 
 	return ERROR_NONE
 }
