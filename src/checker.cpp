@@ -774,7 +774,7 @@ gb_internal void add_type_info_dependency(CheckerInfo *info, DeclInfo *d, Type *
 gb_internal AstPackage *get_runtime_package(CheckerInfo *info) {
 	String name = str_lit("runtime");
 	gbAllocator a = heap_allocator();
-	String path = get_fullpath_base_collection(a, name);
+	String path = get_fullpath_base_collection(a, name, nullptr);
 	defer (gb_free(a, path.text));
 	auto found = string_map_get(&info->packages, path);
 	if (found == nullptr) {
@@ -795,7 +795,7 @@ gb_internal AstPackage *get_core_package(CheckerInfo *info, String name) {
 	}
 
 	gbAllocator a = heap_allocator();
-	String path = get_fullpath_core_collection(a, name);
+	String path = get_fullpath_core_collection(a, name, nullptr);
 	defer (gb_free(a, path.text));
 	auto found = string_map_get(&info->packages, path);
 	if (found == nullptr) {
@@ -810,13 +810,16 @@ gb_internal AstPackage *get_core_package(CheckerInfo *info, String name) {
 	return *found;
 }
 
-gb_internal void add_package_dependency(CheckerContext *c, char const *package_name, char const *name) {
+gb_internal void add_package_dependency(CheckerContext *c, char const *package_name, char const *name, bool required=false) {
 	String n = make_string_c(name);
 	AstPackage *p = get_core_package(&c->checker->info, make_string_c(package_name));
 	Entity *e = scope_lookup(p->scope, n);
 	GB_ASSERT_MSG(e != nullptr, "%s", name);
 	GB_ASSERT(c->decl != nullptr);
 	e->flags |= EntityFlag_Used;
+	if (required) {
+		e->flags |= EntityFlag_Require;
+	}
 	add_dependency(c->info, c->decl, e);
 }
 
@@ -1254,6 +1257,9 @@ gb_internal void init_checker_info(CheckerInfo *i) {
 	mpsc_init(&i->required_global_variable_queue, a); // 1<<10);
 	mpsc_init(&i->required_foreign_imports_through_force_queue, a); // 1<<10);
 	mpsc_init(&i->intrinsics_entry_point_usage, a); // 1<<10); // just waste some memory here, even if it probably never used
+
+	string_map_init(&i->load_directory_cache);
+	map_init(&i->load_directory_map);
 }
 
 gb_internal void destroy_checker_info(CheckerInfo *i) {
@@ -1277,6 +1283,8 @@ gb_internal void destroy_checker_info(CheckerInfo *i) {
 
 	map_destroy(&i->objc_msgSend_types);
 	string_map_destroy(&i->load_file_cache);
+	string_map_destroy(&i->load_directory_cache);
+	map_destroy(&i->load_directory_map);
 }
 
 gb_internal CheckerContext make_checker_context(Checker *c) {
@@ -2567,7 +2575,7 @@ gb_internal void generate_minimum_dependency_set(Checker *c, Entity *start) {
 		str_lit("memmove"),
 	);
 
-	// FORCE_ADD_RUNTIME_ENTITIES(!build_context.tilde_backend,
+	FORCE_ADD_RUNTIME_ENTITIES(is_arch_wasm() && !build_context.tilde_backend,
 	// 	// Extended data type internal procedures
 	// 	str_lit("umodti3"),
 	// 	str_lit("udivti3"),
@@ -2584,10 +2592,10 @@ gb_internal void generate_minimum_dependency_set(Checker *c, Entity *start) {
 	// 	str_lit("gnu_f2h_ieee"),
 	// 	str_lit("extendhfsf2"),
 
-	// 	// WASM Specific
-	// 	str_lit("__ashlti3"),
-	// 	str_lit("__multi3"),
-	// );
+		// WASM Specific
+		str_lit("__ashlti3"),
+		str_lit("__multi3"),
+	);
 
 	FORCE_ADD_RUNTIME_ENTITIES(!build_context.no_rtti,
 		// Odin types
@@ -2954,6 +2962,16 @@ gb_internal void init_core_source_code_location(Checker *c) {
 	t_source_code_location = find_core_type(c, str_lit("Source_Code_Location"));
 	t_source_code_location_ptr = alloc_type_pointer(t_source_code_location);
 }
+
+gb_internal void init_core_load_directory_file(Checker *c) {
+	if (t_load_directory_file != nullptr) {
+		return;
+	}
+	t_load_directory_file = find_core_type(c, str_lit("Load_Directory_File"));
+	t_load_directory_file_ptr = alloc_type_pointer(t_load_directory_file);
+	t_load_directory_file_slice = alloc_type_slice(t_load_directory_file);
+}
+
 
 gb_internal void init_core_map_type(Checker *c) {
 	if (t_map_info != nullptr) {

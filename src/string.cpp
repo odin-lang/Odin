@@ -293,6 +293,18 @@ gb_internal String filename_from_path(String s) {
 	return make_string(nullptr, 0);
 }
 
+
+gb_internal String filename_without_directory(String s) {
+	isize j = 0;
+	for (j = s.len-1; j >= 0; j--) {
+		if (s[j] == '/' ||
+			s[j] == '\\') {
+			break;
+		}
+	}
+	return substring(s, gb_max(j+1, 0), s.len);
+}
+
 gb_internal String concatenate_strings(gbAllocator a, String const &x, String const &y) {
 	isize len = x.len+y.len;
 	u8 *data = gb_alloc_array(a, u8, len+1);

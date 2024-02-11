@@ -296,6 +296,14 @@ Source_Code_Location :: struct {
 	procedure:    string,
 }
 
+/*
+	Used by the built-in directory `#load_directory(path: string) -> []Load_Directory_File`
+*/
+Load_Directory_File :: struct {
+	name: string,
+	data: []byte, // immutable data
+}
+
 Assertion_Failure_Proc :: #type proc(prefix, message: string, loc: Source_Code_Location) -> !
 
 // Allocation Stuff

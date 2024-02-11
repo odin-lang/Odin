@@ -334,7 +334,7 @@ gb_internal void lb_add_callsite_force_inline(lbProcedure *p, lbValue ret_value)
 
 gb_internal lbValue lb_hasher_proc_for_type(lbModule *m, Type *type) {
 	type = core_type(type);
-	GB_ASSERT_MSG(is_type_valid_for_keys(type), "%s", type_to_string(type));
+	GB_ASSERT_MSG(is_type_comparable(type), "%s", type_to_string(type));
 
 	Type *pt = alloc_type_pointer(type);
 

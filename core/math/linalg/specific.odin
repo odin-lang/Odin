@@ -1271,6 +1271,43 @@ matrix2_adjoint :: proc{
 
 
 @(require_results)
+matrix2_rotate_f16 :: proc "contextless" (angle_radians: f16) -> Matrix2f16 {
+	c := math.cos(angle_radians)
+	s := math.sin(angle_radians)
+
+	return Matrix2f16{
+		c, -s,
+		s,  c,
+	}
+}
+@(require_results)
+matrix2_rotate_f32 :: proc "contextless" (angle_radians: f32) -> Matrix2f32 {
+	c := math.cos(angle_radians)
+	s := math.sin(angle_radians)
+
+	return Matrix2f32{
+		c, -s,
+		s,  c,
+	}
+}
+@(require_results)
+matrix2_rotate_f64 :: proc "contextless" (angle_radians: f64) -> Matrix2f64 {
+	c := math.cos(angle_radians)
+	s := math.sin(angle_radians)
+
+	return Matrix2f64{
+		c, -s,
+		s,  c,
+	}
+}
+matrix2_rotate :: proc{
+	matrix2_rotate_f16,
+	matrix2_rotate_f32,
+	matrix2_rotate_f64,
+}
+
+
+@(require_results)
 matrix3_from_quaternion_f16 :: proc "contextless" (q: Quaternionf16) -> (m: Matrix3f16) {
 	qxx := q.x * q.x
 	qyy := q.y * q.y

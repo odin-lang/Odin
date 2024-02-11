@@ -64,7 +64,7 @@ foreign webgl {
 	ClearColor    :: proc(r, g, b, a: f32) ---
 	ClearDepth    :: proc(x: Enum) ---
 	ClearStencil  :: proc(x: Enum) ---
-	ClearMask     :: proc(r, g, b, a: bool) ---
+	ColorMask     :: proc(r, g, b, a: bool) ---
 	CompileShader :: proc(shader: Shader) ---
 	
 	CompressedTexImage2D    :: proc(target: Enum, level: i32, internalformat: Enum, width, height: i32, border: i32, imageSize: int, data: rawptr) ---

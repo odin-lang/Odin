@@ -344,7 +344,7 @@ Camera2D :: struct {
 	zoom:     f32,                // Camera zoom (scaling), should be 1.0f by default
 }
 
-// Vertex data definning a mesh
+// Vertex data defining a mesh
 // NOTE: Data stored in CPU memory (and GPU)
 Mesh :: struct {
 	vertexCount:   c.int,         // Number of vertices stored in arrays
@@ -1051,8 +1051,8 @@ foreign lib {
 	LoadShader              :: proc(vsFileName, fsFileName: cstring) -> Shader ---                                                        // Load shader from files and bind default locations
 	LoadShaderFromMemory    :: proc(vsCode, fsCode: cstring) -> Shader ---                                                                // Load shader from code strings and bind default locations
 	IsShaderReady           :: proc(shader: Shader) -> bool ---                                                                           // Check if a shader is ready
-	GetShaderLocation       :: proc(shader: Shader, uniformName: cstring) -> c.int ---                                                    // Get shader uniform location
-	GetShaderLocationAttrib :: proc(shader: Shader, attribName: cstring) -> c.int ---                                                     // Get shader attribute location
+	GetShaderLocation       :: proc(shader: Shader, uniformName: cstring) -> ShaderLocationIndex ---                                                    // Get shader uniform location
+	GetShaderLocationAttrib :: proc(shader: Shader, attribName: cstring)  -> ShaderLocationIndex ---                                                    // Get shader attribute location
 	SetShaderValue          :: proc(shader: Shader, locIndex: ShaderLocationIndex, value: rawptr, uniformType: ShaderUniformDataType) ---               // Set shader uniform value
 	SetShaderValueV         :: proc(shader: Shader, locIndex: ShaderLocationIndex, value: rawptr, uniformType: ShaderUniformDataType, count: c.int) --- // Set shader uniform value vector
 	SetShaderValueMatrix    :: proc(shader: Shader, locIndex: ShaderLocationIndex, mat: Matrix) ---                                                     // Set shader uniform value (matrix 4x4)

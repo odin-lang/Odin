@@ -2,6 +2,7 @@ package webgl
 
 foreign import "webgl2"
 
+import "base:intrinsics"
 import glm "core:math/linalg/glsl"
 
 Query             :: distinct u32
@@ -135,42 +136,42 @@ UniformMatrix3x2fv :: proc "contextless" (location: i32, m: glm.mat3x2) {
 	foreign webgl2 {
 		_UniformMatrix3x2fv :: proc "contextless" (location: i32, addr: [^]f32) ---
 	}
-	array := matrix_flatten(m)
+	array := intrinsics.matrix_flatten(m)
 	_UniformMatrix3x2fv(location, &array[0])
 }
 UniformMatrix4x2fv :: proc "contextless" (location: i32, m: glm.mat4x2) {
 	foreign webgl2 {
 		_UniformMatrix4x2fv :: proc "contextless" (location: i32, addr: [^]f32) ---
 	}
-	array := matrix_flatten(m)
+	array := intrinsics.matrix_flatten(m)
 	_UniformMatrix4x2fv(location, &array[0])
 }
 UniformMatrix2x3fv :: proc "contextless" (location: i32, m: glm.mat2x3) {
 	foreign webgl2 {
 		_UniformMatrix2x3fv :: proc "contextless" (location: i32, addr: [^]f32) ---
 	}
-	array := matrix_flatten(m)
+	array := intrinsics.matrix_flatten(m)
 	_UniformMatrix2x3fv(location, &array[0])
 }
 UniformMatrix4x3fv :: proc "contextless" (location: i32, m: glm.mat4x3) {
 	foreign webgl2 {
 		_UniformMatrix4x3fv :: proc "contextless" (location: i32, addr: [^]f32) ---
 	}
-	array := matrix_flatten(m)
+	array := intrinsics.matrix_flatten(m)
 	_UniformMatrix4x3fv(location, &array[0])
 }
 UniformMatrix2x4fv :: proc "contextless" (location: i32, m: glm.mat2x4) {
 	foreign webgl2 {
 		_UniformMatrix2x4fv :: proc "contextless" (location: i32, addr: [^]f32) ---
 	}
-	array := matrix_flatten(m)
+	array := intrinsics.matrix_flatten(m)
 	_UniformMatrix2x4fv(location, &array[0])
 }
 UniformMatrix3x4fv :: proc "contextless" (location: i32, m: glm.mat3x4) {
 	foreign webgl2 {
 		_UniformMatrix3x4fv :: proc "contextless" (location: i32, addr: [^]f32) ---
 	}
-	array := matrix_flatten(m)
+	array := intrinsics.matrix_flatten(m)
 	_UniformMatrix3x4fv(location, &array[0])
 }
 

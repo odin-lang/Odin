@@ -39,7 +39,7 @@ tests/core/test_core_net
 tests/core/test_core_os_exit
 tests/core/test_core_reflect
 tests/core/test_core_strings
-tests/core/test_crypto_hash
+tests/core/test_crypto
 tests/core/test_hash
 tests/core/test_hxa
 tests/core/test_json
@@ -49,6 +49,7 @@ tests/core/test_varint
 tests/core/test_xml
 tests/core/test_core_slice
 tests/core/test_core_thread
+tests/core/test_core_runtime
 tests/vendor/vendor_botan
 # Visual Studio 2015 cache/options directory
 .vs/

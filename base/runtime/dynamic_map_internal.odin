@@ -841,6 +841,33 @@ __dynamic_map_get :: proc "contextless" (#no_alias m: ^Raw_Map, #no_alias info: 
 	}
 }
 
+__dynamic_map_get_key_and_value :: proc "contextless" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, h: Map_Hash, key: rawptr) -> (key_ptr, value_ptr: rawptr) {
+	if m.len == 0 {
+		return nil, nil
+	}
+	pos := map_desired_position(m^, h)
+	distance := uintptr(0)
+	mask := (uintptr(1) << map_log2_cap(m^)) - 1
+	ks, vs, hs, _, _ := map_kvh_data_dynamic(m^, info)
+	for {
+		element_hash := hs[pos]
+		if map_hash_is_empty(element_hash) {
+			return nil, nil
+		} else if distance > map_probe_distance(m^, element_hash, pos) {
+			return nil, nil
+		} else if element_hash == h {
+			other_key := rawptr(map_cell_index_dynamic(ks, info.ks, pos))
+			if info.key_equal(key, other_key) {
+				key_ptr   = other_key
+				value_ptr = rawptr(map_cell_index_dynamic(vs, info.vs, pos))
+				return
+			}
+		}
+		pos = (pos + 1) & mask
+		distance += 1
+	}
+}
+
 // IMPORTANT: USED WITHIN THE COMPILER
 __dynamic_map_check_grow :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, loc := #caller_location) -> (err: Allocator_Error, has_grown: bool) {
 	if m.len >= map_resize_threshold(m^) {
@@ -874,6 +901,30 @@ __dynamic_map_set :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_In
 	m.len += 1
 	return rawptr(result)
 }
+__dynamic_map_set_extra_without_hash :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, key, value: rawptr, loc := #caller_location) -> (prev_key_ptr, value_ptr: rawptr) {
+	return __dynamic_map_set_extra(m, info, info.key_hasher(key, map_seed(m^)), key, value, loc)
+}
+
+__dynamic_map_set_extra :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, hash: Map_Hash, key, value: rawptr, loc := #caller_location) -> (prev_key_ptr, value_ptr: rawptr) {
+	if prev_key_ptr, value_ptr = __dynamic_map_get_key_and_value(m, info, hash, key); value_ptr != nil {
+		intrinsics.mem_copy_non_overlapping(value_ptr, value, info.vs.size_of_type)
+		return
+	}
+
+	hash := hash
+	err, has_grown := __dynamic_map_check_grow(m, info, loc)
+	if err != nil {
+		return nil, nil
+	}
+	if has_grown {
+		hash = info.key_hasher(key, map_seed(m^))
+	}
+
+	result := map_insert_hash_dynamic(m, info, hash, uintptr(key), uintptr(value))
+	m.len += 1
+	return nil, rawptr(result)
+}
+
 
 // IMPORTANT: USED WITHIN THE COMPILER
 @(private)

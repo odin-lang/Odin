@@ -23,10 +23,6 @@ verify :: proc (tag, msg, key: []byte) -> bool {
 	ctx: Context = ---
 	derived_tag: [16]byte = ---
 
-	if len(tag) != TAG_SIZE {
-		panic("crypto/poly1305: invalid tag size")
-	}
-
 	init(&ctx, key)
 	update(&ctx, msg)
 	final(&ctx, derived_tag[:])

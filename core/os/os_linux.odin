@@ -569,12 +569,23 @@ close :: proc(fd: Handle) -> Errno {
 	return _get_errno(unix.sys_close(int(fd)))
 }
 
+// If you read or write more than `SSIZE_MAX` bytes, result is implementation defined (probably an error).
+// `SSIZE_MAX` is also implementation defined but usually the max of a `ssize_t` which is `max(int)` in Odin.
+// In practice a read/write call would probably never read/write these big buffers all at once,
+// which is why the number of bytes is returned and why there are procs that will call this in a
+// loop for you.
+// We set a max of 1GB to keep alignment and to be safe.
+@(private)
+MAX_RW :: 1 << 30
+
 read :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 	if len(data) == 0 {
 		return 0, ERROR_NONE
 	}
 
-	bytes_read := unix.sys_read(int(fd), raw_data(data), len(data))
+	to_read := min(uint(len(data)), MAX_RW)
+
+	bytes_read := unix.sys_read(int(fd), raw_data(data), to_read)
 	if bytes_read < 0 {
 		return -1, _get_errno(bytes_read)
 	}
@@ -586,18 +597,23 @@ write :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 		return 0, ERROR_NONE
 	}
 
-	bytes_written := unix.sys_write(int(fd), raw_data(data), len(data))
+	to_write := min(uint(len(data)), MAX_RW)
+
+	bytes_written := unix.sys_write(int(fd), raw_data(data), to_write)
 	if bytes_written < 0 {
 		return -1, _get_errno(bytes_written)
 	}
 	return bytes_written, ERROR_NONE
 }
+
 read_at :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Errno) {
 	if len(data) == 0 {
 		return 0, ERROR_NONE
 	}
 
-	bytes_read := unix.sys_pread(int(fd), raw_data(data), len(data), offset)
+	to_read := min(uint(len(data)), MAX_RW)
+
+	bytes_read := unix.sys_pread(int(fd), raw_data(data), to_read, offset)
 	if bytes_read < 0 {
 		return -1, _get_errno(bytes_read)
 	}
@@ -609,7 +625,9 @@ write_at :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Errno) {
 		return 0, ERROR_NONE
 	}
 
-	bytes_written := unix.sys_pwrite(int(fd), raw_data(data), uint(len(data)), offset)
+	to_write := min(uint(len(data)), MAX_RW)
+
+	bytes_written := unix.sys_pwrite(int(fd), raw_data(data), to_write, offset)
 	if bytes_written < 0 {
 		return -1, _get_errno(bytes_written)
 	}

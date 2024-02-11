@@ -230,6 +230,10 @@ gb_internal Ast *clone_ast(Ast *node, AstFile *f) {
 	case Ast_OrReturnExpr:
 		n->OrReturnExpr.expr = clone_ast(n->OrReturnExpr.expr, f);
 		break;
+	case Ast_OrBranchExpr:
+		n->OrBranchExpr.label = clone_ast(n->OrBranchExpr.label, f);
+		n->OrBranchExpr.expr  = clone_ast(n->OrBranchExpr.expr, f);
+		break;
 	case Ast_TypeAssertion:
 		n->TypeAssertion.expr = clone_ast(n->TypeAssertion.expr, f);
 		n->TypeAssertion.type = clone_ast(n->TypeAssertion.type, f);
@@ -2160,6 +2164,49 @@ gb_internal Array<Ast *> parse_union_variant_list(AstFile *f) {
 	return variants;
 }
 
+gb_internal void parser_check_polymorphic_record_parameters(AstFile *f, Ast *polymorphic_params) {
+	if (polymorphic_params == nullptr) {
+		return;
+	}
+	if (polymorphic_params->kind != Ast_FieldList) {
+		return;
+	}
+
+
+	enum {Unknown, Dollar, Bare} prefix = Unknown;
+	gb_unused(prefix);
+
+	for (Ast *field : polymorphic_params->FieldList.list) {
+		if (field == nullptr || field->kind != Ast_Field) {
+			continue;
+		}
+		for (Ast *name : field->Field.names) {
+			if (name == nullptr) {
+				continue;
+			}
+			bool error = false;
+
+			if (name->kind == Ast_Ident) {
+				switch (prefix) {
+				case Unknown: prefix = Bare; break;
+				case Dollar:  error = true;  break;
+				case Bare:                   break;
+				}
+			} else if (name->kind == Ast_PolyType) {
+				switch (prefix) {
+				case Unknown: prefix = Dollar; break;
+				case Dollar:                   break;
+				case Bare:    error = true;    break;
+				}
+			}
+			if (error) {
+				syntax_error(name, "Mixture of polymorphic $ names and normal identifiers are not allowed within record parameters");
+			}
+		}
+	}
+}
+
+
 gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 	Ast *operand = nullptr; // Operand
 	switch (f->curr_token.kind) {
@@ -2606,6 +2653,8 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 			decls = fields->FieldList.list;
 		}
 
+		parser_check_polymorphic_record_parameters(f, polymorphic_params);
+
 		return ast_struct_type(f, token, decls, name_count, polymorphic_params, is_packed, is_raw_union, no_copy, align, field_align, where_token, where_clauses);
 	} break;
 
@@ -2697,6 +2746,8 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 		Token open = expect_token_after(f, Token_OpenBrace, "union");
 		auto variants = parse_union_variant_list(f);
 		Token close = expect_closing_brace_of_field_list(f);
+
+		parser_check_polymorphic_record_parameters(f, polymorphic_params);
 
 		return ast_union_type(f, token, variants, polymorphic_params, align, union_kind, where_token, where_clauses);
 	} break;
@@ -5515,7 +5566,8 @@ gb_internal bool determine_path_from_string(BlockingMutex *file_mutex, Ast *node
 	if (has_windows_drive) {
 		*path = file_str;
 	} else {
-		String fullpath = string_trim_whitespace(get_fullpath_relative(permanent_allocator(), base_dir, file_str));
+		bool ok = false;
+		String fullpath = string_trim_whitespace(get_fullpath_relative(permanent_allocator(), base_dir, file_str, &ok));
 		*path = fullpath;
 	}
 	return true;
@@ -6137,7 +6189,11 @@ gb_internal ParseFileError parse_packages(Parser *p, String init_filename) {
 	{ // Add these packages serially and then process them parallel
 		TokenPos init_pos = {};
 		{
-			String s = get_fullpath_base_collection(permanent_allocator(), str_lit("runtime"));
+			bool ok = false;
+			String s = get_fullpath_base_collection(permanent_allocator(), str_lit("runtime"), &ok);
+			if (!ok) {
+				compiler_error("Unable to find The 'base:runtime' package. Is the ODIN_ROOT set up correctly?");
+			}
 			try_add_import_path(p, s, s, init_pos, Package_Runtime);
 		}
 
@@ -6145,7 +6201,11 @@ gb_internal ParseFileError parse_packages(Parser *p, String init_filename) {
 		p->init_fullpath = init_fullpath;
 
 		if (build_context.command_kind == Command_test) {
-			String s = get_fullpath_core_collection(permanent_allocator(), str_lit("testing"));
+			bool ok = false;
+			String s = get_fullpath_core_collection(permanent_allocator(), str_lit("testing"), &ok);
+			if (!ok) {
+				compiler_error("Unable to find The 'core:testing' package. Is the ODIN_ROOT set up correctly?");
+			}
 			try_add_import_path(p, s, s, init_pos, Package_Normal);
 		}
 		

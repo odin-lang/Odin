@@ -1,4 +1,6 @@
 gb_internal ParameterValue handle_parameter_value(CheckerContext *ctx, Type *in_type, Type **out_type_, Ast *expr, bool allow_caller_location);
+gb_internal Type *determine_type_from_polymorphic(CheckerContext *ctx, Type *poly_type, Operand const &operand);
+gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is_variadic_, isize *variadic_index_, bool *success_, isize *specialization_count_, Array<Operand> const *operands);
 
 gb_internal void populate_using_array_index(CheckerContext *ctx, Ast *node, AstField *field, Type *t, String name, i32 idx) {
 	t = base_type(t);
@@ -393,7 +395,6 @@ gb_internal Type *check_record_polymorphic_params(CheckerContext *ctx, Ast *poly
                                                   bool *is_polymorphic_,
                                                   Ast *node, Array<Operand> *poly_operands) {
 	Type *polymorphic_params_type = nullptr;
-	bool can_check_fields = true;
 	GB_ASSERT(is_polymorphic_ != nullptr);
 
 	if (polymorphic_params == nullptr) {
@@ -403,6 +404,17 @@ gb_internal Type *check_record_polymorphic_params(CheckerContext *ctx, Ast *poly
 		return polymorphic_params_type;
 	}
 
+
+	// bool is_variadic = false;
+	// isize variadic_index = 0;
+	// bool success = false;
+	// isize specialization_count = 0;
+	// polymorphic_params_type = check_get_params(ctx, ctx->scope, polymorphic_params, &is_variadic, &variadic_index, &success, &specialization_count, poly_operands);
+	// if (success) {
+	// 	return nullptr;
+	// }
+
+	bool can_check_fields = true;
 	ast_node(field_list, FieldList, polymorphic_params);
 	Slice<Ast *> params = field_list->list;
 	if (params.count != 0) {
@@ -417,11 +429,13 @@ gb_internal Type *check_record_polymorphic_params(CheckerContext *ctx, Ast *poly
 
 		auto entities = array_make<Entity *>(permanent_allocator(), 0, variable_count);
 
+		i32 field_group_index = -1;
 		for_array(i, params) {
 			Ast *param = params[i];
 			if (param->kind != Ast_Field) {
 				continue;
 			}
+			field_group_index += 1;
 			ast_node(p, Field, param);
 			Ast *type_expr = p->type;
 			Ast *default_value = unparen_expr(p->default_value);
@@ -481,7 +495,7 @@ gb_internal Type *check_record_polymorphic_params(CheckerContext *ctx, Ast *poly
 				type = t_invalid;
 			}
 
-			if (is_type_polymorphic_type) {
+			if (is_type_polymorphic_type && !is_type_proc(type)) {
 				gbString str = type_to_string(type);
 				error(params[i], "Parameter types cannot be polymorphic, got %s", str);
 				gb_string_free(str);
@@ -523,13 +537,18 @@ gb_internal Type *check_record_polymorphic_params(CheckerContext *ctx, Ast *poly
 						e->TypeName.is_type_alias = true;
 						e->flags |= EntityFlag_PolyConst;
 					} else {
-						if (is_type_polymorphic(base_type(operand.type))) {
+						Type *t = operand.type;
+						if (is_type_proc(type)) {
+							t = determine_type_from_polymorphic(ctx, type, operand);
+						}
+						if (is_type_polymorphic(base_type(t))) {
 							*is_polymorphic_ = true;
 							can_check_fields = false;
 						}
 						if (e == nullptr) {
-							e = alloc_entity_constant(scope, token, operand.type, operand.value);
+							e = alloc_entity_const_param(scope, token, t, operand.value, is_type_polymorphic(t));
 							e->Constant.param_value = param_value;
+							e->Constant.field_group_index = field_group_index;
 						}
 					}
 				} else {
@@ -538,7 +557,8 @@ gb_internal Type *check_record_polymorphic_params(CheckerContext *ctx, Ast *poly
 						e->TypeName.is_type_alias = true;
 						e->flags |= EntityFlag_PolyConst;
 					} else {
-						e = alloc_entity_constant(scope, token, type, param_value.value);
+						e = alloc_entity_const_param(scope, token, type, param_value.value, is_type_polymorphic(type));
+						e->Constant.field_group_index = field_group_index;
 						e->Constant.param_value = param_value;
 					}
 				}
@@ -559,7 +579,6 @@ gb_internal Type *check_record_polymorphic_params(CheckerContext *ctx, Ast *poly
 	if (!*is_polymorphic_) {
 		*is_polymorphic_ = polymorphic_params != nullptr && poly_operands == nullptr;
 	}
-
 	return polymorphic_params_type;
 }
 
