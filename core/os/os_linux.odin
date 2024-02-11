@@ -1174,7 +1174,7 @@ copy_file :: proc(src: string, dst: string, overwrite: bool = false) -> Errno {
 		if read_err != ERROR_NONE {
 			return read_err
 		} else if (bytes_read == 0) {
-			break;
+			break
 		}
 
 		total_written := 0
