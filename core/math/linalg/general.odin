@@ -172,11 +172,21 @@ projection :: proc "contextless" (x, normal: $T/[$N]$E) -> T where IS_NUMERIC(E)
 }
 
 @(require_results)
-identity :: proc "contextless" ($T: typeid/[$N][N]$E) -> (m: T) #no_bounds_check {
+identity_array_based_matrix :: proc "contextless" ($T: typeid/[$N][N]$E) -> (m: T) #no_bounds_check {
 	for i in 0..<N {
 		m[i][i] = E(1)
 	}
 	return m
+}
+
+@(require_results)
+identity_matrix :: proc "contextless" ($T: typeid/matrix[$N, N]$E) -> T #no_bounds_check {
+	return 1
+}
+
+identity :: proc{
+	identity_array_based_matrix,
+	identity_matrix,
 }
 
 transpose :: intrinsics.transpose
