@@ -492,7 +492,6 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 			}
 		}
 
-		return nil
 	case:
 		return UNSUPPORTED_TYPE
 	}
