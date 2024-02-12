@@ -2265,6 +2265,35 @@ gb_internal void init_map_internal_types(Type *type) {
 	GB_ASSERT(key != nullptr);
 	GB_ASSERT(value != nullptr);
 
+	Scope *metadata_scope = create_scope(nullptr, nullptr);
+
+	Type *metadata_type = alloc_type_struct();
+	metadata_type->Struct.fields = slice_make<Entity *>(permanent_allocator(), 3);
+	metadata_type->Struct.fields[0] = alloc_entity_field(metadata_scope, make_token_ident("key"),    key,       false, 0, EntityState_Resolved);
+	metadata_type->Struct.fields[1] = alloc_entity_field(metadata_scope, make_token_ident("value"),  value,     false, 1, EntityState_Resolved);
+	metadata_type->Struct.fields[2] = alloc_entity_field(metadata_scope, make_token_ident("hash"),   t_uintptr, false, 2, EntityState_Resolved);
+	metadata_type->Struct.scope = metadata_scope;
+
+	gb_unused(type_size_of(metadata_type));
+
+	// NOTE(bill): [0]^struct{key: Key, value: Value, hash: uintptr}
+	// This is a zero array to a pointer to keep the alignment to that of a pointer, and not effective the size of the final struct
+	metadata_type = alloc_type_array(alloc_type_pointer(metadata_type), 0);;
+
+
+	Scope *scope = create_scope(nullptr, nullptr);
+	Type *debug_type = alloc_type_struct();
+	debug_type->Struct.fields = slice_make<Entity *>(permanent_allocator(), 4);
+	debug_type->Struct.fields[0] = alloc_entity_field(scope, make_token_ident("data"),       t_uintptr,     false, 0, EntityState_Resolved);
+	debug_type->Struct.fields[1] = alloc_entity_field(scope, make_token_ident("len"),        t_int,         false, 1, EntityState_Resolved);
+	debug_type->Struct.fields[2] = alloc_entity_field(scope, make_token_ident("allocator"),  t_allocator,   false, 2, EntityState_Resolved);
+	debug_type->Struct.fields[3] = alloc_entity_field(scope, make_token_ident("__metadata"), metadata_type, false, 3, EntityState_Resolved);
+	debug_type->Struct.scope = scope;
+
+	gb_unused(type_size_of(debug_type));
+
+	type->Map.debug_metadata_type = debug_type;
+
 	type->Map.lookup_result_type = make_optional_ok_type(value);
 }
 

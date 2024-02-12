@@ -231,6 +231,7 @@ struct TypeProc {
 		Type *key;                                        \
 		Type *value;                                      \
 		Type *lookup_result_type;                         \
+		Type *debug_metadata_type;                        \
 	})                                                        \
 	TYPE_KIND(Struct,  TypeStruct)                            \
 	TYPE_KIND(Union,   TypeUnion)                             \

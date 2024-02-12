@@ -710,7 +710,7 @@ gb_internal void lb_debug_complete_types(lbModule *m) {
 
 			case Type_Map:
 				GB_ASSERT(t_raw_map != nullptr);
-				bt = base_type(t_raw_map);
+				bt = base_type(t->Map.debug_metadata_type);
 				/*fallthrough*/
 			case Type_Struct:
 				if (file == nullptr) {
