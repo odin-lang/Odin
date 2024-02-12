@@ -212,7 +212,7 @@ test_marshalling :: proc(t: ^testing.T) {
 		ev(t, derr, nil)
 		defer cbor.destroy(decoded)
 
-		diagnosis, eerr := cbor.diagnose(decoded)
+		diagnosis, eerr := cbor.to_diagnostic_format(decoded)
 		ev(t, eerr, nil)
 		defer delete(diagnosis)
 
@@ -379,7 +379,7 @@ test_marshalling_maybe :: proc(t: ^testing.T) {
 	val, derr := cbor.decode(string(data))
 	expect_value(t, derr, nil)
 
-	expect_value(t, cbor.diagnose(val), "1")
+	expect_value(t, cbor.to_diagnostic_format(val), "1")
 	
 	maybe_dest: Maybe(int)
 	uerr := cbor.unmarshal(string(data), &maybe_dest)
@@ -396,7 +396,7 @@ test_marshalling_nil_maybe :: proc(t: ^testing.T) {
 	val, derr := cbor.decode(string(data))
 	expect_value(t, derr, nil)
 
-	expect_value(t, cbor.diagnose(val), "nil")
+	expect_value(t, cbor.to_diagnostic_format(val), "nil")
 	
 	maybe_dest: Maybe(int)
 	uerr := cbor.unmarshal(string(data), &maybe_dest)
@@ -432,7 +432,7 @@ test_marshalling_union :: proc(t: ^testing.T) {
 		val, derr := cbor.decode(string(data))
 		expect_value(t, derr, nil)
 
-		expect_value(t, cbor.diagnose(val, -1), `1010(["My_Distinct", "Hello, World!"])`)
+		expect_value(t, cbor.to_diagnostic_format(val, -1), `1010(["My_Distinct", "Hello, World!"])`)
 
 		dest: My_Union
 		uerr := cbor.unmarshal(string(data), &dest)
@@ -455,7 +455,7 @@ test_marshalling_union :: proc(t: ^testing.T) {
 		val, derr := cbor.decode(string(data))
 		expect_value(t, derr, nil)
 
-		expect_value(t, cbor.diagnose(val, -1), `1010(["My_Struct", {"my_enum": 1}])`)
+		expect_value(t, cbor.to_diagnostic_format(val, -1), `1010(["My_Struct", {"my_enum": 1}])`)
 
 		dest: My_Union_No_Nil
 		uerr := cbor.unmarshal(string(data), &dest)
@@ -810,7 +810,7 @@ expect_decoding :: proc(t: ^testing.T, encoded: string, decoded: string, type: t
 	expect_value(t, reflect.union_variant_typeid(res), type, loc)
     expect_value(t, err, nil, loc)
 
-	str := cbor.diagnose(res, padding=-1)
+	str := cbor.to_diagnostic_format(res, padding=-1)
 	defer delete(str)
 
     expect_value(t, str, decoded, loc)
@@ -825,7 +825,7 @@ expect_tag :: proc(t: ^testing.T, encoded: string, nr: cbor.Tag_Number, value_de
 	if tag, is_tag := res.(^cbor.Tag); is_tag {
 		expect_value(t, tag.number, nr, loc)
 
-		str := cbor.diagnose(tag, padding=-1)
+		str := cbor.to_diagnostic_format(tag, padding=-1)
 		defer delete(str)
 
 		expect_value(t, str, value_decoded, loc)

@@ -117,8 +117,8 @@ Example:
 		assert(derr == nil)
 		defer cbor.destroy(decoded)
 
-		// Turn the CBOR into a human readable representation.
-		diagnosis, eerr := cbor.diagnose(decoded)
+		// Turn the CBOR into a human readable representation defined as the diagnostic format in [[RFC 8949 Section 8;https://www.rfc-editor.org/rfc/rfc8949.html#name-diagnostic-notation]].
+		diagnosis, eerr := cbor.to_diagnostic_format(decoded)
 		assert(eerr == nil)
 		defer delete(diagnosis)
 

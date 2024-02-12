@@ -307,23 +307,23 @@ destroy :: proc(val: Value, allocator := context.allocator) {
 }
 
 /*
-diagnose either writes or returns a human-readable representation of the value,
-optionally formatted, defined as the diagnostic format in section 8 of RFC 8949.
+to_diagnostic_format either writes or returns a human-readable representation of the value,
+optionally formatted, defined as the diagnostic format in [[RFC 8949 Section 8;https://www.rfc-editor.org/rfc/rfc8949.html#name-diagnostic-notation]].
 
 Incidentally, if the CBOR does not contain any of the additional types defined on top of JSON
 this will also be valid JSON.
 */
-diagnose :: proc {
-	diagnostic_string,
-	diagnose_to_writer,
+to_diagnostic_format :: proc {
+	to_diagnostic_format_string,
+	to_diagnostic_format_writer,
 }
 
 // Turns the given CBOR value into a human-readable string.
 // See docs on the proc group `diagnose` for more info.
-diagnostic_string :: proc(val: Value, padding := 0, allocator := context.allocator) -> (string, mem.Allocator_Error) #optional_allocator_error {
+to_diagnostic_format_string :: proc(val: Value, padding := 0, allocator := context.allocator) -> (string, mem.Allocator_Error) #optional_allocator_error {
 	b := strings.builder_make(allocator)
 	w := strings.to_stream(&b)
-	err := diagnose_to_writer(w, val, padding)
+	err := to_diagnostic_format_writer(w, val, padding)
 	if err == .EOF {
 		// The string builder stream only returns .EOF, and only if it can't write (out of memory).
 		return "", .Out_Of_Memory
@@ -335,7 +335,7 @@ diagnostic_string :: proc(val: Value, padding := 0, allocator := context.allocat
 
 // Writes the given CBOR value into the writer as human-readable text.
 // See docs on the proc group `diagnose` for more info.
-diagnose_to_writer :: proc(w: io.Writer, val: Value, padding := 0) -> io.Error {
+to_diagnostic_format_writer :: proc(w: io.Writer, val: Value, padding := 0) -> io.Error {
 	@(require_results)
 	indent :: proc(padding: int) -> int {
 		padding := padding
@@ -421,7 +421,7 @@ diagnose_to_writer :: proc(w: io.Writer, val: Value, padding := 0) -> io.Error {
 		newline(w, padding) or_return
 
 		for entry, i in v {
-			diagnose(w, entry, padding) or_return
+			to_diagnostic_format(w, entry, padding) or_return
 			if i != len(v)-1 {
 				comma(w, padding) or_return
 				newline(w, padding) or_return
@@ -444,9 +444,9 @@ diagnose_to_writer :: proc(w: io.Writer, val: Value, padding := 0) -> io.Error {
 		newline(w, padding) or_return
 
 		for entry, i in v {
-			diagnose(w, entry.key, padding) or_return
+			to_diagnostic_format(w, entry.key, padding) or_return
 			io.write_string(w, ": ") or_return
-			diagnose(w, entry.value, padding) or_return
+			to_diagnostic_format(w, entry.value, padding) or_return
 			if i != len(v)-1 {
 				comma(w, padding) or_return
 				newline(w, padding) or_return
@@ -460,7 +460,7 @@ diagnose_to_writer :: proc(w: io.Writer, val: Value, padding := 0) -> io.Error {
 	case ^Tag:
 		io.write_u64(w, v.number) or_return
 		io.write_string(w, "(") or_return
-		diagnose(w, v.value, padding) or_return
+		to_diagnostic_format(w, v.value, padding) or_return
 		io.write_string(w, ")") or_return
 	case Simple:
 		io.write_string(w, "simple(") or_return
