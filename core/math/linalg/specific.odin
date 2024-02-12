@@ -1575,7 +1575,7 @@ matrix3_rotate_f32 :: proc "contextless" (angle_radians: f32, v: Vector3f32) -> 
 	return rot
 }
 @(require_results)
-matrix3_rotate_f64 :: proc "contextless" (angle_radians: f64, v: Vector3f64) -> (rot: Matrix3f64) #no_bounds_check {
+matrix3_rotate_f64 :: proc "contextless" (angle_radians: f64, v: Vector3f64) -> (rot: Matrix3f64) {
 	c := math.cos(angle_radians)
 	s := math.sin(angle_radians)
 
@@ -1783,37 +1783,37 @@ matrix4_inverse :: proc{
 
 
 @(require_results)
-matrix4_minor_f16 :: proc "contextless" (m: Matrix4f16, row, col: int) -> f16 #no_bounds_check {
+matrix4_minor_f16 :: proc "contextless" (m: Matrix4f16, c, r: int) -> f16 #no_bounds_check {
 	cut_down: Matrix3f16
-	for j in 0..<3 {
-		x := j if j < col else j+1
-		for i in 0..<3 {
-			y := i if i < row else i+1
-			cut_down[i, j] = m[x, y]
+	for i in 0..<3 {
+		col := i if i < c else i+1
+		for j in 0..<3 {
+			row := j if j < r else j+1
+			cut_down[i][j] = m[col][row]
 		}
 	}
 	return matrix3_determinant(cut_down)
 }
 @(require_results)
-matrix4_minor_f32 :: proc "contextless" (m: Matrix4f32, row, col: int) -> f32 #no_bounds_check {
+matrix4_minor_f32 :: proc "contextless" (m: Matrix4f32, c, r: int) -> f32 #no_bounds_check {
 	cut_down: Matrix3f32
-	for j in 0..<3 {
-		x := j if j < col else j+1
-		for i in 0..<3 {
-			y := i if i < row else i+1
-			cut_down[i, j] = m[x, y]
+	for i in 0..<3 {
+		col := i if i < c else i+1
+		for j in 0..<3 {
+			row := j if j < r else j+1
+			cut_down[i][j] = m[col][row]
 		}
 	}
 	return matrix3_determinant(cut_down)
 }
 @(require_results)
-matrix4_minor_f64 :: proc "contextless" (m: Matrix4f64, row, col: int) -> f64 #no_bounds_check {
+matrix4_minor_f64 :: proc "contextless" (m: Matrix4f64, c, r: int) -> f64 #no_bounds_check {
 	cut_down: Matrix3f64
-	for j in 0..<3 {
-		x := j if j < col else j+1
-		for i in 0..<3 {
-			y := i if i < row else i+1
-			cut_down[i, j] = m[x, y]
+	for i in 0..<3 {
+		col := i if i < c else i+1
+		for j in 0..<3 {
+			row := j if j < r else j+1
+			cut_down[i][j] = m[col][row]
 		}
 	}
 	return matrix3_determinant(cut_down)
@@ -1826,24 +1826,24 @@ matrix4_minor :: proc{
 
 
 @(require_results)
-matrix4_cofactor_f16 :: proc "contextless" (m: Matrix4f16, row, col: int) -> f16 {
+matrix4_cofactor_f16 :: proc "contextless" (m: Matrix4f16, c, r: int) -> f16 {
 	sign, minor: f16
-	sign = 1 if (row + col) % 2 == 0 else -1
-	minor = matrix4_minor(m, row, col)
+	sign = 1 if (c + r) % 2 == 0 else -1
+	minor = matrix4_minor(m, c, r)
 	return sign * minor
 }
 @(require_results)
-matrix4_cofactor_f32 :: proc "contextless" (m: Matrix4f32, row, col: int) -> f32 {
+matrix4_cofactor_f32 :: proc "contextless" (m: Matrix4f32, c, r: int) -> f32 {
 	sign, minor: f32
-	sign = 1 if (row + col) % 2 == 0 else -1
-	minor = matrix4_minor(m, row, col)
+	sign = 1 if (c + r) % 2 == 0 else -1
+	minor = matrix4_minor(m, c, r)
 	return sign * minor
 }
 @(require_results)
-matrix4_cofactor_f64 :: proc "contextless" (m: Matrix4f64, row, col: int) -> f64 {
+matrix4_cofactor_f64 :: proc "contextless" (m: Matrix4f64, c, r: int) -> f64 {
 	sign, minor: f64
-	sign = 1 if (row + col) % 2 == 0 else -1
-	minor = matrix4_minor(m, row, col)
+	sign = 1 if (c + r) % 2 == 0 else -1
+	minor = matrix4_minor(m, c, r)
 	return sign * minor
 }
 matrix4_cofactor :: proc{
@@ -1857,7 +1857,7 @@ matrix4_cofactor :: proc{
 matrix4_adjoint_f16 :: proc "contextless" (m: Matrix4f16) -> (adjoint: Matrix4f16) #no_bounds_check {
 	for i in 0..<4 {
 		for j in 0..<4 {
-			adjoint[i, j] = matrix4_cofactor(m, i, j)
+			adjoint[i][j] = matrix4_cofactor(m, i, j)
 		}
 	}
 	return
@@ -1866,7 +1866,7 @@ matrix4_adjoint_f16 :: proc "contextless" (m: Matrix4f16) -> (adjoint: Matrix4f1
 matrix4_adjoint_f32 :: proc "contextless" (m: Matrix4f32) -> (adjoint: Matrix4f32) #no_bounds_check {
 	for i in 0..<4 {
 		for j in 0..<4 {
-			adjoint[i, j] = matrix4_cofactor(m, i, j)
+			adjoint[i][j] = matrix4_cofactor(m, i, j)
 		}
 	}
 	return
@@ -1875,7 +1875,7 @@ matrix4_adjoint_f32 :: proc "contextless" (m: Matrix4f32) -> (adjoint: Matrix4f3
 matrix4_adjoint_f64 :: proc "contextless" (m: Matrix4f64) -> (adjoint: Matrix4f64) #no_bounds_check {
 	for i in 0..<4 {
 		for j in 0..<4 {
-			adjoint[i, j] = matrix4_cofactor(m, i, j)
+			adjoint[i][j] = matrix4_cofactor(m, i, j)
 		}
 	}
 	return
@@ -1891,7 +1891,7 @@ matrix4_adjoint :: proc{
 matrix4_determinant_f16 :: proc "contextless" (m: Matrix4f16) -> (determinant: f16) #no_bounds_check {
 	adjoint := matrix4_adjoint(m)
 	for i in 0..<4 {
-		determinant += m[0, i] * adjoint[0, i]
+		determinant += m[i][0] * adjoint[i][0]
 	}
 	return
 }
@@ -1899,7 +1899,7 @@ matrix4_determinant_f16 :: proc "contextless" (m: Matrix4f16) -> (determinant: f
 matrix4_determinant_f32 :: proc "contextless" (m: Matrix4f32) -> (determinant: f32) #no_bounds_check {
 	adjoint := matrix4_adjoint(m)
 	for i in 0..<4 {
-		determinant += m[0, i] * adjoint[0, i]
+		determinant += m[i][0] * adjoint[i][0]
 	}
 	return
 }
@@ -1907,7 +1907,7 @@ matrix4_determinant_f32 :: proc "contextless" (m: Matrix4f32) -> (determinant: f
 matrix4_determinant_f64 :: proc "contextless" (m: Matrix4f64) -> (determinant: f64) #no_bounds_check {
 	adjoint := matrix4_adjoint(m)
 	for i in 0..<4 {
-		determinant += m[0, i] * adjoint[0, i]
+		determinant += m[i][0] * adjoint[i][0]
 	}
 	return
 }
@@ -1923,12 +1923,12 @@ matrix4_inverse_transpose_f16 :: proc "contextless" (m: Matrix4f16) -> (inverse_
 	adjoint := matrix4_adjoint(m)
 	determinant: f16 = 0
 	for i in 0..<4 {
-		determinant += m[0, i] * adjoint[0, i]
+		determinant += m[i][0] * adjoint[i][0]
 	}
 	inv_determinant := 1.0 / determinant
 	for i in 0..<4 {
 		for j in 0..<4 {
-			inverse_transpose[i, j] = adjoint[i, j] * inv_determinant
+			inverse_transpose[i][j] = adjoint[i][j] * inv_determinant
 		}
 	}
 	return
@@ -1938,12 +1938,12 @@ matrix4_inverse_transpose_f32 :: proc "contextless" (m: Matrix4f32) -> (inverse_
 	adjoint := matrix4_adjoint(m)
 	determinant: f32 = 0
 	for i in 0..<4 {
-		determinant += m[0, i] * adjoint[0, i]
+		determinant += m[i][0] * adjoint[i][0]
 	}
 	inv_determinant := 1.0 / determinant
 	for i in 0..<4 {
 		for j in 0..<4 {
-			inverse_transpose[i, j] = adjoint[i, j] * inv_determinant
+			inverse_transpose[i][j] = adjoint[i][j] * inv_determinant
 		}
 	}
 	return
@@ -1953,12 +1953,12 @@ matrix4_inverse_transpose_f64 :: proc "contextless" (m: Matrix4f64) -> (inverse_
 	adjoint := matrix4_adjoint(m)
 	determinant: f64 = 0
 	for i in 0..<4 {
-		determinant += m[0, i] * adjoint[0, i]
+		determinant += m[i][0] * adjoint[i][0]
 	}
 	inv_determinant := 1.0 / determinant
 	for i in 0..<4 {
 		for j in 0..<4 {
-			inverse_transpose[i, j] = adjoint[i, j] * inv_determinant
+			inverse_transpose[i][j] = adjoint[i][j] * inv_determinant
 		}
 	}
 	return
@@ -1971,27 +1971,27 @@ matrix4_inverse_transpose :: proc{
 
 
 @(require_results)
-matrix4_translate_f16 :: proc "contextless" (v: Vector3f16) -> Matrix4f16 {
+matrix4_translate_f16 :: proc "contextless" (v: Vector3f16) -> Matrix4f16 #no_bounds_check {
 	m := MATRIX4F16_IDENTITY
-	m[0, 3] = v[0]
-	m[1, 3] = v[1]
-	m[2, 3] = v[2]
+	m[3][0] = v[0]
+	m[3][1] = v[1]
+	m[3][2] = v[2]
 	return m
 }
 @(require_results)
-matrix4_translate_f32 :: proc "contextless" (v: Vector3f32) -> Matrix4f32 {
+matrix4_translate_f32 :: proc "contextless" (v: Vector3f32) -> Matrix4f32 #no_bounds_check {
 	m := MATRIX4F32_IDENTITY
-	m[0, 3] = v[0]
-	m[1, 3] = v[1]
-	m[2, 3] = v[2]
+	m[3][0] = v[0]
+	m[3][1] = v[1]
+	m[3][2] = v[2]
 	return m
 }
 @(require_results)
-matrix4_translate_f64 :: proc "contextless" (v: Vector3f64) -> Matrix4f64 {
+matrix4_translate_f64 :: proc "contextless" (v: Vector3f64) -> Matrix4f64 #no_bounds_check {
 	m := MATRIX4F64_IDENTITY
-	m[0, 3] = v[0]
-	m[1, 3] = v[1]
-	m[2, 3] = v[2]
+	m[3][0] = v[0]
+	m[3][1] = v[1]
+	m[3][2] = v[2]
 	return m
 }
 matrix4_translate :: proc{
@@ -2002,85 +2002,85 @@ matrix4_translate :: proc{
 
 
 @(require_results)
-matrix4_rotate_f16 :: proc "contextless" (angle_radians: f16, v: Vector3f16) -> (rot: Matrix4f16) #no_bounds_check {
+matrix4_rotate_f16 :: proc "contextless" (angle_radians: f16, v: Vector3f16) -> Matrix4f16 #no_bounds_check {
 	c := math.cos(angle_radians)
 	s := math.sin(angle_radians)
 
 	a := normalize(v)
 	t := a * (1-c)
 
-	rot = 1
+	rot := MATRIX4F16_IDENTITY
 
-	rot[0, 0] = c + t[0]*a[0]
-	rot[1, 0] = 0 + t[0]*a[1] + s*a[2]
-	rot[2, 0] = 0 + t[0]*a[2] - s*a[1]
-	rot[3, 0] = 0
+	rot[0][0] = c + t[0]*a[0]
+	rot[0][1] = 0 + t[0]*a[1] + s*a[2]
+	rot[0][2] = 0 + t[0]*a[2] - s*a[1]
+	rot[0][3] = 0
 
-	rot[0, 1] = 0 + t[1]*a[0] - s*a[2]
-	rot[1, 1] = c + t[1]*a[1]
-	rot[2, 1] = 0 + t[1]*a[2] + s*a[0]
-	rot[3, 1] = 0
+	rot[1][0] = 0 + t[1]*a[0] - s*a[2]
+	rot[1][1] = c + t[1]*a[1]
+	rot[1][2] = 0 + t[1]*a[2] + s*a[0]
+	rot[1][3] = 0
 
-	rot[0, 2] = 0 + t[2]*a[0] + s*a[1]
-	rot[1, 2] = 0 + t[2]*a[1] - s*a[0]
-	rot[2, 2] = c + t[2]*a[2]
-	rot[3, 2] = 0
+	rot[2][0] = 0 + t[2]*a[0] + s*a[1]
+	rot[2][1] = 0 + t[2]*a[1] - s*a[0]
+	rot[2][2] = c + t[2]*a[2]
+	rot[2][3] = 0
 
-	return
+	return rot
 }
 @(require_results)
-matrix4_rotate_f32 :: proc "contextless" (angle_radians: f32, v: Vector3f32) -> (rot: Matrix4f32) #no_bounds_check {
+matrix4_rotate_f32 :: proc "contextless" (angle_radians: f32, v: Vector3f32) -> Matrix4f32 #no_bounds_check {
 	c := math.cos(angle_radians)
 	s := math.sin(angle_radians)
 
 	a := normalize(v)
 	t := a * (1-c)
 
-	rot = 1
+	rot := MATRIX4F32_IDENTITY
 
-	rot[0, 0] = c + t[0]*a[0]
-	rot[1, 0] = 0 + t[0]*a[1] + s*a[2]
-	rot[2, 0] = 0 + t[0]*a[2] - s*a[1]
-	rot[3, 0] = 0
+	rot[0][0] = c + t[0]*a[0]
+	rot[0][1] = 0 + t[0]*a[1] + s*a[2]
+	rot[0][2] = 0 + t[0]*a[2] - s*a[1]
+	rot[0][3] = 0
 
-	rot[0, 1] = 0 + t[1]*a[0] - s*a[2]
-	rot[1, 1] = c + t[1]*a[1]
-	rot[2, 1] = 0 + t[1]*a[2] + s*a[0]
-	rot[3, 1] = 0
+	rot[1][0] = 0 + t[1]*a[0] - s*a[2]
+	rot[1][1] = c + t[1]*a[1]
+	rot[1][2] = 0 + t[1]*a[2] + s*a[0]
+	rot[1][3] = 0
 
-	rot[0, 2] = 0 + t[2]*a[0] + s*a[1]
-	rot[1, 2] = 0 + t[2]*a[1] - s*a[0]
-	rot[2, 2] = c + t[2]*a[2]
-	rot[3, 2] = 0
+	rot[2][0] = 0 + t[2]*a[0] + s*a[1]
+	rot[2][1] = 0 + t[2]*a[1] - s*a[0]
+	rot[2][2] = c + t[2]*a[2]
+	rot[2][3] = 0
 
-	return
+	return rot
 }
 @(require_results)
-matrix4_rotate_f64 :: proc "contextless" (angle_radians: f64, v: Vector3f64) -> (rot: Matrix4f64) #no_bounds_check {
+matrix4_rotate_f64 :: proc "contextless" (angle_radians: f64, v: Vector3f64) -> Matrix4f64 #no_bounds_check {
 	c := math.cos(angle_radians)
 	s := math.sin(angle_radians)
 
 	a := normalize(v)
 	t := a * (1-c)
 
-	rot = 1
+	rot := MATRIX4F64_IDENTITY
 
-	rot[0, 0] = c + t[0]*a[0]
-	rot[1, 0] = 0 + t[0]*a[1] + s*a[2]
-	rot[2, 0] = 0 + t[0]*a[2] - s*a[1]
-	rot[3, 0] = 0
+	rot[0][0] = c + t[0]*a[0]
+	rot[0][1] = 0 + t[0]*a[1] + s*a[2]
+	rot[0][2] = 0 + t[0]*a[2] - s*a[1]
+	rot[0][3] = 0
 
-	rot[0, 1] = 0 + t[1]*a[0] - s*a[2]
-	rot[1, 1] = c + t[1]*a[1]
-	rot[2, 1] = 0 + t[1]*a[2] + s*a[0]
-	rot[3, 1] = 0
+	rot[1][0] = 0 + t[1]*a[0] - s*a[2]
+	rot[1][1] = c + t[1]*a[1]
+	rot[1][2] = 0 + t[1]*a[2] + s*a[0]
+	rot[1][3] = 0
 
-	rot[0, 2] = 0 + t[2]*a[0] + s*a[1]
-	rot[1, 2] = 0 + t[2]*a[1] - s*a[0]
-	rot[2, 2] = c + t[2]*a[2]
-	rot[3, 2] = 0
+	rot[2][0] = 0 + t[2]*a[0] + s*a[1]
+	rot[2][1] = 0 + t[2]*a[1] - s*a[0]
+	rot[2][2] = c + t[2]*a[2]
+	rot[2][3] = 0
 
-	return
+	return rot
 }
 matrix4_rotate :: proc{
 	matrix4_rotate_f16,
@@ -2090,27 +2090,27 @@ matrix4_rotate :: proc{
 
 
 @(require_results)
-matrix4_scale_f16 :: proc "contextless" (v: Vector3f16) -> (m: Matrix4f16) {
-	m[0, 0] = v[0]
-	m[1, 1] = v[1]
-	m[2, 2] = v[2]
-	m[3, 3] = 1
+matrix4_scale_f16 :: proc "contextless" (v: Vector3f16) -> (m: Matrix4f16) #no_bounds_check {
+	m[0][0] = v[0]
+	m[1][1] = v[1]
+	m[2][2] = v[2]
+	m[3][3] = 1
 	return
 }
 @(require_results)
-matrix4_scale_f32 :: proc "contextless" (v: Vector3f32) -> (m: Matrix4f32) {
-	m[0, 0] = v[0]
-	m[1, 1] = v[1]
-	m[2, 2] = v[2]
-	m[3, 3] = 1
+matrix4_scale_f32 :: proc "contextless" (v: Vector3f32) -> (m: Matrix4f32) #no_bounds_check {
+	m[0][0] = v[0]
+	m[1][1] = v[1]
+	m[2][2] = v[2]
+	m[3][3] = 1
 	return
 }
 @(require_results)
-matrix4_scale_f64 :: proc "contextless" (v: Vector3f64) -> (m: Matrix4f64) {
-	m[0, 0] = v[0]
-	m[1, 1] = v[1]
-	m[2, 2] = v[2]
-	m[3, 3] = 1
+matrix4_scale_f64 :: proc "contextless" (v: Vector3f64) -> (m: Matrix4f64) #no_bounds_check {
+	m[0][0] = v[0]
+	m[1][1] = v[1]
+	m[2][2] = v[2]
+	m[3][3] = 1
 	return
 }
 matrix4_scale :: proc{
@@ -2225,7 +2225,7 @@ matrix4_look_at_from_fru :: proc{
 
 
 @(require_results)
-matrix4_perspective_f16 :: proc "contextless" (fovy, aspect, near, far: f16, flip_z_axis := true) -> (m: Matrix4f16) {
+matrix4_perspective_f16 :: proc "contextless" (fovy, aspect, near, far: f16, flip_z_axis := true) -> (m: Matrix4f16) #no_bounds_check {
 	tan_half_fovy := math.tan(0.5 * fovy)
 	m[0, 0] = 1 / (aspect*tan_half_fovy)
 	m[1, 1] = 1 / (tan_half_fovy)
@@ -2240,7 +2240,7 @@ matrix4_perspective_f16 :: proc "contextless" (fovy, aspect, near, far: f16, fli
 	return
 }
 @(require_results)
-matrix4_perspective_f32 :: proc "contextless" (fovy, aspect, near, far: f32, flip_z_axis := true) -> (m: Matrix4f32) {
+matrix4_perspective_f32 :: proc "contextless" (fovy, aspect, near, far: f32, flip_z_axis := true) -> (m: Matrix4f32) #no_bounds_check {
 	tan_half_fovy := math.tan(0.5 * fovy)
 	m[0, 0] = 1 / (aspect*tan_half_fovy)
 	m[1, 1] = 1 / (tan_half_fovy)
@@ -2255,7 +2255,7 @@ matrix4_perspective_f32 :: proc "contextless" (fovy, aspect, near, far: f32, fli
 	return
 }
 @(require_results)
-matrix4_perspective_f64 :: proc "contextless" (fovy, aspect, near, far: f64, flip_z_axis := true) -> (m: Matrix4f64) {
+matrix4_perspective_f64 :: proc "contextless" (fovy, aspect, near, far: f64, flip_z_axis := true) -> (m: Matrix4f64) #no_bounds_check {
 	tan_half_fovy := math.tan(0.5 * fovy)
 	m[0, 0] = 1 / (aspect*tan_half_fovy)
 	m[1, 1] = 1 / (tan_half_fovy)
@@ -2278,7 +2278,7 @@ matrix4_perspective :: proc{
 
 
 @(require_results)
-matrix_ortho3d_f16 :: proc "contextless" (left, right, bottom, top, near, far: f16, flip_z_axis := true) -> (m: Matrix4f16) {
+matrix_ortho3d_f16 :: proc "contextless" (left, right, bottom, top, near, far: f16, flip_z_axis := true) -> (m: Matrix4f16) #no_bounds_check {
 	m[0, 0] = +2 / (right - left)
 	m[1, 1] = +2 / (top - bottom)
 	m[2, 2] = +2 / (far - near)
@@ -2294,7 +2294,7 @@ matrix_ortho3d_f16 :: proc "contextless" (left, right, bottom, top, near, far: f
 	return
 }
 @(require_results)
-matrix_ortho3d_f32 :: proc "contextless" (left, right, bottom, top, near, far: f32, flip_z_axis := true) -> (m: Matrix4f32) {
+matrix_ortho3d_f32 :: proc "contextless" (left, right, bottom, top, near, far: f32, flip_z_axis := true) -> (m: Matrix4f32) #no_bounds_check {
 	m[0, 0] = +2 / (right - left)
 	m[1, 1] = +2 / (top - bottom)
 	m[2, 2] = +2 / (far - near)
@@ -2310,7 +2310,7 @@ matrix_ortho3d_f32 :: proc "contextless" (left, right, bottom, top, near, far: f
 	return
 }
 @(require_results)
-matrix_ortho3d_f64 :: proc "contextless" (left, right, bottom, top, near, far: f64, flip_z_axis := true) -> (m: Matrix4f64) {
+matrix_ortho3d_f64 :: proc "contextless" (left, right, bottom, top, near, far: f64, flip_z_axis := true) -> (m: Matrix4f64) #no_bounds_check {
 	m[0, 0] = +2 / (right - left)
 	m[1, 1] = +2 / (top - bottom)
 	m[2, 2] = +2 / (far - near)
@@ -2334,7 +2334,7 @@ matrix_ortho3d :: proc{
 
 
 @(require_results)
-matrix4_infinite_perspective_f16 :: proc "contextless" (fovy, aspect, near: f16, flip_z_axis := true) -> (m: Matrix4f16) {
+matrix4_infinite_perspective_f16 :: proc "contextless" (fovy, aspect, near: f16, flip_z_axis := true) -> (m: Matrix4f16) #no_bounds_check {
 	tan_half_fovy := math.tan(0.5 * fovy)
 	m[0, 0] = 1 / (aspect*tan_half_fovy)
 	m[1, 1] = 1 / (tan_half_fovy)
@@ -2349,7 +2349,7 @@ matrix4_infinite_perspective_f16 :: proc "contextless" (fovy, aspect, near: f16,
 	return
 }
 @(require_results)
-matrix4_infinite_perspective_f32 :: proc "contextless" (fovy, aspect, near: f32, flip_z_axis := true) -> (m: Matrix4f32) {
+matrix4_infinite_perspective_f32 :: proc "contextless" (fovy, aspect, near: f32, flip_z_axis := true) -> (m: Matrix4f32) #no_bounds_check {
 	tan_half_fovy := math.tan(0.5 * fovy)
 	m[0, 0] = 1 / (aspect*tan_half_fovy)
 	m[1, 1] = 1 / (tan_half_fovy)
@@ -2364,7 +2364,7 @@ matrix4_infinite_perspective_f32 :: proc "contextless" (fovy, aspect, near: f32,
 	return
 }
 @(require_results)
-matrix4_infinite_perspective_f64 :: proc "contextless" (fovy, aspect, near: f64, flip_z_axis := true) -> (m: Matrix4f64) {
+matrix4_infinite_perspective_f64 :: proc "contextless" (fovy, aspect, near: f64, flip_z_axis := true) -> (m: Matrix4f64) #no_bounds_check {
 	tan_half_fovy := math.tan(0.5 * fovy)
 	m[0, 0] = 1 / (aspect*tan_half_fovy)
 	m[1, 1] = 1 / (tan_half_fovy)
@@ -2387,19 +2387,19 @@ matrix4_infinite_perspective :: proc{
 
 
 @(require_results)
-matrix2_from_scalar_f16 :: proc "contextless" (f: f16) -> (m: Matrix2f16) {
+matrix2_from_scalar_f16 :: proc "contextless" (f: f16) -> (m: Matrix2f16) #no_bounds_check {
 	m[0, 0], m[1, 0] = f, 0
 	m[0, 1], m[1, 1] = 0, f
 	return
 }
 @(require_results)
-matrix2_from_scalar_f32 :: proc "contextless" (f: f32) -> (m: Matrix2f32) {
+matrix2_from_scalar_f32 :: proc "contextless" (f: f32) -> (m: Matrix2f32) #no_bounds_check {
 	m[0, 0], m[1, 0] = f, 0
 	m[0, 1], m[1, 1] = 0, f
 	return
 }
 @(require_results)
-matrix2_from_scalar_f64 :: proc "contextless" (f: f64) -> (m: Matrix2f64) {
+matrix2_from_scalar_f64 :: proc "contextless" (f: f64) -> (m: Matrix2f64) #no_bounds_check {
 	m[0, 0], m[1, 0] = f, 0
 	m[0, 1], m[1, 1] = 0, f
 	return
@@ -2412,21 +2412,21 @@ matrix2_from_scalar :: proc{
 
 
 @(require_results)
-matrix3_from_scalar_f16 :: proc "contextless" (f: f16) -> (m: Matrix3f16) {
+matrix3_from_scalar_f16 :: proc "contextless" (f: f16) -> (m: Matrix3f16) #no_bounds_check {
 	m[0, 0], m[1, 0], m[2, 0] = f, 0, 0
 	m[0, 1], m[1, 1], m[2, 1] = 0, f, 0
 	m[0, 2], m[1, 2], m[2, 2] = 0, 0, f
 	return
 }
 @(require_results)
-matrix3_from_scalar_f32 :: proc "contextless" (f: f32) -> (m: Matrix3f32) {
+matrix3_from_scalar_f32 :: proc "contextless" (f: f32) -> (m: Matrix3f32) #no_bounds_check {
 	m[0, 0], m[1, 0], m[2, 0] = f, 0, 0
 	m[0, 1], m[1, 1], m[2, 1] = 0, f, 0
 	m[0, 2], m[1, 2], m[2, 2] = 0, 0, f
 	return
 }
 @(require_results)
-matrix3_from_scalar_f64 :: proc "contextless" (f: f64) -> (m: Matrix3f64) {
+matrix3_from_scalar_f64 :: proc "contextless" (f: f64) -> (m: Matrix3f64) #no_bounds_check {
 	m[0, 0], m[1, 0], m[2, 0] = f, 0, 0
 	m[0, 1], m[1, 1], m[2, 1] = 0, f, 0
 	m[0, 2], m[1, 2], m[2, 2] = 0, 0, f
@@ -2440,7 +2440,7 @@ matrix3_from_scalar :: proc{
 
 
 @(require_results)
-matrix4_from_scalar_f16 :: proc "contextless" (f: f16) -> (m: Matrix4f16) {
+matrix4_from_scalar_f16 :: proc "contextless" (f: f16) -> (m: Matrix4f16) #no_bounds_check {
 	m[0, 0], m[1, 0], m[2, 0], m[3, 0] = f, 0, 0, 0
 	m[0, 1], m[1, 1], m[2, 1], m[3, 1] = 0, f, 0, 0
 	m[0, 2], m[1, 2], m[2, 2], m[3, 2] = 0, 0, f, 0
@@ -2448,7 +2448,7 @@ matrix4_from_scalar_f16 :: proc "contextless" (f: f16) -> (m: Matrix4f16) {
 	return
 }
 @(require_results)
-matrix4_from_scalar_f32 :: proc "contextless" (f: f32) -> (m: Matrix4f32) {
+matrix4_from_scalar_f32 :: proc "contextless" (f: f32) -> (m: Matrix4f32) #no_bounds_check {
 	m[0, 0], m[1, 0], m[2, 0], m[3, 0] = f, 0, 0, 0
 	m[0, 1], m[1, 1], m[2, 1], m[3, 1] = 0, f, 0, 0
 	m[0, 2], m[1, 2], m[2, 2], m[3, 2] = 0, 0, f, 0
@@ -2456,7 +2456,7 @@ matrix4_from_scalar_f32 :: proc "contextless" (f: f32) -> (m: Matrix4f32) {
 	return
 }
 @(require_results)
-matrix4_from_scalar_f64 :: proc "contextless" (f: f64) -> (m: Matrix4f64) {
+matrix4_from_scalar_f64 :: proc "contextless" (f: f64) -> (m: Matrix4f64) #no_bounds_check {
 	m[0, 0], m[1, 0], m[2, 0], m[3, 0] = f, 0, 0, 0
 	m[0, 1], m[1, 1], m[2, 1], m[3, 1] = 0, f, 0, 0
 	m[0, 2], m[1, 2], m[2, 2], m[3, 2] = 0, 0, f, 0
@@ -2471,19 +2471,19 @@ matrix4_from_scalar :: proc{
 
 
 @(require_results)
-matrix2_from_matrix3_f16 :: proc "contextless" (m: Matrix3f16) -> (r: Matrix2f16) {
+matrix2_from_matrix3_f16 :: proc "contextless" (m: Matrix3f16) -> (r: Matrix2f16) #no_bounds_check {
 	r[0, 0], r[1, 0] = m[0, 0], m[1, 0]
 	r[0, 1], r[1, 1] = m[0, 1], m[1, 1]
 	return
 }
 @(require_results)
-matrix2_from_matrix3_f32 :: proc "contextless" (m: Matrix3f32) -> (r: Matrix2f32) {
+matrix2_from_matrix3_f32 :: proc "contextless" (m: Matrix3f32) -> (r: Matrix2f32) #no_bounds_check {
 	r[0, 0], r[1, 0] = m[0, 0], m[1, 0]
 	r[0, 1], r[1, 1] = m[0, 1], m[1, 1]
 	return
 }
 @(require_results)
-matrix2_from_matrix3_f64 :: proc "contextless" (m: Matrix3f64) -> (r: Matrix2f64) {
+matrix2_from_matrix3_f64 :: proc "contextless" (m: Matrix3f64) -> (r: Matrix2f64) #no_bounds_check {
 	r[0, 0], r[1, 0] = m[0, 0], m[1, 0]
 	r[0, 1], r[1, 1] = m[0, 1], m[1, 1]
 	return
@@ -2496,19 +2496,19 @@ matrix2_from_matrix3 :: proc{
 
 
 @(require_results)
-matrix2_from_matrix4_f16 :: proc "contextless" (m: Matrix4f16) -> (r: Matrix2f16) {
+matrix2_from_matrix4_f16 :: proc "contextless" (m: Matrix4f16) -> (r: Matrix2f16) #no_bounds_check {
 	r[0, 0], r[1, 0] = m[0, 0], m[1, 0]
 	r[0, 1], r[1, 1] = m[0, 1], m[1, 1]
 	return
 }
 @(require_results)
-matrix2_from_matrix4_f32 :: proc "contextless" (m: Matrix4f32) -> (r: Matrix2f32) {
+matrix2_from_matrix4_f32 :: proc "contextless" (m: Matrix4f32) -> (r: Matrix2f32) #no_bounds_check {
 	r[0, 0], r[1, 0] = m[0, 0], m[1, 0]
 	r[0, 1], r[1, 1] = m[0, 1], m[1, 1]
 	return
 }
 @(require_results)
-matrix2_from_matrix4_f64 :: proc "contextless" (m: Matrix4f64) -> (r: Matrix2f64) {
+matrix2_from_matrix4_f64 :: proc "contextless" (m: Matrix4f64) -> (r: Matrix2f64) #no_bounds_check {
 	r[0, 0], r[1, 0] = m[0, 0], m[1, 0]
 	r[0, 1], r[1, 1] = m[0, 1], m[1, 1]
 	return
@@ -2521,21 +2521,21 @@ matrix2_from_matrix4 :: proc{
 
 
 @(require_results)
-matrix3_from_matrix2_f16 :: proc "contextless" (m: Matrix2f16) -> (r: Matrix3f16) {
+matrix3_from_matrix2_f16 :: proc "contextless" (m: Matrix2f16) -> (r: Matrix3f16) #no_bounds_check {
 	r[0, 0], r[1, 0], r[2, 0] = m[0, 0], m[1, 0], 0
 	r[0, 1], r[1, 1], r[2, 1] = m[0, 1], m[1, 1], 0
 	r[0, 2], r[1, 2], r[2, 2] =       0,       0, 1
 	return
 }
 @(require_results)
-matrix3_from_matrix2_f32 :: proc "contextless" (m: Matrix2f32) -> (r: Matrix3f32) {
+matrix3_from_matrix2_f32 :: proc "contextless" (m: Matrix2f32) -> (r: Matrix3f32) #no_bounds_check {
 	r[0, 0], r[1, 0], r[2, 0] = m[0, 0], m[1, 0], 0
 	r[0, 1], r[1, 1], r[2, 1] = m[0, 1], m[1, 1], 0
 	r[0, 2], r[1, 2], r[2, 2] =       0,       0, 1
 	return
 }
 @(require_results)
-matrix3_from_matrix2_f64 :: proc "contextless" (m: Matrix2f64) -> (r: Matrix3f64) {
+matrix3_from_matrix2_f64 :: proc "contextless" (m: Matrix2f64) -> (r: Matrix3f64) #no_bounds_check {
 	r[0, 0], r[1, 0], r[2, 0] = m[0, 0], m[1, 0], 0
 	r[0, 1], r[1, 1], r[2, 1] = m[0, 1], m[1, 1], 0
 	r[0, 2], r[1, 2], r[2, 2] =       0,       0, 1
@@ -2549,21 +2549,21 @@ matrix3_from_matrix2 :: proc{
 
 
 @(require_results)
-matrix3_from_matrix4_f16 :: proc "contextless" (m: Matrix4f16) -> (r: Matrix3f16) {
+matrix3_from_matrix4_f16 :: proc "contextless" (m: Matrix4f16) -> (r: Matrix3f16) #no_bounds_check {
 	r[0, 0], r[1, 0], r[2, 0] = m[0, 0], m[1, 0], m[2, 0]
 	r[0, 1], r[1, 1], r[2, 1] = m[0, 1], m[1, 1], m[2, 1]
 	r[0, 2], r[1, 2], r[2, 2] = m[0, 2], m[1, 2], m[2, 2]
 	return
 }
 @(require_results)
-matrix3_from_matrix4_f32 :: proc "contextless" (m: Matrix4f32) -> (r: Matrix3f32) {
+matrix3_from_matrix4_f32 :: proc "contextless" (m: Matrix4f32) -> (r: Matrix3f32) #no_bounds_check {
 	r[0, 0], r[1, 0], r[2, 0] = m[0, 0], m[1, 0], m[2, 0]
 	r[0, 1], r[1, 1], r[2, 1] = m[0, 1], m[1, 1], m[2, 1]
 	r[0, 2], r[1, 2], r[2, 2] = m[0, 2], m[1, 2], m[2, 2]
 	return
 }
 @(require_results)
-matrix3_from_matrix4_f64 :: proc "contextless" (m: Matrix4f64) -> (r: Matrix3f64) {
+matrix3_from_matrix4_f64 :: proc "contextless" (m: Matrix4f64) -> (r: Matrix3f64) #no_bounds_check {
 	r[0, 0], r[1, 0], r[2, 0] = m[0, 0], m[1, 0], m[2, 0]
 	r[0, 1], r[1, 1], r[2, 1] = m[0, 1], m[1, 1], m[2, 1]
 	r[0, 2], r[1, 2], r[2, 2] = m[0, 2], m[1, 2], m[2, 2]
@@ -2577,7 +2577,7 @@ matrix3_from_matrix4 :: proc{
 
 
 @(require_results)
-matrix4_from_matrix2_f16 :: proc "contextless" (m: Matrix2f16) -> (r: Matrix4f16) {
+matrix4_from_matrix2_f16 :: proc "contextless" (m: Matrix2f16) -> (r: Matrix4f16) #no_bounds_check {
 	r[0, 0], r[1, 0], r[2, 0], r[3, 0] = m[0, 0], m[1, 0], 0, 0
 	r[0, 1], r[1, 1], r[2, 1], r[3, 1] = m[0, 1], m[1, 1], 0, 0
 	r[0, 2], r[1, 2], r[2, 2], r[3, 2] =       0,       0, 1, 0
@@ -2585,7 +2585,7 @@ matrix4_from_matrix2_f16 :: proc "contextless" (m: Matrix2f16) -> (r: Matrix4f16
 	return
 }
 @(require_results)
-matrix4_from_matrix2_f32 :: proc "contextless" (m: Matrix2f32) -> (r: Matrix4f32) {
+matrix4_from_matrix2_f32 :: proc "contextless" (m: Matrix2f32) -> (r: Matrix4f32) #no_bounds_check {
 	r[0, 0], r[1, 0], r[2, 0], r[3, 0] = m[0, 0], m[1, 0], 0, 0
 	r[0, 1], r[1, 1], r[2, 1], r[3, 1] = m[0, 1], m[1, 1], 0, 0
 	r[0, 2], r[1, 2], r[2, 2], r[3, 2] =       0,       0, 1, 0
@@ -2593,7 +2593,7 @@ matrix4_from_matrix2_f32 :: proc "contextless" (m: Matrix2f32) -> (r: Matrix4f32
 	return
 }
 @(require_results)
-matrix4_from_matrix2_f64 :: proc "contextless" (m: Matrix2f64) -> (r: Matrix4f64) {
+matrix4_from_matrix2_f64 :: proc "contextless" (m: Matrix2f64) -> (r: Matrix4f64) #no_bounds_check {
 	r[0, 0], r[1, 0], r[2, 0], r[3, 0] = m[0, 0], m[1, 0], 0, 0
 	r[0, 1], r[1, 1], r[2, 1], r[3, 1] = m[0, 1], m[1, 1], 0, 0
 	r[0, 2], r[1, 2], r[2, 2], r[3, 2] =       0,       0, 1, 0
@@ -2608,7 +2608,7 @@ matrix4_from_matrix2 :: proc{
 
 
 @(require_results)
-matrix4_from_matrix3_f16 :: proc "contextless" (m: Matrix3f16) -> (r: Matrix4f16) {
+matrix4_from_matrix3_f16 :: proc "contextless" (m: Matrix3f16) -> (r: Matrix4f16) #no_bounds_check {
 	r[0, 0], r[1, 0], r[2, 0], r[3, 0] = m[0, 0], m[1, 0], m[2, 0], 0
 	r[0, 1], r[1, 1], r[2, 1], r[3, 1] = m[0, 1], m[1, 1], m[2, 1], 0
 	r[0, 2], r[1, 2], r[2, 2], r[3, 2] = m[0, 2], m[1, 2], m[2, 2], 0
@@ -2616,7 +2616,7 @@ matrix4_from_matrix3_f16 :: proc "contextless" (m: Matrix3f16) -> (r: Matrix4f16
 	return
 }
 @(require_results)
-matrix4_from_matrix3_f32 :: proc "contextless" (m: Matrix3f32) -> (r: Matrix4f32) {
+matrix4_from_matrix3_f32 :: proc "contextless" (m: Matrix3f32) -> (r: Matrix4f32) #no_bounds_check {
 	r[0, 0], r[1, 0], r[2, 0], r[3, 0] = m[0, 0], m[1, 0], m[2, 0], 0
 	r[0, 1], r[1, 1], r[2, 1], r[3, 1] = m[0, 1], m[1, 1], m[2, 1], 0
 	r[0, 2], r[1, 2], r[2, 2], r[3, 2] = m[0, 2], m[1, 2], m[2, 2], 0
@@ -2624,7 +2624,7 @@ matrix4_from_matrix3_f32 :: proc "contextless" (m: Matrix3f32) -> (r: Matrix4f32
 	return
 }
 @(require_results)
-matrix4_from_matrix3_f64 :: proc "contextless" (m: Matrix3f64) -> (r: Matrix4f64) {
+matrix4_from_matrix3_f64 :: proc "contextless" (m: Matrix3f64) -> (r: Matrix4f64) #no_bounds_check {
 	r[0, 0], r[1, 0], r[2, 0], r[3, 0] = m[0, 0], m[1, 0], m[2, 0], 0
 	r[0, 1], r[1, 1], r[2, 1], r[3, 1] = m[0, 1], m[1, 1], m[2, 1], 0
 	r[0, 2], r[1, 2], r[2, 2], r[3, 2] = m[0, 2], m[1, 2], m[2, 2], 0
@@ -2710,7 +2710,7 @@ to_quaternion :: proc{
 
 
 @(require_results)
-matrix2_orthonormalize_f16 :: proc "contextless" (m: Matrix2f16) -> (r: Matrix2f16) {
+matrix2_orthonormalize_f16 :: proc "contextless" (m: Matrix2f16) -> (r: Matrix2f16) #no_bounds_check {
 	r[0] = normalize(m[0])
 
 	d0 := dot(r[0], r[1])
@@ -2720,7 +2720,7 @@ matrix2_orthonormalize_f16 :: proc "contextless" (m: Matrix2f16) -> (r: Matrix2f
 	return
 }
 @(require_results)
-matrix2_orthonormalize_f32 :: proc "contextless" (m: Matrix2f32) -> (r: Matrix2f32) {
+matrix2_orthonormalize_f32 :: proc "contextless" (m: Matrix2f32) -> (r: Matrix2f32) #no_bounds_check {
 	r[0] = normalize(m[0])
 
 	d0 := dot(r[0], r[1])
@@ -2730,7 +2730,7 @@ matrix2_orthonormalize_f32 :: proc "contextless" (m: Matrix2f32) -> (r: Matrix2f
 	return
 }
 @(require_results)
-matrix2_orthonormalize_f64 :: proc "contextless" (m: Matrix2f64) -> (r: Matrix2f64) {
+matrix2_orthonormalize_f64 :: proc "contextless" (m: Matrix2f64) -> (r: Matrix2f64) #no_bounds_check {
 	r[0] = normalize(m[0])
 
 	d0 := dot(r[0], r[1])
@@ -2747,7 +2747,7 @@ matrix2_orthonormalize :: proc{
 
 
 @(require_results)
-matrix3_orthonormalize_f16 :: proc "contextless" (m: Matrix3f16) -> (r: Matrix3f16) {
+matrix3_orthonormalize_f16 :: proc "contextless" (m: Matrix3f16) -> (r: Matrix3f16) #no_bounds_check {
 	r[0] = normalize(m[0])
 
 	d0 := dot(r[0], r[1])
@@ -2762,7 +2762,7 @@ matrix3_orthonormalize_f16 :: proc "contextless" (m: Matrix3f16) -> (r: Matrix3f
 	return
 }
 @(require_results)
-matrix3_orthonormalize_f32 :: proc "contextless" (m: Matrix3f32) -> (r: Matrix3f32) {
+matrix3_orthonormalize_f32 :: proc "contextless" (m: Matrix3f32) -> (r: Matrix3f32) #no_bounds_check {
 	r[0] = normalize(m[0])
 
 	d0 := dot(r[0], r[1])
@@ -2777,7 +2777,7 @@ matrix3_orthonormalize_f32 :: proc "contextless" (m: Matrix3f32) -> (r: Matrix3f
 	return
 }
 @(require_results)
-matrix3_orthonormalize_f64 :: proc "contextless" (m: Matrix3f64) -> (r: Matrix3f64) {
+matrix3_orthonormalize_f64 :: proc "contextless" (m: Matrix3f64) -> (r: Matrix3f64) #no_bounds_check {
 	r[0] = normalize(m[0])
 
 	d0 := dot(r[0], r[1])

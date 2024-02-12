@@ -472,7 +472,7 @@ matrix3x3_determinant :: proc "contextless" (m: $M/matrix[3, 3]$T) -> (det: T) #
 @(require_results)
 matrix4x4_determinant :: proc "contextless" (m: $M/matrix[4, 4]$T) -> (det: T) #no_bounds_check {
 	a := adjugate(m)
-	#no_bounds_check for i in 0..<4 {
+	for i in 0..<4 {
 		det += m[0, i] * a[0, i]
 	}
 	return
