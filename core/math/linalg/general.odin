@@ -306,7 +306,7 @@ angle_between :: proc{
 // Splines
 
 @(require_results)
-vector_slerp :: proc "contextless" (x, y: $T/[$N]$E, a: E) -> T #no_bounds_check {
+vector_slerp :: proc "contextless" (x, y: $T/[$N]$E, a: E) -> T {
 	cos_alpha := dot(x, y)
 	alpha := math.acos(cos_alpha)
 	sin_alpha := math.sin(alpha)
@@ -318,7 +318,7 @@ vector_slerp :: proc "contextless" (x, y: $T/[$N]$E, a: E) -> T #no_bounds_check
 }
 
 @(require_results)
-catmull_rom :: proc "contextless" (v1, v2, v3, v4: $T/[$N]$E, s: E) -> T #no_bounds_check {
+catmull_rom :: proc "contextless" (v1, v2, v3, v4: $T/[$N]$E, s: E) -> T {
 	s2 := s*s
 	s3 := s2*s
 
@@ -331,7 +331,7 @@ catmull_rom :: proc "contextless" (v1, v2, v3, v4: $T/[$N]$E, s: E) -> T #no_bou
 }
 
 @(require_results)
-hermite :: proc "contextless" (v1, t1, v2, t2: $T/[$N]$E, s: E) -> T #no_bounds_check {
+hermite :: proc "contextless" (v1, t1, v2, t2: $T/[$N]$E, s: E) -> T {
 	s2 := s*s
 	s3 := s2*s
 
@@ -344,7 +344,7 @@ hermite :: proc "contextless" (v1, t1, v2, t2: $T/[$N]$E, s: E) -> T #no_bounds_
 }
 
 @(require_results)
-cubic :: proc "contextless" (v1, v2, v3, v4: $T/[$N]$E, s: E) -> T #no_bounds_check {
+cubic :: proc "contextless" (v1, v2, v3, v4: $T/[$N]$E, s: E) -> T {
 	return ((v1 * s + v2) * s + v3) * s + v4
 }
 
@@ -425,12 +425,12 @@ inverse :: proc{
 }
 
 @(require_results)
-hermitian_adjoint :: proc "contextless" (m: $M/matrix[$N, N]$T) -> M where intrinsics.type_is_complex(T), N >= 1 #no_bounds_check {
+hermitian_adjoint :: proc "contextless" (m: $M/matrix[$N, N]$T) -> M where intrinsics.type_is_complex(T), N >= 1 {
 	return conj(transpose(m))
 }
 
 @(require_results)
-trace :: proc "contextless" (m: $M/matrix[$N, N]$T) -> (trace: T) #no_bounds_check {
+trace :: proc "contextless" (m: $M/matrix[$N, N]$T) -> (trace: T) {
 	for i in 0..<N {
 		trace += m[i, i]
 	}
@@ -438,7 +438,7 @@ trace :: proc "contextless" (m: $M/matrix[$N, N]$T) -> (trace: T) #no_bounds_che
 }
 
 @(require_results)
-matrix_minor :: proc "contextless" (m: $M/matrix[$N, N]$T, #any_int row, column: int) -> (minor: T) where N > 1 #no_bounds_check {
+matrix_minor :: proc "contextless" (m: $M/matrix[$N, N]$T, #any_int row, column: int) -> (minor: T) where N > 1 {
 	K :: int(N-1)
 	cut_down: matrix[K, K]T
 	for col_idx in 0..<K {
@@ -454,23 +454,23 @@ matrix_minor :: proc "contextless" (m: $M/matrix[$N, N]$T, #any_int row, column:
 
 
 @(require_results)
-matrix1x1_determinant :: proc "contextless" (m: $M/matrix[1, 1]$T) -> (det: T) #no_bounds_check {
+matrix1x1_determinant :: proc "contextless" (m: $M/matrix[1, 1]$T) -> (det: T) {
 	return m[0, 0]
 }
 
 @(require_results)
-matrix2x2_determinant :: proc "contextless" (m: $M/matrix[2, 2]$T) -> (det: T) #no_bounds_check {
+matrix2x2_determinant :: proc "contextless" (m: $M/matrix[2, 2]$T) -> (det: T) {
 	return m[0, 0]*m[1, 1] - m[0, 1]*m[1, 0]
 }
 @(require_results)
-matrix3x3_determinant :: proc "contextless" (m: $M/matrix[3, 3]$T) -> (det: T) #no_bounds_check {
+matrix3x3_determinant :: proc "contextless" (m: $M/matrix[3, 3]$T) -> (det: T) {
 	a := +m[0, 0] * (m[1, 1] * m[2, 2] - m[1, 2] * m[2, 1])
 	b := -m[0, 1] * (m[1, 0] * m[2, 2] - m[1, 2] * m[2, 0])
 	c := +m[0, 2] * (m[1, 0] * m[2, 1] - m[1, 1] * m[2, 0])
 	return a + b + c
 }
 @(require_results)
-matrix4x4_determinant :: proc "contextless" (m: $M/matrix[4, 4]$T) -> (det: T) #no_bounds_check {
+matrix4x4_determinant :: proc "contextless" (m: $M/matrix[4, 4]$T) -> (det: T) {
 	a := adjugate(m)
 	#no_bounds_check for i in 0..<4 {
 		det += m[0, i] * a[0, i]
@@ -482,13 +482,13 @@ matrix4x4_determinant :: proc "contextless" (m: $M/matrix[4, 4]$T) -> (det: T) #
 
 
 @(require_results)
-matrix1x1_adjugate :: proc "contextless" (x: $M/matrix[1, 1]$T) -> (y: M) #no_bounds_check {
+matrix1x1_adjugate :: proc "contextless" (x: $M/matrix[1, 1]$T) -> (y: M) {
 	y = x
 	return
 }
 
 @(require_results)
-matrix2x2_adjugate :: proc "contextless" (x: $M/matrix[2, 2]$T) -> (y: M) #no_bounds_check {
+matrix2x2_adjugate :: proc "contextless" (x: $M/matrix[2, 2]$T) -> (y: M) {
 	y[0, 0] = +x[1, 1]
 	y[0, 1] = -x[1, 0]
 	y[1, 0] = -x[0, 1]
@@ -497,7 +497,7 @@ matrix2x2_adjugate :: proc "contextless" (x: $M/matrix[2, 2]$T) -> (y: M) #no_bo
 }
 
 @(require_results)
-matrix3x3_adjugate :: proc "contextless" (m: $M/matrix[3, 3]$T) -> (y: M) #no_bounds_check {
+matrix3x3_adjugate :: proc "contextless" (m: $M/matrix[3, 3]$T) -> (y: M) {
 	y[0, 0] = +(m[1, 1] * m[2, 2] - m[2, 1] * m[1, 2])
 	y[0, 1] = -(m[1, 0] * m[2, 2] - m[2, 0] * m[1, 2])
 	y[0, 2] = +(m[1, 0] * m[2, 1] - m[2, 0] * m[1, 1])
@@ -512,7 +512,7 @@ matrix3x3_adjugate :: proc "contextless" (m: $M/matrix[3, 3]$T) -> (y: M) #no_bo
 
 
 @(require_results)
-matrix4x4_adjugate :: proc "contextless" (x: $M/matrix[4, 4]$T) -> (y: M) #no_bounds_check {
+matrix4x4_adjugate :: proc "contextless" (x: $M/matrix[4, 4]$T) -> (y: M) {
 	for i in 0..<4 {
 		for j in 0..<4 {
 			sign: T = 1 if (i + j) % 2 == 0 else -1
@@ -523,13 +523,13 @@ matrix4x4_adjugate :: proc "contextless" (x: $M/matrix[4, 4]$T) -> (y: M) #no_bo
 }
 
 @(require_results)
-matrix1x1_inverse_transpose :: proc "contextless" (x: $M/matrix[1, 1]$T) -> (y: M) #no_bounds_check {
+matrix1x1_inverse_transpose :: proc "contextless" (x: $M/matrix[1, 1]$T) -> (y: M) {
 	y[0, 0] = 1/x[0, 0]
 	return
 }
 
 @(require_results)
-matrix2x2_inverse_transpose :: proc "contextless" (x: $M/matrix[2, 2]$T) -> (y: M) #no_bounds_check {
+matrix2x2_inverse_transpose :: proc "contextless" (x: $M/matrix[2, 2]$T) -> (y: M) {
 	d := x[0, 0]*x[1, 1] - x[0, 1]*x[1, 0]
 	when intrinsics.type_is_integer(T) {
 		y[0, 0] = +x[1, 1] / d
@@ -592,13 +592,13 @@ matrix4x4_inverse_transpose :: proc "contextless" (x: $M/matrix[4, 4]$T) -> (y: 
 }
 
 @(require_results)
-matrix1x1_inverse :: proc "contextless" (x: $M/matrix[1, 1]$T) -> (y: M) #no_bounds_check {
+matrix1x1_inverse :: proc "contextless" (x: $M/matrix[1, 1]$T) -> (y: M) {
 	y[0, 0] = 1/x[0, 0]
 	return
 }
 
 @(require_results)
-matrix2x2_inverse :: proc "contextless" (x: $M/matrix[2, 2]$T) -> (y: M) #no_bounds_check {
+matrix2x2_inverse :: proc "contextless" (x: $M/matrix[2, 2]$T) -> (y: M) {
 	d := x[0, 0]*x[1, 1] - x[0, 1]*x[1, 0]
 	when intrinsics.type_is_integer(T) {
 		y[0, 0] = +x[1, 1] / d
