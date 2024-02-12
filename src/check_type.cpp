@@ -2255,6 +2255,34 @@ gb_internal void map_cell_size_and_len(Type *type, i64 *size_, i64 *len_) {
 	if (len_)  *len_ = len;
 }
 
+gb_internal Type *get_map_cell_type(Type *type) {
+	i64 size, len;
+	i64 elem_size = type_size_of(type);
+	map_cell_size_and_len(type, &size, &len);
+
+	if (size == len*elem_size) {
+		return type;
+	}
+
+	if (is_power_of_two(len)) {
+		return type;
+	}
+
+	i64 padding = size - len*elem_size;
+	GB_ASSERT(padding > 0);
+
+	// Padding exists
+	Type *s = alloc_type_struct();
+	Scope *scope = create_scope(nullptr, nullptr);
+	s->Struct.fields = slice_make<Entity *>(permanent_allocator(), 2);
+	s->Struct.fields[0] = alloc_entity_field(scope, make_token_ident("v"), alloc_type_array(type, len), false, 0, EntityState_Resolved);
+	s->Struct.fields[1] = alloc_entity_field(scope, make_token_ident("_"), alloc_type_array(t_u8, padding), false, 1, EntityState_Resolved);
+	s->Struct.scope = scope;
+	gb_unused(type_size_of(s));
+
+	return s;
+}
+
 gb_internal void init_map_internal_types(Type *type) {
 	GB_ASSERT(type->kind == Type_Map);
 	GB_ASSERT(t_allocator != nullptr);
@@ -2265,13 +2293,19 @@ gb_internal void init_map_internal_types(Type *type) {
 	GB_ASSERT(key != nullptr);
 	GB_ASSERT(value != nullptr);
 
-	Scope *metadata_scope = create_scope(nullptr, nullptr);
+
+
+	Type *key_cell   = get_map_cell_type(key);
+	Type *value_cell = get_map_cell_type(value);
 
 	Type *metadata_type = alloc_type_struct();
-	metadata_type->Struct.fields = slice_make<Entity *>(permanent_allocator(), 3);
+	Scope *metadata_scope = create_scope(nullptr, nullptr);
+	metadata_type->Struct.fields = slice_make<Entity *>(permanent_allocator(), 5);
 	metadata_type->Struct.fields[0] = alloc_entity_field(metadata_scope, make_token_ident("key"),    key,       false, 0, EntityState_Resolved);
 	metadata_type->Struct.fields[1] = alloc_entity_field(metadata_scope, make_token_ident("value"),  value,     false, 1, EntityState_Resolved);
 	metadata_type->Struct.fields[2] = alloc_entity_field(metadata_scope, make_token_ident("hash"),   t_uintptr, false, 2, EntityState_Resolved);
+	metadata_type->Struct.fields[3] = alloc_entity_field(metadata_scope, make_token_ident("key_cell"),   key_cell,   false, 3, EntityState_Resolved);
+	metadata_type->Struct.fields[4] = alloc_entity_field(metadata_scope, make_token_ident("value_cell"), value_cell, false, 4, EntityState_Resolved);
 	metadata_type->Struct.scope = metadata_scope;
 
 	gb_unused(type_size_of(metadata_type));
