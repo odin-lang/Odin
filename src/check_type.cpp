@@ -2307,6 +2307,7 @@ gb_internal void init_map_internal_types(Type *type) {
 	metadata_type->Struct.fields[3] = alloc_entity_field(metadata_scope, make_token_ident("key_cell"),   key_cell,   false, 3, EntityState_Resolved);
 	metadata_type->Struct.fields[4] = alloc_entity_field(metadata_scope, make_token_ident("value_cell"), value_cell, false, 4, EntityState_Resolved);
 	metadata_type->Struct.scope = metadata_scope;
+	metadata_type->Struct.node = nullptr;
 
 	gb_unused(type_size_of(metadata_type));
 
@@ -2323,6 +2324,7 @@ gb_internal void init_map_internal_types(Type *type) {
 	debug_type->Struct.fields[2] = alloc_entity_field(scope, make_token_ident("allocator"),  t_allocator,   false, 2, EntityState_Resolved);
 	debug_type->Struct.fields[3] = alloc_entity_field(scope, make_token_ident("__metadata"), metadata_type, false, 3, EntityState_Resolved);
 	debug_type->Struct.scope = scope;
+	debug_type->Struct.node = nullptr;
 
 	gb_unused(type_size_of(debug_type));
 
