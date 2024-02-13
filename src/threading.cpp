@@ -135,7 +135,7 @@ struct MutexGuard {
 	explicit MutexGuard(RecursiveMutex *rm) noexcept : rm{rm} {
 		mutex_lock(this->rm);
 	}
-	explicit MutexGuard(RwMutex *rm) noexcept : rwm{rwm} {
+	explicit MutexGuard(RwMutex *rwm) noexcept : rwm{rwm} {
 		rw_mutex_lock(this->rwm);
 	}
 	explicit MutexGuard(BlockingMutex &bm) noexcept : bm{&bm} {
