@@ -2553,6 +2553,8 @@ gb_internal Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_e
 		GB_ASSERT(is_type_struct(elem));
 
 		Type *old_struct = base_type(elem);
+		RW_MUTEX_GUARD(&old_struct->Struct.fields_mutex);
+
 		field_count = old_struct->Struct.fields.count;
 
 		soa_struct = alloc_type_struct();
@@ -2593,21 +2595,19 @@ gb_internal Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_e
 	}
 
 	if (soa_kind != StructSoa_Fixed) {
-		Entity *len_field = alloc_entity_field(scope, empty_token, t_int, false, cast(i32)field_count+0);
+		Entity *len_field = alloc_entity_field(scope, make_token_ident("__$len"), t_int, false, cast(i32)field_count+0);
 		soa_struct->Struct.fields[field_count+0] = len_field;
 		add_entity(ctx, scope, nullptr, len_field);
 		add_entity_use(ctx, nullptr, len_field);
 
 		if (soa_kind == StructSoa_Dynamic) {
-			Entity *cap_field = alloc_entity_field(scope, empty_token, t_int, false, cast(i32)field_count+1);
+			Entity *cap_field = alloc_entity_field(scope, make_token_ident("__$cap"), t_int, false, cast(i32)field_count+1);
 			soa_struct->Struct.fields[field_count+1] = cap_field;
 			add_entity(ctx, scope, nullptr, cap_field);
 			add_entity_use(ctx, nullptr, cap_field);
 
-			Token token = {};
-			token.string = str_lit("allocator");
 			init_mem_allocator(ctx->checker);
-			Entity *allocator_field = alloc_entity_field(scope, token, t_allocator, false, cast(i32)field_count+2);
+			Entity *allocator_field = alloc_entity_field(scope, make_token_ident("allocator"), t_allocator, false, cast(i32)field_count+2);
 			soa_struct->Struct.fields[field_count+2] = allocator_field;
 			add_entity(ctx, scope, nullptr, allocator_field);
 			add_entity_use(ctx, nullptr, allocator_field);

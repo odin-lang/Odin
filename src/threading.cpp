@@ -119,17 +119,25 @@ struct MutexGuard {
 	explicit MutexGuard(RecursiveMutex *rm) noexcept : rm{rm} {
 		mutex_lock(this->rm);
 	}
+	explicit MutexGuard(RwMutex *rm) noexcept : rwm{rwm} {
+		rw_mutex_lock(this->rwm);
+	}
 	explicit MutexGuard(BlockingMutex &bm) noexcept : bm{&bm} {
 		mutex_lock(this->bm);
 	}
 	explicit MutexGuard(RecursiveMutex &rm) noexcept : rm{&rm} {
 		mutex_lock(this->rm);
 	}
+	explicit MutexGuard(RwMutex &rwm) noexcept : rwm{&rwm} {
+		rw_mutex_lock(this->rwm);
+	}
 	~MutexGuard() noexcept {
 		if (this->bm) {
 			mutex_unlock(this->bm);
 		} else if (this->rm) {
 			mutex_unlock(this->rm);
+		} else if (this->rwm) {
+			rw_mutex_unlock(this->rwm);
 		}
 	}
 
@@ -137,10 +145,12 @@ struct MutexGuard {
 
 	BlockingMutex *bm;
 	RecursiveMutex *rm;
+	RwMutex *rwm;
 };
 
 #define MUTEX_GUARD_BLOCK(m) if (MutexGuard GB_DEFER_3(_mutex_guard_){m})
 #define MUTEX_GUARD(m) mutex_lock(m); defer (mutex_unlock(m))
+#define RW_MUTEX_GUARD(m) rw_mutex_lock(m); defer (rw_mutex_unlock(m))
 
 
 struct RecursiveMutex {
