@@ -107,6 +107,22 @@ gb_internal void thread_set_name        (Thread *t, char const *name);
 gb_internal void yield_thread(void);
 gb_internal void yield_process(void);
 
+struct Wait_Signal {
+	Futex futex;
+};
+
+gb_internal void wait_signal_until_available(Wait_Signal *ws) {
+	if (ws->futex.load() == 0) {
+		futex_wait(&ws->futex, 1);
+	}
+}
+
+gb_internal void wait_signal_set(Wait_Signal *ws) {
+	ws->futex.store(1);
+	futex_broadcast(&ws->futex);
+}
+
+
 
 struct MutexGuard {
 	MutexGuard()                   = delete;

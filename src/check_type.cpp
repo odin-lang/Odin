@@ -632,9 +632,6 @@ gb_internal void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *
 	
 	scope_reserve(ctx->scope, min_field_count);
 
-	rw_mutex_lock(&struct_type->Struct.fields_mutex);
-	defer (rw_mutex_unlock(&struct_type->Struct.fields_mutex));
-
 	if (st->is_raw_union && min_field_count > 1) {
 		struct_type->Struct.is_raw_union = true;
 		context = str_lit("struct #raw_union");
@@ -662,6 +659,7 @@ gb_internal void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *
 			gb_unused(where_clause_ok);
 		}
 		check_struct_fields(ctx, node, &struct_type->Struct.fields, &struct_type->Struct.tags, st->fields, min_field_count, struct_type, context);
+		wait_signal_set(&struct_type->Struct.fields_wait_signal);
 	}
 
 #define ST_ALIGN(_name) if (st->_name != nullptr) {                                                \
@@ -2553,8 +2551,8 @@ gb_internal Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_e
 		GB_ASSERT(is_type_struct(elem));
 
 		Type *old_struct = base_type(elem);
-		RW_MUTEX_GUARD(&old_struct->Struct.fields_mutex);
 
+		wait_signal_until_available(&old_struct->Struct.fields_wait_signal);
 		field_count = old_struct->Struct.fields.count;
 
 		soa_struct = alloc_type_struct();
