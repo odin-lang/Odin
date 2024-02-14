@@ -49,7 +49,7 @@ noise_config :: struct {
 }
 
 noise :: struct {
-	ds:     data_source_vtable,
+	ds:     data_source_base,
 	config: noise_config,
 	lcg:    lcg,
 	state: struct #raw_union {

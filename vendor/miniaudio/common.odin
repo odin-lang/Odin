@@ -141,28 +141,32 @@ result :: enum c.int {
 	CANCELLED                                   = -51,
 	MEMORY_ALREADY_MAPPED                       = -52,
 
+	/* General non-standard errors. */
+	CRC_MISMATCH                                = -100,
+
 	/* General miniaudio-specific errors. */
-	FORMAT_NOT_SUPPORTED                        = -100,
-	DEVICE_TYPE_NOT_SUPPORTED                   = -101,
-	SHARE_MODE_NOT_SUPPORTED                    = -102,
-	NO_BACKEND                                  = -103,
-	NO_DEVICE                                   = -104,
-	API_NOT_FOUND                               = -105,
-	INVALID_DEVICE_CONFIG                       = -106,
-	LOOP                                        = -107,
+	FORMAT_NOT_SUPPORTED                        = -200,
+	DEVICE_TYPE_NOT_SUPPORTED                   = -201,
+	SHARE_MODE_NOT_SUPPORTED                    = -202,
+	NO_BACKEND                                  = -203,
+	NO_DEVICE                                   = -204,
+	API_NOT_FOUND                               = -205,
+	INVALID_DEVICE_CONFIG                       = -206,
+	LOOP                                        = -207,
+	BACKEND_NOT_ENABLED                         = -208,
 
 	/* State errors. */
-	DEVICE_NOT_INITIALIZED                      = -200,
-	DEVICE_ALREADY_INITIALIZED                  = -201,
-	DEVICE_NOT_STARTED                          = -202,
-	DEVICE_NOT_STOPPED                          = -203,
+	DEVICE_NOT_INITIALIZED                      = -300,
+	DEVICE_ALREADY_INITIALIZED                  = -301,
+	DEVICE_NOT_STARTED                          = -302,
+	DEVICE_NOT_STOPPED                          = -303,
 
 	/* Operation errors. */
-	FAILED_TO_INIT_BACKEND                      = -300,
-	FAILED_TO_OPEN_BACKEND_DEVICE               = -301,
-	FAILED_TO_START_BACKEND_DEVICE              = -302,
-	FAILED_TO_STOP_BACKEND_DEVICE               = -303,
-} 
+	FAILED_TO_INIT_BACKEND                      = -400,
+	FAILED_TO_OPEN_BACKEND_DEVICE               = -401,
+	FAILED_TO_START_BACKEND_DEVICE              = -402,
+	FAILED_TO_STOP_BACKEND_DEVICE               = -403,
+}
 
 
 MIN_CHANNELS :: 1
@@ -214,7 +218,7 @@ standard_sample_rate :: enum u32 {
 	rate_192000 = 192000,
 
 	rate_16000  = 16000,     /* Extreme lows */
-	rate_11025  = 11250,
+	rate_11025  = 11025,
 	rate_8000   = 8000,
 
 	rate_352800 = 352800,    /* Extreme highs */
@@ -229,7 +233,7 @@ standard_sample_rate :: enum u32 {
 channel_mix_mode :: enum c.int {
 	rectangular = 0,   /* Simple averaging based on the plane(s) the channel is sitting on. */
 	simple,            /* Drop excess channels; zeroed out extra channels. */
-	custom_weights,    /* Use custom weights specified in ma_channel_router_config. */
+	custom_weights,    /* Use custom weights specified in ma_channel_converter_config. */
 	default = rectangular,
 }
 
