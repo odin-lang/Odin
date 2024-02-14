@@ -1121,6 +1121,11 @@ fcntl :: proc(fd: int, cmd: int, arg: int) -> (int, Errno) {
 
 copy_file :: proc(src: string, dst: string, overwrite: bool = false) -> Errno {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
+	s, stat_err := _stat(src)
+	if stat_err != ERROR_NONE {
+		return stat_err
+	}
+
 	src_handle, src_err := open(src)
 	if src_err != ERROR_NONE {
 		return src_err
@@ -1132,7 +1137,7 @@ copy_file :: proc(src: string, dst: string, overwrite: bool = false) -> Errno {
 		flags |= O_EXCL
 	}
 
-	dst_handle, dst_err := open(dst, flags, 0666)
+	dst_handle, dst_err := open(dst, flags, int(s.mode))
 	if dst_err != ERROR_NONE {
 		return dst_err
 	}
