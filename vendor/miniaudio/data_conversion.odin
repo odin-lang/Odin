@@ -68,7 +68,7 @@ resampling_backend_vtable :: struct {
 	onReset:                       proc "c" (pUserData: rawptr, pBackend: ^resampling_backend) -> result,
 }
 
-resample_algorithm :: enum {
+resample_algorithm :: enum c.int {
 	linear = 0,   /* Fastest, lowest quality. Optional low-pass filtering. Default. */
 	custom,
 }
