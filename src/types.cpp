@@ -144,7 +144,7 @@ struct TypeStruct {
 	Type *          soa_elem;
 	i32             soa_count;
 	StructSoaKind   soa_kind;
-	RwMutex         fields_mutex;
+	Wait_Signal     fields_wait_signal;
 	BlockingMutex   offset_mutex; // for settings offsets
 
 	bool            is_polymorphic;
@@ -231,6 +231,7 @@ struct TypeProc {
 		Type *key;                                        \
 		Type *value;                                      \
 		Type *lookup_result_type;                         \
+		Type *debug_metadata_type;                        \
 	})                                                        \
 	TYPE_KIND(Struct,  TypeStruct)                            \
 	TYPE_KIND(Union,   TypeUnion)                             \
@@ -2968,9 +2969,8 @@ gb_internal Selection lookup_field_from_index(Type *type, i64 index) {
 	isize max_count = 0;
 	switch (type->kind) {
 	case Type_Struct:
-		rw_mutex_shared_lock(&type->Struct.fields_mutex);
+		wait_signal_until_available(&type->Struct.fields_wait_signal);
 		max_count = type->Struct.fields.count;
-		rw_mutex_shared_unlock(&type->Struct.fields_mutex);
 		break;
 	case Type_Tuple:    max_count = type->Tuple.variables.count; break;
 	}
@@ -2981,8 +2981,7 @@ gb_internal Selection lookup_field_from_index(Type *type, i64 index) {
 
 	switch (type->kind) {
 	case Type_Struct: {
-		rw_mutex_shared_lock(&type->Struct.fields_mutex);
-		defer (rw_mutex_shared_unlock(&type->Struct.fields_mutex));
+		wait_signal_until_available(&type->Struct.fields_wait_signal);
 		for (isize i = 0; i < max_count; i++) {
 			Entity *f = type->Struct.fields[i];
 			if (f->kind == Entity_Variable) {
@@ -3047,9 +3046,8 @@ gb_internal Selection lookup_field_with_selection(Type *type_, String field_name
 				}
 			}
 			if (type->kind == Type_Struct) {
-				rw_mutex_shared_lock(&type->Struct.fields_mutex);
+				wait_signal_until_available(&type->Struct.fields_wait_signal);
 				isize field_count = type->Struct.fields.count;
-				rw_mutex_shared_unlock(&type->Struct.fields_mutex);
 				if (field_count != 0) for_array(i, type->Struct.fields) {
 					Entity *f = type->Struct.fields[i];
 					if (f->flags&EntityFlag_Using) {
@@ -3078,9 +3076,8 @@ gb_internal Selection lookup_field_with_selection(Type *type_, String field_name
 		}
 
 		if (type->kind == Type_Struct) {
-			rw_mutex_shared_lock(&type->Struct.fields_mutex);
+			wait_signal_until_available(&type->Struct.fields_wait_signal);
 			Scope *s = type->Struct.scope;
-			rw_mutex_shared_unlock(&type->Struct.fields_mutex);
 			if (s != nullptr) {
 				Entity *found = scope_lookup_current(s, field_name);
 				if (found != nullptr && found->kind != Entity_Variable) {
@@ -3128,9 +3125,8 @@ gb_internal Selection lookup_field_with_selection(Type *type_, String field_name
 			}
 		}
 
-		rw_mutex_shared_lock(&type->Struct.fields_mutex);
+		wait_signal_until_available(&type->Struct.fields_wait_signal);
 		isize field_count = type->Struct.fields.count;
-		rw_mutex_shared_unlock(&type->Struct.fields_mutex);
 		if (field_count != 0) for_array(i, type->Struct.fields) {
 			Entity *f = type->Struct.fields[i];
 			if (f->kind != Entity_Variable || (f->flags & EntityFlag_Field) == 0) {

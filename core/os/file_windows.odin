@@ -394,7 +394,8 @@ get_current_directory :: proc(allocator := context.allocator) -> string {
 }
 
 set_current_directory :: proc(path: string) -> (err: Errno) {
-	wstr := win32.utf8_to_wstring(path)
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
+	wstr := win32.utf8_to_wstring(path, context.temp_allocator)
 
 	win32.AcquireSRWLockExclusive(&cwd_lock)
 
@@ -406,18 +407,7 @@ set_current_directory :: proc(path: string) -> (err: Errno) {
 
 	return
 }
-
-
-
-change_directory :: proc(path: string) -> (err: Errno) {
-	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
-	wpath := win32.utf8_to_wstring(path, context.temp_allocator)
-
-	if !win32.SetCurrentDirectoryW(wpath) {
-		err = Errno(win32.GetLastError())
-	}
-	return
-}
+change_directory :: set_current_directory
 
 make_directory :: proc(path: string, mode: u32 = 0) -> (err: Errno) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
