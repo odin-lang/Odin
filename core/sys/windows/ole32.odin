@@ -1,4 +1,3 @@
-// +build windows
 package sys_windows
 
 foreign import "system:Ole32.lib"
@@ -15,14 +14,14 @@ IUnknown :: struct {
 	using Vtbl: ^IUnknownVtbl,
 }
 IUnknownVtbl :: struct {
-	QueryInterface: proc "stdcall" (This: ^IUnknown, riid: REFIID, ppvObject: ^rawptr) -> HRESULT,
-	AddRef:         proc "stdcall" (This: ^IUnknown) -> ULONG,
-	Release:        proc "stdcall" (This: ^IUnknown) -> ULONG,
+	QueryInterface: proc "system" (This: ^IUnknown, riid: REFIID, ppvObject: ^rawptr) -> HRESULT,
+	AddRef:         proc "system" (This: ^IUnknown) -> ULONG,
+	Release:        proc "system" (This: ^IUnknown) -> ULONG,
 }
 
 LPUNKNOWN :: ^IUnknown
 
-@(default_calling_convention="stdcall")
+@(default_calling_convention="system")
 foreign Ole32 {
 	CoInitializeEx :: proc(reserved: rawptr, co_init: COINIT) -> HRESULT ---
 	CoUninitialize :: proc() ---

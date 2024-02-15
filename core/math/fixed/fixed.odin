@@ -2,7 +2,7 @@ package math_fixed
 
 import "core:math"
 import "core:strconv"
-import "core:intrinsics"
+import "base:intrinsics"
 _, _, _ :: intrinsics, strconv, math
 
 Fixed :: struct($Backing: typeid, $Fraction_Width: uint)
@@ -88,17 +88,19 @@ div_sat :: proc(x, y: $T/Fixed($Backing, $Fraction_Width)) -> (z: T) {
 
 @(require_results)
 floor :: proc(x: $T/Fixed($Backing, $Fraction_Width)) -> Backing {
-	return x.i >> Fraction_Width
+	if x.i >= 0 {
+		return x.i >> Fraction_Width
+	} else {
+		return (x.i - (1 << (Fraction_Width - 1)) + (1 << (Fraction_Width - 2))) >> Fraction_Width
+	}
 }
 @(require_results)
 ceil :: proc(x: $T/Fixed($Backing, $Fraction_Width)) -> Backing {
-	Integer :: 8*size_of(Backing) - Fraction_Width
-	return (x.i + (1 << Integer-1)) >> Fraction_Width
+	return (x.i + (1 << Fraction_Width - 1)) >> Fraction_Width
 }
 @(require_results)
 round :: proc(x: $T/Fixed($Backing, $Fraction_Width)) -> Backing {
-	Integer :: 8*size_of(Backing) - Fraction_Width
-	return (x.i + (1 << (Integer - 1))) >> Fraction_Width
+	return (x.i + (1 << (Fraction_Width - 1))) >> Fraction_Width
 }
 
 

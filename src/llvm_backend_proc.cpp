@@ -1693,24 +1693,61 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 	case BuiltinProc_DIRECTIVE: {
 		ast_node(bd, BasicDirective, ce->proc);
 		String name = bd->name.string;
-		GB_ASSERT(name == "location");
-		String procedure = p->entity->token.string;
-		TokenPos pos = ast_token(ce->proc).pos;
-		if (ce->args.count > 0) {
-			Ast *ident = unselector_expr(ce->args[0]);
-			GB_ASSERT(ident->kind == Ast_Ident);
-			Entity *e = entity_of_node(ident);
-			GB_ASSERT(e != nullptr);
+		if (name == "location") {
+			String procedure = p->entity->token.string;
+			TokenPos pos = ast_token(ce->proc).pos;
+			if (ce->args.count > 0) {
+				Ast *ident = unselector_expr(ce->args[0]);
+				GB_ASSERT(ident->kind == Ast_Ident);
+				Entity *e = entity_of_node(ident);
+				GB_ASSERT(e != nullptr);
 
-			if (e->parent_proc_decl != nullptr && e->parent_proc_decl->entity != nullptr) {
-				procedure = e->parent_proc_decl->entity->token.string;
-			} else {
-				procedure = str_lit("");
+				if (e->parent_proc_decl != nullptr && e->parent_proc_decl->entity != nullptr) {
+					procedure = e->parent_proc_decl->entity->token.string;
+				} else {
+					procedure = str_lit("");
+				}
+				pos = e->token.pos;
+
 			}
-			pos = e->token.pos;
+			return lb_emit_source_code_location_as_global(p, procedure, pos);
+		} else if (name == "load_directory") {
+			lbModule *m = p->module;
+			TEMPORARY_ALLOCATOR_GUARD();
+			LoadDirectoryCache *cache = map_must_get(&m->info->load_directory_map, expr);
+			isize count = cache->files.count;
 
+			LLVMValueRef *elements = gb_alloc_array(temporary_allocator(), LLVMValueRef, count);
+			for_array(i, cache->files) {
+				LoadFileCache *file = cache->files[i];
+
+				String file_name = filename_without_directory(file->path);
+
+				LLVMValueRef values[2] = {};
+				values[0] = lb_const_string(m, file_name).value;
+				values[1] = lb_const_string(m, file->data).value;
+				LLVMValueRef element = llvm_const_named_struct(m, t_load_directory_file, values, gb_count_of(values));
+				elements[i] = element;
+			}
+
+			LLVMValueRef backing_array = llvm_const_array(lb_type(m, t_load_directory_file), elements, count);
+
+			Type *array_type = alloc_type_array(t_load_directory_file, count);
+			lbAddr backing_array_addr = lb_add_global_generated(m, array_type, {backing_array, array_type}, nullptr);
+			lb_make_global_private_const(backing_array_addr);
+
+			LLVMValueRef backing_array_ptr = backing_array_addr.addr.value;
+			backing_array_ptr = LLVMConstPointerCast(backing_array_ptr, lb_type(m, t_load_directory_file_ptr));
+
+			LLVMValueRef const_slice = llvm_const_slice_internal(m, backing_array_ptr, LLVMConstInt(lb_type(m, t_int), count, false));
+
+			lbAddr addr = lb_add_global_generated(p->module, tv.type, {const_slice, t_load_directory_file_slice}, nullptr);
+			lb_make_global_private_const(addr);
+
+			return lb_addr_load(p, addr);
+		} else {
+			GB_PANIC("UNKNOWN DIRECTIVE: %.*s", LIT(name));
 		}
-		return lb_emit_source_code_location_as_global(p, procedure, pos);
 	}
 
 	case BuiltinProc_type_info_of: {
@@ -2033,9 +2070,9 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 
 	case BuiltinProc_clamp:
 		return lb_emit_clamp(p, type_of_expr(expr),
-							 lb_build_expr(p, ce->args[0]),
-							 lb_build_expr(p, ce->args[1]),
-							 lb_build_expr(p, ce->args[2]));
+		                     lb_build_expr(p, ce->args[0]),
+		                     lb_build_expr(p, ce->args[1]),
+		                     lb_build_expr(p, ce->args[2]));
 
 
 	case BuiltinProc_soa_zip:

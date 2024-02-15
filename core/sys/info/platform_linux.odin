@@ -1,8 +1,8 @@
 // +build linux
 package sysinfo
 
-import "core:intrinsics"
-import "core:runtime"
+import "base:intrinsics"
+import "base:runtime"
 import "core:strings"
 import "core:strconv"
 

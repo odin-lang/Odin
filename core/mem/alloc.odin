@@ -1,6 +1,6 @@
 package mem
 
-import "core:runtime"
+import "base:runtime"
 
 // NOTE(bill, 2019-12-31): These are defined in `package runtime` as they are used in the `context`. This is to prevent an import definition cycle.
 Allocator_Mode :: runtime.Allocator_Mode
@@ -11,6 +11,8 @@ Allocator_Mode :: enum byte {
 	Free_All,
 	Resize,
 	Query_Features,
+	Alloc_Non_Zeroed,
+	Resize_Non_Zeroed,
 }
 */
 
@@ -243,12 +245,26 @@ default_resize_align :: proc(old_memory: rawptr, old_size, new_size, alignment: 
 	res = raw_data(data)
 	return
 }
+
+@(require_results)
+default_resize_bytes_align_non_zeroed :: proc(old_data: []byte, new_size, alignment: int, allocator := context.allocator, loc := #caller_location) -> ([]byte, Allocator_Error) {
+	return _default_resize_bytes_align(old_data, new_size, alignment, false, allocator, loc)
+}
 @(require_results)
 default_resize_bytes_align :: proc(old_data: []byte, new_size, alignment: int, allocator := context.allocator, loc := #caller_location) -> ([]byte, Allocator_Error) {
+	return _default_resize_bytes_align(old_data, new_size, alignment, true, allocator, loc)
+}
+
+@(require_results)
+_default_resize_bytes_align :: #force_inline proc(old_data: []byte, new_size, alignment: int, should_zero: bool, allocator := context.allocator, loc := #caller_location) -> ([]byte, Allocator_Error) {
 	old_memory := raw_data(old_data)
 	old_size := len(old_data)
 	if old_memory == nil {
-		return alloc_bytes(new_size, alignment, allocator, loc)
+		if should_zero {
+			return alloc_bytes(new_size, alignment, allocator, loc)
+		} else {
+			return alloc_bytes_non_zeroed(new_size, alignment, allocator, loc)
+		}
 	}
 
 	if new_size == 0 {
@@ -260,7 +276,13 @@ default_resize_bytes_align :: proc(old_data: []byte, new_size, alignment: int, a
 		return old_data, .None
 	}
 
-	new_memory, err := alloc_bytes(new_size, alignment, allocator, loc)
+	new_memory : []byte
+	err : Allocator_Error
+	if should_zero {
+		new_memory, err = alloc_bytes(new_size, alignment, allocator, loc)
+	} else {
+		new_memory, err = alloc_bytes_non_zeroed(new_size, alignment, allocator, loc)
+	}
 	if new_memory == nil || err != nil {
 		return nil, err
 	}

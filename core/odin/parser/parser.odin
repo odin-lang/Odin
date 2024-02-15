@@ -436,6 +436,24 @@ expect_closing_brace_of_field_list :: proc(p: ^Parser) -> tokenizer.Token {
 	return expect_brace
 }
 
+expect_closing_parentheses_of_field_list :: proc(p: ^Parser) -> tokenizer.Token {
+	token := p.curr_tok
+	if allow_token(p, .Close_Paren) {
+		return token
+	}
+
+	if allow_token(p, .Semicolon) && !tokenizer.is_newline(token) {
+		str := tokenizer.token_to_string(token)
+		error(p, end_of_line_pos(p, p.prev_tok), "expected a comma, got %s", str)
+	}
+
+	for p.curr_tok.kind != .Close_Paren && p.curr_tok.kind != .EOF && !is_non_inserted_semicolon(p.curr_tok) {
+		advance_token(p)
+	}
+
+	return expect_token(p, .Close_Paren)
+}
+
 is_non_inserted_semicolon :: proc(tok: tokenizer.Token) -> bool {
 	return tok.kind == .Semicolon && tok.text != "\n"
 }
@@ -2095,7 +2113,7 @@ parse_proc_type :: proc(p: ^Parser, tok: tokenizer.Token) -> ^ast.Proc_Type {
 
 	expect_token(p, .Open_Paren)
 	params, _ := parse_field_list(p, .Close_Paren, ast.Field_Flags_Signature_Params)
-	expect_token(p, .Close_Paren)
+	expect_closing_parentheses_of_field_list(p)
 	results, diverging := parse_results(p)
 
 	is_generic := false
@@ -2529,6 +2547,7 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 
 		poly_params: ^ast.Field_List
 		align:        ^ast.Expr
+		field_align:  ^ast.Expr
 		is_packed:    bool
 		is_raw_union: bool
 		is_no_copy:   bool
@@ -2560,6 +2579,11 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 					error(p, tag.pos, "duplicate struct tag '#%s'", tag.text)
 				}
 				align = parse_expr(p, true)
+			case "field_align":
+				if field_align != nil {
+					error(p, tag.pos, "duplicate struct tag '#%s'", tag.text)
+				}
+				field_align = parse_expr(p, true)
 			case "raw_union":
 				if is_raw_union {
 					error(p, tag.pos, "duplicate struct tag '#%s'", tag.text)
@@ -2602,6 +2626,7 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 		st := ast.new(ast.Struct_Type, tok.pos, end_pos(close))
 		st.poly_params   = poly_params
 		st.align         = align
+		st.field_align   = field_align
 		st.is_packed     = is_packed
 		st.is_raw_union  = is_raw_union
 		st.is_no_copy    = is_no_copy

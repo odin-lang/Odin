@@ -7,6 +7,7 @@ on:
 
 jobs:
   build_windows:
+    name: Windows Build
     if: github.repository == 'odin-lang/Odin'
     runs-on: windows-2022
     steps:
@@ -29,6 +30,7 @@ jobs:
           cp LICENSE dist
           cp LLVM-C.dll dist
           cp -r shared dist
+          cp -r base dist
           cp -r core dist
           cp -r vendor dist
           cp -r bin dist
@@ -39,6 +41,7 @@ jobs:
           name: windows_artifacts
           path: dist
   build_ubuntu:
+    name: Ubuntu Build
     if: github.repository == 'odin-lang/Odin'
     runs-on: ubuntu-latest
     steps:
@@ -56,6 +59,7 @@ jobs:
           cp LICENSE dist
           cp libLLVM* dist
           cp -r shared dist
+          cp -r base dist
           cp -r core dist
           cp -r vendor dist
           cp -r examples dist
@@ -65,8 +69,9 @@ jobs:
           name: ubuntu_artifacts
           path: dist
   build_macos:
+    name: MacOS Build
     if: github.repository == 'odin-lang/Odin'
-    runs-on: macOS-latest
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v1
       - name: Download LLVM and setup PATH
@@ -85,6 +90,7 @@ jobs:
           cp odin dist
           cp LICENSE dist
           cp -r shared dist
+          cp -r base dist
           cp -r core dist
           cp -r vendor dist
           cp -r examples dist
@@ -93,9 +99,40 @@ jobs:
         with:
           name: macos_artifacts
           path: dist
+  build_macos_arm:
+    name: MacOS ARM Build
+    if: github.repository == 'odin-lang/Odin'
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v1
+      - name: Download LLVM and setup PATH
+        run: |
+          brew install llvm@13
+          echo "/opt/homebrew/opt/llvm@13/bin" >> $GITHUB_PATH
+          TMP_PATH=$(xcrun --show-sdk-path)/user/include
+          echo "CPATH=$TMP_PATH" >> $GITHUB_ENV
+      - name: build odin
+        run: make nightly
+      - name: Odin run
+        run: ./odin run examples/demo
+      - name: Copy artifacts
+        run: |
+          mkdir dist
+          cp odin dist
+          cp LICENSE dist
+          cp -r shared dist
+          cp -r base dist
+          cp -r core dist
+          cp -r vendor dist
+          cp -r examples dist
+      - name: Upload artifact
+        uses: actions/upload-artifact@v1
+        with:
+          name: macos_arm_artifacts
+          path: dist
   upload_b2:
     runs-on: [ubuntu-latest]
-    needs: [build_windows, build_macos, build_ubuntu]
+    needs: [build_windows, build_macos, build_macos_arm, build_ubuntu]
     steps:
       - uses: actions/checkout@v1
       - uses: actions/setup-python@v2
@@ -126,6 +163,11 @@ jobs:
         with:
           name: macos_artifacts
 
+      - name: Download macOS arm artifacts
+        uses: actions/download-artifact@v1
+        with:
+          name: macos_arm_artifacts
+
       - name: Create archives and upload
         shell: bash
         env:
@@ -142,6 +184,7 @@ jobs:
           ./ci/upload_create_nightly.sh "$BUCKET" windows-amd64 windows_artifacts/
           ./ci/upload_create_nightly.sh "$BUCKET" ubuntu-amd64 ubuntu_artifacts/
           ./ci/upload_create_nightly.sh "$BUCKET" macos-amd64 macos_artifacts/
+          ./ci/upload_create_nightly.sh "$BUCKET" macos-arm64 macos_arm_artifacts/
 
           echo Deleting old artifacts in B2
           python3 ci/delete_old_binaries.py "$BUCKET" "$DAYS_TO_KEEP"

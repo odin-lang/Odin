@@ -2,7 +2,7 @@
 //+private
 package thread
 
-import "core:intrinsics"
+import "base:intrinsics"
 import "core:sync"
 import win32 "core:sys/windows"
 
@@ -21,7 +21,7 @@ _thread_priority_map := [Thread_Priority]i32{
 _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 	win32_thread_id: win32.DWORD
 
-	__windows_thread_entry_proc :: proc "stdcall" (t_: rawptr) -> win32.DWORD {
+	__windows_thread_entry_proc :: proc "system" (t_: rawptr) -> win32.DWORD {
 		t := (^Thread)(t_)
 
 		t.id = sync.current_thread_id()

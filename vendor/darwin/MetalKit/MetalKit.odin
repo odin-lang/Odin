@@ -1,10 +1,9 @@
-//+build darwin
 package objc_MetalKit
 
 import NS "vendor:darwin/Foundation"
 import MTL "vendor:darwin/Metal"
 import CA "vendor:darwin/QuartzCore"
-import "core:intrinsics"
+import "base:intrinsics"
 
 @(require)
 foreign import "system:MetalKit.framework"

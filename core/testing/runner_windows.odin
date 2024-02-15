@@ -3,8 +3,8 @@
 package testing
 
 import win32 "core:sys/windows"
-import "core:runtime"
-import "core:intrinsics"
+import "base:runtime"
+import "base:intrinsics"
 import "core:time"
 
 Sema :: struct {
@@ -90,7 +90,7 @@ Thread_Os_Specific :: struct {
 }
 
 thread_create :: proc(procedure: Thread_Proc) -> ^Thread {
-	__windows_thread_entry_proc :: proc "stdcall" (t_: rawptr) -> win32.DWORD {
+	__windows_thread_entry_proc :: proc "system" (t_: rawptr) -> win32.DWORD {
 		t := (^Thread)(t_)
 		context = t.init_context.? or_else runtime.default_context()
 
@@ -172,7 +172,7 @@ global_current_t: ^T
 
 run_internal_test :: proc(t: ^T, it: Internal_Test) {
 	thread := thread_create(proc(thread: ^Thread) {
-		exception_handler_proc :: proc "stdcall" (ExceptionInfo: ^win32.EXCEPTION_POINTERS) -> win32.LONG {
+		exception_handler_proc :: proc "system" (ExceptionInfo: ^win32.EXCEPTION_POINTERS) -> win32.LONG {
 			switch ExceptionInfo.ExceptionRecord.ExceptionCode {
 			case
 				win32.EXCEPTION_DATATYPE_MISALIGNMENT,

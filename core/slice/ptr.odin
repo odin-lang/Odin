@@ -1,7 +1,7 @@
 package slice
 
-import "core:builtin"
-import "core:runtime"
+import "base:builtin"
+import "base:runtime"
 
 ptr_add :: proc(p: $P/^$T, x: int) -> ^T {
 	return ([^]T)(p)[x:]

@@ -8,7 +8,7 @@ package vendor_commonmark
 
 import "core:c"
 import "core:c/libc"
-import "core:runtime"
+import "base:runtime"
 
 COMMONMARK_SHARED :: #config(COMMONMARK_SHARED, false)
 BINDING_VERSION :: Version_Info{major = 0, minor = 30, patch = 2}
@@ -24,6 +24,8 @@ when ODIN_OS == .Windows {
 } else when ODIN_OS == .Linux {
 	foreign import lib "system:cmark"
 } else when ODIN_OS == .Darwin {
+	foreign import lib "system:cmark"
+} else {
 	foreign import lib "system:cmark"
 }
 
@@ -509,7 +511,7 @@ cmark_allocator_proc :: proc(allocator_data: rawptr, mode: runtime.Allocator_Mod
 	case .Free_All:
 		return nil, .Mode_Not_Implemented
 
-	case .Resize:
+	case .Resize, .Resize_Non_Zeroed:
 		new_ptr := cmark_alloc.realloc(old_memory, c.size_t(size))
 		res = transmute([]byte)runtime.Raw_Slice{new_ptr, size}
 		if size > old_size {

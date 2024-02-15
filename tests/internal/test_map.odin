@@ -1,7 +1,7 @@
 package test_internal_map
 
 import "core:fmt"
-import "core:intrinsics"
+import "base:intrinsics"
 import "core:math/rand"
 import "core:mem"
 import "core:os"

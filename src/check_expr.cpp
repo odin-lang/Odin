@@ -2988,6 +2988,13 @@ gb_internal bool check_is_castable_to(CheckerContext *c, Operand *operand, Type 
 	}
 	// proc <-> proc
 	if (is_type_proc(src) && is_type_proc(dst)) {
+		if (is_type_polymorphic(dst)) {
+			if (is_type_polymorphic(src) &&
+			    operand->mode == Addressing_Variable) {
+				return true;
+			}
+			return false;
+		}
 		return true;
 	}
 
@@ -3067,7 +3074,6 @@ gb_internal void check_cast(CheckerContext *c, Operand *x, Type *type) {
 
 	bool is_const_expr = x->mode == Addressing_Constant;
 	bool can_convert = check_cast_internal(c, x, type);
-
 	if (!can_convert) {
 		TEMPORARY_ALLOCATOR_GUARD();
 		gbString expr_str  = expr_to_string(x->expr, temporary_allocator());
@@ -3108,6 +3114,26 @@ gb_internal void check_cast(CheckerContext *c, Operand *x, Type *type) {
 			final_type = default_type(x->type);
 		}
 		update_untyped_expr_type(c, x->expr, final_type, true);
+	} else {
+		Type *src = core_type(x->type);
+		Type *dst = core_type(type);
+		if (src != dst) {
+			bool const REQUIRE = true;
+			if (is_type_integer_128bit(src) && is_type_float(dst)) {
+				add_package_dependency(c, "runtime", "floattidf_unsigned", REQUIRE);
+				add_package_dependency(c, "runtime", "floattidf",          REQUIRE);
+			} else if (is_type_integer_128bit(dst) && is_type_float(src)) {
+				add_package_dependency(c, "runtime", "fixunsdfti",         REQUIRE);
+				add_package_dependency(c, "runtime", "fixunsdfdi",         REQUIRE);
+			} else if (src == t_f16 && is_type_float(dst)) {
+				add_package_dependency(c, "runtime", "gnu_h2f_ieee",       REQUIRE);
+				add_package_dependency(c, "runtime", "extendhfsf2",        REQUIRE);
+			} else if (is_type_float(dst) && dst == t_f16) {
+				add_package_dependency(c, "runtime", "truncsfhf2",         REQUIRE);
+				add_package_dependency(c, "runtime", "truncdfhf2",         REQUIRE);
+				add_package_dependency(c, "runtime", "gnu_f2h_ieee",       REQUIRE);
+			}
+		}
 	}
 
 	x->type = type;
@@ -3729,8 +3755,16 @@ gb_internal void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Typ
 		return;
 	}
 
-	if (op.kind == Token_Quo || op.kind == Token_QuoEq) {
-		Type *bt = base_type(x->type);
+	bool REQUIRE = true;
+
+	Type *bt = base_type(x->type);
+	if (op.kind == Token_Mod    || op.kind == Token_ModEq ||
+	    op.kind == Token_ModMod || op.kind == Token_ModModEq) {
+		if (bt->kind == Type_Basic) switch (bt->Basic.kind) {
+		case Basic_u128: add_package_dependency(c, "runtime", "umodti3", REQUIRE); break;
+		case Basic_i128: add_package_dependency(c, "runtime", "modti3",  REQUIRE); break;
+		}
+	} else if (op.kind == Token_Quo || op.kind == Token_QuoEq) {
 		if (bt->kind == Type_Basic) switch (bt->Basic.kind) {
 		case Basic_complex32:     add_package_dependency(c, "runtime", "quo_complex32");     break;
 		case Basic_complex64:     add_package_dependency(c, "runtime", "quo_complex64");     break;
@@ -3738,13 +3772,32 @@ gb_internal void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Typ
 		case Basic_quaternion64:  add_package_dependency(c, "runtime", "quo_quaternion64");  break;
 		case Basic_quaternion128: add_package_dependency(c, "runtime", "quo_quaternion128"); break;
 		case Basic_quaternion256: add_package_dependency(c, "runtime", "quo_quaternion256"); break;
+
+		case Basic_u128: add_package_dependency(c, "runtime", "udivti3", REQUIRE); break;
+		case Basic_i128: add_package_dependency(c, "runtime", "divti3",  REQUIRE); break;
 		}
 	} else if (op.kind == Token_Mul || op.kind == Token_MulEq) {
-		Type *bt = base_type(x->type);
 		if (bt->kind == Type_Basic) switch (bt->Basic.kind) {
-		case Basic_quaternion64:  add_package_dependency(c, "runtime", "mul_quaternion64"); break;
+		case Basic_quaternion64:  add_package_dependency(c, "runtime", "mul_quaternion64");  break;
 		case Basic_quaternion128: add_package_dependency(c, "runtime", "mul_quaternion128"); break;
 		case Basic_quaternion256: add_package_dependency(c, "runtime", "mul_quaternion256"); break;
+
+
+		case Basic_u128:
+		case Basic_i128:
+			if (is_arch_wasm()) {
+				add_package_dependency(c, "runtime", "__multi3", REQUIRE);
+			}
+			break;
+		}
+	} else if (op.kind == Token_Shl || op.kind == Token_ShlEq) {
+		if (bt->kind == Type_Basic) switch (bt->Basic.kind) {
+		case Basic_u128:
+		case Basic_i128:
+			if (is_arch_wasm()) {
+				add_package_dependency(c, "runtime", "__ashlti3", REQUIRE);
+			}
+			break;
 		}
 	}
 
@@ -4575,7 +4628,8 @@ gb_internal bool is_entity_declared_for_selector(Entity *entity, Scope *import_s
 		if (entity->kind == Entity_Builtin) {
 			// NOTE(bill): Builtin's are in the universal scope which is part of every scopes hierarchy
 			// This means that we should just ignore the found result through it
-			*allow_builtin = entity->scope == import_scope || entity->scope != builtin_pkg->scope;
+			*allow_builtin = entity->scope == import_scope ||
+			                 (entity->scope != builtin_pkg->scope && entity->scope != intrinsics_pkg->scope);
 		} else if ((entity->scope->flags&ScopeFlag_Global) == ScopeFlag_Global && (import_scope->flags&ScopeFlag_Global) == 0) {
 			is_declared = false;
 		}
@@ -7053,8 +7107,8 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 		    name == "defined" || 
 		    name == "config" || 
 		    name == "load" ||
-		    name == "load_hash" ||
-		    name == "load_or"
+		    name == "load_directory" ||
+		    name == "load_hash"
 		) {
 			operand->mode = Addressing_Builtin;
 			operand->builtin_id = BuiltinProc_DIRECTIVE;
@@ -7895,7 +7949,7 @@ gb_internal ExprKind check_basic_directive_expr(CheckerContext *c, Operand *o, A
 	} else {
 		if (name == "location") {
 			init_core_source_code_location(c->checker);
-			error(node, "'#%.*s' must be used in a call expression", LIT(name));
+			error(node, "'#location' must be used as a call, i.e. #location(proc), where #location() defaults to the procedure in which it was used.");
 			o->type = t_source_code_location;
 			o->mode = Addressing_Value;
 		} else if (
@@ -7904,6 +7958,7 @@ gb_internal ExprKind check_basic_directive_expr(CheckerContext *c, Operand *o, A
 		    name == "config" ||
 		    name == "load" ||
 		    name == "load_hash" ||
+		    name == "load_directory" ||
 		    name == "load_or"
 		) {
 			error(node, "'#%.*s' must be used as a call", LIT(name));

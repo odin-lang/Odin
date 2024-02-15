@@ -4,6 +4,7 @@ foreign import "system:d3d11.lib"
 
 import "../dxgi"
 import "../d3d_compiler"
+import "core:sys/windows"
 
 IUnknown        :: dxgi.IUnknown
 IUnknown_VTable :: dxgi.IUnknown_VTable
@@ -16,6 +17,7 @@ IID     :: dxgi.IID
 SIZE_T  :: dxgi.SIZE_T
 BOOL    :: dxgi.BOOL
 UINT    :: dxgi.UINT
+INT     :: dxgi.INT
 
 RECT :: dxgi.RECT
 SIZE :: dxgi.SIZE
@@ -24,7 +26,7 @@ IModuleInstance :: d3d_compiler.ID3D11ModuleInstance
 IBlob           :: d3d_compiler.ID3DBlob
 IModule         :: d3d_compiler.ID3D11Module
 
-@(default_calling_convention="stdcall", link_prefix="D3D11")
+@(default_calling_convention="system", link_prefix="D3D11")
 foreign d3d11 {
 	CreateDevice :: proc(
 		pAdapter:           ^dxgi.IAdapter,
@@ -707,8 +709,8 @@ ID3DDestructionNotifier :: struct #raw_union {
 }
 ID3DDestructionNotifier_VTable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
-	RegisterDestructionCallback: proc "stdcall" (this: ^ID3DDestructionNotifier, callbackFn: PFN_DESTRUCTION_CALLBACK, pData: rawptr, pCallbackID: ^u32) -> HRESULT,
-	UnregisterDestructionCallback: proc "stdcall" (this: ^ID3DDestructionNotifier, callbackID: u32) -> HRESULT,
+	RegisterDestructionCallback: proc "system" (this: ^ID3DDestructionNotifier, callbackFn: PFN_DESTRUCTION_CALLBACK, pData: rawptr, pCallbackID: ^u32) -> HRESULT,
+	UnregisterDestructionCallback: proc "system" (this: ^ID3DDestructionNotifier, callbackID: u32) -> HRESULT,
 }
 
 
@@ -1139,10 +1141,10 @@ IDeviceChild :: struct #raw_union {
 }
 IDeviceChild_VTable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
-	GetDevice:               proc "stdcall" (this: ^IDeviceChild, ppDevice: ^^IDevice),
-	GetPrivateData:          proc "stdcall" (this: ^IDeviceChild, guid: ^GUID, pDataSize: ^u32, pData: rawptr) -> HRESULT,
-	SetPrivateData:          proc "stdcall" (this: ^IDeviceChild, guid: ^GUID, DataSize: u32, pData: rawptr) -> HRESULT,
-	SetPrivateDataInterface: proc "stdcall" (this: ^IDeviceChild, guid: ^GUID, pData: ^IUnknown) -> HRESULT,
+	GetDevice:               proc "system" (this: ^IDeviceChild, ppDevice: ^^IDevice),
+	GetPrivateData:          proc "system" (this: ^IDeviceChild, guid: ^GUID, pDataSize: ^u32, pData: rawptr) -> HRESULT,
+	SetPrivateData:          proc "system" (this: ^IDeviceChild, guid: ^GUID, DataSize: u32, pData: rawptr) -> HRESULT,
+	SetPrivateDataInterface: proc "system" (this: ^IDeviceChild, guid: ^GUID, pData: ^IUnknown) -> HRESULT,
 }
 
 
@@ -1204,7 +1206,7 @@ IDepthStencilState :: struct #raw_union {
 }
 IDepthStencilState_VTable :: struct {
 	using id3d11devicechild_vtable: IDeviceChild_VTable,
-	GetDesc: proc "stdcall" (this: ^IDepthStencilState, pDesc: ^DEPTH_STENCIL_DESC),
+	GetDesc: proc "system" (this: ^IDepthStencilState, pDesc: ^DEPTH_STENCIL_DESC),
 }
 
 
@@ -1281,7 +1283,7 @@ IBlendState :: struct #raw_union {
 }
 IBlendState_VTable :: struct {
 	using id3d11devicechild_vtable: IDeviceChild_VTable,
-	GetDesc: proc "stdcall" (this: ^IBlendState, pDesc: ^BLEND_DESC),
+	GetDesc: proc "system" (this: ^IBlendState, pDesc: ^BLEND_DESC),
 }
 
 
@@ -1311,7 +1313,7 @@ IRasterizerState :: struct #raw_union {
 }
 IRasterizerState_VTable :: struct {
 	using id3d11devicechild_vtable: IDeviceChild_VTable,
-	GetDesc: proc "stdcall" (this: ^IRasterizerState, pDesc: ^RASTERIZER_DESC),
+	GetDesc: proc "system" (this: ^IRasterizerState, pDesc: ^RASTERIZER_DESC),
 }
 
 
@@ -1336,9 +1338,9 @@ IResource :: struct #raw_union {
 }
 IResource_VTable :: struct {
 	using id3d11devicechild_vtable: IDeviceChild_VTable,
-	GetType:             proc "stdcall" (this: ^IResource, pResourceDimension: ^RESOURCE_DIMENSION),
-	SetEvictionPriority: proc "stdcall" (this: ^IResource, EvictionPriority: u32),
-	GetEvictionPriority: proc "stdcall" (this: ^IResource) -> u32,
+	GetType:             proc "system" (this: ^IResource, pResourceDimension: ^RESOURCE_DIMENSION),
+	SetEvictionPriority: proc "system" (this: ^IResource, EvictionPriority: u32),
+	GetEvictionPriority: proc "system" (this: ^IResource) -> u32,
 }
 
 
@@ -1364,7 +1366,7 @@ IBuffer :: struct #raw_union {
 }
 IBuffer_VTable :: struct {
 	using id3d11resource_vtable: IResource_VTable,
-	GetDesc: proc "stdcall" (this: ^IBuffer, pDesc: ^BUFFER_DESC),
+	GetDesc: proc "system" (this: ^IBuffer, pDesc: ^BUFFER_DESC),
 }
 
 
@@ -1392,7 +1394,7 @@ ITexture1D :: struct #raw_union {
 }
 ITexture1D_VTable :: struct {
 	using id3d11resource_vtable: IResource_VTable,
-	GetDesc: proc "stdcall" (this: ^ITexture1D, pDesc: ^TEXTURE1D_DESC),
+	GetDesc: proc "system" (this: ^ITexture1D, pDesc: ^TEXTURE1D_DESC),
 }
 
 
@@ -1422,7 +1424,7 @@ ITexture2D :: struct #raw_union {
 }
 ITexture2D_VTable :: struct {
 	using id3d11resource_vtable: IResource_VTable,
-	GetDesc: proc "stdcall" (this: ^ITexture2D, pDesc: ^TEXTURE2D_DESC),
+	GetDesc: proc "system" (this: ^ITexture2D, pDesc: ^TEXTURE2D_DESC),
 }
 
 
@@ -1451,7 +1453,7 @@ ITexture3D :: struct #raw_union {
 }
 ITexture3D_VTable :: struct {
 	using id3d11resource_vtable: IResource_VTable,
-	GetDesc: proc "stdcall" (this: ^ITexture3D, pDesc: ^TEXTURE3D_DESC),
+	GetDesc: proc "system" (this: ^ITexture3D, pDesc: ^TEXTURE3D_DESC),
 }
 
 
@@ -1473,7 +1475,7 @@ IView :: struct #raw_union {
 }
 IView_VTable :: struct {
 	using id3d11devicechild_vtable: IDeviceChild_VTable,
-	GetResource: proc "stdcall" (this: ^IView, ppResource: ^^IResource),
+	GetResource: proc "system" (this: ^IView, ppResource: ^^IResource),
 }
 
 
@@ -1580,7 +1582,7 @@ IShaderResourceView :: struct #raw_union {
 }
 IShaderResourceView_VTable :: struct {
 	using id3d11view_vtable: IView_VTable,
-	GetDesc: proc "stdcall" (this: ^IShaderResourceView, pDesc: ^SHADER_RESOURCE_VIEW_DESC),
+	GetDesc: proc "system" (this: ^IShaderResourceView, pDesc: ^SHADER_RESOURCE_VIEW_DESC),
 }
 
 
@@ -1658,7 +1660,7 @@ IRenderTargetView :: struct #raw_union {
 }
 IRenderTargetView_VTable :: struct {
 	using id3d11view_vtable: IView_VTable,
-	GetDesc: proc "stdcall" (this: ^IRenderTargetView, pDesc: ^RENDER_TARGET_VIEW_DESC),
+	GetDesc: proc "system" (this: ^IRenderTargetView, pDesc: ^RENDER_TARGET_VIEW_DESC),
 }
 
 
@@ -1728,7 +1730,7 @@ IDepthStencilView :: struct #raw_union {
 }
 IDepthStencilView_VTable :: struct {
 	using id3d11view_vtable: IView_VTable,
-	GetDesc: proc "stdcall" (this: ^IDepthStencilView, pDesc: ^DEPTH_STENCIL_VIEW_DESC),
+	GetDesc: proc "system" (this: ^IDepthStencilView, pDesc: ^DEPTH_STENCIL_VIEW_DESC),
 }
 
 
@@ -1797,7 +1799,7 @@ IUnorderedAccessView :: struct #raw_union {
 }
 IUnorderedAccessView_VTable :: struct {
 	using id3d11view_vtable: IView_VTable,
-	GetDesc: proc "stdcall" (this: ^IUnorderedAccessView, pDesc: ^UNORDERED_ACCESS_VIEW_DESC),
+	GetDesc: proc "system" (this: ^IUnorderedAccessView, pDesc: ^UNORDERED_ACCESS_VIEW_DESC),
 }
 
 
@@ -1935,7 +1937,7 @@ ISamplerState :: struct #raw_union {
 }
 ISamplerState_VTable :: struct {
 	using id3d11devicechild_vtable: IDeviceChild_VTable,
-	GetDesc: proc "stdcall" (this: ^ISamplerState, pDesc: ^SAMPLER_DESC),
+	GetDesc: proc "system" (this: ^ISamplerState, pDesc: ^SAMPLER_DESC),
 }
 
 
@@ -1997,7 +1999,7 @@ IAsynchronous :: struct #raw_union {
 }
 IAsynchronous_VTable :: struct {
 	using id3d11devicechild_vtable: IDeviceChild_VTable,
-	GetDataSize: proc "stdcall" (this: ^IAsynchronous) -> u32,
+	GetDataSize: proc "system" (this: ^IAsynchronous) -> u32,
 }
 
 
@@ -2048,7 +2050,7 @@ IQuery :: struct #raw_union {
 }
 IQuery_VTable :: struct {
 	using id3d11asynchronous_vtable: IAsynchronous_VTable,
-	GetDesc: proc "stdcall" (this: ^IQuery, pDesc: ^QUERY_DESC),
+	GetDesc: proc "system" (this: ^IQuery, pDesc: ^QUERY_DESC),
 }
 
 
@@ -2118,7 +2120,7 @@ ICounter :: struct #raw_union {
 }
 ICounter_VTable :: struct {
 	using id3d11asynchronous_vtable: IAsynchronous_VTable,
-	GetDesc: proc "stdcall" (this: ^ICounter, pDesc: ^COUNTER_DESC),
+	GetDesc: proc "system" (this: ^ICounter, pDesc: ^COUNTER_DESC),
 }
 
 
@@ -2152,10 +2154,10 @@ IClassInstance :: struct #raw_union {
 }
 IClassInstance_VTable :: struct {
 	using id3d11devicechild_vtable: IDeviceChild_VTable,
-	GetClassLinkage: proc "stdcall" (this: ^IClassInstance, ppLinkage: ^^IClassLinkage),
-	GetDesc:         proc "stdcall" (this: ^IClassInstance, pDesc: ^CLASS_INSTANCE_DESC),
-	GetInstanceName: proc "stdcall" (this: ^IClassInstance, pInstanceName: cstring, pBufferLength: ^SIZE_T),
-	GetTypeName:     proc "stdcall" (this: ^IClassInstance, pTypeName: cstring, pBufferLength: ^SIZE_T),
+	GetClassLinkage: proc "system" (this: ^IClassInstance, ppLinkage: ^^IClassLinkage),
+	GetDesc:         proc "system" (this: ^IClassInstance, pDesc: ^CLASS_INSTANCE_DESC),
+	GetInstanceName: proc "system" (this: ^IClassInstance, pInstanceName: cstring, pBufferLength: ^SIZE_T),
+	GetTypeName:     proc "system" (this: ^IClassInstance, pTypeName: cstring, pBufferLength: ^SIZE_T),
 }
 
 
@@ -2168,8 +2170,8 @@ IClassLinkage :: struct #raw_union {
 }
 IClassLinkage_VTable :: struct {
 	using id3d11devicechild_vtable: IDeviceChild_VTable,
-	GetClassInstance:    proc "stdcall" (this: ^IClassLinkage, pClassInstanceName: cstring, InstanceIndex: u32, ppInstance: ^^IClassInstance) -> HRESULT,
-	CreateClassInstance: proc "stdcall" (this: ^IClassLinkage, pClassTypeName: cstring, ConstantBufferOffset: u32, ConstantVectorOffset: u32, TextureOffset: u32, SamplerOffset: u32, ppInstance: ^^IClassInstance) -> HRESULT,
+	GetClassInstance:    proc "system" (this: ^IClassLinkage, pClassInstanceName: cstring, InstanceIndex: u32, ppInstance: ^^IClassInstance) -> HRESULT,
+	CreateClassInstance: proc "system" (this: ^IClassLinkage, pClassTypeName: cstring, ConstantBufferOffset: u32, ConstantVectorOffset: u32, TextureOffset: u32, SamplerOffset: u32, ppInstance: ^^IClassInstance) -> HRESULT,
 }
 
 
@@ -2182,7 +2184,7 @@ ICommandList :: struct #raw_union {
 }
 ICommandList_VTable :: struct {
 	using id3d11devicechild_vtable: IDeviceChild_VTable,
-	GetContextFlags: proc "stdcall" (this: ^ICommandList) -> u32,
+	GetContextFlags: proc "system" (this: ^ICommandList) -> u32,
 }
 
 
@@ -2357,114 +2359,114 @@ IDeviceContext :: struct #raw_union {
 }
 IDeviceContext_VTable :: struct {
 	using id3d11devicechild_vtable: IDeviceChild_VTable,
-	VSSetConstantBuffers:                      proc "stdcall" (this: ^IDeviceContext, StartSlot: u32, NumBuffers: u32, ppConstantBuffers: ^^IBuffer),
-	PSSetShaderResources:                      proc "stdcall" (this: ^IDeviceContext, StartSlot: u32, NumViews: u32, ppShaderResourceViews: ^^IShaderResourceView),
-	PSSetShader:                               proc "stdcall" (this: ^IDeviceContext, pPixelShader: ^IPixelShader, ppClassInstances: ^^IClassInstance, NumClassInstances: u32),
-	PSSetSamplers:                             proc "stdcall" (this: ^IDeviceContext, StartSlot: u32, NumSamplers: u32, ppSamplers: ^^ISamplerState),
-	VSSetShader:                               proc "stdcall" (this: ^IDeviceContext, pVertexShader: ^IVertexShader, ppClassInstances: ^^IClassInstance, NumClassInstances: u32),
-	DrawIndexed:                               proc "stdcall" (this: ^IDeviceContext, IndexCount: u32, StartIndexLocation: u32, BaseVertexLocation: i32),
-	Draw:                                      proc "stdcall" (this: ^IDeviceContext, VertexCount: u32, StartVertexLocation: u32),
-	Map:                                       proc "stdcall" (this: ^IDeviceContext, pResource: ^IResource, Subresource: u32, MapType: MAP, MapFlags: MAP_FLAGS, pMappedResource: ^MAPPED_SUBRESOURCE) -> HRESULT,
-	Unmap:                                     proc "stdcall" (this: ^IDeviceContext, pResource: ^IResource, Subresource: u32),
-	PSSetConstantBuffers:                      proc "stdcall" (this: ^IDeviceContext, StartSlot: u32, NumBuffers: u32, ppConstantBuffers: ^^IBuffer),
-	IASetInputLayout:                          proc "stdcall" (this: ^IDeviceContext, pInputLayout: ^IInputLayout),
-	IASetVertexBuffers:                        proc "stdcall" (this: ^IDeviceContext, StartSlot: u32, NumBuffers: u32, ppVertexBuffers: ^^IBuffer, pStrides: ^u32, pOffsets: ^u32),
-	IASetIndexBuffer:                          proc "stdcall" (this: ^IDeviceContext, pIndexBuffer: ^IBuffer, Format: dxgi.FORMAT, Offset: u32),
-	DrawIndexedInstanced:                      proc "stdcall" (this: ^IDeviceContext, IndexCountPerInstance: u32, InstanceCount: u32, StartIndexLocation: u32, BaseVertexLocation: i32, StartInstanceLocation: u32),
-	DrawInstanced:                             proc "stdcall" (this: ^IDeviceContext, VertexCountPerInstance: u32, InstanceCount: u32, StartVertexLocation: u32, StartInstanceLocation: u32),
-	GSSetConstantBuffers:                      proc "stdcall" (this: ^IDeviceContext, StartSlot: u32, NumBuffers: u32, ppConstantBuffers: ^^IBuffer),
-	GSSetShader:                               proc "stdcall" (this: ^IDeviceContext, pShader: ^IGeometryShader, ppClassInstances: ^^IClassInstance, NumClassInstances: u32),
-	IASetPrimitiveTopology:                    proc "stdcall" (this: ^IDeviceContext, Topology: PRIMITIVE_TOPOLOGY),
-	VSSetShaderResources:                      proc "stdcall" (this: ^IDeviceContext, StartSlot: u32, NumViews: u32, ppShaderResourceViews: ^^IShaderResourceView),
-	VSSetSamplers:                             proc "stdcall" (this: ^IDeviceContext, StartSlot: u32, NumSamplers: u32, ppSamplers: ^^ISamplerState),
-	Begin:                                     proc "stdcall" (this: ^IDeviceContext, pAsync: ^IAsynchronous),
-	End:                                       proc "stdcall" (this: ^IDeviceContext, pAsync: ^IAsynchronous),
-	GetData:                                   proc "stdcall" (this: ^IDeviceContext, pAsync: ^IAsynchronous, pData: rawptr, DataSize: u32, GetDataFlags: u32) -> HRESULT,
-	SetPredication:                            proc "stdcall" (this: ^IDeviceContext, pPredicate: ^IPredicate, PredicateValue: BOOL),
-	GSSetShaderResources:                      proc "stdcall" (this: ^IDeviceContext, StartSlot: u32, NumViews: u32, ppShaderResourceViews: ^^IShaderResourceView),
-	GSSetSamplers:                             proc "stdcall" (this: ^IDeviceContext, StartSlot: u32, NumSamplers: u32, ppSamplers: ^^ISamplerState),
-	OMSetRenderTargets:                        proc "stdcall" (this: ^IDeviceContext, NumViews: u32, ppRenderTargetViews: ^^IRenderTargetView, pDepthStencilView: ^IDepthStencilView),
-	OMSetRenderTargetsAndUnorderedAccessViews: proc "stdcall" (this: ^IDeviceContext, NumRTVs: u32, ppRenderTargetViews: ^^IRenderTargetView, pDepthStencilView: ^IDepthStencilView, UAVStartSlot: u32, NumUAVs: u32, ppUnorderedAccessViews: ^^IUnorderedAccessView, pUAVInitialCounts: ^u32),
-	OMSetBlendState:                           proc "stdcall" (this: ^IDeviceContext, pBlendState: ^IBlendState, BlendFactor: ^[4]f32, SampleMask: u32),
-	OMSetDepthStencilState:                    proc "stdcall" (this: ^IDeviceContext, pDepthStencilState: ^IDepthStencilState, StencilRef: u32),
-	SOSetTargets:                              proc "stdcall" (this: ^IDeviceContext, NumBuffers: u32, ppSOTargets: ^^IBuffer, pOffsets: ^u32),
-	DrawAuto:                                  proc "stdcall" (this: ^IDeviceContext),
-	DrawIndexedInstancedIndirect:              proc "stdcall" (this: ^IDeviceContext, pBufferForArgs: ^IBuffer, AlignedByteOffsetForArgs: u32),
-	DrawInstancedIndirect:                     proc "stdcall" (this: ^IDeviceContext, pBufferForArgs: ^IBuffer, AlignedByteOffsetForArgs: u32),
-	Dispatch:                                  proc "stdcall" (this: ^IDeviceContext, ThreadGroupCountX: u32, ThreadGroupCountY: u32, ThreadGroupCountZ: u32),
-	DispatchIndirect:                          proc "stdcall" (this: ^IDeviceContext, pBufferForArgs: ^IBuffer, AlignedByteOffsetForArgs: u32),
-	RSSetState:                                proc "stdcall" (this: ^IDeviceContext, pRasterizerState: ^IRasterizerState),
-	RSSetViewports:                            proc "stdcall" (this: ^IDeviceContext, NumViewports: u32, pViewports: ^VIEWPORT),
-	RSSetScissorRects:                         proc "stdcall" (this: ^IDeviceContext, NumRects: u32, pRects: ^RECT),
-	CopySubresourceRegion:                     proc "stdcall" (this: ^IDeviceContext, pDstResource: ^IResource, DstSubresource: u32, DstX: u32, DstY: u32, DstZ: u32, pSrcResource: ^IResource, SrcSubresource: u32, pSrcBox: ^BOX),
-	CopyResource:                              proc "stdcall" (this: ^IDeviceContext, pDstResource: ^IResource, pSrcResource: ^IResource),
-	UpdateSubresource:                         proc "stdcall" (this: ^IDeviceContext, pDstResource: ^IResource, DstSubresource: u32, pDstBox: ^BOX, pSrcData: rawptr, SrcRowPitch: u32, SrcDepthPitch: u32),
-	CopyStructureCount:                        proc "stdcall" (this: ^IDeviceContext, pDstBuffer: ^IBuffer, DstAlignedByteOffset: u32, pSrcView: ^IUnorderedAccessView),
-	ClearRenderTargetView:                     proc "stdcall" (this: ^IDeviceContext, pRenderTargetView: ^IRenderTargetView, ColorRGBA: ^[4]f32),
-	ClearUnorderedAccessViewUint:              proc "stdcall" (this: ^IDeviceContext, pUnorderedAccessView: ^IUnorderedAccessView, Values: ^[4]u32),
-	ClearUnorderedAccessViewFloat:             proc "stdcall" (this: ^IDeviceContext, pUnorderedAccessView: ^IUnorderedAccessView, Values: ^[4]f32),
-	ClearDepthStencilView:                     proc "stdcall" (this: ^IDeviceContext, pDepthStencilView: ^IDepthStencilView, ClearFlags: CLEAR_FLAGS, Depth: f32, Stencil: u8),
-	GenerateMips:                              proc "stdcall" (this: ^IDeviceContext, pShaderResourceView: ^IShaderResourceView),
-	SetResourceMinLOD:                         proc "stdcall" (this: ^IDeviceContext, pResource: ^IResource, MinLOD: f32),
-	GetResourceMinLOD:                         proc "stdcall" (this: ^IDeviceContext, pResource: ^IResource) -> f32,
-	ResolveSubresource:                        proc "stdcall" (this: ^IDeviceContext, pDstResource: ^IResource, DstSubresource: u32, pSrcResource: ^IResource, SrcSubresource: u32, Format: dxgi.FORMAT),
-	ExecuteCommandList:                        proc "stdcall" (this: ^IDeviceContext, pCommandList: ^ICommandList, RestoreContextState: BOOL),
-	HSSetShaderResources:                      proc "stdcall" (this: ^IDeviceContext, StartSlot: u32, NumViews: u32, ppShaderResourceViews: ^^IShaderResourceView),
-	HSSetShader:                               proc "stdcall" (this: ^IDeviceContext, pHullShader: ^IHullShader, ppClassInstances: ^^IClassInstance, NumClassInstances: u32),
-	HSSetSamplers:                             proc "stdcall" (this: ^IDeviceContext, StartSlot: u32, NumSamplers: u32, ppSamplers: ^^ISamplerState),
-	HSSetConstantBuffers:                      proc "stdcall" (this: ^IDeviceContext, StartSlot: u32, NumBuffers: u32, ppConstantBuffers: ^^IBuffer),
-	DSSetShaderResources:                      proc "stdcall" (this: ^IDeviceContext, StartSlot: u32, NumViews: u32, ppShaderResourceViews: ^^IShaderResourceView),
-	DSSetShader:                               proc "stdcall" (this: ^IDeviceContext, pDomainShader: ^IDomainShader, ppClassInstances: ^^IClassInstance, NumClassInstances: u32),
-	DSSetSamplers:                             proc "stdcall" (this: ^IDeviceContext, StartSlot: u32, NumSamplers: u32, ppSamplers: ^^ISamplerState),
-	DSSetConstantBuffers:                      proc "stdcall" (this: ^IDeviceContext, StartSlot: u32, NumBuffers: u32, ppConstantBuffers: ^^IBuffer),
-	CSSetShaderResources:                      proc "stdcall" (this: ^IDeviceContext, StartSlot: u32, NumViews: u32, ppShaderResourceViews: ^^IShaderResourceView),
-	CSSetUnorderedAccessViews:                 proc "stdcall" (this: ^IDeviceContext, StartSlot: u32, NumUAVs: u32, ppUnorderedAccessViews: ^^IUnorderedAccessView, pUAVInitialCounts: ^u32),
-	CSSetShader:                               proc "stdcall" (this: ^IDeviceContext, pComputeShader: ^IComputeShader, ppClassInstances: ^^IClassInstance, NumClassInstances: u32),
-	CSSetSamplers:                             proc "stdcall" (this: ^IDeviceContext, StartSlot: u32, NumSamplers: u32, ppSamplers: ^^ISamplerState),
-	CSSetConstantBuffers:                      proc "stdcall" (this: ^IDeviceContext, StartSlot: u32, NumBuffers: u32, ppConstantBuffers: ^^IBuffer),
-	VSGetConstantBuffers:                      proc "stdcall" (this: ^IDeviceContext, StartSlot: u32, NumBuffers: u32, ppConstantBuffers: ^^IBuffer),
-	PSGetShaderResources:                      proc "stdcall" (this: ^IDeviceContext, StartSlot: u32, NumViews: u32, ppShaderResourceViews: ^^IShaderResourceView),
-	PSGetShader:                               proc "stdcall" (this: ^IDeviceContext, ppPixelShader: ^^IPixelShader, ppClassInstances: ^^IClassInstance, pNumClassInstances: ^u32),
-	PSGetSamplers:                             proc "stdcall" (this: ^IDeviceContext, StartSlot: u32, NumSamplers: u32, ppSamplers: ^^ISamplerState),
-	VSGetShader:                               proc "stdcall" (this: ^IDeviceContext, ppVertexShader: ^^IVertexShader, ppClassInstances: ^^IClassInstance, pNumClassInstances: ^u32),
-	PSGetConstantBuffers:                      proc "stdcall" (this: ^IDeviceContext, StartSlot: u32, NumBuffers: u32, ppConstantBuffers: ^^IBuffer),
-	IAGetInputLayout:                          proc "stdcall" (this: ^IDeviceContext, ppInputLayout: ^^IInputLayout),
-	IAGetVertexBuffers:                        proc "stdcall" (this: ^IDeviceContext, StartSlot: u32, NumBuffers: u32, ppVertexBuffers: ^^IBuffer, pStrides: ^u32, pOffsets: ^u32),
-	IAGetIndexBuffer:                          proc "stdcall" (this: ^IDeviceContext, pIndexBuffer: ^^IBuffer, Format: ^dxgi.FORMAT, Offset: ^u32),
-	GSGetConstantBuffers:                      proc "stdcall" (this: ^IDeviceContext, StartSlot: u32, NumBuffers: u32, ppConstantBuffers: ^^IBuffer),
-	GSGetShader:                               proc "stdcall" (this: ^IDeviceContext, ppGeometryShader: ^^IGeometryShader, ppClassInstances: ^^IClassInstance, pNumClassInstances: ^u32),
-	IAGetPrimitiveTopology:                    proc "stdcall" (this: ^IDeviceContext, pTopology: ^PRIMITIVE_TOPOLOGY),
-	VSGetShaderResources:                      proc "stdcall" (this: ^IDeviceContext, StartSlot: u32, NumViews: u32, ppShaderResourceViews: ^^IShaderResourceView),
-	VSGetSamplers:                             proc "stdcall" (this: ^IDeviceContext, StartSlot: u32, NumSamplers: u32, ppSamplers: ^^ISamplerState),
-	GetPredication:                            proc "stdcall" (this: ^IDeviceContext, ppPredicate: ^^IPredicate, pPredicateValue: ^BOOL),
-	GSGetShaderResources:                      proc "stdcall" (this: ^IDeviceContext, StartSlot: u32, NumViews: u32, ppShaderResourceViews: ^^IShaderResourceView),
-	GSGetSamplers:                             proc "stdcall" (this: ^IDeviceContext, StartSlot: u32, NumSamplers: u32, ppSamplers: ^^ISamplerState),
-	OMGetRenderTargets:                        proc "stdcall" (this: ^IDeviceContext, NumViews: u32, ppRenderTargetViews: ^^IRenderTargetView, ppDepthStencilView: ^^IDepthStencilView),
-	OMGetRenderTargetsAndUnorderedAccessViews: proc "stdcall" (this: ^IDeviceContext, NumRTVs: u32, ppRenderTargetViews: ^^IRenderTargetView, ppDepthStencilView: ^^IDepthStencilView, UAVStartSlot: u32, NumUAVs: u32, ppUnorderedAccessViews: ^^IUnorderedAccessView),
-	OMGetBlendState:                           proc "stdcall" (this: ^IDeviceContext, ppBlendState: ^^IBlendState, BlendFactor: ^[4]f32, pSampleMask: ^COLOR_WRITE_ENABLE_MASK),
-	OMGetDepthStencilState:                    proc "stdcall" (this: ^IDeviceContext, ppDepthStencilState: ^^IDepthStencilState, pStencilRef: ^u32),
-	SOGetTargets:                              proc "stdcall" (this: ^IDeviceContext, NumBuffers: u32, ppSOTargets: ^^IBuffer),
-	RSGetState:                                proc "stdcall" (this: ^IDeviceContext, ppRasterizerState: ^^IRasterizerState),
-	RSGetViewports:                            proc "stdcall" (this: ^IDeviceContext, pNumViewports: ^u32, pViewports: ^VIEWPORT),
-	RSGetScissorRects:                         proc "stdcall" (this: ^IDeviceContext, pNumRects: ^u32, pRects: ^RECT),
-	HSGetShaderResources:                      proc "stdcall" (this: ^IDeviceContext, StartSlot: u32, NumViews: u32, ppShaderResourceViews: ^^IShaderResourceView),
-	HSGetShader:                               proc "stdcall" (this: ^IDeviceContext, ppHullShader: ^^IHullShader, ppClassInstances: ^^IClassInstance, pNumClassInstances: ^u32),
-	HSGetSamplers:                             proc "stdcall" (this: ^IDeviceContext, StartSlot: u32, NumSamplers: u32, ppSamplers: ^^ISamplerState),
-	HSGetConstantBuffers:                      proc "stdcall" (this: ^IDeviceContext, StartSlot: u32, NumBuffers: u32, ppConstantBuffers: ^^IBuffer),
-	DSGetShaderResources:                      proc "stdcall" (this: ^IDeviceContext, StartSlot: u32, NumViews: u32, ppShaderResourceViews: ^^IShaderResourceView),
-	DSGetShader:                               proc "stdcall" (this: ^IDeviceContext, ppDomainShader: ^^IDomainShader, ppClassInstances: ^^IClassInstance, pNumClassInstances: ^u32),
-	DSGetSamplers:                             proc "stdcall" (this: ^IDeviceContext, StartSlot: u32, NumSamplers: u32, ppSamplers: ^^ISamplerState),
-	DSGetConstantBuffers:                      proc "stdcall" (this: ^IDeviceContext, StartSlot: u32, NumBuffers: u32, ppConstantBuffers: ^^IBuffer),
-	CSGetShaderResources:                      proc "stdcall" (this: ^IDeviceContext, StartSlot: u32, NumViews: u32, ppShaderResourceViews: ^^IShaderResourceView),
-	CSGetUnorderedAccessViews:                 proc "stdcall" (this: ^IDeviceContext, StartSlot: u32, NumUAVs: u32, ppUnorderedAccessViews: ^^IUnorderedAccessView),
-	CSGetShader:                               proc "stdcall" (this: ^IDeviceContext, ppComputeShader: ^^IComputeShader, ppClassInstances: ^^IClassInstance, pNumClassInstances: ^u32),
-	CSGetSamplers:                             proc "stdcall" (this: ^IDeviceContext, StartSlot: u32, NumSamplers: u32, ppSamplers: ^^ISamplerState),
-	CSGetConstantBuffers:                      proc "stdcall" (this: ^IDeviceContext, StartSlot: u32, NumBuffers: u32, ppConstantBuffers: ^^IBuffer),
-	ClearState:                                proc "stdcall" (this: ^IDeviceContext),
-	Flush:                                     proc "stdcall" (this: ^IDeviceContext),
-	GetType:                                   proc "stdcall" (this: ^IDeviceContext) -> DEVICE_CONTEXT_TYPE,
-	GetContextFlags:                           proc "stdcall" (this: ^IDeviceContext) -> u32,
-	FinishCommandList:                         proc "stdcall" (this: ^IDeviceContext, RestoreDeferredContextState: BOOL, ppCommandList: ^^ICommandList) -> HRESULT,
+	VSSetConstantBuffers:                      proc "system" (this: ^IDeviceContext, StartSlot: u32, NumBuffers: u32, ppConstantBuffers: ^^IBuffer),
+	PSSetShaderResources:                      proc "system" (this: ^IDeviceContext, StartSlot: u32, NumViews: u32, ppShaderResourceViews: ^^IShaderResourceView),
+	PSSetShader:                               proc "system" (this: ^IDeviceContext, pPixelShader: ^IPixelShader, ppClassInstances: ^^IClassInstance, NumClassInstances: u32),
+	PSSetSamplers:                             proc "system" (this: ^IDeviceContext, StartSlot: u32, NumSamplers: u32, ppSamplers: ^^ISamplerState),
+	VSSetShader:                               proc "system" (this: ^IDeviceContext, pVertexShader: ^IVertexShader, ppClassInstances: ^^IClassInstance, NumClassInstances: u32),
+	DrawIndexed:                               proc "system" (this: ^IDeviceContext, IndexCount: u32, StartIndexLocation: u32, BaseVertexLocation: i32),
+	Draw:                                      proc "system" (this: ^IDeviceContext, VertexCount: u32, StartVertexLocation: u32),
+	Map:                                       proc "system" (this: ^IDeviceContext, pResource: ^IResource, Subresource: u32, MapType: MAP, MapFlags: MAP_FLAGS, pMappedResource: ^MAPPED_SUBRESOURCE) -> HRESULT,
+	Unmap:                                     proc "system" (this: ^IDeviceContext, pResource: ^IResource, Subresource: u32),
+	PSSetConstantBuffers:                      proc "system" (this: ^IDeviceContext, StartSlot: u32, NumBuffers: u32, ppConstantBuffers: ^^IBuffer),
+	IASetInputLayout:                          proc "system" (this: ^IDeviceContext, pInputLayout: ^IInputLayout),
+	IASetVertexBuffers:                        proc "system" (this: ^IDeviceContext, StartSlot: u32, NumBuffers: u32, ppVertexBuffers: ^^IBuffer, pStrides: ^u32, pOffsets: ^u32),
+	IASetIndexBuffer:                          proc "system" (this: ^IDeviceContext, pIndexBuffer: ^IBuffer, Format: dxgi.FORMAT, Offset: u32),
+	DrawIndexedInstanced:                      proc "system" (this: ^IDeviceContext, IndexCountPerInstance: u32, InstanceCount: u32, StartIndexLocation: u32, BaseVertexLocation: i32, StartInstanceLocation: u32),
+	DrawInstanced:                             proc "system" (this: ^IDeviceContext, VertexCountPerInstance: u32, InstanceCount: u32, StartVertexLocation: u32, StartInstanceLocation: u32),
+	GSSetConstantBuffers:                      proc "system" (this: ^IDeviceContext, StartSlot: u32, NumBuffers: u32, ppConstantBuffers: ^^IBuffer),
+	GSSetShader:                               proc "system" (this: ^IDeviceContext, pShader: ^IGeometryShader, ppClassInstances: ^^IClassInstance, NumClassInstances: u32),
+	IASetPrimitiveTopology:                    proc "system" (this: ^IDeviceContext, Topology: PRIMITIVE_TOPOLOGY),
+	VSSetShaderResources:                      proc "system" (this: ^IDeviceContext, StartSlot: u32, NumViews: u32, ppShaderResourceViews: ^^IShaderResourceView),
+	VSSetSamplers:                             proc "system" (this: ^IDeviceContext, StartSlot: u32, NumSamplers: u32, ppSamplers: ^^ISamplerState),
+	Begin:                                     proc "system" (this: ^IDeviceContext, pAsync: ^IAsynchronous),
+	End:                                       proc "system" (this: ^IDeviceContext, pAsync: ^IAsynchronous),
+	GetData:                                   proc "system" (this: ^IDeviceContext, pAsync: ^IAsynchronous, pData: rawptr, DataSize: u32, GetDataFlags: u32) -> HRESULT,
+	SetPredication:                            proc "system" (this: ^IDeviceContext, pPredicate: ^IPredicate, PredicateValue: BOOL),
+	GSSetShaderResources:                      proc "system" (this: ^IDeviceContext, StartSlot: u32, NumViews: u32, ppShaderResourceViews: ^^IShaderResourceView),
+	GSSetSamplers:                             proc "system" (this: ^IDeviceContext, StartSlot: u32, NumSamplers: u32, ppSamplers: ^^ISamplerState),
+	OMSetRenderTargets:                        proc "system" (this: ^IDeviceContext, NumViews: u32, ppRenderTargetViews: ^^IRenderTargetView, pDepthStencilView: ^IDepthStencilView),
+	OMSetRenderTargetsAndUnorderedAccessViews: proc "system" (this: ^IDeviceContext, NumRTVs: u32, ppRenderTargetViews: ^^IRenderTargetView, pDepthStencilView: ^IDepthStencilView, UAVStartSlot: u32, NumUAVs: u32, ppUnorderedAccessViews: ^^IUnorderedAccessView, pUAVInitialCounts: ^u32),
+	OMSetBlendState:                           proc "system" (this: ^IDeviceContext, pBlendState: ^IBlendState, BlendFactor: ^[4]f32, SampleMask: u32),
+	OMSetDepthStencilState:                    proc "system" (this: ^IDeviceContext, pDepthStencilState: ^IDepthStencilState, StencilRef: u32),
+	SOSetTargets:                              proc "system" (this: ^IDeviceContext, NumBuffers: u32, ppSOTargets: ^^IBuffer, pOffsets: ^u32),
+	DrawAuto:                                  proc "system" (this: ^IDeviceContext),
+	DrawIndexedInstancedIndirect:              proc "system" (this: ^IDeviceContext, pBufferForArgs: ^IBuffer, AlignedByteOffsetForArgs: u32),
+	DrawInstancedIndirect:                     proc "system" (this: ^IDeviceContext, pBufferForArgs: ^IBuffer, AlignedByteOffsetForArgs: u32),
+	Dispatch:                                  proc "system" (this: ^IDeviceContext, ThreadGroupCountX: u32, ThreadGroupCountY: u32, ThreadGroupCountZ: u32),
+	DispatchIndirect:                          proc "system" (this: ^IDeviceContext, pBufferForArgs: ^IBuffer, AlignedByteOffsetForArgs: u32),
+	RSSetState:                                proc "system" (this: ^IDeviceContext, pRasterizerState: ^IRasterizerState),
+	RSSetViewports:                            proc "system" (this: ^IDeviceContext, NumViewports: u32, pViewports: ^VIEWPORT),
+	RSSetScissorRects:                         proc "system" (this: ^IDeviceContext, NumRects: u32, pRects: ^RECT),
+	CopySubresourceRegion:                     proc "system" (this: ^IDeviceContext, pDstResource: ^IResource, DstSubresource: u32, DstX: u32, DstY: u32, DstZ: u32, pSrcResource: ^IResource, SrcSubresource: u32, pSrcBox: ^BOX),
+	CopyResource:                              proc "system" (this: ^IDeviceContext, pDstResource: ^IResource, pSrcResource: ^IResource),
+	UpdateSubresource:                         proc "system" (this: ^IDeviceContext, pDstResource: ^IResource, DstSubresource: u32, pDstBox: ^BOX, pSrcData: rawptr, SrcRowPitch: u32, SrcDepthPitch: u32),
+	CopyStructureCount:                        proc "system" (this: ^IDeviceContext, pDstBuffer: ^IBuffer, DstAlignedByteOffset: u32, pSrcView: ^IUnorderedAccessView),
+	ClearRenderTargetView:                     proc "system" (this: ^IDeviceContext, pRenderTargetView: ^IRenderTargetView, ColorRGBA: ^[4]f32),
+	ClearUnorderedAccessViewUint:              proc "system" (this: ^IDeviceContext, pUnorderedAccessView: ^IUnorderedAccessView, Values: ^[4]u32),
+	ClearUnorderedAccessViewFloat:             proc "system" (this: ^IDeviceContext, pUnorderedAccessView: ^IUnorderedAccessView, Values: ^[4]f32),
+	ClearDepthStencilView:                     proc "system" (this: ^IDeviceContext, pDepthStencilView: ^IDepthStencilView, ClearFlags: CLEAR_FLAGS, Depth: f32, Stencil: u8),
+	GenerateMips:                              proc "system" (this: ^IDeviceContext, pShaderResourceView: ^IShaderResourceView),
+	SetResourceMinLOD:                         proc "system" (this: ^IDeviceContext, pResource: ^IResource, MinLOD: f32),
+	GetResourceMinLOD:                         proc "system" (this: ^IDeviceContext, pResource: ^IResource) -> f32,
+	ResolveSubresource:                        proc "system" (this: ^IDeviceContext, pDstResource: ^IResource, DstSubresource: u32, pSrcResource: ^IResource, SrcSubresource: u32, Format: dxgi.FORMAT),
+	ExecuteCommandList:                        proc "system" (this: ^IDeviceContext, pCommandList: ^ICommandList, RestoreContextState: BOOL),
+	HSSetShaderResources:                      proc "system" (this: ^IDeviceContext, StartSlot: u32, NumViews: u32, ppShaderResourceViews: ^^IShaderResourceView),
+	HSSetShader:                               proc "system" (this: ^IDeviceContext, pHullShader: ^IHullShader, ppClassInstances: ^^IClassInstance, NumClassInstances: u32),
+	HSSetSamplers:                             proc "system" (this: ^IDeviceContext, StartSlot: u32, NumSamplers: u32, ppSamplers: ^^ISamplerState),
+	HSSetConstantBuffers:                      proc "system" (this: ^IDeviceContext, StartSlot: u32, NumBuffers: u32, ppConstantBuffers: ^^IBuffer),
+	DSSetShaderResources:                      proc "system" (this: ^IDeviceContext, StartSlot: u32, NumViews: u32, ppShaderResourceViews: ^^IShaderResourceView),
+	DSSetShader:                               proc "system" (this: ^IDeviceContext, pDomainShader: ^IDomainShader, ppClassInstances: ^^IClassInstance, NumClassInstances: u32),
+	DSSetSamplers:                             proc "system" (this: ^IDeviceContext, StartSlot: u32, NumSamplers: u32, ppSamplers: ^^ISamplerState),
+	DSSetConstantBuffers:                      proc "system" (this: ^IDeviceContext, StartSlot: u32, NumBuffers: u32, ppConstantBuffers: ^^IBuffer),
+	CSSetShaderResources:                      proc "system" (this: ^IDeviceContext, StartSlot: u32, NumViews: u32, ppShaderResourceViews: ^^IShaderResourceView),
+	CSSetUnorderedAccessViews:                 proc "system" (this: ^IDeviceContext, StartSlot: u32, NumUAVs: u32, ppUnorderedAccessViews: ^^IUnorderedAccessView, pUAVInitialCounts: ^u32),
+	CSSetShader:                               proc "system" (this: ^IDeviceContext, pComputeShader: ^IComputeShader, ppClassInstances: ^^IClassInstance, NumClassInstances: u32),
+	CSSetSamplers:                             proc "system" (this: ^IDeviceContext, StartSlot: u32, NumSamplers: u32, ppSamplers: ^^ISamplerState),
+	CSSetConstantBuffers:                      proc "system" (this: ^IDeviceContext, StartSlot: u32, NumBuffers: u32, ppConstantBuffers: ^^IBuffer),
+	VSGetConstantBuffers:                      proc "system" (this: ^IDeviceContext, StartSlot: u32, NumBuffers: u32, ppConstantBuffers: ^^IBuffer),
+	PSGetShaderResources:                      proc "system" (this: ^IDeviceContext, StartSlot: u32, NumViews: u32, ppShaderResourceViews: ^^IShaderResourceView),
+	PSGetShader:                               proc "system" (this: ^IDeviceContext, ppPixelShader: ^^IPixelShader, ppClassInstances: ^^IClassInstance, pNumClassInstances: ^u32),
+	PSGetSamplers:                             proc "system" (this: ^IDeviceContext, StartSlot: u32, NumSamplers: u32, ppSamplers: ^^ISamplerState),
+	VSGetShader:                               proc "system" (this: ^IDeviceContext, ppVertexShader: ^^IVertexShader, ppClassInstances: ^^IClassInstance, pNumClassInstances: ^u32),
+	PSGetConstantBuffers:                      proc "system" (this: ^IDeviceContext, StartSlot: u32, NumBuffers: u32, ppConstantBuffers: ^^IBuffer),
+	IAGetInputLayout:                          proc "system" (this: ^IDeviceContext, ppInputLayout: ^^IInputLayout),
+	IAGetVertexBuffers:                        proc "system" (this: ^IDeviceContext, StartSlot: u32, NumBuffers: u32, ppVertexBuffers: ^^IBuffer, pStrides: ^u32, pOffsets: ^u32),
+	IAGetIndexBuffer:                          proc "system" (this: ^IDeviceContext, pIndexBuffer: ^^IBuffer, Format: ^dxgi.FORMAT, Offset: ^u32),
+	GSGetConstantBuffers:                      proc "system" (this: ^IDeviceContext, StartSlot: u32, NumBuffers: u32, ppConstantBuffers: ^^IBuffer),
+	GSGetShader:                               proc "system" (this: ^IDeviceContext, ppGeometryShader: ^^IGeometryShader, ppClassInstances: ^^IClassInstance, pNumClassInstances: ^u32),
+	IAGetPrimitiveTopology:                    proc "system" (this: ^IDeviceContext, pTopology: ^PRIMITIVE_TOPOLOGY),
+	VSGetShaderResources:                      proc "system" (this: ^IDeviceContext, StartSlot: u32, NumViews: u32, ppShaderResourceViews: ^^IShaderResourceView),
+	VSGetSamplers:                             proc "system" (this: ^IDeviceContext, StartSlot: u32, NumSamplers: u32, ppSamplers: ^^ISamplerState),
+	GetPredication:                            proc "system" (this: ^IDeviceContext, ppPredicate: ^^IPredicate, pPredicateValue: ^BOOL),
+	GSGetShaderResources:                      proc "system" (this: ^IDeviceContext, StartSlot: u32, NumViews: u32, ppShaderResourceViews: ^^IShaderResourceView),
+	GSGetSamplers:                             proc "system" (this: ^IDeviceContext, StartSlot: u32, NumSamplers: u32, ppSamplers: ^^ISamplerState),
+	OMGetRenderTargets:                        proc "system" (this: ^IDeviceContext, NumViews: u32, ppRenderTargetViews: ^^IRenderTargetView, ppDepthStencilView: ^^IDepthStencilView),
+	OMGetRenderTargetsAndUnorderedAccessViews: proc "system" (this: ^IDeviceContext, NumRTVs: u32, ppRenderTargetViews: ^^IRenderTargetView, ppDepthStencilView: ^^IDepthStencilView, UAVStartSlot: u32, NumUAVs: u32, ppUnorderedAccessViews: ^^IUnorderedAccessView),
+	OMGetBlendState:                           proc "system" (this: ^IDeviceContext, ppBlendState: ^^IBlendState, BlendFactor: ^[4]f32, pSampleMask: ^COLOR_WRITE_ENABLE_MASK),
+	OMGetDepthStencilState:                    proc "system" (this: ^IDeviceContext, ppDepthStencilState: ^^IDepthStencilState, pStencilRef: ^u32),
+	SOGetTargets:                              proc "system" (this: ^IDeviceContext, NumBuffers: u32, ppSOTargets: ^^IBuffer),
+	RSGetState:                                proc "system" (this: ^IDeviceContext, ppRasterizerState: ^^IRasterizerState),
+	RSGetViewports:                            proc "system" (this: ^IDeviceContext, pNumViewports: ^u32, pViewports: ^VIEWPORT),
+	RSGetScissorRects:                         proc "system" (this: ^IDeviceContext, pNumRects: ^u32, pRects: ^RECT),
+	HSGetShaderResources:                      proc "system" (this: ^IDeviceContext, StartSlot: u32, NumViews: u32, ppShaderResourceViews: ^^IShaderResourceView),
+	HSGetShader:                               proc "system" (this: ^IDeviceContext, ppHullShader: ^^IHullShader, ppClassInstances: ^^IClassInstance, pNumClassInstances: ^u32),
+	HSGetSamplers:                             proc "system" (this: ^IDeviceContext, StartSlot: u32, NumSamplers: u32, ppSamplers: ^^ISamplerState),
+	HSGetConstantBuffers:                      proc "system" (this: ^IDeviceContext, StartSlot: u32, NumBuffers: u32, ppConstantBuffers: ^^IBuffer),
+	DSGetShaderResources:                      proc "system" (this: ^IDeviceContext, StartSlot: u32, NumViews: u32, ppShaderResourceViews: ^^IShaderResourceView),
+	DSGetShader:                               proc "system" (this: ^IDeviceContext, ppDomainShader: ^^IDomainShader, ppClassInstances: ^^IClassInstance, pNumClassInstances: ^u32),
+	DSGetSamplers:                             proc "system" (this: ^IDeviceContext, StartSlot: u32, NumSamplers: u32, ppSamplers: ^^ISamplerState),
+	DSGetConstantBuffers:                      proc "system" (this: ^IDeviceContext, StartSlot: u32, NumBuffers: u32, ppConstantBuffers: ^^IBuffer),
+	CSGetShaderResources:                      proc "system" (this: ^IDeviceContext, StartSlot: u32, NumViews: u32, ppShaderResourceViews: ^^IShaderResourceView),
+	CSGetUnorderedAccessViews:                 proc "system" (this: ^IDeviceContext, StartSlot: u32, NumUAVs: u32, ppUnorderedAccessViews: ^^IUnorderedAccessView),
+	CSGetShader:                               proc "system" (this: ^IDeviceContext, ppComputeShader: ^^IComputeShader, ppClassInstances: ^^IClassInstance, pNumClassInstances: ^u32),
+	CSGetSamplers:                             proc "system" (this: ^IDeviceContext, StartSlot: u32, NumSamplers: u32, ppSamplers: ^^ISamplerState),
+	CSGetConstantBuffers:                      proc "system" (this: ^IDeviceContext, StartSlot: u32, NumBuffers: u32, ppConstantBuffers: ^^IBuffer),
+	ClearState:                                proc "system" (this: ^IDeviceContext),
+	Flush:                                     proc "system" (this: ^IDeviceContext),
+	GetType:                                   proc "system" (this: ^IDeviceContext) -> DEVICE_CONTEXT_TYPE,
+	GetContextFlags:                           proc "system" (this: ^IDeviceContext) -> u32,
+	FinishCommandList:                         proc "system" (this: ^IDeviceContext, RestoreDeferredContextState: BOOL, ppCommandList: ^^ICommandList) -> HRESULT,
 }
 
 
@@ -2565,8 +2567,8 @@ IVideoDecoder :: struct #raw_union {
 }
 IVideoDecoder_VTable :: struct {
 	using id3d11devicechild_vtable: IDeviceChild_VTable,
-	GetCreationParameters: proc "stdcall" (this: ^IVideoDecoder, pVideoDesc: ^VIDEO_DECODER_DESC, pConfig: ^VIDEO_DECODER_CONFIG) -> HRESULT,
-	GetDriverHandle: proc "stdcall" (this: ^IVideoDecoder, pDriverHandle: ^HANDLE) -> HRESULT,
+	GetCreationParameters: proc "system" (this: ^IVideoDecoder, pVideoDesc: ^VIDEO_DECODER_DESC, pConfig: ^VIDEO_DECODER_CONFIG) -> HRESULT,
+	GetDriverHandle: proc "system" (this: ^IVideoDecoder, pDriverHandle: ^HANDLE) -> HRESULT,
 }
 
 
@@ -2761,12 +2763,12 @@ IVideoProcessorEnumerator :: struct #raw_union {
 }
 IVideoProcessorEnumerator_VTable :: struct {
 	using id3d11devicechild_vtable: IDeviceChild_VTable,
-	GetVideoProcessorContentDesc:        proc "stdcall" (this: ^IVideoProcessorEnumerator, pContentDesc: ^VIDEO_PROCESSOR_CONTENT_DESC) -> HRESULT,
-	CheckVideoProcessorFormat:           proc "stdcall" (this: ^IVideoProcessorEnumerator, Format: dxgi.FORMAT, pFlags: ^u32) -> HRESULT,
-	GetVideoProcessorCaps:               proc "stdcall" (this: ^IVideoProcessorEnumerator, pCaps: ^VIDEO_PROCESSOR_CAPS) -> HRESULT,
-	GetVideoProcessorRateConversionCaps: proc "stdcall" (this: ^IVideoProcessorEnumerator, TypeIndex: u32, pCaps: ^VIDEO_PROCESSOR_RATE_CONVERSION_CAPS) -> HRESULT,
-	GetVideoProcessorCustomRate:         proc "stdcall" (this: ^IVideoProcessorEnumerator, TypeIndex: u32, CustomRateIndex: u32, pRate: ^VIDEO_PROCESSOR_CUSTOM_RATE) -> HRESULT,
-	GetVideoProcessorFilterRange:        proc "stdcall" (this: ^IVideoProcessorEnumerator, Filter: VIDEO_PROCESSOR_FILTER, pRange: ^VIDEO_PROCESSOR_FILTER_RANGE) -> HRESULT,
+	GetVideoProcessorContentDesc:        proc "system" (this: ^IVideoProcessorEnumerator, pContentDesc: ^VIDEO_PROCESSOR_CONTENT_DESC) -> HRESULT,
+	CheckVideoProcessorFormat:           proc "system" (this: ^IVideoProcessorEnumerator, Format: dxgi.FORMAT, pFlags: ^u32) -> HRESULT,
+	GetVideoProcessorCaps:               proc "system" (this: ^IVideoProcessorEnumerator, pCaps: ^VIDEO_PROCESSOR_CAPS) -> HRESULT,
+	GetVideoProcessorRateConversionCaps: proc "system" (this: ^IVideoProcessorEnumerator, TypeIndex: u32, pCaps: ^VIDEO_PROCESSOR_RATE_CONVERSION_CAPS) -> HRESULT,
+	GetVideoProcessorCustomRate:         proc "system" (this: ^IVideoProcessorEnumerator, TypeIndex: u32, CustomRateIndex: u32, pRate: ^VIDEO_PROCESSOR_CUSTOM_RATE) -> HRESULT,
+	GetVideoProcessorFilterRange:        proc "system" (this: ^IVideoProcessorEnumerator, Filter: VIDEO_PROCESSOR_FILTER, pRange: ^VIDEO_PROCESSOR_FILTER_RANGE) -> HRESULT,
 }
 
 
@@ -2872,8 +2874,8 @@ IVideoProcessor :: struct #raw_union {
 }
 IVideoProcessor_VTable :: struct {
 	using id3d11devicechild_vtable: IDeviceChild_VTable,
-	GetContentDesc:        proc "stdcall" (this: ^IVideoProcessor, pDesc: ^VIDEO_PROCESSOR_CONTENT_DESC),
-	GetRateConversionCaps: proc "stdcall" (this: ^IVideoProcessor, pCaps: ^VIDEO_PROCESSOR_RATE_CONVERSION_CAPS),
+	GetContentDesc:        proc "system" (this: ^IVideoProcessor, pDesc: ^VIDEO_PROCESSOR_CONTENT_DESC),
+	GetRateConversionCaps: proc "system" (this: ^IVideoProcessor, pCaps: ^VIDEO_PROCESSOR_RATE_CONVERSION_CAPS),
 }
 
 
@@ -2896,9 +2898,9 @@ IAuthenticatedChannel :: struct #raw_union {
 }
 IAuthenticatedChannel_VTable :: struct {
 	using id3d11devicechild_vtable: IDeviceChild_VTable,
-	GetCertificateSize: proc "stdcall" (this: ^IAuthenticatedChannel, pCertificateSize: ^u32) -> HRESULT,
-	GetCertificate:     proc "stdcall" (this: ^IAuthenticatedChannel, CertificateSize: u32, pCertificate: cstring) -> HRESULT,
-	GetChannelHandle:   proc "stdcall" (this: ^IAuthenticatedChannel, pChannelHandle: ^HANDLE),
+	GetCertificateSize: proc "system" (this: ^IAuthenticatedChannel, pCertificateSize: ^u32) -> HRESULT,
+	GetCertificate:     proc "system" (this: ^IAuthenticatedChannel, CertificateSize: u32, pCertificate: cstring) -> HRESULT,
+	GetChannelHandle:   proc "system" (this: ^IAuthenticatedChannel, pChannelHandle: ^HANDLE),
 }
 
 
@@ -3105,11 +3107,11 @@ ICryptoSession :: struct #raw_union {
 }
 ICryptoSession_VTable :: struct {
 	using id3d11devicechild_vtable: IDeviceChild_VTable,
-	GetCryptoType:          proc "stdcall" (this: ^ICryptoSession, pCryptoType: ^GUID),
-	GetDecoderProfile:      proc "stdcall" (this: ^ICryptoSession, pDecoderProfile: ^GUID),
-	GetCertificateSize:     proc "stdcall" (this: ^ICryptoSession, pCertificateSize: ^u32) -> HRESULT,
-	GetCertificate:         proc "stdcall" (this: ^ICryptoSession, CertificateSize: u32, pCertificate: cstring) -> HRESULT,
-	GetCryptoSessionHandle: proc "stdcall" (this: ^ICryptoSession, pCryptoSessionHandle: ^HANDLE),
+	GetCryptoType:          proc "system" (this: ^ICryptoSession, pCryptoType: ^GUID),
+	GetDecoderProfile:      proc "system" (this: ^ICryptoSession, pDecoderProfile: ^GUID),
+	GetCertificateSize:     proc "system" (this: ^ICryptoSession, pCertificateSize: ^u32) -> HRESULT,
+	GetCertificate:         proc "system" (this: ^ICryptoSession, CertificateSize: u32, pCertificate: cstring) -> HRESULT,
+	GetCryptoSessionHandle: proc "system" (this: ^ICryptoSession, pCryptoSessionHandle: ^HANDLE),
 }
 
 
@@ -3139,7 +3141,7 @@ IVideoDecoderOutputView :: struct #raw_union {
 }
 IVideoDecoderOutputView_VTable :: struct {
 	using id3d11view_vtable: IView_VTable,
-	GetDesc: proc "stdcall" (this: ^IVideoDecoderOutputView, pDesc: ^VIDEO_DECODER_OUTPUT_VIEW_DESC),
+	GetDesc: proc "system" (this: ^IVideoDecoderOutputView, pDesc: ^VIDEO_DECODER_OUTPUT_VIEW_DESC),
 }
 
 
@@ -3170,7 +3172,7 @@ IVideoProcessorInputView :: struct #raw_union {
 }
 IVideoProcessorInputView_VTable :: struct {
 	using id3d11view_vtable: IView_VTable,
-	GetDesc: proc "stdcall" (this: ^IVideoProcessorInputView, pDesc: ^VIDEO_PROCESSOR_INPUT_VIEW_DESC),
+	GetDesc: proc "system" (this: ^IVideoProcessorInputView, pDesc: ^VIDEO_PROCESSOR_INPUT_VIEW_DESC),
 }
 
 
@@ -3207,7 +3209,7 @@ IVideoProcessorOutputView :: struct #raw_union {
 }
 IVideoProcessorOutputView_VTable :: struct {
 	using id3d11view_vtable: IView_VTable,
-	GetDesc: proc "stdcall" (this: ^IVideoProcessorOutputView, pDesc: ^VIDEO_PROCESSOR_OUTPUT_VIEW_DESC),
+	GetDesc: proc "system" (this: ^IVideoProcessorOutputView, pDesc: ^VIDEO_PROCESSOR_OUTPUT_VIEW_DESC),
 }
 
 
@@ -3220,64 +3222,64 @@ IVideoContext :: struct #raw_union {
 }
 IVideoContext_VTable :: struct {
 	using id3d11devicechild_vtable: IDeviceChild_VTable,
-	GetDecoderBuffer:                          proc "stdcall" (this: ^IVideoContext, pDecoder: ^IVideoDecoder, Type: VIDEO_DECODER_BUFFER_TYPE, pBufferSize: ^u32, ppBuffer: ^rawptr) -> HRESULT,
-	ReleaseDecoderBuffer:                      proc "stdcall" (this: ^IVideoContext, pDecoder: ^IVideoDecoder, Type: VIDEO_DECODER_BUFFER_TYPE) -> HRESULT,
-	DecoderBeginFrame:                         proc "stdcall" (this: ^IVideoContext, pDecoder: ^IVideoDecoder, pView: ^IVideoDecoderOutputView, ContentKeySize: u32, pContentKey: rawptr) -> HRESULT,
-	DecoderEndFrame:                           proc "stdcall" (this: ^IVideoContext, pDecoder: ^IVideoDecoder) -> HRESULT,
-	SubmitDecoderBuffers:                      proc "stdcall" (this: ^IVideoContext, pDecoder: ^IVideoDecoder, NumBuffers: u32, pBufferDesc: ^VIDEO_DECODER_BUFFER_DESC) -> HRESULT,
-	DecoderExtension:                          proc "stdcall" (this: ^IVideoContext, pDecoder: ^IVideoDecoder, pExtensionData: ^VIDEO_DECODER_EXTENSION) -> APP_DEPRECATED_HRESULT,
-	VideoProcessorSetOutputTargetRect:         proc "stdcall" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, Enable: BOOL, pRect: ^RECT),
-	VideoProcessorSetOutputBackgroundColor:    proc "stdcall" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, YCbCr: BOOL, pColor: ^VIDEO_COLOR),
-	VideoProcessorSetOutputColorSpace:         proc "stdcall" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, pColorSpace: ^VIDEO_PROCESSOR_COLOR_SPACE),
-	VideoProcessorSetOutputAlphaFillMode:      proc "stdcall" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, AlphaFillMode: VIDEO_PROCESSOR_ALPHA_FILL_MODE, StreamIndex: u32),
-	VideoProcessorSetOutputConstriction:       proc "stdcall" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, Enable: BOOL, Size: SIZE),
-	VideoProcessorSetOutputStereoMode:         proc "stdcall" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, Enable: BOOL),
-	VideoProcessorSetOutputExtension:          proc "stdcall" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, pExtensionGuid: ^GUID, DataSize: u32, pData: rawptr) -> APP_DEPRECATED_HRESULT,
-	VideoProcessorGetOutputTargetRect:         proc "stdcall" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, Enabled: ^BOOL, pRect: ^RECT),
-	VideoProcessorGetOutputBackgroundColor:    proc "stdcall" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, pYCbCr: ^BOOL, pColor: ^VIDEO_COLOR),
-	VideoProcessorGetOutputColorSpace:         proc "stdcall" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, pColorSpace: ^VIDEO_PROCESSOR_COLOR_SPACE),
-	VideoProcessorGetOutputAlphaFillMode:      proc "stdcall" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, pAlphaFillMode: ^VIDEO_PROCESSOR_ALPHA_FILL_MODE, pStreamIndex: ^u32),
-	VideoProcessorGetOutputConstriction:       proc "stdcall" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, pEnabled: ^BOOL, pSize: ^SIZE),
-	VideoProcessorGetOutputStereoMode:         proc "stdcall" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, pEnabled: ^BOOL),
-	VideoProcessorGetOutputExtension:          proc "stdcall" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, pExtensionGuid: ^GUID, DataSize: u32, pData: rawptr) -> APP_DEPRECATED_HRESULT,
-	VideoProcessorSetStreamFrameFormat:        proc "stdcall" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, StreamIndex: u32, FrameFormat: VIDEO_FRAME_FORMAT),
-	VideoProcessorSetStreamColorSpace:         proc "stdcall" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, StreamIndex: u32, pColorSpace: ^VIDEO_PROCESSOR_COLOR_SPACE),
-	VideoProcessorSetStreamOutputRate:         proc "stdcall" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, StreamIndex: u32, OutputRate: VIDEO_PROCESSOR_OUTPUT_RATE, RepeatFrame: BOOL, pCustomRate: ^dxgi.RATIONAL),
-	VideoProcessorSetStreamSourceRect:         proc "stdcall" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, StreamIndex: u32, Enable: BOOL, pRect: ^RECT),
-	VideoProcessorSetStreamDestRect:           proc "stdcall" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, StreamIndex: u32, Enable: BOOL, pRect: ^RECT),
-	VideoProcessorSetStreamAlpha:              proc "stdcall" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, StreamIndex: u32, Enable: BOOL, Alpha: f32),
-	VideoProcessorSetStreamPalette:            proc "stdcall" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, StreamIndex: u32, Count: u32, pEntries: ^u32),
-	VideoProcessorSetStreamPixelAspectRatio:   proc "stdcall" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, StreamIndex: u32, Enable: BOOL, pSourceAspectRatio: ^dxgi.RATIONAL, pDestinationAspectRatio: ^dxgi.RATIONAL),
-	VideoProcessorSetStreamLumaKey:            proc "stdcall" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, StreamIndex: u32, Enable: BOOL, Lower: f32, Upper: f32),
-	VideoProcessorSetStreamStereoFormat:       proc "stdcall" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, StreamIndex: u32, Enable: BOOL, Format: VIDEO_PROCESSOR_STEREO_FORMAT, LeftViewFrame0: BOOL, BaseViewFrame0: BOOL, FlipMode: VIDEO_PROCESSOR_STEREO_FLIP_MODE, MonoOffset: i32),
-	VideoProcessorSetStreamAutoProcessingMode: proc "stdcall" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, StreamIndex: u32, Enable: BOOL),
-	VideoProcessorSetStreamFilter:             proc "stdcall" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, StreamIndex: u32, Filter: VIDEO_PROCESSOR_FILTER, Enable: BOOL, Level: i32),
-	VideoProcessorSetStreamExtension:          proc "stdcall" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, StreamIndex: u32, pExtensionGuid: ^GUID, DataSize: u32, pData: rawptr) -> APP_DEPRECATED_HRESULT,
-	VideoProcessorGetStreamFrameFormat:        proc "stdcall" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, StreamIndex: u32, pFrameFormat: ^VIDEO_FRAME_FORMAT),
-	VideoProcessorGetStreamColorSpace:         proc "stdcall" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, StreamIndex: u32, pColorSpace: ^VIDEO_PROCESSOR_COLOR_SPACE),
-	VideoProcessorGetStreamOutputRate:         proc "stdcall" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, StreamIndex: u32, pOutputRate: ^VIDEO_PROCESSOR_OUTPUT_RATE, pRepeatFrame: ^BOOL, pCustomRate: ^dxgi.RATIONAL),
-	VideoProcessorGetStreamSourceRect:         proc "stdcall" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, StreamIndex: u32, pEnabled: ^BOOL, pRect: ^RECT),
-	VideoProcessorGetStreamDestRect:           proc "stdcall" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, StreamIndex: u32, pEnabled: ^BOOL, pRect: ^RECT),
-	VideoProcessorGetStreamAlpha:              proc "stdcall" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, StreamIndex: u32, pEnabled: ^BOOL, pAlpha: ^f32),
-	VideoProcessorGetStreamPalette:            proc "stdcall" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, StreamIndex: u32, Count: u32, pEntries: ^u32),
-	VideoProcessorGetStreamPixelAspectRatio:   proc "stdcall" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, StreamIndex: u32, pEnabled: ^BOOL, pSourceAspectRatio: ^dxgi.RATIONAL, pDestinationAspectRatio: ^dxgi.RATIONAL),
-	VideoProcessorGetStreamLumaKey:            proc "stdcall" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, StreamIndex: u32, pEnabled: ^BOOL, pLower: ^f32, pUpper: ^f32),
-	VideoProcessorGetStreamStereoFormat:       proc "stdcall" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, StreamIndex: u32, pEnable: ^BOOL, pFormat: ^VIDEO_PROCESSOR_STEREO_FORMAT, pLeftViewFrame0: ^BOOL, pBaseViewFrame0: ^BOOL, pFlipMode: ^VIDEO_PROCESSOR_STEREO_FLIP_MODE, MonoOffset: ^i32),
-	VideoProcessorGetStreamAutoProcessingMode: proc "stdcall" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, StreamIndex: u32, pEnabled: ^BOOL),
-	VideoProcessorGetStreamFilter:             proc "stdcall" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, StreamIndex: u32, Filter: VIDEO_PROCESSOR_FILTER, pEnabled: ^BOOL, pLevel: ^i32),
-	VideoProcessorGetStreamExtension:          proc "stdcall" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, StreamIndex: u32, pExtensionGuid: ^GUID, DataSize: u32, pData: rawptr) -> APP_DEPRECATED_HRESULT,
-	VideoProcessorBlt:                         proc "stdcall" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, pView: ^IVideoProcessorOutputView, OutputFrame: u32, StreamCount: u32, pStreams: ^VIDEO_PROCESSOR_STREAM) -> HRESULT,
-	NegotiateCryptoSessionKeyExchange:         proc "stdcall" (this: ^IVideoContext, pCryptoSession: ^ICryptoSession, DataSize: u32, pData: rawptr) -> HRESULT,
-	EncryptionBlt:                             proc "stdcall" (this: ^IVideoContext, pCryptoSession: ^ICryptoSession, pSrcSurface: ^ITexture2D, pDstSurface: ^ITexture2D, IVSize: u32, pIV: rawptr),
-	DecryptionBlt:                             proc "stdcall" (this: ^IVideoContext, pCryptoSession: ^ICryptoSession, pSrcSurface: ^ITexture2D, pDstSurface: ^ITexture2D, pEncryptedBlockInfo: ^ENCRYPTED_BLOCK_INFO, ContentKeySize: u32, pContentKey: rawptr, IVSize: u32, pIV: rawptr),
-	StartSessionKeyRefresh:                    proc "stdcall" (this: ^IVideoContext, pCryptoSession: ^ICryptoSession, RandomNumberSize: u32, pRandomNumber: rawptr),
-	FinishSessionKeyRefresh:                   proc "stdcall" (this: ^IVideoContext, pCryptoSession: ^ICryptoSession),
-	GetEncryptionBltKey:                       proc "stdcall" (this: ^IVideoContext, pCryptoSession: ^ICryptoSession, KeySize: u32, pReadbackKey: rawptr) -> HRESULT,
-	NegotiateAuthenticatedChannelKeyExchange:  proc "stdcall" (this: ^IVideoContext, pChannel: ^IAuthenticatedChannel, DataSize: u32, pData: rawptr) -> HRESULT,
-	QueryAuthenticatedChannel:                 proc "stdcall" (this: ^IVideoContext, pChannel: ^IAuthenticatedChannel, InputSize: u32, pInput: rawptr, OutputSize: u32, pOutput: rawptr) -> HRESULT,
-	ConfigureAuthenticatedChannel:             proc "stdcall" (this: ^IVideoContext, pChannel: ^IAuthenticatedChannel, InputSize: u32, pInput: rawptr, pOutput: ^AUTHENTICATED_CONFIGURE_OUTPUT) -> HRESULT,
-	VideoProcessorSetStreamRotation:           proc "stdcall" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, StreamIndex: u32, Enable: BOOL, Rotation: VIDEO_PROCESSOR_ROTATION),
-	VideoProcessorGetStreamRotation:           proc "stdcall" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, StreamIndex: u32, pEnable: ^BOOL, pRotation: ^VIDEO_PROCESSOR_ROTATION),
+	GetDecoderBuffer:                          proc "system" (this: ^IVideoContext, pDecoder: ^IVideoDecoder, Type: VIDEO_DECODER_BUFFER_TYPE, pBufferSize: ^u32, ppBuffer: ^rawptr) -> HRESULT,
+	ReleaseDecoderBuffer:                      proc "system" (this: ^IVideoContext, pDecoder: ^IVideoDecoder, Type: VIDEO_DECODER_BUFFER_TYPE) -> HRESULT,
+	DecoderBeginFrame:                         proc "system" (this: ^IVideoContext, pDecoder: ^IVideoDecoder, pView: ^IVideoDecoderOutputView, ContentKeySize: u32, pContentKey: rawptr) -> HRESULT,
+	DecoderEndFrame:                           proc "system" (this: ^IVideoContext, pDecoder: ^IVideoDecoder) -> HRESULT,
+	SubmitDecoderBuffers:                      proc "system" (this: ^IVideoContext, pDecoder: ^IVideoDecoder, NumBuffers: u32, pBufferDesc: ^VIDEO_DECODER_BUFFER_DESC) -> HRESULT,
+	DecoderExtension:                          proc "system" (this: ^IVideoContext, pDecoder: ^IVideoDecoder, pExtensionData: ^VIDEO_DECODER_EXTENSION) -> APP_DEPRECATED_HRESULT,
+	VideoProcessorSetOutputTargetRect:         proc "system" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, Enable: BOOL, pRect: ^RECT),
+	VideoProcessorSetOutputBackgroundColor:    proc "system" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, YCbCr: BOOL, pColor: ^VIDEO_COLOR),
+	VideoProcessorSetOutputColorSpace:         proc "system" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, pColorSpace: ^VIDEO_PROCESSOR_COLOR_SPACE),
+	VideoProcessorSetOutputAlphaFillMode:      proc "system" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, AlphaFillMode: VIDEO_PROCESSOR_ALPHA_FILL_MODE, StreamIndex: u32),
+	VideoProcessorSetOutputConstriction:       proc "system" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, Enable: BOOL, Size: SIZE),
+	VideoProcessorSetOutputStereoMode:         proc "system" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, Enable: BOOL),
+	VideoProcessorSetOutputExtension:          proc "system" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, pExtensionGuid: ^GUID, DataSize: u32, pData: rawptr) -> APP_DEPRECATED_HRESULT,
+	VideoProcessorGetOutputTargetRect:         proc "system" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, Enabled: ^BOOL, pRect: ^RECT),
+	VideoProcessorGetOutputBackgroundColor:    proc "system" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, pYCbCr: ^BOOL, pColor: ^VIDEO_COLOR),
+	VideoProcessorGetOutputColorSpace:         proc "system" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, pColorSpace: ^VIDEO_PROCESSOR_COLOR_SPACE),
+	VideoProcessorGetOutputAlphaFillMode:      proc "system" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, pAlphaFillMode: ^VIDEO_PROCESSOR_ALPHA_FILL_MODE, pStreamIndex: ^u32),
+	VideoProcessorGetOutputConstriction:       proc "system" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, pEnabled: ^BOOL, pSize: ^SIZE),
+	VideoProcessorGetOutputStereoMode:         proc "system" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, pEnabled: ^BOOL),
+	VideoProcessorGetOutputExtension:          proc "system" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, pExtensionGuid: ^GUID, DataSize: u32, pData: rawptr) -> APP_DEPRECATED_HRESULT,
+	VideoProcessorSetStreamFrameFormat:        proc "system" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, StreamIndex: u32, FrameFormat: VIDEO_FRAME_FORMAT),
+	VideoProcessorSetStreamColorSpace:         proc "system" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, StreamIndex: u32, pColorSpace: ^VIDEO_PROCESSOR_COLOR_SPACE),
+	VideoProcessorSetStreamOutputRate:         proc "system" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, StreamIndex: u32, OutputRate: VIDEO_PROCESSOR_OUTPUT_RATE, RepeatFrame: BOOL, pCustomRate: ^dxgi.RATIONAL),
+	VideoProcessorSetStreamSourceRect:         proc "system" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, StreamIndex: u32, Enable: BOOL, pRect: ^RECT),
+	VideoProcessorSetStreamDestRect:           proc "system" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, StreamIndex: u32, Enable: BOOL, pRect: ^RECT),
+	VideoProcessorSetStreamAlpha:              proc "system" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, StreamIndex: u32, Enable: BOOL, Alpha: f32),
+	VideoProcessorSetStreamPalette:            proc "system" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, StreamIndex: u32, Count: u32, pEntries: ^u32),
+	VideoProcessorSetStreamPixelAspectRatio:   proc "system" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, StreamIndex: u32, Enable: BOOL, pSourceAspectRatio: ^dxgi.RATIONAL, pDestinationAspectRatio: ^dxgi.RATIONAL),
+	VideoProcessorSetStreamLumaKey:            proc "system" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, StreamIndex: u32, Enable: BOOL, Lower: f32, Upper: f32),
+	VideoProcessorSetStreamStereoFormat:       proc "system" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, StreamIndex: u32, Enable: BOOL, Format: VIDEO_PROCESSOR_STEREO_FORMAT, LeftViewFrame0: BOOL, BaseViewFrame0: BOOL, FlipMode: VIDEO_PROCESSOR_STEREO_FLIP_MODE, MonoOffset: i32),
+	VideoProcessorSetStreamAutoProcessingMode: proc "system" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, StreamIndex: u32, Enable: BOOL),
+	VideoProcessorSetStreamFilter:             proc "system" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, StreamIndex: u32, Filter: VIDEO_PROCESSOR_FILTER, Enable: BOOL, Level: i32),
+	VideoProcessorSetStreamExtension:          proc "system" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, StreamIndex: u32, pExtensionGuid: ^GUID, DataSize: u32, pData: rawptr) -> APP_DEPRECATED_HRESULT,
+	VideoProcessorGetStreamFrameFormat:        proc "system" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, StreamIndex: u32, pFrameFormat: ^VIDEO_FRAME_FORMAT),
+	VideoProcessorGetStreamColorSpace:         proc "system" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, StreamIndex: u32, pColorSpace: ^VIDEO_PROCESSOR_COLOR_SPACE),
+	VideoProcessorGetStreamOutputRate:         proc "system" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, StreamIndex: u32, pOutputRate: ^VIDEO_PROCESSOR_OUTPUT_RATE, pRepeatFrame: ^BOOL, pCustomRate: ^dxgi.RATIONAL),
+	VideoProcessorGetStreamSourceRect:         proc "system" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, StreamIndex: u32, pEnabled: ^BOOL, pRect: ^RECT),
+	VideoProcessorGetStreamDestRect:           proc "system" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, StreamIndex: u32, pEnabled: ^BOOL, pRect: ^RECT),
+	VideoProcessorGetStreamAlpha:              proc "system" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, StreamIndex: u32, pEnabled: ^BOOL, pAlpha: ^f32),
+	VideoProcessorGetStreamPalette:            proc "system" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, StreamIndex: u32, Count: u32, pEntries: ^u32),
+	VideoProcessorGetStreamPixelAspectRatio:   proc "system" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, StreamIndex: u32, pEnabled: ^BOOL, pSourceAspectRatio: ^dxgi.RATIONAL, pDestinationAspectRatio: ^dxgi.RATIONAL),
+	VideoProcessorGetStreamLumaKey:            proc "system" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, StreamIndex: u32, pEnabled: ^BOOL, pLower: ^f32, pUpper: ^f32),
+	VideoProcessorGetStreamStereoFormat:       proc "system" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, StreamIndex: u32, pEnable: ^BOOL, pFormat: ^VIDEO_PROCESSOR_STEREO_FORMAT, pLeftViewFrame0: ^BOOL, pBaseViewFrame0: ^BOOL, pFlipMode: ^VIDEO_PROCESSOR_STEREO_FLIP_MODE, MonoOffset: ^i32),
+	VideoProcessorGetStreamAutoProcessingMode: proc "system" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, StreamIndex: u32, pEnabled: ^BOOL),
+	VideoProcessorGetStreamFilter:             proc "system" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, StreamIndex: u32, Filter: VIDEO_PROCESSOR_FILTER, pEnabled: ^BOOL, pLevel: ^i32),
+	VideoProcessorGetStreamExtension:          proc "system" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, StreamIndex: u32, pExtensionGuid: ^GUID, DataSize: u32, pData: rawptr) -> APP_DEPRECATED_HRESULT,
+	VideoProcessorBlt:                         proc "system" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, pView: ^IVideoProcessorOutputView, OutputFrame: u32, StreamCount: u32, pStreams: ^VIDEO_PROCESSOR_STREAM) -> HRESULT,
+	NegotiateCryptoSessionKeyExchange:         proc "system" (this: ^IVideoContext, pCryptoSession: ^ICryptoSession, DataSize: u32, pData: rawptr) -> HRESULT,
+	EncryptionBlt:                             proc "system" (this: ^IVideoContext, pCryptoSession: ^ICryptoSession, pSrcSurface: ^ITexture2D, pDstSurface: ^ITexture2D, IVSize: u32, pIV: rawptr),
+	DecryptionBlt:                             proc "system" (this: ^IVideoContext, pCryptoSession: ^ICryptoSession, pSrcSurface: ^ITexture2D, pDstSurface: ^ITexture2D, pEncryptedBlockInfo: ^ENCRYPTED_BLOCK_INFO, ContentKeySize: u32, pContentKey: rawptr, IVSize: u32, pIV: rawptr),
+	StartSessionKeyRefresh:                    proc "system" (this: ^IVideoContext, pCryptoSession: ^ICryptoSession, RandomNumberSize: u32, pRandomNumber: rawptr),
+	FinishSessionKeyRefresh:                   proc "system" (this: ^IVideoContext, pCryptoSession: ^ICryptoSession),
+	GetEncryptionBltKey:                       proc "system" (this: ^IVideoContext, pCryptoSession: ^ICryptoSession, KeySize: u32, pReadbackKey: rawptr) -> HRESULT,
+	NegotiateAuthenticatedChannelKeyExchange:  proc "system" (this: ^IVideoContext, pChannel: ^IAuthenticatedChannel, DataSize: u32, pData: rawptr) -> HRESULT,
+	QueryAuthenticatedChannel:                 proc "system" (this: ^IVideoContext, pChannel: ^IAuthenticatedChannel, InputSize: u32, pInput: rawptr, OutputSize: u32, pOutput: rawptr) -> HRESULT,
+	ConfigureAuthenticatedChannel:             proc "system" (this: ^IVideoContext, pChannel: ^IAuthenticatedChannel, InputSize: u32, pInput: rawptr, pOutput: ^AUTHENTICATED_CONFIGURE_OUTPUT) -> HRESULT,
+	VideoProcessorSetStreamRotation:           proc "system" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, StreamIndex: u32, Enable: BOOL, Rotation: VIDEO_PROCESSOR_ROTATION),
+	VideoProcessorGetStreamRotation:           proc "system" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, StreamIndex: u32, pEnable: ^BOOL, pRotation: ^VIDEO_PROCESSOR_ROTATION),
 }
 
 
@@ -3290,23 +3292,23 @@ IVideoDevice :: struct #raw_union {
 }
 IVideoDevice_VTable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
-	CreateVideoDecoder:             proc "stdcall" (this: ^IVideoDevice, pVideoDesc: ^VIDEO_DECODER_DESC, pConfig: ^VIDEO_DECODER_CONFIG, ppDecoder: ^^IVideoDecoder) -> HRESULT,
-	CreateVideoProcessor:           proc "stdcall" (this: ^IVideoDevice, pEnum: ^IVideoProcessorEnumerator, RateConversionIndex: u32, ppVideoProcessor: ^^IVideoProcessor) -> HRESULT,
-	CreateAuthenticatedChannel:     proc "stdcall" (this: ^IVideoDevice, ChannelType: AUTHENTICATED_CHANNEL_TYPE, ppAuthenticatedChannel: ^^IAuthenticatedChannel) -> HRESULT,
-	CreateCryptoSession:            proc "stdcall" (this: ^IVideoDevice, pCryptoType: ^GUID, pDecoderProfile: ^GUID, pKeyExchangeType: ^GUID, ppCryptoSession: ^^ICryptoSession) -> HRESULT,
-	CreateVideoDecoderOutputView:   proc "stdcall" (this: ^IVideoDevice, pResource: ^IResource, pDesc: ^VIDEO_DECODER_OUTPUT_VIEW_DESC, ppVDOVView: ^^IVideoDecoderOutputView) -> HRESULT,
-	CreateVideoProcessorInputView:  proc "stdcall" (this: ^IVideoDevice, pResource: ^IResource, pEnum: ^IVideoProcessorEnumerator, pDesc: ^VIDEO_PROCESSOR_INPUT_VIEW_DESC, ppVPIView: ^^IVideoProcessorInputView) -> HRESULT,
-	CreateVideoProcessorOutputView: proc "stdcall" (this: ^IVideoDevice, pResource: ^IResource, pEnum: ^IVideoProcessorEnumerator, pDesc: ^VIDEO_PROCESSOR_OUTPUT_VIEW_DESC, ppVPOView: ^^IVideoProcessorOutputView) -> HRESULT,
-	CreateVideoProcessorEnumerator: proc "stdcall" (this: ^IVideoDevice, pDesc: ^VIDEO_PROCESSOR_CONTENT_DESC, ppEnum: ^^IVideoProcessorEnumerator) -> HRESULT,
-	GetVideoDecoderProfileCount:    proc "stdcall" (this: ^IVideoDevice) -> u32,
-	GetVideoDecoderProfile:         proc "stdcall" (this: ^IVideoDevice, Index: u32, pDecoderProfile: ^GUID) -> HRESULT,
-	CheckVideoDecoderFormat:        proc "stdcall" (this: ^IVideoDevice, pDecoderProfile: ^GUID, Format: dxgi.FORMAT, pSupported: ^BOOL) -> HRESULT,
-	GetVideoDecoderConfigCount:     proc "stdcall" (this: ^IVideoDevice, pDesc: ^VIDEO_DECODER_DESC, pCount: ^u32) -> HRESULT,
-	GetVideoDecoderConfig:          proc "stdcall" (this: ^IVideoDevice, pDesc: ^VIDEO_DECODER_DESC, Index: u32, pConfig: ^VIDEO_DECODER_CONFIG) -> HRESULT,
-	GetContentProtectionCaps:       proc "stdcall" (this: ^IVideoDevice, pCryptoType: ^GUID, pDecoderProfile: ^GUID, pCaps: ^VIDEO_CONTENT_PROTECTION_CAPS) -> HRESULT,
-	CheckCryptoKeyExchange:         proc "stdcall" (this: ^IVideoDevice, pCryptoType: ^GUID, pDecoderProfile: ^GUID, Index: u32, pKeyExchangeType: ^GUID) -> HRESULT,
-	SetPrivateData:                 proc "stdcall" (this: ^IVideoDevice, guid: ^GUID, DataSize: u32, pData: rawptr) -> HRESULT,
-	SetPrivateDataInterface:        proc "stdcall" (this: ^IVideoDevice, guid: ^GUID, pData: ^IUnknown) -> HRESULT,
+	CreateVideoDecoder:             proc "system" (this: ^IVideoDevice, pVideoDesc: ^VIDEO_DECODER_DESC, pConfig: ^VIDEO_DECODER_CONFIG, ppDecoder: ^^IVideoDecoder) -> HRESULT,
+	CreateVideoProcessor:           proc "system" (this: ^IVideoDevice, pEnum: ^IVideoProcessorEnumerator, RateConversionIndex: u32, ppVideoProcessor: ^^IVideoProcessor) -> HRESULT,
+	CreateAuthenticatedChannel:     proc "system" (this: ^IVideoDevice, ChannelType: AUTHENTICATED_CHANNEL_TYPE, ppAuthenticatedChannel: ^^IAuthenticatedChannel) -> HRESULT,
+	CreateCryptoSession:            proc "system" (this: ^IVideoDevice, pCryptoType: ^GUID, pDecoderProfile: ^GUID, pKeyExchangeType: ^GUID, ppCryptoSession: ^^ICryptoSession) -> HRESULT,
+	CreateVideoDecoderOutputView:   proc "system" (this: ^IVideoDevice, pResource: ^IResource, pDesc: ^VIDEO_DECODER_OUTPUT_VIEW_DESC, ppVDOVView: ^^IVideoDecoderOutputView) -> HRESULT,
+	CreateVideoProcessorInputView:  proc "system" (this: ^IVideoDevice, pResource: ^IResource, pEnum: ^IVideoProcessorEnumerator, pDesc: ^VIDEO_PROCESSOR_INPUT_VIEW_DESC, ppVPIView: ^^IVideoProcessorInputView) -> HRESULT,
+	CreateVideoProcessorOutputView: proc "system" (this: ^IVideoDevice, pResource: ^IResource, pEnum: ^IVideoProcessorEnumerator, pDesc: ^VIDEO_PROCESSOR_OUTPUT_VIEW_DESC, ppVPOView: ^^IVideoProcessorOutputView) -> HRESULT,
+	CreateVideoProcessorEnumerator: proc "system" (this: ^IVideoDevice, pDesc: ^VIDEO_PROCESSOR_CONTENT_DESC, ppEnum: ^^IVideoProcessorEnumerator) -> HRESULT,
+	GetVideoDecoderProfileCount:    proc "system" (this: ^IVideoDevice) -> u32,
+	GetVideoDecoderProfile:         proc "system" (this: ^IVideoDevice, Index: u32, pDecoderProfile: ^GUID) -> HRESULT,
+	CheckVideoDecoderFormat:        proc "system" (this: ^IVideoDevice, pDecoderProfile: ^GUID, Format: dxgi.FORMAT, pSupported: ^BOOL) -> HRESULT,
+	GetVideoDecoderConfigCount:     proc "system" (this: ^IVideoDevice, pDesc: ^VIDEO_DECODER_DESC, pCount: ^u32) -> HRESULT,
+	GetVideoDecoderConfig:          proc "system" (this: ^IVideoDevice, pDesc: ^VIDEO_DECODER_DESC, Index: u32, pConfig: ^VIDEO_DECODER_CONFIG) -> HRESULT,
+	GetContentProtectionCaps:       proc "system" (this: ^IVideoDevice, pCryptoType: ^GUID, pDecoderProfile: ^GUID, pCaps: ^VIDEO_CONTENT_PROTECTION_CAPS) -> HRESULT,
+	CheckCryptoKeyExchange:         proc "system" (this: ^IVideoDevice, pCryptoType: ^GUID, pDecoderProfile: ^GUID, Index: u32, pKeyExchangeType: ^GUID) -> HRESULT,
+	SetPrivateData:                 proc "system" (this: ^IVideoDevice, guid: ^GUID, DataSize: u32, pData: rawptr) -> HRESULT,
+	SetPrivateDataInterface:        proc "system" (this: ^IVideoDevice, guid: ^GUID, pData: ^IUnknown) -> HRESULT,
 }
 
 
@@ -3319,46 +3321,46 @@ IDevice :: struct #raw_union {
 }
 IDevice_VTable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
-	CreateBuffer:                         proc "stdcall" (this: ^IDevice, pDesc: ^BUFFER_DESC, pInitialData: ^SUBRESOURCE_DATA, ppBuffer: ^^IBuffer) -> HRESULT,
-	CreateTexture1D:                      proc "stdcall" (this: ^IDevice, pDesc: ^TEXTURE1D_DESC, pInitialData: ^SUBRESOURCE_DATA, ppTexture1D: ^^ITexture1D) -> HRESULT,
-	CreateTexture2D:                      proc "stdcall" (this: ^IDevice, pDesc: ^TEXTURE2D_DESC, pInitialData: ^SUBRESOURCE_DATA, ppTexture2D: ^^ITexture2D) -> HRESULT,
-	CreateTexture3D:                      proc "stdcall" (this: ^IDevice, pDesc: ^TEXTURE3D_DESC, pInitialData: ^SUBRESOURCE_DATA, ppTexture3D: ^^ITexture3D) -> HRESULT,
-	CreateShaderResourceView:             proc "stdcall" (this: ^IDevice, pResource: ^IResource, pDesc: ^SHADER_RESOURCE_VIEW_DESC, ppSRView: ^^IShaderResourceView) -> HRESULT,
-	CreateUnorderedAccessView:            proc "stdcall" (this: ^IDevice, pResource: ^IResource, pDesc: ^UNORDERED_ACCESS_VIEW_DESC, ppUAView: ^^IUnorderedAccessView) -> HRESULT,
-	CreateRenderTargetView:               proc "stdcall" (this: ^IDevice, pResource: ^IResource, pDesc: ^RENDER_TARGET_VIEW_DESC, ppRTView: ^^IRenderTargetView) -> HRESULT,
-	CreateDepthStencilView:               proc "stdcall" (this: ^IDevice, pResource: ^IResource, pDesc: ^DEPTH_STENCIL_VIEW_DESC, ppDepthStencilView: ^^IDepthStencilView) -> HRESULT,
-	CreateInputLayout:                    proc "stdcall" (this: ^IDevice, pInputElementDescs: ^INPUT_ELEMENT_DESC, NumElements: u32, pShaderBytecodeWithInputSignature: rawptr, BytecodeLength: SIZE_T, ppInputLayout: ^^IInputLayout) -> HRESULT,
-	CreateVertexShader:                   proc "stdcall" (this: ^IDevice, pShaderBytecode: rawptr, BytecodeLength: SIZE_T, pClassLinkage: ^IClassLinkage, ppVertexShader: ^^IVertexShader) -> HRESULT,
-	CreateGeometryShader:                 proc "stdcall" (this: ^IDevice, pShaderBytecode: rawptr, BytecodeLength: SIZE_T, pClassLinkage: ^IClassLinkage, ppGeometryShader: ^^IGeometryShader) -> HRESULT,
-	CreateGeometryShaderWithStreamOutput: proc "stdcall" (this: ^IDevice, pShaderBytecode: rawptr, BytecodeLength: SIZE_T, pSODeclaration: ^SO_DECLARATION_ENTRY, NumEntries: u32, pBufferStrides: ^u32, NumStrides: u32, RasterizedStream: u32, pClassLinkage: ^IClassLinkage, ppGeometryShader: ^^IGeometryShader) -> HRESULT,
-	CreatePixelShader:                    proc "stdcall" (this: ^IDevice, pShaderBytecode: rawptr, BytecodeLength: SIZE_T, pClassLinkage: ^IClassLinkage, ppPixelShader: ^^IPixelShader) -> HRESULT,
-	CreateHullShader:                     proc "stdcall" (this: ^IDevice, pShaderBytecode: rawptr, BytecodeLength: SIZE_T, pClassLinkage: ^IClassLinkage, ppHullShader: ^^IHullShader) -> HRESULT,
-	CreateDomainShader:                   proc "stdcall" (this: ^IDevice, pShaderBytecode: rawptr, BytecodeLength: SIZE_T, pClassLinkage: ^IClassLinkage, ppDomainShader: ^^IDomainShader) -> HRESULT,
-	CreateComputeShader:                  proc "stdcall" (this: ^IDevice, pShaderBytecode: rawptr, BytecodeLength: SIZE_T, pClassLinkage: ^IClassLinkage, ppComputeShader: ^^IComputeShader) -> HRESULT,
-	CreateClassLinkage:                   proc "stdcall" (this: ^IDevice, ppLinkage: ^^IClassLinkage) -> HRESULT,
-	CreateBlendState:                     proc "stdcall" (this: ^IDevice, pBlendStateDesc: ^BLEND_DESC, ppBlendState: ^^IBlendState) -> HRESULT,
-	CreateDepthStencilState:              proc "stdcall" (this: ^IDevice, pDepthStencilDesc: ^DEPTH_STENCIL_DESC, ppDepthStencilState: ^^IDepthStencilState) -> HRESULT,
-	CreateRasterizerState:                proc "stdcall" (this: ^IDevice, pRasterizerDesc: ^RASTERIZER_DESC, ppRasterizerState: ^^IRasterizerState) -> HRESULT,
-	CreateSamplerState:                   proc "stdcall" (this: ^IDevice, pSamplerDesc: ^SAMPLER_DESC, ppSamplerState: ^^ISamplerState) -> HRESULT,
-	CreateQuery:                          proc "stdcall" (this: ^IDevice, pQueryDesc: ^QUERY_DESC, ppQuery: ^^IQuery) -> HRESULT,
-	CreatePredicate:                      proc "stdcall" (this: ^IDevice, pPredicateDesc: ^QUERY_DESC, ppPredicate: ^^IPredicate) -> HRESULT,
-	CreateCounter:                        proc "stdcall" (this: ^IDevice, pCounterDesc: ^COUNTER_DESC, ppCounter: ^^ICounter) -> HRESULT,
-	CreateDeferredContext:                proc "stdcall" (this: ^IDevice, ContextFlags: u32, ppDeferredContext: ^^IDeviceContext) -> HRESULT,
-	OpenSharedResource:                   proc "stdcall" (this: ^IDevice, hResource: HANDLE, ReturnedInterface: ^IID, ppResource: ^rawptr) -> HRESULT,
-	CheckFormatSupport:                   proc "stdcall" (this: ^IDevice, Format: dxgi.FORMAT, pFormatSupport: ^u32) -> HRESULT,
-	CheckMultisampleQualityLevels:        proc "stdcall" (this: ^IDevice, Format: dxgi.FORMAT, SampleCount: u32, pNumQualityLevels: ^u32) -> HRESULT,
-	CheckCounterInfo:                     proc "stdcall" (this: ^IDevice, pCounterInfo: ^COUNTER_INFO),
-	CheckCounter:                         proc "stdcall" (this: ^IDevice, pDesc: ^COUNTER_DESC, pType: ^COUNTER_TYPE, pActiveCounters: ^u32, szName: cstring, pNameLength: ^u32, szUnits: ^u8, pUnitsLength: ^u32, szDescription: cstring, pDescriptionLength: ^u32) -> HRESULT,
-	CheckFeatureSupport:                  proc "stdcall" (this: ^IDevice, Feature: FEATURE, pFeatureSupportData: rawptr, FeatureSupportDataSize: u32) -> HRESULT,
-	GetPrivateData:                       proc "stdcall" (this: ^IDevice, guid: ^GUID, pDataSize: ^u32, pData: rawptr) -> HRESULT,
-	SetPrivateData:                       proc "stdcall" (this: ^IDevice, guid: ^GUID, DataSize: u32, pData: rawptr) -> HRESULT,
-	SetPrivateDataInterface:              proc "stdcall" (this: ^IDevice, guid: ^GUID, pData: ^IUnknown) -> HRESULT,
-	GetFeatureLevel:                      proc "stdcall" (this: ^IDevice) -> FEATURE_LEVEL,
-	GetCreationFlags:                     proc "stdcall" (this: ^IDevice) -> u32,
-	GetDeviceRemovedReason:               proc "stdcall" (this: ^IDevice) -> HRESULT,
-	GetImmediateContext:                  proc "stdcall" (this: ^IDevice, ppImmediateContext: ^^IDeviceContext),
-	SetExceptionMode:                     proc "stdcall" (this: ^IDevice, RaiseFlags: RAISE_FLAGS) -> HRESULT,
-	GetExceptionMode:                     proc "stdcall" (this: ^IDevice) -> u32,
+	CreateBuffer:                         proc "system" (this: ^IDevice, pDesc: ^BUFFER_DESC, pInitialData: ^SUBRESOURCE_DATA, ppBuffer: ^^IBuffer) -> HRESULT,
+	CreateTexture1D:                      proc "system" (this: ^IDevice, pDesc: ^TEXTURE1D_DESC, pInitialData: ^SUBRESOURCE_DATA, ppTexture1D: ^^ITexture1D) -> HRESULT,
+	CreateTexture2D:                      proc "system" (this: ^IDevice, pDesc: ^TEXTURE2D_DESC, pInitialData: ^SUBRESOURCE_DATA, ppTexture2D: ^^ITexture2D) -> HRESULT,
+	CreateTexture3D:                      proc "system" (this: ^IDevice, pDesc: ^TEXTURE3D_DESC, pInitialData: ^SUBRESOURCE_DATA, ppTexture3D: ^^ITexture3D) -> HRESULT,
+	CreateShaderResourceView:             proc "system" (this: ^IDevice, pResource: ^IResource, pDesc: ^SHADER_RESOURCE_VIEW_DESC, ppSRView: ^^IShaderResourceView) -> HRESULT,
+	CreateUnorderedAccessView:            proc "system" (this: ^IDevice, pResource: ^IResource, pDesc: ^UNORDERED_ACCESS_VIEW_DESC, ppUAView: ^^IUnorderedAccessView) -> HRESULT,
+	CreateRenderTargetView:               proc "system" (this: ^IDevice, pResource: ^IResource, pDesc: ^RENDER_TARGET_VIEW_DESC, ppRTView: ^^IRenderTargetView) -> HRESULT,
+	CreateDepthStencilView:               proc "system" (this: ^IDevice, pResource: ^IResource, pDesc: ^DEPTH_STENCIL_VIEW_DESC, ppDepthStencilView: ^^IDepthStencilView) -> HRESULT,
+	CreateInputLayout:                    proc "system" (this: ^IDevice, pInputElementDescs: ^INPUT_ELEMENT_DESC, NumElements: u32, pShaderBytecodeWithInputSignature: rawptr, BytecodeLength: SIZE_T, ppInputLayout: ^^IInputLayout) -> HRESULT,
+	CreateVertexShader:                   proc "system" (this: ^IDevice, pShaderBytecode: rawptr, BytecodeLength: SIZE_T, pClassLinkage: ^IClassLinkage, ppVertexShader: ^^IVertexShader) -> HRESULT,
+	CreateGeometryShader:                 proc "system" (this: ^IDevice, pShaderBytecode: rawptr, BytecodeLength: SIZE_T, pClassLinkage: ^IClassLinkage, ppGeometryShader: ^^IGeometryShader) -> HRESULT,
+	CreateGeometryShaderWithStreamOutput: proc "system" (this: ^IDevice, pShaderBytecode: rawptr, BytecodeLength: SIZE_T, pSODeclaration: ^SO_DECLARATION_ENTRY, NumEntries: u32, pBufferStrides: ^u32, NumStrides: u32, RasterizedStream: u32, pClassLinkage: ^IClassLinkage, ppGeometryShader: ^^IGeometryShader) -> HRESULT,
+	CreatePixelShader:                    proc "system" (this: ^IDevice, pShaderBytecode: rawptr, BytecodeLength: SIZE_T, pClassLinkage: ^IClassLinkage, ppPixelShader: ^^IPixelShader) -> HRESULT,
+	CreateHullShader:                     proc "system" (this: ^IDevice, pShaderBytecode: rawptr, BytecodeLength: SIZE_T, pClassLinkage: ^IClassLinkage, ppHullShader: ^^IHullShader) -> HRESULT,
+	CreateDomainShader:                   proc "system" (this: ^IDevice, pShaderBytecode: rawptr, BytecodeLength: SIZE_T, pClassLinkage: ^IClassLinkage, ppDomainShader: ^^IDomainShader) -> HRESULT,
+	CreateComputeShader:                  proc "system" (this: ^IDevice, pShaderBytecode: rawptr, BytecodeLength: SIZE_T, pClassLinkage: ^IClassLinkage, ppComputeShader: ^^IComputeShader) -> HRESULT,
+	CreateClassLinkage:                   proc "system" (this: ^IDevice, ppLinkage: ^^IClassLinkage) -> HRESULT,
+	CreateBlendState:                     proc "system" (this: ^IDevice, pBlendStateDesc: ^BLEND_DESC, ppBlendState: ^^IBlendState) -> HRESULT,
+	CreateDepthStencilState:              proc "system" (this: ^IDevice, pDepthStencilDesc: ^DEPTH_STENCIL_DESC, ppDepthStencilState: ^^IDepthStencilState) -> HRESULT,
+	CreateRasterizerState:                proc "system" (this: ^IDevice, pRasterizerDesc: ^RASTERIZER_DESC, ppRasterizerState: ^^IRasterizerState) -> HRESULT,
+	CreateSamplerState:                   proc "system" (this: ^IDevice, pSamplerDesc: ^SAMPLER_DESC, ppSamplerState: ^^ISamplerState) -> HRESULT,
+	CreateQuery:                          proc "system" (this: ^IDevice, pQueryDesc: ^QUERY_DESC, ppQuery: ^^IQuery) -> HRESULT,
+	CreatePredicate:                      proc "system" (this: ^IDevice, pPredicateDesc: ^QUERY_DESC, ppPredicate: ^^IPredicate) -> HRESULT,
+	CreateCounter:                        proc "system" (this: ^IDevice, pCounterDesc: ^COUNTER_DESC, ppCounter: ^^ICounter) -> HRESULT,
+	CreateDeferredContext:                proc "system" (this: ^IDevice, ContextFlags: u32, ppDeferredContext: ^^IDeviceContext) -> HRESULT,
+	OpenSharedResource:                   proc "system" (this: ^IDevice, hResource: HANDLE, ReturnedInterface: ^IID, ppResource: ^rawptr) -> HRESULT,
+	CheckFormatSupport:                   proc "system" (this: ^IDevice, Format: dxgi.FORMAT, pFormatSupport: ^u32) -> HRESULT,
+	CheckMultisampleQualityLevels:        proc "system" (this: ^IDevice, Format: dxgi.FORMAT, SampleCount: u32, pNumQualityLevels: ^u32) -> HRESULT,
+	CheckCounterInfo:                     proc "system" (this: ^IDevice, pCounterInfo: ^COUNTER_INFO),
+	CheckCounter:                         proc "system" (this: ^IDevice, pDesc: ^COUNTER_DESC, pType: ^COUNTER_TYPE, pActiveCounters: ^u32, szName: cstring, pNameLength: ^u32, szUnits: ^u8, pUnitsLength: ^u32, szDescription: cstring, pDescriptionLength: ^u32) -> HRESULT,
+	CheckFeatureSupport:                  proc "system" (this: ^IDevice, Feature: FEATURE, pFeatureSupportData: rawptr, FeatureSupportDataSize: u32) -> HRESULT,
+	GetPrivateData:                       proc "system" (this: ^IDevice, guid: ^GUID, pDataSize: ^u32, pData: rawptr) -> HRESULT,
+	SetPrivateData:                       proc "system" (this: ^IDevice, guid: ^GUID, DataSize: u32, pData: rawptr) -> HRESULT,
+	SetPrivateDataInterface:              proc "system" (this: ^IDevice, guid: ^GUID, pData: ^IUnknown) -> HRESULT,
+	GetFeatureLevel:                      proc "system" (this: ^IDevice) -> FEATURE_LEVEL,
+	GetCreationFlags:                     proc "system" (this: ^IDevice) -> u32,
+	GetDeviceRemovedReason:               proc "system" (this: ^IDevice) -> HRESULT,
+	GetImmediateContext:                  proc "system" (this: ^IDevice, ppImmediateContext: ^^IDeviceContext),
+	SetExceptionMode:                     proc "system" (this: ^IDevice, RaiseFlags: RAISE_FLAGS) -> HRESULT,
+	GetExceptionMode:                     proc "system" (this: ^IDevice) -> u32,
 }
 
 
@@ -3558,17 +3560,17 @@ IShaderReflectionType :: struct {
 	using vtable: ^IShaderReflectionType_VTable,
 }
 IShaderReflectionType_VTable :: struct {
-	GetDesc:              proc "stdcall" (this: ^IShaderReflectionType, pDesc: ^SHADER_TYPE_DESC) -> HRESULT,
-	GetMemberTypeByIndex: proc "stdcall" (this: ^IShaderReflectionType, Index: u32) -> ^IShaderReflectionType,
-	GetMemberTypeByName:  proc "stdcall" (this: ^IShaderReflectionType, Name: cstring) -> ^IShaderReflectionType,
-	GetMemberTypeName:    proc "stdcall" (this: ^IShaderReflectionType, Index: u32) -> cstring,
-	IsEqual:              proc "stdcall" (this: ^IShaderReflectionType, pType: ^IShaderReflectionType) -> HRESULT,
-	GetSubType:           proc "stdcall" (this: ^IShaderReflectionType) -> ^IShaderReflectionType,
-	GetBaseClass:         proc "stdcall" (this: ^IShaderReflectionType) -> ^IShaderReflectionType,
-	GetNumInterfaces:     proc "stdcall" (this: ^IShaderReflectionType) -> u32,
-	GetInterfaceByIndex:  proc "stdcall" (this: ^IShaderReflectionType, uIndex: u32) -> ^IShaderReflectionType,
-	IsOfType:             proc "stdcall" (this: ^IShaderReflectionType, pType: ^IShaderReflectionType) -> HRESULT,
-	ImplementsInterface:  proc "stdcall" (this: ^IShaderReflectionType, pBase: ^IShaderReflectionType) -> HRESULT,
+	GetDesc:              proc "system" (this: ^IShaderReflectionType, pDesc: ^SHADER_TYPE_DESC) -> HRESULT,
+	GetMemberTypeByIndex: proc "system" (this: ^IShaderReflectionType, Index: u32) -> ^IShaderReflectionType,
+	GetMemberTypeByName:  proc "system" (this: ^IShaderReflectionType, Name: cstring) -> ^IShaderReflectionType,
+	GetMemberTypeName:    proc "system" (this: ^IShaderReflectionType, Index: u32) -> cstring,
+	IsEqual:              proc "system" (this: ^IShaderReflectionType, pType: ^IShaderReflectionType) -> HRESULT,
+	GetSubType:           proc "system" (this: ^IShaderReflectionType) -> ^IShaderReflectionType,
+	GetBaseClass:         proc "system" (this: ^IShaderReflectionType) -> ^IShaderReflectionType,
+	GetNumInterfaces:     proc "system" (this: ^IShaderReflectionType) -> u32,
+	GetInterfaceByIndex:  proc "system" (this: ^IShaderReflectionType, uIndex: u32) -> ^IShaderReflectionType,
+	IsOfType:             proc "system" (this: ^IShaderReflectionType, pType: ^IShaderReflectionType) -> HRESULT,
+	ImplementsInterface:  proc "system" (this: ^IShaderReflectionType, pBase: ^IShaderReflectionType) -> HRESULT,
 }
 
 ID3D11ShaderReflectionVariable_UUID_STRING :: "51F23923-F3E5-4BD1-91CB-606177D8DB4C"
@@ -3577,10 +3579,10 @@ IShaderReflectionVariable :: struct {
 	using vtable: ^IShaderReflectionVariable_VTable,
 }
 IShaderReflectionVariable_VTable :: struct {
-	GetDesc:          proc "stdcall" (this: ^IShaderReflectionVariable, pDesc: ^SHADER_VARIABLE_DESC) -> HRESULT,
-	GetType:          proc "stdcall" (this: ^IShaderReflectionVariable) -> ^IShaderReflectionType,
-	GetBuffer:        proc "stdcall" (this: ^IShaderReflectionVariable) -> ^IShaderReflectionConstantBuffer,
-	GetInterfaceSlot: proc "stdcall" (this: ^IShaderReflectionVariable, uArrayIndex: u32) -> u32,
+	GetDesc:          proc "system" (this: ^IShaderReflectionVariable, pDesc: ^SHADER_VARIABLE_DESC) -> HRESULT,
+	GetType:          proc "system" (this: ^IShaderReflectionVariable) -> ^IShaderReflectionType,
+	GetBuffer:        proc "system" (this: ^IShaderReflectionVariable) -> ^IShaderReflectionConstantBuffer,
+	GetInterfaceSlot: proc "system" (this: ^IShaderReflectionVariable, uArrayIndex: u32) -> u32,
 }
 
 ID3D11ShaderReflectionConstantBuffer_UUID_STRING :: "EB62D63D-93DD-4318-8AE8-C6F83AD371B8"
@@ -3589,9 +3591,9 @@ IShaderReflectionConstantBuffer :: struct {
 	using vtable: ^IShaderReflectionConstantBuffer_VTable,
 }
 IShaderReflectionConstantBuffer_VTable :: struct {
-	GetDesc: proc "stdcall" (this: ^IShaderReflectionConstantBuffer, pDesc: ^SHADER_BUFFER_DESC) -> HRESULT,
-	GetVariableByIndex: proc "stdcall" (this: ^IShaderReflectionConstantBuffer, Index: u32) -> ^IShaderReflectionVariable,
-	GetVariableByName: proc "stdcall" (this: ^IShaderReflectionConstantBuffer, Name: cstring) -> ^IShaderReflectionVariable,
+	GetDesc: proc "system" (this: ^IShaderReflectionConstantBuffer, pDesc: ^SHADER_BUFFER_DESC) -> HRESULT,
+	GetVariableByIndex: proc "system" (this: ^IShaderReflectionConstantBuffer, Index: u32) -> ^IShaderReflectionVariable,
+	GetVariableByName: proc "system" (this: ^IShaderReflectionConstantBuffer, Name: cstring) -> ^IShaderReflectionVariable,
 }
 
 
@@ -3603,25 +3605,25 @@ IShaderReflection :: struct #raw_union {
 }
 IShaderReflection_VTable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
-	GetDesc:                       proc "stdcall" (this: ^IShaderReflection, pDesc: ^SHADER_DESC) -> HRESULT,
-	GetConstantBufferByIndex:      proc "stdcall" (this: ^IShaderReflection, Index: u32) -> ^IShaderReflectionConstantBuffer,
-	GetConstantBufferByName:       proc "stdcall" (this: ^IShaderReflection, Name: cstring) -> ^IShaderReflectionConstantBuffer,
-	GetResourceBindingDesc:        proc "stdcall" (this: ^IShaderReflection, ResourceIndex: u32, pDesc: ^SHADER_INPUT_BIND_DESC) -> HRESULT,
-	GetInputParameterDesc:         proc "stdcall" (this: ^IShaderReflection, ParameterIndex: u32, pDesc: ^SIGNATURE_PARAMETER_DESC) -> HRESULT,
-	GetOutputParameterDesc:        proc "stdcall" (this: ^IShaderReflection, ParameterIndex: u32, pDesc: ^SIGNATURE_PARAMETER_DESC) -> HRESULT,
-	GetPatchConstantParameterDesc: proc "stdcall" (this: ^IShaderReflection, ParameterIndex: u32, pDesc: ^SIGNATURE_PARAMETER_DESC) -> HRESULT,
-	GetVariableByName:             proc "stdcall" (this: ^IShaderReflection, Name: cstring) -> ^IShaderReflectionVariable,
-	GetResourceBindingDescByName:  proc "stdcall" (this: ^IShaderReflection, Name: cstring, pDesc: ^SHADER_INPUT_BIND_DESC) -> HRESULT,
-	GetMovInstructionCount:        proc "stdcall" (this: ^IShaderReflection) -> u32,
-	GetMovcInstructionCount:       proc "stdcall" (this: ^IShaderReflection) -> u32,
-	GetConversionInstructionCount: proc "stdcall" (this: ^IShaderReflection) -> u32,
-	GetBitwiseInstructionCount:    proc "stdcall" (this: ^IShaderReflection) -> u32,
-	GetGSInputPrimitive:           proc "stdcall" (this: ^IShaderReflection) -> PRIMITIVE,
-	IsSampleFrequencyShader:       proc "stdcall" (this: ^IShaderReflection) -> BOOL,
-	GetNumInterfaceSlots:          proc "stdcall" (this: ^IShaderReflection) -> u32,
-	GetMinFeatureLevel:            proc "stdcall" (this: ^IShaderReflection, pLevel: ^FEATURE_LEVEL) -> HRESULT,
-	GetThreadGroupSize:            proc "stdcall" (this: ^IShaderReflection, pSizeX: ^u32, pSizeY: ^u32, pSizeZ: ^u32) -> u32,
-	GetRequiresFlags:              proc "stdcall" (this: ^IShaderReflection) -> SHADER_REQUIRES_FLAGS,
+	GetDesc:                       proc "system" (this: ^IShaderReflection, pDesc: ^SHADER_DESC) -> HRESULT,
+	GetConstantBufferByIndex:      proc "system" (this: ^IShaderReflection, Index: u32) -> ^IShaderReflectionConstantBuffer,
+	GetConstantBufferByName:       proc "system" (this: ^IShaderReflection, Name: cstring) -> ^IShaderReflectionConstantBuffer,
+	GetResourceBindingDesc:        proc "system" (this: ^IShaderReflection, ResourceIndex: u32, pDesc: ^SHADER_INPUT_BIND_DESC) -> HRESULT,
+	GetInputParameterDesc:         proc "system" (this: ^IShaderReflection, ParameterIndex: u32, pDesc: ^SIGNATURE_PARAMETER_DESC) -> HRESULT,
+	GetOutputParameterDesc:        proc "system" (this: ^IShaderReflection, ParameterIndex: u32, pDesc: ^SIGNATURE_PARAMETER_DESC) -> HRESULT,
+	GetPatchConstantParameterDesc: proc "system" (this: ^IShaderReflection, ParameterIndex: u32, pDesc: ^SIGNATURE_PARAMETER_DESC) -> HRESULT,
+	GetVariableByName:             proc "system" (this: ^IShaderReflection, Name: cstring) -> ^IShaderReflectionVariable,
+	GetResourceBindingDescByName:  proc "system" (this: ^IShaderReflection, Name: cstring, pDesc: ^SHADER_INPUT_BIND_DESC) -> HRESULT,
+	GetMovInstructionCount:        proc "system" (this: ^IShaderReflection) -> u32,
+	GetMovcInstructionCount:       proc "system" (this: ^IShaderReflection) -> u32,
+	GetConversionInstructionCount: proc "system" (this: ^IShaderReflection) -> u32,
+	GetBitwiseInstructionCount:    proc "system" (this: ^IShaderReflection) -> u32,
+	GetGSInputPrimitive:           proc "system" (this: ^IShaderReflection) -> PRIMITIVE,
+	IsSampleFrequencyShader:       proc "system" (this: ^IShaderReflection) -> BOOL,
+	GetNumInterfaceSlots:          proc "system" (this: ^IShaderReflection) -> u32,
+	GetMinFeatureLevel:            proc "system" (this: ^IShaderReflection, pLevel: ^FEATURE_LEVEL) -> HRESULT,
+	GetThreadGroupSize:            proc "system" (this: ^IShaderReflection, pSizeX: ^u32, pSizeY: ^u32, pSizeZ: ^u32) -> u32,
+	GetRequiresFlags:              proc "system" (this: ^IShaderReflection) -> SHADER_REQUIRES_FLAGS,
 }
 
 
@@ -3633,8 +3635,8 @@ ILibraryReflection :: struct #raw_union {
 }
 ILibraryReflection_VTable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
-	GetDesc:            proc "stdcall" (this: ^ILibraryReflection, pDesc: ^LIBRARY_DESC) -> HRESULT,
-	GetFunctionByIndex: proc "stdcall" (this: ^ILibraryReflection, FunctionIndex: i32) -> ^IFunctionReflection,
+	GetDesc:            proc "system" (this: ^ILibraryReflection, pDesc: ^LIBRARY_DESC) -> HRESULT,
+	GetFunctionByIndex: proc "system" (this: ^ILibraryReflection, FunctionIndex: i32) -> ^IFunctionReflection,
 }
 
 ID3D11FunctionReflection_UUID_STRING :: "207BCECB-D683-4A06-A8A3-9B149B9F73A4"
@@ -3643,13 +3645,13 @@ IFunctionReflection :: struct {
 	using vtable: ^IFunctionReflection_VTable,
 }
 IFunctionReflection_VTable :: struct {
-	GetDesc:                      proc "stdcall" (this: ^IFunctionReflection, pDesc: ^FUNCTION_DESC) -> HRESULT,
-	GetConstantBufferByIndex:     proc "stdcall" (this: ^IFunctionReflection, BufferIndex: u32) -> ^IShaderReflectionConstantBuffer,
-	GetConstantBufferByName:      proc "stdcall" (this: ^IFunctionReflection, Name: cstring) -> ^IShaderReflectionConstantBuffer,
-	GetResourceBindingDesc:       proc "stdcall" (this: ^IFunctionReflection, ResourceIndex: u32, pDesc: ^SHADER_INPUT_BIND_DESC) -> HRESULT,
-	GetVariableByName:            proc "stdcall" (this: ^IFunctionReflection, Name: cstring) -> ^IShaderReflectionVariable,
-	GetResourceBindingDescByName: proc "stdcall" (this: ^IFunctionReflection, Name: cstring, pDesc: ^SHADER_INPUT_BIND_DESC) -> HRESULT,
-	GetFunctionParameter:         proc "stdcall" (this: ^IFunctionReflection, ParameterIndex: i32) -> ^IFunctionParameterReflection,
+	GetDesc:                      proc "system" (this: ^IFunctionReflection, pDesc: ^FUNCTION_DESC) -> HRESULT,
+	GetConstantBufferByIndex:     proc "system" (this: ^IFunctionReflection, BufferIndex: u32) -> ^IShaderReflectionConstantBuffer,
+	GetConstantBufferByName:      proc "system" (this: ^IFunctionReflection, Name: cstring) -> ^IShaderReflectionConstantBuffer,
+	GetResourceBindingDesc:       proc "system" (this: ^IFunctionReflection, ResourceIndex: u32, pDesc: ^SHADER_INPUT_BIND_DESC) -> HRESULT,
+	GetVariableByName:            proc "system" (this: ^IFunctionReflection, Name: cstring) -> ^IShaderReflectionVariable,
+	GetResourceBindingDescByName: proc "system" (this: ^IFunctionReflection, Name: cstring, pDesc: ^SHADER_INPUT_BIND_DESC) -> HRESULT,
+	GetFunctionParameter:         proc "system" (this: ^IFunctionReflection, ParameterIndex: i32) -> ^IFunctionParameterReflection,
 }
 
 ID3D11FunctionParameterReflection_UUID_STRING :: "42757488-334F-47FE-982E-1A65D08CC462"
@@ -3658,7 +3660,7 @@ IFunctionParameterReflection :: struct {
 	using vtable: ^IFunctionParameterReflection_VTable,
 }
 IFunctionParameterReflection_VTable :: struct {
-	GetDesc: proc "stdcall" (this: ^IFunctionParameterReflection, pDesc: ^PARAMETER_DESC) -> HRESULT,
+	GetDesc: proc "system" (this: ^IFunctionParameterReflection, pDesc: ^PARAMETER_DESC) -> HRESULT,
 }
 
 
@@ -3672,14 +3674,14 @@ IFunctionLinkingGraph :: struct #raw_union {
 }
 IFunctionLinkingGraph_VTable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
-	CreateModuleInstance: proc "stdcall" (this: ^IFunctionLinkingGraph, ppModuleInstance: ^^IModuleInstance, ppErrorBuffer: ^^IBlob) -> HRESULT,
-	SetInputSignature:    proc "stdcall" (this: ^IFunctionLinkingGraph, pInputParameters: ^PARAMETER_DESC, cInputParameters: u32, ppInputNode: ^^ILinkingNode) -> HRESULT,
-	SetOutputSignature:   proc "stdcall" (this: ^IFunctionLinkingGraph, pOutputParameters: ^PARAMETER_DESC, cOutputParameters: u32, ppOutputNode: ^^ILinkingNode) -> HRESULT,
-	CallFunction:         proc "stdcall" (this: ^IFunctionLinkingGraph, pModuleInstanceNamespace: cstring, pModuleWithFunctionPrototype: ^IModule, pFunctionName: cstring, ppCallNode: ^^ILinkingNode) -> HRESULT,
-	PassValue:            proc "stdcall" (this: ^IFunctionLinkingGraph, pSrcNode: ^ILinkingNode, SrcParameterIndex: i32, pDstNode: ^ILinkingNode, DstParameterIndex: i32) -> HRESULT,
-	PassValueWithSwizzle: proc "stdcall" (this: ^IFunctionLinkingGraph, pSrcNode: ^ILinkingNode, SrcParameterIndex: i32, pSrcSwizzle: ^u8, pDstNode: ^ILinkingNode, DstParameterIndex: i32, pDstSwizzle: ^u8) -> HRESULT,
-	GetLastError:         proc "stdcall" (this: ^IFunctionLinkingGraph, ppErrorBuffer: ^^IBlob) -> HRESULT,
-	GenerateHlsl:         proc "stdcall" (this: ^IFunctionLinkingGraph, uFlags: u32, ppBuffer: ^^IBlob) -> HRESULT,
+	CreateModuleInstance: proc "system" (this: ^IFunctionLinkingGraph, ppModuleInstance: ^^IModuleInstance, ppErrorBuffer: ^^IBlob) -> HRESULT,
+	SetInputSignature:    proc "system" (this: ^IFunctionLinkingGraph, pInputParameters: ^PARAMETER_DESC, cInputParameters: u32, ppInputNode: ^^ILinkingNode) -> HRESULT,
+	SetOutputSignature:   proc "system" (this: ^IFunctionLinkingGraph, pOutputParameters: ^PARAMETER_DESC, cOutputParameters: u32, ppOutputNode: ^^ILinkingNode) -> HRESULT,
+	CallFunction:         proc "system" (this: ^IFunctionLinkingGraph, pModuleInstanceNamespace: cstring, pModuleWithFunctionPrototype: ^IModule, pFunctionName: cstring, ppCallNode: ^^ILinkingNode) -> HRESULT,
+	PassValue:            proc "system" (this: ^IFunctionLinkingGraph, pSrcNode: ^ILinkingNode, SrcParameterIndex: i32, pDstNode: ^ILinkingNode, DstParameterIndex: i32) -> HRESULT,
+	PassValueWithSwizzle: proc "system" (this: ^IFunctionLinkingGraph, pSrcNode: ^ILinkingNode, SrcParameterIndex: i32, pSrcSwizzle: ^u8, pDstNode: ^ILinkingNode, DstParameterIndex: i32, pDstSwizzle: ^u8) -> HRESULT,
+	GetLastError:         proc "system" (this: ^IFunctionLinkingGraph, ppErrorBuffer: ^^IBlob) -> HRESULT,
+	GenerateHlsl:         proc "system" (this: ^IFunctionLinkingGraph, uFlags: u32, ppBuffer: ^^IBlob) -> HRESULT,
 }
 
 IDebug_UUID_STRING :: "79CF2233-7536-4948-9D36-1E4692DC5760"
@@ -3706,15 +3708,15 @@ DEBUG_FEATURE :: enum u32 {
 
 IDebug_VTable :: struct {
 	using iunkown_vtable: IUnknown_VTable,
-	SetFeatureMask:             proc "stdcall" (this: ^IDebug, mask: DEBUG_FEATURES) -> HRESULT,
-	GetFeatureMask:             proc "stdcall" (this: ^IDebug) -> DEBUG_FEATURES,
-	SetPresentPerRenderOpDelay: proc "stdcall" (this: ^IDebug, Milliseconds: u32) -> HRESULT,
-	GetPresentPerRenderOpDelay: proc "stdcall" (this: ^IDebug) -> u32,
-	SetSwapChain:               proc "stdcall" (this: ^IDebug, pSwapChain: ^dxgi.ISwapChain) -> HRESULT,
-	GetSwapChain:               proc "stdcall" (this: ^IDebug, ppSwapChain: ^^dxgi.ISwapChain) -> HRESULT,
-	ValidateContext:            proc "stdcall" (this: ^IDebug, pContext: ^IDeviceContext) -> HRESULT,
-	ReportLiveDeviceObjects:    proc "stdcall" (this: ^IDebug, Flags: RLDO_FLAGS) -> HRESULT,
-	ValidateContextForDispatch: proc "stdcall" (this: ^IDebug, pContext: ^IDeviceContext) -> HRESULT,
+	SetFeatureMask:             proc "system" (this: ^IDebug, mask: DEBUG_FEATURES) -> HRESULT,
+	GetFeatureMask:             proc "system" (this: ^IDebug) -> DEBUG_FEATURES,
+	SetPresentPerRenderOpDelay: proc "system" (this: ^IDebug, Milliseconds: u32) -> HRESULT,
+	GetPresentPerRenderOpDelay: proc "system" (this: ^IDebug) -> u32,
+	SetSwapChain:               proc "system" (this: ^IDebug, pSwapChain: ^dxgi.ISwapChain) -> HRESULT,
+	GetSwapChain:               proc "system" (this: ^IDebug, ppSwapChain: ^^dxgi.ISwapChain) -> HRESULT,
+	ValidateContext:            proc "system" (this: ^IDebug, pContext: ^IDeviceContext) -> HRESULT,
+	ReportLiveDeviceObjects:    proc "system" (this: ^IDebug, Flags: RLDO_FLAGS) -> HRESULT,
+	ValidateContextForDispatch: proc "system" (this: ^IDebug, pContext: ^IDeviceContext) -> HRESULT,
 }
 
 IInfoQueue_UUID_STRING :: "6543DBB6-1B48-42F5-AB82-E97EC74326F6"
@@ -3773,39 +3775,39 @@ MESSAGE :: struct {
 
 IInfoQueue_VTable :: struct {
 	using iunkown_vtable: IUnknown_VTable,
-	AddApplicationMessage:                        proc "stdcall" (this: ^IInfoQueue, Severity: MESSAGE_SEVERITY, pDescription: cstring) -> HRESULT,
-	AddMessage:                                   proc "stdcall" (this: ^IInfoQueue, Category: MESSAGE_CATEGORY, Severity: MESSAGE_SEVERITY, ID: MESSAGE_ID, pDescription: cstring) -> HRESULT,
-	AddRetrievalFilterEntries:                    proc "stdcall" (this: ^IInfoQueue, pFilter: ^INFO_QUEUE_FILTER) -> HRESULT,
-	AddStorageFilterEntries:                      proc "stdcall" (this: ^IInfoQueue, pFilter: ^INFO_QUEUE_FILTER) -> HRESULT,
-	ClearRetrievalFilter:                         proc "stdcall" (this: ^IInfoQueue),
-	ClearStorageFilter:                           proc "stdcall" (this: ^IInfoQueue),
-	ClearStoredMessages:                          proc "stdcall" (this: ^IInfoQueue),
-	GetBreakOnCategory:                           proc "stdcall" (this: ^IInfoQueue, Category: MESSAGE_CATEGORY) -> BOOL,
-	GetBreakOnID:                                 proc "stdcall" (this: ^IInfoQueue, ID: MESSAGE_ID) -> BOOL,
-	GetBreakOnSeverity:                           proc "stdcall" (this: ^IInfoQueue, Severity: MESSAGE_SEVERITY) -> BOOL,
-	GetMessage:                                   proc "stdcall" (this: ^IInfoQueue, MessageIndex: u64, pMessage: ^MESSAGE, pMessageByteLength: ^SIZE_T) -> HRESULT,
-	GetMessageCountLimit:                         proc "stdcall" (this: ^IInfoQueue) -> u64,
-	GetMuteDebugOutput:                           proc "stdcall" (this: ^IInfoQueue) -> BOOL,
-	GetNumMessagesAllowedByStorageFilter:         proc "stdcall" (this: ^IInfoQueue) -> u64,
-	GetNumMessagesDeniedByStorageFilter:          proc "stdcall" (this: ^IInfoQueue) -> u64,
-	GetNumMessagesDiscardedByMessageCountLimit:   proc "stdcall" (this: ^IInfoQueue) -> u64,
-	GetNumStoredMessages:                         proc "stdcall" (this: ^IInfoQueue) -> u64,
-	GetNumStoredMessagesAllowedByRetrievalFilter: proc "stdcall" (this: ^IInfoQueue) -> u64,
-	GetRetrievalFilter:                           proc "stdcall" (this: ^IInfoQueue, pFilter: ^INFO_QUEUE_FILTER, pFilterByteLength: ^SIZE_T) -> HRESULT,
-	GetRetrievalFilterStackSize:                  proc "stdcall" (this: ^IInfoQueue) -> u64,
-	GetStorageFilter:                             proc "stdcall" (this: ^IInfoQueue, pFilter: ^INFO_QUEUE_FILTER, pFilterByteLength: ^SIZE_T) -> HRESULT,
-	GetStorageFilterStackSize:                    proc "stdcall" (this: ^IInfoQueue) -> u64,
-	PopRetrievalFilter:                           proc "stdcall" (this: ^IInfoQueue),
-	PopStorageFilter:                             proc "stdcall" (this: ^IInfoQueue),
-	PushCopyOfRetrievalFilter:                    proc "stdcall" (this: ^IInfoQueue) -> HRESULT,
-	PushCopyOfStorageFilter:                      proc "stdcall" (this: ^IInfoQueue) -> HRESULT,
-	PushEmptyRetrievalFilter:                     proc "stdcall" (this: ^IInfoQueue) -> HRESULT,
-	PushEmptyStorageFilter:                       proc "stdcall" (this: ^IInfoQueue) -> HRESULT,
-	SetBreakOnCategory:                           proc "stdcall" (this: ^IInfoQueue, Category: MESSAGE_CATEGORY, bEnable: BOOL) -> HRESULT,
-	SetBreakOnID:                                 proc "stdcall" (this: ^IInfoQueue, ID: MESSAGE_ID, bEnable: BOOL) -> HRESULT,
-	SetBreakOnSeverity:                           proc "stdcall" (this: ^IInfoQueue, Severity: MESSAGE_SEVERITY, bEnable: BOOL) -> HRESULT,
-	SetMessageCountLimit:                         proc "stdcall" (this: ^IInfoQueue, MessageCountLimit: u64) -> HRESULT,
-	SetMuteDebugOutput:                           proc "stdcall" (this: ^IInfoQueue, bMute: BOOL),
+	AddApplicationMessage:                        proc "system" (this: ^IInfoQueue, Severity: MESSAGE_SEVERITY, pDescription: cstring) -> HRESULT,
+	AddMessage:                                   proc "system" (this: ^IInfoQueue, Category: MESSAGE_CATEGORY, Severity: MESSAGE_SEVERITY, ID: MESSAGE_ID, pDescription: cstring) -> HRESULT,
+	AddRetrievalFilterEntries:                    proc "system" (this: ^IInfoQueue, pFilter: ^INFO_QUEUE_FILTER) -> HRESULT,
+	AddStorageFilterEntries:                      proc "system" (this: ^IInfoQueue, pFilter: ^INFO_QUEUE_FILTER) -> HRESULT,
+	ClearRetrievalFilter:                         proc "system" (this: ^IInfoQueue),
+	ClearStorageFilter:                           proc "system" (this: ^IInfoQueue),
+	ClearStoredMessages:                          proc "system" (this: ^IInfoQueue),
+	GetBreakOnCategory:                           proc "system" (this: ^IInfoQueue, Category: MESSAGE_CATEGORY) -> BOOL,
+	GetBreakOnID:                                 proc "system" (this: ^IInfoQueue, ID: MESSAGE_ID) -> BOOL,
+	GetBreakOnSeverity:                           proc "system" (this: ^IInfoQueue, Severity: MESSAGE_SEVERITY) -> BOOL,
+	GetMessage:                                   proc "system" (this: ^IInfoQueue, MessageIndex: u64, pMessage: ^MESSAGE, pMessageByteLength: ^SIZE_T) -> HRESULT,
+	GetMessageCountLimit:                         proc "system" (this: ^IInfoQueue) -> u64,
+	GetMuteDebugOutput:                           proc "system" (this: ^IInfoQueue) -> BOOL,
+	GetNumMessagesAllowedByStorageFilter:         proc "system" (this: ^IInfoQueue) -> u64,
+	GetNumMessagesDeniedByStorageFilter:          proc "system" (this: ^IInfoQueue) -> u64,
+	GetNumMessagesDiscardedByMessageCountLimit:   proc "system" (this: ^IInfoQueue) -> u64,
+	GetNumStoredMessages:                         proc "system" (this: ^IInfoQueue) -> u64,
+	GetNumStoredMessagesAllowedByRetrievalFilter: proc "system" (this: ^IInfoQueue) -> u64,
+	GetRetrievalFilter:                           proc "system" (this: ^IInfoQueue, pFilter: ^INFO_QUEUE_FILTER, pFilterByteLength: ^SIZE_T) -> HRESULT,
+	GetRetrievalFilterStackSize:                  proc "system" (this: ^IInfoQueue) -> u64,
+	GetStorageFilter:                             proc "system" (this: ^IInfoQueue, pFilter: ^INFO_QUEUE_FILTER, pFilterByteLength: ^SIZE_T) -> HRESULT,
+	GetStorageFilterStackSize:                    proc "system" (this: ^IInfoQueue) -> u64,
+	PopRetrievalFilter:                           proc "system" (this: ^IInfoQueue),
+	PopStorageFilter:                             proc "system" (this: ^IInfoQueue),
+	PushCopyOfRetrievalFilter:                    proc "system" (this: ^IInfoQueue) -> HRESULT,
+	PushCopyOfStorageFilter:                      proc "system" (this: ^IInfoQueue) -> HRESULT,
+	PushEmptyRetrievalFilter:                     proc "system" (this: ^IInfoQueue) -> HRESULT,
+	PushEmptyStorageFilter:                       proc "system" (this: ^IInfoQueue) -> HRESULT,
+	SetBreakOnCategory:                           proc "system" (this: ^IInfoQueue, Category: MESSAGE_CATEGORY, bEnable: BOOL) -> HRESULT,
+	SetBreakOnID:                                 proc "system" (this: ^IInfoQueue, ID: MESSAGE_ID, bEnable: BOOL) -> HRESULT,
+	SetBreakOnSeverity:                           proc "system" (this: ^IInfoQueue, Severity: MESSAGE_SEVERITY, bEnable: BOOL) -> HRESULT,
+	SetMessageCountLimit:                         proc "system" (this: ^IInfoQueue, MessageCountLimit: u64) -> HRESULT,
+	SetMuteDebugOutput:                           proc "system" (this: ^IInfoQueue, bMute: BOOL),
 }
 
 MESSAGE_ID :: enum u32 {
@@ -5150,4 +5152,18 @@ MESSAGE_ID :: enum u32 {
 
 CalcSubresource :: #force_inline proc "contextless" (MipSlice: UINT, ArraySlice: UINT, MipLevels: UINT) -> UINT {
 	return MipSlice + ArraySlice * MipLevels
+}
+
+ID3DUserDefinedAnnotation_UUID_STRING :: "B2DAAD8B-03D4-4DBF-95EB-32AB4B63D0AB"
+ID3DUserDefinedAnnotation_UUID := &IID{0xB2DAAD8B, 0x03D4, 0x4DBF, {0x95, 0xEB, 0x32, 0xAB, 0x4B, 0x63, 0xD0, 0xAB}}
+ID3DUserDefinedAnnotation :: struct #raw_union {
+	#subtype iunknown: IUnknown,
+	using vtable: ^ID3DUserDefinedAnnotation_VTable,
+}
+ID3DUserDefinedAnnotation_VTable :: struct {
+	using iunknown_vtable: IUnknown_VTable,
+	BeginEvent: proc "system" (this: ^ID3DUserDefinedAnnotation, Name: windows.LPCWSTR) -> INT,
+	EndEvent:   proc "system" (this: ^ID3DUserDefinedAnnotation) -> INT,
+	SetMarker:  proc "system" (this: ^ID3DUserDefinedAnnotation, Name: windows.LPCWSTR),
+	GetStatus:  proc "system" (this: ^ID3DUserDefinedAnnotation) -> BOOL,
 }

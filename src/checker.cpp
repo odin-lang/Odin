@@ -770,15 +770,17 @@ gb_internal void add_type_info_dependency(CheckerInfo *info, DeclInfo *d, Type *
 	rw_mutex_unlock(&d->type_info_deps_mutex);
 }
 
-gb_internal AstPackage *get_core_package(CheckerInfo *info, String name) {
+
+gb_internal AstPackage *get_runtime_package(CheckerInfo *info) {
+	String name = str_lit("runtime");
 	gbAllocator a = heap_allocator();
-	String path = get_fullpath_core(a, name);
+	String path = get_fullpath_base_collection(a, name, nullptr);
 	defer (gb_free(a, path.text));
 	auto found = string_map_get(&info->packages, path);
 	if (found == nullptr) {
 		gb_printf_err("Name: %.*s\n", LIT(name));
 		gb_printf_err("Fullpath: %.*s\n", LIT(path));
-		
+
 		for (auto const &entry : info->packages) {
 			gb_printf_err("%.*s\n", LIT(entry.key));
 		}
@@ -787,14 +789,37 @@ gb_internal AstPackage *get_core_package(CheckerInfo *info, String name) {
 	return *found;
 }
 
+gb_internal AstPackage *get_core_package(CheckerInfo *info, String name) {
+	if (name == "runtime") {
+		return get_runtime_package(info);
+	}
 
-gb_internal void add_package_dependency(CheckerContext *c, char const *package_name, char const *name) {
+	gbAllocator a = heap_allocator();
+	String path = get_fullpath_core_collection(a, name, nullptr);
+	defer (gb_free(a, path.text));
+	auto found = string_map_get(&info->packages, path);
+	if (found == nullptr) {
+		gb_printf_err("Name: %.*s\n", LIT(name));
+		gb_printf_err("Fullpath: %.*s\n", LIT(path));
+
+		for (auto const &entry : info->packages) {
+			gb_printf_err("%.*s\n", LIT(entry.key));
+		}
+		GB_ASSERT_MSG(found != nullptr, "Missing core package %.*s", LIT(name));
+	}
+	return *found;
+}
+
+gb_internal void add_package_dependency(CheckerContext *c, char const *package_name, char const *name, bool required=false) {
 	String n = make_string_c(name);
 	AstPackage *p = get_core_package(&c->checker->info, make_string_c(package_name));
 	Entity *e = scope_lookup(p->scope, n);
 	GB_ASSERT_MSG(e != nullptr, "%s", name);
 	GB_ASSERT(c->decl != nullptr);
 	e->flags |= EntityFlag_Used;
+	if (required) {
+		e->flags |= EntityFlag_Require;
+	}
 	add_dependency(c->info, c->decl, e);
 }
 
@@ -968,10 +993,11 @@ gb_internal void init_universal(void) {
 	add_global_bool_constant("true",  true);
 	add_global_bool_constant("false", false);
 
-	add_global_string_constant("ODIN_VENDOR",  bc->ODIN_VENDOR);
-	add_global_string_constant("ODIN_VERSION", bc->ODIN_VERSION);
-	add_global_string_constant("ODIN_ROOT",    bc->ODIN_ROOT);
+	add_global_string_constant("ODIN_VENDOR",             bc->ODIN_VENDOR);
+	add_global_string_constant("ODIN_VERSION",            bc->ODIN_VERSION);
+	add_global_string_constant("ODIN_ROOT",               bc->ODIN_ROOT);
 	add_global_string_constant("ODIN_BUILD_PROJECT_NAME", bc->ODIN_BUILD_PROJECT_NAME);
+	add_global_string_constant("ODIN_WINDOWS_SUBSYSTEM",  bc->ODIN_WINDOWS_SUBSYSTEM);
 
 	{
 		GlobalEnumValue values[TargetOs_COUNT] = {
@@ -1068,23 +1094,24 @@ gb_internal void init_universal(void) {
 	}
 
 
-	add_global_bool_constant("ODIN_DEBUG",                    bc->ODIN_DEBUG);
-	add_global_bool_constant("ODIN_DISABLE_ASSERT",           bc->ODIN_DISABLE_ASSERT);
-	add_global_bool_constant("ODIN_DEFAULT_TO_NIL_ALLOCATOR", bc->ODIN_DEFAULT_TO_NIL_ALLOCATOR);
-	add_global_bool_constant("ODIN_NO_DYNAMIC_LITERALS",      bc->no_dynamic_literals);
-	add_global_bool_constant("ODIN_NO_CRT",                   bc->no_crt);
-	add_global_bool_constant("ODIN_USE_SEPARATE_MODULES",     bc->use_separate_modules);
-	add_global_bool_constant("ODIN_TEST",                     bc->command_kind == Command_test);
-	add_global_bool_constant("ODIN_NO_ENTRY_POINT",           bc->no_entry_point);
-	add_global_bool_constant("ODIN_FOREIGN_ERROR_PROCEDURES", bc->ODIN_FOREIGN_ERROR_PROCEDURES);
-	add_global_bool_constant("ODIN_NO_RTTI",            bc->no_rtti);
+	add_global_bool_constant("ODIN_DEBUG",                      bc->ODIN_DEBUG);
+	add_global_bool_constant("ODIN_DISABLE_ASSERT",             bc->ODIN_DISABLE_ASSERT);
+	add_global_bool_constant("ODIN_DEFAULT_TO_NIL_ALLOCATOR",   bc->ODIN_DEFAULT_TO_NIL_ALLOCATOR);
+	add_global_bool_constant("ODIN_DEFAULT_TO_PANIC_ALLOCATOR", bc->ODIN_DEFAULT_TO_PANIC_ALLOCATOR);
+	add_global_bool_constant("ODIN_NO_DYNAMIC_LITERALS",        bc->no_dynamic_literals);
+	add_global_bool_constant("ODIN_NO_CRT",                     bc->no_crt);
+	add_global_bool_constant("ODIN_USE_SEPARATE_MODULES",       bc->use_separate_modules);
+	add_global_bool_constant("ODIN_TEST",                       bc->command_kind == Command_test);
+	add_global_bool_constant("ODIN_NO_ENTRY_POINT",             bc->no_entry_point);
+	add_global_bool_constant("ODIN_FOREIGN_ERROR_PROCEDURES",   bc->ODIN_FOREIGN_ERROR_PROCEDURES);
+	add_global_bool_constant("ODIN_NO_RTTI",                    bc->no_rtti);
 
-	add_global_bool_constant("ODIN_VALGRIND_SUPPORT",         bc->ODIN_VALGRIND_SUPPORT);
-	add_global_bool_constant("ODIN_TILDE",                    bc->tilde_backend);
+	add_global_bool_constant("ODIN_VALGRIND_SUPPORT",           bc->ODIN_VALGRIND_SUPPORT);
+	add_global_bool_constant("ODIN_TILDE",                      bc->tilde_backend);
 
 	add_global_constant("ODIN_COMPILE_TIMESTAMP", t_untyped_integer, exact_value_i64(odin_compile_timestamp()));
 
-	add_global_bool_constant("__ODIN_LLVM_F16_SUPPORTED", lb_use_new_pass_system());
+	add_global_bool_constant("__ODIN_LLVM_F16_SUPPORTED", lb_use_new_pass_system() && !is_arch_wasm());
 
 	{
 		GlobalEnumValue values[3] = {
@@ -1230,6 +1257,9 @@ gb_internal void init_checker_info(CheckerInfo *i) {
 	mpsc_init(&i->required_global_variable_queue, a); // 1<<10);
 	mpsc_init(&i->required_foreign_imports_through_force_queue, a); // 1<<10);
 	mpsc_init(&i->intrinsics_entry_point_usage, a); // 1<<10); // just waste some memory here, even if it probably never used
+
+	string_map_init(&i->load_directory_cache);
+	map_init(&i->load_directory_map);
 }
 
 gb_internal void destroy_checker_info(CheckerInfo *i) {
@@ -1253,6 +1283,8 @@ gb_internal void destroy_checker_info(CheckerInfo *i) {
 
 	map_destroy(&i->objc_msgSend_types);
 	string_map_destroy(&i->load_file_cache);
+	string_map_destroy(&i->load_directory_cache);
+	map_destroy(&i->load_directory_map);
 }
 
 gb_internal CheckerContext make_checker_context(Checker *c) {
@@ -2344,6 +2376,43 @@ gb_internal void force_add_dependency_entity(Checker *c, Scope *scope, String co
 	add_dependency_to_set(c, e);
 }
 
+gb_internal void collect_testing_procedures_of_package(Checker *c, AstPackage *pkg) {
+	AstPackage *testing_package = get_core_package(&c->info, str_lit("testing"));
+	Scope *testing_scope = testing_package->scope;
+	Entity *test_signature = scope_lookup_current(testing_scope, str_lit("Test_Signature"));
+
+	Scope *s = pkg->scope;
+	for (auto const &entry : s->elements) {
+		Entity *e = entry.value;
+		if (e->kind != Entity_Procedure) {
+			continue;
+		}
+
+		if ((e->flags & EntityFlag_Test) == 0) {
+			continue;
+		}
+
+		String name = e->token.string;
+
+		bool is_tester = true;
+
+		Type *t = base_type(e->type);
+		GB_ASSERT(t->kind == Type_Proc);
+		if (are_types_identical(t, base_type(test_signature->type))) {
+			// Good
+		} else {
+			gbString str = type_to_string(t);
+			error(e->token, "Testing procedures must have a signature type of proc(^testing.T), got %s", str);
+			gb_string_free(str);
+			is_tester = false;
+		}
+
+		if (is_tester) {
+			add_dependency_to_set(c, e);
+			array_add(&c->info.testing_procedures, e);
+		}
+	}
+}
 
 gb_internal void generate_minimum_dependency_set_internal(Checker *c, Entity *start) {
 	for_array(i, c->info.definitions) {
@@ -2447,41 +2516,13 @@ gb_internal void generate_minimum_dependency_set_internal(Checker *c, Entity *st
 			}
 		}
 
-
-		Entity *test_signature = scope_lookup_current(testing_scope, str_lit("Test_Signature"));
-
-
 		AstPackage *pkg = c->info.init_package;
-		Scope *s = pkg->scope;
+		collect_testing_procedures_of_package(c, pkg);
 
-		for (auto const &entry : s->elements) {
-			Entity *e = entry.value;
-			if (e->kind != Entity_Procedure) {
-				continue;
-			}
-
-			if ((e->flags & EntityFlag_Test) == 0) {
-				continue;
-			}
-
-			String name = e->token.string;
-
-			bool is_tester = true;
-
-			Type *t = base_type(e->type);
-			GB_ASSERT(t->kind == Type_Proc);
-			if (are_types_identical(t, base_type(test_signature->type))) {
-				// Good
-			} else {
-				gbString str = type_to_string(t);
-				error(e->token, "Testing procedures must have a signature type of proc(^testing.T), got %s", str);
-				gb_string_free(str);
-				is_tester = false;
-			}
-
-			if (is_tester) {
-				add_dependency_to_set(c, e);
-				array_add(&c->info.testing_procedures, e);
+		if (build_context.test_all_packages) {
+			for (auto const &entry : c->info.packages) {
+				AstPackage *pkg = entry.value;
+				collect_testing_procedures_of_package(c, pkg);
 			}
 		}
 	} else if (start != nullptr) {
@@ -2516,13 +2557,11 @@ gb_internal void generate_minimum_dependency_set(Checker *c, Entity *start) {
 
 		// Odin internal procedures
 		str_lit("__init_context"),
-		str_lit("cstring_to_string"),
+		// str_lit("cstring_to_string"),
 		str_lit("_cleanup_runtime"),
 
 		// Pseudo-CRT required procedures
 		str_lit("memset"),
-		str_lit("memcpy"),
-		str_lit("memmove"),
 
 		// Utility procedures
 		str_lit("memory_equal"),
@@ -2530,22 +2569,28 @@ gb_internal void generate_minimum_dependency_set(Checker *c, Entity *start) {
 		str_lit("memory_compare_zero"),
 	);
 
-	FORCE_ADD_RUNTIME_ENTITIES(!build_context.tilde_backend,
-		// Extended data type internal procedures
-		str_lit("umodti3"),
-		str_lit("udivti3"),
-		str_lit("modti3"),
-		str_lit("divti3"),
-		str_lit("fixdfti"),
-		str_lit("fixunsdfti"),
-		str_lit("fixunsdfdi"),
-		str_lit("floattidf"),
-		str_lit("floattidf_unsigned"),
-		str_lit("truncsfhf2"),
-		str_lit("truncdfhf2"),
-		str_lit("gnu_h2f_ieee"),
-		str_lit("gnu_f2h_ieee"),
-		str_lit("extendhfsf2"),
+	// Only required if no CRT is present
+	FORCE_ADD_RUNTIME_ENTITIES(build_context.no_crt,
+		str_lit("memcpy"),
+		str_lit("memmove"),
+	);
+
+	FORCE_ADD_RUNTIME_ENTITIES(is_arch_wasm() && !build_context.tilde_backend,
+	// 	// Extended data type internal procedures
+	// 	str_lit("umodti3"),
+	// 	str_lit("udivti3"),
+	// 	str_lit("modti3"),
+	// 	str_lit("divti3"),
+	// 	str_lit("fixdfti"),
+	// 	str_lit("fixunsdfti"),
+	// 	str_lit("fixunsdfdi"),
+	// 	str_lit("floattidf"),
+	// 	str_lit("floattidf_unsigned"),
+	// 	str_lit("truncsfhf2"),
+	// 	str_lit("truncdfhf2"),
+	// 	str_lit("gnu_h2f_ieee"),
+	// 	str_lit("gnu_f2h_ieee"),
+	// 	str_lit("extendhfsf2"),
 
 		// WASM Specific
 		str_lit("__ashlti3"),
@@ -2917,6 +2962,16 @@ gb_internal void init_core_source_code_location(Checker *c) {
 	t_source_code_location = find_core_type(c, str_lit("Source_Code_Location"));
 	t_source_code_location_ptr = alloc_type_pointer(t_source_code_location);
 }
+
+gb_internal void init_core_load_directory_file(Checker *c) {
+	if (t_load_directory_file != nullptr) {
+		return;
+	}
+	t_load_directory_file = find_core_type(c, str_lit("Load_Directory_File"));
+	t_load_directory_file_ptr = alloc_type_pointer(t_load_directory_file);
+	t_load_directory_file_slice = alloc_type_slice(t_load_directory_file);
+}
+
 
 gb_internal void init_core_map_type(Checker *c) {
 	if (t_map_info != nullptr) {
@@ -3808,6 +3863,7 @@ gb_internal void check_builtin_attributes(CheckerContext *ctx, Entity *e, Array<
 	case Entity_ProcGroup:
 	case Entity_Procedure:
 	case Entity_TypeName:
+	case Entity_Constant:
 		// Okay
 		break;
 	default:
@@ -4550,10 +4606,10 @@ gb_internal Array<ImportPathItem> find_import_path(Checker *c, AstPackage *start
 					continue;
 				}
 
-				if (pkg->kind == Package_Runtime) {
-					// NOTE(bill): Allow cyclic imports within the runtime package for the time being
-					continue;
-				}
+				// if (pkg->kind == Package_Runtime) {
+				// 	// NOTE(bill): Allow cyclic imports within the runtime package for the time being
+				// 	continue;
+				// }
 
 				ImportPathItem item = {pkg, decl};
 				if (pkg == end) {

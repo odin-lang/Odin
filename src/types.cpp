@@ -137,13 +137,14 @@ struct TypeStruct {
 	Scope *         scope;
 
 	i64             custom_align;
+	i64             custom_field_align;
 	Type *          polymorphic_params; // Type_Tuple
 	Type *          polymorphic_parent;
 
 	Type *          soa_elem;
 	i32             soa_count;
 	StructSoaKind   soa_kind;
-	RwMutex         fields_mutex;
+	Wait_Signal     fields_wait_signal;
 	BlockingMutex   offset_mutex; // for settings offsets
 
 	bool            is_polymorphic;
@@ -230,6 +231,7 @@ struct TypeProc {
 		Type *key;                                        \
 		Type *value;                                      \
 		Type *lookup_result_type;                         \
+		Type *debug_metadata_type;                        \
 	})                                                        \
 	TYPE_KIND(Struct,  TypeStruct)                            \
 	TYPE_KIND(Union,   TypeUnion)                             \
@@ -678,6 +680,10 @@ gb_global Type *t_allocator_error                = nullptr;
 gb_global Type *t_source_code_location           = nullptr;
 gb_global Type *t_source_code_location_ptr       = nullptr;
 
+gb_global Type *t_load_directory_file            = nullptr;
+gb_global Type *t_load_directory_file_ptr        = nullptr;
+gb_global Type *t_load_directory_file_slice      = nullptr;
+
 gb_global Type *t_map_info                       = nullptr;
 gb_global Type *t_map_cell_info                  = nullptr;
 gb_global Type *t_raw_map                        = nullptr;
@@ -825,11 +831,13 @@ gb_internal void type_path_pop(TypePath *tp) {
 #define FAILURE_SIZE      0
 #define FAILURE_ALIGNMENT 0
 
+gb_internal bool type_ptr_set_exists(PtrSet<Type *> *s, Type *t);
+
 gb_internal bool type_ptr_set_update(PtrSet<Type *> *s, Type *t) {
 	if (t == nullptr) {
 		return true;
 	}
-	if (ptr_set_exists(s, t)) {
+	if (type_ptr_set_exists(s, t)) {
 		return true;
 	}
 	ptr_set_add(s, t);
@@ -2961,9 +2969,8 @@ gb_internal Selection lookup_field_from_index(Type *type, i64 index) {
 	isize max_count = 0;
 	switch (type->kind) {
 	case Type_Struct:
-		rw_mutex_shared_lock(&type->Struct.fields_mutex);
+		wait_signal_until_available(&type->Struct.fields_wait_signal);
 		max_count = type->Struct.fields.count;
-		rw_mutex_shared_unlock(&type->Struct.fields_mutex);
 		break;
 	case Type_Tuple:    max_count = type->Tuple.variables.count; break;
 	}
@@ -2974,8 +2981,7 @@ gb_internal Selection lookup_field_from_index(Type *type, i64 index) {
 
 	switch (type->kind) {
 	case Type_Struct: {
-		rw_mutex_shared_lock(&type->Struct.fields_mutex);
-		defer (rw_mutex_shared_unlock(&type->Struct.fields_mutex));
+		wait_signal_until_available(&type->Struct.fields_wait_signal);
 		for (isize i = 0; i < max_count; i++) {
 			Entity *f = type->Struct.fields[i];
 			if (f->kind == Entity_Variable) {
@@ -3040,9 +3046,8 @@ gb_internal Selection lookup_field_with_selection(Type *type_, String field_name
 				}
 			}
 			if (type->kind == Type_Struct) {
-				rw_mutex_shared_lock(&type->Struct.fields_mutex);
+				wait_signal_until_available(&type->Struct.fields_wait_signal);
 				isize field_count = type->Struct.fields.count;
-				rw_mutex_shared_unlock(&type->Struct.fields_mutex);
 				if (field_count != 0) for_array(i, type->Struct.fields) {
 					Entity *f = type->Struct.fields[i];
 					if (f->flags&EntityFlag_Using) {
@@ -3071,9 +3076,8 @@ gb_internal Selection lookup_field_with_selection(Type *type_, String field_name
 		}
 
 		if (type->kind == Type_Struct) {
-			rw_mutex_shared_lock(&type->Struct.fields_mutex);
+			wait_signal_until_available(&type->Struct.fields_wait_signal);
 			Scope *s = type->Struct.scope;
-			rw_mutex_shared_unlock(&type->Struct.fields_mutex);
 			if (s != nullptr) {
 				Entity *found = scope_lookup_current(s, field_name);
 				if (found != nullptr && found->kind != Entity_Variable) {
@@ -3121,9 +3125,8 @@ gb_internal Selection lookup_field_with_selection(Type *type_, String field_name
 			}
 		}
 
-		rw_mutex_shared_lock(&type->Struct.fields_mutex);
+		wait_signal_until_available(&type->Struct.fields_wait_signal);
 		isize field_count = type->Struct.fields.count;
-		rw_mutex_shared_unlock(&type->Struct.fields_mutex);
 		if (field_count != 0) for_array(i, type->Struct.fields) {
 			Entity *f = type->Struct.fields[i];
 			if (f->kind != Entity_Variable || (f->flags & EntityFlag_Field) == 0) {
@@ -3666,10 +3669,15 @@ gb_internal i64 type_align_of_internal(Type *t, TypePath *path) {
 	return gb_clamp(next_pow2(type_size_of_internal(t, path)), 1, build_context.max_align);
 }
 
-gb_internal i64 *type_set_offsets_of(Slice<Entity *> const &fields, bool is_packed, bool is_raw_union) {
+gb_internal i64 *type_set_offsets_of(Slice<Entity *> const &fields, bool is_packed, bool is_raw_union, i64 min_field_align) {
 	gbAllocator a = permanent_allocator();
 	auto offsets = gb_alloc_array(a, i64, fields.count);
 	i64 curr_offset = 0;
+
+	if (min_field_align == 0) {
+		min_field_align = 1;
+	}
+
 	if (is_raw_union) {
 		for_array(i, fields) {
 			offsets[i] = 0;
@@ -3690,7 +3698,7 @@ gb_internal i64 *type_set_offsets_of(Slice<Entity *> const &fields, bool is_pack
 				offsets[i] = -1;
 			} else {
 				Type *t = fields[i]->type;
-				i64 align = gb_max(type_align_of(t), 1);
+				i64 align = gb_max(type_align_of(t), min_field_align);
 				i64 size  = gb_max(type_size_of( t), 0);
 				curr_offset = align_formula(curr_offset, align);
 				offsets[i] = curr_offset;
@@ -3707,7 +3715,7 @@ gb_internal bool type_set_offsets(Type *t) {
 		MUTEX_GUARD(&t->Struct.offset_mutex);
 		if (!t->Struct.are_offsets_set) {
 			t->Struct.are_offsets_being_processed = true;
-			t->Struct.offsets = type_set_offsets_of(t->Struct.fields, t->Struct.is_packed, t->Struct.is_raw_union);
+			t->Struct.offsets = type_set_offsets_of(t->Struct.fields, t->Struct.is_packed, t->Struct.is_raw_union, t->Struct.custom_field_align);
 			t->Struct.are_offsets_being_processed = false;
 			t->Struct.are_offsets_set = true;
 			return true;
@@ -3716,7 +3724,7 @@ gb_internal bool type_set_offsets(Type *t) {
 		MUTEX_GUARD(&t->Tuple.mutex);
 		if (!t->Tuple.are_offsets_set) {
 			t->Tuple.are_offsets_being_processed = true;
-			t->Tuple.offsets = type_set_offsets_of(t->Tuple.variables, t->Tuple.is_packed, false);
+			t->Tuple.offsets = type_set_offsets_of(t->Tuple.variables, t->Tuple.is_packed, false, 1);
 			t->Tuple.are_offsets_being_processed = false;
 			t->Tuple.are_offsets_set = true;
 			return true;
@@ -4085,7 +4093,7 @@ gb_internal i64 type_offset_of_from_selection(Type *type, Selection sel) {
 	return offset;
 }
 
-gb_internal isize check_is_assignable_to_using_subtype(Type *src, Type *dst, isize level = 0, bool src_is_ptr = false) {
+gb_internal isize check_is_assignable_to_using_subtype(Type *src, Type *dst, isize level = 0, bool src_is_ptr = false, bool allow_polymorphic=false) {
 	Type *prev_src = src;
 	src = type_deref(src);
 	if (!src_is_ptr) {
@@ -4097,10 +4105,18 @@ gb_internal isize check_is_assignable_to_using_subtype(Type *src, Type *dst, isi
 		return 0;
 	}
 
+	bool dst_is_polymorphic = is_type_polymorphic(dst);
+
 	for_array(i, src->Struct.fields) {
 		Entity *f = src->Struct.fields[i];
 		if (f->kind != Entity_Variable || (f->flags&EntityFlags_IsSubtype) == 0) {
 			continue;
+		}
+		if (allow_polymorphic && dst_is_polymorphic) {
+			Type *fb = base_type(type_deref(f->type));
+			if (fb->kind == Type_Struct && fb->Struct.polymorphic_parent == dst) {
+				return true;
+			}
 		}
 
 		if (are_types_identical(f->type, dst)) {
@@ -4111,7 +4127,7 @@ gb_internal isize check_is_assignable_to_using_subtype(Type *src, Type *dst, isi
 				return level+1;
 			}
 		}
-		isize nested_level = check_is_assignable_to_using_subtype(f->type, dst, level+1, src_is_ptr);
+		isize nested_level = check_is_assignable_to_using_subtype(f->type, dst, level+1, src_is_ptr, allow_polymorphic);
 		if (nested_level > 0) {
 			return nested_level;
 		}
@@ -4126,6 +4142,13 @@ gb_internal bool is_type_subtype_of(Type *src, Type *dst) {
 	}
 
 	return 0 < check_is_assignable_to_using_subtype(src, dst, 0, is_type_pointer(src));
+}
+gb_internal bool is_type_subtype_of_and_allow_polymorphic(Type *src, Type *dst) {
+	if (are_types_identical(src, dst)) {
+		return true;
+	}
+
+	return 0 < check_is_assignable_to_using_subtype(src, dst, 0, is_type_pointer(src), true);
 }
 
 

@@ -380,8 +380,18 @@ gb_internal void lb_run_remove_dead_instruction_pass(lbProcedure *p) {
 	}
 }
 
-gb_internal LLVMValueRef lb_run_instrumentation_pass_insert_call(lbProcedure *p, Entity *entity, LLVMBuilderRef dummy_builder) {
+gb_internal LLVMValueRef lb_run_instrumentation_pass_insert_call(lbProcedure *p, Entity *entity, LLVMBuilderRef dummy_builder, bool is_enter) {
 	lbModule *m = p->module;
+
+	if (p->debug_info != nullptr) {
+		TokenPos pos = {};
+		if (is_enter) {
+			pos = ast_token(p->body).pos;
+		} else {
+			pos = ast_end_token(p->body).pos;
+		}
+		LLVMSetCurrentDebugLocation2(dummy_builder, lb_debug_location_from_token_pos(p, pos));
+	}
 
 	lbValue cc = lb_find_procedure_value_from_entity(m, entity);
 
@@ -430,7 +440,7 @@ gb_internal void lb_run_instrumentation_pass(lbProcedure *p) {
 
 	LLVMBasicBlockRef entry_bb = p->entry_block->block;
 	LLVMPositionBuilder(dummy_builder, entry_bb, LLVMGetFirstInstruction(entry_bb));
-	lb_run_instrumentation_pass_insert_call(p, enter, dummy_builder);
+	lb_run_instrumentation_pass_insert_call(p, enter, dummy_builder, true);
 	LLVMRemoveStringAttributeAtIndex(p->value, LLVMAttributeIndex_FunctionIndex, LLVM_V_NAME("instrument-function-entry"));
 
 	unsigned bb_count = LLVMCountBasicBlocks(p->value);
@@ -451,7 +461,7 @@ gb_internal void lb_run_instrumentation_pass(lbProcedure *p) {
 
 
 		LLVMPositionBuilderBefore(dummy_builder, terminator);
-		lb_run_instrumentation_pass_insert_call(p, exit, dummy_builder);
+		lb_run_instrumentation_pass_insert_call(p, exit, dummy_builder, false);
 	}
 
 	LLVMRemoveStringAttributeAtIndex(p->value, LLVMAttributeIndex_FunctionIndex, LLVM_V_NAME("instrument-function-exit"));
@@ -471,6 +481,8 @@ gb_internal void lb_run_function_pass_manager(LLVMPassManagerRef fpm, lbProcedur
 	// are not removed
 	lb_run_remove_dead_instruction_pass(p);
 
+	lb_run_instrumentation_pass(p);
+
 	switch (pass_manager_kind) {
 	case lbFunctionPassManager_none:
 	    return;
@@ -481,7 +493,6 @@ gb_internal void lb_run_function_pass_manager(LLVMPassManagerRef fpm, lbProcedur
 	    }
 	    break;
 	}
-	lb_run_instrumentation_pass(p);
 
 	LLVMRunFunctionPassManager(fpm, p->value);
 }

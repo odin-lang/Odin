@@ -230,6 +230,10 @@ gb_internal Ast *clone_ast(Ast *node, AstFile *f) {
 	case Ast_OrReturnExpr:
 		n->OrReturnExpr.expr = clone_ast(n->OrReturnExpr.expr, f);
 		break;
+	case Ast_OrBranchExpr:
+		n->OrBranchExpr.label = clone_ast(n->OrBranchExpr.label, f);
+		n->OrBranchExpr.expr  = clone_ast(n->OrBranchExpr.expr, f);
+		break;
 	case Ast_TypeAssertion:
 		n->TypeAssertion.expr = clone_ast(n->TypeAssertion.expr, f);
 		n->TypeAssertion.type = clone_ast(n->TypeAssertion.type, f);
@@ -383,10 +387,11 @@ gb_internal Ast *clone_ast(Ast *node, AstFile *f) {
 		n->DynamicArrayType.elem = clone_ast(n->DynamicArrayType.elem, f);
 		break;
 	case Ast_StructType:
-		n->StructType.fields = clone_ast_array(n->StructType.fields, f);
+		n->StructType.fields             = clone_ast_array(n->StructType.fields, f);
 		n->StructType.polymorphic_params = clone_ast(n->StructType.polymorphic_params, f);
-		n->StructType.align  = clone_ast(n->StructType.align, f);
-		n->StructType.where_clauses  = clone_ast_array(n->StructType.where_clauses, f);
+		n->StructType.align              = clone_ast(n->StructType.align, f);
+		n->StructType.field_align        = clone_ast(n->StructType.field_align, f);
+		n->StructType.where_clauses      = clone_ast_array(n->StructType.where_clauses, f);
 		break;
 	case Ast_UnionType:
 		n->UnionType.variants = clone_ast_array(n->UnionType.variants, f);
@@ -1125,7 +1130,7 @@ gb_internal Ast *ast_dynamic_array_type(AstFile *f, Token token, Ast *elem) {
 
 gb_internal Ast *ast_struct_type(AstFile *f, Token token, Slice<Ast *> fields, isize field_count,
                      Ast *polymorphic_params, bool is_packed, bool is_raw_union, bool is_no_copy,
-                     Ast *align,
+                     Ast *align, Ast *field_align,
                      Token where_token, Array<Ast *> const &where_clauses) {
 	Ast *result = alloc_ast_node(f, Ast_StructType);
 	result->StructType.token              = token;
@@ -1136,6 +1141,7 @@ gb_internal Ast *ast_struct_type(AstFile *f, Token token, Slice<Ast *> fields, i
 	result->StructType.is_raw_union       = is_raw_union;
 	result->StructType.is_no_copy         = is_no_copy;
 	result->StructType.align              = align;
+	result->StructType.field_align        = field_align;
 	result->StructType.where_token        = where_token;
 	result->StructType.where_clauses      = slice_from_array(where_clauses);
 	return result;
@@ -2158,6 +2164,49 @@ gb_internal Array<Ast *> parse_union_variant_list(AstFile *f) {
 	return variants;
 }
 
+gb_internal void parser_check_polymorphic_record_parameters(AstFile *f, Ast *polymorphic_params) {
+	if (polymorphic_params == nullptr) {
+		return;
+	}
+	if (polymorphic_params->kind != Ast_FieldList) {
+		return;
+	}
+
+
+	enum {Unknown, Dollar, Bare} prefix = Unknown;
+	gb_unused(prefix);
+
+	for (Ast *field : polymorphic_params->FieldList.list) {
+		if (field == nullptr || field->kind != Ast_Field) {
+			continue;
+		}
+		for (Ast *name : field->Field.names) {
+			if (name == nullptr) {
+				continue;
+			}
+			bool error = false;
+
+			if (name->kind == Ast_Ident) {
+				switch (prefix) {
+				case Unknown: prefix = Bare; break;
+				case Dollar:  error = true;  break;
+				case Bare:                   break;
+				}
+			} else if (name->kind == Ast_PolyType) {
+				switch (prefix) {
+				case Unknown: prefix = Dollar; break;
+				case Dollar:                   break;
+				case Bare:    error = true;    break;
+				}
+			}
+			if (error) {
+				syntax_error(name, "Mixture of polymorphic $ names and normal identifiers are not allowed within record parameters");
+			}
+		}
+	}
+}
+
+
 gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 	Ast *operand = nullptr; // Operand
 	switch (f->curr_token.kind) {
@@ -2507,6 +2556,7 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 		bool is_raw_union       = false;
 		bool no_copy            = false;
 		Ast *align              = nullptr;
+		Ast *field_align        = nullptr;
 
 		if (allow_token(f, Token_OpenParen)) {
 			isize param_count = 0;
@@ -2541,6 +2591,18 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 					gbString s = expr_to_string(align);
 					syntax_warning(tag, "#align requires parentheses around the expression");
 					error_line("\tSuggestion: #align(%s)", s);
+					gb_string_free(s);
+				}
+			} else if (tag.string == "field_align") {
+				if (field_align) {
+					syntax_error(tag, "Duplicate struct tag '#%.*s'", LIT(tag.string));
+				}
+				field_align = parse_expr(f, true);
+				if (field_align && field_align->kind != Ast_ParenExpr) {
+					ERROR_BLOCK();
+					gbString s = expr_to_string(field_align);
+					syntax_warning(tag, "#field_align requires parentheses around the expression");
+					error_line("\tSuggestion: #field_align(%s)", s);
 					gb_string_free(s);
 				}
 			} else if (tag.string == "raw_union") {
@@ -2591,7 +2653,9 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 			decls = fields->FieldList.list;
 		}
 
-		return ast_struct_type(f, token, decls, name_count, polymorphic_params, is_packed, is_raw_union, no_copy, align, where_token, where_clauses);
+		parser_check_polymorphic_record_parameters(f, polymorphic_params);
+
+		return ast_struct_type(f, token, decls, name_count, polymorphic_params, is_packed, is_raw_union, no_copy, align, field_align, where_token, where_clauses);
 	} break;
 
 	case Token_union: {
@@ -2682,6 +2746,8 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 		Token open = expect_token_after(f, Token_OpenBrace, "union");
 		auto variants = parse_union_variant_list(f);
 		Token close = expect_closing_brace_of_field_list(f);
+
+		parser_check_polymorphic_record_parameters(f, polymorphic_params);
 
 		return ast_union_type(f, token, variants, polymorphic_params, align, union_kind, where_token, where_clauses);
 	} break;
@@ -5445,6 +5511,11 @@ gb_internal bool determine_path_from_string(BlockingMutex *file_mutex, Ast *node
 
 
 	if (collection_name.len > 0) {
+		// NOTE(bill): `base:runtime` == `core:runtime`
+		if (collection_name == "core" && string_starts_with(file_str, str_lit("runtime"))) {
+			collection_name = str_lit("base");
+		}
+
 		if (collection_name == "system") {
 			if (node->kind != Ast_ForeignImportDecl) {
 				syntax_error(node, "The library collection 'system' is restrict for 'foreign_library'");
@@ -5474,13 +5545,12 @@ gb_internal bool determine_path_from_string(BlockingMutex *file_mutex, Ast *node
 #endif
 	}
 
-
 	if (is_package_name_reserved(file_str)) {
 		*path = file_str;
-		if (collection_name == "core") {
+		if (collection_name == "core" || collection_name == "base") {
 			return true;
 		} else {
-			syntax_error(node, "The package '%.*s' must be imported with the core library collection: 'core:%.*s'", LIT(file_str), LIT(file_str));
+			syntax_error(node, "The package '%.*s' must be imported with the 'base' library collection: 'base:%.*s'", LIT(file_str), LIT(file_str));
 			return false;
 		}
 	}
@@ -5496,7 +5566,8 @@ gb_internal bool determine_path_from_string(BlockingMutex *file_mutex, Ast *node
 	if (has_windows_drive) {
 		*path = file_str;
 	} else {
-		String fullpath = string_trim_whitespace(get_fullpath_relative(permanent_allocator(), base_dir, file_str));
+		bool ok = false;
+		String fullpath = string_trim_whitespace(get_fullpath_relative(permanent_allocator(), base_dir, file_str, &ok));
 		*path = fullpath;
 	}
 	return true;
@@ -6118,7 +6189,11 @@ gb_internal ParseFileError parse_packages(Parser *p, String init_filename) {
 	{ // Add these packages serially and then process them parallel
 		TokenPos init_pos = {};
 		{
-			String s = get_fullpath_core(permanent_allocator(), str_lit("runtime"));
+			bool ok = false;
+			String s = get_fullpath_base_collection(permanent_allocator(), str_lit("runtime"), &ok);
+			if (!ok) {
+				compiler_error("Unable to find The 'base:runtime' package. Is the ODIN_ROOT set up correctly?");
+			}
 			try_add_import_path(p, s, s, init_pos, Package_Runtime);
 		}
 
@@ -6126,7 +6201,11 @@ gb_internal ParseFileError parse_packages(Parser *p, String init_filename) {
 		p->init_fullpath = init_fullpath;
 
 		if (build_context.command_kind == Command_test) {
-			String s = get_fullpath_core(permanent_allocator(), str_lit("testing"));
+			bool ok = false;
+			String s = get_fullpath_core_collection(permanent_allocator(), str_lit("testing"), &ok);
+			if (!ok) {
+				compiler_error("Unable to find The 'core:testing' package. Is the ODIN_ROOT set up correctly?");
+			}
 			try_add_import_path(p, s, s, init_pos, Package_Normal);
 		}
 		

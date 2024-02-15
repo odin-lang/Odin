@@ -1,6 +1,6 @@
 package log
 
-import "core:runtime"
+import "base:runtime"
 import "core:fmt"
 
 
@@ -116,6 +116,42 @@ panicf :: proc(fmt_str: string, args: ..any, location := #caller_location) -> ! 
 	runtime.panic("log.panicf", location)
 }
 
+@(disabled=ODIN_DISABLE_ASSERT)
+assert :: proc(condition: bool, message := "", loc := #caller_location) {
+	if !condition {
+		@(cold)
+		internal :: proc(message: string, loc: runtime.Source_Code_Location) {
+			p := context.assertion_failure_proc
+			if p == nil {
+				p = runtime.default_assertion_failure_proc
+			}
+			log(.Fatal, message, location=loc)
+			p("runtime assertion", message, loc)
+		}
+		internal(message, loc)
+	}
+}
+
+@(disabled=ODIN_DISABLE_ASSERT)
+assertf :: proc(condition: bool, fmt_str: string, args: ..any, loc := #caller_location) {
+	if !condition {
+		// NOTE(dragos): We are using the same trick as in builtin.assert
+		// to improve performance to make the CPU not
+		// execute speculatively, making it about an order of
+		// magnitude faster
+		@(cold)
+		internal :: proc(loc: runtime.Source_Code_Location, fmt_str: string, args: ..any) {
+			p := context.assertion_failure_proc
+			if p == nil {
+				p = runtime.default_assertion_failure_proc
+			}
+			message := fmt.tprintf(fmt_str, ..args)
+			log(.Fatal, message, location=loc)
+			p("Runtime assertion", message, loc)
+		}
+		internal(loc, fmt_str, ..args)
+	}
+}
 
 
 

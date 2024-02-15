@@ -1,7 +1,7 @@
 package slice
 
-import "core:intrinsics"
-import "core:runtime"
+import "base:intrinsics"
+import "base:runtime"
 
 _ :: intrinsics
 _ :: runtime

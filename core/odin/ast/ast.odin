@@ -768,6 +768,7 @@ Struct_Type :: struct {
 	tok_pos:       tokenizer.Pos,
 	poly_params:   ^Field_List,
 	align:         ^Expr,
+	field_align:   ^Expr,
 	where_token:   tokenizer.Token,
 	where_clauses: []^Expr,
 	is_packed:     bool,

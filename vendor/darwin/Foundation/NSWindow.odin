@@ -1,9 +1,8 @@
-//+build darwin
 package objc_Foundation
 
 import "core:strings"
-import "core:runtime"
-import "core:intrinsics"
+import "base:runtime"
+import "base:intrinsics"
 
 Rect :: struct {
 	using origin: Point,

@@ -1,7 +1,7 @@
 //+private
 package os2
 
-import "core:runtime"
+import "base:runtime"
 
 _lookup_env :: proc(key: string, allocator: runtime.Allocator) -> (value: string, found: bool) {
 	//TODO

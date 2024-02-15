@@ -1264,6 +1264,139 @@ gb_internal LoadDirectiveResult check_load_directive(CheckerContext *c, Operand 
 
 }
 
+gb_internal int file_cache_sort_cmp(void const *x, void const *y) {
+	LoadFileCache const *a = *(LoadFileCache const **)(x);
+	LoadFileCache const *b = *(LoadFileCache const **)(y);
+	return string_compare(a->path, b->path);
+}
+
+gb_internal LoadDirectiveResult check_load_directory_directive(CheckerContext *c, Operand *operand, Ast *call, Type *type_hint, bool err_on_not_found) {
+	ast_node(ce, CallExpr, call);
+	ast_node(bd, BasicDirective, ce->proc);
+	String name = bd->name.string;
+	GB_ASSERT(name == "load_directory");
+
+	if (ce->args.count != 1) {
+		error(ce->args[0], "'#%.*s' expects 1 argument, got %td", LIT(name), ce->args.count);
+		return LoadDirective_Error;
+	}
+
+	Ast *arg = ce->args[0];
+	Operand o = {};
+	check_expr(c, &o, arg);
+	if (o.mode != Addressing_Constant) {
+		error(arg, "'#%.*s' expected a constant string argument", LIT(name));
+		return LoadDirective_Error;
+	}
+
+	if (!is_type_string(o.type)) {
+		gbString str = type_to_string(o.type);
+		error(arg, "'#%.*s' expected a constant string, got %s", LIT(name), str);
+		gb_string_free(str);
+		return LoadDirective_Error;
+	}
+
+	GB_ASSERT(o.value.kind == ExactValue_String);
+
+	init_core_load_directory_file(c->checker);
+
+	operand->type = t_load_directory_file_slice;
+	operand->mode = Addressing_Value;
+
+
+	String original_string = o.value.value_string;
+	String path;
+	if (gb_path_is_absolute((char*)original_string.text)) {
+		path = original_string;
+	} else {
+		String base_dir = dir_from_path(get_file_path_string(call->file_id));
+
+		BlockingMutex *ignore_mutex = nullptr;
+		bool ok = determine_path_from_string(ignore_mutex, call, base_dir, original_string, &path);
+		gb_unused(ok);
+	}
+	MUTEX_GUARD(&c->info->load_directory_mutex);
+
+
+	gbFileError file_error = gbFileError_None;
+
+	Array<LoadFileCache *> file_caches = {};
+
+	LoadDirectoryCache **cache_ptr = string_map_get(&c->info->load_directory_cache, path);
+	LoadDirectoryCache *cache = cache_ptr ? *cache_ptr : nullptr;
+	if (cache) {
+		file_error = cache->file_error;
+	}
+	defer ({
+		if (cache == nullptr) {
+			LoadDirectoryCache *new_cache = gb_alloc_item(permanent_allocator(), LoadDirectoryCache);
+			new_cache->path = path;
+			new_cache->files = file_caches;
+			new_cache->file_error = file_error;
+			string_map_set(&c->info->load_directory_cache, path, new_cache);
+
+			map_set(&c->info->load_directory_map, call, new_cache);
+		} else {
+			cache->file_error = file_error;
+		}
+	});
+
+
+	LoadDirectiveResult result = LoadDirective_Success;
+
+
+	if (cache == nullptr)  {
+		Array<FileInfo> list = {};
+		ReadDirectoryError rd_err = read_directory(path, &list);
+		defer (array_free(&list));
+
+		if (list.count == 1) {
+			GB_ASSERT(path != list[0].fullpath);
+		}
+
+
+		switch (rd_err) {
+		case ReadDirectory_InvalidPath:
+			error(call, "%.*s error - invalid path: %.*s", LIT(name), LIT(original_string));
+			return LoadDirective_NotFound;
+		case ReadDirectory_NotExists:
+			error(call, "%.*s error - path does not exist: %.*s", LIT(name), LIT(original_string));
+			return LoadDirective_NotFound;
+		case ReadDirectory_Permission:
+			error(call, "%.*s error - unknown error whilst reading path, %.*s", LIT(name), LIT(original_string));
+			return LoadDirective_Error;
+		case ReadDirectory_NotDir:
+			error(call, "%.*s error - expected a directory, got a file: %.*s", LIT(name), LIT(original_string));
+			return LoadDirective_Error;
+		case ReadDirectory_Empty:
+			error(call, "%.*s error - empty directory: %.*s", LIT(name), LIT(original_string));
+			return LoadDirective_NotFound;
+		case ReadDirectory_Unknown:
+			error(call, "%.*s error - unknown error whilst reading path %.*s", LIT(name), LIT(original_string));
+			return LoadDirective_Error;
+		}
+
+		isize files_to_reserve = list.count+1; // always reserve 1
+
+		file_caches = array_make<LoadFileCache *>(heap_allocator(), 0, files_to_reserve);
+
+		for (FileInfo fi : list) {
+			LoadFileCache *cache = nullptr;
+			if (cache_load_file_directive(c, call, fi.fullpath, err_on_not_found, &cache)) {
+				array_add(&file_caches, cache);
+			} else {
+				result = LoadDirective_Error;
+			}
+		}
+
+		gb_sort_array(file_caches.data, file_caches.count, file_cache_sort_cmp);
+
+	}
+
+	return result;
+}
+
+
 
 gb_internal bool check_builtin_procedure_directive(CheckerContext *c, Operand *operand, Ast *call, Type *type_hint) {
 	ast_node(ce, CallExpr, call);
@@ -1291,6 +1424,8 @@ gb_internal bool check_builtin_procedure_directive(CheckerContext *c, Operand *o
 		operand->mode = Addressing_Value;
 	} else if (name == "load") {
 		return check_load_directive(c, operand, call, type_hint, true) == LoadDirective_Success;
+	} else if (name == "load_directory") {
+		return check_load_directory_directive(c, operand, call, type_hint, true) == LoadDirective_Success;
 	} else if (name == "load_hash") {
 		if (ce->args.count != 2) {
 			if (ce->args.count == 0) {
@@ -1408,58 +1543,6 @@ gb_internal bool check_builtin_procedure_directive(CheckerContext *c, Operand *o
 			return true;
 		}
 		return false;
-	} else if (name == "load_or") {
-		error(call, "'#load_or' has now been removed in favour of '#load(path) or_else default'");
-
-		if (ce->args.count != 2) {
-			if (ce->args.count == 0) {
-				error(ce->close, "'#load_or' expects 2 arguments, got 0");
-			} else {
-				error(ce->args[0], "'#load_or' expects 2 arguments, got %td", ce->args.count);
-			}
-			return false;
-		}
-
-		Ast *arg = ce->args[0];
-		Operand o = {};
-		check_expr(c, &o, arg);
-		if (o.mode != Addressing_Constant) {
-			error(arg, "'#load_or' expected a constant string argument");
-			return false;
-		}
-
-		if (!is_type_string(o.type)) {
-			gbString str = type_to_string(o.type);
-			error(arg, "'#load_or' expected a constant string, got %s", str);
-			gb_string_free(str);
-			return false;
-		}
-
-		Ast *default_arg = ce->args[1];
-		Operand default_op = {};
-		check_expr_with_type_hint(c, &default_op, default_arg, t_u8_slice);
-		if (default_op.mode != Addressing_Constant) {
-			error(arg, "'#load_or' expected a constant '[]byte' argument");
-			return false;
-		}
-
-		if (!are_types_identical(base_type(default_op.type), t_u8_slice)) {
-			gbString str = type_to_string(default_op.type);
-			error(arg, "'#load_or' expected a constant '[]byte', got %s", str);
-			gb_string_free(str);
-			return false;
-		}
-		GB_ASSERT(o.value.kind == ExactValue_String);
-		String original_string = o.value.value_string;
-
-		operand->type = t_u8_slice;
-		operand->mode = Addressing_Constant;
-		LoadFileCache *cache = nullptr;
-		if (cache_load_file_directive(c, call, original_string, false, &cache)) {
-			operand->value = exact_value_string(cache->data);
-		} else {
-			operand->value = default_op.value;
-		}
 	} else if (name == "assert") {
 		if (ce->args.count != 1 && ce->args.count != 2) {
 			error(call, "'#assert' expects either 1 or 2 arguments, got %td", ce->args.count);
@@ -4892,8 +4975,10 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			switch (bt->kind) {
 			case Type_Basic:
 				switch (bt->Basic.kind) {
+				case Basic_complex32:  operand->type = t_f16; break;
 				case Basic_complex64:  operand->type = t_f32; break;
 				case Basic_complex128: operand->type = t_f64; break;
+				case Basic_quaternion64:  operand->type = t_f16; break;
 				case Basic_quaternion128: operand->type = t_f32; break;
 				case Basic_quaternion256: operand->type = t_f64; break;
 				}
@@ -5684,7 +5769,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				return false;
 			}
 
-			operand->value = exact_value_bool(is_type_subtype_of(op_src.type, op_dst.type));
+			operand->value = exact_value_bool(is_type_subtype_of_and_allow_polymorphic(op_src.type, op_dst.type));
 			operand->mode = Addressing_Constant;
 			operand->type = t_untyped_bool;
 		} break;

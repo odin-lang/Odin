@@ -11,6 +11,7 @@ DEBUG_RLO_FLAGS :: enum u32 { // TODO: convert to bit_set
 }
 
 UINT :: win32.UINT
+INT :: win32.INT
 UINT64 :: win32.UINT64
 LPCSTR :: win32.LPCSTR
 DEBUG_ID :: win32.GUID
@@ -77,43 +78,43 @@ IInfoQueue :: struct #raw_union {
 }
 IInfoQueue_VTable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
-	SetMessageCountLimit:                          proc "stdcall" (this: ^IInfoQueue, Producer: DEBUG_ID, MessageCountLimit: UINT64) -> HRESULT,
-	ClearStoredMessages:                           proc "stdcall" (this: ^IInfoQueue, Producer: DEBUG_ID),
-	GetMessage:                                    proc "stdcall" (this: ^IInfoQueue, Producer: DEBUG_ID, MessageIndex: UINT64, pMessage: ^INFO_QUEUE_MESSAGE, pMessageByteLength: ^SIZE_T) -> HRESULT,
-	GetNumStoredMessagesAllowedByRetrievalFilters: proc "stdcall" (this: ^IInfoQueue, Producer: DEBUG_ID) -> UINT64,
-	GetNumStoredMessages:                          proc "stdcall" (this: ^IInfoQueue, Producer: DEBUG_ID) -> UINT64,
-	GetNumMessagesDiscardedByMessageCountLimit:    proc "stdcall" (this: ^IInfoQueue, Producer: DEBUG_ID) -> UINT64,
-	GetMessageCountLimit:                          proc "stdcall" (this: ^IInfoQueue, Producer: DEBUG_ID) -> UINT64,
-	GetNumMessagesAllowedByStorageFilter:          proc "stdcall" (this: ^IInfoQueue, Producer: DEBUG_ID) -> UINT64,
-	GetNumMessagesDeniedByStorageFilter:           proc "stdcall" (this: ^IInfoQueue, Producer: DEBUG_ID) -> UINT64,
-	AddStorageFilterEntries:                       proc "stdcall" (this: ^IInfoQueue, Producer: DEBUG_ID, pFilter: INFO_QUEUE_FILTER) -> HRESULT,
-	GetStorageFilter:                              proc "stdcall" (this: ^IInfoQueue, Producer: DEBUG_ID, pFilter: ^INFO_QUEUE_FILTER, pFilterByteLength: ^SIZE_T) -> HRESULT,
-	ClearStorageFilter:                            proc "stdcall" (this: ^IInfoQueue, Producer: DEBUG_ID),
-	PushEmptyStorageFilter:                        proc "stdcall" (this: ^IInfoQueue, Producer: DEBUG_ID) -> HRESULT,
-	PushDenyAllStorageFilter:                      proc "stdcall" (this: ^IInfoQueue, Producer: DEBUG_ID) -> HRESULT,
-	PushCopyOfStorageFilter:                       proc "stdcall" (this: ^IInfoQueue, Producer: DEBUG_ID) -> HRESULT,
-	PushStorageFilter:                             proc "stdcall" (this: ^IInfoQueue, Producer: DEBUG_ID, pFilter: ^INFO_QUEUE_FILTER) -> HRESULT,
-	PopStorageFilter:                              proc "stdcall" (this: ^IInfoQueue, Producer: DEBUG_ID),
-	GetStorageFilterStackSize:                     proc "stdcall" (this: ^IInfoQueue, Producer: DEBUG_ID) -> UINT,
-	AddRetrievalFilterEntries:                     proc "stdcall" (this: ^IInfoQueue, Producer: DEBUG_ID, pFilter: ^INFO_QUEUE_FILTER) -> HRESULT,
-	GetRetrievalFilter:                            proc "stdcall" (this: ^IInfoQueue, Producer: DEBUG_ID, pFilter: ^INFO_QUEUE_FILTER, pFilterByteLength: ^SIZE_T) -> HRESULT,
-	ClearRetrievalFilter:                          proc "stdcall" (this: ^IInfoQueue, Producer: DEBUG_ID),
-	PushEmptyRetrievalFilter:                      proc "stdcall" (this: ^IInfoQueue, Producer: DEBUG_ID) -> HRESULT,
-	PushDenyAllRetrievalFilter:                    proc "stdcall" (this: ^IInfoQueue, Producer: DEBUG_ID) -> HRESULT,
-	PushCopyOfRetrievalFilter:                     proc "stdcall" (this: ^IInfoQueue, Producer: DEBUG_ID) -> HRESULT,
-	PushRetrievalFilter:                           proc "stdcall" (this: ^IInfoQueue, Producer: DEBUG_ID, pFilter: ^INFO_QUEUE_FILTER) -> HRESULT,
-	PopRetrievalFilter:                            proc "stdcall" (this: ^IInfoQueue, Producer: DEBUG_ID),
-	GetRetrievalFilterStackSize:                   proc "stdcall" (this: ^IInfoQueue, Producer: DEBUG_ID) -> UINT,
-	AddMessage:                                    proc "stdcall" (this: ^IInfoQueue, Producer: DEBUG_ID, Category: INFO_QUEUE_MESSAGE_CATEGORY, Severity: INFO_QUEUE_MESSAGE_SEVERITY, ID: INFO_QUEUE_MESSAGE_ID, pDescription: LPCSTR) -> HRESULT,
-	AddApplicationMessage:                         proc "stdcall" (this: ^IInfoQueue, Severity: INFO_QUEUE_MESSAGE_SEVERITY, pDescription: LPCSTR) -> HRESULT,
-	SetBreakOnCategory:                            proc "stdcall" (this: ^IInfoQueue, Producer: DEBUG_ID, Category: INFO_QUEUE_MESSAGE_CATEGORY, bEnable: BOOL) -> HRESULT,
-	SetBreakOnSeverity:                            proc "stdcall" (this: ^IInfoQueue, Producer: DEBUG_ID, Severity: INFO_QUEUE_MESSAGE_SEVERITY, bEnable: BOOL) -> HRESULT,
-	SetBreakOnID:                                  proc "stdcall" (this: ^IInfoQueue, Producer: DEBUG_ID, ID: INFO_QUEUE_MESSAGE_ID, bEnable: BOOL) -> HRESULT,
-	GetBreakOnCategory:                            proc "stdcall" (this: ^IInfoQueue, Producer: DEBUG_ID, Category: INFO_QUEUE_MESSAGE_CATEGORY) -> BOOL,
-	GetBreakOnSeverity:                            proc "stdcall" (this: ^IInfoQueue, Producer: DEBUG_ID, Severity: INFO_QUEUE_MESSAGE_SEVERITY) -> BOOL,
-	GetBreakOnID:                                  proc "stdcall" (this: ^IInfoQueue, Producer: DEBUG_ID, ID: INFO_QUEUE_MESSAGE_ID) -> BOOL,
-	SetMuteDebugOutput:                            proc "stdcall" (this: ^IInfoQueue, Producer: DEBUG_ID, bMute: BOOL),
-	GetMuteDebugOutput:                            proc "stdcall" (this: ^IInfoQueue, Producer: DEBUG_ID) -> BOOL,
+	SetMessageCountLimit:                          proc "system" (this: ^IInfoQueue, Producer: DEBUG_ID, MessageCountLimit: UINT64) -> HRESULT,
+	ClearStoredMessages:                           proc "system" (this: ^IInfoQueue, Producer: DEBUG_ID),
+	GetMessage:                                    proc "system" (this: ^IInfoQueue, Producer: DEBUG_ID, MessageIndex: UINT64, pMessage: ^INFO_QUEUE_MESSAGE, pMessageByteLength: ^SIZE_T) -> HRESULT,
+	GetNumStoredMessagesAllowedByRetrievalFilters: proc "system" (this: ^IInfoQueue, Producer: DEBUG_ID) -> UINT64,
+	GetNumStoredMessages:                          proc "system" (this: ^IInfoQueue, Producer: DEBUG_ID) -> UINT64,
+	GetNumMessagesDiscardedByMessageCountLimit:    proc "system" (this: ^IInfoQueue, Producer: DEBUG_ID) -> UINT64,
+	GetMessageCountLimit:                          proc "system" (this: ^IInfoQueue, Producer: DEBUG_ID) -> UINT64,
+	GetNumMessagesAllowedByStorageFilter:          proc "system" (this: ^IInfoQueue, Producer: DEBUG_ID) -> UINT64,
+	GetNumMessagesDeniedByStorageFilter:           proc "system" (this: ^IInfoQueue, Producer: DEBUG_ID) -> UINT64,
+	AddStorageFilterEntries:                       proc "system" (this: ^IInfoQueue, Producer: DEBUG_ID, pFilter: INFO_QUEUE_FILTER) -> HRESULT,
+	GetStorageFilter:                              proc "system" (this: ^IInfoQueue, Producer: DEBUG_ID, pFilter: ^INFO_QUEUE_FILTER, pFilterByteLength: ^SIZE_T) -> HRESULT,
+	ClearStorageFilter:                            proc "system" (this: ^IInfoQueue, Producer: DEBUG_ID),
+	PushEmptyStorageFilter:                        proc "system" (this: ^IInfoQueue, Producer: DEBUG_ID) -> HRESULT,
+	PushDenyAllStorageFilter:                      proc "system" (this: ^IInfoQueue, Producer: DEBUG_ID) -> HRESULT,
+	PushCopyOfStorageFilter:                       proc "system" (this: ^IInfoQueue, Producer: DEBUG_ID) -> HRESULT,
+	PushStorageFilter:                             proc "system" (this: ^IInfoQueue, Producer: DEBUG_ID, pFilter: ^INFO_QUEUE_FILTER) -> HRESULT,
+	PopStorageFilter:                              proc "system" (this: ^IInfoQueue, Producer: DEBUG_ID),
+	GetStorageFilterStackSize:                     proc "system" (this: ^IInfoQueue, Producer: DEBUG_ID) -> UINT,
+	AddRetrievalFilterEntries:                     proc "system" (this: ^IInfoQueue, Producer: DEBUG_ID, pFilter: ^INFO_QUEUE_FILTER) -> HRESULT,
+	GetRetrievalFilter:                            proc "system" (this: ^IInfoQueue, Producer: DEBUG_ID, pFilter: ^INFO_QUEUE_FILTER, pFilterByteLength: ^SIZE_T) -> HRESULT,
+	ClearRetrievalFilter:                          proc "system" (this: ^IInfoQueue, Producer: DEBUG_ID),
+	PushEmptyRetrievalFilter:                      proc "system" (this: ^IInfoQueue, Producer: DEBUG_ID) -> HRESULT,
+	PushDenyAllRetrievalFilter:                    proc "system" (this: ^IInfoQueue, Producer: DEBUG_ID) -> HRESULT,
+	PushCopyOfRetrievalFilter:                     proc "system" (this: ^IInfoQueue, Producer: DEBUG_ID) -> HRESULT,
+	PushRetrievalFilter:                           proc "system" (this: ^IInfoQueue, Producer: DEBUG_ID, pFilter: ^INFO_QUEUE_FILTER) -> HRESULT,
+	PopRetrievalFilter:                            proc "system" (this: ^IInfoQueue, Producer: DEBUG_ID),
+	GetRetrievalFilterStackSize:                   proc "system" (this: ^IInfoQueue, Producer: DEBUG_ID) -> UINT,
+	AddMessage:                                    proc "system" (this: ^IInfoQueue, Producer: DEBUG_ID, Category: INFO_QUEUE_MESSAGE_CATEGORY, Severity: INFO_QUEUE_MESSAGE_SEVERITY, ID: INFO_QUEUE_MESSAGE_ID, pDescription: LPCSTR) -> HRESULT,
+	AddApplicationMessage:                         proc "system" (this: ^IInfoQueue, Severity: INFO_QUEUE_MESSAGE_SEVERITY, pDescription: LPCSTR) -> HRESULT,
+	SetBreakOnCategory:                            proc "system" (this: ^IInfoQueue, Producer: DEBUG_ID, Category: INFO_QUEUE_MESSAGE_CATEGORY, bEnable: BOOL) -> HRESULT,
+	SetBreakOnSeverity:                            proc "system" (this: ^IInfoQueue, Producer: DEBUG_ID, Severity: INFO_QUEUE_MESSAGE_SEVERITY, bEnable: BOOL) -> HRESULT,
+	SetBreakOnID:                                  proc "system" (this: ^IInfoQueue, Producer: DEBUG_ID, ID: INFO_QUEUE_MESSAGE_ID, bEnable: BOOL) -> HRESULT,
+	GetBreakOnCategory:                            proc "system" (this: ^IInfoQueue, Producer: DEBUG_ID, Category: INFO_QUEUE_MESSAGE_CATEGORY) -> BOOL,
+	GetBreakOnSeverity:                            proc "system" (this: ^IInfoQueue, Producer: DEBUG_ID, Severity: INFO_QUEUE_MESSAGE_SEVERITY) -> BOOL,
+	GetBreakOnID:                                  proc "system" (this: ^IInfoQueue, Producer: DEBUG_ID, ID: INFO_QUEUE_MESSAGE_ID) -> BOOL,
+	SetMuteDebugOutput:                            proc "system" (this: ^IInfoQueue, Producer: DEBUG_ID, bMute: BOOL),
+	GetMuteDebugOutput:                            proc "system" (this: ^IInfoQueue, Producer: DEBUG_ID) -> BOOL,
 }
 
 IDebug_UUID_STRING :: "119E7452-DE9E-40fe-8806-88F90C12B441"
@@ -124,7 +125,7 @@ IDebug :: struct #raw_union {
 }
 IDebug_VTable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
-	ReportLiveObjects: proc "stdcall" (this: ^IDebug, apiid: GUID, flags: DEBUG_RLO_FLAGS),
+	ReportLiveObjects: proc "system" (this: ^IDebug, apiid: GUID, flags: DEBUG_RLO_FLAGS),
 }
 
 IDebug1_UUID_STRING :: "c5a05f0c-16f2-4adf-9f4d-a8c4d58ac550"
@@ -135,7 +136,7 @@ IDebug1 :: struct #raw_union {
 }
 IDebug1_VTable :: struct {
 	using idxgidebug_vtable: IDebug_VTable,
-	EnableLeakTrackingForThread:    proc "stdcall" (this: ^IDebug1),
-	DisableLeakTrackingForThread:   proc "stdcall" (this: ^IDebug1),
-	IsLeakTrackingEnabledForThread: proc "stdcall" (this: ^IDebug1) -> BOOL,
+	EnableLeakTrackingForThread:    proc "system" (this: ^IDebug1),
+	DisableLeakTrackingForThread:   proc "system" (this: ^IDebug1),
+	IsLeakTrackingEnabledForThread: proc "system" (this: ^IDebug1) -> BOOL,
 }

@@ -1,7 +1,7 @@
 package simd
 
-import "core:builtin"
-import "core:intrinsics"
+import "base:builtin"
+import "base:intrinsics"
 
 // 128-bit vector aliases
 u8x16 :: #simd[16]u8

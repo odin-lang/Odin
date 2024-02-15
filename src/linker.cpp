@@ -233,7 +233,6 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 			String windows_sdk_bin_path = path_to_string(heap_allocator(), build_context.build_paths[BuildPath_Win_SDK_Bin_Path]);
 			defer (gb_free(heap_allocator(), windows_sdk_bin_path.text));
 
-			char const *subsystem_str = build_context.use_subsystem_windows ? "WINDOWS" : "CONSOLE";
 			if (!build_context.use_lld) { // msvc
 				String res_path = {};
 				defer (gb_free(heap_allocator(), res_path.text));
@@ -265,14 +264,14 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 
 				result = system_exec_command_line_app("msvc-link",
 					"\"%.*slink.exe\" %s %.*s -OUT:\"%.*s\" %s "
-					"/nologo /incremental:no /opt:ref /subsystem:%s "
+					"/nologo /incremental:no /opt:ref /subsystem:%.*s "
 					"%.*s "
 					"%.*s "
 					"%s "
 					"",
 					LIT(vs_exe_path), object_files, LIT(res_path), LIT(output_filename),
 					link_settings,
-					subsystem_str,
+					LIT(build_context.ODIN_WINDOWS_SUBSYSTEM),
 					LIT(build_context.link_flags),
 					LIT(build_context.extra_linker_flags),
 					lib_str
@@ -283,14 +282,14 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 			} else { // lld
 				result = system_exec_command_line_app("msvc-lld-link",
 					"\"%.*s\\bin\\lld-link\" %s -OUT:\"%.*s\" %s "
-					"/nologo /incremental:no /opt:ref /subsystem:%s "
+					"/nologo /incremental:no /opt:ref /subsystem:%.*s "
 					"%.*s "
 					"%.*s "
 					"%s "
 					"",
 					LIT(build_context.ODIN_ROOT), object_files, LIT(output_filename),
 					link_settings,
-					subsystem_str,
+					LIT(build_context.ODIN_WINDOWS_SUBSYSTEM),
 					LIT(build_context.link_flags),
 					LIT(build_context.extra_linker_flags),
 					lib_str
@@ -483,37 +482,33 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 			gbString platform_lib_str = gb_string_make(heap_allocator(), "");
 			defer (gb_string_free(platform_lib_str));
 			if (build_context.metrics.os == TargetOs_darwin) {
-				platform_lib_str = gb_string_appendc(platform_lib_str, "-Wl,-syslibroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk -L/usr/local/lib");
+				platform_lib_str = gb_string_appendc(platform_lib_str, "-Wl,-syslibroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk -L/usr/local/lib ");
 
 				// Homebrew's default library path, checking if it exists to avoid linking warnings.
 				if (gb_file_exists("/opt/homebrew/lib")) {
-					platform_lib_str = gb_string_appendc(platform_lib_str, " -L/opt/homebrew/lib");
+					platform_lib_str = gb_string_appendc(platform_lib_str, "-L/opt/homebrew/lib ");
 				}
 
 				// MacPort's default library path, checking if it exists to avoid linking warnings.
 				if (gb_file_exists("/opt/local/lib")) {
-					platform_lib_str = gb_string_appendc(platform_lib_str, " -L/opt/local/lib");
+					platform_lib_str = gb_string_appendc(platform_lib_str, "-L/opt/local/lib ");
 				}
 
-				#if defined(GB_SYSTEM_OSX)
-				if(!build_context.no_crt) {
-					platform_lib_str = gb_string_appendc(platform_lib_str, " -lm ");
-					if(gen->needs_system_library_linked == 1) {
-						platform_lib_str = gb_string_appendc(platform_lib_str, " -lSystem ");
-					}
-				}
-				#endif
-			} else {
-				platform_lib_str = gb_string_appendc(platform_lib_str, "-lc -lm");
-			}
-
-			if (build_context.metrics.os == TargetOs_darwin) {
 				// This sets a requirement of Mountain Lion and up, but the compiler doesn't work without this limit.
 				if (build_context.minimum_os_version_string.len) {
-					link_settings = gb_string_append_fmt(link_settings, " -mmacosx-version-min=%.*s ", LIT(build_context.minimum_os_version_string));
+					link_settings = gb_string_append_fmt(link_settings, "-mmacosx-version-min=%.*s ", LIT(build_context.minimum_os_version_string));
 				}
 				// This points the linker to where the entry point is
-				link_settings = gb_string_appendc(link_settings, " -e _main ");
+				link_settings = gb_string_appendc(link_settings, "-e _main ");
+			}
+
+			if (!build_context.no_crt) {
+				platform_lib_str = gb_string_appendc(platform_lib_str, "-lm ");
+				if (build_context.metrics.os == TargetOs_darwin) {
+					platform_lib_str = gb_string_appendc(platform_lib_str, "-lSystem ");
+				} else {
+					platform_lib_str = gb_string_appendc(platform_lib_str, "-lc ");
+				}
 			}
 
 			gbString link_command_line = gb_string_make(heap_allocator(), "clang -Wno-unused-command-line-argument ");

@@ -4,7 +4,7 @@ package os2
 import "core:io"
 import "core:mem"
 import "core:sync"
-import "core:runtime"
+import "base:runtime"
 import "core:strings"
 import "core:time"
 import "core:unicode/utf16"
@@ -454,7 +454,7 @@ _remove :: proc(name: string) -> Error {
 
 	if err != err1 {
 		a := win32.GetFileAttributesW(p)
-		if a == ~u32(0) {
+		if a == win32.INVALID_FILE_ATTRIBUTES {
 			err = _get_platform_error()
 		} else {
 			if a & win32.FILE_ATTRIBUTE_DIRECTORY != 0 {
@@ -704,13 +704,13 @@ _fchtimes :: proc(f: ^File, atime, mtime: time.Time) -> Error {
 _exists :: proc(path: string) -> bool {
 	wpath := _fix_long_path(path)
 	attribs := win32.GetFileAttributesW(wpath)
-	return i32(attribs) != win32.INVALID_FILE_ATTRIBUTES
+	return attribs != win32.INVALID_FILE_ATTRIBUTES
 }
 
 _is_file :: proc(path: string) -> bool {
 	wpath := _fix_long_path(path)
 	attribs := win32.GetFileAttributesW(wpath)
-	if i32(attribs) != win32.INVALID_FILE_ATTRIBUTES {
+	if attribs != win32.INVALID_FILE_ATTRIBUTES {
 		return attribs & win32.FILE_ATTRIBUTE_DIRECTORY == 0
 	}
 	return false
@@ -719,7 +719,7 @@ _is_file :: proc(path: string) -> bool {
 _is_dir :: proc(path: string) -> bool {
 	wpath := _fix_long_path(path)
 	attribs := win32.GetFileAttributesW(wpath)
-	if i32(attribs) != win32.INVALID_FILE_ATTRIBUTES {
+	if attribs != win32.INVALID_FILE_ATTRIBUTES {
 		return attribs & win32.FILE_ATTRIBUTE_DIRECTORY != 0
 	}
 	return false

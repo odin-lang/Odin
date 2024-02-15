@@ -1,7 +1,7 @@
 package os2
 
 import "core:io"
-import "core:runtime"
+import "base:runtime"
 
 General_Error :: enum u32 {
 	None,

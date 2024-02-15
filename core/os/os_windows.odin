@@ -2,8 +2,8 @@
 package os
 
 import win32 "core:sys/windows"
-import "core:runtime"
-import "core:intrinsics"
+import "base:runtime"
+import "base:intrinsics"
 
 Handle    :: distinct uintptr
 File_Time :: distinct u64
@@ -90,28 +90,6 @@ last_write_time_by_name :: proc(name: string) -> (File_Time, Errno) {
 	return l | h << 32, ERROR_NONE
 }
 
-
-
-heap_alloc :: proc(size: int, zero_memory := true) -> rawptr {
-	return win32.HeapAlloc(win32.GetProcessHeap(), win32.HEAP_ZERO_MEMORY if zero_memory else 0, uint(size))
-}
-heap_resize :: proc(ptr: rawptr, new_size: int) -> rawptr {
-	if new_size == 0 {
-		heap_free(ptr)
-		return nil
-	}
-	if ptr == nil {
-		return heap_alloc(new_size)
-	}
-
-	return win32.HeapReAlloc(win32.GetProcessHeap(), win32.HEAP_ZERO_MEMORY, ptr, uint(new_size))
-}
-heap_free :: proc(ptr: rawptr) {
-	if ptr == nil {
-		return
-	}
-	win32.HeapFree(win32.GetProcessHeap(), 0, ptr)
-}
 
 get_page_size :: proc() -> int {
 	// NOTE(tetra): The page size never changes, so why do anything complicated

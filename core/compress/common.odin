@@ -12,7 +12,7 @@ package compress
 
 import "core:io"
 import "core:bytes"
-import "core:runtime"
+import "base:runtime"
 
 /*
 	These settings bound how much compression algorithms will allocate for their output buffer.
@@ -20,10 +20,9 @@ import "core:runtime"
 
 */
 
-/*
-	When a decompression routine doesn't stream its output, but writes to a buffer,
-	we pre-allocate an output buffer to speed up decompression. The default is 1 MiB.
-*/
+
+// When a decompression routine doesn't stream its output, but writes to a buffer,
+// we pre-allocate an output buffer to speed up decompression. The default is 1 MiB.
 COMPRESS_OUTPUT_ALLOCATE_MIN :: int(#config(COMPRESS_OUTPUT_ALLOCATE_MIN, 1 << 20))
 
 /*
@@ -34,16 +33,14 @@ COMPRESS_OUTPUT_ALLOCATE_MIN :: int(#config(COMPRESS_OUTPUT_ALLOCATE_MIN, 1 << 2
 
 */
 when size_of(uintptr) == 8 {
-	/*
-		For 64-bit platforms, we set the default max buffer size to 4 GiB,
-		which is GZIP and PKZIP's max payload size.
-	*/	
+
+        // For 64-bit platforms, we set the default max buffer size to 4 GiB,
+        // which is GZIP and PKZIP's max payload size.
 	COMPRESS_OUTPUT_ALLOCATE_MAX :: int(#config(COMPRESS_OUTPUT_ALLOCATE_MAX, 1 << 32))
 } else {
-	/*
-		For 32-bit platforms, we set the default max buffer size to 512 MiB.
-	*/
-	COMPRESS_OUTPUT_ALLOCATE_MAX :: int(#config(COMPRESS_OUTPUT_ALLOCATE_MAX, 1 << 29))
+	
+	// For 32-bit platforms, we set the default max buffer size to 512 MiB.
+        COMPRESS_OUTPUT_ALLOCATE_MAX :: int(#config(COMPRESS_OUTPUT_ALLOCATE_MAX, 1 << 29))
 }
 
 
@@ -69,9 +66,8 @@ General_Error :: enum {
 	Incompatible_Options,
 	Unimplemented,
 
-	/*
-		Memory errors
-	*/
+	// Memory errors
+
 	Allocation_Failed,
 	Resize_Failed,
 }
@@ -86,17 +82,16 @@ GZIP_Error :: enum {
 	Payload_Length_Invalid,
 	Payload_CRC_Invalid,
 
-	/*
-		GZIP's payload can be a maximum of max(u32le), or 4 GiB.
-		If you tell it you expect it to contain more, that's obviously an error.
-	*/
-	Payload_Size_Exceeds_Max_Payload,
-	/*
-		For buffered instead of streamed output, the payload size can't exceed
-		the max set by the `COMPRESS_OUTPUT_ALLOCATE_MAX` switch in compress/common.odin.
+	// GZIP's payload can be a maximum of max(u32le), or 4 GiB.
+	// If you tell it you expect it to contain more, that's obviously an error.
 
-		You can tweak this setting using `-define:COMPRESS_OUTPUT_ALLOCATE_MAX=size_in_bytes`
-	*/
+	Payload_Size_Exceeds_Max_Payload,
+
+	// For buffered instead of streamed output, the payload size can't exceed
+	// the max set by the `COMPRESS_OUTPUT_ALLOCATE_MAX` switch in compress/common.odin.
+	//
+	// You can tweak this setting using `-define:COMPRESS_OUTPUT_ALLOCATE_MAX=size_in_bytes`
+
 	Output_Exceeds_COMPRESS_OUTPUT_ALLOCATE_MAX,
 
 }
@@ -137,9 +132,8 @@ Context_Memory_Input :: struct #packed {
 	code_buffer:       u64,
 	num_bits:          u64,
 
-	/*
-		If we know the data size, we can optimize the reads and writes.
-	*/
+	// If we know the data size, we can optimize the reads and writes.
+
 	size_packed:       i64,
 	size_unpacked:     i64,
 }
@@ -159,18 +153,16 @@ Context_Stream_Input :: struct #packed {
 	code_buffer:       u64,
 	num_bits:          u64,
 
-	/*
-		If we know the data size, we can optimize the reads and writes.
-	*/
+	// If we know the data size, we can optimize the reads and writes.
+
 	size_packed:       i64,
 	size_unpacked:     i64,
 
-	/*
-		Flags:
-			`input_fully_in_memory`
-				true  = This tells us we read input from `input_data` exclusively. [] = EOF.
-				false = Try to refill `input_data` from the `input` stream.
-	*/
+	// Flags:
+	// `input_fully_in_memory`
+	//   true  = This tells us we read input from `input_data` exclusively. [] = EOF.
+	//   false = Try to refill `input_data` from the `input` stream.
+
 	input_fully_in_memory: b8,
 
 	padding: [1]u8,
@@ -214,7 +206,7 @@ read_slice_from_memory :: #force_inline proc(z: ^Context_Memory_Input, size: int
 @(optimization_mode="speed")
 read_slice_from_stream :: #force_inline proc(z: ^Context_Stream_Input, size: int) -> (res: []u8, err: io.Error) {
 	// TODO: REMOVE ALL USE OF context.temp_allocator here
-	// the is literally no need for it
+	// there is literally no need for it
 	b := make([]u8, size, context.temp_allocator)
 	_ = io.read(z.input, b[:]) or_return
 	return b, nil
@@ -248,10 +240,8 @@ read_u8_from_stream :: #force_inline proc(z: ^Context_Stream_Input) -> (res: u8,
 
 read_u8 :: proc{read_u8_from_memory, read_u8_from_stream}
 
-/*
-	You would typically only use this at the end of Inflate, to drain bits from the code buffer
-	preferentially.
-*/
+// You would typically only use this at the end of Inflate, to drain bits from the code buffer
+// preferentially.
 @(optimization_mode="speed")
 read_u8_prefer_code_buffer_lsb :: #force_inline proc(z: ^$C) -> (res: u8, err: io.Error) {
 	if z.num_bits >= 8 {

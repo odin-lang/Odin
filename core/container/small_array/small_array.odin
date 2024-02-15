@@ -1,7 +1,7 @@
 package container_small_array
 
-import "core:builtin"
-import "core:runtime"
+import "base:builtin"
+import "base:runtime"
 _ :: runtime
 
 Small_Array :: struct($N: int, $T: typeid) where N >= 0 {

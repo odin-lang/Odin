@@ -1,6 +1,6 @@
 package encoding_endian
 
-import "core:intrinsics"
+import "base:intrinsics"
 import "core:math/bits"
 
 Byte_Order :: enum u8 {

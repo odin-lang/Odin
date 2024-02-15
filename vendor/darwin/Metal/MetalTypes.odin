@@ -1,8 +1,7 @@
-//+build darwin
 package objc_Metal
 
 import NS "vendor:darwin/Foundation"
-import "core:intrinsics"
+import "base:intrinsics"
 
 BOOL :: NS.BOOL
 id :: ^NS.Object

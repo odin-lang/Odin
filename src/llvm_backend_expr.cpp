@@ -3657,7 +3657,7 @@ gb_internal void lb_build_addr_compound_lit_populate(lbProcedure *p, Slice<Ast *
 		Ast *elem = elems[i];
 		if (elem->kind == Ast_FieldValue) {
 			ast_node(fv, FieldValue, elem);
-			if (lb_is_elem_const(fv->value, et)) {
+			if (bt->kind != Type_DynamicArray && lb_is_elem_const(fv->value, et)) {
 				continue;
 			}
 			if (is_ast_range(fv->field)) {

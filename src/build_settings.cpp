@@ -56,6 +56,19 @@ enum TargetABIKind : u16 {
 	TargetABI_COUNT,
 };
 
+enum Windows_Subsystem : u8 {
+ 	Windows_Subsystem_BOOT_APPLICATION,
+	Windows_Subsystem_CONSOLE,                 // Default,
+	Windows_Subsystem_EFI_APPLICATION,
+	Windows_Subsystem_EFI_BOOT_SERVICE_DRIVER,
+	Windows_Subsystem_EFI_ROM,
+	Windows_Subsystem_EFI_RUNTIME_DRIVER,
+	Windows_Subsystem_NATIVE,
+	Windows_Subsystem_POSIX,
+	Windows_Subsystem_WINDOWS,
+	Windows_Subsystem_WINDOWSCE,
+	Windows_Subsystem_COUNT,
+};
 
 gb_global String target_os_names[TargetOs_COUNT] = {
 	str_lit(""),
@@ -118,6 +131,19 @@ gb_global TargetEndianKind target_endians[TargetArch_COUNT] = {
 	TargetEndian_Little,
 	TargetEndian_Little,
 	TargetEndian_Little,
+};
+
+gb_global String windows_subsystem_names[Windows_Subsystem_COUNT] = {
+	str_lit("BOOT_APPLICATION"),
+	str_lit("CONSOLE"),                 // Default
+	str_lit("EFI_APPLICATION"),
+	str_lit("EFI_BOOT_SERVICE_DRIVER"),
+	str_lit("EFI_ROM"),
+	str_lit("EFI_RUNTIME_DRIVER"),
+	str_lit("NATIVE"),
+	str_lit("POSIX"),
+	str_lit("WINDOWS"),
+	str_lit("WINDOWSCE"),
 };
 
 #ifndef ODIN_VERSION_RAW
@@ -287,15 +313,17 @@ enum SanitizerFlags : u32 {
 // This stores the information for the specify architecture of this build
 struct BuildContext {
 	// Constants
-	String ODIN_OS;      // target operating system
-	String ODIN_ARCH;    // target architecture
-	String ODIN_VENDOR;  // compiler vendor
-	String ODIN_VERSION; // compiler version
-	String ODIN_ROOT;    // Odin ROOT
-	String ODIN_BUILD_PROJECT_NAME; // Odin main/initial package's directory name
-	bool   ODIN_DEBUG;   // Odin in debug mode
-	bool   ODIN_DISABLE_ASSERT; // Whether the default 'assert' et al is disabled in code or not
+	String ODIN_OS;                       // Target operating system
+	String ODIN_ARCH;                     // Target architecture
+	String ODIN_VENDOR;                   // Compiler vendor
+	String ODIN_VERSION;                  // Compiler version
+	String ODIN_ROOT;                     // Odin ROOT
+	String ODIN_BUILD_PROJECT_NAME;       // Odin main/initial package's directory name
+	String ODIN_WINDOWS_SUBSYSTEM;        // Empty string for non-Windows targets
+	bool   ODIN_DEBUG;                    // Odin in debug mode
+	bool   ODIN_DISABLE_ASSERT;           // Whether the default 'assert' et al is disabled in code or not
 	bool   ODIN_DEFAULT_TO_NIL_ALLOCATOR; // Whether the default allocator is a "nil" allocator or not (i.e. it does nothing)
+	bool   ODIN_DEFAULT_TO_PANIC_ALLOCATOR; // Whether the default allocator is a "panic" allocator or not (i.e. panics on any call to it)
 	bool   ODIN_FOREIGN_ERROR_PROCEDURES;
 	bool   ODIN_VALGRIND_SUPPORT;
 
@@ -367,7 +395,6 @@ struct BuildContext {
 	bool   ignore_lazy;
 	bool   ignore_llvm_build;
 
-	bool   use_subsystem_windows;
 	bool   ignore_microsoft_magic;
 	bool   linker_map_file;
 
@@ -396,6 +423,7 @@ struct BuildContext {
 	Array<String> extra_packages;
 
 	StringSet test_names;
+	bool      test_all_packages;
 
 	gbAffinity affinity;
 	isize      thread_count;
@@ -582,7 +610,13 @@ gb_global TargetMetrics target_freestanding_amd64_sysv = {
 	TargetABI_SysV,
 };
 
-
+gb_global TargetMetrics target_freestanding_arm64 = {
+	TargetOs_freestanding,
+	TargetArch_arm64,
+	8, 8, 8, 16,
+	str_lit("aarch64-none-elf"),
+	str_lit("e-m:o-p:32:32-Fi8-i64:64-v128:64:128-a:0:32-n32-S64"),
+};
 
 struct NamedTargetMetrics {
 	String name;
@@ -617,6 +651,7 @@ gb_global NamedTargetMetrics named_targets[] = {
 	{ str_lit("wasi_wasm64p32"),         &target_wasi_wasm64p32 },
 
 	{ str_lit("freestanding_amd64_sysv"), &target_freestanding_amd64_sysv },
+	{ str_lit("freestanding_arm64"), &target_freestanding_arm64 },
 };
 
 gb_global NamedTargetMetrics *selected_target_metrics;
@@ -841,7 +876,7 @@ gb_internal String internal_odin_root_dir(void) {
 
 #include <mach-o/dyld.h>
 
-gb_internal String path_to_fullpath(gbAllocator a, String s);
+gb_internal String path_to_fullpath(gbAllocator a, String s, bool *ok_);
 
 gb_internal String internal_odin_root_dir(void) {
 	String path = global_module_path;
@@ -872,7 +907,7 @@ gb_internal String internal_odin_root_dir(void) {
 	text = gb_alloc_array(permanent_allocator(), u8, len + 1);
 	gb_memmove(text, &path_buf[0], len);
 
-	path = path_to_fullpath(heap_allocator(), make_string(text, len));
+	path = path_to_fullpath(heap_allocator(), make_string(text, len), nullptr);
 
 	for (i = path.len-1; i >= 0; i--) {
 		u8 c = path[i];
@@ -895,7 +930,7 @@ gb_internal String internal_odin_root_dir(void) {
 // NOTE: Linux / Unix is unfinished and not tested very well.
 #include <sys/stat.h>
 
-gb_internal String path_to_fullpath(gbAllocator a, String s);
+gb_internal String path_to_fullpath(gbAllocator a, String s, bool *ok_);
 
 gb_internal String internal_odin_root_dir(void) {
 	String path = global_module_path;
@@ -1037,7 +1072,7 @@ gb_internal String internal_odin_root_dir(void) {
 
 	gb_memmove(text, &path_buf[0], len);
 
-	path = path_to_fullpath(heap_allocator(), make_string(text, len));
+	path = path_to_fullpath(heap_allocator(), make_string(text, len), nullptr);
 	for (i = path.len-1; i >= 0; i--) {
 		u8 c = path[i];
 		if (c == '/' || c == '\\') {
@@ -1056,7 +1091,7 @@ gb_internal String internal_odin_root_dir(void) {
 gb_global BlockingMutex fullpath_mutex;
 
 #if defined(GB_SYSTEM_WINDOWS)
-gb_internal String path_to_fullpath(gbAllocator a, String s) {
+gb_internal String path_to_fullpath(gbAllocator a, String s, bool *ok_) {
 	String result = {};
 
 	String16 string16 = string_to_string16(heap_allocator(), s);
@@ -1082,19 +1117,25 @@ gb_internal String path_to_fullpath(gbAllocator a, String s) {
 				result.text[i] = '/';
 			}
 		}
+		if (ok_) *ok_ = true;
 	} else {
+		if (ok_) *ok_ = false;
 		mutex_unlock(&fullpath_mutex);
 	}
 
 	return result;
 }
 #elif defined(GB_SYSTEM_OSX) || defined(GB_SYSTEM_UNIX)
-gb_internal String path_to_fullpath(gbAllocator a, String s) {
+gb_internal String path_to_fullpath(gbAllocator a, String s, bool *ok_) {
 	char *p;
 	mutex_lock(&fullpath_mutex);
 	p = realpath(cast(char *)s.text, 0);
 	mutex_unlock(&fullpath_mutex);
-	if(p == nullptr) return String{};
+	if(p == nullptr) {
+		if (ok_) *ok_ = false;
+		return String{};
+	}
+	if (ok_) *ok_ = true;
 	return make_string_c(p);
 }
 #else
@@ -1102,7 +1143,7 @@ gb_internal String path_to_fullpath(gbAllocator a, String s) {
 #endif
 
 
-gb_internal String get_fullpath_relative(gbAllocator a, String base_dir, String path) {
+gb_internal String get_fullpath_relative(gbAllocator a, String base_dir, String path, bool *ok_) {
 	u8 *str = gb_alloc_array(heap_allocator(), u8, base_dir.len+1+path.len+1);
 	defer (gb_free(heap_allocator(), str));
 
@@ -1124,11 +1165,31 @@ gb_internal String get_fullpath_relative(gbAllocator a, String base_dir, String 
 
 	String res = make_string(str, i);
 	res = string_trim_whitespace(res);
-	return path_to_fullpath(a, res);
+	return path_to_fullpath(a, res, ok_);
 }
 
 
-gb_internal String get_fullpath_core(gbAllocator a, String path) {
+gb_internal String get_fullpath_base_collection(gbAllocator a, String path, bool *ok_) {
+	String module_dir = odin_root_dir();
+
+	String base = str_lit("base/");
+
+	isize str_len = module_dir.len + base.len + path.len;
+	u8 *str = gb_alloc_array(heap_allocator(), u8, str_len+1);
+	defer (gb_free(heap_allocator(), str));
+
+	isize i = 0;
+	gb_memmove(str+i, module_dir.text, module_dir.len); i += module_dir.len;
+	gb_memmove(str+i, base.text, base.len);             i += base.len;
+	gb_memmove(str+i, path.text, path.len);             i += path.len;
+	str[i] = 0;
+
+	String res = make_string(str, i);
+	res = string_trim_whitespace(res);
+	return path_to_fullpath(a, res, ok_);
+}
+
+gb_internal String get_fullpath_core_collection(gbAllocator a, String path, bool *ok_) {
 	String module_dir = odin_root_dir();
 
 	String core = str_lit("core/");
@@ -1145,7 +1206,7 @@ gb_internal String get_fullpath_core(gbAllocator a, String path) {
 
 	String res = make_string(str, i);
 	res = string_trim_whitespace(res);
-	return path_to_fullpath(a, res);
+	return path_to_fullpath(a, res, ok_);
 }
 
 gb_internal bool show_error_line(void) {
@@ -1275,8 +1336,6 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 		GB_ASSERT(metrics->int_size == 2*metrics->ptr_size);
 	}
 
-
-
 	bc->metrics = *metrics;
 	switch (subtarget) {
 	case Subtarget_Default:
@@ -1293,14 +1352,14 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 		break;
 	}
 
-	bc->ODIN_OS        = target_os_names[metrics->os];
-	bc->ODIN_ARCH      = target_arch_names[metrics->arch];
-	bc->endian_kind    = target_endians[metrics->arch];
-	bc->ptr_size       = metrics->ptr_size;
-	bc->int_size       = metrics->int_size;
-	bc->max_align      = metrics->max_align;
-	bc->max_simd_align = metrics->max_simd_align;
-	bc->link_flags  = str_lit(" ");
+	bc->ODIN_OS           = target_os_names[metrics->os];
+	bc->ODIN_ARCH         = target_arch_names[metrics->arch];
+	bc->endian_kind       = target_endians[metrics->arch];
+	bc->ptr_size          = metrics->ptr_size;
+	bc->int_size          = metrics->int_size;
+	bc->max_align         = metrics->max_align;
+	bc->max_simd_align    = metrics->max_simd_align;
+	bc->link_flags        = str_lit(" ");
 
 	#if defined(DEFAULT_TO_THREADED_CHECKER)
 	bc->threaded_checker = true;
@@ -1320,6 +1379,11 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 			gb_printf_err("-no-rtti is only allowed on freestanding targets\n");
 			gb_exit(1);
 		}
+	}
+
+	// Default to subsystem:CONSOLE on Windows targets
+	if (bc->ODIN_WINDOWS_SUBSYSTEM == "" && bc->metrics.os == TargetOs_windows) {
+		bc->ODIN_WINDOWS_SUBSYSTEM = windows_subsystem_names[Windows_Subsystem_CONSOLE];
 	}
 
 	// NOTE(zangent): The linker flags to set the build architecture are different
@@ -1417,6 +1481,16 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 			bc->ODIN_VALGRIND_SUPPORT = true;
 			break;
 		}
+	}
+
+	if (bc->metrics.os == TargetOs_freestanding) {
+		bc->ODIN_DEFAULT_TO_NIL_ALLOCATOR = !bc->ODIN_DEFAULT_TO_PANIC_ALLOCATOR;
+	} else if (is_arch_wasm()) {
+		if (bc->metrics.os == TargetOs_js || bc->metrics.os == TargetOs_wasi) {
+			// TODO(bill): Should these even have a default "heap-like" allocator?
+		}
+		bc->ODIN_DEFAULT_TO_PANIC_ALLOCATOR = true;
+		bc->ODIN_DEFAULT_TO_NIL_ALLOCATOR = !bc->ODIN_DEFAULT_TO_PANIC_ALLOCATOR;
 	}
 }
 
@@ -1552,8 +1626,8 @@ gb_internal bool init_build_paths(String init_filename) {
 		produces_output_file = true;
 	}
 
-
-	if (build_context.ODIN_DEFAULT_TO_NIL_ALLOCATOR) {
+	if (build_context.ODIN_DEFAULT_TO_NIL_ALLOCATOR ||
+	    build_context.ODIN_DEFAULT_TO_PANIC_ALLOCATOR) {
 		bc->no_dynamic_literals = true;
 	}
 

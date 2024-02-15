@@ -2,7 +2,7 @@
 package os2
 
 import "core:time"
-import "core:runtime"
+import "base:runtime"
 import "core:strings"
 import "core:sys/unix"
 import "core:path/filepath"
@@ -101,7 +101,7 @@ _fstat_internal :: proc(fd: int, allocator: runtime.Allocator) -> (File_Info, Er
 		name = "",
 		size = s.size,
 		mode = 0,
-		is_dir = S_ISDIR(s.mode),
+		is_directory = S_ISDIR(s.mode),
 		modification_time = time.Time {s.modified.seconds},
 		access_time = time.Time {s.last_access.seconds},
 		creation_time = time.Time{0}, // regular stat does not provide this

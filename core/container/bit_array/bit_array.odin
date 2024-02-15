@@ -1,6 +1,6 @@
 package dynamic_bit_array
 
-import "core:intrinsics"
+import "base:intrinsics"
 import "core:mem"
 
 /*

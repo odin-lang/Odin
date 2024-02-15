@@ -334,7 +334,7 @@ gb_internal void lb_add_callsite_force_inline(lbProcedure *p, lbValue ret_value)
 
 gb_internal lbValue lb_hasher_proc_for_type(lbModule *m, Type *type) {
 	type = core_type(type);
-	GB_ASSERT_MSG(is_type_valid_for_keys(type), "%s", type_to_string(type));
+	GB_ASSERT_MSG(is_type_comparable(type), "%s", type_to_string(type));
 
 	Type *pt = alloc_type_pointer(type);
 
@@ -1064,6 +1064,11 @@ gb_internal lbProcedure *lb_create_startup_type_info(lbModule *m) {
 	LLVMSetLinkage(p->value, LLVMInternalLinkage);
 
 	lb_add_attribute_to_proc(m, p->value, "nounwind");
+	// lb_add_attribute_to_proc(p->module, p->value, "mustprogress");
+	// lb_add_attribute_to_proc(p->module, p->value, "nofree");
+	// lb_add_attribute_to_proc(p->module, p->value, "norecurse");
+	// lb_add_attribute_to_proc(p->module, p->value, "nosync");
+	// lb_add_attribute_to_proc(p->module, p->value, "willreturn");
 	if (!LB_USE_GIANT_PACKED_STRUCT) {
 		lb_add_attribute_to_proc(m, p->value, "optnone");
 		lb_add_attribute_to_proc(m, p->value, "noinline");
@@ -2503,7 +2508,7 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 	LLVMCodeModel code_mode = LLVMCodeModelDefault;
 	if (is_arch_wasm()) {
 		code_mode = LLVMCodeModelJITDefault;
-	} else if (build_context.metrics.os == TargetOs_freestanding) {
+	} else if (is_arch_x86() && build_context.metrics.os == TargetOs_freestanding) {
 		code_mode = LLVMCodeModelKernel;
 	}
 

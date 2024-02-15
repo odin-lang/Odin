@@ -1,4 +1,6 @@
 gb_internal ParameterValue handle_parameter_value(CheckerContext *ctx, Type *in_type, Type **out_type_, Ast *expr, bool allow_caller_location);
+gb_internal Type *determine_type_from_polymorphic(CheckerContext *ctx, Type *poly_type, Operand const &operand);
+gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is_variadic_, isize *variadic_index_, bool *success_, isize *specialization_count_, Array<Operand> const *operands);
 
 gb_internal void populate_using_array_index(CheckerContext *ctx, Ast *node, AstField *field, Type *t, String name, i32 idx) {
 	t = base_type(t);
@@ -219,13 +221,13 @@ gb_internal void check_struct_fields(CheckerContext *ctx, Ast *node, Slice<Entit
 }
 
 
-gb_internal bool check_custom_align(CheckerContext *ctx, Ast *node, i64 *align_) {
+gb_internal bool check_custom_align(CheckerContext *ctx, Ast *node, i64 *align_, char const *msg) {
 	GB_ASSERT(align_ != nullptr);
 	Operand o = {};
 	check_expr(ctx, &o, node);
 	if (o.mode != Addressing_Constant) {
 		if (o.mode != Addressing_Invalid) {
-			error(node, "#align must be a constant");
+			error(node, "#%s must be a constant", msg);
 		}
 		return false;
 	}
@@ -237,13 +239,13 @@ gb_internal bool check_custom_align(CheckerContext *ctx, Ast *node, i64 *align_)
 			if (v.used > 1) {
 				gbAllocator a = heap_allocator();
 				String str = big_int_to_string(a, &v);
-				error(node, "#align too large, %.*s", LIT(str));
+				error(node, "#%s too large, %.*s", msg, LIT(str));
 				gb_free(a, str.text);
 				return false;
 			}
 			i64 align = big_int_to_i64(&v);
 			if (align < 1 || !gb_is_power_of_two(cast(isize)align)) {
-				error(node, "#align must be a power of 2, got %lld", align);
+				error(node, "#%s must be a power of 2, got %lld", msg, align);
 				return false;
 			}
 			*align_ = align;
@@ -251,7 +253,7 @@ gb_internal bool check_custom_align(CheckerContext *ctx, Ast *node, i64 *align_)
 		}
 	}
 
-	error(node, "#align must be an integer");
+	error(node, "#%s must be an integer", msg);
 	return false;
 }
 
@@ -393,7 +395,6 @@ gb_internal Type *check_record_polymorphic_params(CheckerContext *ctx, Ast *poly
                                                   bool *is_polymorphic_,
                                                   Ast *node, Array<Operand> *poly_operands) {
 	Type *polymorphic_params_type = nullptr;
-	bool can_check_fields = true;
 	GB_ASSERT(is_polymorphic_ != nullptr);
 
 	if (polymorphic_params == nullptr) {
@@ -403,6 +404,17 @@ gb_internal Type *check_record_polymorphic_params(CheckerContext *ctx, Ast *poly
 		return polymorphic_params_type;
 	}
 
+
+	// bool is_variadic = false;
+	// isize variadic_index = 0;
+	// bool success = false;
+	// isize specialization_count = 0;
+	// polymorphic_params_type = check_get_params(ctx, ctx->scope, polymorphic_params, &is_variadic, &variadic_index, &success, &specialization_count, poly_operands);
+	// if (success) {
+	// 	return nullptr;
+	// }
+
+	bool can_check_fields = true;
 	ast_node(field_list, FieldList, polymorphic_params);
 	Slice<Ast *> params = field_list->list;
 	if (params.count != 0) {
@@ -417,11 +429,13 @@ gb_internal Type *check_record_polymorphic_params(CheckerContext *ctx, Ast *poly
 
 		auto entities = array_make<Entity *>(permanent_allocator(), 0, variable_count);
 
+		i32 field_group_index = -1;
 		for_array(i, params) {
 			Ast *param = params[i];
 			if (param->kind != Ast_Field) {
 				continue;
 			}
+			field_group_index += 1;
 			ast_node(p, Field, param);
 			Ast *type_expr = p->type;
 			Ast *default_value = unparen_expr(p->default_value);
@@ -481,7 +495,7 @@ gb_internal Type *check_record_polymorphic_params(CheckerContext *ctx, Ast *poly
 				type = t_invalid;
 			}
 
-			if (is_type_polymorphic_type) {
+			if (is_type_polymorphic_type && !is_type_proc(type)) {
 				gbString str = type_to_string(type);
 				error(params[i], "Parameter types cannot be polymorphic, got %s", str);
 				gb_string_free(str);
@@ -523,13 +537,18 @@ gb_internal Type *check_record_polymorphic_params(CheckerContext *ctx, Ast *poly
 						e->TypeName.is_type_alias = true;
 						e->flags |= EntityFlag_PolyConst;
 					} else {
-						if (is_type_polymorphic(base_type(operand.type))) {
+						Type *t = operand.type;
+						if (is_type_proc(type)) {
+							t = determine_type_from_polymorphic(ctx, type, operand);
+						}
+						if (is_type_polymorphic(base_type(t))) {
 							*is_polymorphic_ = true;
 							can_check_fields = false;
 						}
 						if (e == nullptr) {
-							e = alloc_entity_constant(scope, token, operand.type, operand.value);
+							e = alloc_entity_const_param(scope, token, t, operand.value, is_type_polymorphic(t));
 							e->Constant.param_value = param_value;
+							e->Constant.field_group_index = field_group_index;
 						}
 					}
 				} else {
@@ -538,7 +557,8 @@ gb_internal Type *check_record_polymorphic_params(CheckerContext *ctx, Ast *poly
 						e->TypeName.is_type_alias = true;
 						e->flags |= EntityFlag_PolyConst;
 					} else {
-						e = alloc_entity_constant(scope, token, type, param_value.value);
+						e = alloc_entity_const_param(scope, token, type, param_value.value, is_type_polymorphic(type));
+						e->Constant.field_group_index = field_group_index;
 						e->Constant.param_value = param_value;
 					}
 				}
@@ -559,7 +579,6 @@ gb_internal Type *check_record_polymorphic_params(CheckerContext *ctx, Ast *poly
 	if (!*is_polymorphic_) {
 		*is_polymorphic_ = polymorphic_params != nullptr && poly_operands == nullptr;
 	}
-
 	return polymorphic_params_type;
 }
 
@@ -613,9 +632,6 @@ gb_internal void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *
 	
 	scope_reserve(ctx->scope, min_field_count);
 
-	rw_mutex_lock(&struct_type->Struct.fields_mutex);
-	defer (rw_mutex_unlock(&struct_type->Struct.fields_mutex));
-
 	if (st->is_raw_union && min_field_count > 1) {
 		struct_type->Struct.is_raw_union = true;
 		context = str_lit("struct #raw_union");
@@ -643,18 +659,29 @@ gb_internal void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *
 			gb_unused(where_clause_ok);
 		}
 		check_struct_fields(ctx, node, &struct_type->Struct.fields, &struct_type->Struct.tags, st->fields, min_field_count, struct_type, context);
+		wait_signal_set(&struct_type->Struct.fields_wait_signal);
 	}
 
-	if (st->align != nullptr) {
-		if (st->is_packed) {
-			syntax_error(st->align, "'#align' cannot be applied with '#packed'");
-			return;
-		}
-		i64 custom_align = 1;
-		if (check_custom_align(ctx, st->align, &custom_align)) {
-			struct_type->Struct.custom_align = custom_align;
-		}
+#define ST_ALIGN(_name) if (st->_name != nullptr) {                                                \
+		if (st->is_packed) {                                                               \
+			syntax_error(st->_name, "'#%s' cannot be applied with '#packed'", #_name); \
+			return;                                                                    \
+		}                                                                                  \
+		i64 align = 1;                                                                     \
+		if (check_custom_align(ctx, st->_name, &align, #_name)) {                          \
+			struct_type->Struct.custom_##_name = align;                                \
+		}                                                                                  \
 	}
+
+	ST_ALIGN(field_align);
+	ST_ALIGN(align);
+	if (struct_type->Struct.custom_align < struct_type->Struct.custom_field_align) {
+		warning(st->align, "#align(%lld) is defined to be less than #field_name(%lld)",
+		        cast(long long)struct_type->Struct.custom_align,
+		        cast(long long)struct_type->Struct.custom_field_align);
+	}
+
+#undef ST_ALIGN
 }
 gb_internal void check_union_type(CheckerContext *ctx, Type *union_type, Ast *node, Array<Operand> *poly_operands, Type *named_type, Type *original_type_for_poly) {
 	GB_ASSERT(is_type_union(union_type));
@@ -746,7 +773,7 @@ gb_internal void check_union_type(CheckerContext *ctx, Type *union_type, Ast *no
 
 	if (ut->align != nullptr) {
 		i64 custom_align = 1;
-		if (check_custom_align(ctx, ut->align, &custom_align)) {
+		if (check_custom_align(ctx, ut->align, &custom_align, "align")) {
 			if (variants.count == 0) {
 				error(ut->align, "An empty union cannot have a custom alignment");
 			} else {
@@ -2226,6 +2253,34 @@ gb_internal void map_cell_size_and_len(Type *type, i64 *size_, i64 *len_) {
 	if (len_)  *len_ = len;
 }
 
+gb_internal Type *get_map_cell_type(Type *type) {
+	i64 size, len;
+	i64 elem_size = type_size_of(type);
+	map_cell_size_and_len(type, &size, &len);
+
+	if (size == len*elem_size) {
+		return type;
+	}
+
+	if (is_power_of_two(len)) {
+		return type;
+	}
+
+	i64 padding = size - len*elem_size;
+	GB_ASSERT(padding > 0);
+
+	// Padding exists
+	Type *s = alloc_type_struct();
+	Scope *scope = create_scope(nullptr, nullptr);
+	s->Struct.fields = slice_make<Entity *>(permanent_allocator(), 2);
+	s->Struct.fields[0] = alloc_entity_field(scope, make_token_ident("v"), alloc_type_array(type, len), false, 0, EntityState_Resolved);
+	s->Struct.fields[1] = alloc_entity_field(scope, make_token_ident("_"), alloc_type_array(t_u8, padding), false, 1, EntityState_Resolved);
+	s->Struct.scope = scope;
+	gb_unused(type_size_of(s));
+
+	return s;
+}
+
 gb_internal void init_map_internal_types(Type *type) {
 	GB_ASSERT(type->kind == Type_Map);
 	GB_ASSERT(t_allocator != nullptr);
@@ -2235,6 +2290,43 @@ gb_internal void init_map_internal_types(Type *type) {
 	Type *value = type->Map.value;
 	GB_ASSERT(key != nullptr);
 	GB_ASSERT(value != nullptr);
+
+
+
+	Type *key_cell   = get_map_cell_type(key);
+	Type *value_cell = get_map_cell_type(value);
+
+	Type *metadata_type = alloc_type_struct();
+	Scope *metadata_scope = create_scope(nullptr, nullptr);
+	metadata_type->Struct.fields = slice_make<Entity *>(permanent_allocator(), 5);
+	metadata_type->Struct.fields[0] = alloc_entity_field(metadata_scope, make_token_ident("key"),    key,       false, 0, EntityState_Resolved);
+	metadata_type->Struct.fields[1] = alloc_entity_field(metadata_scope, make_token_ident("value"),  value,     false, 1, EntityState_Resolved);
+	metadata_type->Struct.fields[2] = alloc_entity_field(metadata_scope, make_token_ident("hash"),   t_uintptr, false, 2, EntityState_Resolved);
+	metadata_type->Struct.fields[3] = alloc_entity_field(metadata_scope, make_token_ident("key_cell"),   key_cell,   false, 3, EntityState_Resolved);
+	metadata_type->Struct.fields[4] = alloc_entity_field(metadata_scope, make_token_ident("value_cell"), value_cell, false, 4, EntityState_Resolved);
+	metadata_type->Struct.scope = metadata_scope;
+	metadata_type->Struct.node = nullptr;
+
+	gb_unused(type_size_of(metadata_type));
+
+	// NOTE(bill): [0]^struct{key: Key, value: Value, hash: uintptr}
+	// This is a zero array to a pointer to keep the alignment to that of a pointer, and not effective the size of the final struct
+	metadata_type = alloc_type_array(alloc_type_pointer(metadata_type), 0);;
+
+
+	Scope *scope = create_scope(nullptr, nullptr);
+	Type *debug_type = alloc_type_struct();
+	debug_type->Struct.fields = slice_make<Entity *>(permanent_allocator(), 4);
+	debug_type->Struct.fields[0] = alloc_entity_field(scope, make_token_ident("data"),       t_uintptr,     false, 0, EntityState_Resolved);
+	debug_type->Struct.fields[1] = alloc_entity_field(scope, make_token_ident("len"),        t_int,         false, 1, EntityState_Resolved);
+	debug_type->Struct.fields[2] = alloc_entity_field(scope, make_token_ident("allocator"),  t_allocator,   false, 2, EntityState_Resolved);
+	debug_type->Struct.fields[3] = alloc_entity_field(scope, make_token_ident("__metadata"), metadata_type, false, 3, EntityState_Resolved);
+	debug_type->Struct.scope = scope;
+	debug_type->Struct.node = nullptr;
+
+	gb_unused(type_size_of(debug_type));
+
+	type->Map.debug_metadata_type = debug_type;
 
 	type->Map.lookup_result_type = make_optional_ok_type(value);
 }
@@ -2380,7 +2472,7 @@ gb_internal Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_e
 
 	bool is_polymorphic = is_type_polymorphic(elem);
 
-	if ((!is_polymorphic || soa_kind == StructSoa_Fixed) && !is_type_struct(elem) && !is_type_raw_union(elem) && !(is_type_array(elem) && bt_elem->Array.count <= 4)) {
+	if (!is_polymorphic && !is_type_struct(elem) && !is_type_raw_union(elem) && !(is_type_array(elem) && bt_elem->Array.count <= 4)) {
 		gbString str = type_to_string(elem);
 		error(elem_expr, "Invalid type for an #soa array, expected a struct or array of length 4 or below, got '%s'", str);
 		gb_string_free(str);
@@ -2397,7 +2489,7 @@ gb_internal Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_e
 	case StructSoa_Slice:	extra_field_count = 1; break;
 	case StructSoa_Dynamic:	extra_field_count = 3; break;
 	}
-	if (is_polymorphic && soa_kind != StructSoa_Fixed) {
+	if (is_polymorphic) {
 		field_count = 0;
 
 		soa_struct = alloc_type_struct();
@@ -2459,6 +2551,8 @@ gb_internal Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_e
 		GB_ASSERT(is_type_struct(elem));
 
 		Type *old_struct = base_type(elem);
+
+		wait_signal_until_available(&old_struct->Struct.fields_wait_signal);
 		field_count = old_struct->Struct.fields.count;
 
 		soa_struct = alloc_type_struct();
@@ -2499,21 +2593,19 @@ gb_internal Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_e
 	}
 
 	if (soa_kind != StructSoa_Fixed) {
-		Entity *len_field = alloc_entity_field(scope, empty_token, t_int, false, cast(i32)field_count+0);
+		Entity *len_field = alloc_entity_field(scope, make_token_ident("__$len"), t_int, false, cast(i32)field_count+0);
 		soa_struct->Struct.fields[field_count+0] = len_field;
 		add_entity(ctx, scope, nullptr, len_field);
 		add_entity_use(ctx, nullptr, len_field);
 
 		if (soa_kind == StructSoa_Dynamic) {
-			Entity *cap_field = alloc_entity_field(scope, empty_token, t_int, false, cast(i32)field_count+1);
+			Entity *cap_field = alloc_entity_field(scope, make_token_ident("__$cap"), t_int, false, cast(i32)field_count+1);
 			soa_struct->Struct.fields[field_count+1] = cap_field;
 			add_entity(ctx, scope, nullptr, cap_field);
 			add_entity_use(ctx, nullptr, cap_field);
 
-			Token token = {};
-			token.string = str_lit("allocator");
 			init_mem_allocator(ctx->checker);
-			Entity *allocator_field = alloc_entity_field(scope, token, t_allocator, false, cast(i32)field_count+2);
+			Entity *allocator_field = alloc_entity_field(scope, make_token_ident("allocator"), t_allocator, false, cast(i32)field_count+2);
 			soa_struct->Struct.fields[field_count+2] = allocator_field;
 			add_entity(ctx, scope, nullptr, allocator_field);
 			add_entity_use(ctx, nullptr, allocator_field);
