@@ -83,6 +83,11 @@ OpenBSD)
 	LDFLAGS="$LDFLAGS -liconv"
 	LDFLAGS="$LDFLAGS $($LLVM_CONFIG --libs core native --system-libs)"
 	;;
+Haiku)
+	CXXFLAGS="$CXXFLAGS $($LLVM_CONFIG --cxxflags --ldflags) -I/system/develop/headers/private/shared -I/system/develop/headers/private/kernel"
+	LDFLAGS="$LDFLAGS -liconv"
+	LDFLAGS="$LDFLAGS $($LLVM_CONFIG --libs core native --system-libs)"
+	;;
 *)
 	error "Platform \"$OS_NAME\" unsupported"
 	;;

@@ -831,6 +831,51 @@ gb_internal void futex_wait(Futex *f, Footex val) {
 		WaitOnAddress(f, (void *)&val, sizeof(val), INFINITE);
 	} while (f->load() == val);
 }
+#elif defined(GB_SYSTEM_HAIKU)
+
+#include <pthread.h>
+#include <unordered_map>
+#include <memory>
+
+struct MutexCond {
+    pthread_mutex_t mutex;
+    pthread_cond_t cond;
+};
+
+std::unordered_map<Futex*, std::unique_ptr<MutexCond>> futex_map;
+
+MutexCond* get_mutex_cond(Futex* f) {
+	if (futex_map.find(f) == futex_map.end()) {
+		futex_map[f] = std::make_unique<MutexCond>();
+		pthread_mutex_init(&futex_map[f]->mutex, NULL);
+		pthread_cond_init(&futex_map[f]->cond, NULL);
+	}
+	return futex_map[f].get();
+}
+
+void futex_signal(Futex *f) {
+	MutexCond* mc = get_mutex_cond(f);
+	pthread_mutex_lock(&mc->mutex);
+	pthread_cond_signal(&mc->cond);
+	pthread_mutex_unlock(&mc->mutex);
+}
+
+void futex_broadcast(Futex *f) {
+	MutexCond* mc = get_mutex_cond(f);
+	pthread_mutex_lock(&mc->mutex);
+	pthread_cond_broadcast(&mc->cond);
+	pthread_mutex_unlock(&mc->mutex);
+}
+
+void futex_wait(Futex *f, Footex val) {
+	MutexCond* mc = get_mutex_cond(f);
+	pthread_mutex_lock(&mc->mutex);
+	while (f->load() == val) {
+		pthread_cond_wait(&mc->cond, &mc->mutex);
+	}
+	pthread_mutex_unlock(&mc->mutex);
+}
+
 #endif
 
 #if defined(GB_SYSTEM_WINDOWS)
