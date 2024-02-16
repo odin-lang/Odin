@@ -644,42 +644,85 @@ trunc :: proc{
 }
 
 @(require_results)
-round_f16   :: proc "contextless" (x: f16)   -> f16 {
-	return ceil(x - 0.5) if x < 0 else floor(x + 0.5)
+round_f16 :: proc "contextless" (x: f16) -> f16 {
+	mask  :: F16_MASK
+	shift :: F16_SHIFT
+	bias  :: F16_BIAS
+
+	bits := transmute(u16)x
+	e := (bits >> shift) & mask
+
+	if e < bias {
+		bits &= 0x8000
+		if e == bias - 1 {
+			bits |= transmute(u16)f16(1)
+		}
+	} else if e < bias + shift {
+		half     :: 1 << (shift - 1)
+		mantissa :: (1 << shift) - 1
+		e -= bias
+		bits += half >> e
+		bits &~= mantissa >> e
+	}
+
+	return transmute(f16)bits
 }
-@(require_results)
-round_f16le :: proc "contextless" (x: f16le) -> f16le {
-	return ceil(x - 0.5) if x < 0 else floor(x + 0.5)
-}
-@(require_results)
-round_f16be :: proc "contextless" (x: f16be) -> f16be {
-	return ceil(x - 0.5) if x < 0 else floor(x + 0.5)
-}
+@(require_results) round_f16le :: proc "contextless" (x: f16le) -> f16le { return #force_inline f16le(round_f16(f16(x))) }
+@(require_results) round_f16be :: proc "contextless" (x: f16be) -> f16be { return #force_inline f16be(round_f16(f16(x))) }
 
 @(require_results)
-round_f32   :: proc "contextless" (x: f32)   -> f32 {
-	return ceil(x - 0.5) if x < 0 else floor(x + 0.5)
+round_f32 :: proc "contextless" (x: f32) -> f32 {
+	mask  :: F32_MASK
+	shift :: F32_SHIFT
+	bias  :: F32_BIAS
+
+	bits := transmute(u32)x
+	e := (bits >> shift) & mask
+
+	if e < bias {
+		bits &= 0x8000_0000
+		if e == bias - 1 {
+			bits |= transmute(u32)f32(1)
+		}
+	} else if e < bias + shift {
+		half     :: 1 << (shift - 1)
+		mantissa :: (1 << shift) - 1
+		e -= bias
+		bits += half >> e
+		bits &~= mantissa >> e
+	}
+
+	return transmute(f32)bits
 }
+@(require_results) round_f32le :: proc "contextless" (x: f32le) -> f32le { return #force_inline f32le(round_f32(f32(x))) }
+@(require_results) round_f32be :: proc "contextless" (x: f32be) -> f32be { return #force_inline f32be(round_f32(f32(x))) }
+
 @(require_results)
-round_f32le :: proc "contextless" (x: f32le) -> f32le {
-	return ceil(x - 0.5) if x < 0 else floor(x + 0.5)
+round_f64 :: proc "contextless" (x: f64) -> f64 {
+	mask  :: F64_MASK
+	shift :: F64_SHIFT
+	bias  :: F64_BIAS
+
+	bits := transmute(u64)x
+	e := (bits >> shift) & mask
+
+	if e < bias {
+		bits &= 0x8000_0000_0000_0000
+		if e == bias - 1 {
+			bits |= transmute(u64)f64(1)
+		}
+	} else if e < bias + shift {
+		half     :: 1 << (shift - 1)
+		mantissa :: (1 << shift) - 1
+		e -= bias
+		bits += half >> e
+		bits &~= mantissa >> e
+	}
+
+	return transmute(f64)bits
 }
-@(require_results)
-round_f32be :: proc "contextless" (x: f32be) -> f32be {
-	return ceil(x - 0.5) if x < 0 else floor(x + 0.5)
-}
-@(require_results)
-round_f64   :: proc "contextless" (x: f64)   -> f64 {
-	return ceil(x - 0.5) if x < 0 else floor(x + 0.5)
-}
-@(require_results)
-round_f64le :: proc "contextless" (x: f64le) -> f64le {
-	return ceil(x - 0.5) if x < 0 else floor(x + 0.5)
-}
-@(require_results)
-round_f64be :: proc "contextless" (x: f64be) -> f64be {
-	return ceil(x - 0.5) if x < 0 else floor(x + 0.5)
-}
+@(require_results) round_f64le :: proc "contextless" (x: f64le) -> f64le { return #force_inline f64le(round_f64(f64(x))) }
+@(require_results) round_f64be :: proc "contextless" (x: f64be) -> f64be { return #force_inline f64be(round_f64(f64(x))) }
 round :: proc{
 	round_f16, round_f16le, round_f16be,
 	round_f32, round_f32le, round_f32be,
