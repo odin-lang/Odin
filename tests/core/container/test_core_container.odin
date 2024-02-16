@@ -19,6 +19,7 @@ expect_equal :: proc(t: ^testing.T, the_slice, expected: []int, loc := #caller_l
 main :: proc() {
 	t := testing.T{}
 
+	test_avl(&t)
 	test_small_array(&t)
 
 	tc.report(&t)
