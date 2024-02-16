@@ -428,7 +428,7 @@ clear_soa :: proc{
 }
 
 // Converts soa slice into a soa dynamic array without cloning or allocating memory
-@(builtin, require_results)
+@(require_results)
 into_dynamic_soa :: proc(array: $T/#soa[]$E) -> #soa[dynamic]E {
 	d: #soa[dynamic]E
 	footer := raw_soa_footer_dynamic_array(&d)
@@ -446,13 +446,9 @@ into_dynamic_soa :: proc(array: $T/#soa[]$E) -> #soa[dynamic]E {
 	}
 
 	array := array
-	dynamic_data := uintptr(&d)
-	slice_data := uintptr(&array)
-	for _ in 0..<field_count {
-		(^uintptr)(dynamic_data)^ = (^uintptr)(slice_data)^
-		dynamic_data += size_of(rawptr)
-		slice_data += size_of(rawptr)
-	}
+	dynamic_data := ([^rawptr])(&d)[:field_count]
+	slice_data   := ([^]rawptr)(&array)[:field_count]
+	copy(dynamic_data, slice_data)
 
 	return d
 }
