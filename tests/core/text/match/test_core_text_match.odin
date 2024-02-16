@@ -202,8 +202,11 @@ test_captures :: proc(t: ^testing.T) {
 	// match all captures
 	compare_captures :: proc(t: ^testing.T, test: ^Temp, haystack: string, comp: []string, loc := #caller_location) {
 		length, err := match.find_aux(haystack, test.pattern, 0, false, &test.captures)
-		if failed(t, len(comp) == length) {
-			logf(t, "Captures Compare Failed -> Lengths %d != %d\n", len(comp), length)
+		result := len(comp) == length && err == .OK
+		if failed(t, result == true) {
+			logf(t, "Captures Compare Failed!\n")
+			logf(t, "\tErr: %v\n", err)
+			logf(t, "\tLengths: %v != %v\n", len(comp), length)
 		}
 
 		for i in 0..<length {
