@@ -16,13 +16,17 @@ Engine
 
 /* Sound flags. */
 sound_flags :: enum c.int {
+	/* Resource manager flags. */
 	STREAM                = 0x00000001,   /* MA_RESOURCE_MANAGER_DATA_SOURCE_FLAG_STREAM */
 	DECODE                = 0x00000002,   /* MA_RESOURCE_MANAGER_DATA_SOURCE_FLAG_DECODE */
 	ASYNC                 = 0x00000004,   /* MA_RESOURCE_MANAGER_DATA_SOURCE_FLAG_ASYNC */
 	WAIT_INIT             = 0x00000008,   /* MA_RESOURCE_MANAGER_DATA_SOURCE_FLAG_WAIT_INIT */
-	NO_DEFAULT_ATTACHMENT = 0x00000010,   /* Do not attach to the endpoint by default. Useful for when setting up nodes in a complex graph system. */
-	NO_PITCH              = 0x00000020,   /* Disable pitch shifting with ma_sound_set_pitch() and ma_sound_group_set_pitch(). This is an optimization. */
-	NO_SPATIALIZATION     = 0x00000040,   /* Disable spatialization. */
+	UNKNOWN_LENGTH        = 0x00000010,   /* MA_RESOURCE_MANAGER_DATA_SOURCE_FLAG_UNKNOWN_LENGTH */
+	
+	/* ma_sound specific flags. */
+	NO_DEFAULT_ATTACHMENT = 0x00001000,   /* Do not attach to the endpoint by default. Useful for when setting up nodes in a complex graph system. */
+	NO_PITCH              = 0x00002000,   /* Disable pitch shifting with ma_sound_set_pitch() and ma_sound_group_set_pitch(). This is an optimization. */
+	NO_SPATIALIZATION     = 0x00004000,   /* Disable spatialization. */
 }
 
 ENGINE_MAX_LISTENERS :: 4
@@ -35,31 +39,44 @@ engine_node_type :: enum c.int {
 }
 
 engine_node_config :: struct {
-	pEngine:                  ^engine,
-	type:                     engine_node_type,
-	channelsIn:               u32,
-	channelsOut:              u32,
-	sampleRate:               u32,     /* Only used when the type is set to ma_engine_node_type_sound. */
-	isPitchDisabled:          b8,      /* Pitching can be explicitly disable with MA_SOUND_FLAG_NO_PITCH to optimize processing. */
-	isSpatializationDisabled: b8,      /* Spatialization can be explicitly disabled with MA_SOUND_FLAG_NO_SPATIALIZATION. */
-	pinnedListenerIndex:      u8,      /* The index of the listener this node should always use for spatialization. If set to MA_LISTENER_INDEX_CLOSEST the engine will use the closest listener. */
+	pEngine:                     ^engine,
+	type:                        engine_node_type,
+	channelsIn:                  u32,
+	channelsOut:                 u32,
+	sampleRate:                  u32,     /* Only used when the type is set to ma_engine_node_type_sound. */
+	volumeSmoothTimeInPCMFrames: u32,
+	monoExpansionMode:           mono_expansion_mode,
+	isPitchDisabled:             b8,      /* Pitching can be explicitly disable with MA_SOUND_FLAG_NO_PITCH to optimize processing. */
+	isSpatializationDisabled:    b8,      /* Spatialization can be explicitly disabled with MA_SOUND_FLAG_NO_SPATIALIZATION. */
+	pinnedListenerIndex:         u8,      /* The index of the listener this node should always use for spatialization. If set to MA_LISTENER_INDEX_CLOSEST the engine will use the closest listener. */
 }
 
 /* Base node object for both ma_sound and ma_sound_group. */
 engine_node :: struct {
-	baseNode:                 node_base,           /* Must be the first member for compatiblity with the ma_node API. */
-	pEngine:                  ^engine,             /* A pointer to the engine. Set based on the value from the config. */
-	sampleRate:               u32,                 /* The sample rate of the input data. For sounds backed by a data source, this will be the data source's sample rate. Otherwise it'll be the engine's sample rate. */
-	fader:                    fader,
-	resampler:                linear_resampler,    /* For pitch shift. */
-	spatializer:              spatializer,
-	panner:                   panner,
-	pitch:                    f32, /*atomic*/
-	oldPitch:                 f32,                 /* For determining whether or not the resampler needs to be updated to reflect the new pitch. The resampler will be updated on the mixing thread. */
-	oldDopplerPitch:          f32,                 /* For determining whether or not the resampler needs to be updated to take a new doppler pitch into account. */
-	isPitchDisabled:          b32, /*atomic*/      /* When set to true, pitching will be disabled which will allow the resampler to be bypassed to save some computation. */
-	isSpatializationDisabled: b32, /*atomic*/      /* Set to false by default. When set to false, will not have spatialisation applied. */
-	pinnedListenerIndex:      u32, /*atomic*/      /* The index of the listener this node should always use for spatialization. If set to MA_LISTENER_INDEX_CLOSEST the engine will use the closest listener. */
+	baseNode:                    node_base,           /* Must be the first member for compatiblity with the ma_node API. */
+	pEngine:                     ^engine,             /* A pointer to the engine. Set based on the value from the config. */
+	sampleRate:                  u32,                 /* The sample rate of the input data. For sounds backed by a data source, this will be the data source's sample rate. Otherwise it'll be the engine's sample rate. */
+	volumeSmoothTimeInPCMFrames: u32,
+	monoExpansionMode:           mono_expansion_mode,
+	fader:                       fader,
+	resampler:                   linear_resampler,    /* For pitch shift. */
+	spatializer:                 spatializer,
+	panner:                      panner,
+	volumeGainer:                gainer,              /* This will only be used if volumeSmoothTimeInPCMFrames is > 0. */
+	volume:                      f32, /*atomic*/      /* Defaults to 1. */
+	pitch:                       f32, /*atomic*/
+	oldPitch:                    f32,                 /* For determining whether or not the resampler needs to be updated to reflect the new pitch. The resampler will be updated on the mixing thread. */
+	oldDopplerPitch:             f32,                 /* For determining whether or not the resampler needs to be updated to take a new doppler pitch into account. */
+	isPitchDisabled:             b32, /*atomic*/      /* When set to true, pitching will be disabled which will allow the resampler to be bypassed to save some computation. */
+	isSpatializationDisabled:    b32, /*atomic*/      /* Set to false by default. When set to false, will not have spatialisation applied. */
+	pinnedListenerIndex:         u32, /*atomic*/      /* The index of the listener this node should always use for spatialization. If set to MA_LISTENER_INDEX_CLOSEST the engine will use the closest listener. */
+
+	fadeSettings: struct {
+		volumeBeg:                  f32, /*atomic*/
+		volumeEnd:                  f32, /*atomic*/
+		fadeLengthInFrames:         u64, /*atomic*/ /* <-- Defaults to (~(ma_uint64)0) which is used to indicate that no fade should be applied. */
+		absoluteGlobalTimeInFrames: u64, /*atomic*/ /* <-- The time to start the fade. */
+	},
 
 	/* Memory management. */
 	_ownsHeap: b8,
@@ -79,6 +96,9 @@ foreign lib {
 
 SOUND_SOURCE_CHANNEL_COUNT :: 0xFFFFFFFF
 
+/* Callback for when a sound reaches the end. */
+sound_end_proc :: #type proc "c" (pUserData: rawptr, pSound: ^sound)
+
 sound_config :: struct {
 	pFilePath:                      cstring,          /* Set this to load from the resource manager. */
 	pFilePathW:                     [^]c.wchar_t,     /* Set this to load from the resource manager. */
@@ -87,14 +107,22 @@ sound_config :: struct {
 	initialAttachmentInputBusIndex: u32,              /* The index of the input bus of pInitialAttachment to attach the sound to. */
 	channelsIn:                     u32,              /* Ignored if using a data source as input (the data source's channel count will be used always). Otherwise, setting to 0 will cause the engine's channel count to be used. */
 	channelsOut:                    u32,              /* Set this to 0 (default) to use the engine's channel count. Set to MA_SOUND_SOURCE_CHANNEL_COUNT to use the data source's channel count (only used if using a data source as input). */
+	monoExpansionMode:              mono_expansion_mode, /* Controls how the mono channel should be expanded to other channels when spatialization is disabled on a sound. */
 	flags:                          u32,              /* A combination of MA_SOUND_FLAG_* flags. */
+	volumeSmoothTimeInPCMFrames:    u32,              /* The number of frames to smooth over volume changes. Defaults to 0 in which case no smoothing is used. */
 	initialSeekPointInPCMFrames:    u64,              /* Initializes the sound such that it's seeked to this location by default. */
 	rangeBegInPCMFrames:            u64,
 	rangeEndInPCMFrames:            u64,
 	loopPointBegInPCMFrames:        u64,
 	loopPointEndInPCMFrames:        u64,
 	isLooping:                      b32,
-	pDoneFence:                     ^fence,           /* Released when the resource manager has finished decoding the entire sound. Not used with streams. */
+
+	endCallback:          sound_end_proc, /* Fired when the sound reaches the end. Will be fired from the audio thread. Do not restart, uninitialize or otherwise change the state of the sound from here. Instead fire an event or set a variable to indicate to a different thread to change the start of the sound. Will not be fired in response to a scheduled stop with ma_sound_set_stop_time_*(). */
+	pEndCallbackUserData: rawptr,
+	
+	initNotifications: resource_manager_pipeline_notifications,
+
+	pDoneFence: ^fence, /* Deprecated. Use initNotifications instead. Released when the resource manager has finished decoding the entire sound. Not used with streams. */
 }
 
 sound :: struct {
@@ -102,6 +130,10 @@ sound :: struct {
 	pDataSource:    ^data_source,
 	seekTarget:     u64, /*atomic*/    /* The PCM frame index to seek to in the mixing thread. Set to (~(ma_uint64)0) to not perform any seeking. */
 	atEnd:          b32, /*atomic*/
+
+	endCallback:          sound_end_proc,
+	pEndCallbackUserData: rawptr,
+
 	ownsDataSource: b8,
 
 	/*
@@ -120,7 +152,9 @@ sound_inlined :: struct {
 
 @(default_calling_convention="c", link_prefix="ma_")
 foreign lib {
-	sound_config_init :: proc() -> sound_config ---
+	@(deprecated="Will be removed in 0.12. Use sound_config_init2() instead.")
+	sound_config_init  :: proc() -> sound_config ---
+	sound_config_init2 :: proc(pEngine: ^engine) -> sound_config --- /* Will be renamed to sound_config_init() in version 0.12. */
 
 	sound_init_from_file                     :: proc(pEngine: ^engine, pFilePath: cstring, flags: u32, pGroup: ^sound_group, pDoneFence: ^fence, pSound: ^sound) -> result ---
 	sound_init_from_file_w                   :: proc(pEngine: ^engine, pFilePath: [^]c.wchar_t, flags: u32, pGroup: ^sound_group, pDoneFence: ^fence, pSound: ^sound) -> result ---
@@ -132,6 +166,8 @@ foreign lib {
 	sound_get_data_source                    :: proc(pSound: ^sound) -> ^data_source ---
 	sound_start                              :: proc(pSound: ^sound) -> result ---
 	sound_stop                               :: proc(pSound: ^sound) -> result ---
+	sound_stop_with_fade_in_pcm_frames       :: proc(pSound: ^sound, fadeLengthInFrames: u64) --- /* Will overwrite any scheduled stop and fade. */
+	sound_stop_with_fade_in_milliseconds     :: proc(pSound: ^sound, fadeLengthInFrames: u64) --- /* Will overwrite any scheduled stop and fade. */
 	sound_set_volume                         :: proc(pSound: ^sound, volume: f32) ---
 	sound_get_volume                         :: proc(pSound: ^sound) -> f32 ---
 	sound_set_pan                            :: proc(pSound: ^sound, pan: f32) ---
@@ -174,13 +210,20 @@ foreign lib {
 	sound_get_directional_attenuation_factor :: proc(pSound: ^sound) -> f32 ---
 	sound_set_fade_in_pcm_frames             :: proc(pSound: ^sound, volumeBeg, volumeEnd: f32, fadeLengthInFrames: u64) ---
 	sound_set_fade_in_milliseconds           :: proc(pSound: ^sound, volumeBeg, volumeEnd: f32, fadeLengthInMilliseconds: u64) ---
+	sound_set_fade_start_in_pcm_frames       :: proc(pSound: ^sound, volumeBeg, volumeEnd: f32, fadeLengthInFrames, absoluteGlobalTimeInFrames: u64) ---
+	sound_set_fade_start_in_milliseconds     :: proc(pSound: ^sound, volumeBeg, volumeEnd: f32, fadeLengthInMilliseconds, absoluteGlobalTimeInMilliseconds: u64) ---
 	sound_get_current_fade_volume            :: proc(pSound: ^sound) -> f32 ---
 	sound_set_start_time_in_pcm_frames       :: proc(pSound: ^sound, absoluteGlobalTimeInFrames: u64) ---
 	sound_set_start_time_in_milliseconds     :: proc(pSound: ^sound, absoluteGlobalTimeInMilliseconds: u64) ---
 	sound_set_stop_time_in_pcm_frames        :: proc(pSound: ^sound, absoluteGlobalTimeInFrames: u64) ---
 	sound_set_stop_time_in_milliseconds      :: proc(pSound: ^sound, absoluteGlobalTimeInMilliseconds: u64) ---
+
+	sound_set_stop_time_with_fade_in_pcm_frames   :: proc(pSound: ^sound, stopAbsoluteGlobalTimeInFrames, fadeLengthInFrames: u64) ---
+	sound_set_stop_time_with_fade_in_milliseconds :: proc(pSound: ^sound, fadeAbsoluteGlobalTimeInMilliseconds, fadeLengthInMilliseconds: u64) ---
+
 	sound_is_playing                         :: proc(pSound: ^sound) -> b32 ---
 	sound_get_time_in_pcm_frames             :: proc(pSound: ^sound) -> u64 ---
+	sound_get_time_in_milliseconds           :: proc(pSound: ^sound) -> u64 ---
 	sound_set_looping                        :: proc(pSound: ^sound, isLooping: b32) ---
 	sound_is_looping                         :: proc(pSound: ^sound) -> b32 ---
 	sound_at_end                             :: proc(pSound: ^sound) -> b32 ---
@@ -190,6 +233,7 @@ foreign lib {
 	sound_get_length_in_pcm_frames           :: proc(pSound: ^sound, pLength: ^u64) -> result ---
 	sound_get_cursor_in_seconds              :: proc(pSound: ^sound, pCursor: ^f32) -> result ---
 	sound_get_length_in_seconds              :: proc(pSound: ^sound, pLength: ^f32) -> result ---
+	sound_set_end_callback                   :: proc(pSound: ^sound, callback: sound_end_proc, pUserData: rawptr) ---
 }
 
 
@@ -199,7 +243,9 @@ sound_group        :: distinct sound
 
 @(default_calling_convention="c", link_prefix="ma_")
 foreign lib {
-	sound_group_config_init :: proc() -> sound_group_config ---
+	@(deprecated="Will be removed in 0.12. Use sound_config_init2() instead.")
+	sound_group_config_init  :: proc() -> sound_group_config ---
+	sound_group_config_init2 :: proc(pEngine: ^engine) -> sound_group_config ---
 
 	sound_group_init                               :: proc(pEngine: ^engine, flags: u32, pParentGroup, pGroup: ^sound_group) -> result ---
 	sound_group_init_ex                            :: proc(pEngine: ^engine, pConfig: ^sound_group_config, pGroup: ^sound_group) -> result ---
@@ -258,12 +304,17 @@ foreign lib {
 	sound_group_get_time_in_pcm_frames             :: proc(pGroup: ^sound_group) -> u64 ---
 }
 
+engine_process_proc :: #type proc "c" (pUserData: rawptr, pFramesOut: [^]f32, frameCount: u64)
 
 engine_config :: struct {
 	pResourceManager:             ^resource_manager,      /* Can be null in which case a resource manager will be created for you. */
 	pContext:                     ^context_type,
 	pDevice:                      ^device,                /* If set, the caller is responsible for calling ma_engine_data_callback() in the device's data callback. */
 	pPlaybackDeviceID:            ^device_id,             /* The ID of the playback device to use with the default listener. */
+
+	dataCallback:         device_data_proc,               /* Can be null. Can be used to provide a custom device data callback. */
+	notificationCallback: device_notification_proc,
+
 	pLog:                         ^log,                   /* When set to NULL, will use the context's log. */
 	listenerCount:                u32,                    /* Must be between 1 and MA_ENGINE_MAX_LISTENERS. */
 	channels:                     u32,                    /* The number of channels to use when mixing and spatializing. When set to 0, will use the native channel count of the device. */
@@ -272,11 +323,16 @@ engine_config :: struct {
 	periodSizeInMilliseconds:     u32,                    /* Used if periodSizeInFrames is unset. */
 	gainSmoothTimeInFrames:       u32,                    /* The number of frames to interpolate the gain of spatialized sounds across. If set to 0, will use gainSmoothTimeInMilliseconds. */
 	gainSmoothTimeInMilliseconds: u32,                    /* When set to 0, gainSmoothTimeInFrames will be used. If both are set to 0, a default value will be used. */
+
+	defaultVolumeSmoothTimeInPCMFrames: u32,              /* Defaults to 0. Controls the default amount of smoothing to apply to volume changes to sounds. High values means more smoothing at the expense of high latency (will take longer to reach the new volume). */
+
 	allocationCallbacks:          allocation_callbacks,
 	noAutoStart:                  b32,                    /* When set to true, requires an explicit call to ma_engine_start(). This is false by default, meaning the engine will be started automatically in ma_engine_init(). */
 	noDevice:                     b32,                    /* When set to true, don't create a default device. ma_engine_read_pcm_frames() can be called manually to read data. */
 	monoExpansionMode:            mono_expansion_mode,    /* Controls how the mono channel should be expanded to other channels when spatialization is disabled on a sound. */
 	pResourceManagerVFS:          ^vfs,                   /* A pointer to a pre-allocated VFS object to use with the resource manager. This is ignored if pResourceManager is not NULL. */
+	onProcess:                    engine_process_proc,    /* Fired at the end of each call to ma_engine_read_pcm_frames(). For engine's that manage their own internal device (the default configuration), this will be fired from the audio thread, and you do not need to call ma_engine_read_pcm_frames() manually in order to trigger this. */
+	pProcessUserData:             rawptr,                 /* User data that's passed into onProcess. */
 }
 
 engine :: struct {
@@ -294,7 +350,12 @@ engine :: struct {
 	pInlinedSoundHead:      ^sound_inlined,               /* The first inlined sound. Inlined sounds are tracked in a linked list. */
 	inlinedSoundCount:      u32, /*atomic*/               /* The total number of allocated inlined sound objects. Used for debugging. */
 	gainSmoothTimeInFrames: u32,                          /* The number of frames to interpolate the gain of spatialized sounds across. */
-	monoExpansionMode:      mono_expansion_mode,
+
+	defaultVolumeSmoothTimeInPCMFrames: u32,
+
+	monoExpansionMode: mono_expansion_mode,
+	onProcess:         engine_process_proc,
+	pProcessUserData:  rawptr,
 }
 
 @(default_calling_convention="c", link_prefix="ma_")
@@ -309,15 +370,26 @@ foreign lib {
 	engine_get_device           :: proc(pEngine: ^engine) -> ^device ---
 	engine_get_log              :: proc(pEngine: ^engine) -> ^log ---
 	engine_get_endpoint         :: proc(pEngine: ^engine) -> ^node ---
-	engine_get_time             :: proc(pEngine: ^engine) -> u64 ---
-	engine_set_time             :: proc(pEngine: ^engine, globalTime: u64) -> result ---
+
+	engine_get_time_in_pcm_frames   :: proc(pEngine: ^engine) -> u64 ---
+	engine_get_time_in_milliseconds :: proc(pEngine: ^engine) -> u64 ---
+	engine_set_time_in_pcm_frames   :: proc(pEngine: ^engine, globalTime: u64) -> result --- 
+	engine_set_time_in_milliseconds :: proc(pEngine: ^engine, globalTime: u64) -> result --- 
+	
+	@(deprecated="Use engine_get_time_in_pcm_frames(). Will be removed in 0.12.")
+	engine_get_time :: proc(pEngine: ^engine) -> u64 ---
+	@(deprecated="Use engine_set_time_in_pcm_frames(). Will be removed in 0.12.")
+	engine_set_time :: proc(pEngine: ^engine, globalTime: u64) -> result ---
+
 	engine_get_channels         :: proc(pEngine: ^engine) -> u32 ---
 	engine_get_sample_rate      :: proc(pEngine: ^engine) -> u32 ---
 	
 	engine_start       :: proc(pEngine: ^engine) -> result ---
 	engine_stop        :: proc(pEngine: ^engine) -> result ---
 	engine_set_volume  :: proc(pEngine: ^engine, volume: f32) -> result ---
+	engine_get_volume  :: proc(pEngine: ^engine) -> f32 ---
 	engine_set_gain_db :: proc(pEngine: ^engine, gainDB: f32) -> result ---
+	engine_get_gain_db :: proc(pEngine: ^engine) -> f32 ---
 	
 	engine_get_listener_count     :: proc(pEngine: ^engine) -> u32 ---
 	engine_find_closest_listener  :: proc(pEngine: ^engine, absolutePosX, absolutePosY, absolutePosZ: f32) -> u32 ---
