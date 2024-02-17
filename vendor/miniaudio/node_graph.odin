@@ -44,7 +44,7 @@ node_vtable :: struct {
 	/*
 	Extended processing callback. This callback is used for effects that process input and output
 	at different rates (i.e. they perform resampling). This is similar to the simple version, only
-	they take two seperate frame counts: one for input, and one for output.
+	they take two separate frame counts: one for input, and one for output.
 
 	On input, `pFrameCountOut` is equal to the capacity of the output buffer for each bus, whereas
 	`pFrameCountIn` will be equal to the number of PCM frames in each of the buffers in `ppFramesIn`.
@@ -102,7 +102,7 @@ node_output_bus :: struct {
 	channels:       u8,                     /* The number of channels in the audio stream for this bus. */
 
 	/* Mutable via multiple threads. Must be used atomically. The weird ordering here is for packing reasons. */
-	inputNodeInputBusIndex: u8, /*atomic*/                  /* The index of the input bus on the input. Required for detaching. */
+	inputNodeInputBusIndex: u8,                             /* The index of the input bus on the input. Required for detaching. Will only be used in the spinlock so does not need to be atomic. */
 	flags:                  u32, /*atomic*/                 /* Some state flags for tracking the read state of the output buffer. A combination of MA_NODE_OUTPUT_BUS_FLAG_*. */
 	refCount:               u32, /*atomic*/                 /* Reference count for some thread-safety when detaching. */
 	isAttached:             b32, /*atomic*/                 /* This is used to prevent iteration of nodes that are in the middle of being detached. Used for thread safety. */
@@ -236,10 +236,11 @@ foreign lib {
 }
 
 
-/* Splitter Node. 1 input, 2 outputs. Used for splitting/copying a stream so it can be as input into two separate output nodes. */
+/* Splitter Node. 1 input, many outputs. Used for splitting/copying a stream so it can be as input into two separate output nodes. */
 splitter_node_config :: struct {
-	nodeConfig: node_config,
-	channels:   u32,
+	nodeConfig:     node_config,
+	channels:       u32,
+	outputBusCount: u32,
 }
 
 splitter_node :: struct {

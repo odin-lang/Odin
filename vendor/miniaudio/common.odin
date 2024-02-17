@@ -14,8 +14,37 @@ when ODIN_OS == .Windows {
 	foreign import lib "lib/miniaudio.a"
 }
 
-handle :: distinct rawptr
+BINDINGS_VERSION_MAJOR    :: 0
+BINDINGS_VERSION_MINOR    :: 11
+BINDINGS_VERSION_REVISION :: 21 
+BINDINGS_VERSION          :: [3]u32{BINDINGS_VERSION_MAJOR, BINDINGS_VERSION_MINOR, BINDINGS_VERSION_REVISION}
+BINDINGS_VERSION_STRING   :: "0.11.21"
 
+@(init)
+version_check :: proc() {
+	v: [3]u32
+	version(&v.x, &v.y, &v.z)
+	if v != BINDINGS_VERSION {
+		buf: [1024]byte
+		n := copy(buf[:],  "miniaudio version mismatch: ")
+		n += copy(buf[n:], "bindings are for version ")
+		n += copy(buf[n:], BINDINGS_VERSION_STRING)
+		n += copy(buf[n:], ", but version ")
+		n += copy(buf[n:], string(version_string()))
+		n += copy(buf[n:], " is linked, make sure to compile the correct miniaudio version by going to `vendor/miniaudio/src` ")
+
+		when ODIN_OS == .Windows {
+			n += copy(buf[n:], "and executing `build.bat`")
+		} else {
+			n += copy(buf[n:], "and executing `make`")
+		}
+
+		panic(string(buf[:n]))
+	}
+}
+
+
+handle :: distinct rawptr
 
 /* SIMD alignment in bytes. Currently set to 32 bytes in preparation for future AVX optimizations. */
 SIMD_ALIGNMENT :: 32
@@ -141,28 +170,32 @@ result :: enum c.int {
 	CANCELLED                                   = -51,
 	MEMORY_ALREADY_MAPPED                       = -52,
 
+	/* General non-standard errors. */
+	CRC_MISMATCH                                = -100,
+
 	/* General miniaudio-specific errors. */
-	FORMAT_NOT_SUPPORTED                        = -100,
-	DEVICE_TYPE_NOT_SUPPORTED                   = -101,
-	SHARE_MODE_NOT_SUPPORTED                    = -102,
-	NO_BACKEND                                  = -103,
-	NO_DEVICE                                   = -104,
-	API_NOT_FOUND                               = -105,
-	INVALID_DEVICE_CONFIG                       = -106,
-	LOOP                                        = -107,
+	FORMAT_NOT_SUPPORTED                        = -200,
+	DEVICE_TYPE_NOT_SUPPORTED                   = -201,
+	SHARE_MODE_NOT_SUPPORTED                    = -202,
+	NO_BACKEND                                  = -203,
+	NO_DEVICE                                   = -204,
+	API_NOT_FOUND                               = -205,
+	INVALID_DEVICE_CONFIG                       = -206,
+	LOOP                                        = -207,
+	BACKEND_NOT_ENABLED                         = -208,
 
 	/* State errors. */
-	DEVICE_NOT_INITIALIZED                      = -200,
-	DEVICE_ALREADY_INITIALIZED                  = -201,
-	DEVICE_NOT_STARTED                          = -202,
-	DEVICE_NOT_STOPPED                          = -203,
+	DEVICE_NOT_INITIALIZED                      = -300,
+	DEVICE_ALREADY_INITIALIZED                  = -301,
+	DEVICE_NOT_STARTED                          = -302,
+	DEVICE_NOT_STOPPED                          = -303,
 
 	/* Operation errors. */
-	FAILED_TO_INIT_BACKEND                      = -300,
-	FAILED_TO_OPEN_BACKEND_DEVICE               = -301,
-	FAILED_TO_START_BACKEND_DEVICE              = -302,
-	FAILED_TO_STOP_BACKEND_DEVICE               = -303,
-} 
+	FAILED_TO_INIT_BACKEND                      = -400,
+	FAILED_TO_OPEN_BACKEND_DEVICE               = -401,
+	FAILED_TO_START_BACKEND_DEVICE              = -402,
+	FAILED_TO_STOP_BACKEND_DEVICE               = -403,
+}
 
 
 MIN_CHANNELS :: 1
@@ -214,7 +247,7 @@ standard_sample_rate :: enum u32 {
 	rate_192000 = 192000,
 
 	rate_16000  = 16000,     /* Extreme lows */
-	rate_11025  = 11250,
+	rate_11025  = 11025,
 	rate_8000   = 8000,
 
 	rate_352800 = 352800,    /* Extreme highs */
@@ -229,7 +262,7 @@ standard_sample_rate :: enum u32 {
 channel_mix_mode :: enum c.int {
 	rectangular = 0,   /* Simple averaging based on the plane(s) the channel is sitting on. */
 	simple,            /* Drop excess channels; zeroed out extra channels. */
-	custom_weights,    /* Use custom weights specified in ma_channel_router_config. */
+	custom_weights,    /* Use custom weights specified in ma_channel_converter_config. */
 	default = rectangular,
 }
 
