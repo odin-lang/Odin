@@ -123,8 +123,8 @@ foreign user32 {
 	TrackPopupMenu :: proc(hMenu: HMENU, uFlags: UINT, x: c_int, y: c_int, nReserved: c_int, hWnd: HWND, prcRect: ^RECT) -> i32 ---
 	RegisterWindowMessageW :: proc(lpString: LPCWSTR) -> UINT ---
 
-	InsertMenuItemW :: proc(hmenu: HMENU,item: UINT,fByPosition: BOOL,lpmi: LPMENUITEMINFOW) -> BOOL ---
-	GetMenuItemInfoW :: proc(hmenu: HMENU, item: UINT,  fByPosition: BOOL,lpmii: LPMENUITEMINFOW) -> BOOL ---
+	InsertMenuItemW :: proc(hmenu: HMENU, item: UINT, fByPosition: BOOL, lpmi: LPMENUITEMINFOW) -> BOOL ---
+	GetMenuItemInfoW :: proc(hmenu: HMENU, item: UINT, fByPosition: BOOL, lpmii: LPMENUITEMINFOW) -> BOOL ---
 	SetMenuItemInfoW :: proc(hmenu: HMENU, item: UINT, fByPositon: BOOL, lpmii: LPMENUITEMINFOW) -> BOOL ---
 	GetMenuDefaultItem :: proc(hMenu: HMENU, fByPos: UINT, gmdiFlags: UINT) -> UINT ---
 	SetMenuDefaultItem :: proc(hMenu: HMENU, uItem: UINT, fByPos: UINT) -> BOOL ---
