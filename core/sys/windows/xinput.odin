@@ -27,18 +27,18 @@ XINPUT_DEVSUBTYPE :: enum BYTE {
 
 // Flags for XINPUT_CAPABILITIES
 // Correspond to log2(XINPUT_CAPS_...)
-XINPUT_CAP :: enum {
+XINPUT_CAP :: enum WORD {
 	FFB_SUPPORTED   = 0,
 	WIRELESS        = 1,
 	VOICE_SUPPORTED = 2,
 	PMD_SUPPORTED   = 3,
 	NO_NAVIGATION   = 4,
 }
-XINPUT_CAPS :: bit_set[XINPUT_CAP;WORD]
+XINPUT_CAPS :: distinct bit_set[XINPUT_CAP;WORD]
 
 // Constants for gamepad buttons
 // Correspond to log2(XINPUT_GAMEPAD_...)
-XINPUT_GAMEPAD_BUTTON_BIT :: enum {
+XINPUT_GAMEPAD_BUTTON_BIT :: enum WORD {
 	DPAD_UP        = 0,
 	DPAD_DOWN      = 1,
 	DPAD_LEFT      = 2,
@@ -54,7 +54,7 @@ XINPUT_GAMEPAD_BUTTON_BIT :: enum {
 	X              = 14,
 	Y              = 15,
 }
-XINPUT_GAMEPAD_BUTTON :: bit_set[XINPUT_GAMEPAD_BUTTON_BIT;WORD]
+XINPUT_GAMEPAD_BUTTON :: distinct bit_set[XINPUT_GAMEPAD_BUTTON_BIT;WORD]
 
 // Gamepad thresholds
 XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE: SHORT : 7849
@@ -63,10 +63,10 @@ XINPUT_GAMEPAD_TRIGGER_THRESHOLD: SHORT : 30
 
 // Flags to pass to XInputGetCapabilities
 // Corresponds to log2(XINPUT_FLAG_...)
-XINPUT_FLAG_BIT :: enum {
+XINPUT_FLAG_BIT :: enum WORD {
 	GAMEPAD = 0,
 }
-XINPUT_FLAG :: bit_set[XINPUT_FLAG_BIT;DWORD]
+XINPUT_FLAG :: distinct bit_set[XINPUT_FLAG_BIT;DWORD]
 
 // Devices that support batteries
 // Corresponds to BATTERY_DEVTYPE_...
@@ -147,12 +147,12 @@ VK_PAD :: enum WORD {
 
 // Flags used in XINPUT_KEYSTROKE
 // Correspond to log2(XINPUT_KEYSTROKE_...)
-XINPUT_KEYSTROKE_BIT :: enum {
+XINPUT_KEYSTROKE_BIT :: enum WORD {
 	KEYDOWN = 0,
 	KEYUP   = 1,
 	REPEAT  = 2,
 }
-XINPUT_KEYSTROKES :: bit_set[XINPUT_KEYSTROKE_BIT;WORD]
+XINPUT_KEYSTROKES :: distinct bit_set[XINPUT_KEYSTROKE_BIT;WORD]
 
 // Structures used by XInput APIs
 XINPUT_GAMEPAD :: struct {
@@ -199,29 +199,12 @@ XINPUT_KEYSTROKE :: struct {
 // XInput APIs
 @(default_calling_convention = "system")
 foreign xinput {
-
-	@(link_name = "XInputGetState")
 	XInputGetState :: proc(user: XUSER, pState: ^XINPUT_STATE) -> System_Error ---
-
-	@(link_name = "XInputSetState")
 	XInputSetState :: proc(user: XUSER, pVibration: ^XINPUT_VIBRATION) -> System_Error ---
-
-	@(link_name = "XInputGetCapabilities")
 	XInputGetCapabilities :: proc(user: XUSER, dwFlags: XINPUT_FLAG, pCapabilities: ^XINPUT_CAPABILITIES) -> System_Error ---
-
-	@(link_name = "XInputEnable")
 	XInputEnable :: proc(enable: BOOL) ---
-
-	@(link_name = "XInputGetAudioDeviceIds")
 	XInputGetAudioDeviceIds :: proc(user: XUSER, pRenderDeviceId: LPWSTR, pRenderCount: ^UINT, pCaptureDeviceId: LPWSTR, pCaptureCount: ^UINT) -> System_Error ---
-
-	@(link_name = "XInputGetBatteryInformation")
 	XInputGetBatteryInformation :: proc(user: XUSER, devType: BATTERY_DEVTYPE, pBatteryInformation: ^XINPUT_BATTERY_INFORMATION) -> System_Error ---
-
-	@(link_name = "XInputGetKeystroke")
 	XInputGetKeystroke :: proc(user: XUSER, dwReserved: DWORD, pKeystroke: ^XINPUT_KEYSTROKE) -> System_Error ---
-
-	@(link_name = "XInputGetDSoundAudioDeviceGuids")
 	XInputGetDSoundAudioDeviceGuids :: proc(user: XUSER, pDSoundRenderGuid: ^GUID, pDSoundCaptureGuid: ^GUID) -> System_Error ---
-
 }
