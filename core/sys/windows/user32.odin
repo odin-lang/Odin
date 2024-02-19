@@ -119,8 +119,15 @@ foreign user32 {
 	CreatePopupMenu :: proc() -> HMENU ---
 	DestroyMenu :: proc(hMenu: HMENU) -> BOOL ---
 	AppendMenuW :: proc(hMenu: HMENU, uFlags: UINT, uIDNewItem: UINT_PTR, lpNewItem: LPCWSTR) -> BOOL ---
-	TrackPopupMenu :: proc(hMenu: HMENU, uFlags: UINT, x: int, y: int, nReserved: int, hWnd: HWND, prcRect: ^RECT) -> i32 ---
+	TrackPopupMenu :: proc(hMenu: HMENU, uFlags: UINT, x: c_int, y: c_int, nReserved: c_int, hWnd: HWND, prcRect: ^RECT) -> i32 ---
 	RegisterWindowMessageW :: proc(lpString: LPCWSTR) -> UINT ---
+
+	InsertMenuItemW :: proc(hmenu: HMENU,item: UINT,fByPosition: BOOL,lpmi: LPCMENUITEMINFOW) -> BOOL ---
+	GetMenuItemInfoW :: proc(hmenu: HMENU, item: UINT,  fByPosition: BOOL,lpmii: LPMENUITEMINFOW) -> BOOL ---
+	SetMenuItemInfoW :: proc(hmenu: HMENU, item: UINT, fByPositon: BOOL, lpmii: LPCMENUITEMINFOW) -> BOOL ---
+	GetMenuDefaultItem :: proc(hMenu: HMENU, fByPos: UINT, gmdiFlags: UINT) -> UINT ---
+	SetMenuDefaultItem :: proc(hMenu: HMENU, uItem: UINT, fByPos: UINT) -> BOOL ---
+	GetMenuItemRect :: proc(hWnd: HWND, hMenu: HMENU, uItem: UINT, lprcItem: LPRECT) -> c_int ---
 
 	GetUpdateRect :: proc(hWnd: HWND, lpRect: LPRECT, bErase: BOOL) -> BOOL ---
 	ValidateRect :: proc(hWnd: HWND, lpRect: ^RECT) -> BOOL ---
@@ -492,3 +499,31 @@ WINDOWINFO :: struct {
 	wCreatorVersion: WORD,
 }
 PWINDOWINFO :: ^WINDOWINFO
+
+MIIM_STATE      :: 0x00000001
+MIIM_ID         :: 0x00000002
+MIIM_SUBMENU    :: 0x00000004
+MIIM_CHECKMARKS :: 0x00000008
+MIIM_TYPE       :: 0x00000010
+MIIM_DATA       :: 0x00000020
+
+MIIM_STRING :: 0x00000040
+MIIM_BITMAP :: 0x00000080
+MIIM_FTYPE  :: 0x00000100
+
+MENUITEMINFOW :: struct
+{
+    cbSize: UINT,
+    fMask: UINT,
+    fType: UINT,         // used if MIIM_TYPE (4.0) or MIIM_FTYPE (>4.0)
+    fState: UINT,        // used if MIIM_STATE
+    wID: UINT,           // used if MIIM_ID
+    hSubMenu: HMENU,      // used if MIIM_SUBMENU
+    hbmpChecked: HBITMAP,   // used if MIIM_CHECKMARKS
+    hbmpUnchecked: HBITMAP, // used if MIIM_CHECKMARKS
+    dwItemData: ULONG_PTR,   // used if MIIM_DATA
+    dwTypeData: LPWSTR,    // used if MIIM_TYPE (4.0) or MIIM_STRING (>4.0)
+    cch: UINT,           // used if MIIM_TYPE (4.0) or MIIM_STRING (>4.0)
+    hbmpItem: HBITMAP,      // used if MIIM_BITMAP
+}
+LPMENUITEMINFOW :: ^MENUITEMINFOW
