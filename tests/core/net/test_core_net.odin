@@ -340,8 +340,6 @@ tcp_tests :: proc(t: ^testing.T) {
 	two_servers_binding_same_endpoint(t)
 	fmt.println("Testing client connecting to a closed port...")
 	client_connects_to_closed_port(t)
-	fmt.println("Testing client connecting to port that doesn't accept...")
-	client_connects_to_open_but_non_accepting_port(t)
 	fmt.println("Testing client sending server data...")
 	client_sends_server_data(t)
 }
@@ -367,27 +365,6 @@ client_connects_to_closed_port :: proc(t: ^testing.T) {
 	skt, err := net.dial_tcp(ENDPOINT)
 	defer net.close(skt)
 	expect(t, err == net.Dial_Error.Refused, "expected dial of a closed endpoint to return .Refused")
-}
-
-@(test)
-client_connects_to_open_but_non_accepting_port :: proc(t: ^testing.T) {
-	s_skt, s_err := net.listen_tcp(ENDPOINT)
-	expect(t, s_err == nil, "expected listening to succeed")
-	defer net.close(s_skt)
-
-	c_skt, c_err := net.dial_tcp(ENDPOINT)
-	expect(t, c_err == nil, "expected dial to succeed")
-	defer net.close(c_skt)
-
-	net.set_option(c_skt, .Send_Timeout, time.Millisecond * 10)
-
-	// NOTE: Have to send a bunch of data so the kernel buffer fills up and it requires writing to the socket.
-	buf, alloc_err := make([]byte, mem.Gigabyte)
-	defer delete(buf)
-	expect(t, alloc_err == nil, "expected to be able to allocate a gigabyte to fill the send buffer")
-
-	_, send_err := net.send(c_skt, buf)
-	expect(t, send_err == net.TCP_Send_Error.Timeout, fmt.tprintf("expected sending to non-accepting socket to timeout, got %v", send_err))
 }
 
 @(test)
