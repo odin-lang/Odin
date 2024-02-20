@@ -375,6 +375,7 @@ client_sends_server_data :: proc(t: ^testing.T) {
 	RECV_TIMEOUT :: time.Duration(1 * time.Second)
 
 	Thread_Data :: struct {
+		t: ^testing.T,
 		skt: net.Any_Socket,
 		err: net.Network_Error,
 		tid: ^thread.Thread,
@@ -384,58 +385,84 @@ client_sends_server_data :: proc(t: ^testing.T) {
 		wg:     ^sync.Wait_Group,
 	}
 
-	thread_data := [2]Thread_Data{}
-
-	wg: sync.Wait_Group
-	thread_data[0].wg = &wg
-	thread_data[1].wg = &wg
-
 	tcp_client :: proc(thread_data: rawptr) {
 		r := transmute(^Thread_Data)thread_data
+
+		log(r.t, "tcp_client entry")
+		defer log(r.t, "tcp_client exit")
+
 		defer sync.wait_group_done(r.wg)
 
+		log(r.t, "tcp_client dial")
 		if r.skt, r.err = net.dial_tcp(ENDPOINT); r.err != nil {
+			log(r.t, r.err)
 			return
 		}
 
 		net.set_option(r.skt, .Send_Timeout, SEND_TIMEOUT)
 
+		log(r.t, "tcp_client send")
 		_, r.err = net.send(r.skt, transmute([]byte)CONTENT)
 	}
 
 	tcp_server :: proc(thread_data: rawptr) {
 		r := transmute(^Thread_Data)thread_data
+
+		log(r.t, "tcp_server entry")
+		defer log(r.t, "tcp_server exit")
+
 		defer sync.wait_group_done(r.wg)
 
+		log(r.t, "tcp_server listen")
 		if r.skt, r.err = net.listen_tcp(ENDPOINT); r.err != nil {
+			log(r.t, r.err)
 			return
 		}
 
+		log(r.t, "tcp_server accept")
 		client: net.TCP_Socket
 		if client, _, r.err = net.accept_tcp(r.skt.(net.TCP_Socket)); r.err != nil {
+			log(r.t, r.err)
 			return
 		}
 		defer net.close(client)
 
 		net.set_option(client, .Receive_Timeout, RECV_TIMEOUT)
 
+		log(r.t, "tcp_server recv")
 		r.length, r.err = net.recv_tcp(client, r.data[:])
 		return
 	}
 	
+	thread_data := [2]Thread_Data{}
+
+	wg: sync.Wait_Group
+
 	sync.wait_group_add(&wg, 2)
+
+	thread_data[0].t = t
+	thread_data[0].wg = &wg
 	thread_data[0].tid = thread.create_and_start_with_data(&thread_data[0], tcp_server, context)
+
+	thread_data[1].t = t
+	thread_data[1].wg = &wg
 	thread_data[1].tid = thread.create_and_start_with_data(&thread_data[1], tcp_client, context)
 
 	defer {
+		log(t, "closing server socket")
 		net.close(thread_data[0].skt)
+		log(t, "destroying server thread")
 		thread.destroy(thread_data[0].tid)
 
+		log(t, "closing client socket")
 		net.close(thread_data[1].skt)
+		log(t, "destroying client thread")
 		thread.destroy(thread_data[1].tid)
 	}
 
+	log(t, "waiting for threads to finish")
 	sync.wait_group_wait(&wg)
+	log(t, "threads finished")
 
 	okay := thread_data[0].err == nil && thread_data[1].err == nil
 	msg  := fmt.tprintf("Expected client and server to return `nil`, got %v and %v", thread_data[0].err, thread_data[1].err)
