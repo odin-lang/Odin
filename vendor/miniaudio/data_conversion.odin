@@ -68,7 +68,7 @@ resampling_backend_vtable :: struct {
 	onReset:                       proc "c" (pUserData: rawptr, pBackend: ^resampling_backend) -> result,
 }
 
-resample_algorithm :: enum {
+resample_algorithm :: enum c.int {
 	linear = 0,   /* Fastest, lowest quality. Optional low-pass filtering. Default. */
 	custom,
 }
@@ -138,7 +138,7 @@ foreign lib {
 	/*
 	Converts the given input data.
 
-	Both the input and output frames must be in the format specified in the config when the resampler was initilized.
+	Both the input and output frames must be in the format specified in the config when the resampler was initialized.
 
 	On input, [pFrameCountOut] contains the number of output frames to process. On output it contains the number of output frames that
 	were actually processed, which may be less than the requested amount which will happen if there's not enough input data. You can use
@@ -161,7 +161,7 @@ foreign lib {
 
 
 	/*
-	Sets the input and output sample sample rate.
+	Sets the input and output sample rate.
 	*/
 	resampler_set_rate :: proc(pResampler: ^resampler, sampleRateIn, sampleRateOut: u32) -> result ---
 
@@ -226,13 +226,14 @@ mono_expansion_mode :: enum c.int {
 }
 
 channel_converter_config :: struct {
-	format:         format,
-	channelsIn:     u32,
-	channelsOut:    u32,
-	pChannelMapIn:  [^]channel,
-	pChannelMapOut: [^]channel,
-	mixingMode:     channel_mix_mode,
-	ppWeights:      ^[^]f32,  /* [in][out]. Only used when mixingMode is set to ma_channel_mix_mode_custom_weights. */
+	format:                          format,
+	channelsIn:                      u32,
+	channelsOut:                     u32,
+	pChannelMapIn:                   [^]channel,
+	pChannelMapOut:                  [^]channel,
+	mixingMode:                      channel_mix_mode,
+	calculateLFEFromSpatialChannels: b32, /* When an output LFE channel is present, but no input LFE, set to true to set the output LFE to the average of all spatial channels (LR, FR, etc.). Ignored when an input LFE is present. */
+	ppWeights:                       ^[^]f32, /* [in][out]. Only used when mixingMode is set to ma_channel_mix_mode_custom_weights. */
 }
 
 channel_converter :: struct {
@@ -275,19 +276,20 @@ Data Conversion
 
 **************************************************************************************************************************************************************/
 data_converter_config :: struct {
-	formatIn:               format,
-	formatOut:              format,
-	channelsIn:             u32,
-	channelsOut:            u32,
-	sampleRateIn:           u32,
-	sampleRateOut:          u32,
-	pChannelMapIn:          [^]channel,
-	pChannelMapOut:         [^]channel,
-	ditherMode:             dither_mode,
-	channelMixMode:         channel_mix_mode,
-	ppChannelWeights:       ^[^]f32, /* [in][out]. Only used when channelMixMode is set to ma_channel_mix_mode_custom_weights. */
-	allowDynamicSampleRate: b32,
-	resampling:             resampler_config,
+	formatIn:                        format,
+	formatOut:                       format,
+	channelsIn:                      u32,
+	channelsOut:                     u32,
+	sampleRateIn:                    u32,
+	sampleRateOut:                   u32,
+	pChannelMapIn:                   [^]channel,
+	pChannelMapOut:                  [^]channel,
+	ditherMode:                      dither_mode,
+	channelMixMode:                  channel_mix_mode,
+	calculateLFEFromSpatialChannels: b32, /* When an output LFE channel is present, but no input LFE, set to true to set the output LFE to the average of all spatial channels (LR, FR, etc.). Ignored when an input LFE is present. */
+	ppChannelWeights:                ^[^]f32, /* [in][out]. Only used when channelMixMode is set to ma_channel_mix_mode_custom_weights. */
+	allowDynamicSampleRate:          b32,
+	resampling:                      resampler_config,
 }
 
 data_converter_execution_path :: enum c.int {
@@ -471,6 +473,28 @@ foreign lib {
 	The channel map buffer must have a capacity of at least `channels`.
 	*/
 	channel_map_contains_channel_position :: proc(channels: u32, pChannelMap: [^]channel, channelPosition: channel) -> b32 ---
+
+	/*
+	Find a channel position in the given channel map. Returns MA_TRUE if the channel is found; MA_FALSE otherwise. The
+	index of the channel is output to `pChannelIndex`.
+	
+	The channel map buffer must have a capacity of at least `channels`.
+	*/
+	channel_map_find_channel_position :: proc(channels: u32, pChannelMap: [^]channel, channelPosition: channel, pChannelIndex: ^u32) -> b32 ---
+
+	/*
+	Generates a string representing the given channel map.
+	
+	This is for printing and debugging purposes, not serialization/deserialization.
+	
+	Returns the length of the string, not including the null terminator.
+	*/
+	channel_map_to_string :: proc(pChannelMap: [^]channel, channels: u32, pBufferOut: [^]u8, bufferCap: uint) -> uint ---
+	
+	/*
+	Retrieves a human readable version of a channel position.
+	*/
+	channel_position_to_string :: proc(channel: channel) -> cstring ---
 }
 
 
@@ -514,9 +538,11 @@ rb :: struct {
 }
 
 pcm_rb :: struct {
-	rb:       rb,
-	format:   format,
-	channels: u32,
+	ds:         data_source_base,
+	rb:         rb,
+	format:     format,
+	channels:   u32,
+	sampleRate: u32, /* Not required for the ring buffer itself, but useful for associating the data with some sample rate, particularly for data sources. */
 }
 
 @(default_calling_convention="c", link_prefix="ma_")
@@ -556,6 +582,10 @@ foreign lib {
 	pcm_rb_get_subbuffer_stride :: proc(pRB: ^pcm_rb) -> u32 ---
 	pcm_rb_get_subbuffer_offset :: proc(pRB: ^pcm_rb, subbufferIndex: u32) -> u32 ---
 	pcm_rb_get_subbuffer_ptr    :: proc(pRB: ^pcm_rb, subbufferIndex: u32, pBuffer: rawptr) -> rawptr ---
+	pcm_rb_get_format           :: proc(pRB: ^pcm_rb) -> format ---
+	pcm_rb_get_channels         :: proc(pRB: ^pcm_rb) -> u32 ---
+	pcm_rb_get_sample_rate      :: proc(pRB: ^pcm_rb) -> u32 ---
+	pcm_rb_set_sample_rate      :: proc(pRB: ^pcm_rb, sampleRate: u32) ---
 }
 
 /*

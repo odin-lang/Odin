@@ -944,8 +944,8 @@ Socket_Type :: enum {
 	Bits for Socket_FD_Flags
 */
 Socket_FD_Flags_Bits :: enum {
-	NONBLOCK  = 14,
-	CLOEXEC   = 25,
+	NONBLOCK  = 11,
+	CLOEXEC   = 19,
 }
 
 /*

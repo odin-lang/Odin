@@ -1,6 +1,6 @@
 package miniaudio
 
-import c "core:c/libc"
+import "core:c"
 
 when ODIN_OS == .Windows {
 	foreign import lib "lib/miniaudio.lib"
@@ -24,7 +24,7 @@ delay_config :: struct {
 delay :: struct {
 	config: delay_config,
 	cursor: u32,               /* Feedback is written to this cursor. Always equal or in front of the read cursor. */
-	bufferSizeInFrames: u32,   /* The maximum of config.startDelayInFrames and config.feedbackDelayInFrames. */
+	bufferSizeInFrames: u32,
 	pBuffer: [^]f32,
 }
 
@@ -51,10 +51,11 @@ gainer_config :: struct {
 }
 
 gainer :: struct {
-	config:    gainer_config,
-	t:         u32,
-	pOldGains: [^]f32,
-	pNewGains: [^]f32,
+	config:       gainer_config,
+	t:            u32,
+	masterVolume: f32,
+	pOldGains:    [^]f32,
+	pNewGains:    [^]f32,
 
 	/* Memory management. */
 	_pHeap:    rawptr,
@@ -72,6 +73,8 @@ foreign lib {
 	gainer_process_pcm_frames :: proc(pGainer: ^gainer, pFramesOut: rawptr, pFramesIn: rawptr, frameCount: u64) -> result ---
 	gainer_set_gain           :: proc(pGainer: ^gainer, newGain: f32) -> result ---
 	gainer_set_gains          :: proc(pGainer: ^gainer, pNewGains: [^]f32) -> result ---
+	gainer_set_master_volume  :: proc(pGainer: ^gainer, volume: f32) -> result ---
+	gainer_get_master_volume  :: proc(pGainer: ^gainer, volume: ^f32) -> result --- 
 }
 
 
@@ -120,7 +123,7 @@ fader :: struct {
 	volumeBeg:      f32,    /* If volumeBeg and volumeEnd is equal to 1, no fading happens (ma_fader_process_pcm_frames() will run as a passthrough). */
 	volumeEnd:      f32,
 	lengthInFrames: u64,    /* The total length of the fade. */
-	cursorInFrames: u64,    /* The current time in frames. Incremented by ma_fader_process_pcm_frames(). */
+	cursorInFrames: i64,    /* The current time in frames. Incremented by ma_fader_process_pcm_frames(). Signed because it'll be offset by startOffsetInFrames in set_fade_ex(). */
 }
 
 @(default_calling_convention="c", link_prefix="ma_")
@@ -131,6 +134,7 @@ foreign lib {
 	fader_process_pcm_frames :: proc(pFader: ^fader, pFramesOut, pFramesIn: rawptr, frameCount: u64) -> result ---
 	fader_get_data_format    :: proc(pFader: ^fader, pFormat: ^format, pChannels, pSampleRate: ^u32) ---
 	fader_set_fade           :: proc(pFader: ^fader, volumeBeg, volumeEnd: f32, lengthInFrames: u64) ---
+	fader_set_fade_ex        :: proc(pFader: ^fader, volumeBeg, volumeEnd: f32, lengthInFrames: u64, startOffsetInFrames: i64) ---
 	fader_get_current_volume :: proc(pFader: ^fader) -> f32 ---
 }
 
@@ -140,6 +144,11 @@ vec3f :: struct {
 	x: f32,
 	y: f32,
 	z: f32,
+}
+
+atomic_vec3f :: struct {
+	v:    vec3f,
+	lock: spinlock,
 }
 
 attenuation_model :: enum c.int {
@@ -172,9 +181,9 @@ spatializer_listener_config :: struct {
 
 spatializer_listener :: struct {
 		config:    spatializer_listener_config,
-		position:  vec3f,  /* The absolute position of the listener. */
-		direction: vec3f,  /* The direction the listener is facing. The world up vector is config.worldUp. */
-		velocity:  vec3f,
+		position:  atomic_vec3f,  /* The absolute position of the listener. */
+		direction: atomic_vec3f,  /* The direction the listener is facing. The world up vector is config.worldUp. */
+		velocity:  atomic_vec3f,
 		isEnabled: b32,
 
 		/* Memory management. */
@@ -224,6 +233,7 @@ spatializer_config :: struct {
 	coneOuterGain:                f32,
 	dopplerFactor:                f32,    /* Set to 0 to disable doppler effect. */
 	directionalAttenuationFactor: f32,    /* Set to 0 to disable directional attenuation. */
+	minSpatializationChannelGain: f32,    /* The minimal scaling factor to apply to channel gains when accounting for the direction of the sound relative to the listener. Must be in the range of 0..1. Smaller values means more aggressive directional panning, larger values means more subtle directional panning. */
 	gainSmoothTimeInFrames:       u32,    /* When the gain of a channel changes during spatialization, the transition will be linearly interpolated over this number of frames. */
 }
 
@@ -245,10 +255,11 @@ spatializer :: struct {
 		dopplerFactor:                f32,      /* Set to 0 to disable doppler effect. */
 		directionalAttenuationFactor: f32,      /* Set to 0 to disable directional attenuation. */
 		gainSmoothTimeInFrames:       u32,      /* When the gain of a channel changes during spatialization, the transition will be linearly interpolated over this number of frames. */
-		position:                     vec3f,
-		direction:                    vec3f,
-		velocity:                     vec3f,    /* For doppler effect. */
+		position:                     atomic_vec3f,
+		direction:                    atomic_vec3f,
+		velocity:                     atomic_vec3f,    /* For doppler effect. */
 		dopplerPitch:                 f32,      /* Will be updated by ma_spatializer_process_pcm_frames() and can be used by higher level functions to apply a pitch shift for doppler effect. */
+		minSpatializationChannelGain: f32,
 		gainer:                       gainer,   /* For smooth gain transitions. */
 		pNewChannelGainsOut:          [^]f32,     /* An offset of _pHeap. Used by ma_spatializer_process_pcm_frames() to store new channel gains. The number of elements in this array is equal to config.channelsOut. */
 
@@ -266,6 +277,8 @@ foreign lib {
 	spatializer_init                                :: proc(pConfig: ^spatializer_config, pAllocationCallbacks: ^allocation_callbacks, pSpatializer: ^spatializer) -> result ---
 	spatializer_uninit                              :: proc(pSpatializer: ^spatializer, pAllocationCallbacks: ^allocation_callbacks) ---
 	spatializer_process_pcm_frames                  :: proc(pSpatializer: ^spatializer, pListener: ^spatializer_listener, pFramesOut, pFramesIn: rawptr, frameCount: u64) -> result ---
+	spatializer_set_master_volume                   :: proc(pSpatializer: ^spatializer, volume: f32) -> result ---
+	spatializer_get_master_volume                   :: proc(pSpatializer: ^spatializer, pVolume: ^f32) -> result ---
 	spatializer_get_input_channels                  :: proc(pSpatializer: ^spatializer) -> u32 ---
 	spatializer_get_output_channels                 :: proc(pSpatializer: ^spatializer) -> u32 ---
 	spatializer_set_attenuation_model               :: proc(pSpatializer: ^spatializer, attenuationModel: attenuation_model) ---

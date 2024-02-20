@@ -17,42 +17,42 @@ PTHREAD_RWLOCKATTR_SIZE :: 16
 
 pthread_t :: distinct u64
 
-pthread_attr_t :: struct #align(16) {
+pthread_attr_t :: struct {
 	sig: c.long,
 	_: [PTHREAD_ATTR_SIZE] c.char,
 }
 
-pthread_cond_t :: struct #align(16) {
+pthread_cond_t :: struct {
 	sig: c.long,
 	_: [PTHREAD_COND_SIZE] c.char,
 }
 
-pthread_condattr_t :: struct #align(16) {
+pthread_condattr_t :: struct {
 	sig: c.long,
 	_: [PTHREAD_CONDATTR_SIZE] c.char,
 }
 
-pthread_mutex_t :: struct #align(16) {
+pthread_mutex_t :: struct {
 	sig: c.long,
 	_: [PTHREAD_MUTEX_SIZE] c.char,
 }
 
-pthread_mutexattr_t :: struct #align(16) {
+pthread_mutexattr_t :: struct {
 	sig: c.long,
 	_: [PTHREAD_MUTEXATTR_SIZE] c.char,
 }
 
-pthread_once_t :: struct #align(16) {
+pthread_once_t :: struct {
 	sig: c.long,
 	_: [PTHREAD_ONCE_SIZE] c.char,
 }
 
-pthread_rwlock_t :: struct #align(16) {
+pthread_rwlock_t :: struct {
 	sig: c.long,
 	_: [PTHREAD_RWLOCK_SIZE] c.char,
 }
 
-pthread_rwlockattr_t :: struct #align(16) {
+pthread_rwlockattr_t :: struct {
 	sig: c.long,
 	_: [PTHREAD_RWLOCKATTR_SIZE] c.char,
 }
