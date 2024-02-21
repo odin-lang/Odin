@@ -170,7 +170,7 @@ gb_internal void odin_cpuid(int leaf, int result[]) {
 }
 
 gb_internal void report_cpu_info() {
-	gb_printf("\tCPU:  ");
+	gb_printf("\tCPU:     ");
 
 	#if defined(GB_CPU_X86)
 
@@ -221,7 +221,7 @@ gb_internal void report_cpu_info() {
 	Report the amount of installed RAM.
 */
 gb_internal void report_ram_info() {
-	gb_printf("\tRAM:  ");
+	gb_printf("\tRAM:     ");
 
 	#if defined(GB_SYSTEM_WINDOWS)
 		MEMORYSTATUSEX statex;
@@ -272,7 +272,7 @@ gb_internal void report_ram_info() {
 }
 
 gb_internal void report_os_info() {
-	gb_printf("\tOS:   ");
+	gb_printf("\tOS:      ");
 
 	#if defined(GB_SYSTEM_WINDOWS)
 	/*
@@ -1019,6 +1019,10 @@ gb_internal void report_os_info() {
 	#endif
 }
 
+gb_internal void report_backend_info() {
+	gb_printf("\tBackend: LLVM %s\n", LLVM_VERSION_STRING);
+}
+
 // NOTE(Jeroen): `odin report` prints some system information for easier bug reporting.
 gb_internal void print_bug_report_help() {
 	gb_printf("Where to find more information and get into contact when you encounter a bug:\n\n");
@@ -1032,7 +1036,7 @@ gb_internal void print_bug_report_help() {
 
 	gb_printf("Useful information to add to a bug report:\n\n");
 
-	gb_printf("\tOdin: %.*s", LIT(ODIN_VERSION));
+	gb_printf("\tOdin:    %.*s", LIT(ODIN_VERSION));
 
 	#ifdef NIGHTLY
 	gb_printf("-nightly");
@@ -1058,4 +1062,6 @@ gb_internal void print_bug_report_help() {
 		And RAM info.
 	*/
 	report_ram_info();
+
+	report_backend_info();
 }
