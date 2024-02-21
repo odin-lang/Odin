@@ -381,8 +381,7 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
         if len(info.variants) == 0 {
             io.write_string(w, "null") or_return
             return
-        }
-        if info.tag_type == nil {
+        } else if info.tag_type == nil {
             panic("Union tag type is nil.")
         }
 
