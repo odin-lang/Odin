@@ -52,7 +52,7 @@ Marshal_Options :: struct {
 	sort_maps_by_key: bool,
 
     // Output enum value's name instead of its underlineing value
-    use_enum_value_names: bool
+    use_enum_value_names: bool,
 
 	// Internal state
 	indentation: int,
