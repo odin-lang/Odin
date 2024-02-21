@@ -627,6 +627,43 @@ enum_from_name_any :: proc(Enum_Type: typeid, name: string) -> (value: Type_Info
 	return
 }
 
+@(require_results)
+enum_name_from_value :: proc(value: $Enum_Type) -> (name: string, ok: bool) where intrinsics.type_is_enum(Enum_Type) {
+	ti := type_info_base(type_info_of(Enum_Type))
+	e := ti.variant.(runtime.Type_Info_Enum) or_return
+	if len(e.values) == 0 {
+		return
+	}
+	ev := Type_Info_Enum_Value(value)
+	for val, idx in e.values {
+		if val == ev {
+			return e.names[idx], true
+		}
+	}
+	return
+}
+
+@(require_results)
+enum_name_from_value_any :: proc(value: any) -> (name: string, ok: bool) {
+	if value.id == nil {
+		return
+	}
+	ti := type_info_base(type_info_of(value.id))
+	e := ti.variant.(runtime.Type_Info_Enum) or_return
+	if len(e.values) == 0 {
+		return
+	}
+	ev := Type_Info_Enum_Value(as_i64(value) or_return)
+	for val, idx in e.values {
+		if val == ev {
+			return e.names[idx], true
+		}
+	}
+	return
+}
+
+
+
 
 @(require_results)
 enum_field_names :: proc(Enum_Type: typeid) -> []string {

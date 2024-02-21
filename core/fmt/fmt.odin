@@ -1408,34 +1408,9 @@ fmt_soa_pointer :: proc(fi: ^Info, p: runtime.Raw_Soa_Pointer, verb: rune) {
 //
 // Returns: The string representation of the enum value and a boolean indicating success.
 //
+@(require_results)
 enum_value_to_string :: proc(val: any) -> (string, bool) {
-	v := val
-	v.id = runtime.typeid_base(v.id)
-	type_info := type_info_of(v.id)
-
-	#partial switch e in type_info.variant {
-	case: return "", false
-	case runtime.Type_Info_Enum:
-		Enum_Value :: runtime.Type_Info_Enum_Value
-
-		ev_, ok := reflect.as_i64(val)
-		ev := Enum_Value(ev_)
-
-		if ok {
-			if len(e.values) == 0 {
-				return "", true
-			} else {
-				for val, idx in e.values {
-					if val == ev {
-						return e.names[idx], true
-					}
-				}
-			}
-			return "", false
-		}
-	}
-
-	return "", false
+	return reflect.enum_name_from_value_any(val)
 }
 // Returns the enum value of a string representation.
 //
