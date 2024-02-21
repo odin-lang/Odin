@@ -377,7 +377,16 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 		opt_write_end(w, opt, '}') or_return
 
 	case runtime.Type_Info_Union:
-        tag_ptr := uintptr(v.data) + info.tag_offset
+        // check for empty unions
+        if len(info.variants) == 0 {
+            io.write_string(w, "null") or_return
+            return
+        }
+        if info.tag_type == nil {
+            panic("Union tag type is nil.")
+        }
+
+		tag_ptr := uintptr(v.data) + info.tag_offset
 		tag_any := any{rawptr(tag_ptr), info.tag_type.id}
 
 		tag: i64 = -1
