@@ -6,9 +6,10 @@ Example:
 		...
 	}
 */
-guard :: proc{
+guard :: proc {
 	mutex_guard,
 	rw_mutex_guard,
+	recursive_mutex_guard,
 	ticket_mutex_guard,
 	benaphore_guard,
 	recursive_benaphore_guard,
@@ -22,15 +23,16 @@ Example:
 		...
 	}
 */
-shared_guard :: proc{
+shared_guard :: proc {
 	rw_mutex_shared_guard,
 	atomic_rw_mutex_shared_guard,
 }
 
 // lock locks m
-lock :: proc{
+lock :: proc {
 	mutex_lock,
 	rw_mutex_lock,
+	recursive_mutex_lock,
 	ticket_mutex_lock,
 	benaphore_lock,
 	recursive_benaphore_lock,
@@ -40,9 +42,10 @@ lock :: proc{
 }
 
 // unlock locks m
-unlock :: proc{
+unlock :: proc {
 	mutex_unlock,
 	rw_mutex_unlock,
+	recursive_mutex_unlock,
 	ticket_mutex_unlock,
 	benaphore_unlock,
 	recursive_benaphore_unlock,
@@ -52,9 +55,10 @@ unlock :: proc{
 }
 
 // try_lock tries to lock m, will return true on success, and false on failure
-try_lock :: proc{
+try_lock :: proc {
 	mutex_try_lock,
 	rw_mutex_try_lock,
+	recursive_mutex_try_lock,
 	benaphore_try_lock,
 	recursive_benaphore_try_lock,
 	atomic_mutex_try_lock,
@@ -63,26 +67,25 @@ try_lock :: proc{
 }
 
 // shared_lock locks rw for reading (with arbitrary number of readers)
-shared_lock :: proc{
+shared_lock :: proc {
 	rw_mutex_shared_lock,
 	atomic_rw_mutex_shared_lock,
 }
 
 // shared_unlock unlocks rw for reading (with arbitrary number of readers)
-shared_unlock :: proc{
+shared_unlock :: proc {
 	rw_mutex_shared_unlock,
 	atomic_rw_mutex_shared_unlock,
 }
 
 // try_shared_lock tries to lock rw for reading (with arbitrary number of readers)
-try_shared_lock :: proc{
+try_shared_lock :: proc {
 	rw_mutex_try_shared_lock,
 	atomic_rw_mutex_try_shared_lock,
 }
 
 
-
-wait :: proc{
+wait :: proc {
 	cond_wait,
 	sema_wait,
 	atomic_cond_wait,
@@ -91,7 +94,7 @@ wait :: proc{
 	wait_group_wait,
 }
 
-wait_with_timeout :: proc{
+wait_with_timeout :: proc {
 	cond_wait_with_timeout,
 	sema_wait_with_timeout,
 	atomic_cond_wait_with_timeout,
@@ -100,18 +103,18 @@ wait_with_timeout :: proc{
 	wait_group_wait_with_timeout,
 }
 
-post :: proc{
+post :: proc {
 	sema_post,
 	atomic_sema_post,
 }
 
-signal :: proc{
+signal :: proc {
 	cond_signal,
 	atomic_cond_signal,
 	futex_signal,
 }
 
-broadcast :: proc{
+broadcast :: proc {
 	cond_broadcast,
 	atomic_cond_broadcast,
 	futex_broadcast,
