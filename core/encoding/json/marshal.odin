@@ -51,6 +51,9 @@ Marshal_Options :: struct {
 	// NOTE: This will temp allocate and sort a list for each map.
 	sort_maps_by_key: bool,
 
+    // Output enum value's name instead of its underlineing value
+    use_enum_value_names: bool
+
 	// Internal state
 	indentation: int,
 	mjson_skipped_first_braces_start: bool,
@@ -401,7 +404,24 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 		}
 
 	case runtime.Type_Info_Enum:
-		return marshal_to_writer(w, any{v.data, info.base.id}, opt)
+		if !opt.use_enum_value_names || len(info.names) == 0 {
+            return marshal_to_writer(w, any{v.data, info.base.id}, opt)
+        } else {
+            enum_a := any{v.data, info.base.id}
+            u: runtime.Type_Info_Enum_Value
+
+            switch i in enum_a {
+                case int: u = runtime.Type_Info_Enum_Value(i)
+                case: panic("Invalid enum base type")
+            }
+
+            pos, found := slice.binary_search(info.values, u)
+            if found {
+                return marshal_to_writer(w, any(info.names[pos]), opt)
+            } else {
+                panic("Unable to find value in enum's values")
+            }
+        }
 
 	case runtime.Type_Info_Bit_Set:
 		is_bit_set_different_endian_to_platform :: proc(ti: ^runtime.Type_Info) -> bool {
