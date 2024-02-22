@@ -1792,19 +1792,21 @@ gb_internal void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup 
 		case Type_BitField:
 			{
 				tag = lb_const_ptr_cast(m, variant_ptr, t_type_info_bit_field_ptr);
-				LLVMValueRef vals[5] = {};
+				LLVMValueRef vals[6] = {};
 
 				vals[0] = lb_type_info(m, t->BitField.backing_type).value;
 				isize count = t->BitField.fields.count;
 				if (count > 0) {
-					i64 names_offset   = 0;
-					i64 types_offset   = 0;
-					i64 bit_sizes_offset = 0;
+					i64 names_offset       = 0;
+					i64 types_offset       = 0;
+					i64 bit_sizes_offset   = 0;
 					i64 bit_offsets_offset = 0;
+					i64 tags_offset        = 0;
 					lbValue memory_names       = lb_type_info_member_names_offset  (m, count, &names_offset);
 					lbValue memory_types       = lb_type_info_member_types_offset  (m, count, &types_offset);
 					lbValue memory_bit_sizes   = lb_type_info_member_offsets_offset(m, count, &bit_sizes_offset);
 					lbValue memory_bit_offsets = lb_type_info_member_offsets_offset(m, count, &bit_offsets_offset);
+					lbValue memory_tags        = lb_type_info_member_tags_offset   (m, count, &tags_offset);
 
 					u64 bit_offset = 0;
 					for (isize source_index = 0; source_index < count; source_index++) {
@@ -1813,8 +1815,8 @@ gb_internal void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup 
 
 						lbValue index = lb_const_int(m, t_int, source_index);
 						if (f->token.string.len > 0) {
-							lbValue name = lb_emit_ptr_offset(p, memory_names, index);
-							lb_emit_store(p, name, lb_const_string(m, f->token.string));
+							lbValue name_ptr = lb_emit_ptr_offset(p, memory_names, index);
+							lb_emit_store(p, name_ptr, lb_const_string(m, f->token.string));
 						}
 						lbValue type_ptr       = lb_emit_ptr_offset(p, memory_types, index);
 						lbValue bit_size_ptr   = lb_emit_ptr_offset(p, memory_bit_sizes, index);
@@ -1824,21 +1826,23 @@ gb_internal void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup 
 						lb_emit_store(p, bit_size_ptr,   lb_const_int(m, t_uintptr, bit_size));
 						lb_emit_store(p, bit_offset_ptr, lb_const_int(m, t_uintptr, bit_offset));
 
-						// lb_global_type_info_member_types_values  [types_offset      +source_index] = get_type_info_ptr(m, f->type);
-						// lb_global_type_info_member_offsets_values[bit_sizes_offset  +source_index] = lb_const_int(m, t_uintptr, bit_size).value;
-						// lb_global_type_info_member_offsets_values[bit_offsets_offset+source_index] = lb_const_int(m, t_uintptr, bit_offset).value;
-						// if (f->token.string.len > 0) {
-						// 	lb_global_type_info_member_names_values[names_offset+source_index] = lb_const_string(m, f->token.string).value;
-						// }
+						if (t->BitField.tags) {
+							String tag = t->BitField.tags[source_index];
+							if (tag.len > 0) {
+								lbValue tag_ptr = lb_emit_ptr_offset(p, memory_tags, index);
+								lb_emit_store(p, tag_ptr, lb_const_string(m, tag));
+							}
+						}
 
 						bit_offset += bit_size;
 					}
 
 					lbValue cv = lb_const_int(m, t_int, count);
-					vals[1] = llvm_const_slice(m, memory_names,   cv);
-					vals[2] = llvm_const_slice(m, memory_types,   cv);
-					vals[3] = llvm_const_slice(m, memory_bit_sizes, cv);
+					vals[1] = llvm_const_slice(m, memory_names,       cv);
+					vals[2] = llvm_const_slice(m, memory_types,       cv);
+					vals[3] = llvm_const_slice(m, memory_bit_sizes,   cv);
 					vals[4] = llvm_const_slice(m, memory_bit_offsets, cv);
+					vals[5] = llvm_const_slice(m, memory_tags,        cv);
 				}
 
 				for (isize i = 0; i < gb_count_of(vals); i++) {

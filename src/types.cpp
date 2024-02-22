@@ -286,6 +286,7 @@ struct TypeProc {
 		Scope *         scope;                            \
 		Type *          backing_type;                     \
 		Slice<Entity *> fields;                           \
+		String *        tags; /*count == fields.count*/   \
 		Slice<u8>       bit_sizes;                        \
 		Slice<i64>      bit_offsets;                      \
 		Ast *           node;                             \

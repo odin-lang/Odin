@@ -959,6 +959,7 @@ gb_internal void check_bit_field_type(CheckerContext *ctx, Type *bit_field_type,
 
 	auto fields    = array_make<Entity *>(permanent_allocator(), 0, bf->fields.count);
 	auto bit_sizes = array_make<u8>      (permanent_allocator(), 0, bf->fields.count);
+	auto tags      = array_make<String>  (permanent_allocator(), 0, bf->fields.count);
 
 	u64 maximum_bit_size = 8 * type_size_of(backing_type);
 	u64 total_bit_size = 0;
@@ -1054,6 +1055,14 @@ gb_internal void check_bit_field_type(CheckerContext *ctx, Type *bit_field_type,
 			add_entity(ctx, ctx->scope, nullptr, e);
 			array_add(&fields, e);
 			array_add(&bit_sizes, bit_size_u8);
+
+			String tag = f->tag.string;
+			if (tag.len != 0 && !unquote_string(permanent_allocator(), &tag, 0, tag.text[0] == '`')) {
+				error(f->tag, "Invalid string literal");
+				tag = {};
+			}
+			array_add(&tags, tag);
+
 			add_entity_use(ctx, field, e);
 		}
 	}
@@ -1080,6 +1089,7 @@ gb_internal void check_bit_field_type(CheckerContext *ctx, Type *bit_field_type,
 	bit_field_type->BitField.fields      = slice_from_array(fields);
 	bit_field_type->BitField.bit_sizes   = slice_from_array(bit_sizes);
 	bit_field_type->BitField.bit_offsets = bit_offsets;
+	bit_field_type->BitField.tags        = tags.data;
 }
 
 gb_internal bool is_type_valid_bit_set_range(Type *t) {

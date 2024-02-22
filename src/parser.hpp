@@ -655,6 +655,7 @@ AST_KIND(_DeclEnd,   "", bool) \
 		Ast *         name;     \
 		Ast *         type;     \
 		Ast *         bit_size; \
+		Token         tag;      \
 		CommentGroup *docs;     \
 		CommentGroup *comment;  \
 	}) \

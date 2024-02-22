@@ -2297,6 +2297,23 @@ fmt_bit_field :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Bit
 		return
 	}
 
+	handle_bit_field_tag :: proc(data: rawptr, info: reflect.Type_Info_Bit_Field, idx: int, verb: ^rune) -> (do_continue: bool) {
+		tag := info.tags[idx]
+		if vt, ok := reflect.struct_tag_lookup(reflect.Struct_Tag(tag), "fmt"); ok {
+			value := strings.trim_space(string(vt))
+			switch value {
+			case "": return false
+			case "-": return true
+			}
+			r, w := utf8.decode_rune_in_string(value)
+			value = value[w:]
+			if value == "" || value[0] == ',' {
+				verb^ = r
+			}
+		}
+		return false
+	}
+
 	io.write_string(fi.writer, "bit_field{", &fi.n)
 
 	hash   := fi.hash;   defer fi.hash = hash
@@ -2318,7 +2335,11 @@ fmt_bit_field :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Bit
 
 	field_count := -1
 	for name, i in info.names {
-		_ = i
+		field_verb := verb
+		if handle_bit_field_tag(v.data, info, i, &field_verb) {
+			continue
+		}
+
 		field_count += 1
 
 		if !do_trailing_comma && field_count > 0 {
@@ -2343,7 +2364,7 @@ fmt_bit_field :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Bit
 			value = (value ~ m) - m
 		}
 
-		fmt_value(fi, any{&value, type.id}, verb)
+		fmt_value(fi, any{&value, type.id}, field_verb)
 		if do_trailing_comma { io.write_string(fi.writer, ",\n", &fi.n) }
 
 	}

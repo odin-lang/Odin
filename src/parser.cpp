@@ -1054,12 +1054,13 @@ gb_internal Ast *ast_field(AstFile *f, Array<Ast *> const &names, Ast *type, Ast
 	return result;
 }
 
-gb_internal Ast *ast_bit_field_field(AstFile *f, Ast *name, Ast *type, Ast *bit_size,
+gb_internal Ast *ast_bit_field_field(AstFile *f, Ast *name, Ast *type, Ast *bit_size, Token tag,
                                      CommentGroup *docs, CommentGroup *comment) {
 	Ast *result = alloc_ast_node(f, Ast_BitFieldField);
 	result->BitFieldField.name     = name;
 	result->BitFieldField.type     = type;
 	result->BitFieldField.bit_size = bit_size;
+	result->BitFieldField.tag      = tag;
 	result->BitFieldField.docs     = docs;
 	result->BitFieldField.comment  = comment;
 	return result;
@@ -2611,7 +2612,12 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 			expect_token(f, Token_Or);
 			Ast *bit_size = parse_expr(f, true);
 
-			Ast *bf_field = ast_bit_field_field(f, name, type, bit_size, docs, comment);
+			Token tag = {};
+			if (f->curr_token.kind == Token_String) {
+				tag = expect_token(f, Token_String);
+			}
+
+			Ast *bf_field = ast_bit_field_field(f, name, type, bit_size, tag, docs, comment);
 			array_add(&fields, bf_field);
 
 			if (!allow_field_separator(f)) {

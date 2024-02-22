@@ -187,6 +187,7 @@ Type_Info_Bit_Field :: struct {
 	types:        []^Type_Info,
 	bit_sizes:    []uintptr,
 	bit_offsets:  []uintptr,
+	tags:         []string,
 }
 
 Type_Info_Flag :: enum u8 {
