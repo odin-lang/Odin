@@ -1886,33 +1886,55 @@ gb_internal bool check_representable_as_constant(CheckerContext *c, ExactValue i
 
 		BigInt i = v.value_integer;
 
-		i64 bit_size = type_size_of(type);
+		i64 byte_size = type_size_of(type);
 		BigInt umax = {};
 		BigInt imin = {};
 		BigInt imax = {};
 
-		if (bit_size < 16) {
-			big_int_from_u64(&umax, unsigned_integer_maxs[bit_size]);
-			big_int_from_i64(&imin, signed_integer_mins[bit_size]);
-			big_int_from_i64(&imax, signed_integer_maxs[bit_size]);
-		} else {
+		if (c->bit_field_bit_size > 0) {
+			i64 bit_size = gb_min(cast(i64)(8*byte_size), cast(i64)c->bit_field_bit_size);
+
 			big_int_from_u64(&umax, 1);
 			big_int_from_i64(&imin, 1);
 			big_int_from_i64(&imax, 1);
 
-			BigInt bi128 = {};
-			BigInt bi127 = {};
-			big_int_from_i64(&bi128, 128);
-			big_int_from_i64(&bi127, 127);
+			BigInt bu = {};
+			BigInt bi = {};
+			big_int_from_i64(&bu, bit_size);
+			big_int_from_i64(&bi, bit_size-1);
 
-			big_int_shl_eq(&umax, &bi128);
+			big_int_shl_eq(&umax, &bu);
 			mp_decr(&umax);
 
-			big_int_shl_eq(&imin, &bi127);
+			big_int_shl_eq(&imin, &bi);
 			big_int_neg(&imin, &imin);
 
-			big_int_shl_eq(&imax, &bi127);
+			big_int_shl_eq(&imax, &bi);
 			mp_decr(&imax);
+		} else {
+			if (byte_size < 16) {
+				big_int_from_u64(&umax, unsigned_integer_maxs[byte_size]);
+				big_int_from_i64(&imin, signed_integer_mins[byte_size]);
+				big_int_from_i64(&imax, signed_integer_maxs[byte_size]);
+			} else {
+				big_int_from_u64(&umax, 1);
+				big_int_from_i64(&imin, 1);
+				big_int_from_i64(&imax, 1);
+
+				BigInt bi128 = {};
+				BigInt bi127 = {};
+				big_int_from_i64(&bi128, 128);
+				big_int_from_i64(&bi127, 127);
+
+				big_int_shl_eq(&umax, &bi128);
+				mp_decr(&umax);
+
+				big_int_shl_eq(&imin, &bi127);
+				big_int_neg(&imin, &imin);
+
+				big_int_shl_eq(&imax, &bi127);
+				mp_decr(&imax);
+			}
 		}
 
 		switch (type->Basic.kind) {
