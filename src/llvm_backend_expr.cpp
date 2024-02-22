@@ -4684,14 +4684,16 @@ gb_internal lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 				Selection sub_sel = sel;
 				sub_sel.index.count -= 1;
 
-				Type *bf_type = type_from_selection(type, sub_sel);
-				bf_type = base_type(type_deref(bf_type));
-				GB_ASSERT(bf_type->kind == Type_BitField);
 
 				lbValue a = lb_addr_get_ptr(p, addr);
 				if (sub_sel.index.count > 0) {
 					a = lb_emit_deep_field_gep(p, a, sub_sel);
 				}
+
+
+				Type *bf_type = type_deref(a.type);
+				bf_type = base_type(type_deref(bf_type));
+				GB_ASSERT(bf_type->kind == Type_BitField);
 
 				i32 index = sel.index[sel.index.count-1];
 
