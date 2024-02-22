@@ -2607,6 +2607,14 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 			CommentGroup *comment = nullptr;
 
 			Ast *name = parse_ident(f);
+			bool err_once = false;
+			while (allow_token(f, Token_Comma)) {
+				Ast *dummy_name = parse_ident(f);
+				if (!err_once) {
+					error(dummy_name, "'bit_field' fields do not support multiple names per field");
+					err_once = true;
+				}
+			}
 			expect_token(f, Token_Colon);
 			Ast *type = parse_type(f);
 			expect_token(f, Token_Or);
