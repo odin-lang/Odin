@@ -102,7 +102,7 @@ _bind :: proc(skt: Any_Socket, ep: Endpoint) -> (err: Network_Error) {
 	res := os.bind(os.Socket(s), (^os.SOCKADDR)(&sockaddr), i32(sockaddr.len))
 	if res != os.ERROR_NONE {
 		if res == os.EACCES && ep.port <= MAX_PRIVILEGED_PORT {
-			err = .Port_Reserved
+			err = .Privileged_Port_Without_Root
 		} else {
 			err = Bind_Error(res)
 		}
