@@ -4677,6 +4677,13 @@ gb_internal lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 
 			Selection sel = lookup_field(type, selector, false);
 			GB_ASSERT(sel.entity != nullptr);
+			if (sel.pseudo_field) {
+				GB_ASSERT(sel.entity->kind == Entity_Procedure || sel.entity->kind == Entity_ProcGroup);
+				Entity *e = entity_of_node(sel_node);
+				GB_ASSERT(e->kind == Entity_Procedure);
+				return lb_addr(lb_find_value_from_entity(p->module, e));
+			}
+
 			if (sel.is_bit_field) {
 				lbAddr addr = lb_build_addr(p, se->expr);
 
@@ -4703,12 +4710,7 @@ gb_internal lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 
 				return lb_addr_bit_field(a, f->type, index, bit_offset, bit_size);
 			}
-			if (sel.pseudo_field) {
-				GB_ASSERT(sel.entity->kind == Entity_Procedure || sel.entity->kind == Entity_ProcGroup);
-				Entity *e = entity_of_node(sel_node);
-				GB_ASSERT(e->kind == Entity_Procedure);
-				return lb_addr(lb_find_value_from_entity(p->module, e));
-			}
+
 
 			{
 				lbAddr addr = lb_build_addr(p, se->expr);
