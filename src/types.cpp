@@ -4114,8 +4114,10 @@ gb_internal isize check_is_assignable_to_using_subtype(Type *src, Type *dst, isi
 		}
 		if (allow_polymorphic && dst_is_polymorphic) {
 			Type *fb = base_type(type_deref(f->type));
-			if (fb->kind == Type_Struct && fb->Struct.polymorphic_parent == dst) {
-				return true;
+			if (fb->kind == Type_Struct) {
+				if (fb->Struct.polymorphic_parent == dst) {
+					return true;
+				}
 			}
 		}
 
