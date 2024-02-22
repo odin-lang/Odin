@@ -1843,7 +1843,11 @@ gb_internal void lb_build_return_stmt_internal(lbProcedure *p, lbValue res) {
 
 		lb_emit_defer_stmts(p, lbDeferExit_Return, nullptr);
 
-		LLVMBuildRetVoid(p->builder);
+		// Check for terminator in the defer stmts
+		LLVMValueRef instr = LLVMGetLastInstruction(p->curr_block->block);
+		if (!lb_is_instr_terminating(instr)) {
+			LLVMBuildRetVoid(p->builder);
+		}
 	} else {
 		LLVMValueRef ret_val = res.value;
 		LLVMTypeRef ret_type = p->abi_function_type->ret.type;
@@ -1868,7 +1872,12 @@ gb_internal void lb_build_return_stmt_internal(lbProcedure *p, lbValue res) {
 		}
 
 		lb_emit_defer_stmts(p, lbDeferExit_Return, nullptr);
-		LLVMBuildRet(p->builder, ret_val);
+
+		// Check for terminator in the defer stmts
+		LLVMValueRef instr = LLVMGetLastInstruction(p->curr_block->block);
+		if (!lb_is_instr_terminating(instr)) {
+			LLVMBuildRet(p->builder, ret_val);
+		}
 	}
 }
 gb_internal void lb_build_return_stmt(lbProcedure *p, Slice<Ast *> const &return_results) {
@@ -1887,8 +1896,12 @@ gb_internal void lb_build_return_stmt(lbProcedure *p, Slice<Ast *> const &return
 		// No return values
 
 		lb_emit_defer_stmts(p, lbDeferExit_Return, nullptr);
-
-		LLVMBuildRetVoid(p->builder);
+		
+		// Check for terminator in the defer stmts
+		LLVMValueRef instr = LLVMGetLastInstruction(p->curr_block->block);
+		if (!lb_is_instr_terminating(instr)) {
+			LLVMBuildRetVoid(p->builder);
+		}
 		return;
 	} else if (return_count == 1) {
 		Entity *e = tuple->variables[0];
