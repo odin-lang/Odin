@@ -1016,6 +1016,11 @@ gb_internal void check_bit_field_type(CheckerContext *ctx, Type *bit_field_type,
 		if (o.value.kind == ExactValue_Float) {
 			o.value = exact_value_to_integer(o.value);
 		}
+		if (f->bit_size->kind == Ast_BinaryExpr && f->bit_size->BinaryExpr.op.kind == Token_Or) {
+			gbString s = expr_to_string(f->bit_size);
+			error(f->bit_size, "Wrap the expression in parentheses, e.g. (%s)", s);
+			gb_string_free(s);
+		}
 
 		ExactValue bit_size = o.value;
 
@@ -1076,7 +1081,6 @@ gb_internal void check_bit_field_type(CheckerContext *ctx, Type *bit_field_type,
 		curr_offset += cast(i64)bit_sizes[i];
 	}
 
-
 	if (total_bit_size > maximum_bit_size) {
 		gbString s = type_to_string(backing_type);
 		error(node, "The numbers required %llu exceeds the backing type's (%s) bit size %llu",
@@ -1085,6 +1089,27 @@ gb_internal void check_bit_field_type(CheckerContext *ctx, Type *bit_field_type,
 		      cast(unsigned long long)maximum_bit_size);
 		gb_string_free(s);
 	}
+
+	if (bit_sizes.count > 0 && is_type_integer(backing_type)) {
+		bool all_booleans = is_type_boolean(fields[0]->type);
+		bool all_ones = bit_sizes[0] == 1;
+		if (all_ones && all_booleans) {
+			for_array(i, bit_sizes) {
+				all_ones = bit_sizes[i] == 1;
+				if (!all_ones) {
+					break;
+				}
+				all_booleans = is_type_boolean(fields[i]->type);
+				if (!all_booleans) {
+					break;
+				}
+			}
+			if (all_ones && all_booleans) {
+				warning(node, "This 'bit_field' might be better expressed as a 'bit_set' since all of the fields are booleans, of 1-bit in size, and the backing type is an integer");
+			}
+		}
+	}
+
 
 	bit_field_type->BitField.fields      = slice_from_array(fields);
 	bit_field_type->BitField.bit_sizes   = slice_from_array(bit_sizes);
