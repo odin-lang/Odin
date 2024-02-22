@@ -2808,6 +2808,11 @@ gb_internal Type *c_vararg_promote_type(Type *type) {
 	GB_ASSERT(type != nullptr);
 
 	Type *core = core_type(type);
+
+	if (core->kind == Type_BitSet) {
+		core = core_type(bit_set_to_int(core));
+	}
+
 	if (core->kind == Type_Basic) {
 		switch (core->Basic.kind) {
 		case Basic_f32:
