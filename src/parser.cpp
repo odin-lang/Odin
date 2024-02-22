@@ -4001,6 +4001,10 @@ gb_internal Array<Ast *> convert_to_ident_list(AstFile *f, Array<AstAndFlags> li
 		case Ast_Ident:
 		case Ast_BadExpr:
 			break;
+		case Ast_Implicit:
+			syntax_error(ident, "Expected an identifier, '%.*s' which is a keyword", LIT(ident->Implicit.string));
+			ident = ast_ident(f, blank_token);
+			break;
 
 		case Ast_PolyType:
 			if (allow_poly_names) {
@@ -4014,8 +4018,9 @@ gb_internal Array<Ast *> convert_to_ident_list(AstFile *f, Array<AstAndFlags> li
 			}
 			/*fallthrough*/
 
+
 		default:
-			syntax_error(ident, "Expected an identifier");
+			syntax_error(ident, "Expected an identifier, %d", ident->kind);
 			ident = ast_ident(f, blank_token);
 			break;
 		}
