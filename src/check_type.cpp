@@ -1105,7 +1105,13 @@ gb_internal void check_bit_field_type(CheckerContext *ctx, Type *bit_field_type,
 				}
 			}
 			if (all_ones && all_booleans) {
-				warning(node, "This 'bit_field' might be better expressed as a 'bit_set' since all of the fields are booleans, of 1-bit in size, and the backing type is an integer");
+				if (build_context.vet_flags & VetFlag_Style) {
+					char const *msg = "This 'bit_field' is better expressed as a 'bit_set' since all of the fields are booleans, of 1-bit in size, and the backing type is an integer (-vet-style)";
+					error(node, msg);
+				} else {
+					char const *msg = "This 'bit_field' might be better expressed as a 'bit_set' since all of the fields are booleans, of 1-bit in size, and the backing type is an integer";
+					warning(node, msg);
+				}
 			}
 		}
 	}
