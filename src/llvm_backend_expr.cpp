@@ -4687,18 +4687,15 @@ gb_internal lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 			if (sel.is_bit_field) {
 				lbAddr addr = lb_build_addr(p, se->expr);
 
-
 				Selection sub_sel = sel;
 				sub_sel.index.count -= 1;
 
-
-				lbValue a = lb_addr_get_ptr(p, addr);
+				lbValue ptr = lb_addr_get_ptr(p, addr);
 				if (sub_sel.index.count > 0) {
-					a = lb_emit_deep_field_gep(p, a, sub_sel);
+					ptr = lb_emit_deep_field_gep(p, ptr, sub_sel);
 				}
 
-
-				Type *bf_type = type_deref(a.type);
+				Type *bf_type = type_deref(ptr.type);
 				bf_type = base_type(type_deref(bf_type));
 				GB_ASSERT(bf_type->kind == Type_BitField);
 
@@ -4708,9 +4705,8 @@ gb_internal lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 				u8 bit_size = bf_type->BitField.bit_sizes[index];
 				i64 bit_offset = bf_type->BitField.bit_offsets[index];
 
-				return lb_addr_bit_field(a, f->type, index, bit_offset, bit_size);
+				return lb_addr_bit_field(ptr, f->type, index, bit_offset, bit_size);
 			}
-
 
 			{
 				lbAddr addr = lb_build_addr(p, se->expr);
