@@ -4020,7 +4020,7 @@ gb_internal Array<Ast *> convert_to_ident_list(AstFile *f, Array<AstAndFlags> li
 
 
 		default:
-			syntax_error(ident, "Expected an identifier, %d", ident->kind);
+			syntax_error(ident, "Expected an identifier");
 			ident = ast_ident(f, blank_token);
 			break;
 		}
