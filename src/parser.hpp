@@ -650,6 +650,13 @@ AST_KIND(_DeclEnd,   "", bool) \
 		CommentGroup *   docs;      \
 		CommentGroup *   comment;   \
 	}) \
+	AST_KIND(BitFieldField, "bit field field", struct { \
+		Ast *         name;     \
+		Ast *         type;     \
+		Ast *         bit_size; \
+		CommentGroup *docs;     \
+		CommentGroup *comment;  \
+	}) \
 	AST_KIND(FieldList, "field list", struct { \
 		Token token;       \
 		Slice<Ast *> list; \
@@ -741,6 +748,14 @@ AST_KIND(_TypeBegin, "", bool) \
 		Token token; \
 		Ast * elem;  \
 		Ast * underlying; \
+	}) \
+	AST_KIND(BitFieldType, "bit field type", struct { \
+		Scope *scope; \
+		Token token; \
+		Ast * backing_type;  \
+		Token open; \
+		Slice<Ast *> fields; /* BitFieldField */ \
+		Token close; \
 	}) \
 	AST_KIND(MapType, "map type", struct { \
 		Token token; \

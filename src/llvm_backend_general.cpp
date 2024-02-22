@@ -2216,7 +2216,9 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 			}
 			return LLVMStructTypeInContext(ctx, fields, field_count, false);
 		}
-	
+
+	case Type_BitField:
+		return lb_type_internal(m, type->BitField.backing_type);
 	}
 
 	GB_PANIC("Invalid type %s", type_to_string(type));

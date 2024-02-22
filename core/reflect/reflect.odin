@@ -35,6 +35,7 @@ Type_Info_Relative_Pointer       :: runtime.Type_Info_Relative_Pointer
 Type_Info_Relative_Multi_Pointer :: runtime.Type_Info_Relative_Multi_Pointer
 Type_Info_Matrix                 :: runtime.Type_Info_Matrix
 Type_Info_Soa_Pointer            :: runtime.Type_Info_Soa_Pointer
+Type_Info_Bit_Field              :: runtime.Type_Info_Bit_Field
 
 Type_Info_Enum_Value :: runtime.Type_Info_Enum_Value
 
@@ -70,6 +71,7 @@ Type_Kind :: enum {
 	Relative_Multi_Pointer,
 	Matrix,
 	Soa_Pointer,
+	Bit_Field,
 }
 
 
@@ -106,6 +108,7 @@ type_kind :: proc(T: typeid) -> Type_Kind {
 		case Type_Info_Relative_Multi_Pointer: return .Relative_Multi_Pointer
 		case Type_Info_Matrix:                 return .Matrix
 		case Type_Info_Soa_Pointer:            return .Soa_Pointer
+		case Type_Info_Bit_Field:              return .Bit_Field
 		}
 
 	}
@@ -1604,6 +1607,13 @@ equal :: proc(a, b: any, including_indirect_array_recursion := false, recursion_
 			}	
 		}
 		return true
+
+	case Type_Info_Bit_Field:
+		x, y := a, b
+		x.id = v.backing_type.id
+		y.id = v.backing_type.id
+		return equal(x, y, including_indirect_array_recursion, recursion_level+0)
+
 	}
 	
 	runtime.print_typeid(a.id)

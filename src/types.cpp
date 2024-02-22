@@ -282,6 +282,13 @@ struct TypeProc {
 		Type *generic_column_count;                       \
 		i64   stride_in_bytes;                            \
 	})                                                        \
+	TYPE_KIND(BitField, struct {                              \
+		Scope *         scope;                            \
+		Type *          backing_type;                     \
+		Slice<Entity *> fields;                           \
+		Slice<u8>       bit_sizes;                        \
+		Ast *           node;                             \
+	})                                                        \
 	TYPE_KIND(SoaPointer, struct { Type *elem; })
 
 
@@ -355,6 +362,7 @@ enum Typeid_Kind : u8 {
 	Typeid_Relative_Multi_Pointer,
 	Typeid_Matrix,
 	Typeid_SoaPointer,
+	Typeid_Bit_Field,
 };
 
 // IMPORTANT NOTE(bill): This must match the same as the in core.odin
@@ -641,6 +649,7 @@ gb_global Type *t_type_info_relative_pointer     = nullptr;
 gb_global Type *t_type_info_relative_multi_pointer = nullptr;
 gb_global Type *t_type_info_matrix               = nullptr;
 gb_global Type *t_type_info_soa_pointer          = nullptr;
+gb_global Type *t_type_info_bit_field            = nullptr;
 
 gb_global Type *t_type_info_named_ptr            = nullptr;
 gb_global Type *t_type_info_integer_ptr          = nullptr;
@@ -670,6 +679,7 @@ gb_global Type *t_type_info_relative_pointer_ptr = nullptr;
 gb_global Type *t_type_info_relative_multi_pointer_ptr = nullptr;
 gb_global Type *t_type_info_matrix_ptr           = nullptr;
 gb_global Type *t_type_info_soa_pointer_ptr      = nullptr;
+gb_global Type *t_type_info_bit_field_ptr        = nullptr;
 
 gb_global Type *t_allocator                      = nullptr;
 gb_global Type *t_allocator_ptr                  = nullptr;
@@ -1037,6 +1047,11 @@ gb_internal Type *alloc_type_enum() {
 	Type *t = alloc_type(Type_Enum);
 	t->Enum.min_value = gb_alloc_item(permanent_allocator(), ExactValue);
 	t->Enum.max_value = gb_alloc_item(permanent_allocator(), ExactValue);
+	return t;
+}
+
+gb_internal Type *alloc_type_bit_field() {
+	Type *t = alloc_type(Type_BitField);
 	return t;
 }
 
@@ -1706,6 +1721,10 @@ gb_internal bool is_type_enum(Type *t) {
 gb_internal bool is_type_bit_set(Type *t) {
 	t = base_type(t);
 	return (t->kind == Type_BitSet);
+}
+gb_internal bool is_type_bit_field(Type *t) {
+	t = base_type(t);
+	return (t->kind == Type_BitField);
 }
 gb_internal bool is_type_map(Type *t) {
 	t = base_type(t);
@@ -3568,6 +3587,8 @@ gb_internal i64 type_align_of_internal(Type *t, TypePath *path) {
 	case Type_Slice:
 		return build_context.int_size;
 
+	case Type_BitField:
+		return type_align_of_internal(t->BitField.backing_type, path);
 
 	case Type_Tuple: {
 		i64 max = 1;
@@ -3942,6 +3963,9 @@ gb_internal i64 type_size_of_internal(Type *t, TypePath *path) {
 		i64 stride_in_bytes = matrix_type_stride_in_bytes(t, path);
 		return stride_in_bytes * t->Matrix.column_count;
 	}
+
+	case Type_BitField:
+		return type_size_of_internal(t->BitField.backing_type, path);
 
 	case Type_RelativePointer:
 		return type_size_of_internal(t->RelativePointer.base_integer, path);

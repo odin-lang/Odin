@@ -174,6 +174,23 @@ are_types_identical :: proc(a, b: ^Type_Info) -> bool {
 		if x.row_count != y.row_count { return false }
 		if x.column_count != y.column_count { return false }
 		return are_types_identical(x.elem, y.elem)
+
+	case Type_Info_Bit_Field:
+		y := b.variant.(Type_Info_Bit_Field) or_return
+		if !are_types_identical(x.backing_type, y.backing_type) { return false }
+		if len(x.names) != len(y.names) { return false }
+		for _, i in x.names {
+			if x.names[i] != y.names[i] {
+				return false
+			}
+			if !are_types_identical(x.types[i], y.types[i]) {
+				return false
+			}
+			if x.bit_sizes[i] != y.bit_sizes[i] {
+				return false
+			}
+		}
+		return true
 	}
 
 	return false
@@ -638,6 +655,20 @@ write_type_writer :: proc(w: io.Writer, ti: ^Type_Info, n_written: ^int = nil) -
 			write_type(w, info.underlying, &n) or_return
 		}
 		io.write_byte(w, ']', &n) or_return
+
+	case Type_Info_Bit_Field:
+		io.write_string(w, "bit_field ", &n) or_return
+		write_type(w, info.backing_type, &n) or_return
+		io.write_string(w, " {",         &n) or_return
+		for name, i in info.names {
+			if i > 0 { io.write_string(w, ", ", &n) or_return }
+			io.write_string(w, name,     &n) or_return
+			io.write_string(w, ": ",     &n) or_return
+			write_type(w, info.types[i], &n) or_return
+			io.write_string(w, " | ",    &n) or_return
+			io.write_u64(w, u64(info.bit_sizes[i]), 10, &n) or_return
+		}
+		io.write_string(w, "}", &n) or_return
 
 	case Type_Info_Simd_Vector:
 		io.write_string(w, "#simd[",         &n) or_return

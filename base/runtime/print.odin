@@ -459,6 +459,20 @@ print_type :: proc "contextless" (ti: ^Type_Info) {
 		}
 		print_byte(']')
 
+	case Type_Info_Bit_Field:
+		print_string("bit_field ")
+		print_type(info.backing_type)
+		print_string(" {")
+		for name, i in info.names {
+			if i > 0 { print_string(", ") }
+			print_string(name)
+			print_string(": ")
+			print_type(info.types[i])
+			print_string(" | ")
+			print_u64(u64(info.bit_sizes[i]))
+		}
+		print_byte('}')
+
 
 	case Type_Info_Simd_Vector:
 		print_string("#simd[")

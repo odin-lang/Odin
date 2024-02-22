@@ -2283,6 +2283,68 @@ fmt_matrix :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Matrix
 		fmt_write_indent(fi)
 	}
 }
+
+fmt_bit_field :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Bit_Field) {
+	read_bits :: proc(ptr: [^]byte, offset, size: uintptr) -> (res: u64) {
+		for i in 0..<size {
+			j := i+offset
+			B := ptr[j/8]
+			k := j&7
+			if B & (u8(1)<<k) != 0 {
+				res |= u64(1)<<u64(i)
+			}
+		}
+		return
+	}
+
+	io.write_string(fi.writer, "bit_field{", &fi.n)
+
+	hash   := fi.hash;   defer fi.hash = hash
+	indent := fi.indent; defer fi.indent -= 1
+	do_trailing_comma := hash
+
+	fi.indent += 1
+
+	if hash	{
+		io.write_byte(fi.writer, '\n', &fi.n)
+	}
+	defer {
+		if hash {
+			for _ in 0..<indent { io.write_byte(fi.writer, '\t', &fi.n) }
+		}
+		io.write_byte(fi.writer, '}', &fi.n)
+	}
+
+
+	field_count := -1
+	for name, i in info.names {
+		_ = i
+		field_count += 1
+
+		if !do_trailing_comma && field_count > 0 {
+			io.write_string(fi.writer, ", ")
+		}
+		if hash {
+			fmt_write_indent(fi)
+		}
+
+		io.write_string(fi.writer, name, &fi.n)
+		io.write_string(fi.writer, " = ", &fi.n)
+
+
+		bit_offset := info.bit_offsets[i]
+		bit_size := info.bit_sizes[i]
+
+		value := read_bits(([^]byte)(v.data), bit_offset, bit_size)
+
+		fmt_value(fi, any{&value, info.types[i].id}, verb)
+		if do_trailing_comma { io.write_string(fi.writer, ",\n", &fi.n) }
+
+	}
+}
+
+
+
 // Formats a value based on its type and formatting verb
 //
 // Inputs:
@@ -2611,6 +2673,9 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 
 	case runtime.Type_Info_Matrix:
 		fmt_matrix(fi, v, verb, info)
+
+	case runtime.Type_Info_Bit_Field:
+		fmt_bit_field(fi, v, verb, info)
 	}
 }
 // Formats a complex number based on the given formatting verb
