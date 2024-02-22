@@ -512,8 +512,7 @@ MIIM_STRING :: 0x00000040
 MIIM_BITMAP :: 0x00000080
 MIIM_FTYPE  :: 0x00000100
 
-MENUITEMINFOW :: struct
-{
+MENUITEMINFOW :: struct {
     cbSize: UINT,
     fMask: UINT,
     fType: UINT,         // used if MIIM_TYPE (4.0) or MIIM_FTYPE (>4.0)
