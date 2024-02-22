@@ -2173,6 +2173,8 @@ fmt_named :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Named) 
 	#partial switch b in info.base.variant {
 	case runtime.Type_Info_Struct:
 		fmt_struct(fi, v, verb, b, info.name)
+	case runtime.Type_Info_Bit_Field:
+		fmt_bit_field(fi, v, verb, b, info.name)
 	case runtime.Type_Info_Bit_Set:
 		fmt_bit_set(fi, v, verb = verb)
 	case:
@@ -2284,7 +2286,7 @@ fmt_matrix :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Matrix
 	}
 }
 
-fmt_bit_field :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Bit_Field) {
+fmt_bit_field :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Bit_Field, type_name: string) {
 	read_bits :: proc(ptr: [^]byte, offset, size: uintptr) -> (res: u64) {
 		for i in 0..<size {
 			j := i+offset
@@ -2314,7 +2316,8 @@ fmt_bit_field :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Bit
 		return false
 	}
 
-	io.write_string(fi.writer, "bit_field{", &fi.n)
+	io.write_string(fi.writer, type_name if len(type_name) != 0 else "bit_field", &fi.n)
+	io.write_string(fi.writer, "{", &fi.n)
 
 	hash   := fi.hash;   defer fi.hash = hash
 	indent := fi.indent; defer fi.indent -= 1
@@ -2702,7 +2705,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 		fmt_matrix(fi, v, verb, info)
 
 	case runtime.Type_Info_Bit_Field:
-		fmt_bit_field(fi, v, verb, info)
+		fmt_bit_field(fi, v, verb, info, "")
 	}
 }
 // Formats a complex number based on the given formatting verb
