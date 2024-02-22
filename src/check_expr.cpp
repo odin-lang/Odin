@@ -11174,7 +11174,6 @@ gb_internal gbString write_expr_to_string(gbString str, Ast *node, bool shorthan
 				}
 				str = write_expr_to_string(str, bf->fields[i], false);
 			}
-			return str;
 		}
 		str = gb_string_appendc(str, "}");
 	case_end;
