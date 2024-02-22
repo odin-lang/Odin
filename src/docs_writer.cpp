@@ -625,6 +625,7 @@ gb_internal OdinDocTypeIndex odin_doc_type(OdinDocWriter *w, Type *type) {
 				fields[i] = odin_doc_add_entity(w, type->BitField.fields[i]);
 			}
 			doc_type.entities = odin_write_slice(w, fields.data, fields.count);
+			doc_type.types = odin_doc_type_as_slice(w, type->BitField.backing_type);
 		}
 		break;
 

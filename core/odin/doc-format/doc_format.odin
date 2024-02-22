@@ -251,6 +251,7 @@ Type :: struct {
 	// .Multi_Pointer      - 1 type:    0=element
 	// .Matrix             - 1 type:    0=element
 	// .Soa_Pointer        - 1 type:    0=element
+	// .Bit_Field          - 1 type:    0=backing type
 	types: Array(Type_Index),
 
 	// Used by:
