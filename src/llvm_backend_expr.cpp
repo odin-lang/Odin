@@ -1946,6 +1946,24 @@ gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 		}
 	}
 
+	// bit_field <-> backing type
+	if (is_type_bit_field(src)) {
+		if (are_types_identical(src->BitField.backing_type, dst)) {
+			lbValue res = {};
+			res.type = t;
+			res.value = value.value;
+			return res;
+		}
+	}
+	if (is_type_bit_field(dst)) {
+		if (are_types_identical(src, dst->BitField.backing_type)) {
+			lbValue res = {};
+			res.type = t;
+			res.value = value.value;
+			return res;
+		}
+	}
+
 
 	// Pointer <-> uintptr
 	if (is_type_pointer(src) && is_type_uintptr(dst)) {

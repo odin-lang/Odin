@@ -210,6 +210,7 @@ gb_internal bool is_type_distinct(Ast *node) {
 	case Ast_UnionType:
 	case Ast_EnumType:
 	case Ast_ProcType:
+	case Ast_BitFieldType:
 		return true;
 
 	case Ast_PointerType:

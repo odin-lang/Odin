@@ -2908,6 +2908,13 @@ gb_internal bool check_is_castable_to(CheckerContext *c, Operand *operand, Type 
 		}
 	}
 
+	if (is_type_bit_field(src)) {
+		return are_types_identical(core_type(src->BitField.backing_type), dst);
+	}
+	if (is_type_bit_field(dst)) {
+		return are_types_identical(src, core_type(dst->BitField.backing_type));
+	}
+
 	if (is_type_integer(src) && is_type_rune(dst)) {
 		return true;
 	}
