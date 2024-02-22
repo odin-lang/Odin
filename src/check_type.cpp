@@ -1035,11 +1035,19 @@ gb_internal void check_bit_field_type(CheckerContext *ctx, Type *bit_field_type,
 				error(f->bit_size, "A bit_field's specified bit size cannot exceed 64 bits, got %lld", cast(long long)bit_size_i64);
 				bit_size_i64 = 64;
 			}
+			i64 sz = 8*type_size_of(type);
+			if (bit_size_i64 > sz) {
+				error(f->bit_size, "A bit_field's specified bit size cannot exceed its type, got %lld, expect <=%lld", cast(long long)bit_size_i64, cast(long long)sz);
+				bit_size_i64 = sz;
+			}
+
 			bit_size_u8 = cast(u8)bit_size_i64;
 
 			Entity *e = alloc_entity_field(ctx->scope, f->name->Ident.token, type, false, field_src_index);
 			e->Variable.docs    = docs;
 			e->Variable.comment = comment;
+			e->Variable.bit_field_bit_size = bit_size_u8;
+			e->flags |= EntityFlag_BitFieldField;
 
 			add_entity(ctx, ctx->scope, nullptr, e);
 			array_add(&fields, e);
@@ -1050,6 +1058,14 @@ gb_internal void check_bit_field_type(CheckerContext *ctx, Type *bit_field_type,
 
 	GB_ASSERT(fields.count <= bf->fields.count);
 
+	auto bit_offsets = slice_make<i64>(permanent_allocator(), fields.count);
+	i64 curr_offset = 0;
+	for_array(i, bit_sizes) {
+		bit_offsets[i] = curr_offset;
+		curr_offset += cast(i64)bit_sizes[i];
+	}
+
+
 	if (total_bit_size > maximum_bit_size) {
 		gbString s = type_to_string(backing_type);
 		error(node, "The numbers required %llu exceeds the backing type's (%s) bit size %llu",
@@ -1059,8 +1075,9 @@ gb_internal void check_bit_field_type(CheckerContext *ctx, Type *bit_field_type,
 		gb_string_free(s);
 	}
 
-	bit_field_type->BitField.fields    = slice_from_array(fields);
-	bit_field_type->BitField.bit_sizes = slice_from_array(bit_sizes);
+	bit_field_type->BitField.fields      = slice_from_array(fields);
+	bit_field_type->BitField.bit_sizes   = slice_from_array(bit_sizes);
+	bit_field_type->BitField.bit_offsets = bit_offsets;
 }
 
 gb_internal bool is_type_valid_bit_set_range(Type *t) {

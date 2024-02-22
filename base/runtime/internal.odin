@@ -1034,3 +1034,25 @@ fixdfti :: proc(a: u64) -> i128 {
 	}
 
 }
+
+
+
+__write_bits :: proc "contextless" (dst, src: [^]byte, offset: uintptr, size: uintptr) {
+	for i in 0..<size {
+		j := offset+i
+		the_bit := byte((src[i/8]) & (1<<(i&7)) != 0)
+		b := the_bit<<(j&7)
+		dst[j/8] &~= b
+		dst[j/8] |=  b
+	}
+}
+
+__read_bits :: proc "contextless" (dst, src: [^]byte, offset: uintptr, size: uintptr) {
+	for j in 0..<size {
+		i := offset+j
+		the_bit := byte((src[i/8]) & (1<<(i&7)) != 0)
+		b := the_bit<<(j&7)
+		dst[j/8] &~= b
+		dst[j/8] |=  b
+	}
+}

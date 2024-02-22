@@ -287,6 +287,7 @@ struct TypeProc {
 		Type *          backing_type;                     \
 		Slice<Entity *> fields;                           \
 		Slice<u8>       bit_sizes;                        \
+		Slice<i64>      bit_offsets;                      \
 		Ast *           node;                             \
 	})                                                        \
 	TYPE_KIND(SoaPointer, struct { Type *elem; })
@@ -408,6 +409,7 @@ struct Selection {
 	bool       indirect; // Set if there was a pointer deref anywhere down the line
 	u8 swizzle_count;    // maximum components = 4
 	u8 swizzle_indices;  // 2 bits per component, representing which swizzle index
+	bool is_bit_field;
 	bool pseudo_field;
 };
 gb_global Selection const empty_selection = {0};
@@ -3187,6 +3189,21 @@ gb_internal Selection lookup_field_with_selection(Type *type_, String field_name
 			else if (field_name == "a") mapped_field_name = str_lit("w");
 			return lookup_field_with_selection(type, mapped_field_name, is_type, sel, allow_blank_ident);
 		}
+	} else if (type->kind == Type_BitField) {
+		for_array(i, type->BitField.fields) {
+			Entity *f = type->BitField.fields[i];
+			if (f->kind != Entity_Variable || (f->flags & EntityFlag_Field) == 0) {
+				continue;
+			}
+			String str = f->token.string;
+			if (field_name == str) {
+				selection_add_index(&sel, i);  // HACK(bill): Leaky memory
+				sel.entity = f;
+				sel.is_bit_field = true;
+				return sel;
+			}
+		}
+
 	} else if (type->kind == Type_Basic) {
 		switch (type->Basic.kind) {
 		case Basic_any: {
@@ -4550,6 +4567,23 @@ gb_internal gbString write_type_to_string(gbString str, Type *type, bool shortha
 	case Type_Matrix:
 		str = gb_string_appendc(str, gb_bprintf("matrix[%d, %d]", cast(int)type->Matrix.row_count, cast(int)type->Matrix.column_count));
 		str = write_type_to_string(str, type->Matrix.elem);
+		break;
+
+	case Type_BitField:
+		str = gb_string_appendc(str, "bit_field ");
+		str = write_type_to_string(str, type->BitField.backing_type);
+		str = gb_string_appendc(str, " {");
+		for (isize i = 0; i < type->BitField.fields.count; i++) {
+			Entity *f = type->BitField.fields[i];
+			if (i > 0) {
+				str = gb_string_appendc(str, ", ");
+			}
+			str = gb_string_append_length(str, f->token.string.text, f->token.string.len);
+			str = gb_string_appendc(str, ": ");
+			str = write_type_to_string(str, f->type);
+			str = gb_string_append_fmt(str, " | %u", type->BitField.bit_sizes[i]);
+		}
+		str = gb_string_appendc(str, " }");
 		break;
 	}
 

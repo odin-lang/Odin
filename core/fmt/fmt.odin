@@ -2331,13 +2331,19 @@ fmt_bit_field :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Bit
 		io.write_string(fi.writer, name, &fi.n)
 		io.write_string(fi.writer, " = ", &fi.n)
 
-
 		bit_offset := info.bit_offsets[i]
 		bit_size := info.bit_sizes[i]
 
 		value := read_bits(([^]byte)(v.data), bit_offset, bit_size)
+		type := info.types[i]
 
-		fmt_value(fi, any{&value, info.types[i].id}, verb)
+		if !reflect.is_unsigned(runtime.type_info_core(type)) {
+			// Sign Extension
+			m := u64(1<<(bit_size-1))
+			value = (value ~ m) - m
+		}
+
+		fmt_value(fi, any{&value, type.id}, verb)
 		if do_trailing_comma { io.write_string(fi.writer, ",\n", &fi.n) }
 
 	}

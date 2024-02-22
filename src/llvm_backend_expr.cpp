@@ -4627,6 +4627,22 @@ gb_internal lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 
 			Selection sel = lookup_field(type, selector, false);
 			GB_ASSERT(sel.entity != nullptr);
+			if (sel.is_bit_field) {
+				lbAddr addr = lb_build_addr(p, se->expr);
+				Type *bf_type = base_type(type_deref(lb_addr_type(addr)));
+				GB_ASSERT(bf_type->kind == Type_BitField);
+
+				lbValue a = lb_addr_get_ptr(p, addr);
+				Selection sub_sel = sel;
+				sub_sel.index.count -= 1;
+				i32 index = sel.index[sel.index.count-1];
+
+				Entity *f = bf_type->BitField.fields[index];
+				u8 bit_size = bf_type->BitField.bit_sizes[index];
+				i64 bit_offset = bf_type->BitField.bit_offsets[index];
+
+				return lb_addr_bit_field(a, f->type, index, bit_offset, bit_size);
+			}
 			if (sel.pseudo_field) {
 				GB_ASSERT(sel.entity->kind == Entity_Procedure || sel.entity->kind == Entity_ProcGroup);
 				Entity *e = entity_of_node(sel_node);

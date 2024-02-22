@@ -485,7 +485,17 @@ gb_internal Type *check_assignment_variable(CheckerContext *ctx, Operand *lhs, O
 	}
 	}
 
+	Entity *lhs_e = entity_of_node(lhs->expr);
+	u8 prev_bit_field_bit_size = ctx->bit_field_bit_size;
+	if (lhs_e && lhs_e->kind == Entity_Variable && lhs_e->Variable.bit_field_bit_size) {
+		// HACK NOTE(bill): This is a bit of a hack, but it will work fine for this use case
+		ctx->bit_field_bit_size = lhs_e->Variable.bit_field_bit_size;
+	}
+
 	check_assignment(ctx, rhs, assignment_type, str_lit("assignment"));
+
+	ctx->bit_field_bit_size = prev_bit_field_bit_size;
+
 	if (rhs->mode == Addressing_Invalid) {
 		return nullptr;
 	}
