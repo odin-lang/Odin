@@ -139,7 +139,7 @@ Entity :: struct {
 	// May be used by (Struct fields and procedure fields):
 	// .Variable
 	// .Constant
-	// This is equal to the "bit size" it this is a `bit_field`s field
+	// This is equal to the negative of the "bit size" it this is a `bit_field`s field
 	field_group_index: i32le,
 
 	// May used by:

@@ -8440,6 +8440,11 @@ gb_internal void check_compound_literal_field_values(CheckerContext *c, Slice<As
 	StringMap<String> fields_visited_through_raw_union = {};
 	defer (string_map_destroy(&fields_visited_through_raw_union));
 
+	String assignment_str = str_lit("structure literal");
+	if (bt->kind == Type_BitField) {
+		assignment_str = str_lit("bit_field literal");
+	}
+
 	for (Ast *elem : elems) {
 		if (elem->kind != Ast_FieldValue) {
 			error(elem, "Mixture of 'field = value' and value elements in a literal is not allowed");
@@ -8461,17 +8466,26 @@ gb_internal void check_compound_literal_field_values(CheckerContext *c, Slice<As
 			continue;
 		}
 
-		Entity *field = bt->Struct.fields[sel.index[0]];
+		Entity *field = nullptr;
+		if (bt->kind == Type_Struct) {
+			field = bt->Struct.fields[sel.index[0]];
+		} else if (bt->kind == Type_BitField) {
+			field = bt->BitField.fields[sel.index[0]];
+		} else {
+			GB_PANIC("Unknown type");
+		}
+
+
 		add_entity_use(c, fv->field, field);
 		if (string_set_update(&fields_visited, name)) {
 			if (sel.index.count > 1) {
 				if (String *found = string_map_get(&fields_visited_through_raw_union, sel.entity->token.string)) {
 					error(fv->field, "Field '%.*s' is already initialized due to a previously assigned struct #raw_union field '%.*s'", LIT(sel.entity->token.string), LIT(*found));
 				} else {
-					error(fv->field, "Duplicate or reused field '%.*s' in structure literal", LIT(sel.entity->token.string));
+					error(fv->field, "Duplicate or reused field '%.*s' in %.*s", LIT(sel.entity->token.string), LIT(assignment_str));
 				}
 			} else {
-				error(fv->field, "Duplicate field '%.*s' in structure literal", LIT(field->token.string));
+				error(fv->field, "Duplicate field '%.*s' in %.*s", LIT(field->token.string), LIT(assignment_str));
 			}
 			continue;
 		} else if (String *found = string_map_get(&fields_visited_through_raw_union, sel.entity->token.string)) {
@@ -8479,11 +8493,13 @@ gb_internal void check_compound_literal_field_values(CheckerContext *c, Slice<As
 			continue;
 		}
 		if (sel.indirect) {
-			error(fv->field, "Cannot assign to the %d-nested anonymous indirect field '%.*s' in a structure literal", cast(int)sel.index.count-1, LIT(name));
+			error(fv->field, "Cannot assign to the %d-nested anonymous indirect field '%.*s' in a %.*s", cast(int)sel.index.count-1, LIT(name), LIT(assignment_str));
 			continue;
 		}
 
 		if (sel.index.count > 1) {
+			GB_ASSERT(bt->kind == Type_Struct);
+
 			if (is_constant) {
 				Type *ft = type;
 				for (i32 index : sel.index) {
@@ -8544,7 +8560,15 @@ gb_internal void check_compound_literal_field_values(CheckerContext *c, Slice<As
 			is_constant = check_is_operand_compound_lit_constant(c, &o);
 		}
 
-		check_assignment(c, &o, field->type, str_lit("structure literal"));
+		u8 prev_bit_field_bit_size = c->bit_field_bit_size;
+		if (field->kind == Entity_Variable && field->Variable.bit_field_bit_size) {
+			// HACK NOTE(bill): This is a bit of a hack, but it will work fine for this use case
+			c->bit_field_bit_size = field->Variable.bit_field_bit_size;
+		}
+
+		check_assignment(c, &o, field->type, assignment_str);
+
+		c->bit_field_bit_size = prev_bit_field_bit_size;
 	}
 }
 
@@ -9346,6 +9370,21 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 		}
 		break;
 	}
+	case Type_BitField: {
+		if (cl->elems.count == 0) {
+			break; // NOTE(bill): No need to init
+		}
+		is_constant = false;
+		if (cl->elems[0]->kind != Ast_FieldValue) {
+			gbString type_str = type_to_string(type);
+			error(node, "%s ('bit_field') compound literals are only allowed to contain 'field = value' elements", type_str);
+			gb_string_free(type_str);
+		} else {
+			check_compound_literal_field_values(c, cl->elems, o, type, is_constant);
+		}
+		break;
+	}
+
 
 	default: {
 		if (cl->elems.count == 0) {
