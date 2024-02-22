@@ -76,15 +76,13 @@ jobs:
       - uses: actions/checkout@v1
       - name: Download LLVM and setup PATH
         run: |
-          brew install llvm@13
+          brew install llvm@13 dylibbundler
           echo "/usr/local/opt/llvm@13/bin" >> $GITHUB_PATH
           TMP_PATH=$(xcrun --show-sdk-path)/user/include
           echo "CPATH=$TMP_PATH" >> $GITHUB_ENV
       - name: build odin
         run: make nightly
-      - name: Odin run
-        run: ./odin run examples/demo
-      - name: Copy artifacts
+      - name: Bundle
         run: |
           mkdir dist
           cp odin dist
@@ -94,6 +92,9 @@ jobs:
           cp -r core dist
           cp -r vendor dist
           cp -r examples dist
+          dylibbundler -b -x dist/odin -d dist/libs -od -p @executable_path/libs
+      - name: Odin run
+        run: ./dist/odin run examples/demo
       - name: Upload artifact
         uses: actions/upload-artifact@v1
         with:
@@ -107,15 +108,13 @@ jobs:
       - uses: actions/checkout@v1
       - name: Download LLVM and setup PATH
         run: |
-          brew install llvm@13
+          brew install llvm@13 dylibbundler
           echo "/opt/homebrew/opt/llvm@13/bin" >> $GITHUB_PATH
           TMP_PATH=$(xcrun --show-sdk-path)/user/include
           echo "CPATH=$TMP_PATH" >> $GITHUB_ENV
       - name: build odin
         run: make nightly
-      - name: Odin run
-        run: ./odin run examples/demo
-      - name: Copy artifacts
+      - name: Bundle
         run: |
           mkdir dist
           cp odin dist
@@ -125,6 +124,9 @@ jobs:
           cp -r core dist
           cp -r vendor dist
           cp -r examples dist
+          dylibbundler -b -x dist/odin -d dist/libs -od -p @executable_path/libs
+      - name: Odin run
+        run: ./dist/odin run examples/demo
       - name: Upload artifact
         uses: actions/upload-artifact@v1
         with:
