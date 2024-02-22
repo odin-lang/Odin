@@ -656,7 +656,7 @@ gb_internal void futex_wait(Futex *addr, Footex val) {
 	for (;;) {
 		int ret = syscall(SYS_futex, addr, FUTEX_WAIT | FUTEX_PRIVATE_FLAG, val, NULL, NULL, 0);
 		if (ret == -1) {
-			if (errno != EAGAIN) {
+			if (errno != EAGAIN && errno != EINTR) {
 				perror("Futex wait");
 				GB_PANIC("Failed in futex wait!\n");
 			} else {

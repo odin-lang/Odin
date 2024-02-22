@@ -1241,7 +1241,7 @@ gb_internal bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, T
 	}
 	case Type_Pointer:
 		if (source->kind == Type_Pointer) {
-			isize level = check_is_assignable_to_using_subtype(source->Pointer.elem, poly->Pointer.elem);
+			isize level = check_is_assignable_to_using_subtype(source->Pointer.elem, poly->Pointer.elem, /*level*/0, /*src_is_ptr*/false, /*allow_polymorphic*/true);
 			if (level > 0) {
 				return true;
 			}
@@ -1413,7 +1413,9 @@ gb_internal bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, T
 				return ok;
 
 			}
-			// return check_is_assignable_to(c, &o, poly);
+
+			// NOTE(bill): Check for subtypes of
+			// return check_is_assignable_to(c, &o, poly); // && is_type_subtype_of_and_allow_polymorphic(o.type, poly);
 		}
 		return false;
 	case Type_Tuple:
