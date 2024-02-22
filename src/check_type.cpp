@@ -89,6 +89,8 @@ gb_internal bool does_field_type_allow_using(Type *t) {
 		return true;
 	} else if (is_type_array(t)) {
 		return t->Array.count <= 4;
+	} else if (is_type_bit_field(t)) {
+		return true;
 	}
 	return false;
 }

@@ -385,6 +385,9 @@ enum : int {
 
 gb_internal bool is_type_comparable(Type *t);
 gb_internal bool is_type_simple_compare(Type *t);
+gb_internal Type *type_deref(Type *t, bool allow_multi_pointer=false);
+gb_internal Type *base_type(Type *t);
+gb_internal Type *alloc_type_multi_pointer(Type *elem);
 
 gb_internal u32 type_info_flags_of_type(Type *type) {
 	if (type == nullptr) {
@@ -762,7 +765,6 @@ gb_internal bool  is_type_proc(Type *t);
 gb_internal bool  is_type_slice(Type *t);
 gb_internal bool  is_type_integer(Type *t);
 gb_internal bool  type_set_offsets(Type *t);
-gb_internal Type *base_type(Type *t);
 
 gb_internal i64 type_size_of_internal(Type *t, TypePath *path);
 gb_internal i64 type_align_of_internal(Type *t, TypePath *path);
@@ -1157,7 +1159,7 @@ gb_internal Type *alloc_type_simd_vector(i64 count, Type *elem, Type *generic_co
 ////////////////////////////////////////////////////////////////
 
 
-gb_internal Type *type_deref(Type *t, bool allow_multi_pointer=false) {
+gb_internal Type *type_deref(Type *t, bool allow_multi_pointer) {
 	if (t != nullptr) {
 		Type *bt = base_type(t);
 		if (bt == nullptr) {
@@ -4260,6 +4262,71 @@ gb_internal Type *alloc_type_proc_from_types(Type **param_types, unsigned param_
 	return t;
 }
 
+
+gb_internal Type *type_from_selection(Type *type, Selection const &sel) {
+	for (i32 index : sel.index) {
+		Type *bt = base_type(type_deref(type));
+		switch (bt->kind) {
+		case Type_Struct:
+			type = bt->Struct.fields[index]->type;
+			break;
+		case Type_Tuple:
+			type = bt->Tuple.variables[index]->type;
+			break;
+		case Type_BitField:
+			type = bt->BitField.fields[index]->type;
+			break;
+		case Type_Array:
+			type = bt->Array.elem;
+			break;
+		case Type_EnumeratedArray:
+			type = bt->Array.elem;
+			break;
+		case Type_Slice:
+			switch (index) {
+			case 0: type = alloc_type_multi_pointer(bt->Slice.elem); break;
+			case 1: type = t_int;                                    break;
+			}
+			break;
+		case Type_DynamicArray:
+			switch (index) {
+			case 0: type = alloc_type_multi_pointer(bt->DynamicArray.elem); break;
+			case 1: type = t_int;                                           break;
+			case 2: type = t_int;                                           break;
+			case 3: type = t_allocator;                                     break;
+			}
+			break;
+		case Type_Map:
+			switch (index) {
+			case 0: type = t_uintptr;   break;
+			case 1: type = t_int;       break;
+			case 2: type = t_allocator; break;
+			}
+			break;
+		case Type_Basic:
+			if (is_type_complex_or_quaternion(bt)) {
+				type = base_complex_elem_type(bt);
+			} else {
+				switch (type->Basic.kind) {
+				case Basic_any:
+					switch (index) {
+					case 0: type = t_rawptr; break;
+					case 1: type = t_typeid; break;
+					}
+					break;
+				case Basic_string:
+					switch (index) {
+					case 0: type = t_u8_multi_ptr; break;
+					case 1: type = t_int;          break;
+					}
+					break;
+				}
+			}
+			break;
+		}
+	}
+	return type;
+}
 
 
 gb_internal gbString write_type_to_string(gbString str, Type *type, bool shorthand=false) {
