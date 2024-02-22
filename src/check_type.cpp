@@ -927,7 +927,7 @@ gb_internal void check_enum_type(CheckerContext *ctx, Type *enum_type, Type *nam
 
 gb_internal bool is_valid_bit_field_backing_type(Type *type) {
 	if (type == nullptr) {
-		return nullptr;
+		return false;
 	}
 	type = base_type(type);
 	if (is_type_untyped(type)) {
