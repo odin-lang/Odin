@@ -893,7 +893,7 @@ gb_internal OdinDocEntityIndex odin_doc_add_entity(OdinDocWriter *w, Entity *e) 
 		}
 
 		if (e->flags & EntityFlag_BitFieldField) {
-			field_group_index = cast(i32)e->Variable.bit_field_bit_size;
+			field_group_index = -cast(i32)e->Variable.bit_field_bit_size;
 		} else {
 			field_group_index = e->Variable.field_group_index;
 		}
