@@ -31,6 +31,8 @@ _mkdir_all :: proc(path: string, perm: File_Mode) -> Error {
 		return p, false, nil
 	}
 
+	_TEMP_ALLOCATOR_GUARD()
+
 	dir, err := stat(path, _temp_allocator())
 	if err == nil {
 		if dir.is_directory {
@@ -124,6 +126,8 @@ _fix_long_path_internal :: proc(path: string) -> string {
 	if !_is_abs(path) { // relative path
 		return path
 	}
+
+	_TEMP_ALLOCATOR_GUARD()
 
 	PREFIX :: `\\?`
 	path_buf := make([]byte, len(PREFIX)+len(path)+1, _temp_allocator())

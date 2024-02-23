@@ -282,6 +282,15 @@ struct TypeProc {
 		Type *generic_column_count;                       \
 		i64   stride_in_bytes;                            \
 	})                                                        \
+	TYPE_KIND(BitField, struct {                              \
+		Scope *         scope;                            \
+		Type *          backing_type;                     \
+		Slice<Entity *> fields;                           \
+		String *        tags; /*count == fields.count*/   \
+		Slice<u8>       bit_sizes;                        \
+		Slice<i64>      bit_offsets;                      \
+		Ast *           node;                             \
+	})                                                        \
 	TYPE_KIND(SoaPointer, struct { Type *elem; })
 
 
@@ -355,6 +364,7 @@ enum Typeid_Kind : u8 {
 	Typeid_Relative_Multi_Pointer,
 	Typeid_Matrix,
 	Typeid_SoaPointer,
+	Typeid_Bit_Field,
 };
 
 // IMPORTANT NOTE(bill): This must match the same as the in core.odin
@@ -376,6 +386,9 @@ enum : int {
 
 gb_internal bool is_type_comparable(Type *t);
 gb_internal bool is_type_simple_compare(Type *t);
+gb_internal Type *type_deref(Type *t, bool allow_multi_pointer=false);
+gb_internal Type *base_type(Type *t);
+gb_internal Type *alloc_type_multi_pointer(Type *elem);
 
 gb_internal u32 type_info_flags_of_type(Type *type) {
 	if (type == nullptr) {
@@ -400,6 +413,7 @@ struct Selection {
 	bool       indirect; // Set if there was a pointer deref anywhere down the line
 	u8 swizzle_count;    // maximum components = 4
 	u8 swizzle_indices;  // 2 bits per component, representing which swizzle index
+	bool is_bit_field;
 	bool pseudo_field;
 };
 gb_global Selection const empty_selection = {0};
@@ -641,6 +655,7 @@ gb_global Type *t_type_info_relative_pointer     = nullptr;
 gb_global Type *t_type_info_relative_multi_pointer = nullptr;
 gb_global Type *t_type_info_matrix               = nullptr;
 gb_global Type *t_type_info_soa_pointer          = nullptr;
+gb_global Type *t_type_info_bit_field            = nullptr;
 
 gb_global Type *t_type_info_named_ptr            = nullptr;
 gb_global Type *t_type_info_integer_ptr          = nullptr;
@@ -670,6 +685,7 @@ gb_global Type *t_type_info_relative_pointer_ptr = nullptr;
 gb_global Type *t_type_info_relative_multi_pointer_ptr = nullptr;
 gb_global Type *t_type_info_matrix_ptr           = nullptr;
 gb_global Type *t_type_info_soa_pointer_ptr      = nullptr;
+gb_global Type *t_type_info_bit_field_ptr        = nullptr;
 
 gb_global Type *t_allocator                      = nullptr;
 gb_global Type *t_allocator_ptr                  = nullptr;
@@ -750,7 +766,6 @@ gb_internal bool  is_type_proc(Type *t);
 gb_internal bool  is_type_slice(Type *t);
 gb_internal bool  is_type_integer(Type *t);
 gb_internal bool  type_set_offsets(Type *t);
-gb_internal Type *base_type(Type *t);
 
 gb_internal i64 type_size_of_internal(Type *t, TypePath *path);
 gb_internal i64 type_align_of_internal(Type *t, TypePath *path);
@@ -1040,6 +1055,11 @@ gb_internal Type *alloc_type_enum() {
 	return t;
 }
 
+gb_internal Type *alloc_type_bit_field() {
+	Type *t = alloc_type(Type_BitField);
+	return t;
+}
+
 gb_internal Type *alloc_type_relative_pointer(Type *pointer_type, Type *base_integer) {
 	GB_ASSERT(is_type_pointer(pointer_type));
 	GB_ASSERT(is_type_integer(base_integer));
@@ -1140,7 +1160,7 @@ gb_internal Type *alloc_type_simd_vector(i64 count, Type *elem, Type *generic_co
 ////////////////////////////////////////////////////////////////
 
 
-gb_internal Type *type_deref(Type *t, bool allow_multi_pointer=false) {
+gb_internal Type *type_deref(Type *t, bool allow_multi_pointer) {
 	if (t != nullptr) {
 		Type *bt = base_type(t);
 		if (bt == nullptr) {
@@ -1706,6 +1726,10 @@ gb_internal bool is_type_enum(Type *t) {
 gb_internal bool is_type_bit_set(Type *t) {
 	t = base_type(t);
 	return (t->kind == Type_BitSet);
+}
+gb_internal bool is_type_bit_field(Type *t) {
+	t = base_type(t);
+	return (t->kind == Type_BitField);
 }
 gb_internal bool is_type_map(Type *t) {
 	t = base_type(t);
@@ -3168,6 +3192,21 @@ gb_internal Selection lookup_field_with_selection(Type *type_, String field_name
 			else if (field_name == "a") mapped_field_name = str_lit("w");
 			return lookup_field_with_selection(type, mapped_field_name, is_type, sel, allow_blank_ident);
 		}
+	} else if (type->kind == Type_BitField) {
+		for_array(i, type->BitField.fields) {
+			Entity *f = type->BitField.fields[i];
+			if (f->kind != Entity_Variable || (f->flags & EntityFlag_Field) == 0) {
+				continue;
+			}
+			String str = f->token.string;
+			if (field_name == str) {
+				selection_add_index(&sel, i);  // HACK(bill): Leaky memory
+				sel.entity = f;
+				sel.is_bit_field = true;
+				return sel;
+			}
+		}
+
 	} else if (type->kind == Type_Basic) {
 		switch (type->Basic.kind) {
 		case Basic_any: {
@@ -3568,6 +3607,8 @@ gb_internal i64 type_align_of_internal(Type *t, TypePath *path) {
 	case Type_Slice:
 		return build_context.int_size;
 
+	case Type_BitField:
+		return type_align_of_internal(t->BitField.backing_type, path);
 
 	case Type_Tuple: {
 		i64 max = 1;
@@ -3943,6 +3984,9 @@ gb_internal i64 type_size_of_internal(Type *t, TypePath *path) {
 		return stride_in_bytes * t->Matrix.column_count;
 	}
 
+	case Type_BitField:
+		return type_size_of_internal(t->BitField.backing_type, path);
+
 	case Type_RelativePointer:
 		return type_size_of_internal(t->RelativePointer.base_integer, path);
 	case Type_RelativeMultiPointer:
@@ -4114,8 +4158,10 @@ gb_internal isize check_is_assignable_to_using_subtype(Type *src, Type *dst, isi
 		}
 		if (allow_polymorphic && dst_is_polymorphic) {
 			Type *fb = base_type(type_deref(f->type));
-			if (fb->kind == Type_Struct && fb->Struct.polymorphic_parent == dst) {
-				return true;
+			if (fb->kind == Type_Struct) {
+				if (fb->Struct.polymorphic_parent == dst) {
+					return true;
+				}
 			}
 		}
 
@@ -4217,7 +4263,70 @@ gb_internal Type *alloc_type_proc_from_types(Type **param_types, unsigned param_
 	return t;
 }
 
-
+// gb_internal Type *type_from_selection(Type *type, Selection const &sel) {
+// 	for (i32 index : sel.index) {
+// 		Type *bt = base_type(type_deref(type));
+// 		switch (bt->kind) {
+// 		case Type_Struct:
+// 			type = bt->Struct.fields[index]->type;
+// 			break;
+// 		case Type_Tuple:
+// 			type = bt->Tuple.variables[index]->type;
+// 			break;
+// 		case Type_BitField:
+// 			type = bt->BitField.fields[index]->type;
+// 			break;
+// 		case Type_Array:
+// 			type = bt->Array.elem;
+// 			break;
+// 		case Type_EnumeratedArray:
+// 			type = bt->Array.elem;
+// 			break;
+// 		case Type_Slice:
+// 			switch (index) {
+// 			case 0: type = alloc_type_multi_pointer(bt->Slice.elem); break;
+// 			case 1: type = t_int;                                    break;
+// 			}
+// 			break;
+// 		case Type_DynamicArray:
+// 			switch (index) {
+// 			case 0: type = alloc_type_multi_pointer(bt->DynamicArray.elem); break;
+// 			case 1: type = t_int;                                           break;
+// 			case 2: type = t_int;                                           break;
+// 			case 3: type = t_allocator;                                     break;
+// 			}
+// 			break;
+// 		case Type_Map:
+// 			switch (index) {
+// 			case 0: type = t_uintptr;   break;
+// 			case 1: type = t_int;       break;
+// 			case 2: type = t_allocator; break;
+// 			}
+// 			break;
+// 		case Type_Basic:
+// 			if (is_type_complex_or_quaternion(bt)) {
+// 				type = base_complex_elem_type(bt);
+// 			} else {
+// 				switch (type->Basic.kind) {
+// 				case Basic_any:
+// 					switch (index) {
+// 					case 0: type = t_rawptr; break;
+// 					case 1: type = t_typeid; break;
+// 					}
+// 					break;
+// 				case Basic_string:
+// 					switch (index) {
+// 					case 0: type = t_u8_multi_ptr; break;
+// 					case 1: type = t_int;          break;
+// 					}
+// 					break;
+// 				}
+// 			}
+// 			break;
+// 		}
+// 	}
+// 	return type;
+// }
 
 gb_internal gbString write_type_to_string(gbString str, Type *type, bool shorthand=false) {
 	if (type == nullptr) {
@@ -4524,6 +4633,23 @@ gb_internal gbString write_type_to_string(gbString str, Type *type, bool shortha
 	case Type_Matrix:
 		str = gb_string_appendc(str, gb_bprintf("matrix[%d, %d]", cast(int)type->Matrix.row_count, cast(int)type->Matrix.column_count));
 		str = write_type_to_string(str, type->Matrix.elem);
+		break;
+
+	case Type_BitField:
+		str = gb_string_appendc(str, "bit_field ");
+		str = write_type_to_string(str, type->BitField.backing_type);
+		str = gb_string_appendc(str, " {");
+		for (isize i = 0; i < type->BitField.fields.count; i++) {
+			Entity *f = type->BitField.fields[i];
+			if (i > 0) {
+				str = gb_string_appendc(str, ", ");
+			}
+			str = gb_string_append_length(str, f->token.string.text, f->token.string.len);
+			str = gb_string_appendc(str, ": ");
+			str = write_type_to_string(str, f->type);
+			str = gb_string_append_fmt(str, " | %u", type->BitField.bit_sizes[i]);
+		}
+		str = gb_string_appendc(str, " }");
 		break;
 	}
 

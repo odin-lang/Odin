@@ -181,6 +181,14 @@ Type_Info_Matrix :: struct {
 Type_Info_Soa_Pointer :: struct {
 	elem: ^Type_Info,
 }
+Type_Info_Bit_Field :: struct {
+	backing_type: ^Type_Info,
+	names:        []string,
+	types:        []^Type_Info,
+	bit_sizes:    []uintptr,
+	bit_offsets:  []uintptr,
+	tags:         []string,
+}
 
 Type_Info_Flag :: enum u8 {
 	Comparable     = 0,
@@ -223,6 +231,7 @@ Type_Info :: struct {
 		Type_Info_Relative_Multi_Pointer,
 		Type_Info_Matrix,
 		Type_Info_Soa_Pointer,
+		Type_Info_Bit_Field,
 	},
 }
 
@@ -256,6 +265,7 @@ Typeid_Kind :: enum u8 {
 	Relative_Multi_Pointer,
 	Matrix,
 	Soa_Pointer,
+	Bit_Field,
 }
 #assert(len(Typeid_Kind) < 32)
 

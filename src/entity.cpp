@@ -43,6 +43,7 @@ enum EntityFlag : u64 {
 	EntityFlag_NoAlias       = 1ull<<9,
 	EntityFlag_TypeField     = 1ull<<10,
 	EntityFlag_Value         = 1ull<<11,
+	EntityFlag_BitFieldField = 1ull<<12,
 
 
 
@@ -212,6 +213,7 @@ struct Entity {
 			Ast *init_expr; // only used for some variables within procedure bodies
 			i32  field_index;
 			i32  field_group_index;
+			u8   bit_field_bit_size;
 
 			ParameterValue param_value;
 

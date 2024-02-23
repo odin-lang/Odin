@@ -615,6 +615,20 @@ gb_internal OdinDocTypeIndex odin_doc_type(OdinDocWriter *w, Type *type) {
 			doc_type.types = odin_write_slice(w, types, gb_count_of(types));
 		}
 		break;
+	case Type_BitField:
+		doc_type.kind = OdinDocType_BitField;
+		{
+			auto fields = array_make<OdinDocEntityIndex>(heap_allocator(), type->BitField.fields.count);
+			defer (array_free(&fields));
+
+			for_array(i, type->BitField.fields) {
+				fields[i] = odin_doc_add_entity(w, type->BitField.fields[i]);
+			}
+			doc_type.entities = odin_write_slice(w, fields.data, fields.count);
+			doc_type.types = odin_doc_type_as_slice(w, type->BitField.backing_type);
+		}
+		break;
+
 	case Type_Struct:
 		doc_type.kind = OdinDocType_Struct;
 		if (type->Struct.soa_kind != StructSoa_None) {
@@ -863,6 +877,10 @@ gb_internal OdinDocEntityIndex odin_doc_add_entity(OdinDocWriter *w, Entity *e) 
 		}
 		break;
 	case Entity_Variable:
+		if (e->flags & EntityFlag_BitFieldField) {
+			flags |= OdinDocEntityFlag_BitField_Field;
+		}
+
 		if (e->Variable.is_foreign) { flags |= OdinDocEntityFlag_Foreign; }
 		if (e->Variable.is_export)  { flags |= OdinDocEntityFlag_Export;  }
 		if (e->Variable.thread_local_model != "") {
@@ -873,7 +891,12 @@ gb_internal OdinDocEntityIndex odin_doc_add_entity(OdinDocWriter *w, Entity *e) 
 		if (init_expr == nullptr) {
 			init_expr = e->Variable.init_expr;
 		}
-		field_group_index = e->Variable.field_group_index;
+
+		if (e->flags & EntityFlag_BitFieldField) {
+			field_group_index = -cast(i32)e->Variable.bit_field_bit_size;
+		} else {
+			field_group_index = e->Variable.field_group_index;
+		}
 		break;
 	case Entity_Constant:
 		field_group_index = e->Constant.field_group_index;

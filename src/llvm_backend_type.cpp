@@ -1788,6 +1788,77 @@ gb_internal void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup 
 				lb_emit_store(p, tag, res);
 			}
 			break;
+
+		case Type_BitField:
+			{
+				tag = lb_const_ptr_cast(m, variant_ptr, t_type_info_bit_field_ptr);
+				LLVMValueRef vals[6] = {};
+
+				vals[0] = lb_type_info(m, t->BitField.backing_type).value;
+				isize count = t->BitField.fields.count;
+				if (count > 0) {
+					i64 names_offset       = 0;
+					i64 types_offset       = 0;
+					i64 bit_sizes_offset   = 0;
+					i64 bit_offsets_offset = 0;
+					i64 tags_offset        = 0;
+					lbValue memory_names       = lb_type_info_member_names_offset  (m, count, &names_offset);
+					lbValue memory_types       = lb_type_info_member_types_offset  (m, count, &types_offset);
+					lbValue memory_bit_sizes   = lb_type_info_member_offsets_offset(m, count, &bit_sizes_offset);
+					lbValue memory_bit_offsets = lb_type_info_member_offsets_offset(m, count, &bit_offsets_offset);
+					lbValue memory_tags        = lb_type_info_member_tags_offset   (m, count, &tags_offset);
+
+					u64 bit_offset = 0;
+					for (isize source_index = 0; source_index < count; source_index++) {
+						Entity *f = t->BitField.fields[source_index];
+						u64 bit_size = cast(u64)t->BitField.bit_sizes[source_index];
+
+						lbValue index = lb_const_int(m, t_int, source_index);
+						if (f->token.string.len > 0) {
+							lbValue name_ptr = lb_emit_ptr_offset(p, memory_names, index);
+							lb_emit_store(p, name_ptr, lb_const_string(m, f->token.string));
+						}
+						lbValue type_ptr       = lb_emit_ptr_offset(p, memory_types, index);
+						lbValue bit_size_ptr   = lb_emit_ptr_offset(p, memory_bit_sizes, index);
+						lbValue bit_offset_ptr = lb_emit_ptr_offset(p, memory_bit_offsets, index);
+
+						lb_emit_store(p, type_ptr,       lb_type_info(m, f->type));
+						lb_emit_store(p, bit_size_ptr,   lb_const_int(m, t_uintptr, bit_size));
+						lb_emit_store(p, bit_offset_ptr, lb_const_int(m, t_uintptr, bit_offset));
+
+						if (t->BitField.tags) {
+							String tag = t->BitField.tags[source_index];
+							if (tag.len > 0) {
+								lbValue tag_ptr = lb_emit_ptr_offset(p, memory_tags, index);
+								lb_emit_store(p, tag_ptr, lb_const_string(m, tag));
+							}
+						}
+
+						bit_offset += bit_size;
+					}
+
+					lbValue cv = lb_const_int(m, t_int, count);
+					vals[1] = llvm_const_slice(m, memory_names,       cv);
+					vals[2] = llvm_const_slice(m, memory_types,       cv);
+					vals[3] = llvm_const_slice(m, memory_bit_sizes,   cv);
+					vals[4] = llvm_const_slice(m, memory_bit_offsets, cv);
+					vals[5] = llvm_const_slice(m, memory_tags,        cv);
+				}
+
+				for (isize i = 0; i < gb_count_of(vals); i++) {
+					if (vals[i] == nullptr) {
+						vals[i]  = LLVMConstNull(lb_type(m, get_struct_field_type(tag.type, i)));
+					}
+				}
+
+				lbValue res = {};
+				res.type = type_deref(tag.type);
+				res.value = llvm_const_named_struct(m, res.type, vals, gb_count_of(vals));
+				lb_emit_store(p, tag, res);
+
+				break;
+			}
+
 		}
 
 
