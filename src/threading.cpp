@@ -831,49 +831,115 @@ gb_internal void futex_wait(Futex *f, Footex val) {
 		WaitOnAddress(f, (void *)&val, sizeof(val), INFINITE);
 	} while (f->load() == val);
 }
+
 #elif defined(GB_SYSTEM_HAIKU)
 
-#include <pthread.h>
-#include <unordered_map>
-#include <memory>
+// Futex implementation taken from https://tavianator.com/2023/futex.html
 
-struct MutexCond {
-    pthread_mutex_t mutex;
-    pthread_cond_t cond;
+#include <pthread.h>
+#include <atomic>
+ 
+struct Futex_Wait_Node {
+	pthread_t thread;
+	Futex *futex;
+	Futex_Wait_Node *prev, *next;	
+};
+ 
+struct Futex_Wait_Queue {
+	std::atomic_flag spinlock;
+	Futex_Wait_Node list;
+ 
+	void lock() {
+		while (spinlock.test_and_set(std::memory_order_acquire)) {
+			; // spin...
+		}	
+	}
+ 
+	void unlock() {
+		spinlock.clear(std::memory_order_release);
+	}
 };
 
-std::unordered_map<Futex*, std::unique_ptr<MutexCond>> futex_map;
-
-MutexCond* get_mutex_cond(Futex* f) {
-	if (futex_map.find(f) == futex_map.end()) {
-		futex_map[f] = std::make_unique<MutexCond>();
-		pthread_mutex_init(&futex_map[f]->mutex, NULL);
-		pthread_cond_init(&futex_map[f]->cond, NULL);
-	}
-	return futex_map[f].get();
+// FIXME: This approach may scale badly in the future,
+// possible solution - hash map (leads to deadlocks now).
+ 
+Futex_Wait_Queue g_waitq = {
+	.spinlock = ATOMIC_FLAG_INIT,
+	.list = {
+		.prev = &g_waitq.list,
+		.next = &g_waitq.list,
+	},
+};
+ 
+Futex_Wait_Queue *get_wait_queue(Futex *f) {
+	// Future hash map method...
+	return &g_waitq;
 }
-
+ 
 void futex_signal(Futex *f) {
-	MutexCond* mc = get_mutex_cond(f);
-	pthread_mutex_lock(&mc->mutex);
-	pthread_cond_signal(&mc->cond);
-	pthread_mutex_unlock(&mc->mutex);
-}
-
-void futex_broadcast(Futex *f) {
-	MutexCond* mc = get_mutex_cond(f);
-	pthread_mutex_lock(&mc->mutex);
-	pthread_cond_broadcast(&mc->cond);
-	pthread_mutex_unlock(&mc->mutex);
-}
-
-void futex_wait(Futex *f, Footex val) {
-	MutexCond* mc = get_mutex_cond(f);
-	pthread_mutex_lock(&mc->mutex);
-	while (f->load() == val) {
-		pthread_cond_wait(&mc->cond, &mc->mutex);
+	auto waitq = get_wait_queue(f);
+ 
+	waitq->lock();
+ 
+	auto head = &waitq->list;
+	for (auto waiter = head->next; waiter != head; waiter = waiter->next) {
+		if (waiter->futex == f) {
+			pthread_kill(waiter->thread, SIGCONT);
+			break;
+		}	
 	}
-	pthread_mutex_unlock(&mc->mutex);
+ 
+	waitq->unlock();
+}
+ 
+void futex_broadcast(Futex *f) {
+	auto waitq = get_wait_queue(f);
+ 
+	waitq->lock();
+ 
+	auto head = &waitq->list;
+	for (auto waiter = head->next; waiter != head; waiter = waiter->next) {
+		if (waiter->futex == f) {
+			pthread_kill(waiter->thread, SIGCONT);
+		}	
+	}
+ 
+	waitq->unlock();
+}
+ 
+void futex_wait(Futex *f, Footex val) {
+	auto waitq = get_wait_queue(f);
+ 
+	waitq->lock();
+ 
+	auto head = &waitq->list;
+	Wait_Node waiter;
+	waiter.thread = pthread_self();
+	waiter.futex = f;
+	waiter.prev = head;
+	waiter.next = head->next;
+ 
+	waiter.prev->next = &waiter;
+	waiter.next->prev = &waiter;
+ 
+	sigset_t old_mask, mask;
+	sigemptyset(&mask);
+	sigaddset(&mask, SIGCONT);
+	pthread_sigmask(SIG_BLOCK, &mask, &old_mask);
+ 
+	if (*f == val) {
+		waitq->unlock();
+		int sig;
+		sigwait(&mask, &sig);
+		waitq->lock();
+	}
+ 
+	waiter.prev->next = waiter.next;
+	waiter.next->prev = waiter.prev;
+ 
+	pthread_sigmask(SIG_SETMASK, &old_mask, NULL);
+ 
+	waitq->unlock();
 }
 
 #endif
