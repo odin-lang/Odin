@@ -55,7 +55,7 @@ OS_Stat :: struct {
 	status_change: Unix_File_Time,	// time of last file status change
 	birthtime:	Unix_File_Time,	// time of file creation
 
-	type: u32                       // attribute/index type
+	type: u32,                      // attribute/index type
 
 	blocks: blkcnt_t,		// blocks allocated for file
 }
@@ -120,6 +120,19 @@ foreign libc {
 	@(link_name="dlclose")	_unix_dlclose	:: proc(handle: rawptr) -> c.int ---
 	@(link_name="dlerror")	_unix_dlerror	:: proc() -> cstring ---
 }
+
+MAXNAMLEN :: 255
+
+Dirent :: struct {
+	dev:      dev_t,
+	pdef:     dev_t,
+	ino:      ino_t,
+	pino:     ino_t,
+	reclen:   u16,
+	name:     [MAXNAMLEN + 1]byte, // name
+}
+
+Dir :: distinct rawptr // DIR*
 
 is_path_separator :: proc(r: rune) -> bool {
 	return r == '/'
