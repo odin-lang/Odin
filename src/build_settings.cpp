@@ -885,6 +885,8 @@ gb_internal String internal_odin_root_dir(void) {
 
 #include <FindDirectory.h>
 
+gb_internal String path_to_fullpath(gbAllocator a, String s, bool *ok_);
+
 gb_internal String internal_odin_root_dir(void) {
 	String path = global_module_path;
 	isize len, i;

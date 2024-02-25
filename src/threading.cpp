@@ -915,7 +915,7 @@ void futex_wait(Futex *f, Footex val) {
 	waitq->lock();
  
 	auto head = &waitq->list;
-	Wait_Node waiter;
+	Futex_Wait_Node waiter;
 	waiter.thread = pthread_self();
 	waiter.futex = f;
 	waiter.prev = head;
