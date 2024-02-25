@@ -32,6 +32,7 @@ uid_t :: distinct u32
 gid_t :: distinct u32
 blksize_t :: distinct i32
 blkcnt_t :: distinct i64
+time_t   :: i64
 
 
 Unix_File_Time :: struct {
@@ -212,6 +213,9 @@ file_size :: proc(fd: Handle) -> (i64, Errno) {
 	}
 	return s.size, ERROR_NONE
 }
+
+// "Argv" arguments converted to Odin strings
+args := _alloc_command_line_arguments()
 
 _alloc_command_line_arguments :: proc() -> []string {
 	res := make([]string, len(runtime.args__))
