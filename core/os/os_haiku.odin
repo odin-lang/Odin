@@ -23,7 +23,7 @@ stdout: Handle = 1
 stderr: Handle = 2
 
 pid_t :: distinct i32
-off_t :: distinct i64
+off_t :: i64
 dev_t :: distinct i32
 ino_t :: distinct i64
 mode_t :: distinct u32
@@ -223,4 +223,158 @@ _alloc_command_line_arguments :: proc() -> []string {
 		res[i] = string(arg)
 	}
 	return res
+}
+
+@private
+_stat :: proc(path: string) -> (OS_Stat, Errno) {
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
+	cstr := strings.clone_to_cstring(path, context.temp_allocator)
+
+	// deliberately uninitialized
+	s: OS_Stat = ---
+	res := _unix_stat(cstr, &s)
+	if res == -1 {
+		return s, Errno(get_last_error())
+	}
+	return s, ERROR_NONE
+}
+
+@private
+_lstat :: proc(path: string) -> (OS_Stat, Errno) {
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
+	cstr := strings.clone_to_cstring(path, context.temp_allocator)
+
+	// deliberately uninitialized
+	s: OS_Stat = ---
+	res := _unix_lstat(cstr, &s)
+	if res == -1 {
+		return s, Errno(get_last_error())
+	}
+	return s, ERROR_NONE
+}
+
+@private
+_fstat :: proc(fd: Handle) -> (OS_Stat, Errno) {
+	// deliberately uninitialized
+	s: OS_Stat = ---
+	res := _unix_fstat(fd, &s)
+	if res == -1 {
+		return s, Errno(get_last_error())
+	}
+	return s, ERROR_NONE
+}
+
+@private
+_fdopendir :: proc(fd: Handle) -> (Dir, Errno) {
+	dirp := _unix_fdopendir(fd)
+	if dirp == cast(Dir)nil {
+		return nil, Errno(get_last_error())
+	}
+	return dirp, ERROR_NONE
+}
+
+@private
+_closedir :: proc(dirp: Dir) -> Errno {
+	rc := _unix_closedir(dirp)
+	if rc != 0 {
+		return Errno(get_last_error())
+	}
+	return ERROR_NONE
+}
+
+@private
+_rewinddir :: proc(dirp: Dir) {
+	_unix_rewinddir(dirp)
+}
+
+@private
+_readdir :: proc(dirp: Dir) -> (entry: Dirent, err: Errno, end_of_stream: bool) {
+	result: ^Dirent
+	rc := _unix_readdir_r(dirp, &entry, &result)
+
+	if rc != 0 {
+		err = Errno(get_last_error())
+		return
+	}
+	err = ERROR_NONE
+
+	if result == nil {
+		end_of_stream = true
+		return
+	}
+
+	return
+}
+
+@private
+_readlink :: proc(path: string) -> (string, Errno) {
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD(ignore = context.temp_allocator == context.allocator)
+	path_cstr := strings.clone_to_cstring(path, context.temp_allocator)
+
+	bufsz : uint = MAX_PATH
+	buf := make([]byte, MAX_PATH)
+	for {
+		rc := _unix_readlink(path_cstr, &(buf[0]), bufsz)
+		if rc == -1 {
+			delete(buf)
+			return "", Errno(get_last_error())
+		} else if rc == int(bufsz) {
+			bufsz += MAX_PATH
+			delete(buf)
+			buf = make([]byte, bufsz)
+		} else {
+			return strings.string_from_ptr(&buf[0], rc), ERROR_NONE
+		}	
+	}
+}
+
+// XXX OpenBSD
+absolute_path_from_handle :: proc(fd: Handle) -> (string, Errno) {
+	return "", Errno(ENOSYS)
+}
+
+absolute_path_from_relative :: proc(rel: string) -> (path: string, err: Errno) {
+	rel := rel
+	if rel == "" {
+		rel = "."
+	}
+
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD(ignore = context.temp_allocator == context.allocator)
+	rel_cstr := strings.clone_to_cstring(rel, context.temp_allocator)
+
+	path_ptr := _unix_realpath(rel_cstr, nil)
+	if path_ptr == nil {
+		return "", Errno(get_last_error())
+	}
+	defer _unix_free(path_ptr)
+
+	path_cstr := transmute(cstring)path_ptr
+	path = strings.clone( string(path_cstr) )
+
+	return path, ERROR_NONE
+}
+
+access :: proc(path: string, mask: int) -> (bool, Errno) {
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
+	cstr := strings.clone_to_cstring(path, context.temp_allocator)
+	res := _unix_access(cstr, c.int(mask))
+	if res == -1 {
+		return false, Errno(get_last_error())
+	}
+	return true, ERROR_NONE
+}
+
+lookup_env :: proc(key: string, allocator := context.allocator) -> (value: string, found: bool) {
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD(ignore = context.temp_allocator == allocator)
+	path_str := strings.clone_to_cstring(key, context.temp_allocator)
+	cstr := _unix_getenv(path_str)
+	if cstr == nil {
+		return "", false
+	}
+	return strings.clone(string(cstr), allocator), true
+}
+
+get_env :: proc(key: string, allocator := context.allocator) -> (value: string) {
+	value, _ = lookup_env(key, allocator)
+	return
 }
