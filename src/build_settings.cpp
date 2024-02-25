@@ -79,6 +79,7 @@ gb_global String target_os_names[TargetOs_COUNT] = {
 	str_lit("essence"),
 	str_lit("freebsd"),
 	str_lit("openbsd"),
+	str_lit("haiku"),
 	
 	str_lit("wasi"),
 	str_lit("js"),
