@@ -84,6 +84,8 @@ enum lbAddrKind {
 
 	lbAddr_Swizzle,
 	lbAddr_SwizzleLarge,
+
+	lbAddr_BitField,
 };
 
 struct lbAddr {
@@ -118,6 +120,12 @@ struct lbAddr {
 			Type *type;
 			Slice<i32> indices;
 		} swizzle_large;
+		struct {
+			Type *type;
+			i64 index;
+			i64 bit_offset;
+			i64 bit_size;
+		} bitfield;
 	};
 };
 

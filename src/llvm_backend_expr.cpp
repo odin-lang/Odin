@@ -1946,6 +1946,24 @@ gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 		}
 	}
 
+	// bit_field <-> backing type
+	if (is_type_bit_field(src)) {
+		if (are_types_identical(src->BitField.backing_type, dst)) {
+			lbValue res = {};
+			res.type = t;
+			res.value = value.value;
+			return res;
+		}
+	}
+	if (is_type_bit_field(dst)) {
+		if (are_types_identical(src, dst->BitField.backing_type)) {
+			lbValue res = {};
+			res.type = t;
+			res.value = value.value;
+			return res;
+		}
+	}
+
 
 	// Pointer <-> uintptr
 	if (is_type_pointer(src) && is_type_uintptr(dst)) {
@@ -4217,6 +4235,38 @@ gb_internal lbAddr lb_build_addr_compound_lit(lbProcedure *p, Ast *expr) {
 	switch (bt->kind) {
 	default: GB_PANIC("Unknown CompoundLit type: %s", type_to_string(type)); break;
 
+	case Type_BitField:
+		for (Ast *elem : cl->elems) {
+			ast_node(fv, FieldValue, elem);
+			String name = fv->field->Ident.token.string;
+			Selection sel = lookup_field(bt, name, false);
+			GB_ASSERT(sel.is_bit_field);
+			GB_ASSERT(!sel.indirect);
+			GB_ASSERT(sel.index.count == 1);
+			GB_ASSERT(sel.entity != nullptr);
+
+			i64 index = sel.index[0];
+			i64 bit_offset = 0;
+			i64 bit_size = -1;
+			for_array(i, bt->BitField.fields) {
+				Entity *f = bt->BitField.fields[i];
+				if (f == sel.entity) {
+					bit_offset = bt->BitField.bit_offsets[i];
+					bit_size   = bt->BitField.bit_sizes[i];
+					break;
+				}
+			}
+			GB_ASSERT(bit_size > 0);
+
+			Type *field_type = sel.entity->type;
+			lbValue field_expr = lb_build_expr(p, fv->value);
+			field_expr = lb_emit_conv(p, field_expr, field_type);
+
+			lbAddr field_addr = lb_addr_bit_field(v.addr, field_type, index, bit_offset, bit_size);
+			lb_addr_store(p, field_addr, field_expr);
+		}
+		return v;
+
 	case Type_Struct: {
 		// TODO(bill): "constant" '#raw_union's are not initialized constantly at the moment.
 		// NOTE(bill): This is due to the layout of the unions when printed to LLVM-IR
@@ -4632,6 +4682,30 @@ gb_internal lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 				Entity *e = entity_of_node(sel_node);
 				GB_ASSERT(e->kind == Entity_Procedure);
 				return lb_addr(lb_find_value_from_entity(p->module, e));
+			}
+
+			if (sel.is_bit_field) {
+				lbAddr addr = lb_build_addr(p, se->expr);
+
+				Selection sub_sel = sel;
+				sub_sel.index.count -= 1;
+
+				lbValue ptr = lb_addr_get_ptr(p, addr);
+				if (sub_sel.index.count > 0) {
+					ptr = lb_emit_deep_field_gep(p, ptr, sub_sel);
+				}
+
+				Type *bf_type = type_deref(ptr.type);
+				bf_type = base_type(type_deref(bf_type));
+				GB_ASSERT(bf_type->kind == Type_BitField);
+
+				i32 index = sel.index[sel.index.count-1];
+
+				Entity *f = bf_type->BitField.fields[index];
+				u8 bit_size = bf_type->BitField.bit_sizes[index];
+				i64 bit_offset = bf_type->BitField.bit_offsets[index];
+
+				return lb_addr_bit_field(ptr, f->type, index, bit_offset, bit_size);
 			}
 
 			{

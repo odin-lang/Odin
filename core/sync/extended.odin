@@ -418,3 +418,27 @@ unpark :: proc "contextless" (p: ^Parker)  {
 		futex_signal(&p.state)
 	}
 }
+
+
+
+// A One_Shot_Event is an associated token which is initially not present:
+//     * The `one_shot_event_wait` blocks the current thread until the event
+//       is made available
+//     * The `one_shot_event_signal` procedure automatically makes the token
+//       available if its was not already.
+One_Shot_Event :: struct #no_copy {
+	state: Futex,
+}
+
+// Blocks the current thread until the event is made available with `one_shot_event_signal`.
+one_shot_event_wait :: proc "contextless" (e: ^One_Shot_Event) {
+	for atomic_load_explicit(&e.state, .Acquire) == 0 {
+		futex_wait(&e.state, 1)
+	}
+}
+
+// Releases any threads that are currently blocked by this event with `one_shot_event_wait`.
+one_shot_event_signal :: proc "contextless" (e: ^One_Shot_Event) {
+	atomic_store_explicit(&e.state, 1, .Release)
+	futex_broadcast(&e.state)
+}

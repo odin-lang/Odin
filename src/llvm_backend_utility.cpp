@@ -1332,7 +1332,7 @@ gb_internal lbValue lb_emit_deep_field_gep(lbProcedure *p, lbValue e, Selection 
 				if (index == 0) {
 					type = t_rawptr;
 				} else if (index == 1) {
-					type = t_type_info_ptr;
+					type = t_typeid;
 				}
 				e = lb_emit_struct_ep(p, e, index);
 				break;

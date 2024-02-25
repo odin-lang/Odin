@@ -313,6 +313,7 @@ gb_internal void add_scope(CheckerContext *c, Ast *node, Scope *scope) {
 	case Ast_StructType:      node->StructType.scope      = scope; break;
 	case Ast_UnionType:       node->UnionType.scope       = scope; break;
 	case Ast_EnumType:        node->EnumType.scope        = scope; break;
+	case Ast_BitFieldType:    node->BitFieldType.scope    = scope; break;
 	default: GB_PANIC("Invalid node for add_scope: %.*s", LIT(ast_strings[node->kind]));
 	}
 }
@@ -334,6 +335,7 @@ gb_internal Scope *scope_of_node(Ast *node) {
 	case Ast_StructType:      return node->StructType.scope;
 	case Ast_UnionType:       return node->UnionType.scope;
 	case Ast_EnumType:        return node->EnumType.scope;
+	case Ast_BitFieldType:    return node->BitFieldType.scope;
 	}
 	GB_PANIC("Invalid node for add_scope: %.*s", LIT(ast_strings[node->kind]));
 	return nullptr;
@@ -355,6 +357,7 @@ gb_internal void check_open_scope(CheckerContext *c, Ast *node) {
 	case Ast_EnumType:
 	case Ast_UnionType:
 	case Ast_BitSetType:
+	case Ast_BitFieldType:
 		scope->flags |= ScopeFlag_Type;
 		break;
 	}
@@ -2061,6 +2064,12 @@ gb_internal void add_type_info_type_internal(CheckerContext *c, Type *t) {
 		add_type_info_type_internal(c, bt->SoaPointer.elem);
 		break;
 
+	case Type_BitField:
+		add_type_info_type_internal(c, bt->BitField.backing_type);
+		for (Entity *f : bt->BitField.fields) {
+			add_type_info_type_internal(c, f->type);
+		}
+		break;
 
 	case Type_Generic:
 		break;
@@ -2308,6 +2317,13 @@ gb_internal void add_min_dep_type_info(Checker *c, Type *t) {
 
 	case Type_SoaPointer:
 		add_min_dep_type_info(c, bt->SoaPointer.elem);
+		break;
+
+	case Type_BitField:
+		add_min_dep_type_info(c, bt->BitField.backing_type);
+		for (Entity *f : bt->BitField.fields) {
+			add_min_dep_type_info(c, f->type);
+		}
 		break;
 
 	default:
@@ -2908,6 +2924,7 @@ gb_internal void init_core_type_info(Checker *c) {
 	t_type_info_relative_multi_pointer = find_core_type(c, str_lit("Type_Info_Relative_Multi_Pointer"));
 	t_type_info_matrix           = find_core_type(c, str_lit("Type_Info_Matrix"));
 	t_type_info_soa_pointer      = find_core_type(c, str_lit("Type_Info_Soa_Pointer"));
+	t_type_info_bit_field        = find_core_type(c, str_lit("Type_Info_Bit_Field"));
 
 	t_type_info_named_ptr            = alloc_type_pointer(t_type_info_named);
 	t_type_info_integer_ptr          = alloc_type_pointer(t_type_info_integer);
@@ -2937,6 +2954,7 @@ gb_internal void init_core_type_info(Checker *c) {
 	t_type_info_relative_multi_pointer_ptr = alloc_type_pointer(t_type_info_relative_multi_pointer);
 	t_type_info_matrix_ptr           = alloc_type_pointer(t_type_info_matrix);
 	t_type_info_soa_pointer_ptr      = alloc_type_pointer(t_type_info_soa_pointer);
+	t_type_info_bit_field_ptr        = alloc_type_pointer(t_type_info_bit_field);
 }
 
 gb_internal void init_mem_allocator(Checker *c) {
