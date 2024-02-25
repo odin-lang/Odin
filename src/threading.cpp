@@ -492,6 +492,8 @@ gb_internal u32 thread_current_id(void) {
 	__asm__("mov %%fs:0x10,%0" : "=r"(thread_id));
 #elif defined(GB_SYSTEM_LINUX)
 	thread_id = gettid();
+#elif defined(GB_SYSTEM_HAIKU)
+	thread_id = find_thread(NULL);
 #else
 	#error Unsupported architecture for thread_current_id()
 #endif
