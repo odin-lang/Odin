@@ -78,6 +78,18 @@ final :: proc(ctx: ^Context, dst: []byte) {
 	hash.final(&ctx._o_hash, dst)
 }
 
+// clone clones the Context other into ctx.
+clone :: proc(ctx, other: ^Context) {
+	if ctx == other {
+		return
+	}
+
+	hash.clone(&ctx._o_hash, &other._o_hash)
+	hash.clone(&ctx._i_hash, &other._i_hash)
+	ctx._tag_sz = other._tag_sz
+	ctx._is_initialized = other._is_initialized
+}
+
 // reset sanitizes the Context.  The Context must be re-initialized to
 // be used again.
 reset :: proc(ctx: ^Context) {
