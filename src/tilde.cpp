@@ -825,6 +825,7 @@ gb_internal bool cg_generate_code(Checker *c, LinkerData *linker_data) {
 		case TargetOs_essence:
 		case TargetOs_freebsd:
 		case TargetOs_openbsd:
+		case TargetOs_haiku:
 			debug_format = TB_DEBUGFMT_DWARF;
 			break;
 		}
