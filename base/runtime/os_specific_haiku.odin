@@ -14,7 +14,7 @@ foreign libc {
 _stderr_write :: proc "contextless" (data: []byte) -> (int, _OS_Errno) {
 	ret := _unix_write(2, raw_data(data), len(data))
 	if ret < len(data) {
-		err := __errnop()
+		err := _errnop()
 		return int(ret), _OS_Errno(err^ if err != nil else 0)
 	}
 	return int(ret), 0
