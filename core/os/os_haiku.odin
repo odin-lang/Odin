@@ -101,3 +101,11 @@ close :: proc(fd: Handle) -> Errno {
 	}
 	return ERROR_NONE
 }
+
+_alloc_command_line_arguments :: proc() -> []string {
+	res := make([]string, len(runtime.args__))
+	for arg, i in runtime.args__ {
+		res[i] = string(arg)
+	}
+	return res
+}
