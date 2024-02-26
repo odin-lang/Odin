@@ -1,7 +1,7 @@
 package mem
 
-import "core:builtin"
-import "core:runtime"
+import "base:builtin"
+import "base:runtime"
 
 Raw_Any           :: runtime.Raw_Any
 Raw_String        :: runtime.Raw_String

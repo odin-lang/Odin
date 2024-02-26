@@ -10,7 +10,7 @@
 package xxhash
 
 import "core:mem"
-import "core:intrinsics"
+import "base:intrinsics"
 
 /*
 	===   XXH3 128-bit streaming   ===

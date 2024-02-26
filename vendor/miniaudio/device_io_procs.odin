@@ -636,17 +636,17 @@ foreign lib {
 					callback will write to every sample in the output buffer, or if you are doing your own clearing.
 
 			noClip
-					When set to true, the contents of the output buffer passed into the data callback will be clipped after returning. When set to false (default), the
-					contents of the output buffer are left alone after returning and it will be left up to the backend itself to decide whether or not the clip. This only
+        			When set to true, the contents of the output buffer are left alone after returning and it will be left up to the backend itself to decide whether or
+        			not to clip. When set to false (default), the contents of the output buffer passed into the data callback will be clipped after returning. This only
 					applies when the playback sample format is f32.
 
 			noDisableDenormals
 					By default, miniaudio will disable denormals when the data callback is called. Setting this to true will prevent the disabling of denormals.
 
 			noFixedSizedCallback
-					Allows miniaudio to fire the data callback with any frame count. When this is set to true, the data callback will be fired with a consistent frame
-					count as specified by `periodSizeInFrames` or `periodSizeInMilliseconds`. When set to false, miniaudio will fire the callback with whatever the
-					backend requests, which could be anything.
+        			Allows miniaudio to fire the data callback with any frame count. When this is set to false (the default), the data callback will be fired with a
+        			consistent frame count as specified by `periodSizeInFrames` or `periodSizeInMilliseconds`. When set to true, miniaudio will fire the callback with
+        			whatever the backend requests, which could be anything.
 
 			dataCallback
 					The callback to fire whenever data is ready to be delivered to or from the device.
@@ -668,7 +668,7 @@ foreign lib {
 					A pointer that will passed to callbacks in pBackendVTable.
 
 			resampling.linear.lpfOrder
-					The linear resampler applies a low-pass filter as part of it's procesing for anti-aliasing. This setting controls the order of the filter. The higher
+					The linear resampler applies a low-pass filter as part of it's processing for anti-aliasing. This setting controls the order of the filter. The higher
 					the value, the better the quality, in general. Setting this to 0 will disable low-pass filtering altogether. The maximum value is
 					`MA_MAX_FILTER_ORDER`. The default value is `min(4, MA_MAX_FILTER_ORDER)`.
 
@@ -1150,8 +1150,6 @@ foreign lib {
 
 	Do not call this in any callback.
 
-	This will be called implicitly by `ma_device_uninit()`.
-
 
 	See Also
 	--------
@@ -1585,6 +1583,11 @@ foreign lib {
 	Retrieves a friendly name for a backend.
 	*/
 	get_backend_name :: proc(backend: backend) -> cstring ---
+
+	/*
+	Retrieves the backend enum from the given name.
+	*/
+	get_backend_from_name :: proc(pBackendName: cstring, pBackend: ^backend) -> result ---
 
 	/*
 	Determines whether or not the given backend is available by the compilation environment.

@@ -1,9 +1,7 @@
 package reflect
 
-import "core:runtime"
-import "core:intrinsics"
-import "core:mem"
-_ :: mem
+import "base:runtime"
+import "base:intrinsics"
 _ :: intrinsics
 
 Type_Info :: runtime.Type_Info
@@ -37,6 +35,7 @@ Type_Info_Relative_Pointer       :: runtime.Type_Info_Relative_Pointer
 Type_Info_Relative_Multi_Pointer :: runtime.Type_Info_Relative_Multi_Pointer
 Type_Info_Matrix                 :: runtime.Type_Info_Matrix
 Type_Info_Soa_Pointer            :: runtime.Type_Info_Soa_Pointer
+Type_Info_Bit_Field              :: runtime.Type_Info_Bit_Field
 
 Type_Info_Enum_Value :: runtime.Type_Info_Enum_Value
 
@@ -72,6 +71,7 @@ Type_Kind :: enum {
 	Relative_Multi_Pointer,
 	Matrix,
 	Soa_Pointer,
+	Bit_Field,
 }
 
 
@@ -108,6 +108,7 @@ type_kind :: proc(T: typeid) -> Type_Kind {
 		case Type_Info_Relative_Multi_Pointer: return .Relative_Multi_Pointer
 		case Type_Info_Matrix:                 return .Matrix
 		case Type_Info_Soa_Pointer:            return .Soa_Pointer
+		case Type_Info_Bit_Field:              return .Bit_Field
 		}
 
 	}
@@ -513,13 +514,13 @@ struct_fields_zipped :: proc(T: typeid) -> (fields: #soa[]Struct_Field) {
 
 
 @(require_results)
-struct_tag_get :: proc(tag: Struct_Tag, key: string) -> (value: Struct_Tag) {
-	value, _ = struct_tag_lookup(tag, key)
-	return
+struct_tag_get :: proc(tag: Struct_Tag, key: string) -> (value: string) {
+	v, _ := struct_tag_lookup(tag, key)
+	return string(v)
 }
 
 @(require_results)
-struct_tag_lookup :: proc(tag: Struct_Tag, key: string) -> (value: Struct_Tag, ok: bool) {
+struct_tag_lookup :: proc(tag: Struct_Tag, key: string) -> (value: string, ok: bool) {
 	for t := tag; t != ""; /**/ {
 		i := 0
 		for i < len(t) && t[i] == ' ' { // Skip whitespace
@@ -570,7 +571,7 @@ struct_tag_lookup :: proc(tag: Struct_Tag, key: string) -> (value: Struct_Tag, o
 		t = t[i+1:]
 
 		if key == name {
-			return Struct_Tag(val[1:i]), true
+			return val[1:i], true
 		}
 	}
 	return
@@ -628,6 +629,43 @@ enum_from_name_any :: proc(Enum_Type: typeid, name: string) -> (value: Type_Info
 	}
 	return
 }
+
+@(require_results)
+enum_name_from_value :: proc(value: $Enum_Type) -> (name: string, ok: bool) where intrinsics.type_is_enum(Enum_Type) {
+	ti := type_info_base(type_info_of(Enum_Type))
+	e := ti.variant.(runtime.Type_Info_Enum) or_return
+	if len(e.values) == 0 {
+		return
+	}
+	ev := Type_Info_Enum_Value(value)
+	for val, idx in e.values {
+		if val == ev {
+			return e.names[idx], true
+		}
+	}
+	return
+}
+
+@(require_results)
+enum_name_from_value_any :: proc(value: any) -> (name: string, ok: bool) {
+	if value.id == nil {
+		return
+	}
+	ti := type_info_base(type_info_of(value.id))
+	e := ti.variant.(runtime.Type_Info_Enum) or_return
+	if len(e.values) == 0 {
+		return
+	}
+	ev := Type_Info_Enum_Value(as_i64(value) or_return)
+	for val, idx in e.values {
+		if val == ev {
+			return e.names[idx], true
+		}
+	}
+	return
+}
+
+
 
 
 @(require_results)
@@ -761,7 +799,7 @@ get_union_variant :: proc(a: any) -> any {
 get_union_as_ptr_variants :: proc(val: ^$T) -> (res: intrinsics.type_convert_variants_to_pointers(T)) where intrinsics.type_is_union(T) {
 	ptr := rawptr(val)
 	tag := get_union_variant_raw_tag(val^)
-	mem.copy(&res, &ptr, size_of(ptr))
+	intrinsics.mem_copy(&res, &ptr, size_of(ptr))
 	set_union_variant_raw_tag(res, tag)
 	return
 }
@@ -1569,6 +1607,13 @@ equal :: proc(a, b: any, including_indirect_array_recursion := false, recursion_
 			}	
 		}
 		return true
+
+	case Type_Info_Bit_Field:
+		x, y := a, b
+		x.id = v.backing_type.id
+		y.id = v.backing_type.id
+		return equal(x, y, including_indirect_array_recursion, recursion_level+0)
+
 	}
 	
 	runtime.print_typeid(a.id)

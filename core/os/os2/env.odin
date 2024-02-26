@@ -1,6 +1,6 @@
 package os2
 
-import "core:runtime"
+import "base:runtime"
 
 // get_env retrieves the value of the environment variable named by the key
 // It returns the value, which will be empty if the variable is not present

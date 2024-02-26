@@ -1,6 +1,6 @@
 package container_priority_queue
 
-import "core:builtin"
+import "base:builtin"
 
 Priority_Queue :: struct($T: typeid) {
 	queue: [dynamic]T,

@@ -84,6 +84,8 @@ enum lbAddrKind {
 
 	lbAddr_Swizzle,
 	lbAddr_SwizzleLarge,
+
+	lbAddr_BitField,
 };
 
 struct lbAddr {
@@ -118,6 +120,12 @@ struct lbAddr {
 			Type *type;
 			Slice<i32> indices;
 		} swizzle_large;
+		struct {
+			Type *type;
+			i64 index;
+			i64 bit_offset;
+			i64 bit_size;
+		} bitfield;
 	};
 };
 
@@ -566,6 +574,8 @@ gb_internal String lb_filepath_ll_for_module(lbModule *m);
 gb_internal LLVMTypeRef lb_type_internal_for_procedures_raw(lbModule *m, Type *type);
 
 gb_internal lbValue lb_emit_source_code_location_as_global_ptr(lbProcedure *p, String const &procedure, TokenPos const &pos);
+
+gb_internal LLVMMetadataRef lb_debug_location_from_token_pos(lbProcedure *p, TokenPos pos);
 
 gb_internal LLVMTypeRef llvm_array_type(LLVMTypeRef ElementType, uint64_t ElementCount) {
 #if LB_USE_NEW_PASS_SYSTEM

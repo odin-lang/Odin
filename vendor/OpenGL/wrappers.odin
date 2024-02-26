@@ -2,7 +2,7 @@ package vendor_gl
 
 #assert(size_of(bool) == size_of(u8))
 
-import "core:runtime"
+import "base:runtime"
 import "core:fmt"
 _ :: runtime
 _ :: fmt

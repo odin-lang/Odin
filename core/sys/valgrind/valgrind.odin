@@ -1,7 +1,7 @@
 //+build amd64
 package sys_valgrind
 
-import "core:intrinsics"
+import "base:intrinsics"
 
 Client_Request :: enum uintptr {
 	Running_On_Valgrind            = 4097,

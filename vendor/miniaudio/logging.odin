@@ -1,6 +1,6 @@
 package miniaudio
 
-import c "core:c/libc"
+import "core:c/libc"
 
 when ODIN_OS == .Windows {
 	foreign import lib "lib/miniaudio.lib"
@@ -34,11 +34,6 @@ logLevel (in)
 
 pMessage (in)
     The log message.
-
-
-Remarks
--------
-Do not modify the state of the device from inside the callback.
 */
 log_callback_proc :: proc "c" (pUserData: rawptr, level: u32, pMessage: cstring)
 
@@ -63,6 +58,6 @@ foreign lib {
 	log_register_callback   :: proc(pLog: ^log, callback: log_callback) -> result ---
 	log_unregister_callback :: proc(pLog: ^log, callback: log_callback) -> result ---
 	log_post                :: proc(pLog: ^log, level: u32, pMessage: cstring) -> result ---
-	log_postv               :: proc(pLog: ^log, level: u32, pFormat: cstring, args: c.va_list) -> result ---
+	log_postv               :: proc(pLog: ^log, level: u32, pFormat: cstring, args: libc.va_list) -> result ---
 	log_postf               :: proc(pLog: ^log, level: u32, pFormat: cstring, #c_vararg args: ..any) -> result ---
 }

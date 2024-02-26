@@ -14,7 +14,7 @@ package math_big_tests
 	TODO: Write tests for `internal_*` and test reusing parameters with the public implementations.
 */
 
-import "core:runtime"
+import "base:runtime"
 import "core:strings"
 import "core:math/big"
 

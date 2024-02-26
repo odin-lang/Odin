@@ -3,7 +3,7 @@ package testing
 import "core:fmt"
 import "core:io"
 import "core:time"
-import "core:intrinsics"
+import "base:intrinsics"
 import "core:reflect"
 
 _ :: reflect // alias reflect to nothing to force visibility for -vet
@@ -80,7 +80,7 @@ logf :: proc(t: ^T, format: string, args: ..any, loc := #caller_location) {
 
 
 // cleanup registers a procedure and user_data, which will be called when the test, and all its subtests, complete
-// cleanup proceduers will be called in LIFO (last added, first called) order.
+// cleanup procedures will be called in LIFO (last added, first called) order.
 cleanup :: proc(t: ^T, procedure: proc(rawptr), user_data: rawptr) {
 	append(&t.cleanups, Internal_Cleanup{procedure, user_data})
 }
@@ -91,6 +91,14 @@ expect :: proc(t: ^T, ok: bool, msg: string = "", loc := #caller_location) -> bo
 	}
 	return ok
 }
+
+expectf :: proc(t: ^T, ok: bool, format: string, args: ..any, loc := #caller_location) -> bool {
+	if !ok {
+		errorf(t, format, ..args, loc=loc)
+	}
+	return ok
+}
+
 expect_value :: proc(t: ^T, value, expected: $T, loc := #caller_location) -> bool where intrinsics.type_is_comparable(T) {
 	ok := value == expected || reflect.is_nil(value) && reflect.is_nil(expected)
 	if !ok {
@@ -98,7 +106,6 @@ expect_value :: proc(t: ^T, value, expected: $T, loc := #caller_location) -> boo
 	}
 	return ok
 }
-
 
 
 set_fail_timeout :: proc(t: ^T, duration: time.Duration, loc := #caller_location) {

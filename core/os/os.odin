@@ -1,5 +1,6 @@
 package os
 
+import "base:runtime"
 import "core:mem"
 import "core:strconv"
 import "core:unicode/utf8"
@@ -168,99 +169,12 @@ read_ptr :: proc(fd: Handle, data: rawptr, len: int) -> (int, Errno) {
 	return read(fd, s)
 }
 
-heap_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
-                            size, alignment: int,
-                            old_memory: rawptr, old_size: int, loc := #caller_location) -> ([]byte, mem.Allocator_Error) {
-	//
-	// NOTE(tetra, 2020-01-14): The heap doesn't respect alignment.
-	// Instead, we overallocate by `alignment + size_of(rawptr) - 1`, and insert
-	// padding. We also store the original pointer returned by heap_alloc right before
-	// the pointer we return to the user.
-	//
+heap_allocator_proc :: runtime.heap_allocator_proc
+heap_allocator :: runtime.heap_allocator
 
-	aligned_alloc :: proc(size, alignment: int, old_ptr: rawptr = nil, zero_memory := true) -> ([]byte, mem.Allocator_Error) {
-		a := max(alignment, align_of(rawptr))
-		space := size + a - 1
-
-		allocated_mem: rawptr
-		if old_ptr != nil {
-			original_old_ptr := mem.ptr_offset((^rawptr)(old_ptr), -1)^
-			allocated_mem = heap_resize(original_old_ptr, space+size_of(rawptr))
-		} else {
-			allocated_mem = heap_alloc(space+size_of(rawptr), zero_memory)
-		}
-		aligned_mem := rawptr(mem.ptr_offset((^u8)(allocated_mem), size_of(rawptr)))
-
-		ptr := uintptr(aligned_mem)
-		aligned_ptr := (ptr - 1 + uintptr(a)) & -uintptr(a)
-		diff := int(aligned_ptr - ptr)
-		if (size + diff) > space || allocated_mem == nil {
-			return nil, .Out_Of_Memory
-		}
-
-		aligned_mem = rawptr(aligned_ptr)
-		mem.ptr_offset((^rawptr)(aligned_mem), -1)^ = allocated_mem
-
-		return mem.byte_slice(aligned_mem, size), nil
-	}
-
-	aligned_free :: proc(p: rawptr) {
-		if p != nil {
-			heap_free(mem.ptr_offset((^rawptr)(p), -1)^)
-		}
-	}
-
-	aligned_resize :: proc(p: rawptr, old_size: int, new_size: int, new_alignment: int, zero_memory := true) -> (new_memory: []byte, err: mem.Allocator_Error) {
-		if p == nil {
-			return nil, nil
-		}
-
-		new_memory = aligned_alloc(new_size, new_alignment, p, zero_memory) or_return
-
-		// NOTE: heap_resize does not zero the new memory, so we do it
-		if zero_memory && new_size > old_size {
-			new_region := mem.raw_data(new_memory[old_size:])
-			mem.zero(new_region, new_size - old_size)
-		}
-		return
-	}
-
-	switch mode {
-	case .Alloc, .Alloc_Non_Zeroed:
-		return aligned_alloc(size, alignment, nil, mode == .Alloc)
-
-	case .Free:
-		aligned_free(old_memory)
-
-	case .Free_All:
-		return nil, .Mode_Not_Implemented
-
-	case .Resize, .Resize_Non_Zeroed:
-		if old_memory == nil {
-			return aligned_alloc(size, alignment, nil, mode == .Resize)
-		}
-		return aligned_resize(old_memory, old_size, size, alignment, mode == .Resize)
-
-	case .Query_Features:
-		set := (^mem.Allocator_Mode_Set)(old_memory)
-		if set != nil {
-			set^ = {.Alloc, .Alloc_Non_Zeroed, .Free, .Resize, .Resize_Non_Zeroed, .Query_Features}
-		}
-		return nil, nil
-
-	case .Query_Info:
-		return nil, .Mode_Not_Implemented
-	}
-
-	return nil, nil
-}
-
-heap_allocator :: proc() -> mem.Allocator {
-	return mem.Allocator{
-		procedure = heap_allocator_proc,
-		data = nil,
-	}
-}
+heap_alloc  :: runtime.heap_alloc
+heap_resize :: runtime.heap_resize
+heap_free   :: runtime.heap_free
 
 processor_core_count :: proc() -> int {
 	return _processor_core_count()

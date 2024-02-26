@@ -3,8 +3,8 @@
 // map type is being used to accelerate lookups.
 package container_topological_sort
 
-import "core:intrinsics"
-import "core:runtime"
+import "base:intrinsics"
+import "base:runtime"
 _ :: intrinsics
 _ :: runtime
 

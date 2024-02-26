@@ -39,7 +39,7 @@ encoder :: struct {
 	onUninit:         encoder_uninit_proc,
 	onWritePCMFrames: encoder_write_pcm_frames_proc,
 	pUserData:        rawptr,
-	pInternalEncoder: rawptr, /* <-- The drwav/drflac/stb_vorbis/etc. objects. */
+	pInternalEncoder: rawptr,
 	data: struct #raw_union {
 		vfs: struct {
 			pVFS: ^vfs,

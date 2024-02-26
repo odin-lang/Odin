@@ -1,3 +1,11 @@
+/*
+package shake implements the SHAKE XOF algorithm family.
+
+The SHA3 hash algorithm can be found in the crypto/sha3.
+
+See:
+- https://nvlpubs.nist.gov/nistpubs/fips/nist.fips.202.pdf
+*/
 package shake
 
 /*
@@ -6,201 +14,55 @@ package shake
 
     List of contributors:
         zhibog, dotbmp:  Initial implementation.
-
-    Interface for the SHAKE hashing algorithm.
-    The SHA3 functionality can be found in package sha3.
-
-    TODO: This should provide an incremental squeeze interface, in addition
-    to the one-shot final call.
 */
-
-import "core:io"
-import "core:os"
 
 import "../_sha3"
 
-/*
-    High level API
-*/
+// Context is a SHAKE128 or SHAKE256 instance.
+Context :: distinct _sha3.Context
 
-DIGEST_SIZE_128 :: 16
-DIGEST_SIZE_256 :: 32
-
-// hash_string_128 will hash the given input and return the
-// computed hash
-hash_string_128 :: proc(data: string) -> [DIGEST_SIZE_128]byte {
-	return hash_bytes_128(transmute([]byte)(data))
+// init_128 initializes a Context for SHAKE128.
+init_128 :: proc(ctx: ^Context) {
+	ctx.mdlen = 128 / 8
+	_init(ctx)
 }
 
-// hash_bytes_128 will hash the given input and return the
-// computed hash
-hash_bytes_128 :: proc(data: []byte) -> [DIGEST_SIZE_128]byte {
-	hash: [DIGEST_SIZE_128]byte
-	ctx: Context
-	ctx.mdlen = DIGEST_SIZE_128
-	init(&ctx)
-	update(&ctx, data)
-	final(&ctx, hash[:])
-	return hash
+// init_256 initializes a Context for SHAKE256.
+init_256 :: proc(ctx: ^Context) {
+	ctx.mdlen = 256 / 8
+	_init(ctx)
 }
 
-// hash_string_to_buffer_128 will hash the given input and assign the
-// computed hash to the second parameter.
-// It requires that the destination buffer is at least as big as the digest size
-hash_string_to_buffer_128 :: proc(data: string, hash: []byte) {
-	hash_bytes_to_buffer_128(transmute([]byte)(data), hash)
+@(private)
+_init :: proc(ctx: ^Context) {
+	_sha3.init(transmute(^_sha3.Context)(ctx))
 }
 
-// hash_bytes_to_buffer_128 will hash the given input and write the
-// computed hash into the second parameter.
-// It requires that the destination buffer is at least as big as the digest size
-hash_bytes_to_buffer_128 :: proc(data, hash: []byte) {
-	ctx: Context
-	ctx.mdlen = DIGEST_SIZE_128
-	init(&ctx)
-	update(&ctx, data)
-	final(&ctx, hash)
+// write writes more data into the SHAKE instance.  This MUST not be called
+// after any reads have been done, and attempts to do so will panic.
+write :: proc(ctx: ^Context, data: []byte) {
+	_sha3.update(transmute(^_sha3.Context)(ctx), data)
 }
 
-// hash_stream_128 will read the stream in chunks and compute a
-// hash from its contents
-hash_stream_128 :: proc(s: io.Stream) -> ([DIGEST_SIZE_128]byte, bool) {
-	hash: [DIGEST_SIZE_128]byte
-	ctx: Context
-	ctx.mdlen = DIGEST_SIZE_128
-	init(&ctx)
-
-	buf := make([]byte, 512)
-	defer delete(buf)
-
-	read := 1
-	for read > 0 {
-		read, _ = io.read(s, buf)
-		if read > 0 {
-			update(&ctx, buf[:read])
-		}
+// read reads output from the SHAKE instance.  There is no practical upper
+// limit to the amount of data that can be read from SHAKE.  After read has
+// been called one or more times, further calls to write will panic.
+read :: proc(ctx: ^Context, dst: []byte) {
+	ctx_ := transmute(^_sha3.Context)(ctx)
+	if !ctx.is_finalized {
+		_sha3.shake_xof(ctx_)
 	}
-	final(&ctx, hash[:])
-	return hash, true
+
+	_sha3.shake_out(ctx_, dst)
 }
 
-// hash_file_128 will read the file provided by the given handle
-// and compute a hash
-hash_file_128 :: proc(hd: os.Handle, load_at_once := false) -> ([DIGEST_SIZE_128]byte, bool) {
-	if !load_at_once {
-		return hash_stream_128(os.stream_from_handle(hd))
-	} else {
-		if buf, ok := os.read_entire_file(hd); ok {
-			return hash_bytes_128(buf[:]), ok
-		}
-	}
-	return [DIGEST_SIZE_128]byte{}, false
+// clone clones the Context other into ctx.
+clone :: proc(ctx, other: ^Context) {
+	_sha3.clone(transmute(^_sha3.Context)(ctx), transmute(^_sha3.Context)(other))
 }
 
-hash_128 :: proc {
-	hash_stream_128,
-	hash_file_128,
-	hash_bytes_128,
-	hash_string_128,
-	hash_bytes_to_buffer_128,
-	hash_string_to_buffer_128,
-}
-
-// hash_string_256 will hash the given input and return the
-// computed hash
-hash_string_256 :: proc(data: string) -> [DIGEST_SIZE_256]byte {
-	return hash_bytes_256(transmute([]byte)(data))
-}
-
-// hash_bytes_256 will hash the given input and return the
-// computed hash
-hash_bytes_256 :: proc(data: []byte) -> [DIGEST_SIZE_256]byte {
-	hash: [DIGEST_SIZE_256]byte
-	ctx: Context
-	ctx.mdlen = DIGEST_SIZE_256
-	init(&ctx)
-	update(&ctx, data)
-	final(&ctx, hash[:])
-	return hash
-}
-
-// hash_string_to_buffer_256 will hash the given input and assign the
-// computed hash to the second parameter.
-// It requires that the destination buffer is at least as big as the digest size
-hash_string_to_buffer_256 :: proc(data: string, hash: []byte) {
-	hash_bytes_to_buffer_256(transmute([]byte)(data), hash)
-}
-
-// hash_bytes_to_buffer_256 will hash the given input and write the
-// computed hash into the second parameter.
-// It requires that the destination buffer is at least as big as the digest size
-hash_bytes_to_buffer_256 :: proc(data, hash: []byte) {
-	ctx: Context
-	ctx.mdlen = DIGEST_SIZE_256
-	init(&ctx)
-	update(&ctx, data)
-	final(&ctx, hash[:])
-}
-
-// hash_stream_256 will read the stream in chunks and compute a
-// hash from its contents
-hash_stream_256 :: proc(s: io.Stream) -> ([DIGEST_SIZE_256]byte, bool) {
-	hash: [DIGEST_SIZE_256]byte
-	ctx: Context
-	ctx.mdlen = DIGEST_SIZE_256
-	init(&ctx)
-
-	buf := make([]byte, 512)
-	defer delete(buf)
-
-	read := 1
-	for read > 0 {
-		read, _ = io.read(s, buf)
-		if read > 0 {
-			update(&ctx, buf[:read])
-		}
-	}
-	final(&ctx, hash[:])
-	return hash, true
-}
-
-// hash_file_256 will read the file provided by the given handle
-// and compute a hash
-hash_file_256 :: proc(hd: os.Handle, load_at_once := false) -> ([DIGEST_SIZE_256]byte, bool) {
-	if !load_at_once {
-		return hash_stream_256(os.stream_from_handle(hd))
-	} else {
-		if buf, ok := os.read_entire_file(hd); ok {
-			return hash_bytes_256(buf[:]), ok
-		}
-	}
-	return [DIGEST_SIZE_256]byte{}, false
-}
-
-hash_256 :: proc {
-	hash_stream_256,
-	hash_file_256,
-	hash_bytes_256,
-	hash_string_256,
-	hash_bytes_to_buffer_256,
-	hash_string_to_buffer_256,
-}
-
-/*
-    Low level API
-*/
-
-Context :: _sha3.Sha3_Context
-
-init :: proc(ctx: ^Context) {
-	_sha3.init(ctx)
-}
-
-update :: proc(ctx: ^Context, data: []byte) {
-	_sha3.update(ctx, data)
-}
-
-final :: proc(ctx: ^Context, hash: []byte) {
-	_sha3.shake_xof(ctx)
-	_sha3.shake_out(ctx, hash[:])
+// reset sanitizes the Context.  The Context must be re-initialized to
+// be used again.
+reset :: proc(ctx: ^Context) {
+	_sha3.reset(transmute(^_sha3.Context)(ctx))
 }

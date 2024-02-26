@@ -143,8 +143,8 @@ arena_static_reset_to :: proc(arena: ^Arena, pos: uint, loc := #caller_location)
 		prev_pos := arena.curr_block.used
 		arena.curr_block.used = clamp(pos, 0, arena.curr_block.reserved)
 
-		if prev_pos < pos {
-			mem.zero_slice(arena.curr_block.base[arena.curr_block.used:][:pos-prev_pos])
+		if prev_pos > pos {
+			mem.zero_slice(arena.curr_block.base[arena.curr_block.used:][:prev_pos-pos])
 		}
 		arena.total_used = arena.curr_block.used
 		return true

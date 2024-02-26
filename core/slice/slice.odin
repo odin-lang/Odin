@@ -1,9 +1,9 @@
 package slice
 
-import "core:intrinsics"
-import "core:builtin"
+import "base:intrinsics"
+import "base:builtin"
 import "core:math/bits"
-import "core:runtime"
+import "base:runtime"
 
 _ :: intrinsics
 _ :: builtin

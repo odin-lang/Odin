@@ -1,6 +1,6 @@
 package linalg
 
-import "core:builtin"
+import "base:builtin"
 import "core:math"
 
 @(require_results)

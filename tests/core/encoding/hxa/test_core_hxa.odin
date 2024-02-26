@@ -150,6 +150,7 @@ test_write :: proc(t: ^testing.T) {
 
 	required_size := hxa.required_write_size(w_file)
 	buf := make([]u8, required_size)
+	defer delete(buf)
 
 	n, write_err := hxa.write(buf, w_file)
 	write_e :: hxa.Write_Error.None
@@ -160,8 +161,6 @@ test_write :: proc(t: ^testing.T) {
 	read_e :: hxa.Read_Error.None
 	tc.expect(t, read_err == read_e, fmt.tprintf("%v: read_err %v != %v", #procedure, read_err, read_e))
 	defer hxa.file_destroy(file)
-
-	delete(buf)
 
 	tc.expect(t, file.magic_number == 0x417848, fmt.tprintf("%v: file.magic_number %v != %v",
 															#procedure, file.magic_number, 0x417848))

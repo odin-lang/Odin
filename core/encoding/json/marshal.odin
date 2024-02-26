@@ -2,7 +2,7 @@ package json
 
 import "core:mem"
 import "core:math/bits"
-import "core:runtime"
+import "base:runtime"
 import "core:strconv"
 import "core:strings"
 import "core:reflect"
@@ -226,6 +226,9 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 		return .Unsupported_Type
 		
 	case runtime.Type_Info_Matrix:
+		return .Unsupported_Type
+
+	case runtime.Type_Info_Bit_Field:
 		return .Unsupported_Type
 
 	case runtime.Type_Info_Array:

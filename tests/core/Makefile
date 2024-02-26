@@ -39,7 +39,7 @@ hash_test:
 	$(ODIN) run hash -o:speed -no-bounds-check -out:test_hash 
 
 crypto_test:
-	$(ODIN) run crypto -o:speed -no-bounds-check -out:test_crypto_hash 
+	$(ODIN) run crypto -o:speed -no-bounds-check -out:test_crypto
 
 noise_test:
 	$(ODIN) run math/noise -out:test_noise

@@ -1,7 +1,7 @@
 package mem
 
-import "core:runtime"
-import "core:intrinsics"
+import "base:runtime"
+import "base:intrinsics"
 
 Byte     :: runtime.Byte
 Kilobyte :: runtime.Kilobyte

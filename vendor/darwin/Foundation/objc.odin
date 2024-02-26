@@ -4,7 +4,7 @@ foreign import "system:Foundation.framework"
 // NOTE: Most of our bindings are reliant on Cocoa (everything under appkit) so just unconditionally import it
 @(require) foreign import "system:Cocoa.framework"
 
-import "core:intrinsics"
+import "base:intrinsics"
 import "core:c"
 
 IMP :: proc "c" (object: id, sel: SEL, #c_vararg args: ..any) -> id

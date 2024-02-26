@@ -1,7 +1,7 @@
 package objc_Foundation
 
 import "core:c"
-import "core:intrinsics"
+import "base:intrinsics"
 
 FastEnumerationState :: struct #packed {
 	state:        c.ulong,

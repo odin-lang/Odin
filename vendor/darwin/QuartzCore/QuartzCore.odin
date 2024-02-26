@@ -2,7 +2,7 @@ package objc_QuartzCore
 
 import NS "vendor:darwin/Foundation"
 import MTL "vendor:darwin/Metal"
-import "core:intrinsics"
+import "base:intrinsics"
 
 @(private)
 msgSend :: intrinsics.objc_send

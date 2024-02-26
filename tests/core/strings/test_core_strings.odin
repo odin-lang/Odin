@@ -4,7 +4,7 @@ import "core:strings"
 import "core:testing"
 import "core:fmt"
 import "core:os"
-import "core:runtime"
+import "base:runtime"
 import "core:mem"
 
 TEST_count := 0

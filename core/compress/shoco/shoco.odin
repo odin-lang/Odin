@@ -11,7 +11,7 @@
 // package shoco is an implementation of the shoco short string compressor
 package shoco
 
-import "core:intrinsics"
+import "base:intrinsics"
 import "core:compress"
 
 Shoco_Pack :: struct {

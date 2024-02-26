@@ -1,14 +1,14 @@
 package os2
 
 import "core:time"
-import "core:runtime"
+import "base:runtime"
 
 File_Info :: struct {
-	fullpath: string,
-	name:     string,
-	size:     i64,
-	mode:     File_Mode,
-	is_dir:   bool,
+	fullpath:          string,
+	name:              string,
+	size:              i64,
+	mode:              File_Mode,
+	is_directory:      bool,
 	creation_time:     time.Time,
 	modification_time: time.Time,
 	access_time:       time.Time,
@@ -33,7 +33,8 @@ stat :: proc(name: string, allocator: runtime.Allocator) -> (File_Info, Error) {
 	return _stat(name, allocator)
 }
 
-lstat :: proc(name: string, allocator: runtime.Allocator) -> (File_Info, Error) {
+lstat :: stat_do_not_follow_links
+stat_do_not_follow_links :: proc(name: string, allocator: runtime.Allocator) -> (File_Info, Error) {
 	return _lstat(name, allocator)
 }
 

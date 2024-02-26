@@ -334,7 +334,7 @@ gb_internal void lb_add_callsite_force_inline(lbProcedure *p, lbValue ret_value)
 
 gb_internal lbValue lb_hasher_proc_for_type(lbModule *m, Type *type) {
 	type = core_type(type);
-	GB_ASSERT_MSG(is_type_valid_for_keys(type), "%s", type_to_string(type));
+	GB_ASSERT_MSG(is_type_comparable(type), "%s", type_to_string(type));
 
 	Type *pt = alloc_type_pointer(type);
 
@@ -1064,6 +1064,11 @@ gb_internal lbProcedure *lb_create_startup_type_info(lbModule *m) {
 	LLVMSetLinkage(p->value, LLVMInternalLinkage);
 
 	lb_add_attribute_to_proc(m, p->value, "nounwind");
+	// lb_add_attribute_to_proc(p->module, p->value, "mustprogress");
+	// lb_add_attribute_to_proc(p->module, p->value, "nofree");
+	// lb_add_attribute_to_proc(p->module, p->value, "norecurse");
+	// lb_add_attribute_to_proc(p->module, p->value, "nosync");
+	// lb_add_attribute_to_proc(p->module, p->value, "willreturn");
 	if (!LB_USE_GIANT_PACKED_STRUCT) {
 		lb_add_attribute_to_proc(m, p->value, "optnone");
 		lb_add_attribute_to_proc(m, p->value, "noinline");
@@ -2714,6 +2719,7 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 		{ // Type info member buffer
 			// NOTE(bill): Removes need for heap allocation by making it global memory
 			isize count = 0;
+			isize offsets_extra = 0;
 
 			for (Type *t : m->info->type_info_types) {
 				isize index = lb_type_info_index(m->info, t, false);
@@ -2731,6 +2737,11 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 				case Type_Tuple:
 					count += t->Tuple.variables.count;
 					break;
+				case Type_BitField:
+					count += t->BitField.fields.count;
+					// Twice is needed for the bit_offsets
+					offsets_extra += t->BitField.fields.count;
+					break;
 				}
 			}
 
@@ -2747,7 +2758,7 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 
 			lb_global_type_info_member_types   = global_type_info_make(m, LB_TYPE_INFO_TYPES_NAME,   t_type_info_ptr, count);
 			lb_global_type_info_member_names   = global_type_info_make(m, LB_TYPE_INFO_NAMES_NAME,   t_string,        count);
-			lb_global_type_info_member_offsets = global_type_info_make(m, LB_TYPE_INFO_OFFSETS_NAME, t_uintptr,       count);
+			lb_global_type_info_member_offsets = global_type_info_make(m, LB_TYPE_INFO_OFFSETS_NAME, t_uintptr,       count+offsets_extra);
 			lb_global_type_info_member_usings  = global_type_info_make(m, LB_TYPE_INFO_USINGS_NAME,  t_bool,          count);
 			lb_global_type_info_member_tags    = global_type_info_make(m, LB_TYPE_INFO_TAGS_NAME,    t_string,        count);
 		}

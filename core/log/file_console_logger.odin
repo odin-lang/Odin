@@ -1,3 +1,4 @@
+//+build !freestanding
 package log
 
 import "core:fmt"

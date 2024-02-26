@@ -1,15 +1,15 @@
 package fmt
 
+import "base:intrinsics"
+import "base:runtime"
 import "core:math/bits"
 import "core:mem"
 import "core:io"
 import "core:reflect"
-import "core:runtime"
 import "core:strconv"
 import "core:strings"
 import "core:time"
 import "core:unicode/utf8"
-import "core:intrinsics"
 
 // Internal data structure that stores the required information for formatted printing
 Info :: struct {
@@ -253,18 +253,24 @@ bprintf :: proc(buf: []byte, fmt: string, args: ..any) -> string {
 // - args: A variadic list of arguments to be formatted
 // - loc: The location of the caller
 //
-// Returns: True if the condition is met, otherwise triggers a runtime assertion with a formatted message
-//
-assertf :: proc(condition: bool, fmt: string, args: ..any, loc := #caller_location) -> bool {
+@(disabled=ODIN_DISABLE_ASSERT)
+assertf :: proc(condition: bool, fmt: string, args: ..any, loc := #caller_location) {
 	if !condition {
-		p := context.assertion_failure_proc
-		if p == nil {
-			p = runtime.default_assertion_failure_proc
+		// NOTE(dragos): We are using the same trick as in builtin.assert
+		// to improve performance to make the CPU not
+		// execute speculatively, making it about an order of
+		// magnitude faster
+		@(cold)
+		internal :: proc(loc: runtime.Source_Code_Location, fmt: string, args: ..any) {
+			p := context.assertion_failure_proc
+			if p == nil {
+				p = runtime.default_assertion_failure_proc
+			}
+			message := tprintf(fmt, ..args)
+			p("Runtime assertion", message, loc)
 		}
-		message := tprintf(fmt, ..args)
-		p("Runtime assertion", message, loc)
+		internal(loc, fmt, ..args)
 	}
-	return condition
 }
 // Runtime panic with a formatted message
 //
@@ -948,23 +954,9 @@ _fmt_int :: proc(fi: ^Info, u: u64, base: int, is_signed: bool, bit_size: int, d
 	start := 0
 
 	flags: strconv.Int_Flags
-	if fi.hash && !fi.zero { flags |= {.Prefix} }
-	if fi.plus             { flags |= {.Plus}   }
+	if fi.hash { flags |= {.Prefix} }
+	if fi.plus { flags |= {.Plus}   }
 	s := strconv.append_bits(buf[start:], u, base, is_signed, bit_size, digits, flags)
-
-	if fi.hash && fi.zero && fi.indent == 0 {
-		c: byte = 0
-		switch base {
-		case 2:  c = 'b'
-		case 8:  c = 'o'
-		case 12: c = 'z'
-		case 16: c = 'x'
-		}
-		if c != 0 {
-			io.write_byte(fi.writer, '0', &fi.n)
-			io.write_byte(fi.writer, c, &fi.n)
-		}
-	}
 
 	prev_zero := fi.zero
 	defer fi.zero = prev_zero
@@ -1416,34 +1408,9 @@ fmt_soa_pointer :: proc(fi: ^Info, p: runtime.Raw_Soa_Pointer, verb: rune) {
 //
 // Returns: The string representation of the enum value and a boolean indicating success.
 //
+@(require_results)
 enum_value_to_string :: proc(val: any) -> (string, bool) {
-	v := val
-	v.id = runtime.typeid_base(v.id)
-	type_info := type_info_of(v.id)
-
-	#partial switch e in type_info.variant {
-	case: return "", false
-	case runtime.Type_Info_Enum:
-		Enum_Value :: runtime.Type_Info_Enum_Value
-
-		ev_, ok := reflect.as_i64(val)
-		ev := Enum_Value(ev_)
-
-		if ok {
-			if len(e.values) == 0 {
-				return "", true
-			} else {
-				for val, idx in e.values {
-					if val == ev {
-						return e.names[idx], true
-					}
-				}
-			}
-			return "", false
-		}
-	}
-
-	return "", false
+	return reflect.enum_name_from_value_any(val)
 }
 // Returns the enum value of a string representation.
 //
@@ -2206,6 +2173,8 @@ fmt_named :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Named) 
 	#partial switch b in info.base.variant {
 	case runtime.Type_Info_Struct:
 		fmt_struct(fi, v, verb, b, info.name)
+	case runtime.Type_Info_Bit_Field:
+		fmt_bit_field(fi, v, verb, b, info.name)
 	case runtime.Type_Info_Bit_Set:
 		fmt_bit_set(fi, v, verb = verb)
 	case:
@@ -2316,6 +2285,96 @@ fmt_matrix :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Matrix
 		fmt_write_indent(fi)
 	}
 }
+
+fmt_bit_field :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Bit_Field, type_name: string) {
+	read_bits :: proc(ptr: [^]byte, offset, size: uintptr) -> (res: u64) {
+		for i in 0..<size {
+			j := i+offset
+			B := ptr[j/8]
+			k := j&7
+			if B & (u8(1)<<k) != 0 {
+				res |= u64(1)<<u64(i)
+			}
+		}
+		return
+	}
+
+	handle_bit_field_tag :: proc(data: rawptr, info: reflect.Type_Info_Bit_Field, idx: int, verb: ^rune) -> (do_continue: bool) {
+		tag := info.tags[idx]
+		if vt, ok := reflect.struct_tag_lookup(reflect.Struct_Tag(tag), "fmt"); ok {
+			value := strings.trim_space(string(vt))
+			switch value {
+			case "": return false
+			case "-": return true
+			}
+			r, w := utf8.decode_rune_in_string(value)
+			value = value[w:]
+			if value == "" || value[0] == ',' {
+				verb^ = r
+			}
+		}
+		return false
+	}
+
+	io.write_string(fi.writer, type_name if len(type_name) != 0 else "bit_field", &fi.n)
+	io.write_string(fi.writer, "{", &fi.n)
+
+	hash   := fi.hash;   defer fi.hash = hash
+	indent := fi.indent; defer fi.indent -= 1
+	do_trailing_comma := hash
+
+	fi.indent += 1
+
+	if hash	{
+		io.write_byte(fi.writer, '\n', &fi.n)
+	}
+	defer {
+		if hash {
+			for _ in 0..<indent { io.write_byte(fi.writer, '\t', &fi.n) }
+		}
+		io.write_byte(fi.writer, '}', &fi.n)
+	}
+
+
+	field_count := -1
+	for name, i in info.names {
+		field_verb := verb
+		if handle_bit_field_tag(v.data, info, i, &field_verb) {
+			continue
+		}
+
+		field_count += 1
+
+		if !do_trailing_comma && field_count > 0 {
+			io.write_string(fi.writer, ", ")
+		}
+		if hash {
+			fmt_write_indent(fi)
+		}
+
+		io.write_string(fi.writer, name, &fi.n)
+		io.write_string(fi.writer, " = ", &fi.n)
+
+		bit_offset := info.bit_offsets[i]
+		bit_size := info.bit_sizes[i]
+
+		value := read_bits(([^]byte)(v.data), bit_offset, bit_size)
+		type := info.types[i]
+
+		if !reflect.is_unsigned(runtime.type_info_core(type)) {
+			// Sign Extension
+			m := u64(1<<(bit_size-1))
+			value = (value ~ m) - m
+		}
+
+		fmt_value(fi, any{&value, type.id}, field_verb)
+		if do_trailing_comma { io.write_string(fi.writer, ",\n", &fi.n) }
+
+	}
+}
+
+
+
 // Formats a value based on its type and formatting verb
 //
 // Inputs:
@@ -2644,6 +2703,9 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 
 	case runtime.Type_Info_Matrix:
 		fmt_matrix(fi, v, verb, info)
+
+	case runtime.Type_Info_Bit_Field:
+		fmt_bit_field(fi, v, verb, info, "")
 	}
 }
 // Formats a complex number based on the given formatting verb

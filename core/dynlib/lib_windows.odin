@@ -4,7 +4,7 @@ package dynlib
 
 import win32 "core:sys/windows"
 import "core:strings"
-import "core:runtime"
+import "base:runtime"
 import "core:reflect"
 
 _load_library :: proc(path: string, global_symbols := false) -> (Library, bool) {

@@ -249,7 +249,7 @@ shift_right :: proc(a: ^Decimal, k: uint) {
 	trim(a)
 }
 
-import "core:runtime"
+import "base:runtime"
 println :: proc(args: ..any) {
 	for arg, i in args {
 		if i != 0 {

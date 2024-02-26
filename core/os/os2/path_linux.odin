@@ -3,7 +3,7 @@ package os2
 
 import "core:strings"
 import "core:strconv"
-import "core:runtime"
+import "base:runtime"
 import "core:sys/unix"
 
 _Path_Separator      :: '/'

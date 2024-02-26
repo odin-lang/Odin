@@ -21,7 +21,7 @@ package net
 		Jeroen van Rijn: Cross platform unification, code style, documentation
 */
 
-import "core:runtime"
+import "base:runtime"
 
 /*
 	TUNEABLES - See also top of `dns.odin` for DNS configuration.

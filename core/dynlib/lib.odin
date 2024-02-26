@@ -1,8 +1,8 @@
 package dynlib
 
-import "core:intrinsics"
+import "base:intrinsics"
 import "core:reflect"
-import "core:runtime"
+import "base:runtime"
 _ :: intrinsics
 _ :: reflect
 _ :: runtime
@@ -123,40 +123,34 @@ Returns:
 
 See doc.odin for an example.
 */
-initialize_symbols :: proc(symbol_table: ^$T, library_path: string, symbol_prefix := "", handle_field_name := "__handle") -> (count: int, ok: bool) where intrinsics.type_is_struct(T) {
+initialize_symbols :: proc(
+	symbol_table: ^$T, library_path: string,
+	symbol_prefix := "", handle_field_name := "__handle",
+) -> (count: int = -1, ok: bool = false) where intrinsics.type_is_struct(T) {
 	assert(symbol_table != nil)
-	handle: Library
 
-	if handle, ok = load_library(library_path); !ok {
-		return -1, false
-	}
-
-	// `symbol_table` must be a struct because of the where clause, so this can't fail.
-	ti := runtime.type_info_base(type_info_of(T))
-	s, _ := ti.variant.(runtime.Type_Info_Struct)
+	handle := load_library(library_path) or_return
 
 	// Buffer to concatenate the prefix + symbol name.
 	prefixed_symbol_buf: [2048]u8 = ---
 
-	sym_ptr: rawptr
-	for field_name, i in s.names {
+	count = 0
+	for field, i in reflect.struct_fields_zipped(T) {
 		// Calculate address of struct member
-		field_ptr := rawptr(uintptr(rawptr(symbol_table)) + uintptr(s.offsets[i]))
+		field_ptr := rawptr(uintptr(symbol_table) + field.offset)
 
 		// If we've come across the struct member for the handle, store it and continue scanning for other symbols.
-		if field_name == handle_field_name {
+		if field.name == handle_field_name {
 			// We appear to be hot reloading. Unload previous incarnation of the library.
 			if old_handle := (^Library)(field_ptr)^; old_handle != nil {
-				if ok = unload_library(old_handle); !ok {
-					return count, ok
-				}
+				unload_library(old_handle) or_return
 			}
 			(^Library)(field_ptr)^ = handle
 			continue
 		}
 
 		// We're not the library handle, so the field needs to be a pointer type, be it a procedure pointer or an exported global.
-		if !(reflect.is_procedure(s.types[i]) || reflect.is_pointer(s.types[i])) {
+		if !(reflect.is_procedure(field.type) || reflect.is_pointer(field.type)) {
 			continue
 		}
 
@@ -164,22 +158,21 @@ initialize_symbols :: proc(symbol_table: ^$T, library_path: string, symbol_prefi
 		prefixed_name: string
 
 		// Do we have a symbol override tag?
-		if override, tag_ok := reflect.struct_tag_lookup(reflect.Struct_Tag(s.tags[i]), "dynlib"); tag_ok {
-			prefixed_name = string(override)
+		if override, tag_ok := reflect.struct_tag_lookup(field.tag, "dynlib"); tag_ok {
+			prefixed_name = override
 		}
 
 		// No valid symbol override tag found, fall back to `<symbol_prefix>name`.
 		if len(prefixed_name) == 0 {
 			offset := copy(prefixed_symbol_buf[:], symbol_prefix)
-			copy(prefixed_symbol_buf[offset:], field_name)
-			prefixed_name = string(prefixed_symbol_buf[:len(symbol_prefix) + len(field_name)])
+			copy(prefixed_symbol_buf[offset:], field.name)
+			prefixed_name = string(prefixed_symbol_buf[:len(symbol_prefix) + len(field.name)])
 		}
 
 		// Assign procedure (or global) pointer if found.
-		if sym_ptr, ok = symbol_address(handle, prefixed_name); ok {
-			(^rawptr)(field_ptr)^ = sym_ptr
-			count += 1
-		}
+		sym_ptr := symbol_address(handle, prefixed_name) or_continue
+		(^rawptr)(field_ptr)^ = sym_ptr
+		count += 1
 	}
 	return count, count > 0
 }

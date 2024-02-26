@@ -230,6 +230,10 @@ gb_internal Ast *clone_ast(Ast *node, AstFile *f) {
 	case Ast_OrReturnExpr:
 		n->OrReturnExpr.expr = clone_ast(n->OrReturnExpr.expr, f);
 		break;
+	case Ast_OrBranchExpr:
+		n->OrBranchExpr.label = clone_ast(n->OrBranchExpr.label, f);
+		n->OrBranchExpr.expr  = clone_ast(n->OrBranchExpr.expr, f);
+		break;
 	case Ast_TypeAssertion:
 		n->TypeAssertion.expr = clone_ast(n->TypeAssertion.expr, f);
 		n->TypeAssertion.type = clone_ast(n->TypeAssertion.type, f);
@@ -346,6 +350,11 @@ gb_internal Ast *clone_ast(Ast *node, AstFile *f) {
 		n->Field.names = clone_ast_array(n->Field.names, f);
 		n->Field.type  = clone_ast(n->Field.type, f);
 		break;
+	case Ast_BitFieldField:
+		n->BitFieldField.name     = clone_ast(n->BitFieldField.name, f);
+		n->BitFieldField.type     = clone_ast(n->BitFieldField.type, f);
+		n->BitFieldField.bit_size = clone_ast(n->BitFieldField.bit_size, f);
+		break;
 	case Ast_FieldList:
 		n->FieldList.list = clone_ast_array(n->FieldList.list, f);
 		break;
@@ -383,10 +392,11 @@ gb_internal Ast *clone_ast(Ast *node, AstFile *f) {
 		n->DynamicArrayType.elem = clone_ast(n->DynamicArrayType.elem, f);
 		break;
 	case Ast_StructType:
-		n->StructType.fields = clone_ast_array(n->StructType.fields, f);
+		n->StructType.fields             = clone_ast_array(n->StructType.fields, f);
 		n->StructType.polymorphic_params = clone_ast(n->StructType.polymorphic_params, f);
-		n->StructType.align  = clone_ast(n->StructType.align, f);
-		n->StructType.where_clauses  = clone_ast_array(n->StructType.where_clauses, f);
+		n->StructType.align              = clone_ast(n->StructType.align, f);
+		n->StructType.field_align        = clone_ast(n->StructType.field_align, f);
+		n->StructType.where_clauses      = clone_ast_array(n->StructType.where_clauses, f);
 		break;
 	case Ast_UnionType:
 		n->UnionType.variants = clone_ast_array(n->UnionType.variants, f);
@@ -400,6 +410,10 @@ gb_internal Ast *clone_ast(Ast *node, AstFile *f) {
 	case Ast_BitSetType:
 		n->BitSetType.elem       = clone_ast(n->BitSetType.elem, f);
 		n->BitSetType.underlying = clone_ast(n->BitSetType.underlying, f);
+		break;
+	case Ast_BitFieldType:
+		n->BitFieldType.backing_type = clone_ast(n->BitFieldType.backing_type, f);
+		n->BitFieldType.fields = clone_ast_array(n->BitFieldType.fields, f);
 		break;
 	case Ast_MapType:
 		n->MapType.count = clone_ast(n->MapType.count, f);
@@ -1040,6 +1054,18 @@ gb_internal Ast *ast_field(AstFile *f, Array<Ast *> const &names, Ast *type, Ast
 	return result;
 }
 
+gb_internal Ast *ast_bit_field_field(AstFile *f, Ast *name, Ast *type, Ast *bit_size, Token tag,
+                                     CommentGroup *docs, CommentGroup *comment) {
+	Ast *result = alloc_ast_node(f, Ast_BitFieldField);
+	result->BitFieldField.name     = name;
+	result->BitFieldField.type     = type;
+	result->BitFieldField.bit_size = bit_size;
+	result->BitFieldField.tag      = tag;
+	result->BitFieldField.docs     = docs;
+	result->BitFieldField.comment  = comment;
+	return result;
+}
+
 gb_internal Ast *ast_field_list(AstFile *f, Token token, Array<Ast *> const &list) {
 	Ast *result = alloc_ast_node(f, Ast_FieldList);
 	result->FieldList.token = token;
@@ -1125,7 +1151,7 @@ gb_internal Ast *ast_dynamic_array_type(AstFile *f, Token token, Ast *elem) {
 
 gb_internal Ast *ast_struct_type(AstFile *f, Token token, Slice<Ast *> fields, isize field_count,
                      Ast *polymorphic_params, bool is_packed, bool is_raw_union, bool is_no_copy,
-                     Ast *align,
+                     Ast *align, Ast *field_align,
                      Token where_token, Array<Ast *> const &where_clauses) {
 	Ast *result = alloc_ast_node(f, Ast_StructType);
 	result->StructType.token              = token;
@@ -1136,6 +1162,7 @@ gb_internal Ast *ast_struct_type(AstFile *f, Token token, Slice<Ast *> fields, i
 	result->StructType.is_raw_union       = is_raw_union;
 	result->StructType.is_no_copy         = is_no_copy;
 	result->StructType.align              = align;
+	result->StructType.field_align        = field_align;
 	result->StructType.where_token        = where_token;
 	result->StructType.where_clauses      = slice_from_array(where_clauses);
 	return result;
@@ -1171,6 +1198,17 @@ gb_internal Ast *ast_bit_set_type(AstFile *f, Token token, Ast *elem, Ast *under
 	result->BitSetType.underlying = underlying;
 	return result;
 }
+
+gb_internal Ast *ast_bit_field_type(AstFile *f, Token token, Ast *backing_type, Token open, Array<Ast *> const &fields, Token close) {
+	Ast *result = alloc_ast_node(f, Ast_BitFieldType);
+	result->BitFieldType.token        = token;
+	result->BitFieldType.backing_type = backing_type;
+	result->BitFieldType.open         = open;
+	result->BitFieldType.fields       = slice_from_array(fields);
+	result->BitFieldType.close        = close;
+	return result;
+}
+
 
 gb_internal Ast *ast_map_type(AstFile *f, Token token, Ast *key, Ast *value) {
 	Ast *result = alloc_ast_node(f, Ast_MapType);
@@ -2158,6 +2196,49 @@ gb_internal Array<Ast *> parse_union_variant_list(AstFile *f) {
 	return variants;
 }
 
+gb_internal void parser_check_polymorphic_record_parameters(AstFile *f, Ast *polymorphic_params) {
+	if (polymorphic_params == nullptr) {
+		return;
+	}
+	if (polymorphic_params->kind != Ast_FieldList) {
+		return;
+	}
+
+
+	enum {Unknown, Dollar, Bare} prefix = Unknown;
+	gb_unused(prefix);
+
+	for (Ast *field : polymorphic_params->FieldList.list) {
+		if (field == nullptr || field->kind != Ast_Field) {
+			continue;
+		}
+		for (Ast *name : field->Field.names) {
+			if (name == nullptr) {
+				continue;
+			}
+			bool error = false;
+
+			if (name->kind == Ast_Ident) {
+				switch (prefix) {
+				case Unknown: prefix = Bare; break;
+				case Dollar:  error = true;  break;
+				case Bare:                   break;
+				}
+			} else if (name->kind == Ast_PolyType) {
+				switch (prefix) {
+				case Unknown: prefix = Dollar; break;
+				case Dollar:                   break;
+				case Bare:    error = true;    break;
+				}
+			}
+			if (error) {
+				syntax_error(name, "Mixture of polymorphic $ names and normal identifiers are not allowed within record parameters");
+			}
+		}
+	}
+}
+
+
 gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 	Ast *operand = nullptr; // Operand
 	switch (f->curr_token.kind) {
@@ -2500,6 +2581,66 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 		return ast_matrix_type(f, token, row_count, column_count, type);
 	} break;
 
+	case Token_bit_field: {
+		Token token = expect_token(f, Token_bit_field);
+		isize prev_level;
+
+		prev_level = f->expr_level;
+		f->expr_level = -1;
+
+		Ast *backing_type = parse_type_or_ident(f);
+		if (backing_type == nullptr) {
+			Token token = advance_token(f);
+			syntax_error(token, "Expected a backing type for a 'bit_field'");
+			backing_type = ast_bad_expr(f, token, f->curr_token);
+		}
+
+		skip_possible_newline_for_literal(f);
+		Token open = expect_token_after(f, Token_OpenBrace, "bit_field");
+
+
+		auto fields = array_make<Ast *>(ast_allocator(f), 0, 0);
+
+		while (f->curr_token.kind != Token_CloseBrace &&
+		       f->curr_token.kind != Token_EOF) {
+			CommentGroup *docs = nullptr;
+			CommentGroup *comment = nullptr;
+
+			Ast *name = parse_ident(f);
+			bool err_once = false;
+			while (allow_token(f, Token_Comma)) {
+				Ast *dummy_name = parse_ident(f);
+				if (!err_once) {
+					error(dummy_name, "'bit_field' fields do not support multiple names per field");
+					err_once = true;
+				}
+			}
+			expect_token(f, Token_Colon);
+			Ast *type = parse_type(f);
+			expect_token(f, Token_Or);
+			Ast *bit_size = parse_expr(f, true);
+
+			Token tag = {};
+			if (f->curr_token.kind == Token_String) {
+				tag = expect_token(f, Token_String);
+			}
+
+			Ast *bf_field = ast_bit_field_field(f, name, type, bit_size, tag, docs, comment);
+			array_add(&fields, bf_field);
+
+			if (!allow_field_separator(f)) {
+				break;
+			}
+		}
+
+		Token close = expect_closing_brace_of_field_list(f);
+
+		f->expr_level = prev_level;
+
+		return ast_bit_field_type(f, token, backing_type, open, fields, close);
+	}
+
+
 	case Token_struct: {
 		Token    token = expect_token(f, Token_struct);
 		Ast *polymorphic_params = nullptr;
@@ -2507,6 +2648,7 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 		bool is_raw_union       = false;
 		bool no_copy            = false;
 		Ast *align              = nullptr;
+		Ast *field_align        = nullptr;
 
 		if (allow_token(f, Token_OpenParen)) {
 			isize param_count = 0;
@@ -2541,6 +2683,18 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 					gbString s = expr_to_string(align);
 					syntax_warning(tag, "#align requires parentheses around the expression");
 					error_line("\tSuggestion: #align(%s)", s);
+					gb_string_free(s);
+				}
+			} else if (tag.string == "field_align") {
+				if (field_align) {
+					syntax_error(tag, "Duplicate struct tag '#%.*s'", LIT(tag.string));
+				}
+				field_align = parse_expr(f, true);
+				if (field_align && field_align->kind != Ast_ParenExpr) {
+					ERROR_BLOCK();
+					gbString s = expr_to_string(field_align);
+					syntax_warning(tag, "#field_align requires parentheses around the expression");
+					error_line("\tSuggestion: #field_align(%s)", s);
 					gb_string_free(s);
 				}
 			} else if (tag.string == "raw_union") {
@@ -2591,7 +2745,9 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 			decls = fields->FieldList.list;
 		}
 
-		return ast_struct_type(f, token, decls, name_count, polymorphic_params, is_packed, is_raw_union, no_copy, align, where_token, where_clauses);
+		parser_check_polymorphic_record_parameters(f, polymorphic_params);
+
+		return ast_struct_type(f, token, decls, name_count, polymorphic_params, is_packed, is_raw_union, no_copy, align, field_align, where_token, where_clauses);
 	} break;
 
 	case Token_union: {
@@ -2682,6 +2838,8 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 		Token open = expect_token_after(f, Token_OpenBrace, "union");
 		auto variants = parse_union_variant_list(f);
 		Token close = expect_closing_brace_of_field_list(f);
+
+		parser_check_polymorphic_record_parameters(f, polymorphic_params);
 
 		return ast_union_type(f, token, variants, polymorphic_params, align, union_kind, where_token, where_clauses);
 	} break;
@@ -3857,6 +4015,10 @@ gb_internal Array<Ast *> convert_to_ident_list(AstFile *f, Array<AstAndFlags> li
 		case Ast_Ident:
 		case Ast_BadExpr:
 			break;
+		case Ast_Implicit:
+			syntax_error(ident, "Expected an identifier, '%.*s' which is a keyword", LIT(ident->Implicit.string));
+			ident = ast_ident(f, blank_token);
+			break;
 
 		case Ast_PolyType:
 			if (allow_poly_names) {
@@ -3869,6 +4031,7 @@ gb_internal Array<Ast *> convert_to_ident_list(AstFile *f, Array<AstAndFlags> li
 				syntax_error(ident, "Expected a non-polymorphic identifier");
 			}
 			/*fallthrough*/
+
 
 		default:
 			syntax_error(ident, "Expected an identifier");
@@ -5445,6 +5608,11 @@ gb_internal bool determine_path_from_string(BlockingMutex *file_mutex, Ast *node
 
 
 	if (collection_name.len > 0) {
+		// NOTE(bill): `base:runtime` == `core:runtime`
+		if (collection_name == "core" && string_starts_with(file_str, str_lit("runtime"))) {
+			collection_name = str_lit("base");
+		}
+
 		if (collection_name == "system") {
 			if (node->kind != Ast_ForeignImportDecl) {
 				syntax_error(node, "The library collection 'system' is restrict for 'foreign_library'");
@@ -5474,13 +5642,12 @@ gb_internal bool determine_path_from_string(BlockingMutex *file_mutex, Ast *node
 #endif
 	}
 
-
 	if (is_package_name_reserved(file_str)) {
 		*path = file_str;
-		if (collection_name == "core") {
+		if (collection_name == "core" || collection_name == "base") {
 			return true;
 		} else {
-			syntax_error(node, "The package '%.*s' must be imported with the core library collection: 'core:%.*s'", LIT(file_str), LIT(file_str));
+			syntax_error(node, "The package '%.*s' must be imported with the 'base' library collection: 'base:%.*s'", LIT(file_str), LIT(file_str));
 			return false;
 		}
 	}
@@ -5496,7 +5663,8 @@ gb_internal bool determine_path_from_string(BlockingMutex *file_mutex, Ast *node
 	if (has_windows_drive) {
 		*path = file_str;
 	} else {
-		String fullpath = string_trim_whitespace(get_fullpath_relative(permanent_allocator(), base_dir, file_str));
+		bool ok = false;
+		String fullpath = string_trim_whitespace(get_fullpath_relative(permanent_allocator(), base_dir, file_str, &ok));
 		*path = fullpath;
 	}
 	return true;
@@ -6118,7 +6286,11 @@ gb_internal ParseFileError parse_packages(Parser *p, String init_filename) {
 	{ // Add these packages serially and then process them parallel
 		TokenPos init_pos = {};
 		{
-			String s = get_fullpath_core(permanent_allocator(), str_lit("runtime"));
+			bool ok = false;
+			String s = get_fullpath_base_collection(permanent_allocator(), str_lit("runtime"), &ok);
+			if (!ok) {
+				compiler_error("Unable to find The 'base:runtime' package. Is the ODIN_ROOT set up correctly?");
+			}
 			try_add_import_path(p, s, s, init_pos, Package_Runtime);
 		}
 
@@ -6126,7 +6298,11 @@ gb_internal ParseFileError parse_packages(Parser *p, String init_filename) {
 		p->init_fullpath = init_fullpath;
 
 		if (build_context.command_kind == Command_test) {
-			String s = get_fullpath_core(permanent_allocator(), str_lit("testing"));
+			bool ok = false;
+			String s = get_fullpath_core_collection(permanent_allocator(), str_lit("testing"), &ok);
+			if (!ok) {
+				compiler_error("Unable to find The 'core:testing' package. Is the ODIN_ROOT set up correctly?");
+			}
 			try_add_import_path(p, s, s, init_pos, Package_Normal);
 		}
 		

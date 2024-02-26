@@ -1,7 +1,7 @@
 package os
 
 import "core:sys/wasm/wasi"
-import "core:runtime"
+import "base:runtime"
 
 Handle :: distinct i32
 Errno :: distinct i32
@@ -100,28 +100,6 @@ file_size :: proc(fd: Handle) -> (i64, Errno) {
 		return 0, Errno(err)
 	}
 	return i64(stat.size), 0
-}
-
-
-
-heap_alloc :: proc(size: int, zero_memory := true) -> rawptr {
-	return nil
-}
-heap_resize :: proc(ptr: rawptr, new_size: int) -> rawptr {
-	if new_size == 0 {
-		heap_free(ptr)
-		return nil
-	}
-	if ptr == nil {
-		return heap_alloc(new_size)
-	}
-
-	return nil
-}
-heap_free :: proc(ptr: rawptr) {
-	if ptr == nil {
-		return
-	}
 }
 
 

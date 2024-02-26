@@ -429,6 +429,7 @@ AST_KIND(_ExprBegin,  "",  bool) \
 		Ast *expr, *selector; \
 		u8 swizzle_count; /*maximum of 4 components, if set, count >= 2*/ \
 		u8 swizzle_indices; /*2 bits per component*/ \
+		bool is_bit_field; \
 	}) \
 	AST_KIND(ImplicitSelectorExpr, "implicit selector expression",    struct { Token token; Ast *selector; }) \
 	AST_KIND(SelectorCallExpr, "selector call expression", struct { \
@@ -650,6 +651,14 @@ AST_KIND(_DeclEnd,   "", bool) \
 		CommentGroup *   docs;      \
 		CommentGroup *   comment;   \
 	}) \
+	AST_KIND(BitFieldField, "bit field field", struct { \
+		Ast *         name;     \
+		Ast *         type;     \
+		Ast *         bit_size; \
+		Token         tag;      \
+		CommentGroup *docs;     \
+		CommentGroup *comment;  \
+	}) \
 	AST_KIND(FieldList, "field list", struct { \
 		Token token;       \
 		Slice<Ast *> list; \
@@ -713,6 +722,7 @@ AST_KIND(_TypeBegin, "", bool) \
 		isize field_count;          \
 		Ast *polymorphic_params;    \
 		Ast *align;                 \
+		Ast *field_align;           \
 		Token where_token;          \
 		Slice<Ast *> where_clauses; \
 		bool is_packed;             \
@@ -740,6 +750,14 @@ AST_KIND(_TypeBegin, "", bool) \
 		Token token; \
 		Ast * elem;  \
 		Ast * underlying; \
+	}) \
+	AST_KIND(BitFieldType, "bit field type", struct { \
+		Scope *scope; \
+		Token token; \
+		Ast * backing_type;  \
+		Token open; \
+		Slice<Ast *> fields; /* BitFieldField */ \
+		Token close; \
 	}) \
 	AST_KIND(MapType, "map type", struct { \
 		Token token; \
