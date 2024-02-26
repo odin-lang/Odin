@@ -33,6 +33,7 @@ import hmac             "core:crypto/hmac"
 import keccak           "core:crypto/legacy/keccak"
 import md5              "core:crypto/legacy/md5"
 import sha1             "core:crypto/legacy/sha1"
+import pbkdf2           "core:crypto/pbkdf2"
 import poly1305         "core:crypto/poly1305"
 import sha2             "core:crypto/sha2"
 import sha3             "core:crypto/sha3"
@@ -149,6 +150,7 @@ _ :: chacha20poly1305
 _ :: hmac
 _ :: keccak
 _ :: md5
+_ :: pbkdf2
 _ :: poly1305
 _ :: sha1
 _ :: sha2

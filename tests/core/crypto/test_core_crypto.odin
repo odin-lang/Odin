@@ -53,6 +53,7 @@ main :: proc() {
 
 	test_hash(&t)
 	test_mac(&t)
+	test_kdf(&t) // After hash/mac tests because those should pass first.
 
 	test_chacha20(&t)
 	test_chacha20poly1305(&t)
