@@ -5,12 +5,13 @@ import "core:c"
 import "core:c/libc"
 import "core:sys/haiku"
 import "core:sys/unix"
+import "core:time"
 
 @(private="file")
 Wait_Node :: struct {
 	thread:     unix.pthread_t,
 	futex:      ^Futex,
-	prev, next: Wait_Node,
+	prev, next: ^Wait_Node,
 }
 @(private="file")
 Wait_Queue :: struct {
@@ -18,14 +19,14 @@ Wait_Queue :: struct {
 	list: Wait_Node,
 }
 @(private="file")
-waitq_lock :: proc(waitq: ^Wait_Queue) {
-	for libc.atomic_flag_test_and_set_explicit(&waitq.lock, .Acquire) {
+waitq_lock :: proc "contextless" (waitq: ^Wait_Queue) {
+	for libc.atomic_flag_test_and_set_explicit(&waitq.lock, .acquire) {
 		; // spin...
 	}
 }
 @(private="file")
-waitq_unlock :: proc(waitq: ^Wait_Queue) {
-	libc.atomic_flag_clear(&waitq.lock, .Release)
+waitq_unlock :: proc "contextless" (waitq: ^Wait_Queue) {
+	libc.atomic_flag_clear_explicit(&waitq.lock, .release)
 }
 
 // FIXME: This approach may scale badly in the future,
@@ -45,8 +46,8 @@ get_waitq :: #force_inline proc "contextless" (f: ^Futex) -> ^Wait_Queue {
 
 _futex_wait :: proc "contextless" (f: ^Futex, expect: u32) -> bool {
 	waitq := get_waitq(f)
-	waitq_lock(&waitq)
-	defer waitq_unlock(&waitq)
+	waitq_lock(waitq)
+	defer waitq_unlock(waitq)
 
 	head   := &waitq.list
 	waiter := Wait_Node{
@@ -64,9 +65,9 @@ _futex_wait :: proc "contextless" (f: ^Futex, expect: u32) -> bool {
 	haiku.sigaddset(&mask, haiku.SIGCONT)
 	unix.pthread_sigmask(haiku.SIG_BLOCK, &mask, &old_mask)
 
-	if u32(atomic_load_explicit(f, .Acquire)) == expect {
-		waitq_unlock(&waitq)
-		defer waitq_lock(&waitq)
+	if u32(atomic_load_explicit(f, .acquire)) == expect {
+		waitq_unlock(waitq)
+		defer waitq_lock(waitq)
 		
 		sig: c.int
 		haiku.sigwait(&mask, &sig)
@@ -89,8 +90,8 @@ _futex_wait_with_timeout :: proc "contextless" (f: ^Futex, expect: u32, duration
 
 _futex_signal :: proc "contextless" (f: ^Futex) {
 	waitq := get_waitq(f)
-	waitq_lock(&waitq)
-	defer waitq_unlock(&waitq)
+	waitq_lock(waitq)
+	defer waitq_unlock(waitq)
 
 	head := &waitq.list
 	for waiter := head.next; waiter != head; waiter = waiter.next {
@@ -103,8 +104,8 @@ _futex_signal :: proc "contextless" (f: ^Futex) {
 
 _futex_broadcast :: proc "contextless" (f: ^Futex) {
 	waitq := get_waitq(f)
-	waitq_lock(&waitq)
-	defer waitq_unlock(&waitq)
+	waitq_lock(waitq)
+	defer waitq_unlock(waitq)
 
 	head := &waitq.list
 	for waiter := head.next; waiter != head; waiter = waiter.next {

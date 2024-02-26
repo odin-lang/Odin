@@ -139,7 +139,7 @@ foreign libroot {
 	*/
 	disable_debugger :: proc(state: c.int) -> c.int ---
 
-	find_thread(name: cstring) -> thread_id ---
+	find_thread :: proc(name: cstring) -> thread_id ---
 }
 
 // Signal.h

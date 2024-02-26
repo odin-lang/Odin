@@ -16,6 +16,8 @@ foreign pthread {
 	// retval is a pointer to a location to put the return value of the thread proc.
 	pthread_join :: proc(t: pthread_t, retval: ^rawptr) -> c.int ---
 
+	pthread_kill :: proc(t: pthread_t, sig: c.int) -> c.int ---
+
 	pthread_self :: proc() -> pthread_t ---
 
 	pthread_equal :: proc(a, b: pthread_t) -> b32 ---
