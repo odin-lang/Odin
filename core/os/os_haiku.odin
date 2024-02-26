@@ -70,7 +70,7 @@ O_RWMASK         :: O_ACCMODE
 
 /* flags for open() */
 O_EXCL           :: 0x0100		/* exclusive creat */
-O_CREAT          :: 0x0200		/* create and open file */
+O_CREATE         :: 0x0200		/* create and open file */
 O_TRUNC          :: 0x0400		/* open with truncation */
 O_NOCTTY         :: 0x1000		/* don't make tty the controlling tty */
 O_NOTRAVERSE     :: 0x2000		/* do not traverse leaf link */
@@ -328,7 +328,6 @@ _readlink :: proc(path: string) -> (string, Errno) {
 	}
 }
 
-// XXX OpenBSD
 absolute_path_from_handle :: proc(fd: Handle) -> (string, Errno) {
 	return "", Errno(ENOSYS)
 }
@@ -377,4 +376,9 @@ lookup_env :: proc(key: string, allocator := context.allocator) -> (value: strin
 get_env :: proc(key: string, allocator := context.allocator) -> (value: string) {
 	value, _ = lookup_env(key, allocator)
 	return
+}
+
+@(private)
+_processor_core_count :: proc() -> int {
+	return int(_sysconf(_SC_NPROCESSORS_ONLN))
 }
