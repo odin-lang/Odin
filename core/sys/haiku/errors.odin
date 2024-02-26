@@ -1,8 +1,6 @@
 //+build haiku
 package sys_haiku
 
-status_t :: i32
-
 Errno :: enum i32 {
 	// Error baselines
 	GENERAL_ERROR_BASE     = min(i32),
@@ -225,6 +223,6 @@ Errno :: enum i32 {
 
 foreign import libroot "system:c"
 foreign libroot {
-	i32 _to_positive_error(error: i32) ---
-	i32 _to_negative_error(error: i32) ---
+	_to_positive_error :: proc(error: i32) -> i32 ---
+	_to_negative_error :: proc(error: i32) -> i32 ---
 }

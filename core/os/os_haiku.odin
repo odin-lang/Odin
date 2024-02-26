@@ -2,39 +2,39 @@ package os
 
 foreign import libc "system:c"
 
-import "core:strings"
-import "core:c"
 import "base:runtime"
+import "core:c"
+import "core:strings"
+import "core:sys/haiku"
 
-Handle    :: distinct i32
-Pid       :: distinct i32
-File_Time :: distinct i64
-Errno     :: distinct i32
+Handle    :: i32
+Pid       :: i32
+File_Time :: i64
+Errno     :: i32
 
-MAX_PATH :: 260
+MAX_PATH :: haiku.PATH_MAX
 
-B_GENERAL_ERROR_BASE :: min(i32)
-B_POSIX_ERROR_BASE   :: B_GENERAL_ERROR_BASE + 0x7000
+ENOSYS :: haiku.Errno.POSIX_ERROR_BASE + 9
 
 INVALID_HANDLE :: ~Handle(0)
 
-ERROR_NONE:	Errno: 0
+ERROR_NONE: Errno: 0
 
 stdin:  Handle = 0
 stdout: Handle = 1
 stderr: Handle = 2
 
-pid_t :: distinct i32
-off_t :: i64
-dev_t :: distinct i32
-ino_t :: distinct i64
-mode_t :: distinct u32
-nlink_t :: distinct i32
-uid_t :: distinct u32
-gid_t :: distinct u32
-blksize_t :: distinct i32
-blkcnt_t :: distinct i64
-time_t   :: i64
+pid_t     :: haiku.pid_t
+off_t     :: haiku.off_t
+dev_t     :: haiku.dev_t
+ino_t     :: haiku.ino_t
+mode_t    :: haiku.mode_t
+nlink_t   :: haiku.nlink_t
+uid_t     :: haiku.uid_t
+gid_t     :: haiku.gid_t
+blksize_t :: haiku.blksize_t
+blkcnt_t  :: haiku.blkcnt_t
+time_t    :: haiku.time_t
 
 
 Unix_File_Time :: struct {
@@ -166,7 +166,7 @@ foreign libc {
 	@(link_name="dlerror")	_unix_dlerror	:: proc() -> cstring ---
 }
 
-MAXNAMLEN :: 255
+MAXNAMLEN :: haiku.NAME_MAX
 
 Dirent :: struct {
 	dev:      dev_t,
