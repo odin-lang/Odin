@@ -424,5 +424,7 @@ get_env :: proc(key: string, allocator := context.allocator) -> (value: string) 
 
 @(private)
 _processor_core_count :: proc() -> int {
-	return int(_sysconf(_SC_NPROCESSORS_ONLN))
+	info: haiku.system_info
+	haiku.get_system_info(&info)
+	return int(info.cpu_count)
 }
