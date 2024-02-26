@@ -14,7 +14,7 @@ Errno     :: i32
 
 MAX_PATH :: haiku.PATH_MAX
 
-ENOSYS :: haiku.Errno.POSIX_ERROR_BASE + 9
+ENOSYS :: int(haiku.Errno.POSIX_ERROR_BASE) + 9
 
 INVALID_HANDLE :: ~Handle(0)
 

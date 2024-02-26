@@ -45,3 +45,6 @@ key_t          :: i32
 clockid_t      :: i32
 
 time_t         :: i64 when ODIN_ARCH == .amd64 || ODIN_ARCH == .arm64 else i32
+
+sig_atomic_t   :: c.int
+sigset_t       :: u64
