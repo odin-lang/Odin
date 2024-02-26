@@ -3,6 +3,7 @@ package sync
 
 import "core:c"
 import "core:c/libc"
+import "core:runtime"
 import "core:sys/haiku"
 import "core:sys/unix"
 import "core:time"
@@ -20,24 +21,34 @@ Wait_Queue :: struct {
 }
 @(private="file")
 waitq_lock :: proc "contextless" (waitq: ^Wait_Queue) {
+	// FIXME: Get rid of context here.
+	context = runtime.default_context()
 	for libc.atomic_flag_test_and_set_explicit(&waitq.lock, .acquire) {
 		; // spin...
 	}
 }
 @(private="file")
 waitq_unlock :: proc "contextless" (waitq: ^Wait_Queue) {
+	// FIXME: Get rid of context here.
+	context = runtime.default_context()
 	libc.atomic_flag_clear_explicit(&waitq.lock, .release)
 }
 
 // FIXME: This approach may scale badly in the future,
 // possible solution - hash map (leads to deadlocks now).
 @(private="file")
-g_waitq := Wait_Queue{
-	list = {
-		prev = &g_waitq.list,
-		next = &g_waitq.list,
-	},
+g_waitq: Wait_Queue
+
+@(init, private="file")
+g_waitq_init :: proc() {
+	g_waitq = {
+		list = {
+			prev = &g_waitq.list,
+			next = &g_waitq.list,
+		},
+	}
 }
+
 @(private="file")
 get_waitq :: #force_inline proc "contextless" (f: ^Futex) -> ^Wait_Queue {
 	_ = f
@@ -65,7 +76,7 @@ _futex_wait :: proc "contextless" (f: ^Futex, expect: u32) -> bool {
 	haiku.sigaddset(&mask, haiku.SIGCONT)
 	unix.pthread_sigmask(haiku.SIG_BLOCK, &mask, &old_mask)
 
-	if u32(atomic_load_explicit(f, .acquire)) == expect {
+	if u32(atomic_load_explicit(f, .Acquire)) == expect {
 		waitq_unlock(waitq)
 		defer waitq_lock(waitq)
 		
