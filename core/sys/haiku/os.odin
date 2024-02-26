@@ -106,14 +106,14 @@ cpu_topology_node_info :: struct {
 	level:         u32,
 
 	data: struct #raw_union {
-		root: struct {
+		_root: struct {
 			platform: cpu_platform,
 		},
-		package: struct {
+		_package: struct {
 			vendor:          cpu_vendor,
 			cache_line_size: u32
 		},
-		core: struct {
+		_core: struct {
 			model:             u32,
 			default_frequency: u64,
 		},
