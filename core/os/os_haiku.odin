@@ -11,6 +11,8 @@ Pid       :: distinct i32
 File_Time :: distinct i64
 Errno     :: distinct i32
 
+MAX_PATH :: 260
+
 B_GENERAL_ERROR_BASE :: min(i32)
 B_POSIX_ERROR_BASE   :: B_GENERAL_ERROR_BASE + 0x7000
 
@@ -74,6 +76,48 @@ O_CREATE         :: 0x0200		/* create and open file */
 O_TRUNC          :: 0x0400		/* open with truncation */
 O_NOCTTY         :: 0x1000		/* don't make tty the controlling tty */
 O_NOTRAVERSE     :: 0x2000		/* do not traverse leaf link */
+
+// File type
+S_IFMT   :: 0o170000 // Type of file mask
+S_IFIFO  :: 0o010000 // Named pipe (fifo)
+S_IFCHR  :: 0o020000 // Character special
+S_IFDIR  :: 0o040000 // Directory
+S_IFBLK  :: 0o060000 // Block special
+S_IFREG  :: 0o100000 // Regular
+S_IFLNK  :: 0o120000 // Symbolic link
+S_IFSOCK :: 0o140000 // Socket
+S_ISVTX  :: 0o001000 // Save swapped text even after use
+
+// File mode
+	// Read, write, execute/search by owner
+S_IRWXU :: 0o0700 // RWX mask for owner
+S_IRUSR :: 0o0400 // R for owner
+S_IWUSR :: 0o0200 // W for owner
+S_IXUSR :: 0o0100 // X for owner
+
+	// Read, write, execute/search by group
+S_IRWXG :: 0o0070 // RWX mask for group
+S_IRGRP :: 0o0040 // R for group
+S_IWGRP :: 0o0020 // W for group
+S_IXGRP :: 0o0010 // X for group
+
+	// Read, write, execute/search by others
+S_IRWXO :: 0o0007 // RWX mask for other
+S_IROTH :: 0o0004 // R for other
+S_IWOTH :: 0o0002 // W for other
+S_IXOTH :: 0o0001 // X for other
+
+S_ISUID :: 0o4000 // Set user id on execution
+S_ISGID :: 0o2000 // Set group id on execution
+S_ISTXT :: 0o1000 // Sticky bit
+
+S_ISLNK  :: #force_inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFLNK  }
+S_ISREG  :: #force_inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFREG  }
+S_ISDIR  :: #force_inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFDIR  }
+S_ISCHR  :: #force_inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFCHR  }
+S_ISBLK  :: #force_inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFBLK  }
+S_ISFIFO :: #force_inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFIFO  }
+S_ISSOCK :: #force_inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFSOCK }
 
 
 foreign libc {
