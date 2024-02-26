@@ -33,20 +33,20 @@ memory_order_acq_rel :: memory_order.acq_rel
 memory_order_seq_cst :: memory_order.seq_cst
 
 // 7.17.2 Initialization
-ATOMIC_VAR_INIT :: #force_inline proc "contextless" (value: $T) -> T {
+ATOMIC_VAR_INIT :: #force_inline proc(value: $T) -> T {
 	return value
 }
 
-atomic_init :: #force_inline proc "contextless" (obj: ^$T, value: T) {
+atomic_init :: #force_inline proc(obj: ^$T, value: T) {
 	intrinsics.atomic_store(obj, value)
 }
 
-kill_dependency :: #force_inline proc "contextless" (value: $T) -> T {
+kill_dependency :: #force_inline proc(value: $T) -> T {
 	return value
 }
 
 // 7.17.4 Fences
-atomic_thread_fence :: #force_inline proc "contextless" (order: memory_order) {
+atomic_thread_fence :: #force_inline proc(order: memory_order) {
 	assert(order != .relaxed)
 	assert(order != .consume)
 	#partial switch order {
@@ -57,7 +57,7 @@ atomic_thread_fence :: #force_inline proc "contextless" (order: memory_order) {
 	}
 }
 
-atomic_signal_fence :: #force_inline proc "contextless" (order: memory_order) {
+atomic_signal_fence :: #force_inline proc(order: memory_order) {
 	assert(order != .relaxed)
 	assert(order != .consume)
 	#partial switch order {
@@ -69,7 +69,7 @@ atomic_signal_fence :: #force_inline proc "contextless" (order: memory_order) {
 }
 
 // 7.17.5 Lock-free property
-atomic_is_lock_free :: #force_inline proc "contextless" (obj: ^$T) -> bool {
+atomic_is_lock_free :: #force_inline proc(obj: ^$T) -> bool {
 	return intrinsics.atomic_type_is_lock_free(T)
 }
 
@@ -113,11 +113,11 @@ atomic_intmax_t       :: distinct intmax_t
 atomic_uintmax_t      :: distinct uintmax_t
 
 // 7.17.7 Operations on atomic types
-atomic_store :: #force_inline proc "contextless" (object: ^$T, desired: T) {
+atomic_store :: #force_inline proc(object: ^$T, desired: T) {
 	intrinsics.atomic_store(object, desired)
 }
 
-atomic_store_explicit :: #force_inline proc "contextless" (object: ^$T, desired: T, order: memory_order) {
+atomic_store_explicit :: #force_inline proc(object: ^$T, desired: T, order: memory_order) {
 	assert(order != .consume)
 	assert(order != .acquire)
 	assert(order != .acq_rel)
@@ -129,11 +129,11 @@ atomic_store_explicit :: #force_inline proc "contextless" (object: ^$T, desired:
 	}
 }
 
-atomic_load :: #force_inline proc "contextless" (object: ^$T) -> T {
+atomic_load :: #force_inline proc(object: ^$T) -> T {
 	return intrinsics.atomic_load(object)
 }
 
-atomic_load_explicit :: #force_inline proc "contextless" (object: ^$T, order: memory_order) {
+atomic_load_explicit :: #force_inline proc(object: ^$T, order: memory_order) {
 	assert(order != .release)
 	assert(order != .acq_rel)
 
@@ -145,11 +145,11 @@ atomic_load_explicit :: #force_inline proc "contextless" (object: ^$T, order: me
 	}
 }
 
-atomic_exchange :: #force_inline proc "contextless" (object: ^$T, desired: T) -> T {
+atomic_exchange :: #force_inline proc(object: ^$T, desired: T) -> T {
 	return intrinsics.atomic_exchange(object, desired)
 }
 
-atomic_exchange_explicit :: #force_inline proc "contextless" (object: ^$T, desired: T, order: memory_order) -> T {
+atomic_exchange_explicit :: #force_inline proc(object: ^$T, desired: T, order: memory_order) -> T {
 	switch order {
 	case .relaxed: return intrinsics.atomic_exchange_explicit(object, desired, .Relaxed)
 	case .consume: return intrinsics.atomic_exchange_explicit(object, desired, .Consume)
@@ -177,13 +177,13 @@ atomic_exchange_explicit :: #force_inline proc "contextless" (object: ^$T, desir
 // 	[success = seq_cst, failure = acquire] => failacq
 // 	[success = acquire, failure = relaxed] => acq_failrelaxed
 // 	[success = acq_rel, failure = relaxed] => acqrel_failrelaxed
-atomic_compare_exchange_strong :: #force_inline proc "contextless" (object, expected: ^$T, desired: T) -> bool {
+atomic_compare_exchange_strong :: #force_inline proc(object, expected: ^$T, desired: T) -> bool {
 	value, ok := intrinsics.atomic_compare_exchange_strong(object, expected^, desired)
 	if !ok { expected^ = value } 
 	return ok
 }
 
-atomic_compare_exchange_strong_explicit :: #force_inline proc "contextless" (object, expected: ^$T, desired: T, success, failure: memory_order) -> bool {
+atomic_compare_exchange_strong_explicit :: #force_inline proc(object, expected: ^$T, desired: T, success, failure: memory_order) -> bool {
 	assert(failure != .release)
 	assert(failure != .acq_rel)
 
@@ -229,13 +229,13 @@ atomic_compare_exchange_strong_explicit :: #force_inline proc "contextless" (obj
 	return ok
 }
 
-atomic_compare_exchange_weak :: #force_inline proc "contextless" (object, expected: ^$T, desired: T) -> bool {
+atomic_compare_exchange_weak :: #force_inline proc(object, expected: ^$T, desired: T) -> bool {
 	value, ok := intrinsics.atomic_compare_exchange_weak(object, expected^, desired)
 	if !ok { expected^ = value }
 	return ok
 }
 
-atomic_compare_exchange_weak_explicit :: #force_inline proc "contextless" (object, expected: ^$T, desited: T, success, failure: memory_order) -> bool {
+atomic_compare_exchange_weak_explicit :: #force_inline proc(object, expected: ^$T, desited: T, success, failure: memory_order) -> bool {
 	assert(failure != .release)
 	assert(failure != .acq_rel)
 
@@ -282,11 +282,11 @@ atomic_compare_exchange_weak_explicit :: #force_inline proc "contextless" (objec
 }
 
 // 7.17.7.5 The atomic_fetch and modify generic functions
-atomic_fetch_add :: #force_inline proc "contextless" (object: ^$T, operand: T) -> T {
+atomic_fetch_add :: #force_inline proc(object: ^$T, operand: T) -> T {
 	return intrinsics.atomic_add(object, operand)
 }
 
-atomic_fetch_add_explicit :: #force_inline proc "contextless" (object: ^$T, operand: T, order: memory_order) -> T {
+atomic_fetch_add_explicit :: #force_inline proc(object: ^$T, operand: T, order: memory_order) -> T {
 	switch order {
 	case .relaxed: return intrinsics.atomic_add_explicit(object, operand, .Relaxed)
 	case .consume: return intrinsics.atomic_add_explicit(object, operand, .Consume)
@@ -298,11 +298,11 @@ atomic_fetch_add_explicit :: #force_inline proc "contextless" (object: ^$T, oper
 	}
 }
 
-atomic_fetch_sub :: #force_inline proc "contextless" (object: ^$T, operand: T) -> T {
+atomic_fetch_sub :: #force_inline proc(object: ^$T, operand: T) -> T {
 	return intrinsics.atomic_sub(object, operand)
 }
 
-atomic_fetch_sub_explicit :: #force_inline proc "contextless" (object: ^$T, operand: T, order: memory_order) -> T {
+atomic_fetch_sub_explicit :: #force_inline proc(object: ^$T, operand: T, order: memory_order) -> T {
 	switch order {
 	case .relaxed: return intrinsics.atomic_sub_explicit(object, operand, .Relaxed)
 	case .consume: return intrinsics.atomic_sub_explicit(object, operand, .Consume)
@@ -314,11 +314,11 @@ atomic_fetch_sub_explicit :: #force_inline proc "contextless" (object: ^$T, oper
 	}
 }
 
-atomic_fetch_or :: #force_inline proc "contextless" (object: ^$T, operand: T) -> T {
+atomic_fetch_or :: #force_inline proc(object: ^$T, operand: T) -> T {
 	return intrinsics.atomic_or(object, operand)
 }
 
-atomic_fetch_or_explicit :: #force_inline proc "contextless" (object: ^$T, operand: T, order: memory_order) -> T {
+atomic_fetch_or_explicit :: #force_inline proc(object: ^$T, operand: T, order: memory_order) -> T {
 	switch order {
 	case .relaxed: return intrinsics.atomic_or_explicit(object, operand, .Relaxed)
 	case .consume: return intrinsics.atomic_or_explicit(object, operand, .Consume)
@@ -330,11 +330,11 @@ atomic_fetch_or_explicit :: #force_inline proc "contextless" (object: ^$T, opera
 	}
 }
 
-atomic_fetch_xor :: #force_inline proc "contextless" (object: ^$T, operand: T) -> T {
+atomic_fetch_xor :: #force_inline proc(object: ^$T, operand: T) -> T {
 	return intrinsics.atomic_xor(object, operand)
 }
 
-atomic_fetch_xor_explicit :: #force_inline proc "contextless" (object: ^$T, operand: T, order: memory_order) -> T {
+atomic_fetch_xor_explicit :: #force_inline proc(object: ^$T, operand: T, order: memory_order) -> T {
 	switch order {
 	case .relaxed: return intrinsics.atomic_xor_explicit(object, operand, .Relaxed)
 	case .consume: return intrinsics.atomic_xor_explicit(object, operand, .Consume)
@@ -346,10 +346,10 @@ atomic_fetch_xor_explicit :: #force_inline proc "contextless" (object: ^$T, oper
 	}
 }
 
-atomic_fetch_and :: #force_inline proc "contextless" (object: ^$T, operand: T) -> T {
+atomic_fetch_and :: #force_inline proc(object: ^$T, operand: T) -> T {
 	return intrinsics.atomic_and(object, operand)
 }
-atomic_fetch_and_explicit :: #force_inline proc "contextless" (object: ^$T, operand: T, order: memory_order) -> T {
+atomic_fetch_and_explicit :: #force_inline proc(object: ^$T, operand: T, order: memory_order) -> T {
 	switch order {
 	case .relaxed: return intrinsics.atomic_and_explicit(object, operand, .Relaxed)
 	case .consume: return intrinsics.atomic_and_explicit(object, operand, .Consume)
@@ -364,18 +364,18 @@ atomic_fetch_and_explicit :: #force_inline proc "contextless" (object: ^$T, oper
 // 7.17.8 Atomic flag type and operations
 atomic_flag :: distinct atomic_bool
 
-atomic_flag_test_and_set :: #force_inline proc "contextless" (flag: ^atomic_flag) -> bool {
+atomic_flag_test_and_set :: #force_inline proc(flag: ^atomic_flag) -> bool {
 	return bool(atomic_exchange(flag, atomic_flag(true)))
 }
 
-atomic_flag_test_and_set_explicit :: #force_inline proc "contextless" (flag: ^atomic_flag, order: memory_order) -> bool {
+atomic_flag_test_and_set_explicit :: #force_inline proc(flag: ^atomic_flag, order: memory_order) -> bool {
 	return bool(atomic_exchange_explicit(flag, atomic_flag(true), order))
 }
 
-atomic_flag_clear :: #force_inline proc "contextless" (flag: ^atomic_flag) {
+atomic_flag_clear :: #force_inline proc(flag: ^atomic_flag) {
 	atomic_store(flag, atomic_flag(false))
 }
 
-atomic_flag_clear_explicit :: #force_inline proc "contextless" (flag: ^atomic_flag, order: memory_order) {
+atomic_flag_clear_explicit :: #force_inline proc(flag: ^atomic_flag, order: memory_order) {
 	atomic_store_explicit(flag, atomic_flag(false), order)
 }

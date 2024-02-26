@@ -65,7 +65,7 @@ _futex_wait :: proc "contextless" (f: ^Futex, expect: u32) -> bool {
 	haiku.sigaddset(&mask, haiku.SIGCONT)
 	unix.pthread_sigmask(haiku.SIG_BLOCK, &mask, &old_mask)
 
-	if u32(atomic_load_explicit(f, .Acquire)) == expect {
+	if u32(atomic_load_explicit(f, .acquire)) == expect {
 		waitq_unlock(waitq)
 		defer waitq_lock(waitq)
 		
