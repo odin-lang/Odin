@@ -1,9 +1,11 @@
 //+build haiku
 package sys_haiku
 
+import "core:c"
+
 Errno :: enum i32 {
 	// Error baselines
-	GENERAL_ERROR_BASE     = min(i32),
+	GENERAL_ERROR_BASE     = -(1<<31),
 	OS_ERROR_BASE          = GENERAL_ERROR_BASE + 0x1000,
 	APP_ERROR_BASE         = GENERAL_ERROR_BASE + 0x2000,
 	INTERFACE_ERROR_BASE   = GENERAL_ERROR_BASE + 0x3000,
@@ -113,6 +115,8 @@ Errno :: enum i32 {
 	EOVERFLOW                         = POSIX_ERROR_BASE + 41,
 	EOPNOTSUPP                        = POSIX_ERROR_BASE + 43,
 
+	EAGAIN                            = WOULD_BLOCK,
+
 	// New error codes that can be mapped to POSIX errors
 	TOO_MANY_ARGS_NEG                 = E2BIG,
 	FILE_TOO_LARGE_NEG                = EFBIG,
@@ -221,8 +225,14 @@ Errno :: enum i32 {
 	ILLEGAL_DATA                 = TRANSLATION_ERROR_BASE + 2,
 }
 
+errno :: #force_inline proc "contextless" () -> Errno {
+	return Errno(_errnop()^)
+}
+
 foreign import libroot "system:c"
 foreign libroot {
-	_to_positive_error :: proc(error: i32) -> i32 ---
-	_to_negative_error :: proc(error: i32) -> i32 ---
+	_to_positive_error :: proc(error: c.int) -> c.int ---
+	_to_negative_error :: proc(error: c.int) -> c.int ---
+
+	_errnop :: proc() -> ^c.int ---
 }

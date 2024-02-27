@@ -193,9 +193,9 @@ sigval :: struct #raw_union {
 }
 
 siginfo_t :: struct {
-	si_signo: c.int,   // signal number
-	si_code:  c.int,   // signal code
-	si_errno: c.int,   // if non zero, an error number associated with this signal
+	si_signo:  c.int,  // signal number
+	si_code:   c.int,  // signal code
+	si_errno:  c.int,  // if non zero, an error number associated with this signal
 
 	si_pid:    pid_t,  // sending process ID
 	si_uid:    uid_t,  // real user ID of sending process
@@ -207,11 +207,11 @@ siginfo_t :: struct {
 
 foreign libroot {
 	// signal set (sigset_t) manipulation
-	sigemptyset :: proc(set: ^sigset_t) -> c.int ---
-	sigfillset  :: proc(set: ^sigset_t) -> c.int ---
-	sigaddset   :: proc(set: ^sigset_t, _signal: c.int) -> c.int ---
-	sigdelset   :: proc(set: ^sigset_t, _signal: c.int) -> c.int ---
-	sigismember :: proc(set: ^sigset_t, _signal: c.int) -> c.int ---
+	sigemptyset  :: proc(set: ^sigset_t) -> c.int ---
+	sigfillset   :: proc(set: ^sigset_t) -> c.int ---
+	sigaddset    :: proc(set: ^sigset_t, _signal: c.int) -> c.int ---
+	sigdelset    :: proc(set: ^sigset_t, _signal: c.int) -> c.int ---
+	sigismember  :: proc(set: ^sigset_t, _signal: c.int) -> c.int ---
 	// querying and waiting for signals
 	sigpending   :: proc(set: ^sigset_t) -> c.int ---
 	sigsuspend   :: proc(mask: ^sigset_t) -> c.int ---

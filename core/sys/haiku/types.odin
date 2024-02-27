@@ -9,9 +9,9 @@ nanotime_t     :: i64
 type_code      :: u32
 perform_code   :: u32
 
-phys_addr_t    :: u64 when ODIN_ARCH == .amd64 || ODIN_ARCH == .arm64 else u32
+phys_addr_t    :: uintptr
 phys_size_t    :: phys_addr_t
-generic_addr_t :: u64 when ODIN_ARCH == .amd64 || ODIN_ARCH == .arm64 else u32
+generic_addr_t :: uintptr
 generic_size_t :: generic_addr_t
 
 area_id        :: i32
