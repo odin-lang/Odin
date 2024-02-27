@@ -119,8 +119,14 @@ gb_internal lbValue lb_type_info(lbModule *m, Type *type) {
 	isize index = lb_type_info_index(m->info, type);
 	GB_ASSERT(index >= 0);
 
-	lbValue data = lb_global_type_info_data_ptr(m);
-	return lb_emit_array_epi(m, data, index);
+	LLVMValueRef global = lb_global_type_info_data_ptr(m).value;
+
+	LLVMValueRef global_array = LLVMGetInitializer(global);
+	LLVMValueRef index_value = LLVMConstInt(lb_type(m, t_int), index, false);
+	lbValue res = {};
+	res.value = LLVMConstPointerCast(LLVMConstExtractElement(global_array, index_value), lb_type(m, t_type_info_ptr));
+	res.type = t_type_info_ptr;
+	return res;
 }
 
 gb_internal LLVMTypeRef lb_get_procedure_raw_type(lbModule *m, Type *type) {
