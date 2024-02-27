@@ -425,6 +425,7 @@ ModelAnimation :: struct {
 	frameCount: c.int,            // Number of animation frames
 	bones:      [^]BoneInfo,      // Bones information (skeleton)
 	framePoses: [^][^]Transform,  // Poses array by frame
+	name:       [32]u8,           // Animation name
 }
 
 // Ray type (useful for raycast)
