@@ -1755,7 +1755,7 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 		TypeAndValue tav = type_and_value_of_expr(arg);
 		if (tav.mode == Addressing_Type) {
 			Type *t = default_type(type_of_expr(arg));
-			return lb_type_info(p->module, t);
+			return lb_type_info(p, t);
 		}
 		GB_ASSERT(is_type_typeid(tav.type));
 

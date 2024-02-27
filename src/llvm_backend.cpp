@@ -1164,7 +1164,7 @@ gb_internal lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProc
 				lbValue data = lb_emit_struct_ep(p, var.var, 0);
 				lbValue ti   = lb_emit_struct_ep(p, var.var, 1);
 				lb_emit_store(p, data, lb_emit_conv(p, gp, t_rawptr));
-				lb_emit_store(p, ti,   lb_type_info(main_module, var_type));
+				lb_emit_store(p, ti,   lb_type_info(p, var_type));
 			} else {
 				LLVMTypeRef vt = llvm_addr_type(p->module, var.var);
 				lbValue src0 = lb_emit_conv(p, var.init, t);

@@ -485,7 +485,7 @@ gb_internal lbValue lb_emit_mul_add(lbProcedure *p, lbValue a, lbValue b, lbValu
 
 gb_internal void lb_fill_slice(lbProcedure *p, lbAddr const &slice, lbValue base_elem, lbValue len);
 
-gb_internal lbValue lb_type_info(lbModule *m, Type *type);
+gb_internal lbValue lb_type_info(lbProcedure *p, Type *type);
 
 gb_internal lbValue lb_find_or_add_entity_string(lbModule *m, String const &str);
 gb_internal lbValue lb_generate_anonymous_proc_lit(lbModule *m, String const &prefix_name, Ast *expr, lbProcedure *parent = nullptr);

@@ -111,22 +111,19 @@ gb_internal lbValue lb_typeid(lbModule *m, Type *type) {
 	return res;
 }
 
-gb_internal lbValue lb_type_info(lbModule *m, Type *type) {
+gb_internal lbValue lb_type_info(lbProcedure *p, Type *type) {
 	GB_ASSERT(!build_context.no_rtti);
 
 	type = default_type(type);
+	lbModule *m = p->module;
 
 	isize index = lb_type_info_index(m->info, type);
 	GB_ASSERT(index >= 0);
 
-	LLVMValueRef global = lb_global_type_info_data_ptr(m).value;
+	lbValue global = lb_global_type_info_data_ptr(m);
 
-	LLVMValueRef global_array = LLVMGetInitializer(global);
-	LLVMValueRef index_value = LLVMConstInt(lb_type(m, t_int), index, false);
-	lbValue res = {};
-	res.value = LLVMConstPointerCast(LLVMConstExtractElement(global_array, index_value), lb_type(m, t_type_info_ptr));
-	res.type = t_type_info_ptr;
-	return res;
+	lbValue ptr = lb_emit_array_epi(p, global, index);
+	return lb_emit_load(p, ptr);
 }
 
 gb_internal LLVMTypeRef lb_get_procedure_raw_type(lbModule *m, Type *type) {
