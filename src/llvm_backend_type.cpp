@@ -62,6 +62,7 @@ gb_internal u64 lb_typeid_kind(lbModule *m, Type *type, u64 id=0) {
 	case Type_RelativePointer: kind = Typeid_Relative_Pointer; break;
 	case Type_RelativeMultiPointer: kind = Typeid_Relative_Multi_Pointer; break;
 	case Type_SoaPointer:      kind = Typeid_SoaPointer;       break;
+	case Type_BitField:        kind = Typeid_Bit_Field;        break;
 	}
 
 	return kind;
@@ -240,7 +241,7 @@ gb_internal LLVMTypeRef *lb_setup_modified_types_for_type_info(lbModule *m, isiz
 	return modified_types;
 }
 
-gb_internal void lb_setup_type_info_data_giant_array(lbModule *m, i64 global_type_info_data_entity_count, lbProcedure *p) { // NOTE(bill): Setup type_info data
+gb_internal void lb_setup_type_info_data_giant_array(lbModule *m, i64 global_type_info_data_entity_count) { // NOTE(bill): Setup type_info data
 	auto const &ADD_GLOBAL_TYPE_INFO_ENTRY = [](lbModule *m, LLVMTypeRef type, isize index) -> LLVMValueRef {
 		char name[64] = {};
 		gb_snprintf(name, 63, "__$ti-%lld", cast(long long)index);
@@ -294,8 +295,10 @@ gb_internal void lb_setup_type_info_data_giant_array(lbModule *m, i64 global_typ
 		entries_handled[entry_index] = true;
 
 
-		LLVMTypeRef stype = modified_types[0];
-		if (t->kind != Type_Named) {
+		LLVMTypeRef stype = nullptr;
+		if (t->kind == Type_Named) {
+			stype = modified_types[0];
+		} else {
 			stype = modified_types[lb_typeid_kind(m, t)];
 		}
 		giant_const_values[entry_index] = ADD_GLOBAL_TYPE_INFO_ENTRY(m, stype, entry_index);
@@ -355,8 +358,10 @@ gb_internal void lb_setup_type_info_data_giant_array(lbModule *m, i64 global_typ
 		entries_handled[entry_index] = true;
 
 
-		LLVMTypeRef stype = modified_types[0];
-		if (t->kind != Type_Named) {
+		LLVMTypeRef stype = nullptr;
+		if (t->kind == Type_Named) {
+			stype = modified_types[0];
+		} else {
 			stype = modified_types[lb_typeid_kind(m, t)];
 		}
 
@@ -982,6 +987,69 @@ gb_internal void lb_setup_type_info_data_giant_array(lbModule *m, i64 global_typ
 				variant_value = llvm_const_named_struct(m, tag_type, vals, gb_count_of(vals));
 			}
 			break;
+
+		case Type_BitField:
+			{
+				tag_type = t_type_info_bit_field;
+
+				LLVMValueRef vals[6] = {};
+				vals[0] = get_type_info_ptr(m, t->BitField.backing_type);
+				isize count = t->BitField.fields.count;
+				if (count > 0) {
+					i64 names_offset       = 0;
+					i64 types_offset       = 0;
+					i64 bit_sizes_offset   = 0;
+					i64 bit_offsets_offset = 0;
+					i64 tags_offset        = 0;
+					lbValue memory_names       = lb_type_info_member_names_offset  (m, count, &names_offset);
+					lbValue memory_types       = lb_type_info_member_types_offset  (m, count, &types_offset);
+					lbValue memory_bit_sizes   = lb_type_info_member_offsets_offset(m, count, &bit_sizes_offset);
+					lbValue memory_bit_offsets = lb_type_info_member_offsets_offset(m, count, &bit_offsets_offset);
+					lbValue memory_tags        = lb_type_info_member_tags_offset   (m, count, &tags_offset);
+
+					u64 bit_offset = 0;
+					for (isize source_index = 0; source_index < count; source_index++) {
+						Entity *f = t->BitField.fields[source_index];
+						u64 bit_size = cast(u64)t->BitField.bit_sizes[source_index];
+
+						lbValue index = lb_const_int(m, t_int, source_index);
+						if (f->token.string.len > 0) {
+							lb_global_type_info_member_names_values[names_offset+source_index] = lb_const_string(m, f->token.string).value;
+						}
+
+						lb_global_type_info_member_types_values[types_offset+source_index] = get_type_info_ptr(m, f->type);
+
+						lb_global_type_info_member_offsets_values[bit_sizes_offset+source_index] = lb_const_int(m, t_uintptr, bit_size).value;
+						lb_global_type_info_member_offsets_values[bit_offsets_offset+source_index] = lb_const_int(m, t_uintptr, bit_offset).value;
+
+						if (t->BitField.tags) {
+							String tag = t->BitField.tags[source_index];
+							if (tag.len > 0) {
+								lb_global_type_info_member_tags_values[tags_offset+source_index] = lb_const_string(m, tag).value;
+							}
+						}
+
+						bit_offset += bit_size;
+					}
+
+					lbValue cv = lb_const_int(m, t_int, count);
+					vals[1] = llvm_const_slice(m, memory_names,       cv);
+					vals[2] = llvm_const_slice(m, memory_types,       cv);
+					vals[3] = llvm_const_slice(m, memory_bit_sizes,   cv);
+					vals[4] = llvm_const_slice(m, memory_bit_offsets, cv);
+					vals[5] = llvm_const_slice(m, memory_tags,        cv);
+				}
+
+
+				for (isize i = 0; i < gb_count_of(vals); i++) {
+					if (vals[i] == nullptr) {
+						vals[i]  = LLVMConstNull(lb_type(m, get_struct_field_type(tag_type, i)));
+					}
+				}
+
+				variant_value = llvm_const_named_struct(m, tag_type, vals, gb_count_of(vals));
+				break;
+			}
 		}
 
 
@@ -1034,12 +1102,11 @@ gb_internal void lb_setup_type_info_data_giant_array(lbModule *m, i64 global_typ
 }
 
 
-gb_internal void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info data
+gb_internal void lb_setup_type_info_data(lbModule *m) { // NOTE(bill): Setup type_info data
 	if (build_context.no_rtti) {
 		return;
 	}
 
-	lbModule *m = p->module;
 
 	i64 global_type_info_data_entity_count = 0;
 
@@ -1050,7 +1117,7 @@ gb_internal void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup 
 	global_type_info_data_entity_count = type->Array.count;
 
 	if (true) {
-		lb_setup_type_info_data_giant_array(m, global_type_info_data_entity_count, p);
+		lb_setup_type_info_data_giant_array(m, global_type_info_data_entity_count);
 	}
 
 	LLVMValueRef data = lb_global_type_info_data_ptr(m).value;

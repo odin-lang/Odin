@@ -1104,6 +1104,8 @@ gb_internal lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProc
 
 	lb_begin_procedure_body(p);
 
+	lb_setup_type_info_data(main_module);
+
 	if (objc_names) {
 		LLVMBuildCall2(p->builder, lb_type_internal_for_procedures_raw(main_module, objc_names->type), objc_names->value, nullptr, 0, "");
 	}
