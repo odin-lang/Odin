@@ -898,6 +898,7 @@ gb_internal String internal_odin_root_dir(void) {
 	}
 
 	auto path_buf = array_make<char>(heap_allocator(), 300);
+	defer (array_free(&path_buf));
 
 	len = 0;
 	for (;;) {
@@ -930,9 +931,6 @@ gb_internal String internal_odin_root_dir(void) {
 	global_module_path = path;
 	global_module_path_set = true;
 
-
-	// array_free(&path_buf);
-
 	return path;
 }
 
@@ -952,6 +950,7 @@ gb_internal String internal_odin_root_dir(void) {
 	}
 
 	auto path_buf = array_make<char>(heap_allocator(), 300);
+	defer (array_free(&path_buf));
 
 	len = 0;
 	for (;;) {
@@ -983,9 +982,6 @@ gb_internal String internal_odin_root_dir(void) {
 
 	global_module_path = path;
 	global_module_path_set = true;
-
-
-	// array_free(&path_buf);
 
 	return path;
 }
