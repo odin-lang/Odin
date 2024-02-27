@@ -1069,10 +1069,6 @@ gb_internal lbProcedure *lb_create_startup_type_info(lbModule *m) {
 	// lb_add_attribute_to_proc(p->module, p->value, "norecurse");
 	// lb_add_attribute_to_proc(p->module, p->value, "nosync");
 	// lb_add_attribute_to_proc(p->module, p->value, "willreturn");
-	if (!LB_USE_GIANT_PACKED_STRUCT) {
-		lb_add_attribute_to_proc(m, p->value, "optnone");
-		lb_add_attribute_to_proc(m, p->value, "noinline");
-	}
 
 	lb_begin_procedure_body(p);
 
@@ -2691,17 +2687,19 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 
 		{ // Add type info data
 			isize max_type_info_count = info->minimum_dependency_type_info_set.count+1;
-			Type *t = alloc_type_array(t_type_info, max_type_info_count);
+			Type *t = alloc_type_array(t_type_info_ptr, max_type_info_count);
 
 			// IMPORTANT NOTE(bill): As LLVM does not have a union type, an array of unions cannot be initialized
 			// at compile time without cheating in some way. This means to emulate an array of unions is to use
 			// a giant packed struct of "corrected" data types.
 
-			LLVMTypeRef internal_llvm_type = lb_setup_type_info_data_internal_type(m, max_type_info_count);
+			LLVMTypeRef internal_llvm_type = lb_type(m, t);
 
 			LLVMValueRef g = LLVMAddGlobal(m->mod, internal_llvm_type, LB_TYPE_INFO_DATA_NAME);
 			LLVMSetInitializer(g, LLVMConstNull(internal_llvm_type));
 			LLVMSetLinkage(g, USE_SEPARATE_MODULES ? LLVMExternalLinkage : LLVMInternalLinkage);
+			LLVMSetUnnamedAddress(g, LLVMGlobalUnnamedAddr);
+			LLVMSetGlobalConstant(g, /*true*/false);
 
 			lbValue value = {};
 			value.value = g;
@@ -2710,11 +2708,6 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 			lb_global_type_info_data_entity = alloc_entity_variable(nullptr, make_token_ident(LB_TYPE_INFO_DATA_NAME), t, EntityState_Resolved);
 			lb_add_entity(m, lb_global_type_info_data_entity, value);
 
-			if (LB_USE_GIANT_PACKED_STRUCT) {
-				LLVMSetLinkage(g, LLVMPrivateLinkage);
-				LLVMSetUnnamedAddress(g, LLVMGlobalUnnamedAddr);
-				LLVMSetGlobalConstant(g, /*true*/false);
-			}
 		}
 		{ // Type info member buffer
 			// NOTE(bill): Removes need for heap allocation by making it global memory
@@ -2750,9 +2743,7 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 				LLVMValueRef g = LLVMAddGlobal(m->mod, lb_type(m, t), name);
 				LLVMSetInitializer(g, LLVMConstNull(lb_type(m, t)));
 				LLVMSetLinkage(g, LLVMInternalLinkage);
-				if (LB_USE_GIANT_PACKED_STRUCT) {
-					lb_make_global_private_const(g);
-				}
+				lb_make_global_private_const(g);
 				return lb_addr({g, alloc_type_pointer(t)});
 			};
 
