@@ -1053,37 +1053,6 @@ struct lbGlobalVariable {
 	bool is_initialized;
 };
 
-gb_internal lbProcedure *lb_create_startup_type_info(lbModule *m) {
-	if (build_context.no_rtti) {
-		return nullptr;
-	}
-	Type *proc_type = alloc_type_proc(nullptr, nullptr, 0, nullptr, 0, false, ProcCC_CDecl);
-
-	lbProcedure *p = lb_create_dummy_procedure(m, str_lit(LB_STARTUP_TYPE_INFO_PROC_NAME), proc_type);
-	p->is_startup = true;
-	LLVMSetLinkage(p->value, LLVMInternalLinkage);
-
-	lb_add_attribute_to_proc(m, p->value, "nounwind");
-	// lb_add_attribute_to_proc(p->module, p->value, "mustprogress");
-	// lb_add_attribute_to_proc(p->module, p->value, "nofree");
-	// lb_add_attribute_to_proc(p->module, p->value, "norecurse");
-	// lb_add_attribute_to_proc(p->module, p->value, "nosync");
-	// lb_add_attribute_to_proc(p->module, p->value, "willreturn");
-
-	lb_begin_procedure_body(p);
-
-	lb_setup_type_info_data(p);
-
-	lb_end_procedure_body(p);
-
-	if (!m->debug_builder && LLVMVerifyFunction(p->value, LLVMReturnStatusAction)) {
-		gb_printf_err("LLVM CODE GEN FAILED FOR PROCEDURE: %s\n", "main");
-		LLVMDumpValue(p->value);
-		gb_printf_err("\n\n\n\n");
-		LLVMVerifyFunction(p->value, LLVMAbortProcessAction);
-	}
-	return p;
-}
 
 gb_internal lbProcedure *lb_create_objc_names(lbModule *main_module) {
 	if (build_context.metrics.os != TargetOs_darwin) {
@@ -1125,7 +1094,7 @@ gb_internal void lb_finalize_objc_names(lbProcedure *p) {
 	lb_end_procedure_body(p);
 }
 
-gb_internal lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProcedure *startup_type_info, lbProcedure *objc_names, Array<lbGlobalVariable> &global_variables) { // Startup Runtime
+gb_internal lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProcedure *objc_names, Array<lbGlobalVariable> &global_variables) { // Startup Runtime
 	Type *proc_type = alloc_type_proc(nullptr, nullptr, 0, nullptr, 0, false, ProcCC_Odin);
 
 	lbProcedure *p = lb_create_dummy_procedure(main_module, str_lit(LB_STARTUP_RUNTIME_PROC_NAME), proc_type);
@@ -1134,10 +1103,6 @@ gb_internal lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProc
 	lb_add_attribute_to_proc(p->module, p->value, "noinline");
 
 	lb_begin_procedure_body(p);
-
-	if (startup_type_info) {
-		LLVMBuildCall2(p->builder, lb_type_internal_for_procedures_raw(main_module, startup_type_info->type), startup_type_info->value, nullptr, 0, "");
-	}
 
 	if (objc_names) {
 		LLVMBuildCall2(p->builder, lb_type_internal_for_procedures_raw(main_module, objc_names->type), objc_names->value, nullptr, 0, "");
@@ -1422,7 +1387,6 @@ gb_internal WORKER_TASK_PROC(lb_llvm_function_pass_per_module) {
 	}
 
 	if (m == &m->gen->default_module) {
-		lb_llvm_function_pass_per_function_internal(m, m->gen->startup_type_info);
 		lb_llvm_function_pass_per_function_internal(m, m->gen->startup_runtime);
 		lb_llvm_function_pass_per_function_internal(m, m->gen->cleanup_runtime);
 		lb_llvm_function_pass_per_function_internal(m, m->gen->objc_names);
@@ -2912,12 +2876,11 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 		}
 	}
 
-	TIME_SECTION("LLVM Runtime Type Information Creation");
-	gen->startup_type_info = lb_create_startup_type_info(default_module);
+	TIME_SECTION("LLVM Runtime Objective-C Names Creation");
 	gen->objc_names = lb_create_objc_names(default_module);
 
 	TIME_SECTION("LLVM Runtime Startup Creation (Global Variables & @(init))");
-	gen->startup_runtime = lb_create_startup_runtime(default_module, gen->startup_type_info, gen->objc_names, global_variables);
+	gen->startup_runtime = lb_create_startup_runtime(default_module, gen->objc_names, global_variables);
 
 	TIME_SECTION("LLVM Runtime Cleanup Creation & @(fini)");
 	gen->cleanup_runtime = lb_create_cleanup_runtime(default_module);
