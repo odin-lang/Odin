@@ -365,6 +365,9 @@ enum Typeid_Kind : u8 {
 	Typeid_Matrix,
 	Typeid_SoaPointer,
 	Typeid_Bit_Field,
+
+	Typeid__COUNT
+
 };
 
 // IMPORTANT NOTE(bill): This must match the same as the in core.odin

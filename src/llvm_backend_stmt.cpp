@@ -748,7 +748,7 @@ gb_internal void lb_build_range_enum(lbProcedure *p, Type *enum_type, Type *val_
 	i64 enum_count = t->Enum.fields.count;
 	lbValue max_count = lb_const_int(m, t_int, enum_count);
 
-	lbValue ti          = lb_type_info(m, t);
+	lbValue ti          = lb_type_info(p, t);
 	lbValue variant     = lb_emit_struct_ep(p, ti, 4);
 	lbValue eti_ptr     = lb_emit_conv(p, variant, t_type_info_enum_ptr);
 	lbValue values      = lb_emit_load(p, lb_emit_struct_ep(p, eti_ptr, 2));
