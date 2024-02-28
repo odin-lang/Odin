@@ -1,7 +1,6 @@
 package os
 
 import "base:runtime"
-import "core:mem"
 import "core:strconv"
 import "core:unicode/utf8"
 
