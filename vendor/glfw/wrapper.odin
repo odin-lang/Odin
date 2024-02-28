@@ -149,8 +149,9 @@ WaitEvents        :: glfw.WaitEvents
 WaitEventsTimeout :: glfw.WaitEventsTimeout
 PostEmptyEvent    :: glfw.PostEmptyEvent
 
-GetInputMode :: glfw.GetInputMode
-SetInputMode :: glfw.SetInputMode
+RawMouseMotionSupported :: glfw.RawMouseMotionSupported
+GetInputMode            :: glfw.GetInputMode
+SetInputMode            :: glfw.SetInputMode
 
 GetMouseButton :: glfw.GetMouseButton
 GetCursorPos :: proc "c" (window: WindowHandle) -> (xpos, ypos: f64) {
