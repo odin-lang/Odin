@@ -3,9 +3,9 @@ package sys_haiku
 
 import "core:c"
 
-Errno :: enum i32 {
+Errno :: enum c.int {
 	// Error baselines
-	GENERAL_ERROR_BASE     = -(1<<31),
+	GENERAL_ERROR_BASE     = min(c.int),
 	OS_ERROR_BASE          = GENERAL_ERROR_BASE + 0x1000,
 	APP_ERROR_BASE         = GENERAL_ERROR_BASE + 0x2000,
 	INTERFACE_ERROR_BASE   = GENERAL_ERROR_BASE + 0x3000,
@@ -115,6 +115,7 @@ Errno :: enum i32 {
 	EOVERFLOW                         = POSIX_ERROR_BASE + 41,
 	EOPNOTSUPP                        = POSIX_ERROR_BASE + 43,
 
+	ENOSYS                            = POSIX_ERROR_BASE + 9,
 	EAGAIN                            = WOULD_BLOCK,
 
 	// New error codes that can be mapped to POSIX errors
