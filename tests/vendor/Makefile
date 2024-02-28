@@ -1,12 +1,11 @@
 ODIN=../../odin
 ODINFLAGS=
+OS ?= $(shell uname -s)
+OS != uname -s
 
-OS=$(shell uname)
+BSDFLAG != echo $(OS) | grep -E 'FreeBSD|OpenBSD' > /dev/null && echo -extra-linker-flags:-L/usr/local/lib
 
-ifeq ($(OS), OpenBSD)
-    ODINFLAGS:=$(ODINFLAGS) -extra-linker-flags:-L/usr/local/lib
-endif
-
+ODINFLAGS := $(ODINFLAGS) $(BSDFLAG)
 all: botan_test
 
 botan_test:

@@ -1,5 +1,6 @@
 ODIN=../../odin
-PYTHON=$(shell which python3)
+PYTHON ?= $(shell which python3)
+PYTHON != which python3
 
 all: c_libc_test \
 	 compress_test \

@@ -365,7 +365,7 @@ seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
 }
 
 file_size :: proc(fd: Handle) -> (i64, Errno) {
-	s, err := fstat(fd)
+	s, err := _fstat(fd)
 	if err != ERROR_NONE {
 		return -1, err
 	}
