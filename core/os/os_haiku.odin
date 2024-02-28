@@ -428,3 +428,8 @@ _processor_core_count :: proc() -> int {
 	haiku.get_system_info(&info)
 	return int(info.cpu_count)
 }
+
+exit :: proc "contextless" (code: int) -> ! {
+	runtime._cleanup_runtime_contextless()
+	_unix_exit(i32(code))
+}
