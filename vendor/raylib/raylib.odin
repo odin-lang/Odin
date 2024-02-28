@@ -404,7 +404,7 @@ BoneInfo :: struct {
 }
 
 // Model type
-Model :: struct {
+Model :: struct #align(align_of(uintptr)) {
 	transform: Matrix,            // Local transform matrix
 
 	meshCount: c.int,             // Number of meshes
@@ -499,7 +499,7 @@ VrDeviceInfo :: struct {
 }
 
 // VR Stereo rendering configuration for simulator
-VrStereoConfig :: struct {
+VrStereoConfig :: struct #align(4) {
 	projection:        [2]Matrix,     // VR projection matrices (per eye)
 	viewOffset:        [2]Matrix,     // VR view offset matrices (per eye)
 	leftLensCenter:    [2]f32,        // VR left lens center
