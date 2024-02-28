@@ -1,12 +1,12 @@
 //+build linux
 package egl
 
-NativeDisplayType :: rawptr
-NativeWindowType  :: rawptr
-Display :: rawptr
-Surface :: rawptr
-Config  :: rawptr
-Context :: rawptr
+NativeDisplayType :: distinct rawptr
+NativeWindowType  :: distinct rawptr
+Display :: distinct rawptr
+Surface :: distinct rawptr
+Config  :: distinct rawptr
+Context :: distinct rawptr
 
 NO_DISPLAY :: Display(uintptr(0))
 NO_CONTEXT :: Context(uintptr(0))
