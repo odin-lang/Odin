@@ -20,9 +20,7 @@ import "core:mem"
 
 ROUNDS :: 24
 
-RATE_SHAKE_128 :: 168
-RATE_SHAKE_256 :: 136
-
+RATE_128 :: 1344 / 8 // ONLY for SHAKE128.
 RATE_224 :: 1152 / 8
 RATE_256 :: 1088 / 8
 RATE_384 :: 832 / 8

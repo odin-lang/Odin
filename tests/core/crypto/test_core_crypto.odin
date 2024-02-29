@@ -415,6 +415,7 @@ test_rand_bytes :: proc(t: ^testing.T) {
 
 TestXOF :: struct {
 	sec_strength: int,
+	domainsep:    string,
 	output:       string,
 	str:          string,
 }
@@ -425,16 +426,19 @@ test_shake :: proc(t: ^testing.T) {
 		// SHAKE128
 		{
 			128,
+			"",
 			"7f9c2ba4e88f827d616045507605853e",
 			"",
 		},
 		{
 			128,
+			"",
 			"f4202e3c5852f9182a0430fd8144f0a7",
 			"The quick brown fox jumps over the lazy dog",
 		},
 		{
 			128,
+			"",
 			"853f4538be0db9621a6cea659a06c110",
 			"The quick brown fox jumps over the lazy dof",
 		},
@@ -442,31 +446,80 @@ test_shake :: proc(t: ^testing.T) {
 		// SHAKE256
 		{
 			256,
+			"",
 			"46b9dd2b0ba88d13233b3feb743eeb243fcd52ea62b81b82b50c27646ed5762f",
 			"",
 		},
 		{
 			256,
+			"",
 			"2f671343d9b2e1604dc9dcf0753e5fe15c7c64a0d283cbbf722d411a0e36f6ca",
 			"The quick brown fox jumps over the lazy dog",
 		},
 		{
 			256,
+			"",
 			"46b1ebb2e142c38b9ac9081bef72877fe4723959640fa57119b366ce6899d401",
 			"The quick brown fox jumps over the lazy dof",
+		},
+
+		// cSHAKE128
+		// - https://csrc.nist.gov/CSRC/media/Projects/Cryptographic-Standards-and-Guidelines/documents/examples/cSHAKE_samples.pdf
+		{
+			128,
+			"Email Signature",
+			"c1c36925b6409a04f1b504fcbca9d82b4017277cb5ed2b2065fc1d3814d5aaf5",
+			"00010203",
+		},
+		{
+			128,
+			"Email Signature",
+			"c5221d50e4f822d96a2e8881a961420f294b7b24fe3d2094baed2c6524cc166b",
+			"000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7",
+		},
+
+		// cSHAKE256
+		// - https://csrc.nist.gov/CSRC/media/Projects/Cryptographic-Standards-and-Guidelines/documents/examples/cSHAKE_samples.pdf
+		{
+			256,
+			"Email Signature",
+			"d008828e2b80ac9d2218ffee1d070c48b8e4c87bff32c9699d5b6896eee0edd164020e2be0560858d9c00c037e34a96937c561a74c412bb4c746469527281c8c",
+			"00010203",
+		},
+		{
+			256,
+			"Email Signature",
+			"07dc27b11e51fbac75bc7b3c1d983e8b4b85fb1defaf218912ac86430273091727f42b17ed1df63e8ec118f04b23633c1dfb1574c8fb55cb45da8e25afb092bb",
+			"000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7",
 		},
 	}
 	for v in test_vectors {
 		dst := make([]byte, len(v.output)/2, context.temp_allocator)
 
 		data := transmute([]byte)(v.str)
+		domainsep := transmute([]byte)(v.domainsep)
 
+		alg_prefix := ""
 		ctx: shake.Context
-		switch v.sec_strength {
-		case 128:
-			shake.init_128(&ctx)
-		case 256:
-			shake.init_256(&ctx)
+		if len(domainsep) == 0 {
+			switch v.sec_strength {
+			case 128:
+				shake.init_128(&ctx)
+			case 256:
+				shake.init_256(&ctx)
+			}
+		} else {
+			alg_prefix = "c"
+
+			// The cSHAKE samples from NIST are binary data.
+			data, _ = hex.decode(data)
+
+			switch v.sec_strength {
+			case 128:
+				shake.init_cshake_128(&ctx, domainsep)
+			case 256:
+				shake.init_cshake_256(&ctx, domainsep)
+			}
 		}
 
 		shake.write(&ctx, data)
@@ -478,7 +531,8 @@ test_shake :: proc(t: ^testing.T) {
 			t,
 			dst_str == v.output,
 			fmt.tprintf(
-				"SHAKE%d: Expected: %s for input of %s, but got %s instead",
+				"%sSHAKE%d: Expected: %s for input of %s, but got %s instead",
+				alg_prefix,
 				v.sec_strength,
 				v.output,
 				v.str,
