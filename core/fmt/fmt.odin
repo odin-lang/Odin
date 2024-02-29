@@ -147,16 +147,30 @@ aprintln :: proc(args: ..any, sep := " ", allocator := context.allocator) -> str
 // 	*Allocates Using Context's Allocator*
 //
 // 	Inputs:
+//	- fmt: A format string with placeholders for the provided arguments.
+//	- args: A variadic list of arguments to be formatted.
+//	- newline: Whether the string should end with a newline. (See `aprintfln`.)
+//
+// 	Returns: A formatted string. The returned string must be freed accordingly.
+//
+aprintf :: proc(fmt: string, args: ..any, allocator := context.allocator, newline := false) -> string {
+	str: strings.Builder
+	strings.builder_init(&str, allocator)
+	sbprintf(&str, fmt, ..args, newline=newline)
+	return strings.to_string(str)
+}
+// 	Creates a formatted string using a format string and arguments, followed by a newline.
+//
+// 	*Allocates Using Context's Allocator*
+//
+// 	Inputs:
 // 	- fmt: A format string with placeholders for the provided arguments.
 // 	- args: A variadic list of arguments to be formatted.
 //
 // 	Returns: A formatted string. The returned string must be freed accordingly.
 //
-aprintf :: proc(fmt: string, args: ..any, allocator := context.allocator) -> string {
-	str: strings.Builder
-	strings.builder_init(&str, allocator)
-	sbprintf(&str, fmt, ..args)
-	return strings.to_string(str)
+aprintfln :: proc(fmt: string, args: ..any, allocator := context.allocator) -> string {
+	return aprintf(fmt, ..args, allocator=allocator, newline=true)
 }
 // 	Creates a formatted string
 //
@@ -195,16 +209,30 @@ tprintln :: proc(args: ..any, sep := " ") -> string {
 // 	*Allocates Using Context's Temporary Allocator*
 //
 // 	Inputs:
+//	- fmt: A format string with placeholders for the provided arguments.
+//	- args: A variadic list of arguments to be formatted.
+//	- newline: Whether the string should end with a newline. (See `tprintfln`.)
+//
+// 	Returns: A formatted string.
+//
+tprintf :: proc(fmt: string, args: ..any, newline := false) -> string {
+	str: strings.Builder
+	strings.builder_init(&str, context.temp_allocator)
+	sbprintf(&str, fmt, ..args, newline=newline)
+	return strings.to_string(str)
+}
+// 	Creates a formatted string using a format string and arguments, followed by a newline.
+//
+// 	*Allocates Using Context's Temporary Allocator*
+//
+// 	Inputs:
 // 	- fmt: A format string with placeholders for the provided arguments.
 // 	- args: A variadic list of arguments to be formatted.
 //
 // 	Returns: A formatted string.
 //
-tprintf :: proc(fmt: string, args: ..any) -> string {
-	str: strings.Builder
-	strings.builder_init(&str, context.temp_allocator)
-	sbprintf(&str, fmt, ..args)
-	return strings.to_string(str)
+tprintfln :: proc(fmt: string, args: ..any) -> string {
+	return tprintf(fmt, ..args, newline=true)
 }
 // Creates a formatted string using a supplied buffer as the backing array. Writes into the buffer.
 //
@@ -238,12 +266,25 @@ bprintln :: proc(buf: []byte, args: ..any, sep := " ") -> string {
 // - buf: The backing buffer
 // - fmt: A format string with placeholders for the provided arguments
 // - args: A variadic list of arguments to be formatted
+// - newline: Whether the string should end with a newline. (See `bprintfln`.)
 //
 // Returns: A formatted string
 //
-bprintf :: proc(buf: []byte, fmt: string, args: ..any) -> string {
+bprintf :: proc(buf: []byte, fmt: string, args: ..any, newline := false) -> string {
 	sb := strings.builder_from_bytes(buf)
-	return sbprintf(&sb, fmt, ..args)
+	return sbprintf(&sb, fmt, ..args, newline=newline)
+}
+// Creates a formatted string using a supplied buffer as the backing array, followed by a newline. Writes into the buffer.
+//
+// Inputs:
+// - buf: The backing buffer
+// - fmt: A format string with placeholders for the provided arguments
+// - args: A variadic list of arguments to be formatted
+//
+// Returns: A formatted string
+//
+bprintfln :: proc(buf: []byte, fmt: string, args: ..any) -> string {
+	return bprintf(buf, fmt, ..args, newline=true)
 }
 // Runtime assertion with a formatted message
 //
@@ -294,18 +335,51 @@ panicf :: proc(fmt: string, args: ..any, loc := #caller_location) -> ! {
 // Inputs:
 // - format: A format string with placeholders for the provided arguments
 // - args: A variadic list of arguments to be formatted
+// - newline: Whether the string should end with a newline. (See `caprintfln`.)
 //
 // Returns: A formatted C string
 //
-caprintf :: proc(format: string, args: ..any) -> cstring {
+caprintf :: proc(format: string, args: ..any, newline := false) -> cstring {
 	str: strings.Builder
 	strings.builder_init(&str)
-	sbprintf(&str, format, ..args)
+	sbprintf(&str, format, ..args, newline=newline)
 	strings.write_byte(&str, 0)
 	s := strings.to_string(str)
 	return cstring(raw_data(s))
 }
+// Creates a formatted C string, followed by a newline.
+//
+// *Allocates Using Context's Allocator*
+//
+// Inputs:
+// - format: A format string with placeholders for the provided arguments
+// - args: A variadic list of arguments to be formatted
+//
+// Returns: A formatted C string
+//
+caprintfln :: proc(format: string, args: ..any) -> cstring {
+	return caprintf(format, ..args, newline=true)
+}
 // Creates a formatted C string
+//
+// *Allocates Using Context's Temporary Allocator*
+//
+// Inputs:
+// - format: A format string with placeholders for the provided arguments
+// - args: A variadic list of arguments to be formatted
+// - newline: Whether the string should end with a newline. (See `ctprintfln`.)
+//
+// Returns: A formatted C string
+//
+ctprintf :: proc(format: string, args: ..any, newline := false) -> cstring {
+	str: strings.Builder
+	strings.builder_init(&str, context.temp_allocator)
+	sbprintf(&str, format, ..args, newline=newline)
+	strings.write_byte(&str, 0)
+	s := strings.to_string(str)
+	return cstring(raw_data(s))
+}
+// Creates a formatted C string, followed by a newline.
 //
 // *Allocates Using Context's Temporary Allocator*
 //
@@ -315,13 +389,8 @@ caprintf :: proc(format: string, args: ..any) -> cstring {
 //
 // Returns: A formatted C string
 //
-ctprintf :: proc(format: string, args: ..any) -> cstring {
-	str: strings.Builder
-	strings.builder_init(&str, context.temp_allocator)
-	sbprintf(&str, format, ..args)
-	strings.write_byte(&str, 0)
-	s := strings.to_string(str)
-	return cstring(raw_data(s))
+ctprintfln :: proc(format: string, args: ..any) -> cstring {
+	return ctprintf(format, ..args, newline=true)
 }
 // Formats using the default print settings and writes to the given strings.Builder
 //
@@ -355,12 +424,24 @@ sbprintln :: proc(buf: ^strings.Builder, args: ..any, sep := " ") -> string {
 // - buf: A pointer to a strings.Builder buffer
 // - fmt: The format string
 // - args: A variadic list of arguments to be formatted
+// - newline: Whether a trailing newline should be written. (See `sbprintfln`.)
 //
 // Returns: The resulting formatted string
 //
-sbprintf :: proc(buf: ^strings.Builder, fmt: string, args: ..any) -> string {
-	wprintf(strings.to_writer(buf), fmt, ..args, flush=true)
+sbprintf :: proc(buf: ^strings.Builder, fmt: string, args: ..any, newline := false) -> string {
+	wprintf(strings.to_writer(buf), fmt, ..args, flush=true, newline=newline)
 	return strings.to_string(buf^)
+}
+// Formats and writes to a strings.Builder buffer according to the specified format string, followed by a newline.
+//
+// Inputs:
+// - buf:  A pointer to a strings.Builder to store the formatted string
+// - args: A variadic list of arguments to be formatted
+//
+// Returns: A formatted string
+//
+sbprintfln :: proc(buf: ^strings.Builder, format: string, args: ..any) -> string {
+	return sbprintf(buf, format, ..args, newline=true)
 }
 // Formats and writes to an io.Writer using the default print settings
 //
@@ -435,10 +516,11 @@ wprintln :: proc(w: io.Writer, args: ..any, sep := " ", flush := true) -> int {
 // - w: An io.Writer to write to
 // - fmt: The format string
 // - args: A variadic list of arguments to be formatted
+// - newline: Whether a trailing newline should be written. (See `wprintfln`.)
 //
 // Returns: The number of bytes written
 //
-wprintf :: proc(w: io.Writer, fmt: string, args: ..any, flush := true) -> int {
+wprintf :: proc(w: io.Writer, fmt: string, args: ..any, flush := true, newline := false) -> int {
 	fi: Info
 	arg_index: int = 0
 	end := len(fmt)
@@ -708,11 +790,26 @@ wprintf :: proc(w: io.Writer, fmt: string, args: ..any, flush := true) -> int {
 		}
 		io.write_string(fi.writer, ")", &fi.n)
 	}
+
+	if newline {
+		io.write_byte(w, '\n', &fi.n)
+	}
 	if flush {
 		io.flush(w)
 	}
 
 	return fi.n
+}
+// Formats and writes to an io.Writer according to the specified format string, followed by a newline.
+//
+// Inputs:
+// - w: The io.Writer to write to.
+// - args: A variadic list of arguments to be formatted.
+//
+// Returns: The number of bytes written.
+//
+wprintfln :: proc(w: io.Writer, format: string, args: ..any, flush := true) -> int {
+	return wprintf(w, format, ..args, flush=flush, newline=true)
 }
 // Writes a ^runtime.Type_Info value to an io.Writer
 //

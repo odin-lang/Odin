@@ -369,6 +369,10 @@ datetime_to_time :: proc "contextless" (year, month, day, hour, minute, second: 
 		mod = year % divisor
 		return
 	}
+	_is_leap_year :: proc "contextless" (year: int) -> bool {
+		return year%4 == 0 && (year%100 != 0 || year%400 == 0)
+	}
+
 
 	ok = true
 
@@ -394,6 +398,10 @@ datetime_to_time :: proc "contextless" (year, month, day, hour, minute, second: 
 	days += (div * DAYS_PER_4_YEARS) + (mod * 365)
 
 	days += int(days_before[_m]) + _d
+
+	if _is_leap_year(year) && _m >= 2 {
+		days += 1
+	}
 
 	s += i64(days)   * SECONDS_PER_DAY
 	s += i64(hour)   * SECONDS_PER_HOUR
