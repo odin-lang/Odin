@@ -107,7 +107,7 @@ jobs:
   build_macos_arm:
     name: MacOS ARM Build
     if: github.repository == 'odin-lang/Odin'
-    runs-on: macos-14
+    runs-on: macos-14 # ARM machine
     steps:
       - uses: actions/checkout@v1
       - name: Download LLVM and setup PATH
@@ -190,9 +190,9 @@ jobs:
           echo Uploading artifcates to B2
           chmod +x ./ci/upload_create_nightly.sh
           ./ci/upload_create_nightly.sh "$BUCKET" windows-amd64 windows_artifacts/
-          ./ci/upload_create_nightly.sh "$BUCKET" ubuntu-amd64 ubuntu_artifacts/
-          ./ci/upload_create_nightly.sh "$BUCKET" macos-amd64 macos_artifacts/
-          ./ci/upload_create_nightly.sh "$BUCKET" macos-arm64 macos_arm_artifacts/
+          ./ci/upload_create_nightly.sh "$BUCKET" ubuntu-amd64 ubuntu_artifacts/dist.zip
+          ./ci/upload_create_nightly.sh "$BUCKET" macos-amd64 macos_artifacts/dist.zip
+          ./ci/upload_create_nightly.sh "$BUCKET" macos-arm64 macos_arm_artifacts/dist.zip
 
           echo Deleting old artifacts in B2
           python3 ci/delete_old_binaries.py "$BUCKET" "$DAYS_TO_KEEP"
