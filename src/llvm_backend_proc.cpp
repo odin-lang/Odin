@@ -1755,7 +1755,7 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 		TypeAndValue tav = type_and_value_of_expr(arg);
 		if (tav.mode == Addressing_Type) {
 			Type *t = default_type(type_of_expr(arg));
-			return lb_type_info(p->module, t);
+			return lb_type_info(p, t);
 		}
 		GB_ASSERT(is_type_typeid(tav.type));
 
@@ -3361,9 +3361,9 @@ gb_internal lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr) {
 					for (Ast *var_arg : variadic) {
 						lbValue arg = lb_build_expr(p, var_arg);
 						if (is_type_any(elem_type)) {
-							array_add(&args, lb_emit_conv(p, arg, default_type(arg.type)));
+							array_add(&args, lb_emit_conv(p, arg, c_vararg_promote_type(default_type(arg.type))));
 						} else {
-							array_add(&args, lb_emit_conv(p, arg, elem_type));
+							array_add(&args, lb_emit_conv(p, arg, c_vararg_promote_type(elem_type)));
 						}
 					}
 					break;

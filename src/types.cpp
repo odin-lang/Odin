@@ -365,6 +365,9 @@ enum Typeid_Kind : u8 {
 	Typeid_Matrix,
 	Typeid_SoaPointer,
 	Typeid_Bit_Field,
+
+	Typeid__COUNT
+
 };
 
 // IMPORTANT NOTE(bill): This must match the same as the in core.odin
@@ -561,6 +564,14 @@ gb_global Type *t_rune            = &basic_types[Basic_rune];
 gb_global Type *t_f16             = &basic_types[Basic_f16];
 gb_global Type *t_f32             = &basic_types[Basic_f32];
 gb_global Type *t_f64             = &basic_types[Basic_f64];
+
+gb_global Type *t_f16be           = &basic_types[Basic_f16be];
+gb_global Type *t_f32be           = &basic_types[Basic_f32be];
+gb_global Type *t_f64be           = &basic_types[Basic_f64be];
+
+gb_global Type *t_f16le           = &basic_types[Basic_f16le];
+gb_global Type *t_f32le           = &basic_types[Basic_f32le];
+gb_global Type *t_f64le           = &basic_types[Basic_f64le];
 
 gb_global Type *t_complex32       = &basic_types[Basic_complex32];
 gb_global Type *t_complex64       = &basic_types[Basic_complex64];
@@ -2816,6 +2827,49 @@ gb_internal Type *default_type(Type *type) {
 		case Basic_UntypedRune:       return t_rune;
 		}
 	}
+	return type;
+}
+
+// See https://en.cppreference.com/w/c/language/conversion#Default_argument_promotions
+gb_internal Type *c_vararg_promote_type(Type *type) {
+	GB_ASSERT(type != nullptr);
+
+	Type *core = core_type(type);
+
+	if (core->kind == Type_BitSet) {
+		core = core_type(bit_set_to_int(core));
+	}
+
+	if (core->kind == Type_Basic) {
+		switch (core->Basic.kind) {
+		case Basic_f32:
+		case Basic_UntypedFloat:
+			return t_f64;
+		case Basic_f32le:
+			return t_f64le;
+		case Basic_f32be:
+			return t_f64be;
+
+		case Basic_UntypedBool:
+		case Basic_bool:
+		case Basic_b8:
+		case Basic_b16:
+		case Basic_i8:
+		case Basic_i16:
+		case Basic_u8:
+		case Basic_u16:
+			return t_i32;
+
+		case Basic_i16le:
+		case Basic_u16le:
+			return t_i32le;
+
+		case Basic_i16be:
+		case Basic_u16be:
+			return t_i32be;
+		}
+	}
+
 	return type;
 }
 
