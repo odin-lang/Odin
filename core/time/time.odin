@@ -299,10 +299,6 @@ _time_abs :: proc "contextless" (t: Time) -> u64 {
 
 @(private)
 _abs_date :: proc "contextless" (abs: u64, full: bool) -> (year: int, month: Month, day: int, yday: int) {
-	_is_leap_year :: proc "contextless" (year: int) -> bool {
-		return year%4 == 0 && (year%100 != 0 || year%400 == 0)
-	}
-
 	d := abs / SECONDS_PER_DAY
 
 	// 400 year cycles
@@ -335,7 +331,7 @@ _abs_date :: proc "contextless" (abs: u64, full: bool) -> (year: int, month: Mon
 
 	day = yday
 
-	if _is_leap_year(year) {
+	if is_leap_year(year) {
 		switch {
 		case day > 31+29-1:
 			day -= 1
@@ -360,7 +356,13 @@ _abs_date :: proc "contextless" (abs: u64, full: bool) -> (year: int, month: Mon
 	return
 }
 
+is_leap_year :: proc "contextless" (year: int) -> bool {
+	return !((year & 3 > 0) || (year & 5 > 0) && !(year % 25 == 0))
+}
+
 datetime_to_time :: proc "contextless" (year, month, day, hour, minute, second: int, nsec := int(0)) -> (t: Time, ok: bool) {
+	EPOCH_DAYS :: 719162
+
 	divmod :: proc "contextless" (year: int, divisor: int) -> (div: int, mod: int) {
 		if divisor <= 0 {
 			intrinsics.debug_trap()
@@ -372,7 +374,7 @@ datetime_to_time :: proc "contextless" (year, month, day, hour, minute, second: 
 
 	ok = true
 
-	_y := year  - 1970
+	_y := year  - 1
 	_m := month - 1
 	_d := day   - 1
 
@@ -395,10 +397,15 @@ datetime_to_time :: proc "contextless" (year, month, day, hour, minute, second: 
 
 	days += int(days_before[_m]) + _d
 
+	if is_leap_year(year) && _m >= 2 {
+		days += 1
+	}
+
 	s += i64(days)   * SECONDS_PER_DAY
 	s += i64(hour)   * SECONDS_PER_HOUR
 	s += i64(minute) * SECONDS_PER_MINUTE
 	s += i64(second)
+	s -= EPOCH_DAYS * SECONDS_PER_DAY
 
 	t._nsec = (s * 1e9) + i64(nsec)
 
