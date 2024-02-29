@@ -81,7 +81,7 @@ Package vendor:raylib implements bindings for version 5.0 of the raylib library 
 */
 package raylib
 
-import c "core:c/libc"
+import c "core:c"
 import "core:fmt"
 import "core:mem"
 import "core:strings"
@@ -925,13 +925,17 @@ NPatchLayout :: enum c.int {
 	THREE_PATCH_HORIZONTAL,  // Npatch layout: 3x1 tiles
 }
 
-
+// NOTE: Castable to `core:c/libc`'s `va_list`.
+// But some use cases of raylib do not want `libc` imported.
+va_list :: struct #align(16) {
+	_: [4096]u8,
+}
 
 // Callbacks to hook some internal functions
 // WARNING: This callbacks are intended for advance users
-TraceLogCallback     :: #type proc "c" (logLevel: TraceLogLevel, text: cstring, args: c.va_list)        // Logging: Redirect trace log messages
-LoadFileDataCallback :: #type proc "c"(fileName: cstring, dataSize: ^c.int) -> [^]u8                  	// FileIO: Load binary data
-SaveFileDataCallback :: #type proc "c" (fileName: cstring, data: rawptr, dataSize: c.int) -> bool  		// FileIO: Save binary data
+TraceLogCallback     :: #type proc "c" (logLevel: TraceLogLevel, text: cstring, args: va_list)          // Logging: Redirect trace log messages
+LoadFileDataCallback :: #type proc "c"(fileName: cstring, dataSize: ^c.int) -> [^]u8                    // FileIO: Load binary data
+SaveFileDataCallback :: #type proc "c" (fileName: cstring, data: rawptr, dataSize: c.int) -> bool       // FileIO: Save binary data
 LoadFileTextCallback :: #type proc "c" (fileName: cstring) -> [^]u8                                     // FileIO: Load text data
 SaveFileTextCallback :: #type proc "c" (fileName: cstring, text: cstring) -> bool                       // FileIO: Save text data
 
