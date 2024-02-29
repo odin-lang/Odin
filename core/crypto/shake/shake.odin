@@ -35,6 +35,7 @@ init_256 :: proc(ctx: ^Context) {
 
 @(private)
 _init :: proc(ctx: ^Context) {
+	ctx.dsbyte = _sha3.DS_SHAKE
 	_sha3.init(transmute(^_sha3.Context)(ctx))
 }
 

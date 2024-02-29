@@ -65,7 +65,7 @@ init_512 :: proc(ctx: ^Context) {
 
 @(private)
 _init :: proc(ctx: ^Context) {
-	ctx.is_keccak = true
+	ctx.dsbyte = _sha3.DS_KECCAK
 	_sha3.init(transmute(^_sha3.Context)(ctx))
 }
 
