@@ -2,7 +2,6 @@ package test_core_libc
 
 import "core:fmt"
 import "core:os"
-import "core:strings"
 import "core:testing"
 
 TEST_count := 0
