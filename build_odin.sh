@@ -63,8 +63,7 @@ Darwin)
 	fi
 
 	CXXFLAGS="$CXXFLAGS $($LLVM_CONFIG --cxxflags --ldflags)"
-	LDFLAGS="$LDFLAGS -liconv -ldl -framework System"
-	LDFLAGS="$LDFLAGS -lLLVM-C"
+	LDFLAGS="$LDFLAGS -liconv -ldl -framework System -lLLVM"
 	;;
 FreeBSD)
 	CXXFLAGS="$CXXFLAGS $($LLVM_CONFIG --cxxflags --ldflags)"
