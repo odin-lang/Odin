@@ -181,6 +181,14 @@ Type_Info_Matrix :: struct {
 Type_Info_Soa_Pointer :: struct {
 	elem: ^Type_Info,
 }
+Type_Info_Bit_Field :: struct {
+	backing_type: ^Type_Info,
+	names:        []string,
+	types:        []^Type_Info,
+	bit_sizes:    []uintptr,
+	bit_offsets:  []uintptr,
+	tags:         []string,
+}
 
 Type_Info_Flag :: enum u8 {
 	Comparable     = 0,
@@ -223,6 +231,7 @@ Type_Info :: struct {
 		Type_Info_Relative_Multi_Pointer,
 		Type_Info_Matrix,
 		Type_Info_Soa_Pointer,
+		Type_Info_Bit_Field,
 	},
 }
 
@@ -256,6 +265,7 @@ Typeid_Kind :: enum u8 {
 	Relative_Multi_Pointer,
 	Matrix,
 	Soa_Pointer,
+	Bit_Field,
 }
 #assert(len(Typeid_Kind) < 32)
 
@@ -270,7 +280,7 @@ Typeid_Kind :: enum u8 {
 
 // NOTE(bill): only the ones that are needed (not all types)
 // This will be set by the compiler
-type_table: []Type_Info
+type_table: []^Type_Info
 
 args__: []cstring
 
@@ -599,7 +609,7 @@ __type_info_of :: proc "contextless" (id: typeid) -> ^Type_Info #no_bounds_check
 	if n < 0 || n >= len(type_table) {
 		n = 0
 	}
-	return &type_table[n]
+	return type_table[n]
 }
 
 when !ODIN_NO_RTTI {

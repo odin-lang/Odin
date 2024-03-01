@@ -5820,6 +5820,26 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		}
 		break;
 
+	case BuiltinProc_type_bit_set_backing_type:
+		{
+			Operand op = {};
+			Type *type = check_type(c, ce->args[0]);
+			Type *bt = base_type(type);
+			if (bt == nullptr || bt == t_invalid) {
+				error(ce->args[0], "Expected a type for '%.*s'", LIT(builtin_name));
+				return false;
+			}
+			if (bt->kind != Type_BitSet) {
+				gbString s = type_to_string(type);
+				error(ce->args[0], "Expected a bit_set type for '%.*s', got %s", LIT(builtin_name), s);
+				return false;
+			}
+
+			operand->mode = Addressing_Type;
+			operand->type = bit_set_to_int(bt);
+			break;
+		}
+
 	case BuiltinProc_type_equal_proc:
 		{
 			Operand op = {};

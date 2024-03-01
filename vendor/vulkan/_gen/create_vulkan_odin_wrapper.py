@@ -565,7 +565,7 @@ def parse_structs(f):
                 # The second way has many fields that are each 1 bit
                 elif int(fname) == 1:
                     bit_field_type = do_type(bit_field[0], prev_name, fname)
-                    ffields.append(tuple(["bit_field", bit_field_type, comment]))
+                    ffields.append(tuple(["bitfield", bit_field_type, comment]))
                     break
                     
 

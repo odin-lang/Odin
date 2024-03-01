@@ -350,6 +350,11 @@ gb_internal Ast *clone_ast(Ast *node, AstFile *f) {
 		n->Field.names = clone_ast_array(n->Field.names, f);
 		n->Field.type  = clone_ast(n->Field.type, f);
 		break;
+	case Ast_BitFieldField:
+		n->BitFieldField.name     = clone_ast(n->BitFieldField.name, f);
+		n->BitFieldField.type     = clone_ast(n->BitFieldField.type, f);
+		n->BitFieldField.bit_size = clone_ast(n->BitFieldField.bit_size, f);
+		break;
 	case Ast_FieldList:
 		n->FieldList.list = clone_ast_array(n->FieldList.list, f);
 		break;
@@ -405,6 +410,10 @@ gb_internal Ast *clone_ast(Ast *node, AstFile *f) {
 	case Ast_BitSetType:
 		n->BitSetType.elem       = clone_ast(n->BitSetType.elem, f);
 		n->BitSetType.underlying = clone_ast(n->BitSetType.underlying, f);
+		break;
+	case Ast_BitFieldType:
+		n->BitFieldType.backing_type = clone_ast(n->BitFieldType.backing_type, f);
+		n->BitFieldType.fields = clone_ast_array(n->BitFieldType.fields, f);
 		break;
 	case Ast_MapType:
 		n->MapType.count = clone_ast(n->MapType.count, f);
@@ -1045,6 +1054,18 @@ gb_internal Ast *ast_field(AstFile *f, Array<Ast *> const &names, Ast *type, Ast
 	return result;
 }
 
+gb_internal Ast *ast_bit_field_field(AstFile *f, Ast *name, Ast *type, Ast *bit_size, Token tag,
+                                     CommentGroup *docs, CommentGroup *comment) {
+	Ast *result = alloc_ast_node(f, Ast_BitFieldField);
+	result->BitFieldField.name     = name;
+	result->BitFieldField.type     = type;
+	result->BitFieldField.bit_size = bit_size;
+	result->BitFieldField.tag      = tag;
+	result->BitFieldField.docs     = docs;
+	result->BitFieldField.comment  = comment;
+	return result;
+}
+
 gb_internal Ast *ast_field_list(AstFile *f, Token token, Array<Ast *> const &list) {
 	Ast *result = alloc_ast_node(f, Ast_FieldList);
 	result->FieldList.token = token;
@@ -1177,6 +1198,17 @@ gb_internal Ast *ast_bit_set_type(AstFile *f, Token token, Ast *elem, Ast *under
 	result->BitSetType.underlying = underlying;
 	return result;
 }
+
+gb_internal Ast *ast_bit_field_type(AstFile *f, Token token, Ast *backing_type, Token open, Array<Ast *> const &fields, Token close) {
+	Ast *result = alloc_ast_node(f, Ast_BitFieldType);
+	result->BitFieldType.token        = token;
+	result->BitFieldType.backing_type = backing_type;
+	result->BitFieldType.open         = open;
+	result->BitFieldType.fields       = slice_from_array(fields);
+	result->BitFieldType.close        = close;
+	return result;
+}
+
 
 gb_internal Ast *ast_map_type(AstFile *f, Token token, Ast *key, Ast *value) {
 	Ast *result = alloc_ast_node(f, Ast_MapType);
@@ -2548,6 +2580,66 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 		
 		return ast_matrix_type(f, token, row_count, column_count, type);
 	} break;
+
+	case Token_bit_field: {
+		Token token = expect_token(f, Token_bit_field);
+		isize prev_level;
+
+		prev_level = f->expr_level;
+		f->expr_level = -1;
+
+		Ast *backing_type = parse_type_or_ident(f);
+		if (backing_type == nullptr) {
+			Token token = advance_token(f);
+			syntax_error(token, "Expected a backing type for a 'bit_field'");
+			backing_type = ast_bad_expr(f, token, f->curr_token);
+		}
+
+		skip_possible_newline_for_literal(f);
+		Token open = expect_token_after(f, Token_OpenBrace, "bit_field");
+
+
+		auto fields = array_make<Ast *>(ast_allocator(f), 0, 0);
+
+		while (f->curr_token.kind != Token_CloseBrace &&
+		       f->curr_token.kind != Token_EOF) {
+			CommentGroup *docs = nullptr;
+			CommentGroup *comment = nullptr;
+
+			Ast *name = parse_ident(f);
+			bool err_once = false;
+			while (allow_token(f, Token_Comma)) {
+				Ast *dummy_name = parse_ident(f);
+				if (!err_once) {
+					error(dummy_name, "'bit_field' fields do not support multiple names per field");
+					err_once = true;
+				}
+			}
+			expect_token(f, Token_Colon);
+			Ast *type = parse_type(f);
+			expect_token(f, Token_Or);
+			Ast *bit_size = parse_expr(f, true);
+
+			Token tag = {};
+			if (f->curr_token.kind == Token_String) {
+				tag = expect_token(f, Token_String);
+			}
+
+			Ast *bf_field = ast_bit_field_field(f, name, type, bit_size, tag, docs, comment);
+			array_add(&fields, bf_field);
+
+			if (!allow_field_separator(f)) {
+				break;
+			}
+		}
+
+		Token close = expect_closing_brace_of_field_list(f);
+
+		f->expr_level = prev_level;
+
+		return ast_bit_field_type(f, token, backing_type, open, fields, close);
+	}
+
 
 	case Token_struct: {
 		Token    token = expect_token(f, Token_struct);
@@ -3923,6 +4015,10 @@ gb_internal Array<Ast *> convert_to_ident_list(AstFile *f, Array<AstAndFlags> li
 		case Ast_Ident:
 		case Ast_BadExpr:
 			break;
+		case Ast_Implicit:
+			syntax_error(ident, "Expected an identifier, '%.*s' which is a keyword", LIT(ident->Implicit.string));
+			ident = ast_ident(f, blank_token);
+			break;
 
 		case Ast_PolyType:
 			if (allow_poly_names) {
@@ -3935,6 +4031,7 @@ gb_internal Array<Ast *> convert_to_ident_list(AstFile *f, Array<AstAndFlags> li
 				syntax_error(ident, "Expected a non-polymorphic identifier");
 			}
 			/*fallthrough*/
+
 
 		default:
 			syntax_error(ident, "Expected an identifier");

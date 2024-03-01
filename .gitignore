@@ -28,6 +28,7 @@ tests/internal/test_map
 tests/internal/test_pow
 tests/internal/test_rtti
 tests/core/test_core_compress
+tests/core/test_core_container
 tests/core/test_core_filepath
 tests/core/test_core_fmt
 tests/core/test_core_i18n

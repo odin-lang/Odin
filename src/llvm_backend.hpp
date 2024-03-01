@@ -84,6 +84,8 @@ enum lbAddrKind {
 
 	lbAddr_Swizzle,
 	lbAddr_SwizzleLarge,
+
+	lbAddr_BitField,
 };
 
 struct lbAddr {
@@ -118,6 +120,12 @@ struct lbAddr {
 			Type *type;
 			Slice<i32> indices;
 		} swizzle_large;
+		struct {
+			Type *type;
+			i64 index;
+			i64 bit_offset;
+			i64 bit_size;
+		} bitfield;
 	};
 };
 
@@ -217,7 +225,6 @@ struct lbGenerator : LinkerData {
 	std::atomic<u32> global_array_index;
 	std::atomic<u32> global_generated_index;
 
-	lbProcedure *startup_type_info;
 	lbProcedure *startup_runtime;
 	lbProcedure *cleanup_runtime;
 	lbProcedure *objc_names;
@@ -478,7 +485,7 @@ gb_internal lbValue lb_emit_mul_add(lbProcedure *p, lbValue a, lbValue b, lbValu
 
 gb_internal void lb_fill_slice(lbProcedure *p, lbAddr const &slice, lbValue base_elem, lbValue len);
 
-gb_internal lbValue lb_type_info(lbModule *m, Type *type);
+gb_internal lbValue lb_type_info(lbProcedure *p, Type *type);
 
 gb_internal lbValue lb_find_or_add_entity_string(lbModule *m, String const &str);
 gb_internal lbValue lb_generate_anonymous_proc_lit(lbModule *m, String const &prefix_name, Ast *expr, lbProcedure *parent = nullptr);
@@ -579,7 +586,6 @@ gb_internal LLVMTypeRef llvm_array_type(LLVMTypeRef ElementType, uint64_t Elemen
 
 #define LB_STARTUP_RUNTIME_PROC_NAME   "__$startup_runtime"
 #define LB_CLEANUP_RUNTIME_PROC_NAME   "__$cleanup_runtime"
-#define LB_STARTUP_TYPE_INFO_PROC_NAME "__$startup_type_info"
 #define LB_TYPE_INFO_DATA_NAME       "__$type_info_data"
 #define LB_TYPE_INFO_TYPES_NAME      "__$type_info_types_data"
 #define LB_TYPE_INFO_NAMES_NAME      "__$type_info_names_data"
