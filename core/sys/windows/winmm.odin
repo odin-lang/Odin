@@ -268,10 +268,6 @@ HWAVEOUT :: distinct HANDLE
 LPHWAVEIN :: ^HWAVEIN
 LPHWAVEOUT :: ^HWAVEOUT
 
-//typedef void (CALLBACK DRVCALLBACK)(HDRVR hdrvr, UINT uMsg, DWORD_PTR dwUser, DWORD_PTR dw1, DWORD_PTR dw2);
-//WAVECALLBACK :: DRVCALLBACK
-//LPWAVECALLBACK :: ^WAVECALLBACK
-
 // https://learn.microsoft.com/en-us/windows/win32/multimedia/multimedia-timer-structures
 MMTIME :: struct {
 	wType: UINT,
@@ -299,6 +295,9 @@ LPMMTIME :: ^MMTIME
 MAXPNAMELEN :: 32
 MAXERRORLENGTH :: 256
 MMVERSION :: UINT
+
+/* flags for wFormatTag field of WAVEFORMAT */
+WAVE_FORMAT_PCM :: 1
 
 WAVEFORMATEX :: struct {
 	wFormatTag:      WORD,
@@ -366,3 +365,12 @@ SND_APPLICATION	:: 0x0080  /* look for application specific association */
 SND_SENTRY		:: 0x00080000 /* Generate a SoundSentry event with this sound */
 SND_RING		:: 0x00100000 /* Treat this as a "ring" from a communications app - don't duck me */
 SND_SYSTEM		:: 0x00200000 /* Treat this as a system sound */
+
+
+CALLBACK_TYPEMASK :: 0x00070000    /* callback type mask */
+CALLBACK_NULL     :: 0x00000000    /* no callback */
+CALLBACK_WINDOW   :: 0x00010000    /* dwCallback is a HWND */
+CALLBACK_TASK     :: 0x00020000    /* dwCallback is a HTASK */
+CALLBACK_FUNCTION :: 0x00030000    /* dwCallback is a FARPROC */
+CALLBACK_THREAD   :: CALLBACK_TASK /* thread ID replaces 16 bit task */
+CALLBACK_EVENT    :: 0x00050000    /* dwCallback is an EVENT Handle */
