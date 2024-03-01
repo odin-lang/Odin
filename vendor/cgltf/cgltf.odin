@@ -34,7 +34,7 @@ memory_options :: struct {
 }
 
 file_options :: struct {
-	read:      proc "c" (memory_options: ^/*const*/memory_options, file_options: ^/*const*/file_options, path: cstring, size: uint, data: ^rawptr) -> result,
+	read:      proc "c" (memory_options: ^/*const*/memory_options, file_options: ^/*const*/file_options, path: cstring, size: ^uint, data: ^rawptr) -> result,
 	release:   proc "c" (memory_options: ^/*const*/memory_options, file_options: ^/*const*/file_options, data: rawptr),
 	user_data: rawptr,
 }
