@@ -14,6 +14,7 @@ import shoco            "core:compress/shoco"
 import gzip             "core:compress/gzip"
 import zlib             "core:compress/zlib"
 
+import avl              "core:container/avl"
 import bit_array        "core:container/bit_array"
 import priority_queue   "core:container/priority_queue"
 import queue            "core:container/queue"
@@ -131,6 +132,7 @@ _ :: compress
 _ :: shoco
 _ :: gzip
 _ :: zlib
+_ :: avl
 _ :: bit_array
 _ :: priority_queue
 _ :: queue

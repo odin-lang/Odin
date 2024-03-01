@@ -451,6 +451,20 @@ gb_internal lbAddr lb_addr_swizzle_large(lbValue addr, Type *array_type, Slice<i
 	return v;
 }
 
+gb_internal lbAddr lb_addr_bit_field(lbValue addr, Type *type, i64 index, i64 bit_offset, i64 bit_size) {
+	GB_ASSERT(is_type_pointer(addr.type));
+	Type *mt = type_deref(addr.type);
+	GB_ASSERT(is_type_bit_field(mt));
+
+	lbAddr v = {lbAddr_BitField, addr};
+	v.bitfield.type       = type;
+	v.bitfield.index      = index;
+	v.bitfield.bit_offset = bit_offset;
+	v.bitfield.bit_size   = bit_size;
+	return v;
+}
+
+
 gb_internal Type *lb_addr_type(lbAddr const &addr) {
 	if (addr.addr.value == nullptr) {
 		return nullptr;
@@ -759,7 +773,17 @@ gb_internal void lb_addr_store(lbProcedure *p, lbAddr addr, lbValue value) {
 		addr = lb_addr(lb_address_from_load(p, lb_addr_load(p, addr)));
 	}
 
-	if (addr.kind == lbAddr_RelativePointer) {
+	if (addr.kind == lbAddr_BitField) {
+		lbValue dst = addr.addr;
+
+		auto args = array_make<lbValue>(temporary_allocator(), 4);
+		args[0] = dst;
+		args[1] = lb_address_from_load_or_generate_local(p, value);
+		args[2] = lb_const_int(p->module, t_uintptr, addr.bitfield.bit_offset);
+		args[3] = lb_const_int(p->module, t_uintptr, addr.bitfield.bit_size);
+		lb_emit_runtime_call(p, "__write_bits", args);
+		return;
+	} else if (addr.kind == lbAddr_RelativePointer) {
 		Type *rel_ptr = base_type(lb_addr_type(addr));
 		GB_ASSERT(rel_ptr->kind == Type_RelativePointer ||
 		          rel_ptr->kind == Type_RelativeMultiPointer);
@@ -1074,8 +1098,31 @@ gb_internal lbValue lb_emit_load(lbProcedure *p, lbValue value) {
 gb_internal lbValue lb_addr_load(lbProcedure *p, lbAddr const &addr) {
 	GB_ASSERT(addr.addr.value != nullptr);
 
+	if (addr.kind == lbAddr_BitField) {
+		lbAddr dst = lb_add_local_generated(p, addr.bitfield.type, true);
+		lbValue src = addr.addr;
 
-	if (addr.kind == lbAddr_RelativePointer) {
+		auto args = array_make<lbValue>(temporary_allocator(), 4);
+		args[0] = dst.addr;
+		args[1] = src;
+		args[2] = lb_const_int(p->module, t_uintptr, addr.bitfield.bit_offset);
+		args[3] = lb_const_int(p->module, t_uintptr, addr.bitfield.bit_size);
+		lb_emit_runtime_call(p, "__read_bits", args);
+
+		lbValue r = lb_addr_load(p, dst);
+
+		if (!is_type_unsigned(core_type(addr.bitfield.type))) {
+			// Sign extension
+			// m := 1<<(bit_size-1)
+			// r = (r XOR m) - m
+			Type *t = addr.bitfield.type;
+			lbValue m = lb_const_int(p->module, t, 1ull<<(addr.bitfield.bit_size-1));
+			r = lb_emit_arith(p, Token_Xor, r, m, t);
+			r = lb_emit_arith(p, Token_Sub, r, m, t);
+		}
+
+		return r;
+	} else if (addr.kind == lbAddr_RelativePointer) {
 		Type *rel_ptr = base_type(lb_addr_type(addr));
 		Type *base_integer = nullptr;
 		Type *pointer_type = nullptr;
@@ -2216,7 +2263,9 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 			}
 			return LLVMStructTypeInContext(ctx, fields, field_count, false);
 		}
-	
+
+	case Type_BitField:
+		return lb_type_internal(m, type->BitField.backing_type);
 	}
 
 	GB_PANIC("Invalid type %s", type_to_string(type));

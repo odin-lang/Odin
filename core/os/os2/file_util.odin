@@ -1,6 +1,5 @@
 package os2
 
-import "core:mem"
 import "base:runtime"
 import "core:strconv"
 import "core:unicode/utf8"
@@ -64,13 +63,11 @@ write_encoded_rune :: proc(f: ^File, r: rune) -> (n: int, err: Error) {
 
 
 write_ptr :: proc(f: ^File, data: rawptr, len: int) -> (n: int, err: Error) {
-	s := transmute([]byte)mem.Raw_Slice{data, len}
-	return write(f, s)
+	return write(f, ([^]byte)(data)[:len])
 }
 
 read_ptr :: proc(f: ^File, data: rawptr, len: int) -> (n: int, err: Error) {
-	s := transmute([]byte)mem.Raw_Slice{data, len}
-	return read(f, s)
+	return read(f, ([^]byte)(data)[:len])
 }
 
 

@@ -10,8 +10,8 @@ Array :: struct($T: typeid) {
 String :: distinct Array(byte)
 
 Version_Type_Major :: 0
-Version_Type_Minor :: 2
-Version_Type_Patch :: 4
+Version_Type_Minor :: 3
+Version_Type_Patch :: 0
 
 Version_Type :: struct {
 	major, minor, patch: u8,
@@ -110,6 +110,8 @@ Entity_Flag :: enum u32le {
 	Param_No_Alias  = 7, // #no_alias
 	Param_Any_Int   = 8, // #any_int
 
+	Bit_Field_Field = 19,
+
 	Type_Alias = 20,
 
 	Builtin_Pkg_Builtin    = 30,
@@ -137,6 +139,7 @@ Entity :: struct {
 	// May be used by (Struct fields and procedure fields):
 	// .Variable
 	// .Constant
+	// This is equal to the negative of the "bit size" it this is a `bit_field`s field
 	field_group_index: i32le,
 
 	// May used by:
@@ -187,6 +190,7 @@ Type_Kind :: enum u32le {
 	Multi_Pointer          = 22,
 	Matrix                 = 23,
 	Soa_Pointer            = 24,
+	Bit_Field              = 25,
 }
 
 Type_Elems_Cap :: 4
@@ -247,6 +251,7 @@ Type :: struct {
 	// .Multi_Pointer      - 1 type:    0=element
 	// .Matrix             - 1 type:    0=element
 	// .Soa_Pointer        - 1 type:    0=element
+	// .Bit_Field          - 1 type:    0=backing type
 	types: Array(Type_Index),
 
 	// Used by:

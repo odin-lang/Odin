@@ -106,6 +106,7 @@ TOKEN_KIND(Token__KeywordBegin, ""), \
 	TOKEN_KIND(Token_union,       "union"),       \
 	TOKEN_KIND(Token_enum,        "enum"),        \
 	TOKEN_KIND(Token_bit_set,     "bit_set"),     \
+	TOKEN_KIND(Token_bit_field,   "bit_field"),   \
 	TOKEN_KIND(Token_map,         "map"),         \
 	TOKEN_KIND(Token_dynamic,     "dynamic"),     \
 	TOKEN_KIND(Token_auto_cast,   "auto_cast"),   \

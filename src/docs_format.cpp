@@ -14,8 +14,8 @@ struct OdinDocVersionType {
 };
 
 #define OdinDocVersionType_Major 0
-#define OdinDocVersionType_Minor 2
-#define OdinDocVersionType_Patch 4
+#define OdinDocVersionType_Minor 3
+#define OdinDocVersionType_Patch 0
 
 struct OdinDocHeaderBase {
 	u8                 magic[8];
@@ -84,6 +84,7 @@ enum OdinDocTypeKind : u32 {
 	OdinDocType_MultiPointer         = 22,
 	OdinDocType_Matrix               = 23,
 	OdinDocType_SoaPointer           = 24,
+	OdinDocType_BitField             = 25,
 };
 
 enum OdinDocTypeFlag_Basic : u32 {
@@ -170,6 +171,8 @@ enum OdinDocEntityFlag : u64 {
 	OdinDocEntityFlag_Param_NoAlias  = 1ull<<7,
 	OdinDocEntityFlag_Param_AnyInt   = 1ull<<8,
 
+	OdinDocEntityFlag_BitField_Field = 1ull<<19,
+
 	OdinDocEntityFlag_Type_Alias = 1ull<<20,
 
 	OdinDocEntityFlag_Builtin_Pkg_Builtin    = 1ull<<30,
@@ -192,7 +195,7 @@ struct OdinDocEntity {
 	u32                reserved_for_init;
 	OdinDocString      comment; // line comment
 	OdinDocString      docs; // preceding comment
-	i32                field_group_index;
+	i32                field_group_index; // For `bit_field`s this is the "bit_size"
 	OdinDocEntityIndex foreign_library;
 	OdinDocString      link_name;
 	OdinDocArray<OdinDocAttribute> attributes;

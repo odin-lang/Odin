@@ -15,6 +15,7 @@ import "core:mem"
 import "core:fmt"
 import "core:net"
 import "core:strconv"
+import "core:sync"
 import "core:time"
 import "core:thread"
 import "core:os"
@@ -62,11 +63,7 @@ main :: proc() {
 
 	address_parsing_test(t)
 
-	when ODIN_OS != .Windows {
-		fmt.printf("IMPORTANT: `core:thread` seems to still be a bit wonky on Linux and MacOS, so we can't run tests relying on them.\n", ODIN_OS)
-	} else {
-		tcp_tests(t)
-	}
+	tcp_tests(t)
 
 	split_url_test(t)
 	join_url_test(t)
@@ -338,174 +335,129 @@ IP_Address_Parsing_Test_Vectors :: []IP_Address_Parsing_Test_Vector{
 	{ .IP6, "c0a8",                    "", ""},
 }
 
+tcp_tests :: proc(t: ^testing.T) {
+	fmt.println("Testing two servers trying to bind to the same endpoint...")
+	two_servers_binding_same_endpoint(t)
+	fmt.println("Testing client connecting to a closed port...")
+	client_connects_to_closed_port(t)
+	fmt.println("Testing client sending server data...")
+	client_sends_server_data(t)
+}
 
 ENDPOINT := net.Endpoint{
 	net.IP4_Address{127, 0, 0, 1},
 	9999,
 }
 
-CONTENT := "Hellope!"
-
-SEND_TIMEOUT :: time.Duration(1 * time.Second)
-RECV_TIMEOUT :: time.Duration(1 * time.Second)
-
-Thread_Data :: struct {
-	skt: net.Any_Socket,
-	err: net.Network_Error,
-	tid: ^thread.Thread,
-
-	no_accept: bool,  // Tell the server proc not to accept.
-
-	data:   [1024]u8, // Received data and its length
-	length: int,
-}
-
-thread_data := [3]Thread_Data{}
-
-/*
-	This runs a bunch of socket tests using threads:
-	- two servers trying to bind the same endpoint
-	- client trying to connect to closed port
-	- client trying to connect to an open port with a non-accepting server
-	- client sending server data and server sending client data
-	- etc.
-*/
-tcp_tests :: proc(t: ^testing.T) {
-	fmt.println("Testing two servers trying to bind to the same endpoint...")
-	two_servers_binding_same_endpoint(t)
-	fmt.println("Testing client connecting to a closed port...")
-	client_connects_to_closed_port(t)
-	fmt.println("Testing client connecting to port that doesn't accept...")
-	client_connects_to_open_but_non_accepting_port(t)
-	fmt.println("Testing client sending server data...")
-	client_sends_server_data(t)
-}
-
-tcp_client :: proc(retval: rawptr) {
-	send :: proc(content: []u8) -> (err: net.Network_Error) {
-		skt := net.dial_tcp(ENDPOINT) or_return
-		defer net.close(skt)
-
-		net.set_option(skt, .Send_Timeout,    SEND_TIMEOUT)
-		net.set_option(skt, .Receive_Timeout, RECV_TIMEOUT)
-
-		_, err = net.send(skt, content)
-		return
-	}
-
-	r := transmute(^Thread_Data)retval
-	r.err = send(transmute([]u8)CONTENT)
-	return
-}
-
-tcp_server :: proc(retval: rawptr) {
-	r := transmute(^Thread_Data)retval
-
-	if r.skt, r.err = net.listen_tcp(ENDPOINT); r.err != nil {
-		return
-	}
-	defer net.close(r.skt)
-
-	if r.no_accept {
-		// Don't accept any connections, just listen.
-		return
-	}
-
-	client: net.TCP_Socket
-	if client, _, r.err = net.accept_tcp(r.skt.(net.TCP_Socket)); r.err != nil {
-		return
-	}
-	defer net.close(client)
-
-
-	r.length, r.err = net.recv_tcp(client, r.data[:])
-	return
-}
-
-cleanup_thread :: proc(data: Thread_Data) {
-	net.close(data.skt)
-
-	thread.terminate(data.tid, 1)
-	thread.destroy(data.tid)
-}
-
+@(test)
 two_servers_binding_same_endpoint :: proc(t: ^testing.T) {
-	thread_data = {}
+	skt1, err1 := net.listen_tcp(ENDPOINT)
+	defer net.close(skt1)
+	skt2, err2 := net.listen_tcp(ENDPOINT)
+	defer net.close(skt2)
 
-	thread_data[0].tid = thread.create_and_start_with_data(&thread_data[0], tcp_server, context)
-	thread_data[1].tid = thread.create_and_start_with_data(&thread_data[1], tcp_server, context)
-
-	defer {
-		cleanup_thread(thread_data[0])
-		cleanup_thread(thread_data[1])
-	}
-
-	// Give the two servers enough time to try and bind the same endpoint
-	time.sleep(1 * time.Second)
-
-	first_won  := thread_data[0].err == nil && thread_data[1].err == net.Bind_Error.Address_In_Use
-	second_won := thread_data[1].err == nil && thread_data[0].err == net.Bind_Error.Address_In_Use
-
-	okay := first_won || second_won
-	msg  := fmt.tprintf("Expected servers to return `nil` and `Address_In_Use`, got %v and %v", thread_data[0].err, thread_data[1].err)
-	expect(t, okay, msg)
+	expect(t, err1 == nil, "expected first server binding to endpoint to do so without error")
+	expect(t, err2 == net.Bind_Error.Address_In_Use, "expected second server to bind to an endpoint to return .Address_In_Use")
 }
 
+@(test)
 client_connects_to_closed_port :: proc(t: ^testing.T) {
-	thread_data = {}
-
-	thread_data[0].tid = thread.create_and_start_with_data(&thread_data[0], tcp_client, context)
-
-	defer {
-		cleanup_thread(thread_data[0])
-	}
-
-	// Give the socket enough time to return `Refused`
-	time.sleep(4 * time.Second)
-
-	okay := thread_data[0].err == net.Dial_Error.Refused
-	msg  := fmt.tprintf("Expected client to return `Refused` connecting to closed port, got %v", thread_data[0].err)
-	expect(t, okay, msg)
+	skt, err := net.dial_tcp(ENDPOINT)
+	defer net.close(skt)
+	expect(t, err == net.Dial_Error.Refused, "expected dial of a closed endpoint to return .Refused")
 }
 
-client_connects_to_open_but_non_accepting_port :: proc(t: ^testing.T) {
-	thread_data = {}
-
-	// Tell server proc not to accept
-	thread_data[0].no_accept = true
-
-	thread_data[0].tid = thread.create_and_start_with_data(&thread_data[0], tcp_server, context)
-	thread_data[1].tid = thread.create_and_start_with_data(&thread_data[1], tcp_client, context)
-
-	defer {
-		cleanup_thread(thread_data[0])
-		cleanup_thread(thread_data[1])
-	}
-
-	// Give the two servers enough time to try and bind the same endpoint
-	time.sleep(4 * time.Second)
-
-	okay := thread_data[0].err == nil && thread_data[1].err == net.Dial_Error.Refused
-	msg  := fmt.tprintf("Expected server and client to return `nil` and `Refused`, got %v and %v", thread_data[0].err, thread_data[1].err)
-	expect(t, okay, msg)
-}
-
+@(test)
 client_sends_server_data :: proc(t: ^testing.T) {
-	thread_data = {}
+	CONTENT: string: "Hellope!"
 
-	// Tell server proc not to accept
-	// thread_data[0].no_accept = true
+	SEND_TIMEOUT :: time.Duration(1 * time.Second)
+	RECV_TIMEOUT :: time.Duration(1 * time.Second)
 
+	Thread_Data :: struct {
+		t: ^testing.T,
+		skt: net.Any_Socket,
+		err: net.Network_Error,
+		tid: ^thread.Thread,
+
+		data:   [1024]u8, // Received data and its length
+		length: int,
+		wg:     ^sync.Wait_Group,
+	}
+
+	tcp_client :: proc(thread_data: rawptr) {
+		r := transmute(^Thread_Data)thread_data
+
+		defer sync.wait_group_done(r.wg)
+
+		if r.skt, r.err = net.dial_tcp(ENDPOINT); r.err != nil {
+			log(r.t, r.err)
+			return
+		}
+
+		net.set_option(r.skt, .Send_Timeout, SEND_TIMEOUT)
+
+		_, r.err = net.send(r.skt, transmute([]byte)CONTENT)
+	}
+
+	tcp_server :: proc(thread_data: rawptr) {
+		r := transmute(^Thread_Data)thread_data
+
+		defer sync.wait_group_done(r.wg)
+
+		log(r.t, "tcp_server listen")
+		if r.skt, r.err = net.listen_tcp(ENDPOINT); r.err != nil {
+			sync.wait_group_done(r.wg)
+			log(r.t, r.err)
+			return
+		}
+
+		sync.wait_group_done(r.wg)
+
+		log(r.t, "tcp_server accept")
+		client: net.TCP_Socket
+		if client, _, r.err = net.accept_tcp(r.skt.(net.TCP_Socket)); r.err != nil {
+			log(r.t, r.err)
+			return
+		}
+		defer net.close(client)
+
+		net.set_option(client, .Receive_Timeout, RECV_TIMEOUT)
+
+		r.length, r.err = net.recv_tcp(client, r.data[:])
+		return
+	}
+	
+	thread_data := [2]Thread_Data{}
+
+	wg: sync.Wait_Group
+	sync.wait_group_add(&wg, 1)
+
+	thread_data[0].t = t
+	thread_data[0].wg = &wg
 	thread_data[0].tid = thread.create_and_start_with_data(&thread_data[0], tcp_server, context)
+	
+	log(t, "waiting for server to start listening")
+	sync.wait_group_wait(&wg)
+	log(t, "starting up client")
+
+	sync.wait_group_add(&wg, 2)
+
+	thread_data[1].t = t
+	thread_data[1].wg = &wg
 	thread_data[1].tid = thread.create_and_start_with_data(&thread_data[1], tcp_client, context)
 
 	defer {
-		cleanup_thread(thread_data[0])
-		cleanup_thread(thread_data[1])
+		net.close(thread_data[0].skt)
+		thread.destroy(thread_data[0].tid)
+
+		net.close(thread_data[1].skt)
+		thread.destroy(thread_data[1].tid)
 	}
 
-	// Give the two servers enough time to try and bind the same endpoint
-	time.sleep(1 * time.Second)
+	log(t, "waiting for threads to finish")
+	sync.wait_group_wait(&wg)
+	log(t, "threads finished")
 
 	okay := thread_data[0].err == nil && thread_data[1].err == nil
 	msg  := fmt.tprintf("Expected client and server to return `nil`, got %v and %v", thread_data[0].err, thread_data[1].err)

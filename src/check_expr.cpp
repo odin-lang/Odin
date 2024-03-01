@@ -100,7 +100,7 @@ gb_internal void     check_union_type               (CheckerContext *c, Type *un
 gb_internal Type *   check_init_variable            (CheckerContext *c, Entity *e, Operand *operand, String context_name);
 
 
-gb_internal void check_assignment_error_suggestion(CheckerContext *c, Operand *o, Type *type);
+gb_internal void check_assignment_error_suggestion(CheckerContext *c, Operand *o, Type *type, i64 max_bit_size=0);
 gb_internal void add_map_key_type_dependencies(CheckerContext *ctx, Type *key);
 
 gb_internal Type *make_soa_struct_slice(CheckerContext *ctx, Ast *array_typ_expr, Ast *elem_expr, Type *elem);
@@ -1241,7 +1241,7 @@ gb_internal bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, T
 	}
 	case Type_Pointer:
 		if (source->kind == Type_Pointer) {
-			isize level = check_is_assignable_to_using_subtype(source->Pointer.elem, poly->Pointer.elem);
+			isize level = check_is_assignable_to_using_subtype(source->Pointer.elem, poly->Pointer.elem, /*level*/0, /*src_is_ptr*/false, /*allow_polymorphic*/true);
 			if (level > 0) {
 				return true;
 			}
@@ -1413,7 +1413,9 @@ gb_internal bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, T
 				return ok;
 
 			}
-			// return check_is_assignable_to(c, &o, poly);
+
+			// NOTE(bill): Check for subtypes of
+			// return check_is_assignable_to(c, &o, poly); // && is_type_subtype_of_and_allow_polymorphic(o.type, poly);
 		}
 		return false;
 	case Type_Tuple:
@@ -1884,33 +1886,55 @@ gb_internal bool check_representable_as_constant(CheckerContext *c, ExactValue i
 
 		BigInt i = v.value_integer;
 
-		i64 bit_size = type_size_of(type);
+		i64 byte_size = type_size_of(type);
 		BigInt umax = {};
 		BigInt imin = {};
 		BigInt imax = {};
 
-		if (bit_size < 16) {
-			big_int_from_u64(&umax, unsigned_integer_maxs[bit_size]);
-			big_int_from_i64(&imin, signed_integer_mins[bit_size]);
-			big_int_from_i64(&imax, signed_integer_maxs[bit_size]);
-		} else {
+		if (c->bit_field_bit_size > 0) {
+			i64 bit_size = gb_min(cast(i64)(8*byte_size), cast(i64)c->bit_field_bit_size);
+
 			big_int_from_u64(&umax, 1);
 			big_int_from_i64(&imin, 1);
 			big_int_from_i64(&imax, 1);
 
-			BigInt bi128 = {};
-			BigInt bi127 = {};
-			big_int_from_i64(&bi128, 128);
-			big_int_from_i64(&bi127, 127);
+			BigInt bu = {};
+			BigInt bi = {};
+			big_int_from_i64(&bu, bit_size);
+			big_int_from_i64(&bi, bit_size-1);
 
-			big_int_shl_eq(&umax, &bi128);
+			big_int_shl_eq(&umax, &bu);
 			mp_decr(&umax);
 
-			big_int_shl_eq(&imin, &bi127);
+			big_int_shl_eq(&imin, &bi);
 			big_int_neg(&imin, &imin);
 
-			big_int_shl_eq(&imax, &bi127);
+			big_int_shl_eq(&imax, &bi);
 			mp_decr(&imax);
+		} else {
+			if (byte_size < 16) {
+				big_int_from_u64(&umax, unsigned_integer_maxs[byte_size]);
+				big_int_from_i64(&imin, signed_integer_mins[byte_size]);
+				big_int_from_i64(&imax, signed_integer_maxs[byte_size]);
+			} else {
+				big_int_from_u64(&umax, 1);
+				big_int_from_i64(&imin, 1);
+				big_int_from_i64(&imax, 1);
+
+				BigInt bi128 = {};
+				BigInt bi127 = {};
+				big_int_from_i64(&bi128, 128);
+				big_int_from_i64(&bi127, 127);
+
+				big_int_shl_eq(&umax, &bi128);
+				mp_decr(&umax);
+
+				big_int_shl_eq(&imin, &bi127);
+				big_int_neg(&imin, &imin);
+
+				big_int_shl_eq(&imax, &bi127);
+				mp_decr(&imax);
+			}
 		}
 
 		switch (type->Basic.kind) {
@@ -2069,11 +2093,17 @@ gb_internal bool check_representable_as_constant(CheckerContext *c, ExactValue i
 }
 
 
-gb_internal bool check_integer_exceed_suggestion(CheckerContext *c, Operand *o, Type *type) {
+gb_internal bool check_integer_exceed_suggestion(CheckerContext *c, Operand *o, Type *type, i64 max_bit_size=0) {
 	if (is_type_integer(type) && o->value.kind == ExactValue_Integer) {
 		gbString b = type_to_string(type);
 
 		i64 sz = type_size_of(type);
+		i64 bit_size = 8*sz;
+		bool size_changed = false;
+		if (max_bit_size > 0) {
+			size_changed = (bit_size != max_bit_size);
+			bit_size = gb_min(bit_size, max_bit_size);
+		}
 		BigInt *bi = &o->value.value_integer;
 		if (is_type_unsigned(type)) {
 			if (big_int_is_neg(bi)) {
@@ -2081,25 +2111,36 @@ gb_internal bool check_integer_exceed_suggestion(CheckerContext *c, Operand *o, 
 			} else {
 				BigInt one = big_int_make_u64(1);
 				BigInt max_size = big_int_make_u64(1);
-				BigInt bits = big_int_make_i64(8*sz);
+				BigInt bits = big_int_make_i64(bit_size);
 				big_int_shl_eq(&max_size, &bits);
 				big_int_sub_eq(&max_size, &one);
 				String max_size_str = big_int_to_string(temporary_allocator(), &max_size);
-				error_line("\tThe maximum value that can be represented by '%s' is '%.*s'\n", b, LIT(max_size_str));
+
+				if (size_changed) {
+					error_line("\tThe maximum value that can be represented with that bit_field's field of '%s | %u' is '%.*s'\n", b, bit_size, LIT(max_size_str));
+				} else {
+					error_line("\tThe maximum value that can be represented by '%s' is '%.*s'\n", b, LIT(max_size_str));
+				}
 			}
 		} else {
 			BigInt zero = big_int_make_u64(0);
 			BigInt one = big_int_make_u64(1);
 			BigInt max_size = big_int_make_u64(1);
-			BigInt bits = big_int_make_i64(8*sz - 1);
+			BigInt bits = big_int_make_i64(bit_size - 1);
 			big_int_shl_eq(&max_size, &bits);
+
+			String max_size_str = {};
 			if (big_int_is_neg(bi)) {
 				big_int_neg(&max_size, &max_size);
-				String max_size_str = big_int_to_string(temporary_allocator(), &max_size);
-				error_line("\tThe minimum value that can be represented by '%s' is '%.*s'\n", b, LIT(max_size_str));
+				max_size_str = big_int_to_string(temporary_allocator(), &max_size);
 			} else {
 				big_int_sub_eq(&max_size, &one);
-				String max_size_str = big_int_to_string(temporary_allocator(), &max_size);
+				max_size_str = big_int_to_string(temporary_allocator(), &max_size);
+			}
+
+			if (size_changed) {
+				error_line("\tThe maximum value that can be represented with that bit_field's field of '%s | %u' is '%.*s'\n", b, bit_size, LIT(max_size_str));
+			} else {
 				error_line("\tThe maximum value that can be represented by '%s' is '%.*s'\n", b, LIT(max_size_str));
 			}
 		}
@@ -2110,7 +2151,7 @@ gb_internal bool check_integer_exceed_suggestion(CheckerContext *c, Operand *o, 
 	}
 	return false;
 }
-gb_internal void check_assignment_error_suggestion(CheckerContext *c, Operand *o, Type *type) {
+gb_internal void check_assignment_error_suggestion(CheckerContext *c, Operand *o, Type *type, i64 max_bit_size) {
 	gbString a = expr_to_string(o->expr);
 	gbString b = type_to_string(type);
 	defer(
@@ -2141,7 +2182,7 @@ gb_internal void check_assignment_error_suggestion(CheckerContext *c, Operand *o
 		error_line("\t            whereas slices in general are assumed to be mutable.\n");
 	} else if (is_type_u8_slice(src) && are_types_identical(dst, t_string) && o->mode != Addressing_Constant) {
 		error_line("\tSuggestion: the expression may be casted to %s\n", b);
-	} else if (check_integer_exceed_suggestion(c, o, type)) {
+	} else if (check_integer_exceed_suggestion(c, o, type, max_bit_size)) {
 		return;
 	}
 }
@@ -2215,13 +2256,18 @@ gb_internal bool check_is_expressible(CheckerContext *ctx, Operand *o, Type *typ
 			if (!is_type_integer(o->type) && is_type_integer(type)) {
 				error(o->expr, "'%s' truncated to '%s', got %s", a, b, s);
 			} else {
+				i64 max_bit_size = 0;
+				if (ctx->bit_field_bit_size) {
+					max_bit_size = ctx->bit_field_bit_size;
+				}
+
 				if (are_types_identical(o->type, type)) {
 					error(o->expr, "Numeric value '%s' from '%s' cannot be represented by '%s'", s, a, b);
 				} else {
 					error(o->expr, "Cannot convert numeric value '%s' from '%s' to '%s' from '%s'", s, a, b, c);
 				}
 
-				check_assignment_error_suggestion(ctx, o, type);
+				check_assignment_error_suggestion(ctx, o, type, max_bit_size);
 			}
 		} else {
 			error(o->expr, "Cannot convert '%s' to '%s' from '%s', got %s", a, b, c, s);
@@ -2232,6 +2278,11 @@ gb_internal bool check_is_expressible(CheckerContext *ctx, Operand *o, Type *typ
 }
 
 gb_internal bool check_is_not_addressable(CheckerContext *c, Operand *o) {
+	if (o->expr && o->expr->kind == Ast_SelectorExpr) {
+		if (o->expr->SelectorExpr.is_bit_field) {
+			return true;
+		}
+	}
 	if (o->mode == Addressing_OptionalOk) {
 		Ast *expr = unselector_expr(o->expr);
 		if (expr->kind != Ast_TypeAssertion) {
@@ -2304,6 +2355,8 @@ gb_internal void check_unary_expr(CheckerContext *c, Operand *o, Token op, Ast *
 				Entity *e = entity_of_node(ue->expr);
 				if (e != nullptr && (e->flags & EntityFlag_Param) != 0) {
 					error(op, "Cannot take the pointer address of '%s' which is a procedure parameter", str);
+				} else if (e != nullptr && (e->flags & EntityFlag_BitFieldField) != 0) {
+					error(op, "Cannot take the pointer address of '%s' which is a bit_field's field", str);
 				} else {
 					switch (o->mode) {
 					case Addressing_Constant:
@@ -2875,6 +2928,13 @@ gb_internal bool check_is_castable_to(CheckerContext *c, Operand *operand, Type 
 		if (is_type_integer(dst) || is_type_float(dst)) {
 			return true;
 		}
+	}
+
+	if (is_type_bit_field(src)) {
+		return are_types_identical(core_type(src->BitField.backing_type), dst);
+	}
+	if (is_type_bit_field(dst)) {
+		return are_types_identical(src, core_type(dst->BitField.backing_type));
 	}
 
 	if (is_type_integer(src) && is_type_rune(dst)) {
@@ -5065,6 +5125,11 @@ gb_internal Entity *check_selector(CheckerContext *c, Operand *operand, Ast *nod
 	operand->type = entity->type;
 	operand->expr = node;
 
+	if (entity->flags & EntityFlag_BitFieldField) {
+		add_package_dependency(c, "runtime", "__write_bits");
+		add_package_dependency(c, "runtime", "__read_bits");
+	}
+
 	switch (entity->kind) {
 	case Entity_Constant:
 	operand->value = entity->Constant.value;
@@ -5078,6 +5143,9 @@ gb_internal Entity *check_selector(CheckerContext *c, Operand *operand, Ast *nod
 		}
 		break;
 	case Entity_Variable:
+		if (sel.is_bit_field) {
+			se->is_bit_field = true;
+		}
 		if (sel.indirect) {
 			operand->mode = Addressing_Variable;
 		} else if (operand->mode == Addressing_Context) {
@@ -8394,6 +8462,11 @@ gb_internal void check_compound_literal_field_values(CheckerContext *c, Slice<As
 	StringMap<String> fields_visited_through_raw_union = {};
 	defer (string_map_destroy(&fields_visited_through_raw_union));
 
+	String assignment_str = str_lit("structure literal");
+	if (bt->kind == Type_BitField) {
+		assignment_str = str_lit("bit_field literal");
+	}
+
 	for (Ast *elem : elems) {
 		if (elem->kind != Ast_FieldValue) {
 			error(elem, "Mixture of 'field = value' and value elements in a literal is not allowed");
@@ -8415,17 +8488,26 @@ gb_internal void check_compound_literal_field_values(CheckerContext *c, Slice<As
 			continue;
 		}
 
-		Entity *field = bt->Struct.fields[sel.index[0]];
+		Entity *field = nullptr;
+		if (bt->kind == Type_Struct) {
+			field = bt->Struct.fields[sel.index[0]];
+		} else if (bt->kind == Type_BitField) {
+			field = bt->BitField.fields[sel.index[0]];
+		} else {
+			GB_PANIC("Unknown type");
+		}
+
+
 		add_entity_use(c, fv->field, field);
 		if (string_set_update(&fields_visited, name)) {
 			if (sel.index.count > 1) {
 				if (String *found = string_map_get(&fields_visited_through_raw_union, sel.entity->token.string)) {
 					error(fv->field, "Field '%.*s' is already initialized due to a previously assigned struct #raw_union field '%.*s'", LIT(sel.entity->token.string), LIT(*found));
 				} else {
-					error(fv->field, "Duplicate or reused field '%.*s' in structure literal", LIT(sel.entity->token.string));
+					error(fv->field, "Duplicate or reused field '%.*s' in %.*s", LIT(sel.entity->token.string), LIT(assignment_str));
 				}
 			} else {
-				error(fv->field, "Duplicate field '%.*s' in structure literal", LIT(field->token.string));
+				error(fv->field, "Duplicate field '%.*s' in %.*s", LIT(field->token.string), LIT(assignment_str));
 			}
 			continue;
 		} else if (String *found = string_map_get(&fields_visited_through_raw_union, sel.entity->token.string)) {
@@ -8433,11 +8515,13 @@ gb_internal void check_compound_literal_field_values(CheckerContext *c, Slice<As
 			continue;
 		}
 		if (sel.indirect) {
-			error(fv->field, "Cannot assign to the %d-nested anonymous indirect field '%.*s' in a structure literal", cast(int)sel.index.count-1, LIT(name));
+			error(fv->field, "Cannot assign to the %d-nested anonymous indirect field '%.*s' in a %.*s", cast(int)sel.index.count-1, LIT(name), LIT(assignment_str));
 			continue;
 		}
 
 		if (sel.index.count > 1) {
+			GB_ASSERT(bt->kind == Type_Struct);
+
 			if (is_constant) {
 				Type *ft = type;
 				for (i32 index : sel.index) {
@@ -8498,7 +8582,15 @@ gb_internal void check_compound_literal_field_values(CheckerContext *c, Slice<As
 			is_constant = check_is_operand_compound_lit_constant(c, &o);
 		}
 
-		check_assignment(c, &o, field->type, str_lit("structure literal"));
+		u8 prev_bit_field_bit_size = c->bit_field_bit_size;
+		if (field->kind == Entity_Variable && field->Variable.bit_field_bit_size) {
+			// HACK NOTE(bill): This is a bit of a hack, but it will work fine for this use case
+			c->bit_field_bit_size = field->Variable.bit_field_bit_size;
+		}
+
+		check_assignment(c, &o, field->type, assignment_str);
+
+		c->bit_field_bit_size = prev_bit_field_bit_size;
 	}
 }
 
@@ -9300,6 +9392,21 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 		}
 		break;
 	}
+	case Type_BitField: {
+		if (cl->elems.count == 0) {
+			break; // NOTE(bill): No need to init
+		}
+		is_constant = false;
+		if (cl->elems[0]->kind != Ast_FieldValue) {
+			gbString type_str = type_to_string(type);
+			error(node, "%s ('bit_field') compound literals are only allowed to contain 'field = value' elements", type_str);
+			gb_string_free(type_str);
+		} else {
+			check_compound_literal_field_values(c, cl->elems, o, type, is_constant);
+		}
+		break;
+	}
+
 
 	default: {
 		if (cl->elems.count == 0) {
@@ -11112,6 +11219,32 @@ gb_internal gbString write_expr_to_string(gbString str, Ast *node, bool shorthan
 		str = write_expr_to_string(str, rt->type, shorthand);
 	case_end;
 
+
+	case_ast_node(f, BitFieldField, node);
+		str = write_expr_to_string(str, f->name, shorthand);
+		str = gb_string_appendc(str, ": ");
+		str = write_expr_to_string(str, f->type, shorthand);
+		str = gb_string_appendc(str, " | ");
+		str = write_expr_to_string(str, f->bit_size, shorthand);
+	case_end;
+	case_ast_node(bf, BitFieldType, node);
+		str = gb_string_appendc(str, "bit_field ");
+		if (!shorthand) {
+			str = write_expr_to_string(str, bf->backing_type, shorthand);
+		}
+		str = gb_string_appendc(str, " {");
+		if (shorthand) {
+			str = gb_string_appendc(str, "...");
+		} else {
+			for_array(i, bf->fields) {
+				if (i > 0) {
+					str = gb_string_appendc(str, ", ");
+				}
+				str = write_expr_to_string(str, bf->fields[i], false);
+			}
+		}
+		str = gb_string_appendc(str, "}");
+	case_end;
 
 	case_ast_node(ia, InlineAsmExpr, node);
 		str = gb_string_appendc(str, "asm(");

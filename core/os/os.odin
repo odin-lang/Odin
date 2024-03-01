@@ -1,7 +1,6 @@
 package os
 
 import "base:runtime"
-import "core:mem"
 import "core:strconv"
 import "core:unicode/utf8"
 
@@ -160,13 +159,11 @@ write_entire_file :: proc(name: string, data: []byte, truncate := true) -> (succ
 }
 
 write_ptr :: proc(fd: Handle, data: rawptr, len: int) -> (int, Errno) {
-	s := transmute([]byte)mem.Raw_Slice{data, len}
-	return write(fd, s)
+	return write(fd, ([^]byte)(data)[:len])
 }
 
 read_ptr :: proc(fd: Handle, data: rawptr, len: int) -> (int, Errno) {
-	s := transmute([]byte)mem.Raw_Slice{data, len}
-	return read(fd, s)
+	return read(fd, ([^]byte)(data)[:len])
 }
 
 heap_allocator_proc :: runtime.heap_allocator_proc

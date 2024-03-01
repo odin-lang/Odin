@@ -92,13 +92,20 @@ _dial_tcp_from_endpoint :: proc(endpoint: Endpoint, options := default_tcp_optio
 	return
 }
 
+// On Darwin, any port below 1024 is 'privileged' - which means that you need root access in order to use it.
+MAX_PRIVILEGED_PORT :: 1023
+
 @(private)
 _bind :: proc(skt: Any_Socket, ep: Endpoint) -> (err: Network_Error) {
 	sockaddr := _endpoint_to_sockaddr(ep)
 	s := any_socket_to_socket(skt)
 	res := os.bind(os.Socket(s), (^os.SOCKADDR)(&sockaddr), i32(sockaddr.len))
 	if res != os.ERROR_NONE {
-		err = Bind_Error(res)
+		if res == os.EACCES && ep.port <= MAX_PRIVILEGED_PORT {
+			err = .Privileged_Port_Without_Root
+		} else {
+			err = Bind_Error(res)
+		}
 	}
 	return
 }

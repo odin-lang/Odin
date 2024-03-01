@@ -1053,41 +1053,6 @@ struct lbGlobalVariable {
 	bool is_initialized;
 };
 
-gb_internal lbProcedure *lb_create_startup_type_info(lbModule *m) {
-	if (build_context.no_rtti) {
-		return nullptr;
-	}
-	Type *proc_type = alloc_type_proc(nullptr, nullptr, 0, nullptr, 0, false, ProcCC_CDecl);
-
-	lbProcedure *p = lb_create_dummy_procedure(m, str_lit(LB_STARTUP_TYPE_INFO_PROC_NAME), proc_type);
-	p->is_startup = true;
-	LLVMSetLinkage(p->value, LLVMInternalLinkage);
-
-	lb_add_attribute_to_proc(m, p->value, "nounwind");
-	// lb_add_attribute_to_proc(p->module, p->value, "mustprogress");
-	// lb_add_attribute_to_proc(p->module, p->value, "nofree");
-	// lb_add_attribute_to_proc(p->module, p->value, "norecurse");
-	// lb_add_attribute_to_proc(p->module, p->value, "nosync");
-	// lb_add_attribute_to_proc(p->module, p->value, "willreturn");
-	if (!LB_USE_GIANT_PACKED_STRUCT) {
-		lb_add_attribute_to_proc(m, p->value, "optnone");
-		lb_add_attribute_to_proc(m, p->value, "noinline");
-	}
-
-	lb_begin_procedure_body(p);
-
-	lb_setup_type_info_data(p);
-
-	lb_end_procedure_body(p);
-
-	if (!m->debug_builder && LLVMVerifyFunction(p->value, LLVMReturnStatusAction)) {
-		gb_printf_err("LLVM CODE GEN FAILED FOR PROCEDURE: %s\n", "main");
-		LLVMDumpValue(p->value);
-		gb_printf_err("\n\n\n\n");
-		LLVMVerifyFunction(p->value, LLVMAbortProcessAction);
-	}
-	return p;
-}
 
 gb_internal lbProcedure *lb_create_objc_names(lbModule *main_module) {
 	if (build_context.metrics.os != TargetOs_darwin) {
@@ -1129,7 +1094,7 @@ gb_internal void lb_finalize_objc_names(lbProcedure *p) {
 	lb_end_procedure_body(p);
 }
 
-gb_internal lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProcedure *startup_type_info, lbProcedure *objc_names, Array<lbGlobalVariable> &global_variables) { // Startup Runtime
+gb_internal lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProcedure *objc_names, Array<lbGlobalVariable> &global_variables) { // Startup Runtime
 	Type *proc_type = alloc_type_proc(nullptr, nullptr, 0, nullptr, 0, false, ProcCC_Odin);
 
 	lbProcedure *p = lb_create_dummy_procedure(main_module, str_lit(LB_STARTUP_RUNTIME_PROC_NAME), proc_type);
@@ -1139,9 +1104,7 @@ gb_internal lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProc
 
 	lb_begin_procedure_body(p);
 
-	if (startup_type_info) {
-		LLVMBuildCall2(p->builder, lb_type_internal_for_procedures_raw(main_module, startup_type_info->type), startup_type_info->value, nullptr, 0, "");
-	}
+	lb_setup_type_info_data(main_module);
 
 	if (objc_names) {
 		LLVMBuildCall2(p->builder, lb_type_internal_for_procedures_raw(main_module, objc_names->type), objc_names->value, nullptr, 0, "");
@@ -1201,7 +1164,7 @@ gb_internal lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProc
 				lbValue data = lb_emit_struct_ep(p, var.var, 0);
 				lbValue ti   = lb_emit_struct_ep(p, var.var, 1);
 				lb_emit_store(p, data, lb_emit_conv(p, gp, t_rawptr));
-				lb_emit_store(p, ti,   lb_type_info(main_module, var_type));
+				lb_emit_store(p, ti,   lb_type_info(p, var_type));
 			} else {
 				LLVMTypeRef vt = llvm_addr_type(p->module, var.var);
 				lbValue src0 = lb_emit_conv(p, var.init, t);
@@ -1426,7 +1389,6 @@ gb_internal WORKER_TASK_PROC(lb_llvm_function_pass_per_module) {
 	}
 
 	if (m == &m->gen->default_module) {
-		lb_llvm_function_pass_per_function_internal(m, m->gen->startup_type_info);
 		lb_llvm_function_pass_per_function_internal(m, m->gen->startup_runtime);
 		lb_llvm_function_pass_per_function_internal(m, m->gen->cleanup_runtime);
 		lb_llvm_function_pass_per_function_internal(m, m->gen->objc_names);
@@ -2691,17 +2653,19 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 
 		{ // Add type info data
 			isize max_type_info_count = info->minimum_dependency_type_info_set.count+1;
-			Type *t = alloc_type_array(t_type_info, max_type_info_count);
+			Type *t = alloc_type_array(t_type_info_ptr, max_type_info_count);
 
 			// IMPORTANT NOTE(bill): As LLVM does not have a union type, an array of unions cannot be initialized
 			// at compile time without cheating in some way. This means to emulate an array of unions is to use
 			// a giant packed struct of "corrected" data types.
 
-			LLVMTypeRef internal_llvm_type = lb_setup_type_info_data_internal_type(m, max_type_info_count);
+			LLVMTypeRef internal_llvm_type = lb_type(m, t);
 
 			LLVMValueRef g = LLVMAddGlobal(m->mod, internal_llvm_type, LB_TYPE_INFO_DATA_NAME);
 			LLVMSetInitializer(g, LLVMConstNull(internal_llvm_type));
 			LLVMSetLinkage(g, USE_SEPARATE_MODULES ? LLVMExternalLinkage : LLVMInternalLinkage);
+			LLVMSetUnnamedAddress(g, LLVMGlobalUnnamedAddr);
+			LLVMSetGlobalConstant(g, /*true*/false);
 
 			lbValue value = {};
 			value.value = g;
@@ -2710,15 +2674,11 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 			lb_global_type_info_data_entity = alloc_entity_variable(nullptr, make_token_ident(LB_TYPE_INFO_DATA_NAME), t, EntityState_Resolved);
 			lb_add_entity(m, lb_global_type_info_data_entity, value);
 
-			if (LB_USE_GIANT_PACKED_STRUCT) {
-				LLVMSetLinkage(g, LLVMPrivateLinkage);
-				LLVMSetUnnamedAddress(g, LLVMGlobalUnnamedAddr);
-				LLVMSetGlobalConstant(g, /*true*/false);
-			}
 		}
 		{ // Type info member buffer
 			// NOTE(bill): Removes need for heap allocation by making it global memory
 			isize count = 0;
+			isize offsets_extra = 0;
 
 			for (Type *t : m->info->type_info_types) {
 				isize index = lb_type_info_index(m->info, t, false);
@@ -2736,6 +2696,11 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 				case Type_Tuple:
 					count += t->Tuple.variables.count;
 					break;
+				case Type_BitField:
+					count += t->BitField.fields.count;
+					// Twice is needed for the bit_offsets
+					offsets_extra += t->BitField.fields.count;
+					break;
 				}
 			}
 
@@ -2744,15 +2709,13 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 				LLVMValueRef g = LLVMAddGlobal(m->mod, lb_type(m, t), name);
 				LLVMSetInitializer(g, LLVMConstNull(lb_type(m, t)));
 				LLVMSetLinkage(g, LLVMInternalLinkage);
-				if (LB_USE_GIANT_PACKED_STRUCT) {
-					lb_make_global_private_const(g);
-				}
+				lb_make_global_private_const(g);
 				return lb_addr({g, alloc_type_pointer(t)});
 			};
 
 			lb_global_type_info_member_types   = global_type_info_make(m, LB_TYPE_INFO_TYPES_NAME,   t_type_info_ptr, count);
 			lb_global_type_info_member_names   = global_type_info_make(m, LB_TYPE_INFO_NAMES_NAME,   t_string,        count);
-			lb_global_type_info_member_offsets = global_type_info_make(m, LB_TYPE_INFO_OFFSETS_NAME, t_uintptr,       count);
+			lb_global_type_info_member_offsets = global_type_info_make(m, LB_TYPE_INFO_OFFSETS_NAME, t_uintptr,       count+offsets_extra);
 			lb_global_type_info_member_usings  = global_type_info_make(m, LB_TYPE_INFO_USINGS_NAME,  t_bool,          count);
 			lb_global_type_info_member_tags    = global_type_info_make(m, LB_TYPE_INFO_TAGS_NAME,    t_string,        count);
 		}
@@ -2915,12 +2878,11 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 		}
 	}
 
-	TIME_SECTION("LLVM Runtime Type Information Creation");
-	gen->startup_type_info = lb_create_startup_type_info(default_module);
+	TIME_SECTION("LLVM Runtime Objective-C Names Creation");
 	gen->objc_names = lb_create_objc_names(default_module);
 
 	TIME_SECTION("LLVM Runtime Startup Creation (Global Variables & @(init))");
-	gen->startup_runtime = lb_create_startup_runtime(default_module, gen->startup_type_info, gen->objc_names, global_variables);
+	gen->startup_runtime = lb_create_startup_runtime(default_module, gen->objc_names, global_variables);
 
 	TIME_SECTION("LLVM Runtime Cleanup Creation & @(fini)");
 	gen->cleanup_runtime = lb_create_cleanup_runtime(default_module);

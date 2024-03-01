@@ -475,6 +475,7 @@ struct CheckerContext {
 	bool       hide_polymorphic_errors;
 	bool       in_polymorphic_specialization;
 	bool       allow_arrow_right_selector_expr;
+	u8         bit_field_bit_size;
 	Scope *    polymorphic_scope;
 
 	Ast *assignment_lhs_hint;

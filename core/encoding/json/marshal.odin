@@ -228,6 +228,9 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 	case runtime.Type_Info_Matrix:
 		return .Unsupported_Type
 
+	case runtime.Type_Info_Bit_Field:
+		return .Unsupported_Type
+
 	case runtime.Type_Info_Array:
 		opt_write_start(w, opt, '[') or_return
 		for i in 0..<info.count {

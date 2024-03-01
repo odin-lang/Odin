@@ -147,16 +147,30 @@ aprintln :: proc(args: ..any, sep := " ", allocator := context.allocator) -> str
 // 	*Allocates Using Context's Allocator*
 //
 // 	Inputs:
+//	- fmt: A format string with placeholders for the provided arguments.
+//	- args: A variadic list of arguments to be formatted.
+//	- newline: Whether the string should end with a newline. (See `aprintfln`.)
+//
+// 	Returns: A formatted string. The returned string must be freed accordingly.
+//
+aprintf :: proc(fmt: string, args: ..any, allocator := context.allocator, newline := false) -> string {
+	str: strings.Builder
+	strings.builder_init(&str, allocator)
+	sbprintf(&str, fmt, ..args, newline=newline)
+	return strings.to_string(str)
+}
+// 	Creates a formatted string using a format string and arguments, followed by a newline.
+//
+// 	*Allocates Using Context's Allocator*
+//
+// 	Inputs:
 // 	- fmt: A format string with placeholders for the provided arguments.
 // 	- args: A variadic list of arguments to be formatted.
 //
 // 	Returns: A formatted string. The returned string must be freed accordingly.
 //
-aprintf :: proc(fmt: string, args: ..any, allocator := context.allocator) -> string {
-	str: strings.Builder
-	strings.builder_init(&str, allocator)
-	sbprintf(&str, fmt, ..args)
-	return strings.to_string(str)
+aprintfln :: proc(fmt: string, args: ..any, allocator := context.allocator) -> string {
+	return aprintf(fmt, ..args, allocator=allocator, newline=true)
 }
 // 	Creates a formatted string
 //
@@ -195,16 +209,30 @@ tprintln :: proc(args: ..any, sep := " ") -> string {
 // 	*Allocates Using Context's Temporary Allocator*
 //
 // 	Inputs:
+//	- fmt: A format string with placeholders for the provided arguments.
+//	- args: A variadic list of arguments to be formatted.
+//	- newline: Whether the string should end with a newline. (See `tprintfln`.)
+//
+// 	Returns: A formatted string.
+//
+tprintf :: proc(fmt: string, args: ..any, newline := false) -> string {
+	str: strings.Builder
+	strings.builder_init(&str, context.temp_allocator)
+	sbprintf(&str, fmt, ..args, newline=newline)
+	return strings.to_string(str)
+}
+// 	Creates a formatted string using a format string and arguments, followed by a newline.
+//
+// 	*Allocates Using Context's Temporary Allocator*
+//
+// 	Inputs:
 // 	- fmt: A format string with placeholders for the provided arguments.
 // 	- args: A variadic list of arguments to be formatted.
 //
 // 	Returns: A formatted string.
 //
-tprintf :: proc(fmt: string, args: ..any) -> string {
-	str: strings.Builder
-	strings.builder_init(&str, context.temp_allocator)
-	sbprintf(&str, fmt, ..args)
-	return strings.to_string(str)
+tprintfln :: proc(fmt: string, args: ..any) -> string {
+	return tprintf(fmt, ..args, newline=true)
 }
 // Creates a formatted string using a supplied buffer as the backing array. Writes into the buffer.
 //
@@ -238,12 +266,25 @@ bprintln :: proc(buf: []byte, args: ..any, sep := " ") -> string {
 // - buf: The backing buffer
 // - fmt: A format string with placeholders for the provided arguments
 // - args: A variadic list of arguments to be formatted
+// - newline: Whether the string should end with a newline. (See `bprintfln`.)
 //
 // Returns: A formatted string
 //
-bprintf :: proc(buf: []byte, fmt: string, args: ..any) -> string {
+bprintf :: proc(buf: []byte, fmt: string, args: ..any, newline := false) -> string {
 	sb := strings.builder_from_bytes(buf)
-	return sbprintf(&sb, fmt, ..args)
+	return sbprintf(&sb, fmt, ..args, newline=newline)
+}
+// Creates a formatted string using a supplied buffer as the backing array, followed by a newline. Writes into the buffer.
+//
+// Inputs:
+// - buf: The backing buffer
+// - fmt: A format string with placeholders for the provided arguments
+// - args: A variadic list of arguments to be formatted
+//
+// Returns: A formatted string
+//
+bprintfln :: proc(buf: []byte, fmt: string, args: ..any) -> string {
+	return bprintf(buf, fmt, ..args, newline=true)
 }
 // Runtime assertion with a formatted message
 //
@@ -294,18 +335,51 @@ panicf :: proc(fmt: string, args: ..any, loc := #caller_location) -> ! {
 // Inputs:
 // - format: A format string with placeholders for the provided arguments
 // - args: A variadic list of arguments to be formatted
+// - newline: Whether the string should end with a newline. (See `caprintfln`.)
 //
 // Returns: A formatted C string
 //
-caprintf :: proc(format: string, args: ..any) -> cstring {
+caprintf :: proc(format: string, args: ..any, newline := false) -> cstring {
 	str: strings.Builder
 	strings.builder_init(&str)
-	sbprintf(&str, format, ..args)
+	sbprintf(&str, format, ..args, newline=newline)
 	strings.write_byte(&str, 0)
 	s := strings.to_string(str)
 	return cstring(raw_data(s))
 }
+// Creates a formatted C string, followed by a newline.
+//
+// *Allocates Using Context's Allocator*
+//
+// Inputs:
+// - format: A format string with placeholders for the provided arguments
+// - args: A variadic list of arguments to be formatted
+//
+// Returns: A formatted C string
+//
+caprintfln :: proc(format: string, args: ..any) -> cstring {
+	return caprintf(format, ..args, newline=true)
+}
 // Creates a formatted C string
+//
+// *Allocates Using Context's Temporary Allocator*
+//
+// Inputs:
+// - format: A format string with placeholders for the provided arguments
+// - args: A variadic list of arguments to be formatted
+// - newline: Whether the string should end with a newline. (See `ctprintfln`.)
+//
+// Returns: A formatted C string
+//
+ctprintf :: proc(format: string, args: ..any, newline := false) -> cstring {
+	str: strings.Builder
+	strings.builder_init(&str, context.temp_allocator)
+	sbprintf(&str, format, ..args, newline=newline)
+	strings.write_byte(&str, 0)
+	s := strings.to_string(str)
+	return cstring(raw_data(s))
+}
+// Creates a formatted C string, followed by a newline.
 //
 // *Allocates Using Context's Temporary Allocator*
 //
@@ -315,13 +389,8 @@ caprintf :: proc(format: string, args: ..any) -> cstring {
 //
 // Returns: A formatted C string
 //
-ctprintf :: proc(format: string, args: ..any) -> cstring {
-	str: strings.Builder
-	strings.builder_init(&str, context.temp_allocator)
-	sbprintf(&str, format, ..args)
-	strings.write_byte(&str, 0)
-	s := strings.to_string(str)
-	return cstring(raw_data(s))
+ctprintfln :: proc(format: string, args: ..any) -> cstring {
+	return ctprintf(format, ..args, newline=true)
 }
 // Formats using the default print settings and writes to the given strings.Builder
 //
@@ -355,12 +424,24 @@ sbprintln :: proc(buf: ^strings.Builder, args: ..any, sep := " ") -> string {
 // - buf: A pointer to a strings.Builder buffer
 // - fmt: The format string
 // - args: A variadic list of arguments to be formatted
+// - newline: Whether a trailing newline should be written. (See `sbprintfln`.)
 //
 // Returns: The resulting formatted string
 //
-sbprintf :: proc(buf: ^strings.Builder, fmt: string, args: ..any) -> string {
-	wprintf(strings.to_writer(buf), fmt, ..args, flush=true)
+sbprintf :: proc(buf: ^strings.Builder, fmt: string, args: ..any, newline := false) -> string {
+	wprintf(strings.to_writer(buf), fmt, ..args, flush=true, newline=newline)
 	return strings.to_string(buf^)
+}
+// Formats and writes to a strings.Builder buffer according to the specified format string, followed by a newline.
+//
+// Inputs:
+// - buf:  A pointer to a strings.Builder to store the formatted string
+// - args: A variadic list of arguments to be formatted
+//
+// Returns: A formatted string
+//
+sbprintfln :: proc(buf: ^strings.Builder, format: string, args: ..any) -> string {
+	return sbprintf(buf, format, ..args, newline=true)
 }
 // Formats and writes to an io.Writer using the default print settings
 //
@@ -435,10 +516,11 @@ wprintln :: proc(w: io.Writer, args: ..any, sep := " ", flush := true) -> int {
 // - w: An io.Writer to write to
 // - fmt: The format string
 // - args: A variadic list of arguments to be formatted
+// - newline: Whether a trailing newline should be written. (See `wprintfln`.)
 //
 // Returns: The number of bytes written
 //
-wprintf :: proc(w: io.Writer, fmt: string, args: ..any, flush := true) -> int {
+wprintf :: proc(w: io.Writer, fmt: string, args: ..any, flush := true, newline := false) -> int {
 	fi: Info
 	arg_index: int = 0
 	end := len(fmt)
@@ -708,11 +790,26 @@ wprintf :: proc(w: io.Writer, fmt: string, args: ..any, flush := true) -> int {
 		}
 		io.write_string(fi.writer, ")", &fi.n)
 	}
+
+	if newline {
+		io.write_byte(w, '\n', &fi.n)
+	}
 	if flush {
 		io.flush(w)
 	}
 
 	return fi.n
+}
+// Formats and writes to an io.Writer according to the specified format string, followed by a newline.
+//
+// Inputs:
+// - w: The io.Writer to write to.
+// - args: A variadic list of arguments to be formatted.
+//
+// Returns: The number of bytes written.
+//
+wprintfln :: proc(w: io.Writer, format: string, args: ..any, flush := true) -> int {
+	return wprintf(w, format, ..args, flush=flush, newline=true)
 }
 // Writes a ^runtime.Type_Info value to an io.Writer
 //
@@ -1408,34 +1505,9 @@ fmt_soa_pointer :: proc(fi: ^Info, p: runtime.Raw_Soa_Pointer, verb: rune) {
 //
 // Returns: The string representation of the enum value and a boolean indicating success.
 //
+@(require_results)
 enum_value_to_string :: proc(val: any) -> (string, bool) {
-	v := val
-	v.id = runtime.typeid_base(v.id)
-	type_info := type_info_of(v.id)
-
-	#partial switch e in type_info.variant {
-	case: return "", false
-	case runtime.Type_Info_Enum:
-		Enum_Value :: runtime.Type_Info_Enum_Value
-
-		ev_, ok := reflect.as_i64(val)
-		ev := Enum_Value(ev_)
-
-		if ok {
-			if len(e.values) == 0 {
-				return "", true
-			} else {
-				for val, idx in e.values {
-					if val == ev {
-						return e.names[idx], true
-					}
-				}
-			}
-			return "", false
-		}
-	}
-
-	return "", false
+	return reflect.enum_name_from_value_any(val)
 }
 // Returns the enum value of a string representation.
 //
@@ -2198,6 +2270,8 @@ fmt_named :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Named) 
 	#partial switch b in info.base.variant {
 	case runtime.Type_Info_Struct:
 		fmt_struct(fi, v, verb, b, info.name)
+	case runtime.Type_Info_Bit_Field:
+		fmt_bit_field(fi, v, verb, b, info.name)
 	case runtime.Type_Info_Bit_Set:
 		fmt_bit_set(fi, v, verb = verb)
 	case:
@@ -2308,6 +2382,96 @@ fmt_matrix :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Matrix
 		fmt_write_indent(fi)
 	}
 }
+
+fmt_bit_field :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Bit_Field, type_name: string) {
+	read_bits :: proc(ptr: [^]byte, offset, size: uintptr) -> (res: u64) {
+		for i in 0..<size {
+			j := i+offset
+			B := ptr[j/8]
+			k := j&7
+			if B & (u8(1)<<k) != 0 {
+				res |= u64(1)<<u64(i)
+			}
+		}
+		return
+	}
+
+	handle_bit_field_tag :: proc(data: rawptr, info: reflect.Type_Info_Bit_Field, idx: int, verb: ^rune) -> (do_continue: bool) {
+		tag := info.tags[idx]
+		if vt, ok := reflect.struct_tag_lookup(reflect.Struct_Tag(tag), "fmt"); ok {
+			value := strings.trim_space(string(vt))
+			switch value {
+			case "": return false
+			case "-": return true
+			}
+			r, w := utf8.decode_rune_in_string(value)
+			value = value[w:]
+			if value == "" || value[0] == ',' {
+				verb^ = r
+			}
+		}
+		return false
+	}
+
+	io.write_string(fi.writer, type_name if len(type_name) != 0 else "bit_field", &fi.n)
+	io.write_string(fi.writer, "{", &fi.n)
+
+	hash   := fi.hash;   defer fi.hash = hash
+	indent := fi.indent; defer fi.indent -= 1
+	do_trailing_comma := hash
+
+	fi.indent += 1
+
+	if hash	{
+		io.write_byte(fi.writer, '\n', &fi.n)
+	}
+	defer {
+		if hash {
+			for _ in 0..<indent { io.write_byte(fi.writer, '\t', &fi.n) }
+		}
+		io.write_byte(fi.writer, '}', &fi.n)
+	}
+
+
+	field_count := -1
+	for name, i in info.names {
+		field_verb := verb
+		if handle_bit_field_tag(v.data, info, i, &field_verb) {
+			continue
+		}
+
+		field_count += 1
+
+		if !do_trailing_comma && field_count > 0 {
+			io.write_string(fi.writer, ", ")
+		}
+		if hash {
+			fmt_write_indent(fi)
+		}
+
+		io.write_string(fi.writer, name, &fi.n)
+		io.write_string(fi.writer, " = ", &fi.n)
+
+		bit_offset := info.bit_offsets[i]
+		bit_size := info.bit_sizes[i]
+
+		value := read_bits(([^]byte)(v.data), bit_offset, bit_size)
+		type := info.types[i]
+
+		if !reflect.is_unsigned(runtime.type_info_core(type)) {
+			// Sign Extension
+			m := u64(1<<(bit_size-1))
+			value = (value ~ m) - m
+		}
+
+		fmt_value(fi, any{&value, type.id}, field_verb)
+		if do_trailing_comma { io.write_string(fi.writer, ",\n", &fi.n) }
+
+	}
+}
+
+
+
 // Formats a value based on its type and formatting verb
 //
 // Inputs:
@@ -2636,6 +2800,9 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 
 	case runtime.Type_Info_Matrix:
 		fmt_matrix(fi, v, verb, info)
+
+	case runtime.Type_Info_Bit_Field:
+		fmt_bit_field(fi, v, verb, info, "")
 	}
 }
 // Formats a complex number based on the given formatting verb
