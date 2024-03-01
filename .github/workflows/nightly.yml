@@ -83,7 +83,9 @@ jobs:
           TMP_PATH=$(xcrun --show-sdk-path)/user/include
           echo "CPATH=$TMP_PATH" >> $GITHUB_ENV
       - name: build odin
-        run: make nightly
+        # These -L makes the linker prioritize system libraries over LLVM libraries, this is mainly to
+        # not link with libunwind bundled with LLVM but link with libunwind on the system.
+        run: CXXFLAGS="-L/usr/lib/system -L/usr/lib" make nightly
       - name: Bundle
         run: |
           mkdir dist
@@ -117,7 +119,9 @@ jobs:
           TMP_PATH=$(xcrun --show-sdk-path)/user/include
           echo "CPATH=$TMP_PATH" >> $GITHUB_ENV
       - name: build odin
-        run: make nightly
+        # These -L makes the linker prioritize system libraries over LLVM libraries, this is mainly to
+        # not link with libunwind bundled with LLVM but link with libunwind on the system.
+        run: CXXFLAGS="-L/usr/lib/system -L/usr/lib" make nightly
       - name: Bundle
         run: |
           mkdir dist
