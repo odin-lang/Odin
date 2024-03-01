@@ -93,7 +93,9 @@ foreign user32 {
 
 	CreateCursor :: proc(hInst: HINSTANCE, xHotSpot: c_int, yHotSpot: c_int, nWidth: c_int, nHeight: c_int, pvANDPlane: PVOID, pvXORPlane: PVOID) -> HCURSOR ---
 	DestroyCursor :: proc(hCursor: HCURSOR) -> BOOL ---
-	ShowCursor :: proc(bShow: BOOL) -> c_int ---
+
+	@(link_name="ShowCursor") // ShowCursor somehow made the raylib fail with: D:/a/Odin/Odin/vendor/raylib/raylib.odin(1016:22) Redeclaration of foreign procedure 'ShowCursor' with different type signatures
+	_ShowCursor :: proc(bShow: BOOL) -> c_int ---
 
 	GetWindowRect :: proc(hWnd: HWND, lpRect: LPRECT) -> BOOL ---
 	GetClientRect :: proc(hWnd: HWND, lpRect: LPRECT) -> BOOL ---
