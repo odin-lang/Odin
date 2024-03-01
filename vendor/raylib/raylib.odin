@@ -81,7 +81,7 @@ Package vendor:raylib implements bindings for version 5.0 of the raylib library 
 */
 package raylib
 
-import c "core:c"
+import "core:c"
 import "core:fmt"
 import "core:mem"
 import "core:strings"
