@@ -410,41 +410,9 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 		if !opt.use_enum_value_names || len(info.names) == 0 {
 			return marshal_to_writer(w, any{v.data, info.base.id}, opt)
 		} else {
-			enum_a := any{v.data, info.base.id}
-			u: runtime.Type_Info_Enum_Value
-
-			switch i in enum_a {
-			case i8:      u = runtime.Type_Info_Enum_Value(i)
-			case i16:     u = runtime.Type_Info_Enum_Value(i)
-			case i32:     u = runtime.Type_Info_Enum_Value(i)
-			case i64:     u = runtime.Type_Info_Enum_Value(i)
-			case int:     u = runtime.Type_Info_Enum_Value(i)
-			case u8:      u = runtime.Type_Info_Enum_Value(i)
-			case u16:     u = runtime.Type_Info_Enum_Value(i)
-			case u32:     u = runtime.Type_Info_Enum_Value(i)
-			case u64:     u = runtime.Type_Info_Enum_Value(i)
-			case uint:    u = runtime.Type_Info_Enum_Value(i)
-			case uintptr: u = runtime.Type_Info_Enum_Value(i)
-
-			case i16le:  u = runtime.Type_Info_Enum_Value(i)
-			case i32le:  u = runtime.Type_Info_Enum_Value(i)
-			case i64le:  u = runtime.Type_Info_Enum_Value(i)
-			case u16le:  u = runtime.Type_Info_Enum_Value(i)
-			case u32le:  u = runtime.Type_Info_Enum_Value(i)
-			case u64le:  u = runtime.Type_Info_Enum_Value(i)
-
-			case i16be:  u = runtime.Type_Info_Enum_Value(i)
-			case i32be:  u = runtime.Type_Info_Enum_Value(i)
-			case i64be:  u = runtime.Type_Info_Enum_Value(i)
-			case u16be:  u = runtime.Type_Info_Enum_Value(i)
-			case u32be:  u = runtime.Type_Info_Enum_Value(i)
-			case u64be:  u = runtime.Type_Info_Enum_Value(i)
-			case: panic("Invalid enum base type")
-			}
-
-			pos, found := slice.linear_search(info.values, u)
+			name, found := reflect.enum_name_from_value_any(v)
 			if found {
-				return marshal_to_writer(w, any(info.names[pos]), opt)
+				return marshal_to_writer(w, name, opt)
 			} else {
 				panic("Unable to find value in enum's values")
 			}
