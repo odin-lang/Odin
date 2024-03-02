@@ -28,6 +28,20 @@ init_cshake :: proc(ctx: ^Context, n, s: []byte, sec_strength: int) {
 	bytepad(ctx, [][]byte{n, s}, rate)
 }
 
+final_cshake :: proc(ctx: ^Context, dst: []byte, finalize_clone: bool = false) {
+	ctx := ctx
+	if finalize_clone {
+		tmp_ctx: Context
+		clone(&tmp_ctx, ctx)
+		ctx = &tmp_ctx
+	}
+	defer reset(ctx)
+
+	encode_byte_len(ctx, len(dst), false) // right_encode
+	shake_xof(ctx)
+	shake_out(ctx, dst)
+}
+
 // right_encode and left_encode are defined to support 0 <= x < 2^2040
 // however, the largest value we will ever need to encode is `max(int) * 8`.
 //

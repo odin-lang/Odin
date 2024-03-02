@@ -40,6 +40,7 @@ import sha2             "core:crypto/sha2"
 import sha3             "core:crypto/sha3"
 import shake            "core:crypto/shake"
 import sm3              "core:crypto/sm3"
+import tuplehash        "core:crypto/tuplehash"
 import x25519           "core:crypto/x25519"
 
 import pe               "core:debug/pe"
@@ -159,6 +160,7 @@ _ :: sha2
 _ :: sha3
 _ :: shake
 _ :: sm3
+_ :: tuplehash
 _ :: x25519
 _ :: pe
 _ :: dynlib
