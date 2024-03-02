@@ -282,6 +282,8 @@ BuiltinProc__type_simple_boolean_end,
 
 	BuiltinProc_type_field_index_of,
 
+	BuiltinProc_type_bit_set_backing_type,
+
 	BuiltinProc_type_equal_proc,
 	BuiltinProc_type_hasher_proc,
 	BuiltinProc_type_map_info,
@@ -585,6 +587,8 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("type_is_subtype_of"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("type_field_index_of"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+
+	{STR_LIT("type_bit_set_backing_type"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("type_equal_proc"),    1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_hasher_proc"),   1, false, Expr_Expr, BuiltinProcPkg_intrinsics},

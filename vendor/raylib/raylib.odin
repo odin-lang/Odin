@@ -318,11 +318,11 @@ GlyphInfo :: struct {
 // Font type, includes texture and charSet array data
 Font :: struct {
 	baseSize:     c.int,          // Base size (default chars height)
-	charsCount:   c.int,          // Number of characters
-	charsPadding: c.int,          // Padding around the chars
+	glyphCount:   c.int,          // Number of characters
+	glyphPadding: c.int,          // Padding around the chars
 	texture:      Texture2D,      // Characters texture atlas
 	recs:         [^]Rectangle,   // Characters rectangles in texture
-	chars:        [^]GlyphInfo,    // Characters info data
+	glyphs:       [^]GlyphInfo,    // Characters info data
 }
 
 // Camera type, defines a camera position/orientation in 3d space
@@ -404,7 +404,7 @@ BoneInfo :: struct {
 }
 
 // Model type
-Model :: struct {
+Model :: struct #align(align_of(uintptr)) {
 	transform: Matrix,            // Local transform matrix
 
 	meshCount: c.int,             // Number of meshes
@@ -425,6 +425,7 @@ ModelAnimation :: struct {
 	frameCount: c.int,            // Number of animation frames
 	bones:      [^]BoneInfo,      // Bones information (skeleton)
 	framePoses: [^][^]Transform,  // Poses array by frame
+	name:       [32]byte,           // Animation name
 }
 
 // Ray type (useful for raycast)
@@ -490,7 +491,6 @@ VrDeviceInfo :: struct {
 	vResolution:            c.int,    // Vertical resolution in pixels
 	hScreenSize:            f32,      // Horizontal size in meters
 	vScreenSize:            f32,      // Vertical size in meters
-	vScreenCenter:          f32,      // Screen center in meters
 	eyeToScreenDistance:    f32,      // Distance between eye and display in meters
 	lensSeparationDistance: f32,      // Lens separation distance in meters
 	interpupillaryDistance: f32,      // IPD (distance between pupils) in meters
@@ -499,7 +499,7 @@ VrDeviceInfo :: struct {
 }
 
 // VR Stereo rendering configuration for simulator
-VrStereoConfig :: struct {
+VrStereoConfig :: struct #align(4) {
 	projection:        [2]Matrix,     // VR projection matrices (per eye)
 	viewOffset:        [2]Matrix,     // VR view offset matrices (per eye)
 	leftLensCenter:    [2]f32,        // VR left lens center

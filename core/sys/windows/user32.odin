@@ -1,6 +1,7 @@
 // +build windows
 package sys_windows
 
+import "base:intrinsics"
 foreign import user32 "system:User32.lib"
 
 @(default_calling_convention="system")
@@ -155,6 +156,9 @@ foreign user32 {
 	GetCursorPos :: proc(lpPoint: LPPOINT) -> BOOL ---
 	SetCursorPos :: proc(X: c_int, Y: c_int) -> BOOL ---
 	SetCursor :: proc(hCursor: HCURSOR) -> HCURSOR ---
+	when !intrinsics.is_package_imported("raylib") {
+		ShowCursor :: proc(bShow: BOOL) -> INT ---
+	}
 
 	EnumDisplaySettingsW :: proc(lpszDeviceName: LPCWSTR, iModeNum: DWORD, lpDevMode: ^DEVMODEW) -> BOOL ---
 

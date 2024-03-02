@@ -280,7 +280,7 @@ Typeid_Kind :: enum u8 {
 
 // NOTE(bill): only the ones that are needed (not all types)
 // This will be set by the compiler
-type_table: []Type_Info
+type_table: []^Type_Info
 
 args__: []cstring
 
@@ -609,7 +609,7 @@ __type_info_of :: proc "contextless" (id: typeid) -> ^Type_Info #no_bounds_check
 	if n < 0 || n >= len(type_table) {
 		n = 0
 	}
-	return &type_table[n]
+	return type_table[n]
 }
 
 when !ODIN_NO_RTTI {
