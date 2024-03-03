@@ -788,7 +788,7 @@ initialize_constants :: proc() -> (res: int) {
 	*/
 	internal_set(      INT_NAN,  1);       INT_NAN.flags = {.Immutable, .NaN}
 	internal_set(      INT_INF,  1);       INT_INF.flags = {.Immutable, .Inf}
-	internal_set(      INT_INF, -1); INT_MINUS_INF.flags = {.Immutable, .Inf}
+	internal_set(INT_MINUS_INF, -1); INT_MINUS_INF.flags = {.Immutable, .Inf}
 
 	return _DEFAULT_MUL_KARATSUBA_CUTOFF
 }
