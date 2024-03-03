@@ -4,16 +4,6 @@ import "core:encoding/endian"
 import "core:math/bits"
 
 init_cshake :: proc(ctx: ^Context, n, s: []byte, sec_strength: int) {
-	rate: int
-	switch sec_strength {
-	case 128:
-		rate = RATE_128
-	case 256:
-		rate = RATE_256
-	case:
-		panic("crypto/sha3: invalid security strength")
-	}
-
 	ctx.mdlen = sec_strength / 8
 
 	// No domain separator is equivalent to vanilla SHAKE.
@@ -25,7 +15,7 @@ init_cshake :: proc(ctx: ^Context, n, s: []byte, sec_strength: int) {
 
 	ctx.dsbyte = DS_CSHAKE
 	init(ctx)
-	bytepad(ctx, [][]byte{n, s}, rate)
+	bytepad(ctx, [][]byte{n, s}, rate_cshake(sec_strength))
 }
 
 final_cshake :: proc(ctx: ^Context, dst: []byte, finalize_clone: bool = false) {
@@ -40,6 +30,17 @@ final_cshake :: proc(ctx: ^Context, dst: []byte, finalize_clone: bool = false) {
 	encode_byte_len(ctx, len(dst), false) // right_encode
 	shake_xof(ctx)
 	shake_out(ctx, dst)
+}
+
+rate_cshake :: #force_inline proc(sec_strength: int) -> int {
+	switch sec_strength {
+	case 128:
+		return RATE_128
+	case 256:
+		return RATE_256
+	}
+
+	panic("crypto/sha3: invalid security strength")
 }
 
 // right_encode and left_encode are defined to support 0 <= x < 2^2040

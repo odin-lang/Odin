@@ -31,6 +31,7 @@ import chacha20poly1305 "core:crypto/chacha20poly1305"
 import crypto_hash      "core:crypto/hash"
 import hkdf             "core:crypto/hkdf"
 import hmac             "core:crypto/hmac"
+import kmac             "core:crypto/kmac"
 import keccak           "core:crypto/legacy/keccak"
 import md5              "core:crypto/legacy/md5"
 import sha1             "core:crypto/legacy/sha1"
@@ -151,6 +152,7 @@ _ :: chacha20
 _ :: chacha20poly1305
 _ :: hmac
 _ :: hkdf
+_ :: kmac
 _ :: keccak
 _ :: md5
 _ :: pbkdf2
