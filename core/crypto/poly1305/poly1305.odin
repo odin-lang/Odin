@@ -1,3 +1,9 @@
+/*
+package poly1305 implements the Poly1305 one-time MAC algorithm.
+
+See:
+- https://datatracker.ietf.org/doc/html/rfc8439
+*/
 package poly1305
 
 import "core:crypto"
@@ -5,13 +11,20 @@ import field "core:crypto/_fiat/field_poly1305"
 import "core:encoding/endian"
 import "core:mem"
 
+// KEY_SIZE is the Poly1305 key size in bytes.
 KEY_SIZE :: 32
+// TAG_SIZE is the Poly1305 tag size in bytes.
 TAG_SIZE :: 16
 
 @(private)
 _BLOCK_SIZE :: 16
 
-sum :: proc (dst, msg, key: []byte) {
+// sum will compute the Poly1305 MAC with the key over msg, and write
+// the computed tag to dst.  It requires that the dst buffer is the tag
+// size.
+//
+// The key SHOULD be unique and MUST be unpredictable for each invocation.
+sum :: proc(dst, msg, key: []byte) {
 	ctx: Context = ---
 
 	init(&ctx, key)
@@ -19,9 +32,12 @@ sum :: proc (dst, msg, key: []byte) {
 	final(&ctx, dst)
 }
 
-verify :: proc (tag, msg, key: []byte) -> bool {
+// verify will verify the Poly1305 tag computed with the key over msg and
+// return true iff the tag is valid.  It requires that the tag is correctly
+// sized.
+verify :: proc(tag, msg, key: []byte) -> bool {
 	ctx: Context = ---
-	derived_tag: [16]byte = ---
+	derived_tag: [TAG_SIZE]byte = ---
 
 	init(&ctx, key)
 	update(&ctx, msg)
@@ -30,18 +46,19 @@ verify :: proc (tag, msg, key: []byte) -> bool {
 	return crypto.compare_constant_time(derived_tag[:], tag) == 1
 }
 
+// Context is a Poly1305 instance.
 Context :: struct {
-	_r: field.Tight_Field_Element,
-	_a: field.Tight_Field_Element,
-	_s: field.Tight_Field_Element,
-
-	_buffer: [_BLOCK_SIZE]byte,
-	_leftover: int,
-
+	_r:              field.Tight_Field_Element,
+	_a:              field.Tight_Field_Element,
+	_s:              field.Tight_Field_Element,
+	_buffer:         [_BLOCK_SIZE]byte,
+	_leftover:       int,
 	_is_initialized: bool,
 }
 
-init :: proc (ctx: ^Context, key: []byte) {
+// init initializes a Context with the specified key.  The key SHOULD be
+// unique and MUST be unpredictable for each invocation.
+init :: proc(ctx: ^Context, key: []byte) {
 	if len(key) != KEY_SIZE {
 		panic("crypto/poly1305: invalid key size")
 	}
@@ -64,7 +81,8 @@ init :: proc (ctx: ^Context, key: []byte) {
 	ctx._is_initialized = true
 }
 
-update :: proc (ctx: ^Context, data: []byte) {
+// update adds more data to the Context.
+update :: proc(ctx: ^Context, data: []byte) {
 	assert(ctx._is_initialized)
 
 	msg := data
@@ -101,8 +119,11 @@ update :: proc (ctx: ^Context, data: []byte) {
 	}
 }
 
-final :: proc (ctx: ^Context, dst: []byte) {
+// final finalizes the Context, writes the tag to dst, and calls
+// reset on the Context.
+final :: proc(ctx: ^Context, dst: []byte) {
 	assert(ctx._is_initialized)
+	defer reset(ctx)
 
 	if len(dst) != TAG_SIZE {
 		panic("poly1305: invalid destination tag size")
@@ -125,11 +146,11 @@ final :: proc (ctx: ^Context, dst: []byte) {
 	tmp: [32]byte = ---
 	field.fe_to_bytes(&tmp, &ctx._a)
 	copy_slice(dst, tmp[0:16])
-
-	reset(ctx)
 }
 
-reset :: proc (ctx: ^Context) {
+// reset sanitizes the Context.  The Context must be re-initialized to
+// be used again.
+reset :: proc(ctx: ^Context) {
 	mem.zero_explicit(&ctx._r, size_of(ctx._r))
 	mem.zero_explicit(&ctx._a, size_of(ctx._a))
 	mem.zero_explicit(&ctx._s, size_of(ctx._s))
@@ -139,7 +160,7 @@ reset :: proc (ctx: ^Context) {
 }
 
 @(private)
-_blocks :: proc (ctx: ^Context, msg: []byte, final := false) {
+_blocks :: proc(ctx: ^Context, msg: []byte, final := false) {
 	n: field.Tight_Field_Element = ---
 	final_byte := byte(!final)
 

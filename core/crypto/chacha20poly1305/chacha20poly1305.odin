@@ -1,3 +1,10 @@
+/*
+package chacha20poly1305 implements the AEAD_CHACHA20_POLY1305 Authenticated
+Encryption with Additional Data algorithm.
+
+See:
+- https://www.rfc-editor.org/rfc/rfc8439
+*/
 package chacha20poly1305
 
 import "core:crypto"
@@ -6,8 +13,11 @@ import "core:crypto/poly1305"
 import "core:encoding/endian"
 import "core:mem"
 
+// KEY_SIZE is the chacha20poly1305 key size in bytes.
 KEY_SIZE :: chacha20.KEY_SIZE
+// NONCE_SIZE is the chacha20poly1305 nonce size in bytes.
 NONCE_SIZE :: chacha20.NONCE_SIZE
+// TAG_SIZE is the chacha20poly1305 tag size in bytes.
 TAG_SIZE :: poly1305.TAG_SIZE
 
 @(private)
@@ -49,6 +59,8 @@ _update_mac_pad16 :: #force_inline proc (ctx: ^poly1305.Context, x_len: int) {
 	}
 }
 
+// encrypt encrypts the plaintext and authenticates the aad and ciphertext,
+// with the provided key and nonce, stores the output in ciphertext and tag.
 encrypt :: proc (ciphertext, tag, key, nonce, aad, plaintext: []byte) {
 	_validate_common_slice_sizes(tag, key, nonce, aad, plaintext)
 	if len(ciphertext) != len(plaintext) {
@@ -95,6 +107,11 @@ encrypt :: proc (ciphertext, tag, key, nonce, aad, plaintext: []byte) {
 	poly1305.final(&mac_ctx, tag) // Implicitly sanitizes context.
 }
 
+// decrypt authenticates the aad and ciphertext, and decrypts the ciphertext,
+// with the provided key, nonce, and tag, and stores the output in plaintext,
+// returning true iff the authentication was successful.
+//
+// If authentication fails, the destination plaintext buffer will be zeroed.
 decrypt :: proc (plaintext, tag, key, nonce, aad, ciphertext: []byte) -> bool {
 	_validate_common_slice_sizes(tag, key, nonce, aad, ciphertext)
 	if len(ciphertext) != len(plaintext) {

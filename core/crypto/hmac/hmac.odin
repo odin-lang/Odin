@@ -11,7 +11,7 @@ import "core:crypto/hash"
 import "core:mem"
 
 // sum will compute the HMAC with the specified algorithm and key
-// over msg, and write the computed digest to dst.  It requires that
+// over msg, and write the computed tag to dst.  It requires that
 // the dst buffer is the tag size.
 sum :: proc(algorithm: hash.Algorithm, dst, msg, key: []byte) {
 	ctx: Context
