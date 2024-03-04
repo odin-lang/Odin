@@ -2810,6 +2810,29 @@ gb_internal bool are_types_identical_internal(Type *x, Type *y, bool check_tuple
 			return are_types_identical(x->SimdVector.elem, y->SimdVector.elem);
 		}
 		break;
+
+	case Type_BitField:
+		if (are_types_identical(x->BitField.backing_type, y->BitField.backing_type) &&
+		    x->BitField.fields.count == y->BitField.fields.count) {
+			for_array(i, x->BitField.fields) {
+				Entity *a = x->BitField.fields[i];
+				Entity *b = y->BitField.fields[i];
+				if (!are_types_identical(a->type, b->type)) {
+					return false;
+				}
+				if (a->token.string != b->token.string) {
+					return false;
+				}
+				if (x->BitField.bit_sizes[i] != y->BitField.bit_sizes[i]) {
+					return false;
+				}
+				if (x->BitField.bit_offsets[i] != y->BitField.bit_offsets[i]) {
+					return false;
+				}
+			}
+			return true;
+		}
+		break;
 	}
 
 	return false;
