@@ -1943,6 +1943,7 @@ gb_internal bool is_foreign_name_valid(String const &name) {
 			case '$':
 			case '.':
 			case '_':
+			case ',':
 				break;
 			default:
 				if (!gb_char_is_alphanumeric(cast(char)rune)) {
