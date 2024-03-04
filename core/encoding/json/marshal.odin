@@ -51,8 +51,10 @@ Marshal_Options :: struct {
 	// NOTE: This will temp allocate and sort a list for each map.
 	sort_maps_by_key: bool,
 
-	// Output enum value's name instead of its underlineing value
-	use_enum_value_names: bool,
+	// Output enum value's name instead of its underlineing value.
+	//
+    // NOTE: If a name isn't found it'll use the underlineing value.
+	use_enum_names: bool,
 
 	// Internal state
 	indentation: int,
@@ -407,14 +409,14 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 		}
 
 	case runtime.Type_Info_Enum:
-		if !opt.use_enum_value_names || len(info.names) == 0 {
+		if !opt.use_enum_names || len(info.names) == 0 {
 			return marshal_to_writer(w, any{v.data, info.base.id}, opt)
 		} else {
 			name, found := reflect.enum_name_from_value_any(v)
 			if found {
 				return marshal_to_writer(w, name, opt)
 			} else {
-				panic("Unable to find value in enum's values")
+				return marshal_to_writer(w, any{v.data, info.base.id}, opt)
 			}
 		}
 
