@@ -2400,6 +2400,9 @@ gb_internal bool is_type_comparable(Type *t) {
 
 	case Type_SimdVector:
 		return true;
+
+	case Type_BitField:
+		return is_type_comparable(t->BitField.backing_type);
 	}
 	return false;
 }
