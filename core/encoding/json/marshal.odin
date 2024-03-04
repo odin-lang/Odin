@@ -51,9 +51,9 @@ Marshal_Options :: struct {
 	// NOTE: This will temp allocate and sort a list for each map.
 	sort_maps_by_key: bool,
 
-	// Output enum value's name instead of its underlineing value.
+	// Output enum value's name instead of its underlying value.
 	//
-	// NOTE: If a name isn't found it'll use the underlineing value.
+	// NOTE: If a name isn't found it'll use the underlying value.
 	use_enum_names: bool,
 
 	// Internal state
