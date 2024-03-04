@@ -53,7 +53,7 @@ Marshal_Options :: struct {
 
 	// Output enum value's name instead of its underlineing value.
 	//
-    // NOTE: If a name isn't found it'll use the underlineing value.
+	// NOTE: If a name isn't found it'll use the underlineing value.
 	use_enum_names: bool,
 
 	// Internal state
