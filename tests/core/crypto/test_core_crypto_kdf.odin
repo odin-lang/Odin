@@ -8,9 +8,11 @@ import "core:crypto/hash"
 import "core:crypto/hkdf"
 import "core:crypto/pbkdf2"
 
+import tc "tests:common"
+
 @(test)
 test_kdf :: proc(t: ^testing.T) {
-	log(t, "Testing KDFs")
+	tc.log(t, "Testing KDFs")
 
 	test_hkdf(t)
 	test_pbkdf2(t)
@@ -18,7 +20,7 @@ test_kdf :: proc(t: ^testing.T) {
 
 @(test)
 test_hkdf :: proc(t: ^testing.T) {
-	log(t, "Testing HKDF")
+	tc.log(t, "Testing HKDF")
 
 	tmp: [128]byte // Good enough.
 
@@ -65,7 +67,7 @@ test_hkdf :: proc(t: ^testing.T) {
 
 		dst_str := string(hex.encode(dst, context.temp_allocator))
 
-		expect(
+		tc.expect(
 			t,
 			dst_str == v.okm,
 			fmt.tprintf(
@@ -83,7 +85,7 @@ test_hkdf :: proc(t: ^testing.T) {
 
 @(test)
 test_pbkdf2 :: proc(t: ^testing.T) {
-	log(t, "Testing PBKDF2")
+	tc.log(t, "Testing PBKDF2")
 
 	tmp: [64]byte // 512-bits is enough for every output for now.
 
@@ -169,7 +171,7 @@ test_pbkdf2 :: proc(t: ^testing.T) {
 
 		dst_str := string(hex.encode(dst, context.temp_allocator))
 
-		expect(
+		tc.expect(
 			t,
 			dst_str == v.dk,
 			fmt.tprintf(

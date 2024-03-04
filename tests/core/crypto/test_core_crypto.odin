@@ -15,35 +15,14 @@ package test_core_crypto
 import "core:encoding/hex"
 import "core:fmt"
 import "core:mem"
-import "core:os"
 import "core:testing"
 
 import "core:crypto"
 import "core:crypto/chacha20"
 import "core:crypto/chacha20poly1305"
-
 import "core:crypto/x25519"
 
-TEST_count := 0
-TEST_fail := 0
-
-when ODIN_TEST {
-	expect :: testing.expect
-	log :: testing.log
-} else {
-	expect :: proc(t: ^testing.T, condition: bool, message: string, loc := #caller_location) {
-		TEST_count += 1
-		if !condition {
-			TEST_fail += 1
-			fmt.printf("[%v] %v\n", loc, message)
-			return
-		}
-	}
-	log :: proc(t: ^testing.T, v: any, loc := #caller_location) {
-		fmt.printf("[%v] ", loc)
-		fmt.printf("log: %v\n", v)
-	}
-}
+import tc "tests:common"
 
 main :: proc() {
 	t := testing.T{}
@@ -61,17 +40,14 @@ main :: proc() {
 
 	bench_crypto(&t)
 
-	fmt.printf("%v/%v tests successful.\n", TEST_count - TEST_fail, TEST_count)
-	if TEST_fail > 0 {
-		os.exit(1)
-	}
+	tc.report(&t)
 }
 
 _PLAINTEXT_SUNSCREEN_STR := "Ladies and Gentlemen of the class of '99: If I could offer you only one tip for the future, sunscreen would be it."
 
 @(test)
 test_chacha20 :: proc(t: ^testing.T) {
-	log(t, "Testing (X)ChaCha20")
+	tc.log(t, "Testing (X)ChaCha20")
 
 	// Test cases taken from RFC 8439, and draft-irtf-cfrg-xchacha-03
 	plaintext := transmute([]byte)(_PLAINTEXT_SUNSCREEN_STR)
@@ -114,7 +90,7 @@ test_chacha20 :: proc(t: ^testing.T) {
 	chacha20.xor_bytes(&ctx, derived_ciphertext[:], plaintext[:])
 
 	derived_ciphertext_str := string(hex.encode(derived_ciphertext[:], context.temp_allocator))
-	expect(
+	tc.expect(
 		t,
 		derived_ciphertext_str == ciphertext_str,
 		fmt.tprintf(
@@ -161,7 +137,7 @@ test_chacha20 :: proc(t: ^testing.T) {
 	chacha20.xor_bytes(&ctx, derived_ciphertext[:], plaintext[:])
 
 	derived_ciphertext_str = string(hex.encode(derived_ciphertext[:], context.temp_allocator))
-	expect(
+	tc.expect(
 		t,
 		derived_ciphertext_str == xciphertext_str,
 		fmt.tprintf(
@@ -174,7 +150,7 @@ test_chacha20 :: proc(t: ^testing.T) {
 
 @(test)
 test_chacha20poly1305 :: proc(t: ^testing.T) {
-	log(t, "Testing chacha20poly1205")
+	tc.log(t, "Testing chacha20poly1205")
 
 	plaintext := transmute([]byte)(_PLAINTEXT_SUNSCREEN_STR)
 
@@ -233,7 +209,7 @@ test_chacha20poly1305 :: proc(t: ^testing.T) {
 	)
 
 	derived_ciphertext_str := string(hex.encode(derived_ciphertext[:], context.temp_allocator))
-	expect(
+	tc.expect(
 		t,
 		derived_ciphertext_str == ciphertext_str,
 		fmt.tprintf(
@@ -244,7 +220,7 @@ test_chacha20poly1305 :: proc(t: ^testing.T) {
 	)
 
 	derived_tag_str := string(hex.encode(derived_tag[:], context.temp_allocator))
-	expect(
+	tc.expect(
 		t,
 		derived_tag_str == tag_str,
 		fmt.tprintf(
@@ -264,8 +240,8 @@ test_chacha20poly1305 :: proc(t: ^testing.T) {
 		ciphertext[:],
 	)
 	derived_plaintext_str := string(derived_plaintext[:])
-	expect(t, ok, "Expected true for decrypt(tag, aad, ciphertext)")
-	expect(
+	tc.expect(t, ok, "Expected true for decrypt(tag, aad, ciphertext)")
+	tc.expect(
 		t,
 		derived_plaintext_str == _PLAINTEXT_SUNSCREEN_STR,
 		fmt.tprintf(
@@ -284,7 +260,7 @@ test_chacha20poly1305 :: proc(t: ^testing.T) {
 		aad[:],
 		derived_ciphertext[:],
 	)
-	expect(t, !ok, "Expected false for decrypt(tag, aad, corrupted_ciphertext)")
+	tc.expect(t, !ok, "Expected false for decrypt(tag, aad, corrupted_ciphertext)")
 
 	aad[0] ~= 0xa5
 	ok = chacha20poly1305.decrypt(
@@ -295,18 +271,12 @@ test_chacha20poly1305 :: proc(t: ^testing.T) {
 		aad[:],
 		ciphertext[:],
 	)
-	expect(t, !ok, "Expected false for decrypt(tag, corrupted_aad, ciphertext)")
-}
-
-TestECDH :: struct {
-	scalar:  string,
-	point:   string,
-	product: string,
+	tc.expect(t, !ok, "Expected false for decrypt(tag, corrupted_aad, ciphertext)")
 }
 
 @(test)
 test_x25519 :: proc(t: ^testing.T) {
-	log(t, "Testing X25519")
+	tc.log(t, "Testing X25519")
 
 	// Local copy of this so that the base point doesn't need to be exported.
 	_BASE_POINT: [32]byte =  {
@@ -314,7 +284,11 @@ test_x25519 :: proc(t: ^testing.T) {
 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 	}
 
-	test_vectors := [?]TestECDH {
+	test_vectors := []struct{
+		scalar:  string,
+		point:   string,
+		product: string,
+	} {
 		// Test vectors from RFC 7748
 		{
 			"a546e36bf0527c9d3b16154b82465edd62144c0ac1fc5a18506a2244ba449ac4",
@@ -335,7 +309,7 @@ test_x25519 :: proc(t: ^testing.T) {
 		x25519.scalarmult(derived_point[:], scalar[:], point[:])
 		derived_point_str := string(hex.encode(derived_point[:], context.temp_allocator))
 
-		expect(
+		tc.expect(
 			t,
 			derived_point_str == v.product,
 			fmt.tprintf(
@@ -353,7 +327,7 @@ test_x25519 :: proc(t: ^testing.T) {
 		x25519.scalarmult(p2[:], scalar[:], _BASE_POINT[:])
 		p1_str := string(hex.encode(p1[:], context.temp_allocator))
 		p2_str := string(hex.encode(p2[:], context.temp_allocator))
-		expect(
+		tc.expect(
 			t,
 			p1_str == p2_str,
 			fmt.tprintf(
@@ -371,16 +345,14 @@ test_x25519 :: proc(t: ^testing.T) {
 
 @(test)
 test_rand_bytes :: proc(t: ^testing.T) {
-	log(t, "Testing rand_bytes")
+	tc.log(t, "Testing rand_bytes")
 
 	if ODIN_OS != .Linux {
-		log(t, "rand_bytes not supported - skipping")
+		tc.log(t, "rand_bytes not supported - skipping")
 		return
 	}
 
-	allocator := context.allocator
-
-	buf := make([]byte, 1 << 25, allocator)
+	buf := make([]byte, 1 << 25, context.allocator)
 	defer delete(buf)
 
 	// Testing a CSPRNG for correctness is incredibly involved and
@@ -405,7 +377,7 @@ test_rand_bytes :: proc(t: ^testing.T) {
 		}
 	}
 
-	expect(
+	tc.expect(
 		t,
 		seems_ok,
 		"Expected to randomize the head and tail of the buffer within a handful of attempts",

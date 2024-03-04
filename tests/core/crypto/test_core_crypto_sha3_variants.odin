@@ -8,9 +8,11 @@ import "core:crypto/kmac"
 import "core:crypto/shake"
 import "core:crypto/tuplehash"
 
+import tc "tests:common"
+
 @(test)
 test_sha3_variants :: proc(t: ^testing.T) {
-	log(t, "Testing SHA3 derived functions")
+	tc.log(t, "Testing SHA3 derived functions")
 
 	test_shake(t)
 	test_cshake(t)
@@ -20,7 +22,7 @@ test_sha3_variants :: proc(t: ^testing.T) {
 
 @(test)
 test_shake :: proc(t: ^testing.T) {
-	log(t, "Testing SHAKE")
+	tc.log(t, "Testing SHAKE")
 
 	test_vectors := []struct {
 		sec_strength: int,
@@ -62,7 +64,7 @@ test_shake :: proc(t: ^testing.T) {
 
 		dst_str := string(hex.encode(dst, context.temp_allocator))
 
-		expect(
+		tc.expect(
 			t,
 			dst_str == v.output,
 			fmt.tprintf(
@@ -78,7 +80,7 @@ test_shake :: proc(t: ^testing.T) {
 
 @(test)
 test_cshake :: proc(t: ^testing.T) {
-	log(t, "Testing cSHAKE")
+	tc.log(t, "Testing cSHAKE")
 
 	test_vectors := []struct {
 		sec_strength: int,
@@ -136,7 +138,7 @@ test_cshake :: proc(t: ^testing.T) {
 
 		dst_str := string(hex.encode(dst, context.temp_allocator))
 
-		expect(
+		tc.expect(
 			t,
 			dst_str == v.output,
 			fmt.tprintf(
@@ -152,7 +154,7 @@ test_cshake :: proc(t: ^testing.T) {
 
 @(test)
 test_tuplehash :: proc(t: ^testing.T) {
-	log(t, "Testing TupleHash(XOF)")
+	tc.log(t, "Testing TupleHash(XOF)")
 
 	test_vectors := []struct {
 		sec_strength: int,
@@ -327,7 +329,7 @@ test_tuplehash :: proc(t: ^testing.T) {
 
 		dst_str := string(hex.encode(dst, context.temp_allocator))
 
-		expect(
+		tc.expect(
 			t,
 			dst_str == v.output,
 			fmt.tprintf(
@@ -344,7 +346,7 @@ test_tuplehash :: proc(t: ^testing.T) {
 
 @(test)
 test_kmac :: proc(t:^testing.T) {
-	log(t, "Testing KMAC")
+	tc.log(t, "Testing KMAC")
 
 	test_vectors := []struct {
 		sec_strength: int,
@@ -422,7 +424,7 @@ test_kmac :: proc(t:^testing.T) {
 
 		dst_str := string(hex.encode(dst, context.temp_allocator))
 
-		expect(
+		tc.expect(
 			t,
 			dst_str == v.output,
 			fmt.tprintf(

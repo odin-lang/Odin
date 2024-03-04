@@ -45,7 +45,7 @@ hash_test:
 	$(ODIN) run hash $(COMMON) -o:speed -no-bounds-check -out:test_hash
 
 crypto_test:
-	$(ODIN) run crypto $(COMMON) -o:speed -no-bounds-check -out:test_crypto
+	$(ODIN) run crypto $(COMMON) $(COLLECTION) -o:speed -no-bounds-check -out:test_crypto
 
 noise_test:
 	$(ODIN) run math/noise $(COMMON) -out:test_noise

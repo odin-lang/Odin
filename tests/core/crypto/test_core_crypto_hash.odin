@@ -8,22 +8,22 @@ import "core:testing"
 
 import "core:crypto/hash"
 
-TestHash :: struct {
-	algo: hash.Algorithm,
-	hash: string,
-	str:  string,
-}
+import tc "tests:common"
 
 @(test)
 test_hash :: proc(t: ^testing.T) {
-	log(t, "Testing Hashes")
+	tc.log(t, "Testing Hashes")
 
 	// TODO:
 	// - Stick the test vectors in a JSON file or something.
 	data_1_000_000_a := strings.repeat("a", 1_000_000)
 
-	digest: [64]byte // 512-bits is enough for every digest for now.
-	test_vectors := [?]TestHash {
+	digest: [hash.MAX_DIGEST_SIZE]byte
+	test_vectors := []struct{
+		algo: hash.Algorithm,
+		hash: string,
+		str:  string,
+	} {
 		// BLAKE2b
 		{
 			hash.Algorithm.BLAKE2B,
@@ -424,9 +424,9 @@ test_hash :: proc(t: ^testing.T) {
 
 		// MD5 (Insecure)
 		// - https://datatracker.ietf.org/doc/html/rfc1321
-		TestHash{hash.Algorithm.Insecure_MD5, "d41d8cd98f00b204e9800998ecf8427e", ""},
-		TestHash{hash.Algorithm.Insecure_MD5, "0cc175b9c0f1b6a831c399e269772661", "a"},
-		TestHash{hash.Algorithm.Insecure_MD5, "900150983cd24fb0d6963f7d28e17f72", "abc"},
+		{hash.Algorithm.Insecure_MD5, "d41d8cd98f00b204e9800998ecf8427e", ""},
+		{hash.Algorithm.Insecure_MD5, "0cc175b9c0f1b6a831c399e269772661", "a"},
+		{hash.Algorithm.Insecure_MD5, "900150983cd24fb0d6963f7d28e17f72", "abc"},
 		{
 			hash.Algorithm.Insecure_MD5,
 			"f96b697d7cb7938d525a2f31aaf161d0",
@@ -451,8 +451,8 @@ test_hash :: proc(t: ^testing.T) {
 		// SHA-1 (Insecure)
 		// - https://csrc.nist.gov/csrc/media/projects/cryptographic-standards-and-guidelines/documents/examples/sha_all.pdf
 		// - https://www.di-mgt.com.au/sha_testvectors.html
-		TestHash{hash.Algorithm.Insecure_SHA1, "da39a3ee5e6b4b0d3255bfef95601890afd80709", ""},
-		TestHash{hash.Algorithm.Insecure_SHA1, "a9993e364706816aba3e25717850c26c9cd0d89d", "abc"},
+		{hash.Algorithm.Insecure_SHA1, "da39a3ee5e6b4b0d3255bfef95601890afd80709", ""},
+		{hash.Algorithm.Insecure_SHA1, "a9993e364706816aba3e25717850c26c9cd0d89d", "abc"},
 		{
 			hash.Algorithm.Insecure_SHA1,
 			"f9537c23893d2014f365adf8ffe33b8eb0297ed1",
@@ -463,7 +463,7 @@ test_hash :: proc(t: ^testing.T) {
 			"346fb528a24b48f563cb061470bcfd23740427ad",
 			"jkijkljklmklmnlmnomnopnopq",
 		},
-		TestHash{hash.Algorithm.Insecure_SHA1, "86f7e437faa5a7fce15d1ddcb9eaeaea377667b8", "a"},
+		{hash.Algorithm.Insecure_SHA1, "86f7e437faa5a7fce15d1ddcb9eaeaea377667b8", "a"},
 		{
 			hash.Algorithm.Insecure_SHA1,
 			"c729c8996ee0a6f74f4f3248e8957edf704fb624",
@@ -493,7 +493,7 @@ test_hash :: proc(t: ^testing.T) {
 
 		dst_str := string(hex.encode(dst, context.temp_allocator))
 
-		expect(
+		tc.expect(
 			t,
 			dst_str == v.hash,
 			fmt.tprintf(
@@ -518,7 +518,7 @@ test_hash :: proc(t: ^testing.T) {
 		// still correct.
 		digest_sz := hash.DIGEST_SIZES[algo]
 		block_sz := hash.BLOCK_SIZES[algo]
-		expect(
+		tc.expect(
 			t,
 			digest_sz <= hash.MAX_DIGEST_SIZE,
 			fmt.tprintf(
@@ -528,7 +528,7 @@ test_hash :: proc(t: ^testing.T) {
 				hash.MAX_DIGEST_SIZE,
 			),
 		)
-		expect(
+		tc.expect(
 			t,
 			block_sz <= hash.MAX_BLOCK_SIZE,
 			fmt.tprintf(
@@ -550,7 +550,7 @@ test_hash :: proc(t: ^testing.T) {
 		a_str := string(hex.encode(digest_a, context.temp_allocator))
 		b_str := string(hex.encode(digest_b, context.temp_allocator))
 
-		expect(
+		tc.expect(
 			t,
 			a_str == b_str,
 			fmt.tprintf(
@@ -568,7 +568,7 @@ test_hash :: proc(t: ^testing.T) {
 
 		api_algo := hash.algorithm(&ctx)
 		api_digest_size := hash.digest_size(&ctx)
-		expect(
+		tc.expect(
 			t,
 			algo == api_algo,
 			fmt.tprintf(
@@ -578,7 +578,7 @@ test_hash :: proc(t: ^testing.T) {
 				api_algo,
 			),
 		)
-		expect(
+		tc.expect(
 			t,
 			hash.DIGEST_SIZES[algo] == api_digest_size,
 			fmt.tprintf(
@@ -601,7 +601,7 @@ test_hash :: proc(t: ^testing.T) {
 		b_str = string(hex.encode(digest_b, context.temp_allocator))
 		c_str := string(hex.encode(digest_c, context.temp_allocator))
 
-		expect(
+		tc.expect(
 			t,
 			a_str == b_str && b_str == c_str,
 			fmt.tprintf(
