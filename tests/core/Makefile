@@ -51,7 +51,6 @@ noise_test:
 	$(ODIN) run math/noise $(COMMON) -out:test_noise
 
 encoding_test:
-<<<<<<< HEAD
 	$(ODIN) run encoding/hxa    $(COMMON) $(COLLECTION) -out:test_hxa
 	$(ODIN) run encoding/json   $(COMMON) -out:test_json
 	$(ODIN) run encoding/varint $(COMMON) -out:test_varint
