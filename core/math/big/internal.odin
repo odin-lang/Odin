@@ -2046,9 +2046,9 @@ internal_int_inverse_modulo :: proc(dest, a, b: ^Int, allocator := context.alloc
 	if internal_is_positive(a) && internal_eq(b, 1) { return internal_zero(dest)	}
 
 	/*
-		`b` cannot be negative and has to be > 1
+		`b` cannot be negative and b has to be > 1
 	*/
-	if internal_is_negative(b) || internal_gt(b, 1) { return .Invalid_Argument }
+	if internal_is_negative(b) || !internal_gt(b, 1) { return .Invalid_Argument }
 
 	/*
 		If the modulus is odd we can use a faster routine instead.
