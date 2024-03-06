@@ -1,6 +1,5 @@
 package raylib
 
-import c "core:c/libc"
 import "core:math"
 import "core:math/linalg"
 
@@ -45,7 +44,7 @@ Wrap :: proc "c" (value: f32, min, max: f32) -> f32 {
 // Check whether two given floats are almost equal
 @(require_results)
 FloatEquals :: proc "c" (x, y: f32) -> bool {
-	return abs(x - y) <= EPSILON*c.fmaxf(1.0, c.fmaxf(abs(x), abs(y)))
+	return abs(x - y) <= EPSILON*fmaxf(1.0, fmaxf(abs(x), abs(y)))
 }
 
 
@@ -815,4 +814,21 @@ QuaternionEquals :: proc "c" (p, q: Quaternion) -> bool {
 	       FloatEquals(p.y, q.y) &&
 	       FloatEquals(p.z, q.z) &&
 	       FloatEquals(p.w, q.w)
+}
+
+@(private, require_results)
+fmaxf :: proc "contextless" (x, y: f32) -> f32 {
+	if math.is_nan(x) {
+		return y
+	}
+
+	if math.is_nan(y) {
+		return x
+	}
+
+	if math.signbit(x) != math.signbit(y) {
+		return y if math.signbit(x) else x
+	}
+
+	return y if x < y else x
 }

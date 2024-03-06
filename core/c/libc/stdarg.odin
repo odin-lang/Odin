@@ -4,6 +4,8 @@ package libc
 
 import "base:intrinsics"
 
+import "core:c"
+
 @(private="file")
 @(default_calling_convention="none")
 foreign _ {
@@ -12,15 +14,7 @@ foreign _ {
 	@(link_name="llvm.va_copy")  _va_copy  :: proc(dst, src: ^i8) ---
 }
 
-// Since there are no types in C with an alignment larger than that of
-// max_align_t, which cannot be larger than sizeof(long double) as any other
-// exposed type wouldn't be valid C, the maximum alignment possible in a
-// strictly conformant C implementation is 16 on the platforms we care about.
-// The choice of 4096 bytes for storage of this type is more than enough on all
-// relevant platforms.
-va_list :: struct #align(16) {
-	_: [4096]u8,
-}
+va_list :: c.va_list
 
 va_start :: #force_inline proc(ap: ^va_list, _: any) {
 	_va_start(cast(^i8)ap)
