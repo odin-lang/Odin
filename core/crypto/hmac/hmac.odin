@@ -11,7 +11,7 @@ import "core:crypto/hash"
 import "core:mem"
 
 // sum will compute the HMAC with the specified algorithm and key
-// over msg, and write the computed digest to dst.  It requires that
+// over msg, and write the computed tag to dst.  It requires that
 // the dst buffer is the tag size.
 sum :: proc(algorithm: hash.Algorithm, dst, msg, key: []byte) {
 	ctx: Context
@@ -76,6 +76,18 @@ final :: proc(ctx: ^Context, dst: []byte) {
 
 	hash.update(&ctx._o_hash, dst) // H((k ^ opad) || H((k ^ ipad) || text))
 	hash.final(&ctx._o_hash, dst)
+}
+
+// clone clones the Context other into ctx.
+clone :: proc(ctx, other: ^Context) {
+	if ctx == other {
+		return
+	}
+
+	hash.clone(&ctx._o_hash, &other._o_hash)
+	hash.clone(&ctx._i_hash, &other._i_hash)
+	ctx._tag_sz = other._tag_sz
+	ctx._is_initialized = other._is_initialized
 }
 
 // reset sanitizes the Context.  The Context must be re-initialized to

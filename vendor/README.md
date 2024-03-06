@@ -127,15 +127,6 @@ Zero-input latency networking library for peer-to-peer games.
 
 See also LICENSE in the `GGPO` directory itself.
 
-## Botan
-
-[Botan](https://botan.randombit.net/) Crypto and TLS library.
-
-`botan.lib` is available under Botan's [BSD](https://botan.randombit.net/license.txt) license.
-
-See also LICENSE in the `botan` directory itself.
-Includes full bindings as well as wrappers to match the `core:crypto` API.
-
 ## CommonMark
 
 [CMark](https://github.com/commonmark/cmark) CommonMark parsing library.

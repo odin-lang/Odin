@@ -31,7 +31,7 @@ echo ---
 echo ---
 echo Running core:crypto tests
 echo ---
-%PATH_TO_ODIN% run crypto %COMMON% -out:test_crypto.exe || exit /b
+%PATH_TO_ODIN% run crypto %COMMON% %COLLECTION% -out:test_crypto.exe || exit /b
 
 echo ---
 echo Running core:encoding tests
