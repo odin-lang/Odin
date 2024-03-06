@@ -365,8 +365,10 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 		opt_write_start(w, opt, '{') or_return
 		
 		for name, i in info.names {
+			json_name := reflect.struct_tag_get(reflect.Struct_Tag(info.tags[i]), "json")
+
 			opt_write_iteration(w, opt, i) or_return
-			if json_name := string(reflect.struct_tag_get(auto_cast info.tags[i], "json")); json_name != "" {
+			if json_name != "" {
 				opt_write_key(w, opt, json_name) or_return
 			} else {
 				opt_write_key(w, opt, name) or_return
