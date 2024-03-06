@@ -522,7 +522,12 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 			link_command_line = gb_string_append_fmt(link_command_line, " %.*s ", LIT(build_context.extra_linker_flags));
 			link_command_line = gb_string_append_fmt(link_command_line, " %s ", link_settings);
 
-			result = system_exec_command_line_app("ld-link", link_command_line);
+			if (build_context.use_lld) {
+				link_command_line = gb_string_append_fmt(link_command_line, " -fuse-ld=lld");
+				result = system_exec_command_line_app("lld-link", link_command_line);
+			} else {
+				result = system_exec_command_line_app("ld-link", link_command_line);
+			}
 
 			if (result) {
 				return result;
