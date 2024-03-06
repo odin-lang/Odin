@@ -126,12 +126,13 @@ gb_internal lbValue lb_emit_min(lbProcedure *p, Type *t, lbValue x, lbValue y) {
 	y = lb_emit_conv(p, y, t);
 	bool use_llvm_intrinsic = is_type_float(t) || (is_type_simd_vector(t) && is_type_float(base_array_type(t)));
 	if (use_llvm_intrinsic) {
-		// NOTE(bill): f either operand is a NaN, returns NaN. Otherwise returns the lesser of the two arguments.
-		// -0.0 is considered to be less than +0.0 for this intrinsic.
-		// These semantics are specified by IEEE 754-2019.
 		LLVMValueRef args[2] = {x.value, y.value};
 		LLVMTypeRef types[1] = {lb_type(p->module, t)};
-		LLVMValueRef v = lb_call_intrinsic(p, "llvm.minimum", args, gb_count_of(args), types, gb_count_of(types));
+
+		// NOTE(bill): f either operand is a NaN, returns NaN. Otherwise returns the lesser of the two arguments.
+		// -0.0 is considered to be less than +0.0 for this intrinsic.
+		// These semantics are specified by IEEE 754-2008.
+		LLVMValueRef v = lb_call_intrinsic(p, "llvm.minnum", args, gb_count_of(args), types, gb_count_of(types));
 		return {v, t};
 	}
 	return lb_emit_select(p, lb_emit_comp(p, Token_Lt, x, y), x, y);
@@ -141,12 +142,13 @@ gb_internal lbValue lb_emit_max(lbProcedure *p, Type *t, lbValue x, lbValue y) {
 	y = lb_emit_conv(p, y, t);
 	bool use_llvm_intrinsic = is_type_float(t) || (is_type_simd_vector(t) && is_type_float(base_array_type(t)));
 	if (use_llvm_intrinsic) {
-		// NOTE(bill): If either operand is a NaN, returns NaN. Otherwise returns the greater of the two arguments.
-		// -0.0 is considered to be less than +0.0 for this intrinsic.
-		// These semantics are specified by IEEE 754-2019.
 		LLVMValueRef args[2] = {x.value, y.value};
 		LLVMTypeRef types[1] = {lb_type(p->module, t)};
-		LLVMValueRef v = lb_call_intrinsic(p, "llvm.maximum", args, gb_count_of(args), types, gb_count_of(types));
+
+		// NOTE(bill): If either operand is a NaN, returns NaN. Otherwise returns the greater of the two arguments.
+		// -0.0 is considered to be less than +0.0 for this intrinsic.
+		// These semantics are specified by IEEE 754-2008.
+		LLVMValueRef v = lb_call_intrinsic(p, "llvm.maxnum", args, gb_count_of(args), types, gb_count_of(types));
 		return {v, t};
 	}
 	return lb_emit_select(p, lb_emit_comp(p, Token_Gt, x, y), x, y);
