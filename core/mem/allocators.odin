@@ -1007,6 +1007,7 @@ Buddy_Allocator :: struct {
 	alignment: uint,
 }
 
+@(require_results)
 buddy_allocator :: proc(b: ^Buddy_Allocator) -> Allocator {
 	return Allocator{
 		procedure = buddy_allocator_proc,
