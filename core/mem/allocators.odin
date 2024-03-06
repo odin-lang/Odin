@@ -84,11 +84,11 @@ arena_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 	case .Free_All:
 		arena.offset = 0
 
-    case .Resize:
-        return default_resize_bytes_align(byte_slice(old_memory, old_size), size, alignment, arena_allocator(arena))
+	case .Resize:
+		return default_resize_bytes_align(byte_slice(old_memory, old_size), size, alignment, arena_allocator(arena))
 
-    case .Resize_Non_Zeroed:
-        return default_resize_bytes_align_non_zeroed(byte_slice(old_memory, old_size), size, alignment, arena_allocator(arena))
+	case .Resize_Non_Zeroed:
+		return default_resize_bytes_align_non_zeroed(byte_slice(old_memory, old_size), size, alignment, arena_allocator(arena))
 
 	case .Query_Features:
 		set := (^Allocator_Mode_Set)(old_memory)
@@ -860,3 +860,5 @@ panic_allocator :: proc() -> Allocator {
 		data = nil,
 	}
 }
+
+
