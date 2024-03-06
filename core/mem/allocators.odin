@@ -1116,12 +1116,24 @@ buddy_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 	case .Query_Features:
 		set := (^Allocator_Mode_Set)(old_memory)
 		if set != nil {
-			set^ = {.Query_Features, .Alloc, .Alloc_Non_Zeroed, .Resize, .Resize_Non_Zeroed, .Free, .Free_All}
+			set^ = {.Query_Features, .Alloc, .Alloc_Non_Zeroed, .Resize, .Resize_Non_Zeroed, .Free, .Free_All, .Query_Info}
 		}
 		return nil, nil
 
 	case .Query_Info:
-		return nil, .Mode_Not_Implemented
+		info := (^Allocator_Query_Info)(old_memory)
+		if info != nil && info.pointer != nil {
+			ptr := old_memory
+			if !(b.head <= ptr && ptr <= b.tail) {
+				return nil, .Invalid_Pointer
+			}
+
+			block := (^Buddy_Block)(([^]byte)(ptr)[-b.alignment:])
+			info.size = int(block.size)
+			info.alignment = int(b.alignment)
+			return byte_slice(info, size_of(info^)), nil
+		}
+		return nil, nil
 	}
 
 	return nil, nil
