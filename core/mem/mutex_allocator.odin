@@ -28,6 +28,6 @@ mutex_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 	m := (^Mutex_allocator)(allocator_data)
 
 	sync.mutex_guard(&m.mutex)
-	return m.backing.procedure(allocator_data, mode, size, alignment, old_memory, old_size, loc)
+	return m.backing.procedure(m.backing.data, mode, size, alignment, old_memory, old_size, loc)
 }
 
