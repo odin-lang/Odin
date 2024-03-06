@@ -10,6 +10,8 @@ import "core:crypto/chacha20poly1305"
 import "core:crypto/poly1305"
 import "core:crypto/x25519"
 
+import tc "tests:common"
+
 // Cryptographic primitive benchmarks.
 
 @(test)
@@ -150,19 +152,19 @@ bench_chacha20 :: proc(t: ^testing.T) {
 	}
 
 	err := time.benchmark(options, context.allocator)
-	expect(t, err == nil, name)
+	tc.expect(t, err == nil, name)
 	benchmark_print(name, options)
 
 	name = "ChaCha20 1024 bytes"
 	options.bytes = 1024
 	err = time.benchmark(options, context.allocator)
-	expect(t, err == nil, name)
+	tc.expect(t, err == nil, name)
 	benchmark_print(name, options)
 
 	name = "ChaCha20 65536 bytes"
 	options.bytes = 65536
 	err = time.benchmark(options, context.allocator)
-	expect(t, err == nil, name)
+	tc.expect(t, err == nil, name)
 	benchmark_print(name, options)
 }
 
@@ -177,13 +179,13 @@ bench_poly1305 :: proc(t: ^testing.T) {
 	}
 
 	err := time.benchmark(options, context.allocator)
-	expect(t, err == nil, name)
+	tc.expect(t, err == nil, name)
 	benchmark_print(name, options)
 
 	name = "Poly1305 1024 zero bytes"
 	options.bytes = 1024
 	err = time.benchmark(options, context.allocator)
-	expect(t, err == nil, name)
+	tc.expect(t, err == nil, name)
 	benchmark_print(name, options)
 }
 
@@ -198,19 +200,19 @@ bench_chacha20poly1305 :: proc(t: ^testing.T) {
 	}
 
 	err := time.benchmark(options, context.allocator)
-	expect(t, err == nil, name)
+	tc.expect(t, err == nil, name)
 	benchmark_print(name, options)
 
 	name = "chacha20poly1305 1024 bytes"
 	options.bytes = 1024
 	err = time.benchmark(options, context.allocator)
-	expect(t, err == nil, name)
+	tc.expect(t, err == nil, name)
 	benchmark_print(name, options)
 
 	name = "chacha20poly1305 65536 bytes"
 	options.bytes = 65536
 	err = time.benchmark(options, context.allocator)
-	expect(t, err == nil, name)
+	tc.expect(t, err == nil, name)
 	benchmark_print(name, options)
 }
 
@@ -229,7 +231,7 @@ bench_x25519 :: proc(t: ^testing.T) {
 	}
 	elapsed := time.since(start)
 
-	log(
+	tc.log(
 		t,
 		fmt.tprintf("x25519.scalarmult: ~%f us/op", time.duration_microseconds(elapsed) / iters),
 	)
