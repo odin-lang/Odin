@@ -375,8 +375,11 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 				field_used[index/8] |= byte(index&7)
 				return prev_set
 			}
-			
-			field_used := intrinsics.alloca((len(fields)+7)/8, 1)
+
+			field_used_bytes := (len(fields)+7)/8
+			field_used := intrinsics.alloca(field_used_bytes, 1)
+			intrinsics.mem_zero(field_used, field_used_bytes)
+
 			use_field_idx := -1
 			
 			for field, field_idx in fields {
