@@ -932,6 +932,9 @@ gb_internal Type *core_type(Type *t) {
 		case Type_Enum:
 			t = t->Enum.base_type;
 			continue;
+		case Type_BitField:
+			t = t->BitField.backing_type;
+			continue;
 		}
 		break;
 	}
