@@ -2296,7 +2296,7 @@ fmt_named :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Named) 
 		fmt_bit_set(fi, v, verb = verb)
 	case:
 		if verb == 'w' {
-			#partial switch b in info.base.variant {
+			#partial switch _ in info.base.variant {
 			case runtime.Type_Info_Array,
 			     runtime.Type_Info_Enumerated_Array,
 			     runtime.Type_Info_Dynamic_Array,
