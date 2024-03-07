@@ -2778,8 +2778,20 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 			io.write_byte(fi.writer, '[' if verb != 'w' else '{', &fi.n)
 			defer io.write_byte(fi.writer, ']' if verb != 'w' else '}', &fi.n)
 
-			fi.record_level += 1
-			defer fi.record_level -= 1
+
+			hash   := fi.hash;   defer fi.hash = hash
+			indent := fi.indent; defer fi.indent -= 1
+			do_trailing_comma := hash
+
+			fi.indent += 1
+			if hash	{
+				io.write_byte(fi.writer, '\n', &fi.n)
+			}
+			defer {
+				if hash {
+					for _ in 0..<indent { io.write_byte(fi.writer, '\t', &fi.n) }
+				}
+			}
 
 			m := (^mem.Raw_Map)(v.data)
 			if m != nil {
@@ -2792,8 +2804,9 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 				for bucket_index in 0..<map_cap {
 					runtime.map_hash_is_valid(hs[bucket_index]) or_continue
 
-					if j > 0 {
-						io.write_string(fi.writer, ", ", &fi.n)
+					if !do_trailing_comma && j > 0 { io.write_string(fi.writer, ", ") }
+					if hash {
+						fmt_write_indent(fi)
 					}
 					j += 1
 
@@ -2801,8 +2814,14 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 					value := runtime.map_cell_index_dynamic(vs, info.map_info.vs, bucket_index)
 
 					fmt_arg(&Info{writer = fi.writer}, any{rawptr(key), info.key.id}, verb)
-					io.write_string(fi.writer, "=", &fi.n)
+					if verb == 'v' {
+						io.write_string(fi.writer, "=", &fi.n)
+					} else {
+						io.write_string(fi.writer, " = ", &fi.n)
+					}
 					fmt_arg(fi, any{rawptr(value), info.value.id}, verb)
+
+					if do_trailing_comma { io.write_string(fi.writer, ",\n", &fi.n) }
 				}
 			}
 		}
