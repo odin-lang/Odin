@@ -1,4 +1,4 @@
-//+build linux, darwin, freebsd, openbsd
+//+build linux, darwin, freebsd, openbsd, haiku
 package unix
 
 foreign import "system:pthread"
@@ -16,6 +16,8 @@ foreign pthread {
 	// retval is a pointer to a location to put the return value of the thread proc.
 	pthread_join :: proc(t: pthread_t, retval: ^rawptr) -> c.int ---
 
+	pthread_kill :: proc(t: pthread_t, sig: c.int) -> c.int ---
+
 	pthread_self :: proc() -> pthread_t ---
 
 	pthread_equal :: proc(a, b: pthread_t) -> b32 ---
@@ -31,15 +33,9 @@ foreign pthread {
 	pthread_attr_getschedparam :: proc(attrs: ^pthread_attr_t, param: ^sched_param) -> c.int ---
 	pthread_attr_setschedparam :: proc(attrs: ^pthread_attr_t, param: ^sched_param) -> c.int ---
 
-	pthread_attr_getschedpolicy :: proc(t: ^pthread_attr_t, policy: ^c.int) -> c.int ---
-	pthread_attr_setschedpolicy :: proc(t: ^pthread_attr_t, policy: c.int) -> c.int ---
-
 	// states: PTHREAD_CREATE_DETACHED, PTHREAD_CREATE_JOINABLE
 	pthread_attr_setdetachstate :: proc(attrs: ^pthread_attr_t, detach_state: c.int) -> c.int ---
-
-	// scheds: PTHREAD_INHERIT_SCHED, PTHREAD_EXPLICIT_SCHED
-	pthread_attr_setinheritsched :: proc(attrs: ^pthread_attr_t, sched: c.int) -> c.int ---
-
+	
 	// NOTE(tetra, 2019-11-06): WARNING: Different systems have different alignment requirements.
 	// For maximum usefulness, use the OS's page size.
 	// ALSO VERY MAJOR WARNING: `stack_ptr` must be the LAST byte of the stack on systems
@@ -52,8 +48,20 @@ foreign pthread {
 	pthread_attr_setstack :: proc(attrs: ^pthread_attr_t, stack_ptr: rawptr, stack_size: u64) -> c.int ---
 	pthread_attr_getstack :: proc(attrs: ^pthread_attr_t, stack_ptr: ^rawptr, stack_size: ^u64) -> c.int ---
 
-	sched_yield :: proc() -> c.int ---
+	pthread_sigmask :: proc(how: c.int, set: rawptr, oldset: rawptr) -> c.int ---
 
+	sched_yield :: proc() -> c.int ---
+}
+
+// NOTE: Unimplemented in Haiku.
+when ODIN_OS != .Haiku {
+	foreign pthread {
+		// scheds: PTHREAD_INHERIT_SCHED, PTHREAD_EXPLICIT_SCHED
+		pthread_attr_setinheritsched :: proc(attrs: ^pthread_attr_t, sched: c.int) -> c.int ---
+
+		pthread_attr_getschedpolicy :: proc(t: ^pthread_attr_t, policy: ^c.int) -> c.int ---
+		pthread_attr_setschedpolicy :: proc(t: ^pthread_attr_t, policy: c.int) -> c.int ---
+	}
 }
 
 @(default_calling_convention="c")

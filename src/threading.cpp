@@ -492,6 +492,8 @@ gb_internal u32 thread_current_id(void) {
 	__asm__("mov %%fs:0x10,%0" : "=r"(thread_id));
 #elif defined(GB_SYSTEM_LINUX)
 	thread_id = gettid();
+#elif defined(GB_SYSTEM_HAIKU)
+	thread_id = find_thread(NULL);
 #else
 	#error Unsupported architecture for thread_current_id()
 #endif
@@ -831,6 +833,176 @@ gb_internal void futex_wait(Futex *f, Footex val) {
 		WaitOnAddress(f, (void *)&val, sizeof(val), INFINITE);
 	} while (f->load() == val);
 }
+
+#elif defined(GB_SYSTEM_HAIKU)
+
+// Futex implementation taken from https://tavianator.com/2023/futex.html
+
+#include <pthread.h>
+#include <atomic>
+
+struct _Spinlock {
+	std::atomic_flag state;
+
+	void init() {
+		state.clear();
+	}
+
+	void lock() {
+		while (state.test_and_set(std::memory_order_acquire)) {
+			#if defined(GB_CPU_X86)
+			_mm_pause();
+			#else
+			(void)0; // spin...
+			#endif
+		}
+	}
+
+	void unlock() {
+		state.clear(std::memory_order_release);
+	}
+};
+
+struct Futex_Waitq;
+ 
+struct Futex_Waiter {
+	_Spinlock lock;
+	pthread_t thread;
+	Futex *futex;
+	Futex_Waitq *waitq;
+	Futex_Waiter *prev, *next;	
+};
+ 
+struct Futex_Waitq {
+	_Spinlock lock;
+	Futex_Waiter list;
+ 
+	void init() {
+		auto head = &list;
+		head->prev = head->next = head;
+	}
+};
+
+// FIXME: This approach may scale badly in the future,
+// possible solution - hash map (leads to deadlocks now).
+ 
+Futex_Waitq g_waitq = {
+	.lock = ATOMIC_FLAG_INIT,
+	.list = {
+		.prev = &g_waitq.list,
+		.next = &g_waitq.list,
+	},
+};
+ 
+Futex_Waitq *get_waitq(Futex *f) {
+	// Future hash map method...
+	return &g_waitq;
+}
+ 
+void futex_signal(Futex *f) {
+	auto waitq = get_waitq(f);
+ 
+	waitq->lock.lock();
+ 
+	auto head = &waitq->list;
+	for (auto waiter = head->next; waiter != head; waiter = waiter->next) {
+		if (waiter->futex != f) {
+			continue;
+		}
+		waitq->lock.unlock();
+		pthread_kill(waiter->thread, SIGCONT);
+		return;
+	}
+ 
+	waitq->lock.unlock();
+}
+ 
+void futex_broadcast(Futex *f) {
+	auto waitq = get_waitq(f);
+ 
+	waitq->lock.lock();
+ 
+	auto head = &waitq->list;
+	for (auto waiter = head->next; waiter != head; waiter = waiter->next) {
+		if (waiter->futex != f) {
+			continue;
+		}
+		if (waiter->next == head) {
+			waitq->lock.unlock();
+			pthread_kill(waiter->thread, SIGCONT);
+			return;
+		} else {
+			pthread_kill(waiter->thread, SIGCONT);
+		}
+	}
+ 
+	waitq->lock.unlock();
+}
+ 
+void futex_wait(Futex *f, Footex val) {
+	Futex_Waiter waiter;
+	waiter.thread = pthread_self();
+	waiter.futex = f;
+
+	auto waitq = get_waitq(f);
+	while (waitq->lock.state.test_and_set(std::memory_order_acquire)) {
+		if (f->load(std::memory_order_relaxed) != val) {
+			return;
+		}
+		#if defined(GB_CPU_X86)
+		_mm_pause();
+		#else
+		(void)0; // spin...
+		#endif
+	}
+
+	waiter.waitq = waitq;
+	waiter.lock.init();
+	waiter.lock.lock();
+ 
+	auto head = &waitq->list;
+	waiter.prev = head->prev;
+	waiter.next = head;
+	waiter.prev->next = &waiter;
+	waiter.next->prev = &waiter;
+ 
+	waiter.prev->next = &waiter;
+	waiter.next->prev = &waiter;
+ 
+	sigset_t old_mask, mask;
+	sigemptyset(&mask);
+	sigaddset(&mask, SIGCONT);
+	pthread_sigmask(SIG_BLOCK, &mask, &old_mask);
+
+	if (f->load(std::memory_order_relaxed) == val) {
+			waiter.lock.unlock();
+			waitq->lock.unlock();
+
+			int sig;
+			sigwait(&mask, &sig);
+
+			waitq->lock.lock();
+			waiter.lock.lock();
+
+			while (waitq != waiter.waitq) {
+				auto req = waiter.waitq;
+				waiter.lock.unlock();
+				waitq->lock.unlock();
+				waitq = req;
+				waitq->lock.lock();
+				waiter.lock.lock();
+			}
+	}
+ 
+	waiter.prev->next = waiter.next;
+	waiter.next->prev = waiter.prev;
+ 
+	pthread_sigmask(SIG_SETMASK, &old_mask, NULL);
+ 
+	waiter.lock.unlock();
+	waitq->lock.unlock();
+}
+
 #endif
 
 #if defined(GB_SYSTEM_WINDOWS)

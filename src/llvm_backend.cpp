@@ -2564,8 +2564,8 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 
 	switch (build_context.reloc_mode) {
 	case RelocMode_Default:
-		if (build_context.metrics.os == TargetOs_openbsd) {
-			// Always use PIC for OpenBSD: it defaults to PIE
+		if (build_context.metrics.os == TargetOs_openbsd || build_context.metrics.os == TargetOs_haiku) {
+			// Always use PIC for OpenBSD and Haiku: they default to PIE
 			reloc_mode = LLVMRelocPIC;
 		}
 		break;
