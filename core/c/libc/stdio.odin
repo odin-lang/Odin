@@ -163,6 +163,36 @@ when ODIN_OS == .Darwin {
 	}
 }
 
+when ODIN_OS == .Haiku {
+	fpos_t :: distinct i64
+	
+	_IOFBF        :: 0
+	_IOLBF        :: 1
+	_IONBF        :: 2
+
+	BUFSIZ        :: 8192
+
+	EOF           :: int(-1)
+
+	FOPEN_MAX     :: 128
+
+	FILENAME_MAX  :: 256
+
+	L_tmpnam      :: 512
+
+	SEEK_SET      :: 0
+	SEEK_CUR      :: 1
+	SEEK_END      :: 2
+
+	TMP_MAX       :: 32768
+
+	foreign libc {
+		stderr: ^FILE
+		stdin:  ^FILE
+		stdout: ^FILE
+	}
+}
+
 @(default_calling_convention="c")
 foreign libc {
 	// 7.21.4 Operations on files

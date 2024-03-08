@@ -4928,6 +4928,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			case TargetOs_essence:
 			case TargetOs_freebsd:
 			case TargetOs_openbsd:
+			case TargetOs_haiku:
 				switch (build_context.metrics.arch) {
 				case TargetArch_i386:
 				case TargetArch_amd64:

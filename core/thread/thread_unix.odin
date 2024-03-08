@@ -1,4 +1,4 @@
-// +build linux, darwin, freebsd, openbsd
+// +build linux, darwin, freebsd, openbsd, haiku
 // +private
 package thread
 
@@ -78,7 +78,9 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 
 	// NOTE(tetra, 2019-11-01): These only fail if their argument is invalid.
 	assert(unix.pthread_attr_setdetachstate(&attrs, unix.PTHREAD_CREATE_JOINABLE) == 0)
-	assert(unix.pthread_attr_setinheritsched(&attrs, unix.PTHREAD_EXPLICIT_SCHED) == 0)
+	when ODIN_OS != .Haiku {
+		assert(unix.pthread_attr_setinheritsched(&attrs, unix.PTHREAD_EXPLICIT_SCHED) == 0)
+	}
 
 	thread := new(Thread)
 	if thread == nil {
@@ -88,8 +90,11 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 
 	// Set thread priority.
 	policy: i32
-	res := unix.pthread_attr_getschedpolicy(&attrs, &policy)
-	assert(res == 0)
+	res: i32
+	when ODIN_OS != .Haiku {
+		res = unix.pthread_attr_getschedpolicy(&attrs, &policy)
+		assert(res == 0)
+	}
 	params: unix.sched_param
 	res = unix.pthread_attr_getschedparam(&attrs, &params)
 	assert(res == 0)

@@ -1,4 +1,4 @@
-//+build linux, darwin, freebsd, openbsd
+//+build linux, darwin, freebsd, openbsd, haiku
 package unix
 
 when ODIN_OS == .Darwin {
