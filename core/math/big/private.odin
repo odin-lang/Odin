@@ -2865,147 +2865,100 @@ _private_inverse_modulo :: proc(dest, a, b: ^Int, allocator := context.allocator
 	x, y, u, v, A, B, C, D := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}
 	defer internal_destroy(x, y, u, v, A, B, C, D)
 
-	/*
-		`b` cannot be negative.
-	*/
+	// `b` cannot be negative.
 	if b.sign == .Negative || internal_is_zero(b) {
 		return .Invalid_Argument
 	}
 
-	/*
-		init temps.
-	*/
+	// init temps.
 	internal_init_multi(x, y, u, v, A, B, C, D) or_return
 
-	/*
-		`x` = `a` % `b`, `y` = `b`
-	*/
+	// `x` = `a` % `b`, `y` = `b`
 	internal_mod(x, a, b) or_return
 	internal_copy(y, b) or_return
 
-	/*
-		2. [modified] if x,y are both even then return an error!
-	*/
+	// 2. [modified] if x,y are both even then return an error!
 	if internal_is_even(x) && internal_is_even(y) {
 		return .Invalid_Argument
 	}
 
-	/*
-		3. u=x, v=y, A=1, B=0, C=0, D=1
-	*/
+	// 3. u=x, v=y, A=1, B=0, C=0, D=1
 	internal_copy(u, x) or_return
 	internal_copy(v, y) or_return
 	internal_one(A) or_return
 	internal_one(D) or_return
 
 	for {
-		/*
-			4.  while `u` is even do:
-		*/
+		// 4.  while `u` is even do:
 		for internal_is_even(u) {
-			/*
-				4.1 `u` = `u` / 2
-			*/
+			// 4.1 `u` = `u` / 2
 			internal_int_shr1(u, u) or_return
 
-			/*
-				4.2 if `A` or `B` is odd then:
-			*/
+			// 4.2 if `A` or `B` is odd then:
 			if internal_is_odd(A) || internal_is_odd(B) {
-				/*
-					`A` = (`A`+`y`) / 2, `B` = (`B`-`x`) / 2
-				*/
+				// `A` = (`A`+`y`) / 2, `B` = (`B`-`x`) / 2
 				internal_add(A, A, y) or_return
-				internal_add(B, B, x) or_return
+				internal_sub(B, B, x) or_return
 			}
-			/*
-				`A` = `A` / 2, `B` = `B` / 2
-			*/
+			// `A` = `A` / 2, `B` = `B` / 2
 			internal_int_shr1(A, A) or_return
 			internal_int_shr1(B, B) or_return
 		}
 
-		/*
-			5.  while `v` is even do:
-		*/
+		// 5.  while `v` is even do:
 		for internal_is_even(v) {
-			/*
-				5.1 `v` = `v` / 2
-			*/
+			// 5.1 `v` = `v` / 2
 			internal_int_shr1(v, v) or_return
 
-			/*
-				5.2 if `C` or `D` is odd then:
-			*/
+			// 5.2 if `C` or `D` is odd then:
 			if internal_is_odd(C) || internal_is_odd(D) {
-				/*
-					`C` = (`C`+`y`) / 2, `D` = (`D`-`x`) / 2
-				*/
+				// `C` = (`C`+`y`) / 2, `D` = (`D`-`x`) / 2
 				internal_add(C, C, y) or_return
-				internal_add(D, D, x) or_return
+				internal_sub(D, D, x) or_return
 			}
-			/*
-				`C` = `C` / 2, `D` = `D` / 2
-			*/
+			// `C` = `C` / 2, `D` = `D` / 2
 			internal_int_shr1(C, C) or_return
 			internal_int_shr1(D, D) or_return
 		}
 
-		/*
-			6.  if `u` >= `v` then:
-		*/
+		// 6.  if `u` >= `v` then:
 		if internal_cmp(u, v) != -1 {
-			/*
-				`u` = `u` - `v`, `A` = `A` - `C`, `B` = `B` - `D`
-			*/
+			// `u` = `u` - `v`, `A` = `A` - `C`, `B` = `B` - `D`
 			internal_sub(u, u, v) or_return
 			internal_sub(A, A, C) or_return
 			internal_sub(B, B, D) or_return
 		} else {
-			/* v - v - u, C = C - A, D = D - B */
+			// v - v - u, C = C - A, D = D - B
 			internal_sub(v, v, u) or_return
 			internal_sub(C, C, A) or_return
 			internal_sub(D, D, B) or_return
 		}
 
-		/*
-			If not zero goto step 4
-		*/
+		// If not zero goto step 4
 		if internal_is_zero(u) {
 			break
 		}
 	}
 
-	/*
-		Now `a` = `C`, `b` = `D`, `gcd` == `g`*`v`
-	*/
+	// Now `a` = `C`, `b` = `D`, `gcd` == `g`*`v`
 
-	/*
-		If `v` != `1` then there is no inverse.
-	*/
+	// If `v` != `1` then there is no inverse.
 	if !internal_eq(v, 1) {
 		return .Invalid_Argument
 	}
 
-	/*
-		If its too low.
-	*/
-	if internal_is_negative(C) {
+	// If its too low.
+	for internal_is_negative(C) {
 		internal_add(C, C, b) or_return
 	}
 
-	/*
-		Too big.
-	*/
-	if internal_gte(C, 0) {
+	// Too big.
+	for internal_cmp_mag(C, b) > -1 {
 		internal_sub(C, C, b) or_return
 	}
 
-	/*
-		`C` is now the inverse.
-	*/
+	// `C` is now the inverse.
 	swap(dest, C)
-
 	return
 }
 

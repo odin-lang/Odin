@@ -1181,28 +1181,18 @@ internal_cmp_digit :: internal_compare_digit
 */
 internal_int_compare_magnitude :: #force_inline proc(a, b: ^Int) -> (comparison: int) {
 	assert_if_nil(a, b)
-	/*
-		Compare based on used digits.
-	*/
+
+	// Compare based on used digits.
 	if a.used != b.used {
-		if a.used > b.used {
-			return +1
-		}
-		return -1
+		return +1 if a.used > b.used else -1
 	}
 
-	/*
-		Same number of used digits, compare based on their value.
-	*/
+	// Same number of used digits, compare based on their value.
 	#no_bounds_check for n := a.used - 1; n >= 0; n -= 1 {
 		if a.digit[n] != b.digit[n] {
-			if a.digit[n] > b.digit[n] {
-				return +1
-			}
-			return -1
+			return +1 if a.digit[n] > b.digit[n] else -1
 		}
 	}
-
 	return 0
 }
 internal_compare_magnitude :: proc { internal_int_compare_magnitude, }
