@@ -56,7 +56,7 @@ fi
 
 case "$OS_NAME" in
 Darwin)
-	if [ "$OS_ARCH" == "arm64" ]; then
+	if [ "$OS_ARCH" = "arm64" ]; then
 		if [ $LLVM_VERSION_MAJOR -lt 13 ] || [ $LLVM_VERSION_MAJOR -gt 17 ]; then
 			error "Darwin Arm64 requires LLVM 13, 14 or 17"
 		fi
@@ -101,7 +101,7 @@ build_odin() {
 		EXTRAFLAGS="-O3"
 		;;
 	release-native)
-		if [ "$OS_ARCH" == "arm64" ]; then
+		if [ "$OS_ARCH" = "arm64" ]; then
 			# Use preferred flag for Arm (ie arm64 / aarch64 / etc)
 			EXTRAFLAGS="-O3 -mcpu=native"
 		else
