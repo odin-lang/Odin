@@ -825,16 +825,18 @@ map_insert :: proc(m: ^$T/map[$K]$V, key: K, value: V, loc := #caller_location) 
 }
 
 // Explicitly inserts a key and value into a map `m`, the same as `map_insert`, but the return values differ.
-// - `prev_key_ptr` will return the previous pointer of a key if it exists, and `nil` otherwise.
+// - `prev_key` will return the previous pointer of a key if it exists, check `found_previous` if was previously found
 // - `value_ptr` will return the pointer of the memory where the insertion happens, and `nil` if the map failed to resize
-// - `found_previous` will be true if `prev_key_ptr != nil`
-@(require_results)
-map_insert_and_check_for_previous :: proc(m: ^$T/map[$K]$V, key: K, value: V, loc := #caller_location) -> (prev_key_ptr: ^K, value_ptr: ^V, found_previous: bool) {
+// - `found_previous` will be true a previous key was found
+@(builtin, require_results)
+map_upsert :: proc(m: ^$T/map[$K]$V, key: K, value: V, loc := #caller_location) -> (prev_key: K, value_ptr: ^V, found_previous: bool) {
 	key, value := key, value
 	kp, vp := __dynamic_map_set_extra_without_hash((^Raw_Map)(m), map_info(T), rawptr(&key), rawptr(&value), loc)
-	prev_key_ptr   = (^K)(kp)
-	value_ptr      = (^V)(vp)
-	found_previous = kp != nil
+	if kp != nil {
+		prev_key = (^K)(kp)^
+		found_previous = true
+	}
+	value_ptr = (^V)(vp)
 	return
 }
 
