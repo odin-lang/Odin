@@ -3430,31 +3430,6 @@ gb_internal Selection lookup_field_with_selection(Type *type_, String field_name
 		}
 
 		return sel;
-	} else if (type->kind == Type_Array) {
-		if (type->Array.count <= 4) {
-			// HACK(bill): Memory leak
-			switch (type->Array.count) {
-			#define _ARRAY_FIELD_CASE_IF(_length, _name) \
-				if (field_name == (_name)) { \
-					selection_add_index(&sel, (_length)-1); \
-					sel.entity = alloc_entity_array_elem(nullptr, make_token_ident(str_lit(_name)), type->Array.elem, (_length)-1); \
-					return sel; \
-				}
-			#define _ARRAY_FIELD_CASE(_length, _name0, _name1) \
-			case (_length): \
-				_ARRAY_FIELD_CASE_IF(_length, _name0); \
-				_ARRAY_FIELD_CASE_IF(_length, _name1); \
-				/*fallthrough*/
-
-			_ARRAY_FIELD_CASE(4, "w", "a");
-			_ARRAY_FIELD_CASE(3, "z", "b");
-			_ARRAY_FIELD_CASE(2, "y", "g");
-			_ARRAY_FIELD_CASE(1, "x", "r");
-			default: break;
-
-			#undef _ARRAY_FIELD_CASE
-			}
-		}
 	} else if (type->kind == Type_DynamicArray) {
 		GB_ASSERT(t_allocator != nullptr);
 		String allocator_str = str_lit("allocator");
@@ -3475,7 +3450,53 @@ gb_internal Selection lookup_field_with_selection(Type *type_, String field_name
 			sel.entity = entity__allocator;
 			return sel;
 		}
+
+
+#define _ARRAY_FIELD_CASE_IF(_length, _name) \
+	if (field_name == (_name)) { \
+		selection_add_index(&sel, (_length)-1); \
+		sel.entity = alloc_entity_array_elem(nullptr, make_token_ident(str_lit(_name)), elem, (_length)-1); \
+		return sel; \
 	}
+#define _ARRAY_FIELD_CASE(_length, _name0, _name1) \
+case (_length): \
+	_ARRAY_FIELD_CASE_IF(_length, _name0); \
+	_ARRAY_FIELD_CASE_IF(_length, _name1); \
+	/*fallthrough*/
+
+
+	} else if (type->kind == Type_Array) {
+
+		Type *elem = type->Array.elem;
+
+		if (type->Array.count <= 4) {
+			// HACK(bill): Memory leak
+			switch (type->Array.count) {
+
+			_ARRAY_FIELD_CASE(4, "w", "a");
+			_ARRAY_FIELD_CASE(3, "z", "b");
+			_ARRAY_FIELD_CASE(2, "y", "g");
+			_ARRAY_FIELD_CASE(1, "x", "r");
+			default: break;
+			}
+		}
+	} else if (type->kind == Type_SimdVector) {
+
+		Type *elem = type->SimdVector.elem;
+		if (type->SimdVector.count <= 4) {
+			// HACK(bill): Memory leak
+			switch (type->SimdVector.count) {
+			_ARRAY_FIELD_CASE(4, "w", "a");
+			_ARRAY_FIELD_CASE(3, "z", "b");
+			_ARRAY_FIELD_CASE(2, "y", "g");
+			_ARRAY_FIELD_CASE(1, "x", "r");
+			default: break;
+			}
+		}
+	}
+
+#undef _ARRAY_FIELD_CASE
+#undef _ARRAY_FIELD_CASE
 
 	return sel;
 }
