@@ -22,6 +22,12 @@ Tracking_Allocator :: struct {
 	bad_free_array:    [dynamic]Tracking_Allocator_Bad_Free_Entry,
 	mutex:             sync.Mutex,
 	clear_on_free_all: bool,
+	allocated:         int,
+	alloc_count:       int,
+	freed:             int,
+	free_count:        int,
+	peak:              int,
+	current:           int,
 }
 
 tracking_allocator_init :: proc(t: ^Tracking_Allocator, backing_allocator: Allocator, internals_allocator := context.allocator) {
@@ -44,6 +50,7 @@ tracking_allocator_clear :: proc(t: ^Tracking_Allocator) {
 	sync.mutex_lock(&t.mutex)
 	clear(&t.allocation_map)
 	clear(&t.bad_free_array)
+	t.current = 0
 	sync.mutex_unlock(&t.mutex)
 }
 
@@ -54,6 +61,19 @@ tracking_allocator :: proc(data: ^Tracking_Allocator) -> Allocator {
 		data = data,
 		procedure = tracking_allocator_proc,
 	}
+}
+
+track_alloc :: proc(data: ^Tracking_Allocator, entry: ^Tracking_Allocator_Entry) {
+	data.allocated += entry.size
+	data.alloc_count += 1
+	data.current += entry.size
+	if data.current > data.peak do data.peak = data.current
+}
+
+track_free :: proc(data: ^Tracking_Allocator, entry: ^Tracking_Allocator_Entry) {
+	data.freed += entry.size
+	data.free_count += 1
+	data.current -= entry.size
 }
 
 tracking_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
@@ -100,13 +120,21 @@ tracking_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 			err = err,
 			location = loc,
 		}
+		track_alloc(data, &data.allocation_map[result_ptr])
 	case .Free:
+		if old_memory != nil && old_memory in data.allocation_map {
+			track_free(data, &data.allocation_map[old_memory])
+		}
 		delete_key(&data.allocation_map, old_memory)
 	case .Free_All:
 		if data.clear_on_free_all {
 			clear_map(&data.allocation_map)
+			data.current = 0
 		}
 	case .Resize, .Resize_Non_Zeroed:
+		if old_memory != nil && old_memory in data.allocation_map {
+			track_free(data, &data.allocation_map[old_memory])
+		}
 		if old_memory != result_ptr {
 			delete_key(&data.allocation_map, old_memory)
 		}
@@ -118,6 +146,7 @@ tracking_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 			err = err,
 			location = loc,
 		}
+		track_alloc(data, &data.allocation_map[result_ptr])
 
 	case .Query_Features:
 		set := (^Allocator_Mode_Set)(old_memory)
