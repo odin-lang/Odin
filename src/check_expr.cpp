@@ -6847,7 +6847,7 @@ gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, O
 
 	Array<Operand> ordered_operands = operands;
 	if (!named_fields) {
-		ordered_operands = array_make<Operand>(permanent_allocator(), param_count);
+		ordered_operands = array_make<Operand>(permanent_allocator(), operands.count);
 		array_copy(&ordered_operands, operands, 0);
 	} else {
 		TEMPORARY_ALLOCATOR_GUARD();
