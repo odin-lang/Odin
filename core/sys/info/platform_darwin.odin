@@ -4,7 +4,7 @@ package sysinfo
 import sys "core:sys/unix"
 import "core:strconv"
 import "core:strings"
-import "core:runtime"
+import "base:runtime"
 
 @(private)
 version_string_buf: [1024]u8

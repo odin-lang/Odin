@@ -461,6 +461,42 @@ gb_internal LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 			lb_debug_type(m, type->Matrix.elem),
 			subscripts, gb_count_of(subscripts));
 	}
+
+	case Type_BitField: {
+		LLVMMetadataRef parent_scope = nullptr;
+		LLVMMetadataRef scope = nullptr;
+		LLVMMetadataRef file = nullptr;
+		unsigned line = 0;
+		u64 size_in_bits = 8*cast(u64)type_size_of(type);
+		u32 align_in_bits = 8*cast(u32)type_align_of(type);
+		LLVMDIFlags flags = LLVMDIFlagZero;
+
+		unsigned element_count = cast(unsigned)type->BitField.fields.count;
+		LLVMMetadataRef *elements = gb_alloc_array(permanent_allocator(), LLVMMetadataRef, element_count);
+
+		u64 offset_in_bits = 0;
+		for (unsigned i = 0; i < element_count; i++) {
+			Entity *f = type->BitField.fields[i];
+			u8 bit_size = type->BitField.bit_sizes[i];
+			GB_ASSERT(f->kind == Entity_Variable);
+			String name = f->token.string;
+			unsigned field_line = 0;
+			LLVMDIFlags field_flags = LLVMDIFlagZero;
+			elements[i] = LLVMDIBuilderCreateBitFieldMemberType(m->debug_builder, scope, cast(char const *)name.text, name.len, file, field_line,
+				bit_size, offset_in_bits, offset_in_bits,
+				field_flags, lb_debug_type(m, f->type)
+			);
+
+			offset_in_bits += bit_size;
+		}
+
+
+		return LLVMDIBuilderCreateStructType(m->debug_builder, parent_scope, "", 0, file, line,
+			size_in_bits, align_in_bits, flags,
+			nullptr, elements, element_count, 0, nullptr,
+			"", 0
+		);
+	}
 	}
 
 	GB_PANIC("Invalid type %s", type_to_string(type));
@@ -710,7 +746,9 @@ gb_internal void lb_debug_complete_types(lbModule *m) {
 
 			case Type_Map:
 				GB_ASSERT(t_raw_map != nullptr);
+				// bt = base_type(bt->Map.debug_metadata_type);
 				bt = base_type(t_raw_map);
+				GB_ASSERT(bt->kind == Type_Struct);
 				/*fallthrough*/
 			case Type_Struct:
 				if (file == nullptr) {

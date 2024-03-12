@@ -1,6 +1,6 @@
 package objc_Foundation
 
-import "core:intrinsics"
+import "base:intrinsics"
 
 @(objc_class="NSArray")
 Array :: struct {

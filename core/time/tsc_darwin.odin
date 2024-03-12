@@ -4,7 +4,7 @@ package time
 
 import "core:c"
 
-foreign import libc "System.framework"
+foreign import libc "system:System.framework"
 foreign libc {
 	@(link_name="sysctlbyname") _sysctlbyname    :: proc(path: cstring, oldp: rawptr, oldlenp: rawptr, newp: rawptr, newlen: int) -> c.int ---
 }

@@ -3,8 +3,8 @@
 package testing
 
 import win32 "core:sys/windows"
-import "core:runtime"
-import "core:intrinsics"
+import "base:runtime"
+import "base:intrinsics"
 import "core:time"
 
 Sema :: struct {

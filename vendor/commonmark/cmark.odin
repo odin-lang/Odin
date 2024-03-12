@@ -8,7 +8,7 @@ package vendor_commonmark
 
 import "core:c"
 import "core:c/libc"
-import "core:runtime"
+import "base:runtime"
 
 COMMONMARK_SHARED :: #config(COMMONMARK_SHARED, false)
 BINDING_VERSION :: Version_Info{major = 0, minor = 30, patch = 2}

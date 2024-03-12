@@ -1,7 +1,6 @@
 package unix
 
-import "core:intrinsics"
-import "core:c"
+import "base:intrinsics"
 
 // Linux has inconsistent system call numbering across architectures,
 // for largely historical reasons.  This attempts to provide a unified
@@ -676,6 +675,8 @@ when ODIN_ARCH == .amd64 {
 	SYS_landlock_create_ruleset : uintptr : 444
 	SYS_landlock_add_rule : uintptr : 445
 	SYS_landlock_restrict_self : uintptr : 446
+	
+	SIGCHLD :: 17
 } else when ODIN_ARCH == .i386 {
 	SYS_restart_syscall : uintptr : 0
 	SYS_exit : uintptr : 1
@@ -1517,441 +1518,12 @@ when ODIN_ARCH == .amd64 {
 	#panic("Unsupported architecture")
 }
 
-// errnos
-ESUCCESS        :: 0
-EPERM           :: 1
-ENOENT          :: 2
-ESRCH           :: 3
-EINTR           :: 4
-EIO             :: 5
-ENXIO           :: 6
-E2BIG           :: 7
-ENOEXEC         :: 8
-EBADF           :: 9
-ECHILD          :: 10
-EAGAIN          :: 11
-EWOULDBLOCK     :: EAGAIN
-ENOMEM          :: 12
-EACCES          :: 13
-EFAULT          :: 14
-ENOTBLK         :: 15
-EBUSY           :: 16
-EEXIST          :: 17
-EXDEV           :: 18
-ENODEV          :: 19
-ENOTDIR         :: 20
-EISDIR          :: 21
-EINVAL          :: 22
-ENFILE          :: 23
-EMFILE          :: 24
-ENOTTY          :: 25
-ETXTBSY         :: 26
-EFBIG           :: 27
-ENOSPC          :: 28
-ESPIPE          :: 29
-EROFS           :: 30
-EMLINK          :: 31
-EPIPE           :: 32
-EDOM            :: 33
-ERANGE          :: 34
-EDEADLK         :: 35
-EDEADLOCK       :: EDEADLK
-ENAMETOOLONG    :: 36
-ENOLCK          :: 37
-ENOSYS          :: 38
-ENOTEMPTY       :: 39
-ELOOP           :: 40
-//              :: 41
-ENOMSG          :: 42
-EIDRM           :: 43
-ECHRNG          :: 44
-EL2NSYNC        :: 45
-EL3HLT          :: 46
-EL3RST          :: 47
-ELNRNG          :: 48
-EUNATCH         :: 49
-ENOCSI          :: 50
-EL2HLT          :: 51
-EBADE           :: 52
-EBADR           :: 53
-EXFULL          :: 54
-ENOANO          :: 55
-EBADRQC         :: 56
-EBADSLT         :: 57
-//              :: 58
-EBFONT          :: 59
-ENOSTR          :: 60
-ENODATA         :: 61
-ETIME           :: 62
-ENOSR           :: 63
-ENONET          :: 64
-ENOPKG          :: 65
-EREMOTE         :: 66
-ENOLINK         :: 67
-EADV            :: 68
-ESRMNT          :: 69
-ECOMM           :: 70
-EPROTO          :: 71
-EMULTIHOP       :: 72
-EDOTDOT         :: 73
-EBADMSG         :: 74
-EOVERFLOW       :: 75
-ENOTUNIQ        :: 76
-EBADFD          :: 77
-EREMCHG         :: 78
-ELIBACC         :: 79
-ELIBBAD         :: 80
-ELIBSCN         :: 81
-ELIBMAX         :: 82
-ELIBEXEC        :: 83
-EILSEQ          :: 84
-ERESTART        :: 85
-ESTRPIPE        :: 86
-EUSERS          :: 87
-ENOTSOCK        :: 88
-EDESTADDRREQ    :: 89
-EMSGSIZE        :: 90
-EPROTOTYPE      :: 91
-ENOPROTOOPT     :: 92
-EPROTONOSUPPORT :: 93
-ESOCKTNOSUPPORT :: 94
-EOPNOTSUPP      :: 95
-ENOTSUP         :: EOPNOTSUPP
-EPFNOSUPPORT    :: 96
-EAFNOSUPPORT    :: 97
-EADDRINUSE      :: 98
-EADDRNOTAVAIL   :: 99
-ENETDOWN        :: 100
-ENETUNREACH     :: 101
-ENETRESET       :: 102
-ECONNABORTED    :: 103
-ECONNRESET      :: 104
-ENOBUFS         :: 105
-EISCONN         :: 106
-ENOTCONN        :: 107
-ESHUTDOWN       :: 108
-ETOOMANYREFS    :: 109
-ETIMEDOUT       :: 110
-ECONNREFUSED    :: 111
-EHOSTDOWN       :: 112
-EHOSTUNREACH    :: 113
-EALREADY        :: 114
-EINPROGRESS     :: 115
-ESTALE          :: 116
-EUCLEAN         :: 117
-ENOTNAM         :: 118
-ENAVAIL         :: 119
-EISNAM          :: 120
-EREMOTEIO       :: 121
-EDQUOT          :: 122
-ENOMEDIUM       :: 123
-EMEDIUMTYPE     :: 124
-ECANCELED       :: 125
-ENOKEY          :: 126
-EKEYEXPIRED     :: 127
-EKEYREVOKED     :: 128
-EKEYREJECTED    :: 129
-EOWNERDEAD      :: 130
-ENOTRECOVERABLE :: 131
-ERFKILL         :: 132
-EHWPOISON       :: 133
-ERRNO_COUNT     :: 134
 
-// *at constants
+// syscall related constants
 AT_FDCWD            :: ~uintptr(99)
 AT_REMOVEDIR        :: uintptr(0x200)
 AT_SYMLINK_FOLLOW   :: uintptr(0x400)
 AT_SYMLINK_NOFOLLOW :: uintptr(0x100)
-
-// open flags
-O_RDONLY    :: 0o00000000
-O_WRONLY    :: 0o00000001
-O_RDWR      :: 0o00000002
-O_CREAT     :: 0o00000100
-O_EXCL      :: 0o00000200
-O_NOCTTY    :: 0o00000400
-O_TRUNC     :: 0o00001000
-O_APPEND    :: 0o00002000
-O_NONBLOCK  :: 0o00004000
-O_LARGEFILE :: 0o00100000
-O_DIRECTORY :: 0o00200000
-O_NOFOLLOW  :: 0o00400000
-O_SYNC      :: 0o04010000
-O_CLOEXEC   :: 0o02000000
-O_PATH      :: 0o10000000
-
-// File type
-S_IFMT   :: 0o170000 // Type of file mask
-S_IFIFO  :: 0o010000 // Named pipe (fifo)
-S_IFCHR  :: 0o020000 // Character special
-S_IFDIR  :: 0o040000 // Directory
-S_IFBLK  :: 0o060000 // Block special
-S_IFREG  :: 0o100000 // Regular
-S_IFLNK  :: 0o120000 // Symbolic link
-S_IFSOCK :: 0o140000 // Socket
-
-// File mode
-S_IRWXU :: 0o0700 // RWX mask for owner
-S_IRUSR :: 0o0400 // R for owner
-S_IWUSR :: 0o0200 // W for owner
-S_IXUSR :: 0o0100 // X for owner
-
-// Read, write, execute/search by group
-S_IRWXG :: 0o0070 // RWX mask for group
-S_IRGRP :: 0o0040 // R for group
-S_IWGRP :: 0o0020 // W for group
-S_IXGRP :: 0o0010 // X for group
-
-// Read, write, execute/search by others
-S_IRWXO :: 0o0007 // RWX mask for other
-S_IROTH :: 0o0004 // R for other
-S_IWOTH :: 0o0002 // W for other
-S_IXOTH :: 0o0001 // X for other
-
-S_ISUID :: 0o4000 // Set user id on execution
-S_ISGID :: 0o2000 // Set group id on execution
-S_ISVTX :: 0o1000 // Directory restircted delete
-
-S_ISLNK  :: #force_inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFLNK  }
-S_ISREG  :: #force_inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFREG  }
-S_ISDIR  :: #force_inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFDIR  }
-S_ISCHR  :: #force_inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFCHR  }
-S_ISBLK  :: #force_inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFBLK  }
-S_ISFIFO :: #force_inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFIFO  }
-S_ISSOCK :: #force_inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFSOCK }
-
-// access flags
-F_OK :: 0 // Test for file existance
-X_OK :: 1 // Test for execute permission
-W_OK :: 2 // Test for write permission
-R_OK :: 4 // Test for read permission
-
-Stat :: struct {
-	device_id:     u64, // ID of device containing file
-	serial:        u64, // File serial number
-	nlink:         u64, // Number of hard links
-	mode:          u32, // Mode of the file
-	uid:           u32, // User ID of the file's owner
-	gid:           u32, // Group ID of the file's group
-	_padding:      i32, // 32 bits of padding
-	rdev:          u64, // Device ID, if device
-	size:          i64, // Size of the file, in bytes
-	block_size:    i64, // Optimal bllocksize for I/O
-	blocks:        i64, // Number of 512-byte blocks allocated
-
-	last_access:   timespec, // Time of last access
-	modified:      timespec, // Time of last modification
-	status_change: timespec, // Time of last status change
-
-	_reserve1,
-	_reserve2,
-	_reserve3:     i64,
-}
-
-// signal numbers
-SIG_COUNT :: 64
-SIGHUP    :: 1
-SIGINT    :: 2
-SIGQUIT   :: 3
-SIGILL    :: 4
-SIGTRAP   :: 5
-SIGABRT   :: 6
-SIGIOT    :: SIGABRT
-SIGBUS    :: 7
-SIGFPE    :: 8
-SIGKILL   :: 9
-SIGUSR1   :: 10
-SIGSEGV   :: 11
-SIGUSR2   :: 12
-SIGPIPE   :: 13
-SIGALRM   :: 14
-SIGTERM   :: 15
-SIGSTKFLT :: 16
-SIGCHLD   :: 17
-SIGCONT   :: 18
-SIGSTOP   :: 19
-SIGTSTP   :: 20
-SIGTTIN   :: 21
-SIGTTOU   :: 22
-SIGURG    :: 23
-SIGXCPU   :: 24
-SIGXFSZ   :: 25
-SIGVTALRM :: 26
-SIGPROF   :: 27
-SIGWINCH  :: 28
-SIGIO     :: 29
-SIGPOLL   :: SIGIO
-SIGPWR    :: 30
-SIGSYS    :: 31
-
-// NOTE: The kernel defines SIGRTMIN as a constant, however,
-//       libc moves this around as a variable since the first
-//       2-3 real-time signals are used for the pthread
-//       implementation. It is recommended that users (of libc)
-//       do SIGRTMIN+x for real-time signals. Obviously, that
-//       that will not work here.
-SIGRTMIN  :: 32
-SIGRTMAX  :: SIG_COUNT
-
-// sa_flags
-SA_NOCLDSTOP      :: 0x00000001
-SA_NOCLDWAIT      :: 0x00000002
-SA_SIGINFO        :: 0x00000004
-SA_UNSUPPORTED    :: 0x00000400
-SA_EXPOSE_TAGBITS :: 0x00000800
-SA_RESTORER       :: 0x04000000
-SA_ONSTACK        :: 0x08000000
-SA_RESTART        :: 0x10000000
-SA_NODEFER        :: 0x40000000
-SA_RESETHAND      :: 0x80000000
-SA_NOMASK         :: SA_NODEFER
-SA_ONESHOT        :: SA_RESETHAND
-
-// In the kernel, clock_t in _sigchld is i64 aligned to 4 on i386.
-// We cannot align primitives, so we just pack the struct when i386.
-when ODIN_ARCH == .i386 {
-	_Sigchld :: struct #packed {
-		_pid: i32,
-		_uid: i32,
-		si_status: i32,
-		si_utime: i64,
-		si_stime: i64,
-	}
-} else {
-	_Sigchld :: struct {
-		_pid: i32,
-		_uid: i32,
-		si_status: i32,
-		si_utime: i64,
-		si_stime: i64,
-	}
-}
-
-sigval_t :: struct #raw_union {
-	si_int: i32,
-	si_ptr: rawptr,
-}
-
-SIGINFO_SIZE :: 128
-
-// In the kernel, this struct is defined followed by macros
-// that allow the user to access the members as if it were a
-// giant struct without the unions. Here, we can actually
-// access the desired names with the `using _` convention.
-Siginfo :: struct #align(size_of(rawptr)) {
-	si_signo: i32,
-	si_errno: i32,
-	si_code:  i32,
-	// _: i32 here on 64 bit
-	using _: struct #raw_union { // _sifields
-		_pad: [SIGINFO_SIZE - 2 * size_of(i32) - size_of(rawptr)]u8,
-		using _: struct {  // kill
-			si_pid: i32,
-			si_uid: i32,
-		},
-		using _: struct {  // timer
-			si_timerid: i32,
-			si_overrun: i32,
-			si_value: sigval_t,
-			si_sys_private: i32,
-		},
-		using _: struct {  // rt
-			_rt_pid: i32,
-			_rt_uid: i32,
-			using _: sigval_t,  // si_int, si_ptr
-		},
-		using _: _Sigchld,  // si_status, si_utime, si_stime
-		using _: struct {  // sigfault
-			si_addr: rawptr,
-			using _: struct #raw_union {
-				si_trapno: i32,
-				si_addr_lsb: i16,
-				using _: struct {  // addr_bnd
-					_dummy_bnd: [align_of(rawptr)]u8,
-					si_lower: rawptr,
-					si_upper: rawptr,
-				},
-				using _: struct {  // addr_pkey
-					_dummy_pkey: [align_of(rawptr)]u8,
-					si_pkey: u32,
-				},
-				using _: struct {  // perf
-					perf_data: c.ulong,
-					perf_type: u32,
-					perf_flags: u32,
-				},
-			},
-		},
-		using _: struct {  // sigpoll
-			si_band: c.long,
-			si_fd: i32,
-		},
-		using _: struct {  // sigsys
-			si_call_addr: rawptr,
-			si_syscall: i32,
-			si_arch: u32,
-		},
-	},
-}
-
-// siginfo SIGCHLD si_codes
-CLD_EXITED    :: 1
-CLD_KILLED    :: 2
-CLD_DUMPED    :: 3
-CLD_TRAPPED   :: 4
-CLD_STOPPED   :: 5
-CLD_CONTINUED :: 6
-
-sighandler_t      :: #type proc "c" (sig: c.int)
-sighandler_info_t :: #type proc "c" (sig: c.int, info: ^Siginfo, ucontext: rawptr)
-sigrestore_t      :: #type proc "c" () -> !
-sigset_t          :: u64
-
-// special signal handler
-SIG_DFL :: uintptr(0)
-SIG_IGN :: uintptr(1)
-SIG_ERR :: ~uintptr(0) // -1
-
-Sigaction :: struct {
-	using _ :  struct #raw_union  {
-		sa_handler:   sighandler_t,
-		sa_sigaction: sighandler_info_t,
-		sa_special:   uintptr,
-	},
-	sa_flags:    c.ulong,
-	sa_restorer: sigrestore_t,
-	sa_mask:     sigset_t,
-}
-
-// wait options
-WNOHANG     :: 0x00000001
-WUNTRACED   :: 0x00000002
-WSTOPPED    :: WUNTRACED
-WEXITED     :: 0x00000004
-WCONTINUED  :: 0x00000008
-WNOWAIT     :: 0x01000000
-__WNOTHREAD :: 0x20000000
-__WALL      :: 0x40000000
-__WCLONE    :: 0x80000000
-
-Rusage :: struct {
-	ru_utime:    timeval, // user time used
-	ru_stime:    timeval, // system time used
-	ru_maxrss:   c.long,  // maximum resident set size
-	ru_ixrss:    c.long,  // integral shared memory size
-	ru_idrss:    c.long,  // integral unshared data size
-	ru_isrss:    c.long,  // integral unshared stack size
-	ru_minflt:   c.long,  // page reclaims
-	ru_majflt:   c.long,  // page faults
-	ru_nswap:    c.long,  // swaps
-	ru_inblock:  c.long,  // block input operations
-	ru_oublock:  c.long,  // block output operations
-	ru_msgsnd:   c.long,  // messages sent
-	ru_msgrcv:   c.long,  // messages received
-	ru_nsignals: c.long,  // signals received
-	ru_nvcsw:    c.long,  // voluntary context switches
-	ru_nivcsw:   c.long,  // involuntary "
-}
 
 // mmap flags
 PROT_NONE      :: 0x0
@@ -1992,6 +1564,8 @@ MADV_WIPEONFORK  :: 18
 MADV_KEEPONFORK  :: 19
 MADV_HWPOISON    :: 100
 
+// pipe2 flags
+O_CLOEXEC :: 0o2000000
 
 // poll events
 POLLIN         :: 0x0001
@@ -2009,12 +1583,6 @@ POLLREMOVE     :: 0x1000
 POLLRDHUP      :: 0x2000
 POLLFREE       :: 0x4000
 POLL_BUSY_LOOP :: 0x8000
-
-Pollfd :: struct {
-	fd: i32,
-	events: i16,
-	revents: i16,
-}
 
 // perf event data
 Perf_Sample :: struct #raw_union {
@@ -2165,40 +1733,6 @@ Perf_Flag :: enum u64 {
 	Sigtrap        = 37,
 }
 
-sys_exit :: proc "contextless" (exit_code: int) -> ! {
-	intrinsics.syscall(SYS_exit, uintptr(exit_code))
-	unreachable()
-}
-
-sys_exit_group :: proc "contextless" (exit_code: int) -> ! {
-	intrinsics.syscall(SYS_exit_group, uintptr(exit_code))
-	unreachable()
-}
-
-sys_getuid :: proc "contextless" () -> int {
-	return int(intrinsics.syscall(SYS_getuid))
-}
-
-sys_geteuid :: proc "contextless" () -> int {
-	return int(intrinsics.syscall(SYS_geteuid))
-}
-
-sys_getgid :: proc "contextless" () -> int {
-	return int(intrinsics.syscall(SYS_getgid))
-}
-
-sys_getegid :: proc "contextless" () -> int {
-	return int(intrinsics.syscall(SYS_getegid))
-}
-
-sys_getpid :: proc "contextless" () -> int {
-	return int(intrinsics.syscall(SYS_getpid))
-}
-
-sys_getppid :: proc "contextless" () -> int {
-	return int(intrinsics.syscall(SYS_getppid))
-}
-
 sys_gettid :: proc "contextless" () -> int {
 	return int(intrinsics.syscall(SYS_gettid))
 }
@@ -2313,10 +1847,6 @@ sys_access :: proc "contextless" (path: cstring, mask: int) -> int {
 	} else { // NOTE: arm64 does not have access
 		return int(intrinsics.syscall(SYS_faccessat, AT_FDCWD, uintptr(rawptr(path)), uintptr(mask)))
 	}
-}
-
-sys_faccessat :: proc "contextless" (dfd: int, path: cstring, mask: int) -> int {
-	return int(intrinsics.syscall(SYS_faccessat, uintptr(dfd), uintptr(rawptr(path)), uintptr(mask)))
 }
 
 sys_getcwd :: proc "contextless" (buf: rawptr, size: uint) -> int {
@@ -2451,14 +1981,6 @@ sys_getdents64 :: proc "contextless" (fd: int, dirent: rawptr, count: int) -> in
 	return int(intrinsics.syscall(SYS_getdents64, uintptr(fd), uintptr(dirent), uintptr(count)))
 }
 
-sys_execveat :: proc "contextless" (dfd: int, filename: cstring, argv, envp: [^]cstring, flags: int) -> int {
-	return int(intrinsics.syscall(SYS_execveat, uintptr(dfd), uintptr(rawptr(filename)), uintptr(argv), uintptr(envp), uintptr(flags)))
-}
-
-sys_execve :: proc "contextless" (filename: cstring, argv, envp: [^]cstring) -> int {
-	return int(intrinsics.syscall(SYS_execve, uintptr(rawptr(filename)), uintptr(argv), uintptr(envp)))
-}
-
 sys_fork :: proc "contextless" () -> int {
 	when ODIN_ARCH != .arm64 {
 		return int(intrinsics.syscall(SYS_fork))
@@ -2466,44 +1988,15 @@ sys_fork :: proc "contextless" () -> int {
 		return int(intrinsics.syscall(SYS_clone, SIGCHLD))
 	}
 }
-
-sys_wait4 :: proc "contextless" (pid: int, wstatus: ^i32, options: int, rusage: ^Rusage) -> int {
-	return int(intrinsics.syscall(SYS_wait4, uintptr(pid), uintptr(wstatus), uintptr(options), uintptr(rusage)))
-}
-
-// first arg to sys_waitid
-Waitid_Which :: enum {
-	P_ALL,
-	P_PID,
-	P_PGID,
-	P_PIDFD,
-}
-sys_waitid :: proc "contextless" (which: Waitid_Which, id: int, siginfo: ^Siginfo, options: int, rusage: ^Rusage) -> int {
-	return int(intrinsics.syscall(SYS_waitid, uintptr(which), uintptr(id), uintptr(siginfo), uintptr(options), uintptr(rusage)))
-}
-
-sys_getrusage :: proc "contextless" (who: int, rusage: ^Rusage) -> int {
-	return int(intrinsics.syscall(SYS_getrusage, uintptr(who), uintptr(rusage)))
-}
-
 sys_pipe2 :: proc "contextless" (fds: rawptr, flags: int) -> int {
 	return int(intrinsics.syscall(SYS_pipe2, uintptr(fds), uintptr(flags)))
 }
-
 sys_dup2 :: proc "contextless" (oldfd: int, newfd: int) -> int {
 	when ODIN_ARCH != .arm64 {
 		return int(intrinsics.syscall(SYS_dup2, uintptr(oldfd), uintptr(newfd)))
 	} else {
 		return int(intrinsics.syscall(SYS_dup3, uintptr(oldfd), uintptr(newfd), 0))
 	}
-}
-
-sys_kill :: proc "contextless" (pid, sig: int) -> int {
-	return int(intrinsics.syscall(SYS_kill, uintptr(pid), uintptr(sig)))
-}
-
-sys_ioctl :: proc "contextless" (fd, cmd, arg: uint) -> int {
-	return int(intrinsics.syscall(SYS_ioctl, uintptr(fd), uintptr(cmd), uintptr(arg)))
 }
 
 sys_mmap :: proc "contextless" (addr: rawptr, length: uint, prot, flags, fd: int, offset: uintptr) -> int {
@@ -2581,44 +2074,6 @@ sys_fcntl :: proc "contextless" (fd: int, cmd: int, arg: int) -> int {
 	return int(intrinsics.syscall(SYS_fcntl, uintptr(fd), uintptr(cmd), uintptr(arg)))
 }
 
-sys_rt_sigreturn :: proc "c" () -> ! {
-	intrinsics.syscall(SYS_rt_sigreturn)
-	unreachable()
-}
-
-sys_rt_sigaction :: proc "contextless" (sig: int, act, oact: ^Sigaction, sigsetsize: uint = size_of(sigset_t)) -> int {
-	// install sa_restorer if it wasn't defined
-	// NOTE: As far as I can tell, this is required for i386 and amd64. Looking
-	//       at the kernel source, it appears to be ignored for arm archs.
-	when ODIN_ARCH == .i386 || ODIN_ARCH == .amd64 {
-		act.sa_flags |= SA_RESTORER
-	}
-	if act != nil && act.sa_restorer == nil {
-		if act.sa_flags & SA_RESTORER != 0 {
-			act.sa_restorer = sys_rt_sigreturn
-		}
-	}
-	return int(intrinsics.syscall(SYS_rt_sigaction, uintptr(sig), uintptr(act), uintptr(oact), uintptr(sigsetsize)))
-}
-
-Sigprocmask_How :: enum {
-	SIG_BLOCK,
-	SIG_UNBLOCK,
-	SIG_SETMASK,
-}
-sys_rt_sigprocmask :: proc "contextless" (how: Sigprocmask_How, set, oldset: ^sigset_t, sigsetsize: uint = size_of(sigset_t)) -> int {
-	return int(intrinsics.syscall(SYS_rt_sigprocmask, uintptr(how), uintptr(set), uintptr(oldset), uintptr(sigsetsize)))
-}
-
-sys_rt_sigtimedwait :: proc "contextless" (uthese: ^sigset_t, uinfo: ^Siginfo, uts: ^timespec, sigsetsize: uint = size_of(sigset_t)) -> int {
-	return int(intrinsics.syscall(SYS_rt_sigtimedwait, uintptr(uthese), uintptr(uinfo), uintptr(uts), uintptr(sigsetsize)))
-}
-
-// NOTE: pidfd_open is fairly new, so be prepared to handle ENOSYS
-sys_pidfd_open :: proc "contextless" (pid: int, flags: uint) -> int {
-	return int(intrinsics.syscall(SYS_pidfd_open, uintptr(pid), uintptr(flags)))
-}
-
 sys_poll :: proc "contextless" (fds: rawptr, nfds: uint, timeout: int) -> int {
 	// NOTE: specialcased here because `arm64` does not have `poll`
 	when ODIN_ARCH == .arm64 {
@@ -2632,7 +2087,7 @@ sys_poll :: proc "contextless" (fds: rawptr, nfds: uint, timeout: int) -> int {
 	}
 }
 
-sys_ppoll :: proc "contextless" (fds: rawptr, nfds: uint, timeout: rawptr, sigmask: rawptr, sigsetsize: uint = size_of(sigset_t)) -> int {
+sys_ppoll :: proc "contextless" (fds: rawptr, nfds: uint, timeout: rawptr, sigmask: rawptr, sigsetsize: uint) -> int {
 	return int(intrinsics.syscall(SYS_ppoll, uintptr(fds), uintptr(nfds), uintptr(timeout), uintptr(sigmask), uintptr(sigsetsize)))
 }
 
@@ -2640,5 +2095,5 @@ get_errno :: proc "contextless" (res: int) -> i32 {
 	if res < 0 && res > -4096 {
 		return i32(-res)
 	}
-	return ESUCCESS
+	return 0
 }

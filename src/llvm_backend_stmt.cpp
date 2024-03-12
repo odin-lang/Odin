@@ -748,7 +748,7 @@ gb_internal void lb_build_range_enum(lbProcedure *p, Type *enum_type, Type *val_
 	i64 enum_count = t->Enum.fields.count;
 	lbValue max_count = lb_const_int(m, t_int, enum_count);
 
-	lbValue ti          = lb_type_info(m, t);
+	lbValue ti          = lb_type_info(p, t);
 	lbValue variant     = lb_emit_struct_ep(p, ti, 4);
 	lbValue eti_ptr     = lb_emit_conv(p, variant, t_type_info_enum_ptr);
 	lbValue values      = lb_emit_load(p, lb_emit_struct_ep(p, eti_ptr, 2));
@@ -1843,7 +1843,11 @@ gb_internal void lb_build_return_stmt_internal(lbProcedure *p, lbValue res) {
 
 		lb_emit_defer_stmts(p, lbDeferExit_Return, nullptr);
 
-		LLVMBuildRetVoid(p->builder);
+		// Check for terminator in the defer stmts
+		LLVMValueRef instr = LLVMGetLastInstruction(p->curr_block->block);
+		if (!lb_is_instr_terminating(instr)) {
+			LLVMBuildRetVoid(p->builder);
+		}
 	} else {
 		LLVMValueRef ret_val = res.value;
 		LLVMTypeRef ret_type = p->abi_function_type->ret.type;
@@ -1868,7 +1872,12 @@ gb_internal void lb_build_return_stmt_internal(lbProcedure *p, lbValue res) {
 		}
 
 		lb_emit_defer_stmts(p, lbDeferExit_Return, nullptr);
-		LLVMBuildRet(p->builder, ret_val);
+
+		// Check for terminator in the defer stmts
+		LLVMValueRef instr = LLVMGetLastInstruction(p->curr_block->block);
+		if (!lb_is_instr_terminating(instr)) {
+			LLVMBuildRet(p->builder, ret_val);
+		}
 	}
 }
 gb_internal void lb_build_return_stmt(lbProcedure *p, Slice<Ast *> const &return_results) {
@@ -1887,8 +1896,12 @@ gb_internal void lb_build_return_stmt(lbProcedure *p, Slice<Ast *> const &return
 		// No return values
 
 		lb_emit_defer_stmts(p, lbDeferExit_Return, nullptr);
-
-		LLVMBuildRetVoid(p->builder);
+		
+		// Check for terminator in the defer stmts
+		LLVMValueRef instr = LLVMGetLastInstruction(p->curr_block->block);
+		if (!lb_is_instr_terminating(instr)) {
+			LLVMBuildRetVoid(p->builder);
+		}
 		return;
 	} else if (return_count == 1) {
 		Entity *e = tuple->variables[0];

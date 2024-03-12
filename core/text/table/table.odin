@@ -12,7 +12,7 @@ import "core:io"
 import "core:fmt"
 import "core:mem"
 import "core:mem/virtual"
-import "core:runtime"
+import "base:runtime"
 
 Cell :: struct {
 	text: string,

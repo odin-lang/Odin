@@ -2,32 +2,32 @@
 package os2
 
 import "core:time"
-import "core:runtime"
+import "base:runtime"
 import "core:strings"
-import "core:sys/unix"
+import "core:sys/linux"
 import "core:path/filepath"
 
 _fstat :: proc(f: ^File, allocator: runtime.Allocator) -> (File_Info, Error) {
 	return _fstat_internal(f.impl.fd, allocator)
 }
 
-_fstat_internal :: proc(fd: int, allocator: runtime.Allocator) -> (File_Info, Error) {
-	s: unix.Stat
-	result := unix.sys_fstat(fd, &s)
-	if result < 0 {
-		return {}, _get_platform_error(result)
+_fstat_internal :: proc(fd: linux.Fd, allocator: runtime.Allocator) -> (File_Info, Error) {
+	s: linux.Stat
+	errno := linux.fstat(fd, &s)
+	if errno != .NONE {
+		return {}, _get_platform_error(errno)
 	}
 
 	// TODO: As of Linux 4.11, the new statx syscall can retrieve creation_time
 	fi := File_Info {
 		fullpath = _get_full_path(fd, allocator),
 		name = "",
-		size = s.size,
+		size = i64(s.size),
 		mode = 0,
-		is_dir = unix.S_ISDIR(s.mode),
-		modification_time = time.Time {s.modified.tv_sec * i64(time.Second) + s.modified.tv_nsec},
-		access_time = time.Time {s.last_access.tv_sec * i64(time.Second) + s.last_access.tv_nsec},
-		creation_time = time.Time{0}, // regular stat does not provide this
+		is_directory = linux.S_ISDIR(s.mode),
+		modification_time = time.Time {i64(s.mtime.time_sec) * i64(time.Second) + i64(s.mtime.time_nsec)},
+		access_time = time.Time {i64(s.atime.time_sec) * i64(time.Second) + i64(s.atime.time_nsec)},
+		creation_time = time.Time{i64(s.ctime.time_sec) * i64(time.Second) + i64(s.ctime.time_nsec)}, // regular stat does not provide this
 	}
 	fi.creation_time = fi.modification_time
 
@@ -40,11 +40,11 @@ _stat :: proc(name: string, allocator: runtime.Allocator) -> (File_Info, Error) 
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	name_cstr := strings.clone_to_cstring(name, context.temp_allocator)
 
-	fd := unix.sys_open(name_cstr, unix.O_RDONLY)
-	if fd < 0 {
-		return {}, _get_platform_error(fd)
+	fd, errno := linux.open(name_cstr, {.RDONLY})
+	if errno != .NONE {
+		return {}, _get_platform_error(errno)
 	}
-	defer unix.sys_close(fd)
+	defer linux.close(fd)
 	return _fstat_internal(fd, allocator)
 }
 
@@ -52,11 +52,11 @@ _lstat :: proc(name: string, allocator: runtime.Allocator) -> (File_Info, Error)
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	name_cstr := strings.clone_to_cstring(name, context.temp_allocator)
 
-	fd := unix.sys_open(name_cstr, unix.O_RDONLY | unix.O_PATH | unix.O_NOFOLLOW)
-	if fd < 0 {
-		return {}, _get_platform_error(fd)
+	fd, errno := linux.open(name_cstr, {.RDONLY, .PATH, .NOFOLLOW})
+	if errno != .NONE {
+		return {}, _get_platform_error(errno)
 	}
-	defer unix.sys_close(fd)
+	defer linux.close(fd)
 	return _fstat_internal(fd, allocator)
 }
 

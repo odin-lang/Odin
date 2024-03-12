@@ -1,6 +1,7 @@
+//+no-instrumentation
 package linux
 
-import "core:intrinsics"
+import "base:intrinsics"
 
 
 /*
@@ -2383,7 +2384,11 @@ timer_delete :: proc "contextless" (timer: Timer) -> (Errno) {
 
 // TODO(flysand): clock_settime
 
-// TODO(flysand): clock_gettime
+clock_gettime :: proc "contextless" (clock: Clock_Id) -> (ts: Time_Spec, err: Errno) {
+	ret := syscall(SYS_clock_gettime, clock, &ts)
+	err = Errno(-ret)
+	return
+}
 
 // TODO(flysand): clock_getres
 

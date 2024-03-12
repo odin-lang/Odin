@@ -88,8 +88,8 @@ foreign lib {
 	RWwrite :: proc(ctx: ^RWops, size: c.size_t, num: c.size_t) -> c.size_t ---
 	RWclose :: proc(ctx: ^RWops) -> c.int ---
 
-	LoadFile_RW :: proc(src: ^RWops, datasize: c.size_t, freesrc: bool) -> rawptr ---
-	LoadFile    :: proc(file: rawptr, datasize: c.size_t) -> rawptr ---
+	LoadFile_RW :: proc(src: ^RWops, datasize: ^c.size_t, freesrc: bool) -> rawptr ---
+	LoadFile    :: proc(file: rawptr, datasize: ^c.size_t) -> rawptr ---
 
 	ReadU8   :: proc(src: ^RWops) -> u8 ---
 	ReadLE16 :: proc(src: ^RWops) -> u16 ---

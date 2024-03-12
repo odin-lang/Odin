@@ -3,6 +3,7 @@ package os2
 import "core:sync"
 import "core:time"
 import "core:c"
+import "base:runtime"
 
 args: []string = _alloc_command_line_arguments()
 

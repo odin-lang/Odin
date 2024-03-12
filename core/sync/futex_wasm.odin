@@ -2,7 +2,7 @@
 //+build wasm32, wasm64p32
 package sync
 
-import "core:intrinsics"
+import "base:intrinsics"
 import "core:time"
 
 _futex_wait :: proc "contextless" (f: ^Futex, expected: u32) -> bool {

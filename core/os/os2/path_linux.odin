@@ -3,13 +3,13 @@ package os2
 
 import "core:strings"
 import "core:strconv"
-import "core:runtime"
-import "core:sys/unix"
+import "base:runtime"
+import "core:sys/linux"
 
 _Path_Separator      :: '/'
 _Path_List_Separator :: ':'
 
-_OPENDIR_FLAGS :: unix.O_RDONLY|unix.O_NONBLOCK|unix.O_DIRECTORY|unix.O_LARGEFILE|unix.O_CLOEXEC
+_OPENDIR_FLAGS : linux.Open_Flags : {.RDONLY, .NONBLOCK, .DIRECTORY, .LARGEFILE, .CLOEXEC}
 
 _is_path_separator :: proc(c: byte) -> bool {
 	return c == '/'
@@ -17,45 +17,46 @@ _is_path_separator :: proc(c: byte) -> bool {
 
 _mkdir :: proc(path: string, perm: File_Mode) -> Error {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
-	// TODO: These modes would require sys_mknod, however, that would require
+	// TODO: These modes would require mknod, however, that would require
 	//       additional arguments to this function.
 	if perm & (File_Mode_Named_Pipe | File_Mode_Device | File_Mode_Char_Device | File_Mode_Sym_Link) != 0 {
 		return .Invalid_Argument
 	}
 
 	path_cstr := strings.clone_to_cstring(path, context.temp_allocator)
-	return _ok_or_error(unix.sys_mkdir(path_cstr, uint(perm & 0o777)))
+	return _get_platform_error(linux.mkdir(path_cstr, transmute(linux.Mode)(u32(perm) & 0o777)))
 }
 
 _mkdir_all :: proc(path: string, perm: File_Mode) -> Error {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
-	_mkdirat :: proc(dfd: int, path: []u8, perm: int, has_created: ^bool) -> Error {
+	_mkdirat :: proc(dfd: linux.Fd, path: []u8, perm: int, has_created: ^bool) -> Error {
 		if len(path) == 0 {
-			return _ok_or_error(unix.sys_close(dfd))
+			return _get_platform_error(linux.close(dfd))
 		}
 		i: int
 		for /**/; i < len(path) - 1 && path[i] != '/'; i += 1 {}
 		path[i] = 0
-		new_dfd := unix.sys_openat(dfd, cstring(&path[0]), _OPENDIR_FLAGS)
-		switch new_dfd {
-		case -unix.ENOENT:
-			if res := unix.sys_mkdirat(dfd, cstring(&path[0]), uint(perm)); res < 0 {
-				return _get_platform_error(res)
+		new_dfd, errno := linux.openat(dfd, cstring(&path[0]), _OPENDIR_FLAGS)
+		#partial switch errno {
+		case .ENOENT:
+			if errno := linux.mkdirat(dfd, cstring(&path[0]), transmute(linux.Mode)(u32(perm))); errno != .NONE {
+				return _get_platform_error(errno)
 			}
 			has_created^ = true
-			if new_dfd = unix.sys_openat(dfd, cstring(&path[0]), _OPENDIR_FLAGS); new_dfd < 0 {
-				return _get_platform_error(new_dfd)
+			errno: linux.Errno
+			if new_dfd, errno = linux.openat(dfd, cstring(&path[0]), _OPENDIR_FLAGS); errno != .NONE {
+				return _get_platform_error(errno)
 			}
 			fallthrough
-		case 0:
-			if res := unix.sys_close(dfd); res < 0 {
-				return _get_platform_error(res)
+		case .NONE:
+			if errno := linux.close(dfd); errno != .NONE {
+				return _get_platform_error(errno)
 			}
 			// skip consecutive '/'
 			for i += 1; i < len(path) && path[i] == '/'; i += 1 {}
 			return _mkdirat(new_dfd, path[i:], perm, has_created)
 		case:
-			return _get_platform_error(new_dfd)
+			return _get_platform_error(errno)
 		}
 		unreachable()
 	}
@@ -72,15 +73,16 @@ _mkdir_all :: proc(path: string, perm: File_Mode) -> Error {
 	copy(path_bytes, path)
 	path_bytes[len(path)] = 0
 
-	dfd: int
+	dfd: linux.Fd
+	errno: linux.Errno
 	if path_bytes[0] == '/' {
-		dfd = unix.sys_open("/", _OPENDIR_FLAGS)
+		dfd, errno = linux.open("/", _OPENDIR_FLAGS)
 		path_bytes = path_bytes[1:]
 	} else {
-		dfd = unix.sys_open(".", _OPENDIR_FLAGS)
+		dfd, errno = linux.open(".", _OPENDIR_FLAGS)
 	}
-	if dfd < 0 {
-		return _get_platform_error(dfd)
+	if errno != .NONE {
+		return _get_platform_error(errno)
 	}
 	
 	has_created: bool
@@ -103,28 +105,28 @@ dirent64 :: struct {
 _remove_all :: proc(path: string) -> Error {
 	DT_DIR :: 4
 
-	_remove_all_dir :: proc(dfd: int) -> Error {
+	_remove_all_dir :: proc(dfd: linux.Fd) -> Error {
 		n := 64
 		buf := make([]u8, n)
 		defer delete(buf)
 
 		loop: for {
-			getdents_res := unix.sys_getdents64(dfd, &buf[0], n)
-			switch getdents_res {
-			case -unix.EINVAL:
+			n, errno := linux.getdents(dfd, buf[:])
+			#partial switch errno {
+			case .EINVAL:
 				delete(buf)
 				n *= 2
 				buf = make([]u8, n)
 				continue loop
-			case -4096..<0:
-				return _get_platform_error(getdents_res)
-			case 0:
+			case .NONE:
 				break loop
+			case:
+				return _get_platform_error(errno)
 			}
 
 			d: ^dirent64
 
-			for i := 0; i < getdents_res; i += int(d.d_reclen) {
+			for i := 0; i < n; i += int(d.d_reclen) {
 				d = (^dirent64)(rawptr(&buf[i]))
 				d_name_cstr := cstring(&d.d_name[0])
 
@@ -140,23 +142,23 @@ _remove_all :: proc(path: string) -> Error {
 					continue
 				}
 
-				unlink_res: int
-
+				errno: linux.Errno
 				switch d.d_type {
 				case DT_DIR:
-					new_dfd := unix.sys_openat(dfd, d_name_cstr, _OPENDIR_FLAGS)
-					if new_dfd < 0 {
-						return _get_platform_error(new_dfd)
+					new_dfd: linux.Fd
+					new_dfd, errno = linux.openat(dfd, d_name_cstr, _OPENDIR_FLAGS)
+					if errno != .NONE {
+						return _get_platform_error(errno)
 					}
-					defer unix.sys_close(new_dfd)
+					defer linux.close(new_dfd)
 					_remove_all_dir(new_dfd) or_return
-					unlink_res = unix.sys_unlinkat(dfd, d_name_cstr, int(unix.AT_REMOVEDIR))
+					errno = linux.unlinkat(dfd, d_name_cstr, {.REMOVEDIR})
 				case:
-					unlink_res = unix.sys_unlinkat(dfd, d_name_cstr) 
+					errno = linux.unlinkat(dfd, d_name_cstr, nil)
 				}
 
-				if unlink_res < 0 {
-					return _get_platform_error(unlink_res)
+				if errno != .NONE {
+					return _get_platform_error(errno)
 				}
 			}
 		}
@@ -165,17 +167,19 @@ _remove_all :: proc(path: string) -> Error {
 
 	path_cstr := strings.clone_to_cstring(path, context.temp_allocator)
 
-	fd := unix.sys_open(path_cstr, _OPENDIR_FLAGS)
-	switch fd {
-	case -unix.ENOTDIR:
-		return _ok_or_error(unix.sys_unlink(path_cstr))
-	case -4096..<0:
-		return _get_platform_error(fd)
+	fd, errno := linux.open(path_cstr, _OPENDIR_FLAGS)
+	#partial switch errno {
+	case .NONE:
+		break
+	case .ENOTDIR:
+		return _get_platform_error(linux.unlink(path_cstr))
+	case:
+		return _get_platform_error(errno)
 	}
 
-	defer unix.sys_close(fd)
+	defer linux.close(fd)
 	_remove_all_dir(fd) or_return
-	return _ok_or_error(unix.sys_rmdir(path_cstr))
+	return _get_platform_error(linux.rmdir(path_cstr))
 }
 
 _getwd :: proc(allocator: runtime.Allocator) -> (string, Error) {
@@ -186,13 +190,12 @@ _getwd :: proc(allocator: runtime.Allocator) -> (string, Error) {
 	PATH_MAX :: 4096
 	buf := make([dynamic]u8, PATH_MAX, allocator)
 	for {
-		#no_bounds_check res := unix.sys_getcwd(&buf[0], uint(len(buf)))
-
-		if res >= 0 {
-			return strings.string_from_null_terminated_ptr(&buf[0], len(buf)), nil
+		#no_bounds_check n, errno := linux.getcwd(buf[:])
+		if errno == .NONE {
+			return string(buf[:n]), nil
 		}
-		if res != -unix.ERANGE {
-			return "", _get_platform_error(res)
+		if errno != .ERANGE {
+			return "", _get_platform_error(errno)
 		}
 		resize(&buf, len(buf)+PATH_MAX)
 	}
@@ -201,16 +204,16 @@ _getwd :: proc(allocator: runtime.Allocator) -> (string, Error) {
 
 _setwd :: proc(dir: string) -> Error {
 	dir_cstr := strings.clone_to_cstring(dir, context.temp_allocator)
-	return _ok_or_error(unix.sys_chdir(dir_cstr))
+	return _get_platform_error(linux.chdir(dir_cstr))
 }
 
-_get_full_path :: proc(fd: int, allocator: runtime.Allocator) -> string {
+_get_full_path :: proc(fd: linux.Fd, allocator: runtime.Allocator) -> string {
 	PROC_FD_PATH :: "/proc/self/fd/"
 
 	buf: [32]u8
 	copy(buf[:], PROC_FD_PATH)
 
-	strconv.itoa(buf[len(PROC_FD_PATH):], fd)
+	strconv.itoa(buf[len(PROC_FD_PATH):], int(fd))
 
 	fullpath: string
 	err: Error

@@ -11,7 +11,7 @@
 package math_big
 
 import "core:time"
-import "core:runtime"
+import "base:runtime"
 
 print_value :: proc(name: string, value: i64) {
 	runtime.print_string("\t")

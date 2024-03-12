@@ -323,6 +323,7 @@ struct BuildContext {
 	bool   ODIN_DEBUG;                    // Odin in debug mode
 	bool   ODIN_DISABLE_ASSERT;           // Whether the default 'assert' et al is disabled in code or not
 	bool   ODIN_DEFAULT_TO_NIL_ALLOCATOR; // Whether the default allocator is a "nil" allocator or not (i.e. it does nothing)
+	bool   ODIN_DEFAULT_TO_PANIC_ALLOCATOR; // Whether the default allocator is a "panic" allocator or not (i.e. panics on any call to it)
 	bool   ODIN_FOREIGN_ERROR_PROCEDURES;
 	bool   ODIN_VALGRIND_SUPPORT;
 
@@ -422,6 +423,7 @@ struct BuildContext {
 	Array<String> extra_packages;
 
 	StringSet test_names;
+	bool      test_all_packages;
 
 	gbAffinity affinity;
 	isize      thread_count;
@@ -874,7 +876,7 @@ gb_internal String internal_odin_root_dir(void) {
 
 #include <mach-o/dyld.h>
 
-gb_internal String path_to_fullpath(gbAllocator a, String s);
+gb_internal String path_to_fullpath(gbAllocator a, String s, bool *ok_);
 
 gb_internal String internal_odin_root_dir(void) {
 	String path = global_module_path;
@@ -905,7 +907,7 @@ gb_internal String internal_odin_root_dir(void) {
 	text = gb_alloc_array(permanent_allocator(), u8, len + 1);
 	gb_memmove(text, &path_buf[0], len);
 
-	path = path_to_fullpath(heap_allocator(), make_string(text, len));
+	path = path_to_fullpath(heap_allocator(), make_string(text, len), nullptr);
 
 	for (i = path.len-1; i >= 0; i--) {
 		u8 c = path[i];
@@ -928,7 +930,7 @@ gb_internal String internal_odin_root_dir(void) {
 // NOTE: Linux / Unix is unfinished and not tested very well.
 #include <sys/stat.h>
 
-gb_internal String path_to_fullpath(gbAllocator a, String s);
+gb_internal String path_to_fullpath(gbAllocator a, String s, bool *ok_);
 
 gb_internal String internal_odin_root_dir(void) {
 	String path = global_module_path;
@@ -1070,7 +1072,7 @@ gb_internal String internal_odin_root_dir(void) {
 
 	gb_memmove(text, &path_buf[0], len);
 
-	path = path_to_fullpath(heap_allocator(), make_string(text, len));
+	path = path_to_fullpath(heap_allocator(), make_string(text, len), nullptr);
 	for (i = path.len-1; i >= 0; i--) {
 		u8 c = path[i];
 		if (c == '/' || c == '\\') {
@@ -1089,7 +1091,7 @@ gb_internal String internal_odin_root_dir(void) {
 gb_global BlockingMutex fullpath_mutex;
 
 #if defined(GB_SYSTEM_WINDOWS)
-gb_internal String path_to_fullpath(gbAllocator a, String s) {
+gb_internal String path_to_fullpath(gbAllocator a, String s, bool *ok_) {
 	String result = {};
 
 	String16 string16 = string_to_string16(heap_allocator(), s);
@@ -1115,19 +1117,25 @@ gb_internal String path_to_fullpath(gbAllocator a, String s) {
 				result.text[i] = '/';
 			}
 		}
+		if (ok_) *ok_ = true;
 	} else {
+		if (ok_) *ok_ = false;
 		mutex_unlock(&fullpath_mutex);
 	}
 
 	return result;
 }
 #elif defined(GB_SYSTEM_OSX) || defined(GB_SYSTEM_UNIX)
-gb_internal String path_to_fullpath(gbAllocator a, String s) {
+gb_internal String path_to_fullpath(gbAllocator a, String s, bool *ok_) {
 	char *p;
 	mutex_lock(&fullpath_mutex);
 	p = realpath(cast(char *)s.text, 0);
 	mutex_unlock(&fullpath_mutex);
-	if(p == nullptr) return String{};
+	if(p == nullptr) {
+		if (ok_) *ok_ = false;
+		return String{};
+	}
+	if (ok_) *ok_ = true;
 	return make_string_c(p);
 }
 #else
@@ -1135,7 +1143,7 @@ gb_internal String path_to_fullpath(gbAllocator a, String s) {
 #endif
 
 
-gb_internal String get_fullpath_relative(gbAllocator a, String base_dir, String path) {
+gb_internal String get_fullpath_relative(gbAllocator a, String base_dir, String path, bool *ok_) {
 	u8 *str = gb_alloc_array(heap_allocator(), u8, base_dir.len+1+path.len+1);
 	defer (gb_free(heap_allocator(), str));
 
@@ -1157,11 +1165,31 @@ gb_internal String get_fullpath_relative(gbAllocator a, String base_dir, String 
 
 	String res = make_string(str, i);
 	res = string_trim_whitespace(res);
-	return path_to_fullpath(a, res);
+	return path_to_fullpath(a, res, ok_);
 }
 
 
-gb_internal String get_fullpath_core(gbAllocator a, String path) {
+gb_internal String get_fullpath_base_collection(gbAllocator a, String path, bool *ok_) {
+	String module_dir = odin_root_dir();
+
+	String base = str_lit("base/");
+
+	isize str_len = module_dir.len + base.len + path.len;
+	u8 *str = gb_alloc_array(heap_allocator(), u8, str_len+1);
+	defer (gb_free(heap_allocator(), str));
+
+	isize i = 0;
+	gb_memmove(str+i, module_dir.text, module_dir.len); i += module_dir.len;
+	gb_memmove(str+i, base.text, base.len);             i += base.len;
+	gb_memmove(str+i, path.text, path.len);             i += path.len;
+	str[i] = 0;
+
+	String res = make_string(str, i);
+	res = string_trim_whitespace(res);
+	return path_to_fullpath(a, res, ok_);
+}
+
+gb_internal String get_fullpath_core_collection(gbAllocator a, String path, bool *ok_) {
 	String module_dir = odin_root_dir();
 
 	String core = str_lit("core/");
@@ -1178,7 +1206,7 @@ gb_internal String get_fullpath_core(gbAllocator a, String path) {
 
 	String res = make_string(str, i);
 	res = string_trim_whitespace(res);
-	return path_to_fullpath(a, res);
+	return path_to_fullpath(a, res, ok_);
 }
 
 gb_internal bool show_error_line(void) {
@@ -1454,6 +1482,16 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 			break;
 		}
 	}
+
+	if (bc->metrics.os == TargetOs_freestanding) {
+		bc->ODIN_DEFAULT_TO_NIL_ALLOCATOR = !bc->ODIN_DEFAULT_TO_PANIC_ALLOCATOR;
+	} else if (is_arch_wasm()) {
+		if (bc->metrics.os == TargetOs_js || bc->metrics.os == TargetOs_wasi) {
+			// TODO(bill): Should these even have a default "heap-like" allocator?
+		}
+		bc->ODIN_DEFAULT_TO_PANIC_ALLOCATOR = true;
+		bc->ODIN_DEFAULT_TO_NIL_ALLOCATOR = !bc->ODIN_DEFAULT_TO_PANIC_ALLOCATOR;
+	}
 }
 
 #if defined(GB_SYSTEM_WINDOWS)
@@ -1588,8 +1626,8 @@ gb_internal bool init_build_paths(String init_filename) {
 		produces_output_file = true;
 	}
 
-
-	if (build_context.ODIN_DEFAULT_TO_NIL_ALLOCATOR) {
+	if (build_context.ODIN_DEFAULT_TO_NIL_ALLOCATOR ||
+	    build_context.ODIN_DEFAULT_TO_PANIC_ALLOCATOR) {
 		bc->no_dynamic_literals = true;
 	}
 

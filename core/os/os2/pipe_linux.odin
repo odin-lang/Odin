@@ -1,13 +1,13 @@
 //+private
 package os2
 
-import "core:sys/unix"
+import "core:sys/linux"
 
 _pipe :: proc() -> (r, w: ^File, err: Error) {
-	fds: [2]i32
-	res := unix.sys_pipe2(&fds[0], 0)
-	if res < 0 {
-		return nil, nil,_get_platform_error(res)
+	fds: [2]linux.Fd
+	errno := linux.pipe2(&fds, nil)
+	if errno != .NONE {
+		return nil, nil,_get_platform_error(errno)
 	}
 
 	r = _new_file(uintptr(fds[0]))

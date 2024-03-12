@@ -1,13 +1,15 @@
 //+private
 package os2
 
+import "base:runtime"
+
 import "core:c"
 import "core:fmt"
+import "core:mem"
 import "core:time"
-import "core:runtime"
 import "core:strings"
 import "core:strconv"
-import "core:sys/unix"
+import "core:sys/linux"
 import "core:path/filepath"
 
 _alloc_command_line_arguments :: proc() -> []string {
@@ -19,31 +21,31 @@ _alloc_command_line_arguments :: proc() -> []string {
 }
 
 _exit :: proc "contextless" (code: int) -> ! {
-	unix.sys_exit_group(code)
+	linux.exit_group(i32(code))
 }
 
 _get_uid :: proc() -> int {
-	return unix.sys_getuid()
+	return int(linux.getuid())
 }
 
 _get_euid :: proc() -> int {
-	return unix.sys_geteuid()
+	return int(linux.geteuid())
 }
 
 _get_gid :: proc() -> int {
-	return unix.sys_getgid()
+	return int(linux.getgid())
 }
 
 _get_egid :: proc() -> int {
-	return unix.sys_getegid()
+	return int(linux.getegid())
 }
 
 _get_pid :: proc() -> int {
-	return unix.sys_getpid()
+	return int(linux.getpid())
 }
 
 _get_ppid :: proc() -> int {
-	return unix.sys_getppid()
+	return int(linux.getppid())
 }
 
 Process_Attributes_OS_Specific :: struct {}
@@ -53,19 +55,20 @@ _process_find :: proc(pid: int) -> (Process, Error) {
 	pid_path := fmt.ctprintf("/proc/%d", pid)
 
 	p: Process
-	dir_fd: int
+	dir_fd: linux.Fd
+	errno: linux.Errno
 
-	switch dir_fd = unix.sys_open(pid_path, _OPENDIR_FLAGS); dir_fd {
-	case 0:
-		unix.sys_close(dir_fd)
+	#partial switch dir_fd, errno = linux.open(pid_path, _OPENDIR_FLAGS); errno {
+	case .NONE:
+		linux.close(dir_fd)
 		p.pid = pid
 		return p, nil
-	case -unix.ENOTDIR:
+	case .ENOTDIR:
 		return p, .Invalid_Dir
-	case -unix.ENOENT:
+	case .ENOENT:
 		return p, .Not_Exist
 	}
-	return p, _get_platform_error(dir_fd)
+	return p, _get_platform_error(errno)
 }
 
 _process_get_state :: proc(p: Process) -> (state: Process_State, err: Error) {
@@ -110,11 +113,12 @@ _process_start :: proc(name: string, argv: []string, attr: ^Process_Attributes) 
 	child: Process
 
 	// TODO
-	//dir_fd := transmute(int)(unix.AT_FDCWD)
-	dir_fd := -100
+	//dir_fd := transmute(int)(linux.AT_FDCWD)
+	dir_fd : linux.Fd = -100
+	errno: linux.Errno
 	if attr != nil && attr.dir != "" {
-		if dir_fd = unix.sys_open("/", _OPENDIR_FLAGS); dir_fd < 0 {
-			return child, _get_platform_error(dir_fd)
+		if dir_fd, errno = linux.open("/", _OPENDIR_FLAGS); errno != .NONE {
+			return child, _get_platform_error(errno)
 		}
 	}
 
@@ -126,7 +130,7 @@ _process_start :: proc(name: string, argv: []string, attr: ^Process_Attributes) 
 		found: bool
 		for dir in path_dirs {
 			executable = fmt.ctprintf("%s/%s", dir, name)
-			if unix.sys_faccessat(dir_fd, executable, unix.F_OK) == 0 {
+			if not_found, errno := linux.faccessat(dir_fd, executable, linux.F_OK); errno == .NONE && !not_found {
 				found = true
 				break
 			}
@@ -134,7 +138,7 @@ _process_start :: proc(name: string, argv: []string, attr: ^Process_Attributes) 
 		if !found {
 			// check in dir to match windows behavior
 			executable = fmt.ctprintf("./%s", name)
-			if unix.sys_faccessat(dir_fd, executable, unix.F_OK) != 0 {
+			if not_found, errno := linux.faccessat(dir_fd, executable, linux.F_OK); errno != .NONE || not_found {
 				return child, .Not_Exist
 			}
 		}
@@ -142,8 +146,9 @@ _process_start :: proc(name: string, argv: []string, attr: ^Process_Attributes) 
 		executable = strings.clone_to_cstring(name, context.temp_allocator)
 	}
 
-	if unix.sys_faccessat(dir_fd, executable, unix.F_OK | unix.X_OK) != 0 {
-		return child, .Permission_Denied
+	not_exec: bool
+	if not_exec, errno = linux.faccessat(dir_fd, executable, linux.F_OK | linux.X_OK); errno != .NONE || not_exec {
+		return child, errno == .NONE ? .Permission_Denied : _get_platform_error(errno)
 	}
 
 	// args and environment need to be a list of cstrings
@@ -180,70 +185,71 @@ _process_start :: proc(name: string, argv: []string, attr: ^Process_Attributes) 
 	//           c. execve
 	//       5. restore signal handlers
 	//
-	stdin_fds: [2]i32
-	stdout_fds: [2]i32
-	stderr_fds: [2]i32
+	stdin_fds: [2]linux.Fd
+	stdout_fds: [2]linux.Fd
+	stderr_fds: [2]linux.Fd
 	if attr != nil && attr.stdin != nil {
-		if res := unix.sys_pipe2(&stdin_fds[0], 0); res < 0 {
-			return child, _get_platform_error(res)
+		if errno := linux.pipe2(&stdin_fds, nil); errno != .NONE {
+			return child, _get_platform_error(errno)
 		}
 	}
 	if attr != nil && attr.stdout != nil {
-		if res := unix.sys_pipe2(&stdout_fds[0], 0); res < 0 {
-			return child, _get_platform_error(res)
+		if errno := linux.pipe2(&stdout_fds, nil); errno != .NONE {
+			return child, _get_platform_error(errno)
 		}
 	}
 	if attr != nil && attr.stderr != nil {
-		if res := unix.sys_pipe2(&stderr_fds[0], 0); res < 0 {
-			return child, _get_platform_error(res)
+		if errno := linux.pipe2(&stderr_fds, nil); errno != .NONE {
+			return child, _get_platform_error(errno)
 		}
 	}
 
-	res: int
-	if res = unix.sys_fork(); res < 0 {
-		return child, _get_platform_error(res)
+	pid: linux.Pid
+	if pid, errno = linux.fork(); errno != .NONE {
+		return child, _get_platform_error(errno)
 	}
 
-	if res == 0 {
+	if pid == 0 {
 		// in child process now
 		if attr != nil && attr.stdin != nil {
-			if unix.sys_close(int(stdin_fds[1])) < 0 { unix.sys_exit(1) }
-			if unix.sys_dup2(int(stdin_fds[0]), 0) < 0 { unix.sys_exit(1) }
-			if unix.sys_close(int(stdin_fds[0])) < 0 { unix.sys_exit(1) }
+			if linux.close(stdin_fds[1]) != .NONE { linux.exit(1) }
+			if _, errno := linux.dup2(stdin_fds[0], 0); errno != .NONE { linux.exit(1) }
+			if linux.close(stdin_fds[0]) != .NONE { linux.exit(1) }
 		}
 		if attr != nil && attr.stdout != nil {
-			if unix.sys_close(int(stdout_fds[0])) < 0 { unix.sys_exit(1) }
-			if unix.sys_dup2(int(stdout_fds[1]), 1) < 0 { unix.sys_exit(1) }
-			if unix.sys_close(int(stdout_fds[1])) < 0 { unix.sys_exit(1) }
+			if linux.close(stdout_fds[0]) != .NONE { linux.exit(1) }
+			if _, errno := linux.dup2(stdout_fds[1], 1); errno != .NONE { linux.exit(1) }
+			if linux.close(stdout_fds[1]) != .NONE { linux.exit(1) }
 		}
 		if attr != nil && attr.stderr != nil {
-			if unix.sys_close(int(stderr_fds[0])) < 0 { unix.sys_exit(1) }
-			if unix.sys_dup2(int(stderr_fds[1]), 2) < 0 { unix.sys_exit(1) }
-			if unix.sys_close(int(stderr_fds[1])) < 0 { unix.sys_exit(1) }
+			if linux.close(stderr_fds[0]) != .NONE { linux.exit(1) }
+			if _, errno := linux.dup2(stderr_fds[1], 2); errno != .NONE { linux.exit(1) }
+			if linux.close(stderr_fds[1]) != .NONE { linux.exit(1) }
 		}
 
-		if res = unix.sys_execveat(dir_fd, executable, &cargs[0], env, 0); res < 0 {
-			print_error(_get_platform_error(res), string(executable))
-			panic("sys_execve failed to replace process")
+		// TODO: missing flags parameter?
+		if errno = linux.execveat(dir_fd, executable, &cargs[0], env); errno != .NONE {
+			print_error(_get_platform_error(errno), string(executable))
+			panic("execve failed to replace process")
 		}
 		unreachable()
 	}
 
 	// in parent process
 	if attr != nil && attr.stdin != nil {
-		unix.sys_close(int(stdin_fds[0]))
+		linux.close(stdin_fds[0])
 		_construct_file(attr.stdin, uintptr(stdin_fds[1]))
 	}
 	if attr != nil && attr.stdout != nil {
-		unix.sys_close(int(stdout_fds[1]))
+		linux.close(stdout_fds[1])
 		_construct_file(attr.stdout, uintptr(stdout_fds[0]))
 	}
 	if attr != nil && attr.stderr != nil {
-		unix.sys_close(int(stderr_fds[1]))
+		linux.close(stderr_fds[1])
 		_construct_file(attr.stderr, uintptr(stderr_fds[0]))
 	}
 
-	child.pid = res
+	child.pid = int(pid)
 	return child, nil
 }
 
@@ -253,109 +259,126 @@ _process_release :: proc(p: ^Process) -> Error {
 }
 
 _process_kill :: proc(p: ^Process) -> Error {
-	res := unix.sys_kill(p.pid, unix.SIGKILL)
-	return _ok_or_error(res)
+	res := linux.kill(linux.Pid(p.pid), .SIGKILL)
+	return _get_platform_error(res)
 }
 
 _process_signal :: proc(sig: Signal, h: Signal_Handler) -> Error {
-	signo: int
+	signo: linux.Signal
 	switch sig {
-	case .Abort:                    signo = unix.SIGABRT
-	case .Floating_Point_Exception: signo = unix.SIGFPE
-	case .Illegal_Instruction:      signo = unix.SIGILL
-	case .Interrupt:                signo = unix.SIGINT
-	case .Segmentation_Fault:       signo = unix.SIGSEGV
-	case .Termination:              signo = unix.SIGTERM
+	case .Abort:                    signo = .SIGABRT
+	case .Floating_Point_Exception: signo = .SIGFPE
+	case .Illegal_Instruction:      signo = .SIGILL
+	case .Interrupt:                signo = .SIGINT
+	case .Segmentation_Fault:       signo = .SIGSEGV
+	case .Termination:              signo = .SIGTERM
 	}
 
-	sigact: unix.Sigaction
+	// TODO: some things missing from linux.Sig_Action
+	sigact: linux.Sig_Action(int)
+	old: ^linux.Sig_Action(int) = nil
+
 	switch v in h {
 	case Signal_Handler_Special:
-		switch v {
-		case .Default:
-			sigact.sa_special = unix.SIG_DFL
-		case .Ignore:
-			sigact.sa_special = unix.SIG_IGN
-		}
+		unimplemented("Need special handlers implemented")
+		//switch v {
+		//case .Default:
+		//	sigact.special = .SIG_DFL
+		//case .Ignore:
+		//	sigact.special = .SIG_IGN
+		//}
 	case Signal_Handler_Proc:
-		sigact.sa_handler = v
+		sigact.handler = (linux.Sig_Handler_Fn)(v)
 	}
 
-	return _ok_or_error(unix.sys_rt_sigaction(signo, &sigact, nil))
+	return _get_platform_error(linux.rt_sigaction(signo, &sigact, old))
 }
 
 _process_wait :: proc(p: ^Process, t: time.Duration) -> (state: Process_State, err: Error) {
 	state.pid = p.pid
 
-	//options: int = unix.WEXITED
-	options: int
+	options: linux.Wait_Options
 	big_if: if t == 0 {
-		options |= unix.WNOHANG
+		options += {.WNOHANG}
 	} else if t != time.MAX_DURATION {
-		ts: unix.timespec = {
-			tv_sec = c.long(t / time.Second),
-			tv_nsec = c.long(t % time.Second),
+		ts: linux.Time_Spec= {
+			time_sec = uint(t / time.Second),
+			time_nsec = uint(t % time.Second),
 		}
 
 		@static has_pidfd_open: bool = true
 
-		// sys_pidfd_open is fairly new, so don't error out on ENOSYS
-		pid_fd: int 
+		// pidfd_open is fairly new, so don't error out on ENOSYS
+		pid_fd: linux.Pid_FD
+		errno: linux.Errno
 		if has_pidfd_open {
-			pid_fd = unix.sys_pidfd_open(p.pid, 0)
-			if pid_fd < 0 && pid_fd != -unix.ENOSYS {
-				return state, _get_platform_error(pid_fd)
+			pid_fd, errno = linux.pidfd_open(linux.Pid(p.pid), nil)
+			if errno != .NONE && errno != .ENOSYS {
+				return state, _get_platform_error(errno)
 			}
 		}
 
-		if has_pidfd_open && pid_fd != -unix.ENOSYS {
-			defer unix.sys_close(pid_fd)
-			pollfd: unix.Pollfd = {
-				fd = i32(pid_fd),
-				events = unix.POLLIN,
+		if has_pidfd_open && errno != .ENOSYS {
+			defer linux.close(linux.Fd(pid_fd))
+			pollfd: [1]linux.Poll_Fd = {
+				{
+					fd = linux.Fd(pid_fd),
+					events = {.IN},
+				},
 			}
 			for {
-				res := unix.sys_ppoll(&pollfd, 1, &ts, nil)
-				if res == -unix.EINTR {
+				errno := linux.ppoll(pollfd[:], &ts, nil)
+				if errno == .EINTR {
 					continue
 				}
-				if res < 0 {
-					return state, _get_platform_error(res)
+				if errno != .NONE {
+					return state, _get_platform_error(errno)
 				}
-				if res == 0 {
+				else {
 					return _process_get_state(p^)
 				}
 				break
 			}
 		} else {
 			has_pidfd_open = false
-			mask: unix.sigset_t = 1 << (unix.SIGCHLD - 1)
-			org_mask : unix.sigset_t
-			res := unix.sys_rt_sigprocmask(.SIG_BLOCK, &mask, &org_mask)
-			if res < 0 {
-				return state, _get_platform_error(res)
+			mask: bit_set[0..=63]
+			mask += { int(linux.Signal.SIGCHLD) - 1 }
+
+			// TODO: fix linux.Sig_Set
+			org_sigset: linux.Sig_Set
+			sigset: linux.Sig_Set
+			mem.copy(&sigset, &mask, size_of(mask))
+			errno := linux.rt_sigprocmask(.SIG_BLOCK, &sigset, &org_sigset)
+			if errno != .NONE {
+				return state, _get_platform_error(errno)
 			}
-			defer unix.sys_rt_sigprocmask(.SIG_SETMASK, &org_mask, nil)
+			defer linux.rt_sigprocmask(.SIG_SETMASK, &org_sigset, nil)
 
 			// In case there was a signal handler on SIGCHLD, avoid race
 			// condition by checking wait first.
-			options |= unix.WNOHANG
-			info: unix.Siginfo
-			res = unix.sys_waitid(.P_PID, p.pid, &info, options | unix.WNOWAIT | unix.WEXITED, nil)
-			if res == 0 && info.si_code != 0 {
+			options += {.WNOHANG}
+			waitid_options := options + {.WNOWAIT, .WEXITED}
+			info: linux.Sig_Info
+			// TODO: missing struct rusage* parameter
+			errno = linux.waitid(.PID, linux.Id(p.pid), &info, waitid_options)
+			if errno == .NONE && info.code != 0 {
 				break big_if
 			}
 
 			loop: for {
-				switch res = unix.sys_rt_sigtimedwait(&mask, &info, &ts); res {
-				case -unix.EAGAIN: // timeout
+				sigset: linux.Sig_Set
+				mem.copy(&sigset, &mask, size_of(mask))
+
+				_, errno = linux.rt_sigtimedwait(&sigset, &info, &ts)
+				#partial switch errno {
+				case .EAGAIN: // timeout
 					return _process_get_state(p^)
-				case -unix.EINVAL:
-					return state, _get_platform_error(res)
-				case -unix.EINTR:
+				case .EINVAL:
+					return state, _get_platform_error(errno)
+				case .EINTR:
 					continue
 				case:
-					if info.si_pid == i32(p.pid) {
+					if int(info.pid) == p.pid {
 						break loop
 					}
 				}
@@ -365,25 +388,27 @@ _process_wait :: proc(p: ^Process, t: time.Duration) -> (state: Process_State, e
 
 	state = _process_get_state(p^) or_return
 
-	status: i32
-	res: int
+	status: u32
+	errno: linux.Errno
 	for {
-		res = unix.sys_wait4(p.pid, &status, options, nil)
-		if res == -unix.EINTR {
+		// TODO: missing struct rusage* parameter
+		_, errno = linux.wait4(linux.Pid(p.pid), &status, options)
+		if errno == .EINTR {
 			continue
 		}
-		if res < 0 {
-			return state, _get_platform_error(res)
+		if errno != .NONE {
+			return state, _get_platform_error(errno)
 		}
 		break
 	}
 
-	if res == 0 {
+	if errno == .NONE {
 		return _process_get_state(p^)
 	}
 
 	state.exited = true
 	p.is_done = true
+
 	// normal exit
 	if signo := status & 0x7f; signo == 0 {
 		state.exit_code = int((status >> 8) & 0xff)

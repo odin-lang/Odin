@@ -12,10 +12,16 @@ package _sha3
 */
 
 import "core:math/bits"
+import "core:mem"
 
 ROUNDS :: 24
 
-Sha3_Context :: struct {
+RATE_224 :: 1152 / 8
+RATE_256 :: 1088 / 8
+RATE_384 :: 832 / 8
+RATE_512 :: 576 / 8
+
+Context :: struct {
 	st:        struct #raw_union {
 		b: [200]u8,
 		q: [25]u64,
@@ -103,81 +109,100 @@ keccakf :: proc "contextless" (st: ^[25]u64) {
 	}
 }
 
-init :: proc(c: ^Sha3_Context) {
+init :: proc(ctx: ^Context) {
 	for i := 0; i < 25; i += 1 {
-		c.st.q[i] = 0
+		ctx.st.q[i] = 0
 	}
-	c.rsiz = 200 - 2 * c.mdlen
-	c.pt = 0
+	ctx.rsiz = 200 - 2 * ctx.mdlen
+	ctx.pt = 0
 
-	c.is_initialized = true
-	c.is_finalized = false
+	ctx.is_initialized = true
+	ctx.is_finalized = false
 }
 
-update :: proc(c: ^Sha3_Context, data: []byte) {
-	assert(c.is_initialized)
-	assert(!c.is_finalized)
+update :: proc(ctx: ^Context, data: []byte) {
+	assert(ctx.is_initialized)
+	assert(!ctx.is_finalized)
 
-	j := c.pt
+	j := ctx.pt
 	for i := 0; i < len(data); i += 1 {
-		c.st.b[j] ~= data[i]
+		ctx.st.b[j] ~= data[i]
 		j += 1
-		if j >= c.rsiz {
-			keccakf(&c.st.q)
+		if j >= ctx.rsiz {
+			keccakf(&ctx.st.q)
 			j = 0
 		}
 	}
-	c.pt = j
+	ctx.pt = j
 }
 
-final :: proc(c: ^Sha3_Context, hash: []byte) {
-	assert(c.is_initialized)
+final :: proc(ctx: ^Context, hash: []byte, finalize_clone: bool = false) {
+	assert(ctx.is_initialized)
 
-	if len(hash) < c.mdlen {
-		if c.is_keccak {
+	if len(hash) < ctx.mdlen {
+		if ctx.is_keccak {
 			panic("crypto/keccac: invalid destination digest size")
 		}
 		panic("crypto/sha3: invalid destination digest size")
 	}
-	if c.is_keccak {
-		c.st.b[c.pt] ~= 0x01
+
+	ctx := ctx
+	if finalize_clone {
+		tmp_ctx: Context
+		clone(&tmp_ctx, ctx)
+		ctx = &tmp_ctx
+	}
+	defer(reset(ctx))
+
+	if ctx.is_keccak {
+		ctx.st.b[ctx.pt] ~= 0x01
 	} else {
-		c.st.b[c.pt] ~= 0x06
+		ctx.st.b[ctx.pt] ~= 0x06
 	}
 
-	c.st.b[c.rsiz - 1] ~= 0x80
-	keccakf(&c.st.q)
-	for i := 0; i < c.mdlen; i += 1 {
-		hash[i] = c.st.b[i]
+	ctx.st.b[ctx.rsiz - 1] ~= 0x80
+	keccakf(&ctx.st.q)
+	for i := 0; i < ctx.mdlen; i += 1 {
+		hash[i] = ctx.st.b[i]
+	}
+}
+
+clone :: proc(ctx, other: ^Context) {
+	ctx^ = other^
+}
+
+reset :: proc(ctx: ^Context) {
+	if !ctx.is_initialized {
+		return
 	}
 
-	c.is_initialized = false // No more absorb, no more squeeze.
+	mem.zero_explicit(ctx, size_of(ctx^))
 }
 
-shake_xof :: proc(c: ^Sha3_Context) {
-	assert(c.is_initialized)
-	assert(!c.is_finalized)
+shake_xof :: proc(ctx: ^Context) {
+	assert(ctx.is_initialized)
+	assert(!ctx.is_finalized)
 
-	c.st.b[c.pt] ~= 0x1F
-	c.st.b[c.rsiz - 1] ~= 0x80
-	keccakf(&c.st.q)
-	c.pt = 0
+	ctx.st.b[ctx.pt] ~= 0x1F
+	ctx.st.b[ctx.rsiz - 1] ~= 0x80
+	keccakf(&ctx.st.q)
+	ctx.pt = 0
 
-	c.is_finalized = true // No more absorb, unlimited squeeze.
+	ctx.is_finalized = true // No more absorb, unlimited squeeze.
 }
 
-shake_out :: proc(c: ^Sha3_Context, hash: []byte) {
-	assert(c.is_initialized)
-	assert(c.is_finalized)
+shake_out :: proc(ctx: ^Context, hash: []byte) {
+	assert(ctx.is_initialized)
+	assert(ctx.is_finalized)
 
-	j := c.pt
+	j := ctx.pt
 	for i := 0; i < len(hash); i += 1 {
-		if j >= c.rsiz {
-			keccakf(&c.st.q)
+		if j >= ctx.rsiz {
+			keccakf(&ctx.st.q)
 			j = 0
 		}
-		hash[i] = c.st.b[j]
+		hash[i] = ctx.st.b[j]
 		j += 1
 	}
-	c.pt = j
+	ctx.pt = j
 }

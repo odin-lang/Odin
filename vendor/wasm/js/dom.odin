@@ -70,7 +70,7 @@ window_get_scroll :: proc "contextless" () -> (x, y: f64) {
 		@(link_name="window_get_scroll")
 		_window_get_scroll :: proc(scroll: ^[2]f64) ---
 	}
-	scroll := [2]f64{x, y}
+	scroll: [2]f64
 	_window_get_scroll(&scroll)
-	return
+	return scroll.x, scroll.y
 }

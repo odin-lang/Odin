@@ -340,6 +340,19 @@ struct LoadFileCache {
 	StringMap<u64> hashes;
 };
 
+
+struct LoadDirectoryFile {
+	String file_name;
+	String data;
+};
+
+struct LoadDirectoryCache {
+	String                 path;
+	gbFileError            file_error;
+	Array<LoadFileCache *> files;
+};
+
+
 struct GenProcsData {
 	Array<Entity *> procs;
 	RwMutex         mutex;
@@ -416,6 +429,11 @@ struct CheckerInfo {
 	BlockingMutex instrumentation_mutex;
 	Entity *instrumentation_enter_entity;
 	Entity *instrumentation_exit_entity;
+
+
+	BlockingMutex                       load_directory_mutex;
+	StringMap<LoadDirectoryCache *>     load_directory_cache;
+	PtrMap<Ast *, LoadDirectoryCache *> load_directory_map; // Key: Ast_CallExpr *
 };
 
 struct CheckerContext {
@@ -457,6 +475,7 @@ struct CheckerContext {
 	bool       hide_polymorphic_errors;
 	bool       in_polymorphic_specialization;
 	bool       allow_arrow_right_selector_expr;
+	u8         bit_field_bit_size;
 	Scope *    polymorphic_scope;
 
 	Ast *assignment_lhs_hint;

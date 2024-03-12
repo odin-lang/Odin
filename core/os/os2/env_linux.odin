@@ -1,8 +1,9 @@
 //+private
 package os2
 
+import "base:runtime"
+
 import "core:slice"
-import "core:runtime"
 import "core:strings"
 import "core:intrinsics"
 

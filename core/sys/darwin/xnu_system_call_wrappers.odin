@@ -1,7 +1,7 @@
 package darwin
 
 import "core:c"
-import "core:intrinsics"
+import "base:intrinsics"
 
 /* flock */
 LOCK_SH :: 1 /* shared lock */

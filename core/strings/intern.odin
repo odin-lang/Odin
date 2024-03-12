@@ -1,6 +1,6 @@
 package strings
 
-import "core:runtime"
+import "base:runtime"
 import "core:mem"
 
 // Custom string entry struct

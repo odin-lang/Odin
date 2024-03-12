@@ -1,8 +1,8 @@
 //+build js
 package os
 
-import "core:intrinsics"
-import "core:runtime"
+import "base:intrinsics"
+import "base:runtime"
 import "core:unicode/utf16"
 
 is_path_separator :: proc(c: byte) -> bool {
@@ -236,17 +236,6 @@ last_write_time_by_name :: proc(name: string) -> (File_Time, Errno) {
 	unimplemented("core:os procedure not supported on JS target")
 }
 
-
-
-heap_alloc :: proc(size: int, zero_memory := true) -> rawptr {
-	unimplemented("core:os procedure not supported on JS target")
-}
-heap_resize :: proc(ptr: rawptr, new_size: int) -> rawptr {
-	unimplemented("core:os procedure not supported on JS target")
-}
-heap_free :: proc(ptr: rawptr) {
-	unimplemented("core:os procedure not supported on JS target")
-}
 
 get_page_size :: proc() -> int {
 	unimplemented("core:os procedure not supported on JS target")

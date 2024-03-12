@@ -1,7 +1,7 @@
 package time
 
-import "core:runtime"
-import "core:intrinsics"
+import "base:runtime"
+import "base:intrinsics"
 
 Tick :: struct {
 	_nsec: i64, // relative amount

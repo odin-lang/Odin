@@ -14,6 +14,7 @@ import shoco            "core:compress/shoco"
 import gzip             "core:compress/gzip"
 import zlib             "core:compress/zlib"
 
+import avl              "core:container/avl"
 import bit_array        "core:container/bit_array"
 import priority_queue   "core:container/priority_queue"
 import queue            "core:container/queue"
@@ -27,6 +28,8 @@ import blake2b          "core:crypto/blake2b"
 import blake2s          "core:crypto/blake2s"
 import chacha20         "core:crypto/chacha20"
 import chacha20poly1305 "core:crypto/chacha20poly1305"
+import crypto_hash      "core:crypto/hash"
+import hmac             "core:crypto/hmac"
 import keccak           "core:crypto/legacy/keccak"
 import md5              "core:crypto/legacy/md5"
 import sha1             "core:crypto/legacy/sha1"
@@ -94,7 +97,7 @@ import slashpath        "core:path/slashpath"
 import filepath         "core:path/filepath"
 
 import reflect          "core:reflect"
-import runtime          "core:runtime"
+import runtime          "base:runtime"
 import simd             "core:simd"
 import slice            "core:slice"
 import slice_heap       "core:slice/heap"
@@ -129,6 +132,7 @@ _ :: compress
 _ :: shoco
 _ :: gzip
 _ :: zlib
+_ :: avl
 _ :: bit_array
 _ :: priority_queue
 _ :: queue
@@ -137,10 +141,12 @@ _ :: lru
 _ :: list
 _ :: topological_sort
 _ :: crypto
+_ :: crypto_hash
 _ :: blake2b
 _ :: blake2s
 _ :: chacha20
 _ :: chacha20poly1305
+_ :: hmac
 _ :: keccak
 _ :: md5
 _ :: poly1305

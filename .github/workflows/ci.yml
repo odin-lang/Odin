@@ -3,6 +3,7 @@ on: [push, pull_request, workflow_dispatch]
 
 jobs:
   build_linux:
+    name: Ubuntu Build, Check, and Test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
@@ -46,6 +47,9 @@ jobs:
       - name: Odin check examples/all for Linux i386
         run: ./odin check examples/all -vet -strict-style -target:linux_i386
         timeout-minutes: 10
+      - name: Odin check examples/all for Linux arm64
+        run: ./odin check examples/all -vet -strict-style -target:linux_arm64
+        timeout-minutes: 10
       - name: Odin check examples/all for FreeBSD amd64
         run: ./odin check examples/all -vet -strict-style -target:freebsd_amd64
         timeout-minutes: 10
@@ -53,6 +57,7 @@ jobs:
         run: ./odin check examples/all -vet -strict-style -target:openbsd_amd64
         timeout-minutes: 10
   build_macOS:
+    name: MacOS Build, Check, and Test
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v1
@@ -92,13 +97,49 @@ jobs:
           cd tests/internal
           make
         timeout-minutes: 10
-      - name: Odin check examples/all for Darwin arm64
-        run: ./odin check examples/all -vet -strict-style -target:darwin_arm64
+  build_macOS_arm:
+    name: MacOS ARM Build, Check, and Test
+    runs-on: macos-14 # This is an arm/m1 runner.
+    steps:
+      - uses: actions/checkout@v1
+      - name: Download LLVM, botan and setup PATH
+        run: |
+          brew install llvm@13 botan
+          echo "/opt/homebrew/opt/llvm@13/bin" >> $GITHUB_PATH
+          TMP_PATH=$(xcrun --show-sdk-path)/user/include
+          echo "CPATH=$TMP_PATH" >> $GITHUB_ENV
+      - name: build odin
+        run: ./build_odin.sh release
+      - name: Odin version
+        run: ./odin version
+        timeout-minutes: 1
+      - name: Odin report
+        run: ./odin report
+        timeout-minutes: 1
+      - name: Odin check
+        run: ./odin check examples/demo -vet
         timeout-minutes: 10
-      - name: Odin check examples/all for Linux arm64
-        run: ./odin check examples/all -vet -strict-style -target:linux_arm64
+      - name: Odin run
+        run: ./odin run examples/demo
+        timeout-minutes: 10
+      - name: Odin run -debug
+        run: ./odin run examples/demo -debug
+        timeout-minutes: 10
+      - name: Odin check examples/all
+        run: ./odin check examples/all -strict-style
+        timeout-minutes: 10
+      - name: Core library tests
+        run: |
+          cd tests/core
+          make
+        timeout-minutes: 10
+      - name: Odin internals tests
+        run: |
+          cd tests/internal
+          make
         timeout-minutes: 10
   build_windows:
+    name: Windows Build, Check, and Test
     runs-on: windows-2022
     steps:
       - uses: actions/checkout@v1

@@ -3,7 +3,7 @@
 // operations into an abstracted stream interface.
 package io
 
-import "core:intrinsics"
+import "base:intrinsics"
 import "core:unicode/utf8"
 
 // Seek whence values

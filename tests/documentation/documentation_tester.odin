@@ -273,7 +273,7 @@ import "core:io"
 import "core:fmt"
 import "core:thread"
 import "core:sync"
-import "core:intrinsics"
+import "base:intrinsics"
 
 @(private="file")
 _read_pipe: os.Handle
