@@ -2047,6 +2047,7 @@ internal_int_inverse_modulo :: proc(dest, a, b: ^Int, allocator := context.alloc
 
 	return _private_inverse_modulo(dest, a, b)
 }
+internal_int_invmod :: internal_int_inverse_modulo
 internal_invmod :: proc{ internal_int_inverse_modulo, }
 
 /*
