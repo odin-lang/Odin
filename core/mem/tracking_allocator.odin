@@ -68,18 +68,18 @@ tracking_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
                                 size, alignment: int,
                                 old_memory: rawptr, old_size: int, loc := #caller_location) -> (result: []byte, err: Allocator_Error) {
 	track_alloc :: proc(data: ^Tracking_Allocator, entry: ^Tracking_Allocator_Entry) {
-		data.total_memory_allocated += entry.size
+		data.total_memory_allocated += i64(entry.size)
 		data.total_allocation_count += 1
-		data.current_memory_allocated += entry.size
+		data.current_memory_allocated += i64(entry.size)
 		if data.current_memory_allocated > data.peak_memory_allocated {
 			data.peak_memory_allocated = data.current_memory_allocated
 		}
 	}
 
 	track_free :: proc(data: ^Tracking_Allocator, entry: ^Tracking_Allocator_Entry) {
-		data.total_memory_freed += entry.size
+		data.total_memory_freed += i64(entry.size)
 		data.total_free_count += 1
-		data.current_memory_allocated -= entry.size
+		data.current_memory_allocated -= i64(entry.size)
 	}
 
 	data := (^Tracking_Allocator)(allocator_data)
