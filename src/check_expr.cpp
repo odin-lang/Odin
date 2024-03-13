@@ -6796,7 +6796,7 @@ gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, O
 					isize index = lookup_polymorphic_record_parameter(original_type, name);
 					if (index >= 0) {
 						TypeTuple *params = get_record_polymorphic_params(original_type);
-						Entity *e = params->variables[i];
+						Entity *e = params->variables[index];
 						if (e->kind == Entity_Constant) {
 							check_expr_with_type_hint(c, &operands[i], fv->value, e->type);
 							continue;
@@ -6847,7 +6847,7 @@ gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, O
 
 	Array<Operand> ordered_operands = operands;
 	if (!named_fields) {
-		ordered_operands = array_make<Operand>(permanent_allocator(), param_count);
+		ordered_operands = array_make<Operand>(permanent_allocator(), operands.count);
 		array_copy(&ordered_operands, operands, 0);
 	} else {
 		TEMPORARY_ALLOCATOR_GUARD();
