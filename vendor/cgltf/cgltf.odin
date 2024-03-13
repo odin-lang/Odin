@@ -1,9 +1,9 @@
-//+build windows
 package cgltf
 
-when ODIN_OS == .Windows {
-	foreign import lib "lib/cgltf.lib"
-}
+when ODIN_OS == .Windows      { foreign import lib "lib/cgltf.lib" } 
+else when ODIN_OS == .Linux   { foreign import lib "lib/cgltf.a"        }
+else when ODIN_OS == .Darwin  { foreign import lib "lib/darwin/cgltf.a" }
+else                          { foreign import lib "system:cgltf"          }
 
 import "core:c"
 
