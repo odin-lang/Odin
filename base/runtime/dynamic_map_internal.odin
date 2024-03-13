@@ -416,7 +416,7 @@ map_insert_hash_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^
 	tv := map_cell_index_dynamic(sv, info.vs, 1)
 
 	swap_loop: for {
-		if distance > mask
+		if distance > mask {
 			// Failed to find an empty slot and prevent infinite loop
 			return 0
 		}
