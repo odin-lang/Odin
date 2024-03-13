@@ -3,26 +3,27 @@ package darwin
 
 Bool :: b8
 
-timespec :: struct {
-        seconds:      int,
-        microseconds: int,
+timeval :: struct {
+	tv_sec:  int,
+	tv_usec: int,
 }
 
 RUsage :: struct {
-        utime:         timespec,
-        stime:         timespec,
-        maxrss_word:   int,
-        ixrss_word:    int,
-        idrss_word:    int,
-        isrss_word:    int,
-        minflt_word:   int,
-        majflt_word:   int,
-        nswap_word:    int,
-        inblock_word:  int,
-        oublock_word:  int,
-        msgsnd_word:   int,
-        msgrcv_word:   int,
-        nsignals_word: int,
-        nvcsw_word:    int,
-        nivcsw_word:   int,
+	ru_utime:    timeval,
+	ru_stime:    timeval,
+	ru_maxrss:   int,
+	ru_ixrss:    int,
+	ru_idrss:    int,
+	ru_isrss:    int,
+	ru_minflt:   int,
+	ru_majflt:   int,
+	ru_nswap:    int,
+	ru_inblock:  int,
+	ru_oublock:  int,
+	ru_msgsnd:   int,
+	ru_msgrcv:   int,
+	ru_nsignals: int,
+	ru_nvcsw:    int,
+	ru_nivcsw:   int,
 }
+
