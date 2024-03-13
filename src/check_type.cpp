@@ -1272,7 +1272,7 @@ gb_internal void check_bit_set_type(CheckerContext *c, Type *type, Type *named_t
 		}
 		if (!is_valid) {
 			if (actual_lower != lower) {
-				error(bs->elem, "bit_set range is greater than %lld bits, %lld bits are required (internal the lower changed was changed 0 as an underlying type was set)", bits, bits_required);
+				error(bs->elem, "bit_set range is greater than %lld bits, %lld bits are required (internally the lower bound was changed to 0 as an underlying type was set)", bits, bits_required);
 			} else {
 				error(bs->elem, "bit_set range is greater than %lld bits, %lld bits are required", bits, bits_required);
 			}
@@ -1342,7 +1342,7 @@ gb_internal void check_bit_set_type(CheckerContext *c, Type *type, Type *named_t
 				if (upper - lower >= bits) {
 					i64 bits_required = upper-lower+1;
 					if (lower_changed) {
-						error(bs->elem, "bit_set range is greater than %lld bits, %lld bits are required (internal the lower changed was changed 0 as an underlying type was set)", bits, bits_required);
+						error(bs->elem, "bit_set range is greater than %lld bits, %lld bits are required (internally the lower bound was changed to 0 as an underlying type was set)", bits, bits_required);
 					} else {
 						error(bs->elem, "bit_set range is greater than %lld bits, %lld bits are required", bits, bits_required);
 					}
