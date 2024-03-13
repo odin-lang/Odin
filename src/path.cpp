@@ -407,7 +407,7 @@ gb_internal ReadDirectoryError read_directory(String path, Array<FileInfo> *fi) 
 		i64 size = dir_stat.st_size;
 
 		FileInfo info = {};
-		info.name = name;
+		info.name = copy_string(a, name);
 		info.fullpath = path_to_full_path(a, filepath);
 		info.size = size;
 		array_add(fi, info);
