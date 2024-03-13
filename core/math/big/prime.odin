@@ -44,7 +44,7 @@ internal_int_prime_is_divisible :: proc(a: ^Int, allocator := context.allocator)
 	Computes res == G**X mod P.
 	Assumes `res`, `G`, `X` and `P` to not be `nil` and for `G`, `X` and `P` to have been initialized.
 */
-internal_int_exponent_mod :: proc(res, G, X, P: ^Int, allocator := context.allocator) -> (err: Error) {
+internal_int_power_modulo :: proc(res, G, X, P: ^Int, allocator := context.allocator) -> (err: Error) {
 	context.allocator = allocator
 
 	dr: int
@@ -112,6 +112,9 @@ internal_int_exponent_mod :: proc(res, G, X, P: ^Int, allocator := context.alloc
 	*/
 	return _private_int_exponent_mod(res, G, X, P, 0)
 }
+internal_int_exponent_mod :: internal_int_power_modulo
+internal_int_powmod :: internal_int_power_modulo
+internal_powmod :: proc { internal_int_power_modulo, }
 
 /*
 	Kronecker/Legendre symbol (a|p)
