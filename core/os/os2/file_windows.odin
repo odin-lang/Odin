@@ -73,8 +73,6 @@ _File :: struct {
 	wname: win32.wstring,
 	kind: _File_Kind,
 
-	stream: io.Stream,
-
 	allocator: runtime.Allocator,
 
 	rw_mutex: sync.RW_Mutex, // read write calls
@@ -181,7 +179,7 @@ _new_file :: proc(handle: uintptr, name: string) -> ^File {
 	}
 	f.impl.kind = kind
 
-	f.impl.stream = {
+	f.stream = {
 		data = f,
 		procedure = _file_stream_proc,
 	}
