@@ -3,11 +3,6 @@ package darwin
 
 Bool :: b8
 
-timeval :: struct {
-	tv_sec:  int,
-	tv_usec: int,
-}
-
 RUsage :: struct {
 	ru_utime:    timeval,
 	ru_stime:    timeval,
