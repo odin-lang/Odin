@@ -418,7 +418,7 @@ map_insert_hash_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^
 	swap_loop: for {
 		if distance > mask {
 			// Failed to find an empty slot and prevent infinite loop
-			return 0
+			panic("unable to insert into a map")
 		}
 
 		element_hash := hs[pos]
