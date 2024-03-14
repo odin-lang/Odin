@@ -125,7 +125,7 @@ DARWIN_MAXCOMLEN :: 16
 /*--==========================================================================--*/
 
 __darwin_ino64_t :: u64
-__darwin_time_t :: u32
+__darwin_time_t :: int
 __darwin_dev_t :: i32
 __darwin_mode_t :: u16
 __darwin_off_t :: i64
