@@ -125,7 +125,7 @@ DARWIN_MAXCOMLEN :: 16
 /*--==========================================================================--*/
 
 __darwin_ino64_t :: u64
-__darwin_time_t :: u32
+__darwin_time_t :: c.long
 __darwin_dev_t :: i32
 __darwin_mode_t :: u16
 __darwin_off_t :: i64
@@ -416,4 +416,8 @@ syscall_chdir :: #force_inline proc "contextless" (path: cstring) -> c.int {
 
 syscall_fchdir :: #force_inline proc "contextless" (fd: c.int, path: cstring) -> c.int {
 	return cast(c.int)intrinsics.syscall(unix_offset_syscall(.getentropy), uintptr(fd), transmute(uintptr)path)
+}
+
+syscall_getrusage :: #force_inline proc "contextless" (who: c.int, rusage: ^RUsage) -> c.int {
+	return cast(c.int) intrinsics.syscall(unix_offset_syscall(.getrusage), uintptr(who), uintptr(rusage))
 }
