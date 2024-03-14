@@ -426,3 +426,96 @@ clear_soa_dynamic_array :: proc(array: ^$T/#soa[dynamic]$E) {
 clear_soa :: proc{
 	clear_soa_dynamic_array,
 }
+
+// Converts soa slice into a soa dynamic array without cloning or allocating memory
+@(require_results)
+into_dynamic_soa :: proc(array: $T/#soa[]$E) -> #soa[dynamic]E {
+	d: #soa[dynamic]E
+	footer := raw_soa_footer_dynamic_array(&d)
+	footer^ = {
+		cap = len(array),
+		len = 0,
+		allocator = nil_allocator(),
+	}
+
+	field_count: uintptr
+	when intrinsics.type_is_array(E) {
+		field_count = len(E)
+	} else {
+		field_count = uintptr(intrinsics.type_struct_field_count(E))
+	}
+
+	array := array
+	dynamic_data := ([^]rawptr)(&d)[:field_count]
+	slice_data   := ([^]rawptr)(&array)[:field_count]
+	copy(dynamic_data, slice_data)
+
+	return d
+}
+
+// `unordered_remove_soa` removed the element at the specified `index`. It does so by replacing the current end value
+// with the old value, and reducing the length of the dynamic array by 1.
+//
+// Note: This is an O(1) operation.
+// Note: If you the elements to remain in their order, use `ordered_remove_soa`.
+// Note: If the index is out of bounds, this procedure will panic.
+@builtin
+unordered_remove_soa :: proc(array: ^$T/#soa[dynamic]$E, index: int, loc := #caller_location) #no_bounds_check {
+	bounds_check_error_loc(loc, index, len(array))
+	if index+1 < len(array) {
+		ti := type_info_of(typeid_of(T))
+		ti = type_info_base(ti)
+		si := &ti.variant.(Type_Info_Struct)
+
+		field_count: uintptr
+		when intrinsics.type_is_array(E) {
+			field_count = len(E)
+		} else {
+			field_count = uintptr(intrinsics.type_struct_field_count(E))
+		}
+
+		data := uintptr(array)
+		for i in 0..<field_count {
+			type := si.types[i].variant.(Type_Info_Pointer).elem
+
+			offset := rawptr((^uintptr)(data)^ + uintptr(index*type.size))
+			final := rawptr((^uintptr)(data)^ + uintptr((len(array)-1)*type.size))
+			mem_copy(offset, final, type.size)
+			data += size_of(rawptr)
+		}
+	}
+	raw_soa_footer_dynamic_array(array).len -= 1
+}
+
+// `ordered_remove_soa` removed the element at the specified `index` whilst keeping the order of the other elements.
+//
+// Note: This is an O(N) operation.
+// Note: If you the elements do not have to remain in their order, prefer `unordered_remove_soa`.
+// Note: If the index is out of bounds, this procedure will panic.
+@builtin
+ordered_remove_soa :: proc(array: ^$T/#soa[dynamic]$E, index: int, loc := #caller_location) #no_bounds_check {
+	bounds_check_error_loc(loc, index, len(array))
+	if index+1 < len(array) {
+		ti := type_info_of(typeid_of(T))
+		ti = type_info_base(ti)
+		si := &ti.variant.(Type_Info_Struct)
+
+		field_count: uintptr
+		when intrinsics.type_is_array(E) {
+			field_count = len(E)
+		} else {
+			field_count = uintptr(intrinsics.type_struct_field_count(E))
+		}
+
+		data := uintptr(array)
+		for i in 0..<field_count {
+			type := si.types[i].variant.(Type_Info_Pointer).elem
+
+			offset := (^uintptr)(data)^ + uintptr(index*type.size)
+			length := type.size*(len(array) - index - 1)
+			mem_copy(rawptr(offset), rawptr(offset + uintptr(type.size)), length)
+			data += size_of(rawptr)
+		}
+	}
+	raw_soa_footer_dynamic_array(array).len -= 1
+}

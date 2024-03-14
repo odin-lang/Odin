@@ -474,8 +474,8 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 					link_settings = gb_string_appendc(link_settings, "-Wl,-fini,'_odin_exit_point' ");
 				}
 
-			} else if (build_context.metrics.os != TargetOs_openbsd) {
-				// OpenBSD defaults to PIE executable. do not pass -no-pie for it.
+			} else if (build_context.metrics.os != TargetOs_openbsd && build_context.metrics.os != TargetOs_haiku) {
+				// OpenBSD and Haiku default to PIE executable. do not pass -no-pie for it.
 				link_settings = gb_string_appendc(link_settings, "-no-pie ");
 			}
 
@@ -522,7 +522,12 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 			link_command_line = gb_string_append_fmt(link_command_line, " %.*s ", LIT(build_context.extra_linker_flags));
 			link_command_line = gb_string_append_fmt(link_command_line, " %s ", link_settings);
 
-			result = system_exec_command_line_app("ld-link", link_command_line);
+			if (build_context.use_lld) {
+				link_command_line = gb_string_append_fmt(link_command_line, " -fuse-ld=lld");
+				result = system_exec_command_line_app("lld-link", link_command_line);
+			} else {
+				result = system_exec_command_line_app("ld-link", link_command_line);
+			}
 
 			if (result) {
 				return result;

@@ -1,9 +1,18 @@
+/*
+package x25519 implements the X25519 (aka curve25519) Elliptic-Curve
+Diffie-Hellman key exchange protocol.
+
+See:
+- https://www.rfc-editor.org/rfc/rfc7748
+*/
 package x25519
 
 import field "core:crypto/_fiat/field_curve25519"
 import "core:mem"
 
+// SCALAR_SIZE is the size of a X25519 scalar (private key) in bytes.
 SCALAR_SIZE :: 32
+// POINT_SIZE is the size of a X25519 point (public key/shared secret) in bytes.
 POINT_SIZE :: 32
 
 @(private)
@@ -14,11 +23,11 @@ _scalar_bit :: #force_inline proc "contextless" (s: ^[32]byte, i: int) -> u8 {
 	if i < 0 {
 		return 0
 	}
-	return (s[i>>3] >> uint(i&7)) & 1
+	return (s[i >> 3] >> uint(i & 7)) & 1
 }
 
 @(private)
-_scalarmult :: proc (out, scalar, point: ^[32]byte) {
+_scalarmult :: proc(out, scalar, point: ^[32]byte) {
 	// Montgomery pseduo-multiplication taken from Monocypher.
 
 	// computes the scalar product
@@ -26,7 +35,7 @@ _scalarmult :: proc (out, scalar, point: ^[32]byte) {
 	field.fe_from_bytes(&x1, point)
 
 	// computes the actual scalar product (the result is in x2 and z2)
-	x2, x3, z2, z3: field.Tight_Field_Element =  ---, ---, ---, ---
+	x2, x3, z2, z3: field.Tight_Field_Element = ---, ---, ---, ---
 	t0, t1: field.Loose_Field_Element = ---, ---
 
 	// Montgomery ladder
@@ -38,7 +47,7 @@ _scalarmult :: proc (out, scalar, point: ^[32]byte) {
 	field.fe_one(&z3)
 
 	swap: int
-	for pos := 255-1; pos >= 0; pos = pos - 1 	{
+	for pos := 255 - 1; pos >= 0; pos = pos - 1 {
 		// constant time conditional swap before ladder step
 		b := int(_scalar_bit(scalar, pos))
 		swap ~= b // xor trick avoids swapping at the end of the loop
@@ -94,7 +103,9 @@ _scalarmult :: proc (out, scalar, point: ^[32]byte) {
 	mem.zero_explicit(&t1, size_of(t1))
 }
 
-scalarmult :: proc (dst, scalar, point: []byte) {
+// scalarmult "multiplies" the provided scalar and point, and writes the
+// resulting point to dst.
+scalarmult :: proc(dst, scalar, point: []byte) {
 	if len(scalar) != SCALAR_SIZE {
 		panic("crypto/x25519: invalid scalar size")
 	}
@@ -123,7 +134,9 @@ scalarmult :: proc (dst, scalar, point: []byte) {
 	mem.zero_explicit(&d, size_of(d))
 }
 
-scalarmult_basepoint :: proc (dst, scalar: []byte) {
+// scalarmult_basepoint "multiplies" the provided scalar with the X25519
+// base point and writes the resulting point to dst.
+scalarmult_basepoint :: proc(dst, scalar: []byte) {
 	// TODO/perf: Switch to using a precomputed table.
 	scalarmult(dst, scalar, _BASE_POINT[:])
 }

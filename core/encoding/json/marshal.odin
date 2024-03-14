@@ -51,6 +51,11 @@ Marshal_Options :: struct {
 	// NOTE: This will temp allocate and sort a list for each map.
 	sort_maps_by_key: bool,
 
+	// Output enum value's name instead of its underlying value.
+	//
+	// NOTE: If a name isn't found it'll use the underlying value.
+	use_enum_names: bool,
+
 	// Internal state
 	indentation: int,
 	mjson_skipped_first_braces_start: bool,
@@ -365,8 +370,10 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 		opt_write_start(w, opt, '{') or_return
 		
 		for name, i in info.names {
+			json_name := reflect.struct_tag_get(reflect.Struct_Tag(info.tags[i]), "json")
+
 			opt_write_iteration(w, opt, i) or_return
-			if json_name := string(reflect.struct_tag_get(auto_cast info.tags[i], "json")); json_name != "" {
+			if json_name != "" {
 				opt_write_key(w, opt, json_name) or_return
 			} else {
 				opt_write_key(w, opt, name) or_return
@@ -380,6 +387,11 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 		opt_write_end(w, opt, '}') or_return
 
 	case runtime.Type_Info_Union:
+		if len(info.variants) == 0 || v.data == nil {
+			io.write_string(w, "null") or_return
+			return nil
+		}
+
 		tag_ptr := uintptr(v.data) + info.tag_offset
 		tag_any := any{rawptr(tag_ptr), info.tag_type.id}
 
@@ -404,7 +416,16 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 		}
 
 	case runtime.Type_Info_Enum:
-		return marshal_to_writer(w, any{v.data, info.base.id}, opt)
+		if !opt.use_enum_names || len(info.names) == 0 {
+			return marshal_to_writer(w, any{v.data, info.base.id}, opt)
+		} else {
+			name, found := reflect.enum_name_from_value_any(v)
+			if found {
+				return marshal_to_writer(w, name, opt)
+			} else {
+				return marshal_to_writer(w, any{v.data, info.base.id}, opt)
+			}
+		}
 
 	case runtime.Type_Info_Bit_Set:
 		is_bit_set_different_endian_to_platform :: proc(ti: ^runtime.Type_Info) -> bool {

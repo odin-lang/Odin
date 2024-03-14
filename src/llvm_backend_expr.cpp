@@ -4655,7 +4655,7 @@ gb_internal lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 
 			if (se->swizzle_count > 0) {
 				Type *array_type = base_type(type_deref(tav.type));
-				GB_ASSERT(array_type->kind == Type_Array);
+				GB_ASSERT(array_type->kind == Type_Array || array_type->kind == Type_SimdVector);
 				u8 swizzle_count = se->swizzle_count;
 				u8 swizzle_indices_raw = se->swizzle_indices;
 				u8 swizzle_indices[4] = {};
@@ -4671,7 +4671,7 @@ gb_internal lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 					a = lb_addr_get_ptr(p, addr);
 				}
 
-				GB_ASSERT(is_type_array(expr->tav.type));
+				GB_ASSERT(is_type_array(expr->tav.type) || is_type_simd_vector(expr->tav.type));
 				return lb_addr_swizzle(a, expr->tav.type, swizzle_count, swizzle_indices);
 			}
 

@@ -1181,28 +1181,18 @@ internal_cmp_digit :: internal_compare_digit
 */
 internal_int_compare_magnitude :: #force_inline proc(a, b: ^Int) -> (comparison: int) {
 	assert_if_nil(a, b)
-	/*
-		Compare based on used digits.
-	*/
+
+	// Compare based on used digits.
 	if a.used != b.used {
-		if a.used > b.used {
-			return +1
-		}
-		return -1
+		return +1 if a.used > b.used else -1
 	}
 
-	/*
-		Same number of used digits, compare based on their value.
-	*/
+	// Same number of used digits, compare based on their value.
 	#no_bounds_check for n := a.used - 1; n >= 0; n -= 1 {
 		if a.digit[n] != b.digit[n] {
-			if a.digit[n] > b.digit[n] {
-				return +1
-			}
-			return -1
+			return +1 if a.digit[n] > b.digit[n] else -1
 		}
 	}
-
 	return 0
 }
 internal_compare_magnitude :: proc { internal_int_compare_magnitude, }
@@ -2046,9 +2036,9 @@ internal_int_inverse_modulo :: proc(dest, a, b: ^Int, allocator := context.alloc
 	if internal_is_positive(a) && internal_eq(b, 1) { return internal_zero(dest)	}
 
 	/*
-		`b` cannot be negative and has to be > 1
+		`b` cannot be negative and b has to be > 1
 	*/
-	if internal_is_negative(b) || internal_gt(b, 1) { return .Invalid_Argument }
+	if internal_is_negative(b) || !internal_gt(b, 1) { return .Invalid_Argument }
 
 	/*
 		If the modulus is odd we can use a faster routine instead.
@@ -2057,6 +2047,7 @@ internal_int_inverse_modulo :: proc(dest, a, b: ^Int, allocator := context.alloc
 
 	return _private_inverse_modulo(dest, a, b)
 }
+internal_int_invmod :: internal_int_inverse_modulo
 internal_invmod :: proc{ internal_int_inverse_modulo, }
 
 /*

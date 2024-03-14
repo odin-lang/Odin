@@ -367,7 +367,7 @@ syscall_execve :: #force_inline proc "contextless" (path: cstring, argv: [^]cstr
 }
 
 syscall_munmap :: #force_inline proc "contextless" (addr: rawptr, len: u64) -> c.int {
-	return cast(c.int)intrinsics.syscall(unix_offset_syscall(.mmap), uintptr(addr), uintptr(len))
+	return cast(c.int)intrinsics.syscall(unix_offset_syscall(.munmap), uintptr(addr), uintptr(len))
 }
 
 syscall_mmap :: #force_inline proc "contextless" (addr: ^u8, len: u64, port: c.int, flags: c.int, fd: int, offset: off_t) -> ^u8 {

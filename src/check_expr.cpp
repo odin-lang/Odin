@@ -4920,7 +4920,7 @@ gb_internal Entity *check_selector(CheckerContext *c, Operand *operand, Ast *nod
 		}
 	}
 
-	if (entity == nullptr && selector->kind == Ast_Ident && is_type_array(type_deref(operand->type))) {
+	if (entity == nullptr && selector->kind == Ast_Ident && (is_type_array(type_deref(operand->type)) || is_type_simd_vector(type_deref(operand->type)))) {
 		String field_name = selector->Ident.token.string;
 		if (1 < field_name.len && field_name.len <= 4) {
 			u8 swizzles_xyzw[4] = {'x', 'y', 'z', 'w'};
@@ -4975,8 +4975,10 @@ gb_internal Entity *check_selector(CheckerContext *c, Operand *operand, Ast *nod
 
 			Type *original_type = operand->type;
 			Type *array_type = base_type(type_deref(original_type));
-			GB_ASSERT(array_type->kind == Type_Array);
-			i64 array_count = array_type->Array.count;
+			GB_ASSERT(array_type->kind == Type_Array || array_type->kind == Type_SimdVector);
+
+			i64 array_count = get_array_type_count(array_type);
+
 			for (u8 i = 0; i < index_count; i++) {
 				u8 idx = indices>>(i*2) & 3;
 				if (idx >= array_count) {
@@ -4996,7 +4998,6 @@ gb_internal Entity *check_selector(CheckerContext *c, Operand *operand, Ast *nod
 			se->swizzle_count = index_count;
 			se->swizzle_indices = indices;
 
-
 			AddressingMode prev_mode = operand->mode;
 			operand->mode = Addressing_SwizzleValue;
 			operand->type = determine_swizzle_array_type(original_type, type_hint, index_count);
@@ -5008,6 +5009,10 @@ gb_internal Entity *check_selector(CheckerContext *c, Operand *operand, Ast *nod
 			case Addressing_SwizzleVariable:
 				operand->mode = Addressing_SwizzleVariable;
 				break;
+			}
+
+			if (array_type->kind == Type_SimdVector) {
+				operand->mode = Addressing_Value;
 			}
 
 			Entity *swizzle_entity = alloc_entity_variable(nullptr, make_token_ident(field_name), operand->type, EntityState_Resolved);
@@ -6791,7 +6796,7 @@ gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, O
 					isize index = lookup_polymorphic_record_parameter(original_type, name);
 					if (index >= 0) {
 						TypeTuple *params = get_record_polymorphic_params(original_type);
-						Entity *e = params->variables[i];
+						Entity *e = params->variables[index];
 						if (e->kind == Entity_Constant) {
 							check_expr_with_type_hint(c, &operands[i], fv->value, e->type);
 							continue;
@@ -6842,7 +6847,7 @@ gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, O
 
 	Array<Operand> ordered_operands = operands;
 	if (!named_fields) {
-		ordered_operands = array_make<Operand>(permanent_allocator(), param_count);
+		ordered_operands = array_make<Operand>(permanent_allocator(), operands.count);
 		array_copy(&ordered_operands, operands, 0);
 	} else {
 		TEMPORARY_ALLOCATOR_GUARD();

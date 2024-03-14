@@ -341,7 +341,7 @@ gb_internal ReadDirectoryError read_directory(String path, Array<FileInfo> *fi) 
 
 	return ReadDirectory_None;
 }
-#elif defined(GB_SYSTEM_LINUX) || defined(GB_SYSTEM_OSX) || defined(GB_SYSTEM_FREEBSD) || defined(GB_SYSTEM_OPENBSD)
+#elif defined(GB_SYSTEM_LINUX) || defined(GB_SYSTEM_OSX) || defined(GB_SYSTEM_FREEBSD) || defined(GB_SYSTEM_OPENBSD) || defined(GB_SYSTEM_HAIKU)
 
 #include <dirent.h>
 
@@ -407,7 +407,7 @@ gb_internal ReadDirectoryError read_directory(String path, Array<FileInfo> *fi) 
 		i64 size = dir_stat.st_size;
 
 		FileInfo info = {};
-		info.name = name;
+		info.name = copy_string(a, name);
 		info.fullpath = path_to_full_path(a, filepath);
 		info.size = size;
 		array_add(fi, info);

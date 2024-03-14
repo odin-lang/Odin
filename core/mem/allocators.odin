@@ -84,11 +84,11 @@ arena_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 	case .Free_All:
 		arena.offset = 0
 
-    case .Resize:
-        return default_resize_bytes_align(byte_slice(old_memory, old_size), size, alignment, arena_allocator(arena))
+	case .Resize:
+		return default_resize_bytes_align(byte_slice(old_memory, old_size), size, alignment, arena_allocator(arena))
 
-    case .Resize_Non_Zeroed:
-        return default_resize_bytes_align_non_zeroed(byte_slice(old_memory, old_size), size, alignment, arena_allocator(arena))
+	case .Resize_Non_Zeroed:
+		return default_resize_bytes_align_non_zeroed(byte_slice(old_memory, old_size), size, alignment, arena_allocator(arena))
 
 	case .Query_Features:
 		set := (^Allocator_Mode_Set)(old_memory)
@@ -859,4 +859,283 @@ panic_allocator :: proc() -> Allocator {
 		procedure = panic_allocator_proc,
 		data = nil,
 	}
+}
+
+
+
+
+
+
+Buddy_Block :: struct #align(align_of(uint)) {
+	size:    uint,
+	is_free: bool,
+}
+
+@(require_results)
+buddy_block_next :: proc(block: ^Buddy_Block) -> ^Buddy_Block {
+	return (^Buddy_Block)(([^]byte)(block)[block.size:])
+}
+
+@(require_results)
+buddy_block_split :: proc(block: ^Buddy_Block, size: uint) -> ^Buddy_Block {
+	block := block
+	if block != nil && size != 0 {
+		// Recursive Split
+		for size < block.size {
+			sz := block.size >> 1
+			block.size = sz
+			block = buddy_block_next(block)
+			block.size = sz
+			block.is_free = true
+		}
+		if size <= block.size {
+			return block
+		}
+	}
+	// Block cannot fit the requested allocation size
+	return nil
+}
+
+buddy_block_coalescence :: proc(head, tail: ^Buddy_Block) {
+	for {
+		// Keep looping until there are no more buddies to coalesce
+		block := head
+		buddy := buddy_block_next(block)
+
+		no_coalescence := true
+		for block < tail && buddy < tail { // make sure the buddies are within the range
+			if block.is_free && buddy.is_free && block.size == buddy.size {
+				// Coalesce buddies into one
+				block.size <<= 1
+				block = buddy_block_next(block)
+				if block < tail {
+					buddy = buddy_block_next(block)
+					no_coalescence = false
+				}
+			} else if block.size < buddy.size {
+				// The buddy block is split into smaller blocks
+				block = buddy
+				buddy = buddy_block_next(buddy)
+			} else {
+				block = buddy_block_next(buddy)
+				if block < tail {
+					// Leave the buddy block for the next iteration
+					buddy = buddy_block_next(block)
+				}
+			}
+		}
+
+		if no_coalescence {
+			return
+		}
+	}
+}
+
+
+@(require_results)
+buddy_block_find_best :: proc(head, tail: ^Buddy_Block, size: uint) -> ^Buddy_Block {
+	assert(size != 0)
+
+	best_block: ^Buddy_Block
+	block := head                    // left
+	buddy := buddy_block_next(block) // right
+
+	// The entire memory section between head and tail is free,
+	// just call 'buddy_block_split' to get the allocation
+	if buddy == tail && block.is_free {
+		return buddy_block_split(block, size)
+	}
+
+	// Find the block which is the 'best_block' to requested allocation sized
+	for block < tail && buddy < tail { // make sure the buddies are within the range
+		// If both buddies are free, coalesce them together
+		// NOTE: this is an optimization to reduce fragmentation
+		//       this could be completely ignored
+		if block.is_free && buddy.is_free && block.size == buddy.size {
+			block.size <<= 1
+			if size <= block.size && (best_block == nil || block.size <= best_block.size) {
+				best_block = block
+			}
+
+			block = buddy_block_next(buddy)
+			if block < tail {
+				// Delay the buddy block for the next iteration
+				buddy = buddy_block_next(block)
+			}
+			continue
+		}
+
+
+		if block.is_free && size <= block.size &&
+		   (best_block == nil || block.size <= best_block.size) {
+			best_block = block
+		}
+
+		if buddy.is_free && size <= buddy.size &&
+		   (best_block == nil || buddy.size < best_block.size) {
+			// If each buddy are the same size, then it makes more sense
+			// to pick the buddy as it "bounces around" less
+			best_block = buddy
+		}
+
+		if (block.size <= buddy.size) {
+			block = buddy_block_next(buddy)
+			if (block < tail) {
+				// Delay the buddy block for the next iteration
+				buddy = buddy_block_next(block)
+			}
+		} else {
+			// Buddy was split into smaller blocks
+			block = buddy
+			buddy = buddy_block_next(buddy)
+		}
+	}
+
+	if best_block != nil {
+		// This will handle the case if the 'best_block' is also the perfect fit
+		return buddy_block_split(best_block, size)
+	}
+
+	// Maybe out of memory
+	return nil
+}
+
+
+Buddy_Allocator :: struct {
+	head: ^Buddy_Block,
+	tail: ^Buddy_Block,
+	alignment: uint,
+}
+
+@(require_results)
+buddy_allocator :: proc(b: ^Buddy_Allocator) -> Allocator {
+	return Allocator{
+		procedure = buddy_allocator_proc,
+		data      = b,
+	}
+}
+
+buddy_allocator_init :: proc(b: ^Buddy_Allocator, data: []byte, alignment: uint) {
+	assert(data != nil)
+	assert(is_power_of_two(uintptr(len(data))))
+	assert(is_power_of_two(uintptr(alignment)))
+
+	alignment := alignment
+	if alignment < size_of(Buddy_Block) {
+		alignment = size_of(Buddy_Block)
+	}
+
+	ptr := raw_data(data)
+	assert(uintptr(ptr) % uintptr(alignment) == 0, "data is not aligned to minimum alignment")
+
+	b.head = (^Buddy_Block)(ptr)
+
+	b.head.size = len(data)
+	b.head.is_free = true
+
+	b.tail = buddy_block_next(b.head)
+
+	b.alignment = alignment
+}
+
+@(require_results)
+buddy_block_size_required :: proc(b: ^Buddy_Allocator, size: uint) -> uint {
+	size := size
+	actual_size := b.alignment
+	size += size_of(Buddy_Block)
+	size = align_forward_uint(size, b.alignment)
+
+	for size > actual_size {
+		actual_size <<= 1
+	}
+
+	return actual_size
+}
+
+@(require_results)
+buddy_allocator_alloc :: proc(b: ^Buddy_Allocator, size: uint, zeroed: bool) -> ([]byte, Allocator_Error) {
+	if size != 0 {
+		actual_size := buddy_block_size_required(b, size)
+
+		found := buddy_block_find_best(b.head, b.tail, actual_size)
+		if found != nil {
+			// Try to coalesce all the free buddy blocks and then search again
+			buddy_block_coalescence(b.head, b.tail)
+			found = buddy_block_find_best(b.head, b.tail, actual_size)
+		}
+		if found == nil {
+			return nil, .Out_Of_Memory
+		}
+		found.is_free = false
+
+		data := ([^]byte)(found)[b.alignment:][:size]
+		if zeroed {
+			zero_slice(data)
+		}
+		return data, nil
+	}
+	return nil, nil
+}
+
+buddy_allocator_free :: proc(b: ^Buddy_Allocator, ptr: rawptr) -> Allocator_Error {
+	if ptr != nil {
+		if !(b.head <= ptr && ptr <= b.tail) {
+			return .Invalid_Pointer
+		}
+
+		block := (^Buddy_Block)(([^]byte)(ptr)[-b.alignment:])
+		block.is_free = true
+
+		buddy_block_coalescence(b.head, b.tail)
+	}
+	return nil
+}
+
+buddy_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
+                             size, alignment: int,
+                             old_memory: rawptr, old_size: int,loc := #caller_location) -> ([]byte, Allocator_Error) {
+
+	b := (^Buddy_Allocator)(allocator_data)
+
+	switch mode {
+	case .Alloc, .Alloc_Non_Zeroed:
+		return buddy_allocator_alloc(b, uint(size), mode == .Alloc)
+	case .Resize:
+		return default_resize_bytes_align(byte_slice(old_memory, old_size), size, alignment, buddy_allocator(b))
+	case .Resize_Non_Zeroed:
+		return default_resize_bytes_align_non_zeroed(byte_slice(old_memory, old_size), size, alignment, buddy_allocator(b))
+	case .Free:
+		return nil, buddy_allocator_free(b, old_memory)
+	case .Free_All:
+
+		alignment := b.alignment
+		head := ([^]byte)(b.head)
+		tail := ([^]byte)(b.tail)
+		data := head[:ptr_sub(tail, head)]
+		buddy_allocator_init(b, data, alignment)
+
+	case .Query_Features:
+		set := (^Allocator_Mode_Set)(old_memory)
+		if set != nil {
+			set^ = {.Query_Features, .Alloc, .Alloc_Non_Zeroed, .Resize, .Resize_Non_Zeroed, .Free, .Free_All, .Query_Info}
+		}
+		return nil, nil
+
+	case .Query_Info:
+		info := (^Allocator_Query_Info)(old_memory)
+		if info != nil && info.pointer != nil {
+			ptr := old_memory
+			if !(b.head <= ptr && ptr <= b.tail) {
+				return nil, .Invalid_Pointer
+			}
+
+			block := (^Buddy_Block)(([^]byte)(ptr)[-b.alignment:])
+			info.size = int(block.size)
+			info.alignment = int(b.alignment)
+			return byte_slice(info, size_of(info^)), nil
+		}
+		return nil, nil
+	}
+
+	return nil, nil
 }

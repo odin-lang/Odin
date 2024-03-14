@@ -18,6 +18,7 @@ enum TargetOsKind : u16 {
 	TargetOs_essence,
 	TargetOs_freebsd,
 	TargetOs_openbsd,
+	TargetOs_haiku,
 	
 	TargetOs_wasi,
 	TargetOs_js,
@@ -78,6 +79,7 @@ gb_global String target_os_names[TargetOs_COUNT] = {
 	str_lit("essence"),
 	str_lit("freebsd"),
 	str_lit("openbsd"),
+	str_lit("haiku"),
 	
 	str_lit("wasi"),
 	str_lit("js"),
@@ -542,6 +544,13 @@ gb_global TargetMetrics target_openbsd_amd64 = {
 	str_lit("e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"),
 };
 
+gb_global TargetMetrics target_haiku_amd64 = {
+	TargetOs_haiku,
+	TargetArch_amd64,
+	8, 8, 8, 16,
+	str_lit("x86_64-unknown-haiku"),
+};
+
 gb_global TargetMetrics target_essence_amd64 = {
 	TargetOs_essence,
 	TargetArch_amd64,
@@ -641,6 +650,7 @@ gb_global NamedTargetMetrics named_targets[] = {
 	{ str_lit("freebsd_amd64"),       &target_freebsd_amd64  },
 
 	{ str_lit("openbsd_amd64"),       &target_openbsd_amd64  },
+	{ str_lit("haiku_amd64"),         &target_haiku_amd64    },
 
 	{ str_lit("freestanding_wasm32"), &target_freestanding_wasm32 },
 	{ str_lit("wasi_wasm32"),         &target_wasi_wasm32 },
@@ -872,6 +882,58 @@ gb_internal String internal_odin_root_dir(void) {
 	return path;
 }
 
+#elif defined(GB_SYSTEM_HAIKU)
+
+#include <FindDirectory.h>
+
+gb_internal String path_to_fullpath(gbAllocator a, String s, bool *ok_);
+
+gb_internal String internal_odin_root_dir(void) {
+	String path = global_module_path;
+	isize len, i;
+	u8 *text;
+
+	if (global_module_path_set) {
+		return global_module_path;
+	}
+
+	auto path_buf = array_make<char>(heap_allocator(), 300);
+	defer (array_free(&path_buf));
+
+	len = 0;
+	for (;;) {
+		u32 sz = path_buf.count;
+		int res = find_path(B_APP_IMAGE_SYMBOL, B_FIND_PATH_IMAGE_PATH, nullptr, &path_buf[0], sz);
+		if(res == B_OK) {
+			len = sz;
+			break;
+		} else {
+			array_resize(&path_buf, sz + 1);
+		}
+	}
+
+	mutex_lock(&string_buffer_mutex);
+	defer (mutex_unlock(&string_buffer_mutex));
+
+	text = gb_alloc_array(permanent_allocator(), u8, len + 1);
+	gb_memmove(text, &path_buf[0], len);
+
+	path = path_to_fullpath(heap_allocator(), make_string(text, len), nullptr);
+
+	for (i = path.len-1; i >= 0; i--) {
+		u8 c = path[i];
+		if (c == '/' || c == '\\') {
+			break;
+		}
+		path.len--;
+	}
+
+	global_module_path = path;
+	global_module_path_set = true;
+
+	return path;
+}
+
 #elif defined(GB_SYSTEM_OSX)
 
 #include <mach-o/dyld.h>
@@ -888,6 +950,7 @@ gb_internal String internal_odin_root_dir(void) {
 	}
 
 	auto path_buf = array_make<char>(heap_allocator(), 300);
+	defer (array_free(&path_buf));
 
 	len = 0;
 	for (;;) {
@@ -919,9 +982,6 @@ gb_internal String internal_odin_root_dir(void) {
 
 	global_module_path = path;
 	global_module_path_set = true;
-
-
-	// array_free(&path_buf);
 
 	return path;
 }
@@ -1301,6 +1361,8 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 			metrics = &target_freebsd_amd64;
 		#elif defined(GB_SYSTEM_OPENBSD)
 			metrics = &target_openbsd_amd64;
+		#elif defined(GB_SYSTEM_HAIKU)
+			metrics = &target_haiku_amd64;
 		#elif defined(GB_CPU_ARM)
 			metrics = &target_linux_arm64;
 		#else
@@ -1403,6 +1465,9 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 			bc->link_flags = str_lit("-arch x86-64 ");
 			break;
 		case TargetOs_openbsd:
+			bc->link_flags = str_lit("-arch x86-64 ");
+			break;
+		case TargetOs_haiku:
 			bc->link_flags = str_lit("-arch x86-64 ");
 			break;
 		}

@@ -6,6 +6,7 @@ import "core:reflect"
 import "core:strconv"
 import "core:strings"
 import "base:runtime"
+import "base:intrinsics"
 
 Unmarshal_Data_Error :: enum {
 	Invalid_Data,
@@ -368,11 +369,17 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 			unmarshal_expect_token(p, .Colon)						
 			
 			fields := reflect.struct_fields_zipped(ti.id)
-			
-			runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD(ignore = context.temp_allocator == context.allocator)
 
-			field_used := make([]bool, len(fields), context.temp_allocator)
-			
+			field_test :: #force_inline proc "contextless" (field_used: [^]byte, index: int) -> bool {
+				prev_set := field_used[index/8] & byte(index&7) != 0
+				field_used[index/8] |= byte(index&7)
+				return prev_set
+			}
+
+			field_used_bytes := (len(fields)+7)/8
+			field_used := intrinsics.alloca(field_used_bytes, 1)
+			intrinsics.mem_zero(field_used, field_used_bytes)
+
 			use_field_idx := -1
 			
 			for field, field_idx in fields {
@@ -393,10 +400,9 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 			}
 			
 			if use_field_idx >= 0 {
-				if field_used[use_field_idx] {
+				if field_test(field_used, use_field_idx) {
 					return .Multiple_Use_Field
 				}
-				field_used[use_field_idx] = true
 				offset := fields[use_field_idx].offset
 				type := fields[use_field_idx].type
 				name := fields[use_field_idx].name
@@ -411,6 +417,12 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 				continue struct_loop
 			} else {
 				// allows skipping unused struct fields
+
+				// NOTE(bill): prevent possible memory leak if a string is unquoted
+				allocator := p.allocator
+				defer p.allocator = allocator
+				p.allocator = mem.nil_allocator()
+
 				parse_value(p) or_return
 				if parse_comma(p) {
 					break struct_loop

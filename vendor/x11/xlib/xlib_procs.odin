@@ -520,6 +520,13 @@ foreign xlib {
 		colors:   [^]XColor,
 		ncolors:  i32,
 		) ---
+	XQueryExtension :: proc(
+		display:             ^Display,
+		name:                cstring,
+		major_opcode_return: ^i32,
+		first_event_return:  ^i32,
+		first_error_return:  ^i32,
+		) -> b32 ---
 	XcmsQueryColor :: proc(
 		display:  ^Display,
 		colormap: Colormap,
@@ -1278,13 +1285,15 @@ foreign xlib {
 	XEnableAccessControl  :: proc(display: ^Display) ---
 	XDisableAccessControl :: proc(display: ^Display) ---
 	// Events
-	XSelectInput  :: proc(display: ^Display, window: Window, mask: EventMask) ---
-	XFlush        :: proc(display: ^Display) ---
-	XSync         :: proc(display: ^Display) ---
-	XEventsQueued :: proc(display: ^Display, mode: EventQueueMode) -> i32 ---
-	XPending      :: proc(display: ^Display) -> i32 ---
-	XNextEvent    :: proc(display: ^Display, event: ^XEvent) ---
-	XPeekEvent    :: proc(display: ^Display, event: ^XEvent) ---
+	XSelectInput   :: proc(display: ^Display, window: Window, mask: EventMask) ---
+	XFlush         :: proc(display: ^Display) ---
+	XSync          :: proc(display: ^Display) ---
+	XEventsQueued  :: proc(display: ^Display, mode: EventQueueMode) -> i32 ---
+	XPending       :: proc(display: ^Display) -> i32 ---
+	XNextEvent     :: proc(display: ^Display, event: ^XEvent) ---
+	XPeekEvent     :: proc(display: ^Display, event: ^XEvent) ---
+	XGetEventData  :: proc(display: ^Display, cookie: ^XGenericEventCookie) -> b32 ---
+	XFreeEventData :: proc(display: ^Display, cookie: ^XGenericEventCookie) ---
 	// Selecting events using a predicate procedure
 	XIfEvent :: proc(
 		display:   ^Display,

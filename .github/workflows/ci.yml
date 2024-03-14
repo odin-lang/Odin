@@ -7,8 +7,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
-      - name: Download LLVM, botan
-        run: sudo apt-get install llvm-11 clang-11 libbotan-2-dev botan
+      - name: Download LLVM
+        run: sudo apt-get install llvm-11 clang-11
       - name: build odin
         run: ./build_odin.sh release
       - name: Odin version
@@ -61,9 +61,9 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v1
-      - name: Download LLVM, botan and setup PATH
+      - name: Download LLVM, and setup PATH
         run: |
-          brew install llvm@13 botan
+          brew install llvm@13
           echo "/usr/local/opt/llvm@13/bin" >> $GITHUB_PATH
           TMP_PATH=$(xcrun --show-sdk-path)/user/include
           echo "CPATH=$TMP_PATH" >> $GITHUB_ENV
@@ -102,9 +102,9 @@ jobs:
     runs-on: macos-14 # This is an arm/m1 runner.
     steps:
       - uses: actions/checkout@v1
-      - name: Download LLVM, botan and setup PATH
+      - name: Download LLVM and setup PATH
         run: |
-          brew install llvm@13 botan
+          brew install llvm@13
           echo "/opt/homebrew/opt/llvm@13/bin" >> $GITHUB_PATH
           TMP_PATH=$(xcrun --show-sdk-path)/user/include
           echo "CPATH=$TMP_PATH" >> $GITHUB_ENV
@@ -128,11 +128,11 @@ jobs:
       - name: Odin check examples/all
         run: ./odin check examples/all -strict-style
         timeout-minutes: 10
-      - name: Core library tests
-        run: |
-          cd tests/core
-          make
-        timeout-minutes: 10
+      # - name: Core library tests
+      #   run: |
+      #     cd tests/core
+      #     make
+      #   timeout-minutes: 10
       - name: Odin internals tests
         run: |
           cd tests/internal

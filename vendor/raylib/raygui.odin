@@ -1,6 +1,6 @@
 package raylib
 
-import c "core:c/libc"
+import "core:c"
 
 RAYGUI_SHARED :: #config(RAYGUI_SHARED, false)
 
@@ -240,7 +240,10 @@ SCROLLBAR_RIGHT_SIDE :: 1
 
 @(default_calling_convention="c")
 foreign lib {
-	@(link_name="raylib_version") version: cstring
+	// WASM does not have foreign variable declarations.
+	when ODIN_ARCH != .wasm32 && ODIN_ARCH != .wasm64p32 {
+		@(link_name="raylib_version") version: cstring
+	}
 	// Global gui state control functions
 	
 	GuiEnable           :: proc() ---                                                                         // Enable gui controls (global state)

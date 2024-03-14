@@ -1,6 +1,5 @@
 package raylib
 
-import c "core:c/libc"
 import "core:math"
 import "core:math/linalg"
 
@@ -45,7 +44,7 @@ Wrap :: proc "c" (value: f32, min, max: f32) -> f32 {
 // Check whether two given floats are almost equal
 @(require_results)
 FloatEquals :: proc "c" (x, y: f32) -> bool {
-	return abs(x - y) <= EPSILON*c.fmaxf(1.0, c.fmaxf(abs(x), abs(y)))
+	return abs(x - y) <= EPSILON*fmaxf(1.0, fmaxf(abs(x), abs(y)))
 }
 
 
@@ -86,33 +85,33 @@ Vector2SubtractValue :: proc "c" (v: Vector2, value: f32) -> Vector2 {
 	return v - value
 }
 // Calculate vector length
-@(require_results, deprecated="Prefer linalg.length(v)")
+@(require_results)
 Vector2Length :: proc "c" (v: Vector2) -> f32 {
 	return linalg.length(v)
 }
 // Calculate vector square length
-@(require_results, deprecated="Prefer linalg.length2(v)")
+@(require_results)
 Vector2LengthSqr :: proc "c" (v: Vector2) -> f32 {
 	return linalg.length2(v)
 }
 // Calculate two vectors dot product
-@(require_results, deprecated="Prefer linalg.dot(v1, v2)")
+@(require_results)
 Vector2DotProduct :: proc "c" (v1, v2: Vector2) -> f32 {
 	return linalg.dot(v1, v2)
 }
 // Calculate distance between two vectors
-@(require_results, deprecated="Prefer linalg.distance(v1, v2)")
+@(require_results)
 Vector2Distance :: proc "c" (v1, v2: Vector2) -> f32 {
 	return linalg.distance(v1, v2)
 }
 // Calculate square distance between two vectors
-@(require_results, deprecated="Prefer linalg.length2(v2-v1)")
+@(require_results)
 Vector2DistanceSqrt :: proc "c" (v1, v2: Vector2) -> f32 {
 	return linalg.length2(v2-v1)
 }
 // Calculate angle between two vectors
 // NOTE: Angle is calculated from origin point (0, 0)
-@(require_results, deprecated="Prefer linalg.angle_between(v1, v2)")
+@(require_results)
 Vector2Angle :: proc "c" (v1, v2: Vector2) -> f32 {
 	return linalg.angle_between(v1, v2)
 }
@@ -147,7 +146,7 @@ Vector2Divide :: proc "c" (v1, v2: Vector2) -> Vector2 {
 	return v1 / v2
 }
 // Normalize provided vector
-@(require_results, deprecated="Prefer linalg.normalize0(v)")
+@(require_results)
 Vector2Normalize :: proc "c" (v: Vector2) -> Vector2 {
 	return linalg.normalize0(v)
 }
@@ -271,38 +270,38 @@ Vector3SubtractValue :: proc "c" (v: Vector3, value: f32) -> Vector3 {
 	return v - value
 }
 // Calculate vector length
-@(require_results, deprecated="Prefer linalg.length(v)")
+@(require_results)
 Vector3Length :: proc "c" (v: Vector3) -> f32 {
 	return linalg.length(v)
 }
 // Calculate vector square length
-@(require_results, deprecated="Prefer linalg.length2(v)")
+@(require_results)
 Vector3LengthSqr :: proc "c" (v: Vector3) -> f32 {
 	return linalg.length2(v)
 }
 // Calculate two vectors dot product
-@(require_results, deprecated="Prefer linalg.dot(v1, v2)")
+@(require_results)
 Vector3DotProduct :: proc "c" (v1, v2: Vector3) -> f32 {
 	return linalg.dot(v1, v2)
 }
 // Calculate two vectors dot product
-@(require_results, deprecated="Prefer linalg.cross(v1, v2)")
+@(require_results)
 Vector3CrossProduct :: proc "c" (v1, v2: Vector3) -> Vector3 {
 	return linalg.cross(v1, v2)
 }
 // Calculate distance between two vectors
-@(require_results, deprecated="Prefer linalg.distance(v1, v2)")
+@(require_results)
 Vector3Distance :: proc "c" (v1, v2: Vector3) -> f32 {
 	return linalg.distance(v1, v2)
 }
 // Calculate square distance between two vectors
-@(require_results, deprecated="Prefer linalg.length2(v2-v1)")
+@(require_results)
 Vector3DistanceSqrt :: proc "c" (v1, v2: Vector3) -> f32 {
 	return linalg.length2(v2-v1)
 }
 // Calculate angle between two vectors
 // NOTE: Angle is calculated from origin point (0, 0)
-@(require_results, deprecated="Prefer linalg.angle_between(v1, v2)")
+@(require_results)
 Vector3Angle :: proc "c" (v1, v2: Vector3) -> f32 {
 	return linalg.angle_between(v1, v2)
 }
@@ -337,7 +336,7 @@ Vector3Divide :: proc "c" (v1, v2: Vector3) -> Vector3 {
 	return v1 / v2
 }
 // Normalize provided vector
-@(require_results, deprecated="Prefer linalg.normalize0(v)")
+@(require_results)
 Vector3Normalize :: proc "c" (v: Vector3) -> Vector3 {
 	return linalg.normalize0(v)
 }
@@ -365,7 +364,7 @@ Vector3OrthoNormalize :: proc "c" (v1, v2: ^Vector3) {
 }
 
 // Transform a vector by quaternion rotation
-@(require_results, deprecated="Prefer linalg.mul(q, v")
+@(require_results)
 Vector3RotateByQuaternion :: proc "c" (v: Vector3, q: Quaternion) -> Vector3 {
 	return linalg.mul(q, v)
 }
@@ -481,12 +480,12 @@ Vector3Equals :: proc "c" (p, q: Vector3) -> bool {
 }
 
 
-@(require_results, deprecated="Prefer linalg.min(v1, v2)")
+@(require_results)
 Vector3Min :: proc "c" (v1, v2: Vector3) -> Vector3 {
 	return linalg.min(v1, v2)
 }
 
-@(require_results, deprecated="Prefer linalg.max(v1, v2)")
+@(require_results)
 Vector3Max :: proc "c" (v1, v2: Vector3) -> Vector3 {
 	return linalg.max(v1, v2)
 }
@@ -540,25 +539,25 @@ Vector3Unproject :: proc "c" (source: Vector3, projection: Matrix, view: Matrix)
 //----------------------------------------------------------------------------------
 
 // Compute matrix determinant
-@(require_results, deprecated="Prefer linalg.determinant(mat)")
+@(require_results)
 MatrixDeterminant :: proc "c" (mat: Matrix) -> f32 {
 	return linalg.determinant(mat)
 }
 
 // Get the trace of the matrix (sum of the values along the diagonal)
-@(require_results, deprecated="Prefer linalg.trace(mat)")
+@(require_results)
 MatrixTrace :: proc "c" (mat: Matrix) -> f32 {
 	return linalg.trace(mat)
 }
 
 // Transposes provided matrix
-@(require_results, deprecated="Prefer linalg.transpose(mat)")
+@(require_results)
 MatrixTranspose :: proc "c" (mat: Matrix) -> Matrix {
 	return linalg.transpose(mat)
 }
 
 // Invert provided matrix
-@(require_results, deprecated="Prefer linalg.inverse(mat)")
+@(require_results)
 MatrixInvert :: proc "c" (mat: Matrix) -> Matrix {
 	return linalg.inverse(mat)
 }
@@ -705,7 +704,7 @@ QuaternionLength :: proc "c" (q: Quaternion) -> f32 {
 	return abs(q)
 }
 // Normalize provided quaternion
-@(require_results, deprecated="Prefer linalg.normalize0(q)")
+@(require_results)
 QuaternionNormalize :: proc "c" (q: Quaternion) -> Quaternion {
 	return linalg.normalize0(q)
 }
@@ -815,4 +814,21 @@ QuaternionEquals :: proc "c" (p, q: Quaternion) -> bool {
 	       FloatEquals(p.y, q.y) &&
 	       FloatEquals(p.z, q.z) &&
 	       FloatEquals(p.w, q.w)
+}
+
+@(private, require_results)
+fmaxf :: proc "contextless" (x, y: f32) -> f32 {
+	if math.is_nan(x) {
+		return y
+	}
+
+	if math.is_nan(y) {
+		return x
+	}
+
+	if math.signbit(x) != math.signbit(y) {
+		return y if math.signbit(x) else x
+	}
+
+	return y if x < y else x
 }

@@ -2711,6 +2711,7 @@ to_quaternion :: proc{
 
 @(require_results)
 matrix2_orthonormalize_f16 :: proc "contextless" (m: Matrix2f16) -> (r: Matrix2f16) #no_bounds_check {
+	r = m
 	r[0] = normalize(m[0])
 
 	d0 := dot(r[0], r[1])
@@ -2721,6 +2722,7 @@ matrix2_orthonormalize_f16 :: proc "contextless" (m: Matrix2f16) -> (r: Matrix2f
 }
 @(require_results)
 matrix2_orthonormalize_f32 :: proc "contextless" (m: Matrix2f32) -> (r: Matrix2f32) #no_bounds_check {
+	r = m
 	r[0] = normalize(m[0])
 
 	d0 := dot(r[0], r[1])
@@ -2731,6 +2733,7 @@ matrix2_orthonormalize_f32 :: proc "contextless" (m: Matrix2f32) -> (r: Matrix2f
 }
 @(require_results)
 matrix2_orthonormalize_f64 :: proc "contextless" (m: Matrix2f64) -> (r: Matrix2f64) #no_bounds_check {
+	r = m
 	r[0] = normalize(m[0])
 
 	d0 := dot(r[0], r[1])
@@ -2748,6 +2751,7 @@ matrix2_orthonormalize :: proc{
 
 @(require_results)
 matrix3_orthonormalize_f16 :: proc "contextless" (m: Matrix3f16) -> (r: Matrix3f16) #no_bounds_check {
+	r = m
 	r[0] = normalize(m[0])
 
 	d0 := dot(r[0], r[1])
@@ -2763,6 +2767,7 @@ matrix3_orthonormalize_f16 :: proc "contextless" (m: Matrix3f16) -> (r: Matrix3f
 }
 @(require_results)
 matrix3_orthonormalize_f32 :: proc "contextless" (m: Matrix3f32) -> (r: Matrix3f32) #no_bounds_check {
+	r = m
 	r[0] = normalize(m[0])
 
 	d0 := dot(r[0], r[1])
@@ -2778,6 +2783,7 @@ matrix3_orthonormalize_f32 :: proc "contextless" (m: Matrix3f32) -> (r: Matrix3f
 }
 @(require_results)
 matrix3_orthonormalize_f64 :: proc "contextless" (m: Matrix3f64) -> (r: Matrix3f64) #no_bounds_check {
+	r = m
 	r[0] = normalize(m[0])
 
 	d0 := dot(r[0], r[1])

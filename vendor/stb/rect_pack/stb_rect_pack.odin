@@ -1,6 +1,6 @@
 package stb_rect_pack
 
-import c "core:c/libc"
+import "core:c"
 
 #assert(size_of(b32) == size_of(c.int))
 

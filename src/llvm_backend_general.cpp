@@ -434,7 +434,7 @@ gb_internal lbAddr lb_addr_soa_variable(lbValue addr, lbValue index, Ast *index_
 }
 
 gb_internal lbAddr lb_addr_swizzle(lbValue addr, Type *array_type, u8 swizzle_count, u8 swizzle_indices[4]) {
-	GB_ASSERT(is_type_array(array_type));
+	GB_ASSERT(is_type_array(array_type) || is_type_simd_vector(array_type));
 	GB_ASSERT(1 < swizzle_count && swizzle_count <= 4);
 	lbAddr v = {lbAddr_Swizzle, addr};
 	v.swizzle.type = array_type;
@@ -1264,6 +1264,30 @@ gb_internal lbValue lb_addr_load(lbProcedure *p, lbAddr const &addr) {
 		return lb_addr_load(p, res);
 	} else if (addr.kind == lbAddr_Swizzle) {
 		Type *array_type = base_type(addr.swizzle.type);
+		if (array_type->kind == Type_SimdVector) {
+			lbValue vec = lb_emit_load(p, addr.addr);
+			u8 index_count = addr.swizzle.count;
+			if (index_count == 0) {
+				return vec;
+			}
+
+			unsigned mask_len = cast(unsigned)index_count;
+			LLVMValueRef *mask_elems = gb_alloc_array(permanent_allocator(), LLVMValueRef, index_count);
+			for (isize i = 0; i < index_count; i++) {
+				mask_elems[i] = LLVMConstInt(lb_type(p->module, t_u32), addr.swizzle.indices[i], false);
+			}
+
+			LLVMValueRef mask = LLVMConstVector(mask_elems, mask_len);
+
+			LLVMValueRef v1 = vec.value;
+			LLVMValueRef v2 = vec.value;
+
+			lbValue res = {};
+			res.type = addr.swizzle.type;
+			res.value = LLVMBuildShuffleVector(p->builder, v1, v2, mask, "");
+			return res;
+		}
+
 		GB_ASSERT(array_type->kind == Type_Array);
 
 		unsigned res_align = cast(unsigned)type_align_of(addr.swizzle.type);
