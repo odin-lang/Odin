@@ -1398,6 +1398,8 @@ NOTE: Can't find UTF-8 based runes.
 Inputs:
 - s: The input string to search in.
 - c: The byte to search for.
+- start: The index to start searching from. (default: -1)
+- end: The index to stop searching at. (default: -1)
 
 Returns:
 - res: The byte offset of the first occurrence of `c` in `s`, or -1 if not found.
@@ -1411,7 +1413,9 @@ Example:
 		fmt.println(strings.index_byte("test", 't'))
 		fmt.println(strings.index_byte("test", 'e'))
 		fmt.println(strings.index_byte("test", 'x'))
-		fmt.println(strings.index_byte("teäst", 'ä'))
+		fmt.println(strings.index_byte("test", 'ä'))
+		fmt.println(strings.index_byte("test", 't', 1))
+		fmt.println(strings.index_byte("test", 's', end=1))
 	}
 
 Output:
@@ -1420,10 +1424,14 @@ Output:
 	1
 	-1
 	-1
+	3
+	-1
 
 */
-index_byte :: proc(s: string, c: byte) -> (res: int) {
-	for i := 0; i < len(s); i += 1 {
+index_byte :: proc(s: string, c: byte, start:=-1, end:= -1) -> (res: int) {
+	start_ind := 0 if start == -1 else start
+	end_ind := len(s) if end == -1 else end
+	for i := start_ind; i < end_ind; i += 1 {
 		if s[i] == c {
 			return i
 		}
@@ -1537,7 +1545,8 @@ Returns the byte offset of the string `substr` in the string `s`, -1 when not fo
 Inputs:
 - s: The input string to search in.
 - substr: The substring to search for.
-
+- start: The index to start search at. (default: -1)
+- end: The index to end search at. (default: -1)
 Returns:
 - res: The byte offset of the first occurrence of `substr` in `s`, or -1 if not found.
 
@@ -1551,6 +1560,8 @@ Example:
 		fmt.println(strings.index("test", "te"))
 		fmt.println(strings.index("test", "st"))
 		fmt.println(strings.index("test", "tt"))
+		fmt.println(strings.index("test", "t", 1))
+		fmt.println(strings.index("test", "s", end=1))
 	}
 
 Output:
@@ -1559,9 +1570,11 @@ Output:
 	0
 	2
 	-1
+	3
+	-1
 
 */
-index :: proc(s, substr: string) -> (res: int) {
+index :: proc(s, substr: string, start:= -1, end := -1) -> (res: int) {
 	hash_str_rabin_karp :: proc(s: string) -> (hash: u32 = 0, pow: u32 = 1) {
 		for i := 0; i < len(s); i += 1 {
 			hash = hash*PRIME_RABIN_KARP + u32(s[i])
@@ -1575,31 +1588,33 @@ index :: proc(s, substr: string) -> (res: int) {
 		}
 		return
 	}
-
 	n := len(substr)
+	start_ind := 0 if start == -1 else start
+	end_ind := len(s) if end == -1 else end
 	switch {
 	case n == 0:
 		return 0
 	case n == 1:
-		return index_byte(s, substr[0])
+		return index_byte(s, substr[0], start_ind, end)
 	case n == len(s):
 		if s == substr {
 			return 0
 		}
 		return -1
-	case n > len(s):
+	case n + start_ind > end_ind:
 		return -1
 	}
 
 	hash, pow := hash_str_rabin_karp(substr)
 	h: u32
-	for i := 0; i < n; i += 1 {
+	for i := start_ind; i < n + start_ind; i += 1 {
 		h = h*PRIME_RABIN_KARP + u32(s[i])
 	}
-	if h == hash && s[:n] == substr {
+	if h == hash && s[start_ind:n + start_ind] == substr {
 		return 0
 	}
-	for i := n; i < len(s); /**/ {
+
+	for i := n + start_ind; i < end_ind; /**/ {
 		h *= PRIME_RABIN_KARP
 		h += u32(s[i])
 		h -= pow * u32(s[i-n])

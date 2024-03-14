@@ -34,6 +34,7 @@ main :: proc() {
 	test_index_any_larger_string_not_found(&t)
 	test_index_any_small_string_found(&t)
 	test_index_any_larger_string_found(&t)
+	test_index_start_end(&t)
 	test_cut(&t)
 	test_case_conversion(&t)
 
@@ -77,6 +78,29 @@ test_last_index_any_small_string_found :: proc(t: ^testing.T) {
 test_last_index_any_small_string_not_found :: proc(t: ^testing.T) {
 	index := strings.last_index_any(".", "/:\"")
 	expect(t, index == -1, "last_index_any should be -1")
+}
+
+@test
+test_index_start_end :: proc(t: ^testing.T) {
+	s := "aaaaaaaa:aaaaaaaa"
+	// provide start and end
+	index := strings.index(s, ":a", 0, len(s))
+	expect(t, index == 8, "index_any should be 8")
+	// provide only start
+	index = strings.index(s, ":a", 0)
+	expect(t, index == 8, "index_any should be 8")
+	// provide only end
+	index = strings.index(s, ":a", end=10)
+	expect(t, index == 8, "index_any should be 8")
+	// restrict end -> substr not found
+	index = strings.index(s, ":a", end=4)
+	expect(t, index == -1, "index_any should be -1")
+	// degenerate case
+	index = strings.index(s, ":a", 1, 0)
+	expect(t, index == -1, "index_any should be -1")
+	// substring missing
+	index = strings.index(s, ":b", 0, 0)
+	expect(t, index == -1, "index_any should be -1")
 }
 
 Cut_Test :: struct {
