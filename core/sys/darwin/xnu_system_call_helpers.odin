@@ -128,22 +128,7 @@ sys_open :: proc(path: string, oflag: Open_Flags, mode: Permission) -> (c.int, b
 
 	cflags = _sys_permission_mode(mode)
 
-	cmode |= OPEN_FLAG_RDONLY       * u32(Open_Flags.RDONLY in oflag)
-	cmode |= OPEN_FLAG_WRONLY       * u32(Open_Flags.WRONLY in oflag)
-	cmode |= OPEN_FLAG_RDWR         * u32(Open_Flags.RDWR in oflag)
-	cmode |= OPEN_FLAG_NONBLOCK     * u32(Open_Flags.NONBLOCK in oflag)
-	cmode |= OPEN_FLAG_CREAT        * u32(Open_Flags.CREAT in oflag)
-	cmode |= OPEN_FLAG_APPEND       * u32(Open_Flags.APPEND in oflag)
-	cmode |= OPEN_FLAG_TRUNC        * u32(Open_Flags.TRUNC in oflag)
-	cmode |= OPEN_FLAG_EXCL         * u32(Open_Flags.EXCL in oflag)
-	cmode |= OPEN_FLAG_SHLOCK       * u32(Open_Flags.SHLOCK in oflag)
-	cmode |= OPEN_FLAG_EXLOCK       * u32(Open_Flags.EXLOCK in oflag)
-	cmode |= OPEN_FLAG_DIRECTORY    * u32(Open_Flags.DIRECTORY in oflag)
-	cmode |= OPEN_FLAG_NOFOLLOW     * u32(Open_Flags.NOFOLLOW in oflag)
-	cmode |= OPEN_FLAG_SYMLINK      * u32(Open_Flags.SYMLINK in oflag)
-	cmode |= OPEN_FLAG_EVTONLY      * u32(Open_Flags.EVTONLY in oflag)
-	cmode |= OPEN_FLAG_CLOEXEC      * u32(Open_Flags.CLOEXEC in oflag)
-	cmode |= OPEN_FLAG_NOFOLLOW_ANY * u32(Open_Flags.NOFOLLOW_ANY in oflag)
+	cmode = _sys_open_mode(oflag)
 	
 	result := syscall_open(cpath, cmode, cflags)
 	state  := result != -1
