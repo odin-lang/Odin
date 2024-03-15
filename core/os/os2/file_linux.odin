@@ -1,7 +1,6 @@
 //+private
 package os2
 
-import "core:c"
 import "core:io"
 import "core:time"
 import "core:strings"
@@ -152,7 +151,7 @@ _read :: proc(f: ^File, p: []byte) -> (i64, Error) {
 	if errno != .NONE {
 		return -1, _get_platform_error(errno)
 	}
-	return i64(n), nil
+	return i64(n), n == 0 ? io.Error.EOF : nil
 }
 
 _read_at :: proc(f: ^File, p: []byte, offset: i64) -> (i64, Error) {
@@ -164,7 +163,7 @@ _read_at :: proc(f: ^File, p: []byte, offset: i64) -> (i64, Error) {
 	if errno != .NONE {
 		return -1, _get_platform_error(errno)
 	}
-	return i64(n), nil
+	return i64(n), n == 0 ? io.Error.EOF : nil
 }
 
 _write :: proc(f: ^File, p: []byte) -> (i64, Error) {

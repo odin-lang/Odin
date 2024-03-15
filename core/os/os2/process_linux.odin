@@ -3,7 +3,6 @@ package os2
 
 import "base:runtime"
 
-import "core:c"
 import "core:fmt"
 import "core:mem"
 import "core:time"

@@ -111,7 +111,7 @@ _remove_all :: proc(path: string) -> Error {
 		defer delete(buf)
 
 		loop: for {
-			n, errno := linux.getdents(dfd, buf[:])
+			buflen, errno := linux.getdents(dfd, buf[:])
 			#partial switch errno {
 			case .EINVAL:
 				delete(buf)
@@ -126,7 +126,7 @@ _remove_all :: proc(path: string) -> Error {
 
 			d: ^dirent64
 
-			for i := 0; i < n; i += int(d.d_reclen) {
+			for i := 0; i < buflen; i += int(d.d_reclen) {
 				d = (^dirent64)(rawptr(&buf[i]))
 				d_name_cstr := cstring(&d.d_name[0])
 
@@ -142,7 +142,6 @@ _remove_all :: proc(path: string) -> Error {
 					continue
 				}
 
-				errno: linux.Errno
 				switch d.d_type {
 				case DT_DIR:
 					new_dfd: linux.Fd
