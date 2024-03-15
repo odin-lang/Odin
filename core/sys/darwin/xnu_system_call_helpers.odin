@@ -206,3 +206,20 @@ sys_lstat :: proc(path: string, status: ^stat) -> bool {
 	cpath: cstring = clone_to_cstring(path, context.temp_allocator)
 	return syscall_lstat(cpath, status) != -1
 }
+
+sys_shm_open :: proc(name: string, oflag: Open_Flags, mode: Permission) -> (c.int, bool) {
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
+
+	cmode: u32 = 0
+	cflags: u32 = 0
+	cname: cstring = clone_to_cstring(name, context.temp_allocator)
+
+	cflags = _sys_permission_mode(mode)
+
+	cmode = _sys_open_mode(oflag)
+
+	result := syscall_shm_open(cname, cmode, cflags)
+	state  := result != -1
+
+	return result * cast(c.int)state, state
+}
