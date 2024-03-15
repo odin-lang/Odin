@@ -87,6 +87,29 @@ _sys_permission_mode :: #force_inline proc (mode: Permission) -> u32 {
 	return cflags
 }
 
+_sys_open_mode :: #force_inline proc(mode: Open_Flags) -> u32 {
+	cflags : u32 = 0
+
+	cflags |= OPEN_FLAG_RDONLY       * u32(Open_Flags.RDONLY in mode)
+	cflags |= OPEN_FLAG_WRONLY       * u32(Open_Flags.WRONLY in mode)
+	cflags |= OPEN_FLAG_RDWR         * u32(Open_Flags.RDWR in mode)
+	cflags |= OPEN_FLAG_NONBLOCK     * u32(Open_Flags.NONBLOCK in mode)
+	cflags |= OPEN_FLAG_CREAT        * u32(Open_Flags.CREAT in mode)
+	cflags |= OPEN_FLAG_APPEND       * u32(Open_Flags.APPEND in mode)
+	cflags |= OPEN_FLAG_TRUNC        * u32(Open_Flags.TRUNC in mode)
+	cflags |= OPEN_FLAG_EXCL         * u32(Open_Flags.EXCL in mode)
+	cflags |= OPEN_FLAG_SHLOCK       * u32(Open_Flags.SHLOCK in mode)
+	cflags |= OPEN_FLAG_EXLOCK       * u32(Open_Flags.EXLOCK in mode)
+	cflags |= OPEN_FLAG_DIRECTORY    * u32(Open_Flags.DIRECTORY in mode)
+	cflags |= OPEN_FLAG_NOFOLLOW     * u32(Open_Flags.NOFOLLOW in mode)
+	cflags |= OPEN_FLAG_SYMLINK      * u32(Open_Flags.SYMLINK in mode)
+	cflags |= OPEN_FLAG_EVTONLY      * u32(Open_Flags.EVTONLY in mode)
+	cflags |= OPEN_FLAG_CLOEXEC      * u32(Open_Flags.CLOEXEC in mode)
+	cflags |= OPEN_FLAG_NOFOLLOW_ANY * u32(Open_Flags.NOFOLLOW_ANY in mode)
+
+	return cflags
+}
+
 @(private)
 clone_to_cstring :: proc(s: string, allocator: runtime.Allocator, loc := #caller_location) -> cstring {
 	c := make([]byte, len(s)+1, allocator, loc)
