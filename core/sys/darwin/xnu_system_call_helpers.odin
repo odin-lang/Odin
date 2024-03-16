@@ -206,5 +206,9 @@ sys_shm_open :: proc(name: string, oflag: Open_Flags, mode: Permission) -> (c.in
 	result := syscall_shm_open(cname, cmode, cflags)
 	state  := result != -1
 
+	if state && cflags != 0 {
+		state = (syscall_fchmod(result, cflags) != -1)
+	}
+
 	return result * cast(c.int)state, state
 }
