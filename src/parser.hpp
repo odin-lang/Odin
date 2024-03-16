@@ -310,6 +310,8 @@ enum StateFlag : u8 {
 
 enum ViralStateFlag : u8 {
 	ViralStateFlag_ContainsDeferredProcedure = 1<<0,
+	ViralStateFlag_ContainsOrBreak           = 1<<1,
+	ViralStateFlag_ContainsOrReturn          = 1<<2,
 };
 
 

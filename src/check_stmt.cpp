@@ -221,6 +221,12 @@ gb_internal bool check_has_break(Ast *stmt, String const &label, bool implicit) 
 			return true;
 		}
 		break;
+
+	case Ast_ExprStmt:
+		if (stmt->ExprStmt.expr->viral_state_flags & ViralStateFlag_ContainsOrBreak) {
+			return true;
+		}
+		break;
 	}
 
 	return false;

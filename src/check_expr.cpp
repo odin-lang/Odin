@@ -8405,6 +8405,7 @@ gb_internal ExprKind check_or_branch_expr(CheckerContext *c, Operand *o, Ast *no
 
 	switch (be->token.kind) {
 	case Token_or_break:
+		node->viral_state_flags |= ViralStateFlag_ContainsOrBreak;
 		if ((c->stmt_flags & Stmt_BreakAllowed) == 0 && label == nullptr) {
 			error(be->token, "'%.*s' only allowed in non-inline loops or 'switch' statements", LIT(name));
 		}
@@ -10254,6 +10255,7 @@ gb_internal ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast
 	case_end;
 
 	case_ast_node(re, OrReturnExpr, node);
+		node->viral_state_flags |= ViralStateFlag_ContainsOrReturn;
 		return check_or_return_expr(c, o, node, type_hint);
 	case_end;
 
