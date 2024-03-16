@@ -1543,8 +1543,12 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 				goto skip_expr_range_stmt;
 			}
 		} else if (operand.mode != Addressing_Invalid) {
+			if (operand.mode == Addressing_OptionalOk || operand.mode == Addressing_OptionalOkPtr) {
+				check_promote_optional_ok(ctx, &operand, nullptr, nullptr);
+			}
 			bool is_ptr = is_type_pointer(operand.type);
 			Type *t = base_type(type_deref(operand.type));
+
 			switch (t->kind) {
 			case Type_Basic:
 				if (t->Basic.kind == Basic_string || t->Basic.kind == Basic_UntypedString) {
