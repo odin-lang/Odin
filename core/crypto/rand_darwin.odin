@@ -10,3 +10,7 @@ _rand_bytes :: proc(dst: []byte) {
 		panic(fmt.tprintf("crypto/rand_bytes: SecRandomCopyBytes returned non-zero result: %v %s", res, msg))
 	}
 }
+
+_has_rand_bytes :: proc () -> bool {
+	return true
+}
