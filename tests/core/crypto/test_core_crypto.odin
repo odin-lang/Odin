@@ -347,7 +347,7 @@ test_x25519 :: proc(t: ^testing.T) {
 test_rand_bytes :: proc(t: ^testing.T) {
 	tc.log(t, "Testing rand_bytes")
 
-	if ODIN_OS != .Linux {
+	if !crypto.has_rand_bytes() {
 		tc.log(t, "rand_bytes not supported - skipping")
 		return
 	}
