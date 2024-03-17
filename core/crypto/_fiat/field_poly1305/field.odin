@@ -51,3 +51,32 @@ fe_from_u64s :: proc "contextless" (out1: ^Tight_Field_Element, lo, hi: u64) {
 	// This routine is only used to deserialize `r` which is confidential.
 	mem.zero_explicit(&tmp, size_of(tmp))
 }
+
+fe_zero :: proc "contextless" (out1: ^Tight_Field_Element) {
+	out1[0] = 0
+	out1[1] = 0
+	out1[2] = 0
+}
+
+fe_set :: #force_inline proc "contextless" (out1, arg1: ^Tight_Field_Element) {
+	x1 := arg1[0]
+	x2 := arg1[1]
+	x3 := arg1[2]
+	out1[0] = x1
+	out1[1] = x2
+	out1[2] = x3
+}
+
+@(optimization_mode="none")
+fe_cond_swap :: #force_no_inline proc "contextless" (out1, out2: ^Tight_Field_Element, arg1: bool) {
+	mask := -u64(arg1)
+	x := (out1[0] ~ out2[0]) & mask
+	x1, y1 := out1[0] ~ x, out2[0] ~ x
+	x = (out1[1] ~ out2[1]) & mask
+	x2, y2 := out1[1] ~ x, out2[1] ~ x
+	x = (out1[2] ~ out2[2]) & mask
+	x3, y3 := out1[2] ~ x, out2[2] ~ x
+	out1[0], out2[0] = x1, y1
+	out1[1], out2[1] = x2, y2
+	out1[2], out2[2] = x3, y3
+}
