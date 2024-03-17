@@ -599,7 +599,7 @@ fe_set :: proc "contextless" (out1, arg1: ^Tight_Field_Element) {
 
 @(optimization_mode="none")
 fe_cond_swap :: #force_no_inline proc "contextless" (out1, out2: ^Tight_Field_Element, arg1: int) {
-	mask := -u64(arg1)
+	mask := (u64(arg1) * 0xffffffffffffffff)
 	x := (out1[0] ~ out2[0]) & mask
 	x1, y1 := out1[0] ~ x, out2[0] ~ x
 	x = (out1[1] ~ out2[1]) & mask
