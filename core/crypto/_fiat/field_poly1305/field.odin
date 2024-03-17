@@ -3,15 +3,19 @@ package field_poly1305
 import "core:encoding/endian"
 import "core:mem"
 
-fe_relax_cast :: #force_inline proc "contextless" (arg1: ^Tight_Field_Element) -> ^Loose_Field_Element {
+fe_relax_cast :: #force_inline proc "contextless" (
+	arg1: ^Tight_Field_Element,
+) -> ^Loose_Field_Element {
 	return transmute(^Loose_Field_Element)(arg1)
 }
 
-fe_tighten_cast :: #force_inline proc "contextless" (arg1: ^Loose_Field_Element) -> ^Tight_Field_Element {
+fe_tighten_cast :: #force_inline proc "contextless" (
+	arg1: ^Loose_Field_Element,
+) -> ^Tight_Field_Element {
 	return transmute(^Tight_Field_Element)(arg1)
 }
 
-fe_from_bytes :: #force_inline proc (out1: ^Tight_Field_Element, arg1: []byte, arg2: byte) {
+fe_from_bytes :: #force_inline proc(out1: ^Tight_Field_Element, arg1: []byte, arg2: byte) {
 	// fiat-crypto's deserialization routine effectively processes a
 	// single byte at a time, and wants 256-bits of input for a value
 	// that will be 128-bits or 129-bits.
@@ -67,8 +71,11 @@ fe_set :: #force_inline proc "contextless" (out1, arg1: ^Tight_Field_Element) {
 	out1[2] = x3
 }
 
-@(optimization_mode="none")
-fe_cond_swap :: #force_no_inline proc "contextless" (out1, out2: ^Tight_Field_Element, arg1: bool) {
+@(optimization_mode = "none")
+fe_cond_swap :: #force_no_inline proc "contextless" (
+	out1, out2: ^Tight_Field_Element,
+	arg1: bool,
+) {
 	mask := -u64(arg1)
 	x := (out1[0] ~ out2[0]) & mask
 	x1, y1 := out1[0] ~ x, out2[0] ~ x
