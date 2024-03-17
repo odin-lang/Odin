@@ -42,7 +42,7 @@ import "core:math/bits"
 Loose_Field_Element :: distinct [5]u64
 Tight_Field_Element :: distinct [5]u64
 
-SQRT_M1 := Tight_Field_Element{
+SQRT_M1 := Tight_Field_Element {
 	1718705420411056,
 	234908883556509,
 	2233514472574048,
@@ -50,7 +50,13 @@ SQRT_M1 := Tight_Field_Element{
 	765476049583133,
 }
 
-_addcarryx_u51 :: #force_inline proc "contextless" (arg1: fiat.u1, arg2, arg3: u64) -> (out1: u64, out2: fiat.u1) {
+_addcarryx_u51 :: #force_inline proc "contextless" (
+	arg1: fiat.u1,
+	arg2, arg3: u64,
+) -> (
+	out1: u64,
+	out2: fiat.u1,
+) {
 	x1 := ((u64(arg1) + arg2) + arg3)
 	x2 := (x1 & 0x7ffffffffffff)
 	x3 := fiat.u1((x1 >> 51))
@@ -59,7 +65,13 @@ _addcarryx_u51 :: #force_inline proc "contextless" (arg1: fiat.u1, arg2, arg3: u
 	return
 }
 
-_subborrowx_u51 :: #force_inline proc "contextless" (arg1: fiat.u1, arg2, arg3: u64) -> (out1: u64, out2: fiat.u1) {
+_subborrowx_u51 :: #force_inline proc "contextless" (
+	arg1: fiat.u1,
+	arg2, arg3: u64,
+) -> (
+	out1: u64,
+	out2: fiat.u1,
+) {
 	x1 := ((i64(arg2) - i64(arg1)) - i64(arg3))
 	x2 := fiat.i1((x1 >> 51))
 	x3 := (u64(x1) & 0x7ffffffffffff)
@@ -68,7 +80,7 @@ _subborrowx_u51 :: #force_inline proc "contextless" (arg1: fiat.u1, arg2, arg3: 
 	return
 }
 
-fe_carry_mul :: proc (out1: ^Tight_Field_Element, arg1, arg2: ^Loose_Field_Element) {
+fe_carry_mul :: proc(out1: ^Tight_Field_Element, arg1, arg2: ^Loose_Field_Element) {
 	x2, x1 := bits.mul_u64(arg1[4], (arg2[4] * 0x13))
 	x4, x3 := bits.mul_u64(arg1[4], (arg2[3] * 0x13))
 	x6, x5 := bits.mul_u64(arg1[4], (arg2[2] * 0x13))
@@ -167,7 +179,7 @@ fe_carry_mul :: proc (out1: ^Tight_Field_Element, arg1, arg2: ^Loose_Field_Eleme
 	out1[4] = x152
 }
 
-fe_carry_square :: proc (out1: ^Tight_Field_Element, arg1: ^Loose_Field_Element) {
+fe_carry_square :: proc(out1: ^Tight_Field_Element, arg1: ^Loose_Field_Element) {
 	x1 := (arg1[4] * 0x13)
 	x2 := (x1 * 0x2)
 	x3 := (arg1[4] * 0x2)
@@ -303,8 +315,11 @@ fe_opp :: proc "contextless" (out1: ^Loose_Field_Element, arg1: ^Tight_Field_Ele
 	out1[4] = x5
 }
 
-@(optimization_mode="none")
-fe_cond_assign :: #force_no_inline proc "contextless" (out1, arg1: ^Tight_Field_Element, arg2: int) {
+@(optimization_mode = "none")
+fe_cond_assign :: #force_no_inline proc "contextless" (
+	out1, arg1: ^Tight_Field_Element,
+	arg2: int,
+) {
 	x1 := fiat.cmovznz_u64(fiat.u1(arg2), out1[0], arg1[0])
 	x2 := fiat.cmovznz_u64(fiat.u1(arg2), out1[1], arg1[1])
 	x3 := fiat.cmovznz_u64(fiat.u1(arg2), out1[2], arg1[2])
@@ -525,7 +540,7 @@ fe_relax :: proc "contextless" (out1: ^Loose_Field_Element, arg1: ^Tight_Field_E
 	out1[4] = x5
 }
 
-fe_carry_scmul_121666 :: proc (out1: ^Tight_Field_Element, arg1: ^Loose_Field_Element) {
+fe_carry_scmul_121666 :: proc(out1: ^Tight_Field_Element, arg1: ^Loose_Field_Element) {
 	x2, x1 := bits.mul_u64(0x1db42, arg1[4])
 	x4, x3 := bits.mul_u64(0x1db42, arg1[3])
 	x6, x5 := bits.mul_u64(0x1db42, arg1[2])

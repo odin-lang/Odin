@@ -3,11 +3,15 @@ package field_curve25519
 import "core:crypto"
 import "core:mem"
 
-fe_relax_cast :: #force_inline proc "contextless" (arg1: ^Tight_Field_Element) -> ^Loose_Field_Element {
+fe_relax_cast :: #force_inline proc "contextless" (
+	arg1: ^Tight_Field_Element,
+) -> ^Loose_Field_Element {
 	return transmute(^Loose_Field_Element)(arg1)
 }
 
-fe_tighten_cast :: #force_inline proc "contextless" (arg1: ^Loose_Field_Element) -> ^Tight_Field_Element {
+fe_tighten_cast :: #force_inline proc "contextless" (
+	arg1: ^Loose_Field_Element,
+) -> ^Tight_Field_Element {
 	return transmute(^Tight_Field_Element)(arg1)
 }
 
@@ -46,7 +50,7 @@ fe_equal_bytes :: proc "contextless" (arg1: ^Tight_Field_Element, arg2: ^[32]byt
 	return ret
 }
 
-fe_carry_pow2k :: proc (out1: ^Tight_Field_Element, arg1: ^Loose_Field_Element, arg2: uint) {
+fe_carry_pow2k :: proc(out1: ^Tight_Field_Element, arg1: ^Loose_Field_Element, arg2: uint) {
 	// Special case: `arg1^(2 * 0) = 1`, though this should never happen.
 	if arg2 == 0 {
 		fe_one(out1)
@@ -54,7 +58,7 @@ fe_carry_pow2k :: proc (out1: ^Tight_Field_Element, arg1: ^Loose_Field_Element, 
 	}
 
 	fe_carry_square(out1, arg1)
-	for _ in 1..<arg2 {
+	for _ in 1 ..< arg2 {
 		fe_carry_square(out1, fe_relax_cast(out1))
 	}
 }
@@ -64,7 +68,7 @@ fe_carry_opp :: #force_inline proc "contextless" (out1, arg1: ^Tight_Field_Eleme
 	fe_carry(out1, fe_relax_cast(out1))
 }
 
-fe_carry_invsqrt :: proc (out1: ^Tight_Field_Element, arg1: ^Loose_Field_Element) -> int {
+fe_carry_invsqrt :: proc(out1: ^Tight_Field_Element, arg1: ^Loose_Field_Element) -> int {
 	// Inverse square root taken from Monocypher.
 
 	tmp1, tmp2, tmp3: Tight_Field_Element = ---, ---, ---
@@ -116,7 +120,7 @@ fe_carry_invsqrt :: proc (out1: ^Tight_Field_Element, arg1: ^Loose_Field_Element
 	// then  isr = x^((p-1)/4) * sqrt(-1)
 	// else  isr = x^((p-1)/4)
 	fe_carry_mul(out1, fe_relax_cast(&tmp1), fe_relax_cast(&SQRT_M1))
-	fe_cond_assign(out1, &tmp1, (m1|ms) ~ 1)
+	fe_cond_assign(out1, &tmp1, (m1 | ms) ~ 1)
 
 	mem.zero_explicit(&tmp1, size_of(tmp1))
 	mem.zero_explicit(&tmp2, size_of(tmp2))
@@ -126,7 +130,7 @@ fe_carry_invsqrt :: proc (out1: ^Tight_Field_Element, arg1: ^Loose_Field_Element
 	return p1 | m1
 }
 
-fe_carry_inv :: proc (out1: ^Tight_Field_Element, arg1: ^Loose_Field_Element) {
+fe_carry_inv :: proc(out1: ^Tight_Field_Element, arg1: ^Loose_Field_Element) {
 	tmp1: Tight_Field_Element
 
 	fe_carry_square(&tmp1, arg1)
@@ -166,7 +170,7 @@ fe_set :: proc "contextless" (out1, arg1: ^Tight_Field_Element) {
 	out1[4] = x5
 }
 
-@(optimization_mode="none")
+@(optimization_mode = "none")
 fe_cond_swap :: #force_no_inline proc "contextless" (out1, out2: ^Tight_Field_Element, arg1: int) {
 	mask := (u64(arg1) * 0xffffffffffffffff)
 	x := (out1[0] ~ out2[0]) & mask
