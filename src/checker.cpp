@@ -1104,7 +1104,7 @@ gb_internal void init_universal(void) {
 			sscanf(cast(const char *)(build_context.minimum_os_version_string.text), "%d.%d.%d", &major, &minor, &revision);
 			minimum_os_version = (major*10000)+(minor*100)+revision;
 		}
-		add_global_constant("MINIMUM_OS_VERSION", t_untyped_integer, exact_value_i64(minimum_os_version));
+		add_global_constant("ODIN_MINIMUM_OS_VERSION", t_untyped_integer, exact_value_i64(minimum_os_version));
 	}
 
 	add_global_bool_constant("ODIN_DEBUG",                      bc->ODIN_DEBUG);
