@@ -3067,6 +3067,18 @@ gb_internal DECL_ATTRIBUTE_PROC(foreign_block_decl_attribute) {
 			error(elem, "Expected a string value for '%.*s'", LIT(name));
 		}
 		return true;
+	} else if (name == "link_suffix") {
+		if (ev.kind == ExactValue_String) {
+			String link_suffix = ev.value_string;
+			if (!is_foreign_name_valid(link_suffix)) {
+				error(elem, "Invalid link suffix: '%.*s'", LIT(link_suffix));
+			} else {
+				c->foreign_context.link_suffix = link_suffix;
+			}
+		} else {
+			error(elem, "Expected a string value for '%.*s'", LIT(name));
+		}
+		return true;
 	} else if (name == "private") {
 		EntityVisiblityKind kind = EntityVisiblity_PrivateToPackage;
 		if (ev.kind == ExactValue_Invalid) {
@@ -3360,6 +3372,18 @@ gb_internal DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 			error(elem, "Expected a string value for '%.*s'", LIT(name));
 		}
 		return true;
+	} else if (name == "link_suffix") {
+		ExactValue ev = check_decl_attribute_value(c, value);
+
+		if (ev.kind == ExactValue_String) {
+			ac->link_suffix = ev.value_string;
+			if (!is_foreign_name_valid(ac->link_suffix)) {
+				error(elem, "Invalid link suffix: %.*s", LIT(ac->link_suffix));
+			}
+		} else {
+			error(elem, "Expected a string value for '%.*s'", LIT(name));
+		}
+		return true;
 	} else if (name == "deprecated") {
 		ExactValue ev = check_decl_attribute_value(c, value);
 
@@ -3638,6 +3662,17 @@ gb_internal DECL_ATTRIBUTE_PROC(var_decl_attribute) {
 			error(elem, "Expected a string value for '%.*s'", LIT(name));
 		}
 		return true;
+	} else if (name == "link_suffix") {
+		ExactValue ev = check_decl_attribute_value(c, value);
+		if (ev.kind == ExactValue_String) {
+			ac->link_suffix = ev.value_string;
+			if (!is_foreign_name_valid(ac->link_suffix)) {
+				error(elem, "Invalid link suffix: %.*s", LIT(ac->link_suffix));
+			}
+		} else {
+			error(elem, "Expected a string value for '%.*s'", LIT(name));
+		}
+		return true;
 	} else if (name == "link_section") {
 		ExactValue ev = check_decl_attribute_value(c, value);
 		if (ev.kind == ExactValue_String) {
@@ -3702,8 +3737,10 @@ gb_internal void check_decl_attributes(CheckerContext *c, Array<Ast *> const &at
 	if (attributes.count == 0) return;
 
 	String original_link_prefix = {};
+	String original_link_suffix = {};
 	if (ac) {
 		original_link_prefix = ac->link_prefix;
+		original_link_suffix = ac->link_suffix;
 	}
 
 	StringSet set = {};
@@ -3775,6 +3812,13 @@ gb_internal void check_decl_attributes(CheckerContext *c, Array<Ast *> const &at
 			if (ac->link_name.len > 0) {
 				ac->link_prefix.text = nullptr;
 				ac->link_prefix.len  = 0;
+			}
+		}
+
+		if (ac->link_suffix.text == original_link_suffix.text) {
+			if (ac->link_name.len > 0) {
+				ac->link_suffix.text = nullptr;
+				ac->link_suffix.len  = 0;
 			}
 		}
 	}
@@ -4068,6 +4112,7 @@ gb_internal void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 				e->Variable.foreign_library_ident = fl;
 
 				e->Variable.link_prefix = c->foreign_context.link_prefix;
+				e->Variable.link_suffix = c->foreign_context.link_suffix;
 			}
 
 			Ast *init_expr = value;
@@ -4142,6 +4187,7 @@ gb_internal void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 						}
 					}
 					e->Procedure.link_prefix = c->foreign_context.link_prefix;
+					e->Procedure.link_suffix = c->foreign_context.link_suffix;
 
 					GB_ASSERT(cc != ProcCC_Invalid);
 					pl->type->ProcType.calling_convention = cc;
