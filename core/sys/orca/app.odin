@@ -2,7 +2,7 @@ package orca
 
 import "core:c"
 
-window :: u64
+window :: distinct u64
 
 mouse_cursor :: enum c.int {
 	ARROW,

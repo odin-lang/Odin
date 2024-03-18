@@ -3,14 +3,14 @@ package orca
 import "core:c"
 
 // types
-color :: [4]f32
-utf32 :: u32
+color :: distinct [4]f32
+utf32 :: rune
 
 // handles
-surface :: u64
-font :: u64
-image :: u64
-canvas :: u64
+surface :: distinct u64
+font :: distinct u64
+image :: distinct u64
+canvas :: distinct u64
 
 joint_type :: enum c.int {
 	MITER,

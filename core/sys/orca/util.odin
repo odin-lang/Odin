@@ -21,7 +21,7 @@ base_allocator :: struct {
 
 arena_chunk :: struct {
 	listElt: list_elt,
-	ptr: ^c.char,
+	ptr: [^]byte,
 	offset: u64,
 	committed: u64,
 	cap: u64,
@@ -161,8 +161,6 @@ list_iterate :: proc "c" (iter: ^List_Iterator($T)) -> (ptr: ^T, ok: bool) {
 // Strings / string lists / path strings
 //----------------------------------------------------------------
 
-// TODO use odin cstring when ^c.char is used?
-
 str8 :: string
 str32 :: []rune
 
@@ -179,8 +177,8 @@ str8_elt :: struct {
 
 @(default_calling_convention="c", link_prefix="oc_")
 foreign {
-	str8_push_buffer :: proc(arena: ^arena, len: u64, buffer: ^c.char) -> str8 ---
-	str8_push_cstring :: proc(arena: ^arena, str: ^c.char) -> str8 ---
+	str8_push_buffer :: proc(arena: ^arena, len: u64, buffer: [^]c.char) -> str8 ---
+	str8_push_cstring :: proc(arena: ^arena, str: cstring) -> str8 ---
 	str8_push_copy :: proc(arena: ^arena, s: str8) -> str8 ---
 	str8_push_slice :: proc(arena: ^arena, s: str8, start: u64, end: u64) -> str8 ---
 	
@@ -188,7 +186,7 @@ foreign {
 	str8_pushfv :: proc(arena: ^arena, format: cstring, args: c.va_list) -> str8 ---
 	str8_pushf :: proc(arena: ^arena, format: cstring, #c_vararg args: ..any) -> str8 ---
 
-	str8_to_cstring :: proc(arena: ^arena, string: str8) -> ^c.char ---
+	str8_to_cstring :: proc(arena: ^arena, string: str8) -> cstring ---
 
 	str8_list_push :: proc(arena: ^arena, list: ^str8_list, str: str8) ---
 	str8_list_pushf :: proc(arena: ^arena, list: ^str8_list, format: cstring, #c_vararg args: ..any) ---
