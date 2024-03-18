@@ -1535,46 +1535,46 @@ struct CIdentSuggestion {
 
 // NOTE(bill): this linear look-up table might be slow but because it's an error case, it should be fine
 gb_internal CIdentSuggestion const c_ident_suggestions[] = {
-	{str_lit("while"),     str_lit("Did you mean 'for'? Odin only has one loop construct: 'for'")},
+	{str_lit("while"),     str_lit("'for'? Odin only has one loop construct: 'for'")},
 
-	{str_lit("sizeof"),    str_lit("Did you mean 'size_of'?")},
-	{str_lit("alignof"),   str_lit("Did you mean 'align_of'?")},
-	{str_lit("offsetof"),  str_lit("Did you mean 'offset_of'?")},
+	{str_lit("sizeof"),    str_lit("'size_of'?")},
+	{str_lit("alignof"),   str_lit("'align_of'?")},
+	{str_lit("offsetof"),  str_lit("'offset_of'?")},
 
-	{str_lit("_Bool"),     str_lit("Did you mean 'bool'?")},
+	{str_lit("_Bool"),     str_lit("'bool'?")},
 
-	{str_lit("char"),      str_lit("Did you mean 'u8', 'i8', or 'c.char' (which is part of 'core:c')?")},
-	{str_lit("short"),     str_lit("Did you mean 'i16' or 'c.short' (which is part of 'core:c')?")},
-	{str_lit("long"),      str_lit("Did you mean 'c.long' (which is part of 'core:c')?")},
-	{str_lit("float"),     str_lit("Did you mean 'f32'?")},
-	{str_lit("double"),    str_lit("Did you mean 'f64'?")},
-	{str_lit("unsigned"),  str_lit("Did you mean 'c.uint' (which is part of 'core:c')?")},
-	{str_lit("signed"),    str_lit("Did you mean 'c.int' (which is part of 'core:c')?")},
+	{str_lit("char"),      str_lit("'u8', 'i8', or 'c.char' (which is part of 'core:c')?")},
+	{str_lit("short"),     str_lit("'i16' or 'c.short' (which is part of 'core:c')?")},
+	{str_lit("long"),      str_lit("'c.long' (which is part of 'core:c')?")},
+	{str_lit("float"),     str_lit("'f32'?")},
+	{str_lit("double"),    str_lit("'f64'?")},
+	{str_lit("unsigned"),  str_lit("'c.uint' (which is part of 'core:c')?")},
+	{str_lit("signed"),    str_lit("'c.int' (which is part of 'core:c')?")},
 
-	{str_lit("size_t"),    str_lit("Did you mean 'uint', or 'c.size_t' (which is part of 'core:c')?")},
-	{str_lit("ssize_t"),   str_lit("Did you mean 'int', or 'c.ssize_t' (which is part of 'core:c')?")},
+	{str_lit("size_t"),    str_lit("'uint', or 'c.size_t' (which is part of 'core:c')?")},
+	{str_lit("ssize_t"),   str_lit("'int', or 'c.ssize_t' (which is part of 'core:c')?")},
 
-	{str_lit("uintptr_t"), str_lit("Did you mean 'uintptr'?")},
-	{str_lit("intptr_t"),  str_lit("Did you mean 'uintptr' or `int` or something else?")},
-	{str_lit("ptrdiff_t"), str_lit("Did you mean 'int' or 'c.ptrdiff_t' (which is part of 'core:c')?")},
-	{str_lit("intmax_t"),  str_lit("Dit you mean 'c.intmax_t' (which is part of 'core:c')?")},
-	{str_lit("uintmax_t"), str_lit("Dit you mean 'c.uintmax_t' (which is part of 'core:c')?")},
+	{str_lit("uintptr_t"), str_lit("'uintptr'?")},
+	{str_lit("intptr_t"),  str_lit("'uintptr' or `int` or something else?")},
+	{str_lit("ptrdiff_t"), str_lit("'int' or 'c.ptrdiff_t' (which is part of 'core:c')?")},
+	{str_lit("intmax_t"),  str_lit("'c.intmax_t' (which is part of 'core:c')?")},
+	{str_lit("uintmax_t"), str_lit("'c.uintmax_t' (which is part of 'core:c')?")},
 
-	{str_lit("uint8_t"),   str_lit("Did you mean 'u8'?")},
-	{str_lit("int8_t"),    str_lit("Did you mean 'i8'?")},
-	{str_lit("uint16_t"),  str_lit("Did you mean 'u16'?")},
-	{str_lit("int16_t"),   str_lit("Did you mean 'i16'?")},
-	{str_lit("uint32_t"),  str_lit("Did you mean 'u32'?")},
-	{str_lit("int32_t"),   str_lit("Did you mean 'i32'?")},
-	{str_lit("uint64_t"),  str_lit("Did you mean 'u64'?")},
-	{str_lit("int64_t"),   str_lit("Did you mean 'i64'?")},
-	{str_lit("uint128_t"), str_lit("Did you mean 'u128'?")},
-	{str_lit("int128_t"),  str_lit("Did you mean 'i128'?")},
+	{str_lit("uint8_t"),   str_lit("'u8'?")},
+	{str_lit("int8_t"),    str_lit("'i8'?")},
+	{str_lit("uint16_t"),  str_lit("'u16'?")},
+	{str_lit("int16_t"),   str_lit("'i16'?")},
+	{str_lit("uint32_t"),  str_lit("'u32'?")},
+	{str_lit("int32_t"),   str_lit("'i32'?")},
+	{str_lit("uint64_t"),  str_lit("'u64'?")},
+	{str_lit("int64_t"),   str_lit("'i64'?")},
+	{str_lit("uint128_t"), str_lit("'u128'?")},
+	{str_lit("int128_t"),  str_lit("'i128'?")},
 
-	{str_lit("float32"),   str_lit("Did you mean 'f32'?")},
-	{str_lit("float64"),   str_lit("Did you mean 'f64'?")},
-	{str_lit("float32_t"), str_lit("Did you mean 'f32'?")},
-	{str_lit("float64_t"), str_lit("Did you mean 'f64'?")},
+	{str_lit("float32"),   str_lit("'f32'?")},
+	{str_lit("float64"),   str_lit("'f64'?")},
+	{str_lit("float32_t"), str_lit("'f32'?")},
+	{str_lit("float64_t"), str_lit("'f64'?")},
 };
 
 gb_internal Entity *check_ident(CheckerContext *c, Operand *o, Ast *n, Type *named_type, Type *type_hint, bool allow_import_name) {
@@ -1595,7 +1595,7 @@ gb_internal Entity *check_ident(CheckerContext *c, Operand *o, Ast *n, Type *nam
 
 			for (CIdentSuggestion const &suggestion : c_ident_suggestions) {
 				if (name == suggestion.name) {
-					error_line("\tSuggestion: %s\n", LIT(suggestion.msg));
+					error_line("\tSuggestion: Did you mean %s\n", LIT(suggestion.msg));
 				}
 			}
 		}
