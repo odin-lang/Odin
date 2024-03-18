@@ -1015,6 +1015,7 @@ gb_internal void init_universal(void) {
 			{"WASI",         TargetOs_wasi},
 			{"JS",           TargetOs_js},
 			{"Freestanding", TargetOs_freestanding},
+			{"Orca",         TargetOs_orca},
 		};
 
 		auto fields = add_global_enum_type(str_lit("Odin_OS_Type"), values, gb_count_of(values));

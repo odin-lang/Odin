@@ -1,7 +1,11 @@
 //+build wasm32
 package sys_wasi
 
-foreign import wasi "wasi_snapshot_preview1"
+when ODIN_OS == .Orca {
+	foreign import wasi "wasi"
+} else {
+	foreign import wasi "wasi_snapshot_preview1"
+}
 
 DIRCOOKIE_START :: u64(0)
 size_t :: uint

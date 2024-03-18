@@ -1,8 +1,10 @@
-//+build wasi
+//+build orca
 //+private
 package runtime
 
-// TODO reimplement fd_write
+// TODO
+// foreign import 
+// fd_write :: proc "contextless" ()
 import "core:sys/wasm/wasi"
 
 _stderr_write :: proc "contextless" (data: []byte) -> (int, _OS_Errno) {
