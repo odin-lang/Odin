@@ -1539,7 +1539,25 @@ gb_internal Entity *check_ident(CheckerContext *c, Operand *o, Ast *n, Type *nam
 		if (is_blank_ident(name)) {
 			error(n, "'_' cannot be used as a value");
 		} else {
+			ERROR_BLOCK();
 			error(n, "Undeclared name: %.*s", LIT(name));
+
+			// NOTE(bill): Loads of checks for C programmers
+			if (name == "float") {
+				error_line("\tSuggestion: Did you mean 'f32'?\n");
+			} else if (name == "double") {
+				error_line("\tSuggestion: Did you mean 'f64'?\n");
+			} else if (name == "short") {
+				error_line("\tSuggestion: Did you mean 'i16' or 'c.short' (which is part of 'core:c')?\n");
+			} else if (name == "long") {
+				error_line("\tSuggestion: Did you mean 'c.long' (which is part of 'core:c')?\n");
+			} else if (name == "unsigned") {
+				error_line("\tSuggestion: Did you mean 'c.uint' (which is part of 'core:c')?\n");
+			} else if (name == "char") {
+				error_line("\tSuggestion: Did you mean 'u8', 'i8' or 'c.char' (which is part of 'core:c')?\n");
+			} else if (name == "while") {
+				error_line("\tSuggestion: Did you mean 'for'? Odin only has one loop construct: 'for'\n");
+			}
 		}
 		o->type = t_invalid;
 		o->mode = Addressing_Invalid;
