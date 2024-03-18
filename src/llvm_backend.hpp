@@ -508,7 +508,7 @@ gb_internal lbValue lb_dynamic_map_reserve(lbProcedure *p, lbValue const &map_pt
 gb_internal lbValue lb_find_procedure_value_from_entity(lbModule *m, Entity *e);
 gb_internal lbValue lb_find_value_from_entity(lbModule *m, Entity *e);
 
-gb_internal void lb_store_type_case_implicit(lbProcedure *p, Ast *clause, lbValue value);
+gb_internal void lb_store_type_case_implicit(lbProcedure *p, Ast *clause, lbValue value, bool is_default_case);
 gb_internal lbAddr lb_store_range_stmt_val(lbProcedure *p, Ast *stmt_val, lbValue value);
 gb_internal lbValue lb_emit_source_code_location_const(lbProcedure *p, String const &procedure, TokenPos const &pos);
 gb_internal lbValue lb_const_source_code_location_const(lbModule *m, String const &procedure, TokenPos const &pos);

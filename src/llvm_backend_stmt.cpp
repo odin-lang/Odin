@@ -1454,7 +1454,7 @@ gb_internal void lb_build_switch_stmt(lbProcedure *p, AstSwitchStmt *ss, Scope *
 	lb_close_scope(p, lbDeferExit_Default, done);
 }
 
-gb_internal void lb_store_type_case_implicit(lbProcedure *p, Ast *clause, lbValue value) {
+gb_internal void lb_store_type_case_implicit(lbProcedure *p, Ast *clause, lbValue value, bool is_default_case) {
 	Entity *e = implicit_entity_of_node(clause);
 	GB_ASSERT(e != nullptr);
 	if (e->flags & EntityFlag_Value) {
@@ -1463,8 +1463,9 @@ gb_internal void lb_store_type_case_implicit(lbProcedure *p, Ast *clause, lbValu
 		lbAddr x = lb_add_local(p, e->type, e, false);
 		lb_addr_store(p, x, value);
 	} else {
-		// by reference
-		GB_ASSERT(are_types_identical(e->type, type_deref(value.type)));
+		if (!is_default_case) {
+			GB_ASSERT_MSG(are_types_identical(e->type, type_deref(value.type)), "%s %s", type_to_string(e->type), type_to_string(value.type));
+		}
 		lb_add_entity(p->module, e, value);
 	}
 }
@@ -1622,7 +1623,7 @@ gb_internal void lb_build_type_switch_stmt(lbProcedure *p, AstTypeSwitchStmt *ss
 		lb_open_scope(p, cc->scope);
 		if (cc->list.count == 0) {
 			lb_start_block(p, default_block);
-			lb_store_type_case_implicit(p, clause, parent_value);
+			lb_store_type_case_implicit(p, clause, parent_value, true);
 			lb_type_case_body(p, ss->label, clause, p->curr_block, done);
 			continue;
 		}
@@ -1688,7 +1689,7 @@ gb_internal void lb_build_type_switch_stmt(lbProcedure *p, AstTypeSwitchStmt *ss
 			lb_add_entity(p->module, case_entity, ptr);
 			lb_add_debug_local_variable(p, ptr.value, case_entity->type, case_entity->token);
 		} else {
-			lb_store_type_case_implicit(p, clause, parent_value);
+			lb_store_type_case_implicit(p, clause, parent_value, false);
 		}
 
 		lb_type_case_body(p, ss->label, clause, body, done);
