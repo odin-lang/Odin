@@ -219,57 +219,48 @@ log_level :: enum c.int {
 foreign {
 	bridge_log :: proc(
 		level:       log_level,
-		functionLen: i32,
-		function:    cstring,
-		fileLen:     i32,
-		file:        cstring,
-		line:        i32,
-		msgLen:      i32,
+		functionLen: c.int,
+		function:    [^]byte,
+		fileLen:     c.int,
+		file:        [^]byte,
+		line:        c.int,
+		msgLen:      c.int,
 		msg:         [^]byte,
-	) ---
-
-	log_ext :: proc(
-		level: log_level,
-		function: cstring,
-		file: cstring,
-		line: c.int,
-		fmt: cstring,
-		#c_vararg args: ..any,
 	) ---
 }
 
-log_proc: [1028]u8
-log_file: [1028]u8
+@(private)
+log_position :: proc "contextless" (loc: runtime.Source_Code_Location) -> (functionLen: c.int, function: [^]byte,
+                                                                           fileLen: c.int, file: [^]byte,
+                                                                           line: c.int) {
+	functionLen = c.int(len(loc.procedure))
+	function = raw_data(loc.procedure)
 
-log_temp :: proc "c" (loc: runtime.Source_Code_Location) -> (function, file: cstring) {
-	copy(log_proc[:], loc.procedure)
-	log_proc[len(loc.procedure)] = 0
-	function = cstring(&log_proc[0])
-	
-	copy(log_file[:], loc.file_path)
-	log_file[len(loc.file_path)] = 0
-	file = cstring(&log_file[0])
+	fileLen = c.int(len(loc.file_path))
+	file = raw_data(loc.file_path)
 
+	line = c.int(loc.line)
 	return
 }
 
-log_info :: proc "c" (format: cstring, args: ..any, loc := #caller_location) {
-	function, file := log_temp(loc)
-	// final := fmt.ctprintf(format, ..args)
-	// log_ext(.INFO, function, file, loc.line, final, {})
-	log_ext(.INFO, function, file, loc.line, format, {})
+log_ext :: proc "contextless" (level: log_level, format: string, args: ..any, loc := #caller_location) {
+	@(thread_local) buffer: [256]byte
+
+	context = runtime.default_context()
+
+	s := fmt.bprintf(buffer[:], format, ..args)
+
+	bridge_log(level, log_position(loc), c.int(len(s)), raw_data(s))
 }
 
-log_warning :: proc "c" (format: cstring, args: ..any, loc := #caller_location) {
-	function, file := log_temp(loc)
-	// final := fmt.ctprintf(format, ..args)
-	// log_ext(.WARNING, function, file, loc.line, final, {})
-	log_ext(.WARNING, function, file, loc.line, format, {})
+log_info :: proc "contextless" (format: string, args: ..any, loc := #caller_location) {
+	log_ext(.INFO, format, ..args, loc=loc)
 }
 
-log_error :: proc "c" (format: cstring, args: ..any, loc := #caller_location) {
-	function, file := log_temp(loc)
-	// final := fmt.ctprintf(format, ..args)
-	// log_ext(.ERROR, function, file, loc.line, final, {})
-	log_ext(.ERROR, function, file, loc.line, format, {})
+log_warning :: proc "contextless" (format: string, args: ..any, loc := #caller_location) {
+	log_ext(.WARNING, format, ..args, loc=loc)
+}
+
+log_error :: proc "contextless" (format: string, args: ..any, loc := #caller_location) {
+	log_ext(.ERROR, format, ..args, loc=loc)
 }

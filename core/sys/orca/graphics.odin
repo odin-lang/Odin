@@ -7,10 +7,10 @@ color :: distinct [4]f32
 utf32 :: rune
 
 // handles
-surface :: distinct u64
-font :: distinct u64
-image :: distinct u64
-canvas :: distinct u64
+surface :: distinct u32
+font    :: distinct u32
+image   :: distinct u32
+canvas  :: distinct u32
 
 joint_type :: enum c.int {
 	MITER,
@@ -58,22 +58,23 @@ image_region :: struct {
 //------------------------------------------------------------------------------------------
 // graphics surface
 //------------------------------------------------------------------------------------------
-@(default_calling_convention="c", link_prefix="oc_")
+@(default_calling_convention="c", link_prefix="oc_", link_suffix="_argptr_stub")
 foreign {
 	surface_nil :: proc() -> surface ---
 	surface_is_nil :: proc() -> c.bool ---
-	surface_canvas :: proc() -> surface ---
-	surface_gles :: proc() -> surface ---
+	surface_canvas :: proc(s: ^surface) ---
 	surface_destroy :: proc(surface: surface) ---
-	
-	surface_select :: proc(surface: surface) ---
-	surface_deselect :: proc() ---
-	surface_present :: proc(surface: surface) ---
-	
+
 	surface_get_size :: proc(surface: surface) -> vec2 ---
 	surface_contents_scaling :: proc(surface: surface) -> vec2 ---
 	surface_bring_to_front :: proc(surface: surface) ---
 	surface_send_to_back :: proc(surface: surface) ---
+
+	surface_gles :: proc(surface: ^surface) ---
+	surface_select :: proc(surface: surface) ---
+
+	surface_deselect :: proc() ---
+	surface_present :: proc(surface: surface) ---
 }
 
 //------------------------------------------------------------------------------------------

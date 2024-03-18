@@ -13,7 +13,7 @@ rect :: [4]f32
 //------------------------------------------------------------------------------------------
 // window
 //------------------------------------------------------------------------------------------
-@(default_calling_convention="c", link_prefix="oc_")
+@(default_calling_convention="c", link_prefix="oc_", link_suffix="_argptr_stub")
 foreign {
 	window_set_title :: proc(title: str8) ---
 	window_set_size :: proc(size: vec2) ---
