@@ -8485,18 +8485,26 @@ gb_internal void check_compound_literal_field_values(CheckerContext *c, Slice<As
 			continue;
 		}
 		ast_node(fv, FieldValue, elem);
-		if (fv->field->kind != Ast_Ident) {
-			gbString expr_str = expr_to_string(fv->field);
+		Ast *ident = fv->field;
+		if (ident->kind == Ast_ImplicitSelectorExpr) {
+			gbString expr_str = expr_to_string(ident);
+			error(ident, "Field names do not start with a '.', remove the '.' in structure literal", expr_str);
+			gb_string_free(expr_str);
+
+			ident = ident->ImplicitSelectorExpr.selector;
+		}
+		if (ident->kind != Ast_Ident) {
+			gbString expr_str = expr_to_string(ident);
 			error(elem, "Invalid field name '%s' in structure literal", expr_str);
 			gb_string_free(expr_str);
 			continue;
 		}
-		String name = fv->field->Ident.token.string;
+		String name = ident->Ident.token.string;
 
 		Selection sel = lookup_field(type, name, o->mode == Addressing_Type);
 		bool is_unknown = sel.entity == nullptr;
 		if (is_unknown) {
-			error(fv->field, "Unknown field '%.*s' in structure literal", LIT(name));
+			error(ident, "Unknown field '%.*s' in structure literal", LIT(name));
 			continue;
 		}
 
@@ -8510,24 +8518,24 @@ gb_internal void check_compound_literal_field_values(CheckerContext *c, Slice<As
 		}
 
 
-		add_entity_use(c, fv->field, field);
+		add_entity_use(c, ident, field);
 		if (string_set_update(&fields_visited, name)) {
 			if (sel.index.count > 1) {
 				if (String *found = string_map_get(&fields_visited_through_raw_union, sel.entity->token.string)) {
-					error(fv->field, "Field '%.*s' is already initialized due to a previously assigned struct #raw_union field '%.*s'", LIT(sel.entity->token.string), LIT(*found));
+					error(ident, "Field '%.*s' is already initialized due to a previously assigned struct #raw_union field '%.*s'", LIT(sel.entity->token.string), LIT(*found));
 				} else {
-					error(fv->field, "Duplicate or reused field '%.*s' in %.*s", LIT(sel.entity->token.string), LIT(assignment_str));
+					error(ident, "Duplicate or reused field '%.*s' in %.*s", LIT(sel.entity->token.string), LIT(assignment_str));
 				}
 			} else {
-				error(fv->field, "Duplicate field '%.*s' in %.*s", LIT(field->token.string), LIT(assignment_str));
+				error(ident, "Duplicate field '%.*s' in %.*s", LIT(field->token.string), LIT(assignment_str));
 			}
 			continue;
 		} else if (String *found = string_map_get(&fields_visited_through_raw_union, sel.entity->token.string)) {
-			error(fv->field, "Field '%.*s' is already initialized due to a previously assigned struct #raw_union field '%.*s'", LIT(sel.entity->token.string), LIT(*found));
+			error(ident, "Field '%.*s' is already initialized due to a previously assigned struct #raw_union field '%.*s'", LIT(sel.entity->token.string), LIT(*found));
 			continue;
 		}
 		if (sel.indirect) {
-			error(fv->field, "Cannot assign to the %d-nested anonymous indirect field '%.*s' in a %.*s", cast(int)sel.index.count-1, LIT(name), LIT(assignment_str));
+			error(ident, "Cannot assign to the %d-nested anonymous indirect field '%.*s' in a %.*s", cast(int)sel.index.count-1, LIT(name), LIT(assignment_str));
 			continue;
 		}
 
