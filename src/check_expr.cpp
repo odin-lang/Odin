@@ -1528,6 +1528,55 @@ gb_internal bool check_cycle(CheckerContext *c, Entity *curr, bool report) {
 	return false;
 }
 
+struct CIdentSuggestion {
+	String name;
+	String msg;
+};
+
+// NOTE(bill): this linear look-up table might be slow but because it's an error case, it should be fine
+gb_internal CIdentSuggestion const c_ident_suggestions[] = {
+	{str_lit("while"),     str_lit("Did you mean 'for'? Odin only has one loop construct: 'for'")},
+
+	{str_lit("sizeof"),    str_lit("Did you mean 'size_of'?")},
+	{str_lit("alignof"),   str_lit("Did you mean 'align_of'?")},
+	{str_lit("offsetof"),  str_lit("Did you mean 'offset_of'?")},
+
+	{str_lit("_Bool"),     str_lit("Did you mean 'bool'?")},
+
+	{str_lit("char"),      str_lit("Did you mean 'u8', 'i8', or 'c.char' (which is part of 'core:c')?")},
+	{str_lit("short"),     str_lit("Did you mean 'i16' or 'c.short' (which is part of 'core:c')?")},
+	{str_lit("long"),      str_lit("Did you mean 'c.long' (which is part of 'core:c')?")},
+	{str_lit("float"),     str_lit("Did you mean 'f32'?")},
+	{str_lit("double"),    str_lit("Did you mean 'f64'?")},
+	{str_lit("unsigned"),  str_lit("Did you mean 'c.uint' (which is part of 'core:c')?")},
+	{str_lit("signed"),    str_lit("Did you mean 'c.int' (which is part of 'core:c')?")},
+
+	{str_lit("size_t"),    str_lit("Did you mean 'uint', or 'c.size_t' (which is part of 'core:c')?")},
+	{str_lit("ssize_t"),   str_lit("Did you mean 'int', or 'c.ssize_t' (which is part of 'core:c')?")},
+
+	{str_lit("uintptr_t"), str_lit("Did you mean 'uintptr'?")},
+	{str_lit("intptr_t"),  str_lit("Did you mean 'uintptr' or `int` or something else?")},
+	{str_lit("ptrdiff_t"), str_lit("Did you mean 'int' or 'c.ptrdiff_t' (which is part of 'core:c')?")},
+	{str_lit("intmax_t"),  str_lit("Dit you mean 'c.intmax_t' (which is part of 'core:c')?")},
+	{str_lit("uintmax_t"), str_lit("Dit you mean 'c.uintmax_t' (which is part of 'core:c')?")},
+
+	{str_lit("uint8_t"),   str_lit("Did you mean 'u8'?")},
+	{str_lit("int8_t"),    str_lit("Did you mean 'i8'?")},
+	{str_lit("uint16_t"),  str_lit("Did you mean 'u16'?")},
+	{str_lit("int16_t"),   str_lit("Did you mean 'i16'?")},
+	{str_lit("uint32_t"),  str_lit("Did you mean 'u32'?")},
+	{str_lit("int32_t"),   str_lit("Did you mean 'i32'?")},
+	{str_lit("uint64_t"),  str_lit("Did you mean 'u64'?")},
+	{str_lit("int64_t"),   str_lit("Did you mean 'i64'?")},
+	{str_lit("uint128_t"), str_lit("Did you mean 'u128'?")},
+	{str_lit("int128_t"),  str_lit("Did you mean 'i128'?")},
+
+	{str_lit("float32"),   str_lit("Did you mean 'f32'?")},
+	{str_lit("float64"),   str_lit("Did you mean 'f64'?")},
+	{str_lit("float32_t"), str_lit("Did you mean 'f32'?")},
+	{str_lit("float64_t"), str_lit("Did you mean 'f64'?")},
+};
+
 gb_internal Entity *check_ident(CheckerContext *c, Operand *o, Ast *n, Type *named_type, Type *type_hint, bool allow_import_name) {
 	GB_ASSERT(n->kind == Ast_Ident);
 	o->mode = Addressing_Invalid;
@@ -1543,20 +1592,11 @@ gb_internal Entity *check_ident(CheckerContext *c, Operand *o, Ast *n, Type *nam
 			error(n, "Undeclared name: %.*s", LIT(name));
 
 			// NOTE(bill): Loads of checks for C programmers
-			if (name == "float") {
-				error_line("\tSuggestion: Did you mean 'f32'?\n");
-			} else if (name == "double") {
-				error_line("\tSuggestion: Did you mean 'f64'?\n");
-			} else if (name == "short") {
-				error_line("\tSuggestion: Did you mean 'i16' or 'c.short' (which is part of 'core:c')?\n");
-			} else if (name == "long") {
-				error_line("\tSuggestion: Did you mean 'c.long' (which is part of 'core:c')?\n");
-			} else if (name == "unsigned") {
-				error_line("\tSuggestion: Did you mean 'c.uint' (which is part of 'core:c')?\n");
-			} else if (name == "char") {
-				error_line("\tSuggestion: Did you mean 'u8', 'i8' or 'c.char' (which is part of 'core:c')?\n");
-			} else if (name == "while") {
-				error_line("\tSuggestion: Did you mean 'for'? Odin only has one loop construct: 'for'\n");
+
+			for (CIdentSuggestion const &suggestion : c_ident_suggestions) {
+				if (name == suggestion.name) {
+					error_line("\tSuggestion: %s\n", LIT(suggestion.msg));
+				}
 			}
 		}
 		o->type = t_invalid;

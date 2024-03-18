@@ -106,6 +106,9 @@ gb_internal gb_inline bool str_eq_ignore_case(String const &a, String const &b) 
 
 template <isize N>
 gb_internal gb_inline bool str_eq_ignore_case(String const &a, char const (&b_)[N]) {
+	if (a.len != N-1) {
+		return false;
+	}
 	String b = {cast(u8 *)b_, N-1};
 	return str_eq_ignore_case(a, b);
 }
