@@ -104,6 +104,13 @@ gb_internal gb_inline bool str_eq_ignore_case(String const &a, String const &b) 
 	return false;
 }
 
+template <isize N>
+gb_internal gb_inline bool str_eq_ignore_case(String const &a, char const (&b_)[N]) {
+	String b = {cast(u8 *)b_, N-1};
+	return str_eq_ignore_case(a, b);
+}
+
+
 gb_internal void string_to_lower(String *s) {
 	for (isize i = 0; i < s->len; i++) {
 		s->text[i] = gb_char_to_lower(s->text[i]);

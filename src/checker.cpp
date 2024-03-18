@@ -4806,6 +4806,22 @@ gb_internal void check_add_foreign_import_decl(CheckerContext *ctx, Ast *decl) {
 		return;
 	}
 
+	for (String const &path : fl->fullpaths) {
+		String ext = path_extension(path);
+		if (str_eq_ignore_case(ext, ".c") ||
+		    str_eq_ignore_case(ext, ".cpp") ||
+		    str_eq_ignore_case(ext, ".cxx") ||
+		    str_eq_ignore_case(ext, ".h") ||
+		    str_eq_ignore_case(ext, ".hpp") ||
+		    str_eq_ignore_case(ext, ".hxx") ||
+		    false
+		) {
+			error(fl->token, "With 'foreign import', you cannot import a %.*s file directory, you must precompile the library and link against that", LIT(ext));
+			break;
+		}
+	}
+
+
 	// if (fl->collection_name != "system") {
 	// 	char *c_str = gb_alloc_array(heap_allocator(), char, fullpath.len+1);
 	// 	defer (gb_free(heap_allocator(), c_str));
