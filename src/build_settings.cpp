@@ -22,6 +22,7 @@ enum TargetOsKind : u16 {
 	
 	TargetOs_wasi,
 	TargetOs_js,
+	TargetOs_orca,
 
 	TargetOs_freestanding,
 
@@ -83,6 +84,7 @@ gb_global String target_os_names[TargetOs_COUNT] = {
 	
 	str_lit("wasi"),
 	str_lit("js"),
+	str_lit("orca"),
 
 	str_lit("freestanding"),
 };
@@ -583,6 +585,14 @@ gb_global TargetMetrics target_wasi_wasm32 = {
 	str_lit("e-m:e-p:32:32-i64:64-n32:64-S128"),
 };
 
+gb_global TargetMetrics target_orca_wasm32 = {
+	TargetOs_orca,
+	TargetArch_wasm32,
+	4, 4, 8, 16,
+	str_lit("wasm32-wasi-js"),
+	str_lit("e-m:e-p:32:32-i64:64-n32:64-S128"),
+};
+
 
 gb_global TargetMetrics target_freestanding_wasm64p32 = {
 	TargetOs_freestanding,
@@ -655,6 +665,7 @@ gb_global NamedTargetMetrics named_targets[] = {
 	{ str_lit("freestanding_wasm32"), &target_freestanding_wasm32 },
 	{ str_lit("wasi_wasm32"),         &target_wasi_wasm32 },
 	{ str_lit("js_wasm32"),           &target_js_wasm32 },
+	{ str_lit("orca_wasm32"),         &target_orca_wasm32 },
 
 	{ str_lit("freestanding_wasm64p32"), &target_freestanding_wasm64p32 },
 	{ str_lit("js_wasm64p32"),           &target_js_wasm64p32 },
@@ -1513,9 +1524,12 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 		// if (bc->metrics.arch == TargetArch_wasm64) {
 		// 	link_flags = gb_string_appendc(link_flags, "-mwasm64 ");
 		// }
-		if (bc->no_entry_point) {
+		if (bc->no_entry_point || bc->metrics.os == TargetOs_orca) {
 			link_flags = gb_string_appendc(link_flags, "--no-entry ");
-		}
+			
+			// in case orca target was
+			bc->no_entry_point = true; 
+		} 
 		
 		bc->link_flags = make_string_c(link_flags);
 		
