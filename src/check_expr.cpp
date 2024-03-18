@@ -108,7 +108,7 @@ gb_internal Type *make_soa_struct_dynamic_array(CheckerContext *ctx, Ast *array_
 
 gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32 id, Type *type_hint);
 
-gb_internal void check_promote_optional_ok(CheckerContext *c, Operand *x, Type **val_type_, Type **ok_type_);
+gb_internal void check_promote_optional_ok(CheckerContext *c, Operand *x, Type **val_type_, Type **ok_type_, bool change_operand=true);
 
 gb_internal void check_or_else_right_type(CheckerContext *c, Ast *expr, String const &name, Type *right_type);
 gb_internal void check_or_else_split_types(CheckerContext *c, Operand *x, String const &name, Type **left_type_, Type **right_type_);
@@ -7801,7 +7801,7 @@ gb_internal ExprKind check_implicit_selector_expr(CheckerContext *c, Operand *o,
 }
 
 
-gb_internal void check_promote_optional_ok(CheckerContext *c, Operand *x, Type **val_type_, Type **ok_type_) {
+gb_internal void check_promote_optional_ok(CheckerContext *c, Operand *x, Type **val_type_, Type **ok_type_, bool change_operand) {
 	switch (x->mode) {
 	case Addressing_MapIndex:
 	case Addressing_OptionalOk:
@@ -7819,22 +7819,28 @@ gb_internal void check_promote_optional_ok(CheckerContext *c, Operand *x, Type *
 		Type *pt = base_type(type_of_expr(expr->CallExpr.proc));
 		if (is_type_proc(pt)) {
 			Type *tuple = pt->Proc.results;
-			add_type_and_value(c, x->expr, x->mode, tuple, x->value);
 
 			if (pt->Proc.result_count >= 2) {
 				if (ok_type_) *ok_type_ = tuple->Tuple.variables[1]->type;
 			}
-			expr->CallExpr.optional_ok_one = false;
-			x->type = tuple;
+			if (change_operand) {
+				expr->CallExpr.optional_ok_one = false;
+				x->type = tuple;
+				add_type_and_value(c, x->expr, x->mode, tuple, x->value);
+			}
 			return;
 		}
 	}
 
 	Type *tuple = make_optional_ok_type(x->type);
+
 	if (ok_type_) *ok_type_ = tuple->Tuple.variables[1]->type;
-	add_type_and_value(c, x->expr, x->mode, tuple, x->value);
-	x->type = tuple;
-	GB_ASSERT(is_type_tuple(type_of_expr(x->expr)));
+
+	if (change_operand) {
+		add_type_and_value(c, x->expr, x->mode, tuple, x->value);
+		x->type = tuple;
+		GB_ASSERT(is_type_tuple(type_of_expr(x->expr)));
+	}
 }
 
 
