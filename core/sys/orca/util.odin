@@ -217,6 +217,17 @@ log_level :: enum c.int {
 
 @(default_calling_convention="c", link_prefix="oc_")
 foreign {
+	bridge_log :: proc(
+		level:       log_level,
+		functionLen: i32,
+		function:    cstring,
+		fileLen:     i32,
+		file:        cstring,
+		line:        i32,
+		msgLen:      i32,
+		msg:         [^]byte,
+	) ---
+
 	log_ext :: proc(
 		level: log_level,
 		function: cstring,
