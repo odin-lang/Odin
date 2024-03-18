@@ -70,16 +70,19 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 		timings_start_section(timings, str_lit("wasm-ld"));
 
 		String extra_orca_flags = {};
-		if (build_context.metrics.os == TargetOs_orca) {
-			extra_orca_flags = str_lit(" -L . -lorca --export-dynamic");
-		}
 
 	#if defined(GB_SYSTEM_WINDOWS)
+		if (build_context.metrics.os == TargetOs_orca) {
+			extra_orca_flags = str_lit(" -L . --export-dynamic");
+		}
 		result = system_exec_command_line_app("wasm-ld",
 			"\"%.*s\\bin\\wasm-ld\" \"%.*s.o\" -o \"%.*s\" %.*s %.*s %.*s",
 			LIT(build_context.ODIN_ROOT),
 			LIT(output_filename), LIT(output_filename), LIT(build_context.link_flags), LIT(build_context.extra_linker_flags), LIT(extra_orca_flags));
 	#else
+		if (build_context.metrics.os == TargetOs_orca) {
+			extra_orca_flags = str_lit(" -L . -lorca --export-dynamic");
+		}
 		result = system_exec_command_line_app("wasm-ld",
 			"wasm-ld \"%.*s.o\" -o \"%.*s\" %.*s %.*s %.*s",
 			LIT(output_filename), LIT(output_filename), LIT(build_context.link_flags), LIT(build_context.extra_linker_flags), LIT(extra_orca_flags));
