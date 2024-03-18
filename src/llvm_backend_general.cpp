@@ -1515,9 +1515,11 @@ gb_internal String lb_set_nested_type_name_ir_mangled_name(Entity *e, lbProcedur
 			GB_ASSERT(scope->flags & ScopeFlag_Proc);
 			proc = scope->procedure_entity;
 		}
-		GB_ASSERT(proc->kind == Entity_Procedure);
-		if (proc->code_gen_procedure != nullptr) {
-			p = proc->code_gen_procedure;
+		if (proc != nullptr) {
+			GB_ASSERT(proc->kind == Entity_Procedure);
+			if (proc->code_gen_procedure != nullptr) {
+				p = proc->code_gen_procedure;
+			}
 		}
 	}
 
