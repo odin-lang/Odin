@@ -1107,7 +1107,7 @@ gb_internal void odin_doc_write_docs(OdinDocWriter *w) {
 	}
 
 	debugf("odin_doc_update_entities sort pkgs %s\n", w->state ? "preparing" : "writing");
-	gb_sort_array(pkgs.data, pkgs.count, cmp_ast_package_by_name);
+	array_sort(pkgs, cmp_ast_package_by_name);
 
 	for_array(i, pkgs) {
 		gbAllocator allocator = heap_allocator();

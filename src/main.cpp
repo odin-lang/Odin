@@ -2095,7 +2095,7 @@ gb_internal void print_show_unused(Checker *c) {
 		array_add(&unused, e);
 	}
 
-	gb_sort_array(unused.data, unused.count, cmp_entities_for_printing);
+	array_sort(unused, cmp_entities_for_printing);
 
 	print_usage_line(0, "Unused Package Declarations");
 
@@ -2680,6 +2680,7 @@ int main(int arg_count, char const **arg_ptr) {
 	}
 
 	if (any_errors()) {
+		print_all_errors();
 		return 1;
 	}
 
@@ -2691,6 +2692,7 @@ int main(int arg_count, char const **arg_ptr) {
 
 	check_parsed_files(checker);
 	if (any_errors()) {
+		print_all_errors();
 		return 1;
 	}
 

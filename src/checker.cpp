@@ -5044,7 +5044,7 @@ gb_internal void check_create_file_scopes(Checker *c) {
 	for_array(i, c->parser->packages) {
 		AstPackage *pkg = c->parser->packages[i];
 
-		gb_sort_array(pkg->files.data, pkg->files.count, sort_file_by_name);
+		array_sort(pkg->files, sort_file_by_name);
 
 		isize total_pkg_decl_count = 0;
 		for_array(j, pkg->files) {
@@ -5673,7 +5673,7 @@ gb_internal void remove_neighbouring_duplicate_entires_from_sorted_array(Array<E
 
 
 gb_internal void check_test_procedures(Checker *c) {
-	gb_sort_array(c->info.testing_procedures.data, c->info.testing_procedures.count, init_procedures_cmp);
+	array_sort(c->info.testing_procedures, init_procedures_cmp);
 	remove_neighbouring_duplicate_entires_from_sorted_array(&c->info.testing_procedures);
 
 	if (build_context.test_names.entries.count == 0) {
@@ -6122,8 +6122,8 @@ gb_internal GB_COMPARE_PROC(fini_procedures_cmp) {
 }
 
 gb_internal void check_sort_init_and_fini_procedures(Checker *c) {
-	gb_sort_array(c->info.init_procedures.data, c->info.init_procedures.count, init_procedures_cmp);
-	gb_sort_array(c->info.fini_procedures.data, c->info.fini_procedures.count, fini_procedures_cmp);
+	array_sort(c->info.init_procedures, init_procedures_cmp);
+	array_sort(c->info.fini_procedures, fini_procedures_cmp);
 
 	// NOTE(bill): remove possible duplicates from the init/fini lists
 	// NOTE(bill): because the arrays are sorted, you only need to check the previous element

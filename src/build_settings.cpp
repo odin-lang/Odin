@@ -1272,6 +1272,10 @@ gb_internal String get_fullpath_core_collection(gbAllocator a, String path, bool
 gb_internal bool show_error_line(void) {
 	return !build_context.hide_error_line;
 }
+
+gb_internal bool terse_errors(void) {
+	return build_context.terse_errors;
+}
 gb_internal bool has_ansi_terminal_colours(void) {
 	return build_context.has_ansi_terminal_colours;
 }

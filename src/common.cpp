@@ -913,7 +913,7 @@ gb_internal void did_you_mean_append(DidYouMeanAnswers *d, String const &target)
 	array_add(&d->distances, dat);
 }
 gb_internal Slice<DistanceAndTarget> did_you_mean_results(DidYouMeanAnswers *d) {
-	gb_sort_array(d->distances.data, d->distances.count, gb_isize_cmp(gb_offset_of(DistanceAndTarget, distance)));
+	array_sort(d->distances, gb_isize_cmp(gb_offset_of(DistanceAndTarget, distance)));
 	isize count = 0;
 	for (isize i = 0; i < d->distances.count; i++) {
 		isize distance = d->distances[i].distance;

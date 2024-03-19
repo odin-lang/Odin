@@ -3021,7 +3021,7 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 		}
 	}
 
-	gb_sort_array(gen->foreign_libraries.data, gen->foreign_libraries.count, foreign_library_cmp);
+	array_sort(gen->foreign_libraries, foreign_library_cmp);
 
 	return true;
 }

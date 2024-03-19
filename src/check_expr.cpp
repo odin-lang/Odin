@@ -6485,7 +6485,7 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 	}
 
 	if (valids.count > 1) {
-		gb_sort_array(valids.data, valids.count, valid_index_and_score_cmp);
+		array_sort(valids, valid_index_and_score_cmp);
 		i64 best_score = valids[0].score;
 		Entity *best_entity = proc_entities[valids[0].index];
 		GB_ASSERT(best_entity != nullptr);
