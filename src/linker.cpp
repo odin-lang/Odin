@@ -73,7 +73,7 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 
 	#if defined(GB_SYSTEM_WINDOWS)
 		if (build_context.metrics.os == TargetOs_orca) {
-			extra_orca_flags = str_lit(" -L . --export-dynamic");
+			extra_orca_flags = str_lit(" W:/orca/installation/dev-afb9591/bin/liborca_wasm.a --export-dynamic");
 		}
 		result = system_exec_command_line_app("wasm-ld",
 			"\"%.*s\\bin\\wasm-ld\" \"%.*s.o\" -o \"%.*s\" %.*s %.*s %.*s",

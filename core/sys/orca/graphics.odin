@@ -8,9 +8,9 @@ utf32 :: rune
 
 // handles
 surface :: distinct u32
-font    :: distinct u32
-image   :: distinct u32
-canvas  :: distinct u32
+font    :: distinct u64
+image   :: distinct u64
+canvas  :: distinct u64
 
 joint_type :: enum c.int {
 	MITER,
