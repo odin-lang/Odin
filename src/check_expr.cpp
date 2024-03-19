@@ -3431,6 +3431,11 @@ gb_internal void check_binary_matrix(CheckerContext *c, Token const &op, Operand
 				if (xt->Matrix.column_count != yt->Matrix.row_count) {
 					goto matrix_error;
 				}
+
+				if (xt->Matrix.is_row_major != yt->Matrix.is_row_major) {
+					goto matrix_error;
+				}
+
 				x->mode = Addressing_Value;
 				if (are_types_identical(xt, yt)) {
 					if (!is_type_named(x->type) && is_type_named(y->type)) {
@@ -3438,7 +3443,8 @@ gb_internal void check_binary_matrix(CheckerContext *c, Token const &op, Operand
 						x->type = y->type;
 					}
 				} else {
-					x->type = alloc_type_matrix(xt->Matrix.elem, xt->Matrix.row_count, yt->Matrix.column_count);
+					bool is_row_major = xt->Matrix.is_row_major && yt->Matrix.is_row_major;
+					x->type = alloc_type_matrix(xt->Matrix.elem, xt->Matrix.row_count, yt->Matrix.column_count, nullptr, nullptr, is_row_major);
 				}
 				goto matrix_success;
 			} else if (yt->kind == Type_Array) {
@@ -3452,7 +3458,7 @@ gb_internal void check_binary_matrix(CheckerContext *c, Token const &op, Operand
 				
 				// Treat arrays as column vectors
 				x->mode = Addressing_Value;
-				if (type_hint == nullptr && xt->Matrix.row_count == yt->Array.count) {
+				if (xt->Matrix.row_count == yt->Array.count) {
 					x->type = y->type;
 				} else {
 					x->type = alloc_type_matrix(xt->Matrix.elem, xt->Matrix.row_count, 1);
@@ -3483,7 +3489,7 @@ gb_internal void check_binary_matrix(CheckerContext *c, Token const &op, Operand
 				
 				// Treat arrays as row vectors
 				x->mode = Addressing_Value;
-				if (type_hint == nullptr && yt->Matrix.column_count == xt->Array.count) {
+				if (yt->Matrix.column_count == xt->Array.count) {
 					x->type = x->type;
 				} else {
 					x->type = alloc_type_matrix(yt->Matrix.elem, 1, yt->Matrix.column_count);

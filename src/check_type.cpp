@@ -2658,7 +2658,7 @@ gb_internal void check_matrix_type(CheckerContext *ctx, Type **type, Ast *node) 
 	}
 type_assign:;
 	
-	*type = alloc_type_matrix(elem, row_count, column_count, generic_row, generic_column);
+	*type = alloc_type_matrix(elem, row_count, column_count, generic_row, generic_column, mt->is_row_major);
 	
 	return;
 }

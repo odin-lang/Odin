@@ -2396,7 +2396,11 @@ fmt_matrix :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Matrix
 			for col in 0..<info.column_count {
 				if col > 0 { io.write_string(fi.writer, ", ", &fi.n) }
 
-				offset := (row + col*info.elem_stride)*info.elem_size
+				offset: int
+				switch info.layout {
+				case .Column_Major: offset = (row + col*info.elem_stride)*info.elem_size
+				case .Row_Major:    offset = (col + row*info.elem_stride)*info.elem_size
+				}
 
 				data := uintptr(v.data) + uintptr(offset)
 				fmt_arg(fi, any{rawptr(data), info.elem.id}, verb)
@@ -2410,7 +2414,11 @@ fmt_matrix :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Matrix
 			for col in 0..<info.column_count {
 				if col > 0 { io.write_string(fi.writer, ", ", &fi.n) }
 
-				offset := (row + col*info.elem_stride)*info.elem_size
+				offset: int
+				switch info.layout {
+				case .Column_Major: offset = (row + col*info.elem_stride)*info.elem_size
+				case .Row_Major:    offset = (col + row*info.elem_stride)*info.elem_size
+				}
 
 				data := uintptr(v.data) + uintptr(offset)
 				fmt_arg(fi, any{rawptr(data), info.elem.id}, verb)

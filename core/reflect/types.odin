@@ -173,6 +173,7 @@ are_types_identical :: proc(a, b: ^Type_Info) -> bool {
 		y := b.variant.(Type_Info_Matrix) or_return
 		if x.row_count != y.row_count { return false }
 		if x.column_count != y.column_count { return false }
+		if x.layout != y.layout { return false }
 		return are_types_identical(x.elem, y.elem)
 
 	case Type_Info_Bit_Field:
@@ -689,6 +690,9 @@ write_type_writer :: proc(w: io.Writer, ti: ^Type_Info, n_written: ^int = nil) -
 		write_type(w, info.pointer,      &n) or_return
 		
 	case Type_Info_Matrix:
+		if info.layout == .Row_Major {
+			io.write_string(w, "#row_major ",   &n) or_return
+		}
 		io.write_string(w, "matrix[",               &n) or_return
 		io.write_i64(w, i64(info.row_count), 10,    &n) or_return
 		io.write_string(w, ", ",                    &n) or_return

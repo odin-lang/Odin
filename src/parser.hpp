@@ -772,6 +772,7 @@ AST_KIND(_TypeBegin, "", bool) \
 		Ast *row_count;    \
 		Ast *column_count; \
 		Ast *elem;         \
+		bool is_row_major; \
 	}) \
 AST_KIND(_TypeEnd,  "", bool)
 
