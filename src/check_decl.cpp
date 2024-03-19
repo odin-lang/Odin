@@ -1279,7 +1279,7 @@ gb_internal void check_global_variable_decl(CheckerContext *ctx, Entity *&e, Ast
 			error(e->token, "A foreign variable declaration cannot have a default value");
 		}
 		init_entity_foreign_library(ctx, e);
-		if (is_arch_wasm()) {
+		if (is_arch_wasm() && build_context.metrics.os != TargetOs_orca) {
 			error(e->token, "A foreign variable declaration are not allowed for the '%.*s' architecture", LIT(target_arch_names[build_context.metrics.arch]));
 		}
 	}
