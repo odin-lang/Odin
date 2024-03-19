@@ -8672,6 +8672,24 @@ gb_internal void check_compound_literal_field_values(CheckerContext *c, Slice<As
 	}
 }
 
+gb_internal bool is_expr_inferred_fixed_array(Ast *type_expr) {
+	type_expr = unparen_expr(type_expr);
+	if (type_expr == nullptr) {
+		return false;
+	}
+
+
+	// [?]Type
+	if (type_expr->kind == Ast_ArrayType && type_expr->ArrayType.count != nullptr) {
+		Ast *count = type_expr->ArrayType.count;
+		if (count->kind == Ast_UnaryExpr &&
+		    count->UnaryExpr.op.kind == Token_Question) {
+		    	return true;
+		}
+	}
+	return false;
+}
+
 gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *node, Type *type_hint) {
 	ExprKind kind = Expr_Expr;
 	ast_node(cl, CompoundLit, node);
@@ -8682,20 +8700,31 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 	}
 	bool is_to_be_determined_array_count = false;
 	bool is_constant = true;
-	if (cl->type != nullptr) {
+
+	Ast *type_expr = cl->type;
+
+	bool used_type_hint_expr = false;
+	if (type_expr == nullptr && c->type_hint_expr != nullptr) {
+		if (is_expr_inferred_fixed_array(c->type_hint_expr)) {
+			type_expr = clone_ast(c->type_hint_expr);
+			used_type_hint_expr = true;
+		}
+	}
+
+	if (type_expr != nullptr) {
 		type = nullptr;
 
 		// [?]Type
-		if (cl->type->kind == Ast_ArrayType && cl->type->ArrayType.count != nullptr) {
-			Ast *count = cl->type->ArrayType.count;
+		if (type_expr->kind == Ast_ArrayType && type_expr->ArrayType.count != nullptr) {
+			Ast *count = type_expr->ArrayType.count;
 			if (count->kind == Ast_UnaryExpr &&
 			    count->UnaryExpr.op.kind == Token_Question) {
-				type = alloc_type_array(check_type(c, cl->type->ArrayType.elem), -1);
+				type = alloc_type_array(check_type(c, type_expr->ArrayType.elem), -1);
 				is_to_be_determined_array_count = true;
 			}
 			if (cl->elems.count > 0) {
-				if (cl->type->ArrayType.tag != nullptr) {
-					Ast *tag = cl->type->ArrayType.tag;
+				if (type_expr->ArrayType.tag != nullptr) {
+					Ast *tag = type_expr->ArrayType.tag;
 					GB_ASSERT(tag->kind == Ast_BasicDirective);
 					String name = tag->BasicDirective.name.string;
 					if (name == "soa") {
@@ -8705,9 +8734,9 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 				}
 			}
 		}
-		if (cl->type->kind == Ast_DynamicArrayType && cl->type->DynamicArrayType.tag != nullptr) {
+		if (type_expr->kind == Ast_DynamicArrayType && type_expr->DynamicArrayType.tag != nullptr) {
 			if (cl->elems.count > 0) {
-				Ast *tag = cl->type->DynamicArrayType.tag;
+				Ast *tag = type_expr->DynamicArrayType.tag;
 				GB_ASSERT(tag->kind == Ast_BasicDirective);
 				String name = tag->BasicDirective.name.string;
 				if (name == "soa") {
@@ -8718,7 +8747,7 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 		}
 
 		if (type == nullptr) {
-			type = check_type(c, cl->type);
+			type = check_type(c, type_expr);
 		}
 	}
 

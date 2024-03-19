@@ -451,6 +451,7 @@ struct CheckerContext {
 	u32            state_flags;
 	bool           in_defer;
 	Type *         type_hint;
+	Ast *          type_hint_expr;
 
 	String         proc_name;
 	DeclInfo *     curr_proc_decl;
