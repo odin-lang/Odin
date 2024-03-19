@@ -1107,7 +1107,7 @@ gb_internal void odin_doc_write_docs(OdinDocWriter *w) {
 	}
 
 	debugf("odin_doc_update_entities sort pkgs %s\n", w->state ? "preparing" : "writing");
-	gb_sort_array(pkgs.data, pkgs.count, cmp_ast_package_by_name);
+	array_sort(pkgs, cmp_ast_package_by_name);
 
 	for_array(i, pkgs) {
 		gbAllocator allocator = heap_allocator();
@@ -1170,7 +1170,7 @@ gb_internal void odin_doc_write_to_file(OdinDocWriter *w, char const *filename) 
 	gbFileError err = gb_file_open_mode(&f, gbFileMode_Write, filename);
 	if (err != gbFileError_None) {
 		gb_printf_err("Failed to write .odin-doc to: %s\n", filename);
-		gb_exit(1);
+		exit_with_errors();
 		return;
 	}
 	defer (gb_file_close(&f));

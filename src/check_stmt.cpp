@@ -1919,17 +1919,19 @@ gb_internal void check_value_decl_stmt(CheckerContext *ctx, Ast *node, u32 mod_f
 			e->Variable.thread_local_model = ac.thread_local_model;
 		}
 
-		if (is_arch_wasm() && e->Variable.thread_local_model.len != 0) {
-			// error(e->token, "@(thread_local) is not supported for this target platform");
-		}
-
-
 		if (ac.is_static && ac.thread_local_model != "") {
 			error(e->token, "The 'static' attribute is not needed if 'thread_local' is applied");
 		}
 	}
 
+	// NOTE(bill): This is to improve error handling for things like `x: [?]T = {...}`
+	Ast *prev_type_hint_expr = ctx->type_hint_expr;
+	ctx->type_hint_expr = vd->type;
+
 	check_init_variables(ctx, entities, entity_count, vd->values, str_lit("variable declaration"));
+
+	ctx->type_hint_expr = prev_type_hint_expr;
+
 	check_arity_match(ctx, vd, false);
 
 	for (isize i = 0; i < entity_count; i++) {

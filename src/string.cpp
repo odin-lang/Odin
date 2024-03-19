@@ -89,7 +89,6 @@ gb_internal char *alloc_cstring(gbAllocator a, String s) {
 }
 
 
-
 gb_internal gb_inline bool str_eq_ignore_case(String const &a, String const &b) {
 	if (a.len == b.len) {
 		for (isize i = 0; i < a.len; i++) {

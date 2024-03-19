@@ -2834,6 +2834,111 @@ gb_internal Type *make_soa_struct_dynamic_array(CheckerContext *ctx, Ast *array_
 	return make_soa_struct_internal(ctx, array_typ_expr, elem_expr, elem, -1, nullptr, StructSoa_Dynamic);
 }
 
+gb_internal void check_array_type_internal(CheckerContext *ctx, Ast *e, Type **type, Type *named_type) {
+	ast_node(at, ArrayType, e);
+	if (at->count != nullptr) {
+		Operand o = {};
+		i64 count = check_array_count(ctx, &o, at->count);
+		Type *generic_type = nullptr;
+
+		Type *elem = check_type_expr(ctx, at->elem, nullptr);
+
+		if (o.mode == Addressing_Type && o.type->kind == Type_Generic) {
+			generic_type = o.type;
+		} else if (o.mode == Addressing_Type && is_type_enum(o.type)) {
+			Type *index = o.type;
+			Type *bt = base_type(index);
+			GB_ASSERT(bt->kind == Type_Enum);
+
+			Type *t = alloc_type_enumerated_array(elem, index, bt->Enum.min_value, bt->Enum.max_value, bt->Enum.fields.count, Token_Invalid);
+
+			bool is_sparse = false;
+			if (at->tag != nullptr) {
+				GB_ASSERT(at->tag->kind == Ast_BasicDirective);
+				String name = at->tag->BasicDirective.name.string;
+				if (name == "sparse") {
+					is_sparse = true;
+				} else {
+					error(at->tag, "Invalid tag applied to an enumerated array, got #%.*s", LIT(name));
+				}
+			}
+
+			if (!is_sparse && t->EnumeratedArray.count > bt->Enum.fields.count) {
+				error(e, "Non-contiguous enumeration used as an index in an enumerated array");
+				long long ea_count   = cast(long long)t->EnumeratedArray.count;
+				long long enum_count = cast(long long)bt->Enum.fields.count;
+				error_line("\tenumerated array length: %lld\n", ea_count);
+				error_line("\tenum field count: %lld\n", enum_count);
+				error_line("\tSuggestion: prepend #sparse to the enumerated array to allow for non-contiguous elements\n");
+				if (2*enum_count < ea_count) {
+					error_line("\tWarning: the number of named elements is much smaller than the length of the array, are you sure this is what you want?\n");
+					error_line("\t         this warning will be removed if #sparse is applied\n");
+				}
+			}
+			t->EnumeratedArray.is_sparse = is_sparse;
+
+			*type = t;
+
+			return;
+		}
+
+		if (count < 0) {
+			error(at->count, "? can only be used in conjuction with compound literals");
+			count = 0;
+		}
+
+
+		if (at->tag != nullptr) {
+			GB_ASSERT(at->tag->kind == Ast_BasicDirective);
+			String name = at->tag->BasicDirective.name.string;
+			if (name == "soa") {
+				*type = make_soa_struct_fixed(ctx, e, at->elem, elem, count, generic_type);
+			} else if (name == "simd") {
+				if (!is_type_valid_vector_elem(elem) && !is_type_polymorphic(elem)) {
+					gbString str = type_to_string(elem);
+					error(at->elem, "Invalid element type for #simd, expected an integer, float, or boolean with no specific endianness, got '%s'", str);
+					gb_string_free(str);
+					*type = alloc_type_array(elem, count, generic_type);
+					return;
+				}
+
+				if (generic_type != nullptr) {
+					// Ignore
+				} else if (count < 1 || !is_power_of_two(count)) {
+					error(at->count, "Invalid length for #simd, expected a power of two length, got '%lld'", cast(long long)count);
+					*type = alloc_type_array(elem, count, generic_type);
+					return;
+				}
+
+				*type = alloc_type_simd_vector(count, elem, generic_type);
+
+				if (count > SIMD_ELEMENT_COUNT_MAX) {
+					error(at->count, "#simd support a maximum element count of %d, got %lld", SIMD_ELEMENT_COUNT_MAX, cast(long long)count);
+				}
+			} else {
+				error(at->tag, "Invalid tag applied to array, got #%.*s", LIT(name));
+				*type = alloc_type_array(elem, count, generic_type);
+			}
+		} else {
+			*type = alloc_type_array(elem, count, generic_type);
+		}
+	} else {
+		Type *elem = check_type(ctx, at->elem);
+
+		if (at->tag != nullptr) {
+			GB_ASSERT(at->tag->kind == Ast_BasicDirective);
+			String name = at->tag->BasicDirective.name.string;
+			if (name == "soa") {
+				*type = make_soa_struct_slice(ctx, e, at->elem, elem);
+			} else {
+				error(at->tag, "Invalid tag applied to array, got #%.*s", LIT(name));
+				*type = alloc_type_slice(elem);
+			}
+		} else {
+			*type = alloc_type_slice(elem);
+		}
+	}
+}
 gb_internal bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, Type *named_type) {
 	GB_ASSERT_NOT_NULL(type);
 	if (e == nullptr) {
@@ -3072,109 +3177,7 @@ gb_internal bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, T
 	case_end;
 
 	case_ast_node(at, ArrayType, e);
-		if (at->count != nullptr) {
-			Operand o = {};
-			i64 count = check_array_count(ctx, &o, at->count);
-			Type *generic_type = nullptr;
-
-			Type *elem = check_type_expr(ctx, at->elem, nullptr);
-
-			if (o.mode == Addressing_Type && o.type->kind == Type_Generic) {
-				generic_type = o.type;
-			} else if (o.mode == Addressing_Type && is_type_enum(o.type)) {
-				Type *index = o.type;
-				Type *bt = base_type(index);
-				GB_ASSERT(bt->kind == Type_Enum);
-
-				Type *t = alloc_type_enumerated_array(elem, index, bt->Enum.min_value, bt->Enum.max_value, bt->Enum.fields.count, Token_Invalid);
-
-				bool is_sparse = false;
-				if (at->tag != nullptr) {
-					GB_ASSERT(at->tag->kind == Ast_BasicDirective);
-					String name = at->tag->BasicDirective.name.string;
-					if (name == "sparse") {
-						is_sparse = true;
-					} else {
-						error(at->tag, "Invalid tag applied to an enumerated array, got #%.*s", LIT(name));
-					}
-				}
-
-				if (!is_sparse && t->EnumeratedArray.count > bt->Enum.fields.count) {
-					error(e, "Non-contiguous enumeration used as an index in an enumerated array");
-					long long ea_count   = cast(long long)t->EnumeratedArray.count;
-					long long enum_count = cast(long long)bt->Enum.fields.count;
-					error_line("\tenumerated array length: %lld\n", ea_count);
-					error_line("\tenum field count: %lld\n", enum_count);
-					error_line("\tSuggestion: prepend #sparse to the enumerated array to allow for non-contiguous elements\n");
-					if (2*enum_count < ea_count) {
-						error_line("\tWarning: the number of named elements is much smaller than the length of the array, are you sure this is what you want?\n");
-						error_line("\t         this warning will be removed if #sparse is applied\n");
-					}
-				}
-				t->EnumeratedArray.is_sparse = is_sparse;
-
-				*type = t;
-
-				goto array_end;
-			}
-
-			if (count < 0) {
-				error(at->count, "? can only be used in conjuction with compound literals");
-				count = 0;
-			}
-
-
-			if (at->tag != nullptr) {
-				GB_ASSERT(at->tag->kind == Ast_BasicDirective);
-				String name = at->tag->BasicDirective.name.string;
-				if (name == "soa") {
-					*type = make_soa_struct_fixed(ctx, e, at->elem, elem, count, generic_type);
-				} else if (name == "simd") {
-					if (!is_type_valid_vector_elem(elem) && !is_type_polymorphic(elem)) {
-						gbString str = type_to_string(elem);
-						error(at->elem, "Invalid element type for #simd, expected an integer, float, or boolean with no specific endianness, got '%s'", str);
-						gb_string_free(str);
-						*type = alloc_type_array(elem, count, generic_type);
-						goto array_end;
-					}
-
-					if (generic_type != nullptr) {
-						// Ignore
-					} else if (count < 1 || !is_power_of_two(count)) {
-						error(at->count, "Invalid length for #simd, expected a power of two length, got '%lld'", cast(long long)count);
-						*type = alloc_type_array(elem, count, generic_type);
-						goto array_end;
-					}
-
-					*type = alloc_type_simd_vector(count, elem, generic_type);
-
-					if (count > SIMD_ELEMENT_COUNT_MAX) {
-						error(at->count, "#simd support a maximum element count of %d, got %lld", SIMD_ELEMENT_COUNT_MAX, cast(long long)count);
-					}
-				} else {
-					error(at->tag, "Invalid tag applied to array, got #%.*s", LIT(name));
-					*type = alloc_type_array(elem, count, generic_type);
-				}
-			} else {
-				*type = alloc_type_array(elem, count, generic_type);
-			}
-		} else {
-			Type *elem = check_type(ctx, at->elem);
-
-			if (at->tag != nullptr) {
-				GB_ASSERT(at->tag->kind == Ast_BasicDirective);
-				String name = at->tag->BasicDirective.name.string;
-				if (name == "soa") {
-					*type = make_soa_struct_slice(ctx, e, at->elem, elem);
-				} else {
-					error(at->tag, "Invalid tag applied to array, got #%.*s", LIT(name));
-					*type = alloc_type_slice(elem);
-				}
-			} else {
-				*type = alloc_type_slice(elem);
-			}
-		}
-	array_end:
+		check_array_type_internal(ctx, e, type, named_type);
 		set_base_type(named_type, *type);
 		return true;
 	case_end;
@@ -3344,9 +3347,37 @@ gb_internal Type *check_type_expr(CheckerContext *ctx, Ast *e, Type *named_type)
 
 	if (!ok) {
 		gbString err_str = expr_to_string(e);
+		defer (gb_string_free(err_str));
+
+		begin_error_block();
 		error(e, "'%s' is not a type", err_str);
-		gb_string_free(err_str);
+
 		type = t_invalid;
+
+
+		// NOTE(bill): Check for common mistakes from C programmers e.g. T[] and T[N]
+		Ast *node = unparen_expr(e);
+		if (node && node->kind == Ast_IndexExpr) {
+			gbString index_str = nullptr;
+			if (node->IndexExpr.index) {
+				index_str = expr_to_string(node->IndexExpr.index);
+			}
+			defer (gb_string_free(index_str));
+
+			gbString type_str = expr_to_string(node->IndexExpr.expr);
+			defer (gb_string_free(type_str));
+
+			error_line("\tSuggestion: Did you mean '[%s]%s'?", index_str ? index_str : "", type_str);
+			end_error_block();
+
+			// NOTE(bill): Minimize error propagation of bad array syntax by treating this like a type
+			if (node->IndexExpr.expr != nullptr) {
+				Ast *pseudo_array_expr = ast_array_type(e->file(), ast_token(node->IndexExpr.expr), node->IndexExpr.index, node->IndexExpr.expr);
+				check_array_type_internal(ctx, pseudo_array_expr, &type, nullptr);
+			}
+		} else {
+			end_error_block();
+		}
 	}
 
 	if (type == nullptr) {

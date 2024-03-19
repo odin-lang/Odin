@@ -237,7 +237,7 @@ gb_internal void print_doc_package(CheckerInfo *info, AstPackage *pkg) {
 			}
 			array_add(&entities, e);
 		}
-		gb_sort_array(entities.data, entities.count, cmp_entities_for_printing);
+		array_sort(entities, cmp_entities_for_printing);
 
 		bool show_docs = (build_context.cmd_doc_flags & CmdDocFlag_Short) == 0;
 
@@ -358,7 +358,7 @@ gb_internal void generate_documentation(Checker *c) {
 			}
 		}
 
-		gb_sort_array(pkgs.data, pkgs.count, cmp_ast_package_by_name);
+		array_sort(pkgs, cmp_ast_package_by_name);
 
 		for_array(i, pkgs) {
 			print_doc_package(info, pkgs[i]);

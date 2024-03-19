@@ -292,6 +292,7 @@ enum BuildFlagKind {
 	BuildFlag_WarningsAsErrors,
 	BuildFlag_TerseErrors,
 	BuildFlag_VerboseErrors,
+	BuildFlag_JsonErrors,
 	BuildFlag_ErrorPosStyle,
 	BuildFlag_MaxErrorCount,
 
@@ -480,6 +481,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_WarningsAsErrors,        str_lit("warnings-as-errors"),        BuildFlagParam_None,    Command_all);
 	add_flag(&build_flags, BuildFlag_TerseErrors,             str_lit("terse-errors"),              BuildFlagParam_None,    Command_all);
 	add_flag(&build_flags, BuildFlag_VerboseErrors,           str_lit("verbose-errors"),            BuildFlagParam_None,    Command_all);
+	add_flag(&build_flags, BuildFlag_JsonErrors,              str_lit("json-errors"),               BuildFlagParam_None,    Command_all);
 	add_flag(&build_flags, BuildFlag_ErrorPosStyle,           str_lit("error-pos-style"),           BuildFlagParam_String,  Command_all);
 	add_flag(&build_flags, BuildFlag_MaxErrorCount,           str_lit("max-error-count"),           BuildFlagParam_Integer, Command_all);
 
@@ -1184,6 +1186,10 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							build_context.terse_errors = false;
 							break;
 
+						case BuildFlag_JsonErrors:
+							build_context.json_errors = true;
+							break;
+
 						case BuildFlag_ErrorPosStyle:
 							GB_ASSERT(value.kind == ExactValue_String);
 
@@ -1398,7 +1404,7 @@ gb_internal void timings_export_all(Timings *t, Checker *c, bool timings_are_fin
 	gbFileError err = gb_file_open_mode(&f, gbFileMode_Write, fileName);
 	if (err != gbFileError_None) {
 		gb_printf_err("Failed to export timings to: %s\n", fileName);
-		gb_exit(1);
+		exit_with_errors();
 		return;
 	} else {
 		gb_printf("\nExporting timings to '%s'... ", fileName);
@@ -1984,6 +1990,10 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 		print_usage_line(2, "Prints a terse error message without showing the code on that line and the location in that line.");
 		print_usage_line(0, "");
 
+		print_usage_line(1, "-json-errors");
+		print_usage_line(2, "Prints the error messages as json to stderr.");
+		print_usage_line(0, "");
+
 		print_usage_line(1, "-error-pos-style:<string>");
 		print_usage_line(2, "Available options:");
 		print_usage_line(3, "-error-pos-style:unix      file/path:45:3:");
@@ -2095,7 +2105,7 @@ gb_internal void print_show_unused(Checker *c) {
 		array_add(&unused, e);
 	}
 
-	gb_sort_array(unused.data, unused.count, cmp_entities_for_printing);
+	array_sort(unused, cmp_entities_for_printing);
 
 	print_usage_line(0, "Unused Package Declarations");
 
@@ -2680,6 +2690,7 @@ int main(int arg_count, char const **arg_ptr) {
 	}
 
 	if (any_errors()) {
+		print_all_errors();
 		return 1;
 	}
 
@@ -2691,6 +2702,7 @@ int main(int arg_count, char const **arg_ptr) {
 
 	check_parsed_files(checker);
 	if (any_errors()) {
+		print_all_errors();
 		return 1;
 	}
 

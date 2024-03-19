@@ -1389,7 +1389,7 @@ gb_internal LoadDirectiveResult check_load_directory_directive(CheckerContext *c
 			}
 		}
 
-		gb_sort_array(file_caches.data, file_caches.count, file_cache_sort_cmp);
+		array_sort(file_caches, file_cache_sort_cmp);
 
 	}
 

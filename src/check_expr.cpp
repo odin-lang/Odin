@@ -119,6 +119,8 @@ gb_internal bool is_diverging_expr(Ast *expr);
 
 gb_internal isize get_procedure_param_count_excluding_defaults(Type *pt, isize *param_count_);
 
+gb_internal bool is_expr_inferred_fixed_array(Ast *type_expr);
+
 enum LoadDirectiveResult {
 	LoadDirective_Success  = 0,
 	LoadDirective_Error    = 1,
@@ -2242,6 +2244,10 @@ gb_internal void check_assignment_error_suggestion(CheckerContext *c, Operand *o
 		error_line("\tSuggestion: the expression may be casted to %s\n", b);
 	} else if (check_integer_exceed_suggestion(c, o, type, max_bit_size)) {
 		return;
+	} else if (is_expr_inferred_fixed_array(c->type_hint_expr) && is_type_array_like(type) && is_type_array_like(o->type)) {
+		gbString s = expr_to_string(c->type_hint_expr);
+		error_line("\tSuggestion: make sure that `%s` is attached to the compound literal directly\n", s);
+		gb_string_free(s);
 	}
 }
 
@@ -6479,7 +6485,7 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 	}
 
 	if (valids.count > 1) {
-		gb_sort_array(valids.data, valids.count, valid_index_and_score_cmp);
+		array_sort(valids, valid_index_and_score_cmp);
 		i64 best_score = valids[0].score;
 		Entity *best_entity = proc_entities[valids[0].index];
 		GB_ASSERT(best_entity != nullptr);
@@ -8672,6 +8678,23 @@ gb_internal void check_compound_literal_field_values(CheckerContext *c, Slice<As
 	}
 }
 
+gb_internal bool is_expr_inferred_fixed_array(Ast *type_expr) {
+	type_expr = unparen_expr(type_expr);
+	if (type_expr == nullptr) {
+		return false;
+	}
+
+	// [?]Type
+	if (type_expr->kind == Ast_ArrayType && type_expr->ArrayType.count != nullptr) {
+		Ast *count = type_expr->ArrayType.count;
+		if (count->kind == Ast_UnaryExpr &&
+		    count->UnaryExpr.op.kind == Token_Question) {
+		    	return true;
+		}
+	}
+	return false;
+}
+
 gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *node, Type *type_hint) {
 	ExprKind kind = Expr_Expr;
 	ast_node(cl, CompoundLit, node);
@@ -8682,20 +8705,31 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 	}
 	bool is_to_be_determined_array_count = false;
 	bool is_constant = true;
-	if (cl->type != nullptr) {
+
+	Ast *type_expr = cl->type;
+
+	bool used_type_hint_expr = false;
+	if (type_expr == nullptr && c->type_hint_expr != nullptr) {
+		if (is_expr_inferred_fixed_array(c->type_hint_expr)) {
+			type_expr = clone_ast(c->type_hint_expr);
+			used_type_hint_expr = true;
+		}
+	}
+
+	if (type_expr != nullptr) {
 		type = nullptr;
 
 		// [?]Type
-		if (cl->type->kind == Ast_ArrayType && cl->type->ArrayType.count != nullptr) {
-			Ast *count = cl->type->ArrayType.count;
+		if (type_expr->kind == Ast_ArrayType && type_expr->ArrayType.count != nullptr) {
+			Ast *count = type_expr->ArrayType.count;
 			if (count->kind == Ast_UnaryExpr &&
 			    count->UnaryExpr.op.kind == Token_Question) {
-				type = alloc_type_array(check_type(c, cl->type->ArrayType.elem), -1);
+				type = alloc_type_array(check_type(c, type_expr->ArrayType.elem), -1);
 				is_to_be_determined_array_count = true;
 			}
 			if (cl->elems.count > 0) {
-				if (cl->type->ArrayType.tag != nullptr) {
-					Ast *tag = cl->type->ArrayType.tag;
+				if (type_expr->ArrayType.tag != nullptr) {
+					Ast *tag = type_expr->ArrayType.tag;
 					GB_ASSERT(tag->kind == Ast_BasicDirective);
 					String name = tag->BasicDirective.name.string;
 					if (name == "soa") {
@@ -8705,9 +8739,9 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 				}
 			}
 		}
-		if (cl->type->kind == Ast_DynamicArrayType && cl->type->DynamicArrayType.tag != nullptr) {
+		if (type_expr->kind == Ast_DynamicArrayType && type_expr->DynamicArrayType.tag != nullptr) {
 			if (cl->elems.count > 0) {
-				Ast *tag = cl->type->DynamicArrayType.tag;
+				Ast *tag = type_expr->DynamicArrayType.tag;
 				GB_ASSERT(tag->kind == Ast_BasicDirective);
 				String name = tag->BasicDirective.name.string;
 				if (name == "soa") {
@@ -8718,7 +8752,7 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 		}
 
 		if (type == nullptr) {
-			type = check_type(c, cl->type);
+			type = check_type(c, type_expr);
 		}
 	}
 
