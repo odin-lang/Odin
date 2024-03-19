@@ -2947,6 +2947,7 @@ parse_literal_value :: proc(p: ^Parser, type: ^ast.Expr) -> ^ast.Comp_Lit {
 	}
 	p.expr_level -= 1
 
+	skip_possible_newline(p)
 	close := expect_token_after(p, .Close_Brace, "compound literal")
 
 	pos := type.pos if type != nil else open.pos
