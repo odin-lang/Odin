@@ -2329,6 +2329,19 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 				break;
 			}
 			return original_type;
+		} else if (name.string == "row_major" ||
+		           name.string == "column_major") {
+			Ast *original_type = parse_type(f);
+			Ast *type = unparen_expr(original_type);
+			switch (type->kind) {
+			case Ast_MatrixType:
+				type->MatrixType.is_row_major = (name.string == "row_major");
+				break;
+			default:
+				syntax_error(type, "Expected a matrix type after #%.*s, got %.*s", LIT(name.string), LIT(ast_strings[type->kind]));
+				break;
+			}
+			return original_type;
 		} else if (name.string == "partial") {
 			Ast *tag = ast_basic_directive(f, token, name);
 			Ast *original_expr = parse_expr(f, lhs);

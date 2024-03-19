@@ -979,12 +979,13 @@ gb_internal void lb_setup_type_info_data_giant_array(lbModule *m, i64 global_typ
 				tag_type = t_type_info_matrix;
 				i64 ez = type_size_of(t->Matrix.elem);
 
-				LLVMValueRef vals[5] = {
+				LLVMValueRef vals[6] = {
 					get_type_info_ptr(m, t->Matrix.elem),
 					lb_const_int(m, t_int, ez).value,
 					lb_const_int(m, t_int, matrix_type_stride_in_elems(t)).value,
 					lb_const_int(m, t_int, t->Matrix.row_count).value,
 					lb_const_int(m, t_int, t->Matrix.column_count).value,
+					lb_const_int(m, t_u8,  cast(u8)t->Matrix.is_row_major).value,
 				};
 
 				variant_value = llvm_const_named_struct(m, tag_type, vals, gb_count_of(vals));

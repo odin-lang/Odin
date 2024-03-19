@@ -281,6 +281,7 @@ struct TypeProc {
 		Type *generic_row_count;                          \
 		Type *generic_column_count;                       \
 		i64   stride_in_bytes;                            \
+		bool  is_row_major;                               \
 	})                                                        \
 	TYPE_KIND(BitField, struct {                              \
 		Scope *         scope;                            \
@@ -1002,7 +1003,7 @@ gb_internal Type *alloc_type_array(Type *elem, i64 count, Type *generic_count = 
 	return t;
 }
 
-gb_internal Type *alloc_type_matrix(Type *elem, i64 row_count, i64 column_count, Type *generic_row_count = nullptr, Type *generic_column_count = nullptr) {
+gb_internal Type *alloc_type_matrix(Type *elem, i64 row_count, i64 column_count, Type *generic_row_count, Type *generic_column_count, bool is_row_major) {
 	if (generic_row_count != nullptr || generic_column_count != nullptr) {
 		Type *t = alloc_type(Type_Matrix);
 		t->Matrix.elem                 = elem;
@@ -1010,12 +1011,14 @@ gb_internal Type *alloc_type_matrix(Type *elem, i64 row_count, i64 column_count,
 		t->Matrix.column_count         = column_count;
 		t->Matrix.generic_row_count    = generic_row_count;
 		t->Matrix.generic_column_count = generic_column_count;
+		t->Matrix.is_row_major         = is_row_major;
 		return t;
 	}
 	Type *t = alloc_type(Type_Matrix);
 	t->Matrix.elem = elem;
 	t->Matrix.row_count = row_count;
 	t->Matrix.column_count = column_count;
+	t->Matrix.is_row_major = is_row_major;
 	return t;
 }
 
@@ -1512,14 +1515,18 @@ gb_internal i64 matrix_indices_to_offset(Type *t, i64 row_index, i64 column_inde
 	GB_ASSERT(0 <= row_index && row_index < t->Matrix.row_count);
 	GB_ASSERT(0 <= column_index && column_index < t->Matrix.column_count);
 	i64 stride_elems = matrix_type_stride_in_elems(t);
-	// NOTE(bill): Column-major layout internally
-	return row_index + stride_elems*column_index;
+	if (t->Matrix.is_row_major) {
+		return column_index + stride_elems*row_index;
+	} else {
+		// NOTE(bill): Column-major layout internally
+		return row_index + stride_elems*column_index;
+	}
 }
 
 gb_internal i64 matrix_row_major_index_to_offset(Type *t, i64 index) {
 	t = base_type(t);
 	GB_ASSERT(t->kind == Type_Matrix);
-	
+
 	i64 row_index    = index/t->Matrix.column_count;
 	i64 column_index = index%t->Matrix.column_count;
 	return matrix_indices_to_offset(t, row_index, column_index);
@@ -2690,6 +2697,7 @@ gb_internal bool are_types_identical_internal(Type *x, Type *y, bool check_tuple
 	case Type_Matrix:
 		return x->Matrix.row_count == y->Matrix.row_count &&
 		       x->Matrix.column_count == y->Matrix.column_count &&
+		       x->Matrix.is_row_major == y->Matrix.is_row_major &&
 		       are_types_identical(x->Matrix.elem, y->Matrix.elem);
 
 	case Type_DynamicArray:
@@ -4735,6 +4743,9 @@ gb_internal gbString write_type_to_string(gbString str, Type *type, bool shortha
 		break;
 		
 	case Type_Matrix:
+		if (type->Matrix.is_row_major) {
+			str = gb_string_appendc(str, "#row_major ");
+		}
 		str = gb_string_appendc(str, gb_bprintf("matrix[%d, %d]", cast(int)type->Matrix.row_count, cast(int)type->Matrix.column_count));
 		str = write_type_to_string(str, type->Matrix.elem);
 		break;

@@ -177,6 +177,10 @@ Type_Info_Matrix :: struct {
 	row_count:    int,
 	column_count: int,
 	// Total element count = column_count * elem_stride
+	layout: enum u8 {
+		Column_Major, // array of column vectors
+		Row_Major,    // array of row vectors
+	},
 }
 Type_Info_Soa_Pointer :: struct {
 	elem: ^Type_Info,
