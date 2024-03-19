@@ -1003,7 +1003,7 @@ gb_internal Type *alloc_type_array(Type *elem, i64 count, Type *generic_count = 
 	return t;
 }
 
-gb_internal Type *alloc_type_matrix(Type *elem, i64 row_count, i64 column_count, Type *generic_row_count = nullptr, Type *generic_column_count = nullptr, bool is_row_major = false) {
+gb_internal Type *alloc_type_matrix(Type *elem, i64 row_count, i64 column_count, Type *generic_row_count, Type *generic_column_count, bool is_row_major) {
 	if (generic_row_count != nullptr || generic_column_count != nullptr) {
 		Type *t = alloc_type(Type_Matrix);
 		t->Matrix.elem                 = elem;

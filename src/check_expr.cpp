@@ -3397,6 +3397,13 @@ gb_internal Type *check_matrix_type_hint(Type *matrix, Type *type_hint) {
 		Type *th = base_type(type_hint);
 		if (are_types_identical(th, xt)) {
 			return type_hint;
+		} else if (xt->kind == Type_Matrix && th->kind == Type_Matrix) {
+			if (!are_types_identical(xt->Matrix.elem, th->Matrix.elem)) {
+				// ignore
+			} if (xt->Matrix.row_count == th->Matrix.row_count &&
+			      xt->Matrix.column_count == th->Matrix.column_count) {
+				return type_hint;
+			}
 		} else if (xt->kind == Type_Matrix && th->kind == Type_Array) {
 			if (!are_types_identical(xt->Matrix.elem, th->Array.elem)) {
 				// ignore
@@ -3461,7 +3468,7 @@ gb_internal void check_binary_matrix(CheckerContext *c, Token const &op, Operand
 				if (xt->Matrix.row_count == yt->Array.count) {
 					x->type = y->type;
 				} else {
-					x->type = alloc_type_matrix(xt->Matrix.elem, xt->Matrix.row_count, 1);
+					x->type = alloc_type_matrix(xt->Matrix.elem, xt->Matrix.row_count, 1, nullptr, nullptr, xt->Matrix.is_row_major);
 				}
 				goto matrix_success;
 			}
@@ -3492,7 +3499,7 @@ gb_internal void check_binary_matrix(CheckerContext *c, Token const &op, Operand
 				if (yt->Matrix.column_count == xt->Array.count) {
 					x->type = x->type;
 				} else {
-					x->type = alloc_type_matrix(yt->Matrix.elem, 1, yt->Matrix.column_count);
+					x->type = alloc_type_matrix(yt->Matrix.elem, 1, yt->Matrix.column_count, nullptr, nullptr, yt->Matrix.is_row_major);
 				}
 				goto matrix_success;
 			} else if (are_types_identical(yt->Matrix.elem, xt)) {

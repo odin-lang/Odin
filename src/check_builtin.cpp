@@ -3488,7 +3488,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			}
 		} else {
 			GB_ASSERT(t->kind == Type_Matrix);
-			operand->type = alloc_type_matrix(t->Matrix.elem, t->Matrix.column_count, t->Matrix.row_count);
+			operand->type = alloc_type_matrix(t->Matrix.elem, t->Matrix.column_count, t->Matrix.row_count, nullptr, nullptr, t->Matrix.is_row_major);
 		}
 		operand->type = check_matrix_type_hint(operand->type, type_hint);
 		break;
@@ -3556,7 +3556,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		}
 		
 		operand->mode = Addressing_Value;
-		operand->type = alloc_type_matrix(elem, xt->Array.count, yt->Array.count);	
+		operand->type = alloc_type_matrix(elem, xt->Array.count, yt->Array.count, nullptr, nullptr, false);
 		operand->type = check_matrix_type_hint(operand->type, type_hint);
 		break;
 	}
