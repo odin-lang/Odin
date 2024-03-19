@@ -119,6 +119,8 @@ gb_internal bool is_diverging_expr(Ast *expr);
 
 gb_internal isize get_procedure_param_count_excluding_defaults(Type *pt, isize *param_count_);
 
+gb_internal bool is_expr_inferred_fixed_array(Ast *type_expr);
+
 enum LoadDirectiveResult {
 	LoadDirective_Success  = 0,
 	LoadDirective_Error    = 1,
@@ -2242,6 +2244,10 @@ gb_internal void check_assignment_error_suggestion(CheckerContext *c, Operand *o
 		error_line("\tSuggestion: the expression may be casted to %s\n", b);
 	} else if (check_integer_exceed_suggestion(c, o, type, max_bit_size)) {
 		return;
+	} else if (is_expr_inferred_fixed_array(c->type_hint_expr) && is_type_array_like(type) && is_type_array_like(o->type)) {
+		gbString s = expr_to_string(c->type_hint_expr);
+		error_line("\tSuggestion: make sure that `%s` is attached to the compound literal directly\n", s);
+		gb_string_free(s);
 	}
 }
 
@@ -8677,7 +8683,6 @@ gb_internal bool is_expr_inferred_fixed_array(Ast *type_expr) {
 	if (type_expr == nullptr) {
 		return false;
 	}
-
 
 	// [?]Type
 	if (type_expr->kind == Ast_ArrayType && type_expr->ArrayType.count != nullptr) {
