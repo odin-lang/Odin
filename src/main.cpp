@@ -292,6 +292,7 @@ enum BuildFlagKind {
 	BuildFlag_WarningsAsErrors,
 	BuildFlag_TerseErrors,
 	BuildFlag_VerboseErrors,
+	BuildFlag_JsonErrors,
 	BuildFlag_ErrorPosStyle,
 	BuildFlag_MaxErrorCount,
 
@@ -480,6 +481,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_WarningsAsErrors,        str_lit("warnings-as-errors"),        BuildFlagParam_None,    Command_all);
 	add_flag(&build_flags, BuildFlag_TerseErrors,             str_lit("terse-errors"),              BuildFlagParam_None,    Command_all);
 	add_flag(&build_flags, BuildFlag_VerboseErrors,           str_lit("verbose-errors"),            BuildFlagParam_None,    Command_all);
+	add_flag(&build_flags, BuildFlag_JsonErrors,              str_lit("json-errors"),               BuildFlagParam_None,    Command_all);
 	add_flag(&build_flags, BuildFlag_ErrorPosStyle,           str_lit("error-pos-style"),           BuildFlagParam_String,  Command_all);
 	add_flag(&build_flags, BuildFlag_MaxErrorCount,           str_lit("max-error-count"),           BuildFlagParam_Integer, Command_all);
 
@@ -1182,6 +1184,10 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							gb_printf_err("-verbose-errors is not the default, -terse-errors can now disable it\n");
 							build_context.hide_error_line = false;
 							build_context.terse_errors = false;
+							break;
+
+						case BuildFlag_JsonErrors:
+							build_context.json_errors = true;
 							break;
 
 						case BuildFlag_ErrorPosStyle:
@@ -1982,6 +1988,10 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 
 		print_usage_line(1, "-terse-errors");
 		print_usage_line(2, "Prints a terse error message without showing the code on that line and the location in that line.");
+		print_usage_line(0, "");
+
+		print_usage_line(1, "-json-errors");
+		print_usage_line(2, "Prints the error messages as json to stderr.");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-error-pos-style:<string>");

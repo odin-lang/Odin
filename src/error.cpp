@@ -6,6 +6,7 @@ enum ErrorValueKind : u32 {
 struct ErrorValue {
 	ErrorValueKind kind;
 	TokenPos       pos;
+	TokenPos       end;
 	Array<String>  msgs;
 };
 
@@ -146,6 +147,7 @@ gb_internal bool global_warnings_as_errors(void);
 gb_internal bool global_ignore_warnings(void);
 gb_internal bool show_error_line(void);
 gb_internal bool terse_errors(void);
+gb_internal bool json_errors(void);
 gb_internal bool has_ansi_terminal_colours(void);
 gb_internal gbString get_file_line_as_string(TokenPos const &pos, i32 *offset);
 
@@ -168,13 +170,11 @@ gb_internal ERROR_OUT_PROC(default_error_out_va) {
 	isize len = gb_snprintf_va(buf, gb_size_of(buf), fmt, va);
 	isize n = len-1;
 
-	String msg = {};
-	if (n) {
-		msg = copy_string(permanent_allocator(), {(u8 *)buf, n});
+	if (n > 0) {
+		String msg = copy_string(permanent_allocator(), {(u8 *)buf, n});
+		ErrorValue *ev = get_error_value();
+		array_add(&ev->msgs, msg);
 	}
-
-	ErrorValue *ev = get_error_value();
-	array_add(&ev->msgs, msg);
 }
 
 gb_global ErrorOutProc *error_out_va = default_error_out_va;
@@ -246,6 +246,7 @@ gb_internal void terminal_reset_colours(void) {
 
 
 gb_internal bool show_error_on_line(TokenPos const &pos, TokenPos end) {
+	get_error_value()->end = end;
 	if (!show_error_line()) {
 		return false;
 	}
@@ -622,19 +623,99 @@ gb_internal int error_value_cmp(void const *a, void const *b) {
 }
 
 gb_internal void print_all_errors(void) {
+	auto const &escape_char = [](gbFile *f, u8 c) {
+		switch (c) {
+		case '\n': gb_file_write(f, "\\n",  2); break;
+		case '"':  gb_file_write(f, "\\\"", 2); break;
+		case '\\': gb_file_write(f, "\\\\", 2); break;
+		case '\b': gb_file_write(f, "\\b",  2); break;
+		case '\f': gb_file_write(f, "\\f",  2); break;
+		case '\r': gb_file_write(f, "\\r",  2); break;
+		case '\t': gb_file_write(f, "\\t",  2); break;
+		default:
+			if ('\x00' <= c && c <= '\x1f') {
+				gb_fprintf(f, "\\u%04x", c);
+			} else {
+				gb_file_write(f, &c, 1);
+			}
+			break;
+		}
+	};
+
 	GB_ASSERT(any_errors());
 	gbFile *f = gb_file_get_standard(gbFileStandard_Error);
 
 	array_sort(global_error_collector.error_values, error_value_cmp);
 
-	for_array(i, global_error_collector.error_values) {
-		ErrorValue ev = global_error_collector.error_values[i];
-		for (isize j = 0; j < ev.msgs.count; j++) {
-			String msg = ev.msgs[j];
-			gb_file_write(f, msg.text, msg.len);
 
-			if (terse_errors() && string_contains_char(msg, '\n')) {
-				break;
+	if (json_errors()) {
+		gb_fprintf(f, "{\n");
+		gb_fprintf(f, "\t\"error_count\": %td,\n", global_error_collector.error_values.count);
+		gb_fprintf(f, "\t\"errors\": [\n");
+		for_array(i, global_error_collector.error_values) {
+			ErrorValue ev = global_error_collector.error_values[i];
+
+			gb_fprintf(f, "\t\t{\n");
+
+			gb_fprintf(f, "\t\t\t\"pos\": {\n");
+
+			if (ev.pos.file_id) {
+				gb_fprintf(f, "\t\t\t\t\"file\": \"");
+				String file = get_file_path_string(ev.pos.file_id);
+				for (isize k = 0; k < file.len; k++) {
+					escape_char(f, file.text[k]);
+				}
+				gb_fprintf(f, "\",\n");
+				gb_fprintf(f, "\t\t\t\t\"line\": %d,\n", ev.pos.line);
+				gb_fprintf(f, "\t\t\t\t\"column\": %d,\n", ev.pos.column);
+				i32 end_column = gb_max(ev.end.column, ev.pos.column);
+				gb_fprintf(f, "\t\t\t\t\"end_column\": %d\n", end_column);
+				gb_fprintf(f, "\t\t\t},\n");
+			}
+
+			gb_fprintf(f, "\t\t\t\"msgs\": [\n");
+
+			if (ev.msgs.count > 1) {
+				gb_fprintf(f, "\t\t\t\t\"");
+
+				for (isize j = 1; j < ev.msgs.count; j++) {
+					String msg = ev.msgs[j];
+					for (isize k = 0; k < msg.len; k++) {
+						u8 c = msg.text[k];
+						if (c == '\n') {
+							if (k+1 == msg.len && j+1 == ev.msgs.count) {
+								// don't do the last one
+							} else {
+								gb_fprintf(f, "\",\n");
+								gb_fprintf(f, "\t\t\t\t\"");
+							}
+						} else {
+							escape_char(f, c);
+						}
+					}
+				}
+				gb_fprintf(f, "\"\n");
+			}
+			gb_fprintf(f, "\t\t\t]\n");
+			gb_fprintf(f, "\t\t}");
+			if (i+1 != global_error_collector.error_values.count) {
+				gb_fprintf(f, ",");
+			}
+			gb_fprintf(f, "\n");
+		}
+
+		gb_fprintf(f, "\t]\n");
+		gb_fprintf(f, "}\n");
+	} else {
+		for_array(i, global_error_collector.error_values) {
+			ErrorValue ev = global_error_collector.error_values[i];
+			for (isize j = 0; j < ev.msgs.count; j++) {
+				String msg = ev.msgs[j];
+				gb_file_write(f, msg.text, msg.len);
+
+				if (terse_errors() && string_contains_char(msg, '\n')) {
+					break;
+				}
 			}
 		}
 	}
