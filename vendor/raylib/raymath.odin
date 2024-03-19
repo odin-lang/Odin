@@ -590,74 +590,79 @@ MatrixMultiply :: proc "c" (left, right: Matrix) -> Matrix {
 // Get translation matrix
 @(require_results)
 MatrixTranslate :: proc "c" (x, y, z: f32) -> Matrix {
-	return linalg.matrix4_translate(Vector3{x, y, z})
+	return {
+		1, 0, 0, x,
+		0, 1, 0, y,
+		0, 0, 1, z,
+		0, 0, 0, 1,
+	}
 }
 
 // Create rotation matrix from axis and angle
 // NOTE: Angle should be provided in radians
 @(require_results)
 MatrixRotate :: proc "c" (axis: Vector3, angle: f32) -> Matrix {
-	return linalg.matrix4_rotate(angle, axis)
+	return auto_cast linalg.matrix4_rotate(angle, axis)
 }
 
 // Get x-rotation matrix
 // NOTE: Angle must be provided in radians
 @(require_results)
 MatrixRotateX :: proc "c" (angle: f32) -> Matrix {
-	return linalg.matrix4_rotate(angle, Vector3{1, 0, 0})
+	return auto_cast linalg.matrix4_rotate(angle, Vector3{1, 0, 0})
 }
 
 // Get y-rotation matrix
 // NOTE: Angle must be provided in radians
 @(require_results)
 MatrixRotateY :: proc "c" (angle: f32) -> Matrix {
-	return linalg.matrix4_rotate(angle, Vector3{0, 1, 0})
+	return auto_cast linalg.matrix4_rotate(angle, Vector3{0, 1, 0})
 }
 
 // Get z-rotation matrix
 // NOTE: Angle must be provided in radians
 @(require_results)
 MatrixRotateZ :: proc "c" (angle: f32) -> Matrix {
-	return linalg.matrix4_rotate(angle, Vector3{0, 0, 1})
+	return auto_cast linalg.matrix4_rotate(angle, Vector3{0, 0, 1})
 }
 
 // Get xyz-rotation matrix
 // NOTE: Angle must be provided in radians
 @(require_results)
 MatrixRotateXYZ :: proc "c" (angle: Vector3) -> Matrix {
-	return linalg.matrix4_from_euler_angles_xyz(angle.x, angle.y, angle.z)
+	return auto_cast linalg.matrix4_from_euler_angles_xyz(angle.x, angle.y, angle.z)
 }
 
 // Get zyx-rotation matrix
 // NOTE: Angle must be provided in radians
 @(require_results)
 MatrixRotateZYX :: proc "c" (angle: Vector3) -> Matrix {
-	return linalg.matrix4_from_euler_angles_zyx(angle.x, angle.y, angle.z)
+	return auto_cast linalg.matrix4_from_euler_angles_zyx(angle.x, angle.y, angle.z)
 }
 
 
 // Get scaling matrix
 @(require_results)
 MatrixScale :: proc "c" (x, y, z: f32) -> Matrix {
-	return linalg.matrix4_scale(Vector3{x, y, z})
+	return auto_cast linalg.matrix4_scale(Vector3{x, y, z})
 }
 
 // Get orthographic projection matrix
 @(require_results)
 MatrixOrtho :: proc "c" (left, right, bottom, top, near, far: f32) -> Matrix {
-	return linalg.matrix_ortho3d(left, right, bottom, top, near, far)
+	return auto_cast linalg.matrix_ortho3d(left, right, bottom, top, near, far)
 }
 
 // Get perspective projection matrix
 // NOTE: Fovy angle must be provided in radians
 @(require_results)
 MatrixPerspective :: proc "c" (fovY, aspect, nearPlane, farPlane: f32) -> Matrix {
-	return linalg.matrix4_perspective(fovY, aspect, nearPlane, farPlane)
+	return auto_cast linalg.matrix4_perspective(fovY, aspect, nearPlane, farPlane)
 }
 // Get camera look-at matrix (view matrix)
 @(require_results)
 MatrixLookAt :: proc "c" (eye, target, up: Vector3) -> Matrix {
-	return linalg.matrix4_look_at(eye, target, up)
+	return auto_cast linalg.matrix4_look_at(eye, target, up)
 }
 
 // Get float array of matrix data
@@ -755,12 +760,12 @@ QuaternionFromVector3ToVector3 :: proc "c" (from, to: Vector3) -> Quaternion {
 // Get a quaternion for a given rotation matrix
 @(require_results)
 QuaternionFromMatrix :: proc "c" (mat: Matrix) -> Quaternion {
-	return linalg.quaternion_from_matrix4(mat)
+	return linalg.quaternion_from_matrix4(linalg.Matrix4f32(mat))
 }
 // Get a matrix for a given quaternion
 @(require_results)
 QuaternionToMatrix :: proc "c" (q: Quaternion) -> Matrix {
-	return linalg.matrix4_from_quaternion(q)
+	return auto_cast linalg.matrix4_from_quaternion(q)
 }
 // Get rotation quaternion for an angle and axis NOTE: Angle must be provided in radians
 @(require_results)

@@ -213,17 +213,17 @@ MAGENTA    :: Color{ 255, 0, 255, 255 }     // Magenta
 RAYWHITE   :: Color{ 245, 245, 245, 255 }   // My own White (raylib logo)
 
 // Vector2 type
-Vector2 :: linalg.Vector2f32
+Vector2 :: [2]f32
 // Vector3 type
-Vector3 :: linalg.Vector3f32
+Vector3 :: [3]f32
 // Vector4 type
-Vector4 :: linalg.Vector4f32
+Vector4 :: [4]f32
 
 // Quaternion type
-Quaternion :: linalg.Quaternionf32
+Quaternion :: quaternion128
 
-// Matrix type (OpenGL style 4x4 - right handed, stored column major)
-Matrix :: linalg.Matrix4x4f32
+// Matrix type (right handed, stored row major)
+Matrix :: #row_major matrix[4, 4]f32
 
 
 // Color, 4 components, R8G8B8A8 (32bit)
