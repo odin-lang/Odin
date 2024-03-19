@@ -14,10 +14,9 @@ struct ErrorCollector {
 	std::atomic<i64>  count;
 	std::atomic<i64>  warning_count;
 	std::atomic<bool> in_block;
-	BlockingMutex     mutex;
-	BlockingMutex     error_out_mutex;
-	BlockingMutex     string_mutex;
-	RecursiveMutex    block_mutex;
+
+	RecursiveMutex    mutex;
+	BlockingMutex     path_mutex;
 
 	Array<ErrorValue> error_values;
 	ErrorValue        curr_error_value;
@@ -81,7 +80,7 @@ gb_internal char *token_pos_to_string(TokenPos const &pos);
 gb_internal bool set_file_path_string(i32 index, String const &path) {
 	bool ok = false;
 	GB_ASSERT(index >= 0);
-	mutex_lock(&global_error_collector.string_mutex);
+	mutex_lock(&global_error_collector.path_mutex);
 
 	if (index >= global_file_path_strings.count) {
 		array_resize(&global_file_path_strings, index+1);
@@ -92,14 +91,14 @@ gb_internal bool set_file_path_string(i32 index, String const &path) {
 		ok = true;
 	}
 
-	mutex_unlock(&global_error_collector.string_mutex);
+	mutex_unlock(&global_error_collector.path_mutex);
 	return ok;
 }
 
 gb_internal bool thread_safe_set_ast_file_from_id(i32 index, AstFile *file) {
 	bool ok = false;
 	GB_ASSERT(index >= 0);
-	mutex_lock(&global_error_collector.string_mutex);
+	mutex_lock(&global_error_collector.path_mutex);
 
 	if (index >= global_files.count) {
 		array_resize(&global_files, index+1);
@@ -110,33 +109,33 @@ gb_internal bool thread_safe_set_ast_file_from_id(i32 index, AstFile *file) {
 		ok = true;
 	}
 
-	mutex_unlock(&global_error_collector.string_mutex);
+	mutex_unlock(&global_error_collector.path_mutex);
 	return ok;
 }
 
 gb_internal String get_file_path_string(i32 index) {
 	GB_ASSERT(index >= 0);
-	mutex_lock(&global_error_collector.string_mutex);
+	mutex_lock(&global_error_collector.path_mutex);
 
 	String path = {};
 	if (index < global_file_path_strings.count) {
 		path = global_file_path_strings[index];
 	}
 
-	mutex_unlock(&global_error_collector.string_mutex);
+	mutex_unlock(&global_error_collector.path_mutex);
 	return path;
 }
 
 gb_internal AstFile *thread_safe_get_ast_file_from_id(i32 index) {
 	GB_ASSERT(index >= 0);
-	mutex_lock(&global_error_collector.string_mutex);
+	mutex_lock(&global_error_collector.path_mutex);
 
 	AstFile *file = nullptr;
 	if (index < global_files.count) {
 		file = global_files[index];
 	}
 
-	mutex_unlock(&global_error_collector.string_mutex);
+	mutex_unlock(&global_error_collector.path_mutex);
 	return file;
 }
 
@@ -169,23 +168,26 @@ gb_internal ERROR_OUT_PROC(default_error_out_va) {
 	isize len = gb_snprintf_va(buf, gb_size_of(buf), fmt, va);
 	isize n = len-1;
 
-	String msg = {(u8 *)buf, n};
+	String msg = {};
+	if (n) {
+		msg = copy_string(permanent_allocator(), {(u8 *)buf, n});
+	}
 
 	ErrorValue *ev = get_error_value();
-	array_add(&ev->msgs, copy_string(permanent_allocator(), msg));
+	array_add(&ev->msgs, msg);
 }
 
 gb_global ErrorOutProc *error_out_va = default_error_out_va;
 
 gb_internal void begin_error_block(void) {
-	mutex_lock(&global_error_collector.block_mutex);
+	mutex_lock(&global_error_collector.mutex);
 	global_error_collector.in_block.store(true);
 }
 
 gb_internal void end_error_block(void) {
 	pop_error_value();
 	global_error_collector.in_block.store(false);
-	mutex_unlock(&global_error_collector.block_mutex);
+	mutex_unlock(&global_error_collector.mutex);
 }
 
 #define ERROR_BLOCK() begin_error_block(); defer (end_error_block())
@@ -328,6 +330,9 @@ gb_internal bool show_error_on_line(TokenPos const &pos, TokenPos end) {
 	return false;
 }
 
+gb_internal void error_out_empty(void) {
+	error_out("");
+}
 gb_internal void error_out_pos(TokenPos pos) {
 	terminal_set_colours(TerminalStyle_Bold, TerminalColour_White);
 	error_out("%s ", token_pos_to_string(pos));
@@ -353,6 +358,7 @@ gb_internal void error_va(TokenPos const &pos, TokenPos end, char const *fmt, va
 	push_error_value(pos, ErrorValue_Error);
 	// NOTE(bill): Duplicate error, skip it
 	if (pos.line == 0) {
+		error_out_empty();
 		error_out_coloured("Error: ", TerminalStyle_Normal, TerminalColour_Red);
 		error_out_va(fmt, va);
 		error_out("\n");
@@ -385,6 +391,7 @@ gb_internal void warning_va(TokenPos const &pos, TokenPos end, char const *fmt, 
 	if (!global_ignore_warnings()) {
 		// NOTE(bill): Duplicate error, skip it
 		if (pos.line == 0) {
+			error_out_empty();
 			error_out_coloured("Warning: ", TerminalStyle_Normal, TerminalColour_Yellow);
 			error_out_va(fmt, va);
 			error_out("\n");
@@ -418,6 +425,7 @@ gb_internal void error_no_newline_va(TokenPos const &pos, char const *fmt, va_li
 
 	// NOTE(bill): Duplicate error, skip it
 	if (pos.line == 0) {
+		error_out_empty();
 		error_out_coloured("Error: ", TerminalStyle_Normal, TerminalColour_Red);
 		error_out_va(fmt, va);
 	} else if (global_error_collector.prev != pos) {
@@ -453,6 +461,7 @@ gb_internal void syntax_error_va(TokenPos const &pos, TokenPos end, char const *
 		error_out("\n");
 		// show_error_on_line(pos, end);
 	} else if (pos.line == 0) {
+		error_out_empty();
 		error_out_coloured("Syntax Error: ", TerminalStyle_Normal, TerminalColour_Red);
 		error_out_va(fmt, va);
 		error_out("\n");
@@ -474,6 +483,7 @@ gb_internal void syntax_error_with_verbose_va(TokenPos const &pos, TokenPos end,
 
 	// NOTE(bill): Duplicate error, skip it
 	if (pos.line == 0) {
+		error_out_empty();
 		error_out_coloured("Syntax_Error: ", TerminalStyle_Normal, TerminalColour_Red);
 		error_out_va(fmt, va);
 		error_out("\n");
@@ -514,6 +524,7 @@ gb_internal void syntax_warning_va(TokenPos const &pos, TokenPos end, char const
 			error_out("\n");
 			// show_error_on_line(pos, end);
 		} else if (pos.line == 0) {
+			error_out_empty();
 			error_out_coloured("Syntax Warning: ", TerminalStyle_Normal, TerminalColour_Yellow);
 			error_out_va(fmt, va);
 			error_out("\n");
@@ -618,15 +629,13 @@ gb_internal void print_all_errors(void) {
 
 	for_array(i, global_error_collector.error_values) {
 		ErrorValue ev = global_error_collector.error_values[i];
-		for_array(j, ev.msgs) {
+		for (isize j = 0; j < ev.msgs.count; j++) {
 			String msg = ev.msgs[j];
 			gb_file_write(f, msg.text, msg.len);
-			if (terse_errors()) {
-				if (string_contains_char(msg, '\n')) {
-					break;
-				}
+
+			if (terse_errors() && string_contains_char(msg, '\n')) {
+				break;
 			}
 		}
 	}
-
 }
