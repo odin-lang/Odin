@@ -206,6 +206,11 @@ sys_shm_open :: proc(name: string, oflag: Open_Flags, mode: Permission) -> (c.in
 	result := syscall_shm_open(cname, cmode, cflags)
 	state  := result != -1
 
+	// NOTE(beau): Presently fstat doesn't report any changed permissions
+	// on the file descriptor even with this fchmod (which fails with a
+	// non-zero return). I can also reproduce this with the syscalls in c
+	// so I suspect it's not odin's bug. I've left the fchmod in case the
+	// underlying issue is fixed.
 	if state && cflags != 0 {
 		state = (syscall_fchmod(result, cflags) != -1)
 	}
