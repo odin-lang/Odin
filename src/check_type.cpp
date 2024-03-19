@@ -3349,7 +3349,7 @@ gb_internal Type *check_type_expr(CheckerContext *ctx, Ast *e, Type *named_type)
 		gbString err_str = expr_to_string(e);
 		defer (gb_string_free(err_str));
 
-		ERROR_BLOCK();
+		begin_error_block();
 		error(e, "'%s' is not a type", err_str);
 
 		type = t_invalid;
@@ -3368,14 +3368,16 @@ gb_internal Type *check_type_expr(CheckerContext *ctx, Ast *e, Type *named_type)
 			defer (gb_string_free(type_str));
 
 			error_line("\tSuggestion: Did you mean '[%s]%s'?", index_str ? index_str : "", type_str);
+			end_error_block();
 
 			// NOTE(bill): Minimize error propagation of bad array syntax by treating this like a type
 			if (node->IndexExpr.expr != nullptr) {
 				Ast *pseudo_array_expr = ast_array_type(e->file(), ast_token(node->IndexExpr.expr), node->IndexExpr.index, node->IndexExpr.expr);
 				check_array_type_internal(ctx, pseudo_array_expr, &type, nullptr);
 			}
+		} else {
+			end_error_block();
 		}
-
 	}
 
 	if (type == nullptr) {
