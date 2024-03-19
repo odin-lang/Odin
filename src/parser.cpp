@@ -1484,7 +1484,7 @@ gb_internal Token expect_token(AstFile *f, TokenKind kind) {
 		String p = token_to_string(prev);
 		syntax_error(f->curr_token, "Expected '%.*s', got '%.*s'", LIT(c), LIT(p));
 		if (prev.kind == Token_EOF) {
-			gb_exit(1);
+			exit_with_errors();
 		}
 	}
 
@@ -6177,7 +6177,7 @@ gb_internal ParseFileError process_imported_file(Parser *p, ImportedFile importe
 		if (err == ParseFile_EmptyFile) {
 			if (fi.fullpath == p->init_fullpath) {
 				syntax_error(pos, "Initial file is empty - %.*s\n", LIT(p->init_fullpath));
-				gb_exit(1);
+				exit_with_errors();
 			}
 		} else {
 			switch (err) {

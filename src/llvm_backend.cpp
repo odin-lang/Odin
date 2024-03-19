@@ -1350,7 +1350,7 @@ gb_internal WORKER_TASK_PROC(lb_llvm_emit_worker_proc) {
 
 	if (LLVMTargetMachineEmitToFile(wd->target_machine, wd->m->mod, cast(char *)wd->filepath_obj.text, wd->code_gen_file_type, &llvm_error)) {
 		gb_printf_err("LLVM Error: %s\n", llvm_error);
-		gb_exit(1);
+		exit_with_errors();
 	}
 	debugf("Generated File: %.*s\n", LIT(wd->filepath_obj));
 	return 0;
@@ -1919,7 +1919,7 @@ verify
 				gb_printf_err("LLVM Error: %s\n", llvm_error);
 			}
 		}
-		gb_exit(1);
+		exit_with_errors();
 		return 1;
 	}
 #endif
@@ -2104,11 +2104,11 @@ gb_internal WORKER_TASK_PROC(lb_llvm_module_verification_worker_proc) {
 			String filepath_ll = lb_filepath_ll_for_module(m);
 			if (LLVMPrintModuleToFile(m->mod, cast(char const *)filepath_ll.text, &llvm_error)) {
 				gb_printf_err("LLVM Error: %s\n", llvm_error);
-				gb_exit(1);
+				exit_with_errors();
 				return false;
 			}
 		}
-		gb_exit(1);
+		exit_with_errors();
 		return 1;
 	}
 	return 0;
@@ -2193,7 +2193,7 @@ gb_internal bool lb_llvm_object_generation(lbGenerator *gen, bool do_threading) 
 
 			if (LLVMTargetMachineEmitToFile(m->target_machine, m->mod, cast(char *)filepath_obj.text, code_gen_file_type, &llvm_error)) {
 				gb_printf_err("LLVM Error: %s\n", llvm_error);
-				gb_exit(1);
+				exit_with_errors();
 				return false;
 			}
 			debugf("Generated File: %.*s\n", LIT(filepath_obj));
@@ -2393,7 +2393,7 @@ gb_internal void lb_generate_procedure(lbModule *m, lbProcedure *p) {
 			gb_printf_err("LLVM Error: %s\n", llvm_error);
 		}
 		LLVMVerifyFunction(p->value, LLVMPrintMessageAction);
-		gb_exit(1);
+		exit_with_errors();
 	}
 }
 
@@ -2962,7 +2962,7 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 			String filepath_ll = lb_filepath_ll_for_module(m);
 			if (LLVMPrintModuleToFile(m->mod, cast(char const *)filepath_ll.text, &llvm_error)) {
 				gb_printf_err("LLVM Error: %s\n", llvm_error);
-				gb_exit(1);
+				exit_with_errors();
 				return false;
 			}
 			array_add(&gen->output_temp_paths, filepath_ll);

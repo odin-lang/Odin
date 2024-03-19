@@ -1404,7 +1404,7 @@ gb_internal void timings_export_all(Timings *t, Checker *c, bool timings_are_fin
 	gbFileError err = gb_file_open_mode(&f, gbFileMode_Write, fileName);
 	if (err != gbFileError_None) {
 		gb_printf_err("Failed to export timings to: %s\n", fileName);
-		gb_exit(1);
+		exit_with_errors();
 		return;
 	} else {
 		gb_printf("\nExporting timings to '%s'... ", fileName);

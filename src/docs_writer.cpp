@@ -1170,7 +1170,7 @@ gb_internal void odin_doc_write_to_file(OdinDocWriter *w, char const *filename) 
 	gbFileError err = gb_file_open_mode(&f, gbFileMode_Write, filename);
 	if (err != gbFileError_None) {
 		gb_printf_err("Failed to write .odin-doc to: %s\n", filename);
-		gb_exit(1);
+		exit_with_errors();
 		return;
 	}
 	defer (gb_file_close(&f));

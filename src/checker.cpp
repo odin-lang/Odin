@@ -1204,7 +1204,7 @@ gb_internal void init_universal(void) {
 	}
 
 	if (defined_values_double_declaration) {
-		gb_exit(1);
+		exit_with_errors();
 	}
 
 
@@ -4504,7 +4504,7 @@ gb_internal void add_import_dependency_node(Checker *c, Ast *decl, PtrMap<AstPac
 		if (found == nullptr) {
 			Token token = ast_token(decl);
 			error(token, "Unable to find package: %.*s", LIT(path));
-			gb_exit(1);
+			exit_with_errors();
 		}
 		AstPackage *pkg = *found;
 		GB_ASSERT(pkg->scope != nullptr);

@@ -613,6 +613,10 @@ gb_internal void compiler_error(char const *fmt, ...) {
 }
 
 
+gb_internal void exit_with_errors(void) {
+	print_all_errors();
+	gb_exit(1);
+}
 
 
 
