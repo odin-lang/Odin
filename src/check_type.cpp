@@ -3344,8 +3344,25 @@ gb_internal Type *check_type_expr(CheckerContext *ctx, Ast *e, Type *named_type)
 
 	if (!ok) {
 		gbString err_str = expr_to_string(e);
+		defer (gb_string_free(err_str));
+
+		ERROR_BLOCK();
 		error(e, "'%s' is not a type", err_str);
-		gb_string_free(err_str);
+
+		Ast *node = unparen_expr(e);
+		if (node && node->kind == Ast_IndexExpr) {
+			gbString index_str = nullptr;
+			if (node->IndexExpr.index) {
+				index_str = expr_to_string(node->IndexExpr.index);
+			}
+			defer (gb_string_free(index_str));
+
+			gbString type_str = expr_to_string(node->IndexExpr.expr);
+			defer (gb_string_free(type_str));
+
+			error_line("\tSuggestion: Did you mean '[%s]%s'?", index_str ? index_str : "", type_str);
+		}
+
 		type = t_invalid;
 	}
 
