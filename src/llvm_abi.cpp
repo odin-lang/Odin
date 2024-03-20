@@ -876,7 +876,7 @@ namespace lbAbiAmd64SysV {
 		if (types.count == 1) {
 			return types[0];
 		}
-		return LLVMStructTypeInContext(c, types.data, cast(unsigned)types.count, false);
+		return LLVMStructTypeInContext(c, types.data, cast(unsigned)types.count, true);
 	}
 
 	gb_internal void classify_with(LLVMTypeRef t, Array<RegClass> *cls, i64 ix, i64 off) {
@@ -1312,7 +1312,7 @@ namespace lbAbiWasm {
 				// ignore padding
 				LLVMStructGetTypeAtIndex(type, 2)
 			};
-			LLVMTypeRef new_type = LLVMStructTypeInContext(c, types, gb_count_of(types), false);
+			LLVMTypeRef new_type = LLVMStructTypeInContext(c, types, gb_count_of(types), true);
 			return lb_arg_type_direct(type, new_type, nullptr, nullptr);
 		} else {
 			return is_struct(c, type, calling_convention);
