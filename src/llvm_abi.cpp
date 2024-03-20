@@ -1187,7 +1187,21 @@ namespace lbAbiArm64 {
 						cast_type = LLVMIntTypeInContext(c, cast(unsigned)(size*8));
 					} else {
 						unsigned count = cast(unsigned)((size+7)/8);
-						cast_type = llvm_array_type(LLVMIntTypeInContext(c, 64), count);
+
+						LLVMTypeRef llvm_i64 = LLVMIntTypeInContext(c, 64);
+						LLVMTypeRef *types = gb_alloc_array(temporary_allocator(), LLVMTypeRef, count);
+
+						i64 size_copy = size;
+						for (unsigned i = 0; i < count; i++) {
+							if (size_copy >= 8) {
+								types[i] = llvm_i64;
+							} else {
+								types[i] = LLVMIntTypeInContext(c, 8*cast(unsigned)size_copy);
+							}
+							size_copy -= 8;
+						}
+						GB_ASSERT(size_copy <= 0);
+						cast_type = LLVMStructTypeInContext(c, types, count, true);
 					}
 					args[i] = lb_arg_type_direct(type, cast_type, nullptr, nullptr);
 				} else {
