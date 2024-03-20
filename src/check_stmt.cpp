@@ -1365,6 +1365,8 @@ gb_internal void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_
 		}
 
 		if (unhandled.count > 0) {
+			ERROR_BLOCK();
+
 			if (unhandled.count == 1) {
 				gbString s = type_to_string(unhandled[0]);
 				error_no_newline(node, "Unhandled switch case: %s", s);
