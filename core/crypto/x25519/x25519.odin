@@ -94,11 +94,11 @@ _scalarmult :: proc "contextless" (out, scalar, point: ^[32]byte) {
 	field.fe_carry_mul(&x2, field.fe_relax_cast(&x2), field.fe_relax_cast(&z2))
 	field.fe_to_bytes(out, &x2)
 
-	mem.zero_explicit(&x1, size_of(x1))
-	mem.zero_explicit(&x2, size_of(x2))
-	mem.zero_explicit(&x3, size_of(x3))
-	mem.zero_explicit(&z2, size_of(z2))
-	mem.zero_explicit(&z3, size_of(z3))
+	field.fe_clear(&x1)
+	field.fe_clear(&x2)
+	field.fe_clear(&x3)
+	field.fe_clear(&z2)
+	field.fe_clear(&z3)
 	mem.zero_explicit(&t0, size_of(t0))
 	mem.zero_explicit(&t1, size_of(t1))
 }
