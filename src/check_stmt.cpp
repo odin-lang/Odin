@@ -1661,6 +1661,8 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 			defer (gb_string_free(s));
 			defer (gb_string_free(t));
 
+			ERROR_BLOCK();
+
 			error(operand.expr, "Cannot iterate over '%s' of type '%s'", s, t);
 
 			if (rs->vals.count == 1) {
