@@ -99,7 +99,7 @@ _subborrowx_u43 :: #force_inline proc "contextless" (
 	return
 }
 
-fe_carry_mul :: proc(out1: ^Tight_Field_Element, arg1, arg2: ^Loose_Field_Element) {
+fe_carry_mul :: proc "contextless" (out1: ^Tight_Field_Element, arg1, arg2: ^Loose_Field_Element) {
 	x2, x1 := bits.mul_u64(arg1[2], (arg2[2] * 0x5))
 	x4, x3 := bits.mul_u64(arg1[2], (arg2[1] * 0xa))
 	x6, x5 := bits.mul_u64(arg1[1], (arg2[2] * 0xa))
@@ -144,7 +144,7 @@ fe_carry_mul :: proc(out1: ^Tight_Field_Element, arg1, arg2: ^Loose_Field_Elemen
 	out1[2] = x62
 }
 
-fe_carry_square :: proc(out1: ^Tight_Field_Element, arg1: ^Loose_Field_Element) {
+fe_carry_square :: proc "contextless" (out1: ^Tight_Field_Element, arg1: ^Loose_Field_Element) {
 	x1 := (arg1[2] * 0x5)
 	x2 := (x1 * 0x2)
 	x3 := (arg1[2] * 0x2)

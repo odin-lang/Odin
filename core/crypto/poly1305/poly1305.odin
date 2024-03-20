@@ -168,7 +168,7 @@ reset :: proc(ctx: ^Context) {
 }
 
 @(private)
-_blocks :: proc(ctx: ^Context, msg: []byte, final := false) {
+_blocks :: proc "contextless" (ctx: ^Context, msg: []byte, final := false) {
 	n: field.Tight_Field_Element = ---
 	final_byte := byte(!final)
 

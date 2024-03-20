@@ -1,5 +1,6 @@
 package field_poly1305
 
+import "base:intrinsics"
 import "core:encoding/endian"
 import "core:mem"
 
@@ -15,7 +16,11 @@ fe_tighten_cast :: #force_inline proc "contextless" (
 	return transmute(^Tight_Field_Element)(arg1)
 }
 
-fe_from_bytes :: #force_inline proc(out1: ^Tight_Field_Element, arg1: []byte, arg2: byte) {
+fe_from_bytes :: #force_inline proc "contextless" (
+	out1: ^Tight_Field_Element,
+	arg1: []byte,
+	arg2: byte,
+) {
 	// fiat-crypto's deserialization routine effectively processes a
 	// single byte at a time, and wants 256-bits of input for a value
 	// that will be 128-bits or 129-bits.
@@ -24,7 +29,9 @@ fe_from_bytes :: #force_inline proc(out1: ^Tight_Field_Element, arg1: []byte, ar
 	// makes implementing the actual MAC block processing considerably
 	// neater.
 
-	assert(len(arg1) == 16)
+	if len(arg1) != 16 {
+		intrinsics.trap()
+	}
 
 	// While it may be unwise to do deserialization here on our
 	// own when fiat-crypto provides equivalent functionality,
