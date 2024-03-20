@@ -3991,17 +3991,20 @@ gb_internal lbAddr lb_build_addr_index_expr(lbProcedure *p, Ast *expr) {
 		lbValue index = lb_build_expr(p, ie->index);
 		index = lb_emit_conv(p, index, t_int);
 
+		isize bounds_len = 0;
 		lbValue elem = {};
 		if (t->Matrix.is_row_major) {
+			bounds_len = t->Matrix.row_count;
 			elem = lb_emit_matrix_ep(p, matrix, index, lb_const_int(p->module, t_int, 0));
 		} else {
+			bounds_len = t->Matrix.column_count;
 			elem = lb_emit_matrix_ep(p, matrix, lb_const_int(p->module, t_int, 0), index);
 		}
 		elem = lb_emit_conv(p, elem, alloc_type_pointer(type_of_expr(expr)));
 
 		auto index_tv = type_and_value_of_expr(ie->index);
 		if (index_tv.mode != Addressing_Constant) {
-			lbValue len = lb_const_int(p->module, t_int, t->Matrix.column_count);
+			lbValue len = lb_const_int(p->module, t_int, bounds_len);
 			lb_emit_bounds_check(p, ast_token(ie->index), index, len);
 		}
 		return lb_addr(elem);
