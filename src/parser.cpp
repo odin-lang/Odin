@@ -5453,7 +5453,7 @@ gb_internal AstPackage *try_add_import_path(Parser *p, String path, String const
 		}
 	}
 	if (files_with_ext == 0 || files_to_reserve == 1) {
-		if (files_to_reserve == 1) {
+		if (files_with_ext != 0) {
 			syntax_error(pos, "Directory contains no .odin files for the specified platform: %.*s", LIT(rel_path));
 		} else {
 			syntax_error(pos, "Empty directory that contains no .odin files: %.*s", LIT(rel_path));
