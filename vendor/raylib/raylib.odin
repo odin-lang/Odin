@@ -664,7 +664,7 @@ KeyboardKey :: enum c.int {
 	KP_EQUAL        = 336,            // Key: Keypad =
 	// Android key buttons
 	BACK            = 4,              // Key: Android back button
-	MENU            = 82,             // Key: Android menu button
+	MENU            = 5,              // Key: Android menu button
 	VOLUME_UP       = 24,             // Key: Android volume up button
 	VOLUME_DOWN     = 25,             // Key: Android volume down button
 }
