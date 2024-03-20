@@ -20,6 +20,10 @@ _TWO_336 := Montgomery_Domain_Field_Element {
 	0x3d217f5be65cb5c,
 }
 
+fe_clear :: proc "contextless" (arg1: ^Montgomery_Domain_Field_Element) {
+	mem.zero_explicit(arg1, size_of(Montgomery_Domain_Field_Element))
+}
+
 fe_from_bytes :: proc "contextless" (
 	out1: ^Montgomery_Domain_Field_Element,
 	arg1: ^[32]byte,
@@ -85,7 +89,7 @@ fe_from_bytes_wide :: proc "contextless" (
 	fe_mul(&tmp, &tmp, &_TWO_336) // c * 2^336
 	fe_add(out1, out1, &tmp) // a + b * 2^168 + c * 2^336
 
-	mem.zero_explicit(&tmp, size_of(tmp))
+	fe_clear(&tmp)
 }
 
 @(private)
@@ -125,7 +129,7 @@ fe_equal :: proc "contextless" (arg1, arg2: ^Montgomery_Domain_Field_Element) ->
 	// which will be 1.
 	_, borrow := bits.sub_u64(fe_non_zero(&tmp), 1, 0)
 
-	mem.zero_explicit(&tmp, size_of(tmp))
+	fe_clear(&tmp)
 
 	return int(borrow)
 }

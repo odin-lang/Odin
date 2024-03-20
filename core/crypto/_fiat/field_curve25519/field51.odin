@@ -42,7 +42,10 @@ import "core:math/bits"
 Loose_Field_Element :: distinct [5]u64
 Tight_Field_Element :: distinct [5]u64
 
-SQRT_M1 := Tight_Field_Element {
+FE_ZERO := Tight_Field_Element{0, 0, 0, 0, 0}
+FE_ONE := Tight_Field_Element{1, 0, 0, 0, 0}
+
+FE_SQRT_M1 := Tight_Field_Element {
 	1718705420411056,
 	234908883556509,
 	2233514472574048,
