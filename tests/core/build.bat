@@ -100,3 +100,8 @@ echo ---
 echo Running core:runtime tests
 echo ---
 %PATH_TO_ODIN% run runtime %COMMON% %COLLECTION% -out:test_core_runtime.exe || exit /b
+
+echo ---
+echo Running core:time tests
+echo ---
+%PATH_TO_ODIN% run time %COMMON% %COLLECTION% -out:test_core_time.exe || exit /b
