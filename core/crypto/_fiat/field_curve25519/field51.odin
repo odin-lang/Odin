@@ -80,7 +80,7 @@ _subborrowx_u51 :: #force_inline proc "contextless" (
 	return
 }
 
-fe_carry_mul :: proc(out1: ^Tight_Field_Element, arg1, arg2: ^Loose_Field_Element) {
+fe_carry_mul :: proc "contextless" (out1: ^Tight_Field_Element, arg1, arg2: ^Loose_Field_Element) {
 	x2, x1 := bits.mul_u64(arg1[4], (arg2[4] * 0x13))
 	x4, x3 := bits.mul_u64(arg1[4], (arg2[3] * 0x13))
 	x6, x5 := bits.mul_u64(arg1[4], (arg2[2] * 0x13))
@@ -179,7 +179,7 @@ fe_carry_mul :: proc(out1: ^Tight_Field_Element, arg1, arg2: ^Loose_Field_Elemen
 	out1[4] = x152
 }
 
-fe_carry_square :: proc(out1: ^Tight_Field_Element, arg1: ^Loose_Field_Element) {
+fe_carry_square :: proc "contextless" (out1: ^Tight_Field_Element, arg1: ^Loose_Field_Element) {
 	x1 := (arg1[4] * 0x13)
 	x2 := (x1 * 0x2)
 	x3 := (arg1[4] * 0x2)
@@ -540,7 +540,10 @@ fe_relax :: proc "contextless" (out1: ^Loose_Field_Element, arg1: ^Tight_Field_E
 	out1[4] = x5
 }
 
-fe_carry_scmul_121666 :: proc(out1: ^Tight_Field_Element, arg1: ^Loose_Field_Element) {
+fe_carry_scmul_121666 :: proc "contextless" (
+	out1: ^Tight_Field_Element,
+	arg1: ^Loose_Field_Element,
+) {
 	x2, x1 := bits.mul_u64(0x1db42, arg1[4])
 	x4, x3 := bits.mul_u64(0x1db42, arg1[3])
 	x6, x5 := bits.mul_u64(0x1db42, arg1[2])

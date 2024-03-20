@@ -50,7 +50,11 @@ fe_equal_bytes :: proc "contextless" (arg1: ^Tight_Field_Element, arg2: ^[32]byt
 	return ret
 }
 
-fe_carry_pow2k :: proc(out1: ^Tight_Field_Element, arg1: ^Loose_Field_Element, arg2: uint) {
+fe_carry_pow2k :: proc "contextless" (
+	out1: ^Tight_Field_Element,
+	arg1: ^Loose_Field_Element,
+	arg2: uint,
+) {
 	// Special case: `arg1^(2 * 0) = 1`, though this should never happen.
 	if arg2 == 0 {
 		fe_one(out1)
@@ -68,7 +72,10 @@ fe_carry_opp :: #force_inline proc "contextless" (out1, arg1: ^Tight_Field_Eleme
 	fe_carry(out1, fe_relax_cast(out1))
 }
 
-fe_carry_invsqrt :: proc(out1: ^Tight_Field_Element, arg1: ^Loose_Field_Element) -> int {
+fe_carry_invsqrt :: proc "contextless" (
+	out1: ^Tight_Field_Element,
+	arg1: ^Loose_Field_Element,
+) -> int {
 	// Inverse square root taken from Monocypher.
 
 	tmp1, tmp2, tmp3: Tight_Field_Element = ---, ---, ---
@@ -130,7 +137,7 @@ fe_carry_invsqrt :: proc(out1: ^Tight_Field_Element, arg1: ^Loose_Field_Element)
 	return p1 | m1
 }
 
-fe_carry_inv :: proc(out1: ^Tight_Field_Element, arg1: ^Loose_Field_Element) {
+fe_carry_inv :: proc "contextless" (out1: ^Tight_Field_Element, arg1: ^Loose_Field_Element) {
 	tmp1: Tight_Field_Element
 
 	fe_carry_square(&tmp1, arg1)

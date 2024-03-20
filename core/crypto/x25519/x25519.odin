@@ -27,7 +27,7 @@ _scalar_bit :: #force_inline proc "contextless" (s: ^[32]byte, i: int) -> u8 {
 }
 
 @(private)
-_scalarmult :: proc(out, scalar, point: ^[32]byte) {
+_scalarmult :: proc "contextless" (out, scalar, point: ^[32]byte) {
 	// Montgomery pseduo-multiplication taken from Monocypher.
 
 	// computes the scalar product
