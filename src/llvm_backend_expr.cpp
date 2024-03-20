@@ -3990,7 +3990,13 @@ gb_internal lbAddr lb_build_addr_index_expr(lbProcedure *p, Ast *expr) {
 		}
 		lbValue index = lb_build_expr(p, ie->index);
 		index = lb_emit_conv(p, index, t_int);
-		lbValue elem = lb_emit_matrix_ep(p, matrix, lb_const_int(p->module, t_int, 0), index);
+
+		lbValue elem = {};
+		if (t->Matrix.is_row_major) {
+			elem = lb_emit_matrix_ep(p, matrix, index, lb_const_int(p->module, t_int, 0));
+		} else {
+			elem = lb_emit_matrix_ep(p, matrix, lb_const_int(p->module, t_int, 0), index);
+		}
 		elem = lb_emit_conv(p, elem, alloc_type_pointer(type_of_expr(expr)));
 
 		auto index_tv = type_and_value_of_expr(ie->index);
