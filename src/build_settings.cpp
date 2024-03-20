@@ -1191,13 +1191,24 @@ gb_internal String path_to_fullpath(gbAllocator a, String s, bool *ok_) {
 	char *p;
 	mutex_lock(&fullpath_mutex);
 	p = realpath(cast(char *)s.text, 0);
+	defer (free(p));
 	mutex_unlock(&fullpath_mutex);
 	if(p == nullptr) {
 		if (ok_) *ok_ = false;
-		return String{};
+
+		// Path doesn't exist or is malformed, Windows's `GetFullPathNameW` does not check for
+		// existence of the file where `realpath` does, which causes different behaviour between platforms.
+		// Two things could be done here:
+		// 1. clean the path and resolve it manually, just like the Windows function does,
+		//    probably requires porting `filepath.clean` from Odin and doing some more processing.
+		// 2. just return a copy of the original path.
+		//
+		// I have opted for 2 because it is much simpler + we already return `ok = false` + further
+		// checks and processes will use the path and cause errors (which we want).
+		return copy_string(a, s);
 	}
 	if (ok_) *ok_ = true;
-	return make_string_c(p);
+	return copy_string(a, make_string_c(p));
 }
 #else
 #error Implement system
@@ -1947,6 +1958,18 @@ gb_internal bool init_build_paths(String init_filename) {
 		}
 	}
 
+	if (build_context.no_crt && !build_context.ODIN_DEFAULT_TO_NIL_ALLOCATOR && !build_context.ODIN_DEFAULT_TO_PANIC_ALLOCATOR) {
+		switch (build_context.metrics.os) {
+		case TargetOs_linux:
+		case TargetOs_darwin:
+		case TargetOs_essence:
+		case TargetOs_freebsd:
+		case TargetOs_openbsd:
+		case TargetOs_haiku:
+			gb_printf_err("-no-crt on unix systems requires either -default-to-nil-allocator or -default-to-panic-allocator to also be present because the default allocator requires crt\n");
+			return false;
+		}
+	}
 
 	if (bc->target_features_string.len != 0) {
 		enable_target_feature({}, bc->target_features_string);

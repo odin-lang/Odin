@@ -376,6 +376,10 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 								LIT(obj_file),
 								LIT(build_context.extra_assembler_flags)
 							);						
+							if (!result) {
+								gb_printf_err("executing `nasm` to assemble foreing import of %.*s failed.\n\tSuggestion: `nasm` does not ship with the compiler and should be installed with your system's package manager.\n", LIT(asm_file));
+								return result;
+							}
 						}
 						array_add(&gen->output_object_paths, obj_file);
 					} else {
@@ -383,9 +387,13 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 							continue;
 						}
 
-						// NOTE(zangent): Sometimes, you have to use -framework on MacOS.
-						//   This allows you to specify '-f' in a #foreign_system_library,
-						//   without having to implement any new syntax specifically for MacOS.
+						// Do not add libc again, this is added later already, and omitted with
+						// the `-no-crt` flag, not skipping here would cause duplicate library
+						// warnings when linking on darwin and might link libc silently even with `-no-crt`.
+						if (lib == str_lit("System.framework") || lib == str_lit("c")) {
+							continue;
+						}
+
 						if (build_context.metrics.os == TargetOs_darwin) {
 							if (string_ends_with(lib, str_lit(".framework"))) {
 								// framework thingie
