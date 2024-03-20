@@ -1183,14 +1183,8 @@ namespace lbAbiArm64 {
 				i64 size = lb_sizeof(type);
 				if (size <= 16) {
 					LLVMTypeRef cast_type = nullptr;
-					if (size <= 1) {
-						cast_type = LLVMIntTypeInContext(c, 8);
-					} else if (size <= 2) {
-						cast_type = LLVMIntTypeInContext(c, 16);
-					} else if (size <= 4) {
-						cast_type = LLVMIntTypeInContext(c, 32);
-					} else if (size <= 8) {
-						cast_type = LLVMIntTypeInContext(c, 64);
+					if (size <= 8) {
+						cast_type = LLVMIntTypeInContext(c, cast(unsigned)(size*8));
 					} else {
 						unsigned count = cast(unsigned)((size+7)/8);
 						cast_type = llvm_array_type(LLVMIntTypeInContext(c, 64), count);
