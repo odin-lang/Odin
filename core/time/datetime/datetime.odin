@@ -32,7 +32,7 @@ components_to_date :: proc "contextless" (#any_int year, #any_int month, #any_in
 }
 
 components_to_time :: proc "contextless" (#any_int hour, #any_int minute, #any_int second: i64, #any_int nanos := i64(0)) -> (time: Time, err: Error) {
-	time = Time{i64(hour), i64(minute), i64(second), i64(nanos)}
+	time = Time{i8(hour), i8(minute), i8(second), i32(nanos)}
 	validate(time) or_return
 	return time, .None
 }
@@ -67,10 +67,10 @@ subtract_datetimes :: proc "contextless" (a, b: DateTime) -> (delta: Delta, err:
 	validate(a.time) or_return
 	validate(b.time) or_return
 
-	seconds_a := a.hour * 3600 + a.minute * 60 + a.second
-	seconds_b := b.hour * 3600 + b.minute * 60 + b.second
+	seconds_a := i64(a.hour) * 3600 + i64(a.minute) * 60 + i64(a.second)
+	seconds_b := i64(b.hour) * 3600 + i64(b.minute) * 60 + i64(b.second)
 
-	delta = Delta{ord_a - ord_b, seconds_a - seconds_b, a.nano - b.nano}
+	delta = Delta{ord_a - ord_b, seconds_a - seconds_b, i64(a.nano) - i64(b.nano)}
 	return
 }
 
@@ -97,19 +97,18 @@ add_delta_to_date :: proc "contextless" (a: Date, delta: Delta) -> (date: Date, 
 add_delta_to_datetime :: proc "contextless" (a: DateTime, delta: Delta) -> (datetime: DateTime, err: Error) {
 	days   := date_to_ordinal(a) or_return
 
-	a_seconds := a.hour * 3600 + a.minute * 60 + a.second
-	a_delta   := Delta{days=days, seconds=a_seconds, nanos=a.nano}
+	a_seconds := i64(a.hour) * 3600 + i64(a.minute) * 60 + i64(a.second)
+	a_delta   := Delta{days=days, seconds=a_seconds, nanos=i64(a.nano)}
 
 	sum_delta := Delta{days=a_delta.days + delta.days, seconds=a_delta.seconds + delta.seconds, nanos=a_delta.nanos + delta.nanos}
 	sum_delta  = normalize_delta(sum_delta) or_return
 
 	datetime.date = ordinal_to_date(sum_delta.days) or_return
 
-	r: i64
-	datetime.hour, r                 = divmod(sum_delta.seconds, 3600)
-	datetime.minute, datetime.second = divmod(r, 60)
-	datetime.nano = sum_delta.nanos
+	hour,   rem    := divmod(sum_delta.seconds, 3600)
+	minute, second := divmod(rem, 60)
 
+	datetime.time = components_to_time(hour, minute, second, sum_delta.nanos) or_return
 	return
 }
 add :: proc{add_days_to_date, add_delta_to_date, add_delta_to_datetime}

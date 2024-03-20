@@ -31,10 +31,10 @@ Date :: struct {
 }
 
 Time :: struct {
-	hour:   i64,
-	minute: i64,
-	second: i64,
-	nano:   i64,
+	hour:   i8,
+	minute: i8,
+	second: i8,
+	nano:   i32,
 }
 
 DateTime :: struct {
