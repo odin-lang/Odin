@@ -26,8 +26,8 @@ Error :: enum {
 
 Date :: struct {
 	year:   i64,
-	month:  i64,
-	day:    i64,
+	month:  i8,
+	day:    i8,
 }
 
 Time :: struct {

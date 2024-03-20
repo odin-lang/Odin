@@ -15,7 +15,7 @@ date_to_ordinal :: proc "contextless" (date: Date) -> (ordinal: Ordinal, err: Er
 }
 
 components_to_ordinal :: proc "contextless" (#any_int year, #any_int month, #any_int day: i64) -> (ordinal: Ordinal, err: Error) {
-	return date_to_ordinal(Date{year, month, day})
+	return date_to_ordinal(Date{year, i8(month), i8(day)})
 }
 
 // Procedures that return a Date
@@ -26,7 +26,7 @@ ordinal_to_date :: proc "contextless" (ordinal: Ordinal) -> (date: Date, err: Er
 }
 
 components_to_date :: proc "contextless" (#any_int year, #any_int month, #any_int day: i64) -> (date: Date, err: Error) {
-	date = Date{i64(year), i64(month), i64(day)}
+	date = Date{i64(year), i8(month), i8(day)}
 	validate(date) or_return
 	return date, .None
 }
@@ -128,7 +128,7 @@ days_remaining :: proc "contextless" (date: Date) -> (days_remaining: i64, err: 
 	return delta.days, .None
 }
 
-last_day_of_month :: proc "contextless" (year, month: i64) -> (day: i64, err: Error) {
+last_day_of_month :: proc "contextless" (#any_int year: i64, #any_int month: i8) -> (day: i64, err: Error) {
 	// Not using formula 2.27 from the book. This is far simpler and gives the same answer.
 
 	validate(Date{year, month, 1}) or_return
@@ -210,7 +210,7 @@ unsafe_date_to_ordinal :: proc "contextless" (date: Date) -> (ordinal: Ordinal) 
 	ordinal += floor_div(year_minus_one, 4)          // Julian-rule leap days
 	ordinal -= floor_div(year_minus_one, 100)        // Prior century years
 	ordinal += floor_div(year_minus_one, 400)        // Prior 400-multiple years
-	ordinal += floor_div(367 * date.month - 362, 12) // Prior days this year
+	ordinal += floor_div(367 * i64(date.month) - 362, 12) // Prior days this year
 
 	// Apply correction
 	if date.month <= 2 {
@@ -222,7 +222,7 @@ unsafe_date_to_ordinal :: proc "contextless" (date: Date) -> (ordinal: Ordinal) 
 	}
 
 	// Add days
-	ordinal += date.day
+	ordinal += i64(date.day)
 	return
 }
 
@@ -268,8 +268,8 @@ unsafe_ordinal_to_date :: proc "contextless" (ordinal: Ordinal) -> (date: Date) 
 		correction = 1
 	}
 
-	month := floor_div((12 * (prior_days + correction) + 373), 367)
-	day   := ordinal - unsafe_date_to_ordinal(Date{year, month, 1}) + 1
+	month := i8(floor_div((12 * (prior_days + correction) + 373), 367))
+	day   := i8(ordinal - unsafe_date_to_ordinal(Date{year, month, 1}) + 1)
 
 	return {year, month, day}
 }
