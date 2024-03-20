@@ -15,7 +15,8 @@ date_to_ordinal :: proc "contextless" (date: Date) -> (ordinal: Ordinal, err: Er
 }
 
 components_to_ordinal :: proc "contextless" (#any_int year, #any_int month, #any_int day: i64) -> (ordinal: Ordinal, err: Error) {
-	return date_to_ordinal(Date{year, i8(month), i8(day)})
+	validate(year, month, day) or_return
+	return unsafe_date_to_ordinal({year, i8(month), i8(day)}), .None
 }
 
 // Procedures that return a Date
@@ -26,15 +27,13 @@ ordinal_to_date :: proc "contextless" (ordinal: Ordinal) -> (date: Date, err: Er
 }
 
 components_to_date :: proc "contextless" (#any_int year, #any_int month, #any_int day: i64) -> (date: Date, err: Error) {
-	date = Date{i64(year), i8(month), i8(day)}
-	validate(date) or_return
-	return date, .None
+	validate(year, month, day) or_return
+	return Date{i64(year), i8(month), i8(day)}, .None
 }
 
 components_to_time :: proc "contextless" (#any_int hour, #any_int minute, #any_int second: i64, #any_int nanos := i64(0)) -> (time: Time, err: Error) {
-	time = Time{i8(hour), i8(minute), i8(second), i32(nanos)}
-	validate(time) or_return
-	return time, .None
+	validate(hour, minute, second, nanos) or_return
+	return Time{i8(hour), i8(minute), i8(second), i32(nanos)}, .None
 }
 
 components_to_datetime :: proc "contextless" (#any_int year, #any_int month, #any_int day, #any_int hour, #any_int minute, #any_int second: i64, #any_int nanos := i64(0)) -> (datetime: DateTime, err: Error) {
@@ -142,15 +141,13 @@ last_day_of_month :: proc "contextless" (#any_int year: i64, #any_int month: i8)
 }
 
 new_year :: proc "contextless" (#any_int year: i64) -> (new_year: Date, err: Error) {
-	new_year = {year, 1, 1}
-	validate(new_year) or_return
-	return
+	validate(year, 1, 1) or_return
+	return {year, 1, 1}, .None
 }
 
 year_end :: proc "contextless" (#any_int year: i64) -> (year_end: Date, err: Error) {
-	year_end = {year, 12, 31}
-	validate(year_end) or_return
-	return
+	validate(year, 12, 31) or_return
+	return {year, 12, 31}, .None
 }
 
 year_range :: proc (#any_int year: i64, allocator := context.allocator) -> (range: []Date) {

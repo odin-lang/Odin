@@ -37,16 +37,20 @@ validate_ordinal :: proc "contextless" (ordinal: Ordinal) -> (err: Error) {
 }
 
 validate_time :: proc "contextless" (time: Time) -> (err: Error) {
-	if time.hour < 0 || time.hour > 23 {
+	return validate(time.hour, time.minute, time.second, time.nano)
+}
+
+validate_hour_minute_second :: proc "contextless" (#any_int hour, #any_int minute, #any_int second, #any_int nano: i64) -> (err: Error) {
+	if hour < 0 || hour > 23 {
 		return .Invalid_Hour
 	}
-	if time.minute < 0 || time.minute > 59 {
+	if minute < 0 || minute > 59 {
 		return .Invalid_Minute
 	}
-	if time.second < 0 || time.second > 59 {
+	if second < 0 || second > 59 {
 		return .Invalid_Second
 	}
-	if time.nano < 0 || time.nano > 1e9 {
+	if nano < 0 || nano > 1e9 {
 		return .Invalid_Nano
 	}
 	return .None
@@ -62,6 +66,7 @@ validate :: proc{
 	validate_date,
 	validate_year_month_day,
 	validate_ordinal,
+	validate_hour_minute_second,
 	validate_time,
 	validate_datetime,
 }
