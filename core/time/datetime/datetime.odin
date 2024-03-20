@@ -8,25 +8,39 @@ package datetime
 import "base:intrinsics"
 
 // Procedures that return an Ordinal
+
 date_to_ordinal :: proc "contextless" (date: Date) -> (ordinal: Ordinal, err: Error) {
 	validate(date) or_return
 	return unsafe_date_to_ordinal(date), .None
 }
 
-components_to_ordinal :: proc "contextless" (year, month, day: int) -> (ordinal: Ordinal, err: Error) {
+components_to_ordinal :: proc "contextless" (#any_int year, #any_int month, #any_int day: i64) -> (ordinal: Ordinal, err: Error) {
 	return date_to_ordinal(Date{year, month, day})
 }
 
 // Procedures that return a Date
+
 ordinal_to_date :: proc "contextless" (ordinal: Ordinal) -> (date: Date, err: Error) {
 	validate(ordinal) or_return
 	return unsafe_ordinal_to_date(ordinal), .None
 }
 
-components_to_date :: proc "contextless" (year, month, day: int) -> (date: Date, err: Error) {
-	date = Date{year, month, day}
+components_to_date :: proc "contextless" (#any_int year, #any_int month, #any_int day: i64) -> (date: Date, err: Error) {
+	date = Date{i64(year), i64(month), i64(day)}
 	validate(date) or_return
 	return date, .None
+}
+
+components_to_time :: proc "contextless" (#any_int hour, #any_int minute, #any_int second: i64, #any_int nanos := i64(0)) -> (time: Time, err: Error) {
+	time = Time{i64(hour), i64(minute), i64(second), i64(nanos)}
+	validate(time) or_return
+	return time, .None
+}
+
+components_to_datetime :: proc "contextless" (#any_int year, #any_int month, #any_int day, #any_int hour, #any_int minute, #any_int second: i64, #any_int nanos := i64(0)) -> (datetime: DateTime, err: Error) {
+	date := components_to_date(year, month, day)            or_return
+	time := components_to_time(hour, minute, second, nanos) or_return
+	return {date, time}, .None
 }
 
 ordinal_to_datetime :: proc "contextless" (ordinal: Ordinal) -> (datetime: DateTime, err: Error) {
@@ -67,7 +81,7 @@ subtract_deltas :: proc "contextless" (a, b: Delta) -> (delta: Delta, err: Error
 }
 sub :: proc{subtract_datetimes, subtract_dates, subtract_deltas}
 
-add_days_to_date :: proc "contextless" (a: Date, days: int) -> (date: Date, err: Error) {
+add_days_to_date :: proc "contextless" (a: Date, days: i64) -> (date: Date, err: Error) {
 	ord := date_to_ordinal(a) or_return
 	ord += days
 	return ordinal_to_date(ord)
@@ -91,7 +105,7 @@ add_delta_to_datetime :: proc "contextless" (a: DateTime, delta: Delta) -> (date
 
 	datetime.date = ordinal_to_date(sum_delta.days) or_return
 
-	r: int
+	r: i64
 	datetime.hour, r                 = divmod(sum_delta.seconds, 3600)
 	datetime.minute, datetime.second = divmod(r, 60)
 	datetime.nano = sum_delta.nanos
@@ -100,7 +114,7 @@ add_delta_to_datetime :: proc "contextless" (a: DateTime, delta: Delta) -> (date
 }
 add :: proc{add_days_to_date, add_delta_to_date, add_delta_to_datetime}
 
-day_number :: proc "contextless" (date: Date) -> (day_number: int, err: Error) {
+day_number :: proc "contextless" (date: Date) -> (day_number: i64, err: Error) {
 	validate(date) or_return
 
 	ord := unsafe_date_to_ordinal(date)
@@ -108,39 +122,39 @@ day_number :: proc "contextless" (date: Date) -> (day_number: int, err: Error) {
 	return
 }
 
-days_remaining :: proc "contextless" (date: Date) -> (days_remaining: int, err: Error) {
+days_remaining :: proc "contextless" (date: Date) -> (days_remaining: i64, err: Error) {
 	// Alternative formulation `day_number` subtracted from 365 or 366 depending on leap year
 	validate(date) or_return
 	delta := sub(date, Date{date.year, 12, 31}) or_return
 	return delta.days, .None
 }
 
-last_day_of_month :: proc "contextless" (year, month: int) -> (day: int, err: Error) {
+last_day_of_month :: proc "contextless" (year, month: i64) -> (day: i64, err: Error) {
 	// Not using formula 2.27 from the book. This is far simpler and gives the same answer.
 
 	validate(Date{year, month, 1}) or_return
 	month_days := MONTH_DAYS
 
-	day = month_days[month]
+	day = i64(month_days[month])
 	if month == 2 && is_leap_year(year) {
 		day += 1
 	}
 	return
 }
 
-new_year :: proc "contextless" (year: int) -> (new_year: Date, err: Error) {
+new_year :: proc "contextless" (#any_int year: i64) -> (new_year: Date, err: Error) {
 	new_year = {year, 1, 1}
 	validate(new_year) or_return
 	return
 }
 
-year_end :: proc "contextless" (year: int) -> (year_end: Date, err: Error) {
+year_end :: proc "contextless" (#any_int year: i64) -> (year_end: Date, err: Error) {
 	year_end = {year, 12, 31}
 	validate(year_end) or_return
 	return
 }
 
-year_range :: proc (year: int, allocator := context.allocator) -> (range: []Date) {
+year_range :: proc (#any_int year: i64, allocator := context.allocator) -> (range: []Date) {
 	is_leap := is_leap_year(year)
 
 	days := 366 if is_leap else 365
@@ -154,7 +168,7 @@ year_range :: proc (year: int, allocator := context.allocator) -> (range: []Date
 	i := 0
 	for month in 1..=len(month_days) {
 		for day in 1..=month_days[month] {
-			range[i] = Date{year, month, day}
+			range[i], _ = components_to_date(year, month, day)
 			i += 1
 		}
 	}
@@ -167,7 +181,7 @@ normalize_delta :: proc "contextless" (delta: Delta) -> (normalized: Delta, err:
 
 	// Add original seconds to rolled over seconds.
 	seconds += delta.seconds
-	days: int
+	days: i64
 
 	// Distribute seconds into number of days and remaining seconds.
 	days, seconds = divmod(seconds, 24 * 3600)
@@ -213,7 +227,7 @@ unsafe_date_to_ordinal :: proc "contextless" (date: Date) -> (ordinal: Ordinal) 
 	return
 }
 
-unsafe_ordinal_to_year :: proc "contextless" (ordinal: Ordinal) -> (year: int, day_ordinal: int) {
+unsafe_ordinal_to_year :: proc "contextless" (ordinal: Ordinal) -> (year: i64, day_ordinal: i64) {
 	// Days after epoch
 	d0   := ordinal - EPOCH
 

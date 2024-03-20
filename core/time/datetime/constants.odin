@@ -2,23 +2,14 @@ package datetime
 
 // Ordinal 1 = Midnight Monday, January 1, 1 A.D. (Gregorian)
 //         |   Midnight Monday, January 3, 1 A.D. (Julian)
-Ordinal :: int
+Ordinal :: i64
 EPOCH   :: Ordinal(1)
 
 // Minimum and maximum dates and ordinals. Chosen for safe roundtripping.
-when size_of(int) == 4 {
-	MIN_DATE :: Date{year = -5_879_608, month =  1, day =  1}
-	MAX_DATE :: Date{year =  5_879_608, month = 12, day = 31}
-
-	MIN_ORD  :: Ordinal(-2_147_483_090)
-	MAX_ORD  :: Ordinal( 2_147_482_725)
-} else {
-	MIN_DATE :: Date{year = -25_252_734_927_766_552, month =  1, day =  1}
-	MAX_DATE :: Date{year =  25_252_734_927_766_552, month = 12, day = 31}
-
-	MIN_ORD  :: Ordinal(-9_223_372_036_854_775_234)
-	MAX_ORD  :: Ordinal( 9_223_372_036_854_774_869)
-}
+MIN_DATE :: Date{year = -25_252_734_927_766_552, month =  1, day =  1}
+MAX_DATE :: Date{year =  25_252_734_927_766_552, month = 12, day = 31}
+MIN_ORD  :: Ordinal(-9_223_372_036_854_775_234)
+MAX_ORD  :: Ordinal( 9_223_372_036_854_774_869)
 
 Error :: enum {
 	None,
@@ -34,16 +25,16 @@ Error :: enum {
 }
 
 Date :: struct {
-	year:   int,
-	month:  int,
-	day:    int,
+	year:   i64,
+	month:  i64,
+	day:    i64,
 }
 
 Time :: struct {
-	hour:   int,
-	minute: int,
-	second: int,
-	nano:   int,
+	hour:   i64,
+	minute: i64,
+	second: i64,
+	nano:   i64,
 }
 
 DateTime :: struct {
@@ -52,12 +43,12 @@ DateTime :: struct {
 }
 
 Delta :: struct {
-	days:    int,
-	seconds: int,
-	nanos:   int,
+	days:    i64, // These are all i64 because we can also use it to add a number of seconds or nanos to a moment,
+	seconds: i64, // that are then normalized within their respective ranges.
+	nanos:   i64,
 }
 
-Month :: enum int {
+Month :: enum i8 {
 	January = 1,
 	February,
 	March,
@@ -72,7 +63,7 @@ Month :: enum int {
 	December,
 }
 
-Weekday :: enum int {
+Weekday :: enum i8 {
 	Sunday = 0,
 	Monday,
 	Tuesday,
@@ -83,4 +74,4 @@ Weekday :: enum int {
 }
 
 @(private)
-MONTH_DAYS :: [?]int{-1, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31}
+MONTH_DAYS :: [?]i8{-1, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31}

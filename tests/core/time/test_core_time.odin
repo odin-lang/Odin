@@ -155,7 +155,8 @@ test_component_to_time_roundtrip :: proc(t: ^testing.T) {
 				days += 1
 			}
 			for day in 1..=days {
-				date_component_roundtrip_test(t, {{year, month, day}, {0, 0, 0, 0}})
+				d, _ := dt.components_to_datetime(year, month, day, 0, 0, 0, 0)
+				date_component_roundtrip_test(t, d)
 			}
 		}
 	}
@@ -171,7 +172,7 @@ date_component_roundtrip_test :: proc(t: ^testing.T, moment: dt.DateTime) {
 	expected := fmt.tprintf("Expected %4d-%2d-%2d %2d:%2d:%2d, got %4d-%2d-%2d %2d:%2d:%2d",
 	                        moment.year, moment.month, moment.day, moment.hour, moment.minute, moment.second, YYYY, MM, DD, hh, mm, ss)
 
-	ok =  moment.year == YYYY && moment.month  == int(MM) && moment.day    == DD
-	ok &= moment.hour == hh   && moment.minute == mm      && moment.second == ss
+	ok =  moment.year == i64(YYYY) && moment.month  == i64(MM) && moment.day    == i64(DD)
+	ok &= moment.hour == i64(hh)   && moment.minute == i64(mm) && moment.second == i64(ss)
 	expect(t, ok, expected)
 }

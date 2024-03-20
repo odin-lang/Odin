@@ -357,8 +357,11 @@ _abs_date :: proc "contextless" (abs: u64, full: bool) -> (year: int, month: Mon
 	return
 }
 
-components_to_time :: proc "contextless" (year, month, day, hour, minute, second: int, nsec := int(0)) -> (t: Time, ok: bool) {
-	this_date := dt.DateTime{date={year, month, day}, time={hour, minute, second, nsec}}
+components_to_time :: proc "contextless" (#any_int year, #any_int month, #any_int day, #any_int hour, #any_int minute, #any_int second: i64, #any_int nsec := i64(0)) -> (t: Time, ok: bool) {
+	this_date, err := dt.components_to_datetime(year, month, day, hour, minute, second, nsec)
+	if err != .None {
+		return
+	}
 	return compound_to_time(this_date)
 }
 

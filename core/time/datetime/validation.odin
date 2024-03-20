@@ -1,7 +1,7 @@
 package datetime
 
 // Validation helpers
-is_leap_year :: proc "contextless" (year: int) -> (leap: bool) {
+is_leap_year :: proc "contextless" (#any_int year: i64) -> (leap: bool) {
 	return year % 4 == 0 && (year % 100 != 0 || year % 400 == 0)
 }
 
@@ -9,7 +9,7 @@ validate_date :: proc "contextless" (date: Date) -> (err: Error) {
 	return validate(date.year, date.month, date.day)
 }
 
-validate_year_month_day :: proc "contextless" (year, month, day: int) -> (err: Error) {
+validate_year_month_day :: proc "contextless" (#any_int year, #any_int month, #any_int day: i64) -> (err: Error) {
 	if year < MIN_DATE.year || year > MAX_DATE.year {
 		return .Invalid_Year
 	}
@@ -23,7 +23,7 @@ validate_year_month_day :: proc "contextless" (year, month, day: int) -> (err: E
 		days_this_month = 29
 	}
 
-	if day < 1 || day > days_this_month {
+	if day < 1 || day > i64(days_this_month) {
 		return .Invalid_Day
 	}
 	return .None
