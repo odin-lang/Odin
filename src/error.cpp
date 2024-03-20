@@ -670,6 +670,7 @@ gb_internal void print_all_errors(void) {
 					escape_char(f, file.text[k]);
 				}
 				gb_fprintf(f, "\",\n");
+				gb_fprintf(f, "\t\t\t\t\"offset\": %d,\n", ev.pos.offset);
 				gb_fprintf(f, "\t\t\t\t\"line\": %d,\n", ev.pos.line);
 				gb_fprintf(f, "\t\t\t\t\"column\": %d,\n", ev.pos.column);
 				i32 end_column = gb_max(ev.end.column, ev.pos.column);
