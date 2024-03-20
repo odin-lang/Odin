@@ -1476,6 +1476,7 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 			bc->link_flags = str_lit("/machine:x64 ");
 			break;
 		case TargetOs_darwin:
+			bc->link_flags = str_lit("-arch x86_64 ");
 			break;
 		case TargetOs_linux:
 			bc->link_flags = str_lit("-arch x86-64 ");
