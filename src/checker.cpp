@@ -6320,6 +6320,8 @@ gb_internal void check_parsed_files(Checker *c) {
 
 			error(token, "Undefined entry point procedure 'main'");
 		}
+	} else if (build_context.build_mode == BuildMode_DynamicLibrary && build_context.no_entry_point) {
+		c->info.entry_point = nullptr;
 	}
 
 	thread_pool_wait();
