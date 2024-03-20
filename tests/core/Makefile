@@ -24,7 +24,8 @@ all: c_libc_test \
 	 slice_test \
 	 strings_test \
 	 thread_test \
-	 runtime_test
+	 runtime_test \
+	 time_test
 
 download_test_assets:
 	$(PYTHON) download_assets.py
@@ -94,3 +95,6 @@ thread_test:
 
 runtime_test:
 	$(ODIN) run runtime $(COMMON) -out:test_core_runtime
+
+time_test:
+	$(ODIN) run time $(COMMON) -out:test_core_time

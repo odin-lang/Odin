@@ -117,6 +117,7 @@ import table            "core:text/table"
 import edit             "core:text/edit"
 import thread           "core:thread"
 import time             "core:time"
+import datetime         "core:time/datetime"
 
 import sysinfo          "core:sys/info"
 
@@ -225,6 +226,7 @@ _ :: table
 _ :: edit
 _ :: thread
 _ :: time
+_ :: datetime
 _ :: sysinfo
 _ :: unicode
 _ :: utf8
