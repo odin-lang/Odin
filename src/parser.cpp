@@ -5440,14 +5440,27 @@ gb_internal AstPackage *try_add_import_path(Parser *p, String path, String const
 		return nullptr;
 	}
 
+	isize files_with_ext = 0;
 	isize files_to_reserve = 1; // always reserve 1
 	for (FileInfo fi : list) {
 		String name = fi.name;
 		String ext = path_extension(name);
+		if (ext == FILE_EXT) {
+			files_with_ext += 1;
+		}
 		if (ext == FILE_EXT && !is_excluded_target_filename(name)) {
 			files_to_reserve += 1;
 		}
 	}
+	if (files_with_ext == 0 || files_to_reserve == 1) {
+		if (files_to_reserve == 1) {
+			syntax_error(pos, "Directory contains no .odin files for the specified platform: %.*s", LIT(rel_path));
+		} else {
+			syntax_error(pos, "Empty directory that contains no .odin files: %.*s", LIT(rel_path));
+		}
+		return nullptr;
+	}
+
 
 	array_reserve(&pkg->files, files_to_reserve);
 	for (FileInfo fi : list) {
