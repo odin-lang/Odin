@@ -5863,7 +5863,8 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 		}
 	}
 
-	auto eval_param_and_score = [](CheckerContext *c, Operand *o, Type *param_type, CallArgumentError &err, bool param_is_variadic, Entity *e, bool show_error, bool allow_array_programming) -> i64 {
+	auto eval_param_and_score = [](CheckerContext *c, Operand *o, Type *param_type, CallArgumentError &err, bool param_is_variadic, Entity *e, bool show_error) -> i64 {
+		bool allow_array_programming = !(e && (e->flags & EntityFlag_NoBroadcast));
 		i64 s = 0;
 		if (!check_is_assignable_to_with_score(c, o, param_type, &s, param_is_variadic, allow_array_programming)) {
 			bool ok = false;
@@ -5977,8 +5978,7 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 			if (param_is_variadic) {
 				continue;
 			}
-			bool allow_array_programming = !(e && (e->flags & EntityFlag_NoBroadcast));
-			score += eval_param_and_score(c, o, e->type, err, param_is_variadic, e, show_error, allow_array_programming);
+			score += eval_param_and_score(c, o, e->type, err, false, e, show_error);
 		}
 	}
 
@@ -6010,8 +6010,7 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 					return CallArgumentError_MultipleVariadicExpand;
 				}
 			}
-			bool allow_array_programming = !(var_entity && (var_entity->flags & EntityFlag_NoBroadcast));
-			score += eval_param_and_score(c, o, t, err, true, nullptr, show_error, allow_array_programming);
+			score += eval_param_and_score(c, o, t, err, true, var_entity, show_error);
 		}
 	}
 
