@@ -102,13 +102,15 @@ Entity_Flag :: enum u32le {
 	Foreign = 0,
 	Export  = 1,
 
-	Param_Using     = 2, // using
-	Param_Const     = 3, // #const
-	Param_Auto_Cast = 4, // auto_cast
-	Param_Ellipsis  = 5, // Variadic parameter
-	Param_CVararg   = 6, // #c_vararg
-	Param_No_Alias  = 7, // #no_alias
-	Param_Any_Int   = 8, // #any_int
+	Param_Using        = 2, // using
+	Param_Const        = 3, // #const
+	Param_Auto_Cast    = 4, // auto_cast
+	Param_Ellipsis     = 5, // Variadic parameter
+	Param_CVararg      = 6, // #c_vararg
+	Param_No_Alias     = 7, // #no_alias
+	Param_Any_Int      = 8, // #any_int
+	Param_By_Ptr       = 9, // #by_ptr
+	Param_No_Broadcast = 10, // #no_broadcast
 
 	Bit_Field_Field = 19,
 

@@ -15,7 +15,7 @@ struct OdinDocVersionType {
 
 #define OdinDocVersionType_Major 0
 #define OdinDocVersionType_Minor 3
-#define OdinDocVersionType_Patch 0
+#define OdinDocVersionType_Patch 1
 
 struct OdinDocHeaderBase {
 	u8                 magic[8];
@@ -163,13 +163,15 @@ enum OdinDocEntityFlag : u64 {
 	OdinDocEntityFlag_Foreign = 1ull<<0,
 	OdinDocEntityFlag_Export  = 1ull<<1,
 
-	OdinDocEntityFlag_Param_Using    = 1ull<<2,
-	OdinDocEntityFlag_Param_Const    = 1ull<<3,
-	OdinDocEntityFlag_Param_AutoCast = 1ull<<4,
-	OdinDocEntityFlag_Param_Ellipsis = 1ull<<5,
-	OdinDocEntityFlag_Param_CVararg  = 1ull<<6,
-	OdinDocEntityFlag_Param_NoAlias  = 1ull<<7,
-	OdinDocEntityFlag_Param_AnyInt   = 1ull<<8,
+	OdinDocEntityFlag_Param_Using       = 1ull<<2,
+	OdinDocEntityFlag_Param_Const       = 1ull<<3,
+	OdinDocEntityFlag_Param_AutoCast    = 1ull<<4,
+	OdinDocEntityFlag_Param_Ellipsis    = 1ull<<5,
+	OdinDocEntityFlag_Param_CVararg     = 1ull<<6,
+	OdinDocEntityFlag_Param_NoAlias     = 1ull<<7,
+	OdinDocEntityFlag_Param_AnyInt      = 1ull<<8,
+	OdinDocEntityFlag_Param_ByPtr       = 1ull<<9,
+	OdinDocEntityFlag_Param_NoBroadcast = 1ull<<10,
 
 	OdinDocEntityFlag_BitField_Field = 1ull<<19,
 
