@@ -486,7 +486,7 @@ gb_global TargetMetrics target_linux_i386 = {
 gb_global TargetMetrics target_linux_amd64 = {
 	TargetOs_linux,
 	TargetArch_amd64,
-	8, 8, 8, 16,
+	8, 8, 16, 16,
 	str_lit("x86_64-pc-linux-gnu"),
 	str_lit("e-m:w-i64:64-f80:128-n8:16:32:64-S128"),
 };
@@ -1479,7 +1479,7 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 			bc->link_flags = str_lit("-arch x86_64 ");
 			break;
 		case TargetOs_linux:
-			bc->link_flags = str_lit("-arch x86-64 ");
+			bc->link_flags = str_lit("-march=x86-64 ");
 			break;
 		case TargetOs_freebsd:
 			bc->link_flags = str_lit("-arch x86-64 ");
@@ -1501,7 +1501,7 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 			gb_exit(1);
 			break;
 		case TargetOs_linux:
-			bc->link_flags = str_lit("-arch x86 ");
+			bc->link_flags = str_lit("-march=x86 ");
 			break;
 		case TargetOs_freebsd:
 			bc->link_flags = str_lit("-arch x86 ");
@@ -1510,7 +1510,7 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 	} else if (bc->metrics.arch == TargetArch_arm32) {
 		switch (bc->metrics.os) {
 		case TargetOs_linux:
-			bc->link_flags = str_lit("-arch arm ");
+			bc->link_flags = str_lit("-march=arm ");
 			break;
 		default:
 			gb_printf_err("Compiler Error: Unsupported architecture\n");
@@ -1522,7 +1522,7 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 			bc->link_flags = str_lit("-arch arm64 ");
 			break;
 		case TargetOs_linux:
-			bc->link_flags = str_lit("-arch aarch64 ");
+			bc->link_flags = str_lit("-march=aarch64 ");
 			break;
 		}
 	} else if (is_arch_wasm()) {
