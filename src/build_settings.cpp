@@ -949,7 +949,7 @@ gb_global TargetMetrics target_linux_i386 = {
 gb_global TargetMetrics target_linux_amd64 = {
 	TargetOs_linux,
 	TargetArch_amd64,
-	8, 8, 8, 16,
+	8, 8, 16, 16,
 	str_lit("x86_64-pc-linux-gnu"),
 	str_lit("e-m:w-i64:64-f80:128-n8:16:32:64-S128"),
 };
