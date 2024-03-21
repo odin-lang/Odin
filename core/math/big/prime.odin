@@ -1112,7 +1112,7 @@ internal_int_prime_next_prime :: proc(a: ^Int, trials: int, bbs_style: bool, all
 		Generate the restable.
 	*/
 	for x := 1; x < _PRIME_TAB_SIZE; x += 1 {
-		res_tab = internal_mod(a, _private_prime_table[x]) or_return
+		res_tab = cast(type_of(res_tab))(internal_mod(a, _private_prime_table[x]) or_return)
 	}
 
 	for {

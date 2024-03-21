@@ -3898,14 +3898,15 @@ struct ParseFieldPrefixMapping {
 	FieldFlag       flag;
 };
 
-gb_global ParseFieldPrefixMapping parse_field_prefix_mappings[] = {
-	{str_lit("using"),      Token_using,     FieldFlag_using},
-	{str_lit("no_alias"),   Token_Hash,      FieldFlag_no_alias},
-	{str_lit("c_vararg"),   Token_Hash,      FieldFlag_c_vararg},
-	{str_lit("const"),      Token_Hash,      FieldFlag_const},
-	{str_lit("any_int"),    Token_Hash,      FieldFlag_any_int},
-	{str_lit("subtype"),    Token_Hash,      FieldFlag_subtype},
-	{str_lit("by_ptr"),     Token_Hash,      FieldFlag_by_ptr},
+gb_global ParseFieldPrefixMapping const parse_field_prefix_mappings[] = {
+	{str_lit("using"),        Token_using,     FieldFlag_using},
+	{str_lit("no_alias"),     Token_Hash,      FieldFlag_no_alias},
+	{str_lit("c_vararg"),     Token_Hash,      FieldFlag_c_vararg},
+	{str_lit("const"),        Token_Hash,      FieldFlag_const},
+	{str_lit("any_int"),      Token_Hash,      FieldFlag_any_int},
+	{str_lit("subtype"),      Token_Hash,      FieldFlag_subtype},
+	{str_lit("by_ptr"),       Token_Hash,      FieldFlag_by_ptr},
+	{str_lit("no_broadcast"), Token_Hash,      FieldFlag_no_broadcast},
 };
 
 

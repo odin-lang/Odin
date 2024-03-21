@@ -159,7 +159,7 @@ Vector2Transform :: proc "c" (v: Vector2, m: Matrix) -> Vector2 {
 // Calculate linear interpolation between two vectors
 @(require_results, deprecated="Prefer = linalg.lerp(v1, v2, amount)")
 Vector2Lerp :: proc "c" (v1, v2: Vector2, amount: f32) -> Vector2 {
-	return linalg.lerp(v1, v2, amount)
+	return linalg.lerp(v1, v2, Vector2(amount))
 }
 // Calculate reflected vector to normal
 @(require_results, deprecated="Prefer = linalg.reflect(v, normal)")
@@ -405,7 +405,7 @@ Vector3Transform :: proc "c" (v: Vector3, m: Matrix) -> Vector3 {
 // Calculate linear interpolation between two vectors
 @(require_results, deprecated="Prefer = linalg.lerp(v1, v2, amount)")
 Vector3Lerp :: proc "c" (v1, v2: Vector3, amount: f32) -> Vector3 {
-	return linalg.lerp(v1, v2, amount)
+	return linalg.lerp(v1, v2, Vector3(amount))
 }
 // Calculate reflected vector to normal
 @(require_results, deprecated="Prefer = linalg.reflect(v, normal)")

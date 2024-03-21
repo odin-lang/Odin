@@ -597,6 +597,7 @@ Field_Flag :: enum {
 	Any_Int,
 	Subtype,
 	By_Ptr,
+	No_Broadcast,
 
 	Results,
 	Tags,
@@ -616,6 +617,7 @@ field_flag_strings := [Field_Flag]string{
 	.Any_Int            = "#any_int",
 	.Subtype            = "#subtype",
 	.By_Ptr             = "#by_ptr",
+	.No_Broadcast       ="#no_broadcast",
 
 	.Results            = "results",
 	.Tags               = "field tag",
@@ -624,12 +626,13 @@ field_flag_strings := [Field_Flag]string{
 }
 
 field_hash_flag_strings := []struct{key: string, flag: Field_Flag}{
-	{"no_alias", .No_Alias},
-	{"c_vararg", .C_Vararg},
-	{"const",    .Const},
-	{"any_int",  .Any_Int},
-	{"subtype",  .Subtype},
-	{"by_ptr",   .By_Ptr},
+	{"no_alias",     .No_Alias},
+	{"c_vararg",     .C_Vararg},
+	{"const",        .Const},
+	{"any_int",      .Any_Int},
+	{"subtype",      .Subtype},
+	{"by_ptr",       .By_Ptr},
+	{"no_broadcast", .No_Broadcast},
 }
 
 
@@ -650,6 +653,7 @@ Field_Flags_Signature :: Field_Flags{
 	.Const,
 	.Any_Int,
 	.By_Ptr,
+	.No_Broadcast,
 	.Default_Parameters,
 }
 

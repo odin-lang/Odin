@@ -61,6 +61,7 @@ enum EntityFlag : u64 {
 
 	EntityFlag_CVarArg       = 1ull<<22,
 
+	EntityFlag_NoBroadcast   = 1ull<<23,
 	EntityFlag_AnyInt        = 1ull<<24,
 
 	EntityFlag_Disabled      = 1ull<<25,

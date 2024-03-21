@@ -1869,6 +1869,10 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 					error(name, "'#any_int' can only be applied to variable fields");
 					p->flags &= ~FieldFlag_any_int;
 				}
+				if (p->flags&FieldFlag_no_broadcast) {
+					error(name, "'#no_broadcast' can only be applied to variable fields");
+					p->flags &= ~FieldFlag_no_broadcast;
+				}
 				if (p->flags&FieldFlag_by_ptr) {
 					error(name, "'#by_ptr' can only be applied to variable fields");
 					p->flags &= ~FieldFlag_by_ptr;
@@ -1926,7 +1930,13 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 							}
 						}
 					}
-					if (type != t_invalid && !check_is_assignable_to(ctx, &op, type)) {
+
+					bool allow_array_programming = true;
+					if (p->flags&FieldFlag_no_broadcast) {
+						allow_array_programming = false;
+					}
+
+					if (type != t_invalid && !check_is_assignable_to(ctx, &op, type, allow_array_programming)) {
 						bool ok = true;
 						if (p->flags&FieldFlag_any_int) {
 							if ((!is_type_integer(op.type) && !is_type_enum(op.type)) || (!is_type_integer(type) && !is_type_enum(type))) {
@@ -2002,6 +2012,10 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 			if (p->flags&FieldFlag_no_alias) {
 				param->flags |= EntityFlag_NoAlias;
 			}
+			if (p->flags&FieldFlag_no_broadcast) {
+				param->flags |= EntityFlag_NoBroadcast;
+			}
+
 			if (p->flags&FieldFlag_any_int) {
 				if (!is_type_integer(param->type) && !is_type_enum(param->type)) {
 					gbString str = type_to_string(param->type);

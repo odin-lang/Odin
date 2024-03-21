@@ -623,7 +623,7 @@ gb_internal bool check_cast_internal(CheckerContext *c, Operand *x, Type *type);
 
 #define MAXIMUM_TYPE_DISTANCE 10
 
-gb_internal i64 check_distance_between_types(CheckerContext *c, Operand *operand, Type *type) {
+gb_internal i64 check_distance_between_types(CheckerContext *c, Operand *operand, Type *type, bool allow_array_programming) {
 	if (c == nullptr) {
 		GB_ASSERT(operand->mode == Addressing_Value);
 		GB_ASSERT(is_type_typed(operand->type));
@@ -832,7 +832,7 @@ gb_internal i64 check_distance_between_types(CheckerContext *c, Operand *operand
 
 		if (dst->Union.variants.count == 1) {
 			Type *vt = dst->Union.variants[0];
-			i64 score = check_distance_between_types(c, operand, vt);
+			i64 score = check_distance_between_types(c, operand, vt, allow_array_programming);
 			if (score >= 0) {
 				return score+2;
 			}
@@ -840,7 +840,7 @@ gb_internal i64 check_distance_between_types(CheckerContext *c, Operand *operand
 			i64 prev_lowest_score = -1;
 			i64 lowest_score = -1;
 			for (Type *vt : dst->Union.variants) {
-				i64 score = check_distance_between_types(c, operand, vt);
+				i64 score = check_distance_between_types(c, operand, vt, allow_array_programming);
 				if (score >= 0) {
 					if (lowest_score < 0) {
 						lowest_score = score;
@@ -863,14 +863,14 @@ gb_internal i64 check_distance_between_types(CheckerContext *c, Operand *operand
 	}
 
 	if (is_type_relative_pointer(dst)) {
-		i64 score = check_distance_between_types(c, operand, dst->RelativePointer.pointer_type);
+		i64 score = check_distance_between_types(c, operand, dst->RelativePointer.pointer_type, allow_array_programming);
 		if (score >= 0) {
 			return score+2;
 		}
 	}
 
 	if (is_type_relative_multi_pointer(dst)) {
-		i64 score = check_distance_between_types(c, operand, dst->RelativeMultiPointer.pointer_type);
+		i64 score = check_distance_between_types(c, operand, dst->RelativeMultiPointer.pointer_type, allow_array_programming);
 		if (score >= 0) {
 			return score+2;
 		}
@@ -896,19 +896,21 @@ gb_internal i64 check_distance_between_types(CheckerContext *c, Operand *operand
 		}
 	}
 
-	if (is_type_array(dst)) {
-		Type *elem = base_array_type(dst);
-		i64 distance = check_distance_between_types(c, operand, elem);
-		if (distance >= 0) {
-			return distance + 6;
+	if (allow_array_programming) {
+		if (is_type_array(dst)) {
+			Type *elem = base_array_type(dst);
+			i64 distance = check_distance_between_types(c, operand, elem, allow_array_programming);
+			if (distance >= 0) {
+				return distance + 6;
+			}
 		}
-	}
 
-	if (is_type_simd_vector(dst)) {
-		Type *dst_elem = base_array_type(dst);
-		i64 distance = check_distance_between_types(c, operand, dst_elem);
-		if (distance >= 0) {
-			return distance + 6;
+		if (is_type_simd_vector(dst)) {
+			Type *dst_elem = base_array_type(dst);
+			i64 distance = check_distance_between_types(c, operand, dst_elem, allow_array_programming);
+			if (distance >= 0) {
+				return distance + 6;
+			}
 		}
 	}
 	
@@ -918,7 +920,7 @@ gb_internal i64 check_distance_between_types(CheckerContext *c, Operand *operand
 		}
 		if (dst->Matrix.row_count == dst->Matrix.column_count) {
 			Type *dst_elem = base_array_type(dst);
-			i64 distance = check_distance_between_types(c, operand, dst_elem);
+			i64 distance = check_distance_between_types(c, operand, dst_elem, allow_array_programming);
 			if (distance >= 0) {
 				return distance + 7;
 			}
@@ -966,9 +968,9 @@ gb_internal i64 assign_score_function(i64 distance, bool is_variadic=false) {
 }
 
 
-gb_internal bool check_is_assignable_to_with_score(CheckerContext *c, Operand *operand, Type *type, i64 *score_, bool is_variadic=false) {
+gb_internal bool check_is_assignable_to_with_score(CheckerContext *c, Operand *operand, Type *type, i64 *score_, bool is_variadic=false, bool allow_array_programming=true) {
 	i64 score = 0;
-	i64 distance = check_distance_between_types(c, operand, type);
+	i64 distance = check_distance_between_types(c, operand, type, allow_array_programming);
 	bool ok = distance >= 0;
 	if (ok) {
 		score = assign_score_function(distance, is_variadic);
@@ -978,9 +980,9 @@ gb_internal bool check_is_assignable_to_with_score(CheckerContext *c, Operand *o
 }
 
 
-gb_internal bool check_is_assignable_to(CheckerContext *c, Operand *operand, Type *type) {
+gb_internal bool check_is_assignable_to(CheckerContext *c, Operand *operand, Type *type, bool allow_array_programming=true) {
 	i64 score = 0;
-	return check_is_assignable_to_with_score(c, operand, type, &score);
+	return check_is_assignable_to_with_score(c, operand, type, &score, /*is_variadic*/false, allow_array_programming);
 }
 
 gb_internal bool internal_check_is_assignable_to(Type *src, Type *dst) {
@@ -3140,6 +3142,14 @@ gb_internal bool check_is_castable_to(CheckerContext *c, Operand *operand, Type 
 	// rawptr -> proc
 	if (is_type_rawptr(src) && is_type_proc(dst)) {
 		return true;
+	}
+
+
+	if (is_type_array(dst)) {
+		Type *elem = base_array_type(dst);
+		if (check_is_castable_to(c, operand, elem)) {
+			return true;
+		}
 	}
 
 	if (is_type_simd_vector(src) && is_type_simd_vector(dst)) {
@@ -5853,13 +5863,18 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 		}
 	}
 
-	auto eval_param_and_score = [](CheckerContext *c, Operand *o, Type *param_type, CallArgumentError &err, bool param_is_variadic, Entity *e, bool show_error) -> i64 {
+	auto eval_param_and_score = [](CheckerContext *c, Operand *o, Type *param_type, CallArgumentError &err, bool param_is_variadic, Entity *e, bool show_error, bool allow_array_programming) -> i64 {
 		i64 s = 0;
-		if (!check_is_assignable_to_with_score(c, o, param_type, &s, param_is_variadic)) {
+		if (!check_is_assignable_to_with_score(c, o, param_type, &s, param_is_variadic, allow_array_programming)) {
 			bool ok = false;
-			if (e && e->flags & EntityFlag_AnyInt) {
+			if (e && (e->flags & EntityFlag_AnyInt)) {
 				if (is_type_integer(param_type)) {
 					ok = check_is_castable_to(c, o, param_type);
+				}
+			}
+			if (!allow_array_programming && check_is_assignable_to_with_score(c, o, param_type, nullptr, param_is_variadic, !allow_array_programming)) {
+				if (show_error) {
+					error(o->expr, "'#no_broadcast' disallows automatic broadcasting a value across all elements of an array-like type in a procedure argument");
 				}
 			}
 			if (ok) {
@@ -5878,7 +5893,6 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 				}
 				err = CallArgumentError_WrongTypes;
 			}
-
 		} else if (show_error) {
 			check_assignment(c, o, param_type, str_lit("procedure argument"));
 		}
@@ -5963,12 +5977,14 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 			if (param_is_variadic) {
 				continue;
 			}
-			score += eval_param_and_score(c, o, e->type, err, param_is_variadic, e, show_error);
+			bool allow_array_programming = !(e && (e->flags & EntityFlag_NoBroadcast));
+			score += eval_param_and_score(c, o, e->type, err, param_is_variadic, e, show_error, allow_array_programming);
 		}
 	}
 
 	if (variadic) {
-		Type *slice = pt->params->Tuple.variables[pt->variadic_index]->type;
+		Entity *var_entity = pt->params->Tuple.variables[pt->variadic_index];
+		Type *slice = var_entity->type;
 		GB_ASSERT(is_type_slice(slice));
 		Type *elem = base_type(slice)->Slice.elem;
 		Type *t = elem;
@@ -5994,7 +6010,8 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 					return CallArgumentError_MultipleVariadicExpand;
 				}
 			}
-			score += eval_param_and_score(c, o, t, err, true, nullptr, show_error);
+			bool allow_array_programming = !(var_entity && (var_entity->flags & EntityFlag_NoBroadcast));
+			score += eval_param_and_score(c, o, t, err, true, nullptr, show_error, allow_array_programming);
 		}
 	}
 
@@ -11147,6 +11164,9 @@ gb_internal gbString write_expr_to_string(gbString str, Ast *node, bool shorthan
 		}
 		if (f->flags&FieldFlag_any_int) {
 			str = gb_string_appendc(str, "#any_int ");
+		}
+		if (f->flags&FieldFlag_no_broadcast) {
+			str = gb_string_appendc(str, "#no_broadcast ");
 		}
 		if (f->flags&FieldFlag_const) {
 			str = gb_string_appendc(str, "#const ");
