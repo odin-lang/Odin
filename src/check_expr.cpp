@@ -1599,7 +1599,7 @@ gb_internal Entity *check_ident(CheckerContext *c, Operand *o, Ast *n, Type *nam
 
 			for (CIdentSuggestion const &suggestion : c_ident_suggestions) {
 				if (name == suggestion.name) {
-					error_line("\tSuggestion: Did you mean %s\n", LIT(suggestion.msg));
+					error_line("\tSuggestion: Did you mean %.*s\n", LIT(suggestion.msg));
 				}
 			}
 		}
