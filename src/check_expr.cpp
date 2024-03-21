@@ -6138,7 +6138,10 @@ gb_internal bool evaluate_where_clauses(CheckerContext *ctx, Ast *call_expr, Sco
 						}
 					}
 
-					if (call_expr) error(call_expr, "at caller location");
+					if (call_expr) {
+						TokenPos pos = ast_token(call_expr).pos;
+						error_line("%s at caller location\n", token_pos_to_string(pos));
+					}
 				}
 				return false;
 			}
