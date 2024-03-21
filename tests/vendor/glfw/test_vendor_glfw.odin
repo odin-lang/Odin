@@ -6,8 +6,8 @@ import "vendor:glfw"
 import "core:os"
 
 GLFW_MAJOR :: 3
-GLFW_MINOR :: 3
-GLFW_PATCH :: 4
+GLFW_MINOR :: 4
+GLFW_PATCH :: 0
 
 TEST_count := 0
 TEST_fail  := 0

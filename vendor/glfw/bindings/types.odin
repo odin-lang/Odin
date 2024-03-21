@@ -30,6 +30,13 @@ GamepadState :: struct {
 	axes:    [6]f32,
 }
 
+Allocator :: struct {
+	allocate:   AllocateProc,
+	reallocate: ReallocateProc,
+	deallocate: DeallocateProc,
+	user:       rawptr,
+}
+
 /*** Procedure type declarations ***/
 WindowIconifyProc      :: #type proc "c" (window: WindowHandle, iconified: c.int)
 WindowRefreshProc      :: #type proc "c" (window: WindowHandle)
@@ -53,3 +60,7 @@ CursorEnterProc        :: #type proc "c" (window: WindowHandle, entered: c.int)
 JoystickProc           :: #type proc "c" (joy, event: c.int)
 
 ErrorProc              :: #type proc "c" (error: c.int, description: cstring)
+
+AllocateProc           :: #type proc "c" (size: c.size_t, user: rawptr) -> rawptr
+ReallocateProc         :: #type proc "c" (block: rawptr, size: c.size_t, user: rawptr) -> rawptr
+DeallocateProc         :: #type proc "c" (block: rawptr, user: rawptr)
