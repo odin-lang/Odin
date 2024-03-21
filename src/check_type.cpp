@@ -2396,6 +2396,8 @@ gb_internal i64 check_array_count(CheckerContext *ctx, Operand *o, Ast *e) {
 				return 0;
 			}
 
+			ERROR_BLOCK();
+
 			gbString s = expr_to_string(o->expr);
 			error(e, "Array count must be a constant integer, got %s", s);
 			gb_string_free(s);
@@ -2878,6 +2880,8 @@ gb_internal void check_array_type_internal(CheckerContext *ctx, Ast *e, Type **t
 			}
 
 			if (!is_sparse && t->EnumeratedArray.count > bt->Enum.fields.count) {
+				ERROR_BLOCK();
+
 				error(e, "Non-contiguous enumeration used as an index in an enumerated array");
 				long long ea_count   = cast(long long)t->EnumeratedArray.count;
 				long long enum_count = cast(long long)bt->Enum.fields.count;
