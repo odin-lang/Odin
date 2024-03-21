@@ -8,6 +8,10 @@ Terminate :: glfw.Terminate
 
 InitHint  :: glfw.InitHint
 
+InitAllocator :: glfw.InitAllocator
+
+InitVulkanLoader :: glfw.InitVulkanLoader
+
 GetVersion :: proc "c" () -> (major, minor, rev: c.int) {
 	glfw.GetVersion(&major, &minor, &rev)
 	return
@@ -121,6 +125,7 @@ GetKeyName :: proc "c" (key, scancode: c.int) -> string {
 	return string(glfw.GetKeyName(key, scancode))
 }
 SetWindowShouldClose :: glfw.SetWindowShouldClose
+GetWindowTitle       :: glfw.GetWindowTitle
 JoystickPresent      :: glfw.JoystickPresent
 GetJoystickName :: proc "c" (joy: c.int) -> string {
 	return string(glfw.GetJoystickName(joy))
@@ -237,6 +242,8 @@ SetJoystickCallback    :: glfw.SetJoystickCallback
 
 SetErrorCallback :: glfw.SetErrorCallback
 
+GetPlatform       :: glfw.GetPlatform
+PlatformSupported :: glfw.PlatformSupported
 
 // Used by vendor:OpenGL
 gl_set_proc_address :: proc(p: rawptr, name: cstring) {
