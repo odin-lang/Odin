@@ -1546,10 +1546,13 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 			}
 		} else if (operand.mode != Addressing_Invalid) {
 			if (operand.mode == Addressing_OptionalOk || operand.mode == Addressing_OptionalOkPtr) {
-				Type *end_type = nullptr;
-				check_promote_optional_ok(ctx, &operand, nullptr, &end_type, false);
-				if (is_type_boolean(end_type)) {
-					check_promote_optional_ok(ctx, &operand, nullptr, &end_type, true);
+				Ast *expr = unparen_expr(operand.expr);
+				if (expr->kind != Ast_TypeAssertion) { // Only for procedure calls
+					Type *end_type = nullptr;
+					check_promote_optional_ok(ctx, &operand, nullptr, &end_type, false);
+					if (is_type_boolean(end_type)) {
+						check_promote_optional_ok(ctx, &operand, nullptr, &end_type, true);
+					}
 				}
 			}
 			bool is_ptr = is_type_pointer(operand.type);
