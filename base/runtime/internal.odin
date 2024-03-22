@@ -962,9 +962,11 @@ udivmodti4 :: proc "c" (a, b: u128, rem: ^u128) -> u128 {
 	return udivmod128(a, b, rem)
 }
 
-@(link_name="__udivti3", linkage=RUNTIME_LINKAGE, require=RUNTIME_REQUIRE)
-udivti3 :: proc "c" (a, b: u128) -> u128 {
-	return udivmodti4(a, b, nil)
+when !IS_WASM {
+	@(link_name="__udivti3", linkage=RUNTIME_LINKAGE, require=RUNTIME_REQUIRE)
+	udivti3 :: proc "c" (a, b: u128) -> u128 {
+		return udivmodti4(a, b, nil)
+	}
 }
 
 
