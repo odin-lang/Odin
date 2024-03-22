@@ -1,11 +1,11 @@
 package process
 
 import "core:time"
-import "core:io"
+import "core:os"
 
 TIMEOUT_INFINITE :: time.MAX_DURATION
 
-Error :: enum {
+Open_Error :: enum {
 	None,
 	Not_Found,
 	Not_Executable,
@@ -14,9 +14,64 @@ Error :: enum {
 
 /*
 	Process handle.
+
+	Changing any of the values in this struct will not affect the running
+	process.
 */
 Process :: struct {
 	_os_handle: u64,
+	stdout: os.Handle,
+	stderr: os.Handle,
+	stdin:  os.Handle,
+}
+
+/*
+	Type for values describing how a given stream of the child process shall
+	be mapped.
+
+	* `None`: The stream will be bound to an equivalent of /dev/null.
+	* `Pipe`: A pipe will be created for that stream, which one can obtain later
+		and use it to pipe the output to a different process or file.
+	* `Stdout`: Special value available for `stderr` stream: binds it with
+		stdout.
+	
+	Additionally in the Process_Desc struct, aside from stream bindings from
+	this enum, the corresponding streams accept os.Handle directly, in order
+	to support piping from one command to another.
+*/
+Stream_Binding :: enum {
+	None,
+	Pipe,
+	Stdout,
+}
+
+/*
+	Description of how the process shall be created.
+*/
+Process_Desc :: struct {
+	// Specifies either an argv array or a command to be run in a default shell
+	// for the current OS.
+	// In case the command is specified as `[]string`,
+	// each element of the slice refers to an element of the resulting argv
+	// array, and the first element specifies the executable to run.
+	// The first element of the slice will be searched in the current working
+	// directory and any of the paths specified by $PATH variable according to
+	// the environment of the parent process. On windows the paths having
+	// .exe or .bat suffix will be searched for as well.
+	// In case the command is specified as `string`, the whole string will be
+	// passed as a single argument into shell (`/bin/sh -c` on linux and
+	// `cmd.exe /C` on windows).
+	command: union { string, []string },
+	// Specifies the environment to run the process at.
+	// Each element of the slice specifies a string of the form `KEY=VALUE`.
+	// If the duplicate entries are found within the slce, the last one is taken.
+	environment: []string,
+	// Specifies the binding for te stdout stream. See `Stream_Binding`.
+	stdout: union { os.Handle, Stream_Binding },
+	// Specifies the binding for te stderr stream. See `Stream_Binding`.
+	stderr: union { os.Handle, Stream_Binding },
+	// Specifies the binding for te stdin stream. See `Stream_Binding`.
+	stdin: union { os.Handle, Stream_Binding },
 }
 
 /*
@@ -46,27 +101,17 @@ Stream_Selector :: enum {
 /*
 	Creates a process handle.
 
-	This procedure opens a process handle given an executable specified by
-	the `path` argument. The process referred by the handle is created in
+	This procedure opens a process handle given a description of the process
+	specified by the `desc` argument.
+	
+	The process referred by the handle is created in
 	**suspended** mode. To run the suspended process call the `start()`
 	procedure.
-
-	This function emulates the behavior of the shell for relative paths. First
-	it will look whether the path relative to the current working directory
-	exists, then, if the path didn't exist, it will check each path in the
-	$PATH environment variable. In case the process wasn't found, the .Not_Found
-	error is returned.
 
 	If `bind_streams` is set, the streams (stdout, stderr, stdin) of the created
 	process are bound to the streams of the current process.
 */
-open :: proc(
-	path: string,
-	argv: []string,
-	envp: []string,
-	bind_streams := false,
-	allocator := context.temp_allocator,
-) -> (Process, Error) {
+open :: proc(desc: Process_Desc, allocator := context.allocator) -> (Process, Open_Error) {
 	return {}, .None
 }
 
@@ -76,22 +121,22 @@ open :: proc(
 	This procedure should be called for any process for which `open()` returned
 	successfully.
 */
-close :: proc(process: Process) {
-
+close :: proc(process: Process) -> (ok: bool) {
+	return false
 }
 
 /*
 	Run a suspended process.
 */
-start :: proc(process: Process) -> (Error) {
-	return .None
+start :: proc(process: Process) -> (ok: bool) {
+	return false
 }
 
 /*
 	Suspend a running process.
 */
-suspend :: proc(process: Process) {
-	
+suspend :: proc(process: Process) -> (ok: bool) {
+	return false
 }
 
 /*
@@ -113,18 +158,4 @@ terminate :: proc(process: Process) -> (ok: bool) {
 */
 wait :: proc(process: Process, timeout: time.Duration) -> (i64, Wait_Status) {
 	return 0, .Timeout
-}
-
-/*
-	Returns process's the stream of a running process.
-
-	- In case Stdin is specified:
-		Returns writeable stream, such that if the data is written to it, the
-		data will be sent to `stdin` stream of the process.
-	- In case stdout or stderr is specified.
-		Returns readable stream, such that if the data is read from the process,
-		it will return the data sent by the process to the corresponding stream.
-*/
-get_stream :: proc(process: Process, $stream: Stream_Selector) -> (io.Stream, bool) {
-	return {}, false
 }
