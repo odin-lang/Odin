@@ -100,7 +100,6 @@ import os               "core:os"
 import slashpath        "core:path/slashpath"
 import filepath         "core:path/filepath"
 
-import process          "core:process"
 import reflect          "core:reflect"
 import runtime          "base:runtime"
 import simd             "core:simd"
@@ -210,7 +209,6 @@ _ :: os
 _ :: spall
 _ :: slashpath
 _ :: filepath
-_ :: process
 _ :: reflect
 _ :: runtime
 _ :: simd
