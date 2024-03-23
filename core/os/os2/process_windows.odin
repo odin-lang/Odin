@@ -131,12 +131,12 @@ _process_open :: proc(desc: Process_Desc) -> (Process, Process_Error) {
 	if stdout_pipe {
 		windows.CloseHandle(stdout_w)
 		stdout_file = new_file(uintptr(stdout_r), "stdout-pipe-ro")
-		stdout_file.impl.kind = .Console
+		stdout_file.impl.kind = .Pipe
 	}
 	if stderr_pipe {
 		windows.CloseHandle(stderr_w)
 		stderr_file = new_file(uintptr(stderr_r), "stderr-pipe-ro")
-		stderr_file.impl.kind = .Console
+		stderr_file.impl.kind = .Pipe
 	}
 	return Process {
 		_os_data = _Process {

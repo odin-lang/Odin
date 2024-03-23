@@ -13,10 +13,6 @@ General_Error :: enum u32 {
 
 	Timeout,
 
-	// Indicates that an attempt to retrieve a file's size was made, but the
-	// file doesn't have a size.
-	No_Size,
-
 	Invalid_File,
 	Invalid_Dir,
 	Invalid_Path,
@@ -61,7 +57,6 @@ error_string :: proc(ferr: Error) -> string {
 		case .Not_Exist:         return "file does not exist"
 		case .Closed:            return "file already closed"
 		case .Timeout:           return "i/o timeout"
-		case .No_Size:           return "file has no definite size"
 		case .Invalid_File:      return "invalid file"
 		case .Invalid_Dir:       return "invalid directory"
 		case .Invalid_Path:      return "invalid path"
@@ -75,6 +70,7 @@ error_string :: proc(ferr: Error) -> string {
 		case .Short_Write:       return "short write"
 		case .Invalid_Write:     return "invalid write result"
 		case .Short_Buffer:      return "short buffer"
+		case .No_Size:           return "file has no definite size"
 		case .No_Progress:       return "multiple read calls return no data or error"
 		case .Invalid_Whence:    return "invalid whence"
 		case .Invalid_Offset:    return "invalid offset"
