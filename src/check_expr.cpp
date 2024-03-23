@@ -1807,9 +1807,11 @@ gb_internal bool check_unary_op(CheckerContext *c, Operand *o, Token op) {
 			if (is_type_pointer(o->type)) {
 				str = expr_to_string(o->expr);
 				error_line("\tSuggestion: Did you mean '%s^'?\n", str);
+				o->type = type_deref(o->type);
 			} else if (is_type_multi_pointer(o->type)) {
 				str = expr_to_string(o->expr);
 				error_line("\tSuggestion: The value is a multi-pointer, did you mean '%s[0]'?\n", str);
+				o->type = type_deref(o->type, true);
 			}
 		}
 		break;
