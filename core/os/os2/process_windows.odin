@@ -16,8 +16,12 @@ _Process :: struct {
 }
 
 _process_open :: proc(desc: Process_Desc) -> (Process, Process_Error) {
+	context.allocator = _temp_allocator()
+	temp := _temp_allocator_temp_begin()
+	defer _temp_allocator_temp_end(temp)
 	app_name: wstring = ---
 	command_line: wstring = ---
+	environment := desc.environment
 	switch command in desc.command {
 	case string:
 		command_line = to_wstring(_build_command_line(
@@ -39,7 +43,7 @@ _process_open :: proc(desc: Process_Desc) -> (Process, Process_Error) {
 		nil,
 		false,
 		windows.CREATE_SUSPENDED,
-		nil,
+		raw_data(_build_environment_block(desc.environment)),
 		nil,
 		&startup_info,
 		&process_info,
@@ -102,6 +106,32 @@ _build_command_line :: proc(command: []string) -> string {
 		}
 		_write_quoted_arg(&builder, arg)
 	}
+	return strings.to_string(builder)
+}
+
+_build_environment_block :: proc(environment: []string) -> string {
+	builder := strings.builder_make()
+	#reverse for kv, cur_idx in environment {
+		eq_idx := strings.index_byte(kv, '=')
+		assert(eq_idx != -1, "Malformed environment string. Expected '=' to separate keys and values")
+		key := kv[:eq_idx]
+		already_handled := false
+		for old_kv in environment[cur_idx+1:] {
+			old_key := old_kv[:strings.index_byte(old_kv, '=')]
+			if key == old_key {
+				already_handled = true
+				break
+			}
+		}
+		if already_handled {
+			continue
+		}
+		strings.write_bytes(&builder, transmute([]byte) kv)
+		strings.write_byte(&builder, 0)
+	}
+	// Note(flysand): Environment block on windows is terminated by two
+	// NUL-terminators: one for the string, and one for the array of strings.
+	strings.write_byte(&builder, 0)
 	return strings.to_string(builder)
 }
 

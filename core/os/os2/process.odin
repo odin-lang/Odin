@@ -143,8 +143,7 @@ Wait_Status :: enum {
 	**suspended** mode. To run the suspended process call the `process_start()`
 	procedure.
 */
-process_open :: proc(desc: Process_Desc, allocator: runtime.Allocator) -> (Process, Process_Error) {
-	context.allocator = allocator
+process_open :: proc(desc: Process_Desc) -> (Process, Process_Error) {
 	return _process_open(desc)
 }
 
