@@ -14,6 +14,7 @@ _Process :: struct {
 	process: windows.HANDLE,
 	thread: windows.HANDLE,
 	stdout_w: windows.HANDLE,
+	stderr_w: windows.HANDLE,
 }
 
 _process_open :: proc(desc: Process_Desc) -> (Process, Process_Error) {
@@ -39,20 +40,62 @@ _process_open :: proc(desc: Process_Desc) -> (Process, Process_Error) {
 		nLength = size_of(windows.SECURITY_ATTRIBUTES),
 		bInheritHandle = true,
 	}
-	stdout_pipe_r := windows.INVALID_HANDLE_VALUE
-	stdout_pipe_w := windows.INVALID_HANDLE_VALUE
-	stdout_pipe_ok := windows.CreatePipe(
-		&stdout_pipe_r,
-		&stdout_pipe_w,
-		&pipe_security_attr,
-		0,
-	)
-	if !stdout_pipe_ok {
-		return {}, .Unspecified_Error
+	stdout_pipe := false
+	stdout_w := windows.INVALID_HANDLE_VALUE
+	stdout_r := windows.INVALID_HANDLE_VALUE
+	switch binding in desc.stdout {
+	case File:
+		stdout_w = windows.HANDLE(binding.impl.fd)
+	case Stream_Binding:
+		switch binding {
+		case .None:
+		case .Pipe:
+			stdout_pipe_ok := windows.CreatePipe(
+				&stdout_r,
+				&stdout_w,
+				&pipe_security_attr,
+				0,
+			)
+			if !stdout_pipe_ok {
+				return {}, .Unspecified_Error
+			}
+			handle_info_ok := windows.SetHandleInformation(stdout_r, windows.HANDLE_FLAG_INHERIT, 0)
+			if !handle_info_ok {
+				return {}, .Unspecified_Error
+			}
+			stdout_pipe = true
+		case .Stdout:
+			panic("Invalid option for stdout stream binding: .Stdout")
+		}
 	}
-	handle_info_ok := windows.SetHandleInformation(stdout_pipe_r, windows.HANDLE_FLAG_INHERIT, 0)
-	if !handle_info_ok {
-		return {}, .Unspecified_Error
+	stderr_pipe := false
+	stderr_w := windows.INVALID_HANDLE_VALUE
+	stderr_r := windows.INVALID_HANDLE_VALUE
+	switch binding in desc.stderr {
+	case File:
+		stderr_w = windows.HANDLE(binding.impl.fd)
+	case Stream_Binding:
+		switch binding {
+		case .None:
+		case .Pipe:
+			stderr_pipe_ok := windows.CreatePipe(
+				&stderr_r,
+				&stderr_w,
+				&pipe_security_attr,
+				0,
+			)
+			if !stderr_pipe_ok {
+				return {}, .Unspecified_Error
+			}
+			handle_info_ok := windows.SetHandleInformation(stderr_r, windows.HANDLE_FLAG_INHERIT, 0)
+			if !handle_info_ok {
+				return {}, .Unspecified_Error
+			}
+			stderr_pipe := true
+		case .Stdout:
+			stderr_w = stdout_w
+			stderr_r = stdout_r
+		}
 	}
 	process_info: windows.PROCESS_INFORMATION = ---
 	process_ok := windows.CreateProcessW(
@@ -66,8 +109,8 @@ _process_open :: proc(desc: Process_Desc) -> (Process, Process_Error) {
 		nil,
 		&windows.STARTUPINFOW {
 			cb = size_of(windows.STARTUPINFOW),
-			hStdError = stdout_pipe_w,
-			hStdOutput = stdout_pipe_w,
+			hStdError = stderr_w,
+			hStdOutput = stdout_w,
 			dwFlags = windows.STARTF_USESTDHANDLES,
 		},
 		&process_info,
@@ -81,15 +124,24 @@ _process_open :: proc(desc: Process_Desc) -> (Process, Process_Error) {
 			return {}, .Unspecified_Error
 		}
 	}
-	windows.CloseHandle(stdout_pipe_w)
+	// Note(flysand): Writeable end of pipe has to be closed to signal to the
+	// process that we're ready to read.
+	if stdout_pipe {
+		windows.CloseHandle(stdout_w)
+	}
+	if stderr_pipe {
+		windows.CloseHandle(stderr_w)
+	}
 	return Process {
 		_os_data = _Process {
 			process = process_info.hProcess,
 			thread = process_info.hThread,
-			stdout_w = stdout_pipe_w,
+			stdout_w = stdout_w if stdout_pipe else windows.INVALID_HANDLE,
+			stderr_w = stderr_w if stderr_pipe else windows.INVALID_HANDLE,
 		},
 		pid = int(process_info.dwProcessId),
-		stdout = new_file(uintptr(stdout_pipe_r), "child-process-stdout-handle"),
+		stdout = new_file(uintptr(stdout_r), "stdout-pipe-ro"),
+		stderr = new_file(uintptr(stderr_r), "stderr-pipe-ro"),
 	}, .None
 }
 
@@ -99,6 +151,16 @@ _process_close :: proc(process: Process) -> (Process_Error) {
 	}
 	if !windows.CloseHandle(process._os_data.thread) {
 		return .Unspecified_Error
+	}
+	if process._os_data.stdout_w != windows.INVALID_HANDLE {
+		if !windows.CloseHandle(process._os_data.stdout_w) {
+			return .Unspecified_Error
+		}
+	}
+	if process._os_data.stderr_w != windows.INVALID_HANDLE {
+		if !windows.CloseHandle(process._os_data.stderr_w) {
+			return .Unspecified_Error
+		}
 	}
 	return .None
 }
