@@ -2541,6 +2541,9 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 		return ast_pointer_type(f, token, elem);
 	} break;
 
+	case Token_Mul:
+		return parse_unary_expr(f, true);
+
 	case Token_OpenBracket: {
 		Token token = expect_token(f, Token_OpenBracket);
 		Ast *count_expr = nullptr;
@@ -3274,7 +3277,9 @@ gb_internal Ast *parse_unary_expr(AstFile *f, bool lhs) {
 	case Token_Sub:
 	case Token_Xor:
 	case Token_And:
-	case Token_Not: {
+	case Token_Not:
+	case Token_Mul: // Used for error handling when people do C-like things
+	{
 		Token token = advance_token(f);
 		Ast *expr = parse_unary_expr(f, lhs);
 		return ast_unary_expr(f, token, expr);

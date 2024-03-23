@@ -3375,7 +3375,9 @@ gb_internal Type *check_type_expr(CheckerContext *ctx, Ast *e, Type *named_type)
 		type = t_invalid;
 
 
-		// NOTE(bill): Check for common mistakes from C programmers e.g. T[] and T[N]
+		// NOTE(bill): Check for common mistakes from C programmers
+		// e.g. T[] and T[N]
+		// e.g. *T
 		Ast *node = unparen_expr(e);
 		if (node && node->kind == Ast_IndexExpr) {
 			gbString index_str = nullptr;
@@ -3394,6 +3396,18 @@ gb_internal Type *check_type_expr(CheckerContext *ctx, Ast *e, Type *named_type)
 			if (node->IndexExpr.expr != nullptr) {
 				Ast *pseudo_array_expr = ast_array_type(e->file(), ast_token(node->IndexExpr.expr), node->IndexExpr.index, node->IndexExpr.expr);
 				check_array_type_internal(ctx, pseudo_array_expr, &type, nullptr);
+			}
+		} else if (node && node->kind == Ast_UnaryExpr && node->UnaryExpr.op.kind == Token_Mul) {
+			gbString type_str = expr_to_string(node->UnaryExpr.expr);
+			defer (gb_string_free(type_str));
+
+			error_line("\tSuggestion: Did you mean '^%s'?\n", type_str);
+			end_error_block();
+
+			// NOTE(bill): Minimize error propagation of bad array syntax by treating this like a type
+			if (node->UnaryExpr.expr != nullptr) {
+				Ast *pseudo_pointer_expr = ast_pointer_type(e->file(), ast_token(node->UnaryExpr.expr), node->UnaryExpr.expr);
+				return check_type_expr(ctx, pseudo_pointer_expr, named_type);
 			}
 		} else {
 			end_error_block();
