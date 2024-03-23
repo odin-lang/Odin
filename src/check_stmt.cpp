@@ -2325,7 +2325,7 @@ gb_internal void check_return_stmt(CheckerContext *ctx, Ast *node) {
 				}
 			} else if (x->kind == Ast_MatrixIndexExpr) {
 				Entity *f = entity_of_node(x->MatrixIndexExpr.expr);
-				if (is_entity_local_variable(f)) {
+				if (is_type_matrix(f->type) && is_entity_local_variable(f)) {
 					unsafe_return_error(o, "the address of an indexed variable", f->type);
 				}
 			}
