@@ -128,7 +128,7 @@ read_entire_file_from_file :: proc(f: ^File, allocator: runtime.Allocator) -> (d
 				if err == .EOF || err == .Broken_Pipe {
 					err = nil
 				}
-				data = data[:total]
+				data = out_buffer[:total]
 				return
 			}
 		}
