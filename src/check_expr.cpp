@@ -11236,6 +11236,18 @@ gb_internal gbString write_expr_to_string(gbString str, Ast *node, bool shorthan
 				if (field->flags&FieldFlag_c_vararg) {
 					str = gb_string_appendc(str, "#c_vararg ");
 				}
+				if (field->flags&FieldFlag_any_int) {
+					str = gb_string_appendc(str, "#any_int ");
+				}
+				if (field->flags&FieldFlag_no_broadcast) {
+					str = gb_string_appendc(str, "#no_broadcast ");
+				}
+				if (field->flags&FieldFlag_const) {
+					str = gb_string_appendc(str, "#const ");
+				}
+				if (field->flags&FieldFlag_subtype) {
+					str = gb_string_appendc(str, "#subtype ");
+				}
 
 				str = write_expr_to_string(str, field->type, shorthand);
 			}
