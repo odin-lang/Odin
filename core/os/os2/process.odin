@@ -50,6 +50,7 @@ Process_Error :: enum {
 	None,
 	Not_Found,
 	Not_Executable,
+	Unspecified_Error,
 }
 
 /*
@@ -59,7 +60,8 @@ Process_Error :: enum {
 	process.
 */
 Process :: struct {
-	_os_handle: u64,
+	_os_data: _Process,
+	pid: int,
 	stdout: File,
 	stderr: File,
 	stdin:  File,
@@ -122,11 +124,13 @@ Process_Desc :: struct {
 	Indicates a normal termination of a process.
 	* `Signaled`: returned, when a process terminates due to receiving a
 	signal, or an exception. Indicates an abnormal termination of a process.
+	* `Error`: OS returned an error on an attempt to wait.
 */
 Wait_Status :: enum {
 	Timeout,
 	Exited,
 	Signaled,
+	Error,
 }
 
 /*
@@ -140,7 +144,8 @@ Wait_Status :: enum {
 	procedure.
 */
 process_open :: proc(desc: Process_Desc, allocator: runtime.Allocator) -> (Process, Process_Error) {
-	return {}, .None
+	context.allocator = allocator
+	return _process_open(desc)
 }
 
 /*
@@ -150,28 +155,28 @@ process_open :: proc(desc: Process_Desc, allocator: runtime.Allocator) -> (Proce
 	returned successfully.
 */
 process_close :: proc(process: Process) -> (Process_Error) {
-	return .None
+	return _process_close(process)
 }
 
 /*
 	Run a suspended process.
 */
 process_start :: proc(process: Process) -> (Process_Error) {
-	return .None
+	return _process_start(process)
 }
 
 /*
 	Suspend a running process.
 */
 process_suspend :: proc(process: Process) -> (Process_Error) {
-	return .None
+	return _process_suspend(process)
 }
 
 /*
 	Terminate a running process.
 */
-process_terminate :: proc(process: Process) -> (Process_Error) {
-	return .None
+process_terminate :: proc(process: Process, code: i32) -> (Process_Error) {
+	return _process_terminate(process, code)
 }
 
 /*
@@ -185,7 +190,7 @@ process_terminate :: proc(process: Process) -> (Process_Error) {
 	Otherwise, if it is terminated due to an exception or a signal, the code
 	contains the signal or exception number that terminated the process.
 */
-process_wait :: proc(process: Process, timeout: time.Duration) -> (i64, Wait_Status, Process_Error) {
-	return 0, .Timeout
+process_wait :: proc(process: Process, timeout: time.Duration) -> (int, Wait_Status) {
+	return _process_wait(process, timeout)
 }
 
