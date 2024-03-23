@@ -50,7 +50,6 @@ Process_Error :: enum {
 	None,
 	Not_Found,
 	Not_Executable,
-	// TODO;
 }
 
 /*
@@ -76,7 +75,7 @@ Process :: struct {
 	* `Stdout`: Special value available for `stderr` stream: binds it with
 		stdout.
 	
-	Additionally in the Process_Desc struct, aside from stream bindings from
+	Additionally in the `Process_Desc` struct, aside from stream bindings from
 	this enum, the corresponding streams accept Handle directly, in order
 	to support piping from one command to another.
 */
@@ -131,15 +130,6 @@ Wait_Status :: enum {
 }
 
 /*
-	The selector stream of a process.
-*/
-Stream_Selector :: enum {
-	Stdout,
-	Stderr,
-	Stdin,
-}
-
-/*
 	Creates a process handle.
 
 	This procedure opens a process handle given a description of the process
@@ -148,9 +138,6 @@ Stream_Selector :: enum {
 	The process referred by the handle is created in
 	**suspended** mode. To run the suspended process call the `process_start()`
 	procedure.
-
-	If `bind_streams` is set, the streams (stdout, stderr, stdin) of the created
-	process are bound to the streams of the current process.
 */
 process_open :: proc(desc: Process_Desc, allocator: runtime.Allocator) -> (Process, Process_Error) {
 	return {}, .None
@@ -159,8 +146,8 @@ process_open :: proc(desc: Process_Desc, allocator: runtime.Allocator) -> (Proce
 /*
 	Close a terminated or running process.
 
-	This procedure should be called for any process for which `process_open()` returned
-	successfully.
+	This procedure should be called for any process for which `process_open()`
+	returned successfully.
 */
 process_close :: proc(process: Process) -> (Process_Error) {
 	return .None
@@ -192,10 +179,11 @@ process_terminate :: proc(process: Process) -> (Process_Error) {
 
 	If `TIMEOUT_INFINITE` is specified, then the wait is indefinite.
 
-	This function returns the status of a wait, and a code. In case the process
-	was terminated normally (via a call to `exit()`, returns the exit code).
-	Otherwise, if it is terminated due to an exception or a signal, the signal
-	or exception number is returned (respectively).
+	This function returns the code and a status of the wait. In case the process
+	was terminated normally (via a call to `exit()`), the code represents
+	the exit code of the child process.
+	Otherwise, if it is terminated due to an exception or a signal, the code
+	contains the signal or exception number that terminated the process.
 */
 process_wait :: proc(process: Process, timeout: time.Duration) -> (i64, Wait_Status, Process_Error) {
 	return 0, .Timeout
