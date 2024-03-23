@@ -4050,6 +4050,7 @@ gb_internal void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 			Entity *e = alloc_entity_variable(c->scope, name->Ident.token, nullptr);
 			e->identifier = name;
 			e->file = c->file;
+			e->Variable.is_global = true;
 
 			if (entity_visibility_kind != EntityVisiblity_Public) {
 				e->flags |= EntityFlag_NotExported;

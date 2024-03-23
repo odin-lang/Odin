@@ -1465,25 +1465,6 @@ gb_internal bool check_stmt_internal_builtin_proc_id(Ast *expr, BuiltinProcId *i
 	return id != BuiltinProc_Invalid;
 }
 
-gb_internal bool check_expr_is_stack_variable(Ast *expr) {
-	/*
-	expr = unparen_expr(expr);
-	Entity *e = entity_of_node(expr);
-	if (e && e->kind == Entity_Variable) {
-		if (e->flags & (EntityFlag_Static|EntityFlag_Using|EntityFlag_ImplicitReference|EntityFlag_ForValue)) {
-			// okay
-		} else if (e->Variable.thread_local_model.len != 0) {
-			// okay
-		} else if (e->scope) {
-			if ((e->scope->flags & (ScopeFlag_Global|ScopeFlag_File|ScopeFlag_Type)) == 0) {
-				return true;
-			}
-		}
-	}
-	*/
-	return false;
-}
-
 gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 	ast_node(rs, RangeStmt, node);
 
@@ -2297,29 +2278,6 @@ gb_internal void check_return_stmt(CheckerContext *ctx, Ast *node) {
 			if (is_type_untyped(o->type)) {
 				update_untyped_expr_type(ctx, o->expr, e->type, true);
 			}
-
-
-			// NOTE(bill): This is very basic escape analysis
-			// This needs to be improved tremendously, and a lot of it done during the
-			// middle-end (or LLVM side) to improve checks and error messages
-			Ast *expr = unparen_expr(o->expr);
-			if (expr->kind == Ast_UnaryExpr && expr->UnaryExpr.op.kind == Token_And) {
-				Ast *x = unparen_expr(expr->UnaryExpr.expr);
-				if (x->kind == Ast_CompoundLit) {
-					error(expr, "Cannot return the address to a stack value from a procedure");
-				} else if (x->kind == Ast_IndexExpr) {
-					Ast *array = x->IndexExpr.expr;
-					if (is_type_array_like(type_of_expr(array)) && check_expr_is_stack_variable(array)) {
-						gbString t = type_to_string(type_of_expr(array));
-						error(expr, "Cannot return the address to an element of stack variable from a procedure, of type %s", t);
-						gb_string_free(t);
-					}
-				} else {
-					if (check_expr_is_stack_variable(x)) {
-						error(expr, "Cannot return the address to a stack variable from a procedure");
-					}
-				}
-			}
 		}
 	}
 
@@ -2327,16 +2285,51 @@ gb_internal void check_return_stmt(CheckerContext *ctx, Ast *node) {
 		if (o.expr == nullptr) {
 			continue;
 		}
-		if (o.expr->kind != Ast_CompoundLit || !is_type_slice(o.type)) {
-			continue;
+		Ast *expr = unparen_expr(o.expr);
+
+		auto unsafe_return_error = [](Operand const &o, char const *msg, Type *extra_type=nullptr) {
+			gbString s = expr_to_string(o.expr);
+			if (extra_type) {
+				gbString t = type_to_string(extra_type);
+				error(o.expr, "It is unsafe to return %s ('%s') of type ('%s') from a procedure, as it uses the current stack frame's memory", msg, s, t);
+				gb_string_free(t);
+			} else {
+				error(o.expr, "It is unsafe to return %s ('%s') from a procedure, as it uses the current stack frame's memory", msg, s);
+			}
+			gb_string_free(s);
+		};
+
+
+		// NOTE(bill): This is very basic escape analysis
+		// This needs to be improved tremendously, and a lot of it done during the
+		// middle-end (or LLVM side) to improve checks and error messages
+		if (expr->kind == Ast_CompoundLit && is_type_slice(o.type)) {
+			ast_node(cl, CompoundLit, expr);
+			if (cl->elems.count == 0) {
+				continue;
+			}
+			unsafe_return_error(o, "a compound literal of a slice");
+		} else if (expr->kind == Ast_UnaryExpr && expr->UnaryExpr.op.kind == Token_And) {
+			Ast *x = unparen_expr(expr->UnaryExpr.expr);
+			Entity *e = entity_of_node(x);
+			if (is_entity_local_variable(e)) {
+				unsafe_return_error(o, "the address of a local variable");
+			} else if(x->kind == Ast_CompoundLit) {
+				unsafe_return_error(o, "the address of a compound literal");
+			} else if (x->kind == Ast_IndexExpr) {
+				Entity *f = entity_of_node(x->IndexExpr.expr);
+				if (is_type_array_like(f->type) || is_type_matrix(f->type)) {
+					if (is_entity_local_variable(f)) {
+						unsafe_return_error(o, "the address of an indexed variable", f->type);
+					}
+				}
+			} else if (x->kind == Ast_MatrixIndexExpr) {
+				Entity *f = entity_of_node(x->MatrixIndexExpr.expr);
+				if (is_entity_local_variable(f)) {
+					unsafe_return_error(o, "the address of an indexed variable", f->type);
+				}
+			}
 		}
-		ast_node(cl, CompoundLit, o.expr);
-		if (cl->elems.count == 0) {
-			continue;
-		}
-		gbString s = type_to_string(o.type);
-		error(o.expr, "It is unsafe to return a compound literal of a slice ('%s') with elements from a procedure, as the contents of the slice uses the current stack frame's memory", s);
-		gb_string_free(s);
 	}
 
 }
