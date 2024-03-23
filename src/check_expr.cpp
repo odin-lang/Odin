@@ -4900,10 +4900,18 @@ gb_internal Entity *check_selector(CheckerContext *c, Operand *operand, Ast *nod
 	Selection sel = {}; // NOTE(bill): Not used if it's an import name
 
 	if (!c->allow_arrow_right_selector_expr && se->token.kind == Token_ArrowRight) {
+		ERROR_BLOCK();
 		error(node, "Illegal use of -> selector shorthand outside of a call");
-		operand->mode = Addressing_Invalid;
-		operand->expr = node;
-		return nullptr;
+		gbString x = expr_to_string(se->expr);
+		gbString y = expr_to_string(se->selector);
+		error_line("\tSuggestion: Did you mean '%s.%s'?\n", x, y);
+		gb_string_free(y);
+		gb_string_free(x);
+
+		// TODO(bill): Should this terminate here or propagate onwards?
+		// operand->mode = Addressing_Invalid;
+		// operand->expr = node;
+		// return nullptr;
 	}
 
 	operand->expr = node;
