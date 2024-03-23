@@ -128,11 +128,11 @@ jobs:
       - name: Odin check examples/all
         run: ./odin check examples/all -strict-style
         timeout-minutes: 10
-      # - name: Core library tests
-      #   run: |
-      #     cd tests/core
-      #     make
-      #   timeout-minutes: 10
+      - name: Core library tests
+        run: |
+          cd tests/core
+          make
+        timeout-minutes: 10
       - name: Odin internals tests
         run: |
           cd tests/internal
