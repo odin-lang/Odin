@@ -13,6 +13,7 @@ to_wstring :: windows.utf8_to_wstring
 _Process :: struct {
 	process: windows.HANDLE,
 	thread: windows.HANDLE,
+	stdout_w: windows.HANDLE,
 }
 
 _process_open :: proc(desc: Process_Desc) -> (Process, Process_Error) {
@@ -34,18 +35,41 @@ _process_open :: proc(desc: Process_Desc) -> (Process, Process_Error) {
 	case []string:
 		command_line = to_wstring(_build_command_line(command))
 	}
-	startup_info: windows.STARTUPINFOW = ---
+	pipe_security_attr := windows.SECURITY_ATTRIBUTES {
+		nLength = size_of(windows.SECURITY_ATTRIBUTES),
+		bInheritHandle = true,
+	}
+	stdout_pipe_r := windows.INVALID_HANDLE_VALUE
+	stdout_pipe_w := windows.INVALID_HANDLE_VALUE
+	stdout_pipe_ok := windows.CreatePipe(
+		&stdout_pipe_r,
+		&stdout_pipe_w,
+		&pipe_security_attr,
+		0,
+	)
+	if !stdout_pipe_ok {
+		return {}, .Unspecified_Error
+	}
+	handle_info_ok := windows.SetHandleInformation(stdout_pipe_r, windows.HANDLE_FLAG_INHERIT, 0)
+	if !handle_info_ok {
+		return {}, .Unspecified_Error
+	}
 	process_info: windows.PROCESS_INFORMATION = ---
 	process_ok := windows.CreateProcessW(
 		nil,
 		command_line,
 		nil,
 		nil,
-		false,
+		true,
 		windows.CREATE_SUSPENDED,
 		raw_data(_build_environment_block(desc.environment)),
 		nil,
-		&startup_info,
+		&windows.STARTUPINFOW {
+			cb = size_of(windows.STARTUPINFOW),
+			hStdError = stdout_pipe_w,
+			hStdOutput = stdout_pipe_w,
+			dwFlags = windows.STARTF_USESTDHANDLES,
+		},
 		&process_info,
 	)
 	if !process_ok {
@@ -57,18 +81,25 @@ _process_open :: proc(desc: Process_Desc) -> (Process, Process_Error) {
 			return {}, .Unspecified_Error
 		}
 	}
+	windows.CloseHandle(stdout_pipe_w)
 	return Process {
 		_os_data = _Process {
 			process = process_info.hProcess,
 			thread = process_info.hThread,
+			stdout_w = stdout_pipe_w,
 		},
 		pid = int(process_info.dwProcessId),
+		stdout = new_file(uintptr(stdout_pipe_r), "child-process-stdout-handle"),
 	}, .None
 }
 
 _process_close :: proc(process: Process) -> (Process_Error) {
-	windows.CloseHandle(process._os_data.process)
-	windows.CloseHandle(process._os_data.thread)
+	if !windows.CloseHandle(process._os_data.process) {
+		return .Unspecified_Error
+	}
+	if !windows.CloseHandle(process._os_data.thread) {
+		return .Unspecified_Error
+	}
 	return .None
 }
 
@@ -88,14 +119,15 @@ _process_wait :: proc(process: Process, timeout: time.Duration) -> (int, Wait_St
 	timeout_ms := u32(timeout / time.Millisecond)
 	wait_result := windows.WaitForSingleObject(process._os_data.process, timeout_ms)
 	switch wait_result {
-	case windows.WAIT_FAILED:
-		return 0, .Error
+	case windows.WAIT_OBJECT_0:
+		exit_code: u32 = ---
+		windows.GetExitCodeProcess(process._os_data.process, &exit_code)
+		return cast(int) i32(exit_code), .Exited
 	case windows.WAIT_TIMEOUT:
 		return 0, .Timeout
+	case:
+		return 0, .Error
 	}
-	exit_code: u32 = ---
-	windows.GetExitCodeProcess(process._os_data.process, &exit_code)
-	return cast(int) i32(exit_code), .Exited
 }
 
 _build_command_line :: proc(command: []string) -> string {

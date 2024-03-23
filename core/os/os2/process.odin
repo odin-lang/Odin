@@ -62,9 +62,9 @@ Process_Error :: enum {
 Process :: struct {
 	_os_data: _Process,
 	pid: int,
-	stdout: File,
-	stderr: File,
-	stdin:  File,
+	stdout: ^File,
+	stderr: ^File,
+	stdin:  ^File,
 }
 
 /*
