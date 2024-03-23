@@ -6295,7 +6295,7 @@ gb_internal ParseFileError parse_packages(Parser *p, String init_filename) {
 	if (!path_is_directory(init_fullpath)) {
 		String const ext = str_lit(".odin");
 		if (!string_ends_with(init_fullpath, ext)) {
-			error_line("Expected either a directory or a .odin file, got '%.*s'\n", LIT(init_filename));
+			error({}, "Expected either a directory or a .odin file, got '%.*s'\n", LIT(init_filename));
 			return ParseFile_WrongExtension;
 		}
 	} else if (init_fullpath.len != 0) {
@@ -6308,7 +6308,7 @@ gb_internal ParseFileError parse_packages(Parser *p, String init_filename) {
 			String short_path = filename_from_path(path);
 			char *cpath = alloc_cstring(temporary_allocator(), short_path);
 			if (gb_file_exists(cpath)) {
-			    	error_line("Please specify the executable name with -out:<string> as a directory exists with the same name in the current working directory");
+			    	error({}, "Please specify the executable name with -out:<string> as a directory exists with the same name in the current working directory");
 			    	return ParseFile_DirectoryAlreadyExists;
 			}
 		}
@@ -6344,7 +6344,7 @@ gb_internal ParseFileError parse_packages(Parser *p, String init_filename) {
 			if (!path_is_directory(fullpath)) {
 				String const ext = str_lit(".odin");
 				if (!string_ends_with(fullpath, ext)) {
-					error_line("Expected either a directory or a .odin file, got '%.*s'\n", LIT(fullpath));
+					error({}, "Expected either a directory or a .odin file, got '%.*s'\n", LIT(fullpath));
 					return ParseFile_WrongExtension;
 				}
 			}

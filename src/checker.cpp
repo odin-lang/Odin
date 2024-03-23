@@ -3180,6 +3180,7 @@ gb_internal DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 		    linkage == "link_once") {
 			ac->linkage = linkage;
 		} else {
+			ERROR_BLOCK();
 			error(elem, "Invalid linkage '%.*s'. Valid kinds:", LIT(linkage));
 			error_line("\tinternal\n");
 			error_line("\tstrong\n");
@@ -3428,6 +3429,7 @@ gb_internal DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 			} else if (mode == "speed") {
 				ac->optimization_mode = ProcedureOptimizationMode_Speed;
 			} else {
+				ERROR_BLOCK();
 				error(elem, "Invalid optimization_mode for '%.*s'. Valid modes:", LIT(name));
 				error_line("\tnone\n");
 				error_line("\tminimal\n");
@@ -3558,6 +3560,7 @@ gb_internal DECL_ATTRIBUTE_PROC(var_decl_attribute) {
 			    model == "localexec") {
 				ac->thread_local_model = model;
 			} else {
+				ERROR_BLOCK();
 				error(elem, "Invalid thread local model '%.*s'. Valid models:", LIT(model));
 				error_line("\tdefault\n");
 				error_line("\tlocaldynamic\n");
@@ -3608,6 +3611,7 @@ gb_internal DECL_ATTRIBUTE_PROC(var_decl_attribute) {
 		    linkage == "link_once") {
 			ac->linkage = linkage;
 		} else {
+			ERROR_BLOCK();
 			error(elem, "Invalid linkage '%.*s'. Valid kinds:", LIT(linkage));
 			error_line("\tinternal\n");
 			error_line("\tstrong\n");
@@ -3762,6 +3766,7 @@ gb_internal void check_decl_attributes(CheckerContext *c, Array<Ast *> const &at
 
 			if (!proc(c, elem, name, value, ac)) {
 				if (!build_context.ignore_unknown_attributes) {
+					ERROR_BLOCK();
 					error(elem, "Unknown attribute element name '%.*s'", LIT(name));
 					error_line("\tDid you forget to use build flag '-ignore-unknown-attributes'?\n");
 				}
@@ -3831,6 +3836,8 @@ gb_internal bool check_arity_match(CheckerContext *c, AstValueDecl *vd, bool is_
 			gb_string_free(str);
 			return false;
 		} else if (is_global) {
+			ERROR_BLOCK();
+
 			Ast *n = vd->values[rhs-1];
 			error(n, "Expected %td expressions on the right hand side, got %td", lhs, rhs);
 			error_line("Note: Global declarations do not allow for multi-valued expressions");
@@ -6052,11 +6059,14 @@ gb_internal void check_unique_package_names(Checker *c) {
 			continue;
 		}
 
+
+		begin_error_block();
 		error(curr, "Duplicate declaration of 'package %.*s'", LIT(name));
 		error_line("\tA package name must be unique\n"
 		           "\tThere is no relation between a package name and the directory that contains it, so they can be completely different\n"
 		           "\tA package name is required for link name prefixing to have a consistent ABI\n");
-		error(prev, "found at previous location");
+		error_line("%s found at previous location\n", token_pos_to_string(ast_token(prev).pos));
+		end_error_block();
 	}
 }
 

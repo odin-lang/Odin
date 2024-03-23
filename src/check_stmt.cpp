@@ -883,6 +883,7 @@ gb_internal void check_inline_range_stmt(CheckerContext *ctx, Ast *node, u32 mod
 		}
 
 		if (ctx->inline_for_depth >= MAX_INLINE_FOR_DEPTH && prev_inline_for_depth < MAX_INLINE_FOR_DEPTH) {
+			ERROR_BLOCK();
 			if (prev_inline_for_depth > 0) {
 				error(node, "Nested '#unroll for' loop cannot be inlined as it exceeds the maximum '#unroll for' depth (%lld levels >= %lld maximum levels)", v, MAX_INLINE_FOR_DEPTH);
 			} else {
@@ -1592,6 +1593,7 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 				{
 					isize count = t->Tuple.variables.count;
 					if (count < 1 || count > 3) {
+						ERROR_BLOCK();
 						check_not_tuple(ctx, &operand);
 						error_line("\tMultiple return valued parameters in a range statement are limited to a maximum of 2 usable values with a trailing boolean for the conditional\n");
 						break;
@@ -2085,6 +2087,9 @@ gb_internal void check_expr_stmt(CheckerContext *ctx, Ast *node) {
 		}
 		return;
 	}
+
+	ERROR_BLOCK();
+
 	gbString expr_str = expr_to_string(operand.expr);
 	error(node, "Expression is not used: '%s'", expr_str);
 	gb_string_free(expr_str);

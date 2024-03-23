@@ -5905,6 +5905,7 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 				s = assign_score_function(MAXIMUM_TYPE_DISTANCE);
 			} else {
 				if (show_error) {
+					ERROR_BLOCK();
 					check_assignment(c, o, param_type, str_lit("procedure argument"));
 
 					Type *src = base_type(o->type);
@@ -8459,6 +8460,7 @@ gb_internal ExprKind check_or_return_expr(CheckerContext *c, Operand *o, Ast *no
 				// NOTE(bill): allow implicit conversion between boolean types
 				// within 'or_return' to improve the experience using third-party code
 			} else if (!check_is_assignable_to(c, &rhs, end_type)) {
+				ERROR_BLOCK();
 				// TODO(bill): better error message
 				gbString a = type_to_string(right_type);
 				gbString b = type_to_string(end_type);
@@ -10030,6 +10032,7 @@ gb_internal ExprKind check_index_expr(CheckerContext *c, Operand *o, Ast *node, 
 	bool ok = check_index_value(c, t, false, ie->index, max_count, &index, index_type_hint);
 	if (is_const) {
 		if (index < 0) {
+			ERROR_BLOCK();
 			gbString str = expr_to_string(o->expr);
 			error(o->expr, "Cannot index a constant '%s'", str);
 			if (!build_context.terse_errors) {
@@ -10046,6 +10049,7 @@ gb_internal ExprKind check_index_expr(CheckerContext *c, Operand *o, Ast *node, 
 			bool finish = false;
 			o->value = get_constant_field_single(c, value, cast(i32)index, &success, &finish);
 			if (!success) {
+				ERROR_BLOCK();
 				gbString str = expr_to_string(o->expr);
 				error(o->expr, "Cannot index a constant '%s' with index %lld", str, cast(long long)index);
 				if (!build_context.terse_errors) {
@@ -10236,6 +10240,7 @@ gb_internal ExprKind check_slice_expr(CheckerContext *c, Operand *o, Ast *node, 
 			}
 		}
 		if (!all_constant) {
+			ERROR_BLOCK();
 			gbString str = expr_to_string(o->expr);
 			error(o->expr, "Cannot slice '%s' with non-constant indices", str);
 			if (!build_context.terse_errors) {
