@@ -510,7 +510,7 @@ gb_global TargetMetrics target_darwin_amd64 = {
 	TargetOs_darwin,
 	TargetArch_amd64,
 	8, 8, 8, 16,
-	str_lit("x86_64-apple-darwin"),
+	str_lit("x86_64-apple-macosx"), // NOTE: Changes during initialization based on build flags.
 	str_lit("e-m:o-i64:64-f80:128-n8:16:32:64-S128"),
 };
 
@@ -518,7 +518,7 @@ gb_global TargetMetrics target_darwin_arm64 = {
 	TargetOs_darwin,
 	TargetArch_arm64,
 	8, 8, 8, 16,
-	str_lit("arm64-apple-macosx11.0.0"),
+	str_lit("arm64-apple-macosx"), // NOTE: Changes during initialization based on build flags.
 	str_lit("e-m:o-i64:64-i128:128-n32:64-S128"),
 };
 
@@ -1418,19 +1418,25 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 	}
 
 	bc->metrics = *metrics;
-	switch (subtarget) {
-	case Subtarget_Default:
-		break;
-	case Subtarget_iOS:
-		GB_ASSERT(metrics->os == TargetOs_darwin);
-		if (metrics->arch == TargetArch_arm64) {
-			bc->metrics.target_triplet = str_lit("arm64-apple-ios");
-		} else if (metrics->arch == TargetArch_amd64) {
-			bc->metrics.target_triplet = str_lit("x86_64-apple-ios");
-		} else {
-			GB_PANIC("Unknown architecture for darwin");
+	if (metrics->os == TargetOs_darwin) {
+		if (bc->minimum_os_version_string.len == 0) {
+			bc->minimum_os_version_string = str_lit("11.0.0");
 		}
-		break;
+
+		switch (subtarget) {
+		case Subtarget_Default:
+			bc->metrics.target_triplet = concatenate_strings(permanent_allocator(), bc->metrics.target_triplet, bc->minimum_os_version_string);
+			break;
+		case Subtarget_iOS:
+			if (metrics->arch == TargetArch_arm64) {
+				bc->metrics.target_triplet = str_lit("arm64-apple-ios");
+			} else if (metrics->arch == TargetArch_amd64) {
+				bc->metrics.target_triplet = str_lit("x86_64-apple-ios");
+			} else {
+				GB_PANIC("Unknown architecture for darwin");
+			}
+			break;
+		}
 	}
 
 	bc->ODIN_OS           = target_os_names[metrics->os];

@@ -1925,7 +1925,7 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 	if (run_or_build) {
 		print_usage_line(1, "-minimum-os-version:<string>");
 		print_usage_line(2, "Sets the minimum OS version targeted by the application.");
-		print_usage_line(2, "Example: -minimum-os-version:12.0.0");
+		print_usage_line(2, "Default: -minimum-os-version:11.0.0");
 		print_usage_line(2, "(Only used when target is Darwin.)");
 		print_usage_line(0, "");
 
