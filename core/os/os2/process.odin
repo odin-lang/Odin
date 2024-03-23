@@ -109,11 +109,11 @@ Process_Desc :: struct {
 	// If the duplicate entries are found within the slce, the last one is taken.
 	environment: []string,
 	// Specifies the binding for te stdout stream. See `Stream_Binding`.
-	stdout: union { File, Stream_Binding },
+	stdout: union { ^File, Stream_Binding },
 	// Specifies the binding for te stderr stream. See `Stream_Binding`.
-	stderr: union { File, Stream_Binding },
+	stderr: union { ^File, Stream_Binding },
 	// Specifies the binding for te stdin stream. See `Stream_Binding`.
-	stdin: union { File, Stream_Binding },
+	stdin: union { ^File, Stream_Binding },
 }
 
 /*

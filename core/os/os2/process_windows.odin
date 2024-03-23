@@ -44,7 +44,7 @@ _process_open :: proc(desc: Process_Desc) -> (Process, Process_Error) {
 	stdout_w := windows.INVALID_HANDLE_VALUE
 	stdout_r := windows.INVALID_HANDLE_VALUE
 	switch binding in desc.stdout {
-	case File:
+	case ^File:
 		stdout_w = windows.HANDLE(binding.impl.fd)
 	case Stream_Binding:
 		switch binding {
@@ -72,7 +72,7 @@ _process_open :: proc(desc: Process_Desc) -> (Process, Process_Error) {
 	stderr_w := windows.INVALID_HANDLE_VALUE
 	stderr_r := windows.INVALID_HANDLE_VALUE
 	switch binding in desc.stderr {
-	case File:
+	case ^File:
 		stderr_w = windows.HANDLE(binding.impl.fd)
 	case Stream_Binding:
 		switch binding {
@@ -126,11 +126,17 @@ _process_open :: proc(desc: Process_Desc) -> (Process, Process_Error) {
 	}
 	// Note(flysand): Writeable end of pipe has to be closed to signal to the
 	// process that we're ready to read.
+	stdout_file := cast(^File) nil
+	stderr_file := cast(^File) nil
 	if stdout_pipe {
 		windows.CloseHandle(stdout_w)
+		stdout_file = new_file(uintptr(stdout_r), "stdout-pipe-ro")
+		stdout_file.impl.kind = .Console
 	}
 	if stderr_pipe {
 		windows.CloseHandle(stderr_w)
+		stderr_file = new_file(uintptr(stderr_r), "stderr-pipe-ro")
+		stderr_file.impl.kind = .Console
 	}
 	return Process {
 		_os_data = _Process {
@@ -140,8 +146,8 @@ _process_open :: proc(desc: Process_Desc) -> (Process, Process_Error) {
 			stderr_w = stderr_w if stderr_pipe else windows.INVALID_HANDLE,
 		},
 		pid = int(process_info.dwProcessId),
-		stdout = new_file(uintptr(stdout_r), "stdout-pipe-ro"),
-		stderr = new_file(uintptr(stderr_r), "stderr-pipe-ro"),
+		stdout = stdout_file,
+		stderr = stderr_file,
 	}, .None
 }
 
