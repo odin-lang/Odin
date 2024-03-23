@@ -3112,19 +3112,21 @@ gb_internal bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, T
 
 		Type *elem = t_invalid;
 		Operand o = {};
+
 		check_expr_or_type(&c, &o, pt->type);
 		if (o.mode != Addressing_Invalid && o.mode != Addressing_Type) {
-			// NOTE(bill): call check_type_expr again to get a consistent error message
-			ERROR_BLOCK();
-			elem = check_type_expr(&c, pt->type, nullptr);
 			if (o.mode == Addressing_Variable) {
 				gbString s = expr_to_string(pt->type);
-				error_line("\tSuggestion: ^ is used for pointer types, did you mean '&%s'?\n", s);
+				error(e, "^ is used for pointer types, did you mean '&%s'?", s);
 				gb_string_free(s);
+			} else {
+				// NOTE(bill): call check_type_expr again to get a consistent error message
+				elem = check_type_expr(&c, pt->type, nullptr);
 			}
 		} else {
 			elem = o.type;
 		}
+
 
 		if (pt->tag != nullptr) {
 			GB_ASSERT(pt->tag->kind == Ast_BasicDirective);
@@ -3385,7 +3387,7 @@ gb_internal Type *check_type_expr(CheckerContext *ctx, Ast *e, Type *named_type)
 			gbString type_str = expr_to_string(node->IndexExpr.expr);
 			defer (gb_string_free(type_str));
 
-			error_line("\tSuggestion: Did you mean '[%s]%s'?", index_str ? index_str : "", type_str);
+			error_line("\tSuggestion: Did you mean '[%s]%s'?\n", index_str ? index_str : "", type_str);
 			end_error_block();
 
 			// NOTE(bill): Minimize error propagation of bad array syntax by treating this like a type
