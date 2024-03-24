@@ -1146,11 +1146,26 @@ namespace lbAbiArm64 {
 			if (size <= 16) {
 				LLVMTypeRef cast_type = nullptr;
 
+				GB_ASSERT(size > 0);
 				if (size <= 8) {
 					cast_type = LLVMIntTypeInContext(c, cast(unsigned)(size*8));
 				} else {
 					unsigned count = cast(unsigned)((size+7)/8);
-					cast_type = llvm_array_type(LLVMInt64TypeInContext(c), count);
+
+					LLVMTypeRef llvm_i64 = LLVMIntTypeInContext(c, 64);
+					LLVMTypeRef *types = gb_alloc_array(temporary_allocator(), LLVMTypeRef, count);
+
+					i64 size_copy = size;
+					for (unsigned i = 0; i < count; i++) {
+						if (size_copy >= 8) {
+							types[i] = llvm_i64;
+						} else {
+							types[i] = LLVMIntTypeInContext(c, 8*cast(unsigned)size_copy);
+						}
+						size_copy -= 8;
+					}
+					GB_ASSERT(size_copy <= 0);
+					cast_type = LLVMStructTypeInContext(c, types, count, true);
 				}
 				return lb_arg_type_direct(return_type, cast_type, nullptr, nullptr);
 			} else {
@@ -1183,7 +1198,9 @@ namespace lbAbiArm64 {
 				i64 size = lb_sizeof(type);
 				if (size <= 16) {
 					LLVMTypeRef cast_type = nullptr;
-					if (size <= 8) {
+					if (size == 0) {
+						cast_type = LLVMStructTypeInContext(c, nullptr, 0, false);
+					} else if (size <= 8) {
 						cast_type = LLVMIntTypeInContext(c, cast(unsigned)(size*8));
 					} else {
 						unsigned count = cast(unsigned)((size+7)/8);
