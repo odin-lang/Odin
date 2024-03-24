@@ -265,14 +265,15 @@ gb_internal Entity *find_polymorphic_record_entity(CheckerContext *ctx, Type *or
 
 	auto *found_gen_types = map_get(&ctx->info->gen_types, original_type);
 	if (found_gen_types == nullptr) {
-		rw_mutex_shared_unlock(&ctx->info->gen_types_mutex); // @@global
-		return nullptr;
+		GenTypesData gen_types = {};
+		gen_types.types = array_make<Entity *>(heap_allocator());
+		map_set(&ctx->info->gen_types, original_type, gen_types);
+		found_gen_types = map_get(&ctx->info->gen_types, original_type);
 	}
 
-	rw_mutex_shared_lock(&found_gen_types->mutex); // @@local
-	defer (rw_mutex_shared_unlock(&found_gen_types->mutex)); // @@local
-
 	rw_mutex_shared_unlock(&ctx->info->gen_types_mutex); // @@global
+
+	rw_mutex_shared_lock(&found_gen_types->mutex); // @@local
 
 	for (Entity *e : found_gen_types->types) {
 		Type *t = base_type(e->type);
@@ -334,14 +335,16 @@ gb_internal Entity *find_polymorphic_record_entity(CheckerContext *ctx, Type *or
 			}
 		}
 		if (!skip) {
+			rw_mutex_shared_unlock(&found_gen_types->mutex);
 			return e;
 		}
 	}
+	// found_gen_types->mutex will be unlocked by add_polymorphic_record_entity
 	return nullptr;
 }
 
 
-gb_internal void add_polymorphic_record_entity(CheckerContext *ctx, Ast *node, Type *named_type, Type *original_type) {
+gb_internal void add_polymorphic_record_entity(CheckerContext *ctx, Ast *node, Type *named_type, Type *original_type, bool local_gen_types_locked) {
 	GB_ASSERT(is_type_named(named_type));
 	gbAllocator a = heap_allocator();
 	Scope *s = ctx->scope->parent;
@@ -370,7 +373,9 @@ gb_internal void add_polymorphic_record_entity(CheckerContext *ctx, Ast *node, T
 	rw_mutex_lock(&ctx->info->gen_types_mutex);
 	auto *found_gen_types = map_get(&ctx->info->gen_types, original_type);
 	if (found_gen_types) {
-		rw_mutex_lock(&found_gen_types->mutex);
+		if (!local_gen_types_locked) {
+			rw_mutex_lock(&found_gen_types->mutex);
+		}
 		array_add(&found_gen_types->types, e);
 		rw_mutex_unlock(&found_gen_types->mutex);
 	} else {
@@ -613,7 +618,7 @@ gb_internal bool check_record_poly_operand_specialization(CheckerContext *ctx, T
 }
 
 
-gb_internal void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *node, Array<Operand> *poly_operands, Type *named_type, Type *original_type_for_poly) {
+gb_internal void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *node, Array<Operand> *poly_operands, Type *named_type, Type *original_type_for_poly, bool local_gen_types_locked) {
 	GB_ASSERT(is_type_struct(struct_type));
 	ast_node(st, StructType, node);
 
@@ -650,7 +655,7 @@ gb_internal void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *
 	struct_type->Struct.is_poly_specialized = check_record_poly_operand_specialization(ctx, struct_type, poly_operands, &struct_type->Struct.is_polymorphic);
 	if (original_type_for_poly) {
 		GB_ASSERT(named_type != nullptr);
-		add_polymorphic_record_entity(ctx, node, named_type, original_type_for_poly);
+		add_polymorphic_record_entity(ctx, node, named_type, original_type_for_poly, local_gen_types_locked);
 	}
 
 	if (!struct_type->Struct.is_polymorphic) {
@@ -685,7 +690,7 @@ gb_internal void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *
 
 #undef ST_ALIGN
 }
-gb_internal void check_union_type(CheckerContext *ctx, Type *union_type, Ast *node, Array<Operand> *poly_operands, Type *named_type, Type *original_type_for_poly) {
+gb_internal void check_union_type(CheckerContext *ctx, Type *union_type, Ast *node, Array<Operand> *poly_operands, Type *named_type, Type *original_type_for_poly, bool local_gen_types_locked) {
 	GB_ASSERT(is_type_union(union_type));
 	ast_node(ut, UnionType, node);
 
@@ -699,7 +704,7 @@ gb_internal void check_union_type(CheckerContext *ctx, Type *union_type, Ast *no
 	union_type->Union.is_poly_specialized = check_record_poly_operand_specialization(ctx, union_type, poly_operands, &union_type->Union.is_polymorphic);
 	if (original_type_for_poly) {
 		GB_ASSERT(named_type != nullptr);
-		add_polymorphic_record_entity(ctx, node, named_type, original_type_for_poly);
+		add_polymorphic_record_entity(ctx, node, named_type, original_type_for_poly, local_gen_types_locked);
 	}
 
 	if (!union_type->Union.is_polymorphic) {
