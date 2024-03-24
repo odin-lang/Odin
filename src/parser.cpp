@@ -3666,6 +3666,7 @@ gb_internal Ast *parse_simple_stmt(AstFile *f, u32 flags) {
 		expect_token_after(f, Token_Colon, "identifier list");
 		if ((flags&StmtAllowFlag_Label) && lhs.count == 1) {
 			bool is_partial = false;
+			bool is_reverse = false;
 			Token partial_token = {};
 			if (f->curr_token.kind == Token_Hash) {
 				// NOTE(bill): This is purely for error messages
@@ -3675,6 +3676,11 @@ gb_internal Ast *parse_simple_stmt(AstFile *f, u32 flags) {
 					partial_token = expect_token(f, Token_Hash);
 					expect_token(f, Token_Ident);
 					is_partial = true;
+				} else if (name.kind == Token_Ident && name.string == "reverse" &&
+				    peek_token_n(f, 1).kind == Token_for) {
+					partial_token = expect_token(f, Token_Hash);
+					expect_token(f, Token_Ident);
+					is_reverse = true;
 				}
 			}
 			switch (f->curr_token.kind) {
@@ -3709,6 +3715,18 @@ gb_internal Ast *parse_simple_stmt(AstFile *f, u32 flags) {
 						break;
 					}
 					syntax_error(partial_token, "Incorrect use of directive, use '#partial %.*s: switch'", LIT(ast_token(name).string));
+				} else if (is_reverse) {
+					switch (stmt->kind) {
+					case Ast_RangeStmt:
+						if (stmt->RangeStmt.reverse) {
+							syntax_error(token, "#reverse already applied to a 'for in' statement");
+						}
+						stmt->RangeStmt.reverse = true;
+						break;
+					default:
+						syntax_error(token, "#reverse can only be applied to a 'for in' statement");
+						break;
+					}
 				}
 
 				return stmt;
