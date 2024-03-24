@@ -2351,9 +2351,6 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 				return ast_bad_expr(f, token, name);
 			}
 			switch (expr->kind) {
-			case Ast_ArrayType:
-				syntax_error(expr, "#partial has been replaced with #sparse for non-contiguous enumerated array types");
-				break;
 			case Ast_CompoundLit:
 				expr->CompoundLit.tag = tag;
 				break;
