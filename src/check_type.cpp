@@ -2490,6 +2490,7 @@ gb_internal Type *get_map_cell_type(Type *type) {
 	s->Struct.fields[0] = alloc_entity_field(scope, make_token_ident("v"), alloc_type_array(type, len), false, 0, EntityState_Resolved);
 	s->Struct.fields[1] = alloc_entity_field(scope, make_token_ident("_"), alloc_type_array(t_u8, padding), false, 1, EntityState_Resolved);
 	s->Struct.scope = scope;
+	wait_signal_set(&s->Struct.fields_wait_signal);
 	gb_unused(type_size_of(s));
 
 	return s;
@@ -2520,6 +2521,7 @@ gb_internal void init_map_internal_types(Type *type) {
 	metadata_type->Struct.fields[4] = alloc_entity_field(metadata_scope, make_token_ident("value_cell"), value_cell, false, 4, EntityState_Resolved);
 	metadata_type->Struct.scope = metadata_scope;
 	metadata_type->Struct.node = nullptr;
+	wait_signal_set(&metadata_type->Struct.fields_wait_signal);
 
 	gb_unused(type_size_of(metadata_type));
 
@@ -2537,6 +2539,7 @@ gb_internal void init_map_internal_types(Type *type) {
 	debug_type->Struct.fields[3] = alloc_entity_field(scope, make_token_ident("__metadata"), metadata_type, false, 3, EntityState_Resolved);
 	debug_type->Struct.scope = scope;
 	debug_type->Struct.node = nullptr;
+	wait_signal_set(&debug_type->Struct.fields_wait_signal);
 
 	gb_unused(type_size_of(debug_type));
 
@@ -2832,6 +2835,7 @@ gb_internal Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_e
 	add_entity(ctx, scope, nullptr, base_type_entity);
 
 	add_type_info_type(ctx, soa_struct);
+	wait_signal_set(&soa_struct->Struct.fields_wait_signal);
 
 	return soa_struct;
 }
