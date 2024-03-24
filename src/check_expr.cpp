@@ -5830,10 +5830,14 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 			Operand *variadic_operand = &ordered_operands[pt->variadic_index];
 
 			if (vari_expand) {
-				GB_ASSERT(variadic_operands.count != 0);
-				*variadic_operand = variadic_operands[0];
-				variadic_operand->type = default_type(variadic_operand->type);
-				actually_variadic = true;
+				if (variadic_operands.count == 0) {
+					error(call, "'..' in the wrong position");
+				} else {
+					GB_ASSERT(variadic_operands.count != 0);
+					*variadic_operand = variadic_operands[0];
+					variadic_operand->type = default_type(variadic_operand->type);
+					actually_variadic = true;
+				}
 			} else {
 				AstFile *f = call->file();
 
