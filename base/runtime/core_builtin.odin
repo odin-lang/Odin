@@ -741,7 +741,7 @@ _resize_dynamic_array :: #force_inline proc(array: ^$T/[dynamic]$E, length: int,
 
 	if length <= a.cap {
 		if should_zero && a.len < length {
-			intrinsics.mem_zero(([^]T)(a.data)[a.len:], (length-a.len)*size_of(T))
+			intrinsics.mem_zero(([^]E)(a.data)[a.len:], (length-a.len)*size_of(E))
 		}
 		a.len = max(length, 0)
 		return nil
