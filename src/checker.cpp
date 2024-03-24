@@ -5465,7 +5465,10 @@ gb_internal void check_procedure_later_from_entity(Checker *c, Entity *e, char c
 		return;
 	}
 	Type *type = base_type(e->type);
-	GB_ASSERT(type->kind == Type_Proc);
+	if (type == t_invalid) {
+		return;
+	}
+	GB_ASSERT_MSG(type->kind == Type_Proc, "%s", type_to_string(e->type));
 
 	if (is_type_polymorphic(type) && !type->Proc.is_poly_specialized) {
 		return;
