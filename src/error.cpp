@@ -28,7 +28,7 @@ gb_global ErrorCollector global_error_collector;
 
 
 gb_internal void push_error_value(TokenPos const &pos, ErrorValueKind kind = ErrorValue_Error) {
-	GB_ASSERT(global_error_collector.curr_error_value_set.load() == false);
+	GB_ASSERT_MSG(global_error_collector.curr_error_value_set.load() == false, "Possible race condition in error handling system, please report this with an issue");
 	ErrorValue ev = {kind, pos};
 	ev.msgs.allocator = heap_allocator();
 
@@ -53,7 +53,7 @@ gb_internal void try_pop_error_value(void) {
 }
 
 gb_internal ErrorValue *get_error_value(void) {
-	GB_ASSERT(global_error_collector.curr_error_value_set.load() == true);
+	GB_ASSERT_MSG(global_error_collector.curr_error_value_set.load() == true, "Possible race condition in error handling system, please report this with an issue");
 	return &global_error_collector.curr_error_value;
 }
 
