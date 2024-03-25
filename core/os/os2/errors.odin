@@ -13,6 +13,8 @@ General_Error :: enum u32 {
 
 	Timeout,
 
+	Broken_Pipe,
+
 	// Indicates that an attempt to retrieve a file's size was made, but the
 	// file doesn't have a size.
 	No_Size,
@@ -26,15 +28,9 @@ General_Error :: enum u32 {
 
 Platform_Error :: enum i32 {None=0}
 
-Read_Error :: enum u32 {
-	None,
-	Broken_Pipe,
-}
-
 Error :: union #shared_nil {
 	General_Error,
 	io.Error,
-	Read_Error,
 	runtime.Allocator_Error,
 	Platform_Error,
 }
@@ -61,6 +57,7 @@ error_string :: proc(ferr: Error) -> string {
 		case .Not_Exist:         return "file does not exist"
 		case .Closed:            return "file already closed"
 		case .Timeout:           return "i/o timeout"
+		case .Broken_Pipe:       return "Broken pipe"
 		case .No_Size:           return "file has no definite size"
 		case .Invalid_File:      return "invalid file"
 		case .Invalid_Dir:       return "invalid directory"
@@ -92,11 +89,6 @@ error_string :: proc(ferr: Error) -> string {
 		case .Invalid_Pointer:      return "invalid allocator pointer"
 		case .Invalid_Argument:     return "invalid allocator argument"
 		case .Mode_Not_Implemented: return "allocator mode not implemented"
-		}
-	case Read_Error:
-		switch e {
-			case .None:             return ""
-			case .Broken_Pipe:      return "Broken pipe"
 		}
 	case Platform_Error:
 		return _error_string(i32(e))
