@@ -122,8 +122,6 @@ gb_internal void wait_signal_set(Wait_Signal *ws) {
 	futex_broadcast(&ws->futex);
 }
 
-
-
 struct MutexGuard {
 	MutexGuard()                   = delete;
 	MutexGuard(MutexGuard const &) = delete;

@@ -79,7 +79,6 @@ gb_internal Type *   check_type_expr                (CheckerContext *c, Ast *exp
 gb_internal Type *   make_optional_ok_type          (Type *value, bool typed=true);
 gb_internal Entity * check_selector                 (CheckerContext *c, Operand *operand, Ast *node, Type *type_hint);
 gb_internal Entity * check_ident                    (CheckerContext *c, Operand *o, Ast *n, Type *named_type, Type *type_hint, bool allow_import_name);
-gb_internal Entity * find_polymorphic_record_entity (CheckerContext *c, Type *original_type, isize param_count, Array<Operand> const &ordered_operands, bool *failure);
 gb_internal void     check_not_tuple                (CheckerContext *c, Operand *operand);
 gb_internal void     convert_to_typed               (CheckerContext *c, Operand *operand, Type *target_type);
 gb_internal gbString expr_to_string                 (Ast *expression);
@@ -120,6 +119,8 @@ gb_internal bool is_diverging_expr(Ast *expr);
 gb_internal isize get_procedure_param_count_excluding_defaults(Type *pt, isize *param_count_);
 
 gb_internal bool is_expr_inferred_fixed_array(Ast *type_expr);
+
+gb_internal Entity *find_polymorphic_record_entity(GenTypesData *found_gen_types, isize param_count, Array<Operand> const &ordered_operands);
 
 enum LoadDirectiveResult {
 	LoadDirective_Success  = 0,
@@ -7171,8 +7172,12 @@ gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, O
 	}
 
 	{
-		bool failure = false;
-		Entity *found_entity = find_polymorphic_record_entity(c, original_type, param_count, ordered_operands, &failure);
+		GenTypesData *found_gen_types = ensure_polymorphic_record_entity_has_gen_types(c, original_type);
+
+		mutex_lock(&found_gen_types->mutex);
+		defer (mutex_unlock(&found_gen_types->mutex));
+		Entity *found_entity = find_polymorphic_record_entity(found_gen_types, param_count, ordered_operands);
+
 		if (found_entity) {
 			operand->mode = Addressing_Type;
 			operand->type = found_entity->type;
