@@ -600,7 +600,9 @@ gb_internal void syntax_error_with_verbose(TokenPos pos, TokenPos end, char cons
 
 
 gb_internal void compiler_error(char const *fmt, ...) {
-	print_all_errors();
+	if (any_errors()) {
+		print_all_errors();
+	}
 
 	va_list va;
 
@@ -614,7 +616,9 @@ gb_internal void compiler_error(char const *fmt, ...) {
 
 
 gb_internal void exit_with_errors(void) {
-	print_all_errors();
+	if (any_errors()) {
+		print_all_errors();
+	}
 	gb_exit(1);
 }
 
