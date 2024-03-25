@@ -8878,6 +8878,7 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 			break;
 		}
 
+		wait_signal_until_available(&t->Struct.fields_wait_signal);
 		isize field_count = t->Struct.fields.count;
 		isize min_field_count = t->Struct.fields.count;
 		for (isize i = min_field_count-1; i >= 0; i--) {

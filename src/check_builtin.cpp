@@ -3393,6 +3393,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			elem->Struct.tags = gb_alloc_array(permanent_allocator(), String, fields.count);
 			elem->Struct.node = dummy_node_struct;
 			type_set_offsets(elem);
+			wait_signal_set(&elem->Struct.fields_wait_signal);
 		}
 
 		Type *soa_type = make_soa_struct_slice(c, dummy_node_soa, nullptr, elem);
@@ -3766,6 +3767,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				soa_struct->Struct.tags[i] = old_struct->Struct.tags[i];
 			}
 		}
+		wait_signal_set(&soa_struct->Struct.fields_wait_signal);
 
 		Token token = {};
 		token.string = str_lit("Base_Type");

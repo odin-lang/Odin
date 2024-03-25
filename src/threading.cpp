@@ -113,7 +113,7 @@ struct Wait_Signal {
 
 gb_internal void wait_signal_until_available(Wait_Signal *ws) {
 	if (ws->futex.load() == 0) {
-		futex_wait(&ws->futex, 1);
+		futex_wait(&ws->futex, 0);
 	}
 }
 
