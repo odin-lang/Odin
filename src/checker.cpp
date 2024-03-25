@@ -1115,7 +1115,16 @@ gb_internal void init_universal(void) {
 
 	add_global_constant("ODIN_COMPILE_TIMESTAMP", t_untyped_integer, exact_value_i64(odin_compile_timestamp()));
 
-	add_global_bool_constant("__ODIN_LLVM_F16_SUPPORTED", lb_use_new_pass_system() && !is_arch_wasm());
+	{
+		bool f16_supported = lb_use_new_pass_system();
+		if (is_arch_wasm()) {
+			f16_supported = false;
+		} else if (build_context.metrics.os == TargetOs_darwin && build_context.metrics.arch == TargetArch_amd64) {
+			// NOTE(laytan): See #3222 for my ramblings on this.
+			f16_supported = false;
+		}
+		add_global_bool_constant("__ODIN_LLVM_F16_SUPPORTED", f16_supported);
+	}
 
 	{
 		GlobalEnumValue values[3] = {
