@@ -145,6 +145,7 @@ struct TypeStruct {
 	i32             soa_count;
 	StructSoaKind   soa_kind;
 	Wait_Signal     fields_wait_signal;
+	BlockingMutex   soa_mutex;
 	BlockingMutex   offset_mutex; // for settings offsets
 
 	bool            is_polymorphic;

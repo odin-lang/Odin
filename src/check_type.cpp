@@ -2683,6 +2683,107 @@ type_assign:;
 	return;
 }
 
+struct SoaTypeWorkerData {
+	CheckerContext ctx;
+	Type *         type;
+	bool           wait_to_finish;
+};
+
+
+gb_internal void complete_soa_type(CheckerContext *ctx, Type *t, bool wait_to_finish) {
+	Type *original_type = t;
+	t = base_type(t);
+	if (t == nullptr || !is_type_soa_struct(t)) {
+		return;
+	}
+
+	MUTEX_GUARD(&t->Struct.soa_mutex);
+
+	if (t->Struct.fields_wait_signal.futex.load()) {
+		return;
+	}
+
+	isize field_count = 0;
+	i32 extra_field_count = 0;
+	switch (t->Struct.soa_kind) {
+	case StructSoa_Fixed:	extra_field_count = 0; break;
+	case StructSoa_Slice:	extra_field_count = 1; break;
+	case StructSoa_Dynamic:	extra_field_count = 3; break;
+	}
+
+
+	Ast *node = t->Struct.node;
+	Scope *scope = t->Struct.scope;
+	i64 soa_count = t->Struct.soa_count;
+	Type *elem = t->Struct.soa_elem;
+	Type *old_struct = base_type(elem);
+	GB_ASSERT(old_struct->kind == Type_Struct);
+
+	if (wait_to_finish) {
+		wait_signal_until_available(&old_struct->Struct.fields_wait_signal);
+	}
+
+
+	field_count = old_struct->Struct.fields.count;
+
+	t->Struct.fields = slice_make<Entity *>(permanent_allocator(), field_count+extra_field_count);
+	t->Struct.tags = gb_alloc_array(permanent_allocator(), String, field_count+extra_field_count);
+	if (soa_count > I32_MAX) {
+		soa_count = I32_MAX;
+		error(node, "Array count too large for an #soa struct, got %lld", cast(long long)soa_count);
+	}
+	t->Struct.soa_count = cast(i32)soa_count;
+
+	for_array(i, old_struct->Struct.fields) {
+		Entity *old_field = old_struct->Struct.fields[i];
+		if (old_field->kind == Entity_Variable) {
+			Type *field_type = nullptr;
+			if (t->Struct.soa_kind == StructSoa_Fixed) {
+				GB_ASSERT(soa_count >= 0);
+				field_type = alloc_type_array(old_field->type, soa_count);
+			} else {
+				field_type = alloc_type_pointer(old_field->type);
+			}
+			Entity *new_field = alloc_entity_field(scope, old_field->token, field_type, false, old_field->Variable.field_index);
+			t->Struct.fields[i] = new_field;
+			add_entity(ctx, scope, nullptr, new_field);
+			add_entity_use(ctx, nullptr, new_field);
+		} else {
+			t->Struct.fields[i] = old_field;
+		}
+
+		t->Struct.tags[i] = old_struct->Struct.tags[i];
+	}
+
+	if (t->Struct.soa_kind != StructSoa_Fixed) {
+		Entity *len_field = alloc_entity_field(scope, make_token_ident("__$len"), t_int, false, cast(i32)field_count+0);
+		t->Struct.fields[field_count+0] = len_field;
+		add_entity(ctx, scope, nullptr, len_field);
+		add_entity_use(ctx, nullptr, len_field);
+
+		if (t->Struct.soa_kind == StructSoa_Dynamic) {
+			Entity *cap_field = alloc_entity_field(scope, make_token_ident("__$cap"), t_int, false, cast(i32)field_count+1);
+			t->Struct.fields[field_count+1] = cap_field;
+			add_entity(ctx, scope, nullptr, cap_field);
+			add_entity_use(ctx, nullptr, cap_field);
+
+			init_mem_allocator(ctx->checker);
+			Entity *allocator_field = alloc_entity_field(scope, make_token_ident("allocator"), t_allocator, false, cast(i32)field_count+2);
+			t->Struct.fields[field_count+2] = allocator_field;
+			add_entity(ctx, scope, nullptr, allocator_field);
+			add_entity_use(ctx, nullptr, allocator_field);
+		}
+	}
+
+	add_type_info_type(ctx, original_type);
+}
+
+gb_internal WORKER_TASK_PROC(complete_soa_type_worker) {
+	SoaTypeWorkerData *wd = cast(SoaTypeWorkerData *)data;
+	complete_soa_type(&wd->ctx, wd->type, wd->wait_to_finish);
+	return 0;
+}
+
 
 
 gb_internal Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_expr, Ast *elem_expr, Type *elem, i64 count, Type *generic_type, StructSoaKind soa_kind) {
@@ -2697,8 +2798,9 @@ gb_internal Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_e
 		return alloc_type_array(elem, count, generic_type);
 	}
 
-	Type *soa_struct = nullptr;
-	Scope *scope = nullptr;
+	Type * soa_struct  = nullptr;
+	Scope *scope       = nullptr;
+	bool   is_complete = false;
 
 	isize field_count = 0;
 	i32 extra_field_count = 0;
@@ -2707,39 +2809,40 @@ gb_internal Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_e
 	case StructSoa_Slice:	extra_field_count = 1; break;
 	case StructSoa_Dynamic:	extra_field_count = 3; break;
 	}
+
+	soa_struct = alloc_type_struct();
+	soa_struct->Struct.soa_kind = soa_kind;
+	soa_struct->Struct.soa_elem = elem;
+	soa_struct->Struct.is_polymorphic = is_polymorphic;
+	soa_struct->Struct.node = array_typ_expr;
+
+	if (count > I32_MAX) {
+		count = I32_MAX;
+		error(array_typ_expr, "Array count too large for an #soa struct, got %lld", cast(long long)count);
+	}
+	soa_struct->Struct.soa_count = cast(i32)count;
+
+	scope = create_scope(ctx->info, ctx->scope);
+	soa_struct->Struct.scope = scope;
+
+
 	if (is_polymorphic) {
 		field_count = 0;
 
-		soa_struct = alloc_type_struct();
 		soa_struct->Struct.fields = slice_make<Entity *>(permanent_allocator(), field_count+extra_field_count);
 		soa_struct->Struct.tags = gb_alloc_array(permanent_allocator(), String, field_count+extra_field_count);
-		soa_struct->Struct.node = array_typ_expr;
-		soa_struct->Struct.soa_kind = soa_kind;
-		soa_struct->Struct.soa_elem = elem;
 		soa_struct->Struct.soa_count = 0;
-		soa_struct->Struct.is_polymorphic = true;
 
-		scope = create_scope(ctx->info, ctx->scope);
-		soa_struct->Struct.scope = scope;
+		is_complete = true;
+
 	} else if (is_type_array(elem)) {
 		Type *old_array = base_type(elem);
 		field_count = cast(isize)old_array->Array.count;
 
-		soa_struct = alloc_type_struct();
 		soa_struct->Struct.fields = slice_make<Entity *>(permanent_allocator(), field_count+extra_field_count);
 		soa_struct->Struct.tags = gb_alloc_array(permanent_allocator(), String, field_count+extra_field_count);
-		soa_struct->Struct.node = array_typ_expr;
-		soa_struct->Struct.soa_kind = soa_kind;
-		soa_struct->Struct.soa_elem = elem;
-		if (count > I32_MAX) {
-			count = I32_MAX;
-			error(array_typ_expr, "Array count too large for an #soa struct, got %lld", cast(long long)count);
-		}
-		soa_struct->Struct.soa_count = cast(i32)count;
 
-		scope = create_scope(ctx->info, ctx->scope);
 		string_map_init(&scope->elements, 8);
-		soa_struct->Struct.scope = scope;
 
 		String params_xyzw[4] = {
 			str_lit("x"),
@@ -2765,52 +2868,44 @@ gb_internal Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_e
 			add_entity_use(ctx, nullptr, new_field);
 		}
 
+		is_complete = true;
+
 	} else {
 		GB_ASSERT(is_type_struct(elem));
 
 		Type *old_struct = base_type(elem);
 
-		wait_signal_until_available(&old_struct->Struct.fields_wait_signal);
-		field_count = old_struct->Struct.fields.count;
+		if (old_struct->Struct.fields_wait_signal.futex.load()) {
+			field_count = old_struct->Struct.fields.count;
 
-		soa_struct = alloc_type_struct();
-		soa_struct->Struct.fields = slice_make<Entity *>(permanent_allocator(), field_count+extra_field_count);
-		soa_struct->Struct.tags = gb_alloc_array(permanent_allocator(), String, field_count+extra_field_count);
-		soa_struct->Struct.node = array_typ_expr;
-		soa_struct->Struct.soa_kind = soa_kind;
-		soa_struct->Struct.soa_elem = elem;
-		if (count > I32_MAX) {
-			count = I32_MAX;
-			error(array_typ_expr, "Array count too large for an #soa struct, got %lld", cast(long long)count);
-		}
-		soa_struct->Struct.soa_count = cast(i32)count;
+			soa_struct->Struct.fields = slice_make<Entity *>(permanent_allocator(), field_count+extra_field_count);
+			soa_struct->Struct.tags = gb_alloc_array(permanent_allocator(), String, field_count+extra_field_count);
 
-		scope = create_scope(ctx->info, old_struct->Struct.scope->parent);
-		soa_struct->Struct.scope = scope;
-
-		for_array(i, old_struct->Struct.fields) {
-			Entity *old_field = old_struct->Struct.fields[i];
-			if (old_field->kind == Entity_Variable) {
-				Type *field_type = nullptr;
-				if (soa_kind == StructSoa_Fixed) {
-					GB_ASSERT(count >= 0);
-					field_type = alloc_type_array(old_field->type, count);
+			for_array(i, old_struct->Struct.fields) {
+				Entity *old_field = old_struct->Struct.fields[i];
+				if (old_field->kind == Entity_Variable) {
+					Type *field_type = nullptr;
+					if (soa_kind == StructSoa_Fixed) {
+						GB_ASSERT(count >= 0);
+						field_type = alloc_type_array(old_field->type, count);
+					} else {
+						field_type = alloc_type_pointer(old_field->type);
+					}
+					Entity *new_field = alloc_entity_field(scope, old_field->token, field_type, false, old_field->Variable.field_index);
+					soa_struct->Struct.fields[i] = new_field;
+					add_entity(ctx, scope, nullptr, new_field);
+					add_entity_use(ctx, nullptr, new_field);
 				} else {
-					field_type = alloc_type_pointer(old_field->type);
+					soa_struct->Struct.fields[i] = old_field;
 				}
-				Entity *new_field = alloc_entity_field(scope, old_field->token, field_type, false, old_field->Variable.field_index);
-				soa_struct->Struct.fields[i] = new_field;
-				add_entity(ctx, scope, nullptr, new_field);
-				add_entity_use(ctx, nullptr, new_field);
-			} else {
-				soa_struct->Struct.fields[i] = old_field;
-			}
 
-			soa_struct->Struct.tags[i] = old_struct->Struct.tags[i];
+				soa_struct->Struct.tags[i] = old_struct->Struct.tags[i];
+			}
+			is_complete = true;
 		}
 	}
 
-	if (soa_kind != StructSoa_Fixed) {
+	if (is_complete && soa_kind != StructSoa_Fixed) {
 		Entity *len_field = alloc_entity_field(scope, make_token_ident("__$len"), t_int, false, cast(i32)field_count+0);
 		soa_struct->Struct.fields[field_count+0] = len_field;
 		add_entity(ctx, scope, nullptr, len_field);
@@ -2835,8 +2930,16 @@ gb_internal Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_e
 	Entity *base_type_entity = alloc_entity_type_name(scope, token, elem, EntityState_Resolved);
 	add_entity(ctx, scope, nullptr, base_type_entity);
 
-	add_type_info_type(ctx, soa_struct);
-	wait_signal_set(&soa_struct->Struct.fields_wait_signal);
+	if (is_complete) {
+		add_type_info_type(ctx, soa_struct);
+		wait_signal_set(&soa_struct->Struct.fields_wait_signal);
+	} else {
+		SoaTypeWorkerData *wd = gb_alloc_item(permanent_allocator(), SoaTypeWorkerData);
+		wd->ctx = *ctx;
+		wd->type = soa_struct;
+		wd->wait_to_finish = true;
+		thread_pool_add_task(complete_soa_type_worker, wd);
+	}
 
 	return soa_struct;
 }
