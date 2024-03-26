@@ -62,29 +62,6 @@ Process_Error :: enum {
 Process :: struct {
 	_os_data: _Process,
 	pid: int,
-	stdout: ^File,
-	stderr: ^File,
-	stdin:  ^File,
-}
-
-/*
-	Type for values describing how a given stream of the child process shall
-	be mapped.
-
-	* `None`: The stream will be bound to an equivalent of /dev/null.
-	* `Pipe`: A pipe will be created for that stream, which one can obtain later
-		and use it to pipe the output to a different process or file.
-	* `Stdout`: Special value available for `stderr` stream: binds it with
-		stdout.
-	
-	Additionally in the `Process_Desc` struct, aside from stream bindings from
-	this enum, the corresponding streams accept Handle directly, in order
-	to support piping from one command to another.
-*/
-Stream_Binding :: enum {
-	None,
-	Pipe,
-	Stdout,
 }
 
 /*
@@ -108,12 +85,15 @@ Process_Desc :: struct {
 	// Each element of the slice specifies a string of the form `KEY=VALUE`.
 	// If the duplicate entries are found within the slce, the last one is taken.
 	environment: []string,
-	// Specifies the binding for te stdout stream. See `Stream_Binding`.
-	stdout: union { ^File, Stream_Binding },
-	// Specifies the binding for te stderr stream. See `Stream_Binding`.
-	stderr: union { ^File, Stream_Binding },
-	// Specifies the binding for te stdin stream. See `Stream_Binding`.
-	stdin: union { ^File, Stream_Binding },
+	// Specifies the binding for stdout/stderr/stdin stream. In case of stdout
+	// or stderr, this must be a write-end of a pipe or a writeable file.
+	// In case of stdin, this must be a read-end of a pipe or a readable file.
+	// To create a pipe use `os2.create_pipe()`.
+	// Note that passing a handle here alters the handle such that it is
+	// inheritable.
+	stdout: ^File,
+	stderr: ^File,
+	stdin:  ^File,
 }
 
 /*
