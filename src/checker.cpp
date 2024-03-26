@@ -2048,7 +2048,9 @@ gb_internal void add_type_info_type_internal(CheckerContext *c, Type *t) {
 		add_type_info_type_internal(c, bt->Struct.polymorphic_params);
 		for_array(i, bt->Struct.fields) {
 			Entity *f = bt->Struct.fields[i];
-			add_type_info_type_internal(c, f->type);
+			if (f && f->type) {
+				add_type_info_type_internal(c, f->type);
+			}
 		}
 		add_comparison_procedures_for_fields(c, bt);
 		break;
