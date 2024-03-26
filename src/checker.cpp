@@ -2028,6 +2028,8 @@ gb_internal void add_type_info_type_internal(CheckerContext *c, Type *t) {
 		break;
 
 	case Type_Struct:
+		if (bt->Struct.fields_wait_signal.futex.load() == 0)
+			return;
 		if (bt->Struct.scope != nullptr) {
 			for (auto const &entry : bt->Struct.scope->elements) {
 				Entity *e = entry.value;
