@@ -1,4 +1,4 @@
-//+build windows
+//+private
 package os2
 
 import "base:runtime"
@@ -178,4 +178,3 @@ _write_byte_n_times :: #force_inline proc(builder: ^strings.Builder, b: byte, n:
 		strings.write_byte(builder, b)
 	}
 }
-
