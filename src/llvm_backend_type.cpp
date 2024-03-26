@@ -205,7 +205,7 @@ gb_internal LLVMTypeRef *lb_setup_modified_types_for_type_info(lbModule *m, isiz
 	stypes[1] = lb_type(m, tibt->Struct.fields[1]->type);
 	stypes[2] = lb_type(m, tibt->Struct.fields[2]->type);
 	isize variant_index = 0;
-	if (build_context.int_size == 8) {
+	if (build_context.ptr_size == 8) {
 		stypes[3] = lb_type(m, t_i32); // padding
 		stypes[4] = lb_type(m, tibt->Struct.fields[3]->type);
 		variant_index = 5;
@@ -385,7 +385,7 @@ gb_internal void lb_setup_type_info_data_giant_array(lbModule *m, i64 global_typ
 		small_const_values[2] = type_info_flags.value;
 
 		unsigned variant_index = 0;
-		if (build_context.int_size == 8) {
+		if (build_context.ptr_size == 8) {
 			small_const_values[3] = LLVMConstNull(LLVMStructGetTypeAtIndex(stype, 3));
 			small_const_values[4] = id.value;
 			variant_index = 5;
