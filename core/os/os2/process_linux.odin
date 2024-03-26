@@ -1,6 +1,8 @@
 //+private
 package os2
 
+import "core:time"
+
 _Process :: struct {}
 
 _process_open :: proc(desc: Process_Desc) -> (Process, Process_Error) {
