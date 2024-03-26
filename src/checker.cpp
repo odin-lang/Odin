@@ -1371,6 +1371,7 @@ gb_internal void init_checker(Checker *c) {
 	array_init(&c->nested_proc_lits, heap_allocator(), 0, 1<<20);
 
 	mpsc_init(&c->global_untyped_queue, a); // , 1<<20);
+	mpsc_init(&c->soa_types_to_complete, a); // , 1<<20);
 
 	c->builtin_ctx = make_checker_context(c);
 }
@@ -1383,6 +1384,7 @@ gb_internal void destroy_checker(Checker *c) {
 	array_free(&c->nested_proc_lits);
 	array_free(&c->procs_to_check);
 	mpsc_destroy(&c->global_untyped_queue);
+	mpsc_destroy(&c->soa_types_to_complete);
 }
 
 
@@ -1682,6 +1684,26 @@ gb_internal bool add_entity_with_name(CheckerContext *c, Scope *scope, Ast *iden
 	}
 	return true;
 }
+
+gb_internal bool add_entity_with_name(CheckerInfo *info, Scope *scope, Ast *identifier, Entity *entity, String name) {
+	if (scope == nullptr) {
+		return false;
+	}
+
+
+	if (!is_blank_ident(name)) {
+		Entity *ie = scope_insert(scope, entity);
+		if (ie != nullptr) {
+			return redeclaration_error(name, entity, ie);
+		}
+	}
+	if (identifier != nullptr) {
+		GB_ASSERT(entity->file != nullptr);
+		add_entity_definition(info, identifier, entity);
+	}
+	return true;
+}
+
 gb_internal bool add_entity(CheckerContext *c, Scope *scope, Ast *identifier, Entity *entity) {
 	return add_entity_with_name(c, scope, identifier, entity, entity->token.string);
 }
@@ -4440,6 +4462,10 @@ gb_internal void check_all_global_entities(Checker *c) {
 		DeclInfo *d = e->decl_info;
 		check_single_global_entity(c, e, d);
 		if (e->type != nullptr && is_type_typed(e->type)) {
+			for (Type *t = nullptr; mpsc_dequeue(&c->soa_types_to_complete, &t); /**/) {
+				complete_soa_type(c, t, false);
+			}
+
 			(void)type_size_of(e->type);
 			(void)type_align_of(e->type);
 		}
@@ -6108,6 +6134,9 @@ gb_internal void check_add_definitions_from_queues(Checker *c) {
 }
 
 gb_internal void check_merge_queues_into_arrays(Checker *c) {
+	for (Type *t = nullptr; mpsc_dequeue(&c->soa_types_to_complete, &t); /**/) {
+		complete_soa_type(c, t, false);
+	}
 	check_add_entities_from_queues(c);
 	check_add_definitions_from_queues(c);
 }
@@ -6317,6 +6346,8 @@ gb_internal void check_parsed_files(Checker *c) {
 
 	TIME_SECTION("check bodies have all been checked");
 	check_unchecked_bodies(c);
+
+	TIME_SECTION("check #soa types");
 
 	check_merge_queues_into_arrays(c);
 	thread_pool_wait();

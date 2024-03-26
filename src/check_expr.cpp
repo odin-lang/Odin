@@ -122,6 +122,8 @@ gb_internal bool is_expr_inferred_fixed_array(Ast *type_expr);
 
 gb_internal Entity *find_polymorphic_record_entity(GenTypesData *found_gen_types, isize param_count, Array<Operand> const &ordered_operands);
 
+gb_internal bool complete_soa_type(Checker *checker, Type *t, bool wait_to_finish);
+
 enum LoadDirectiveResult {
 	LoadDirective_Success  = 0,
 	LoadDirective_Error    = 1,
@@ -5031,6 +5033,9 @@ gb_internal Entity *check_selector(CheckerContext *c, Operand *operand, Ast *nod
 		}
 	}
 
+	if (operand->type && is_type_soa_struct(type_deref(operand->type))) {
+		complete_soa_type(c->checker, type_deref(operand->type), false);
+	}
 
 	if (entity == nullptr && selector->kind == Ast_Ident) {
 		String field_name = selector->Ident.token.string;

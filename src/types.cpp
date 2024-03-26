@@ -3772,6 +3772,8 @@ gb_internal i64 type_align_of_internal(Type *t, TypePath *path) {
 			return 1;
 		}
 
+		type_set_offsets(t);
+
 		i64 max = 1;
 		for_array(i, t->Struct.fields) {
 			Type *field_type = t->Struct.fields[i]->type;

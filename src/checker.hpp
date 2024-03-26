@@ -500,6 +500,7 @@ struct Checker {
 
 
 	MPSCQueue<UntypedExprInfo> global_untyped_queue;
+	MPSCQueue<Type *> soa_types_to_complete;
 };
 
 
