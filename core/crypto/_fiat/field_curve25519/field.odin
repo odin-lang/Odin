@@ -109,6 +109,10 @@ fe_carry_opp :: #force_inline proc "contextless" (out1, arg1: ^Tight_Field_Eleme
 	fe_carry(out1, fe_relax_cast(out1))
 }
 
+fe_carry_abs :: #force_inline proc "contextless" (out1, arg1: ^Tight_Field_Element) {
+	fe_cond_negate(out1, arg1, fe_is_negative(arg1))
+}
+
 fe_carry_sqrt_ratio_m1 :: proc "contextless" (
 	out1: ^Tight_Field_Element,
 	arg1: ^Loose_Field_Element, // u
@@ -168,8 +172,7 @@ fe_carry_sqrt_ratio_m1 :: proc "contextless" (
 	fe_cond_assign(r, r_prime, flipped_sign_sqrt | flipped_sign_sqrt_i)
 
 	// Pick the non-negative square root.
-	fe_carry_opp(r_prime, r)
-	fe_cond_select(out1, r, r_prime, fe_is_negative(r))
+	fe_carry_abs(out1, r)
 
 	fe_clear_vec([]^Tight_Field_Element{&w, &tmp1, &tmp2, &tmp3})
 	mem.zero_explicit(&b, size_of(b))
@@ -253,4 +256,12 @@ fe_cond_select :: #force_no_inline proc "contextless" (
 	out1[2] = x3
 	out1[3] = x4
 	out1[4] = x5
+}
+
+fe_cond_negate :: proc "contextless" (out1, arg1: ^Tight_Field_Element, ctrl: int) {
+	tmp1: Tight_Field_Element = ---
+	fe_carry_opp(&tmp1, arg1)
+	fe_cond_select(out1, arg1, &tmp1, ctrl)
+
+	fe_clear(&tmp1)
 }

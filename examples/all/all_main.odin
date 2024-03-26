@@ -37,6 +37,7 @@ import md5              "core:crypto/legacy/md5"
 import sha1             "core:crypto/legacy/sha1"
 import pbkdf2           "core:crypto/pbkdf2"
 import poly1305         "core:crypto/poly1305"
+import ristretto255     "core:crypto/ristretto255"
 import sha2             "core:crypto/sha2"
 import sha3             "core:crypto/sha3"
 import shake            "core:crypto/shake"
@@ -158,6 +159,7 @@ _ :: keccak
 _ :: md5
 _ :: pbkdf2
 _ :: poly1305
+_ :: ristretto255
 _ :: sha1
 _ :: sha2
 _ :: sha3
