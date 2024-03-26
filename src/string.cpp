@@ -237,11 +237,16 @@ gb_internal String string_split_iterator(String_Iterator *it, const char sep) {
 	return substring(it->str, start, end);
 }
 
+gb_internal gb_inline bool is_separator(u8 const &ch) {
+	return (ch == '/' || ch == '\\');
+}
+
+
 gb_internal gb_inline isize string_extension_position(String const &str) {
 	isize dot_pos = -1;
 	isize i = str.len;
 	while (i --> 0) {
-		if (str[i] == '\\' || str[i] == '/')
+		if (is_separator(str[i]))
 			break;
 		if (str[i] == '.') {
 			dot_pos = i;
@@ -332,8 +337,7 @@ gb_internal String filename_from_path(String s) {
 	if (i > 0) {
 		isize j = 0;
 		for (j = s.len-1; j >= 0; j--) {
-			if (s[j] == '/' ||
-				s[j] == '\\') {
+			if (is_separator(s[j])) {
 				break;
 			}
 		}
@@ -346,8 +350,7 @@ gb_internal String filename_from_path(String s) {
 gb_internal String filename_without_directory(String s) {
 	isize j = 0;
 	for (j = s.len-1; j >= 0; j--) {
-		if (s[j] == '/' ||
-			s[j] == '\\') {
+		if (is_separator(s[j])) {
 			break;
 		}
 	}
@@ -410,7 +413,26 @@ gb_internal String copy_string(gbAllocator a, String const &s) {
 	return make_string(data, s.len);
 }
 
-
+gb_internal String normalize_path(gbAllocator a, String const &path, String const &sep) {
+	String s;
+	if (sep.len < 1) {
+		return path;
+	}
+	if (path.len < 1) {
+		s = STR_LIT("");
+	} else if (is_separator(path[path.len-1])) {
+		s = copy_string(a, path);
+	} else {
+		s = concatenate_strings(a, path, sep);
+	}
+	isize i;
+	for (i = 0; i < s.len; i++) {
+		if (is_separator(s.text[i])) {
+			s.text[i] = sep.text[0];
+		}
+	}
+	return s;
+}
 
 
 #if defined(GB_SYSTEM_WINDOWS)

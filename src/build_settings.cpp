@@ -840,13 +840,11 @@ gb_internal String odin_root_dir(void) {
 	char const *found = gb_get_env("ODIN_ROOT", a);
 	if (found) {
 		String path = path_to_full_path(a, make_string_c(found));
-		if (path[path.len-1] != '/' && path[path.len-1] != '\\') {
 		#if defined(GB_SYSTEM_WINDOWS)
-			path = concatenate_strings(a, path, WIN32_SEPARATOR_STRING);
+			path = normalize_path(a, path, WIN32_SEPARATOR_STRING);
 		#else
-			path = concatenate_strings(a, path, NIX_SEPARATOR_STRING);
+			path = normalize_path(a, path, NIX_SEPARATOR_STRING);
 		#endif
-		}
 
 		global_module_path = path;
 		global_module_path_set = true;
