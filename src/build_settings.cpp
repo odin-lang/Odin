@@ -436,7 +436,9 @@ struct BuildContext {
 	BlockingMutex target_features_mutex;
 	StringSet target_features_set;
 	String target_features_string;
+
 	String minimum_os_version_string;
+	bool   minimum_os_version_string_given;
 };
 
 gb_global BuildContext build_context = {0};
@@ -1419,7 +1421,7 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 
 	bc->metrics = *metrics;
 	if (metrics->os == TargetOs_darwin) {
-		if (bc->minimum_os_version_string.len == 0) {
+		if (!bc->minimum_os_version_string_given) {
 			bc->minimum_os_version_string = str_lit("11.0.0");
 		}
 
