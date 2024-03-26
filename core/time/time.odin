@@ -240,7 +240,7 @@ time_add :: proc "contextless" (t: Time, d: Duration) -> Time {
 // On Windows it depends but is comparable with regular sleep in the worst case.
 // To get the same kind of accuracy as on Linux, have your program call `windows.timeBeginPeriod(1)` to
 // tell Windows to use a more accurate timer for your process.
-// Additionally your program should call `windows.timeEndPeriod(1)` when you're done.
+// Additionally your program should call `windows.timeEndPeriod(1)` once you're done. 
 accurate_sleep :: proc "contextless" (d: Duration) {
 	to_sleep, estimate, mean, m2, count: Duration
 
