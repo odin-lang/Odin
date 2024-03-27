@@ -250,6 +250,9 @@ enum BuildFlagKind {
 	BuildFlag_NoThreadedChecker,
 	BuildFlag_ShowDebugMessages,
 
+	BuildFlag_ShowDefineables,
+	BuildFlag_ExportDefineables,
+
 	BuildFlag_Vet,
 	BuildFlag_VetShadowing,
 	BuildFlag_VetUnused,
@@ -439,6 +442,9 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_UseSeparateModules,      str_lit("use-separate-modules"),      BuildFlagParam_None,    Command__does_build);
 	add_flag(&build_flags, BuildFlag_NoThreadedChecker,       str_lit("no-threaded-checker"),       BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_ShowDebugMessages,       str_lit("show-debug-messages"),       BuildFlagParam_None,    Command_all);
+
+	add_flag(&build_flags, BuildFlag_ShowDefineables,         str_lit("show-defineables"),          BuildFlagParam_None,    Command__does_check);
+	add_flag(&build_flags, BuildFlag_ExportDefineables,       str_lit("export-defineables"),        BuildFlagParam_String,  Command__does_check);
 
 	add_flag(&build_flags, BuildFlag_Vet,                     str_lit("vet"),                       BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_VetUnused,               str_lit("vet-unused"),                BuildFlagParam_None,    Command__does_check);
@@ -733,6 +739,24 @@ gb_internal bool parse_build_flags(Array<String> args) {
 								build_context.export_timings_file = path_to_full_path(heap_allocator(), export_path);
 							} else {
 								gb_printf_err("Invalid -export-timings-file path, got %.*s\n", LIT(export_path));
+								bad_flags = true;
+							}
+
+							break;
+						}
+						case BuildFlag_ShowDefineables: {
+							GB_ASSERT(value.kind == ExactValue_Invalid);
+							build_context.show_defineables = true;
+							break;
+						}
+						case BuildFlag_ExportDefineables: {
+							GB_ASSERT(value.kind == ExactValue_String);
+
+							String export_path = string_trim_whitespace(value.value_string);
+							if (is_build_flag_path_valid(export_path)) {
+								build_context.export_defineables_file = path_to_full_path(heap_allocator(), export_path);
+							} else {
+								gb_printf_err("Invalid -export-defineables path, got %.*s\n", LIT(export_path));
 								bad_flags = true;
 							}
 
@@ -1478,6 +1502,109 @@ gb_internal void timings_export_all(Timings *t, Checker *c, bool timings_are_fin
 	gb_printf("Done.\n");
 }
 
+gb_internal void check_defines(BuildContext *bc, Checker *c) {
+	for (auto const &entry : bc->defined_values) {
+		String name = make_string_c(entry.key);
+		ExactValue value = entry.value;
+		GB_ASSERT(value.kind != ExactValue_Invalid);
+		
+		bool found = false;
+		for_array(i, c->info.defineables) {
+			Defineable *def = &c->info.defineables[i];
+			if (def->name == name) {
+				found = true;
+				break;
+			}
+		}
+
+		if (!found) {
+			warning(nullptr, "given -define:%s is unused in the project", name);
+			error_line("\tSuggestion: use the -show-defineables flag for an overview of the possible defines\n");
+		}
+	}
+}
+
+gb_internal void temp_alloc_defineable_strings(Checker *c) {
+	for_array(i, c->info.defineables) {
+		Defineable *def = &c->info.defineables[i];
+		def->default_value_str = make_string_c(write_exact_value_to_string(gb_string_make(temporary_allocator(), ""), def->default_value));
+		def->pos_str           = make_string_c(token_pos_to_string(def->pos));
+	}
+}
+
+gb_internal GB_COMPARE_PROC(defineables_cmp) {
+	Defineable *x = (Defineable *)a;
+	Defineable *y = (Defineable *)b;
+	
+	int cmp = 0;
+	
+	String x_file = get_file_path_string(x->pos.file_id);
+	String y_file = get_file_path_string(y->pos.file_id);
+	cmp = string_compare(x_file, y_file);
+	if (cmp) {
+		return cmp;
+	}
+
+	return i32_cmp(x->pos.offset, y->pos.offset);
+}
+
+gb_internal void sort_defineables(Checker *c) {
+	gb_sort_array(c->info.defineables.data, c->info.defineables.count, defineables_cmp);
+}
+
+gb_internal void export_defineables(Checker *c, String path) {
+	gbFile f = {};
+	gbFileError err = gb_file_open_mode(&f, gbFileMode_Write, (char *)path.text);
+	if (err != gbFileError_None) {
+		gb_printf_err("Failed to export defineables to: %.*s\n", LIT(path));
+		gb_exit(1);
+		return;
+	} else {
+		gb_printf("Exporting defineables to '%.*s'...\n", LIT(path));
+	}
+	defer (gb_file_close(&f));
+
+	gb_fprintf(&f, "Defineable,Default Value,Location\n");
+	for_array(i, c->info.defineables) {
+		Defineable *def = &c->info.defineables[i];
+		gb_fprintf(&f,"%.*s,%.*s,%.*s\n", LIT(def->name), LIT(def->default_value_str), LIT(def->pos_str));
+	}
+}
+
+gb_internal void show_defineables(Checker *c) {
+	isize max_name_len    = gb_strlen("Defineable");
+	isize max_default_len = gb_strlen("Default Value");
+	isize max_pos_len     = gb_strlen("Location");
+
+	for_array(i, c->info.defineables) {
+		Defineable *def = &c->info.defineables[i];
+		if (def->name.len > max_name_len) {
+			max_name_len = def->name.len;
+		}
+
+		if (def->default_value_str.len > max_default_len) {
+			max_default_len = def->default_value_str.len;
+		}
+
+		if (def->pos_str.len > max_pos_len) {
+			max_pos_len = def->pos_str.len;
+		}
+	}
+
+	printf("%-*s - %-*s - %-*s\n",
+		cast(int)max_name_len,    "Defineable",
+		cast(int)max_default_len, "Default Value",
+		cast(int)max_pos_len,     "Location");
+
+	for_array(i, c->info.defineables) {
+		Defineable *def = &c->info.defineables[i];
+		printf("%-*.*s - %-*.*s - %-*.*s\n",
+			cast(int)max_name_len,    LIT(def->name),
+			cast(int)max_default_len, LIT(def->default_value_str),
+			cast(int)max_pos_len,     LIT(def->pos_str));
+	}
+}
+
 gb_internal void show_timings(Checker *c, Timings *t) {
 	Parser *p      = c->parser;
 	isize lines    = p->total_line_count;
@@ -1797,6 +1924,15 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 		print_usage_line(2, "Example: -define:SPAM=123");
 		print_usage_line(2, "Usage in code:");
 		print_usage_line(3, "#config(SPAM, default_value)");
+		print_usage_line(0, "");
+
+		print_usage_line(1, "-show-defineables");
+		print_usage_line(2, "Shows an overview of all the #config/#defined usages in the project.");
+		print_usage_line(0, "");
+
+		print_usage_line(1, "-export-defineables:<filename>");
+		print_usage_line(2, "Exports an overview of all the #config/#defined usages in CSV format to the given file path.");
+		print_usage_line(2, "Example: -export-defineables:defineables.csv");
 		print_usage_line(0, "");
 	}
 
@@ -2702,9 +2838,24 @@ int main(int arg_count, char const **arg_ptr) {
 	defer (destroy_checker(checker));
 
 	check_parsed_files(checker);
+	check_defines(&build_context, checker);
 	if (any_errors()) {
 		print_all_errors();
 		return 1;
+	}
+
+	if (build_context.show_defineables || build_context.export_defineables_file != "") {
+		TEMPORARY_ALLOCATOR_GUARD();
+		temp_alloc_defineable_strings(checker);
+		sort_defineables(checker);
+
+		if (build_context.show_defineables) {
+			show_defineables(checker);
+		}
+
+		if (build_context.export_defineables_file != "") {
+			export_defineables(checker, build_context.export_defineables_file);
+		}
 	}
 
 	if (build_context.command_kind == Command_strip_semicolon) {
