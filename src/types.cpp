@@ -1061,6 +1061,13 @@ gb_internal Type *alloc_type_struct() {
 	return t;
 }
 
+gb_internal Type *alloc_type_struct_complete() {
+	Type *t = alloc_type(Type_Struct);
+	wait_signal_set(&t->Struct.fields_wait_signal);
+	return t;
+}
+
+
 gb_internal Type *alloc_type_union() {
 	Type *t = alloc_type(Type_Union);
 	return t;
