@@ -160,6 +160,7 @@ Open_Flags_Bits :: enum {
 	DSYNC     = 12,
 	ASYNC     = 13,
 	DIRECT    = 14,
+	LARGEFILE = 15,
 	DIRECTORY = 16,
 	NOFOLLOW  = 17,
 	NOATIME   = 18,
