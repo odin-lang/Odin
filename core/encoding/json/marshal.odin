@@ -367,23 +367,36 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 		opt_write_end(w, opt, '}') or_return
 
 	case runtime.Type_Info_Struct:
-		opt_write_start(w, opt, '{') or_return
-		
-		for name, i in info.names {
-			json_name := reflect.struct_tag_get(reflect.Struct_Tag(info.tags[i]), "json")
+		marshal_struct_fields :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: Marshal_Error) {
+			ti := runtime.type_info_base(type_info_of(v.id))
+			info := ti.variant.(runtime.Type_Info_Struct)
+			for name, i in info.names {
+				json_name := reflect.struct_tag_get(reflect.Struct_Tag(info.tags[i]), "json")
 
-			opt_write_iteration(w, opt, i) or_return
-			if json_name != "" {
-				opt_write_key(w, opt, json_name) or_return
-			} else {
-				opt_write_key(w, opt, name) or_return
+				opt_write_iteration(w, opt, i) or_return
+				if json_name != "" {
+					opt_write_key(w, opt, json_name) or_return
+				} else {
+					// Marshal the fields of 'using _: T' fields directly into the parent struct
+					if info.usings[i] && name == "_" {
+						id := info.types[i].id
+						data := rawptr(uintptr(v.data) + info.offsets[i])
+						marshal_struct_fields(w, any{data, id}, opt) or_return
+						continue
+					} else {
+						opt_write_key(w, opt, name) or_return
+					}
+				}
+
+				id := info.types[i].id
+				data := rawptr(uintptr(v.data) + info.offsets[i])
+				marshal_to_writer(w, any{data, id}, opt) or_return
 			}
-
-			id := info.types[i].id
-			data := rawptr(uintptr(v.data) + info.offsets[i])
-			marshal_to_writer(w, any{data, id}, opt) or_return
+			return
 		}
-
+		
+		opt_write_start(w, opt, '{') or_return
+		marshal_struct_fields(w, v, opt) or_return
 		opt_write_end(w, opt, '}') or_return
 
 	case runtime.Type_Info_Union:
