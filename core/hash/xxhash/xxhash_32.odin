@@ -19,15 +19,15 @@ xxh_u32    :: u32
 XXH32_DEFAULT_SEED :: XXH32_hash(0)
 
 XXH32_state :: struct {
-   total_len_32: XXH32_hash,    /*!< Total length hashed, modulo 2^32 */
-   large_len:    XXH32_hash,    /*!< Whether the hash is >= 16 (handles @ref total_len_32 overflow) */
-   v1:           XXH32_hash,    /*!< First accumulator lane */
-   v2:           XXH32_hash,    /*!< Second accumulator lane */
-   v3:           XXH32_hash,    /*!< Third accumulator lane */
-   v4:           XXH32_hash,    /*!< Fourth accumulator lane */
-   mem32:        [4]XXH32_hash, /*!< Internal buffer for partial reads. Treated as unsigned char[16]. */
-   memsize:      XXH32_hash,    /*!< Amount of data in @ref mem32 */
-   reserved:     XXH32_hash,    /*!< Reserved field. Do not read or write to it, it may be removed. */
+	total_len_32: XXH32_hash,    /*!< Total length hashed, modulo 2^32 */
+	large_len:    XXH32_hash,    /*!< Whether the hash is >= 16 (handles @ref total_len_32 overflow) */
+	v1:           XXH32_hash,    /*!< First accumulator lane */
+	v2:           XXH32_hash,    /*!< Second accumulator lane */
+	v3:           XXH32_hash,    /*!< Third accumulator lane */
+	v4:           XXH32_hash,    /*!< Fourth accumulator lane */
+	mem32:        [4]XXH32_hash, /*!< Internal buffer for partial reads. Treated as unsigned char[16]. */
+	memsize:      XXH32_hash,    /*!< Amount of data in @ref mem32 */
+	reserved:     XXH32_hash,    /*!< Reserved field. Do not read or write to it, it may be removed. */
 }
 
 XXH32_canonical :: struct {
