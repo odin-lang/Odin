@@ -3,6 +3,7 @@
 package sync
 
 import "core:c"
+import "core:sys/darwin"
 import "core:time"
 
 foreign import System "system:System.framework"
@@ -29,8 +30,29 @@ _futex_wait :: proc "contextless" (f: ^Futex, expected: u32) -> bool {
 }
 
 _futex_wait_with_timeout :: proc "contextless" (f: ^Futex, expected: u32, duration: time.Duration) -> bool {
+	when darwin.WAIT_ON_ADDRESS_AVAILABLE {
+		s: i32
+		if duration > 0 {
+			s = darwin.os_sync_wait_on_address_with_timeout(f, u64(expected), size_of(Futex), {}, .MACH_ABSOLUTE_TIME, u64(duration))
+		} else {
+			s = darwin.os_sync_wait_on_address(f, u64(expected), size_of(Futex), {})
+		}
+
+		if s >= 0 {
+			return true
+		}
+
+		switch darwin.errno() {
+		case -EINTR, -EFAULT:
+			return true
+		case -ETIMEDOUT:
+			return false
+		case:
+			_panic("darwin.os_sync_wait_on_address_with_timeout failure")
+		}
+	} else {
+
 	timeout_ns := u32(duration) * 1000
-	
 	s := __ulock_wait(UL_COMPARE_AND_WAIT | ULF_NO_ERRNO, f, u64(expected), timeout_ns)
 	if s >= 0 {
 		return true
@@ -45,9 +67,27 @@ _futex_wait_with_timeout :: proc "contextless" (f: ^Futex, expected: u32, durati
 	}
 	return true
 
+	}
 }
 
 _futex_signal :: proc "contextless" (f: ^Futex) {
+	when darwin.WAIT_ON_ADDRESS_AVAILABLE {
+		loop: for {
+			s := darwin.os_sync_wake_by_address_any(f, size_of(Futex), {})
+			if s >= 0 {
+				return
+			}
+			switch darwin.errno() {
+			case -EINTR, -EFAULT:
+				continue loop
+			case -ENOENT:
+				return
+			case:
+				_panic("darwin.os_sync_wake_by_address_any failure")
+			}
+		}
+	} else {
+
 	loop: for {
 		s := __ulock_wake(UL_COMPARE_AND_WAIT | ULF_NO_ERRNO, f, 0)
 		if s >= 0 {
@@ -62,9 +102,28 @@ _futex_signal :: proc "contextless" (f: ^Futex) {
 			_panic("futex_wake_single failure")
 		}
 	}
+
+	}
 }
 
 _futex_broadcast :: proc "contextless" (f: ^Futex) {
+	when darwin.WAIT_ON_ADDRESS_AVAILABLE {
+		loop: for {
+			s := darwin.os_sync_wake_by_address_all(f, size_of(Futex), {})
+			if s >= 0 {
+				return
+			}
+			switch darwin.errno() {
+			case -EINTR, -EFAULT:
+				continue loop
+			case -ENOENT:
+				return
+			case:
+				_panic("darwin.os_sync_wake_by_address_all failure")
+			}
+		}
+	} else {
+
 	loop: for {
 		s := __ulock_wake(UL_COMPARE_AND_WAIT | ULF_NO_ERRNO | ULF_WAKE_ALL, f, 0)
 		if s >= 0 {
@@ -79,5 +138,6 @@ _futex_broadcast :: proc "contextless" (f: ^Futex) {
 			_panic("futex_wake_all failure")
 		}
 	}
-}
 
+	}
+}

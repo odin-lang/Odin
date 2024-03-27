@@ -2885,6 +2885,10 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 		elem = parse_expr(f, true);
 		f->allow_range = prev_allow_range;
 
+		if (elem == nullptr) {
+			syntax_error(token, "Expected a type or range, got nothing");
+		}
+
 		if (allow_token(f, Token_Semicolon)) {
 			underlying = parse_type(f);
 		} else if (allow_token(f, Token_Comma)) {
@@ -2893,6 +2897,7 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 
 			underlying = parse_type(f);
 		}
+
 
 		expect_token(f, Token_CloseBracket);
 		return ast_bit_set_type(f, token, elem, underlying);
@@ -5009,6 +5014,7 @@ gb_internal Ast *parse_stmt(AstFile *f) {
 	case Token_Xor:
 	case Token_Not:
 	case Token_And:
+	case Token_Mul: // Used for error handling when people do C-like things
 		s = parse_simple_stmt(f, StmtAllowFlag_Label);
 		expect_semicolon(f);
 		return s;
