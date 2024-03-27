@@ -434,6 +434,9 @@ _write_at :: proc(f: ^File, p: []byte, offset: i64) -> (n: i64, err: Error) {
 
 _file_size :: proc(f: ^File) -> (n: i64, err: Error) {
 	length: win32.LARGE_INTEGER
+	if f.impl.kind == .Pipe {
+		return 0, .No_Size
+	}
 	handle := _handle(f)
 	if !win32.GetFileSizeEx(handle, &length) {
 		err = _get_platform_error()
@@ -766,7 +769,6 @@ _is_dir :: proc(path: string) -> bool {
 _file_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, offset: i64, whence: io.Seek_From) -> (n: i64, err: io.Error) {
 	f := (^File)(stream_data)
 	ferr: Error
-	i: int
 	switch mode {
 	case .Read:
 		n, ferr = _read(f, p)
