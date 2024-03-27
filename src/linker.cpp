@@ -508,8 +508,10 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 					link_settings = gb_string_append_fmt(link_settings, "-mmacosx-version-min=%.*s ", LIT(build_context.minimum_os_version_string));
 				}
 
-				// This points the linker to where the entry point is
-				link_settings = gb_string_appendc(link_settings, "-e _main ");
+				if (build_context.build_mode != BuildMode_DynamicLibrary) {
+					// This points the linker to where the entry point is
+					link_settings = gb_string_appendc(link_settings, "-e _main ");
+				}
 			}
 
 			if (!build_context.no_crt) {
