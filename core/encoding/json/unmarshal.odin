@@ -370,13 +370,13 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 			
 			fields := reflect.struct_fields_zipped(ti.id)
 
-			field_test :: #force_inline proc "contextless" (field_used: [^]byte, index: int) -> bool {
-				prev_set := field_used[index/8] & byte(index&7) != 0
-				field_used[index/8] |= byte(index&7)
+			field_test :: #force_inline proc "contextless" (field_used: [^]byte, offset: uintptr) -> bool {
+				prev_set := field_used[offset/8] & byte(offset&7) != 0
+				field_used[offset/8] |= byte(offset&7)
 				return prev_set
 			}
 
-			field_used_bytes := (len(fields)+7)/8
+			field_used_bytes := (reflect.size_of_typeid(ti.id)+7)/8
 			field_used := intrinsics.alloca(field_used_bytes, 1)
 			intrinsics.mem_zero(field_used, field_used_bytes)
 
@@ -399,13 +399,45 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 				}
 			}
 			
-			if use_field_idx >= 0 {
-				if field_test(field_used, use_field_idx) {
+			check_children_using_fields :: proc(key: string, parent: typeid) -> (
+				offset: uintptr,
+				type: ^reflect.Type_Info,
+				found: bool,
+			) {
+				for field in reflect.struct_fields_zipped(parent) {
+					if field.is_using && field.name == "_" {
+						offset, type, found = check_children_using_fields(key, field.type.id)
+						if found {
+							offset += field.offset
+							return
+						}
+					}
+
+					if field.name == key {
+						offset = field.offset
+						type = field.type
+						found = true
+						return
+					}
+				}
+				return
+			}
+
+			offset: uintptr
+			type: ^reflect.Type_Info
+			field_found: bool = use_field_idx >= 0
+
+			if field_found {
+				offset = fields[use_field_idx].offset
+				type = fields[use_field_idx].type
+			} else {
+				offset, type, field_found = check_children_using_fields(key, ti.id)
+			}
+
+			if field_found {
+				if field_test(field_used, offset) {
 					return .Multiple_Use_Field
 				}
-				offset := fields[use_field_idx].offset
-				type := fields[use_field_idx].type
-				name := fields[use_field_idx].name
 				
 				field_ptr := rawptr(uintptr(v.data) + offset)
 				field := any{field_ptr, type.id}
