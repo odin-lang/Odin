@@ -4,7 +4,6 @@ import "core:encoding/hex"
 import "core:testing"
 import "core:fmt"
 import "core:os"
-import "core:bytes"
 
 TEST_count := 0
 TEST_fail  := 0
