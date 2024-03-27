@@ -758,6 +758,11 @@ gb_internal void futex_wait(Futex *f, Footex val) {
 
 #elif defined(GB_SYSTEM_OSX)
 
+#if __has_include(<os/os_sync_wait_on_address.h>)
+	#define DARWIN_WAIT_ON_ADDRESS_AVAILABLE
+	#include <os/os_sync_wait_on_address.h>
+#endif
+
 #define UL_COMPARE_AND_WAIT	0x00000001
 #define ULF_NO_ERRNO        0x01000000
 
@@ -765,6 +770,23 @@ extern "C" int __ulock_wait(uint32_t operation, void *addr, uint64_t value, uint
 extern "C" int __ulock_wake(uint32_t operation, void *addr, uint64_t wake_value);
 
 gb_internal void futex_signal(Futex *f) {
+	#ifdef DARWIN_WAIT_ON_ADDRESS_AVAILABLE
+	if (__builtin_available(macOS 14.4, *)) {
+		for (;;) {
+			int ret = os_sync_wake_by_address_any(f, sizeof(Futex), OS_SYNC_WAKE_BY_ADDRESS_NONE);
+			if (ret >= 0) {
+				return;
+			}
+			if (errno == EINTR || errno == EFAULT) {
+				continue;
+			}
+			if (errno == ENOENT) {
+				return;
+			}
+			GB_PANIC("Failed in futex wake %d %d!\n", ret, errno);
+		}
+	} else {
+	#endif
 	for (;;) {
 		int ret = __ulock_wake(UL_COMPARE_AND_WAIT | ULF_NO_ERRNO, f, 0);
 		if (ret >= 0) {
@@ -778,9 +800,29 @@ gb_internal void futex_signal(Futex *f) {
 		}
 		GB_PANIC("Failed in futex wake!\n");
 	}
+	#ifdef DARWIN_WAIT_ON_ADDRESS_AVAILABLE
+	}
+	#endif
 }
 
 gb_internal void futex_broadcast(Futex *f) {
+	#ifdef DARWIN_WAIT_ON_ADDRESS_AVAILABLE
+	if (__builtin_available(macOS 14.4, *)) {
+		for (;;) {
+			int ret = os_sync_wake_by_address_all(f, sizeof(Footex), OS_SYNC_WAKE_BY_ADDRESS_NONE);
+			if (ret >= 0) {
+				return;
+			}
+			if (errno == EINTR || errno == EFAULT) {
+				continue;
+			}
+			if (errno == ENOENT) {
+				return;
+			}
+			GB_PANIC("Failed in futext wake %d %d!\n", ret, errno);
+		}
+	} else {
+	#endif
 	for (;;) {
 		enum { ULF_WAKE_ALL = 0x00000100 };
 		int ret = __ulock_wake(UL_COMPARE_AND_WAIT | ULF_NO_ERRNO | ULF_WAKE_ALL, f, 0);
@@ -795,9 +837,32 @@ gb_internal void futex_broadcast(Futex *f) {
 		}
 		GB_PANIC("Failed in futex wake!\n");
 	}
+	#ifdef DARWIN_WAIT_ON_ADDRESS_AVAILABLE
+	}
+	#endif
 }
 
 gb_internal void futex_wait(Futex *f, Footex val) {
+	#ifdef DARWIN_WAIT_ON_ADDRESS_AVAILABLE
+	if (__builtin_available(macOS 14.4, *)) {
+		for (;;) {
+			int ret = os_sync_wait_on_address(f, cast(uint64_t)(val), sizeof(Footex), OS_SYNC_WAIT_ON_ADDRESS_NONE);
+			if (ret >= 0) {
+				if (*f != val) {
+					return;
+				}
+				continue;
+			}
+			if (errno == EINTR || errno == EFAULT) {
+				continue;
+			}
+			if (errno == ENOENT) {
+				return;
+			}
+			GB_PANIC("Failed in futex wait %d %d!\n", ret, errno);
+		}
+	} else {
+	#endif
 	for (;;) {
 		int ret = __ulock_wait(UL_COMPARE_AND_WAIT | ULF_NO_ERRNO, f, val, 0);
 		if (ret >= 0) {
@@ -815,7 +880,11 @@ gb_internal void futex_wait(Futex *f, Footex val) {
 
 		GB_PANIC("Failed in futex wait!\n");
 	}
+	#ifdef DARWIN_WAIT_ON_ADDRESS_AVAILABLE
+	}
+	#endif
 }
+
 #elif defined(GB_SYSTEM_WINDOWS)
 
 gb_internal void futex_signal(Futex *f) {

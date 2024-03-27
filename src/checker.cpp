@@ -1097,6 +1097,15 @@ gb_internal void init_universal(void) {
 		scope_insert(intrinsics_pkg->scope, t_atomic_memory_order->Named.type_name);
 	}
 
+	{
+		int minimum_os_version = 0;
+		if (build_context.minimum_os_version_string != "") {
+			int major, minor, revision = 0;
+			sscanf(cast(const char *)(build_context.minimum_os_version_string.text), "%d.%d.%d", &major, &minor, &revision);
+			minimum_os_version = (major*10000)+(minor*100)+revision;
+		}
+		add_global_constant("ODIN_MINIMUM_OS_VERSION", t_untyped_integer, exact_value_i64(minimum_os_version));
+	}
 
 	add_global_bool_constant("ODIN_DEBUG",                      bc->ODIN_DEBUG);
 	add_global_bool_constant("ODIN_DISABLE_ASSERT",             bc->ODIN_DISABLE_ASSERT);

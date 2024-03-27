@@ -3,6 +3,8 @@ package darwin
 
 import "core:c"
 
+foreign import system "system:System.framework"
+
 Bool :: b8
 
 RUsage :: struct {
@@ -24,3 +26,10 @@ RUsage :: struct {
 	ru_nivcsw:   c.long,
 }
 
+foreign system {
+	__error :: proc() -> ^i32 ---
+}
+
+errno :: #force_inline proc "contextless" () -> i32 {
+	return __error()^
+}
