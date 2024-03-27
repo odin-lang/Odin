@@ -189,7 +189,7 @@ pop_front_safe :: proc(q: ^$Q/Queue($T)) -> (elem: T, ok: bool) {
 	return
 }
 
-// Push multiple elements to the front of the queue
+// Push multiple elements to the back of the queue
 push_back_elems :: proc(q: ^$Q/Queue($T), elems: ..T) -> (ok: bool, err: runtime.Allocator_Error)  {
 	n := uint(builtin.len(elems))
 	if space(q^) < int(n) {
@@ -241,7 +241,7 @@ clear :: proc(q: ^$Q/Queue($T)) {
 }
 
 
-// Internal growinh procedure
+// Internal growing procedure
 _grow :: proc(q: ^$Q/Queue($T), min_capacity: uint = 0) -> runtime.Allocator_Error {
 	new_capacity := max(min_capacity, uint(8), uint(builtin.len(q.data))*2)
 	n := uint(builtin.len(q.data))
