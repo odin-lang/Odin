@@ -1,3 +1,9 @@
+#define GB_WINDOWS_H_INCLUDED
+#include "gb/gb.h"
+
+#include "mimalloc/mimalloc-new-delete.h"
+#include "mimalloc/mimalloc-override.h"
+
 #if defined(GB_SYSTEM_UNIX)
 // Required for intrinsics on GCC
 #include <xmmintrin.h>
@@ -14,7 +20,6 @@
 #undef NOMINMAX
 #endif
 
-#define GB_WINDOWS_H_INCLUDED
 #define GB_IMPLEMENTATION
 #include "gb/gb.h"
 
