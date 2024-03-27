@@ -3,7 +3,11 @@ package libc
 // 7.30 Wide character classification and mapping utilities
 
 when ODIN_OS == .Windows {
-	foreign import libc "system:libucrt.lib"
+	when #config(WINDOWS_DYNAMIC_CRT, false) {
+		foreign import libc "system:ucrt.lib"
+	} else {
+		foreign import libc "system:libucrt.lib"
+	}
 } else when ODIN_OS == .Darwin {
 	foreign import libc "system:System.framework"
 } else {

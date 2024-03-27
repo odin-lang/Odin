@@ -6,9 +6,16 @@ thrd_start_t :: proc "c" (rawptr) -> int
 tss_dtor_t   :: proc "c" (rawptr)
 
 when ODIN_OS == .Windows {
-	foreign import libc {
-		"system:libucrt.lib", 
-		"system:msvcprt.lib",
+	when #config(WINDOWS_DYNAMIC_CRT, false) {
+		foreign import libc {
+			"system:ucrt.lib",
+			"system:msvcprt.lib",
+		}
+	} else {
+		foreign import libc {
+			"system:libucrt.lib",
+			"system:msvcprt.lib",
+		}
 	}
 
 	thrd_success        :: 0                             // _Thrd_success
