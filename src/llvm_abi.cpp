@@ -876,7 +876,8 @@ namespace lbAbiAmd64SysV {
 		if (types.count == 1) {
 			return types[0];
 		}
-		return LLVMStructTypeInContext(c, types.data, cast(unsigned)types.count, true);
+		// TODO(bill): this should be packed but it causes code generation issues
+		return LLVMStructTypeInContext(c, types.data, cast(unsigned)types.count, false);
 	}
 
 	gb_internal void classify_with(LLVMTypeRef t, Array<RegClass> *cls, i64 ix, i64 off) {
@@ -1165,7 +1166,8 @@ namespace lbAbiArm64 {
 						size_copy -= 8;
 					}
 					GB_ASSERT(size_copy <= 0);
-					cast_type = LLVMStructTypeInContext(c, types, count, true);
+					// TODO(bill): this should be packed but it causes code generation issues
+					cast_type = LLVMStructTypeInContext(c, types, count, false);
 				}
 				return lb_arg_type_direct(return_type, cast_type, nullptr, nullptr);
 			} else {
