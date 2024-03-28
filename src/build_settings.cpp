@@ -1190,11 +1190,16 @@ gb_internal String path_to_fullpath(gbAllocator a, String s, bool *ok_) {
 }
 #elif defined(GB_SYSTEM_OSX) || defined(GB_SYSTEM_UNIX)
 gb_internal String path_to_fullpath(gbAllocator a, String s, bool *ok_) {
+	static gb_thread_local StringMap<String> cache;
+
+	String* cached = string_map_get(&cache, s);
+	if (cached != nullptr) {
+		return copy_string(a, *cached);
+	}
+
 	char *p;
-	mutex_lock(&fullpath_mutex);
 	p = realpath(cast(char *)s.text, 0);
 	defer (free(p));
-	mutex_unlock(&fullpath_mutex);
 	if(p == nullptr) {
 		if (ok_) *ok_ = false;
 
@@ -1207,10 +1212,14 @@ gb_internal String path_to_fullpath(gbAllocator a, String s, bool *ok_) {
 		//
 		// I have opted for 2 because it is much simpler + we already return `ok = false` + further
 		// checks and processes will use the path and cause errors (which we want).
-		return copy_string(a, s);
+		String result = copy_string(a, s);
+		string_map_set(&cache, copy_string(permanent_allocator(), s), copy_string(permanent_allocator(), result));
+		return result;
 	}
 	if (ok_) *ok_ = true;
-	return copy_string(a, make_string_c(p));
+	String result = copy_string(a, make_string_c(p));
+	string_map_set(&cache, copy_string(permanent_allocator(), s), copy_string(permanent_allocator(), result));
+	return result;
 }
 #else
 #error Implement system
