@@ -1189,12 +1189,19 @@ gb_internal String path_to_fullpath(gbAllocator a, String s, bool *ok_) {
 	return result;
 }
 #elif defined(GB_SYSTEM_OSX) || defined(GB_SYSTEM_UNIX)
-gb_internal String path_to_fullpath(gbAllocator a, String s, bool *ok_) {
-	static gb_thread_local StringMap<String> cache;
 
-	String* cached = string_map_get(&cache, s);
+struct PathToFullpathResult {
+	String result;
+	bool   ok;
+};
+
+gb_internal String path_to_fullpath(gbAllocator a, String s, bool *ok_) {
+	static gb_thread_local StringMap<PathToFullpathResult> cache;
+
+	PathToFullpathResult *cached = string_map_get(&cache, s);
 	if (cached != nullptr) {
-		return copy_string(a, *cached);
+		if (ok_) *ok_ = cached->ok;
+		return copy_string(a, cached->result);
 	}
 
 	char *p;
@@ -1213,12 +1220,22 @@ gb_internal String path_to_fullpath(gbAllocator a, String s, bool *ok_) {
 		// I have opted for 2 because it is much simpler + we already return `ok = false` + further
 		// checks and processes will use the path and cause errors (which we want).
 		String result = copy_string(a, s);
-		string_map_set(&cache, copy_string(permanent_allocator(), s), copy_string(permanent_allocator(), result));
+
+		PathToFullpathResult cached_result = {};
+		cached_result.result = copy_string(permanent_allocator(), result);
+		cached_result.ok     = false;
+		string_map_set(&cache, copy_string(permanent_allocator(), s), cached_result);
+
 		return result;
 	}
 	if (ok_) *ok_ = true;
 	String result = copy_string(a, make_string_c(p));
-	string_map_set(&cache, copy_string(permanent_allocator(), s), copy_string(permanent_allocator(), result));
+
+	PathToFullpathResult cached_result = {};
+	cached_result.result = copy_string(permanent_allocator(), result);
+	cached_result.ok     = true;
+	string_map_set(&cache, copy_string(permanent_allocator(), s), cached_result);
+
 	return result;
 }
 #else
