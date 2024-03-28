@@ -34,28 +34,6 @@ get_ppid :: proc() -> int {
 	return -1
 }
 
-
-Process :: struct {
-	pid:          int,
-	handle:       uintptr,
-	is_done:      b32,
-	signal_mutex: sync.RW_Mutex,
-}
-
-
-Process_Attributes :: struct {
-	dir: string,
-	env: []string,
-	files: []^File,
-	sys: ^Process_Attributes_OS_Specific,
-}
-
-Process_Attributes_OS_Specific :: struct{}
-
-Process_Error :: enum {
-	None,
-}
-
 Process_State :: struct {
 	pid:         int,
 	exit_code:   int,
@@ -66,37 +44,132 @@ Process_State :: struct {
 	sys:         rawptr,
 }
 
-Signal :: #type proc()
+TIMEOUT_INFINITE :: time.MAX_DURATION
 
-Kill:      Signal = nil
-Interrupt: Signal = nil
-
-
-find_process :: proc(pid: int) -> (^Process, Process_Error) {
-	return nil, .None
+Process_Error :: enum {
+	None,
+	Not_Found,
+	Not_Executable,
+	Unspecified_Error,
 }
 
+/*
+	Process handle.
 
-process_start :: proc(name: string, argv: []string, attr: ^Process_Attributes) -> (^Process, Process_Error) {
-	return nil, .None
+	Changing any of the values in this struct will not affect the running
+	process.
+*/
+Process :: struct {
+	_os_data: _Process,
+	pid: int,
 }
 
-process_release :: proc(p: ^Process) -> Process_Error {
-	return .None
+/*
+	Description of how the process shall be created.
+*/
+Process_Desc :: struct {
+	// Specifies either an argv array or a command to be run in a default shell
+	// for the current OS.
+	// In case the command is specified as `[]string`,
+	// each element of the slice refers to an element of the resulting argv
+	// array, and the first element specifies the executable to run.
+	// The first element of the slice will be searched in the current working
+	// directory and any of the paths specified by $PATH variable according to
+	// the environment of the parent process. On windows the paths having
+	// .exe or .bat suffix will be searched for as well.
+	// In case the command is specified as `string`, the whole string will be
+	// passed as a single argument into shell (`/bin/sh -c` on linux and
+	// `cmd.exe /C` on windows).
+	command: union { string, []string },
+	// Specifies the environment to run the process at.
+	// Each element of the slice specifies a string of the form `KEY=VALUE`.
+	// If the duplicate entries are found within the slce, the last one is taken.
+	environment: []string,
+	// Specifies the binding for stdout/stderr/stdin stream. In case of stdout
+	// or stderr, this must be a write-end of a pipe or a writeable file.
+	// In case of stdin, this must be a read-end of a pipe or a readable file.
+	// To create a pipe use `os2.create_pipe()`.
+	// Note that passing a handle here alters the handle such that it is
+	// inheritable.
+	stdout: ^File,
+	stderr: ^File,
+	stdin:  ^File,
 }
 
-process_kill :: proc(p: ^Process) -> Process_Error {
-	return .None
+/*
+	Result of waiting on a process handle.
+
+	* `Timeout`: returned, when a wait timeout is reached.
+	* `Exited`: returned, when a process exits via a call to exit() function.
+	Indicates a normal termination of a process.
+	* `Signaled`: returned, when a process terminates due to receiving a
+	signal, or an exception. Indicates an abnormal termination of a process.
+	* `Error`: OS returned an error on an attempt to wait.
+*/
+Wait_Status :: enum {
+	Timeout,
+	Exited,
+	Signaled,
+	Error,
 }
 
-process_signal :: proc(p: ^Process, sig: Signal) -> Process_Error {
-	return .None
+/*
+	Creates a process handle.
+
+	This procedure opens a process handle given a description of the process
+	specified by the `desc` argument.
+	
+	The process referred by the handle is created in
+	**suspended** mode. To run the suspended process call the `process_start()`
+	procedure.
+*/
+process_open :: proc(desc: Process_Desc) -> (Process, Process_Error) {
+	return _process_open(desc)
 }
 
-process_wait :: proc(p: ^Process) -> (Process_State, Process_Error) {
-	return {}, .None
+/*
+	Close a terminated or running process.
+
+	This procedure should be called for any process for which `process_open()`
+	returned successfully.
+*/
+process_close :: proc(process: Process) -> (Process_Error) {
+	return _process_close(process)
 }
 
+/*
+	Run a suspended process.
+*/
+process_start :: proc(process: Process) -> (Process_Error) {
+	return _process_start(process)
+}
 
+/*
+	Suspend a running process.
+*/
+process_suspend :: proc(process: Process) -> (Process_Error) {
+	return _process_suspend(process)
+}
 
+/*
+	Terminate a running process.
+*/
+process_terminate :: proc(process: Process, code: i32) -> (Process_Error) {
+	return _process_terminate(process, code)
+}
+
+/*
+	Wait for termination on a running process, or until the timeout expires.
+
+	If `TIMEOUT_INFINITE` is specified, then the wait is indefinite.
+
+	This function returns the code and a status of the wait. In case the process
+	was terminated normally (via a call to `exit()`), the code represents
+	the exit code of the child process.
+	Otherwise, if it is terminated due to an exception or a signal, the code
+	contains the signal or exception number that terminated the process.
+*/
+process_wait :: proc(process: Process, timeout: time.Duration) -> (int, Wait_Status) {
+	return _process_wait(process, timeout)
+}
 
