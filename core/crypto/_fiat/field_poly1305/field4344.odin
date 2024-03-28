@@ -39,7 +39,13 @@ import "core:math/bits"
 Loose_Field_Element :: distinct [3]u64
 Tight_Field_Element :: distinct [3]u64
 
-_addcarryx_u44 :: #force_inline proc "contextless" (arg1: fiat.u1, arg2, arg3: u64) -> (out1: u64, out2: fiat.u1) {
+_addcarryx_u44 :: #force_inline proc "contextless" (
+	arg1: fiat.u1,
+	arg2, arg3: u64,
+) -> (
+	out1: u64,
+	out2: fiat.u1,
+) {
 	x1 := ((u64(arg1) + arg2) + arg3)
 	x2 := (x1 & 0xfffffffffff)
 	x3 := fiat.u1((x1 >> 44))
@@ -48,7 +54,13 @@ _addcarryx_u44 :: #force_inline proc "contextless" (arg1: fiat.u1, arg2, arg3: u
 	return
 }
 
-_subborrowx_u44 :: #force_inline proc "contextless" (arg1: fiat.u1, arg2, arg3: u64) -> (out1: u64, out2: fiat.u1) {
+_subborrowx_u44 :: #force_inline proc "contextless" (
+	arg1: fiat.u1,
+	arg2, arg3: u64,
+) -> (
+	out1: u64,
+	out2: fiat.u1,
+) {
 	x1 := ((i64(arg2) - i64(arg1)) - i64(arg3))
 	x2 := fiat.i1((x1 >> 44))
 	x3 := (u64(x1) & 0xfffffffffff)
@@ -57,7 +69,13 @@ _subborrowx_u44 :: #force_inline proc "contextless" (arg1: fiat.u1, arg2, arg3: 
 	return
 }
 
-_addcarryx_u43 :: #force_inline proc "contextless" (arg1: fiat.u1, arg2, arg3: u64) -> (out1: u64, out2: fiat.u1) {
+_addcarryx_u43 :: #force_inline proc "contextless" (
+	arg1: fiat.u1,
+	arg2, arg3: u64,
+) -> (
+	out1: u64,
+	out2: fiat.u1,
+) {
 	x1 := ((u64(arg1) + arg2) + arg3)
 	x2 := (x1 & 0x7ffffffffff)
 	x3 := fiat.u1((x1 >> 43))
@@ -66,7 +84,13 @@ _addcarryx_u43 :: #force_inline proc "contextless" (arg1: fiat.u1, arg2, arg3: u
 	return
 }
 
-_subborrowx_u43 :: #force_inline proc "contextless" (arg1: fiat.u1, arg2, arg3: u64) -> (out1: u64, out2: fiat.u1) {
+_subborrowx_u43 :: #force_inline proc "contextless" (
+	arg1: fiat.u1,
+	arg2, arg3: u64,
+) -> (
+	out1: u64,
+	out2: fiat.u1,
+) {
 	x1 := ((i64(arg2) - i64(arg1)) - i64(arg3))
 	x2 := fiat.i1((x1 >> 43))
 	x3 := (u64(x1) & 0x7ffffffffff)
@@ -75,7 +99,7 @@ _subborrowx_u43 :: #force_inline proc "contextless" (arg1: fiat.u1, arg2, arg3: 
 	return
 }
 
-fe_carry_mul :: proc (out1: ^Tight_Field_Element, arg1, arg2: ^Loose_Field_Element) {
+fe_carry_mul :: proc "contextless" (out1: ^Tight_Field_Element, arg1, arg2: ^Loose_Field_Element) {
 	x2, x1 := bits.mul_u64(arg1[2], (arg2[2] * 0x5))
 	x4, x3 := bits.mul_u64(arg1[2], (arg2[1] * 0xa))
 	x6, x5 := bits.mul_u64(arg1[1], (arg2[2] * 0xa))
@@ -120,7 +144,7 @@ fe_carry_mul :: proc (out1: ^Tight_Field_Element, arg1, arg2: ^Loose_Field_Eleme
 	out1[2] = x62
 }
 
-fe_carry_square :: proc (out1: ^Tight_Field_Element, arg1: ^Loose_Field_Element) {
+fe_carry_square :: proc "contextless" (out1: ^Tight_Field_Element, arg1: ^Loose_Field_Element) {
 	x1 := (arg1[2] * 0x5)
 	x2 := (x1 * 0x2)
 	x3 := (arg1[2] * 0x2)
@@ -201,8 +225,11 @@ fe_opp :: proc "contextless" (out1: ^Loose_Field_Element, arg1: ^Tight_Field_Ele
 	out1[2] = x3
 }
 
-@(optimization_mode="none")
-fe_cond_assign :: #force_no_inline proc "contextless" (out1, arg1: ^Tight_Field_Element, arg2: bool) {
+@(optimization_mode = "none")
+fe_cond_assign :: #force_no_inline proc "contextless" (
+	out1, arg1: ^Tight_Field_Element,
+	arg2: bool,
+) {
 	x1 := fiat.cmovznz_u64(fiat.u1(arg2), out1[0], arg1[0])
 	x2 := fiat.cmovznz_u64(fiat.u1(arg2), out1[1], arg1[1])
 	x3 := fiat.cmovznz_u64(fiat.u1(arg2), out1[2], arg1[2])
@@ -324,35 +351,4 @@ fe_relax :: proc "contextless" (out1: ^Loose_Field_Element, arg1: ^Tight_Field_E
 	out1[0] = x1
 	out1[1] = x2
 	out1[2] = x3
-}
-
-// The following routines were added by hand, and do not come from fiat-crypto.
-
-fe_zero :: proc "contextless" (out1: ^Tight_Field_Element) {
-	out1[0] = 0
-	out1[1] = 0
-	out1[2] = 0
-}
-
-fe_set :: #force_inline proc "contextless" (out1, arg1: ^Tight_Field_Element) {
-	x1 := arg1[0]
-	x2 := arg1[1]
-	x3 := arg1[2]
-	out1[0] = x1
-	out1[1] = x2
-	out1[2] = x3
-}
-
-@(optimization_mode="none")
-fe_cond_swap :: #force_no_inline proc "contextless" (out1, out2: ^Tight_Field_Element, arg1: bool) {
-	mask := -u64(arg1)
-	x := (out1[0] ~ out2[0]) & mask
-	x1, y1 := out1[0] ~ x, out2[0] ~ x
-	x = (out1[1] ~ out2[1]) & mask
-	x2, y2 := out1[1] ~ x, out2[1] ~ x
-	x = (out1[2] ~ out2[2]) & mask
-	x3, y3 := out1[2] ~ x, out2[2] ~ x
-	out1[0], out2[0] = x1, y1
-	out1[1], out2[1] = x2, y2
-	out1[2], out2[2] = x3, y3
 }

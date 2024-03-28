@@ -34,3 +34,7 @@ _rand_bytes :: proc (dst: []byte) {
 		dst = dst[n_read:]
 	}
 }
+
+_has_rand_bytes :: proc () -> bool {
+	return true
+}
