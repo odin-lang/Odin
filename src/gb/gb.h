@@ -144,8 +144,6 @@ extern "C" {
 	#error Unknown CPU Type
 #endif
 
-
-
 #ifndef GB_STATIC_ASSERT
 	#define GB_STATIC_ASSERT3(cond, msg) typedef char static_assertion_##msg[(!!(cond))*2-1]
 	// NOTE(bill): Token pasting madness!!
@@ -480,6 +478,13 @@ typedef i32 b32; // NOTE(bill): Prefer this!!!
 	#endif
 #endif
 
+#if !defined(gb_no_asan)
+	#if defined(_MSC_VER)
+		#define gb_no_asan __declspec(no_sanitize_address)
+	#else
+		#define gb_no_asan __attribute__((disable_sanitizer_instrumentation))
+	#endif
+#endif
 
 // NOTE(bill): Easy to grep
 // NOTE(bill): Not needed in macros
@@ -3573,7 +3578,7 @@ gb_inline void gb_str_to_upper(char *str) {
 }
 
 
-gb_inline isize gb_strlen(char const *str) {
+gb_no_asan isize gb_strlen(char const *str) {
 	char const *begin = str;
 	isize const *w;
 	if (str == NULL)  {
@@ -5679,7 +5684,7 @@ char *gb_path_get_full_name(gbAllocator a, char const *path) {
 			isize path_len = gb_strlen(path);
 			isize cwd_len  = gb_strlen(cwd);
 			len            = cwd_len + 1 + path_len + 1;
-			result         = gb_alloc_array(a, char, len);
+			result         = gb_alloc_array(a, char, len+1);
 
 			gb_memmove(result, (void *)cwd, cwd_len);
 			result[cwd_len] = '/';
