@@ -652,7 +652,9 @@ gb_internal void lb_debug_complete_types(lbModule *m) {
 	for_array(debug_incomplete_type_index, m->debug_incomplete_types) {
 		TEMPORARY_ALLOCATOR_GUARD();
 
-		auto const &idt = m->debug_incomplete_types[debug_incomplete_type_index];
+		// NOTE(laytan): don't make this a pointer, the array could resize while in this iteration
+ 		// and cause a use-after-free at the end.
+		auto const idt = m->debug_incomplete_types[debug_incomplete_type_index];
 		GB_ASSERT(idt.type != nullptr);
 		GB_ASSERT(idt.metadata != nullptr);
 
