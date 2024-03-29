@@ -730,9 +730,21 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bo
 		return res;
 	case ExactValue_Float:
 		if (is_type_different_to_arch_endianness(type)) {
-			u64 u = bit_cast<u64>(value.value_float);
-			u = gb_endian_swap64(u);
-			res.value = LLVMConstReal(lb_type(m, original_type), bit_cast<f64>(u));
+			if (type->Basic.kind == Basic_f32le || type->Basic.kind == Basic_f32be) {
+				f32 f = static_cast<float>(value.value_float);
+				u32 u = bit_cast<u32>(f);
+				u = gb_endian_swap32(u);
+				res.value = LLVMConstReal(lb_type(m, original_type), bit_cast<f32>(u));
+			} else if (type->Basic.kind == Basic_f16le || type->Basic.kind == Basic_f16be) {
+				f32 f = static_cast<float>(value.value_float);
+				u16 u = f32_to_f16(f);
+				u = gb_endian_swap16(u);
+				res.value = LLVMConstReal(lb_type(m, original_type), f16_to_f32(u));
+			} else {
+				u64 u = bit_cast<u64>(value.value_float);
+				u = gb_endian_swap64(u);
+				res.value = LLVMConstReal(lb_type(m, original_type), bit_cast<f64>(u));
+			}
 		} else {
 			res.value = LLVMConstReal(lb_type(m, original_type), value.value_float);
 		}
