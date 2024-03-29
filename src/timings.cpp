@@ -44,12 +44,12 @@ gb_internal mach_timebase_info_data_t osx_init_timebase_info(void) {
 }
 
 gb_internal u64 osx_time_stamp_time_now(void) {
-	gb_local_persist mach_timebase_info_data_t data = osx_init_timebase_info();
-	return (mach_absolute_time() * cast(u64)data.numer) / cast(u64)data.denom; // Effectively converts to nanoseconds
+	return mach_absolute_time();
 }
 
 gb_internal u64 osx_time_stamp__freq(void) {
-	return 1000000000ull; // Nanoseconds to seconds
+	gb_local_persist mach_timebase_info_data_t data = osx_init_timebase_info();
+	return 1000000000ull * cast(u64)data.denom / cast(u64)data.numer;
 }
 
 #elif defined(GB_SYSTEM_UNIX)
