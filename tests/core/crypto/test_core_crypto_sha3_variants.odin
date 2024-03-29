@@ -1,5 +1,6 @@
 package test_core_crypto
 
+import "base:runtime"
 import "core:encoding/hex"
 import "core:fmt"
 import "core:testing"
@@ -12,6 +13,8 @@ import tc "tests:common"
 
 @(test)
 test_sha3_variants :: proc(t: ^testing.T) {
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
+
 	tc.log(t, "Testing SHA3 derived functions")
 
 	test_shake(t)

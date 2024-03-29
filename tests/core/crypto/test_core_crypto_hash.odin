@@ -1,5 +1,6 @@
 package test_core_crypto
 
+import "base:runtime"
 import "core:bytes"
 import "core:encoding/hex"
 import "core:fmt"
@@ -12,6 +13,8 @@ import tc "tests:common"
 
 @(test)
 test_hash :: proc(t: ^testing.T) {
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
+
 	tc.log(t, "Testing Hashes")
 
 	// TODO:
