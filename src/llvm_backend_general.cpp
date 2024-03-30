@@ -2121,16 +2121,18 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 				array_add(&fields, padding_type);
 			}
 			
-			i64 padding_offset = 0;
+			i64 prev_offset = 0;
 			for (i32 field_index : struct_fields_index_by_increasing_offset(temporary_allocator(), type)) {
 				Entity *field = type->Struct.fields[field_index];
-				i64 padding = type->Struct.offsets[field_index] - padding_offset;
+				i64 offset = type->Struct.offsets[field_index];
+				GB_ASSERT(offset >= prev_offset);
 
+				i64 padding = offset - prev_offset;
 				if (padding != 0) {
 					LLVMTypeRef padding_type = lb_type_padding_filler(m, padding, type_align_of(field->type));
 					array_add(&fields, padding_type);
 				}
-				
+
 				field_remapping[field_index] = cast(i32)fields.count;
 
 				Type *field_type = field->type;
@@ -2141,14 +2143,11 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 				}
 
 				array_add(&fields, lb_type(m, field_type));
-				
-				if (!type->Struct.is_packed) {
-					padding_offset = align_formula(padding_offset, type_align_of(field->type));
-				}
-				padding_offset += type_size_of(field->type);
+
+				prev_offset = offset + type_size_of(field->type);
 			}
 			
-			i64 end_padding = full_type_size-padding_offset;
+			i64 end_padding = full_type_size-prev_offset;
 			if (end_padding > 0) {
 				array_add(&fields, lb_type_padding_filler(m, end_padding, 1));
 			}
