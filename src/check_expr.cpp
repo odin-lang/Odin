@@ -2419,10 +2419,6 @@ gb_internal bool check_is_not_addressable(CheckerContext *c, Operand *o) {
 }
 
 gb_internal void check_old_for_or_switch_value_usage(Ast *expr) {
-	if (!(build_context.strict_style || (check_vet_flags(expr) & VetFlag_Style))) {
-		return;
-	}
-
 	Entity *e = entity_of_node(expr);
 	if (e != nullptr && (e->flags & EntityFlag_OldForOrSwitchValue) != 0) {
 		GB_ASSERT(e->kind == Entity_Variable);
