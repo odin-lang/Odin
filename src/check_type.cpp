@@ -2477,10 +2477,6 @@ gb_internal Type *get_map_cell_type(Type *type) {
 		return type;
 	}
 
-	if (is_power_of_two(len)) {
-		return type;
-	}
-
 	i64 padding = size - len*elem_size;
 	GB_ASSERT(padding > 0);
 
