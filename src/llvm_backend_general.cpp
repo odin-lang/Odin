@@ -81,7 +81,6 @@ gb_internal void lb_init_module(lbModule *m, Checker *c) {
 	array_init(&m->global_procedures_and_types_to_create, a, 0, 1024);
 	array_init(&m->missing_procedures_to_check, a, 0, 16);
 	map_init(&m->debug_values);
-	array_init(&m->debug_incomplete_types, a, 0, 1024);
 
 	string_map_init(&m->objc_classes);
 	string_map_init(&m->objc_selectors);

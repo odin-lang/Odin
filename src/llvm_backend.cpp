@@ -1978,12 +1978,6 @@ gb_internal void lb_debug_info_complete_types_and_finalize(lbGenerator *gen) {
 	for (auto const &entry : gen->modules) {
 		lbModule *m = entry.value;
 		if (m->debug_builder != nullptr) {
-			lb_debug_complete_types(m);
-		}
-	}
-	for (auto const &entry : gen->modules) {
-		lbModule *m = entry.value;
-		if (m->debug_builder != nullptr) {
 			LLVMDIBuilderFinalize(m->debug_builder);
 		}
 	}

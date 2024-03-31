@@ -199,8 +199,6 @@ struct lbModule {
 	RecursiveMutex debug_values_mutex;
 	PtrMap<void *, LLVMMetadataRef> debug_values; 
 
-	Array<lbIncompleteDebugType> debug_incomplete_types;
-
 	StringMap<lbAddr> objc_classes;
 	StringMap<lbAddr> objc_selectors;
 
