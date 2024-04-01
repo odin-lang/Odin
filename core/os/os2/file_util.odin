@@ -117,7 +117,7 @@ read_entire_file_from_file :: proc(f: ^File, allocator: runtime.Allocator) -> (d
 		}
 	} else {
 		buffer: [1024]u8
-		out_buffer := make([dynamic]u8)
+		out_buffer := make([dynamic]u8, 0, 0, allocator)
 		total := 0
 		for {
 			n: int = ---
