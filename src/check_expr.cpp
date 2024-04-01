@@ -2428,7 +2428,7 @@ gb_internal void check_old_for_or_switch_value_usage(Ast *expr) {
 		if ((e->flags & EntityFlag_ForValue) != 0) {
 			Type *parent_type = type_deref(e->Variable.for_loop_parent_type);
 
-			error(expr, "Assuming a for-in defined value is addressable as the iterable is passed by value has been disallowed with '-strict-style'.");
+			error(expr, "Assuming a for-in defined value is addressable as the iterable is passed by value has been disallowed.");
 
 			if (is_type_map(parent_type)) {
 				error_line("\tSuggestion: Prefer doing 'for key, &%.*s in ...'\n", LIT(e->token.string));
@@ -2438,7 +2438,7 @@ gb_internal void check_old_for_or_switch_value_usage(Ast *expr) {
 		} else {
 			GB_ASSERT((e->flags & EntityFlag_SwitchValue) != 0);
 
-			error(expr, "Assuming a switch-in defined value is addressable as the iterable is passed by value has been disallowed with '-strict-style'.");
+			error(expr, "Assuming a switch-in defined value is addressable as the iterable is passed by value has been disallowed.");
 			error_line("\tSuggestion: Prefer doing 'switch &%.*s in ...'\n", LIT(e->token.string));
 		}
 	}
