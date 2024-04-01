@@ -249,7 +249,6 @@ Type :: struct {
 	// .Bit_Set            - <=2 types: 0=element type, 1=underlying type (Underlying_Type flag will be set)
 	// .Simd_Vector        - 1 type:    0=element
 	// .Relative_Pointer   - 2 types:   0=pointer type, 1=base integer
-	// .Relative_Slice     - 2 types:   0=slice type, 1=base integer
 	// .Multi_Pointer      - 1 type:    0=element
 	// .Matrix             - 1 type:    0=element
 	// .Soa_Pointer        - 1 type:    0=element
