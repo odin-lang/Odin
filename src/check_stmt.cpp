@@ -1479,6 +1479,7 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 	auto vals = array_make<Type *>(temporary_allocator(), 0, 2);
 	auto entities = array_make<Entity *>(temporary_allocator(), 0, 2);
 	bool is_map = false;
+	bool is_bit_set = false;
 	bool use_by_reference_for_value = false;
 	bool is_soa = false;
 	bool is_reverse = rs->reverse;
@@ -1556,14 +1557,9 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 
 			case Type_BitSet:
 				array_add(&vals, t->BitSet.elem);
-				if (rs->vals.count > 1) {
-					error(rs->vals[1], "Expected 1 name when iterating over a bit_set, got %td", rs->vals.count);
-				}
-				if (rs->vals.count == 1 &&
-				    rs->vals[0]->kind == Ast_UnaryExpr &&
-				    rs->vals[0]->UnaryExpr.op.kind == Token_And) {
-					error(rs->vals[0], "When iteraing across a bit_set, you cannot modify the value with '&' as that does not make much sense");
-				}
+				max_val_count = 1;
+				is_bit_set = true;
+				is_possibly_addressable = false;
 				add_type_info_type(ctx, operand.type);
 				break;
 
@@ -1722,7 +1718,7 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 					if (is_possibly_addressable && i == addressable_index) {
 						entity->flags &= ~EntityFlag_Value;
 					} else {
-						char const *idx_name = is_map ? "key" : "index";
+						char const *idx_name = is_map ? "key" : is_bit_set ? "element" : "index";
 						error(token, "The %s variable '%.*s' cannot be made addressable", idx_name, LIT(str));
 					}
 				} else if (i == addressable_index && use_by_reference_for_value) {
