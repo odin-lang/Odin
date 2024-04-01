@@ -925,7 +925,7 @@ gb_internal LLVMMetadataRef lb_debug_type(lbModule *m, Type *type) {
 
 		String name = type->Named.name;
 		if (type->Named.type_name && type->Named.type_name->pkg && type->Named.type_name->pkg->name.len != 0) {
-			name = concatenate3_strings(permanent_allocator(), type->Named.type_name->pkg->name, str_lit("."), type->Named.name);
+			name = concatenate3_strings(temporary_allocator(), type->Named.type_name->pkg->name, str_lit("."), type->Named.name);
 		}
 
 		Type *bt = base_type(type->Named.base);
