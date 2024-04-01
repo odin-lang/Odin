@@ -945,7 +945,7 @@ gb_internal LLVMMetadataRef lb_debug_type(lbModule *m, Type *type) {
 		}
 
 		case Type_Map: {
-			bt = base_type(type->Map.debug_metadata_type);
+			bt = base_type(bt->Map.debug_metadata_type);
 			GB_ASSERT(bt->kind == Type_Struct);
 			return lb_debug_struct(m, type, bt, name, scope, file, line);
 		}
