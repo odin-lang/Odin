@@ -1525,6 +1525,9 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 				array_add(&vals, operand.type);
 				array_add(&vals, t_int);
 				add_type_info_type(ctx, operand.type);
+				if (build_context.no_rtti) {
+					error(node, "Iteration over an enum type is not allowed runtime type information (RTTI) has been disallowed");
+				}
 				goto skip_expr_range_stmt;
 			}
 		} else if (operand.mode != Addressing_Invalid) {
@@ -1561,6 +1564,9 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 				is_bit_set = true;
 				is_possibly_addressable = false;
 				add_type_info_type(ctx, operand.type);
+				if (build_context.no_rtti && is_type_enum(t->BitSet.elem)) {
+					error(node, "Iteration over a bit_set of an enum is not allowed runtime type information (RTTI) has been disallowed");
+				}
 				break;
 
 			case Type_EnumeratedArray:
