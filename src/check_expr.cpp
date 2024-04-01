@@ -4129,7 +4129,7 @@ gb_internal void update_untyped_expr_value(CheckerContext *c, Ast *e, ExactValue
 	}
 }
 
-gb_internal void convert_untyped_error(CheckerContext *c, Operand *operand, Type *target_type) {
+gb_internal void convert_untyped_error(CheckerContext *c, Operand *operand, Type *target_type, bool ignore_error_block=false) {
 	gbString expr_str = expr_to_string(operand->expr);
 	gbString type_str = type_to_string(target_type);
 	gbString from_type_str = type_to_string(operand->type);
@@ -4143,7 +4143,9 @@ gb_internal void convert_untyped_error(CheckerContext *c, Operand *operand, Type
 			}
 		}
 	}
-	ERROR_BLOCK();
+	if (!ignore_error_block) {
+		begin_error_block();
+	}
 
 	error(operand->expr, "Cannot convert untyped value '%s' to '%s' from '%s'%s", expr_str, type_str, from_type_str, extra_text);
 	if (operand->value.kind == ExactValue_String) {
@@ -4158,6 +4160,11 @@ gb_internal void convert_untyped_error(CheckerContext *c, Operand *operand, Type
 	gb_string_free(type_str);
 	gb_string_free(expr_str);
 	operand->mode = Addressing_Invalid;
+
+	if (!ignore_error_block) {
+		end_error_block();
+	}
+
 }
 
 gb_internal ExactValue convert_exact_value_for_type(ExactValue v, Type *type) {
@@ -4287,7 +4294,7 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 				operand->mode = Addressing_Invalid;
 				ERROR_BLOCK();
 				
-				convert_untyped_error(c, operand, target_type);
+				convert_untyped_error(c, operand, target_type, true);
 				error_line("\tNote: Only a square matrix types can be initialized with a scalar value\n");
 				return;
 			} else {
@@ -4350,7 +4357,7 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 
 				GB_ASSERT(first_success_index >= 0);
 				operand->mode = Addressing_Invalid;
-				convert_untyped_error(c, operand, target_type);
+				convert_untyped_error(c, operand, target_type, true);
 
 				error_line("Ambiguous type conversion to '%s', which variant did you mean:\n\t", type_str);
 				i32 j = 0;
@@ -4375,9 +4382,10 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 				ERROR_BLOCK();
 
 				operand->mode = Addressing_Invalid;
-				convert_untyped_error(c, operand, target_type);
+				convert_untyped_error(c, operand, target_type, true);
 				if (count > 0) {
 					error_line("'%s' is a union which only excepts the following types:\n", type_str);
+
 					error_line("\t");
 					for (i32 i = 0; i < count; i++) {
 						Type *v = t->Union.variants[i];
