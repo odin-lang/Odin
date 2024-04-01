@@ -87,26 +87,50 @@ read_entire_file_from_path :: proc(name: string, allocator: runtime.Allocator) -
 
 read_entire_file_from_file :: proc(f: ^File, allocator: runtime.Allocator) -> (data: []byte, err: Error) {
 	size: int
+	has_size := true
 	if size64, err := file_size(f); err == nil {
 		if i64(int(size64)) != size64 {
 			size = int(size64)
 		}
+	} else if err == .No_Size {
+		has_size = false
+	} else {
+		return
 	}
 	size += 1 // for EOF
 
 	// TODO(bill): Is this correct logic?
-	total: int
-	data = make([]byte, size, allocator) or_return
-	for {
-		n: int
-		n, err = read(f, data[total:])
-		total += n
-		if err != nil {
-			if err == .EOF {
-				err = nil
+	if has_size {
+		total: int
+		data = make([]byte, size, allocator) or_return
+		for {
+			n: int
+			n, err = read(f, data[total:])
+			total += n
+			if err != nil {
+				if err == .EOF {
+					err = nil
+				}
+				data = data[:total]
+				return
 			}
-			data = data[:total]
-			return
+		}
+	} else {
+		buffer: [1024]u8
+		out_buffer := make([dynamic]u8, 0, 0, allocator)
+		total := 0
+		for {
+			n: int = ---
+			n, err = read(f, buffer[:])
+			total += n
+			append_elems(&out_buffer, ..buffer[:total])
+			if err != nil {
+				if err == .EOF || err == .Broken_Pipe {
+					err = nil
+				}
+				data = out_buffer[:total]
+				return
+			}
 		}
 	}
 }
