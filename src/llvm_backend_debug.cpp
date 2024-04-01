@@ -117,8 +117,6 @@ gb_internal LLVMMetadataRef lb_debug_basic_struct(lbModule *m, String const &nam
 gb_internal LLVMMetadataRef lb_debug_struct(lbModule *m, Type *type, Type *bt, String name, LLVMMetadataRef scope, LLVMMetadataRef file, unsigned line) {
 	GB_ASSERT(bt->kind == Type_Struct);
 
-	unsigned const int_bits = cast(unsigned)(8*build_context.int_size);
-
 	unsigned tag = DW_TAG_structure_type;
 	if (is_type_raw_union(bt)) {
 		tag = DW_TAG_union_type;
@@ -135,59 +133,12 @@ gb_internal LLVMMetadataRef lb_debug_struct(lbModule *m, Type *type, Type *bt, S
 
 	lb_set_llvm_metadata(m, type, temp_forward_decl);
 
-	isize element_offset = 0;	
-	switch (type->Struct.soa_kind) {
-	case StructSoa_Slice:   element_offset = 1; break;
-	case StructSoa_Dynamic: element_offset = 3; break;
-	}
-
 	type_set_offsets(bt);
 
-	unsigned element_count = cast(unsigned)(bt->Struct.fields.count + element_offset);
+	unsigned element_count = cast(unsigned)(bt->Struct.fields.count);
 	LLVMMetadataRef *elements = gb_alloc_array(temporary_allocator(), LLVMMetadataRef, element_count);
 
 	LLVMMetadataRef member_scope = lb_get_llvm_metadata(m, bt->Struct.scope);
-
-	isize field_size_bits = 8*type_size_of(bt) - element_offset*int_bits;
-
-	switch (bt->Struct.soa_kind) {
-	case StructSoa_Slice:
-		elements[0] = LLVMDIBuilderCreateMemberType(
-			m->debug_builder, member_scope,
-			"len", 3,
-			file, line,
-			8*cast(u64)type_size_of(t_int), 8*cast(u32)type_align_of(t_int),
-			field_size_bits,
-			LLVMDIFlagZero, lb_debug_type(m, t_int)
-		);
-		break;
-	case StructSoa_Dynamic:
-		elements[0] = LLVMDIBuilderCreateMemberType(
-			m->debug_builder, member_scope,
-			"len", 3,
-			file, line,
-			8*cast(u64)type_size_of(t_int), 8*cast(u32)type_align_of(t_int),
-			field_size_bits + 0*int_bits,
-			LLVMDIFlagZero, lb_debug_type(m, t_int)
-		);
-		elements[1] = LLVMDIBuilderCreateMemberType(
-			m->debug_builder, member_scope,
-			"cap", 3,
-			file, line,
-			8*cast(u64)type_size_of(t_int), 8*cast(u32)type_align_of(t_int),
-			field_size_bits + 1*int_bits,
-			LLVMDIFlagZero, lb_debug_type(m, t_int)
-		);
-		elements[2] = LLVMDIBuilderCreateMemberType(
-			m->debug_builder, member_scope,
-			"allocator", 9,
-			file, line,
-			8*cast(u64)type_size_of(t_int), 8*cast(u32)type_align_of(t_int),
-			field_size_bits + 2*int_bits,
-			LLVMDIFlagZero, lb_debug_type(m, t_allocator)
-		);
-		break;
-	}
 
 	for_array(j, bt->Struct.fields) {
 		Entity *f = bt->Struct.fields[j];
