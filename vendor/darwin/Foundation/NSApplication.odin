@@ -79,9 +79,20 @@ Application_setActivationPolicy :: proc "c" (self: ^Application, activationPolic
 	return msgSend(BOOL, self, "setActivationPolicy:", activationPolicy)
 }
 
+@(deprecated="Use NSApplication method activate instead.")
 @(objc_type=Application, objc_name="activateIgnoringOtherApps")
 Application_activateIgnoringOtherApps :: proc "c" (self: ^Application, ignoreOtherApps: BOOL) {
 	msgSend(nil, self, "activateIgnoringOtherApps:", ignoreOtherApps)
+}
+
+@(objc_type=Application, objc_name="activate")
+Application_activate :: proc "c" (self: ^Application) {
+	msgSend(nil, self, "activate")
+}
+
+@(objc_type=Application, objc_name="setTitle")
+Application_setTitle :: proc "c" (self: ^Application, title: ^String) {
+	msgSend(nil, self, "setTitle", title)
 }
 
 @(objc_type=Application, objc_name="setMainMenu")
