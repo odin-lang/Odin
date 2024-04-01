@@ -1554,6 +1554,19 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 				}
 				break;
 
+			case Type_BitSet:
+				array_add(&vals, t->BitSet.elem);
+				if (rs->vals.count > 1) {
+					error(rs->vals[1], "Expected 1 name when iterating over a bit_set, got %td", rs->vals.count);
+				}
+				if (rs->vals.count == 1 &&
+				    rs->vals[0]->kind == Ast_UnaryExpr &&
+				    rs->vals[0]->UnaryExpr.op.kind == Token_And) {
+					error(rs->vals[0], "When iteraing across a bit_set, you cannot modify the value with '&' as that does not make much sense");
+				}
+				add_type_info_type(ctx, operand.type);
+				break;
+
 			case Type_EnumeratedArray:
 				if (is_ptr) use_by_reference_for_value = true;
 				array_add(&vals, t->EnumeratedArray.elem);

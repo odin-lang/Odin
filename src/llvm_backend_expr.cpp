@@ -1373,6 +1373,57 @@ gb_internal bool lb_is_empty_string_constant(Ast *expr) {
 	return false;
 }
 
+gb_internal lbValue lb_build_binary_in(lbProcedure *p, lbValue left, lbValue right, TokenKind op) {
+	Type *rt = base_type(right.type);
+	if (is_type_pointer(rt)) {
+		right = lb_emit_load(p, right);
+		rt = base_type(type_deref(rt));
+	}
+
+	switch (rt->kind) {
+	case Type_Map:
+		{
+			lbValue map_ptr = lb_address_from_load_or_generate_local(p, right);
+			lbValue key = left;
+			lbValue ptr = lb_internal_dynamic_map_get_ptr(p, map_ptr, key);
+			if (op == Token_in) {
+				return lb_emit_conv(p, lb_emit_comp_against_nil(p, Token_NotEq, ptr), t_bool);
+			} else {
+				return lb_emit_conv(p, lb_emit_comp_against_nil(p, Token_CmpEq, ptr), t_bool);
+			}
+		}
+		break;
+	case Type_BitSet:
+		{
+			Type *key_type = rt->BitSet.elem;
+			GB_ASSERT(are_types_identical(left.type, key_type));
+
+			Type *it = bit_set_to_int(rt);
+			left = lb_emit_conv(p, left, it);
+			if (is_type_different_to_arch_endianness(it)) {
+				left = lb_emit_byte_swap(p, left, integer_endian_type_to_platform_type(it));
+			}
+
+			lbValue lower = lb_const_value(p->module, left.type, exact_value_i64(rt->BitSet.lower));
+			lbValue key = lb_emit_arith(p, Token_Sub, left, lower, left.type);
+			lbValue bit = lb_emit_arith(p, Token_Shl, lb_const_int(p->module, left.type, 1), key, left.type);
+			bit = lb_emit_conv(p, bit, it);
+
+			lbValue old_value = lb_emit_transmute(p, right, it);
+			lbValue new_value = lb_emit_arith(p, Token_And, old_value, bit, it);
+
+			if (op == Token_in) {
+				return lb_emit_conv(p, lb_emit_comp(p, Token_NotEq, new_value, lb_const_int(p->module, new_value.type, 0)), t_bool);
+			} else {
+				return lb_emit_conv(p, lb_emit_comp(p, Token_CmpEq, new_value, lb_const_int(p->module, new_value.type, 0)), t_bool);
+			}
+		}
+		break;
+	}
+	GB_PANIC("Invalid 'in' type");
+	return {};
+}
+
 gb_internal lbValue lb_build_binary_expr(lbProcedure *p, Ast *expr) {
 	ast_node(be, BinaryExpr, expr);
 
@@ -1480,57 +1531,8 @@ gb_internal lbValue lb_build_binary_expr(lbProcedure *p, Ast *expr) {
 		{
 			lbValue left = lb_build_expr(p, be->left);
 			lbValue right = lb_build_expr(p, be->right);
-			Type *rt = base_type(right.type);
-			if (is_type_pointer(rt)) {
-				right = lb_emit_load(p, right);
-				rt = base_type(type_deref(rt));
-			}
-
-			switch (rt->kind) {
-			case Type_Map:
-				{
-					lbValue map_ptr = lb_address_from_load_or_generate_local(p, right);
-					lbValue key = left;
-					lbValue ptr = lb_internal_dynamic_map_get_ptr(p, map_ptr, key);
-					if (be->op.kind == Token_in) {
-						return lb_emit_conv(p, lb_emit_comp_against_nil(p, Token_NotEq, ptr), t_bool);
-					} else {
-						return lb_emit_conv(p, lb_emit_comp_against_nil(p, Token_CmpEq, ptr), t_bool);
-					}
-				}
-				break;
-			case Type_BitSet:
-				{
-					Type *key_type = rt->BitSet.elem;
-					GB_ASSERT(are_types_identical(left.type, key_type));
-
-					Type *it = bit_set_to_int(rt);
-					left = lb_emit_conv(p, left, it);
-					if (is_type_different_to_arch_endianness(it)) {
-						left = lb_emit_byte_swap(p, left, integer_endian_type_to_platform_type(it));
-					}
-
-					lbValue lower = lb_const_value(p->module, left.type, exact_value_i64(rt->BitSet.lower));
-					lbValue key = lb_emit_arith(p, Token_Sub, left, lower, left.type);
-					lbValue bit = lb_emit_arith(p, Token_Shl, lb_const_int(p->module, left.type, 1), key, left.type);
-					bit = lb_emit_conv(p, bit, it);
-
-					lbValue old_value = lb_emit_transmute(p, right, it);
-					lbValue new_value = lb_emit_arith(p, Token_And, old_value, bit, it);
-
-					if (be->op.kind == Token_in) {
-						return lb_emit_conv(p, lb_emit_comp(p, Token_NotEq, new_value, lb_const_int(p->module, new_value.type, 0)), t_bool);
-					} else {
-						return lb_emit_conv(p, lb_emit_comp(p, Token_CmpEq, new_value, lb_const_int(p->module, new_value.type, 0)), t_bool);
-					}
-				}
-				break;
-			default:
-				GB_PANIC("Invalid 'in' type");
-			}
-			break;
+			return lb_build_binary_in(p, left, right, be->op.kind);
 		}
-		break;
 	default:
 		GB_PANIC("Invalid binary expression");
 		break;
