@@ -790,6 +790,9 @@ gb_internal void check_enum_type(CheckerContext *ctx, Type *enum_type, Type *nam
 	ast_node(et, EnumType, node);
 	GB_ASSERT(is_type_enum(enum_type));
 
+	enum_type->Enum.base_type = t_int;
+	enum_type->Enum.scope = ctx->scope;
+
 	Type *base_type = t_int;
 	if (et->base_type != nullptr) {
 		base_type = check_type(ctx, et->base_type);
@@ -811,7 +814,6 @@ gb_internal void check_enum_type(CheckerContext *ctx, Type *enum_type, Type *nam
 
 	// NOTE(bill): Must be up here for the 'check_init_constant' system
 	enum_type->Enum.base_type = base_type;
-	enum_type->Enum.scope = ctx->scope;
 
 	auto fields = array_make<Entity *>(permanent_allocator(), 0, et->fields.count);
 
