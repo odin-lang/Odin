@@ -1316,10 +1316,10 @@ begin_window :: proc(ctx: ^Context, title: string, rect: Rect, opt := Options{})
 
 		/* do title text */
 		if .NO_TITLE not_in opt {
-			id := get_id(ctx, "!title")
-			update_control(ctx, id, tr, opt)
+			tid := get_id(ctx, "!title")
+			update_control(ctx, tid, tr, opt)
 			draw_control_text(ctx, title, tr, .TITLE_TEXT, opt)
-			if id == ctx.focus_id && ctx.mouse_down_bits == {.LEFT} {
+			if tid == ctx.focus_id && ctx.mouse_down_bits == {.LEFT} {
 				cnt.rect.x += ctx.mouse_delta.x
 				cnt.rect.y += ctx.mouse_delta.y
 			}
@@ -1329,12 +1329,12 @@ begin_window :: proc(ctx: ^Context, title: string, rect: Rect, opt := Options{})
 
 		/* do `close` button */
 		if .NO_CLOSE not_in opt {
-			id := get_id(ctx, "!close")
+			cid := get_id(ctx, "!close")
 			r := Rect{tr.x + tr.w - tr.h, tr.y, tr.h, tr.h}
 			tr.w -= r.w
 			draw_icon(ctx, .CLOSE, r, ctx.style.colors[.TITLE_TEXT])
-			update_control(ctx, id, r, opt)
-			if .LEFT in ctx.mouse_released_bits && id == ctx.hover_id {
+			update_control(ctx, cid, r, opt)
+			if .LEFT in ctx.mouse_released_bits && cid == ctx.hover_id {
 				cnt.open = false
 			}
 		}
@@ -1343,11 +1343,11 @@ begin_window :: proc(ctx: ^Context, title: string, rect: Rect, opt := Options{})
 	/* do `resize` handle */
 	if .NO_RESIZE not_in opt {
 		sz := ctx.style.footer_height
-		id := get_id(ctx, "!resize")
+		rid := get_id(ctx, "!resize")
 		r := Rect{rect.x + rect.w - sz, rect.y + rect.h - sz, sz, sz}
 		draw_icon(ctx, .RESIZE, r, ctx.style.colors[.TEXT])
-		update_control(ctx, id, r, opt)
-		if id == ctx.focus_id && .LEFT in ctx.mouse_down_bits {
+		update_control(ctx, rid, r, opt)
+		if rid == ctx.focus_id && .LEFT in ctx.mouse_down_bits {
 			cnt.rect.w = max(96, cnt.rect.w + ctx.mouse_delta.x)
 			cnt.rect.h = max(64, cnt.rect.h + ctx.mouse_delta.y)
 		}

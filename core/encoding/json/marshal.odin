@@ -246,7 +246,6 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 		opt_write_end(w, opt, ']') or_return
 		
 	case runtime.Type_Info_Enumerated_Array:
-		index := runtime.type_info_base(info.index).variant.(runtime.Type_Info_Enum)
 		opt_write_start(w, opt, '[') or_return
 		for i in 0..<info.count {
 			opt_write_iteration(w, opt, i) or_return
@@ -299,14 +298,14 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 
 					// check for string type
 					{
-						v := any{key, info.key.id}
-						ti := runtime.type_info_base(type_info_of(v.id))
-						a := any{v.data, ti.id}
+						kv  := any{key, info.key.id}
+						kti := runtime.type_info_base(type_info_of(kv.id))
+						ka  := any{kv.data, kti.id}
 						name: string
 
-						#partial switch info in ti.variant {
+						#partial switch info in kti.variant {
 						case runtime.Type_Info_String:
-							switch s in a {
+							switch s in ka {
 							case string: name = s
 							case cstring: name = string(s)
 							}
@@ -336,13 +335,13 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 
 					// check for string type
 					{
-						v := any{key, info.key.id}
-						ti := runtime.type_info_base(type_info_of(v.id))
-						a := any{v.data, ti.id}
+						kv  := any{key, info.key.id}
+						kti := runtime.type_info_base(type_info_of(kv.id))
+						ka  := any{kv.data, kti.id}
 
-						#partial switch info in ti.variant {
+						#partial switch info in kti.variant {
 						case runtime.Type_Info_String:
-							switch s in a {
+							switch s in ka {
 							case string: name = s
 							case cstring: name = string(s)
 							}

@@ -816,7 +816,6 @@ parse_response :: proc(response: []u8, filter: DNS_Record_Type = nil, allocator 
 
 		dq_sz :: 4
 		hn_sz := skip_hostname(response, cur_idx) or_return
-		dns_query := mem.slice_data_cast([]u16be, response[cur_idx+hn_sz:cur_idx+hn_sz+dq_sz])
 
 		cur_idx += hn_sz + dq_sz
 	}

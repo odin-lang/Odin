@@ -483,9 +483,9 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 			
 			
 			mem.zero_slice(elem_backing)
-			if err := unmarshal_value(p, map_backing_value); err != nil {
+			if uerr := unmarshal_value(p, map_backing_value); uerr != nil {
 				delete(key, p.allocator)
-				return err
+				return uerr
 			}
 
 			key_ptr := rawptr(&key)

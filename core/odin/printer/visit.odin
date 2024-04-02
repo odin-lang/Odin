@@ -1462,9 +1462,9 @@ visit_binary_expr :: proc(p: ^Printer, binary: ^ast.Binary_Expr) {
 	}
 
 	either_implicit_selector := false
-	if _, ok := binary.left.derived.(^ast.Implicit_Selector_Expr); ok {
+	if _, lok := binary.left.derived.(^ast.Implicit_Selector_Expr); lok {
 		either_implicit_selector = true
-	} else if _, ok := binary.right.derived.(^ast.Implicit_Selector_Expr); ok {
+	} else if _, rok := binary.right.derived.(^ast.Implicit_Selector_Expr); rok {
 		either_implicit_selector = true
 	}
 
