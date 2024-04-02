@@ -3359,6 +3359,9 @@ gb_internal lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr) {
 					for (Ast *var_arg : variadic) {
 						lbValue arg = lb_build_expr(p, var_arg);
 						if (is_type_any(elem_type)) {
+							if (is_type_untyped_nil(arg.type)) {
+								arg = lb_const_nil(p->module, t_rawptr);
+							}
 							array_add(&args, lb_emit_conv(p, arg, c_vararg_promote_type(default_type(arg.type))));
 						} else {
 							array_add(&args, lb_emit_conv(p, arg, c_vararg_promote_type(elem_type)));
@@ -3434,6 +3437,9 @@ gb_internal lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr) {
 				for (Ast *var_arg : literal->elems) {
 					lbValue arg = lb_build_expr(p, var_arg);
 					if (is_type_any(elem_type)) {
+						if (is_type_untyped_nil(arg.type)) {
+							arg = lb_const_nil(p->module, t_rawptr);
+						}
 						array_add(&args, lb_emit_conv(p, arg, c_vararg_promote_type(default_type(arg.type))));
 					} else {
 						array_add(&args, lb_emit_conv(p, arg, c_vararg_promote_type(elem_type)));
