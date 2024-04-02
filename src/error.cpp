@@ -12,7 +12,7 @@ struct ErrorValue {
 
 struct ErrorCollector {
 	TokenPos prev;
-	std::atomic<i64>  count; // error+warning_count
+	std::atomic<i64>  count;
 	std::atomic<i64>  warning_count;
 	std::atomic<bool> in_block;
 
@@ -62,7 +62,9 @@ gb_internal ErrorValue *get_error_value(void) {
 gb_internal bool any_errors(void) {
 	return global_error_collector.count.load() != 0;
 }
-
+gb_internal bool any_warnings(void) {
+	return global_error_collector.warning_count.load() != 0;
+}
 
 
 gb_internal void init_global_error_collector(void) {
@@ -384,7 +386,6 @@ gb_internal void warning_va(TokenPos const &pos, TokenPos end, char const *fmt, 
 		error_va(pos, end, fmt, va);
 		return;
 	}
-	global_error_collector.count.fetch_add(1);
 	global_error_collector.warning_count.fetch_add(1);
 	mutex_lock(&global_error_collector.mutex);
 
@@ -601,7 +602,7 @@ gb_internal void syntax_error_with_verbose(TokenPos pos, TokenPos end, char cons
 
 
 gb_internal void compiler_error(char const *fmt, ...) {
-	if (any_errors()) {
+	if (any_errors() || any_warnings()) {
 		print_all_errors();
 	}
 
@@ -617,7 +618,7 @@ gb_internal void compiler_error(char const *fmt, ...) {
 
 
 gb_internal void exit_with_errors(void) {
-	if (any_errors()) {
+	if (any_errors() || any_warnings()) {
 		print_all_errors();
 	}
 	gb_exit(1);
@@ -651,7 +652,7 @@ gb_internal void print_all_errors(void) {
 		}
 	};
 
-	GB_ASSERT(any_errors());
+	GB_ASSERT(any_errors() || any_warnings());
 	gbFile *f = gb_file_get_standard(gbFileStandard_Error);
 
 	array_sort(global_error_collector.error_values, error_value_cmp);

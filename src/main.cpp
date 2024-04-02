@@ -2694,6 +2694,9 @@ int main(int arg_count, char const **arg_ptr) {
 		print_all_errors();
 		return 1;
 	}
+	if (any_warnings()) {
+		print_all_errors();
+	}
 
 	MAIN_TIME_SECTION("type check");
 
@@ -2706,6 +2709,10 @@ int main(int arg_count, char const **arg_ptr) {
 		print_all_errors();
 		return 1;
 	}
+	if (any_warnings()) {
+		print_all_errors();
+	}
+
 
 	if (build_context.command_kind == Command_strip_semicolon) {
 		return strip_semicolons(parser);
