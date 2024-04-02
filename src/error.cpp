@@ -12,7 +12,7 @@ struct ErrorValue {
 
 struct ErrorCollector {
 	TokenPos prev;
-	std::atomic<i64>  count;
+	std::atomic<i64>  count; // error+warning_count
 	std::atomic<i64>  warning_count;
 	std::atomic<bool> in_block;
 
@@ -384,6 +384,7 @@ gb_internal void warning_va(TokenPos const &pos, TokenPos end, char const *fmt, 
 		error_va(pos, end, fmt, va);
 		return;
 	}
+	global_error_collector.count.fetch_add(1);
 	global_error_collector.warning_count.fetch_add(1);
 	mutex_lock(&global_error_collector.mutex);
 
