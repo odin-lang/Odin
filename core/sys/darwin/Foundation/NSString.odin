@@ -23,12 +23,9 @@ StringEncoding :: enum UInteger {
 	WindowsCP1250     = 15,
 	ISO2022JP         = 21,
 	MacOSRoman        = 30,
-
 	UTF16             = Unicode,
-
 	UTF16BigEndian    = 0x90000100,
 	UTF16LittleEndian = 0x94000100,
-
 	UTF32             = 0x8c000100,
 	UTF32BigEndian    = 0x98000100,
 	UTF32LittleEndian = 0x9c000100,
@@ -49,12 +46,9 @@ StringCompareOption :: enum UInteger {
 
 unichar :: distinct u16
 
-@(link_prefix="NS", default_calling_convention="c")
-foreign Foundation {
-	StringFromClass :: proc(cls: Class) -> ^String ---
-}
-
 AT :: MakeConstantString
+
+// CFString is 'toll-free bridged' with its Cocoa Foundation counterpart, NSString.
 MakeConstantString :: proc "c" (#const c: cstring) -> ^String {
 	foreign Foundation {
 		__CFStringMakeConstantString :: proc "c" (c: cstring) -> ^String ---
@@ -62,6 +56,10 @@ MakeConstantString :: proc "c" (#const c: cstring) -> ^String {
 	return __CFStringMakeConstantString(c)
 }
 
+@(link_prefix="NS", default_calling_convention="c")
+foreign Foundation {
+	StringFromClass :: proc(cls: Class) -> ^String ---
+}
 
 @(objc_type=String, objc_name="alloc", objc_is_class_method=true)
 String_alloc :: proc "c" () -> ^String {
@@ -72,7 +70,6 @@ String_alloc :: proc "c" () -> ^String {
 String_init :: proc "c" (self: ^String) -> ^String {
 	return msgSend(^String, self, "init")
 }
-
 
 @(objc_type=String, objc_name="initWithString")
 String_initWithString :: proc "c" (self: ^String, other: ^String) -> ^String {
