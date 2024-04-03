@@ -199,8 +199,8 @@ save_to_buffer :: proc(img: ^Image, custom_info: Info = {}, allocator := context
 				for x in 0 ..< img.width {
 					i := y * img.width + x
 					for c in 0 ..< img.channels {
-						i := i * img.channels + c
-						fmt.sbprintf(&data, "%i ", pixels[i])
+						j := i * img.channels + c
+						fmt.sbprintf(&data, "%i ", pixels[j])
 					}
 					fmt.sbprint(&data, "\n")
 				}
@@ -213,8 +213,8 @@ save_to_buffer :: proc(img: ^Image, custom_info: Info = {}, allocator := context
 				for x in 0 ..< img.width {
 					i := y * img.width + x
 					for c in 0 ..< img.channels {
-						i := i * img.channels + c
-						fmt.sbprintf(&data, "%i ", pixels[i])
+						j := i * img.channels + c
+						fmt.sbprintf(&data, "%i ", pixels[j])
 					}
 					fmt.sbprint(&data, "\n")
 				}
@@ -283,7 +283,7 @@ _parse_header_pnm :: proc(data: []byte) -> (header: Header, length: int, err: Er
 	current_field := 0
 	current_value := header_fields[0]
 
-	parse_loop: for d, i in data[SIG_LENGTH:] {
+	parse_loop: for d in data[SIG_LENGTH:] {
 		length += 1
 
 		// handle comments

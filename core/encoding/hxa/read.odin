@@ -177,7 +177,7 @@ read :: proc(data: []byte, filename := "<input>", print_error := false, allocato
 	}
 	defer file.nodes = file.nodes[:node_count]
 
-	for node_idx in 0..<header.internal_node_count {
+	for _ in 0..<header.internal_node_count {
 		node := &file.nodes[node_count]
 		type := read_value(r, Node_Type) or_return
 		if type > max(Node_Type) {

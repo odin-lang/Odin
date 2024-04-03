@@ -119,9 +119,9 @@ aton :: proc(address_and_maybe_port: string, family: Address_Family, allow_decim
 		}
 
 		a: [4]u8 = ---
-		for v, i in buf {
+		for v, j in buf {
 			if v > 255 { return {}, false }
-			a[i] = u8(v)
+			a[j] = u8(v)
 		}
 		return IP4_Address(a), true
 

@@ -18,8 +18,8 @@ init_os_version :: proc () {
 	fd, errno := linux.open("/etc/os-release", {.RDONLY}, {})
 	assert(errno == .NONE, "Failed to read /etc/os-release")
 	defer {
-		errno := linux.close(fd)
-		assert(errno == .NONE, "Failed to close the file descriptor")
+		cerrno := linux.close(fd)
+		assert(cerrno == .NONE, "Failed to close the file descriptor")
 	}
 	os_release_buf: [2048]u8
 	n, read_errno := linux.read(fd, os_release_buf[:])

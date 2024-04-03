@@ -128,7 +128,7 @@ parse_qt_linguist_from_bytes :: proc(data: []byte, options := DEFAULT_PARSE_OPTI
 
 				num_plurals: int
 				for {
-					numerus_id := xml.find_child_by_ident(ts, translation_id, "numerusform", num_plurals) or_break
+					xml.find_child_by_ident(ts, translation_id, "numerusform", num_plurals) or_break
 					num_plurals += 1
 				}
 

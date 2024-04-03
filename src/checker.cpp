@@ -224,7 +224,7 @@ gb_internal Scope *create_scope(CheckerInfo *info, Scope *parent) {
 	if (parent != nullptr && parent != builtin_pkg->scope) {
 		Scope *prev_head_child = parent->head_child.exchange(s, std::memory_order_acq_rel);
 		if (prev_head_child) {
-			prev_head_child->next.store(s, std::memory_order_release);
+			s->next.store(prev_head_child, std::memory_order_release);
 		}
 	}
 

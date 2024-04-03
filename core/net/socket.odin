@@ -161,11 +161,10 @@ recv_any :: proc(socket: Any_Socket, buf: []byte) -> (
 ) {
 	switch socktype in socket {
 	case TCP_Socket:
-		bytes_read, err := recv_tcp(socktype, buf)
-		return bytes_read, nil, err
+		bytes_read, err = recv_tcp(socktype, buf)
+		return
 	case UDP_Socket:
-		bytes_read, endpoint, err := recv_udp(socktype, buf)
-		return bytes_read, endpoint, err
+		return recv_udp(socktype, buf)
 	case: panic("Not supported")
 	}
 }
