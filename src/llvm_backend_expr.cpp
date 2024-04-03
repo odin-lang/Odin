@@ -4677,8 +4677,10 @@ gb_internal lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 			if (tav.mode == Addressing_Type) { // Addressing_Type
 				Selection sel = lookup_field(tav.type, selector, true);
 				if (sel.pseudo_field) {
-					GB_ASSERT(sel.entity->kind == Entity_Procedure);
-					return lb_addr(lb_find_value_from_entity(p->module, sel.entity));
+					GB_ASSERT(sel.entity->kind == Entity_Procedure || sel.entity->kind == Entity_ProcGroup);
+					Entity *e = entity_of_node(sel_node);
+					GB_ASSERT(e->kind == Entity_Procedure);
+					return lb_addr(lb_find_value_from_entity(p->module, e));
 				}
 				GB_PANIC("Unreachable %.*s", LIT(selector));
 			}
