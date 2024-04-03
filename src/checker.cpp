@@ -703,6 +703,15 @@ gb_internal void check_scope_usage(Checker *c, Scope *scope, u64 vet_flags) {
 			array_add(&vetted_entities, ve_unused);
 		} else if (is_shadowed) {
 			array_add(&vetted_entities, ve_shadowed);
+		} else if (e->kind == Entity_Variable && (e->flags & (EntityFlag_Param|EntityFlag_Using)) == 0) {
+			i64 sz = type_size_of(e->type);
+			// TODO(bill): When is a good size warn?
+			// Is 128 KiB good enough?
+			if (sz >= 1ll<<17) {
+				gbString type_str = type_to_string(e->type);
+				warning(e->token, "Declaration of '%.*s' may cause a stack overflow due to its type '%s' having a size of %lld bytes", LIT(e->token.string), type_str, cast(long long)sz);
+				gb_string_free(type_str);
+			}
 		}
 	}
 	rw_mutex_shared_unlock(&scope->mutex);
@@ -732,17 +741,6 @@ gb_internal void check_scope_usage(Checker *c, Scope *scope, u64 vet_flags) {
 				break;
 			default:
 				break;
-			}
-		}
-
-		if (e->kind == Entity_Variable && (e->flags & (EntityFlag_Param|EntityFlag_Using)) == 0) {
-			i64 sz = type_size_of(e->type);
-			// TODO(bill): When is a good size warn?
-			// Is 128 KiB good enough?
-			if (sz >= 1ll<<17) {
-				gbString type_str = type_to_string(e->type);
-				warning(e->token, "Declaration of '%.*s' may cause a stack overflow due to its type '%s' having a size of %lld bytes", LIT(name), type_str, cast(long long)sz);
-				gb_string_free(type_str);
 			}
 		}
 	}
