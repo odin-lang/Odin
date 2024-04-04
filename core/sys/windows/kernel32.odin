@@ -324,6 +324,7 @@ foreign kernel32 {
 		lpName: LPCWSTR,
 	) -> HANDLE ---
 	ResetEvent :: proc(hEvent: HANDLE) -> BOOL ---
+	SetEvent :: proc(hEvent: HANDLE) -> BOOL ---
 	WaitForMultipleObjects :: proc(
 		nCount: DWORD,
 		lpHandles: ^HANDLE,
