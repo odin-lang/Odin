@@ -192,7 +192,7 @@ gb_internal void lb_add_function_type_attributes(LLVMValueRef fn, lbFunctionType
 	// } 
 	LLVMSetFunctionCallConv(fn, cc_kind);
 	if (calling_convention == ProcCC_Odin) {
-		unsigned context_index = offset+arg_count;
+		unsigned context_index = arg_index;
 		LLVMAddAttributeAtIndex(fn, context_index, noalias_attr);
 		LLVMAddAttributeAtIndex(fn, context_index, nonnull_attr);
 		LLVMAddAttributeAtIndex(fn, context_index, nocapture_attr);
