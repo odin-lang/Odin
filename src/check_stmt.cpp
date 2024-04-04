@@ -740,6 +740,25 @@ gb_internal bool check_using_stmt_entity(CheckerContext *ctx, AstUsingStmt *us, 
 	return true;
 }
 
+gb_internal void error_var_decl_identifier(Ast *name) {
+	GB_ASSERT(name != nullptr);
+	GB_ASSERT(name->kind != Ast_Ident);
+
+	ERROR_BLOCK();
+	gbString s = expr_to_string(name);
+	defer (gb_string_free(s));
+
+	error(name, "A variable declaration must be an identifier, got '%s'", s);
+	if (name->kind == Ast_Implicit) {
+		String imp = name->Implicit.string;
+		if (imp == "context") {
+			error_line("\tSuggestion: '%.*s' is a reserved keyword, would 'ctx' suffice?\n", LIT(imp));
+		} else {
+			error_line("\tNote: '%.*s' is a reserved keyword\n", LIT(imp));
+		}
+	}
+}
+
 gb_internal void check_inline_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 	ast_node(irs, UnrollRangeStmt, node);
 	check_open_scope(ctx, node);
@@ -851,7 +870,7 @@ gb_internal void check_inline_range_stmt(CheckerContext *ctx, Ast *node, u32 mod
 				entity = found;
 			}
 		} else {
-			error(name, "A variable declaration must be an identifier");
+			error_var_decl_identifier(name);
 		}
 
 		if (entity == nullptr) {
@@ -1747,9 +1766,7 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 				entity = found;
 			}
 		} else {
-			gbString s = expr_to_string(lhs[i]);
-			error(name, "A variable declaration must be an identifier, got %s", s);
-			gb_string_free(s);
+			error_var_decl_identifier(name);
 		}
 
 		if (entity == nullptr) {
@@ -1801,7 +1818,7 @@ gb_internal void check_value_decl_stmt(CheckerContext *ctx, Ast *node, u32 mod_f
 	for (Ast *name : vd->names) {
 		Entity *entity = nullptr;
 		if (name->kind != Ast_Ident) {
-			error(name, "A variable declaration must be an identifier");
+			error_var_decl_identifier(name);
 		} else {
 			Token token = name->Ident.token;
 			String str = token.string;
