@@ -1482,7 +1482,16 @@ gb_internal Token expect_token(AstFile *f, TokenKind kind) {
 	if (prev.kind != kind) {
 		String c = token_strings[kind];
 		String p = token_to_string(prev);
+		begin_error_block();
 		syntax_error(f->curr_token, "Expected '%.*s', got '%.*s'", LIT(c), LIT(p));
+		if (kind == Token_Ident) switch (prev.kind) {
+		case Token_context:
+			error_line("\tSuggestion: 'context' is a reserved keyword, would 'ctx' suffice?\n");
+			break;
+		}
+
+		end_error_block();
+
 		if (prev.kind == Token_EOF) {
 			exit_with_errors();
 		}
@@ -4055,7 +4064,12 @@ gb_internal Array<Ast *> convert_to_ident_list(AstFile *f, Array<AstAndFlags> li
 		case Ast_BadExpr:
 			break;
 		case Ast_Implicit:
+			begin_error_block();
 			syntax_error(ident, "Expected an identifier, '%.*s' which is a keyword", LIT(ident->Implicit.string));
+			if (ident->Implicit.kind == Token_context) {
+				error_line("\tSuggestion: Would 'ctx' suffice as an alternative name?\n");
+			}
+			end_error_block();
 			ident = ast_ident(f, blank_token);
 			break;
 
