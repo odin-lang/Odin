@@ -143,6 +143,8 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 			string_set_init(&min_libs_set, 64);
 			defer (string_set_destroy(&min_libs_set));
 
+			String prev_lib = {};
+
 			StringSet asm_files = {};
 			string_set_init(&asm_files, 64);
 			defer (string_set_destroy(&asm_files));
@@ -191,7 +193,10 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 						}
 					} else if (!string_set_update(&min_libs_set, lib) ||
 					           !build_context.min_link_libs) {
-						lib_str = gb_string_append_fmt(lib_str, " \"%.*s\"", LIT(lib));
+						if (prev_lib != lib) {
+							lib_str = gb_string_append_fmt(lib_str, " \"%.*s\"", LIT(lib));
+						}
+						prev_lib = lib;
 					}
 				}
 			}
@@ -317,6 +322,8 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 			StringSet min_libs_set = {};
 			string_set_init(&min_libs_set, 64);
 			defer (string_set_destroy(&min_libs_set));
+
+			String prev_lib = {};
 			
 			for (Entity *e : gen->foreign_libraries) {
 				GB_ASSERT(e->kind == Entity_LibraryName);
@@ -387,6 +394,11 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 						if (string_set_update(&min_libs_set, lib) && build_context.min_link_libs) {
 							continue;
 						}
+
+						if (prev_lib == lib) {
+							continue;
+						}
+						prev_lib = lib;
 
 						// Do not add libc again, this is added later already, and omitted with
 						// the `-no-crt` flag, not skipping here would cause duplicate library
