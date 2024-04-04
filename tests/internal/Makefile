@@ -1,6 +1,6 @@
 ODIN=../../odin
 
-all: rtti_test map_test pow_test 128_test
+all: rtti_test map_test pow_test 128_test asan_test
 
 rtti_test:
 	$(ODIN) run test_rtti.odin -file -vet -strict-style -o:minimal
@@ -13,3 +13,6 @@ pow_test:
 
 128_test:
 	$(ODIN) run test_128.odin -file -vet -strict-style -o:minimal
+
+asan_test:
+	$(ODIN) run test_asan.odin -file -sanitize:address -debug
