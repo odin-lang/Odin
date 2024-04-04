@@ -275,7 +275,7 @@ gb_internal i64 lb_alignof(LLVMTypeRef type) {
 	case LLVMIntegerTypeKind:
 		{
 			unsigned w = LLVMGetIntTypeWidth(type);
-			return gb_clamp((w + 7)/8, 1, build_context.ptr_size);
+			return gb_clamp((w + 7)/8, 1, build_context.max_align);
 		}
 	case LLVMHalfTypeKind:
 		return 2;
