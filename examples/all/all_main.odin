@@ -29,6 +29,7 @@ import blake2s          "core:crypto/blake2s"
 import chacha20         "core:crypto/chacha20"
 import chacha20poly1305 "core:crypto/chacha20poly1305"
 import crypto_hash      "core:crypto/hash"
+import ed25519          "core:crypto/ed25519"
 import hkdf             "core:crypto/hkdf"
 import hmac             "core:crypto/hmac"
 import kmac             "core:crypto/kmac"
@@ -152,6 +153,7 @@ _ :: blake2b
 _ :: blake2s
 _ :: chacha20
 _ :: chacha20poly1305
+_ :: ed25519
 _ :: hmac
 _ :: hkdf
 _ :: kmac
