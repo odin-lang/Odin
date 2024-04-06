@@ -2,7 +2,7 @@
 package sync
 
 import "core:c"
-import "core:runtime"
+import "base:runtime"
 import "core:sys/haiku"
 import "core:sys/unix"
 import "core:time"
