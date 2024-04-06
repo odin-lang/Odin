@@ -1,7 +1,7 @@
 //+build darwin
 package darwin
 
-import "core:runtime"
+import "base:runtime"
 
 foreign import core_foundation "system:CoreFoundation.framework"
 
