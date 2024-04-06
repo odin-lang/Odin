@@ -251,7 +251,7 @@ foreign lib {
 	GuiDisable          :: proc() ---                                                                         // Disable gui controls (global state)
 	GuiUnlock           :: proc() ---                                                                         // Unlock gui controls (global state)
 	GuiIsLocked         :: proc() -> bool ---                                                                 // Check if gui is locked (global state)
-	GuiFade             :: proc(alpha: f32) ---                                                               // Set gui controls alpha (global state), alpha goes from 0.0f to 1.0f
+	GuiSetAlpha         :: proc(alpha: f32) ---                                                               // Set gui controls alpha (global state), alpha goes from 0.0f to 1.0f
 	GuiSetState         :: proc(state: c.int) ---                                                             // Set gui state (global state)
 	GuiGetState         :: proc() -> c.int ---                                                                // Get gui state (global state)
 	
