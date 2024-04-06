@@ -324,6 +324,7 @@ foreign kernel32 {
 		lpName: LPCWSTR,
 	) -> HANDLE ---
 	ResetEvent :: proc(hEvent: HANDLE) -> BOOL ---
+	SetEvent :: proc(hEvent: HANDLE) -> BOOL ---
 	WaitForMultipleObjects :: proc(
 		nCount: DWORD,
 		lpHandles: ^HANDLE,
@@ -544,6 +545,10 @@ FILE_MAP_COPY            :: DWORD(0x00000001)
 FILE_MAP_RESERVE         :: DWORD(0x80000000)
 FILE_MAP_TARGETS_INVALID :: DWORD(0x40000000)
 FILE_MAP_LARGE_PAGES     :: DWORD(0x20000000)
+
+// Flags for `SetFileCompletionNotificationModes`.
+FILE_SKIP_COMPLETION_PORT_ON_SUCCESS :: 0x1
+FILE_SKIP_SET_EVENT_ON_HANDLE        :: 0x2
 
 PAGE_NOACCESS          :: 0x01
 PAGE_READONLY          :: 0x02

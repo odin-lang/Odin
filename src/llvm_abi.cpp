@@ -192,7 +192,7 @@ gb_internal void lb_add_function_type_attributes(LLVMValueRef fn, lbFunctionType
 	// } 
 	LLVMSetFunctionCallConv(fn, cc_kind);
 	if (calling_convention == ProcCC_Odin) {
-		unsigned context_index = offset+arg_count;
+		unsigned context_index = arg_index;
 		LLVMAddAttributeAtIndex(fn, context_index, noalias_attr);
 		LLVMAddAttributeAtIndex(fn, context_index, nonnull_attr);
 		LLVMAddAttributeAtIndex(fn, context_index, nocapture_attr);
@@ -275,7 +275,7 @@ gb_internal i64 lb_alignof(LLVMTypeRef type) {
 	case LLVMIntegerTypeKind:
 		{
 			unsigned w = LLVMGetIntTypeWidth(type);
-			return gb_clamp((w + 7)/8, 1, build_context.ptr_size);
+			return gb_clamp((w + 7)/8, 1, build_context.max_align);
 		}
 	case LLVMHalfTypeKind:
 		return 2;
@@ -558,7 +558,6 @@ namespace lbAbiAmd64SysV {
 		Amd64TypeAttribute_StructRect,
 	};
 
-	gb_internal LB_ABI_COMPUTE_RETURN_TYPE(compute_return_type);
 	gb_internal void classify_with(LLVMTypeRef t, Array<RegClass> *cls, i64 ix, i64 off);
 	gb_internal void fixup(LLVMTypeRef t, Array<RegClass> *cls);
 	gb_internal lbArgType amd64_type(LLVMContextRef c, LLVMTypeRef type, Amd64TypeAttributeKind attribute_kind, ProcCallingConvention calling_convention);
@@ -796,10 +795,10 @@ namespace lbAbiAmd64SysV {
 			}
 		}
 
+		i64 sz = lb_sizeof(type);
 		if (all_ints) {
-			i64 sz = lb_sizeof(type);
 			for_array(i, reg_classes) {
-				GB_ASSERT(sz != 0);
+				GB_ASSERT(sz > 0);
 				// TODO(bill): is this even correct? BECAUSE LLVM DOES NOT DOCUMENT ANY OF THIS!!!
 				if (sz >= 8) {
 					array_add(&types, LLVMIntTypeInContext(c, 64));
@@ -811,12 +810,16 @@ namespace lbAbiAmd64SysV {
 			}
 		} else {
 			for (isize i = 0; i < reg_classes.count; /**/) {
+				GB_ASSERT(sz > 0);
 				RegClass reg_class = reg_classes[i];
 				switch (reg_class) {
 				case RegClass_Int:
-					// TODO(bill): is this even correct? BECAUSE LLVM DOES NOT DOCUMENT ANY OF THIS!!!
-					array_add(&types, LLVMIntTypeInContext(c, 64));
-					break;
+					{
+						i64 rs = gb_min(sz, 8);
+						array_add(&types, LLVMIntTypeInContext(c, cast(unsigned)(rs*8)));
+						sz -= rs;
+						break;
+					}
 				case RegClass_SSEFv:
 				case RegClass_SSEDv:
 				case RegClass_SSEInt8:
@@ -856,15 +859,18 @@ namespace lbAbiAmd64SysV {
 						unsigned vec_len = llvec_len(reg_classes, i+1);
 						LLVMTypeRef vec_type = LLVMVectorType(elem_type, vec_len * elems_per_word);
 						array_add(&types, vec_type);
+						sz -= lb_sizeof(vec_type);
 						i += vec_len;
 						continue;
 					}
 					break;
 				case RegClass_SSEFs:
 					array_add(&types, LLVMFloatTypeInContext(c));
+					sz -= 4;
 					break;
 				case RegClass_SSEDs:
 					array_add(&types, LLVMDoubleTypeInContext(c));
+					sz -= 8;
 					break;
 				default:
 					GB_PANIC("Unhandled RegClass");
@@ -876,8 +882,8 @@ namespace lbAbiAmd64SysV {
 		if (types.count == 1) {
 			return types[0];
 		}
-		// TODO(bill): this should be packed but it causes code generation issues
-		return LLVMStructTypeInContext(c, types.data, cast(unsigned)types.count, false);
+
+		return LLVMStructTypeInContext(c, types.data, cast(unsigned)types.count, sz == 0);
 	}
 
 	gb_internal void classify_with(LLVMTypeRef t, Array<RegClass> *cls, i64 ix, i64 off) {
@@ -979,28 +985,6 @@ namespace lbAbiAmd64SysV {
 			GB_PANIC("Unhandled type");
 			break;
 		}
-	}
-
-	gb_internal LB_ABI_COMPUTE_RETURN_TYPE(compute_return_type) {
-		if (!return_is_defined) {
-			return lb_arg_type_direct(LLVMVoidTypeInContext(c));
-		} else if (lb_is_type_kind(return_type, LLVMStructTypeKind)) {
-			i64 sz = lb_sizeof(return_type);
-			switch (sz) {
-			case 1: return lb_arg_type_direct(return_type, LLVMIntTypeInContext(c,  8), nullptr, nullptr);
-			case 2: return lb_arg_type_direct(return_type, LLVMIntTypeInContext(c, 16), nullptr, nullptr);
-			case 4: return lb_arg_type_direct(return_type, LLVMIntTypeInContext(c, 32), nullptr, nullptr);
-			case 8: return lb_arg_type_direct(return_type, LLVMIntTypeInContext(c, 64), nullptr, nullptr);
-			}
-
-			LB_ABI_MODIFY_RETURN_IF_TUPLE_MACRO();
-
-			LLVMAttributeRef attr = lb_create_enum_attribute_with_type(c, "sret", return_type);
-			return lb_arg_type_indirect(return_type, attr);
-		} else if (build_context.metrics.os == TargetOs_windows && lb_is_type_kind(return_type, LLVMIntegerTypeKind) && lb_sizeof(return_type) == 16) {
-			return lb_arg_type_direct(return_type, LLVMIntTypeInContext(c, 128), nullptr, nullptr);
-		}
-		return non_struct(c, return_type);
 	}
 };
 
@@ -1166,8 +1150,7 @@ namespace lbAbiArm64 {
 						size_copy -= 8;
 					}
 					GB_ASSERT(size_copy <= 0);
-					// TODO(bill): this should be packed but it causes code generation issues
-					cast_type = LLVMStructTypeInContext(c, types, count, false);
+					cast_type = LLVMStructTypeInContext(c, types, count, true);
 				}
 				return lb_arg_type_direct(return_type, cast_type, nullptr, nullptr);
 			} else {

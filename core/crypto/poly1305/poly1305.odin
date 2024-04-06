@@ -9,6 +9,7 @@ package poly1305
 import "core:crypto"
 import field "core:crypto/_fiat/field_poly1305"
 import "core:encoding/endian"
+import "core:math/bits"
 import "core:mem"
 
 // KEY_SIZE is the Poly1305 key size in bytes.
@@ -50,7 +51,7 @@ verify :: proc(tag, msg, key: []byte) -> bool {
 Context :: struct {
 	_r:              field.Tight_Field_Element,
 	_a:              field.Tight_Field_Element,
-	_s:              field.Tight_Field_Element,
+	_s:              [2]u64,
 	_buffer:         [_BLOCK_SIZE]byte,
 	_leftover:       int,
 	_is_initialized: bool,
@@ -66,11 +67,12 @@ init :: proc(ctx: ^Context, key: []byte) {
 	// r = le_bytes_to_num(key[0..15])
 	// r = clamp(r) (r &= 0xffffffc0ffffffc0ffffffc0fffffff)
 	tmp_lo := endian.unchecked_get_u64le(key[0:]) & 0x0ffffffc0fffffff
-	tmp_hi := endian.unchecked_get_u64le(key[8:]) & 0xffffffc0ffffffc
+	tmp_hi := endian.unchecked_get_u64le(key[8:]) & 0x0ffffffc0ffffffc
 	field.fe_from_u64s(&ctx._r, tmp_lo, tmp_hi)
 
 	// s = le_bytes_to_num(key[16..31])
-	field.fe_from_bytes(&ctx._s, key[16:32], 0)
+	ctx._s[0] = endian.unchecked_get_u64le(key[16:])
+	ctx._s[1] = endian.unchecked_get_u64le(key[24:])
 
 	// a = 0
 	field.fe_zero(&ctx._a)
@@ -138,14 +140,20 @@ final :: proc(ctx: ^Context, dst: []byte) {
 		_blocks(ctx, ctx._buffer[:], true)
 	}
 
-	// a += s
-	field.fe_add(field.fe_relax_cast(&ctx._a), &ctx._a, &ctx._s) // _a unreduced
-	field.fe_carry(&ctx._a, field.fe_relax_cast(&ctx._a)) // _a reduced
-
-	// return num_to_16_le_bytes(a)
+	// a += s (NOT mod p)
 	tmp: [32]byte = ---
 	field.fe_to_bytes(&tmp, &ctx._a)
-	copy_slice(dst, tmp[0:16])
+
+	c: u64
+	lo := endian.unchecked_get_u64le(tmp[0:])
+	hi := endian.unchecked_get_u64le(tmp[8:])
+
+	lo, c = bits.add_u64(lo, ctx._s[0], 0)
+	hi, _ = bits.add_u64(hi, ctx._s[1], c)
+
+	// return num_to_16_le_bytes(a)
+	endian.unchecked_put_u64le(dst[0:], lo)
+	endian.unchecked_put_u64le(dst[8:], hi)
 }
 
 // reset sanitizes the Context.  The Context must be re-initialized to
