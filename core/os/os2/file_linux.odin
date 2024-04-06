@@ -69,7 +69,7 @@ _open :: proc(name: string, flags: File_Flags, perm: File_Mode) -> (^File, Error
 	// allowing us to open serial devices.
 	sys_flags: linux.Open_Flags = {.NOCTTY}
 	switch flags & O_RDONLY|O_WRONLY|O_RDWR {
-	case O_RDONLY: sys_flags += {.RDONLY}
+	case O_RDONLY:
 	case O_WRONLY: sys_flags += {.WRONLY}
 	case O_RDWR:   sys_flags += {.RDWR}
 	}
@@ -214,15 +214,18 @@ _remove :: proc(name: string) -> Error {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	name_cstr := strings.clone_to_cstring(name, context.temp_allocator)
 
-	fd, errno := linux.open(name_cstr, {.RDONLY})
-	if errno != .NONE {
+	fd, errno := linux.open(name_cstr, {.NOFOLLOW})
+	#partial switch (errno) {
+	case .ELOOP: /* symlink */
+	case .NONE:
+		if _is_dir_fd(fd) {
+			return _get_platform_error(linux.rmdir(name_cstr))
+		}
+		linux.close(fd)
+	case:
 		return _get_platform_error(errno)
 	}
-	defer linux.close(fd)
 
-	if _is_dir_fd(fd) {
-		return _get_platform_error(linux.rmdir(name_cstr))
-	}
 	return _get_platform_error(linux.unlink(name_cstr))
 }
 
@@ -404,7 +407,7 @@ _read_entire_pseudo_file_string :: proc(name: string, allocator := context.alloc
 }
 
 _read_entire_pseudo_file_cstring :: proc(name: cstring, allocator := context.allocator) -> ([]u8, Error) {
-	fd, errno := linux.open(name, {.RDONLY})
+	fd, errno := linux.open(name, {})
 	if errno != .NONE {
 		return nil, _get_platform_error(errno)
 	}

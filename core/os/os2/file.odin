@@ -150,7 +150,7 @@ symlink :: proc(old_name, new_name: string) -> Error {
 	return _symlink(old_name, new_name)
 }
 
-read_link :: proc(name: string, allocator: runtime.Allocator) -> (string, Error) {
+read_link :: proc(name: string, allocator := context.allocator) -> (string, Error) {
 	return _read_link(name,allocator)
 }
 

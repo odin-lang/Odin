@@ -9,7 +9,7 @@ import "core:sys/linux"
 _Path_Separator      :: '/'
 _Path_List_Separator :: ':'
 
-_OPENDIR_FLAGS : linux.Open_Flags : {.RDONLY, .NONBLOCK, .DIRECTORY, .LARGEFILE, .CLOEXEC}
+_OPENDIR_FLAGS : linux.Open_Flags : {.NONBLOCK, .DIRECTORY, .LARGEFILE, .CLOEXEC}
 
 _is_path_separator :: proc(c: byte) -> bool {
 	return c == '/'

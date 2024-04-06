@@ -504,7 +504,7 @@ Sig_Set :: [_SIGSET_NWORDS]uint
 @private SI_TIMER_PAD_SIZE :: size_of(Uid) - size_of(i32)
 
 Sig_Handler_Fn :: #type proc "c" (sig: Signal)
-Sig_Restore_Fn :: #type proc "c" ()
+Sig_Restore_Fn :: #type proc "c" () -> !
 
 Sig_Info :: struct #packed {
 	signo: Signal,
@@ -583,10 +583,17 @@ Sig_Stack :: struct {
 	size: uintptr,
 }
 
+Sig_Action_Special :: enum uint {
+	SIG_DFL = 0,
+	SIG_IGN = 1,
+	SIG_ERR = ~uint(0)
+}
+
 Sig_Action :: struct($T: typeid) {
 	using _u: struct #raw_union {
 		handler: Sig_Handler_Fn,
 		sigaction: #type proc "c" (sig: Signal, si: ^Sig_Info, ctx: ^T),
+		special: Sig_Action_Special,
 	},
 	flags: uint,
 	restorer: Sig_Restore_Fn,

@@ -40,10 +40,10 @@ write :: proc "contextless" (fd: Fd, buf: []u8) -> (int, Errno) {
 */
 open :: proc "contextless" (name: cstring, flags: Open_Flags, mode: Mode = {}) -> (Fd, Errno) {
 	when ODIN_ARCH == .arm64 {
-		ret := syscall(SYS_openat, AT_FDCWD, transmute(uintptr) name, transmute(u32) mode)
+		ret := syscall(SYS_openat, AT_FDCWD, transmute(uintptr) name, transmute(u32) flags, transmute(u32) mode)
 		return errno_unwrap(ret, Fd)
 	} else {
-		ret := syscall(SYS_open, transmute(uintptr) name, transmute(u32) mode)
+		ret := syscall(SYS_open, transmute(uintptr) name, transmute(u32) flags, transmute(u32) mode)
 		return errno_unwrap(ret, Fd)
 	}
 }
@@ -91,10 +91,10 @@ stat :: proc "contextless" (filename: cstring, stat: ^Stat) -> (Errno) {
 */
 fstat :: proc "contextless" (fd: Fd, stat: ^Stat) -> (Errno) {
 	when size_of(int) == 8 {
-		ret := syscall(SYS_fstat, stat)
+		ret := syscall(SYS_fstat, fd, stat)
 		return Errno(-ret)
 	} else {
-		ret := syscall(SYS_fstat64, stat)
+		ret := syscall(SYS_fstat64, fd, stat)
 		return Errno(-ret)
 	}
 }
@@ -787,8 +787,8 @@ exit :: proc "contextless" (code: i32) -> ! {
 	Wait for the process to change state.
 	Available since Linux 1.0.
 */
-wait4 :: proc "contextless" (pid: Pid, status: ^u32, options: Wait_Options) -> (Pid, Errno) {
-	ret := syscall(SYS_wait4, pid, status, transmute(u32) options)
+wait4 :: proc "contextless" (pid: Pid, status: ^u32, options: Wait_Options, rusage: ^RUsage) -> (Pid, Errno) {
+	ret := syscall(SYS_wait4, pid, status, transmute(u32) options, rusage)
 	return errno_unwrap(ret, Pid)
 }
 
@@ -1118,7 +1118,7 @@ ftruncate :: proc "contextless" (fd: Fd, length: i64) -> (Errno) {
 		ret := syscall(SYS_ftruncate64, fd, compat64_arg_pair(length))
 		return Errno(-ret)
 	} else {
-		ret := syscall(SYS_truncate, fd, compat64_arg_pair(length))
+		ret := syscall(SYS_ftruncate, fd, compat64_arg_pair(length))
 		return Errno(-ret)
 	}
 }
@@ -2471,8 +2471,8 @@ tgkill :: proc "contextless" (tgid, tid: Pid, sig: Signal) -> (Errno) {
 	Wait on process, process group or pid file descriptor.
 	Available since Linux 2.6.10.
 */
-waitid :: proc "contextless" (id_type: Id_Type, id: Id, sig_info: ^Sig_Info, options: Wait_Options) -> (Errno) {
-	ret := syscall(SYS_waitid, id_type, id, sig_info, transmute(i32) options)
+waitid :: proc "contextless" (id_type: Id_Type, id: Id, sig_info: ^Sig_Info, options: Wait_Options, rusage: ^RUsage) -> (Errno) {
+	ret := syscall(SYS_waitid, id_type, id, sig_info, transmute(i32) options, rusage)
 	return Errno(-ret)
 }
 
@@ -2803,8 +2803,8 @@ getrandom :: proc "contextless" (buf: []u8, flags: Get_Random_Flags) -> (int, Er
 	Execute program relative to a directory file descriptor.
 	Available since Linux 3.19.
 */
-execveat :: proc "contextless" (dirfd: Fd, name: cstring, argv: [^]cstring, envp: [^]cstring) -> (Errno) {
-	ret := syscall(SYS_execveat, dirfd, cast(rawptr) name, cast(rawptr) argv, cast(rawptr) envp)
+execveat :: proc "contextless" (dirfd: Fd, name: cstring, argv: [^]cstring, envp: [^]cstring, flags: FD_Flags = {}) -> (Errno) {
+	ret := syscall(SYS_execveat, dirfd, cast(rawptr) name, cast(rawptr) argv, cast(rawptr) envp, transmute(i32) flags)
 	return Errno(-ret)
 }
 

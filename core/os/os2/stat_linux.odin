@@ -40,7 +40,7 @@ _stat :: proc(name: string, allocator: runtime.Allocator) -> (File_Info, Error) 
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	name_cstr := strings.clone_to_cstring(name, context.temp_allocator)
 
-	fd, errno := linux.open(name_cstr, {.RDONLY})
+	fd, errno := linux.open(name_cstr, {})
 	if errno != .NONE {
 		return {}, _get_platform_error(errno)
 	}
@@ -52,7 +52,7 @@ _lstat :: proc(name: string, allocator: runtime.Allocator) -> (File_Info, Error)
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	name_cstr := strings.clone_to_cstring(name, context.temp_allocator)
 
-	fd, errno := linux.open(name_cstr, {.RDONLY, .PATH, .NOFOLLOW})
+	fd, errno := linux.open(name_cstr, {.PATH, .NOFOLLOW})
 	if errno != .NONE {
 		return {}, _get_platform_error(errno)
 	}

@@ -148,9 +148,13 @@ Errno :: enum i32 {
 	Bits for Open_Flags
 */
 Open_Flags_Bits :: enum {
-	RDONLY    = 0,
-	WRONLY    = 1,
-	RDWR      = 2,
+	/* RDONLY is an empty set */
+	WRONLY    = 0,
+	RDWR      = 1,
+	_         = 2,
+	_         = 3,
+	_         = 4,
+	_         = 5,
 	CREAT     = 6,
 	EXCL      = 7,
 	NOCTTY    = 8,
@@ -165,6 +169,7 @@ Open_Flags_Bits :: enum {
 	NOFOLLOW  = 17,
 	NOATIME   = 18,
 	CLOEXEC   = 19,
+	_         = 20,
 	PATH      = 21,
 }
 

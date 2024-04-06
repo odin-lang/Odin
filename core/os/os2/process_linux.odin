@@ -111,8 +111,6 @@ _process_start :: proc(name: string, argv: []string, attr: ^Process_Attributes) 
 
 	child: Process
 
-	// TODO
-	//dir_fd := transmute(int)(linux.AT_FDCWD)
 	dir_fd : linux.Fd = -100
 	errno: linux.Errno
 	if attr != nil && attr.dir != "" {
@@ -358,8 +356,7 @@ _process_wait :: proc(p: ^Process, t: time.Duration) -> (state: Process_State, e
 			options += {.WNOHANG}
 			waitid_options := options + {.WNOWAIT, .WEXITED}
 			info: linux.Sig_Info
-			// TODO: missing struct rusage* parameter
-			errno = linux.waitid(.PID, linux.Id(p.pid), &info, waitid_options)
+			errno = linux.waitid(.PID, linux.Id(p.pid), &info, waitid_options, nil)
 			if errno == .NONE && info.code != 0 {
 				break big_if
 			}
@@ -390,8 +387,7 @@ _process_wait :: proc(p: ^Process, t: time.Duration) -> (state: Process_State, e
 	status: u32
 	errno: linux.Errno
 	for {
-		// TODO: missing struct rusage* parameter
-		_, errno = linux.wait4(linux.Pid(p.pid), &status, options)
+		_, errno = linux.wait4(linux.Pid(p.pid), &status, options, nil)
 		if errno == .EINTR {
 			continue
 		}
