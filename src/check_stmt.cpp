@@ -2075,13 +2075,13 @@ gb_internal void check_expr_stmt(CheckerContext *ctx, Ast *node) {
 	}
 
 	Ast *expr = strip_or_return_expr(operand.expr);
-	if (expr->kind == Ast_CallExpr) {
+	if (expr && expr->kind == Ast_CallExpr) {
 		BuiltinProcId builtin_id = BuiltinProc_Invalid;
 		bool do_require = false;
 
 		AstCallExpr *ce = &expr->CallExpr;
 		Type *t = base_type(type_of_expr(ce->proc));
-		if (t->kind == Type_Proc) {
+		if (t && t->kind == Type_Proc) {
 			do_require = t->Proc.require_results;
 		} else if (check_stmt_internal_builtin_proc_id(ce->proc, &builtin_id)) {
 			auto const &bp = builtin_procs[builtin_id];
@@ -2093,7 +2093,7 @@ gb_internal void check_expr_stmt(CheckerContext *ctx, Ast *node) {
 			gb_string_free(expr_str);
 		}
 		return;
-	} else if (expr->kind == Ast_SelectorCallExpr) {
+	} else if (expr && expr->kind == Ast_SelectorCallExpr) {
 		BuiltinProcId builtin_id = BuiltinProc_Invalid;
 		bool do_require = false;
 
