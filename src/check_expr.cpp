@@ -8157,8 +8157,12 @@ gb_internal ExprKind check_basic_directive_expr(CheckerContext *c, Operand *o, A
 	o->mode = Addressing_Constant;
 	String name = bd->name.string;
 	if (name == "file") {
+		String file = get_file_path_string(bd->token.pos.file_id);
+		if (build_context.obfuscate_source_code_locations) {
+			file = obfuscate_string(file, "F");
+		}
 		o->type = t_untyped_string;
-		o->value = exact_value_string(get_file_path_string(bd->token.pos.file_id));
+		o->value = exact_value_string(file);
 	} else if (name == "line") {
 		o->type = t_untyped_integer;
 		o->value = exact_value_i64(bd->token.pos.line);
@@ -8168,8 +8172,12 @@ gb_internal ExprKind check_basic_directive_expr(CheckerContext *c, Operand *o, A
 			o->type = t_untyped_string;
 			o->value = exact_value_string(str_lit(""));
 		} else {
+			String p = c->proc_name;
+			if (build_context.obfuscate_source_code_locations) {
+				p = obfuscate_string(p, "P");
+			}
 			o->type = t_untyped_string;
-			o->value = exact_value_string(c->proc_name);
+			o->value = exact_value_string(p);
 		}
 	} else if (name == "caller_location") {
 		init_core_source_code_location(c->checker);

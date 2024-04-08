@@ -287,17 +287,6 @@ gb_internal lbValue lb_expr_untyped_const_to_typed(lbModule *m, Ast *expr, Type 
 	return lb_const_value(m, t, tv.value);
 }
 
-gb_internal String lb_obfuscate_string(String const &s, char const *prefix) {
-	if (s.len == 0) {
-		return {};
-	}
-	GB_ASSERT(prefix != nullptr);
-	u64 hash = gb_fnv64a(s.text, s.len);
-	gbString res = gb_string_make(temporary_allocator(), prefix);
-	res = gb_string_append_fmt(res, "x%llx", cast(long long unsigned)hash);
-	return make_string_c(res);
-}
-
 gb_internal i32 lb_obfuscate_i32(i32 i) {
 	i32 x = cast(i32)gb_fnv64a(&i, sizeof(i));
 	if (x < 0) {
@@ -314,8 +303,8 @@ gb_internal lbValue lb_const_source_code_location_const(lbModule *m, String cons
 	i32 column = pos.column;
 
 	if (build_context.obfuscate_source_code_locations) {
-		file = lb_obfuscate_string(file, "F");
-		procedure = lb_obfuscate_string(procedure, "P");
+		file = obfuscate_string(file, "F");
+		procedure = obfuscate_string(procedure, "P");
 
 		line   = lb_obfuscate_i32(line);
 		column = lb_obfuscate_i32(column);
