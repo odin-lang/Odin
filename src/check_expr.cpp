@@ -4595,7 +4595,8 @@ gb_internal ExactValue get_constant_field_single(CheckerContext *c, ExactValue v
 					String name = fv->field->Ident.token.string;
 					Selection sub_sel = lookup_field(node->tav.type, name, false);
 					defer (array_free(&sub_sel.index));
-					if (sub_sel.index[0] == index) {
+					if (sub_sel.index.count > 0 &&
+					    sub_sel.index[0] == index) {
 						value = fv->value->tav.value;
 						found = true;
 						break;
