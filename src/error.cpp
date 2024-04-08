@@ -667,6 +667,14 @@ gb_internal void print_all_errors(void) {
 
 			gb_fprintf(f, "\t\t{\n");
 
+			gb_fprintf(f, "\t\t\t\"type\": \"");
+			if (ev.kind == ErrorValue_Warning) {
+				gb_fprintf(f, "warning");
+			} else {
+				gb_fprintf(f, "error");
+			}
+			gb_fprintf(f, "\",\n");
+
 			gb_fprintf(f, "\t\t\t\"pos\": {\n");
 
 			if (ev.pos.file_id) {
