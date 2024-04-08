@@ -6014,6 +6014,8 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				return false;
 			}
 
+			enable_target_feature({}, str_lit("atomics"));
+
 			Operand ptr = {};
 			Operand expected = {};
 			Operand timeout = {};
@@ -6065,6 +6067,8 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				error(call, "'%.*s' is only allowed on wasm targets", LIT(builtin_name));
 				return false;
 			}
+
+			enable_target_feature({}, str_lit("atomics"));
 
 			Operand ptr = {};
 			Operand waiters = {};
