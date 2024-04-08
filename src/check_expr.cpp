@@ -8164,8 +8164,12 @@ gb_internal ExprKind check_basic_directive_expr(CheckerContext *c, Operand *o, A
 		o->type = t_untyped_string;
 		o->value = exact_value_string(file);
 	} else if (name == "line") {
+		i32 line = bd->token.pos.line;
+		if (build_context.obfuscate_source_code_locations) {
+			line = obfuscate_i32(line);
+		}
 		o->type = t_untyped_integer;
-		o->value = exact_value_i64(bd->token.pos.line);
+		o->value = exact_value_i64(line);
 	} else if (name == "procedure") {
 		if (c->curr_proc_decl == nullptr) {
 			error(node, "#procedure may only be used within procedures");

@@ -287,13 +287,6 @@ gb_internal lbValue lb_expr_untyped_const_to_typed(lbModule *m, Ast *expr, Type 
 	return lb_const_value(m, t, tv.value);
 }
 
-gb_internal i32 lb_obfuscate_i32(i32 i) {
-	i32 x = cast(i32)gb_fnv64a(&i, sizeof(i));
-	if (x < 0) {
-		x = 1-x;
-	}
-	return cast(i32)x;
-}
 
 gb_internal lbValue lb_const_source_code_location_const(lbModule *m, String const &procedure_, TokenPos const &pos) {
 	String file = get_file_path_string(pos.file_id);
@@ -306,8 +299,8 @@ gb_internal lbValue lb_const_source_code_location_const(lbModule *m, String cons
 		file = obfuscate_string(file, "F");
 		procedure = obfuscate_string(procedure, "P");
 
-		line   = lb_obfuscate_i32(line);
-		column = lb_obfuscate_i32(column);
+		line   = obfuscate_i32(line);
+		column = obfuscate_i32(column);
 	}
 
 	LLVMValueRef fields[4] = {};

@@ -364,6 +364,14 @@ gb_internal String obfuscate_string(String const &s, char const *prefix) {
 	return make_string_c(res);
 }
 
+gb_internal i32 obfuscate_i32(i32 i) {
+	i32 x = cast(i32)gb_fnv64a(&i, sizeof(i));
+	if (x < 0) {
+		x = 1-x;
+	}
+	return cast(i32)x;
+}
+
 
 
 struct StringIntern {
