@@ -2,7 +2,7 @@
 
 package glfw
 
-import NS "vendor:darwin/Foundation"
+import NS "core:sys/darwin/Foundation"
 
 @(default_calling_convention="c", link_prefix="glfw")
 foreign {
