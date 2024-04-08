@@ -355,11 +355,11 @@ gb_global bool global_module_path_set = false;
 
 gb_internal String obfuscate_string(String const &s, char const *prefix) {
 	if (s.len == 0) {
-		return {};
+		return s;
 	}
 	GB_ASSERT(prefix != nullptr);
 	u64 hash = gb_fnv64a(s.text, s.len);
-	gbString res = gb_string_make(temporary_allocator(), prefix);
+	gbString res = gb_string_make(permanent_allocator(), prefix);
 	res = gb_string_append_fmt(res, "x%llx", cast(long long unsigned)hash);
 	return make_string_c(res);
 }
