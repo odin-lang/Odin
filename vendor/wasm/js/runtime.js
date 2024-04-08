@@ -1335,7 +1335,7 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 
 			// return a bigint to be converted to i64
 			time_now: () => BigInt(Date.now()),
-			tick_now: () => BigInt(performance.now()),
+			tick_now: () => performance.now(),
 			time_sleep: (duration_ms) => {
 				if (duration_ms > 0) {
 					// TODO(bill): Does this even make any sense?
