@@ -1335,7 +1335,7 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 
 			// return a bigint to be converted to i64
 			time_now: () => BigInt(Date.now()),
-			tick_now: () => BigInt(performance.now()),
+			tick_now: () => performance.now(),
 			time_sleep: (duration_ms) => {
 				if (duration_ms > 0) {
 					// TODO(bill): Does this even make any sense?
@@ -1676,6 +1676,9 @@ async function runWasm(wasmPath, consoleElement, extraForeignImports) {
 
 	exports._start();
 
+	// Define a `@export step :: proc(dt: f32) -> (continue: bool) {`
+	// in your app and it will get called every frame.
+	// return `false` to stop the execution of the module.
 	if (exports.step) {
 		const odin_ctx = exports.default_context_ptr();
 
@@ -1687,14 +1690,19 @@ async function runWasm(wasmPath, consoleElement, extraForeignImports) {
 
 			const dt = (currTimeStamp - prevTimeStamp)*0.001;
 			prevTimeStamp = currTimeStamp;
-			exports.step(dt, odin_ctx);
+
+			if (!exports.step(dt, odin_ctx)) {
+				exports._end();
+				return;
+			}
+
 			window.requestAnimationFrame(step);
 		};
 
 		window.requestAnimationFrame(step);
+	} else {
+		exports._end();
 	}
-
-	exports._end();
 
 	return;
 };
