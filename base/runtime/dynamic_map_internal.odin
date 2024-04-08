@@ -333,7 +333,7 @@ map_kvh_data_values_dynamic :: proc "contextless" (m: Raw_Map, #no_alias info: ^
 }
 
 
-@(private, require_results)
+@(require_results)
 map_total_allocation_size :: #force_inline proc "contextless" (capacity: uintptr, info: ^Map_Info) -> uintptr {
 	round :: #force_inline proc "contextless" (value: uintptr) -> uintptr {
 		CACHE_MASK :: MAP_CACHE_LINE_SIZE - 1
@@ -349,6 +349,12 @@ map_total_allocation_size :: #force_inline proc "contextless" (capacity: uintptr
 	size = round(map_cell_index_dynamic(size, info.vs, 2)) // Two additional vs for scratch storage
 	return size
 }
+
+@(require_results)
+map_total_allocation_size_from_value :: #force_inline proc "contextless" (m: $M/map[$K]$V) -> uintptr {
+	return map_total_allocation_size(uintptr(cap(m)), map_info(M))
+}
+
 
 // The only procedure which needs access to the context is the one which allocates the map.
 @(require_results)
