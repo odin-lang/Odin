@@ -1486,7 +1486,15 @@ gb_internal Token expect_token(AstFile *f, TokenKind kind) {
 		syntax_error(f->curr_token, "Expected '%.*s', got '%.*s'", LIT(c), LIT(p));
 		if (kind == Token_Ident) switch (prev.kind) {
 		case Token_context:
-			error_line("\tSuggestion: 'context' is a reserved keyword, would 'ctx' suffice?\n");
+			error_line("\tSuggestion: '%.*s' is a keyword, would 'ctx' suffice?\n", LIT(prev.string));
+			break;
+		case Token_package:
+			error_line("\tSuggestion: '%.*s' is a keyword, would 'pkg' suffice?\n", LIT(prev.string));
+			break;
+		default:
+			if (token_is_keyword(prev.kind)) {
+				error_line("\tNote: '%.*s' is a keyword\n", LIT(prev.string));
+			}
 			break;
 		}
 
