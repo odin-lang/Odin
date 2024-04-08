@@ -384,7 +384,7 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 								LIT(obj_file),
 								LIT(build_context.extra_assembler_flags)
 							);						
-							if (!result) {
+							if (result) {
 								gb_printf_err("executing `nasm` to assemble foreing import of %.*s failed.\n\tSuggestion: `nasm` does not ship with the compiler and should be installed with your system's package manager.\n", LIT(asm_file));
 								return result;
 							}
