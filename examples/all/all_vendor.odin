@@ -62,7 +62,7 @@ _ :: xlib
 
 // NOTE: needed for doc generator
 
-import NS  "vendor:darwin/Foundation"
+import NS  "core:sys/darwin/Foundation"
 import MTL "vendor:darwin/Metal"
 import MTK "vendor:darwin/MetalKit"
 import CA  "vendor:darwin/QuartzCore"
