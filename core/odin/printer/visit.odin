@@ -445,7 +445,7 @@ visit_decl :: proc(p: ^Printer, decl: ^ast.Decl, called_in_stmt := false) {
 
 		for value in v.values {
 			#partial switch a in value.derived {
-			case ^ast.Union_Type, ^ast.Enum_Type, ^ast.Struct_Type:
+			case ^ast.Union_Type, ^ast.Enum_Type, ^ast.Struct_Type, ^ast.Bit_Field_Type:
 				add_semicolon = false || called_in_stmt
 			case ^ast.Proc_Lit:
 				add_semicolon = false
@@ -477,6 +477,37 @@ visit_exprs :: proc(p: ^Printer, list: []^ast.Expr, options := List_Options{}) {
 		}
 
 		visit_expr(p, expr, options)
+
+		if (i != len(list) - 1 || .Trailing in options) && .Add_Comma in options {
+			push_generic_token(p, .Comma, 0)
+		}
+	}
+
+	if len(list) > 1 && .Enforce_Newline in options {
+		newline_position(p, 1)
+	}
+}
+
+@(private)
+visit_bit_field_fields :: proc(p: ^Printer, list: []^ast.Bit_Field_Field, options := List_Options{}) {
+	if len(list) == 0 {
+		return
+	}
+
+	// we have to newline the expressions to respect the source
+	for v, i in list {
+		// Don't move the first expression, it looks bad
+		if i != 0 && .Enforce_Newline in options {
+			newline_position(p, 1)
+		} else if i != 0 {
+			move_line_limit(p, v.pos, 1)
+		}
+
+		visit_expr(p, v.name, options)
+		push_generic_token(p, .Colon, 0)
+		visit_expr(p, v.type, options)
+		push_generic_token(p, .Or, 1)
+		visit_expr(p, v.bit_size, options)
 
 		if (i != len(list) - 1 || .Trailing in options) && .Add_Comma in options {
 			push_generic_token(p, .Comma, 0)
@@ -1293,6 +1324,25 @@ visit_expr :: proc(p: ^Printer, expr: ^ast.Expr, options := List_Options{}) {
 		visit_expr(p, v.column_count)
 		push_generic_token(p, .Close_Bracket, 0)
 		visit_expr(p, v.elem)
+	case ^ast.Bit_Field_Type:
+		push_generic_token(p, .Bit_Field, 1)
+
+		visit_expr(p, v.backing_type)
+
+		if len(v.fields) == 0 || v.pos.line == v.close.line {
+			push_generic_token(p, .Open_Brace, 1)
+			visit_bit_field_fields(p, v.fields, {.Add_Comma})
+			push_generic_token(p, .Close_Brace, 0)
+		} else {
+			visit_begin_brace(p, v.pos, .Generic, len(v.fields))
+			newline_position(p, 1)
+			set_source_position(p, v.fields[0].pos)
+			visit_bit_field_fields(p, v.fields, {.Add_Comma, .Trailing, .Enforce_Newline})
+			set_source_position(p, v.close)
+			visit_end_brace(p, v.close)
+		}
+
+		set_source_position(p, v.close)
 	case:
 		panic(fmt.aprint(expr.derived))
 	}

@@ -531,7 +531,7 @@ is_semicolon_optional_for_node :: proc(p: ^Parser, node: ^ast.Node) -> bool {
 		return is_semicolon_optional_for_node(p, n.type)
 	case ^ast.Pointer_Type:
 		return is_semicolon_optional_for_node(p, n.elem)
-	case ^ast.Struct_Type, ^ast.Union_Type, ^ast.Enum_Type:
+	case ^ast.Struct_Type, ^ast.Union_Type, ^ast.Enum_Type, ^ast.Bit_Set_Type, ^ast.Bit_Field_Type:
 		// Require semicolon within a procedure body
 		return p.curr_proc == nil
 	case ^ast.Proc_Lit:
@@ -2790,6 +2790,48 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 		mt.column_count = column_count
 		mt.elem = elem
 		return mt
+	
+	case .Bit_Field:
+		tok := expect_token(p, .Bit_Field)
+
+		backing_type := parse_type_or_ident(p)
+		if backing_type == nil {
+			token := advance_token(p)
+			error(p, token.pos, "Expected a backing type for a 'bit_field'")
+		}
+
+		skip_possible_newline_for_literal(p)
+		open := expect_token_after(p, .Open_Brace, "bit_field")
+
+		fields: [dynamic]^ast.Bit_Field_Field
+		for p.curr_tok.kind != .Close_Brace && p.curr_tok.kind != .EOF {
+			name := parse_ident(p)
+			expect_token(p, .Colon)
+			type := parse_type(p)
+			expect_token(p, .Or)
+			bit_size := parse_expr(p, true)
+
+			field := ast.new(ast.Bit_Field_Field, name.pos, bit_size)
+
+			field.name     = name
+			field.type     = type
+			field.bit_size = bit_size
+
+			append(&fields, field)
+
+			allow_token(p, .Comma) or_break
+		}
+
+		close := expect_closing_brace_of_field_list(p)
+
+		bf := ast.new(ast.Bit_Field_Type, tok.pos, close.pos)
+
+		bf.tok_pos      = tok.pos
+		bf.backing_type = backing_type
+		bf.open         = open.pos
+		bf.fields       = fields[:]
+		bf.close        = close.pos
+		return bf
 
 	case .Asm:
 		tok := expect_token(p, .Asm)
@@ -2897,7 +2939,8 @@ is_literal_type :: proc(expr: ^ast.Expr) -> bool {
 		^ast.Map_Type,
 		^ast.Bit_Set_Type,
 		^ast.Matrix_Type,
-		^ast.Call_Expr:
+		^ast.Call_Expr,
+		^ast.Bit_Field_Type:
 		return true
 	}
 	return false

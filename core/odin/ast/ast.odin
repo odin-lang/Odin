@@ -617,7 +617,7 @@ field_flag_strings := [Field_Flag]string{
 	.Any_Int            = "#any_int",
 	.Subtype            = "#subtype",
 	.By_Ptr             = "#by_ptr",
-	.No_Broadcast       ="#no_broadcast",
+	.No_Broadcast       = "#no_broadcast",
 
 	.Results            = "results",
 	.Tags               = "field tag",
@@ -842,6 +842,23 @@ Matrix_Type :: struct {
 	elem:         ^Expr,
 }
 
+Bit_Field_Type :: struct {
+	using node:   Expr,
+	tok_pos:      tokenizer.Pos,
+	backing_type: ^Expr,
+	open:         tokenizer.Pos,
+	fields:       []^Bit_Field_Field,
+	close:        tokenizer.Pos,
+}
+
+Bit_Field_Field :: struct {
+	using node: Node,
+	docs:       ^Comment_Group,
+	name:       ^Expr,
+	type:       ^Expr,
+	bit_size:   ^Expr,
+	comments:   ^Comment_Group,
+}
 
 Any_Node :: union {
 	^Package,
@@ -898,6 +915,7 @@ Any_Node :: union {
 	^Map_Type,
 	^Relative_Type,
 	^Matrix_Type,
+	^Bit_Field_Type,
 
 	^Bad_Stmt,
 	^Empty_Stmt,
@@ -928,6 +946,7 @@ Any_Node :: union {
 	^Attribute,
 	^Field,
 	^Field_List,
+	^Bit_Field_Field,
 }
 
 
@@ -982,6 +1001,7 @@ Any_Expr :: union {
 	^Map_Type,
 	^Relative_Type,
 	^Matrix_Type,
+	^Bit_Field_Type,
 }
 
 
