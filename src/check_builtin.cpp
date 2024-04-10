@@ -4089,8 +4089,8 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				}
 			}
 
-			operand->mode = Addressing_OptionalOk;
-			operand->type = default_type(x.type);
+			operand->mode = Addressing_Value;
+			operand->type = make_optional_ok_type(default_type(x.type));
 		}
 		break;
 
