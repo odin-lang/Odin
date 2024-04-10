@@ -2711,7 +2711,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 			}
 		} else {
 			io.write_byte(fi.writer, '[' if verb != 'w' else '{', &fi.n)
-			io.write_byte(fi.writer, ']' if verb != 'w' else '}', &fi.n)
+			defer io.write_byte(fi.writer, ']' if verb != 'w' else '}', &fi.n)
 			for i in 0..<info.count {
 				if i > 0 { io.write_string(fi.writer, ", ", &fi.n) }
 
