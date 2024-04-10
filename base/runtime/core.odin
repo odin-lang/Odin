@@ -597,8 +597,9 @@ type_info_core :: proc "contextless" (info: ^Type_Info) -> ^Type_Info {
 	base := info
 	loop: for {
 		#partial switch i in base.variant {
-		case Type_Info_Named:  base = i.base
-		case Type_Info_Enum:   base = i.base
+		case Type_Info_Named:     base = i.base
+		case Type_Info_Enum:      base = i.base
+		case Type_Info_Bit_Field: base = i.backing_type
 		case: break loop
 		}
 	}

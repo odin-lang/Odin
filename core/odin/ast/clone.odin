@@ -336,6 +336,13 @@ clone_node :: proc(node: ^Node) -> ^Node {
 		case ^Relative_Type:
 			r.tag = clone(r.tag)
 			r.type = clone(r.type)
+		case ^Bit_Field_Type:
+			r.backing_type = clone(r.backing_type)
+			r.fields       = auto_cast clone(r.fields)
+		case ^Bit_Field_Field:
+			r.name     = clone(r.name)
+			r.type     = clone(r.type)
+			r.bit_size = clone(r.bit_size)
 		case:
 			fmt.panicf("Unhandled node kind: %v", r)
 		}
