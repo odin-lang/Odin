@@ -344,10 +344,11 @@ unmarshal_expect_token :: proc(p: ^Parser, kind: Token_Kind, loc := #caller_loca
 }
 
 @(private)
-json_name_from_tag_value :: proc(value: string) -> (json_name: string) {
+json_name_from_tag_value :: proc(value: string) -> (json_name, extra: string) {
 	json_name = value
 	if comma_index := strings.index_byte(json_name, ','); comma_index >= 0 {
 		json_name = json_name[:comma_index]
+		extra = json_name[comma_index:]
 	}
 	return
 }
@@ -393,7 +394,8 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 			
 			for field, field_idx in fields {
 				tag_value := string(reflect.struct_tag_get(field.tag, "json"))
-				if key == json_name_from_tag_value(tag_value) {
+				json_name, _ := json_name_from_tag_value(tag_value)
+				if key == json_name {
 					use_field_idx = field_idx
 					break
 				}

@@ -366,12 +366,63 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 		opt_write_end(w, opt, '}') or_return
 
 	case runtime.Type_Info_Struct:
+		is_omitempty :: proc(v: any) -> bool {
+			v := v
+			if v == nil {
+				return true
+			}
+			ti := runtime.type_info_core(type_info_of(v.id))
+			#partial switch info in ti.variant {
+			case runtime.Type_Info_String:
+				switch x in v {
+				case string:
+					return x == ""
+				case cstring:
+					return x == nil || x == ""
+				}
+			case runtime.Type_Info_Any:
+				return v.(any) == nil
+			case runtime.Type_Info_Type_Id:
+				return v.(typeid) == nil
+			case runtime.Type_Info_Pointer,
+			     runtime.Type_Info_Multi_Pointer,
+			     runtime.Type_Info_Procedure:
+			     	return (^rawptr)(v.data)^ == nil
+			case runtime.Type_Info_Dynamic_Array:
+			     	return (^runtime.Raw_Dynamic_Array)(v.data).len == 0
+			case runtime.Type_Info_Slice:
+			     	return (^runtime.Raw_Slice)(v.data).len == 0
+			case runtime.Type_Info_Union,
+			     runtime.Type_Info_Bit_Set,
+			     runtime.Type_Info_Soa_Pointer:
+				return reflect.is_nil(v)
+			case runtime.Type_Info_Map:
+			     	return (^runtime.Raw_Map)(v.data).len == 0
+			}
+			return false
+		}
+
 		marshal_struct_fields :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: Marshal_Error) {
 			ti := runtime.type_info_base(type_info_of(v.id))
 			info := ti.variant.(runtime.Type_Info_Struct)
 			for name, i in info.names {
-				json_name := reflect.struct_tag_get(reflect.Struct_Tag(info.tags[i]), "json")
-				json_name = json_name_from_tag_value(json_name)
+				omitempty := false
+
+				json_name, extra := json_name_from_tag_value(reflect.struct_tag_get(reflect.Struct_Tag(info.tags[i]), "json"))
+				for flag in strings.split_iterator(&extra, ",") {
+					switch flag {
+					case "omitempty":
+						omitempty = true
+					}
+				}
+
+				id := info.types[i].id
+				data := rawptr(uintptr(v.data) + info.offsets[i])
+				the_value := any{data, id}
+
+				if is_omitempty(the_value) {
+					continue
+				}
 
 				opt_write_iteration(w, opt, i) or_return
 				if json_name != "" {
@@ -379,18 +430,15 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 				} else {
 					// Marshal the fields of 'using _: T' fields directly into the parent struct
 					if info.usings[i] && name == "_" {
-						id := info.types[i].id
-						data := rawptr(uintptr(v.data) + info.offsets[i])
-						marshal_struct_fields(w, any{data, id}, opt) or_return
+						marshal_struct_fields(w, the_value, opt) or_return
 						continue
 					} else {
 						opt_write_key(w, opt, name) or_return
 					}
 				}
 
-				id := info.types[i].id
-				data := rawptr(uintptr(v.data) + info.offsets[i])
-				marshal_to_writer(w, any{data, id}, opt) or_return
+
+				marshal_to_writer(w, the_value, opt) or_return
 			}
 			return
 		}
