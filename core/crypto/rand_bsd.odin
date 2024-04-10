@@ -10,3 +10,7 @@ foreign libc {
 _rand_bytes :: proc(dst: []byte) {
 	arc4random_buf(raw_data(dst), len(dst))
 }
+
+_has_rand_bytes :: proc () -> bool {
+	return true
+}

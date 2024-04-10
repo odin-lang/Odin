@@ -27,7 +27,7 @@ _scalar_bit :: #force_inline proc "contextless" (s: ^[32]byte, i: int) -> u8 {
 }
 
 @(private)
-_scalarmult :: proc(out, scalar, point: ^[32]byte) {
+_scalarmult :: proc "contextless" (out, scalar, point: ^[32]byte) {
 	// Montgomery pseduo-multiplication taken from Monocypher.
 
 	// computes the scalar product
@@ -94,13 +94,8 @@ _scalarmult :: proc(out, scalar, point: ^[32]byte) {
 	field.fe_carry_mul(&x2, field.fe_relax_cast(&x2), field.fe_relax_cast(&z2))
 	field.fe_to_bytes(out, &x2)
 
-	mem.zero_explicit(&x1, size_of(x1))
-	mem.zero_explicit(&x2, size_of(x2))
-	mem.zero_explicit(&x3, size_of(x3))
-	mem.zero_explicit(&z2, size_of(z2))
-	mem.zero_explicit(&z3, size_of(z3))
-	mem.zero_explicit(&t0, size_of(t0))
-	mem.zero_explicit(&t1, size_of(t1))
+	field.fe_clear_vec([]^field.Tight_Field_Element{&x1, &x2, &x3, &z2, &z3})
+	field.fe_clear_vec([]^field.Loose_Field_Element{&t0, &t1})
 }
 
 // scalarmult "multiplies" the provided scalar and point, and writes the
@@ -137,6 +132,5 @@ scalarmult :: proc(dst, scalar, point: []byte) {
 // scalarmult_basepoint "multiplies" the provided scalar with the X25519
 // base point and writes the resulting point to dst.
 scalarmult_basepoint :: proc(dst, scalar: []byte) {
-	// TODO/perf: Switch to using a precomputed table.
 	scalarmult(dst, scalar, _BASE_POINT[:])
 }
