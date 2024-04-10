@@ -1,7 +1,7 @@
 //+private
 package os2
 
-import "core:runtime"
+import "base:runtime"
 import "core:time"
 import "core:strings"
 import win32 "core:sys/windows"
@@ -46,6 +46,8 @@ full_path_from_name :: proc(name: string, allocator: runtime.Allocator) -> (path
 	if name == "" {
 		name = "."
 	}
+	_TEMP_ALLOCATOR_GUARD()
+
 	p := win32.utf8_to_utf16(name, _temp_allocator())
 
 	n := win32.GetFullPathNameW(raw_data(p), 0, nil, nil)
@@ -129,6 +131,7 @@ _cleanpath_from_handle :: proc(f: ^File, allocator: runtime.Allocator) -> (strin
 	if n == 0 {
 		return "", _get_platform_error()
 	}
+	_TEMP_ALLOCATOR_GUARD()
 	buf := make([]u16, max(n, 260)+1, _temp_allocator())
 	n = win32.GetFinalPathNameByHandleW(h, raw_data(buf), u32(len(buf)), 0)
 	return _cleanpath_from_buf(buf[:n], allocator)
@@ -144,6 +147,7 @@ _cleanpath_from_handle_u16 :: proc(f: ^File) -> ([]u16, Error) {
 	if n == 0 {
 		return nil, _get_platform_error()
 	}
+	_TEMP_ALLOCATOR_GUARD()
 	buf := make([]u16, max(n, 260)+1, _temp_allocator())
 	n = win32.GetFinalPathNameByHandleW(h, raw_data(buf), u32(len(buf)), 0)
 	return _cleanpath_strip_prefix(buf[:n]), nil
@@ -228,7 +232,7 @@ _file_info_from_win32_file_attribute_data :: proc(d: ^win32.WIN32_FILE_ATTRIBUTE
 	fi.size = i64(d.nFileSizeHigh)<<32 + i64(d.nFileSizeLow)
 
 	fi.mode |= _file_mode_from_file_attributes(d.dwFileAttributes, nil, 0)
-	fi.is_dir = fi.mode & File_Mode_Dir != 0
+	fi.is_directory = fi.mode & File_Mode_Dir != 0
 
 	fi.creation_time     = time.unix(0, win32.FILETIME_as_unix_nanoseconds(d.ftCreationTime))
 	fi.modification_time = time.unix(0, win32.FILETIME_as_unix_nanoseconds(d.ftLastWriteTime))
@@ -245,7 +249,7 @@ _file_info_from_win32_find_data :: proc(d: ^win32.WIN32_FIND_DATAW, name: string
 	fi.size = i64(d.nFileSizeHigh)<<32 + i64(d.nFileSizeLow)
 
 	fi.mode |= _file_mode_from_file_attributes(d.dwFileAttributes, nil, 0)
-	fi.is_dir = fi.mode & File_Mode_Dir != 0
+	fi.is_directory = fi.mode & File_Mode_Dir != 0
 
 	fi.creation_time     = time.unix(0, win32.FILETIME_as_unix_nanoseconds(d.ftCreationTime))
 	fi.modification_time = time.unix(0, win32.FILETIME_as_unix_nanoseconds(d.ftLastWriteTime))
@@ -282,7 +286,7 @@ _file_info_from_get_file_information_by_handle :: proc(path: string, h: win32.HA
 	fi.size = i64(d.nFileSizeHigh)<<32 + i64(d.nFileSizeLow)
 
 	fi.mode |= _file_mode_from_file_attributes(ti.FileAttributes, h, ti.ReparseTag)
-	fi.is_dir = fi.mode & File_Mode_Dir != 0
+	fi.is_directory = fi.mode & File_Mode_Dir != 0
 
 	fi.creation_time     = time.unix(0, win32.FILETIME_as_unix_nanoseconds(d.ftCreationTime))
 	fi.modification_time = time.unix(0, win32.FILETIME_as_unix_nanoseconds(d.ftLastWriteTime))

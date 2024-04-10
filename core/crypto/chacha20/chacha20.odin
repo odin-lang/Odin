@@ -1,11 +1,21 @@
+/*
+package chacha20 implements the ChaCha20 and XChaCha20 stream ciphers.
+
+See:
+- https://datatracker.ietf.org/doc/html/rfc8439
+- https://datatracker.ietf.org/doc/draft-irtf-cfrg-xchacha/03/
+*/
 package chacha20
 
 import "core:encoding/endian"
 import "core:math/bits"
 import "core:mem"
 
+// KEY_SIZE is the (X)ChaCha20 key size in bytes.
 KEY_SIZE :: 32
+// NONCE_SIZE is the ChaCha20 nonce size in bytes.
 NONCE_SIZE :: 12
+// XNONCE_SIZE is the XChaCha20 nonce size in bytes.
 XNONCE_SIZE :: 24
 
 @(private)
@@ -19,25 +29,26 @@ _STATE_SIZE_U32 :: 16
 _ROUNDS :: 20
 
 @(private)
-_SIGMA_0 : u32 : 0x61707865
+_SIGMA_0: u32 : 0x61707865
 @(private)
-_SIGMA_1 : u32 : 0x3320646e
+_SIGMA_1: u32 : 0x3320646e
 @(private)
-_SIGMA_2 : u32 : 0x79622d32
+_SIGMA_2: u32 : 0x79622d32
 @(private)
-_SIGMA_3 : u32 : 0x6b206574
+_SIGMA_3: u32 : 0x6b206574
 
+// Context is a ChaCha20 or XChaCha20 instance.
 Context :: struct {
-	_s: [_STATE_SIZE_U32]u32,
-
-	_buffer: [_BLOCK_SIZE]byte,
-	_off: int,
-
+	_s:              [_STATE_SIZE_U32]u32,
+	_buffer:         [_BLOCK_SIZE]byte,
+	_off:            int,
 	_is_ietf_flavor: bool,
 	_is_initialized: bool,
 }
 
-init :: proc (ctx: ^Context, key, nonce: []byte) {
+// init inititializes a Context for ChaCha20 or XChaCha20 with the provided
+// key and nonce.
+init :: proc(ctx: ^Context, key, nonce: []byte) {
 	if len(key) != KEY_SIZE {
 		panic("crypto/chacha20: invalid ChaCha20 key size")
 	}
@@ -89,7 +100,8 @@ init :: proc (ctx: ^Context, key, nonce: []byte) {
 	ctx._is_initialized = true
 }
 
-seek :: proc (ctx: ^Context, block_nr: u64) {
+// seek seeks the (X)ChaCha20 stream counter to the specified block.
+seek :: proc(ctx: ^Context, block_nr: u64) {
 	assert(ctx._is_initialized)
 
 	if ctx._is_ietf_flavor {
@@ -103,7 +115,10 @@ seek :: proc (ctx: ^Context, block_nr: u64) {
 	ctx._off = _BLOCK_SIZE
 }
 
-xor_bytes :: proc (ctx: ^Context, dst, src: []byte) {
+// xor_bytes XORs each byte in src with bytes taken from the (X)ChaCha20
+// keystream, and writes the resulting output to dst.  Dst and src MUST
+// alias exactly or not at all.
+xor_bytes :: proc(ctx: ^Context, dst, src: []byte) {
 	assert(ctx._is_initialized)
 
 	// TODO: Enforcing that dst and src alias exactly or not at all
@@ -147,7 +162,8 @@ xor_bytes :: proc (ctx: ^Context, dst, src: []byte) {
 	}
 }
 
-keystream_bytes :: proc (ctx: ^Context, dst: []byte) {
+// keystream_bytes fills dst with the raw (X)ChaCha20 keystream output.
+keystream_bytes :: proc(ctx: ^Context, dst: []byte) {
 	assert(ctx._is_initialized)
 
 	dst := dst
@@ -180,7 +196,9 @@ keystream_bytes :: proc (ctx: ^Context, dst: []byte) {
 	}
 }
 
-reset :: proc (ctx: ^Context) {
+// reset sanitizes the Context.  The Context must be re-initialized to
+// be used again.
+reset :: proc(ctx: ^Context) {
 	mem.zero_explicit(&ctx._s, size_of(ctx._s))
 	mem.zero_explicit(&ctx._buffer, size_of(ctx._buffer))
 
@@ -188,7 +206,7 @@ reset :: proc (ctx: ^Context) {
 }
 
 @(private)
-_do_blocks :: proc (ctx: ^Context, dst, src: []byte, nr_blocks: int) {
+_do_blocks :: proc(ctx: ^Context, dst, src: []byte, nr_blocks: int) {
 	// Enforce the maximum consumed keystream per nonce.
 	//
 	// While all modern "standard" definitions of ChaCha20 use

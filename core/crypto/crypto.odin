@@ -1,3 +1,7 @@
+/*
+package crypto implements a selection of cryptography algorithms and useful
+helper routines.
+*/
 package crypto
 
 import "core:mem"
@@ -50,4 +54,10 @@ rand_bytes :: proc (dst: []byte) {
 	mem.zero_explicit(raw_data(dst), len(dst))
 
 	_rand_bytes(dst)
+}
+
+// has_rand_bytes returns true iff the target has support for accessing the
+// system entropty source.
+has_rand_bytes :: proc () -> bool {
+	return _has_rand_bytes()
 }

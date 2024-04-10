@@ -643,7 +643,7 @@ align_switch_stmt :: proc(p: ^Printer, index: int) {
 	format_tokens := make([dynamic]TokenAndLength, 0, brace_token.parameter_count, context.temp_allocator)
 
 	//find all the switch cases that are one lined
-	for line, line_index in p.lines[brace_line + 1:] {
+	for line in p.lines[brace_line + 1:] {
 
 		case_found  := false
 		colon_found := false
@@ -716,7 +716,7 @@ align_enum :: proc(p: ^Printer, index: int) {
 
 	format_tokens := make([dynamic]TokenAndLength, 0, brace_token.parameter_count, context.temp_allocator)
 
-	for line, line_index in p.lines[brace_line + 1:] {
+	for line in p.lines[brace_line + 1:] {
 		length := 0
 
 		for format_token, i in line.format_tokens {
@@ -880,7 +880,7 @@ align_comments :: proc(p: ^Printer) {
 
 			length := 0
 
-			for format_token, i in line.format_tokens {
+			for format_token in line.format_tokens {
 				if format_token.kind == .Comment {
 					current_info.length = max(current_info.length, length)
 					current_info.end = line_index

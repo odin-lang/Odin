@@ -1,6 +1,6 @@
 package os2
 
-import "core:runtime"
+import "base:runtime"
 
 heap_allocator :: proc() -> runtime.Allocator {
 	return runtime.Allocator{

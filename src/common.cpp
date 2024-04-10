@@ -353,6 +353,27 @@ gb_global bool global_module_path_set = false;
 #include "thread_pool.cpp"
 
 
+gb_internal String obfuscate_string(String const &s, char const *prefix) {
+	if (s.len == 0) {
+		return s;
+	}
+	GB_ASSERT(prefix != nullptr);
+	u64 hash = gb_fnv64a(s.text, s.len);
+	gbString res = gb_string_make(permanent_allocator(), prefix);
+	res = gb_string_append_fmt(res, "x%llx", cast(long long unsigned)hash);
+	return make_string_c(res);
+}
+
+gb_internal i32 obfuscate_i32(i32 i) {
+	i32 x = cast(i32)gb_fnv64a(&i, sizeof(i));
+	if (x < 0) {
+		x = 1-x;
+	}
+	return cast(i32)x;
+}
+
+
+
 struct StringIntern {
 	StringIntern *next;
 	isize len;
@@ -913,7 +934,7 @@ gb_internal void did_you_mean_append(DidYouMeanAnswers *d, String const &target)
 	array_add(&d->distances, dat);
 }
 gb_internal Slice<DistanceAndTarget> did_you_mean_results(DidYouMeanAnswers *d) {
-	gb_sort_array(d->distances.data, d->distances.count, gb_isize_cmp(gb_offset_of(DistanceAndTarget, distance)));
+	array_sort(d->distances, gb_isize_cmp(gb_offset_of(DistanceAndTarget, distance)));
 	isize count = 0;
 	for (isize i = 0; i < d->distances.count; i++) {
 		isize distance = d->distances[i].distance;

@@ -8,7 +8,7 @@ package vendor_commonmark
 
 import "core:c"
 import "core:c/libc"
-import "core:runtime"
+import "base:runtime"
 
 COMMONMARK_SHARED :: #config(COMMONMARK_SHARED, false)
 BINDING_VERSION :: Version_Info{major = 0, minor = 30, patch = 2}
@@ -365,6 +365,16 @@ foreign lib {
 	// Any children of the node will be rendered after this text.
 	// Returns `true` on success, `false`on failure.
 	node_set_on_enter :: proc(node: ^Node, on_enter: cstring) -> (success: b32) ---
+
+	// Returns the literal "on exit" text for a custom 'node', or
+	// an empty string if no on_exit is set.  Returns NULL if
+	// called on a non-custom node.
+	node_get_on_exit :: proc(node: ^Node) -> (on_exit: cstring) ---
+
+	// Sets the literal text to render "on exit" for a custom 'node'.
+	// Any children of the node will be rendered before this text.
+	// Returns 1 on success 0 on failure.
+	node_set_on_exit :: proc(node: ^Node, on_exit: cstring) -> (success: b32) ---
 
 	// Returns the line on which `node` begins.
 	node_get_start_line :: proc(node: ^Node) -> (line: c.int) ---

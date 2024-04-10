@@ -2,20 +2,12 @@
 
 package glfw
 
-import NS "vendor:darwin/Foundation"
-
-when GLFW_SHARED {
-    #panic("Dynamic linking for glfw is not supported for darwin yet")
-    foreign import glfw {"_"}
-} else {
-    foreign import glfw {
-        "lib/darwin/libglfw3.a",
-    }
-}
+import NS "core:sys/darwin/Foundation"
 
 @(default_calling_convention="c", link_prefix="glfw")
-foreign glfw {
-    GetCocoaWindow :: proc(window: WindowHandle) -> ^NS.Window ---
+foreign {
+	GetCocoaWindow :: proc(window: WindowHandle) -> ^NS.Window ---
+	GetCocoaView   :: proc(window: WindowHandle) -> ^NS.View   ---
 }
 
 // TODO:

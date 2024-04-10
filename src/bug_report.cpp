@@ -170,7 +170,7 @@ gb_internal void odin_cpuid(int leaf, int result[]) {
 }
 
 gb_internal void report_cpu_info() {
-	gb_printf("\tCPU:  ");
+	gb_printf("\tCPU:     ");
 
 	#if defined(GB_CPU_X86)
 
@@ -221,7 +221,7 @@ gb_internal void report_cpu_info() {
 	Report the amount of installed RAM.
 */
 gb_internal void report_ram_info() {
-	gb_printf("\tRAM:  ");
+	gb_printf("\tRAM:     ");
 
 	#if defined(GB_SYSTEM_WINDOWS)
 		MEMORYSTATUSEX statex;
@@ -272,7 +272,7 @@ gb_internal void report_ram_info() {
 }
 
 gb_internal void report_os_info() {
-	gb_printf("\tOS:   ");
+	gb_printf("\tOS:      ");
 
 	#if defined(GB_SYSTEM_WINDOWS)
 	/*
@@ -880,9 +880,15 @@ gb_internal void report_os_info() {
 			{"23A344",   {23,  0,  0}, "macOS", {"Sonoma",        {14,  0,  0}}},
 			{"23B74",    {23,  1,  0}, "macOS", {"Sonoma",        {14,  1,  0}}},
 			{"23B81",    {23,  1,  0}, "macOS", {"Sonoma",        {14,  1,  1}}},
+			{"23B2082",  {23,  1,  0}, "macOS", {"Sonoma",        {14,  1,  1}}},
 			{"23B92",    {23,  1,  0}, "macOS", {"Sonoma",        {14,  1,  2}}},
+			{"23B2091",  {23,  1,  0}, "macOS", {"Sonoma",        {14,  1,  2}}},
 			{"23C64",    {23,  2,  0}, "macOS", {"Sonoma",        {14,  2,  0}}},
 			{"23C71",    {23,  2,  0}, "macOS", {"Sonoma",        {14,  2,  1}}},
+			{"23D56",    {23,  3,  0}, "macOS", {"Sonoma",        {14,  3,  0}}},
+			{"23D60",    {23,  3,  0}, "macOS", {"Sonoma",        {14,  3,  1}}},
+			{"23E214",   {23,  4,  0}, "macOS", {"Sonoma",        {14,  4,  0}}},
+			{"23E224",   {23,  4,  0}, "macOS", {"Sonoma",        {14,  4,  1}}},
 		};
 
 
@@ -1019,6 +1025,10 @@ gb_internal void report_os_info() {
 	#endif
 }
 
+gb_internal void report_backend_info() {
+	gb_printf("\tBackend: LLVM %s\n", LLVM_VERSION_STRING);
+}
+
 // NOTE(Jeroen): `odin report` prints some system information for easier bug reporting.
 gb_internal void print_bug_report_help() {
 	gb_printf("Where to find more information and get into contact when you encounter a bug:\n\n");
@@ -1032,7 +1042,7 @@ gb_internal void print_bug_report_help() {
 
 	gb_printf("Useful information to add to a bug report:\n\n");
 
-	gb_printf("\tOdin: %.*s", LIT(ODIN_VERSION));
+	gb_printf("\tOdin:    %.*s", LIT(ODIN_VERSION));
 
 	#ifdef NIGHTLY
 	gb_printf("-nightly");
@@ -1058,4 +1068,6 @@ gb_internal void print_bug_report_help() {
 		And RAM info.
 	*/
 	report_ram_info();
+
+	report_backend_info();
 }

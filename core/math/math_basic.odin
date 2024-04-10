@@ -1,7 +1,7 @@
 //+build !js
 package math
 
-import "core:intrinsics"
+import "base:intrinsics"
 
 @(default_calling_convention="none", private="file")
 foreign _ {

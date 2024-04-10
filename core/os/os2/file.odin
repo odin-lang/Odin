@@ -2,10 +2,11 @@ package os2
 
 import "core:io"
 import "core:time"
-import "core:runtime"
+import "base:runtime"
 
 File :: struct {
 	impl: _File,
+	stream: io.Stream,
 }
 
 File_Mode :: distinct u32
@@ -72,56 +73,56 @@ name :: proc(f: ^File) -> string {
 
 close :: proc(f: ^File) -> Error {
 	if f != nil {
-		return io.close(f.impl.stream)
+		return io.close(f.stream)
 	}
 	return nil
 }
 
 seek :: proc(f: ^File, offset: i64, whence: io.Seek_From) -> (ret: i64, err: Error) {
 	if f != nil {
-		return io.seek(f.impl.stream, offset, whence)
+		return io.seek(f.stream, offset, whence)
 	}
 	return 0, .Invalid_File
 }
 
 read :: proc(f: ^File, p: []byte) -> (n: int, err: Error) {
 	if f != nil {
-		return io.read(f.impl.stream, p)
+		return io.read(f.stream, p)
 	}
 	return 0, .Invalid_File
 }
 
 read_at :: proc(f: ^File, p: []byte, offset: i64) -> (n: int, err: Error) {
 	if f != nil {
-		return io.read_at(f.impl.stream, p, offset)
+		return io.read_at(f.stream, p, offset)
 	}
 	return 0, .Invalid_File
 }
 
 write :: proc(f: ^File, p: []byte) -> (n: int, err: Error) {
 	if f != nil {
-		return io.write(f.impl.stream, p)
+		return io.write(f.stream, p)
 	}
 	return 0, .Invalid_File
 }
 
 write_at :: proc(f: ^File, p: []byte, offset: i64) -> (n: int, err: Error) {
 	if f != nil {
-		return io.write_at(f.impl.stream, p, offset)
+		return io.write_at(f.stream, p, offset)
 	}
 	return 0, .Invalid_File
 }
 
 file_size :: proc(f: ^File) -> (n: i64, err: Error) {
 	if f != nil {
-		return io.size(f.impl.stream)
+		return io.size(f.stream)
 	}
 	return 0, .Invalid_File
 }
 
 flush :: proc(f: ^File) -> Error {
 	if f != nil {
-		return io.flush(f.impl.stream)
+		return io.flush(f.stream)
 	}
 	return nil
 }
@@ -156,41 +157,46 @@ read_link :: proc(name: string, allocator: runtime.Allocator) -> (string, Error)
 }
 
 
-chdir :: proc(name: string) -> Error {
+chdir :: change_directory
+change_directory :: proc(name: string) -> Error {
 	return _chdir(name)
 }
 
-chmod :: proc(name: string, mode: File_Mode) -> Error {
+chmod :: change_mode
+change_mode :: proc(name: string, mode: File_Mode) -> Error {
 	return _chmod(name, mode)
 }
-
-chown :: proc(name: string, uid, gid: int) -> Error {
+chown :: change_owner
+change_owner :: proc(name: string, uid, gid: int) -> Error {
 	return _chown(name, uid, gid)
 }
 
-fchdir :: proc(f: ^File) -> Error {
+fchdir :: fchange_directory
+fchange_directory :: proc(f: ^File) -> Error {
 	return _fchdir(f)
 }
-
-fchmod :: proc(f: ^File, mode: File_Mode) -> Error {
+fchmod :: fchange_mode
+fchange_mode :: proc(f: ^File, mode: File_Mode) -> Error {
 	return _fchmod(f, mode)
 }
 
-fchown :: proc(f: ^File, uid, gid: int) -> Error {
+fchown :: fchange_owner
+fchange_owner :: proc(f: ^File, uid, gid: int) -> Error {
 	return _fchown(f, uid, gid)
 }
 
 
-
-lchown :: proc(name: string, uid, gid: int) -> Error {
+lchown :: change_owner_do_not_follow_links
+change_owner_do_not_follow_links :: proc(name: string, uid, gid: int) -> Error {
 	return _lchown(name, uid, gid)
 }
 
-
-chtimes :: proc(name: string, atime, mtime: time.Time) -> Error {
+chtimes :: change_times
+change_times :: proc(name: string, atime, mtime: time.Time) -> Error {
 	return _chtimes(name, atime, mtime)
 }
-fchtimes :: proc(f: ^File, atime, mtime: time.Time) -> Error {
+fchtimes :: fchange_times
+fchange_times :: proc(f: ^File, atime, mtime: time.Time) -> Error {
 	return _fchtimes(f, atime, mtime)
 }
 
@@ -202,7 +208,8 @@ is_file :: proc(path: string) -> bool {
 	return _is_file(path)
 }
 
-is_dir :: proc(path: string) -> bool {
+is_dir :: is_directory
+is_directory :: proc(path: string) -> bool {
 	return _is_dir(path)
 }
 
@@ -213,7 +220,7 @@ copy_file :: proc(dst_path, src_path: string) -> Error {
 
 	info := fstat(src, _file_allocator()) or_return
 	defer file_info_delete(info, _file_allocator())
-	if info.is_dir {
+	if info.is_directory {
 		return .Invalid_File
 	}
 

@@ -1,8 +1,8 @@
 package os
 
 import win32 "core:sys/windows"
-import "core:intrinsics"
-import "core:runtime"
+import "base:intrinsics"
+import "base:runtime"
 import "core:unicode/utf16"
 
 is_path_separator :: proc(c: byte) -> bool {
@@ -349,7 +349,7 @@ exists :: proc(path: string) -> bool {
 	wpath := win32.utf8_to_wstring(path, context.temp_allocator)
 	attribs := win32.GetFileAttributesW(wpath)
 
-	return i32(attribs) != win32.INVALID_FILE_ATTRIBUTES
+	return attribs != win32.INVALID_FILE_ATTRIBUTES
 }
 
 is_file :: proc(path: string) -> bool {
@@ -357,7 +357,7 @@ is_file :: proc(path: string) -> bool {
 	wpath := win32.utf8_to_wstring(path, context.temp_allocator)
 	attribs := win32.GetFileAttributesW(wpath)
 
-	if i32(attribs) != win32.INVALID_FILE_ATTRIBUTES {
+	if attribs != win32.INVALID_FILE_ATTRIBUTES {
 		return attribs & win32.FILE_ATTRIBUTE_DIRECTORY == 0
 	}
 	return false
@@ -368,7 +368,7 @@ is_dir :: proc(path: string) -> bool {
 	wpath := win32.utf8_to_wstring(path, context.temp_allocator)
 	attribs := win32.GetFileAttributesW(wpath)
 
-	if i32(attribs) != win32.INVALID_FILE_ATTRIBUTES {
+	if attribs != win32.INVALID_FILE_ATTRIBUTES {
 		return attribs & win32.FILE_ATTRIBUTE_DIRECTORY != 0
 	}
 	return false
@@ -394,7 +394,8 @@ get_current_directory :: proc(allocator := context.allocator) -> string {
 }
 
 set_current_directory :: proc(path: string) -> (err: Errno) {
-	wstr := win32.utf8_to_wstring(path)
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
+	wstr := win32.utf8_to_wstring(path, context.temp_allocator)
 
 	win32.AcquireSRWLockExclusive(&cwd_lock)
 
@@ -406,18 +407,7 @@ set_current_directory :: proc(path: string) -> (err: Errno) {
 
 	return
 }
-
-
-
-change_directory :: proc(path: string) -> (err: Errno) {
-	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
-	wpath := win32.utf8_to_wstring(path, context.temp_allocator)
-
-	if !win32.SetCurrentDirectoryW(wpath) {
-		err = Errno(win32.GetLastError())
-	}
-	return
-}
+change_directory :: set_current_directory
 
 make_directory :: proc(path: string, mode: u32 = 0) -> (err: Errno) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()

@@ -1,7 +1,7 @@
 //+build i386, amd64
 package sysinfo
 
-import "core:intrinsics"
+import "base:intrinsics"
 
 // cpuid :: proc(ax, cx: u32) -> (eax, ebc, ecx, edx: u32) ---
 cpuid :: intrinsics.x86_cpuid

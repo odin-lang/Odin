@@ -287,24 +287,6 @@ gb_internal lbValue lb_expr_untyped_const_to_typed(lbModule *m, Ast *expr, Type 
 	return lb_const_value(m, t, tv.value);
 }
 
-gb_internal String lb_obfuscate_string(String const &s, char const *prefix) {
-	if (s.len == 0) {
-		return {};
-	}
-	GB_ASSERT(prefix != nullptr);
-	u64 hash = gb_fnv64a(s.text, s.len);
-	gbString res = gb_string_make(temporary_allocator(), prefix);
-	res = gb_string_append_fmt(res, "x%llx", cast(long long unsigned)hash);
-	return make_string_c(res);
-}
-
-gb_internal i32 lb_obfuscate_i32(i32 i) {
-	i32 x = cast(i32)gb_fnv64a(&i, sizeof(i));
-	if (x < 0) {
-		x = 1-x;
-	}
-	return cast(i32)x;
-}
 
 gb_internal lbValue lb_const_source_code_location_const(lbModule *m, String const &procedure_, TokenPos const &pos) {
 	String file = get_file_path_string(pos.file_id);
@@ -314,11 +296,11 @@ gb_internal lbValue lb_const_source_code_location_const(lbModule *m, String cons
 	i32 column = pos.column;
 
 	if (build_context.obfuscate_source_code_locations) {
-		file = lb_obfuscate_string(file, "F");
-		procedure = lb_obfuscate_string(procedure, "P");
+		file = obfuscate_string(file, "F");
+		procedure = obfuscate_string(procedure, "P");
 
-		line   = lb_obfuscate_i32(line);
-		column = lb_obfuscate_i32(column);
+		line   = obfuscate_i32(line);
+		column = obfuscate_i32(column);
 	}
 
 	LLVMValueRef fields[4] = {};
@@ -730,9 +712,21 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bo
 		return res;
 	case ExactValue_Float:
 		if (is_type_different_to_arch_endianness(type)) {
-			u64 u = bit_cast<u64>(value.value_float);
-			u = gb_endian_swap64(u);
-			res.value = LLVMConstReal(lb_type(m, original_type), bit_cast<f64>(u));
+			if (type->Basic.kind == Basic_f32le || type->Basic.kind == Basic_f32be) {
+				f32 f = static_cast<float>(value.value_float);
+				u32 u = bit_cast<u32>(f);
+				u = gb_endian_swap32(u);
+				res.value = LLVMConstReal(lb_type(m, original_type), bit_cast<f32>(u));
+			} else if (type->Basic.kind == Basic_f16le || type->Basic.kind == Basic_f16be) {
+				f32 f = static_cast<float>(value.value_float);
+				u16 u = f32_to_f16(f);
+				u = gb_endian_swap16(u);
+				res.value = LLVMConstReal(lb_type(m, original_type), f16_to_f32(u));
+			} else {
+				u64 u = bit_cast<u64>(value.value_float);
+				u = gb_endian_swap64(u);
+				res.value = LLVMConstReal(lb_type(m, original_type), bit_cast<f64>(u));
+			}
 		} else {
 			res.value = LLVMConstReal(lb_type(m, original_type), value.value_float);
 		}
@@ -1302,11 +1296,11 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bo
 				GB_ASSERT_MSG(elem_count == max_count, "%td != %td", elem_count, max_count);
 
 				LLVMValueRef *values = gb_alloc_array(temporary_allocator(), LLVMValueRef, cast(isize)total_count);
-				
 				for_array(i, cl->elems) {
 					TypeAndValue tav = cl->elems[i]->tav;
 					GB_ASSERT(tav.mode != Addressing_Invalid);
-					i64 offset = matrix_row_major_index_to_offset(type, i);
+					i64 offset = 0;
+					offset = matrix_row_major_index_to_offset(type, i);
 					values[offset] = lb_const_value(m, elem_type, tav.value, allow_local).value;
 				}
 				for (isize i = 0; i < total_count; i++) {

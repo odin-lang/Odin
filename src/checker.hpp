@@ -340,6 +340,19 @@ struct LoadFileCache {
 	StringMap<u64> hashes;
 };
 
+
+struct LoadDirectoryFile {
+	String file_name;
+	String data;
+};
+
+struct LoadDirectoryCache {
+	String                 path;
+	gbFileError            file_error;
+	Array<LoadFileCache *> files;
+};
+
+
 struct GenProcsData {
 	Array<Entity *> procs;
 	RwMutex         mutex;
@@ -347,7 +360,7 @@ struct GenProcsData {
 
 struct GenTypesData {
 	Array<Entity *> types;
-	RwMutex         mutex;
+	RecursiveMutex  mutex;
 };
 
 // CheckerInfo stores all the symbol information for a type-checked program
@@ -387,8 +400,8 @@ struct CheckerInfo {
 
 	RecursiveMutex lazy_mutex; // Mutex required for lazy type checking of specific files
 
-	RwMutex       gen_types_mutex;
-	PtrMap<Type *, GenTypesData > gen_types;
+	BlockingMutex                  gen_types_mutex;
+	PtrMap<Type *, GenTypesData *> gen_types;
 
 	BlockingMutex type_info_mutex; // NOT recursive
 	Array<Type *> type_info_types;
@@ -416,6 +429,11 @@ struct CheckerInfo {
 	BlockingMutex instrumentation_mutex;
 	Entity *instrumentation_enter_entity;
 	Entity *instrumentation_exit_entity;
+
+
+	BlockingMutex                       load_directory_mutex;
+	StringMap<LoadDirectoryCache *>     load_directory_cache;
+	PtrMap<Ast *, LoadDirectoryCache *> load_directory_map; // Key: Ast_CallExpr *
 };
 
 struct CheckerContext {
@@ -433,6 +451,7 @@ struct CheckerContext {
 	u32            state_flags;
 	bool           in_defer;
 	Type *         type_hint;
+	Ast *          type_hint_expr;
 
 	String         proc_name;
 	DeclInfo *     curr_proc_decl;
@@ -457,6 +476,7 @@ struct CheckerContext {
 	bool       hide_polymorphic_errors;
 	bool       in_polymorphic_specialization;
 	bool       allow_arrow_right_selector_expr;
+	u8         bit_field_bit_size;
 	Scope *    polymorphic_scope;
 
 	Ast *assignment_lhs_hint;
@@ -480,6 +500,7 @@ struct Checker {
 
 
 	MPSCQueue<UntypedExprInfo> global_untyped_queue;
+	MPSCQueue<Type *> soa_types_to_complete;
 };
 
 
@@ -540,3 +561,6 @@ gb_internal void init_core_context(Checker *c);
 gb_internal void init_mem_allocator(Checker *c);
 
 gb_internal void add_untyped_expressions(CheckerInfo *cinfo, UntypedExprInfoMap *untyped);
+
+
+gb_internal GenTypesData *ensure_polymorphic_record_entity_has_gen_types(CheckerContext *ctx, Type *original_type);

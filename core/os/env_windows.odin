@@ -1,7 +1,7 @@
 package os
 
 import win32 "core:sys/windows"
-import "core:runtime"
+import "base:runtime"
 
 // lookup_env gets the value of the environment variable named by the key
 // If the variable is found in the environment the value (which can be empty) is returned and the boolean is true

@@ -43,6 +43,7 @@ enum EntityFlag : u64 {
 	EntityFlag_NoAlias       = 1ull<<9,
 	EntityFlag_TypeField     = 1ull<<10,
 	EntityFlag_Value         = 1ull<<11,
+	EntityFlag_BitFieldField = 1ull<<12,
 
 
 
@@ -59,7 +60,7 @@ enum EntityFlag : u64 {
 	EntityFlag_ProcBodyChecked = 1ull<<21,
 
 	EntityFlag_CVarArg       = 1ull<<22,
-
+	EntityFlag_NoBroadcast   = 1ull<<23,
 	EntityFlag_AnyInt        = 1ull<<24,
 
 	EntityFlag_Disabled      = 1ull<<25,
@@ -212,6 +213,7 @@ struct Entity {
 			Ast *init_expr; // only used for some variables within procedure bodies
 			i32  field_index;
 			i32  field_group_index;
+			u8   bit_field_bit_size;
 
 			ParameterValue param_value;
 
@@ -227,6 +229,7 @@ struct Entity {
 			CommentGroup *comment;
 			bool       is_foreign;
 			bool       is_export;
+			bool       is_global;
 		} Variable;
 		struct {
 			Type * type_parameter_specialization;
@@ -477,4 +480,26 @@ gb_internal Entity *strip_entity_wrapping(Entity *e) {
 gb_internal Entity *strip_entity_wrapping(Ast *expr) {
 	Entity *e = entity_from_expr(expr);
 	return strip_entity_wrapping(e);
+}
+
+
+gb_internal bool is_entity_local_variable(Entity *e) {
+	if (e == nullptr) {
+		return false;
+	}
+	if (e->kind != Entity_Variable) {
+		return false;
+	}
+	if (e->Variable.is_global) {
+		return false;
+	}
+	if (e->scope == nullptr) {
+		return true;
+	}
+	if (e->flags & (EntityFlag_ForValue|EntityFlag_SwitchValue)) {
+		return false;
+	}
+
+	return ((e->scope->flags &~ ScopeFlag_ContextDefined) == 0) ||
+	       (e->scope->flags & ScopeFlag_Proc) != 0;
 }

@@ -1,6 +1,6 @@
 package objc_Metal
 
-import NS "vendor:darwin/Foundation"
+import NS "core:sys/darwin/Foundation"
 import "core:c"
 
 @(require)

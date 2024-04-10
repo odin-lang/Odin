@@ -1,9 +1,6 @@
 package sdl2
 
 import "core:c"
-import "core:intrinsics"
-import "core:runtime"
-_, _ :: intrinsics, runtime
 
 when ODIN_OS == .Windows {
 	foreign import lib "SDL2.lib"
@@ -17,16 +14,6 @@ bool :: distinct b32
 FOURCC :: #force_inline proc "c" (A, B, C, D: u8) -> u32 {
 	return u32(A) << 0 | u32(B) << 8 | u32(C) << 16 | u32(D) << 24
 }
-
-
-stack_alloc :: proc "c" ($T: typeid, #any_int count: int) -> ^T {
-	return (^T)(intrinsics.alloca(size_of(T)*count))
-}
-stack_make :: proc "c" ($T: typeid/[]$E, #any_int count: int) -> T {
-	ptr := (^T)(intrinsics.alloca(size_of(T)*count))
-	return transmute(T)runtime.Raw_Slice{ptr, count}
-}
-stack_free :: proc "c" (ptr: rawptr) {}
 
 
 malloc_func  :: proc "c" (size: c.size_t) -> rawptr

@@ -81,12 +81,11 @@ Package vendor:raylib implements bindings for version 5.0 of the raylib library 
 */
 package raylib
 
-import c "core:c/libc"
+import "core:c"
 import "core:fmt"
 import "core:mem"
 import "core:strings"
 
-USE_LINALG :: #config(RAYLIB_USE_LINALG, true)
 import "core:math/linalg"
 _ :: linalg
 
@@ -213,39 +212,19 @@ BLANK      :: Color{ 0, 0, 0, 0 }           // Blank (Transparent)
 MAGENTA    :: Color{ 255, 0, 255, 255 }     // Magenta
 RAYWHITE   :: Color{ 245, 245, 245, 255 }   // My own White (raylib logo)
 
+// Vector2 type
+Vector2 :: [2]f32
+// Vector3 type
+Vector3 :: [3]f32
+// Vector4 type
+Vector4 :: [4]f32
 
-when USE_LINALG {
-	// Vector2 type
-	Vector2 :: linalg.Vector2f32
-	// Vector3 type
-	Vector3 :: linalg.Vector3f32
-	// Vector4 type
-	Vector4 :: linalg.Vector4f32
+// Quaternion type
+Quaternion :: quaternion128
 
-	// Quaternion type
-	Quaternion :: linalg.Quaternionf32
+// Matrix type (right handed, stored row major)
+Matrix :: #row_major matrix[4, 4]f32
 
-	// Matrix type (OpenGL style 4x4 - right handed, column major)
-	Matrix :: linalg.Matrix4x4f32
-} else {
-	// Vector2 type
-	Vector2 :: distinct [2]f32
-	// Vector3 type
-	Vector3 :: distinct [3]f32
-	// Vector4 type
-	Vector4 :: distinct [4]f32
-
-	// Quaternion type
-	Quaternion :: distinct quaternion128
-	
-	// Matrix, 4x4 components, column major, OpenGL style, right handed
-	Matrix :: struct {
-		m0, m4, m8, m12:  f32, // Matrix first row (4 components)
-		m1, m5, m9, m13:  f32, // Matrix second row (4 components)
-		m2, m6, m10, m14: f32, // Matrix third row (4 components)
-		m3, m7, m11, m15: f32, // Matrix fourth row (4 components)
-	}
-}
 
 // Color, 4 components, R8G8B8A8 (32bit)
 //
@@ -318,11 +297,11 @@ GlyphInfo :: struct {
 // Font type, includes texture and charSet array data
 Font :: struct {
 	baseSize:     c.int,          // Base size (default chars height)
-	charsCount:   c.int,          // Number of characters
-	charsPadding: c.int,          // Padding around the chars
+	glyphCount:   c.int,          // Number of characters
+	glyphPadding: c.int,          // Padding around the chars
 	texture:      Texture2D,      // Characters texture atlas
 	recs:         [^]Rectangle,   // Characters rectangles in texture
-	chars:        [^]GlyphInfo,    // Characters info data
+	glyphs:       [^]GlyphInfo,    // Characters info data
 }
 
 // Camera type, defines a camera position/orientation in 3d space
@@ -344,7 +323,7 @@ Camera2D :: struct {
 	zoom:     f32,                // Camera zoom (scaling), should be 1.0f by default
 }
 
-// Vertex data definning a mesh
+// Vertex data defining a mesh
 // NOTE: Data stored in CPU memory (and GPU)
 Mesh :: struct {
 	vertexCount:   c.int,         // Number of vertices stored in arrays
@@ -404,7 +383,7 @@ BoneInfo :: struct {
 }
 
 // Model type
-Model :: struct {
+Model :: struct #align(align_of(uintptr)) {
 	transform: Matrix,            // Local transform matrix
 
 	meshCount: c.int,             // Number of meshes
@@ -425,6 +404,7 @@ ModelAnimation :: struct {
 	frameCount: c.int,            // Number of animation frames
 	bones:      [^]BoneInfo,      // Bones information (skeleton)
 	framePoses: [^][^]Transform,  // Poses array by frame
+	name:       [32]byte,           // Animation name
 }
 
 // Ray type (useful for raycast)
@@ -490,7 +470,6 @@ VrDeviceInfo :: struct {
 	vResolution:            c.int,    // Vertical resolution in pixels
 	hScreenSize:            f32,      // Horizontal size in meters
 	vScreenSize:            f32,      // Vertical size in meters
-	vScreenCenter:          f32,      // Screen center in meters
 	eyeToScreenDistance:    f32,      // Distance between eye and display in meters
 	lensSeparationDistance: f32,      // Lens separation distance in meters
 	interpupillaryDistance: f32,      // IPD (distance between pupils) in meters
@@ -499,7 +478,7 @@ VrDeviceInfo :: struct {
 }
 
 // VR Stereo rendering configuration for simulator
-VrStereoConfig :: struct {
+VrStereoConfig :: struct #align(4) {
 	projection:        [2]Matrix,     // VR projection matrices (per eye)
 	viewOffset:        [2]Matrix,     // VR view offset matrices (per eye)
 	leftLensCenter:    [2]f32,        // VR left lens center
@@ -925,13 +904,11 @@ NPatchLayout :: enum c.int {
 	THREE_PATCH_HORIZONTAL,  // Npatch layout: 3x1 tiles
 }
 
-
-
 // Callbacks to hook some internal functions
 // WARNING: This callbacks are intended for advance users
 TraceLogCallback     :: #type proc "c" (logLevel: TraceLogLevel, text: cstring, args: c.va_list)        // Logging: Redirect trace log messages
-LoadFileDataCallback :: #type proc "c"(fileName: cstring, dataSize: ^c.int) -> [^]u8                  	// FileIO: Load binary data
-SaveFileDataCallback :: #type proc "c" (fileName: cstring, data: rawptr, dataSize: c.int) -> bool  		// FileIO: Save binary data
+LoadFileDataCallback :: #type proc "c"(fileName: cstring, dataSize: ^c.int) -> [^]u8                    // FileIO: Load binary data
+SaveFileDataCallback :: #type proc "c" (fileName: cstring, data: rawptr, dataSize: c.int) -> bool       // FileIO: Save binary data
 LoadFileTextCallback :: #type proc "c" (fileName: cstring) -> [^]u8                                     // FileIO: Load text data
 SaveFileTextCallback :: #type proc "c" (fileName: cstring, text: cstring) -> bool                       // FileIO: Save text data
 
@@ -1051,8 +1028,8 @@ foreign lib {
 	LoadShader              :: proc(vsFileName, fsFileName: cstring) -> Shader ---                                                        // Load shader from files and bind default locations
 	LoadShaderFromMemory    :: proc(vsCode, fsCode: cstring) -> Shader ---                                                                // Load shader from code strings and bind default locations
 	IsShaderReady           :: proc(shader: Shader) -> bool ---                                                                           // Check if a shader is ready
-	GetShaderLocation       :: proc(shader: Shader, uniformName: cstring) -> c.int ---                                                    // Get shader uniform location
-	GetShaderLocationAttrib :: proc(shader: Shader, attribName: cstring) -> c.int ---                                                     // Get shader attribute location
+	GetShaderLocation       :: proc(shader: Shader, uniformName: cstring) -> ShaderLocationIndex ---                                                    // Get shader uniform location
+	GetShaderLocationAttrib :: proc(shader: Shader, attribName: cstring)  -> ShaderLocationIndex ---                                                    // Get shader attribute location
 	SetShaderValue          :: proc(shader: Shader, locIndex: ShaderLocationIndex, value: rawptr, uniformType: ShaderUniformDataType) ---               // Set shader uniform value
 	SetShaderValueV         :: proc(shader: Shader, locIndex: ShaderLocationIndex, value: rawptr, uniformType: ShaderUniformDataType, count: c.int) --- // Set shader uniform value vector
 	SetShaderValueMatrix    :: proc(shader: Shader, locIndex: ShaderLocationIndex, mat: Matrix) ---                                                     // Set shader uniform value (matrix 4x4)

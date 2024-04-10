@@ -440,6 +440,24 @@ expect_closing_token_of_field_list :: proc(p: ^Parser, closing_kind: tokenizer.T
 	return expect_closing
 }
 
+expect_closing_parentheses_of_field_list :: proc(p: ^Parser) -> tokenizer.Token {
+	token := p.curr_tok
+	if allow_token(p, .Close_Paren) {
+		return token
+	}
+
+	if allow_token(p, .Semicolon) && !tokenizer.is_newline(token) {
+		str := tokenizer.token_to_string(token)
+		error(p, end_of_line_pos(p, p.prev_tok), "expected a comma, got %s", str)
+	}
+
+	for p.curr_tok.kind != .Close_Paren && p.curr_tok.kind != .EOF && !is_non_inserted_semicolon(p.curr_tok) {
+		advance_token(p)
+	}
+
+	return expect_token(p, .Close_Paren)
+}
+
 is_non_inserted_semicolon :: proc(tok: tokenizer.Token) -> bool {
 	return tok.kind == .Semicolon && tok.text != "\n"
 }
@@ -517,7 +535,7 @@ is_semicolon_optional_for_node :: proc(p: ^Parser, node: ^ast.Node) -> bool {
 		return is_semicolon_optional_for_node(p, n.type)
 	case ^ast.Pointer_Type:
 		return is_semicolon_optional_for_node(p, n.elem)
-	case ^ast.Struct_Type, ^ast.Union_Type, ^ast.Enum_Type:
+	case ^ast.Struct_Type, ^ast.Union_Type, ^ast.Enum_Type, ^ast.Bit_Set_Type, ^ast.Bit_Field_Type:
 		// Require semicolon within a procedure body
 		return p.curr_proc == nil
 	case ^ast.Proc_Lit:
@@ -2100,7 +2118,7 @@ parse_proc_type :: proc(p: ^Parser, tok: tokenizer.Token) -> ^ast.Proc_Type {
 
 	expect_token(p, .Open_Paren)
 	params, _ := parse_field_list(p, .Close_Paren, ast.Field_Flags_Signature_Params)
-	expect_token(p, .Close_Paren)
+	expect_closing_parentheses_of_field_list(p)
 	results, diverging := parse_results(p)
 
 	is_generic := false
@@ -2534,6 +2552,7 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 
 		poly_params: ^ast.Field_List
 		align:        ^ast.Expr
+		field_align:  ^ast.Expr
 		is_packed:    bool
 		is_raw_union: bool
 		is_no_copy:   bool
@@ -2565,6 +2584,11 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 					error(p, tag.pos, "duplicate struct tag '#%s'", tag.text)
 				}
 				align = parse_expr(p, true)
+			case "field_align":
+				if field_align != nil {
+					error(p, tag.pos, "duplicate struct tag '#%s'", tag.text)
+				}
+				field_align = parse_expr(p, true)
 			case "raw_union":
 				if is_raw_union {
 					error(p, tag.pos, "duplicate struct tag '#%s'", tag.text)
@@ -2607,6 +2631,7 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 		st := ast.new(ast.Struct_Type, tok.pos, end_pos(close))
 		st.poly_params   = poly_params
 		st.align         = align
+		st.field_align   = field_align
 		st.is_packed     = is_packed
 		st.is_raw_union  = is_raw_union
 		st.is_no_copy    = is_no_copy
@@ -2770,6 +2795,48 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 		mt.column_count = column_count
 		mt.elem = elem
 		return mt
+	
+	case .Bit_Field:
+		tok := expect_token(p, .Bit_Field)
+
+		backing_type := parse_type_or_ident(p)
+		if backing_type == nil {
+			token := advance_token(p)
+			error(p, token.pos, "Expected a backing type for a 'bit_field'")
+		}
+
+		skip_possible_newline_for_literal(p)
+		open := expect_token_after(p, .Open_Brace, "bit_field")
+
+		fields: [dynamic]^ast.Bit_Field_Field
+		for p.curr_tok.kind != .Close_Brace && p.curr_tok.kind != .EOF {
+			name := parse_ident(p)
+			expect_token(p, .Colon)
+			type := parse_type(p)
+			expect_token(p, .Or)
+			bit_size := parse_expr(p, true)
+
+			field := ast.new(ast.Bit_Field_Field, name.pos, bit_size)
+
+			field.name     = name
+			field.type     = type
+			field.bit_size = bit_size
+
+			append(&fields, field)
+
+			allow_token(p, .Comma) or_break
+		}
+
+		close := expect_closing_brace_of_field_list(p)
+
+		bf := ast.new(ast.Bit_Field_Type, tok.pos, close.pos)
+
+		bf.tok_pos      = tok.pos
+		bf.backing_type = backing_type
+		bf.open         = open.pos
+		bf.fields       = fields[:]
+		bf.close        = close.pos
+		return bf
 
 	case .Asm:
 		tok := expect_token(p, .Asm)
@@ -2877,7 +2944,8 @@ is_literal_type :: proc(expr: ^ast.Expr) -> bool {
 		^ast.Map_Type,
 		^ast.Bit_Set_Type,
 		^ast.Matrix_Type,
-		^ast.Call_Expr:
+		^ast.Call_Expr,
+		^ast.Bit_Field_Type:
 		return true
 	}
 	return false
@@ -2927,6 +2995,7 @@ parse_literal_value :: proc(p: ^Parser, type: ^ast.Expr) -> ^ast.Comp_Lit {
 	}
 	p.expr_level -= 1
 
+  skip_possible_newline(p)
 	close := expect_closing_brace_of_field_list(p);
 
 	pos := type.pos if type != nil else open.pos

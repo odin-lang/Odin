@@ -7,6 +7,7 @@ on:
 
 jobs:
   build_windows:
+    name: Windows Build
     if: github.repository == 'odin-lang/Odin'
     runs-on: windows-2022
     steps:
@@ -29,6 +30,7 @@ jobs:
           cp LICENSE dist
           cp LLVM-C.dll dist
           cp -r shared dist
+          cp -r base dist
           cp -r core dist
           cp -r vendor dist
           cp -r bin dist
@@ -39,12 +41,17 @@ jobs:
           name: windows_artifacts
           path: dist
   build_ubuntu:
+    name: Ubuntu Build
     if: github.repository == 'odin-lang/Odin'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
       - name: (Linux) Download LLVM
-        run: sudo apt-get install llvm-11 clang-11
+        run: |
+          wget https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh 17
+          echo "/usr/lib/llvm-17/bin" >> $GITHUB_PATH
       - name: build odin
         run: make nightly
       - name: Odin run
@@ -56,46 +63,88 @@ jobs:
           cp LICENSE dist
           cp libLLVM* dist
           cp -r shared dist
+          cp -r base dist
           cp -r core dist
           cp -r vendor dist
           cp -r examples dist
+          # Zipping so executable permissions are retained, see https://github.com/actions/upload-artifact/issues/38
+          zip -r dist.zip dist
       - name: Upload artifact
         uses: actions/upload-artifact@v1
         with:
           name: ubuntu_artifacts
-          path: dist
+          path: dist.zip
   build_macos:
+    name: MacOS Build
     if: github.repository == 'odin-lang/Odin'
-    runs-on: macOS-latest
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v1
       - name: Download LLVM and setup PATH
         run: |
-          brew install llvm@13
-          echo "/usr/local/opt/llvm@13/bin" >> $GITHUB_PATH
-          TMP_PATH=$(xcrun --show-sdk-path)/user/include
-          echo "CPATH=$TMP_PATH" >> $GITHUB_ENV
+          brew install llvm@17 dylibbundler
+          echo "/usr/local/opt/llvm@17/bin" >> $GITHUB_PATH
       - name: build odin
-        run: make nightly
-      - name: Odin run
-        run: ./odin run examples/demo
-      - name: Copy artifacts
+        # These -L makes the linker prioritize system libraries over LLVM libraries, this is mainly to
+        # not link with libunwind bundled with LLVM but link with libunwind on the system.
+        run: CXXFLAGS="-L/usr/lib/system -L/usr/lib" make nightly
+      - name: Bundle
         run: |
           mkdir dist
           cp odin dist
           cp LICENSE dist
           cp -r shared dist
+          cp -r base dist
           cp -r core dist
           cp -r vendor dist
           cp -r examples dist
+          dylibbundler -b -x dist/odin -d dist/libs -od -p @executable_path/libs
+          # Zipping so executable permissions are retained, see https://github.com/actions/upload-artifact/issues/38
+          zip -r dist.zip dist
+      - name: Odin run
+        run: ./dist/odin run examples/demo
       - name: Upload artifact
         uses: actions/upload-artifact@v1
         with:
           name: macos_artifacts
-          path: dist
+          path: dist.zip
+  build_macos_arm:
+    name: MacOS ARM Build
+    if: github.repository == 'odin-lang/Odin'
+    runs-on: macos-14 # ARM machine
+    steps:
+      - uses: actions/checkout@v1
+      - name: Download LLVM and setup PATH
+        run: |
+          brew install llvm@17 dylibbundler
+          echo "/opt/homebrew/opt/llvm@17/bin" >> $GITHUB_PATH
+      - name: build odin
+        # These -L makes the linker prioritize system libraries over LLVM libraries, this is mainly to
+        # not link with libunwind bundled with LLVM but link with libunwind on the system.
+        run: CXXFLAGS="-L/usr/lib/system -L/usr/lib" make nightly
+      - name: Bundle
+        run: |
+          mkdir dist
+          cp odin dist
+          cp LICENSE dist
+          cp -r shared dist
+          cp -r base dist
+          cp -r core dist
+          cp -r vendor dist
+          cp -r examples dist
+          dylibbundler -b -x dist/odin -d dist/libs -od -p @executable_path/libs
+          # Zipping so executable permissions are retained, see https://github.com/actions/upload-artifact/issues/38
+          zip -r dist.zip dist
+      - name: Odin run
+        run: ./dist/odin run examples/demo
+      - name: Upload artifact
+        uses: actions/upload-artifact@v1
+        with:
+          name: macos_arm_artifacts
+          path: dist.zip
   upload_b2:
     runs-on: [ubuntu-latest]
-    needs: [build_windows, build_macos, build_ubuntu]
+    needs: [build_windows, build_macos, build_macos_arm, build_ubuntu]
     steps:
       - uses: actions/checkout@v1
       - uses: actions/setup-python@v2
@@ -126,6 +175,11 @@ jobs:
         with:
           name: macos_artifacts
 
+      - name: Download macOS arm artifacts
+        uses: actions/download-artifact@v1
+        with:
+          name: macos_arm_artifacts
+
       - name: Create archives and upload
         shell: bash
         env:
@@ -140,8 +194,9 @@ jobs:
           echo Uploading artifcates to B2
           chmod +x ./ci/upload_create_nightly.sh
           ./ci/upload_create_nightly.sh "$BUCKET" windows-amd64 windows_artifacts/
-          ./ci/upload_create_nightly.sh "$BUCKET" ubuntu-amd64 ubuntu_artifacts/
-          ./ci/upload_create_nightly.sh "$BUCKET" macos-amd64 macos_artifacts/
+          ./ci/upload_create_nightly.sh "$BUCKET" ubuntu-amd64 ubuntu_artifacts/dist.zip
+          ./ci/upload_create_nightly.sh "$BUCKET" macos-amd64 macos_artifacts/dist.zip
+          ./ci/upload_create_nightly.sh "$BUCKET" macos-arm64 macos_arm_artifacts/dist.zip
 
           echo Deleting old artifacts in B2
           python3 ci/delete_old_binaries.py "$BUCKET" "$DAYS_TO_KEEP"

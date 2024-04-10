@@ -1,7 +1,7 @@
 package mem
 
-import "core:runtime"
-import "core:intrinsics"
+import "base:runtime"
+import "base:intrinsics"
 
 Byte     :: runtime.Byte
 Kilobyte :: runtime.Kilobyte
@@ -45,6 +45,8 @@ copy_non_overlapping :: proc "contextless" (dst, src: rawptr, len: int) -> rawpt
 	intrinsics.mem_copy_non_overlapping(dst, src, len)
 	return dst
 }
+
+@(require_results)
 compare :: proc "contextless" (a, b: []byte) -> int {
 	res := compare_byte_ptrs(raw_data(a), raw_data(b), min(len(a), len(b)))
 	if res == 0 && len(a) != len(b) {

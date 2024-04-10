@@ -210,6 +210,7 @@ gb_internal bool is_type_distinct(Ast *node) {
 	case Ast_UnionType:
 	case Ast_EnumType:
 	case Ast_ProcType:
+	case Ast_BitFieldType:
 		return true;
 
 	case Ast_PointerType:
@@ -1143,7 +1144,7 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 					      "\tat %s",
 					      LIT(name), token_pos_to_string(pos));
 				}
-			} else if (!are_types_identical(this_type, other_type)) {
+			} else if (!signature_parameter_similar_enough(this_type, other_type)) {
 				error(d->proc_lit,
 				      "Foreign entity '%.*s' previously declared elsewhere with a different type\n"
 				      "\tat %s",
@@ -1284,7 +1285,7 @@ gb_internal void check_global_variable_decl(CheckerContext *ctx, Entity *&e, Ast
 			TokenPos pos = f->token.pos;
 			Type *this_type = base_type(e->type);
 			Type *other_type = base_type(f->type);
-			if (!are_types_identical(this_type, other_type)) {
+			if (!signature_parameter_similar_enough(this_type, other_type)) {
 				error(e->token,
 				      "Foreign entity '%.*s' previously declared elsewhere with a different type\n"
 				      "\tat %s",
@@ -1629,6 +1630,7 @@ gb_internal bool check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *de
 		Entity *uvar = entry.uvar;
 		Entity *prev = scope_insert_no_mutex(ctx->scope, uvar);
 		if (prev != nullptr) {
+			ERROR_BLOCK();
 			error(e->token, "Namespace collision while 'using' procedure argument '%.*s' of: %.*s", LIT(e->token.string), LIT(prev->token.string));
 			error_line("%.*s != %.*s\n", LIT(uvar->token.string), LIT(prev->token.string));
 			break;

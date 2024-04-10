@@ -2,7 +2,7 @@ package os2
 
 import "core:sync"
 import "core:time"
-import "core:runtime"
+import "base:runtime"
 
 args: []string
 

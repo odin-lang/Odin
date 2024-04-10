@@ -81,7 +81,6 @@ gb_internal void lb_init_module(lbModule *m, Checker *c) {
 	array_init(&m->global_procedures_and_types_to_create, a, 0, 1024);
 	array_init(&m->missing_procedures_to_check, a, 0, 16);
 	map_init(&m->debug_values);
-	array_init(&m->debug_incomplete_types, a, 0, 1024);
 
 	string_map_init(&m->objc_classes);
 	string_map_init(&m->objc_selectors);
@@ -434,7 +433,7 @@ gb_internal lbAddr lb_addr_soa_variable(lbValue addr, lbValue index, Ast *index_
 }
 
 gb_internal lbAddr lb_addr_swizzle(lbValue addr, Type *array_type, u8 swizzle_count, u8 swizzle_indices[4]) {
-	GB_ASSERT(is_type_array(array_type));
+	GB_ASSERT(is_type_array(array_type) || is_type_simd_vector(array_type));
 	GB_ASSERT(1 < swizzle_count && swizzle_count <= 4);
 	lbAddr v = {lbAddr_Swizzle, addr};
 	v.swizzle.type = array_type;
@@ -450,6 +449,20 @@ gb_internal lbAddr lb_addr_swizzle_large(lbValue addr, Type *array_type, Slice<i
 	v.swizzle_large.indices = swizzle_indices;
 	return v;
 }
+
+gb_internal lbAddr lb_addr_bit_field(lbValue addr, Type *type, i64 index, i64 bit_offset, i64 bit_size) {
+	GB_ASSERT(is_type_pointer(addr.type));
+	Type *mt = type_deref(addr.type);
+	GB_ASSERT_MSG(is_type_bit_field(mt), "%s", type_to_string(mt));
+
+	lbAddr v = {lbAddr_BitField, addr};
+	v.bitfield.type       = type;
+	v.bitfield.index      = index;
+	v.bitfield.bit_offset = bit_offset;
+	v.bitfield.bit_size   = bit_size;
+	return v;
+}
+
 
 gb_internal Type *lb_addr_type(lbAddr const &addr) {
 	if (addr.addr.value == nullptr) {
@@ -759,7 +772,17 @@ gb_internal void lb_addr_store(lbProcedure *p, lbAddr addr, lbValue value) {
 		addr = lb_addr(lb_address_from_load(p, lb_addr_load(p, addr)));
 	}
 
-	if (addr.kind == lbAddr_RelativePointer) {
+	if (addr.kind == lbAddr_BitField) {
+		lbValue dst = addr.addr;
+
+		auto args = array_make<lbValue>(temporary_allocator(), 4);
+		args[0] = dst;
+		args[1] = lb_address_from_load_or_generate_local(p, value);
+		args[2] = lb_const_int(p->module, t_uintptr, addr.bitfield.bit_offset);
+		args[3] = lb_const_int(p->module, t_uintptr, addr.bitfield.bit_size);
+		lb_emit_runtime_call(p, "__write_bits", args);
+		return;
+	} else if (addr.kind == lbAddr_RelativePointer) {
 		Type *rel_ptr = base_type(lb_addr_type(addr));
 		GB_ASSERT(rel_ptr->kind == Type_RelativePointer ||
 		          rel_ptr->kind == Type_RelativeMultiPointer);
@@ -1074,8 +1097,31 @@ gb_internal lbValue lb_emit_load(lbProcedure *p, lbValue value) {
 gb_internal lbValue lb_addr_load(lbProcedure *p, lbAddr const &addr) {
 	GB_ASSERT(addr.addr.value != nullptr);
 
+	if (addr.kind == lbAddr_BitField) {
+		lbAddr dst = lb_add_local_generated(p, addr.bitfield.type, true);
+		lbValue src = addr.addr;
 
-	if (addr.kind == lbAddr_RelativePointer) {
+		auto args = array_make<lbValue>(temporary_allocator(), 4);
+		args[0] = dst.addr;
+		args[1] = src;
+		args[2] = lb_const_int(p->module, t_uintptr, addr.bitfield.bit_offset);
+		args[3] = lb_const_int(p->module, t_uintptr, addr.bitfield.bit_size);
+		lb_emit_runtime_call(p, "__read_bits", args);
+
+		lbValue r = lb_addr_load(p, dst);
+
+		if (!is_type_unsigned(core_type(addr.bitfield.type))) {
+			// Sign extension
+			// m := 1<<(bit_size-1)
+			// r = (r XOR m) - m
+			Type *t = addr.bitfield.type;
+			lbValue m = lb_const_int(p->module, t, 1ull<<(addr.bitfield.bit_size-1));
+			r = lb_emit_arith(p, Token_Xor, r, m, t);
+			r = lb_emit_arith(p, Token_Sub, r, m, t);
+		}
+
+		return r;
+	} else if (addr.kind == lbAddr_RelativePointer) {
 		Type *rel_ptr = base_type(lb_addr_type(addr));
 		Type *base_integer = nullptr;
 		Type *pointer_type = nullptr;
@@ -1217,6 +1263,30 @@ gb_internal lbValue lb_addr_load(lbProcedure *p, lbAddr const &addr) {
 		return lb_addr_load(p, res);
 	} else if (addr.kind == lbAddr_Swizzle) {
 		Type *array_type = base_type(addr.swizzle.type);
+		if (array_type->kind == Type_SimdVector) {
+			lbValue vec = lb_emit_load(p, addr.addr);
+			u8 index_count = addr.swizzle.count;
+			if (index_count == 0) {
+				return vec;
+			}
+
+			unsigned mask_len = cast(unsigned)index_count;
+			LLVMValueRef *mask_elems = gb_alloc_array(permanent_allocator(), LLVMValueRef, index_count);
+			for (isize i = 0; i < index_count; i++) {
+				mask_elems[i] = LLVMConstInt(lb_type(p->module, t_u32), addr.swizzle.indices[i], false);
+			}
+
+			LLVMValueRef mask = LLVMConstVector(mask_elems, mask_len);
+
+			LLVMValueRef v1 = vec.value;
+			LLVMValueRef v2 = vec.value;
+
+			lbValue res = {};
+			res.type = addr.swizzle.type;
+			res.value = LLVMBuildShuffleVector(p->builder, v1, v2, mask, "");
+			return res;
+		}
+
 		GB_ASSERT(array_type->kind == Type_Array);
 
 		unsigned res_align = cast(unsigned)type_align_of(addr.swizzle.type);
@@ -1444,9 +1514,11 @@ gb_internal String lb_set_nested_type_name_ir_mangled_name(Entity *e, lbProcedur
 			GB_ASSERT(scope->flags & ScopeFlag_Proc);
 			proc = scope->procedure_entity;
 		}
-		GB_ASSERT(proc->kind == Entity_Procedure);
-		if (proc->code_gen_procedure != nullptr) {
-			p = proc->code_gen_procedure;
+		if (proc != nullptr) {
+			GB_ASSERT(proc->kind == Entity_Procedure);
+			if (proc->code_gen_procedure != nullptr) {
+				p = proc->code_gen_procedure;
+			}
 		}
 	}
 
@@ -2048,16 +2120,18 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 				array_add(&fields, padding_type);
 			}
 			
-			i64 padding_offset = 0;
+			i64 prev_offset = 0;
 			for (i32 field_index : struct_fields_index_by_increasing_offset(temporary_allocator(), type)) {
 				Entity *field = type->Struct.fields[field_index];
-				i64 padding = type->Struct.offsets[field_index] - padding_offset;
+				i64 offset = type->Struct.offsets[field_index];
+				GB_ASSERT(offset >= prev_offset);
 
+				i64 padding = offset - prev_offset;
 				if (padding != 0) {
 					LLVMTypeRef padding_type = lb_type_padding_filler(m, padding, type_align_of(field->type));
 					array_add(&fields, padding_type);
 				}
-				
+
 				field_remapping[field_index] = cast(i32)fields.count;
 
 				Type *field_type = field->type;
@@ -2068,14 +2142,11 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 				}
 
 				array_add(&fields, lb_type(m, field_type));
-				
-				if (!type->Struct.is_packed) {
-					padding_offset = align_formula(padding_offset, type_align_of(field->type));
-				}
-				padding_offset += type_size_of(field->type);
+
+				prev_offset = offset + type_size_of(field->type);
 			}
 			
-			i64 end_padding = full_type_size-padding_offset;
+			i64 end_padding = full_type_size-prev_offset;
 			if (end_padding > 0) {
 				array_add(&fields, lb_type_padding_filler(m, end_padding, 1));
 			}
@@ -2216,7 +2287,9 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 			}
 			return LLVMStructTypeInContext(ctx, fields, field_count, false);
 		}
-	
+
+	case Type_BitField:
+		return lb_type_internal(m, type->BitField.backing_type);
 	}
 
 	GB_PANIC("Invalid type %s", type_to_string(type));

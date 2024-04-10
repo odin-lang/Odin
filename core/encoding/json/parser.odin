@@ -204,8 +204,8 @@ parse_array :: proc(p: ^Parser) -> (value: Value, err: Error) {
 }
 
 @(private)
-bytes_make :: proc(size, alignment: int, allocator: mem.Allocator) -> (bytes: []byte, err: Error) {
-	b, berr := mem.alloc_bytes(size, alignment, allocator)
+bytes_make :: proc(size, alignment: int, allocator: mem.Allocator, loc := #caller_location) -> (bytes: []byte, err: Error) {
+	b, berr := mem.alloc_bytes(size, alignment, allocator, loc)
 	if berr != nil {
 		if berr == .Out_Of_Memory {
 			err = .Out_Of_Memory
@@ -217,9 +217,9 @@ bytes_make :: proc(size, alignment: int, allocator: mem.Allocator) -> (bytes: []
 	return
 }
 
-clone_string :: proc(s: string, allocator: mem.Allocator) -> (str: string, err: Error) {
+clone_string :: proc(s: string, allocator: mem.Allocator, loc := #caller_location) -> (str: string, err: Error) {
 	n := len(s)
-	b := bytes_make(n+1, 1, allocator) or_return
+	b := bytes_make(n+1, 1, allocator, loc) or_return
 	copy(b, s)
 	if len(b) > n {
 		b[n] = 0
@@ -290,7 +290,7 @@ parse_object :: proc(p: ^Parser) -> (value: Value, err: Error) {
 
 
 // IMPORTANT NOTE(bill): unquote_string assumes a mostly valid string
-unquote_string :: proc(token: Token, spec: Specification, allocator := context.allocator) -> (value: string, err: Error) {
+unquote_string :: proc(token: Token, spec: Specification, allocator := context.allocator, loc := #caller_location) -> (value: string, err: Error) {
 	get_u2_rune :: proc(s: string) -> rune {
 		if len(s) < 4 || s[0] != '\\' || s[1] != 'x' {
 			return -1
@@ -359,7 +359,7 @@ unquote_string :: proc(token: Token, spec: Specification, allocator := context.a
 		i += w
 	}
 	if i == len(s) {
-		return clone_string(s, allocator)
+		return clone_string(s, allocator, loc)
 	}
 
 	b := bytes_make(len(s) + 2*utf8.UTF_MAX, 1, allocator) or_return

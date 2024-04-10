@@ -9,6 +9,7 @@ Example:
 guard :: proc{
 	mutex_guard,
 	rw_mutex_guard,
+	recursive_mutex_guard,
 	ticket_mutex_guard,
 	benaphore_guard,
 	recursive_benaphore_guard,
@@ -31,6 +32,7 @@ shared_guard :: proc{
 lock :: proc{
 	mutex_lock,
 	rw_mutex_lock,
+	recursive_mutex_lock,
 	ticket_mutex_lock,
 	benaphore_lock,
 	recursive_benaphore_lock,
@@ -43,6 +45,7 @@ lock :: proc{
 unlock :: proc{
 	mutex_unlock,
 	rw_mutex_unlock,
+	recursive_mutex_unlock,
 	ticket_mutex_unlock,
 	benaphore_unlock,
 	recursive_benaphore_unlock,
@@ -55,6 +58,7 @@ unlock :: proc{
 try_lock :: proc{
 	mutex_try_lock,
 	rw_mutex_try_lock,
+	recursive_mutex_try_lock,
 	benaphore_try_lock,
 	recursive_benaphore_try_lock,
 	atomic_mutex_try_lock,

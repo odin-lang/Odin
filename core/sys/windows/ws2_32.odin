@@ -2,12 +2,12 @@
 package sys_windows
 
 // Define flags to be used with the WSAAsyncSelect() call.
-FD_READ :: 0x01
-FD_WRITE :: 0x02
-FD_OOB :: 0x04
-FD_ACCEPT :: 0x08
-FD_CONNECT :: 0x10
-FD_CLOSE :: 0x20
+FD_READ       :: 0x01
+FD_WRITE      :: 0x02
+FD_OOB        :: 0x04
+FD_ACCEPT     :: 0x08
+FD_CONNECT    :: 0x10
+FD_CLOSE      :: 0x20
 FD_MAX_EVENTS :: 10
 
 INADDR_LOOPBACK :: 0x7f000001
@@ -24,10 +24,10 @@ POLLERR    :: 0x0001
 POLLHUP    :: 0x0002
 POLLNVAL   :: 0x0004
 
-WSA_POLLFD::struct{
-	fd:SOCKET,
-	events:c_short,
-	revents:c_short,
+WSA_POLLFD :: struct{
+	fd:      SOCKET,
+	events:  c_short,
+	revents: c_short,
 }
 
 WSANETWORKEVENTS :: struct {
@@ -37,16 +37,43 @@ WSANETWORKEVENTS :: struct {
 
 WSAEVENT :: HANDLE
 
-WSAID_ACCEPTEX :: GUID{0xb5367df1, 0xcbac, 0x11cf, {0x95, 0xca, 0x00, 0x80, 0x5f, 0x48, 0xa1, 0x92}}
+WSAID_ACCEPTEX             :: GUID{0xb5367df1, 0xcbac, 0x11cf, {0x95, 0xca, 0x00, 0x80, 0x5f, 0x48, 0xa1, 0x92}}
 WSAID_GETACCEPTEXSOCKADDRS :: GUID{0xb5367df2, 0xcbac, 0x11cf, {0x95, 0xca, 0x00, 0x80, 0x5f, 0x48, 0xa1, 0x92}}
+WSAID_CONNECTX             :: GUID{0x25a207b9, 0xddf3, 0x4660, {0x8e, 0xe9, 0x76, 0xe5, 0x8c, 0x74, 0x06, 0x3e}}
+
 SIO_GET_EXTENSION_FUNCTION_POINTER :: IOC_INOUT | IOC_WS2 | 6
-IOC_OUT :: 0x40000000
-IOC_IN :: 0x80000000
+
+IOC_OUT   :: 0x40000000
+IOC_IN    :: 0x80000000
 IOC_INOUT :: (IOC_IN | IOC_OUT)
-IOC_WS2 :: 0x08000000
+IOC_WS2   :: 0x08000000
+
+SO_UPDATE_ACCEPT_CONTEXT :: 28683
+
+LPFN_CONNECTEX :: #type proc "system" (
+	s:                SOCKET,
+	sockaddr:         ^SOCKADDR_STORAGE_LH,
+	namelen:          c_int,
+	lpSendBuffer:     PVOID,
+	dwSendDataLength: DWORD,
+	lpdwBytesSent:    LPDWORD,
+	lpOverlapped:     LPOVERLAPPED,
+) -> BOOL
+
+LPFN_ACCEPTEX :: #type proc "system" (
+	sListenSocket:         SOCKET,
+	sAcceptSocket:         SOCKET,
+	lpOutputBuffer:        PVOID,
+	dwReceiveDataLength:   DWORD,
+	dwLocalAddressLength:  DWORD,
+	dwRemoteAddressLength: DWORD,
+	lpdwBytesReceived:     LPDWORD,
+	lpOverlapped:          LPOVERLAPPED,
+) -> BOOL
+
 /*
 Example Load:
-	load_accept_ex :: proc(listener: SOCKET, fn_acceptex: rawptr) {
+	load_accept_ex :: proc(listener: SOCKET, fn_acceptex: ^LPFN_ACCEPTEX) {
 		bytes: u32
 		guid_accept_ex := WSAID_ACCEPTEX
 		rc := WSAIoctl(listener, SIO_GET_EXTENSION_FUNCTION_POINTER, &guid_accept_ex, size_of(guid_accept_ex),

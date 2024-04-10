@@ -11,6 +11,7 @@ DEBUG_RLO_FLAGS :: enum u32 { // TODO: convert to bit_set
 }
 
 UINT :: win32.UINT
+INT :: win32.INT
 UINT64 :: win32.UINT64
 LPCSTR :: win32.LPCSTR
 DEBUG_ID :: win32.GUID

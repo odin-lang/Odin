@@ -130,6 +130,7 @@ foreign kernel32 {
 	ResumeThread :: proc(thread: HANDLE) -> DWORD ---
 	GetThreadPriority :: proc(thread: HANDLE) -> c_int ---
 	SetThreadPriority :: proc(thread: HANDLE, priority: c_int) -> BOOL ---
+	SetThreadDescription :: proc(hThread: HANDLE, lpThreadDescription: PCWSTR) -> HRESULT ---
 	GetExitCodeThread :: proc(thread: HANDLE, exit_code: ^DWORD) -> BOOL ---
 	TerminateThread :: proc(thread: HANDLE, exit_code: DWORD) -> BOOL ---
 	SuspendThread :: proc(hThread: HANDLE) -> DWORD ---
@@ -323,6 +324,7 @@ foreign kernel32 {
 		lpName: LPCWSTR,
 	) -> HANDLE ---
 	ResetEvent :: proc(hEvent: HANDLE) -> BOOL ---
+	SetEvent :: proc(hEvent: HANDLE) -> BOOL ---
 	WaitForMultipleObjects :: proc(
 		nCount: DWORD,
 		lpHandles: ^HANDLE,
@@ -543,6 +545,10 @@ FILE_MAP_COPY            :: DWORD(0x00000001)
 FILE_MAP_RESERVE         :: DWORD(0x80000000)
 FILE_MAP_TARGETS_INVALID :: DWORD(0x40000000)
 FILE_MAP_LARGE_PAGES     :: DWORD(0x20000000)
+
+// Flags for `SetFileCompletionNotificationModes`.
+FILE_SKIP_COMPLETION_PORT_ON_SUCCESS :: 0x1
+FILE_SKIP_SET_EVENT_ON_HANDLE        :: 0x2
 
 PAGE_NOACCESS          :: 0x01
 PAGE_READONLY          :: 0x02
@@ -1199,3 +1205,22 @@ SYSTEM_LOGICAL_PROCESSOR_INFORMATION :: struct {
 	Relationship: LOGICAL_PROCESSOR_RELATIONSHIP,
 	DummyUnion: DUMMYUNIONNAME_u,
 }
+
+/* Global Memory Flags */
+GMEM_FIXED          :: 0x0000
+GMEM_MOVEABLE       :: 0x0002
+GMEM_NOCOMPACT      :: 0x0010
+GMEM_NODISCARD      :: 0x0020
+GMEM_ZEROINIT       :: 0x0040
+GMEM_MODIFY         :: 0x0080
+GMEM_DISCARDABLE    :: 0x0100
+GMEM_NOT_BANKED     :: 0x1000
+GMEM_SHARE          :: 0x2000
+GMEM_DDESHARE       :: 0x2000
+GMEM_NOTIFY         :: 0x4000
+GMEM_LOWER          :: GMEM_NOT_BANKED
+GMEM_VALID_FLAGS    :: 0x7F72
+GMEM_INVALID_HANDLE :: 0x8000
+
+GHND                :: (GMEM_MOVEABLE | GMEM_ZEROINIT)
+GPTR                :: (GMEM_FIXED | GMEM_ZEROINIT)

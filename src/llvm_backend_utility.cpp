@@ -83,27 +83,13 @@ gb_internal LLVMValueRef lb_mem_zero_ptr_internal(lbProcedure *p, LLVMValueRef p
 		lb_type(p->module, t_rawptr),
 		lb_type(p->module, t_int)
 	};
-	if (true || is_inlinable) {
+	LLVMValueRef args[4] = {};
+	args[0] = LLVMBuildPointerCast(p->builder, ptr, types[0], "");
+	args[1] = LLVMConstInt(LLVMInt8TypeInContext(p->module->ctx), 0, false);
+	args[2] = LLVMBuildIntCast2(p->builder, len, types[1], /*signed*/false, "");
+	args[3] = LLVMConstInt(LLVMInt1TypeInContext(p->module->ctx), is_volatile, false);
 
-		LLVMValueRef args[4] = {};
-		args[0] = LLVMBuildPointerCast(p->builder, ptr, types[0], "");
-		args[1] = LLVMConstInt(LLVMInt8TypeInContext(p->module->ctx), 0, false);
-		args[2] = LLVMBuildIntCast2(p->builder, len, types[1], /*signed*/false, "");
-		args[3] = LLVMConstInt(LLVMInt1TypeInContext(p->module->ctx), is_volatile, false);
-
-		return lb_call_intrinsic(p, name, args, gb_count_of(args), types, gb_count_of(types));
-	} else {
-		lbValue pr = lb_lookup_runtime_procedure(p->module, str_lit("memset"));
-
-		LLVMValueRef args[3] = {};
-		args[0] = LLVMBuildPointerCast(p->builder, ptr, types[0], "");
-		args[1] = LLVMConstInt(LLVMInt32TypeInContext(p->module->ctx), 0, false);
-		args[2] = LLVMBuildIntCast2(p->builder, len, types[1], /*signed*/false, "");
-
-		// We always get the function pointer type rather than the function and there is apparently no way around that?
-		LLVMTypeRef type = lb_type_internal_for_procedures_raw(p->module, pr.type);
-		return LLVMBuildCall2(p->builder, type, pr.value, args, gb_count_of(args), "");
-	}
+	return lb_call_intrinsic(p, name, args, gb_count_of(args), types, gb_count_of(types));
 
 }
 
@@ -138,11 +124,33 @@ gb_internal lbValue lb_emit_select(lbProcedure *p, lbValue cond, lbValue x, lbVa
 gb_internal lbValue lb_emit_min(lbProcedure *p, Type *t, lbValue x, lbValue y) {
 	x = lb_emit_conv(p, x, t);
 	y = lb_emit_conv(p, y, t);
+	bool use_llvm_intrinsic = !is_arch_wasm() && (is_type_float(t) || (is_type_simd_vector(t) && is_type_float(base_array_type(t))));
+	if (use_llvm_intrinsic) {
+		LLVMValueRef args[2] = {x.value, y.value};
+		LLVMTypeRef types[1] = {lb_type(p->module, t)};
+
+		// NOTE(bill): f either operand is a NaN, returns NaN. Otherwise returns the lesser of the two arguments.
+		// -0.0 is considered to be less than +0.0 for this intrinsic.
+		// These semantics are specified by IEEE 754-2008.
+		LLVMValueRef v = lb_call_intrinsic(p, "llvm.minnum", args, gb_count_of(args), types, gb_count_of(types));
+		return {v, t};
+	}
 	return lb_emit_select(p, lb_emit_comp(p, Token_Lt, x, y), x, y);
 }
 gb_internal lbValue lb_emit_max(lbProcedure *p, Type *t, lbValue x, lbValue y) {
 	x = lb_emit_conv(p, x, t);
 	y = lb_emit_conv(p, y, t);
+	bool use_llvm_intrinsic = !is_arch_wasm() && (is_type_float(t) || (is_type_simd_vector(t) && is_type_float(base_array_type(t))));
+	if (use_llvm_intrinsic) {
+		LLVMValueRef args[2] = {x.value, y.value};
+		LLVMTypeRef types[1] = {lb_type(p->module, t)};
+
+		// NOTE(bill): If either operand is a NaN, returns NaN. Otherwise returns the greater of the two arguments.
+		// -0.0 is considered to be less than +0.0 for this intrinsic.
+		// These semantics are specified by IEEE 754-2008.
+		LLVMValueRef v = lb_call_intrinsic(p, "llvm.maxnum", args, gb_count_of(args), types, gb_count_of(types));
+		return {v, t};
+	}
 	return lb_emit_select(p, lb_emit_comp(p, Token_Gt, x, y), x, y);
 }
 
@@ -1346,7 +1354,7 @@ gb_internal lbValue lb_emit_deep_field_gep(lbProcedure *p, lbValue e, Selection 
 				if (index == 0) {
 					type = t_rawptr;
 				} else if (index == 1) {
-					type = t_type_info_ptr;
+					type = t_typeid;
 				}
 				e = lb_emit_struct_ep(p, e, index);
 				break;
@@ -1456,13 +1464,15 @@ gb_internal lbValue lb_emit_matrix_epi(lbProcedure *p, lbValue s, isize row, isi
 	Type *t = s.type;
 	GB_ASSERT(is_type_pointer(t));
 	Type *mt = base_type(type_deref(t));
-	if (column == 0) {
-		GB_ASSERT_MSG(is_type_matrix(mt) || is_type_array_like(mt), "%s", type_to_string(mt));
-		return lb_emit_epi(p, s, row);
-	} else if (row == 0 && is_type_array_like(mt)) {
-		return lb_emit_epi(p, s, column);
+
+	if (!mt->Matrix.is_row_major) {
+		if (column == 0) {
+			GB_ASSERT_MSG(is_type_matrix(mt) || is_type_array_like(mt), "%s", type_to_string(mt));
+			return lb_emit_epi(p, s, row);
+		} else if (row == 0 && is_type_array_like(mt)) {
+			return lb_emit_epi(p, s, column);
+		}
 	}
-	
 	
 	GB_ASSERT_MSG(is_type_matrix(mt), "%s", type_to_string(mt));
 	
@@ -1483,7 +1493,13 @@ gb_internal lbValue lb_emit_matrix_ep(lbProcedure *p, lbValue s, lbValue row, lb
 	row = lb_emit_conv(p, row, t_int);
 	column = lb_emit_conv(p, column, t_int);
 	
-	LLVMValueRef index = LLVMBuildAdd(p->builder, row.value, LLVMBuildMul(p->builder, column.value, stride_elems, ""), "");
+	LLVMValueRef index = nullptr;
+
+	if (mt->Matrix.is_row_major) {
+		index = LLVMBuildAdd(p->builder, column.value, LLVMBuildMul(p->builder, row.value, stride_elems, ""), "");
+	} else {
+		index = LLVMBuildAdd(p->builder, row.value, LLVMBuildMul(p->builder, column.value, stride_elems, ""), "");
+	}
 
 	LLVMValueRef indices[2] = {
 		LLVMConstInt(lb_type(p->module, t_int), 0, false),

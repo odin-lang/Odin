@@ -200,7 +200,7 @@ _heap_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
 	case .Free_All:
 		return nil, .Mode_Not_Implemented
 
-	case .Resize:
+	case .Resize, .Resize_Non_Zeroed:
 		if old_memory == nil {
 			return aligned_alloc(size, alignment)
 		}

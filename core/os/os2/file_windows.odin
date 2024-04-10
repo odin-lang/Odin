@@ -1,10 +1,11 @@
 //+private
 package os2
 
+import "base:runtime"
+
 import "core:io"
 import "core:mem"
 import "core:sync"
-import "core:runtime"
 import "core:strings"
 import "core:time"
 import "core:unicode/utf16"
@@ -20,10 +21,44 @@ _file_allocator :: proc() -> runtime.Allocator {
 	return heap_allocator()
 }
 
+_temp_allocator_proc :: runtime.arena_allocator_proc
+
+@(private="file", thread_local)
+_global_default_temp_allocator_arena: runtime.Arena
+
 _temp_allocator :: proc() -> runtime.Allocator {
-	// TODO(bill): make this not depend on the context allocator
-	return context.temp_allocator
+	return runtime.Allocator{
+		procedure = _temp_allocator_proc,
+		data      = &_global_default_temp_allocator_arena,
+	}
 }
+
+@(require_results)
+_temp_allocator_temp_begin :: proc(loc := #caller_location) -> (temp: runtime.Arena_Temp) {
+	temp = runtime.arena_temp_begin(&_global_default_temp_allocator_arena, loc)
+	return
+}
+
+_temp_allocator_temp_end :: proc(temp: runtime.Arena_Temp, loc := #caller_location) {
+	runtime.arena_temp_end(temp, loc)
+}
+
+@(fini, private)
+_destroy_temp_allocator_fini :: proc() {
+	runtime.arena_destroy(&_global_default_temp_allocator_arena)
+	_global_default_temp_allocator_arena = {}
+}
+
+@(deferred_out=_temp_allocator_temp_end)
+_TEMP_ALLOCATOR_GUARD :: #force_inline proc(ignore := false, loc := #caller_location) -> (runtime.Arena_Temp, runtime.Source_Code_Location) {
+	if ignore {
+		return {}, loc
+	} else {
+		return _temp_allocator_temp_begin(loc), loc
+	}
+}
+
+
 
 
 _File_Kind :: enum u8 {
@@ -37,8 +72,6 @@ _File :: struct {
 	name: string,
 	wname: win32.wstring,
 	kind: _File_Kind,
-
-	stream: io.Stream,
 
 	allocator: runtime.Allocator,
 
@@ -146,7 +179,7 @@ _new_file :: proc(handle: uintptr, name: string) -> ^File {
 	}
 	f.impl.kind = kind
 
-	f.impl.stream = {
+	f.stream = {
 		data = f,
 		procedure = _file_stream_proc,
 	}
@@ -401,6 +434,9 @@ _write_at :: proc(f: ^File, p: []byte, offset: i64) -> (n: i64, err: Error) {
 
 _file_size :: proc(f: ^File) -> (n: i64, err: Error) {
 	length: win32.LARGE_INTEGER
+	if f.impl.kind == .Pipe {
+		return 0, .No_Size
+	}
 	handle := _handle(f)
 	if !win32.GetFileSizeEx(handle, &length) {
 		err = _get_platform_error()
@@ -454,7 +490,7 @@ _remove :: proc(name: string) -> Error {
 
 	if err != err1 {
 		a := win32.GetFileAttributesW(p)
-		if a == ~u32(0) {
+		if a == win32.INVALID_FILE_ATTRIBUTES {
 			err = _get_platform_error()
 		} else {
 			if a & win32.FILE_ATTRIBUTE_DIRECTORY != 0 {
@@ -546,6 +582,9 @@ _normalize_link_path :: proc(p: []u16, allocator: runtime.Allocator) -> (str: st
 	if n == 0 {
 		return "", _get_platform_error()
 	}
+
+	_TEMP_ALLOCATOR_GUARD()
+
 	buf := make([]u16, n+1, _temp_allocator())
 	n = win32.GetFinalPathNameByHandleW(handle, raw_data(buf), u32(len(buf)), win32.VOLUME_NAME_DOS)
 	if n == 0 {
@@ -704,13 +743,13 @@ _fchtimes :: proc(f: ^File, atime, mtime: time.Time) -> Error {
 _exists :: proc(path: string) -> bool {
 	wpath := _fix_long_path(path)
 	attribs := win32.GetFileAttributesW(wpath)
-	return i32(attribs) != win32.INVALID_FILE_ATTRIBUTES
+	return attribs != win32.INVALID_FILE_ATTRIBUTES
 }
 
 _is_file :: proc(path: string) -> bool {
 	wpath := _fix_long_path(path)
 	attribs := win32.GetFileAttributesW(wpath)
-	if i32(attribs) != win32.INVALID_FILE_ATTRIBUTES {
+	if attribs != win32.INVALID_FILE_ATTRIBUTES {
 		return attribs & win32.FILE_ATTRIBUTE_DIRECTORY == 0
 	}
 	return false
@@ -719,7 +758,7 @@ _is_file :: proc(path: string) -> bool {
 _is_dir :: proc(path: string) -> bool {
 	wpath := _fix_long_path(path)
 	attribs := win32.GetFileAttributesW(wpath)
-	if i32(attribs) != win32.INVALID_FILE_ATTRIBUTES {
+	if attribs != win32.INVALID_FILE_ATTRIBUTES {
 		return attribs & win32.FILE_ATTRIBUTE_DIRECTORY != 0
 	}
 	return false
@@ -730,7 +769,6 @@ _is_dir :: proc(path: string) -> bool {
 _file_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, offset: i64, whence: io.Seek_From) -> (n: i64, err: io.Error) {
 	f := (^File)(stream_data)
 	ferr: Error
-	i: int
 	switch mode {
 	case .Read:
 		n, ferr = _read(f, p)

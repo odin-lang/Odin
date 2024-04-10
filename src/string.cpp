@@ -89,7 +89,6 @@ gb_internal char *alloc_cstring(gbAllocator a, String s) {
 }
 
 
-
 gb_internal gb_inline bool str_eq_ignore_case(String const &a, String const &b) {
 	if (a.len == b.len) {
 		for (isize i = 0; i < a.len; i++) {
@@ -103,6 +102,16 @@ gb_internal gb_inline bool str_eq_ignore_case(String const &a, String const &b) 
 	}
 	return false;
 }
+
+template <isize N>
+gb_internal gb_inline bool str_eq_ignore_case(String const &a, char const (&b_)[N]) {
+	if (a.len != N-1) {
+		return false;
+	}
+	String b = {cast(u8 *)b_, N-1};
+	return str_eq_ignore_case(a, b);
+}
+
 
 gb_internal void string_to_lower(String *s) {
 	for (isize i = 0; i < s->len; i++) {
@@ -291,6 +300,18 @@ gb_internal String filename_from_path(String s) {
 		return substring(s, j+1, s.len);
 	}
 	return make_string(nullptr, 0);
+}
+
+
+gb_internal String filename_without_directory(String s) {
+	isize j = 0;
+	for (j = s.len-1; j >= 0; j--) {
+		if (s[j] == '/' ||
+			s[j] == '\\') {
+			break;
+		}
+	}
+	return substring(s, gb_max(j+1, 0), s.len);
 }
 
 gb_internal String concatenate_strings(gbAllocator a, String const &x, String const &y) {

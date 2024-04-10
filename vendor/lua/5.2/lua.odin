@@ -1,7 +1,7 @@
 package lua_5_2
 
-import "core:intrinsics"
-import "core:builtin"
+import "base:intrinsics"
+import "base:builtin"
 
 import c "core:c/libc"
 

@@ -34,11 +34,6 @@ enum BuiltinProcId {
 
 	BuiltinProc_soa_zip,
 	BuiltinProc_soa_unzip,
-	
-	BuiltinProc_transpose,
-	BuiltinProc_outer_product,
-	BuiltinProc_hadamard_product,
-	BuiltinProc_matrix_flatten,
 
 	BuiltinProc_unreachable,
 
@@ -48,6 +43,11 @@ enum BuiltinProcId {
 
 	// "Intrinsics"
 	BuiltinProc_is_package_imported,
+
+	BuiltinProc_transpose,
+	BuiltinProc_outer_product,
+	BuiltinProc_hadamard_product,
+	BuiltinProc_matrix_flatten,
 	
 	BuiltinProc_soa_struct,
 
@@ -282,6 +282,8 @@ BuiltinProc__type_simple_boolean_end,
 
 	BuiltinProc_type_field_index_of,
 
+	BuiltinProc_type_bit_set_backing_type,
+
 	BuiltinProc_type_equal_proc,
 	BuiltinProc_type_hasher_proc,
 	BuiltinProc_type_map_info,
@@ -341,11 +343,6 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 
 	{STR_LIT("soa_zip"),          1, true,  Expr_Expr, BuiltinProcPkg_builtin},
 	{STR_LIT("soa_unzip"),        1, false, Expr_Expr, BuiltinProcPkg_builtin},
-	
-	{STR_LIT("transpose"),        1, false, Expr_Expr, BuiltinProcPkg_builtin},
-	{STR_LIT("outer_product"),    2, false, Expr_Expr, BuiltinProcPkg_builtin},
-	{STR_LIT("hadamard_product"), 2, false, Expr_Expr, BuiltinProcPkg_builtin},
-	{STR_LIT("matrix_flatten"),   1, false, Expr_Expr, BuiltinProcPkg_builtin},
 
 	{STR_LIT("unreachable"),      0, false, Expr_Expr, BuiltinProcPkg_builtin, /*diverging*/true},
 
@@ -356,6 +353,11 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 
 	// "Intrinsics"
 	{STR_LIT("is_package_imported"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+
+	{STR_LIT("transpose"),        1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("outer_product"),    2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("hadamard_product"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("matrix_flatten"),   1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 		
 	{STR_LIT("soa_struct"),  2, false, Expr_Expr, BuiltinProcPkg_intrinsics}, // Type
 
@@ -585,6 +587,8 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("type_is_subtype_of"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("type_field_index_of"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+
+	{STR_LIT("type_bit_set_backing_type"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("type_equal_proc"),    1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_hasher_proc"),   1, false, Expr_Expr, BuiltinProcPkg_intrinsics},

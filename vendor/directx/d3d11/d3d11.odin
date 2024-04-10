@@ -4,6 +4,7 @@ foreign import "system:d3d11.lib"
 
 import "../dxgi"
 import "../d3d_compiler"
+import "core:sys/windows"
 
 IUnknown        :: dxgi.IUnknown
 IUnknown_VTable :: dxgi.IUnknown_VTable
@@ -16,6 +17,7 @@ IID     :: dxgi.IID
 SIZE_T  :: dxgi.SIZE_T
 BOOL    :: dxgi.BOOL
 UINT    :: dxgi.UINT
+INT     :: dxgi.INT
 
 RECT :: dxgi.RECT
 SIZE :: dxgi.SIZE
@@ -5150,4 +5152,18 @@ MESSAGE_ID :: enum u32 {
 
 CalcSubresource :: #force_inline proc "contextless" (MipSlice: UINT, ArraySlice: UINT, MipLevels: UINT) -> UINT {
 	return MipSlice + ArraySlice * MipLevels
+}
+
+ID3DUserDefinedAnnotation_UUID_STRING :: "B2DAAD8B-03D4-4DBF-95EB-32AB4B63D0AB"
+ID3DUserDefinedAnnotation_UUID := &IID{0xB2DAAD8B, 0x03D4, 0x4DBF, {0x95, 0xEB, 0x32, 0xAB, 0x4B, 0x63, 0xD0, 0xAB}}
+ID3DUserDefinedAnnotation :: struct #raw_union {
+	#subtype iunknown: IUnknown,
+	using vtable: ^ID3DUserDefinedAnnotation_VTable,
+}
+ID3DUserDefinedAnnotation_VTable :: struct {
+	using iunknown_vtable: IUnknown_VTable,
+	BeginEvent: proc "system" (this: ^ID3DUserDefinedAnnotation, Name: windows.LPCWSTR) -> INT,
+	EndEvent:   proc "system" (this: ^ID3DUserDefinedAnnotation) -> INT,
+	SetMarker:  proc "system" (this: ^ID3DUserDefinedAnnotation, Name: windows.LPCWSTR),
+	GetStatus:  proc "system" (this: ^ID3DUserDefinedAnnotation) -> BOOL,
 }

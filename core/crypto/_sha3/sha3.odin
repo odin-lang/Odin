@@ -7,50 +7,69 @@ package _sha3
     List of contributors:
         zhibog, dotbmp:  Initial implementation.
 
-    Implementation of the Keccak hashing algorithm, standardized as SHA3 in <https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.202.pdf>
-    To use the original Keccak padding, set the is_keccak bool to true, otherwise it will use SHA3 padding.
+    Implementation of the Keccak hashing algorithm, standardized as SHA3
+    in <https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.202.pdf>.
+
+    As the only difference between the legacy Keccak and SHA3 is the domain
+    separation byte, set dsbyte to the appropriate value to pick the desired
+    algorithm.
 */
 
 import "core:math/bits"
+import "core:mem"
 
 ROUNDS :: 24
 
-Sha3_Context :: struct {
-	st:        struct #raw_union {
+RATE_128 :: 1344 / 8 // ONLY for SHAKE128.
+RATE_224 :: 1152 / 8
+RATE_256 :: 1088 / 8
+RATE_384 :: 832 / 8
+RATE_512 :: 576 / 8
+
+DS_KECCAK :: 0x01
+DS_SHA3 :: 0x06
+DS_SHAKE :: 0x1f
+DS_CSHAKE :: 0x04
+
+Context :: struct {
+	st:             struct #raw_union {
 		b: [200]u8,
 		q: [25]u64,
 	},
-	pt:        int,
-	rsiz:      int,
-	mdlen:     int,
-	is_keccak: bool,
-
+	pt:             int,
+	rsiz:           int,
+	mdlen:          int,
+	dsbyte:         byte,
 	is_initialized: bool,
 	is_finalized:   bool, // For SHAKE (unlimited squeeze is allowed)
 }
 
+@(private)
+keccakf_rndc := [?]u64 {
+	0x0000000000000001, 0x0000000000008082, 0x800000000000808a,
+	0x8000000080008000, 0x000000000000808b, 0x0000000080000001,
+	0x8000000080008081, 0x8000000000008009, 0x000000000000008a,
+	0x0000000000000088, 0x0000000080008009, 0x000000008000000a,
+	0x000000008000808b, 0x800000000000008b, 0x8000000000008089,
+	0x8000000000008003, 0x8000000000008002, 0x8000000000000080,
+	0x000000000000800a, 0x800000008000000a, 0x8000000080008081,
+	0x8000000000008080, 0x0000000080000001, 0x8000000080008008,
+}
+
+@(private)
+keccakf_rotc := [?]int {
+	1, 3, 6, 10, 15, 21, 28, 36, 45, 55, 2, 14,
+	27, 41, 56, 8, 25, 43, 62, 18, 39, 61, 20, 44,
+}
+
+@(private)
+keccakf_piln := [?]i32 {
+	10, 7, 11, 17, 18, 3, 5, 16, 8, 21, 24, 4,
+	15, 23, 19, 13, 12, 2, 20, 14, 22, 9, 6, 1,
+}
+
+@(private)
 keccakf :: proc "contextless" (st: ^[25]u64) {
-	keccakf_rndc := [?]u64 {
-		0x0000000000000001, 0x0000000000008082, 0x800000000000808a,
-		0x8000000080008000, 0x000000000000808b, 0x0000000080000001,
-		0x8000000080008081, 0x8000000000008009, 0x000000000000008a,
-		0x0000000000000088, 0x0000000080008009, 0x000000008000000a,
-		0x000000008000808b, 0x800000000000008b, 0x8000000000008089,
-		0x8000000000008003, 0x8000000000008002, 0x8000000000000080,
-		0x000000000000800a, 0x800000008000000a, 0x8000000080008081,
-		0x8000000000008080, 0x0000000080000001, 0x8000000080008008,
-	}
-
-	keccakf_rotc := [?]int {
-		1, 3, 6, 10, 15, 21, 28, 36, 45, 55, 2, 14,
-		27, 41, 56, 8, 25, 43, 62, 18, 39, 61, 20, 44,
-	}
-
-	keccakf_piln := [?]i32 {
-		10, 7, 11, 17, 18, 3, 5, 16, 8, 21, 24, 4,
-		15, 23, 19, 13, 12, 2, 20, 14, 22, 9, 6, 1,
-	}
-
 	i, j, r: i32 = ---, ---, ---
 	t: u64 = ---
 	bc: [5]u64 = ---
@@ -103,81 +122,93 @@ keccakf :: proc "contextless" (st: ^[25]u64) {
 	}
 }
 
-init :: proc(c: ^Sha3_Context) {
+init :: proc(ctx: ^Context) {
 	for i := 0; i < 25; i += 1 {
-		c.st.q[i] = 0
+		ctx.st.q[i] = 0
 	}
-	c.rsiz = 200 - 2 * c.mdlen
-	c.pt = 0
+	ctx.rsiz = 200 - 2 * ctx.mdlen
+	ctx.pt = 0
 
-	c.is_initialized = true
-	c.is_finalized = false
+	ctx.is_initialized = true
+	ctx.is_finalized = false
 }
 
-update :: proc(c: ^Sha3_Context, data: []byte) {
-	assert(c.is_initialized)
-	assert(!c.is_finalized)
+update :: proc(ctx: ^Context, data: []byte) {
+	assert(ctx.is_initialized)
+	assert(!ctx.is_finalized)
 
-	j := c.pt
+	j := ctx.pt
 	for i := 0; i < len(data); i += 1 {
-		c.st.b[j] ~= data[i]
+		ctx.st.b[j] ~= data[i]
 		j += 1
-		if j >= c.rsiz {
-			keccakf(&c.st.q)
+		if j >= ctx.rsiz {
+			keccakf(&ctx.st.q)
 			j = 0
 		}
 	}
-	c.pt = j
+	ctx.pt = j
 }
 
-final :: proc(c: ^Sha3_Context, hash: []byte) {
-	assert(c.is_initialized)
+final :: proc(ctx: ^Context, hash: []byte, finalize_clone: bool = false) {
+	assert(ctx.is_initialized)
 
-	if len(hash) < c.mdlen {
-		if c.is_keccak {
-			panic("crypto/keccac: invalid destination digest size")
-		}
+	if len(hash) < ctx.mdlen {
 		panic("crypto/sha3: invalid destination digest size")
 	}
-	if c.is_keccak {
-		c.st.b[c.pt] ~= 0x01
-	} else {
-		c.st.b[c.pt] ~= 0x06
-	}
 
-	c.st.b[c.rsiz - 1] ~= 0x80
-	keccakf(&c.st.q)
-	for i := 0; i < c.mdlen; i += 1 {
-		hash[i] = c.st.b[i]
+	ctx := ctx
+	if finalize_clone {
+		tmp_ctx: Context
+		clone(&tmp_ctx, ctx)
+		ctx = &tmp_ctx
 	}
+	defer (reset(ctx))
 
-	c.is_initialized = false // No more absorb, no more squeeze.
+	ctx.st.b[ctx.pt] ~= ctx.dsbyte
+
+	ctx.st.b[ctx.rsiz - 1] ~= 0x80
+	keccakf(&ctx.st.q)
+	for i := 0; i < ctx.mdlen; i += 1 {
+		hash[i] = ctx.st.b[i]
+	}
 }
 
-shake_xof :: proc(c: ^Sha3_Context) {
-	assert(c.is_initialized)
-	assert(!c.is_finalized)
-
-	c.st.b[c.pt] ~= 0x1F
-	c.st.b[c.rsiz - 1] ~= 0x80
-	keccakf(&c.st.q)
-	c.pt = 0
-
-	c.is_finalized = true // No more absorb, unlimited squeeze.
+clone :: proc(ctx, other: ^Context) {
+	ctx^ = other^
 }
 
-shake_out :: proc(c: ^Sha3_Context, hash: []byte) {
-	assert(c.is_initialized)
-	assert(c.is_finalized)
+reset :: proc(ctx: ^Context) {
+	if !ctx.is_initialized {
+		return
+	}
 
-	j := c.pt
+	mem.zero_explicit(ctx, size_of(ctx^))
+}
+
+shake_xof :: proc(ctx: ^Context) {
+	assert(ctx.is_initialized)
+	assert(!ctx.is_finalized)
+
+	ctx.st.b[ctx.pt] ~= ctx.dsbyte
+	ctx.st.b[ctx.rsiz - 1] ~= 0x80
+	keccakf(&ctx.st.q)
+	ctx.pt = 0
+
+	ctx.is_finalized = true // No more absorb, unlimited squeeze.
+}
+
+shake_out :: proc(ctx: ^Context, hash: []byte) {
+	assert(ctx.is_initialized)
+	assert(ctx.is_finalized)
+
+	j := ctx.pt
 	for i := 0; i < len(hash); i += 1 {
-		if j >= c.rsiz {
-			keccakf(&c.st.q)
+		if j >= ctx.rsiz {
+			keccakf(&ctx.st.q)
 			j = 0
 		}
-		hash[i] = c.st.b[j]
+		hash[i] = ctx.st.b[j]
 		j += 1
 	}
-	c.pt = j
+	ctx.pt = j
 }

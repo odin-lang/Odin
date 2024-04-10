@@ -1,7 +1,8 @@
 //+build linux
+//+no-instrumentation
 package linux
 
-import "core:intrinsics"
+import "base:intrinsics"
 
 // Note(flysand): In the case of syscall let's get rid of extra
 // casting. First of all, let these syscalls return int, because

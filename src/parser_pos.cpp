@@ -111,6 +111,7 @@ gb_internal Token ast_token(Ast *node) {
 	case Ast_UnionType:        return node->UnionType.token;
 	case Ast_EnumType:         return node->EnumType.token;
 	case Ast_BitSetType:       return node->BitSetType.token;
+	case Ast_BitFieldType:     return node->BitFieldType.token;
 	case Ast_MapType:          return node->MapType.token;
 	case Ast_MatrixType:       return node->MatrixType.token;
 	}
@@ -364,6 +365,8 @@ Token ast_end_token(Ast *node) {
 			return ast_end_token(node->BitSetType.underlying);
 		}
 		return ast_end_token(node->BitSetType.elem);
+	case Ast_BitFieldType:
+		return node->BitFieldType.close;
 	case Ast_MapType:          return ast_end_token(node->MapType.value);
 	case Ast_MatrixType:       return ast_end_token(node->MatrixType.elem);
 	}
