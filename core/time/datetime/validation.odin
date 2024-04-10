@@ -56,9 +56,9 @@ validate_hour_minute_second :: proc "contextless" (#any_int hour, #any_int minut
 	return .None
 }
 
-validate_datetime :: proc "contextless" (using datetime: DateTime) -> (err: Error) {
-	validate(date) or_return
-	validate(time) or_return
+validate_datetime :: proc "contextless" (datetime: DateTime) -> (err: Error) {
+	validate(datetime.date) or_return
+	validate(datetime.time) or_return
 	return .None
 }
 
