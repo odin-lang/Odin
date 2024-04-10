@@ -371,6 +371,7 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 			info := ti.variant.(runtime.Type_Info_Struct)
 			for name, i in info.names {
 				json_name := reflect.struct_tag_get(reflect.Struct_Tag(info.tags[i]), "json")
+				json_name = json_name_from_tag_value(json_name)
 
 				opt_write_iteration(w, opt, i) or_return
 				if json_name != "" {
