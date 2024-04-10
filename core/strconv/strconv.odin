@@ -1213,6 +1213,13 @@ Output:
 append_int :: proc(buf: []byte, i: i64, base: int) -> string {
 	return append_bits(buf, u64(i), base, true, 8*size_of(int), digits, nil)
 }
+
+
+
+append_u128 :: proc(buf: []byte, u: u128, base: int) -> string {
+	return append_bits_128(buf, u, base, false, 8*size_of(uint), digits, nil)
+}
+
 /* 
 Converts an integer value to a string and stores it in the given buffer
 
