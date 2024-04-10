@@ -1,5 +1,6 @@
 package test_core_crypto
 
+import "base:runtime"
 import "core:encoding/hex"
 import "core:fmt"
 import "core:mem"
@@ -14,6 +15,8 @@ import tc "tests:common"
 
 @(test)
 test_mac :: proc(t: ^testing.T) {
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
+
 	tc.log(t, "Testing MACs")
 
 	test_hmac(t)

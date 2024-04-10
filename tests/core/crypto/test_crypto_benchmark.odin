@@ -1,5 +1,6 @@
 package test_core_crypto
 
+import "base:runtime"
 import "core:encoding/hex"
 import "core:fmt"
 import "core:testing"
@@ -7,6 +8,7 @@ import "core:time"
 
 import "core:crypto/chacha20"
 import "core:crypto/chacha20poly1305"
+import "core:crypto/ed25519"
 import "core:crypto/poly1305"
 import "core:crypto/x25519"
 
@@ -16,11 +18,14 @@ import tc "tests:common"
 
 @(test)
 bench_crypto :: proc(t: ^testing.T) {
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
+
 	fmt.println("Starting benchmarks:")
 
 	bench_chacha20(t)
 	bench_poly1305(t)
 	bench_chacha20poly1305(t)
+	bench_ed25519(t)
 	bench_x25519(t)
 }
 
@@ -214,6 +219,64 @@ bench_chacha20poly1305 :: proc(t: ^testing.T) {
 	err = time.benchmark(options, context.allocator)
 	tc.expect(t, err == nil, name)
 	benchmark_print(name, options)
+}
+
+bench_ed25519 :: proc(t: ^testing.T) {
+	iters :: 10000
+
+	priv_str := "cafebabecafebabecafebabecafebabecafebabecafebabecafebabecafebabe"
+	priv_bytes, _ := hex.decode(transmute([]byte)(priv_str), context.temp_allocator)
+	priv_key: ed25519.Private_Key
+	start := time.now()
+	for i := 0; i < iters; i = i + 1 {
+		ok := ed25519.private_key_set_bytes(&priv_key, priv_bytes)
+		assert(ok, "private key should deserialize")
+	}
+	elapsed := time.since(start)
+	tc.log(
+		t,
+		fmt.tprintf(
+			"ed25519.private_key_set_bytes: ~%f us/op",
+			time.duration_microseconds(elapsed) / iters,
+		),
+	)
+
+	pub_bytes := priv_key._pub_key._b[:] // "I know what I am doing"
+	pub_key: ed25519.Public_Key
+	start = time.now()
+	for i := 0; i < iters; i = i + 1 {
+		ok := ed25519.public_key_set_bytes(&pub_key, pub_bytes[:])
+		assert(ok, "public key should deserialize")
+	}
+	elapsed = time.since(start)
+	tc.log(
+		t,
+		fmt.tprintf(
+			"ed25519.public_key_set_bytes: ~%f us/op",
+			time.duration_microseconds(elapsed) / iters,
+		),
+	)
+
+	msg := "Got a job for you, 621."
+	sig_bytes: [ed25519.SIGNATURE_SIZE]byte
+	msg_bytes := transmute([]byte)(msg)
+	start = time.now()
+	for i := 0; i < iters; i = i + 1 {
+		ed25519.sign(&priv_key, msg_bytes, sig_bytes[:])
+	}
+	elapsed = time.since(start)
+	tc.log(t, fmt.tprintf("ed25519.sign: ~%f us/op", time.duration_microseconds(elapsed) / iters))
+
+	start = time.now()
+	for i := 0; i < iters; i = i + 1 {
+		ok := ed25519.verify(&pub_key, msg_bytes, sig_bytes[:])
+		assert(ok, "signature should validate")
+	}
+	elapsed = time.since(start)
+	tc.log(
+		t,
+		fmt.tprintf("ed25519.verify: ~%f us/op", time.duration_microseconds(elapsed) / iters),
+	)
 }
 
 bench_x25519 :: proc(t: ^testing.T) {
