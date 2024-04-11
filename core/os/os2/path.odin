@@ -25,7 +25,7 @@ remove_all :: proc(path: string) -> Error {
 
 
 getwd :: get_working_directory
-get_working_directory :: proc(allocator: runtime.Allocator) -> (dir: string, err: Error) {
+get_working_directory :: proc(allocator := context.allocator) -> (dir: string, err: Error) {
 	return _getwd(allocator)
 }
 

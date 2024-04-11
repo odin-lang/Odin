@@ -17,8 +17,8 @@ _is_path_separator :: proc(c: byte) -> bool {
 
 _mkdir :: proc(path: string, perm: File_Mode) -> Error {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
-	// TODO: These modes would require mknod, however, that would require
-	//       additional arguments to this function.
+	// TODO: These modes would require mknod, however, that would also
+	//       require additional arguments to this function..
 	if perm & (File_Mode_Named_Pipe | File_Mode_Device | File_Mode_Char_Device | File_Mode_Sym_Link) != 0 {
 		return .Invalid_Argument
 	}
@@ -29,12 +29,12 @@ _mkdir :: proc(path: string, perm: File_Mode) -> Error {
 
 _mkdir_all :: proc(path: string, perm: File_Mode) -> Error {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
-	_mkdirat :: proc(dfd: linux.Fd, path: []u8, perm: int, has_created: ^bool) -> Error {
-		if len(path) == 0 {
-			return _get_platform_error(linux.close(dfd))
-		}
+	mkdirat :: proc(dfd: linux.Fd, path: []u8, perm: int, has_created: ^bool) -> Error {
 		i: int
 		for /**/; i < len(path) - 1 && path[i] != '/'; i += 1 {}
+		if i == 0 {
+			return _get_platform_error(linux.close(dfd))
+		}
 		path[i] = 0
 		new_dfd, errno := linux.openat(dfd, cstring(&path[0]), _OPENDIR_FLAGS)
 		#partial switch errno {
@@ -54,7 +54,7 @@ _mkdir_all :: proc(path: string, perm: File_Mode) -> Error {
 			}
 			// skip consecutive '/'
 			for i += 1; i < len(path) && path[i] == '/'; i += 1 {}
-			return _mkdirat(new_dfd, path[i:], perm, has_created)
+			return mkdirat(new_dfd, path[i:], perm, has_created)
 		case:
 			return _get_platform_error(errno)
 		}
@@ -86,7 +86,7 @@ _mkdir_all :: proc(path: string, perm: File_Mode) -> Error {
 	}
 	
 	has_created: bool
-	_mkdirat(dfd, path_bytes, int(perm & 0o777), &has_created) or_return
+	mkdirat(dfd, path_bytes, int(perm & 0o777), &has_created) or_return
 	if has_created {
 		return nil
 	}
@@ -105,7 +105,7 @@ dirent64 :: struct {
 _remove_all :: proc(path: string) -> Error {
 	DT_DIR :: 4
 
-	_remove_all_dir :: proc(dfd: linux.Fd) -> Error {
+	remove_all_dir :: proc(dfd: linux.Fd) -> Error {
 		n := 64
 		buf := make([]u8, n)
 		defer delete(buf)
@@ -119,7 +119,7 @@ _remove_all :: proc(path: string) -> Error {
 				buf = make([]u8, n)
 				continue loop
 			case .NONE:
-				break loop
+				if buflen == 0 { break loop }
 			case:
 				return _get_platform_error(errno)
 			}
@@ -150,7 +150,7 @@ _remove_all :: proc(path: string) -> Error {
 						return _get_platform_error(errno)
 					}
 					defer linux.close(new_dfd)
-					_remove_all_dir(new_dfd) or_return
+					remove_all_dir(new_dfd) or_return
 					errno = linux.unlinkat(dfd, d_name_cstr, {.REMOVEDIR})
 				case:
 					errno = linux.unlinkat(dfd, d_name_cstr, nil)
@@ -177,7 +177,7 @@ _remove_all :: proc(path: string) -> Error {
 	}
 
 	defer linux.close(fd)
-	_remove_all_dir(fd) or_return
+	remove_all_dir(fd) or_return
 	return _get_platform_error(linux.rmdir(path_cstr))
 }
 
@@ -191,7 +191,7 @@ _getwd :: proc(allocator: runtime.Allocator) -> (string, Error) {
 	for {
 		#no_bounds_check n, errno := linux.getcwd(buf[:])
 		if errno == .NONE {
-			return string(buf[:n]), nil
+			return string(buf[:n-1]), nil
 		}
 		if errno != .ERANGE {
 			return "", _get_platform_error(errno)

@@ -114,7 +114,8 @@ _process_start :: proc(name: string, argv: []string, attr: ^Process_Attributes) 
 	dir_fd : linux.Fd = -100
 	errno: linux.Errno
 	if attr != nil && attr.dir != "" {
-		if dir_fd, errno = linux.open("/", _OPENDIR_FLAGS); errno != .NONE {
+		dir_cstr := strings.clone_to_cstring(attr.dir, context.temp_allocator)
+		if dir_fd, errno = linux.open(dir_cstr, _OPENDIR_FLAGS); errno != .NONE {
 			return child, _get_platform_error(errno)
 		}
 	}
@@ -133,7 +134,7 @@ _process_start :: proc(name: string, argv: []string, attr: ^Process_Attributes) 
 			}
 		}
 		if !found {
-			// check in dir to match windows behavior
+			// check in cwd to match windows behavior
 			executable = fmt.ctprintf("./%s", name)
 			if not_found, errno := linux.faccessat(dir_fd, executable, linux.F_OK); errno != .NONE || not_found {
 				return child, .Not_Exist
@@ -164,7 +165,7 @@ _process_start :: proc(name: string, argv: []string, attr: ^Process_Attributes) 
 		env = raw_data(export_cstring_environment(context.temp_allocator))
 	} else {
 		cenv := make([]cstring, len(attr.env) + 1, context.temp_allocator)
-		for i := 0; i < len(argv); i += 1 {
+		for i := 0; i < len(attr.env); i += 1 {
 			cenv[i] = strings.clone_to_cstring(attr.env[i], context.temp_allocator)
 		}
 		env = &cenv[0]
@@ -224,7 +225,6 @@ _process_start :: proc(name: string, argv: []string, attr: ^Process_Attributes) 
 			if linux.close(stderr_fds[1]) != .NONE { linux.exit(1) }
 		}
 
-		// TODO: missing flags parameter?
 		if errno = linux.execveat(dir_fd, executable, &cargs[0], env); errno != .NONE {
 			print_error(_get_platform_error(errno), string(executable))
 			panic("execve failed to replace process")
@@ -271,7 +271,6 @@ _process_signal :: proc(sig: Signal, h: Signal_Handler) -> Error {
 	case .Termination:              signo = .SIGTERM
 	}
 
-	// TODO: some things missing from linux.Sig_Action
 	sigact: linux.Sig_Action(int)
 	old: ^linux.Sig_Action(int) = nil
 
@@ -292,14 +291,22 @@ _process_signal :: proc(sig: Signal, h: Signal_Handler) -> Error {
 }
 
 _process_wait :: proc(p: ^Process, t: time.Duration) -> (state: Process_State, err: Error) {
+	safe_state :: proc(p: Process, state: Process_State = {}) -> (Process_State, Error) {
+		// process_get_state can fail, so we don't want to return it directly.
+		if new_state, err := _process_get_state(p); err == nil {
+			return new_state, nil
+		}
+		return state, nil
+	}
+
 	state.pid = p.pid
 
 	options: linux.Wait_Options
 	big_if: if t == 0 {
 		options += {.WNOHANG}
 	} else if t != time.MAX_DURATION {
-		ts: linux.Time_Spec= {
-			time_sec = uint(t / time.Second),
+		ts: linux.Time_Spec = {
+			time_sec  = uint(t / time.Second),
 			time_nsec = uint(t % time.Second),
 		}
 
@@ -324,15 +331,15 @@ _process_wait :: proc(p: ^Process, t: time.Duration) -> (state: Process_State, e
 				},
 			}
 			for {
-				errno := linux.ppoll(pollfd[:], &ts, nil)
+				n, errno := linux.ppoll(pollfd[:], &ts, nil)
 				if errno == .EINTR {
 					continue
 				}
 				if errno != .NONE {
 					return state, _get_platform_error(errno)
 				}
-				else {
-					return _process_get_state(p^)
+				if n == 0 {
+					return safe_state(p^, state)
 				}
 				break
 			}
@@ -341,7 +348,6 @@ _process_wait :: proc(p: ^Process, t: time.Duration) -> (state: Process_State, e
 			mask: bit_set[0..=63]
 			mask += { int(linux.Signal.SIGCHLD) - 1 }
 
-			// TODO: fix linux.Sig_Set
 			org_sigset: linux.Sig_Set
 			sigset: linux.Sig_Set
 			mem.copy(&sigset, &mask, size_of(mask))
@@ -368,7 +374,7 @@ _process_wait :: proc(p: ^Process, t: time.Duration) -> (state: Process_State, e
 				_, errno = linux.rt_sigtimedwait(&sigset, &info, &ts)
 				#partial switch errno {
 				case .EAGAIN: // timeout
-					return _process_get_state(p^)
+					return safe_state(p^, state)
 				case .EINVAL:
 					return state, _get_platform_error(errno)
 				case .EINTR:
@@ -382,23 +388,19 @@ _process_wait :: proc(p: ^Process, t: time.Duration) -> (state: Process_State, e
 		}
 	}
 
-	state = _process_get_state(p^) or_return
+	state, _ = safe_state(p^, state)
 
 	status: u32
-	errno: linux.Errno
-	for {
+	errno: linux.Errno = .EINTR
+	for errno == .EINTR {
 		_, errno = linux.wait4(linux.Pid(p.pid), &status, options, nil)
-		if errno == .EINTR {
-			continue
-		}
 		if errno != .NONE {
 			return state, _get_platform_error(errno)
 		}
-		break
 	}
 
-	if errno == .NONE {
-		return _process_get_state(p^)
+	if !linux.WIFEXITED(status) {
+		return safe_state(p^, state)
 	}
 
 	state.exited = true
@@ -406,13 +408,13 @@ _process_wait :: proc(p: ^Process, t: time.Duration) -> (state: Process_State, e
 
 	// normal exit
 	if signo := status & 0x7f; signo == 0 {
-		state.exit_code = int((status >> 8) & 0xff)
+		state.exit_code = int(linux.WEXITSTATUS(status))
 		state.success = state.exit_code == 0
 	}
 
 	// signaled
 	if (status & 0xffff) - 1 < 0xff {
-		// NOTE: for now, success = false and exit_code = 0
+		// NOTE(jason): for now, success = false, exit_code = 0
 	}
 
 	return

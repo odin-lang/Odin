@@ -2499,7 +2499,7 @@ waitid :: proc "contextless" (id_type: Id_Type, id: Id, sig_info: ^Sig_Info, opt
 	Available since Linux 2.6.16.
 */
 openat :: proc "contextless" (fd: Fd, name: cstring, flags: Open_Flags, mode: Mode = {}) -> (Fd, Errno) {
-	ret := syscall(SYS_openat, fd, AT_FDCWD, transmute(uintptr) name, transmute(u32) mode)
+	ret := syscall(SYS_openat, fd, transmute(uintptr) name, transmute(u32) flags, transmute(u32) mode)
 	return errno_unwrap(ret, Fd)
 }
 
@@ -2614,13 +2614,13 @@ faccessat :: proc "contextless" (dirfd: Fd, name: cstring, mode: Mode = F_OK) ->
 	Wait for events on a file descriptor.
 	Available since Linux 2.6.16.
 */
-ppoll :: proc "contextless" (fds: []Poll_Fd, timeout: ^Time_Spec, sigmask: ^Sig_Set) -> (Errno) {
+ppoll :: proc "contextless" (fds: []Poll_Fd, timeout: ^Time_Spec, sigmask: ^Sig_Set) -> (i32, Errno) {
 	when size_of(int) == 8 {
 		ret := syscall(SYS_ppoll, raw_data(fds), len(fds), timeout, sigmask, size_of(Sig_Set))
-		return Errno(-ret)
+		return errno_unwrap(ret, i32)
 	} else {
 		ret := syscall(SYS_ppoll_time64, raw_data(fds), len(fds), timeout, sigmask, size_of(Sig_Set))
-		return Errno(-ret)
+		return errno_unwrap(ret, i32)
 	}
 }
 
