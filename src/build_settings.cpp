@@ -631,6 +631,15 @@ gb_global TargetMetrics target_freestanding_amd64_sysv = {
 	TargetABI_SysV,
 };
 
+gb_global TargetMetrics target_freestanding_amd64_win64 = {
+	TargetOs_freestanding,
+	TargetArch_amd64,
+	8, 8, 8, 16,
+	str_lit("x86_64-pc-none-msvc"),
+	str_lit("e-m:w-i64:64-f80:128-n8:16:32:64-S128"),
+	TargetABI_Win64,
+};
+
 gb_global TargetMetrics target_freestanding_arm64 = {
 	TargetOs_freestanding,
 	TargetArch_arm64,
@@ -672,7 +681,9 @@ gb_global NamedTargetMetrics named_targets[] = {
 	{ str_lit("js_wasm64p32"),           &target_js_wasm64p32 },
 	{ str_lit("wasi_wasm64p32"),         &target_wasi_wasm64p32 },
 
-	{ str_lit("freestanding_amd64_sysv"), &target_freestanding_amd64_sysv },
+	{ str_lit("freestanding_amd64_sysv"),  &target_freestanding_amd64_sysv },
+	{ str_lit("freestanding_amd64_win64"), &target_freestanding_amd64_win64 },
+
 	{ str_lit("freestanding_arm64"), &target_freestanding_arm64 },
 };
 
