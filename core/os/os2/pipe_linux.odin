@@ -5,7 +5,7 @@ import "core:sys/linux"
 
 _pipe :: proc() -> (r, w: ^File, err: Error) {
 	fds: [2]linux.Fd
-	errno := linux.pipe2(&fds, nil)
+	errno := linux.pipe2(&fds, {.CLOEXEC})
 	if errno != .NONE {
 		return nil, nil,_get_platform_error(errno)
 	}

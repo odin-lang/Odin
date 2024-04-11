@@ -1,7 +1,5 @@
 package os2
 
-import "base:runtime"
-
 // get_env retrieves the value of the environment variable named by the key
 // It returns the value, which will be empty if the variable is not present
 // To distinguish between an empty value and an unset value, use lookup_env

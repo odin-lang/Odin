@@ -1,7 +1,5 @@
 package os2
 
-import "base:runtime"
-
 Path_Separator      :: _Path_Separator      // OS-Specific
 Path_List_Separator :: _Path_List_Separator // OS-Specific
 

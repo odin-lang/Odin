@@ -64,7 +64,7 @@ _set_env :: proc(key, value: string) -> bool {
 		}
 	}
 
-	key_addr := ([^]u8)(heap_alloc(kv_size));
+	key_addr := ([^]u8)(heap_alloc(kv_size))
 	if key_addr == nil {
 		return false
 	}

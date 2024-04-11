@@ -586,7 +586,7 @@ Sig_Stack :: struct {
 Sig_Action_Special :: enum uint {
 	SIG_DFL = 0,
 	SIG_IGN = 1,
-	SIG_ERR = ~uint(0)
+	SIG_ERR = ~uint(0),
 }
 
 Sig_Action :: struct($T: typeid) {
