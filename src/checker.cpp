@@ -728,7 +728,10 @@ gb_internal void check_scope_usage(Checker *c, Scope *scope, u64 vet_flags) {
 		} else if (vet_flags) {
 			switch (ve.kind) {
 			case VettedEntity_Unused:
-				if (vet_flags & VetFlag_Unused) {
+				if (e->kind == Entity_Variable && (vet_flags & VetFlag_UnusedVariables) != 0) {
+					error(e->token, "'%.*s' declared but not used", LIT(name));
+				}
+				if ((e->kind == Entity_ImportName || e->kind == Entity_LibraryName) && (vet_flags & VetFlag_UnusedImports) != 0) {
 					error(e->token, "'%.*s' declared but not used", LIT(name));
 				}
 				break;

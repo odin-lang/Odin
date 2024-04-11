@@ -272,13 +272,16 @@ enum BuildPath : u8 {
 };
 
 enum VetFlags : u64 {
-	VetFlag_NONE       = 0,
-	VetFlag_Unused     = 1u<<0, // 1
-	VetFlag_Shadowing  = 1u<<1, // 2
-	VetFlag_UsingStmt  = 1u<<2, // 4
-	VetFlag_UsingParam = 1u<<3, // 8
-	VetFlag_Style      = 1u<<4, // 16
-	VetFlag_Semicolon  = 1u<<5, // 32
+	VetFlag_NONE            = 0,
+	VetFlag_Shadowing       = 1u<<0,
+	VetFlag_UsingStmt       = 1u<<1,
+	VetFlag_UsingParam      = 1u<<2,
+	VetFlag_Style           = 1u<<3,
+	VetFlag_Semicolon       = 1u<<4,
+	VetFlag_UnusedVariables = 1u<<5,
+	VetFlag_UnusedImports   = 1u<<6,
+
+	VetFlag_Unused = VetFlag_UnusedVariables|VetFlag_UnusedImports,
 
 	VetFlag_All = VetFlag_Unused|VetFlag_Shadowing|VetFlag_UsingStmt,
 
@@ -288,6 +291,10 @@ enum VetFlags : u64 {
 u64 get_vet_flag_from_name(String const &name) {
 	if (name == "unused") {
 		return VetFlag_Unused;
+	} else if (name == "unused-variables") {
+		return VetFlag_UnusedVariables;
+	} else if (name == "unused-imports") {
+		return VetFlag_UnusedImports;
 	} else if (name == "shadowing") {
 		return VetFlag_Shadowing;
 	} else if (name == "using-stmt") {
