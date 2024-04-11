@@ -496,7 +496,7 @@ gb_internal bool is_entity_local_variable(Entity *e) {
 	if (e->scope == nullptr) {
 		return true;
 	}
-	if (e->flags & (EntityFlag_ForValue|EntityFlag_SwitchValue)) {
+	if (e->flags & (EntityFlag_ForValue|EntityFlag_SwitchValue|EntityFlag_Static)) {
 		return false;
 	}
 
