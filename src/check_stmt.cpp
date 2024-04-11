@@ -2355,14 +2355,14 @@ gb_internal void check_return_stmt(CheckerContext *ctx, Ast *node) {
 				unsafe_return_error(o, "the address of a compound literal");
 			} else if (x->kind == Ast_IndexExpr) {
 				Entity *f = entity_of_node(x->IndexExpr.expr);
-				if (is_type_array_like(f->type) || is_type_matrix(f->type)) {
+				if (f && (is_type_array_like(f->type) || is_type_matrix(f->type))) {
 					if (is_entity_local_variable(f)) {
 						unsafe_return_error(o, "the address of an indexed variable", f->type);
 					}
 				}
 			} else if (x->kind == Ast_MatrixIndexExpr) {
 				Entity *f = entity_of_node(x->MatrixIndexExpr.expr);
-				if (is_type_matrix(f->type) && is_entity_local_variable(f)) {
+				if (f && (is_type_matrix(f->type) && is_entity_local_variable(f))) {
 					unsafe_return_error(o, "the address of an indexed variable", f->type);
 				}
 			}
