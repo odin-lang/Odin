@@ -2996,7 +2996,7 @@ parse_literal_value :: proc(p: ^Parser, type: ^ast.Expr) -> ^ast.Comp_Lit {
 	p.expr_level -= 1
 
   	skip_possible_newline(p)
-	close := expect_closing_brace_of_field_list(p);
+	close := expect_closing_brace_of_field_list(p)
 
 	pos := type.pos if type != nil else open.pos
 	lit := ast.new(ast.Comp_Lit, pos, end_pos(close))
