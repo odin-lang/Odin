@@ -709,7 +709,7 @@ gb_internal void check_scope_usage(Checker *c, Scope *scope, u64 vet_flags) {
 			// Is >256 KiB good enough?
 			if (sz > 1ll<<18) {
 				gbString type_str = type_to_string(e->type);
-				warning(e->token, "Declaration of '%.*s' may cause a stack overflow? due to its type '%s' having a size of %lld bytes", LIT(e->token.string), type_str, cast(long long)sz);
+				warning(e->token, "Declaration of '%.*s' may cause a stack overflow due to its type '%s' having a size of %lld bytes", LIT(e->token.string), type_str, cast(long long)sz);
 				gb_string_free(type_str);
 			}
 		}
