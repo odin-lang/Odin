@@ -15,7 +15,7 @@ version_string_buf: [1024]u8
 init_os_version :: proc () {
 	os_version.platform = .Linux
 	// Try to parse `/etc/os-release` for `PRETTY_NAME="Ubuntu 20.04.3 LTS`
-	fd, errno := linux.open("/etc/os-release", {.RDONLY}, {})
+	fd, errno := linux.open("/etc/os-release", {}, {})
 	assert(errno == .NONE, "Failed to read /etc/os-release")
 	defer {
 		errno := linux.close(fd)
