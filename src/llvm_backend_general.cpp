@@ -954,16 +954,6 @@ gb_internal void lb_addr_store(lbProcedure *p, lbAddr addr, lbValue value) {
 	GB_ASSERT(value.value != nullptr);
 	value = lb_emit_conv(p, value, lb_addr_type(addr));
 
-	// if (lb_is_const_or_global(value)) {
-	// 	// NOTE(bill): Just bypass the actual storage and set the initializer
-	// 	if (LLVMGetValueKind(addr.addr.value) == LLVMGlobalVariableValueKind) {
-	// 		LLVMValueRef dst = addr.addr.value;
-	// 		LLVMValueRef src = value.value;
-	// 		LLVMSetInitializer(dst, src);
-	// 		return;
-	// 	}
-	// }
-
 	lb_emit_store(p, addr.addr, value);
 }
 

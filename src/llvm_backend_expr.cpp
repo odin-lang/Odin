@@ -2143,9 +2143,18 @@ gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 		lbAddr v = lb_add_local_generated(p, t, false);
 		isize index_count = cast(isize)get_array_type_count(dst);
 
-		for (isize i = 0; i < index_count; i++) {
-			lbValue elem = lb_emit_array_epi(p, v.addr, i);
+		if (type_size_of(dst) > build_context.max_simd_align) {
+			auto loop_data = lb_loop_start(p, index_count, t_int);
+
+			lbValue elem = lb_emit_array_ep(p, v.addr, loop_data.idx);
 			lb_emit_store(p, elem, e);
+
+			lb_loop_end(p, loop_data);
+		} else {
+			for (isize i = 0; i < index_count; i++) {
+				lbValue elem = lb_emit_array_epi(p, v.addr, i);
+				lb_emit_store(p, elem, e);
+			}
 		}
 		return lb_addr_load(p, v);
 	}
