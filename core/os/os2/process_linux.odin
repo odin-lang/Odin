@@ -276,13 +276,12 @@ _process_signal :: proc(sig: Signal, h: Signal_Handler) -> Error {
 
 	switch v in h {
 	case Signal_Handler_Special:
-		unimplemented("Need special handlers implemented")
-		//switch v {
-		//case .Default:
-		//	sigact.special = .SIG_DFL
-		//case .Ignore:
-		//	sigact.special = .SIG_IGN
-		//}
+		switch v {
+		case .Default:
+			sigact.special = .SIG_DFL
+		case .Ignore:
+			sigact.special = .SIG_IGN
+		}
 	case Signal_Handler_Proc:
 		sigact.handler = (linux.Sig_Handler_Fn)(v)
 	}

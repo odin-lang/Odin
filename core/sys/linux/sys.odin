@@ -201,9 +201,24 @@ brk :: proc "contextless" (addr: uintptr) -> (Errno) {
 }
 
 /*
+	Returns from signal handlers on some archs.
+*/
+rt_sigreturn :: proc "c" () -> ! {
+	intrinsics.syscall(uintptr(SYS_rt_sigreturn))
+	unreachable()
+}
+
+/*
 	Alter an action taken by a process.
 */
-rt_sigaction :: proc "contextless" (sig: Signal, sigaction: ^Sig_Action, old_sigaction: ^Sig_Action) -> Errno {
+rt_sigaction :: proc "contextless" (sig: Signal, sigaction: ^Sig_Action($T), old_sigaction: ^Sig_Action) -> Errno {
+	// NOTE(jason): It appears that the restorer is required for i386 and amd64
+	when ODIN_ARCH == .i386 || ODIN_ARCH == .amd64 {
+		sigaction.flags += {.RESTORER}
+	}
+	if sigaction != nil && sigaction.restorer == nil && .RESTORER in sigaction.flags {
+		sigaction.restorer = rt_sigreturn
+	}
 	ret := syscall(SYS_rt_sigaction, sig, sigaction, old_sigaction, size_of(Sig_Set))
 	return Errno(-ret)
 }

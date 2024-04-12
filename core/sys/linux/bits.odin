@@ -930,9 +930,22 @@ Sig_Stack_Flag :: enum i32 {
 	AUTODISARM = 31,
 }
 
+Sig_Action_Flag :: enum u32 {
+	NOCLDSTOP      = 0,
+	NOCLDWAIT      = 1,
+	SIGINFO        = 2,
+	UNSUPPORTED    = 10,
+	EXPOSE_TAGBITS = 11,
+	RESTORER       = 26,
+	ONSTACK        = 27,
+	RESTART        = 28,
+	NODEFER        = 30,
+	RESETHAND      = 31,
+}
+
 /*
 	Type of socket to create
-    - For TCP you want to use SOCK_STREAM
+	- For TCP you want to use SOCK_STREAM
 	- For UDP you want to use SOCK_DGRAM
 	Also see `Protocol`
 */
