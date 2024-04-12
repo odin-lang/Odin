@@ -84,6 +84,7 @@ gb_internal bool set_file_path_string(i32 index, String const &path) {
 	bool ok = false;
 	GB_ASSERT(index >= 0);
 	mutex_lock(&global_error_collector.path_mutex);
+	mutex_lock(&global_files_mutex);
 
 	if (index >= global_file_path_strings.count) {
 		array_resize(&global_file_path_strings, index+1);
@@ -94,6 +95,7 @@ gb_internal bool set_file_path_string(i32 index, String const &path) {
 		ok = true;
 	}
 
+	mutex_unlock(&global_files_mutex);
 	mutex_unlock(&global_error_collector.path_mutex);
 	return ok;
 }
@@ -102,6 +104,7 @@ gb_internal bool thread_safe_set_ast_file_from_id(i32 index, AstFile *file) {
 	bool ok = false;
 	GB_ASSERT(index >= 0);
 	mutex_lock(&global_error_collector.path_mutex);
+	mutex_lock(&global_files_mutex);
 
 	if (index >= global_files.count) {
 		array_resize(&global_files, index+1);
@@ -111,7 +114,7 @@ gb_internal bool thread_safe_set_ast_file_from_id(i32 index, AstFile *file) {
 		global_files[index] = file;
 		ok = true;
 	}
-
+	mutex_unlock(&global_files_mutex);
 	mutex_unlock(&global_error_collector.path_mutex);
 	return ok;
 }
@@ -119,12 +122,14 @@ gb_internal bool thread_safe_set_ast_file_from_id(i32 index, AstFile *file) {
 gb_internal String get_file_path_string(i32 index) {
 	GB_ASSERT(index >= 0);
 	mutex_lock(&global_error_collector.path_mutex);
+	mutex_lock(&global_files_mutex);
 
 	String path = {};
 	if (index < global_file_path_strings.count) {
 		path = global_file_path_strings[index];
 	}
 
+	mutex_unlock(&global_files_mutex);
 	mutex_unlock(&global_error_collector.path_mutex);
 	return path;
 }
@@ -132,12 +137,14 @@ gb_internal String get_file_path_string(i32 index) {
 gb_internal AstFile *thread_safe_get_ast_file_from_id(i32 index) {
 	GB_ASSERT(index >= 0);
 	mutex_lock(&global_error_collector.path_mutex);
+	mutex_lock(&global_files_mutex);
 
 	AstFile *file = nullptr;
 	if (index < global_files.count) {
 		file = global_files[index];
 	}
 
+	mutex_unlock(&global_files_mutex);
 	mutex_unlock(&global_error_collector.path_mutex);
 	return file;
 }
@@ -247,10 +254,10 @@ gb_internal void terminal_reset_colours(void) {
 }
 
 
-gb_internal bool show_error_on_line(TokenPos const &pos, TokenPos end) {
+gb_internal isize show_error_on_line(TokenPos const &pos, TokenPos end, char const *prefix=nullptr) {
 	get_error_value()->end = end;
 	if (!show_error_line()) {
-		return false;
+		return -1;
 	}
 
 	i32 offset = 0;
@@ -269,6 +276,10 @@ gb_internal bool show_error_on_line(TokenPos const &pos, TokenPos end) {
 			ELLIPSIS_PADDING = 8, // `...  ...`
 			MAX_LINE_LENGTH_PADDED = MAX_LINE_LENGTH-MAX_TAB_WIDTH-ELLIPSIS_PADDING,
 		};
+
+		if (prefix) {
+			error_out("\t%s\n\n", prefix);
+		}
 
 		error_out("\t");
 
@@ -328,9 +339,9 @@ gb_internal bool show_error_on_line(TokenPos const &pos, TokenPos end) {
 		terminal_reset_colours();
 
 		error_out("\n");
-		return true;
+		return offset;
 	}
-	return false;
+	return -1;
 }
 
 gb_internal void error_out_empty(void) {

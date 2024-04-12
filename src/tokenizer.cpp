@@ -193,6 +193,7 @@ gb_internal void init_keyword_hash_table(void) {
 
 gb_global Array<String>           global_file_path_strings; // index is file id
 gb_global Array<struct AstFile *> global_files; // index is file id
+gb_global BlockingMutex           global_files_mutex;
 
 gb_internal String   get_file_path_string(i32 index);
 gb_internal struct AstFile *thread_safe_get_ast_file_from_id(i32 index);
