@@ -533,22 +533,22 @@ split_url_test :: proc(t: ^testing.T) {
 		{
 			"http", "example.com", "/",
 			{}, "Hellope",
-			{"http://example.com#Hellope"}
+			{"http://example.com#Hellope"},
 		},
 		{
 			"https", "odin-lang.org", "/",
 			{"a" = ""}, "Hellope",
-			{"https://odin-lang.org?a#Hellope"}
+			{"https://odin-lang.org?a#Hellope"},
 		},
 		{
 			"http", "example.com", "/",
 			{"a" = "b"}, "BeesKnees",
-			{"http://example.com?a=b#BeesKnees"}
+			{"http://example.com?a=b#BeesKnees"},
 		},
 		{
 			"https", "odin-lang.org", "/docs/overview/",
 			{}, "hellope",
-			{"https://odin-lang.org/docs/overview/#hellope"}
+			{"https://odin-lang.org/docs/overview/#hellope"},
 		},
 	}
 
@@ -630,22 +630,22 @@ join_url_test :: proc(t: ^testing.T) {
 		{
 			"http", "example.com", "/",
 			{}, "Hellope",
-			{"http://example.com/#Hellope"}
+			{"http://example.com/#Hellope"},
 		},
 		{
 			"https", "odin-lang.org", "/",
 			{"a" = ""}, "Hellope",
-			{"https://odin-lang.org/?a#Hellope"}
+			{"https://odin-lang.org/?a#Hellope"},
 		},
 		{
 			"http", "example.com", "/",
 			{"a" = "b"}, "BeesKnees",
-			{"http://example.com/?a=b#BeesKnees"}
+			{"http://example.com/?a=b#BeesKnees"},
 		},
 		{
 			"https", "odin-lang.org", "/docs/overview/",
 			{}, "hellope",
-			{"https://odin-lang.org/docs/overview/#hellope"}
+			{"https://odin-lang.org/docs/overview/#hellope"},
 		},
 	}
 
