@@ -3233,6 +3233,11 @@ gb_internal bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, T
 		Type *elem = t_invalid;
 		Operand o = {};
 
+		if (unparen_expr(pt->type) == nullptr) {
+			error(e, "Invalid pointer type");
+			return false;
+		}
+
 		check_expr_or_type(&c, &o, pt->type);
 		if (o.mode != Addressing_Invalid && o.mode != Addressing_Type) {
 			if (o.mode == Addressing_Variable) {
