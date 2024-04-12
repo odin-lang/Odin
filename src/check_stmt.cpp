@@ -499,7 +499,7 @@ gb_internal Type *check_assignment_variable(CheckerContext *ctx, Operand *lhs, O
 			ERROR_BLOCK();
 			error(lhs->expr, "Cannot assign to '%s'", str);
 
-			if (e) if (e->flags & EntityFlag_ForValue) {
+			if (e && e->flags & EntityFlag_ForValue) {
 				isize offset = show_error_on_line(e->token.pos, token_pos_end(e->token), "Suggestion:");
 				if (offset < 0) {
 					if (is_type_map(e->type)) {
@@ -515,7 +515,7 @@ gb_internal Type *check_assignment_variable(CheckerContext *ctx, Operand *lhs, O
 					error_line("'%.*s' is immutable, declare it as '&%.*s' to make it mutable\n", LIT(e->token.string), LIT(e->token.string));
 				}
 
-			} else if (e->flags & EntityFlag_SwitchValue) {
+			} else if (e && e->flags & EntityFlag_SwitchValue) {
 				isize offset = show_error_on_line(e->token.pos, token_pos_end(e->token), "Suggestion:");
 				if (offset < 0) {
 					error_line("\tSuggestion: Did you mean? 'switch &%.*s in ...'\n", LIT(e->token.string));
