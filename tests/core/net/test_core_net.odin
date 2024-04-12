@@ -531,9 +531,9 @@ split_url_test :: proc(t: ^testing.T) {
 			{"https://example.com/callback?redirect=https://other.com/login"},
 		},
 		{
-			"http", "odin-lang.org", "/",
+			"http", "example.com", "/",
 			{}, "Hellope",
-			{"http://odin-lang.org#Hellope"}
+			{"http://example.com#Hellope"}
 		},
 		{
 			"https", "odin-lang.org", "/",
@@ -542,13 +542,13 @@ split_url_test :: proc(t: ^testing.T) {
 		},
 		{
 			"http", "example.com", "/",
-			{"a" = "b"}, "Hellope",
-			{"http://example.com?a=b#Hellope"}
+			{"a" = "b"}, "BeesKnees",
+			{"http://example.com?a=b#BeesKnees"}
 		},
 		{
-			"https", "example.com", "/example",
-			{}, "Hellope",
-			{"https://example.com/example#Hellope"}
+			"https", "odin-lang.org", "/docs/overview/",
+			{}, "hellope",
+			{"https://odin-lang.org/docs/overview/#hellope"}
 		},
 	}
 
@@ -628,24 +628,24 @@ join_url_test :: proc(t: ^testing.T) {
 			{"http://example.com/example?a&b", "http://example.com/example?b&a"},
 		},
 		{
-			"http", "odin-lang.org", "",
+			"http", "example.com", "/",
 			{}, "Hellope",
-			{"http://odin-lang.org#Hellope"}
+			{"http://example.com/#Hellope"}
 		},
 		{
-			"https", "odin-lang.org", "",
+			"https", "odin-lang.org", "/",
 			{"a" = ""}, "Hellope",
-			{"https://odin-lang.org?a#Hellope"}
+			{"https://odin-lang.org/?a#Hellope"}
 		},
 		{
-			"http", "example.com", "",
-			{"a" = "b"}, "Hellope",
-			{"http://example.com?a=b#Hellope"}
+			"http", "example.com", "/",
+			{"a" = "b"}, "BeesKnees",
+			{"http://example.com/?a=b#BeesKnees"}
 		},
 		{
-			"https", "example.com", "/example",
-			{}, "Hellope",
-			{"https://example.com/example#Hellope"}
+			"https", "odin-lang.org", "/docs/overview/",
+			{}, "hellope",
+			{"https://odin-lang.org/docs/overview/#hellope"}
 		},
 	}
 
