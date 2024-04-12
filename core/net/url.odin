@@ -30,7 +30,7 @@ split_url :: proc(url: string, allocator := context.allocator) -> (scheme, host,
 		s = s[i+3:]
 	}
 
-	i = strings.index_byte(s, '#')
+	i = strings.index(s, "#")
 	if i != -1 {
 		fragment = s[i+1:]
 		s = s[:i]
@@ -103,7 +103,7 @@ join_url :: proc(scheme, host, path: string, queries: map[string]string, fragmen
 
 	if fragment != "" {
 		if fragment[0] != '#' {
-			strings.write_byte(&b, '#')
+			strings.write_string(&b, "#")
 		}
 		strings.write_string(&b, strings.trim_space(fragment))
 	}
