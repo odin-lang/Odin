@@ -212,6 +212,7 @@ gb_internal void usage(String argv0) {
 	print_usage_line(1, "doc               Generates documentation on a directory of .odin files.");
 	print_usage_line(1, "version           Prints version.");
 	print_usage_line(1, "report            Prints information useful to reporting a bug.");
+	print_usage_line(1, "root              Prints the root path where Odin looks for the builtin collections.");
 	print_usage_line(0, "");
 	print_usage_line(0, "For further details on a command, invoke command help:");
 	print_usage_line(1, "e.g. `odin build -help` or `odin help build`");
@@ -2572,6 +2573,9 @@ int main(int arg_count, char const **arg_ptr) {
 			print_show_help(args[0], args[2]);
 			return 0;
 		}
+	} else if (command == "root") {
+		gb_printf("%.*s", LIT(odin_root_dir()));
+		return 0;
 	} else {
 		usage(args[0]);
 		return 1;
