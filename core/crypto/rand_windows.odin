@@ -22,6 +22,6 @@ _rand_bytes :: proc(dst: []byte) {
 	}
 }
 
-_has_rand_bytes :: proc () -> bool {
+_has_rand_bytes :: proc() -> bool {
 	return true
 }
