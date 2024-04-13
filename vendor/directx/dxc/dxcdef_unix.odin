@@ -1,4 +1,4 @@
-//+build linux, darwin
+//+build linux, darwin, freebsd, openbsd
 package directx_dxc
 import "core:c"
 
