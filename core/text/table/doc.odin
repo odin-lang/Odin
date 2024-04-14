@@ -1,11 +1,8 @@
 /*
-	package table implements ascii/markdown/html/custom rendering of tables.
+The package `table` implements ASCII/markdown/HTML/custom rendering of tables.
 
-	---
+**Custom rendering example:**
 
-	Custom rendering example:
-
-	```odin
 	tbl := init(&Table{})
 	padding(tbl, 0, 1)
 	row(tbl, "A_LONG_ENUM", "= 54,", "// A comment about A_LONG_ENUM")
@@ -17,19 +14,14 @@
 		}
 		io.write_byte(stdio_writer(), '\n')
 	}
-	```
 
-	This outputs:
-	```
+This outputs:
+
 	A_LONG_ENUM         = 54, // A comment about A_LONG_ENUM
 	AN_EVEN_LONGER_ENUM = 1,  // A comment about AN_EVEN_LONGER_ENUM
-	```
 
-	---
+**ASCII rendering example:**
 
-	ASCII rendering example:
-
-	```odin
 	tbl := init(&Table{})
 	defer destroy(tbl)
 
@@ -69,10 +61,9 @@
 
 	write_ascii_table(stdio_writer(), tbl)
 	write_markdown_table(stdio_writer(), tbl)
-	```
 
-	This outputs:
-	```
+This outputs:
+
 	+-----------------------------------------------+
 	|  This is a table caption and it is very long  |
 	+------------------+-----------------+----------+
@@ -82,19 +73,15 @@
 	| 000000005        | 6.283185        |          |
 	|        a         | bbb             | c        |
 	+------------------+-----------------+----------+
-	```
 
-	and
+and
 
-	```
 	|    AAAAAAAAA     |        B        |    C     |
 	|:-----------------|:---------------:|---------:|
 	| 123              | foo             |          |
 	| 000000005        | 6.283185        |          |
 	| a                | bbb             | c        |
-	```
 
-	respectively.
+respectively.
 */
-
 package text_table
