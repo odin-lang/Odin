@@ -40,10 +40,10 @@ write :: proc "contextless" (fd: Fd, buf: []u8) -> (int, Errno) {
 */
 open :: proc "contextless" (name: cstring, flags: Open_Flags, mode: Mode = {}) -> (Fd, Errno) {
 	when ODIN_ARCH == .arm64 {
-		ret := syscall(SYS_openat, AT_FDCWD, transmute(uintptr) name, transmute(u32) mode)
+		ret := syscall(SYS_openat, AT_FDCWD, transmute(uintptr) name, transmute(u32) flags, transmute(u32) mode)
 		return errno_unwrap(ret, Fd)
 	} else {
-		ret := syscall(SYS_open, transmute(uintptr) name, transmute(u32) mode)
+		ret := syscall(SYS_open, transmute(uintptr) name, transmute(u32) flags, transmute(u32) mode)
 		return errno_unwrap(ret, Fd)
 	}
 }
@@ -91,10 +91,10 @@ stat :: proc "contextless" (filename: cstring, stat: ^Stat) -> (Errno) {
 */
 fstat :: proc "contextless" (fd: Fd, stat: ^Stat) -> (Errno) {
 	when size_of(int) == 8 {
-		ret := syscall(SYS_fstat, stat)
+		ret := syscall(SYS_fstat, cast(i32) fd, stat)
 		return Errno(-ret)
 	} else {
-		ret := syscall(SYS_fstat64, stat)
+		ret := syscall(SYS_fstat64, cast(i32) fd, stat)
 		return Errno(-ret)
 	}
 }
