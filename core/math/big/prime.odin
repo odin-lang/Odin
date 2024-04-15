@@ -1247,6 +1247,20 @@ internal_random_prime :: proc(a: ^Int, size_in_bits: int, trials: int, flags := 
 			a.digit[0] |= 3
 		}
 		if .Second_MSB_On in flags {
+			/*
+				Ensure there's enough space for the bit to be set.
+			*/
+			if a.used * _DIGIT_BITS < size_in_bits - 1 {
+				new_size := (size_in_bits - 1) / _DIGIT_BITS
+
+				if new_size % _DIGIT_BITS > 0 {
+					new_size += 1
+				}
+
+				internal_grow(a, new_size) or_return
+				a.used = new_size
+			}
+
 			internal_int_bitfield_set_single(a, size_in_bits - 2) or_return
 		}
 
