@@ -92,7 +92,7 @@ begin :: proc(s: ^State, id: u64, builder: ^strings.Builder) {
 		end(s)
 	}
 	s.id = id
-	s.selection = {len(builder.buf, 0}
+	s.selection = {len(builder.buf), 0}
 	s.builder = builder
 	update_time(s)
 	undo_clear(s, &s.undo)
