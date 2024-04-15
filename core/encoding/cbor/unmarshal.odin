@@ -518,7 +518,7 @@ _unmarshal_array :: proc(d: Decoder, v: any, ti: ^reflect.Type_Info, hdr: Header
 		return
 
 	case reflect.Type_Info_Array:
-		_length, scap := err_conv(_decode_len_container(d, add)) or_return
+		_, scap := err_conv(_decode_len_container(d, add)) or_return
 		length := min(scap, t.count)
 	
 		if length > t.count {
@@ -532,7 +532,7 @@ _unmarshal_array :: proc(d: Decoder, v: any, ti: ^reflect.Type_Info, hdr: Header
 		return
 
 	case reflect.Type_Info_Enumerated_Array:
-		_length, scap := err_conv(_decode_len_container(d, add)) or_return
+		_, scap := err_conv(_decode_len_container(d, add)) or_return
 		length := min(scap, t.count)
 	
 		if length > t.count {
@@ -546,7 +546,7 @@ _unmarshal_array :: proc(d: Decoder, v: any, ti: ^reflect.Type_Info, hdr: Header
 		return
 
 	case reflect.Type_Info_Complex:
-		_length, scap := err_conv(_decode_len_container(d, add)) or_return
+		_, scap := err_conv(_decode_len_container(d, add)) or_return
 		length := min(scap, 2)
 	
 		if length > 2 {
@@ -568,7 +568,7 @@ _unmarshal_array :: proc(d: Decoder, v: any, ti: ^reflect.Type_Info, hdr: Header
 		return
 	
 	case reflect.Type_Info_Quaternion:
-		_length, scap := err_conv(_decode_len_container(d, add)) or_return
+		_, scap := err_conv(_decode_len_container(d, add)) or_return
 		length := min(scap, 4)
 	
 		if length > 4 {
@@ -628,7 +628,7 @@ _unmarshal_map :: proc(d: Decoder, v: any, ti: ^reflect.Type_Info, hdr: Header, 
 			return _unsupported(v, hdr)
 		}
 
-		length, scap := err_conv(_decode_len_container(d, add)) or_return
+		length, _ := err_conv(_decode_len_container(d, add)) or_return
 		unknown := length == -1
 		fields := reflect.struct_fields_zipped(ti.id)
 	
@@ -672,7 +672,7 @@ _unmarshal_map :: proc(d: Decoder, v: any, ti: ^reflect.Type_Info, hdr: Header, 
 			}
 
 			field := fields[use_field_idx]
-			name  := field.name
+			// name  := field.name
 			ptr   := rawptr(uintptr(v.data) + field.offset)
 			fany  := any{ptr, field.type.id}
 			_unmarshal_value(d, fany, _decode_header(r) or_return) or_return

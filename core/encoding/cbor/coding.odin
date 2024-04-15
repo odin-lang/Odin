@@ -377,6 +377,7 @@ _decode_bytes_ptr :: proc(d: Decoder, add: Add, type: Major = .Bytes) -> (v: ^By
 _decode_bytes :: proc(d: Decoder, add: Add, type: Major = .Bytes, allocator := context.allocator) -> (v: Bytes, err: Decode_Error) {
 	context.allocator = allocator
 
+	add := add
 	n, scap := _decode_len_str(d, add) or_return
 	
 	buf := strings.builder_make(0, scap) or_return
@@ -385,8 +386,9 @@ _decode_bytes :: proc(d: Decoder, add: Add, type: Major = .Bytes, allocator := c
 
 	if n == -1 {
 		indefinite_loop: for {
-			header   := _decode_header(d.reader) or_return
-			maj, add := _header_split(header)
+			header := _decode_header(d.reader) or_return
+			maj: Major
+			maj, add = _header_split(header)
 			#partial switch maj {
 			case type:
 				iter_n, iter_cap := _decode_len_str(d, add) or_return

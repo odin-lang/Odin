@@ -208,7 +208,6 @@ marshal_into_encoder :: proc(e: Encoder, v: any) -> (err: Marshal_Error) {
 		}
 
 	case runtime.Type_Info_Boolean:
-		val: bool
 		switch b in a {
 		case bool: return _encode_bool(e.writer, b)
 		case b8:   return _encode_bool(e.writer, bool(b))
@@ -231,7 +230,7 @@ marshal_into_encoder :: proc(e: Encoder, v: any) -> (err: Marshal_Error) {
 		return
 
 	case runtime.Type_Info_Enumerated_Array:
-		index := runtime.type_info_base(info.index).variant.(runtime.Type_Info_Enum)
+		// index := runtime.type_info_base(info.index).variant.(runtime.Type_Info_Enum)
 		err_conv(_encode_u64(e, u64(info.count), .Array)) or_return
 		for i in 0..<info.count {
 			data := uintptr(v.data) + uintptr(i*info.elem_size)
@@ -480,7 +479,7 @@ marshal_into_encoder :: proc(e: Encoder, v: any) -> (err: Marshal_Error) {
 			entries := make([dynamic]Name, 0, n, e.temp_allocator) or_return
 			defer delete(entries)
 
-			for name, i in info.names {
+			for _, i in info.names {
 				fname := field_name(info, i)
 				if fname == "-" {
 					continue
@@ -498,7 +497,7 @@ marshal_into_encoder :: proc(e: Encoder, v: any) -> (err: Marshal_Error) {
 				marshal_entry(e, info, v, entry.name, entry.field) or_return
 			}
 		} else {
-			for name, i in info.names {
+			for _, i in info.names {
 				fname := field_name(info, i)
 				if fname == "-" {
 					continue
@@ -514,14 +513,12 @@ marshal_into_encoder :: proc(e: Encoder, v: any) -> (err: Marshal_Error) {
 		case Value: return err_conv(encode(e, vv))
 		}
 
-		tag := reflect.get_union_variant_raw_tag(v)
-		if v.data == nil || tag <= 0 {
+		id := reflect.union_variant_typeid(v)
+		if v.data == nil || id == nil {
 			return _encode_nil(e.writer)
 		}
 
-		id := info.variants[tag-1].id
 		if len(info.variants) == 1 {
-			id := info.variants[tag-1].id
 			return marshal_into(e, any{v.data, id})
 		}
 

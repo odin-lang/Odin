@@ -428,7 +428,7 @@ to_diagnostic_format_writer :: proc(w: io.Writer, val: Value, padding := 0) -> i
 			}
 		}
 
-		padding := dedent(padding)
+		padding = dedent(padding)
 		newline(w, padding) or_return
 
 		io.write_string(w, "]") or_return
@@ -453,7 +453,7 @@ to_diagnostic_format_writer :: proc(w: io.Writer, val: Value, padding := 0) -> i
 			}
 		}
 
-		padding := dedent(padding)
+		padding = dedent(padding)
 		newline(w, padding) or_return
 
 		io.write_string(w, "}") or_return
