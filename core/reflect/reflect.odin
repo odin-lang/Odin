@@ -934,6 +934,27 @@ set_union_value :: proc(dst: any, value: any) -> bool {
 	panic("expected a union to reflect.set_union_variant_typeid")
 }
 
+@(require_results)
+bit_set_is_big_endian :: proc(value: any, loc := #caller_location) -> bool {
+	if value == nil { return ODIN_ENDIAN == .Big }
+	
+	ti := runtime.type_info_base(type_info_of(value.id))
+	if info, ok := ti.variant.(runtime.Type_Info_Bit_Set); ok {
+		if info.underlying == nil { return ODIN_ENDIAN == .Big }
+
+		underlying_ti := runtime.type_info_base(info.underlying)
+		if underlying_info, uok := underlying_ti.variant.(runtime.Type_Info_Integer); uok {
+			switch underlying_info.endianness {
+			case .Platform: return ODIN_ENDIAN == .Big
+			case .Little:   return false
+			case .Big:      return true
+			}
+		}
+
+		return ODIN_ENDIAN == .Big
+	}
+	panic("expected a bit_set to reflect.bit_set_is_big_endian", loc)
+}
 
 
 @(require_results)
