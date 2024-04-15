@@ -6114,7 +6114,13 @@ gb_internal bool parse_file(Parser *p, AstFile *f) {
 	CommentGroup *docs = f->lead_comment;
 
 	if (f->curr_token.kind != Token_package) {
+		ERROR_BLOCK();
 		syntax_error(f->curr_token, "Expected a package declaration at the beginning of the file");
+		// IMPORTANT NOTE(bill): this is technically a race condition with the suggestion, but it's ony a suggession
+		// so in practice is should be "fine"
+		if (f->pkg && f->pkg->name != "") {
+			error_line("\tSuggestion: Add 'package %.*s' to the top of the file\n", LIT(f->pkg->name));
+		}
 		return false;
 	}
 
