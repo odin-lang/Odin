@@ -171,6 +171,9 @@ template <isize N> gb_internal bool operator >  (String const &a, char const (&b
 template <isize N> gb_internal bool operator <= (String const &a, char const (&b)[N]) { return str_le(a, make_string(cast(u8 *)b, N-1)); }
 template <isize N> gb_internal bool operator >= (String const &a, char const (&b)[N]) { return str_ge(a, make_string(cast(u8 *)b, N-1)); }
 
+template <> bool operator == (String const &a, char const (&b)[1]) { return a.len == 0; }
+template <> bool operator != (String const &a, char const (&b)[1]) { return a.len != 0; }
+
 gb_internal gb_inline bool string_starts_with(String const &s, String const &prefix) {
 	if (prefix.len > s.len) {
 		return false;
