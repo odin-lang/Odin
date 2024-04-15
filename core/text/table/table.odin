@@ -12,6 +12,7 @@ import "core:io"
 import "core:fmt"
 import "core:mem"
 import "core:mem/virtual"
+import "core:unicode/utf8"
 import "base:runtime"
 
 Cell :: struct {
@@ -174,7 +175,7 @@ build :: proc(tbl: ^Table) {
 	for row in 0..<tbl.nr_rows {
 		for col in 0..<tbl.nr_cols {
 			cell := get_cell(tbl, row, col)
-			if w := len(cell.text) + tbl.lpad + tbl.rpad; w > tbl.colw[col] {
+			if w := utf8.rune_count(cell.text) + tbl.lpad + tbl.rpad; w > tbl.colw[col] {
 				tbl.colw[col] = w
 			}
 		}
@@ -185,7 +186,7 @@ build :: proc(tbl: ^Table) {
 		colw_sum += v
 	}
 
-	tbl.tblw = max(colw_sum, len(tbl.caption) + tbl.lpad + tbl.rpad)
+	tbl.tblw = max(colw_sum, utf8.rune_count(tbl.caption) + tbl.lpad + tbl.rpad)
 
 	// Resize columns to match total width of table
 	remain := tbl.tblw-colw_sum
@@ -367,15 +368,15 @@ write_text_align :: proc(w: io.Writer, colw, lpad, rpad: int, text: string, alig
 	switch alignment {
 	case .Left:
 		io.write_string(w, text)
-		write_byte_repeat(w, colw - len(text), ' ')
+		write_byte_repeat(w, colw - utf8.rune_count(text), ' ')
 	case .Center:
-		pad := colw - len(text)
+		pad := colw - utf8.rune_count(text)
 		odd := pad & 1 != 0
 		write_byte_repeat(w, pad/2, ' ')
 		io.write_string(w, text)
 		write_byte_repeat(w, pad/2 + 1 if odd else pad/2, ' ')
 	case .Right:
-		write_byte_repeat(w, colw - len(text), ' ')
+		write_byte_repeat(w, colw - utf8.rune_count(text), ' ')
 		io.write_string(w, text)
 	}
 	write_byte_repeat(w, rpad, ' ')
