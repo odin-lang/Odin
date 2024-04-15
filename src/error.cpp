@@ -292,10 +292,11 @@ gb_internal isize show_error_on_line(TokenPos const &pos, TokenPos end, char con
 
 		if (line_len > MAX_LINE_LENGTH_PADDED) {
 			i32 left = MAX_TAB_WIDTH;
-			if (offset > 0) {
-				line_text += offset-left;
-				line_len  -= offset-left;
-				offset = left+MAX_TAB_WIDTH/2;
+			i32 diff = gb_max(offset-left, 0);
+			if (diff > 0) {
+				line_text += diff;
+				line_len  -= diff;
+				offset = left + ELLIPSIS_PADDING/2;
 			}
 			if (line_len > MAX_LINE_LENGTH_PADDED) {
 				line_len = MAX_LINE_LENGTH_PADDED;
@@ -304,7 +305,7 @@ gb_internal isize show_error_on_line(TokenPos const &pos, TokenPos end, char con
 					squiggle_extra = 1;
 				}
 			}
-			if (offset > 0) {
+			if (diff > 0) {
 				error_out("... %.*s ...", cast(i32)line_len, line_text);
 			} else {
 				error_out("%.*s ...", cast(i32)line_len, line_text);
