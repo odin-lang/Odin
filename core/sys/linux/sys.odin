@@ -787,8 +787,8 @@ exit :: proc "contextless" (code: i32) -> ! {
 	Wait for the process to change state.
 	Available since Linux 1.0.
 */
-wait4 :: proc "contextless" (pid: Pid, status: ^u32, options: Wait_Options) -> (Pid, Errno) {
-	ret := syscall(SYS_wait4, pid, status, transmute(u32) options)
+wait4 :: proc "contextless" (pid: Pid, status: ^u32, options: Wait_Options, rusage: ^RUsage) -> (Pid, Errno) {
+	ret := syscall(SYS_wait4, pid, status, transmute(u32) options, rusage)
 	return errno_unwrap(ret, Pid)
 }
 
