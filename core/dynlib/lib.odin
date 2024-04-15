@@ -135,7 +135,7 @@ initialize_symbols :: proc(
 	prefixed_symbol_buf: [2048]u8 = ---
 
 	count = 0
-	for field, i in reflect.struct_fields_zipped(T) {
+	for field in reflect.struct_fields_zipped(T) {
 		// Calculate address of struct member
 		field_ptr := rawptr(uintptr(symbol_table) + field.offset)
 
