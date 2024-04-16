@@ -341,7 +341,7 @@ gb_internal ReadDirectoryError read_directory(String path, Array<FileInfo> *fi) 
 
 	return ReadDirectory_None;
 }
-#elif defined(GB_SYSTEM_LINUX) || defined(GB_SYSTEM_OSX) || defined(GB_SYSTEM_FREEBSD) || defined(GB_SYSTEM_OPENBSD) || defined(GB_SYSTEM_HAIKU)
+#elif defined(GB_SYSTEM_LINUX) || defined(GB_SYSTEM_OSX) || defined(GB_SYSTEM_FREEBSD) || defined(GB_SYSTEM_OPENBSD) || defined(GB_SYSTEM_NETBSD) || defined(GB_SYSTEM_HAIKU)
 
 #include <dirent.h>
 

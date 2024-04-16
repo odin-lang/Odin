@@ -627,8 +627,12 @@ gb_internal void thread_set_name(Thread *t, char const *name) {
 #elif defined(GB_SYSTEM_FREEBSD) || defined(GB_SYSTEM_OPENBSD)
 	pthread_set_name_np(t->posix_handle, name);
 #else
-	// TODO(bill): Test if this works
-	pthread_setname_np(t->posix_handle, name);
+	#ifdef GB_SYSTEM_NETBSD
+		// TODO(phix): Could be that libs are to old on NetBSD? Just ignore for now.
+	#else
+		// TODO(bill): Test if this works
+		pthread_setname_np(t->posix_handle, name);
+	#endif
 #endif
 }
 
@@ -901,10 +905,11 @@ gb_internal void futex_wait(Futex *f, Footex val) {
 	} while (f->load() == val);
 }
 
-#elif defined(GB_SYSTEM_HAIKU)
+#elif defined(GB_SYSTEM_HAIKU) || defined(GB_SYSTEM_NETBSD)
 
 // Futex implementation taken from https://tavianator.com/2023/futex.html
 
+#include <signal.h>
 #include <pthread.h>
 #include <atomic>
 
