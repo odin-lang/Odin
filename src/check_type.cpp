@@ -2495,17 +2495,15 @@ gb_internal Type *get_map_cell_type(Type *type) {
 	return s;
 }
 
-gb_internal void init_map_internal_types(Type *type) {
+gb_internal void init_map_internal_debug_types(Type *type) {
 	GB_ASSERT(type->kind == Type_Map);
 	GB_ASSERT(t_allocator != nullptr);
-	if (type->Map.lookup_result_type != nullptr) return;
+	if (type->Map.debug_metadata_type != nullptr) return;
 
 	Type *key   = type->Map.key;
 	Type *value = type->Map.value;
 	GB_ASSERT(key != nullptr);
 	GB_ASSERT(value != nullptr);
-
-
 
 	Type *key_cell   = get_map_cell_type(key);
 	Type *value_cell = get_map_cell_type(value);
@@ -2541,6 +2539,18 @@ gb_internal void init_map_internal_types(Type *type) {
 	gb_unused(type_size_of(debug_type));
 
 	type->Map.debug_metadata_type = debug_type;
+}
+
+
+gb_internal void init_map_internal_types(Type *type) {
+	GB_ASSERT(type->kind == Type_Map);
+	GB_ASSERT(t_allocator != nullptr);
+	if (type->Map.lookup_result_type != nullptr) return;
+
+	Type *key   = type->Map.key;
+	Type *value = type->Map.value;
+	GB_ASSERT(key != nullptr);
+	GB_ASSERT(value != nullptr);
 
 	type->Map.lookup_result_type = make_optional_ok_type(value);
 }
@@ -2613,8 +2623,6 @@ gb_internal void check_map_type(CheckerContext *ctx, Type *type, Ast *node) {
 
 	init_core_map_type(ctx->checker);
 	init_map_internal_types(type);
-
-	// error(node, "'map' types are not yet implemented");
 }
 
 gb_internal void check_matrix_type(CheckerContext *ctx, Type **type, Ast *node) {

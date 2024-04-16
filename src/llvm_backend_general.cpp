@@ -2070,7 +2070,7 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 		break;
 
 	case Type_Map:
-		init_map_internal_types(type);
+		init_map_internal_debug_types(type);
 		GB_ASSERT(t_raw_map != nullptr);
 		return lb_type_internal(m, t_raw_map);
 

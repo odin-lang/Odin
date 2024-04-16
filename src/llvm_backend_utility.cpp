@@ -1125,7 +1125,7 @@ gb_internal lbValue lb_emit_struct_ep(lbProcedure *p, lbValue s, i32 index) {
 		case 3: result_type = t_allocator; break;
 		}
 	} else if (is_type_map(t)) {
-		init_map_internal_types(t);
+		init_map_internal_debug_types(t);
 		Type *itp = alloc_type_pointer(t_raw_map);
 		s = lb_emit_transmute(p, s, itp);
 
@@ -1264,7 +1264,7 @@ gb_internal lbValue lb_emit_struct_ev(lbProcedure *p, lbValue s, i32 index) {
 
 	case Type_Map:
 		{
-			init_map_internal_types(t);
+			init_map_internal_debug_types(t);
 			switch (index) {
 			case 0: result_type = get_struct_field_type(t_raw_map, 0); break;
 			case 1: result_type = get_struct_field_type(t_raw_map, 1); break;

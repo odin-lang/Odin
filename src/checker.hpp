@@ -564,3 +564,6 @@ gb_internal void add_untyped_expressions(CheckerInfo *cinfo, UntypedExprInfoMap 
 
 
 gb_internal GenTypesData *ensure_polymorphic_record_entity_has_gen_types(CheckerContext *ctx, Type *original_type);
+
+
+gb_internal void init_map_internal_types(Type *type);

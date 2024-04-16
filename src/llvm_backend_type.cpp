@@ -903,7 +903,7 @@ gb_internal void lb_setup_type_info_data_giant_array(lbModule *m, i64 global_typ
 
 		case Type_Map: {
 			tag_type = t_type_info_map;
-			init_map_internal_types(t);
+			init_map_internal_debug_types(t);
 
 			LLVMValueRef vals[3] = {
 				get_type_info_ptr(m, t->Map.key),
