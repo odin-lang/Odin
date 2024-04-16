@@ -1640,6 +1640,7 @@ inferattrs,
 function<eager-inv>(
 	lower-expect,
 	simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;no-switch-range-to-icmp;no-switch-to-lookup;keep-loops;no-hoist-common-insts;no-sink-common-insts;speculate-blocks;simplify-cond-branch>,
+	sroa<modify-cfg>,
 	early-cse<>
 ),
 ipsccp,
@@ -1661,6 +1662,7 @@ cgscc(
 		inline,
 		function-attrs<skip-non-recursive-function-attrs>,
 		function<eager-inv;no-rerun>(
+			sroa<modify-cfg>,
 			early-cse<memssa>,
 			speculative-execution<only-if-divergent-target>,
 			jump-threading,
@@ -1688,6 +1690,7 @@ cgscc(
 				loop-deletion,
 				loop-unroll-full
 			),
+			sroa<modify-cfg>,
 			vector-combine,
 			mldst-motion<no-split-footer-bb>,
 			gvn<>,
@@ -1737,6 +1740,7 @@ function<eager-inv>(
 	instcombine<max-iterations=1;no-use-loop-info;no-verify-fixpoint>,
 	loop-unroll<O2>,
 	transform-warning,
+	sroa<preserve-cfg>,
 	infer-alignment,
 	instcombine<max-iterations=1;no-use-loop-info;no-verify-fixpoint>,
 	loop-mssa(
@@ -1896,6 +1900,7 @@ inferattrs,
 function<eager-inv>(
 	lower-expect,
 	simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;no-switch-range-to-icmp;no-switch-to-lookup;keep-loops;no-hoist-common-insts;no-sink-common-insts;speculate-blocks;simplify-cond-branch>,
+	sroa<modify-cfg>,
 	early-cse<>
 ),
 ipsccp,
@@ -1917,6 +1922,7 @@ cgscc(
 		inline,
 		function-attrs<skip-non-recursive-function-attrs>,
 		function<eager-inv;no-rerun>(
+			sroa<modify-cfg>,
 			early-cse<memssa>,
 			speculative-execution<only-if-divergent-target>,
 			jump-threading,
@@ -1945,6 +1951,7 @@ cgscc(
 				loop-deletion,
 				loop-unroll-full
 			),
+			sroa<modify-cfg>,
 			vector-combine,
 			mldst-motion<no-split-footer-bb>,
 			gvn<>,
@@ -1994,6 +2001,7 @@ function<eager-inv>(
 	instcombine<max-iterations=1;no-use-loop-info;no-verify-fixpoint>,
 	loop-unroll<O2>,
 	transform-warning,
+	sroa<modify-cfg>,
 	infer-alignment,
 	instcombine<max-iterations=1;no-use-loop-info;no-verify-fixpoint>,
 	loop-mssa(
@@ -2157,6 +2165,7 @@ inferattrs,
 function<eager-inv>(
 	lower-expect,
 	simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;no-switch-range-to-icmp;no-switch-to-lookup;keep-loops;no-hoist-common-insts;no-sink-common-insts;speculate-blocks;simplify-cond-branch>,
+	sroa<modify-cfg>,
 	early-cse<>,
 	callsite-splitting
 ),
@@ -2178,6 +2187,7 @@ cgscc(
 		function-attrs<skip-non-recursive-function-attrs>,
 		argpromotion,
 		function<eager-inv;no-rerun>(
+			sroa<modify-cfg>,
 			early-cse<memssa>,
 			speculative-execution<only-if-divergent-target>,
 			jump-threading,
@@ -2206,6 +2216,7 @@ cgscc(
 				loop-deletion,
 				loop-unroll-full
 			),
+			sroa<modify-cfg>,
 			vector-combine,
 			mldst-motion<no-split-footer-bb>,
 			gvn<>,
@@ -2254,6 +2265,7 @@ function<eager-inv>(
 	instcombine<max-iterations=1;no-use-loop-info;no-verify-fixpoint>,
 	loop-unroll<O3>,
 	transform-warning,
+	sroa<preserve-cfg>,
 	infer-alignment,
 	instcombine<max-iterations=1;no-use-loop-info;no-verify-fixpoint>,
 	loop-mssa(licm<allowspeculation>),
