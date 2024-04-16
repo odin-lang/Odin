@@ -276,6 +276,43 @@ gb_internal String string_trim_whitespace(String str) {
 
 	return str;
 }
+gb_internal String string_trim_trailing_whitespace(String str) {
+	while (str.len > 0)  {
+		u8 c = str[str.len-1];
+		if (rune_is_whitespace(c) || c == 0) {
+			str.len -= 1;
+		} else {
+			break;
+		}
+	}
+	return str;
+}
+
+gb_internal String split_lines_first_line_from_array(Array<u8> const &array, gbAllocator allocator) {
+	String_Iterator it = {{array.data, array.count}, 0};
+
+	String line = string_split_iterator(&it, '\n');
+	line = string_trim_trailing_whitespace(line);
+	return line;
+}
+
+gb_internal Array<String> split_lines_from_array(Array<u8> const &array, gbAllocator allocator) {
+	Array<String> lines = {};
+	lines.allocator = allocator;
+
+	String_Iterator it = {{array.data, array.count}, 0};
+
+	for (;;) {
+		String line = string_split_iterator(&it, '\n');
+		if (line.len == 0) {
+			break;
+		}
+		line = string_trim_trailing_whitespace(line);
+		array_add(&lines, line);
+	}
+
+	return lines;
+}
 
 gb_internal bool string_contains_char(String const &s, u8 c) {
 	isize i;

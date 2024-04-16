@@ -7,7 +7,8 @@ struct ErrorValue {
 	ErrorValueKind kind;
 	TokenPos       pos;
 	TokenPos       end;
-	Array<String>  msgs;
+	Array<u8>      msg;
+	bool           seen_newline;
 };
 
 struct ErrorCollector {
@@ -30,19 +31,21 @@ gb_global ErrorCollector global_error_collector;
 gb_internal void push_error_value(TokenPos const &pos, ErrorValueKind kind = ErrorValue_Error) {
 	GB_ASSERT_MSG(global_error_collector.curr_error_value_set.load() == false, "Possible race condition in error handling system, please report this with an issue");
 	ErrorValue ev = {kind, pos};
-	ev.msgs.allocator = heap_allocator();
+	ev.msg.allocator = heap_allocator();
 
 	global_error_collector.curr_error_value = ev;
 	global_error_collector.curr_error_value_set.store(true);
 }
 
 gb_internal void pop_error_value(void) {
+	mutex_lock(&global_error_collector.mutex);
 	if (global_error_collector.curr_error_value_set.load()) {
 		array_add(&global_error_collector.error_values, global_error_collector.curr_error_value);
 
 		global_error_collector.curr_error_value = {};
 		global_error_collector.curr_error_value_set.store(false);
 	}
+	mutex_unlock(&global_error_collector.mutex);
 }
 
 
@@ -180,9 +183,18 @@ gb_internal ERROR_OUT_PROC(default_error_out_va) {
 	isize n = len-1;
 
 	if (n > 0) {
-		String msg = copy_string(permanent_allocator(), {(u8 *)buf, n});
 		ErrorValue *ev = get_error_value();
-		array_add(&ev->msgs, msg);
+		if (terse_errors()) {
+			for (isize i = 0; i < n && !ev->seen_newline; i++) {
+				u8 c = cast(u8)buf[i];
+				if (c == '\n') {
+					ev->seen_newline = true;
+				}
+				array_add(&ev->msg, c);
+			}
+		} else {
+			array_add_elems(&ev->msg, (u8 *)buf, n);
+		}
 	}
 }
 
@@ -645,109 +657,119 @@ gb_internal int error_value_cmp(void const *a, void const *b) {
 }
 
 gb_internal void print_all_errors(void) {
-	auto const &escape_char = [](gbFile *f, u8 c) {
+	auto const &escape_char = [](gbString res, u8 c) -> gbString {
 		switch (c) {
-		case '\n': gb_file_write(f, "\\n",  2); break;
-		case '"':  gb_file_write(f, "\\\"", 2); break;
-		case '\\': gb_file_write(f, "\\\\", 2); break;
-		case '\b': gb_file_write(f, "\\b",  2); break;
-		case '\f': gb_file_write(f, "\\f",  2); break;
-		case '\r': gb_file_write(f, "\\r",  2); break;
-		case '\t': gb_file_write(f, "\\t",  2); break;
+		case '\n': res = gb_string_append_length(res, "\\n",  2); break;
+		case '"':  res = gb_string_append_length(res, "\\\"", 2); break;
+		case '\\': res = gb_string_append_length(res, "\\\\", 2); break;
+		case '\b': res = gb_string_append_length(res, "\\b",  2); break;
+		case '\f': res = gb_string_append_length(res, "\\f",  2); break;
+		case '\r': res = gb_string_append_length(res, "\\r",  2); break;
+		case '\t': res = gb_string_append_length(res, "\\t",  2); break;
 		default:
 			if ('\x00' <= c && c <= '\x1f') {
-				gb_fprintf(f, "\\u%04x", c);
+				res = gb_string_append_fmt(res, "\\u%04x", c);
 			} else {
-				gb_file_write(f, &c, 1);
+				res = gb_string_append_length(res, &c, 1);
 			}
 			break;
 		}
+		return res;
 	};
 
 	GB_ASSERT(any_errors() || any_warnings());
-	gbFile *f = gb_file_get_standard(gbFileStandard_Error);
+
 
 	array_sort(global_error_collector.error_values, error_value_cmp);
 
+	gbString res = gb_string_make(heap_allocator(), "");
+	defer (gb_string_free(res));
 
 	if (json_errors()) {
-		gb_fprintf(f, "{\n");
-		gb_fprintf(f, "\t\"error_count\": %td,\n", global_error_collector.error_values.count);
-		gb_fprintf(f, "\t\"errors\": [\n");
+		res = gb_string_append_fmt(res, "{\n");
+		res = gb_string_append_fmt(res, "\t\"error_count\": %td,\n", global_error_collector.error_values.count);
+		res = gb_string_append_fmt(res, "\t\"errors\": [\n");
 		for_array(i, global_error_collector.error_values) {
 			ErrorValue ev = global_error_collector.error_values[i];
 
-			gb_fprintf(f, "\t\t{\n");
+			res = gb_string_append_fmt(res, "\t\t{\n");
 
-			gb_fprintf(f, "\t\t\t\"type\": \"");
+			res = gb_string_append_fmt(res, "\t\t\t\"type\": \"");
 			if (ev.kind == ErrorValue_Warning) {
-				gb_fprintf(f, "warning");
+				res = gb_string_append_fmt(res, "warning");
 			} else {
-				gb_fprintf(f, "error");
+				res = gb_string_append_fmt(res, "error");
 			}
-			gb_fprintf(f, "\",\n");
+			res = gb_string_append_fmt(res, "\",\n");
 
-			gb_fprintf(f, "\t\t\t\"pos\": {\n");
+			res = gb_string_append_fmt(res, "\t\t\t\"pos\": {\n");
 
 			if (ev.pos.file_id) {
-				gb_fprintf(f, "\t\t\t\t\"file\": \"");
+				res = gb_string_append_fmt(res, "\t\t\t\t\"file\": \"");
 				String file = get_file_path_string(ev.pos.file_id);
 				for (isize k = 0; k < file.len; k++) {
-					escape_char(f, file.text[k]);
+					res = escape_char(res, file.text[k]);
 				}
-				gb_fprintf(f, "\",\n");
-				gb_fprintf(f, "\t\t\t\t\"offset\": %d,\n", ev.pos.offset);
-				gb_fprintf(f, "\t\t\t\t\"line\": %d,\n", ev.pos.line);
-				gb_fprintf(f, "\t\t\t\t\"column\": %d,\n", ev.pos.column);
+				res = gb_string_append_fmt(res, "\",\n");
+				res = gb_string_append_fmt(res, "\t\t\t\t\"offset\": %d,\n", ev.pos.offset);
+				res = gb_string_append_fmt(res, "\t\t\t\t\"line\": %d,\n", ev.pos.line);
+				res = gb_string_append_fmt(res, "\t\t\t\t\"column\": %d,\n", ev.pos.column);
 				i32 end_column = gb_max(ev.end.column, ev.pos.column);
-				gb_fprintf(f, "\t\t\t\t\"end_column\": %d\n", end_column);
-				gb_fprintf(f, "\t\t\t},\n");
+				res = gb_string_append_fmt(res, "\t\t\t\t\"end_column\": %d\n", end_column);
+				res = gb_string_append_fmt(res, "\t\t\t},\n");
 			}
 
-			gb_fprintf(f, "\t\t\t\"msgs\": [\n");
+			res = gb_string_append_fmt(res, "\t\t\t\"msgs\": [\n");
 
-			if (ev.msgs.count > 1) {
-				gb_fprintf(f, "\t\t\t\t\"");
+			auto lines = split_lines_from_array(ev.msg, heap_allocator());
+			defer (array_free(&lines));
 
-				for (isize j = 1; j < ev.msgs.count; j++) {
-					String msg = ev.msgs[j];
-					for (isize k = 0; k < msg.len; k++) {
-						u8 c = msg.text[k];
-						if (c == '\n') {
-							if (k+1 == msg.len && j+1 == ev.msgs.count) {
-								// don't do the last one
-							} else {
-								gb_fprintf(f, "\",\n");
-								gb_fprintf(f, "\t\t\t\t\"");
-							}
-						} else {
-							escape_char(f, c);
-						}
+			if (lines.count > 0) {
+				res = gb_string_append_fmt(res, "\t\t\t\t\"");
+
+				for (isize j = 0; j < lines.count; j++) {
+					String line = lines[j];
+					for (isize k = 0; k < line.len; k++) {
+						u8 c = line.text[k];
+						res = escape_char(res, c);
+					}
+					if (j+1 < lines.count) {
+						res = gb_string_append_fmt(res, "\",\n");
+						res = gb_string_append_fmt(res, "\t\t\t\t\"");
 					}
 				}
-				gb_fprintf(f, "\"\n");
+				res = gb_string_append_fmt(res, "\"\n");
 			}
-			gb_fprintf(f, "\t\t\t]\n");
-			gb_fprintf(f, "\t\t}");
+			res = gb_string_append_fmt(res, "\t\t\t]\n");
+			res = gb_string_append_fmt(res, "\t\t}");
 			if (i+1 != global_error_collector.error_values.count) {
-				gb_fprintf(f, ",");
+				res = gb_string_append_fmt(res, ",");
 			}
-			gb_fprintf(f, "\n");
+			res = gb_string_append_fmt(res, "\n");
 		}
 
-		gb_fprintf(f, "\t]\n");
-		gb_fprintf(f, "}\n");
+		res = gb_string_append_fmt(res, "\t]\n");
+		res = gb_string_append_fmt(res, "}\n");
 	} else {
 		for_array(i, global_error_collector.error_values) {
 			ErrorValue ev = global_error_collector.error_values[i];
-			for (isize j = 0; j < ev.msgs.count; j++) {
-				String msg = ev.msgs[j];
-				gb_file_write(f, msg.text, msg.len);
 
-				if (terse_errors() && string_contains_char(msg, '\n')) {
+			String_Iterator it = {{ev.msg.data, ev.msg.count}, 0};
+
+			for (isize line_idx = 0; /**/; line_idx++) {
+				String line = string_split_iterator(&it, '\n');
+				if (line.len == 0) {
+					break;
+				}
+				line = string_trim_trailing_whitespace(line);
+				res = gb_string_append_length(res, line.text, line.len);
+				res = gb_string_append_length(res, " \n", 2);
+				if (line_idx == 0 && terse_errors()) {
 					break;
 				}
 			}
 		}
 	}
+	gbFile *f = gb_file_get_standard(gbFileStandard_Error);
+	gb_file_write(f, res, gb_string_length(res));
 }
