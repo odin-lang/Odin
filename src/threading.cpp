@@ -626,13 +626,11 @@ gb_internal void thread_set_name(Thread *t, char const *name) {
 	pthread_setname_np(name);
 #elif defined(GB_SYSTEM_FREEBSD) || defined(GB_SYSTEM_OPENBSD)
 	pthread_set_name_np(t->posix_handle, name);
+#elif defined(GB_SYSTEM_NETBSD)
+	pthread_setname_np(t->posix_handle, "%s", (void*)name);
 #else
-	#ifdef GB_SYSTEM_NETBSD
-		// TODO(phix): Could be that libs are to old on NetBSD? Just ignore for now.
-	#else
-		// TODO(bill): Test if this works
-		pthread_setname_np(t->posix_handle, name);
-	#endif
+	// TODO(bill): Test if this works
+	pthread_setname_np(t->posix_handle, name);
 #endif
 }
 
