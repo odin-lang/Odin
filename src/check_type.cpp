@@ -29,10 +29,11 @@ gb_internal void populate_using_array_index(CheckerContext *ctx, Ast *node, AstF
 	}
 }
 
-gb_internal void populate_using_entity_scope(CheckerContext *ctx, Ast *node, AstField *field, Type *t) {
+gb_internal void populate_using_entity_scope(CheckerContext *ctx, Ast *node, AstField *field, Type *t, isize level) {
 	if (t == nullptr) {
 		return;
 	}
+	Type *original_type = t;
 	t = base_type(type_deref(t));
 	gbString str = nullptr;
 	defer (gb_string_free(str));
@@ -46,16 +47,18 @@ gb_internal void populate_using_entity_scope(CheckerContext *ctx, Ast *node, Ast
 			String name = f->token.string;
 			Entity *e = scope_lookup_current(ctx->scope, name);
 			if (e != nullptr && name != "_") {
+				gbString ot = type_to_string(original_type);
 				// TODO(bill): Better type error
 				if (str != nullptr) {
-					error(e->token, "'%.*s' is already declared in '%s'", LIT(name), str);
+					error(e->token, "'%.*s' is already declared in '%s', through 'using' from '%s'", LIT(name), str, ot);
 				} else {
-					error(e->token, "'%.*s' is already declared", LIT(name));
+					error(e->token, "'%.*s' is already declared, through 'using' from '%s'", LIT(name), ot);
 				}
+				gb_string_free(ot);
 			} else {
 				add_entity(ctx, ctx->scope, nullptr, f);
 				if (f->flags & EntityFlag_Using) {
-					populate_using_entity_scope(ctx, node, field, f->type);
+					populate_using_entity_scope(ctx, node, field, f->type, level+1);
 				}
 			}
 		}
@@ -200,7 +203,7 @@ gb_internal void check_struct_fields(CheckerContext *ctx, Ast *node, Slice<Entit
 				continue;
 			}
 
-			populate_using_entity_scope(ctx, node, p, type);
+			populate_using_entity_scope(ctx, node, p, type, 1);
 		}
 
 		if (is_subtype && p->names.count > 0) {
