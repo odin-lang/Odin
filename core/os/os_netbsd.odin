@@ -281,7 +281,7 @@ W_OK :: 2 // Test for write permission
 R_OK :: 4 // Test for read permission
 
 foreign libc {
-	@(link_name="__errno")		__errno_location :: proc() -> ^c.int ---
+	@(link_name="__errno")          __errno_location    :: proc() -> ^c.int ---
 
 	@(link_name="open")             _unix_open          :: proc(path: cstring, flags: c.int, mode: c.int) -> Handle ---
 	@(link_name="close")            _unix_close         :: proc(fd: Handle) -> c.int ---
@@ -290,8 +290,8 @@ foreign libc {
 	@(link_name="lseek")            _unix_seek          :: proc(fd: Handle, offset: i64, whence: c.int) -> i64 ---
 	@(link_name="getpagesize")      _unix_getpagesize   :: proc() -> c.int ---
 	@(link_name="stat")             _unix_stat          :: proc(path: cstring, stat: ^OS_Stat) -> c.int ---
-	@(link_name="lstat")            _unix_lstat         :: proc(path: cstring, sb: ^OS_Stat) -> c.int ---
-	@(link_name="fstat")            _unix_fstat         :: proc(fd: Handle, stat: ^OS_Stat) -> c.int ---
+	@(link_name="__lstat50")        _unix_lstat         :: proc(path: cstring, sb: ^OS_Stat) -> c.int ---
+	@(link_name="__fstat50")        _unix_fstat         :: proc(fd: Handle, stat: ^OS_Stat) -> c.int ---
 	@(link_name="readlink")         _unix_readlink      :: proc(path: cstring, buf: ^byte, bufsiz: c.size_t) -> c.ssize_t ---
 	@(link_name="access")           _unix_access        :: proc(path: cstring, mask: c.int) -> c.int ---
 	@(link_name="getcwd")           _unix_getcwd        :: proc(buf: cstring, len: c.size_t) -> cstring ---
