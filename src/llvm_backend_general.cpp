@@ -211,7 +211,7 @@ gb_internal void lb_loop_end(lbProcedure *p, lbLoopData const &data) {
 
 
 gb_internal void lb_make_global_private_const(LLVMValueRef global_data) {
-	LLVMSetLinkage(global_data, LLVMPrivateLinkage);
+	LLVMSetLinkage(global_data, LLVMLinkerPrivateLinkage);
 	LLVMSetUnnamedAddress(global_data, LLVMGlobalUnnamedAddr);
 	LLVMSetGlobalConstant(global_data, true);
 }

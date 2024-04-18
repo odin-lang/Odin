@@ -249,9 +249,7 @@ gb_internal void lb_setup_type_info_data_giant_array(lbModule *m, i64 global_typ
 		char name[64] = {};
 		gb_snprintf(name, 63, "__$ti-%lld", cast(long long)index);
 		LLVMValueRef g = LLVMAddGlobal(m->mod, type, name);
-		LLVMSetLinkage(g, LLVMInternalLinkage);
-		LLVMSetUnnamedAddress(g, LLVMGlobalUnnamedAddr);
-		LLVMSetGlobalConstant(g, true);
+		lb_make_global_private_const(g);
 		return g;
 	};
 
@@ -1103,8 +1101,7 @@ gb_internal void lb_setup_type_info_data_giant_array(lbModule *m, i64 global_typ
 	LLVMValueRef giant_const = LLVMConstArray(lb_type(m, t_type_info_ptr), giant_const_values, cast(unsigned)global_type_info_data_entity_count);
 	LLVMValueRef giant_array = lb_global_type_info_data_ptr(m).value;
 	LLVMSetInitializer(giant_array, giant_const);
-	LLVMSetGlobalConstant(giant_array, true);
-	LLVMSetLinkage(giant_array, LLVMLinkerPrivateLinkage);
+	lb_make_global_private_const(giant_array);
 }
 
 
