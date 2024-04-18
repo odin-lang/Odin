@@ -1103,6 +1103,7 @@ gb_internal void lb_setup_type_info_data_giant_array(lbModule *m, i64 global_typ
 	LLVMValueRef giant_const = LLVMConstArray(lb_type(m, t_type_info_ptr), giant_const_values, cast(unsigned)global_type_info_data_entity_count);
 	LLVMValueRef giant_array = lb_global_type_info_data_ptr(m).value;
 	LLVMSetInitializer(giant_array, giant_const);
+	LLVMSetGlobalConstant(giant_array, true);
 }
 
 
@@ -1132,4 +1133,7 @@ gb_internal void lb_setup_type_info_data(lbModule *m) { // NOTE(bill): Setup typ
 	LLVMValueRef slice = llvm_const_slice_internal(m, data, len);
 
 	LLVMSetInitializer(global_type_table.value, slice);
+
+	// force it to be constant
+	LLVMSetGlobalConstant(global_type_table.value, true);
 }
