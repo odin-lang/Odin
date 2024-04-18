@@ -243,6 +243,7 @@ enum BuildFlagKind {
 	BuildFlag_Debug,
 	BuildFlag_DisableAssert,
 	BuildFlag_NoBoundsCheck,
+	BuildFlag_NoTypeAssert,
 	BuildFlag_NoDynamicLiterals,
 	BuildFlag_NoCRT,
 	BuildFlag_NoEntryPoint,
@@ -436,6 +437,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_Debug,                   str_lit("debug"),                     BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_DisableAssert,           str_lit("disable-assert"),            BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_NoBoundsCheck,           str_lit("no-bounds-check"),           BuildFlagParam_None,    Command__does_check);
+	add_flag(&build_flags, BuildFlag_NoTypeAssert,            str_lit("no-type-assert"),            BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_NoThreadLocal,           str_lit("no-thread-local"),           BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_NoDynamicLiterals,       str_lit("no-dynamic-literals"),       BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_NoCRT,                   str_lit("no-crt"),                    BuildFlagParam_None,    Command__does_build);
@@ -1012,6 +1014,9 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							break;
 						case BuildFlag_NoBoundsCheck:
 							build_context.no_bounds_check = true;
+							break;
+						case BuildFlag_NoTypeAssert:
+							build_context.no_type_assert = true;
 							break;
 						case BuildFlag_NoDynamicLiterals:
 							build_context.no_dynamic_literals = true;
@@ -1848,6 +1853,10 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 
 		print_usage_line(1, "-no-bounds-check");
 		print_usage_line(2, "Disables bounds checking program wide.");
+		print_usage_line(0, "");
+
+		print_usage_line(1, "-no-type-assert");
+		print_usage_line(2, "Disables type assertion checking program wide.");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-no-crt");

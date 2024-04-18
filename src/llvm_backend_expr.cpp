@@ -3116,7 +3116,7 @@ gb_internal lbValue lb_build_unary_and(lbProcedure *p, Ast *expr) {
 				Type *dst_type = type;
 
 
-				if ((p->state_flags & StateFlag_no_type_assert) == 0) {
+				if (!build_context.no_type_assert && (p->state_flags & StateFlag_no_type_assert) == 0) {
 					lbValue src_tag = {};
 					lbValue dst_tag = {};
 					if (is_type_union_maybe_pointer(src_type)) {
@@ -3156,7 +3156,7 @@ gb_internal lbValue lb_build_unary_and(lbProcedure *p, Ast *expr) {
 					v = lb_emit_load(p, v);
 				}
 				lbValue data_ptr = lb_emit_struct_ev(p, v, 0);
-				if ((p->state_flags & StateFlag_no_type_assert) == 0) {
+				if (!build_context.no_type_assert && (p->state_flags & StateFlag_no_type_assert) == 0) {
 					GB_ASSERT(!build_context.no_rtti);
 
 					lbValue any_id = lb_emit_struct_ev(p, v, 1);
