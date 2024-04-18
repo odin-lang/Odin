@@ -19,6 +19,7 @@ type_assertion_trap :: proc "contextless" () -> ! {
 }
 
 
+@(disabled=ODIN_NO_BOUNDS_CHECK)
 bounds_check_error :: proc "contextless" (file: string, line, column: i32, index, count: int) {
 	if uint(index) < uint(count) {
 		return
@@ -61,6 +62,7 @@ multi_pointer_slice_handle_error :: proc "contextless" (file: string, line, colu
 }
 
 
+@(disabled=ODIN_NO_BOUNDS_CHECK)
 multi_pointer_slice_expr_error :: proc "contextless" (file: string, line, column: i32, lo, hi: int) {
 	if lo <= hi {
 		return
@@ -68,6 +70,7 @@ multi_pointer_slice_expr_error :: proc "contextless" (file: string, line, column
 	multi_pointer_slice_handle_error(file, line, column, lo, hi)
 }
 
+@(disabled=ODIN_NO_BOUNDS_CHECK)
 slice_expr_error_hi :: proc "contextless" (file: string, line, column: i32, hi: int, len: int) {
 	if 0 <= hi && hi <= len {
 		return
@@ -75,6 +78,7 @@ slice_expr_error_hi :: proc "contextless" (file: string, line, column: i32, hi: 
 	slice_handle_error(file, line, column, 0, hi, len)
 }
 
+@(disabled=ODIN_NO_BOUNDS_CHECK)
 slice_expr_error_lo_hi :: proc "contextless" (file: string, line, column: i32, lo, hi: int, len: int) {
 	if 0 <= lo && lo <= len && lo <= hi && hi <= len {
 		return
@@ -82,6 +86,7 @@ slice_expr_error_lo_hi :: proc "contextless" (file: string, line, column: i32, l
 	slice_handle_error(file, line, column, lo, hi, len)
 }
 
+@(disabled=ODIN_NO_BOUNDS_CHECK)
 dynamic_array_expr_error :: proc "contextless" (file: string, line, column: i32, low, high, max: int) {
 	if 0 <= low && low <= high && high <= max {
 		return
@@ -102,6 +107,7 @@ dynamic_array_expr_error :: proc "contextless" (file: string, line, column: i32,
 }
 
 
+@(disabled=ODIN_NO_BOUNDS_CHECK)
 matrix_bounds_check_error :: proc "contextless" (file: string, line, column: i32, row_index, column_index, row_count, column_count: int) {
 	if uint(row_index) < uint(row_count) &&
 	   uint(column_index) < uint(column_count) {
@@ -224,6 +230,7 @@ when ODIN_NO_RTTI {
 }
 
 
+@(disabled=ODIN_NO_BOUNDS_CHECK)
 make_slice_error_loc :: #force_inline proc "contextless" (loc := #caller_location, len: int) {
 	if 0 <= len {
 		return
@@ -239,6 +246,7 @@ make_slice_error_loc :: #force_inline proc "contextless" (loc := #caller_locatio
 	handle_error(loc, len)
 }
 
+@(disabled=ODIN_NO_BOUNDS_CHECK)
 make_dynamic_array_error_loc :: #force_inline proc "contextless" (loc := #caller_location, len, cap: int) {
 	if 0 <= len && len <= cap {
 		return
@@ -256,6 +264,7 @@ make_dynamic_array_error_loc :: #force_inline proc "contextless" (loc := #caller
 	handle_error(loc, len, cap)
 }
 
+@(disabled=ODIN_NO_BOUNDS_CHECK)
 make_map_expr_error_loc :: #force_inline proc "contextless" (loc := #caller_location, cap: int) {
 	if 0 <= cap {
 		return
@@ -274,19 +283,22 @@ make_map_expr_error_loc :: #force_inline proc "contextless" (loc := #caller_loca
 
 
 
-
+@(disabled=ODIN_NO_BOUNDS_CHECK)
 bounds_check_error_loc :: #force_inline proc "contextless" (loc := #caller_location, index, count: int) {
 	bounds_check_error(loc.file_path, loc.line, loc.column, index, count)
 }
 
+@(disabled=ODIN_NO_BOUNDS_CHECK)
 slice_expr_error_hi_loc :: #force_inline proc "contextless" (loc := #caller_location, hi: int, len: int) {
 	slice_expr_error_hi(loc.file_path, loc.line, loc.column, hi, len)
 }
 
+@(disabled=ODIN_NO_BOUNDS_CHECK)
 slice_expr_error_lo_hi_loc :: #force_inline proc "contextless" (loc := #caller_location, lo, hi: int, len: int) {
 	slice_expr_error_lo_hi(loc.file_path, loc.line, loc.column, lo, hi, len)
 }
 
+@(disabled=ODIN_NO_BOUNDS_CHECK)
 dynamic_array_expr_error_loc :: #force_inline proc "contextless" (loc := #caller_location, low, high, max: int) {
 	dynamic_array_expr_error(loc.file_path, loc.line, loc.column, low, high, max)
 }
