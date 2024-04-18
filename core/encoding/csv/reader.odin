@@ -91,7 +91,10 @@ DEFAULT_RECORD_BUFFER_CAPACITY :: 256
 
 // reader_init initializes a new Reader from r
 reader_init :: proc(reader: ^Reader, r: io.Reader, buffer_allocator := context.allocator) {
-	reader.comma = ','
+	switch reader.comma {
+	case '\x00', '\n', '\r', 0xfffd:
+		reader.comma = ','
+	}
 
 	context.allocator = buffer_allocator
 	reserve(&reader.record_buffer, DEFAULT_RECORD_BUFFER_CAPACITY)
