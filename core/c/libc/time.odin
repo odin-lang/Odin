@@ -45,7 +45,7 @@ when ODIN_OS == .Windows {
 	}
 }
 
-when ODIN_OS == .Linux || ODIN_OS == .FreeBSD || ODIN_OS == .Darwin || ODIN_OS == .OpenBSD || ODIN_OS == .Haiku {
+when ODIN_OS == .Linux || ODIN_OS == .FreeBSD || ODIN_OS == .Darwin || ODIN_OS == .OpenBSD || ODIN_OS == .NetBSD || ODIN_OS == .Haiku {
 	@(default_calling_convention="c")
 	foreign libc {
 		// 7.27.2 Time manipulation functions

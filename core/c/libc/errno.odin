@@ -40,7 +40,7 @@ when ODIN_OS == .FreeBSD {
 	ERANGE :: 34
 }
 
-when ODIN_OS == .OpenBSD {
+when ODIN_OS == .OpenBSD || ODIN_OS == .NetBSD {
 	@(private="file")
 	@(default_calling_convention="c")
 	foreign libc {

@@ -60,7 +60,7 @@ _file_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, 
 	case .Destroy:
 		err = .Empty
 	case .Query:
-		when ODIN_OS == .FreeBSD || ODIN_OS == .OpenBSD || ODIN_OS == .Haiku {
+		when ODIN_OS == .FreeBSD || ODIN_OS == .OpenBSD || ODIN_OS == .NetBSD || ODIN_OS == .Haiku {
 			return io.query_utility({.Close, .Flush, .Read, .Write, .Seek, .Size, .Query})
 		} else {
 			return io.query_utility({.Close, .Flush, .Read, .Read_At, .Write, .Write_At, .Seek, .Size, .Query})
