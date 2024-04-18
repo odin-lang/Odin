@@ -13,8 +13,8 @@ SIG_BLOCK   :: 1
 SIG_UNBLOCK :: 2
 SIG_SETMASK :: 3
 
-siginfo_t :: struct { si_pad: [128]c.char }
-sigset_t :: struct { bits: [4]u32 }
+siginfo_t :: struct { _: [128]u8 }
+sigset_t :: struct { _: [4]u32 }
 
 foreign libc {
 	@(link_name="__sigemptyset14")  sigemptyset  :: proc(set: ^sigset_t) -> c.int ---

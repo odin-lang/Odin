@@ -20,7 +20,7 @@ Thread_Os_Specific :: struct #align(16) {
 // It then waits for `start` to be called.
 //
 _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
-	__linux_thread_entry_proc :: proc "c" (t: rawptr) -> rawptr {
+	__unix_thread_entry_proc :: proc "c" (t: rawptr) -> rawptr {
 		t := (^Thread)(t)
 
 		when ODIN_OS != .Darwin {
@@ -109,7 +109,7 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 	assert(res == 0)
 
 	thread.procedure = procedure
-	if unix.pthread_create(&thread.unix_thread, &attrs, __linux_thread_entry_proc, thread) != 0 {
+	if unix.pthread_create(&thread.unix_thread, &attrs, __unix_thread_entry_proc, thread) != 0 {
 		free(thread, thread.creation_allocator)
 		return nil
 	}
