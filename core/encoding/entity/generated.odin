@@ -1,4 +1,4 @@
-package unicode_entity
+package encoding_unicode_entity
 
 /*
 	------ GENERATED ------ DO NOT EDIT ------ GENERATED ------ DO NOT EDIT ------ GENERATED ------

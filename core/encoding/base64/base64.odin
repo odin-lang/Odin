@@ -1,4 +1,4 @@
-package base64
+package encoding_base64
 
 import "core:io"
 import "core:mem"

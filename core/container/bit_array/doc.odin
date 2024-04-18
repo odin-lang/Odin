@@ -49,4 +49,4 @@ The Bit Array can be used in several ways:
 		fmt.printf("Freed.\n")
 	}
 */
-package dynamic_bit_array
+package container_dynamic_bit_array

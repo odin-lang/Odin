@@ -137,5 +137,5 @@ Output:
 		"str": "Hello, World!"
 	}
 */
-package cbor
+package encoding_cbor
 

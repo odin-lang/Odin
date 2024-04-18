@@ -1,4 +1,4 @@
-package cbor
+package encoding_cbor
 
 import "base:runtime"
 

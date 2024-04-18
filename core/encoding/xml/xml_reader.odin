@@ -24,7 +24,7 @@ MAYBE:
 List of contributors:
 - Jeroen van Rijn: Initial implementation.
 */
-package xml
+package encoding_xml
 // An XML 1.0 / 1.1 parser
 
 import "core:bytes"

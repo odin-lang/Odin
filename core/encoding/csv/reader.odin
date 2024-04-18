@@ -1,6 +1,6 @@
 // package csv reads and writes comma-separated values (CSV) files.
 // This package supports the format described in RFC 4180 <https://tools.ietf.org/html/rfc4180.html>
-package csv
+package encoding_csv
 
 import "core:bufio"
 import "core:bytes"

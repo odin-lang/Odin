@@ -1,4 +1,4 @@
-package csv
+package encoding_csv
 
 import "core:io"
 import "core:strings"
