@@ -1104,6 +1104,7 @@ gb_internal void lb_setup_type_info_data_giant_array(lbModule *m, i64 global_typ
 	LLVMValueRef giant_array = lb_global_type_info_data_ptr(m).value;
 	LLVMSetInitializer(giant_array, giant_const);
 	LLVMSetGlobalConstant(giant_array, true);
+	LLVMSetLinkage(giant_array, LLVMLinkerPrivateLinkage);
 }
 
 
