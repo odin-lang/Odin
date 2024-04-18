@@ -257,6 +257,8 @@ print_typeid :: #force_no_inline proc "contextless" (id: typeid) {
 		}
 	}
 }
+
+@(optimization_mode="size")
 print_type :: #force_no_inline proc "contextless" (ti: ^Type_Info) {
 	if ti == nil {
 		print_string("nil")
