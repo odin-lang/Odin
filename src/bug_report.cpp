@@ -17,7 +17,7 @@
 	#include <sys/sysctl.h>
 #endif
 
-#if defined(GB_SYSTEM_OPENBSD)
+#if defined(GB_SYSTEM_OPENBSD) || defined(GB_SYSTEM_NETBSD)
 	#include <sys/sysctl.h>
 	#include <sys/utsname.h>
 #endif
@@ -250,7 +250,7 @@ gb_internal void report_ram_info() {
 		if (sysctl(mibs, 2, &ram_amount, &val_size, NULL, 0) != -1) {
 			gb_printf("%lld MiB\n", ram_amount / gb_megabytes(1));
 		}
-	#elif defined(GB_SYSTEM_OPENBSD)
+	#elif defined(GB_SYSTEM_OPENBSD) || defined(GB_SYSTEM_NETBSD) 
 		uint64_t ram_amount;
 		size_t   val_size = sizeof(ram_amount);
 
@@ -985,13 +985,17 @@ gb_internal void report_os_info() {
 			gb_printf("macOS Unknown (kernel: %d.%d.%d)\n", major, minor, patch);
 			return;
 		}
-	#elif defined(GB_SYSTEM_OPENBSD)
+	#elif defined(GB_SYSTEM_OPENBSD) || defined(GB_SYSTEM_NETBSD)
 		struct utsname un;
 		
 		if (uname(&un) != -1) {
 			gb_printf("%s %s %s %s\n", un.sysname, un.release, un.version, un.machine);
 		} else {
-			gb_printf("OpenBSD: Unknown\n");    
+			#if defined(GB_SYSTEM_NETBSD)
+				gb_printf("NetBSD: Unknown\n");
+			#else
+				gb_printf("OpenBSD: Unknown\n");    
+			#endif
 		}
 	#elif defined(GB_SYSTEM_FREEBSD)
 		#define freebsd_version_buffer 129
