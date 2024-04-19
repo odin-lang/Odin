@@ -258,7 +258,7 @@ _send_tcp :: proc(tcp_sock: TCP_Socket, buf: []byte) -> (int, Network_Error) {
 	for total_written < len(buf) {
 		limit := min(int(max(i32)), len(buf) - total_written)
 		remaining := buf[total_written:][:limit]
-		res, errno := linux.send(linux.Fd(tcp_sock), remaining, {})
+		res, errno := linux.send(linux.Fd(tcp_sock), remaining, {.NOSIGNAL})
 		if errno != .NONE {
 			return total_written, TCP_Send_Error(errno)
 		}
