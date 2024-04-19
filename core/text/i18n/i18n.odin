@@ -90,7 +90,7 @@ DEFAULT_PARSE_OPTIONS :: Parse_Options{
 	- get(key, number), which returns the appropriate plural from the active catalog, or
 	- get(key, number, catalog) to grab text from a specific one.
 */
-get_single_section :: proc(key: string, number := 0, catalog: ^Translation = ACTIVE) -> (value: string) {
+get_single_section :: proc(key: string, number := 1, catalog: ^Translation = ACTIVE) -> (value: string) {
 	/*
 		A lot of languages use singular for 1 item and plural for 0 or more than 1 items. This is our default pluralize rule.
 	*/
@@ -108,7 +108,7 @@ get_single_section :: proc(key: string, number := 0, catalog: ^Translation = ACT
 	- get(section, key, number), which returns the appropriate plural from the active catalog, or
 	- get(section, key, number, catalog) to grab text from a specific one.
 */
-get_by_section :: proc(section, key: string, number := 0, catalog: ^Translation = ACTIVE) -> (value: string) {
+get_by_section :: proc(section, key: string, number := 1, catalog: ^Translation = ACTIVE) -> (value: string) {
 	/*
 		A lot of languages use singular for 1 item and plural for 0 or more than 1 items. This is our default pluralize rule.
 	*/
