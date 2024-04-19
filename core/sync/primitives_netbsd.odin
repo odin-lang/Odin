@@ -1,4 +1,3 @@
-//+build netbsd
 //+private
 package sync
 

@@ -4,7 +4,6 @@ package sync
 import "core:c"
 import "core:time"
 import "core:sys/unix"
-import "base:runtime"
 
 @(private="file")
 Wait_Node :: struct {

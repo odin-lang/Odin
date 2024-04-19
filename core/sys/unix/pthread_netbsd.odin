@@ -1,4 +1,3 @@
-//+build netbsd
 package unix
 
 import "core:c"
@@ -19,39 +18,39 @@ PTHREAD_BARRIER_T_SIZE :: 48
 PTHREAD_ATTR_T_SIZE    :: 16
 
 pthread_cond_t :: struct #align(16) {
-	_: [PTHREAD_COND_T_SIZE] c.char
+	_: [PTHREAD_COND_T_SIZE] c.char,
 }
 
 pthread_mutex_t :: struct #align(16) {
-	_: [PTHREAD_MUTEX_T_SIZE] c.char
+	_: [PTHREAD_MUTEX_T_SIZE] c.char,
 }
 
 pthread_rwlock_t :: struct #align(16) {
-	_: [PTHREAD_RWLOCK_T_SIZE] c.char
+	_: [PTHREAD_RWLOCK_T_SIZE] c.char,
 }
 
 pthread_barrier_t :: struct #align(16) {
-	_: [PTHREAD_BARRIER_T_SIZE] c.char
+	_: [PTHREAD_BARRIER_T_SIZE] c.char,
 }
 
 pthread_attr_t :: struct #align(16) {
-	_: [PTHREAD_ATTR_T_SIZE] c.char
+	_: [PTHREAD_ATTR_T_SIZE] c.char,
 }
 
 pthread_condattr_t :: struct #align(16) {
-	_: [PTHREAD_CONDATTR_T_SIZE] c.char
+	_: [PTHREAD_CONDATTR_T_SIZE] c.char,
 }
 
 pthread_mutexattr_t :: struct #align(16) {
-	_: [PTHREAD_MUTEXATTR_T_SIZE] c.char
+	_: [PTHREAD_MUTEXATTR_T_SIZE] c.char,
 }
 
 pthread_rwlockattr_t :: struct #align(16) {
-	_: [PTHREAD_RWLOCKATTR_T_SIZE] c.char
+	_: [PTHREAD_RWLOCKATTR_T_SIZE] c.char,
 }
 
 pthread_barrierattr_t :: struct #align(16) {
-	_: [PTHREAD_BARRIERATTR_T_SIZE] c.char
+	_: [PTHREAD_BARRIERATTR_T_SIZE] c.char,
 }
 
 PTHREAD_MUTEX_NORMAL     :: 0
@@ -75,7 +74,7 @@ sched_param :: struct {
 }
 
 sem_t :: struct #align(16) {
-	_: [SEM_T_SIZE] c.char
+	_: [SEM_T_SIZE] c.char,
 }
 
 PTHREAD_CANCEL_ENABLE       :: 0
