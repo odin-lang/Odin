@@ -262,7 +262,7 @@ _send_tcp :: proc(tcp_sock: TCP_Socket, buf: []byte) -> (int, Network_Error) {
 		if errno == .EPIPE {
 			// If the peer is disconnected when we are trying to send we will get an `EPIPE` error,
 			// so we turn that into a clearer error
-			return total_written, .Connection_Closed
+			return total_written, TCP_Send_Error.Connection_Closed
 		} else if errno != .NONE {
 			return total_written, TCP_Send_Error(errno)
 		}
