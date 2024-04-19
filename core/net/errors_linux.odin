@@ -136,7 +136,6 @@ TCP_Send_Error :: enum c.int {
 	Interrupted               = c.int(linux.Errno.EINTR),        // A signal occurred before any data was transmitted. See signal(7).
 	Timeout                   = c.int(linux.Errno.EWOULDBLOCK),  // The send timeout duration passed before all data was sent. See Socket_Option.Send_Timeout.
 	Not_Socket                = c.int(linux.Errno.ENOTSOCK),     // The so-called socket is not an open socket.
-	Broken_Pipe               = c.int(linux.Errno.EPIPE),        // The peer has disconnected when we are trying to send to it
 }
 
 // TODO

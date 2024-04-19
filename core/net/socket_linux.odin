@@ -259,7 +259,9 @@ _send_tcp :: proc(tcp_sock: TCP_Socket, buf: []byte) -> (int, Network_Error) {
 		limit := min(int(max(i32)), len(buf) - total_written)
 		remaining := buf[total_written:][:limit]
 		res, errno := linux.send(linux.Fd(tcp_sock), remaining, {.NOSIGNAL})
-		if errno != .NONE {
+		if errno == .EPIPE {
+			return total_written, TCP_Send_Error.Connection_Closed
+		} else if errno != .NONE {
 			return total_written, TCP_Send_Error(errno)
 		}
 		total_written += int(res)
