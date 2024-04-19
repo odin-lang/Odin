@@ -228,14 +228,18 @@ print_caller_location :: #force_no_inline proc "contextless" (loc: Source_Code_L
 	when ODIN_ERROR_POS_STYLE == .Default {
 		print_byte('(')
 		print_u64(u64(loc.line))
-		print_byte(':')
-		print_u64(u64(loc.column))
+		if loc.column != 0 {
+			print_byte(':')
+			print_u64(u64(loc.column))
+		}
 		print_byte(')')
 	} else when ODIN_ERROR_POS_STYLE == .Unix {
 		print_byte(':')
 		print_u64(u64(loc.line))
-		print_byte(':')
-		print_u64(u64(loc.column))
+		if loc.column != 0 {
+			print_byte(':')
+			print_u64(u64(loc.column))
+		}
 		print_byte(':')
 	} else {
 		#panic("unhandled ODIN_ERROR_POS_STYLE")
