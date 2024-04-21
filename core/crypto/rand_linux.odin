@@ -4,8 +4,12 @@ import "core:fmt"
 
 import "core:sys/linux"
 
+HAS_RAND_BYTES :: true
+
+@(private)
 _MAX_PER_CALL_BYTES :: 33554431 // 2^25 - 1
 
+@(private)
 _rand_bytes :: proc (dst: []byte) {
 	dst := dst
 	l := len(dst)
@@ -33,8 +37,4 @@ _rand_bytes :: proc (dst: []byte) {
 		l -= n_read
 		dst = dst[n_read:]
 	}
-}
-
-_has_rand_bytes :: proc() -> bool {
-	return true
 }
