@@ -258,8 +258,12 @@ _send_tcp :: proc(tcp_sock: TCP_Socket, buf: []byte) -> (int, Network_Error) {
 	for total_written < len(buf) {
 		limit := min(int(max(i32)), len(buf) - total_written)
 		remaining := buf[total_written:][:limit]
-		res, errno := linux.send(linux.Fd(tcp_sock), remaining, {})
-		if errno != .NONE {
+		res, errno := linux.send(linux.Fd(tcp_sock), remaining, {.NOSIGNAL})
+		if errno == .EPIPE {
+			// If the peer is disconnected when we are trying to send we will get an `EPIPE` error,
+			// so we turn that into a clearer error
+			return total_written, TCP_Send_Error.Connection_Closed
+		} else if errno != .NONE {
 			return total_written, TCP_Send_Error(errno)
 		}
 		total_written += int(res)

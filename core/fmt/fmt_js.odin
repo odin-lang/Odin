@@ -37,6 +37,8 @@ print   :: proc(args: ..any, sep := " ", flush := true) -> int { return wprint(w
 println :: proc(args: ..any, sep := " ", flush := true) -> int { return wprintln(w=stdout, args=args, sep=sep, flush=flush) }
 // printf formats according to the specififed format string and writes to stdout
 printf  :: proc(fmt: string, args: ..any, flush := true) -> int { return wprintf(stdout, fmt, ..args, flush=flush) }
+// printfln formats according to the specified format string and writes to stdout, followed by a newline.
+printfln :: proc(fmt: string, args: ..any, flush := true) -> int { return wprintf(stdout, fmt, ..args, flush=flush, newline=true) }
 
 // eprint formats using the default print settings and writes to stderr
 eprint   :: proc(args: ..any, sep := " ", flush := true) -> int { return wprint(w=stderr, args=args, sep=sep, flush=flush) }
@@ -44,3 +46,5 @@ eprint   :: proc(args: ..any, sep := " ", flush := true) -> int { return wprint(
 eprintln :: proc(args: ..any, sep := " ", flush := true) -> int { return wprintln(w=stderr, args=args, sep=sep, flush=flush) }
 // eprintf formats according to the specififed format string and writes to stderr
 eprintf  :: proc(fmt: string, args: ..any, flush := true) -> int { return wprintf(stderr, fmt, ..args, flush=flush) }
+// eprintfln formats according to the specified format string and writes to stderr, followed by a newline.
+eprintfln :: proc(fmt: string, args: ..any, flush := true) -> int { return wprintf(stdout, fmt, ..args, flush=flush, newline=true) }

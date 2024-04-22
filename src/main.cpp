@@ -342,12 +342,12 @@ struct BuildFlag {
 	String             name;
 	BuildFlagParamKind param_kind;
 	u32                command_support;
-	bool               allow_mulitple;
+	bool               allow_multiple;
 };
 
 
-gb_internal void add_flag(Array<BuildFlag> *build_flags, BuildFlagKind kind, String name, BuildFlagParamKind param_kind, u32 command_support, bool allow_mulitple=false) {
-	BuildFlag flag = {kind, name, param_kind, command_support, allow_mulitple};
+gb_internal void add_flag(Array<BuildFlag> *build_flags, BuildFlagKind kind, String name, BuildFlagParamKind param_kind, u32 command_support, bool allow_multiple=false) {
+	BuildFlag flag = {kind, name, param_kind, command_support, allow_multiple};
 	array_add(build_flags, flag);
 }
 
@@ -1363,7 +1363,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						}
 					}
 
-					if (!bf.allow_mulitple) {
+					if (!bf.allow_multiple) {
 						set_flags[bf.kind] = ok;
 					}
 				}
