@@ -250,7 +250,7 @@ gb_internal void report_ram_info() {
 		if (sysctl(mibs, 2, &ram_amount, &val_size, NULL, 0) != -1) {
 			gb_printf("%lld MiB\n", ram_amount / gb_megabytes(1));
 		}
-	#elif defined(GB_SYSTEM_OPENBSD) || defined(GB_SYSTEM_NETBSD) 
+	#elif defined(GB_SYSTEM_OPENBSD)
 		uint64_t ram_amount;
 		size_t   val_size = sizeof(ram_amount);
 
@@ -258,7 +258,7 @@ gb_internal void report_ram_info() {
 		if (sysctl(mibs, 2, &ram_amount, &val_size, NULL, 0) != -1) {
 			gb_printf("%lld MiB\n", ram_amount / gb_megabytes(1));
 		}
-	#elif defined(GB_SYSTEM_FREEBSD)
+	#elif defined(GB_SYSTEM_FREEBSD) || defined(GB_SYSTEM_NETBSD)
 		uint64_t ram_amount;
 		size_t   val_size = sizeof(ram_amount);
 
