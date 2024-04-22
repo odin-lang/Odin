@@ -198,7 +198,12 @@ gb_internal void print_usage_line(i32 indent, char const *fmt, ...) {
 	gb_printf("\n");
 }
 
-gb_internal void usage(String argv0) {
+gb_internal void usage(String argv0, String argv1 = {}) {
+	if (argv1 == "run.") {
+		print_usage_line(0, "Did you mean 'odin run .'?");
+	} else if (argv1 == "build.") {
+		print_usage_line(0, "Did you mean 'odin build .'?");
+	}
 	print_usage_line(0, "%.*s is a tool for managing Odin source code.", LIT(argv0));
 	print_usage_line(0, "Usage:");
 	print_usage_line(1, "%.*s command [arguments]", LIT(argv0));
@@ -2586,7 +2591,11 @@ int main(int arg_count, char const **arg_ptr) {
 		gb_printf("%.*s", LIT(odin_root_dir()));
 		return 0;
 	} else {
-		usage(args[0]);
+		String argv1 = {};
+		if (args.count > 1) {
+			argv1 = args[1];
+		}
+		usage(args[0], argv1);
 		return 1;
 	}
 
