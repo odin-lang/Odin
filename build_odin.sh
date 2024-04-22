@@ -65,7 +65,7 @@ Darwin)
 	fi
 
 	CXXFLAGS="$CXXFLAGS $($LLVM_CONFIG --cxxflags --ldflags)"
-	LDFLAGS="$LDFLAGS -liconv -ldl -framework System -lLLVM -Wl,-rpath $($LLVM_CONFIG --libdir)"
+	LDFLAGS="$LDFLAGS -isysroot $(xcrun --show-sdk-path -sdk macosx) -liconv -ldl -framework System -lLLVM -Wl,-rpath $($LLVM_CONFIG --libdir)"
 	;;
 FreeBSD)
 	CXXFLAGS="$CXXFLAGS $($LLVM_CONFIG --cxxflags --ldflags)"
