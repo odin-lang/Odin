@@ -922,17 +922,17 @@ gb_internal isize MAX_ERROR_COLLECTOR_COUNT(void) {
 	return build_context.max_error_count;
 }
 
-// NOTE: AMD64 targets had their alignment on 128 bit ints bumped from 8 to 16 (undocumented of course).
 #if defined(GB_SYSTEM_WINDOWS)
-	#define AMD64_MAX_ALIGNMENT (8) // TODO: up to 16 when Windows is updated to LLVM 18.
+	#include <llvm-c/Config/llvm-config.h>
 #else
 	#include <llvm/Config/llvm-config.h>
+#endif
 
-	#if LLVM_VERSION_MAJOR >= 18
-		#define AMD64_MAX_ALIGNMENT (16)
-	#else
-		#define AMD64_MAX_ALIGNMENT (8)
-	#endif
+// NOTE: AMD64 targets had their alignment on 128 bit ints bumped from 8 to 16 (undocumented of course).
+#if LLVM_VERSION_MAJOR >= 18
+	#define AMD64_MAX_ALIGNMENT 16
+#else
+	#define AMD64_MAX_ALIGNMENT 8
 #endif
 
 gb_global TargetMetrics target_windows_i386 = {
