@@ -955,13 +955,18 @@ gb_internal void check_bit_field_type(CheckerContext *ctx, Type *bit_field_type,
 	GB_ASSERT(is_type_bit_field(bit_field_type));
 
 	Type *backing_type = check_type(ctx, bf->backing_type);
-	if (backing_type == nullptr || !is_valid_bit_field_backing_type(backing_type)) {
-		error(node, "Backing type for a bit_field must be an integer or an array of an integer");
+
+	bit_field_type->BitField.backing_type = backing_type ? backing_type : t_u8;
+	bit_field_type->BitField.scope = ctx->scope;
+
+	if (backing_type == nullptr) {
+		error(bf->backing_type, "Backing type for a bit_field must be an integer or an array of an integer");
 		return;
 	}
-
-	bit_field_type->BitField.backing_type = backing_type;
-	bit_field_type->BitField.scope = ctx->scope;
+	if (!is_valid_bit_field_backing_type(backing_type)) {
+		error(bf->backing_type, "Backing type for a bit_field must be an integer or an array of an integer");
+		return;
+	}
 
 	auto fields    = array_make<Entity *>(permanent_allocator(), 0, bf->fields.count);
 	auto bit_sizes = array_make<u8>      (permanent_allocator(), 0, bf->fields.count);

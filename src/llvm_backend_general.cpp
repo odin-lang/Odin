@@ -774,13 +774,23 @@ gb_internal void lb_addr_store(lbProcedure *p, lbAddr addr, lbValue value) {
 
 	if (addr.kind == lbAddr_BitField) {
 		lbValue dst = addr.addr;
+		lbValue src = lb_address_from_load_or_generate_local(p, value);
 
-		auto args = array_make<lbValue>(temporary_allocator(), 4);
-		args[0] = dst;
-		args[1] = lb_address_from_load_or_generate_local(p, value);
-		args[2] = lb_const_int(p->module, t_uintptr, addr.bitfield.bit_offset);
-		args[3] = lb_const_int(p->module, t_uintptr, addr.bitfield.bit_size);
-		lb_emit_runtime_call(p, "__write_bits", args);
+		if ((addr.bitfield.bit_offset & 7) == 0 &&
+		    (addr.bitfield.bit_size   & 7) == 0) {
+			lbValue byte_offset = lb_const_int(p->module, t_uintptr, addr.bitfield.bit_offset/8);
+			lbValue byte_size = lb_const_int(p->module, t_uintptr, addr.bitfield.bit_size/8);
+			lbValue dst_offset = lb_emit_conv(p, dst, t_u8_ptr);
+			dst_offset = lb_emit_ptr_offset(p, dst_offset, byte_offset);
+			lb_mem_copy_non_overlapping(p, dst_offset, src, byte_size);
+		} else {
+			auto args = array_make<lbValue>(temporary_allocator(), 4);
+			args[0] = dst;
+			args[1] = src;
+			args[2] = lb_const_int(p->module, t_uintptr, addr.bitfield.bit_offset);
+			args[3] = lb_const_int(p->module, t_uintptr, addr.bitfield.bit_size);
+			lb_emit_runtime_call(p, "__write_bits", args);
+		}
 		return;
 	} else if (addr.kind == lbAddr_RelativePointer) {
 		Type *rel_ptr = base_type(lb_addr_type(addr));
@@ -1088,23 +1098,63 @@ gb_internal lbValue lb_addr_load(lbProcedure *p, lbAddr const &addr) {
 	GB_ASSERT(addr.addr.value != nullptr);
 
 	if (addr.kind == lbAddr_BitField) {
-		lbAddr dst = lb_add_local_generated(p, addr.bitfield.type, true);
+		Type *ct = core_type(addr.bitfield.type);
+		bool do_mask = false;
+		if (is_type_unsigned(ct) || is_type_boolean(ct)) {
+			// Mask
+			if (addr.bitfield.bit_size != 8*type_size_of(ct)) {
+				do_mask = true;
+			}
+		}
+
+		i64 total_bitfield_bit_size = 8*type_size_of(lb_addr_type(addr));
+		i64 dst_byte_size = type_size_of(addr.bitfield.type);
+		lbAddr dst = lb_add_local_generated(p, addr.bitfield.type, false);
 		lbValue src = addr.addr;
 
-		auto args = array_make<lbValue>(temporary_allocator(), 4);
-		args[0] = dst.addr;
-		args[1] = src;
-		args[2] = lb_const_int(p->module, t_uintptr, addr.bitfield.bit_offset);
-		args[3] = lb_const_int(p->module, t_uintptr, addr.bitfield.bit_size);
-		lb_emit_runtime_call(p, "__read_bits", args);
+		lbValue bit_offset  = lb_const_int(p->module, t_uintptr, addr.bitfield.bit_offset);
+		lbValue bit_size    = lb_const_int(p->module, t_uintptr, addr.bitfield.bit_size);
+		lbValue byte_offset = lb_const_int(p->module, t_uintptr, (addr.bitfield.bit_offset+7)/8);
+		lbValue byte_size   = lb_const_int(p->module, t_uintptr, (addr.bitfield.bit_size+7)/8);
+
+		GB_ASSERT(type_size_of(addr.bitfield.type) >= ((addr.bitfield.bit_size+7)/8));
+
+		if ((addr.bitfield.bit_offset & 7) == 0) {
+			lbValue copy_size = byte_size;
+			lbValue src_offset = lb_emit_conv(p, src, t_u8_ptr);
+			src_offset = lb_emit_ptr_offset(p, src_offset, byte_offset);
+			if (addr.bitfield.bit_offset + dst_byte_size <= total_bitfield_bit_size) {
+				do_mask = true;
+				copy_size = lb_const_int(p->module, t_uintptr, dst_byte_size);
+			}
+			lb_mem_copy_non_overlapping(p, dst.addr, src_offset, copy_size, false);
+		} else {
+			auto args = array_make<lbValue>(temporary_allocator(), 4);
+			args[0] = dst.addr;
+			args[1] = src;
+			args[2] = bit_offset;
+			args[3] = bit_size;
+			lb_emit_runtime_call(p, "__read_bits", args);
+		}
 
 		lbValue r = lb_addr_load(p, dst);
+		Type *t = addr.bitfield.type;
 
-		if (!is_type_unsigned(core_type(addr.bitfield.type))) {
+		if (do_mask) {
+			GB_ASSERT(addr.bitfield.bit_size < 8*type_size_of(ct));
+
+			LLVMTypeRef lt = lb_type(p->module, t);
+			LLVMValueRef mask = LLVMConstInt(lt, 1, false);
+			mask = LLVMConstShl(mask, LLVMConstInt(lt, addr.bitfield.bit_size, false));
+			mask = LLVMConstSub(mask, LLVMConstInt(lt, 1, false));
+			lbValue m = {mask, t};
+			r = lb_emit_arith(p, Token_And, r, m, t);
+		}
+
+		if (!is_type_unsigned(ct) && !is_type_boolean(ct)) {
 			// Sign extension
 			// m := 1<<(bit_size-1)
 			// r = (r XOR m) - m
-			Type *t = addr.bitfield.type;
 			lbValue m = lb_const_int(p->module, t, 1ull<<(addr.bitfield.bit_size-1));
 			r = lb_emit_arith(p, Token_Xor, r, m, t);
 			r = lb_emit_arith(p, Token_Sub, r, m, t);
