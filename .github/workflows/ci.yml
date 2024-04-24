@@ -62,7 +62,7 @@ jobs:
         timeout-minutes: 10
   build_macOS:
     name: MacOS Build, Check, and Test
-    runs-on: macos-latest
+    runs-on: macos-13
     steps:
       - uses: actions/checkout@v1
       - name: Download LLVM, and setup PATH
