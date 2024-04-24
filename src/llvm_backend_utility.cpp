@@ -97,15 +97,12 @@ gb_internal void lb_mem_zero_ptr(lbProcedure *p, LLVMValueRef ptr, Type *type, u
 	LLVMTypeRef llvm_type = lb_type(p->module, type);
 
 	LLVMTypeKind kind = LLVMGetTypeKind(llvm_type);
-
+	i64 sz = type_size_of(type);
 	switch (kind) {
 	case LLVMStructTypeKind:
 	case LLVMArrayTypeKind:
-		{
-			// NOTE(bill): Enforce zeroing through memset to make sure padding is zeroed too
-			i32 sz = cast(i32)type_size_of(type);
-			lb_mem_zero_ptr_internal(p, ptr, lb_const_int(p->module, t_int, sz).value, alignment, false);
-		}
+		// NOTE(bill): Enforce zeroing through memset to make sure padding is zeroed too
+		lb_mem_zero_ptr_internal(p, ptr, lb_const_int(p->module, t_int, sz).value, alignment, false);
 		break;
 	default:
 		LLVMBuildStore(p->builder, LLVMConstNull(lb_type(p->module, type)), ptr);

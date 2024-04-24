@@ -450,14 +450,13 @@ gb_internal lbAddr lb_addr_swizzle_large(lbValue addr, Type *array_type, Slice<i
 	return v;
 }
 
-gb_internal lbAddr lb_addr_bit_field(lbValue addr, Type *type, i64 index, i64 bit_offset, i64 bit_size) {
+gb_internal lbAddr lb_addr_bit_field(lbValue addr, Type *type, i64 bit_offset, i64 bit_size) {
 	GB_ASSERT(is_type_pointer(addr.type));
 	Type *mt = type_deref(addr.type);
 	GB_ASSERT_MSG(is_type_bit_field(mt), "%s", type_to_string(mt));
 
 	lbAddr v = {lbAddr_BitField, addr};
 	v.bitfield.type       = type;
-	v.bitfield.index      = index;
 	v.bitfield.bit_offset = bit_offset;
 	v.bitfield.bit_size   = bit_size;
 	return v;
