@@ -4347,7 +4347,19 @@ gb_internal lbAddr lb_build_addr_compound_lit(lbProcedure *p, Ast *expr) {
 			}
 		}
 
-		if (fields.count == bt->BitField.fields.count) {
+		bool any_fields_different_endian = false;
+		for (auto const &f : fields) {
+			if (is_type_different_to_arch_endianness(f.field_type)) {
+				// NOTE(bill): Just be slow for this, to be correct
+				any_fields_different_endian = true;
+				break;
+			}
+		}
+
+		if (!any_fields_different_endian &&
+		    fields.count == bt->BitField.fields.count) {
+			// SINGLE INTEGER BACKING ONLY
+
 			Type *backing_type = core_type(bt->BitField.backing_type);
 			GB_ASSERT(is_type_integer(backing_type) ||
 			          (is_type_array(backing_type) && is_type_integer(backing_type->Array.elem)));
@@ -4359,27 +4371,90 @@ gb_internal lbAddr lb_build_addr_compound_lit(lbProcedure *p, Ast *expr) {
 			u64 total_bit_size = cast(u64)(8*type_size_of(bt));
 
 			if (is_type_integer(backing_type)) {
-				LLVMTypeRef lbt = lb_type(p->module, backing_type);
+				LLVMTypeRef lit = lb_type(p->module, backing_type);
 
-				LLVMValueRef res = LLVMConstInt(lbt, 0, false);
+				LLVMValueRef res = LLVMConstInt(lit, 0, false);
 
 				for (isize i = 0; i < fields.count; i++) {
 					auto const &f = fields[i];
 
-					LLVMValueRef mask = LLVMConstInt(lbt, 1, false);
-					mask = LLVMConstShl(mask, LLVMConstInt(lbt, f.bit_size, false));
-					mask = LLVMConstSub(mask, LLVMConstInt(lbt, 1, false));
+					LLVMValueRef mask = LLVMConstInt(lit, 1, false);
+					mask = LLVMConstShl(mask, LLVMConstInt(lit, f.bit_size, false));
+					mask = LLVMConstSub(mask, LLVMConstInt(lit, 1, false));
 
 					LLVMValueRef elem = values[i].value;
-					elem = LLVMBuildZExt(p->builder, elem, lbt, "");
+					elem = LLVMBuildZExt(p->builder, elem, lit, "");
 					elem = LLVMBuildAnd(p->builder, elem, mask, "");
 
-					elem = LLVMBuildShl(p->builder, elem, LLVMConstInt(lbt, f.bit_offset, false), "");
+					elem = LLVMBuildShl(p->builder, elem, LLVMConstInt(lit, f.bit_offset, false), "");
 
 					res = LLVMBuildOr(p->builder, res, elem, "");
 				}
+
 				LLVMBuildStore(p->builder, res, v.addr.value);
+			} else if (is_type_array(backing_type)) {
+				// ARRAY OF INTEGER BACKING
+
+				i64 array_count = backing_type->Array.count;
+				LLVMTypeRef lit = lb_type(p->module, core_type(backing_type->Array.elem));
+				gb_unused(array_count);
+				gb_unused(lit);
+
+				LLVMValueRef *elems = gb_alloc_array(temporary_allocator(), LLVMValueRef, array_count);
+				for (i64 i = 0; i < array_count; i++) {
+					elems[i] = LLVMConstInt(lit, 0, false);
+				}
+
+				u64 elem_bit_size = cast(u64)(8*type_size_of(backing_type->Array.elem));
+				u64 curr_bit_offset = 0;
+				for (isize i = 0; i < fields.count; i++) {
+					auto const &f = fields[i];
+
+					LLVMValueRef val = values[i].value;
+					LLVMTypeRef vt = lb_type(p->module, values[i].type);
+					for (u64 bits_to_set = f.bit_size;
+					     bits_to_set > 0;
+					     /**/) {
+						i64 elem_idx = curr_bit_offset/elem_bit_size;
+						u64 elem_bit_offset = curr_bit_offset%elem_bit_size;
+
+						u64 mask_width = gb_min(bits_to_set, elem_bit_size-elem_bit_offset);
+						GB_ASSERT(mask_width > 0);
+						bits_to_set -= mask_width;
+
+						LLVMValueRef mask = LLVMConstInt(vt, 1, false);
+						mask = LLVMConstShl(mask, LLVMConstInt(vt, mask_width, false));
+						mask = LLVMConstSub(mask, LLVMConstInt(vt, 1, false));
+
+						LLVMValueRef to_set = LLVMBuildAnd(p->builder, val, mask, "");
+
+						if (elem_bit_offset != 0) {
+							to_set = LLVMBuildShl(p->builder, to_set, LLVMConstInt(vt, elem_bit_offset, false), "");
+						}
+						to_set = LLVMBuildTrunc(p->builder, to_set, lit, "");
+
+						if (LLVMIsNull(elems[elem_idx])) {
+							elems[elem_idx] = to_set; // don't even bother doing `0 | to_set`
+						} else {
+							elems[elem_idx] = LLVMBuildOr(p->builder, elems[elem_idx], to_set, "");
+						}
+
+						if (mask_width != 0) {
+							val = LLVMBuildLShr(p->builder, val, LLVMConstInt(vt, mask_width, false), "");
+						}
+						curr_bit_offset += mask_width;
+					}
+
+					GB_ASSERT(curr_bit_offset == f.bit_offset + f.bit_size);
+				}
+
+				for (i64 i = 0; i < array_count; i++) {
+					LLVMValueRef elem_ptr = LLVMBuildStructGEP2(p->builder, lb_type(p->module, backing_type), v.addr.value, cast(unsigned)i, "");
+					LLVMBuildStore(p->builder, elems[i], elem_ptr);
+				}
 			} else {
+				// SLOW STORAGE
+
 				for_array(i, fields) {
 					auto const &f = fields[i];
 

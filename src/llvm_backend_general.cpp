@@ -775,8 +775,8 @@ gb_internal void lb_addr_store(lbProcedure *p, lbAddr addr, lbValue value) {
 		lbValue dst = addr.addr;
 		lbValue src = lb_address_from_load_or_generate_local(p, value);
 
-		if ((addr.bitfield.bit_offset & 7) == 0 &&
-		    (addr.bitfield.bit_size   & 7) == 0) {
+		if ((addr.bitfield.bit_offset % 8) == 0 &&
+		    (addr.bitfield.bit_size   % 8) == 0) {
 			lbValue byte_offset = lb_const_int(p->module, t_uintptr, addr.bitfield.bit_offset/8);
 			lbValue byte_size = lb_const_int(p->module, t_uintptr, addr.bitfield.bit_size/8);
 			lbValue dst_offset = lb_emit_conv(p, dst, t_u8_ptr);
@@ -1108,7 +1108,7 @@ gb_internal lbValue lb_addr_load(lbProcedure *p, lbAddr const &addr) {
 
 		i64 total_bitfield_bit_size = 8*type_size_of(lb_addr_type(addr));
 		i64 dst_byte_size = type_size_of(addr.bitfield.type);
-		lbAddr dst = lb_add_local_generated(p, addr.bitfield.type, false);
+		lbAddr dst = lb_add_local_generated(p, addr.bitfield.type, true);
 		lbValue src = addr.addr;
 
 		lbValue bit_offset  = lb_const_int(p->module, t_uintptr, addr.bitfield.bit_offset);
@@ -1118,7 +1118,7 @@ gb_internal lbValue lb_addr_load(lbProcedure *p, lbAddr const &addr) {
 
 		GB_ASSERT(type_size_of(addr.bitfield.type) >= ((addr.bitfield.bit_size+7)/8));
 
-		if ((addr.bitfield.bit_offset & 7) == 0) {
+		if ((addr.bitfield.bit_offset % 8) == 0) {
 			lbValue copy_size = byte_size;
 			lbValue src_offset = lb_emit_conv(p, src, t_u8_ptr);
 			src_offset = lb_emit_ptr_offset(p, src_offset, byte_offset);
