@@ -2,7 +2,7 @@
 //+private
 package mem_virtual
 
-foreign import libc "system:System.framework"
+foreign import libc "system:System"
 import "core:c"
 
 PROT_NONE  :: 0x0 /* [MC2] no permissions */

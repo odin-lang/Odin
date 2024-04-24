@@ -169,6 +169,7 @@ struct TargetMetrics {
 enum Subtarget : u32 {
 	Subtarget_Default,
 	Subtarget_iOS,
+	Subtarget_iPhoneSimulator,
 
 	Subtarget_COUNT,
 };
@@ -176,6 +177,7 @@ enum Subtarget : u32 {
 gb_global String subtarget_strings[Subtarget_COUNT] = {
 	str_lit(""),
 	str_lit("ios"),
+	str_lit("ios-simulator"),
 };
 
 
@@ -1477,10 +1479,17 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 		case Subtarget_iOS:
 			if (metrics->arch == TargetArch_arm64) {
 				bc->metrics.target_triplet = str_lit("arm64-apple-ios");
-			} else if (metrics->arch == TargetArch_amd64) {
-				bc->metrics.target_triplet = str_lit("x86_64-apple-ios");
 			} else {
-				GB_PANIC("Unknown architecture for darwin");
+				GB_PANIC("Unknown architecture for ios");
+			}
+			break;
+		case Subtarget_iPhoneSimulator:
+			if (metrics->arch == TargetArch_arm64) {
+				bc->metrics.target_triplet = str_lit("arm64-apple-ios-simulator");
+			} else if (metrics->arch == TargetArch_amd64) {
+				bc->metrics.target_triplet = str_lit("x86_64-apple-ios-simulator");
+			} else {
+				GB_PANIC("Unknown architecture for ios simulator");
 			}
 			break;
 		}

@@ -3,7 +3,7 @@ package darwin
 
 import "core:c"
 
-foreign import system "system:System.framework"
+foreign import system "system:System"
 
 Bool :: b8
 

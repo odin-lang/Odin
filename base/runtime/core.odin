@@ -531,6 +531,7 @@ Odin_Endian_Type :: type_of(ODIN_ENDIAN)
 	Odin_Platform_Subtarget_Type :: enum int {
 		Default,
 		iOS,
+		iPhoneSimulator,
 	}
 */
 Odin_Platform_Subtarget_Type :: type_of(ODIN_PLATFORM_SUBTARGET)
