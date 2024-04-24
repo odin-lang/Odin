@@ -773,16 +773,33 @@ gb_internal void lb_addr_store(lbProcedure *p, lbAddr addr, lbValue value) {
 
 	if (addr.kind == lbAddr_BitField) {
 		lbValue dst = addr.addr;
-		lbValue src = lb_address_from_load_or_generate_local(p, value);
+		if (is_type_endian_big(addr.bitfield.type)) {
+			i64 shift_amount = 8*type_size_of(value.type) - addr.bitfield.bit_size;
+			lbValue shifted_value = value;
+			shifted_value.value = LLVMBuildLShr(p->builder,
+				shifted_value.value,
+				LLVMConstInt(LLVMTypeOf(shifted_value.value), shift_amount, false), "");
 
-		if ((addr.bitfield.bit_offset % 8) == 0 &&
-		    (addr.bitfield.bit_size   % 8) == 0) {
+			lbValue src = lb_address_from_load_or_generate_local(p, shifted_value);
+
+			auto args = array_make<lbValue>(temporary_allocator(), 4);
+			args[0] = dst;
+			args[1] = src;
+			args[2] = lb_const_int(p->module, t_uintptr, addr.bitfield.bit_offset);
+			args[3] = lb_const_int(p->module, t_uintptr, addr.bitfield.bit_size);
+			lb_emit_runtime_call(p, "__write_bits", args);
+		} else if ((addr.bitfield.bit_offset % 8) == 0 &&
+		           (addr.bitfield.bit_size   % 8) == 0) {
+			lbValue src = lb_address_from_load_or_generate_local(p, value);
+
 			lbValue byte_offset = lb_const_int(p->module, t_uintptr, addr.bitfield.bit_offset/8);
 			lbValue byte_size = lb_const_int(p->module, t_uintptr, addr.bitfield.bit_size/8);
 			lbValue dst_offset = lb_emit_conv(p, dst, t_u8_ptr);
 			dst_offset = lb_emit_ptr_offset(p, dst_offset, byte_offset);
 			lb_mem_copy_non_overlapping(p, dst_offset, src, byte_size);
 		} else {
+			lbValue src = lb_address_from_load_or_generate_local(p, value);
+
 			auto args = array_make<lbValue>(temporary_allocator(), 4);
 			args[0] = dst;
 			args[1] = src;
@@ -1118,7 +1135,23 @@ gb_internal lbValue lb_addr_load(lbProcedure *p, lbAddr const &addr) {
 
 		GB_ASSERT(type_size_of(addr.bitfield.type) >= ((addr.bitfield.bit_size+7)/8));
 
-		if ((addr.bitfield.bit_offset % 8) == 0) {
+		lbValue r = {};
+		if (is_type_endian_big(addr.bitfield.type)) {
+			auto args = array_make<lbValue>(temporary_allocator(), 4);
+			args[0] = dst.addr;
+			args[1] = src;
+			args[2] = bit_offset;
+			args[3] = bit_size;
+			lb_emit_runtime_call(p, "__read_bits", args);
+
+			LLVMValueRef shift_amount = LLVMConstInt(
+				lb_type(p->module, lb_addr_type(dst)),
+				8*dst_byte_size - addr.bitfield.bit_size,
+				false
+			);
+			r = lb_addr_load(p, dst);
+			r.value = LLVMBuildShl(p->builder, r.value, shift_amount, "");
+		} else if ((addr.bitfield.bit_offset % 8) == 0) {
 			lbValue copy_size = byte_size;
 			lbValue src_offset = lb_emit_conv(p, src, t_u8_ptr);
 			src_offset = lb_emit_ptr_offset(p, src_offset, byte_offset);
@@ -1127,6 +1160,7 @@ gb_internal lbValue lb_addr_load(lbProcedure *p, lbAddr const &addr) {
 				copy_size = lb_const_int(p->module, t_uintptr, dst_byte_size);
 			}
 			lb_mem_copy_non_overlapping(p, dst.addr, src_offset, copy_size, false);
+			r = lb_addr_load(p, dst);
 		} else {
 			auto args = array_make<lbValue>(temporary_allocator(), 4);
 			args[0] = dst.addr;
@@ -1134,20 +1168,16 @@ gb_internal lbValue lb_addr_load(lbProcedure *p, lbAddr const &addr) {
 			args[2] = bit_offset;
 			args[3] = bit_size;
 			lb_emit_runtime_call(p, "__read_bits", args);
+			r = lb_addr_load(p, dst);
 		}
 
-		lbValue r = lb_addr_load(p, dst);
 		Type *t = addr.bitfield.type;
 
 		if (do_mask) {
 			GB_ASSERT(addr.bitfield.bit_size < 8*type_size_of(ct));
 
-			LLVMTypeRef lt = lb_type(p->module, t);
-			LLVMValueRef mask = LLVMConstInt(lt, 1, false);
-			mask = LLVMConstShl(mask, LLVMConstInt(lt, addr.bitfield.bit_size, false));
-			mask = LLVMConstSub(mask, LLVMConstInt(lt, 1, false));
-			lbValue m = {mask, t};
-			r = lb_emit_arith(p, Token_And, r, m, t);
+			lbValue mask = lb_const_int(p->module, t, (1ull<<cast(u64)addr.bitfield.bit_size)-1);
+			r = lb_emit_arith(p, Token_And, r, mask, t);
 		}
 
 		if (!is_type_unsigned(ct) && !is_type_boolean(ct)) {
