@@ -1101,6 +1101,45 @@ gb_internal void check_bit_field_type(CheckerContext *ctx, Type *bit_field_type,
 		gb_string_free(s);
 	}
 
+	enum EndianKind {
+		Endian_Unknown,
+		Endian_Native,
+		Endian_Little,
+		Endian_Big,
+	};
+	auto const &determine_endian_kind = [](Type *type) -> EndianKind {
+		if (is_type_boolean(type)) {
+			// NOTE(bill): it doesn't matter, and when it does,
+			// that api is absolutely stupid
+			return Endian_Unknown;
+		} else if (is_type_endian_specific(type)) {
+			if (is_type_endian_little(type)) {
+				return Endian_Little;
+			} else {
+				return Endian_Big;
+			}
+		}
+		return Endian_Native;
+	};
+
+	EndianKind backing_type_endian_kind = determine_endian_kind(core_array_type(backing_type));
+	EndianKind endian_kind = Endian_Unknown;
+	for (Entity *f : fields) {
+		EndianKind field_kind = determine_endian_kind(f->type);
+
+		if (field_kind && backing_type_endian_kind != field_kind) {
+			error(f->token, "All 'bit_field' field types must match the same endian kind as the backing type, i.e. all native, all little, or all big");
+		}
+
+		if (endian_kind == Endian_Unknown) {
+			endian_kind = field_kind;
+		} else if (field_kind && endian_kind != field_kind) {
+			error(f->token, "All 'bit_field' field types must be of the same endian variety, i.e. all native, all little, or all big");
+		}
+	}
+
+
+
 	if (bit_sizes.count > 0 && is_type_integer(backing_type)) {
 		bool all_booleans = is_type_boolean(fields[0]->type);
 		bool all_ones = bit_sizes[0] == 1;
