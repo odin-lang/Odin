@@ -164,6 +164,7 @@ struct TargetMetrics {
 enum Subtarget : u32 {
 	Subtarget_Default,
 	Subtarget_iOS,
+	Subtarget_iPhoneSimulator,
 
 	Subtarget_COUNT,
 };
@@ -171,6 +172,7 @@ enum Subtarget : u32 {
 gb_global String subtarget_strings[Subtarget_COUNT] = {
 	str_lit(""),
 	str_lit("ios"),
+	str_lit("ios-simulator"),
 };
 
 
@@ -1575,6 +1577,33 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 	}
 
 	bc->metrics = *metrics;
+	if (metrics->os == TargetOs_darwin) {
+		if (!bc->minimum_os_version_string_given) {
+			bc->minimum_os_version_string = str_lit("11.0.0");
+		}
+
+		switch (subtarget) {
+		case Subtarget_Default:
+			bc->metrics.target_triplet = concatenate_strings(permanent_allocator(), bc->metrics.target_triplet, bc->minimum_os_version_string);
+			break;
+		case Subtarget_iOS:
+			if (metrics->arch == TargetArch_arm64) {
+				bc->metrics.target_triplet = str_lit("arm64-apple-ios");
+			} else {
+				GB_PANIC("Unknown architecture for ios");
+			}
+			break;
+		case Subtarget_iPhoneSimulator:
+			if (metrics->arch == TargetArch_arm64) {
+				bc->metrics.target_triplet = str_lit("arm64-apple-ios-simulator");
+			} else if (metrics->arch == TargetArch_amd64) {
+				bc->metrics.target_triplet = str_lit("x86_64-apple-ios-simulator");
+			} else {
+				GB_PANIC("Unknown architecture for ios simulator");
+			}
+			break;
+		}
+	}
 
 	bc->ODIN_OS           = target_os_names[metrics->os];
 	bc->ODIN_ARCH         = target_arch_names[metrics->arch];

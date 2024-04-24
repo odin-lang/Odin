@@ -86,7 +86,7 @@ PTHREAD_CANCEL_DISABLE      :: 1
 PTHREAD_CANCEL_DEFERRED     :: 0
 PTHREAD_CANCEL_ASYNCHRONOUS :: 1
 
-foreign import pthread "system:System.framework"
+foreign import pthread "system:System"
 
 @(default_calling_convention="c")
 foreign pthread {

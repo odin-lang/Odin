@@ -609,22 +609,40 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 			gbString platform_lib_str = gb_string_make(heap_allocator(), "");
 			defer (gb_string_free(platform_lib_str));
 			if (build_context.metrics.os == TargetOs_darwin) {
-				platform_lib_str = gb_string_appendc(platform_lib_str, "-Wl,-syslibroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk -L/usr/local/lib ");
+				// NOTE(harold): We should attempt to use `xcrun --sdk <SDK_GIVEN_SUBTARGET> --show-sdk-path`
+				// here to get the SDK path, else fallback to a best-effort default.
+				// -Wl,-ld_classic is added to avoid the "no platform load command found in..." linker warning.
+				if (selected_subtarget == Subtarget_iOS) {
+					platform_lib_str = gb_string_append_fmt(platform_lib_str, "-target %.*s -Wl,-ld_classic -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS.sdk ", LIT(build_context.metrics.target_triplet));
 
-				// Homebrew's default library path, checking if it exists to avoid linking warnings.
-				if (gb_file_exists("/opt/homebrew/lib")) {
-					platform_lib_str = gb_string_appendc(platform_lib_str, "-L/opt/homebrew/lib ");
-				}
+					if (build_context.minimum_os_version_string_given) {
+						link_settings = gb_string_append_fmt(link_settings, "-mios-version-min=%.*s ", LIT(build_context.minimum_os_version_string));
+					}
+				
+				} else if (selected_subtarget == Subtarget_iPhoneSimulator) {
+						platform_lib_str = gb_string_append_fmt(platform_lib_str, "-target %.*s -Wl,-ld_classic -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator.sdk ", LIT(build_context.metrics.target_triplet));
 
-				// MacPort's default library path, checking if it exists to avoid linking warnings.
-				if (gb_file_exists("/opt/local/lib")) {
-					platform_lib_str = gb_string_appendc(platform_lib_str, "-L/opt/local/lib ");
-				}
+						if (build_context.minimum_os_version_string_given) {
+							link_settings = gb_string_append_fmt(link_settings, "-mios-simulator-version-min=%.*s ", LIT(build_context.minimum_os_version_string));
+						}
+				} else {
+					platform_lib_str = gb_string_appendc(platform_lib_str, "-Wl,-syslibroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk -L/usr/local/lib ");
 
-				// Only specify this flag if the user has given a minimum version to target.
-				// This will cause warnings to show up for mismatched libraries.
-				if (build_context.minimum_os_version_string_given) {
-					link_settings = gb_string_append_fmt(link_settings, "-mmacosx-version-min=%.*s ", LIT(build_context.minimum_os_version_string));
+					// Homebrew's default library path, checking if it exists to avoid linking warnings.
+					if (gb_file_exists("/opt/homebrew/lib")) {
+						platform_lib_str = gb_string_appendc(platform_lib_str, "-L/opt/homebrew/lib ");
+					}
+
+					// MacPort's default library path, checking if it exists to avoid linking warnings.
+					if (gb_file_exists("/opt/local/lib")) {
+						platform_lib_str = gb_string_appendc(platform_lib_str, "-L/opt/local/lib ");
+					}
+
+					// Only specify this flag if the user has given a minimum version to target.
+					// This will cause warnings to show up for mismatched libraries.
+					if (build_context.minimum_os_version_string_given) {
+						link_settings = gb_string_append_fmt(link_settings, "-mmacosx-version-min=%.*s ", LIT(build_context.minimum_os_version_string));
+					}
 				}
 
 				if (build_context.build_mode != BuildMode_DynamicLibrary && build_context.build_mode != BuildMode_StaticLibrary) {
