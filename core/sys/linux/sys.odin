@@ -769,8 +769,7 @@ execve :: proc "contextless" (name: cstring, argv: [^]cstring, envp: [^]cstring)
 		ret := syscall(SYS_execve, cast(rawptr) name, cast(rawptr) argv, cast(rawptr) envp)
 		return Errno(-ret)
 	} else {
-		ret := syscall(SYS_execveat, AT_FDCWD, cast(rawptr) name, cast(rawptr) argv, cast(rawptr) envp)
-		return Errno(-ret)
+		return execveat(AT_FDCWD, name, argv, envp, 0)
 	}
 }
 
@@ -2803,8 +2802,8 @@ getrandom :: proc "contextless" (buf: []u8, flags: Get_Random_Flags) -> (int, Er
 	Execute program relative to a directory file descriptor.
 	Available since Linux 3.19.
 */
-execveat :: proc "contextless" (dirfd: Fd, name: cstring, argv: [^]cstring, envp: [^]cstring) -> (Errno) {
-	ret := syscall(SYS_execveat, dirfd, cast(rawptr) name, cast(rawptr) argv, cast(rawptr) envp)
+execveat :: proc "contextless" (dirfd: Fd, name: cstring, argv: [^]cstring, envp: [^]cstring, flags: i32) -> (Errno) {
+	ret := syscall(SYS_execveat, dirfd, cast(rawptr) name, cast(rawptr) argv, cast(rawptr) envp, flags)
 	return Errno(-ret)
 }
 

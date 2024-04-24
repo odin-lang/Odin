@@ -5,6 +5,8 @@ package linux
 	that relative paths are relative to current directory.
 */
 AT_FDCWD :: Fd(-100)
+AT_EMPTY_PATH :: 0x1000
+AT_SYMLINK_NOFOLLOW :: 0x100
 
 /*
 	Special value to put into timespec for utimensat() to set timestamp to the current time.
