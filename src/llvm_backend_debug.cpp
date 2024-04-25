@@ -379,13 +379,14 @@ gb_internal LLVMMetadataRef lb_debug_union(lbModule *m, Type *type, String name,
 
 		unsigned field_index = cast(unsigned)(index_offset+j);
 
-		char name[16] = {};
-		gb_snprintf(name, gb_size_of(name), "v%u", field_index);
-		isize name_len = gb_strlen(name);
+		gbString name = gb_string_make(temporary_allocator(), "");
+		name = gb_string_append_fmt(name, "v%u(", field_index);
+		name = write_type_to_string(name, variant, true);
+		name = gb_string_appendc(name, ")");
 
 		elements[field_index] = LLVMDIBuilderCreateMemberType(
 			m->debug_builder, member_scope,
-			name, name_len,
+			name, gb_string_length(name),
 			file, line,
 			8*cast(u64)type_size_of(variant), 8*cast(u32)type_align_of(variant),
 			0,
