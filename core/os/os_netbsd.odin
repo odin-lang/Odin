@@ -176,6 +176,8 @@ RTLD_TRACE        :: 0x200
 RTLD_NODELETE     :: 0x01000
 RTLD_NOLOAD       :: 0x02000
 
+F_GETPATH :: 15
+
 MAX_PATH :: 1024
 MAXNAMLEN :: 511
 
@@ -188,7 +190,7 @@ Unix_File_Time :: struct {
 
 dev_t :: u64
 ino_t :: u64
-nlink_t :: u64
+nlink_t :: u32
 off_t :: i64
 mode_t :: u16
 pid_t :: u32
@@ -300,6 +302,7 @@ foreign libc {
 	@(link_name="unlink")           _unix_unlink        :: proc(path: cstring) -> c.int ---
 	@(link_name="rmdir")            _unix_rmdir         :: proc(path: cstring) -> c.int ---
 	@(link_name="mkdir")            _unix_mkdir         :: proc(path: cstring, mode: mode_t) -> c.int ---
+	@(link_name="fcntl")            _unix_fcntl         :: proc(fd: Handle, cmd: c.int, arg: uintptr) -> c.int ---
 	
 	@(link_name="fdopendir")        _unix_fdopendir     :: proc(fd: Handle) -> Dir ---
 	@(link_name="closedir")         _unix_closedir      :: proc(dirp: Dir) -> c.int ---
@@ -490,6 +493,14 @@ exists :: proc(path: string) -> bool {
 	return res == 0
 }
 
+fcntl :: proc(fd: int, cmd: int, arg: int) -> (int, Errno) {
+	result := _unix_fcntl(Handle(fd), c.int(cmd), uintptr(arg))
+	if result < 0 {
+		return 0, Errno(get_last_error())
+	}
+	return int(result), ERROR_NONE
+}
+
 // NOTE(bill): Uses startup to initialize it
 
 stdin: Handle  = 0
@@ -618,7 +629,14 @@ _readlink :: proc(path: string) -> (string, Errno) {
 }
 
 absolute_path_from_handle :: proc(fd: Handle) -> (string, Errno) {
-	return "", Errno(ENOSYS)
+	buf: [MAX_PATH]byte
+	_, err := fcntl(int(fd), F_GETPATH, int(uintptr(&buf[0])))
+	if err != ERROR_NONE {
+		return "", err
+	}
+
+	path := strings.clone_from_cstring(cstring(&buf[0]))
+	return path, err
 }
 
 absolute_path_from_relative :: proc(rel: string) -> (path: string, err: Errno) {
