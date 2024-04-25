@@ -1,8 +1,8 @@
 package os
 
 foreign import dl   "system:dl"
-foreign import libc "system:System.framework"
-foreign import pthread "system:System.framework"
+foreign import libc "system:System"
+foreign import pthread "system:System"
 
 import "base:runtime"
 import "core:strings"

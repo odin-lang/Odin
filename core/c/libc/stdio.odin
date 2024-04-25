@@ -8,7 +8,7 @@ when ODIN_OS == .Windows {
 		"system:legacy_stdio_definitions.lib",
 	}
 } else when ODIN_OS == .Darwin {
-	foreign import libc "system:System.framework"
+	foreign import libc "system:System"
 } else {
 	foreign import libc "system:c"
 }

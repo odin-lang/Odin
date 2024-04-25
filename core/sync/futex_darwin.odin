@@ -6,7 +6,7 @@ import "core:c"
 import "core:sys/darwin"
 import "core:time"
 
-foreign import System "system:System.framework"
+foreign import System "system:System"
 
 foreign System {
 	// __ulock_wait is not available on 10.15
