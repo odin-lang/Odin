@@ -21,6 +21,9 @@ jobs:
           PKG_PATH="https://cdn.NetBSD.org/pub/pkgsrc/packages/NetBSD/$(uname -p)/$(uname -r | cut -d_ -f1)_${PKGSRC_BRANCH}/All" /usr/sbin/pkg_add pkgin
           pkgin -y in llvm clang gmake git bash python312
           git config --global --add safe.directory $(pwd)
+          echo XXXXXXXXXXXXXXXXXXXXXXXX
+          echo $(pwd)
+          echo XXXXXXXXXXXXXXXXXXXXXXXX
           ln -s /usr/pkg/bin/python3.12 /usr/bin/python3
           ln -s /usr/pkg/bin/bash /bin/bash
         run: |
