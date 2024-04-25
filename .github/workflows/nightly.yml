@@ -77,7 +77,7 @@ jobs:
   build_macos:
     name: MacOS Build
     if: github.repository == 'odin-lang/Odin'
-    runs-on: macos-latest
+    runs-on: macos-13
     steps:
       - uses: actions/checkout@v1
       - name: Download LLVM and setup PATH

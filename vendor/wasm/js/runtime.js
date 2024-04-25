@@ -104,9 +104,12 @@ class WasmMemoryInterface {
 	storeInt(addr, value)  { this.mem.setInt32  (addr, value, true); }
 	storeUint(addr, value) { this.mem.setUint32 (addr, value, true); }
 
+	// Returned length might not be the same as `value.length` if non-ascii strings are given.
 	storeString(addr, value) {
-		const bytes = this.loadBytes(addr, value.length);
-		new TextEncoder().encodeInto(value, bytes);
+		const src = new TextEncoder().encode(value);
+		const dst = new Uint8Array(this.memory.buffer, addr, src.length);
+		dst.set(src);
+		return src.length;
 	}
 };
 

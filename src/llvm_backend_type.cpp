@@ -249,9 +249,7 @@ gb_internal void lb_setup_type_info_data_giant_array(lbModule *m, i64 global_typ
 		char name[64] = {};
 		gb_snprintf(name, 63, "__$ti-%lld", cast(long long)index);
 		LLVMValueRef g = LLVMAddGlobal(m->mod, type, name);
-		LLVMSetLinkage(g, LLVMInternalLinkage);
-		LLVMSetUnnamedAddress(g, LLVMGlobalUnnamedAddr);
-		LLVMSetGlobalConstant(g, true);
+		lb_make_global_private_const(g);
 		return g;
 	};
 
@@ -903,7 +901,7 @@ gb_internal void lb_setup_type_info_data_giant_array(lbModule *m, i64 global_typ
 
 		case Type_Map: {
 			tag_type = t_type_info_map;
-			init_map_internal_types(t);
+			init_map_internal_debug_types(t);
 
 			LLVMValueRef vals[3] = {
 				get_type_info_ptr(m, t->Map.key),
@@ -1103,6 +1101,7 @@ gb_internal void lb_setup_type_info_data_giant_array(lbModule *m, i64 global_typ
 	LLVMValueRef giant_const = LLVMConstArray(lb_type(m, t_type_info_ptr), giant_const_values, cast(unsigned)global_type_info_data_entity_count);
 	LLVMValueRef giant_array = lb_global_type_info_data_ptr(m).value;
 	LLVMSetInitializer(giant_array, giant_const);
+	lb_make_global_private_const(giant_array);
 }
 
 
@@ -1132,4 +1131,7 @@ gb_internal void lb_setup_type_info_data(lbModule *m) { // NOTE(bill): Setup typ
 	LLVMValueRef slice = llvm_const_slice_internal(m, data, len);
 
 	LLVMSetInitializer(global_type_table.value, slice);
+
+	// force it to be constant
+	LLVMSetGlobalConstant(global_type_table.value, true);
 }

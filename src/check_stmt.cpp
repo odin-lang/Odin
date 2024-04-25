@@ -474,16 +474,59 @@ gb_internal Type *check_assignment_variable(CheckerContext *ctx, Operand *lhs, O
 		}
 
 		Entity *e = entity_of_node(lhs->expr);
+		Entity *original_e = e;
+
+		Ast *name = unparen_expr(lhs->expr);
+		while (name->kind == Ast_SelectorExpr) {
+			name = name->SelectorExpr.expr;
+			e = entity_of_node(name);
+		}
+		if (e == nullptr) {
+			e = original_e;
+		}
 
 		gbString str = expr_to_string(lhs->expr);
 		if (e != nullptr && e->flags & EntityFlag_Param) {
+			ERROR_BLOCK();
 			if (e->flags & EntityFlag_Using) {
 				error(lhs->expr, "Cannot assign to '%s' which is from a 'using' procedure parameter", str);
 			} else {
 				error(lhs->expr, "Cannot assign to '%s' which is a procedure parameter", str);
 			}
+			error_line("\tSuggestion: Did you mean to pass '%.*s' by pointer?\n", LIT(e->token.string));
+			show_error_on_line(e->token.pos, token_pos_end(e->token));
 		} else {
+			ERROR_BLOCK();
 			error(lhs->expr, "Cannot assign to '%s'", str);
+
+			if (e && e->flags & EntityFlag_ForValue) {
+				isize offset = show_error_on_line(e->token.pos, token_pos_end(e->token), "Suggestion:");
+				if (offset < 0) {
+					if (is_type_map(e->type)) {
+						error_line("\tSuggestion: Did you mean? 'for key, &%.*s in ...'\n", LIT(e->token.string));
+					} else {
+						error_line("\tSuggestion: Did you mean? 'for &%.*s in ...'\n", LIT(e->token.string));
+					}
+				} else {
+					error_line("\t");
+					for (isize i = 0; i < offset-1; i++) {
+						error_line(" ");
+					}
+					error_line("'%.*s' is immutable, declare it as '&%.*s' to make it mutable\n", LIT(e->token.string), LIT(e->token.string));
+				}
+
+			} else if (e && e->flags & EntityFlag_SwitchValue) {
+				isize offset = show_error_on_line(e->token.pos, token_pos_end(e->token), "Suggestion:");
+				if (offset < 0) {
+					error_line("\tSuggestion: Did you mean? 'switch &%.*s in ...'\n", LIT(e->token.string));
+				} else {
+					error_line("\t");
+					for (isize i = 0; i < offset-1; i++) {
+						error_line(" ");
+					}
+					error_line("'%.*s' is immutable, declare it as '&%.*s' to make it mutable\n", LIT(e->token.string), LIT(e->token.string));
+				}
+			}
 		}
 		gb_string_free(str);
 
@@ -2355,14 +2398,14 @@ gb_internal void check_return_stmt(CheckerContext *ctx, Ast *node) {
 				unsafe_return_error(o, "the address of a compound literal");
 			} else if (x->kind == Ast_IndexExpr) {
 				Entity *f = entity_of_node(x->IndexExpr.expr);
-				if (is_type_array_like(f->type) || is_type_matrix(f->type)) {
+				if (f && (is_type_array_like(f->type) || is_type_matrix(f->type))) {
 					if (is_entity_local_variable(f)) {
 						unsafe_return_error(o, "the address of an indexed variable", f->type);
 					}
 				}
 			} else if (x->kind == Ast_MatrixIndexExpr) {
 				Entity *f = entity_of_node(x->MatrixIndexExpr.expr);
-				if (is_type_matrix(f->type) && is_entity_local_variable(f)) {
+				if (f && (is_type_matrix(f->type) && is_entity_local_variable(f))) {
 					unsafe_return_error(o, "the address of an indexed variable", f->type);
 				}
 			}

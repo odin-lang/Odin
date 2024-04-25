@@ -7,7 +7,7 @@ import "core:os"
 import "core:thread"
 import "core:time"
 import "core:reflect"
-import "core:runtime"
+import "base:runtime"
 import "core:intrinsics"
 import "core:math/big"
 

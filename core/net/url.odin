@@ -21,13 +21,19 @@ import "core:strconv"
 import "core:unicode/utf8"
 import "core:encoding/hex"
 
-split_url :: proc(url: string, allocator := context.allocator) -> (scheme, host, path: string, queries: map[string]string) {
+split_url :: proc(url: string, allocator := context.allocator) -> (scheme, host, path: string, queries: map[string]string, fragment: string) {
 	s := url
 
 	i := strings.index(s, "://")
 	if i >= 0 {
 		scheme = s[:i]
 		s = s[i+3:]
+	}
+
+	i = strings.index(s, "#")
+	if i != -1 {
+		fragment = s[i+1:]
+		s = s[:i]
 	}
 
 	i = strings.index(s, "?")
@@ -62,7 +68,7 @@ split_url :: proc(url: string, allocator := context.allocator) -> (scheme, host,
 	return
 }
 
-join_url :: proc(scheme, host, path: string, queries: map[string]string, allocator := context.allocator) -> string {
+join_url :: proc(scheme, host, path: string, queries: map[string]string, fragment: string, allocator := context.allocator) -> string {
 	b := strings.builder_make(allocator)
 	strings.builder_grow(&b, len(scheme) + 3 + len(host) + 1 + len(path))
 
@@ -93,6 +99,13 @@ join_url :: proc(scheme, host, path: string, queries: map[string]string, allocat
 			strings.write_string(&b, "&")
 		}
 		i += 1
+	}
+
+	if fragment != "" {
+		if fragment[0] != '#' {
+			strings.write_string(&b, "#")
+		}
+		strings.write_string(&b, strings.trim_space(fragment))
 	}
 
 	return strings.to_string(b)

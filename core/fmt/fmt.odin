@@ -1900,7 +1900,7 @@ fmt_struct :: proc(fi: ^Info, v: any, the_verb: rune, info: runtime.Type_Info_St
 	// fi.hash = false;
 	fi.indent += 1
 
-	if hash	{
+	if !is_soa && hash {
 		io.write_byte(fi.writer, '\n', &fi.n)
 	}
 	defer {
@@ -1934,6 +1934,9 @@ fmt_struct :: proc(fi: ^Info, v: any, the_verb: rune, info: runtime.Type_Info_St
 			n = uintptr((^int)(uintptr(v.data) + info.offsets[actual_field_count])^)
 		}
 
+		if hash && n > 0 {
+			io.write_byte(fi.writer, '\n', &fi.n)
+		}
 
 		for index in 0..<n {
 			if !hash && index > 0 { io.write_string(fi.writer, ", ", &fi.n) }
@@ -1942,9 +1945,23 @@ fmt_struct :: proc(fi: ^Info, v: any, the_verb: rune, info: runtime.Type_Info_St
 
 			if !hash && field_count > 0 { io.write_string(fi.writer, ", ", &fi.n) }
 
+			if hash {
+				fi.indent -= 1
+				fmt_write_indent(fi)
+				fi.indent += 1
+			}
 			io.write_string(fi.writer, base_type_name, &fi.n)
 			io.write_byte(fi.writer, '{', &fi.n)
-			defer io.write_byte(fi.writer, '}', &fi.n)
+			if hash { io.write_byte(fi.writer, '\n', &fi.n) }
+			defer {
+				if hash {
+					fi.indent -= 1
+					fmt_write_indent(fi)
+					fi.indent += 1
+				}
+				io.write_byte(fi.writer, '}', &fi.n)
+				if hash { io.write_string(fi.writer, ",\n", &fi.n) }
+			}
 			fi.record_level += 1
 			defer fi.record_level -= 1
 
@@ -2156,14 +2173,18 @@ fmt_named :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Named) 
 			when ODIN_ERROR_POS_STYLE == .Default {
 				io.write_byte(fi.writer, '(', &fi.n)
 				io.write_int(fi.writer, int(a.line), 10, &fi.n)
-				io.write_byte(fi.writer, ':', &fi.n)
-				io.write_int(fi.writer, int(a.column), 10, &fi.n)
+				if a.column != 0 {
+					io.write_byte(fi.writer, ':', &fi.n)
+					io.write_int(fi.writer, int(a.column), 10, &fi.n)
+				}
 				io.write_byte(fi.writer, ')', &fi.n)
 			} else when ODIN_ERROR_POS_STYLE == .Unix {
 				io.write_byte(fi.writer, ':', &fi.n)
 				io.write_int(fi.writer, int(a.line), 10, &fi.n)
-				io.write_byte(fi.writer, ':', &fi.n)
-				io.write_int(fi.writer, int(a.column), 10, &fi.n)
+				if a.column != 0 {
+					io.write_byte(fi.writer, ':', &fi.n)
+					io.write_int(fi.writer, int(a.column), 10, &fi.n)
+				}
 				io.write_byte(fi.writer, ':', &fi.n)
 			} else {
 				#panic("Unhandled ODIN_ERROR_POS_STYLE")

@@ -2659,7 +2659,7 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 			LLVMSetInitializer(g, LLVMConstNull(internal_llvm_type));
 			LLVMSetLinkage(g, USE_SEPARATE_MODULES ? LLVMExternalLinkage : LLVMInternalLinkage);
 			LLVMSetUnnamedAddress(g, LLVMGlobalUnnamedAddr);
-			LLVMSetGlobalConstant(g, /*true*/false);
+			LLVMSetGlobalConstant(g, true);
 
 			lbValue value = {};
 			value.value = g;

@@ -789,8 +789,8 @@ shuffle :: proc(array: $T/[]$E, r: ^Rand = nil) {
 		return
 	}
 
-	for i := i64(0); i < n; i += 1 {
-		j := int63_max(n, r)
+	for i := i64(n - 1); i > 0; i -= 1 {
+		j := int63_max(i + 1, r)
 		array[i], array[j] = array[j], array[i]
 	}
 }

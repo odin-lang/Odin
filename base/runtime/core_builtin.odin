@@ -40,7 +40,7 @@ copy_slice :: proc "contextless" (dst, src: $T/[]$E) -> int {
 	}
 	return n
 }
-// `copy_from_string` is a built-in procedure that copies elements from a source slice `src` to a destination string `dst`.
+// `copy_from_string` is a built-in procedure that copies elements from a source string `src` to a destination slice `dst`.
 // The source and destination may overlap. Copy returns the number of elements copied, which will be the minimum
 // of len(src) and len(dst).
 //
@@ -53,7 +53,7 @@ copy_from_string :: proc "contextless" (dst: $T/[]$E/u8, src: $S/string) -> int 
 	}
 	return n
 }
-// `copy` is a built-in procedure that copies elements from a source slice `src` to a destination slice/string `dst`.
+// `copy` is a built-in procedure that copies elements from a source slice/string `src` to a destination slice `dst`.
 // The source and destination may overlap. Copy returns the number of elements copied, which will be the minimum
 // of len(src) and len(dst).
 @builtin

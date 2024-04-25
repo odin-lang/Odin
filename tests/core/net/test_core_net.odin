@@ -473,6 +473,7 @@ client_sends_server_data :: proc(t: ^testing.T) {
 URL_Test :: struct {
 	scheme, host, path: string,
 	queries: map[string]string,
+	fragment: string,
 	url: []string,
 }
 
@@ -481,58 +482,78 @@ split_url_test :: proc(t: ^testing.T) {
 	test_cases := []URL_Test{
 		{
 			"http", "example.com", "/",
-			{},
+			{}, "",
 			{"http://example.com"},
 		},
 		{
 			"https", "odin-lang.org", "/",
-			{},
+			{}, "",
 			{"https://odin-lang.org"},
 		},
 		{
 			"https", "odin-lang.org", "/docs/",
-			{},
+			{}, "",
 			{"https://odin-lang.org/docs/"},
 		},
 		{
 			"https", "odin-lang.org", "/docs/overview",
-			{},
+			{}, "",
 			{"https://odin-lang.org/docs/overview"},
 		},
 		{
 			"http", "example.com", "/",
-			{"a" = "b"},
+			{"a" = "b"}, "",
 			{"http://example.com?a=b"},
 		},
 		{
 			"http", "example.com", "/",
-			{"a" = ""},
+			{"a" = ""}, "",
 			{"http://example.com?a"},
 		},
 		{
 			"http", "example.com", "/",
-			{"a" = "b", "c" = "d"},
+			{"a" = "b", "c" = "d"}, "",
 			{"http://example.com?a=b&c=d"},
 		},
 		{
 			"http", "example.com", "/",
-			{"a" = "", "c" = "d"},
+			{"a" = "", "c" = "d"}, "",
 			{"http://example.com?a&c=d"},
 		},
 		{
 			"http", "example.com", "/example",
-			{"a" = "", "b" = ""},
+			{"a" = "", "b" = ""}, "",
 			{"http://example.com/example?a&b"},
 		},
 		{
 			"https", "example.com", "/callback",
-			{"redirect" = "https://other.com/login"},
+			{"redirect" = "https://other.com/login"}, "",
 			{"https://example.com/callback?redirect=https://other.com/login"},
+		},
+		{
+			"http", "example.com", "/",
+			{}, "Hellope",
+			{"http://example.com#Hellope"},
+		},
+		{
+			"https", "odin-lang.org", "/",
+			{"a" = ""}, "Hellope",
+			{"https://odin-lang.org?a#Hellope"},
+		},
+		{
+			"http", "example.com", "/",
+			{"a" = "b"}, "BeesKnees",
+			{"http://example.com?a=b#BeesKnees"},
+		},
+		{
+			"https", "odin-lang.org", "/docs/overview/",
+			{}, "hellope",
+			{"https://odin-lang.org/docs/overview/#hellope"},
 		},
 	}
 
 	for test in test_cases {
-		scheme, host, path, queries := net.split_url(test.url[0])
+		scheme, host, path, queries, fragment := net.split_url(test.url[0])
 		defer {
 			delete(queries)
 			delete(test.queries)
@@ -551,6 +572,9 @@ split_url_test :: proc(t: ^testing.T) {
 			msg = fmt.tprintf("Expected `net.split_url` to return %s, got %s", expected, v)
 			expect(t, v == expected, msg)
 		}
+		msg = fmt.tprintf("Expected `net.split_url` to return %s, got %s", test.fragment, fragment)
+		expect(t, fragment == test.fragment, msg)
+
 	}
 }
 
@@ -560,53 +584,73 @@ join_url_test :: proc(t: ^testing.T) {
 	test_cases := []URL_Test{
 		{
 			"http", "example.com", "/",
-			{},
+			{}, "",
 			{"http://example.com/"},
 		},
 		{
 			"https", "odin-lang.org", "/",
-			{},
+			{}, "",
 			{"https://odin-lang.org/"},
 		},
 		{
 			"https", "odin-lang.org", "/docs/",
-			{},
+			{}, "",
 			{"https://odin-lang.org/docs/"},
 		},
 		{
 			"https", "odin-lang.org", "/docs/overview",
-			{},
+			{}, "",
 			{"https://odin-lang.org/docs/overview"},
 		},
 		{
 			"http", "example.com", "/",
-			{"a" = "b"},
+			{"a" = "b"}, "",
 			{"http://example.com/?a=b"},
 		},
 		{
 			"http", "example.com", "/",
-			{"a" = ""},
+			{"a" = ""}, "",
 			{"http://example.com/?a"},
 		},
 		{
 			"http", "example.com", "/",
-			{"a" = "b", "c" = "d"},
+			{"a" = "b", "c" = "d"}, "",
 			{"http://example.com/?a=b&c=d", "http://example.com/?c=d&a=b"},
 		},
 		{
 			"http", "example.com", "/",
-			{"a" = "", "c" = "d"},
+			{"a" = "", "c" = "d"}, "",
 			{"http://example.com/?a&c=d", "http://example.com/?c=d&a"},
 		},
 		{
 			"http", "example.com", "/example",
-			{"a" = "", "b" = ""},
+			{"a" = "", "b" = ""}, "",
 			{"http://example.com/example?a&b", "http://example.com/example?b&a"},
+		},
+		{
+			"http", "example.com", "/",
+			{}, "Hellope",
+			{"http://example.com/#Hellope"},
+		},
+		{
+			"https", "odin-lang.org", "/",
+			{"a" = ""}, "Hellope",
+			{"https://odin-lang.org/?a#Hellope"},
+		},
+		{
+			"http", "example.com", "/",
+			{"a" = "b"}, "BeesKnees",
+			{"http://example.com/?a=b#BeesKnees"},
+		},
+		{
+			"https", "odin-lang.org", "/docs/overview/",
+			{}, "hellope",
+			{"https://odin-lang.org/docs/overview/#hellope"},
 		},
 	}
 
 	for test in test_cases {
-		url := net.join_url(test.scheme, test.host, test.path, test.queries)
+		url := net.join_url(test.scheme, test.host, test.path, test.queries, test.fragment)
 		defer {
 			delete(url)
 			delete(test.queries)

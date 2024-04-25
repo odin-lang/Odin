@@ -163,6 +163,10 @@ gb_internal void platform_virtual_memory_protect(void *memory, isize size);
 		GB_ASSERT(is_protected);
 	}
 #else
+	#if !defined(MAP_ANONYMOUS) && defined(MAP_ANON)
+	#define MAP_ANONYMOUS MAP_ANON
+	#endif
+
 	gb_internal void platform_virtual_memory_init(void) {
 		global_platform_memory_block_sentinel.prev = &global_platform_memory_block_sentinel;	
 		global_platform_memory_block_sentinel.next = &global_platform_memory_block_sentinel;

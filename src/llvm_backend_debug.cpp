@@ -739,6 +739,7 @@ gb_internal LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 	}
 
 	case Type_Map: {
+		init_map_internal_debug_types(type);
 		Type *bt = base_type(type->Map.debug_metadata_type);
 		GB_ASSERT(bt->kind == Type_Struct);
 
@@ -945,6 +946,7 @@ gb_internal LLVMMetadataRef lb_debug_type(lbModule *m, Type *type) {
 		}
 
 		case Type_Map: {
+			init_map_internal_debug_types(bt);
 			bt = base_type(bt->Map.debug_metadata_type);
 			GB_ASSERT(bt->kind == Type_Struct);
 			return lb_debug_struct(m, type, bt, name, scope, file, line);
@@ -1025,7 +1027,7 @@ gb_internal void lb_add_debug_local_variable(lbProcedure *p, LLVMValueRef ptr, T
 	LLVMDIBuilderInsertDeclareAtEnd(m->debug_builder, storage, var_info, llvm_expr, llvm_debug_loc, block);
 }
 
-gb_internal void lb_add_debug_param_variable(lbProcedure *p, LLVMValueRef ptr, Type *type, Token const &token, unsigned arg_number, lbBlock *block, lbArgKind arg_kind) {
+gb_internal void lb_add_debug_param_variable(lbProcedure *p, LLVMValueRef ptr, Type *type, Token const &token, unsigned arg_number, lbBlock *block) {
 	if (p->debug_info == nullptr) {
 		return;
 	}
@@ -1086,15 +1088,7 @@ gb_internal void lb_add_debug_param_variable(lbProcedure *p, LLVMValueRef ptr, T
 	// NOTE(bill, 2022-02-01): For parameter values, you must insert them at the end of the decl block
 	// The reason is that if the parameter is at index 0 and a pointer, there is not such things as an
 	// instruction "before" it.
-	switch (arg_kind) {
-	case lbArg_Direct:
-		LLVMDIBuilderInsertDbgValueAtEnd(m->debug_builder, storage, var_info, llvm_expr, llvm_debug_loc, block->block);
-		break;
-	case lbArg_Indirect:
-		LLVMDIBuilderInsertDeclareAtEnd(m->debug_builder, storage, var_info, llvm_expr, llvm_debug_loc, block->block);
-		break;
-	}
-
+	LLVMDIBuilderInsertDeclareAtEnd(m->debug_builder, storage, var_info, llvm_expr, llvm_debug_loc, block->block);
 }
 
 

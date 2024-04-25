@@ -122,7 +122,6 @@ struct lbAddr {
 		} swizzle_large;
 		struct {
 			Type *type;
-			i64 index;
 			i64 bit_offset;
 			i64 bit_size;
 		} bitfield;

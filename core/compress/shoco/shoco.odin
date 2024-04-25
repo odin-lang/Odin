@@ -9,7 +9,7 @@
 */
 
 // package shoco is an implementation of the shoco short string compressor
-package shoco
+package compress_shoco
 
 import "base:intrinsics"
 import "core:compress"

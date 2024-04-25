@@ -703,11 +703,11 @@ gb_internal void check_scope_usage(Checker *c, Scope *scope, u64 vet_flags) {
 			array_add(&vetted_entities, ve_unused);
 		} else if (is_shadowed) {
 			array_add(&vetted_entities, ve_shadowed);
-		} else if (e->kind == Entity_Variable && (e->flags & (EntityFlag_Param|EntityFlag_Using)) == 0) {
+		} else if (e->kind == Entity_Variable && (e->flags & (EntityFlag_Param|EntityFlag_Using|EntityFlag_Static)) == 0 && !e->Variable.is_global) {
 			i64 sz = type_size_of(e->type);
 			// TODO(bill): When is a good size warn?
-			// Is 128 KiB good enough?
-			if (sz >= 1ll<<17) {
+			// Is >256 KiB good enough?
+			if (sz > 1ll<<18) {
 				gbString type_str = type_to_string(e->type);
 				warning(e->token, "Declaration of '%.*s' may cause a stack overflow due to its type '%s' having a size of %lld bytes", LIT(e->token.string), type_str, cast(long long)sz);
 				gb_string_free(type_str);
@@ -728,7 +728,10 @@ gb_internal void check_scope_usage(Checker *c, Scope *scope, u64 vet_flags) {
 		} else if (vet_flags) {
 			switch (ve.kind) {
 			case VettedEntity_Unused:
-				if (vet_flags & VetFlag_Unused) {
+				if (e->kind == Entity_Variable && (vet_flags & VetFlag_UnusedVariables) != 0) {
+					error(e->token, "'%.*s' declared but not used", LIT(name));
+				}
+				if ((e->kind == Entity_ImportName || e->kind == Entity_LibraryName) && (vet_flags & VetFlag_UnusedImports) != 0) {
 					error(e->token, "'%.*s' declared but not used", LIT(name));
 				}
 				break;
@@ -1109,6 +1112,8 @@ gb_internal void init_universal(void) {
 	add_global_bool_constant("ODIN_DEBUG",                      bc->ODIN_DEBUG);
 	add_global_bool_constant("ODIN_DISABLE_ASSERT",             bc->ODIN_DISABLE_ASSERT);
 	add_global_bool_constant("ODIN_DEFAULT_TO_NIL_ALLOCATOR",   bc->ODIN_DEFAULT_TO_NIL_ALLOCATOR);
+	add_global_bool_constant("ODIN_NO_BOUNDS_CHECK",            build_context.no_bounds_check);
+	add_global_bool_constant("ODIN_NO_TYPE_ASSERT",             build_context.no_type_assert);
 	add_global_bool_constant("ODIN_DEFAULT_TO_PANIC_ALLOCATOR", bc->ODIN_DEFAULT_TO_PANIC_ALLOCATOR);
 	add_global_bool_constant("ODIN_NO_DYNAMIC_LITERALS",        bc->no_dynamic_literals);
 	add_global_bool_constant("ODIN_NO_CRT",                     bc->no_crt);

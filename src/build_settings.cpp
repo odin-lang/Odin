@@ -274,13 +274,16 @@ enum BuildPath : u8 {
 };
 
 enum VetFlags : u64 {
-	VetFlag_NONE       = 0,
-	VetFlag_Unused     = 1u<<0, // 1
-	VetFlag_Shadowing  = 1u<<1, // 2
-	VetFlag_UsingStmt  = 1u<<2, // 4
-	VetFlag_UsingParam = 1u<<3, // 8
-	VetFlag_Style      = 1u<<4, // 16
-	VetFlag_Semicolon  = 1u<<5, // 32
+	VetFlag_NONE            = 0,
+	VetFlag_Shadowing       = 1u<<0,
+	VetFlag_UsingStmt       = 1u<<1,
+	VetFlag_UsingParam      = 1u<<2,
+	VetFlag_Style           = 1u<<3,
+	VetFlag_Semicolon       = 1u<<4,
+	VetFlag_UnusedVariables = 1u<<5,
+	VetFlag_UnusedImports   = 1u<<6,
+
+	VetFlag_Unused = VetFlag_UnusedVariables|VetFlag_UnusedImports,
 
 	VetFlag_All = VetFlag_Unused|VetFlag_Shadowing|VetFlag_UsingStmt,
 
@@ -290,6 +293,10 @@ enum VetFlags : u64 {
 u64 get_vet_flag_from_name(String const &name) {
 	if (name == "unused") {
 		return VetFlag_Unused;
+	} else if (name == "unused-variables") {
+		return VetFlag_UnusedVariables;
+	} else if (name == "unused-imports") {
+		return VetFlag_UnusedImports;
 	} else if (name == "shadowing") {
 		return VetFlag_Shadowing;
 	} else if (name == "using-stmt") {
@@ -377,6 +384,7 @@ struct BuildContext {
 	bool   keep_temp_files;
 	bool   ignore_unknown_attributes;
 	bool   no_bounds_check;
+	bool   no_type_assert;
 	bool   no_dynamic_literals;
 	bool   no_output_files;
 	bool   no_crt;
@@ -634,6 +642,15 @@ gb_global TargetMetrics target_freestanding_amd64_sysv = {
 	TargetABI_SysV,
 };
 
+gb_global TargetMetrics target_freestanding_amd64_win64 = {
+	TargetOs_freestanding,
+	TargetArch_amd64,
+	8, 8, 8, 16,
+	str_lit("x86_64-pc-none-msvc"),
+	str_lit("e-m:w-i64:64-f80:128-n8:16:32:64-S128"),
+	TargetABI_Win64,
+};
+
 gb_global TargetMetrics target_freestanding_arm64 = {
 	TargetOs_freestanding,
 	TargetArch_arm64,
@@ -676,7 +693,9 @@ gb_global NamedTargetMetrics named_targets[] = {
 	{ str_lit("js_wasm64p32"),           &target_js_wasm64p32 },
 	{ str_lit("wasi_wasm64p32"),         &target_wasi_wasm64p32 },
 
-	{ str_lit("freestanding_amd64_sysv"), &target_freestanding_amd64_sysv },
+	{ str_lit("freestanding_amd64_sysv"),  &target_freestanding_amd64_sysv },
+	{ str_lit("freestanding_amd64_win64"), &target_freestanding_amd64_win64 },
+
 	{ str_lit("freestanding_arm64"), &target_freestanding_arm64 },
 };
 
@@ -832,13 +851,11 @@ gb_internal String odin_root_dir(void) {
 	char const *found = gb_get_env("ODIN_ROOT", a);
 	if (found) {
 		String path = path_to_full_path(a, make_string_c(found));
-		if (path[path.len-1] != '/' && path[path.len-1] != '\\') {
 		#if defined(GB_SYSTEM_WINDOWS)
-			path = concatenate_strings(a, path, WIN32_SEPARATOR_STRING);
+			path = normalize_path(a, path, WIN32_SEPARATOR_STRING);
 		#else
-			path = concatenate_strings(a, path, NIX_SEPARATOR_STRING);
+			path = normalize_path(a, path, NIX_SEPARATOR_STRING);
 		#endif
-		}
 
 		global_module_path = path;
 		global_module_path_set = true;
@@ -1461,26 +1478,6 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 	}
 
 	bc->metrics = *metrics;
-	if (metrics->os == TargetOs_darwin) {
-		if (!bc->minimum_os_version_string_given) {
-			bc->minimum_os_version_string = str_lit("11.0.0");
-		}
-
-		switch (subtarget) {
-		case Subtarget_Default:
-			bc->metrics.target_triplet = concatenate_strings(permanent_allocator(), bc->metrics.target_triplet, bc->minimum_os_version_string);
-			break;
-		case Subtarget_iOS:
-			if (metrics->arch == TargetArch_arm64) {
-				bc->metrics.target_triplet = str_lit("arm64-apple-ios");
-			} else if (metrics->arch == TargetArch_amd64) {
-				bc->metrics.target_triplet = str_lit("x86_64-apple-ios");
-			} else {
-				GB_PANIC("Unknown architecture for darwin");
-			}
-			break;
-		}
-	}
 
 	bc->ODIN_OS           = target_os_names[metrics->os];
 	bc->ODIN_ARCH         = target_arch_names[metrics->arch];
@@ -1516,65 +1513,26 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 		bc->ODIN_WINDOWS_SUBSYSTEM = windows_subsystem_names[Windows_Subsystem_CONSOLE];
 	}
 
-	// NOTE(zangent): The linker flags to set the build architecture are different
-	// across OSs. It doesn't make sense to allocate extra data on the heap
-	// here, so I just #defined the linker flags to keep things concise.
-	if (bc->metrics.arch == TargetArch_amd64) {
-		switch (bc->metrics.os) {
-		case TargetOs_windows:
-			bc->link_flags = str_lit("/machine:x64 ");
+	if (metrics->os == TargetOs_darwin && subtarget == Subtarget_iOS) {
+		switch (metrics->arch) {
+		case TargetArch_arm64:
+			bc->metrics.target_triplet = str_lit("arm64-apple-ios");
 			break;
-		case TargetOs_darwin:
-			bc->link_flags = str_lit("-arch x86_64 ");
-			break;
-		case TargetOs_linux:
-			bc->link_flags = str_lit("-arch x86-64 ");
-			break;
-		case TargetOs_freebsd:
-			bc->link_flags = str_lit("-arch x86-64 ");
-			break;
-		case TargetOs_openbsd:
-			bc->link_flags = str_lit("-arch x86-64 ");
-			break;
-		case TargetOs_netbsd:
-			bc->link_flags = str_lit("-arch x86-64 ");
-			break;
-		case TargetOs_haiku:
-			bc->link_flags = str_lit("-arch x86-64 ");
-			break;
-		}
-	} else if (bc->metrics.arch == TargetArch_i386) {
-		switch (bc->metrics.os) {
-		case TargetOs_windows:
-			bc->link_flags = str_lit("/machine:x86 ");
-			break;
-		case TargetOs_darwin:
-			gb_printf_err("Unsupported architecture\n");
-			gb_exit(1);
-			break;
-		case TargetOs_linux:
-			bc->link_flags = str_lit("-arch x86 ");
-			break;
-		case TargetOs_freebsd:
-			bc->link_flags = str_lit("-arch x86 ");
-			break;
-		}
-	} else if (bc->metrics.arch == TargetArch_arm32) {
-		switch (bc->metrics.os) {
-		case TargetOs_linux:
-			bc->link_flags = str_lit("-arch arm ");
+		case TargetArch_amd64:
+			bc->metrics.target_triplet = str_lit("x86_64-apple-ios");
 			break;
 		default:
-			gb_printf_err("Compiler Error: Unsupported architecture\n");
-			gb_exit(1);
+			GB_PANIC("Unknown architecture for darwin");
 		}
-	} else if (bc->metrics.arch == TargetArch_arm64) {
-		switch (bc->metrics.os) {
-		case TargetOs_darwin:
-			bc->link_flags = str_lit("-arch arm64 ");
+	}
+
+	if (bc->metrics.os == TargetOs_windows) {
+		switch (bc->metrics.arch) {
+		case TargetArch_amd64:
+			bc->link_flags = str_lit("/machine:x64 ");
 			break;
-		case TargetOs_linux:
-			bc->link_flags = str_lit("-arch aarch64 ");
+		case TargetArch_i386:
+			bc->link_flags = str_lit("/machine:x86 ");
 			break;
 		}
 	} else if (is_arch_wasm()) {
@@ -1594,8 +1552,20 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 		// Disallow on wasm
 		bc->use_separate_modules = false;
 	} else {
-		gb_printf_err("Compiler Error: Unsupported architecture\n");
-		gb_exit(1);
+		bc->link_flags = concatenate3_strings(permanent_allocator(),
+			str_lit("-target "), bc->metrics.target_triplet, str_lit(" "));
+	}
+
+	// NOTE: needs to be done after adding the -target flag to the linker flags so the linker
+	// does not annoy the user with version warnings.
+	if (metrics->os == TargetOs_darwin) {
+		if (!bc->minimum_os_version_string_given) {
+			bc->minimum_os_version_string = str_lit("11.0.0");
+		}
+
+		if (subtarget == Subtarget_Default) {
+			bc->metrics.target_triplet = concatenate_strings(permanent_allocator(), bc->metrics.target_triplet, bc->minimum_os_version_string);
+		}
 	}
 
 	if (bc->ODIN_DEBUG && !bc->custom_optimization_level) {

@@ -416,24 +416,28 @@ end_of_line_pos :: proc(p: ^Parser, tok: tokenizer.Token) -> tokenizer.Pos {
 }
 
 expect_closing_brace_of_field_list :: proc(p: ^Parser) -> tokenizer.Token {
+	return expect_closing_token_of_field_list(p, .Close_Brace, "field list")
+}
+
+expect_closing_token_of_field_list :: proc(p: ^Parser, closing_kind: tokenizer.Token_Kind, msg: string) -> tokenizer.Token {
 	token := p.curr_tok
-	if allow_token(p, .Close_Brace) {
+	if allow_token(p, closing_kind) {
 		return token
 	}
 	if allow_token(p, .Semicolon) && !tokenizer.is_newline(token) {
 		str := tokenizer.token_to_string(token)
 		error(p, end_of_line_pos(p, p.prev_tok), "expected a comma, got %s", str)
 	}
-	expect_brace := expect_token(p, .Close_Brace)
+	expect_closing := expect_token_after(p, closing_kind, msg)
 
-	if expect_brace.kind != .Close_Brace {
-		for p.curr_tok.kind != .Close_Brace && p.curr_tok.kind != .EOF && !is_non_inserted_semicolon(p.curr_tok) {
+	if expect_closing.kind != closing_kind {
+		for p.curr_tok.kind != closing_kind && p.curr_tok.kind != .EOF && !is_non_inserted_semicolon(p.curr_tok) {
 			advance_token(p)
 		}
 		return p.curr_tok
 	} 
 
-	return expect_brace
+	return expect_closing
 }
 
 expect_closing_parentheses_of_field_list :: proc(p: ^Parser) -> tokenizer.Token {
@@ -1354,6 +1358,7 @@ parse_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 
 		rs := ast.new(ast.Return_Stmt, tok.pos, end)
 		rs.results = results[:]
+		expect_semicolon(p, rs)
 		return rs
 
 	case .Break, .Continue, .Fallthrough:
@@ -2990,8 +2995,8 @@ parse_literal_value :: proc(p: ^Parser, type: ^ast.Expr) -> ^ast.Comp_Lit {
 	}
 	p.expr_level -= 1
 
-	skip_possible_newline(p)
-	close := expect_token_after(p, .Close_Brace, "compound literal")
+  	skip_possible_newline(p)
+	close := expect_closing_brace_of_field_list(p)
 
 	pos := type.pos if type != nil else open.pos
 	lit := ast.new(ast.Comp_Lit, pos, end_pos(close))
@@ -3054,7 +3059,7 @@ parse_call_expr :: proc(p: ^Parser, operand: ^ast.Expr) -> ^ast.Expr {
 		allow_token(p, .Comma) or_break
 	}
 
-	close := expect_token_after(p, .Close_Paren, "argument list")
+	close := expect_closing_token_of_field_list(p, .Close_Paren, "argument list")
 	p.expr_level -= 1
 
 	ce := ast.new(ast.Call_Expr, operand.pos, end_pos(close))

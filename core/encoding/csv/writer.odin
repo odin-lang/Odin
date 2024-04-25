@@ -1,4 +1,4 @@
-package csv
+package encoding_csv
 
 import "core:io"
 import "core:strings"
@@ -17,7 +17,10 @@ Writer :: struct {
 
 // writer_init initializes a Writer that writes to w
 writer_init :: proc(writer: ^Writer, w: io.Writer) {
-	writer.comma = ','
+	switch writer.comma {
+	case '\x00', '\n', '\r', 0xfffd:
+		writer.comma = ','
+	}
 	writer.w = w
 }
 
