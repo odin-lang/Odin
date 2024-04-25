@@ -2,6 +2,28 @@ name: CI
 on: [push, pull_request, workflow_dispatch]
 
 jobs:
+  build_netbsd:
+    name: NetBSD Build, Check, and Test
+    runs-on: ubuntu-latest
+    env:
+      PKGSRC_BRANCH: 2024Q1
+    steps:
+    - uses: actions/checkout@v4
+    - name: Build and Test
+      id: netbsd
+      uses: vmactions/netbsd-vm@v1
+      with:
+        release: "10.0"
+        envs: PKGSRC_BRANCH
+        usesh: true
+        copyback: false
+        prepare: |
+          export PKG_PATH="https://cdn.NetBSD.org/pub/pkgsrc/packages/NetBSD/$(uname -p)/$(uname -r | cut -d_ -f1)_${PKGSRC_BRANCH}/All" /usr/sbin/pkg_add pkgin
+          pkgin -y in llvm clang gmake git bash
+        run: |
+          gmake release
+          (cd tests/core; gmake)
+          (cd tests/internal; gmake)
   build_linux:
     name: Ubuntu Build, Check, and Test
     runs-on: ubuntu-latest
