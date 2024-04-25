@@ -30,7 +30,7 @@ get_last_error :: proc "contextless" () -> int {
 }
 
 _futex_wait :: proc "contextless" (futex: ^Futex, expected: u32) -> bool {
-	if cast(int) intrinsics.syscall(unix.SYS___futex, uintptr(futex), FUTEX_WAIT_PRIVATE, uintptr(expected), 0) == -1 {
+	if cast(int) intrinsics.syscall(unix.SYS___futex, uintptr(futex), FUTEX_WAIT_PRIVATE, uintptr(expected), 0, 0, 0) == -1 {
 		switch get_last_error() {
 		case EINTR, EAGAIN:
 			return true
@@ -48,7 +48,7 @@ _futex_wait_with_timeout :: proc "contextless" (futex: ^Futex, expected: u32, du
 	if cast(int) intrinsics.syscall(unix.SYS___futex, uintptr(futex), FUTEX_WAIT_PRIVATE, uintptr(expected), cast(uintptr) &Time_Spec{
 		time_sec  = cast(uint)(duration / 1e9),
 		time_nsec = cast(uint)(duration % 1e9),
-	}) == -1 {
+	}, 0, 0) == -1 {
 		switch get_last_error() {
 		case EINTR, EAGAIN:
 			return true
@@ -62,13 +62,13 @@ _futex_wait_with_timeout :: proc "contextless" (futex: ^Futex, expected: u32, du
 }
 
 _futex_signal :: proc "contextless" (futex: ^Futex) {
-	if cast(int) intrinsics.syscall(unix.SYS___futex, uintptr(futex), FUTEX_WAKE_PRIVATE, 1) == -1 {
+	if cast(int) intrinsics.syscall(unix.SYS___futex, uintptr(futex), FUTEX_WAKE_PRIVATE, 1, 0, 0, 0) == -1 {
 		_panic("futex_wake_single failure")
 	}
 }
 
 _futex_broadcast :: proc "contextless" (futex: ^Futex)  {
-	if cast(int) intrinsics.syscall(unix.SYS___futex, uintptr(futex), FUTEX_WAKE_PRIVATE, uintptr(max(i32))) == -1 {
+	if cast(int) intrinsics.syscall(unix.SYS___futex, uintptr(futex), FUTEX_WAKE_PRIVATE, uintptr(max(i32)), 0, 0, 0) == -1 {
 		_panic("_futex_wake_all failure")
 	}
 }
