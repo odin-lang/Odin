@@ -4310,8 +4310,9 @@ gb_internal bool correct_single_type_alias(CheckerContext *c, Entity *e) {
 gb_internal bool correct_type_alias_in_scope_backwards(CheckerContext *c, Scope *s) {
 	bool correction = false;
 	for (u32 n = s->elements.count, i = n-1; i < n; i--) {
-		Entity *e = s->elements.entries[i].value;
-		if (e != nullptr) {
+		auto const &entry = s->elements.entries[i];
+		Entity *e = entry.value;
+		if (entry.hash && e != nullptr) {
 			correction |= correct_single_type_alias(c, e);
 		}
 	}
@@ -4490,8 +4491,6 @@ gb_internal void check_all_global_entities(Checker *c) {
 			(void)type_align_of(e->type);
 		}
 	}
-
-	gb_printf_err("Global Entity Count: %td\n", c->info.entities.count);
 }
 
 
