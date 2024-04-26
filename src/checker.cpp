@@ -4486,6 +4486,8 @@ gb_internal void check_all_global_entities(Checker *c) {
 			(void)type_align_of(e->type);
 		}
 	}
+
+	gb_printf_err("Global Entity Count: %td\n", c->info.entities.count);
 }
 
 
