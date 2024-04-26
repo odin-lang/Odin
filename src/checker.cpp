@@ -2192,7 +2192,7 @@ gb_internal void add_min_dep_type_info(Checker *c, Type *t) {
 	// IMPORTANT NOTE(bill): this must be copied as `map_set` takes a const ref
 	// and effectively assigns the `+1` of the value
 	isize const count = set->count;
-	if (map_set_if_not_previously_exists(set, ti_index, count)) {
+	if (map_set_if_not_previously_exists(set, ti_index+1, count)) {
 		// Type already exists;
 		return;
 	}

@@ -2,7 +2,7 @@ gb_internal isize lb_type_info_index(CheckerInfo *info, Type *type, bool err_on_
 	auto *set = &info->minimum_dependency_type_info_set;
 	isize index = type_info_index(info, type, err_on_not_found);
 	if (index >= 0) {
-		auto *found = map_get(set, index);
+		auto *found = map_get(set, index+1);
 		if (found) {
 			GB_ASSERT(*found >= 0);
 			return *found + 1;
