@@ -1897,8 +1897,7 @@ gb_internal void add_type_info_type_internal(CheckerContext *c, Type *t) {
 	add_type_info_dependency(c->info, c->decl, t);
 
 	MUTEX_GUARD_BLOCK(&c->info->type_info_mutex) {
-		MapFindResult fr;
-		auto found = map_try_get(&c->info->type_info_map, t, &fr);
+		auto found = map_get(&c->info->type_info_map, t);
 		if (found != nullptr) {
 			// Types have already been added
 			return;
@@ -1922,7 +1921,7 @@ gb_internal void add_type_info_type_internal(CheckerContext *c, Type *t) {
 			ti_index = c->info->type_info_types.count;
 			array_add(&c->info->type_info_types, t);
 		}
-		map_set_internal_from_try_get(&c->checker->info.type_info_map, t, ti_index, fr);
+		map_set(&c->checker->info.type_info_map, t, ti_index);
 
 		if (prev) {
 			// NOTE(bill): If a previous one exists already, no need to continue
