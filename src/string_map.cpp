@@ -2,8 +2,8 @@ GB_STATIC_ASSERT(sizeof(MapIndex) == sizeof(u32));
 
 
 struct StringHashKey {
-	u32    hash;
 	String string;
+	u32    hash;
 
 	operator String() const noexcept {
 		return this->string;
@@ -329,7 +329,7 @@ gb_internal StringMapEntry<T> const *begin(StringMap<T> const &m) noexcept {
 
 
 template <typename T>
-gb_internal StringMapEntry<T> *end(StringMap<T> &m) {
+gb_internal StringMapEntry<T> *end(StringMap<T> &m) noexcept {
 	return m.entries + m.count;
 }
 
@@ -337,3 +337,4 @@ template <typename T>
 gb_internal StringMapEntry<T> const *end(StringMap<T> const &m) noexcept {
 	return m.entries + m.count;
 }
+

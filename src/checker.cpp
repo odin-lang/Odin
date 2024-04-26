@@ -4309,17 +4309,21 @@ gb_internal bool correct_single_type_alias(CheckerContext *c, Entity *e) {
 
 gb_internal bool correct_type_alias_in_scope_backwards(CheckerContext *c, Scope *s) {
 	bool correction = false;
-	u32 n = s->elements.count;
-	for (u32 i = n-1; i < n; i--) {
-		correction |= correct_single_type_alias(c, s->elements.entries[i].value);
+	for (u32 n = s->elements.count, i = n-1; i < n; i--) {
+		Entity *e = s->elements.entries[i].value;
+		if (e != nullptr) {
+			correction |= correct_single_type_alias(c, e);
+		}
 	}
 	return correction;
 }
 gb_internal bool correct_type_alias_in_scope_forwards(CheckerContext *c, Scope *s) {
 	bool correction = false;
-	u32 n = s->elements.count;
-	for (isize i = 0; i < n; i++) {
-		correction |= correct_single_type_alias(c, s->elements.entries[i].value);
+	for (auto const &entry : s->elements) {
+		Entity *e = entry.value;
+		if (e != nullptr) {
+			correction |= correct_single_type_alias(c, entry.value);
+		}
 	}
 	return correction;
 }
