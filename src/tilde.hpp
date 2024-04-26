@@ -6,10 +6,9 @@
 #endif
 
 #include "tilde/tb.h"
-#include "tilde/tb_arena.h"
 
-#define TB_TYPE_F16    TB_DataType{ { TB_INT, 16 } }
-#define TB_TYPE_I128   TB_DataType{ { TB_INT, 128 } }
+#define TB_TYPE_F16    TB_DataType{ { TB_TAG_INT, 16 } }
+#define TB_TYPE_I128   TB_DataType{ { TB_TAG_INT, 128 } }
 #define TB_TYPE_INT    TB_TYPE_INTN(cast(u16)(8*build_context.int_size))
 #define TB_TYPE_INTPTR TB_TYPE_INTN(cast(u16)(8*build_context.ptr_size))
 

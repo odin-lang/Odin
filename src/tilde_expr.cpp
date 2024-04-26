@@ -223,41 +223,45 @@ gb_internal cgValue cg_emit_transmute(cgProcedure *p, cgValue value, Type *type)
 		value.type = type;
 		if (value.node->dt.raw != dt.raw) {
 			switch (value.node->dt.type) {
-			case TB_INT:
+			case TB_TAG_INT:
 				switch (value.node->dt.type) {
-				case TB_INT:
+				case TB_TAG_INT:
 					break;
-				case TB_FLOAT:
+				case TB_TAG_F32:
+				case TB_TAG_F64:
 					value.node = tb_inst_bitcast(p->func, value.node, dt);
 					break;
-				case TB_PTR:
+				case TB_TAG_PTR:
 					value.node = tb_inst_int2ptr(p->func, value.node);
 					break;
 				}
 				break;
-			case TB_FLOAT:
+			case TB_TAG_F32:
+			case TB_TAG_F64:
 				switch (value.node->dt.type) {
-				case TB_INT:
+				case TB_TAG_INT:
 					value.node = tb_inst_bitcast(p->func, value.node, dt);
 					break;
-				case TB_FLOAT:
+				case TB_TAG_F32:
+				case TB_TAG_F64:
 					break;
-				case TB_PTR:
+				case TB_TAG_PTR:
 					value.node = tb_inst_bitcast(p->func, value.node, TB_TYPE_INTPTR);
 					value.node = tb_inst_int2ptr(p->func, value.node);
 					break;
 				}
 				break;
-			case TB_PTR:
+			case TB_TAG_PTR:
 				switch (value.node->dt.type) {
-				case TB_INT:
+				case TB_TAG_INT:
 					value.node = tb_inst_ptr2int(p->func, value.node, dt);
 					break;
-				case TB_FLOAT:
+				case TB_TAG_F32:
+				case TB_TAG_F64:
 					value.node = tb_inst_ptr2int(p->func, value.node, TB_TYPE_INTPTR);
 					value.node = tb_inst_bitcast(p->func, value.node, dt);
 					break;
-				case TB_PTR:
+				case TB_TAG_PTR:
 					break;
 				}
 				break;

@@ -1,16 +1,16 @@
 #include "tilde.hpp"
 
 
-gb_global Slice<TB_Arena> global_tb_arenas;
+gb_global Slice<TB_Arena *> global_tb_arenas;
 
 gb_internal TB_Arena *cg_arena(void) {
-	return &global_tb_arenas[current_thread_index()];
+	return global_tb_arenas[current_thread_index()];
 }
 
 gb_internal void cg_global_arena_init(void) {
-	global_tb_arenas = slice_make<TB_Arena>(permanent_allocator(), global_thread_pool.threads.count);
+	global_tb_arenas = slice_make<TB_Arena *>(permanent_allocator(), global_thread_pool.threads.count);
 	for_array(i, global_tb_arenas) {
-		tb_arena_create(&global_tb_arenas[i], 2ull<<20);
+		global_tb_arenas[i] = tb_arena_create(2ull<<20);
 	}
 }
 
@@ -125,7 +125,7 @@ gb_internal cgValue cg_value(TB_Node *node, Type *type) {
 	return v;
 }
 gb_internal cgValue cg_lvalue_addr(TB_Node *node, Type *type) {
-	GB_ASSERT(node->dt.type == TB_PTR);
+	GB_ASSERT(node->dt.type == TB_TAG_PTR);
 	cgValue v = {};
 	v.kind = cgValue_Addr;
 	v.type = type;
@@ -136,10 +136,10 @@ gb_internal cgValue cg_lvalue_addr(TB_Node *node, Type *type) {
 gb_internal cgValue cg_lvalue_addr_to_value(cgValue v) {
 	if (v.kind == cgValue_Value) {
 		GB_ASSERT(is_type_pointer(v.type));
-		GB_ASSERT(v.node->dt.type == TB_PTR);
+		GB_ASSERT(v.node->dt.type == TB_TAG_PTR);
 	} else {
 		GB_ASSERT(v.kind == cgValue_Addr);
-		GB_ASSERT(v.node->dt.type == TB_PTR);
+		GB_ASSERT(v.node->dt.type == TB_TAG_PTR);
 		v.kind = cgValue_Value;
 		v.type = alloc_type_pointer(v.type);
 	}
@@ -440,9 +440,8 @@ gb_internal cgModule *cg_module_create(Checker *c) {
 	m->info = &c->info;
 
 
-	TB_FeatureSet feature_set = {};
 	bool is_jit = false;
-	m->mod = tb_module_create(TB_ARCH_X86_64, TB_SYSTEM_WINDOWS, &feature_set, is_jit);
+	m->mod = tb_module_create(TB_ARCH_X86_64, TB_SYSTEM_WINDOWS, is_jit);
 	tb_module_set_tls_index(m->mod, 10, "_tls_index");
 
 	map_init(&m->values);
@@ -464,8 +463,7 @@ gb_internal cgModule *cg_module_create(Checker *c) {
 
 	for_array(id, global_files) {
 		if (AstFile *f = global_files[id]) {
-			char const *path = alloc_cstring(temporary_allocator(), f->fullpath);
-			TB_SourceFile *file = tb_get_source_file(m->mod, path);
+			TB_SourceFile *file = tb_get_source_file(m->mod, f->fullpath.len, cast(char const *)f->fullpath.text);
 			map_set(&m->file_id_map, cast(uintptr)id, file);
 		}
 	}
@@ -830,8 +828,8 @@ gb_internal bool cg_generate_code(Checker *c, LinkerData *linker_data) {
 			break;
 		}
 	}
-	TB_ExportBuffer export_buffer = tb_module_object_export(m->mod, debug_format);
-	defer (tb_export_buffer_free(export_buffer));
+	TB_ExportBuffer export_buffer = tb_module_object_export(m->mod, cg_arena(), debug_format);
+	// defer (tb_export_buffer_free(export_buffer)); // THIS IS MISSING
 
 	String filepath_obj = cg_filepath_obj_for_module(m, false);
 	array_add(&linker_data->output_object_paths, filepath_obj);

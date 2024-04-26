@@ -201,8 +201,8 @@ gb_internal TB_DebugType *cg_debug_type_internal(cgModule *m, Type *type) {
 		case Basic_rune:          return tb_debug_get_integer(m->mod, is_signed, bits);
 
 		case Basic_f16:           return tb_debug_get_integer(m->mod, false, bits);
-		case Basic_f32:           return tb_debug_get_float(m->mod,   TB_FLT_32);
-		case Basic_f64:           return tb_debug_get_float(m->mod,   TB_FLT_64);
+		case Basic_f32:           return tb_debug_get_float32(m->mod);
+		case Basic_f64:           return tb_debug_get_float64(m->mod);
 
 		case Basic_complex32:
 		case Basic_complex64:
@@ -295,11 +295,11 @@ gb_internal TB_DebugType *cg_debug_type_internal(cgModule *m, Type *type) {
 		case Basic_u128be:        return tb_debug_get_integer(m->mod, is_signed, bits);
 
 		case Basic_f16le:         return tb_debug_get_integer(m->mod, false, bits);
-		case Basic_f32le:         return tb_debug_get_float(m->mod,   TB_FLT_32);
-		case Basic_f64le:         return tb_debug_get_float(m->mod,   TB_FLT_64);
+		case Basic_f32le:         return tb_debug_get_float32(m->mod);
+		case Basic_f64le:         return tb_debug_get_float64(m->mod);
 		case Basic_f16be:         return tb_debug_get_integer(m->mod, false, bits);
-		case Basic_f32be:         return tb_debug_get_float(m->mod,   TB_FLT_32);
-		case Basic_f64be:         return tb_debug_get_float(m->mod,   TB_FLT_64);
+		case Basic_f32be:         return tb_debug_get_float32(m->mod);
+		case Basic_f64be:         return tb_debug_get_float64(m->mod);
 		}
 		break;
 	case Type_Generic:

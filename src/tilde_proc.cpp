@@ -225,7 +225,7 @@ gb_internal void cg_procedure_begin(cgProcedure *p) {
 	}
 
 	TB_ModuleSectionHandle section = tb_module_get_text(p->module->mod);
-	tb_function_set_prototype(p->func, section, p->proto, cg_arena());
+	tb_function_set_prototype(p->func, section, p->proto);
 
 	if (p->body == nullptr) {
 		return;
@@ -289,7 +289,7 @@ gb_internal void cg_procedure_begin(cgProcedure *p) {
 			continue;
 		}
 
-		GB_ASSERT(param_ptr->dt.type == TB_PTR);
+		GB_ASSERT(param_ptr->dt.type == TB_TAG_PTR);
 
 		cgValue local = cg_value(param_ptr, alloc_type_pointer(e->type));
 
@@ -368,49 +368,50 @@ gb_internal void cg_procedure_begin(cgProcedure *p) {
 
 gb_internal WORKER_TASK_PROC(cg_procedure_compile_worker_proc) {
 	cgProcedure *p = cast(cgProcedure *)data;
+	gb_unused(p);
 
-	TB_Passes *opt = tb_pass_enter(p->func, cg_arena());
-	defer (tb_pass_exit(opt));
+	// TB_Passes *opt = tb_pass_enter(p->func, cg_arena());
+	// defer (tb_pass_exit(opt));
 
-	// optimization passes
-	if (false) {
-		tb_pass_peephole(opt, TB_PEEPHOLE_ALL);
-		tb_pass_mem2reg(opt);
-		tb_pass_peephole(opt, TB_PEEPHOLE_ALL);
-	}
+	// // optimization passes
+	// if (false) {
+	// 	tb_pass_peephole(opt, TB_PEEPHOLE_ALL);
+	// 	tb_pass_mem2reg(opt);
+	// 	tb_pass_peephole(opt, TB_PEEPHOLE_ALL);
+	// }
 
-	bool emit_asm = false;
-	if (
-	    // string_starts_with(p->name, str_lit("runtime@_windows_default_alloc_or_resize")) ||
-	    false
-	) {
-		emit_asm = true;
-	}
+	// bool emit_asm = false;
+	// if (
+	//     // string_starts_with(p->name, str_lit("runtime@_windows_default_alloc_or_resize")) ||
+	//     false
+	// ) {
+	// 	emit_asm = true;
+	// }
 
-	// emit ir
-	if (
-	    // string_starts_with(p->name, str_lit("main@")) ||
-	    false
-	) { // IR Printing
-		TB_Arena *arena = cg_arena();
-		TB_Passes *passes = tb_pass_enter(p->func, arena);
-		defer (tb_pass_exit(passes));
+	// // emit ir
+	// if (
+	//     // string_starts_with(p->name, str_lit("main@")) ||
+	//     false
+	// ) { // IR Printing
+	// 	TB_Arena *arena = cg_arena();
+	// 	TB_Passes *passes = tb_pass_enter(p->func, arena);
+	// 	defer (tb_pass_exit(passes));
 
-		tb_pass_print(passes);
-		fprintf(stdout, "\n");
-		fflush(stdout);
-	}
-	if (false) { // GraphViz printing
-		tb_pass_print_dot(opt, tb_default_print_callback, stdout);
-	}
+	// 	tb_pass_print(passes);
+	// 	fprintf(stdout, "\n");
+	// 	fflush(stdout);
+	// }
+	// if (false) { // GraphViz printing
+	// 	tb_pass_print_dot(opt, tb_default_print_callback, stdout);
+	// }
 
-	// compile
-	TB_FunctionOutput *output = tb_pass_codegen(opt, emit_asm);
-	if (emit_asm) {
-		tb_output_print_asm(output, stdout);
-		fprintf(stdout, "\n");
-		fflush(stdout);
-	}
+	// // compile
+	// TB_FunctionOutput *output = tb_pass_codegen(opt, emit_asm);
+	// if (emit_asm) {
+	// 	tb_output_print_asm(output, stdout);
+	// 	fprintf(stdout, "\n");
+	// 	fflush(stdout);
+	// }
 
 	return 0;
 }
@@ -1025,8 +1026,8 @@ gb_internal cgProcedure *cg_equal_proc_for_type(cgModule *m, Type *type) {
 
 	TB_Node *x = tb_inst_param(p->func, 0);
 	TB_Node *y = tb_inst_param(p->func, 1);
-	GB_ASSERT(x->dt.type == TB_PTR);
-	GB_ASSERT(y->dt.type == TB_PTR);
+	GB_ASSERT(x->dt.type == TB_TAG_PTR);
+	GB_ASSERT(y->dt.type == TB_TAG_PTR);
 
 	TB_DataType ret_dt = TB_PROTOTYPE_RETURNS(p->proto)->dt;
 

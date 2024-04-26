@@ -42,8 +42,8 @@ gb_internal cgValue cg_emit_load(cgProcedure *p, cgValue const &ptr, bool is_vol
 			return cg_lvalue_addr(tb_inst_get_symbol_address(p->func, ptr.symbol), type);
 		}
 	}
-	GB_ASSERT(dt.type != TB_MEMORY);
-	GB_ASSERT(dt.type != TB_TUPLE);
+	GB_ASSERT(dt.type != TB_TAG_MEMORY);
+	GB_ASSERT(dt.type != TB_TAG_TUPLE);
 
 	// use the natural alignment
 	// if people need a special alignment, they can use `intrinsics.unaligned_load`
@@ -129,7 +129,7 @@ gb_internal void cg_emit_store(cgProcedure *p, cgValue dst, cgValue src, bool is
 	case cgValue_Value:
 		switch (src.kind) {
 		case cgValue_Value:
-			if (src.node->dt.type == TB_INT && src.node->dt.data == 1) {
+			if (src.node->dt.type == TB_TAG_INT && src.node->dt.data == 1) {
 				src.node = tb_inst_zxt(p->func, src.node, dt);
 			}
 			tb_inst_store(p->func, dt, dst.node, src.node, alignment, is_volatile);
@@ -1178,7 +1178,7 @@ gb_internal void cg_build_return_stmt_internal(cgProcedure *p, Slice<cgValue> co
 				GB_ASSERT(st.type == dt.type);
 				if (st.raw == dt.raw) {
 					final_res = result.node;
-				} else if (st.type == TB_INT && st.data == 1) {
+				} else if (st.type == TB_TAG_INT && st.data == 1) {
 					final_res = tb_inst_zxt(p->func, result.node, dt);
 				} else {
 					final_res = tb_inst_bitcast(p->func, result.node, dt);
@@ -1218,7 +1218,7 @@ gb_internal void cg_build_return_stmt_internal(cgProcedure *p, Slice<cgValue> co
 					GB_ASSERT(st.type == dt.type);
 					if (st.raw == dt.raw) {
 						final_res = result.node;
-					} else if (st.type == TB_INT && st.data == 1) {
+					} else if (st.type == TB_TAG_INT && st.data == 1) {
 						final_res = tb_inst_zxt(p->func, result.node, dt);
 					} else {
 						final_res = tb_inst_bitcast(p->func, result.node, dt);

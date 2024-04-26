@@ -29,6 +29,7 @@
 
 /* Values for e_machine. */
 #define TB_EM_NONE    0   /* Unknown machine. */
+#define TB_EM_MIPS    8   /* Mips */
 #define TB_EM_X86_64  62  /* Advanced Micro Devices x86-64 */
 #define TB_EM_AARCH64 183 /* AArch64 (64-bit ARM) */
 

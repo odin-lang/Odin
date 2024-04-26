@@ -202,12 +202,10 @@ gb_internal cgValue cg_builtin_abs(cgProcedure *p, cgValue const &x) {
 	TB_DataType dt = cg_data_type(x.type);
 	GB_ASSERT(!TB_IS_VOID_TYPE(dt));
 	TB_Node *zero = nullptr;
-	if (dt.type == TB_FLOAT) {
-		if (dt.data == 32) {
-			zero = tb_inst_float32(p->func, 0);
-		} else if (dt.data == 64) {
-			zero = tb_inst_float64(p->func, 0);
-		}
+	if (dt.type == TB_TAG_F32) {
+		zero = tb_inst_float32(p->func, 0);
+	} else if (dt.type == TB_TAG_F64) {
+		zero = tb_inst_float64(p->func, 0);
 	} else {
 		zero = tb_inst_uint(p->func, dt, 0);
 	}
