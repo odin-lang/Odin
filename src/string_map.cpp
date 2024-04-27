@@ -2,8 +2,8 @@ GB_STATIC_ASSERT(sizeof(MapIndex) == sizeof(u32));
 
 
 struct StringHashKey {
-	u32    hash;
 	String string;
+	u32    hash;
 
 	operator String() const noexcept {
 		return this->string;
@@ -13,7 +13,8 @@ struct StringHashKey {
 	}
 };
 gb_internal gb_inline u32 string_hash(String const &s) {
-	return fnv32a(s.text, s.len) & 0x7fffffff;
+	u32 res = fnv32a(s.text, s.len) & 0x7fffffff;
+	return res | (res == 0);
 }
 
 gb_internal gb_inline StringHashKey string_hash_string(String const &s) {
@@ -25,19 +26,16 @@ gb_internal gb_inline StringHashKey string_hash_string(String const &s) {
 
 template <typename T>
 struct StringMapEntry {
-	String        key;
-	u32           hash;
-	MapIndex      next;
-	T             value;
+	String key;
+	u32    hash;
+	T      value;
 };
 
 template <typename T>
 struct StringMap {
-	MapIndex *         hashes;
-	usize              hashes_count;
 	StringMapEntry<T> *entries;
 	u32                count;
-	u32                entries_capacity;
+	u32                capacity;
 };
 
 
@@ -73,127 +71,91 @@ gb_internal gb_inline void string_map_init(StringMap<T> *h, usize capacity) {
 
 template <typename T>
 gb_internal gb_inline void string_map_destroy(StringMap<T> *h) {
-	gb_free(string_map_allocator(), h->hashes);
 	gb_free(string_map_allocator(), h->entries);
 }
 
 
 template <typename T>
-gb_internal void string_map__resize_hashes(StringMap<T> *h, usize count) {
-	h->hashes_count = cast(u32)resize_array_raw(&h->hashes, string_map_allocator(), h->hashes_count, count, MAP_CACHE_LINE_SIZE);
-}
-
-
-template <typename T>
-gb_internal void string_map__reserve_entries(StringMap<T> *h, usize capacity) {
-	h->entries_capacity = cast(u32)resize_array_raw(&h->entries, string_map_allocator(), h->entries_capacity, capacity, MAP_CACHE_LINE_SIZE);
-}
-
-
-template <typename T>
-gb_internal MapIndex string_map__add_entry(StringMap<T> *h, u32 hash, String const &key) {
-	StringMapEntry<T> e = {};
-	e.key = key;
-	e.hash = hash;
-	e.next = MAP_SENTINEL;
-	if (h->count+1 >= h->entries_capacity) {
-		string_map__reserve_entries(h, gb_max(h->entries_capacity*2, 4));
+gb_internal void string_map__insert(StringMap<T> *h, u32 hash, String const &key, T const &value) {
+	if (h->count+1 >= h->capacity) {
+		string_map_grow(h);
 	}
-	h->entries[h->count++] = e;
-	return cast(MapIndex)(h->count-1);
-}
+	GB_ASSERT(h->count+1 < h->capacity);
 
-template <typename T>
-gb_internal MapFindResult string_map__find(StringMap<T> *h, u32 hash, String const &key) {
-	MapFindResult fr = {MAP_SENTINEL, MAP_SENTINEL, MAP_SENTINEL};
-	if (h->hashes_count != 0) {
-		fr.hash_index = cast(MapIndex)(hash & (h->hashes_count-1));
-		fr.entry_index = h->hashes[fr.hash_index];
-		while (fr.entry_index != MAP_SENTINEL) {
-			auto *entry = &h->entries[fr.entry_index];
-			if (entry->hash == hash && entry->key == key) {
-				return fr;
-			}
-			fr.entry_prev = fr.entry_index;
-			fr.entry_index = entry->next;
+	u32 mask = h->capacity-1;
+	MapIndex index = hash & mask;
+	MapIndex original_index = index;
+	do {
+		auto *entry = h->entries+index;
+		if (entry->hash == 0) {
+			entry->key   = key;
+			entry->hash  = hash;
+			entry->value = value;
+
+			h->count += 1;
+			return;
 		}
-	}
-	return fr;
-}
+		index = (index+1)&mask;
+	} while (index != original_index);
 
-template <typename T>
-gb_internal MapFindResult string_map__find_from_entry(StringMap<T> *h, StringMapEntry<T> *e) {
-	MapFindResult fr = {MAP_SENTINEL, MAP_SENTINEL, MAP_SENTINEL};
-	if (h->hashes_count != 0) {
-		fr.hash_index  = cast(MapIndex)(e->hash & (h->hashes_count-1));
-		fr.entry_index = h->hashes[fr.hash_index];
-		while (fr.entry_index != MAP_SENTINEL) {
-			auto *entry = &h->entries[fr.entry_index];
-			if (entry == e) {
-				return fr;
-			}
-			fr.entry_prev = fr.entry_index;
-			fr.entry_index = entry->next;
-		}
-	}
-	return fr;
+	GB_PANIC("Full map");
 }
 
 template <typename T>
 gb_internal b32 string_map__full(StringMap<T> *h) {
-	return 0.75f * h->hashes_count <= h->count;
+	return 0.75f * h->count <= h->capacity;
 }
 
 template <typename T>
 gb_inline void string_map_grow(StringMap<T> *h) {
-	isize new_count = gb_max(h->hashes_count<<1, 16);
-	string_map_reserve(h, new_count);
+	isize new_capacity = gb_max(h->capacity<<1, 16);
+	string_map_reserve(h, new_capacity);
 }
 
-
-template <typename T>
-gb_internal void string_map_reset_entries(StringMap<T> *h) {
-	for (u32 i = 0; i < h->hashes_count; i++) {
-		h->hashes[i] = MAP_SENTINEL;
-	}
-	for (isize i = 0; i < h->count; i++) {
-		MapFindResult fr;
-		StringMapEntry<T> *e = &h->entries[i];
-		e->next = MAP_SENTINEL;
-		fr = string_map__find_from_entry(h, e);
-		if (fr.entry_prev == MAP_SENTINEL) {
-			h->hashes[fr.hash_index] = cast(MapIndex)i;
-		} else {
-			h->entries[fr.entry_prev].next = cast(MapIndex)i;
-		}
-	}
-}
 
 template <typename T>
 gb_internal void string_map_reserve(StringMap<T> *h, usize cap) {
-	if (h->count*2 < h->hashes_count) {
+	if (cap < h->capacity) {
 		return;
 	}
-	string_map__reserve_entries(h, cap);
-	string_map__resize_hashes(h,   cap*2);
-	string_map_reset_entries(h);
+	cap = next_pow2_isize(cap);
+
+	StringMap<T> new_h = {};
+	new_h.count    = 0;
+	new_h.capacity = cast(u32)cap;
+	new_h.entries = gb_alloc_array(string_map_allocator(), StringMapEntry<T>, new_h.capacity);
+
+	if (h->count) {
+		for (u32 i = 0; i < h->capacity; i++) {
+			auto *entry = h->entries+i;
+			if (entry->hash) {
+				string_map__insert(&new_h, entry->hash, entry->key, entry->value);
+			}
+		}
+	}
+	string_map_destroy(h);
+	*h = new_h;
 }
 
 template <typename T>
 gb_internal T *string_map_get(StringMap<T> *h, u32 hash, String const &key) {
-	MapFindResult fr = {MAP_SENTINEL, MAP_SENTINEL, MAP_SENTINEL};
-	if (h->hashes_count != 0) {
-		fr.hash_index = cast(MapIndex)(hash & (h->hashes_count-1));
-		fr.entry_index = h->hashes[fr.hash_index];
-		while (fr.entry_index != MAP_SENTINEL) {
-			auto *entry = &h->entries[fr.entry_index];
-			if (entry->hash == hash && entry->key == key) {
-				return &entry->value;
-			}
-			fr.entry_prev = fr.entry_index;
-			fr.entry_index = entry->next;
-		}
+	if (h->count == 0) {
+		return nullptr;
 	}
+	u32 mask = (h->capacity-1);
+	u32 index = hash & mask;
+	u32 original_index = index;
+	do {
+		auto *entry = h->entries+index;
+		u32 curr_hash = entry->hash;
+		if (curr_hash == 0) {
+			// NOTE(bill): no found, but there isn't any key removal for this hash map
+			return nullptr;
+		} else if (curr_hash == hash && entry->key == key) {
+			return &entry->value;
+		}
+		index = (index+1) & mask;
+	} while (original_index != index);
 	return nullptr;
 }
 
@@ -216,9 +178,9 @@ gb_internal gb_inline T *string_map_get(StringMap<T> *h, char const *key) {
 
 template <typename T>
 gb_internal T &string_map_must_get(StringMap<T> *h, u32 hash, String const &key) {
-	isize index = string_map__find(h, hash, key).entry_index;
-	GB_ASSERT(index != MAP_SENTINEL);
-	return h->entries[index].value;
+	T *found = string_map_get(h, hash, key);
+	GB_ASSERT(found != nullptr);
+	return *found;
 }
 
 template <typename T>
@@ -239,27 +201,15 @@ gb_internal gb_inline T &string_map_must_get(StringMap<T> *h, char const *key) {
 
 template <typename T>
 gb_internal void string_map_set(StringMap<T> *h, u32 hash, String const &key, T const &value) {
-	MapIndex index;
-	MapFindResult fr;
-	if (h->hashes_count == 0) {
+	if (h->count == 0) {
 		string_map_grow(h);
 	}
-	fr = string_map__find(h, hash, key);
-	if (fr.entry_index != MAP_SENTINEL) {
-		index = fr.entry_index;
-	} else {
-		index = string_map__add_entry(h, hash, key);
-		if (fr.entry_prev != MAP_SENTINEL) {
-			h->entries[fr.entry_prev].next = index;
-		} else {
-			h->hashes[fr.hash_index] = index;
-		}
+	auto *found = string_map_get(h, hash, key);
+	if (found) {
+		*found = value;
+		return;
 	}
-	h->entries[index].value = value;
-
-	if (string_map__full(h)) {
-		string_map_grow(h);
-	}
+	string_map__insert(h, hash, key, value);
 }
 
 template <typename T>
@@ -278,62 +228,80 @@ gb_internal gb_inline void string_map_set(StringMap<T> *h, StringHashKey const &
 }
 
 
-
-// template <typename T>
-// gb_internal void string_map__erase(StringMap<T> *h, MapFindResult const &fr) {
-// 	MapFindResult last;
-// 	if (fr.entry_prev == MAP_SENTINEL) {
-// 		h->hashes[fr.hash_index] = h->entries[fr.entry_index].next;
-// 	} else {
-// 		h->entries[fr.entry_prev].next = h->entries[fr.entry_index].next;
-// 	}
-// 	if (fr.entry_index == h->count-1) {
-// 		array_pop(&h->entries);
-// 		return;
-// 	}
-// 	h->entries[fr.entry_index] = h->entries[h->count-1];
-// 	last = string_map__find(h, h->entries[fr.entry_index].key);
-// 	if (last.entry_prev != MAP_SENTINEL) {
-// 		h->entries[last.entry_prev].next = fr.entry_index;
-// 	} else {
-// 		h->hashes[last.hash_index] = fr.entry_index;
-// 	}
-// }
-
-// template <typename T>
-// gb_internal void string_map_remove(StringMap<T> *h, StringHashKey const &key) {
-// 	MapFindResult fr = string_map__find(h, key);
-// 	if (fr.entry_index != MAP_SENTINEL) {
-// 		string_map__erase(h, fr);
-// 	}
-// }
-
 template <typename T>
 gb_internal gb_inline void string_map_clear(StringMap<T> *h) {
 	h->count = 0;
-	for (u32 i = 0; i < h->hashes_count; i++) {
-		h->hashes[i] = MAP_SENTINEL;
+	gb_zero_array(h->entries, h->capacity);
+}
+
+
+template <typename T>
+struct StringMapIterator {
+	StringMap<T> *map;
+	MapIndex index;
+
+	StringMapIterator<T> &operator++() noexcept {
+		for (;;) {
+			++index;
+			if (map->capacity == index) {
+				return *this;
+			}
+			StringMapEntry<T> *entry = map->entries+index;
+			if (entry->hash != 0) {
+				return *this;
+			}
+		}
 	}
+
+	bool operator==(StringMapIterator<T> const &other) const noexcept {
+		return this->map == other->map && this->index == other->index;
+	}
+
+	operator StringMapEntry<T> *() const {
+		return map->entries+index;
+	}
+};
+
+
+template <typename T>
+gb_internal StringMapIterator<T> end(StringMap<T> &m) noexcept {
+	return StringMapIterator<T>{&m, m.capacity};
+}
+
+template <typename T>
+gb_internal StringMapIterator<T> const end(StringMap<T> const &m) noexcept {
+	return StringMapIterator<T>{&m, m.capacity};
 }
 
 
 
 template <typename T>
-gb_internal StringMapEntry<T> *begin(StringMap<T> &m) noexcept {
-	return m.entries;
+gb_internal StringMapIterator<T> begin(StringMap<T> &m) noexcept {
+	if (m.count == 0) {
+		return end(m);
+	}
+
+	MapIndex index = 0;
+	while (index < m.capacity) {
+		if (m.entries[index].hash) {
+			break;
+		}
+		index++;
+	}
+	return StringMapIterator<T>{&m, index};
 }
 template <typename T>
-gb_internal StringMapEntry<T> const *begin(StringMap<T> const &m) noexcept {
-	return m.entries;
-}
+gb_internal StringMapIterator<T> const begin(StringMap<T> const &m) noexcept {
+	if (m.count == 0) {
+		return end(m);
+	}
 
-
-template <typename T>
-gb_internal StringMapEntry<T> *end(StringMap<T> &m) {
-	return m.entries + m.count;
-}
-
-template <typename T>
-gb_internal StringMapEntry<T> const *end(StringMap<T> const &m) noexcept {
-	return m.entries + m.count;
+	MapIndex index = 0;
+	while (index < m.capacity) {
+		if (m.entries[index].hash) {
+			break;
+		}
+		index++;
+	}
+	return StringMapIterator<T>{&m, index};
 }

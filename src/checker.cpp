@@ -1897,8 +1897,7 @@ gb_internal void add_type_info_type_internal(CheckerContext *c, Type *t) {
 	add_type_info_dependency(c->info, c->decl, t);
 
 	MUTEX_GUARD_BLOCK(&c->info->type_info_mutex) {
-		MapFindResult fr;
-		auto found = map_try_get(&c->info->type_info_map, t, &fr);
+		auto found = map_get(&c->info->type_info_map, t);
 		if (found != nullptr) {
 			// Types have already been added
 			return;
@@ -1922,7 +1921,7 @@ gb_internal void add_type_info_type_internal(CheckerContext *c, Type *t) {
 			ti_index = c->info->type_info_types.count;
 			array_add(&c->info->type_info_types, t);
 		}
-		map_set_internal_from_try_get(&c->checker->info.type_info_map, t, ti_index, fr);
+		map_set(&c->checker->info.type_info_map, t, ti_index);
 
 		if (prev) {
 			// NOTE(bill): If a previous one exists already, no need to continue
@@ -2193,7 +2192,7 @@ gb_internal void add_min_dep_type_info(Checker *c, Type *t) {
 	// IMPORTANT NOTE(bill): this must be copied as `map_set` takes a const ref
 	// and effectively assigns the `+1` of the value
 	isize const count = set->count;
-	if (map_set_if_not_previously_exists(set, ti_index, count)) {
+	if (map_set_if_not_previously_exists(set, ti_index+1, count)) {
 		// Type already exists;
 		return;
 	}
@@ -4309,17 +4308,22 @@ gb_internal bool correct_single_type_alias(CheckerContext *c, Entity *e) {
 
 gb_internal bool correct_type_alias_in_scope_backwards(CheckerContext *c, Scope *s) {
 	bool correction = false;
-	u32 n = s->elements.count;
-	for (u32 i = n-1; i < n; i--) {
-		correction |= correct_single_type_alias(c, s->elements.entries[i].value);
+	for (u32 n = s->elements.count, i = n-1; i < n; i--) {
+		auto const &entry = s->elements.entries[i];
+		Entity *e = entry.value;
+		if (entry.hash && e != nullptr) {
+			correction |= correct_single_type_alias(c, e);
+		}
 	}
 	return correction;
 }
 gb_internal bool correct_type_alias_in_scope_forwards(CheckerContext *c, Scope *s) {
 	bool correction = false;
-	u32 n = s->elements.count;
-	for (isize i = 0; i < n; i++) {
-		correction |= correct_single_type_alias(c, s->elements.entries[i].value);
+	for (auto const &entry : s->elements) {
+		Entity *e = entry.value;
+		if (e != nullptr) {
+			correction |= correct_single_type_alias(c, entry.value);
+		}
 	}
 	return correction;
 }
