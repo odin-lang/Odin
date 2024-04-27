@@ -754,7 +754,7 @@ fork :: proc "contextless" () -> (Pid, Errno) {
 	when ODIN_ARCH == .arm64 {
 		ret, err := clone(u64(Signal.SIGCHLD), nil, nil, nil, 0)
 		if err != .NONE do return Pid(ret), err
-		return Pid(ret), .NONE
+		return Pid(ret), err
 	} else {
 		ret := syscall(SYS_fork)
 		return errno_unwrap(ret, Pid)
