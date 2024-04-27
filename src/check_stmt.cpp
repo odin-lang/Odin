@@ -1629,6 +1629,17 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 				if (build_context.no_rtti && is_type_enum(t->BitSet.elem)) {
 					error(node, "Iteration over a bit_set of an enum is not allowed runtime type information (RTTI) has been disallowed");
 				}
+				if (rs->vals.count == 1 && rs->vals[0] && rs->vals[0]->kind == Ast_Ident) {
+					String name = rs->vals[0]->Ident.token.string;
+					Entity *found = scope_lookup(ctx->scope, name);
+					if (found && are_types_identical(found->type, t->BitSet.elem)) {
+						ERROR_BLOCK();
+						gbString s = expr_to_string(expr);
+						error(rs->vals[0], "'%.*s' shadows a previous declaration which might be ambiguous with 'for (%.*s in %s)'", LIT(name), LIT(name), s);
+						error_line("\tSuggestion: Use a different identifier if iteration is wanted, or surround in parentheses if a normal for loop is wanted\n");
+						gb_string_free(s);
+					}
+				}
 				break;
 
 			case Type_EnumeratedArray:
@@ -1663,6 +1674,17 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 				array_add(&vals, t->Map.value);
 				if (is_reverse) {
 					error(node, "#reverse for is not supported for map types, as maps are unordered");
+				}
+				if (rs->vals.count == 1 && rs->vals[0] && rs->vals[0]->kind == Ast_Ident) {
+					String name = rs->vals[0]->Ident.token.string;
+					Entity *found = scope_lookup(ctx->scope, name);
+					if (found && are_types_identical(found->type, t->Map.key)) {
+						ERROR_BLOCK();
+						gbString s = expr_to_string(expr);
+						error(rs->vals[0], "'%.*s' shadows a previous declaration which might be ambiguous with 'for (%.*s in %s)'", LIT(name), LIT(name), s);
+						error_line("\tSuggestion: Use a different identifier if iteration is wanted, or surround in parentheses if a normal for loop is wanted\n");
+						gb_string_free(s);
+					}
 				}
 				break;
 
