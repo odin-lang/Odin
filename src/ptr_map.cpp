@@ -147,7 +147,7 @@ gb_internal void map_reserve(PtrMap<K, V> *h, isize cap) {
 	PtrMap<K, V> new_h = {};
 	new_h.count    = 0;
 	new_h.capacity = cast(u32)cap;
-	new_h.entries = gb_alloc_array(string_map_allocator(), EntryType, new_h.capacity);
+	new_h.entries = gb_alloc_array(map_allocator(), EntryType, new_h.capacity);
 
 	if (h->count) {
 		for (u32 i = 0; i < h->capacity; i++) {
