@@ -568,13 +568,13 @@ scan :: proc(s: ^Scanner) -> (tok: rune) {
 				break
 			case '"':
 				if .Scan_Strings in s.flags {
-					scan_string(s, '"')
+					_ = scan_string(s, '"')
 					tok = String
 				}
 				ch = advance(s)
 			case '\'':
 				if .Scan_Chars in s.flags {
-					scan_string(s, '\'')
+					_ = scan_string(s, '\'')
 					tok = Char
 				}
 				ch = advance(s)
