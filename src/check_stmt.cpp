@@ -1669,12 +1669,20 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 			case Type_Tuple:
 				{
 					isize count = t->Tuple.variables.count;
-					if (count < 1 || count > 3) {
+					if (count < 1) {
 						ERROR_BLOCK();
 						check_not_tuple(ctx, &operand);
-						error_line("\tMultiple return valued parameters in a range statement are limited to a maximum of 2 usable values with a trailing boolean for the conditional\n");
+						error_line("\tMultiple return valued parameters in a range statement are limited to a minimum of 1 usable values with a trailing boolean for the conditional, got %td\n", count);
 						break;
 					}
+					enum : isize {MAXIMUM_COUNT = 100};
+					if (count > MAXIMUM_COUNT) {
+						ERROR_BLOCK();
+						check_not_tuple(ctx, &operand);
+						error_line("\tMultiple return valued parameters in a range statement are limited to a maximum of %td usable values with a trailing boolean for the conditional, got %td\n", MAXIMUM_COUNT, count);
+						break;
+					}
+
 					Type *cond_type = t->Tuple.variables[count-1]->type;
 					if (!is_type_boolean(cond_type)) {
 						gbString s = type_to_string(cond_type);
@@ -1683,24 +1691,23 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 						break;
 					}
 
+					max_val_count = count;
+
 					for (Entity *e : t->Tuple.variables) {
 						array_add(&vals, e->type);
 					}
 
 					is_possibly_addressable = false;
 
-					if (rs->vals.count > 1 && rs->vals[1] != nullptr && count < 3) {
-						gbString s = type_to_string(t);
-						error(operand.expr, "Expected a 3-valued expression on the rhs, got (%s)", s);
-						gb_string_free(s);
-						break;
-					}
-
-					if (rs->vals.count > 0 && rs->vals[0] != nullptr && count < 2) {
-						gbString s = type_to_string(t);
-						error(operand.expr, "Expected at least a 2-valued expression on the rhs, got (%s)", s);
-						gb_string_free(s);
-						break;
+					bool do_break = false;
+					for (isize i = rs->vals.count-1; i >= 0; i--) {
+						if (rs->vals[i] != nullptr && count < i+2) {
+							gbString s = type_to_string(t);
+							error(operand.expr, "Expected a %td-valued expression on the rhs, got (%s)", i+2, s);
+							gb_string_free(s);
+							do_break = true;
+							break;
+						}
 					}
 
 					if (is_reverse) {
