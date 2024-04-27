@@ -4,6 +4,9 @@ import win32 "core:sys/windows"
 import "core:os"
 import "core:fmt"
 
+HAS_RAND_BYTES :: true
+
+@(private)
 _rand_bytes :: proc(dst: []byte) {
 	ret := (os.Errno)(win32.BCryptGenRandom(nil, raw_data(dst), u32(len(dst)), win32.BCRYPT_USE_SYSTEM_PREFERRED_RNG))
 	if ret != os.ERROR_NONE {
@@ -20,8 +23,4 @@ _rand_bytes :: proc(dst: []byte) {
 				panic(fmt.tprintf("crypto: BCryptGenRandom failed: %d\n", ret))
 		}
 	}
-}
-
-_has_rand_bytes :: proc() -> bool {
-	return true
 }

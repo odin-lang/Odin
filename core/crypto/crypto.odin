@@ -49,15 +49,12 @@ compare_byte_ptrs_constant_time :: proc "contextless" (a, b: ^byte, n: int) -> i
 // the system entropy source.  This routine will block if the system entropy
 // source is not ready yet.  All system entropy source failures are treated
 // as catastrophic, resulting in a panic.
+//
+// Support for the system entropy source can be checked with the
+// `HAS_RAND_BYTES` boolean constant.
 rand_bytes :: proc (dst: []byte) {
 	// zero-fill the buffer first
 	mem.zero_explicit(raw_data(dst), len(dst))
 
 	_rand_bytes(dst)
-}
-
-// has_rand_bytes returns true iff the target has support for accessing the
-// system entropty source.
-has_rand_bytes :: proc () -> bool {
-	return _has_rand_bytes()
 }
