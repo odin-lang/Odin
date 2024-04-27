@@ -2526,8 +2526,11 @@ fmt_bit_field :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Bit
 		bit_offset := info.bit_offsets[i]
 		bit_size := info.bit_sizes[i]
 
-		value := read_bits(([^]byte)(v.data), bit_offset, bit_size)
 		type := info.types[i]
+		value := read_bits(([^]byte)(v.data), bit_offset, bit_size)
+		if reflect.is_endian_big(type) {
+			value <<= u64(8*type.size) - u64(bit_size)
+		}
 
 		if !reflect.is_unsigned(runtime.type_info_core(type)) {
 			// Sign Extension
