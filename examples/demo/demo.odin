@@ -2385,7 +2385,7 @@ matrix_type :: proc() {
 
 		c := a * b
 		#assert(type_of(c) == matrix[2, 2]f32)
-		fmt.tprintln("c = a * b", c)
+		fmt.println("c = a * b", c)
 	}
 
 	{ // Matrices support multiplication between matrices and arrays
