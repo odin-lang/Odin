@@ -131,6 +131,9 @@ _frames :: proc(ctx: ^Context, skip: uint, allocator: runtime.Allocator) -> (fra
 
 @(private="package")
 _resolve :: proc(ctx: ^Context, frame: Frame, allocator: runtime.Allocator) -> Frame_Location {
+	intrinsics.atomic_store(&ctx.in_resolve, true)
+	defer intrinsics.atomic_store(&ctx.in_resolve, false)
+
 	Backtrace_Context :: struct {
 		rt_ctx:    runtime.Context,
 		allocator: runtime.Allocator,
