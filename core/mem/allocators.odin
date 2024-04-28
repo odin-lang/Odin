@@ -1124,7 +1124,7 @@ buddy_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 	case .Query_Info:
 		info := (^Allocator_Query_Info)(old_memory)
 		if info != nil && info.pointer != nil {
-			ptr := old_memory
+			ptr := info.pointer
 			if !(b.head <= ptr && ptr <= b.tail) {
 				return nil, .Invalid_Pointer
 			}
