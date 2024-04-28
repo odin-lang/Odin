@@ -2925,6 +2925,8 @@ gb_internal void init_core_type_info(Checker *c) {
 		return;
 	}
 	Entity *type_info_entity = find_core_entity(c, str_lit("Type_Info"));
+	GB_ASSERT(type_info_entity != nullptr);
+	GB_ASSERT(type_info_entity->type != nullptr);
 
 	t_type_info = type_info_entity->type;
 	t_type_info_ptr = alloc_type_pointer(t_type_info);
