@@ -1,5 +1,5 @@
 //+private file
-//+build linux
+//+build linux, darwin
 package debug_trace
 
 import "base:intrinsics"
