@@ -1,4 +1,4 @@
-//+build !windows
+//+build !windows !linux
 package debug_trace
 
 _Context :: struct {
