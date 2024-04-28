@@ -730,31 +730,13 @@ getsockopt :: proc {
 }
 
 /*
-	Creates a new ("child") process, in a manner similar to fork.
-	Available since Linux 1.0? (<2.4)
-
-	Note(flysand): this syscall is not documented, but the bottom 8 bits of flags
-	are for exit signal
-*/
-clone :: proc "contextless" (flags: u64, stack: rawptr, parent_tid, child_tid: ^i32, tls: u64) -> (i64, Errno) {
-	when ODIN_ARCH == .amd64 {
-		ret := syscall(SYS_clone, flags, stack, parent_tid, child_tid, tls)
-		return errno_unwrap(ret, i64)
-	} else {
-		ret := syscall(SYS_clone, flags, stack, parent_tid, tls, child_tid)
-		return errno_unwrap(ret, i64)
-	}
-}
-
-/*
 	Creates a copy of the running process.
 	Available since Linux 1.0.
 */
 fork :: proc "contextless" () -> (Pid, Errno) {
 	when ODIN_ARCH == .arm64 {
-		ret, err := clone(u64(Signal.SIGCHLD), nil, nil, nil, 0)
-		if err != .NONE do return Pid(ret), err
-		return Pid(ret), err
+		ret := syscall(SYS_clone, u64(Signal.SIGCHLD), cast(rawptr) nil, cast(rawptr) nil, cast(rawptr) nil, u64(0))
+		return errno_unwrap(ret, Pid)
 	} else {
 		ret := syscall(SYS_fork)
 		return errno_unwrap(ret, Pid)
