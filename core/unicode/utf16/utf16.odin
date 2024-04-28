@@ -11,11 +11,11 @@ _surr3           :: 0xe000
 _surr_self       :: 0x10000
 
 
-is_surrogate :: proc(r: rune) -> bool {
+is_surrogate :: proc "contextless" (r: rune) -> bool {
 	return _surr1 <= r && r < _surr3
 }
 
-decode_surrogate_pair :: proc(r1, r2: rune) -> rune {
+decode_surrogate_pair :: proc "contextless" (r1, r2: rune) -> rune {
 	if _surr1 <= r1 && r1 < _surr2 && _surr2 <= r2 && r2 < _surr3 {
 		return (r1-_surr1)<<10 | (r2 - _surr2) + _surr_self
 	}
@@ -23,7 +23,7 @@ decode_surrogate_pair :: proc(r1, r2: rune) -> rune {
 }
 
 
-encode_surrogate_pair :: proc(c: rune) -> (r1, r2: rune) {
+encode_surrogate_pair :: proc "contextless" (c: rune) -> (r1, r2: rune) {
 	r := c
 	if r < _surr_self || r > MAX_RUNE {
 		return REPLACEMENT_CHAR, REPLACEMENT_CHAR
@@ -32,7 +32,7 @@ encode_surrogate_pair :: proc(c: rune) -> (r1, r2: rune) {
 	return _surr1 + (r>>10)&0x3ff, _surr2 + r&0x3ff
 }
 
-encode :: proc(d: []u16, s: []rune) -> int {
+encode :: proc "contextless" (d: []u16, s: []rune) -> int {
 	n, m := 0, len(d)
 	loop: for r in s {
 		switch r {
@@ -58,7 +58,7 @@ encode :: proc(d: []u16, s: []rune) -> int {
 }
 
 
-encode_string :: proc(d: []u16, s: string) -> int {
+encode_string :: proc "contextless" (d: []u16, s: string) -> int {
 	n, m := 0, len(d)
 	loop: for r in s {
 		switch r {
@@ -83,7 +83,7 @@ encode_string :: proc(d: []u16, s: string) -> int {
 	return n
 }
 
-decode :: proc(d: []rune, s: []u16) -> (n: int) {
+decode :: proc "contextless" (d: []rune, s: []u16) -> (n: int) {
 	for i := 0; i < len(s); i += 1 {
 		if n >= len(d) {
 			return
@@ -107,7 +107,7 @@ decode :: proc(d: []rune, s: []u16) -> (n: int) {
 }
 
 
-decode_to_utf8 :: proc(d: []byte, s: []u16) -> (n: int) {
+decode_to_utf8 :: proc "contextless" (d: []byte, s: []u16) -> (n: int) {
 	for i := 0; i < len(s); i += 1 {
 		if n >= len(d) {
 			return

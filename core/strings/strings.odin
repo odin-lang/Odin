@@ -3173,7 +3173,7 @@ Returns:
 - res: A slice of substrings of the input string, or an empty slice if all code points in the input string satisfy the predicate or if the input string is empty
 - err: An optional allocator error if one occured, `nil` otherwise
 */
-fields_proc :: proc(s: string, f: proc(rune) -> bool, allocator := context.allocator, loc := #caller_location) -> (res: []string, err: mem.Allocator_Error) #optional_allocator_error #no_bounds_check {
+fields_proc :: proc(s: string, f: proc "contextless" (rune) -> bool, allocator := context.allocator, loc := #caller_location) -> (res: []string, err: mem.Allocator_Error) #optional_allocator_error #no_bounds_check {
 	substrings := make([dynamic]string, 0, 32, allocator, loc) or_return
 
 	start, end := -1, -1

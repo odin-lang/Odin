@@ -5,7 +5,7 @@ REPLACEMENT_CHAR :: '\ufffd'     // Represented an invalid code point
 MAX_ASCII        :: '\u007f'     // Maximum ASCII value
 MAX_LATIN1       :: '\u00ff'     // Maximum Latin-1 value
 
-binary_search :: proc(c: i32, table: []i32, length, stride: int) -> int {
+binary_search :: proc "contextless" (c: i32, table: []i32, length, stride: int) -> int {
 	n := length
 	t := 0
 	for n > 1 {
@@ -24,7 +24,7 @@ binary_search :: proc(c: i32, table: []i32, length, stride: int) -> int {
 	return -1
 }
 
-to_lower :: proc(r: rune) -> rune {
+to_lower :: proc "contextless" (r: rune) -> rune {
 	c := i32(r)
 	p := binary_search(c, to_lower_ranges[:], len(to_lower_ranges)/3, 3)
 	if p >= 0 && to_lower_ranges[p] <= c && c <= to_lower_ranges[p+1] {
@@ -36,7 +36,7 @@ to_lower :: proc(r: rune) -> rune {
 	}
 	return rune(c)
 }
-to_upper :: proc(r: rune) -> rune {
+to_upper :: proc "contextless" (r: rune) -> rune {
 	c := i32(r)
 	p := binary_search(c, to_upper_ranges[:], len(to_upper_ranges)/3, 3)
 	if p >= 0 && to_upper_ranges[p] <= c && c <= to_upper_ranges[p+1] {
@@ -48,7 +48,7 @@ to_upper :: proc(r: rune) -> rune {
 	}
 	return rune(c)
 }
-to_title :: proc(r: rune) -> rune {
+to_title :: proc "contextless" (r: rune) -> rune {
 	c := i32(r)
 	p := binary_search(c, to_upper_singlets[:], len(to_title_singlets)/2, 2)
 	if p >= 0 && c == to_upper_singlets[p] {
@@ -58,7 +58,7 @@ to_title :: proc(r: rune) -> rune {
 }
 
 
-is_lower :: proc(r: rune) -> bool {
+is_lower :: proc "contextless" (r: rune) -> bool {
 	if r <= MAX_ASCII {
 		return u32(r)-'a' < 26
 	}
@@ -74,7 +74,7 @@ is_lower :: proc(r: rune) -> bool {
 	return false
 }
 
-is_upper :: proc(r: rune) -> bool {
+is_upper :: proc "contextless" (r: rune) -> bool {
 	if r <= MAX_ASCII {
 		return u32(r)-'A' < 26
 	}
@@ -91,7 +91,7 @@ is_upper :: proc(r: rune) -> bool {
 }
 
 is_alpha :: is_letter
-is_letter :: proc(r: rune) -> bool {
+is_letter :: proc "contextless" (r: rune) -> bool {
 	if u32(r) <= MAX_LATIN1 {
 		return char_properties[u8(r)]&pLmask != 0
 	}
@@ -111,11 +111,11 @@ is_letter :: proc(r: rune) -> bool {
 	return false
 }
 
-is_title :: proc(r: rune) -> bool {
+is_title :: proc "contextless" (r: rune) -> bool {
 	return is_upper(r) && is_lower(r)
 }
 
-is_digit :: proc(r: rune) -> bool {
+is_digit :: proc "contextless" (r: rune) -> bool {
 	if r <= MAX_LATIN1 {
 		return '0' <= r && r <= '9'
 	}
@@ -124,7 +124,7 @@ is_digit :: proc(r: rune) -> bool {
 
 
 is_white_space :: is_space
-is_space :: proc(r: rune) -> bool {
+is_space :: proc "contextless" (r: rune) -> bool {
 	if u32(r) <= MAX_LATIN1 {
 		switch r {
 		case '\t', '\n', '\v', '\f', '\r', ' ', 0x85, 0xa0:
@@ -140,7 +140,7 @@ is_space :: proc(r: rune) -> bool {
 	return false
 }
 
-is_combining :: proc(r: rune) -> bool {
+is_combining :: proc "contextless" (r: rune) -> bool {
 	c := i32(r)
 
 	return c >= 0x0300 && (c <= 0x036f ||
@@ -152,42 +152,42 @@ is_combining :: proc(r: rune) -> bool {
 
 
 
-is_graphic :: proc(r: rune) -> bool {
+is_graphic :: proc "contextless" (r: rune) -> bool {
 	if u32(r) <= MAX_LATIN1 {
 		return char_properties[u8(r)]&pg != 0
 	}
 	return false
 }
 
-is_print :: proc(r: rune) -> bool {
+is_print :: proc "contextless" (r: rune) -> bool {
 	if u32(r) <= MAX_LATIN1 {
 		return char_properties[u8(r)]&pp != 0
 	}
 	return false
 }
 
-is_control :: proc(r: rune) -> bool {
+is_control :: proc "contextless" (r: rune) -> bool {
 	if u32(r) <= MAX_LATIN1 {
 		return char_properties[u8(r)]&pC != 0
 	}
 	return false
 }
 
-is_number :: proc(r: rune) -> bool {
+is_number :: proc "contextless" (r: rune) -> bool {
 	if u32(r) <= MAX_LATIN1 {
 		return char_properties[u8(r)]&pN != 0
 	}
 	return false
 }
 
-is_punct :: proc(r: rune) -> bool {
+is_punct :: proc "contextless" (r: rune) -> bool {
 	if u32(r) <= MAX_LATIN1 {
 		return char_properties[u8(r)]&pP != 0
 	}
 	return false
 }
 
-is_symbol :: proc(r: rune) -> bool {
+is_symbol :: proc "contextless" (r: rune) -> bool {
 	if u32(r) <= MAX_LATIN1 {
 		return char_properties[u8(r)]&pS != 0
 	}

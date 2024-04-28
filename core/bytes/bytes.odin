@@ -1141,7 +1141,7 @@ fields :: proc(s: []byte, allocator := context.allocator) -> [][]byte #no_bounds
 //
 // fields_proc makes no guarantee about the order in which it calls f(ch)
 // it assumes that `f` always returns the same value for a given ch
-fields_proc :: proc(s: []byte, f: proc(rune) -> bool, allocator := context.allocator) -> [][]byte #no_bounds_check {
+fields_proc :: proc(s: []byte, f: proc "contextless" (rune) -> bool, allocator := context.allocator) -> [][]byte #no_bounds_check {
 	subslices := make([dynamic][]byte, 0, 32, allocator)
 
 	start, end := -1, -1
