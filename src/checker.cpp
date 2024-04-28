@@ -2535,6 +2535,11 @@ gb_internal void generate_minimum_dependency_set_internal(Checker *c, Entity *st
 					is_init = false;
 				}
 
+				if ((e->flags & EntityFlag_Disabled) != 0) {
+					warning(e->token, "This @(init) procedure is disabled; you must call it manually");
+					is_init = false;
+				}
+
 				if (is_init) {
 					add_dependency_to_set(c, e);
 					array_add(&c->info.init_procedures, e);
