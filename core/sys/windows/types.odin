@@ -93,10 +93,14 @@ LONG32  :: i32
 ULONG64 :: u64
 LONG64  :: i64
 
+DWORD64 :: u64
+PDWORD64 :: ^DWORD64
+
 PDWORD_PTR :: ^DWORD_PTR
 ATOM :: distinct WORD
 
 wstring :: [^]WCHAR
+PWSTR   :: [^]WCHAR
 
 PBYTE :: ^BYTE
 LPBYTE :: ^BYTE
