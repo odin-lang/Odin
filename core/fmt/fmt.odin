@@ -120,6 +120,7 @@ register_user_formatter :: proc(id: typeid, formatter: User_Formatter) -> Regist
 //
 // 	Returns: A formatted string. 
 //
+@(require_results)
 aprint :: proc(args: ..any, sep := " ", allocator := context.allocator) -> string {
 	str: strings.Builder
 	strings.builder_init(&str, allocator)
@@ -136,6 +137,7 @@ aprint :: proc(args: ..any, sep := " ", allocator := context.allocator) -> strin
 //
 // 	Returns: A formatted string with a newline character at the end.
 //
+@(require_results)
 aprintln :: proc(args: ..any, sep := " ", allocator := context.allocator) -> string {
 	str: strings.Builder
 	strings.builder_init(&str, allocator)
@@ -153,6 +155,7 @@ aprintln :: proc(args: ..any, sep := " ", allocator := context.allocator) -> str
 //
 // 	Returns: A formatted string. The returned string must be freed accordingly.
 //
+@(require_results)
 aprintf :: proc(fmt: string, args: ..any, allocator := context.allocator, newline := false) -> string {
 	str: strings.Builder
 	strings.builder_init(&str, allocator)
@@ -169,6 +172,7 @@ aprintf :: proc(fmt: string, args: ..any, allocator := context.allocator, newlin
 //
 // 	Returns: A formatted string. The returned string must be freed accordingly.
 //
+@(require_results)
 aprintfln :: proc(fmt: string, args: ..any, allocator := context.allocator) -> string {
 	return aprintf(fmt, ..args, allocator=allocator, newline=true)
 }
@@ -182,6 +186,7 @@ aprintfln :: proc(fmt: string, args: ..any, allocator := context.allocator) -> s
 //
 // 	Returns: A formatted string.
 //
+@(require_results)
 tprint :: proc(args: ..any, sep := " ") -> string {
 	str: strings.Builder
 	strings.builder_init(&str, context.temp_allocator)
@@ -198,6 +203,7 @@ tprint :: proc(args: ..any, sep := " ") -> string {
 //
 // 	Returns: A formatted string with a newline character at the end.
 //
+@(require_results)
 tprintln :: proc(args: ..any, sep := " ") -> string {
 	str: strings.Builder
 	strings.builder_init(&str, context.temp_allocator)
@@ -215,6 +221,7 @@ tprintln :: proc(args: ..any, sep := " ") -> string {
 //
 // 	Returns: A formatted string.
 //
+@(require_results)
 tprintf :: proc(fmt: string, args: ..any, newline := false) -> string {
 	str: strings.Builder
 	strings.builder_init(&str, context.temp_allocator)
@@ -231,6 +238,7 @@ tprintf :: proc(fmt: string, args: ..any, newline := false) -> string {
 //
 // 	Returns: A formatted string.
 //
+@(require_results)
 tprintfln :: proc(fmt: string, args: ..any) -> string {
 	return tprintf(fmt, ..args, newline=true)
 }
@@ -339,6 +347,7 @@ panicf :: proc(fmt: string, args: ..any, loc := #caller_location) -> ! {
 //
 // Returns: A formatted C string
 //
+@(require_results)
 caprintf :: proc(format: string, args: ..any, newline := false) -> cstring {
 	str: strings.Builder
 	strings.builder_init(&str)
@@ -357,6 +366,7 @@ caprintf :: proc(format: string, args: ..any, newline := false) -> cstring {
 //
 // Returns: A formatted C string
 //
+@(require_results)
 caprintfln :: proc(format: string, args: ..any) -> cstring {
 	return caprintf(format, ..args, newline=true)
 }
@@ -371,6 +381,7 @@ caprintfln :: proc(format: string, args: ..any) -> cstring {
 //
 // Returns: A formatted C string
 //
+@(require_results)
 ctprintf :: proc(format: string, args: ..any, newline := false) -> cstring {
 	str: strings.Builder
 	strings.builder_init(&str, context.temp_allocator)
@@ -389,6 +400,7 @@ ctprintf :: proc(format: string, args: ..any, newline := false) -> cstring {
 //
 // Returns: A formatted C string
 //
+@(require_results)
 ctprintfln :: proc(format: string, args: ..any) -> cstring {
 	return ctprintf(format, ..args, newline=true)
 }
