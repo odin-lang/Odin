@@ -29,7 +29,7 @@ _destroy :: proc "contextless" (ctx: ^Context) -> bool {
 }
 
 _frames :: proc "contextless" (ctx: ^Context, skip: uint, frames_buffer: []Frame) -> []Frame {
-	frame_count := win32.RtlCaptureStackBackTrace(u32(skip) + 2, len(frames_buffer), &frames_buffer[0], nil)
+	frame_count := win32.RtlCaptureStackBackTrace(u32(skip) + 2, u32(len(frames_buffer)), ([^]rawptr)(&frames_buffer[0]), nil)
 	for i in 0..<frame_count {
 		// NOTE: Return address is one after the call instruction so subtract a byte to
 		// end up back inside the call instruction which is needed for SymFromAddr.
