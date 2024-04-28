@@ -461,7 +461,7 @@ foreign kernel32 {
 	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/handleapi/nf-handleapi-gethandleinformation)
 	GetHandleInformation :: proc(hObject: HANDLE, lpdwFlags: ^DWORD) -> BOOL ---
 
-	RtlCaptureStackBackTrace :: proc(FramesToSkip: ULONG, FramesToCapture: ULONG, BackTrace: [^]PVOID, BackTraceHash: PULONG) -> USHORT ---;
+	RtlCaptureStackBackTrace :: proc(FramesToSkip: ULONG, FramesToCapture: ULONG, BackTrace: [^]PVOID, BackTraceHash: PULONG) -> USHORT ---
 }
 
 DEBUG_PROCESS                    :: 0x00000001
