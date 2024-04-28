@@ -4,7 +4,7 @@ import "base:intrinsics"
 import "base:runtime"
 
 Frame :: distinct uintptr
-MAX_FRAMES :: 64
+MAX_FRAMES :: 512
 
 Frame_Location :: struct {
 	using loc: runtime.Source_Code_Location,
