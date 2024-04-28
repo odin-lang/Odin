@@ -4,7 +4,6 @@ import "base:intrinsics"
 import "base:runtime"
 
 Frame :: distinct uintptr
-MAX_FRAMES :: 512
 
 Frame_Location :: struct {
 	using loc: runtime.Source_Code_Location,
@@ -32,8 +31,8 @@ destroy :: proc(ctx: ^Context) -> bool {
 }
 
 @(require_results)
-frames :: proc(ctx: ^Context, skip: uint, allocator: runtime.Allocator) -> []Frame {
-	return _frames(ctx, skip, allocator)
+frames :: proc(ctx: ^Context, skip: uint, frames_buffer: []Frame) -> []Frame {
+	return _frames(ctx, skip, frames_buffer)
 }
 
 @(require_results)

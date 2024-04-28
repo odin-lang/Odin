@@ -28,16 +28,14 @@ _destroy :: proc "contextless" (ctx: ^Context) -> bool {
 	return true
 }
 
-_frames :: proc(ctx: ^Context, skip: uint, allocator: runtime.Allocator) -> []Frame {
-	buffer: [MAX_FRAMES]rawptr
-	frame_count := win32.RtlCaptureStackBackTrace(u32(skip) + 2, len(buffer), &buffer[0], nil)
-	frames := make([]Frame, frame_count, allocator)
-	for &f, i in frames {
+_frames :: proc "contextless" (ctx: ^Context, skip: uint, frames_buffer: []Frame) -> []Frame {
+	frame_count := win32.RtlCaptureStackBackTrace(u32(skip) + 2, len(frames_buffer), &frames_buffer[0], nil)
+	for i in 0..<frame_count {
 		// NOTE: Return address is one after the call instruction so subtract a byte to
 		// end up back inside the call instruction which is needed for SymFromAddr.
-		f = Frame(buffer[i]) - 1
+		frames_buffer[i] -= 1
 	}
-	return frames
+	return frames_buffer[:frame_count]
 }
 
 

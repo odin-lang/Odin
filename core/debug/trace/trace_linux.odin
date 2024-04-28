@@ -2,6 +2,7 @@
 //+build linux
 package debug_trace
 
+import "base:intrinsics"
 import "base:runtime"
 import "core:strings"
 import "core:fmt"
@@ -92,17 +93,16 @@ _destroy :: proc(ctx: ^Context) -> bool {
 }
 
 @(private="package")
-_frames :: proc(ctx: ^Context, skip: uint, allocator: runtime.Allocator) -> (frames: []Frame) {
+_frames :: proc "contextless" (ctx: ^Context, skip: uint, frames_buffer: []Frame) -> (frames: []Frame) {
 	Backtrace_Context :: struct {
 		ctx:         ^Context,
-		rt_ctx:      runtime.Context,
-		frames:      [MAX_FRAMES]Frame,
+		frames:      []Frame,
 		frame_count: int,
 	}
 
 	btc := &Backtrace_Context{
 		ctx = ctx,
-		rt_ctx = context,
+		frames = frames_buffer,
 	}
 	backtrace_simple(
 		ctx.impl.state,
@@ -113,6 +113,9 @@ _frames :: proc(ctx: ^Context, skip: uint, allocator: runtime.Allocator) -> (fra
 			if address == 0 {
 				return 1
 			}
+			if btc.frame_count == len(btc.frames) {
+				return 1
+			}
 			btc.frames[btc.frame_count] = address
 			btc.frame_count += 1
 			return 0
@@ -121,10 +124,8 @@ _frames :: proc(ctx: ^Context, skip: uint, allocator: runtime.Allocator) -> (fra
 		btc,
 	)
 
-	res := btc.frames[:btc.frame_count]
-	if len(res) > 0 {
-		frames = make([]Frame, btc.frame_count, allocator)
-		copy(frames, res)
+	if btc.frame_count > 0 {
+		frames = btc.frames[:btc.frame_count]
 	}
 	return
 }
