@@ -403,6 +403,8 @@ gb_internal void error_va(TokenPos const &pos, TokenPos end, char const *fmt, va
 		error_out("\n");
 		show_error_on_line(pos, end);
 	} else {
+		global_error_collector.curr_error_value = {};
+		global_error_collector.curr_error_value_set.store(false);
 		global_error_collector.count.fetch_sub(1);
 	}
 	try_pop_error_value();
