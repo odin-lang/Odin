@@ -19,10 +19,11 @@ Example:
 		}
 		runtime.print_byte('\n')
 
-		ctx := &global_trace_ctx
+		ctx := &trace_ctx
 		if !trace.in_resolve(ctx) {
+			buf: [64]trace.Frame
 			runtime.print_string("Debug Trace:\n")
-			frames := trace.frames(ctx, skip=1, allocator=context.temp_allocator)
+			frames := trace.frames(ctx, 1, buf[:])
 			for f, i in frames {
 				fl := trace.resolve(ctx, f, context.temp_allocator)
 				if fl.loc.file_path == "" && fl.loc.line == 0 {
