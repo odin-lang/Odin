@@ -767,9 +767,8 @@ gb_internal void tokenizer_get_token(Tokenizer *t, Token *token, int repeat=0) {
 				}
 			}
 
-			// TODO(bill): Better Error Handling
 			if (valid && n != 1) {
-				tokenizer_err(t, "Invalid rune literal");
+				tokenizer_err(t, token->pos, "Invalid rune literal");
 			}
 			token->string.len = t->curr - token->string.text;
 			goto semicolon_check;
