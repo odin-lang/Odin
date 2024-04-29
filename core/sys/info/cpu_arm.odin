@@ -1,6 +1,10 @@
 //+build arm32, arm64
 package sysinfo
 
+import "core:sys/unix"
+
+_ :: unix
+
 CPU_Feature :: enum u64 {
 	// Advanced SIMD & floating-point capabilities:
 	asimd,         // General support for Advanced SIMD instructions/neon.
@@ -45,11 +49,22 @@ cpu_name_buf: [128]byte
 
 @(init, private)
 init_cpu_name :: proc "contextless" () {
-	when ODIN_ARCH == .arm64 {
-		copy(cpu_name_buf[:], "ARM64")
-		cpu_name = string(cpu_name_buf[:len("ARM64")])
-	} else {
-		copy(cpu_name_buf[:], "ARM")
-		cpu_name = string(cpu_name_buf[:len("ARM")])
+	generic := true
+
+	when ODIN_OS == .Darwin {
+		if unix.sysctlbyname("machdep.cpu.brand_string", &cpu_name_buf) {
+			cpu_name = string(cstring(rawptr(&cpu_name_buf)))
+			generic = false
+		}
+	}
+
+	if generic {
+		when ODIN_ARCH == .arm64 {
+			copy(cpu_name_buf[:], "ARM64")
+			cpu_name = string(cpu_name_buf[:len("ARM64")])
+		} else {
+			copy(cpu_name_buf[:], "ARM")
+			cpu_name = string(cpu_name_buf[:len("ARM")])
+		}
 	}
 }
