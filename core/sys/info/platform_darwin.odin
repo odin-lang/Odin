@@ -76,6 +76,8 @@ init_os_version :: proc () {
 	os_version.minor = rel.darwin.y
 	os_version.patch = rel.darwin.z
 
+	macos_version = transmute(Version)rel.release.version
+
 	strings.write_string(&b, rel.os_name)
 	if match == .Exact || match == .Nearest {
 		strings.write_rune(&b, ' ')
