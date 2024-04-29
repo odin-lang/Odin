@@ -83,7 +83,7 @@ init_os_version :: proc () {
 	}
 }
 
-@(init)
+@(init, private)
 init_ram :: proc() {
 	// Retrieve RAM info using `sysinfo`
 	sys_info: linux.Sys_Info

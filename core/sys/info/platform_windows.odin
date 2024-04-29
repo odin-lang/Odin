@@ -258,7 +258,7 @@ init_os_version :: proc () {
 	}
 }
 
-@(init)
+@(init, private)
 init_ram :: proc() {
 	state: sys.MEMORYSTATUSEX
 

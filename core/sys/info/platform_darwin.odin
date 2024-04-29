@@ -114,7 +114,7 @@ init_os_version :: proc () {
 	os_version.as_string = strings.to_string(b)
 }
 
-@(init)
+@(init, private)
 init_ram :: proc() {
 	// Retrieve RAM info using `sysctl`
 
