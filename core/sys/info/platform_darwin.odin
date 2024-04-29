@@ -1,4 +1,3 @@
-// +build darwin
 package sysinfo
 
 import sys "core:sys/unix"

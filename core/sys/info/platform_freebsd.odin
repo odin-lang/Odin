@@ -1,4 +1,3 @@
-// +build freebsd
 package sysinfo
 
 import sys "core:sys/unix"

@@ -1,4 +1,3 @@
-// +build openbsd
 package sysinfo
 
 import sys "core:sys/unix"

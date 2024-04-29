@@ -1,4 +1,3 @@
-// +build windows
 package sysinfo
 
 import sys "core:sys/windows"
