@@ -1,9 +1,7 @@
 //+build js
 package os
 
-import "base:intrinsics"
 import "base:runtime"
-import "core:unicode/utf16"
 
 is_path_separator :: proc(c: byte) -> bool {
 	return c == '/' || c == '\\'
