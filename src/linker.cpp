@@ -167,7 +167,7 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 
 					if (has_asm_extension(lib)) {
 						if (!string_set_update(&asm_files, lib)) {
-							String asm_file = asm_files.entries[i].value;
+							String asm_file = lib;
 							String obj_file = concatenate_strings(permanent_allocator(), asm_file, str_lit(".obj"));
 							String obj_format = str_lit("win64");
 						#if defined(GB_ARCH_32_BIT)

@@ -140,7 +140,7 @@ gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c) {
 	}
 
 	gen->default_module.gen = gen;
-	map_set(&gen->modules, cast(void *)nullptr, &gen->default_module);
+	map_set(&gen->modules, cast(void *)1, &gen->default_module);
 	lb_init_module(&gen->default_module, c);
 
 

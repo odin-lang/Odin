@@ -987,9 +987,8 @@ gb_internal void odin_doc_update_entities(OdinDocWriter *w) {
 		auto entities = array_make<Entity *>(heap_allocator(), 0, w->entity_cache.count);
 		defer (array_free(&entities));
 
-		for (u32 i = 0; i < w->entity_cache.count; i++) {
-			Entity *e = w->entity_cache.entries[i].key;
-			array_add(&entities, e);
+		for (auto const &entry : w->entity_cache) {
+			array_add(&entities, entry.key);
 		}
 		for (Entity *e : entities) {
 			GB_ASSERT(e != nullptr);
@@ -998,9 +997,9 @@ gb_internal void odin_doc_update_entities(OdinDocWriter *w) {
 		}
 	}
 
-	for (u32 i = 0; i < w->entity_cache.count; i++) {
-		Entity *e = w->entity_cache.entries[i].key;
-		OdinDocEntityIndex entity_index = w->entity_cache.entries[i].value;
+	for (auto const &entry : w->entity_cache) {
+		Entity *e = entry.key;
+		OdinDocEntityIndex entity_index = entry.value;
 		OdinDocTypeIndex type_index = odin_doc_type(w, e->type);
 
 		OdinDocEntityIndex foreign_library = 0;

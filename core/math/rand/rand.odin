@@ -5,6 +5,7 @@ Package core:math/rand implements various random number generators
 package rand
 
 import "base:intrinsics"
+import "core:crypto"
 import "core:math"
 import "core:mem"
 
@@ -104,27 +105,30 @@ init :: proc(r: ^Rand, seed: u64) {
 }
 
 /*
-Initialises a random number generator to use the system random number generator.  
-The system random number generator is platform specific.  
-On `linux` refer to the `getrandom` syscall.  
-On `darwin` refer to `getentropy`.  
-On `windows` refer to `BCryptGenRandom`.
-
-All other platforms are not supported
+Initialises a random number generator to use the system random number generator.
+The system random number generator is platform specific, and not supported
+on all targets.
 
 Inputs:
 - r: The random number generator to use the system random number generator
 
-WARNING: Panics if the system is not either `windows`, `darwin` or `linux`
+WARNING: Panics if the system random number generator is not supported.
+Support can be determined via the `core:crypto.HAS_RAND_BYTES` constant.
 
 Example:
+	import "core:crypto"
 	import "core:math/rand"
 	import "core:fmt"
 
 	init_as_system_example :: proc() {
 		my_rand: rand.Rand
-		rand.init_as_system(&my_rand)
-		fmt.println(rand.uint64(&my_rand))
+		switch crypto.HAS_RAND_BYTES {
+		case true:
+			rand.init_as_system(&my_rand)
+			fmt.println(rand.uint64(&my_rand))
+		case false:
+			fmt.println("system random not supported!")
+		}
 	}
 
 Possible Output:
@@ -133,7 +137,7 @@ Possible Output:
 
 */
 init_as_system :: proc(r: ^Rand) {
-	if !#defined(_system_random) {
+	if !crypto.HAS_RAND_BYTES {
 		panic(#procedure + " is not supported on this platform yet")
 	}
 	r.state = 0
@@ -144,15 +148,14 @@ init_as_system :: proc(r: ^Rand) {
 @(private)
 _random_u64 :: proc(r: ^Rand) -> u64 {
 	r := r
-	if r == nil {
+	switch {
+	case r == nil:
 		r = &global_rand
+	case r.is_system:
+		value: u64
+		crypto.rand_bytes((cast([^]u8)&value)[:size_of(u64)])
+		return value
 	}
-	when #defined(_system_random) {
-		if r.is_system {
-			return _system_random()
-		}
-	}
-
 
 	old_state := r.state
 	r.state = old_state * 6364136223846793005 + (r.inc|1)

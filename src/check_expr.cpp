@@ -8079,11 +8079,10 @@ gb_internal void add_constant_switch_case(CheckerContext *ctx, SeenMap *seen, Op
 	}
 
 	uintptr key = hash_exact_value(operand.value);
-	TypeAndToken *found = map_get(seen, key);
-	if (found != nullptr) {
+	GB_ASSERT(key != 0);
+	isize count = multi_map_count(seen, key);
+	if (count) {
 		TEMPORARY_ALLOCATOR_GUARD();
-
-		isize count = multi_map_count(seen, key);
 		TypeAndToken *taps = gb_alloc_array(temporary_allocator(), TypeAndToken, count);
 
 		multi_map_get_all(seen, key, taps);
@@ -9406,7 +9405,8 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 					continue;
 				}
 				ExactValue v = f->Constant.value;
-				auto found = map_get(&seen, hash_exact_value(v));
+				uintptr hash = hash_exact_value(v);
+				auto found = map_get(&seen, hash);
 				if (!found) {
 					array_add(&unhandled, f);
 				}

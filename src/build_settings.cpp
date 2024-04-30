@@ -1465,26 +1465,6 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 	}
 
 	bc->metrics = *metrics;
-	if (metrics->os == TargetOs_darwin) {
-		if (!bc->minimum_os_version_string_given) {
-			bc->minimum_os_version_string = str_lit("11.0.0");
-		}
-
-		switch (subtarget) {
-		case Subtarget_Default:
-			bc->metrics.target_triplet = concatenate_strings(permanent_allocator(), bc->metrics.target_triplet, bc->minimum_os_version_string);
-			break;
-		case Subtarget_iOS:
-			if (metrics->arch == TargetArch_arm64) {
-				bc->metrics.target_triplet = str_lit("arm64-apple-ios");
-			} else if (metrics->arch == TargetArch_amd64) {
-				bc->metrics.target_triplet = str_lit("x86_64-apple-ios");
-			} else {
-				GB_PANIC("Unknown architecture for darwin");
-			}
-			break;
-		}
-	}
 
 	bc->ODIN_OS           = target_os_names[metrics->os];
 	bc->ODIN_ARCH         = target_arch_names[metrics->arch];
@@ -1520,62 +1500,26 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 		bc->ODIN_WINDOWS_SUBSYSTEM = windows_subsystem_names[Windows_Subsystem_CONSOLE];
 	}
 
-	// NOTE(zangent): The linker flags to set the build architecture are different
-	// across OSs. It doesn't make sense to allocate extra data on the heap
-	// here, so I just #defined the linker flags to keep things concise.
-	if (bc->metrics.arch == TargetArch_amd64) {
-		switch (bc->metrics.os) {
-		case TargetOs_windows:
-			bc->link_flags = str_lit("/machine:x64 ");
+	if (metrics->os == TargetOs_darwin && subtarget == Subtarget_iOS) {
+		switch (metrics->arch) {
+		case TargetArch_arm64:
+			bc->metrics.target_triplet = str_lit("arm64-apple-ios");
 			break;
-		case TargetOs_darwin:
-			bc->link_flags = str_lit("-arch x86_64 ");
-			break;
-		case TargetOs_linux:
-			bc->link_flags = str_lit("-arch x86-64 ");
-			break;
-		case TargetOs_freebsd:
-			bc->link_flags = str_lit("-arch x86-64 ");
-			break;
-		case TargetOs_openbsd:
-			bc->link_flags = str_lit("-arch x86-64 ");
-			break;
-		case TargetOs_haiku:
-			bc->link_flags = str_lit("-arch x86-64 ");
-			break;
-		}
-	} else if (bc->metrics.arch == TargetArch_i386) {
-		switch (bc->metrics.os) {
-		case TargetOs_windows:
-			bc->link_flags = str_lit("/machine:x86 ");
-			break;
-		case TargetOs_darwin:
-			gb_printf_err("Unsupported architecture\n");
-			gb_exit(1);
-			break;
-		case TargetOs_linux:
-			bc->link_flags = str_lit("-arch x86 ");
-			break;
-		case TargetOs_freebsd:
-			bc->link_flags = str_lit("-arch x86 ");
-			break;
-		}
-	} else if (bc->metrics.arch == TargetArch_arm32) {
-		switch (bc->metrics.os) {
-		case TargetOs_linux:
-			bc->link_flags = str_lit("-arch arm ");
+		case TargetArch_amd64:
+			bc->metrics.target_triplet = str_lit("x86_64-apple-ios");
 			break;
 		default:
-			gb_printf_err("Compiler Error: Unsupported architecture\n");
-			gb_exit(1);
+			GB_PANIC("Unknown architecture for darwin");
 		}
-	} else if (bc->metrics.arch == TargetArch_arm64) {
-		switch (bc->metrics.os) {
-		case TargetOs_darwin:
-			bc->link_flags = str_lit("-arch arm64 ");
+	}
+
+	if (bc->metrics.os == TargetOs_windows) {
+		switch (bc->metrics.arch) {
+		case TargetArch_amd64:
+			bc->link_flags = str_lit("/machine:x64 ");
 			break;
-		case TargetOs_linux:
-			bc->link_flags = str_lit("-arch aarch64 ");
+		case TargetArch_i386:
+			bc->link_flags = str_lit("/machine:x86 ");
 			break;
 		}
 	} else if (is_arch_wasm()) {
@@ -1595,8 +1539,20 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 		// Disallow on wasm
 		bc->use_separate_modules = false;
 	} else {
-		gb_printf_err("Compiler Error: Unsupported architecture\n");
-		gb_exit(1);
+		bc->link_flags = concatenate3_strings(permanent_allocator(),
+			str_lit("-target "), bc->metrics.target_triplet, str_lit(" "));
+	}
+
+	// NOTE: needs to be done after adding the -target flag to the linker flags so the linker
+	// does not annoy the user with version warnings.
+	if (metrics->os == TargetOs_darwin) {
+		if (!bc->minimum_os_version_string_given) {
+			bc->minimum_os_version_string = str_lit("11.0.0");
+		}
+
+		if (subtarget == Subtarget_Default) {
+			bc->metrics.target_triplet = concatenate_strings(permanent_allocator(), bc->metrics.target_triplet, bc->minimum_os_version_string);
+		}
 	}
 
 	if (bc->ODIN_DEBUG && !bc->custom_optimization_level) {
@@ -1627,8 +1583,10 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 		if (bc->metrics.os == TargetOs_js || bc->metrics.os == TargetOs_wasi) {
 			// TODO(bill): Should these even have a default "heap-like" allocator?
 		}
-		bc->ODIN_DEFAULT_TO_PANIC_ALLOCATOR = true;
-		bc->ODIN_DEFAULT_TO_NIL_ALLOCATOR = !bc->ODIN_DEFAULT_TO_PANIC_ALLOCATOR;
+
+		if (!bc->ODIN_DEFAULT_TO_NIL_ALLOCATOR && !bc->ODIN_DEFAULT_TO_PANIC_ALLOCATOR) {
+			bc->ODIN_DEFAULT_TO_PANIC_ALLOCATOR = true;
+		}
 	}
 }
 

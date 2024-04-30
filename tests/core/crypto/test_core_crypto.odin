@@ -277,7 +277,7 @@ test_chacha20poly1305 :: proc(t: ^testing.T) {
 test_rand_bytes :: proc(t: ^testing.T) {
 	tc.log(t, "Testing rand_bytes")
 
-	if !crypto.has_rand_bytes() {
+	if !crypto.HAS_RAND_BYTES {
 		tc.log(t, "rand_bytes not supported - skipping")
 		return
 	}
