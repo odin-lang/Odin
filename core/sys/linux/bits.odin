@@ -145,26 +145,29 @@ Errno :: enum i32 {
 }
 
 /*
-	Bits for Open_Flags
+	Bits for Open_Flags.
+
+	RDONLY flag is not present, because it has the value of 0, i.e. it is the
+	default, unless WRONLY or RDWR is specified.
 */
 Open_Flags_Bits :: enum {
-	RDONLY    = 0,
-	WRONLY    = 1,
-	RDWR      = 2,
-	CREAT     = 6,
-	EXCL      = 7,
-	NOCTTY    = 8,
-	TRUNC     = 9,
-	APPEND    = 10,
-	NONBLOCK  = 11,
-	DSYNC     = 12,
-	ASYNC     = 13,
-	DIRECT    = 14,
-	DIRECTORY = 16,
-	NOFOLLOW  = 17,
-	NOATIME   = 18,
-	CLOEXEC   = 19,
-	PATH      = 21,
+	WRONLY    = 0,
+	RDWR      = 1,
+	CREAT     = 8,
+	EXCL      = 9,
+	NOCTTY    = 10,
+	TRUNC     = 11,
+	APPEND    = 12,
+	NONBLOCK  = 14,
+	DSYNC     = 16,
+	ASYNC     = 17,
+	DIRECT    = 18,
+	LARGEFILE = 20,
+	DIRECTORY = 21,
+	NOFOLLOW  = 22,
+	NOATIME   = 24,
+	CLOEXEC   = 25,
+	PATH      = 28,
 }
 
 /*
