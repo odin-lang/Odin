@@ -1691,6 +1691,14 @@ gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 		return res;
 	}
 
+	// integer -> boolean
+	if (is_type_integer(src) && is_type_boolean(dst)) {
+		lbValue res = {};
+		res.value = LLVMBuildICmp(p->builder, LLVMIntNE, value.value, LLVMConstNull(lb_type(m, value.type)), "");
+		res.type = t_llvm_bool;
+		return lb_emit_conv(p, res, t);
+	}
+
 	if (is_type_cstring(src) && is_type_u8_ptr(dst)) {
 		return lb_emit_transmute(p, value, dst);
 	}
@@ -1720,14 +1728,6 @@ gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 		return lb_emit_conv(p, s, dst);
 	}
 
-
-	// integer -> boolean
-	if (is_type_integer(src) && is_type_boolean(dst)) {
-		lbValue res = {};
-		res.value = LLVMBuildICmp(p->builder, LLVMIntNE, value.value, LLVMConstNull(lb_type(m, value.type)), "");
-		res.type = t_llvm_bool;
-		return lb_emit_conv(p, res, t);
-	}
 
 	// float -> float
 	if (is_type_float(src) && is_type_float(dst)) {

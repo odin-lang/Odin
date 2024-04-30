@@ -375,6 +375,9 @@ gb_internal isize cg_append_tuple_values(cgProcedure *p, Array<cgValue> *dst_val
 gb_internal cgValue cg_handle_param_value(cgProcedure *p, Type *parameter_type, ParameterValue const &param_value, TokenPos const &pos);
 
 gb_internal cgValue cg_builtin_len(cgProcedure *p, cgValue value);
+gb_internal cgValue cg_builtin_mem_zero(cgProcedure *p, cgValue const &ptr, cgValue const &len);
+gb_internal cgValue cg_builtin_mem_copy(cgProcedure *p, cgValue const &dst, cgValue const &src, cgValue const &len);
+gb_internal cgValue cg_builtin_mem_copy_non_overlapping(cgProcedure *p, cgValue const &dst, cgValue const &src, cgValue const &len);
 gb_internal cgValue cg_builtin_raw_data(cgProcedure *p, cgValue const &x);
 gb_internal cgValue cg_builtin_map_info(cgProcedure *p, Type *map_type);
 gb_internal cgValue cg_builtin_map_cell_info(cgProcedure *p, Type *type);

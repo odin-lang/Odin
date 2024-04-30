@@ -392,9 +392,11 @@ gb_internal WORKER_TASK_PROC(cg_procedure_compile_worker_proc) {
 		// feature_set.x64 |= TB_FEATURE_X64_LZCNT;
 	}
 
+#if 0
 	bool emit_asm = false;
 	TB_FunctionOutput *output = tb_codegen(p->func, cg_worklist(), cg_arena(), &feature_set, emit_asm);
 	gb_unused(output);
+#endif
 
 	// tb_print(p->func, cg_arena());
 	// fprintf(stdout, "\n");
