@@ -381,6 +381,21 @@ gb_internal WORKER_TASK_PROC(cg_procedure_compile_worker_proc) {
 	cgProcedure *p = cast(cgProcedure *)data;
 	gb_unused(p);
 
+	TB_FeatureSet feature_set = {};
+
+	if (build_context.metrics.arch == TargetArch_amd64) {
+		feature_set.x64 |= TB_FEATURE_X64_SSE2;
+		feature_set.x64 |= TB_FEATURE_X64_SSE3;
+		feature_set.x64 |= TB_FEATURE_X64_SSE41;
+
+		// feature_set.x64 |= TB_FEATURE_X64_POPCNT;
+		// feature_set.x64 |= TB_FEATURE_X64_LZCNT;
+	}
+
+	bool emit_asm = false;
+	TB_FunctionOutput *output = tb_codegen(p->func, cg_worklist(), cg_arena(), &feature_set, emit_asm);
+	gb_unused(output);
+
 	// tb_print(p->func, cg_arena());
 	// fprintf(stdout, "\n");
 

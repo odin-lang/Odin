@@ -145,8 +145,8 @@ typedef enum TB_FeatureSet_Generic {
 } TB_FeatureSet_Generic;
 
 typedef struct TB_FeatureSet {
-    TB_FeatureSet_Generic gen;
-    TB_FeatureSet_X64     x64;
+    uint32_t gen; // TB_FeatureSet_Generic
+    uint32_t x64; // TB_FeatureSet_X64
 } TB_FeatureSet;
 
 typedef enum TB_Linkage {

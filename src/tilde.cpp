@@ -467,9 +467,38 @@ gb_internal cgModule *cg_module_create(Checker *c) {
 	m->checker = c;
 	m->info = &c->info;
 
-
 	bool is_jit = false;
-	m->mod = tb_module_create(TB_ARCH_X86_64, TB_SYSTEM_WINDOWS, is_jit);
+	TB_Arch arch = TB_ARCH_X86_64;
+	TB_System system = TB_SYSTEM_WINDOWS;
+
+	switch (build_context.metrics.arch) {
+	case TargetArch_amd64:     arch = TB_ARCH_X86_64;  break;
+	case TargetArch_arm64:     arch = TB_ARCH_AARCH64; break;
+	case TargetArch_wasm32:    arch = TB_ARCH_WASM32;  break;
+	case TargetArch_wasm64p32: arch = TB_ARCH_WASM32;  break;
+
+	case TargetArch_i386:
+	case TargetArch_arm32:
+	default:
+		GB_PANIC("UNSUPPORTED ARCH");
+		break;
+	}
+
+	switch (build_context.metrics.os) {
+	case TargetOs_windows: system = TB_SYSTEM_WINDOWS; break;
+	case TargetOs_darwin:  system = TB_SYSTEM_MACOS;   break;
+	case TargetOs_linux:   system = TB_SYSTEM_LINUX;   break;
+
+	case TargetOs_essence:
+	case TargetOs_freebsd:
+	case TargetOs_openbsd:
+	case TargetOs_haiku:
+	default:
+		GB_PANIC("UNSUPPORTED OS");
+		break;
+	}
+
+	m->mod = tb_module_create(arch, system, is_jit);
 	tb_module_set_tls_index(m->mod, 10, "_tls_index");
 
 	map_init(&m->values);
@@ -833,20 +862,25 @@ gb_internal bool cg_generate_code(Checker *c, LinkerData *linker_data) {
 
 	thread_pool_wait();
 
-	{
+	{ // Create startup
 		cgProcedure *p = cg_startup_runtime_proc;
 		cg_procedure_begin(p);
 		cg_global_variables_initialize(p, &global_variables);
 		tb_inst_ret(p->func, 0, nullptr);
 		cg_procedure_end(p);
 	}
-	{
+	{ // Create cleanup
 		cgProcedure *p = cg_cleanup_runtime_proc;
 		cg_procedure_begin(p);
 		tb_inst_ret(p->func, 0, nullptr);
 		cg_procedure_end(p);
 	}
 
+	{ // Module passes
+		if (build_context.optimization_level > 0) {
+			tb_module_ipo(m->mod);
+		}
+	}
 
 	TB_DebugFormat debug_format = TB_DEBUGFMT_NONE;
 	if (build_context.ODIN_DEBUG) {
