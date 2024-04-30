@@ -2,7 +2,6 @@
 set -eu
 
 : ${CPPFLAGS=}
-: ${CXX=clang++}
 : ${CXXFLAGS=}
 : ${LDFLAGS=}
 : ${LLVM_CONFIG=}
@@ -43,6 +42,8 @@ if [ -z "$LLVM_CONFIG" ]; then
 		error "No llvm-config command found. Set LLVM_CONFIG to proceed."
 	fi
 fi
+
+: ${CXX=$($LLVM_CONFIG --bindir)/clang++}
 
 LLVM_VERSION="$($LLVM_CONFIG --version)"
 LLVM_VERSION_MAJOR="$(echo $LLVM_VERSION | awk -F. '{print $1}')"
