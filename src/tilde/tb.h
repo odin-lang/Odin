@@ -33,7 +33,7 @@
 #define TB_VERSION_MINOR 4
 #define TB_VERSION_PATCH 0
 
-#define TB_PACKED_USERS 0
+#define TB_PACKED_USERS 1
 
 #ifndef TB_API
 #  ifdef __cplusplus
@@ -316,6 +316,9 @@ typedef enum TB_NodeTypeEnum {
     TB_SYSCALL,        // (Control, Memory, Ptr, Data...) -> (Control, Memory, Data)
     //   performs call while recycling the stack frame somewhat
     TB_TAILCALL,       // (Control, Memory, RPC, Data, Data...) -> ()
+    //   this is a safepoint used for traditional C debugging, each of these nodes
+    //   annotates a debug line location.
+    TB_DEBUG_LOCATION, // (Control, Memory) -> (Control, Memory)
     //   safepoint polls are the same except they only trigger if the poll site
     //   says to (platform specific but almost always just the page being made
     //   unmapped/guard), 3rd argument is the poll site.
@@ -564,12 +567,6 @@ typedef struct TB_Symbol {
     // after this point it's tag-specific storage
 } TB_Symbol;
 
-// associated to nodes for debug locations
-typedef struct {
-    TB_SourceFile* file;
-    int line, column;
-} TB_NodeLocation;
-
 typedef struct TB_Node TB_Node;
 
 typedef struct {
@@ -653,6 +650,11 @@ typedef struct { // any integer binary operator
 typedef struct {
     TB_CharUnits align;
 } TB_NodeMemAccess;
+
+typedef struct { // TB_DEBUG_LOCATION
+    TB_SourceFile* file;
+    int line, column;
+} TB_NodeDbgLoc;
 
 typedef struct {
     int level;
@@ -815,8 +817,6 @@ typedef struct {
 #define TB_TYPE_PTRN(N) (TB_DataType){ { TB_TAG_PTR,   (N) } }
 
 #endif
-
-typedef void (*TB_PrintCallback)(void* user_data, const char* fmt, ...);
 
 // defined in common/arena.h
 typedef struct TB_Arena TB_Arena;
@@ -1491,11 +1491,9 @@ TB_API void tb_opt(TB_Function* f, TB_Worklist* ws, bool preserve_types);
 // Asserts on all kinds of broken behavior, dumps to stderr (i will change that later)
 TB_API void tb_verify(TB_Function* f, TB_Arena* tmp);
 
-// print in SSA-CFG looking form (with BB params for the phis)
+// print in SSA-CFG looking form (with BB params for the phis), if tmp is NULL it'll use the
+// function's tmp arena
 TB_API void tb_print(TB_Function* f, TB_Arena* tmp);
-// prints IR as GraphViz's DOT
-TB_API void tb_print_dot(TB_Function* f, TB_PrintCallback callback, void* user_data);
-// p is optional
 TB_API void tb_print_dumb(TB_Function* f, bool use_fancy_types);
 
 // super special experimental stuff (no touchy yet)
