@@ -96,6 +96,10 @@ gb_internal cgProcedure *cg_procedure_create(cgModule *m, Entity *entity, bool i
 
 	if (p->symbol == nullptr)  {
 		p->func = tb_function_create(m->mod, link_name.len, cast(char const *)link_name.text, linkage);
+		p->arenas[0] = tb_arena_create(0);
+		p->arenas[1] = tb_arena_create(0);
+
+		tb_function_set_arenas(p->func, p->arenas[0], p->arenas[1]);
 
 		p->debug_type = cg_debug_type_for_proc(m, p->type);
 		p->proto = tb_prototype_from_dbg(m->mod, p->debug_type);
@@ -104,6 +108,8 @@ gb_internal cgProcedure *cg_procedure_create(cgModule *m, Entity *entity, bool i
 	}
 
 	p->value = cg_value(p->symbol, p->type);
+
+	GB_ASSERT(p->symbol != nullptr || p->func != nullptr);
 
 	cg_add_symbol(m, entity, p->symbol);
 	cg_add_entity(m, entity, p->value);
@@ -225,6 +231,11 @@ gb_internal void cg_procedure_begin(cgProcedure *p) {
 	}
 
 	TB_ModuleSectionHandle section = tb_module_get_text(p->module->mod);
+	if (p->arenas[0] == nullptr) {
+		p->arenas[0] = tb_arena_create(0);
+		p->arenas[1] = tb_arena_create(0);
+	}
+	tb_function_set_arenas(p->func, p->arenas[0], p->arenas[1]);
 	tb_function_set_prototype(p->func, section, p->proto);
 
 	if (p->body == nullptr) {
@@ -370,48 +381,11 @@ gb_internal WORKER_TASK_PROC(cg_procedure_compile_worker_proc) {
 	cgProcedure *p = cast(cgProcedure *)data;
 	gb_unused(p);
 
-	// TB_Passes *opt = tb_pass_enter(p->func, cg_arena());
-	// defer (tb_pass_exit(opt));
+	tb_print(p->func, cg_arena());
+	fprintf(stdout, "\n");
 
-	// // optimization passes
-	// if (false) {
-	// 	tb_pass_peephole(opt, TB_PEEPHOLE_ALL);
-	// 	tb_pass_mem2reg(opt);
-	// 	tb_pass_peephole(opt, TB_PEEPHOLE_ALL);
-	// }
-
-	// bool emit_asm = false;
-	// if (
-	//     // string_starts_with(p->name, str_lit("runtime@_windows_default_alloc_or_resize")) ||
-	//     false
-	// ) {
-	// 	emit_asm = true;
-	// }
-
-	// // emit ir
-	// if (
-	//     // string_starts_with(p->name, str_lit("main@")) ||
-	//     false
-	// ) { // IR Printing
-	// 	TB_Arena *arena = cg_arena();
-	// 	TB_Passes *passes = tb_pass_enter(p->func, arena);
-	// 	defer (tb_pass_exit(passes));
-
-	// 	tb_pass_print(passes);
-	// 	fprintf(stdout, "\n");
-	// 	fflush(stdout);
-	// }
-	// if (false) { // GraphViz printing
-	// 	tb_pass_print_dot(opt, tb_default_print_callback, stdout);
-	// }
-
-	// // compile
-	// TB_FunctionOutput *output = tb_pass_codegen(opt, emit_asm);
-	// if (emit_asm) {
-	// 	tb_output_print_asm(output, stdout);
-	// 	fprintf(stdout, "\n");
-	// 	fflush(stdout);
-	// }
+	// bool preserve_types = true;
+	// tb_opt(p->func, cg_worklist(), preserve_types);
 
 	return 0;
 }

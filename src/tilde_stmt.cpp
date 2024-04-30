@@ -1257,8 +1257,7 @@ gb_internal void cg_build_return_stmt(cgProcedure *p, Slice<Ast *> const &return
 			cg_append_tuple_values(p, &results, res);
 		}
 	} else {
-		for_array(i, tuple->variables) {
-			Entity *e = tuple->variables[i];
+		for (Entity *e : tuple->variables) {
 			cgAddr addr = map_must_get(&p->variable_map, e);
 			cgValue res = cg_addr_load(p, addr);
 			array_add(&results, res);

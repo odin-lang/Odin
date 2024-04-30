@@ -1,16 +1,42 @@
 #include "tilde.hpp"
 
 
-gb_global Slice<TB_Arena *> global_tb_arenas;
+struct CGArenaPair {
+	TB_Arena *arenas[2];
+};
 
-gb_internal TB_Arena *cg_arena(void) {
-	return global_tb_arenas[current_thread_index()];
+gb_global Slice<CGArenaPair> global_tb_arenas;
+
+gb_internal TB_Arena *cg_arena(int index) {
+	return global_tb_arenas[current_thread_index()].arenas[index];
 }
 
 gb_internal void cg_global_arena_init(void) {
-	global_tb_arenas = slice_make<TB_Arena *>(permanent_allocator(), global_thread_pool.threads.count);
-	for_array(i, global_tb_arenas) {
-		global_tb_arenas[i] = tb_arena_create(2ull<<20);
+	global_tb_arenas = slice_make<CGArenaPair>(permanent_allocator(), global_thread_pool.threads.count);
+	for (CGArenaPair &pair : global_tb_arenas) {
+		for (TB_Arena *&arena : pair.arenas) {
+			arena = tb_arena_create(1ull<<20);
+		}
+	}
+}
+
+
+gb_global Slice<TB_Worklist *> global_tb_worklists;
+
+gb_internal TB_Worklist *cg_worklist(void) {
+	return global_tb_worklists[current_thread_index()];
+}
+
+gb_internal void cg_global_worklist_init(void) {
+	global_tb_worklists = slice_make<TB_Worklist *>(permanent_allocator(), global_thread_pool.threads.count);
+	for (TB_Worklist *&worklist : global_tb_worklists) {
+		worklist = tb_worklist_alloc();
+	}
+}
+
+gb_internal void cg_global_worklist_destroy(void) {
+	for (TB_Worklist *worklist : global_tb_worklists) {
+		tb_worklist_free(worklist);
 	}
 }
 
@@ -248,7 +274,9 @@ gb_internal void cg_add_member(cgModule *m, String const &name, cgValue const &v
 gb_internal void cg_add_procedure_value(cgModule *m, cgProcedure *p) {
 	rw_mutex_lock(&m->values_mutex);
 	if (p->entity != nullptr) {
-		map_set(&m->procedure_values, p->func, p->entity);
+		if (p->func != nullptr) {
+			map_set(&m->procedure_values, p->func, p->entity);
+		}
 		if (p->symbol != nullptr) {
 			map_set(&m->symbols, p->entity, p->symbol);
 		}
@@ -729,6 +757,7 @@ gb_internal bool cg_generate_code(Checker *c, LinkerData *linker_data) {
 	#endif
 
 	cg_global_arena_init();
+	cg_global_worklist_init();
 
 	cgModule *m = cg_module_create(c);
 	defer (cg_module_destroy(m));
@@ -828,8 +857,11 @@ gb_internal bool cg_generate_code(Checker *c, LinkerData *linker_data) {
 			break;
 		}
 	}
-	TB_ExportBuffer export_buffer = tb_module_object_export(m->mod, cg_arena(), debug_format);
-	// defer (tb_export_buffer_free(export_buffer)); // THIS IS MISSING
+
+	TB_Arena *export_arena = tb_arena_create(0);
+	defer (tb_arena_destroy(export_arena));
+
+	TB_ExportBuffer export_buffer = tb_module_object_export(m->mod, export_arena, debug_format);
 
 	String filepath_obj = cg_filepath_obj_for_module(m, false);
 	array_add(&linker_data->output_object_paths, filepath_obj);

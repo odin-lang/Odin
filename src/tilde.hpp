@@ -167,6 +167,8 @@ struct cgProcedure {
 	TB_FunctionPrototype *proto;
 	TB_Symbol *symbol;
 
+	TB_Arena *arenas[2];
+
 	Entity *  entity;
 	cgModule *module;
 	String    name;
@@ -272,7 +274,7 @@ gb_global cgProcedure *cg_cleanup_runtime_proc = nullptr;
 
 
 
-gb_internal TB_Arena *cg_arena(void);
+gb_internal TB_Arena *cg_arena(int index=0);
 
 gb_internal cgProcedure *cg_procedure_create(cgModule *m, Entity *entity, bool ignore_body=false);
 gb_internal void cg_add_procedure_to_queue(cgProcedure *p);

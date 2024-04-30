@@ -581,6 +581,21 @@ gb_internal cgValue cg_build_builtin(cgProcedure *p, BuiltinProcId id, Ast *expr
 			return cg_emit_arith(p, Token_Sub, size, cg_value(ones, n.type), n.type);
 		}
 
+	case BuiltinProc_volatile_load:
+		{
+			cgValue ptr = cg_build_expr(p, ce->args[0]);
+			ptr = cg_flatten_value(p, ptr);
+			GB_ASSERT(ptr.kind == cgValue_Value);
+			return cg_emit_load(p, ptr, true);
+		}
+
+	case BuiltinProc_volatile_store:
+		{
+			cgValue ptr = cg_build_expr(p, ce->args[0]);
+			cgValue val = cg_build_expr(p, ce->args[1]);
+			cg_emit_store(p, ptr, val, true);
+			return {};
+		}
 	}
 
 
