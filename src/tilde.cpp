@@ -781,6 +781,33 @@ gb_internal void cg_add_procedure_to_queue(cgProcedure *p) {
 	}
 }
 
+gb_internal i32 cg_procedure_cmp(void const *a, void const *b) {
+	cgProcedure *x = *(cgProcedure **)a;
+	cgProcedure *y = *(cgProcedure **)b;
+
+	if (x == y) {
+		return 0;
+	}
+	if (!x->parent && y->parent) {
+		return +1;
+	}
+	if (x->parent && !y->parent) {
+		return -1;
+	}
+	if (!x->entity && y->entity) {
+		return -1;
+	}
+	if (x->entity && !y->entity) {
+		return +1;
+	}
+
+	if (x->entity && y->entity) {
+		return token_pos_cmp(x->entity->token.pos, y->entity->token.pos);
+	}
+
+	return string_compare(x->name, y->name);
+}
+
 gb_internal bool cg_generate_code(Checker *c, LinkerData *linker_data) {
 	TIME_SECTION("Tilde Module Initializtion");
 
@@ -854,13 +881,15 @@ gb_internal bool cg_generate_code(Checker *c, LinkerData *linker_data) {
 	}
 
 	if (!m->do_threading) {
+		gb_sort_array(m->single_threaded_procedure_queue.data, m->single_threaded_procedure_queue.count, cg_procedure_cmp);
+
 		for (isize i = 0; i < m->single_threaded_procedure_queue.count; i++) {
 			cgProcedure *p = m->single_threaded_procedure_queue[i];
 			cg_procedure_generate(p);
 		}
+	} else {
+		thread_pool_wait();
 	}
-
-	thread_pool_wait();
 
 	{ // Create startup
 		cgProcedure *p = cg_startup_runtime_proc;
