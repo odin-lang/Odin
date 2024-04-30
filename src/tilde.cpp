@@ -679,6 +679,13 @@ gb_internal String cg_filepath_obj_for_module(cgModule *m, bool use_assembly) {
 		build_context.build_paths[BuildPath_Output].name
 	);
 
+#if defined(GB_SYSTEM_WINDOWS)
+	for (isize i = 0; i < path.len; i++) {
+		if (path.text[i] == '/') {
+			path.text[i] = '\\';
+		}
+	}
+#endif
 	// if (m->file) {
 	// 	char buf[32] = {};
 	// 	isize n = gb_snprintf(buf, gb_size_of(buf), "-%u", m->file->id);
@@ -861,11 +868,12 @@ gb_internal bool cg_generate_code(Checker *c, LinkerData *linker_data) {
 	TB_Arena *export_arena = tb_arena_create(0);
 	defer (tb_arena_destroy(export_arena));
 
-	TB_ExportBuffer export_buffer = tb_module_object_export(m->mod, export_arena, debug_format);
-
 	String filepath_obj = cg_filepath_obj_for_module(m, false);
-	array_add(&linker_data->output_object_paths, filepath_obj);
+
+	TB_ExportBuffer export_buffer = tb_module_object_export(m->mod, export_arena, debug_format);
 	GB_ASSERT(tb_export_buffer_to_file(export_buffer, cast(char const *)filepath_obj.text));
+
+	array_add(&linker_data->output_object_paths, filepath_obj);
 
 	return true;
 }

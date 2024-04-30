@@ -287,13 +287,10 @@ gb_internal void cg_setup_type_info_data(cgModule *m) {
 	CheckerInfo *info = m->info;
 	{ // Add type info data
 		isize max_type_info_count = info->minimum_dependency_type_info_set.count+1;
-		// gb_printf_err("max_type_info_count: %td\n", max_type_info_count);
-		Type *t = alloc_type_array(t_type_info, max_type_info_count);
-
-		i64 max_objects = cast(i64)max_type_info_count * cg_global_const_calculate_region_count_from_basic_type(t_type_info);
+		Type *t = alloc_type_array(t_type_info_ptr, max_type_info_count);
 
 		TB_Global *g = tb_global_create(m->mod, -1, CG_TYPE_INFO_DATA_NAME, nullptr, TB_LINKAGE_PRIVATE);
-		tb_global_set_storage(m->mod, tb_module_get_rdata(m->mod), g, type_size_of(t), 16, max_objects);
+		tb_global_set_storage(m->mod, tb_module_get_rdata(m->mod), g, type_size_of(t), 16, cast(i64)max_type_info_count);
 
 		cgValue value = cg_value(g, alloc_type_pointer(t));
 		cg_global_type_info_data_entity = alloc_entity_variable(nullptr, make_token_ident(CG_TYPE_INFO_DATA_NAME), t, EntityState_Resolved);
@@ -318,6 +315,9 @@ gb_internal void cg_setup_type_info_data(cgModule *m) {
 				break;
 			case Type_Struct:
 				count += t->Struct.fields.count;
+				break;
+			case Type_BitField:
+				count += t->BitField.fields.count;
 				break;
 			case Type_Tuple:
 				count += t->Tuple.variables.count;
@@ -405,7 +405,6 @@ gb_internal void cg_setup_type_info_data(cgModule *m) {
 	entries_handled[0] = true;
 
 
-	i64 type_info_size = type_size_of(t_type_info);
 	i64 size_offset    = type_offset_of(t_type_info, 0);
 	i64 align_offset   = type_offset_of(t_type_info, 1);
 	i64 flags_offset   = type_offset_of(t_type_info, 2);
@@ -441,9 +440,18 @@ gb_internal void cg_setup_type_info_data(cgModule *m) {
 		}
 		entries_handled[entry_index] = true;
 
-		TB_Global *global = type_table_array;
 
-		i64 offset = entry_index * type_info_size;
+		char ti_entry_name[64] = {};
+		gb_snprintf(ti_entry_name, 63, "__$ti-%td", entry_index+1);
+
+		TB_Global *global = tb_global_create(m->mod, -1, ti_entry_name, nullptr, TB_LINKAGE_PRIVATE);
+		tb_global_set_storage(m->mod, tb_module_get_rdata(m->mod), global,
+		                      type_size_of(t_type_info), 16,
+		                      cg_global_const_calculate_region_count_from_basic_type(t_type_info));
+
+		tb_global_add_symbol_reloc(m->mod, type_table_array, entry_index * build_context.ptr_size, cast(TB_Symbol *)global);
+
+		i64 offset = 0;
 
 		i64 size  = type_size_of(t);
 		i64 align = type_align_of(t);
@@ -466,6 +474,9 @@ gb_internal void cg_setup_type_info_data(cgModule *m) {
 		Type *tag_type = nullptr;
 
 		switch (t->kind) {
+		default:
+			GB_PANIC("MISSING TYPE: %s", type_to_string(t));
+			break;
 		case Type_Named: {
 			// Type_Info_Named :: struct {
 			// 	name: string,

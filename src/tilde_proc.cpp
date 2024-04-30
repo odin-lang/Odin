@@ -381,8 +381,8 @@ gb_internal WORKER_TASK_PROC(cg_procedure_compile_worker_proc) {
 	cgProcedure *p = cast(cgProcedure *)data;
 	gb_unused(p);
 
-	tb_print(p->func, cg_arena());
-	fprintf(stdout, "\n");
+	// tb_print(p->func, cg_arena());
+	// fprintf(stdout, "\n");
 
 	// bool preserve_types = true;
 	// tb_opt(p->func, cg_worklist(), preserve_types);
