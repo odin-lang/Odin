@@ -1,4 +1,3 @@
-// +build windows
 package sysinfo
 
 import sys "core:sys/windows"
@@ -259,7 +258,7 @@ init_os_version :: proc () {
 	}
 }
 
-@(init)
+@(init, private)
 init_ram :: proc() {
 	state: sys.MEMORYSTATUSEX
 
