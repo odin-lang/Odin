@@ -945,6 +945,13 @@ gb_internal void cg_emit_store_union_variant(cgProcedure *p, cgValue parent, cgV
 	}
 }
 
+gb_internal cgValue cg_emit_union_tag_value(cgProcedure *p, cgValue u) {
+	cgValue ptr = cg_address_from_load_or_generate_local(p, u);
+	cgValue tag_ptr = cg_emit_union_tag_ptr(p, ptr);
+	return cg_emit_load(p, tag_ptr);
+}
+
+
 gb_internal cgValue cg_emit_conv(cgProcedure *p, cgValue value, Type *t) {
 	t = reduce_tuple_to_single_type(t);
 
@@ -3154,6 +3161,7 @@ cgAddr cg_build_addr_compound_lit(cgProcedure *p, Ast *expr) {
 	}
 
 	case Type_SimdVector: {
+		GB_PANIC("TODO(bill): #simd compound literals");
 		// auto temp_data = array_make<cgCompoundLitElemTempData>(temporary_allocator(), 0, cl->elems.count);
 
 		// populate(p, cl->elems, &temp_data, type);
@@ -3241,151 +3249,150 @@ gb_internal cgValue cg_build_unary_and(cgProcedure *p, Ast *expr) {
 		cgAddr addr = cg_build_addr_compound_lit(p, expr);
 		return addr.addr;
 	} else if (ue_expr->kind == Ast_TypeAssertion) {
-		GB_PANIC("TODO(bill): &v.(T)");
-		// if (is_type_tuple(tv.type)) {
-		// 	Type *tuple = tv.type;
-		// 	Type *ptr_type = tuple->Tuple.variables[0]->type;
-		// 	Type *ok_type = tuple->Tuple.variables[1]->type;
+		if (is_type_tuple(tv.type)) {
+			Type *tuple = tv.type;
+			Type *ptr_type = tuple->Tuple.variables[0]->type;
+			Type *ok_type = tuple->Tuple.variables[1]->type;
 
-		// 	ast_node(ta, TypeAssertion, ue_expr);
-		// 	TokenPos pos = ast_token(expr).pos;
-		// 	Type *type = type_of_expr(ue_expr);
-		// 	GB_ASSERT(!is_type_tuple(type));
+			ast_node(ta, TypeAssertion, ue_expr);
+			TokenPos pos = ast_token(expr).pos;
+			Type *type = type_of_expr(ue_expr);
+			GB_ASSERT(!is_type_tuple(type));
 
-		// 	lbValue e = lb_build_expr(p, ta->expr);
-		// 	Type *t = type_deref(e.type);
-		// 	if (is_type_union(t)) {
-		// 		lbValue v = e;
-		// 		if (!is_type_pointer(v.type)) {
-		// 			v = lb_address_from_load_or_generate_local(p, v);
-		// 		}
-		// 		Type *src_type = type_deref(v.type);
-		// 		Type *dst_type = type;
+			cgValue e = cg_build_expr(p, ta->expr);
+			Type *t = type_deref(e.type);
+			if (is_type_union(t)) {
+				cgValue v = e;
+				if (!is_type_pointer(v.type)) {
+					v = cg_address_from_load_or_generate_local(p, v);
+				}
+				Type *src_type = type_deref(v.type);
+				Type *dst_type = type;
 
-		// 		lbValue src_tag = {};
-		// 		lbValue dst_tag = {};
-		// 		if (is_type_union_maybe_pointer(src_type)) {
-		// 			src_tag = lb_emit_comp_against_nil(p, Token_NotEq, v);
-		// 			dst_tag = lb_const_bool(p->module, t_bool, true);
-		// 		} else {
-		// 			src_tag = lb_emit_load(p, lb_emit_union_tag_ptr(p, v));
-		// 			dst_tag = lb_const_union_tag(p->module, src_type, dst_type);
-		// 		}
+				cgValue src_tag = {};
+				cgValue dst_tag = {};
+				if (is_type_union_maybe_pointer(src_type)) {
+					src_tag = cg_emit_comp_against_nil(p, Token_NotEq, v);
+					dst_tag = cg_const_bool(p, t_bool, true);
+				} else {
+					src_tag = cg_emit_load(p, cg_emit_union_tag_ptr(p, v));
+					dst_tag = cg_const_union_tag(p, src_type, dst_type);
+				}
 
-		// 		lbValue ok = lb_emit_comp(p, Token_CmpEq, src_tag, dst_tag);
+				cgValue ok = cg_emit_comp(p, Token_CmpEq, src_tag, dst_tag);
 
-		// 		lbValue data_ptr = lb_emit_conv(p, v, ptr_type);
-		// 		lbAddr res = lb_add_local_generated(p, tuple, true);
-		// 		lbValue gep0 = lb_emit_struct_ep(p, res.addr, 0);
-		// 		lbValue gep1 = lb_emit_struct_ep(p, res.addr, 1);
-		// 		lb_emit_store(p, gep0, lb_emit_select(p, ok, data_ptr, lb_const_nil(p->module, ptr_type)));
-		// 		lb_emit_store(p, gep1, lb_emit_conv(p, ok, ok_type));
-		// 		return lb_addr_load(p, res);
-		// 	} else if (is_type_any(t)) {
-		// 		lbValue v = e;
-		// 		if (is_type_pointer(v.type)) {
-		// 			v = lb_emit_load(p, v);
-		// 		}
+				cgValue data_ptr = cg_emit_conv(p, v, ptr_type);
+				cgAddr res = cg_add_local(p, tuple, nullptr, true);
+				cgValue gep0 = cg_emit_struct_ep(p, res.addr, 0);
+				cgValue gep1 = cg_emit_struct_ep(p, res.addr, 1);
+				cg_emit_store(p, gep0, cg_emit_select(p, ok, data_ptr, cg_const_nil(p, ptr_type)));
+				cg_emit_store(p, gep1, cg_emit_conv(p, ok, ok_type));
+				return cg_addr_load(p, res);
+			} else if (is_type_any(t)) {
+				cgValue v = e;
+				if (is_type_pointer(v.type)) {
+					v = cg_emit_load(p, v);
+				}
 
-		// 		lbValue data_ptr = lb_emit_conv(p, lb_emit_struct_ev(p, v, 0), ptr_type);
-		// 		lbValue any_id = lb_emit_struct_ev(p, v, 1);
-		// 		lbValue id = lb_typeid(p->module, type);
+				cgValue data_ptr = cg_emit_conv(p, cg_emit_struct_ev(p, v, 0), ptr_type);
+				cgValue any_id = cg_emit_struct_ev(p, v, 1);
+				cgValue id = cg_typeid(p, type);
 
-		// 		lbValue ok = lb_emit_comp(p, Token_CmpEq, any_id, id);
+				cgValue ok = cg_emit_comp(p, Token_CmpEq, any_id, id);
 
-		// 		lbAddr res = lb_add_local_generated(p, tuple, false);
-		// 		lbValue gep0 = lb_emit_struct_ep(p, res.addr, 0);
-		// 		lbValue gep1 = lb_emit_struct_ep(p, res.addr, 1);
-		// 		lb_emit_store(p, gep0, lb_emit_select(p, ok, data_ptr, lb_const_nil(p->module, ptr_type)));
-		// 		lb_emit_store(p, gep1, lb_emit_conv(p, ok, ok_type));
-		// 		return lb_addr_load(p, res);
-		// 	} else {
-		// 		GB_PANIC("TODO(bill): type assertion %s", type_to_string(type));
-		// 	}
+				cgAddr res = cg_add_local(p, tuple, nullptr, false);
+				cgValue gep0 = cg_emit_struct_ep(p, res.addr, 0);
+				cgValue gep1 = cg_emit_struct_ep(p, res.addr, 1);
+				cg_emit_store(p, gep0, cg_emit_select(p, ok, data_ptr, cg_const_nil(p, ptr_type)));
+				cg_emit_store(p, gep1, cg_emit_conv(p, ok, ok_type));
+				return cg_addr_load(p, res);
+			} else {
+				GB_PANIC("TODO(bill): type assertion %s", type_to_string(type));
+			}
 
-		// } else {
-		// 	GB_ASSERT(is_type_pointer(tv.type));
+		} else {
+			GB_ASSERT(is_type_pointer(tv.type));
 
-		// 	ast_node(ta, TypeAssertion, ue_expr);
-		// 	TokenPos pos = ast_token(expr).pos;
-		// 	Type *type = type_of_expr(ue_expr);
-		// 	GB_ASSERT(!is_type_tuple(type));
+			ast_node(ta, TypeAssertion, ue_expr);
+			TokenPos pos = ast_token(expr).pos;
+			Type *type = type_of_expr(ue_expr);
+			GB_ASSERT(!is_type_tuple(type));
 
-		// 	lbValue e = lb_build_expr(p, ta->expr);
-		// 	Type *t = type_deref(e.type);
-		// 	if (is_type_union(t)) {
-		// 		lbValue v = e;
-		// 		if (!is_type_pointer(v.type)) {
-		// 			v = lb_address_from_load_or_generate_local(p, v);
-		// 		}
-		// 		Type *src_type = type_deref(v.type);
-		// 		Type *dst_type = type;
-
-
-		// 		if ((p->state_flags & StateFlag_no_type_assert) == 0) {
-		// 			lbValue src_tag = {};
-		// 			lbValue dst_tag = {};
-		// 			if (is_type_union_maybe_pointer(src_type)) {
-		// 				src_tag = lb_emit_comp_against_nil(p, Token_NotEq, v);
-		// 				dst_tag = lb_const_bool(p->module, t_bool, true);
-		// 			} else {
-		// 				src_tag = lb_emit_load(p, lb_emit_union_tag_ptr(p, v));
-		// 				dst_tag = lb_const_union_tag(p->module, src_type, dst_type);
-		// 			}
+			cgValue e = cg_build_expr(p, ta->expr);
+			Type *t = type_deref(e.type);
+			if (is_type_union(t)) {
+				cgValue v = e;
+				if (!is_type_pointer(v.type)) {
+					v = cg_address_from_load_or_generate_local(p, v);
+				}
+				Type *src_type = type_deref(v.type);
+				Type *dst_type = type;
 
 
-		// 			isize arg_count = 6;
-		// 			if (build_context.no_rtti) {
-		// 				arg_count = 4;
-		// 			}
+				if (!build_context.no_type_assert && (p->state_flags & StateFlag_no_type_assert) == 0) {
+					cgValue src_tag = {};
+					cgValue dst_tag = {};
+					if (is_type_union_maybe_pointer(src_type)) {
+						src_tag = cg_emit_comp_against_nil(p, Token_NotEq, v);
+						dst_tag = cg_const_bool(p, t_bool, true);
+					} else {
+						src_tag = cg_emit_load(p, cg_emit_union_tag_ptr(p, v));
+						dst_tag = cg_const_union_tag(p, src_type, dst_type);
+					}
 
-		// 			lbValue ok = lb_emit_comp(p, Token_CmpEq, src_tag, dst_tag);
-		// 			auto args = array_make<lbValue>(permanent_allocator(), arg_count);
-		// 			args[0] = ok;
 
-		// 			args[1] = lb_find_or_add_entity_string(p->module, get_file_path_string(pos.file_id));
-		// 			args[2] = lb_const_int(p->module, t_i32, pos.line);
-		// 			args[3] = lb_const_int(p->module, t_i32, pos.column);
+					isize arg_count = 6;
+					if (build_context.no_rtti) {
+						arg_count = 4;
+					}
 
-		// 			if (!build_context.no_rtti) {
-		// 				args[4] = lb_typeid(p->module, src_type);
-		// 				args[5] = lb_typeid(p->module, dst_type);
-		// 			}
-		// 			lb_emit_runtime_call(p, "type_assertion_check", args);
-		// 		}
+					cgValue ok = cg_emit_comp(p, Token_CmpEq, src_tag, dst_tag);
+					auto args = slice_make<cgValue>(permanent_allocator(), arg_count);
+					args[0] = ok;
 
-		// 		lbValue data_ptr = v;
-		// 		return lb_emit_conv(p, data_ptr, tv.type);
-		// 	} else if (is_type_any(t)) {
-		// 		lbValue v = e;
-		// 		if (is_type_pointer(v.type)) {
-		// 			v = lb_emit_load(p, v);
-		// 		}
-		// 		lbValue data_ptr = lb_emit_struct_ev(p, v, 0);
-		// 		if ((p->state_flags & StateFlag_no_type_assert) == 0) {
-		// 			GB_ASSERT(!build_context.no_rtti);
+					args[1] = cg_find_or_add_entity_string(p, get_file_path_string(pos.file_id));
+					args[2] = cg_const_int(p, t_i32, pos.line);
+					args[3] = cg_const_int(p, t_i32, pos.column);
 
-		// 			lbValue any_id = lb_emit_struct_ev(p, v, 1);
+					if (!build_context.no_rtti) {
+						args[4] = cg_typeid(p, src_type);
+						args[5] = cg_typeid(p, dst_type);
+					}
+					cg_emit_runtime_call(p, "type_assertion_check", args);
+				}
 
-		// 			lbValue id = lb_typeid(p->module, type);
-		// 			lbValue ok = lb_emit_comp(p, Token_CmpEq, any_id, id);
-		// 			auto args = array_make<lbValue>(permanent_allocator(), 6);
-		// 			args[0] = ok;
+				cgValue data_ptr = v;
+				return cg_emit_conv(p, data_ptr, tv.type);
+			} else if (is_type_any(t)) {
+				cgValue v = e;
+				if (is_type_pointer(v.type)) {
+					v = cg_emit_load(p, v);
+				}
+				cgValue data_ptr = cg_emit_struct_ev(p, v, 0);
+				if (!build_context.no_type_assert && (p->state_flags & StateFlag_no_type_assert) == 0) {
+					GB_ASSERT(!build_context.no_rtti);
 
-		// 			args[1] = lb_find_or_add_entity_string(p->module, get_file_path_string(pos.file_id));
-		// 			args[2] = lb_const_int(p->module, t_i32, pos.line);
-		// 			args[3] = lb_const_int(p->module, t_i32, pos.column);
+					cgValue any_id = cg_emit_struct_ev(p, v, 1);
 
-		// 			args[4] = any_id;
-		// 			args[5] = id;
-		// 			lb_emit_runtime_call(p, "type_assertion_check", args);
-		// 		}
+					cgValue id = cg_typeid(p, type);
+					cgValue ok = cg_emit_comp(p, Token_CmpEq, any_id, id);
+					auto args = slice_make<cgValue>(permanent_allocator(), 6);
+					args[0] = ok;
 
-		// 		return lb_emit_conv(p, data_ptr, tv.type);
-		// 	} else {
-		// 		GB_PANIC("TODO(bill): type assertion %s", type_to_string(type));
-		// 	}
-		// }
+					args[1] = cg_find_or_add_entity_string(p, get_file_path_string(pos.file_id));
+					args[2] = cg_const_int(p, t_i32, pos.line);
+					args[3] = cg_const_int(p, t_i32, pos.column);
+
+					args[4] = any_id;
+					args[5] = id;
+					cg_emit_runtime_call(p, "type_assertion_check", args);
+				}
+
+				return cg_emit_conv(p, data_ptr, tv.type);
+			} else {
+				GB_PANIC("TODO(bill): type assertion %s", type_to_string(type));
+			}
+		}
 	}
 
 	return cg_build_addr_ptr(p, ue->expr);
@@ -3558,6 +3565,52 @@ gb_internal cgValue cg_emit_cast_any(cgProcedure *p, cgValue value, Type *type, 
 	return cg_value_multi2(cg_emit_load(p, gep0), cg_emit_load(p, gep1), tuple);
 }
 
+gb_internal cgValue cg_emit_cast_union_ok_only(cgProcedure *p, cgValue value, Type *type, TokenPos pos) {
+	GB_ASSERT(is_type_tuple(type));
+
+	Type *src_type = value.type;
+	bool is_ptr = is_type_pointer(src_type);
+
+
+	// IMPORTANT NOTE(bill): This assumes that the value is completely ignored
+	// so when it does an assignment, it complete ignores the value.
+	// Just make it two booleans and ignore the first one
+	//
+	// _, ok := x.(T);
+	//
+	Type *ok_type = type->Tuple.variables[1]->type;
+	Type *gen_tuple_types[2] = {};
+	gen_tuple_types[0] = ok_type;
+	gen_tuple_types[1] = ok_type;
+
+	Type *gen_tuple = alloc_type_tuple_from_field_types(gen_tuple_types, gb_count_of(gen_tuple_types), false, true);
+
+	cgAddr v = cg_add_local(p, gen_tuple, nullptr, false);
+
+	if (is_ptr) {
+		value = cg_emit_load(p, value);
+	}
+	Type *src = base_type(type_deref(src_type));
+	GB_ASSERT_MSG(is_type_union(src), "%s", type_to_string(src_type));
+	Type *dst = type->Tuple.variables[0]->type;
+
+	cgValue cond = {};
+
+	if (is_type_union_maybe_pointer(src)) {
+		cgValue data = cg_emit_transmute(p, value, dst);
+		cond = cg_emit_comp_against_nil(p, Token_NotEq, data);
+	} else {
+		cgValue tag = cg_emit_union_tag_value(p, value);
+		cgValue dst_tag = cg_const_union_tag(p, src, dst);
+		cond = cg_emit_comp(p, Token_CmpEq, tag, dst_tag);
+	}
+
+	cgValue gep1 = cg_emit_struct_ep(p, v.addr, 1);
+	cg_emit_store(p, gep1, cond);
+
+	return cg_addr_load(p, v);
+}
+
 
 gb_internal cgValue cg_build_type_assertion(cgProcedure *p, Ast *expr, Type *type) {
 	ast_node(ta, TypeAssertion, expr);
@@ -3567,6 +3620,9 @@ gb_internal cgValue cg_build_type_assertion(cgProcedure *p, Ast *expr, Type *typ
 	Type *t = type_deref(e.type);
 
 	if (is_type_union(t)) {
+		if (ta->ignores[0]) {
+			return cg_emit_cast_union_ok_only(p, e, type, pos);
+		}
 		return cg_emit_cast_union(p, e, type, pos);
 	} else if (is_type_any(t)) {
 		return cg_emit_cast_any(p, e, type, pos);

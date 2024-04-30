@@ -81,7 +81,6 @@ gb_internal void cg_global_source_code_location_const(cgModule *m, String const 
 	}
 }
 
-
 gb_internal cgValue cg_emit_source_code_location_as_global(cgProcedure *p, String const &proc_name, TokenPos pos) {
 	cgModule *m = p->module;
 	char name[32] = {};
@@ -1045,5 +1044,12 @@ gb_internal cgValue cg_const_string(cgProcedure *p, Type *type, String const &st
 
 gb_internal cgValue cg_const_union_tag(cgProcedure *p, Type *u, Type *v) {
 	return cg_const_value(p, union_tag_type(u), exact_value_i64(union_variant_index(u, v)));
+}
+
+
+
+gb_internal cgValue cg_find_or_add_entity_string(cgProcedure *p, String const &s) {
+	// TODO(bill): make this better
+	return cg_const_string(p, t_string, s);
 }
 

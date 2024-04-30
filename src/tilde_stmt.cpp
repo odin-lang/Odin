@@ -771,6 +771,16 @@ gb_internal cgValue cg_emit_struct_ev(cgProcedure *p, cgValue s, i64 index) {
 	return cg_flatten_value(p, cg_emit_load(p, ptr));
 }
 
+gb_internal cgValue cg_emit_tuple_ev(cgProcedure *p, cgValue value, i64 index) {
+	GB_ASSERT(value.kind == cgValue_Multi);
+	GB_ASSERT(value.multi != nullptr);
+	GB_ASSERT(value.type->kind == Type_Tuple);
+	GB_ASSERT(0 <= index && index < value.type->Tuple.variables.count);
+	return value.multi->values[index];
+}
+
+
+
 
 gb_internal cgValue cg_emit_deep_field_gep(cgProcedure *p, cgValue e, Selection const &sel) {
 	GB_ASSERT(sel.index.count > 0);
@@ -1950,6 +1960,58 @@ gb_internal void cg_build_range_stmt_struct_soa(cgProcedure *p, AstRangeStmt *rs
 
 }
 
+gb_internal void cg_build_range_tuple(cgProcedure *p, AstRangeStmt *rs, Scope *scope) {
+	Ast *expr = unparen_expr(rs->expr);
+
+	Type *expr_type = type_of_expr(expr);
+	Type *et = base_type(type_deref(expr_type));
+	GB_ASSERT(et->kind == Type_Tuple);
+
+	i32 value_count = cast(i32)et->Tuple.variables.count;
+
+	cgValue *values = gb_alloc_array(permanent_allocator(), cgValue, value_count);
+
+	cg_scope_open(p, scope);
+
+	TB_Node *loop = cg_control_region(p, "for.tuple.loop");
+	cg_emit_goto(p, loop);
+	tb_inst_set_control(p->func, loop);
+
+	TB_Node *body = cg_control_region(p, "for.tuple.body");
+	TB_Node *done = cg_control_region(p, "for.tuple.done");
+
+	cgValue tuple_value = cg_build_expr(p, expr);
+	Type *tuple = tuple_value.type;
+	GB_ASSERT(tuple->kind == Type_Tuple);
+	i32 tuple_count = cast(i32)tuple->Tuple.variables.count;
+	i32 cond_index = tuple_count-1;
+
+	cgValue cond = cg_emit_struct_ev(p, tuple_value, cond_index);
+	cg_emit_if(p, cond, body, done);
+	tb_inst_set_control(p->func, body);
+
+	for (i32 i = 0; i < value_count; i++) {
+		values[i] = cg_emit_tuple_ev(p, tuple_value, i);
+	}
+
+	GB_ASSERT(rs->vals.count <= value_count);
+	for (isize i = 0; i < rs->vals.count; i++) {
+		Ast *val = rs->vals[i];
+		if (val != nullptr) {
+			cg_range_stmt_store_val(p, val, values[i]);
+		}
+	}
+
+	cg_push_target_list(p, rs->label, done, loop, nullptr);
+
+	cg_build_stmt(p, rs->body);
+
+	cg_scope_close(p, cgDeferExit_Default, nullptr);
+	cg_pop_target_list(p);
+	cg_emit_goto(p, loop);
+	tb_inst_set_control(p->func, done);
+}
+
 
 gb_internal void cg_build_range_stmt(cgProcedure *p, Ast *node) {
 	ast_node(rs, RangeStmt, node);
@@ -1970,6 +2032,17 @@ gb_internal void cg_build_range_stmt(cgProcedure *p, Ast *node) {
 		}
 	}
 
+	TypeAndValue tav = type_and_value_of_expr(expr);
+	if (tav.mode != Addressing_Type) {
+		Type *expr_type = type_of_expr(expr);
+		Type *et = base_type(type_deref(expr_type));
+		if (et->kind == Type_Tuple) {
+			cg_build_range_tuple(p, rs, rs->scope);
+			return;
+		}
+	}
+
+
 	cg_scope_open(p, rs->scope);
 
 
@@ -1989,7 +2062,6 @@ gb_internal void cg_build_range_stmt(cgProcedure *p, Ast *node) {
 	TB_Node *loop = nullptr;
 	TB_Node *done = nullptr;
 	bool is_map = false;
-	TypeAndValue tav = type_and_value_of_expr(expr);
 
 	if (tav.mode == Addressing_Type) {
 		cg_build_range_stmt_enum(p, type_deref(tav.type), val0_type, &val, &key, &loop, &done);
@@ -2067,8 +2139,11 @@ gb_internal void cg_build_range_stmt(cgProcedure *p, Ast *node) {
 			break;
 		}
 		case Type_Tuple:
-			GB_PANIC("TODO(bill): cg_build_range_tuple");
-			// cg_build_range_tuple(p, expr, val0_type, val1_type, &val, &key, &loop, &done);
+			GB_PANIC("Should be handled already");
+			break;
+
+		case Type_BitSet:
+			GB_PANIC("TODO(bill): for in bit_set");
 			break;
 		default:
 			GB_PANIC("Cannot range over %s", type_to_string(expr_type));
