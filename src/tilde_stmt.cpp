@@ -228,6 +228,86 @@ gb_internal cgValue cg_addr_load(cgProcedure *p, cgAddr addr) {
 	case cgAddr_Default:
 		return cg_emit_load(p, addr.addr);
 
+	case cgAddr_BitField:
+		{
+			Type *ct = core_type(addr.bitfield.type);
+			bool do_mask = false;
+			if (is_type_unsigned(ct) || is_type_boolean(ct)) {
+				// Mask
+				if (addr.bitfield.bit_size != 8*type_size_of(ct)) {
+					do_mask = true;
+				}
+			}
+
+			i64 total_bitfield_bit_size = 8*type_size_of(cg_addr_type(addr));
+			i64 dst_byte_size = type_size_of(addr.bitfield.type);
+			cgAddr dst = cg_add_local(p, addr.bitfield.type, nullptr, true);
+			cgValue src = addr.addr;
+
+			cgValue bit_offset  = cg_const_int(p, t_uintptr, addr.bitfield.bit_offset);
+			cgValue bit_size    = cg_const_int(p, t_uintptr, addr.bitfield.bit_size);
+			cgValue byte_offset = cg_const_int(p, t_uintptr, (addr.bitfield.bit_offset+7)/8);
+			cgValue byte_size   = cg_const_int(p, t_uintptr, (addr.bitfield.bit_size+7)/8);
+
+			GB_ASSERT(type_size_of(addr.bitfield.type) >= ((addr.bitfield.bit_size+7)/8));
+
+			cgValue r = {};
+			if (is_type_endian_big(addr.bitfield.type)) {
+				auto args = slice_make<cgValue>(temporary_allocator(), 4);
+				args[0] = dst.addr;
+				args[1] = src;
+				args[2] = bit_offset;
+				args[3] = bit_size;
+				cg_emit_runtime_call(p, "__read_bits", args);
+
+				cgValue shift_amount = cg_const_int(
+					p,
+					cg_addr_type(dst),
+					8*dst_byte_size - addr.bitfield.bit_size
+				);
+				r = cg_addr_load(p, dst);
+				r.node = tb_inst_shl(p->func, r.node, shift_amount.node, TB_ARITHMATIC_NONE);
+			} else if ((addr.bitfield.bit_offset % 8) == 0) {
+				cgValue copy_size = byte_size;
+				cgValue src_offset = cg_emit_conv(p, src, t_u8_ptr);
+				src_offset = cg_emit_ptr_offset(p, src_offset, byte_offset);
+				if (addr.bitfield.bit_offset + dst_byte_size <= total_bitfield_bit_size) {
+					do_mask = true;
+					copy_size = cg_const_int(p, t_uintptr, dst_byte_size);
+				}
+				cg_builtin_mem_copy_non_overlapping(p, dst.addr, src_offset, copy_size);
+				r = cg_addr_load(p, dst);
+			} else {
+				auto args = slice_make<cgValue>(temporary_allocator(), 4);
+				args[0] = dst.addr;
+				args[1] = src;
+				args[2] = bit_offset;
+				args[3] = bit_size;
+				cg_emit_runtime_call(p, "__read_bits", args);
+				r = cg_addr_load(p, dst);
+			}
+
+			Type *t = addr.bitfield.type;
+
+			if (do_mask) {
+				GB_ASSERT(addr.bitfield.bit_size < 8*type_size_of(ct));
+
+				cgValue mask = cg_const_int(p, t, (1ull<<cast(u64)addr.bitfield.bit_size)-1);
+				r = cg_emit_arith(p, Token_And, r, mask, t);
+			}
+
+			if (!is_type_unsigned(ct) && !is_type_boolean(ct)) {
+				// Sign extension
+				// m := 1<<(bit_size-1)
+				// r = (r XOR m) - m
+				cgValue m = cg_const_int(p, t, 1ull<<(addr.bitfield.bit_size-1));
+				r = cg_emit_arith(p, Token_Xor, r, m, t);
+				r = cg_emit_arith(p, Token_Sub, r, m, t);
+			}
+
+			return r;
+		}
+
 	case cgAddr_Map:
 		{
 			Type *map_type = base_type(type_deref(addr.addr.type));
@@ -337,7 +417,44 @@ gb_internal void cg_addr_store(cgProcedure *p, cgAddr addr, cgValue value) {
 		addr = cg_addr(cg_address_from_load(p, cg_addr_load(p, addr)));
 	}
 
-	if (addr.kind == cgAddr_RelativePointer) {
+	if (addr.kind == cgAddr_BitField) {
+		cgValue dst = addr.addr;
+		if (is_type_endian_big(addr.bitfield.type)) {
+			i64 shift_amount = 8*type_size_of(value.type) - addr.bitfield.bit_size;
+			cgValue shifted_value = value;
+			shifted_value.node = tb_inst_shr(p->func,
+				shifted_value.node,
+				tb_inst_uint(p->func, cg_data_type(shifted_value.type), shift_amount));
+
+			cgValue src = cg_address_from_load_or_generate_local(p, shifted_value);
+
+			auto args = slice_make<cgValue>(temporary_allocator(), 4);
+			args[0] = dst;
+			args[1] = src;
+			args[2] = cg_const_int(p, t_uintptr, addr.bitfield.bit_offset);
+			args[3] = cg_const_int(p, t_uintptr, addr.bitfield.bit_size);
+			cg_emit_runtime_call(p, "__write_bits", args);
+		} else if ((addr.bitfield.bit_offset % 8) == 0 &&
+		           (addr.bitfield.bit_size   % 8) == 0) {
+			cgValue src = cg_address_from_load_or_generate_local(p, value);
+
+			cgValue byte_offset = cg_const_int(p, t_uintptr, addr.bitfield.bit_offset/8);
+			cgValue byte_size = cg_const_int(p, t_uintptr, addr.bitfield.bit_size/8);
+			cgValue dst_offset = cg_emit_conv(p, dst, t_u8_ptr);
+			dst_offset = cg_emit_ptr_offset(p, dst_offset, byte_offset);
+			cg_builtin_mem_copy_non_overlapping(p, dst_offset, src, byte_size);
+		} else {
+			cgValue src = cg_address_from_load_or_generate_local(p, value);
+
+			auto args = slice_make<cgValue>(temporary_allocator(), 4);
+			args[0] = dst;
+			args[1] = src;
+			args[2] = cg_const_int(p, t_uintptr, addr.bitfield.bit_offset);
+			args[3] = cg_const_int(p, t_uintptr, addr.bitfield.bit_size);
+			cg_emit_runtime_call(p, "__write_bits", args);
+		}
+		return;
+	} else if (addr.kind == cgAddr_RelativePointer) {
 		GB_PANIC("TODO(bill): cgAddr_RelativePointer");
 	} else if (addr.kind == cgAddr_RelativeSlice) {
 		GB_PANIC("TODO(bill): cgAddr_RelativeSlice");

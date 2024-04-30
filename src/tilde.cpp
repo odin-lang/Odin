@@ -235,6 +235,19 @@ gb_internal cgAddr cg_addr_soa_variable(cgValue addr, cgValue index, Ast *index_
 }
 
 
+gb_internal cgAddr cg_addr_bit_field(cgValue addr, Type *type, i64 bit_offset, i64 bit_size) {
+	GB_ASSERT(is_type_pointer(addr.type));
+	Type *mt = type_deref(addr.type);
+	GB_ASSERT_MSG(is_type_bit_field(mt), "%s", type_to_string(mt));
+
+	cgAddr v = {cgAddr_BitField, addr};
+	v.bitfield.type       = type;
+	v.bitfield.bit_offset = bit_offset;
+	v.bitfield.bit_size   = bit_size;
+	return v;
+}
+
+
 
 gb_internal void cg_set_debug_pos_from_node(cgProcedure *p, Ast *node) {
 	if (node) {

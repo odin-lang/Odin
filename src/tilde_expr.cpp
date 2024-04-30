@@ -2701,6 +2701,195 @@ cgAddr cg_build_addr_compound_lit(cgProcedure *p, Ast *expr) {
 	switch (bt->kind) {
 	default: GB_PANIC("Unknown CompoundLit type: %s", type_to_string(type)); break;
 
+	case Type_BitField: {
+		TEMPORARY_ALLOCATOR_GUARD();
+
+		struct FieldData {
+			Type *field_type;
+			u64 bit_offset;
+			u64 bit_size;
+		};
+		auto values = array_make<cgValue>  (temporary_allocator(), 0, cl->elems.count);
+		auto fields = array_make<FieldData>(temporary_allocator(), 0, cl->elems.count);
+
+		for (Ast *elem : cl->elems) {
+			ast_node(fv, FieldValue, elem);
+			String name = fv->field->Ident.token.string;
+			Selection sel = lookup_field(bt, name, false);
+			GB_ASSERT(sel.is_bit_field);
+			GB_ASSERT(!sel.indirect);
+			GB_ASSERT(sel.index.count == 1);
+			GB_ASSERT(sel.entity != nullptr);
+
+			i64 index = sel.index[0];
+			Entity *f = bt->BitField.fields[index];
+			GB_ASSERT(f == sel.entity);
+			i64 bit_offset = bt->BitField.bit_offsets[index];
+			i64 bit_size   = bt->BitField.bit_sizes[index];
+			GB_ASSERT(bit_size > 0);
+
+			Type *field_type = sel.entity->type;
+			cgValue field_expr = cg_build_expr(p, fv->value);
+			field_expr = cg_emit_conv(p, field_expr, field_type);
+			array_add(&values, field_expr);
+			array_add(&fields, FieldData{field_type, cast(u64)bit_offset, cast(u64)bit_size});
+		}
+
+		// NOTE(bill): inline insertion sort should be good enough, right?
+		for (isize i = 1; i < values.count; i++) {
+			for (isize j = i;
+			     j > 0 && fields[i].bit_offset < fields[j].bit_offset;
+			     j--) {
+				auto vtmp = values[j];
+				values[j] = values[j-1];
+				values[j-1] = vtmp;
+
+				auto ftmp = fields[j];
+				fields[j] = fields[j-1];
+				fields[j-1] = ftmp;
+			}
+		}
+
+		bool any_fields_different_endian = false;
+		for (auto const &f : fields) {
+			if (is_type_different_to_arch_endianness(f.field_type)) {
+				// NOTE(bill): Just be slow for this, to be correct
+				any_fields_different_endian = true;
+				break;
+			}
+		}
+
+		Type *backing_type = core_type(bt->BitField.backing_type);
+		GB_ASSERT(!is_type_integer_128bit(core_array_type(backing_type)));
+
+		if (!any_fields_different_endian &&
+		    fields.count == bt->BitField.fields.count) {
+			// SINGLE INTEGER BACKING ONLY
+
+			GB_ASSERT(is_type_integer(backing_type) ||
+			          (is_type_array(backing_type) && is_type_integer(backing_type->Array.elem)));
+
+			// NOTE(bill): all fields are present
+			// this means no masking is necessary since on write, the bits will be overridden
+
+			cgValue dst_byte_ptr = cg_emit_conv(p, v.addr, t_u8_ptr);
+			u64 total_bit_size = cast(u64)(8*type_size_of(bt));
+
+			if (is_type_integer(backing_type)) {
+				TB_DataType dt = cg_data_type(backing_type);
+				cgValue res = cg_const_int(p, backing_type, 0);
+
+				for (isize i = 0; i < fields.count; i++) {
+					auto const &f = fields[i];
+
+					// IMPORTANT NOTE(bill): this will not work for 128-bit integers
+					u64 mask = (1ull<<f.bit_size)-1;
+
+					cgValue elem = cg_flatten_value(p, values[i]);
+					GB_ASSERT(elem.kind == cgValue_Value);
+					elem.node = tb_inst_zxt(p->func, elem.node, dt);
+					elem.node = tb_inst_and(p->func, elem.node, tb_inst_uint(p->func, dt, mask));
+
+					elem.node = tb_inst_shl(p->func, elem.node, tb_inst_uint(p->func, dt, f.bit_offset), TB_ARITHMATIC_NONE);
+
+					res.node = tb_inst_or(p->func, res.node, elem.node);
+				}
+
+				cg_addr_store(p, v, res);
+			} else if (is_type_array(backing_type)) {
+				// ARRAY OF INTEGER BACKING
+
+				i64 array_count = backing_type->Array.count;
+
+				TB_DataType lit = cg_data_type(core_type(backing_type->Array.elem));
+
+				TB_Node **elems = gb_alloc_array(temporary_allocator(), TB_Node *, array_count);
+				for (i64 i = 0; i < array_count; i++) {
+					elems[i] = tb_inst_uint(p->func, lit, 0);
+				}
+
+				u64 elem_bit_size = cast(u64)(8*type_size_of(backing_type->Array.elem));
+				u64 curr_bit_offset = 0;
+				for (isize i = 0; i < fields.count; i++) {
+					auto const &f = fields[i];
+
+					cgValue val = values[i];
+					Type *vt = val.type;
+					TB_DataType dt = cg_data_type(vt);
+					for (u64 bits_to_set = f.bit_size;
+					     bits_to_set > 0;
+					     /**/) {
+						i64 elem_idx = curr_bit_offset/elem_bit_size;
+						u64 elem_bit_offset = curr_bit_offset%elem_bit_size;
+
+						u64 mask_width = gb_min(bits_to_set, elem_bit_size-elem_bit_offset);
+						GB_ASSERT(mask_width > 0);
+						bits_to_set -= mask_width;
+
+						// IMPORTANT NOTE(bill): this will not work for 128-bit integers
+						u64 mask = (1ull<<mask_width)-1;
+
+						TB_Node *to_set = tb_inst_and(p->func, val.node, tb_inst_uint(p->func, dt, mask));
+
+						if (elem_bit_offset != 0) {
+							to_set = tb_inst_shl(p->func, to_set, tb_inst_uint(p->func, dt, elem_bit_offset), TB_ARITHMATIC_NONE);
+						}
+						to_set = tb_inst_trunc(p->func, to_set, lit);
+
+						if (tb_node_is_constant_zero(elems[elem_idx])) {
+							elems[elem_idx] = to_set; // don't even bother doing `0 | to_set`
+						} else {
+							elems[elem_idx] = tb_inst_or(p->func, elems[elem_idx], to_set);
+						}
+
+						if (mask_width != 0) {
+							val.node = tb_inst_shr(p->func, val.node, tb_inst_uint(p->func, dt, mask_width));
+						}
+						curr_bit_offset += mask_width;
+					}
+
+					GB_ASSERT(curr_bit_offset == f.bit_offset + f.bit_size);
+				}
+
+				for (i64 i = 0; i < array_count; i++) {
+					cgValue elem_ptr = cg_flatten_value(p, cg_emit_struct_ep(p, v.addr, i));
+					GB_ASSERT(elem_ptr.kind == cgValue_Value);
+					cg_emit_store(p, elem_ptr, cg_value(elems[i], type_deref(elem_ptr.type)));
+				}
+			} else {
+				// SLOW STORAGE
+
+				for_array(i, fields) {
+					auto const &f = fields[i];
+
+					if ((f.bit_offset & 7) == 0) {
+						u64 unpacked_bit_size  = cast(u64)(8*type_size_of(f.field_type));
+						u64 byte_size = (f.bit_size+7)/8;
+
+						if (f.bit_offset + unpacked_bit_size <= total_bit_size) {
+							byte_size = unpacked_bit_size/8;
+						}
+						cgValue dst = cg_emit_ptr_offset(p, dst_byte_ptr, cg_const_int(p, t_int, f.bit_offset/8));
+						cgValue src = cg_address_from_load_or_generate_local(p, values[i]);
+						cg_builtin_mem_copy_non_overlapping(p, dst, src, cg_const_int(p, t_uintptr, byte_size));
+					} else {
+						cgAddr dst = cg_addr_bit_field(v.addr, f.field_type, f.bit_offset, f.bit_size);
+						cg_addr_store(p, dst, values[i]);
+					}
+				}
+			}
+		} else {
+			// individual storing
+			for_array(i, values) {
+				auto const &f = fields[i];
+				cgAddr dst = cg_addr_bit_field(v.addr, f.field_type, f.bit_offset, f.bit_size);
+				cg_addr_store(p, dst, values[i]);
+			}
+		}
+
+		return v;
+	}
+
 	case Type_Struct: {
 		TypeStruct *st = &bt->Struct;
 		cgValue comp_lit_ptr = cg_addr_get_ptr(p, v);
@@ -2974,7 +3163,7 @@ cgAddr cg_build_addr_compound_lit(cgProcedure *p, Ast *expr) {
 		// for (auto const &td : temp_data) if (td.value.node != nullptr) {
 		// 	if (td.elem_length > 0) {
 		// 		for (i64 k = 0; k < td.elem_length; k++) {
-		// 			LLVMValueRef index = cg_const_int(p->module, t_u32, td.elem_index + k).value;
+		// 			LLVMValueRef index = cg_const_int(p, t_u32, td.elem_index + k).value;
 		// 			vector_value.value = LLVMBuildInsertElement(p->builder, vector_value.value, td.value.value, index, "");
 		// 		}
 		// 	} else {

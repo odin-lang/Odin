@@ -66,6 +66,8 @@ enum cgAddrKind {
 
 	cgAddr_Swizzle,
 	cgAddr_SwizzleLarge,
+
+	cgAddr_BitField,
 };
 
 struct cgAddr {
@@ -100,6 +102,11 @@ struct cgAddr {
 			Type *type;
 			Slice<i32> indices;
 		} swizzle_large;
+		struct {
+			Type *type;
+			i64 bit_offset;
+			i64 bit_size;
+		} bitfield;
 	};
 };
 
