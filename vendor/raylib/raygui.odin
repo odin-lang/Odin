@@ -278,11 +278,11 @@ foreign lib {
 	
 	// Icons functionality
 	
-	GuiIconText         :: proc(iconId: c.int, text: cstring) -> cstring ---                                  // Get text with icon id prepended (if supported)
-	GuiSetIconScale     :: proc(scale: c.int) ---                                                             // Set default icon drawing size
-	GuiGetIcons         :: proc() -> [^]u32 ---                                                               // Get raygui icons data pointer
-	GuiLoadIcons        :: proc(fileName: cstring, loadIconsName: bool) -> [^]cstring ---                     // Load raygui icons file (.rgi) into internal icons data
-	GuiDrawIcon         :: proc(iconId: c.int, posX: c.int, posY: c.int, pixelSize: c.int, color: Color) ---  // Draw icon using pixel size at specified position
+	GuiIconText         :: proc(iconId: GuiIconName, text: cstring) -> cstring ---                                  // Get text with icon id prepended (if supported)
+	GuiSetIconScale     :: proc(scale: c.int) ---                                                                   // Set default icon drawing size
+	GuiGetIcons         :: proc() -> [^]u32 ---                                                                     // Get raygui icons data pointer
+	GuiLoadIcons        :: proc(fileName: cstring, loadIconsName: bool) -> [^]cstring ---                           // Load raygui icons file (.rgi) into internal icons data
+	GuiDrawIcon         :: proc(iconId: GuiIconName, posX: c.int, posY: c.int, pixelSize: c.int, color: Color) ---  // Draw icon using pixel size at specified position
 	
 	
 	// Controls
