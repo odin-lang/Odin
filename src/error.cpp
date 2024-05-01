@@ -452,11 +452,11 @@ gb_internal void error_line_va(char const *fmt, va_list va) {
 
 gb_internal void error_no_newline_va(TokenPos const &pos, char const *fmt, va_list va) {
 	global_error_collector.count.fetch_add(1);
+	mutex_lock(&global_error_collector.mutex);
 	if (global_error_collector.count.load() > MAX_ERROR_COLLECTOR_COUNT()) {
 		print_all_errors();
 		gb_exit(1);
 	}
-	mutex_lock(&global_error_collector.mutex);
 
 	push_error_value(pos, ErrorValue_Error);
 
@@ -485,11 +485,11 @@ gb_internal void error_no_newline_va(TokenPos const &pos, char const *fmt, va_li
 
 gb_internal void syntax_error_va(TokenPos const &pos, TokenPos end, char const *fmt, va_list va) {
 	global_error_collector.count.fetch_add(1);
+	mutex_lock(&global_error_collector.mutex);
 	if (global_error_collector.count > MAX_ERROR_COLLECTOR_COUNT()) {
 		print_all_errors();
 		gb_exit(1);
 	}
-	mutex_lock(&global_error_collector.mutex);
 
 	push_error_value(pos, ErrorValue_Warning);
 
@@ -518,11 +518,11 @@ gb_internal void syntax_error_va(TokenPos const &pos, TokenPos end, char const *
 
 gb_internal void syntax_error_with_verbose_va(TokenPos const &pos, TokenPos end, char const *fmt, va_list va) {
 	global_error_collector.count.fetch_add(1);
+	mutex_lock(&global_error_collector.mutex);
 	if (global_error_collector.count > MAX_ERROR_COLLECTOR_COUNT()) {
 		print_all_errors();
 		gb_exit(1);
 	}
-	mutex_lock(&global_error_collector.mutex);
 
 	push_error_value(pos, ErrorValue_Warning);
 
