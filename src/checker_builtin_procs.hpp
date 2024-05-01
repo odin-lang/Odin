@@ -44,6 +44,8 @@ enum BuiltinProcId {
 	// "Intrinsics"
 	BuiltinProc_is_package_imported,
 
+	BuiltinProc_has_target_feature,
+
 	BuiltinProc_transpose,
 	BuiltinProc_outer_product,
 	BuiltinProc_hadamard_product,
@@ -353,6 +355,8 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 
 	// "Intrinsics"
 	{STR_LIT("is_package_imported"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+
+	{STR_LIT("has_target_feature"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("transpose"),        1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("outer_product"),    2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
