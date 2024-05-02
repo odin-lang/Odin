@@ -89,11 +89,11 @@ FD_Flags :: bit_set[FD_Flags_Bits; i32]
 	Represents file's permission and status bits
 **Example:**
 	When you're passing a value of this type the recommended usage is:
-	
+
 	```
 	  linux.Mode{.S_IXOTH, .S_IROTH} | linux.S_IRWXU | linux.S_IRWXG
 	```
-	  
+
 	This would generate a mode that has full permissions for the
 	file's owner and group, and only "read" and "execute" bits
 	for others.
@@ -151,9 +151,9 @@ when ODIN_ARCH == .amd64 {
 		size:       i64,
 		blksize:    uint,
 		blocks:     u64,
-		atim:       Time_Spec,
-		mtim:       Time_Spec,
-		ctim:       Time_Spec,
+		atime:      Time_Spec,
+		mtime:      Time_Spec,
+		ctime:      Time_Spec,
 		ino:        Inode,
 	}
 }
@@ -571,29 +571,35 @@ Sig_Info :: struct #packed {
 }
 
 #assert(size_of(Sig_Info) == 128)
-
-#assert(offset_of(Sig_Info, pid)        == 0x10)
-#assert(offset_of(Sig_Info, uid)        == 0x14)
-#assert(offset_of(Sig_Info, timerid)    == 0x10)
-#assert(offset_of(Sig_Info, overrun)    == 0x14)
-#assert(offset_of(Sig_Info, value)      == 0x18)
-#assert(offset_of(Sig_Info, status)     == 0x18)
-#assert(offset_of(Sig_Info, utime)      == 0x20)
-#assert(offset_of(Sig_Info, stime)      == 0x28)
-#assert(offset_of(Sig_Info, addr)       == 0x10)
-#assert(offset_of(Sig_Info, addr_lsb)   == 0x18)
-#assert(offset_of(Sig_Info, trapno)     == 0x18)
-#assert(offset_of(Sig_Info, lower)      == 0x20)
-#assert(offset_of(Sig_Info, upper)      == 0x28)
-#assert(offset_of(Sig_Info, pkey)       == 0x20)
-#assert(offset_of(Sig_Info, perf_data)  == 0x18)
-#assert(offset_of(Sig_Info, perf_type)  == 0x20)
-#assert(offset_of(Sig_Info, perf_flags) == 0x24)
-#assert(offset_of(Sig_Info, band)       == 0x10)
-#assert(offset_of(Sig_Info, fd)         == 0x18)
-#assert(offset_of(Sig_Info, call_addr)  == 0x10)
-#assert(offset_of(Sig_Info, syscall)    == 0x18)
-#assert(offset_of(Sig_Info, arch)       == 0x1C)
+when ODIN_ARCH == .amd64 || ODIN_ARCH == .arm64 {
+	#assert(offset_of(Sig_Info, signo)      == 0x00)
+	#assert(offset_of(Sig_Info, errno)      == 0x04)
+	#assert(offset_of(Sig_Info, code)       == 0x08)
+	#assert(offset_of(Sig_Info, pid)        == 0x10)
+	#assert(offset_of(Sig_Info, uid)        == 0x14)
+	#assert(offset_of(Sig_Info, timerid)    == 0x10)
+	#assert(offset_of(Sig_Info, overrun)    == 0x14)
+	#assert(offset_of(Sig_Info, value)      == 0x18)
+	#assert(offset_of(Sig_Info, status)     == 0x18)
+	#assert(offset_of(Sig_Info, utime)      == 0x20)
+	#assert(offset_of(Sig_Info, stime)      == 0x28)
+	#assert(offset_of(Sig_Info, addr)       == 0x10)
+	#assert(offset_of(Sig_Info, addr_lsb)   == 0x18)
+	#assert(offset_of(Sig_Info, trapno)     == 0x18)
+	#assert(offset_of(Sig_Info, lower)      == 0x20)
+	#assert(offset_of(Sig_Info, upper)      == 0x28)
+	#assert(offset_of(Sig_Info, pkey)       == 0x20)
+	#assert(offset_of(Sig_Info, perf_data)  == 0x18)
+	#assert(offset_of(Sig_Info, perf_type)  == 0x20)
+	#assert(offset_of(Sig_Info, perf_flags) == 0x24)
+	#assert(offset_of(Sig_Info, band)       == 0x10)
+	#assert(offset_of(Sig_Info, fd)         == 0x18)
+	#assert(offset_of(Sig_Info, call_addr)  == 0x10)
+	#assert(offset_of(Sig_Info, syscall)    == 0x18)
+	#assert(offset_of(Sig_Info, arch)       == 0x1C)
+} else {
+	// TODO
+}
 
 SIGEV_MAX_SIZE :: 64
 SIGEV_PAD_SIZE :: ((SIGEV_MAX_SIZE-size_of(i32)*2+size_of(Sig_Val))/size_of(i32))
@@ -774,7 +780,7 @@ RLimit :: struct {
 
 /*
 	Structure representing how much of each resource got used.
-*/	
+*/
 RUsage :: struct {
 	utime:         Time_Val,
 	stime:         Time_Val,
@@ -854,7 +860,7 @@ when size_of(int) == 8 || ODIN_ARCH == .i386 {
 		cpid:       Pid,
 		lpid:       Pid,
 		nattach:    uint,
-		_:          [2]uint,        
+		_:          [2]uint,
 	}
 }
 

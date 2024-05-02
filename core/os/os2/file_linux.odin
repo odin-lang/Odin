@@ -218,10 +218,10 @@ _remove :: proc(name: string) -> Error {
 	#partial switch (errno) {
 	case .ELOOP: /* symlink */
 	case .NONE:
+		defer linux.close(fd)
 		if _is_dir_fd(fd) {
 			return _get_platform_error(linux.rmdir(name_cstr))
 		}
-		linux.close(fd)
 	case:
 		return _get_platform_error(errno)
 	}

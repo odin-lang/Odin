@@ -251,7 +251,7 @@ _process_start :: proc(name: string, argv: []string, attr: ^Process_Attributes) 
 }
 
 _process_release :: proc(p: ^Process) -> Error {
-	// TODO
+	// We didn't allocate...
 	return nil
 }
 
@@ -398,23 +398,24 @@ _process_wait :: proc(p: ^Process, t: time.Duration) -> (state: Process_State, e
 		}
 	}
 
-	if !linux.WIFEXITED(status) {
-		return safe_state(p^, state)
-	}
-
-	state.exited = true
-	p.is_done = true
-
-	// normal exit
-	if signo := status & 0x7f; signo == 0 {
+	// terminated by exit
+	if linux.WIFEXITED(status) {
+		p.is_done = true
+		state.exited = true
 		state.exit_code = int(linux.WEXITSTATUS(status))
 		state.success = state.exit_code == 0
+		return state, nil
 	}
 
-	// signaled
-	if (status & 0xffff) - 1 < 0xff {
-		// NOTE(jason): for now, success = false, exit_code = 0
+	// terminated by signal
+	if linux.WIFSIGNALED(status) {
+		// NOTE: what's the correct behavior here??
+		p.is_done = true
+		state.exited = false
+		state.exit_code = int(linux.WTERMSIG(status))
+		state.success = false
+		return state, nil
 	}
 
-	return
+	return safe_state(p^, state)
 }

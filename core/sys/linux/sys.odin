@@ -69,7 +69,7 @@ close :: proc "contextless" (fd: Fd) -> (Errno) {
 stat :: proc "contextless" (filename: cstring, stat: ^Stat) -> (Errno) {
 	when size_of(int) == 8 {
 		when ODIN_ARCH == .arm64 {
-			ret := syscall(SYS_fstatat, AT_FDCWD, cast(rawptr) filename, stat)
+			ret := syscall(SYS_fstatat, AT_FDCWD, cast(rawptr) filename, stat, 0)
 			return Errno(-ret)
 		} else {
 			ret := syscall(SYS_stat, cast(rawptr) filename, stat)
@@ -104,7 +104,7 @@ fstat :: proc "contextless" (fd: Fd, stat: ^Stat) -> (Errno) {
 	The information is returned in a struct pointed to by `stat` parameter.
 	The difference with stat, fstat is that if the file is a symbolic link,
 	stat and fstat will dereference the link. lstat doesn't dereference symlinks.
-	
+
 	Available since Linux 1.0.
 	For 32-bit systems a different syscall is used that became available since 2.4.
 	Not available on arm64.
@@ -668,7 +668,7 @@ where
 	intrinsics.type_is_pointer(T) ||
 	intrinsics.type_is_multi_pointer(T)
 {
-	return setsockopt_base(sock, cast(int) level, cast(int) opt, val) 
+	return setsockopt_base(sock, cast(int) level, cast(int) opt, val)
 }
 
 setsockopt_tcp :: proc "contextless" (sock: Fd, level: Socket_API_Level_TCP, opt: Socket_TCP_Option, val: $T) -> (Errno)
@@ -1271,7 +1271,7 @@ unlink :: proc "contextless" (name: cstring) -> (Errno) {
 */
 symlink :: proc "contextless" (target: cstring, linkpath: cstring) -> (Errno) {
 	when ODIN_ARCH == .arm64 {
-		ret := syscall(SYS_symlinkat, AT_FDCWD, cast(rawptr) target, cast(rawptr) linkpath)
+		ret := syscall(SYS_symlinkat, cast(rawptr) target, AT_FDCWD, cast(rawptr) linkpath)
 		return Errno(-ret)
 	} else {
 		ret := syscall(SYS_symlink, cast(rawptr) target, cast(rawptr) linkpath)
@@ -1301,7 +1301,7 @@ readlink :: proc "contextless" (name: cstring, buf: []u8) -> (int, Errno) {
 */
 chmod :: proc "contextless" (name: cstring, mode: Mode) -> (Errno) {
 	when ODIN_ARCH == .arm64 {
-		ret := syscall(SYS_fchmodat, cast(rawptr) name, transmute(u32) mode, 0)
+		ret := syscall(SYS_fchmodat, AT_FDCWD, cast(rawptr) name, transmute(u32) mode)
 		return Errno(-ret)
 	} else {
 		ret := syscall(SYS_chmod, cast(rawptr) name, transmute(u32) mode)
@@ -1930,10 +1930,10 @@ sigaltstack :: proc "contextless" (stack: ^Sig_Stack, old_stack: ^Sig_Stack) -> 
 
 /*
 	Create a special or ordinary file.
-	
+
 	`mode` parameter contains both the the file mode and the type of the node to create.
 	 ->  Add one of S_IFSOCK, S_IFBLK, S_IFFIFO, S_IFCHR to mode.
-	 
+
 	Available since Linux 1.0.
 	On ARM64 available since Linux 2.6.16.
 */
@@ -1960,7 +1960,7 @@ personality :: proc "contextless" (personality: uint) -> (uint, Errno) {
 
 /*
 	Query information about filesystem.
-	
+
 	Available since Linux 1.0.
 	For 32-bit systems a different syscall is used that became available since 2.6.
 */
@@ -1976,7 +1976,7 @@ statfs :: proc "contextless" (path: cstring, statfs: ^Stat_FS) -> (Errno) {
 
 /*
 	Query information about filesystem by file descriptor.
-	
+
 	Available since Linux 1.0.
 	For 32-bit systems a different syscall is used that became available since 2.6.
 */
@@ -2322,9 +2322,9 @@ futex :: proc {
 
 /*
 	Open an epoll file descriptor.
-	
+
 	The `size` argument is ignored but must be greater than zero.
-	
+
 	Available since Linux 2.6.
 */
 epoll_create :: proc(size: i32 = 1) -> (Fd, Errno) {
@@ -2420,9 +2420,9 @@ exit_group :: proc "contextless" (code: i32) -> ! {
 
 /*
 	Wait for an I/O event on an epoll file descriptor.
-	
+
 	`timeout` is specified in milliseconds.
-	
+
 	Available since Linux 2.6.
 */
 epoll_wait :: proc(epfd: Fd, events: [^]EPoll_Event, count: i32, timeout: i32) -> (i32, Errno) {
@@ -2593,8 +2593,8 @@ linkat :: proc "contextless" (target_dirfd: Fd, oldpath: cstring, link_dirfd: Fd
 	Create a symbolic link at specified dirfd.
 	Available since Linux 2.6.16.
 */
-symlinkat :: proc "contextless" (dirfd: Fd, target: cstring, linkpath: cstring) -> (Errno) {
-	ret := syscall(SYS_symlinkat, dirfd, cast(rawptr) target, cast(rawptr) linkpath)
+symlinkat :: proc "contextless" (target: cstring, dirfd: Fd, linkpath: cstring) -> (Errno) {
+	ret := syscall(SYS_symlinkat, cast(rawptr) target, dirfd, cast(rawptr) linkpath)
 	return Errno(-ret)
 }
 
