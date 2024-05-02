@@ -948,6 +948,7 @@ gb_internal void set_base_type(Type *t, Type *base) {
 	}
 }
 
+
 gb_internal Type *alloc_type(TypeKind kind) {
 	// gbAllocator a = heap_allocator();
 	gbAllocator a = permanent_allocator();

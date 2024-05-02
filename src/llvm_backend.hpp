@@ -66,6 +66,7 @@ struct lbProcedure;
 struct lbValue {
 	LLVMValueRef value;
 	Type *type;
+	bool is_packed;
 };
 
 

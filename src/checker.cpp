@@ -4315,7 +4315,7 @@ gb_internal bool correct_single_type_alias(CheckerContext *c, Entity *e) {
 
 gb_internal bool correct_type_alias_in_scope_backwards(CheckerContext *c, Scope *s) {
 	bool correction = false;
-	for (u32 n = s->elements.capacity, i = n-1; i < n; i--) {
+	for (u32 n = s->elements.count, i = n-1; i < n; i--) {
 		auto const &entry = s->elements.entries[i];
 		Entity *e = entry.value;
 		if (entry.hash && e != nullptr) {
