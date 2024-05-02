@@ -1131,8 +1131,9 @@ namespace lbAbiArm64 {
 			if (size <= 16) {
 				LLVMTypeRef cast_type = nullptr;
 
-				GB_ASSERT(size > 0);
-				if (size <= 8) {
+				if (size == 0) {
+					cast_type = LLVMStructTypeInContext(c, nullptr, 0, false);
+				} else if (size <= 8) {
 					cast_type = LLVMIntTypeInContext(c, cast(unsigned)(size*8));
 				} else {
 					unsigned count = cast(unsigned)((size+7)/8);

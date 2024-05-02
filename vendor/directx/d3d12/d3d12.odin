@@ -2283,7 +2283,7 @@ IHeap :: struct #raw_union {
 }
 IHeap_VTable :: struct {
 	using id3d12devicechild_vtable: IDeviceChild_VTable,
-	GetDesc: proc "system" (this: ^IHeap) -> HEAP_DESC,
+	GetDesc: proc "system" (this: ^IHeap, pRetValue: ^HEAP_DESC) -> ^HEAP_DESC,
 }
 
 
@@ -2297,7 +2297,7 @@ IResource_VTable :: struct {
 	using id3d12devicechild_vtable: IDeviceChild_VTable,
 	Map:                  proc "system" (this: ^IResource, Subresource: u32, pReadRange: ^RANGE, ppData: ^rawptr) -> HRESULT,
 	Unmap:                proc "system" (this: ^IResource, Subresource: u32, pWrittenRange: ^RANGE),
-	GetDesc:              proc "system" (this: ^IResource) -> RESOURCE_DESC,
+	GetDesc:              proc "system" (this: ^IResource, pRetValue: ^RESOURCE_DESC) -> ^RESOURCE_DESC,
 	GetGPUVirtualAddress: proc "system" (this: ^IResource) -> GPU_VIRTUAL_ADDRESS,
 	WriteToSubresource:   proc "system" (this: ^IResource, DstSubresource: u32, pDstBox: ^BOX, pSrcData: rawptr, SrcRowPitch: u32, SrcDepthPitch: u32) -> HRESULT,
 	ReadFromSubresource:  proc "system" (this: ^IResource, pDstData: rawptr, DstRowPitch: u32, DstDepthPitch: u32, SrcSubresource: u32, pSrcBox: ^BOX) -> HRESULT,
@@ -2514,7 +2514,7 @@ ICommandQueue_VTable :: struct {
 	Wait:                  proc "system" (this: ^ICommandQueue, pFence: ^IFence, Value: u64) -> HRESULT,
 	GetTimestampFrequency: proc "system" (this: ^ICommandQueue, pFrequency: ^u64) -> HRESULT,
 	GetClockCalibration:   proc "system" (this: ^ICommandQueue, pGpuTimestamp: ^u64, pCpuTimestamp: ^u64) -> HRESULT,
-	GetDesc:               proc "system" (this: ^ICommandQueue) -> COMMAND_QUEUE_DESC,
+	GetDesc:               proc "system" (this: ^ICommandQueue, pRetVal: ^COMMAND_QUEUE_DESC) -> ^COMMAND_QUEUE_DESC,
 }
 
 
@@ -2712,7 +2712,7 @@ IProtectedResourceSession :: struct #raw_union {
 }
 IProtectedResourceSession_VTable :: struct {
 	using id3d12protectedsession_vtable: IProtectedSession_VTable,
-	GetDesc: proc "system" (this: ^IProtectedResourceSession) -> PROTECTED_RESOURCE_SESSION_DESC,
+	GetDesc: proc "system" (this: ^IProtectedResourceSession, pRetVal: ^PROTECTED_RESOURCE_SESSION_DESC) -> ^PROTECTED_RESOURCE_SESSION_DESC,
 }
 
 
@@ -3492,7 +3492,7 @@ IProtectedResourceSession1 :: struct #raw_union {
 }
 IProtectedResourceSession1_VTable :: struct {
 	using id3d12protectedresourcesession_vtable: IProtectedResourceSession_VTable,
-	GetDesc1: proc "system" (this: ^IProtectedResourceSession1) -> PROTECTED_RESOURCE_SESSION_DESC1,
+	GetDesc1: proc "system" (this: ^IProtectedResourceSession1, pRetVal: ^PROTECTED_RESOURCE_SESSION_DESC1) -> ^PROTECTED_RESOURCE_SESSION_DESC1,
 }
 
 
@@ -3545,7 +3545,7 @@ IResource2 :: struct #raw_union {
 }
 IResource2_VTable :: struct {
 	using id3d12resource1_vtable: IResource1_VTable,
-	GetDesc1: proc "system" (this: ^IResource2) -> RESOURCE_DESC1,
+	GetDesc1: proc "system" (this: ^IResource2, pRetVal: ^RESOURCE_DESC1) -> ^RESOURCE_DESC1,
 }
 
 

@@ -474,16 +474,59 @@ gb_internal Type *check_assignment_variable(CheckerContext *ctx, Operand *lhs, O
 		}
 
 		Entity *e = entity_of_node(lhs->expr);
+		Entity *original_e = e;
+
+		Ast *name = unparen_expr(lhs->expr);
+		while (name->kind == Ast_SelectorExpr) {
+			name = name->SelectorExpr.expr;
+			e = entity_of_node(name);
+		}
+		if (e == nullptr) {
+			e = original_e;
+		}
 
 		gbString str = expr_to_string(lhs->expr);
 		if (e != nullptr && e->flags & EntityFlag_Param) {
+			ERROR_BLOCK();
 			if (e->flags & EntityFlag_Using) {
 				error(lhs->expr, "Cannot assign to '%s' which is from a 'using' procedure parameter", str);
 			} else {
 				error(lhs->expr, "Cannot assign to '%s' which is a procedure parameter", str);
 			}
+			error_line("\tSuggestion: Did you mean to pass '%.*s' by pointer?\n", LIT(e->token.string));
+			show_error_on_line(e->token.pos, token_pos_end(e->token));
 		} else {
+			ERROR_BLOCK();
 			error(lhs->expr, "Cannot assign to '%s'", str);
+
+			if (e && e->flags & EntityFlag_ForValue) {
+				isize offset = show_error_on_line(e->token.pos, token_pos_end(e->token), "Suggestion:");
+				if (offset < 0) {
+					if (is_type_map(e->type)) {
+						error_line("\tSuggestion: Did you mean? 'for key, &%.*s in ...'\n", LIT(e->token.string));
+					} else {
+						error_line("\tSuggestion: Did you mean? 'for &%.*s in ...'\n", LIT(e->token.string));
+					}
+				} else {
+					error_line("\t");
+					for (isize i = 0; i < offset-1; i++) {
+						error_line(" ");
+					}
+					error_line("'%.*s' is immutable, declare it as '&%.*s' to make it mutable\n", LIT(e->token.string), LIT(e->token.string));
+				}
+
+			} else if (e && e->flags & EntityFlag_SwitchValue) {
+				isize offset = show_error_on_line(e->token.pos, token_pos_end(e->token), "Suggestion:");
+				if (offset < 0) {
+					error_line("\tSuggestion: Did you mean? 'switch &%.*s in ...'\n", LIT(e->token.string));
+				} else {
+					error_line("\t");
+					for (isize i = 0; i < offset-1; i++) {
+						error_line(" ");
+					}
+					error_line("'%.*s' is immutable, declare it as '&%.*s' to make it mutable\n", LIT(e->token.string), LIT(e->token.string));
+				}
+			}
 		}
 		gb_string_free(str);
 
@@ -1586,6 +1629,17 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 				if (build_context.no_rtti && is_type_enum(t->BitSet.elem)) {
 					error(node, "Iteration over a bit_set of an enum is not allowed runtime type information (RTTI) has been disallowed");
 				}
+				if (rs->vals.count == 1 && rs->vals[0] && rs->vals[0]->kind == Ast_Ident) {
+					String name = rs->vals[0]->Ident.token.string;
+					Entity *found = scope_lookup(ctx->scope, name);
+					if (found && are_types_identical(found->type, t->BitSet.elem)) {
+						ERROR_BLOCK();
+						gbString s = expr_to_string(expr);
+						error(rs->vals[0], "'%.*s' shadows a previous declaration which might be ambiguous with 'for (%.*s in %s)'", LIT(name), LIT(name), s);
+						error_line("\tSuggestion: Use a different identifier if iteration is wanted, or surround in parentheses if a normal for loop is wanted\n");
+						gb_string_free(s);
+					}
+				}
 				break;
 
 			case Type_EnumeratedArray:
@@ -1621,17 +1675,36 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 				if (is_reverse) {
 					error(node, "#reverse for is not supported for map types, as maps are unordered");
 				}
+				if (rs->vals.count == 1 && rs->vals[0] && rs->vals[0]->kind == Ast_Ident) {
+					String name = rs->vals[0]->Ident.token.string;
+					Entity *found = scope_lookup(ctx->scope, name);
+					if (found && are_types_identical(found->type, t->Map.key)) {
+						ERROR_BLOCK();
+						gbString s = expr_to_string(expr);
+						error(rs->vals[0], "'%.*s' shadows a previous declaration which might be ambiguous with 'for (%.*s in %s)'", LIT(name), LIT(name), s);
+						error_line("\tSuggestion: Use a different identifier if iteration is wanted, or surround in parentheses if a normal for loop is wanted\n");
+						gb_string_free(s);
+					}
+				}
 				break;
 
 			case Type_Tuple:
 				{
 					isize count = t->Tuple.variables.count;
-					if (count < 1 || count > 3) {
+					if (count < 1) {
 						ERROR_BLOCK();
 						check_not_tuple(ctx, &operand);
-						error_line("\tMultiple return valued parameters in a range statement are limited to a maximum of 2 usable values with a trailing boolean for the conditional\n");
+						error_line("\tMultiple return valued parameters in a range statement are limited to a minimum of 1 usable values with a trailing boolean for the conditional, got %td\n", count);
 						break;
 					}
+					enum : isize {MAXIMUM_COUNT = 100};
+					if (count > MAXIMUM_COUNT) {
+						ERROR_BLOCK();
+						check_not_tuple(ctx, &operand);
+						error_line("\tMultiple return valued parameters in a range statement are limited to a maximum of %td usable values with a trailing boolean for the conditional, got %td\n", MAXIMUM_COUNT, count);
+						break;
+					}
+
 					Type *cond_type = t->Tuple.variables[count-1]->type;
 					if (!is_type_boolean(cond_type)) {
 						gbString s = type_to_string(cond_type);
@@ -1640,24 +1713,23 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 						break;
 					}
 
+					max_val_count = count;
+
 					for (Entity *e : t->Tuple.variables) {
 						array_add(&vals, e->type);
 					}
 
 					is_possibly_addressable = false;
 
-					if (rs->vals.count > 1 && rs->vals[1] != nullptr && count < 3) {
-						gbString s = type_to_string(t);
-						error(operand.expr, "Expected a 3-valued expression on the rhs, got (%s)", s);
-						gb_string_free(s);
-						break;
-					}
-
-					if (rs->vals.count > 0 && rs->vals[0] != nullptr && count < 2) {
-						gbString s = type_to_string(t);
-						error(operand.expr, "Expected at least a 2-valued expression on the rhs, got (%s)", s);
-						gb_string_free(s);
-						break;
+					bool do_break = false;
+					for (isize i = rs->vals.count-1; i >= 0; i--) {
+						if (rs->vals[i] != nullptr && count < i+2) {
+							gbString s = type_to_string(t);
+							error(operand.expr, "Expected a %td-valued expression on the rhs, got (%s)", i+2, s);
+							gb_string_free(s);
+							do_break = true;
+							break;
+						}
 					}
 
 					if (is_reverse) {
@@ -2355,14 +2427,14 @@ gb_internal void check_return_stmt(CheckerContext *ctx, Ast *node) {
 				unsafe_return_error(o, "the address of a compound literal");
 			} else if (x->kind == Ast_IndexExpr) {
 				Entity *f = entity_of_node(x->IndexExpr.expr);
-				if (is_type_array_like(f->type) || is_type_matrix(f->type)) {
+				if (f && (is_type_array_like(f->type) || is_type_matrix(f->type))) {
 					if (is_entity_local_variable(f)) {
 						unsafe_return_error(o, "the address of an indexed variable", f->type);
 					}
 				}
 			} else if (x->kind == Ast_MatrixIndexExpr) {
 				Entity *f = entity_of_node(x->MatrixIndexExpr.expr);
-				if (is_type_matrix(f->type) && is_entity_local_variable(f)) {
+				if (f && (is_type_matrix(f->type) && is_entity_local_variable(f))) {
 					unsafe_return_error(o, "the address of an indexed variable", f->type);
 				}
 			}

@@ -3,8 +3,8 @@ package os
 import "core:time"
 
 File_Info :: struct {
-	fullpath: string,
-	name:     string,
+	fullpath: string, // allocated
+	name:     string, // uses `fullpath` as underlying data
 	size:     i64,
 	mode:     File_Mode,
 	is_dir:   bool,

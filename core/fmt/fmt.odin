@@ -120,11 +120,11 @@ register_user_formatter :: proc(id: typeid, formatter: User_Formatter) -> Regist
 //
 // 	Returns: A formatted string. 
 //
+@(require_results)
 aprint :: proc(args: ..any, sep := " ", allocator := context.allocator) -> string {
 	str: strings.Builder
 	strings.builder_init(&str, allocator)
-	sbprint(&str, ..args, sep=sep)
-	return strings.to_string(str)
+	return sbprint(&str, ..args, sep=sep)
 }
 // 	Creates a formatted string with a newline character at the end
 //
@@ -136,11 +136,11 @@ aprint :: proc(args: ..any, sep := " ", allocator := context.allocator) -> strin
 //
 // 	Returns: A formatted string with a newline character at the end.
 //
+@(require_results)
 aprintln :: proc(args: ..any, sep := " ", allocator := context.allocator) -> string {
 	str: strings.Builder
 	strings.builder_init(&str, allocator)
-	sbprintln(&str, ..args, sep=sep)
-	return strings.to_string(str)
+	return sbprintln(&str, ..args, sep=sep)
 }
 // 	Creates a formatted string using a format string and arguments
 //
@@ -153,11 +153,11 @@ aprintln :: proc(args: ..any, sep := " ", allocator := context.allocator) -> str
 //
 // 	Returns: A formatted string. The returned string must be freed accordingly.
 //
+@(require_results)
 aprintf :: proc(fmt: string, args: ..any, allocator := context.allocator, newline := false) -> string {
 	str: strings.Builder
 	strings.builder_init(&str, allocator)
-	sbprintf(&str, fmt, ..args, newline=newline)
-	return strings.to_string(str)
+	return sbprintf(&str, fmt, ..args, newline=newline)
 }
 // 	Creates a formatted string using a format string and arguments, followed by a newline.
 //
@@ -169,6 +169,7 @@ aprintf :: proc(fmt: string, args: ..any, allocator := context.allocator, newlin
 //
 // 	Returns: A formatted string. The returned string must be freed accordingly.
 //
+@(require_results)
 aprintfln :: proc(fmt: string, args: ..any, allocator := context.allocator) -> string {
 	return aprintf(fmt, ..args, allocator=allocator, newline=true)
 }
@@ -182,11 +183,11 @@ aprintfln :: proc(fmt: string, args: ..any, allocator := context.allocator) -> s
 //
 // 	Returns: A formatted string.
 //
+@(require_results)
 tprint :: proc(args: ..any, sep := " ") -> string {
 	str: strings.Builder
 	strings.builder_init(&str, context.temp_allocator)
-	sbprint(&str, ..args, sep=sep)
-	return strings.to_string(str)
+	return sbprint(&str, ..args, sep=sep)
 }
 // 	Creates a formatted string with a newline character at the end
 //
@@ -198,11 +199,11 @@ tprint :: proc(args: ..any, sep := " ") -> string {
 //
 // 	Returns: A formatted string with a newline character at the end.
 //
+@(require_results)
 tprintln :: proc(args: ..any, sep := " ") -> string {
 	str: strings.Builder
 	strings.builder_init(&str, context.temp_allocator)
-	sbprintln(&str, ..args, sep=sep)
-	return strings.to_string(str)
+	return sbprintln(&str, ..args, sep=sep)
 }
 // 	Creates a formatted string using a format string and arguments
 //
@@ -215,11 +216,11 @@ tprintln :: proc(args: ..any, sep := " ") -> string {
 //
 // 	Returns: A formatted string.
 //
+@(require_results)
 tprintf :: proc(fmt: string, args: ..any, newline := false) -> string {
 	str: strings.Builder
 	strings.builder_init(&str, context.temp_allocator)
-	sbprintf(&str, fmt, ..args, newline=newline)
-	return strings.to_string(str)
+	return sbprintf(&str, fmt, ..args, newline=newline)
 }
 // 	Creates a formatted string using a format string and arguments, followed by a newline.
 //
@@ -231,6 +232,7 @@ tprintf :: proc(fmt: string, args: ..any, newline := false) -> string {
 //
 // 	Returns: A formatted string.
 //
+@(require_results)
 tprintfln :: proc(fmt: string, args: ..any) -> string {
 	return tprintf(fmt, ..args, newline=true)
 }
@@ -339,6 +341,7 @@ panicf :: proc(fmt: string, args: ..any, loc := #caller_location) -> ! {
 //
 // Returns: A formatted C string
 //
+@(require_results)
 caprintf :: proc(format: string, args: ..any, newline := false) -> cstring {
 	str: strings.Builder
 	strings.builder_init(&str)
@@ -357,6 +360,7 @@ caprintf :: proc(format: string, args: ..any, newline := false) -> cstring {
 //
 // Returns: A formatted C string
 //
+@(require_results)
 caprintfln :: proc(format: string, args: ..any) -> cstring {
 	return caprintf(format, ..args, newline=true)
 }
@@ -371,6 +375,7 @@ caprintfln :: proc(format: string, args: ..any) -> cstring {
 //
 // Returns: A formatted C string
 //
+@(require_results)
 ctprintf :: proc(format: string, args: ..any, newline := false) -> cstring {
 	str: strings.Builder
 	strings.builder_init(&str, context.temp_allocator)
@@ -389,6 +394,7 @@ ctprintf :: proc(format: string, args: ..any, newline := false) -> cstring {
 //
 // Returns: A formatted C string
 //
+@(require_results)
 ctprintfln :: proc(format: string, args: ..any) -> cstring {
 	return ctprintf(format, ..args, newline=true)
 }
@@ -1900,7 +1906,7 @@ fmt_struct :: proc(fi: ^Info, v: any, the_verb: rune, info: runtime.Type_Info_St
 	// fi.hash = false;
 	fi.indent += 1
 
-	if hash	{
+	if !is_soa && hash {
 		io.write_byte(fi.writer, '\n', &fi.n)
 	}
 	defer {
@@ -1934,6 +1940,9 @@ fmt_struct :: proc(fi: ^Info, v: any, the_verb: rune, info: runtime.Type_Info_St
 			n = uintptr((^int)(uintptr(v.data) + info.offsets[actual_field_count])^)
 		}
 
+		if hash && n > 0 {
+			io.write_byte(fi.writer, '\n', &fi.n)
+		}
 
 		for index in 0..<n {
 			if !hash && index > 0 { io.write_string(fi.writer, ", ", &fi.n) }
@@ -1942,9 +1951,23 @@ fmt_struct :: proc(fi: ^Info, v: any, the_verb: rune, info: runtime.Type_Info_St
 
 			if !hash && field_count > 0 { io.write_string(fi.writer, ", ", &fi.n) }
 
+			if hash {
+				fi.indent -= 1
+				fmt_write_indent(fi)
+				fi.indent += 1
+			}
 			io.write_string(fi.writer, base_type_name, &fi.n)
 			io.write_byte(fi.writer, '{', &fi.n)
-			defer io.write_byte(fi.writer, '}', &fi.n)
+			if hash { io.write_byte(fi.writer, '\n', &fi.n) }
+			defer {
+				if hash {
+					fi.indent -= 1
+					fmt_write_indent(fi)
+					fi.indent += 1
+				}
+				io.write_byte(fi.writer, '}', &fi.n)
+				if hash { io.write_string(fi.writer, ",\n", &fi.n) }
+			}
 			fi.record_level += 1
 			defer fi.record_level -= 1
 
@@ -2156,14 +2179,18 @@ fmt_named :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Named) 
 			when ODIN_ERROR_POS_STYLE == .Default {
 				io.write_byte(fi.writer, '(', &fi.n)
 				io.write_int(fi.writer, int(a.line), 10, &fi.n)
-				io.write_byte(fi.writer, ':', &fi.n)
-				io.write_int(fi.writer, int(a.column), 10, &fi.n)
+				if a.column != 0 {
+					io.write_byte(fi.writer, ':', &fi.n)
+					io.write_int(fi.writer, int(a.column), 10, &fi.n)
+				}
 				io.write_byte(fi.writer, ')', &fi.n)
 			} else when ODIN_ERROR_POS_STYLE == .Unix {
 				io.write_byte(fi.writer, ':', &fi.n)
 				io.write_int(fi.writer, int(a.line), 10, &fi.n)
-				io.write_byte(fi.writer, ':', &fi.n)
-				io.write_int(fi.writer, int(a.column), 10, &fi.n)
+				if a.column != 0 {
+					io.write_byte(fi.writer, ':', &fi.n)
+					io.write_int(fi.writer, int(a.column), 10, &fi.n)
+				}
 				io.write_byte(fi.writer, ':', &fi.n)
 			} else {
 				#panic("Unhandled ODIN_ERROR_POS_STYLE")
@@ -2505,8 +2532,11 @@ fmt_bit_field :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Bit
 		bit_offset := info.bit_offsets[i]
 		bit_size := info.bit_sizes[i]
 
-		value := read_bits(([^]byte)(v.data), bit_offset, bit_size)
 		type := info.types[i]
+		value := read_bits(([^]byte)(v.data), bit_offset, bit_size)
+		if reflect.is_endian_big(type) {
+			value <<= u64(8*type.size) - u64(bit_size)
+		}
 
 		if !reflect.is_unsigned(runtime.type_info_core(type)) {
 			// Sign Extension

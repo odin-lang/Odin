@@ -703,11 +703,11 @@ gb_internal void check_scope_usage(Checker *c, Scope *scope, u64 vet_flags) {
 			array_add(&vetted_entities, ve_unused);
 		} else if (is_shadowed) {
 			array_add(&vetted_entities, ve_shadowed);
-		} else if (e->kind == Entity_Variable && (e->flags & (EntityFlag_Param|EntityFlag_Using)) == 0) {
+		} else if (e->kind == Entity_Variable && (e->flags & (EntityFlag_Param|EntityFlag_Using|EntityFlag_Static)) == 0 && !e->Variable.is_global) {
 			i64 sz = type_size_of(e->type);
 			// TODO(bill): When is a good size warn?
-			// Is 128 KiB good enough?
-			if (sz >= 1ll<<17) {
+			// Is >256 KiB good enough?
+			if (sz > 1ll<<18) {
 				gbString type_str = type_to_string(e->type);
 				warning(e->token, "Declaration of '%.*s' may cause a stack overflow due to its type '%s' having a size of %lld bytes", LIT(e->token.string), type_str, cast(long long)sz);
 				gb_string_free(type_str);
@@ -728,7 +728,10 @@ gb_internal void check_scope_usage(Checker *c, Scope *scope, u64 vet_flags) {
 		} else if (vet_flags) {
 			switch (ve.kind) {
 			case VettedEntity_Unused:
-				if (vet_flags & VetFlag_Unused) {
+				if (e->kind == Entity_Variable && (vet_flags & VetFlag_UnusedVariables) != 0) {
+					error(e->token, "'%.*s' declared but not used", LIT(name));
+				}
+				if ((e->kind == Entity_ImportName || e->kind == Entity_LibraryName) && (vet_flags & VetFlag_UnusedImports) != 0) {
 					error(e->token, "'%.*s' declared but not used", LIT(name));
 				}
 				break;
@@ -1109,6 +1112,8 @@ gb_internal void init_universal(void) {
 	add_global_bool_constant("ODIN_DEBUG",                      bc->ODIN_DEBUG);
 	add_global_bool_constant("ODIN_DISABLE_ASSERT",             bc->ODIN_DISABLE_ASSERT);
 	add_global_bool_constant("ODIN_DEFAULT_TO_NIL_ALLOCATOR",   bc->ODIN_DEFAULT_TO_NIL_ALLOCATOR);
+	add_global_bool_constant("ODIN_NO_BOUNDS_CHECK",            build_context.no_bounds_check);
+	add_global_bool_constant("ODIN_NO_TYPE_ASSERT",             build_context.no_type_assert);
 	add_global_bool_constant("ODIN_DEFAULT_TO_PANIC_ALLOCATOR", bc->ODIN_DEFAULT_TO_PANIC_ALLOCATOR);
 	add_global_bool_constant("ODIN_NO_DYNAMIC_LITERALS",        bc->no_dynamic_literals);
 	add_global_bool_constant("ODIN_NO_CRT",                     bc->no_crt);
@@ -1893,8 +1898,7 @@ gb_internal void add_type_info_type_internal(CheckerContext *c, Type *t) {
 	add_type_info_dependency(c->info, c->decl, t);
 
 	MUTEX_GUARD_BLOCK(&c->info->type_info_mutex) {
-		MapFindResult fr;
-		auto found = map_try_get(&c->info->type_info_map, t, &fr);
+		auto found = map_get(&c->info->type_info_map, t);
 		if (found != nullptr) {
 			// Types have already been added
 			return;
@@ -1918,7 +1922,7 @@ gb_internal void add_type_info_type_internal(CheckerContext *c, Type *t) {
 			ti_index = c->info->type_info_types.count;
 			array_add(&c->info->type_info_types, t);
 		}
-		map_set_internal_from_try_get(&c->checker->info.type_info_map, t, ti_index, fr);
+		map_set(&c->checker->info.type_info_map, t, ti_index);
 
 		if (prev) {
 			// NOTE(bill): If a previous one exists already, no need to continue
@@ -2189,7 +2193,7 @@ gb_internal void add_min_dep_type_info(Checker *c, Type *t) {
 	// IMPORTANT NOTE(bill): this must be copied as `map_set` takes a const ref
 	// and effectively assigns the `+1` of the value
 	isize const count = set->count;
-	if (map_set_if_not_previously_exists(set, ti_index, count)) {
+	if (map_set_if_not_previously_exists(set, ti_index+1, count)) {
 		// Type already exists;
 		return;
 	}
@@ -2529,6 +2533,11 @@ gb_internal void generate_minimum_dependency_set_internal(Checker *c, Entity *st
 
 				if ((e->scope->flags & (ScopeFlag_File|ScopeFlag_Pkg)) == 0) {
 					error(e->token, "@(init) procedures must be declared at the file scope");
+					is_init = false;
+				}
+
+				if ((e->flags & EntityFlag_Disabled) != 0) {
+					warning(e->token, "This @(init) procedure is disabled; you must call it manually");
 					is_init = false;
 				}
 
@@ -2922,6 +2931,8 @@ gb_internal void init_core_type_info(Checker *c) {
 		return;
 	}
 	Entity *type_info_entity = find_core_entity(c, str_lit("Type_Info"));
+	GB_ASSERT(type_info_entity != nullptr);
+	GB_ASSERT(type_info_entity->type != nullptr);
 
 	t_type_info = type_info_entity->type;
 	t_type_info_ptr = alloc_type_pointer(t_type_info);
@@ -4305,17 +4316,22 @@ gb_internal bool correct_single_type_alias(CheckerContext *c, Entity *e) {
 
 gb_internal bool correct_type_alias_in_scope_backwards(CheckerContext *c, Scope *s) {
 	bool correction = false;
-	u32 n = s->elements.count;
-	for (u32 i = n-1; i < n; i--) {
-		correction |= correct_single_type_alias(c, s->elements.entries[i].value);
+	for (u32 n = s->elements.count, i = n-1; i < n; i--) {
+		auto const &entry = s->elements.entries[i];
+		Entity *e = entry.value;
+		if (entry.hash && e != nullptr) {
+			correction |= correct_single_type_alias(c, e);
+		}
 	}
 	return correction;
 }
 gb_internal bool correct_type_alias_in_scope_forwards(CheckerContext *c, Scope *s) {
 	bool correction = false;
-	u32 n = s->elements.count;
-	for (isize i = 0; i < n; i++) {
-		correction |= correct_single_type_alias(c, s->elements.entries[i].value);
+	for (auto const &entry : s->elements) {
+		Entity *e = entry.value;
+		if (e != nullptr) {
+			correction |= correct_single_type_alias(c, entry.value);
+		}
 	}
 	return correction;
 }

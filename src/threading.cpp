@@ -634,9 +634,15 @@ gb_internal void thread_set_name(Thread *t, char const *name) {
 #endif
 }
 
-#if defined(GB_SYSTEM_LINUX)
-#include <linux/futex.h>
+#if defined(GB_SYSTEM_LINUX) || defined(GB_SYSTEM_NETBSD)
+
 #include <sys/syscall.h>
+#ifdef GB_SYSTEM_LINUX
+	#include <linux/futex.h>
+#else
+	#include <sys/futex.h>
+	#define SYS_futex SYS___futex
+#endif
 
 gb_internal void futex_signal(Futex *addr) {
 	int ret = syscall(SYS_futex, addr, FUTEX_WAKE | FUTEX_PRIVATE_FLAG, 1, NULL, NULL, 0);
@@ -903,11 +909,10 @@ gb_internal void futex_wait(Futex *f, Footex val) {
 	} while (f->load() == val);
 }
 
-#elif defined(GB_SYSTEM_HAIKU) || defined(GB_SYSTEM_NETBSD)
+#elif defined(GB_SYSTEM_HAIKU)
 
 // Futex implementation taken from https://tavianator.com/2023/futex.html
 
-#include <signal.h>
 #include <pthread.h>
 #include <atomic>
 

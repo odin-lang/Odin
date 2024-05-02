@@ -1,4 +1,4 @@
-package json
+package encoding_json
 
 import "core:mem"
 import "core:unicode/utf8"

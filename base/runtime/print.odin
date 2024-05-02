@@ -6,7 +6,7 @@ _INTEGER_DIGITS :: "0123456789abcdefghijklmnopqrstuvwxyz"
 _INTEGER_DIGITS_VAR := _INTEGER_DIGITS
 
 when !ODIN_NO_RTTI {
-	print_any_single :: proc "contextless" (arg: any) {
+	print_any_single :: #force_no_inline proc "contextless" (arg: any) {
 		x := arg
 		if x.data == nil {
 			print_string("nil")
@@ -72,7 +72,7 @@ when !ODIN_NO_RTTI {
 			print_string("<invalid-value>")
 		}
 	}
-	println_any :: proc "contextless" (args: ..any) {
+	println_any :: #force_no_inline proc "contextless" (args: ..any) {
 		context = default_context()
 		loop: for arg, i in args {
 			assert(arg.id != nil)
@@ -122,12 +122,12 @@ encode_rune :: proc "contextless" (c: rune) -> ([4]u8, int) {
 	return buf, 4
 }
 
-print_string :: proc "contextless" (str: string) -> (n: int) {
+print_string :: #force_no_inline proc "contextless" (str: string) -> (n: int) {
 	n, _ = stderr_write(transmute([]byte)str)
 	return
 }
 
-print_strings :: proc "contextless" (args: ..string) -> (n: int) {
+print_strings :: #force_no_inline proc "contextless" (args: ..string) -> (n: int) {
 	for str in args {
 		m, err := stderr_write(transmute([]byte)str)
 		n += m
@@ -138,12 +138,12 @@ print_strings :: proc "contextless" (args: ..string) -> (n: int) {
 	return
 }
 
-print_byte :: proc "contextless" (b: byte) -> (n: int) {
+print_byte :: #force_no_inline proc "contextless" (b: byte) -> (n: int) {
 	n, _ = stderr_write([]byte{b})
 	return
 }
 
-print_encoded_rune :: proc "contextless" (r: rune) {
+print_encoded_rune :: #force_no_inline proc "contextless" (r: rune) {
 	print_byte('\'')
 
 	switch r {
@@ -170,7 +170,7 @@ print_encoded_rune :: proc "contextless" (r: rune) {
 	print_byte('\'')
 }
 
-print_rune :: proc "contextless" (r: rune) -> int #no_bounds_check {
+print_rune :: #force_no_inline proc "contextless" (r: rune) -> int #no_bounds_check {
 	RUNE_SELF :: 0x80
 
 	if r < RUNE_SELF {
@@ -183,7 +183,7 @@ print_rune :: proc "contextless" (r: rune) -> int #no_bounds_check {
 }
 
 
-print_u64 :: proc "contextless" (x: u64) #no_bounds_check {
+print_u64 :: #force_no_inline proc "contextless" (x: u64) #no_bounds_check {
 	a: [129]byte
 	i := len(a)
 	b := u64(10)
@@ -198,7 +198,7 @@ print_u64 :: proc "contextless" (x: u64) #no_bounds_check {
 }
 
 
-print_i64 :: proc "contextless" (x: i64) #no_bounds_check {
+print_i64 :: #force_no_inline proc "contextless" (x: i64) #no_bounds_check {
 	b :: i64(10)
 
 	u := x
@@ -223,25 +223,29 @@ print_uint    :: proc "contextless" (x: uint)    { print_u64(u64(x)) }
 print_uintptr :: proc "contextless" (x: uintptr) { print_u64(u64(x)) }
 print_int     :: proc "contextless" (x: int)     { print_i64(i64(x)) }
 
-print_caller_location :: proc "contextless" (loc: Source_Code_Location) {
+print_caller_location :: #force_no_inline proc "contextless" (loc: Source_Code_Location) {
 	print_string(loc.file_path)
 	when ODIN_ERROR_POS_STYLE == .Default {
 		print_byte('(')
 		print_u64(u64(loc.line))
-		print_byte(':')
-		print_u64(u64(loc.column))
+		if loc.column != 0 {
+			print_byte(':')
+			print_u64(u64(loc.column))
+		}
 		print_byte(')')
 	} else when ODIN_ERROR_POS_STYLE == .Unix {
 		print_byte(':')
 		print_u64(u64(loc.line))
-		print_byte(':')
-		print_u64(u64(loc.column))
+		if loc.column != 0 {
+			print_byte(':')
+			print_u64(u64(loc.column))
+		}
 		print_byte(':')
 	} else {
 		#panic("unhandled ODIN_ERROR_POS_STYLE")
 	}
 }
-print_typeid :: proc "contextless" (id: typeid) {
+print_typeid :: #force_no_inline proc "contextless" (id: typeid) {
 	when ODIN_NO_RTTI {
 		if id == nil {
 			print_string("nil")
@@ -257,7 +261,9 @@ print_typeid :: proc "contextless" (id: typeid) {
 		}
 	}
 }
-print_type :: proc "contextless" (ti: ^Type_Info) {
+
+@(optimization_mode="size")
+print_type :: #force_no_inline proc "contextless" (ti: ^Type_Info) {
 	if ti == nil {
 		print_string("nil")
 		return

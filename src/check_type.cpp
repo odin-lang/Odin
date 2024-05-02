@@ -29,10 +29,11 @@ gb_internal void populate_using_array_index(CheckerContext *ctx, Ast *node, AstF
 	}
 }
 
-gb_internal void populate_using_entity_scope(CheckerContext *ctx, Ast *node, AstField *field, Type *t) {
+gb_internal void populate_using_entity_scope(CheckerContext *ctx, Ast *node, AstField *field, Type *t, isize level) {
 	if (t == nullptr) {
 		return;
 	}
+	Type *original_type = t;
 	t = base_type(type_deref(t));
 	gbString str = nullptr;
 	defer (gb_string_free(str));
@@ -46,16 +47,18 @@ gb_internal void populate_using_entity_scope(CheckerContext *ctx, Ast *node, Ast
 			String name = f->token.string;
 			Entity *e = scope_lookup_current(ctx->scope, name);
 			if (e != nullptr && name != "_") {
+				gbString ot = type_to_string(original_type);
 				// TODO(bill): Better type error
 				if (str != nullptr) {
-					error(e->token, "'%.*s' is already declared in '%s'", LIT(name), str);
+					error(e->token, "'%.*s' is already declared in '%s', through 'using' from '%s'", LIT(name), str, ot);
 				} else {
-					error(e->token, "'%.*s' is already declared", LIT(name));
+					error(e->token, "'%.*s' is already declared, through 'using' from '%s'", LIT(name), ot);
 				}
+				gb_string_free(ot);
 			} else {
 				add_entity(ctx, ctx->scope, nullptr, f);
 				if (f->flags & EntityFlag_Using) {
-					populate_using_entity_scope(ctx, node, field, f->type);
+					populate_using_entity_scope(ctx, node, field, f->type, level+1);
 				}
 			}
 		}
@@ -200,7 +203,7 @@ gb_internal void check_struct_fields(CheckerContext *ctx, Ast *node, Slice<Entit
 				continue;
 			}
 
-			populate_using_entity_scope(ctx, node, p, type);
+			populate_using_entity_scope(ctx, node, p, type, 1);
 		}
 
 		if (is_subtype && p->names.count > 0) {
@@ -952,13 +955,18 @@ gb_internal void check_bit_field_type(CheckerContext *ctx, Type *bit_field_type,
 	GB_ASSERT(is_type_bit_field(bit_field_type));
 
 	Type *backing_type = check_type(ctx, bf->backing_type);
-	if (backing_type == nullptr || !is_valid_bit_field_backing_type(backing_type)) {
-		error(node, "Backing type for a bit_field must be an integer or an array of an integer");
+
+	bit_field_type->BitField.backing_type = backing_type ? backing_type : t_u8;
+	bit_field_type->BitField.scope = ctx->scope;
+
+	if (backing_type == nullptr) {
+		error(bf->backing_type, "Backing type for a bit_field must be an integer or an array of an integer");
 		return;
 	}
-
-	bit_field_type->BitField.backing_type = backing_type;
-	bit_field_type->BitField.scope = ctx->scope;
+	if (!is_valid_bit_field_backing_type(backing_type)) {
+		error(bf->backing_type, "Backing type for a bit_field must be an integer or an array of an integer");
+		return;
+	}
 
 	auto fields    = array_make<Entity *>(permanent_allocator(), 0, bf->fields.count);
 	auto bit_sizes = array_make<u8>      (permanent_allocator(), 0, bf->fields.count);
@@ -1092,6 +1100,45 @@ gb_internal void check_bit_field_type(CheckerContext *ctx, Type *bit_field_type,
 		      cast(unsigned long long)maximum_bit_size);
 		gb_string_free(s);
 	}
+
+	enum EndianKind {
+		Endian_Unknown,
+		Endian_Native,
+		Endian_Little,
+		Endian_Big,
+	};
+	auto const &determine_endian_kind = [](Type *type) -> EndianKind {
+		if (is_type_boolean(type)) {
+			// NOTE(bill): it doesn't matter, and when it does,
+			// that api is absolutely stupid
+			return Endian_Unknown;
+		} else if (is_type_endian_specific(type)) {
+			if (is_type_endian_little(type)) {
+				return Endian_Little;
+			} else {
+				return Endian_Big;
+			}
+		}
+		return Endian_Native;
+	};
+
+	EndianKind backing_type_endian_kind = determine_endian_kind(core_array_type(backing_type));
+	EndianKind endian_kind = Endian_Unknown;
+	for (Entity *f : fields) {
+		EndianKind field_kind = determine_endian_kind(f->type);
+
+		if (field_kind && backing_type_endian_kind != field_kind) {
+			error(f->token, "All 'bit_field' field types must match the same endian kind as the backing type, i.e. all native, all little, or all big");
+		}
+
+		if (endian_kind == Endian_Unknown) {
+			endian_kind = field_kind;
+		} else if (field_kind && endian_kind != field_kind) {
+			error(f->token, "All 'bit_field' field types must be of the same endian variety, i.e. all native, all little, or all big");
+		}
+	}
+
+
 
 	if (bit_sizes.count > 0 && is_type_integer(backing_type)) {
 		bool all_booleans = is_type_boolean(fields[0]->type);
@@ -2495,17 +2542,15 @@ gb_internal Type *get_map_cell_type(Type *type) {
 	return s;
 }
 
-gb_internal void init_map_internal_types(Type *type) {
+gb_internal void init_map_internal_debug_types(Type *type) {
 	GB_ASSERT(type->kind == Type_Map);
 	GB_ASSERT(t_allocator != nullptr);
-	if (type->Map.lookup_result_type != nullptr) return;
+	if (type->Map.debug_metadata_type != nullptr) return;
 
 	Type *key   = type->Map.key;
 	Type *value = type->Map.value;
 	GB_ASSERT(key != nullptr);
 	GB_ASSERT(value != nullptr);
-
-
 
 	Type *key_cell   = get_map_cell_type(key);
 	Type *value_cell = get_map_cell_type(value);
@@ -2541,6 +2586,18 @@ gb_internal void init_map_internal_types(Type *type) {
 	gb_unused(type_size_of(debug_type));
 
 	type->Map.debug_metadata_type = debug_type;
+}
+
+
+gb_internal void init_map_internal_types(Type *type) {
+	GB_ASSERT(type->kind == Type_Map);
+	GB_ASSERT(t_allocator != nullptr);
+	if (type->Map.lookup_result_type != nullptr) return;
+
+	Type *key   = type->Map.key;
+	Type *value = type->Map.value;
+	GB_ASSERT(key != nullptr);
+	GB_ASSERT(value != nullptr);
 
 	type->Map.lookup_result_type = make_optional_ok_type(value);
 }
@@ -2613,8 +2670,6 @@ gb_internal void check_map_type(CheckerContext *ctx, Type *type, Ast *node) {
 
 	init_core_map_type(ctx->checker);
 	init_map_internal_types(type);
-
-	// error(node, "'map' types are not yet implemented");
 }
 
 gb_internal void check_matrix_type(CheckerContext *ctx, Type **type, Ast *node) {
@@ -3232,6 +3287,11 @@ gb_internal bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, T
 
 		Type *elem = t_invalid;
 		Operand o = {};
+
+		if (unparen_expr(pt->type) == nullptr) {
+			error(e, "Invalid pointer type");
+			return false;
+		}
 
 		check_expr_or_type(&c, &o, pt->type);
 		if (o.mode != Addressing_Invalid && o.mode != Addressing_Type) {

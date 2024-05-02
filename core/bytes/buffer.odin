@@ -359,7 +359,7 @@ buffer_read_from :: proc(b: ^Buffer, r: io.Reader) -> (n: i64, err: io.Error) #n
 		resize(&b.buf, i)
 		m, e := io.read(r, b.buf[i:cap(b.buf)])
 		if m < 0 {
-			err = .Negative_Read
+			err = e if e != nil else .Negative_Read
 			return
 		}
 

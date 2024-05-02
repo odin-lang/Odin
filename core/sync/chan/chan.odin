@@ -75,6 +75,7 @@ create_raw_unbuffered :: proc(#any_int msg_size, msg_alignment: int, allocator: 
 
 	ptr := mem.alloc(size, align, allocator) or_return
 	c = (^Raw_Chan)(ptr)
+	c.allocator = allocator
 	c.allocation_size = size
 	c.unbuffered_data = ([^]byte)(ptr)[offset:]
 	c.msg_size = u16(msg_size)
@@ -99,6 +100,7 @@ create_raw_buffered :: proc(#any_int msg_size, msg_alignment: int, #any_int cap:
 
 	ptr := mem.alloc(size, align, allocator) or_return
 	c = (^Raw_Chan)(ptr)
+	c.allocator = allocator
 	c.allocation_size = size
 
 	bptr := ([^]byte)(ptr)

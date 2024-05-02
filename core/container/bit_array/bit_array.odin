@@ -1,4 +1,4 @@
-package dynamic_bit_array
+package container_dynamic_bit_array
 
 import "base:intrinsics"
 import "core:mem"

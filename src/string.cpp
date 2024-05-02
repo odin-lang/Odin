@@ -171,6 +171,9 @@ template <isize N> gb_internal bool operator >  (String const &a, char const (&b
 template <isize N> gb_internal bool operator <= (String const &a, char const (&b)[N]) { return str_le(a, make_string(cast(u8 *)b, N-1)); }
 template <isize N> gb_internal bool operator >= (String const &a, char const (&b)[N]) { return str_ge(a, make_string(cast(u8 *)b, N-1)); }
 
+template <> bool operator == (String const &a, char const (&b)[1]) { return a.len == 0; }
+template <> bool operator != (String const &a, char const (&b)[1]) { return a.len != 0; }
+
 gb_internal gb_inline bool string_starts_with(String const &s, String const &prefix) {
 	if (prefix.len > s.len) {
 		return false;
@@ -234,11 +237,16 @@ gb_internal String string_split_iterator(String_Iterator *it, const char sep) {
 	return substring(it->str, start, end);
 }
 
+gb_internal gb_inline bool is_separator(u8 const &ch) {
+	return (ch == '/' || ch == '\\');
+}
+
+
 gb_internal gb_inline isize string_extension_position(String const &str) {
 	isize dot_pos = -1;
 	isize i = str.len;
 	while (i --> 0) {
-		if (str[i] == '\\' || str[i] == '/')
+		if (is_separator(str[i]))
 			break;
 		if (str[i] == '.') {
 			dot_pos = i;
@@ -273,6 +281,43 @@ gb_internal String string_trim_whitespace(String str) {
 
 	return str;
 }
+gb_internal String string_trim_trailing_whitespace(String str) {
+	while (str.len > 0)  {
+		u8 c = str[str.len-1];
+		if (rune_is_whitespace(c) || c == 0) {
+			str.len -= 1;
+		} else {
+			break;
+		}
+	}
+	return str;
+}
+
+gb_internal String split_lines_first_line_from_array(Array<u8> const &array, gbAllocator allocator) {
+	String_Iterator it = {{array.data, array.count}, 0};
+
+	String line = string_split_iterator(&it, '\n');
+	line = string_trim_trailing_whitespace(line);
+	return line;
+}
+
+gb_internal Array<String> split_lines_from_array(Array<u8> const &array, gbAllocator allocator) {
+	Array<String> lines = {};
+	lines.allocator = allocator;
+
+	String_Iterator it = {{array.data, array.count}, 0};
+
+	for (;;) {
+		String line = string_split_iterator(&it, '\n');
+		if (line.len == 0) {
+			break;
+		}
+		line = string_trim_trailing_whitespace(line);
+		array_add(&lines, line);
+	}
+
+	return lines;
+}
 
 gb_internal bool string_contains_char(String const &s, u8 c) {
 	isize i;
@@ -292,8 +337,7 @@ gb_internal String filename_from_path(String s) {
 	if (i > 0) {
 		isize j = 0;
 		for (j = s.len-1; j >= 0; j--) {
-			if (s[j] == '/' ||
-				s[j] == '\\') {
+			if (is_separator(s[j])) {
 				break;
 			}
 		}
@@ -306,8 +350,7 @@ gb_internal String filename_from_path(String s) {
 gb_internal String filename_without_directory(String s) {
 	isize j = 0;
 	for (j = s.len-1; j >= 0; j--) {
-		if (s[j] == '/' ||
-			s[j] == '\\') {
+		if (is_separator(s[j])) {
 			break;
 		}
 	}
@@ -370,7 +413,26 @@ gb_internal String copy_string(gbAllocator a, String const &s) {
 	return make_string(data, s.len);
 }
 
-
+gb_internal String normalize_path(gbAllocator a, String const &path, String const &sep) {
+	String s;
+	if (sep.len < 1) {
+		return path;
+	}
+	if (path.len < 1) {
+		s = STR_LIT("");
+	} else if (is_separator(path[path.len-1])) {
+		s = copy_string(a, path);
+	} else {
+		s = concatenate_strings(a, path, sep);
+	}
+	isize i;
+	for (i = 0; i < s.len; i++) {
+		if (is_separator(s.text[i])) {
+			s.text[i] = sep.text[0];
+		}
+	}
+	return s;
+}
 
 
 #if defined(GB_SYSTEM_WINDOWS)

@@ -1,4 +1,4 @@
-package json
+package encoding_json
 
 import "core:mem"
 import "core:math/bits"
@@ -420,7 +420,7 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 				data := rawptr(uintptr(v.data) + info.offsets[i])
 				the_value := any{data, id}
 
-				if is_omitempty(the_value) {
+				if omitempty && is_omitempty(the_value) {
 					continue
 				}
 

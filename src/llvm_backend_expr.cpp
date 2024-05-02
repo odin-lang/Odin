@@ -2138,14 +2138,45 @@ gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 
 	if (is_type_array_like(dst)) {
 		Type *elem = base_array_type(dst);
-		lbValue e = lb_emit_conv(p, value, elem);
-		// NOTE(bill): Doesn't need to be zero because it will be initialized in the loops
-		lbAddr v = lb_add_local_generated(p, t, false);
 		isize index_count = cast(isize)get_array_type_count(dst);
 
-		for (isize i = 0; i < index_count; i++) {
-			lbValue elem = lb_emit_array_epi(p, v.addr, i);
+		isize inlineable = type_size_of(dst) <= build_context.max_simd_align;
+		lbValue e = lb_emit_conv(p, value, elem);
+		if (inlineable && lb_is_const(e)) {
+			lbAddr v = {};
+			if (e.value) {
+				TEMPORARY_ALLOCATOR_GUARD();
+				LLVMValueRef *values = gb_alloc_array(temporary_allocator(), LLVMValueRef, index_count);
+				for (isize i = 0; i < index_count; i++) {
+					values[i] = e.value;
+				}
+				lbValue array_const_value = {};
+				array_const_value.type = t;
+				array_const_value.value = LLVMConstArray(lb_type(m, elem), values, cast(unsigned)index_count);
+				v = lb_add_global_generated(m, t, array_const_value);
+			} else {
+				v = lb_add_global_generated(m, t);
+			}
+
+			lb_make_global_private_const(v);
+			return lb_addr_load(p, v);
+		}
+
+		// NOTE(bill): Doesn't need to be zero because it will be initialized in the loops
+		lbAddr v = lb_add_local_generated(p, t, false);
+
+		if (!inlineable) {
+			auto loop_data = lb_loop_start(p, index_count, t_int);
+
+			lbValue elem = lb_emit_array_ep(p, v.addr, loop_data.idx);
 			lb_emit_store(p, elem, e);
+
+			lb_loop_end(p, loop_data);
+		} else {
+			for (isize i = 0; i < index_count; i++) {
+				lbValue elem = lb_emit_array_epi(p, v.addr, i);
+				lb_emit_store(p, elem, e);
+			}
 		}
 		return lb_addr_load(p, v);
 	}
@@ -3085,7 +3116,7 @@ gb_internal lbValue lb_build_unary_and(lbProcedure *p, Ast *expr) {
 				Type *dst_type = type;
 
 
-				if ((p->state_flags & StateFlag_no_type_assert) == 0) {
+				if (!build_context.no_type_assert && (p->state_flags & StateFlag_no_type_assert) == 0) {
 					lbValue src_tag = {};
 					lbValue dst_tag = {};
 					if (is_type_union_maybe_pointer(src_type)) {
@@ -3125,7 +3156,7 @@ gb_internal lbValue lb_build_unary_and(lbProcedure *p, Ast *expr) {
 					v = lb_emit_load(p, v);
 				}
 				lbValue data_ptr = lb_emit_struct_ev(p, v, 0);
-				if ((p->state_flags & StateFlag_no_type_assert) == 0) {
+				if (!build_context.no_type_assert && (p->state_flags & StateFlag_no_type_assert) == 0) {
 					GB_ASSERT(!build_context.no_rtti);
 
 					lbValue any_id = lb_emit_struct_ev(p, v, 1);
@@ -4265,7 +4296,19 @@ gb_internal lbAddr lb_build_addr_compound_lit(lbProcedure *p, Ast *expr) {
 	switch (bt->kind) {
 	default: GB_PANIC("Unknown CompoundLit type: %s", type_to_string(type)); break;
 
-	case Type_BitField:
+	case Type_BitField: {
+		TEMPORARY_ALLOCATOR_GUARD();
+
+		// Type *backing_type = core_type(bt->BitField.backing_type);
+
+		struct FieldData {
+			Type *field_type;
+			u64 bit_offset;
+			u64 bit_size;
+		};
+		auto values = array_make<lbValue>(temporary_allocator(), 0, cl->elems.count);
+		auto fields = array_make<FieldData>(temporary_allocator(), 0, cl->elems.count);
+
 		for (Ast *elem : cl->elems) {
 			ast_node(fv, FieldValue, elem);
 			String name = fv->field->Ident.token.string;
@@ -4276,26 +4319,172 @@ gb_internal lbAddr lb_build_addr_compound_lit(lbProcedure *p, Ast *expr) {
 			GB_ASSERT(sel.entity != nullptr);
 
 			i64 index = sel.index[0];
-			i64 bit_offset = 0;
-			i64 bit_size = -1;
-			for_array(i, bt->BitField.fields) {
-				Entity *f = bt->BitField.fields[i];
-				if (f == sel.entity) {
-					bit_offset = bt->BitField.bit_offsets[i];
-					bit_size   = bt->BitField.bit_sizes[i];
-					break;
-				}
-			}
+			Entity *f = bt->BitField.fields[index];
+			GB_ASSERT(f == sel.entity);
+			i64 bit_offset = bt->BitField.bit_offsets[index];
+			i64 bit_size   = bt->BitField.bit_sizes[index];
 			GB_ASSERT(bit_size > 0);
 
 			Type *field_type = sel.entity->type;
 			lbValue field_expr = lb_build_expr(p, fv->value);
 			field_expr = lb_emit_conv(p, field_expr, field_type);
-
-			lbAddr field_addr = lb_addr_bit_field(v.addr, field_type, index, bit_offset, bit_size);
-			lb_addr_store(p, field_addr, field_expr);
+			array_add(&values, field_expr);
+			array_add(&fields, FieldData{field_type, cast(u64)bit_offset, cast(u64)bit_size});
 		}
+
+		// NOTE(bill): inline insertion sort should be good enough, right?
+		for (isize i = 1; i < values.count; i++) {
+			for (isize j = i;
+			     j > 0 && fields[i].bit_offset < fields[j].bit_offset;
+			     j--) {
+				auto vtmp = values[j];
+				values[j] = values[j-1];
+				values[j-1] = vtmp;
+
+				auto ftmp = fields[j];
+				fields[j] = fields[j-1];
+				fields[j-1] = ftmp;
+			}
+		}
+
+		bool any_fields_different_endian = false;
+		for (auto const &f : fields) {
+			if (is_type_different_to_arch_endianness(f.field_type)) {
+				// NOTE(bill): Just be slow for this, to be correct
+				any_fields_different_endian = true;
+				break;
+			}
+		}
+
+		if (!any_fields_different_endian &&
+		    fields.count == bt->BitField.fields.count) {
+			// SINGLE INTEGER BACKING ONLY
+
+			Type *backing_type = core_type(bt->BitField.backing_type);
+			GB_ASSERT(is_type_integer(backing_type) ||
+			          (is_type_array(backing_type) && is_type_integer(backing_type->Array.elem)));
+
+			// NOTE(bill): all fields are present
+			// this means no masking is necessary since on write, the bits will be overridden
+
+			lbValue dst_byte_ptr = lb_emit_conv(p, v.addr, t_u8_ptr);
+			u64 total_bit_size = cast(u64)(8*type_size_of(bt));
+
+			if (is_type_integer(backing_type)) {
+				LLVMTypeRef lit = lb_type(p->module, backing_type);
+
+				LLVMValueRef res = LLVMConstInt(lit, 0, false);
+
+				for (isize i = 0; i < fields.count; i++) {
+					auto const &f = fields[i];
+
+					LLVMValueRef mask = LLVMConstInt(lit, 1, false);
+					mask = LLVMConstShl(mask, LLVMConstInt(lit, f.bit_size, false));
+					mask = LLVMConstSub(mask, LLVMConstInt(lit, 1, false));
+
+					LLVMValueRef elem = values[i].value;
+					elem = LLVMBuildZExt(p->builder, elem, lit, "");
+					elem = LLVMBuildAnd(p->builder, elem, mask, "");
+
+					elem = LLVMBuildShl(p->builder, elem, LLVMConstInt(lit, f.bit_offset, false), "");
+
+					res = LLVMBuildOr(p->builder, res, elem, "");
+				}
+
+				LLVMBuildStore(p->builder, res, v.addr.value);
+			} else if (is_type_array(backing_type)) {
+				// ARRAY OF INTEGER BACKING
+
+				i64 array_count = backing_type->Array.count;
+				LLVMTypeRef lit = lb_type(p->module, core_type(backing_type->Array.elem));
+				gb_unused(array_count);
+				gb_unused(lit);
+
+				LLVMValueRef *elems = gb_alloc_array(temporary_allocator(), LLVMValueRef, array_count);
+				for (i64 i = 0; i < array_count; i++) {
+					elems[i] = LLVMConstInt(lit, 0, false);
+				}
+
+				u64 elem_bit_size = cast(u64)(8*type_size_of(backing_type->Array.elem));
+				u64 curr_bit_offset = 0;
+				for (isize i = 0; i < fields.count; i++) {
+					auto const &f = fields[i];
+
+					LLVMValueRef val = values[i].value;
+					LLVMTypeRef vt = lb_type(p->module, values[i].type);
+					for (u64 bits_to_set = f.bit_size;
+					     bits_to_set > 0;
+					     /**/) {
+						i64 elem_idx = curr_bit_offset/elem_bit_size;
+						u64 elem_bit_offset = curr_bit_offset%elem_bit_size;
+
+						u64 mask_width = gb_min(bits_to_set, elem_bit_size-elem_bit_offset);
+						GB_ASSERT(mask_width > 0);
+						bits_to_set -= mask_width;
+
+						LLVMValueRef mask = LLVMConstInt(vt, 1, false);
+						mask = LLVMConstShl(mask, LLVMConstInt(vt, mask_width, false));
+						mask = LLVMConstSub(mask, LLVMConstInt(vt, 1, false));
+
+						LLVMValueRef to_set = LLVMBuildAnd(p->builder, val, mask, "");
+
+						if (elem_bit_offset != 0) {
+							to_set = LLVMBuildShl(p->builder, to_set, LLVMConstInt(vt, elem_bit_offset, false), "");
+						}
+						to_set = LLVMBuildTrunc(p->builder, to_set, lit, "");
+
+						if (LLVMIsNull(elems[elem_idx])) {
+							elems[elem_idx] = to_set; // don't even bother doing `0 | to_set`
+						} else {
+							elems[elem_idx] = LLVMBuildOr(p->builder, elems[elem_idx], to_set, "");
+						}
+
+						if (mask_width != 0) {
+							val = LLVMBuildLShr(p->builder, val, LLVMConstInt(vt, mask_width, false), "");
+						}
+						curr_bit_offset += mask_width;
+					}
+
+					GB_ASSERT(curr_bit_offset == f.bit_offset + f.bit_size);
+				}
+
+				for (i64 i = 0; i < array_count; i++) {
+					LLVMValueRef elem_ptr = LLVMBuildStructGEP2(p->builder, lb_type(p->module, backing_type), v.addr.value, cast(unsigned)i, "");
+					LLVMBuildStore(p->builder, elems[i], elem_ptr);
+				}
+			} else {
+				// SLOW STORAGE
+
+				for_array(i, fields) {
+					auto const &f = fields[i];
+
+					if ((f.bit_offset & 7) == 0) {
+						u64 unpacked_bit_size  = cast(u64)(8*type_size_of(f.field_type));
+						u64 byte_size = (f.bit_size+7)/8;
+
+						if (f.bit_offset + unpacked_bit_size <= total_bit_size) {
+							byte_size = unpacked_bit_size/8;
+						}
+						lbValue dst = lb_emit_ptr_offset(p, dst_byte_ptr, lb_const_int(p->module, t_int, f.bit_offset/8));
+						lbValue src = lb_address_from_load_or_generate_local(p, values[i]);
+						lb_mem_copy_non_overlapping(p, dst, src, lb_const_int(p->module, t_uintptr, byte_size));
+					} else {
+						lbAddr dst = lb_addr_bit_field(v.addr, f.field_type, f.bit_offset, f.bit_size);
+						lb_addr_store(p, dst, values[i]);
+					}
+				}
+			}
+		} else {
+			// individual storing
+			for_array(i, values) {
+				auto const &f = fields[i];
+				lbAddr dst = lb_addr_bit_field(v.addr, f.field_type, f.bit_offset, f.bit_size);
+				lb_addr_store(p, dst, values[i]);
+			}
+		}
+
 		return v;
+	}
 
 	case Type_Struct: {
 		// TODO(bill): "constant" '#raw_union's are not initialized constantly at the moment.
@@ -4740,7 +4929,7 @@ gb_internal lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 				u8 bit_size = bf_type->BitField.bit_sizes[index];
 				i64 bit_offset = bf_type->BitField.bit_offsets[index];
 
-				return lb_addr_bit_field(ptr, f->type, index, bit_offset, bit_size);
+				return lb_addr_bit_field(ptr, f->type, bit_offset, bit_size);
 			}
 
 			{

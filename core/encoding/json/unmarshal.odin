@@ -1,4 +1,4 @@
-package json
+package encoding_json
 
 import "core:mem"
 import "core:math"
@@ -348,7 +348,7 @@ json_name_from_tag_value :: proc(value: string) -> (json_name, extra: string) {
 	json_name = value
 	if comma_index := strings.index_byte(json_name, ','); comma_index >= 0 {
 		json_name = json_name[:comma_index]
-		extra = json_name[comma_index:]
+		extra = value[1 + comma_index:]
 	}
 	return
 }

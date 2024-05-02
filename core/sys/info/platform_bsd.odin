@@ -1,4 +1,4 @@
-// +build openbsd
+//+build openbsd, netbsd
 package sysinfo
 
 import sys "core:sys/unix"
@@ -11,12 +11,16 @@ version_string_buf: [1024]u8
 
 @(init, private)
 init_os_version :: proc () {
-	os_version.platform = .OpenBSD
+	when ODIN_OS == .NetBSD {
+		os_version.platform = .NetBSD
+	} else {
+		os_version.platform = .OpenBSD
+	}
 
 	kernel_version_buf: [1024]u8
 
 	b := strings.builder_from_bytes(version_string_buf[:])
-	// Retrieve kernel info using `sysctl`, e.g. OpenBSD
+	// Retrieve kernel info using `sysctl`, e.g. OpenBSD and NetBSD
 	mib := []i32{sys.CTL_KERN, sys.KERN_OSTYPE}
 	if !sys.sysctl(mib, &kernel_version_buf) {
 		return
@@ -61,7 +65,7 @@ init_os_version :: proc () {
 	os_version.as_string = strings.to_string(b)
 }
 
-@(init)
+@(init, private)
 init_ram :: proc() {
 	// Retrieve RAM info using `sysctl`
 	mib := []i32{sys.CTL_HW, sys.HW_PHYSMEM64}
