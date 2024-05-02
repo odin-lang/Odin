@@ -20,7 +20,7 @@ jobs:
         prepare: |
           PKG_PATH="https://cdn.NetBSD.org/pub/pkgsrc/packages/NetBSD/$(uname -p)/$(uname -r | cut -d_ -f1)_${PKGSRC_BRANCH}/All" /usr/sbin/pkg_add pkgin
           pkgin -y in gmake git bash python311
-          pkgin -y in libxml2 perl5 zstd
+          pkgin -y in libxml2 perl zstd
           /usr/sbin/pkg_add https://github.com/andreas-jonsson/llvm17-netbsd-bin/releases/download/pkgsrc-current/llvm-17.0.6.tgz
           ln -s /usr/pkg/bin/python3.11 /usr/bin/python3
           ln -s /usr/pkg/bin/bash /bin/bash
