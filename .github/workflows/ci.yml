@@ -22,6 +22,7 @@ jobs:
           pkgin -y in gmake git bash python311
           pkgin -y in libxml2 perl zstd
           /usr/sbin/pkg_add https://github.com/andreas-jonsson/llvm17-netbsd-bin/releases/download/pkgsrc-current/llvm-17.0.6.tgz
+          /usr/sbin/pkg_add https://github.com/andreas-jonsson/llvm17-netbsd-bin/releases/download/pkgsrc-current/clang-17.0.6.tgz
           ln -s /usr/pkg/bin/python3.11 /usr/bin/python3
           ln -s /usr/pkg/bin/bash /bin/bash
         run: |
