@@ -321,7 +321,6 @@ enum TypeFlag : u32 {
 	TypeFlag_Polymorphic     = 1<<1,
 	TypeFlag_PolySpecialized = 1<<2,
 	TypeFlag_InProcessOfCheckingPolymorphic = 1<<3,
-	TypeFlag_Packed = 1<<4, 
 };
 
 struct Type {
@@ -948,7 +947,6 @@ gb_internal void set_base_type(Type *t, Type *base) {
 		t->Named.base = base;
 	}
 }
-
 
 gb_internal Type *alloc_type(TypeKind kind) {
 	// gbAllocator a = heap_allocator();
@@ -3670,9 +3668,6 @@ gb_internal i64 type_size_of(Type *t) {
 
 gb_internal i64 type_align_of(Type *t) {
 	if (t == nullptr) {
-		return 1;
-	}
-	if (t->flags & TypeFlag_Packed) {
 		return 1;
 	}
 	if (t->kind != Type_Named && t->cached_align > 0) {

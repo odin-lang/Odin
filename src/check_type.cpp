@@ -135,8 +135,6 @@ gb_internal void check_struct_fields(CheckerContext *ctx, Ast *node, Slice<Entit
 			if (is_type_polymorphic(type)) {
 				struct_type->Struct.is_polymorphic = true;
 				type = nullptr;
-			} else if(struct_type->Struct.is_packed) {
-				type->flags |= TypeFlag_Packed;
 			}
 		}
 		if (type == nullptr) {
