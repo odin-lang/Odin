@@ -1596,8 +1596,10 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 		if (bc->metrics.os == TargetOs_js || bc->metrics.os == TargetOs_wasi) {
 			// TODO(bill): Should these even have a default "heap-like" allocator?
 		}
-		bc->ODIN_DEFAULT_TO_PANIC_ALLOCATOR = true;
-		bc->ODIN_DEFAULT_TO_NIL_ALLOCATOR = !bc->ODIN_DEFAULT_TO_PANIC_ALLOCATOR;
+
+		if (!bc->ODIN_DEFAULT_TO_NIL_ALLOCATOR && !bc->ODIN_DEFAULT_TO_PANIC_ALLOCATOR) {
+			bc->ODIN_DEFAULT_TO_PANIC_ALLOCATOR = true;
+		}
 	}
 }
 

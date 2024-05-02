@@ -81,7 +81,7 @@ _reader_read_new_chunk :: proc(b: ^Reader) -> io.Error {
 	for i := b.max_consecutive_empty_reads; i > 0; i -= 1 {
 		n, err := io.read(b.rd, b.buf[b.w:])
 		if n < 0 {
-			return .Negative_Read
+			return err if err != nil else .Negative_Read
 		}
 		b.w += n
 		if err != nil {
@@ -189,7 +189,7 @@ reader_read :: proc(b: ^Reader, p: []byte) -> (n: int, err: io.Error) {
 		if len(p) >= len(b.buf) {
 			n, b.err = io.read(b.rd, p)
 			if n < 0 {
-				return 0, .Negative_Read
+				return 0, b.err if b.err != nil else .Negative_Read
 			}
 
 			if n > 0 {
@@ -202,7 +202,7 @@ reader_read :: proc(b: ^Reader, p: []byte) -> (n: int, err: io.Error) {
 		b.r, b.w = 0, 0
 		n, b.err = io.read(b.rd, b.buf)
 		if n < 0 {
-			return 0, .Negative_Read
+			return 0, b.err if b.err != nil else .Negative_Read
 		}
 		if n == 0 {
 			return 0, _reader_consume_err(b)
@@ -290,7 +290,7 @@ reader_write_to :: proc(b: ^Reader, w: io.Writer) -> (n: i64, err: io.Error) {
 	write_buf :: proc(b: ^Reader, w: io.Writer) -> (i64, io.Error) {
 		n, err := io.write(w, b.buf[b.r:b.w])
 		if n < 0 {
-			return 0, .Negative_Write
+			return 0, err if err != nil else .Negative_Write
 		}
 		b.r += n
 		return i64(n), err

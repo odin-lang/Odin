@@ -204,14 +204,27 @@ gb_internal void report_cpu_info() {
 	}
 
 	#elif defined(GB_CPU_ARM)
-		/*
-			TODO(Jeroen): On *nix, perhaps query `/proc/cpuinfo`.
-		*/
-		#if defined(GB_ARCH_64_BIT)
-			gb_printf("ARM64\n");
-		#else
-			gb_printf("ARM\n");
+		bool generic = true;
+
+		#if defined(GB_SYSTEM_OSX)
+			char cpu_name[128] = {};	
+			size_t cpu_name_size = 128;
+			if (sysctlbyname("machdep.cpu.brand_string", &cpu_name, &cpu_name_size, nullptr, 0) == 0) {
+				generic = false;
+				gb_printf("%s\n", (char *)&cpu_name[0]);
+			}
 		#endif
+
+		if (generic) {
+			/*
+				TODO(Jeroen): On *nix, perhaps query `/proc/cpuinfo`.
+			*/
+			#if defined(GB_ARCH_64_BIT)
+				gb_printf("ARM64\n");
+			#else
+				gb_printf("ARM\n");
+			#endif
+		}
 	#else
 		gb_printf("Unknown\n");
 	#endif

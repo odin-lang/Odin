@@ -408,7 +408,68 @@ is_relative_multi_pointer :: proc(info: ^Type_Info) -> bool {
 }
 
 
+@(require_results)
+is_endian_platform :: proc(info: ^Type_Info) -> bool {
+	if info == nil { return false}
+	info := info
+	info = type_info_core(info)
+	#partial switch v in info.variant {
+	case Type_Info_Integer:
+		return v.endianness == .Platform
+	case Type_Info_Bit_Set:
+		if v.underlying != nil {
+			return is_endian_platform(v.underlying)
+		}
+		return true
+	case Type_Info_Pointer:
+		return true
+	}
+	return false
+}
 
+@(require_results)
+is_endian_little :: proc(info: ^Type_Info) -> bool {
+	if info == nil { return false}
+	info := info
+	info = type_info_core(info)
+	#partial switch v in info.variant {
+	case Type_Info_Integer:
+		if v.endianness == .Platform {
+			return ODIN_ENDIAN == .Little
+		}
+		return v.endianness == .Little
+	case Type_Info_Bit_Set:
+		if v.underlying != nil {
+			return is_endian_platform(v.underlying)
+		}
+		return ODIN_ENDIAN == .Little
+	case Type_Info_Pointer:
+		return ODIN_ENDIAN == .Little
+	}
+	return ODIN_ENDIAN == .Little
+}
+
+@(require_results)
+is_endian_big :: proc(info: ^Type_Info) -> bool {
+	if info == nil { return false}
+	info := info
+	info = type_info_core(info)
+	#partial switch v in info.variant {
+	case Type_Info_Integer:
+		if v.endianness == .Platform {
+			return ODIN_ENDIAN == .Big
+		}
+		return v.endianness == .Big
+	case Type_Info_Bit_Set:
+		if v.underlying != nil {
+			return is_endian_platform(v.underlying)
+		}
+		return ODIN_ENDIAN == .Big
+	case Type_Info_Pointer:
+		return ODIN_ENDIAN == .Big
+	}
+	return ODIN_ENDIAN == .Big
+}
 
 
 
