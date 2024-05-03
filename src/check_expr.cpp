@@ -1802,11 +1802,13 @@ gb_internal bool check_unary_op(CheckerContext *c, Operand *o, Token op) {
 	case Token_Not:
 		if (!is_type_boolean(type) || is_type_array_like(o->type)) {
 			ERROR_BLOCK();
-			str = expr_to_string(o->expr);
 			error(op, "Operator '%.*s' is only allowed on boolean expressions", LIT(op.string));
-			gb_string_free(str);
 			if (is_type_integer(type)) {
-				error_line("\tSuggestion: Did you mean to use the bitwise not operator '~'?\n");
+				str = expr_to_string(o->expr);
+				error_line("\tSuggestion: Did you mean to do one of the following?\n");
+				error_line("\t\t'%s == 0'?\n", str);
+				error_line("\t\tUse of the bitwise not operator '~'?\n");
+				gb_string_free(str);
 			}
 		} else {
 			o->type = t_untyped_bool;
