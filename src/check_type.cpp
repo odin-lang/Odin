@@ -2017,8 +2017,8 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 				}
 
 				if (p->flags&FieldFlag_no_alias) {
-					if (!is_type_pointer(type)) {
-						error(name, "'#no_alias' can only be applied pointer typed parameters");
+					if (!is_type_pointer(type) && !is_type_multi_pointer(type)) {
+						error(name, "'#no_alias' can only be applied pointer or multi-pointer typed parameters");
 						p->flags &= ~FieldFlag_no_alias; // Remove the flag
 					}
 				}
