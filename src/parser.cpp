@@ -5710,7 +5710,7 @@ gb_internal bool determine_path_from_string(BlockingMutex *file_mutex, Ast *node
 		//                 working directory of the exe to the library search paths.
 		//                 Static libraries can be linked directly with the full pathname
 		//
-		if (node->kind == Ast_ForeignImportDecl && string_ends_with(file_str, str_lit(".so"))) {
+		if (node->kind == Ast_ForeignImportDecl && (string_ends_with(file_str, str_lit(".so")) || string_contains_string(file_str, str_lit(".so.")))) {
 			*path = file_str;
 			return true;
 		}

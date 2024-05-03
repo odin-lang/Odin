@@ -328,6 +328,25 @@ gb_internal bool string_contains_char(String const &s, u8 c) {
 	return false;
 }
 
+gb_internal bool string_contains_string(String const &haystack, String const &needle) {
+    if (needle.len == 0) return true;
+    if (needle.len > haystack.len) return false;
+
+    for (isize i = 0; i <= haystack.len - needle.len; i++) {
+        bool found = true;
+        for (isize j = 0; j < needle.len; j++) {
+            if (haystack[i + j] != needle[j]) {
+                found = false;
+                break;
+            }
+        }
+        if (found) {
+            return true;
+        }
+    }
+    return false;
+}
+
 gb_internal String filename_from_path(String s) {
 	isize i = string_extension_position(s);
 	if (i >= 0) {
