@@ -1,5 +1,6 @@
 package test_core_crypto
 
+import "base:runtime"
 import "core:encoding/hex"
 import "core:fmt"
 import "core:mem"
@@ -10,9 +11,13 @@ import "core:crypto/hmac"
 import "core:crypto/poly1305"
 import "core:crypto/siphash"
 
+import tc "tests:common"
+
 @(test)
 test_mac :: proc(t: ^testing.T) {
-	log(t, "Testing MACs")
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
+
+	tc.log(t, "Testing MACs")
 
 	test_hmac(t)
 	test_poly1305(t)
@@ -81,7 +86,7 @@ test_hmac :: proc(t: ^testing.T) {
 		msg_str := string(hex.encode(msg, context.temp_allocator))
 		dst_str := string(hex.encode(dst[:tag_len], context.temp_allocator))
 
-		expect(
+		tc.expect(
 			t,
 			dst_str == expected_str,
 			fmt.tprintf(
@@ -97,7 +102,7 @@ test_hmac :: proc(t: ^testing.T) {
 		hmac.sum(algo, dst, msg, key)
 		oneshot_str := string(hex.encode(dst[:tag_len], context.temp_allocator))
 
-		expect(
+		tc.expect(
 			t,
 			oneshot_str == expected_str,
 			fmt.tprintf(
@@ -114,7 +119,7 @@ test_hmac :: proc(t: ^testing.T) {
 
 @(test)
 test_poly1305 :: proc(t: ^testing.T) {
-	log(t, "Testing poly1305")
+	tc.log(t, "Testing poly1305")
 
 	// Test cases taken from poly1305-donna.
 	key := [poly1305.KEY_SIZE]byte {
@@ -152,13 +157,13 @@ test_poly1305 :: proc(t: ^testing.T) {
 
 	// Verify - oneshot + compare
 	ok := poly1305.verify(tag[:], msg[:], key[:])
-	expect(t, ok, "oneshot verify call failed")
+	tc.expect(t, ok, "oneshot verify call failed")
 
 	// Sum - oneshot
 	derived_tag: [poly1305.TAG_SIZE]byte
 	poly1305.sum(derived_tag[:], msg[:], key[:])
 	derived_tag_str := string(hex.encode(derived_tag[:], context.temp_allocator))
-	expect(
+	tc.expect(
 		t,
 		derived_tag_str == tag_str,
 		fmt.tprintf("Expected %s for sum(msg, key), but got %s instead", tag_str, derived_tag_str),
@@ -177,7 +182,7 @@ test_poly1305 :: proc(t: ^testing.T) {
 	}
 	poly1305.final(&ctx, derived_tag[:])
 	derived_tag_str = string(hex.encode(derived_tag[:], context.temp_allocator))
-	expect(
+	tc.expect(
 		t,
 		derived_tag_str == tag_str,
 		fmt.tprintf(
@@ -190,7 +195,7 @@ test_poly1305 :: proc(t: ^testing.T) {
 
 @(test)
 test_siphash_2_4 :: proc(t: ^testing.T) {
-	log(t, "Testing SipHash-2-4")
+	tc.log(t, "Testing SipHash-2-4")
 
 	// Test vectors from
 	// https://github.com/veorq/SipHash/blob/master/vectors.h
@@ -227,7 +232,7 @@ test_siphash_2_4 :: proc(t: ^testing.T) {
 		vector := test_vectors[i]
 		computed := siphash.sum_2_4(data[:], key[:])
 
-		expect(
+		tc.expect(
 			t,
 			computed == vector,
 			fmt.tprintf(

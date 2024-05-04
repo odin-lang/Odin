@@ -44,7 +44,7 @@ internal_int_prime_is_divisible :: proc(a: ^Int, allocator := context.allocator)
 	Computes res == G**X mod P.
 	Assumes `res`, `G`, `X` and `P` to not be `nil` and for `G`, `X` and `P` to have been initialized.
 */
-internal_int_exponent_mod :: proc(res, G, X, P: ^Int, allocator := context.allocator) -> (err: Error) {
+internal_int_power_modulo :: proc(res, G, X, P: ^Int, allocator := context.allocator) -> (err: Error) {
 	context.allocator = allocator
 
 	dr: int
@@ -112,6 +112,9 @@ internal_int_exponent_mod :: proc(res, G, X, P: ^Int, allocator := context.alloc
 	*/
 	return _private_int_exponent_mod(res, G, X, P, 0)
 }
+internal_int_exponent_mod :: internal_int_power_modulo
+internal_int_powmod :: internal_int_power_modulo
+internal_powmod :: proc { internal_int_power_modulo, }
 
 /*
 	Kronecker/Legendre symbol (a|p)
@@ -1109,7 +1112,7 @@ internal_int_prime_next_prime :: proc(a: ^Int, trials: int, bbs_style: bool, all
 		Generate the restable.
 	*/
 	for x := 1; x < _PRIME_TAB_SIZE; x += 1 {
-		res_tab = internal_mod(a, _private_prime_table[x]) or_return
+		res_tab = cast(type_of(res_tab))(internal_mod(a, _private_prime_table[x]) or_return)
 	}
 
 	for {
@@ -1244,6 +1247,20 @@ internal_random_prime :: proc(a: ^Int, size_in_bits: int, trials: int, flags := 
 			a.digit[0] |= 3
 		}
 		if .Second_MSB_On in flags {
+			/*
+				Ensure there's enough space for the bit to be set.
+			*/
+			if a.used * _DIGIT_BITS < size_in_bits - 1 {
+				new_size := (size_in_bits - 1) / _DIGIT_BITS
+
+				if new_size % _DIGIT_BITS > 0 {
+					new_size += 1
+				}
+
+				internal_grow(a, new_size) or_return
+				a.used = new_size
+			}
+
 			internal_int_bitfield_set_single(a, size_in_bits - 2) or_return
 		}
 

@@ -7,8 +7,12 @@ package _sha3
     List of contributors:
         zhibog, dotbmp:  Initial implementation.
 
-    Implementation of the Keccak hashing algorithm, standardized as SHA3 in <https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.202.pdf>
-    To use the original Keccak padding, set the is_keccak bool to true, otherwise it will use SHA3 padding.
+    Implementation of the Keccak hashing algorithm, standardized as SHA3
+    in <https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.202.pdf>.
+
+    As the only difference between the legacy Keccak and SHA3 is the domain
+    separation byte, set dsbyte to the appropriate value to pick the desired
+    algorithm.
 */
 
 import "core:math/bits"
@@ -16,47 +20,56 @@ import "core:mem"
 
 ROUNDS :: 24
 
+RATE_128 :: 1344 / 8 // ONLY for SHAKE128.
 RATE_224 :: 1152 / 8
 RATE_256 :: 1088 / 8
 RATE_384 :: 832 / 8
 RATE_512 :: 576 / 8
 
+DS_KECCAK :: 0x01
+DS_SHA3 :: 0x06
+DS_SHAKE :: 0x1f
+DS_CSHAKE :: 0x04
+
 Context :: struct {
-	st:        struct #raw_union {
+	st:             struct #raw_union {
 		b: [200]u8,
 		q: [25]u64,
 	},
-	pt:        int,
-	rsiz:      int,
-	mdlen:     int,
-	is_keccak: bool,
-
+	pt:             int,
+	rsiz:           int,
+	mdlen:          int,
+	dsbyte:         byte,
 	is_initialized: bool,
 	is_finalized:   bool, // For SHAKE (unlimited squeeze is allowed)
 }
 
+@(private)
+keccakf_rndc := [?]u64 {
+	0x0000000000000001, 0x0000000000008082, 0x800000000000808a,
+	0x8000000080008000, 0x000000000000808b, 0x0000000080000001,
+	0x8000000080008081, 0x8000000000008009, 0x000000000000008a,
+	0x0000000000000088, 0x0000000080008009, 0x000000008000000a,
+	0x000000008000808b, 0x800000000000008b, 0x8000000000008089,
+	0x8000000000008003, 0x8000000000008002, 0x8000000000000080,
+	0x000000000000800a, 0x800000008000000a, 0x8000000080008081,
+	0x8000000000008080, 0x0000000080000001, 0x8000000080008008,
+}
+
+@(private)
+keccakf_rotc := [?]int {
+	1, 3, 6, 10, 15, 21, 28, 36, 45, 55, 2, 14,
+	27, 41, 56, 8, 25, 43, 62, 18, 39, 61, 20, 44,
+}
+
+@(private)
+keccakf_piln := [?]i32 {
+	10, 7, 11, 17, 18, 3, 5, 16, 8, 21, 24, 4,
+	15, 23, 19, 13, 12, 2, 20, 14, 22, 9, 6, 1,
+}
+
+@(private)
 keccakf :: proc "contextless" (st: ^[25]u64) {
-	keccakf_rndc := [?]u64 {
-		0x0000000000000001, 0x0000000000008082, 0x800000000000808a,
-		0x8000000080008000, 0x000000000000808b, 0x0000000080000001,
-		0x8000000080008081, 0x8000000000008009, 0x000000000000008a,
-		0x0000000000000088, 0x0000000080008009, 0x000000008000000a,
-		0x000000008000808b, 0x800000000000008b, 0x8000000000008089,
-		0x8000000000008003, 0x8000000000008002, 0x8000000000000080,
-		0x000000000000800a, 0x800000008000000a, 0x8000000080008081,
-		0x8000000000008080, 0x0000000080000001, 0x8000000080008008,
-	}
-
-	keccakf_rotc := [?]int {
-		1, 3, 6, 10, 15, 21, 28, 36, 45, 55, 2, 14,
-		27, 41, 56, 8, 25, 43, 62, 18, 39, 61, 20, 44,
-	}
-
-	keccakf_piln := [?]i32 {
-		10, 7, 11, 17, 18, 3, 5, 16, 8, 21, 24, 4,
-		15, 23, 19, 13, 12, 2, 20, 14, 22, 9, 6, 1,
-	}
-
 	i, j, r: i32 = ---, ---, ---
 	t: u64 = ---
 	bc: [5]u64 = ---
@@ -140,9 +153,6 @@ final :: proc(ctx: ^Context, hash: []byte, finalize_clone: bool = false) {
 	assert(ctx.is_initialized)
 
 	if len(hash) < ctx.mdlen {
-		if ctx.is_keccak {
-			panic("crypto/keccac: invalid destination digest size")
-		}
 		panic("crypto/sha3: invalid destination digest size")
 	}
 
@@ -152,13 +162,9 @@ final :: proc(ctx: ^Context, hash: []byte, finalize_clone: bool = false) {
 		clone(&tmp_ctx, ctx)
 		ctx = &tmp_ctx
 	}
-	defer(reset(ctx))
+	defer (reset(ctx))
 
-	if ctx.is_keccak {
-		ctx.st.b[ctx.pt] ~= 0x01
-	} else {
-		ctx.st.b[ctx.pt] ~= 0x06
-	}
+	ctx.st.b[ctx.pt] ~= ctx.dsbyte
 
 	ctx.st.b[ctx.rsiz - 1] ~= 0x80
 	keccakf(&ctx.st.q)
@@ -183,7 +189,7 @@ shake_xof :: proc(ctx: ^Context) {
 	assert(ctx.is_initialized)
 	assert(!ctx.is_finalized)
 
-	ctx.st.b[ctx.pt] ~= 0x1F
+	ctx.st.b[ctx.pt] ~= ctx.dsbyte
 	ctx.st.b[ctx.rsiz - 1] ~= 0x80
 	keccakf(&ctx.st.q)
 	ctx.pt = 0

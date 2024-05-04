@@ -204,14 +204,27 @@ gb_internal void report_cpu_info() {
 	}
 
 	#elif defined(GB_CPU_ARM)
-		/*
-			TODO(Jeroen): On *nix, perhaps query `/proc/cpuinfo`.
-		*/
-		#if defined(GB_ARCH_64_BIT)
-			gb_printf("ARM64\n");
-		#else
-			gb_printf("ARM\n");
+		bool generic = true;
+
+		#if defined(GB_SYSTEM_OSX)
+			char cpu_name[128] = {};	
+			size_t cpu_name_size = 128;
+			if (sysctlbyname("machdep.cpu.brand_string", &cpu_name, &cpu_name_size, nullptr, 0) == 0) {
+				generic = false;
+				gb_printf("%s\n", (char *)&cpu_name[0]);
+			}
 		#endif
+
+		if (generic) {
+			/*
+				TODO(Jeroen): On *nix, perhaps query `/proc/cpuinfo`.
+			*/
+			#if defined(GB_ARCH_64_BIT)
+				gb_printf("ARM64\n");
+			#else
+				gb_printf("ARM\n");
+			#endif
+		}
 	#else
 		gb_printf("Unknown\n");
 	#endif
@@ -880,9 +893,15 @@ gb_internal void report_os_info() {
 			{"23A344",   {23,  0,  0}, "macOS", {"Sonoma",        {14,  0,  0}}},
 			{"23B74",    {23,  1,  0}, "macOS", {"Sonoma",        {14,  1,  0}}},
 			{"23B81",    {23,  1,  0}, "macOS", {"Sonoma",        {14,  1,  1}}},
+			{"23B2082",  {23,  1,  0}, "macOS", {"Sonoma",        {14,  1,  1}}},
 			{"23B92",    {23,  1,  0}, "macOS", {"Sonoma",        {14,  1,  2}}},
+			{"23B2091",  {23,  1,  0}, "macOS", {"Sonoma",        {14,  1,  2}}},
 			{"23C64",    {23,  2,  0}, "macOS", {"Sonoma",        {14,  2,  0}}},
 			{"23C71",    {23,  2,  0}, "macOS", {"Sonoma",        {14,  2,  1}}},
+			{"23D56",    {23,  3,  0}, "macOS", {"Sonoma",        {14,  3,  0}}},
+			{"23D60",    {23,  3,  0}, "macOS", {"Sonoma",        {14,  3,  1}}},
+			{"23E214",   {23,  4,  0}, "macOS", {"Sonoma",        {14,  4,  0}}},
+			{"23E224",   {23,  4,  0}, "macOS", {"Sonoma",        {14,  4,  1}}},
 		};
 
 

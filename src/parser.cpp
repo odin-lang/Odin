@@ -1482,9 +1482,26 @@ gb_internal Token expect_token(AstFile *f, TokenKind kind) {
 	if (prev.kind != kind) {
 		String c = token_strings[kind];
 		String p = token_to_string(prev);
+		begin_error_block();
 		syntax_error(f->curr_token, "Expected '%.*s', got '%.*s'", LIT(c), LIT(p));
+		if (kind == Token_Ident) switch (prev.kind) {
+		case Token_context:
+			error_line("\tSuggestion: '%.*s' is a keyword, would 'ctx' suffice?\n", LIT(prev.string));
+			break;
+		case Token_package:
+			error_line("\tSuggestion: '%.*s' is a keyword, would 'pkg' suffice?\n", LIT(prev.string));
+			break;
+		default:
+			if (token_is_keyword(prev.kind)) {
+				error_line("\tNote: '%.*s' is a keyword\n", LIT(prev.string));
+			}
+			break;
+		}
+
+		end_error_block();
+
 		if (prev.kind == Token_EOF) {
-			gb_exit(1);
+			exit_with_errors();
 		}
 	}
 
@@ -2329,6 +2346,19 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 				break;
 			}
 			return original_type;
+		} else if (name.string == "row_major" ||
+		           name.string == "column_major") {
+			Ast *original_type = parse_type(f);
+			Ast *type = unparen_expr(original_type);
+			switch (type->kind) {
+			case Ast_MatrixType:
+				type->MatrixType.is_row_major = (name.string == "row_major");
+				break;
+			default:
+				syntax_error(type, "Expected a matrix type after #%.*s, got %.*s", LIT(name.string), LIT(ast_strings[type->kind]));
+				break;
+			}
+			return original_type;
 		} else if (name.string == "partial") {
 			Ast *tag = ast_basic_directive(f, token, name);
 			Ast *original_expr = parse_expr(f, lhs);
@@ -2338,9 +2368,6 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 				return ast_bad_expr(f, token, name);
 			}
 			switch (expr->kind) {
-			case Ast_ArrayType:
-				syntax_error(expr, "#partial has been replaced with #sparse for non-contiguous enumerated array types");
-				break;
 			case Ast_CompoundLit:
 				expr->CompoundLit.tag = tag;
 				break;
@@ -2527,6 +2554,9 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 		Ast *elem = parse_type(f);
 		return ast_pointer_type(f, token, elem);
 	} break;
+
+	case Token_Mul:
+		return parse_unary_expr(f, true);
 
 	case Token_OpenBracket: {
 		Token token = expect_token(f, Token_OpenBracket);
@@ -2872,6 +2902,10 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 		elem = parse_expr(f, true);
 		f->allow_range = prev_allow_range;
 
+		if (elem == nullptr) {
+			syntax_error(token, "Expected a type or range, got nothing");
+		}
+
 		if (allow_token(f, Token_Semicolon)) {
 			underlying = parse_type(f);
 		} else if (allow_token(f, Token_Comma)) {
@@ -2880,6 +2914,7 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 
 			underlying = parse_type(f);
 		}
+
 
 		expect_token(f, Token_CloseBracket);
 		return ast_bit_set_type(f, token, elem, underlying);
@@ -3261,7 +3296,9 @@ gb_internal Ast *parse_unary_expr(AstFile *f, bool lhs) {
 	case Token_Sub:
 	case Token_Xor:
 	case Token_And:
-	case Token_Not: {
+	case Token_Not:
+	case Token_Mul: // Used for error handling when people do C-like things
+	{
 		Token token = advance_token(f);
 		Ast *expr = parse_unary_expr(f, lhs);
 		return ast_unary_expr(f, token, expr);
@@ -3648,6 +3685,7 @@ gb_internal Ast *parse_simple_stmt(AstFile *f, u32 flags) {
 		expect_token_after(f, Token_Colon, "identifier list");
 		if ((flags&StmtAllowFlag_Label) && lhs.count == 1) {
 			bool is_partial = false;
+			bool is_reverse = false;
 			Token partial_token = {};
 			if (f->curr_token.kind == Token_Hash) {
 				// NOTE(bill): This is purely for error messages
@@ -3657,6 +3695,11 @@ gb_internal Ast *parse_simple_stmt(AstFile *f, u32 flags) {
 					partial_token = expect_token(f, Token_Hash);
 					expect_token(f, Token_Ident);
 					is_partial = true;
+				} else if (name.kind == Token_Ident && name.string == "reverse" &&
+				    peek_token_n(f, 1).kind == Token_for) {
+					partial_token = expect_token(f, Token_Hash);
+					expect_token(f, Token_Ident);
+					is_reverse = true;
 				}
 			}
 			switch (f->curr_token.kind) {
@@ -3691,6 +3734,18 @@ gb_internal Ast *parse_simple_stmt(AstFile *f, u32 flags) {
 						break;
 					}
 					syntax_error(partial_token, "Incorrect use of directive, use '#partial %.*s: switch'", LIT(ast_token(name).string));
+				} else if (is_reverse) {
+					switch (stmt->kind) {
+					case Ast_RangeStmt:
+						if (stmt->RangeStmt.reverse) {
+							syntax_error(token, "#reverse already applied to a 'for in' statement");
+						}
+						stmt->RangeStmt.reverse = true;
+						break;
+					default:
+						syntax_error(token, "#reverse can only be applied to a 'for in' statement");
+						break;
+					}
 				}
 
 				return stmt;
@@ -3885,14 +3940,15 @@ struct ParseFieldPrefixMapping {
 	FieldFlag       flag;
 };
 
-gb_global ParseFieldPrefixMapping parse_field_prefix_mappings[] = {
-	{str_lit("using"),      Token_using,     FieldFlag_using},
-	{str_lit("no_alias"),   Token_Hash,      FieldFlag_no_alias},
-	{str_lit("c_vararg"),   Token_Hash,      FieldFlag_c_vararg},
-	{str_lit("const"),      Token_Hash,      FieldFlag_const},
-	{str_lit("any_int"),    Token_Hash,      FieldFlag_any_int},
-	{str_lit("subtype"),    Token_Hash,      FieldFlag_subtype},
-	{str_lit("by_ptr"),     Token_Hash,      FieldFlag_by_ptr},
+gb_global ParseFieldPrefixMapping const parse_field_prefix_mappings[] = {
+	{str_lit("using"),        Token_using,     FieldFlag_using},
+	{str_lit("no_alias"),     Token_Hash,      FieldFlag_no_alias},
+	{str_lit("c_vararg"),     Token_Hash,      FieldFlag_c_vararg},
+	{str_lit("const"),        Token_Hash,      FieldFlag_const},
+	{str_lit("any_int"),      Token_Hash,      FieldFlag_any_int},
+	{str_lit("subtype"),      Token_Hash,      FieldFlag_subtype},
+	{str_lit("by_ptr"),       Token_Hash,      FieldFlag_by_ptr},
+	{str_lit("no_broadcast"), Token_Hash,      FieldFlag_no_broadcast},
 };
 
 
@@ -4016,7 +4072,12 @@ gb_internal Array<Ast *> convert_to_ident_list(AstFile *f, Array<AstAndFlags> li
 		case Ast_BadExpr:
 			break;
 		case Ast_Implicit:
+			begin_error_block();
 			syntax_error(ident, "Expected an identifier, '%.*s' which is a keyword", LIT(ident->Implicit.string));
+			if (ident->Implicit.kind == Token_context) {
+				error_line("\tSuggestion: Would 'ctx' suffice as an alternative name?\n");
+			}
+			end_error_block();
 			ident = ast_ident(f, blank_token);
 			break;
 
@@ -4975,6 +5036,7 @@ gb_internal Ast *parse_stmt(AstFile *f) {
 	case Token_Xor:
 	case Token_Not:
 	case Token_And:
+	case Token_Mul: // Used for error handling when people do C-like things
 		s = parse_simple_stmt(f, StmtAllowFlag_Label);
 		expect_semicolon(f);
 		return s;
@@ -5427,14 +5489,27 @@ gb_internal AstPackage *try_add_import_path(Parser *p, String path, String const
 		return nullptr;
 	}
 
+	isize files_with_ext = 0;
 	isize files_to_reserve = 1; // always reserve 1
 	for (FileInfo fi : list) {
 		String name = fi.name;
 		String ext = path_extension(name);
+		if (ext == FILE_EXT) {
+			files_with_ext += 1;
+		}
 		if (ext == FILE_EXT && !is_excluded_target_filename(name)) {
 			files_to_reserve += 1;
 		}
 	}
+	if (files_with_ext == 0 || files_to_reserve == 1) {
+		if (files_with_ext != 0) {
+			syntax_error(pos, "Directory contains no .odin files for the specified platform: %.*s", LIT(rel_path));
+		} else {
+			syntax_error(pos, "Empty directory that contains no .odin files: %.*s", LIT(rel_path));
+		}
+		return nullptr;
+	}
+
 
 	array_reserve(&pkg->files, files_to_reserve);
 	for (FileInfo fi : list) {
@@ -5635,7 +5710,7 @@ gb_internal bool determine_path_from_string(BlockingMutex *file_mutex, Ast *node
 		//                 working directory of the exe to the library search paths.
 		//                 Static libraries can be linked directly with the full pathname
 		//
-		if (node->kind == Ast_ForeignImportDecl && string_ends_with(file_str, str_lit(".so"))) {
+		if (node->kind == Ast_ForeignImportDecl && (string_ends_with(file_str, str_lit(".so")) || string_contains_string(file_str, str_lit(".so.")))) {
 			*path = file_str;
 			return true;
 		}
@@ -6039,7 +6114,13 @@ gb_internal bool parse_file(Parser *p, AstFile *f) {
 	CommentGroup *docs = f->lead_comment;
 
 	if (f->curr_token.kind != Token_package) {
+		ERROR_BLOCK();
 		syntax_error(f->curr_token, "Expected a package declaration at the beginning of the file");
+		// IMPORTANT NOTE(bill): this is technically a race condition with the suggestion, but it's ony a suggession
+		// so in practice is should be "fine"
+		if (f->pkg && f->pkg->name != "") {
+			error_line("\tSuggestion: Add 'package %.*s' to the top of the file\n", LIT(f->pkg->name));
+		}
 		return false;
 	}
 
@@ -6177,7 +6258,7 @@ gb_internal ParseFileError process_imported_file(Parser *p, ImportedFile importe
 		if (err == ParseFile_EmptyFile) {
 			if (fi.fullpath == p->init_fullpath) {
 				syntax_error(pos, "Initial file is empty - %.*s\n", LIT(p->init_fullpath));
-				gb_exit(1);
+				exit_with_errors();
 			}
 		} else {
 			switch (err) {
@@ -6263,7 +6344,7 @@ gb_internal ParseFileError parse_packages(Parser *p, String init_filename) {
 	if (!path_is_directory(init_fullpath)) {
 		String const ext = str_lit(".odin");
 		if (!string_ends_with(init_fullpath, ext)) {
-			error_line("Expected either a directory or a .odin file, got '%.*s'\n", LIT(init_filename));
+			error({}, "Expected either a directory or a .odin file, got '%.*s'\n", LIT(init_filename));
 			return ParseFile_WrongExtension;
 		}
 	} else if (init_fullpath.len != 0) {
@@ -6276,7 +6357,7 @@ gb_internal ParseFileError parse_packages(Parser *p, String init_filename) {
 			String short_path = filename_from_path(path);
 			char *cpath = alloc_cstring(temporary_allocator(), short_path);
 			if (gb_file_exists(cpath)) {
-			    	error_line("Please specify the executable name with -out:<string> as a directory exists with the same name in the current working directory");
+			    	error({}, "Please specify the executable name with -out:<string> as a directory exists with the same name in the current working directory");
 			    	return ParseFile_DirectoryAlreadyExists;
 			}
 		}
@@ -6312,7 +6393,7 @@ gb_internal ParseFileError parse_packages(Parser *p, String init_filename) {
 			if (!path_is_directory(fullpath)) {
 				String const ext = str_lit(".odin");
 				if (!string_ends_with(fullpath, ext)) {
-					error_line("Expected either a directory or a .odin file, got '%.*s'\n", LIT(fullpath));
+					error({}, "Expected either a directory or a .odin file, got '%.*s'\n", LIT(fullpath));
 					return ParseFile_WrongExtension;
 				}
 			}

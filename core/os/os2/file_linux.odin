@@ -13,8 +13,6 @@ _File :: struct {
 	name: string,
 	fd: linux.Fd,
 	allocator: runtime.Allocator,
-
-	stream: io.Stream,
 }
 
 _stdin : File = {
@@ -99,7 +97,7 @@ _construct_file :: proc(file: ^File, fd: uintptr, _: string = "") {
 	file.impl.fd = linux.Fd(fd)
 	file.impl.allocator = _file_allocator()
 	file.impl.name = _get_full_path(file.impl.fd, file.impl.allocator)
-	file.impl.stream = {
+	file.stream = {
 		data = file,
 		procedure = _file_stream_proc,
 	}

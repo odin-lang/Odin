@@ -416,24 +416,28 @@ end_of_line_pos :: proc(p: ^Parser, tok: tokenizer.Token) -> tokenizer.Pos {
 }
 
 expect_closing_brace_of_field_list :: proc(p: ^Parser) -> tokenizer.Token {
+	return expect_closing_token_of_field_list(p, .Close_Brace, "field list")
+}
+
+expect_closing_token_of_field_list :: proc(p: ^Parser, closing_kind: tokenizer.Token_Kind, msg: string) -> tokenizer.Token {
 	token := p.curr_tok
-	if allow_token(p, .Close_Brace) {
+	if allow_token(p, closing_kind) {
 		return token
 	}
 	if allow_token(p, .Semicolon) && !tokenizer.is_newline(token) {
 		str := tokenizer.token_to_string(token)
 		error(p, end_of_line_pos(p, p.prev_tok), "expected a comma, got %s", str)
 	}
-	expect_brace := expect_token(p, .Close_Brace)
+	expect_closing := expect_token_after(p, closing_kind, msg)
 
-	if expect_brace.kind != .Close_Brace {
-		for p.curr_tok.kind != .Close_Brace && p.curr_tok.kind != .EOF && !is_non_inserted_semicolon(p.curr_tok) {
+	if expect_closing.kind != closing_kind {
+		for p.curr_tok.kind != closing_kind && p.curr_tok.kind != .EOF && !is_non_inserted_semicolon(p.curr_tok) {
 			advance_token(p)
 		}
 		return p.curr_tok
 	} 
 
-	return expect_brace
+	return expect_closing
 }
 
 expect_closing_parentheses_of_field_list :: proc(p: ^Parser) -> tokenizer.Token {
@@ -531,7 +535,7 @@ is_semicolon_optional_for_node :: proc(p: ^Parser, node: ^ast.Node) -> bool {
 		return is_semicolon_optional_for_node(p, n.type)
 	case ^ast.Pointer_Type:
 		return is_semicolon_optional_for_node(p, n.elem)
-	case ^ast.Struct_Type, ^ast.Union_Type, ^ast.Enum_Type:
+	case ^ast.Struct_Type, ^ast.Union_Type, ^ast.Enum_Type, ^ast.Bit_Set_Type, ^ast.Bit_Field_Type:
 		// Require semicolon within a procedure body
 		return p.curr_proc == nil
 	case ^ast.Proc_Lit:
@@ -1354,6 +1358,7 @@ parse_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 
 		rs := ast.new(ast.Return_Stmt, tok.pos, end)
 		rs.results = results[:]
+		expect_semicolon(p, rs)
 		return rs
 
 	case .Break, .Continue, .Fallthrough:
@@ -2790,6 +2795,48 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 		mt.column_count = column_count
 		mt.elem = elem
 		return mt
+	
+	case .Bit_Field:
+		tok := expect_token(p, .Bit_Field)
+
+		backing_type := parse_type_or_ident(p)
+		if backing_type == nil {
+			token := advance_token(p)
+			error(p, token.pos, "Expected a backing type for a 'bit_field'")
+		}
+
+		skip_possible_newline_for_literal(p)
+		open := expect_token_after(p, .Open_Brace, "bit_field")
+
+		fields: [dynamic]^ast.Bit_Field_Field
+		for p.curr_tok.kind != .Close_Brace && p.curr_tok.kind != .EOF {
+			name := parse_ident(p)
+			expect_token(p, .Colon)
+			type := parse_type(p)
+			expect_token(p, .Or)
+			bit_size := parse_expr(p, true)
+
+			field := ast.new(ast.Bit_Field_Field, name.pos, bit_size)
+
+			field.name     = name
+			field.type     = type
+			field.bit_size = bit_size
+
+			append(&fields, field)
+
+			allow_token(p, .Comma) or_break
+		}
+
+		close := expect_closing_brace_of_field_list(p)
+
+		bf := ast.new(ast.Bit_Field_Type, tok.pos, close.pos)
+
+		bf.tok_pos      = tok.pos
+		bf.backing_type = backing_type
+		bf.open         = open.pos
+		bf.fields       = fields[:]
+		bf.close        = close.pos
+		return bf
 
 	case .Asm:
 		tok := expect_token(p, .Asm)
@@ -2897,7 +2944,8 @@ is_literal_type :: proc(expr: ^ast.Expr) -> bool {
 		^ast.Map_Type,
 		^ast.Bit_Set_Type,
 		^ast.Matrix_Type,
-		^ast.Call_Expr:
+		^ast.Call_Expr,
+		^ast.Bit_Field_Type:
 		return true
 	}
 	return false
@@ -2947,7 +2995,8 @@ parse_literal_value :: proc(p: ^Parser, type: ^ast.Expr) -> ^ast.Comp_Lit {
 	}
 	p.expr_level -= 1
 
-	close := expect_token_after(p, .Close_Brace, "compound literal")
+  	skip_possible_newline(p)
+	close := expect_closing_brace_of_field_list(p)
 
 	pos := type.pos if type != nil else open.pos
 	lit := ast.new(ast.Comp_Lit, pos, end_pos(close))
@@ -3010,7 +3059,7 @@ parse_call_expr :: proc(p: ^Parser, operand: ^ast.Expr) -> ^ast.Expr {
 		allow_token(p, .Comma) or_break
 	}
 
-	close := expect_token_after(p, .Close_Paren, "argument list")
+	close := expect_closing_token_of_field_list(p, .Close_Paren, "argument list")
 	p.expr_level -= 1
 
 	ce := ast.new(ast.Call_Expr, operand.pos, end_pos(close))

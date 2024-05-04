@@ -145,16 +145,15 @@ Errno :: enum i32 {
 }
 
 /*
-	Bits for Open_Flags
+	Bits for Open_Flags.
+
+	RDONLY flag is not present, because it has the value of 0, i.e. it is the
+	default, unless WRONLY or RDWR is specified.
 */
 when ODIN_ARCH != .arm64 && ODIN_ARCH != .arm32 {
 	Open_Flags_Bits :: enum {
 		WRONLY    = 0,
 		RDWR      = 1,
-		_         = 2,
-		_         = 3,
-		_         = 4,
-		_         = 5,
 		CREAT     = 6,
 		EXCL      = 7,
 		NOCTTY    = 8,
@@ -169,17 +168,12 @@ when ODIN_ARCH != .arm64 && ODIN_ARCH != .arm32 {
 		NOFOLLOW  = 17,
 		NOATIME   = 18,
 		CLOEXEC   = 19,
-		_         = 20,
 		PATH      = 21,
 	}
 } else {
 	Open_Flags_Bits :: enum {
 		WRONLY    = 0,
 		RDWR      = 1,
-		_         = 2,
-		_         = 3,
-		_         = 4,
-		_         = 5,
 		CREAT     = 6,
 		EXCL      = 7,
 		NOCTTY    = 8,
@@ -194,7 +188,6 @@ when ODIN_ARCH != .arm64 && ODIN_ARCH != .arm32 {
 		LARGEFILE = 17,
 		NOATIME   = 18,
 		CLOEXEC   = 19,
-		_         = 20,
 		PATH      = 21,
 	}
 }

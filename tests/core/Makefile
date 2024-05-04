@@ -24,7 +24,8 @@ all: c_libc_test \
 	 slice_test \
 	 strings_test \
 	 thread_test \
-	 runtime_test
+	 runtime_test \
+	 time_test
 
 download_test_assets:
 	$(PYTHON) download_assets.py
@@ -45,7 +46,7 @@ hash_test:
 	$(ODIN) run hash $(COMMON) -o:speed -no-bounds-check -out:test_hash
 
 crypto_test:
-	$(ODIN) run crypto $(COMMON) -o:speed -no-bounds-check -out:test_crypto
+	$(ODIN) run crypto $(COMMON) $(COLLECTION) -o:speed -no-bounds-check -out:test_crypto
 
 noise_test:
 	$(ODIN) run math/noise $(COMMON) -out:test_noise
@@ -55,6 +56,9 @@ encoding_test:
 	$(ODIN) run encoding/json   $(COMMON) -out:test_json
 	$(ODIN) run encoding/varint $(COMMON) -out:test_varint
 	$(ODIN) run encoding/xml    $(COMMON) -out:test_xml
+	$(ODIN) run encoding/cbor   $(COMMON) -out:test_cbor
+	$(ODIN) run encoding/hex    $(COMMON) -out:test_hex
+	$(ODIN) run encoding/base64 $(COMMON) -out:test_base64
 
 math_test:
 	$(ODIN) run math $(COMMON) $(COLLECTION) -out:test_core_math
@@ -94,3 +98,6 @@ thread_test:
 
 runtime_test:
 	$(ODIN) run runtime $(COMMON) -out:test_core_runtime
+
+time_test:
+	$(ODIN) run time $(COMMON) -out:test_core_time

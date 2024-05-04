@@ -97,15 +97,12 @@ gb_internal void lb_mem_zero_ptr(lbProcedure *p, LLVMValueRef ptr, Type *type, u
 	LLVMTypeRef llvm_type = lb_type(p->module, type);
 
 	LLVMTypeKind kind = LLVMGetTypeKind(llvm_type);
-
+	i64 sz = type_size_of(type);
 	switch (kind) {
 	case LLVMStructTypeKind:
 	case LLVMArrayTypeKind:
-		{
-			// NOTE(bill): Enforce zeroing through memset to make sure padding is zeroed too
-			i32 sz = cast(i32)type_size_of(type);
-			lb_mem_zero_ptr_internal(p, ptr, lb_const_int(p->module, t_int, sz).value, alignment, false);
-		}
+		// NOTE(bill): Enforce zeroing through memset to make sure padding is zeroed too
+		lb_mem_zero_ptr_internal(p, ptr, lb_const_int(p->module, t_int, sz).value, alignment, false);
 		break;
 	default:
 		LLVMBuildStore(p->builder, LLVMConstNull(lb_type(p->module, type)), ptr);
@@ -124,11 +121,33 @@ gb_internal lbValue lb_emit_select(lbProcedure *p, lbValue cond, lbValue x, lbVa
 gb_internal lbValue lb_emit_min(lbProcedure *p, Type *t, lbValue x, lbValue y) {
 	x = lb_emit_conv(p, x, t);
 	y = lb_emit_conv(p, y, t);
+	bool use_llvm_intrinsic = !is_arch_wasm() && (is_type_float(t) || (is_type_simd_vector(t) && is_type_float(base_array_type(t))));
+	if (use_llvm_intrinsic) {
+		LLVMValueRef args[2] = {x.value, y.value};
+		LLVMTypeRef types[1] = {lb_type(p->module, t)};
+
+		// NOTE(bill): f either operand is a NaN, returns NaN. Otherwise returns the lesser of the two arguments.
+		// -0.0 is considered to be less than +0.0 for this intrinsic.
+		// These semantics are specified by IEEE 754-2008.
+		LLVMValueRef v = lb_call_intrinsic(p, "llvm.minnum", args, gb_count_of(args), types, gb_count_of(types));
+		return {v, t};
+	}
 	return lb_emit_select(p, lb_emit_comp(p, Token_Lt, x, y), x, y);
 }
 gb_internal lbValue lb_emit_max(lbProcedure *p, Type *t, lbValue x, lbValue y) {
 	x = lb_emit_conv(p, x, t);
 	y = lb_emit_conv(p, y, t);
+	bool use_llvm_intrinsic = !is_arch_wasm() && (is_type_float(t) || (is_type_simd_vector(t) && is_type_float(base_array_type(t))));
+	if (use_llvm_intrinsic) {
+		LLVMValueRef args[2] = {x.value, y.value};
+		LLVMTypeRef types[1] = {lb_type(p->module, t)};
+
+		// NOTE(bill): If either operand is a NaN, returns NaN. Otherwise returns the greater of the two arguments.
+		// -0.0 is considered to be less than +0.0 for this intrinsic.
+		// These semantics are specified by IEEE 754-2008.
+		LLVMValueRef v = lb_call_intrinsic(p, "llvm.maxnum", args, gb_count_of(args), types, gb_count_of(types));
+		return {v, t};
+	}
 	return lb_emit_select(p, lb_emit_comp(p, Token_Gt, x, y), x, y);
 }
 
@@ -706,29 +725,31 @@ gb_internal lbValue lb_emit_union_cast(lbProcedure *p, lbValue value, Type *type
 	lb_start_block(p, end_block);
 
 	if (!is_tuple) {
-		GB_ASSERT((p->state_flags & StateFlag_no_type_assert) == 0);
-		// NOTE(bill): Panic on invalid conversion
-		Type *dst_type = tuple->Tuple.variables[0]->type;
+		if (!build_context.no_type_assert) {
+			GB_ASSERT((p->state_flags & StateFlag_no_type_assert) == 0);
+			// NOTE(bill): Panic on invalid conversion
+			Type *dst_type = tuple->Tuple.variables[0]->type;
 
-		isize arg_count = 7;
-		if (build_context.no_rtti) {
-			arg_count = 4;
+			isize arg_count = 7;
+			if (build_context.no_rtti) {
+				arg_count = 4;
+			}
+
+			lbValue ok = lb_emit_load(p, lb_emit_struct_ep(p, v.addr, 1));
+			auto args = array_make<lbValue>(permanent_allocator(), arg_count);
+			args[0] = ok;
+
+			args[1] = lb_const_string(m, get_file_path_string(pos.file_id));
+			args[2] = lb_const_int(m, t_i32, pos.line);
+			args[3] = lb_const_int(m, t_i32, pos.column);
+
+			if (!build_context.no_rtti) {
+				args[4] = lb_typeid(m, src_type);
+				args[5] = lb_typeid(m, dst_type);
+				args[6] = lb_emit_conv(p, value_, t_rawptr);
+			}
+			lb_emit_runtime_call(p, "type_assertion_check2", args);
 		}
-
-		lbValue ok = lb_emit_load(p, lb_emit_struct_ep(p, v.addr, 1));
-		auto args = array_make<lbValue>(permanent_allocator(), arg_count);
-		args[0] = ok;
-
-		args[1] = lb_const_string(m, get_file_path_string(pos.file_id));
-		args[2] = lb_const_int(m, t_i32, pos.line);
-		args[3] = lb_const_int(m, t_i32, pos.column);
-
-		if (!build_context.no_rtti) {
-			args[4] = lb_typeid(m, src_type);
-			args[5] = lb_typeid(m, dst_type);
-			args[6] = lb_emit_conv(p, value_, t_rawptr);
-		}
-		lb_emit_runtime_call(p, "type_assertion_check2", args);
 
 		return lb_emit_load(p, lb_emit_struct_ep(p, v.addr, 0));
 	}
@@ -784,25 +805,27 @@ gb_internal lbAddr lb_emit_any_cast_addr(lbProcedure *p, lbValue value, Type *ty
 
 	if (!is_tuple) {
 		// NOTE(bill): Panic on invalid conversion
-		lbValue ok = lb_emit_load(p, lb_emit_struct_ep(p, v.addr, 1));
+		if (!build_context.no_type_assert) {
+			lbValue ok = lb_emit_load(p, lb_emit_struct_ep(p, v.addr, 1));
 
-		isize arg_count = 7;
-		if (build_context.no_rtti) {
-			arg_count = 4;
+			isize arg_count = 7;
+			if (build_context.no_rtti) {
+				arg_count = 4;
+			}
+			auto args = array_make<lbValue>(permanent_allocator(), arg_count);
+			args[0] = ok;
+
+			args[1] = lb_const_string(m, get_file_path_string(pos.file_id));
+			args[2] = lb_const_int(m, t_i32, pos.line);
+			args[3] = lb_const_int(m, t_i32, pos.column);
+
+			if (!build_context.no_rtti) {
+				args[4] = any_typeid;
+				args[5] = dst_typeid;
+				args[6] = lb_emit_struct_ev(p, value, 0);
+			}
+			lb_emit_runtime_call(p, "type_assertion_check2", args);
 		}
-		auto args = array_make<lbValue>(permanent_allocator(), arg_count);
-		args[0] = ok;
-
-		args[1] = lb_const_string(m, get_file_path_string(pos.file_id));
-		args[2] = lb_const_int(m, t_i32, pos.line);
-		args[3] = lb_const_int(m, t_i32, pos.column);
-
-		if (!build_context.no_rtti) {
-			args[4] = any_typeid;
-			args[5] = dst_typeid;
-			args[6] = lb_emit_struct_ev(p, value, 0);
-		}
-		lb_emit_runtime_call(p, "type_assertion_check2", args);
 
 		return lb_addr(lb_emit_struct_ep(p, v.addr, 0));
 	}
@@ -1103,7 +1126,7 @@ gb_internal lbValue lb_emit_struct_ep(lbProcedure *p, lbValue s, i32 index) {
 		case 3: result_type = t_allocator; break;
 		}
 	} else if (is_type_map(t)) {
-		init_map_internal_types(t);
+		init_map_internal_debug_types(t);
 		Type *itp = alloc_type_pointer(t_raw_map);
 		s = lb_emit_transmute(p, s, itp);
 
@@ -1242,7 +1265,7 @@ gb_internal lbValue lb_emit_struct_ev(lbProcedure *p, lbValue s, i32 index) {
 
 	case Type_Map:
 		{
-			init_map_internal_types(t);
+			init_map_internal_debug_types(t);
 			switch (index) {
 			case 0: result_type = get_struct_field_type(t_raw_map, 0); break;
 			case 1: result_type = get_struct_field_type(t_raw_map, 1); break;
@@ -1442,13 +1465,15 @@ gb_internal lbValue lb_emit_matrix_epi(lbProcedure *p, lbValue s, isize row, isi
 	Type *t = s.type;
 	GB_ASSERT(is_type_pointer(t));
 	Type *mt = base_type(type_deref(t));
-	if (column == 0) {
-		GB_ASSERT_MSG(is_type_matrix(mt) || is_type_array_like(mt), "%s", type_to_string(mt));
-		return lb_emit_epi(p, s, row);
-	} else if (row == 0 && is_type_array_like(mt)) {
-		return lb_emit_epi(p, s, column);
+
+	if (!mt->Matrix.is_row_major) {
+		if (column == 0) {
+			GB_ASSERT_MSG(is_type_matrix(mt) || is_type_array_like(mt), "%s", type_to_string(mt));
+			return lb_emit_epi(p, s, row);
+		} else if (row == 0 && is_type_array_like(mt)) {
+			return lb_emit_epi(p, s, column);
+		}
 	}
-	
 	
 	GB_ASSERT_MSG(is_type_matrix(mt), "%s", type_to_string(mt));
 	
@@ -1469,7 +1494,13 @@ gb_internal lbValue lb_emit_matrix_ep(lbProcedure *p, lbValue s, lbValue row, lb
 	row = lb_emit_conv(p, row, t_int);
 	column = lb_emit_conv(p, column, t_int);
 	
-	LLVMValueRef index = LLVMBuildAdd(p->builder, row.value, LLVMBuildMul(p->builder, column.value, stride_elems, ""), "");
+	LLVMValueRef index = nullptr;
+
+	if (mt->Matrix.is_row_major) {
+		index = LLVMBuildAdd(p->builder, column.value, LLVMBuildMul(p->builder, row.value, stride_elems, ""), "");
+	} else {
+		index = LLVMBuildAdd(p->builder, row.value, LLVMBuildMul(p->builder, column.value, stride_elems, ""), "");
+	}
 
 	LLVMValueRef indices[2] = {
 		LLVMConstInt(lb_type(p->module, t_int), 0, false),

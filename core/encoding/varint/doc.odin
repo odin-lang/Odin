@@ -25,4 +25,4 @@
 	```
 
 */
-package varint
+package encoding_varint

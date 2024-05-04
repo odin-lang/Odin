@@ -32,11 +32,11 @@ if [ -z "$LLVM_CONFIG" ]; then
 	elif [ -n "$(command -v llvm-config-12)" ]; then LLVM_CONFIG="llvm-config-12"
 	elif [ -n "$(command -v llvm-config-11)" ]; then LLVM_CONFIG="llvm-config-11"
 	# freebsd
-	elif [ -n "$(command -v llvm-config17)" ]; then  LLVM_CONFIG="llvm-config-17"
-	elif [ -n "$(command -v llvm-config14)" ]; then  LLVM_CONFIG="llvm-config-14"
-	elif [ -n "$(command -v llvm-config13)" ]; then  LLVM_CONFIG="llvm-config-13"
-	elif [ -n "$(command -v llvm-config12)" ]; then  LLVM_CONFIG="llvm-config-12"
-	elif [ -n "$(command -v llvm-config11)" ]; then  LLVM_CONFIG="llvm-config-11"
+	elif [ -n "$(command -v llvm-config17)" ]; then  LLVM_CONFIG="llvm-config17"
+	elif [ -n "$(command -v llvm-config14)" ]; then  LLVM_CONFIG="llvm-config14"
+	elif [ -n "$(command -v llvm-config13)" ]; then  LLVM_CONFIG="llvm-config13"
+	elif [ -n "$(command -v llvm-config12)" ]; then  LLVM_CONFIG="llvm-config12"
+	elif [ -n "$(command -v llvm-config11)" ]; then  LLVM_CONFIG="llvm-config11"
 	# fallback
 	elif [ -n "$(command -v llvm-config)" ]; then LLVM_CONFIG="llvm-config"
 	else
@@ -56,7 +56,7 @@ fi
 
 case "$OS_NAME" in
 Darwin)
-	if [ "$OS_ARCH" == "arm64" ]; then
+	if [ "$OS_ARCH" = "arm64" ]; then
 		if [ $LLVM_VERSION_MAJOR -lt 13 ] || [ $LLVM_VERSION_MAJOR -gt 17 ]; then
 			error "Darwin Arm64 requires LLVM 13, 14 or 17"
 		fi
@@ -82,6 +82,11 @@ OpenBSD)
 	LDFLAGS="$LDFLAGS -liconv"
 	LDFLAGS="$LDFLAGS $($LLVM_CONFIG --libs core native --system-libs)"
 	;;
+Haiku)
+	CXXFLAGS="$CXXFLAGS $($LLVM_CONFIG --cxxflags --ldflags) -I/system/develop/headers/private/shared -I/system/develop/headers/private/kernel"
+	LDFLAGS="$LDFLAGS -liconv"
+	LDFLAGS="$LDFLAGS $($LLVM_CONFIG --libs core native --system-libs)"
+	;;
 *)
 	error "Platform \"$OS_NAME\" unsupported"
 	;;
@@ -96,7 +101,7 @@ build_odin() {
 		EXTRAFLAGS="-O3"
 		;;
 	release-native)
-		if [ "$OS_ARCH" == "arm64" ]; then
+		if [ "$OS_ARCH" = "arm64" ]; then
 			# Use preferred flag for Arm (ie arm64 / aarch64 / etc)
 			EXTRAFLAGS="-O3 -mcpu=native"
 		else

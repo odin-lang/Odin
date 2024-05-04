@@ -456,6 +456,7 @@ foreign libc {
 	@(link_name="fstat64")          _unix_fstat         :: proc(fd: Handle, stat: ^OS_Stat) -> c.int ---
 	@(link_name="readlink")         _unix_readlink      :: proc(path: cstring, buf: ^byte, bufsiz: c.size_t) -> c.ssize_t ---
 	@(link_name="access")           _unix_access        :: proc(path: cstring, mask: int) -> int ---
+        @(link_name="fsync")            _unix_fsync         :: proc(handle: Handle) -> c.int ---
 
 	@(link_name="fdopendir$INODE64") _unix_fdopendir_amd64 :: proc(fd: Handle) -> Dir ---
 	@(link_name="readdir_r$INODE64") _unix_readdir_r_amd64 :: proc(dirp: Dir, entry: ^Dirent, result: ^^Dirent) -> c.int ---
@@ -565,8 +566,8 @@ fchmod :: proc(fd: Handle, mode: u16) -> Errno {
 	return cast(Errno)_unix_fchmod(fd, mode)
 }
 
-close :: proc(fd: Handle) -> bool {
-	return _unix_close(fd) == 0
+close :: proc(fd: Handle) -> Errno {
+	return cast(Errno)_unix_close(fd)
 }
 
 // If you read or write more than `SSIZE_MAX` bytes, most darwin implementations will return `EINVAL`
@@ -892,6 +893,10 @@ access :: proc(path: string, mask: int) -> bool {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	cstr := strings.clone_to_cstring(path, context.temp_allocator)
 	return _unix_access(cstr, mask) == 0
+}
+
+flush :: proc(fd: Handle) -> Errno {
+    return cast(Errno)_unix_fsync(fd)
 }
 
 lookup_env :: proc(key: string, allocator := context.allocator) -> (value: string, found: bool) {

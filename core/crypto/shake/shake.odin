@@ -1,10 +1,11 @@
 /*
-package shake implements the SHAKE XOF algorithm family.
+package shake implements the SHAKE and cSHAKE XOF algorithm families.
 
 The SHA3 hash algorithm can be found in the crypto/sha3.
 
 See:
 - https://nvlpubs.nist.gov/nistpubs/fips/nist.fips.202.pdf
+- https://nvlpubs.nist.gov/nistpubs/specialpublications/nist.sp.800-185.pdf
 */
 package shake
 
@@ -18,24 +19,27 @@ package shake
 
 import "../_sha3"
 
-// Context is a SHAKE128 or SHAKE256 instance.
+// Context is a SHAKE128, SHAKE256, cSHAKE128, or cSHAKE256 instance.
 Context :: distinct _sha3.Context
 
 // init_128 initializes a Context for SHAKE128.
 init_128 :: proc(ctx: ^Context) {
-	ctx.mdlen = 128 / 8
-	_init(ctx)
+	_sha3.init_cshake(transmute(^_sha3.Context)(ctx), nil, nil, 128)
 }
 
 // init_256 initializes a Context for SHAKE256.
 init_256 :: proc(ctx: ^Context) {
-	ctx.mdlen = 256 / 8
-	_init(ctx)
+	_sha3.init_cshake(transmute(^_sha3.Context)(ctx), nil, nil, 256)
 }
 
-@(private)
-_init :: proc(ctx: ^Context) {
-	_sha3.init(transmute(^_sha3.Context)(ctx))
+// init_cshake_128 initializes a Context for cSHAKE128.
+init_cshake_128 :: proc(ctx: ^Context, domain_sep: []byte) {
+	_sha3.init_cshake(transmute(^_sha3.Context)(ctx), nil, domain_sep, 128)
+}
+
+// init_cshake_256 initializes a Context for cSHAKE256.
+init_cshake_256 :: proc(ctx: ^Context, domain_sep: []byte) {
+	_sha3.init_cshake(transmute(^_sha3.Context)(ctx), nil, domain_sep, 256)
 }
 
 // write writes more data into the SHAKE instance.  This MUST not be called

@@ -1,5 +1,5 @@
 //+private
-//+build linux, darwin, freebsd, openbsd
+//+build linux, darwin, freebsd, openbsd, haiku
 package time
 
 import "core:sys/unix"

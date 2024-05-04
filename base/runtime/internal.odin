@@ -962,9 +962,11 @@ udivmodti4 :: proc "c" (a, b: u128, rem: ^u128) -> u128 {
 	return udivmod128(a, b, rem)
 }
 
-@(link_name="__udivti3", linkage=RUNTIME_LINKAGE, require=RUNTIME_REQUIRE)
-udivti3 :: proc "c" (a, b: u128) -> u128 {
-	return udivmodti4(a, b, nil)
+when !IS_WASM {
+	@(link_name="__udivti3", linkage=RUNTIME_LINKAGE, require=RUNTIME_REQUIRE)
+	udivti3 :: proc "c" (a, b: u128) -> u128 {
+		return udivmodti4(a, b, nil)
+	}
 }
 
 
@@ -1040,19 +1042,17 @@ fixdfti :: proc(a: u64) -> i128 {
 __write_bits :: proc "contextless" (dst, src: [^]byte, offset: uintptr, size: uintptr) {
 	for i in 0..<size {
 		j := offset+i
-		the_bit := byte((src[i/8]) & (1<<(i&7)) != 0)
-		b := the_bit<<(j&7)
-		dst[j/8] &~= b
-		dst[j/8] |=  b
+		the_bit := byte((src[i>>3]) & (1<<(i&7)) != 0)
+		dst[j>>3] &~=       1<<(j&7)
+		dst[j>>3]  |= the_bit<<(j&7)
 	}
 }
 
 __read_bits :: proc "contextless" (dst, src: [^]byte, offset: uintptr, size: uintptr) {
 	for j in 0..<size {
 		i := offset+j
-		the_bit := byte((src[i/8]) & (1<<(i&7)) != 0)
-		b := the_bit<<(j&7)
-		dst[j/8] &~= b
-		dst[j/8] |=  b
+		the_bit := byte((src[i>>3]) & (1<<(i&7)) != 0)
+		dst[j>>3] &~=       1<<(j&7)
+		dst[j>>3]  |= the_bit<<(j&7)
 	}
 }

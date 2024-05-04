@@ -31,7 +31,7 @@ echo ---
 echo ---
 echo Running core:crypto tests
 echo ---
-%PATH_TO_ODIN% run crypto %COMMON% -out:test_crypto.exe || exit /b
+%PATH_TO_ODIN% run crypto %COMMON% %COLLECTION% -out:test_crypto.exe || exit /b
 
 echo ---
 echo Running core:encoding tests
@@ -40,6 +40,9 @@ rem %PATH_TO_ODIN% run encoding/hxa    %COMMON% %COLLECTION% -out:test_hxa.exe |
 %PATH_TO_ODIN% run encoding/json   %COMMON% -out:test_json.exe || exit /b
 %PATH_TO_ODIN% run encoding/varint %COMMON% -out:test_varint.exe || exit /b
 %PATH_TO_ODIN% run encoding/xml    %COMMON% -out:test_xml.exe || exit /b
+%PATH_TO_ODIN% test encoding/cbor  %COMMON% -out:test_cbor.exe || exit /b
+%PATH_TO_ODIN% run encoding/hex    %COMMON% -out:test_hex.exe || exit /b
+%PATH_TO_ODIN% run encoding/base64 %COMMON% -out:test_base64.exe || exit /b
 
 echo ---
 echo Running core:math/noise tests
@@ -100,3 +103,8 @@ echo ---
 echo Running core:runtime tests
 echo ---
 %PATH_TO_ODIN% run runtime %COMMON% %COLLECTION% -out:test_core_runtime.exe || exit /b
+
+echo ---
+echo Running core:time tests
+echo ---
+%PATH_TO_ODIN% run time %COMMON% %COLLECTION% -out:test_core_time.exe || exit /b

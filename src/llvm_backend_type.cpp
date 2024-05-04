@@ -2,7 +2,7 @@ gb_internal isize lb_type_info_index(CheckerInfo *info, Type *type, bool err_on_
 	auto *set = &info->minimum_dependency_type_info_set;
 	isize index = type_info_index(info, type, err_on_not_found);
 	if (index >= 0) {
-		auto *found = map_get(set, index);
+		auto *found = map_get(set, index+1);
 		if (found) {
 			GB_ASSERT(*found >= 0);
 			return *found + 1;
@@ -205,7 +205,7 @@ gb_internal LLVMTypeRef *lb_setup_modified_types_for_type_info(lbModule *m, isiz
 	stypes[1] = lb_type(m, tibt->Struct.fields[1]->type);
 	stypes[2] = lb_type(m, tibt->Struct.fields[2]->type);
 	isize variant_index = 0;
-	if (build_context.int_size == 8) {
+	if (build_context.ptr_size == 8) {
 		stypes[3] = lb_type(m, t_i32); // padding
 		stypes[4] = lb_type(m, tibt->Struct.fields[3]->type);
 		variant_index = 5;
@@ -249,9 +249,7 @@ gb_internal void lb_setup_type_info_data_giant_array(lbModule *m, i64 global_typ
 		char name[64] = {};
 		gb_snprintf(name, 63, "__$ti-%lld", cast(long long)index);
 		LLVMValueRef g = LLVMAddGlobal(m->mod, type, name);
-		LLVMSetLinkage(g, LLVMInternalLinkage);
-		LLVMSetUnnamedAddress(g, LLVMGlobalUnnamedAddr);
-		LLVMSetGlobalConstant(g, true);
+		lb_make_global_private_const(g);
 		return g;
 	};
 
@@ -385,7 +383,7 @@ gb_internal void lb_setup_type_info_data_giant_array(lbModule *m, i64 global_typ
 		small_const_values[2] = type_info_flags.value;
 
 		unsigned variant_index = 0;
-		if (build_context.int_size == 8) {
+		if (build_context.ptr_size == 8) {
 			small_const_values[3] = LLVMConstNull(LLVMStructGetTypeAtIndex(stype, 3));
 			small_const_values[4] = id.value;
 			variant_index = 5;
@@ -860,7 +858,7 @@ gb_internal void lb_setup_type_info_data_giant_array(lbModule *m, i64 global_typ
 					Entity *f = t->Struct.fields[source_index];
 					i64 foffset = 0;
 					if (!t->Struct.is_raw_union) {
-						GB_ASSERT(t->Struct.offsets != nullptr);
+						GB_ASSERT_MSG(t->Struct.offsets != nullptr, "%s", type_to_string(t));
 						GB_ASSERT(0 <= f->Variable.field_index && f->Variable.field_index < count);
 						foffset = t->Struct.offsets[source_index];
 					}
@@ -903,7 +901,7 @@ gb_internal void lb_setup_type_info_data_giant_array(lbModule *m, i64 global_typ
 
 		case Type_Map: {
 			tag_type = t_type_info_map;
-			init_map_internal_types(t);
+			init_map_internal_debug_types(t);
 
 			LLVMValueRef vals[3] = {
 				get_type_info_ptr(m, t->Map.key),
@@ -979,12 +977,13 @@ gb_internal void lb_setup_type_info_data_giant_array(lbModule *m, i64 global_typ
 				tag_type = t_type_info_matrix;
 				i64 ez = type_size_of(t->Matrix.elem);
 
-				LLVMValueRef vals[5] = {
+				LLVMValueRef vals[6] = {
 					get_type_info_ptr(m, t->Matrix.elem),
 					lb_const_int(m, t_int, ez).value,
 					lb_const_int(m, t_int, matrix_type_stride_in_elems(t)).value,
 					lb_const_int(m, t_int, t->Matrix.row_count).value,
 					lb_const_int(m, t_int, t->Matrix.column_count).value,
+					lb_const_int(m, t_u8,  cast(u8)t->Matrix.is_row_major).value,
 				};
 
 				variant_value = llvm_const_named_struct(m, tag_type, vals, gb_count_of(vals));
@@ -1102,6 +1101,7 @@ gb_internal void lb_setup_type_info_data_giant_array(lbModule *m, i64 global_typ
 	LLVMValueRef giant_const = LLVMConstArray(lb_type(m, t_type_info_ptr), giant_const_values, cast(unsigned)global_type_info_data_entity_count);
 	LLVMValueRef giant_array = lb_global_type_info_data_ptr(m).value;
 	LLVMSetInitializer(giant_array, giant_const);
+	lb_make_global_private_const(giant_array);
 }
 
 
@@ -1131,4 +1131,7 @@ gb_internal void lb_setup_type_info_data(lbModule *m) { // NOTE(bill): Setup typ
 	LLVMValueRef slice = llvm_const_slice_internal(m, data, len);
 
 	LLVMSetInitializer(global_type_table.value, slice);
+
+	// force it to be constant
+	LLVMSetGlobalConstant(global_type_table.value, true);
 }

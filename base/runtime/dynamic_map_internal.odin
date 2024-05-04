@@ -333,7 +333,7 @@ map_kvh_data_values_dynamic :: proc "contextless" (m: Raw_Map, #no_alias info: ^
 }
 
 
-@(private, require_results)
+@(require_results)
 map_total_allocation_size :: #force_inline proc "contextless" (capacity: uintptr, info: ^Map_Info) -> uintptr {
 	round :: #force_inline proc "contextless" (value: uintptr) -> uintptr {
 		CACHE_MASK :: MAP_CACHE_LINE_SIZE - 1
@@ -349,6 +349,12 @@ map_total_allocation_size :: #force_inline proc "contextless" (capacity: uintptr
 	size = round(map_cell_index_dynamic(size, info.vs, 2)) // Two additional vs for scratch storage
 	return size
 }
+
+@(require_results)
+map_total_allocation_size_from_value :: #force_inline proc "contextless" (m: $M/map[$K]$V) -> uintptr {
+	return map_total_allocation_size(uintptr(cap(m)), map_info(M))
+}
+
 
 // The only procedure which needs access to the context is the one which allocates the map.
 @(require_results)
@@ -391,7 +397,8 @@ map_alloc_dynamic :: proc "odin" (info: ^Map_Info, log2_capacity: uintptr, alloc
 // arrays to reduce variance. This swapping can only be done with memcpy since
 // there is no type information.
 //
-// This procedure returns the address of the just inserted value.
+// This procedure returns the address of the just inserted value, and will
+// return 'nil' if there was no room to insert the entry
 @(require_results)
 map_insert_hash_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, h: Map_Hash, ik: uintptr, iv: uintptr) -> (result: uintptr) {
 	h        := h
@@ -415,6 +422,11 @@ map_insert_hash_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^
 	tv := map_cell_index_dynamic(sv, info.vs, 1)
 
 	swap_loop: for {
+		if distance > mask {
+			// Failed to find an empty slot and prevent infinite loop
+			panic("unable to insert into a map")
+		}
+
 		element_hash := hs[pos]
 
 		if map_hash_is_empty(element_hash) {
@@ -898,7 +910,9 @@ __dynamic_map_set :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_In
 	}
 
 	result := map_insert_hash_dynamic(m, info, hash, uintptr(key), uintptr(value))
-	m.len += 1
+	if result != 0 {
+		m.len += 1
+	}
 	return rawptr(result)
 }
 __dynamic_map_set_extra_without_hash :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, key, value: rawptr, loc := #caller_location) -> (prev_key_ptr, value_ptr: rawptr) {
@@ -921,7 +935,9 @@ __dynamic_map_set_extra :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^
 	}
 
 	result := map_insert_hash_dynamic(m, info, hash, uintptr(key), uintptr(value))
-	m.len += 1
+	if result != 0 {
+		m.len += 1
+	}
 	return nil, rawptr(result)
 }
 

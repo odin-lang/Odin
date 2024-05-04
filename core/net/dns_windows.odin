@@ -85,11 +85,9 @@ _get_dns_records_os :: proc(hostname: string, type: DNS_Record_Type, allocator :
 			append(&recs, record)
 
 		case .CNAME:
-
-			hostname := strings.clone(string(r.Data.CNAME))
 			record := DNS_Record_CNAME{
 				base      = base_record,
-				host_name = hostname,
+				host_name = strings.clone(string(r.Data.CNAME)),
 			}
 			append(&recs, record)
 
@@ -107,10 +105,9 @@ _get_dns_records_os :: proc(hostname: string, type: DNS_Record_Type, allocator :
 			}
 
 		case .NS:
-			hostname := strings.clone(string(r.Data.NS))
 			record := DNS_Record_NS{
 				base      = base_record,
-				host_name = hostname,
+				host_name = strings.clone(string(r.Data.NS)),
 			}
 			append(&recs, record)
 

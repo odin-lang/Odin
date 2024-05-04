@@ -708,7 +708,7 @@ XGenericEventCookie :: struct {
     type:              EventType,
     serial:            uint,
     send_event:        b32,
-    display:           Display,
+    display:           ^Display,
     extension:         i32,
     evtype:            i32,
     cookie:            u32,

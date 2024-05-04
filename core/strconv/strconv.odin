@@ -878,7 +878,7 @@ parse_f64_prefix :: proc(str: string) -> (value: f64, nr: int, ok: bool) {
 				s = s[1:]
 				fallthrough
 			case 'i', 'I':
-				n := common_prefix_len_ignore_case(s, "infinity")
+				n = common_prefix_len_ignore_case(s, "infinity")
 				if 3 < n && n < 8 { // "inf" or "infinity"
 					n = 3
 				}
@@ -1213,6 +1213,13 @@ Output:
 append_int :: proc(buf: []byte, i: i64, base: int) -> string {
 	return append_bits(buf, u64(i), base, true, 8*size_of(int), digits, nil)
 }
+
+
+
+append_u128 :: proc(buf: []byte, u: u128, base: int) -> string {
+	return append_bits_128(buf, u, base, false, 8*size_of(uint), digits, nil)
+}
+
 /* 
 Converts an integer value to a string and stores it in the given buffer
 

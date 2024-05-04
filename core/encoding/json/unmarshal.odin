@@ -1,4 +1,4 @@
-package json
+package encoding_json
 
 import "core:mem"
 import "core:math"
@@ -6,6 +6,7 @@ import "core:reflect"
 import "core:strconv"
 import "core:strings"
 import "base:runtime"
+import "base:intrinsics"
 
 Unmarshal_Data_Error :: enum {
 	Invalid_Data,
@@ -342,6 +343,16 @@ unmarshal_expect_token :: proc(p: ^Parser, kind: Token_Kind, loc := #caller_loca
 	return prev
 }
 
+@(private)
+json_name_from_tag_value :: proc(value: string) -> (json_name, extra: string) {
+	json_name = value
+	if comma_index := strings.index_byte(json_name, ','); comma_index >= 0 {
+		json_name = json_name[:comma_index]
+		extra = value[1 + comma_index:]
+	}
+	return
+}
+
 
 @(private)
 unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unmarshal_Error) {
@@ -368,16 +379,23 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 			unmarshal_expect_token(p, .Colon)						
 			
 			fields := reflect.struct_fields_zipped(ti.id)
-			
-			runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD(ignore = context.temp_allocator == context.allocator)
 
-			field_used := make([]bool, len(fields), context.temp_allocator)
-			
+			field_test :: #force_inline proc "contextless" (field_used: [^]byte, offset: uintptr) -> bool {
+				prev_set := field_used[offset/8] & byte(offset&7) != 0
+				field_used[offset/8] |= byte(offset&7)
+				return prev_set
+			}
+
+			field_used_bytes := (reflect.size_of_typeid(ti.id)+7)/8
+			field_used := intrinsics.alloca(field_used_bytes, 1)
+			intrinsics.mem_zero(field_used, field_used_bytes)
+
 			use_field_idx := -1
 			
 			for field, field_idx in fields {
 				tag_value := string(reflect.struct_tag_get(field.tag, "json"))
-				if key == tag_value {
+				json_name, _ := json_name_from_tag_value(tag_value)
+				if key == json_name {
 					use_field_idx = field_idx
 					break
 				}
@@ -392,14 +410,45 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 				}
 			}
 			
-			if use_field_idx >= 0 {
-				if field_used[use_field_idx] {
+			check_children_using_fields :: proc(key: string, parent: typeid) -> (
+				offset: uintptr,
+				type: ^reflect.Type_Info,
+				found: bool,
+			) {
+				for field in reflect.struct_fields_zipped(parent) {
+					if field.is_using && field.name == "_" {
+						offset, type, found = check_children_using_fields(key, field.type.id)
+						if found {
+							offset += field.offset
+							return
+						}
+					}
+
+					if field.name == key {
+						offset = field.offset
+						type = field.type
+						found = true
+						return
+					}
+				}
+				return
+			}
+
+			offset: uintptr
+			type: ^reflect.Type_Info
+			field_found: bool = use_field_idx >= 0
+
+			if field_found {
+				offset = fields[use_field_idx].offset
+				type = fields[use_field_idx].type
+			} else {
+				offset, type, field_found = check_children_using_fields(key, ti.id)
+			}
+
+			if field_found {
+				if field_test(field_used, offset) {
 					return .Multiple_Use_Field
 				}
-				field_used[use_field_idx] = true
-				offset := fields[use_field_idx].offset
-				type := fields[use_field_idx].type
-				name := fields[use_field_idx].name
 				
 				field_ptr := rawptr(uintptr(v.data) + offset)
 				field := any{field_ptr, type.id}
@@ -411,6 +460,12 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 				continue struct_loop
 			} else {
 				// allows skipping unused struct fields
+
+				// NOTE(bill): prevent possible memory leak if a string is unquoted
+				allocator := p.allocator
+				defer p.allocator = allocator
+				p.allocator = mem.nil_allocator()
+
 				parse_value(p) or_return
 				if parse_comma(p) {
 					break struct_loop
@@ -439,9 +494,9 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 			
 			
 			mem.zero_slice(elem_backing)
-			if err := unmarshal_value(p, map_backing_value); err != nil {
+			if uerr := unmarshal_value(p, map_backing_value); uerr != nil {
 				delete(key, p.allocator)
-				return err
+				return uerr
 			}
 
 			key_ptr := rawptr(&key)

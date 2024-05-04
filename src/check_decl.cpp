@@ -1630,6 +1630,7 @@ gb_internal bool check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *de
 		Entity *uvar = entry.uvar;
 		Entity *prev = scope_insert_no_mutex(ctx->scope, uvar);
 		if (prev != nullptr) {
+			ERROR_BLOCK();
 			error(e->token, "Namespace collision while 'using' procedure argument '%.*s' of: %.*s", LIT(e->token.string), LIT(prev->token.string));
 			error_line("%.*s != %.*s\n", LIT(uvar->token.string), LIT(prev->token.string));
 			break;

@@ -32,7 +32,7 @@ map_insert_random_key_value :: proc(t: ^testing.T) {
 		}
 
 		key_count := 0
-		for k in m {
+		for _ in m {
 			key_count += 1
 		}
 
@@ -82,7 +82,7 @@ map_update_random_key_value :: proc(t: ^testing.T) {
 		}
 
 		key_count := 0
-		for k in m {
+		for _ in m {
 			key_count += 1
 		}
 
@@ -144,7 +144,7 @@ map_delete_random_key_value :: proc(t: ^testing.T) {
 		}
 
 		key_count := 0
-		for k in m {
+		for _ in m {
 			key_count += 1
 		}
 
@@ -220,7 +220,7 @@ set_insert_random_key_value :: proc(t: ^testing.T) {
 		}
 
 		key_count := 0
-		for k in m {
+		for _ in m {
 			key_count += 1
 		}
 
@@ -268,7 +268,7 @@ set_delete_random_key_value :: proc(t: ^testing.T) {
 		}
 
 		key_count := 0
-		for k in m {
+		for _ in m {
 			key_count += 1
 		}
 

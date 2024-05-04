@@ -125,7 +125,7 @@ DARWIN_MAXCOMLEN :: 16
 /*--==========================================================================--*/
 
 __darwin_ino64_t :: u64
-__darwin_time_t :: u32
+__darwin_time_t :: c.long
 __darwin_dev_t :: i32
 __darwin_mode_t :: u16
 __darwin_off_t :: i64
@@ -337,7 +337,7 @@ syscall_ftruncate :: #force_inline proc "contextless" (fd: c.int, length: off_t)
 	return cast(c.int)intrinsics.syscall(unix_offset_syscall(.ftruncate), uintptr(fd), uintptr(length))
 }
 
-syscall_sysctl :: #force_inline proc "contextless" (name: ^c.int, namelen: c.uint, oldp: rawptr, oldlenp: ^i64, newp: ^i8, newlen: i64) -> c.int {
+syscall_sysctl :: #force_inline proc "contextless" (name: [^]c.int, namelen: c.size_t, oldp: rawptr, oldlenp: ^c.size_t, newp: rawptr, newlen: c.size_t) -> c.int {
 	return cast(c.int)intrinsics.syscall(unix_offset_syscall(.sysctl), uintptr(name), uintptr(namelen), uintptr(oldp), uintptr(oldlenp), uintptr(newp), uintptr(newlen))
 }
 
@@ -367,7 +367,7 @@ syscall_execve :: #force_inline proc "contextless" (path: cstring, argv: [^]cstr
 }
 
 syscall_munmap :: #force_inline proc "contextless" (addr: rawptr, len: u64) -> c.int {
-	return cast(c.int)intrinsics.syscall(unix_offset_syscall(.mmap), uintptr(addr), uintptr(len))
+	return cast(c.int)intrinsics.syscall(unix_offset_syscall(.munmap), uintptr(addr), uintptr(len))
 }
 
 syscall_mmap :: #force_inline proc "contextless" (addr: ^u8, len: u64, port: c.int, flags: c.int, fd: int, offset: off_t) -> ^u8 {
@@ -390,8 +390,8 @@ syscall_adjtime :: #force_inline proc "contextless" (delta: ^timeval, old_delta:
 	return cast(c.int)intrinsics.syscall(unix_offset_syscall(.adjtime), uintptr(delta), uintptr(old_delta))
 }
 
-syscall_sysctlbyname :: #force_inline proc "contextless" (name: cstring, oldp: rawptr, oldlenp: ^i64, newp: rawptr, newlen: i64) -> c.int {
-	return cast(c.int)intrinsics.syscall(unix_offset_syscall(.sysctlbyname), transmute(uintptr)name, uintptr(oldp), uintptr(oldlenp), uintptr(newp), uintptr(newlen))
+syscall_sysctlbyname :: #force_inline proc "contextless" (name: string, oldp: rawptr, oldlenp: ^c.size_t, newp: rawptr, newlen: c.size_t) -> c.int {
+	return cast(c.int)intrinsics.syscall(unix_offset_syscall(.sysctlbyname), uintptr(raw_data(name)), uintptr(len(name)), uintptr(oldp), uintptr(oldlenp), uintptr(newp), uintptr(newlen))
 }
 
 syscall_proc_info :: #force_inline proc "contextless" (num: c.int, pid: u32, flavor: c.int, arg: u64, buffer: rawptr, buffer_size: c.int) -> c.int {
@@ -416,4 +416,8 @@ syscall_chdir :: #force_inline proc "contextless" (path: cstring) -> c.int {
 
 syscall_fchdir :: #force_inline proc "contextless" (fd: c.int, path: cstring) -> c.int {
 	return cast(c.int)intrinsics.syscall(unix_offset_syscall(.getentropy), uintptr(fd), transmute(uintptr)path)
+}
+
+syscall_getrusage :: #force_inline proc "contextless" (who: c.int, rusage: ^RUsage) -> c.int {
+	return cast(c.int) intrinsics.syscall(unix_offset_syscall(.getrusage), uintptr(who), uintptr(rusage))
 }

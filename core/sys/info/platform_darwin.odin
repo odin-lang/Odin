@@ -1,4 +1,3 @@
-// +build darwin
 package sysinfo
 
 import sys "core:sys/unix"
@@ -76,6 +75,8 @@ init_os_version :: proc () {
 	os_version.minor = rel.darwin.y
 	os_version.patch = rel.darwin.z
 
+	macos_version = transmute(Version)rel.release.version
+
 	strings.write_string(&b, rel.os_name)
 	if match == .Exact || match == .Nearest {
 		strings.write_rune(&b, ' ')
@@ -113,7 +114,7 @@ init_os_version :: proc () {
 	os_version.as_string = strings.to_string(b)
 }
 
-@(init)
+@(init, private)
 init_ram :: proc() {
 	// Retrieve RAM info using `sysctl`
 
@@ -517,9 +518,15 @@ macos_release_map: map[string]Darwin_To_Release = {
 	"23A344"     = {{23, 0, 0}, "macOS", {"Sonoma",         {14, 0, 0}}},
 	"23B74"      = {{23, 1, 0}, "macOS", {"Sonoma",         {14, 1, 0}}},
 	"23B81"      = {{23, 1, 0}, "macOS", {"Sonoma",         {14, 1, 1}}},
+	"23B2082"    = {{23, 1, 0}, "macOS", {"Sonoma",         {14, 1, 1}}},
 	"23B92"      = {{23, 1, 0}, "macOS", {"Sonoma",         {14, 1, 2}}},
+	"23B2091"    = {{23, 1, 0}, "macOS", {"Sonoma",         {14, 1, 2}}},
 	"23C64"      = {{23, 2, 0}, "macOS", {"Sonoma",         {14, 2, 0}}},
 	"23C71"      = {{23, 2, 0}, "macOS", {"Sonoma",         {14, 2, 1}}},
+	"23D56"      = {{23, 3, 0}, "macOS", {"Sonoma",         {14, 3, 0}}},
+	"23D60"      = {{23, 3, 0}, "macOS", {"Sonoma",         {14, 3, 1}}},
+	"23E214"     = {{23, 4, 0}, "macOS", {"Sonoma",         {14, 4, 0}}},
+	"23E224"     = {{23, 4, 0}, "macOS", {"Sonoma",         {14, 4, 1}}},
 }
 
 @(private)

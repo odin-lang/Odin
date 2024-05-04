@@ -326,6 +326,7 @@ ln :: proc "contextless" (x: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
 
 @(require_results)
 log2 :: proc "contextless" (x: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
+	INVLN2 :: 1.4426950408889634073599246810018921374266459541529859341354494069
 	when IS_ARRAY(T) {
 		for i in 0..<len(T) {
 			out[i] = INVLN2 * math.ln(x[i])
@@ -338,6 +339,7 @@ log2 :: proc "contextless" (x: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
 
 @(require_results)
 log10 :: proc "contextless" (x: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
+	INVLN10 :: 0.4342944819032518276511289189166050822943970058036665661144537831
 	when IS_ARRAY(T) {
 		for i in 0..<len(T) {
 			out[i] = INVLN10 * math.ln(x[i])
@@ -355,7 +357,7 @@ log :: proc "contextless" (x, b: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
 			out[i] = math.ln(x[i]) / math.ln(cast(ELEM_TYPE(T))b[i])
 		}
 	} else {
-		out = INVLN10 * math.ln(x) / math.ln(cast(ELEM_TYPE(T))b)
+		out = math.ln(x) / math.ln(cast(ELEM_TYPE(T))b)
 	}
 	return
 }

@@ -173,6 +173,7 @@ are_types_identical :: proc(a, b: ^Type_Info) -> bool {
 		y := b.variant.(Type_Info_Matrix) or_return
 		if x.row_count != y.row_count { return false }
 		if x.column_count != y.column_count { return false }
+		if x.layout != y.layout { return false }
 		return are_types_identical(x.elem, y.elem)
 
 	case Type_Info_Bit_Field:
@@ -407,7 +408,68 @@ is_relative_multi_pointer :: proc(info: ^Type_Info) -> bool {
 }
 
 
+@(require_results)
+is_endian_platform :: proc(info: ^Type_Info) -> bool {
+	if info == nil { return false}
+	info := info
+	info = type_info_core(info)
+	#partial switch v in info.variant {
+	case Type_Info_Integer:
+		return v.endianness == .Platform
+	case Type_Info_Bit_Set:
+		if v.underlying != nil {
+			return is_endian_platform(v.underlying)
+		}
+		return true
+	case Type_Info_Pointer:
+		return true
+	}
+	return false
+}
 
+@(require_results)
+is_endian_little :: proc(info: ^Type_Info) -> bool {
+	if info == nil { return false}
+	info := info
+	info = type_info_core(info)
+	#partial switch v in info.variant {
+	case Type_Info_Integer:
+		if v.endianness == .Platform {
+			return ODIN_ENDIAN == .Little
+		}
+		return v.endianness == .Little
+	case Type_Info_Bit_Set:
+		if v.underlying != nil {
+			return is_endian_platform(v.underlying)
+		}
+		return ODIN_ENDIAN == .Little
+	case Type_Info_Pointer:
+		return ODIN_ENDIAN == .Little
+	}
+	return ODIN_ENDIAN == .Little
+}
+
+@(require_results)
+is_endian_big :: proc(info: ^Type_Info) -> bool {
+	if info == nil { return false}
+	info := info
+	info = type_info_core(info)
+	#partial switch v in info.variant {
+	case Type_Info_Integer:
+		if v.endianness == .Platform {
+			return ODIN_ENDIAN == .Big
+		}
+		return v.endianness == .Big
+	case Type_Info_Bit_Set:
+		if v.underlying != nil {
+			return is_endian_platform(v.underlying)
+		}
+		return ODIN_ENDIAN == .Big
+	case Type_Info_Pointer:
+		return ODIN_ENDIAN == .Big
+	}
+	return ODIN_ENDIAN == .Big
+}
 
 
 
@@ -689,6 +751,9 @@ write_type_writer :: proc(w: io.Writer, ti: ^Type_Info, n_written: ^int = nil) -
 		write_type(w, info.pointer,      &n) or_return
 		
 	case Type_Info_Matrix:
+		if info.layout == .Row_Major {
+			io.write_string(w, "#row_major ",   &n) or_return
+		}
 		io.write_string(w, "matrix[",               &n) or_return
 		io.write_i64(w, i64(info.row_count), 10,    &n) or_return
 		io.write_string(w, ", ",                    &n) or_return

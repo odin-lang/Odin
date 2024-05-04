@@ -651,7 +651,7 @@ alpha_add_if_missing :: proc(img: ^Image, alpha_key := Alpha_Key{}, allocator :=
 				// We have keyed alpha.
 				o: GA_Pixel
 				for p in inp {
-					if p == key.r {
+					if p.r == key.r {
 						o = GA_Pixel{0, key.g}
 					} else {
 						o = GA_Pixel{p.r, 255}
@@ -710,7 +710,7 @@ alpha_add_if_missing :: proc(img: ^Image, alpha_key := Alpha_Key{}, allocator :=
 				// We have keyed alpha.
 				o: GA_Pixel_16
 				for p in inp {
-					if p == key.r {
+					if p.r == key.r {
 						o = GA_Pixel_16{0, key.g}
 					} else {
 						o = GA_Pixel_16{p.r, 65535}
@@ -842,11 +842,11 @@ alpha_drop_if_present :: proc(img: ^Image, options := Options{}, alpha_key := Al
 			bg  := G_Pixel{}
 			if temp_bg, temp_bg_ok := img.background.(RGB_Pixel_16); temp_bg_ok {
 				// Background is RGB 16-bit, take just the red channel's topmost byte.
-				bg = u8(temp_bg.r >> 8)
+				bg.r = u8(temp_bg.r >> 8)
 			}
 
 			for p in inp {
-				out[0] = bg if p == key else p
+				out[0] = bg if p.r == key else p
 				out    = out[1:]
 			}
 
@@ -865,8 +865,8 @@ alpha_drop_if_present :: proc(img: ^Image, options := Options{}, alpha_key := Al
 				for p in inp {
 					a := f32(p.g) / 255.0
 					c := ((1.0 - a) * bg + a * f32(p.r))
-					out[0] = u8(c)
-					out    = out[1:]
+					out[0].r = u8(c)
+					out      = out[1:]
 				}
 
 			} else if .alpha_premultiply in options {
@@ -874,14 +874,14 @@ alpha_drop_if_present :: proc(img: ^Image, options := Options{}, alpha_key := Al
 				for p in inp {
 					a := f32(p.g) / 255.0
 					c := f32(p.r) * a
-					out[0] = u8(c)
-					out    = out[1:]
+					out[0].r = u8(c)
+					out      = out[1:]
 				}
 			} else {
 				// Just drop alpha on the floor.
 				for p in inp {
-					out[0] = p.r
-					out    = out[1:]
+					out[0].r = p.r
+					out      = out[1:]
 				}
 			}
 
@@ -951,11 +951,11 @@ alpha_drop_if_present :: proc(img: ^Image, options := Options{}, alpha_key := Al
 			bg  := G_Pixel_16{}
 			if temp_bg, temp_bg_ok := img.background.(RGB_Pixel_16); temp_bg_ok {
 				// Background is RGB 16-bit, take just the red channel.
-				bg = temp_bg.r
+				bg.r = temp_bg.r
 			}
 
 			for p in inp {
-				out[0] = bg if p == key else p
+				out[0] = bg if p.r == key else p
 				out    = out[1:]
 			}
 
@@ -974,8 +974,8 @@ alpha_drop_if_present :: proc(img: ^Image, options := Options{}, alpha_key := Al
 				for p in inp {
 					a := f32(p.g) / 65535.0
 					c := ((1.0 - a) * bg + a * f32(p.r))
-					out[0] = u16(c)
-					out    = out[1:]
+					out[0].r = u16(c)
+					out      = out[1:]
 				}
 
 			} else if .alpha_premultiply in options {
@@ -983,14 +983,14 @@ alpha_drop_if_present :: proc(img: ^Image, options := Options{}, alpha_key := Al
 				for p in inp {
 					a := f32(p.g) / 65535.0
 					c := f32(p.r) * a
-					out[0] = u16(c)
-					out    = out[1:]
+					out[0].r = u16(c)
+					out      = out[1:]
 				}
 			} else {
 				// Just drop alpha on the floor.
 				for p in inp {
-					out[0] = p.r
-					out    = out[1:]
+					out[0].r = p.r
+					out      = out[1:]
 				}
 			}
 

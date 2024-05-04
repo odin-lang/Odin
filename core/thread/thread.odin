@@ -163,7 +163,7 @@ create_and_start_with_data :: proc(data: rawptr, fn: proc(data: rawptr), init_co
 	t := create(thread_proc, priority)
 	t.data = rawptr(fn)
 	t.user_index = 1
-	t.user_args = data
+	t.user_args[0] = data
 	if self_cleanup {
 		t.flags += {.Self_Cleanup}
 	}

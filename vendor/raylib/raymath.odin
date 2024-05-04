@@ -1,6 +1,5 @@
 package raylib
 
-import c "core:c/libc"
 import "core:math"
 import "core:math/linalg"
 
@@ -45,7 +44,7 @@ Wrap :: proc "c" (value: f32, min, max: f32) -> f32 {
 // Check whether two given floats are almost equal
 @(require_results)
 FloatEquals :: proc "c" (x, y: f32) -> bool {
-	return abs(x - y) <= EPSILON*c.fmaxf(1.0, c.fmaxf(abs(x), abs(y)))
+	return abs(x - y) <= EPSILON*fmaxf(1.0, fmaxf(abs(x), abs(y)))
 }
 
 
@@ -86,33 +85,33 @@ Vector2SubtractValue :: proc "c" (v: Vector2, value: f32) -> Vector2 {
 	return v - value
 }
 // Calculate vector length
-@(require_results, deprecated="Prefer linalg.length(v)")
+@(require_results)
 Vector2Length :: proc "c" (v: Vector2) -> f32 {
 	return linalg.length(v)
 }
 // Calculate vector square length
-@(require_results, deprecated="Prefer linalg.length2(v)")
+@(require_results)
 Vector2LengthSqr :: proc "c" (v: Vector2) -> f32 {
 	return linalg.length2(v)
 }
 // Calculate two vectors dot product
-@(require_results, deprecated="Prefer linalg.dot(v1, v2)")
+@(require_results)
 Vector2DotProduct :: proc "c" (v1, v2: Vector2) -> f32 {
 	return linalg.dot(v1, v2)
 }
 // Calculate distance between two vectors
-@(require_results, deprecated="Prefer linalg.distance(v1, v2)")
+@(require_results)
 Vector2Distance :: proc "c" (v1, v2: Vector2) -> f32 {
 	return linalg.distance(v1, v2)
 }
 // Calculate square distance between two vectors
-@(require_results, deprecated="Prefer linalg.length2(v2-v1)")
+@(require_results)
 Vector2DistanceSqrt :: proc "c" (v1, v2: Vector2) -> f32 {
 	return linalg.length2(v2-v1)
 }
 // Calculate angle between two vectors
 // NOTE: Angle is calculated from origin point (0, 0)
-@(require_results, deprecated="Prefer linalg.angle_between(v1, v2)")
+@(require_results)
 Vector2Angle :: proc "c" (v1, v2: Vector2) -> f32 {
 	return linalg.angle_between(v1, v2)
 }
@@ -147,7 +146,7 @@ Vector2Divide :: proc "c" (v1, v2: Vector2) -> Vector2 {
 	return v1 / v2
 }
 // Normalize provided vector
-@(require_results, deprecated="Prefer linalg.normalize0(v)")
+@(require_results)
 Vector2Normalize :: proc "c" (v: Vector2) -> Vector2 {
 	return linalg.normalize0(v)
 }
@@ -160,7 +159,7 @@ Vector2Transform :: proc "c" (v: Vector2, m: Matrix) -> Vector2 {
 // Calculate linear interpolation between two vectors
 @(require_results, deprecated="Prefer = linalg.lerp(v1, v2, amount)")
 Vector2Lerp :: proc "c" (v1, v2: Vector2, amount: f32) -> Vector2 {
-	return linalg.lerp(v1, v2, amount)
+	return linalg.lerp(v1, v2, Vector2(amount))
 }
 // Calculate reflected vector to normal
 @(require_results, deprecated="Prefer = linalg.reflect(v, normal)")
@@ -271,38 +270,38 @@ Vector3SubtractValue :: proc "c" (v: Vector3, value: f32) -> Vector3 {
 	return v - value
 }
 // Calculate vector length
-@(require_results, deprecated="Prefer linalg.length(v)")
+@(require_results)
 Vector3Length :: proc "c" (v: Vector3) -> f32 {
 	return linalg.length(v)
 }
 // Calculate vector square length
-@(require_results, deprecated="Prefer linalg.length2(v)")
+@(require_results)
 Vector3LengthSqr :: proc "c" (v: Vector3) -> f32 {
 	return linalg.length2(v)
 }
 // Calculate two vectors dot product
-@(require_results, deprecated="Prefer linalg.dot(v1, v2)")
+@(require_results)
 Vector3DotProduct :: proc "c" (v1, v2: Vector3) -> f32 {
 	return linalg.dot(v1, v2)
 }
 // Calculate two vectors dot product
-@(require_results, deprecated="Prefer linalg.cross(v1, v2)")
+@(require_results)
 Vector3CrossProduct :: proc "c" (v1, v2: Vector3) -> Vector3 {
 	return linalg.cross(v1, v2)
 }
 // Calculate distance between two vectors
-@(require_results, deprecated="Prefer linalg.distance(v1, v2)")
+@(require_results)
 Vector3Distance :: proc "c" (v1, v2: Vector3) -> f32 {
 	return linalg.distance(v1, v2)
 }
 // Calculate square distance between two vectors
-@(require_results, deprecated="Prefer linalg.length2(v2-v1)")
+@(require_results)
 Vector3DistanceSqrt :: proc "c" (v1, v2: Vector3) -> f32 {
 	return linalg.length2(v2-v1)
 }
 // Calculate angle between two vectors
 // NOTE: Angle is calculated from origin point (0, 0)
-@(require_results, deprecated="Prefer linalg.angle_between(v1, v2)")
+@(require_results)
 Vector3Angle :: proc "c" (v1, v2: Vector3) -> f32 {
 	return linalg.angle_between(v1, v2)
 }
@@ -337,7 +336,7 @@ Vector3Divide :: proc "c" (v1, v2: Vector3) -> Vector3 {
 	return v1 / v2
 }
 // Normalize provided vector
-@(require_results, deprecated="Prefer linalg.normalize0(v)")
+@(require_results)
 Vector3Normalize :: proc "c" (v: Vector3) -> Vector3 {
 	return linalg.normalize0(v)
 }
@@ -365,7 +364,7 @@ Vector3OrthoNormalize :: proc "c" (v1, v2: ^Vector3) {
 }
 
 // Transform a vector by quaternion rotation
-@(require_results, deprecated="Prefer linalg.mul(q, v")
+@(require_results)
 Vector3RotateByQuaternion :: proc "c" (v: Vector3, q: Quaternion) -> Vector3 {
 	return linalg.mul(q, v)
 }
@@ -406,7 +405,7 @@ Vector3Transform :: proc "c" (v: Vector3, m: Matrix) -> Vector3 {
 // Calculate linear interpolation between two vectors
 @(require_results, deprecated="Prefer = linalg.lerp(v1, v2, amount)")
 Vector3Lerp :: proc "c" (v1, v2: Vector3, amount: f32) -> Vector3 {
-	return linalg.lerp(v1, v2, amount)
+	return linalg.lerp(v1, v2, Vector3(amount))
 }
 // Calculate reflected vector to normal
 @(require_results, deprecated="Prefer = linalg.reflect(v, normal)")
@@ -481,12 +480,12 @@ Vector3Equals :: proc "c" (p, q: Vector3) -> bool {
 }
 
 
-@(require_results, deprecated="Prefer linalg.min(v1, v2)")
+@(require_results)
 Vector3Min :: proc "c" (v1, v2: Vector3) -> Vector3 {
 	return linalg.min(v1, v2)
 }
 
-@(require_results, deprecated="Prefer linalg.max(v1, v2)")
+@(require_results)
 Vector3Max :: proc "c" (v1, v2: Vector3) -> Vector3 {
 	return linalg.max(v1, v2)
 }
@@ -540,25 +539,25 @@ Vector3Unproject :: proc "c" (source: Vector3, projection: Matrix, view: Matrix)
 //----------------------------------------------------------------------------------
 
 // Compute matrix determinant
-@(require_results, deprecated="Prefer linalg.determinant(mat)")
+@(require_results)
 MatrixDeterminant :: proc "c" (mat: Matrix) -> f32 {
 	return linalg.determinant(mat)
 }
 
 // Get the trace of the matrix (sum of the values along the diagonal)
-@(require_results, deprecated="Prefer linalg.trace(mat)")
+@(require_results)
 MatrixTrace :: proc "c" (mat: Matrix) -> f32 {
 	return linalg.trace(mat)
 }
 
 // Transposes provided matrix
-@(require_results, deprecated="Prefer linalg.transpose(mat)")
+@(require_results)
 MatrixTranspose :: proc "c" (mat: Matrix) -> Matrix {
 	return linalg.transpose(mat)
 }
 
 // Invert provided matrix
-@(require_results, deprecated="Prefer linalg.inverse(mat)")
+@(require_results)
 MatrixInvert :: proc "c" (mat: Matrix) -> Matrix {
 	return linalg.inverse(mat)
 }
@@ -591,74 +590,79 @@ MatrixMultiply :: proc "c" (left, right: Matrix) -> Matrix {
 // Get translation matrix
 @(require_results)
 MatrixTranslate :: proc "c" (x, y, z: f32) -> Matrix {
-	return linalg.matrix4_translate(Vector3{x, y, z})
+	return {
+		1, 0, 0, x,
+		0, 1, 0, y,
+		0, 0, 1, z,
+		0, 0, 0, 1,
+	}
 }
 
 // Create rotation matrix from axis and angle
 // NOTE: Angle should be provided in radians
 @(require_results)
 MatrixRotate :: proc "c" (axis: Vector3, angle: f32) -> Matrix {
-	return linalg.matrix4_rotate(angle, axis)
+	return auto_cast linalg.matrix4_rotate(angle, axis)
 }
 
 // Get x-rotation matrix
 // NOTE: Angle must be provided in radians
 @(require_results)
 MatrixRotateX :: proc "c" (angle: f32) -> Matrix {
-	return linalg.matrix4_rotate(angle, Vector3{1, 0, 0})
+	return auto_cast linalg.matrix4_rotate(angle, Vector3{1, 0, 0})
 }
 
 // Get y-rotation matrix
 // NOTE: Angle must be provided in radians
 @(require_results)
 MatrixRotateY :: proc "c" (angle: f32) -> Matrix {
-	return linalg.matrix4_rotate(angle, Vector3{0, 1, 0})
+	return auto_cast linalg.matrix4_rotate(angle, Vector3{0, 1, 0})
 }
 
 // Get z-rotation matrix
 // NOTE: Angle must be provided in radians
 @(require_results)
 MatrixRotateZ :: proc "c" (angle: f32) -> Matrix {
-	return linalg.matrix4_rotate(angle, Vector3{0, 0, 1})
+	return auto_cast linalg.matrix4_rotate(angle, Vector3{0, 0, 1})
 }
 
 // Get xyz-rotation matrix
 // NOTE: Angle must be provided in radians
 @(require_results)
 MatrixRotateXYZ :: proc "c" (angle: Vector3) -> Matrix {
-	return linalg.matrix4_from_euler_angles_xyz(angle.x, angle.y, angle.z)
+	return auto_cast linalg.matrix4_from_euler_angles_xyz(angle.x, angle.y, angle.z)
 }
 
 // Get zyx-rotation matrix
 // NOTE: Angle must be provided in radians
 @(require_results)
 MatrixRotateZYX :: proc "c" (angle: Vector3) -> Matrix {
-	return linalg.matrix4_from_euler_angles_zyx(angle.x, angle.y, angle.z)
+	return auto_cast linalg.matrix4_from_euler_angles_zyx(angle.x, angle.y, angle.z)
 }
 
 
 // Get scaling matrix
 @(require_results)
 MatrixScale :: proc "c" (x, y, z: f32) -> Matrix {
-	return linalg.matrix4_scale(Vector3{x, y, z})
+	return auto_cast linalg.matrix4_scale(Vector3{x, y, z})
 }
 
 // Get orthographic projection matrix
 @(require_results)
 MatrixOrtho :: proc "c" (left, right, bottom, top, near, far: f32) -> Matrix {
-	return linalg.matrix_ortho3d(left, right, bottom, top, near, far)
+	return auto_cast linalg.matrix_ortho3d(left, right, bottom, top, near, far)
 }
 
 // Get perspective projection matrix
 // NOTE: Fovy angle must be provided in radians
 @(require_results)
 MatrixPerspective :: proc "c" (fovY, aspect, nearPlane, farPlane: f32) -> Matrix {
-	return linalg.matrix4_perspective(fovY, aspect, nearPlane, farPlane)
+	return auto_cast linalg.matrix4_perspective(fovY, aspect, nearPlane, farPlane)
 }
 // Get camera look-at matrix (view matrix)
 @(require_results)
 MatrixLookAt :: proc "c" (eye, target, up: Vector3) -> Matrix {
-	return linalg.matrix4_look_at(eye, target, up)
+	return auto_cast linalg.matrix4_look_at(eye, target, up)
 }
 
 // Get float array of matrix data
@@ -705,7 +709,7 @@ QuaternionLength :: proc "c" (q: Quaternion) -> f32 {
 	return abs(q)
 }
 // Normalize provided quaternion
-@(require_results, deprecated="Prefer linalg.normalize0(q)")
+@(require_results)
 QuaternionNormalize :: proc "c" (q: Quaternion) -> Quaternion {
 	return linalg.normalize0(q)
 }
@@ -756,12 +760,12 @@ QuaternionFromVector3ToVector3 :: proc "c" (from, to: Vector3) -> Quaternion {
 // Get a quaternion for a given rotation matrix
 @(require_results)
 QuaternionFromMatrix :: proc "c" (mat: Matrix) -> Quaternion {
-	return linalg.quaternion_from_matrix4(mat)
+	return linalg.quaternion_from_matrix4(linalg.Matrix4f32(mat))
 }
 // Get a matrix for a given quaternion
 @(require_results)
 QuaternionToMatrix :: proc "c" (q: Quaternion) -> Matrix {
-	return linalg.matrix4_from_quaternion(q)
+	return auto_cast linalg.matrix4_from_quaternion(q)
 }
 // Get rotation quaternion for an angle and axis NOTE: Angle must be provided in radians
 @(require_results)
@@ -815,4 +819,21 @@ QuaternionEquals :: proc "c" (p, q: Quaternion) -> bool {
 	       FloatEquals(p.y, q.y) &&
 	       FloatEquals(p.z, q.z) &&
 	       FloatEquals(p.w, q.w)
+}
+
+@(private, require_results)
+fmaxf :: proc "contextless" (x, y: f32) -> f32 {
+	if math.is_nan(x) {
+		return y
+	}
+
+	if math.is_nan(y) {
+		return x
+	}
+
+	if math.signbit(x) != math.signbit(y) {
+		return y if math.signbit(x) else x
+	}
+
+	return y if x < y else x
 }

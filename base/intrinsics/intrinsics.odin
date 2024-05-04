@@ -38,9 +38,9 @@ count_leading_zeros  :: proc(x: $T) -> T where type_is_integer(T) || type_is_sim
 reverse_bits         :: proc(x: $T) -> T where type_is_integer(T) || type_is_simd_vector(T) ---
 byte_swap            :: proc(x: $T) -> T where type_is_integer(T) || type_is_float(T) ---
 
-overflow_add :: proc(lhs, rhs: $T) -> (T, bool) #optional_ok ---
-overflow_sub :: proc(lhs, rhs: $T) -> (T, bool) #optional_ok ---
-overflow_mul :: proc(lhs, rhs: $T) -> (T, bool) #optional_ok ---
+overflow_add :: proc(lhs, rhs: $T) -> (T, bool) ---
+overflow_sub :: proc(lhs, rhs: $T) -> (T, bool) ---
+overflow_mul :: proc(lhs, rhs: $T) -> (T, bool) ---
 
 sqrt :: proc(x: $T) -> T where type_is_float(T) || (type_is_simd_vector(T) && type_is_float(type_elem_type(T))) ---
 
@@ -293,7 +293,9 @@ wasm_memory_size :: proc(index: uintptr)        -> int ---
 // 0 - indicates that the thread blocked and then was woken up
 // 1 - the loaded value from `ptr` did not match `expected`, the thread did not block
 // 2 - the thread blocked, but the timeout
+@(enable_target_feature="atomics")
 wasm_memory_atomic_wait32   :: proc(ptr: ^u32, expected: u32, timeout_ns: i64) -> u32 ---
+@(enable_target_feature="atomics")
 wasm_memory_atomic_notify32 :: proc(ptr: ^u32, waiters: u32) -> (waiters_woken_up: u32) ---
 
 // x86 Targets (i386, amd64)

@@ -15,36 +15,13 @@ package test_core_crypto
 import "core:encoding/hex"
 import "core:fmt"
 import "core:mem"
-import "core:os"
 import "core:testing"
 
 import "core:crypto"
 import "core:crypto/chacha20"
 import "core:crypto/chacha20poly1305"
 
-import "core:crypto/shake"
-import "core:crypto/x25519"
-
-TEST_count := 0
-TEST_fail := 0
-
-when ODIN_TEST {
-	expect :: testing.expect
-	log :: testing.log
-} else {
-	expect :: proc(t: ^testing.T, condition: bool, message: string, loc := #caller_location) {
-		TEST_count += 1
-		if !condition {
-			TEST_fail += 1
-			fmt.printf("[%v] %v\n", loc, message)
-			return
-		}
-	}
-	log :: proc(t: ^testing.T, v: any, loc := #caller_location) {
-		fmt.printf("[%v] ", loc)
-		fmt.printf("log: %v\n", v)
-	}
-}
+import tc "tests:common"
 
 main :: proc() {
 	t := testing.T{}
@@ -53,25 +30,23 @@ main :: proc() {
 
 	test_hash(&t)
 	test_mac(&t)
+	test_kdf(&t) // After hash/mac tests because those should pass first.
+	test_ecc25519(&t)
 
 	test_chacha20(&t)
 	test_chacha20poly1305(&t)
-	test_shake(&t)
-	test_x25519(&t)
+	test_sha3_variants(&t)
 
 	bench_crypto(&t)
 
-	fmt.printf("%v/%v tests successful.\n", TEST_count - TEST_fail, TEST_count)
-	if TEST_fail > 0 {
-		os.exit(1)
-	}
+	tc.report(&t)
 }
 
 _PLAINTEXT_SUNSCREEN_STR := "Ladies and Gentlemen of the class of '99: If I could offer you only one tip for the future, sunscreen would be it."
 
 @(test)
 test_chacha20 :: proc(t: ^testing.T) {
-	log(t, "Testing (X)ChaCha20")
+	tc.log(t, "Testing (X)ChaCha20")
 
 	// Test cases taken from RFC 8439, and draft-irtf-cfrg-xchacha-03
 	plaintext := transmute([]byte)(_PLAINTEXT_SUNSCREEN_STR)
@@ -114,7 +89,7 @@ test_chacha20 :: proc(t: ^testing.T) {
 	chacha20.xor_bytes(&ctx, derived_ciphertext[:], plaintext[:])
 
 	derived_ciphertext_str := string(hex.encode(derived_ciphertext[:], context.temp_allocator))
-	expect(
+	tc.expect(
 		t,
 		derived_ciphertext_str == ciphertext_str,
 		fmt.tprintf(
@@ -161,7 +136,7 @@ test_chacha20 :: proc(t: ^testing.T) {
 	chacha20.xor_bytes(&ctx, derived_ciphertext[:], plaintext[:])
 
 	derived_ciphertext_str = string(hex.encode(derived_ciphertext[:], context.temp_allocator))
-	expect(
+	tc.expect(
 		t,
 		derived_ciphertext_str == xciphertext_str,
 		fmt.tprintf(
@@ -174,7 +149,7 @@ test_chacha20 :: proc(t: ^testing.T) {
 
 @(test)
 test_chacha20poly1305 :: proc(t: ^testing.T) {
-	log(t, "Testing chacha20poly1205")
+	tc.log(t, "Testing chacha20poly1205")
 
 	plaintext := transmute([]byte)(_PLAINTEXT_SUNSCREEN_STR)
 
@@ -233,7 +208,7 @@ test_chacha20poly1305 :: proc(t: ^testing.T) {
 	)
 
 	derived_ciphertext_str := string(hex.encode(derived_ciphertext[:], context.temp_allocator))
-	expect(
+	tc.expect(
 		t,
 		derived_ciphertext_str == ciphertext_str,
 		fmt.tprintf(
@@ -244,7 +219,7 @@ test_chacha20poly1305 :: proc(t: ^testing.T) {
 	)
 
 	derived_tag_str := string(hex.encode(derived_tag[:], context.temp_allocator))
-	expect(
+	tc.expect(
 		t,
 		derived_tag_str == tag_str,
 		fmt.tprintf(
@@ -264,8 +239,8 @@ test_chacha20poly1305 :: proc(t: ^testing.T) {
 		ciphertext[:],
 	)
 	derived_plaintext_str := string(derived_plaintext[:])
-	expect(t, ok, "Expected true for decrypt(tag, aad, ciphertext)")
-	expect(
+	tc.expect(t, ok, "Expected true for decrypt(tag, aad, ciphertext)")
+	tc.expect(
 		t,
 		derived_plaintext_str == _PLAINTEXT_SUNSCREEN_STR,
 		fmt.tprintf(
@@ -284,7 +259,7 @@ test_chacha20poly1305 :: proc(t: ^testing.T) {
 		aad[:],
 		derived_ciphertext[:],
 	)
-	expect(t, !ok, "Expected false for decrypt(tag, aad, corrupted_ciphertext)")
+	tc.expect(t, !ok, "Expected false for decrypt(tag, aad, corrupted_ciphertext)")
 
 	aad[0] ~= 0xa5
 	ok = chacha20poly1305.decrypt(
@@ -295,92 +270,19 @@ test_chacha20poly1305 :: proc(t: ^testing.T) {
 		aad[:],
 		ciphertext[:],
 	)
-	expect(t, !ok, "Expected false for decrypt(tag, corrupted_aad, ciphertext)")
-}
-
-TestECDH :: struct {
-	scalar:  string,
-	point:   string,
-	product: string,
-}
-
-@(test)
-test_x25519 :: proc(t: ^testing.T) {
-	log(t, "Testing X25519")
-
-	// Local copy of this so that the base point doesn't need to be exported.
-	_BASE_POINT: [32]byte =  {
-		9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	}
-
-	test_vectors := [?]TestECDH {
-		// Test vectors from RFC 7748
-		{
-			"a546e36bf0527c9d3b16154b82465edd62144c0ac1fc5a18506a2244ba449ac4",
-			"e6db6867583030db3594c1a424b15f7c726624ec26b3353b10a903a6d0ab1c4c",
-			"c3da55379de9c6908e94ea4df28d084f32eccf03491c71f754b4075577a28552",
-		},
-		{
-			"4b66e9d4d1b4673c5ad22691957d6af5c11b6421e0ea01d42ca4169e7918ba0d",
-			"e5210f12786811d3f4b7959d0538ae2c31dbe7106fc03c3efc4cd549c715a493",
-			"95cbde9476e8907d7aade45cb4b873f88b595a68799fa152e6f8f7647aac7957",
-		},
-	}
-	for v, _ in test_vectors {
-		scalar, _ := hex.decode(transmute([]byte)(v.scalar), context.temp_allocator)
-		point, _ := hex.decode(transmute([]byte)(v.point), context.temp_allocator)
-
-		derived_point: [x25519.POINT_SIZE]byte
-		x25519.scalarmult(derived_point[:], scalar[:], point[:])
-		derived_point_str := string(hex.encode(derived_point[:], context.temp_allocator))
-
-		expect(
-			t,
-			derived_point_str == v.product,
-			fmt.tprintf(
-				"Expected %s for %s * %s, but got %s instead",
-				v.product,
-				v.scalar,
-				v.point,
-				derived_point_str,
-			),
-		)
-
-		// Abuse the test vectors to sanity-check the scalar-basepoint multiply.
-		p1, p2: [x25519.POINT_SIZE]byte
-		x25519.scalarmult_basepoint(p1[:], scalar[:])
-		x25519.scalarmult(p2[:], scalar[:], _BASE_POINT[:])
-		p1_str := string(hex.encode(p1[:], context.temp_allocator))
-		p2_str := string(hex.encode(p2[:], context.temp_allocator))
-		expect(
-			t,
-			p1_str == p2_str,
-			fmt.tprintf(
-				"Expected %s for %s * basepoint, but got %s instead",
-				p2_str,
-				v.scalar,
-				p1_str,
-			),
-		)
-	}
-
-	// TODO/tests: Run the wycheproof test vectors, once I figure out
-	// how to work with JSON.
+	tc.expect(t, !ok, "Expected false for decrypt(tag, corrupted_aad, ciphertext)")
 }
 
 @(test)
 test_rand_bytes :: proc(t: ^testing.T) {
-	log(t, "Testing rand_bytes")
+	tc.log(t, "Testing rand_bytes")
 
-	if ODIN_OS != .Linux {
-		log(t, "rand_bytes not supported - skipping")
+	if !crypto.HAS_RAND_BYTES {
+		tc.log(t, "rand_bytes not supported - skipping")
 		return
 	}
 
-	allocator := context.allocator
-
-	buf := make([]byte, 1 << 25, allocator)
+	buf := make([]byte, 1 << 25, context.allocator)
 	defer delete(buf)
 
 	// Testing a CSPRNG for correctness is incredibly involved and
@@ -405,84 +307,9 @@ test_rand_bytes :: proc(t: ^testing.T) {
 		}
 	}
 
-	expect(
+	tc.expect(
 		t,
 		seems_ok,
 		"Expected to randomize the head and tail of the buffer within a handful of attempts",
 	)
-}
-
-TestXOF :: struct {
-	sec_strength: int,
-	output:       string,
-	str:          string,
-}
-
-@(test)
-test_shake :: proc(t: ^testing.T) {
-	test_vectors := [?]TestXOF {
-		// SHAKE128
-		{
-			128,
-			"7f9c2ba4e88f827d616045507605853e",
-			"",
-		},
-		{
-			128,
-			"f4202e3c5852f9182a0430fd8144f0a7",
-			"The quick brown fox jumps over the lazy dog",
-		},
-		{
-			128,
-			"853f4538be0db9621a6cea659a06c110",
-			"The quick brown fox jumps over the lazy dof",
-		},
-
-		// SHAKE256
-		{
-			256,
-			"46b9dd2b0ba88d13233b3feb743eeb243fcd52ea62b81b82b50c27646ed5762f",
-			"",
-		},
-		{
-			256,
-			"2f671343d9b2e1604dc9dcf0753e5fe15c7c64a0d283cbbf722d411a0e36f6ca",
-			"The quick brown fox jumps over the lazy dog",
-		},
-		{
-			256,
-			"46b1ebb2e142c38b9ac9081bef72877fe4723959640fa57119b366ce6899d401",
-			"The quick brown fox jumps over the lazy dof",
-		},
-	}
-	for v in test_vectors {
-		dst := make([]byte, len(v.output)/2, context.temp_allocator)
-
-		data := transmute([]byte)(v.str)
-
-		ctx: shake.Context
-		switch v.sec_strength {
-		case 128:
-			shake.init_128(&ctx)
-		case 256:
-			shake.init_256(&ctx)
-		}
-
-		shake.write(&ctx, data)
-		shake.read(&ctx, dst)
-
-		dst_str := string(hex.encode(dst, context.temp_allocator))
-
-		expect(
-			t,
-			dst_str == v.output,
-			fmt.tprintf(
-				"SHAKE%d: Expected: %s for input of %s, but got %s instead",
-				v.sec_strength,
-				v.output,
-				v.str,
-				dst_str,
-			),
-		)
-	}
 }

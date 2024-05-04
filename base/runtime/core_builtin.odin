@@ -40,7 +40,7 @@ copy_slice :: proc "contextless" (dst, src: $T/[]$E) -> int {
 	}
 	return n
 }
-// `copy_from_string` is a built-in procedure that copies elements from a source slice `src` to a destination string `dst`.
+// `copy_from_string` is a built-in procedure that copies elements from a source string `src` to a destination slice `dst`.
 // The source and destination may overlap. Copy returns the number of elements copied, which will be the minimum
 // of len(src) and len(dst).
 //
@@ -53,7 +53,7 @@ copy_from_string :: proc "contextless" (dst: $T/[]$E/u8, src: $S/string) -> int 
 	}
 	return n
 }
-// `copy` is a built-in procedure that copies elements from a source slice `src` to a destination slice/string `dst`.
+// `copy` is a built-in procedure that copies elements from a source slice/string `src` to a destination slice `dst`.
 // The source and destination may overlap. Copy returns the number of elements copied, which will be the minimum
 // of len(src) and len(dst).
 @builtin
@@ -447,12 +447,12 @@ _append_elem :: #force_inline proc(array: ^$T/[dynamic]$E, arg: E, should_zero: 
 }
 
 @builtin
-append_elem :: proc(array: ^$T/[dynamic]$E, arg: E, loc := #caller_location) -> (n: int, err: Allocator_Error) #optional_allocator_error {
+append_elem :: proc(array: ^$T/[dynamic]$E, #no_broadcast arg: E, loc := #caller_location) -> (n: int, err: Allocator_Error) #optional_allocator_error {
 	return _append_elem(array, arg, true, loc=loc)
 }
 
 @builtin
-non_zero_append_elem :: proc(array: ^$T/[dynamic]$E, arg: E, loc := #caller_location) -> (n: int, err: Allocator_Error) #optional_allocator_error {
+non_zero_append_elem :: proc(array: ^$T/[dynamic]$E, #no_broadcast arg: E, loc := #caller_location) -> (n: int, err: Allocator_Error) #optional_allocator_error {
 	return _append_elem(array, arg, false, loc=loc)
 }
 
@@ -496,12 +496,12 @@ _append_elems :: #force_inline proc(array: ^$T/[dynamic]$E, should_zero: bool, l
 }
 
 @builtin
-append_elems :: proc(array: ^$T/[dynamic]$E, args: ..E, loc := #caller_location) -> (n: int, err: Allocator_Error) #optional_allocator_error {
+append_elems :: proc(array: ^$T/[dynamic]$E, #no_broadcast args: ..E, loc := #caller_location) -> (n: int, err: Allocator_Error) #optional_allocator_error {
 	return _append_elems(array, true, loc, ..args)
 }
 
 @builtin
-non_zero_append_elems :: proc(array: ^$T/[dynamic]$E, args: ..E, loc := #caller_location) -> (n: int, err: Allocator_Error) #optional_allocator_error {
+non_zero_append_elems :: proc(array: ^$T/[dynamic]$E, #no_broadcast args: ..E, loc := #caller_location) -> (n: int, err: Allocator_Error) #optional_allocator_error {
 	return _append_elems(array, false, loc, ..args)
 }
 
@@ -556,7 +556,7 @@ append_nothing :: proc(array: ^$T/[dynamic]$E, loc := #caller_location) -> (n: i
 
 
 @builtin
-inject_at_elem :: proc(array: ^$T/[dynamic]$E, index: int, arg: E, loc := #caller_location) -> (ok: bool, err: Allocator_Error) #no_bounds_check #optional_allocator_error {
+inject_at_elem :: proc(array: ^$T/[dynamic]$E, index: int, #no_broadcast arg: E, loc := #caller_location) -> (ok: bool, err: Allocator_Error) #no_bounds_check #optional_allocator_error {
 	if array == nil {
 		return
 	}
@@ -574,7 +574,7 @@ inject_at_elem :: proc(array: ^$T/[dynamic]$E, index: int, arg: E, loc := #calle
 }
 
 @builtin
-inject_at_elems :: proc(array: ^$T/[dynamic]$E, index: int, args: ..E, loc := #caller_location) -> (ok: bool, err: Allocator_Error) #no_bounds_check #optional_allocator_error {
+inject_at_elems :: proc(array: ^$T/[dynamic]$E, index: int, #no_broadcast args: ..E, loc := #caller_location) -> (ok: bool, err: Allocator_Error) #no_bounds_check #optional_allocator_error {
 	if array == nil {
 		return
 	}
@@ -740,6 +740,9 @@ _resize_dynamic_array :: #force_inline proc(array: ^$T/[dynamic]$E, length: int,
 	a := (^Raw_Dynamic_Array)(array)
 
 	if length <= a.cap {
+		if should_zero && a.len < length {
+			intrinsics.mem_zero(([^]E)(a.data)[a.len:], (length-a.len)*size_of(E))
+		}
 		a.len = max(length, 0)
 		return nil
 	}
@@ -825,16 +828,18 @@ map_insert :: proc(m: ^$T/map[$K]$V, key: K, value: V, loc := #caller_location) 
 }
 
 // Explicitly inserts a key and value into a map `m`, the same as `map_insert`, but the return values differ.
-// - `prev_key_ptr` will return the previous pointer of a key if it exists, and `nil` otherwise.
+// - `prev_key` will return the previous pointer of a key if it exists, check `found_previous` if was previously found
 // - `value_ptr` will return the pointer of the memory where the insertion happens, and `nil` if the map failed to resize
-// - `found_previous` will be true if `prev_key_ptr != nil`
-@(require_results)
-map_insert_and_check_for_previous :: proc(m: ^$T/map[$K]$V, key: K, value: V, loc := #caller_location) -> (prev_key_ptr: ^K, value_ptr: ^V, found_previous: bool) {
+// - `found_previous` will be true a previous key was found
+@(builtin, require_results)
+map_upsert :: proc(m: ^$T/map[$K]$V, key: K, value: V, loc := #caller_location) -> (prev_key: K, value_ptr: ^V, found_previous: bool) {
 	key, value := key, value
 	kp, vp := __dynamic_map_set_extra_without_hash((^Raw_Map)(m), map_info(T), rawptr(&key), rawptr(&value), loc)
-	prev_key_ptr   = (^K)(kp)
-	value_ptr      = (^V)(vp)
-	found_previous = kp != nil
+	if kp != nil {
+		prev_key = (^K)(kp)^
+		found_previous = true
+	}
+	value_ptr = (^V)(vp)
 	return
 }
 

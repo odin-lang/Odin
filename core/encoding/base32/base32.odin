@@ -1,4 +1,4 @@
-package base32
+package encoding_base32
 
 // @note(zh): Encoding utility for Base32
 // A secondary param can be used to supply a custom alphabet to

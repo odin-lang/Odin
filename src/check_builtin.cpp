@@ -89,6 +89,7 @@ gb_internal void check_or_else_split_types(CheckerContext *c, Operand *x, String
 
 
 gb_internal void check_or_else_expr_no_value_error(CheckerContext *c, String const &name, Operand const &x, Type *type_hint) {
+	ERROR_BLOCK();
 	gbString t = type_to_string(x.type);
 	error(x.expr, "'%.*s' does not return a value, value is of type %s", LIT(name), t);
 	if (is_type_union(type_deref(x.type))) {
@@ -1389,7 +1390,7 @@ gb_internal LoadDirectiveResult check_load_directory_directive(CheckerContext *c
 			}
 		}
 
-		gb_sort_array(file_caches.data, file_caches.count, file_cache_sort_cmp);
+		array_sort(file_caches, file_cache_sort_cmp);
 
 	}
 
@@ -1565,6 +1566,7 @@ gb_internal bool check_builtin_procedure_directive(CheckerContext *c, Operand *o
 		}
 
 		if (!operand->value.value_bool) {
+			ERROR_BLOCK();
 			gbString arg1 = expr_to_string(ce->args[0]);
 			gbString arg2 = {};
 
@@ -1590,6 +1592,7 @@ gb_internal bool check_builtin_procedure_directive(CheckerContext *c, Operand *o
 		operand->type = t_untyped_bool;
 		operand->mode = Addressing_Constant;
 	} else if (name == "panic") {
+		ERROR_BLOCK();
 		if (ce->args.count != 1) {
 			error(call, "'#panic' expects 1 argument, got %td", ce->args.count);
 			return false;
@@ -3390,6 +3393,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			elem->Struct.tags = gb_alloc_array(permanent_allocator(), String, fields.count);
 			elem->Struct.node = dummy_node_struct;
 			type_set_offsets(elem);
+			wait_signal_set(&elem->Struct.fields_wait_signal);
 		}
 
 		Type *soa_type = make_soa_struct_slice(c, dummy_node_soa, nullptr, elem);
@@ -3488,7 +3492,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			}
 		} else {
 			GB_ASSERT(t->kind == Type_Matrix);
-			operand->type = alloc_type_matrix(t->Matrix.elem, t->Matrix.column_count, t->Matrix.row_count);
+			operand->type = alloc_type_matrix(t->Matrix.elem, t->Matrix.column_count, t->Matrix.row_count, nullptr, nullptr, t->Matrix.is_row_major);
 		}
 		operand->type = check_matrix_type_hint(operand->type, type_hint);
 		break;
@@ -3556,7 +3560,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		}
 		
 		operand->mode = Addressing_Value;
-		operand->type = alloc_type_matrix(elem, xt->Array.count, yt->Array.count);	
+		operand->type = alloc_type_matrix(elem, xt->Array.count, yt->Array.count, nullptr, nullptr, false);
 		operand->type = check_matrix_type_hint(operand->type, type_hint);
 		break;
 	}
@@ -3763,6 +3767,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				soa_struct->Struct.tags[i] = old_struct->Struct.tags[i];
 			}
 		}
+		wait_signal_set(&soa_struct->Struct.fields_wait_signal);
 
 		Token token = {};
 		token.string = str_lit("Base_Type");
@@ -4084,8 +4089,8 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				}
 			}
 
-			operand->mode = Addressing_OptionalOk;
-			operand->type = default_type(x.type);
+			operand->mode = Addressing_Value;
+			operand->type = make_optional_ok_type(default_type(x.type));
 		}
 		break;
 
@@ -4928,6 +4933,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			case TargetOs_essence:
 			case TargetOs_freebsd:
 			case TargetOs_openbsd:
+			case TargetOs_haiku:
 				switch (build_context.metrics.arch) {
 				case TargetArch_i386:
 				case TargetArch_amd64:
@@ -6008,6 +6014,8 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				return false;
 			}
 
+			enable_target_feature({}, str_lit("atomics"));
+
 			Operand ptr = {};
 			Operand expected = {};
 			Operand timeout = {};
@@ -6059,6 +6067,8 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				error(call, "'%.*s' is only allowed on wasm targets", LIT(builtin_name));
 				return false;
 			}
+
+			enable_target_feature({}, str_lit("atomics"));
 
 			Operand ptr = {};
 			Operand waiters = {};

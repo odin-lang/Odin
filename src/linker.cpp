@@ -139,9 +139,11 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 			}
 
 
-			StringSet libs = {};
-			string_set_init(&libs, 64);
-			defer (string_set_destroy(&libs));
+			StringSet min_libs_set = {};
+			string_set_init(&min_libs_set, 64);
+			defer (string_set_destroy(&min_libs_set));
+
+			String prev_lib = {};
 
 			StringSet asm_files = {};
 			string_set_init(&asm_files, 64);
@@ -149,6 +151,11 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 
 			for (Entity *e : gen->foreign_libraries) {
 				GB_ASSERT(e->kind == Entity_LibraryName);
+				// NOTE(bill): Add these before the linking values
+				String extra_linker_flags = string_trim_whitespace(e->LibraryName.extra_linker_flags);
+				if (extra_linker_flags.len != 0) {
+					lib_str = gb_string_append_fmt(lib_str, " %.*s", LIT(extra_linker_flags));
+				}
 				for_array(i, e->LibraryName.paths) {
 					String lib = string_trim_whitespace(e->LibraryName.paths[i]);
 					// IMPORTANT NOTE(bill): calling `string_to_lower` here is not an issue because
@@ -160,14 +167,13 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 
 					if (has_asm_extension(lib)) {
 						if (!string_set_update(&asm_files, lib)) {
-							String asm_file = asm_files.entries[i].value;
+							String asm_file = lib;
 							String obj_file = concatenate_strings(permanent_allocator(), asm_file, str_lit(".obj"));
-							String obj_format;
-#if defined(GB_ARCH_64_BIT)
-							obj_format = str_lit("win64");
-#elif defined(GB_ARCH_32_BIT)
+							String obj_format = str_lit("win64");
+						#if defined(GB_ARCH_32_BIT)
 							obj_format = str_lit("win32");
-#endif // GB_ARCH_*_BIT
+						#endif
+
 							result = system_exec_command_line_app("nasm",
 								"\"%.*s\\bin\\nasm\\windows\\nasm.exe\" \"%.*s\" "
 								"-f \"%.*s\" "
@@ -185,18 +191,13 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 							}
 							array_add(&gen->output_object_paths, obj_file);
 						}
-					} else {
-						if (!string_set_update(&libs, lib)) {
+					} else if (!string_set_update(&min_libs_set, lib) ||
+					           !build_context.min_link_libs) {
+						if (prev_lib != lib) {
 							lib_str = gb_string_append_fmt(lib_str, " \"%.*s\"", LIT(lib));
 						}
+						prev_lib = lib;
 					}
-				}
-			}
-
-			for (Entity *e : gen->foreign_libraries) {
-				GB_ASSERT(e->kind == Entity_LibraryName);
-				if (e->LibraryName.extra_linker_flags.len != 0) {
-					lib_str = gb_string_append_fmt(lib_str, " %.*s", LIT(e->LibraryName.extra_linker_flags));
 				}
 			}
 
@@ -318,12 +319,19 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 			string_set_init(&asm_files, 64);
 			defer (string_set_destroy(&asm_files));
 			
-			StringSet libs = {};
-			string_set_init(&libs, 64);
-			defer (string_set_destroy(&libs));
+			StringSet min_libs_set = {};
+			string_set_init(&min_libs_set, 64);
+			defer (string_set_destroy(&min_libs_set));
+
+			String prev_lib = {};
 			
 			for (Entity *e : gen->foreign_libraries) {
 				GB_ASSERT(e->kind == Entity_LibraryName);
+				// NOTE(bill): Add these before the linking values
+				String extra_linker_flags = string_trim_whitespace(e->LibraryName.extra_linker_flags);
+				if (extra_linker_flags.len != 0) {
+					lib_str = gb_string_append_fmt(lib_str, " %.*s", LIT(extra_linker_flags));
+				}
 				for (String lib : e->LibraryName.paths) {
 					lib = string_trim_whitespace(lib);
 					if (lib.len == 0) {
@@ -336,19 +344,19 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 						String asm_file = lib;
 						String obj_file = concatenate_strings(permanent_allocator(), asm_file, str_lit(".o"));
 						String obj_format;
-#if defined(GB_ARCH_64_BIT)
+					#if defined(GB_ARCH_64_BIT)
 						if (is_osx) {
 							obj_format = str_lit("macho64");
 						} else {
 							obj_format = str_lit("elf64");
 						}
-#elif defined(GB_ARCH_32_BIT)
+					#elif defined(GB_ARCH_32_BIT)
 						if (is_osx) {
 							obj_format = str_lit("macho32");
 						} else {
 							obj_format = str_lit("elf32");
 						}
-#endif // GB_ARCH_*_BIT
+					#endif // GB_ARCH_*_BIT
 
 						if (is_osx) {
 							// `as` comes with MacOS.
@@ -376,16 +384,29 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 								LIT(obj_file),
 								LIT(build_context.extra_assembler_flags)
 							);						
+							if (result) {
+								gb_printf_err("executing `nasm` to assemble foreing import of %.*s failed.\n\tSuggestion: `nasm` does not ship with the compiler and should be installed with your system's package manager.\n", LIT(asm_file));
+								return result;
+							}
 						}
 						array_add(&gen->output_object_paths, obj_file);
 					} else {
-						if (string_set_update(&libs, lib)) {
+						if (string_set_update(&min_libs_set, lib) && build_context.min_link_libs) {
 							continue;
 						}
 
-						// NOTE(zangent): Sometimes, you have to use -framework on MacOS.
-						//   This allows you to specify '-f' in a #foreign_system_library,
-						//   without having to implement any new syntax specifically for MacOS.
+						if (prev_lib == lib) {
+							continue;
+						}
+						prev_lib = lib;
+
+						// Do not add libc again, this is added later already, and omitted with
+						// the `-no-crt` flag, not skipping here would cause duplicate library
+						// warnings when linking on darwin and might link libc silently even with `-no-crt`.
+						if (lib == str_lit("System.framework") || lib == str_lit("c")) {
+							continue;
+						}
+
 						if (build_context.metrics.os == TargetOs_darwin) {
 							if (string_ends_with(lib, str_lit(".framework"))) {
 								// framework thingie
@@ -411,7 +432,7 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 							if (string_ends_with(lib, str_lit(".a")) || string_ends_with(lib, str_lit(".o"))) {
 								// static libs and object files, absolute full path relative to the file in which the lib was imported from
 								lib_str = gb_string_append_fmt(lib_str, " -l:\"%.*s\" ", LIT(lib));
-							} else if (string_ends_with(lib, str_lit(".so"))) {
+							} else if (string_ends_with(lib, str_lit(".so")) || string_contains_string(lib, str_lit(".so."))) {
 								// dynamic lib, relative path to executable
 								// NOTE(vassvik): it is the user's responsibility to make sure the shared library files are visible
 								//                at runtime to the executable
@@ -422,13 +443,6 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 							}
 						}
 					}
-				}
-			}
-
-			for (Entity *e : gen->foreign_libraries) {
-				GB_ASSERT(e->kind == Entity_LibraryName);
-				if (e->LibraryName.extra_linker_flags.len != 0) {
-					lib_str = gb_string_append_fmt(lib_str, " %.*s", LIT(e->LibraryName.extra_linker_flags));
 				}
 			}
 
@@ -474,8 +488,8 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 					link_settings = gb_string_appendc(link_settings, "-Wl,-fini,'_odin_exit_point' ");
 				}
 
-			} else if (build_context.metrics.os != TargetOs_openbsd) {
-				// OpenBSD defaults to PIE executable. do not pass -no-pie for it.
+			} else if (build_context.metrics.os != TargetOs_openbsd && build_context.metrics.os != TargetOs_haiku) {
+				// OpenBSD and Haiku default to PIE executable. do not pass -no-pie for it.
 				link_settings = gb_string_appendc(link_settings, "-no-pie ");
 			}
 
@@ -494,18 +508,24 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 					platform_lib_str = gb_string_appendc(platform_lib_str, "-L/opt/local/lib ");
 				}
 
-				// This sets a requirement of Mountain Lion and up, but the compiler doesn't work without this limit.
-				if (build_context.minimum_os_version_string.len) {
+				// Only specify this flag if the user has given a minimum version to target.
+				// This will cause warnings to show up for mismatched libraries.
+				if (build_context.minimum_os_version_string_given) {
 					link_settings = gb_string_append_fmt(link_settings, "-mmacosx-version-min=%.*s ", LIT(build_context.minimum_os_version_string));
 				}
-				// This points the linker to where the entry point is
-				link_settings = gb_string_appendc(link_settings, "-e _main ");
+
+				if (build_context.build_mode != BuildMode_DynamicLibrary) {
+					// This points the linker to where the entry point is
+					link_settings = gb_string_appendc(link_settings, "-e _main ");
+				}
 			}
 
 			if (!build_context.no_crt) {
 				platform_lib_str = gb_string_appendc(platform_lib_str, "-lm ");
 				if (build_context.metrics.os == TargetOs_darwin) {
-					platform_lib_str = gb_string_appendc(platform_lib_str, "-lSystem ");
+					// NOTE: adding this causes a warning about duplicate libraries, I think it is
+					// automatically assumed/added by clang when you don't do `-nostdlib`.
+					// platform_lib_str = gb_string_appendc(platform_lib_str, "-lSystem ");
 				} else {
 					platform_lib_str = gb_string_appendc(platform_lib_str, "-lc ");
 				}
@@ -522,7 +542,12 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 			link_command_line = gb_string_append_fmt(link_command_line, " %.*s ", LIT(build_context.extra_linker_flags));
 			link_command_line = gb_string_append_fmt(link_command_line, " %s ", link_settings);
 
-			result = system_exec_command_line_app("ld-link", link_command_line);
+			if (build_context.use_lld) {
+				link_command_line = gb_string_append_fmt(link_command_line, " -fuse-ld=lld");
+				result = system_exec_command_line_app("lld-link", link_command_line);
+			} else {
+				result = system_exec_command_line_app("ld-link", link_command_line);
+			}
 
 			if (result) {
 				return result;

@@ -1580,7 +1580,7 @@ run_png_suite :: proc(t: ^testing.T, suite: []PNG_Test) -> (subtotal: int) {
 
 					{
 						// Roundtrip through PBM to test the PBM encoders and decoders - prefer ASCII
-						pbm_info, pbm_format_selected := pbm.autoselect_pbm_format_from_image(img, false)
+						pbm_info, _ := pbm.autoselect_pbm_format_from_image(img, false)
 
 						// We already tested the binary formats above.
 						if pbm_info.header.format in pbm.ASCII {

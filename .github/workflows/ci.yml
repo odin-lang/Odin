@@ -7,8 +7,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
-      - name: Download LLVM, botan
-        run: sudo apt-get install llvm-11 clang-11 libbotan-2-dev botan
+      - name: Download LLVM
+        run: |
+          wget https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh 17
+          echo "/usr/lib/llvm-17/bin" >> $GITHUB_PATH
       - name: build odin
         run: ./build_odin.sh release
       - name: Odin version
@@ -58,15 +62,13 @@ jobs:
         timeout-minutes: 10
   build_macOS:
     name: MacOS Build, Check, and Test
-    runs-on: macos-latest
+    runs-on: macos-13
     steps:
       - uses: actions/checkout@v1
-      - name: Download LLVM, botan and setup PATH
+      - name: Download LLVM, and setup PATH
         run: |
-          brew install llvm@13 botan
-          echo "/usr/local/opt/llvm@13/bin" >> $GITHUB_PATH
-          TMP_PATH=$(xcrun --show-sdk-path)/user/include
-          echo "CPATH=$TMP_PATH" >> $GITHUB_ENV
+          brew install llvm@17
+          echo "/usr/local/opt/llvm@17/bin" >> $GITHUB_PATH
       - name: build odin
         run: ./build_odin.sh release
       - name: Odin version
@@ -102,12 +104,10 @@ jobs:
     runs-on: macos-14 # This is an arm/m1 runner.
     steps:
       - uses: actions/checkout@v1
-      - name: Download LLVM, botan and setup PATH
+      - name: Download LLVM and setup PATH
         run: |
-          brew install llvm@13 botan
-          echo "/opt/homebrew/opt/llvm@13/bin" >> $GITHUB_PATH
-          TMP_PATH=$(xcrun --show-sdk-path)/user/include
-          echo "CPATH=$TMP_PATH" >> $GITHUB_ENV
+          brew install llvm@17
+          echo "/opt/homebrew/opt/llvm@17/bin" >> $GITHUB_PATH
       - name: build odin
         run: ./build_odin.sh release
       - name: Odin version

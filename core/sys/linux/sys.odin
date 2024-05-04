@@ -91,10 +91,10 @@ stat :: proc "contextless" (filename: cstring, stat: ^Stat) -> (Errno) {
 */
 fstat :: proc "contextless" (fd: Fd, stat: ^Stat) -> (Errno) {
 	when size_of(int) == 8 {
-		ret := syscall(SYS_fstat, fd, stat)
+		ret := syscall(SYS_fstat, cast(i32) fd, stat)
 		return Errno(-ret)
 	} else {
-		ret := syscall(SYS_fstat64, fd, stat)
+		ret := syscall(SYS_fstat64, cast(i32) fd, stat)
 		return Errno(-ret)
 	}
 }

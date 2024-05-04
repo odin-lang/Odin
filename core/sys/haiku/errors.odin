@@ -1,0 +1,239 @@
+//+build haiku
+package sys_haiku
+
+import "core:c"
+
+Errno :: enum c.int {
+	// Error baselines
+	GENERAL_ERROR_BASE     = min(c.int),
+	OS_ERROR_BASE          = GENERAL_ERROR_BASE + 0x1000,
+	APP_ERROR_BASE         = GENERAL_ERROR_BASE + 0x2000,
+	INTERFACE_ERROR_BASE   = GENERAL_ERROR_BASE + 0x3000,
+	MEDIA_ERROR_BASE       = GENERAL_ERROR_BASE + 0x4000,
+	TRANSLATION_ERROR_BASE = GENERAL_ERROR_BASE + 0x4800,
+	MIDI_ERROR_BASE        = GENERAL_ERROR_BASE + 0x5000,
+	STORAGE_ERROR_BASE     = GENERAL_ERROR_BASE + 0x6000,
+	POSIX_ERROR_BASE       = GENERAL_ERROR_BASE + 0x7000,
+	MAIL_ERROR_BASE        = GENERAL_ERROR_BASE + 0x8000,
+	PRINT_ERROR_BASE       = GENERAL_ERROR_BASE + 0x9000,
+	DEVICE_ERROR_BASE      = GENERAL_ERROR_BASE + 0xa000,
+
+	// Developer-defined errors start at (ERRORS_END+1)
+	ERRORS_END             = GENERAL_ERROR_BASE + 0xffff,
+
+	// General Errors
+	NO_MEMORY              = GENERAL_ERROR_BASE + 0,
+	IO_ERROR               = GENERAL_ERROR_BASE + 1,
+	PERMISSION_DENIED      = GENERAL_ERROR_BASE + 2,
+	BAD_INDEX              = GENERAL_ERROR_BASE + 3,
+	BAD_TYPE               = GENERAL_ERROR_BASE + 4,
+	BAD_VALUE              = GENERAL_ERROR_BASE + 5,
+	MISMATCHED_VALUES      = GENERAL_ERROR_BASE + 6,
+	NAME_NOT_FOUND         = GENERAL_ERROR_BASE + 7,
+	NAME_IN_USE            = GENERAL_ERROR_BASE + 8,
+	TIMED_OUT              = GENERAL_ERROR_BASE + 9,
+	INTERRUPTED            = GENERAL_ERROR_BASE + 10,
+	WOULD_BLOCK            = GENERAL_ERROR_BASE + 11,
+	CANCELED               = GENERAL_ERROR_BASE + 12,
+	NO_INIT                = GENERAL_ERROR_BASE + 13,
+	NOT_INITIALIZED        = GENERAL_ERROR_BASE + 13,
+	BUSY                   = GENERAL_ERROR_BASE + 14,
+	NOT_ALLOWED            = GENERAL_ERROR_BASE + 15,
+	BAD_DATA               = GENERAL_ERROR_BASE + 16,
+	DONT_DO_THAT           = GENERAL_ERROR_BASE + 17,
+
+	ERROR                  = -1,
+	OK                     = 0,
+	NO_ERROR               = 0,
+
+	// Kernel Kit Errors
+	BAD_SEM_ID                        = OS_ERROR_BASE + 0,
+	NO_MORE_SEMS                      = OS_ERROR_BASE + 1,
+	BAD_THREAD_ID                     = OS_ERROR_BASE + 0x100,
+	NO_MORE_THREADS                   = OS_ERROR_BASE + 0x101,
+	BAD_THREAD_STATE                  = OS_ERROR_BASE + 0x102,
+	BAD_TEAM_ID                       = OS_ERROR_BASE + 0x103,
+	NO_MORE_TEAMS                     = OS_ERROR_BASE + 0x104,
+	BAD_PORT_ID                       = OS_ERROR_BASE + 0x200,
+	NO_MORE_PORTS                     = OS_ERROR_BASE + 0x201,
+	BAD_IMAGE_ID                      = OS_ERROR_BASE + 0x300,
+	BAD_ADDRESS                       = OS_ERROR_BASE + 0x301,
+	NOT_AN_EXECUTABLE                 = OS_ERROR_BASE + 0x302,
+	MISSING_LIBRARY                   = OS_ERROR_BASE + 0x303,
+	MISSING_SYMBOL                    = OS_ERROR_BASE + 0x304,
+	UNKNOWN_EXECUTABLE                = OS_ERROR_BASE + 0x305,
+	LEGACY_EXECUTABLE                 = OS_ERROR_BASE + 0x306,
+
+	DEBUGGER_ALREADY_INSTALLED        = OS_ERROR_BASE + 0x400,
+
+	// Application Kit Errors
+	BAD_REPLY                         = APP_ERROR_BASE + 0,
+	DUPLICATE_REPLY                   = APP_ERROR_BASE + 1,
+	MESSAGE_TO_SELF                   = APP_ERROR_BASE + 2,
+	BAD_HANDLER                       = APP_ERROR_BASE + 3,
+	ALREADY_RUNNING                   = APP_ERROR_BASE + 4,
+	LAUNCH_FAILED                     = APP_ERROR_BASE + 5,
+	AMBIGUOUS_APP_LAUNCH              = APP_ERROR_BASE + 6,
+	UNKNOWN_MIME_TYPE                 = APP_ERROR_BASE + 7,
+	BAD_SCRIPT_SYNTAX                 = APP_ERROR_BASE + 8,
+	LAUNCH_FAILED_NO_RESOLVE_LINK     = APP_ERROR_BASE + 9,
+	LAUNCH_FAILED_EXECUTABLE          = APP_ERROR_BASE + 10,
+	LAUNCH_FAILED_APP_NOT_FOUND       = APP_ERROR_BASE + 11,
+	LAUNCH_FAILED_APP_IN_TRASH        = APP_ERROR_BASE + 12,
+	LAUNCH_FAILED_NO_PREFERRED_APP    = APP_ERROR_BASE + 13,
+	LAUNCH_FAILED_FILES_APP_NOT_FOUND = APP_ERROR_BASE + 14,
+	BAD_MIME_SNIFFER_RULE             = APP_ERROR_BASE + 15,
+	NOT_A_MESSAGE                     = APP_ERROR_BASE + 16,
+	SHUTDOWN_CANCELLED                = APP_ERROR_BASE + 17,
+	SHUTTING_DOWN                     = APP_ERROR_BASE + 18,
+
+	// Storage Kit/File System Errors
+	FILE_ERROR                        = STORAGE_ERROR_BASE + 0,
+	// 1 was B_FILE_NOT_FOUND (deprecated)
+	FILE_EXISTS                       = STORAGE_ERROR_BASE + 2,
+	ENTRY_NOT_FOUND                   = STORAGE_ERROR_BASE + 3,
+	NAME_TOO_LONG                     = STORAGE_ERROR_BASE + 4,
+	NOT_A_DIRECTORY                   = STORAGE_ERROR_BASE + 5,
+	DIRECTORY_NOT_EMPTY               = STORAGE_ERROR_BASE + 6,
+	DEVICE_FULL                       = STORAGE_ERROR_BASE + 7,
+	READ_ONLY_DEVICE                  = STORAGE_ERROR_BASE + 8,
+	IS_A_DIRECTORY                    = STORAGE_ERROR_BASE + 9,
+	NO_MORE_FDS                       = STORAGE_ERROR_BASE + 10,
+	CROSS_DEVICE_LINK                 = STORAGE_ERROR_BASE + 11,
+	LINK_LIMIT                        = STORAGE_ERROR_BASE + 12,
+	BUSTED_PIPE                       = STORAGE_ERROR_BASE + 13,
+	UNSUPPORTED                       = STORAGE_ERROR_BASE + 14,
+	PARTITION_TOO_SMALL               = STORAGE_ERROR_BASE + 15,
+	PARTIAL_READ                      = STORAGE_ERROR_BASE + 16,
+	PARTIAL_WRITE                     = STORAGE_ERROR_BASE + 17,
+
+	// Some POSIX errors
+	E2BIG                             = POSIX_ERROR_BASE + 1,
+	EFBIG                             = POSIX_ERROR_BASE + 4,
+	ENODEV                            = POSIX_ERROR_BASE + 7,
+	ERANGE                            = POSIX_ERROR_BASE + 17,
+	EOVERFLOW                         = POSIX_ERROR_BASE + 41,
+	EOPNOTSUPP                        = POSIX_ERROR_BASE + 43,
+
+	ENOSYS                            = POSIX_ERROR_BASE + 9,
+	EAGAIN                            = WOULD_BLOCK,
+
+	// New error codes that can be mapped to POSIX errors
+	TOO_MANY_ARGS_NEG                 = E2BIG,
+	FILE_TOO_LARGE_NEG                = EFBIG,
+	DEVICE_NOT_FOUND_NEG              = ENODEV,
+	RESULT_NOT_REPRESENTABLE_NEG      = ERANGE,
+	BUFFER_OVERFLOW_NEG               = EOVERFLOW,
+	NOT_SUPPORTED_NEG                 = EOPNOTSUPP,
+
+	TOO_MANY_ARGS_POS                 = -E2BIG,
+	FILE_TOO_LARGE_POS                = -EFBIG,
+	DEVICE_NOT_FOUND_POS              = -ENODEV,
+	RESULT_NOT_REPRESENTABLE_POS      = -ERANGE,
+	BUFFER_OVERFLOW_POS               = -EOVERFLOW,
+	NOT_SUPPORTED_POS                 = -EOPNOTSUPP,
+
+	// Media Kit Errors
+	STREAM_NOT_FOUND             = MEDIA_ERROR_BASE + 0,
+	SERVER_NOT_FOUND             = MEDIA_ERROR_BASE + 1,
+	RESOURCE_NOT_FOUND           = MEDIA_ERROR_BASE + 2,
+	RESOURCE_UNAVAILABLE         = MEDIA_ERROR_BASE + 3,
+	BAD_SUBSCRIBER               = MEDIA_ERROR_BASE + 4,
+	SUBSCRIBER_NOT_ENTERED       = MEDIA_ERROR_BASE + 5,
+	BUFFER_NOT_AVAILABLE         = MEDIA_ERROR_BASE + 6,
+	LAST_BUFFER_ERROR            = MEDIA_ERROR_BASE + 7,
+	MEDIA_SYSTEM_FAILURE         = MEDIA_ERROR_BASE + 100,
+	MEDIA_BAD_NODE               = MEDIA_ERROR_BASE + 101,
+	MEDIA_NODE_BUSY              = MEDIA_ERROR_BASE + 102,
+	MEDIA_BAD_FORMAT             = MEDIA_ERROR_BASE + 103,
+	MEDIA_BAD_BUFFER             = MEDIA_ERROR_BASE + 104,
+	MEDIA_TOO_MANY_NODES         = MEDIA_ERROR_BASE + 105,
+	MEDIA_TOO_MANY_BUFFERS       = MEDIA_ERROR_BASE + 106,
+	MEDIA_NODE_ALREADY_EXISTS    = MEDIA_ERROR_BASE + 107,
+	MEDIA_BUFFER_ALREADY_EXISTS  = MEDIA_ERROR_BASE + 108,
+	MEDIA_CANNOT_SEEK            = MEDIA_ERROR_BASE + 109,
+	MEDIA_CANNOT_CHANGE_RUN_MODE = MEDIA_ERROR_BASE + 110,
+	MEDIA_APP_ALREADY_REGISTERED = MEDIA_ERROR_BASE + 111,
+	MEDIA_APP_NOT_REGISTERED     = MEDIA_ERROR_BASE + 112,
+	MEDIA_CANNOT_RECLAIM_BUFFERS = MEDIA_ERROR_BASE + 113,
+	MEDIA_BUFFERS_NOT_RECLAIMED  = MEDIA_ERROR_BASE + 114,
+	MEDIA_TIME_SOURCE_STOPPED    = MEDIA_ERROR_BASE + 115,
+	MEDIA_TIME_SOURCE_BUSY       = MEDIA_ERROR_BASE + 116,
+	MEDIA_BAD_SOURCE             = MEDIA_ERROR_BASE + 117,
+	MEDIA_BAD_DESTINATION        = MEDIA_ERROR_BASE + 118,
+	MEDIA_ALREADY_CONNECTED      = MEDIA_ERROR_BASE + 119,
+	MEDIA_NOT_CONNECTED          = MEDIA_ERROR_BASE + 120,
+	MEDIA_BAD_CLIP_FORMAT        = MEDIA_ERROR_BASE + 121,
+	MEDIA_ADDON_FAILED           = MEDIA_ERROR_BASE + 122,
+	MEDIA_ADDON_DISABLED         = MEDIA_ERROR_BASE + 123,
+	MEDIA_CHANGE_IN_PROGRESS     = MEDIA_ERROR_BASE + 124,
+	MEDIA_STALE_CHANGE_COUNT     = MEDIA_ERROR_BASE + 125,
+	MEDIA_ADDON_RESTRICTED       = MEDIA_ERROR_BASE + 126,
+	MEDIA_NO_HANDLER             = MEDIA_ERROR_BASE + 127,
+	MEDIA_DUPLICATE_FORMAT       = MEDIA_ERROR_BASE + 128,
+	MEDIA_REALTIME_DISABLED      = MEDIA_ERROR_BASE + 129,
+	MEDIA_REALTIME_UNAVAILABLE   = MEDIA_ERROR_BASE + 130,
+
+	// Mail Kit Errors
+	MAIL_NO_DAEMON               = MAIL_ERROR_BASE + 0,
+	MAIL_UNKNOWN_USER            = MAIL_ERROR_BASE + 1,
+	MAIL_WRONG_PASSWORD          = MAIL_ERROR_BASE + 2,
+	MAIL_UNKNOWN_HOST            = MAIL_ERROR_BASE + 3,
+	MAIL_ACCESS_ERROR            = MAIL_ERROR_BASE + 4,
+	MAIL_UNKNOWN_FIELD           = MAIL_ERROR_BASE + 5,
+	MAIL_NO_RECIPIENT            = MAIL_ERROR_BASE + 6,
+	MAIL_INVALID_MAIL            = MAIL_ERROR_BASE + 7,
+
+	// Printing Errors
+	NO_PRINT_SERVER              = PRINT_ERROR_BASE + 0,
+
+	// Device Kit Errors
+	DEV_INVALID_IOCTL            = DEVICE_ERROR_BASE + 0,
+	DEV_NO_MEMORY                = DEVICE_ERROR_BASE + 1,
+	DEV_BAD_DRIVE_NUM            = DEVICE_ERROR_BASE + 2,
+	DEV_NO_MEDIA                 = DEVICE_ERROR_BASE + 3,
+	DEV_UNREADABLE               = DEVICE_ERROR_BASE + 4,
+	DEV_FORMAT_ERROR             = DEVICE_ERROR_BASE + 5,
+	DEV_TIMEOUT                  = DEVICE_ERROR_BASE + 6,
+	DEV_RECALIBRATE_ERROR        = DEVICE_ERROR_BASE + 7,
+	DEV_SEEK_ERROR               = DEVICE_ERROR_BASE + 8,
+	DEV_ID_ERROR                 = DEVICE_ERROR_BASE + 9,
+	DEV_READ_ERROR               = DEVICE_ERROR_BASE + 10,
+	DEV_WRITE_ERROR              = DEVICE_ERROR_BASE + 11,
+	DEV_NOT_READY                = DEVICE_ERROR_BASE + 12,
+	DEV_MEDIA_CHANGED            = DEVICE_ERROR_BASE + 13,
+	DEV_MEDIA_CHANGE_REQUESTED   = DEVICE_ERROR_BASE + 14,
+	DEV_RESOURCE_CONFLICT        = DEVICE_ERROR_BASE + 15,
+	DEV_CONFIGURATION_ERROR      = DEVICE_ERROR_BASE + 16,
+	DEV_DISABLED_BY_USER         = DEVICE_ERROR_BASE + 17,
+	DEV_DOOR_OPEN                = DEVICE_ERROR_BASE + 18,
+	DEV_INVALID_PIPE             = DEVICE_ERROR_BASE + 19,
+	DEV_CRC_ERROR                = DEVICE_ERROR_BASE + 20,
+	DEV_STALLED                  = DEVICE_ERROR_BASE + 21,
+	DEV_BAD_PID                  = DEVICE_ERROR_BASE + 22,
+	DEV_UNEXPECTED_PID           = DEVICE_ERROR_BASE + 23,
+	DEV_DATA_OVERRUN             = DEVICE_ERROR_BASE + 24,
+	DEV_DATA_UNDERRUN            = DEVICE_ERROR_BASE + 25,
+	DEV_FIFO_OVERRUN             = DEVICE_ERROR_BASE + 26,
+	DEV_FIFO_UNDERRUN            = DEVICE_ERROR_BASE + 27,
+	DEV_PENDING                  = DEVICE_ERROR_BASE + 28,
+	DEV_MULTIPLE_ERRORS          = DEVICE_ERROR_BASE + 29,
+	DEV_TOO_LATE                 = DEVICE_ERROR_BASE + 30,
+
+	// Translation Kit Errors
+	TRANSLATION_BASE_ERROR       = TRANSLATION_ERROR_BASE + 0,
+	NO_TRANSLATOR                = TRANSLATION_ERROR_BASE + 1,
+	ILLEGAL_DATA                 = TRANSLATION_ERROR_BASE + 2,
+}
+
+errno :: #force_inline proc "contextless" () -> Errno {
+	return Errno(_errnop()^)
+}
+
+foreign import libroot "system:c"
+foreign libroot {
+	_to_positive_error :: proc(error: c.int) -> c.int ---
+	_to_negative_error :: proc(error: c.int) -> c.int ---
+
+	_errnop :: proc() -> ^c.int ---
+}

@@ -177,6 +177,10 @@ Type_Info_Matrix :: struct {
 	row_count:    int,
 	column_count: int,
 	// Total element count = column_count * elem_stride
+	layout: enum u8 {
+		Column_Major, // array of column vectors
+		Row_Major,    // array of row vectors
+	},
 }
 Type_Info_Soa_Pointer :: struct {
 	elem: ^Type_Info,
@@ -593,8 +597,9 @@ type_info_core :: proc "contextless" (info: ^Type_Info) -> ^Type_Info {
 	base := info
 	loop: for {
 		#partial switch i in base.variant {
-		case Type_Info_Named:  base = i.base
-		case Type_Info_Enum:   base = i.base
+		case Type_Info_Named:     base = i.base
+		case Type_Info_Enum:      base = i.base
+		case Type_Info_Bit_Field: base = i.backing_type
 		case: break loop
 		}
 	}

@@ -1,4 +1,4 @@
-package hex
+package encoding_hex
 
 import "core:strings"
 

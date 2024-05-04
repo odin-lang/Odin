@@ -1,4 +1,4 @@
-package json
+package encoding_json
 
 import "core:mem"
 import "core:math/bits"
@@ -50,6 +50,11 @@ Marshal_Options :: struct {
 	//
 	// NOTE: This will temp allocate and sort a list for each map.
 	sort_maps_by_key: bool,
+
+	// Output enum value's name instead of its underlying value.
+	//
+	// NOTE: If a name isn't found it'll use the underlying value.
+	use_enum_names: bool,
 
 	// Internal state
 	indentation: int,
@@ -241,7 +246,6 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 		opt_write_end(w, opt, ']') or_return
 		
 	case runtime.Type_Info_Enumerated_Array:
-		index := runtime.type_info_base(info.index).variant.(runtime.Type_Info_Enum)
 		opt_write_start(w, opt, '[') or_return
 		for i in 0..<info.count {
 			opt_write_iteration(w, opt, i) or_return
@@ -294,14 +298,14 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 
 					// check for string type
 					{
-						v := any{key, info.key.id}
-						ti := runtime.type_info_base(type_info_of(v.id))
-						a := any{v.data, ti.id}
+						kv  := any{key, info.key.id}
+						kti := runtime.type_info_base(type_info_of(kv.id))
+						ka  := any{kv.data, kti.id}
 						name: string
 
-						#partial switch info in ti.variant {
+						#partial switch info in kti.variant {
 						case runtime.Type_Info_String:
-							switch s in a {
+							switch s in ka {
 							case string: name = s
 							case cstring: name = string(s)
 							}
@@ -331,13 +335,13 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 
 					// check for string type
 					{
-						v := any{key, info.key.id}
-						ti := runtime.type_info_base(type_info_of(v.id))
-						a := any{v.data, ti.id}
+						kv  := any{key, info.key.id}
+						kti := runtime.type_info_base(type_info_of(kv.id))
+						ka  := any{kv.data, kti.id}
 
-						#partial switch info in ti.variant {
+						#partial switch info in kti.variant {
 						case runtime.Type_Info_String:
-							switch s in a {
+							switch s in ka {
 							case string: name = s
 							case cstring: name = string(s)
 							}
@@ -362,24 +366,93 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 		opt_write_end(w, opt, '}') or_return
 
 	case runtime.Type_Info_Struct:
-		opt_write_start(w, opt, '{') or_return
-		
-		for name, i in info.names {
-			opt_write_iteration(w, opt, i) or_return
-			if json_name := string(reflect.struct_tag_get(auto_cast info.tags[i], "json")); json_name != "" {
-				opt_write_key(w, opt, json_name) or_return
-			} else {
-				opt_write_key(w, opt, name) or_return
+		is_omitempty :: proc(v: any) -> bool {
+			v := v
+			if v == nil {
+				return true
 			}
-
-			id := info.types[i].id
-			data := rawptr(uintptr(v.data) + info.offsets[i])
-			marshal_to_writer(w, any{data, id}, opt) or_return
+			ti := runtime.type_info_core(type_info_of(v.id))
+			#partial switch info in ti.variant {
+			case runtime.Type_Info_String:
+				switch x in v {
+				case string:
+					return x == ""
+				case cstring:
+					return x == nil || x == ""
+				}
+			case runtime.Type_Info_Any:
+				return v.(any) == nil
+			case runtime.Type_Info_Type_Id:
+				return v.(typeid) == nil
+			case runtime.Type_Info_Pointer,
+			     runtime.Type_Info_Multi_Pointer,
+			     runtime.Type_Info_Procedure:
+			     	return (^rawptr)(v.data)^ == nil
+			case runtime.Type_Info_Dynamic_Array:
+			     	return (^runtime.Raw_Dynamic_Array)(v.data).len == 0
+			case runtime.Type_Info_Slice:
+			     	return (^runtime.Raw_Slice)(v.data).len == 0
+			case runtime.Type_Info_Union,
+			     runtime.Type_Info_Bit_Set,
+			     runtime.Type_Info_Soa_Pointer:
+				return reflect.is_nil(v)
+			case runtime.Type_Info_Map:
+			     	return (^runtime.Raw_Map)(v.data).len == 0
+			}
+			return false
 		}
 
+		marshal_struct_fields :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: Marshal_Error) {
+			ti := runtime.type_info_base(type_info_of(v.id))
+			info := ti.variant.(runtime.Type_Info_Struct)
+			for name, i in info.names {
+				omitempty := false
+
+				json_name, extra := json_name_from_tag_value(reflect.struct_tag_get(reflect.Struct_Tag(info.tags[i]), "json"))
+				for flag in strings.split_iterator(&extra, ",") {
+					switch flag {
+					case "omitempty":
+						omitempty = true
+					}
+				}
+
+				id := info.types[i].id
+				data := rawptr(uintptr(v.data) + info.offsets[i])
+				the_value := any{data, id}
+
+				if omitempty && is_omitempty(the_value) {
+					continue
+				}
+
+				opt_write_iteration(w, opt, i) or_return
+				if json_name != "" {
+					opt_write_key(w, opt, json_name) or_return
+				} else {
+					// Marshal the fields of 'using _: T' fields directly into the parent struct
+					if info.usings[i] && name == "_" {
+						marshal_struct_fields(w, the_value, opt) or_return
+						continue
+					} else {
+						opt_write_key(w, opt, name) or_return
+					}
+				}
+
+
+				marshal_to_writer(w, the_value, opt) or_return
+			}
+			return
+		}
+		
+		opt_write_start(w, opt, '{') or_return
+		marshal_struct_fields(w, v, opt) or_return
 		opt_write_end(w, opt, '}') or_return
 
 	case runtime.Type_Info_Union:
+		if len(info.variants) == 0 || v.data == nil {
+			io.write_string(w, "null") or_return
+			return nil
+		}
+
 		tag_ptr := uintptr(v.data) + info.tag_offset
 		tag_any := any{rawptr(tag_ptr), info.tag_type.id}
 
@@ -404,7 +477,16 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 		}
 
 	case runtime.Type_Info_Enum:
-		return marshal_to_writer(w, any{v.data, info.base.id}, opt)
+		if !opt.use_enum_names || len(info.names) == 0 {
+			return marshal_to_writer(w, any{v.data, info.base.id}, opt)
+		} else {
+			name, found := reflect.enum_name_from_value_any(v)
+			if found {
+				return marshal_to_writer(w, name, opt)
+			} else {
+				return marshal_to_writer(w, any{v.data, info.base.id}, opt)
+			}
+		}
 
 	case runtime.Type_Info_Bit_Set:
 		is_bit_set_different_endian_to_platform :: proc(ti: ^runtime.Type_Info) -> bool {

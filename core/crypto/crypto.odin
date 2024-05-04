@@ -1,3 +1,7 @@
+/*
+package crypto implements a selection of cryptography algorithms and useful
+helper routines.
+*/
 package crypto
 
 import "core:mem"
@@ -45,6 +49,9 @@ compare_byte_ptrs_constant_time :: proc "contextless" (a, b: ^byte, n: int) -> i
 // the system entropy source.  This routine will block if the system entropy
 // source is not ready yet.  All system entropy source failures are treated
 // as catastrophic, resulting in a panic.
+//
+// Support for the system entropy source can be checked with the
+// `HAS_RAND_BYTES` boolean constant.
 rand_bytes :: proc (dst: []byte) {
 	// zero-fill the buffer first
 	mem.zero_explicit(raw_data(dst), len(dst))
