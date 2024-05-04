@@ -1241,7 +1241,7 @@ creat :: proc "contextless" (name: cstring, mode: Mode) -> (Fd, Errno) {
 */
 link :: proc "contextless" (target: cstring, linkpath: cstring) -> (Errno) {
 	when ODIN_ARCH == .arm64 {
-		ret := syscall(SYS_linkat, AT_FDCWD, cast(rawptr) target, AT_FDCWD, cast(rawptr) linkpath)
+		ret := syscall(SYS_linkat, AT_FDCWD, cast(rawptr) target, AT_FDCWD, cast(rawptr) linkpath, 0)
 		return Errno(-ret)
 	} else {
 		ret := syscall(SYS_link, cast(rawptr) target, cast(rawptr) linkpath)
