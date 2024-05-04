@@ -3,116 +3,145 @@ package os2
 
 import "base:runtime"
 
+import "core:sync"
 import "core:slice"
 import "core:strings"
 import "core:intrinsics"
 
-// the environment is a 0 delimited list of <key>=<value> strings
-_env_map: map[string]string
+// TODO: IF NO_CRT:
+//         Override the libc environment functions' weak linkage to
+//         allow us to interact with 3rd party code that DOES link
+//         to libc.  Otherwise, our environment can be out of sync.
+//       ELSE:
+//         Just use the libc.
 
-// Need to be able to figure out if the environment variable
+NOT_FOUND :: -1
+
+// the environment is a 0 delimited list of <key>=<value> strings
+_env: [dynamic]string
+
+_env_mutex: sync.Mutex
+
+// We need to be able to figure out if the environment variable
 // is contained in the original environment or not. This also
-// serves as a flag to determine if we have built _env_map.
+// serves as a flag to determine if we have built _env.
 _org_env_begin: uintptr
-_org_env_end: uintptr
+_org_env_end:   uintptr
+
+// Returns value + index location into _env
+// or -1 if not found
+_lookup :: proc(key: string) -> (value: string, idx: int) {
+	sync.mutex_lock(&_env_mutex)
+	defer sync.mutex_unlock(&_env_mutex)
+
+	for entry, i in _env {
+		if k, v := _kv_from_entry(entry); k == key {
+			return v, i
+		}
+	}
+	return "", -1
+}
 
 _lookup_env :: proc(key: string, allocator: runtime.Allocator) -> (value: string, found: bool) {
 	if _org_env_begin == 0 {
-		_build_env_map()
+		_build_env()
 	}
 
-	v: string
-	if v, found = _env_map[key]; found {
-		value = strings.clone(v, allocator)
+	if v, idx := _lookup(key); idx != -1 {
+		return strings.clone(v, allocator), true
 	}
 	return
 }
 
-_set_env :: proc(key, value: string) -> bool {
+_set_env :: proc(key, v_new: string) -> bool {
 	if _org_env_begin == 0 {
-		_build_env_map()
+		_build_env()
 	}
 
 	// all key values are stored as "key=value\x00"
-	kv_size := len(key) + len(value) + 2
-	if mapped_val, found := _env_map[key]; found {
-		// nothing to do
-		if mapped_val == value {
+	kv_size := len(key) + len(v_new) + 2
+	if v_curr, idx := _lookup(key); idx != NOT_FOUND {
+		if v_curr == v_new {
 			return true
 		}
-		delete_key(&_env_map, key)
+		sync.mutex_lock(&_env_mutex)
+		defer sync.mutex_unlock(&_env_mutex)
 
-		// We allocated this key-value. Possibly resize and
-		// overwrite the value only. Otherwise, treat as if it
-		// wasn't in the environment in the first place.
-		if !_is_in_org_env(mapped_val) {
-			key_addr, val_addr := _kv_addr_from_mapped_val(mapped_val, key)
-			if len(value) > len(mapped_val) {
-				key_addr = ([^]u8)(heap_resize(key_addr, kv_size))
-				if key_addr == nil {
+		unordered_remove(&_env, idx)
+
+		if !_is_in_org_env(v_curr) {
+			// We allocated this key-value. Possibly resize and
+			// overwrite the value only. Otherwise, treat as if it
+			// wasn't in the environment in the first place.
+			k_addr, v_addr := _kv_addr_from_val(v_curr, key)
+			if len(v_new) > len(v_curr) {
+				k_addr = ([^]u8)(heap_resize(k_addr, kv_size))
+				if k_addr == nil {
 					return false
 				}
-				val_addr = &key_addr[len(key) + 1]
+				v_addr = &k_addr[len(key) + 1]
 			}
-			intrinsics.mem_copy_non_overlapping(val_addr, raw_data(value), len(value))
-			val_addr[len(value)] = 0
+			intrinsics.mem_copy_non_overlapping(v_addr, raw_data(v_new), len(v_new))
+			v_addr[len(v_new)] = 0
 
-			k := string(key_addr[:len(key)])
-			v := string(val_addr[:len(value)])
-			_env_map[k] = v
+			append(&_env, string(k_addr[:kv_size]))
 			return true
 		}
 	}
 
-	key_addr := ([^]u8)(heap_alloc(kv_size))
-	if key_addr == nil {
+	k_addr := ([^]u8)(heap_alloc(kv_size))
+	if k_addr == nil {
 		return false
 	}
-	intrinsics.mem_copy_non_overlapping(key_addr, raw_data(key), len(key))
-	key_addr[len(key)] = '='
+	intrinsics.mem_copy_non_overlapping(k_addr, raw_data(key), len(key))
+	k_addr[len(key)] = '='
 
-	val_slice := key_addr[len(key) + 1:]
-	intrinsics.mem_copy_non_overlapping(&val_slice[0], raw_data(value), len(value))
-	val_slice[len(value)] = 0
+	val_slice := k_addr[len(key) + 1:]
+	intrinsics.mem_copy_non_overlapping(&val_slice[0], raw_data(v_new), len(v_new))
+	val_slice[len(v_new)] = 0
 
-	k := string(key_addr[:len(key)])
-	v := string(val_slice[:len(value)])
-	_env_map[k] = v
-
+	sync.mutex_lock(&_env_mutex)
+	append(&_env, string(k_addr[:kv_size - 1]))
+	sync.mutex_unlock(&_env_mutex)
 	return true
 }
 
 _unset_env :: proc(key: string) -> bool {
 	if _org_env_begin == 0 {
-		_build_env_map()
+		_build_env()
 	}
 
 	v: string
-	found: bool
-	if v, found = _env_map[key]; !found {
+	i: int
+	if v, i = _lookup(key); i == -1 {
 		return false
 	}
 
-	delete_key(&_env_map, key)
+	sync.mutex_lock(&_env_mutex)
+	unordered_remove(&_env, i)
+	sync.mutex_unlock(&_env_mutex)
+
 	if _is_in_org_env(v) {
 		return true
 	}
 
 	// if we got this far, the envrionment variable
-	// existed and was allocated by us.
-	key_addr, _ := _kv_addr_from_mapped_val(v, key)
-	heap_free(key_addr)
-
+	// existed AND was allocated by us.
+	k_addr, _ := _kv_addr_from_val(v, key)
+	heap_free(k_addr)
 	return true
 }
 
 _clear_env :: proc() {
-	for k, _ in _env_map {
-		if !_is_in_org_env(k) {
-			heap_free(raw_data(k))
+	sync.mutex_lock(&_env_mutex)
+	defer sync.mutex_unlock(&_env_mutex)
+
+	for kv in _env {
+		if !_is_in_org_env(kv) {
+			heap_free(raw_data(kv))
 		}
 	}
-	clear(&_env_map)
+	clear(&_env)
 
 	// nothing resides in the original environment either
 	_org_env_begin = ~uintptr(0)
@@ -121,16 +150,15 @@ _clear_env :: proc() {
 
 _environ :: proc(allocator: runtime.Allocator) -> []string {
 	if _org_env_begin == 0 {
-		_build_env_map()
+		_build_env()
 	}
-	env := make([]string, len(_env_map), allocator)
+	env := make([]string, len(_env), allocator)
 
-	i: int
-	for k, v in _env_map {
-		env[i] = strings.clone_from(raw_data(k), len(k) + len(v) + 1)
-		i += 1
+	sync.mutex_lock(&_env_mutex)
+	defer sync.mutex_unlock(&_env_mutex)
+	for entry, i in _env {
+		env[i] = strings.clone_from(raw_data(entry), len(entry))
 	}
-
 	return env
 }
 
@@ -145,56 +173,57 @@ export_cstring_environment :: proc(allocator: runtime.Allocator) -> []cstring {
 		for ; org_env[n] != nil; n += 1 {}
 		return slice.clone(org_env[:n + 1], allocator)
 	}
-	env := make([]cstring, len(_env_map) + 1, allocator)
 
-	i: int
-	for k, _ in _env_map {
-		env[i] = cstring(raw_data(k))
-		i += 1
+	// NOTE: already terminated by nil pointer via + 1
+	env := make([]cstring, len(_env) + 1, allocator)
+
+	sync.mutex_lock(&_env_mutex)
+	defer sync.mutex_unlock(&_env_mutex)
+	for entry, i in _env {
+		env[i] = cstring(raw_data(entry))
 	}
-	// NOTE: already terminated by nil pointer
-
 	return env
 }
 
-_build_env_map :: proc() {
-	// Use heap allocator since context.allocator isn't safe here
-	_env_map = make(type_of(_env_map), 64, heap_allocator())
-	env := _get_original_env()
-	_org_env_begin = uintptr(rawptr(env[0]))
-	for i := 0; env[i] != nil; i += 1 {
-		// basically strlen
-		bytes := ([^]u8)(env[i])
-		n: int
-		for ; bytes[n] != 0; n += 1 {}
-		_org_env_end = uintptr(&bytes[n])
-		kv := string(bytes[:n])
+_build_env :: proc() {
+	sync.mutex_lock(&_env_mutex)
+	defer sync.mutex_unlock(&_env_mutex)
+	if _org_env_begin != 0 {
+		return
+	}
 
-		// parse key=value
-		k := kv
-		switch n = strings.index_byte(k, '='); n {
-		case 0: case -1:
-			// zero length slice that can still find key
-			_env_map[k] = k[len(k) + 1:len(k) + 1]
-			continue
-		}
-		k = k[:n]
-		v := kv[len(k) + 1:]
-		_env_map[k] = v
+	// Use heap allocator since context.allocator isn't safe here
+	_env = make(type_of(_env), heap_allocator())
+	cstring_env := _get_original_env()
+	_org_env_begin = uintptr(rawptr(cstring_env[0]))
+	for i := 0; cstring_env[i] != nil; i += 1 {
+		bytes := ([^]u8)(cstring_env[i])
+		n := len(cstring_env[i])
+		_org_env_end = uintptr(&bytes[n])
+		append(&_env, string(bytes[:n]))
 	}
 }
 
-_get_original_env :: proc() -> [^]cstring {
+_get_original_env :: #force_inline proc() -> [^]cstring {
 	// essentially &argv[argc] which should be a nil pointer!
 	#no_bounds_check env: [^]cstring = &runtime.args__[len(runtime.args__)]
 	assert(env[0] == nil)
 	return &env[1]
 }
 
-_kv_addr_from_mapped_val :: #force_inline proc(mapped_val: string, key: string) -> ([^]u8, [^]u8) {
-	val_addr := raw_data(mapped_val)
-	key_addr := ([^]u8)(&val_addr[-(len(key) + 1)])
-	return key_addr, val_addr
+_kv_from_entry :: #force_inline proc(entry: string) -> (k, v: string) {
+	eq_idx := strings.index_byte(entry, '=')
+	if eq_idx == -1 {
+		return entry, ""
+	}
+	return entry[:eq_idx], entry[eq_idx + 1:]
+}
+
+// val is expected to be inside of _env and key is not.
+_kv_addr_from_val :: #force_inline proc(val: string, key: string) -> ([^]u8, [^]u8) {
+	v_addr := raw_data(val)
+	k_addr := ([^]u8)(&v_addr[-(len(key) + 1)])
+	return k_addr, v_addr
 }
 
 _is_in_org_env :: #force_inline proc(env_data: string) -> bool {
