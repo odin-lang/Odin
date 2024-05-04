@@ -20,9 +20,9 @@ _stdin : File = {
 		name = "/proc/self/fd/0",
 		fd = 0,
 		allocator = _file_allocator(),
-		stream = {
-			procedure = _file_stream_proc,
-		},
+	},
+	stream = {
+		procedure = _file_stream_proc,
 	},
 }
 _stdout : File = {
@@ -30,9 +30,9 @@ _stdout : File = {
 		name = "/proc/self/fd/1",
 		fd = 1,
 		allocator = _file_allocator(),
-		stream = {
-			procedure = _file_stream_proc,
-		},
+	},
+	stream = {
+		procedure = _file_stream_proc,
 	},
 }
 _stderr : File = {
@@ -40,18 +40,18 @@ _stderr : File = {
 		name = "/proc/self/fd/2",
 		fd = 2,
 		allocator = _file_allocator(),
-		stream = {
-			procedure = _file_stream_proc,
-		},
+	},
+	stream = {
+		procedure = _file_stream_proc,
 	},
 }
 
 @init
 _standard_stream_init :: proc() {
 	// cannot define these manually because cyclic reference
-	_stdin.impl.stream.data = &_stdin
-	_stdout.impl.stream.data = &_stdout
-	_stderr.impl.stream.data = &_stderr
+	_stdin.stream.data = &_stdin
+	_stdout.stream.data = &_stdout
+	_stderr.stream.data = &_stderr
 }
 
 _file_allocator :: proc() -> runtime.Allocator {

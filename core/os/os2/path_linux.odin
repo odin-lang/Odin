@@ -39,17 +39,16 @@ _mkdir_all :: proc(path: string, perm: File_Mode) -> Error {
 		new_dfd, errno := linux.openat(dfd, cstring(&path[0]), _OPENDIR_FLAGS)
 		#partial switch errno {
 		case .ENOENT:
-			if errno := linux.mkdirat(dfd, cstring(&path[0]), transmute(linux.Mode)(u32(perm))); errno != .NONE {
+			if errno = linux.mkdirat(dfd, cstring(&path[0]), transmute(linux.Mode)(u32(perm))); errno != .NONE {
 				return _get_platform_error(errno)
 			}
 			has_created^ = true
-			errno: linux.Errno
 			if new_dfd, errno = linux.openat(dfd, cstring(&path[0]), _OPENDIR_FLAGS); errno != .NONE {
 				return _get_platform_error(errno)
 			}
 			fallthrough
 		case .NONE:
-			if errno := linux.close(dfd); errno != .NONE {
+			if errno = linux.close(dfd); errno != .NONE {
 				return _get_platform_error(errno)
 			}
 			// skip consecutive '/'

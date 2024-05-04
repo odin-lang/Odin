@@ -128,7 +128,8 @@ _process_start :: proc(name: string, argv: []string, attr: ^Process_Attributes) 
 		found: bool
 		for dir in path_dirs {
 			executable = fmt.ctprintf("%s/%s", dir, name)
-			if not_found, errno := linux.faccessat(dir_fd, executable, linux.F_OK); errno == .NONE && !not_found {
+			fail: bool
+			if fail, errno = linux.faccessat(dir_fd, executable, linux.F_OK); errno == .NONE && !fail {
 				found = true
 				break
 			}
@@ -136,7 +137,8 @@ _process_start :: proc(name: string, argv: []string, attr: ^Process_Attributes) 
 		if !found {
 			// check in cwd to match windows behavior
 			executable = fmt.ctprintf("./%s", name)
-			if not_found, errno := linux.faccessat(dir_fd, executable, linux.F_OK); errno != .NONE || not_found {
+			fail: bool
+			if fail, errno = linux.faccessat(dir_fd, executable, linux.F_OK); errno != .NONE || fail {
 				return child, .Not_Exist
 			}
 		}
@@ -187,17 +189,17 @@ _process_start :: proc(name: string, argv: []string, attr: ^Process_Attributes) 
 	stdout_fds: [2]linux.Fd
 	stderr_fds: [2]linux.Fd
 	if attr != nil && attr.stdin != nil {
-		if errno := linux.pipe2(&stdin_fds, nil); errno != .NONE {
+		if errno = linux.pipe2(&stdin_fds, nil); errno != .NONE {
 			return child, _get_platform_error(errno)
 		}
 	}
 	if attr != nil && attr.stdout != nil {
-		if errno := linux.pipe2(&stdout_fds, nil); errno != .NONE {
+		if errno = linux.pipe2(&stdout_fds, nil); errno != .NONE {
 			return child, _get_platform_error(errno)
 		}
 	}
 	if attr != nil && attr.stderr != nil {
-		if errno := linux.pipe2(&stderr_fds, nil); errno != .NONE {
+		if errno = linux.pipe2(&stderr_fds, nil); errno != .NONE {
 			return child, _get_platform_error(errno)
 		}
 	}
@@ -211,17 +213,17 @@ _process_start :: proc(name: string, argv: []string, attr: ^Process_Attributes) 
 		// in child process now
 		if attr != nil && attr.stdin != nil {
 			if linux.close(stdin_fds[1]) != .NONE { linux.exit(1) }
-			if _, errno := linux.dup2(stdin_fds[0], 0); errno != .NONE { linux.exit(1) }
+			if _, errno = linux.dup2(stdin_fds[0], 0); errno != .NONE { linux.exit(1) }
 			if linux.close(stdin_fds[0]) != .NONE { linux.exit(1) }
 		}
 		if attr != nil && attr.stdout != nil {
 			if linux.close(stdout_fds[0]) != .NONE { linux.exit(1) }
-			if _, errno := linux.dup2(stdout_fds[1], 1); errno != .NONE { linux.exit(1) }
+			if _, errno = linux.dup2(stdout_fds[1], 1); errno != .NONE { linux.exit(1) }
 			if linux.close(stdout_fds[1]) != .NONE { linux.exit(1) }
 		}
 		if attr != nil && attr.stderr != nil {
 			if linux.close(stderr_fds[0]) != .NONE { linux.exit(1) }
-			if _, errno := linux.dup2(stderr_fds[1], 2); errno != .NONE { linux.exit(1) }
+			if _, errno = linux.dup2(stderr_fds[1], 2); errno != .NONE { linux.exit(1) }
 			if linux.close(stderr_fds[1]) != .NONE { linux.exit(1) }
 		}
 
@@ -330,11 +332,11 @@ _process_wait :: proc(p: ^Process, t: time.Duration) -> (state: Process_State, e
 				},
 			}
 			for {
-				n, errno := linux.ppoll(pollfd[:], &ts, nil)
-				if errno == .EINTR {
+				n, e := linux.ppoll(pollfd[:], &ts, nil)
+				if e == .EINTR {
 					continue
 				}
-				if errno != .NONE {
+				if e != .NONE {
 					return state, _get_platform_error(errno)
 				}
 				if n == 0 {
@@ -350,7 +352,7 @@ _process_wait :: proc(p: ^Process, t: time.Duration) -> (state: Process_State, e
 			org_sigset: linux.Sig_Set
 			sigset: linux.Sig_Set
 			mem.copy(&sigset, &mask, size_of(mask))
-			errno := linux.rt_sigprocmask(.SIG_BLOCK, &sigset, &org_sigset)
+			errno = linux.rt_sigprocmask(.SIG_BLOCK, &sigset, &org_sigset)
 			if errno != .NONE {
 				return state, _get_platform_error(errno)
 			}
@@ -367,7 +369,7 @@ _process_wait :: proc(p: ^Process, t: time.Duration) -> (state: Process_State, e
 			}
 
 			loop: for {
-				sigset: linux.Sig_Set
+				sigset = {}
 				mem.copy(&sigset, &mask, size_of(mask))
 
 				_, errno = linux.rt_sigtimedwait(&sigset, &info, &ts)
