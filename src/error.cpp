@@ -728,9 +728,8 @@ gb_internal void print_all_errors(void) {
 			}
 			res = gb_string_append_fmt(res, "\",\n");
 
-			res = gb_string_append_fmt(res, "\t\t\t\"pos\": {\n");
-
 			if (ev.pos.file_id) {
+				res = gb_string_append_fmt(res, "\t\t\t\"pos\": {\n");
 				res = gb_string_append_fmt(res, "\t\t\t\t\"file\": \"");
 				String file = get_file_path_string(ev.pos.file_id);
 				for (isize k = 0; k < file.len; k++) {
@@ -743,6 +742,8 @@ gb_internal void print_all_errors(void) {
 				i32 end_column = gb_max(ev.end.column, ev.pos.column);
 				res = gb_string_append_fmt(res, "\t\t\t\t\"end_column\": %d\n", end_column);
 				res = gb_string_append_fmt(res, "\t\t\t},\n");
+			} else {
+				res = gb_string_append_fmt(res, "\t\t\t\"pos\": null,\n");
 			}
 
 			res = gb_string_append_fmt(res, "\t\t\t\"msgs\": [\n");
