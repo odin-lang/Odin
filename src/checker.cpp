@@ -4315,7 +4315,10 @@ gb_internal bool correct_single_type_alias(CheckerContext *c, Entity *e) {
 
 gb_internal bool correct_type_alias_in_scope_backwards(CheckerContext *c, Scope *s) {
 	bool correction = false;
-	for (u32 n = s->elements.count, i = n-1; i < n; i--) {
+	// Note: s->elements.entries is sparse as it is the raw backing store
+	// of a hash table, so this MUST use capacity, not count as the entire
+	// array must be examined.
+	for (u32 n = s->elements.capacity, i = n-1; i < n; i--) {
 		auto const &entry = s->elements.entries[i];
 		Entity *e = entry.value;
 		if (entry.hash && e != nullptr) {
@@ -6109,7 +6112,7 @@ gb_internal void check_deferred_procedures(Checker *c) {
 gb_internal void check_unique_package_names(Checker *c) {
 	ERROR_BLOCK();
 
-	OldStringMap<AstPackage *> pkgs = {}; // Key: package name
+	StringMap<AstPackage *> pkgs = {}; // Key: package name
 	string_map_init(&pkgs, 2*c->info.packages.count);
 	defer (string_map_destroy(&pkgs));
 

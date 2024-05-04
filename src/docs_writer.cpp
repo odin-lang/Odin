@@ -24,7 +24,7 @@ struct OdinDocWriter {
 	isize data_len;
 	OdinDocHeader *header;
 
-	OldStringMap<OdinDocString> string_cache;
+	StringMap<OdinDocString> string_cache;
 
 	PtrMap<AstFile *,    OdinDocFileIndex>   file_cache;
 	PtrMap<AstPackage *, OdinDocPkgIndex>    pkg_cache;

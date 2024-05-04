@@ -251,7 +251,7 @@ struct Scope {
 	std::atomic<Scope *> head_child;
 
 	RwMutex mutex;
-	OldStringMap<Entity *> elements;
+	StringMap<Entity *> elements;
 	PtrSet<Scope *> imported;
 
 	i32             flags; // ScopeFlag
@@ -337,7 +337,7 @@ struct LoadFileCache {
 	String         path;
 	gbFileError    file_error;
 	String         data;
-	OldStringMap<u64> hashes;
+	StringMap<u64> hashes;
 };
 
 
@@ -368,7 +368,7 @@ struct CheckerInfo {
 	Checker *checker;
 
 	OldStringMap<AstFile *>    files;    // Key (full path)
-	OldStringMap<AstPackage *> packages; // Key (full path)
+	StringMap<AstPackage *> packages; // Key (full path)
 	Array<DeclInfo *>       variable_init_order;
 
 	AstPackage *          builtin_package;
@@ -408,7 +408,7 @@ struct CheckerInfo {
 	PtrMap<Type *, isize> type_info_map;
 
 	BlockingMutex foreign_mutex; // NOT recursive
-	OldStringMap<Entity *> foreigns;
+	StringMap<Entity *> foreigns;
 
 	MPSCQueue<Entity *> definition_queue;
 	MPSCQueue<Entity *> entity_queue;
@@ -421,7 +421,7 @@ struct CheckerInfo {
 	PtrMap<Ast *, ObjcMsgData> objc_msgSend_types;
 
 	BlockingMutex load_file_mutex;
-	OldStringMap<LoadFileCache *> load_file_cache;
+	StringMap<LoadFileCache *> load_file_cache;
 
 	BlockingMutex all_procedures_mutex;
 	Array<ProcInfo *> all_procedures;
@@ -432,7 +432,7 @@ struct CheckerInfo {
 
 
 	BlockingMutex                       load_directory_mutex;
-	OldStringMap<LoadDirectoryCache *>     load_directory_cache;
+	StringMap<LoadDirectoryCache *>     load_directory_cache;
 	PtrMap<Ast *, LoadDirectoryCache *> load_directory_map; // Key: Ast_CallExpr *
 };
 

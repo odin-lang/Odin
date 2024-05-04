@@ -8722,7 +8722,7 @@ gb_internal void check_compound_literal_field_values(CheckerContext *c, Slice<As
 	StringSet fields_visited = {};
 	defer (string_set_destroy(&fields_visited));
 
-	OldStringMap<String> fields_visited_through_raw_union = {};
+	StringMap<String> fields_visited_through_raw_union = {};
 	defer (string_map_destroy(&fields_visited_through_raw_union));
 
 	String assignment_str = str_lit("structure literal");
