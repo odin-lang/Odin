@@ -2,13 +2,13 @@
 package os2
 
 import "core:runtime"
-
+import "core:time"
 
 _alloc_command_line_arguments :: proc() -> []string {
 	return nil
 }
 
-_exit :: proc() -> ! {
+_exit :: proc "contextless" (_: int) -> ! {
 	runtime.trap()
 }
 
@@ -39,7 +39,7 @@ _get_ppid :: proc() -> int {
 Process_Attributes_OS_Specific :: struct{}
 
 _process_find :: proc(pid: int) -> (Process, Error) {
-	return nil, nil
+	return Process{}, nil
 }
 
 _process_get_state :: proc(p: Process) -> (Process_State, Error) {
