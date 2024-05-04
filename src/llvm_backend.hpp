@@ -164,12 +164,12 @@ struct lbModule {
 
 	PtrMap<Entity *, lbValue> values;           
 	PtrMap<Entity *, lbAddr>  soa_values;       
-	StringMap<lbValue>  members;
-	StringMap<lbProcedure *> procedures;
+	OldStringMap<lbValue>  members;
+	OldStringMap<lbProcedure *> procedures;
 	PtrMap<LLVMValueRef, Entity *> procedure_values;
 	Array<lbProcedure *> missing_procedures_to_check;
 
-	StringMap<LLVMValueRef> const_strings;
+	OldStringMap<LLVMValueRef> const_strings;
 
 	PtrMap<Type *, struct lbFunctionType *> function_type_map; 
 
@@ -193,8 +193,8 @@ struct lbModule {
 	RecursiveMutex debug_values_mutex;
 	PtrMap<void *, LLVMMetadataRef> debug_values; 
 
-	StringMap<lbAddr> objc_classes;
-	StringMap<lbAddr> objc_selectors;
+	OldStringMap<lbAddr> objc_classes;
+	OldStringMap<lbAddr> objc_selectors;
 
 	PtrMap<Type *, lbAddr> map_cell_info_map; // address of runtime.Map_Info
 	PtrMap<Type *, lbAddr> map_info_map;      // address of runtime.Map_Cell_Info

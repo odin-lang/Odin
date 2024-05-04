@@ -1667,7 +1667,7 @@ struct PathToFullpathResult {
 };
 
 gb_internal String path_to_fullpath(gbAllocator a, String s, bool *ok_) {
-	static gb_thread_local StringMap<PathToFullpathResult> cache;
+	static gb_thread_local OldStringMap<PathToFullpathResult> cache;
 
 	PathToFullpathResult *cached = string_map_get(&cache, s);
 	if (cached != nullptr) {
