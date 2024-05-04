@@ -25,7 +25,7 @@ gb_internal gb_inline StringHashKey string_hash_string(String const &s) {
 }
 
 
-#if 1 /* old string map */
+// #if 1 /* old string map */
 
 template <typename T>
 struct OldStringMapEntry {
@@ -312,7 +312,7 @@ gb_internal OldStringMapEntry<T> const *end(OldStringMap<T> const &m) noexcept {
 	return m.entries + m.count;
 }
 
-#else /* new string map */
+// #else /* new string map */
 
 template <typename T>
 struct StringMapEntry {
@@ -349,9 +349,9 @@ template <typename T> gb_internal void string_map_clear   (StringMap<T> *h);
 template <typename T> gb_internal void string_map_grow    (StringMap<T> *h);
 template <typename T> gb_internal void string_map_reserve (StringMap<T> *h, usize new_count);
 
-gb_internal gbAllocator string_map_allocator(void) {
-	return heap_allocator();
-}
+// gb_internal gbAllocator string_map_allocator(void) {
+// 	return heap_allocator();
+// }
 
 template <typename T>
 gb_internal gb_inline void string_map_init(StringMap<T> *h, usize capacity) {
@@ -596,4 +596,4 @@ gb_internal StringMapIterator<T> const begin(StringMap<T> const &m) noexcept {
 	return StringMapIterator<T>{&m, index};
 }
 
-#endif
+// #endif
