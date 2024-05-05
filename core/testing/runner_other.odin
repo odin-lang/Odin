@@ -1,5 +1,10 @@
 //+private
 //+build !windows
+//+build !linux
+//+build !darwin
+//+build !freebsd
+//+build !openbsd
+//+build !haiku
 package testing
 
 import "core:time"
