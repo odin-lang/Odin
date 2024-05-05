@@ -268,7 +268,7 @@ _mm_testnzc_si128 :: #force_inline proc "c" (a: __m128i, mask: __m128i) -> i32 {
 _mm_test_all_zeros :: #force_inline proc "c" (a: __m128i, mask: __m128i) -> i32 {
 	return _mm_testz_si128(a, mask)
 }
-@(require_results, enable_target_feature="sse4.1")
+@(require_results, enable_target_feature="sse2,sse4.1")
 _mm_test_all_ones :: #force_inline proc "c" (a: __m128i) -> i32 {
 	return _mm_testc_si128(a, _mm_cmpeq_epi32(a, a))
 }
