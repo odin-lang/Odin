@@ -1008,7 +1008,6 @@ gb_global TargetMetrics target_freebsd_arm64 = {
 	TargetArch_arm64,
 	8, 8, 16, 16,
 	str_lit("aarch64-unknown-freebsd-elf"),
-	str_lit("e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128"),
 };
 
 gb_global TargetMetrics target_openbsd_amd64 = {
