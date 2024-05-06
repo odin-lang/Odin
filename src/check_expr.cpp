@@ -1416,7 +1416,6 @@ gb_internal bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, T
 					break;
 				case StructSoa_Fixed:
 					if (modify_type) {
-						bool breakpoint = true;
 						Type *type = make_soa_struct_fixed(c, nullptr, poly->Struct.node, poly->Struct.soa_elem, poly->Struct.soa_count, nullptr);
 						gb_memmove(poly, type, gb_size_of(*type));
 					}
