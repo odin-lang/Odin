@@ -1080,6 +1080,8 @@ gb_internal void check_bit_field_type(CheckerContext *ctx, Type *bit_field_type,
 			array_add(&tags, tag);
 
 			add_entity_use(ctx, field, e);
+
+			total_bit_size += bit_size_u8;
 		}
 	}
 
@@ -1094,7 +1096,7 @@ gb_internal void check_bit_field_type(CheckerContext *ctx, Type *bit_field_type,
 
 	if (total_bit_size > maximum_bit_size) {
 		gbString s = type_to_string(backing_type);
-		error(node, "The numbers required %llu exceeds the backing type's (%s) bit size %llu",
+		error(node, "The total bit size of a bit_field's fields (%llu) must fit into its backing type's (%s) bit size of %llu",
 		      cast(unsigned long long)total_bit_size,
 		      s,
 		      cast(unsigned long long)maximum_bit_size);
