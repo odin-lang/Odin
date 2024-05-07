@@ -722,6 +722,7 @@ gb_internal void print_all_errors(void) {
 				if (it.str.len-it.pos > 0) {
 					array_add_elems(&prev_ev->msg, it.str.text+it.pos, it.str.len-it.pos);
 				}
+				array_free(&ev.msg);
 				array_ordered_remove(&global_error_collector.error_values, i);
 			} else {
 				prev_ev = &ev;
