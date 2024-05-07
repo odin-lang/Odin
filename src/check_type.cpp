@@ -1430,6 +1430,10 @@ gb_internal bool check_type_specialization_to(CheckerContext *ctx, Type *special
 		bool can_convert = check_cast_internal(ctx, &o, specialization);
 		return can_convert;
 	} else if (t->kind == Type_Struct) {
+		if (t->Struct.polymorphic_parent == nullptr &&
+		    t == s) {
+			return true;
+		}
 		if (t->Struct.polymorphic_parent == specialization) {
 			return true;
 		}
@@ -1479,6 +1483,10 @@ gb_internal bool check_type_specialization_to(CheckerContext *ctx, Type *special
 			return true;
 		}
 	} else if (t->kind == Type_Union) {
+		if (t->Union.polymorphic_parent == nullptr &&
+		    t == s) {
+			return true;
+		}
 		if (t->Union.polymorphic_parent == specialization) {
 			return true;
 		}
