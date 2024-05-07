@@ -581,6 +581,10 @@ gb_internal LLVMTypeRef llvm_array_type(LLVMTypeRef ElementType, uint64_t Elemen
 #endif
 }
 
+
+gb_internal void lb_set_metadata_custom_u64(lbModule *m, LLVMValueRef v_ref, String name, u64 value);
+gb_internal u64 lb_get_metadata_custom_u64(lbModule *m, LLVMValueRef v_ref, String name);
+
 #define LB_STARTUP_RUNTIME_PROC_NAME   "__$startup_runtime"
 #define LB_CLEANUP_RUNTIME_PROC_NAME   "__$cleanup_runtime"
 #define LB_TYPE_INFO_DATA_NAME       "__$type_info_data"
@@ -719,4 +723,4 @@ gb_global char const *llvm_linkage_strings[] = {
 	"linker private weak linkage"
 };
 
-#define ODIN_METADATA_REQUIRE "odin-metadata-require", 21
+#define ODIN_METADATA_IS_PACKED str_lit("odin-is-packed")
