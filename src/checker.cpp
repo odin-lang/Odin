@@ -1265,7 +1265,7 @@ gb_internal void init_checker_info(CheckerInfo *i) {
 	map_init(&i->gen_types);
 	array_init(&i->type_info_types, a);
 	map_init(&i->type_info_map);
-	string_map_init(&i->files);
+	array_init(&i->files, a);
 	string_map_init(&i->packages);
 	array_init(&i->variable_init_order, a);
 	array_init(&i->testing_procedures, a, 0, 0);
@@ -1296,7 +1296,7 @@ gb_internal void destroy_checker_info(CheckerInfo *i) {
 	map_destroy(&i->gen_types);
 	array_free(&i->type_info_types);
 	map_destroy(&i->type_info_map);
-	string_map_destroy(&i->files);
+	array_free(&i->files);
 	string_map_destroy(&i->packages);
 	array_free(&i->variable_init_order);
 	array_free(&i->required_foreign_imports_through_force);
@@ -5131,7 +5131,7 @@ gb_internal void check_create_file_scopes(Checker *c) {
 		isize total_pkg_decl_count = 0;
 		for_array(j, pkg->files) {
 			AstFile *f = pkg->files[j];
-			string_map_set(&c->info.files, f->fullpath, f);
+			array_add(&c->info.files, f);
 
 			create_scope_from_file(nullptr, f);
 			total_pkg_decl_count += f->total_file_decl_count;
@@ -5178,17 +5178,12 @@ gb_internal void check_collect_entities_all(Checker *c) {
 		map_init(&wd->untyped);
 	}
 
-	// WARNING: Instead of iterating over c->info.files, this MUST be
-	// done in sorted package/file order to ensure that the base/runtime
-	// package goes first.
-	for_array(i, c->parser->packages) {
-		AstPackage *pkg = c->parser->packages[i];
-
-		// INVARIANT: pkg->files is sorted (check_create_file_scope).
-		for_array(j, pkg->files) {
-			AstFile *f = pkg->files[j];
-			thread_pool_add_task(check_collect_entities_all_worker_proc, f);
-		}
+	// WARNING: This is ordering sensitive (the runtime package MUST be
+	// processed first, in lexographic order by filename).
+	//
+	// INVARIANT: c->info.files is sorted (See: check_create_file_scope).
+	for (auto const &f : c->info.files) {
+		thread_pool_add_task(check_collect_entities_all_worker_proc, f);
 	}
 
 	thread_pool_wait();
@@ -6327,8 +6322,7 @@ gb_internal void check_parsed_files(Checker *c) {
 	check_merge_queues_into_arrays(c);
 
 	TIME_SECTION("check scope usage");
-	for (auto const &entry : c->info.files) {
-		AstFile *f = entry.value;
+	for (auto const &f : c->info.files) {
 		u64 vet_flags = build_context.vet_flags;
 		if (f->vet_flags_set) {
 			vet_flags = f->vet_flags;

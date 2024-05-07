@@ -367,7 +367,7 @@ struct GenTypesData {
 struct CheckerInfo {
 	Checker *checker;
 
-	StringMap<AstFile *>    files;    // Key (full path)
+	Array<AstFile *>        files;    // Sorted (package/lexographical full path)
 	StringMap<AstPackage *> packages; // Key (full path)
 	Array<DeclInfo *>       variable_init_order;
 

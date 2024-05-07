@@ -2972,8 +2972,7 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 	for (auto const &entry : gen->modules) {
 		lbModule *m = entry.value;
 		if (m->debug_builder) { // Debug Info
-			for (auto const &file_entry : info->files) {
-				AstFile *f = file_entry.value;
+			for (auto const &f : info->files) {
 				LLVMMetadataRef res = LLVMDIBuilderCreateFile(m->debug_builder,
 					cast(char const *)f->filename.text, f->filename.len,
 					cast(char const *)f->directory.text, f->directory.len);
