@@ -145,12 +145,14 @@ Errno :: enum i32 {
 }
 
 /*
-	Bits for Open_Flags
+	Bits for Open_Flags.
+
+	RDONLY flag is not present, because it has the value of 0, i.e. it is the
+	default, unless WRONLY or RDWR is specified.
 */
 Open_Flags_Bits :: enum {
-	RDONLY    = 0,
-	WRONLY    = 1,
-	RDWR      = 2,
+	WRONLY    = 0,
+	RDWR      = 1,
 	CREAT     = 6,
 	EXCL      = 7,
 	NOCTTY    = 8,
@@ -160,12 +162,32 @@ Open_Flags_Bits :: enum {
 	DSYNC     = 12,
 	ASYNC     = 13,
 	DIRECT    = 14,
+	LARGEFILE = 15,
 	DIRECTORY = 16,
 	NOFOLLOW  = 17,
 	NOATIME   = 18,
 	CLOEXEC   = 19,
 	PATH      = 21,
 }
+
+// https://github.com/torvalds/linux/blob/7367539ad4b0f8f9b396baf02110962333719a48/include/uapi/asm-generic/fcntl.h#L19
+#assert(1 << uint(Open_Flags_Bits.WRONLY)    == 0o0000000_1)
+#assert(1 << uint(Open_Flags_Bits.RDWR)      == 0o0000000_2)
+#assert(1 << uint(Open_Flags_Bits.CREAT)     == 0o00000_100)
+#assert(1 << uint(Open_Flags_Bits.EXCL)      == 0o00000_200)
+#assert(1 << uint(Open_Flags_Bits.NOCTTY)    == 0o00000_400)
+#assert(1 << uint(Open_Flags_Bits.TRUNC)     == 0o0000_1000)
+#assert(1 << uint(Open_Flags_Bits.APPEND)    == 0o0000_2000)
+#assert(1 << uint(Open_Flags_Bits.NONBLOCK)  == 0o0000_4000)
+#assert(1 << uint(Open_Flags_Bits.DSYNC)     == 0o000_10000)
+#assert(1 << uint(Open_Flags_Bits.ASYNC)     == 0o000_20000)
+#assert(1 << uint(Open_Flags_Bits.DIRECT)    == 0o000_40000)
+#assert(1 << uint(Open_Flags_Bits.LARGEFILE) == 0o00_100000)
+#assert(1 << uint(Open_Flags_Bits.DIRECTORY) == 0o00_200000)
+#assert(1 << uint(Open_Flags_Bits.NOFOLLOW)  == 0o00_400000)
+#assert(1 << uint(Open_Flags_Bits.NOATIME)   == 0o0_1000000)
+#assert(1 << uint(Open_Flags_Bits.CLOEXEC)   == 0o0_2000000)
+#assert(1 << uint(Open_Flags_Bits.PATH)      == 0o_10000000)
 
 /*
 	Bits for FD_Flags bitset

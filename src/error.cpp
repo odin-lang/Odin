@@ -12,7 +12,7 @@ struct ErrorValue {
 };
 
 struct ErrorCollector {
-	TokenPos prev;
+	// TokenPos prev; // no point collecting because of the mulithreaded nature
 	std::atomic<i64>  count;
 	std::atomic<i64>  warning_count;
 	std::atomic<bool> in_block;
@@ -383,14 +383,13 @@ gb_internal void error_va(TokenPos const &pos, TokenPos end, char const *fmt, va
 	}
 
 	push_error_value(pos, ErrorValue_Error);
-	// NOTE(bill): Duplicate error, skip it
 	if (pos.line == 0) {
 		error_out_empty();
 		error_out_coloured("Error: ", TerminalStyle_Normal, TerminalColour_Red);
 		error_out_va(fmt, va);
 		error_out("\n");
-	} else if (global_error_collector.prev != pos) {
-		global_error_collector.prev = pos;
+	} else {
+		// global_error_collector.prev = pos;
 		if (json_errors()) {
 			error_out_empty();
 		} else {
@@ -402,10 +401,6 @@ gb_internal void error_va(TokenPos const &pos, TokenPos end, char const *fmt, va
 		error_out_va(fmt, va);
 		error_out("\n");
 		show_error_on_line(pos, end);
-	} else {
-		global_error_collector.curr_error_value = {};
-		global_error_collector.curr_error_value_set.store(false);
-		global_error_collector.count.fetch_sub(1);
 	}
 	try_pop_error_value();
 	mutex_unlock(&global_error_collector.mutex);
@@ -422,14 +417,13 @@ gb_internal void warning_va(TokenPos const &pos, TokenPos end, char const *fmt, 
 	push_error_value(pos, ErrorValue_Warning);
 
 	if (!global_ignore_warnings()) {
-		// NOTE(bill): Duplicate error, skip it
 		if (pos.line == 0) {
 			error_out_empty();
 			error_out_coloured("Warning: ", TerminalStyle_Normal, TerminalColour_Yellow);
 			error_out_va(fmt, va);
 			error_out("\n");
-		} else if (global_error_collector.prev != pos) {
-			global_error_collector.prev = pos;
+		} else {
+			// global_error_collector.prev = pos;
 			if (json_errors()) {
 				error_out_empty();
 			} else {
@@ -452,21 +446,20 @@ gb_internal void error_line_va(char const *fmt, va_list va) {
 
 gb_internal void error_no_newline_va(TokenPos const &pos, char const *fmt, va_list va) {
 	global_error_collector.count.fetch_add(1);
+	mutex_lock(&global_error_collector.mutex);
 	if (global_error_collector.count.load() > MAX_ERROR_COLLECTOR_COUNT()) {
 		print_all_errors();
 		gb_exit(1);
 	}
-	mutex_lock(&global_error_collector.mutex);
 
 	push_error_value(pos, ErrorValue_Error);
 
-	// NOTE(bill): Duplicate error, skip it
 	if (pos.line == 0) {
 		error_out_empty();
 		error_out_coloured("Error: ", TerminalStyle_Normal, TerminalColour_Red);
 		error_out_va(fmt, va);
-	} else if (global_error_collector.prev != pos) {
-		global_error_collector.prev = pos;
+	} else {
+		// global_error_collector.prev = pos;
 		if (json_errors()) {
 			error_out_empty();
 		} else {
@@ -485,17 +478,21 @@ gb_internal void error_no_newline_va(TokenPos const &pos, char const *fmt, va_li
 
 gb_internal void syntax_error_va(TokenPos const &pos, TokenPos end, char const *fmt, va_list va) {
 	global_error_collector.count.fetch_add(1);
+	mutex_lock(&global_error_collector.mutex);
 	if (global_error_collector.count > MAX_ERROR_COLLECTOR_COUNT()) {
 		print_all_errors();
 		gb_exit(1);
 	}
-	mutex_lock(&global_error_collector.mutex);
 
 	push_error_value(pos, ErrorValue_Warning);
 
-	// NOTE(bill): Duplicate error, skip it
-	if (global_error_collector.prev != pos) {
-		global_error_collector.prev = pos;
+	if (pos.line == 0) {
+		error_out_empty();
+		error_out_coloured("Syntax Error: ", TerminalStyle_Normal, TerminalColour_Red);
+		error_out_va(fmt, va);
+		error_out("\n");
+	} else {
+		// global_error_collector.prev = pos;
 		if (json_errors()) {
 			error_out_empty();
 		} else {
@@ -505,11 +502,6 @@ gb_internal void syntax_error_va(TokenPos const &pos, TokenPos end, char const *
 		error_out_va(fmt, va);
 		error_out("\n");
 		show_error_on_line(pos, end);
-	} else if (pos.line == 0) {
-		error_out_empty();
-		error_out_coloured("Syntax Error: ", TerminalStyle_Normal, TerminalColour_Red);
-		error_out_va(fmt, va);
-		error_out("\n");
 	}
 
 	try_pop_error_value();
@@ -518,22 +510,21 @@ gb_internal void syntax_error_va(TokenPos const &pos, TokenPos end, char const *
 
 gb_internal void syntax_error_with_verbose_va(TokenPos const &pos, TokenPos end, char const *fmt, va_list va) {
 	global_error_collector.count.fetch_add(1);
+	mutex_lock(&global_error_collector.mutex);
 	if (global_error_collector.count > MAX_ERROR_COLLECTOR_COUNT()) {
 		print_all_errors();
 		gb_exit(1);
 	}
-	mutex_lock(&global_error_collector.mutex);
 
 	push_error_value(pos, ErrorValue_Warning);
 
-	// NOTE(bill): Duplicate error, skip it
 	if (pos.line == 0) {
 		error_out_empty();
 		error_out_coloured("Syntax_Error: ", TerminalStyle_Normal, TerminalColour_Red);
 		error_out_va(fmt, va);
 		error_out("\n");
-	} else if (global_error_collector.prev != pos) {
-		global_error_collector.prev = pos;
+	} else {
+		// global_error_collector.prev = pos;
 		if (json_errors()) {
 			error_out_empty();
 		} else {
@@ -564,9 +555,13 @@ gb_internal void syntax_warning_va(TokenPos const &pos, TokenPos end, char const
 	push_error_value(pos, ErrorValue_Warning);
 
 	if (!global_ignore_warnings()) {
-		// NOTE(bill): Duplicate error, skip it
-		if (global_error_collector.prev != pos) {
-			global_error_collector.prev = pos;
+		if (pos.line == 0) {
+			error_out_empty();
+			error_out_coloured("Syntax Warning: ", TerminalStyle_Normal, TerminalColour_Yellow);
+			error_out_va(fmt, va);
+			error_out("\n");
+		} else {
+			// global_error_collector.prev = pos;
 			if (json_errors()) {
 				error_out_empty();
 			} else {
@@ -576,11 +571,6 @@ gb_internal void syntax_warning_va(TokenPos const &pos, TokenPos end, char const
 			error_out_va(fmt, va);
 			error_out("\n");
 			// show_error_on_line(pos, end);
-		} else if (pos.line == 0) {
-			error_out_empty();
-			error_out_coloured("Syntax Warning: ", TerminalStyle_Normal, TerminalColour_Yellow);
-			error_out_va(fmt, va);
-			error_out("\n");
 		}
 	}
 
@@ -705,8 +695,41 @@ gb_internal void print_all_errors(void) {
 
 	GB_ASSERT(any_errors() || any_warnings());
 
-
 	array_sort(global_error_collector.error_values, error_value_cmp);
+
+
+	{ // NOTE(bill): merge neighbouring errors
+		isize default_lines_to_skip = 1;
+		if (show_error_line()) {
+			// NOTE(bill): this will always be 2 extra lines
+			default_lines_to_skip += 2;
+		}
+
+		ErrorValue *prev_ev = nullptr;
+		for (isize i = 0; i < global_error_collector.error_values.count; /**/) {
+			ErrorValue &ev = global_error_collector.error_values[i];
+
+			if (prev_ev && prev_ev->pos == ev.pos) {
+				String_Iterator it = {{ev.msg.data, ev.msg.count}, 0};
+
+				for (isize lines_to_skip = default_lines_to_skip; lines_to_skip > 0; lines_to_skip -= 1) {
+					String line = string_split_iterator(&it, '\n');
+					if (line.len == 0) {
+						break;
+					}
+				}
+
+				if (it.str.len-it.pos > 0) {
+					array_add_elems(&prev_ev->msg, it.str.text+it.pos, it.str.len-it.pos);
+				}
+				array_free(&ev.msg);
+				array_ordered_remove(&global_error_collector.error_values, i);
+			} else {
+				prev_ev = &ev;
+				i += 1;
+			}
+		}
+	}
 
 	gbString res = gb_string_make(heap_allocator(), "");
 	defer (gb_string_free(res));
@@ -715,6 +738,7 @@ gb_internal void print_all_errors(void) {
 		res = gb_string_append_fmt(res, "{\n");
 		res = gb_string_append_fmt(res, "\t\"error_count\": %td,\n", global_error_collector.error_values.count);
 		res = gb_string_append_fmt(res, "\t\"errors\": [\n");
+
 		for_array(i, global_error_collector.error_values) {
 			ErrorValue ev = global_error_collector.error_values[i];
 
@@ -728,9 +752,8 @@ gb_internal void print_all_errors(void) {
 			}
 			res = gb_string_append_fmt(res, "\",\n");
 
-			res = gb_string_append_fmt(res, "\t\t\t\"pos\": {\n");
-
 			if (ev.pos.file_id) {
+				res = gb_string_append_fmt(res, "\t\t\t\"pos\": {\n");
 				res = gb_string_append_fmt(res, "\t\t\t\t\"file\": \"");
 				String file = get_file_path_string(ev.pos.file_id);
 				for (isize k = 0; k < file.len; k++) {
@@ -743,6 +766,8 @@ gb_internal void print_all_errors(void) {
 				i32 end_column = gb_max(ev.end.column, ev.pos.column);
 				res = gb_string_append_fmt(res, "\t\t\t\t\"end_column\": %d\n", end_column);
 				res = gb_string_append_fmt(res, "\t\t\t},\n");
+			} else {
+				res = gb_string_append_fmt(res, "\t\t\t\"pos\": null,\n");
 			}
 
 			res = gb_string_append_fmt(res, "\t\t\t\"msgs\": [\n");

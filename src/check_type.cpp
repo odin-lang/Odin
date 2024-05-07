@@ -797,11 +797,11 @@ gb_internal void check_enum_type(CheckerContext *ctx, Type *enum_type, Type *nam
 	enum_type->Enum.scope = ctx->scope;
 
 	Type *base_type = t_int;
-	if (et->base_type != nullptr) {
+	if (unparen_expr(et->base_type) != nullptr) {
 		base_type = check_type(ctx, et->base_type);
 	}
 
-	if (base_type == nullptr || !is_type_integer(base_type)) {
+	if (base_type == nullptr || base_type == t_invalid || !is_type_integer(base_type)) {
 		error(node, "Base type for enumeration must be an integer");
 		return;
 	}
@@ -1080,6 +1080,8 @@ gb_internal void check_bit_field_type(CheckerContext *ctx, Type *bit_field_type,
 			array_add(&tags, tag);
 
 			add_entity_use(ctx, field, e);
+
+			total_bit_size += bit_size_u8;
 		}
 	}
 
@@ -1094,7 +1096,7 @@ gb_internal void check_bit_field_type(CheckerContext *ctx, Type *bit_field_type,
 
 	if (total_bit_size > maximum_bit_size) {
 		gbString s = type_to_string(backing_type);
-		error(node, "The numbers required %llu exceeds the backing type's (%s) bit size %llu",
+		error(node, "The total bit size of a bit_field's fields (%llu) must fit into its backing type's (%s) bit size of %llu",
 		      cast(unsigned long long)total_bit_size,
 		      s,
 		      cast(unsigned long long)maximum_bit_size);
@@ -1428,6 +1430,10 @@ gb_internal bool check_type_specialization_to(CheckerContext *ctx, Type *special
 		bool can_convert = check_cast_internal(ctx, &o, specialization);
 		return can_convert;
 	} else if (t->kind == Type_Struct) {
+		if (t->Struct.polymorphic_parent == nullptr &&
+		    t == s) {
+			return true;
+		}
 		if (t->Struct.polymorphic_parent == specialization) {
 			return true;
 		}
@@ -1477,6 +1483,10 @@ gb_internal bool check_type_specialization_to(CheckerContext *ctx, Type *special
 			return true;
 		}
 	} else if (t->kind == Type_Union) {
+		if (t->Union.polymorphic_parent == nullptr &&
+		    t == s) {
+			return true;
+		}
 		if (t->Union.polymorphic_parent == specialization) {
 			return true;
 		}
@@ -2017,8 +2027,8 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 				}
 
 				if (p->flags&FieldFlag_no_alias) {
-					if (!is_type_pointer(type)) {
-						error(name, "'#no_alias' can only be applied pointer typed parameters");
+					if (!is_type_pointer(type) && !is_type_multi_pointer(type)) {
+						error(name, "'#no_alias' can only be applied pointer or multi-pointer typed parameters");
 						p->flags &= ~FieldFlag_no_alias; // Remove the flag
 					}
 				}
@@ -3263,6 +3273,11 @@ gb_internal bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, T
 	case_end;
 
 	case_ast_node(pe, ParenExpr, e);
+		if (pe->expr == nullptr) {
+			error(e, "Expected an expression or type within the parentheses");
+			*type = t_invalid;
+			return true;
+		}
 		*type = check_type_expr(ctx, pe->expr, named_type);
 		set_base_type(named_type, *type);
 		return true;

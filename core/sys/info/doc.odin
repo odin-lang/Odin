@@ -19,18 +19,21 @@ Example:
 	import si "core:sys/info"
 
 	main :: proc() {
-		fmt.printf("Odin:  %v\n",     ODIN_VERSION)
-		fmt.printf("OS:    %v\n",     si.os_version.as_string)
-		fmt.printf("OS:    %#v\n",    si.os_version)
-		fmt.printf("CPU:   %v\n",     si.cpu_name)
-		fmt.printf("RAM:   %v MiB\n", si.ram.total_ram / 1024 / 1024)
+		fmt.printfln("Odin:  %v",    ODIN_VERSION)
+		fmt.printfln("OS:    %v",    si.os_version.as_string)
+		fmt.printfln("OS:    %#v",   si.os_version)
+		fmt.printfln("CPU:   %v",    si.cpu_name)
+		fmt.printfln("RAM:   %#.1M", si.ram.total_ram)
+
+		// fmt.printfln("Features: %v",      si.cpu_features)
+		// fmt.printfln("MacOS version: %v", si.macos_version)
 
 		fmt.println()
 		for gpu, i in si.gpus {
-			fmt.printf("GPU #%v:\n", i)
-			fmt.printf("\tVendor: %v\n",     gpu.vendor_name)
-			fmt.printf("\tModel:  %v\n",     gpu.model_name)
-			fmt.printf("\tVRAM:   %v MiB\n", gpu.total_ram / 1024 / 1024)
+			fmt.printfln("GPU #%v:", i)
+			fmt.printfln("\tVendor: %v",    gpu.vendor_name)
+			fmt.printfln("\tModel:  %v",    gpu.model_name)
+			fmt.printfln("\tVRAM:   %#.1M", gpu.total_ram)
 		}
 	}
 
@@ -51,11 +54,11 @@ Example:
 		as_string = "Windows 10 Professional (version: 20H2), build: 19042.1466",
 	}
 	CPU:   AMD Ryzen 7 1800X Eight-Core Processor
-	RAM:   65469 MiB
+	RAM:   64.0 GiB
 	GPU #0:
 		Vendor: Advanced Micro Devices, Inc.
 		Model:  Radeon RX Vega
-		VRAM:   8176 MiB
+		VRAM:   8.0 GiB
 
 - Example macOS output:
 
@@ -73,6 +76,6 @@ Example:
 			as_string = "macOS Monterey 12.4 (build 21F79, kernel 21.5.0)",
 	}
 	CPU:  Intel(R) Core(TM) i5-7360U CPU @ 2.30GHz
-	RAM:  8192 MiB
+	RAM:  8.0 GiB
 */
 package sysinfo

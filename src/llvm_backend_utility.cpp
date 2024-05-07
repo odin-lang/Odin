@@ -1708,7 +1708,8 @@ gb_internal lbValue lb_emit_mul_add(lbProcedure *p, lbValue a, lbValue b, lbValu
 	if (is_possible) {
 		switch (build_context.metrics.arch) {
 		case TargetArch_amd64:
-			if (type_size_of(t) == 2) {
+			// NOTE: using the intrinsic when not supported causes slow codegen (See #2928).
+			if (type_size_of(t) == 2 || !check_target_feature_is_enabled(str_lit("fma"), nullptr)) {
 				is_possible = false;
 			}
 			break;
