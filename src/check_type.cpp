@@ -381,6 +381,7 @@ gb_internal Type *check_record_polymorphic_params(CheckerContext *ctx, Ast *poly
 			Type *type = nullptr;
 			bool is_type_param = false;
 			bool is_type_polymorphic_type = false;
+			Type *specialization = nullptr;
 			if (type_expr == nullptr && default_value == nullptr) {
 				error(param, "Expected a type for this parameter");
 				continue;
@@ -393,7 +394,6 @@ gb_internal Type *check_record_polymorphic_params(CheckerContext *ctx, Ast *poly
 				}
 				if (type_expr->kind == Ast_TypeidType) {
 					is_type_param = true;
-					Type *specialization = nullptr;
 					if (type_expr->TypeidType.specialization != nullptr) {
 						Ast *s = type_expr->TypeidType.specialization;
 						specialization = check_type(ctx, s);
@@ -471,6 +471,15 @@ gb_internal Type *check_record_polymorphic_params(CheckerContext *ctx, Ast *poly
 						if (is_type_polymorphic(base_type(operand.type))) {
 							*is_polymorphic_ = true;
 							can_check_fields = false;
+						} else if (specialization &&
+						           !check_type_specialization_to(ctx, specialization, operand.type, false, /*modify_type*/true)) {
+							if (!ctx->no_polymorphic_errors) {
+								gbString t = type_to_string(operand.type);
+								gbString s = type_to_string(specialization);
+								error(operand.expr, "Cannot convert type '%s' to the specialization '%s'", t, s);
+								gb_string_free(s);
+								gb_string_free(t);
+							}
 						}
 						e = alloc_entity_type_name(scope, token, operand.type);
 						e->TypeName.is_type_alias = true;
