@@ -5178,10 +5178,19 @@ gb_internal void check_collect_entities_all(Checker *c) {
 		map_init(&wd->untyped);
 	}
 
-	for (auto const &entry : c->info.files) {
-		AstFile *f = entry.value;
-		thread_pool_add_task(check_collect_entities_all_worker_proc, f);
+	// WARNING: Instead of iterating over c->info.files, this MUST be
+	// done in sorted package/file order to ensure that the base/runtime
+	// package goes first.
+	for_array(i, c->parser->packages) {
+		AstPackage *pkg = c->parser->packages[i];
+
+		// INVARIANT: pkg->files is sorted (check_create_file_scope).
+		for_array(j, pkg->files) {
+			AstFile *f = pkg->files[j];
+			thread_pool_add_task(check_collect_entities_all_worker_proc, f);
+		}
 	}
+
 	thread_pool_wait();
 }
 
