@@ -3499,6 +3499,10 @@ gb_internal Ast *parse_type(AstFile *f) {
 		Token token = advance_token(f);
 		syntax_error(token, "Expected a type");
 		return ast_bad_expr(f, token, f->curr_token);
+	} else if (type->kind == Ast_ParenExpr &&
+	           unparen_expr(type) == nullptr) {
+		syntax_error(type, "Expected a type within the parentheses");
+		return ast_bad_expr(f, type->ParenExpr.open, type->ParenExpr.close);
 	}
 	return type;
 }

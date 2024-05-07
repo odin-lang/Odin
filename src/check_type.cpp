@@ -797,11 +797,11 @@ gb_internal void check_enum_type(CheckerContext *ctx, Type *enum_type, Type *nam
 	enum_type->Enum.scope = ctx->scope;
 
 	Type *base_type = t_int;
-	if (et->base_type != nullptr) {
+	if (unparen_expr(et->base_type) != nullptr) {
 		base_type = check_type(ctx, et->base_type);
 	}
 
-	if (base_type == nullptr || !is_type_integer(base_type)) {
+	if (base_type == nullptr || base_type == t_invalid || !is_type_integer(base_type)) {
 		error(node, "Base type for enumeration must be an integer");
 		return;
 	}
@@ -3265,6 +3265,11 @@ gb_internal bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, T
 	case_end;
 
 	case_ast_node(pe, ParenExpr, e);
+		if (pe->expr == nullptr) {
+			error(e, "Expected an expression or type within the parentheses");
+			*type = t_invalid;
+			return true;
+		}
 		*type = check_type_expr(ctx, pe->expr, named_type);
 		set_base_type(named_type, *type);
 		return true;
