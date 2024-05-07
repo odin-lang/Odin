@@ -2023,6 +2023,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		
 		Selection sel = lookup_field(type, field_name, false);
 		if (sel.entity == nullptr) {
+			ERROR_BLOCK();
 			gbString type_str = type_to_string_shorthand(type);
 			error(ce->args[0],
 			      "'%s' has no field named '%.*s'", type_str, LIT(field_name));
@@ -2096,6 +2097,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		
 		Selection sel = lookup_field(type, field_name, false);
 		if (sel.entity == nullptr) {
+			ERROR_BLOCK();
 			gbString type_str = type_to_string_shorthand(type);
 			error(ce->args[0],
 			      "'%s' has no field named '%.*s'", type_str, LIT(field_name));
@@ -5837,6 +5839,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 
 			Selection sel = lookup_field(type, field_name, false);
 			if (sel.entity == nullptr) {
+				ERROR_BLOCK();
 				gbString type_str = type_to_string(bt);
 				error(ce->args[0],
 				      "'%s' has no field named '%.*s'", type_str, LIT(field_name));
