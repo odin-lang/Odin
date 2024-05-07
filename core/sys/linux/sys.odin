@@ -2314,7 +2314,7 @@ futex :: proc {
 */
 epoll_create :: proc(size: i32 = 1) -> (Fd, Errno) {
 	when ODIN_ARCH != .arm64 {
-		ret := syscall(SYS_epoll_create)
+		ret := syscall(SYS_epoll_create, i32(1))
 		return errno_unwrap(ret, Fd)
 	} else {
 		ret := syscall(SYS_epoll_create1, i32(0))
