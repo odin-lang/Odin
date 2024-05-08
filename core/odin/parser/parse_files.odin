@@ -39,10 +39,10 @@ collect_package :: proc(path: string) -> (pkg: ^ast.Package, success: bool) {
 			delete(fullpath)
 			return
 		}
-        if strings.trim_space(string(src)) == "" {
-            delete(fullpath)
-            continue
-        }
+		if strings.trim_space(string(src)) == "" {
+			delete(fullpath)
+			continue
+		}
 
 		file := ast.new(ast.File, NO_POS, NO_POS)
 		file.pkg = pkg
@@ -76,9 +76,9 @@ parse_package :: proc(pkg: ^ast.Package, p: ^Parser = nil) -> bool {
 		if !parse_file(p, file) {
 			ok = false
 		}
-        if file.pkg_decl == nil {
-            error(p, p.curr_tok.pos, "Expected pacakge declaration at the start of the file")
-        } else if pkg.name == "" {
+		if file.pkg_decl == nil {
+			error(p, p.curr_tok.pos, "Expected pacakge declaration at the start of the file")
+		} else if pkg.name == "" {
 			pkg.name = file.pkg_decl.name
 		} else if pkg.name != file.pkg_decl.name {
 			error(p, file.pkg_decl.pos, "different package name, expected '%s', got '%s'", pkg.name, file.pkg_decl.name)
