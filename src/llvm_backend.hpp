@@ -1,13 +1,9 @@
 #if defined(GB_SYSTEM_WINDOWS)
-#include "llvm-c/Core.h"
-#include "llvm-c/ExecutionEngine.h"
-#include "llvm-c/Target.h"
-#include "llvm-c/Analysis.h"
-#include "llvm-c/Object.h"
-#include "llvm-c/BitWriter.h"
-#include "llvm-c/DebugInfo.h"
-#include "llvm-c/Transforms/PassBuilder.h"
+#include <llvm-c/Config/llvm-config.h>
 #else
+#include <llvm/Config/llvm-config.h>
+#endif
+
 #include <llvm-c/Core.h>
 #include <llvm-c/ExecutionEngine.h>
 #include <llvm-c/Target.h>
@@ -25,7 +21,6 @@
 #include <llvm-c/Transforms/Scalar.h>
 #include <llvm-c/Transforms/Utils.h>
 #include <llvm-c/Transforms/Vectorize.h>
-#endif
 #endif
 
 #if LLVM_VERSION_MAJOR < 11

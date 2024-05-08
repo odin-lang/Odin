@@ -613,7 +613,6 @@ struct TargetMetrics {
 	isize          max_align;
 	isize          max_simd_align;
 	String         target_triplet;
-	String         target_data_layout;
 	TargetABIKind  abi;
 };
 
@@ -923,7 +922,18 @@ gb_internal isize MAX_ERROR_COLLECTOR_COUNT(void) {
 	return build_context.max_error_count;
 }
 
+#if defined(GB_SYSTEM_WINDOWS)
+	#include <llvm-c/Config/llvm-config.h>
+#else
+	#include <llvm/Config/llvm-config.h>
+#endif
 
+// NOTE: AMD64 targets had their alignment on 128 bit ints bumped from 8 to 16 (undocumented of course).
+#if LLVM_VERSION_MAJOR >= 18
+	#define AMD64_MAX_ALIGNMENT 16
+#else
+	#define AMD64_MAX_ALIGNMENT 8
+#endif
 
 gb_global TargetMetrics target_windows_i386 = {
 	TargetOs_windows,
@@ -934,9 +944,8 @@ gb_global TargetMetrics target_windows_i386 = {
 gb_global TargetMetrics target_windows_amd64 = {
 	TargetOs_windows,
 	TargetArch_amd64,
-	8, 8, 8, 16,
+	8, 8, AMD64_MAX_ALIGNMENT, 16,
 	str_lit("x86_64-pc-windows-msvc"),
-	str_lit("e-m:w-i64:64-f80:128-n8:16:32:64-S128"),
 };
 
 gb_global TargetMetrics target_linux_i386 = {
@@ -949,16 +958,14 @@ gb_global TargetMetrics target_linux_i386 = {
 gb_global TargetMetrics target_linux_amd64 = {
 	TargetOs_linux,
 	TargetArch_amd64,
-	8, 8, 8, 16,
+	8, 8, AMD64_MAX_ALIGNMENT, 16,
 	str_lit("x86_64-pc-linux-gnu"),
-	str_lit("e-m:w-i64:64-f80:128-n8:16:32:64-S128"),
 };
 gb_global TargetMetrics target_linux_arm64 = {
 	TargetOs_linux,
 	TargetArch_arm64,
-	8, 8, 8, 16,
+	8, 8, 16, 16,
 	str_lit("aarch64-linux-elf"),
-	str_lit("e-m:o-p:32:32-Fi8-i64:64-v128:64:128-a:0:32-n32-S64"),
 };
 
 gb_global TargetMetrics target_linux_arm32 = {
@@ -966,15 +973,13 @@ gb_global TargetMetrics target_linux_arm32 = {
 	TargetArch_arm32,
 	4, 4, 4, 8,
 	str_lit("arm-linux-gnu"),
-	str_lit("e-m:o-p:32:32-Fi8-i64:64-v128:64:128-a:0:32-n32-S64"),
 };
 
 gb_global TargetMetrics target_darwin_amd64 = {
 	TargetOs_darwin,
 	TargetArch_amd64,
-	8, 8, 8, 16,
+	8, 8, AMD64_MAX_ALIGNMENT, 16,
 	str_lit("x86_64-apple-macosx"), // NOTE: Changes during initialization based on build flags.
-	str_lit("e-m:o-i64:64-f80:128-n8:16:32:64-S128"),
 };
 
 gb_global TargetMetrics target_darwin_arm64 = {
@@ -982,7 +987,6 @@ gb_global TargetMetrics target_darwin_arm64 = {
 	TargetArch_arm64,
 	8, 8, 16, 16,
 	str_lit("arm64-apple-macosx"), // NOTE: Changes during initialization based on build flags.
-	str_lit("e-m:o-i64:64-i128:128-n32:64-S128"),
 };
 
 gb_global TargetMetrics target_freebsd_i386 = {
@@ -995,9 +999,8 @@ gb_global TargetMetrics target_freebsd_i386 = {
 gb_global TargetMetrics target_freebsd_amd64 = {
 	TargetOs_freebsd,
 	TargetArch_amd64,
-	8, 8, 8, 16,
+	8, 8, AMD64_MAX_ALIGNMENT, 16,
 	str_lit("x86_64-unknown-freebsd-elf"),
-	str_lit("e-m:w-i64:64-f80:128-n8:16:32:64-S128"),
 };
 
 gb_global TargetMetrics target_freebsd_arm64 = {
@@ -1005,28 +1008,26 @@ gb_global TargetMetrics target_freebsd_arm64 = {
 	TargetArch_arm64,
 	8, 8, 16, 16,
 	str_lit("aarch64-unknown-freebsd-elf"),
-	str_lit("e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128"),
 };
 
 gb_global TargetMetrics target_openbsd_amd64 = {
 	TargetOs_openbsd,
 	TargetArch_amd64,
-	8, 8, 8, 16,
+	8, 8, AMD64_MAX_ALIGNMENT, 16,
 	str_lit("x86_64-unknown-openbsd-elf"),
-	str_lit("e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"),
 };
 
 gb_global TargetMetrics target_haiku_amd64 = {
 	TargetOs_haiku,
 	TargetArch_amd64,
-	8, 8, 8, 16,
+	8, 8, AMD64_MAX_ALIGNMENT, 16,
 	str_lit("x86_64-unknown-haiku"),
 };
 
 gb_global TargetMetrics target_essence_amd64 = {
 	TargetOs_essence,
 	TargetArch_amd64,
-	8, 8, 8, 16,
+	8, 8, AMD64_MAX_ALIGNMENT, 16,
 	str_lit("x86_64-pc-none-elf"),
 };
 
@@ -1036,7 +1037,6 @@ gb_global TargetMetrics target_freestanding_wasm32 = {
 	TargetArch_wasm32,
 	4, 4, 8, 16,
 	str_lit("wasm32-freestanding-js"),
-	str_lit("e-m:e-p:32:32-i64:64-n32:64-S128"),
 };
 
 gb_global TargetMetrics target_js_wasm32 = {
@@ -1044,7 +1044,6 @@ gb_global TargetMetrics target_js_wasm32 = {
 	TargetArch_wasm32,
 	4, 4, 8, 16,
 	str_lit("wasm32-js-js"),
-	str_lit("e-m:e-p:32:32-i64:64-n32:64-S128"),
 };
 
 gb_global TargetMetrics target_wasi_wasm32 = {
@@ -1052,7 +1051,6 @@ gb_global TargetMetrics target_wasi_wasm32 = {
 	TargetArch_wasm32,
 	4, 4, 8, 16,
 	str_lit("wasm32-wasi-js"),
-	str_lit("e-m:e-p:32:32-i64:64-n32:64-S128"),
 };
 
 
@@ -1061,7 +1059,6 @@ gb_global TargetMetrics target_freestanding_wasm64p32 = {
 	TargetArch_wasm64p32,
 	4, 8, 8, 16,
 	str_lit("wasm32-freestanding-js"),
-	str_lit("e-m:e-p:32:32-i64:64-n32:64-S128"),
 };
 
 gb_global TargetMetrics target_js_wasm64p32 = {
@@ -1069,7 +1066,6 @@ gb_global TargetMetrics target_js_wasm64p32 = {
 	TargetArch_wasm64p32,
 	4, 8, 8, 16,
 	str_lit("wasm32-js-js"),
-	str_lit("e-m:e-p:32:32-i64:64-n32:64-S128"),
 };
 
 gb_global TargetMetrics target_wasi_wasm64p32 = {
@@ -1077,7 +1073,6 @@ gb_global TargetMetrics target_wasi_wasm64p32 = {
 	TargetArch_wasm32,
 	4, 8, 8, 16,
 	str_lit("wasm32-wasi-js"),
-	str_lit("e-m:e-p:32:32-i64:64-n32:64-S128"),
 };
 
 
@@ -1085,27 +1080,24 @@ gb_global TargetMetrics target_wasi_wasm64p32 = {
 gb_global TargetMetrics target_freestanding_amd64_sysv = {
 	TargetOs_freestanding,
 	TargetArch_amd64,
-	8, 8, 8, 16,
+	8, 8, AMD64_MAX_ALIGNMENT, 16,
 	str_lit("x86_64-pc-none-gnu"),
-	str_lit("e-m:w-i64:64-f80:128-n8:16:32:64-S128"),
 	TargetABI_SysV,
 };
 
 gb_global TargetMetrics target_freestanding_amd64_win64 = {
 	TargetOs_freestanding,
 	TargetArch_amd64,
-	8, 8, 8, 16,
+	8, 8, AMD64_MAX_ALIGNMENT, 16,
 	str_lit("x86_64-pc-none-msvc"),
-	str_lit("e-m:w-i64:64-f80:128-n8:16:32:64-S128"),
 	TargetABI_Win64,
 };
 
 gb_global TargetMetrics target_freestanding_arm64 = {
 	TargetOs_freestanding,
 	TargetArch_arm64,
-	8, 8, 8, 16,
+	8, 8, 16, 16,
 	str_lit("aarch64-none-elf"),
-	str_lit("e-m:o-p:32:32-Fi8-i64:64-v128:64:128-a:0:32-n32-S64"),
 };
 
 struct NamedTargetMetrics {
@@ -2027,7 +2019,8 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 
 	bc->optimization_level = gb_clamp(bc->optimization_level, -1, 3);
 
-	if (bc->metrics.os != TargetOs_windows) {
+	// TODO: Static map calls are bugged on `amd64sysv` abi.
+	if (bc->metrics.os != TargetOs_windows && bc->metrics.arch == TargetArch_amd64) {
 		// ENFORCE DYNAMIC MAP CALLS
 		bc->dynamic_map_calls = true;
 	}
