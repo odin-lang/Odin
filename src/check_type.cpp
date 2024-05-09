@@ -2076,6 +2076,7 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 					param = alloc_entity_param(scope, name->Ident.token, type, is_using, true);
 					param->Variable.param_value = param_value;
 					param->Variable.field_group_index = field_group_index;
+					param->Variable.type_expr = type_expr;
 				}
 			}
 			if (p->flags&FieldFlag_no_alias) {

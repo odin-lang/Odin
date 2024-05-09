@@ -210,6 +210,7 @@ struct Entity {
 			CommentGroup *comment;
 		} Constant;
 		struct {
+			Ast *type_expr; // only used for some variables within procedure bodies
 			Ast *init_expr; // only used for some variables within procedure bodies
 			i32  field_index;
 			i32  field_group_index;

@@ -3267,6 +3267,10 @@ gb_internal Selection lookup_field_with_selection(Type *type_, String field_name
 			}
 		}
 
+		if (is_type_polymorphic(type)) {
+			// NOTE(bill): A polymorphic struct has no fields, this only hits in the case of an error
+			return sel;
+		}
 		wait_signal_until_available(&type->Struct.fields_wait_signal);
 		isize field_count = type->Struct.fields.count;
 		if (field_count != 0) for_array(i, type->Struct.fields) {
