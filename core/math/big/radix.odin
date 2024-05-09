@@ -469,7 +469,7 @@ internal_int_pack_count :: proc(a: ^Int, $T: typeid, nails := 0) -> (size_needed
 	Assumes `a` not to be `nil` and to have been initialized.
 */
 internal_int_pack :: proc(a: ^Int, buf: []$T, nails := 0, order := Order.LSB_First) -> (written: int, err: Error)
-                     where intrinsics.type_is_integer(T) && intrinsics.type_is_unsigned(T) && size_of(T) <= 16 {
+                     where intrinsics.type_is_integer(T), intrinsics.type_is_unsigned(T), size_of(T) <= 16 {
 
 	assert(nails >= 0 && nails < (size_of(T) * 8))
 
@@ -505,7 +505,7 @@ internal_int_pack :: proc(a: ^Int, buf: []$T, nails := 0, order := Order.LSB_Fir
 
 
 internal_int_unpack :: proc(a: ^Int, buf: []$T, nails := 0, order := Order.LSB_First, allocator := context.allocator) -> (err: Error)
-                     where intrinsics.type_is_integer(T) && intrinsics.type_is_unsigned(T) && size_of(T) <= 16 {
+                     where intrinsics.type_is_integer(T), intrinsics.type_is_unsigned(T), size_of(T) <= 16 {
 	assert(nails >= 0 && nails < (size_of(T) * 8))
 	context.allocator = allocator
 
