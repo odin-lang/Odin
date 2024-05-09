@@ -1,7 +1,7 @@
 #include "parser_pos.cpp"
 
 gb_internal u64 ast_file_vet_flags(AstFile *f) {
-	if (f->vet_flags_set) {
+	if (f != nullptr && f->vet_flags_set) {
 		return f->vet_flags;
 	}
 	return build_context.vet_flags;
