@@ -719,9 +719,13 @@ gb_internal void print_all_errors(void) {
 					}
 				}
 
-				if (it.str.len-it.pos > 0) {
-					array_add_elems(&prev_ev->msg, it.str.text+it.pos, it.str.len-it.pos);
+				// Merge additional text (suggestions for example) into the previous error.
+				String current = {prev_ev->msg.data, prev_ev->msg.count};
+				String addition = {it.str.text+it.pos, it.str.len-it.pos};
+				if (addition.len > 0 && !string_contains_string(current, addition)) {
+					array_add_elems(&prev_ev->msg, addition.text, addition.len);
 				}
+
 				array_free(&ev.msg);
 				array_ordered_remove(&global_error_collector.error_values, i);
 			} else {

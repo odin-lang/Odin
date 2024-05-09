@@ -6201,7 +6201,7 @@ gb_internal bool evaluate_where_clauses(CheckerContext *ctx, Ast *call_expr, Sco
 					error(c, "Prefer to separate 'where' clauses with a comma rather than '&&'");
 					gbString x = expr_to_string(c->BinaryExpr.left);
 					gbString y = expr_to_string(c->BinaryExpr.right);
-					error_line("\tSuggestion: '%s, %s'", x, y);
+					error_line("\tSuggestion: '%s, %s'\n", x, y);
 					gb_string_free(y);
 					gb_string_free(x);
 				}
