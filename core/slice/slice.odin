@@ -706,7 +706,7 @@ enumerated_array :: proc(ptr: ^$T) -> []intrinsics.type_elem_type(T)
 // e.g.:
 //    bs := slice.enum_slice_to_bitset(my_flag_slice, rl.ConfigFlags)
 @(require_results)
-enum_slice_to_bitset :: proc(enums: []$E, $T: typeid/bit_set[E]) -> (bits: T) where intrinsics.type_is_enum(E) && intrinsics.type_bit_set_elem_type(T) == E {
+enum_slice_to_bitset :: proc(enums: []$E, $T: typeid/bit_set[E]) -> (bits: T) where intrinsics.type_is_enum(E), intrinsics.type_bit_set_elem_type(T) == E {
 	for v in enums {
 		bits |= {v}
 	}
@@ -717,7 +717,7 @@ enum_slice_to_bitset :: proc(enums: []$E, $T: typeid/bit_set[E]) -> (bits: T) wh
 // e.g.:
 //    sl := slice.bitset_to_enum_slice(flag_buf[:], bs)
 @(require_results)
-bitset_to_enum_slice :: proc(buf: []$E, bs: $T) -> (slice: []E) where intrinsics.type_is_enum(E) && intrinsics.type_bit_set_elem_type(T) == E {
+bitset_to_enum_slice_with_buffer :: proc(buf: []$E, bs: $T) -> (slice: []E) where intrinsics.type_is_enum(E), intrinsics.type_bit_set_elem_type(T) == E {
 	count := 0
 	for v in bs {
 		buf[count] = v
@@ -725,3 +725,15 @@ bitset_to_enum_slice :: proc(buf: []$E, bs: $T) -> (slice: []E) where intrinsics
 	}
 	return buf[:count]
 }
+
+// Turn a `bit_set[E]` into a `[]E`, allocates
+// e.g.:
+//    sl := slice.bitset_to_enum_slice(bs)
+@(require_results)
+bitset_to_enum_slice_with_make :: proc(bs: $T, $E: typeid, allocator := context.allocator) -> (slice: []E) where intrinsics.type_is_enum(E), intrinsics.type_bit_set_elem_type(T) == E {
+	ones := intrinsics.count_ones(transmute(E)bs)
+	buf  := make([]E, int(ones), allocator)
+	return bitset_to_enum_slice(buf, bs)
+}
+
+bitset_to_enum_slice :: proc{bitset_to_enum_slice_with_make, bitset_to_enum_slice_with_buffer}
