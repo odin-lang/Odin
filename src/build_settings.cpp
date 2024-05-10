@@ -564,7 +564,7 @@ gb_global TargetMetrics target_netbsd_amd64 = {
 	TargetArch_amd64,
 	8, 8, 8, 16,
 	str_lit("x86_64-unknown-netbsd-elf"),
-	str_lit("e-m:w-i64:64-f80:128-n8:16:32:64-S128"),
+	str_lit("e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"),
 };
 
 gb_global TargetMetrics target_haiku_amd64 = {
