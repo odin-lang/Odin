@@ -41,6 +41,7 @@ collect_package :: proc(path: string) -> (pkg: ^ast.Package, success: bool) {
 		}
 		if strings.trim_space(string(src)) == "" {
 			delete(fullpath)
+			delete(src)
 			continue
 		}
 
@@ -77,7 +78,7 @@ parse_package :: proc(pkg: ^ast.Package, p: ^Parser = nil) -> bool {
 			ok = false
 		}
 		if file.pkg_decl == nil {
-			error(p, p.curr_tok.pos, "Expected pacakge declaration at the start of the file")
+			error(p, p.curr_tok.pos, "Expected a package declaration at the start of the file")
 		} else if pkg.name == "" {
 			pkg.name = file.pkg_decl.name
 		} else if pkg.name != file.pkg_decl.name {
