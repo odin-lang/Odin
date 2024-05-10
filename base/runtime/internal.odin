@@ -801,6 +801,10 @@ truncsfhf2 :: proc "c" (value: f32) -> __float16 {
 	}
 }
 
+@(link_name="__aeabi_d2h", linkage=RUNTIME_LINKAGE, require=RUNTIME_REQUIRE)
+aeabi_d2h :: proc "c" (value: f64) -> __float16 {
+	return truncsfhf2(f32(value))
+}
 
 @(link_name="__truncdfhf2", linkage=RUNTIME_LINKAGE, require=RUNTIME_REQUIRE)
 truncdfhf2 :: proc "c" (value: f64) -> __float16 {
