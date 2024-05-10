@@ -2117,7 +2117,9 @@ parse_proc_type :: proc(p: ^Parser, tok: tokenizer.Token) -> ^ast.Proc_Type {
 	}
 
 	expect_token(p, .Open_Paren)
+	p.expr_level += 1
 	params, _ := parse_field_list(p, .Close_Paren, ast.Field_Flags_Signature_Params)
+	p.expr_level -= 1
 	expect_closing_parentheses_of_field_list(p)
 	results, diverging := parse_results(p)
 
