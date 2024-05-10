@@ -1187,7 +1187,7 @@ IOutput5_VTable :: struct {
 HDR_METADATA_TYPE :: enum i32 {
 	NONE      = 0,
 	HDR10     = 1,
-	HDR10PLUS = 2
+	HDR10PLUS = 2,
 }
 
 HDR_METADATA_HDR10 :: struct {
