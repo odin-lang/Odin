@@ -104,8 +104,7 @@ generic_ftoa :: proc(buf: []byte, val: f64, fmt: byte, precision, bit_size: int)
 	} else {
 		switch fmt {
 		case 'e', 'E':
-			prec += 1
-			decimal.round(d, prec)
+			decimal.round(d, prec + 1)
 		case 'f', 'F':
 			decimal.round(d, d.decimal_point+prec)
 		case 'g', 'G':
