@@ -161,8 +161,7 @@ gb_internal bool check_is_terminating_list(Slice<Ast *> const &stmts, String con
 }
 
 gb_internal bool check_has_break_list(Slice<Ast *> const &stmts, String const &label, bool implicit) {
-	for_array(i, stmts) {
-		Ast *stmt = stmts[i];
+	for (Ast *stmt : stmts) {
 		if (check_has_break(stmt, label, implicit)) {
 			return true;
 		}
@@ -170,6 +169,14 @@ gb_internal bool check_has_break_list(Slice<Ast *> const &stmts, String const &l
 	return false;
 }
 
+gb_internal bool check_has_break_expr_list(Slice<Ast *> const &exprs, String const &label) {
+	for (Ast *expr : exprs) {
+		if (expr && expr->viral_state_flags & ViralStateFlag_ContainsOrBreak) {
+			return true;
+		}
+	}
+	return false;
+}
 
 gb_internal bool check_has_break(Ast *stmt, String const &label, bool implicit) {
 	switch (stmt->kind) {
@@ -227,6 +234,20 @@ gb_internal bool check_has_break(Ast *stmt, String const &label, bool implicit) 
 			return true;
 		}
 		break;
+
+	case Ast_ValueDecl:
+		if (stmt->ValueDecl.is_mutable && check_has_break_expr_list(stmt->ValueDecl.values, label)) {
+			return true;
+		}
+		break;
+	case Ast_AssignStmt:
+		if (check_has_break_expr_list(stmt->AssignStmt.lhs, label)) {
+			return true;
+		}
+		if (check_has_break_expr_list(stmt->AssignStmt.rhs, label)) {
+			return true;
+		}
+		break;
 	}
 
 	return false;
@@ -248,6 +269,15 @@ gb_internal bool check_is_terminating(Ast *node, String const &label) {
 
 	case_ast_node(es, ExprStmt, node);
 		return check_is_terminating(unparen_expr(es->expr), label);
+	case_end;
+
+	case_ast_node(vd, ValueDecl, node);
+		return check_has_break_expr_list(vd->values, label);
+	case_end;
+
+	case_ast_node(as, AssignStmt, node);
+		return check_has_break_expr_list(as->lhs, label) ||
+		       check_has_break_expr_list(as->rhs, label);
 	case_end;
 
 	case_ast_node(bs, BranchStmt, node);
