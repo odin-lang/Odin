@@ -25,7 +25,8 @@ all: c_libc_test \
 	 strings_test \
 	 thread_test \
 	 runtime_test \
-	 time_test
+	 time_test \
+	 fmt_test
 
 download_test_assets:
 	$(PYTHON) download_assets.py
