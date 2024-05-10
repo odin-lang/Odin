@@ -86,11 +86,8 @@ gb_global Timings global_timings = {0};
 
 #if defined(GB_SYSTEM_OSX)
 	#include <llvm/Config/llvm-config.h>
-	#if LLVM_VERSION_MAJOR < 11
-	#error LLVM Version 11+ is required => "brew install llvm@11"
-	#endif
-	#if (LLVM_VERSION_MAJOR > 14 && LLVM_VERSION_MAJOR < 17) || LLVM_VERSION_MAJOR > 17
-	#error LLVM Version 11..=14 or =17 is required => "brew install llvm@14"
+	#if LLVM_VERSION_MAJOR < 11 || (LLVM_VERSION_MAJOR > 14 && LLVM_VERSION_MAJOR < 17) || LLVM_VERSION_MAJOR > 18
+	#error LLVM Version 11..=14 or =18 is required => "brew install llvm@14"
 	#endif
 #endif
 
@@ -272,6 +269,7 @@ enum BuildFlagKind {
 	BuildFlag_ExtraAssemblerFlags,
 	BuildFlag_Microarch,
 	BuildFlag_TargetFeatures,
+	BuildFlag_StrictTargetFeatures,
 	BuildFlag_MinimumOSVersion,
 	BuildFlag_NoThreadLocal,
 
@@ -467,6 +465,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_ExtraAssemblerFlags,     str_lit("extra-assembler-flags"),     BuildFlagParam_String,  Command__does_build);
 	add_flag(&build_flags, BuildFlag_Microarch,               str_lit("microarch"),                 BuildFlagParam_String,  Command__does_build);
 	add_flag(&build_flags, BuildFlag_TargetFeatures,          str_lit("target-features"),           BuildFlagParam_String,  Command__does_build);
+	add_flag(&build_flags, BuildFlag_StrictTargetFeatures,    str_lit("strict-target-features"),    BuildFlagParam_None,    Command__does_build);
 	add_flag(&build_flags, BuildFlag_MinimumOSVersion,        str_lit("minimum-os-version"),        BuildFlagParam_String,  Command__does_build);
 
 	add_flag(&build_flags, BuildFlag_RelocMode,               str_lit("reloc-mode"),                BuildFlagParam_String,  Command__does_build);
@@ -1083,6 +1082,9 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							string_to_lower(&build_context.target_features_string);
 							break;
 						}
+					    case BuildFlag_StrictTargetFeatures:
+						    build_context.strict_target_features = true;
+						    break;
 						case BuildFlag_MinimumOSVersion: {
 							GB_ASSERT(value.kind == ExactValue_String);
 							build_context.minimum_os_version_string = value.value_string;
@@ -1981,7 +1983,20 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 		print_usage_line(2, "Examples:");
 		print_usage_line(3, "-microarch:sandybridge");
 		print_usage_line(3, "-microarch:native");
-		print_usage_line(3, "-microarch:? for a list");
+		print_usage_line(3, "-microarch:\"?\" for a list");
+		print_usage_line(0, "");
+
+		print_usage_line(1, "-target-features:<string>");
+		print_usage_line(2, "Specifies CPU features to enable on top of the enabled features implied by -microarch.");
+		print_usage_line(2, "Examples:");
+		print_usage_line(3, "-target-features:atomics");
+		print_usage_line(3, "-target-features:\"sse2,aes\"");
+		print_usage_line(3, "-target-features:\"?\" for a list");
+		print_usage_line(0, "");
+
+		print_usage_line(1, "-strict-target-features");
+		print_usage_line(2, "Makes @(enable_target_features=\"...\") behave the same way as @(require_target_features=\"...\").");
+		print_usage_line(2, "This enforces that all generated code uses features supported by the combination of -target, -microarch, and -target-features.");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-reloc-mode:<string>");
@@ -2663,7 +2678,7 @@ int main(int arg_count, char const **arg_ptr) {
 
 	// Check chosen microarchitecture. If not found or ?, print list.
 	bool print_microarch_list = true;
-	if (build_context.microarch.len == 0) {
+	if (build_context.microarch.len == 0 || build_context.microarch == str_lit("native")) {
 		// Autodetect, no need to print list.
 		print_microarch_list = false;
 	} else {
@@ -2678,6 +2693,11 @@ int main(int arg_count, char const **arg_ptr) {
 				break;
 			}
 		}
+	}
+
+	// Set and check build paths...
+	if (!init_build_paths(init_filename)) {
+		return 1;
 	}
 
 	String default_march = get_default_microarchitecture();
@@ -2703,13 +2723,57 @@ int main(int arg_count, char const **arg_ptr) {
 		return 0;
 	}
 
-	// Set and check build paths...
-	if (!init_build_paths(init_filename)) {
-		return 1;
+	String march = get_final_microarchitecture();
+	String default_features = get_default_features();
+	{
+		String_Iterator it = {default_features, 0};
+		for (;;) {
+			String str = string_split_iterator(&it, ',');
+			if (str == "") break;
+			string_set_add(&build_context.target_features_set, str);
+		}
+	}
+
+	if (build_context.target_features_string.len != 0) {
+		String_Iterator target_it = {build_context.target_features_string, 0};
+		for (;;) {
+			String item = string_split_iterator(&target_it, ',');
+			if (item == "") break;
+
+			String invalid;
+			if (!check_target_feature_is_valid_for_target_arch(item, &invalid) && item != str_lit("help")) {
+				if (item != str_lit("?")) {
+					gb_printf_err("Unkown target feature '%.*s'.\n", LIT(invalid));
+				}
+				gb_printf("Possible -target-features for target %.*s are:\n", LIT(target_arch_names[build_context.metrics.arch]));
+				gb_printf("\n");
+
+				String feature_list = target_features_list[build_context.metrics.arch];
+				String_Iterator it = {feature_list, 0};
+				for (;;) {
+					String str = string_split_iterator(&it, ',');
+					if (str == "") break;
+					if (check_single_target_feature_is_valid(default_features, str)) {
+						if (has_ansi_terminal_colours()) {
+							gb_printf("\t%.*s\x1b[38;5;244m (implied by target microarch %.*s)\x1b[0m\n", LIT(str), LIT(march));
+						} else {
+							gb_printf("\t%.*s (implied by current microarch %.*s)\n", LIT(str), LIT(march));
+						}
+					} else {
+						gb_printf("\t%.*s\n", LIT(str));
+					}
+				}
+
+				return 1;
+			}
+
+			string_set_add(&build_context.target_features_set, item);
+		}
 	}
 
 	if (build_context.show_debug_messages) {
-		debugf("Selected microarch: %.*s\n", LIT(default_march));
+		debugf("Selected microarch: %.*s\n", LIT(march));
+		debugf("Default microarch features: %.*s\n", LIT(default_features));
 		for_array(i, build_context.build_paths) {
 			String build_path = path_to_string(heap_allocator(), build_context.build_paths[i]);
 			debugf("build_paths[%ld]: %.*s\n", i, LIT(build_path));

@@ -177,17 +177,24 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 		break;
 	}
 
-	if (!entity->Procedure.target_feature_disabled &&
-	    entity->Procedure.target_feature.len != 0) {
-	    	auto features = split_by_comma(entity->Procedure.target_feature);
-		for_array(i, features) {
-			String feature = features[i];
-			LLVMAttributeRef ref = LLVMCreateStringAttribute(
-				m->ctx,
-				cast(char const *)feature.text, cast(unsigned)feature.len,
-				"", 0);
-			LLVMAddAttributeAtIndex(p->value, LLVMAttributeIndex_FunctionIndex, ref);
+	if (pt->Proc.enable_target_feature.len != 0) {
+		gbString feature_str = gb_string_make(temporary_allocator(), "");
+
+		String_Iterator it = {pt->Proc.enable_target_feature, 0};
+		bool first = true;
+		for (;;) {
+			String str = string_split_iterator(&it, ',');
+			if (str == "") break;
+			if (!first) {
+				feature_str = gb_string_appendc(feature_str, ",");
+			}
+			first = false;
+
+			feature_str = gb_string_appendc(feature_str, "+");
+			feature_str = gb_string_append_length(feature_str, str.text, str.len);
 		}
+
+		lb_add_attribute_to_proc_with_string(m, p->value, make_string_c("target-features"), make_string_c(feature_str));
 	}
 
 	if (entity->flags & EntityFlag_Cold) {

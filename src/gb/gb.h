@@ -3025,6 +3025,8 @@ gb_inline u32 gb_thread_current_id(void) {
 	thread_id = gettid();
 #elif defined(GB_SYSTEM_HAIKU)
 	thread_id = find_thread(NULL);
+#elif defined(GB_SYSTEM_FREEBSD)
+	thread_id = pthread_getthreadid_np();
 #else
 	#error Unsupported architecture for gb_thread_current_id()
 #endif

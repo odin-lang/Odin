@@ -25,7 +25,7 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 
 		when ODIN_OS != .Darwin {
 			// We need to give the thread a moment to start up before we enable cancellation.
-			can_set_thread_cancel_state := unix.pthread_setcancelstate(unix.PTHREAD_CANCEL_DISABLE, nil) == 0
+			can_set_thread_cancel_state := unix.pthread_setcancelstate(unix.PTHREAD_CANCEL_ENABLE, nil) == 0
 		}
 
 		sync.lock(&t.mutex)
@@ -40,7 +40,7 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 			// Enable thread's cancelability.
 			if can_set_thread_cancel_state {
 				unix.pthread_setcanceltype (unix.PTHREAD_CANCEL_ASYNCHRONOUS, nil)
-				unix.pthread_setcancelstate(unix.PTHREAD_CANCEL_DISABLE,      nil)
+				unix.pthread_setcancelstate(unix.PTHREAD_CANCEL_ENABLE,       nil)
 			}
 		}
 

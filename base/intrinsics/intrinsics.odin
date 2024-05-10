@@ -169,15 +169,18 @@ type_has_nil :: proc($T: typeid) -> bool ---
 
 type_is_specialization_of :: proc($T, $S: typeid) -> bool ---
 
-type_is_variant_of :: proc($U, $V: typeid) -> bool where type_is_union(U) ---
-type_union_tag_type :: proc($T: typeid) -> typeid where type_is_union(T) ---
-type_union_tag_offset :: proc($T: typeid) -> uintptr where type_is_union(T) ---
-type_union_base_tag_value :: proc($T: typeid) -> int where type_is_union(U) ---
-type_union_variant_count :: proc($T: typeid) -> int where type_is_union(T) ---
-type_variant_type_of :: proc($T: typeid, $index: int) -> typeid where type_is_union(T) ---
-type_variant_index_of :: proc($U, $V: typeid) -> int where type_is_union(U) ---
+type_is_variant_of        :: proc($U, $V: typeid)          -> bool    where type_is_union(U) ---
+type_union_tag_type       :: proc($T: typeid)              -> typeid  where type_is_union(T) ---
+type_union_tag_offset     :: proc($T: typeid)              -> uintptr where type_is_union(T) ---
+type_union_base_tag_value :: proc($T: typeid)              -> int     where type_is_union(U) ---
+type_union_variant_count  :: proc($T: typeid)              -> int     where type_is_union(T) ---
+type_variant_type_of      :: proc($T: typeid, $index: int) -> typeid  where type_is_union(T) ---
+type_variant_index_of     :: proc($U, $V: typeid)          -> int     where type_is_union(U) ---
 
-type_has_field :: proc($T: typeid, $name: string) -> bool ---
+type_bit_set_elem_type       :: proc($T: typeid) -> typeid where type_is_bit_set(T) ---
+type_bit_set_underlying_type :: proc($T: typeid) -> typeid where type_is_bit_set(T) ---
+
+type_has_field  :: proc($T: typeid, $name: string) -> bool ---
 type_field_type :: proc($T: typeid, $name: string) -> typeid ---
 
 type_proc_parameter_count :: proc($T: typeid) -> int where type_is_proc(T) ---
@@ -282,6 +285,12 @@ simd_reverse :: proc(a: #simd[N]T) -> #simd[N]T ---
 simd_rotate_left  :: proc(a: #simd[N]T, $offset: int) -> #simd[N]T ---
 simd_rotate_right :: proc(a: #simd[N]T, $offset: int) -> #simd[N]T ---
 
+// Checks if the current target supports the given target features.
+//
+// Takes a constant comma-seperated string (eg: "sha512,sse4.1"), or a procedure type which has either
+// `@(require_target_feature)` or `@(enable_target_feature)` as its input and returns a boolean indicating
+// if all listed features are supported.
+has_target_feature :: proc($test: $T) -> bool where type_is_string(T) || type_is_proc(T) ---
 
 // WASM targets only
 wasm_memory_grow :: proc(index, delta: uintptr) -> int ---
@@ -293,9 +302,9 @@ wasm_memory_size :: proc(index: uintptr)        -> int ---
 // 0 - indicates that the thread blocked and then was woken up
 // 1 - the loaded value from `ptr` did not match `expected`, the thread did not block
 // 2 - the thread blocked, but the timeout
-@(enable_target_feature="atomics")
+@(require_target_feature="atomics")
 wasm_memory_atomic_wait32   :: proc(ptr: ^u32, expected: u32, timeout_ns: i64) -> u32 ---
-@(enable_target_feature="atomics")
+@(require_target_feature="atomics")
 wasm_memory_atomic_notify32 :: proc(ptr: ^u32, waiters: u32) -> (waiters_woken_up: u32) ---
 
 // x86 Targets (i386, amd64)
