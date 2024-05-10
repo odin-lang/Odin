@@ -57,6 +57,29 @@ gb_internal lbValue lb_correct_endianness(lbProcedure *p, lbValue value) {
 	return value;
 }
 
+
+gb_internal void lb_set_metadata_custom_u64(lbModule *m, LLVMValueRef v_ref, String name, u64 value) {
+	unsigned md_id = LLVMGetMDKindIDInContext(m->ctx, cast(char const *)name.text, cast(unsigned)name.len);
+	LLVMMetadataRef md = LLVMValueAsMetadata(LLVMConstInt(lb_type(m, t_u64), value, false));
+	LLVMValueRef node = LLVMMetadataAsValue(m->ctx, LLVMMDNodeInContext2(m->ctx, &md, 1));
+	LLVMSetMetadata(v_ref, md_id, node);
+}
+gb_internal u64 lb_get_metadata_custom_u64(lbModule *m, LLVMValueRef v_ref, String name) {
+	unsigned md_id = LLVMGetMDKindIDInContext(m->ctx, cast(char const *)name.text, cast(unsigned)name.len);
+	LLVMValueRef v_md = LLVMGetMetadata(v_ref, md_id);
+	if (v_md == nullptr) {
+		return 0;
+	}
+	unsigned node_count = LLVMGetMDNodeNumOperands(v_md);
+	if (node_count == 0) {
+		return 0;
+	}
+	GB_ASSERT(node_count == 1);
+	LLVMValueRef value = nullptr;
+	LLVMGetMDNodeOperands(v_md, &value);
+	return LLVMConstIntGetZExtValue(value);
+}
+
 gb_internal LLVMValueRef lb_mem_zero_ptr_internal(lbProcedure *p, LLVMValueRef ptr, usize len, unsigned alignment, bool is_volatile) {
 	return lb_mem_zero_ptr_internal(p, ptr, LLVMConstInt(lb_type(p->module, t_uint), len, false), alignment, is_volatile);
 }
@@ -1148,7 +1171,15 @@ gb_internal lbValue lb_emit_struct_ep(lbProcedure *p, lbValue s, i32 index) {
 
 	GB_ASSERT_MSG(result_type != nullptr, "%s %d", type_to_string(t), index);
 	
-	return lb_emit_struct_ep_internal(p, s, index, result_type);
+	lbValue gep = lb_emit_struct_ep_internal(p, s, index, result_type);
+
+	Type *bt = base_type(t);
+	if (bt->kind == Type_Struct && bt->Struct.is_packed) {
+		lb_set_metadata_custom_u64(p->module, gep.value, ODIN_METADATA_IS_PACKED, 1);
+		GB_ASSERT(lb_get_metadata_custom_u64(p->module, gep.value, ODIN_METADATA_IS_PACKED) == 1);
+	}
+
+	return gep;
 }
 
 gb_internal lbValue lb_emit_tuple_ev(lbProcedure *p, lbValue value, i32 index) {
@@ -1708,7 +1739,8 @@ gb_internal lbValue lb_emit_mul_add(lbProcedure *p, lbValue a, lbValue b, lbValu
 	if (is_possible) {
 		switch (build_context.metrics.arch) {
 		case TargetArch_amd64:
-			if (type_size_of(t) == 2) {
+			// NOTE: using the intrinsic when not supported causes slow codegen (See #2928).
+			if (type_size_of(t) == 2 || !check_target_feature_is_enabled(str_lit("fma"), nullptr)) {
 				is_possible = false;
 			}
 			break;

@@ -886,17 +886,37 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 
 	check_objc_methods(ctx, e, ac);
 
-	if (ac.require_target_feature.len != 0 && ac.enable_target_feature.len != 0) {
-		error(e->token, "Attributes @(require_target_feature=...) and @(enable_target_feature=...) cannot be used together");
-	} else if (ac.require_target_feature.len != 0) {
-		if (check_target_feature_is_enabled(e->token.pos, ac.require_target_feature)) {
-			e->Procedure.target_feature = ac.require_target_feature;
-		} else {
-			e->Procedure.target_feature_disabled = true;
+	{
+		if (ac.require_target_feature.len != 0 && ac.enable_target_feature.len != 0) {
+			error(e->token, "A procedure cannot have both @(require_target_feature=\"...\") and @(enable_target_feature=\"...\")");
 		}
-	} else if (ac.enable_target_feature.len != 0) {
-		enable_target_feature(e->token.pos, ac.enable_target_feature);
-		e->Procedure.target_feature = ac.enable_target_feature;
+
+		if (build_context.strict_target_features && ac.enable_target_feature.len != 0) {
+			ac.require_target_feature = ac.enable_target_feature;
+			ac.enable_target_feature.len = 0;
+		}
+
+		if (ac.require_target_feature.len != 0) {
+			pt->require_target_feature = ac.require_target_feature;
+			String invalid;
+			if (!check_target_feature_is_valid_globally(ac.require_target_feature, &invalid)) {
+				error(e->token, "Required target feature '%.*s' is not a valid target feature", LIT(invalid));
+			} else if (!check_target_feature_is_enabled(ac.require_target_feature, nullptr)) {
+				e->flags |= EntityFlag_Disabled;
+			}
+		} else if (ac.enable_target_feature.len != 0) {
+
+			// NOTE: disallow wasm, features on that arch are always global to the module.
+			if (is_arch_wasm()) {
+				error(e->token, "@(enable_target_feature=\"...\") is not allowed on wasm, features for wasm must be declared globally");
+			}
+
+			pt->enable_target_feature = ac.enable_target_feature;
+			String invalid;
+			if (!check_target_feature_is_valid_globally(ac.enable_target_feature, &invalid)) {
+				error(e->token, "Procedure enabled target feature '%.*s' is not a valid target feature", LIT(invalid));
+			}
+		}
 	}
 
 	switch (e->Procedure.optimization_mode) {
@@ -1370,6 +1390,10 @@ gb_internal void check_proc_group_decl(CheckerContext *ctx, Entity *pg_entity, D
 			continue;
 		}
 
+		if (p->flags & EntityFlag_Disabled) {
+			continue;
+		}
+
 		String name = p->token.string;
 
 		for (isize k = j+1; k < pge->entities.count; k++) {
@@ -1386,6 +1410,10 @@ gb_internal void check_proc_group_decl(CheckerContext *ctx, Entity *pg_entity, D
 
 
 			ERROR_BLOCK();
+
+			if (q->flags & EntityFlag_Disabled) {
+				continue;
+			}
 
 			ProcTypeOverloadKind kind = are_proc_types_overload_safe(p->type, q->type);
 			bool both_have_where_clauses = false;
@@ -1423,6 +1451,7 @@ gb_internal void check_proc_group_decl(CheckerContext *ctx, Entity *pg_entity, D
 				break;
 			case ProcOverload_ParamCount:
 			case ProcOverload_ParamTypes:
+			case ProcOverload_TargetFeatures:
 				// This is okay :)
 				break;
 
@@ -1590,6 +1619,17 @@ gb_internal bool check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *de
 				if (e->kind != Entity_Variable) {
 					continue;
 				}
+				if (is_type_polymorphic(e->type)) {
+					gbString s = type_to_string(e->type);
+					char const *msg = "Unspecialized polymorphic types are not allowed in procedure parameters, got %s";
+					if (e->Variable.type_expr) {
+						error(e->Variable.type_expr, msg, s);
+					} else {
+						error(e->token, msg, s);
+					}
+					gb_string_free(s);
+				}
+
 				if (!(e->flags & EntityFlag_Using)) {
 					continue;
 				}

@@ -4383,7 +4383,11 @@ gb_internal lbAddr lb_build_addr_compound_lit(lbProcedure *p, Ast *expr) {
 					mask = LLVMConstSub(mask, LLVMConstInt(lit, 1, false));
 
 					LLVMValueRef elem = values[i].value;
-					elem = LLVMBuildZExt(p->builder, elem, lit, "");
+					if (lb_sizeof(lit) < lb_sizeof(LLVMTypeOf(elem))) {
+						elem = LLVMBuildTrunc(p->builder, elem, lit, "");
+					} else {
+						elem = LLVMBuildZExt(p->builder, elem, lit, "");
+					}
 					elem = LLVMBuildAnd(p->builder, elem, mask, "");
 
 					elem = LLVMBuildShl(p->builder, elem, LLVMConstInt(lit, f.bit_offset, false), "");

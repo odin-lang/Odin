@@ -184,6 +184,8 @@ struct TypeProc {
 	isize    specialization_count;
 	ProcCallingConvention calling_convention;
 	i32      variadic_index;
+	String   require_target_feature;
+	String   enable_target_feature;
 	// TODO(bill): Make this a flag set rather than bools
 	bool     variadic;
 	bool     require_results;
@@ -2991,7 +2993,22 @@ gb_internal Type *union_tag_type(Type *u) {
 	return t_uint;
 }
 
+gb_internal int matched_target_features(TypeProc *t) {
+	if (t->require_target_feature.len == 0) {
+		return 0;
+	}
 
+	int matches = 0;
+	String_Iterator it = {t->require_target_feature, 0};
+	for (;;) {
+		String str = string_split_iterator(&it, ',');
+		if (str == "") break;
+		if (check_target_feature_is_valid_for_target_arch(str, nullptr)) {
+			matches += 1;
+		}
+	}
+	return matches;
+}
 
 enum ProcTypeOverloadKind {
 	ProcOverload_Identical, // The types are identical
@@ -3003,6 +3020,7 @@ enum ProcTypeOverloadKind {
 	ProcOverload_ResultCount,
 	ProcOverload_ResultTypes,
 	ProcOverload_Polymorphic,
+	ProcOverload_TargetFeatures,
 
 	ProcOverload_NotProcedure,
 
@@ -3058,6 +3076,10 @@ gb_internal ProcTypeOverloadKind are_proc_types_overload_safe(Type *x, Type *y) 
 		if (!are_types_identical(ex->type, ey->type)) {
 			return ProcOverload_ResultTypes;
 		}
+	}
+
+	if (matched_target_features(&px) != matched_target_features(&py)) {
+		return ProcOverload_TargetFeatures;
 	}
 
 	if (px.params != nullptr && py.params != nullptr) {
@@ -3245,6 +3267,10 @@ gb_internal Selection lookup_field_with_selection(Type *type_, String field_name
 			}
 		}
 
+		if (is_type_polymorphic(type)) {
+			// NOTE(bill): A polymorphic struct has no fields, this only hits in the case of an error
+			return sel;
+		}
 		wait_signal_until_available(&type->Struct.fields_wait_signal);
 		isize field_count = type->Struct.fields.count;
 		if (field_count != 0) for_array(i, type->Struct.fields) {

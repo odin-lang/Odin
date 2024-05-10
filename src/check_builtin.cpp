@@ -1719,6 +1719,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 	case BuiltinProc_objc_register_selector: 
 	case BuiltinProc_objc_register_class: 
 	case BuiltinProc_atomic_type_is_lock_free:
+	case BuiltinProc_has_target_feature:
 		// NOTE(bill): The first arg may be a Type, this will be checked case by case
 		break;
 
@@ -2022,6 +2023,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		
 		Selection sel = lookup_field(type, field_name, false);
 		if (sel.entity == nullptr) {
+			ERROR_BLOCK();
 			gbString type_str = type_to_string_shorthand(type);
 			error(ce->args[0],
 			      "'%s' has no field named '%.*s'", type_str, LIT(field_name));
@@ -2095,6 +2097,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		
 		Selection sel = lookup_field(type, field_name, false);
 		if (sel.entity == nullptr) {
+			ERROR_BLOCK();
 			gbString type_str = type_to_string_shorthand(type);
 			error(ce->args[0],
 			      "'%s' has no field named '%.*s'", type_str, LIT(field_name));
@@ -3660,6 +3663,41 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		operand->mode = Addressing_Constant;
 		operand->type = t_untyped_bool;
 		operand->value = exact_value_bool(value);
+		break;
+	}
+
+	case BuiltinProc_has_target_feature: {
+		String features = str_lit("");
+
+		check_expr_or_type(c, operand, ce->args[0]);
+
+		if (is_type_string(operand->type) && operand->mode == Addressing_Constant) {
+			GB_ASSERT(operand->value.kind == ExactValue_String);
+			features = operand->value.value_string;
+		} else {
+			Type *pt = base_type(operand->type);
+			if (pt->kind == Type_Proc) {
+				if (pt->Proc.require_target_feature.len != 0) {
+					GB_ASSERT(pt->Proc.enable_target_feature.len == 0);
+					features = pt->Proc.require_target_feature;
+				} else if (pt->Proc.enable_target_feature.len != 0) {
+					features = pt->Proc.enable_target_feature;
+				} else {
+					error(ce->args[0], "Expected the procedure type given to '%.*s' to have @(require_target_feature=\"...\") or @(enable_target_feature=\"...\")", LIT(builtin_name));
+				}
+			} else {
+				error(ce->args[0], "Expected a constant string or procedure type for '%.*s'", LIT(builtin_name));
+			}
+		}
+
+		String invalid;
+		if (!check_target_feature_is_valid_globally(features, &invalid)) {
+			error(ce->args[0], "Target feature '%.*s' is not a valid target feature", LIT(invalid));
+		}
+
+		operand->value = exact_value_bool(check_target_feature_is_enabled(features, nullptr));
+		operand->mode = Addressing_Constant;
+		operand->type = t_untyped_bool;
 		break;
 	}
 
@@ -5395,6 +5433,58 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			operand->value = exact_value_i64(u->Union.kind == UnionType_no_nil ? 0 : 1);
 		} break;
 
+	case BuiltinProc_type_bit_set_elem_type:
+		{
+
+			if (operand->mode != Addressing_Type) {
+				error(operand->expr, "Expected a type for '%.*s'", LIT(builtin_name));
+				operand->mode = Addressing_Invalid;
+				operand->type = t_invalid;
+				return false;
+			}
+
+			Type *bs = operand->type;
+
+			if (!is_type_bit_set(bs)) {
+				error(operand->expr, "Expected a bit_set type for '%.*s'", LIT(builtin_name));
+				operand->mode = Addressing_Invalid;
+				operand->type = t_invalid;
+				return false;
+			}
+
+			bs = base_type(bs);
+			GB_ASSERT(bs->kind == Type_BitSet);
+
+			operand->mode = Addressing_Type;
+			operand->type = bs->BitSet.elem;
+		} break;
+
+	case BuiltinProc_type_bit_set_underlying_type:
+		{
+
+			if (operand->mode != Addressing_Type) {
+				error(operand->expr, "Expected a type for '%.*s'", LIT(builtin_name));
+				operand->mode = Addressing_Invalid;
+				operand->type = t_invalid;
+				return false;
+			}
+
+			Type *bs = operand->type;
+
+			if (!is_type_bit_set(bs)) {
+				error(operand->expr, "Expected a bit_set type for '%.*s'", LIT(builtin_name));
+				operand->mode = Addressing_Invalid;
+				operand->type = t_invalid;
+				return false;
+			}
+
+			bs = base_type(bs);
+			GB_ASSERT(bs->kind == Type_BitSet);
+
+			operand->mode = Addressing_Type;
+			operand->type = bit_set_to_int(bs);
+		} break;
+
 	case BuiltinProc_type_union_variant_count:
 		{
 			if (operand->mode != Addressing_Type) {
@@ -5801,6 +5891,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 
 			Selection sel = lookup_field(type, field_name, false);
 			if (sel.entity == nullptr) {
+				ERROR_BLOCK();
 				gbString type_str = type_to_string(bt);
 				error(ce->args[0],
 				      "'%s' has no field named '%.*s'", type_str, LIT(field_name));
@@ -6014,7 +6105,10 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				return false;
 			}
 
-			enable_target_feature({}, str_lit("atomics"));
+			if (!check_target_feature_is_enabled(str_lit("atomics"), nullptr)) {
+				error(call, "'%.*s' requires target feature 'atomics' to be enabled, enable it with -target-features:\"atomics\" or choose a different -microarch", LIT(builtin_name));
+				return false;
+			}
 
 			Operand ptr = {};
 			Operand expected = {};
@@ -6068,7 +6162,10 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				return false;
 			}
 
-			enable_target_feature({}, str_lit("atomics"));
+			if (!check_target_feature_is_enabled(str_lit("atomics"), nullptr)) {
+				error(call, "'%.*s' requires target feature 'atomics' to be enabled, enable it with -target-features:\"atomics\" or choose a different -microarch", LIT(builtin_name));
+				return false;
+			}
 
 			Operand ptr = {};
 			Operand waiters = {};

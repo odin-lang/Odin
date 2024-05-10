@@ -1,7 +1,7 @@
 #include "parser_pos.cpp"
 
 gb_internal u64 ast_file_vet_flags(AstFile *f) {
-	if (f->vet_flags_set) {
+	if (f != nullptr && f->vet_flags_set) {
 		return f->vet_flags;
 	}
 	return build_context.vet_flags;
@@ -3499,6 +3499,10 @@ gb_internal Ast *parse_type(AstFile *f) {
 		Token token = advance_token(f);
 		syntax_error(token, "Expected a type");
 		return ast_bad_expr(f, token, f->curr_token);
+	} else if (type->kind == Ast_ParenExpr &&
+	           unparen_expr(type) == nullptr) {
+		syntax_error(type, "Expected a type within the parentheses");
+		return ast_bad_expr(f, type->ParenExpr.open, type->ParenExpr.close);
 	}
 	return type;
 }
@@ -5710,7 +5714,7 @@ gb_internal bool determine_path_from_string(BlockingMutex *file_mutex, Ast *node
 		//                 working directory of the exe to the library search paths.
 		//                 Static libraries can be linked directly with the full pathname
 		//
-		if (node->kind == Ast_ForeignImportDecl && string_ends_with(file_str, str_lit(".so"))) {
+		if (node->kind == Ast_ForeignImportDecl && (string_ends_with(file_str, str_lit(".so")) || string_contains_string(file_str, str_lit(".so.")))) {
 			*path = file_str;
 			return true;
 		}

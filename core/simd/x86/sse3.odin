@@ -36,7 +36,7 @@ _mm_lddqu_si128 :: #force_inline proc "c" (mem_addr: ^__m128i) -> __m128i {
 _mm_movedup_pd :: #force_inline proc "c" (a: __m128d) -> __m128d {
 	return simd.shuffle(a, a, 0, 0)
 }
-@(require_results, enable_target_feature="sse3")
+@(require_results, enable_target_feature="sse2,sse3")
 _mm_loaddup_pd :: #force_inline proc "c" (mem_addr: [^]f64) -> __m128d {
 	return _mm_load1_pd(mem_addr)
 }

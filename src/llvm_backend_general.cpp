@@ -1107,6 +1107,12 @@ gb_internal lbValue lb_emit_load(lbProcedure *p, lbValue value) {
 	GB_ASSERT(is_type_pointer(value.type));
 	Type *t = type_deref(value.type);
 	LLVMValueRef v = LLVMBuildLoad2(p->builder, lb_type(p->module, t), value.value, "");
+
+	u64 is_packed = lb_get_metadata_custom_u64(p->module, value.value, ODIN_METADATA_IS_PACKED);
+	if (is_packed != 0) {
+		LLVMSetAlignment(v, 1);
+	}
+
 	return lbValue{v, t};
 }
 

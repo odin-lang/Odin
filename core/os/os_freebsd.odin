@@ -159,7 +159,7 @@ blkcnt_t :: i64
 blksize_t :: i32
 fflags_t :: u32
 
-when ODIN_ARCH == .amd64 /* LP64 */ {
+when ODIN_ARCH == .amd64 || ODIN_ARCH == .arm64 /* LP64 */ {
 	time_t :: i64
 } else {
 	time_t :: i32
