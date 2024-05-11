@@ -37,6 +37,8 @@ when ODIN_OS == .Windows {
 			"system:OpenGL.framework",
 		}
 	}
+} else when ODIN_OS == .Linux && !GLFW_SHARED {
+	foreign import glfw "../lib/linux/libglfw3.a"
 } else {
 	foreign import glfw "system:glfw"
 }
