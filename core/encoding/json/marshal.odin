@@ -469,12 +469,15 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 		case: panic("Invalid union tag type")
 		}
 
-		if v.data == nil || tag == 0 {
-			io.write_string(w, "null") or_return
-		} else {
-			id := info.variants[tag-1].id
-			return marshal_to_writer(w, any{v.data, id}, opt)
+		if !info.no_nil {
+			if tag == 0 {
+				io.write_string(w, "null") or_return
+				return nil
+			}
+			tag -= 1
 		}
+		id := info.variants[tag].id
+		return marshal_to_writer(w, any{v.data, id}, opt)
 
 	case runtime.Type_Info_Enum:
 		if !opt.use_enum_names || len(info.names) == 0 {
