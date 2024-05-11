@@ -1133,12 +1133,13 @@ gb_internal void check_bit_field_type(CheckerContext *ctx, Type *bit_field_type,
 		return Endian_Native;
 	};
 
-	EndianKind backing_type_endian_kind = determine_endian_kind(core_array_type(backing_type));
+	Type *backing_type_elem = core_array_type(backing_type);
+	EndianKind backing_type_endian_kind = determine_endian_kind(backing_type_elem);
 	EndianKind endian_kind = Endian_Unknown;
 	for (Entity *f : fields) {
 		EndianKind field_kind = determine_endian_kind(f->type);
 
-		if (field_kind && backing_type_endian_kind != field_kind) {
+		if (field_kind && backing_type_endian_kind != field_kind && backing_type_elem != t_u8) {
 			error(f->token, "All 'bit_field' field types must match the same endian kind as the backing type, i.e. all native, all little, or all big");
 		}
 
