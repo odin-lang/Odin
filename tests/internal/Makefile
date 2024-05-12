@@ -16,3 +16,6 @@ pow_test:
 
 asan_test:
 	$(ODIN) run test_asan.odin -file -sanitize:address -debug
+
+string_compare_test:
+	$(ODIN) run test_string_compare.odin -file -vet -strict-style -o:minimal
