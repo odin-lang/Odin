@@ -15,7 +15,9 @@ Test :: struct {
 CASES := []Test{
 	{"hellope",  "hellope", {.Eq=true,  .Lt=false, .Gt=false}},
 	{"Hellope",  "hellope", {.Eq=false, .Lt=true,  .Gt=false}}, // H < h
+	{"Hell",     "Hellope", {.Eq=false, .Lt=true,  .Gt=false}},
 	{"Hellope!", "Hellope", {.Eq=false, .Lt=false, .Gt=true }},
+	{"Hellopf",  "Hellope", {.Eq=false, .Lt=false, .Gt=true }},
 }
 
 @test
