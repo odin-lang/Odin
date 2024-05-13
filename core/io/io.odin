@@ -32,6 +32,10 @@ Error :: enum i32 {
 	// Short_Buffer means that a read/write required a longer buffer than was provided
 	Short_Buffer,
 
+	// Indicates that an attempt to retrieve a stream's size was made, but the
+	// stream doesn't have a size.
+	No_Size,
+
 	// No_Progress is returned by some implementations of `io.Reader` when many calls
 	// to `read` have failed to return any data or error.
 	// This is usually a sign of a broken `io.Reader` implementation

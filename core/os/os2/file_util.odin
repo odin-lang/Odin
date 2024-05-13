@@ -3,6 +3,7 @@ package os2
 import "base:runtime"
 import "core:strconv"
 import "core:unicode/utf8"
+import "core:io"
 
 write_string :: proc(f: ^File, s: string) -> (n: int, err: Error) {
 	return write(f, transmute([]byte)s)
@@ -92,7 +93,7 @@ read_entire_file_from_file :: proc(f: ^File, allocator: runtime.Allocator) -> (d
 		if i64(int(size64)) != size64 {
 			size = int(size64)
 		}
-	} else if err == .No_Size {
+	} else if err == io.Error.No_Size {
 		has_size = false
 	} else {
 		return

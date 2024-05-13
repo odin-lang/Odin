@@ -72,6 +72,7 @@ error_string :: proc(ferr: Error) -> string {
 		case .Short_Write:       return "short write"
 		case .Invalid_Write:     return "invalid write result"
 		case .Short_Buffer:      return "short buffer"
+		case .No_Size:           return "file has no definite size"
 		case .No_Progress:       return "multiple read calls return no data or error"
 		case .Invalid_Whence:    return "invalid whence"
 		case .Invalid_Offset:    return "invalid offset"

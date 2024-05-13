@@ -435,7 +435,7 @@ _write_at :: proc(f: ^File, p: []byte, offset: i64) -> (n: i64, err: Error) {
 _file_size :: proc(f: ^File) -> (n: i64, err: Error) {
 	length: win32.LARGE_INTEGER
 	if f.impl.kind == .Pipe {
-		return 0, .No_Size
+		return 0, io.Error.No_Size
 	}
 	handle := _handle(f)
 	if !win32.GetFileSizeEx(handle, &length) {

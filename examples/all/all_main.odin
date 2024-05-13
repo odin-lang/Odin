@@ -99,6 +99,7 @@ import odin_tokenizer   "core:odin/tokenizer"
 import spall            "core:prof/spall"
 
 import os               "core:os"
+import os2              "core:os/os2"
 
 import slashpath        "core:path/slashpath"
 import filepath         "core:path/filepath"
@@ -212,6 +213,7 @@ _ :: odin_parser
 _ :: odin_printer
 _ :: odin_tokenizer
 _ :: os
+_ :: os2
 _ :: spall
 _ :: slashpath
 _ :: filepath
