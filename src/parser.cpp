@@ -11,6 +11,9 @@ gb_internal bool ast_file_vet_style(AstFile *f) {
 	return (ast_file_vet_flags(f) & VetFlag_Style) != 0;
 }
 
+gb_internal bool ast_file_vet_deprecated(AstFile *f) {
+	return (ast_file_vet_flags(f) & VetFlag_Deprecated) != 0;
+}
 
 gb_internal bool file_allow_newline(AstFile *f) {
 	bool is_strict = build_context.strict_style || ast_file_vet_style(f);
@@ -5694,8 +5697,26 @@ gb_internal bool determine_path_from_string(BlockingMutex *file_mutex, Ast *node
 
 	if (collection_name.len > 0) {
 		// NOTE(bill): `base:runtime` == `core:runtime`
-		if (collection_name == "core" && string_starts_with(file_str, str_lit("runtime"))) {
-			collection_name = str_lit("base");
+		if (collection_name == "core") {
+			bool replace_with_base = false;
+			if (string_starts_with(file_str, str_lit("runtime"))) {
+				replace_with_base = true;
+			} else if (string_starts_with(file_str, str_lit("intrinsics"))) {
+				replace_with_base = true;
+			} if (string_starts_with(file_str, str_lit("builtin"))) {
+				replace_with_base = true;
+			}
+
+			if (replace_with_base) {
+				collection_name = str_lit("base");
+			}
+			if (replace_with_base) {
+				if (ast_file_vet_deprecated(node->file())) {
+					syntax_error(node, "import \"core:%.*s\" has been deprecated in favour of \"base:%.*s\"", LIT(file_str), LIT(file_str));
+				} else {
+					syntax_warning(ast_token(node), "import \"core:%.*s\" has been deprecated in favour of \"base:%.*s\"", LIT(file_str), LIT(file_str));
+				}
+			}
 		}
 
 		if (collection_name == "system") {
