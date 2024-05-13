@@ -751,7 +751,7 @@ gb_internal bool check_using_stmt_entity(CheckerContext *ctx, AstUsingStmt *us, 
 		for (auto const &entry : scope->elements) {
 			String name = entry.key;
 			Entity *decl = entry.value;
-			if (!is_entity_exported(decl)) continue;
+			if (!is_entity_exported(decl, true)) continue;
 
 			Entity *found = scope_insert_with_name(ctx->scope, name, decl);
 			if (found != nullptr) {
