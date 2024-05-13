@@ -2514,7 +2514,7 @@ gb_internal lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left
 			case Token_Lt:    runtime_procedure = "cstring_lt"; break;
 			case Token_Gt:    runtime_procedure = "cstring_gt"; break;
 			case Token_LtEq:  runtime_procedure = "cstring_le"; break;
-			case Token_GtEq:  runtime_procedure = "cstring_gt"; break;
+			case Token_GtEq:  runtime_procedure = "cstring_ge"; break;
 			}
 			GB_ASSERT(runtime_procedure != nullptr);
 
@@ -2537,7 +2537,7 @@ gb_internal lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left
 		case Token_Lt:    runtime_procedure = "string_lt"; break;
 		case Token_Gt:    runtime_procedure = "string_gt"; break;
 		case Token_LtEq:  runtime_procedure = "string_le"; break;
-		case Token_GtEq:  runtime_procedure = "string_gt"; break;
+		case Token_GtEq:  runtime_procedure = "string_ge"; break;
 		}
 		GB_ASSERT(runtime_procedure != nullptr);
 

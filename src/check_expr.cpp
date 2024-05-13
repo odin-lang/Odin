@@ -6193,6 +6193,20 @@ gb_internal bool evaluate_where_clauses(CheckerContext *ctx, Ast *call_expr, Sco
 				}
 				return false;
 			}
+
+			if (ast_file_vet_style(ctx->file)) {
+				Ast *c = unparen_expr(clause);
+				if (c->kind == Ast_BinaryExpr && c->BinaryExpr.op.kind == Token_CmpAnd) {
+					ERROR_BLOCK();
+					error(c, "Prefer to separate 'where' clauses with a comma rather than '&&'");
+					gbString x = expr_to_string(c->BinaryExpr.left);
+					gbString y = expr_to_string(c->BinaryExpr.right);
+					error_line("\tSuggestion: '%s, %s'\n", x, y);
+					gb_string_free(y);
+					gb_string_free(x);
+				}
+			}
+
 		}
 	}
 
@@ -10774,6 +10788,7 @@ gb_internal ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast
 		return Expr_Expr;
 	case_end;
 
+	case Ast_DistinctType:
 	case Ast_TypeidType:
 	case Ast_PolyType:
 	case Ast_ProcType:

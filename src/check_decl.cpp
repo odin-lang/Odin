@@ -1619,7 +1619,7 @@ gb_internal bool check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *de
 				if (e->kind != Entity_Variable) {
 					continue;
 				}
-				if (is_type_polymorphic(e->type)) {
+				if (is_type_polymorphic(e->type) && is_type_polymorphic_record_unspecialized(e->type)) {
 					gbString s = type_to_string(e->type);
 					char const *msg = "Unspecialized polymorphic types are not allowed in procedure parameters, got %s";
 					if (e->Variable.type_expr) {

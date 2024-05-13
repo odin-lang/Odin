@@ -108,3 +108,8 @@ echo ---
 echo Running core:time tests
 echo ---
 %PATH_TO_ODIN% run time %COMMON% %COLLECTION% -out:test_core_time.exe || exit /b
+
+echo ---
+echo Running core:fmt tests
+echo ---
+%PATH_TO_ODIN% run fmt %COMMON% %COLLECTION% -out:test_core_fmt.exe || exit /b
