@@ -204,7 +204,7 @@ jobs:
         run: |
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat
           cd tests\documentation
-          rem call build.bat
+          call build.bat
         timeout-minutes: 10
       - name: core:math/big tests
         shell: cmd
