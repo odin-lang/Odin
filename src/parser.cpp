@@ -5508,10 +5508,14 @@ gb_internal AstPackage *try_add_import_path(Parser *p, String path, String const
 		}
 	}
 	if (files_with_ext == 0 || files_to_reserve == 1) {
+		ERROR_BLOCK();
 		if (files_with_ext != 0) {
 			syntax_error(pos, "Directory contains no .odin files for the specified platform: %.*s", LIT(rel_path));
 		} else {
 			syntax_error(pos, "Empty directory that contains no .odin files: %.*s", LIT(rel_path));
+		}
+		if (build_context.command_kind == Command_test) {
+			error_line("\tSuggestion: Make an .odin file that imports packages to test and use the `-all-packages` flag.");
 		}
 		return nullptr;
 	}
