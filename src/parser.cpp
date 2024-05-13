@@ -3883,10 +3883,12 @@ gb_internal Ast *parse_proc_type(AstFile *f, Token proc_token) {
 
 
 	expect_token(f, Token_OpenParen);
+	f->expr_level += 1;
 	params = parse_field_list(f, nullptr, FieldFlag_Signature, Token_CloseParen, true, true);
 	if (file_allow_newline(f)) {
 		skip_possible_newline(f);
 	}
+	f->expr_level -= 1;
 	expect_token_after(f, Token_CloseParen, "parameter list");
 	results = parse_results(f, &diverging);
 

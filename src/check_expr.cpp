@@ -10788,6 +10788,7 @@ gb_internal ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast
 		return Expr_Expr;
 	case_end;
 
+	case Ast_DistinctType:
 	case Ast_TypeidType:
 	case Ast_PolyType:
 	case Ast_ProcType:

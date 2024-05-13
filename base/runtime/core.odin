@@ -273,14 +273,14 @@ Typeid_Kind :: enum u8 {
 }
 #assert(len(Typeid_Kind) < 32)
 
-// Typeid_Bit_Field :: bit_field #align(align_of(uintptr)) {
-// 	index:    8*size_of(uintptr) - 8,
-// 	kind:     5, // Typeid_Kind
-// 	named:    1,
-// 	special:  1, // signed, cstring, etc
-// 	reserved: 1,
-// }
-// #assert(size_of(Typeid_Bit_Field) == size_of(uintptr));
+Typeid_Bit_Field :: bit_field uintptr {
+	index:    uintptr     | 8*size_of(uintptr) - 8,
+	kind:     Typeid_Kind | 5, // Typeid_Kind
+	named:    bool        | 1,
+	special:  bool        | 1, // signed, cstring, etc
+	reserved: bool        | 1,
+}
+#assert(size_of(Typeid_Bit_Field) == size_of(uintptr))
 
 // NOTE(bill): only the ones that are needed (not all types)
 // This will be set by the compiler
