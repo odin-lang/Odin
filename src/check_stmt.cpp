@@ -243,7 +243,15 @@ gb_internal bool check_is_terminating(Ast *node, String const &label) {
 	case_end;
 
 	case_ast_node(bs, BlockStmt, node);
-		return check_is_terminating_list(bs->stmts, label);
+		if (check_is_terminating_list(bs->stmts, label)) {
+			if (bs->label != nullptr) {
+				return check_is_terminating_list(bs->stmts, bs->label->Ident.token.string);
+			} else {
+				return true;
+			}
+		} else {
+			return false;
+		}
 	case_end;
 
 	case_ast_node(es, ExprStmt, node);
@@ -290,8 +298,16 @@ gb_internal bool check_is_terminating(Ast *node, String const &label) {
 	case_end;
 
 	case_ast_node(fs, ForStmt, node);
-		if (fs->cond == nullptr && !check_has_break(fs->body, label, true)) {
-			return true;
+		if (fs->cond == nullptr) {
+			if (!check_has_break(fs->body, label, true)) {
+				if (fs->label != nullptr) {
+					if (!check_has_break(fs->body, fs->label->Ident.token.string, false)) {
+						return true;
+					}
+				} else {
+					return true;
+				}
+			}
 		}
 	case_end;
 
