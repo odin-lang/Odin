@@ -4141,7 +4141,7 @@ gb_internal lbAddr lb_build_addr_slice_expr(lbProcedure *p, Ast *expr) {
 		if (se->high == nullptr) {
 			lbValue offset = base;
 			LLVMValueRef indices[1] = {low.value};
-			offset.value = LLVMBuildGEP2(p->builder, lb_type(p->module, offset.type->MultiPointer.elem), offset.value, indices, 1, "");
+			offset.value = LLVMBuildGEP2(p->builder, lb_type(p->module, base_type(offset.type)->MultiPointer.elem), offset.value, indices, 1, "");
 			lb_addr_store(p, res, offset);
 		} else {
 			low = lb_emit_conv(p, low, t_int);
@@ -4150,7 +4150,7 @@ gb_internal lbAddr lb_build_addr_slice_expr(lbProcedure *p, Ast *expr) {
 			lb_emit_multi_pointer_slice_bounds_check(p, se->open, low, high);
 
 			LLVMValueRef indices[1] = {low.value};
-			LLVMValueRef ptr = LLVMBuildGEP2(p->builder, lb_type(p->module, base.type->MultiPointer.elem), base.value, indices, 1, "");
+			LLVMValueRef ptr = LLVMBuildGEP2(p->builder, lb_type(p->module, base_type(base.type)->MultiPointer.elem), base.value, indices, 1, "");
 			LLVMValueRef len = LLVMBuildSub(p->builder, high.value, low.value, "");
 
 			LLVMValueRef gep0 = lb_emit_struct_ep(p, res.addr, 0).value;
