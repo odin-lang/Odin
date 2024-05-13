@@ -30,7 +30,7 @@ jobs:
           gmake release
           ./odin version
           ./odin report
-          ./odin check examples/demo -vet
+          ./odin check examples/all -vet -strict-style -target:netbsd_amd64
           (cd tests/core; gmake all_bsd)
           (cd tests/internal; gmake all_bsd)
           (cd tests/issues; ./run.sh)
