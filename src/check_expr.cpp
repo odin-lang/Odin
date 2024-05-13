@@ -10263,6 +10263,17 @@ gb_internal ExprKind check_slice_expr(CheckerContext *c, Operand *o, Ast *node, 
 	case Type_Struct:
 		if (is_type_soa_struct(t)) {
 			valid = true;
+			if (t->Struct.soa_kind == StructSoa_Fixed) {
+				max_count = t->Struct.soa_count;
+				if (o->mode != Addressing_Variable && !is_type_pointer(o->type)) {
+					gbString str = expr_to_string(node);
+					error(node, "Cannot slice #soa array '%s', value is not addressable", str);
+					gb_string_free(str);
+					o->mode = Addressing_Invalid;
+					o->expr = node;
+					return kind;
+				}
+			}
 			o->type = make_soa_struct_slice(c, nullptr, nullptr, t->Struct.soa_elem);
 		}
 		break;
