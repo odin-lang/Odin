@@ -672,7 +672,20 @@ gb_internal int error_value_cmp(void const *a, void const *b) {
 	return token_pos_cmp(x->pos, y->pos);
 }
 
+gb_internal bool errors_already_printed = false;
+
 gb_internal void print_all_errors(void) {
+	if (errors_already_printed) {
+		if (global_error_collector.warning_count.load() == global_error_collector.error_values.count) {
+			for (ErrorValue &ev : global_error_collector.error_values) {
+				array_free(&ev.msg);
+			}
+			array_clear(&global_error_collector.error_values);
+			errors_already_printed = false;
+		}
+		return;
+	}
+
 	auto const &escape_char = [](gbString res, u8 c) -> gbString {
 		switch (c) {
 		case '\n': res = gb_string_append_length(res, "\\n",  2); break;
@@ -827,4 +840,6 @@ gb_internal void print_all_errors(void) {
 	}
 	gbFile *f = gb_file_get_standard(gbFileStandard_Error);
 	gb_file_write(f, res, gb_string_length(res));
+
+	errors_already_printed = true;
 }
