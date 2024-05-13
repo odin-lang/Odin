@@ -100,7 +100,8 @@ _join :: proc(t: ^Thread) {
 	t.flags += {.Joined}
 
 	if .Started not_in t.flags {
-		_start(t)
+		t.flags += {.Started}
+		win32.ResumeThread(t.win32_thread)
 	}
 
 	win32.WaitForSingleObject(t.win32_thread, win32.INFINITE)
