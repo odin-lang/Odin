@@ -253,14 +253,16 @@ gb_internal bool check_has_break(Ast *stmt, String const &label, bool implicit) 
 	return false;
 }
 
-
-String label_from_node(Ast *node, String default_label) {
-	if (node != nullptr && node->kind == Ast_Ident) {
+String label_string(Ast *node) {
+	GB_ASSERT(node != nullptr);
+	if (node->kind == Ast_Ident) {
 		return node->Ident.token.string;
+	} else if (node->kind == Ast_Label) {
+		return label_string(node->Label.name);
 	}
-	return default_label;
+	GB_ASSERT("INVALID LABEL");
+	return {};
 }
-
 
 // NOTE(bill): The last expression has to be a 'return' statement
 // TODO(bill): This is a mild hack and should be probably handled properly
@@ -271,7 +273,12 @@ gb_internal bool check_is_terminating(Ast *node, String const &label) {
 	case_end;
 
 	case_ast_node(bs, BlockStmt, node);
-		return check_is_terminating_list(bs->stmts, label_from_node(bs->label, label));
+		if (check_is_terminating_list(bs->stmts, label)) {
+			if (bs->label != nullptr) {
+				return check_is_terminating_list(bs->stmts, label_string(bs->label));
+			}
+			return true;
+		}
 	case_end;
 
 	case_ast_node(es, ExprStmt, node);
@@ -292,10 +299,9 @@ gb_internal bool check_is_terminating(Ast *node, String const &label) {
 	case_end;
 
 	case_ast_node(is, IfStmt, node);
-		String new_label = label_from_node(is->label, label);
 		if (is->else_stmt != nullptr) {
-			if (check_is_terminating(is->body, new_label) &&
-			    check_is_terminating(is->else_stmt, new_label)) {
+			if (check_is_terminating(is->body, label) &&
+			    check_is_terminating(is->else_stmt, label)) {
 			    return true;
 		    }
 		}
@@ -328,8 +334,10 @@ gb_internal bool check_is_terminating(Ast *node, String const &label) {
 	case_end;
 
 	case_ast_node(fs, ForStmt, node);
-		String new_label = label_from_node(fs->label, label);
-		if (fs->cond == nullptr && !check_has_break(fs->body, new_label, true)) {
+		if (fs->cond == nullptr && !check_has_break(fs->body, label, true)) {
+			if (fs->label) {
+				return !check_has_break(fs->body, label_string(fs->label), false);
+			}
 			return true;
 		}
 	case_end;
@@ -344,15 +352,14 @@ gb_internal bool check_is_terminating(Ast *node, String const &label) {
 
 	case_ast_node(ss, SwitchStmt, node);
 		bool has_default = false;
-		String new_label = label_from_node(ss->label, label);
 		for_array(i, ss->body->BlockStmt.stmts) {
 			Ast *clause = ss->body->BlockStmt.stmts[i];
 			ast_node(cc, CaseClause, clause);
 			if (cc->list.count == 0) {
 				has_default = true;
 			}
-			if (!check_is_terminating_list(cc->stmts, new_label) ||
-			    check_has_break_list(cc->stmts, new_label, true)) {
+			if (!check_is_terminating_list(cc->stmts, label) ||
+			    check_has_break_list(cc->stmts, label, true)) {
 				return false;
 			}
 		}
@@ -361,15 +368,14 @@ gb_internal bool check_is_terminating(Ast *node, String const &label) {
 
 	case_ast_node(ss, TypeSwitchStmt, node);
 		bool has_default = false;
-		String new_label = label_from_node(ss->label, label);
 		for_array(i, ss->body->BlockStmt.stmts) {
 			Ast *clause = ss->body->BlockStmt.stmts[i];
 			ast_node(cc, CaseClause, clause);
 			if (cc->list.count == 0) {
 				has_default = true;
 			}
-			if (!check_is_terminating_list(cc->stmts, new_label) ||
-			    check_has_break_list(cc->stmts, new_label, true)) {
+			if (!check_is_terminating_list(cc->stmts, label) ||
+			    check_has_break_list(cc->stmts, label, true)) {
 				return false;
 			}
 		}
