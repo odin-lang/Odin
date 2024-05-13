@@ -1180,7 +1180,7 @@ gb_internal lbValue lb_addr_load(lbProcedure *p, lbAddr const &addr) {
 		Type *t = addr.bitfield.type;
 
 		if (do_mask) {
-			GB_ASSERT(addr.bitfield.bit_size < 8*type_size_of(ct));
+			GB_ASSERT(addr.bitfield.bit_size <= 8*type_size_of(ct));
 
 			lbValue mask = lb_const_int(p->module, t, (1ull<<cast(u64)addr.bitfield.bit_size)-1);
 			r = lb_emit_arith(p, Token_And, r, mask, t);
