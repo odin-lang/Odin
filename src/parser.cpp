@@ -1572,7 +1572,7 @@ gb_internal Token expect_operator(AstFile *f) {
 		             LIT(p));
 	}
 	if (prev.kind == Token_Ellipsis) {
-		syntax_warning(prev, "'..' for ranges has now been deprecated, prefer '..='");
+		syntax_error(prev, "'..' for ranges are not allowed, did you mean '..<' or '..='?");
 		f->tokens[f->curr_token_index].flags |= TokenFlag_Replace;
 	}
 	
