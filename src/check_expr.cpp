@@ -1441,6 +1441,13 @@ gb_internal bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, T
 			// return check_is_assignable_to(c, &o, poly); // && is_type_subtype_of_and_allow_polymorphic(o.type, poly);
 		}
 		return false;
+
+	case Type_BitField:
+		if (source->kind == Type_BitField) {
+			return is_polymorphic_type_assignable(c, poly->BitField.backing_type, source->BitField.backing_type, true, modify_type);
+		}
+		return false;
+
 	case Type_Tuple:
 		GB_PANIC("This should never happen");
 		return false;
