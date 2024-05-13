@@ -19,10 +19,12 @@ gb_internal void populate_using_array_index(CheckerContext *ctx, Ast *node, AstF
 		}
 	} else {
 		Token tok = make_token_ident(name);
-		if (field->names.count > 0) {
-			tok.pos = ast_token(field->names[0]).pos;
-		} else {
-			tok.pos = ast_token(field->type).pos;
+		if (field) {
+			if (field->names.count > 0) {
+				tok.pos = ast_token(field->names[0]).pos;
+			} else {
+				tok.pos = ast_token(field->type).pos;
+			}
 		}
 		Entity *f = alloc_entity_array_elem(nullptr, tok, t->Array.elem, idx);
 		add_entity(ctx, ctx->scope, nullptr, f);
