@@ -191,9 +191,10 @@ gb_internal void check_struct_fields(CheckerContext *ctx, Ast *node, Slice<Entit
 
 		if (is_using && p->names.count > 0) {
 			Type *first_type = fields_array[fields_array.count-1]->type;
+			bool soa_ptr = is_type_soa_pointer(first_type);
 			Type *t = base_type(type_deref(first_type));
 
-			if (!does_field_type_allow_using(t) &&
+			if ((soa_ptr || !does_field_type_allow_using(t)) &&
 			    p->names.count >= 1 &&
 			    p->names[0]->kind == Ast_Ident) {
 				Token name_token = p->names[0]->Ident.token;
