@@ -138,10 +138,3 @@ _lstat :: proc(name: string, allocator: runtime.Allocator) -> (fi: File_Info, er
 _same_file :: proc(fi1, fi2: File_Info) -> bool {
 	return fi1.fullpath == fi2.fullpath
 }
-
-// _stat_internal :: proc(name: string) -> (s: _Stat, res: int) {
-// 	TEMP_ALLOCATOR_GUARD()
-// 	name_cstr := temp_cstring(name) or_return
-// 	res = unix.sys_stat(name_cstr, &s)
-// 	return
-// }
