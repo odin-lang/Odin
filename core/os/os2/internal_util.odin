@@ -7,6 +7,7 @@ import "base:runtime"
 
 // Splits pattern by the last wildcard "*", if it exists, and returns the prefix and suffix
 // parts which are split by the last "*"
+@(require_results)
 _prefix_and_suffix :: proc(pattern: string) -> (prefix, suffix: string, err: Error) {
 	for i in 0..<len(pattern) {
 		if is_path_separator(pattern[i]) {
@@ -24,13 +25,32 @@ _prefix_and_suffix :: proc(pattern: string) -> (prefix, suffix: string, err: Err
 	return
 }
 
-clone_string :: proc(s: string, allocator: runtime.Allocator) -> string {
-	buf := make([]byte, len(s), allocator)
+@(require_results)
+clone_string :: proc(s: string, allocator: runtime.Allocator) -> (res: string, err: runtime.Allocator_Error) {
+	buf := make([]byte, len(s), allocator) or_return
 	copy(buf, s)
-	return string(buf)
+	return string(buf), nil
 }
 
 
+@(require_results)
+clone_to_cstring :: proc(s: string, allocator: runtime.Allocator) -> (res: cstring, err: runtime.Allocator_Error) {
+	res = "" // do not use a `nil` cstring
+	buf := make([]byte, len(s)+1, allocator) or_return
+	copy(buf, s)
+	buf[len(s)] = 0
+	return cstring(&buf[0]), nil
+}
+
+@(require_results)
+temp_cstring :: proc(s: string) -> (cstring, runtime.Allocator_Error) {
+	return clone_to_cstring(s, temp_allocator())
+}
+
+
+
+
+@(require_results)
 concatenate_strings_from_buffer :: proc(buf: []byte, strings: ..string) -> string {
 	n := 0
 	for s in strings {
@@ -57,6 +77,7 @@ init_random_string_seed :: proc() {
 	_ = next_random(s)
 }
 
+@(require_results)
 next_random :: proc(r: ^[2]u64) -> u64 {
 	old_state := r[0]
 	r[0] = old_state * 6364136223846793005 + (r[1]|1)
@@ -65,6 +86,7 @@ next_random :: proc(r: ^[2]u64) -> u64 {
 	return (xor_shifted >> rot) | (xor_shifted << ((-rot) & 63))
 }
 
+@(require_results)
 random_string :: proc(buf: []byte) -> string {
 	@static digits := "0123456789"
 

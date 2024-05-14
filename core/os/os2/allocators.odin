@@ -3,6 +3,7 @@ package os2
 
 import "base:runtime"
 
+@(require_results)
 file_allocator :: proc() -> runtime.Allocator {
 	return heap_allocator()
 }
@@ -12,6 +13,7 @@ temp_allocator_proc :: runtime.arena_allocator_proc
 @(private="file", thread_local)
 global_default_temp_allocator_arena: runtime.Arena
 
+@(require_results)
 temp_allocator :: proc() -> runtime.Allocator {
 	return runtime.Allocator{
 		procedure = temp_allocator_proc,

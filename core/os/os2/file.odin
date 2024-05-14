@@ -51,22 +51,27 @@ stdout: ^File = nil // OS-Specific
 stderr: ^File = nil // OS-Specific
 
 
+@(require_results)
 create :: proc(name: string) -> (^File, Error) {
 	return open(name, {.Read, .Write, .Create}, File_Mode(0o777))
 }
 
+@(require_results)
 open :: proc(name: string, flags := File_Flags{.Read}, perm := File_Mode(0o777)) -> (^File, Error) {
 	return _open(name, flags, perm)
 }
 
+@(require_results)
 new_file :: proc(handle: uintptr, name: string) -> ^File {
 	return _new_file(handle, name)
 }
 
+@(require_results)
 fd :: proc(f: ^File) -> uintptr {
 	return _fd(f)
 }
 
+@(require_results)
 name :: proc(f: ^File) -> string {
 	return _name(f)
 }
@@ -200,15 +205,18 @@ fchange_times :: proc(f: ^File, atime, mtime: time.Time) -> Error {
 	return _fchtimes(f, atime, mtime)
 }
 
+@(require_results)
 exists :: proc(path: string) -> bool {
 	return _exists(path)
 }
 
+@(require_results)
 is_file :: proc(path: string) -> bool {
 	return _is_file(path)
 }
 
 is_dir :: is_directory
+@(require_results)
 is_directory :: proc(path: string) -> bool {
 	return _is_dir(path)
 }

@@ -32,7 +32,8 @@ _mkdir :: proc(path: string, perm: File_Mode) -> Error {
 		return .Invalid_Argument
 	}
 
-	path_cstr := strings.clone_to_cstring(path, context.temp_allocator)
+	TEMP_ALLOCATOR_GUARD()
+	path_cstr := strings.clone_to_cstring(path, temp_allocator())
 	return _ok_or_error(unix.sys_mkdir(path_cstr, uint(perm & 0o777)))
 }
 

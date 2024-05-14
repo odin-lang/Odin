@@ -3,6 +3,7 @@ package os2
 import "core:strings"
 import "base:runtime"
 
+@(require_results)
 user_cache_dir :: proc(allocator: runtime.Allocator) -> (dir: string, err: Error) {
 	#partial switch ODIN_OS {
 	case .Windows:
@@ -31,6 +32,7 @@ user_cache_dir :: proc(allocator: runtime.Allocator) -> (dir: string, err: Error
 	return
 }
 
+@(require_results)
 user_config_dir :: proc(allocator: runtime.Allocator) -> (dir: string, err: Error) {
 	#partial switch ODIN_OS {
 	case .Windows:
@@ -59,6 +61,7 @@ user_config_dir :: proc(allocator: runtime.Allocator) -> (dir: string, err: Erro
 	return
 }
 
+@(require_results)
 user_home_dir :: proc(allocator: runtime.Allocator) -> (dir: string, err: Error) {
 	env := "HOME"
 	#partial switch ODIN_OS {

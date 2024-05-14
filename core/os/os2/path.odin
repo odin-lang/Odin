@@ -6,6 +6,7 @@ Path_Separator        :: _Path_Separator        // OS-Specific
 Path_Separator_String :: _Path_Separator_String // OS-Specific
 Path_List_Separator   :: _Path_List_Separator   // OS-Specific
 
+@(require_results)
 is_path_separator :: proc(c: byte) -> bool {
 	return _is_path_separator(c)
 }
@@ -26,6 +27,7 @@ remove_all :: proc(path: string) -> Error {
 
 
 getwd :: get_working_directory
+@(require_results)
 get_working_directory :: proc(allocator: runtime.Allocator) -> (dir: string, err: Error) {
 	return _getwd(allocator)
 }
