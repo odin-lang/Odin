@@ -377,7 +377,6 @@ _temp_name_to_cstring :: proc(name: string) -> (cname: cstring) {
 _file_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, offset: i64, whence: io.Seek_From) -> (n: i64, err: io.Error) {
 	f := (^File)(stream_data)
 	ferr: Error
-	i: int
 	switch mode {
 	case .Read:
 		n, ferr = _read(f, p)

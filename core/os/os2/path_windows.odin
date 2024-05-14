@@ -5,8 +5,9 @@ import win32 "core:sys/windows"
 import "base:runtime"
 import "core:strings"
 
-_Path_Separator      :: '\\'
-_Path_List_Separator :: ';'
+_Path_Separator        :: '\\'
+_Path_Separator_String :: "\\"
+_Path_List_Separator   :: ';'
 
 _is_path_separator :: proc(c: byte) -> bool {
 	return c == '\\' || c == '/'

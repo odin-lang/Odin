@@ -88,11 +88,11 @@ read_entire_file_from_path :: proc(name: string, allocator: runtime.Allocator) -
 read_entire_file_from_file :: proc(f: ^File, allocator: runtime.Allocator) -> (data: []byte, err: Error) {
 	size: int
 	has_size := true
-	if size64, err := file_size(f); err == nil {
+	if size64, serr := file_size(f); serr == nil {
 		if i64(int(size64)) != size64 {
 			size = int(size64)
 		}
-	} else if err == .No_Size {
+	} else if serr == .No_Size {
 		has_size = false
 	} else {
 		return

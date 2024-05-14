@@ -282,10 +282,10 @@ _read :: proc(f: ^File, p: []byte) -> (n: i64, err: Error) {
 		to_read := min(win32.DWORD(length), MAX_RW)
 		ok: win32.BOOL
 		if f.impl.kind == .Console {
-			n, err := read_console(handle, p[total_read:][:to_read])
+			n, cerr := read_console(handle, p[total_read:][:to_read])
 			total_read += n
-			if err != nil {
-				return i64(total_read), err
+			if cerr != nil {
+				return i64(total_read), cerr
 			}
 		} else {
 			ok = win32.ReadFile(handle, &p[total_read], to_read, &single_read_length, nil)

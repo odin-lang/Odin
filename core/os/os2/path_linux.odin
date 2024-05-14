@@ -6,8 +6,9 @@ import "core:strconv"
 import "base:runtime"
 import "core:sys/unix"
 
-_Path_Separator      :: '/'
-_Path_List_Separator :: ':'
+_Path_Separator        :: '/'
+_Path_Separator_String :: "/"
+_Path_List_Separator   :: ':'
 
 _S_IFMT   :: 0o170000 // Type of file mask
 _S_IFIFO  :: 0o010000 // Named pipe (fifo)
