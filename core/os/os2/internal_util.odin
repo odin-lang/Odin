@@ -47,8 +47,16 @@ temp_cstring :: proc(s: string) -> (cstring, runtime.Allocator_Error) {
 	return clone_to_cstring(s, temp_allocator())
 }
 
-
-
+string_from_null_terminated_bytes :: proc(b: []byte) -> (res: string) {
+	s := string(b)
+	i := 0
+	for ; i < len(s); i += 1 {
+		if s[i] == 0 {
+			break
+		}
+	}
+	return s[:i]
+}
 
 @(require_results)
 concatenate_strings_from_buffer :: proc(buf: []byte, strings: ..string) -> string {
@@ -59,6 +67,20 @@ concatenate_strings_from_buffer :: proc(buf: []byte, strings: ..string) -> strin
 	}
 	n = min(len(buf), n)
 	return string(buf[:n])
+}
+
+@(require_results)
+concatenate :: proc(strings: []string, allocator: runtime.Allocator) -> (res: string, err: runtime.Allocator_Error) {
+	n := 0
+	for s in strings {
+		n += len(s)
+	}
+	buf := make([]byte, n) or_return
+	n = 0
+	for s in strings {
+		n += copy(buf[n:], s)
+	}
+	return string(buf), nil
 }
 
 

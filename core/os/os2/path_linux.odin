@@ -1,7 +1,6 @@
 //+private
 package os2
 
-import "core:strings"
 import "core:strconv"
 import "base:runtime"
 import "core:sys/unix"
@@ -33,7 +32,7 @@ _mkdir :: proc(path: string, perm: File_Mode) -> Error {
 	}
 
 	TEMP_ALLOCATOR_GUARD()
-	path_cstr := strings.clone_to_cstring(path, temp_allocator())
+	path_cstr := temp_cstring(path) or_return
 	return _ok_or_error(unix.sys_mkdir(path_cstr, uint(perm & 0o777)))
 }
 
@@ -73,6 +72,8 @@ _mkdir_all :: proc(path: string, perm: File_Mode) -> Error {
 		return .Invalid_Argument
 	}
 
+	TEMP_ALLOCATOR_GUARD()
+
 	// need something we can edit, and use to generate cstrings
 	allocated: bool
 	path_bytes: []u8
@@ -80,7 +81,7 @@ _mkdir_all :: proc(path: string, perm: File_Mode) -> Error {
 		allocated = true
 		path_bytes = make([]u8, len(path) + 1)
 	} else {
-		path_bytes = make([]u8, len(path) + 1, context.temp_allocator)
+		path_bytes = make([]u8, len(path) + 1, temp_allocator())
 	}
 
 	// NULL terminate the byte slice to make it a valid cstring
@@ -178,7 +179,8 @@ _remove_all :: proc(path: string) -> Error {
 		return nil
 	}
 
-	path_cstr := strings.clone_to_cstring(path, context.temp_allocator)
+	TEMP_ALLOCATOR_GUARD()
+	path_cstr := temp_cstring(path) or_return
 
 	fd := unix.sys_open(path_cstr, _OPENDIR_FLAGS)
 	switch fd {
@@ -204,7 +206,7 @@ _getwd :: proc(allocator: runtime.Allocator) -> (string, Error) {
 		#no_bounds_check res := unix.sys_getcwd(&buf[0], uint(len(buf)))
 
 		if res >= 0 {
-			return strings.string_from_null_terminated_ptr(&buf[0], len(buf)), nil
+			return string_from_null_terminated_bytes(buf[:]), nil
 		}
 		if res != -ERANGE {
 			return "", _get_platform_error(res)
@@ -215,7 +217,7 @@ _getwd :: proc(allocator: runtime.Allocator) -> (string, Error) {
 }
 
 _setwd :: proc(dir: string) -> Error {
-	dir_cstr := strings.clone_to_cstring(dir, context.temp_allocator)
+	dir_cstr := temp_cstring(dir) or_return
 	return _ok_or_error(unix.sys_chdir(dir_cstr))
 }
 

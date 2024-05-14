@@ -6,7 +6,6 @@ import "base:runtime"
 import "core:io"
 import "core:mem"
 import "core:sync"
-import "core:strings"
 import "core:time"
 import "core:unicode/utf16"
 import win32 "core:sys/windows"
@@ -137,7 +136,7 @@ _new_file :: proc(handle: uintptr, name: string) -> ^File {
 
 	f.impl.allocator = file_allocator()
 	f.impl.fd = rawptr(handle)
-	f.impl.name = strings.clone(name, f.impl.allocator)
+	f.impl.name, _ = clone_string(name, f.impl.allocator)
 	f.impl.wname = win32.utf8_to_wstring(name, f.impl.allocator)
 
 	handle := _handle(f)

@@ -1,6 +1,5 @@
 package os2
 
-import "core:strings"
 import "base:runtime"
 
 @(require_results)
@@ -9,12 +8,12 @@ user_cache_dir :: proc(allocator: runtime.Allocator) -> (dir: string, err: Error
 	case .Windows:
 		dir = get_env("LocalAppData", allocator)
 		if dir != "" {
-			dir = strings.clone(dir, allocator) or_return
+			dir = clone_string(dir, allocator) or_return
 		}
 	case .Darwin:
 		dir = get_env("HOME", allocator)
 		if dir != "" {
-			dir = strings.concatenate({dir, "/Library/Caches"}, allocator) or_return
+			dir = concatenate({dir, "/Library/Caches"}, allocator) or_return
 		}
 	case: // All other UNIX systems
 		dir = get_env("XDG_CACHE_HOME", allocator)
@@ -23,7 +22,7 @@ user_cache_dir :: proc(allocator: runtime.Allocator) -> (dir: string, err: Error
 			if dir == "" {
 				return
 			}
-			dir = strings.concatenate({dir, "/.cache"}, allocator) or_return
+			dir = concatenate({dir, "/.cache"}, allocator) or_return
 		}
 	}
 	if dir == "" {
@@ -38,12 +37,12 @@ user_config_dir :: proc(allocator: runtime.Allocator) -> (dir: string, err: Erro
 	case .Windows:
 		dir = get_env("AppData", allocator)
 		if dir != "" {
-			dir = strings.clone(dir, allocator) or_return
+			dir = clone_string(dir, allocator) or_return
 		}
 	case .Darwin:
 		dir = get_env("HOME", allocator)
 		if dir != "" {
-			dir = strings.concatenate({dir, "/Library/Application Support"}, allocator) or_return
+			dir = concatenate({dir, "/Library/Application Support"}, allocator) or_return
 		}
 	case: // All other UNIX systems
 		dir = get_env("XDG_CACHE_HOME", allocator)
@@ -52,7 +51,7 @@ user_config_dir :: proc(allocator: runtime.Allocator) -> (dir: string, err: Erro
 			if dir == "" {
 				return
 			}
-			dir = strings.concatenate({dir, "/.config"}, allocator) or_return
+			dir = concatenate({dir, "/.config"}, allocator) or_return
 		}
 	}
 	if dir == "" {
