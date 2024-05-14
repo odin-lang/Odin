@@ -17,49 +17,6 @@ S_IWRITE :: 0o200
 _ERROR_BAD_NETPATH :: 53
 MAX_RW :: 1<<30
 
-_file_allocator :: proc() -> runtime.Allocator {
-	return heap_allocator()
-}
-
-_temp_allocator_proc :: runtime.arena_allocator_proc
-
-@(private="file", thread_local)
-_global_default_temp_allocator_arena: runtime.Arena
-
-_temp_allocator :: proc() -> runtime.Allocator {
-	return runtime.Allocator{
-		procedure = _temp_allocator_proc,
-		data      = &_global_default_temp_allocator_arena,
-	}
-}
-
-@(require_results)
-_temp_allocator_temp_begin :: proc(loc := #caller_location) -> (temp: runtime.Arena_Temp) {
-	temp = runtime.arena_temp_begin(&_global_default_temp_allocator_arena, loc)
-	return
-}
-
-_temp_allocator_temp_end :: proc(temp: runtime.Arena_Temp, loc := #caller_location) {
-	runtime.arena_temp_end(temp, loc)
-}
-
-@(fini, private)
-_destroy_temp_allocator_fini :: proc() {
-	runtime.arena_destroy(&_global_default_temp_allocator_arena)
-	_global_default_temp_allocator_arena = {}
-}
-
-@(deferred_out=_temp_allocator_temp_end)
-_TEMP_ALLOCATOR_GUARD :: #force_inline proc(ignore := false, loc := #caller_location) -> (runtime.Arena_Temp, runtime.Source_Code_Location) {
-	if ignore {
-		return {}, loc
-	} else {
-		return _temp_allocator_temp_begin(loc), loc
-	}
-}
-
-
-
 
 _File_Kind :: enum u8 {
 	File,
@@ -162,9 +119,9 @@ _new_file :: proc(handle: uintptr, name: string) -> ^File {
 	if handle == INVALID_HANDLE {
 		return nil
 	}
-	f := new(File, _file_allocator())
+	f := new(File, file_allocator())
 
-	f.impl.allocator = _file_allocator()
+	f.impl.allocator = file_allocator()
 	f.impl.fd = rawptr(handle)
 	f.impl.name = strings.clone(name, f.impl.allocator)
 	f.impl.wname = win32.utf8_to_wstring(name, f.impl.allocator)
@@ -583,9 +540,9 @@ _normalize_link_path :: proc(p: []u16, allocator: runtime.Allocator) -> (str: st
 		return "", _get_platform_error()
 	}
 
-	_TEMP_ALLOCATOR_GUARD()
+	TEMP_ALLOCATOR_GUARD()
 
-	buf := make([]u16, n+1, _temp_allocator())
+	buf := make([]u16, n+1, temp_allocator())
 	n = win32.GetFinalPathNameByHandleW(handle, raw_data(buf), u32(len(buf)), win32.VOLUME_NAME_DOS)
 	if n == 0 {
 		return "", _get_platform_error()

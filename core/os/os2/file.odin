@@ -218,8 +218,8 @@ copy_file :: proc(dst_path, src_path: string) -> Error {
 	src := open(src_path) or_return
 	defer close(src)
 
-	info := fstat(src, _file_allocator()) or_return
-	defer file_info_delete(info, _file_allocator())
+	info := fstat(src, file_allocator()) or_return
+	defer file_info_delete(info, file_allocator())
 	if info.is_directory {
 		return .Invalid_File
 	}

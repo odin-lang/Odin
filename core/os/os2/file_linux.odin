@@ -35,10 +35,6 @@ _File :: struct {
 	allocator: runtime.Allocator,
 }
 
-_file_allocator :: proc() -> runtime.Allocator {
-	return heap_allocator()
-}
-
 _open :: proc(name: string, flags: File_Flags, perm: File_Mode) -> (^File, Error) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	name_cstr := strings.clone_to_cstring(name, context.temp_allocator)
@@ -69,9 +65,9 @@ _open :: proc(name: string, flags: File_Flags, perm: File_Mode) -> (^File, Error
 }
 
 _new_file :: proc(fd: uintptr, _: string) -> ^File {
-	file := new(File, _file_allocator())
+	file := new(File, file_allocator())
 	file.impl.fd = int(fd)
-	file.impl.allocator = _file_allocator()
+	file.impl.allocator = file_allocator()
 	file.impl.name = _get_full_path(file.impl.fd, file.impl.allocator)
 	file.stream = {
 		data = file,
