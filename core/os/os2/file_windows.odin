@@ -36,6 +36,20 @@ _File :: struct {
 	p_mutex:  sync.Mutex, // pread pwrite calls
 }
 
+@(init)
+init_std_files :: proc() {
+	stdin  = new_file(uintptr(win32.GetStdHandle(win32.STD_INPUT_HANDLE)),  "<stdin>")
+	stdout = new_file(uintptr(win32.GetStdHandle(win32.STD_OUTPUT_HANDLE)), "<stdout>")
+	stderr = new_file(uintptr(win32.GetStdHandle(win32.STD_ERROR_HANDLE)),  "<stderr>")
+}
+@(fini)
+fini_std_files :: proc() {
+	close(stdin)
+	close(stdout)
+	close(stderr)
+}
+
+
 _handle :: proc(f: ^File) -> win32.HANDLE {
 	return win32.HANDLE(_fd(f))
 }
@@ -755,14 +769,12 @@ _file_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, 
 		ferr = _flush(f)
 		err = error_to_io_error(ferr)
 		return
-	case .Close:
+	case .Close, .Destroy:
 		ferr = _close(f)
 		err = error_to_io_error(ferr)
 		return
 	case .Query:
 		return io.query_utility({.Read, .Read_At, .Write, .Write_At, .Seek, .Size, .Flush, .Close, .Query})
-	case .Destroy:
-		return 0, .Empty
 	}
 	return 0, .Empty
 }

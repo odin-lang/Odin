@@ -36,8 +36,8 @@ _File :: struct {
 }
 
 _open :: proc(name: string, flags: File_Flags, perm: File_Mode) -> (^File, Error) {
-	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
-	name_cstr := strings.clone_to_cstring(name, context.temp_allocator)
+	TEMP_ALLOCATOR_GUARD()
+	name_cstr := _temp_name_to_cstring(name)
 
 	// Just default to using O_NOCTTY because needing to open a controlling
 	// terminal would be incredibly rare. This has no effect on files while
@@ -49,12 +49,12 @@ _open :: proc(name: string, flags: File_Flags, perm: File_Mode) -> (^File, Error
 	case O_RDWR:   flags_i = _O_RDWR
 	}
 
-	flags_i |= (_O_APPEND * int(.Append in flags))
-	flags_i |= (_O_CREAT * int(.Create in flags))
-	flags_i |= (_O_EXCL * int(.Excl in flags))
-	flags_i |= (_O_SYNC * int(.Sync in flags))
-	flags_i |= (_O_TRUNC * int(.Trunc in flags))
-	flags_i |= (_O_CLOEXEC * int(.Close_On_Exec in flags))
+	if .Append        in flags { flags_i |= _O_APPEND  }
+	if .Create        in flags { flags_i |= _O_CREAT   }
+	if .Excl          in flags { flags_i |= _O_EXCL    }
+	if .Sync          in flags { flags_i |= _O_SYNC    }
+	if .Trunc         in flags { flags_i |= _O_TRUNC   }
+	if .Close_On_Exec in flags { flags_i |= _O_CLOEXEC }
 
 	fd := unix.sys_open(name_cstr, flags_i, uint(perm))
 	if fd < 0 {
@@ -87,8 +87,12 @@ _destroy :: proc(f: ^File) -> Error {
 
 
 _close :: proc(f: ^File) -> Error {
-	res := unix.sys_close(f.impl.fd)
-	return _ok_or_error(res)
+	if f != nil {
+		res := unix.sys_close(f.impl.fd)
+		_destroy(f)
+		return _ok_or_error(res)
+	}
+	return nil
 }
 
 _fd :: proc(f: ^File) -> uintptr {
@@ -190,7 +194,8 @@ _truncate :: proc(f: ^File, size: i64) -> Error {
 }
 
 _remove :: proc(name: string) -> Error {
-	name_cstr := strings.clone_to_cstring(name, context.temp_allocator)
+	TEMP_ALLOCATOR_GUARD()
+	name_cstr := _temp_name_to_cstring(name)
 
 	fd := unix.sys_open(name_cstr, int(File_Flags.Read))
 	if fd < 0 {
@@ -244,17 +249,20 @@ _read_link_cstr :: proc(name_cstr: cstring, allocator: runtime.Allocator) -> (st
 }
 
 _read_link :: proc(name: string, allocator: runtime.Allocator) -> (string, Error) {
-	name_cstr := strings.clone_to_cstring(name, context.temp_allocator)
+	TEMP_ALLOCATOR_GUARD()
+	name_cstr := _temp_name_to_cstring(name)
 	return _read_link_cstr(name_cstr, allocator)
 }
 
 _unlink :: proc(name: string) -> Error {
-	name_cstr := strings.clone_to_cstring(name, context.temp_allocator)
+	TEMP_ALLOCATOR_GUARD()
+	name_cstr := _temp_name_to_cstring(name)
 	return _ok_or_error(unix.sys_unlink(name_cstr))
 }
 
 _chdir :: proc(name: string) -> Error {
-	name_cstr := strings.clone_to_cstring(name, context.temp_allocator)
+	TEMP_ALLOCATOR_GUARD()
+	name_cstr := _temp_name_to_cstring(name)
 	return _ok_or_error(unix.sys_chdir(name_cstr))
 }
 
@@ -263,7 +271,8 @@ _fchdir :: proc(f: ^File) -> Error {
 }
 
 _chmod :: proc(name: string, mode: File_Mode) -> Error {
-	name_cstr := strings.clone_to_cstring(name, context.temp_allocator)
+	TEMP_ALLOCATOR_GUARD()
+	name_cstr := _temp_name_to_cstring(name)
 	return _ok_or_error(unix.sys_chmod(name_cstr, uint(mode)))
 }
 
@@ -273,13 +282,15 @@ _fchmod :: proc(f: ^File, mode: File_Mode) -> Error {
 
 // NOTE: will throw error without super user priviledges
 _chown :: proc(name: string, uid, gid: int) -> Error {
-	name_cstr := strings.clone_to_cstring(name, context.temp_allocator)
+	TEMP_ALLOCATOR_GUARD()
+	name_cstr := _temp_name_to_cstring(name)
 	return _ok_or_error(unix.sys_chown(name_cstr, uid, gid))
 }
 
 // NOTE: will throw error without super user priviledges
 _lchown :: proc(name: string, uid, gid: int) -> Error {
-	name_cstr := strings.clone_to_cstring(name, context.temp_allocator)
+	TEMP_ALLOCATOR_GUARD()
+	name_cstr := _temp_name_to_cstring(name)
 	return _ok_or_error(unix.sys_lchown(name_cstr, uid, gid))
 }
 
@@ -289,7 +300,8 @@ _fchown :: proc(f: ^File, uid, gid: int) -> Error {
 }
 
 _chtimes :: proc(name: string, atime, mtime: time.Time) -> Error {
-	name_cstr := strings.clone_to_cstring(name, context.temp_allocator)
+	TEMP_ALLOCATOR_GUARD()
+	name_cstr := _temp_name_to_cstring(name)
 	times := [2]Unix_File_Time {
 		{ atime._nsec, 0 },
 		{ mtime._nsec, 0 },
@@ -306,12 +318,14 @@ _fchtimes :: proc(f: ^File, atime, mtime: time.Time) -> Error {
 }
 
 _exists :: proc(name: string) -> bool {
-	name_cstr := strings.clone_to_cstring(name, context.temp_allocator)
+	TEMP_ALLOCATOR_GUARD()
+	name_cstr := _temp_name_to_cstring(name)
 	return unix.sys_access(name_cstr, F_OK) == 0
 }
 
 _is_file :: proc(name: string) -> bool {
-	name_cstr := strings.clone_to_cstring(name, context.temp_allocator)
+	TEMP_ALLOCATOR_GUARD()
+	name_cstr := _temp_name_to_cstring(name)
 	s: _Stat
 	res := unix.sys_stat(name_cstr, &s)
 	if res < 0 {
@@ -330,7 +344,8 @@ _is_file_fd :: proc(fd: int) -> bool {
 }
 
 _is_dir :: proc(name: string) -> bool {
-	name_cstr := strings.clone_to_cstring(name, context.temp_allocator)
+	TEMP_ALLOCATOR_GUARD()
+	name_cstr := _temp_name_to_cstring(name)
 	s: _Stat
 	res := unix.sys_stat(name_cstr, &s)
 	if res < 0 {
@@ -354,7 +369,7 @@ _is_dir_fd :: proc(fd: int) -> bool {
 // buffer. Therefor, any large paths will use context.allocator.
 @(private="file")
 _temp_name_to_cstring :: proc(name: string) -> (cname: cstring) {
-	return strings.clone_to_cstring(name, context.temp_allocator)
+	return strings.clone_to_cstring(name, temp_allocator())
 }
 
 
