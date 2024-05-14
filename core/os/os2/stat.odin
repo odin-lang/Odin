@@ -3,6 +3,8 @@ package os2
 import "core:time"
 import "base:runtime"
 
+Fstat_Callback :: proc(f: ^File, allocator: runtime.Allocator) -> (File_Info, Error)
+
 File_Info :: struct {
 	fullpath:          string,
 	name:              string,
@@ -27,6 +29,9 @@ file_info_delete :: proc(fi: File_Info, allocator: runtime.Allocator) {
 
 @(require_results)
 fstat :: proc(f: ^File, allocator: runtime.Allocator) -> (File_Info, Error) {
+	if f != nil && f.user_fstat != nil {
+		return f->user_fstat(allocator)
+	}
 	return _fstat(f, allocator)
 }
 
