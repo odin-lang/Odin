@@ -1,3 +1,4 @@
+//+build freebsd, netbsd
 package os
 
 import "core:mem"

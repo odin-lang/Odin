@@ -1,6 +1,8 @@
 ODIN=../../odin
 
-all: rtti_test map_test pow_test 128_test asan_test string_compare_test
+all: all_bsd asan_test
+
+all_bsd: rtti_test map_test pow_test 128_test string_compare_test
 
 rtti_test:
 	$(ODIN) run test_rtti.odin -file -vet -strict-style -o:minimal
