@@ -64,7 +64,16 @@ Darwin)
 		fi
 	fi
 
-	CXXFLAGS="$CXXFLAGS $($LLVM_CONFIG --cxxflags --ldflags)"
+	darwin_sysroot=
+	if [ $(which xcode-select) ]; then
+		darwin_sysroot="--sysroot $(xcode-select -p)/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk"
+	elif [[ -e "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk" ]]; then
+		darwin_sysroot="--sysroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk"
+	else
+		echo "Warning: MacOSX.sdk not found."
+	fi
+
+	CXXFLAGS="$CXXFLAGS $($LLVM_CONFIG --cxxflags --ldflags) ${darwin_sysroot}"
 	LDFLAGS="$LDFLAGS -liconv -ldl -framework System -lLLVM"
 	;;
 FreeBSD)
