@@ -989,6 +989,8 @@ gb_internal bool parse_build_flags(Array<String> args) {
 								build_context.build_mode = BuildMode_DynamicLibrary;
 							} else if (str == "obj" || str == "object") {
 								build_context.build_mode = BuildMode_Object;
+							} else if (str == "static" || str == "lib") {
+								build_context.build_mode = BuildMode_StaticLibrary;
 							} else if (str == "exe") {
 								build_context.build_mode = BuildMode_Executable;
 							} else if (str == "asm" || str == "assembly" || str == "assembler") {
@@ -999,6 +1001,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 								gb_printf_err("Unknown build mode '%.*s'\n", LIT(str));
 								gb_printf_err("Valid build modes:\n");
 								gb_printf_err("\tdll, shared, dynamic\n");
+								gb_printf_err("\tlib, static\n");
 								gb_printf_err("\tobj, object\n");
 								gb_printf_err("\texe\n");
 								gb_printf_err("\tasm, assembly, assembler\n");
@@ -1637,6 +1640,7 @@ gb_internal void remove_temp_files(lbGenerator *gen) {
 
 	switch (build_context.build_mode) {
 	case BuildMode_Executable:
+	case BuildMode_StaticLibrary:
 	case BuildMode_DynamicLibrary:
 		break;
 
@@ -1655,6 +1659,7 @@ gb_internal void remove_temp_files(lbGenerator *gen) {
 	if (!build_context.keep_object_files) {
 		switch (build_context.build_mode) {
 		case BuildMode_Executable:
+		case BuildMode_StaticLibrary:
 		case BuildMode_DynamicLibrary:
 			for (String const &path : gen->output_object_paths) {
 				gb_file_remove(cast(char const *)path.text);
@@ -1833,6 +1838,9 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 		print_usage_line(3, "-build-mode:exe         Builds as an executable.");
 		print_usage_line(3, "-build-mode:dll         Builds as a dynamically linked library.");
 		print_usage_line(3, "-build-mode:shared      Builds as a dynamically linked library.");
+		print_usage_line(3, "-build-mode:lib         Builds as a statically linked library.");
+		print_usage_line(3, "-build-mode:static      Builds as a statically linked library.");
+		print_usage_line(3, "-build-mode:lib         Builds as an static library.");
 		print_usage_line(3, "-build-mode:obj         Builds as an object file.");
 		print_usage_line(3, "-build-mode:object      Builds as an object file.");
 		print_usage_line(3, "-build-mode:assembly    Builds as an assembly file.");
@@ -2866,6 +2874,7 @@ int main(int arg_count, char const **arg_ptr) {
 
 		switch (build_context.build_mode) {
 		case BuildMode_Executable:
+		case BuildMode_StaticLibrary:
 		case BuildMode_DynamicLibrary:
 			i32 result = linker_stage(&linker_data);
 			if (result) {
@@ -2887,6 +2896,7 @@ int main(int arg_count, char const **arg_ptr) {
 		if (lb_generate_code(gen)) {
 			switch (build_context.build_mode) {
 			case BuildMode_Executable:
+			case BuildMode_StaticLibrary:
 			case BuildMode_DynamicLibrary:
 				i32 result = linker_stage(gen);
 				if (result) {
