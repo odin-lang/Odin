@@ -266,7 +266,7 @@ gb_internal void terminal_reset_colours(void) {
 }
 
 
-gb_internal isize show_error_on_line(TokenPos const &pos, TokenPos end, char const *prefix=nullptr) {
+gb_internal isize show_error_on_line(TokenPos const &pos, TokenPos end) {
 	get_error_value()->end = end;
 	if (!show_error_line()) {
 		return -1;
@@ -289,16 +289,12 @@ gb_internal isize show_error_on_line(TokenPos const &pos, TokenPos end, char con
 			MAX_LINE_LENGTH_PADDED = MAX_LINE_LENGTH-MAX_TAB_WIDTH-ELLIPSIS_PADDING,
 		};
 
-		if (prefix) {
-			error_out("\t%s\n\n", prefix);
-		}
+		i32 error_length = gb_max(end.offset - pos.offset, 1);
 
 		error_out("\t");
 
 		terminal_set_colours(TerminalStyle_Bold, TerminalColour_White);
 
-
-		i32 error_length = gb_max(end.offset - pos.offset, 1);
 
 		isize squiggle_extra = 0;
 

@@ -572,7 +572,7 @@ gb_internal Type *check_assignment_variable(CheckerContext *ctx, Operand *lhs, O
 			error(lhs->expr, "Cannot assign to '%s'", str);
 
 			if (e && e->flags & EntityFlag_ForValue) {
-				isize offset = show_error_on_line(e->token.pos, token_pos_end(e->token), "Suggestion:");
+				isize offset = show_error_on_line(e->token.pos, token_pos_end(e->token));
 				if (offset < 0) {
 					if (is_type_map(e->type)) {
 						error_line("\tSuggestion: Did you mean? 'for key, &%.*s in ...'\n", LIT(e->token.string));
@@ -588,7 +588,7 @@ gb_internal Type *check_assignment_variable(CheckerContext *ctx, Operand *lhs, O
 				}
 
 			} else if (e && e->flags & EntityFlag_SwitchValue) {
-				isize offset = show_error_on_line(e->token.pos, token_pos_end(e->token), "Suggestion:");
+				isize offset = show_error_on_line(e->token.pos, token_pos_end(e->token));
 				if (offset < 0) {
 					error_line("\tSuggestion: Did you mean? 'switch &%.*s in ...'\n", LIT(e->token.string));
 				} else {
