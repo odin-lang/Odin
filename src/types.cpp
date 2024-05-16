@@ -988,6 +988,16 @@ gb_internal Type *alloc_type_soa_pointer(Type *elem) {
 	return t;
 }
 
+gb_internal Type *alloc_type_pointer_to_multi_pointer(Type *ptr) {
+	Type *original_type = ptr;
+	ptr = base_type(ptr);
+	if (ptr->kind == Type_Pointer) {
+		return alloc_type_multi_pointer(ptr->Pointer.elem);
+	} else if (ptr->kind != Type_MultiPointer) {
+		GB_PANIC("Invalid type: %s", type_to_string(original_type));
+	}
+	return original_type;
+}
 
 gb_internal Type *alloc_type_array(Type *elem, i64 count, Type *generic_count = nullptr) {
 	if (generic_count != nullptr) {

@@ -328,6 +328,7 @@ gb_internal lbValue lb_soa_zip(lbProcedure *p, AstCallExpr *ce, TypeAndValue con
 	lbAddr res = lb_add_local_generated(p, tv.type, true);
 	for_array(i, slices) {
 		lbValue src = lb_slice_elem(p, slices[i]);
+		src = lb_emit_conv(p, src, alloc_type_pointer_to_multi_pointer(src.type));
 		lbValue dst = lb_emit_struct_ep(p, res.addr, cast(i32)i);
 		lb_emit_store(p, dst, src);
 	}
@@ -1559,19 +1560,26 @@ gb_internal lbValue lb_emit_matrix_ev(lbProcedure *p, lbValue s, isize row, isiz
 	return lb_emit_load(p, ptr);
 }
 
-
 gb_internal void lb_fill_slice(lbProcedure *p, lbAddr const &slice, lbValue base_elem, lbValue len) {
 	Type *t = lb_addr_type(slice);
 	GB_ASSERT(is_type_slice(t));
 	lbValue ptr = lb_addr_get_ptr(p, slice);
-	lb_emit_store(p, lb_emit_struct_ep(p, ptr, 0), base_elem);
+	lbValue data = lb_emit_struct_ep(p, ptr, 0);
+	if (are_types_identical(type_deref(base_elem.type, true), type_deref(type_deref(data.type), true))) {
+		base_elem = lb_emit_conv(p, base_elem, type_deref(data.type));
+	}
+	lb_emit_store(p, data, base_elem);
 	lb_emit_store(p, lb_emit_struct_ep(p, ptr, 1), len);
 }
 gb_internal void lb_fill_string(lbProcedure *p, lbAddr const &string, lbValue base_elem, lbValue len) {
 	Type *t = lb_addr_type(string);
 	GB_ASSERT(is_type_string(t));
 	lbValue ptr = lb_addr_get_ptr(p, string);
-	lb_emit_store(p, lb_emit_struct_ep(p, ptr, 0), base_elem);
+	lbValue data = lb_emit_struct_ep(p, ptr, 0);
+	if (are_types_identical(type_deref(base_elem.type, true), type_deref(type_deref(data.type), true))) {
+		base_elem = lb_emit_conv(p, base_elem, type_deref(data.type));
+	}
+	lb_emit_store(p, data, base_elem);
 	lb_emit_store(p, lb_emit_struct_ep(p, ptr, 1), len);
 }
 

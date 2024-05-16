@@ -3428,8 +3428,8 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		auto types = slice_make<Type *>(permanent_allocator(), t->Struct.fields.count-1);
 		for_array(i, types) {
 			Entity *f = t->Struct.fields[i];
-			GB_ASSERT(f->type->kind == Type_Pointer);
-			types[i] = alloc_type_slice(f->type->Pointer.elem);
+			GB_ASSERT(f->type->kind == Type_MultiPointer);
+			types[i] = alloc_type_slice(f->type->MultiPointer.elem);
 		}
 
 		operand->type = alloc_type_tuple_from_field_types(types.data, types.count, false, false);
