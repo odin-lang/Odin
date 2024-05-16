@@ -3851,27 +3851,39 @@ gb_internal lbAddr lb_build_addr_index_expr(lbProcedure *p, Ast *expr) {
 
 	if (ie->expr->tav.mode == Addressing_SoaVariable) {
 		// SOA Structures for slices/dynamic arrays
-		GB_ASSERT(is_type_pointer(type_of_expr(ie->expr)));
+		GB_ASSERT_MSG(is_type_multi_pointer(type_of_expr(ie->expr)), "%s", type_to_string(type_of_expr(ie->expr)));
 
 		lbValue field = lb_build_expr(p, ie->expr);
 		lbValue index = lb_build_expr(p, ie->index);
 
-
 		if (!build_context.no_bounds_check) {
-			// TODO HACK(bill): Clean up this hack to get the length for bounds checking
-			// GB_ASSERT(LLVMIsALoadInst(field.value));
+			Ast *se_expr = unparen_expr(ie->expr);
+			if (se_expr->kind == Ast_SelectorExpr) {
+				ast_node(se, SelectorExpr, se_expr);
+				lbValue len = {};
 
-			// lbValue a = {};
-			// a.value = LLVMGetOperand(field.value, 0);
-			// a.type = alloc_type_pointer(field.type);
+				Type *type = base_type(type_deref(type_of_expr(se->expr)));
+				GB_ASSERT_MSG(is_type_soa_struct(type), "%s", type_to_string(type));
+				if (type->Struct.soa_kind == StructSoa_Fixed) {
+					len = lb_const_int(p->module, t_int, type->Struct.soa_count);
+				} else {
+					lbAddr *found = map_get(&p->selector_addr, se_expr);
+					if (found) {
+						lbAddr addr = *found;
+						lbValue parent = lb_addr_get_ptr(p, addr);
+						if (is_type_pointer(type_deref(parent.type))) {
+							parent = lb_emit_load(p, parent);
+						}
+						len = lb_soa_struct_len(p, parent);
+					}
+				}
 
-			// irInstr *b = &a->Instr;
-			// GB_ASSERT(b->kind == irInstr_StructElementPtr);
-			// lbValue base_struct = b->StructElementPtr.address;
-
-			// GB_ASSERT(is_type_soa_struct(type_deref(ir_type(base_struct))));
-			// lbValue len = ir_soa_struct_len(p, base_struct);
-			// lb_emit_bounds_check(p, ast_token(ie->index), index, len);
+				if (len.value) {
+					lb_emit_bounds_check(p, ast_token(ie->index), index, len);
+				}
+			} else {
+				// TODO(bill): how do you even do bounds checking here?
+			}
 		}
 		lbValue val = lb_emit_ptr_offset(p, field, index);
 		return lb_addr(val);
@@ -4218,6 +4230,7 @@ gb_internal lbAddr lb_build_addr_slice_expr(lbProcedure *p, Ast *expr) {
 					lbValue field_dst = lb_emit_struct_ep(p, dst.addr, i);
 					lbValue field_src = lb_emit_struct_ep(p, lb_addr_get_ptr(p, addr), i);
 					field_src = lb_emit_array_ep(p, field_src, low);
+					field_src = lb_emit_conv(p, field_src, type_deref(field_dst.type));
 					lb_emit_store(p, field_dst, field_src);
 				}
 
@@ -4233,6 +4246,7 @@ gb_internal lbAddr lb_build_addr_slice_expr(lbProcedure *p, Ast *expr) {
 						lbValue field_dst = lb_emit_struct_ep(p, dst.addr, i);
 						lbValue field_src = lb_emit_struct_ev(p, base, i);
 						field_src = lb_emit_ptr_offset(p, field_src, low);
+						field_src = lb_emit_conv(p, field_src, type_deref(field_dst.type));
 						lb_emit_store(p, field_dst, field_src);
 					}
 
@@ -4247,6 +4261,7 @@ gb_internal lbAddr lb_build_addr_slice_expr(lbProcedure *p, Ast *expr) {
 					lbValue field_dst = lb_emit_struct_ep(p, dst.addr, i);
 					lbValue field_src = lb_emit_struct_ev(p, base, i);
 					field_src = lb_emit_ptr_offset(p, field_src, low);
+					field_src = lb_emit_conv(p, field_src, type_deref(field_dst.type));
 					lb_emit_store(p, field_dst, field_src);
 				}
 
@@ -4987,6 +5002,11 @@ gb_internal lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 					GB_ASSERT(sel.index.count > 0);
 					// NOTE(bill): just patch the index in place
 					sel.index[0] = addr.swizzle.indices[sel.index[0]];
+				}
+
+				Type *atype = type_deref(lb_addr_type(addr));
+				if (is_type_soa_struct(atype)) {
+					map_set(&p->selector_addr, expr, addr);
 				}
 
 				lbValue a = lb_addr_get_ptr(p, addr);

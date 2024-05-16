@@ -7806,8 +7806,8 @@ gb_internal bool check_set_index_data(Operand *o, Type *t, bool indirection, i64
 
 	if (is_type_pointer(original_type) && indirection) {
 		Type *ptr = base_type(original_type);
-		if (ptr->kind == Type_Pointer && o->mode == Addressing_SoaVariable) {
-			o->type = ptr->Pointer.elem;
+		if (ptr->kind == Type_MultiPointer && o->mode == Addressing_SoaVariable) {
+			o->type = ptr->MultiPointer.elem;
 			o->mode = Addressing_Value;
 			return true;
 		}

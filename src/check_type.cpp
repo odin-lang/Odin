@@ -2827,12 +2827,15 @@ gb_internal bool complete_soa_type(Checker *checker, Type *t, bool wait_to_finis
 				GB_ASSERT(soa_count >= 0);
 				field_type = alloc_type_array(old_field->type, soa_count);
 			} else {
-				field_type = alloc_type_pointer(old_field->type);
+				field_type = alloc_type_multi_pointer(old_field->type);
 			}
 			Entity *new_field = alloc_entity_field(scope, old_field->token, field_type, false, old_field->Variable.field_index);
 			t->Struct.fields[i] = new_field;
 			add_entity(scope, new_field);
 			new_field->flags |= EntityFlag_Used;
+			if (t->Struct.soa_kind != StructSoa_Fixed) {
+				new_field->flags |= EntityFlag_SoaPtrField;
+			}
 		} else {
 			t->Struct.fields[i] = old_field;
 		}
@@ -2948,7 +2951,7 @@ gb_internal Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_e
 				GB_ASSERT(count >= 0);
 				field_type = alloc_type_array(old_array->Array.elem, count);
 			} else {
-				field_type = alloc_type_pointer(old_array->Array.elem);
+				field_type = alloc_type_multi_pointer(old_array->Array.elem);
 			}
 			Token token = {};
 			token.string = params_xyzw[i];
@@ -2957,6 +2960,9 @@ gb_internal Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_e
 			soa_struct->Struct.fields[i] = new_field;
 			add_entity(ctx, scope, nullptr, new_field);
 			add_entity_use(ctx, nullptr, new_field);
+			if (soa_kind != StructSoa_Fixed) {
+				new_field->flags |= EntityFlag_SoaPtrField;
+			}
 		}
 
 		is_complete = true;
@@ -2980,12 +2986,15 @@ gb_internal Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_e
 						GB_ASSERT(count >= 0);
 						field_type = alloc_type_array(old_field->type, count);
 					} else {
-						field_type = alloc_type_pointer(old_field->type);
+						field_type = alloc_type_multi_pointer(old_field->type);
 					}
 					Entity *new_field = alloc_entity_field(scope, old_field->token, field_type, false, old_field->Variable.field_index);
 					soa_struct->Struct.fields[i] = new_field;
 					add_entity(ctx, scope, nullptr, new_field);
 					add_entity_use(ctx, nullptr, new_field);
+					if (soa_kind != StructSoa_Fixed) {
+						new_field->flags |= EntityFlag_SoaPtrField;
+					}
 				} else {
 					soa_struct->Struct.fields[i] = old_field;
 				}
