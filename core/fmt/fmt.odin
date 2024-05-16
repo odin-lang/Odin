@@ -1960,7 +1960,7 @@ fmt_struct :: proc(fi: ^Info, v: any, the_verb: rune, info: runtime.Type_Info_St
 						fmt_arg(fi, any{data, t.id}, verb)
 					}
 				} else {
-					t := info.types[i].variant.(runtime.Type_Info_Pointer).elem
+					t := info.types[i].variant.(runtime.Type_Info_Multi_Pointer).elem
 					t_size := uintptr(t.size)
 					if reflect.is_any(t) {
 						io.write_string(fi.writer, "any{}", &fi.n)
