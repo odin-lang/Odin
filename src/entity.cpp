@@ -85,8 +85,6 @@ enum EntityFlag : u64 {
 	EntityFlag_Require = 1ull<<50,
 	EntityFlag_ByPtr   = 1ull<<51, // enforce parameter is passed by pointer
 
-	EntityFlag_OldForOrSwitchValue = 1ull<<52,
-
 	EntityFlag_Overridden    = 1ull<<63,
 };
 

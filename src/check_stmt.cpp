@@ -501,7 +501,6 @@ gb_internal Type *check_assignment_variable(CheckerContext *ctx, Operand *lhs, O
 		return nullptr;
 
 	case Addressing_Variable:
-		check_old_for_or_switch_value_usage(lhs->expr);
 		break;
 
 	case Addressing_MapIndex: {
@@ -523,9 +522,8 @@ gb_internal Type *check_assignment_variable(CheckerContext *ctx, Operand *lhs, O
 		break;
 	}
 
-	case Addressing_Context: {
+	case Addressing_Context:
 		break;
-	}
 
 	case Addressing_SoaVariable:
 		break;
@@ -1328,7 +1326,6 @@ gb_internal void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_
 		}
 	}
 
-	bool is_ptr = is_type_pointer(x.type);
 
 	// NOTE(bill): Check for multiple defaults
 	Ast *first_default = nullptr;
@@ -1447,15 +1444,6 @@ gb_internal void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_
 		}
 
 		bool is_reference = is_addressed;
-		bool old_style = false;
-
-		if (!is_reference &&
-		    is_ptr &&
-		    cc->list.count == 1 &&
-		    case_type != nullptr) {
-			is_reference = true;
-			old_style = true;
-		}
 
 		if (cc->list.count > 1 || saw_nil) {
 			case_type = nullptr;
@@ -1476,9 +1464,6 @@ gb_internal void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_
 			tag_var->flags |= EntityFlag_SwitchValue;
 			if (!is_reference) {
 				tag_var->flags |= EntityFlag_Value;
-			}
-			if (old_style) {
-				tag_var->flags |= EntityFlag_OldForOrSwitchValue;
 			}
 			add_entity(ctx, ctx->scope, lhs, tag_var);
 			add_entity_use(ctx, lhs, tag_var);
@@ -1618,7 +1603,6 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 	auto entities = array_make<Entity *>(temporary_allocator(), 0, 2);
 	bool is_map = false;
 	bool is_bit_set = false;
-	bool use_by_reference_for_value = false;
 	bool is_soa = false;
 	bool is_reverse = rs->reverse;
 
@@ -1679,7 +1663,6 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 					}
 				}
 			}
-			bool is_ptr = is_type_pointer(operand.type);
 			Type *t = base_type(type_deref(operand.type));
 
 			switch (t->kind) {
@@ -1719,32 +1702,27 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 				break;
 
 			case Type_EnumeratedArray:
-				if (is_ptr) use_by_reference_for_value = true;
 				array_add(&vals, t->EnumeratedArray.elem);
 				array_add(&vals, t->EnumeratedArray.index);
 				break;
 
 			case Type_Array:
-				if (is_ptr) use_by_reference_for_value = true;
-				if (!is_ptr) is_possibly_addressable = operand.mode == Addressing_Variable;
+				is_possibly_addressable = operand.mode == Addressing_Variable;
 				array_add(&vals, t->Array.elem);
 				array_add(&vals, t_int);
 				break;
 
 			case Type_DynamicArray:
-				if (is_ptr) use_by_reference_for_value = true;
 				array_add(&vals, t->DynamicArray.elem);
 				array_add(&vals, t_int);
 				break;
 
 			case Type_Slice:
-				if (is_ptr) use_by_reference_for_value = true;
 				array_add(&vals, t->Slice.elem);
 				array_add(&vals, t_int);
 				break;
 
 			case Type_Map:
-				if (is_ptr) use_by_reference_for_value = true;
 				is_map = true;
 				array_add(&vals, t->Map.key);
 				array_add(&vals, t->Map.value);
@@ -1817,7 +1795,6 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 			case Type_Struct:
 				if (t->Struct.soa_kind != StructSoa_None) {
 					is_soa = true;
-					if (is_ptr) use_by_reference_for_value = true;
 					array_add(&vals, t->Struct.soa_elem);
 					array_add(&vals, t_int);
 				}
@@ -1894,9 +1871,6 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 						char const *idx_name = is_map ? "key" : is_bit_set ? "element" : "index";
 						error(token, "The %s variable '%.*s' cannot be made addressable", idx_name, LIT(str));
 					}
-				} else if (i == addressable_index && use_by_reference_for_value) {
-					entity->flags |= EntityFlag_OldForOrSwitchValue;
-					entity->flags &= ~EntityFlag_Value;
 				}
 				if (is_soa) {
 					if (i == 0) {
