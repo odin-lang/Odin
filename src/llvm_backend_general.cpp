@@ -1292,6 +1292,7 @@ gb_internal lbValue lb_addr_load(lbProcedure *p, lbAddr const &addr) {
 		if (t->Struct.soa_kind == StructSoa_Fixed) {
 			len = lb_const_int(p->module, t_int, t->Struct.soa_count);
 		} else {
+			elem = alloc_type_multi_pointer_to_pointer(elem);
 			lbValue v = lb_emit_load(p, addr.addr);
 			len = lb_soa_struct_len(p, v);
 		}
