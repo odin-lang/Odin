@@ -1441,6 +1441,13 @@ gb_internal bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, T
 			// return check_is_assignable_to(c, &o, poly); // && is_type_subtype_of_and_allow_polymorphic(o.type, poly);
 		}
 		return false;
+
+	case Type_BitField:
+		if (source->kind == Type_BitField) {
+			return is_polymorphic_type_assignable(c, poly->BitField.backing_type, source->BitField.backing_type, true, modify_type);
+		}
+		return false;
+
 	case Type_Tuple:
 		GB_PANIC("This should never happen");
 		return false;
@@ -1787,6 +1794,13 @@ gb_internal bool check_unary_op(CheckerContext *c, Operand *o, Token op) {
 		gb_string_free(str);
 		return false;
 	}
+	if (o->mode == Addressing_Type) {
+		gbString str = type_to_string(o->type);
+		error(o->expr, "Expected an expression for operator '%.*s', got type '%s'", LIT(op.string), str);
+		gb_string_free(str);
+		return false;
+	}
+
 	Type *type = base_type(core_array_type(o->type));
 	gbString str = nullptr;
 	switch (op.kind) {
@@ -10249,6 +10263,17 @@ gb_internal ExprKind check_slice_expr(CheckerContext *c, Operand *o, Ast *node, 
 	case Type_Struct:
 		if (is_type_soa_struct(t)) {
 			valid = true;
+			if (t->Struct.soa_kind == StructSoa_Fixed) {
+				max_count = t->Struct.soa_count;
+				if (o->mode != Addressing_Variable && !is_type_pointer(o->type)) {
+					gbString str = expr_to_string(node);
+					error(node, "Cannot slice #soa array '%s', value is not addressable", str);
+					gb_string_free(str);
+					o->mode = Addressing_Invalid;
+					o->expr = node;
+					return kind;
+				}
+			}
 			o->type = make_soa_struct_slice(c, nullptr, nullptr, t->Struct.soa_elem);
 		}
 		break;

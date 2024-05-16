@@ -23,6 +23,8 @@ General_Error :: enum u32 {
 	Invalid_Dir,
 	Invalid_Path,
 
+	Pattern_Has_Separator,
+
 	Unsupported,
 }
 
@@ -63,6 +65,7 @@ error_string :: proc(ferr: Error) -> string {
 		case .Invalid_Dir:       return "invalid directory"
 		case .Invalid_Path:      return "invalid path"
 		case .Unsupported:       return "unsupported"
+		case .Pattern_Has_Separator: return "pattern has separator"
 		}
 	case io.Error:
 		switch e {

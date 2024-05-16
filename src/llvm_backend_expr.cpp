@@ -4141,7 +4141,7 @@ gb_internal lbAddr lb_build_addr_slice_expr(lbProcedure *p, Ast *expr) {
 		if (se->high == nullptr) {
 			lbValue offset = base;
 			LLVMValueRef indices[1] = {low.value};
-			offset.value = LLVMBuildGEP2(p->builder, lb_type(p->module, offset.type->MultiPointer.elem), offset.value, indices, 1, "");
+			offset.value = LLVMBuildGEP2(p->builder, lb_type(p->module, base_type(offset.type)->MultiPointer.elem), offset.value, indices, 1, "");
 			lb_addr_store(p, res, offset);
 		} else {
 			low = lb_emit_conv(p, low, t_int);
@@ -4150,7 +4150,7 @@ gb_internal lbAddr lb_build_addr_slice_expr(lbProcedure *p, Ast *expr) {
 			lb_emit_multi_pointer_slice_bounds_check(p, se->open, low, high);
 
 			LLVMValueRef indices[1] = {low.value};
-			LLVMValueRef ptr = LLVMBuildGEP2(p->builder, lb_type(p->module, base.type->MultiPointer.elem), base.value, indices, 1, "");
+			LLVMValueRef ptr = LLVMBuildGEP2(p->builder, lb_type(p->module, base_type(base.type)->MultiPointer.elem), base.value, indices, 1, "");
 			LLVMValueRef len = LLVMBuildSub(p->builder, high.value, low.value, "");
 
 			LLVMValueRef gep0 = lb_emit_struct_ep(p, res.addr, 0).value;
@@ -5193,6 +5193,54 @@ gb_internal lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 	case_ast_node(oe, OrReturnExpr, expr);
 		lbValue ptr = lb_address_from_load_or_generate_local(p, lb_build_expr(p, expr));
 		return lb_addr(ptr);
+	case_end;
+
+
+	case_ast_node(be, OrBranchExpr, expr);
+		lbBlock *block = nullptr;
+
+		if (be->label != nullptr) {
+			lbBranchBlocks bb = lb_lookup_branch_blocks(p, be->label);
+			switch (be->token.kind) {
+			case Token_or_break:    block = bb.break_;    break;
+			case Token_or_continue: block = bb.continue_; break;
+			}
+		} else {
+			for (lbTargetList *t = p->target_list; t != nullptr && block == nullptr; t = t->prev) {
+				if (t->is_block) {
+					continue;
+				}
+
+				switch (be->token.kind) {
+				case Token_or_break:    block = t->break_;    break;
+				case Token_or_continue: block = t->continue_; break;
+				}
+			}
+		}
+
+		GB_ASSERT(block != nullptr);
+		TypeAndValue tv = expr->tav;
+
+		lbValue lhs = {};
+		lbValue rhs = {};
+		lb_emit_try_lhs_rhs(p, be->expr, tv, &lhs, &rhs);
+		Type *type = default_type(tv.type);
+		if (lhs.value) {
+			lhs = lb_emit_conv(p, lhs, type);
+		} else if (type != nullptr && type != t_invalid) {
+			lhs = lb_const_nil(p->module, type);
+		}
+
+		lbBlock *then  = lb_create_block(p, "or_branch.then");
+		lbBlock *else_ = lb_create_block(p, "or_branch.else");
+
+		lb_emit_if(p, lb_emit_try_has_value(p, rhs), then, else_);
+		lb_start_block(p, else_);
+		lb_emit_defer_stmts(p, lbDeferExit_Branch, block);
+		lb_emit_jump(p, block);
+		lb_start_block(p, then);
+
+		return lb_addr(lb_address_from_load_or_generate_local(p, lhs));
 	case_end;
 	}
 

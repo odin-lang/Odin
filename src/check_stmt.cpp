@@ -169,9 +169,16 @@ gb_internal bool check_has_break_list(Slice<Ast *> const &stmts, String const &l
 	return false;
 }
 
+gb_internal bool check_has_break_expr(Ast * expr, String const &label) {
+	if (expr && expr->viral_state_flags & ViralStateFlag_ContainsOrBreak) {
+		return true;
+	}
+	return false;
+}
+
 gb_internal bool check_has_break_expr_list(Slice<Ast *> const &exprs, String const &label) {
 	for (Ast *expr : exprs) {
-		if (expr && expr->viral_state_flags & ViralStateFlag_ContainsOrBreak) {
+		if (check_has_break_expr(expr, label)) {
 			return true;
 		}
 	}
@@ -196,6 +203,13 @@ gb_internal bool check_has_break(Ast *stmt, String const &label, bool implicit) 
 		return check_has_break_list(stmt->BlockStmt.stmts, label, implicit);
 
 	case Ast_IfStmt:
+		if (stmt->IfStmt.init && check_has_break(stmt->IfStmt.init, label, implicit)) {
+			return true;
+		}
+		if (stmt->IfStmt.cond && check_has_break_expr(stmt->IfStmt.cond, label)) {
+			return true;
+		}
+
 		if (check_has_break(stmt->IfStmt.body, label, implicit) ||
 		    (stmt->IfStmt.else_stmt != nullptr && check_has_break(stmt->IfStmt.else_stmt, label, implicit))) {
 			return true;
@@ -206,6 +220,9 @@ gb_internal bool check_has_break(Ast *stmt, String const &label, bool implicit) 
 		return check_has_break_list(stmt->CaseClause.stmts, label, implicit);
 
 	case Ast_SwitchStmt:
+		if (stmt->SwitchStmt.init && check_has_break_expr(stmt->SwitchStmt.init, label)) {
+			return true;
+		}
 		if (label != "" && check_has_break(stmt->SwitchStmt.body, label, false)) {
 			return true;
 		}
@@ -218,6 +235,16 @@ gb_internal bool check_has_break(Ast *stmt, String const &label, bool implicit) 
 		break;
 
 	case Ast_ForStmt:
+		if (stmt->ForStmt.init && check_has_break(stmt->ForStmt.init, label, implicit)) {
+			return true;
+		}
+		if (stmt->ForStmt.cond && check_has_break_expr(stmt->ForStmt.cond, label)) {
+			return true;
+		}
+		if (stmt->ForStmt.post && check_has_break(stmt->ForStmt.post, label, implicit)) {
+			return true;
+		}
+
 		if (label != "" && check_has_break(stmt->ForStmt.body, label, false)) {
 			return true;
 		}
@@ -253,7 +280,16 @@ gb_internal bool check_has_break(Ast *stmt, String const &label, bool implicit) 
 	return false;
 }
 
-
+String label_string(Ast *node) {
+	GB_ASSERT(node != nullptr);
+	if (node->kind == Ast_Ident) {
+		return node->Ident.token.string;
+	} else if (node->kind == Ast_Label) {
+		return label_string(node->Label.name);
+	}
+	GB_ASSERT("INVALID LABEL");
+	return {};
+}
 
 // NOTE(bill): The last expression has to be a 'return' statement
 // TODO(bill): This is a mild hack and should be probably handled properly
@@ -264,7 +300,12 @@ gb_internal bool check_is_terminating(Ast *node, String const &label) {
 	case_end;
 
 	case_ast_node(bs, BlockStmt, node);
-		return check_is_terminating_list(bs->stmts, label);
+		if (check_is_terminating_list(bs->stmts, label)) {
+			if (bs->label != nullptr) {
+				return check_is_terminating_list(bs->stmts, label_string(bs->label));
+			}
+			return true;
+		}
 	case_end;
 
 	case_ast_node(es, ExprStmt, node);
@@ -321,6 +362,9 @@ gb_internal bool check_is_terminating(Ast *node, String const &label) {
 
 	case_ast_node(fs, ForStmt, node);
 		if (fs->cond == nullptr && !check_has_break(fs->body, label, true)) {
+			if (fs->label) {
+				return !check_has_break(fs->body, label_string(fs->label), false);
+			}
 			return true;
 		}
 	case_end;
@@ -734,7 +778,7 @@ gb_internal bool check_using_stmt_entity(CheckerContext *ctx, AstUsingStmt *us, 
 		for (auto const &entry : scope->elements) {
 			String name = entry.key;
 			Entity *decl = entry.value;
-			if (!is_entity_exported(decl)) continue;
+			if (!is_entity_exported(decl, true)) continue;
 
 			Entity *found = scope_insert_with_name(ctx->scope, name, decl);
 			if (found != nullptr) {
@@ -759,6 +803,8 @@ gb_internal bool check_using_stmt_entity(CheckerContext *ctx, AstUsingStmt *us, 
 		bool is_ptr = is_type_pointer(e->type);
 		Type *t = base_type(type_deref(e->type));
 		if (t->kind == Type_Struct) {
+			wait_signal_until_available(&t->Struct.fields_wait_signal);
+
 			Scope *found = t->Struct.scope;
 			GB_ASSERT(found != nullptr);
 			for (auto const &entry : found->elements) {

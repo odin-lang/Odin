@@ -11,6 +11,9 @@ gb_internal bool ast_file_vet_style(AstFile *f) {
 	return (ast_file_vet_flags(f) & VetFlag_Style) != 0;
 }
 
+gb_internal bool ast_file_vet_deprecated(AstFile *f) {
+	return (ast_file_vet_flags(f) & VetFlag_Deprecated) != 0;
+}
 
 gb_internal bool file_allow_newline(AstFile *f) {
 	bool is_strict = build_context.strict_style || ast_file_vet_style(f);
@@ -1569,7 +1572,7 @@ gb_internal Token expect_operator(AstFile *f) {
 		             LIT(p));
 	}
 	if (prev.kind == Token_Ellipsis) {
-		syntax_warning(prev, "'..' for ranges has now been deprecated, prefer '..='");
+		syntax_error(prev, "'..' for ranges are not allowed, did you mean '..<' or '..='?");
 		f->tokens[f->curr_token_index].flags |= TokenFlag_Replace;
 	}
 	
@@ -5508,10 +5511,14 @@ gb_internal AstPackage *try_add_import_path(Parser *p, String path, String const
 		}
 	}
 	if (files_with_ext == 0 || files_to_reserve == 1) {
+		ERROR_BLOCK();
 		if (files_with_ext != 0) {
 			syntax_error(pos, "Directory contains no .odin files for the specified platform: %.*s", LIT(rel_path));
 		} else {
 			syntax_error(pos, "Empty directory that contains no .odin files: %.*s", LIT(rel_path));
+		}
+		if (build_context.command_kind == Command_test) {
+			error_line("\tSuggestion: Make an .odin file that imports packages to test and use the `-all-packages` flag.");
 		}
 		return nullptr;
 	}
@@ -5690,8 +5697,26 @@ gb_internal bool determine_path_from_string(BlockingMutex *file_mutex, Ast *node
 
 	if (collection_name.len > 0) {
 		// NOTE(bill): `base:runtime` == `core:runtime`
-		if (collection_name == "core" && string_starts_with(file_str, str_lit("runtime"))) {
-			collection_name = str_lit("base");
+		if (collection_name == "core") {
+			bool replace_with_base = false;
+			if (string_starts_with(file_str, str_lit("runtime"))) {
+				replace_with_base = true;
+			} else if (string_starts_with(file_str, str_lit("intrinsics"))) {
+				replace_with_base = true;
+			} if (string_starts_with(file_str, str_lit("builtin"))) {
+				replace_with_base = true;
+			}
+
+			if (replace_with_base) {
+				collection_name = str_lit("base");
+			}
+			if (replace_with_base) {
+				if (ast_file_vet_deprecated(node->file())) {
+					syntax_error(node, "import \"core:%.*s\" has been deprecated in favour of \"base:%.*s\"", LIT(file_str), LIT(file_str));
+				} else {
+					syntax_warning(ast_token(node), "import \"core:%.*s\" has been deprecated in favour of \"base:%.*s\"", LIT(file_str), LIT(file_str));
+				}
+			}
 		}
 
 		if (collection_name == "system") {

@@ -19,10 +19,12 @@ gb_internal void populate_using_array_index(CheckerContext *ctx, Ast *node, AstF
 		}
 	} else {
 		Token tok = make_token_ident(name);
-		if (field->names.count > 0) {
-			tok.pos = ast_token(field->names[0]).pos;
-		} else {
-			tok.pos = ast_token(field->type).pos;
+		if (field) {
+			if (field->names.count > 0) {
+				tok.pos = ast_token(field->names[0]).pos;
+			} else {
+				tok.pos = ast_token(field->type).pos;
+			}
 		}
 		Entity *f = alloc_entity_array_elem(nullptr, tok, t->Array.elem, idx);
 		add_entity(ctx, ctx->scope, nullptr, f);
@@ -191,9 +193,10 @@ gb_internal void check_struct_fields(CheckerContext *ctx, Ast *node, Slice<Entit
 
 		if (is_using && p->names.count > 0) {
 			Type *first_type = fields_array[fields_array.count-1]->type;
+			bool soa_ptr = is_type_soa_pointer(first_type);
 			Type *t = base_type(type_deref(first_type));
 
-			if (!does_field_type_allow_using(t) &&
+			if ((soa_ptr || !does_field_type_allow_using(t)) &&
 			    p->names.count >= 1 &&
 			    p->names[0]->kind == Ast_Ident) {
 				Token name_token = p->names[0]->Ident.token;
