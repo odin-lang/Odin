@@ -93,9 +93,9 @@ parse_mo_from_bytes :: proc(data: []byte, options := DEFAULT_PARSE_OPTIONS, plur
 			return translation, .MO_File_Incorrect_Plural_Count
 		}
 
-		section_name := ""
 		for k in keys {
-			key := string(k)
+			section_name := ""
+			key          := string(k)
 
 			// Scan for <context>EOT<key>
 			for ch, i in k {
@@ -105,12 +105,25 @@ parse_mo_from_bytes :: proc(data: []byte, options := DEFAULT_PARSE_OPTIONS, plur
 					break
 				}
 			}
+
+			// If we merge sections, then all entries end in the "" context.
+			if options.merge_sections {
+				section_name = ""
+			}
+
 			section_name, _ = strings.intern_get(&translation.intern, section_name)
 			if section_name not_in translation.k_v {
 				translation.k_v[section_name] = {}
 			}
 
+			section         := &translation.k_v[section_name]
 			interned_key, _ := strings.intern_get(&translation.intern, string(key))
+
+			// Duplicate key should not be allowed.
+			if interned_key in section {
+				return translation, .Duplicate_Key
+			}
+
 			interned_vals := make([]string, len(vals))
 			last_val: string
 
@@ -118,8 +131,6 @@ parse_mo_from_bytes :: proc(data: []byte, options := DEFAULT_PARSE_OPTIONS, plur
 				interned_vals[i], _ = strings.intern_get(&translation.intern, string(v))
 				last_val = interned_vals[i]
 			}
-
-			section := &translation.k_v[section_name]
 			section[interned_key] = interned_vals
 		}
 	}
