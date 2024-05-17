@@ -13,7 +13,8 @@ function stripNewline(str) {
     return str.replace(/\n/, ' ')
 }
 
-const STRING_SIZE = 2*4;
+const INT_SIZE    = 4; // NOTE: set to `8` if the target has 64 bit ints (`wasm64p32` for example).
+const STRING_SIZE = 2*INT_SIZE;
 
 class WasmMemoryInterface {
 	constructor() {
@@ -69,19 +70,34 @@ class WasmMemoryInterface {
 		const hi = this.mem.getInt32 (addr + 4, true);
 		return lo + hi*4294967296;
 	};
-	loadF32(addr)  { return this.mem.getFloat32(addr, true); }
-	loadF64(addr)  { return this.mem.getFloat64(addr, true); }
-	loadInt(addr)  { return this.mem.getInt32  (addr, true); }
-	loadUint(addr) { return this.mem.getUint32 (addr, true); }
-
-	loadPtr(addr) { return this.loadUint(addr); }
+	loadF32(addr) { return this.mem.getFloat32(addr, true); }
+	loadF64(addr) { return this.mem.getFloat64(addr, true); }
+	loadInt(addr) {
+		if (INT_SIZE == 8) {
+			return this.loadI64(addr);
+		} else if (INT_SIZE == 4) {
+			return this.loadI32(addr);
+		} else {
+			throw new Error('Unhandled `INT_SIZE`, expected `4` or `8`');
+		}
+	};
+	loadUint(addr) {
+		if (INT_SIZE == 8) {
+			return this.loadU64(addr);
+		} else if (INT_SIZE == 4) {
+			return this.loadU32(addr);
+		} else {
+			throw new Error('Unhandled `INT_SIZE`, expected `4` or `8`');
+		}
+	};
+	loadPtr(addr) { return this.loadU32(addr); }
 
 	loadBytes(ptr, len) {
-		return new Uint8Array(this.memory.buffer, ptr, len);
+		return new Uint8Array(this.memory.buffer, ptr, Number(len));
 	}
 
 	loadString(ptr, len) {
-		const bytes = this.loadBytes(ptr, len);
+		const bytes = this.loadBytes(ptr, Number(len));
 		return new TextDecoder().decode(bytes);
 	}
 
@@ -99,10 +115,26 @@ class WasmMemoryInterface {
 		this.mem.setUint32(addr + 0, value, true);
 		this.mem.setInt32 (addr + 4, Math.floor(value / 4294967296), true);
 	}
-	storeF32(addr, value)  { this.mem.setFloat32(addr, value, true); }
-	storeF64(addr, value)  { this.mem.setFloat64(addr, value, true); }
-	storeInt(addr, value)  { this.mem.setInt32  (addr, value, true); }
-	storeUint(addr, value) { this.mem.setUint32 (addr, value, true); }
+	storeF32(addr, value) { this.mem.setFloat32(addr, value, true); }
+	storeF64(addr, value) { this.mem.setFloat64(addr, value, true); }
+	storeInt(addr, value) {
+		if (INT_SIZE == 8) {
+			this.storeI64(addr, value);
+		} else if (INT_SIZE == 4) {
+			this.storeI32(addr, value);
+		} else {
+			throw new Error('Unhandled `INT_SIZE`, expected `4` or `8`');
+		}
+	}
+	storeUint(addr, value) {
+		if (INT_SIZE == 8) {
+			this.storeU64(addr, value);
+		} else if (INT_SIZE == 4) {
+			this.storeU32(addr, value);
+		} else {
+			throw new Error('Unhandled `INT_SIZE`, expected `4` or `8`');
+		}
+	}
 
 	// Returned length might not be the same as `value.length` if non-ascii strings are given.
 	storeString(addr, value) {
