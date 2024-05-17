@@ -73,6 +73,20 @@ TESTS := []Test_Suite{
 	},
 
 	{
+		file   = "assets/I18N/mixed_context.mo",
+		loader = i18n.parse_mo_file,
+		plural = nil,
+		tests  = {
+			// These are in the catalog.
+			{"",        "Message1",               "This is message 1 without Context", 1},
+			{"Context", "Message1",               "This is message 1 with Context",    1},
+
+			// This isn't in the catalog, so should ruturn the key.
+			{"", "Come visit us on Discord!",     "Come visit us on Discord!",         1},
+		},
+	},
+
+	{
 		file   = "assets/I18N/nl_NL.mo",
 		loader = i18n.parse_mo_file,
 		plural = nil, // Default pluralizer
