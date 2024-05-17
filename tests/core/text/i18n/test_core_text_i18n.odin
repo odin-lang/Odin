@@ -87,6 +87,15 @@ TESTS := []Test_Suite{
 	},
 
 	{
+		file    = "assets/I18N/mixed_context.mo",
+		loader  = i18n.parse_mo_file,
+		plural  = nil,
+		// Message1 exists twice, once within Context, which has been merged into ""
+		err     = .Duplicate_Key,
+		options = {merge_sections = true},
+	},
+
+	{
 		file   = "assets/I18N/nl_NL.mo",
 		loader = i18n.parse_mo_file,
 		plural = nil, // Default pluralizer
@@ -128,7 +137,7 @@ TESTS := []Test_Suite{
 	{
 		file    = "assets/I18N/nl_NL-qt-ts.ts",
 		loader  = i18n.parse_qt_linguist_file,
-		plural = nil, // Default pluralizer
+		plural  = nil, // Default pluralizer
 		options = {merge_sections = true},
 		tests   = {
 			// All of them are now in section "", lookup with original section should return the key.
@@ -151,7 +160,7 @@ TESTS := []Test_Suite{
 	{
 		file    = "assets/I18N/duplicate-key.ts",
 		loader  = i18n.parse_qt_linguist_file,
-		plural = nil, // Default pluralizer
+		plural  = nil, // Default pluralizer
 		options = {merge_sections = true},
 		err     = .Duplicate_Key,
 	},
@@ -160,7 +169,7 @@ TESTS := []Test_Suite{
 	{
 		file    = "assets/I18N/duplicate-key.ts",
 		loader  = i18n.parse_qt_linguist_file,
-		plural = nil, // Default pluralizer
+		plural  = nil, // Default pluralizer
 	},
 }
 
