@@ -9,18 +9,18 @@ import "core:simd"
 // This is loosely based on Ted Krovetz's public domain C intrinsic
 // implementation.
 //
-// This is written to perform adequately on any target that has SIMD
-// capabilities equvalent to baseline AMD64, and to ensure "even LLVM
-// probably won't output code awful enough to where this will spill".
+// This is written to perform adequately on any target that has "enough"
+// 128-bit vector registers, and to try to avoid spilling.  Most targets
+// are capable of taking performance further (3 or 4 blocks per iter),
+// however this quickly becomes a battle against register pressure, and
+// such targets would also be (in most cases) better served by a 256-bit
+// implementation.
 //
 // Notes:
 // - Using a byte shuffle (ie: PSHUFB) for the 8 and 16 rotates
 //   benchmarks worse than using two shifts and an xor, but this may
-//   be due to AMD CPU or LLVM weirdness.
-// - It would be nice if the round function could be a proc somehow to
-//   avoid the mountain of code-duplication.  All attempts to do so even
-//   with `#force_inline` has made performance dramatically worse than
-//   not using SIMD at all.
+//   be due to AMD CPU weirdness, since the generated assembly looks
+//   fine.
 //
 // See:
 // supercop-20230530/crypto_stream/chacha20/krovetz/vec128
@@ -71,6 +71,82 @@ when ODIN_ENDIAN == .Big {
 }
 
 @(private)
+_dq_round_simd128 :: #force_inline proc "contextless" (v0, v1, v2, v3: simd.u32x4) -> (simd.u32x4, simd.u32x4, simd.u32x4, simd.u32x4) {
+	v0, v1, v2, v3 := v0, v1, v2, v3
+
+	// a += b; d ^= a; d = ROTW16(d);
+	v0 = simd.add(v0, v1)
+	v3 = simd.bit_xor(v3, v0)
+	v3 = simd.bit_xor(simd.shl(v3, _ROT_16), simd.shr(v3, _ROT_16))
+
+	// c += d; b ^= c; b = ROTW12(b);
+	v2 = simd.add(v2, v3)
+	v1 = simd.bit_xor(v1, v2)
+	v1 = simd.bit_xor(simd.shl(v1, _ROT_12L), simd.shr(v1, _ROT_12R))
+
+	// a += b; d ^= a; d = ROTW8(d);
+	v0 = simd.add(v0, v1)
+	v3 = simd.bit_xor(v3, v0)
+	v3 = simd.bit_xor(simd.shl(v3, _ROT_8L), simd.shr(v3, _ROT_8R))
+
+	// c += d; b ^= c; b = ROTW7(b);
+	v2 = simd.add(v2, v3)
+	v1 = simd.bit_xor(v1, v2)
+	v1 = simd.bit_xor(simd.shl(v1, _ROT_7L), simd.shr(v1, _ROT_7R))
+
+	// b = ROTV1(b); c = ROTV2(c);  d = ROTV3(d);
+	v1 = simd.shuffle(v1, v1, 1, 2, 3, 0)
+	v2 = simd.shuffle(v2, v2, 2, 3, 0, 1)
+	v3 = simd.shuffle(v3, v3, 3, 0, 1, 2)
+
+	// a += b; d ^= a; d = ROTW16(d);
+	v0 = simd.add(v0, v1)
+	v3 = simd.bit_xor(v3, v0)
+	v3 = simd.bit_xor(simd.shl(v3, _ROT_16), simd.shr(v3, _ROT_16))
+
+	// c += d; b ^= c; b = ROTW12(b);
+	v2 = simd.add(v2, v3)
+	v1 = simd.bit_xor(v1, v2)
+	v1 = simd.bit_xor(simd.shl(v1, _ROT_12L), simd.shr(v1, _ROT_12R))
+
+	// a += b; d ^= a; d = ROTW8(d);
+	v0 = simd.add(v0, v1)
+	v3 = simd.bit_xor(v3, v0)
+	v3 = simd.bit_xor(simd.shl(v3, _ROT_8L), simd.shr(v3, _ROT_8R))
+
+	// c += d; b ^= c; b = ROTW7(b);
+	v2 = simd.add(v2, v3)
+	v1 = simd.bit_xor(v1, v2)
+	v1 = simd.bit_xor(simd.shl(v1, _ROT_7L), simd.shr(v1, _ROT_7R))
+
+	// b = ROTV3(b); c = ROTV2(c); d = ROTV1(d);
+	v1 = simd.shuffle(v1, v1, 3, 0, 1, 2)
+	v2 = simd.shuffle(v2, v2, 2, 3, 0, 1)
+	v3 = simd.shuffle(v3, v3, 1, 2, 3, 0)
+
+	return v0, v1, v2, v3
+}
+
+@(private)
+_add_state_simd128 :: #force_inline proc "contextless" (v0, v1, v2, v3, s0, s1, s2, s3: simd.u32x4) -> (simd.u32x4, simd.u32x4, simd.u32x4, simd.u32x4) {
+	v0, v1, v2, v3 := v0, v1, v2, v3
+
+	v0 = simd.add(v0, s0)
+	v1 = simd.add(v1, s1)
+	v2 = simd.add(v2, s2)
+	v3 = simd.add(v3, s3)
+
+	when ODIN_ENDIAN == .Big {
+		v0 = _byteswap_u32x4(v0)
+		v1 = _byteswap_u32x4(v1)
+		v2 = _byteswap_u32x4(v2)
+		v3 = _byteswap_u32x4(v3)
+	}
+
+	return v0, v1, v2, v3
+}
+
+@(private)
 _do_blocks :: proc(ctx: ^Context, dst, src: []byte, nr_blocks: int) {
 	// Enforce the maximum consumed keystream per nonce.
 	_check_counter_limit(ctx, nr_blocks)
@@ -101,127 +177,24 @@ _do_blocks :: proc(ctx: ^Context, dst, src: []byte, nr_blocks: int) {
 		v4, v5, v6, v7 := s0, s1, s2, s7
 
 		for i := _ROUNDS; i > 0; i = i - 2 {
-			// a += b; d ^= a; d = ROTW16(d);
-			v0 = simd.add(v0, v1)
-			v4 = simd.add(v4, v5)
-			v3 = simd.bit_xor(v3, v0)
-			v7 = simd.bit_xor(v7, v4)
-			v3 = simd.bit_xor(simd.shl(v3, _ROT_16), simd.shr(v3, _ROT_16))
-			v7 = simd.bit_xor(simd.shl(v7, _ROT_16), simd.shr(v7, _ROT_16))
-
-			// c += d; b ^= c; b = ROTW12(b);
-			v2 = simd.add(v2, v3)
-			v6 = simd.add(v6, v7)
-			v1 = simd.bit_xor(v1, v2)
-			v5 = simd.bit_xor(v5, v6)
-			v1 = simd.bit_xor(simd.shl(v1, _ROT_12L), simd.shr(v1, _ROT_12R))
-			v5 = simd.bit_xor(simd.shl(v5, _ROT_12L), simd.shr(v5, _ROT_12R))
-
-			// a += b; d ^= a; d = ROTW8(d);
-			v0 = simd.add(v0, v1)
-			v4 = simd.add(v4, v5)
-			v3 = simd.bit_xor(v3, v0)
-			v7 = simd.bit_xor(v7, v4)
-			v3 = simd.bit_xor(simd.shl(v3, _ROT_8L), simd.shr(v3, _ROT_8R))
-			v7 = simd.bit_xor(simd.shl(v7, _ROT_8L), simd.shr(v7, _ROT_8R))
-
-			// c += d; b ^= c; b = ROTW7(b);
-			v2 = simd.add(v2, v3)
-			v6 = simd.add(v6, v7)
-			v1 = simd.bit_xor(v1, v2)
-			v5 = simd.bit_xor(v5, v6)
-			v1 = simd.bit_xor(simd.shl(v1, _ROT_7L), simd.shr(v1, _ROT_7R))
-			v5 = simd.bit_xor(simd.shl(v5, _ROT_7L), simd.shr(v5, _ROT_7R))
-
-			// b = ROTV1(b); c = ROTV2(c);  d = ROTV3(d);
-			v1 = simd.shuffle(v1, v1, 1, 2, 3, 0)
-			v5 = simd.shuffle(v5, v5, 1, 2, 3, 0)
-			v2 = simd.shuffle(v2, v2, 2, 3, 0, 1)
-			v6 = simd.shuffle(v6, v6, 2, 3, 0, 1)
-			v3 = simd.shuffle(v3, v3, 3, 0, 1, 2)
-			v7 = simd.shuffle(v7, v7, 3, 0, 1, 2)
-
-			// a += b; d ^= a; d = ROTW16(d);
-			v0 = simd.add(v0, v1)
-			v4 = simd.add(v4, v5)
-			v3 = simd.bit_xor(v3, v0)
-			v7 = simd.bit_xor(v7, v4)
-			v3 = simd.bit_xor(simd.shl(v3, _ROT_16), simd.shr(v3, _ROT_16))
-			v7 = simd.bit_xor(simd.shl(v7, _ROT_16), simd.shr(v7, _ROT_16))
-
-			// c += d; b ^= c; b = ROTW12(b);
-			v2 = simd.add(v2, v3)
-			v6 = simd.add(v6, v7)
-			v1 = simd.bit_xor(v1, v2)
-			v5 = simd.bit_xor(v5, v6)
-			v1 = simd.bit_xor(simd.shl(v1, _ROT_12L), simd.shr(v1, _ROT_12R))
-			v5 = simd.bit_xor(simd.shl(v5, _ROT_12L), simd.shr(v5, _ROT_12R))
-
-			// a += b; d ^= a; d = ROTW8(d);
-			v0 = simd.add(v0, v1)
-			v4 = simd.add(v4, v5)
-			v3 = simd.bit_xor(v3, v0)
-			v7 = simd.bit_xor(v7, v4)
-			v3 = simd.bit_xor(simd.shl(v3, _ROT_8L), simd.shr(v3, _ROT_8R))
-			v7 = simd.bit_xor(simd.shl(v7, _ROT_8L), simd.shr(v7, _ROT_8R))
-
-			// c += d; b ^= c; b = ROTW7(b);
-			v2 = simd.add(v2, v3)
-			v6 = simd.add(v6, v7)
-			v1 = simd.bit_xor(v1, v2)
-			v5 = simd.bit_xor(v5, v6)
-			v1 = simd.bit_xor(simd.shl(v1, _ROT_7L), simd.shr(v1, _ROT_7R))
-			v5 = simd.bit_xor(simd.shl(v5, _ROT_7L), simd.shr(v5, _ROT_7R))
-
-			// b = ROTV3(b); c = ROTV2(c); d = ROTV1(d);
-			v1 = simd.shuffle(v1, v1, 3, 0, 1, 2)
-			v5 = simd.shuffle(v5, v5, 3, 0, 1, 2)
-			v2 = simd.shuffle(v2, v2, 2, 3, 0, 1)
-			v6 = simd.shuffle(v6, v6, 2, 3, 0, 1)
-			v3 = simd.shuffle(v3, v3, 1, 2, 3, 0)
-			v7 = simd.shuffle(v7, v7, 1, 2, 3, 0)
+			v0, v1, v2, v3 = _dq_round_simd128(v0, v1, v2, v3)
+			v4, v5, v6, v7 = _dq_round_simd128(v4, v5, v6, v7)
 		}
 
-		v0 = simd.add(v0, s0)
-		v4 = simd.add(v4, s0)
-		v1 = simd.add(v1, s1)
-		v5 = simd.add(v5, s1)
-		v2 = simd.add(v2, s2)
-		v6 = simd.add(v6, s2)
-		v3 = simd.add(v3, s3)
-		v7 = simd.add(v7, s7)
-
-		when ODIN_ENDIAN == .Big {
-			v0 = _byteswap_u32x4(v0)
-			v1 = _byteswap_u32x4(v1)
-			v2 = _byteswap_u32x4(v2)
-			v3 = _byteswap_u32x4(v3)
-			v4 = _byteswap_u32x4(v4)
-			v5 = _byteswap_u32x4(v5)
-			v6 = _byteswap_u32x4(v6)
-			v7 = _byteswap_u32x4(v7)
-		}
+		v0, v1, v2, v3 = _add_state_simd128(v0, v1, v2, v3, s0, s1, s2, s3)
+		v4, v5, v6, v7 = _add_state_simd128(v4, v5, v6, v7, s0, s1, s2, s7)
 
 		#no_bounds_check {
 			if src != nil {
-				sr0 := intrinsics.unaligned_load((^simd.u32x4)(src_v[0:]))
-				sr1 := intrinsics.unaligned_load((^simd.u32x4)(src_v[1:]))
-				sr2 := intrinsics.unaligned_load((^simd.u32x4)(src_v[2:]))
-				sr3 := intrinsics.unaligned_load((^simd.u32x4)(src_v[3:]))
-				sr4 := intrinsics.unaligned_load((^simd.u32x4)(src_v[4:]))
-				sr5 := intrinsics.unaligned_load((^simd.u32x4)(src_v[5:]))
-				sr6 := intrinsics.unaligned_load((^simd.u32x4)(src_v[6:]))
-				sr7 := intrinsics.unaligned_load((^simd.u32x4)(src_v[7:]))
+				v0 = simd.bit_xor(v0, intrinsics.unaligned_load((^simd.u32x4)(src_v[0:])))
+				v1 = simd.bit_xor(v1, intrinsics.unaligned_load((^simd.u32x4)(src_v[1:])))
+				v2 = simd.bit_xor(v2, intrinsics.unaligned_load((^simd.u32x4)(src_v[2:])))
+				v3 = simd.bit_xor(v3, intrinsics.unaligned_load((^simd.u32x4)(src_v[3:])))
+				v4 = simd.bit_xor(v4, intrinsics.unaligned_load((^simd.u32x4)(src_v[4:])))
+				v5 = simd.bit_xor(v5, intrinsics.unaligned_load((^simd.u32x4)(src_v[5:])))
+				v6 = simd.bit_xor(v6, intrinsics.unaligned_load((^simd.u32x4)(src_v[6:])))
+				v7 = simd.bit_xor(v7, intrinsics.unaligned_load((^simd.u32x4)(src_v[7:])))
 				src_v = src_v[_BLOCK_SIZE * 2 / 16:]
-
-				v0 = simd.bit_xor(v0, sr0)
-				v1 = simd.bit_xor(v1, sr1)
-				v2 = simd.bit_xor(v2, sr2)
-				v3 = simd.bit_xor(v3, sr3)
-				v4 = simd.bit_xor(v4, sr4)
-				v5 = simd.bit_xor(v5, sr5)
-				v6 = simd.bit_xor(v6, sr6)
-				v7 = simd.bit_xor(v7, sr7)
 			}
 
 			intrinsics.unaligned_store((^simd.u32x4)(dst_v[0:]), v0)
@@ -248,81 +221,18 @@ _do_blocks :: proc(ctx: ^Context, dst, src: []byte, nr_blocks: int) {
 		v0, v1, v2, v3 := s0, s1, s2, s3
 
 		for i := _ROUNDS; i > 0; i = i - 2 {
-			// a += b; d ^= a; d = ROTW16(d);
-			v0 = simd.add(v0, v1)
-			v3 = simd.bit_xor(v3, v0)
-			v3 = simd.bit_xor(simd.shl(v3, _ROT_16), simd.shr(v3, _ROT_16))
-
-			// c += d; b ^= c; b = ROTW12(b);
-			v2 = simd.add(v2, v3)
-			v1 = simd.bit_xor(v1, v2)
-			v1 = simd.bit_xor(simd.shl(v1, _ROT_12L), simd.shr(v1, _ROT_12R))
-
-			// a += b; d ^= a; d = ROTW8(d);
-			v0 = simd.add(v0, v1)
-			v3 = simd.bit_xor(v3, v0)
-			v3 = simd.bit_xor(simd.shl(v3, _ROT_8L), simd.shr(v3, _ROT_8R))
-
-			// c += d; b ^= c; b = ROTW7(b);
-			v2 = simd.add(v2, v3)
-			v1 = simd.bit_xor(v1, v2)
-			v1 = simd.bit_xor(simd.shl(v1, _ROT_7L), simd.shr(v1, _ROT_7R))
-
-			// b = ROTV1(b); c = ROTV2(c);  d = ROTV3(d);
-			v1 = simd.shuffle(v1, v1, 1, 2, 3, 0)
-			v2 = simd.shuffle(v2, v2, 2, 3, 0, 1)
-			v3 = simd.shuffle(v3, v3, 3, 0, 1, 2)
-
-			// a += b; d ^= a; d = ROTW16(d);
-			v0 = simd.add(v0, v1)
-			v3 = simd.bit_xor(v3, v0)
-			v3 = simd.bit_xor(simd.shl(v3, _ROT_16), simd.shr(v3, _ROT_16))
-
-			// c += d; b ^= c; b = ROTW12(b);
-			v2 = simd.add(v2, v3)
-			v1 = simd.bit_xor(v1, v2)
-			v1 = simd.bit_xor(simd.shl(v1, _ROT_12L), simd.shr(v1, _ROT_12R))
-
-			// a += b; d ^= a; d = ROTW8(d);
-			v0 = simd.add(v0, v1)
-			v3 = simd.bit_xor(v3, v0)
-			v3 = simd.bit_xor(simd.shl(v3, _ROT_8L), simd.shr(v3, _ROT_8R))
-
-			// c += d; b ^= c; b = ROTW7(b);
-			v2 = simd.add(v2, v3)
-			v1 = simd.bit_xor(v1, v2)
-			v1 = simd.bit_xor(simd.shl(v1, _ROT_7L), simd.shr(v1, _ROT_7R))
-
-			// b = ROTV3(b); c = ROTV2(c); d = ROTV1(d);
-			v1 = simd.shuffle(v1, v1, 3, 0, 1, 2)
-			v2 = simd.shuffle(v2, v2, 2, 3, 0, 1)
-			v3 = simd.shuffle(v3, v3, 1, 2, 3, 0)
+			v0, v1, v2, v3 = _dq_round_simd128(v0, v1, v2, v3)
 		}
 
-		v0 = simd.add(v0, s0)
-		v1 = simd.add(v1, s1)
-		v2 = simd.add(v2, s2)
-		v3 = simd.add(v3, s3)
-
-		when ODIN_ENDIAN == .Big {
-			v0 = _byteswap_u32x4(v0)
-			v1 = _byteswap_u32x4(v1)
-			v2 = _byteswap_u32x4(v2)
-			v3 = _byteswap_u32x4(v3)
-		}
+		v0, v1, v2, v3 = _add_state_simd128(v0, v1, v2, v3, s0, s1, s2, s3)
 
 		#no_bounds_check {
 			if src != nil {
-				sr0 := intrinsics.unaligned_load((^simd.u32x4)(src_v[0:]))
-				sr1 := intrinsics.unaligned_load((^simd.u32x4)(src_v[1:]))
-				sr2 := intrinsics.unaligned_load((^simd.u32x4)(src_v[2:]))
-				sr3 := intrinsics.unaligned_load((^simd.u32x4)(src_v[3:]))
+				v0 = simd.bit_xor(v0, intrinsics.unaligned_load((^simd.u32x4)(src_v[0:])))
+				v1 = simd.bit_xor(v1, intrinsics.unaligned_load((^simd.u32x4)(src_v[1:])))
+				v2 = simd.bit_xor(v2, intrinsics.unaligned_load((^simd.u32x4)(src_v[2:])))
+				v3 = simd.bit_xor(v3, intrinsics.unaligned_load((^simd.u32x4)(src_v[3:])))
 				src_v = src_v[_BLOCK_SIZE / 16:]
-
-				v0 = simd.bit_xor(v0, sr0)
-				v1 = simd.bit_xor(v1, sr1)
-				v2 = simd.bit_xor(v2, sr2)
-				v3 = simd.bit_xor(v3, sr3)
 			}
 
 			intrinsics.unaligned_store((^simd.u32x4)(dst_v[0:]), v0)
@@ -362,55 +272,7 @@ _hchacha20 :: proc "contextless" (dst, key, nonce: []byte) {
 	}
 
 	for i := _ROUNDS; i > 0; i = i - 2 {
-		// a += b; d ^= a; d = ROTW16(d);
-		v0 = simd.add(v0, v1)
-		v3 = simd.bit_xor(v3, v0)
-		v3 = simd.bit_xor(simd.shl(v3, _ROT_16), simd.shr(v3, _ROT_16))
-
-		// c += d; b ^= c; b = ROTW12(b);
-		v2 = simd.add(v2, v3)
-		v1 = simd.bit_xor(v1, v2)
-		v1 = simd.bit_xor(simd.shl(v1, _ROT_12L), simd.shr(v1, _ROT_12R))
-
-		// a += b; d ^= a; d = ROTW8(d);
-		v0 = simd.add(v0, v1)
-		v3 = simd.bit_xor(v3, v0)
-		v3 = simd.bit_xor(simd.shl(v3, _ROT_8L), simd.shr(v3, _ROT_8R))
-
-		// c += d; b ^= c; b = ROTW7(b);
-		v2 = simd.add(v2, v3)
-		v1 = simd.bit_xor(v1, v2)
-		v1 = simd.bit_xor(simd.shl(v1, _ROT_7L), simd.shr(v1, _ROT_7R))
-
-		// b = ROTV1(b); c = ROTV2(c);  d = ROTV3(d);
-		v1 = simd.shuffle(v1, v1, 1, 2, 3, 0)
-		v2 = simd.shuffle(v2, v2, 2, 3, 0, 1)
-		v3 = simd.shuffle(v3, v3, 3, 0, 1, 2)
-
-		// a += b; d ^= a; d = ROTW16(d);
-		v0 = simd.add(v0, v1)
-		v3 = simd.bit_xor(v3, v0)
-		v3 = simd.bit_xor(simd.shl(v3, _ROT_16), simd.shr(v3, _ROT_16))
-
-		// c += d; b ^= c; b = ROTW12(b);
-		v2 = simd.add(v2, v3)
-		v1 = simd.bit_xor(v1, v2)
-		v1 = simd.bit_xor(simd.shl(v1, _ROT_12L), simd.shr(v1, _ROT_12R))
-
-		// a += b; d ^= a; d = ROTW8(d);
-		v0 = simd.add(v0, v1)
-		v3 = simd.bit_xor(v3, v0)
-		v3 = simd.bit_xor(simd.shl(v3, _ROT_8L), simd.shr(v3, _ROT_8R))
-
-		// c += d; b ^= c; b = ROTW7(b);
-		v2 = simd.add(v2, v3)
-		v1 = simd.bit_xor(v1, v2)
-		v1 = simd.bit_xor(simd.shl(v1, _ROT_7L), simd.shr(v1, _ROT_7R))
-
-		// b = ROTV3(b); c = ROTV2(c); d = ROTV1(d);
-		v1 = simd.shuffle(v1, v1, 3, 0, 1, 2)
-		v2 = simd.shuffle(v2, v2, 2, 3, 0, 1)
-		v3 = simd.shuffle(v3, v3, 1, 2, 3, 0)
+		v0, v1, v2, v3 = _dq_round_simd128(v0, v1, v2, v3)
 	}
 
 	when ODIN_ENDIAN == .Big {
