@@ -93,15 +93,15 @@ parse_mo_from_bytes :: proc(data: []byte, options := DEFAULT_PARSE_OPTIONS, plur
 
 		keys := bytes.split(key, zero)
 		vals := bytes.split(val, zero)
-	
-		if len(keys) != len(vals) || max(len(keys), len(vals)) > MAX_PLURALS {
+
+		if (len(keys) != 1 && len(keys) != 2) || len(vals) > MAX_PLURALS {
 			return translation, .MO_File_Incorrect_Plural_Count
 		}
 
 		for k in keys {
 			interned_key, _ := strings.intern_get(&translation.intern, string(k))
 
-			interned_vals := make([]string, len(keys))
+			interned_vals := make([]string, len(vals))
 			last_val: string
 
 			i := 0
