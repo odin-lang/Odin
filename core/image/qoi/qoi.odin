@@ -76,8 +76,6 @@ save_to_buffer  :: proc(output: ^bytes.Buffer, img: ^Image, options := Options{}
 	pix  := RGBA_Pixel{0, 0, 0, 255}
 	prev := pix
 
-	seen[qoi_hash(pix)] = pix
-
 	input := img.pixels.buf[:]
 	run   := u8(0)
 
