@@ -2904,7 +2904,6 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 				break;
 			case TargetArch_arm32:
 				{
-					// TODO(bill): Check this is correct
 					GB_ASSERT(arg_count <= 7);
 
 					char asm_string[] = "svc #0";
@@ -2912,13 +2911,14 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 					for (unsigned i = 0; i < arg_count; i++) {
 						constraints = gb_string_appendc(constraints, ",{");
 						static char const *regs[] = {
-							"r8",
+							"r7",
 							"r0",
 							"r1",
 							"r2",
 							"r3",
 							"r4",
 							"r5",
+							"r6",
 						};
 						constraints = gb_string_appendc(constraints, regs[i]);
 						constraints = gb_string_appendc(constraints, "}");

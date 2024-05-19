@@ -251,7 +251,7 @@ gb_internal void report_ram_info() {
 		int result = sysinfo(&info);
 
 		if (result == 0x0) {
-			gb_printf("%lu MiB\n", info.totalram * info.mem_unit / gb_megabytes(1));
+			gb_printf("%lu MiB\n", (unsigned long)(info.totalram * info.mem_unit / gb_megabytes(1)));
 		} else {
 			gb_printf("Unknown.\n");
 		}

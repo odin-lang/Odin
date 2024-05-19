@@ -6261,11 +6261,12 @@ gb_no_inline isize gb_snprintf_va(char *text, isize max_len, char const *fmt, va
 #elif defined(__aarch64__)
 	gb_inline u64 gb_rdtsc(void) {
 		int64_t virtual_timer_value;
- 		asm volatile("mrs %0, cntvct_el0" : "=r"(virtual_timer_value));
- 		return virtual_timer_value;
+		asm volatile("mrs %0, cntvct_el0" : "=r"(virtual_timer_value));
+		return virtual_timer_value;
 	}
 #else
-#error "gb_rdtsc not supported"
+#warning "gb_rdtsc not supported"
+	gb_inline u64 gb_rdtsc(void) { return 0; }
 #endif
 
 #if defined(GB_SYSTEM_WINDOWS)

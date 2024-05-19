@@ -2645,6 +2645,10 @@ gb_internal void generate_minimum_dependency_set(Checker *c, Entity *start) {
 		str_lit("memmove"),
 	);
 
+	FORCE_ADD_RUNTIME_ENTITIES(build_context.metrics.arch == TargetArch_arm32,
+		str_lit("aeabi_d2h")
+	);
+
 	FORCE_ADD_RUNTIME_ENTITIES(is_arch_wasm() && !build_context.tilde_backend,
 	// 	// Extended data type internal procedures
 	// 	str_lit("umodti3"),
