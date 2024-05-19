@@ -2384,9 +2384,10 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 
 			lbValue ptr0 = lb_emit_conv(p, lb_build_expr(p, ce->args[0]), t_uintptr);
 			lbValue ptr1 = lb_emit_conv(p, lb_build_expr(p, ce->args[1]), t_uintptr);
+			ptr0 = lb_emit_conv(p, ptr0, t_int);
+			ptr1 = lb_emit_conv(p, ptr1, t_int);
 
-			lbValue diff = lb_emit_arith(p, Token_Sub, ptr0, ptr1, t_uintptr);
-			diff = lb_emit_conv(p, diff, t_int);
+			lbValue diff = lb_emit_arith(p, Token_Sub, ptr0, ptr1, t_int);
 			return lb_emit_arith(p, Token_Quo, diff, lb_const_int(p->module, t_int, type_size_of(elem)), t_int);
 		}
 
