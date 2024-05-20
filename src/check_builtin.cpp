@@ -1092,7 +1092,13 @@ gb_internal bool cache_load_file_directive(CheckerContext *c, Ast *call, String 
 
 		BlockingMutex *ignore_mutex = nullptr;
 		bool ok = determine_path_from_string(ignore_mutex, call, base_dir, original_string, &path);
-		gb_unused(ok);
+		if (!ok) {
+			if (err_on_not_found) {
+				error(ce->proc, "Failed to `#%.*s` file: %.*s; invalid file or cannot be found", LIT(builtin_name), LIT(original_string));
+			}
+			call->state_flags |= StateFlag_DirectiveWasFalse;
+			return false;
+		}
 	}
 
 	MUTEX_GUARD(&c->info->load_file_mutex);
