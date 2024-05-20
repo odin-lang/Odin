@@ -167,6 +167,9 @@ type_is_matrix           :: proc($T: typeid) -> bool ---
 
 type_has_nil :: proc($T: typeid) -> bool ---
 
+type_is_matrix_row_major    :: proc($T: typeid) -> bool where type_is_matrix(T) ---
+type_is_matrix_column_major :: proc($T: typeid) -> bool where type_is_matrix(T) ---
+
 type_is_specialization_of :: proc($T, $S: typeid) -> bool ---
 
 type_is_variant_of        :: proc($U, $V: typeid)          -> bool    where type_is_union(U) ---

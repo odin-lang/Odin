@@ -5221,6 +5221,34 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		operand->type = t_untyped_bool;
 		break;
 
+
+	case BuiltinProc_type_is_matrix_row_major:
+	case BuiltinProc_type_is_matrix_column_major:
+		{
+			Operand op = {};
+			Type *bt = check_type(c, ce->args[0]);
+			Type *type = base_type(bt);
+			if (type == nullptr || type == t_invalid) {
+				error(ce->args[0], "Expected a type for '%.*s'", LIT(builtin_name));
+				return false;
+			}
+			if (type->kind != Type_Matrix) {
+				gbString s = type_to_string(bt);
+				error(ce->args[0], "Expected a matrix type for '%.*s', got '%s'", LIT(builtin_name), s);
+				gb_string_free(s);
+				return false;
+			}
+
+			if (id == BuiltinProc_type_is_matrix_row_major) {
+				operand->value = exact_value_bool(bt->Matrix.is_row_major == true);
+			} else {
+				operand->value = exact_value_bool(bt->Matrix.is_row_major == false);
+			}
+			operand->mode = Addressing_Constant;
+			operand->type = t_untyped_bool;
+			break;
+		}
+
 	case BuiltinProc_type_has_field:
 		{
 			Operand op = {};
