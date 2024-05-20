@@ -7755,13 +7755,18 @@ gb_internal bool check_set_index_data(Operand *o, Type *t, bool indirection, i64
 		return true;
 		
 	case Type_Matrix:
-		*max_count = t->Matrix.column_count;
 		if (indirection) {
 			o->mode = Addressing_Variable;
 		} else if (o->mode != Addressing_Variable) {
 			o->mode = Addressing_Value;
 		}
-		o->type = alloc_type_array(t->Matrix.elem, t->Matrix.row_count);
+		if (t->Matrix.is_row_major) {
+			*max_count = t->Matrix.row_count;
+			o->type = alloc_type_array(t->Matrix.elem, t->Matrix.column_count);
+		} else {
+			*max_count = t->Matrix.column_count;
+			o->type = alloc_type_array(t->Matrix.elem, t->Matrix.row_count);
+		}
 		return true;
 
 	case Type_Slice:
