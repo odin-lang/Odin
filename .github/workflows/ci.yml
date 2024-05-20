@@ -2,6 +2,38 @@ name: CI
 on: [push, pull_request, workflow_dispatch]
 
 jobs:
+  build_netbsd:
+    name: NetBSD Build, Check, and Test
+    runs-on: ubuntu-latest
+    env:
+      PKGSRC_BRANCH: 2024Q1
+    steps:
+    - uses: actions/checkout@v4
+    - name: Build, Check, and Test
+      timeout-minutes: 25
+      uses: vmactions/netbsd-vm@v1
+      with:
+        release: "10.0"
+        envs: PKGSRC_BRANCH
+        usesh: true
+        copyback: false
+        prepare: |
+          PKG_PATH="https://cdn.NetBSD.org/pub/pkgsrc/packages/NetBSD/$(uname -p)/$(uname -r | cut -d_ -f1)_${PKGSRC_BRANCH}/All" /usr/sbin/pkg_add pkgin
+          pkgin -y in gmake git bash python311
+          pkgin -y in libxml2 perl zstd
+          /usr/sbin/pkg_add https://github.com/andreas-jonsson/llvm17-netbsd-bin/releases/download/pkgsrc-current/llvm-17.0.6.tgz
+          /usr/sbin/pkg_add https://github.com/andreas-jonsson/llvm17-netbsd-bin/releases/download/pkgsrc-current/clang-17.0.6.tgz
+          ln -s /usr/pkg/bin/python3.11 /usr/bin/python3
+          ln -s /usr/pkg/bin/bash /bin/bash
+        run: |
+          git config --global --add safe.directory $(pwd)
+          gmake release
+          ./odin version
+          ./odin report
+          ./odin check examples/all -vet -strict-style -target:netbsd_amd64
+          (cd tests/core; gmake all_bsd)
+          (cd tests/internal; gmake all_bsd)
+          (cd tests/issues; ./run.sh)
   build_linux:
     name: Ubuntu Build, Check, and Test
     runs-on: ubuntu-latest
