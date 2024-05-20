@@ -2223,8 +2223,8 @@ gb_internal LLVMAtomicOrdering llvm_atomic_ordering_from_odin(ExactValue const &
 	GB_ASSERT(value.kind == ExactValue_Integer);
 	i64 v = exact_value_to_i64(value);
 	switch (v) {
-	case OdinAtomicMemoryOrder_relaxed: return LLVMAtomicOrderingUnordered;
-	case OdinAtomicMemoryOrder_consume: return LLVMAtomicOrderingMonotonic;
+	case OdinAtomicMemoryOrder_relaxed: return LLVMAtomicOrderingMonotonic;
+	case OdinAtomicMemoryOrder_consume: return LLVMAtomicOrderingAcquire;
 	case OdinAtomicMemoryOrder_acquire: return LLVMAtomicOrderingAcquire;
 	case OdinAtomicMemoryOrder_release: return LLVMAtomicOrderingRelease;
 	case OdinAtomicMemoryOrder_acq_rel: return LLVMAtomicOrderingAcquireRelease;
