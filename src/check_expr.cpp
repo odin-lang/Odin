@@ -10157,7 +10157,7 @@ gb_internal ExprKind check_index_expr(CheckerContext *c, Operand *o, Ast *node, 
 			o->mode = Addressing_Invalid;
 			o->expr = node;
 			return kind;
-		} else if (ok) {
+		} else if (ok && !is_type_matrix(t)) {
 			ExactValue value = type_and_value_of_expr(ie->expr).value;
 			o->mode = Addressing_Constant;
 			bool success = false;
