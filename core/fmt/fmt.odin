@@ -2679,7 +2679,6 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 			io.write_byte(fi.writer, '[' if verb != 'w' else '{', &fi.n)
 			io.write_byte(fi.writer, '\n', &fi.n)
 			defer {
-				io.write_byte(fi.writer, '\n', &fi.n)
 				fmt_write_indent(fi)
 				io.write_byte(fi.writer, ']' if verb != 'w' else '}', &fi.n)
 			}
