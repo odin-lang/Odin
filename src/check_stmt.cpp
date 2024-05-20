@@ -1663,6 +1663,7 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 					}
 				}
 			}
+			bool is_ptr = type_deref(operand.type);
 			Type *t = base_type(type_deref(operand.type));
 
 			switch (t->kind) {
@@ -1707,7 +1708,7 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 				break;
 
 			case Type_Array:
-				is_possibly_addressable = operand.mode == Addressing_Variable;
+				is_possibly_addressable = operand.mode == Addressing_Variable || is_ptr;
 				array_add(&vals, t->Array.elem);
 				array_add(&vals, t_int);
 				break;
