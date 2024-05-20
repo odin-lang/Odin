@@ -3499,8 +3499,14 @@ gb_internal Array<Ast *> parse_ident_list(AstFile *f, bool allow_poly_names) {
 gb_internal Ast *parse_type(AstFile *f) {
 	Ast *type = parse_type_or_ident(f);
 	if (type == nullptr) {
-		Token token = advance_token(f);
-		syntax_error(token, "Expected a type");
+		Token prev_token = f->curr_token;
+		Token token = {};
+		if (f->curr_token.kind == Token_OpenBrace) {
+			token = f->curr_token;
+		} else {
+			token = advance_token(f);
+		}
+		syntax_error(token, "Expected a type, got '%.*s'", LIT(prev_token.string));
 		return ast_bad_expr(f, token, f->curr_token);
 	} else if (type->kind == Ast_ParenExpr &&
 	           unparen_expr(type) == nullptr) {
