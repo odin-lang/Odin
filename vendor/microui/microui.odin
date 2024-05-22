@@ -121,6 +121,9 @@ Key :: enum u32 {
 	HOME,
 	END,
 	A,
+	X,
+	C,
+	V,
 }
 Key_Set :: distinct bit_set[Key; u32]
 
@@ -317,12 +320,16 @@ default_draw_frame :: proc(ctx: ^Context, rect: Rect, colorid: Color_Type) {
 	}
 }
 
-init :: proc(ctx: ^Context) {
+init :: proc(ctx: ^Context, set_clipboard: proc(user_data: rawptr, text: string) -> (ok: bool), get_clipboard: proc(user_data: rawptr) -> (text: string, ok: bool), clipboard_user_data: rawptr) {
 	ctx^ = {} // zero memory
 	ctx.draw_frame  = default_draw_frame
 	ctx._style      = default_style
 	ctx.style       = &ctx._style
 	ctx.text_input  = strings.builder_from_bytes(ctx._text_store[:])
+
+	ctx.textbox_state.set_clipboard       = set_clipboard
+	ctx.textbox_state.get_clipboard       = get_clipboard
+	ctx.textbox_state.clipboard_user_data = clipboard_user_data
 }
 
 begin :: proc(ctx: ^Context) {
@@ -977,6 +984,16 @@ checkbox :: proc(ctx: ^Context, label: string, state: ^bool) -> (res: Result_Set
 }
 
 textbox_raw :: proc(ctx: ^Context, textbuf: []u8, textlen: ^int, id: Id, r: Rect, opt := Options{}) -> (res: Result_Set) {
+	try_input_string :: proc(state: ^textedit.State, textbuf: []u8, textlen: ^int, s: string) -> bool {
+		n := min(len(textbuf) - textlen^, len(s))
+		if n > 0 {
+			textedit.input_text(state, s[:n])
+			textlen^ = strings.builder_len(state.builder^)
+			return true
+		}
+		return false
+	}
+
 	update_control(ctx, id, r, opt | {.HOLD_FOCUS})
 
 	font := ctx.style.font
@@ -997,16 +1014,29 @@ textbox_raw :: proc(ctx: ^Context, textbuf: []u8, textlen: ^int, id: Id, r: Rect
 		}
 
 		/* handle text input */
-		n := min(len(textbuf) - textlen^, strings.builder_len(ctx.text_input))
-		if n > 0 {
-			s := strings.to_string(ctx.text_input)[:n]
-			textedit.input_text(&ctx.textbox_state, s)
-			textlen^ = strings.builder_len(builder)
-			res += {.CHANGE}
-		}
+		if try_input_string(&ctx.textbox_state, textbuf, textlen, strings.to_string(ctx.text_input)) do res += {.CHANGE}
 		/* handle ctrl+a */
 		if .A in ctx.key_pressed_bits && .CTRL in ctx.key_down_bits && .ALT not_in ctx.key_down_bits {
 			ctx.textbox_state.selection = {textlen^, 0}
+		}
+		/* handle ctrl+x */
+		if .X in ctx.key_pressed_bits && .CTRL in ctx.key_down_bits && .ALT not_in ctx.key_down_bits {
+			if textedit.cut(&ctx.textbox_state) {
+				textlen^ = strings.builder_len(builder)
+				res += {.CHANGE}
+			}
+		}
+		/* handle ctrl+c */
+		if .C in ctx.key_pressed_bits && .CTRL in ctx.key_down_bits && .ALT not_in ctx.key_down_bits {
+			textedit.copy(&ctx.textbox_state)
+		}
+		/* handle ctrl+v */
+		if .V in ctx.key_pressed_bits && .CTRL in ctx.key_down_bits && .ALT not_in ctx.key_down_bits {
+			if ctx.textbox_state.get_clipboard != nil {
+				if s, ok := ctx.textbox_state.get_clipboard(ctx.textbox_state.clipboard_user_data); ok {
+					if try_input_string(&ctx.textbox_state, textbuf, textlen, s) do res += {.CHANGE}
+				}
+			}
 		}
 		/* handle left/right */
 		if .LEFT in ctx.key_pressed_bits {
