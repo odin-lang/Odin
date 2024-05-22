@@ -1179,13 +1179,58 @@ gb_internal void check_assignment(CheckerContext *c, Operand *operand, Type *typ
 				      LIT(context_name));
 				check_assignment_error_suggestion(c, operand, type);
 
+				Type *src = base_type(operand->type);
+				Type *dst = base_type(type);
 				if (context_name == "procedure argument") {
-					Type *src = base_type(operand->type);
-					Type *dst = base_type(type);
 					if (is_type_slice(src) && are_types_identical(src->Slice.elem, dst)) {
 						gbString a = expr_to_string(operand->expr);
 						error_line("\tSuggestion: Did you mean to pass the slice into the variadic parameter with ..%s?\n\n", a);
 						gb_string_free(a);
+					}
+				}
+				if (src->kind == dst->kind && src->kind == Type_Proc) {
+					Type *x = src;
+					Type *y = dst;
+					bool same_inputs  = are_types_identical_internal(x->Proc.params,  y->Proc.params,  false);
+					bool same_outputs = are_types_identical_internal(x->Proc.results, y->Proc.results, false);
+					if (same_inputs && same_outputs) {
+					    	if (x->Proc.calling_convention != y->Proc.calling_convention) {
+					    		gbString s_expected = type_to_string(y);
+					    		gbString s_got = type_to_string(x);
+
+							error_line("\tNote: The calling conventions differ between the procedure signature types\n");
+							error_line("\t      Expected \"%s\", got \"%s\"\n",
+							           proc_calling_convention_strings[y->Proc.calling_convention],
+							           proc_calling_convention_strings[x->Proc.calling_convention]);
+							error_line("\t      Expected: %s\n", s_expected);
+							error_line("\t      Got:      %s\n", s_got);
+							gb_string_free(s_got);
+							gb_string_free(s_expected);
+					    	}
+					} else if (same_inputs) {
+						gbString s_expected = type_to_string(y->Proc.results);
+						gbString s_got = type_to_string(x->Proc.results);
+						error_line("\tNote: The return types differ between the procedure signature types\n");
+						error_line("\t      Expected: %s\n", s_expected);
+						error_line("\t      Got:      %s\n", s_got);
+						gb_string_free(s_got);
+						gb_string_free(s_expected);
+					} else if (same_outputs) {
+						gbString s_expected = type_to_string(y->Proc.params);
+						gbString s_got = type_to_string(x->Proc.params);
+						error_line("\tNote: The input parameter types differ between the procedure signature types\n");
+						error_line("\t      Expected: %s\n", s_expected);
+						error_line("\t      Got:      %s\n", s_got);
+						gb_string_free(s_got);
+						gb_string_free(s_expected);
+					} else {
+						gbString s_expected = type_to_string(y);
+						gbString s_got = type_to_string(x);
+						error_line("\tNote: The signature type do not match whatsoever\n");
+						error_line("\t      Expected: %s\n", s_expected);
+						error_line("\t      Got:      %s\n", s_got);
+						gb_string_free(s_got);
+						gb_string_free(s_expected);
 					}
 				}
 			}
