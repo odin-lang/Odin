@@ -565,7 +565,11 @@ gb_internal Type *check_assignment_variable(CheckerContext *ctx, Operand *lhs, O
 			} else {
 				error(lhs->expr, "Cannot assign to '%s' which is a procedure parameter", str);
 			}
-			error_line("\tSuggestion: Did you mean to pass '%.*s' by pointer?\n", LIT(e->token.string));
+			if (is_type_pointer(e->type)) {
+				error_line("\tSuggestion: Did you mean to shadow it? '%.*s := %.*s'?\n", LIT(e->token.string), LIT(e->token.string));
+			} else {
+				error_line("\tSuggestion: Did you mean to pass '%.*s' by pointer?\n", LIT(e->token.string));
+			}
 			show_error_on_line(e->token.pos, token_pos_end(e->token));
 		} else {
 			ERROR_BLOCK();
