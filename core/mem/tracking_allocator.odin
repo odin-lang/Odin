@@ -47,6 +47,7 @@ tracking_allocator_destroy :: proc(t: ^Tracking_Allocator) {
 }
 
 
+// Clear only the current allocation data while keeping the totals intact.
 tracking_allocator_clear :: proc(t: ^Tracking_Allocator) {
 	sync.mutex_lock(&t.mutex)
 	clear(&t.allocation_map)
@@ -55,6 +56,19 @@ tracking_allocator_clear :: proc(t: ^Tracking_Allocator) {
 	sync.mutex_unlock(&t.mutex)
 }
 
+// Reset all of a Tracking Allocator's allocation data back to zero.
+tracking_allocator_reset :: proc(t: ^Tracking_Allocator) {
+	sync.mutex_lock(&t.mutex)
+	clear(&t.allocation_map)
+	clear(&t.bad_free_array)
+	t.total_memory_allocated = 0
+	t.total_allocation_count = 0
+	t.total_memory_freed = 0
+	t.total_free_count = 0
+	t.peak_memory_allocated = 0
+	t.current_memory_allocated = 0
+	sync.mutex_unlock(&t.mutex)
+}
 
 @(require_results)
 tracking_allocator :: proc(data: ^Tracking_Allocator) -> Allocator {
