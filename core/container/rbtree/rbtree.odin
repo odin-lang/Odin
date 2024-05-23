@@ -1,5 +1,5 @@
 // This package implements a red-black tree
-package container_intrusive_rbtree
+package container_rbtree
 
 @(require) import "base:intrinsics"
 @(require) import "base:runtime"
