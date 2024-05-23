@@ -2951,12 +2951,31 @@ int main(int arg_count, char const **arg_ptr) {
 
 		gb_fprintf(&f, "%.*s:", LIT(exe_name));
 
+		isize current_line_length = exe_name.len + 1;
+
 		for (isize i = parser->packages.count-1; i >= 0; i--) {
 			AstPackage *pkg = parser->packages[i];
 			for (isize j = pkg->files.count-1; j >= 0; j--) {
 				AstFile *file = pkg->files[j];
 
-				gb_fprintf(&f, " \\\n  %.*s", LIT(file->fullpath));
+				/* Arbitrary line break value. Maybe make this better? */
+				if (current_line_length >= 80-2) {
+					gb_file_write(&f, " \\\n ", 4);
+					current_line_length = 1;
+				}
+
+				gb_file_write(&f, " ", 1);
+				current_line_length++;
+
+				for (isize k = 0; k < file->fullpath.len; k++) {
+					char part = file->fullpath.text[k];
+					if (part == ' ') {
+						gb_file_write(&f, "\\", 1);
+						current_line_length++;
+					}
+					gb_file_write(&f, &part, 1);
+					current_line_length++;
+				}
 			}
 		}
 
