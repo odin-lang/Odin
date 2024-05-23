@@ -73,15 +73,7 @@ file_console_logger_proc :: proc(logger_data: rawptr, level: Level, text: string
 	do_level_header(options, level, &buf)
 
 	when time.IS_SUPPORTED {
-		if Full_Timestamp_Opts & options != nil {
-			fmt.sbprint(&buf, "[")
-			t := time.now()
-			y, m, d := time.date(t)
-			h, min, s := time.clock(t)
-			if .Date in options { fmt.sbprintf(&buf, "%d-%02d-%02d ", y, m, d)    }
-			if .Time in options { fmt.sbprintf(&buf, "%02d:%02d:%02d", h, min, s) }
-			fmt.sbprint(&buf, "] ")
-		}
+		do_time_header(options, &buf, time.now())
 	}
 
 	do_location_header(options, &buf, location)
@@ -121,6 +113,19 @@ do_level_header :: proc(opts: Options, level: Level, str: ^strings.Builder) {
 		fmt.sbprint(str, Level_Headers[level])
 		if .Terminal_Color in opts {
 			fmt.sbprint(str, RESET)
+		}
+	}
+}
+
+do_time_header :: proc(opts: Options, buf: ^strings.Builder, t: time.Time) {
+	when time.IS_SUPPORTED {
+		if Full_Timestamp_Opts & opts != nil {
+			fmt.sbprint(buf, "[")
+			y, m, d := time.date(t)
+			h, min, s := time.clock(t)
+			if .Date in opts { fmt.sbprintf(buf, "%d-%02d-%02d ", y, m, d)    }
+			if .Time in opts { fmt.sbprintf(buf, "%02d:%02d:%02d", h, min, s) }
+			fmt.sbprint(buf, "] ")
 		}
 	}
 }
