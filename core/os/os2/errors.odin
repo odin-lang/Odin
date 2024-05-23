@@ -23,6 +23,8 @@ General_Error :: enum u32 {
 	Invalid_Dir,
 	Invalid_Path,
 
+	Pattern_Has_Separator,
+
 	Unsupported,
 }
 
@@ -63,6 +65,7 @@ error_string :: proc(ferr: Error) -> string {
 		case .Invalid_Dir:       return "invalid directory"
 		case .Invalid_Path:      return "invalid path"
 		case .Unsupported:       return "unsupported"
+		case .Pattern_Has_Separator: return "pattern has separator"
 		}
 	case io.Error:
 		switch e {
@@ -98,12 +101,12 @@ error_string :: proc(ferr: Error) -> string {
 }
 
 print_error :: proc(ferr: Error, msg: string) {
-	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
+	TEMP_ALLOCATOR_GUARD()
 	err_str := error_string(ferr)
 
 	// msg + ": " + err_str + '\n'
 	length := len(msg) + 2 + len(err_str) + 1
-	buf := make([]u8, length, context.temp_allocator)
+	buf := make([]u8, length, temp_allocator())
 
 	copy(buf, msg)
 	buf[len(msg)] = ':'

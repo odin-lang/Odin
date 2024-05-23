@@ -177,17 +177,24 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 		break;
 	}
 
-	if (!entity->Procedure.target_feature_disabled &&
-	    entity->Procedure.target_feature.len != 0) {
-	    	auto features = split_by_comma(entity->Procedure.target_feature);
-		for_array(i, features) {
-			String feature = features[i];
-			LLVMAttributeRef ref = LLVMCreateStringAttribute(
-				m->ctx,
-				cast(char const *)feature.text, cast(unsigned)feature.len,
-				"", 0);
-			LLVMAddAttributeAtIndex(p->value, LLVMAttributeIndex_FunctionIndex, ref);
+	if (pt->Proc.enable_target_feature.len != 0) {
+		gbString feature_str = gb_string_make(temporary_allocator(), "");
+
+		String_Iterator it = {pt->Proc.enable_target_feature, 0};
+		bool first = true;
+		for (;;) {
+			String str = string_split_iterator(&it, ',');
+			if (str == "") break;
+			if (!first) {
+				feature_str = gb_string_appendc(feature_str, ",");
+			}
+			first = false;
+
+			feature_str = gb_string_appendc(feature_str, "+");
+			feature_str = gb_string_append_length(feature_str, str.text, str.len);
 		}
+
+		lb_add_attribute_to_proc_with_string(m, p->value, make_string_c("target-features"), make_string_c(feature_str));
 	}
 
 	if (entity->flags & EntityFlag_Cold) {
@@ -2377,9 +2384,10 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 
 			lbValue ptr0 = lb_emit_conv(p, lb_build_expr(p, ce->args[0]), t_uintptr);
 			lbValue ptr1 = lb_emit_conv(p, lb_build_expr(p, ce->args[1]), t_uintptr);
+			ptr0 = lb_emit_conv(p, ptr0, t_int);
+			ptr1 = lb_emit_conv(p, ptr1, t_int);
 
-			lbValue diff = lb_emit_arith(p, Token_Sub, ptr0, ptr1, t_uintptr);
-			diff = lb_emit_conv(p, diff, t_int);
+			lbValue diff = lb_emit_arith(p, Token_Sub, ptr0, ptr1, t_int);
 			return lb_emit_arith(p, Token_Quo, diff, lb_const_int(p->module, t_int, type_size_of(elem)), t_int);
 		}
 
@@ -2828,8 +2836,7 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 				{
 					GB_ASSERT(arg_count <= 7);
 
-					char asm_string_default[] = "int $$0x80";
-					char *asm_string = asm_string_default;
+					char asm_string[] = "int $$0x80";
 					gbString constraints = gb_string_make(heap_allocator(), "={eax}");
 
 					for (unsigned i = 0; i < gb_min(arg_count, 6); i++) {
@@ -2841,15 +2848,10 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 							"edx",
 							"esi",
 							"edi",
+							"ebp",
 						};
 						constraints = gb_string_appendc(constraints, regs[i]);
 						constraints = gb_string_appendc(constraints, "}");
-					}
-					if (arg_count == 7) {
-						char asm_string7[] = "push %[arg6]\npush %%ebp\nmov 4(%%esp), %%ebp\nint $0x80\npop %%ebp\nadd $4, %%esp";
-						asm_string = asm_string7;
-
-						constraints = gb_string_appendc(constraints, ",rm");
 					}
 
 					inline_asm = llvm_get_inline_asm(func_type, make_string_c(asm_string), make_string_c(constraints));
@@ -2902,7 +2904,6 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 				break;
 			case TargetArch_arm32:
 				{
-					// TODO(bill): Check this is correct
 					GB_ASSERT(arg_count <= 7);
 
 					char asm_string[] = "svc #0";
@@ -2910,13 +2911,14 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 					for (unsigned i = 0; i < arg_count; i++) {
 						constraints = gb_string_appendc(constraints, ",{");
 						static char const *regs[] = {
-							"r8",
+							"r7",
 							"r0",
 							"r1",
 							"r2",
 							"r3",
 							"r4",
 							"r5",
+							"r6",
 						};
 						constraints = gb_string_appendc(constraints, regs[i]);
 						constraints = gb_string_appendc(constraints, "}");

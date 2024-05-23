@@ -1107,6 +1107,12 @@ gb_internal lbValue lb_emit_load(lbProcedure *p, lbValue value) {
 	GB_ASSERT(is_type_pointer(value.type));
 	Type *t = type_deref(value.type);
 	LLVMValueRef v = LLVMBuildLoad2(p->builder, lb_type(p->module, t), value.value, "");
+
+	u64 is_packed = lb_get_metadata_custom_u64(p->module, value.value, ODIN_METADATA_IS_PACKED);
+	if (is_packed != 0) {
+		LLVMSetAlignment(v, 1);
+	}
+
 	return lbValue{v, t};
 }
 
@@ -1174,7 +1180,7 @@ gb_internal lbValue lb_addr_load(lbProcedure *p, lbAddr const &addr) {
 		Type *t = addr.bitfield.type;
 
 		if (do_mask) {
-			GB_ASSERT(addr.bitfield.bit_size < 8*type_size_of(ct));
+			GB_ASSERT(addr.bitfield.bit_size <= 8*type_size_of(ct));
 
 			lbValue mask = lb_const_int(p->module, t, (1ull<<cast(u64)addr.bitfield.bit_size)-1);
 			r = lb_emit_arith(p, Token_And, r, mask, t);
@@ -1318,7 +1324,7 @@ gb_internal lbValue lb_addr_load(lbProcedure *p, lbAddr const &addr) {
 			for (isize i = 0; i < field_count; i++) {
 				Entity *field = t->Struct.fields[i];
 				Type *base_type = field->type;
-				GB_ASSERT(base_type->kind == Type_Pointer);
+				GB_ASSERT(base_type->kind == Type_MultiPointer);
 
 				lbValue dst = lb_emit_struct_ep(p, res.addr, cast(i32)i);
 				lbValue src_ptr = lb_emit_struct_ep(p, addr.addr, cast(i32)i);

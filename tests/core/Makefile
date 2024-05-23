@@ -3,29 +3,32 @@ PYTHON=$(shell which python3)
 COMMON=-vet -strict-style
 COLLECTION=-collection:tests=..
 
-all: c_libc_test \
-	 compress_test \
-	 container_test \
-	 crypto_test \
-	 download_test_assets \
-	 encoding_test \
-	 filepath_test \
-	 fmt_test \
-	 hash_test \
-	 i18n_test \
-	 image_test \
-	 linalg_glsl_math_test \
-	 match_test \
-	 math_test \
-	 net_test \
-	 noise_test \
-	 os_exit_test \
-	 reflect_test \
-	 slice_test \
-	 strings_test \
-	 thread_test \
-	 runtime_test \
-	 time_test
+all: all_bsd \
+     net_test
+
+all_bsd: c_libc_test \
+         compress_test \
+         container_test \
+         crypto_test \
+         download_test_assets \
+         encoding_test \
+         filepath_test \
+         fmt_test \
+         hash_test \
+         i18n_test \
+         image_test \
+         linalg_glsl_math_test \
+         match_test \
+         math_test \
+         noise_test \
+         os_exit_test \
+         reflect_test \
+         slice_test \
+         strings_test \
+         thread_test \
+         runtime_test \
+         time_test \
+         fmt_test
 
 download_test_assets:
 	$(PYTHON) download_assets.py

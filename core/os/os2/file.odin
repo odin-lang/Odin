@@ -1,11 +1,13 @@
 package os2
 
+import "base:runtime"
 import "core:io"
 import "core:time"
 
 File :: struct {
-	impl: _File,
+	impl:   _File,
 	stream: io.Stream,
+	user_fstat: Fstat_Callback,
 }
 
 File_Mode :: distinct u32
@@ -49,22 +51,27 @@ stdout: ^File = &_stdout
 stderr: ^File = &_stderr
 
 
+@(require_results)
 create :: proc(name: string) -> (^File, Error) {
 	return open(name, {.Read, .Write, .Create}, File_Mode(0o777))
 }
 
+@(require_results)
 open :: proc(name: string, flags := File_Flags{.Read}, perm := File_Mode(0o777)) -> (^File, Error) {
 	return _open(name, flags, perm)
 }
 
+@(require_results)
 new_file :: proc(handle: uintptr, name: string) -> ^File {
 	return _new_file(handle, name)
 }
 
+@(require_results)
 fd :: proc(f: ^File) -> uintptr {
 	return _fd(f)
 }
 
+@(require_results)
 name :: proc(f: ^File) -> string {
 	return _name(f)
 }
@@ -150,7 +157,7 @@ symlink :: proc(old_name, new_name: string) -> Error {
 	return _symlink(old_name, new_name)
 }
 
-read_link :: proc(name: string, allocator := context.allocator) -> (string, Error) {
+read_link :: proc(name: string, allocator: runtime.Allocator) -> (string, Error) {
 	return _read_link(name,allocator)
 }
 
@@ -198,15 +205,18 @@ fchange_times :: proc(f: ^File, atime, mtime: time.Time) -> Error {
 	return _fchtimes(f, atime, mtime)
 }
 
+@(require_results)
 exists :: proc(path: string) -> bool {
 	return _exists(path)
 }
 
+@(require_results)
 is_file :: proc(path: string) -> bool {
 	return _is_file(path)
 }
 
 is_dir :: is_directory
+@(require_results)
 is_directory :: proc(path: string) -> bool {
 	return _is_dir(path)
 }
@@ -216,8 +226,8 @@ copy_file :: proc(dst_path, src_path: string) -> Error {
 	src := open(src_path) or_return
 	defer close(src)
 
-	info := fstat(src, _file_allocator()) or_return
-	defer file_info_delete(info, _file_allocator())
+	info := fstat(src, file_allocator()) or_return
+	defer file_info_delete(info, file_allocator())
 	if info.is_directory {
 		return .Invalid_File
 	}

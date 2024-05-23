@@ -3,7 +3,6 @@ package os2
 
 import "core:time"
 import "base:runtime"
-import "core:strings"
 import "core:sys/linux"
 import "core:path/filepath"
 
@@ -36,9 +35,9 @@ _fstat_internal :: proc(fd: linux.Fd, allocator: runtime.Allocator) -> (File_Inf
 }
 
 // NOTE: _stat and _lstat are using _fstat to avoid a race condition when populating fullpath
-_stat :: proc(name: string, allocator: runtime.Allocator) -> (File_Info, Error) {
-	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
-	name_cstr := strings.clone_to_cstring(name, context.temp_allocator)
+_stat :: proc(name: string, allocator: runtime.Allocator) -> (fi: File_Info, err: Error) {
+	TEMP_ALLOCATOR_GUARD()
+	name_cstr := temp_cstring(name) or_return
 
 	fd, errno := linux.open(name_cstr, {})
 	if errno != .NONE {
@@ -48,9 +47,9 @@ _stat :: proc(name: string, allocator: runtime.Allocator) -> (File_Info, Error) 
 	return _fstat_internal(fd, allocator)
 }
 
-_lstat :: proc(name: string, allocator: runtime.Allocator) -> (File_Info, Error) {
-	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
-	name_cstr := strings.clone_to_cstring(name, context.temp_allocator)
+_lstat :: proc(name: string, allocator: runtime.Allocator) -> (fi: File_Info, err: Error) {
+	TEMP_ALLOCATOR_GUARD()
+	name_cstr := temp_cstring(name) or_return
 
 	fd, errno := linux.open(name_cstr, {.PATH, .NOFOLLOW})
 	if errno != .NONE {

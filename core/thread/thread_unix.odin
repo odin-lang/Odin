@@ -1,4 +1,4 @@
-// +build linux, darwin, freebsd, openbsd, haiku
+// +build linux, darwin, freebsd, openbsd, netbsd, haiku
 // +private
 package thread
 
@@ -20,12 +20,12 @@ Thread_Os_Specific :: struct #align(16) {
 // It then waits for `start` to be called.
 //
 _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
-	__linux_thread_entry_proc :: proc "c" (t: rawptr) -> rawptr {
+	__unix_thread_entry_proc :: proc "c" (t: rawptr) -> rawptr {
 		t := (^Thread)(t)
 
 		when ODIN_OS != .Darwin {
 			// We need to give the thread a moment to start up before we enable cancellation.
-			can_set_thread_cancel_state := unix.pthread_setcancelstate(unix.PTHREAD_CANCEL_DISABLE, nil) == 0
+			can_set_thread_cancel_state := unix.pthread_setcancelstate(unix.PTHREAD_CANCEL_ENABLE, nil) == 0
 		}
 
 		sync.lock(&t.mutex)
@@ -36,11 +36,15 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 			sync.wait(&t.cond, &t.mutex)
 		}
 
+		if .Joined in t.flags {
+			return nil
+		}
+
 		when ODIN_OS != .Darwin {
 			// Enable thread's cancelability.
 			if can_set_thread_cancel_state {
 				unix.pthread_setcanceltype (unix.PTHREAD_CANCEL_ASYNCHRONOUS, nil)
-				unix.pthread_setcancelstate(unix.PTHREAD_CANCEL_DISABLE,      nil)
+				unix.pthread_setcancelstate(unix.PTHREAD_CANCEL_ENABLE,       nil)
 			}
 		}
 
@@ -78,7 +82,7 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 
 	// NOTE(tetra, 2019-11-01): These only fail if their argument is invalid.
 	assert(unix.pthread_attr_setdetachstate(&attrs, unix.PTHREAD_CREATE_JOINABLE) == 0)
-	when ODIN_OS != .Haiku {
+	when ODIN_OS != .Haiku && ODIN_OS != .NetBSD {
 		assert(unix.pthread_attr_setinheritsched(&attrs, unix.PTHREAD_EXPLICIT_SCHED) == 0)
 	}
 
@@ -91,7 +95,7 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 	// Set thread priority.
 	policy: i32
 	res: i32
-	when ODIN_OS != .Haiku {
+	when ODIN_OS != .Haiku && ODIN_OS != .NetBSD {
 		res = unix.pthread_attr_getschedpolicy(&attrs, &policy)
 		assert(res == 0)
 	}
@@ -109,7 +113,7 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 	assert(res == 0)
 
 	thread.procedure = procedure
-	if unix.pthread_create(&thread.unix_thread, &attrs, __linux_thread_entry_proc, thread) != 0 {
+	if unix.pthread_create(&thread.unix_thread, &attrs, __unix_thread_entry_proc, thread) != 0 {
 		free(thread, thread.creation_allocator)
 		return nil
 	}
@@ -142,6 +146,11 @@ _join :: proc(t: ^Thread) {
 	// it means the previous value had that flag set and we can return.
 	if res, ok := CAS(&t.flags, unjoined, joined); res == joined && !ok {
 		return
+	}
+	// Prevent non-started threads from blocking main thread with initial wait
+	// condition.
+	if .Started not_in unjoined {
+		_start(t)
 	}
 	unix.pthread_join(t.unix_thread, nil)
 }

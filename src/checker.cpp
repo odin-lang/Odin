@@ -1013,6 +1013,7 @@ gb_internal void init_universal(void) {
 			{"FreeBSD",      TargetOs_freebsd},
 			{"Haiku",        TargetOs_haiku},
 			{"OpenBSD",      TargetOs_openbsd},
+			{"NetBSD",       TargetOs_netbsd},
 			{"WASI",         TargetOs_wasi},
 			{"JS",           TargetOs_js},
 			{"Freestanding", TargetOs_freestanding},
@@ -1043,6 +1044,7 @@ gb_internal void init_universal(void) {
 		GlobalEnumValue values[BuildMode_COUNT] = {
 			{"Executable", BuildMode_Executable},
 			{"Dynamic",    BuildMode_DynamicLibrary},
+			{"Static",     BuildMode_StaticLibrary},
 			{"Object",     BuildMode_Object},
 			{"Assembly",   BuildMode_Assembly},
 			{"LLVM_IR",    BuildMode_LLVM_IR},
@@ -2641,6 +2643,10 @@ gb_internal void generate_minimum_dependency_set(Checker *c, Entity *start) {
 	FORCE_ADD_RUNTIME_ENTITIES(build_context.no_crt,
 		str_lit("memcpy"),
 		str_lit("memmove"),
+	);
+
+	FORCE_ADD_RUNTIME_ENTITIES(build_context.metrics.arch == TargetArch_arm32,
+		str_lit("aeabi_d2h")
 	);
 
 	FORCE_ADD_RUNTIME_ENTITIES(is_arch_wasm() && !build_context.tilde_backend,

@@ -8,7 +8,7 @@ import "core:thread"
 import "core:time"
 import "core:reflect"
 import "base:runtime"
-import "core:intrinsics"
+import "base:intrinsics"
 import "core:math/big"
 
 /*
@@ -48,7 +48,7 @@ the_basics :: proc() {
 		// os.args holds the path to the current executable and any arguments passed to it.
 		if len(os.args) == 1 {
 			fmt.printf("Hellope from %v.\n", os.args[0])
-		} else {
+		} else if len(os.args) > 2 {
 			fmt.printf("%v, %v! from %v.\n", os.args[1], os.args[2], os.args[0])
 		}
 

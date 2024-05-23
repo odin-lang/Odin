@@ -102,7 +102,7 @@ make_soa_aligned :: proc($T: typeid/#soa[]$E, length: int, alignment: int, alloc
 
 	total_size := 0
 	for i in 0..<field_count {
-		type := si.types[i].variant.(Type_Info_Pointer).elem
+		type := si.types[i].variant.(Type_Info_Multi_Pointer).elem
 		total_size += type.size * length
 		total_size = align_forward_int(total_size, max_align)
 	}
@@ -126,7 +126,7 @@ make_soa_aligned :: proc($T: typeid/#soa[]$E, length: int, alignment: int, alloc
 	data := uintptr(&array)
 	offset := 0
 	for i in 0..<field_count {
-		type := si.types[i].variant.(Type_Info_Pointer).elem
+		type := si.types[i].variant.(Type_Info_Multi_Pointer).elem
 
 		offset = align_forward_int(offset, max_align)
 
@@ -226,7 +226,7 @@ reserve_soa :: proc(array: ^$T/#soa[dynamic]$E, capacity: int, loc := #caller_lo
 
 	max_align :: align_of(E)
 	for i in 0..<field_count {
-		type := si.types[i].variant.(Type_Info_Pointer).elem
+		type := si.types[i].variant.(Type_Info_Multi_Pointer).elem
 
 		old_size += type.size * old_cap
 		new_size += type.size * capacity
@@ -249,7 +249,7 @@ reserve_soa :: proc(array: ^$T/#soa[dynamic]$E, capacity: int, loc := #caller_lo
 	old_offset := 0
 	new_offset := 0
 	for i in 0..<field_count {
-		type := si.types[i].variant.(Type_Info_Pointer).elem
+		type := si.types[i].variant.(Type_Info_Multi_Pointer).elem
 
 		old_offset = align_forward_int(old_offset, max_align)
 		new_offset = align_forward_int(new_offset, max_align)
@@ -307,7 +307,7 @@ append_soa_elem :: proc(array: ^$T/#soa[dynamic]$E, arg: E, loc := #caller_locat
 
 		max_align :: align_of(E)
 		for i in 0..<field_count {
-			type := si.types[i].variant.(Type_Info_Pointer).elem
+			type := si.types[i].variant.(Type_Info_Multi_Pointer).elem
 
 			soa_offset  = align_forward_int(soa_offset, max_align)
 			item_offset = align_forward_int(item_offset, type.align)
@@ -358,7 +358,7 @@ append_soa_elems :: proc(array: ^$T/#soa[dynamic]$E, args: ..E, loc := #caller_l
 
 		max_align :: align_of(E)
 		for i in 0..<field_count {
-			type := si.types[i].variant.(Type_Info_Pointer).elem
+			type := si.types[i].variant.(Type_Info_Multi_Pointer).elem
 
 			soa_offset  = align_forward_int(soa_offset, max_align)
 			item_offset = align_forward_int(item_offset, type.align)
@@ -476,7 +476,7 @@ unordered_remove_soa :: proc(array: ^$T/#soa[dynamic]$E, index: int, loc := #cal
 
 		data := uintptr(array)
 		for i in 0..<field_count {
-			type := si.types[i].variant.(Type_Info_Pointer).elem
+			type := si.types[i].variant.(Type_Info_Multi_Pointer).elem
 
 			offset := rawptr((^uintptr)(data)^ + uintptr(index*type.size))
 			final := rawptr((^uintptr)(data)^ + uintptr((len(array)-1)*type.size))
@@ -509,7 +509,7 @@ ordered_remove_soa :: proc(array: ^$T/#soa[dynamic]$E, index: int, loc := #calle
 
 		data := uintptr(array)
 		for i in 0..<field_count {
-			type := si.types[i].variant.(Type_Info_Pointer).elem
+			type := si.types[i].variant.(Type_Info_Multi_Pointer).elem
 
 			offset := (^uintptr)(data)^ + uintptr(index*type.size)
 			length := type.size*(len(array) - index - 1)

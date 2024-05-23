@@ -102,6 +102,7 @@ gb_internal Type *   check_init_variable            (CheckerContext *c, Entity *
 gb_internal void check_assignment_error_suggestion(CheckerContext *c, Operand *o, Type *type, i64 max_bit_size=0);
 gb_internal void add_map_key_type_dependencies(CheckerContext *ctx, Type *key);
 
+gb_internal Type *make_soa_struct_fixed(CheckerContext *ctx, Ast *array_typ_expr, Ast *elem_expr, Type *elem, i64 count, Type *generic_type);
 gb_internal Type *make_soa_struct_slice(CheckerContext *ctx, Ast *array_typ_expr, Ast *elem_expr, Type *elem);
 gb_internal Type *make_soa_struct_dynamic_array(CheckerContext *ctx, Ast *array_typ_expr, Ast *elem_expr, Type *elem);
 
@@ -1409,11 +1410,16 @@ gb_internal bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, T
 			    poly->Struct.soa_kind != StructSoa_None) {
 				bool ok = is_polymorphic_type_assignable(c, poly->Struct.soa_elem, source->Struct.soa_elem, true, modify_type);
 				if (ok) switch (source->Struct.soa_kind) {
-				case StructSoa_Fixed:
+				case StructSoa_None:
 				default:
 					GB_PANIC("Unhandled SOA Kind");
 					break;
-
+				case StructSoa_Fixed:
+					if (modify_type) {
+						Type *type = make_soa_struct_fixed(c, nullptr, poly->Struct.node, poly->Struct.soa_elem, poly->Struct.soa_count, nullptr);
+						gb_memmove(poly, type, gb_size_of(*type));
+					}
+					break;
 				case StructSoa_Slice:
 					if (modify_type) {
 						Type *type = make_soa_struct_slice(c, nullptr, poly->Struct.node, poly->Struct.soa_elem);
@@ -1435,6 +1441,13 @@ gb_internal bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, T
 			// return check_is_assignable_to(c, &o, poly); // && is_type_subtype_of_and_allow_polymorphic(o.type, poly);
 		}
 		return false;
+
+	case Type_BitField:
+		if (source->kind == Type_BitField) {
+			return is_polymorphic_type_assignable(c, poly->BitField.backing_type, source->BitField.backing_type, true, modify_type);
+		}
+		return false;
+
 	case Type_Tuple:
 		GB_PANIC("This should never happen");
 		return false;
@@ -1781,6 +1794,13 @@ gb_internal bool check_unary_op(CheckerContext *c, Operand *o, Token op) {
 		gb_string_free(str);
 		return false;
 	}
+	if (o->mode == Addressing_Type) {
+		gbString str = type_to_string(o->type);
+		error(o->expr, "Expected an expression for operator '%.*s', got type '%s'", LIT(op.string), str);
+		gb_string_free(str);
+		return false;
+	}
+
 	Type *type = base_type(core_array_type(o->type));
 	gbString str = nullptr;
 	switch (op.kind) {
@@ -2420,32 +2440,6 @@ gb_internal bool check_is_not_addressable(CheckerContext *c, Operand *o) {
 	return o->mode != Addressing_Variable && o->mode != Addressing_SoaVariable;
 }
 
-gb_internal void check_old_for_or_switch_value_usage(Ast *expr) {
-	Entity *e = entity_of_node(expr);
-	if (e != nullptr && (e->flags & EntityFlag_OldForOrSwitchValue) != 0) {
-		GB_ASSERT(e->kind == Entity_Variable);
-
-		ERROR_BLOCK();
-
-		if ((e->flags & EntityFlag_ForValue) != 0) {
-			Type *parent_type = type_deref(e->Variable.for_loop_parent_type);
-
-			error(expr, "Assuming a for-in defined value is addressable as the iterable is passed by value has been disallowed.");
-
-			if (is_type_map(parent_type)) {
-				error_line("\tSuggestion: Prefer doing 'for key, &%.*s in ...'\n", LIT(e->token.string));
-			} else {
-				error_line("\tSuggestion: Prefer doing 'for &%.*s in ...'\n", LIT(e->token.string));
-			}
-		} else {
-			GB_ASSERT((e->flags & EntityFlag_SwitchValue) != 0);
-
-			error(expr, "Assuming a switch-in defined value is addressable as the iterable is passed by value has been disallowed.");
-			error_line("\tSuggestion: Prefer doing 'switch &%.*s in ...'\n", LIT(e->token.string));
-		}
-	}
-}
-
 gb_internal void check_unary_expr(CheckerContext *c, Operand *o, Token op, Ast *node) {
 	switch (op.kind) {
 	case Token_And: { // Pointer address
@@ -2473,7 +2467,10 @@ gb_internal void check_unary_expr(CheckerContext *c, Operand *o, Token op, Ast *
 						{
 							ERROR_BLOCK();
 							error(op, "Cannot take the pointer address of '%s'", str);
-							if (e != nullptr && (e->flags & EntityFlag_ForValue) != 0) {
+							if (e == nullptr) {
+								break;
+							}
+							if ((e->flags & EntityFlag_ForValue) != 0) {
 								Type *parent_type = type_deref(e->Variable.for_loop_parent_type);
 
 								if (parent_type != nullptr && is_type_string(parent_type)) {
@@ -2483,9 +2480,17 @@ gb_internal void check_unary_expr(CheckerContext *c, Operand *o, Token op, Ast *
 								} else {
 									error_line("\tSuggestion: Did you want to pass the iterable value to the for statement by pointer to get addressable semantics?\n");
 								}
+
+								if (is_type_map(parent_type)) {
+									error_line("\t            Prefer doing 'for key, &%.*s in ...'\n", LIT(e->token.string));
+								} else {
+									error_line("\t            Prefer doing 'for &%.*s in ...'\n", LIT(e->token.string));
+								}
 							}
-							if (e != nullptr && (e->flags & EntityFlag_SwitchValue) != 0) {
+							if ((e->flags & EntityFlag_SwitchValue) != 0) {
 								error_line("\tSuggestion: Did you want to pass the value to the switch statement by pointer to get addressable semantics?\n");
+
+								error_line("\t            Prefer doing 'switch &%.*s in ...'\n", LIT(e->token.string));
 							}
 						}
 						break;
@@ -2507,11 +2512,6 @@ gb_internal void check_unary_expr(CheckerContext *c, Operand *o, Token op, Ast *
 				o->type = alloc_type_pointer(o->type);
 			}
 		} else {
-			if (ast_node_expect(node, Ast_UnaryExpr)) {
-				ast_node(ue, UnaryExpr, node);
-				check_old_for_or_switch_value_usage(ue->expr);
-			}
-
 			o->type = alloc_type_pointer(o->type);
 		}
 
@@ -6187,6 +6187,20 @@ gb_internal bool evaluate_where_clauses(CheckerContext *ctx, Ast *call_expr, Sco
 				}
 				return false;
 			}
+
+			if (ast_file_vet_style(ctx->file)) {
+				Ast *c = unparen_expr(clause);
+				if (c->kind == Ast_BinaryExpr && c->BinaryExpr.op.kind == Token_CmpAnd) {
+					ERROR_BLOCK();
+					error(c, "Prefer to separate 'where' clauses with a comma rather than '&&'");
+					gbString x = expr_to_string(c->BinaryExpr.left);
+					gbString y = expr_to_string(c->BinaryExpr.right);
+					error_line("\tSuggestion: '%s, %s'\n", x, y);
+					gb_string_free(y);
+					gb_string_free(x);
+				}
+			}
+
 		}
 	}
 
@@ -6528,12 +6542,17 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 		array_add(&proc_entities, proc);
 	}
 
+	int max_matched_features = 0;
 
 	gbString expr_name = expr_to_string(operand->expr);
 	defer (gb_string_free(expr_name));
 
 	for_array(i, procs) {
 		Entity *p = procs[i];
+		if (p->flags & EntityFlag_Disabled) {
+			continue;
+		}
+
 		Type *pt = base_type(p->type);
 		if (pt != nullptr && is_type_proc(pt)) {
 			CallArgumentData data = {};
@@ -6564,8 +6583,21 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 				item.score += assign_score_function(1);
 			}
 
+			max_matched_features = gb_max(max_matched_features, matched_target_features(&pt->Proc));
+
 			item.index = index;
 			array_add(&valids, item);
+		}
+	}
+
+	if (max_matched_features > 0) {
+		for_array(i, valids) {
+			Entity *p = procs[valids[i].index];
+			Type *t = base_type(p->type);
+			GB_ASSERT(t->kind == Type_Proc);
+
+			int matched = matched_target_features(&t->Proc);
+			valids[i].score += assign_score_function(max_matched_features-matched);
 		}
 	}
 
@@ -6710,7 +6742,11 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 		ERROR_BLOCK();
 
 		error(operand->expr, "Ambiguous procedure group call '%s' that match with the given arguments", expr_name);
-		print_argument_types();
+		if (positional_operands.count == 0 && named_operands.count == 0) {
+			error_line("\tNo given arguments\n");
+		} else {
+			print_argument_types();
+		}
 
 		for (auto const &valid : valids) {
 			Entity *proc = proc_entities[valid.index];
@@ -7555,8 +7591,11 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 		}
 	}
 
+	bool is_call_inlined = false;
+
 	switch (inlining) {
 	case ProcInlining_inline:
+		is_call_inlined = true;
 		if (proc != nullptr) {
 			Entity *e = entity_from_expr(proc);
 			if (e != nullptr && e->kind == Entity_Procedure) {
@@ -7572,6 +7611,47 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 		break;
 	case ProcInlining_no_inline:
 		break;
+	case ProcInlining_none:
+		if (proc != nullptr) {
+			Entity *e = entity_from_expr(proc);
+			if (e != nullptr && e->kind == Entity_Procedure) {
+				DeclInfo *decl = e->decl_info;
+				if (decl->proc_lit) {
+					ast_node(pl, ProcLit, decl->proc_lit);
+					if (pl->inlining == ProcInlining_inline) {
+						is_call_inlined = true;
+					}
+				}
+			}
+		}
+	}
+
+	{
+		String invalid;
+		if (pt->kind == Type_Proc && pt->Proc.require_target_feature.len != 0) {
+			if (!check_target_feature_is_valid_for_target_arch(pt->Proc.require_target_feature, &invalid)) {
+				error(call, "Called procedure requires target feature '%.*s' which is invalid for the build target", LIT(invalid));
+			} else if (!check_target_feature_is_enabled(pt->Proc.require_target_feature, &invalid)) {
+				error(call, "Calling this procedure requires target feature '%.*s' to be enabled", LIT(invalid));
+			}
+		}
+
+		if (pt->kind == Type_Proc && pt->Proc.enable_target_feature.len != 0) {
+			if (!check_target_feature_is_valid_for_target_arch(pt->Proc.enable_target_feature, &invalid)) {
+				error(call, "Called procedure enables target feature '%.*s' which is invalid for the build target", LIT(invalid));
+			}
+
+			// NOTE: Due to restrictions in LLVM you can not inline calls with a superset of features.
+			if (is_call_inlined) {
+				GB_ASSERT(c->curr_proc_decl);
+				GB_ASSERT(c->curr_proc_decl->entity);
+				GB_ASSERT(c->curr_proc_decl->entity->type->kind == Type_Proc);
+				String scope_features = c->curr_proc_decl->entity->type->Proc.enable_target_feature;
+				if (!check_target_feature_is_superset_of(scope_features, pt->Proc.enable_target_feature, &invalid)) {
+					error(call, "Inlined procedure enables target feature '%.*s', this requires the calling procedure to at least enable the same feature", LIT(invalid));
+				}
+			}
+		}
 	}
 
 	operand->expr = call;
@@ -7675,13 +7755,18 @@ gb_internal bool check_set_index_data(Operand *o, Type *t, bool indirection, i64
 		return true;
 		
 	case Type_Matrix:
-		*max_count = t->Matrix.column_count;
 		if (indirection) {
 			o->mode = Addressing_Variable;
 		} else if (o->mode != Addressing_Variable) {
 			o->mode = Addressing_Value;
 		}
-		o->type = alloc_type_array(t->Matrix.elem, t->Matrix.row_count);
+		if (t->Matrix.is_row_major) {
+			*max_count = t->Matrix.row_count;
+			o->type = alloc_type_array(t->Matrix.elem, t->Matrix.column_count);
+		} else {
+			*max_count = t->Matrix.column_count;
+			o->type = alloc_type_array(t->Matrix.elem, t->Matrix.row_count);
+		}
 		return true;
 
 	case Type_Slice:
@@ -7726,8 +7811,8 @@ gb_internal bool check_set_index_data(Operand *o, Type *t, bool indirection, i64
 
 	if (is_type_pointer(original_type) && indirection) {
 		Type *ptr = base_type(original_type);
-		if (ptr->kind == Type_Pointer && o->mode == Addressing_SoaVariable) {
-			o->type = ptr->Pointer.elem;
+		if (ptr->kind == Type_MultiPointer && o->mode == Addressing_SoaVariable) {
+			o->type = ptr->MultiPointer.elem;
 			o->mode = Addressing_Value;
 			return true;
 		}
@@ -10077,7 +10162,7 @@ gb_internal ExprKind check_index_expr(CheckerContext *c, Operand *o, Ast *node, 
 			o->mode = Addressing_Invalid;
 			o->expr = node;
 			return kind;
-		} else if (ok) {
+		} else if (ok && !is_type_matrix(t)) {
 			ExactValue value = type_and_value_of_expr(ie->expr).value;
 			o->mode = Addressing_Constant;
 			bool success = false;
@@ -10163,6 +10248,17 @@ gb_internal ExprKind check_slice_expr(CheckerContext *c, Operand *o, Ast *node, 
 	case Type_Struct:
 		if (is_type_soa_struct(t)) {
 			valid = true;
+			if (t->Struct.soa_kind == StructSoa_Fixed) {
+				max_count = t->Struct.soa_count;
+				if (o->mode != Addressing_Variable && !is_type_pointer(o->type)) {
+					gbString str = expr_to_string(node);
+					error(node, "Cannot slice #soa array '%s', value is not addressable", str);
+					gb_string_free(str);
+					o->mode = Addressing_Invalid;
+					o->expr = node;
+					return kind;
+				}
+			}
 			o->type = make_soa_struct_slice(c, nullptr, nullptr, t->Struct.soa_elem);
 		}
 		break;
@@ -10702,6 +10798,7 @@ gb_internal ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast
 		return Expr_Expr;
 	case_end;
 
+	case Ast_DistinctType:
 	case Ast_TypeidType:
 	case Ast_PolyType:
 	case Ast_ProcType:

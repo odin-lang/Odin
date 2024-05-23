@@ -2514,7 +2514,7 @@ gb_internal lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left
 			case Token_Lt:    runtime_procedure = "cstring_lt"; break;
 			case Token_Gt:    runtime_procedure = "cstring_gt"; break;
 			case Token_LtEq:  runtime_procedure = "cstring_le"; break;
-			case Token_GtEq:  runtime_procedure = "cstring_gt"; break;
+			case Token_GtEq:  runtime_procedure = "cstring_ge"; break;
 			}
 			GB_ASSERT(runtime_procedure != nullptr);
 
@@ -2537,7 +2537,7 @@ gb_internal lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left
 		case Token_Lt:    runtime_procedure = "string_lt"; break;
 		case Token_Gt:    runtime_procedure = "string_gt"; break;
 		case Token_LtEq:  runtime_procedure = "string_le"; break;
-		case Token_GtEq:  runtime_procedure = "string_gt"; break;
+		case Token_GtEq:  runtime_procedure = "string_ge"; break;
 		}
 		GB_ASSERT(runtime_procedure != nullptr);
 
@@ -3851,27 +3851,39 @@ gb_internal lbAddr lb_build_addr_index_expr(lbProcedure *p, Ast *expr) {
 
 	if (ie->expr->tav.mode == Addressing_SoaVariable) {
 		// SOA Structures for slices/dynamic arrays
-		GB_ASSERT(is_type_pointer(type_of_expr(ie->expr)));
+		GB_ASSERT_MSG(is_type_multi_pointer(type_of_expr(ie->expr)), "%s", type_to_string(type_of_expr(ie->expr)));
 
 		lbValue field = lb_build_expr(p, ie->expr);
 		lbValue index = lb_build_expr(p, ie->index);
 
-
 		if (!build_context.no_bounds_check) {
-			// TODO HACK(bill): Clean up this hack to get the length for bounds checking
-			// GB_ASSERT(LLVMIsALoadInst(field.value));
+			Ast *se_expr = unparen_expr(ie->expr);
+			if (se_expr->kind == Ast_SelectorExpr) {
+				ast_node(se, SelectorExpr, se_expr);
+				lbValue len = {};
 
-			// lbValue a = {};
-			// a.value = LLVMGetOperand(field.value, 0);
-			// a.type = alloc_type_pointer(field.type);
+				Type *type = base_type(type_deref(type_of_expr(se->expr)));
+				GB_ASSERT_MSG(is_type_soa_struct(type), "%s", type_to_string(type));
+				if (type->Struct.soa_kind == StructSoa_Fixed) {
+					len = lb_const_int(p->module, t_int, type->Struct.soa_count);
+				} else {
+					lbAddr *found = map_get(&p->selector_addr, se_expr);
+					if (found) {
+						lbAddr addr = *found;
+						lbValue parent = lb_addr_get_ptr(p, addr);
+						if (is_type_pointer(type_deref(parent.type))) {
+							parent = lb_emit_load(p, parent);
+						}
+						len = lb_soa_struct_len(p, parent);
+					}
+				}
 
-			// irInstr *b = &a->Instr;
-			// GB_ASSERT(b->kind == irInstr_StructElementPtr);
-			// lbValue base_struct = b->StructElementPtr.address;
-
-			// GB_ASSERT(is_type_soa_struct(type_deref(ir_type(base_struct))));
-			// lbValue len = ir_soa_struct_len(p, base_struct);
-			// lb_emit_bounds_check(p, ast_token(ie->index), index, len);
+				if (len.value) {
+					lb_emit_bounds_check(p, ast_token(ie->index), index, len);
+				}
+			} else {
+				// TODO(bill): how do you even do bounds checking here?
+			}
 		}
 		lbValue val = lb_emit_ptr_offset(p, field, index);
 		return lb_addr(val);
@@ -4141,7 +4153,7 @@ gb_internal lbAddr lb_build_addr_slice_expr(lbProcedure *p, Ast *expr) {
 		if (se->high == nullptr) {
 			lbValue offset = base;
 			LLVMValueRef indices[1] = {low.value};
-			offset.value = LLVMBuildGEP2(p->builder, lb_type(p->module, offset.type->MultiPointer.elem), offset.value, indices, 1, "");
+			offset.value = LLVMBuildGEP2(p->builder, lb_type(p->module, base_type(offset.type)->MultiPointer.elem), offset.value, indices, 1, "");
 			lb_addr_store(p, res, offset);
 		} else {
 			low = lb_emit_conv(p, low, t_int);
@@ -4150,7 +4162,7 @@ gb_internal lbAddr lb_build_addr_slice_expr(lbProcedure *p, Ast *expr) {
 			lb_emit_multi_pointer_slice_bounds_check(p, se->open, low, high);
 
 			LLVMValueRef indices[1] = {low.value};
-			LLVMValueRef ptr = LLVMBuildGEP2(p->builder, lb_type(p->module, base.type->MultiPointer.elem), base.value, indices, 1, "");
+			LLVMValueRef ptr = LLVMBuildGEP2(p->builder, lb_type(p->module, base_type(base.type)->MultiPointer.elem), base.value, indices, 1, "");
 			LLVMValueRef len = LLVMBuildSub(p->builder, high.value, low.value, "");
 
 			LLVMValueRef gep0 = lb_emit_struct_ep(p, res.addr, 0).value;
@@ -4218,6 +4230,7 @@ gb_internal lbAddr lb_build_addr_slice_expr(lbProcedure *p, Ast *expr) {
 					lbValue field_dst = lb_emit_struct_ep(p, dst.addr, i);
 					lbValue field_src = lb_emit_struct_ep(p, lb_addr_get_ptr(p, addr), i);
 					field_src = lb_emit_array_ep(p, field_src, low);
+					field_src = lb_emit_conv(p, field_src, type_deref(field_dst.type));
 					lb_emit_store(p, field_dst, field_src);
 				}
 
@@ -4233,6 +4246,7 @@ gb_internal lbAddr lb_build_addr_slice_expr(lbProcedure *p, Ast *expr) {
 						lbValue field_dst = lb_emit_struct_ep(p, dst.addr, i);
 						lbValue field_src = lb_emit_struct_ev(p, base, i);
 						field_src = lb_emit_ptr_offset(p, field_src, low);
+						field_src = lb_emit_conv(p, field_src, type_deref(field_dst.type));
 						lb_emit_store(p, field_dst, field_src);
 					}
 
@@ -4247,6 +4261,7 @@ gb_internal lbAddr lb_build_addr_slice_expr(lbProcedure *p, Ast *expr) {
 					lbValue field_dst = lb_emit_struct_ep(p, dst.addr, i);
 					lbValue field_src = lb_emit_struct_ev(p, base, i);
 					field_src = lb_emit_ptr_offset(p, field_src, low);
+					field_src = lb_emit_conv(p, field_src, type_deref(field_dst.type));
 					lb_emit_store(p, field_dst, field_src);
 				}
 
@@ -4383,7 +4398,11 @@ gb_internal lbAddr lb_build_addr_compound_lit(lbProcedure *p, Ast *expr) {
 					mask = LLVMConstSub(mask, LLVMConstInt(lit, 1, false));
 
 					LLVMValueRef elem = values[i].value;
-					elem = LLVMBuildZExt(p->builder, elem, lit, "");
+					if (lb_sizeof(lit) < lb_sizeof(LLVMTypeOf(elem))) {
+						elem = LLVMBuildTrunc(p->builder, elem, lit, "");
+					} else {
+						elem = LLVMBuildZExt(p->builder, elem, lit, "");
+					}
 					elem = LLVMBuildAnd(p->builder, elem, mask, "");
 
 					elem = LLVMBuildShl(p->builder, elem, LLVMConstInt(lit, f.bit_offset, false), "");
@@ -4974,6 +4993,9 @@ gb_internal lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 					if (sub_sel.index.count > 0) {
 						item = lb_emit_deep_field_gep(p, item, sub_sel);
 					}
+					// make sure it's ^T and not [^]T
+					item.type = alloc_type_multi_pointer_to_pointer(item.type);
+
 					return lb_addr(item);
 				} else if (addr.kind == lbAddr_Swizzle) {
 					GB_ASSERT(sel.index.count > 0);
@@ -4983,6 +5005,11 @@ gb_internal lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 					GB_ASSERT(sel.index.count > 0);
 					// NOTE(bill): just patch the index in place
 					sel.index[0] = addr.swizzle.indices[sel.index[0]];
+				}
+
+				Type *atype = type_deref(lb_addr_type(addr));
+				if (is_type_soa_struct(atype)) {
+					map_set(&p->selector_addr, expr, addr);
 				}
 
 				lbValue a = lb_addr_get_ptr(p, addr);
@@ -5189,6 +5216,54 @@ gb_internal lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 	case_ast_node(oe, OrReturnExpr, expr);
 		lbValue ptr = lb_address_from_load_or_generate_local(p, lb_build_expr(p, expr));
 		return lb_addr(ptr);
+	case_end;
+
+
+	case_ast_node(be, OrBranchExpr, expr);
+		lbBlock *block = nullptr;
+
+		if (be->label != nullptr) {
+			lbBranchBlocks bb = lb_lookup_branch_blocks(p, be->label);
+			switch (be->token.kind) {
+			case Token_or_break:    block = bb.break_;    break;
+			case Token_or_continue: block = bb.continue_; break;
+			}
+		} else {
+			for (lbTargetList *t = p->target_list; t != nullptr && block == nullptr; t = t->prev) {
+				if (t->is_block) {
+					continue;
+				}
+
+				switch (be->token.kind) {
+				case Token_or_break:    block = t->break_;    break;
+				case Token_or_continue: block = t->continue_; break;
+				}
+			}
+		}
+
+		GB_ASSERT(block != nullptr);
+		TypeAndValue tv = expr->tav;
+
+		lbValue lhs = {};
+		lbValue rhs = {};
+		lb_emit_try_lhs_rhs(p, be->expr, tv, &lhs, &rhs);
+		Type *type = default_type(tv.type);
+		if (lhs.value) {
+			lhs = lb_emit_conv(p, lhs, type);
+		} else if (type != nullptr && type != t_invalid) {
+			lhs = lb_const_nil(p->module, type);
+		}
+
+		lbBlock *then  = lb_create_block(p, "or_branch.then");
+		lbBlock *else_ = lb_create_block(p, "or_branch.else");
+
+		lb_emit_if(p, lb_emit_try_has_value(p, rhs), then, else_);
+		lb_start_block(p, else_);
+		lb_emit_defer_stmts(p, lbDeferExit_Branch, block);
+		lb_emit_jump(p, block);
+		lb_start_block(p, then);
+
+		return lb_addr(lb_address_from_load_or_generate_local(p, lhs));
 	case_end;
 	}
 

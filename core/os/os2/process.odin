@@ -10,26 +10,32 @@ exit :: proc "contextless" (code: int) -> ! {
 	_exit(code)
 }
 
+@(require_results)
 get_uid :: proc() -> int {
 	return _get_uid()
 }
 
+@(require_results)
 get_euid :: proc() -> int {
 	return _get_euid()
 }
 
+@(require_results)
 get_gid :: proc() -> int {
 	return _get_gid()
 }
 
+@(require_results)
 get_egid :: proc() -> int {
 	return _get_euid()
 }
 
+@(require_results)
 get_pid :: proc() -> int {
 	return _get_pid()
 }
 
+@(require_results)
 get_ppid :: proc() -> int {
 	return _get_ppid()
 }
@@ -82,14 +88,17 @@ Signal_Handler :: union {
 	Signal_Handler_Special,
 }
 
+@(require_results)
 process_find :: proc(pid: int) -> (Process, Error) {
 	return _process_find(pid)
 }
 
+@(require_results)
 process_get_state :: proc(p: Process) -> (Process_State, Error) {
 	return _process_get_state(p)
 }
 
+@(require_results)
 process_start :: proc(name: string, argv: []string, attr: ^Process_Attributes = nil) -> (Process, Error) {
 	return _process_start(name, argv, attr)
 }

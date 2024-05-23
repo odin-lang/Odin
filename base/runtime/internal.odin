@@ -40,6 +40,24 @@ align_forward_int :: #force_inline proc(ptr, align: int) -> int {
 	return p
 }
 
+is_power_of_two_uint :: #force_inline proc "contextless" (x: uint) -> bool {
+	if x <= 0 {
+		return false
+	}
+	return (x & (x-1)) == 0
+}
+
+align_forward_uint :: #force_inline proc(ptr, align: uint) -> uint {
+	assert(is_power_of_two_uint(align))
+
+	p := ptr
+	modulo := p & (align-1)
+	if modulo != 0 {
+		p += align - modulo
+	}
+	return p
+}
+
 is_power_of_two_uintptr :: #force_inline proc "contextless" (x: uintptr) -> bool {
 	if x <= 0 {
 		return false
@@ -56,6 +74,18 @@ align_forward_uintptr :: #force_inline proc(ptr, align: uintptr) -> uintptr {
 		p += align - modulo
 	}
 	return p
+}
+
+is_power_of_two :: proc {
+	is_power_of_two_int,
+	is_power_of_two_uint,
+	is_power_of_two_uintptr,
+}
+
+align_forward :: proc {
+	align_forward_int,
+	align_forward_uint,
+	align_forward_uintptr,
 }
 
 mem_zero :: proc "contextless" (data: rawptr, len: int) -> rawptr {
@@ -801,6 +831,10 @@ truncsfhf2 :: proc "c" (value: f32) -> __float16 {
 	}
 }
 
+@(link_name="__aeabi_d2h", linkage=RUNTIME_LINKAGE, require=RUNTIME_REQUIRE)
+aeabi_d2h :: proc "c" (value: f64) -> __float16 {
+	return truncsfhf2(f32(value))
+}
 
 @(link_name="__truncdfhf2", linkage=RUNTIME_LINKAGE, require=RUNTIME_REQUIRE)
 truncdfhf2 :: proc "c" (value: f64) -> __float16 {

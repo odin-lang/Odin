@@ -3,11 +3,8 @@ package os2
 
 import "core:io"
 import "core:time"
-import "core:strings"
 import "base:runtime"
 import "core:sys/linux"
-
-INVALID_HANDLE :: -1
 
 _File :: struct {
 	name: string,
@@ -58,9 +55,9 @@ _file_allocator :: proc() -> runtime.Allocator {
 	return heap_allocator()
 }
 
-_open :: proc(name: string, flags: File_Flags, perm: File_Mode) -> (^File, Error) {
-	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
-	name_cstr := strings.clone_to_cstring(name, context.temp_allocator)
+_open :: proc(name: string, flags: File_Flags, perm: File_Mode) -> (f: ^File, err: Error) {
+	TEMP_ALLOCATOR_GUARD()
+	name_cstr := temp_cstring(name) or_return
 
 	// Just default to using O_NOCTTY because needing to open a controlling
 	// terminal would be incredibly rare. This has no effect on files while
@@ -88,18 +85,22 @@ _open :: proc(name: string, flags: File_Flags, perm: File_Mode) -> (^File, Error
 }
 
 _new_file :: proc(fd: uintptr, _: string = "") -> ^File {
-	file := new(File, _file_allocator())
+	file := new(File, file_allocator())
 	_construct_file(file, fd, "")
 	return file
 }
 
 _construct_file :: proc(file: ^File, fd: uintptr, _: string = "") {
-	file.impl.fd = linux.Fd(fd)
-	file.impl.allocator = _file_allocator()
-	file.impl.name = _get_full_path(file.impl.fd, file.impl.allocator)
-	file.stream = {
-		data = file,
-		procedure = _file_stream_proc,
+	file^ = {
+		impl = {
+			fd = linux.Fd(fd),
+			allocator = file_allocator(),
+			name = _get_full_path(file.impl.fd, file.impl.allocator),
+		},
+		stream = {
+			data = file,
+			procedure = _file_stream_proc,
+		},
 	}
 }
 
@@ -114,11 +115,14 @@ _destroy :: proc(f: ^File) -> Error {
 
 
 _close :: proc(f: ^File) -> Error {
+	if f == nil {
+		return nil
+	}
 	errno := linux.close(f.impl.fd)
 	if errno == .EBADF { // avoid possible double free
 		return _get_platform_error(errno)
 	}
-	_destroy(f) or_return
+	_destroy(f)
 	return _get_platform_error(errno)
 }
 
@@ -209,8 +213,8 @@ _truncate :: proc(f: ^File, size: i64) -> Error {
 }
 
 _remove :: proc(name: string) -> Error {
-	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
-	name_cstr := strings.clone_to_cstring(name, context.temp_allocator)
+	TEMP_ALLOCATOR_GUARD()
+	name_cstr := temp_cstring(name) or_return
 
 	fd, errno := linux.open(name_cstr, {.NOFOLLOW})
 	#partial switch (errno) {
@@ -228,26 +232,25 @@ _remove :: proc(name: string) -> Error {
 }
 
 _rename :: proc(old_name, new_name: string) -> Error {
-	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
-	old_name_cstr := strings.clone_to_cstring(old_name, context.temp_allocator)
-	new_name_cstr := strings.clone_to_cstring(new_name, context.temp_allocator)
+	TEMP_ALLOCATOR_GUARD()
+	old_name_cstr := temp_cstring(old_name) or_return
+	new_name_cstr := temp_cstring(new_name) or_return
 
 	return _get_platform_error(linux.rename(old_name_cstr, new_name_cstr))
 }
 
 _link :: proc(old_name, new_name: string) -> Error {
-	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
-	old_name_cstr := strings.clone_to_cstring(old_name, context.temp_allocator)
-	new_name_cstr := strings.clone_to_cstring(new_name, context.temp_allocator)
+	TEMP_ALLOCATOR_GUARD()
+	old_name_cstr := temp_cstring(old_name) or_return
+	new_name_cstr := temp_cstring(new_name) or_return
 
 	return _get_platform_error(linux.link(old_name_cstr, new_name_cstr))
 }
 
 _symlink :: proc(old_name, new_name: string) -> Error {
-	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
-	old_name_cstr := strings.clone_to_cstring(old_name, context.temp_allocator)
-	new_name_cstr := strings.clone_to_cstring(new_name, context.temp_allocator)
-
+	TEMP_ALLOCATOR_GUARD()
+	old_name_cstr := temp_cstring(old_name) or_return
+	new_name_cstr := temp_cstring(new_name) or_return
 	return _get_platform_error(linux.symlink(old_name_cstr, new_name_cstr))
 }
 
@@ -264,21 +267,20 @@ _read_link_cstr :: proc(name_cstr: cstring, allocator: runtime.Allocator) -> (st
 			delete(buf, allocator)
 			buf = make([]byte, bufsz, allocator)
 		} else {
-			s := string(buf[:sz])
-			return s, nil
+			return string(buf[:sz]), nil
 		}
 	}
 }
 
-_read_link :: proc(name: string, allocator: runtime.Allocator) -> (string, Error) {
-	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
-	name_cstr := strings.clone_to_cstring(name, context.temp_allocator)
+_read_link :: proc(name: string, allocator: runtime.Allocator) -> (s: string, e: Error) {
+	TEMP_ALLOCATOR_GUARD()
+	name_cstr := temp_cstring(name) or_return
 	return _read_link_cstr(name_cstr, allocator)
 }
 
 _chdir :: proc(name: string) -> Error {
-	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
-	name_cstr := strings.clone_to_cstring(name, context.temp_allocator)
+	TEMP_ALLOCATOR_GUARD()
+	name_cstr := temp_cstring(name) or_return
 	return _get_platform_error(linux.chdir(name_cstr))
 }
 
@@ -287,8 +289,8 @@ _fchdir :: proc(f: ^File) -> Error {
 }
 
 _chmod :: proc(name: string, mode: File_Mode) -> Error {
-	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
-	name_cstr := strings.clone_to_cstring(name, context.temp_allocator)
+	TEMP_ALLOCATOR_GUARD()
+	name_cstr := temp_cstring(name) or_return
 	return _get_platform_error(linux.chmod(name_cstr, transmute(linux.Mode)(u32(mode))))
 }
 
@@ -298,15 +300,15 @@ _fchmod :: proc(f: ^File, mode: File_Mode) -> Error {
 
 // NOTE: will throw error without super user priviledges
 _chown :: proc(name: string, uid, gid: int) -> Error {
-	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
-	name_cstr := strings.clone_to_cstring(name, context.temp_allocator)
+	TEMP_ALLOCATOR_GUARD()
+	name_cstr := temp_cstring(name) or_return
 	return _get_platform_error(linux.chown(name_cstr, linux.Uid(uid), linux.Gid(gid)))
 }
 
 // NOTE: will throw error without super user priviledges
 _lchown :: proc(name: string, uid, gid: int) -> Error {
-	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
-	name_cstr := strings.clone_to_cstring(name, context.temp_allocator)
+	TEMP_ALLOCATOR_GUARD()
+	name_cstr := temp_cstring(name) or_return
 	return _get_platform_error(linux.lchown(name_cstr, linux.Uid(uid), linux.Gid(gid)))
 }
 
@@ -316,8 +318,8 @@ _fchown :: proc(f: ^File, uid, gid: int) -> Error {
 }
 
 _chtimes :: proc(name: string, atime, mtime: time.Time) -> Error {
-	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
-	name_cstr := strings.clone_to_cstring(name, context.temp_allocator)
+	TEMP_ALLOCATOR_GUARD()
+	name_cstr := temp_cstring(name) or_return
 	times := [2]linux.Time_Spec {
 		{
 			uint(atime._nsec) / uint(time.Second),
@@ -328,9 +330,7 @@ _chtimes :: proc(name: string, atime, mtime: time.Time) -> Error {
 			uint(mtime._nsec) % uint(time.Second),
 		},
 	}
-	// TODO:
-	//return _get_platform_error(linux.utimensat(transmute(int)(linux.AT_FDCWD), name_cstr, &times, 0))
-	return _get_platform_error(linux.utimensat(-100, name_cstr, &times[0], nil))
+	return _get_platform_error(linux.utimensat(linux.AT_FDCWD, name_cstr, &times[0], nil))
 }
 
 _fchtimes :: proc(f: ^File, atime, mtime: time.Time) -> Error {
@@ -348,15 +348,15 @@ _fchtimes :: proc(f: ^File, atime, mtime: time.Time) -> Error {
 }
 
 _exists :: proc(name: string) -> bool {
-	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
-	name_cstr := strings.clone_to_cstring(name, context.temp_allocator)
+	TEMP_ALLOCATOR_GUARD()
+	name_cstr, _ := temp_cstring(name)
 	res, errno := linux.access(name_cstr, linux.F_OK)
 	return !res && errno == .NONE
 }
 
 _is_file :: proc(name: string) -> bool {
-	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
-	name_cstr := strings.clone_to_cstring(name, context.temp_allocator)
+	TEMP_ALLOCATOR_GUARD()
+	name_cstr, _ := temp_cstring(name)
 	s: linux.Stat
 	if linux.stat(name_cstr, &s) != .NONE {
 		return false
@@ -373,8 +373,8 @@ _is_file_fd :: proc(fd: linux.Fd) -> bool {
 }
 
 _is_dir :: proc(name: string) -> bool {
-	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
-	name_cstr := strings.clone_to_cstring(name, context.temp_allocator)
+	TEMP_ALLOCATOR_GUARD()
+	name_cstr, _ := temp_cstring(name)
 	s: linux.Stat
 	if linux.stat(name_cstr, &s) != .NONE {
 		return false
@@ -398,13 +398,13 @@ _is_dir_fd :: proc(fd: linux.Fd) -> bool {
  */
 _read_entire_pseudo_file :: proc { _read_entire_pseudo_file_string, _read_entire_pseudo_file_cstring }
 
-_read_entire_pseudo_file_string :: proc(name: string, allocator := context.allocator) -> ([]u8, Error) {
-	name_cstr := strings.clone_to_cstring(name, allocator)
+_read_entire_pseudo_file_string :: proc(name: string, allocator: runtime.Allocator) -> (b: []u8, e: Error) {
+	name_cstr := clone_to_cstring(name, allocator) or_return
 	defer delete(name, allocator)
-	return _read_entire_pseudo_file_cstring(name_cstr)
+	return _read_entire_pseudo_file_cstring(name_cstr, allocator)
 }
 
-_read_entire_pseudo_file_cstring :: proc(name: cstring, allocator := context.allocator) -> ([]u8, Error) {
+_read_entire_pseudo_file_cstring :: proc(name: cstring, allocator: runtime.Allocator) -> ([]u8, Error) {
 	fd, errno := linux.open(name, {})
 	if errno != .NONE {
 		return nil, _get_platform_error(errno)

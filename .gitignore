@@ -323,3 +323,5 @@ build.sh
 
 # RAD debugger project file
 *.raddbg
+
+misc/featuregen/featuregen

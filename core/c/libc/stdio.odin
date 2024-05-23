@@ -83,7 +83,7 @@ when ODIN_OS == .Linux {
 	}
 }
 
-when ODIN_OS == .OpenBSD {
+when ODIN_OS == .OpenBSD || ODIN_OS == .NetBSD {
 	fpos_t :: distinct i64
 
 	_IOFBF :: 0

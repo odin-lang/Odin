@@ -1,13 +1,13 @@
 //+private
 package os2
 
-import "core:strings"
 import "core:strconv"
 import "base:runtime"
 import "core:sys/linux"
 
-_Path_Separator      :: '/'
-_Path_List_Separator :: ':'
+_Path_Separator        :: '/'
+_Path_Separator_String :: "/"
+_Path_List_Separator   :: ':'
 
 _OPENDIR_FLAGS : linux.Open_Flags : {.NONBLOCK, .DIRECTORY, .LARGEFILE, .CLOEXEC}
 
@@ -16,22 +16,21 @@ _is_path_separator :: proc(c: byte) -> bool {
 }
 
 _mkdir :: proc(path: string, perm: File_Mode) -> Error {
-	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	// TODO: These modes would require mknod, however, that would also
 	//       require additional arguments to this function..
 	if perm & (File_Mode_Named_Pipe | File_Mode_Device | File_Mode_Char_Device | File_Mode_Sym_Link) != 0 {
 		return .Invalid_Argument
 	}
 
-	path_cstr := strings.clone_to_cstring(path, context.temp_allocator)
+	TEMP_ALLOCATOR_GUARD()
+	path_cstr := temp_cstring(path) or_return
 	return _get_platform_error(linux.mkdir(path_cstr, transmute(linux.Mode)(u32(perm) & 0o777)))
 }
 
 _mkdir_all :: proc(path: string, perm: File_Mode) -> Error {
-	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	mkdirat :: proc(dfd: linux.Fd, path: []u8, perm: int, has_created: ^bool) -> Error {
 		i: int
-		for /**/; i < len(path) - 1 && path[i] != '/'; i += 1 {}
+		for ; i < len(path) - 1 && path[i] != '/'; i += 1 {}
 		if i == 0 {
 			return _get_platform_error(linux.close(dfd))
 		}
@@ -65,8 +64,9 @@ _mkdir_all :: proc(path: string, perm: File_Mode) -> Error {
 		return .Invalid_Argument
 	}
 
+	TEMP_ALLOCATOR_GUARD()
 	// need something we can edit, and use to generate cstrings
-	path_bytes := make([]u8, len(path) + 1, context.temp_allocator)
+	path_bytes := make([]u8, len(path) + 1, temp_allocator())
 
 	// zero terminate the byte slice to make it a valid cstring
 	copy(path_bytes, path)
@@ -163,7 +163,8 @@ _remove_all :: proc(path: string) -> Error {
 		return nil
 	}
 
-	path_cstr := strings.clone_to_cstring(path, context.temp_allocator)
+	TEMP_ALLOCATOR_GUARD()
+	path_cstr := temp_cstring(path) or_return
 
 	fd, errno := linux.open(path_cstr, _OPENDIR_FLAGS)
 	#partial switch errno {
@@ -201,7 +202,7 @@ _getwd :: proc(allocator: runtime.Allocator) -> (string, Error) {
 }
 
 _setwd :: proc(dir: string) -> Error {
-	dir_cstr := strings.clone_to_cstring(dir, context.temp_allocator)
+	dir_cstr := temp_cstring(dir) or_return
 	return _get_platform_error(linux.chdir(dir_cstr))
 }
 

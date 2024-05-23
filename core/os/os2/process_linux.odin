@@ -50,7 +50,7 @@ _get_ppid :: proc() -> int {
 Process_Attributes_OS_Specific :: struct {}
 
 _process_find :: proc(pid: int) -> (Process, Error) {
-	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
+	TEMP_ALLOCATOR_GUARD()
 	pid_path := fmt.ctprintf("/proc/%d", pid)
 
 	p: Process
@@ -71,11 +71,11 @@ _process_find :: proc(pid: int) -> (Process, Error) {
 }
 
 _process_get_state :: proc(p: Process) -> (state: Process_State, err: Error) {
-	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
+	TEMP_ALLOCATOR_GUARD()
 
 	stat_name := fmt.ctprintf("/proc/%d/stat", p.pid)
 	stat_buf: []u8
-	stat_buf, err = _read_entire_pseudo_file(stat_name, context.temp_allocator)
+	stat_buf, err = _read_entire_pseudo_file(stat_name, temp_allocator())
 
 	if err != nil {
 		return
@@ -106,15 +106,13 @@ _process_get_state :: proc(p: Process) -> (state: Process_State, err: Error) {
 	return
 }
 
-_process_start :: proc(name: string, argv: []string, attr: ^Process_Attributes) -> (Process, Error) {
-	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
+_process_start :: proc(name: string, argv: []string, attr: ^Process_Attributes) -> (child: Process, err: Error) {
+	TEMP_ALLOCATOR_GUARD()
 
-	child: Process
-
-	dir_fd : linux.Fd = -100
+	dir_fd := linux.AT_FDCWD
 	errno: linux.Errno
 	if attr != nil && attr.dir != "" {
-		dir_cstr := strings.clone_to_cstring(attr.dir, context.temp_allocator)
+		dir_cstr := temp_cstring(attr.dir) or_return
 		if dir_fd, errno = linux.open(dir_cstr, _OPENDIR_FLAGS); errno != .NONE {
 			return child, _get_platform_error(errno)
 		}
@@ -123,8 +121,8 @@ _process_start :: proc(name: string, argv: []string, attr: ^Process_Attributes) 
 	// search PATH if just a plain name is provided
 	executable: cstring
 	if !strings.contains_rune(name, '/') {
-		path_env := get_env("PATH", context.temp_allocator)
-		path_dirs := filepath.split_list(path_env, context.temp_allocator)
+		path_env := get_env("PATH", temp_allocator())
+		path_dirs := filepath.split_list(path_env, temp_allocator())
 		found: bool
 		for dir in path_dirs {
 			executable = fmt.ctprintf("%s/%s", dir, name)
@@ -143,7 +141,7 @@ _process_start :: proc(name: string, argv: []string, attr: ^Process_Attributes) 
 			}
 		}
 	} else {
-		executable = strings.clone_to_cstring(name, context.temp_allocator)
+		executable = temp_cstring(name) or_return
 	}
 
 	not_exec: bool
@@ -154,21 +152,21 @@ _process_start :: proc(name: string, argv: []string, attr: ^Process_Attributes) 
 	// args and environment need to be a list of cstrings
 	// that are terminated by a nil pointer.
 	// The first argument is a copy of the executable name.
-	cargs := make([]cstring, len(argv) + 2, context.temp_allocator)
+	cargs := make([]cstring, len(argv) + 2, temp_allocator())
 	cargs[0] = executable
 	for i := 0; i < len(argv); i += 1 {
-		cargs[i + 1] = strings.clone_to_cstring(argv[i], context.temp_allocator)
+		cargs[i + 1] = temp_cstring(argv[i]) or_return
 	}
 
 	// Use current process's environment if attributes not provided
 	env: [^]cstring
 	if attr == nil {
 		// take this process's current environment
-		env = raw_data(export_cstring_environment(context.temp_allocator))
+		env = raw_data(export_cstring_environment(temp_allocator()))
 	} else {
-		cenv := make([]cstring, len(attr.env) + 1, context.temp_allocator)
+		cenv := make([]cstring, len(attr.env) + 1, temp_allocator())
 		for i := 0; i < len(attr.env); i += 1 {
-			cenv[i] = strings.clone_to_cstring(attr.env[i], context.temp_allocator)
+			cenv[i] = temp_cstring(attr.env[i]) or_return
 		}
 		env = &cenv[0]
 	}
@@ -209,25 +207,32 @@ _process_start :: proc(name: string, argv: []string, attr: ^Process_Attributes) 
 		return child, _get_platform_error(errno)
 	}
 
+	IN  :: 1
+	OUT :: 0
+
+	STDIN  :: linux.Fd(0)
+	STDOUT :: linux.Fd(1)
+	STDERR :: linux.Fd(2)
+
 	if pid == 0 {
 		// in child process now
 		if attr != nil && attr.stdin != nil {
-			if linux.close(stdin_fds[1]) != .NONE { linux.exit(1) }
-			if _, errno = linux.dup2(stdin_fds[0], 0); errno != .NONE { linux.exit(1) }
-			if linux.close(stdin_fds[0]) != .NONE { linux.exit(1) }
+			if linux.close(stdin_fds[IN]) != .NONE { linux.exit(1) }
+			if _, errno = linux.dup2(stdin_fds[OUT], STDIN); errno != .NONE { linux.exit(1) }
+			if linux.close(stdin_fds[OUT]) != .NONE { linux.exit(1) }
 		}
 		if attr != nil && attr.stdout != nil {
-			if linux.close(stdout_fds[0]) != .NONE { linux.exit(1) }
-			if _, errno = linux.dup2(stdout_fds[1], 1); errno != .NONE { linux.exit(1) }
-			if linux.close(stdout_fds[1]) != .NONE { linux.exit(1) }
+			if linux.close(stdout_fds[OUT]) != .NONE { linux.exit(1) }
+			if _, errno = linux.dup2(stdout_fds[IN], STDOUT); errno != .NONE { linux.exit(1) }
+			if linux.close(stdout_fds[IN]) != .NONE { linux.exit(1) }
 		}
 		if attr != nil && attr.stderr != nil {
-			if linux.close(stderr_fds[0]) != .NONE { linux.exit(1) }
-			if _, errno = linux.dup2(stderr_fds[1], 2); errno != .NONE { linux.exit(1) }
-			if linux.close(stderr_fds[1]) != .NONE { linux.exit(1) }
+			if linux.close(stderr_fds[OUT]) != .NONE { linux.exit(1) }
+			if _, errno = linux.dup2(stderr_fds[IN], STDERR); errno != .NONE { linux.exit(1) }
+			if linux.close(stderr_fds[IN]) != .NONE { linux.exit(1) }
 		}
 
-		if errno = linux.execveat(dir_fd, executable, &cargs[0], env); errno != .NONE {
+		if errno = linux.execveat(dir_fd, executable, &cargs[OUT], env); errno != .NONE {
 			print_error(_get_platform_error(errno), string(executable))
 			panic("execve failed to replace process")
 		}
@@ -236,16 +241,16 @@ _process_start :: proc(name: string, argv: []string, attr: ^Process_Attributes) 
 
 	// in parent process
 	if attr != nil && attr.stdin != nil {
-		linux.close(stdin_fds[0])
-		_construct_file(attr.stdin, uintptr(stdin_fds[1]))
+		linux.close(stdin_fds[OUT])
+		_construct_file(attr.stdin, uintptr(stdin_fds[IN]))
 	}
 	if attr != nil && attr.stdout != nil {
-		linux.close(stdout_fds[1])
-		_construct_file(attr.stdout, uintptr(stdout_fds[0]))
+		linux.close(stdout_fds[IN])
+		_construct_file(attr.stdout, uintptr(stdout_fds[OUT]))
 	}
 	if attr != nil && attr.stderr != nil {
-		linux.close(stderr_fds[1])
-		_construct_file(attr.stderr, uintptr(stderr_fds[0]))
+		linux.close(stderr_fds[IN])
+		_construct_file(attr.stderr, uintptr(stderr_fds[OUT]))
 	}
 
 	child.pid = int(pid)

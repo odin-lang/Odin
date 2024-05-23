@@ -85,8 +85,6 @@ enum EntityFlag : u64 {
 	EntityFlag_Require = 1ull<<50,
 	EntityFlag_ByPtr   = 1ull<<51, // enforce parameter is passed by pointer
 
-	EntityFlag_OldForOrSwitchValue = 1ull<<52,
-
 	EntityFlag_Overridden    = 1ull<<63,
 };
 
@@ -210,6 +208,7 @@ struct Entity {
 			CommentGroup *comment;
 		} Constant;
 		struct {
+			Ast *type_expr; // only used for some variables within procedure bodies
 			Ast *init_expr; // only used for some variables within procedure bodies
 			i32  field_index;
 			i32  field_group_index;
@@ -252,10 +251,8 @@ struct Entity {
 			bool    is_foreign                 : 1;
 			bool    is_export                  : 1;
 			bool    generated_from_polymorphic : 1;
-			bool    target_feature_disabled    : 1;
 			bool    entry_point_only           : 1;
 			bool    has_instrumentation        : 1;
-			String  target_feature;
 		} Procedure;
 		struct {
 			Array<Entity *> entities;

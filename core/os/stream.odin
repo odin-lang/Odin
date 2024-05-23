@@ -32,7 +32,7 @@ _file_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, 
 		}
 
 	case .Read_At:
-		when !(ODIN_OS == .FreeBSD || ODIN_OS == .OpenBSD || ODIN_OS == .Haiku) {
+		when !(ODIN_OS == .FreeBSD || ODIN_OS == .OpenBSD || ODIN_OS == .NetBSD || ODIN_OS == .Haiku) {
 			n_int, os_err = read_at(fd, p, offset)
 			n = i64(n_int)
 			if n == 0 && os_err == 0 {
@@ -46,7 +46,7 @@ _file_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, 
 			err = .EOF
 		}
 	case .Write_At:
-		when !(ODIN_OS == .FreeBSD || ODIN_OS == .OpenBSD || ODIN_OS == .Haiku) {
+		when !(ODIN_OS == .FreeBSD || ODIN_OS == .OpenBSD || ODIN_OS == .NetBSD || ODIN_OS == .Haiku) {
 			n_int, os_err = write_at(fd, p, offset)
 			n = i64(n_int)
 			if n == 0 && os_err == 0 {
@@ -60,7 +60,7 @@ _file_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, 
 	case .Destroy:
 		err = .Empty
 	case .Query:
-		when ODIN_OS == .FreeBSD || ODIN_OS == .OpenBSD || ODIN_OS == .Haiku {
+		when ODIN_OS == .FreeBSD || ODIN_OS == .OpenBSD || ODIN_OS == .NetBSD || ODIN_OS == .Haiku {
 			return io.query_utility({.Close, .Flush, .Read, .Write, .Seek, .Size, .Query})
 		} else {
 			return io.query_utility({.Close, .Flush, .Read, .Read_At, .Write, .Write_At, .Seek, .Size, .Query})

@@ -2157,6 +2157,16 @@ gb_internal void lb_build_if_stmt(lbProcedure *p, Ast *node) {
 	lb_open_scope(p, is->scope); // Scope #1
 	defer (lb_close_scope(p, lbDeferExit_Default, nullptr));
 
+	lbBlock *then = lb_create_block(p, "if.then");
+	lbBlock *done = lb_create_block(p, "if.done");
+	lbBlock *else_ = done;
+	if (is->else_stmt != nullptr) {
+		else_ = lb_create_block(p, "if.else");
+	}
+	if (is->label != nullptr) {
+		lbTargetList *tl = lb_push_target_list(p, is->label, done, nullptr, nullptr);
+		tl->is_block = true;
+	}
 	if (is->init != nullptr) {
 		lbBlock *init = lb_create_block(p, "if.init");
 		lb_emit_jump(p, init);
@@ -2164,22 +2174,12 @@ gb_internal void lb_build_if_stmt(lbProcedure *p, Ast *node) {
 
 		lb_build_stmt(p, is->init);
 	}
-	lbBlock *then = lb_create_block(p, "if.then");
-	lbBlock *done = lb_create_block(p, "if.done");
-	lbBlock *else_ = done;
-	if (is->else_stmt != nullptr) {
-		else_ = lb_create_block(p, "if.else");
-	}
 
 	lbValue cond = lb_build_cond(p, is->cond, then, else_);
 	// Note `cond.value` only set for non-and/or conditions and const negs so that the `LLVMIsConstant()`
 	// and `LLVMConstIntGetZExtValue()` calls below will be valid and `LLVMInstructionEraseFromParent()`
 	// will target the correct (& only) branch statement
 
-	if (is->label != nullptr) {
-		lbTargetList *tl = lb_push_target_list(p, is->label, done, nullptr, nullptr);
-		tl->is_block = true;
-	}
 
 	if (cond.value && LLVMIsConstant(cond.value)) {
 		// NOTE(bill): Do a compile time short circuit for when the condition is constantly known.
@@ -2244,15 +2244,6 @@ gb_internal void lb_build_for_stmt(lbProcedure *p, Ast *node) {
 	if (p->debug_info != nullptr) {
 		LLVMSetCurrentDebugLocation2(p->builder, lb_debug_location_from_ast(p, node));
 	}
-
-	if (fs->init != nullptr) {
-	#if 1
-		lbBlock *init = lb_create_block(p, "for.init");
-		lb_emit_jump(p, init);
-		lb_start_block(p, init);
-	#endif
-		lb_build_stmt(p, fs->init);
-	}
 	lbBlock *body = lb_create_block(p, "for.body");
 	lbBlock *done = lb_create_block(p, "for.done"); // NOTE(bill): Append later
 	lbBlock *loop = body;
@@ -2262,6 +2253,17 @@ gb_internal void lb_build_for_stmt(lbProcedure *p, Ast *node) {
 	lbBlock *post = loop;
 	if (fs->post != nullptr) {
 		post = lb_create_block(p, "for.post");
+	}
+
+	lb_push_target_list(p, fs->label, done, post, nullptr);
+
+	if (fs->init != nullptr) {
+	#if 1
+		lbBlock *init = lb_create_block(p, "for.init");
+		lb_emit_jump(p, init);
+		lb_start_block(p, init);
+	#endif
+		lb_build_stmt(p, fs->init);
 	}
 
 	lb_emit_jump(p, loop);
@@ -2276,7 +2278,6 @@ gb_internal void lb_build_for_stmt(lbProcedure *p, Ast *node) {
 		lb_start_block(p, body);
 	}
 
-	lb_push_target_list(p, fs->label, done, post, nullptr);
 
 	lb_build_stmt(p, fs->body);
 

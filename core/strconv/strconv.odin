@@ -727,10 +727,10 @@ Example:
 	import "core:strconv"
 	parse_f32_example :: proc() {
 		n, ok := strconv.parse_f32("1234eee")
-		fmt.println(n, ok)
+		fmt.printfln("%.3f %v", n, ok)
 
 		n, ok = strconv.parse_f32("5678e2")
-		fmt.println(n, ok)
+		fmt.printfln("%.3f %v", n, ok)
 	}
 	
 Output:
@@ -760,10 +760,10 @@ Example:
 	import "core:strconv"
 	parse_f64_example :: proc() {
 		n, ok := strconv.parse_f64("1234eee")
-		fmt.println(n, ok)
+		fmt.printfln("%.3f %v", n, ok)
 
 		n, ok = strconv.parse_f64("5678e2")
-		fmt.println(n, ok)
+		fmt.printfln("%.3f %v", n, ok)
 	}
 	
 Output:
@@ -796,10 +796,10 @@ Example:
 	import "core:strconv"
 	parse_f32_prefix_example :: proc() {
 		n, _, ok := strconv.parse_f32_prefix("1234eee")
-		fmt.println(n, ok)
+		fmt.printfln("%.3f %v", n, ok)
 
 		n, _, ok = strconv.parse_f32_prefix("5678e2")
-		fmt.println(n, ok)
+		fmt.printfln("%.3f %v", n, ok)
 	}
 	
 Output:
@@ -831,10 +831,10 @@ Example:
 	import "core:strconv"
 	parse_f64_prefix_example :: proc() {
 		n, _, ok := strconv.parse_f64_prefix("12.34eee")
-		fmt.println(n, ok)
+		fmt.printfln("%.3f %v", n, ok)
 
 		n, _, ok = strconv.parse_f64_prefix("12.34e2")
-		fmt.println(n, ok)
+		fmt.printfln("%.3f %v", n, ok)
 	}
 
 Output:
@@ -1283,7 +1283,7 @@ Example:
 	import "core:fmt"
 	import "core:strconv"
 	atof_example :: proc() {
-		fmt.println(strconv.atof("3.14"))
+		fmt.printfln("%.3f", strconv.atof("3.14"))
 	}
 
 Output:

@@ -2,16 +2,16 @@
 package os2
 
 import "base:runtime"
+import "base:intrinsics"
 
 import "core:sync"
 import "core:slice"
 import "core:strings"
-import "core:intrinsics"
 
 // TODO: IF NO_CRT:
 //         Override the libc environment functions' weak linkage to
 //         allow us to interact with 3rd party code that DOES link
-//         to libc.  Otherwise, our environment can be out of sync.
+//         to libc. Otherwise, our environment can be out of sync.
 //       ELSE:
 //         Just use the libc.
 
@@ -48,7 +48,8 @@ _lookup_env :: proc(key: string, allocator: runtime.Allocator) -> (value: string
 	}
 
 	if v, idx := _lookup(key); idx != -1 {
-		return strings.clone(v, allocator), true
+		found = true
+		value, _ = clone_string(v, allocator)
 	}
 	return
 }
@@ -157,7 +158,7 @@ _environ :: proc(allocator: runtime.Allocator) -> []string {
 	sync.mutex_lock(&_env_mutex)
 	defer sync.mutex_unlock(&_env_mutex)
 	for entry, i in _env {
-		env[i] = strings.clone_from(raw_data(entry), len(entry))
+		env[i], _ = clone_string(entry, allocator)
 	}
 	return env
 }
@@ -192,7 +193,6 @@ _build_env :: proc() {
 		return
 	}
 
-	// Use heap allocator since context.allocator isn't safe here
 	_env = make(type_of(_env), heap_allocator())
 	cstring_env := _get_original_env()
 	_org_env_begin = uintptr(rawptr(cstring_env[0]))
@@ -219,7 +219,6 @@ _kv_from_entry :: #force_inline proc(entry: string) -> (k, v: string) {
 	return entry[:eq_idx], entry[eq_idx + 1:]
 }
 
-// val is expected to be inside of _env and key is not.
 _kv_addr_from_val :: #force_inline proc(val: string, key: string) -> ([^]u8, [^]u8) {
 	v_addr := raw_data(val)
 	k_addr := ([^]u8)(&v_addr[-(len(key) + 1)])

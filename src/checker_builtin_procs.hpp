@@ -44,6 +44,8 @@ enum BuiltinProcId {
 	// "Intrinsics"
 	BuiltinProc_is_package_imported,
 
+	BuiltinProc_has_target_feature,
+
 	BuiltinProc_transpose,
 	BuiltinProc_outer_product,
 	BuiltinProc_hadamard_product,
@@ -254,6 +256,9 @@ BuiltinProc__type_simple_boolean_begin,
 
 BuiltinProc__type_simple_boolean_end,
 
+	BuiltinProc_type_is_matrix_row_major,
+	BuiltinProc_type_is_matrix_column_major,
+
 	BuiltinProc_type_has_field,
 	BuiltinProc_type_field_type,
 
@@ -266,6 +271,9 @@ BuiltinProc__type_simple_boolean_end,
 	BuiltinProc_type_union_variant_count,
 	BuiltinProc_type_variant_type_of,
 	BuiltinProc_type_variant_index_of,
+
+	BuiltinProc_type_bit_set_elem_type,
+	BuiltinProc_type_bit_set_underlying_type,
 
 	BuiltinProc_type_struct_field_count,
 
@@ -353,6 +361,8 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 
 	// "Intrinsics"
 	{STR_LIT("is_package_imported"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+
+	{STR_LIT("has_target_feature"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("transpose"),        1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("outer_product"),    2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
@@ -560,6 +570,9 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("type_has_nil"),              1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT(""), 0, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
 
+	{STR_LIT("type_is_matrix_row_major"),    1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("type_is_matrix_column_major"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+
 	{STR_LIT("type_has_field"),            2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_field_type"),           2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
@@ -572,6 +585,9 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("type_union_variant_count"),    1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_variant_type_of"),        2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_variant_index_of"),       2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+
+	{STR_LIT("type_bit_set_elem_type"),       1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("type_bit_set_underlying_type"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("type_struct_field_count"),   1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 

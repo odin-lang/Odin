@@ -12,6 +12,7 @@ Memory_Block :: struct {
 	capacity:  uint,
 }
 
+// NOTE: This is for internal use, prefer `Arena` from `core:mem/virtual` if necessary
 Arena :: struct {
 	backing_allocator:  Allocator,
 	curr_block:         ^Memory_Block,
