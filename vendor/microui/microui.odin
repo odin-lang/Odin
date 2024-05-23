@@ -984,16 +984,6 @@ checkbox :: proc(ctx: ^Context, label: string, state: ^bool) -> (res: Result_Set
 }
 
 textbox_raw :: proc(ctx: ^Context, textbuf: []u8, textlen: ^int, id: Id, r: Rect, opt := Options{}) -> (res: Result_Set) {
-	try_input_string :: proc(state: ^textedit.State, textbuf: []u8, textlen: ^int, s: string) -> bool {
-		n := min(len(textbuf) - textlen^, len(s))
-		if n > 0 {
-			textedit.input_text(state, s[:n])
-			textlen^ = strings.builder_len(state.builder^)
-			return true
-		}
-		return false
-	}
-
 	update_control(ctx, id, r, opt | {.HOLD_FOCUS})
 
 	font := ctx.style.font
@@ -1014,7 +1004,12 @@ textbox_raw :: proc(ctx: ^Context, textbuf: []u8, textlen: ^int, id: Id, r: Rect
 		}
 
 		/* handle text input */
-		if try_input_string(&ctx.textbox_state, textbuf, textlen, strings.to_string(ctx.text_input)) do res += {.CHANGE}
+		if strings.builder_len(ctx.text_input) > 0 {
+			if textedit.input_text(&ctx.textbox_state, strings.to_string(ctx.text_input)) > 0 {
+				textlen^ = strings.builder_len(builder)
+				res += {.CHANGE}
+			}
+		}
 		/* handle ctrl+a */
 		if .A in ctx.key_pressed_bits && .CTRL in ctx.key_down_bits && .ALT not_in ctx.key_down_bits {
 			ctx.textbox_state.selection = {textlen^, 0}
@@ -1032,10 +1027,9 @@ textbox_raw :: proc(ctx: ^Context, textbuf: []u8, textlen: ^int, id: Id, r: Rect
 		}
 		/* handle ctrl+v */
 		if .V in ctx.key_pressed_bits && .CTRL in ctx.key_down_bits && .ALT not_in ctx.key_down_bits {
-			if ctx.textbox_state.get_clipboard != nil {
-				if s, ok := ctx.textbox_state.get_clipboard(ctx.textbox_state.clipboard_user_data); ok {
-					if try_input_string(&ctx.textbox_state, textbuf, textlen, s) do res += {.CHANGE}
-				}
+			if textedit.paste(&ctx.textbox_state) {
+				textlen^ = strings.builder_len(builder)
+				res += {.CHANGE}
 			}
 		}
 		/* handle left/right */
