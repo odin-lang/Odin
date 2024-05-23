@@ -234,6 +234,7 @@ enum BuildFlagKind {
 	BuildFlag_ShowMoreTimings,
 	BuildFlag_ExportTimings,
 	BuildFlag_ExportTimingsFile,
+	BuildFlag_ExportDependencies,
 	BuildFlag_ShowSystemCalls,
 	BuildFlag_ThreadCount,
 	BuildFlag_KeepTempFiles,
@@ -319,7 +320,6 @@ enum BuildFlagKind {
 	BuildFlag_WindowsPdbName,
 	BuildFlag_Subsystem,
 #endif
-
 
 	BuildFlag_COUNT,
 };
@@ -427,6 +427,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_ShowMoreTimings,         str_lit("show-more-timings"),         BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_ExportTimings,           str_lit("export-timings"),            BuildFlagParam_String,  Command__does_check);
 	add_flag(&build_flags, BuildFlag_ExportTimingsFile,       str_lit("export-timings-file"),       BuildFlagParam_String,  Command__does_check);
+	add_flag(&build_flags, BuildFlag_ExportDependencies,      str_lit("export-dependencies"),  BuildFlagParam_String,  Command__does_check);
 	add_flag(&build_flags, BuildFlag_ShowUnused,              str_lit("show-unused"),               BuildFlagParam_None,    Command_check);
 	add_flag(&build_flags, BuildFlag_ShowUnusedWithLocation,  str_lit("show-unused-with-location"), BuildFlagParam_None,    Command_check);
 	add_flag(&build_flags, BuildFlag_ShowSystemCalls,         str_lit("show-system-calls"),         BuildFlagParam_None,    Command_all);
@@ -752,6 +753,19 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							}
 
 							break;
+						}
+						case BuildFlag_ExportDependencies: {
+							GB_ASSERT(value.kind == ExactValue_String);
+
+							String export_path = string_trim_whitespace(value.value_string);
+							if (is_build_flag_path_valid(export_path)) {
+								build_context.export_dependencies_file = path_to_full_path(heap_allocator(), export_path);
+							} else {
+								gb_printf_err("Invalid -export-dependencies path, got %.*s\n", LIT(export_path));
+								bad_flags = true;
+							}
+							
+							break;	
 						}
 						case BuildFlag_ShowSystemCalls: {
 							GB_ASSERT(value.kind == ExactValue_Invalid);
@@ -1788,6 +1802,11 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 		print_usage_line(1, "-export-timings-file:<filename>");
 		print_usage_line(2, "Specifies the filename for `-export-timings`.");
 		print_usage_line(2, "Example: -export-timings-file:timings.json");
+		print_usage_line(0, "");
+
+		print_usage_line(1, "-export-dependencies:<filename>");
+		print_usage_line(2, "Exports all source files used to create the output file in Make format.");
+		print_usage_line(2, "Example: -export-dependencies:odin.d");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-thread-count:<integer>");
@@ -2916,10 +2935,35 @@ int main(int arg_count, char const **arg_ptr) {
 		show_timings(checker, &global_timings);
 	}
 
-	if (run_output) {
-		String exe_name = path_to_string(heap_allocator(), build_context.build_paths[BuildPath_Output]);
-		defer (gb_free(heap_allocator(), exe_name.text));
+	String exe_name = path_to_string(heap_allocator(), build_context.build_paths[BuildPath_Output]);
+	defer (gb_free(heap_allocator(), exe_name.text));
 
+	if (build_context.export_dependencies_file.len > 0) {
+		gbFile f = {};
+		char * fileName = (char *)build_context.export_dependencies_file.text;
+		gbFileError err = gb_file_open_mode(&f, gbFileMode_Write, fileName);
+		if (err != gbFileError_None) {
+			gb_printf_err("Failed to export dependencies to: %s\n", fileName);
+			exit_with_errors();
+			return 1;
+		}
+		defer (gb_file_close(&f));
+
+		gb_fprintf(&f, "%.*s:", LIT(exe_name));
+
+		for (isize i = parser->packages.count-1; i >= 0; i--) {
+			AstPackage *pkg = parser->packages[i];
+			for (isize j = pkg->files.count-1; j >= 0; j--) {
+				AstFile *file = pkg->files[j];
+
+				gb_fprintf(&f, " \\\n  %.*s", LIT(file->fullpath));
+			}
+		}
+
+		gb_fprintf(&f, "\n");
+	}
+
+	if (run_output) {
 		return system_exec_command_line_app("odin run", "\"%.*s\" %.*s", LIT(exe_name), LIT(run_args_string));
 	}
 	return 0;
