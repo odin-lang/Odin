@@ -7,7 +7,6 @@ package text_edit
 */
 
 import "base:runtime"
-import "core:fmt"
 import "core:time"
 import "core:mem"
 import "core:strings"
@@ -239,7 +238,7 @@ insert :: proc(s: ^State, at: int, text: string) -> int {
 			for is_continuation_byte(text[n]) {
 				n -= 1
 			}
-			if ok, _ := inject_at(&s.builder.buf, at, text[:n]); !ok {
+			if ok2, _ := inject_at(&s.builder.buf, at, text[:n]); !ok2 {
 				n = 0
 			}
 			return n

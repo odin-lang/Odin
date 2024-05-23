@@ -29,7 +29,6 @@ import "core:sort"
 import "core:strings"
 import "core:strconv"
 import "core:math"
-import "core:mem"
 import textedit "core:text/edit"
 
 COMMAND_LIST_SIZE    :: #config(MICROUI_COMMAND_LIST_SIZE,    256 * 1024)
