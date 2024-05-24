@@ -91,9 +91,7 @@ import virtual          "core:mem/virtual"
 
 import ast              "core:odin/ast"
 import doc_format       "core:odin/doc-format"
-import odin_format      "core:odin/format"
 import odin_parser      "core:odin/parser"
-import odin_printer     "core:odin/printer"
 import odin_tokenizer   "core:odin/tokenizer"
 
 import spall            "core:prof/spall"
@@ -207,9 +205,7 @@ _ :: mem
 _ :: virtual
 _ :: ast
 _ :: doc_format
-_ :: odin_format
 _ :: odin_parser
-_ :: odin_printer
 _ :: odin_tokenizer
 _ :: os
 _ :: spall
