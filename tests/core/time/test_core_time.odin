@@ -92,6 +92,8 @@ RFC3339_Test :: struct{
 rfc3339_tests :: []RFC3339_Test{
 	// This represents 20 minutes and 50.52 seconds after the 23rd hour of April 12th, 1985 in UTC.
 	{"1985-04-12T23:20:50.52Z",      {482196050520000000},  true,  0,    23, false},
+	{"1985-04-12t23:20:50.52Z",      {482196050520000000},  true,  0,    23, false},
+	{"1985-04-12 23:20:50.52Z",      {482196050520000000},  true,  0,    23, false},
 
 	// This represents 39 minutes and 57 seconds after the 16th hour of December 19th, 1996 with an offset of -08:00 from UTC (Pacific Standard Time).
 	// Note that this is equivalent to 1996-12-20T00:39:57Z in UTC.
