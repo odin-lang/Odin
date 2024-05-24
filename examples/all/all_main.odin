@@ -21,6 +21,7 @@ import queue            "core:container/queue"
 import small_array      "core:container/small_array"
 import lru              "core:container/lru"
 import list             "core:container/intrusive/list"
+import rbtree           "core:container/rbtree"
 import topological_sort "core:container/topological_sort"
 
 import crypto           "core:crypto"
@@ -147,6 +148,7 @@ _ :: queue
 _ :: small_array
 _ :: lru
 _ :: list
+_ :: rbtree
 _ :: topological_sort
 _ :: crypto
 _ :: crypto_hash
