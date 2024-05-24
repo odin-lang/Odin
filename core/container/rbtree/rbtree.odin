@@ -131,7 +131,7 @@ find_value :: proc(t: ^$T/Tree($Key, $Value), key: Key) -> (value: Value, ok: bo
 // find_or_insert attempts to insert the value into the tree, and returns
 // the node, a boolean indicating if the value was inserted, and the
 // node allocator error if relevant.  If the value is already present, the existing node is updated.
-find_or_insert :: proc(t: ^$T/Tree($Key, $Value), key: Key, value: Value) -> (n: ^Node(Key, Value), inserted: bool) {
+find_or_insert :: proc(t: ^$T/Tree($Key, $Value), key: Key, value: Value) -> (n: ^Node(Key, Value), inserted: bool, err: runtime.Allocator_Error) {
 	n_ptr := &t._root
 	for n_ptr^ != nil {
 		n = n_ptr^
@@ -145,11 +145,12 @@ find_or_insert :: proc(t: ^$T/Tree($Key, $Value), key: Key, value: Value) -> (n:
 		}
 	}
 	_parent := n
-	n = new_clone(Node(Key, Value){key=key, value=value, _parent=_parent, _color=.Red}, t._node_allocator) // or_return
+
+	n = new_clone(Node(Key, Value){key=key, value=value, _parent=_parent, _color=.Red}, t._node_allocator) or_return
 	n_ptr^ = n
 	insert_case1(t, n)
 	t._size += 1
-	return n, true
+	return n, true, nil
 }
 
 // remove removes a node or value from the tree, and returns true iff the
@@ -208,7 +209,7 @@ remove_node :: proc(t: ^$T/Tree($Key, $Value), node: ^$N/Node(Key, Value), call_
 // iterator returns a tree iterator in the specified direction.
 iterator :: proc "contextless" (t: ^$T/Tree($Key, $Value), direction: Direction) -> Iterator(Key, Value) {
 	it: Iterator(Key, Value)
-	it._tree      = transmute(^Tree(Key, Value))t
+	it._tree      = cast(^Tree(Key, Value))t
 	it._direction = direction
 
 	iterator_first(&it)

@@ -44,7 +44,7 @@ test_rbtree_integer :: proc(t: ^testing.T, $Key: typeid, $Value: typeid) {
 		v := Value(rand.uint32(&r))
 
 		existing_node, in_map := inserted_map[k]
-		n, inserted := rb.find_or_insert(&tree, k, v)
+		n, inserted, _ := rb.find_or_insert(&tree, k, v)
 		tc.expect(t, in_map != inserted, "insert: inserted should match inverse of map lookup")
 		if inserted {
 			inserted_map[k] = n
