@@ -4,12 +4,12 @@ import "core:container/avl"
 import "core:math/rand"
 import "core:slice"
 import "core:testing"
-
+import "core:fmt"
 import tc "tests:common"
 
 @(test)
 test_avl :: proc(t: ^testing.T) {
-	tc.log(t, "Testing avl")
+	tc.log(t, fmt.tprintf("Testing avl, using random seed %v, add -define:RANDOM_SEED=%v to reuse it.", random_seed, random_seed))
 
 	// Initialization.
 	tree: avl.Tree(int)
@@ -21,11 +21,14 @@ test_avl :: proc(t: ^testing.T) {
 	iter := avl.iterator(&tree, avl.Direction.Forward)
 	tc.expect(t, avl.iterator_get(&iter) == nil, "empty/iterator: first node should be nil")
 
+	r: rand.Rand
+	rand.init(&r, random_seed)
+
 	// Test insertion.
 	NR_INSERTS :: 32 + 1 // Ensure at least 1 collision.
 	inserted_map := make(map[int]^avl.Node(int))
 	for i := 0; i < NR_INSERTS; i += 1 {
-		v := int(rand.uint32() & 0x1f)
+		v := int(rand.uint32(&r) & 0x1f)
 		existing_node, in_map := inserted_map[v]
 
 		n, ok, _ := avl.find_or_insert(&tree, v)
@@ -38,7 +41,7 @@ test_avl :: proc(t: ^testing.T) {
 	}
 	nrEntries := len(inserted_map)
 	tc.expect(t, avl.len(&tree) == nrEntries, "insert: len after")
-	tree_validate(t, &tree)
+	validate_avl(t, &tree)
 
 	// Ensure that all entries can be found.
 	for k, v in inserted_map {
@@ -74,7 +77,7 @@ test_avl :: proc(t: ^testing.T) {
 	tc.expect(t, visited == nrEntries, "iterator/backward: visited")
 
 	// Test removal.
-	rand.shuffle(inserted_values[:])
+	rand.shuffle(inserted_values[:], &r)
 	for v, i in inserted_values {
 		node := avl.find(&tree, v)
 		tc.expect(t, node != nil, "remove: find (pre)")
@@ -82,7 +85,7 @@ test_avl :: proc(t: ^testing.T) {
 		ok := avl.remove(&tree, v)
 		tc.expect(t, ok, "remove: succeeds")
 		tc.expect(t, nrEntries - (i + 1) == avl.len(&tree), "remove: len (post)")
-		tree_validate(t, &tree)
+		validate_avl(t, &tree)
 
 		tc.expect(t, nil == avl.find(&tree, v), "remove: find (post")
 	}
@@ -114,7 +117,7 @@ test_avl :: proc(t: ^testing.T) {
 		tc.expect(t, ok == (avl.len(&tree) > 0), "iterator/remove: next should return false")
 		tc.expect(t, node == avl.first(&tree), "iterator/remove: next should return first")
 
-		tree_validate(t, &tree)
+		validate_avl(t, &tree)
 	}
 	tc.expect(t, avl.len(&tree) == nrEntries - 1, "iterator/remove: len should drop by 1")
 
@@ -123,7 +126,7 @@ test_avl :: proc(t: ^testing.T) {
 }
 
 @(private)
-tree_validate :: proc(t: ^testing.T, tree: ^avl.Tree($Value)) {
+validate_avl :: proc(t: ^testing.T, tree: ^avl.Tree($Value)) {
 	tree_check_invariants(t, tree, tree._root, nil)
 }
 

@@ -20,7 +20,7 @@ main :: proc() {
 	t := testing.T{}
 
 	test_avl(&t)
+	test_rbtree(&t)
 	test_small_array(&t)
-
 	tc.report(&t)
 }
