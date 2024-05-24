@@ -155,7 +155,7 @@ pipe :: proc() -> (r, w: Handle, err: Errno) {
 	unimplemented("core:os procedure not supported on JS target")
 }
 
-read_dir :: proc(fd: Handle, n: int, allocator := context.allocator) -> (fi: []File_Info, err: Errno) {
+read_dir :: proc(fd: Handle, fi_size: int = 100, allocator := context.allocator) -> (fi: []File_Info, err: Errno) {
 	unimplemented("core:os procedure not supported on JS target")
 }
 

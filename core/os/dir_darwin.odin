@@ -3,7 +3,7 @@ package os
 import "core:strings"
 import "core:mem"
 
-read_dir :: proc(fd: Handle, n: int, allocator := context.allocator) -> (fi: []File_Info, err: Errno) {
+read_dir :: proc(fd: Handle, fi_size: int = 100, allocator := context.allocator) -> (fi: []File_Info, err: Errno) {
 	dirp: Dir
 	dirp, err = _fdopendir(fd)
 	if err != ERROR_NONE {
@@ -20,14 +20,11 @@ read_dir :: proc(fd: Handle, n: int, allocator := context.allocator) -> (fi: []F
 
 	defer delete(dirpath)
 
-	n := n
-	size := n
-	if n <= 0 {
-		n = -1
-		size = 100
+	if fi_size <= 0 {
+		fi_size = 100
 	}
 
-	dfi := make([dynamic]File_Info, 0, size, allocator)
+	dfi := make([dynamic]File_Info, 0, fi_size, allocator)
 
 	for {
 		entry: Dirent
