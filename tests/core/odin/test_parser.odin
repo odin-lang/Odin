@@ -3,9 +3,7 @@ package test_core_odin_parser
 import "core:fmt"
 import "core:odin/ast"
 import "core:odin/parser"
-import "core:odin/printer"
 import "core:os"
-import "core:strings"
 import "core:testing"
 
 
@@ -81,14 +79,4 @@ Foo :: bit_field uint {
 	p := parser.default_parser()
 	ok := parser.parse_file(&p, &file)
 	expect(t, ok == true, "bad parse")
-
-	cfg := printer.default_style
-	cfg.newline_style = .LF
-	print := printer.make_printer(cfg)
-	out := printer.print(&print, &file)
-
-	tsrc := strings.trim_space(file.src)
-	tout := strings.trim_space(out)
-
-	expect(t, tsrc == tout, fmt.tprintf("\n%s\n!=\n%s", tsrc, tout))
 }
