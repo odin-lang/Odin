@@ -87,7 +87,7 @@ _rfc3339_to_components :: proc(rfc_datetime: string) -> (res: dt.DateTime, utc_o
 
 	// Scan UTC offset
 	switch rfc_datetime[count] {
-	case 'Z':
+	case 'Z', 'z':
 		utc_offset = 0
 		count += 1
 	case '+', '-':
