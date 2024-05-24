@@ -283,7 +283,7 @@ foreign system {
 	//				and the shared memory specification
 	//				(See os_sync_wake_by_address_flags_t).
 	// ENOENT	:	No waiter(s) found waiting on the @addr.
-	os_sync_wake_by_address_any :: proc(addr: rawptr, size: uint, flags: os_sync_wait_on_address_flags) -> i32 ---
+	os_sync_wake_by_address_any :: proc(addr: rawptr, size: uint, flags: os_sync_wake_by_address_flag) -> i32 ---
 
 	// This function is a variant of os_sync_wake_by_address_any that wakes up all waiters
 	// blocked in os_sync_wait_on_address or its variants.
@@ -305,5 +305,5 @@ foreign system {
 	// In the event of an error, returns -1 with errno set to indicate the error.
 	//
 	// This function returns same error codes as returned by os_sync_wait_on_address.
-	os_sync_wake_by_address_all :: proc(addr: rawptr, size: uint, flags: os_sync_wait_on_address_flags) -> i32 ---
+	os_sync_wake_by_address_all :: proc(addr: rawptr, size: uint, flags: os_sync_wake_by_address_flag) -> i32 ---
 }
