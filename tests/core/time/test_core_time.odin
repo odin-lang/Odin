@@ -92,7 +92,9 @@ RFC3339_Test :: struct{
 rfc3339_tests :: []RFC3339_Test{
 	// This represents 20 minutes and 50.52 seconds after the 23rd hour of April 12th, 1985 in UTC.
 	{"1985-04-12T23:20:50.52Z",      {482196050520000000},  true,  0,    23, false},
-	{"1985-04-12t23:20:50.52Z",      {482196050520000000},  true,  0,    23, false},
+	// "T" and "Z" characters in this syntax may alternatively be lower case "t" or "z" respectively.
+	{"1985-04-12t23:20:50.52z",      {482196050520000000},  true,  0,    23, false},
+	// Applications may, for the sake of readability, specify a full-date and full-time separated by (say) a space character.
 	{"1985-04-12 23:20:50.52Z",      {482196050520000000},  true,  0,    23, false},
 
 	// This represents 39 minutes and 57 seconds after the 16th hour of December 19th, 1996 with an offset of -08:00 from UTC (Pacific Standard Time).
