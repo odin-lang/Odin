@@ -69,8 +69,8 @@ _iso8601_to_components :: proc(iso_datetime: string) -> (res: dt.DateTime, utc_o
 	if iso_datetime[count] == '.' {
 		count += 1 // consume '.'
 		multiplier := 100_000_000
-		for digit in iso_datetime[count:] && multiplier >= 1 {
-			if int(digit) >= '0' && int(digit) <= '9' {
+		for digit in iso_datetime[count:] {
+			if multiplier >= 1 && int(digit) >= '0' && int(digit) <= '9' {
 				nanos += int(digit - '0') * multiplier
 				multiplier /= 10
 				count += 1
