@@ -4,7 +4,6 @@ package encoding_csv
 import "core:fmt"
 import "core:encoding/csv"
 import "core:os"
-import "core:mem"
 
 // Requires keeping the entire CSV file in memory at once
 iterate_csv_from_string :: proc(filename: string) {
