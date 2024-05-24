@@ -4,7 +4,7 @@ import win32 "core:sys/windows"
 import "core:strings"
 import "base:runtime"
 
-read_dir :: proc(fd: Handle, n: int, allocator := context.allocator) -> (fi: []File_Info, err: Errno) {
+read_dir :: proc(fd: Handle, fi_size: int = 100, allocator := context.allocator) -> (fi: []File_Info, err: Errno) {
 	find_data_to_file_info :: proc(base_path: string, d: ^win32.WIN32_FIND_DATAW) -> (fi: File_Info) {
 		// Ignore "." and ".."
 		if d.cFileName[0] == '.' && d.cFileName[1] == 0 {
@@ -60,11 +60,8 @@ read_dir :: proc(fd: Handle, n: int, allocator := context.allocator) -> (fi: []F
 		return nil, ERROR_FILE_IS_NOT_DIR
 	}
 
-	n := n
-	size := n
-	if n <= 0 {
-		n = -1
-		size = 100
+	if fi_size <= 0 {
+		fi_size = 100
 	}
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD(ignore = context.temp_allocator == allocator)
 
@@ -74,7 +71,7 @@ read_dir :: proc(fd: Handle, n: int, allocator := context.allocator) -> (fi: []F
 		return
 	}
 
-	dfi := make([dynamic]File_Info, 0, size)
+	dfi := make([dynamic]File_Info, 0, fi_size)
 
 	wpath_search := make([]u16, len(wpath)+3, context.temp_allocator)
 	copy(wpath_search, wpath)
