@@ -57,6 +57,9 @@ Reader :: struct {
 	field_indices: [dynamic]int,
 	last_record:   [dynamic]string,
 	sr: strings.Reader, // used by reader_init_with_string
+
+	// Set and used by the iterator. Query using `iterator_last_error`
+	last_iterator_error: Error,
 }
 
 
@@ -119,6 +122,25 @@ reader_destroy :: proc(r: ^Reader) {
 	delete(r.field_indices)
 	delete(r.last_record)
 	bufio.reader_destroy(&r.r)
+}
+
+/*
+	Returns a record at a time.
+
+	for record, row_idx in csv.iterator_next(&r) { ... }
+
+	TIP: If you process the results within the loop and don't need to own the results,
+	you can set the Reader's `reuse_record` and `reuse_record_reuse_record_buffer` to true;
+	you won't need to delete the record or its fields.
+*/
+iterator_next :: proc(r: ^Reader) -> (record: []string, idx: int, err: Error, more: bool) {
+	record, r.last_iterator_error = read(r)
+	return record, r.line_count - 1, r.last_iterator_error, r.last_iterator_error == nil
+}
+
+// Get last error if we the iterator
+iterator_last_error :: proc(r: Reader) -> (err: Error) {
+	return r.last_iterator_error
 }
 
 // read reads a single record (a slice of fields) from r
@@ -460,5 +482,4 @@ _read_record :: proc(r: ^Reader, dst: ^[dynamic]string, allocator := context.all
 		r.fields_per_record = len(dst)
 	}
 	return dst[:], err
-
 }
