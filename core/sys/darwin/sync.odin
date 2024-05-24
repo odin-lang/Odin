@@ -17,9 +17,6 @@ when ODIN_OS == .Darwin {
 }
 
 os_sync_wait_on_address_flag :: enum u32 {
-	// This flag should be used as a default flag when no other flags listed below are required.
-	NONE,
-
 	// This flag should be used when synchronizing among multiple processes by
 	// placing the @addr passed to os_sync_wait_on_address and its variants
 	// in a shared memory region.
@@ -31,15 +28,12 @@ os_sync_wait_on_address_flag :: enum u32 {
 	// This flag should not be used when synchronizing among multiple threads of
 	// a single process. It allows the kernel to perform performance optimizations
 	// as the @addr is local to the calling process.
-	SHARED,
+	SHARED = 0,
 }
 
-os_sync_wait_on_address_flags :: bit_set[os_sync_wait_on_address_flag; u32]
+os_sync_wait_on_address_flags :: distinct bit_set[os_sync_wait_on_address_flag; u32]
 
 os_sync_wake_by_address_flag :: enum u32 {
-	// This flag should be used as a default flag when no other flags listed below are required.
-	NONE,
-
 	// This flag should be used when synchronizing among multiple processes by
 	// placing the @addr passed to os_sync_wake_by_address_any and its variants
 	// in a shared memory region.
@@ -51,10 +45,10 @@ os_sync_wake_by_address_flag :: enum u32 {
 	// This flag should not be used when synchronizing among multiple threads of
 	// a single process. It allows the kernel to perform performance optimizations
 	// as the @addr is local the calling process.
-	SHARED,
+	SHARED = 0,
 }
 
-os_sync_wake_by_address_flags :: bit_set[os_sync_wake_by_address_flag; u32]
+os_sync_wake_by_address_flags :: distinct bit_set[os_sync_wake_by_address_flag; u32]
 
 os_clockid :: enum u32 {
 	MACH_ABSOLUTE_TIME = 32,
