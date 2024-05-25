@@ -35,6 +35,7 @@ main :: proc() {
 	unmarshal_json(&t)
 	surrogate(&t)
 	utf8_string_of_multibyte_characters(&t)
+	marshal_and_unmarshal_bit_set(&t)
 
 	fmt.printf("%v/%v tests successful.\n", TEST_count - TEST_fail, TEST_count)
 	if TEST_fail > 0 {
@@ -410,4 +411,40 @@ utf8_string_of_multibyte_characters :: proc(t: ^testing.T) {
 	_, err := json.parse_string(`"🐛✅"`)
 	msg := fmt.tprintf("Expected `json.parse` to return nil, got %v", err)
 	expect(t, err == nil, msg)
+}
+
+@test
+marshal_and_unmarshal_bit_set :: proc(t: ^testing.T) {
+	TestEnum :: enum u8 {
+		First,
+		Second,
+		Third,
+		Fourth,
+		Fifth,
+		Sixth,
+		Seventh,
+		Eighth,
+	}
+	TestBitSet :: bit_set[TestEnum]
+
+	input_to_marshal := TestBitSet{.First, .Fifth}
+	expected_json := "17"
+
+	input_to_unmarshal := "108"
+	expected_bit_set := TestBitSet{.Third, .Fourth, .Sixth, .Seventh}
+
+	out_json, err := json.marshal(input_to_marshal, allocator = context.temp_allocator)
+	msg := fmt.tprintf("Expected `json.marshal(%q)` to return a nil error, got %v", input_to_marshal, err)
+	expect(t, err == nil, msg)
+
+	msg = fmt.tprintf("Expected `json.marshal(%q)` to return %q, got %q", input_to_marshal, expected_json, string(out_json))
+	expect(t, string(out_json) == expected_json, msg)
+
+	out_bitset: TestBitSet
+	uerr := json.unmarshal(transmute([]u8)input_to_unmarshal, &out_bitset, allocator = context.temp_allocator)
+	msg = fmt.tprintf("Expected `json.unmarshal(%q)` to return a nil error, got %v", input_to_unmarshal, uerr)
+	expect(t, uerr == nil, msg)
+
+	msg = fmt.tprintf("Expected `json.unmarshal(%q)` to return %q, got %q", input_to_unmarshal, expected_bit_set, out_bitset)
+	expect(t, out_bitset == expected_bit_set, msg)
 }
