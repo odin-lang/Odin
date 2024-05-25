@@ -14,11 +14,12 @@ import "core:testing"
 import "core:mem"
 import "core:fmt"
 import "core:net"
+import "core:os"
 import "core:strconv"
 import "core:sync"
 import "core:time"
 import "core:thread"
-import "core:os"
+// import "core:os"
 
 _, _ :: time, thread
 
@@ -61,13 +62,23 @@ main :: proc() {
 	mem.tracking_allocator_init(&_tracking_allocator, context.allocator)
 	context.allocator = mem.tracking_allocator(&_tracking_allocator)
 
-	address_parsing_test(t)
-
-	tcp_tests(t)
-
-	split_url_test(t)
-	join_url_test(t)
-
+	if len(os.args) > 1 {
+		// Enable specific tests only
+		for arg in os.args[1:] {
+			switch arg {
+			case "parsing": address_parsing_test(t)
+			case "tcp":     tcp_tests(t)
+			case "split":   split_url_test(t)
+			case "join":    join_url_test(t)
+			}
+		}
+	} else {
+		// Run all
+		address_parsing_test(t)
+		tcp_tests(t)
+		split_url_test(t)
+		join_url_test(t)
+	}
 	fmt.printf("%v/%v tests successful.\n", TEST_count - TEST_fail, TEST_count)
 
 	print_tracking_allocator_report()

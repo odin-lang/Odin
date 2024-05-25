@@ -30,10 +30,30 @@ when ODIN_TEST {
 
 main :: proc() {
 	poly_data_test(t)
+	join_waits_on_user_proc(t)
+
+	fmt.printf("%v/%v tests successful.\n", TEST_count - TEST_fail, TEST_count)
 
 	if TEST_fail > 0 {
 		os.exit(1)
 	}
+}
+
+@(test)
+join_waits_on_user_proc :: proc(_t: ^testing.T) {
+	@static a := 42
+	t1 := thread.create_and_start_with_data(&a, proc(user_data: rawptr) {
+		(^int)(user_data)^ -= 42
+	})
+	thread.join(t1)
+	expect(_t, a == 0, "join did not wait on user procedure")
+
+	a = 13
+	t2 := thread.create_and_start(proc() {
+		(^int)(&a)^ -= 13
+	})
+	thread.join(t2)
+	expect(_t, a == 0, "join did not wait on user procedure")
 }
 
 @(test)

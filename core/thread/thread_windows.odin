@@ -23,11 +23,6 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 
 	__windows_thread_entry_proc :: proc "system" (t_: rawptr) -> win32.DWORD {
 		t := (^Thread)(t_)
-
-		if .Joined in t.flags {
-			return 0
-		}
-
 		t.id = sync.current_thread_id()
 
 		{
@@ -93,11 +88,9 @@ _is_done :: proc(t: ^Thread) -> bool {
 _join :: proc(t: ^Thread) {
 	sync.guard(&t.mutex)
 
-	if .Joined in t.flags || t.win32_thread == win32.INVALID_HANDLE {
+	if t.win32_thread == win32.INVALID_HANDLE {
 		return
 	}
-
-	t.flags += {.Joined}
 
 	if .Started not_in t.flags {
 		t.flags += {.Started}
@@ -145,4 +138,3 @@ _terminate :: proc(thread: ^Thread, exit_code: int) {
 _yield :: proc() {
 	win32.SwitchToThread()
 }
-

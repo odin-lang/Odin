@@ -103,15 +103,13 @@ pool_join :: proc(pool: ^Pool) {
 
 	yield()
 
-started_count: int
+	started_count: int
 	for started_count < len(pool.threads) {
 		started_count = 0
 		for t in pool.threads {
 			if .Started in t.flags {
 				started_count += 1
-				if .Joined not_in t.flags {
-					join(t)
-				}
+				join(t)
 			}
 		}
 	}

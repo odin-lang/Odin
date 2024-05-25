@@ -36,10 +36,6 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 			sync.wait(&t.cond, &t.mutex)
 		}
 
-		if .Joined in t.flags {
-			return nil
-		}
-
 		when ODIN_OS != .Darwin {
 			// Enable thread's cancelability.
 			if can_set_thread_cancel_state {
@@ -138,18 +134,8 @@ _join :: proc(t: ^Thread) {
 		return
 	}
 
-	// Preserve other flags besides `.Joined`, like `.Started`.
-	unjoined := intrinsics.atomic_load(&t.flags) - {.Joined}
-	joined   := unjoined + {.Joined}
-
-	// Try to set `t.flags` from unjoined to joined. If it returns joined,
-	// it means the previous value had that flag set and we can return.
-	if res, ok := CAS(&t.flags, unjoined, joined); res == joined && !ok {
-		return
-	}
-	// Prevent non-started threads from blocking main thread with initial wait
-	// condition.
-	if .Started not_in unjoined {
+	// Prevent non-started threads from blocking main thread with initial wait condition.
+	if .Started not_in t.flags {
 		_start(t)
 	}
 	unix.pthread_join(t.unix_thread, nil)

@@ -12,7 +12,6 @@ MAX_USER_ARGUMENTS :: 8
 
 Thread_State :: enum u8 {
 	Started,
-	Joined,
 	Done,
 	Self_Cleanup,
 }
@@ -88,10 +87,10 @@ is_done :: proc(thread: ^Thread) -> bool {
 }
 
 
+// Joins the `Thread` and waits on the user procedure to finish.
 join :: proc(thread: ^Thread) {
 	_join(thread)
 }
-
 
 join_multiple :: proc(threads: ..^Thread) {
 	_join_multiple(..threads)
@@ -149,9 +148,6 @@ create_and_start :: proc(fn: proc(), init_context: Maybe(runtime.Context) = nil,
 	start(t)
 	return t
 }
-
-
-
 
 create_and_start_with_data :: proc(data: rawptr, fn: proc(data: rawptr), init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal, self_cleanup := false) -> ^Thread {
 	thread_proc :: proc(t: ^Thread) {
