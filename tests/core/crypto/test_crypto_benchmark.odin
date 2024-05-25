@@ -6,6 +6,7 @@ import "core:fmt"
 import "core:testing"
 import "core:time"
 
+import "core:crypto/aes"
 import "core:crypto/chacha20"
 import "core:crypto/chacha20poly1305"
 import "core:crypto/ed25519"
@@ -25,6 +26,7 @@ bench_crypto :: proc(t: ^testing.T) {
 	bench_chacha20(t)
 	bench_poly1305(t)
 	bench_chacha20poly1305(t)
+	bench_aes256_gcm(t)
 	bench_ed25519(t)
 	bench_x25519(t)
 }
@@ -134,6 +136,26 @@ _benchmark_chacha20poly1305 :: proc(
 	return nil
 }
 
+_benchmark_aes256_gcm :: proc(
+	options: ^time.Benchmark_Options,
+	allocator := context.allocator,
+) -> (
+	err: time.Benchmark_Error,
+) {
+	buf := options.input
+	nonce: [aes.GCM_NONCE_SIZE]byte
+	tag: [aes.GCM_TAG_SIZE]byte = ---
+
+	ctx := transmute(^aes.Context_GCM)context.user_ptr
+
+	for _ in 0 ..= options.rounds {
+		aes.seal_gcm(ctx, buf, tag[:], nonce[:], nil, buf)
+	}
+	options.count = options.rounds
+	options.processed = options.rounds * options.bytes
+	return nil
+}
+
 benchmark_print :: proc(name: string, options: ^time.Benchmark_Options) {
 	fmt.printf(
 		"\t[%v] %v rounds, %v bytes processed in %v ns\n\t\t%5.3f rounds/s, %5.3f MiB/s\n",
@@ -215,6 +237,44 @@ bench_chacha20poly1305 :: proc(t: ^testing.T) {
 	benchmark_print(name, options)
 
 	name = "chacha20poly1305 65536 bytes"
+	options.bytes = 65536
+	err = time.benchmark(options, context.allocator)
+	tc.expect(t, err == nil, name)
+	benchmark_print(name, options)
+}
+
+bench_aes256_gcm :: proc(t: ^testing.T) {
+	name := "AES256-GCM 64 bytes"
+	options := &time.Benchmark_Options {
+		rounds = 1_000,
+		bytes = 64,
+		setup = _setup_sized_buf,
+		bench = _benchmark_aes256_gcm,
+		teardown = _teardown_sized_buf,
+	}
+
+	key := [aes.KEY_SIZE_256]byte {
+		0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef,
+		0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef,
+		0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef,
+		0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef,
+	}
+	ctx: aes.Context_GCM
+	aes.init_gcm(&ctx, key[:])
+
+	context.user_ptr = &ctx
+
+	err := time.benchmark(options, context.allocator)
+	tc.expect(t, err == nil, name)
+	benchmark_print(name, options)
+
+	name = "AES256-GCM 1024 bytes"
+	options.bytes = 1024
+	err = time.benchmark(options, context.allocator)
+	tc.expect(t, err == nil, name)
+	benchmark_print(name, options)
+
+	name = "AES256-GCM 65536 bytes"
 	options.bytes = 65536
 	err = time.benchmark(options, context.allocator)
 	tc.expect(t, err == nil, name)
