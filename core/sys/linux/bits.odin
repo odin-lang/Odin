@@ -562,6 +562,14 @@ Map_Flags_Bits :: enum {
 }
 
 /*
+	Specific sized constants for .HUGETLB
+	that can be transmuted into Map_Flags.
+*/
+MAP_HUGE_SHIFT :: 26
+MAP_HUGE_2MB   :: 21 << MAP_HUGE_SHIFT
+MAP_HUGE_1GB   :: 30 << MAP_HUGE_SHIFT
+
+/*
 	Bits for MLock_Flags
 */
 MLock_Flags_Bits :: enum {
