@@ -1805,7 +1805,7 @@ gb_internal Entity *check_ident(CheckerContext *c, Operand *o, Ast *n, Type *nam
 
 	case Entity_ImportName:
 		if (!allow_import_name) {
-			error(n, "Use of import '%.*s' not in selector", LIT(name));
+			error(n, "Use of import name '%.*s' not in the form of 'x.y'", LIT(name));
 		}
 		return e;
 	case Entity_LibraryName:

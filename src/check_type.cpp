@@ -1595,7 +1595,7 @@ gb_internal bool is_expr_from_a_parameter(CheckerContext *ctx, Ast *expr) {
 		return is_expr_from_a_parameter(ctx, lhs);
 	} else if (expr->kind == Ast_Ident) {
 		Operand x= {};
-		Entity *e = check_ident(ctx, &x, expr, nullptr, nullptr, false);
+		Entity *e = check_ident(ctx, &x, expr, nullptr, nullptr, true);
 		if (e->flags & EntityFlag_Param) {
 			return true;
 		}
