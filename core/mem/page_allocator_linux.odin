@@ -4,7 +4,11 @@ package mem
 import "core:sys/linux"
 
 _PAGE_SIZE                    :: 4 * Kilobyte
-_PAGE_ALLOCATOR_MAX_ALIGNMENT :: 1 * Terabyte
+when size_of(rawptr) == 8 {
+	_PAGE_ALLOCATOR_MAX_ALIGNMENT :: 1 * Terabyte
+} else {
+	_PAGE_ALLOCATOR_MAX_ALIGNMENT :: 1 * Gigabyte
+}
 
 // unused
 _Page_Allocator_Platform_Data :: uintptr
