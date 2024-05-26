@@ -1145,6 +1145,32 @@ Page_Allocator :: runtime.Allocator
 g_last_was_large: bool
 g_tail_waste: int
 g_head_waste: int
+
+// Some defaults for unsupport systems
+when ODIN_OS != .Linux {
+	_PAGE_SIZE :: 4 * Kilobyte
+	_PAGE_ALLOCATOR_MAX_ALIGNMENT :: _PAGE_SIZE
+	
+	_Page_Allocator_Platform_Data :: uintptr
+	
+	_page_allocator_aligned_alloc :: proc(size, alignment: int, flags: Page_Allocator_Flags) -> ([]byte, Allocator_Error) {
+		return nil, .Mode_Not_Implemented
+	}
+	_page_allocator_aligned_resize :: proc(old_ptr: rawptr,
+		                               old_size, new_size, new_align: int,
+					       flags: Page_Allocator_Flags) -> (new_memory: []byte, err: Allocator_Error) {
+		return nil, .Mode_Not_Implemented
+	}
+	
+	_page_allocator_free :: proc(p: rawptr, size: int) -> Allocator_Error {
+		return .Mode_Not_Implemented
+	}
+	
+	_set_system_large_page_count :: proc(count: int) -> (okay: bool) {
+		return false /* Not_Implemented */
+	}
+}
+
 /* */
 
 PAGE_SIZE                    :: _PAGE_SIZE
@@ -1213,30 +1239,18 @@ page_allocator :: proc(flags: Page_Allocator_Flags = {}) -> (allocator: Page_All
 page_allocator_aligned_alloc :: proc(size: int,
 	                             alignment: int = PAGE_SIZE,
 				     flags: Page_Allocator_Flags = {}) -> ([]byte, Allocator_Error) {
-	when ODIN_OS == .Linux {
-		return _page_allocator_aligned_alloc(size, alignment, flags)
-	} else {
-		return nil, Mode_Not_Implemented
-	}
+	return _page_allocator_aligned_alloc(size, alignment, flags)
 }
 
 @(require_results)
 page_allocator_aligned_resize :: proc(old_ptr: rawptr,
 	                               old_size, new_size, new_align: int,
 				       flags: Page_Allocator_Flags = {}) -> ([]byte, Allocator_Error) {
-	when ODIN_OS == .Linux {
-		return _page_allocator_aligned_resize(old_ptr, old_size, new_size, new_align, flags)
-	} else {
-		return nil, .Mode_Not_Implemented
-	}
+	return _page_allocator_aligned_resize(old_ptr, old_size, new_size, new_align, flags)
 }
 
 page_allocator_free :: proc(p: rawptr, size: int) -> Allocator_Error {
-	when ODIN_OS == .Linux {
-		return _page_allocator_free(p, size)
-	} else {
-		return .Mode_Not_Implemented
-	}
+	return _page_allocator_free(p, size)
 }
 
 page_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,

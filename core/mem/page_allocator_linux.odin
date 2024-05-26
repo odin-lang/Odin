@@ -5,7 +5,7 @@ import "core:sys/linux"
 
 _PAGE_SIZE                    :: 4 * Kilobyte
 when size_of(rawptr) == 8 {
-	_PAGE_ALLOCATOR_MAX_ALIGNMENT :: 1 * Terabyte
+	_PAGE_ALLOCATOR_MAX_ALIGNMENT :: 32 * Gigabyte
 } else {
 	_PAGE_ALLOCATOR_MAX_ALIGNMENT :: 1 * Gigabyte
 }
@@ -140,8 +140,9 @@ _page_allocator_aligned_resize :: proc(old_ptr: rawptr,
 }
 
 _page_allocator_free :: proc(p: rawptr, size: int) -> Allocator_Error {
-	if p != nil && size >= 0 && page_aligned(p) && page_aligned(rawptr(uintptr(size))) {
-		errno := linux.munmap(p, uint(size))
+	if p != nil && size >= 0 && page_aligned(p) {
+		aligned_size := align_forward_uint(uint(size), PAGE_SIZE)
+		errno := linux.munmap(p, aligned_size)
 		return errno == nil ? nil : .Invalid_Pointer
 	}
 	return .Invalid_Argument
