@@ -45,7 +45,13 @@ if [ -z "$LLVM_CONFIG" ]; then
 	fi
 fi
 
-: ${CXX=$($LLVM_CONFIG --bindir)/clang++}
+if [ -x "$(which clang++)" ]; then
+	: ${CXX="clang++"}
+elif [ -x "$($LLVM_CONFIG --bindir)/clang++" ]; then
+	: ${CXX=$($LLVM_CONFIG --bindir)/clang++}
+else
+	error "No clang++ command found. Set CXX to proceed."
+fi
 
 LLVM_VERSION="$($LLVM_CONFIG --version)"
 LLVM_VERSION_MAJOR="$(echo $LLVM_VERSION | awk -F. '{print $1}')"
