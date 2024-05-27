@@ -4883,7 +4883,44 @@ gb_internal void check_add_foreign_import_decl(CheckerContext *ctx, Ast *decl) {
 	Scope *parent_scope = ctx->scope;
 	GB_ASSERT(parent_scope->flags&ScopeFlag_File);
 
-	GB_ASSERT(fl->fullpaths.count > 0);
+	String base_dir = dir_from_path(decl->file()->fullpath);
+
+	auto fullpaths = array_make<String>(permanent_allocator(), 0, fl->filepaths.count);
+
+	for (Ast *fp_node : fl->filepaths) {
+		Operand op = {};
+		check_expr(ctx, &op, fp_node);
+		if (op.mode != Addressing_Constant && op.value.kind != ExactValue_String) {
+			gbString s = expr_to_string(op.expr);
+			error(fp_node, "Expected a constant string value, got '%s'", s);
+			gb_string_free(s);
+			continue;
+		}
+		if (!is_type_string(op.type)) {
+			gbString s = type_to_string(op.type);
+			error(fp_node, "Expected a constant string value, got value of type '%s'", s);
+			gb_string_free(s);
+			continue;
+		}
+
+		String file_str = op.value.value_string;
+		file_str = string_trim_whitespace(file_str);
+
+		String fullpath = file_str;
+		if (allow_check_foreign_filepath()) {
+			String foreign_path = {};
+			bool ok = determine_path_from_string(nullptr, decl, base_dir, file_str, &foreign_path);
+			gb_unused(ok);
+			fullpath = foreign_path;
+		}
+		array_add(&fullpaths, fullpath);
+	}
+	fl->fullpaths = slice_from_array(fullpaths);
+
+
+	if (fl->fullpaths.count == 0) {
+		return;
+	}
 	String fullpath = fl->fullpaths[0];
 	String library_name = path_to_entity_name(fl->library_name.string, fullpath);
 	if (is_blank_ident(library_name)) {

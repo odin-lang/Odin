@@ -631,7 +631,7 @@ AST_KIND(_DeclBegin,      "", bool) \
 	}) \
 	AST_KIND(ForeignImportDecl, "foreign import declaration", struct { \
 		Token    token;           \
-		Slice<Token> filepaths;   \
+		Slice<Ast *> filepaths;   \
 		Token    library_name;    \
 		String   collection_name; \
 		Slice<String> fullpaths;  \
