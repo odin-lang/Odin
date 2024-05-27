@@ -42,7 +42,7 @@ create_file_logger :: proc(h: os.Handle, lowest := Level.Debug, opt := Default_F
 	return Logger{file_console_logger_proc, data, lowest, opt}
 }
 
-destroy_file_logger :: proc(log: ^Logger) {
+destroy_file_logger :: proc(log: Logger) {
 	data := cast(^File_Console_Logger_Data)log.data
 	if data.file_handle != os.INVALID_HANDLE {
 		os.close(data.file_handle)
