@@ -1,6 +1,7 @@
 //+build !freestanding
 package log
 
+import "core:encoding/ansi"
 import "core:fmt"
 import "core:strings"
 import "core:os"
@@ -93,10 +94,10 @@ file_console_logger_proc :: proc(logger_data: rawptr, level: Level, text: string
 
 do_level_header :: proc(opts: Options, str: ^strings.Builder, level: Level) {
 
-	RESET     :: "\x1b[0m"
-	RED       :: "\x1b[31m"
-	YELLOW    :: "\x1b[33m"
-	DARK_GREY :: "\x1b[90m"
+	RESET     :: ansi.CSI + ansi.RESET           + ansi.SGR
+	RED       :: ansi.CSI + ansi.FG_RED          + ansi.SGR
+	YELLOW    :: ansi.CSI + ansi.FG_YELLOW       + ansi.SGR
+	DARK_GREY :: ansi.CSI + ansi.FG_BRIGHT_BLACK + ansi.SGR
 
 	col := RESET
 	switch level {
