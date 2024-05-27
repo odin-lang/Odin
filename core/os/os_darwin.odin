@@ -442,7 +442,7 @@ F_GETPATH :: 50 // return the full path of the fd
 foreign libc {
 	@(link_name="__error") __error :: proc() -> ^c.int ---
 
-	@(link_name="open")             _unix_open          :: proc(path: cstring, flags: i32, mode: u16) -> Handle ---
+	@(link_name="open")             _unix_open          :: proc(path: cstring, flags: i32, #c_vararg args: ..any) -> Handle ---
 	@(link_name="close")            _unix_close         :: proc(handle: Handle) -> c.int ---
 	@(link_name="read")             _unix_read          :: proc(handle: Handle, buffer: rawptr, count: c.size_t) -> int ---
 	@(link_name="write")            _unix_write         :: proc(handle: Handle, buffer: rawptr, count: c.size_t) -> int ---
