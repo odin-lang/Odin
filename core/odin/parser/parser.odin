@@ -1190,12 +1190,12 @@ parse_foreign_decl :: proc(p: ^Parser) -> ^ast.Decl {
 			error(p, name.pos, "illegal foreign import name: '_'")
 		}
 
-		fullpaths: [dynamic]string
+		fullpaths: [dynamic]^ast.Expr
 		if allow_token(p, .Open_Brace) {
 			for p.curr_tok.kind != .Close_Brace &&
 				p.curr_tok.kind != .EOF {
-				path := expect_token(p, .String)
-				append(&fullpaths, path.text)
+				path := parse_expr(p, false)
+				append(&fullpaths, path)
 
 				allow_token(p, .Comma) or_break
 			}
@@ -1203,7 +1203,9 @@ parse_foreign_decl :: proc(p: ^Parser) -> ^ast.Decl {
 		} else {
 			path := expect_token(p, .String)
 			reserve(&fullpaths, 1)
-			append(&fullpaths, path.text)
+			bl := ast.new(ast.Basic_Lit, path.pos, end_pos(path))
+			bl.tok = tok
+			append(&fullpaths, bl)
 		}
 
 		if len(fullpaths) == 0 {

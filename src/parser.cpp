@@ -4894,7 +4894,7 @@ gb_internal Ast *parse_foreign_decl(AstFile *f) {
 			while (f->curr_token.kind != Token_CloseBrace &&
 			       f->curr_token.kind != Token_EOF) {
 
-				Ast *path = parse_expr(f, true);
+				Ast *path = parse_expr(f, false);
 				array_add(&filepaths, path);
 
 				if (!allow_field_separator(f)) {
