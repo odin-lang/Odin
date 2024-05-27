@@ -266,6 +266,7 @@ struct Entity {
 			Scope *scope;
 		} ImportName;
 		struct {
+			Ast *decl;
 			Slice<String> paths;
 			String name;
 			i64 priority_index;

@@ -414,6 +414,7 @@ struct CheckerInfo {
 	MPSCQueue<Entity *> entity_queue;
 	MPSCQueue<Entity *> required_global_variable_queue;
 	MPSCQueue<Entity *> required_foreign_imports_through_force_queue;
+	MPSCQueue<Entity *> foreign_imports_to_check_fullpaths;
 
 	MPSCQueue<Ast *> intrinsics_entry_point_usage;
 
@@ -434,6 +435,8 @@ struct CheckerInfo {
 	BlockingMutex                       load_directory_mutex;
 	StringMap<LoadDirectoryCache *>     load_directory_cache;
 	PtrMap<Ast *, LoadDirectoryCache *> load_directory_map; // Key: Ast_CallExpr *
+
+
 };
 
 struct CheckerContext {

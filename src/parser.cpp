@@ -1285,13 +1285,15 @@ gb_internal Ast *ast_import_decl(AstFile *f, Token token, Token relpath, Token i
 }
 
 gb_internal Ast *ast_foreign_import_decl(AstFile *f, Token token, Array<Ast *> filepaths, Token library_name,
-                             CommentGroup *docs, CommentGroup *comment) {
+                                         bool multiple_filepaths,
+                                         CommentGroup *docs, CommentGroup *comment) {
 	Ast *result = alloc_ast_node(f, Ast_ForeignImportDecl);
 	result->ForeignImportDecl.token        = token;
 	result->ForeignImportDecl.filepaths    = slice_from_array(filepaths);
 	result->ForeignImportDecl.library_name = library_name;
 	result->ForeignImportDecl.docs         = docs;
 	result->ForeignImportDecl.comment      = comment;
+	result->ForeignImportDecl.multiple_filepaths = multiple_filepaths;
 	result->ForeignImportDecl.attributes.allocator = ast_allocator(f);
 
 	return result;
@@ -4882,8 +4884,11 @@ gb_internal Ast *parse_foreign_decl(AstFile *f) {
 		if (is_blank_ident(lib_name)) {
 			syntax_error(lib_name, "Illegal foreign import name: '_'");
 		}
+		bool multiple_filepaths = false;
+
 		Array<Ast *> filepaths = {};
 		if (allow_token(f, Token_OpenBrace)) {
+			multiple_filepaths = true;
 			array_init(&filepaths, ast_allocator(f));
 
 			while (f->curr_token.kind != Token_CloseBrace &&
@@ -4912,7 +4917,7 @@ gb_internal Ast *parse_foreign_decl(AstFile *f) {
 			syntax_error(lib_name, "You cannot use foreign import within a procedure. This must be done at the file scope");
 			s = ast_bad_decl(f, lib_name, ast_token(filepaths[0]));
 		} else {
-			s = ast_foreign_import_decl(f, token, filepaths, lib_name, docs, f->line_comment);
+			s = ast_foreign_import_decl(f, token, filepaths, lib_name, multiple_filepaths, docs, f->line_comment);
 		}
 		expect_semicolon(f);
 		return s;
@@ -5859,7 +5864,24 @@ gb_internal void parse_setup_file_decls(Parser *p, AstFile *f, String const &bas
 				syntax_error(decls[i], "No foreign paths found");
 				decls[i] = ast_bad_decl(f, ast_token(fl->filepaths[0]), ast_end_token(fl->filepaths[fl->filepaths.count-1]));
 				goto end;
-
+			} else if (!fl->multiple_filepaths &&
+			           fl->filepaths.count == 1) {
+				Ast *fp = fl->filepaths[0];
+				GB_ASSERT(fp->kind == Ast_BasicLit);
+				Token fp_token = fp->BasicLit.token;
+				String file_str = string_trim_whitespace(string_value_from_token(f, fp_token));
+				String fullpath = file_str;
+				if (allow_check_foreign_filepath()) {
+					String foreign_path = {};
+					bool ok = determine_path_from_string(&p->file_decl_mutex, node, base_dir, file_str, &foreign_path);
+					if (!ok) {
+						decls[i] = ast_bad_decl(f, fp_token, fp_token);
+						goto end;
+					}
+					fullpath = foreign_path;
+				}
+				fl->fullpaths = slice_make<String>(permanent_allocator(), 1);
+				fl->fullpaths[0] = fullpath;
 			}
 
 		} else if (node->kind == Ast_WhenStmt) {
