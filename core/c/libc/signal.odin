@@ -34,7 +34,7 @@ when ODIN_OS == .Windows {
 	SIGTERM :: 15
 }
 
-when ODIN_OS == .Linux || ODIN_OS == .FreeBSD {
+when ODIN_OS == .Linux || ODIN_OS == .FreeBSD || ODIN_OS == .Haiku || ODIN_OS == .OpenBSD || ODIN_OS == .NetBSD {
 	SIG_ERR  :: rawptr(~uintptr(0))
 	SIG_DFL  :: rawptr(uintptr(0))
 	SIG_IGN  :: rawptr(uintptr(1)) 
