@@ -70,7 +70,7 @@ file_console_logger_proc :: proc(logger_data: rawptr, level: Level, text: string
 	backing: [1024]byte //NOTE(Hoej): 1024 might be too much for a header backing, unless somebody has really long paths.
 	buf := strings.builder_from_bytes(backing[:])
 
-	do_level_header(options, level, &buf)
+	do_level_header(options, &buf, level)
 
 	when time.IS_SUPPORTED {
 		do_time_header(options, &buf, time.now())
@@ -91,7 +91,7 @@ file_console_logger_proc :: proc(logger_data: rawptr, level: Level, text: string
 	fmt.fprintf(h, "%s%s\n", strings.to_string(buf), text)
 }
 
-do_level_header :: proc(opts: Options, level: Level, str: ^strings.Builder) {
+do_level_header :: proc(opts: Options, str: ^strings.Builder, level: Level) {
 
 	RESET     :: "\x1b[0m"
 	RED       :: "\x1b[31m"
