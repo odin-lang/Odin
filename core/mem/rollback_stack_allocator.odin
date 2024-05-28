@@ -61,16 +61,14 @@ Rollback_Stack :: struct {
 }
 
 
-@(private="file")
-@(require_results)
+@(private="file", require_results)
 rb_ptr_in_bounds :: proc(block: ^Rollback_Stack_Block, ptr: rawptr) -> bool {
 	start := cast(uintptr)raw_data(block.buffer)
 	end   := cast(uintptr)raw_data(block.buffer) + block.offset
 	return start < cast(uintptr)ptr && cast(uintptr)ptr <= end
 }
 
-@(private="file")
-@(require_results)
+@(private="file", require_results)
 rb_find_ptr :: proc(stack: ^Rollback_Stack, ptr: rawptr) -> (
 	parent: ^Rollback_Stack_Block,
 	block:  ^Rollback_Stack_Block,
@@ -87,8 +85,7 @@ rb_find_ptr :: proc(stack: ^Rollback_Stack, ptr: rawptr) -> (
 	return nil, nil, nil, .Invalid_Pointer
 }
 
-@(private="file")
-@(require_results)
+@(private="file", require_results)
 rb_find_last_alloc :: proc(stack: ^Rollback_Stack, ptr: rawptr) -> (
 	block: ^Rollback_Stack_Block,
 	header: ^Rollback_Stack_Header,
@@ -113,8 +110,7 @@ rb_rollback_block :: proc(block: ^Rollback_Stack_Block, header: ^Rollback_Stack_
 	}
 }
 
-@(private="file")
-@(require_results)
+@(private="file", require_results)
 rb_free :: proc(stack: ^Rollback_Stack, ptr: rawptr) -> Allocator_Error {
 	parent, block, header := rb_find_ptr(stack, ptr) or_return
 	if header.is_free {
@@ -145,8 +141,7 @@ rb_free_all :: proc(stack: ^Rollback_Stack) {
 	stack.head.offset = 0
 }
 
-@(private="file")
-@(require_results)
+@(private="file", require_results)
 rb_resize :: proc(stack: ^Rollback_Stack, ptr: rawptr, old_size, size, alignment: int) -> (result: []byte, err: Allocator_Error) {
 	if ptr != nil {
 		if block, _, ok := rb_find_last_alloc(stack, ptr); ok {
@@ -172,8 +167,7 @@ rb_resize :: proc(stack: ^Rollback_Stack, ptr: rawptr, old_size, size, alignment
 	return
 }
 
-@(private="file")
-@(require_results)
+@(private="file", require_results)
 rb_alloc :: proc(stack: ^Rollback_Stack, size, alignment: int) -> (result: []byte, err: Allocator_Error) {
 	parent: ^Rollback_Stack_Block
 	for block := stack.head; /**/; block = block.next_block {
@@ -232,8 +226,7 @@ rb_alloc :: proc(stack: ^Rollback_Stack, size, alignment: int) -> (result: []byt
 	return nil, .Out_Of_Memory
 }
 
-@(private="file")
-@(require_results)
+@(private="file", require_results)
 rb_make_block :: proc(size: int, allocator: Allocator) -> (block: ^Rollback_Stack_Block, err: Allocator_Error) {
 	buffer := runtime.mem_alloc(size_of(Rollback_Stack_Block) + size, align_of(Rollback_Stack_Block), allocator) or_return
 
