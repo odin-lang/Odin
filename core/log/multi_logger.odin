@@ -12,11 +12,10 @@ create_multi_logger :: proc(logs: ..Logger) -> Logger {
 	return Logger{multi_logger_proc, data, Level.Debug, nil}
 }
 
-destroy_multi_logger :: proc(log : ^Logger) {
+destroy_multi_logger :: proc(log: Logger) {
 	data := (^Multi_Logger_Data)(log.data)
 	delete(data.loggers)
-	free(log.data)
-	log^ = nil_logger()
+	free(data)
 }
 
 multi_logger_proc :: proc(logger_data: rawptr, level: Level, text: string,
