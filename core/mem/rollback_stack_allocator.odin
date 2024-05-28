@@ -150,6 +150,10 @@ rb_free_all :: proc(stack: ^Rollback_Stack) {
 rb_resize :: proc(stack: ^Rollback_Stack, ptr: rawptr, old_size, size, alignment: int) -> (result: []byte, err: Allocator_Error) {
 	if ptr != nil {
 		if block, _, ok := rb_find_last_alloc(stack, ptr); ok {
+			// `block.offset` should never underflow because it is contingent
+			// on `old_size` in the first place, assuming sane arguments.
+			assert(block.offset >= cast(uintptr)old_size, "Rollback Stack Allocator received invalid `old_size`.")
+
 			if block.offset + cast(uintptr)size - cast(uintptr)old_size < cast(uintptr)len(block.buffer) {
 				block.offset += cast(uintptr)size - cast(uintptr)old_size
 				#no_bounds_check return (cast([^]byte)ptr)[:size], nil
@@ -169,6 +173,10 @@ rb_resize :: proc(stack: ^Rollback_Stack, ptr: rawptr, old_size, size, alignment
 rb_alloc :: proc(stack: ^Rollback_Stack, size, alignment: int) -> (result: []byte, err: Allocator_Error) {
 	parent: ^Rollback_Stack_Block
 	for block := stack.head; /**/; block = block.next_block {
+		when !ODIN_DISABLE_ASSERT {
+			allocated_new_block: bool
+		}
+
 		if block == nil {
 			if stack.block_allocator.procedure == nil {
 				return nil, .Out_Of_Memory
@@ -178,12 +186,20 @@ rb_alloc :: proc(stack: ^Rollback_Stack, size, alignment: int) -> (result: []byt
 			new_block_size := max(minimum_size_required, stack.block_size)
 			block = rb_make_block(new_block_size, stack.block_allocator) or_return
 			parent.next_block = block
+			when !ODIN_DISABLE_ASSERT {
+				allocated_new_block = true
+			}
 		}
 
 		start := cast(uintptr)raw_data(block.buffer) + block.offset
 		padding := cast(uintptr)calc_padding_with_header(start, cast(uintptr)alignment, size_of(Rollback_Stack_Header))
 
 		if block.offset + padding + cast(uintptr)size > cast(uintptr)len(block.buffer) {
+			when !ODIN_DISABLE_ASSERT {
+				if allocated_new_block {
+					panic("Rollback Stack Allocator allocated a new block but did not use it.")
+				}
+			}
 			parent = block
 			continue
 		}
@@ -223,9 +239,9 @@ rb_make_block :: proc(size: int, allocator: Allocator) -> (block: ^Rollback_Stac
 }
 
 
-rollback_stack_init_buffered :: proc(stack: ^Rollback_Stack, buffer: []byte) {
+rollback_stack_init_buffered :: proc(stack: ^Rollback_Stack, buffer: []byte, location := #caller_location) {
 	MIN_SIZE :: size_of(Rollback_Stack_Block) + size_of(Rollback_Stack_Header) + size_of(rawptr)
-	assert(len(buffer) >= MIN_SIZE, "User-provided buffer to Rollback Stack Allocator is too small.")
+	assert(len(buffer) >= MIN_SIZE, "User-provided buffer to Rollback Stack Allocator is too small.", location)
 
 	block := cast(^Rollback_Stack_Block)raw_data(buffer)
 	block^ = {}
@@ -240,9 +256,10 @@ rollback_stack_init_dynamic :: proc(
 	stack: ^Rollback_Stack,
 	block_size := ROLLBACK_STACK_DEFAULT_BLOCK_SIZE,
 	block_allocator := context.allocator,
+	location := #caller_location,
 ) -> Allocator_Error {
-	assert(block_size >= size_of(Rollback_Stack_Header) + size_of(rawptr), "Rollback Stack Allocator block size is too small.")
-	assert(block_size <= ROLLBACK_STACK_MAX_HEAD_BLOCK_SIZE, "Rollback Stack Allocators cannot support head blocks larger than 2 gigabytes.")
+	assert(block_size >= size_of(Rollback_Stack_Header) + size_of(rawptr), "Rollback Stack Allocator block size is too small.", location)
+	assert(block_size <= ROLLBACK_STACK_MAX_HEAD_BLOCK_SIZE, "Rollback Stack Allocators cannot support head blocks larger than 2 gigabytes.", location)
 
 	block := rb_make_block(block_size, block_allocator) or_return
 
@@ -284,7 +301,8 @@ rollback_stack_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mo
 
 	switch mode {
 	case .Alloc, .Alloc_Non_Zeroed:
-		assert(is_power_of_two(cast(uintptr)alignment), "alignment must be a power of two", location)
+		assert(size >= 0, "Size must be positive or zero.", location)
+		assert(is_power_of_two(cast(uintptr)alignment), "Alignment must be a power of two.", location)
 		result = rb_alloc(stack, size, alignment) or_return
 
 		if mode == .Alloc {
@@ -298,6 +316,9 @@ rollback_stack_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mo
 		rb_free_all(stack)
 
 	case .Resize, .Resize_Non_Zeroed:
+		assert(size >= 0, "Size must be positive or zero.", location)
+		assert(old_size >= 0, "Old size must be positive or zero.", location)
+		assert(is_power_of_two(cast(uintptr)alignment), "Alignment must be a power of two.", location)
 		result = rb_resize(stack, old_memory, old_size, size, alignment) or_return
 
 		#no_bounds_check if mode == .Resize && size > old_size {
