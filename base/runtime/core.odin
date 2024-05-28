@@ -481,7 +481,9 @@ Raw_Soa_Pointer :: struct {
 		Linux,
 		Essence,
 		FreeBSD,
+		Haiku,
 		OpenBSD,
+		NetBSD,
 		WASI,
 		JS,
 		Freestanding,
@@ -508,6 +510,7 @@ Odin_Arch_Type :: type_of(ODIN_ARCH)
 	Odin_Build_Mode_Type :: enum int {
 		Executable,
 		Dynamic,
+		Static,
 		Object,
 		Assembly,
 		LLVM_IR,
