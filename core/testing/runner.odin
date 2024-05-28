@@ -277,10 +277,6 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 	fmt.assertf(alloc_error == nil, "Error allocating memory for task data slots: %v", alloc_error)
 	defer delete(task_data_slots)
 
-	safe_heap: mem.Mutex_Allocator
-	mem.mutex_allocator_init(&safe_heap, context.allocator)
-	safe_heap_allocator := mem.mutex_allocator(&safe_heap)
-
 	// Tests rotate through these allocators as they finish.
 	task_allocators: []mem.Rollback_Stack = ---
 	task_allocators, alloc_error = make([]mem.Rollback_Stack, thread_count)
@@ -295,7 +291,7 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 	}
 
 	#no_bounds_check for i in 0 ..< thread_count {
-		alloc_error = mem.rollback_stack_init(&task_allocators[i], PER_THREAD_MEMORY, block_allocator = safe_heap_allocator)
+		alloc_error = mem.rollback_stack_init(&task_allocators[i], PER_THREAD_MEMORY)
 		fmt.assertf(alloc_error == nil, "Error allocating memory for task allocator #%i: %v", i, alloc_error)
 		when TRACKING_MEMORY {
 			mem.tracking_allocator_init(&task_memory_trackers[i], mem.rollback_stack_allocator(&task_allocators[i]))
@@ -339,11 +335,9 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 
 	// NOTE(Feoramund): This is the allocator that will be used by threads to
 	// persist log messages past their lifetimes. It has its own variable name
-	// in the event it needs to be changed from `safe_heap_allocator` without
+	// in the event it needs to be changed from `context.allocator` without
 	// digging through the source to divine everywhere it is used for that.
-	shared_log_allocator := safe_heap_allocator
-
-	context.allocator = safe_heap_allocator
+	shared_log_allocator := context.allocator
 
 	context.logger = {
 		procedure = runner_logger_proc,
