@@ -38,19 +38,19 @@ ROLLBACK_STACK_DEFAULT_BLOCK_SIZE :: 4 * Megabyte
 //
 // This is because allocations over the block size are not split up if the item
 // within is freed; they are immediately returned to the block allocator.
-ROLLBACK_STACK_MAX_HEAD_BLOCK_SIZE :: 1 * Gigabyte
+ROLLBACK_STACK_MAX_HEAD_BLOCK_SIZE :: 2 * Gigabyte
 
 
 Rollback_Stack_Header :: bit_field u64 {
-	prev_offset:  int | 32,
-	is_free:     bool |  1,
-	prev_ptr:     int | 31,
+	prev_offset:  uintptr | 32,
+	is_free:         bool |  1,
+	prev_ptr:     uintptr | 31,
 }
 
 Rollback_Stack_Block :: struct {
 	next_block: ^Rollback_Stack_Block,
 	last_alloc: rawptr,
-	offset: int,
+	offset: uintptr,
 	buffer: []byte,
 }
 
@@ -65,7 +65,7 @@ Rollback_Stack :: struct {
 @(require_results)
 rb_ptr_in_bounds :: proc(block: ^Rollback_Stack_Block, ptr: rawptr) -> bool {
 	start := cast(uintptr)raw_data(block.buffer)
-	end   := cast(uintptr)raw_data(block.buffer) + cast(uintptr)block.offset
+	end   := cast(uintptr)raw_data(block.buffer) + block.offset
 	return start < cast(uintptr)ptr && cast(uintptr)ptr <= end
 }
 
@@ -150,8 +150,8 @@ rb_free_all :: proc(stack: ^Rollback_Stack) {
 rb_resize :: proc(stack: ^Rollback_Stack, ptr: rawptr, old_size, size, alignment: int) -> (result: []byte, err: Allocator_Error) {
 	if ptr != nil {
 		if block, _, ok := rb_find_last_alloc(stack, ptr); ok {
-			if block.offset + (size - old_size) < len(block.buffer) {
-				block.offset += (size - old_size)
+			if block.offset + cast(uintptr)size - cast(uintptr)old_size < cast(uintptr)len(block.buffer) {
+				block.offset += cast(uintptr)size - cast(uintptr)old_size
 				#no_bounds_check return (cast([^]byte)ptr)[:size], nil
 			}
 		}
@@ -180,10 +180,10 @@ rb_alloc :: proc(stack: ^Rollback_Stack, size, alignment: int) -> (result: []byt
 			parent.next_block = block
 		}
 
-		start := cast(uintptr)raw_data(block.buffer) + cast(uintptr)block.offset
-		padding := calc_padding_with_header(start, cast(uintptr)alignment, size_of(Rollback_Stack_Header))
+		start := cast(uintptr)raw_data(block.buffer) + block.offset
+		padding := cast(uintptr)calc_padding_with_header(start, cast(uintptr)alignment, size_of(Rollback_Stack_Header))
 
-		if block.offset + padding + size > len(block.buffer) {
+		if block.offset + padding + cast(uintptr)size > cast(uintptr)len(block.buffer) {
 			parent = block
 			continue
 		}
@@ -193,17 +193,17 @@ rb_alloc :: proc(stack: ^Rollback_Stack, size, alignment: int) -> (result: []byt
 
 		header^ = {
 			prev_offset = block.offset,
-			prev_ptr = max(0, cast(int)(cast(uintptr)block.last_alloc - cast(uintptr)raw_data(block.buffer))),
+			prev_ptr = uintptr(0) if block.last_alloc == nil else cast(uintptr)block.last_alloc - cast(uintptr)raw_data(block.buffer),
 			is_free = false,
 		}
 
 		block.last_alloc = ptr
-		block.offset += padding + size
+		block.offset += padding + cast(uintptr)size
 
 		if len(block.buffer) > stack.block_size {
 			// This block exceeds the allocator's standard block size and is considered a singleton.
 			// Prevent any further allocations on it.
-			block.offset = len(block.buffer)
+			block.offset = cast(uintptr)len(block.buffer)
 		}
 		
 		#no_bounds_check return ptr[:size], nil
@@ -242,7 +242,7 @@ rollback_stack_init_dynamic :: proc(
 	block_allocator := context.allocator,
 ) -> Allocator_Error {
 	assert(block_size >= size_of(Rollback_Stack_Header) + size_of(rawptr), "Rollback Stack Allocator block size is too small.")
-	assert(block_size <= ROLLBACK_STACK_MAX_HEAD_BLOCK_SIZE, "Rollback Stack Allocators cannot support head blocks larger than 1 gigabyte.")
+	assert(block_size <= ROLLBACK_STACK_MAX_HEAD_BLOCK_SIZE, "Rollback Stack Allocators cannot support head blocks larger than 2 gigabytes.")
 
 	block := rb_make_block(block_size, block_allocator) or_return
 
