@@ -192,7 +192,7 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 		fmt.assertf(it.p != nil, "Test %s.%s has <nil> procedure.", it.pkg, it.name)
 	}
 
-	slice.stable_sort_by(internal_tests, proc(a, b: Internal_Test) -> bool {
+	slice.sort_by(internal_tests, proc(a, b: Internal_Test) -> bool {
 		if a.pkg == b.pkg {
 			return a.name < b.name
 		} else {
