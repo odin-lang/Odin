@@ -155,7 +155,11 @@ rb_resize :: proc(stack: ^Rollback_Stack, ptr: rawptr, old_size, size, alignment
 			assert(block.offset >= cast(uintptr)old_size, "Rollback Stack Allocator received invalid `old_size`.")
 
 			if block.offset + cast(uintptr)size - cast(uintptr)old_size < cast(uintptr)len(block.buffer) {
-				block.offset += cast(uintptr)size - cast(uintptr)old_size
+				// Prevent singleton allocations from fragmenting by forbidding
+				// them to shrink, removing the possibility of overflow bugs.
+				if len(block.buffer) <= stack.block_size {
+					block.offset += cast(uintptr)size - cast(uintptr)old_size
+				}
 				#no_bounds_check return (cast([^]byte)ptr)[:size], nil
 			}
 		}
