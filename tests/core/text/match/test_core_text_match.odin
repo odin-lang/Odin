@@ -14,7 +14,7 @@ failed :: proc(t: ^testing.T, ok: bool, loc := #caller_location) -> bool {
 	TEST_count += 1
 	
 	if !ok {
-		fmt.wprintf(t.w, "%v: ", loc)
+		fmt.printf(/*t.w,*/ "%v: ", loc)
 		t.error_count += 1	
 		TEST_fail += 1
 	}
@@ -25,7 +25,7 @@ failed :: proc(t: ^testing.T, ok: bool, loc := #caller_location) -> bool {
 expect :: testing.expect
 
 logf :: proc(t: ^testing.T, format: string, args: ..any) {
-	fmt.wprintf(t.w, format, ..args)
+	fmt.printf(/*t.w,*/ format, ..args)
 }
 
 // find correct byte offsets 
@@ -380,7 +380,7 @@ main :: proc() {
 	t: testing.T
 	stream := os.stream_from_handle(os.stdout)
 	w := io.to_writer(stream)
-	t.w = w
+	// t.w = w
 	
 	test_find(&t)
 	test_match(&t)

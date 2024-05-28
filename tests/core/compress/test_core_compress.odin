@@ -21,7 +21,7 @@ import "core:fmt"
 
 import "core:mem"
 import "core:os"
-import "core:io"
+// import "core:io"
 
 TEST_count := 0
 TEST_fail  := 0
@@ -45,8 +45,8 @@ when ODIN_TEST {
 }
 
 main :: proc() {
-	w := io.to_writer(os.stream_from_handle(os.stdout))
-	t := testing.T{w=w}
+	// w := io.to_writer(os.stream_from_handle(os.stdout))
+	t := testing.T{}//{w=w}
 	zlib_test(&t)
 	gzip_test(&t)
 	shoco_test(&t)
