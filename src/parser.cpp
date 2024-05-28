@@ -1284,14 +1284,16 @@ gb_internal Ast *ast_import_decl(AstFile *f, Token token, Token relpath, Token i
 	return result;
 }
 
-gb_internal Ast *ast_foreign_import_decl(AstFile *f, Token token, Array<Token> filepaths, Token library_name,
-                             CommentGroup *docs, CommentGroup *comment) {
+gb_internal Ast *ast_foreign_import_decl(AstFile *f, Token token, Array<Ast *> filepaths, Token library_name,
+                                         bool multiple_filepaths,
+                                         CommentGroup *docs, CommentGroup *comment) {
 	Ast *result = alloc_ast_node(f, Ast_ForeignImportDecl);
 	result->ForeignImportDecl.token        = token;
 	result->ForeignImportDecl.filepaths    = slice_from_array(filepaths);
 	result->ForeignImportDecl.library_name = library_name;
 	result->ForeignImportDecl.docs         = docs;
 	result->ForeignImportDecl.comment      = comment;
+	result->ForeignImportDecl.multiple_filepaths = multiple_filepaths;
 	result->ForeignImportDecl.attributes.allocator = ast_allocator(f);
 
 	return result;
@@ -4882,14 +4884,17 @@ gb_internal Ast *parse_foreign_decl(AstFile *f) {
 		if (is_blank_ident(lib_name)) {
 			syntax_error(lib_name, "Illegal foreign import name: '_'");
 		}
-		Array<Token> filepaths = {};
+		bool multiple_filepaths = false;
+
+		Array<Ast *> filepaths = {};
 		if (allow_token(f, Token_OpenBrace)) {
+			multiple_filepaths = true;
 			array_init(&filepaths, ast_allocator(f));
 
 			while (f->curr_token.kind != Token_CloseBrace &&
 			       f->curr_token.kind != Token_EOF) {
 
-				Token path = expect_token(f, Token_String);
+				Ast *path = parse_expr(f, false);
 				array_add(&filepaths, path);
 
 				if (!allow_field_separator(f)) {
@@ -4898,9 +4903,10 @@ gb_internal Ast *parse_foreign_decl(AstFile *f) {
 			}
 			expect_closing_brace_of_field_list(f);
 		} else {
-			filepaths = array_make<Token>(ast_allocator(f), 0, 1);
+			filepaths = array_make<Ast *>(ast_allocator(f), 0, 1);
 			Token path = expect_token(f, Token_String);
-			array_add(&filepaths, path);
+			Ast *lit = ast_basic_lit(f, path);
+			array_add(&filepaths, lit);
 		}
 
 		Ast *s = nullptr;
@@ -4909,9 +4915,9 @@ gb_internal Ast *parse_foreign_decl(AstFile *f) {
 			s = ast_bad_decl(f, lib_name, f->curr_token);
 		} else if (f->curr_proc != nullptr) {
 			syntax_error(lib_name, "You cannot use foreign import within a procedure. This must be done at the file scope");
-			s = ast_bad_decl(f, lib_name, filepaths[0]);
+			s = ast_bad_decl(f, lib_name, ast_token(filepaths[0]));
 		} else {
-			s = ast_foreign_import_decl(f, token, filepaths, lib_name, docs, f->line_comment);
+			s = ast_foreign_import_decl(f, token, filepaths, lib_name, multiple_filepaths, docs, f->line_comment);
 		}
 		expect_semicolon(f);
 		return s;
@@ -5648,8 +5654,18 @@ gb_internal bool is_package_name_reserved(String const &name) {
 }
 
 
-gb_internal bool determine_path_from_string(BlockingMutex *file_mutex, Ast *node, String base_dir, String const &original_string, String *path) {
+gb_internal bool determine_path_from_string(BlockingMutex *file_mutex, Ast *node, String base_dir, String const &original_string, String *path, bool use_check_errors=false) {
 	GB_ASSERT(path != nullptr);
+
+	void (*do_error)(Ast *, char const *, ...);
+	void (*do_warning)(Token const &, char const *, ...);
+
+	do_error = &syntax_error;
+	do_warning = &syntax_warning;
+	if (use_check_errors) {
+		do_error = &error;
+		do_error = &warning;
+	}
 
 	// NOTE(bill): if file_mutex == nullptr, this means that the code is used within the semantics stage
 
@@ -5677,7 +5693,7 @@ gb_internal bool determine_path_from_string(BlockingMutex *file_mutex, Ast *node
 
 	String file_str = {};
 	if (colon_pos == 0) {
-		syntax_error(node, "Expected a collection name");
+		do_error(node, "Expected a collection name");
 		return false;
 	}
 
@@ -5692,11 +5708,11 @@ gb_internal bool determine_path_from_string(BlockingMutex *file_mutex, Ast *node
 	if (has_windows_drive) {
 		String sub_file_path = substring(file_str, 3, file_str.len);
 		if (!is_import_path_valid(sub_file_path)) {
-			syntax_error(node, "Invalid import path: '%.*s'", LIT(file_str));
+			do_error(node, "Invalid import path: '%.*s'", LIT(file_str));
 			return false;
 		}
 	} else if (!is_import_path_valid(file_str)) {
-		syntax_error(node, "Invalid import path: '%.*s'", LIT(file_str));
+		do_error(node, "Invalid import path: '%.*s'", LIT(file_str));
 		return false;
 	}
 
@@ -5718,16 +5734,16 @@ gb_internal bool determine_path_from_string(BlockingMutex *file_mutex, Ast *node
 			}
 			if (replace_with_base) {
 				if (ast_file_vet_deprecated(node->file())) {
-					syntax_error(node, "import \"core:%.*s\" has been deprecated in favour of \"base:%.*s\"", LIT(file_str), LIT(file_str));
+					do_error(node, "import \"core:%.*s\" has been deprecated in favour of \"base:%.*s\"", LIT(file_str), LIT(file_str));
 				} else {
-					syntax_warning(ast_token(node), "import \"core:%.*s\" has been deprecated in favour of \"base:%.*s\"", LIT(file_str), LIT(file_str));
+					do_warning(ast_token(node), "import \"core:%.*s\" has been deprecated in favour of \"base:%.*s\"", LIT(file_str), LIT(file_str));
 				}
 			}
 		}
 
 		if (collection_name == "system") {
 			if (node->kind != Ast_ForeignImportDecl) {
-				syntax_error(node, "The library collection 'system' is restrict for 'foreign_library'");
+				do_error(node, "The library collection 'system' is restrict for 'foreign import'");
 				return false;
 			} else {
 				*path = file_str;
@@ -5735,7 +5751,7 @@ gb_internal bool determine_path_from_string(BlockingMutex *file_mutex, Ast *node
 			}
 		} else if (!find_library_collection_path(collection_name, &base_dir)) {
 			// NOTE(bill): It's a naughty name
-			syntax_error(node, "Unknown library collection: '%.*s'", LIT(collection_name));
+			do_error(node, "Unknown library collection: '%.*s'", LIT(collection_name));
 			return false;
 		}
 	} else {
@@ -5759,7 +5775,7 @@ gb_internal bool determine_path_from_string(BlockingMutex *file_mutex, Ast *node
 		if (collection_name == "core" || collection_name == "base") {
 			return true;
 		} else {
-			syntax_error(node, "The package '%.*s' must be imported with the 'base' library collection: 'base:%.*s'", LIT(file_str), LIT(file_str));
+			do_error(node, "The package '%.*s' must be imported with the 'base' library collection: 'base:%.*s'", LIT(file_str), LIT(file_str));
 			return false;
 		}
 	}
@@ -5844,30 +5860,29 @@ gb_internal void parse_setup_file_decls(Parser *p, AstFile *f, String const &bas
 		} else if (node->kind == Ast_ForeignImportDecl) {
 			ast_node(fl, ForeignImportDecl, node);
 
-			auto fullpaths = array_make<String>(permanent_allocator(), 0, fl->filepaths.count);
-
-			for (Token const &fp : fl->filepaths) {
-				String file_str = string_trim_whitespace(string_value_from_token(f, fp));
+			if (fl->filepaths.count == 0) {
+				syntax_error(decls[i], "No foreign paths found");
+				decls[i] = ast_bad_decl(f, ast_token(fl->filepaths[0]), ast_end_token(fl->filepaths[fl->filepaths.count-1]));
+				goto end;
+			} else if (!fl->multiple_filepaths &&
+			           fl->filepaths.count == 1) {
+				Ast *fp = fl->filepaths[0];
+				GB_ASSERT(fp->kind == Ast_BasicLit);
+				Token fp_token = fp->BasicLit.token;
+				String file_str = string_trim_whitespace(string_value_from_token(f, fp_token));
 				String fullpath = file_str;
 				if (allow_check_foreign_filepath()) {
 					String foreign_path = {};
 					bool ok = determine_path_from_string(&p->file_decl_mutex, node, base_dir, file_str, &foreign_path);
 					if (!ok) {
-						decls[i] = ast_bad_decl(f, fp, fl->filepaths[fl->filepaths.count-1]);
+						decls[i] = ast_bad_decl(f, fp_token, fp_token);
 						goto end;
 					}
 					fullpath = foreign_path;
 				}
-				array_add(&fullpaths, fullpath);
+				fl->fullpaths = slice_make<String>(permanent_allocator(), 1);
+				fl->fullpaths[0] = fullpath;
 			}
-			if (fullpaths.count == 0) {
-				syntax_error(decls[i], "No foreign paths found");
-				decls[i] = ast_bad_decl(f, fl->filepaths[0], fl->filepaths[fl->filepaths.count-1]);
-				goto end;
-			}
-
-			fl->fullpaths = slice_from_array(fullpaths);
-
 
 		} else if (node->kind == Ast_WhenStmt) {
 			ast_node(ws, WhenStmt, node);

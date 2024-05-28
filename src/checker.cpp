@@ -1283,6 +1283,7 @@ gb_internal void init_checker_info(CheckerInfo *i) {
 	mpsc_init(&i->definition_queue, a); //); // 1<<20);
 	mpsc_init(&i->required_global_variable_queue, a); // 1<<10);
 	mpsc_init(&i->required_foreign_imports_through_force_queue, a); // 1<<10);
+	mpsc_init(&i->foreign_imports_to_check_fullpaths, a); // 1<<10);
 	mpsc_init(&i->intrinsics_entry_point_usage, a); // 1<<10); // just waste some memory here, even if it probably never used
 
 	string_map_init(&i->load_directory_cache);
@@ -1307,6 +1308,7 @@ gb_internal void destroy_checker_info(CheckerInfo *i) {
 	mpsc_destroy(&i->definition_queue);
 	mpsc_destroy(&i->required_global_variable_queue);
 	mpsc_destroy(&i->required_foreign_imports_through_force_queue);
+	mpsc_destroy(&i->foreign_imports_to_check_fullpaths);
 
 	map_destroy(&i->objc_msgSend_types);
 	string_map_destroy(&i->load_file_cache);
@@ -4874,6 +4876,83 @@ gb_internal DECL_ATTRIBUTE_PROC(foreign_import_decl_attribute) {
 	return false;
 }
 
+gb_internal void check_foreign_import_fullpaths(Checker *c) {
+	CheckerContext ctx = make_checker_context(c);
+
+	UntypedExprInfoMap untyped = {};
+	defer (map_destroy(&untyped));
+
+	for (Entity *e = nullptr; mpsc_dequeue(&c->info.foreign_imports_to_check_fullpaths, &e); /**/) {
+		GB_ASSERT(e != nullptr);
+		GB_ASSERT(e->kind == Entity_LibraryName);
+		Ast *decl = e->LibraryName.decl;
+		ast_node(fl, ForeignImportDecl, decl);
+
+		AstFile *f = decl->file();
+
+		reset_checker_context(&ctx, f, &untyped);
+		ctx.collect_delayed_decls = false;
+
+		GB_ASSERT(ctx.scope == e->scope);
+
+		if (fl->fullpaths.count == 0) {
+			String base_dir = dir_from_path(decl->file()->fullpath);
+
+			auto fullpaths = array_make<String>(permanent_allocator(), 0, fl->filepaths.count);
+
+			for (Ast *fp_node : fl->filepaths) {
+				Operand op = {};
+				check_expr(&ctx, &op, fp_node);
+				if (op.mode != Addressing_Constant && op.value.kind != ExactValue_String) {
+					gbString s = expr_to_string(op.expr);
+					error(fp_node, "Expected a constant string value, got '%s'", s);
+					gb_string_free(s);
+					continue;
+				}
+				if (!is_type_string(op.type)) {
+					gbString s = type_to_string(op.type);
+					error(fp_node, "Expected a constant string value, got value of type '%s'", s);
+					gb_string_free(s);
+					continue;
+				}
+
+				String file_str = op.value.value_string;
+				file_str = string_trim_whitespace(file_str);
+
+				String fullpath = file_str;
+				if (allow_check_foreign_filepath()) {
+					String foreign_path = {};
+					bool ok = determine_path_from_string(nullptr, decl, base_dir, file_str, &foreign_path, /*use error not syntax_error*/true);
+					if (ok) {
+						fullpath = foreign_path;
+					}
+				}
+				array_add(&fullpaths, fullpath);
+			}
+			fl->fullpaths = slice_from_array(fullpaths);
+		}
+
+		for (String const &path : fl->fullpaths) {
+			String ext = path_extension(path);
+			if (str_eq_ignore_case(ext, ".c") ||
+			    str_eq_ignore_case(ext, ".cpp") ||
+			    str_eq_ignore_case(ext, ".cxx") ||
+			    str_eq_ignore_case(ext, ".h") ||
+			    str_eq_ignore_case(ext, ".hpp") ||
+			    str_eq_ignore_case(ext, ".hxx") ||
+			    false
+			) {
+				error(fl->token, "With 'foreign import', you cannot import a %.*s file/directory, you must precompile the library and link against that", LIT(ext));
+				break;
+			}
+		}
+
+		add_untyped_expressions(ctx.info, &untyped);
+
+		e->LibraryName.paths = fl->fullpaths;
+	}
+}
+
 gb_internal void check_add_foreign_import_decl(CheckerContext *ctx, Ast *decl) {
 	if (decl->state_flags & StateFlag_BeenHandled) return;
 	decl->state_flags |= StateFlag_BeenHandled;
@@ -4883,58 +4962,25 @@ gb_internal void check_add_foreign_import_decl(CheckerContext *ctx, Ast *decl) {
 	Scope *parent_scope = ctx->scope;
 	GB_ASSERT(parent_scope->flags&ScopeFlag_File);
 
-	GB_ASSERT(fl->fullpaths.count > 0);
-	String fullpath = fl->fullpaths[0];
-	String library_name = path_to_entity_name(fl->library_name.string, fullpath);
-	if (is_blank_ident(library_name)) {
-		error(fl->token, "File name, %.*s, cannot be as a library name as it is not a valid identifier", LIT(fl->library_name.string));
+	String library_name = fl->library_name.string;
+	if (library_name.len == 0 && fl->fullpaths.count != 0) {
+		String fullpath = fl->fullpaths[0];
+		library_name = path_to_entity_name(fl->library_name.string, fullpath);
+	}
+	if (library_name.len == 0 || is_blank_ident(library_name)) {
+		error(fl->token, "File name, '%.*s', cannot be as a library name as it is not a valid identifier", LIT(library_name));
 		return;
 	}
 
-	for (String const &path : fl->fullpaths) {
-		String ext = path_extension(path);
-		if (str_eq_ignore_case(ext, ".c") ||
-		    str_eq_ignore_case(ext, ".cpp") ||
-		    str_eq_ignore_case(ext, ".cxx") ||
-		    str_eq_ignore_case(ext, ".h") ||
-		    str_eq_ignore_case(ext, ".hpp") ||
-		    str_eq_ignore_case(ext, ".hxx") ||
-		    false
-		) {
-			error(fl->token, "With 'foreign import', you cannot import a %.*s file directory, you must precompile the library and link against that", LIT(ext));
-			break;
-		}
-	}
-
-
-	// if (fl->collection_name != "system") {
-	// 	char *c_str = gb_alloc_array(heap_allocator(), char, fullpath.len+1);
-	// 	defer (gb_free(heap_allocator(), c_str));
-	// 	gb_memmove(c_str, fullpath.text, fullpath.len);
-	// 	c_str[fullpath.len] = '\0';
-
-	// 	gbFile f = {};
-	// 	gbFileError file_err = gb_file_open(&f, c_str);
-	// 	defer (gb_file_close(&f));
-
-	// 	switch (file_err) {
-	// 	case gbFileError_Invalid:
-	// 		error(decl, "Invalid file or cannot be found ('%.*s')", LIT(fullpath));
-	// 		return;
-	// 	case gbFileError_NotExists:
-	// 		error(decl, "File cannot be found ('%.*s')", LIT(fullpath));
-	// 		return;
-	// 	}
-	// }
 
 	GB_ASSERT(fl->library_name.pos.line != 0);
 	fl->library_name.string = library_name;
 
 	Entity *e = alloc_entity_library_name(parent_scope, fl->library_name, t_invalid,
 	                                      fl->fullpaths, library_name);
+	e->LibraryName.decl = decl;
 	add_entity_flags_from_file(ctx, e, parent_scope);
 	add_entity(ctx, parent_scope, nullptr, e);
-
 
 	AttributeContext ac = {};
 	check_decl_attributes(ctx, fl->attributes, foreign_import_decl_attribute, &ac);
@@ -4950,12 +4996,8 @@ gb_internal void check_add_foreign_import_decl(CheckerContext *ctx, Ast *decl) {
 		e->LibraryName.extra_linker_flags = extra_linker_flags;
 	}
 
-	if (has_asm_extension(fullpath)) {
-		if (build_context.metrics.arch != TargetArch_amd64 && build_context.metrics.os != TargetOs_darwin) {
-			error(decl, "Assembly files are not yet supported on this platform: %.*s_%.*s",
-			      LIT(target_os_names[build_context.metrics.os]), LIT(target_arch_names[build_context.metrics.arch]));
-		}
-	}
+	mpsc_enqueue(&ctx->info->foreign_imports_to_check_fullpaths, e);
+
 }
 
 // Returns true if a new package is present
@@ -6316,6 +6358,9 @@ gb_internal void check_parsed_files(Checker *c) {
 
 	TIME_SECTION("check procedure bodies");
 	check_procedure_bodies(c);
+
+	TIME_SECTION("check foreign import fullpaths");
+	check_foreign_import_fullpaths(c);
 
 	TIME_SECTION("add entities from procedure bodies");
 	check_merge_queues_into_arrays(c);

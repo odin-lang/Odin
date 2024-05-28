@@ -538,7 +538,7 @@ Foreign_Import_Decl :: struct {
 	import_tok:      tokenizer.Token,
 	name:            ^Ident,
 	collection_name: string,
-	fullpaths:       []string,
+	fullpaths:       []^Expr,
 	comment:         ^Comment_Group,
 }
 
