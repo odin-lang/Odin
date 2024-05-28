@@ -292,7 +292,7 @@ rollback_stack_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mo
 		}
 
 	case .Free:
-        err = rb_free(stack, old_memory)
+		err = rb_free(stack, old_memory)
 
 	case .Free_All:
 		rb_free_all(stack)
