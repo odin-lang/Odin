@@ -2,6 +2,12 @@
 //+build windows
 package testing
 
+run_internal_test :: proc(t: ^T, it: Internal_Test) {
+	it.p(t)
+}
+
+// Temporarily disabled during multi-threaded test runner refactor.
+/*
 import win32 "core:sys/windows"
 import "base:runtime"
 import "base:intrinsics"
@@ -233,3 +239,4 @@ run_internal_test :: proc(t: ^T, it: Internal_Test) {
 
 	return
 }
+*/
