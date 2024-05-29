@@ -6,7 +6,7 @@ python3 download_assets.py
 echo ---
 echo Running core:compress tests
 echo ---
-%PATH_TO_ODIN% run compress %COMMON% -out:test_core_compress.exe || exit /b
+%PATH_TO_ODIN% test compress %COMMON% -define:test_progress_width=3 -out:test_core_compress.exe || exit /b
 
 echo ---
 echo Running core:container tests

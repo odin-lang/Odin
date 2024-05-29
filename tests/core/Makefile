@@ -37,7 +37,7 @@ image_test:
 	$(ODIN) test image $(COMMON) -define:test_progress_width=12 -out:test_core_image
 
 compress_test:
-	$(ODIN) run compress $(COMMON) -out:test_core_compress
+	$(ODIN) test compress $(COMMON) -define:test_progress_width=3 -out:test_core_compress
 
 container_test:
 	$(ODIN) run container $(COMMON) $(COLLECTION) -out:test_core_container
