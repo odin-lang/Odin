@@ -13,41 +13,20 @@ package test_core_crypto
 */
 
 import "core:encoding/hex"
-import "core:fmt"
 import "core:mem"
 import "core:testing"
+import "base:runtime"
+import "core:log"
 
 import "core:crypto"
 import "core:crypto/chacha20"
 import "core:crypto/chacha20poly1305"
 
-import tc "tests:common"
-
-main :: proc() {
-	t := testing.T{}
-
-	test_rand_bytes(&t)
-
-	test_hash(&t)
-	test_mac(&t)
-	test_kdf(&t) // After hash/mac tests because those should pass first.
-	test_ecc25519(&t)
-
-	test_aes(&t)
-	test_chacha20(&t)
-	test_chacha20poly1305(&t)
-	test_sha3_variants(&t)
-
-	bench_crypto(&t)
-
-	tc.report(&t)
-}
-
 _PLAINTEXT_SUNSCREEN_STR := "Ladies and Gentlemen of the class of '99: If I could offer you only one tip for the future, sunscreen would be it."
 
 @(test)
 test_chacha20 :: proc(t: ^testing.T) {
-	tc.log(t, "Testing (X)ChaCha20")
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 
 	// Test cases taken from RFC 8439, and draft-irtf-cfrg-xchacha-03
 	plaintext := transmute([]byte)(_PLAINTEXT_SUNSCREEN_STR)
@@ -90,14 +69,12 @@ test_chacha20 :: proc(t: ^testing.T) {
 	chacha20.xor_bytes(&ctx, derived_ciphertext[:], plaintext[:])
 
 	derived_ciphertext_str := string(hex.encode(derived_ciphertext[:], context.temp_allocator))
-	tc.expect(
+	testing.expectf(
 		t,
 		derived_ciphertext_str == ciphertext_str,
-		fmt.tprintf(
-			"Expected %s for xor_bytes(plaintext_str), but got %s instead",
-			ciphertext_str,
-			derived_ciphertext_str,
-		),
+		"Expected %s for xor_bytes(plaintext_str), but got %s instead",
+		ciphertext_str,
+		derived_ciphertext_str,
 	)
 
 	xkey := [chacha20.KEY_SIZE]byte {
@@ -137,21 +114,17 @@ test_chacha20 :: proc(t: ^testing.T) {
 	chacha20.xor_bytes(&ctx, derived_ciphertext[:], plaintext[:])
 
 	derived_ciphertext_str = string(hex.encode(derived_ciphertext[:], context.temp_allocator))
-	tc.expect(
+	testing.expectf(
 		t,
 		derived_ciphertext_str == xciphertext_str,
-		fmt.tprintf(
-			"Expected %s for xor_bytes(plaintext_str), but got %s instead",
-			xciphertext_str,
-			derived_ciphertext_str,
-		),
+		"Expected %s for xor_bytes(plaintext_str), but got %s instead",
+		xciphertext_str,
+		derived_ciphertext_str,
 	)
 }
 
 @(test)
 test_chacha20poly1305 :: proc(t: ^testing.T) {
-	tc.log(t, "Testing chacha20poly1205")
-
 	plaintext := transmute([]byte)(_PLAINTEXT_SUNSCREEN_STR)
 
 	aad := [12]byte {
@@ -209,25 +182,21 @@ test_chacha20poly1305 :: proc(t: ^testing.T) {
 	)
 
 	derived_ciphertext_str := string(hex.encode(derived_ciphertext[:], context.temp_allocator))
-	tc.expect(
+	testing.expectf(
 		t,
 		derived_ciphertext_str == ciphertext_str,
-		fmt.tprintf(
-			"Expected ciphertext %s for encrypt(aad, plaintext), but got %s instead",
-			ciphertext_str,
-			derived_ciphertext_str,
-		),
+		"Expected ciphertext %s for encrypt(aad, plaintext), but got %s instead",
+		ciphertext_str,
+		derived_ciphertext_str,
 	)
 
 	derived_tag_str := string(hex.encode(derived_tag[:], context.temp_allocator))
-	tc.expect(
+	testing.expectf(
 		t,
 		derived_tag_str == tag_str,
-		fmt.tprintf(
-			"Expected tag %s for encrypt(aad, plaintext), but got %s instead",
-			tag_str,
-			derived_tag_str,
-		),
+		"Expected tag %s for encrypt(aad, plaintext), but got %s instead",
+		tag_str,
+		derived_tag_str,
 	)
 
 	derived_plaintext: [114]byte
@@ -240,15 +209,13 @@ test_chacha20poly1305 :: proc(t: ^testing.T) {
 		ciphertext[:],
 	)
 	derived_plaintext_str := string(derived_plaintext[:])
-	tc.expect(t, ok, "Expected true for decrypt(tag, aad, ciphertext)")
-	tc.expect(
+	testing.expect(t, ok, "Expected true for decrypt(tag, aad, ciphertext)")
+	testing.expectf(
 		t,
 		derived_plaintext_str == _PLAINTEXT_SUNSCREEN_STR,
-		fmt.tprintf(
-			"Expected plaintext %s for decrypt(tag, aad, ciphertext), but got %s instead",
-			_PLAINTEXT_SUNSCREEN_STR,
-			derived_plaintext_str,
-		),
+		"Expected plaintext %s for decrypt(tag, aad, ciphertext), but got %s instead",
+		_PLAINTEXT_SUNSCREEN_STR,
+		derived_plaintext_str,
 	)
 
 	derived_ciphertext[0] ~= 0xa5
@@ -260,7 +227,7 @@ test_chacha20poly1305 :: proc(t: ^testing.T) {
 		aad[:],
 		derived_ciphertext[:],
 	)
-	tc.expect(t, !ok, "Expected false for decrypt(tag, aad, corrupted_ciphertext)")
+	testing.expect(t, !ok, "Expected false for decrypt(tag, aad, corrupted_ciphertext)")
 
 	aad[0] ~= 0xa5
 	ok = chacha20poly1305.decrypt(
@@ -271,15 +238,13 @@ test_chacha20poly1305 :: proc(t: ^testing.T) {
 		aad[:],
 		ciphertext[:],
 	)
-	tc.expect(t, !ok, "Expected false for decrypt(tag, corrupted_aad, ciphertext)")
+	testing.expect(t, !ok, "Expected false for decrypt(tag, corrupted_aad, ciphertext)")
 }
 
 @(test)
 test_rand_bytes :: proc(t: ^testing.T) {
-	tc.log(t, "Testing rand_bytes")
-
 	if !crypto.HAS_RAND_BYTES {
-		tc.log(t, "rand_bytes not supported - skipping")
+		log.info("rand_bytes not supported - skipping")
 		return
 	}
 
@@ -307,10 +272,5 @@ test_rand_bytes :: proc(t: ^testing.T) {
 			break
 		}
 	}
-
-	tc.expect(
-		t,
-		seems_ok,
-		"Expected to randomize the head and tail of the buffer within a handful of attempts",
-	)
+	testing.expect(t, seems_ok, "Expected to randomize the head and tail of the buffer within a handful of attempts")
 }

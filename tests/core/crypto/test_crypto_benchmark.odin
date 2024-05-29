@@ -2,7 +2,7 @@ package test_core_crypto
 
 import "base:runtime"
 import "core:encoding/hex"
-import "core:fmt"
+import "core:log"
 import "core:testing"
 import "core:time"
 
@@ -13,16 +13,11 @@ import "core:crypto/ed25519"
 import "core:crypto/poly1305"
 import "core:crypto/x25519"
 
-import tc "tests:common"
-
 // Cryptographic primitive benchmarks.
 
 @(test)
 bench_crypto :: proc(t: ^testing.T) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
-
-	fmt.println("Starting benchmarks:")
-
 	bench_chacha20(t)
 	bench_poly1305(t)
 	bench_chacha20poly1305(t)
@@ -157,8 +152,8 @@ _benchmark_aes256_gcm :: proc(
 }
 
 benchmark_print :: proc(name: string, options: ^time.Benchmark_Options) {
-	fmt.printf(
-		"\t[%v] %v rounds, %v bytes processed in %v ns\n\t\t%5.3f rounds/s, %5.3f MiB/s\n",
+	log.infof(
+		"\n\t[%v] %v rounds, %v bytes processed in %v ns\n\t\t%5.3f rounds/s, %5.3f MiB/s",
 		name,
 		options.rounds,
 		options.processed,
@@ -179,19 +174,19 @@ bench_chacha20 :: proc(t: ^testing.T) {
 	}
 
 	err := time.benchmark(options, context.allocator)
-	tc.expect(t, err == nil, name)
+	testing.expect(t, err == nil, name)
 	benchmark_print(name, options)
 
 	name = "ChaCha20 1024 bytes"
 	options.bytes = 1024
 	err = time.benchmark(options, context.allocator)
-	tc.expect(t, err == nil, name)
+	testing.expect(t, err == nil, name)
 	benchmark_print(name, options)
 
 	name = "ChaCha20 65536 bytes"
 	options.bytes = 65536
 	err = time.benchmark(options, context.allocator)
-	tc.expect(t, err == nil, name)
+	testing.expect(t, err == nil, name)
 	benchmark_print(name, options)
 }
 
@@ -206,13 +201,13 @@ bench_poly1305 :: proc(t: ^testing.T) {
 	}
 
 	err := time.benchmark(options, context.allocator)
-	tc.expect(t, err == nil, name)
+	testing.expect(t, err == nil, name)
 	benchmark_print(name, options)
 
 	name = "Poly1305 1024 zero bytes"
 	options.bytes = 1024
 	err = time.benchmark(options, context.allocator)
-	tc.expect(t, err == nil, name)
+	testing.expect(t, err == nil, name)
 	benchmark_print(name, options)
 }
 
@@ -227,19 +222,19 @@ bench_chacha20poly1305 :: proc(t: ^testing.T) {
 	}
 
 	err := time.benchmark(options, context.allocator)
-	tc.expect(t, err == nil, name)
+	testing.expect(t, err == nil, name)
 	benchmark_print(name, options)
 
 	name = "chacha20poly1305 1024 bytes"
 	options.bytes = 1024
 	err = time.benchmark(options, context.allocator)
-	tc.expect(t, err == nil, name)
+	testing.expect(t, err == nil, name)
 	benchmark_print(name, options)
 
 	name = "chacha20poly1305 65536 bytes"
 	options.bytes = 65536
 	err = time.benchmark(options, context.allocator)
-	tc.expect(t, err == nil, name)
+	testing.expect(t, err == nil, name)
 	benchmark_print(name, options)
 }
 
@@ -265,19 +260,19 @@ bench_aes256_gcm :: proc(t: ^testing.T) {
 	context.user_ptr = &ctx
 
 	err := time.benchmark(options, context.allocator)
-	tc.expect(t, err == nil, name)
+	testing.expect(t, err == nil, name)
 	benchmark_print(name, options)
 
 	name = "AES256-GCM 1024 bytes"
 	options.bytes = 1024
 	err = time.benchmark(options, context.allocator)
-	tc.expect(t, err == nil, name)
+	testing.expect(t, err == nil, name)
 	benchmark_print(name, options)
 
 	name = "AES256-GCM 65536 bytes"
 	options.bytes = 65536
 	err = time.benchmark(options, context.allocator)
-	tc.expect(t, err == nil, name)
+	testing.expect(t, err == nil, name)
 	benchmark_print(name, options)
 }
 
@@ -293,12 +288,9 @@ bench_ed25519 :: proc(t: ^testing.T) {
 		assert(ok, "private key should deserialize")
 	}
 	elapsed := time.since(start)
-	tc.log(
-		t,
-		fmt.tprintf(
-			"ed25519.private_key_set_bytes: ~%f us/op",
-			time.duration_microseconds(elapsed) / iters,
-		),
+	log.infof(
+		"ed25519.private_key_set_bytes: ~%f us/op",
+		time.duration_microseconds(elapsed) / iters,
 	)
 
 	pub_bytes := priv_key._pub_key._b[:] // "I know what I am doing"
@@ -309,12 +301,9 @@ bench_ed25519 :: proc(t: ^testing.T) {
 		assert(ok, "public key should deserialize")
 	}
 	elapsed = time.since(start)
-	tc.log(
-		t,
-		fmt.tprintf(
-			"ed25519.public_key_set_bytes: ~%f us/op",
-			time.duration_microseconds(elapsed) / iters,
-		),
+	log.infof(
+		"ed25519.public_key_set_bytes: ~%f us/op",
+		time.duration_microseconds(elapsed) / iters,
 	)
 
 	msg := "Got a job for you, 621."
@@ -325,7 +314,10 @@ bench_ed25519 :: proc(t: ^testing.T) {
 		ed25519.sign(&priv_key, msg_bytes, sig_bytes[:])
 	}
 	elapsed = time.since(start)
-	tc.log(t, fmt.tprintf("ed25519.sign: ~%f us/op", time.duration_microseconds(elapsed) / iters))
+	log.infof(
+	    "ed25519.sign: ~%f us/op",
+	    time.duration_microseconds(elapsed) / iters,
+	)
 
 	start = time.now()
 	for i := 0; i < iters; i = i + 1 {
@@ -333,9 +325,9 @@ bench_ed25519 :: proc(t: ^testing.T) {
 		assert(ok, "signature should validate")
 	}
 	elapsed = time.since(start)
-	tc.log(
-		t,
-		fmt.tprintf("ed25519.verify: ~%f us/op", time.duration_microseconds(elapsed) / iters),
+	log.infof(
+		"ed25519.verify: ~%f us/op",
+		time.duration_microseconds(elapsed) / iters,
 	)
 }
 
@@ -354,8 +346,8 @@ bench_x25519 :: proc(t: ^testing.T) {
 	}
 	elapsed := time.since(start)
 
-	tc.log(
-		t,
-		fmt.tprintf("x25519.scalarmult: ~%f us/op", time.duration_microseconds(elapsed) / iters),
+	log.infof(
+		"x25519.scalarmult: ~%f us/op",
+		time.duration_microseconds(elapsed) / iters,
 	)
 }

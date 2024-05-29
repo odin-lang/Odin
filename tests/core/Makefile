@@ -42,14 +42,14 @@ compress_test:
 container_test:
 	$(ODIN) test container $(COMMON) -define:test_progress_width=4 -out:test_core_container
 
+crypto_test:
+	$(ODIN) test crypto $(COMMON) -define:test_progress_width=18 -o:speed -out:test_crypto
+
 strings_test:
 	$(ODIN) run strings $(COMMON) -out:test_core_strings
 
 hash_test:
 	$(ODIN) run hash $(COMMON) -o:speed -out:test_hash
-
-crypto_test:
-	$(ODIN) run crypto $(COMMON) $(COLLECTION) -o:speed -out:test_crypto
 
 noise_test:
 	$(ODIN) run math/noise $(COMMON) -out:test_noise

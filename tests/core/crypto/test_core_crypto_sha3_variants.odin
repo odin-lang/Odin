@@ -2,30 +2,14 @@ package test_core_crypto
 
 import "base:runtime"
 import "core:encoding/hex"
-import "core:fmt"
 import "core:testing"
-
 import "core:crypto/kmac"
 import "core:crypto/shake"
 import "core:crypto/tuplehash"
 
-import tc "tests:common"
-
-@(test)
-test_sha3_variants :: proc(t: ^testing.T) {
-	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
-
-	tc.log(t, "Testing SHA3 derived functions")
-
-	test_shake(t)
-	test_cshake(t)
-	test_tuplehash(t)
-	test_kmac(t)
-}
-
 @(test)
 test_shake :: proc(t: ^testing.T) {
-	tc.log(t, "Testing SHAKE")
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 
 	test_vectors := []struct {
 		sec_strength: int,
@@ -67,23 +51,21 @@ test_shake :: proc(t: ^testing.T) {
 
 		dst_str := string(hex.encode(dst, context.temp_allocator))
 
-		tc.expect(
+		testing.expectf(
 			t,
 			dst_str == v.output,
-			fmt.tprintf(
-				"SHAKE%d: Expected: %s for input of %s, but got %s instead",
-				v.sec_strength,
-				v.output,
-				v.str,
-				dst_str,
-			),
+			"SHAKE%d: Expected: %s for input of %s, but got %s instead",
+			v.sec_strength,
+			v.output,
+			v.str,
+			dst_str,
 		)
 	}
 }
 
 @(test)
 test_cshake :: proc(t: ^testing.T) {
-	tc.log(t, "Testing cSHAKE")
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 
 	test_vectors := []struct {
 		sec_strength: int,
@@ -135,29 +117,27 @@ test_cshake :: proc(t: ^testing.T) {
 			shake.init_cshake_256(&ctx, domainsep)
 		}
 
-		data, _ := hex.decode(transmute([]byte)(v.str))
+		data, _ := hex.decode(transmute([]byte)(v.str), context.temp_allocator)
 		shake.write(&ctx, data)
 		shake.read(&ctx, dst)
 
 		dst_str := string(hex.encode(dst, context.temp_allocator))
 
-		tc.expect(
+		testing.expectf(
 			t,
 			dst_str == v.output,
-			fmt.tprintf(
-				"cSHAKE%d: Expected: %s for input of %s, but got %s instead",
-				v.sec_strength,
-				v.output,
-				v.str,
-				dst_str,
-			),
+			"cSHAKE%d: Expected: %s for input of %s, but got %s instead",
+			v.sec_strength,
+			v.output,
+			v.str,
+			dst_str,
 		)
 	}
 }
 
 @(test)
 test_tuplehash :: proc(t: ^testing.T) {
-	tc.log(t, "Testing TupleHash(XOF)")
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 
 	test_vectors := []struct {
 		sec_strength: int,
@@ -317,7 +297,7 @@ test_tuplehash :: proc(t: ^testing.T) {
 		}
 
 		for e in v.tuple {
-			data, _ := hex.decode(transmute([]byte)(e))
+			data, _ := hex.decode(transmute([]byte)(e), context.temp_allocator)
 			tuplehash.write_element(&ctx, data)
 		}
 
@@ -332,24 +312,22 @@ test_tuplehash :: proc(t: ^testing.T) {
 
 		dst_str := string(hex.encode(dst, context.temp_allocator))
 
-		tc.expect(
+		testing.expectf(
 			t,
 			dst_str == v.output,
-			fmt.tprintf(
-				"TupleHash%s%d: Expected: %s for input of %v, but got %s instead",
-				suffix,
-				v.sec_strength,
-				v.output,
-				v.tuple,
-				dst_str,
-			),
+			"TupleHash%s%d: Expected: %s for input of %v, but got %s instead",
+			suffix,
+			v.sec_strength,
+			v.output,
+			v.tuple,
+			dst_str,
 		)
 	}
 }
 
 @(test)
 test_kmac :: proc(t:^testing.T) {
-	tc.log(t, "Testing KMAC")
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 
 	test_vectors := []struct {
 		sec_strength: int,
@@ -410,7 +388,7 @@ test_kmac :: proc(t:^testing.T) {
 	for v in test_vectors {
 		dst := make([]byte, len(v.output) / 2, context.temp_allocator)
 
-		key, _ := hex.decode(transmute([]byte)(v.key))
+		key, _ := hex.decode(transmute([]byte)(v.key), context.temp_allocator)
 		domainsep := transmute([]byte)(v.domainsep)
 
 		ctx: kmac.Context
@@ -421,24 +399,22 @@ test_kmac :: proc(t:^testing.T) {
 			kmac.init_256(&ctx, key, domainsep)
 		}
 
-		data, _ := hex.decode(transmute([]byte)(v.msg))
+		data, _ := hex.decode(transmute([]byte)(v.msg), context.temp_allocator)
 		kmac.update(&ctx, data)
 		kmac.final(&ctx, dst)
 
 		dst_str := string(hex.encode(dst, context.temp_allocator))
 
-		tc.expect(
+		testing.expectf(
 			t,
 			dst_str == v.output,
-			fmt.tprintf(
-				"KMAC%d: Expected: %s for input of (%s, %s, %s), but got %s instead",
-				v.sec_strength,
-				v.output,
-				v.key,
-				v.domainsep,
-				v.msg,
-				dst_str,
-			),
+			"KMAC%d: Expected: %s for input of (%s, %s, %s), but got %s instead",
+			v.sec_strength,
+			v.output,
+			v.key,
+			v.domainsep,
+			v.msg,
+			dst_str,
 		)
 	}
 }

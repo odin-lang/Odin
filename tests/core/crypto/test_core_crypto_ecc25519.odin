@@ -1,8 +1,6 @@
 package test_core_crypto
 
-import "base:runtime"
 import "core:encoding/hex"
-import "core:fmt"
 import "core:testing"
 
 import field "core:crypto/_fiat/field_curve25519"
@@ -10,25 +8,8 @@ import "core:crypto/ed25519"
 import "core:crypto/ristretto255"
 import "core:crypto/x25519"
 
-import tc "tests:common"
-
-@(test)
-test_ecc25519 :: proc(t: ^testing.T) {
-	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
-
-	tc.log(t, "Testing curve25519 ECC")
-
-	test_sqrt_ratio_m1(t)
-	test_ristretto255(t)
-
-	test_ed25519(t)
-	test_x25519(t)
-}
-
 @(test)
 test_sqrt_ratio_m1 :: proc(t: ^testing.T) {
-	tc.log(t, "Testing sqrt_ratio_m1")
-
 	test_vectors := []struct {
 		u: string,
 		v: string,
@@ -90,25 +71,21 @@ test_sqrt_ratio_m1 :: proc(t: ^testing.T) {
 			field.fe_relax_cast(&vee),
 		)
 
-		tc.expect(
+		testing.expectf(
 			t,
 			(was_square == 1) == v.was_square && field.fe_equal_bytes(&r, r_) == 1,
-			fmt.tprintf(
-				"Expected (%v, %s) for SQRT_RATIO_M1(%s, %s), got %s",
-				v.was_square,
-				v.r,
-				v.u,
-				v.v,
-				fe_str(&r),
-			),
+			"Expected (%v, %s) for SQRT_RATIO_M1(%s, %s), got %s",
+			v.was_square,
+			v.r,
+			v.u,
+			v.v,
+			fe_str(&r),
 		)
 	}
 }
 
 @(test)
 test_ristretto255 :: proc(t: ^testing.T) {
-	tc.log(t, "Testing ristretto255")
-
 	ge_gen: ristretto255.Group_Element
 	ristretto255.ge_generator(&ge_gen)
 
@@ -158,7 +135,7 @@ test_ristretto255 :: proc(t: ^testing.T) {
 
 		ge: ristretto255.Group_Element
 		ok := ristretto255.ge_set_bytes(&ge, b)
-		tc.expect(t, !ok, fmt.tprintf("Expected false for %s", x))
+		testing.expectf(t, !ok, "Expected false for %s", x)
 	}
 
 	generator_multiples := []string {
@@ -185,22 +162,20 @@ test_ristretto255 :: proc(t: ^testing.T) {
 
 		ge := &ges[i]
 		ok := ristretto255.ge_set_bytes(ge, b)
-		tc.expect(t, ok, fmt.tprintf("Expected true for %s", x))
+		testing.expectf(t, ok, "Expected true for %s", x)
 
 		x_check := ge_str(ge)
 
-		tc.expect(
+		testing.expectf(
 			t,
 			x == x_check,
-			fmt.tprintf(
-				"Expected %s (round-trip) but got %s instead",
-				x,
-				x_check,
-			),
+			"Expected %s (round-trip) but got %s instead",
+			x,
+			x_check,
 		)
 
 		if i == 1 {
-			tc.expect(
+			testing.expect(
 				t,
 				ristretto255.ge_equal(ge, &ge_gen) == 1,
 				"Expected element 1 to be the generator",
@@ -217,41 +192,35 @@ test_ristretto255 :: proc(t: ^testing.T) {
 
 		ristretto255.ge_scalarmult_generator(&ge_check, &sc)
 		x_check := ge_str(&ge_check)
-		tc.expect(
+		testing.expectf(
 			t,
 			x_check == generator_multiples[i],
-			fmt.tprintf(
-				"Expected %s for G * %d (specialized), got %s",
-				generator_multiples[i],
-				i,
-				x_check,
-			),
+			"Expected %s for G * %d (specialized), got %s",
+			generator_multiples[i],
+			i,
+			x_check,
 		)
 
 		ristretto255.ge_scalarmult(&ge_check, &ges[1], &sc)
 		x_check = ge_str(&ge_check)
-		tc.expect(
+		testing.expectf(
 			t,
 			x_check == generator_multiples[i],
-			fmt.tprintf(
-				"Expected %s for G * %d (generic), got %s (slow compare)",
-				generator_multiples[i],
-				i,
-				x_check,
-			),
+			"Expected %s for G * %d (generic), got %s (slow compare)",
+			generator_multiples[i],
+			i,
+			x_check,
 		)
 
 		ristretto255.ge_scalarmult_vartime(&ge_check, &ges[1], &sc)
 		x_check = ge_str(&ge_check)
-		tc.expect(
+		testing.expectf(
 			t,
 			x_check == generator_multiples[i],
-			fmt.tprintf(
-				"Expected %s for G * %d (generic vartime), got %s (slow compare)",
-				generator_multiples[i],
-				i,
-				x_check,
-			),
+			"Expected %s for G * %d (generic vartime), got %s (slow compare)",
+			generator_multiples[i],
+			i,
+			x_check,
 		)
 
 		switch i {
@@ -261,28 +230,24 @@ test_ristretto255 :: proc(t: ^testing.T) {
 			ristretto255.ge_add(&ge_check, ge_prev, &ge_gen)
 
 			x_check = ge_str(&ge_check)
-			tc.expect(
+			testing.expectf(
 				t,
 				x_check == generator_multiples[i],
-				fmt.tprintf(
-					"Expected %s for ges[%d] + ges[%d], got %s (slow compare)",
-					generator_multiples[i],
-					i-1,
-					1,
-					x_check,
-				),
+				"Expected %s for ges[%d] + ges[%d], got %s (slow compare)",
+				generator_multiples[i],
+				i-1,
+				1,
+				x_check,
 			)
 
-			tc.expect(
+			testing.expectf(
 				t,
 				ristretto255.ge_equal(&ges[i], &ge_check) == 1,
-				fmt.tprintf(
-					"Expected %s for ges[%d] + ges[%d], got %s (fast compare)",
-					generator_multiples[i],
-					i-1,
-					1,
-					x_check,
-				),
+				"Expected %s for ges[%d] + ges[%d], got %s (fast compare)",
+				generator_multiples[i],
+				i-1,
+				1,
+				x_check,
 			)
 		}
 	}
@@ -344,22 +309,18 @@ test_ristretto255 :: proc(t: ^testing.T) {
 		ristretto255.ge_set_wide_bytes(&ge, in_bytes)
 
 		ge_check := ge_str(&ge)
-		tc.expect(
+		testing.expectf(
 			t,
 			ge_check == v.output,
-			fmt.tprintf(
-				"Expected %s for %s, got %s",
-				v.output,
-				ge_check,
-			),
+			"Expected %s for %s, got %s",
+			v.output,
+			ge_check,
 		)
 	}
 }
 
 @(test)
 test_ed25519 :: proc(t: ^testing.T) {
-	tc.log(t, "Testing ed25519")
-
 	test_vectors_rfc := []struct {
 		priv_key: string,
 		pub_key:  string,
@@ -401,87 +362,73 @@ test_ed25519 :: proc(t: ^testing.T) {
 
 		priv_key: ed25519.Private_Key
 		ok := ed25519.private_key_set_bytes(&priv_key, priv_bytes)
-		tc.expect(
+		testing.expectf(
 			t,
 			ok,
-			fmt.tprintf(
-				"Expected %s to be a valid private key",
-				v.priv_key,
-			),
+			"Expected %s to be a valid private key",
+			v.priv_key,
 		)
 
 		key_bytes: [32]byte
 		ed25519.private_key_bytes(&priv_key, key_bytes[:])
-		tc.expect(
+		testing.expectf(
 			t,
 			ok,
-			fmt.tprintf(
-				"Expected private key %s round-trip, got %s",
-				v.priv_key,
-				string(hex.encode(key_bytes[:], context.temp_allocator)),
-			),
+			"Expected private key %s round-trip, got %s",
+			v.priv_key,
+			string(hex.encode(key_bytes[:], context.temp_allocator)),
 		)
 
 		pub_key: ed25519.Public_Key
 		ok = ed25519.public_key_set_bytes(&pub_key, pub_bytes)
-		tc.expect(
+		testing.expectf(
 			t,
 			ok,
-			fmt.tprintf(
-				"Expected %s to be a valid public key (priv->pub: %s)",
-				v.pub_key,
-				string(hex.encode(priv_key._pub_key._b[:], context.temp_allocator)),
-			),
+			"Expected %s to be a valid public key (priv->pub: %s)",
+			v.pub_key,
+			string(hex.encode(priv_key._pub_key._b[:], context.temp_allocator)),
 		)
 
 		ed25519.public_key_bytes(&pub_key, key_bytes[:])
-		tc.expect(
+		testing.expectf(
 			t,
 			ok,
-			fmt.tprintf(
-				"Expected public key %s round-trip, got %s",
-				v.pub_key,
-				string(hex.encode(key_bytes[:], context.temp_allocator)),
-			),
+			"Expected public key %s round-trip, got %s",
+			v.pub_key,
+			string(hex.encode(key_bytes[:], context.temp_allocator)),
 		)
 
 		sig: [ed25519.SIGNATURE_SIZE]byte
 		ed25519.sign(&priv_key, msg_bytes, sig[:])
 		x := string(hex.encode(sig[:], context.temp_allocator))
-		tc.expect(
+		testing.expectf(
 			t,
 			x == v.sig,
-			fmt.tprintf(
-				"Expected %s for sign(%s, %s), got %s",
-				v.sig,
-				v.priv_key,
-				v.msg,
-				x,
-			),
+			"Expected %s for sign(%s, %s), got %s",
+			v.sig,
+			v.priv_key,
+			v.msg,
+			x,
 		)
 
 		ok = ed25519.verify(&pub_key, msg_bytes, sig_bytes)
-		tc.expect(
+		testing.expectf(
 			t,
 			ok,
-			fmt.tprintf(
-				"Expected true for verify(%s, %s, %s)",
-				v.pub_key,
-				v.msg,
-				v.sig,
-			),
+			"Expected true for verify(%s, %s, %s)",
+			v.pub_key,
+			v.msg,
+			v.sig,
 		)
 
 		ok = ed25519.verify(&priv_key._pub_key, msg_bytes, sig_bytes)
-		tc.expect(
+		testing.expectf(
 			t,
 			ok,
-			fmt.tprintf(
-				"Expected true for verify(pub(%s), %s %s)",
-				v.priv_key,
-				v.msg,
-				v.sig,
-			),
+			"Expected true for verify(pub(%s), %s %s)",
+			v.priv_key,
+			v.msg,
+			v.sig,
 		)
 
 		// Corrupt the message and make sure verification fails.
@@ -493,15 +440,13 @@ test_ed25519 :: proc(t: ^testing.T) {
 			msg_bytes[0] = msg_bytes[0] ~ 69
 		}
 		ok = ed25519.verify(&pub_key, msg_bytes, sig_bytes)
-		tc.expect(
+		testing.expectf(
 			t,
 			ok == false,
-			fmt.tprintf(
-				"Expected false for verify(%s, %s (corrupted), %s)",
-				v.pub_key,
-				v.msg,
-				v.sig,
-			),
+			"Expected false for verify(%s, %s (corrupted), %s)",
+			v.pub_key,
+			v.msg,
+			v.sig,
 		)
 	}
 
@@ -634,15 +579,13 @@ test_ed25519 :: proc(t: ^testing.T) {
 
 		pub_key: ed25519.Public_Key
 		ok := ed25519.public_key_set_bytes(&pub_key, pub_bytes)
-		tc.expect(
+		testing.expectf(
 			t,
 			ok == v.pub_key_ok,
-			fmt.tprintf(
-				"speccheck/%d: Expected %s to be a (in)valid public key, got %v",
-				i,
-				v.pub_key,
-				ok,
-			),
+			"speccheck/%d: Expected %s to be a (in)valid public key, got %v",
+			i,
+			v.pub_key,
+			ok,
 		)
 
 		// If A is rejected for being non-canonical, skip signature check.
@@ -651,17 +594,15 @@ test_ed25519 :: proc(t: ^testing.T) {
 		}
 
 		ok = ed25519.verify(&pub_key, msg_bytes, sig_bytes)
-		tc.expect(
+		testing.expectf(
 			t,
 			ok == v.sig_ok,
-			fmt.tprintf(
-				"speccheck/%d Expected %v for verify(%s, %s, %s)",
-				i,
-				v.sig_ok,
-				v.pub_key,
-				v.msg,
-				v.sig,
-			),
+			"speccheck/%d Expected %v for verify(%s, %s, %s)",
+			i,
+			v.sig_ok,
+			v.pub_key,
+			v.msg,
+			v.sig,
 		)
 
 		// If the signature is accepted, skip the relaxed signature check.
@@ -670,25 +611,21 @@ test_ed25519 :: proc(t: ^testing.T) {
 		}
 
 		ok = ed25519.verify(&pub_key, msg_bytes, sig_bytes, true)
-		tc.expect(
+		testing.expectf(
 			t,
 			ok == v.sig_ok_relaxed,
-			fmt.tprintf(
-				"speccheck/%d Expected %v for verify(%s, %s, %s, true)",
-				i,
-				v.sig_ok_relaxed,
-				v.pub_key,
-				v.msg,
-				v.sig,
-			),
+			"speccheck/%d Expected %v for verify(%s, %s, %s, true)",
+			i,
+			v.sig_ok_relaxed,
+			v.pub_key,
+			v.msg,
+			v.sig,
 		)
 	}
 }
 
 @(test)
 test_x25519 :: proc(t: ^testing.T) {
-	tc.log(t, "Testing X25519")
-
 	// Local copy of this so that the base point doesn't need to be exported.
 	_BASE_POINT: [32]byte = {
 		9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -720,17 +657,15 @@ test_x25519 :: proc(t: ^testing.T) {
 		x25519.scalarmult(derived_point[:], scalar[:], point[:])
 		derived_point_str := string(hex.encode(derived_point[:], context.temp_allocator))
 
-		tc.expect(
+		testing.expectf(
 			t,
 			derived_point_str == v.product,
-			fmt.tprintf(
-				"Expected %s for %s * %s, but got %s instead",
-				v.product,
-				v.scalar,
-				v.point,
-				derived_point_str,
-			),
-		)
+			"Expected %s for %s * %s, but got %s instead",
+			v.product,
+			v.scalar,
+			v.point,
+			derived_point_str,
+			)
 
 		// Abuse the test vectors to sanity-check the scalar-basepoint multiply.
 		p1, p2: [x25519.POINT_SIZE]byte
@@ -738,15 +673,13 @@ test_x25519 :: proc(t: ^testing.T) {
 		x25519.scalarmult(p2[:], scalar[:], _BASE_POINT[:])
 		p1_str := string(hex.encode(p1[:], context.temp_allocator))
 		p2_str := string(hex.encode(p2[:], context.temp_allocator))
-		tc.expect(
+		testing.expectf(
 			t,
 			p1_str == p2_str,
-			fmt.tprintf(
-				"Expected %s for %s * basepoint, but got %s instead",
-				p2_str,
-				v.scalar,
-				p1_str,
-			),
+			"Expected %s for %s * basepoint, but got %s instead",
+			p2_str,
+			v.scalar,
+			p1_str,
 		)
 	}
 }

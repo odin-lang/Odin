@@ -23,9 +23,8 @@ import "core:hash"
 import "core:strings"
 import "core:mem"
 import "core:time"
-import "base:runtime"
 
-TEST_SUITE_PATH :: "assets/PNG"
+TEST_SUITE_PATH :: ODIN_ROOT + "tests/core/assets/PNG/"
 
 I_Error :: image.Error
 
@@ -1455,10 +1454,9 @@ png_test_no_postproc :: proc(t: ^testing.T) {
 }
 
 run_png_suite :: proc(t: ^testing.T, suite: []PNG_Test) {
-	context = runtime.default_context()
-
 	for file in suite {
-		test_file := strings.concatenate({TEST_SUITE_PATH, "/", file.file, ".png"}, context.temp_allocator)
+		test_file := strings.concatenate({TEST_SUITE_PATH, file.file, ".png"})
+		defer delete(test_file)
 
 		img: ^png.Image
 		err: png.Error
@@ -1466,10 +1464,6 @@ run_png_suite :: proc(t: ^testing.T, suite: []PNG_Test) {
 		count := 0
 		for test in file.tests {
 			count += 1
-
-			track: mem.Tracking_Allocator
-			mem.tracking_allocator_init(&track, context.allocator)
-			context.allocator = mem.tracking_allocator(&track)
 
 			img, err = png.load(test_file, test.options)
 

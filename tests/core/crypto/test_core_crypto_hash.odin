@@ -3,23 +3,17 @@ package test_core_crypto
 import "base:runtime"
 import "core:bytes"
 import "core:encoding/hex"
-import "core:fmt"
 import "core:strings"
 import "core:testing"
-
 import "core:crypto/hash"
-
-import tc "tests:common"
 
 @(test)
 test_hash :: proc(t: ^testing.T) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 
-	tc.log(t, "Testing Hashes")
-
 	// TODO:
 	// - Stick the test vectors in a JSON file or something.
-	data_1_000_000_a := strings.repeat("a", 1_000_000)
+	data_1_000_000_a := strings.repeat("a", 1_000_000, context.temp_allocator)
 
 	digest: [hash.MAX_DIGEST_SIZE]byte
 	test_vectors := []struct{
@@ -496,16 +490,14 @@ test_hash :: proc(t: ^testing.T) {
 
 		dst_str := string(hex.encode(dst, context.temp_allocator))
 
-		tc.expect(
+		testing.expectf(
 			t,
 			dst_str == v.hash,
-			fmt.tprintf(
-				"%s/incremental: Expected: %s for input of %s, but got %s instead",
-				algo_name,
-				v.hash,
-				v.str,
-				dst_str,
-			),
+			"%s/incremental: Expected: %s for input of %s, but got %s instead",
+			algo_name,
+			v.hash,
+			v.str,
+			dst_str,
 		)
 	}
 
@@ -521,25 +513,21 @@ test_hash :: proc(t: ^testing.T) {
 		// still correct.
 		digest_sz := hash.DIGEST_SIZES[algo]
 		block_sz := hash.BLOCK_SIZES[algo]
-		tc.expect(
+		testing.expectf(
 			t,
 			digest_sz <= hash.MAX_DIGEST_SIZE,
-			fmt.tprintf(
-				"%s: Digest size %d exceeds max %d",
-				algo_name,
-				digest_sz,
-				hash.MAX_DIGEST_SIZE,
-			),
+			"%s: Digest size %d exceeds max %d",
+			algo_name,
+			digest_sz,
+			hash.MAX_DIGEST_SIZE,
 		)
-		tc.expect(
+		testing.expectf(
 			t,
 			block_sz <= hash.MAX_BLOCK_SIZE,
-			fmt.tprintf(
-				"%s: Block size %d exceeds max %d",
-				algo_name,
-				block_sz,
-				hash.MAX_BLOCK_SIZE,
-			),
+			"%s: Block size %d exceeds max %d",
+			algo_name,
+			block_sz,
+			hash.MAX_BLOCK_SIZE,
 		)
 
 		// Exercise most of the happy-path for the high level interface.
@@ -553,15 +541,13 @@ test_hash :: proc(t: ^testing.T) {
 		a_str := string(hex.encode(digest_a, context.temp_allocator))
 		b_str := string(hex.encode(digest_b, context.temp_allocator))
 
-		tc.expect(
+		testing.expectf(
 			t,
 			a_str == b_str,
-			fmt.tprintf(
-				"%s/cmp: Expected: %s (hash_stream) == %s (hash_bytes)",
-				algo_name,
-				a_str,
-				b_str,
-			),
+			"%s/cmp: Expected: %s (hash_stream) == %s (hash_bytes)",
+			algo_name,
+			a_str,
+			b_str,
 		)
 
 		// Exercise the rolling digest functionality, which also covers
@@ -571,25 +557,21 @@ test_hash :: proc(t: ^testing.T) {
 
 		api_algo := hash.algorithm(&ctx)
 		api_digest_size := hash.digest_size(&ctx)
-		tc.expect(
+		testing.expectf(
 			t,
 			algo == api_algo,
-			fmt.tprintf(
-				"%s/algorithm: Expected: %v but got %v instead",
-				algo_name,
-				algo,
-				api_algo,
-			),
+			"%s/algorithm: Expected: %v but got %v instead",
+			algo_name,
+			algo,
+			api_algo,
 		)
-		tc.expect(
+		testing.expectf(
 			t,
 			hash.DIGEST_SIZES[algo] == api_digest_size,
-			fmt.tprintf(
-				"%s/digest_size: Expected: %d but got %d instead",
-				algo_name,
-				hash.DIGEST_SIZES[algo],
-				api_digest_size,
-			),
+			"%s/digest_size: Expected: %d but got %d instead",
+			algo_name,
+			hash.DIGEST_SIZES[algo],
+			api_digest_size,
 		)
 
 		hash.update(&ctx, digest_a)
@@ -604,16 +586,14 @@ test_hash :: proc(t: ^testing.T) {
 		b_str = string(hex.encode(digest_b, context.temp_allocator))
 		c_str := string(hex.encode(digest_c, context.temp_allocator))
 
-		tc.expect(
+		testing.expectf(
 			t,
 			a_str == b_str && b_str == c_str,
-			fmt.tprintf(
-				"%s/rolling: Expected: %s (first) == %s (second) == %s (third)",
-				algo_name,
-				a_str,
-				b_str,
-				c_str,
-			),
+			"%s/rolling: Expected: %s (first) == %s (second) == %s (third)",
+			algo_name,
+			a_str,
+			b_str,
+			c_str,
 		)
 	}
 }
