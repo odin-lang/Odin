@@ -330,6 +330,12 @@ Socket_Address_Basic :: struct #packed {
 	data: [14]c.char,
 }
 
+UNIX_PATH_MAX :: 104
+Socket_Address_Unix :: struct #packed {
+	using _: Socket_Address_Basic,
+	path: [UNIX_PATH_MAX]byte,
+}
+
 /*
  * howto arguments for shutdown(2), specified by Posix.1g.
  */

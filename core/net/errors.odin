@@ -192,9 +192,33 @@ UDP_Recv_Error :: enum i32 {
 	Unknown,
 }
 
+Unix_Recv_Error :: enum i32 {
+	None,
+	// No network connection, or the network stack is not initialized.
+	Network_Unreachable,
+	// Not enough space in internal tables/buffers to create a new socket, or an unsupported protocol is given.
+	Insufficient_Resources,
+	// Invalid socket or buffer given.
+	Invalid_Argument,
+	// The socket is not connected.
+	Not_Connected,
+	// Connection was closed/broken/shutdown while receiving data.
+	Connection_Closed,
+	// Timed out before being able to receive any data.
+	Timeout,
+	// Non-blocking socket that would need to block waiting on data.
+	Would_Block,
+	// Interrupted by a signal or other method of cancellation like WSACancelBlockingCall on Windows.
+	Interrupted,
+
+	// An error unable to be categorized in above categories, `last_platform_error` may have more info.
+	Unknown,
+}
+
 Send_Error :: union #shared_nil {
 	TCP_Send_Error,
 	UDP_Send_Error,
+	Unix_Send_Error,
 }
 
 TCP_Send_Error :: enum i32 {
@@ -206,6 +230,31 @@ TCP_Send_Error :: enum i32 {
 	// Invalid socket or buffer given.
 	Invalid_Argument,
 	// Connection was closed/broken/shutdown while sending data.
+	Connection_Closed,
+	// The socket is not connected.
+	Not_Connected,
+	// Could not reach the remote host.
+	Host_Unreachable,
+	// Timed out before being able to send any data.
+	Timeout,
+	// Non-blocking socket that would need to block waiting on the remote to be able to receive the data.
+	Would_Block,
+	// Interrupted by a signal or other method of cancellation like WSACancelBlockingCall on Windows.
+	Interrupted,
+
+	// An error unable to be categorized in above categories, `last_platform_error` may have more info.
+	Unknown,
+}
+
+Unix_Send_Error :: enum i32 {
+	None,
+	// No network connection, or the network stack is not initialized.
+	Network_Unreachable,
+	// Not enough space in internal tables/buffers to create a new socket, or an unsupported protocol is given.
+	Insufficient_Resources,
+	// Invalid socket or buffer given.
+	Invalid_Argument,
+	// Connection was closed/broken/shutdown while receiving data.
 	Connection_Closed,
 	// The socket is not connected.
 	Not_Connected,
