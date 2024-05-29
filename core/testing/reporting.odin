@@ -16,9 +16,11 @@ SGR_RUNNING :: ansi.CSI + ansi.FG_YELLOW       + ansi.SGR
 SGR_SUCCESS :: ansi.CSI + ansi.FG_GREEN        + ansi.SGR
 SGR_FAILED  :: ansi.CSI + ansi.FG_RED          + ansi.SGR
 
+MAX_PROGRESS_WIDTH :: 100
+
 // More than enough bytes to cover long package names, long test names, dozens
 // of ANSI codes, et cetera.
-LINE_BUFFER_SIZE :: (PROGRESS_WIDTH * 8 + 256) * runtime.Byte
+LINE_BUFFER_SIZE :: (MAX_PROGRESS_WIDTH * 8 + 224) * runtime.Byte
 
 PROGRESS_COLUMN_SPACING :: 2
 
@@ -44,6 +46,7 @@ Report :: struct {
 
 	pkg_column_len: int,
 	test_column_len: int,
+	progress_width: int,
 
 	all_tests: []Internal_Test,
 	all_test_states: []Test_State,
@@ -73,6 +76,10 @@ make_report :: proc(internal_tests: []Internal_Test) -> (report: Report, error: 
 				}) or_return
 			}
 
+			when PROGRESS_WIDTH == 0 {
+				report.progress_width = max(report.progress_width, index - pkg_start)
+			}
+
 			pkg_start = index
 			report.pkg_column_len = max(report.pkg_column_len, len(cur_pkg))
 			cur_pkg = it.pkg
@@ -80,7 +87,7 @@ make_report :: proc(internal_tests: []Internal_Test) -> (report: Report, error: 
 		report.test_column_len = max(report.test_column_len, len(it.name))
 	}
 
-	// Handle the last package.
+	// Handle the last (or only) package.
 	#no_bounds_check {
 		append(&packages, Package_Run {
 			name = cur_pkg,
@@ -89,6 +96,12 @@ make_report :: proc(internal_tests: []Internal_Test) -> (report: Report, error: 
 			test_states = report.all_test_states[pkg_start:],
 		}) or_return
 	}
+	when PROGRESS_WIDTH == 0 {
+		report.progress_width = max(report.progress_width, len(internal_tests) - pkg_start)
+	} else {
+		report.progress_width = PROGRESS_WIDTH
+	}
+	report.progress_width = min(report.progress_width, MAX_PROGRESS_WIDTH)
 
 	report.pkg_column_len = PROGRESS_COLUMN_SPACING + max(report.pkg_column_len, len(cur_pkg))
 
@@ -123,7 +136,7 @@ destroy_report :: proc(report: ^Report) {
 	delete(report.all_test_states)
 }
 
-redraw_package :: proc(w: io.Writer, pkg: ^Package_Run) {
+redraw_package :: proc(w: io.Writer, report: Report, pkg: ^Package_Run) {
 	if pkg.frame_ready {
 		io.write_string(w, pkg.redraw_string)
 		return
@@ -150,8 +163,8 @@ redraw_package :: proc(w: io.Writer, pkg: ^Package_Run) {
 		}
 	}
 
-	start := max(0, highest_run_index - (PROGRESS_WIDTH - 1))
-	end := min(start + PROGRESS_WIDTH, len(pkg.test_states))
+	start := max(0, highest_run_index - (report.progress_width - 1))
+	end   := min(start + report.progress_width, len(pkg.test_states))
 
 	// This variable is to keep track of the last ANSI code emitted, in
 	// order to avoid repeating the same code over in a sequence.
@@ -187,7 +200,7 @@ redraw_package :: proc(w: io.Writer, pkg: ^Package_Run) {
 		io.write_byte(line_writer, '|')
 	}
 
-	for _ in 0 ..< PROGRESS_WIDTH - (end - start) {
+	for _ in 0 ..< report.progress_width - (end - start) {
 		io.write_byte(line_writer, ' ')
 	}
 
@@ -255,7 +268,7 @@ redraw_report :: proc(w: io.Writer, report: Report) {
 	// still break...
 	fmt.wprint(w, ansi.CSI + ansi.DECAWM_OFF)
 	for &pkg in report.packages {
-		redraw_package(w, &pkg)
+		redraw_package(w, report, &pkg)
 	}
 	fmt.wprint(w, ansi.CSI + ansi.DECAWM_ON)
 }
