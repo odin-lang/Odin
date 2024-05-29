@@ -1403,6 +1403,65 @@ gb_internal LoadDirectiveResult check_load_directory_directive(CheckerContext *c
 	return result;
 }
 
+gb_internal bool check_hash_kind(CheckerContext *c, Ast *call, String const &hash_kind, u8 const *data, isize data_size, u64 *hash_value) {
+	ast_node(ce, CallExpr, call);
+	ast_node(bd, BasicDirective, ce->proc);
+	String name = bd->name.string;
+	GB_ASSERT(name == "load_hash" || name == "hash");
+
+	String supported_hashes[] = {
+		str_lit("adler32"),
+		str_lit("crc32"),
+		str_lit("crc64"),
+		str_lit("fnv32"),
+		str_lit("fnv64"),
+		str_lit("fnv32a"),
+		str_lit("fnv64a"),
+		str_lit("murmur32"),
+		str_lit("murmur64"),
+	};
+
+	bool hash_found = false;
+	for (isize i = 0; i < gb_count_of(supported_hashes); i++) {
+		if (supported_hashes[i] == hash_kind) {
+			hash_found = true;
+			break;
+		}
+	}
+	if (!hash_found) {
+		ERROR_BLOCK();
+		error(ce->proc, "Invalid hash kind passed to `#%.*s`, got: %.*s", LIT(name), LIT(hash_kind));
+		error_line("\tAvailable hash kinds:\n");
+		for (isize i = 0; i < gb_count_of(supported_hashes); i++) {
+			error_line("\t%.*s\n", LIT(supported_hashes[i]));
+		}
+		return false;
+	}
+	
+	if (hash_kind == "adler32") {
+		*hash_value = gb_adler32(data, data_size);
+	} else if (hash_kind == "crc32") {
+		*hash_value = gb_crc32(data, data_size);
+	} else if (hash_kind == "crc64") {
+		*hash_value = gb_crc64(data, data_size);
+	} else if (hash_kind == "fnv32") {
+		*hash_value = gb_fnv32(data, data_size);
+	} else if (hash_kind == "fnv64") {
+		*hash_value = gb_fnv64(data, data_size);
+	} else if (hash_kind == "fnv32a") {
+		*hash_value = fnv32a(data, data_size);
+	} else if (hash_kind == "fnv64a") {
+		*hash_value = fnv64a(data, data_size);
+	} else if (hash_kind == "murmur32") {
+		*hash_value = gb_murmur32(data, data_size);
+	} else if (hash_kind == "murmur64") {
+		*hash_value = gb_murmur64(data, data_size);
+	} else {
+		compiler_error("unhandled hash kind: %.*s", LIT(hash_kind));
+	}
+	return true;
+}
+
 
 
 gb_internal bool check_builtin_procedure_directive(CheckerContext *c, Operand *operand, Ast *call, Type *type_hint) {
@@ -1480,35 +1539,6 @@ gb_internal bool check_builtin_procedure_directive(CheckerContext *c, Operand *o
 		String original_string = o.value.value_string;
 		String hash_kind = o_hash.value.value_string;
 
-		String supported_hashes[] = {
-			str_lit("adler32"),
-			str_lit("crc32"),
-			str_lit("crc64"),
-			str_lit("fnv32"),
-			str_lit("fnv64"),
-			str_lit("fnv32a"),
-			str_lit("fnv64a"),
-			str_lit("murmur32"),
-			str_lit("murmur64"),
-		};
-
-		bool hash_found = false;
-		for (isize i = 0; i < gb_count_of(supported_hashes); i++) {
-			if (supported_hashes[i] == hash_kind) {
-				hash_found = true;
-				break;
-			}
-		}
-		if (!hash_found) {
-			ERROR_BLOCK();
-			error(ce->proc, "Invalid hash kind passed to `#load_hash`, got: %.*s", LIT(hash_kind));
-			error_line("\tAvailable hash kinds:\n");
-			for (isize i = 0; i < gb_count_of(supported_hashes); i++) {
-				error_line("\t%.*s\n", LIT(supported_hashes[i]));
-			}
-			return false;
-		}
-
 		LoadFileCache *cache = nullptr;
 		if (cache_load_file_directive(c, call, original_string, true, &cache)) {
 			MUTEX_GUARD(&c->info->load_file_mutex);
@@ -1520,30 +1550,69 @@ gb_internal bool check_builtin_procedure_directive(CheckerContext *c, Operand *o
 			} else {
 				u8 *data = cache->data.text;
 				isize file_size = cache->data.len;
-				if (hash_kind == "adler32") {
-					hash_value = gb_adler32(data, file_size);
-				} else if (hash_kind == "crc32") {
-					hash_value = gb_crc32(data, file_size);
-				} else if (hash_kind == "crc64") {
-					hash_value = gb_crc64(data, file_size);
-				} else if (hash_kind == "fnv32") {
-					hash_value = gb_fnv32(data, file_size);
-				} else if (hash_kind == "fnv64") {
-					hash_value = gb_fnv64(data, file_size);
-				} else if (hash_kind == "fnv32a") {
-					hash_value = fnv32a(data, file_size);
-				} else if (hash_kind == "fnv64a") {
-					hash_value = fnv64a(data, file_size);
-				} else if (hash_kind == "murmur32") {
-					hash_value = gb_murmur32(data, file_size);
-				} else if (hash_kind == "murmur64") {
-					hash_value = gb_murmur64(data, file_size);
-				} else {
-					compiler_error("unhandled hash kind: %.*s", LIT(hash_kind));
+
+				if (!check_hash_kind(c, call, hash_kind, data, file_size, &hash_value)) {
+					return false;
 				}
 				string_map_set(&cache->hashes, hash_kind, hash_value);
 			}
 
+			operand->type = t_untyped_integer;
+			operand->mode = Addressing_Constant;
+			operand->value = exact_value_u64(hash_value);
+			return true;
+		}
+		return false;
+	} else if (name == "hash") {
+		 if (ce->args.count != 2) {
+			if (ce->args.count == 0) {
+				error(ce->close, "'#hash' expects 2 argument, got 0");
+			} else {
+				error(ce->args[0], "'#hash' expects 2 argument, got %td", ce->args.count);
+			}
+			return false;
+		}
+
+		Ast *arg0 = ce->args[0];
+		Ast *arg1 = ce->args[1];
+		Operand o = {};
+		check_expr(c, &o, arg0);
+		if (o.mode != Addressing_Constant) {
+			error(arg0, "'#hash' expected a constant string argument");
+			return false;
+		}
+
+		if (!is_type_string(o.type)) {
+			gbString str = type_to_string(o.type);
+			error(arg0, "'#hash' expected a constant string, got %s", str);
+			gb_string_free(str);
+			return false;
+		}
+
+		Operand o_hash = {};
+		check_expr(c, &o_hash, arg1);
+		if (o_hash.mode != Addressing_Constant) {
+			error(arg1, "'#hash' expected a constant string argument");
+			return false;
+		}
+
+		if (!is_type_string(o_hash.type)) {
+			gbString str = type_to_string(o.type);
+			error(arg1, "'#hash' expected a constant string, got %s", str);
+			gb_string_free(str);
+			return false;
+		}
+		gbAllocator a = heap_allocator();
+
+		GB_ASSERT(o.value.kind == ExactValue_String);
+		GB_ASSERT(o_hash.value.kind == ExactValue_String);
+
+		String original_string = o.value.value_string;
+		String hash_kind = o_hash.value.value_string;
+
+		// TODO: Cache hash values based off of string constant and hash kind?
+		u64 hash_value = 0;
+		if (check_hash_kind(c, call, hash_kind, original_string.text, original_string.len, &hash_value)) {
 			operand->type = t_untyped_integer;
 			operand->mode = Addressing_Constant;
 			operand->value = exact_value_u64(hash_value);
