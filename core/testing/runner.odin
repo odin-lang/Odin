@@ -23,19 +23,21 @@ _ :: pkg_log
 _ :: strings
 
 // Specify how many threads to use when running tests.
-TEST_THREADS      : int    : #config(ODIN_TEST_THREADS, 0)
+TEST_THREADS          : int    : #config(ODIN_TEST_THREADS, 0)
 // Track the memory used by each test.
-TRACKING_MEMORY   : bool   : #config(ODIN_TEST_TRACK_MEMORY, true)
+TRACKING_MEMORY       : bool   : #config(ODIN_TEST_TRACK_MEMORY, true)
+// Always report how much memory is used, even when there are no leaks or bad frees.
+ALWAYS_REPORT_MEMORY  : bool   : #config(ODIN_TEST_ALWAYS_REPORT_MEMORY, false)
 // Specify how much memory each thread allocator starts with.
-PER_THREAD_MEMORY : int    : #config(ODIN_TEST_THREAD_MEMORY, mem.ROLLBACK_STACK_DEFAULT_BLOCK_SIZE)
+PER_THREAD_MEMORY     : int    : #config(ODIN_TEST_THREAD_MEMORY, mem.ROLLBACK_STACK_DEFAULT_BLOCK_SIZE)
 // Select a specific set of tests to run by name.
-TEST_NAMES        : string : #config(ODIN_TEST_NAMES, "")
+TEST_NAMES            : string : #config(ODIN_TEST_NAMES, "")
 // Show the fancy animated progress report.
-FANCY_OUTPUT      : bool   : #config(ODIN_TEST_FANCY, true)
+FANCY_OUTPUT          : bool   : #config(ODIN_TEST_FANCY, true)
 // Copy failed tests to the clipboard when done.
-USE_CLIPBOARD     : bool   : #config(ODIN_TEST_CLIPBOARD, false)
+USE_CLIPBOARD         : bool   : #config(ODIN_TEST_CLIPBOARD, false)
 // How many test results to show at a time per package.
-PROGRESS_WIDTH    : int    : #config(ODIN_TEST_PROGRESS_WIDTH, 24)
+PROGRESS_WIDTH        : int    : #config(ODIN_TEST_PROGRESS_WIDTH, 24)
 
 
 end_t :: proc(t: ^T) {
@@ -382,8 +384,14 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 	}
 
 	when TRACKING_MEMORY {
-		pkg_log.info("Memory tracking is enabled. Tests will log their memory usage when complete.")
+		when ALWAYS_REPORT_MEMORY {
+			pkg_log.info("Memory tracking is enabled. Tests will log their memory usage when complete.")
+		} else {
+			pkg_log.info("Memory tracking is enabled. Tests will log their memory usage if there's an issue.")
+		}
 		pkg_log.info("< Final Mem/ Total Mem> <  Peak Mem> (#Free/Alloc) :: [package.test_name]")
+	} else when ALWAYS_REPORT_MEMORY {
+		pkg_log.warn("ODIN_TEST_ALWAYS_REPORT_MEMORY is true, but ODIN_TRACK_MEMORY is false.")
 	}
 
 	start_time := time.now()
@@ -397,10 +405,18 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 			when TRACKING_MEMORY {
 				#no_bounds_check tracker := &task_memory_trackers[data.allocator_index]
 
-				write_memory_report(batch_writer, tracker, data.it.pkg, data.it.name)
+				when ALWAYS_REPORT_MEMORY {
+					should_report := true
+				} else {
+					should_report := len(tracker.allocation_map) + len(tracker.bad_free_array) > 0
+				}
 
-				pkg_log.info(bytes.buffer_to_string(&batch_buffer))
-				bytes.buffer_reset(&batch_buffer)
+				if should_report {
+					write_memory_report(batch_writer, tracker, data.it.pkg, data.it.name)
+
+					pkg_log.info(bytes.buffer_to_string(&batch_buffer))
+					bytes.buffer_reset(&batch_buffer)
+				}
 
 				mem.tracking_allocator_reset(tracker)
 			}
