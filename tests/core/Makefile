@@ -1,6 +1,6 @@
 ODIN=../../odin
 PYTHON=$(shell which python3)
-COMMON=-vet -strict-style
+COMMON=-no-bounds-check -vet -strict-style -define:test_track_memory=true
 COLLECTION=-collection:tests=..
 
 all: all_bsd \
@@ -34,7 +34,7 @@ download_test_assets:
 	$(PYTHON) download_assets.py
 
 image_test:
-	$(ODIN) run image $(COMMON) -out:test_core_image
+	$(ODIN) test image $(COMMON) -define:test_progress_width=12 -out:test_core_image
 
 compress_test:
 	$(ODIN) run compress $(COMMON) -out:test_core_compress

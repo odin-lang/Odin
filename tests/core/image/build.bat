@@ -1,4 +1,2 @@
 @echo off
-pushd ..
-odin run image
-popd
+odin test . -define:test_track_memory=true -define:test_progress_width=12 -vet -strict-style

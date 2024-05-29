@@ -1,5 +1,5 @@
 @echo off
-set COMMON=-no-bounds-check -vet -strict-style
+set COMMON=-no-bounds-check -vet -strict-style -define:test_track_memory=true
 set COLLECTION=-collection:tests=..
 set PATH_TO_ODIN==..\..\odin
 python3 download_assets.py
@@ -42,7 +42,7 @@ echo ---
 echo ---
 echo Running core:image tests
 echo ---
-%PATH_TO_ODIN% run image    %COMMON% -out:test_core_image.exe || exit /b
+%PATH_TO_ODIN% test image %COMMON% -define:test_progress_width=12 -out:test_core_image.exe || exit /b
 
 echo ---
 echo Running core:math tests
