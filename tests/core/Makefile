@@ -1,16 +1,16 @@
 ODIN=../../odin
 PYTHON=$(shell which python3)
-COMMON=-no-bounds-check -vet -strict-style -define:ODIN_TEST_TRACK_MEMORY=true
+COMMON=-no-bounds-check -vet -strict-style
 COLLECTION=-collection:tests=..
 
 all: all_bsd \
      net_test
 
-all_bsd: c_libc_test \
+all_bsd: download_test_assets \
+         c_libc_test \
          compress_test \
          container_test \
          crypto_test \
-         download_test_assets \
          encoding_test \
          filepath_test \
          fmt_test \
@@ -23,36 +23,26 @@ all_bsd: c_libc_test \
          noise_test \
          os_exit_test \
          reflect_test \
+         runtime_test \
          slice_test \
          strings_test \
          thread_test \
-         runtime_test \
-         time_test \
-         fmt_test
+         time_test
 
 download_test_assets:
 	$(PYTHON) download_assets.py
 
-image_test:
-	$(ODIN) test image $(COMMON) -define:ODIN_TEST_PROGRESS_WIDTH=12 -out:test_core_image
+c_libc_test:
+	$(ODIN) run c/libc $(COMMON) -out:test_core_libc
 
 compress_test:
-	$(ODIN) test compress $(COMMON) -define:ODIN_TEST_PROGRESS_WIDTH=3 -out:test_core_compress
+	$(ODIN) test compress $(COMMON) -out:test_core_compress
 
 container_test:
-	$(ODIN) test container $(COMMON) -define:ODIN_TEST_PROGRESS_WIDTH=4 -out:test_core_container
+	$(ODIN) test container $(COMMON) -out:test_core_container
 
 crypto_test:
-	$(ODIN) test crypto $(COMMON) -define:ODIN_TEST_PROGRESS_WIDTH=18 -o:speed -out:test_crypto
-
-strings_test:
-	$(ODIN) run strings $(COMMON) -out:test_core_strings
-
-hash_test:
-	$(ODIN) run hash $(COMMON) -o:speed -out:test_hash
-
-noise_test:
-	$(ODIN) run math/noise $(COMMON) -out:test_noise
+	$(ODIN) test crypto $(COMMON) -o:speed -out:test_crypto
 
 encoding_test:
 	$(ODIN) run encoding/hxa    $(COMMON) $(COLLECTION) -out:test_hxa
@@ -63,44 +53,53 @@ encoding_test:
 	$(ODIN) run encoding/hex    $(COMMON) -out:test_hex
 	$(ODIN) run encoding/base64 $(COMMON) -out:test_base64
 
-math_test:
-	$(ODIN) run math $(COMMON) $(COLLECTION) -out:test_core_math
-
-linalg_glsl_math_test:
-	$(ODIN) run math/linalg/glsl $(COMMON) $(COLLECTION) -out:test_linalg_glsl_math
-
 filepath_test:
 	$(ODIN) run path/filepath $(COMMON) $(COLLECTION) -out:test_core_filepath
-
-reflect_test:
-	$(ODIN) run reflect $(COMMON) $(COLLECTION) -out:test_core_reflect
-
-slice_test:
-	$(ODIN) run slice $(COMMON) -out:test_core_slice
-
-os_exit_test:
-	$(ODIN) run os/test_core_os_exit.odin -file -out:test_core_os_exit && exit 1 || exit 0
-
-i18n_test:
-	$(ODIN) run text/i18n $(COMMON) -out:test_core_i18n
-
-match_test:
-	$(ODIN) run text/match $(COMMON) -out:test_core_match
-
-c_libc_test:
-	$(ODIN) run c/libc $(COMMON) -out:test_core_libc
-
-net_test:
-	$(ODIN) run net $(COMMON) -out:test_core_net
 
 fmt_test:
 	$(ODIN) run fmt $(COMMON) -out:test_core_fmt
 
-thread_test:
-	$(ODIN) run thread $(COMMON) -out:test_core_thread
+hash_test:
+	$(ODIN) run hash $(COMMON) -o:speed -out:test_hash
+
+i18n_test:
+	$(ODIN) run text/i18n $(COMMON) -out:test_core_i18n
+
+image_test:
+	$(ODIN) test image $(COMMON) -out:test_core_image
+
+linalg_glsl_math_test:
+	$(ODIN) run math/linalg/glsl $(COMMON) $(COLLECTION) -out:test_linalg_glsl_math
+
+match_test:
+	$(ODIN) run text/match $(COMMON) -out:test_core_match
+
+math_test:
+	$(ODIN) run math $(COMMON) $(COLLECTION) -out:test_core_math
+
+net_test:
+	$(ODIN) run net $(COMMON) -out:test_core_net
+
+noise_test:
+	$(ODIN) run math/noise $(COMMON) -out:test_noise
+
+os_exit_test:
+	$(ODIN) run os/test_core_os_exit.odin -file -out:test_core_os_exit && exit 1 || exit 0
+
+reflect_test:
+	$(ODIN) run reflect $(COMMON) $(COLLECTION) -out:test_core_reflect
 
 runtime_test:
 	$(ODIN) run runtime $(COMMON) -out:test_core_runtime
+
+slice_test:
+	$(ODIN) run slice $(COMMON) -out:test_core_slice
+
+strings_test:
+	$(ODIN) run strings $(COMMON) -out:test_core_strings
+
+thread_test:
+	$(ODIN) run thread $(COMMON) -out:test_core_thread
 
 time_test:
 	$(ODIN) run time $(COMMON) -out:test_core_time

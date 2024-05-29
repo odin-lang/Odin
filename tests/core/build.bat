@@ -1,22 +1,22 @@
 @echo off
-set COMMON=-no-bounds-check -vet -strict-style -define:ODIN_TEST_TRACK_MEMORY=true
+set COMMON=-no-bounds-check -vet -strict-style
 set COLLECTION=-collection:tests=..
 set PATH_TO_ODIN==..\..\odin
 python3 download_assets.py
 echo ---
 echo Running core:compress tests
 echo ---
-%PATH_TO_ODIN% test compress %COMMON% -define:ODIN_TEST_PROGRESS_WIDTH=3 -out:test_core_compress.exe || exit /b
+%PATH_TO_ODIN% test compress %COMMON% -out:test_core_compress.exe || exit /b
 
 echo ---
 echo Running core:container tests
 echo ---
-%PATH_TO_ODIN% test container %COMMON% -define:ODIN_TEST_PROGRESS_WIDTH=4 -out:test_core_container.exe || exit /b
+%PATH_TO_ODIN% test container %COMMON% -out:test_core_container.exe || exit /b
 
 echo ---
 echo Running core:crypto tests
 echo ---
-%PATH_TO_ODIN% test crypto %COMMON% define:test_progress_width=18 -o:speed -out:test_crypto.exe || exit /b
+%PATH_TO_ODIN% test crypto %COMMON% -o:speed -out:test_crypto.exe || exit /b
 
 echo ---
 echo Running core:encoding tests
@@ -42,7 +42,7 @@ echo ---
 echo ---
 echo Running core:image tests
 echo ---
-%PATH_TO_ODIN% test image %COMMON% -define:ODIN_TEST_PROGRESS_WIDTH=12 -out:test_core_image.exe || exit /b
+%PATH_TO_ODIN% test image %COMMON% -out:test_core_image.exe || exit /b
 
 echo ---
 echo Running core:math tests
