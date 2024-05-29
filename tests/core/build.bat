@@ -1,17 +1,17 @@
 @echo off
-set COMMON=-no-bounds-check -vet -strict-style -define:test_track_memory=true
+set COMMON=-no-bounds-check -vet -strict-style -define:ODIN_TEST_TRACK_MEMORY=true
 set COLLECTION=-collection:tests=..
 set PATH_TO_ODIN==..\..\odin
 python3 download_assets.py
 echo ---
 echo Running core:compress tests
 echo ---
-%PATH_TO_ODIN% test compress %COMMON% -define:test_progress_width=3 -out:test_core_compress.exe || exit /b
+%PATH_TO_ODIN% test compress %COMMON% -define:ODIN_TEST_PROGRESS_WIDTH=3 -out:test_core_compress.exe || exit /b
 
 echo ---
 echo Running core:container tests
 echo ---
-%PATH_TO_ODIN% test container %COMMON% -define:test_progress_width=4 -out:test_core_container.exe || exit /b
+%PATH_TO_ODIN% test container %COMMON% -define:ODIN_TEST_PROGRESS_WIDTH=4 -out:test_core_container.exe || exit /b
 
 echo ---
 echo Running core:crypto tests
@@ -25,7 +25,7 @@ rem %PATH_TO_ODIN% run encoding/hxa    %COMMON% %COLLECTION% -out:test_hxa.exe |
 %PATH_TO_ODIN% run encoding/json   %COMMON% -out:test_json.exe || exit /b
 %PATH_TO_ODIN% run encoding/varint %COMMON% -out:test_varint.exe || exit /b
 %PATH_TO_ODIN% run encoding/xml    %COMMON% -out:test_xml.exe || exit /b
-%PATH_TO_ODIN% test encoding/cbor  %COMMON% -out:test_cbor.exe -define:test_threads=1 -define:test_fancy=false || exit /b
+%PATH_TO_ODIN% test encoding/cbor  %COMMON% -out:test_cbor.exe -define:ODIN_TEST_THREADS=1 -define:ODIN_TEST_FANCY=false || exit /b
 %PATH_TO_ODIN% run encoding/hex    %COMMON% -out:test_hex.exe || exit /b
 %PATH_TO_ODIN% run encoding/base64 %COMMON% -out:test_base64.exe || exit /b
 
@@ -42,7 +42,7 @@ echo ---
 echo ---
 echo Running core:image tests
 echo ---
-%PATH_TO_ODIN% test image %COMMON% -define:test_progress_width=12 -out:test_core_image.exe || exit /b
+%PATH_TO_ODIN% test image %COMMON% -define:ODIN_TEST_PROGRESS_WIDTH=12 -out:test_core_image.exe || exit /b
 
 echo ---
 echo Running core:math tests

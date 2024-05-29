@@ -23,19 +23,19 @@ _ :: pkg_log
 _ :: strings
 
 // Specify how many threads to use when running tests.
-TEST_THREADS      : int    : #config(test_threads, 0)
+TEST_THREADS      : int    : #config(ODIN_TEST_THREADS, 0)
 // Track the memory used by each test.
-TRACKING_MEMORY   : bool   : #config(test_track_memory, false)
+TRACKING_MEMORY   : bool   : #config(ODIN_TEST_TRACK_MEMORY, false)
 // Specify how much memory each thread allocator starts with.
-PER_THREAD_MEMORY : int    : #config(test_thread_memory, mem.ROLLBACK_STACK_DEFAULT_BLOCK_SIZE)
+PER_THREAD_MEMORY : int    : #config(ODIN_TEST_THREAD_MEMORY, mem.ROLLBACK_STACK_DEFAULT_BLOCK_SIZE)
 // Select a specific set of tests to run by name.
-TEST_SELECT       : string : #config(test_select, "")
+TEST_NAMES        : string : #config(ODIN_TEST_NAMES, "")
 // Show the fancy animated progress report.
-FANCY_OUTPUT      : bool   : #config(test_fancy, true)
+FANCY_OUTPUT      : bool   : #config(ODIN_TEST_FANCY, true)
 // Copy failed tests to the clipboard when done.
-USE_CLIPBOARD     : bool   : #config(test_clipboard, false)
+USE_CLIPBOARD     : bool   : #config(ODIN_TEST_CLIPBOARD, false)
 // How many test results to show at a time per package.
-PROGRESS_WIDTH    : int    : #config(test_progress_width, 24)
+PROGRESS_WIDTH    : int    : #config(ODIN_TEST_PROGRESS_WIDTH, 24)
 
 
 end_t :: proc(t: ^T) {
@@ -122,12 +122,12 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 
 	alloc_error: mem.Allocator_Error
 
-	when TEST_SELECT != "" {
+	when TEST_NAMES != "" {
 		select_internal_tests: [dynamic]Internal_Test
 		defer delete(select_internal_tests)
 
 		{
-			index_list := TEST_SELECT
+			index_list := TEST_NAMES
 			for selector in strings.split_iterator(&index_list, ",") {
 				// Temp allocator is fine since we just need to identify which test it's referring to.
 				split_selector := strings.split(selector, ".", context.temp_allocator)
@@ -640,7 +640,7 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 		if total_success_count > 0 {
 			when USE_CLIPBOARD {
 				clipboard_writer := io.to_writer(bytes.buffer_to_stream(&clipboard_buffer))
-				fmt.wprint(clipboard_writer, "-define:test_select=")
+				fmt.wprint(clipboard_writer, "-define:ODIN_TEST_NAMES=")
 				for test_index in sorted_failed_test_reasons {
 					#no_bounds_check it := internal_tests[test_index]
 					fmt.wprintf(clipboard_writer, "%s.%s,", it.pkg, it.name)
@@ -655,7 +655,7 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 					"" if total_failure_count == 1 else "s",
 					" has" if total_failure_count == 1 else "s have")
 			} else {
-				fmt.wprintf(batch_writer, "\nTo run only the failed test%s, use:\n\t-define:test_select=",
+				fmt.wprintf(batch_writer, "\nTo run only the failed test%s, use:\n\t-define:ODIN_TEST_NAMES=",
 					"" if total_failure_count == 1 else "s")
 				for test_index in sorted_failed_test_reasons {
 					#no_bounds_check it := internal_tests[test_index]
