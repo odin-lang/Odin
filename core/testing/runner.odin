@@ -25,7 +25,7 @@ _ :: strings
 // Specify how many threads to use when running tests.
 TEST_THREADS      : int    : #config(ODIN_TEST_THREADS, 0)
 // Track the memory used by each test.
-TRACKING_MEMORY   : bool   : #config(ODIN_TEST_TRACK_MEMORY, false)
+TRACKING_MEMORY   : bool   : #config(ODIN_TEST_TRACK_MEMORY, true)
 // Specify how much memory each thread allocator starts with.
 PER_THREAD_MEMORY : int    : #config(ODIN_TEST_THREAD_MEMORY, mem.ROLLBACK_STACK_DEFAULT_BLOCK_SIZE)
 // Select a specific set of tests to run by name.
