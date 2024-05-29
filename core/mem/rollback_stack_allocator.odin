@@ -251,12 +251,16 @@ rollback_stack_init_buffered :: proc(stack: ^Rollback_Stack, buffer: []byte, loc
 
 rollback_stack_init_dynamic :: proc(
 	stack: ^Rollback_Stack,
-	block_size := ROLLBACK_STACK_DEFAULT_BLOCK_SIZE,
+	block_size : int = ROLLBACK_STACK_DEFAULT_BLOCK_SIZE,
 	block_allocator := context.allocator,
 	location := #caller_location,
 ) -> Allocator_Error {
 	assert(block_size >= size_of(Rollback_Stack_Header) + size_of(rawptr), "Rollback Stack Allocator block size is too small.", location)
-	assert(block_size <= ROLLBACK_STACK_MAX_HEAD_BLOCK_SIZE, "Rollback Stack Allocators cannot support head blocks larger than 2 gigabytes.", location)
+	when size_of(int) > 4 {
+		// It's impossible to specify an argument in excess when your integer
+		// size is insufficient; check only on platforms with big enough ints.
+		assert(block_size <= ROLLBACK_STACK_MAX_HEAD_BLOCK_SIZE, "Rollback Stack Allocators cannot support head blocks larger than 2 gigabytes.", location)
+	}
 
 	block := rb_make_block(block_size, block_allocator) or_return
 
