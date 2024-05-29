@@ -43,7 +43,7 @@ container_test:
 	$(ODIN) test container $(COMMON) -define:ODIN_TEST_PROGRESS_WIDTH=4 -out:test_core_container
 
 crypto_test:
-	$(ODIN) test crypto $(COMMON) -define:test_progress_width=18 -o:speed -out:test_crypto
+	$(ODIN) test crypto $(COMMON) -define:ODIN_TEST_PROGRESS_WIDTH=18 -o:speed -out:test_crypto
 
 strings_test:
 	$(ODIN) run strings $(COMMON) -out:test_core_strings
