@@ -667,7 +667,7 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 		}
 	}
 
-	fmt.wprint(batch_writer, ansi.CSI + ansi.DECTCEM_SHOW)
+	fmt.wprint(stdout, ansi.CSI + ansi.DECTCEM_SHOW)
 
 	fmt.wprintln(stderr, bytes.buffer_to_string(&batch_buffer))
 
