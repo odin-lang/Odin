@@ -29,6 +29,16 @@ Internal_Cleanup :: struct {
 T :: struct {
 	error_count: int,
 
+	// If your test needs to perform random operations, it's advised to use
+	// this value to seed a local random number generator rather than relying
+	// on the non-thread-safe global one.
+	//
+	// This way, your results will be deterministic.
+	//
+	// This value is chosen at startup of the test runner, logged, and may be
+	// specified by the user. It is the same for all tests of a single run.
+	seed: u64,
+
 	channel: Update_Channel_Sender,
 
 	cleanups: [dynamic]Internal_Cleanup,

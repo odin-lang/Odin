@@ -9,6 +9,7 @@ import "core:encoding/base64"
 import "core:fmt"
 import "core:io"
 import pkg_log "core:log"
+import "core:math/rand"
 import "core:mem"
 import "core:os"
 import "core:slice"
@@ -38,6 +39,9 @@ FANCY_OUTPUT          : bool   : #config(ODIN_TEST_FANCY, true)
 USE_CLIPBOARD         : bool   : #config(ODIN_TEST_CLIPBOARD, false)
 // How many test results to show at a time per package.
 PROGRESS_WIDTH        : int    : #config(ODIN_TEST_PROGRESS_WIDTH, 24)
+// This is the random seed that will be sent to each test.
+// If it is unspecified, it will be set to the system cycle counter at startup.
+SHARED_RANDOM_SEED    : u64    : #config(ODIN_TEST_RANDOM_SEED, 0)
 
 
 end_t :: proc(t: ^T) {
@@ -333,6 +337,12 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 		defer bytes.buffer_destroy(&clipboard_buffer)
 	}
 
+	when SHARED_RANDOM_SEED == 0 {
+		shared_random_seed := cast(u64)intrinsics.read_cycle_counter()
+	} else {
+		shared_random_seed := SHARED_RANDOM_SEED
+	}
+
 	// -- Setup initial tasks.
 
 	// NOTE(Feoramund): This is the allocator that will be used by threads to
@@ -356,6 +366,7 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 			defer run_index += 1
 
 			data.it = it
+			data.t.seed = shared_random_seed
 			#no_bounds_check data.t.channel = chan.as_send(task_channels[task_index].channel)
 			data.t._log_allocator = shared_log_allocator
 			data.allocator_index = task_index
@@ -382,6 +393,8 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 		redraw_report(stdout, report)
 		draw_status_bar(stdout, thread_count_status_string, total_done_count, total_test_count)
 	}
+
+	pkg_log.infof("The random seed sent to every test is: %v", shared_random_seed)
 
 	when TRACKING_MEMORY {
 		when ALWAYS_REPORT_MEMORY {
@@ -428,6 +441,7 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 				defer run_index += 1
 
 				data.it = it
+				data.t.seed = shared_random_seed
 				data.t.error_count = 0
 
 				thread.pool_add_task(&pool, task.allocator, run_test_task, data, run_index)
