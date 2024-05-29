@@ -583,8 +583,14 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 
 	finished_in := time.since(start_time)
 
+	when !FANCY_OUTPUT {
+		// One line to space out the results, since we don't have the status
+		// bar in plain mode.
+		fmt.wprintln(batch_writer)
+	}
+
 	fmt.wprintf(batch_writer,
-		"\nFinished %i test%s in %v.",
+		"Finished %i test%s in %v.",
 		total_done_count,
 		"" if total_done_count == 1 else "s",
 		finished_in)

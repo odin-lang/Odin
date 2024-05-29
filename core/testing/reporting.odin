@@ -271,7 +271,11 @@ needs_to_redraw :: proc(report: Report) -> bool {
 }
 
 draw_status_bar :: proc(w: io.Writer, threads_string: string, total_done_count, total_test_count: int) {
-	if total_done_count != total_test_count {
+	if total_done_count == total_test_count {
+		// All tests are done; print a blank line to maintain the same height
+		// of the progress report.
+		fmt.wprintln(w)
+	} else {
 		fmt.wprintfln(w,
 			"%s % 4i/% 4i :: total",
 			threads_string,
