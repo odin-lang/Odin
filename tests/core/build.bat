@@ -11,7 +11,7 @@ echo ---
 echo ---
 echo Running core:container tests
 echo ---
-%PATH_TO_ODIN% run container %COMMON% %COLLECTION% -out:test_core_container.exe || exit /b
+%PATH_TO_ODIN% test container %COMMON% define:test_progress_width=4 -out:test_core_container.exe || exit /b
 
 echo ---
 echo Running core:crypto tests

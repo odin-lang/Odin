@@ -40,7 +40,7 @@ compress_test:
 	$(ODIN) test compress $(COMMON) -define:test_progress_width=3 -out:test_core_compress
 
 container_test:
-	$(ODIN) run container $(COMMON) $(COLLECTION) -out:test_core_container
+	$(ODIN) test container $(COMMON) -define:test_progress_width=4 -out:test_core_container
 
 strings_test:
 	$(ODIN) run strings $(COMMON) -out:test_core_strings
