@@ -1365,6 +1365,8 @@ gb_internal lbValue lb_emit_deep_field_gep(lbProcedure *p, lbValue e, Selection 
 			} else {
 				e = lb_emit_ptr_offset(p, lb_emit_load(p, arr), index);
 			}
+			e.type = alloc_type_multi_pointer_to_pointer(e.type);
+
 		} else if (is_type_quaternion(type)) {
 			e = lb_emit_struct_ep(p, e, index);
 		} else if (is_type_raw_union(type)) {
