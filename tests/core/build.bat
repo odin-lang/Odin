@@ -35,6 +35,11 @@ echo ---
 %PATH_TO_ODIN% test encoding/xml    %COMMON% -out:test_xml.exe    || exit /b
 
 echo ---
+echo Running core:path/filepath tests
+echo ---
+%PATH_TO_ODIN% test path/filepath %COMMON% -out:test_core_filepath.exe || exit /b
+
+echo ---
 echo Running core:fmt tests
 echo ---
 %PATH_TO_ODIN% run fmt %COMMON% %COLLECTION% -out:test_core_fmt.exe || exit /b
@@ -73,11 +78,6 @@ echo ---
 echo Running core:odin tests
 echo ---
 %PATH_TO_ODIN% run odin %COMMON% -o:size -out:test_core_odin.exe || exit /b
-
-echo ---
-echo Running core:path/filepath tests
-echo ---
-%PATH_TO_ODIN% run path/filepath %COMMON% %COLLECTION% -out:test_core_filepath.exe || exit /b
 
 echo ---
 echo Running core:reflect tests

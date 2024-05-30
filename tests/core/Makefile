@@ -54,7 +54,7 @@ encoding_test:
 	$(ODIN) test encoding/xml    $(COMMON) -out:test_xml
 
 filepath_test:
-	$(ODIN) run path/filepath $(COMMON) $(COLLECTION) -out:test_core_filepath
+	$(ODIN) test path/filepath $(COMMON) -out:test_core_filepath
 
 fmt_test:
 	$(ODIN) run fmt $(COMMON) -out:test_core_fmt
