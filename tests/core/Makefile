@@ -48,7 +48,7 @@ encoding_test:
 	$(ODIN) test encoding/base64 $(COMMON) -out:test_base64
 	$(ODIN) test encoding/cbor   $(COMMON) -out:test_cbor
 	$(ODIN) test encoding/hex    $(COMMON) -out:test_hex
-	$(ODIN) run encoding/hxa     $(COMMON) $(COLLECTION) -out:test_hxa
+	$(ODIN) test encoding/hxa    $(COMMON) -out:test_hxa
 	$(ODIN) run encoding/json    $(COMMON) -out:test_json
 	$(ODIN) run encoding/varint  $(COMMON) -out:test_varint
 	$(ODIN) run encoding/xml     $(COMMON) -out:test_xml
