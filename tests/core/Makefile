@@ -68,6 +68,9 @@ image_test:
 i18n_test:
 	$(ODIN) test text/i18n $(COMMON) -out:test_core_i18n
 
+match_test:
+	$(ODIN) test text/match $(COMMON) -out:test_core_match
+
 math_test:
 	$(ODIN) test math $(COMMON) -out:test_core_math
 
@@ -76,9 +79,6 @@ linalg_glsl_math_test:
 
 noise_test:
 	$(ODIN) test math/noise $(COMMON) -out:test_noise
-
-match_test:
-	$(ODIN) run text/match $(COMMON) -out:test_core_match
 
 net_test:
 	$(ODIN) run net $(COMMON) -out:test_core_net

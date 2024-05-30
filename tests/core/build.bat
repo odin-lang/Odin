@@ -60,6 +60,11 @@ echo ---
 %PATH_TO_ODIN% test text\i18n %COMMON% -out:test_core_i18n.exe || exit /b
 
 echo ---
+echo Running text:match tests
+echo ---
+%PATH_TO_ODIN% test text/match %COMMON% -out:test_core_match.exe || exit /b
+
+echo ---
 echo Running core:math tests
 echo ---
 %PATH_TO_ODIN% test math %COMMON% -out:test_core_math.exe || exit /b
