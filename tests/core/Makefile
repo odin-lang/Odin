@@ -21,6 +21,7 @@ all_bsd: download_test_assets \
          match_test \
          math_test \
          noise_test \
+         odin_test \
          os_exit_test \
          reflect_test \
          runtime_test \
@@ -86,8 +87,11 @@ net_test:
 os_exit_test:
 	$(ODIN) run os/test_core_os_exit.odin -file -out:test_core_os_exit && exit 1 || exit 0
 
+odin_test:
+	$(ODIN) test odin $(COMMON) -out:test_core_odin
+
 reflect_test:
-	$(ODIN) run reflect $(COMMON) $(COLLECTION) -out:test_core_reflect
+	$(ODIN) test reflect $(COMMON) -out:test_core_reflect
 
 runtime_test:
 	$(ODIN) run runtime $(COMMON) -out:test_core_runtime
@@ -103,3 +107,6 @@ thread_test:
 
 time_test:
 	$(ODIN) run time $(COMMON) -out:test_core_time
+
+clean:
+	rm test_*

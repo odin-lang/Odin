@@ -87,7 +87,7 @@ echo ---
 echo ---
 echo Running core:odin tests
 echo ---
-%PATH_TO_ODIN% run odin %COMMON% -o:size -out:test_core_odin.exe || exit /b
+%PATH_TO_ODIN% test odin %COMMON% -o:size -out:test_core_odin.exe || exit /b
 
 echo ---
 echo Running core:reflect tests
