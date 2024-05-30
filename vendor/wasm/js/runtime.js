@@ -1443,7 +1443,12 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 				wmi.storeU8(off(1), !!e.isTrusted);
 
 				let base = off(0, 8);
-				if (e instanceof MouseEvent) {
+				if (e instanceof WheelEvent) {
+					wmi.storeF64(off(8), e.deltaX);
+					wmi.storeF64(off(8), e.deltaY);
+					wmi.storeF64(off(8), e.deltaZ);
+					wmi.storeU32(off(4), e.deltaMode);
+				} else if (e instanceof MouseEvent) {
 					wmi.storeI64(off(8), e.screenX);
 					wmi.storeI64(off(8), e.screenY);
 					wmi.storeI64(off(8), e.clientX);
@@ -1482,11 +1487,6 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 					wmi.storeI32(off(W), e.code.length)
 					wmi.storeString(off(16, 1), e.key);
 					wmi.storeString(off(16, 1), e.code);
-				} else if (e instanceof WheelEvent) {
-					wmi.storeF64(off(8), e.deltaX);
-					wmi.storeF64(off(8), e.deltaY);
-					wmi.storeF64(off(8), e.deltaZ);
-					wmi.storeU32(off(4), e.deltaMode);
 				} else if (e.type === 'scroll') {
 					wmi.storeF64(off(8), window.scrollX);
 					wmi.storeF64(off(8), window.scrollY);
