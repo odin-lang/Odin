@@ -60,7 +60,7 @@ fmt_test:
 	$(ODIN) test fmt $(COMMON) -out:test_core_fmt
 
 hash_test:
-	$(ODIN) run hash $(COMMON) -o:speed -out:test_hash
+	$(ODIN) test hash $(COMMON) -o:speed -out:test_hash
 
 i18n_test:
 	$(ODIN) run text/i18n $(COMMON) -out:test_core_i18n

@@ -47,7 +47,7 @@ echo ---
 echo ---
 echo Running core:hash tests
 echo ---
-%PATH_TO_ODIN% run hash %COMMON% -o:size -out:test_core_hash.exe || exit /b
+%PATH_TO_ODIN% test hash %COMMON% -o:speed -out:test_core_hash.exe || exit /b
 
 echo ---
 echo Running core:image tests
