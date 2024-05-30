@@ -62,17 +62,17 @@ echo ---
 echo ---
 echo Running core:math tests
 echo ---
-%PATH_TO_ODIN% run math %COMMON% %COLLECTION% -out:test_core_math.exe || exit /b
+%PATH_TO_ODIN% test math %COMMON% -out:test_core_math.exe || exit /b
 
 echo ---
 echo Running core:math/linalg/glsl tests
 echo ---
-%PATH_TO_ODIN% run math/linalg/glsl %COMMON% %COLLECTION% -out:test_linalg_glsl.exe || exit /b
+%PATH_TO_ODIN% test math/linalg/glsl %COMMON% -out:test_linalg_glsl.exe || exit /b
 
 echo ---
 echo Running core:math/noise tests
 echo ---
-%PATH_TO_ODIN% run math/noise %COMMON% -out:test_noise.exe || exit /b
+%PATH_TO_ODIN% test math/noise %COMMON% -out:test_noise.exe || exit /b
 
 echo ---
 echo Running core:net

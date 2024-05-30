@@ -68,20 +68,20 @@ image_test:
 i18n_test:
 	$(ODIN) test text/i18n $(COMMON) -out:test_core_i18n
 
+math_test:
+	$(ODIN) test math $(COMMON) -out:test_core_math
+
 linalg_glsl_math_test:
-	$(ODIN) run math/linalg/glsl $(COMMON) $(COLLECTION) -out:test_linalg_glsl_math
+	$(ODIN) test math/linalg/glsl $(COMMON) -out:test_linalg_glsl_math
+
+noise_test:
+	$(ODIN) test math/noise $(COMMON) -out:test_noise
 
 match_test:
 	$(ODIN) run text/match $(COMMON) -out:test_core_match
 
-math_test:
-	$(ODIN) run math $(COMMON) $(COLLECTION) -out:test_core_math
-
 net_test:
 	$(ODIN) run net $(COMMON) -out:test_core_net
-
-noise_test:
-	$(ODIN) run math/noise $(COMMON) -out:test_noise
 
 os_exit_test:
 	$(ODIN) run os/test_core_os_exit.odin -file -out:test_core_os_exit && exit 1 || exit 0
