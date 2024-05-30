@@ -21,13 +21,13 @@ echo ---
 echo ---
 echo Running core:encoding tests
 echo ---
+%PATH_TO_ODIN% test encoding/base64 %COMMON% -out:test_base64.exe || exit /b
+%PATH_TO_ODIN% test encoding/cbor   %COMMON% -out:test_cbor.exe   || exit /b
+%PATH_TO_ODIN% test encoding/hex    %COMMON% -out:test_hex.exe    || exit /b
 rem %PATH_TO_ODIN% run encoding/hxa    %COMMON% %COLLECTION% -out:test_hxa.exe || exit /b
-%PATH_TO_ODIN% run encoding/json   %COMMON% -out:test_json.exe || exit /b
-%PATH_TO_ODIN% run encoding/varint %COMMON% -out:test_varint.exe || exit /b
-%PATH_TO_ODIN% run encoding/xml    %COMMON% -out:test_xml.exe || exit /b
-%PATH_TO_ODIN% test encoding/cbor  %COMMON% -out:test_cbor.exe -define:ODIN_TEST_THREADS=1 -define:ODIN_TEST_FANCY=false || exit /b
-%PATH_TO_ODIN% run encoding/hex    %COMMON% -out:test_hex.exe || exit /b
-%PATH_TO_ODIN% run encoding/base64 %COMMON% -out:test_base64.exe || exit /b
+%PATH_TO_ODIN% run encoding/json   %COMMON% -out:test_json.exe    || exit /b
+%PATH_TO_ODIN% run encoding/varint %COMMON% -out:test_varint.exe  || exit /b
+%PATH_TO_ODIN% run encoding/xml    %COMMON% -out:test_xml.exe     || exit /b
 
 echo ---
 echo Running core:fmt tests
