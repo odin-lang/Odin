@@ -7414,7 +7414,8 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 		    name == "config" || 
 		    name == "load" ||
 		    name == "load_directory" ||
-		    name == "load_hash"
+		    name == "load_hash" ||
+		    name == "hash"
 		) {
 			operand->mode = Addressing_Builtin;
 			operand->builtin_id = BuiltinProc_DIRECTIVE;
