@@ -94,7 +94,7 @@ reflect_test:
 	$(ODIN) test reflect $(COMMON) -out:test_core_reflect
 
 runtime_test:
-	$(ODIN) run runtime $(COMMON) -out:test_core_runtime
+	$(ODIN) test runtime $(COMMON) -out:test_core_runtime
 
 slice_test:
 	$(ODIN) run slice $(COMMON) -out:test_core_slice
