@@ -62,11 +62,11 @@ fmt_test:
 hash_test:
 	$(ODIN) test hash $(COMMON) -o:speed -out:test_hash
 
-i18n_test:
-	$(ODIN) run text/i18n $(COMMON) -out:test_core_i18n
-
 image_test:
 	$(ODIN) test image $(COMMON) -out:test_core_image
+
+i18n_test:
+	$(ODIN) test text/i18n $(COMMON) -out:test_core_i18n
 
 linalg_glsl_math_test:
 	$(ODIN) run math/linalg/glsl $(COMMON) $(COLLECTION) -out:test_linalg_glsl_math

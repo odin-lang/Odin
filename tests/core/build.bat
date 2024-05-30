@@ -55,6 +55,11 @@ echo ---
 %PATH_TO_ODIN% test image %COMMON% -out:test_core_image.exe || exit /b
 
 echo ---
+echo Running core:text/i18n tests
+echo ---
+%PATH_TO_ODIN% test text\i18n %COMMON% -out:test_core_i18n.exe || exit /b
+
+echo ---
 echo Running core:math tests
 echo ---
 %PATH_TO_ODIN% run math %COMMON% %COLLECTION% -out:test_core_math.exe || exit /b
@@ -98,11 +103,6 @@ echo ---
 echo Running core:strings tests
 echo ---
 %PATH_TO_ODIN% run strings %COMMON% -out:test_core_strings.exe || exit /b
-
-echo ---
-echo Running core:text/i18n tests
-echo ---
-%PATH_TO_ODIN% run text\i18n %COMMON% -out:test_core_i18n.exe || exit /b
 
 echo ---
 echo Running core:thread tests
