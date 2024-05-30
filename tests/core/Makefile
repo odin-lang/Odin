@@ -33,7 +33,7 @@ download_test_assets:
 	$(PYTHON) download_assets.py
 
 c_libc_test:
-	$(ODIN) run c/libc $(COMMON) -out:test_core_libc
+	$(ODIN) test c/libc $(COMMON) -out:test_core_libc
 
 compress_test:
 	$(ODIN) test compress $(COMMON) -out:test_core_compress

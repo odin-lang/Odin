@@ -4,6 +4,11 @@ set COLLECTION=-collection:tests=..
 set PATH_TO_ODIN==..\..\odin
 python3 download_assets.py
 echo ---
+echo Running core:c/libc tests
+echo ---
+%PATH_TO_ODIN% test c\libc %COMMON% -out:test_libc.exe || exit /b
+
+echo ---
 echo Running core:compress tests
 echo ---
 %PATH_TO_ODIN% test compress %COMMON% -out:test_core_compress.exe || exit /b
