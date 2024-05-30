@@ -97,7 +97,7 @@ runtime_test:
 	$(ODIN) test runtime $(COMMON) -out:test_core_runtime
 
 slice_test:
-	$(ODIN) run slice $(COMMON) -out:test_core_slice
+	$(ODIN) test slice $(COMMON) -out:test_core_slice
 
 strings_test:
 	$(ODIN) run strings $(COMMON) -out:test_core_strings

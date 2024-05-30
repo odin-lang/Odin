@@ -102,7 +102,7 @@ echo ---
 echo ---
 echo Running core:slice tests
 echo ---
-%PATH_TO_ODIN% run slice %COMMON% -out:test_core_slice.exe || exit /b
+%PATH_TO_ODIN% test slice %COMMON% -out:test_core_slice.exe || exit /b
 
 echo ---
 echo Running core:strings tests
