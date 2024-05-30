@@ -42,7 +42,7 @@ echo ---
 echo ---
 echo Running core:fmt tests
 echo ---
-%PATH_TO_ODIN% run fmt %COMMON% %COLLECTION% -out:test_core_fmt.exe || exit /b
+%PATH_TO_ODIN% test fmt %COMMON% -out:test_core_fmt.exe || exit /b
 
 echo ---
 echo Running core:hash tests

@@ -57,7 +57,7 @@ filepath_test:
 	$(ODIN) test path/filepath $(COMMON) -out:test_core_filepath
 
 fmt_test:
-	$(ODIN) run fmt $(COMMON) -out:test_core_fmt
+	$(ODIN) test fmt $(COMMON) -out:test_core_fmt
 
 hash_test:
 	$(ODIN) run hash $(COMMON) -o:speed -out:test_hash
