@@ -319,7 +319,12 @@ default_draw_frame :: proc(ctx: ^Context, rect: Rect, colorid: Color_Type) {
 	}
 }
 
-init :: proc(ctx: ^Context, set_clipboard: proc(user_data: rawptr, text: string) -> (ok: bool), get_clipboard: proc(user_data: rawptr) -> (text: string, ok: bool), clipboard_user_data: rawptr) {
+init :: proc(
+	ctx: ^Context,
+	set_clipboard: proc(user_data: rawptr, text: string) -> (ok: bool) = nil,
+	get_clipboard: proc(user_data: rawptr) -> (text: string, ok: bool) = nil,
+	clipboard_user_data: rawptr = nil,
+) {
 	ctx^ = {} // zero memory
 	ctx.draw_frame  = default_draw_frame
 	ctx._style      = default_style
