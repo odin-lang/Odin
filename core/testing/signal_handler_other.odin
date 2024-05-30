@@ -2,10 +2,18 @@
 //+build js, wasi, freestanding
 package testing
 
-setup_signal_handler :: proc() {
+_setup_signal_handler :: proc() {
 	// Do nothing.
 }
 
-should_abort :: proc() -> bool {
+_setup_task_signal_handler :: proc(test_index: int) {
+	// Do nothing.
+}
+
+_should_stop_runner :: proc() -> bool {
 	return false
+}
+
+_should_stop_test :: proc() -> (test_index: int, reason: Stop_Reason, ok: bool) {
+	return 0, {}, false
 }

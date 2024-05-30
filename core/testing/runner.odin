@@ -69,6 +69,8 @@ Task_Timeout :: struct {
 run_test_task :: proc(task: thread.Task) {
 	data := cast(^Task_Data)(task.data)
 
+	setup_task_signal_handler(task.user_index)
+
 	chan.send(data.t.channel, Event_New_Test {
 		test_index = task.user_index,
 	})
@@ -76,6 +78,8 @@ run_test_task :: proc(task: thread.Task) {
 	chan.send(data.t.channel, Event_State_Change {
 		new_state = .Running,
 	})
+	
+	context.assertion_failure_proc = test_assertion_failure_proc
 
 	context.logger = {
 		procedure = test_logger_proc,
@@ -389,6 +393,8 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 	fmt.wprint(stdout, ansi.CSI + ansi.DECTCEM_HIDE)
 
 	when FANCY_OUTPUT {
+		signals_were_raised := false
+
 		redraw_report(stdout, report)
 		draw_status_bar(stdout, thread_count_status_string, total_done_count, total_test_count)
 	}
@@ -557,10 +563,55 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 			}
 		}
 
-		if should_abort() {
+		if should_stop_runner() {
 			fmt.wprintln(stderr, "\nCaught interrupt signal. Stopping all tests.")
 			thread.pool_shutdown(&pool)
 			break main_loop
+		}
+
+		when FANCY_OUTPUT {
+			// Because the bounds checking procs send directly to STDERR with
+			// no way to redirect or handle them, we need to at least try to
+			// let the user see those messages when using the animated progress
+			// report. This flag may be set by the block of code below if a
+			// signal is raised.
+			//
+			// It'll be purely by luck if the output is interleaved properly,
+			// given the nature of non-thread-safe printing.
+			//
+			// At worst, if Odin did not print any error for this signal, we'll
+			// just re-display the progress report. The fatal log error message
+			// should be enough to clue the user in that something dire has
+			// occurred.
+			bypass_progress_overwrite := false
+		}
+
+		if test_index, reason, ok := should_stop_test(); ok {
+			#no_bounds_check report.all_test_states[test_index] = .Failed
+			#no_bounds_check it := internal_tests[test_index]
+			#no_bounds_check pkg := report.packages_by_name[it.pkg]
+			pkg.frame_ready = false
+
+			fmt.assertf(thread.pool_stop_task(&pool, test_index),
+				"A signal (%v) was raised to stop test #%i %s.%s, but it was unable to be found.",
+				reason, test_index, it.pkg, it.name)
+
+			if test_index not_in failed_test_reason_map {
+				// We only write a new error message here if there wasn't one
+				// already, because the message we can provide based only on
+				// the signal won't be very useful, whereas asserts and panics
+				// will provide a user-written error message.
+				failed_test_reason_map[test_index] = fmt.aprintf("Signal caught: %v", reason, allocator = shared_log_allocator)
+				pkg_log.fatalf("Caught signal to stop test #%i %s.%s for: %v.", test_index, it.pkg, it.name, reason)
+
+				when FANCY_OUTPUT {
+					signals_were_raised = true
+					bypass_progress_overwrite = true
+				}
+			}
+
+			total_failure_count += 1
+			total_done_count += 1
 		}
 
 		// -- Redraw.
@@ -570,7 +621,9 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 				continue main_loop
 			}
 
-			fmt.wprintf(stdout, ansi_redraw_string, total_done_count, total_test_count)
+			if !bypass_progress_overwrite {
+				fmt.wprintf(stdout, ansi_redraw_string, total_done_count, total_test_count)
+			}
 		} else {
 			if total_done_count != last_done_count {
 				fmt.wprintf(stdout, OSC_WINDOW_TITLE, total_done_count, total_test_count)
@@ -697,6 +750,14 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 	}
 
 	fmt.wprint(stdout, ansi.CSI + ansi.DECTCEM_SHOW)
+
+	when FANCY_OUTPUT {
+		if signals_were_raised {
+			fmt.wprintln(batch_writer, `
+Signals were raised during this test run. Log messages are likely to have collided with each other.
+To partly mitigate this, redirect STDERR to a file or use the -define:ODIN_TEST_FANCY=false option.`)
+		}
+	}
 
 	fmt.wprintln(stderr, bytes.buffer_to_string(&batch_buffer))
 
