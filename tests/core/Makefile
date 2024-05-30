@@ -51,7 +51,7 @@ encoding_test:
 	$(ODIN) test encoding/hxa    $(COMMON) -out:test_hxa
 	$(ODIN) test encoding/json   $(COMMON) -out:test_json
 	$(ODIN) test encoding/varint $(COMMON) -out:test_varint
-	$(ODIN) run encoding/xml     $(COMMON) -out:test_xml
+	$(ODIN) test encoding/xml    $(COMMON) -out:test_xml
 
 filepath_test:
 	$(ODIN) run path/filepath $(COMMON) $(COLLECTION) -out:test_core_filepath

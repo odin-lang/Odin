@@ -32,7 +32,7 @@ echo ---
 %PATH_TO_ODIN% test encoding/hxa    %COMMON% -out:test_hxa.exe    || exit /b
 %PATH_TO_ODIN% test encoding/json   %COMMON% -out:test_json.exe   || exit /b
 %PATH_TO_ODIN% test encoding/varint %COMMON% -out:test_varint.exe || exit /b
-%PATH_TO_ODIN% run encoding/xml    %COMMON% -out:test_xml.exe     || exit /b
+%PATH_TO_ODIN% test encoding/xml    %COMMON% -out:test_xml.exe    || exit /b
 
 echo ---
 echo Running core:fmt tests
