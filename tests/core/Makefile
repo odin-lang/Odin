@@ -106,7 +106,7 @@ thread_test:
 	$(ODIN) run thread $(COMMON) -out:test_core_thread
 
 time_test:
-	$(ODIN) run time $(COMMON) -out:test_core_time
+	$(ODIN) test time $(COMMON) -out:test_core_time
 
 clean:
 	rm test_*
