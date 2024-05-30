@@ -487,6 +487,7 @@ connect :: proc "contextless" (sock: Fd, addr: ^$T) -> (Errno)
 where
 	T == Sock_Addr_In ||
 	T == Sock_Addr_In6 ||
+	T == Sock_Addr_Un ||
 	T == Sock_Addr_Any
 {
 	ret := syscall(SYS_connect, sock, addr, size_of(T))
@@ -502,6 +503,7 @@ accept :: proc "contextless" (sock: Fd, addr: ^$T, sockflags: Socket_FD_Flags = 
 where
 	T == Sock_Addr_In ||
 	T == Sock_Addr_In6 ||
+	T == Sock_Addr_Un ||
 	T == Sock_Addr_Any
 {
 	addr_len: i32 = size_of(T)
@@ -514,6 +516,7 @@ recvfrom :: proc "contextless" (sock: Fd, buf: []u8, flags: Socket_Msg, addr: ^$
 where
 	T == Sock_Addr_In ||
 	T == Sock_Addr_In6 ||
+	T == Sock_Addr_Un ||
 	T == Sock_Addr_Any
 {
 	addr_len: i32 = size_of(T)
@@ -531,6 +534,7 @@ sendto :: proc "contextless" (sock: Fd, buf: []u8, flags: Socket_Msg, addr: ^$T)
 where
 	T == Sock_Addr_In ||
 	T == Sock_Addr_In6 ||
+	T == Sock_Addr_Un ||
 	T == Sock_Addr_Any
 {
 	ret := syscall(SYS_sendto, sock, raw_data(buf), len(buf), transmute(i32) flags, addr, size_of(T))
@@ -590,6 +594,7 @@ bind :: proc "contextless" (sock: Fd, addr: ^$T) -> (Errno)
 where
 	T == Sock_Addr_In ||
 	T == Sock_Addr_In6 ||
+	T == Sock_Addr_Un ||
 	T == Sock_Addr_Any
 {
 	ret := syscall(SYS_bind, sock, addr, size_of(T))
