@@ -223,6 +223,7 @@ struct Entity {
 			Ast *      foreign_library_ident;
 			String     link_name;
 			String     link_prefix;
+			String     link_suffix;
 			String     link_section;
 			CommentGroup *docs;
 			CommentGroup *comment;
@@ -243,6 +244,7 @@ struct Entity {
 			Ast *   foreign_library_ident;
 			String  link_name;
 			String  link_prefix;
+			String  link_suffix;
 			DeferredProcedure deferred_procedure;
 
 			struct GenProcsData *gen_procs;
