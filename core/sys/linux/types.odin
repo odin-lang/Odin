@@ -636,7 +636,7 @@ Sock_Addr_In6 :: struct #packed {
 */
 Sock_Addr_Un :: struct #packed {
 	sun_family: Address_Family,
-	sun_path:   [108]u8
+	sun_path:   [108]u8,
 }
 
 /*
