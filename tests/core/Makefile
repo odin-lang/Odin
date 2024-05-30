@@ -100,7 +100,7 @@ slice_test:
 	$(ODIN) test slice $(COMMON) -out:test_core_slice
 
 strings_test:
-	$(ODIN) run strings $(COMMON) -out:test_core_strings
+	$(ODIN) test strings $(COMMON) -out:test_core_strings
 
 thread_test:
 	$(ODIN) run thread $(COMMON) -out:test_core_thread

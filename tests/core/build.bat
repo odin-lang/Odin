@@ -107,7 +107,7 @@ echo ---
 echo ---
 echo Running core:strings tests
 echo ---
-%PATH_TO_ODIN% run strings %COMMON% -out:test_core_strings.exe || exit /b
+%PATH_TO_ODIN% test strings %COMMON% -out:test_core_strings.exe || exit /b
 
 echo ---
 echo Running core:thread tests
