@@ -1,5 +1,5 @@
 //+private
-//+build js, wasi, freestanding
+//+build !windows !linux !darwin !freebsd !openbsd !netbsd !haiku
 package testing
 
 _setup_signal_handler :: proc() {
