@@ -24,6 +24,9 @@ Cursor   :: XID
 Colormap :: XID
 GContext :: XID
 
+RRCrtc   :: XID
+RROutput :: XID
+
 KeyCode  :: u8
 
 /* ----  X11/Xlib.h ---------------------------------------------------------*/

@@ -712,3 +712,7 @@ Window_setDelegate :: proc "c" (self: ^Window, delegate: ^WindowDelegate) {
 Window_backingScaleFactor :: proc "c" (self: ^Window) -> Float {
 	return msgSend(Float, self, "backingScaleFactor")
 }
+@(objc_type=Window, objc_name="setWantsLayer")
+Window_setWantsLayer :: proc "c" (self: ^Window, ok: BOOL) {
+	msgSend(nil, self, "setWantsLayer:", ok)
+}
