@@ -5,22 +5,17 @@ import "base:intrinsics"
 import "base:runtime"
 import "core:bytes"
 import "core:encoding/ansi"
-import "core:encoding/base64"
+@require import "core:encoding/base64"
 import "core:fmt"
 import "core:io"
-import pkg_log "core:log"
+@require import pkg_log "core:log"
 import "core:mem"
 import "core:os"
 import "core:slice"
-import "core:strings"
+@require import "core:strings"
 import "core:sync/chan"
 import "core:thread"
 import "core:time"
-
-// Keep `-vet` happy.
-base64_encode :: base64.encode
-_ :: pkg_log
-_ :: strings
 
 // Specify how many threads to use when running tests.
 TEST_THREADS          : int    : #config(ODIN_TEST_THREADS, 0)
@@ -728,7 +723,7 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 					fmt.wprintf(clipboard_writer, "%s.%s,", it.pkg, it.name)
 				}
 
-				encoded_names := base64_encode(bytes.buffer_to_bytes(&clipboard_buffer), allocator = context.temp_allocator)
+				encoded_names := base64.encode(bytes.buffer_to_bytes(&clipboard_buffer), allocator = context.temp_allocator)
 
 				fmt.wprintf(batch_writer,
 					ansi.OSC + ansi.CLIPBOARD + ";c;%s" + ansi.ST + 
