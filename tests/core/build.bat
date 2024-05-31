@@ -81,7 +81,7 @@ echo ---
 echo ---
 echo Running core:net
 echo ---
-%PATH_TO_ODIN% run net %COMMON% -out:test_core_net.exe || exit /b
+%PATH_TO_ODIN% test net %COMMON% -out:test_core_net.exe || exit /b
 
 echo ---
 echo Running core:odin tests

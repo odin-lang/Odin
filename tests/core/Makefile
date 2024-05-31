@@ -81,7 +81,7 @@ noise_test:
 	$(ODIN) test math/noise $(COMMON) -out:test_noise
 
 net_test:
-	$(ODIN) run net $(COMMON) -out:test_core_net
+	$(ODIN) test net $(COMMON) -out:test_core_net
 
 os_exit_test:
 	$(ODIN) run os/test_core_os_exit.odin -file -out:test_core_os_exit && exit 1 || exit 0

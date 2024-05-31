@@ -11,71 +11,12 @@
 package test_core_net
 
 import "core:testing"
-import "core:mem"
-import "core:fmt"
 import "core:net"
 import "core:strconv"
 import "core:sync"
 import "core:time"
 import "core:thread"
-import "core:os"
-
-_, _ :: time, thread
-
-TEST_count := 0
-TEST_fail  := 0
-
-t := &testing.T{}
-
-when ODIN_TEST {
-    expect  :: testing.expect
-    log     :: testing.log
-} else {
-    expect  :: proc(t: ^testing.T, condition: bool, message: string, loc := #caller_location) {
-        TEST_count += 1
-        if !condition {
-            TEST_fail += 1
-            fmt.printf("[%v] %v\n", loc, message)
-            return
-        }
-    }
-    log     :: proc(t: ^testing.T, v: any, loc := #caller_location) {
-        fmt.printf("[%v] ", loc)
-        fmt.printf("log: %v\n", v)
-    }
-}
-
-_tracking_allocator := mem.Tracking_Allocator{}
-
-print_tracking_allocator_report :: proc() {
-	for _, leak in _tracking_allocator.allocation_map {
-		fmt.printf("%v leaked %v bytes\n", leak.location, leak.size)
-	}
-
-	for bf in _tracking_allocator.bad_free_array {
-		fmt.printf("%v allocation %p was freed badly\n", bf.location, bf.memory)
-	}
-}
-
-main :: proc() {
-	mem.tracking_allocator_init(&_tracking_allocator, context.allocator)
-	context.allocator = mem.tracking_allocator(&_tracking_allocator)
-
-	address_parsing_test(t)
-
-	tcp_tests(t)
-
-	split_url_test(t)
-	join_url_test(t)
-
-	fmt.printf("%v/%v tests successful.\n", TEST_count - TEST_fail, TEST_count)
-
-	print_tracking_allocator_report()
-
-	if TEST_fail > 0 {
-		os.exit(1)
-	}
-}
+import "core:fmt"
 
 @test
 address_parsing_test :: proc(t: ^testing.T) {
@@ -89,125 +30,64 @@ address_parsing_test :: proc(t: ^testing.T) {
 		}
 
 		valid := len(vector.binstr) > 0
-
-		fmt.printf("%v %v\n", kind, vector.input)
-
-		msg := "-set a proper message-"
 		switch vector.family {
 		case .IP4, .IP4_Alt:
-			/*
-				Does `net.parse_ip4_address` think we parsed the address properly?
-			*/
+			// Does `net.parse_ip4_address` think we parsed the address properly?
 			non_decimal := vector.family == .IP4_Alt
+			any_addr    := net.parse_address(vector.input, non_decimal)
+			parsed_ok   := any_addr != nil
+			parsed: net.IP4_Address
 
-			any_addr  := net.parse_address(vector.input, non_decimal)
-			parsed_ok := any_addr != nil
-			parsed:   net.IP4_Address
-
-			/*
-				Ensure that `parse_address` doesn't parse IPv4 addresses into IPv6 addreses by mistake.
-			*/
+			// Ensure that `parse_address` doesn't parse IPv4 addresses into IPv6 addreses by mistake.
 			switch addr in any_addr {
 			case net.IP4_Address:
 				parsed = addr
 			case net.IP6_Address:
 				parsed_ok = false
-				msg = fmt.tprintf("parse_address mistook %v as IPv6 address %04x", vector.input, addr)
-				expect(t, false, msg)
+				testing.expectf(t, false, "parse_address mistook %v as IPv6 address %04x", vector.input, addr)
 			}
 
 			if !parsed_ok && valid {
-				msg = fmt.tprintf("parse_ip4_address failed to parse %v, expected %v", vector.input, binstr_to_address(vector.binstr))
+				testing.expectf(t, parsed_ok == valid, "parse_ip4_address failed to parse %v, expected %v", vector.input, binstr_to_address(t, vector.binstr))
 
 			} else if parsed_ok && !valid {
-				msg = fmt.tprintf("parse_ip4_address parsed %v into %v, expected failure", vector.input, parsed)
+				testing.expectf(t, parsed_ok == valid, "parse_ip4_address parsed %v into %v, expected failure", vector.input, parsed)
 			}
-			expect(t, parsed_ok == valid, msg)
 
 			if valid && parsed_ok {
 				actual_binary := address_to_binstr(parsed)
-				msg = fmt.tprintf("parse_ip4_address parsed %v into %v, expected %v", vector.input, actual_binary, vector.binstr)
-				expect(t, actual_binary == vector.binstr, msg)
+				testing.expectf(t, actual_binary == vector.binstr, "parse_ip4_address parsed %v into %v, expected %v", vector.input, actual_binary, vector.binstr)
 
-				/*
-					Do we turn an address back into the same string properly?
-					No point in testing the roundtrip if the first part failed.
-				*/
+				// Do we turn an address back into the same string properly? No point in testing the roundtrip if the first part failed.
 				if len(vector.output) > 0 && actual_binary == vector.binstr {
 					stringified := net.address_to_string(parsed)
-					msg = fmt.tprintf("address_to_string turned %v into %v, expected %v", parsed, stringified, vector.output)
-					expect(t, stringified == vector.output, msg)
+					testing.expectf(t, stringified == vector.output, "address_to_string turned %v into %v, expected %v", parsed, stringified, vector.output)
 				}
 			}
 
 		case .IP6:
-			/*
-				Do we parse the address properly?
-			*/
+			// Do we parse the address properly?
 			parsed, parsed_ok := net.parse_ip6_address(vector.input)
 
 			if !parsed_ok && valid {
-				msg = fmt.tprintf("parse_ip6_address failed to parse %v, expected %04x", vector.input, binstr_to_address(vector.binstr))
+				testing.expectf(t, parsed_ok == valid, "parse_ip6_address failed to parse %v, expected %04x", vector.input, binstr_to_address(t, vector.binstr))
 
 			} else if parsed_ok && !valid {
-				msg = fmt.tprintf("parse_ip6_address parsed %v into %04x, expected failure", vector.input, parsed)
+				testing.expectf(t, parsed_ok == valid, "parse_ip6_address parsed %v into %04x, expected failure", vector.input, parsed)
 			}
-			expect(t, parsed_ok == valid, msg)
 
 			if valid && parsed_ok {
 				actual_binary := address_to_binstr(parsed)
-				msg = fmt.tprintf("parse_ip6_address parsed %v into %v, expected %v", vector.input, actual_binary, vector.binstr)
-				expect(t, actual_binary == vector.binstr, msg)
+				testing.expectf(t, actual_binary == vector.binstr, "parse_ip6_address parsed %v into %v, expected %v", vector.input, actual_binary, vector.binstr)
 
-				/*
-					Do we turn an address back into the same string properly?
-					No point in testing the roundtrip if the first part failed.
-				*/
+				// Do we turn an address back into the same string properly? No point in testing the roundtrip if the first part failed.
 				if len(vector.output) > 0 && actual_binary == vector.binstr {
 					stringified := net.address_to_string(parsed)
-					msg = fmt.tprintf("address_to_string turned %v into %v, expected %v", parsed, stringified, vector.output)
-					expect(t, stringified == vector.output, msg)
+					testing.expectf(t, stringified == vector.output, "address_to_string turned %v into %v, expected %v", parsed, stringified, vector.output)
 				}
 			}
 		}
 	}
-}
-
-address_to_binstr :: proc(address: net.Address) -> (binstr: string) {
-	switch t in address {
-	case net.IP4_Address:
-		b := transmute(u32be)t
-		return fmt.tprintf("%08x", b)
-	case net.IP6_Address:
-		b := transmute(u128be)t
-		return fmt.tprintf("%32x", b)
-	case:
-		return ""
-	}
-	unreachable()
-}
-
-binstr_to_address :: proc(binstr: string) -> (address: net.Address) {
-	switch len(binstr) {
-	case 8:  // IPv4
-		a, ok := strconv.parse_u64_of_base(binstr, 16)
-		expect(t, ok, "failed to parse test case bin string")
-
-		ipv4 := u32be(a)
-		return net.IP4_Address(transmute([4]u8)ipv4)
-
-
-	case 32: // IPv6
-		a, ok := strconv.parse_u128_of_base(binstr, 16)
-		expect(t, ok, "failed to parse test case bin string")
-
-		ipv4 := u128be(a)
-		return net.IP6_Address(transmute([8]u16be)ipv4)
-
-	case 0:
-		return nil
-	}
-	panic("Invalid test case")
 }
 
 Kind :: enum {
@@ -223,10 +103,7 @@ IP_Address_Parsing_Test_Vector :: struct {
 	// Input address to try and parse.
 	input:            string,
 
-	/*
-		Hexadecimal representation of the expected numeric value of the address.
-		Zero length means input is invalid and the parser should report failure.
-	*/
+	// Hexadecimal representation of the expected numeric value of the address. Zero length means input is invalid and the parser should report failure.
 	binstr:           string,
 
 	// Expected `address_to_string` output, if a valid input and this string is non-empty.
@@ -335,37 +212,29 @@ IP_Address_Parsing_Test_Vectors :: []IP_Address_Parsing_Test_Vector{
 	{ .IP6, "c0a8",                    "", ""},
 }
 
-tcp_tests :: proc(t: ^testing.T) {
-	fmt.println("Testing two servers trying to bind to the same endpoint...")
-	two_servers_binding_same_endpoint(t)
-	fmt.println("Testing client connecting to a closed port...")
-	client_connects_to_closed_port(t)
-	fmt.println("Testing client sending server data...")
-	client_sends_server_data(t)
-}
-
-ENDPOINT := net.Endpoint{
-	net.IP4_Address{127, 0, 0, 1},
-	9999,
-}
+ENDPOINT_TWO_SERVERS  := net.Endpoint{net.IP4_Address{127, 0, 0, 1}, 9991}
+ENDPOINT_CLOSED_PORT  := net.Endpoint{net.IP4_Address{127, 0, 0, 1}, 9992}
+ENDPOINT_SERVER_SENDS := net.Endpoint{net.IP4_Address{127, 0, 0, 1}, 9993}
 
 @(test)
 two_servers_binding_same_endpoint :: proc(t: ^testing.T) {
-	skt1, err1 := net.listen_tcp(ENDPOINT)
+	skt1, err1 := net.listen_tcp(ENDPOINT_TWO_SERVERS)
 	defer net.close(skt1)
-	skt2, err2 := net.listen_tcp(ENDPOINT)
+	skt2, err2 := net.listen_tcp(ENDPOINT_TWO_SERVERS)
 	defer net.close(skt2)
 
-	expect(t, err1 == nil, "expected first server binding to endpoint to do so without error")
-	expect(t, err2 == net.Bind_Error.Address_In_Use, "expected second server to bind to an endpoint to return .Address_In_Use")
+	testing.expect(t, err1 == nil, "expected first server binding to endpoint to do so without error")
+	testing.expect(t, err2 == net.Bind_Error.Address_In_Use, "expected second server to bind to an endpoint to return .Address_In_Use")
 }
 
 @(test)
 client_connects_to_closed_port :: proc(t: ^testing.T) {
-	skt, err := net.dial_tcp(ENDPOINT)
+
+	skt, err := net.dial_tcp(ENDPOINT_CLOSED_PORT)
 	defer net.close(skt)
-	expect(t, err == net.Dial_Error.Refused, "expected dial of a closed endpoint to return .Refused")
+	testing.expect(t, err == net.Dial_Error.Refused, "expected dial of a closed endpoint to return .Refused")
 }
+
 
 @(test)
 client_sends_server_data :: proc(t: ^testing.T) {
@@ -390,8 +259,8 @@ client_sends_server_data :: proc(t: ^testing.T) {
 
 		defer sync.wait_group_done(r.wg)
 
-		if r.skt, r.err = net.dial_tcp(ENDPOINT); r.err != nil {
-			log(r.t, r.err)
+		if r.skt, r.err = net.dial_tcp(ENDPOINT_SERVER_SENDS); r.err != nil {
+			testing.expectf(r.t, false, "[tcp_client:dial_tcp] %v", r.err)
 			return
 		}
 
@@ -405,19 +274,17 @@ client_sends_server_data :: proc(t: ^testing.T) {
 
 		defer sync.wait_group_done(r.wg)
 
-		log(r.t, "tcp_server listen")
-		if r.skt, r.err = net.listen_tcp(ENDPOINT); r.err != nil {
+		if r.skt, r.err = net.listen_tcp(ENDPOINT_SERVER_SENDS); r.err != nil {
 			sync.wait_group_done(r.wg)
-			log(r.t, r.err)
+			testing.expectf(r.t, false, "[tcp_server:listen_tcp] %v", r.err)
 			return
 		}
 
 		sync.wait_group_done(r.wg)
 
-		log(r.t, "tcp_server accept")
 		client: net.TCP_Socket
 		if client, _, r.err = net.accept_tcp(r.skt.(net.TCP_Socket)); r.err != nil {
-			log(r.t, r.err)
+			testing.expectf(r.t, false, "[tcp_server:accept_tcp] %v", r.err)
 			return
 		}
 		defer net.close(client)
@@ -437,10 +304,7 @@ client_sends_server_data :: proc(t: ^testing.T) {
 	thread_data[0].wg = &wg
 	thread_data[0].tid = thread.create_and_start_with_data(&thread_data[0], tcp_server, context)
 	
-	log(t, "waiting for server to start listening")
 	sync.wait_group_wait(&wg)
-	log(t, "starting up client")
-
 	sync.wait_group_add(&wg, 2)
 
 	thread_data[1].t = t
@@ -454,20 +318,15 @@ client_sends_server_data :: proc(t: ^testing.T) {
 		net.close(thread_data[1].skt)
 		thread.destroy(thread_data[1].tid)
 	}
-
-	log(t, "waiting for threads to finish")
 	sync.wait_group_wait(&wg)
-	log(t, "threads finished")
 
 	okay := thread_data[0].err == nil && thread_data[1].err == nil
-	msg  := fmt.tprintf("Expected client and server to return `nil`, got %v and %v", thread_data[0].err, thread_data[1].err)
-	expect(t, okay, msg)
+	testing.expectf(t, okay, "Expected client and server to return `nil`, got %v and %v", thread_data[0].err, thread_data[1].err)
 
 	received := string(thread_data[0].data[:thread_data[0].length])
 
 	okay  = received == CONTENT
-	msg   = fmt.tprintf("Expected client to send \"{}\", got \"{}\"", CONTENT, received)
-	expect(t, okay, msg)
+	testing.expectf(t, okay, "Expected client to send \"{}\", got \"{}\"", CONTENT, received)
 }
 
 URL_Test :: struct {
@@ -559,22 +418,15 @@ split_url_test :: proc(t: ^testing.T) {
 			delete(test.queries)
 		}
 
-		msg := fmt.tprintf("Expected `net.split_url` to return %s, got %s", test.scheme, scheme)
-		expect(t, scheme == test.scheme, msg)
-		msg = fmt.tprintf("Expected `net.split_url` to return %s, got %s", test.host, host)
-		expect(t, host == test.host, msg)
-		msg = fmt.tprintf("Expected `net.split_url` to return %s, got %s", test.path, path)
-		expect(t, path == test.path, msg)
-		msg = fmt.tprintf("Expected `net.split_url` to return %d queries, got %d queries", len(test.queries), len(queries))
-		expect(t, len(queries) == len(test.queries), msg)
+		testing.expectf(t, scheme       == test.scheme,       "Expected `net.split_url` to return %s, got %s", test.scheme, scheme)
+		testing.expectf(t, host         == test.host,         "Expected `net.split_url` to return %s, got %s", test.host, host)
+		testing.expectf(t, path         == test.path,         "Expected `net.split_url` to return %s, got %s", test.path, path)
+		testing.expectf(t, len(queries) == len(test.queries), "Expected `net.split_url` to return %d queries, got %d queries", len(test.queries), len(queries))
 		for k, v in queries {
 			expected := test.queries[k]
-			msg = fmt.tprintf("Expected `net.split_url` to return %s, got %s", expected, v)
-			expect(t, v == expected, msg)
+			testing.expectf(t, v == expected, "Expected `net.split_url` to return %s, got %s", expected, v)
 		}
-		msg = fmt.tprintf("Expected `net.split_url` to return %s, got %s", test.fragment, fragment)
-		expect(t, fragment == test.fragment, msg)
-
+		testing.expectf(t, fragment == test.fragment, "Expected `net.split_url` to return %s, got %s", test.fragment, fragment)
 	}
 }
 
@@ -659,7 +511,45 @@ join_url_test :: proc(t: ^testing.T) {
 		for test_url in test.url {
 			pass |= url == test_url
 		}
-		msg := fmt.tprintf("Expected `net.join_url` to return one of %s, got %s", test.url, url)
-		expect(t, pass, msg)
+		testing.expectf(t, pass, "Expected `net.join_url` to return one of %s, got %s", test.url, url)
 	}
+}
+
+@(private)
+address_to_binstr :: proc(address: net.Address) -> (binstr: string) {
+	switch t in address {
+	case net.IP4_Address:
+		b := transmute(u32be)t
+		return fmt.tprintf("%08x", b)
+	case net.IP6_Address:
+		b := transmute(u128be)t
+		return fmt.tprintf("%32x", b)
+	case:
+		return ""
+	}
+	unreachable()
+}
+
+@(private)
+binstr_to_address :: proc(t: ^testing.T, binstr: string) -> (address: net.Address) {
+	switch len(binstr) {
+	case 8:  // IPv4
+		a, ok := strconv.parse_u64_of_base(binstr, 16)
+		testing.expect(t, ok, "failed to parse test case bin string")
+
+		ipv4 := u32be(a)
+		return net.IP4_Address(transmute([4]u8)ipv4)
+
+
+	case 32: // IPv6
+		a, ok := strconv.parse_u128_of_base(binstr, 16)
+		testing.expect(t, ok, "failed to parse test case bin string")
+
+		ipv4 := u128be(a)
+		return net.IP6_Address(transmute([8]u16be)ipv4)
+
+	case 0:
+		return nil
+	}
+	panic("Invalid test case")
 }
