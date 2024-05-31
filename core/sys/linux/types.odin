@@ -632,6 +632,14 @@ Sock_Addr_In6 :: struct #packed {
 }
 
 /*
+  Struct representing Unix Domain Socket address
+*/
+Sock_Addr_Un :: struct #packed {
+	sun_family: Address_Family,
+	sun_path:   [108]u8,
+}
+
+/*
 	Struct representing an arbitrary socket address.
 */
 Sock_Addr_Any :: struct #raw_union {
@@ -641,6 +649,7 @@ Sock_Addr_Any :: struct #raw_union {
 	},
 	using ipv4: Sock_Addr_In,
 	using ipv6: Sock_Addr_In6,
+	using uds: Sock_Addr_Un,
 }
 
 /*
