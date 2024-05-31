@@ -261,13 +261,6 @@ jobs:
           cd tests\core\math\big
           call build.bat
         timeout-minutes: 10
-      - name: Core library benchmarks
-        shell: cmd
-        run: |
-          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat
-          cd tests\benchmark
-          call build.bat
-        timeout-minutes: 10
       - name: Odin check examples/all for Windows 32bits
         shell: cmd
         run: |
