@@ -1,6 +1,5 @@
 @echo off
 set COMMON=-no-bounds-check -vet -strict-style
-set COLLECTION=-collection:tests=..
 set PATH_TO_ODIN==..\..\odin
 python3 download_assets.py
 echo ---
@@ -112,7 +111,7 @@ echo ---
 echo ---
 echo Running core:thread tests
 echo ---
-%PATH_TO_ODIN% run thread %COMMON% %COLLECTION% -out:test_core_thread.exe || exit /b
+%PATH_TO_ODIN% test thread %COMMON% -out:test_core_thread.exe || exit /b
 
 echo ---
 echo Running core:time tests

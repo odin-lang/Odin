@@ -1,7 +1,6 @@
 ODIN=../../odin
 PYTHON=$(shell which python3)
 COMMON=-no-bounds-check -vet -strict-style
-COLLECTION=-collection:tests=..
 
 all: all_bsd \
      net_test
@@ -103,7 +102,7 @@ strings_test:
 	$(ODIN) test strings $(COMMON) -out:test_core_strings
 
 thread_test:
-	$(ODIN) run thread $(COMMON) -out:test_core_thread
+	$(ODIN) test thread $(COMMON) -out:test_core_thread
 
 time_test:
 	$(ODIN) test time $(COMMON) -out:test_core_time
