@@ -233,6 +233,13 @@ jobs:
           cd tests\core
           call build.bat
         timeout-minutes: 10
+      - name: Core library benchmarks
+        shell: cmd
+        run: |
+          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat
+          cd tests\benchmark
+          call build.bat
+        timeout-minutes: 10
       - name: Vendor library tests
         shell: cmd
         run: |
