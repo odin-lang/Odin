@@ -659,6 +659,13 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 
 	// -- All tests are complete, or the runner has been interrupted.
 
+	// NOTE(Feoramund): If you've arrived here after receiving signal 11 or
+	// SIGSEGV on the main runner thread, while using a UNIX-like platform,
+	// there is the possibility that you may have encountered a rare edge case
+	// involving the joining of threads.
+	//
+	// At the time of writing, the thread library is undergoing a rewrite that
+	// should solve this problem; it is not an issue with the test runner itself.
 	thread.pool_join(&pool)
 
 	finished_in := time.since(start_time)
