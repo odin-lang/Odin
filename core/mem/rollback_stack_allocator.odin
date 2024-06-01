@@ -63,9 +63,9 @@ Rollback_Stack :: struct {
 
 @(private="file", require_results)
 rb_ptr_in_bounds :: proc(block: ^Rollback_Stack_Block, ptr: rawptr) -> bool {
-	start := cast(uintptr)raw_data(block.buffer)
-	end   := cast(uintptr)raw_data(block.buffer) + block.offset
-	return start < cast(uintptr)ptr && cast(uintptr)ptr <= end
+	start := raw_data(block.buffer)
+	end   := start[block.offset:]
+	return start < ptr && ptr <= end
 }
 
 @(private="file", require_results)
@@ -105,8 +105,8 @@ rb_rollback_block :: proc(block: ^Rollback_Stack_Block, header: ^Rollback_Stack_
 	header := header
 	for block.offset > 0 && header.is_free {
 		block.offset = header.prev_offset
-		block.last_alloc = cast(rawptr)(cast(uintptr)raw_data(block.buffer) + cast(uintptr)header.prev_ptr)
-		header = cast(^Rollback_Stack_Header)(cast(uintptr)raw_data(block.buffer) + cast(uintptr)header.prev_ptr - size_of(Rollback_Stack_Header)) 
+		block.last_alloc = raw_data(block.buffer)[header.prev_ptr:]
+		header = cast(^Rollback_Stack_Header)(raw_data(block.buffer)[header.prev_ptr - size_of(Rollback_Stack_Header):])
 	}
 }
 
@@ -189,8 +189,8 @@ rb_alloc :: proc(stack: ^Rollback_Stack, size, alignment: int) -> (result: []byt
 			}
 		}
 
-		start := cast(uintptr)raw_data(block.buffer) + block.offset
-		padding := cast(uintptr)calc_padding_with_header(start, cast(uintptr)alignment, size_of(Rollback_Stack_Header))
+		start := raw_data(block.buffer)[block.offset:]
+		padding := cast(uintptr)calc_padding_with_header(cast(uintptr)start, cast(uintptr)alignment, size_of(Rollback_Stack_Header))
 
 		if block.offset + padding + cast(uintptr)size > cast(uintptr)len(block.buffer) {
 			when !ODIN_DISABLE_ASSERT {
@@ -202,8 +202,8 @@ rb_alloc :: proc(stack: ^Rollback_Stack, size, alignment: int) -> (result: []byt
 			continue
 		}
 
-		header := cast(^Rollback_Stack_Header)(start + cast(uintptr)padding - size_of(Rollback_Stack_Header))
-		ptr := (cast([^]byte)(start + cast(uintptr)padding))
+		header := cast(^Rollback_Stack_Header)(start[padding - size_of(Rollback_Stack_Header):])
+		ptr := start[padding:]
 
 		header^ = {
 			prev_offset = block.offset,
