@@ -39,7 +39,22 @@ PROGRESS_WIDTH        : int    : #config(ODIN_TEST_PROGRESS_WIDTH, 24)
 // This is the random seed that will be sent to each test.
 // If it is unspecified, it will be set to the system cycle counter at startup.
 SHARED_RANDOM_SEED    : u64    : #config(ODIN_TEST_RANDOM_SEED, 0)
+// Set the lowest log level for this test run.
+LOG_LEVEL             : string : #config(ODIN_TEST_LOG_LEVEL, "info")
 
+
+get_log_level :: #force_inline proc() -> runtime.Logger_Level {
+	when ODIN_DEBUG {
+		// Always use .Debug in `-debug` mode.
+		return .Debug
+	} else {
+		when LOG_LEVEL == "debug"        { return .Debug   }
+		else when LOG_LEVEL == "info"    { return .Info    }
+		else when LOG_LEVEL == "warning" { return .Warning }
+		else when LOG_LEVEL == "error"   { return .Error   }
+		else when LOG_LEVEL == "fatal"   { return .Fatal   }
+	}
+}
 
 end_t :: proc(t: ^T) {
 	for i := len(t.cleanups)-1; i >= 0; i -= 1 {
@@ -82,7 +97,7 @@ run_test_task :: proc(task: thread.Task) {
 	context.logger = {
 		procedure = test_logger_proc,
 		data = &data.t,
-		lowest_level = .Debug if ODIN_DEBUG else .Info,
+		lowest_level = get_log_level(),
 		options = Default_Test_Logger_Opts,
 	}
 
@@ -355,7 +370,7 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 	context.logger = {
 		procedure = runner_logger_proc,
 		data = &log_messages,
-		lowest_level = .Debug if ODIN_DEBUG else .Info,
+		lowest_level = get_log_level(),
 		options = Default_Test_Logger_Opts - {.Short_File_Path, .Line, .Procedure},
 	}
 
