@@ -180,6 +180,7 @@ pool_stop_task :: proc(pool: ^Pool, user_index: int, exit_code: int = 1) -> bool
 			replacement := create(pool_thread_runner)
 			replacement.user_index = t.user_index
 			replacement.data = data
+			data.task = {}
 			pool.threads[i] = replacement
 
 			start(replacement)
@@ -211,6 +212,7 @@ pool_stop_all_tasks :: proc(pool: ^Pool, exit_code: int = 1) {
 			replacement := create(pool_thread_runner)
 			replacement.user_index = t.user_index
 			replacement.data = data
+			data.task = {}
 			pool.threads[i] = replacement
 
 			start(replacement)
