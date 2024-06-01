@@ -748,6 +748,7 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 					#no_bounds_check it := internal_tests[test_index]
 					fmt.wprintf(batch_writer, "%s.%s,", it.pkg, it.name)
 				}
+				fmt.wprint(batch_writer, "\n\nIf your terminal supports OSC 52, you may use -define:ODIN_TEST_CLIPBOARD to have this copied directly to your clipboard.")
 			}
 
 			fmt.wprintln(batch_writer)
