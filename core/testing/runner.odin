@@ -439,6 +439,23 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 
 	thread.pool_start(&pool)
 	main_loop: for !thread.pool_is_empty(&pool) {
+		{
+			events_pending := thread.pool_num_done(&pool) > 0
+
+			if !events_pending {
+				poll_tasks: for &task_channel in task_channels {
+					if chan.len(task_channel.channel) > 0 {
+						events_pending = true
+						break poll_tasks
+					}
+				}
+			}
+
+			if !events_pending {
+				// Keep the main thread from pegging a core at 100% usage.
+				time.sleep(1 * time.Microsecond)
+			}
+		}
 
 		cycle_pool: for task in thread.pool_pop_done(&pool) {
 			data := cast(^Task_Data)(task.data)
