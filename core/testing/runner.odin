@@ -26,6 +26,9 @@ ALWAYS_REPORT_MEMORY  : bool   : #config(ODIN_TEST_ALWAYS_REPORT_MEMORY, false)
 // Specify how much memory each thread allocator starts with.
 PER_THREAD_MEMORY     : int    : #config(ODIN_TEST_THREAD_MEMORY, mem.ROLLBACK_STACK_DEFAULT_BLOCK_SIZE)
 // Select a specific set of tests to run by name.
+// Each test is separated by a comma and may optionally include the package name.
+// This may be useful when running tests on multiple packages with `-all-packages`.
+// The format is: `package.test_name,test_name_only,...`
 TEST_NAMES            : string : #config(ODIN_TEST_NAMES, "")
 // Show the fancy animated progress report.
 FANCY_OUTPUT          : bool   : #config(ODIN_TEST_FANCY, true)
