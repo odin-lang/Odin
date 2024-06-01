@@ -88,7 +88,7 @@ run_test_task :: proc(task: thread.Task) {
 
 	free_all(context.temp_allocator)
 
-	run_internal_test(&data.t, data.it)
+	data.it.p(&data.t)
 
 	end_t(&data.t)
 
