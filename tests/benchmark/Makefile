@@ -1,5 +1,5 @@
 ODIN=../../odin
-COMMON=-no-bounds-check -vet -strict-style
+COMMON=-no-bounds-check -vet -strict-style -define:ODIN_TEST_FANCY=false
 
 all: crypto_bench \
      hash_bench

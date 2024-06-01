@@ -1,5 +1,5 @@
 @echo off
-set COMMON=-show-timings -no-bounds-check -vet -strict-style
+set COMMON=-show-timings -no-bounds-check -vet -strict-style -define:ODIN_TEST_FANCY=false
 set PATH_TO_ODIN==..\..\odin
 
 echo ---

@@ -1,5 +1,5 @@
 @echo off
-set COMMON=-no-bounds-check -vet -strict-style
+set COMMON=-no-bounds-check -vet -strict-style -define:ODIN_TEST_FANCY=false
 set PATH_TO_ODIN==..\..\odin
 python3 download_assets.py
 echo ---

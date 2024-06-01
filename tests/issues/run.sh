@@ -4,7 +4,7 @@ set -eu
 mkdir -p build
 pushd build
 ODIN=../../../odin
-COMMON="-collection:tests=../.."
+COMMON="-collection:tests=../.. -define:ODIN_TEST_FANCY=false"
 
 NO_NIL_ERR="Error: "
 

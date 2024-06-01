@@ -1,6 +1,6 @@
 ODIN=../../odin
 PYTHON=$(shell which python3)
-COMMON=-no-bounds-check -vet -strict-style
+COMMON=-no-bounds-check -vet -strict-style -define:ODIN_TEST_FANCY=false
 
 all: all_bsd \
      net_test

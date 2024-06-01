@@ -3,7 +3,7 @@
 if not exist "build\" mkdir build
 pushd build
 
-set COMMON=-collection:tests=..\..
+set COMMON=-collection:tests=..\.. -define:ODIN_TEST_FANCY=false
 
 @echo on
 
