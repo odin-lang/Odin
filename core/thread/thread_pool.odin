@@ -225,6 +225,7 @@ pool_stop_all_tasks :: proc(pool: ^Pool, exit_code: int = 1) {
 //
 // The pool must still be destroyed after this.
 pool_shutdown :: proc(pool: ^Pool, exit_code: int = 1) {
+	intrinsics.atomic_store(&pool.is_running, false)
 	sync.guard(&pool.mutex)
 
 	for t in pool.threads {
