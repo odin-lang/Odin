@@ -33,6 +33,7 @@ main :: proc() {
 	test_kdf(&t) // After hash/mac tests because those should pass first.
 	test_ecc25519(&t)
 
+	test_aes(&t)
 	test_chacha20(&t)
 	test_chacha20poly1305(&t)
 	test_sha3_variants(&t)
