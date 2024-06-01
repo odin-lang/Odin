@@ -397,6 +397,16 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 		draw_status_bar(stdout, thread_count_status_string, total_done_count, total_test_count)
 	}
 
+	when TEST_THREADS == 0 {
+		pkg_log.infof("Starting test runner with %i thread%s. Set with -define:ODIN_TEST_THREADS=n.",
+			thread_count,
+			"" if thread_count == 1 else "s")
+	} else {
+		pkg_log.infof("Starting test runner with %i thread%s.",
+			thread_count,
+			"" if thread_count == 1 else "s")
+	}
+
 	pkg_log.infof("The random seed sent to every test is: %v", shared_random_seed)
 
 	when TRACKING_MEMORY {
