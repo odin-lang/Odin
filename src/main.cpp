@@ -2657,6 +2657,10 @@ int main(int arg_count, char const **arg_ptr) {
 					gb_printf_err("Expected either a directory or a .odin file, got '%.*s'\n", LIT(init_filename));
 					return 1;
 				}
+				if (!gb_file_exists(cast(const char*)init_filename.text)) {
+					gb_printf_err("The file '%.*s' was not found.\n", LIT(init_filename));
+					return 1;
+				}
 			}
 		}
 	}
