@@ -14,10 +14,10 @@ Float_Class :: enum {
 	Neg_Inf,   // negative infinity
 }
 
-TAU          :: 6.28318530717958647692528676655900576
-PI           :: 3.14159265358979323846264338327950288
+TAU :: 6.28318530717958647692528676655900576
+PI  :: 3.14159265358979323846264338327950288
 
-E            :: 2.71828182845904523536
+E   :: 2.71828182845904523536
 
 τ :: TAU
 π :: PI
@@ -41,6 +41,32 @@ abs :: builtin.abs
 min :: builtin.min
 max :: builtin.max
 clamp :: builtin.clamp
+
+
+@(private)
+IS_WASM :: ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32
+
+@(require_results)
+sqrt_f16 :: proc "contextless" (x: f16) -> f16 {
+	when IS_WASM {
+		return f16(sqrt_f64(f64(x)))
+	} else {
+		return intrinsics.sqrt(x)
+	}
+}
+@(require_results)
+sqrt_f32 :: proc "contextless" (x: f32) -> f32 {
+	when IS_WASM {
+		return f32(sqrt_f64(f64(x)))
+	} else {
+		return intrinsics.sqrt(x)
+	}
+}
+@(require_results)
+sqrt_f64 :: proc "contextless" (x: f64) -> f64 {
+	return intrinsics.sqrt(x)
+}
+
 
 @(require_results) sqrt_f16le :: proc "contextless" (x: f16le) -> f16le { return #force_inline f16le(sqrt_f16(f16(x))) }
 @(require_results) sqrt_f16be :: proc "contextless" (x: f16be) -> f16be { return #force_inline f16be(sqrt_f16(f16(x))) }
