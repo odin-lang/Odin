@@ -648,10 +648,11 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 				failed_test_reason_map[test_index] = fmt.aprintf("Signal caught: %v", reason, allocator = shared_log_allocator)
 				pkg_log.fatalf("Caught signal to stop test #%i %s.%s for: %v.", test_index, it.pkg, it.name, reason)
 
-				when FANCY_OUTPUT {
-					signals_were_raised = true
-					bypass_progress_overwrite = true
-				}
+			}
+
+			when FANCY_OUTPUT {
+				bypass_progress_overwrite = true
+				signals_were_raised = true
 			}
 
 			total_failure_count += 1
