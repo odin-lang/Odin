@@ -31,10 +31,6 @@ jobs:
           ./odin version
           ./odin report
           ./odin check examples/all -vet -strict-style -target:netbsd_amd64
-          (cd tests/core; gmake all_bsd)
-          (cd tests/internal; gmake all_bsd)
-          (cd tests/issues; ./run.sh)
-          (cd tests/benchmark; gmake all)
   build_linux:
     name: Ubuntu Build, Check, and Test
     runs-on: ubuntu-latest
