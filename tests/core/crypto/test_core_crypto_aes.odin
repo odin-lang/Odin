@@ -15,6 +15,7 @@ test_aes :: proc(t: ^testing.T) {
 	log.info("Testing AES")
 
 	impls := make([dynamic]aes.Implementation, 0, 2)
+	defer delete(impls)
 	append(&impls, aes.Implementation.Portable)
 	if aes.is_hardware_accelerated() {
 		append(&impls, aes.Implementation.Hardware)
