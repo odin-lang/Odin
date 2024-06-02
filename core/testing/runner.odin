@@ -422,7 +422,11 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 			"" if thread_count == 1 else "s")
 	}
 
-	pkg_log.infof("The random seed sent to every test is: %v", shared_random_seed)
+	when SHARED_RANDOM_SEED == 0 {
+		pkg_log.infof("The random seed sent to every test is: %v. Set with -define:ODIN_TEST_RANDOM_SEED=n.", shared_random_seed)
+	} else {
+		pkg_log.infof("The random seed sent to every test is: %v.", shared_random_seed)
+	}
 
 	when TRACKING_MEMORY {
 		when ALWAYS_REPORT_MEMORY {
