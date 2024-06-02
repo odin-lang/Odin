@@ -1,10 +1,9 @@
 @echo off
 set PATH_TO_ODIN==..\..\odin
-rem %PATH_TO_ODIN% run test_rtti.odin -file -vet -strict-style -o:minimal || exit /b
-%PATH_TO_ODIN% run test_map.odin -file -vet -strict-style -o:minimal || exit /b
-rem -define:SEED=42
-%PATH_TO_ODIN% run test_pow.odin -file -vet -strict-style -o:minimal || exit /b
-
-%PATH_TO_ODIN% run test_128.odin -file -vet -strict-style -o:minimal || exit /b
-
-%PATH_TO_ODIN% run test_string_compare.odin -file -vet -strict-style -o:minimal || exit /b
+set COMMON=-file -vet -strict-style -o:minimal
+%PATH_TO_ODIN% test test_rtti.odin %COMMON% || exit /b
+%PATH_TO_ODIN% test test_map.odin  %COMMON% || exit /b
+%PATH_TO_ODIN% test test_pow.odin  %COMMON% || exit /b
+%PATH_TO_ODIN% test test_asan.odin %COMMON% || exit /b
+%PATH_TO_ODIN% test test_128.odin  %COMMON% || exit /b
+%PATH_TO_ODIN% test test_string_compare.odin %COMMON% || exit /b
