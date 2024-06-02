@@ -89,47 +89,57 @@ sincos :: proc{
 	sincos_f64, sincos_f64le, sincos_f64be,
 }
 
+@(require_results)
 sincos_f16 :: proc "contextless" (x: f16) -> (sin, cos: f16) #no_bounds_check {
 	s, c := sincos_f64(f64(x))
 	return f16(s), f16(c)
 }
+@(require_results)
 sincos_f16le :: proc "contextless" (x: f16le) -> (sin, cos: f16le) #no_bounds_check {
 	s, c := sincos_f64(f64(x))
 	return f16le(s), f16le(c)
 }
+@(require_results)
 sincos_f16be :: proc "contextless" (x: f16be) -> (sin, cos: f16be) #no_bounds_check {
 	s, c := sincos_f64(f64(x))
 	return f16be(s), f16be(c)
 }
 
+@(require_results)
 sincos_f32 :: proc "contextless" (x: f32) -> (sin, cos: f32) #no_bounds_check {
 	s, c := sincos_f64(f64(x))
 	return f32(s), f32(c)
 }
+@(require_results)
 sincos_f32le :: proc "contextless" (x: f32le) -> (sin, cos: f32le) #no_bounds_check {
 	s, c := sincos_f64(f64(x))
 	return f32le(s), f32le(c)
 }
+@(require_results)
 sincos_f32be :: proc "contextless" (x: f32be) -> (sin, cos: f32be) #no_bounds_check {
 	s, c := sincos_f64(f64(x))
 	return f32be(s), f32be(c)
 }
 
+@(require_results)
 sincos_f64le :: proc "contextless" (x: f64le) -> (sin, cos: f64le) #no_bounds_check {
 	s, c := sincos_f64(f64(x))
 	return f64le(s), f64le(c)
 }
+@(require_results)
 sincos_f64be :: proc "contextless" (x: f64be) -> (sin, cos: f64be) #no_bounds_check {
 	s, c := sincos_f64(f64(x))
 	return f64be(s), f64be(c)
 }
 
+
+@(private="file") PI4A :: 0h3fe921fb40000000 // 7.85398125648498535156e-1  PI/4 split into three parts
+@(private="file") PI4B :: 0h3e64442d00000000 // 3.77489470793079817668e-8
+@(private="file") PI4C :: 0h3ce8469898cc5170 // 2.69515142907905952645e-15
+
+@(require_results)
 sincos_f64 :: proc "contextless" (x: f64) -> (sin, cos: f64) #no_bounds_check {
 	x := x
-
-	PI4A :: 0h3fe921fb40000000 // 7.85398125648498535156e-1  PI/4 split into three parts
-	PI4B :: 0h3e64442d00000000 // 3.77489470793079817668e-8
-	PI4C :: 0h3ce8469898cc5170 // 2.69515142907905952645e-15
 
 	// special cases
 	switch {
@@ -189,12 +199,12 @@ sincos_f64 :: proc "contextless" (x: f64) -> (sin, cos: f64) #no_bounds_check {
 // sin coefficients
 @(private="file")
 _sin := [?]f64{
-	 0h3de5d8fd1fd19ccd, //  1.58962301576546568060e-10
-	 0hbe5ae5e5a9291f5d, // -2.50507477628578072866e-8
-	 0h3ec71de3567d48a1, //  2.75573136213857245213e-6
-	 0hbf2a01a019bfdf03, // -1.98412698295895385996e-4
-	 0h3f8111111110f7d0, //  8.33333333332211858878e-3
-	 0hbfc5555555555548, // -1.66666666666666307295e-1
+	0h3de5d8fd1fd19ccd, //  1.58962301576546568060e-10
+	0hbe5ae5e5a9291f5d, // -2.50507477628578072866e-8
+	0h3ec71de3567d48a1, //  2.75573136213857245213e-6
+	0hbf2a01a019bfdf03, // -1.98412698295895385996e-4
+	0h3f8111111110f7d0, //  8.33333333332211858878e-3
+	0hbfc5555555555548, // -1.66666666666666307295e-1
 }
 
 // cos coefficients
@@ -229,6 +239,7 @@ REDUCE_THRESHOLD :: 1 << 29
 // "ARGUMENT REDUCTION FOR HUGE ARGUMENTS: Good to the Last Bit"
 // K. C. Ng et al, March 24, 1992
 // The simulated multi-precision calculation of x*B uses 64-bit integer arithmetic.
+@(require_results)
 _trig_reduce_f64 :: proc "contextless" (x: f64) -> (j: u64, z: f64) #no_bounds_check {
 	// bd_pi4 is the binary digits of 4/pi as a u64 array,
 	// that is, 4/pi = Sum bd_pi4[i]*2^(-64*i)
@@ -306,3 +317,111 @@ _trig_reduce_f64 :: proc "contextless" (x: f64) -> (j: u64, z: f64) #no_bounds_c
 	// Multiply the fractional part by pi/4.
 	return j, z * PI4
 }
+
+
+@(require_results)
+cos_f64 :: proc "contextless" (x: f64) -> f64 #no_bounds_check {
+	x := x
+	switch {
+	case is_nan(x) || is_inf(x, 0):
+		return nan_f64()
+	}
+
+	// make argument positive
+	sign := false
+	x = abs(x)
+
+	j: u64
+	y, z: f64
+	if x >= REDUCE_THRESHOLD {
+		j, z = _trig_reduce_f64(x)
+	} else {
+		j = u64(x * (4.0 / PI))
+		y = f64(j)
+
+		// map zeros to origin
+		if j&1 == 1 {
+			j += 1
+			y += 1
+		}
+		j &= 7                               // octant modulo 2Pi radians (360 degrees)
+		z = ((x - y*PI4A) - y*PI4B) - y*PI4C // Extended precision modular arithmetic
+	}
+
+	if j > 3 {
+		j -= 4
+		sign = !sign
+	}
+	if j > 1 {
+		sign = !sign
+	}
+
+	zz := z * z
+	if j == 1 || j == 2 {
+		y = z + z*zz*((((((_sin[0]*zz)+_sin[1])*zz+_sin[2])*zz+_sin[3])*zz+_sin[4])*zz+_sin[5])
+	} else {
+		y = 1.0 - 0.5*zz + zz*zz*((((((_cos[0]*zz)+_cos[1])*zz+_cos[2])*zz+_cos[3])*zz+_cos[4])*zz+_cos[5])
+	}
+	if sign {
+		y = -y
+	}
+	return y
+}
+
+
+@(require_results)
+sin_f64 :: proc "contextless" (x: f64) -> f64 #no_bounds_check {
+	x := x
+
+	switch {
+	case x == 0 || is_nan(x):
+		return x
+	case is_inf(x, 0):
+		return nan_f64()
+	}
+
+	// make argument positive but save the sign
+	sign := false
+	if x < 0 {
+		x = -x
+		sign = true
+	}
+
+	j: u64
+	y, z: f64
+	if x >= REDUCE_THRESHOLD {
+		j, z = _trig_reduce_f64(x)
+	} else {
+		j = u64(x * (4.0 / PI))
+		y = f64(j)
+
+		// map zeros to origin
+		if j&1 == 1 {
+			j += 1
+			y += 1
+		}
+		j &= 7                               // octant modulo 2Pi radians (360 degrees)
+		z = ((x - y*PI4A) - y*PI4B) - y*PI4C // Extended precision modular arithmetic
+	}
+	// reflect in x axis
+	if j > 3 {
+		sign = !sign
+		j -= 4
+	}
+	zz := z * z
+	if j == 1 || j == 2 {
+		y = 1.0 - 0.5*zz + zz*zz*((((((_cos[0]*zz)+_cos[1])*zz+_cos[2])*zz+_cos[3])*zz+_cos[4])*zz+_cos[5])
+	} else {
+		y = z + z*zz*((((((_sin[0]*zz)+_sin[1])*zz+_sin[2])*zz+_sin[3])*zz+_sin[4])*zz+_sin[5])
+	}
+	if sign {
+		y = -y
+	}
+	return y
+}
+
+
+@(require_results) sin_f16 :: proc "c" (θ: f16) -> f16 { return f16(sin_f64(f64(θ))) }
+@(require_results) cos_f16 :: proc "c" (θ: f16) -> f16 { return f16(cos_f64(f64(θ))) }
+@(require_results) sin_f32 :: proc "c" (θ: f32) -> f32 { return f32(sin_f64(f64(θ))) }
+@(require_results) cos_f32 :: proc "c" (θ: f32) -> f32 { return f32(cos_f64(f64(θ))) }

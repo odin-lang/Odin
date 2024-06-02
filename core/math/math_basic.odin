@@ -5,20 +5,6 @@ import "base:intrinsics"
 
 @(default_calling_convention="none", private="file")
 foreign _ {
-	@(link_name="llvm.sin.f16", require_results)
-	_sin_f16 :: proc(θ: f16) -> f16 ---
-	@(link_name="llvm.sin.f32", require_results)
-	_sin_f32 :: proc(θ: f32) -> f32 ---
-	@(link_name="llvm.sin.f64", require_results)
-	_sin_f64 :: proc(θ: f64) -> f64 ---
-
-	@(link_name="llvm.cos.f16", require_results)
-	_cos_f16 :: proc(θ: f16) -> f16 ---
-	@(link_name="llvm.cos.f32", require_results)
-	_cos_f32 :: proc(θ: f32) -> f32 ---
-	@(link_name="llvm.cos.f64", require_results)
-	_cos_f64 :: proc(θ: f64) -> f64 ---
-
 	@(link_name="llvm.pow.f16", require_results)
 	_pow_f16 :: proc(x, power: f16) -> f16 ---
 	@(link_name="llvm.pow.f32", require_results)
@@ -41,31 +27,6 @@ foreign _ {
 	_exp_f64 :: proc(x: f64) -> f64 ---
 }
 
-@(require_results)
-sin_f16 :: proc "contextless" (θ: f16) -> f16 {
-	return _sin_f16(θ)
-}
-@(require_results)
-sin_f32 :: proc "contextless" (θ: f32) -> f32 {
-	return _sin_f32(θ)
-}
-@(require_results)
-sin_f64 :: proc "contextless" (θ: f64) -> f64 {
-	return _sin_f64(θ)
-}
-
-@(require_results)
-cos_f16 :: proc "contextless" (θ: f16) -> f16 {
-	return _cos_f16(θ)
-}
-@(require_results)
-cos_f32 :: proc "contextless" (θ: f32) -> f32 {
-	return _cos_f32(θ)
-}
-@(require_results)
-cos_f64 :: proc "contextless" (θ: f64) -> f64 {
-	return _cos_f64(θ)
-}
 
 @(require_results)
 pow_f16 :: proc "contextless" (x, power: f16) -> f16 {
