@@ -8,7 +8,7 @@ import "core:log"
 
 @(test)
 test_avl :: proc(t: ^testing.T) {
-	log.infof("Testing avl, using random seed %v, add -define:RANDOM_SEED=%v to reuse it.", random_seed, random_seed)
+	log.infof("Testing avl using random seed %v.", t.seed)
 
 	// Initialization.
 	tree: avl.Tree(int)
@@ -21,7 +21,7 @@ test_avl :: proc(t: ^testing.T) {
 	testing.expect(t, avl.iterator_get(&iter) == nil, "empty/iterator: first node should be nil")
 
 	r: rand.Rand
-	rand.init(&r, random_seed)
+	rand.init(&r, t.seed)
 
 	// Test insertion.
 	NR_INSERTS :: 32 + 1 // Ensure at least 1 collision.

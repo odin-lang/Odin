@@ -8,12 +8,6 @@ import "core:mem"
 import "core:slice"
 import "core:log"
 
-@(private)
-_RANDOM_SEED :: #config(RANDOM_SEED, u64(0))
-
-// Exported
-random_seed := u64(intrinsics.read_cycle_counter()) when _RANDOM_SEED == 0 else u64(_RANDOM_SEED)
-
 test_rbtree_integer :: proc(t: ^testing.T, $Key: typeid, $Value: typeid) {
 	track: mem.Tracking_Allocator
 	mem.tracking_allocator_init(&track, context.allocator)
@@ -21,9 +15,9 @@ test_rbtree_integer :: proc(t: ^testing.T, $Key: typeid, $Value: typeid) {
 	context.allocator = mem.tracking_allocator(&track)
 
 	r: rand.Rand
-	rand.init(&r, random_seed)
+	rand.init(&r, t.seed)
 
-	log.infof("Testing Red-Black Tree($Key=%v,$Value=%v), using random seed %v, add -define:RANDOM_SEED=%v to reuse it.", type_info_of(Key), type_info_of(Value), random_seed, random_seed)
+	log.infof("Testing Red-Black Tree($Key=%v,$Value=%v) using random seed %v.", type_info_of(Key), type_info_of(Value), t.seed)
 	tree: rb.Tree(Key, Value)
 	rb.init(&tree)
 
