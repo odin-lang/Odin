@@ -6,6 +6,7 @@ import "base:intrinsics"
 import "core:c/libc"
 import "core:encoding/ansi"
 import "core:sync"
+@require import "core:sys/unix"
 
 @(private="file") stop_runner_flag: libc.sig_atomic_t
 
@@ -75,6 +76,18 @@ This is a dire bug and should be reported to the Odin developers.
 			// Idle until this thread is terminated by the runner,
 			// otherwise we may continue to generate signals.
 			intrinsics.cpu_relax()
+
+			when ODIN_OS != .Windows {
+				// NOTE(Feoramund): Some UNIX-like platforms may require this.
+				//
+				// During testing, I found that NetBSD 10.0 refused to
+				// terminate a task thread, even when its thread had been
+				// properly set to PTHREAD_CANCEL_ASYNCHRONOUS.
+				//
+				// The runner would stall after returning from `pthread_cancel`.
+			
+				unix.pthread_testcancel()
+			}
 		}
 	}
 }
