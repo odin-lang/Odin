@@ -1204,7 +1204,7 @@ parse_foreign_decl :: proc(p: ^Parser) -> ^ast.Decl {
 			path := expect_token(p, .String)
 			reserve(&fullpaths, 1)
 			bl := ast.new(ast.Basic_Lit, path.pos, end_pos(path))
-			bl.tok = tok
+			bl.tok = path
 			append(&fullpaths, bl)
 		}
 
