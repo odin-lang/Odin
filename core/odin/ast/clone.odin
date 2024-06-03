@@ -279,6 +279,7 @@ clone_node :: proc(node: ^Node) -> ^Node {
 			r.body            = clone(r.body)
 		case ^Foreign_Import_Decl:
 			r.name = auto_cast clone(r.name)
+			r.fullpaths = auto_cast clone_array(r.fullpaths)
 		case ^Proc_Group:
 			r.args = clone(r.args)
 		case ^Attribute:
