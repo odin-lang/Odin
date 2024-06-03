@@ -49,7 +49,7 @@ sem_t :: distinct rawptr
 PTHREAD_CANCEL_ENABLE       :: 0
 PTHREAD_CANCEL_DISABLE      :: 1
 PTHREAD_CANCEL_DEFERRED     :: 0
-PTHREAD_CANCEL_ASYNCHRONOUS :: 1
+PTHREAD_CANCEL_ASYNCHRONOUS :: 2
 
 foreign import libc "system:c"
 
