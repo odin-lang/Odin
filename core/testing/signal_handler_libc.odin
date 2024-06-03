@@ -51,7 +51,7 @@ stop_test_callback :: proc "c" (sig: libc.int) {
 				sigbuf[i] = cast(u8)('0' + m)
 				i -= 1
 			}
-			sigstr = cast(string)sigbuf[i:]
+			sigstr = cast(string)sigbuf[1 + i:len(sigbuf) - 1]
 		}
 
 		advisory_a := `
