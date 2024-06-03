@@ -189,7 +189,7 @@ jobs:
           DAYS_TO_KEEP: ${{ secrets.B2_DAYS_TO_KEEP }}
         run: |
           echo Authorizing B2 account
-          b2 authorize-account "$APPID" "$APPKEY"
+          b2 acount authorize "$APPID" "$APPKEY"
 
           echo Uploading artifcates to B2
           chmod +x ./ci/upload_create_nightly.sh

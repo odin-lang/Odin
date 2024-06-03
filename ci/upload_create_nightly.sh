@@ -22,4 +22,4 @@ else
 	7z a -bd "output/$filename" -r "$artifact"
 fi
 
-b2 upload-file --noProgress "$bucket" "output/$filename" "nightly/$filename"
+b2 upload-file "$bucket" "output/$filename" "nightly/$filename"
