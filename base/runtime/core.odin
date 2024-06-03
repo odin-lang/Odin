@@ -470,6 +470,12 @@ Raw_Soa_Pointer :: struct {
 	index: int,
 }
 
+Raw_Complex64     :: struct {real, imag: f32}
+Raw_Complex128    :: struct {real, imag: f64}
+Raw_Quaternion128 :: struct {imag, jmag, kmag: f32, real: f32}
+Raw_Quaternion256 :: struct {imag, jmag, kmag: f64, real: f64}
+Raw_Quaternion128_Vector_Scalar :: struct {vector: [3]f32, scalar: f32}
+Raw_Quaternion256_Vector_Scalar :: struct {vector: [3]f64, scalar: f64}
 
 
 /*
