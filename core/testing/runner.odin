@@ -467,16 +467,18 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 			when TRACKING_MEMORY {
 				#no_bounds_check tracker := &task_memory_trackers[data.allocator_index]
 
+				memory_is_in_bad_state := len(tracker.allocation_map) + len(tracker.bad_free_array) > 0
+
 				when ALWAYS_REPORT_MEMORY {
 					should_report := true
 				} else {
-					should_report := len(tracker.allocation_map) + len(tracker.bad_free_array) > 0
+					should_report := memory_is_in_bad_state
 				}
 
 				if should_report {
 					write_memory_report(batch_writer, tracker, data.it.pkg, data.it.name)
 
-					pkg_log.info(bytes.buffer_to_string(&batch_buffer))
+					pkg_log.log(.Warning if memory_is_in_bad_state else .Info, bytes.buffer_to_string(&batch_buffer))
 					bytes.buffer_reset(&batch_buffer)
 				}
 
