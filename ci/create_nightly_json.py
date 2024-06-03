@@ -9,7 +9,7 @@ def main():
     files_by_date = {}
     bucket = sys.argv[1]
 
-    files_lines = execute_cli(f"b2 ls --long {bucket} nightly").split("\n")
+    files_lines = execute_cli(f"b2 ls --long b2://{bucket}/nightly/").split("\n")
     for x in files_lines:
         parts = x.split(" ", 1)
         if parts[0]:
