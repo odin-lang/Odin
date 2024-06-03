@@ -441,6 +441,8 @@ foreign kernel32 {
 	GetConsoleCursorInfo :: proc(hConsoleOutput: HANDLE, lpConsoleCursorInfo: PCONSOLE_CURSOR_INFO) -> BOOL ---
 	SetConsoleCursorInfo :: proc(hConsoleOutput: HANDLE, lpConsoleCursorInfo: PCONSOLE_CURSOR_INFO) -> BOOL ---
 
+	FlushConsoleInputBuffer :: proc(hConsoleInput: HANDLE) -> BOOL ---
+
 	GetDiskFreeSpaceExW :: proc(
 		lpDirectoryName: LPCWSTR,
 		lpFreeBytesAvailableToCaller: PULARGE_INTEGER,
