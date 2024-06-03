@@ -1,8 +1,10 @@
 package test_core_fmt
 
+import "base:runtime"
 import "core:fmt"
 import "core:os"
 import "core:testing"
+import "core:math"
 import "core:mem"
 
 TEST_count := 0
@@ -59,6 +61,70 @@ test_fmt_memory :: proc(t: ^testing.T) {
 	check(t, "1.00 EiB",  "%#M",   mem.Exabyte)
 	check(t, "255 B",     "%#M",   u8(255))
 	check(t, "0b",        "%m",    u8(0))
+}
+
+@(test)
+test_fmt_complex_quaternion :: proc(t: ^testing.T) {
+	neg_inf  := math.inf_f64(-1)
+	pos_inf  := math.inf_f64(+1)
+	neg_zero := f64(0h80000000_00000000)
+	nan      := math.nan_f64()
+
+	// NOTE(Feoramund): Doing it this way, because complex construction is broken.
+	// Reported in issue #3665.
+	c: complex128
+	cptr := cast(^runtime.Raw_Complex128)&c
+
+	cptr^ = {0, 0}
+	check(t, "0+0i",      "%v", c)
+	cptr^ = {1, 1}
+	check(t, "1+1i",      "%v", c)
+	cptr^ = {1, 0}
+	check(t, "1+0i",      "%v", c)
+	cptr^ = {-1, -1}
+	check(t, "-1-1i",     "%v", c)
+	cptr^ = {0, neg_zero}
+	check(t, "0-0i",      "%v", c)
+	cptr^ = {nan, nan}
+	check(t, "NaNNaNi",   "%v", c)
+	cptr^ = {pos_inf, pos_inf}
+	check(t, "+Inf+Infi", "%v", c)
+	cptr^ = {neg_inf, neg_inf}
+	check(t, "-Inf-Infi", "%v", c)
+
+	// Check forced plus signs.
+	cptr^ = {0, neg_zero}
+	check(t, "+0-0i",     "%+v", c)
+	cptr^ = {1, 1}
+	check(t, "+1+1i",     "%+v", c)
+	cptr^ = {nan, nan}
+	check(t, "NaNNaNi",   "%+v", c)
+	cptr^ = {pos_inf, pos_inf}
+	check(t, "+Inf+Infi", "%+v", c)
+	cptr^ = {neg_inf, neg_inf}
+	check(t, "-Inf-Infi", "%+v", c)
+
+	// Remember that the real number is the last in a quaternion's data layout,
+	// opposed to a complex, where it is the first.
+	q: quaternion256
+	qptr := cast(^runtime.Raw_Quaternion256)&q
+
+	qptr^ = {0, 0, 0, 0}
+	check(t, "0+0i+0j+0k",        "%v", q)
+	qptr^ = {1, 1, 1, 1}
+	check(t, "1+1i+1j+1k",        "%v", q)
+	qptr^ = {2, 3, 4, 1}
+	check(t, "1+2i+3j+4k",        "%v", q)
+	qptr^ = {-1, -1, -1, -1}
+	check(t, "-1-1i-1j-1k",       "%v", q)
+	qptr^ = {2, neg_zero, neg_zero, 1}
+	check(t, "1+2i-0j-0k",        "%v", q)
+	qptr^ = {neg_inf, neg_inf, neg_inf, -1}
+	check(t, "-1-Infi-Infj-Infk", "%v", q)
+	qptr^ = {pos_inf, pos_inf, pos_inf, -1}
+	check(t, "-1+Infi+Infj+Infk", "%v", q)
+	qptr^ = {nan, nan, nan, -1}
+	check(t, "-1NaNiNaNjNaNk",    "%v", q)
 }
 
 @(test)
