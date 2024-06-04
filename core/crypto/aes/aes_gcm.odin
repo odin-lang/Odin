@@ -113,7 +113,7 @@ reset_gcm :: proc "contextless" (ctx: ^Context_GCM) {
 	ctx._is_initialized = false
 }
 
-@(private)
+@(private = "file")
 gcm_validate_common_slice_sizes :: proc(tag, nonce, aad, text: []byte) {
 	if len(tag) != GCM_TAG_SIZE {
 		panic("crypto/aes: invalid GCM tag size")
@@ -184,7 +184,7 @@ gctr_ct64 :: proc(
 	h: ^[_aes.GHASH_KEY_SIZE]byte,
 	nonce: []byte,
 	is_seal: bool,
-) {
+) #no_bounds_check {
 	ct64_inc_ctr32 := #force_inline proc "contextless" (dst: []byte, ctr: u32) -> u32 {
 		endian.unchecked_put_u32be(dst[12:], ctr)
 		return ctr + 1
@@ -205,9 +205,6 @@ gctr_ct64 :: proc(
 		ctrs[i] = tmp[i][:]
 		copy(ctrs[i], nonce)
 	}
-
-	// We stitch the GCTR and GHASH operations together, so that only
-	// one pass over the ciphertext is required.
 
 	impl := &ctx._impl.(ct64.Context)
 	src, dst := src, dst

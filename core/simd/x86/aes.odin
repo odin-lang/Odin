@@ -28,7 +28,7 @@ _mm_aesimc_si128 :: #force_inline proc "c" (a: __m128i) -> __m128i {
 
 @(require_results, enable_target_feature = "aes")
 _mm_aeskeygenassist_si128 :: #force_inline proc "c" (a: __m128i, $IMM8: u8) -> __m128i {
-	return aeskeygenassist(a, u8(IMM8))
+	return aeskeygenassist(a, IMM8)
 }
 
 
@@ -45,5 +45,5 @@ foreign _ {
 	@(link_name = "llvm.x86.aesni.aesimc")
 	aesimc :: proc(a: __m128i) -> __m128i ---
 	@(link_name = "llvm.x86.aesni.aeskeygenassist")
-	aeskeygenassist :: proc(a: __m128i, imm8: u8) -> __m128i ---
+	aeskeygenassist :: proc(a: __m128i, #const imm8: u8) -> __m128i ---
 }

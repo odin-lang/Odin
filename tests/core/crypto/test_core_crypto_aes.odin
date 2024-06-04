@@ -12,8 +12,6 @@ import "core:crypto/sha2"
 test_aes :: proc(t: ^testing.T) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 
-	log.info("Testing AES")
-
 	impls := make([dynamic]aes.Implementation, 0, 2)
 	defer delete(impls)
 	append(&impls, aes.Implementation.Portable)
@@ -29,7 +27,7 @@ test_aes :: proc(t: ^testing.T) {
 }
 
 test_aes_ecb :: proc(t: ^testing.T, impl: aes.Implementation) {
-	log.infof("Testing AES-ECB/%v", impl)
+	log.debugf("Testing AES-ECB/%v", impl)
 
 	test_vectors := []struct {
 		key: string,
@@ -136,7 +134,7 @@ test_aes_ecb :: proc(t: ^testing.T, impl: aes.Implementation) {
 }
 
 test_aes_ctr :: proc(t: ^testing.T, impl: aes.Implementation) {
-	log.infof("Testing AES-CTR/%v", impl)
+	log.debugf("Testing AES-CTR/%v", impl)
 
 	test_vectors := []struct {
 		key: string,
@@ -200,7 +198,7 @@ test_aes_ctr :: proc(t: ^testing.T, impl: aes.Implementation) {
 	ctx: aes.Context_CTR
 	key: [aes.KEY_SIZE_256]byte
 	nonce: [aes.CTR_IV_SIZE]byte
-	aes.init_ctr(&ctx, key[:], nonce[:])
+	aes.init_ctr(&ctx, key[:], nonce[:], impl)
 
 	h_ctx: sha2.Context_512
 	sha2.init_512_256(&h_ctx)
@@ -226,7 +224,7 @@ test_aes_ctr :: proc(t: ^testing.T, impl: aes.Implementation) {
 }
 
 test_aes_gcm :: proc(t: ^testing.T, impl: aes.Implementation) {
-	log.infof("Testing AES-GCM/%v", impl)
+	log.debugf("Testing AES-GCM/%v", impl)
 
 	// NIST did a reorg of their site, so the source of the test vectors
 	// is only available from an archive.  The commented out tests are
@@ -431,7 +429,7 @@ test_aes_gcm :: proc(t: ^testing.T, impl: aes.Implementation) {
 		testing.expectf(
 			t,
 			ok && dst_str == v.plaintext,
-			"AES-GCM/%v: Expected: (%s, true) for open(%s, %s, %s, %s, %s), but got (%s, %s) instead",
+			"AES-GCM/%v: Expected: (%s, true) for open(%s, %s, %s, %s, %s), but got (%s, %v) instead",
 			impl,
 			v.plaintext,
 			v.key,

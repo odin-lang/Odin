@@ -125,8 +125,8 @@ reset_ctr :: proc "contextless" (ctx: ^Context_CTR) {
 	ctx._is_initialized = false
 }
 
-@(private)
-ctr_blocks :: proc(ctx: ^Context_CTR, dst, src: []byte, nr_blocks: int) {
+@(private = "file")
+ctr_blocks :: proc(ctx: ^Context_CTR, dst, src: []byte, nr_blocks: int) #no_bounds_check {
 	// Use the optimized hardware implementation if available.
 	if _, is_hw := ctx._impl.(Context_Impl_Hardware); is_hw {
 		ctr_blocks_hw(ctx, dst, src, nr_blocks)
@@ -185,17 +185,17 @@ xor_blocks :: #force_inline proc "contextless" (dst, src: []byte, blocks: [][]by
 	// performance of this implementation matters to where that
 	// optimization would be worth it, use chacha20poly1305, or a
 	// CPU that isn't e-waste.
-	if src != nil {
-		#no_bounds_check {
-			for i in 0 ..< len(blocks) {
-				off := i * BLOCK_SIZE
-				for j in 0 ..< BLOCK_SIZE {
-					blocks[i][j] ~= src[off + j]
+	#no_bounds_check {
+		if src != nil {
+				for i in 0 ..< len(blocks) {
+					off := i * BLOCK_SIZE
+					for j in 0 ..< BLOCK_SIZE {
+						blocks[i][j] ~= src[off + j]
+					}
 				}
-			}
 		}
-	}
-	for i in 0 ..< len(blocks) {
-		copy(dst[i * BLOCK_SIZE:], blocks[i])
+		for i in 0 ..< len(blocks) {
+			copy(dst[i * BLOCK_SIZE:], blocks[i])
+		}
 	}
 }
