@@ -54,6 +54,12 @@ jobs:
       - name: Odin report
         run: ./odin report
         timeout-minutes: 1
+      - name: Compile needed Vendor
+        run: |
+          make -C $(./odin root)/vendor/stb/src
+          make -C $(./odin root)/vendor/cgltf/src
+          make -C $(./odin root)/vendor/miniaudio/src
+        timeout-minutes: 10
       - name: Odin check
         run: ./odin check examples/demo -vet
         timeout-minutes: 10
@@ -115,6 +121,12 @@ jobs:
       - name: Odin report
         run: ./odin report
         timeout-minutes: 1
+      - name: Compile needed Vendor
+        run: |
+          make -C $(./odin root)/vendor/stb/src
+          make -C $(./odin root)/vendor/cgltf/src
+          make -C $(./odin root)/vendor/miniaudio/src
+        timeout-minutes: 10
       - name: Odin check
         run: ./odin check examples/demo -vet
         timeout-minutes: 10
@@ -159,6 +171,12 @@ jobs:
       - name: Odin report
         run: ./odin report
         timeout-minutes: 1
+      - name: Compile needed Vendor
+        run: |
+          make -C $(./odin root)/vendor/stb/src
+          make -C $(./odin root)/vendor/cgltf/src
+          make -C $(./odin root)/vendor/miniaudio/src
+        timeout-minutes: 10
       - name: Odin check
         run: ./odin check examples/demo -vet
         timeout-minutes: 10

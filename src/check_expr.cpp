@@ -7420,6 +7420,7 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 		String name = bd->name.string;
 		if (
 		    name == "location" || 
+		    name == "exists" ||
 		    name == "assert" || 
 		    name == "panic" || 
 		    name == "defined" || 
@@ -8341,6 +8342,7 @@ gb_internal ExprKind check_basic_directive_expr(CheckerContext *c, Operand *o, A
 		    name == "assert" ||
 		    name == "defined" ||
 		    name == "config" ||
+			name == "exists" ||
 		    name == "load" ||
 		    name == "load_hash" ||
 		    name == "load_directory" ||
