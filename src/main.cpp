@@ -276,8 +276,6 @@ enum BuildFlagKind {
 	BuildFlag_RelocMode,
 	BuildFlag_DisableRedZone,
 
-	BuildFlag_TestName,
-
 	BuildFlag_DisallowDo,
 	BuildFlag_DefaultToNilAllocator,
 	BuildFlag_DefaultToPanicAllocator,
@@ -470,8 +468,6 @@ gb_internal bool parse_build_flags(Array<String> args) {
 
 	add_flag(&build_flags, BuildFlag_RelocMode,               str_lit("reloc-mode"),                BuildFlagParam_String,  Command__does_build);
 	add_flag(&build_flags, BuildFlag_DisableRedZone,          str_lit("disable-red-zone"),          BuildFlagParam_None,    Command__does_build);
-
-	add_flag(&build_flags, BuildFlag_TestName,                str_lit("test-name"),                 BuildFlagParam_String,  Command_test);
 
 	add_flag(&build_flags, BuildFlag_DisallowDo,              str_lit("disallow-do"),               BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_DefaultToNilAllocator,   str_lit("default-to-nil-allocator"),  BuildFlagParam_None,    Command__does_check);
@@ -1119,21 +1115,6 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_DisableRedZone:
 							build_context.disable_red_zone = true;
 							break;
-						case BuildFlag_TestName: {
-							GB_ASSERT(value.kind == ExactValue_String);
-							{
-								String name = value.value_string;
-								if (!string_is_valid_identifier(name)) {
-									gb_printf_err("Test name '%.*s' must be a valid identifier\n", LIT(name));
-									bad_flags = true;
-									break;
-								}
-								string_set_add(&build_context.test_names, name);
-
-								// NOTE(bill): Allow for multiple -test-name
-								continue;
-							}
-						}
 						case BuildFlag_DisallowDo:
 							build_context.disallow_do = true;
 							break;
@@ -1962,10 +1943,6 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 	}
 
 	if (test_only) {
-		print_usage_line(1, "-test-name:<string>");
-		print_usage_line(2, "Runs specific test only by name.");
-		print_usage_line(0, "");
-
 		print_usage_line(1, "-all-packages");
 		print_usage_line(2, "Tests all packages imported into the given initial package.");
 		print_usage_line(0, "");
@@ -2489,7 +2466,6 @@ int main(int arg_count, char const **arg_ptr) {
 	TIME_SECTION("init args");
 	map_init(&build_context.defined_values);
 	build_context.extra_packages.allocator = heap_allocator();
-	string_set_init(&build_context.test_names);
 
 	Array<String> args = setup_args(arg_count, arg_ptr);
 

@@ -893,7 +893,6 @@ struct BuildContext {
 	u32 cmd_doc_flags;
 	Array<String> extra_packages;
 
-	StringSet test_names;
 	bool      test_all_packages;
 
 	gbAffinity affinity;

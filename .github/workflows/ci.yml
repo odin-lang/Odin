@@ -34,6 +34,7 @@ jobs:
           (cd tests/core; gmake all_bsd)
           (cd tests/internal; gmake all_bsd)
           (cd tests/issues; ./run.sh)
+          (cd tests/benchmark; gmake all)
   build_linux:
     name: Ubuntu Build, Check, and Test
     runs-on: ubuntu-latest
@@ -78,6 +79,11 @@ jobs:
       - name: Odin internals tests
         run: |
           cd tests/internal
+          make
+        timeout-minutes: 10
+      - name: Odin core library benchmarks
+        run: |
+          cd tests/benchmark
           make
         timeout-minutes: 10
       - name: Odin check examples/all for Linux i386
@@ -131,6 +137,11 @@ jobs:
           cd tests/internal
           make
         timeout-minutes: 10
+      - name: Odin core library benchmarks
+        run: |
+          cd tests/benchmark
+          make
+        timeout-minutes: 10
   build_macOS_arm:
     name: MacOS ARM Build, Check, and Test
     runs-on: macos-14 # This is an arm/m1 runner.
@@ -168,6 +179,11 @@ jobs:
       - name: Odin internals tests
         run: |
           cd tests/internal
+          make
+        timeout-minutes: 10
+      - name: Odin core library benchmarks
+        run: |
+          cd tests/benchmark
           make
         timeout-minutes: 10
   build_windows:
@@ -215,6 +231,13 @@ jobs:
         run: |
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat
           cd tests\core
+          call build.bat
+        timeout-minutes: 10
+      - name: Core library benchmarks
+        shell: cmd
+        run: |
+          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat
+          cd tests\benchmark
           call build.bat
         timeout-minutes: 10
       - name: Vendor library tests

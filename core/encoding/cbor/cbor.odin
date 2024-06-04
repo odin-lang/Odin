@@ -320,8 +320,8 @@ to_diagnostic_format :: proc {
 
 // Turns the given CBOR value into a human-readable string.
 // See docs on the proc group `diagnose` for more info.
-to_diagnostic_format_string :: proc(val: Value, padding := 0, allocator := context.allocator) -> (string, mem.Allocator_Error) #optional_allocator_error {
-	b := strings.builder_make(allocator)
+to_diagnostic_format_string :: proc(val: Value, padding := 0, allocator := context.allocator, loc := #caller_location) -> (string, mem.Allocator_Error) #optional_allocator_error {
+	b := strings.builder_make(allocator, loc)
 	w := strings.to_stream(&b)
 	err := to_diagnostic_format_writer(w, val, padding)
 	if err == .EOF {

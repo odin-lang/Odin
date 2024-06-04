@@ -1,6 +1,4 @@
-/*
-	Hash Test Vectors
-*/
+// Hash Test Vectors
 package test_core_hash
 
 XXHASH_Test_Vectors :: struct #packed {
