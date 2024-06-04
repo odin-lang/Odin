@@ -5,47 +5,21 @@ import "core:c"
 RAYGUI_SHARED :: #config(RAYGUI_SHARED, false)
 
 when ODIN_OS == .Windows {
-	when RAYGUI_SHARED {
-		foreign import lib {
-			"windows/rayguidll.lib",
-		}
-	} else {
-		foreign import lib {
-			"windows/raygui.lib",
-		}
+	foreign import lib {
+		"windows/rayguidll.lib" when RAYGUI_SHARED else "windows/raygui.lib",
 	}
 } else when ODIN_OS == .Linux  {
-	when RAYGUI_SHARED {
-		foreign import lib "linux/libraygui.so"
-	} else {
-		foreign import lib "linux/libraygui.a"
+	foreign import lib {
+		"linux/libraygui.so" when RAYGUI_SHARED else "linux/libraygui.a"
 	}
 } else when ODIN_OS == .Darwin {
 	when ODIN_ARCH == .arm64 {
-		when RAYGUI_SHARED {
-			foreign import lib {
-				"macos-arm64/libraygui.dylib",
-			}
-		} else {
-			foreign import lib {
-				"macos-arm64/libraygui.a",
-				// "system:Cocoa.framework",
-				// "system:OpenGL.framework",
-				// "system:IOKit.framework",
-			}
+		foreign import lib {
+			"macos-arm64/libraygui.dylib" when RAYGUI_SHARED else "macos-arm64/libraygui.a",
 		}
 	} else {
-		when RAYGUI_SHARED {
-			foreign import lib {
-				"macos/libraygui.dylib",
-			}
-		} else {
-			foreign import lib {
-				"macos/libraygui.a",
-				// "system:Cocoa.framework",
-				// "system:OpenGL.framework",
-				// "system:IOKit.framework",
-			}
+		foreign import lib {
+			"macos/libraygui.dylib" when RAYGUI_SHARED else "macos/libraygui.a",
 		}
 	}
 } else {
