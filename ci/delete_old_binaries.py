@@ -12,7 +12,6 @@ def main():
     print(f"Looking for binaries to delete older than {days_to_keep} days")
 
     files_lines = execute_cli(f"b2 ls --long --versions b2://{bucket}/nightly/").split("\n")
-    print(files_lines)
     for x in files_lines:
         parts = [y for y in x.split(' ') if y]
 
@@ -23,7 +22,7 @@ def main():
 
             if delta.days > days_to_keep:
                 print(f'Deleting {parts[5]}')
-                execute_cli(f'b2 delete-file-version {parts[0]}')
+                execute_cli(f'b2 rm {parts[0]}')
 
 
 def execute_cli(command):
@@ -32,4 +31,3 @@ def execute_cli(command):
 
 if __name__ == '__main__':
     sys.exit(main())
-
