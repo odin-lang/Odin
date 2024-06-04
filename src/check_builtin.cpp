@@ -1345,6 +1345,8 @@ gb_internal LoadDirectiveResult check_load_directory_directive(CheckerContext *c
 			map_set(&c->info->load_directory_map, call, new_cache);
 		} else {
 			cache->file_error = file_error;
+
+			map_set(&c->info->load_directory_map, call, cache);
 		}
 	});
 
