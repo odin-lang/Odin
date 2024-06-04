@@ -1,21 +1,8 @@
 // Tests "core:reflect/reflect".
-// Must be run with `-collection:tests=` flag, e.g.
-// ./odin run tests/core/reflect/test_core_reflect.odin -out=tests/core/test_core_reflect -collection:tests=./tests
 package test_core_reflect
 
-import "core:fmt"
 import "core:reflect"
 import "core:testing"
-import tc "tests:common"
-
-main :: proc() {
-    t := testing.T{}
-
-	test_as_u64(&t)
-	test_as_f64(&t)
-
-	tc.report(&t)
-}
 
 @test
 test_as_u64 :: proc(t: ^testing.T) {
@@ -31,9 +18,8 @@ test_as_u64 :: proc(t: ^testing.T) {
 		for d, i in data {
 			assert(i == d.i)
 			r, valid := reflect.as_u64(d.v)
-			tc.expect(t, valid, fmt.tprintf("i:%d %s(i8 %v) !valid\n", i, #procedure, d.v))
-			tc.expect(t, r == d.e, fmt.tprintf("i:%d %s(i8 %v) -> %v (0x%X) != %v (0x%X)\n",
-												i, #procedure, d.v, r, r, d.e, d.e))
+			testing.expectf(t, valid,    "i8 %v !valid",                    d.v)
+			testing.expectf(t, r == d.e, "i8 %v -> %v (0x%X) != %v (0x%X)", d.v, r, r, d.e, d.e)
 		}
 	}
 	{
@@ -48,9 +34,8 @@ test_as_u64 :: proc(t: ^testing.T) {
 		for d, i in data {
 			assert(i == d.i)
 			r, valid := reflect.as_u64(d.v)
-			tc.expect(t, valid, fmt.tprintf("i:%d %s(i16 %v) !valid\n", i, #procedure, d.v))
-			tc.expect(t, r == d.e, fmt.tprintf("i:%d %s(i16 %v) -> %v (0x%X) != %v (0x%X)\n",
-												i, #procedure, d.v, r, r, d.e, d.e))
+			testing.expectf(t, valid,    "i16 %v !valid",                    d.v)
+			testing.expectf(t, r == d.e, "i16 %v -> %v (0x%X) != %v (0x%X)", d.v, r, r, d.e, d.e)
 		}
 	}
 	{
@@ -65,9 +50,8 @@ test_as_u64 :: proc(t: ^testing.T) {
 		for d, i in data {
 			assert(i == d.i)
 			r, valid := reflect.as_u64(d.v)
-			tc.expect(t, valid, fmt.tprintf("i:%d %s(i32 %v) !valid\n", i, #procedure, d.v))
-			tc.expect(t, r == d.e, fmt.tprintf("i:%d %s(i32 %v) -> %v (0x%X) != %v (0x%X)\n",
-												i, #procedure, d.v, r, r, d.e, d.e))
+			testing.expectf(t, valid,    "i32 %v !valid",                    d.v)
+			testing.expectf(t, r == d.e, "i32 %v -> %v (0x%X) != %v (0x%X)", d.v, r, r, d.e, d.e)
 		}
 	}
 	{
@@ -82,9 +66,8 @@ test_as_u64 :: proc(t: ^testing.T) {
 		for d, i in data {
 			assert(i == d.i)
 			r, valid := reflect.as_u64(d.v)
-			tc.expect(t, valid, fmt.tprintf("i:%d %s(i64 %v) !valid\n", i, #procedure, d.v))
-			tc.expect(t, r == d.e, fmt.tprintf("i:%d %s(i64 %v) -> %v (0x%X) != %v (0x%X)\n",
-												i, #procedure, d.v, r, r, d.e, d.e))
+			testing.expectf(t, valid,    "i64 %v !valid",                    d.v)
+			testing.expectf(t, r == d.e, "i64 %v -> %v (0x%X) != %v (0x%X)", d.v, r, r, d.e, d.e)
 		}
 	}
 	{
@@ -102,9 +85,8 @@ test_as_u64 :: proc(t: ^testing.T) {
 		for d, i in data {
 			assert(i == d.i)
 			r, valid := reflect.as_u64(d.v)
-			tc.expect(t, valid, fmt.tprintf("i:%d %s(i128 %v) !valid\n", i, #procedure, d.v))
-			tc.expect(t, r == d.e, fmt.tprintf("i:%d %s(i128 %v) -> %v (0x%X) != %v (0x%X)\n",
-												i, #procedure, d.v, r, r, d.e, d.e))
+			testing.expectf(t, valid,    "i128 %v !valid",                    d.v)
+			testing.expectf(t, r == d.e, "i128 %v -> %v (0x%X) != %v (0x%X)", d.v, r, r, d.e, d.e)
 		}
 	}
 	{
@@ -118,8 +100,8 @@ test_as_u64 :: proc(t: ^testing.T) {
 		for d, i in data {
 			assert(i == d.i)
 			r, valid := reflect.as_u64(d.v)
-			tc.expect(t, valid, fmt.tprintf("i:%d %s(f16 %v) !valid\n", i, #procedure, d.v))
-			tc.expect(t, r == d.e, fmt.tprintf("i:%d %s(f16 %v) -> %v != %v\n", i, #procedure, d.v, r, d.e))
+			testing.expectf(t, valid,    "f16 %v !valid",      d.v)
+			testing.expectf(t, r == d.e, "f16 %v -> %v != %v", d.v, r, d.e)
 		}
 	}
 	{
@@ -132,8 +114,8 @@ test_as_u64 :: proc(t: ^testing.T) {
 		for d, i in data {
 			assert(i == d.i)
 			r, valid := reflect.as_u64(d.v)
-			tc.expect(t, valid, fmt.tprintf("i:%d %s(f32 %v) !valid\n", i, #procedure, d.v))
-			tc.expect(t, r == d.e, fmt.tprintf("i:%d %s(f32 %v) -> %v != %v\n", i, #procedure, d.v, r, d.e))
+			testing.expectf(t, valid,    "f32 %v !valid",      d.v)
+			testing.expectf(t, r == d.e, "f32 %v -> %v != %v", d.v, r, d.e)
 		}
 	}
 	{
@@ -146,8 +128,8 @@ test_as_u64 :: proc(t: ^testing.T) {
 		for d, i in data {
 			assert(i == d.i)
 			r, valid := reflect.as_u64(d.v)
-			tc.expect(t, valid, fmt.tprintf("i:%d %s(f64 %v) !valid\n", i, #procedure, d.v))
-			tc.expect(t, r == d.e, fmt.tprintf("i:%d %s(f64 %v) -> %v != %v\n", i, #procedure, d.v, r, d.e))
+			testing.expectf(t, valid,    "f64 %v !valid",      d.v)
+			testing.expectf(t, r == d.e, "f64 %v -> %v != %v", d.v, r, d.e)
 		}
 	}
 }
@@ -166,8 +148,8 @@ test_as_f64 :: proc(t: ^testing.T) {
 		for d, i in data {
 			assert(i == d.i)
 			r, valid := reflect.as_f64(d.v)
-			tc.expect(t, valid, fmt.tprintf("i:%d %s(i8 %v) !valid\n", i, #procedure, d.v))
-			tc.expect(t, r == d.e, fmt.tprintf("i:%d %s(i8 %v) -> %v != %v\n", i, #procedure, d.v, r, d.e))
+			testing.expectf(t, valid,    "i8 %v !valid",      d.v)
+			testing.expectf(t, r == d.e, "i8 %v -> %v != %v", d.v, r, d.e)
 		}
 	}
 	{
@@ -182,8 +164,8 @@ test_as_f64 :: proc(t: ^testing.T) {
 		for d, i in data {
 			assert(i == d.i)
 			r, valid := reflect.as_f64(d.v)
-			tc.expect(t, valid, fmt.tprintf("i:%d %s(i16 %v) !valid\n", i, #procedure, d.v))
-			tc.expect(t, r == d.e, fmt.tprintf("i:%d %s(i16 %v) -> %v != %v\n", i, #procedure, d.v, r, d.e))
+			testing.expectf(t, valid,    "i16 %v !valid",      d.v)
+			testing.expectf(t, r == d.e, "i16 %v -> %v != %v", d.v, r, d.e)
 		}
 	}
 	{
@@ -198,8 +180,8 @@ test_as_f64 :: proc(t: ^testing.T) {
 		for d, i in data {
 			assert(i == d.i)
 			r, valid := reflect.as_f64(d.v)
-			tc.expect(t, valid, fmt.tprintf("i:%d %s(i32 %v) !valid\n", i, #procedure, d.v))
-			tc.expect(t, r == d.e, fmt.tprintf("i:%d %s(i32 %v) -> %v != %v\n", i, #procedure, d.v, r, d.e))
+			testing.expectf(t, valid,    "i32 %v !valid",      d.v)
+			testing.expectf(t, r == d.e, "i32 %v -> %v != %v", d.v, r, d.e)
 		}
 	}
 	{
@@ -214,8 +196,8 @@ test_as_f64 :: proc(t: ^testing.T) {
 		for d, i in data {
 			assert(i == d.i)
 			r, valid := reflect.as_f64(d.v)
-			tc.expect(t, valid, fmt.tprintf("i:%d %s(i64 %v) !valid\n", i, #procedure, d.v))
-			tc.expect(t, r == d.e, fmt.tprintf("i:%d %s(i64 %v) -> %v != %v\n", i, #procedure, d.v, r, d.e))
+			testing.expectf(t, valid,    "i64 %v !valid",      d.v)
+			testing.expectf(t, r == d.e, "i64 %v -> %v != %v", d.v, r, d.e)
 		}
 	}
 	{
@@ -231,9 +213,8 @@ test_as_f64 :: proc(t: ^testing.T) {
 		for d, i in data {
 			assert(i == d.i)
 			r, valid := reflect.as_f64(d.v)
-			tc.expect(t, valid, fmt.tprintf("i:%d %s(i128 %v) !valid\n", i, #procedure, d.v))
-			tc.expect(t, r == d.e, fmt.tprintf("i:%d %s(i128 %v) -> %v (%H) != %v (%H)\n",
-												i, #procedure, d.v, r, r, d.e, d.e))
+			testing.expectf(t, valid,    "i128 %v !valid",                d.v)
+			testing.expectf(t, r == d.e, "i128 %v -> %v (%H) != %v (%H)", d.v, r, r, d.e, d.e)
 		}
 	}
 	{
@@ -247,9 +228,8 @@ test_as_f64 :: proc(t: ^testing.T) {
 		for d, i in data {
 			assert(i == d.i)
 			r, valid := reflect.as_f64(d.v)
-			tc.expect(t, valid, fmt.tprintf("i:%d %s(f16 %v) !valid\n", i, #procedure, d.v))
-			tc.expect(t, r == d.e, fmt.tprintf("i:%d %s(f16 %v (%H)) -> %v (%H) != %v (%H)\n",
-												i, #procedure, d.v, d.v, r, r, d.e, d.e))
+			testing.expectf(t, valid,    "f16 %v !valid",                     d.v)
+			testing.expectf(t, r == d.e, "f16 %v (%H) -> %v (%H) != %v (%H)", d.v, d.v, r, r, d.e, d.e)
 		}
 	}
 	{
@@ -262,9 +242,8 @@ test_as_f64 :: proc(t: ^testing.T) {
 		for d, i in data {
 			assert(i == d.i)
 			r, valid := reflect.as_f64(d.v)
-			tc.expect(t, valid, fmt.tprintf("i:%d %s(f32 %v) !valid\n", i, #procedure, d.v))
-			tc.expect(t, r == d.e, fmt.tprintf("i:%d %s(f32 %v (%H)) -> %v (%H) != %v (%H)\n",
-												i, #procedure, d.v, d.v, r, r, d.e, d.e))
+			testing.expectf(t, valid,    "f32 %v !valid", d.v)
+			testing.expectf(t, r == d.e, "f32 %v (%H) -> %v (%H) != %v (%H)", d.v, d.v, r, r, d.e, d.e)
 		}
 	}
 	{
@@ -277,8 +256,8 @@ test_as_f64 :: proc(t: ^testing.T) {
 		for d, i in data {
 			assert(i == d.i)
 			r, valid := reflect.as_f64(d.v)
-			tc.expect(t, valid, fmt.tprintf("i:%d %s(f64 %v) !valid\n", i, #procedure, d.v))
-			tc.expect(t, r == d.e, fmt.tprintf("i:%d %s(f64 %v) -> %v != %v\n", i, #procedure, d.v, r, d.e))
+			testing.expectf(t, valid,    "f64 %v !valid",      d.v)
+			testing.expectf(t, r == d.e, "f64 %v -> %v != %v", d.v, r, d.e)
 		}
 	}
 }

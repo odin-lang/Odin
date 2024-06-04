@@ -1,47 +1,8 @@
 package test_core_fmt
 
 import "core:fmt"
-import "core:os"
-import "core:testing"
 import "core:mem"
-
-TEST_count := 0
-TEST_fail  := 0
-
-when ODIN_TEST {
-	expect  :: testing.expect
-	log     :: testing.log
-} else {
-	expect  :: proc(t: ^testing.T, condition: bool, message: string, loc := #caller_location) {
-		TEST_count += 1
-		if !condition {
-			TEST_fail += 1
-			fmt.printf("[%v] %v\n", loc, message)
-			return
-		}
-	}
-	log     :: proc(t: ^testing.T, v: any, loc := #caller_location) {
-		fmt.printf("[%v] ", loc)
-		fmt.printf("log: %v\n", v)
-	}
-}
-
-main :: proc() {
-	t := testing.T{}
-	test_fmt_memory(&t)
-	test_fmt_doc_examples(&t)
-	test_fmt_options(&t)
-
-	fmt.printf("%v/%v tests successful.\n", TEST_count - TEST_fail, TEST_count)
-	if TEST_fail > 0 {
-		os.exit(1)
-	}
-}
-
-check :: proc(t: ^testing.T, exp: string, format: string, args: ..any, loc := #caller_location) {
-	got := fmt.tprintf(format, ..args)
-	expect(t, got == exp, fmt.tprintf("(%q, %v): %q != %q", format, args, got, exp), loc)
-}
+import "core:testing"
 
 @(test)
 test_fmt_memory :: proc(t: ^testing.T) {
@@ -75,7 +36,7 @@ test_fmt_doc_examples :: proc(t: ^testing.T) {
 }
 
 @(test)
-test_fmt_options :: proc(t: ^testing.T) {
+test_fmt_escaping_prefixes :: proc(t: ^testing.T) {
 	// Escaping
 	check(t, "% { } 0 { } } {", "%% {{ }} {} {{ }} }} {{", 0 )
 
@@ -86,7 +47,10 @@ test_fmt_options :: proc(t: ^testing.T) {
 	check(t, "+3",     "%+i",   3 )
 	check(t, "0b11",   "%#b",   3 )
 	check(t, "0xA",    "%#X",   10 )
+}
 
+@(test)
+test_fmt_indexing :: proc(t: ^testing.T) {
 	// Specific index formatting
 	check(t, "1 2 3", "%i %i %i",          1, 2, 3)
 	check(t, "1 2 3", "%[0]i %[1]i %[2]i", 1, 2, 3)
@@ -95,7 +59,10 @@ test_fmt_options :: proc(t: ^testing.T) {
 	check(t, "1 2 3", "%i %[1]i %i",       1, 2, 3)
 	check(t, "1 3 2", "%i %[2]i %i",       1, 2, 3)
 	check(t, "1 1 1", "%[0]i %[0]i %[0]i", 1)
+}
 
+@(test)
+test_fmt_width_precision :: proc(t: ^testing.T) {
 	// Width
 	check(t, "3.140",  "%f",  3.14)
 	check(t, "3.140",  "%4f", 3.14)
@@ -133,7 +100,10 @@ test_fmt_options :: proc(t: ^testing.T) {
 	check(t, "3.140", "%*[1].*[2][0]f", 3.14, 5, 3)
 	check(t, "3.140", "%*[2].*[1]f",    3.14, 3, 5)
 	check(t, "3.140", "%5.*[1]f",       3.14, 3)
+}
 
+@(test)
+test_fmt_arg_errors :: proc(t: ^testing.T) {
 	// Error checking
 	check(t, "%!(MISSING ARGUMENT)%!(NO VERB)", "%" )
 
@@ -156,7 +126,10 @@ test_fmt_options :: proc(t: ^testing.T) {
 	check(t, "%!(BAD ARGUMENT NUMBER)%!(NO VERB)%!(EXTRA 0)", "%[1]", 0)
 
 	check(t, "3.1%!(EXTRA 3.14)", "%.1f", 3.14, 3.14)
+}
 
+@(test)
+test_fmt_python_syntax :: proc(t: ^testing.T) {
 	// Python-like syntax
 	check(t, "1 2 3", "{} {} {}",          1, 2, 3)
 	check(t, "3 2 1", "{2} {1} {0}",       1, 2, 3)
@@ -180,4 +153,10 @@ test_fmt_options :: proc(t: ^testing.T) {
 	check(t, "%!(MISSING ARGUMENT)%!(MISSING CLOSE BRACE)", "{" )
 	check(t, "%!(MISSING CLOSE BRACE)%!(EXTRA 1)",          "{",  1)
 	check(t, "%!(MISSING CLOSE BRACE)%!(EXTRA 1)",          "{0", 1 )
+}
+
+@(private)
+check :: proc(t: ^testing.T, exp: string, format: string, args: ..any) {
+	got := fmt.tprintf(format, ..args)
+	testing.expectf(t, got == exp, "(%q, %v): %q != %q", format, args, got, exp)
 }

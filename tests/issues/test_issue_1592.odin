@@ -1,7 +1,6 @@
 // Tests issue #1592 https://github.com/odin-lang/Odin/issues/1592
 package test_issues
 
-import "core:fmt"
 import "core:testing"
 
 /* Original issue #1592 example */
@@ -31,428 +30,428 @@ true_result :: proc() -> bool {
 @test
 test_simple_const_false :: proc(t: ^testing.T) {
 	if CONSTANT_FALSE {
-		testing.expect(t, false, fmt.tprintf("%s: !false\n", #procedure))
+		testing.expect(t, false, "!false")
 	} else {
-		testing.expect(t, true, fmt.tprintf("%s: !true\n", #procedure))
+		testing.expect(t, true, "!true")
 	}
 	if (CONSTANT_FALSE) {
-		testing.expect(t, false, fmt.tprintf("%s: !false\n", #procedure))
+		testing.expect(t, false, "!false")
 	} else {
-		testing.expect(t, true, fmt.tprintf("%s: !true\n", #procedure))
+		testing.expect(t, true, "!true")
 	}
 	if !CONSTANT_FALSE {
-		testing.expect(t, true, fmt.tprintf("%s: !true\n", #procedure))
+		testing.expect(t, true, "!true")
 	} else {
-		testing.expect(t, false, fmt.tprintf("%s: !false\n", #procedure))
+		testing.expect(t, false, "!false")
 	}
 	if (!CONSTANT_FALSE) {
-		testing.expect(t, true, fmt.tprintf("%s: !true\n", #procedure))
+		testing.expect(t, true, "!true")
 	} else {
-		testing.expect(t, false, fmt.tprintf("%s: !false\n", #procedure))
+		testing.expect(t, false, "!false")
 	}
 	if !(CONSTANT_FALSE) {
-		testing.expect(t, true, fmt.tprintf("%s: !true\n", #procedure))
+		testing.expect(t, true, "!true")
 	} else {
-		testing.expect(t, false, fmt.tprintf("%s: !false\n", #procedure))
+		testing.expect(t, false, "!false")
 	}
 	if !!CONSTANT_FALSE {
-		testing.expect(t, false, fmt.tprintf("%s: !false\n", #procedure))
+		testing.expect(t, false, "!false")
 	} else {
-		testing.expect(t, true, fmt.tprintf("%s: !true\n", #procedure))
+		testing.expect(t, true, "!true")
 	}
 	if CONSTANT_FALSE == true {
-		testing.expect(t, false, fmt.tprintf("%s: !false\n", #procedure))
+		testing.expect(t, false, "!false")
 	} else {
-		testing.expect(t, true, fmt.tprintf("%s: !true\n", #procedure))
+		testing.expect(t, true, "!true")
 	}
 	if CONSTANT_FALSE == false {
-		testing.expect(t, true, fmt.tprintf("%s: !true\n", #procedure))
+		testing.expect(t, true, "!true")
 	} else {
-		testing.expect(t, false, fmt.tprintf("%s: !false\n", #procedure))
+		testing.expect(t, false, "!false")
 	}
 	if !(CONSTANT_FALSE == true) {
-		testing.expect(t, true, fmt.tprintf("%s: !true\n", #procedure))
+		testing.expect(t, true, "!true")
 	} else {
-		testing.expect(t, false, fmt.tprintf("%s: !false\n", #procedure))
+		testing.expect(t, false, "!false")
 	}
 	if !(CONSTANT_FALSE == false) {
-		testing.expect(t, false, fmt.tprintf("%s: !false\n", #procedure))
+		testing.expect(t, false, "!false")
 	} else {
-		testing.expect(t, true, fmt.tprintf("%s: !true\n", #procedure))
+		testing.expect(t, true, "!true")
 	}
 }
 
 @test
 test_simple_const_true :: proc(t: ^testing.T) {
 	if CONSTANT_TRUE {
-		testing.expect(t, true, fmt.tprintf("%s: !true\n", #procedure))
+		testing.expect(t, true, "!true")
 	} else {
-		testing.expect(t, false, fmt.tprintf("%s: !false\n", #procedure))
+		testing.expect(t, false, "!false")
 	}
 	if (CONSTANT_TRUE) {
-		testing.expect(t, true, fmt.tprintf("%s: !true\n", #procedure))
+		testing.expect(t, true, "!true")
 	} else {
-		testing.expect(t, false, fmt.tprintf("%s: !false\n", #procedure))
+		testing.expect(t, false, "!false")
 	}
 	if !CONSTANT_TRUE {
-		testing.expect(t, false, fmt.tprintf("%s: !false\n", #procedure))
+		testing.expect(t, false, "!false")
 	} else {
-		testing.expect(t, true, fmt.tprintf("%s: !true\n", #procedure))
+		testing.expect(t, true, "!true")
 	}
 	if (!CONSTANT_TRUE) {
-		testing.expect(t, false, fmt.tprintf("%s: !false\n", #procedure))
+		testing.expect(t, false, "!false")
 	} else {
-		testing.expect(t, true, fmt.tprintf("%s: !true\n", #procedure))
+		testing.expect(t, true, "!true")
 	}
 	if (!CONSTANT_TRUE) {
-		testing.expect(t, false, fmt.tprintf("%s: !false\n", #procedure))
+		testing.expect(t, false, "!false")
 	} else {
-		testing.expect(t, true, fmt.tprintf("%s: !true\n", #procedure))
+		testing.expect(t, true, "!true")
 	}
 	if !(CONSTANT_TRUE) {
-		testing.expect(t, false, fmt.tprintf("%s: !false\n", #procedure))
+		testing.expect(t, false, "!false")
 	} else {
-		testing.expect(t, true, fmt.tprintf("%s: !true\n", #procedure))
+		testing.expect(t, true, "!true")
 	}
 	if !!CONSTANT_TRUE {
-		testing.expect(t, true, fmt.tprintf("%s: !true\n", #procedure))
+		testing.expect(t, true, "!true")
 	} else {
-		testing.expect(t, false, fmt.tprintf("%s: !false\n", #procedure))
+		testing.expect(t, false, "!false")
 	}
 	if CONSTANT_TRUE == true {
-		testing.expect(t, true, fmt.tprintf("%s: !true\n", #procedure))
+		testing.expect(t, true, "!true")
 	} else {
-		testing.expect(t, false, fmt.tprintf("%s: !false\n", #procedure))
+		testing.expect(t, false, "!false")
 	}
 	if CONSTANT_TRUE == false {
-		testing.expect(t, false, fmt.tprintf("%s: !false\n", #procedure))
+		testing.expect(t, false, "!false")
 	} else {
-		testing.expect(t, true, fmt.tprintf("%s: !true\n", #procedure))
+		testing.expect(t, true, "!true")
 	}
 	if !(CONSTANT_TRUE == true) {
-		testing.expect(t, false, fmt.tprintf("%s: !false\n", #procedure))
+		testing.expect(t, false, "!false")
 	} else {
-		testing.expect(t, true, fmt.tprintf("%s: !true\n", #procedure))
+		testing.expect(t, true, "!true")
 	}
 	if !(CONSTANT_TRUE == false) {
-		testing.expect(t, true, fmt.tprintf("%s: !true\n", #procedure))
+		testing.expect(t, true, "!true")
 	} else {
-		testing.expect(t, false, fmt.tprintf("%s: !false\n", #procedure))
+		testing.expect(t, false, "!false")
 	}
 }
 
 @test
 test_simple_proc_false :: proc(t: ^testing.T) {
 	if false_result() {
-		testing.expect(t, false, fmt.tprintf("%s: !false\n", #procedure))
+		testing.expect(t, false, "!false")
 	} else {
-		testing.expect(t, true, fmt.tprintf("%s: !true\n", #procedure))
+		testing.expect(t, true, "!true")
 	}
 	if !false_result() {
-		testing.expect(t, true, fmt.tprintf("%s: !true\n", #procedure))
+		testing.expect(t, true, "!true")
 	} else {
-		testing.expect(t, false, fmt.tprintf("%s: !false\n", #procedure))
+		testing.expect(t, false, "!false")
 	}
 }
 
 @test
 test_simple_proc_true :: proc(t: ^testing.T) {
 	if true_result() {
-		testing.expect(t, true, fmt.tprintf("%s: !true\n", #procedure))
+		testing.expect(t, true, "!true")
 	} else {
-		testing.expect(t, false, fmt.tprintf("%s: !false\n", #procedure))
+		testing.expect(t, false, "!false")
 	}
 	if !true_result() {
-		testing.expect(t, false, fmt.tprintf("%s: !false\n", #procedure))
+		testing.expect(t, false, "!false")
 	} else {
-		testing.expect(t, true, fmt.tprintf("%s: !true\n", #procedure))
+		testing.expect(t, true, "!true")
 	}
 }
 
 @test
 test_const_false_const_false :: proc(t: ^testing.T) {
 	if CONSTANT_FALSE || CONSTANT_FALSE {
-		testing.expect(t, false, fmt.tprintf("%s: !false\n", #procedure))
+		testing.expect(t, false, "!false")
 	} else {
-		testing.expect(t, true, fmt.tprintf("%s: !true\n", #procedure))
+		testing.expect(t, true, "!true")
 	}
 	if CONSTANT_FALSE && CONSTANT_FALSE {
-		testing.expect(t, false, fmt.tprintf("%s: !false\n", #procedure))
+		testing.expect(t, false, "!false")
 	} else {
-		testing.expect(t, true, fmt.tprintf("%s: !true\n", #procedure))
+		testing.expect(t, true, "!true")
 	}
 
 	if !CONSTANT_FALSE || CONSTANT_FALSE {
-		testing.expect(t, true, fmt.tprintf("%s: !true\n", #procedure))
+		testing.expect(t, true, "!true")
 	} else {
-		testing.expect(t, false, fmt.tprintf("%s: !false\n", #procedure))
+		testing.expect(t, false, "!false")
 	}
 	if !CONSTANT_FALSE && CONSTANT_FALSE {
-		testing.expect(t, false, fmt.tprintf("%s: !false\n", #procedure))
+		testing.expect(t, false, "!false")
 	} else {
-		testing.expect(t, true, fmt.tprintf("%s: !true\n", #procedure))
+		testing.expect(t, true, "!true")
 	}
 
 	if CONSTANT_FALSE || !CONSTANT_FALSE {
-		testing.expect(t, true, fmt.tprintf("%s: !true\n", #procedure))
+		testing.expect(t, true, "!true")
 	} else {
-		testing.expect(t, false, fmt.tprintf("%s: !false\n", #procedure))
+		testing.expect(t, false, "!false")
 	}
 	if CONSTANT_FALSE && !CONSTANT_FALSE {
-		testing.expect(t, false, fmt.tprintf("%s: !false\n", #procedure))
+		testing.expect(t, false, "!false")
 	} else {
-		testing.expect(t, true, fmt.tprintf("%s: !true\n", #procedure))
+		testing.expect(t, true, "!true")
 	}
 
 	if !(CONSTANT_FALSE || CONSTANT_FALSE) {
-		testing.expect(t, true, fmt.tprintf("%s: !true\n", #procedure))
+		testing.expect(t, true, "!true")
 	} else {
-		testing.expect(t, false, fmt.tprintf("%s: !false\n", #procedure))
+		testing.expect(t, false, "!false")
 	}
 	if !(CONSTANT_FALSE && CONSTANT_FALSE) {
-		testing.expect(t, true, fmt.tprintf("%s: !true\n", #procedure))
+		testing.expect(t, true, "!true")
 	} else {
-		testing.expect(t, false, fmt.tprintf("%s: !false\n", #procedure))
+		testing.expect(t, false, "!false")
 	}
 }
 
 @test
 test_const_false_const_true :: proc(t: ^testing.T) {
 	if CONSTANT_FALSE || CONSTANT_TRUE {
-		testing.expect(t, true, fmt.tprintf("%s: !true\n", #procedure))
+		testing.expect(t, true, "!true")
 	} else {
-		testing.expect(t, false, fmt.tprintf("%s: !false\n", #procedure))
+		testing.expect(t, false, "!false")
 	}
 	if CONSTANT_FALSE && CONSTANT_TRUE {
-		testing.expect(t, false, fmt.tprintf("%s: !false\n", #procedure))
+		testing.expect(t, false, "!false")
 	} else {
-		testing.expect(t, true, fmt.tprintf("%s: !true\n", #procedure))
+		testing.expect(t, true, "!true")
 	}
 
 	if !CONSTANT_FALSE || CONSTANT_TRUE {
-		testing.expect(t, true, fmt.tprintf("%s: !true\n", #procedure))
+		testing.expect(t, true, "!true")
 	} else {
-		testing.expect(t, false, fmt.tprintf("%s: !false\n", #procedure))
+		testing.expect(t, false, "!false")
 	}
 	if !CONSTANT_FALSE && CONSTANT_TRUE {
-		testing.expect(t, true, fmt.tprintf("%s: !true\n", #procedure))
+		testing.expect(t, true, "!true")
 	} else {
-		testing.expect(t, false, fmt.tprintf("%s: !false\n", #procedure))
+		testing.expect(t, false, "!false")
 	}
 
 	if CONSTANT_FALSE || !CONSTANT_TRUE {
-		testing.expect(t, false, fmt.tprintf("%s: !false\n", #procedure))
+		testing.expect(t, false, "!false")
 	} else {
-		testing.expect(t, true, fmt.tprintf("%s: !true\n", #procedure))
+		testing.expect(t, true, "!true")
 	}
 	if CONSTANT_FALSE && !CONSTANT_TRUE {
-		testing.expect(t, false, fmt.tprintf("%s: !false\n", #procedure))
+		testing.expect(t, false, "!false")
 	} else {
-		testing.expect(t, true, fmt.tprintf("%s: !true\n", #procedure))
+		testing.expect(t, true, "!true")
 	}
 
 	if !(CONSTANT_FALSE || CONSTANT_TRUE) {
-		testing.expect(t, false, fmt.tprintf("%s: !false\n", #procedure))
+		testing.expect(t, false, "!false")
 	} else {
-		testing.expect(t, true, fmt.tprintf("%s: !true\n", #procedure))
+		testing.expect(t, true, "!true")
 	}
 	if !(CONSTANT_FALSE && CONSTANT_TRUE) {
-		testing.expect(t, true, fmt.tprintf("%s: !true\n", #procedure))
+		testing.expect(t, true, "!true")
 	} else {
-		testing.expect(t, false, fmt.tprintf("%s: !false\n", #procedure))
+		testing.expect(t, false, "!false")
 	}
 }
 
 @test
 test_const_true_const_false :: proc(t: ^testing.T) {
 	if CONSTANT_TRUE || CONSTANT_FALSE {
-		testing.expect(t, true, fmt.tprintf("%s: !true\n", #procedure))
+		testing.expect(t, true, "!true")
 	} else {
-		testing.expect(t, false, fmt.tprintf("%s: !false\n", #procedure))
+		testing.expect(t, false, "!false")
 	}
 	if CONSTANT_TRUE && CONSTANT_FALSE {
-		testing.expect(t, false, fmt.tprintf("%s: !false\n", #procedure))
+		testing.expect(t, false, "!false")
 	} else {
-		testing.expect(t, true, fmt.tprintf("%s: !true\n", #procedure))
+		testing.expect(t, true, "!true")
 	}
 
 	if !CONSTANT_TRUE || CONSTANT_FALSE {
-		testing.expect(t, false, fmt.tprintf("%s: !false\n", #procedure))
+		testing.expect(t, false, "!false")
 	} else {
-		testing.expect(t, true, fmt.tprintf("%s: !true\n", #procedure))
+		testing.expect(t, true, "!true")
 	}
 	if !CONSTANT_TRUE && CONSTANT_FALSE {
-		testing.expect(t, false, fmt.tprintf("%s: !false\n", #procedure))
+		testing.expect(t, false, "!false")
 	} else {
-		testing.expect(t, true, fmt.tprintf("%s: !true\n", #procedure))
+		testing.expect(t, true, "!true")
 	}
 
 	if CONSTANT_TRUE || !CONSTANT_FALSE {
-		testing.expect(t, true, fmt.tprintf("%s: !true\n", #procedure))
+		testing.expect(t, true, "!true")
 	} else {
-		testing.expect(t, false, fmt.tprintf("%s: !false\n", #procedure))
+		testing.expect(t, false, "!false")
 	}
 	if CONSTANT_TRUE && !CONSTANT_FALSE {
-		testing.expect(t, true, fmt.tprintf("%s: !true\n", #procedure))
+		testing.expect(t, true, "!true")
 	} else {
-		testing.expect(t, false, fmt.tprintf("%s: !false\n", #procedure))
+		testing.expect(t, false, "!false")
 	}
 
 	if !(CONSTANT_TRUE || CONSTANT_FALSE) {
-		testing.expect(t, false, fmt.tprintf("%s: !false\n", #procedure))
+		testing.expect(t, false, "!false")
 	} else {
-		testing.expect(t, true, fmt.tprintf("%s: !true\n", #procedure))
+		testing.expect(t, true, "!true")
 	}
 	if !(CONSTANT_TRUE && CONSTANT_FALSE) {
-		testing.expect(t, true, fmt.tprintf("%s: !true\n", #procedure))
+		testing.expect(t, true, "!true")
 	} else {
-		testing.expect(t, false, fmt.tprintf("%s: !false\n", #procedure))
+		testing.expect(t, false, "!false")
 	}
 }
 
 @test
 test_const_true_const_true :: proc(t: ^testing.T) {
 	if CONSTANT_TRUE || CONSTANT_TRUE {
-		testing.expect(t, true, fmt.tprintf("%s: !true\n", #procedure))
+		testing.expect(t, true, "!true")
 	} else {
-		testing.expect(t, false, fmt.tprintf("%s: !false\n", #procedure))
+		testing.expect(t, false, "!false")
 	}
 	if CONSTANT_TRUE && CONSTANT_TRUE {
-		testing.expect(t, true, fmt.tprintf("%s: !true\n", #procedure))
+		testing.expect(t, true, "!true")
 	} else {
-		testing.expect(t, false, fmt.tprintf("%s: !false\n", #procedure))
+		testing.expect(t, false, "!false")
 	}
 
 	if !CONSTANT_TRUE || CONSTANT_TRUE {
-		testing.expect(t, true, fmt.tprintf("%s: !true\n", #procedure))
+		testing.expect(t, true, "!true")
 	} else {
-		testing.expect(t, false, fmt.tprintf("%s: !false\n", #procedure))
+		testing.expect(t, false, "!false")
 	}
 	if !CONSTANT_TRUE && CONSTANT_TRUE {
-		testing.expect(t, false, fmt.tprintf("%s: !false\n", #procedure))
+		testing.expect(t, false, "!false")
 	} else {
-		testing.expect(t, true, fmt.tprintf("%s: !true\n", #procedure))
+		testing.expect(t, true, "!true")
 	}
 
 	if CONSTANT_TRUE || !CONSTANT_TRUE {
-		testing.expect(t, true, fmt.tprintf("%s: !true\n", #procedure))
+		testing.expect(t, true, "!true")
 	} else {
-		testing.expect(t, false, fmt.tprintf("%s: !false\n", #procedure))
+		testing.expect(t, false, "!false")
 	}
 	if CONSTANT_TRUE && !CONSTANT_TRUE {
-		testing.expect(t, false, fmt.tprintf("%s: !false\n", #procedure))
+		testing.expect(t, false, "!false")
 	} else {
-		testing.expect(t, true, fmt.tprintf("%s: !true\n", #procedure))
+		testing.expect(t, true, "!true")
 	}
 
 	if !(CONSTANT_TRUE || CONSTANT_TRUE) {
-		testing.expect(t, false, fmt.tprintf("%s: !false\n", #procedure))
+		testing.expect(t, false, "!false")
 	} else {
-		testing.expect(t, true, fmt.tprintf("%s: !true\n", #procedure))
+		testing.expect(t, true, "!true")
 	}
 	if !(CONSTANT_TRUE && CONSTANT_TRUE) {
-		testing.expect(t, false, fmt.tprintf("%s: !false\n", #procedure))
+		testing.expect(t, false, "!false")
 	} else {
-		testing.expect(t, true, fmt.tprintf("%s: !true\n", #procedure))
+		testing.expect(t, true, "!true")
 	}
 }
 
 @test
 test_proc_false_const_false :: proc(t: ^testing.T) {
 	if false_result() || CONSTANT_FALSE {
-		testing.expect(t, false, fmt.tprintf("%s: !false\n", #procedure))
+		testing.expect(t, false, "!false")
 	} else {
-		testing.expect(t, true, fmt.tprintf("%s: !true\n", #procedure))
+		testing.expect(t, true, "!true")
 	}
 	if false_result() && CONSTANT_FALSE {
-		testing.expect(t, false, fmt.tprintf("%s: !false\n", #procedure))
+		testing.expect(t, false, "!false")
 	} else {
-		testing.expect(t, true, fmt.tprintf("%s: !true\n", #procedure))
+		testing.expect(t, true, "!true")
 	}
 
 	if !(false_result() || CONSTANT_FALSE) {
-		testing.expect(t, true, fmt.tprintf("%s: !true\n", #procedure))
+		testing.expect(t, true, "!true")
 	} else {
-		testing.expect(t, false, fmt.tprintf("%s: !false\n", #procedure))
+		testing.expect(t, false, "!false")
 	}
 	if !(false_result() && CONSTANT_FALSE) {
-		testing.expect(t, true, fmt.tprintf("%s: !true\n", #procedure))
+		testing.expect(t, true, "!true")
 	} else {
-		testing.expect(t, false, fmt.tprintf("%s: !false\n", #procedure))
+		testing.expect(t, false, "!false")
 	}
 }
 
 @test
 test_proc_false_const_true :: proc(t: ^testing.T) {
 	if false_result() || CONSTANT_TRUE {
-		testing.expect(t, true, fmt.tprintf("%s: !true\n", #procedure))
+		testing.expect(t, true, "!true")
 	} else {
-		testing.expect(t, false, fmt.tprintf("%s: !false\n", #procedure))
+		testing.expect(t, false, "!false")
 	}
 	if false_result() && CONSTANT_TRUE {
-		testing.expect(t, false, fmt.tprintf("%s: !false\n", #procedure))
+		testing.expect(t, false, "!false")
 	} else {
-		testing.expect(t, true, fmt.tprintf("%s: !true\n", #procedure))
+		testing.expect(t, true, "!true")
 	}
 
 	if !(false_result() || CONSTANT_TRUE) {
-		testing.expect(t, false, fmt.tprintf("%s: !false\n", #procedure))
+		testing.expect(t, false, "!false")
 	} else {
-		testing.expect(t, true, fmt.tprintf("%s: !true\n", #procedure))
+		testing.expect(t, true, "!true")
 	}
 	if !(false_result() && CONSTANT_TRUE) {
-		testing.expect(t, true, fmt.tprintf("%s: !true\n", #procedure))
+		testing.expect(t, true, "!true")
 	} else {
-		testing.expect(t, false, fmt.tprintf("%s: !false\n", #procedure))
+		testing.expect(t, false, "!false")
 	}
 }
 
 @test
 test_proc_true_const_false :: proc(t: ^testing.T) {
 	if true_result() || CONSTANT_FALSE {
-		testing.expect(t, true, fmt.tprintf("%s: !true\n", #procedure))
+		testing.expect(t, true, "!true")
 	} else {
-		testing.expect(t, false, fmt.tprintf("%s: !false\n", #procedure))
+		testing.expect(t, false, "!false")
 	}
 	if true_result() && CONSTANT_FALSE {
-		testing.expect(t, false, fmt.tprintf("%s: !false\n", #procedure))
+		testing.expect(t, false, "!false")
 	} else {
-		testing.expect(t, true, fmt.tprintf("%s: !true\n", #procedure))
+		testing.expect(t, true, "!true")
 	}
 
 	if !(true_result() || CONSTANT_FALSE) {
-		testing.expect(t, false, fmt.tprintf("%s: !false\n", #procedure))
+		testing.expect(t, false, "!false")
 	} else {
-		testing.expect(t, true, fmt.tprintf("%s: !true\n", #procedure))
+		testing.expect(t, true, "!true")
 	}
 	if !(true_result() && CONSTANT_FALSE) {
-		testing.expect(t, true, fmt.tprintf("%s: !true\n", #procedure))
+		testing.expect(t, true, "!true")
 	} else {
-		testing.expect(t, false, fmt.tprintf("%s: !false\n", #procedure))
+		testing.expect(t, false, "!false")
 	}
 }
 
 @test
 test_proc_true_const_true :: proc(t: ^testing.T) {
 	if true_result() || CONSTANT_TRUE {
-		testing.expect(t, true, fmt.tprintf("%s: !true\n", #procedure))
+		testing.expect(t, true, "!true")
 	} else {
-		testing.expect(t, false, fmt.tprintf("%s: !false\n", #procedure))
+		testing.expect(t, false, "!false")
 	}
 	if true_result() && CONSTANT_TRUE {
-		testing.expect(t, true, fmt.tprintf("%s: !true\n", #procedure))
+		testing.expect(t, true, "!true")
 	} else {
-		testing.expect(t, false, fmt.tprintf("%s: !false\n", #procedure))
+		testing.expect(t, false, "!false")
 	}
 
 	if !(true_result() || CONSTANT_TRUE) {
-		testing.expect(t, false, fmt.tprintf("%s: !false\n", #procedure))
+		testing.expect(t, false, "!false")
 	} else {
-		testing.expect(t, true, fmt.tprintf("%s: !true\n", #procedure))
+		testing.expect(t, true, "!true")
 	}
 	if !(true_result() && CONSTANT_TRUE) {
-		testing.expect(t, false, fmt.tprintf("%s: !false\n", #procedure))
+		testing.expect(t, false, "!false")
 	} else {
-		testing.expect(t, true, fmt.tprintf("%s: !true\n", #procedure))
+		testing.expect(t, true, "!true")
 	}
 }

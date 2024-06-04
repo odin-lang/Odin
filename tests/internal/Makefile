@@ -1,23 +1,22 @@
 ODIN=../../odin
+COMMON=-file -vet -strict-style -o:minimal
 
-all: all_bsd asan_test
-
-all_bsd: rtti_test map_test pow_test 128_test string_compare_test
+all: asan_test rtti_test map_test pow_test 128_test string_compare_test
 
 rtti_test:
-	$(ODIN) run test_rtti.odin -file -vet -strict-style -o:minimal
+	$(ODIN) test test_rtti.odin $(COMMON)
 
 map_test:
-	$(ODIN) run test_map.odin -file -vet -strict-style -o:minimal
+	$(ODIN) test test_map.odin $(COMMON)
 
 pow_test:
-	$(ODIN) run test_pow.odin -file -vet -strict-style -o:minimal
+	$(ODIN) test test_pow.odin $(COMMON)
 
 128_test:
-	$(ODIN) run test_128.odin -file -vet -strict-style -o:minimal
+	$(ODIN) test test_128.odin $(COMMON)
 
 asan_test:
-	$(ODIN) run test_asan.odin -file -sanitize:address -debug
+	$(ODIN) test test_asan.odin $(COMMON) -sanitize:address -debug
 
 string_compare_test:
-	$(ODIN) run test_string_compare.odin -file -vet -strict-style -o:minimal
+	$(ODIN) test test_string_compare.odin $(COMMON)

@@ -2,45 +2,7 @@ package test_core_json
 
 import "core:encoding/json"
 import "core:testing"
-import "core:fmt"
-import "core:os"
 import "core:mem/virtual"
-
-TEST_count := 0
-TEST_fail  := 0
-
-when ODIN_TEST {
-	expect  :: testing.expect
-	log     :: testing.log
-} else {
-	expect  :: proc(t: ^testing.T, condition: bool, message: string, loc := #caller_location) {
-		TEST_count += 1
-		if !condition {
-			TEST_fail += 1
-			fmt.printf("[%v] %v\n", loc, message)
-			return
-		}
-	}
-	log     :: proc(t: ^testing.T, v: any, loc := #caller_location) {
-		fmt.printf("[%v] ", loc)
-		fmt.printf("log: %v\n", v)
-	}
-}
-
-main :: proc() {
-	t := testing.T{}
-
-	parse_json(&t)
-	marshal_json(&t)
-	unmarshal_json(&t)
-	surrogate(&t)
-	utf8_string_of_multibyte_characters(&t)
-
-	fmt.printf("%v/%v tests successful.\n", TEST_count - TEST_fail, TEST_count)
-	if TEST_fail > 0 {
-		os.exit(1)
-	}
-}
 
 @test
 parse_json :: proc(t: ^testing.T) {
@@ -72,10 +34,9 @@ parse_json :: proc(t: ^testing.T) {
 	}
 	`
    
-	_, err := json.parse(transmute([]u8)json_data)
-
-	msg := fmt.tprintf("Expected `json.parse` to return nil, got %v", err)
-	expect(t, err == nil, msg)
+	val, err := json.parse(transmute([]u8)json_data)
+	json.destroy_value(val)
+	testing.expectf(t, err == nil, "Expected `json.parse` to return nil, got %v", err)
 }
 
 @test
@@ -83,7 +44,7 @@ out_of_memory_in_parse_json :: proc(t: ^testing.T) {
 	arena: virtual.Arena
 	arena_buffer: [256]byte
 	arena_init_error := virtual.arena_init_buffer(&arena, arena_buffer[:])
-	testing.expect(t, arena_init_error == nil, fmt.tprintf("Expected arena initialization to not return error, got: %v\n", arena_init_error))
+	testing.expectf(t, arena_init_error == nil, "Expected arena initialization to not return error, got: %v\n", arena_init_error)
 
 	context.allocator = virtual.arena_allocator(&arena)
 	
@@ -114,11 +75,11 @@ out_of_memory_in_parse_json :: proc(t: ^testing.T) {
 	}
 	`
 
-	_, err := json.parse(transmute([]u8)json_data)
+	val, err := json.parse(transmute([]u8)json_data)
+	json.destroy_value(val)
 
 	expected_error := json.Error.Out_Of_Memory
-	msg := fmt.tprintf("Expected `json.parse` to fail with %v, got %v", expected_error, err)
-	expect(t, err == json.Error.Out_Of_Memory, msg)
+	testing.expectf(t, err == json.Error.Out_Of_Memory, "Expected `json.parse` to fail with %v, got %v", expected_error, err)
 }
 
 @test
@@ -134,9 +95,9 @@ marshal_json :: proc(t: ^testing.T) {
 		b = 5,
 	}
    
-	_, err := json.marshal(my_struct)
-	msg := fmt.tprintf("Expected `json.marshal` to return nil, got %v", err)
-	expect(t, err == nil, msg)
+	data, err := json.marshal(my_struct)
+	defer delete(data)
+	testing.expectf(t, err == nil, "Expected `json.marshal` to return nil, got %v", err)
 }
 
 PRODUCTS := `
@@ -378,17 +339,12 @@ unmarshal_json :: proc(t: ^testing.T) {
 	err := json.unmarshal(transmute([]u8)PRODUCTS, &g, json.DEFAULT_SPECIFICATION)
 	defer cleanup(g)
 
-	msg := fmt.tprintf("Expected `json.unmarshal` to return nil, got %v", err)
-	expect(t, err == nil, msg)
-
-	msg = fmt.tprintf("Expected %v products to have been unmarshaled, got %v", len(original_data.products), len(g.products))
-	expect(t, len(g.products) == len(original_data.products), msg)
-
-	msg = fmt.tprintf("Expected cash to have been unmarshaled as %v, got %v", original_data.cash, g.cash)
-	expect(t, original_data.cash == g.cash, msg)
+	testing.expectf(t, err == nil,                                     "Expected `json.unmarshal` to return nil, got %v", err)
+	testing.expectf(t, len(g.products) == len(original_data.products), "Expected %v products to have been unmarshaled, got %v", len(original_data.products), len(g.products))
+	testing.expectf(t, original_data.cash == g.cash,                   "Expected cash to have been unmarshaled as %v, got %v", original_data.cash, g.cash)
 
 	for p, i in g.products {
-		expect(t, p == original_data.products[i], "Producted unmarshaled improperly")
+		testing.expect(t, p == original_data.products[i], "Producted unmarshaled improperly")
 	}
 }
 
@@ -397,17 +353,19 @@ surrogate :: proc(t: ^testing.T) {
 	input := `+ + * 😃 - /`
 
 	out, err := json.marshal(input)
-	expect(t, err == nil, fmt.tprintf("Expected `json.marshal(%q)` to return a nil error, got %v", input, err))
+	defer delete(out)
+	testing.expectf(t, err == nil,    "Expected `json.marshal(%q)` to return a nil error, got %v", input, err)
 
 	back: string
 	uerr := json.unmarshal(out, &back)
-	expect(t, uerr == nil, fmt.tprintf("Expected `json.unmarshal(%q)` to return a nil error, got %v", string(out), uerr))
-	expect(t, back == input, fmt.tprintf("Expected `json.unmarshal(%q)` to return %q, got %v", string(out), input, uerr))
+	defer delete(back)
+	testing.expectf(t, uerr == nil,   "Expected `json.unmarshal(%q)` to return a nil error, got %v", string(out), uerr)
+	testing.expectf(t, back == input, "Expected `json.unmarshal(%q)` to return %q, got %v", string(out), input, uerr)
 }
 
 @test
 utf8_string_of_multibyte_characters :: proc(t: ^testing.T) {
-	_, err := json.parse_string(`"🐛✅"`)
-	msg := fmt.tprintf("Expected `json.parse` to return nil, got %v", err)
-	expect(t, err == nil, msg)
+	val, err := json.parse_string(`"🐛✅"`)
+	defer json.destroy_value(val)
+	testing.expectf(t, err == nil, "Expected `json.parse` to return nil, got %v", err)
 }

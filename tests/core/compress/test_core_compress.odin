@@ -15,47 +15,7 @@ import "core:testing"
 import "core:compress/zlib"
 import "core:compress/gzip"
 import "core:compress/shoco"
-
 import "core:bytes"
-import "core:fmt"
-
-import "core:mem"
-import "core:os"
-import "core:io"
-
-TEST_count := 0
-TEST_fail  := 0
-
-when ODIN_TEST {
-	expect  :: testing.expect
-	log     :: testing.log
-} else {
-	expect  :: proc(t: ^testing.T, condition: bool, message: string, loc := #caller_location) {
-		TEST_count += 1
-		if !condition {
-			TEST_fail += 1
-			fmt.printf("[%v] %v\n", loc, message)
-			return
-		}
-	}
-	log     :: proc(t: ^testing.T, v: any, loc := #caller_location) {
-		fmt.printf("[%v] ", loc)
-		fmt.printf("log: %v\n", v)
-	}
-}
-
-main :: proc() {
-	w := io.to_writer(os.stream_from_handle(os.stdout))
-	t := testing.T{w=w}
-	zlib_test(&t)
-	gzip_test(&t)
-	shoco_test(&t)
-
-	fmt.printf("%v/%v tests successful.\n", TEST_count - TEST_fail, TEST_count)
-	if TEST_fail > 0 {
-		os.exit(1)
-	}
-}
 
 @test
 zlib_test :: proc(t: ^testing.T) {
@@ -80,26 +40,14 @@ zlib_test :: proc(t: ^testing.T) {
 	}
 
 	buf: bytes.Buffer
+	err := zlib.inflate(ODIN_DEMO, &buf)
 
-	track: mem.Tracking_Allocator
-	mem.tracking_allocator_init(&track, context.allocator)
-	context.allocator = mem.tracking_allocator(&track)
-
-	err  := zlib.inflate(ODIN_DEMO, &buf)
-
-	expect(t, err == nil, "ZLIB failed to decompress ODIN_DEMO")
+	testing.expect(t, err == nil, "ZLIB failed to decompress ODIN_DEMO")
 	s := bytes.buffer_to_string(&buf)
 
-	expect(t, s[68] == 240 && s[69] == 159 && s[70] == 152, "ZLIB result should've contained 😃 at position 68.")
-
-	expect(t, len(s) == 438, "ZLIB result has an unexpected length.")
-
+	testing.expect(t, s[68] == 240 && s[69] == 159 && s[70] == 152, "ZLIB result should've contained 😃 at position 68.")
+	testing.expect(t, len(s) == 438, "ZLIB result has an unexpected length.")
 	bytes.buffer_destroy(&buf)
-
-	for _, v in track.allocation_map {
-		error := fmt.tprintf("ZLIB test leaked %v bytes", v.size)
-		expect(t, false, error)
-	}
 }
 
 @test
@@ -117,24 +65,12 @@ gzip_test :: proc(t: ^testing.T) {
 	}
 
 	buf: bytes.Buffer
+	err := gzip.load(TEST, &buf)
 
-	track: mem.Tracking_Allocator
-	mem.tracking_allocator_init(&track, context.allocator)
-	context.allocator = mem.tracking_allocator(&track)
-
-	err := gzip.load(TEST, &buf) // , 438);
-
-	expect(t, err == nil, "GZIP failed to decompress TEST")
-	s := bytes.buffer_to_string(&buf)
-
-	expect(t, s == "payload", "GZIP result wasn't 'payload'")
+	testing.expect(t, err == nil, "GZIP failed to decompress TEST")
+	testing.expect(t, bytes.buffer_to_string(&buf) == "payload", "GZIP result wasn't 'payload'")
 
 	bytes.buffer_destroy(&buf)
-
-	for _, v in track.allocation_map {
-		error := fmt.tprintf("GZIP test leaked %v bytes", v.size)
-		expect(t, false, error)
-	}
 }
 
 @test
@@ -168,31 +104,26 @@ shoco_test :: proc(t: ^testing.T) {
 		defer delete(buffer)
 
 		size, err := shoco.decompress(v.compressed, buffer[:])
-		msg := fmt.tprintf("Expected `decompress` to return `nil`, got %v", err)
-		expect(t, err == nil, msg)
+		testing.expectf(t, err == nil, "Expected `decompress` to return `nil`, got %v", err)
 
-		msg  = fmt.tprintf("Decompressed %v bytes into %v. Expected to decompress into %v bytes.", len(v.compressed), size, expected_raw)
-		expect(t, size == expected_raw, msg)
-		expect(t, string(buffer[:size]) == string(v.raw), "Decompressed contents don't match.")
+		testing.expectf(t, size == expected_raw, "Decompressed %v bytes into %v. Expected to decompress into %v bytes", len(v.compressed), size, expected_raw)
+		testing.expect(t, string(buffer[:size]) == string(v.raw), "Decompressed contents don't match")
 
 		size, err = shoco.compress(string(v.raw), buffer[:])
-		expect(t, err == nil, "Expected `compress` to return `nil`.")
+		testing.expect(t, err == nil, "Expected `compress` to return `nil`.")
 
-		msg = fmt.tprintf("Compressed %v bytes into %v. Expected to compress into %v bytes.", expected_raw, size, expected_compressed)
-		expect(t, size == expected_compressed, msg)
+		testing.expectf(t, size == expected_compressed, "Compressed %v bytes into %v. Expected to compress into %v bytes", expected_raw, size, expected_compressed)
 
 		size, err = shoco.decompress(v.compressed, buffer[:expected_raw - 10])
-		msg = fmt.tprintf("Decompressing into too small a buffer returned %v, expected `.Output_Too_Short`", err)
-		expect(t, err == .Output_Too_Short, msg)
+		testing.expectf(t, err == .Output_Too_Short, "Decompressing into too small a buffer returned %v, expected `.Output_Too_Short`", err)
 
 		size, err = shoco.compress(string(v.raw), buffer[:expected_compressed - 10])
-		msg = fmt.tprintf("Compressing into too small a buffer returned %v, expected `.Output_Too_Short`", err)
-		expect(t, err == .Output_Too_Short, msg)
+		testing.expectf(t, err == .Output_Too_Short, "Compressing into too small a buffer returned %v, expected `.Output_Too_Short`", err)
 
 		size, err = shoco.decompress(v.compressed[:v.short_pack], buffer[:])
-		expect(t, err == .Stream_Too_Short, "Expected `decompress` to return `Stream_Too_Short` because there was no more data after selecting a pack.")
+		testing.expectf(t, err == .Stream_Too_Short, "Insufficient data after pack returned %v, expected `.Stream_Too_Short`", err)
 
 		size, err = shoco.decompress(v.compressed[:v.short_sentinel], buffer[:])
-		expect(t, err == .Stream_Too_Short, "Expected `decompress` to return `Stream_Too_Short` because there was no more data after non-ASCII sentinel.")
+		testing.expectf(t, err == .Stream_Too_Short, "No more data after non-ASCII sentinel returned %v, expected `.Stream_Too_Short`", err)
 	}
 }

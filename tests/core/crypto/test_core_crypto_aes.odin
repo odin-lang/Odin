@@ -2,21 +2,20 @@ package test_core_crypto
 
 import "base:runtime"
 import "core:encoding/hex"
-import "core:fmt"
+import "core:log"
 import "core:testing"
 
 import "core:crypto/aes"
 import "core:crypto/sha2"
 
-import tc "tests:common"
-
 @(test)
 test_aes :: proc(t: ^testing.T) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 
-	tc.log(t, "Testing AES")
+	log.info("Testing AES")
 
 	impls := make([dynamic]aes.Implementation, 0, 2)
+	defer delete(impls)
 	append(&impls, aes.Implementation.Portable)
 	if aes.is_hardware_accelerated() {
 		append(&impls, aes.Implementation.Hardware)
@@ -29,9 +28,8 @@ test_aes :: proc(t: ^testing.T) {
 	}
 }
 
-@(test)
 test_aes_ecb :: proc(t: ^testing.T, impl: aes.Implementation) {
-	tc.log(t, fmt.tprintf("Testing AES-ECB/%v", impl))
+	log.infof("Testing AES-ECB/%v", impl)
 
 	test_vectors := []struct {
 		key: string,
@@ -111,39 +109,34 @@ test_aes_ecb :: proc(t: ^testing.T, impl: aes.Implementation) {
 
 		aes.encrypt_ecb(&ctx, dst[:], plaintext)
 		dst_str := string(hex.encode(dst[:], context.temp_allocator))
-		tc.expect(
+		testing.expectf(
 			t,
 			dst_str == v.ciphertext,
-			fmt.tprintf(
-				"AES-ECB/%v: Expected: %s for encrypt(%s, %s), but got %s instead",
-				impl,
-				v.ciphertext,
-				v.key,
-				v.plaintext,
-				dst_str,
-			),
+			"AES-ECB/%v: Expected: %s for encrypt(%s, %s), but got %s instead",
+			impl,
+			v.ciphertext,
+			v.key,
+			v.plaintext,
+			dst_str,
 		)
 
 		aes.decrypt_ecb(&ctx, dst[:], ciphertext)
 		dst_str = string(hex.encode(dst[:], context.temp_allocator))
-		tc.expect(
+		testing.expectf(
 			t,
 			dst_str == v.plaintext,
-			fmt.tprintf(
-				"AES-ECB/%v: Expected: %s for decrypt(%s, %s), but got %s instead",
-				impl,
-				v.plaintext,
-				v.key,
-				v.ciphertext,
-				dst_str,
-			),
+			"AES-ECB/%v: Expected: %s for decrypt(%s, %s), but got %s instead",
+			impl,
+			v.plaintext,
+			v.key,
+			v.ciphertext,
+			dst_str,
 		)
 	}
 }
 
-@(test)
 test_aes_ctr :: proc(t: ^testing.T, impl: aes.Implementation) {
-	tc.log(t, fmt.tprintf("Testing AES-CTR/%v", impl))
+	log.infof("Testing AES-CTR/%v", impl)
 
 	test_vectors := []struct {
 		key: string,
@@ -185,18 +178,16 @@ test_aes_ctr :: proc(t: ^testing.T, impl: aes.Implementation) {
 		aes.xor_bytes_ctr(&ctx, dst, plaintext)
 
 		dst_str := string(hex.encode(dst[:], context.temp_allocator))
-		tc.expect(
+		testing.expectf(
 			t,
 			dst_str == v.ciphertext,
-			fmt.tprintf(
-				"AES-CTR/%v: Expected: %s for encrypt(%s, %s, %s), but got %s instead",
-				impl,
-				v.ciphertext,
-				v.key,
-				v.iv,
-				v.plaintext,
-				dst_str,
-			),
+			"AES-CTR/%v: Expected: %s for encrypt(%s, %s, %s), but got %s instead",
+			impl,
+			v.ciphertext,
+			v.key,
+			v.iv,
+			v.plaintext,
+			dst_str,
 		)
 	}
 
@@ -224,21 +215,18 @@ test_aes_ctr :: proc(t: ^testing.T, impl: aes.Implementation) {
 	digest_str := string(hex.encode(digest[:], context.temp_allocator))
 
 	expected_digest_str := "d4445343afeb9d1237f95b10d00358aed4c1d7d57c9fe480cd0afb5e2ffd448c"
-	tc.expect(
+	testing.expectf(
 		t,
 		expected_digest_str == digest_str,
-		fmt.tprintf(
-			"AES-CTR/%v: Expected %s for keystream digest, but got %s instead",
-			impl,
-			expected_digest_str,
-			digest_str,
-		),
+		"AES-CTR/%v: Expected %s for keystream digest, but got %s instead",
+		impl,
+		expected_digest_str,
+		digest_str,
 	)
 }
 
-@(test)
 test_aes_gcm :: proc(t: ^testing.T, impl: aes.Implementation) {
-	tc.log(t, fmt.tprintf("Testing AES-GCM/%v", impl))
+	log.infof("Testing AES-GCM/%v", impl)
 
 	// NIST did a reorg of their site, so the source of the test vectors
 	// is only available from an archive.  The commented out tests are
@@ -422,41 +410,37 @@ test_aes_gcm :: proc(t: ^testing.T, impl: aes.Implementation) {
 		dst_str := string(hex.encode(dst[:], context.temp_allocator))
 		tag_str := string(hex.encode(tag_[:], context.temp_allocator))
 
-		tc.expect(
+		testing.expectf(
 			t,
 			dst_str == v.ciphertext && tag_str == v.tag,
-			fmt.tprintf(
-				"AES-GCM/%v: Expected: (%s, %s) for seal(%s, %s, %s, %s), but got (%s, %s) instead",
-				impl,
-				v.ciphertext,
-				v.tag,
-				v.key,
-				v.iv,
-				v.aad,
-				v.plaintext,
-				dst_str,
-				tag_str,
-			),
+			"AES-GCM/%v: Expected: (%s, %s) for seal(%s, %s, %s, %s), but got (%s, %s) instead",
+			impl,
+			v.ciphertext,
+			v.tag,
+			v.key,
+			v.iv,
+			v.aad,
+			v.plaintext,
+			dst_str,
+			tag_str,
 		)
 
 		ok := aes.open_gcm(&ctx, dst, iv, aad, ciphertext, tag)
 		dst_str = string(hex.encode(dst[:], context.temp_allocator))
 
-		tc.expect(
+		testing.expectf(
 			t,
 			ok && dst_str == v.plaintext,
-			fmt.tprintf(
-				"AES-GCM/%v: Expected: (%s, true) for open(%s, %s, %s, %s, %s), but got (%s, %s) instead",
-				impl,
-				v.plaintext,
-				v.key,
-				v.iv,
-				v.aad,
-				v.ciphertext,
-				v.tag,
-				dst_str,
-				ok,
-			),
+			"AES-GCM/%v: Expected: (%s, true) for open(%s, %s, %s, %s, %s), but got (%s, %s) instead",
+			impl,
+			v.plaintext,
+			v.key,
+			v.iv,
+			v.aad,
+			v.ciphertext,
+			v.tag,
+			dst_str,
+			ok,
 		)
 	}
 }

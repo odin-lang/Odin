@@ -95,24 +95,25 @@ decode :: decode_from
 
 // Decodes the given string as CBOR.
 // See docs on the proc group `decode` for more information.
-decode_from_string :: proc(s: string, flags: Decoder_Flags = {}, allocator := context.allocator) -> (v: Value, err: Decode_Error) {
+decode_from_string :: proc(s: string, flags: Decoder_Flags = {}, allocator := context.allocator, loc := #caller_location) -> (v: Value, err: Decode_Error) {
 	r: strings.Reader
 	strings.reader_init(&r, s)
-	return decode_from_reader(strings.reader_to_stream(&r), flags, allocator)
+	return decode_from_reader(strings.reader_to_stream(&r), flags, allocator, loc)
 }
 
 // Reads a CBOR value from the given reader.
 // See docs on the proc group `decode` for more information.
-decode_from_reader :: proc(r: io.Reader, flags: Decoder_Flags = {}, allocator := context.allocator) -> (v: Value, err: Decode_Error) {
+decode_from_reader :: proc(r: io.Reader, flags: Decoder_Flags = {}, allocator := context.allocator, loc := #caller_location) -> (v: Value, err: Decode_Error) {
 	return decode_from_decoder(
 		Decoder{ DEFAULT_MAX_PRE_ALLOC, flags, r },
 		allocator=allocator,
+		loc = loc,
 	)
 }
 
 // Reads a CBOR value from the given decoder.
 // See docs on the proc group `decode` for more information.
-decode_from_decoder :: proc(d: Decoder, allocator := context.allocator) -> (v: Value, err: Decode_Error) {
+decode_from_decoder :: proc(d: Decoder, allocator := context.allocator, loc := #caller_location) -> (v: Value, err: Decode_Error) {
 	context.allocator = allocator
 	
 	d := d
@@ -121,13 +122,13 @@ decode_from_decoder :: proc(d: Decoder, allocator := context.allocator) -> (v: V
 		d.max_pre_alloc = DEFAULT_MAX_PRE_ALLOC
 	}
 
-	v, err = _decode_from_decoder(d)
+	v, err = _decode_from_decoder(d, {}, allocator, loc)
 	// Normal EOF does not exist here, we try to read the exact amount that is said to be provided.
 	if err == .EOF { err = .Unexpected_EOF }
 	return
 }
 
-_decode_from_decoder :: proc(d: Decoder, hdr: Header = Header(0)) -> (v: Value, err: Decode_Error) {
+_decode_from_decoder :: proc(d: Decoder, hdr: Header = Header(0), allocator := context.allocator, loc := #caller_location) -> (v: Value, err: Decode_Error) {
 	hdr := hdr
 	r := d.reader
 	if hdr == Header(0) { hdr = _decode_header(r) or_return }
@@ -161,11 +162,11 @@ _decode_from_decoder :: proc(d: Decoder, hdr: Header = Header(0)) -> (v: Value, 
 	switch maj {
 	case .Unsigned: return _decode_tiny_u8(add)
 	case .Negative: return Negative_U8(_decode_tiny_u8(add) or_return), nil
-	case .Bytes:    return _decode_bytes_ptr(d, add)
-	case .Text:     return _decode_text_ptr(d, add)
-	case .Array:    return _decode_array_ptr(d, add)
-	case .Map:      return _decode_map_ptr(d, add)
-	case .Tag:      return _decode_tag_ptr(d, add)
+	case .Bytes:    return _decode_bytes_ptr(d, add, .Bytes, allocator, loc)
+	case .Text:     return _decode_text_ptr(d, add, allocator, loc)
+	case .Array:    return _decode_array_ptr(d, add, allocator, loc)
+	case .Map:      return _decode_map_ptr(d, add, allocator, loc)
+	case .Tag:      return _decode_tag_ptr(d, add, allocator, loc)
 	case .Other:    return _decode_tiny_simple(add)
 	case:           return nil, .Bad_Major
 	}
@@ -203,27 +204,27 @@ encode :: encode_into
 
 // Encodes the CBOR value into binary CBOR allocated on the given allocator.
 // See the docs on the proc group `encode_into` for more info.
-encode_into_bytes :: proc(v: Value, flags := ENCODE_SMALL, allocator := context.allocator, temp_allocator := context.temp_allocator) -> (data: []byte, err: Encode_Error) {
-	b := strings.builder_make(allocator) or_return
+encode_into_bytes :: proc(v: Value, flags := ENCODE_SMALL, allocator := context.allocator, temp_allocator := context.temp_allocator, loc := #caller_location) -> (data: []byte, err: Encode_Error) {
+	b := strings.builder_make(allocator, loc) or_return
 	encode_into_builder(&b, v, flags, temp_allocator) or_return
 	return b.buf[:], nil
 }
 
 // Encodes the CBOR value into binary CBOR written to the given builder.
 // See the docs on the proc group `encode_into` for more info.
-encode_into_builder :: proc(b: ^strings.Builder, v: Value, flags := ENCODE_SMALL, temp_allocator := context.temp_allocator) -> Encode_Error {
-	return encode_into_writer(strings.to_stream(b), v, flags, temp_allocator)
+encode_into_builder :: proc(b: ^strings.Builder, v: Value, flags := ENCODE_SMALL, temp_allocator := context.temp_allocator, loc := #caller_location) -> Encode_Error {
+	return encode_into_writer(strings.to_stream(b), v, flags, temp_allocator, loc=loc)
 }
 
 // Encodes the CBOR value into binary CBOR written to the given writer.
 // See the docs on the proc group `encode_into` for more info.
-encode_into_writer :: proc(w: io.Writer, v: Value, flags := ENCODE_SMALL, temp_allocator := context.temp_allocator) -> Encode_Error {
-	return encode_into_encoder(Encoder{flags, w, temp_allocator}, v)
+encode_into_writer :: proc(w: io.Writer, v: Value, flags := ENCODE_SMALL, temp_allocator := context.temp_allocator, loc := #caller_location) -> Encode_Error {
+	return encode_into_encoder(Encoder{flags, w, temp_allocator}, v, loc=loc)
 }
 
 // Encodes the CBOR value into binary CBOR written to the given encoder.
 // See the docs on the proc group `encode_into` for more info.
-encode_into_encoder :: proc(e: Encoder, v: Value) -> Encode_Error {
+encode_into_encoder :: proc(e: Encoder, v: Value, loc := #caller_location) -> Encode_Error {
 	e := e
 
 	if e.temp_allocator.procedure == nil {
@@ -366,21 +367,21 @@ _encode_u64_exact :: proc(w: io.Writer, v: u64, major: Major = .Unsigned) -> (er
 	return
 }
 
-_decode_bytes_ptr :: proc(d: Decoder, add: Add, type: Major = .Bytes) -> (v: ^Bytes, err: Decode_Error) {
-	v = new(Bytes) or_return
-	defer if err != nil { free(v) }
+_decode_bytes_ptr :: proc(d: Decoder, add: Add, type: Major = .Bytes, allocator := context.allocator, loc := #caller_location) -> (v: ^Bytes, err: Decode_Error) {
+	v = new(Bytes, allocator, loc) or_return
+	defer if err != nil { free(v, allocator, loc) }
 
-	v^ = _decode_bytes(d, add, type) or_return
+	v^ = _decode_bytes(d, add, type, allocator, loc) or_return
 	return
 }
 
-_decode_bytes :: proc(d: Decoder, add: Add, type: Major = .Bytes, allocator := context.allocator) -> (v: Bytes, err: Decode_Error) {
+_decode_bytes :: proc(d: Decoder, add: Add, type: Major = .Bytes, allocator := context.allocator, loc := #caller_location) -> (v: Bytes, err: Decode_Error) {
 	context.allocator = allocator
 
 	add := add
 	n, scap := _decode_len_str(d, add) or_return
 	
-	buf := strings.builder_make(0, scap) or_return
+	buf := strings.builder_make(0, scap, allocator, loc) or_return
 	defer if err != nil { strings.builder_destroy(&buf) }
 	buf_stream := strings.to_stream(&buf)
 
@@ -426,40 +427,40 @@ _encode_bytes :: proc(e: Encoder, val: Bytes, major: Major = .Bytes) -> (err: En
 	return
 }
 
-_decode_text_ptr :: proc(d: Decoder, add: Add) -> (v: ^Text, err: Decode_Error) {
-	v = new(Text) or_return
+_decode_text_ptr :: proc(d: Decoder, add: Add, allocator := context.allocator, loc := #caller_location) -> (v: ^Text, err: Decode_Error) {
+	v = new(Text, allocator, loc) or_return
 	defer if err != nil { free(v) }
 
-	v^ = _decode_text(d, add) or_return
+	v^ = _decode_text(d, add, allocator, loc) or_return
 	return
 }
 
-_decode_text :: proc(d: Decoder, add: Add, allocator := context.allocator) -> (v: Text, err: Decode_Error) {
-	return (Text)(_decode_bytes(d, add, .Text, allocator) or_return), nil
+_decode_text :: proc(d: Decoder, add: Add, allocator := context.allocator, loc := #caller_location) -> (v: Text, err: Decode_Error) {
+	return (Text)(_decode_bytes(d, add, .Text, allocator, loc) or_return), nil
 }
 
 _encode_text :: proc(e: Encoder, val: Text) -> Encode_Error {
     return _encode_bytes(e, transmute([]byte)val, .Text)
 }
 
-_decode_array_ptr :: proc(d: Decoder, add: Add) -> (v: ^Array, err: Decode_Error) {
-	v = new(Array) or_return
+_decode_array_ptr :: proc(d: Decoder, add: Add, allocator := context.allocator, loc := #caller_location) -> (v: ^Array, err: Decode_Error) {
+	v = new(Array, allocator, loc) or_return
 	defer if err != nil { free(v) }
 
-	v^ = _decode_array(d, add) or_return
+	v^ = _decode_array(d, add, allocator, loc) or_return
 	return
 }
 
-_decode_array :: proc(d: Decoder, add: Add) -> (v: Array, err: Decode_Error) {
+_decode_array :: proc(d: Decoder, add: Add, allocator := context.allocator, loc := #caller_location) -> (v: Array, err: Decode_Error) {
 	n, scap := _decode_len_container(d, add) or_return
-	array := make([dynamic]Value, 0, scap) or_return
+	array := make([dynamic]Value, 0, scap, allocator, loc) or_return
 	defer if err != nil {
-		for entry in array { destroy(entry) }
-		delete(array)
+		for entry in array { destroy(entry, allocator) }
+		delete(array, loc)
 	}
 	
 	for i := 0; n == -1 || i < n; i += 1 {
-		val, verr := _decode_from_decoder(d)
+		val, verr := _decode_from_decoder(d, {}, allocator, loc)
 		if n == -1 && verr == .Break {
 			break
 		} else if verr != nil {
@@ -485,39 +486,39 @@ _encode_array :: proc(e: Encoder, arr: Array) -> Encode_Error {
     return nil
 }
 
-_decode_map_ptr :: proc(d: Decoder, add: Add) -> (v: ^Map, err: Decode_Error) {
-	v = new(Map) or_return
+_decode_map_ptr :: proc(d: Decoder, add: Add, allocator := context.allocator, loc := #caller_location) -> (v: ^Map, err: Decode_Error) {
+	v = new(Map, allocator, loc) or_return
 	defer if err != nil { free(v) }
 
-	v^ = _decode_map(d, add) or_return
+	v^ = _decode_map(d, add, allocator, loc) or_return
 	return
 }
 
-_decode_map :: proc(d: Decoder, add: Add) -> (v: Map, err: Decode_Error) {
+_decode_map :: proc(d: Decoder, add: Add, allocator := context.allocator, loc := #caller_location) -> (v: Map, err: Decode_Error) {
 	n, scap := _decode_len_container(d, add) or_return
-	items := make([dynamic]Map_Entry, 0, scap) or_return
+	items := make([dynamic]Map_Entry, 0, scap, allocator, loc) or_return
 	defer if err != nil { 
 		for entry in items {
 			destroy(entry.key)
 			destroy(entry.value)
 		}
-		delete(items)
+		delete(items, loc)
 	}
 
 	for i := 0; n == -1 || i < n; i += 1 {
-		key, kerr := _decode_from_decoder(d)
+		key, kerr := _decode_from_decoder(d, {}, allocator, loc)
 		if n == -1 && kerr == .Break {
 			break
 		} else if kerr != nil {
 			return nil, kerr
 		} 
 
-		value := _decode_from_decoder(d) or_return
+		value := _decode_from_decoder(d, {}, allocator, loc) or_return
 
 		append(&items, Map_Entry{
 			key   = key,
 			value = value,
-		}) or_return
+		}, loc) or_return
 	}
 
 	if .Shrink_Excess in d.flags { shrink(&items) }
@@ -578,20 +579,20 @@ _encode_map :: proc(e: Encoder, m: Map) -> (err: Encode_Error) {
     return nil
 }
 
-_decode_tag_ptr :: proc(d: Decoder, add: Add) -> (v: Value, err: Decode_Error) {
-	tag := _decode_tag(d, add) or_return
+_decode_tag_ptr :: proc(d: Decoder, add: Add, allocator := context.allocator, loc := #caller_location) -> (v: Value, err: Decode_Error) {
+	tag := _decode_tag(d, add, allocator, loc) or_return
 	if t, ok := tag.?; ok {
 		defer if err != nil { destroy(t.value) }
-		tp := new(Tag) or_return
+		tp := new(Tag, allocator, loc) or_return
 		tp^ = t
 		return tp, nil
 	}
 
 	// no error, no tag, this was the self described CBOR tag, skip it.
-	return _decode_from_decoder(d)
+	return _decode_from_decoder(d, {}, allocator, loc)
 }
 
-_decode_tag :: proc(d: Decoder, add: Add) -> (v: Maybe(Tag), err: Decode_Error) {
+_decode_tag :: proc(d: Decoder, add: Add, allocator := context.allocator, loc := #caller_location) -> (v: Maybe(Tag), err: Decode_Error) {
 	num := _decode_uint_as_u64(d.reader, add) or_return
 
 	// CBOR can be wrapped in a tag that decoders can use to see/check if the binary data is CBOR.
@@ -602,7 +603,7 @@ _decode_tag :: proc(d: Decoder, add: Add) -> (v: Maybe(Tag), err: Decode_Error) 
 
 	t := Tag{
 		number = num,
-		value = _decode_from_decoder(d) or_return,
+		value = _decode_from_decoder(d, {}, allocator, loc) or_return,
 	}
 
 	if nested, ok := t.value.(^Tag); ok {

@@ -11,24 +11,21 @@ Read_Error :: enum {
 	Unable_To_Read_File,
 }
 
-read_from_file :: proc(filename: string, print_error := false, allocator := context.allocator) -> (file: File, err: Read_Error) {
+read_from_file :: proc(filename: string, print_error := false, allocator := context.allocator, loc := #caller_location) -> (file: File, err: Read_Error) {
 	context.allocator = allocator
 
-	data, ok := os.read_entire_file(filename)
+	data, ok := os.read_entire_file(filename, allocator, loc)
 	if !ok {
 		err = .Unable_To_Read_File
+		delete(data, allocator, loc)
 		return
 	}
-	defer if !ok {
-		delete(data)
-	} else {
-		file.backing = data
-	}
-	file, err = read(data, filename, print_error, allocator)
+	file, err = read(data, filename, print_error, allocator, loc)
+	file.backing   = data
 	return
 }
 
-read :: proc(data: []byte, filename := "<input>", print_error := false, allocator := context.allocator) -> (file: File, err: Read_Error) {
+read :: proc(data: []byte, filename := "<input>", print_error := false, allocator := context.allocator, loc := #caller_location) -> (file: File, err: Read_Error) {
 	Reader :: struct {
 		filename:    string,
 		data:        []byte,
@@ -79,8 +76,8 @@ read :: proc(data: []byte, filename := "<input>", print_error := false, allocato
 		return string(data[:len]), nil
 	}
 
-	read_meta :: proc(r: ^Reader, capacity: u32le) -> (meta_data: []Meta, err: Read_Error) {
-		meta_data = make([]Meta, int(capacity))
+	read_meta :: proc(r: ^Reader, capacity: u32le, allocator := context.allocator, loc := #caller_location) -> (meta_data: []Meta, err: Read_Error) {
+		meta_data = make([]Meta, int(capacity), allocator=allocator)
 		count := 0
 		defer meta_data = meta_data[:count]
 		for &m in meta_data {
@@ -111,10 +108,10 @@ read :: proc(data: []byte, filename := "<input>", print_error := false, allocato
 		return
 	}
 
-	read_layer_stack :: proc(r: ^Reader, capacity: u32le) -> (layers: Layer_Stack, err: Read_Error) {
+	read_layer_stack :: proc(r: ^Reader, capacity: u32le, allocator := context.allocator, loc := #caller_location) -> (layers: Layer_Stack, err: Read_Error) {
 		stack_count := read_value(r, u32le) or_return
 		layer_count := 0
-		layers = make(Layer_Stack, stack_count)
+		layers = make(Layer_Stack, stack_count, allocator=allocator, loc=loc)
 		defer layers = layers[:layer_count]
 		for &layer in layers {
 			layer.name = read_name(r) or_return
@@ -170,7 +167,8 @@ read :: proc(data: []byte, filename := "<input>", print_error := false, allocato
 
 	node_count := 0
 	file.header = header^
-	file.nodes = make([]Node, header.internal_node_count)
+	file.nodes = make([]Node, header.internal_node_count, allocator=allocator, loc=loc)
+	file.allocator = allocator
 	defer if err != nil {
 		nodes_destroy(file.nodes)
 		file.nodes = nil
@@ -198,15 +196,15 @@ read :: proc(data: []byte, filename := "<input>", print_error := false, allocato
 		case .Geometry:
 			g: Node_Geometry
 
-			g.vertex_count      = read_value(r, u32le)                     or_return
-			g.vertex_stack      = read_layer_stack(r, g.vertex_count)      or_return
-			g.edge_corner_count = read_value(r, u32le)                     or_return
-			g.corner_stack      = read_layer_stack(r, g.edge_corner_count) or_return
+			g.vertex_count      = read_value(r, u32le)                               or_return
+			g.vertex_stack      = read_layer_stack(r, g.vertex_count, loc=loc)       or_return
+			g.edge_corner_count = read_value(r, u32le)                               or_return
+			g.corner_stack      = read_layer_stack(r, g.edge_corner_count, loc=loc)  or_return
 			if header.version > 2 {
-				g.edge_stack = read_layer_stack(r, g.edge_corner_count) or_return
+				g.edge_stack = read_layer_stack(r, g.edge_corner_count, loc=loc) or_return
 			}
-			g.face_count = read_value(r, u32le)              or_return
-			g.face_stack = read_layer_stack(r, g.face_count) or_return
+			g.face_count = read_value(r, u32le)                       or_return
+			g.face_stack = read_layer_stack(r, g.face_count, loc=loc) or_return
 
 			node.content = g
 

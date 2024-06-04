@@ -2,30 +2,17 @@ package test_core_crypto
 
 import "base:runtime"
 import "core:encoding/hex"
-import "core:fmt"
 import "core:mem"
 import "core:testing"
-
 import "core:crypto/hash"
 import "core:crypto/hmac"
 import "core:crypto/poly1305"
 import "core:crypto/siphash"
 
-import tc "tests:common"
-
-@(test)
-test_mac :: proc(t: ^testing.T) {
-	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
-
-	tc.log(t, "Testing MACs")
-
-	test_hmac(t)
-	test_poly1305(t)
-	test_siphash_2_4(t)
-}
-
 @(test)
 test_hmac :: proc(t: ^testing.T) {
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
+
 	// Test cases pulled out of RFC 6234, note that HMAC is a generic
 	// construct so as long as the underlying hash is correct and all
 	// the code paths are covered the implementation is "fine", so
@@ -86,40 +73,36 @@ test_hmac :: proc(t: ^testing.T) {
 		msg_str := string(hex.encode(msg, context.temp_allocator))
 		dst_str := string(hex.encode(dst[:tag_len], context.temp_allocator))
 
-		tc.expect(
+		testing.expectf(
 			t,
 			dst_str == expected_str,
-			fmt.tprintf(
-				"%s/incremental: Expected: %s for input of %s - %s, but got %s instead",
-				algo_name,
-				tags_sha256[i],
-				key_str,
-				msg_str,
-				dst_str,
-			),
+			"%s/incremental: Expected: %s for input of %s - %s, but got %s instead",
+			algo_name,
+			tags_sha256[i],
+			key_str,
+			msg_str,
+			dst_str,
 		)
 
 		hmac.sum(algo, dst, msg, key)
 		oneshot_str := string(hex.encode(dst[:tag_len], context.temp_allocator))
 
-		tc.expect(
+		testing.expectf(
 			t,
 			oneshot_str == expected_str,
-			fmt.tprintf(
-				"%s/oneshot: Expected: %s for input of %s - %s, but got %s instead",
-				algo_name,
-				tags_sha256[i],
-				key_str,
-				msg_str,
-				oneshot_str,
-			),
+			"%s/oneshot: Expected: %s for input of %s - %s, but got %s instead",
+			algo_name,
+			tags_sha256[i],
+			key_str,
+			msg_str,
+			oneshot_str,
 		)
 	}
 }
 
 @(test)
 test_poly1305 :: proc(t: ^testing.T) {
-	tc.log(t, "Testing poly1305")
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 
 	// Test cases taken from poly1305-donna.
 	key := [poly1305.KEY_SIZE]byte {
@@ -157,16 +140,17 @@ test_poly1305 :: proc(t: ^testing.T) {
 
 	// Verify - oneshot + compare
 	ok := poly1305.verify(tag[:], msg[:], key[:])
-	tc.expect(t, ok, "oneshot verify call failed")
+	testing.expect(t, ok, "oneshot verify call failed")
 
 	// Sum - oneshot
 	derived_tag: [poly1305.TAG_SIZE]byte
 	poly1305.sum(derived_tag[:], msg[:], key[:])
 	derived_tag_str := string(hex.encode(derived_tag[:], context.temp_allocator))
-	tc.expect(
+	testing.expectf(
 		t,
 		derived_tag_str == tag_str,
-		fmt.tprintf("Expected %s for sum(msg, key), but got %s instead", tag_str, derived_tag_str),
+		"Expected %s for sum(msg, key), but got %s instead",
+		tag_str, derived_tag_str,
 	)
 
 	// Incremental
@@ -182,21 +166,16 @@ test_poly1305 :: proc(t: ^testing.T) {
 	}
 	poly1305.final(&ctx, derived_tag[:])
 	derived_tag_str = string(hex.encode(derived_tag[:], context.temp_allocator))
-	tc.expect(
+	testing.expectf(
 		t,
 		derived_tag_str == tag_str,
-		fmt.tprintf(
-			"Expected %s for init/update/final - incremental, but got %s instead",
-			tag_str,
-			derived_tag_str,
-		),
+		"Expected %s for init/update/final - incremental, but got %s instead",
+		tag_str, derived_tag_str,
 	)
 }
 
 @(test)
 test_siphash_2_4 :: proc(t: ^testing.T) {
-	tc.log(t, "Testing SipHash-2-4")
-
 	// Test vectors from
 	// https://github.com/veorq/SipHash/blob/master/vectors.h
 	test_vectors := [?]u64 {
@@ -225,6 +204,7 @@ test_siphash_2_4 :: proc(t: ^testing.T) {
 
 	for i in 0 ..< len(test_vectors) {
 		data := make([]byte, i)
+		defer delete(data)
 		for j in 0 ..< i {
 			data[j] = byte(j)
 		}
@@ -232,15 +212,13 @@ test_siphash_2_4 :: proc(t: ^testing.T) {
 		vector := test_vectors[i]
 		computed := siphash.sum_2_4(data[:], key[:])
 
-		tc.expect(
+		testing.expectf(
 			t,
 			computed == vector,
-			fmt.tprintf(
-				"Expected: 0x%x for input of %v, but got 0x%x instead",
-				vector,
-				data,
-				computed,
-			),
+			"Expected: 0x%x for input of %v, but got 0x%x instead",
+			vector,
+			data,
+			computed,
 		)
 	}
 }

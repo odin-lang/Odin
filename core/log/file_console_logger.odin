@@ -1,6 +1,7 @@
 //+build !freestanding
 package log
 
+import "core:encoding/ansi"
 import "core:fmt"
 import "core:strings"
 import "core:os"
@@ -70,18 +71,10 @@ file_console_logger_proc :: proc(logger_data: rawptr, level: Level, text: string
 	backing: [1024]byte //NOTE(Hoej): 1024 might be too much for a header backing, unless somebody has really long paths.
 	buf := strings.builder_from_bytes(backing[:])
 
-	do_level_header(options, level, &buf)
+	do_level_header(options, &buf, level)
 
 	when time.IS_SUPPORTED {
-		if Full_Timestamp_Opts & options != nil {
-			fmt.sbprint(&buf, "[")
-			t := time.now()
-			y, m, d := time.date(t)
-			h, min, s := time.clock(t)
-			if .Date in options { fmt.sbprintf(&buf, "%d-%02d-%02d ", y, m, d)    }
-			if .Time in options { fmt.sbprintf(&buf, "%02d:%02d:%02d", h, min, s) }
-			fmt.sbprint(&buf, "] ")
-		}
+		do_time_header(options, &buf, time.now())
 	}
 
 	do_location_header(options, &buf, location)
@@ -99,12 +92,12 @@ file_console_logger_proc :: proc(logger_data: rawptr, level: Level, text: string
 	fmt.fprintf(h, "%s%s\n", strings.to_string(buf), text)
 }
 
-do_level_header :: proc(opts: Options, level: Level, str: ^strings.Builder) {
+do_level_header :: proc(opts: Options, str: ^strings.Builder, level: Level) {
 
-	RESET     :: "\x1b[0m"
-	RED       :: "\x1b[31m"
-	YELLOW    :: "\x1b[33m"
-	DARK_GREY :: "\x1b[90m"
+	RESET     :: ansi.CSI + ansi.RESET           + ansi.SGR
+	RED       :: ansi.CSI + ansi.FG_RED          + ansi.SGR
+	YELLOW    :: ansi.CSI + ansi.FG_YELLOW       + ansi.SGR
+	DARK_GREY :: ansi.CSI + ansi.FG_BRIGHT_BLACK + ansi.SGR
 
 	col := RESET
 	switch level {
@@ -121,6 +114,24 @@ do_level_header :: proc(opts: Options, level: Level, str: ^strings.Builder) {
 		fmt.sbprint(str, Level_Headers[level])
 		if .Terminal_Color in opts {
 			fmt.sbprint(str, RESET)
+		}
+	}
+}
+
+do_time_header :: proc(opts: Options, buf: ^strings.Builder, t: time.Time) {
+	when time.IS_SUPPORTED {
+		if Full_Timestamp_Opts & opts != nil {
+			fmt.sbprint(buf, "[")
+			y, m, d := time.date(t)
+			h, min, s := time.clock(t)
+			if .Date in opts {
+				fmt.sbprintf(buf, "%d-%02d-%02d", y, m, d)
+				if .Time in opts {
+					fmt.sbprint(buf, " ")
+				}
+			}
+			if .Time in opts { fmt.sbprintf(buf, "%02d:%02d:%02d", h, min, s) }
+			fmt.sbprint(buf, "] ")
 		}
 	}
 }
