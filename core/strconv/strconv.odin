@@ -835,17 +835,21 @@ Example:
 
 		n, _, ok = strconv.parse_f64_prefix("12.34e2")
 		fmt.printfln("%.3f %v", n, ok)
+
+		n, _, ok = strconv.parse_f64_prefix("13.37 hellope")
+		fmt.printfln("%.3f %v", n, ok)
 	}
 
 Output:
 
 	0.000 false
 	1234.000 true
+	13.370 true
 
 **Returns**  
 - value: The parsed 64-bit floating point number.
 - nr: The length of the parsed substring.
-- ok: `false` if a base 10 float could not be found, or if the input string contained more than just the number.
+- ok: `false` if a base 10 float could not be found
 */
 parse_f64_prefix :: proc(str: string) -> (value: f64, nr: int, ok: bool) {
 	common_prefix_len_ignore_case :: proc "contextless" (s, prefix: string) -> int {
