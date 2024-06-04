@@ -7408,6 +7408,7 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 		String name = bd->name.string;
 		if (
 		    name == "location" || 
+		    name == "exists" ||
 		    name == "assert" || 
 		    name == "panic" || 
 		    name == "defined" || 

@@ -336,7 +336,16 @@ struct ObjcMsgData {
 	ObjcMsgKind kind;
 	Type *proc_type;
 };
+
+enum LoadFileTier {
+	LoadFileTier_Invalid,
+	LoadFileTier_Exists,
+	LoadFileTier_Contents,
+};
+
 struct LoadFileCache {
+	LoadFileTier   tier;
+	bool           exists;
 	String         path;
 	gbFileError    file_error;
 	String         data;
