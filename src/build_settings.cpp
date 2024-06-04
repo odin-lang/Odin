@@ -696,6 +696,12 @@ enum TimingsExportFormat : i32 {
 	TimingsExportCSV         = 2,
 };
 
+enum DependenciesExportFormat : i32 {
+	DependenciesExportUnspecified = 0,
+	DependenciesExportMake        = 1,
+	DependenciesExportJson        = 2,
+};
+
 enum ErrorPosStyle {
 	ErrorPosStyle_Default, // path(line:column) msg
 	ErrorPosStyle_Unix,    // path:line:column: msg
@@ -833,6 +839,8 @@ struct BuildContext {
 	bool   show_timings;
 	TimingsExportFormat export_timings_format;
 	String export_timings_file;
+	DependenciesExportFormat export_dependencies_format;
+	String export_dependencies_file;
 	bool   show_unused;
 	bool   show_unused_with_location;
 	bool   show_more_timings;

@@ -234,6 +234,8 @@ enum BuildFlagKind {
 	BuildFlag_ShowMoreTimings,
 	BuildFlag_ExportTimings,
 	BuildFlag_ExportTimingsFile,
+	BuildFlag_ExportDependencies,
+	BuildFlag_ExportDependenciesFile,
 	BuildFlag_ShowSystemCalls,
 	BuildFlag_ThreadCount,
 	BuildFlag_KeepTempFiles,
@@ -317,7 +319,6 @@ enum BuildFlagKind {
 	BuildFlag_WindowsPdbName,
 	BuildFlag_Subsystem,
 #endif
-
 
 	BuildFlag_COUNT,
 };
@@ -425,6 +426,8 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_ShowMoreTimings,         str_lit("show-more-timings"),         BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_ExportTimings,           str_lit("export-timings"),            BuildFlagParam_String,  Command__does_check);
 	add_flag(&build_flags, BuildFlag_ExportTimingsFile,       str_lit("export-timings-file"),       BuildFlagParam_String,  Command__does_check);
+	add_flag(&build_flags, BuildFlag_ExportDependencies,      str_lit("export-dependencies"),       BuildFlagParam_String,  Command__does_build);
+	add_flag(&build_flags, BuildFlag_ExportDependenciesFile,  str_lit("export-dependencies-file"),  BuildFlagParam_String,  Command__does_build);
 	add_flag(&build_flags, BuildFlag_ShowUnused,              str_lit("show-unused"),               BuildFlagParam_None,    Command_check);
 	add_flag(&build_flags, BuildFlag_ShowUnusedWithLocation,  str_lit("show-unused-with-location"), BuildFlagParam_None,    Command_check);
 	add_flag(&build_flags, BuildFlag_ShowSystemCalls,         str_lit("show-system-calls"),         BuildFlagParam_None,    Command_all);
@@ -744,6 +747,36 @@ gb_internal bool parse_build_flags(Array<String> args) {
 								build_context.export_timings_file = path_to_full_path(heap_allocator(), export_path);
 							} else {
 								gb_printf_err("Invalid -export-timings-file path, got %.*s\n", LIT(export_path));
+								bad_flags = true;
+							}
+
+							break;
+						}
+						case BuildFlag_ExportDependencies: {
+							GB_ASSERT(value.kind == ExactValue_String);
+
+							if (value.value_string == "make") {
+								build_context.export_dependencies_format = DependenciesExportMake;
+							} else if (value.value_string == "json") {
+								build_context.export_dependencies_format = DependenciesExportJson;
+							} else {
+								gb_printf_err("Invalid export format for -export-dependencies:<string>, got %.*s\n", LIT(value.value_string));
+								gb_printf_err("Valid export formats:\n");
+								gb_printf_err("\tmake\n");
+								gb_printf_err("\tjson\n");
+								bad_flags = true;
+							}
+
+							break;	
+						}
+						case BuildFlag_ExportDependenciesFile: {
+							GB_ASSERT(value.kind == ExactValue_String);
+
+							String export_path = string_trim_whitespace(value.value_string);
+							if (is_build_flag_path_valid(export_path)) {
+								build_context.export_dependencies_file = path_to_full_path(heap_allocator(), export_path);
+							} else {
+								gb_printf_err("Invalid -export-dependencies path, got %.*s\n", LIT(export_path));
 								bad_flags = true;
 							}
 
@@ -1616,6 +1649,74 @@ gb_internal void show_timings(Checker *c, Timings *t) {
 	}
 }
 
+gb_internal void export_dependencies(Parser *p) {
+	GB_ASSERT(build_context.export_dependencies_format != DependenciesExportUnspecified);
+
+	if (build_context.export_dependencies_file.len <= 0) {
+		gb_printf_err("No dependency file specified with `-export-dependencies-file`\n");
+		exit_with_errors();
+		return;
+	}
+
+	gbFile f = {};
+	char * fileName = (char *)build_context.export_dependencies_file.text;
+	gbFileError err = gb_file_open_mode(&f, gbFileMode_Write, fileName);
+	if (err != gbFileError_None) {
+		gb_printf_err("Failed to export dependencies to: %s\n", fileName);
+		exit_with_errors();
+		return;
+	}
+	defer (gb_file_close(&f));
+
+	if (build_context.export_dependencies_format == DependenciesExportMake) {
+		String exe_name = path_to_string(heap_allocator(), build_context.build_paths[BuildPath_Output]);
+		defer (gb_free(heap_allocator(), exe_name.text));
+
+		gb_fprintf(&f, "%.*s:", LIT(exe_name));
+
+		isize current_line_length = exe_name.len + 1;
+
+		for(AstPackage *pkg : p->packages) {
+			for(AstFile *file : pkg->files) {
+				/* Arbitrary line break value. Maybe make this better? */
+				if (current_line_length >= 80-2) {
+					gb_file_write(&f, " \\\n ", 4);
+					current_line_length = 1;
+				}
+
+				gb_file_write(&f, " ", 1);
+				current_line_length++;
+
+				for (isize k = 0; k < file->fullpath.len; k++) {
+					char part = file->fullpath.text[k];
+					if (part == ' ') {
+						gb_file_write(&f, "\\", 1);
+						current_line_length++;
+					}
+					gb_file_write(&f, &part, 1);
+					current_line_length++;
+				}
+			}
+		}
+
+		gb_fprintf(&f, "\n");
+	} else if (build_context.export_dependencies_format == DependenciesExportJson) {
+		gb_fprintf(&f, "{\n");
+
+		gb_fprintf(&f, "\t\"source_files\": [\n");
+
+		for(AstPackage *pkg : p->packages) {
+			for(AstFile *file : pkg->files) {
+				gb_fprintf(&f, "\t\t\"%.*s\",\n", LIT(file->fullpath));
+			}
+		}
+
+		gb_fprintf(&f, "\t],\n");
+
+		gb_fprintf(&f, "}\n");
+	}
+}
+
 gb_internal void remove_temp_files(lbGenerator *gen) {
 	if (build_context.keep_temp_files) return;
 
@@ -1769,6 +1870,18 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 		print_usage_line(1, "-export-timings-file:<filename>");
 		print_usage_line(2, "Specifies the filename for `-export-timings`.");
 		print_usage_line(2, "Example: -export-timings-file:timings.json");
+		print_usage_line(0, "");
+
+		print_usage_line(1, "-export-dependencies:<format>");
+		print_usage_line(2, "Exports dependencies to one of a few formats. Requires `-export-dependencies-file`.");
+		print_usage_line(2, "Available options:");
+		print_usage_line(3, "-export-dependencies:make   Exports in Makefile format");
+		print_usage_line(3, "-export-dependencies:json   Exports in JSON format");
+		print_usage_line(0, "");
+
+		print_usage_line(1, "-export-dependencies-file:<filename>");
+		print_usage_line(2, "Specifies the filename for `-export-dependencies`.");
+		print_usage_line(2, "Example: -export-dependencies-file:dependencies.d");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-thread-count:<integer>");
@@ -2861,6 +2974,10 @@ int main(int arg_count, char const **arg_ptr) {
 				if (build_context.show_timings) {
 					show_timings(checker, &global_timings);
 				}
+
+				if (build_context.export_dependencies_format != DependenciesExportUnspecified) {
+					export_dependencies(parser);
+				}
 				return result;
 			}
 			break;
@@ -2883,6 +3000,10 @@ int main(int arg_count, char const **arg_ptr) {
 					if (build_context.show_timings) {
 						show_timings(checker, &global_timings);
 					}
+
+					if (build_context.export_dependencies_format != DependenciesExportUnspecified) {
+						export_dependencies(parser);
+					}
 					return result;
 				}
 				break;
@@ -2894,6 +3015,10 @@ int main(int arg_count, char const **arg_ptr) {
 
 	if (build_context.show_timings) {
 		show_timings(checker, &global_timings);
+	}
+
+	if (build_context.export_dependencies_format != DependenciesExportUnspecified) {
+		export_dependencies(parser);
 	}
 
 	if (run_output) {
