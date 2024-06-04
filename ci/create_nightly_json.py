@@ -13,7 +13,8 @@ def main():
     for x in files_lines:
         parts = x.split(" ", 1)
         if parts[0]:
-            json_str = execute_cli(f"b2 file info {parts[0]}")
+            print(f"Parts[0]: {parts[0]}", flush=True)
+            json_str = execute_cli(f"b2 file info b2://{bucket}/{parts[0]}")
             data = json.loads(json_str)
             name = remove_prefix(data['fileName'], "nightly/")
             url = f"https://f001.backblazeb2.com/file/{bucket}/nightly/{urllib.parse.quote_plus(name)}"
