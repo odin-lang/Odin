@@ -174,7 +174,7 @@ foreign ws2_32 {
 	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-shutdown)
 	shutdown :: proc(socket: SOCKET, how: c_int) -> c_int ---
 	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-accept)
-	accept :: proc(socket: SOCKET, address: ^SOCKADDR_STORAGE_LH, address_len: ^c_int) -> SOCKET ---
+	accept :: proc(socket: SOCKET, address: ^sockaddr, address_len: ^c_int) -> SOCKET ---
 
 	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-setsockopt)
 	setsockopt :: proc(
@@ -185,15 +185,15 @@ foreign ws2_32 {
 		optlen: c_int,
 	) -> c_int ---
 	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-getsockname)
-	getsockname :: proc(socket: SOCKET, address: ^SOCKADDR_STORAGE_LH, address_len: ^c_int) -> c_int ---
+	getsockname :: proc(socket: SOCKET, address: ^sockaddr, address_len: ^c_int) -> c_int ---
 	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-getpeername)
-	getpeername :: proc(socket: SOCKET, address: ^SOCKADDR_STORAGE_LH, address_len: ^c_int) -> c_int ---
+	getpeername :: proc(socket: SOCKET, address: ^sockaddr, address_len: ^c_int) -> c_int ---
 	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-bind)
-	bind :: proc(socket: SOCKET, address: ^SOCKADDR_STORAGE_LH, address_len: socklen_t) -> c_int ---
+	bind :: proc(socket: SOCKET, address: ^sockaddr, address_len: socklen_t) -> c_int ---
 	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-listen)
 	listen :: proc(socket: SOCKET, backlog: c_int) -> c_int ---
 	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-connect)
-	connect :: proc(socket: SOCKET, address: ^SOCKADDR_STORAGE_LH, len: c_int) -> c_int ---
+	connect :: proc(socket: SOCKET, address: ^sockaddr, len: c_int) -> c_int ---
 	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/ws2tcpip/nf-ws2tcpip-getaddrinfo)
 	getaddrinfo :: proc(
 		node: cstring,
@@ -243,4 +243,8 @@ foreign ws2_32 {
 	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-htons)
 	@(deprecated="Use endian specific integers instead, https://odin-lang.org/docs/overview/#basic-types")
 	htons :: proc(hostshort: c_ushort) -> c_ushort ---
+	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/ws2tcpip/nf-ws2tcpip-inet_pton)
+	inet_pton :: proc(Family: INT, pszAddrString: PCSTR, pAddrBuf: PVOID) -> INT ---
+	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/ws2tcpip/nf-ws2tcpip-inet_ntop)
+	inet_ntop :: proc(Family: INT, pAddr: PVOID, pStringBuf: PSTR, StringBufSize: uint) -> PCSTR ---
 }

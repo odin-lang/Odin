@@ -110,6 +110,7 @@ LPCSTR :: cstring
 LPCWSTR :: wstring
 LPCTSTR :: wstring
 LPDWORD :: ^DWORD
+PSTR :: [^]CHAR
 PCSTR :: cstring
 PCWSTR :: wstring
 PDWORD :: ^DWORD
@@ -4153,7 +4154,7 @@ sockaddr_in6 :: struct {
 }
 
 in_addr :: struct {
-	s_addr: u32,
+	s_addr: u32be,
 }
 
 in6_addr :: struct {
