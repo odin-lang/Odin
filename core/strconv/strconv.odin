@@ -1124,6 +1124,275 @@ parse_f64_prefix :: proc(str: string) -> (value: f64, nr: int, ok: bool) {
 	ok = !overflow
 	return
 }
+/*
+Parses a 128-bit complex number from a string
+
+**Inputs**  
+- str: The input string containing a 128-bit complex number.
+- n: An optional pointer to an int to store the length of the parsed substring (default: nil).
+
+Example:
+
+	import "core:fmt"
+	import "core:strconv"
+	parse_complex128_example :: proc() {
+		n: int
+		c, ok := strconv.parse_complex128("3+1i", &n)
+		fmt.printfln("%v %i %t", c, n, ok)
+
+		c, ok = strconv.parse_complex128("5+7i hellope", &n)
+		fmt.printfln("%v %i %t", c, n, ok)
+	}
+	
+Output:
+
+	3+1i 4 true
+	5+7i 4 false
+	
+**Returns**  
+- value: The parsed 128-bit complex number.
+- ok: `false` if a complex number could not be found, or if the input string contained more than just the number.
+*/
+parse_complex128 :: proc(str: string, n: ^int = nil) -> (value: complex128, ok: bool) {
+	real_value, imag_value: f64
+	nr_r, nr_i: int
+
+	real_value, nr_r, _ = parse_f64_prefix(str)
+	imag_value, nr_i, _ = parse_f64_prefix(str[nr_r:])
+
+	i_parsed := len(str) >= nr_r + nr_i + 1 && str[nr_r + nr_i] == 'i'
+	if !i_parsed {
+		// No `i` means we refuse to treat the second float we parsed as an
+		// imaginary value.
+		imag_value = 0
+		nr_i = 0
+	}
+
+	ok = i_parsed && len(str) == nr_r + nr_i + 1
+
+	if n != nil {
+		n^ = nr_r + nr_i + (1 if i_parsed else 0)
+	}
+
+	value = complex(real_value, imag_value)
+	return 
+}
+/*
+Parses a 64-bit complex number from a string
+
+**Inputs**  
+- str: The input string containing a 64-bit complex number.
+- n: An optional pointer to an int to store the length of the parsed substring (default: nil).
+
+Example:
+
+	import "core:fmt"
+	import "core:strconv"
+	parse_complex64_example :: proc() {
+		n: int
+		c, ok := strconv.parse_complex64("3+1i", &n)
+		fmt.printfln("%v %i %t", c, n, ok)
+
+		c, ok = strconv.parse_complex64("5+7i hellope", &n)
+		fmt.printfln("%v %i %t", c, n, ok)
+	}
+	
+Output:
+
+	3+1i 4 true
+	5+7i 4 false
+	
+**Returns**  
+- value: The parsed 64-bit complex number.
+- ok: `false` if a complex number could not be found, or if the input string contained more than just the number.
+*/
+parse_complex64 :: proc(str: string, n: ^int = nil) -> (value: complex64, ok: bool) {
+	v: complex128 = ---
+	v, ok = parse_complex128(str, n)
+	return cast(complex64)v, ok
+}
+/*
+Parses a 32-bit complex number from a string
+
+**Inputs**  
+- str: The input string containing a 32-bit complex number.
+- n: An optional pointer to an int to store the length of the parsed substring (default: nil).
+
+Example:
+
+	import "core:fmt"
+	import "core:strconv"
+	parse_complex32_example :: proc() {
+		n: int
+		c, ok := strconv.parse_complex32("3+1i", &n)
+		fmt.printfln("%v %i %t", c, n, ok)
+
+		c, ok = strconv.parse_complex32("5+7i hellope", &n)
+		fmt.printfln("%v %i %t", c, n, ok)
+	}
+	
+Output:
+
+	3+1i 4 true
+	5+7i 4 false
+	
+**Returns**  
+- value: The parsed 32-bit complex number.
+- ok: `false` if a complex number could not be found, or if the input string contained more than just the number.
+*/
+parse_complex32 :: proc(str: string, n: ^int = nil) -> (value: complex32, ok: bool) {
+	v: complex128 = ---
+	v, ok = parse_complex128(str, n)
+	return cast(complex32)v, ok
+}
+/*
+Parses a 256-bit quaternion from a string
+
+**Inputs**  
+- str: The input string containing a 256-bit quaternion.
+- n: An optional pointer to an int to store the length of the parsed substring (default: nil).
+
+Example:
+
+	import "core:fmt"
+	import "core:strconv"
+	parse_quaternion256_example :: proc() {
+		n: int
+		q, ok := strconv.parse_quaternion256("1+2i+3j+4k", &n)
+		fmt.printfln("%v %i %t", q, n, ok)
+
+		q, ok = strconv.parse_quaternion256("1+2i+3j+4k hellope", &n)
+		fmt.printfln("%v %i %t", q, n, ok)
+	}
+	
+Output:
+
+	1+2i+3j+4k 10 true
+	1+2i+3j+4k 10 false
+	
+**Returns**  
+- value: The parsed 256-bit quaternion.
+- ok: `false` if a quaternion could not be found, or if the input string contained more than just the quaternion.
+*/
+parse_quaternion256 :: proc(str: string, n: ^int = nil) -> (value: quaternion256, ok: bool) {
+	iterate_and_assign :: proc (iter: ^string, terminator: byte, nr_total: ^int, state: bool) -> (value: f64, ok: bool) {
+		if !state {
+			return
+		}
+
+		nr: int
+		value, nr, _ = parse_f64_prefix(iter^)
+		iter^ = iter[nr:]
+
+		if len(iter) > 0 && iter[0] == terminator {
+			iter^ = iter[1:]
+			nr_total^ += nr + 1
+			ok = true
+		} else {
+			value = 0
+		}
+
+		return
+	}
+
+	real_value, imag_value, jmag_value, kmag_value: f64
+	nr: int
+
+	real_value, nr, _ = parse_f64_prefix(str)
+	iter := str[nr:]
+
+	// Need to have parsed at least something in order to get started.
+	ok = nr > 0
+
+	// Quaternion parsing is done this way to honour the rest of the API with
+	// regards to partial parsing. Otherwise, we could error out early.
+	imag_value, ok = iterate_and_assign(&iter, 'i', &nr, ok)
+	jmag_value, ok = iterate_and_assign(&iter, 'j', &nr, ok)
+	kmag_value, ok = iterate_and_assign(&iter, 'k', &nr, ok)
+
+	if len(iter) != 0 {
+		ok = false
+	}
+
+	if n != nil {
+		n^ = nr
+	}
+
+	value = quaternion(
+		real = real_value,
+		imag = imag_value,
+		jmag = jmag_value,
+		kmag = kmag_value)
+	return
+}
+/*
+Parses a 128-bit quaternion from a string
+
+**Inputs**  
+- str: The input string containing a 128-bit quaternion.
+- n: An optional pointer to an int to store the length of the parsed substring (default: nil).
+
+Example:
+
+	import "core:fmt"
+	import "core:strconv"
+	parse_quaternion128_example :: proc() {
+		n: int
+		q, ok := strconv.parse_quaternion128("1+2i+3j+4k", &n)
+		fmt.printfln("%v %i %t", q, n, ok)
+
+		q, ok = strconv.parse_quaternion128("1+2i+3j+4k hellope", &n)
+		fmt.printfln("%v %i %t", q, n, ok)
+	}
+	
+Output:
+
+	1+2i+3j+4k 10 true
+	1+2i+3j+4k 10 false
+	
+**Returns**  
+- value: The parsed 128-bit quaternion.
+- ok: `false` if a quaternion could not be found, or if the input string contained more than just the quaternion.
+*/
+parse_quaternion128 :: proc(str: string, n: ^int = nil) -> (value: quaternion128, ok: bool) {
+	v: quaternion256 = ---
+	v, ok = parse_quaternion256(str, n)
+	return cast(quaternion128)v, ok
+}
+/*
+Parses a 64-bit quaternion from a string
+
+**Inputs**  
+- str: The input string containing a 64-bit quaternion.
+- n: An optional pointer to an int to store the length of the parsed substring (default: nil).
+
+Example:
+
+	import "core:fmt"
+	import "core:strconv"
+	parse_quaternion64_example :: proc() {
+		n: int
+		q, ok := strconv.parse_quaternion64("1+2i+3j+4k", &n)
+		fmt.printfln("%v %i %t", q, n, ok)
+
+		q, ok = strconv.parse_quaternion64("1+2i+3j+4k hellope", &n)
+		fmt.printfln("%v %i %t", q, n, ok)
+	}
+	
+Output:
+
+	1+2i+3j+4k 10 true
+	1+2i+3j+4k 10 false
+	
+**Returns**  
+- value: The parsed 64-bit quaternion.
+- ok: `false` if a quaternion could not be found, or if the input string contained more than just the quaternion.
+*/
+parse_quaternion64 :: proc(str: string, n: ^int = nil) -> (value: quaternion64, ok: bool) {
+	v: quaternion256 = ---
+	v, ok = parse_quaternion256(str, n)
+	return cast(quaternion64)v, ok
+}
 /* 
 Appends a boolean value as a string to the given buffer
 
