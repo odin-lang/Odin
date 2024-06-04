@@ -951,8 +951,8 @@ foreign lib {
 	SetWindowTitle           :: proc(title: cstring) ---                        // Set title for window (only PLATFORM_DESKTOP and PLATFORM_WEB)
 	SetWindowPosition        :: proc(x, y: c.int) ---                           // Set window position on screen (only PLATFORM_DESKTOP)
 	SetWindowMonitor         :: proc(monitor: c.int) ---                        // Set monitor for the current window
-	SetWindowMinSize         :: proc(width, height: c.int) ---                  // Set window minimum dimensions (for FLAG_WINDOW_RESIZABLE)
-	SetWindowMaxSize         :: proc(width, height: c.int) ---                  // Set window maximum dimensions (for FLAG_WINDOW_RESIZABLE)
+	SetWindowMinSize         :: proc(width, height: c.int) ---                  // Set window minimum dimensions (for WINDOW_RESIZABLE)
+	SetWindowMaxSize         :: proc(width, height: c.int) ---                  // Set window maximum dimensions (for WINDOW_RESIZABLE)
 	SetWindowSize            :: proc(width, height: c.int) ---                  // Set window dimensions
 	SetWindowOpacity         :: proc(opacity: f32) ---                          // Set window opacity [0.0f..1.0f] (only PLATFORM_DESKTOP)
 	SetWindowFocused         :: proc() ---                                      // Set window focused (only PLATFORM_DESKTOP)
