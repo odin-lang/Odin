@@ -125,6 +125,8 @@ gb_internal Entity *find_polymorphic_record_entity(GenTypesData *found_gen_types
 
 gb_internal bool complete_soa_type(Checker *checker, Type *t, bool wait_to_finish);
 
+gb_internal bool check_is_castable_to(CheckerContext *c, Operand *operand, Type *y);
+
 enum LoadDirectiveResult {
 	LoadDirective_Success  = 0,
 	LoadDirective_Error    = 1,
@@ -2252,6 +2254,17 @@ gb_internal bool check_representable_as_constant(CheckerContext *c, ExactValue i
 gb_internal bool check_integer_exceed_suggestion(CheckerContext *c, Operand *o, Type *type, i64 max_bit_size=0) {
 	if (is_type_integer(type) && o->value.kind == ExactValue_Integer) {
 		gbString b = type_to_string(type);
+		defer (gb_string_free(b));
+
+		if (is_type_enum(o->type)) {
+			if (check_is_castable_to(c, o, type)) {
+				gbString ot = type_to_string(o->type);
+				error_line("\tSuggestion: Try casting the '%s' expression to '%s'", ot, b);
+				gb_string_free(ot);
+			}
+			return true;
+		}
+
 
 		i64 sz = type_size_of(type);
 		i64 bit_size = 8*sz;
@@ -2301,7 +2314,6 @@ gb_internal bool check_integer_exceed_suggestion(CheckerContext *c, Operand *o, 
 			}
 		}
 
-		gb_string_free(b);
 
 		return true;
 	}
