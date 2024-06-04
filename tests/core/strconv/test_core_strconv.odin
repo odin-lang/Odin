@@ -136,4 +136,19 @@ test_infinity :: proc(t: ^testing.T) {
 		testing.expect_value(t, ok, true)
 		testing.expect_value(t, math.classify(f), math.Float_Class.Inf)
 	}
+
+	// Explicitly check how trailing characters are handled.
+	s = "infinityyyy"
+	f, ok := strconv.parse_f64(s, &n)
+	testing.expect_value(t, f, pos_inf)
+	testing.expect_value(t, n, 8)
+	testing.expect_value(t, ok, false)
+	testing.expect_value(t, math.classify(f), math.Float_Class.Inf)
+
+	s = "inflippity"
+	f, ok = strconv.parse_f64(s, &n)
+	testing.expect_value(t, f, pos_inf)
+	testing.expect_value(t, n, 3)
+	testing.expect_value(t, ok, false)
+	testing.expect_value(t, math.classify(f), math.Float_Class.Inf)
 }
