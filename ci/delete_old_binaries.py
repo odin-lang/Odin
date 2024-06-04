@@ -21,8 +21,8 @@ def main():
             delta = now - date
 
             if delta.days > days_to_keep:
-                print(f'Deleting {parts[5]}')
-                execute_cli(f'b2 rm {parts[0]}')
+                print(f'Deleting b2://{bucket}/{parts[5]}')
+                execute_cli(f'b2 rm b2://{bucket}/{parts[5]}')
 
 
 def execute_cli(command):
