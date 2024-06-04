@@ -46,6 +46,15 @@ gb_internal LLVMMetadataRef lb_debug_end_location_from_ast(lbProcedure *p, Ast *
 	return lb_debug_location_from_token_pos(p, ast_end_token(node).pos);
 }
 
+gb_internal void lb_debug_file_line(lbModule *m, Ast *node, LLVMMetadataRef *file, unsigned *line) {
+	if (*file == nullptr) {
+		if (node) {
+			*file = lb_get_llvm_metadata(m, node->file());
+			*line = cast(unsigned)ast_token(node).pos.line;
+		}
+	}
+}
+
 gb_internal LLVMMetadataRef lb_debug_type_internal_proc(lbModule *m, Type *type) {
 	i64 size = type_size_of(type); // Check size
 	gb_unused(size);
@@ -116,6 +125,8 @@ gb_internal LLVMMetadataRef lb_debug_basic_struct(lbModule *m, String const &nam
 
 gb_internal LLVMMetadataRef lb_debug_struct(lbModule *m, Type *type, Type *bt, String name, LLVMMetadataRef scope, LLVMMetadataRef file, unsigned line) {
 	GB_ASSERT(bt->kind == Type_Struct);
+
+	lb_debug_file_line(m, bt->Struct.node, &file, &line);
 
 	unsigned tag = DW_TAG_structure_type;
 	if (is_type_raw_union(bt)) {
@@ -336,6 +347,8 @@ gb_internal LLVMMetadataRef lb_debug_union(lbModule *m, Type *type, String name,
 	Type *bt = base_type(type);
 	GB_ASSERT(bt->kind == Type_Union);
 
+	lb_debug_file_line(m, bt->Union.node, &file, &line);
+
 	u64 size_in_bits = 8*type_size_of(bt);
 	u32 align_in_bits = 8*cast(u32)type_align_of(bt);
 
@@ -415,6 +428,8 @@ gb_internal LLVMMetadataRef lb_debug_bitset(lbModule *m, Type *type, String name
 	Type *bt = base_type(type);
 	GB_ASSERT(bt->kind == Type_BitSet);
 
+	lb_debug_file_line(m, bt->BitSet.node, &file, &line);
+
 	u64 size_in_bits = 8*type_size_of(bt);
 	u32 align_in_bits = 8*cast(u32)type_align_of(bt);
 
@@ -493,6 +508,8 @@ gb_internal LLVMMetadataRef lb_debug_bitset(lbModule *m, Type *type, String name
 gb_internal LLVMMetadataRef lb_debug_enum(lbModule *m, Type *type, String name, LLVMMetadataRef scope, LLVMMetadataRef file, unsigned line) {
 	Type *bt = base_type(type);
 	GB_ASSERT(bt->kind == Type_Enum);
+
+	lb_debug_file_line(m, bt->Enum.node, &file, &line);
 
 	u64 size_in_bits = 8*type_size_of(bt);
 	u32 align_in_bits = 8*cast(u32)type_align_of(bt);
