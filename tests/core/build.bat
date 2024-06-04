@@ -104,6 +104,11 @@ echo ---
 %PATH_TO_ODIN% test slice %COMMON% -out:test_core_slice.exe || exit /b
 
 echo ---
+echo Running core:strconv tests
+echo ---
+%PATH_TO_ODIN% test strconv %COMMON% -out:test_core_strconv.exe || exit /b
+
+echo ---
 echo Running core:strings tests
 echo ---
 %PATH_TO_ODIN% test strings %COMMON% -out:test_core_strings.exe || exit /b
