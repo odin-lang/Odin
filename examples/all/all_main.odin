@@ -234,6 +234,7 @@ _ :: edit
 _ :: thread
 _ :: time
 _ :: datetime
+_ :: flags
 _ :: sysinfo
 _ :: unicode
 _ :: utf8
