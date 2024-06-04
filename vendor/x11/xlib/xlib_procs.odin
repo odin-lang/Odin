@@ -1592,6 +1592,31 @@ foreign xlib {
 		image: ^XImage,
 		value: int,
 		) ---
+	StoreNamedColor :: proc(
+		display:  ^Display,
+		colormap: Colormap,
+		name:     cstring,
+		pixel:    uint,
+		flags:    ColorFlags,
+		) ---
+	QueryColor :: proc(
+		display:  ^Display,
+		colormap: Colormap,
+		color:    ^XColor,
+		) ---
+	QueryColors :: proc(
+		display:  ^Display,
+		colormap: Colormap,
+		colors:   [^]XColor,
+		ncolors:  i32,
+		) ---
+	QueryExtension :: proc(
+		display:             ^Display,
+		name:                cstring,
+		major_opcode_return: ^i32,
+		first_event_return:  ^i32,
+		first_error_return:  ^i32,
+		) -> b32 ---
 	DestroyImage :: proc(image: ^XImage) ---
 	ResourceManagerString :: proc(display: ^Display) -> cstring ---
 }
@@ -1618,31 +1643,6 @@ foreign xlib {
 		ncolors:  XcmsColor,
 		cflags:   [^]b32,
 		) -> Status ---
-	StoreNamedColor :: proc(
-		display:  ^Display,
-		colormap: Colormap,
-		name:     cstring,
-		pixel:    uint,
-		flags:    ColorFlags,
-		) ---
-	QueryColor :: proc(
-		display:  ^Display,
-		colormap: Colormap,
-		color:    ^XColor,
-		) ---
-	QueryColors :: proc(
-		display:  ^Display,
-		colormap: Colormap,
-		colors:   [^]XColor,
-		ncolors:  i32,
-		) ---
-	QueryExtension :: proc(
-		display:             ^Display,
-		name:                cstring,
-		major_opcode_return: ^i32,
-		first_event_return:  ^i32,
-		first_error_return:  ^i32,
-		) -> b32 ---
 	XcmsQueryColor :: proc(
 		display:  ^Display,
 		colormap: Colormap,
@@ -1669,12 +1669,9 @@ foreign xlib {
 	// Color conversion context macros
 	XcmsDisplayOfCCC :: proc(ccc: XcmsCCC) -> ^Display ---
 	XcmsVisualOfCCC  :: proc(ccc: XcmsCCC) -> ^Visual ---
-	XcmsScreenNumberOfCCC ::
-						proc(ccc: XcmsCCC) -> i32 ---
-	XcmsScreenWhitePointOfCCC ::
-						proc(ccc: XcmsCCC) -> XcmsColor ---
-	XcmsClientWhitePointOfCCC ::
-						proc(ccc: XcmsCCC) -> XcmsColor ---
+	XcmsScreenNumberOfCCC :: proc(ccc: XcmsCCC) -> i32 ---
+	XcmsScreenWhitePointOfCCC :: proc(ccc: XcmsCCC) -> XcmsColor ---
+	XcmsClientWhitePointOfCCC :: proc(ccc: XcmsCCC) -> XcmsColor ---
 	// Modifying the attributes of color conversion context
 	XcmsSetWhitePoint :: proc(
 		ccc: XcmsCCC,
