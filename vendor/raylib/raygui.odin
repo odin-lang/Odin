@@ -10,7 +10,7 @@ when ODIN_OS == .Windows {
 	}
 } else when ODIN_OS == .Linux  {
 	foreign import lib {
-		"linux/libraygui.so" when RAYGUI_SHARED else "linux/libraygui.a"
+		"linux/libraygui.so" when RAYGUI_SHARED else "linux/libraygui.a",
 	}
 } else when ODIN_OS == .Darwin {
 	when ODIN_ARCH == .arm64 {
