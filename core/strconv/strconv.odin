@@ -878,13 +878,10 @@ parse_f64_prefix :: proc(str: string) -> (value: f64, nr: int, ok: bool) {
 				s = s[1:]
 				fallthrough
 			case 'i', 'I':
-				n = common_prefix_len_ignore_case(s, "infinity")
-				if 3 < n && n < 8 { // "inf" or "infinity"
-					n = 3
-				}
-				if n == 3 || n == 8 {
+				m := common_prefix_len_ignore_case(s, "infinity")
+				if m == 3 || m == 8 { // "inf" or "infinity"
 					f = 0h7ff00000_00000000 if sign == 1 else 0hfff00000_00000000
-					n = nsign + 3
+					n = nsign + m
 					ok = true
 					return
 				}
