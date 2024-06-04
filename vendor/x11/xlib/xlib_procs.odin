@@ -1618,25 +1618,25 @@ foreign xlib {
 		ncolors:  XcmsColor,
 		cflags:   [^]b32,
 		) -> Status ---
-	StoreNamedColor :: proc(
+	XStoreNamedColor :: proc(
 		display:  ^Display,
 		colormap: Colormap,
 		name:     cstring,
 		pixel:    uint,
 		flags:    ColorFlags,
 		) ---
-	QueryColor :: proc(
+	XQueryColor :: proc(
 		display:  ^Display,
 		colormap: Colormap,
 		color:    ^XColor,
 		) ---
-	QueryColors :: proc(
+	XQueryColors :: proc(
 		display:  ^Display,
 		colormap: Colormap,
 		colors:   [^]XColor,
 		ncolors:  i32,
 		) ---
-	QueryExtension :: proc(
+	XQueryExtension :: proc(
 		display:             ^Display,
 		name:                cstring,
 		major_opcode_return: ^i32,
