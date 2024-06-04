@@ -97,8 +97,7 @@ MAX_TEXT_BUFFER_LENGTH :: #config(RAYLIB_MAX_TEXT_BUFFER_LENGTH, 1024)
 RAYLIB_SHARED :: #config(RAYLIB_SHARED, false)
 
 when ODIN_OS == .Windows {
-	_WINDOWS_LIB :: "windows/raylib" +" dll" when RAYLIB_SHARED else "" + ".lib"
-	@(extra_linker_flags="/NODEFAULTLIB:msvcrt")
+	@(extra_linker_flags="/NODEFAULTLIB:" + ("msvcrt" when RAYLIB_SHARED else "libcmt"))
 	foreign import lib {
 		"windows/raylibdll.lib" when RAYLIB_SHARED else "windows/raylib.lib" ,
 		"system:Winmm.lib",
