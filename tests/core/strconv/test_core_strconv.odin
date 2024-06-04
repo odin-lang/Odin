@@ -62,18 +62,15 @@ test_infinity :: proc(t: ^testing.T) {
 	n: int
 	s := "infinity"
 
-	for i in 1 ..< len(s) + 1 {
+	for i in 0 ..< len(s) + 1 {
 		ss := s[:i]
 		f, ok := strconv.parse_f64(ss, &n)
-		if i == 3 { // "inf"
+		if i >= 3 { // "inf" .. "infinity"
+			expected_n := 8 if i == 8 else 3
+			expected_ok := i == 3 || i == 8
 			testing.expect_value(t, f, pos_inf)
-			testing.expect_value(t, n, 3)
-			testing.expect_value(t, ok, true)
-			testing.expect_value(t, math.classify(f), math.Float_Class.Inf)
-		} else if i == 8 { // "infinity"
-			testing.expect_value(t, f, pos_inf)
-			testing.expect_value(t, n, 8)
-			testing.expect_value(t, ok, true)
+			testing.expect_value(t, n, expected_n)
+			testing.expect_value(t, ok, expected_ok)
 			testing.expect_value(t, math.classify(f), math.Float_Class.Inf)
 		} else { // invalid substring
 			testing.expect_value(t, f, 0)
@@ -84,18 +81,15 @@ test_infinity :: proc(t: ^testing.T) {
 	}
 	
 	s = "+infinity"
-	for i in 1 ..< len(s) + 1 {
+	for i in 0 ..< len(s) + 1 {
 		ss := s[:i]
 		f, ok := strconv.parse_f64(ss, &n)
-		if i == 4 { // "+inf"
+		if i >= 4 { // "+inf" .. "+infinity"
+			expected_n := 9 if i == 9 else 4
+			expected_ok := i == 4 || i == 9
 			testing.expect_value(t, f, pos_inf)
-			testing.expect_value(t, n, 4)
-			testing.expect_value(t, ok, true)
-			testing.expect_value(t, math.classify(f), math.Float_Class.Inf)
-		} else if i == 9 { // "+infinity"
-			testing.expect_value(t, f, pos_inf)
-			testing.expect_value(t, n, 9)
-			testing.expect_value(t, ok, true)
+			testing.expect_value(t, n, expected_n)
+			testing.expect_value(t, ok, expected_ok)
 			testing.expect_value(t, math.classify(f), math.Float_Class.Inf)
 		} else { // invalid substring
 			testing.expect_value(t, f, 0)
@@ -106,18 +100,15 @@ test_infinity :: proc(t: ^testing.T) {
 	}
 
 	s = "-infinity"
-	for i in 1 ..< len(s) + 1 {
+	for i in 0 ..< len(s) + 1 {
 		ss := s[:i]
 		f, ok := strconv.parse_f64(ss, &n)
-		if i == 4 { // "-inf"
+		if i >= 4 { // "-inf" .. "infinity"
+			expected_n := 9 if i == 9 else 4
+			expected_ok := i == 4 || i == 9
 			testing.expect_value(t, f, neg_inf)
-			testing.expect_value(t, n, 4)
-			testing.expect_value(t, ok, true)
-			testing.expect_value(t, math.classify(f), math.Float_Class.Neg_Inf)
-		} else if i == 9 { // "-infinity"
-			testing.expect_value(t, f, neg_inf)
-			testing.expect_value(t, n, 9)
-			testing.expect_value(t, ok, true)
+			testing.expect_value(t, n, expected_n)
+			testing.expect_value(t, ok, expected_ok)
 			testing.expect_value(t, math.classify(f), math.Float_Class.Neg_Inf)
 		} else { // invalid substring
 			testing.expect_value(t, f, 0)
