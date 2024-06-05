@@ -54,45 +54,45 @@ allocator :: proc(t: ^Allocator) -> runtime.Allocator {
 }
 
 @(require_results)
-create_from_buf :: proc(buf: []byte) -> (control: ^Allocator, err: Error) {
+init_from_buffer :: proc(control: ^Allocator, buf: []byte) -> Error {
+	assert(control != nil)
 	if uintptr(raw_data(buf)) % ALIGN_SIZE != 0 {
-		return nil, .Invalid_Alignment
+		return .Invalid_Alignment
 	}
 
-	pool_bytes := align_down(len(buf) - POOL_OVERHEAD - size_of(Allocator), ALIGN_SIZE)
+	pool_bytes := align_down(len(buf) - POOL_OVERHEAD, ALIGN_SIZE)
 	if pool_bytes < BLOCK_SIZE_MIN {
-		return nil, .Backing_Buffer_Too_Small
+		return .Backing_Buffer_Too_Small
 	} else if pool_bytes > BLOCK_SIZE_MAX {
-		return nil, .Backing_Buffer_Too_Large
+		return .Backing_Buffer_Too_Large
 	}
 
-	control = (^Allocator)(raw_data(buf))
 	clear(control)
-	pool_add(control, buf[size_of(Allocator):]) or_return
-	return
+	return pool_add(control, buf[:])
 }
 
 @(require_results)
-create_from_allocator :: proc(backing: runtime.Allocator, initial_pool_size: int, new_pool_size := 0) -> (control: ^Allocator, err: Error) {
-	pool_bytes := align_up(uint(initial_pool_size) + POOL_OVERHEAD + size_of(Allocator), ALIGN_SIZE)
+init_from_allocator :: proc(control: ^Allocator, backing: runtime.Allocator, initial_pool_size: int, new_pool_size := 0) -> Error {
+	assert(control != nil)
+	pool_bytes := align_up(uint(initial_pool_size) + POOL_OVERHEAD, ALIGN_SIZE)
 	if pool_bytes < BLOCK_SIZE_MIN {
-		return nil, .Backing_Buffer_Too_Small
+		return .Backing_Buffer_Too_Small
 	} else if pool_bytes > BLOCK_SIZE_MAX {
-		return nil, .Backing_Buffer_Too_Large
+		return .Backing_Buffer_Too_Large
 	}
 
-	if buf, backing_err := runtime.make_aligned([]byte, pool_bytes, ALIGN_SIZE, backing); backing_err != nil {
-		return nil, .Backing_Allocator_Error
-	} else {
-		control, err = create_from_buf(buf)
-		control.pool = Pool{
-			data      = buf,
-			allocator = backing,
-		}
+	buf, backing_err := runtime.make_aligned([]byte, pool_bytes, ALIGN_SIZE, backing)
+	if backing_err != nil {
+		return .Backing_Allocator_Error
 	}
-	return
+	err := init_from_buffer(control, buf)
+	control.pool = Pool{
+		data      = buf,
+		allocator = backing,
+	}
+	return err
 }
-create :: proc{create_from_buf, create_from_allocator}
+init :: proc{init_from_buffer, init_from_allocator}
 
 destroy :: proc(control: ^Allocator) {
 	if control == nil { return }

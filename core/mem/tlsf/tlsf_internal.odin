@@ -522,10 +522,10 @@ block_locate_free :: proc(control: ^Allocator, size: uint) -> (block: ^Block_Hea
 @(require_results)
 block_prepare_used :: proc(control: ^Allocator, block: ^Block_Header, size: uint) -> (res: []byte, err: runtime.Allocator_Error) {
 	if block != nil {
-			assert(size != 0, "Size must be non-zero")
-			block_trim_free(control, block, size)
-			block_mark_as_used(block)
-			res = ([^]byte)(block_to_ptr(block))[:size]
+		assert(size != 0, "Size must be non-zero")
+		block_trim_free(control, block, size)
+		block_mark_as_used(block)
+		res = ([^]byte)(block_to_ptr(block))[:size]
 	}
 	return
 }
@@ -588,6 +588,7 @@ pool_remove :: proc(control: ^Allocator, pool: []u8) {
 
 @(require_results)
 alloc_bytes_non_zeroed :: proc(control: ^Allocator, size: uint, align: uint) -> (res: []byte, err: runtime.Allocator_Error) {
+	assert(control != nil)
 	adjust := adjust_request_size(size, ALIGN_SIZE)
 
 	GAP_MINIMUM :: size_of(Block_Header)
@@ -635,6 +636,7 @@ alloc_bytes :: proc(control: ^Allocator, size: uint, align: uint) -> (res: []byt
 
 
 free_with_size :: proc(control: ^Allocator, ptr: rawptr, size: uint) {
+	assert(control != nil)
 	// `size` is currently ignored
 	if ptr == nil {
 		return
@@ -651,8 +653,7 @@ free_with_size :: proc(control: ^Allocator, ptr: rawptr, size: uint) {
 
 @(require_results)
 resize :: proc(control: ^Allocator, ptr: rawptr, old_size, new_size: uint, alignment: uint) -> (res: []byte, err: runtime.Allocator_Error) {
-	// `size` is currently ignored
-
+	assert(control != nil)
 	if ptr != nil && new_size == 0 {
 		free_with_size(control, ptr, old_size)
 		return
@@ -696,8 +697,7 @@ resize :: proc(control: ^Allocator, ptr: rawptr, old_size, new_size: uint, align
 
 @(require_results)
 resize_non_zeroed :: proc(control: ^Allocator, ptr: rawptr, old_size, new_size: uint, alignment: uint) -> (res: []byte, err: runtime.Allocator_Error) {
-	// `size` is currently ignored
-
+	assert(control != nil)
 	if ptr != nil && new_size == 0 {
 		free_with_size(control, ptr, old_size)
 		return
