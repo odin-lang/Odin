@@ -328,6 +328,11 @@ foreign dl {
 	@(link_name="dlerror")          _unix_dlerror       :: proc() -> cstring ---
 }
 
+@(private)
+foreign libc {
+	_lwp_self :: proc() -> i32 ---
+}
+
 // NOTE(phix): Perhaps share the following functions with FreeBSD if they turn out to be the same in the end.
 
 is_path_separator :: proc(r: rune) -> bool {
@@ -721,7 +726,7 @@ exit :: proc "contextless" (code: int) -> ! {
 }
 
 current_thread_id :: proc "contextless" () -> int {
-	return cast(int) unix.pthread_self()
+	return int(_lwp_self())
 }
 
 dlopen :: proc(filename: string, flags: int) -> rawptr {
