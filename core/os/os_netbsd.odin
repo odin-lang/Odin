@@ -5,7 +5,6 @@ foreign import libc "system:c"
 
 import "base:runtime"
 import "core:strings"
-import "core:sys/unix"
 import "core:c"
 
 Handle :: distinct i32
