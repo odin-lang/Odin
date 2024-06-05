@@ -1,6 +1,6 @@
 import os
 import sys
-from zipfile import ZipFile
+from zipfile  import ZipFile, ZIP_DEFLATED
 from b2sdk.v2 import InMemoryAccountInfo, B2Api
 from datetime import datetime
 import json
@@ -40,7 +40,7 @@ def create_and_upload_artifact_zip(platform: str, artifact: str) -> int:
 		print(f"Creating archive {destination_zip_name} from {artifact} and uploading to {bucket_name}")
 
 		source_zip_name = destination_zip_name
-		with ZipFile(source_zip_name, 'w') as z:
+		with ZipFile(source_zip_name, mode='w', compression=ZIP_DEFLATED, compresslevel=9) as z:
 			for root, directory, filenames in os.walk(artifact):
 				for file in filenames:
 					file_path = os.path.join(root, file)
