@@ -151,11 +151,11 @@ jobs:
         with:
           python-version: '3.8.x'
 
-      - name: Install B2 CLI
+      - name: Install B2 SDK
         shell: bash
         run: |
           python -m pip install --upgrade pip
-          pip install --upgrade b2
+          pip install --upgrade b2sdk
 
       - name: Display Python version
         run: python -c "import sys; print(sys.version)"
@@ -188,24 +188,9 @@ jobs:
           BUCKET: ${{ secrets.B2_BUCKET }}
           DAYS_TO_KEEP: ${{ secrets.B2_DAYS_TO_KEEP }}
         run: |
-          echo Authorizing B2 account
-          b2 account authorize "$APPID" "$APPKEY"
-
-          echo Uploading artifcates to B2
-          chmod +x ./ci/upload_create_nightly.sh
-          ./ci/upload_create_nightly.sh "$BUCKET" windows-amd64 windows_artifacts/
-          ./ci/upload_create_nightly.sh "$BUCKET" ubuntu-amd64 ubuntu_artifacts/dist.zip
-          ./ci/upload_create_nightly.sh "$BUCKET" macos-amd64 macos_artifacts/dist.zip
-          ./ci/upload_create_nightly.sh "$BUCKET" macos-arm64 macos_arm_artifacts/dist.zip
-
-          echo Deleting old artifacts in B2
-          python3 ci/delete_old_binaries.py "$BUCKET" "$DAYS_TO_KEEP"
-
-          echo Creating nightly.json
-          python3 ci/create_nightly_json.py "$BUCKET" > nightly.json
-
-          echo Uploading nightly.json
-          b2 upload-file "$BUCKET" nightly.json nightly.json
-
-          echo Clear B2 account info
-          b2 clear-account
+          python3 ci/nightly.py artifact windows-amd64 windows_artifacts/
+          python3 ci/nightly.py artifact ubuntu-amd64 ubuntu_artifacts/dist.zip
+          python3 ci/nightly.py artifact macos-amd64 macos_artifacts/dist.zip
+          python3 ci/nightly.py artifact macos-arm64 macos_arm_artifacts/dist.zip
+          python3 ci/nightly.py prune
+          python3 ci/nightly.py json
