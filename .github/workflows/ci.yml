@@ -24,7 +24,6 @@ jobs:
           /usr/sbin/pkg_add https://github.com/andreas-jonsson/llvm17-netbsd-bin/releases/download/pkgsrc-current/llvm-17.0.6.tgz
           /usr/sbin/pkg_add https://github.com/andreas-jonsson/llvm17-netbsd-bin/releases/download/pkgsrc-current/clang-17.0.6.tgz
           ln -s /usr/pkg/bin/python3.11 /usr/bin/python3
-          ln -s /usr/pkg/bin/bash /bin/bash
         run: |
           git config --global --add safe.directory $(pwd)
           gmake release
