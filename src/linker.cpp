@@ -72,12 +72,10 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 
 		gbString extra_orca_flags = gb_string_make(temporary_allocator(), "");
 
-		gbString inputs = gb_string_make(temporary_allocator(), "");		
+		gbString inputs = gb_string_make(temporary_allocator(), "");
 		inputs = gb_string_append_fmt(inputs, "\"%.*s.o\"", LIT(output_filename));
 
 		if (build_context.metrics.os == TargetOs_orca) {
-			// TODO: Orca windows.
-
 			gbString orca_sdk_path = gb_string_make(temporary_allocator(), "");
 			if (!system_exec_command_line_app_output("orca sdk-path", &orca_sdk_path)) {
 				gb_printf_err("executing `orca sdk-path` failed, make sure Orca is installed and added to your path\n");
@@ -95,10 +93,10 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 
 	#if defined(GB_SYSTEM_WINDOWS)
 		result = system_exec_command_line_app("wasm-ld",
-			"\"%.*s\\bin\\wasm-ld\" \"%.*s.o\" -o \"%.*s\" %.*s %.*s %.*s",
+			"\"%.*s\\bin\\wasm-ld\" %s -o \"%.*s\" %.*s %.*s %s",
 			LIT(build_context.ODIN_ROOT),
-			LIT(output_filename), LIT(output_filename), LIT(build_context.link_flags), LIT(build_context.extra_linker_flags),
-			LIT(extra_orca_flags));
+			inputs, LIT(output_filename), LIT(build_context.link_flags), LIT(build_context.extra_linker_flags),
+			extra_orca_flags);
 	#else
 		result = system_exec_command_line_app("wasm-ld",
 			"wasm-ld %s -o \"%.*s\" %.*s %.*s %s",

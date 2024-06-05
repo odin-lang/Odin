@@ -1080,7 +1080,7 @@ gb_global TargetMetrics target_orca_wasm32 = {
 	TargetOs_orca,
 	TargetArch_wasm32,
 	4, 4, 8, 16,
-	str_lit("wasm32-freestanding-js"),
+	str_lit("wasm32-wasi-js"),
 };
 
 

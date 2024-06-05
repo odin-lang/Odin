@@ -155,7 +155,11 @@ gb_internal i32 system_exec_command_line_app(char const *name, char const *fmt, 
 	return exit_code;
 }
 
-// TODO: windows.
+#if defined(GB_SYSTEM_WINDOWS)
+#define popen _popen
+#define pclose _pclose
+#endif
+
 gb_internal bool system_exec_command_line_app_output(char const *command, gbString *output) {
 	GB_ASSERT(output);
 
