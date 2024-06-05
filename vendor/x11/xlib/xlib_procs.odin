@@ -72,7 +72,7 @@ foreign xlib {
 	DoesBackingStore    :: proc(screen: ^Screen) -> BackingStore ---
 	DoesSaveUnders      :: proc(screen: ^Screen) -> b32 ---
 	DisplayOfScreen     :: proc(screen: ^Screen) -> ^Display ---
-	ScreenNumberOfScreens :: proc(screen: ^Screen) -> i32 ---
+	ScreenNumberOfScreen :: proc(screen: ^Screen) -> i32 ---
 	EventMaskOfScreen   :: proc(screen: ^Screen) -> EventMask ---
 	WidthOfScreen       :: proc(screen: ^Screen) -> i32 ---
 	HeightOfScreen      :: proc(screen: ^Screen) -> i32 ---
@@ -1619,6 +1619,62 @@ foreign xlib {
 		) -> b32 ---
 	DestroyImage :: proc(image: ^XImage) ---
 	ResourceManagerString :: proc(display: ^Display) -> cstring ---
+
+	OpenIM :: proc(
+		display: ^Display,
+		rdb:      XrmHashBucket,
+		res_name: cstring,
+		res_class: cstring,
+	) -> XIM ---
+	XSetLocaleModifiers :: proc(modifiers: cstring) -> cstring ---
+
+/* ----  X11/XKBlib.h ---------------------------------------------------------*/
+
+	kbQueryExtension :: proc(
+		display: ^Display,
+		opcode_return: ^i32,
+		event_base_return: ^i32,
+		error_base_return: ^i32,
+		major_return: ^i32,
+		minor_return: ^i32,
+	) -> b32 ---
+	kbUseExtension :: proc(
+		display: ^Display,
+		major_return: ^i32,
+		minor_return: ^i32,
+	) -> b32 ---
+	kbGetMap :: proc(
+		display: ^Display,
+		which: XkbInfoMask,
+		device_spec: i32,
+	) -> XkbDescPtr ---
+	kbGetUpdatedMap :: proc(
+		display: ^Display,
+		which: XkbInfoMask,
+		desc: XkbDescPtr,
+	) -> b32 ---
+	kbSelectEvents :: proc(
+		display: ^Display,
+		deviceID: u32,
+		bits_to_change: XkbEventMask,
+		values: XkbEventMask,
+	) -> b32 ---
+	kbSetDetectableAutoRepeat :: proc(
+		display: ^Display,
+		detectable: b32,
+		supported: ^b32,
+	) -> b32 ---
+	kbGetState :: proc (
+		display: ^Display,
+		device_spec: u32,
+		return_state: XkbStatePtr,
+	) -> Status ---
+	kbGetKeySyms :: proc(
+		display: ^Display,
+		first: u32,
+		num: u32,
+		xkb: XkbDescPtr,
+	) -> Status ---
 }
 
 @(default_calling_convention="c")
@@ -1921,3 +1977,4 @@ foreign xlib {
 	XrmGetStringDatabase :: proc(data: cstring) -> XrmDatabase ---
 	XrmGetResource :: proc(db: XrmDatabase, name: cstring, class: cstring, type_return: ^cstring, val_return: ^XrmValue) -> b32 ---
 }
+

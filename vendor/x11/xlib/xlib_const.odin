@@ -1,6 +1,80 @@
 //+build linux, freebsd, openbsd
 package xlib
 
+/* ----  X11/extensions/XKB.h ---------------------------------------------------------*/
+
+XkbMinLegalKeyCode     :: 8
+XkbMaxLegalKeyCode     :: 255
+XkbMaxKeyCount         :: XkbMaxLegalKeyCode - XkbMinLegalKeyCode + 1
+XkbPerKeyBitArraySize  :: (XkbMaxLegalKeyCode + 1) / 8
+XkbKeyNameLength       :: 4
+XkbNumVirtualMods      :: 16
+XkbNumIndicators       :: 32
+XkbNumKbdGroups        :: 4
+XkbAnyActionDataSize   :: 7
+XkbUseCoreKbd          :: 0x0100
+XkbActionMessageLength :: 6
+
+XkbInfoMask :: bit_set[XkbInfoMaskBits; int]
+XkbInfoMaskBits :: enum u32 {
+	KeyTypes           = 0,
+	KeySyms            = 1,
+	ModifierMap        = 2,
+	ExplicitComponents = 3,
+	KeyActions         = 4,
+	KeyBehaviors       = 5,
+	VirtualMods        = 6,
+	VirtualModMap      = 7,
+}
+
+XkbAllClientInfoMask :: XkbInfoMask {
+	.KeyTypes,
+	.KeySyms,
+	.ModifierMap,
+}
+
+XkbAllServerInfoMask :: XkbInfoMask {
+	.ExplicitComponents,
+	.KeyActions,
+	.KeyBehaviors,
+	.VirtualMods,
+	.VirtualModMap,
+}
+
+XkbEventMask :: bit_set[XkbEventType; int]
+XkbEventType :: enum i32 {
+	NewKeyboardNotify     = 0,
+	MapNotify             = 1,
+	StateNotify           = 2,
+	ControlsNotify        = 3,
+	IndicatorStateNotify  = 4,
+	IndicatorMapNotify    = 5,
+	NamesNotify           = 6,
+	CompatMapNotify       = 7,
+	BellNotify            = 8,
+	ActionMessage         = 9,
+	AccessXNotify         = 10,
+	ExtensionDeviceNotify = 11,
+}
+
+XkbAllEventsMask :: XkbEventMask {
+	.NewKeyboardNotify,
+	.MapNotify,
+	.StateNotify,
+	.ControlsNotify,
+	.IndicatorStateNotify,
+	.IndicatorMapNotify,
+	.NamesNotify,
+	.CompatMapNotify,
+	.BellNotify,
+	.ActionMessage,
+	.AccessXNotify,
+	.ExtensionDeviceNotify,
+}
+
+
+/* ----  X11/Xlib.h ---------------------------------------------------------*/
+
 // Special values for many types. Most of these constants
 // aren't attached to a specific type.
 
