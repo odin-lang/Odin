@@ -457,6 +457,15 @@ gb_internal Selection sub_selection(Selection const &sel, isize offset) {
 	return res;
 }
 
+gb_internal Selection trim_selection(Selection const &sel) {
+	Selection res = {};
+	res.index.data = sel.index.data;
+	res.index.count = gb_max(sel.index.count - 1, 0);
+	res.index.capacity = res.index.count;
+	return res;
+}
+
+
 gb_global Type basic_types[] = {
 	{Type_Basic, {Basic_Invalid,           0,                                          0, STR_LIT("invalid type")}},
 

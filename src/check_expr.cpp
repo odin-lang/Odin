@@ -8866,6 +8866,10 @@ gb_internal void check_compound_literal_field_values(CheckerContext *c, Slice<As
 					case Type_Array:
 						ft = bt->Array.elem;
 						break;
+					case Type_BitField:
+						is_constant = false;
+						ft = bt->BitField.fields[index]->type;
+						break;
 					default:
 						GB_PANIC("invalid type: %s", type_to_string(ft));
 						break;
@@ -8891,6 +8895,9 @@ gb_internal void check_compound_literal_field_values(CheckerContext *c, Slice<As
 					break;
 				case Type_Array:
 					nested_ft = bt->Array.elem;
+					break;
+				case Type_BitField:
+					nested_ft = bt->BitField.fields[index]->type;
 					break;
 				default:
 					GB_PANIC("invalid type %s", type_to_string(nested_ft));

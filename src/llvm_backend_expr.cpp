@@ -4533,10 +4533,26 @@ gb_internal lbAddr lb_build_addr_compound_lit(lbProcedure *p, Ast *expr) {
 						if (lb_is_nested_possibly_constant(type, sel, elem)) {
 							continue;
 						}
-						lbValue dst = lb_emit_deep_field_gep(p, comp_lit_ptr, sel);
 						field_expr = lb_build_expr(p, elem);
 						field_expr = lb_emit_conv(p, field_expr, sel.entity->type);
-						lb_emit_store(p, dst, field_expr);
+						if (sel.is_bit_field) {
+							Selection sub_sel = trim_selection(sel);
+							lbValue trimmed_dst = lb_emit_deep_field_gep(p, comp_lit_ptr, sub_sel);
+							Type *bf = base_type(type_deref(trimmed_dst.type));
+							if (is_type_pointer(bf)) {
+								trimmed_dst = lb_emit_load(p, trimmed_dst);
+								bf = base_type(type_deref(trimmed_dst.type));
+							}
+							GB_ASSERT(bf->kind == Type_BitField);
+
+							isize idx = sel.index[sel.index.count-1];
+							lbAddr dst = lb_addr_bit_field(trimmed_dst, bf->BitField.fields[idx]->type, bf->BitField.bit_offsets[idx], bf->BitField.bit_sizes[idx]);
+							lb_addr_store(p, dst, field_expr);
+
+						} else {
+							lbValue dst = lb_emit_deep_field_gep(p, comp_lit_ptr, sel);
+							lb_emit_store(p, dst, field_expr);
+						}
 						continue;
 					}
 
