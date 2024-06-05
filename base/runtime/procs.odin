@@ -25,7 +25,7 @@ when ODIN_NO_CRT && ODIN_OS == .Windows {
 		RtlMoveMemory(dst, src, len)
 		return dst
 	}
-} else when ODIN_NO_CRT || (ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32) {
+} else when ODIN_NO_CRT || (ODIN_OS != .Orca && (ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32)) {
 	// NOTE: on wasm, calls to these procs are generated (by LLVM) with type `i32` instead of `int`.
 	//
 	// NOTE: `#any_int` is also needed, because calls that we generate (and package code)
