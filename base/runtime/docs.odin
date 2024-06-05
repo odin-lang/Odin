@@ -157,7 +157,7 @@ __dynamic_map_get // dynamic map calls
 __dynamic_map_set // dynamic map calls
 
 
-## Dynamic literals ([dymamic]T and map[K]V) (can be disabled with -no-dynamic-literals)
+## Dynamic literals ([dynamic]T and map[K]V) (can be disabled with -no-dynamic-literals)
 
 __dynamic_array_reserve
 __dynamic_array_append
