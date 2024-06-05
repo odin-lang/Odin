@@ -1039,6 +1039,13 @@ gb_global TargetMetrics target_netbsd_amd64 = {
 	str_lit("x86_64-unknown-netbsd-elf"),
 };
 
+gb_global TargetMetrics target_netbsd_arm64 = {
+	TargetOs_netbsd,
+	TargetArch_arm64,
+	8, 8, 16, 16,
+	str_lit("aarch64-unknown-netbsd-elf"),
+};
+
 gb_global TargetMetrics target_haiku_amd64 = {
 	TargetOs_haiku,
 	TargetArch_amd64,
@@ -1154,8 +1161,10 @@ gb_global NamedTargetMetrics named_targets[] = {
 	{ str_lit("freebsd_amd64"),       &target_freebsd_amd64  },
 	{ str_lit("freebsd_arm64"),       &target_freebsd_arm64  },
 
-	{ str_lit("openbsd_amd64"),       &target_openbsd_amd64  },
 	{ str_lit("netbsd_amd64"),        &target_netbsd_amd64   },
+	{ str_lit("netbsd_arm64"),        &target_netbsd_arm64   },
+
+	{ str_lit("openbsd_amd64"),       &target_openbsd_amd64  },
 	{ str_lit("haiku_amd64"),         &target_haiku_amd64    },
 
 	{ str_lit("freestanding_wasm32"), &target_freestanding_wasm32 },
@@ -1916,7 +1925,11 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 		#elif defined(GB_SYSTEM_OPENBSD)
 			metrics = &target_openbsd_amd64;
 		#elif defined(GB_SYSTEM_NETBSD)
-			metrics = &target_netbsd_amd64;
+			#if defined(GB_CPU_ARM)
+				metrics = &target_netbsd_arm64;
+			#else
+				metrics = &target_netbsd_amd64;
+			#endif
 		#elif defined(GB_SYSTEM_HAIKU)
 			metrics = &target_haiku_amd64;
 		#elif defined(GB_CPU_ARM)

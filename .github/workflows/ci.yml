@@ -10,7 +10,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: Build, Check, and Test
-      timeout-minutes: 25
+      timeout-minutes: 15
       uses: vmactions/netbsd-vm@v1
       with:
         release: "10.0"
@@ -31,6 +31,7 @@ jobs:
           ./odin version
           ./odin report
           ./odin check examples/all -vet -strict-style -target:netbsd_amd64
+          ./odin check examples/all -vet -strict-style -target:netbsd_arm64
           (cd tests/core; gmake all_bsd)
           (cd tests/internal; gmake all_bsd)
           (cd tests/issues; ./run.sh)
