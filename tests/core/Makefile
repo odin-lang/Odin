@@ -25,6 +25,7 @@ all_bsd: download_test_assets \
          reflect_test \
          runtime_test \
          slice_test \
+         strconv_test \
          strings_test \
          thread_test \
          time_test
@@ -97,6 +98,9 @@ runtime_test:
 
 slice_test:
 	$(ODIN) test slice $(COMMON) -out:test_core_slice
+
+strconv_test:
+	$(ODIN) test strconv $(COMMON) -out:test_core_strconv
 
 strings_test:
 	$(ODIN) test strings $(COMMON) -out:test_core_strings

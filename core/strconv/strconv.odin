@@ -882,13 +882,16 @@ parse_f64_prefix :: proc(str: string) -> (value: f64, nr: int, ok: bool) {
 				s = s[1:]
 				fallthrough
 			case 'i', 'I':
-				n = common_prefix_len_ignore_case(s, "infinity")
-				if 3 < n && n < 8 { // "inf" or "infinity"
-					n = 3
-				}
-				if n == 3 || n == 8 {
+				m := common_prefix_len_ignore_case(s, "infinity")
+				if 3 <= m && m < 9 { // "inf" to "infinity"
 					f = 0h7ff00000_00000000 if sign == 1 else 0hfff00000_00000000
-					n = nsign + 3
+					if m == 8 {
+						// We only count the entire prefix if it is precisely "infinity".
+						n = nsign + m
+					} else {
+						// The string was either only "inf" or incomplete.
+						n = nsign + 3
+					}
 					ok = true
 					return
 				}

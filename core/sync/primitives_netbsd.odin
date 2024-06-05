@@ -1,8 +1,12 @@
 //+private
 package sync
 
-import "core:sys/unix"
+foreign import libc "system:c"
+
+foreign libc {
+	_lwp_self :: proc "c" () -> i32 ---
+}
 
 _current_thread_id :: proc "contextless" () -> int {
-	return cast(int) unix.pthread_self()
+	return int(_lwp_self())
 }
