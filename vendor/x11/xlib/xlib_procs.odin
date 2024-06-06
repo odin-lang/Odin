@@ -6,6 +6,16 @@ foreign xlib {
 	@(link_name="_Xdebug") _Xdebug: i32
 }
 
+foreign import xcursor "system:Xcursor"
+@(default_calling_convention="c", link_prefix="X")
+foreign xcursor {
+	cursorGetTheme         :: proc(display: ^Display) -> cstring ---
+	cursorGetDefaultSize   :: proc(display: ^Display) -> i32 ---
+	cursorLibraryLoadImage :: proc(name: cstring, theme: cstring, size: i32) -> rawptr ---
+	cursorImageLoadCursor  :: proc(display: ^Display, img: rawptr) -> Cursor ---
+	cursorImageDestroy     :: proc(img: rawptr) ---
+}
+
 /* ----  X11/Xlib.h ---------------------------------------------------------*/
 
 @(default_calling_convention="c", link_prefix="X")
@@ -20,11 +30,9 @@ foreign xlib {
 	NoOp              :: proc(display: ^Display) ---
 	// Display macros (connection)
 	ConnectionNumber  :: proc(display: ^Display) -> i32 ---
-	ExtendedMaxRequestSize ::
-	                      proc(display: ^Display) -> int ---
+	ExtendedMaxRequestSize :: proc(display: ^Display) -> int ---
 	MaxRequestSize    :: proc(display: ^Display) -> int ---
-	LastKnownRequestProcessed ::
-	                      proc(display: ^Display) -> uint ---
+	LastKnownRequestProcessed :: proc(display: ^Display) -> uint ---
 	NextRequest       :: proc(display: ^Display) -> uint ---
 	ProtocolVersion   :: proc(display: ^Display) -> i32 ---
 	ProtocolRevision  :: proc(display: ^Display) -> i32 ---
@@ -46,8 +54,7 @@ foreign xlib {
 	DefaultRootWindow :: proc(display: ^Display) -> Window ---
 	DefaultScreen     :: proc(display: ^Display) -> i32 ---
 	DefaultVisual     :: proc(display: ^Display, screen_no: i32) -> ^Visual ---
-	DefaultScreenOfDisplay ::
-	                      proc(display: ^Display) -> ^Screen ---
+	DefaultScreenOfDisplay :: proc(display: ^Display) -> ^Screen ---
 	// Display macros (other)
 	RootWindow        :: proc(display: ^Display, screen_no: i32) -> Window ---
 	ScreenCount       :: proc(display: ^Display) -> i32 ---
@@ -1619,6 +1626,17 @@ foreign xlib {
 		) -> b32 ---
 	DestroyImage :: proc(image: ^XImage) ---
 	ResourceManagerString :: proc(display: ^Display) -> cstring ---
+	utf8SetWMProperties :: proc(
+		display:      ^Display,
+		window:       Window,
+		window_name:  cstring,
+		icon_name:    cstring,
+		argv:         ^cstring,
+		argc:         i32,
+		normal_hints: ^XSizeHints,
+		wm_hints:     ^XWMHints,
+		class_hints:  ^XClassHint,
+	) ---
 }
 
 @(default_calling_convention="c")
