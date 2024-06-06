@@ -155,6 +155,38 @@ gb_internal i32 system_exec_command_line_app(char const *name, char const *fmt, 
 	return exit_code;
 }
 
+#if defined(GB_SYSTEM_WINDOWS)
+#define popen _popen
+#define pclose _pclose
+#endif
+
+gb_internal bool system_exec_command_line_app_output(char const *command, gbString *output) {
+	GB_ASSERT(output);
+
+	u8 buffer[256];
+	FILE *stream;
+	stream = popen(command, "r");
+	if (!stream) {
+		return false;
+	}
+	defer (pclose(stream));
+
+	while (!feof(stream)) {
+		size_t n = fread(buffer, 1, 255, stream);
+		*output = gb_string_append_length(*output, buffer, n);
+
+		if (ferror(stream)) {
+			return false;
+		}
+	}
+
+	if (build_context.show_system_calls) {
+		gb_printf_err("[SYSTEM CALL OUTPUT] %s -> %s\n", command, *output);
+	}
+
+	return true;
+}
+
 gb_internal Array<String> setup_args(int argc, char const **argv) {
 	gbAllocator a = heap_allocator();
 
