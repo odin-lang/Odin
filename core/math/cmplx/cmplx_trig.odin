@@ -350,7 +350,7 @@ _reduce_pi_f64 :: proc "contextless" (x: f64) -> f64 #no_bounds_check {
 	// that is, 1/PI = SUM bdpi[i]*2^(-64*i).
 	// 19 64-bit digits give 1216 bits of precision
 	// to handle the largest possible f64 exponent.
-	@static bdpi := [?]u64{
+	@(static, rodata) bdpi := [?]u64{
 		0x0000000000000000,
 		0x517cc1b727220a94,
 		0xfe13abe8fa9a6ee0,
