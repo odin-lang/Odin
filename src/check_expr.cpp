@@ -7331,14 +7331,9 @@ gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, O
 			gbString s = gb_string_make_reserve(heap_allocator(), e->token.string.len+3);
 			s = gb_string_append_fmt(s, "%.*s(", LIT(e->token.string));
 
-			Type *params = nullptr;
-			switch (bt->kind) {
-			case Type_Struct: params = bt->Struct.polymorphic_params; break;
-			case Type_Union:  params = bt->Union.polymorphic_params;  break;
-			}
-
-			if (params != nullptr) for_array(i, params->Tuple.variables) {
-				Entity *v = params->Tuple.variables[i];
+			TypeTuple *tuple = get_record_polymorphic_params(e->type);
+			if (tuple != nullptr) for_array(i, tuple->variables) {
+				Entity *v = tuple->variables[i];
 				String name = v->token.string;
 				if (i > 0) {
 					s = gb_string_append_fmt(s, ", ");

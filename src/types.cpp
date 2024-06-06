@@ -140,6 +140,7 @@ struct TypeStruct {
 	i64             custom_field_align;
 	Type *          polymorphic_params; // Type_Tuple
 	Type *          polymorphic_parent;
+	Wait_Signal     polymorphic_wait_signal;
 
 	Type *          soa_elem;
 	i32             soa_count;
@@ -167,6 +168,7 @@ struct TypeUnion {
 	i64           custom_align;
 	Type *        polymorphic_params; // Type_Tuple
 	Type *        polymorphic_parent;
+	Wait_Signal   polymorphic_wait_signal;
 
 	i16           tag_size;
 	bool          is_polymorphic;
@@ -1093,6 +1095,7 @@ gb_internal Type *alloc_type_struct() {
 gb_internal Type *alloc_type_struct_complete() {
 	Type *t = alloc_type(Type_Struct);
 	wait_signal_set(&t->Struct.fields_wait_signal);
+	wait_signal_set(&t->Struct.polymorphic_wait_signal);
 	return t;
 }
 
@@ -2136,15 +2139,30 @@ gb_internal bool is_type_polymorphic_record_unspecialized(Type *t) {
 	return false;
 }
 
+gb_internal void wait_for_record_polymorphic_params(Type *t) {
+	t = base_type(t);
+	switch (t->kind) {
+	case Type_Struct:
+		wait_signal_until_available(&t->Struct.polymorphic_wait_signal);
+		break;
+	case Type_Union:
+		wait_signal_until_available(&t->Union.polymorphic_wait_signal);
+		break;
+	}
+}
+
+
 gb_internal TypeTuple *get_record_polymorphic_params(Type *t) {
 	t = base_type(t);
 	switch (t->kind) {
 	case Type_Struct:
+		wait_signal_until_available(&t->Struct.polymorphic_wait_signal);
 		if (t->Struct.polymorphic_params) {
 			return &t->Struct.polymorphic_params->Tuple;
 		}
 		break;
 	case Type_Union:
+		wait_signal_until_available(&t->Union.polymorphic_wait_signal);
 		if (t->Union.polymorphic_params) {
 			return &t->Union.polymorphic_params->Tuple;
 		}
