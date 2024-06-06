@@ -1491,10 +1491,10 @@ gb_internal i64 matrix_align_of(Type *t, struct TypePath *tp) {
 	i64 total_expected_size = row_count*t->Matrix.column_count*elem_size;
 	// i64 min_alignment = prev_pow2(elem_align * row_count);
 	i64 min_alignment = prev_pow2(total_expected_size);
-	while ((total_expected_size % min_alignment) != 0) {
+	while (total_expected_size != 0 && (total_expected_size % min_alignment) != 0) {
 		min_alignment >>= 1;
 	}
-	GB_ASSERT(min_alignment >= elem_align);
+	min_alignment = gb_max(min_alignment, elem_align);
 	
 	i64 align = gb_min(min_alignment, build_context.max_simd_align);
 	return align;
