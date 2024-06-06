@@ -2031,7 +2031,6 @@ gb_internal void add_type_info_type_internal(CheckerContext *c, Type *t) {
 		} else {
 			add_type_info_type_internal(c, t_type_info_ptr);
 		}
-		wait_for_record_polymorphic_params(bt);
 		add_type_info_type_internal(c, bt->Union.polymorphic_params);
 		for_array(i, bt->Union.variants) {
 			add_type_info_type_internal(c, bt->Union.variants[i]);
@@ -2064,7 +2063,6 @@ gb_internal void add_type_info_type_internal(CheckerContext *c, Type *t) {
 				}
 			}
 		}
-		wait_for_record_polymorphic_params(bt);
 		add_type_info_type_internal(c, bt->Struct.polymorphic_params);
 		for_array(i, bt->Struct.fields) {
 			Entity *f = bt->Struct.fields[i];
@@ -2294,7 +2292,6 @@ gb_internal void add_min_dep_type_info(Checker *c, Type *t) {
 		} else {
 			add_min_dep_type_info(c, t_type_info_ptr);
 		}
-		wait_for_record_polymorphic_params(bt);
 		add_min_dep_type_info(c, bt->Union.polymorphic_params);
 		for_array(i, bt->Union.variants) {
 			add_min_dep_type_info(c, bt->Union.variants[i]);
@@ -2324,7 +2321,6 @@ gb_internal void add_min_dep_type_info(Checker *c, Type *t) {
 				}
 			}
 		}
-		wait_for_record_polymorphic_params(bt);
 		add_min_dep_type_info(c, bt->Struct.polymorphic_params);
 		for_array(i, bt->Struct.fields) {
 			Entity *f = bt->Struct.fields[i];

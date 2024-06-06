@@ -1445,8 +1445,6 @@ gb_internal bool check_type_specialization_to(CheckerContext *ctx, Type *special
 			return true;
 		}
 
-		wait_for_record_polymorphic_params(s);
-		wait_for_record_polymorphic_params(t);
 		if (t->Struct.polymorphic_parent == s->Struct.polymorphic_parent &&
 		    s->Struct.polymorphic_params != nullptr &&
 		    t->Struct.polymorphic_params != nullptr) {
@@ -1500,8 +1498,6 @@ gb_internal bool check_type_specialization_to(CheckerContext *ctx, Type *special
 			return true;
 		}
 
-		wait_for_record_polymorphic_params(s);
-		wait_for_record_polymorphic_params(t);
 		if (t->Union.polymorphic_parent == s->Union.polymorphic_parent &&
 		    s->Union.polymorphic_params != nullptr &&
 		    t->Union.polymorphic_params != nullptr) {

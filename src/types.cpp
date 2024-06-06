@@ -2139,18 +2139,6 @@ gb_internal bool is_type_polymorphic_record_unspecialized(Type *t) {
 	return false;
 }
 
-gb_internal void wait_for_record_polymorphic_params(Type *t) {
-	t = base_type(t);
-	switch (t->kind) {
-	case Type_Struct:
-		wait_signal_until_available(&t->Struct.polymorphic_wait_signal);
-		break;
-	case Type_Union:
-		wait_signal_until_available(&t->Union.polymorphic_wait_signal);
-		break;
-	}
-}
-
 
 gb_internal TypeTuple *get_record_polymorphic_params(Type *t) {
 	t = base_type(t);
