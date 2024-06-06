@@ -126,10 +126,14 @@ ffs :: proc "contextless" (word: u32) -> (bit: i32) {
 fls :: proc "contextless" (word: u32) -> (bit: i32) {
 	return i32(31 - intrinsics.count_leading_zeros(word))
 }
-@(require_results)
-fls_uint :: proc "contextless" (size: uint) -> (bit: i32) {
-	N :: size_of(uintptr)-1
-	return i32(N - intrinsics.count_leading_zeros(size))
+
+when size_of(uintptr) == 8 {
+	@(require_results)
+	fls_uint :: proc "contextless" (size: uint) -> (bit: i32) {
+		return i32(63 - intrinsics.count_leading_zeros(size))
+	}
+} else {
+	fls_uint :: fls_u32
 }
 
 @(require_results)
