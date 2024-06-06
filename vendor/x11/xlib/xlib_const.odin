@@ -17,6 +17,11 @@ AllTemporary    :: 0
 CurrentTime     :: 0
 NoSymbol        :: 0
 
+PropModeReplace :: 0
+PropModePrepend :: 1
+PropModeAppend  :: 2
+
+XA_ATOM              :: Atom(4)
 XA_WM_CLASS          :: Atom(67)
 XA_WM_CLIENT_MACHINE :: Atom(36)
 XA_WM_COMMAND        :: Atom(34)

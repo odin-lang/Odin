@@ -1088,7 +1088,6 @@ gb_global TargetMetrics target_orca_wasm32 = {
 	TargetArch_wasm32,
 	4, 4, 8, 16,
 	str_lit("wasm32-wasi-js"),
-	// str_lit("e-m:e-p:32:32-i64:64-n32:64-S128"),
 };
 
 
@@ -1170,6 +1169,7 @@ gb_global NamedTargetMetrics named_targets[] = {
 	{ str_lit("freestanding_wasm32"), &target_freestanding_wasm32 },
 	{ str_lit("wasi_wasm32"),         &target_wasi_wasm32 },
 	{ str_lit("js_wasm32"),           &target_js_wasm32 },
+	{ str_lit("orca_wasm32"),         &target_orca_wasm32 },
 
 	{ str_lit("freestanding_wasm64p32"), &target_freestanding_wasm64p32 },
 	{ str_lit("js_wasm64p32"),           &target_js_wasm64p32 },
@@ -2045,11 +2045,10 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 		// }
 		if (bc->no_entry_point || bc->metrics.os == TargetOs_orca) {
 			link_flags = gb_string_appendc(link_flags, "--no-entry ");
-			bc->no_entry_point = true; // just in case for the "orca" target
 		}
-		
+
 		bc->link_flags = make_string_c(link_flags);
-		
+
 		// Disallow on wasm
 		bc->use_separate_modules = false;
 	} else {
