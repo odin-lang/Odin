@@ -7,7 +7,6 @@ import "core:compress"
 import "core:mem"
 import "base:intrinsics"
 import "base:runtime"
-@(require) import "core:fmt"
 
 Error   :: image.Error
 Image   :: image.Image
@@ -18,6 +17,101 @@ RGBA_Pixel :: image.RGBA_Pixel
 
 FILE_HEADER_SIZE :: 14
 INFO_STUB_SIZE   :: FILE_HEADER_SIZE + size_of(image.BMP_Version)
+
+save_to_buffer  :: proc(output: ^bytes.Buffer, img: ^Image, options := Options{}, allocator := context.allocator) -> (err: Error) {
+	context.allocator = allocator
+
+	if img == nil {
+		return .Invalid_Input_Image
+	}
+
+	if output == nil {
+		return .Invalid_Output
+	}
+
+	pixels := img.width * img.height
+	if pixels == 0 || pixels > image.MAX_DIMENSIONS {
+		return .Invalid_Input_Image
+	}
+
+	// While the BMP spec (and our loader) support more fanciful image types,
+	// `bmp.save` supports only 3 and 4 channel images with a bit depth of 8.
+	if img.depth != 8 || img.channels < 3 || img.channels > 4 {
+		return .Invalid_Input_Image
+	}
+
+	if img.channels * pixels != len(img.pixels.buf) {
+		return .Invalid_Input_Image
+	}
+
+	// Calculate and allocate size.
+	header_size       := u32le(image.BMP_Version.V3)
+	total_header_size := header_size + 14 // file header = 14
+	pixel_count_bytes := u32le(align4(img.width * img.channels) * img.height)
+
+	header := image.BMP_Header{
+		// File header
+		magic            = .Bitmap,
+		size             = total_header_size + pixel_count_bytes,
+		_res1            = 0,
+		_res2            = 0,
+		pixel_offset     = total_header_size,
+		// V3
+		info_size        = .V3,
+		width            = i32le(img.width),
+		height           = i32le(img.height),
+		planes           = 1,
+		bpp              = u16le(8 * img.channels),
+		compression      = .RGB,
+		image_size       = pixel_count_bytes,
+		pels_per_meter   = {2835, 2835}, // 72 DPI
+		colors_used      = 0,
+		colors_important = 0,
+	}
+	written := 0
+
+	if resize(&output.buf, int(header.size)) != nil {
+	 	return .Unable_To_Allocate_Or_Resize
+	}
+
+	header_bytes := transmute([size_of(image.BMP_Header)]u8)header
+	written += int(total_header_size)
+	copy(output.buf[:], header_bytes[:written])
+
+	switch img.channels {
+	case 3:
+		row_bytes  := img.width * img.channels
+		row_padded := align4(row_bytes)
+		pixels := mem.slice_data_cast([]RGB_Pixel, img.pixels.buf[:])
+		for y in 0..<img.height {
+			row_offset := row_padded * (img.height - y - 1) + written
+			for x in 0..<img.width {
+				pix_offset := 3 * x
+				output.buf[row_offset + pix_offset + 0] = pixels[0].b
+				output.buf[row_offset + pix_offset + 1] = pixels[0].g
+				output.buf[row_offset + pix_offset + 2] = pixels[0].r
+				pixels = pixels[1:]
+			}
+		}
+
+	case 4:
+		row_bytes  := img.width * img.channels
+		pixels := mem.slice_data_cast([]RGBA_Pixel, img.pixels.buf[:])
+		for y in 0..<img.height {
+			row_offset := row_bytes * (img.height - y - 1) + written
+			for x in 0..<img.width {
+				pix_offset := 4 * x
+				output.buf[row_offset + pix_offset + 0] = pixels[0].b
+				output.buf[row_offset + pix_offset + 1] = pixels[0].g
+				output.buf[row_offset + pix_offset + 2] = pixels[0].r
+				output.buf[row_offset + pix_offset + 3] = pixels[0].a
+				pixels = pixels[1:]
+			}
+		}
+	}
+	return
+}
+
 
 load_from_bytes :: proc(data: []byte, options := Options{}, allocator := context.allocator) -> (img: ^Image, err: Error) {
 	ctx := &compress.Context_Memory_Input{

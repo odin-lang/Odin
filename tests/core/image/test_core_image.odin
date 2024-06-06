@@ -2327,10 +2327,6 @@ run_bmp_suite :: proc(t: ^testing.T, suite: []Test) {
 			testing.expectf(t, passed, "%q failed to load with error %v.", file.file, err)
 
 			if err == nil { // No point in running the other tests if it didn't load.
-				qoi_file := strings.concatenate({TEST_SUITE_PATH_BMP, "/", file.file, ".qoi"}, context.allocator)
-				defer delete(qoi_file)
-
-				qoi.save(qoi_file, img)
 				pixels := bytes.buffer_to_bytes(&img.pixels)
 
 				dims   := Dims{img.width, img.height, img.channels, img.depth}
@@ -2338,6 +2334,26 @@ run_bmp_suite :: proc(t: ^testing.T, suite: []Test) {
 
 				img_hash := hash.crc32(pixels)
 				testing.expectf(t, test.hash == img_hash, "%v test #1's hash is %08x, expected %08x with %v.", file.file, img_hash, test.hash, test.options)
+
+				// Save to BMP file in memory
+				buf: bytes.Buffer
+				save_err := bmp.save(&buf, img)
+				testing.expectf(t, save_err == nil, "expected saving to BMP in memory not to raise error, got %v", save_err)
+
+				// Reload BMP from memory
+				reload_img, reload_err := bmp.load(buf.buf[:])
+				testing.expectf(t, reload_err == nil, "expected reloading BMP from memory not to raise error, got %v", reload_err)
+
+				testing.expect(t, img.width    == reload_img.width    && img.height == reload_img.height, "expected saved BMP to have the same dimensions")
+				testing.expect(t, img.channels == reload_img.channels && img.depth  == reload_img.depth,  "expected saved BMP to have the same dimensions")
+
+				reload_pixels := bytes.buffer_to_bytes(&reload_img.pixels)
+				reload_hash   := hash.crc32(reload_pixels)
+
+				testing.expectf(t, img_hash == reload_hash, "expected saved BMP to have the same pixel hash (%08x), got %08x", img_hash, reload_hash)
+
+				bytes.buffer_destroy(&buf)
+				bmp.destroy(reload_img)
 			}
 			bmp.destroy(img)
 		}
