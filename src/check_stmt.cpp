@@ -501,6 +501,9 @@ gb_internal Type *check_assignment_variable(CheckerContext *ctx, Operand *lhs, O
 		return nullptr;
 
 	case Addressing_Variable:
+		if (e && e->kind == Entity_Variable && e->Variable.is_rodata) {
+			error(lhs->expr, "Assignment to variable '%.*s' marked as @(rodata) is not allowed", LIT(e->token.string));
+		}
 		break;
 
 	case Addressing_MapIndex: {
@@ -2054,6 +2057,9 @@ gb_internal void check_value_decl_stmt(CheckerContext *ctx, Ast *node, u32 mod_f
 					error(e->token, "'static' variables cannot be declared within a defer statement");
 				}
 			}
+		}
+		if (ac.rodata) {
+			error(e->token, "Only global variables can have @(rodata) applied");
 		}
 		if (ac.thread_local_model != "") {
 			String name = e->token.string;

@@ -1160,6 +1160,10 @@ gb_internal lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProc
 				if (is_type_untyped_nil(init.type)) {
 					LLVMSetInitializer(var.var.value, LLVMConstNull(global_type));
 					var.is_initialized = true;
+
+					if (e->Variable.is_rodata) {
+						LLVMSetGlobalConstant(var.var.value, true);
+					}
 					continue;
 				}
 				GB_PANIC("Invalid init value, got %s", expr_to_string(init_expr));
@@ -1174,6 +1178,10 @@ gb_internal lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProc
 					}
 					LLVMSetInitializer(var.var.value, init.value);
 					var.is_initialized = true;
+
+					if (e->Variable.is_rodata) {
+						LLVMSetGlobalConstant(var.var.value, true);
+					}
 					continue;
 				}
 			} else {
@@ -1206,8 +1214,9 @@ gb_internal lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProc
 
 			var.is_initialized = true;
 		}
+
+
 	}
-	
 	CheckerInfo *info = main_module->gen->info;
 	
 	for (Entity *e : info->init_procedures) {
@@ -3210,14 +3219,21 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 						lbValue init = lb_const_value(m, tav.type, v);
 						LLVMSetInitializer(g.value, init.value);
 						var.is_initialized = true;
+						if (e->kind == Entity_Variable && e->Variable.is_rodata) {
+							LLVMSetGlobalConstant(g.value, true);
+						}
 					}
 				}
 			}
 			if (!var.is_initialized && is_type_untyped_nil(tav.type)) {
 				var.is_initialized = true;
+				if (e->kind == Entity_Variable && e->Variable.is_rodata) {
+					LLVMSetGlobalConstant(g.value, true);
+				}
 			}
+		} else if (e->kind == Entity_Variable && e->Variable.is_rodata) {
+			LLVMSetGlobalConstant(g.value, true);
 		}
-
 		array_add(&global_variables, var);
 
 		lb_add_entity(m, e, g);

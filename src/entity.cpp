@@ -230,6 +230,7 @@ struct Entity {
 			bool       is_foreign;
 			bool       is_export;
 			bool       is_global;
+			bool       is_rodata;
 		} Variable;
 		struct {
 			Type * type_parameter_specialization;
