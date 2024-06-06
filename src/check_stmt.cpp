@@ -2059,7 +2059,11 @@ gb_internal void check_value_decl_stmt(CheckerContext *ctx, Ast *node, u32 mod_f
 			}
 		}
 		if (ac.rodata) {
-			error(e->token, "Only global variables can have @(rodata) applied");
+			if (ac.is_static) {
+				e->Variable.is_rodata = true;
+			} else {
+				error(e->token, "Only global or @(static) variables can have @(rodata) applied");
+			}
 		}
 		if (ac.thread_local_model != "") {
 			String name = e->token.string;

@@ -1850,7 +1850,9 @@ gb_internal void lb_build_static_variables(lbProcedure *p, AstValueDecl *vd) {
 		LLVMSetInitializer(global, LLVMConstNull(lb_type(p->module, e->type)));
 		if (value.value != nullptr) {
 			LLVMSetInitializer(global, value.value);
-		} else {
+		}
+		if (e->Variable.is_rodata) {
+			LLVMSetGlobalConstant(global, true);
 		}
 		if (e->Variable.thread_local_model != "") {
 			LLVMSetThreadLocal(global, true);
