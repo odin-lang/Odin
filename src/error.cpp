@@ -407,29 +407,31 @@ gb_internal void warning_va(TokenPos const &pos, TokenPos end, char const *fmt, 
 		error_va(pos, end, fmt, va);
 		return;
 	}
+	if (global_ignore_warnings()) {
+		return;
+	}
+
 	global_error_collector.warning_count.fetch_add(1);
 	mutex_lock(&global_error_collector.mutex);
 
 	push_error_value(pos, ErrorValue_Warning);
 
-	if (!global_ignore_warnings()) {
-		if (pos.line == 0) {
+	if (pos.line == 0) {
+		error_out_empty();
+		error_out_coloured("Warning: ", TerminalStyle_Normal, TerminalColour_Yellow);
+		error_out_va(fmt, va);
+		error_out("\n");
+	} else {
+		// global_error_collector.prev = pos;
+		if (json_errors()) {
 			error_out_empty();
-			error_out_coloured("Warning: ", TerminalStyle_Normal, TerminalColour_Yellow);
-			error_out_va(fmt, va);
-			error_out("\n");
 		} else {
-			// global_error_collector.prev = pos;
-			if (json_errors()) {
-				error_out_empty();
-			} else {
-				error_out_pos(pos);
-			}
-			error_out_coloured("Warning: ", TerminalStyle_Normal, TerminalColour_Yellow);
-			error_out_va(fmt, va);
-			error_out("\n");
-			show_error_on_line(pos, end);
+			error_out_pos(pos);
 		}
+		error_out_coloured("Warning: ", TerminalStyle_Normal, TerminalColour_Yellow);
+		error_out_va(fmt, va);
+		error_out("\n");
+		show_error_on_line(pos, end);
 	}
 	try_pop_error_value();
 	mutex_unlock(&global_error_collector.mutex);
@@ -544,30 +546,31 @@ gb_internal void syntax_warning_va(TokenPos const &pos, TokenPos end, char const
 		syntax_error_va(pos, end, fmt, va);
 		return;
 	}
+	if (global_ignore_warnings()) {
+		return;
+	}
 	mutex_lock(&global_error_collector.mutex);
 	global_error_collector.warning_count++;
 
 
 	push_error_value(pos, ErrorValue_Warning);
 
-	if (!global_ignore_warnings()) {
-		if (pos.line == 0) {
+	if (pos.line == 0) {
+		error_out_empty();
+		error_out_coloured("Syntax Warning: ", TerminalStyle_Normal, TerminalColour_Yellow);
+		error_out_va(fmt, va);
+		error_out("\n");
+	} else {
+		// global_error_collector.prev = pos;
+		if (json_errors()) {
 			error_out_empty();
-			error_out_coloured("Syntax Warning: ", TerminalStyle_Normal, TerminalColour_Yellow);
-			error_out_va(fmt, va);
-			error_out("\n");
 		} else {
-			// global_error_collector.prev = pos;
-			if (json_errors()) {
-				error_out_empty();
-			} else {
-				error_out_pos(pos);
-			}
-			error_out_coloured("Syntax Warning: ", TerminalStyle_Normal, TerminalColour_Yellow);
-			error_out_va(fmt, va);
-			error_out("\n");
-			// show_error_on_line(pos, end);
+			error_out_pos(pos);
 		}
+		error_out_coloured("Syntax Warning: ", TerminalStyle_Normal, TerminalColour_Yellow);
+		error_out_va(fmt, va);
+		error_out("\n");
+		// show_error_on_line(pos, end);
 	}
 
 	try_pop_error_value();
