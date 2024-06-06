@@ -79,6 +79,11 @@ echo ---
 %PATH_TO_ODIN% test math/noise %COMMON% -out:test_noise.exe || exit /b
 
 echo ---
+echo Running core:mem tests
+echo ---
+%PATH_TO_ODIN% test mem %COMMON% -out:test_core_mem.exe || exit /b
+
+echo ---
 echo Running core:net
 echo ---
 %PATH_TO_ODIN% test net %COMMON% -out:test_core_net.exe || exit /b

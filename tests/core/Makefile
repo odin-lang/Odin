@@ -19,6 +19,7 @@ all_bsd: download_test_assets \
          linalg_glsl_math_test \
          match_test \
          math_test \
+         mem_test \
          noise_test \
          odin_test \
          os_exit_test \
@@ -79,6 +80,9 @@ linalg_glsl_math_test:
 
 noise_test:
 	$(ODIN) test math/noise $(COMMON) -out:test_noise
+
+mem_test:
+	$(ODIN) test mem $(COMMON) -out:test_core_mem
 
 net_test:
 	$(ODIN) test net $(COMMON) -out:test_core_net
