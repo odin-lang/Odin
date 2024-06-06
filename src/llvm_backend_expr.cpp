@@ -504,6 +504,10 @@ gb_internal bool lb_is_matrix_simdable(Type *t) {
 	if ((mt->Matrix.row_count & 1) ^ (mt->Matrix.column_count & 1)) {
 		return false;
 	}
+	if (mt->Matrix.is_row_major) {
+		// TODO(bill): make #row_major matrices work with SIMD
+		return false;
+	}
 	
 	if (elem->kind == Type_Basic) {
 		switch (elem->Basic.kind) {
