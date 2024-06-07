@@ -38,14 +38,17 @@ jobs:
   build_linux:
     name: Ubuntu Build, Check, and Test
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        llvm_version: [17, 18]
     steps:
       - uses: actions/checkout@v1
       - name: Download LLVM
         run: |
           wget https://apt.llvm.org/llvm.sh
           chmod +x llvm.sh
-          sudo ./llvm.sh 17
-          echo "/usr/lib/llvm-17/bin" >> $GITHUB_PATH
+          sudo ./llvm.sh ${{ matrix.llvm_version }}
+          echo "/usr/lib/llvm-${{ matrix.llvm_version }}/bin" >> $GITHUB_PATH
       - name: build odin
         run: ./build_odin.sh release
       - name: Odin version
@@ -104,15 +107,19 @@ jobs:
       - name: Odin check examples/all for OpenBSD amd64
         run: ./odin check examples/all -vet -strict-style -target:openbsd_amd64
         timeout-minutes: 10
+
   build_macOS:
     name: MacOS Build, Check, and Test
     runs-on: macos-13
+    strategy:
+      matrix:
+        llvm_version: [17, 18]
     steps:
       - uses: actions/checkout@v1
       - name: Download LLVM, and setup PATH
         run: |
-          brew install llvm@17
-          echo "/usr/local/opt/llvm@17/bin" >> $GITHUB_PATH
+          brew install llvm@${{ matrix.llvm_version }}
+          echo "/usr/local/opt/llvm@${{ matrix.llvm_version }}/bin" >> $GITHUB_PATH
       - name: build odin
         run: ./build_odin.sh release
       - name: Odin version
@@ -157,12 +164,15 @@ jobs:
   build_macOS_arm:
     name: MacOS ARM Build, Check, and Test
     runs-on: macos-14 # This is an arm/m1 runner.
+    strategy:
+      matrix:
+        llvm_version: [17, 18]
     steps:
       - uses: actions/checkout@v1
       - name: Download LLVM and setup PATH
         run: |
-          brew install llvm@17
-          echo "/opt/homebrew/opt/llvm@17/bin" >> $GITHUB_PATH
+          brew install llvm@${{ matrix.llvm_version }}
+          echo "/opt/homebrew/optllvm@${{ matrix.llvm_version }}/bin" >> $GITHUB_PATH
       - name: build odin
         run: ./build_odin.sh release
       - name: Odin version

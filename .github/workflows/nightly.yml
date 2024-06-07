@@ -44,14 +44,17 @@ jobs:
     name: Ubuntu Build
     if: github.repository == 'odin-lang/Odin'
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        llvm_version: [17, 18]
     steps:
       - uses: actions/checkout@v1
       - name: (Linux) Download LLVM
         run: |
           wget https://apt.llvm.org/llvm.sh
           chmod +x llvm.sh
-          sudo ./llvm.sh 17
-          echo "/usr/lib/llvm-17/bin" >> $GITHUB_PATH
+          sudo ./llvm.sh ${{ matrix.llvm_version }}
+          echo "/usr/lib/llvm-${{ matrix.llvm_version }}/bin" >> $GITHUB_PATH
       - name: build odin
         run: make nightly
       - name: Odin run
@@ -78,12 +81,15 @@ jobs:
     name: MacOS Build
     if: github.repository == 'odin-lang/Odin'
     runs-on: macos-13
+    strategy:
+      matrix:
+        llvm_version: [17, 18]
     steps:
       - uses: actions/checkout@v1
       - name: Download LLVM and setup PATH
         run: |
-          brew install llvm@17 dylibbundler
-          echo "/usr/local/opt/llvm@17/bin" >> $GITHUB_PATH
+          brew install llvm@${{ matrix.llvm_version }} dylibbundler
+          echo "/usr/local/opt/llvm@${{ matrix.llvm_version }}/bin" >> $GITHUB_PATH
       - name: build odin
         # These -L makes the linker prioritize system libraries over LLVM libraries, this is mainly to
         # not link with libunwind bundled with LLVM but link with libunwind on the system.
@@ -112,12 +118,15 @@ jobs:
     name: MacOS ARM Build
     if: github.repository == 'odin-lang/Odin'
     runs-on: macos-14 # ARM machine
+    strategy:
+      matrix:
+        llvm_version: [17, 18]
     steps:
       - uses: actions/checkout@v1
       - name: Download LLVM and setup PATH
         run: |
-          brew install llvm@17 dylibbundler
-          echo "/opt/homebrew/opt/llvm@17/bin" >> $GITHUB_PATH
+          brew install llvm@${{ matrix.llvm_version }} dylibbundler
+          echo "/opt/homebrew/opt/llvm@${{ matrix.llvm_version }}/bin" >> $GITHUB_PATH
       - name: build odin
         # These -L makes the linker prioritize system libraries over LLVM libraries, this is mainly to
         # not link with libunwind bundled with LLVM but link with libunwind on the system.
