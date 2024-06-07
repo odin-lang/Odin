@@ -1593,7 +1593,8 @@ gb_internal void check_defines(BuildContext *bc, Checker *c) {
 		}
 
 		if (!found) {
-			warning(nullptr, "given -define:%s is unused in the project", name);
+			ERROR_BLOCK();
+			warning(nullptr, "given -define:%.*s is unused in the project", LIT(name));
 			error_line("\tSuggestion: use the -show-defineables flag for an overview of the possible defines\n");
 		}
 	}
@@ -1639,44 +1640,49 @@ gb_internal void export_defineables(Checker *c, String path) {
 	}
 	defer (gb_file_close(&f));
 
-	gb_fprintf(&f, "Defineable,Default Value,Location\n");
+	gbString docs = gb_string_make(heap_allocator(), "");
+	defer (gb_string_free(docs));
+
+	gb_fprintf(&f, "Defineable,Default Value,Docs,Location\n");
 	for_array(i, c->info.defineables) {
 		Defineable *def = &c->info.defineables[i];
-		gb_fprintf(&f,"%.*s,%.*s,%.*s\n", LIT(def->name), LIT(def->default_value_str), LIT(def->pos_str));
+
+		gb_string_clear(docs);
+		if (def->docs) {
+			docs = gb_string_appendc(docs, "\"");
+			for (Token const &token : def->docs->list) {
+				for (isize i = 0; i < token.string.len; i++) {
+					u8 c = token.string.text[i];
+				   	if (c == '"') {
+				   		docs = gb_string_appendc(docs, "\"\"");
+				   	} else {
+						docs = gb_string_append_length(docs, &c, 1);
+					}
+				}
+			}
+			docs = gb_string_appendc(docs, "\"");
+		}
+
+		gb_fprintf(&f,"%.*s,%.*s,%s,%.*s\n", LIT(def->name), LIT(def->default_value_str), docs, LIT(def->pos_str));
 	}
 }
 
 gb_internal void show_defineables(Checker *c) {
-	isize max_name_len    = gb_strlen("Defineable");
-	isize max_default_len = gb_strlen("Default Value");
-	isize max_pos_len     = gb_strlen("Location");
-
 	for_array(i, c->info.defineables) {
 		Defineable *def = &c->info.defineables[i];
-		if (def->name.len > max_name_len) {
-			max_name_len = def->name.len;
+		if (has_ansi_terminal_colours()) {
+			gb_printf("\x1b[0;90m");
 		}
-
-		if (def->default_value_str.len > max_default_len) {
-			max_default_len = def->default_value_str.len;
+		printf("%.*s\n", LIT(def->pos_str));
+		if (def->docs) {
+			for (Token const &token : def->docs->list) {
+				gb_printf("%.*s\n", LIT(token.string));
+			}
 		}
-
-		if (def->pos_str.len > max_pos_len) {
-			max_pos_len = def->pos_str.len;
+		if (has_ansi_terminal_colours()) {
+			gb_printf("\x1b[0m");
 		}
-	}
-
-	printf("%-*s - %-*s - %-*s\n",
-		cast(int)max_name_len,    "Defineable",
-		cast(int)max_default_len, "Default Value",
-		cast(int)max_pos_len,     "Location");
-
-	for_array(i, c->info.defineables) {
-		Defineable *def = &c->info.defineables[i];
-		printf("%-*.*s - %-*.*s - %-*.*s\n",
-			cast(int)max_name_len,    LIT(def->name),
-			cast(int)max_default_len, LIT(def->default_value_str),
-			cast(int)max_pos_len,     LIT(def->pos_str));
+		gb_printf("%.*s :: %.*s\n\n", LIT(def->name), LIT(def->default_value_str));
 	}
 }
 

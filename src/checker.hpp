@@ -377,9 +377,10 @@ struct GenTypesData {
 };
 
 struct Defineable {
-	String     name;
-	ExactValue default_value;
-	TokenPos   pos;
+	String        name;
+	ExactValue    default_value;
+	TokenPos      pos;
+	CommentGroup *docs;
 
 	// These strings are only computed from previous fields when defineables are being shown or exported.
 	String default_value_str;
