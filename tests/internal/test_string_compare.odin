@@ -1,4 +1,4 @@
-package test_internal_string_compare
+package test_internal
 
 import "core:testing"
 

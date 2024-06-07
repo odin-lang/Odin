@@ -1,4 +1,4 @@
-package test_internal_math_pow
+package test_internal
 
 @(require) import "core:log"
 import "core:math"
