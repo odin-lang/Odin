@@ -1495,7 +1495,7 @@ fmt_pointer :: proc(fi: ^Info, p: rawptr, verb: rune) {
 	u := u64(uintptr(p))
 	switch verb {
 	case 'p', 'v', 'w':
-		if !fi.hash && verb == 'v' {
+		if !fi.hash {
 			io.write_string(fi.writer, "0x", &fi.n)
 		}
 		_fmt_int(fi, u, 16, false, 8*size_of(rawptr), __DIGITS_UPPER)
