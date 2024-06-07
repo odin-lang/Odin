@@ -259,7 +259,7 @@ test_pointers :: proc(t: ^testing.T) {
 }
 
 @(private)
-check :: proc(t: ^testing.T, exp: string, format: string, args: ..any) {
+check :: proc(t: ^testing.T, exp: string, format: string, args: ..any, loc := #caller_location) {
 	got := fmt.tprintf(format, ..args)
-	testing.expectf(t, got == exp, "(%q, %v): %q != %q", format, args, got, exp)
+	testing.expectf(t, got == exp, "(%q, %v): %q != %q", format, args, got, exp, loc = loc)
 }
