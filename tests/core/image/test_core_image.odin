@@ -1472,7 +1472,6 @@ run_png_suite :: proc(t: ^testing.T, suite: []Test) {
 			if err == nil { // No point in running the other tests if it didn't load.
 				pixels := bytes.buffer_to_bytes(&img.pixels)
 
-				// This struct compare fails at -opt:2 if PNG_Dims is not #packed.
 				dims      := Dims{img.width, img.height, img.channels, img.depth}
 				dims_pass := test.dims == dims
 				testing.expectf(t, dims_pass, "%v has %v, expected: %v", file.file, dims, test.dims)
