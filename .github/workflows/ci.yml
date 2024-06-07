@@ -29,186 +29,101 @@ jobs:
           gmake release
           ./odin version
           ./odin report
+          gmake -C vendor/stb/src
+          gmake -C vendor/cgltf/src
+          gmake -C vendor/miniaudio/src
           ./odin check examples/all -vet -strict-style -target:netbsd_amd64
           ./odin check examples/all -vet -strict-style -target:netbsd_arm64
-          (cd tests/core; gmake all_bsd)
-          (cd tests/internal; gmake all_bsd)
+          ./odin test tests/core/normal.odin -file -all-packages -define:ODIN_TEST_FANCY=false
+          ./odin test tests/core/speed.odin -file -all-packages -o:speed -define:ODIN_TEST_FANCY=false
+          ./odin test tests/vendor -all-packages -define:ODIN_TEST_FANCY=false
+          ./odin test tests/benchmark -all-packages -define:ODIN_TEST_FANCY=false
           (cd tests/issues; ./run.sh)
-          (cd tests/benchmark; gmake all)
-  build_linux:
-    name: Ubuntu Build, Check, and Test
-    runs-on: ubuntu-latest
+  ci:
+    strategy:
+      fail-fast: false
+      matrix:
+        # MacOS 13 runs on Intel, 14 runs on ARM
+        os: [ubuntu-latest, macos-13, macos-14]
+    runs-on: ${{ matrix.os }}
+    name: ${{ matrix.os == 'macos-14' && 'MacOS ARM' || (matrix.os == 'macos-13' && 'MacOS Intel' || 'Ubuntu') }} Build, Check, and Test
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v1
-      - name: Download LLVM
+      - uses: actions/checkout@v4
+
+      - name: Download LLVM (Linux)
+        if: matrix.os == 'ubuntu-latest'
         run: |
           wget https://apt.llvm.org/llvm.sh
           chmod +x llvm.sh
           sudo ./llvm.sh 17
           echo "/usr/lib/llvm-17/bin" >> $GITHUB_PATH
-      - name: build odin
-        run: ./build_odin.sh release
-      - name: Odin version
-        run: ./odin version
-        timeout-minutes: 1
-      - name: Odin report
-        run: ./odin report
-        timeout-minutes: 1
-      - name: Compile needed Vendor
-        run: |
-          make -C $(./odin root)/vendor/stb/src
-          make -C $(./odin root)/vendor/cgltf/src
-          make -C $(./odin root)/vendor/miniaudio/src
-        timeout-minutes: 10
-      - name: Odin check
-        run: ./odin check examples/demo -vet
-        timeout-minutes: 10
-      - name: Odin run
-        run: ./odin run examples/demo
-        timeout-minutes: 10
-      - name: Odin run -debug
-        run: ./odin run examples/demo -debug
-        timeout-minutes: 10
-      - name: Odin check examples/all
-        run: ./odin check examples/all -strict-style
-        timeout-minutes: 10
-      - name: Core library tests
-        run: |
-          cd tests/core
-          make
-        timeout-minutes: 10
-      - name: Vendor library tests
-        run: |
-          cd tests/vendor
-          make
-        timeout-minutes: 10
-      - name: Odin internals tests
-        run: |
-          cd tests/internal
-          make
-        timeout-minutes: 10
-      - name: Odin core library benchmarks
-        run: |
-          cd tests/benchmark
-          make
-        timeout-minutes: 10
-      - name: Odin check examples/all for Linux i386
-        run: ./odin check examples/all -vet -strict-style -target:linux_i386
-        timeout-minutes: 10
-      - name: Odin check examples/all for Linux arm64
-        run: ./odin check examples/all -vet -strict-style -target:linux_arm64
-        timeout-minutes: 10
-      - name: Odin check examples/all for FreeBSD amd64
-        run: ./odin check examples/all -vet -strict-style -target:freebsd_amd64
-        timeout-minutes: 10
-      - name: Odin check examples/all for OpenBSD amd64
-        run: ./odin check examples/all -vet -strict-style -target:openbsd_amd64
-        timeout-minutes: 10
-  build_macOS:
-    name: MacOS Build, Check, and Test
-    runs-on: macos-13
-    steps:
-      - uses: actions/checkout@v1
-      - name: Download LLVM, and setup PATH
+
+      - name: Download LLVM (MacOS Intel)
+        if: matrix.os == 'macos-13'
         run: |
           brew install llvm@17
           echo "/usr/local/opt/llvm@17/bin" >> $GITHUB_PATH
-      - name: build odin
-        run: ./build_odin.sh release
-      - name: Odin version
-        run: ./odin version
-        timeout-minutes: 1
-      - name: Odin report
-        run: ./odin report
-        timeout-minutes: 1
-      - name: Compile needed Vendor
-        run: |
-          make -C $(./odin root)/vendor/stb/src
-          make -C $(./odin root)/vendor/cgltf/src
-          make -C $(./odin root)/vendor/miniaudio/src
-        timeout-minutes: 10
-      - name: Odin check
-        run: ./odin check examples/demo -vet
-        timeout-minutes: 10
-      - name: Odin run
-        run: ./odin run examples/demo
-        timeout-minutes: 10
-      - name: Odin run -debug
-        run: ./odin run examples/demo -debug
-        timeout-minutes: 10
-      - name: Odin check examples/all
-        run: ./odin check examples/all -strict-style
-        timeout-minutes: 10
-      - name: Core library tests
-        run: |
-          cd tests/core
-          make
-        timeout-minutes: 10
-      - name: Odin internals tests
-        run: |
-          cd tests/internal
-          make
-        timeout-minutes: 10
-      - name: Odin core library benchmarks
-        run: |
-          cd tests/benchmark
-          make
-        timeout-minutes: 10
-  build_macOS_arm:
-    name: MacOS ARM Build, Check, and Test
-    runs-on: macos-14 # This is an arm/m1 runner.
-    steps:
-      - uses: actions/checkout@v1
-      - name: Download LLVM and setup PATH
+
+      - name: Download LLVM (MacOS ARM)
+        if: matrix.os == 'macos-14'
         run: |
           brew install llvm@17
           echo "/opt/homebrew/opt/llvm@17/bin" >> $GITHUB_PATH
-      - name: build odin
+
+      - name: Build Odin
         run: ./build_odin.sh release
       - name: Odin version
         run: ./odin version
-        timeout-minutes: 1
       - name: Odin report
         run: ./odin report
-        timeout-minutes: 1
       - name: Compile needed Vendor
         run: |
-          make -C $(./odin root)/vendor/stb/src
-          make -C $(./odin root)/vendor/cgltf/src
-          make -C $(./odin root)/vendor/miniaudio/src
-        timeout-minutes: 10
+          make -C vendor/stb/src
+          make -C vendor/cgltf/src
+          make -C vendor/miniaudio/src
       - name: Odin check
         run: ./odin check examples/demo -vet
-        timeout-minutes: 10
       - name: Odin run
         run: ./odin run examples/demo
-        timeout-minutes: 10
       - name: Odin run -debug
         run: ./odin run examples/demo -debug
-        timeout-minutes: 10
       - name: Odin check examples/all
         run: ./odin check examples/all -strict-style
-        timeout-minutes: 10
-      - name: Core library tests
+      - name: Normal Core library tests
+        run: ./odin test tests/core/normal.odin -file -all-packages -define:ODIN_TEST_FANCY=false
+      - name: Optimized Core library tests
+        run: ./odin test tests/core/speed.odin -o:speed -file -all-packages -define:ODIN_TEST_FANCY=false
+      - name: Vendor library tests
+        run: ./odin test tests/vendor -all-packages -define:ODIN_TEST_FANCY=false
+      - name: Internals tests
+        run: ./odin test tests/internal -all-packages -define:ODIN_TEST_FANCY=false
+      - name: Core library benchmarks
+        run: ./odin test tests/benchmark -all-packages -define:ODIN_TEST_FANCY=false
+      - name: GitHub Issue tests
         run: |
-          cd tests/core
-          make
-        timeout-minutes: 10
-      - name: Odin internals tests
-        run: |
-          cd tests/internal
-          make
-        timeout-minutes: 10
-      - name: Odin core library benchmarks
-        run: |
-          cd tests/benchmark
-          make
-        timeout-minutes: 10
+          cd tests/issues
+          ./run.sh
+
+      - name: Odin check examples/all for Linux i386
+        run: ./odin check examples/all -vet -strict-style -target:linux_i386
+        if: matrix.os == 'ubuntu-latest'
+      - name: Odin check examples/all for Linux arm64
+        run: ./odin check examples/all -vet -strict-style -target:linux_arm64
+        if: matrix.os == 'ubuntu-latest'
+      - name: Odin check examples/all for FreeBSD amd64
+        run: ./odin check examples/all -vet -strict-style -target:freebsd_amd64
+        if: matrix.os == 'ubuntu-latest'
+      - name: Odin check examples/all for OpenBSD amd64
+        run: ./odin check examples/all -vet -strict-style -target:openbsd_amd64
+        if: matrix.os == 'ubuntu-latest'
+
   build_windows:
     name: Windows Build, Check, and Test
     runs-on: windows-2022
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v4
       - name: build Odin
         shell: cmd
         run: |
@@ -216,79 +131,67 @@ jobs:
           ./build.bat 1
       - name: Odin version
         run: ./odin version
-        timeout-minutes: 1
       - name: Odin report
         run: ./odin report
-        timeout-minutes: 1
       - name: Odin check
         shell: cmd
         run: |
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat
           odin check examples/demo -vet
-        timeout-minutes: 10
       - name: Odin run
         shell: cmd
         run: |
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat
           odin run examples/demo
-        timeout-minutes: 10
       - name: Odin run -debug
         shell: cmd
         run: |
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat
           odin run examples/demo -debug
-        timeout-minutes: 10
       - name: Odin check examples/all
         shell: cmd
         run: |
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat
           odin check examples/all -strict-style
-        timeout-minutes: 10
       - name: Core library tests
         shell: cmd
         run: |
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat
-          cd tests\core
-          call build.bat
-        timeout-minutes: 10
+          odin test tests/core/normal.odin -file -all-packages -define:ODIN_TEST_FANCY=false
+      - name: Optimized core library tests
+        shell: cmd
+        run: |
+          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat
+          odin test tests/core/speed.odin -o:speed -file -all-packages -define:ODIN_TEST_FANCY=false
       - name: Core library benchmarks
         shell: cmd
         run: |
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat
-          cd tests\benchmark
-          call build.bat
-        timeout-minutes: 10
+          odin test tests/benchmark -all-packages -define:ODIN_TEST_FANCY=false
       - name: Vendor library tests
         shell: cmd
         run: |
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat
-          cd tests\vendor
-          call build.bat
-        timeout-minutes: 10
+          odin test tests/vendor -all-packages -define:ODIN_TEST_FANCY=false
       - name: Odin internals tests
         shell: cmd
         run: |
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat
-          cd tests\internal
-          call build.bat
-        timeout-minutes: 10
+          odin test tests/internal -all-packages -define:ODIN_TEST_FANCY=false
       - name: Odin documentation tests
         shell: cmd
         run: |
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat
           cd tests\documentation
           call build.bat
-        timeout-minutes: 10
       - name: core:math/big tests
         shell: cmd
         run: |
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat
           cd tests\core\math\big
           call build.bat
-        timeout-minutes: 10
       - name: Odin check examples/all for Windows 32bits
         shell: cmd
         run: |
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat
           odin check examples/all -strict-style -target:windows_i386
-        timeout-minutes: 10

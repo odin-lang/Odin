@@ -776,7 +776,7 @@ gb_internal void check_union_type(CheckerContext *ctx, Type *union_type, Ast *no
 			}
 		}
 		if (variants.count < 2) {
-			error(ut->align, "A union with #no_nil must have at least 2 variants");
+			error(node, "A union with #no_nil must have at least 2 variants");
 		}
 		break;
 	}

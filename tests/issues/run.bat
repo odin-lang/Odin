@@ -10,7 +10,6 @@ set COMMON=-define:ODIN_TEST_FANCY=false -file -vet -strict-style
 ..\..\..\odin test ..\test_issue_829.odin  %COMMON%   || exit /b
 ..\..\..\odin test ..\test_issue_1592.odin %COMMON%  || exit /b
 ..\..\..\odin test ..\test_issue_2056.odin %COMMON%  || exit /b
-..\..\..\odin test ..\test_issue_2087.odin %COMMON%  || exit /b
 ..\..\..\odin build ..\test_issue_2113.odin %COMMON% -debug || exit /b
 ..\..\..\odin test ..\test_issue_2466.odin %COMMON%  || exit /b
 ..\..\..\odin test ..\test_issue_2615.odin %COMMON%  || exit /b

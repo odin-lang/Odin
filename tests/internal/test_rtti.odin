@@ -1,4 +1,4 @@
-package test_internal_rtti
+package test_internal
 
 import "core:fmt"
 import "core:testing"

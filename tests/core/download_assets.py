@@ -8,7 +8,7 @@ import hashlib
 import hmac
 
 TEST_SUITES        = ['PNG', 'XML', 'BMP']
-DOWNLOAD_BASE_PATH = "assets/{}"
+DOWNLOAD_BASE_PATH = sys.argv[1] + "/{}"
 ASSETS_BASE_URL    = "https://raw.githubusercontent.com/odin-lang/test-assets/master/{}/{}"
 HMAC_KEY           = "https://odin-lang.org"
 HMAC_HASH          = hashlib.sha3_512
