@@ -1255,8 +1255,6 @@ gb_internal void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags
 					error_line("\t%.*s\n", LIT(f->token.string));
 				}
 			}
-			error_line("\n");
-
 			error_line("\tSuggestion: Was '#partial switch' wanted?\n");
 		}
 	}
