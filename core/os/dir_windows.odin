@@ -87,8 +87,12 @@ read_dir :: proc(fd: Handle, n: int, allocator := context.allocator) -> (fi: []F
 
 	find_data := &win32.WIN32_FIND_DATAW{}
 	find_handle := win32.FindFirstFileW(raw_data(wpath_search), find_data)
+	if find_handle == win32.INVALID_HANDLE_VALUE {
+		err = Errno(win32.GetLastError())
+		return dfi[:], err
+	}
 	defer win32.FindClose(find_handle)
-	for n != 0 && find_handle != nil {
+	for n != 0 {
 		fi: File_Info
 		fi = find_data_to_file_info(path, find_data)
 		if fi.name != "" {
