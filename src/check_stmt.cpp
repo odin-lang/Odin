@@ -2501,6 +2501,10 @@ gb_internal void check_return_stmt(CheckerContext *ctx, Ast *node) {
 					unsafe_return_error(o, "the address of an indexed variable", f->type);
 				}
 			}
+		} else if (o.mode == Addressing_Constant && is_type_slice(o.type)) {
+			ERROR_BLOCK();
+			unsafe_return_error(o, "a compound literal of a slice");
+			error_line("\tNote: A constant slice value will use the memory of the current stack frame\n");
 		}
 	}
 
