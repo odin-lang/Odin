@@ -710,13 +710,12 @@ gb_internal void lb_begin_procedure_body(lbProcedure *p) {
 	lb_set_debug_position_to_procedure_begin(p);
 	if (p->debug_info != nullptr) {
 		if (p->context_stack.count != 0) {
+			lbBlock *prev_block = p->curr_block;
 			p->curr_block = p->decl_block;
 			lb_add_debug_context_variable(p, lb_find_or_generate_context_ptr(p));
+			p->curr_block = prev_block;
 		}
-
 	}
-
-	lb_start_block(p, p->entry_block);
 }
 
 gb_internal void lb_end_procedure_body(lbProcedure *p) {
