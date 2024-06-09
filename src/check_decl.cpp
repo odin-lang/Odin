@@ -1264,6 +1264,9 @@ gb_internal void check_global_variable_decl(CheckerContext *ctx, Entity *&e, Ast
 	if (ac.is_static) {
 		error(e->token, "@(static) is not supported for global variables, nor required");
 	}
+	if (ac.rodata) {
+		e->Variable.is_rodata = true;
+	}
 	ac.link_name = handle_link_name(ctx, e->token, ac.link_name, ac.link_prefix, ac.link_suffix);
 
 	if (is_arch_wasm() && e->Variable.thread_local_model.len != 0) {
@@ -1350,6 +1353,9 @@ gb_internal void check_global_variable_decl(CheckerContext *ctx, Entity *&e, Ast
 	Operand o = {};
 	check_expr_with_type_hint(ctx, &o, init_expr, e->type);
 	check_init_variable(ctx, e, &o, str_lit("variable declaration"));
+	if (e->Variable.is_rodata && o.mode != Addressing_Constant) {
+		error(o.expr, "Variables declared with @(rodata) must have constant initialization");
+	}
 
 	check_rtti_type_disallowed(e->token, e->type, "A variable declaration is using a type, %s, which has been disallowed");
 }

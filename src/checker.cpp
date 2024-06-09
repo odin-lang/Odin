@@ -3628,6 +3628,12 @@ gb_internal DECL_ATTRIBUTE_PROC(var_decl_attribute) {
 		}
 		ac->is_static = true;
 		return true;
+	} else if (name == "rodata") {
+		if (value != nullptr) {
+			error(elem, "'rodata' does not have any parameters");
+		}
+		ac->rodata = true;
+		return true;
 	} else if (name == "thread_local") {
 		ExactValue ev = check_decl_attribute_value(c, value);
 		if (ac->init_expr_list_count > 0) {

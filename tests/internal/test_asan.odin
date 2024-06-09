@@ -1,5 +1,5 @@
 // Intended to contain code that would trigger asan easily if the abi was set up badly.
-package test_asan
+package test_internal
 
 import "core:testing"
 

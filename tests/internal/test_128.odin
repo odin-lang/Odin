@@ -1,4 +1,4 @@
-package test_128
+package test_internal
 
 import "core:testing"
 

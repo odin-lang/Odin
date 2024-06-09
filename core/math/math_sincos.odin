@@ -234,7 +234,7 @@ _trig_reduce_f64 :: proc "contextless" (x: f64) -> (j: u64, z: f64) #no_bounds_c
 	// that is, 4/pi = Sum bd_pi4[i]*2^(-64*i)
 	// 19 64-bit digits and the leading one bit give 1217 bits
 	// of precision to handle the largest possible f64 exponent.
-	@static bd_pi4 := [?]u64{
+	@(static, rodata) bd_pi4 := [?]u64{
 		0x0000000000000001,
 		0x45f306dc9c882a53,
 		0xf84eafa3ea69bb81,

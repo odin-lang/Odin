@@ -501,6 +501,9 @@ gb_internal Type *check_assignment_variable(CheckerContext *ctx, Operand *lhs, O
 		return nullptr;
 
 	case Addressing_Variable:
+		if (e && e->kind == Entity_Variable && e->Variable.is_rodata) {
+			error(lhs->expr, "Assignment to variable '%.*s' marked as @(rodata) is not allowed", LIT(e->token.string));
+		}
 		break;
 
 	case Addressing_MapIndex: {
@@ -1252,8 +1255,6 @@ gb_internal void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags
 					error_line("\t%.*s\n", LIT(f->token.string));
 				}
 			}
-			error_line("\n");
-
 			error_line("\tSuggestion: Was '#partial switch' wanted?\n");
 		}
 	}
@@ -2055,6 +2056,13 @@ gb_internal void check_value_decl_stmt(CheckerContext *ctx, Ast *node, u32 mod_f
 				}
 			}
 		}
+		if (ac.rodata) {
+			if (ac.is_static) {
+				e->Variable.is_rodata = true;
+			} else {
+				error(e->token, "Only global or @(static) variables can have @(rodata) applied");
+			}
+		}
 		if (ac.thread_local_model != "") {
 			String name = e->token.string;
 			if (name == "_") {
@@ -2493,6 +2501,10 @@ gb_internal void check_return_stmt(CheckerContext *ctx, Ast *node) {
 					unsafe_return_error(o, "the address of an indexed variable", f->type);
 				}
 			}
+		} else if (o.mode == Addressing_Constant && is_type_slice(o.type)) {
+			ERROR_BLOCK();
+			unsafe_return_error(o, "a compound literal of a slice");
+			error_line("\tNote: A constant slice value will use the memory of the current stack frame\n");
 		}
 	}
 

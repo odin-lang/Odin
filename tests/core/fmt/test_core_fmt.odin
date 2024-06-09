@@ -221,8 +221,45 @@ test_fmt_python_syntax :: proc(t: ^testing.T) {
 	check(t, "%!(MISSING CLOSE BRACE)%!(EXTRA 1)",          "{0", 1 )
 }
 
+@(test)
+test_pointers :: proc(t: ^testing.T) {
+	S :: struct { i: int }
+	a: rawptr
+	b: ^int
+	c: ^S
+	d: ^S = cast(^S)cast(uintptr)0xFFFF
+
+	check(t, "0x0", "%p", a)
+	check(t, "0x0", "%p", b)
+	check(t, "0x0", "%p", c)
+	check(t, "0xFFFF", "%p", d)
+
+	check(t, "0x0", "%#p", a)
+	check(t, "0x0", "%#p", b)
+	check(t, "0x0", "%#p", c)
+	check(t, "0xFFFF", "%#p", d)
+
+	check(t, "0x0",   "%v", a)
+	check(t, "0x0",   "%v", b)
+	check(t, "<nil>", "%v", c)
+
+	check(t, "0x0",   "%#v", a)
+	check(t, "0x0",   "%#v", b)
+	check(t, "<nil>", "%#v", c)
+
+	check(t, "0x0000", "%4p", a)
+	check(t, "0x0000", "%4p", b)
+	check(t, "0x0000", "%4p", c)
+	check(t, "0xFFFF", "%4p", d)
+
+	check(t, "0x0000", "%#4p", a)
+	check(t, "0x0000", "%#4p", b)
+	check(t, "0x0000", "%#4p", c)
+	check(t, "0xFFFF", "%#4p", d)
+}
+
 @(private)
-check :: proc(t: ^testing.T, exp: string, format: string, args: ..any) {
+check :: proc(t: ^testing.T, exp: string, format: string, args: ..any, loc := #caller_location) {
 	got := fmt.tprintf(format, ..args)
-	testing.expectf(t, got == exp, "(%q, %v): %q != %q", format, args, got, exp)
+	testing.expectf(t, got == exp, "(%q, %v): %q != %q", format, args, got, exp, loc = loc)
 }

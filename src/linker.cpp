@@ -13,6 +13,7 @@ struct LinkerData {
 };
 
 gb_internal i32 system_exec_command_line_app(char const *name, char const *fmt, ...);
+gb_internal bool system_exec_command_line_app_output(char const *command, gbString *output);
 
 #if defined(GB_SYSTEM_OSX)
 gb_internal void linker_enable_system_library_linking(LinkerData *ld) {
@@ -69,27 +70,40 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 	if (is_arch_wasm()) {
 		timings_start_section(timings, str_lit("wasm-ld"));
 
-		String extra_orca_flags = {};
+		gbString extra_orca_flags = gb_string_make(temporary_allocator(), "");
 
-	#if defined(GB_SYSTEM_WINDOWS)
+		gbString inputs = gb_string_make(temporary_allocator(), "");
+		inputs = gb_string_append_fmt(inputs, "\"%.*s.o\"", LIT(output_filename));
+
 		if (build_context.metrics.os == TargetOs_orca) {
-			extra_orca_flags = str_lit(" W:/orca/installation/dev-afb9591/bin/liborca_wasm.a --export-dynamic");
+			gbString orca_sdk_path = gb_string_make(temporary_allocator(), "");
+			if (!system_exec_command_line_app_output("orca sdk-path", &orca_sdk_path)) {
+				gb_printf_err("executing `orca sdk-path` failed, make sure Orca is installed and added to your path\n");
+				return 1;
+			}
+			if (gb_string_length(orca_sdk_path) == 0) {
+				gb_printf_err("executing `orca sdk-path` did not produce output\n");
+				return 1;
+			}
+			inputs = gb_string_append_fmt(inputs, " \"%s/orca-libc/lib/crt1.o\" \"%s/orca-libc/lib/libc.o\"", orca_sdk_path, orca_sdk_path);
+
+			extra_orca_flags = gb_string_append_fmt(extra_orca_flags, " -L \"%s/bin\" -lorca_wasm --export-dynamic", orca_sdk_path);
 		}
 
-		result = system_exec_command_line_app("wasm-ld",
-			"\"%.*s\\bin\\wasm-ld\" \"%.*s.o\" -o \"%.*s\" %.*s %.*s %.*s",
-			LIT(build_context.ODIN_ROOT),
-			LIT(output_filename), LIT(output_filename), LIT(build_context.link_flags), LIT(build_context.extra_linker_flags),
-			LIT(extra_orca_flags));
-	#else
-		if (build_context.metrics.os == TargetOs_orca) {
-					extra_orca_flags = str_lit(" -L . -lorca --export-dynamic");
-				}
 
+	#if defined(GB_SYSTEM_WINDOWS)
 		result = system_exec_command_line_app("wasm-ld",
-			"wasm-ld \"%.*s.o\" -o \"%.*s\" %.*s %.*s %.*s",
-			LIT(output_filename), LIT(output_filename), LIT(build_context.link_flags), LIT(build_context.extra_linker_flags),
-			LIT(extra_orca_flags));
+			"\"%.*s\\bin\\wasm-ld\" %s -o \"%.*s\" %.*s %.*s %s",
+			LIT(build_context.ODIN_ROOT),
+			inputs, LIT(output_filename), LIT(build_context.link_flags), LIT(build_context.extra_linker_flags),
+			extra_orca_flags);
+	#else
+		result = system_exec_command_line_app("wasm-ld",
+			"wasm-ld %s -o \"%.*s\" %.*s %.*s %s",
+			inputs, LIT(output_filename),
+			LIT(build_context.link_flags),
+			LIT(build_context.extra_linker_flags),
+			extra_orca_flags);
 	#endif
 		return result;
 	}

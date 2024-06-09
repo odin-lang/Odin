@@ -118,8 +118,8 @@ when ODIN_OS == .Windows {
 } else when ODIN_OS == .Darwin {
 	foreign import lib {
 		"macos" +
-			"-arm64" when ODIN_ARCH == .arm64 else "" +
-			"/libraylib" + ".500.dylib" when RAYLIB_SHARED else ".a",
+			("-arm64" when ODIN_ARCH == .arm64 else "") +
+			"/libraylib" + (".500.dylib" when RAYLIB_SHARED else ".a"),
 		"system:Cocoa.framework",
 		"system:OpenGL.framework",
 		"system:IOKit.framework",

@@ -2419,6 +2419,9 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		if (arg_count > max_count) {
 			error(call, "Too many 'swizzle' indices, %td > %td", arg_count, max_count);
 			return false;
+		} else if (arg_count < 2) {
+			error(call, "Not enough 'swizzle' indices, %td < 2", arg_count);
+			return false;
 		}
 
 		if (type->kind == Type_Array) {
@@ -5912,15 +5915,9 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		if (operand->mode != Addressing_Type) {
 			error(operand->expr, "Expected a record type for '%.*s'", LIT(builtin_name));
 		} else {
-			Type *bt = base_type(operand->type);
-			if (bt->kind == Type_Struct) {
-				if (bt->Struct.polymorphic_params != nullptr) {
-					operand->value = exact_value_i64(bt->Struct.polymorphic_params->Tuple.variables.count);
-				}
-			} else if (bt->kind == Type_Union) {
-				if (bt->Union.polymorphic_params != nullptr) {
-					operand->value = exact_value_i64(bt->Union.polymorphic_params->Tuple.variables.count);
-				}
+			TypeTuple *tuple = get_record_polymorphic_params(operand->type);
+			if (tuple) {
+				operand->value = exact_value_i64(tuple->variables.count);
 			} else {
 				error(operand->expr, "Expected a record type for '%.*s'", LIT(builtin_name));
 			}
@@ -5952,20 +5949,11 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			Entity *param = nullptr;
 			i64 count = 0;
 
-			Type *bt = base_type(operand->type);
-			if (bt->kind == Type_Struct) {
-				if (bt->Struct.polymorphic_params != nullptr) {
-					count = bt->Struct.polymorphic_params->Tuple.variables.count;
-					if (index < count) {
-						param = bt->Struct.polymorphic_params->Tuple.variables[cast(isize)index];
-					}
-				}
-			} else if (bt->kind == Type_Union) {
-				if (bt->Union.polymorphic_params != nullptr) {
-					count = bt->Union.polymorphic_params->Tuple.variables.count;
-					if (index < count) {
-						param = bt->Union.polymorphic_params->Tuple.variables[cast(isize)index];
-					}
+			TypeTuple *tuple = get_record_polymorphic_params(operand->type);
+			if (tuple) {
+				count = tuple->variables.count;
+				if (index < count) {
+					param = tuple->variables[cast(isize)index];
 				}
 			} else {
 				error(operand->expr, "Expected a specialized polymorphic record type for '%.*s'", LIT(builtin_name));

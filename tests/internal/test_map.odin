@@ -1,4 +1,4 @@
-package test_internal_map
+package test_internal
 
 import "core:log"
 import "base:intrinsics"
