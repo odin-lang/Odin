@@ -281,8 +281,20 @@ gb_internal void error_operand_not_expression(Operand *o) {
 
 gb_internal void error_operand_no_value(Operand *o) {
 	if (o->mode == Addressing_NoValue) {
-		gbString err = expr_to_string(o->expr);
 		Ast *x = unparen_expr(o->expr);
+
+		if (x->kind == Ast_CallExpr) {
+			Ast *p = unparen_expr(x->CallExpr.proc);
+			if (p->kind == Ast_BasicDirective) {
+				String tag = p->BasicDirective.name.string;
+				if (tag == "panic" ||
+				    tag == "assert") {
+					return;
+				}
+			}
+		}
+
+		gbString err = expr_to_string(o->expr);
 		if (x->kind == Ast_CallExpr) {
 			error(o->expr, "'%s' call does not return a value and cannot be used as a value", err);
 		} else {
@@ -3336,12 +3348,11 @@ gb_internal void check_cast(CheckerContext *c, Operand *x, Type *type) {
 	}
 
 	if (is_type_untyped(x->type)) {
-		convert_to_typed(c, x, type);
-		// Type *final_type = type;
-		// if (is_const_expr && !is_type_constant_type(type)) {
-		// 	final_type = default_type(x->type);
-		// }
-		// update_untyped_expr_type(c, x->expr, final_type, true);
+		Type *final_type = type;
+		if (is_const_expr && !is_type_constant_type(type)) {
+			final_type = default_type(x->type);
+		}
+		update_untyped_expr_type(c, x->expr, final_type, true);
 	} else {
 		Type *src = core_type(x->type);
 		Type *dst = core_type(type);
@@ -4287,8 +4298,7 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 		} else {
 			switch (operand->type->Basic.kind) {
 			case Basic_UntypedBool:
-				if (!is_type_boolean(target_type) &&
-				    !is_type_integer(target_type)) {
+				if (!is_type_boolean(target_type)) {
 					operand->mode = Addressing_Invalid;
 					convert_untyped_error(c, operand, target_type);
 					return;
@@ -7529,6 +7539,9 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 				}
 				operand->type = t;
 				operand->expr = call;
+				if (operand->mode != Addressing_Invalid) {
+					update_untyped_expr_type(c, arg, t, false);
+				}
 				break;
 			}
 			}
@@ -8336,7 +8349,7 @@ gb_internal ExprKind check_basic_directive_expr(CheckerContext *c, Operand *o, A
 		    name == "assert" ||
 		    name == "defined" ||
 		    name == "config" ||
-			name == "exists" ||
+		    name == "exists" ||
 		    name == "load" ||
 		    name == "load_hash" ||
 		    name == "load_directory" ||
