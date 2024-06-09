@@ -25,6 +25,7 @@ download_assets :: proc() {
 @(require) import "math/big"
 @(require) import "math/linalg/glsl"
 @(require) import "math/noise"
+@(require) import "mem"
 @(require) import "net"
 @(require) import "odin"
 @(require) import "path/filepath"
