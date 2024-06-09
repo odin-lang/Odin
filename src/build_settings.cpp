@@ -1137,6 +1137,14 @@ gb_global TargetMetrics target_freestanding_arm64 = {
 	str_lit("aarch64-none-elf"),
 };
 
+gb_global TargetMetrics target_freestanding_arm32 = {
+	TargetOs_freestanding,
+	TargetArch_arm32,
+	4, 4, 4, 8,
+	str_lit("arm-unknown-unknown-gnueabihf"),
+};
+
+
 struct NamedTargetMetrics {
 	String name;
 	TargetMetrics *metrics;
@@ -1179,6 +1187,7 @@ gb_global NamedTargetMetrics named_targets[] = {
 	{ str_lit("freestanding_amd64_win64"), &target_freestanding_amd64_win64 },
 
 	{ str_lit("freestanding_arm64"), &target_freestanding_arm64 },
+	{ str_lit("freestanding_arm32"), &target_freestanding_arm32 },
 };
 
 gb_global NamedTargetMetrics *selected_target_metrics;
