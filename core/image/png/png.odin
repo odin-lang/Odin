@@ -735,18 +735,11 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 			return {}, .Unable_To_Allocate_Or_Resize
 		}
 
-		i := 0; j := 0
-
 		// If we don't have transparency or drop it without applying it, we can do this:
 		if (!seen_trns || (seen_trns && .alpha_drop_if_present in options && .alpha_premultiply not_in options)) && .alpha_add_if_missing not_in options {
-			for h := 0; h < int(img.height); h += 1 {
-				for w := 0; w < int(img.width);  w += 1 {
-					c := _plte.entries[temp.buf[i]]
-					t.buf[j  ] = c.r
-					t.buf[j+1] = c.g
-					t.buf[j+2] = c.b
-					i += 1; j += 3
-				}
+			output := mem.slice_data_cast([]image.RGB_Pixel, t.buf[:])
+			for pal_idx, idx in temp.buf {
+				output[idx] = _plte.entries[pal_idx]
 			}
 		} else if add_alpha || .alpha_drop_if_present in options {
 			bg := PLTE_Entry{0, 0, 0}
@@ -758,12 +751,23 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 			no_alpha := (.alpha_drop_if_present in options || premultiply) && .alpha_add_if_missing not_in options
 			blend_background := seen_bkgd && .blend_background in options
 
-			for h := 0; h < int(img.height); h += 1 {
-				for w := 0; w < int(img.width);  w += 1 {
-					index := temp.buf[i]
+			if no_alpha {
+				output := mem.slice_data_cast([]image.RGB_Pixel, t.buf[:])
+				for orig, idx in temp.buf {
+					c := _plte.entries[orig]
+					a := int(orig) < len(trns.data) ? trns.data[orig] : 255
 
-					c := _plte.entries[index]
-					a := int(index) < len(trns.data) ? trns.data[index] : 255
+					if blend_background {
+						output[idx] = image.blend(c, a, bg)
+					} else if premultiply {
+						output[idx] = image.blend(PLTE_Entry{}, a, c)
+					}
+				}
+			} else {
+				output := mem.slice_data_cast([]image.RGBA_Pixel, t.buf[:])
+				for orig, idx in temp.buf {
+					c := _plte.entries[orig]
+					a := int(orig) < len(trns.data) ? trns.data[orig] : 255
 
 					if blend_background {
 						c = image.blend(c, a, bg)
@@ -772,17 +776,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 						c = image.blend(PLTE_Entry{}, a, c)
 					}
 
-					t.buf[j  ] = c.r
-					t.buf[j+1] = c.g
-					t.buf[j+2] = c.b
-					i += 1
-
-					if no_alpha {
-						j += 3
-					} else {
-						t.buf[j+3] = u8(a)
-						j += 4
-					}
+					output[idx] = {c.r, c.g, c.b, u8(a)}
 				}
 			}
 		} else {

@@ -1479,7 +1479,6 @@ run_png_suite :: proc(t: ^testing.T, suite: []Test) {
 
 				png_hash := hash.crc32(pixels)
 				testing.expectf(t, test.hash == png_hash, "%v test %v hash is %08x, expected %08x with %v", file.file, count, png_hash, test.hash, test.options)
-
 				passed &= test.hash == png_hash
 
 				if passed {
