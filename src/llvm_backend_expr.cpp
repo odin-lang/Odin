@@ -1873,13 +1873,40 @@ gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 			lbValue res_i128 = lb_emit_runtime_call(p, call, args);
 			return lb_emit_conv(p, res_i128, t);
 		}
+		i64 sz = type_size_of(src);
 
 		lbValue res = {};
 		res.type = t;
 		if (is_type_unsigned(dst)) {
-			res.value = LLVMBuildFPToUI(p->builder, value.value, lb_type(m, t), "");
+			switch (sz) {
+			case 2:
+			case 4:
+				res.value = LLVMBuildFPToUI(p->builder, value.value, lb_type(m, t_u32), "");
+				res.value = LLVMBuildIntCast2(p->builder, res.value, lb_type(m, t), false, "");
+				break;
+			case 8:
+				res.value = LLVMBuildFPToUI(p->builder, value.value, lb_type(m, t_u64), "");
+				res.value = LLVMBuildIntCast2(p->builder, res.value, lb_type(m, t), false, "");
+				break;
+			default:
+				GB_PANIC("Unhandled float type");
+				break;
+			}
 		} else {
-			res.value = LLVMBuildFPToSI(p->builder, value.value, lb_type(m, t), "");
+			switch (sz) {
+			case 2:
+			case 4:
+				res.value = LLVMBuildFPToSI(p->builder, value.value, lb_type(m, t_i32), "");
+				res.value = LLVMBuildIntCast2(p->builder, res.value, lb_type(m, t), false, "");
+				break;
+			case 8:
+				res.value = LLVMBuildFPToSI(p->builder, value.value, lb_type(m, t_i64), "");
+				res.value = LLVMBuildIntCast2(p->builder, res.value, lb_type(m, t), false, "");
+				break;
+			default:
+				GB_PANIC("Unhandled float type");
+				break;
+			}
 		}
 		return res;
 	}
