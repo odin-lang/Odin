@@ -1383,8 +1383,6 @@ gb_internal lbValue lb_addr_load(lbProcedure *p, lbAddr const &addr) {
 
 		LLVMTypeRef vector_type = nullptr;
 		if (lb_try_vector_cast(p->module, addr.addr, &vector_type)) {
-			LLVMSetAlignment(res.addr.value, cast(unsigned)lb_alignof(vector_type));
-
 			LLVMValueRef vp = LLVMBuildPointerCast(p->builder, addr.addr.value, LLVMPointerType(vector_type, 0), "");
 			LLVMValueRef v = LLVMBuildLoad2(p->builder, vector_type, vp, "");
 			LLVMValueRef scalars[4] = {};
@@ -1393,6 +1391,8 @@ gb_internal lbValue lb_addr_load(lbProcedure *p, lbAddr const &addr) {
 			}
 			LLVMValueRef mask = LLVMConstVector(scalars, addr.swizzle.count);
 			LLVMValueRef sv = llvm_basic_shuffle(p, v, mask);
+
+			LLVMSetAlignment(res.addr.value, cast(unsigned)lb_alignof(LLVMTypeOf(sv)));
 
 			LLVMValueRef dst = LLVMBuildPointerCast(p->builder, ptr.value, LLVMPointerType(LLVMTypeOf(sv), 0), "");
 			LLVMBuildStore(p->builder, sv, dst);
