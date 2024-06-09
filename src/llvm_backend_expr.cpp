@@ -1897,11 +1897,11 @@ gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 			case 2:
 			case 4:
 				res.value = LLVMBuildFPToSI(p->builder, value.value, lb_type(m, t_i32), "");
-				res.value = LLVMBuildIntCast2(p->builder, res.value, lb_type(m, t), false, "");
+				res.value = LLVMBuildIntCast2(p->builder, res.value, lb_type(m, t), true, "");
 				break;
 			case 8:
 				res.value = LLVMBuildFPToSI(p->builder, value.value, lb_type(m, t_i64), "");
-				res.value = LLVMBuildIntCast2(p->builder, res.value, lb_type(m, t), false, "");
+				res.value = LLVMBuildIntCast2(p->builder, res.value, lb_type(m, t), true, "");
 				break;
 			default:
 				GB_PANIC("Unhandled float type");
