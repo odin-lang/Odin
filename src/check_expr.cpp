@@ -3336,11 +3336,12 @@ gb_internal void check_cast(CheckerContext *c, Operand *x, Type *type) {
 	}
 
 	if (is_type_untyped(x->type)) {
-		Type *final_type = type;
-		if (is_const_expr && !is_type_constant_type(type)) {
-			final_type = default_type(x->type);
-		}
-		update_untyped_expr_type(c, x->expr, final_type, true);
+		convert_to_typed(c, x, type);
+		// Type *final_type = type;
+		// if (is_const_expr && !is_type_constant_type(type)) {
+		// 	final_type = default_type(x->type);
+		// }
+		// update_untyped_expr_type(c, x->expr, final_type, true);
 	} else {
 		Type *src = core_type(x->type);
 		Type *dst = core_type(type);
@@ -4286,7 +4287,8 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 		} else {
 			switch (operand->type->Basic.kind) {
 			case Basic_UntypedBool:
-				if (!is_type_boolean(target_type)) {
+				if (!is_type_boolean(target_type) &&
+				    !is_type_integer(target_type)) {
 					operand->mode = Addressing_Invalid;
 					convert_untyped_error(c, operand, target_type);
 					return;
@@ -7527,9 +7529,6 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 				}
 				operand->type = t;
 				operand->expr = call;
-				if (operand->mode != Addressing_Invalid) {
-					update_untyped_expr_type(c, arg, t, false);
-				}
 				break;
 			}
 			}
