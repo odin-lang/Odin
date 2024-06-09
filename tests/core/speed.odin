@@ -3,3 +3,4 @@ package tests_core
 
 @(require) import "crypto"
 @(require) import "hash"
+@(require) import "image"
