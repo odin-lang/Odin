@@ -749,10 +749,10 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 				}
 			}
 		} else if add_alpha || .alpha_drop_if_present in options {
-			bg := [3]f32{0, 0, 0}
+			bg := PLTE_Entry{0, 0, 0}
 			if premultiply && seen_bkgd {
 				c16 := img.background.([3]u16)
-				bg = [3]f32{f32(c16.r), f32(c16.g), f32(c16.b)}
+				bg = {u8(c16.r), u8(c16.g), u8(c16.b)}
 			}
 
 			no_alpha := (.alpha_drop_if_present in options || premultiply) && .alpha_add_if_missing not_in options
@@ -766,14 +766,10 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 					a := int(index) < len(trns.data) ? trns.data[index] : 255
 
 					if blend_background {
-						c.r = image.blend(c.r, a, u8(u32(bg.r)))
-						c.g = image.blend(c.g, a, u8(u32(bg.g)))
-						c.b = image.blend(c.b, a, u8(u32(bg.b)))
+						c = image.blend(c, a, bg)
 						a = 255
 					} else if premultiply {
-						c.r = image.blend(u8(0), a, c.r)
-						c.g = image.blend(u8(0), a, c.g)
-						c.b = image.blend(u8(0), a, c.b)
+						c = image.blend(PLTE_Entry{}, a, c)
 					}
 
 					t.buf[j  ] = c.r
@@ -1014,8 +1010,8 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 			return {}, .Unable_To_Allocate_Or_Resize
 		}
 
-		p := mem.slice_data_cast([]u8, temp.buf[:])
-		o := mem.slice_data_cast([]u8, t.buf[:])
+		p := temp.buf[:]
+		o := t.buf[:]
 
 		switch raw_image_channels {
 		case 1:
