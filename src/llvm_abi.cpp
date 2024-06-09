@@ -900,7 +900,15 @@ namespace lbAbiAmd64SysV {
 		}
 
 		switch (LLVMGetTypeKind(t)) {
-		case LLVMIntegerTypeKind:
+		case LLVMIntegerTypeKind: {
+			i64 s = t_size;
+			while (s > 0) {
+				unify(cls, ix + off/8, RegClass_Int);
+				off += 8;
+				s   -= 8;
+			}
+			break;
+		}
 		case LLVMPointerTypeKind:
 		case LLVMHalfTypeKind:
 			unify(cls, ix + off/8, RegClass_Int);
