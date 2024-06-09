@@ -2359,3 +2359,39 @@ run_bmp_suite :: proc(t: ^testing.T, suite: []Test) {
 	}
 	return
 }
+
+@test
+will_it_blend :: proc(t: ^testing.T) {
+	Pixel    :: image.RGB_Pixel
+	Pixel_16 :: image.RGB_Pixel_16
+
+	{
+		bg := Pixel{255, 255,   0}
+		fg := Pixel{  0,   0, 255}
+
+		for a in 0..=255 {
+			blended := Pixel{
+				image.blend(fg.r, u8(a), bg.r),
+				image.blend(fg.g, u8(a), bg.g),
+				image.blend(fg.b, u8(a), bg.b),
+			}
+			testing.expectf(t, blended.r == bg.r - u8(a),    "Expected blend(%v, %3d, %v) = %v, got %v", fg.r, a, bg.r, bg.r - u8(a), blended.r)
+			testing.expectf(t, blended.b == 255 - blended.r, "Expected blend(%v, %3d, %v) = %v, got %v", fg.b, a, bg.b, 255 - blended.r, blended.b)
+		}
+	}
+
+	{
+		bg := Pixel_16{65535, 65535,     0}
+		fg := Pixel_16{    0,     0, 65535}
+
+		for a in 0..=65535 {
+			blended := Pixel_16{
+				image.blend(fg.r, u16(a), bg.r),
+				image.blend(fg.g, u16(a), bg.g),
+				image.blend(fg.b, u16(a), bg.b),
+			}
+			testing.expectf(t, blended.r == bg.r - u16(a),     "Expected blend(%v, %3d, %v) = %v, got %v", fg.r, a, bg.r, bg.r - u16(a), blended.r)
+			testing.expectf(t, blended.b == 65535 - blended.r, "Expected blend(%v, %3d, %v) = %v, got %v", fg.b, a, bg.b, 65535 - blended.r, blended.b)
+		}
+	}
+}

@@ -20,7 +20,6 @@ download_assets :: proc() {
 @(require) import "encoding/varint"
 @(require) import "encoding/xml"
 @(require) import "fmt"
-@(require) import "image"
 @(require) import "math"
 @(require) import "math/big"
 @(require) import "math/linalg/glsl"

@@ -597,7 +597,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 				dsc   := depth_scale_table
 				scale := dsc[info.header.bit_depth]
 				if scale != 1 {
-					key := mem.slice_data_cast([]u16be, c.data)[0] * u16be(scale)
+					key := (^u16be)(raw_data(c.data))^ * u16be(scale)
 					c.data = []u8{0, u8(key & 255)}
 				}
 			}
@@ -762,19 +762,18 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 				for w := 0; w < int(img.width);  w += 1 {
 					index := temp.buf[i]
 
-					c     := _plte.entries[index]
-					a     := int(index) < len(trns.data) ? trns.data[index] : 255
-					alpha := f32(a) / 255.0
+					c := _plte.entries[index]
+					a := int(index) < len(trns.data) ? trns.data[index] : 255
 
 					if blend_background {
-						c.r = u8((1.0 - alpha) * bg[0] + f32(c.r) * alpha)
-						c.g = u8((1.0 - alpha) * bg[1] + f32(c.g) * alpha)
-						c.b = u8((1.0 - alpha) * bg[2] + f32(c.b) * alpha)
+						c.r = image.blend(c.r, a, u8(u32(bg.r)))
+						c.g = image.blend(c.g, a, u8(u32(bg.g)))
+						c.b = image.blend(c.b, a, u8(u32(bg.b)))
 						a = 255
 					} else if premultiply {
-						c.r = u8(f32(c.r) * alpha)
-						c.g = u8(f32(c.g) * alpha)
-						c.b = u8(f32(c.b) * alpha)
+						c.r = image.blend(u8(0), a, c.r)
+						c.g = image.blend(u8(0), a, c.g)
+						c.b = image.blend(u8(0), a, c.b)
 					}
 
 					t.buf[j  ] = c.r
@@ -1626,7 +1625,6 @@ defilter :: proc(img: ^Image, filter_bytes: ^bytes.Buffer, header: ^image.PNG_IH
 
 	return nil
 }
-
 
 @(init, private)
 _register :: proc() {
