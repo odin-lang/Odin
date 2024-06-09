@@ -7,20 +7,20 @@ import "base:intrinsics"
 Port of emmalloc, modified for use in Odin.
 
 Invariants:
- - Per-allocation header overhead is 8 bytes, smallest allocated payload
-   amount is 8 bytes, and a multiple of 4 bytes.
- - Acquired memory blocks are subdivided into disjoint regions that lie
-   next to each other.
- - A region is either in used or free.
-   Used regions may be adjacent, and a used and unused region
-   may be adjacent, but not two unused ones - they would be
-   merged.
- - Memory allocation takes constant time, unless the alloc needs to wasm_memory_grow()
-   or memory is very close to being exhausted.
- - Free and used regions are managed inside "root regions", which are slabs
-   of memory acquired via wasm_memory_grow().
- - Memory retrieved using wasm_memory_grow() can not be given back to the OS.
-   Therefore, frees are internal to the allocator.
+	- Per-allocation header overhead is 8 bytes, smallest allocated payload
+	  amount is 8 bytes, and a multiple of 4 bytes.
+	- Acquired memory blocks are subdivided into disjoint regions that lie
+	  next to each other.
+	- A region is either in used or free.
+	  Used regions may be adjacent, and a used and unused region
+	  may be adjacent, but not two unused ones - they would be
+	  merged.
+	- Memory allocation takes constant time, unless the alloc needs to wasm_memory_grow()
+	  or memory is very close to being exhausted.
+	- Free and used regions are managed inside "root regions", which are slabs
+	  of memory acquired via wasm_memory_grow().
+	- Memory retrieved using wasm_memory_grow() can not be given back to the OS.
+	  Therefore, frees are internal to the allocator.
 
 Copyright (c) 2010-2014 Emscripten authors, see AUTHORS file.
 
