@@ -185,3 +185,33 @@ test_binary_search :: proc(t: ^testing.T) {
 	testing.expect(t, index == 0,     "Expected index to be 0.")
 	testing.expect(t, found == false, "Expected found to be false.")
 }
+
+@test
+test_permutation_iterator :: proc(t: ^testing.T) {
+	// Big enough to do some sanity checking but not overly large.
+	FAC_5 :: 120
+	s := []int{1, 2, 3, 4, 5}
+	seen: map[int]bool
+	defer delete(seen)
+
+	iter := slice.make_permutation_iterator(s)
+	defer slice.destroy_permutation_iterator(iter)
+
+	permutations_counted: int
+	for slice.permute(&iter) {
+		n := 0
+		for item, index in s {
+			n *= 10
+			n += item
+		}
+		if n in seen {
+			testing.fail_now(t, "Permutation iterator made a duplicate permutation.")
+			return
+		}
+		seen[n] = true
+		permutations_counted += 1
+	}
+
+	testing.expect_value(t, len(seen), FAC_5)
+	testing.expect_value(t, permutations_counted, FAC_5)
+}
