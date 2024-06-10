@@ -1040,6 +1040,8 @@ gb_internal void init_universal(void) {
 		add_global_enum_constant(fields, "ODIN_ARCH", bc->metrics.arch);
 		add_global_string_constant("ODIN_ARCH_STRING", target_arch_names[bc->metrics.arch]);
 	}
+
+	add_global_string_constant("ODIN_MICROARCH_STRING", bc->microarch);
 	
 	{
 		GlobalEnumValue values[BuildMode_COUNT] = {
@@ -1131,6 +1133,17 @@ gb_internal void init_universal(void) {
 	add_global_constant("ODIN_COMPILE_TIMESTAMP", t_untyped_integer, exact_value_i64(odin_compile_timestamp()));
 
 	{
+		String version = {};
+
+		#ifdef GIT_SHA
+		version.text = cast(u8 *)GIT_SHA;
+		version.len = gb_strlen(GIT_SHA);
+		#endif
+
+		add_global_string_constant("ODIN_VERSION_HASH", version);
+	}
+
+	{
 		bool f16_supported = lb_use_new_pass_system();
 		if (is_arch_wasm()) {
 			f16_supported = false;
@@ -1167,6 +1180,18 @@ gb_internal void init_universal(void) {
 		add_global_constant("ODIN_SANITIZER_FLAGS", named_type, exact_value_u64(bc->sanitizer_flags));
 	}
 
+	{
+		GlobalEnumValue values[5] = {
+			{"None",      -1},
+			{"Minimal",    0},
+			{"Size",       1},
+			{"Speed",      2},
+			{"Aggressive", 3},
+		};
+
+		auto fields = add_global_enum_type(str_lit("Odin_Optimization_Mode"), values, gb_count_of(values));
+		add_global_enum_constant(fields, "ODIN_OPTIMIZATION_MODE", bc->optimization_level);
+	}
 
 
 // Builtin Procedures
