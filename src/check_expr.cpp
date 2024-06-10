@@ -7672,7 +7672,7 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 				if (decl->proc_lit) {
 					ast_node(pl, ProcLit, decl->proc_lit);
 					if (pl->inlining == ProcInlining_no_inline) {
-						error(call, "'#force_inline' cannot be applied to a procedure that has be marked as '#force_no_inline'");
+						error(call, "'#force_inline' cannot be applied to a procedure that has been marked as '#force_no_inline'");
 					}
 				}
 			}
