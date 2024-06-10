@@ -2091,6 +2091,9 @@ gb_internal bool ast_on_same_line(Token const &x, Ast *yp) {
 gb_internal Ast *parse_force_inlining_operand(AstFile *f, Token token) {
 	Ast *expr = parse_unary_expr(f, false);
 	Ast *e = strip_or_return_expr(expr);
+	if (e == nullptr) {
+		return expr;
+	}
 	if (e->kind != Ast_ProcLit && e->kind != Ast_CallExpr) {
 		syntax_error(expr, "%.*s must be followed by a procedure literal or call, got %.*s", LIT(token.string), LIT(ast_strings[expr->kind]));
 		return ast_bad_expr(f, token, f->curr_token);
