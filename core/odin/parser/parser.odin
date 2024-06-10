@@ -3514,9 +3514,21 @@ parse_simple_stmt :: proc(p: ^Parser, flags: Stmt_Allow_Flags) -> ^ast.Stmt {
 		}
 	case op.kind == .Colon:
 		expect_token_after(p, .Colon, "identifier list")
-		if .Label in flags && len(lhs) == 1 {
+		colon_label_block: if .Label in flags && len(lhs) == 1 {
 			#partial switch p.curr_tok.kind {
-			case .Open_Brace, .If, .For, .Switch:
+			case .Open_Brace, .If, .For, .Switch, .Hash:
+				if p.curr_tok.kind == .Hash {
+					name := peek_token(p)
+					switch name.text {
+					case "reverse":
+						expect_token(p, .Hash)
+						expect_token(p, .Ident)
+						break
+					case:
+						break colon_label_block
+					}
+				}
+
 				label := lhs[0]
 				stmt := parse_stmt(p)
 
