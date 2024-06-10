@@ -6,6 +6,7 @@ import "base:intrinsics"
 import "core:c/libc"
 import "core:encoding/ansi"
 import "core:sync"
+import "core:os"
 @require import "core:sys/unix"
 
 @(private="file") stop_runner_flag: libc.sig_atomic_t
@@ -20,7 +21,13 @@ local_test_index: libc.sig_atomic_t
 
 @(private="file")
 stop_runner_callback :: proc "c" (sig: libc.int) {
-	intrinsics.atomic_store(&stop_runner_flag, 1)
+	prev := intrinsics.atomic_add(&stop_runner_flag, 1)
+
+	// If the flag was already set (if this is the second signal sent for example),
+	// consider this a forced (not graceful) exit.
+	if prev > 0 {
+		os.exit(int(sig))
+	}
 }
 
 @(private="file")
