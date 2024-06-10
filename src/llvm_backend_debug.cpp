@@ -626,50 +626,50 @@ gb_internal LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 		case Basic_complex32:
 			{
 				LLVMMetadataRef elements[2] = {};
-				elements[0] = lb_debug_struct_field(m, str_lit("real"), t_f16, 0);
-				elements[1] = lb_debug_struct_field(m, str_lit("imag"), t_f16, 4);
+				elements[0] = lb_debug_struct_field(m, str_lit("real"), t_f16, 0*16);
+				elements[1] = lb_debug_struct_field(m, str_lit("imag"), t_f16, 1*16);
 				return lb_debug_basic_struct(m, str_lit("complex32"), 64, 32, elements, gb_count_of(elements));
 			}
 		case Basic_complex64:
 			{
 				LLVMMetadataRef elements[2] = {};
-				elements[0] = lb_debug_struct_field(m, str_lit("real"), t_f32, 0);
-				elements[1] = lb_debug_struct_field(m, str_lit("imag"), t_f32, 4);
+				elements[0] = lb_debug_struct_field(m, str_lit("real"), t_f32, 0*32);
+				elements[1] = lb_debug_struct_field(m, str_lit("imag"), t_f32, 2*32);
 				return lb_debug_basic_struct(m, str_lit("complex64"), 64, 32, elements, gb_count_of(elements));
 			}
 		case Basic_complex128:
 			{
 				LLVMMetadataRef elements[2] = {};
-				elements[0] = lb_debug_struct_field(m, str_lit("real"), t_f64, 0);
-				elements[1] = lb_debug_struct_field(m, str_lit("imag"), t_f64, 8);
+				elements[0] = lb_debug_struct_field(m, str_lit("real"), t_f64, 0*64);
+				elements[1] = lb_debug_struct_field(m, str_lit("imag"), t_f64, 1*64);
 				return lb_debug_basic_struct(m, str_lit("complex128"), 128, 64, elements, gb_count_of(elements));
 			}
 
 		case Basic_quaternion64:
 			{
 				LLVMMetadataRef elements[4] = {};
-				elements[0] = lb_debug_struct_field(m, str_lit("imag"), t_f16, 0);
-				elements[1] = lb_debug_struct_field(m, str_lit("jmag"), t_f16, 4);
-				elements[2] = lb_debug_struct_field(m, str_lit("kmag"), t_f16, 8);
-				elements[3] = lb_debug_struct_field(m, str_lit("real"), t_f16, 12);
+				elements[0] = lb_debug_struct_field(m, str_lit("imag"), t_f16, 0*16);
+				elements[1] = lb_debug_struct_field(m, str_lit("jmag"), t_f16, 1*16);
+				elements[2] = lb_debug_struct_field(m, str_lit("kmag"), t_f16, 2*16);
+				elements[3] = lb_debug_struct_field(m, str_lit("real"), t_f16, 3*16);
 				return lb_debug_basic_struct(m, str_lit("quaternion64"), 128, 32, elements, gb_count_of(elements));
 			}
 		case Basic_quaternion128:
 			{
 				LLVMMetadataRef elements[4] = {};
-				elements[0] = lb_debug_struct_field(m, str_lit("imag"), t_f32, 0);
-				elements[1] = lb_debug_struct_field(m, str_lit("jmag"), t_f32, 4);
-				elements[2] = lb_debug_struct_field(m, str_lit("kmag"), t_f32, 8);
-				elements[3] = lb_debug_struct_field(m, str_lit("real"), t_f32, 12);
+				elements[0] = lb_debug_struct_field(m, str_lit("imag"), t_f32, 0*32);
+				elements[1] = lb_debug_struct_field(m, str_lit("jmag"), t_f32, 1*32);
+				elements[2] = lb_debug_struct_field(m, str_lit("kmag"), t_f32, 2*32);
+				elements[3] = lb_debug_struct_field(m, str_lit("real"), t_f32, 3*32);
 				return lb_debug_basic_struct(m, str_lit("quaternion128"), 128, 32, elements, gb_count_of(elements));
 			}
 		case Basic_quaternion256:
 			{
 				LLVMMetadataRef elements[4] = {};
-				elements[0] = lb_debug_struct_field(m, str_lit("imag"), t_f64, 0);
-				elements[1] = lb_debug_struct_field(m, str_lit("jmag"), t_f64, 8);
-				elements[2] = lb_debug_struct_field(m, str_lit("kmag"), t_f64, 16);
-				elements[3] = lb_debug_struct_field(m, str_lit("real"), t_f64, 24);
+				elements[0] = lb_debug_struct_field(m, str_lit("imag"), t_f64, 0*64);
+				elements[1] = lb_debug_struct_field(m, str_lit("jmag"), t_f64, 1*64);
+				elements[2] = lb_debug_struct_field(m, str_lit("kmag"), t_f64, 2*64);
+				elements[3] = lb_debug_struct_field(m, str_lit("real"), t_f64, 3*64);
 				return lb_debug_basic_struct(m, str_lit("quaternion256"), 256, 32, elements, gb_count_of(elements));
 			}
 
