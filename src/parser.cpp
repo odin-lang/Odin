@@ -555,7 +555,7 @@ gb_internal Ast *ast_unary_expr(AstFile *f, Token op, Ast *expr) {
 		syntax_error_with_verbose(expr, "'or_return' within an unary expression not wrapped in parentheses (...)");
 		break;
 	case Ast_OrBranchExpr:
-		syntax_error_with_verbose(expr, "'or_%.*s' within an unary expression not wrapped in parentheses (...)", LIT(expr->OrBranchExpr.token.string));
+		syntax_error_with_verbose(expr, "'%.*s' within an unary expression not wrapped in parentheses (...)", LIT(expr->OrBranchExpr.token.string));
 		break;
 	}
 
@@ -583,7 +583,7 @@ gb_internal Ast *ast_binary_expr(AstFile *f, Token op, Ast *left, Ast *right) {
 		syntax_error_with_verbose(left, "'or_return' within a binary expression not wrapped in parentheses (...)");
 		break;
 	case Ast_OrBranchExpr:
-		syntax_error_with_verbose(left, "'or_%.*s' within a binary expression not wrapped in parentheses (...)", LIT(left->OrBranchExpr.token.string));
+		syntax_error_with_verbose(left, "'%.*s' within a binary expression not wrapped in parentheses (...)", LIT(left->OrBranchExpr.token.string));
 		break;
 	}
 	if (right) switch (right->kind) {
@@ -591,7 +591,7 @@ gb_internal Ast *ast_binary_expr(AstFile *f, Token op, Ast *left, Ast *right) {
 		syntax_error_with_verbose(right, "'or_return' within a binary expression not wrapped in parentheses (...)");
 		break;
 	case Ast_OrBranchExpr:
-		syntax_error_with_verbose(right, "'or_%.*s' within a binary expression not wrapped in parentheses (...)", LIT(right->OrBranchExpr.token.string));
+		syntax_error_with_verbose(right, "'%.*s' within a binary expression not wrapped in parentheses (...)", LIT(right->OrBranchExpr.token.string));
 		break;
 	}
 
@@ -3102,7 +3102,7 @@ gb_internal void parse_check_or_return(Ast *operand, char const *msg) {
 		syntax_error_with_verbose(operand, "'or_return' use within %s is not wrapped in parentheses (...)", msg);
 		break;
 	case Ast_OrBranchExpr:
-		syntax_error_with_verbose(operand, "'or_%.*s' use within %s is not wrapped in parentheses (...)", msg, LIT(operand->OrBranchExpr.token.string));
+		syntax_error_with_verbose(operand, "'%.*s' use within %s is not wrapped in parentheses (...)", msg, LIT(operand->OrBranchExpr.token.string));
 		break;
 	}
 }
