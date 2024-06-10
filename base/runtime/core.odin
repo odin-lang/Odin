@@ -560,6 +560,19 @@ Odin_Platform_Subtarget_Type :: type_of(ODIN_PLATFORM_SUBTARGET)
 */
 Odin_Sanitizer_Flags :: type_of(ODIN_SANITIZER_FLAGS)
 
+/*
+	// Defined internally by the compiler
+	Odin_Optimization_Mode :: enum int {
+		None       = -1,
+		Minimal    =  0,
+		Size       =  1,
+		Speed      =  2,
+		Aggressive =  3,
+	}
+
+	ODIN_OPTIMIZATION_MODE // is a constant
+*/
+Odin_Optimization_Mode :: type_of(ODIN_OPTIMIZATION_MODE)
 
 /////////////////////////////
 // Init Startup Procedures //
