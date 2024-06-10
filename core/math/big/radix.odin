@@ -315,6 +315,7 @@ int_atoi :: proc(res: ^Int, input: string, radix := i8(10), allocator := context
 
 
 atoi :: proc { int_atoi, }
+string_to_int :: int_atoi
 
 /*
 	We size for `string` by default.
