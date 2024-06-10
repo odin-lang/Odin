@@ -3,6 +3,8 @@
 #include "entity.cpp"
 #include "types.cpp"
 
+String get_final_microarchitecture();
+
 gb_internal void check_expr(CheckerContext *c, Operand *operand, Ast *expression);
 gb_internal void check_expr_or_type(CheckerContext *c, Operand *operand, Ast *expression, Type *type_hint=nullptr);
 gb_internal void add_comparison_procedures_for_fields(CheckerContext *c, Type *t);
@@ -1041,7 +1043,7 @@ gb_internal void init_universal(void) {
 		add_global_string_constant("ODIN_ARCH_STRING", target_arch_names[bc->metrics.arch]);
 	}
 
-	add_global_string_constant("ODIN_MICROARCH_STRING", bc->microarch);
+	add_global_string_constant("ODIN_MICROARCH_STRING", get_final_microarchitecture());
 	
 	{
 		GlobalEnumValue values[BuildMode_COUNT] = {
