@@ -3747,8 +3747,10 @@ gb_internal Ast *parse_simple_stmt(AstFile *f, u32 flags) {
 					case Ast_TypeSwitchStmt:
 						stmt->TypeSwitchStmt.partial = true;
 						break;
+					default:
+						syntax_error(partial_token, "Incorrect use of directive, use '%.*s: #partial switch'", LIT(ast_token(name).string));
+						break;
 					}
-					syntax_error(partial_token, "Incorrect use of directive, use '#partial %.*s: switch'", LIT(ast_token(name).string));
 				} else if (is_reverse) {
 					switch (stmt->kind) {
 					case Ast_RangeStmt:
@@ -5176,7 +5178,7 @@ gb_internal Ast *parse_stmt(AstFile *f) {
 		} else if (tag == "unroll") {
 			return parse_unrolled_for_loop(f, name);
 		} else if (tag == "reverse") {
-			Ast *for_stmt = parse_for_stmt(f);
+			Ast *for_stmt = parse_stmt(f);
 			if (for_stmt->kind == Ast_RangeStmt) {
 				if (for_stmt->RangeStmt.reverse) {
 					syntax_error(token, "#reverse already applied to a 'for in' statement");

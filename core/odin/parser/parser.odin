@@ -1455,7 +1455,7 @@ parse_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 		case "unroll":
 			return parse_unrolled_for_loop(p, tag)
 		case "reverse":
-			stmt := parse_for_stmt(p)
+			stmt := parse_stmt(p)
 
 			if range, is_range := stmt.derived.(^ast.Range_Stmt); is_range {
 				if range.reverse {
@@ -3515,6 +3515,25 @@ parse_simple_stmt :: proc(p: ^Parser, flags: Stmt_Allow_Flags) -> ^ast.Stmt {
 	case op.kind == .Colon:
 		expect_token_after(p, .Colon, "identifier list")
 		if .Label in flags && len(lhs) == 1 {
+			is_partial := false
+			is_reverse := false
+
+			partial_token: tokenizer.Token
+			if p.curr_tok.kind == .Hash {
+				name := peek_token(p)
+				if name.kind == .Ident && name.text == "partial" &&
+				   peek_token(p, 1).kind == .Switch {
+					partial_token = expect_token(p, .Hash)
+					expect_token(p, .Ident)
+					is_partial = true
+				} else if name.kind == .Ident && name.text == "reverse" &&
+				          peek_token(p, 1).kind == .For {
+					partial_token = expect_token(p, .Hash)
+					expect_token(p, .Ident)
+					is_reverse = true
+				}
+			}
+
 			#partial switch p.curr_tok.kind {
 			case .Open_Brace, .If, .For, .Switch:
 				label := lhs[0]
@@ -3528,6 +3547,22 @@ parse_simple_stmt :: proc(p: ^Parser, flags: Stmt_Allow_Flags) -> ^ast.Stmt {
 					case ^ast.Switch_Stmt:      n.label = label
 					case ^ast.Type_Switch_Stmt: n.label = label
 					case ^ast.Range_Stmt:	    n.label = label
+					}
+
+					if is_partial {
+						#partial switch n in stmt.derived_stmt {
+						case ^ast.Switch_Stmt:      n.partial = true
+						case ^ast.Type_Switch_Stmt: n.partial = true
+						case:
+							error(p, partial_token.pos, "incorrect use of directive, use '%s: #partial switch'", partial_token.text)
+						}
+					}
+					if is_reverse {
+						#partial switch n in stmt.derived_stmt {
+						case ^ast.Range_Stmt: n.reverse = true
+						case:
+							error(p, partial_token.pos, "incorrect use of directive, use '%s: #reverse for'", partial_token.text)
+						}
 					}
 				}
 
