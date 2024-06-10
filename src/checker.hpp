@@ -51,6 +51,12 @@ enum StmtFlag {
 enum BuiltinProcPkg {
 	BuiltinProcPkg_builtin,
 	BuiltinProcPkg_intrinsics,
+	BuiltinProcPkg_COUNT
+};
+
+String builtin_proc_pkg_name[BuiltinProcPkg_COUNT] = {
+	str_lit("builtin"),
+	str_lit("intrinsics"),
 };
 
 struct BuiltinProc {

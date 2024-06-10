@@ -1843,6 +1843,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 	case BuiltinProc_objc_register_class: 
 	case BuiltinProc_atomic_type_is_lock_free:
 	case BuiltinProc_has_target_feature:
+	case BuiltinProc_procedure_of:
 		// NOTE(bill): The first arg may be a Type, this will be checked case by case
 		break;
 
@@ -6154,6 +6155,51 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 
 			operand->mode = Addressing_Value;
 			operand->type = t_map_cell_info_ptr;
+			break;
+		}
+
+	case BuiltinProc_procedure_of:
+		{
+			Ast *call_expr = unparen_expr(ce->args[0]);
+			Operand op = {};
+			check_expr_base(c, &op, ce->args[0], nullptr);
+			if (op.mode != Addressing_Value && !(call_expr && call_expr->kind == Ast_CallExpr)) {
+				error(ce->args[0], "Expected a call expression for '%.*s'", LIT(builtin_name));
+				return false;
+			}
+
+			Ast *proc = call_expr->CallExpr.proc;
+			Entity *e = entity_of_node(proc);
+
+			if (e == nullptr) {
+				error(ce->args[0], "Invalid procedure value, expected a regular/specialized procedure");
+				return false;
+			}
+
+			TypeAndValue tav = proc->tav;
+
+
+			operand->type       = e->type;
+			operand->mode       = Addressing_Value;
+			operand->value      = tav.value;
+			operand->builtin_id = BuiltinProc_Invalid;
+			operand->proc_group = nullptr;
+
+			if (tav.mode == Addressing_Builtin) {
+				operand->mode = tav.mode;
+				operand->builtin_id = cast(BuiltinProcId)e->Builtin.id;
+				break;
+			}
+
+			if (!is_type_proc(e->type)) {
+				gbString s = type_to_string(e->type);
+				error(ce->args[0], "Expected a procedure value, got '%s'", s);
+				gb_string_free(s);
+				return false;
+			}
+
+
+			ce->entity_procedure_of = e;
 			break;
 		}
 

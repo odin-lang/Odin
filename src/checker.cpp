@@ -1479,6 +1479,10 @@ gb_internal Entity *entity_of_node(Ast *expr) {
 	case_ast_node(cc, CaseClause, expr);
 		return cc->implicit_entity;
 	case_end;
+
+	case_ast_node(ce, CallExpr, expr);
+		return ce->entity_procedure_of;
+	case_end;
 	}
 	return nullptr;
 }

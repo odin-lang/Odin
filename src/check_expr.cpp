@@ -578,6 +578,7 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 	d->defer_use_checked = false;
 
 	Entity *entity = alloc_entity_procedure(nullptr, token, final_proc_type, tags);
+	entity->state.store(EntityState_Resolved);
 	entity->identifier = ident;
 
 	add_entity_and_decl_info(&nctx, ident, entity, d);

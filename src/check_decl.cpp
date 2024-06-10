@@ -88,11 +88,14 @@ gb_internal Type *check_init_variable(CheckerContext *ctx, Entity *e, Operand *o
 			e->type = t_invalid;
 			return nullptr;
 		} else if (is_type_polymorphic(t)) {
-			gbString str = type_to_string(t);
-			defer (gb_string_free(str));
-			error(e->token, "Invalid use of a polymorphic type '%s' in %.*s", str, LIT(context_name));
-			e->type = t_invalid;
-			return nullptr;
+			Entity *e = entity_of_node(operand->expr);
+			if (e->state.load() != EntityState_Resolved) {
+				gbString str = type_to_string(t);
+				defer (gb_string_free(str));
+				error(e->token, "Invalid use of a polymorphic type '%s' in %.*s", str, LIT(context_name));
+				e->type = t_invalid;
+				return nullptr;
+			}
 		} else if (is_type_empty_union(t)) {
 			gbString str = type_to_string(t);
 			defer (gb_string_free(str));
@@ -479,6 +482,9 @@ gb_internal void check_const_decl(CheckerContext *ctx, Entity *e, Ast *type_expr
 			entity = check_selector(ctx, &operand, init, e->type);
 		} else {
 			check_expr_or_type(ctx, &operand, init, e->type);
+			if (init->kind == Ast_CallExpr) {
+				entity = init->CallExpr.entity_procedure_of;
+			}
 		}
 
 		switch (operand.mode) {
@@ -525,6 +531,7 @@ gb_internal void check_const_decl(CheckerContext *ctx, Entity *e, Ast *type_expr
 			e->ProcGroup.entities = array_clone(heap_allocator(), operand.proc_group->ProcGroup.entities);
 			return;
 		}
+
 
 		if (entity != nullptr) {
 			if (e->type != nullptr) {

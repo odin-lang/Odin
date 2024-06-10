@@ -2224,8 +2224,16 @@ gb_internal void check_expr_stmt(CheckerContext *ctx, Ast *node) {
 		}
 		if (do_require) {
 			gbString expr_str = expr_to_string(ce->proc);
+			defer (gb_string_free(expr_str));
+			if (builtin_id) {
+				String real_name = builtin_procs[builtin_id].name;
+				if (real_name != make_string(cast(u8 const *)expr_str, gb_string_length(expr_str))) {
+					error(node, "'%s' ('%.*s.%.*s') requires that its results must be handled", expr_str,
+					      LIT(builtin_proc_pkg_name[builtin_procs[builtin_id].pkg]), LIT(real_name));
+					return;
+				}
+			}
 			error(node, "'%s' requires that its results must be handled", expr_str);
-			gb_string_free(expr_str);
 		}
 		return;
 	} else if (expr && expr->kind == Ast_SelectorCallExpr) {
