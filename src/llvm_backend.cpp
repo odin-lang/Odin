@@ -1125,6 +1125,49 @@ gb_internal void lb_finalize_objc_names(lbProcedure *p) {
 	lb_end_procedure_body(p);
 }
 
+gb_internal void lb_verify_function(lbModule *m, lbProcedure *p, bool dump_ll=false) {
+	if (!m->debug_builder && LLVMVerifyFunction(p->value, LLVMReturnStatusAction)) {
+		char *llvm_error = nullptr;
+
+		gb_printf_err("LLVM CODE GEN FAILED FOR PROCEDURE: %.*s\n", LIT(p->name));
+		LLVMDumpValue(p->value);
+		gb_printf_err("\n");
+		if (dump_ll) {
+			gb_printf_err("\n\n\n");
+			String filepath_ll = lb_filepath_ll_for_module(m);
+			if (LLVMPrintModuleToFile(m->mod, cast(char const *)filepath_ll.text, &llvm_error)) {
+				gb_printf_err("LLVM Error: %s\n", llvm_error);
+			}
+		}
+		LLVMVerifyFunction(p->value, LLVMPrintMessageAction);
+		exit_with_errors();
+	}
+}
+
+gb_internal WORKER_TASK_PROC(lb_llvm_module_verification_worker_proc) {
+	char *llvm_error = nullptr;
+	defer (LLVMDisposeMessage(llvm_error));
+	lbModule *m = cast(lbModule *)data;
+
+	if (LLVMVerifyModule(m->mod, LLVMReturnStatusAction, &llvm_error)) {
+		gb_printf_err("LLVM Error:\n%s\n", llvm_error);
+		if (build_context.keep_temp_files) {
+			TIME_SECTION("LLVM Print Module to File");
+			String filepath_ll = lb_filepath_ll_for_module(m);
+			if (LLVMPrintModuleToFile(m->mod, cast(char const *)filepath_ll.text, &llvm_error)) {
+				gb_printf_err("LLVM Error: %s\n", llvm_error);
+				exit_with_errors();
+				return false;
+			}
+		}
+		exit_with_errors();
+		return 1;
+	}
+	return 0;
+}
+
+
+
 gb_internal lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProcedure *objc_names, Array<lbGlobalVariable> &global_variables) { // Startup Runtime
 	Type *proc_type = alloc_type_proc(nullptr, nullptr, 0, nullptr, 0, false, ProcCC_Odin);
 
@@ -1227,13 +1270,7 @@ gb_internal lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProc
 
 	lb_end_procedure_body(p);
 
-	if (!main_module->debug_builder && LLVMVerifyFunction(p->value, LLVMReturnStatusAction)) {
-		gb_printf_err("LLVM CODE GEN FAILED FOR PROCEDURE: %s\n", "main");
-		LLVMDumpValue(p->value);
-		gb_printf_err("\n\n\n\n");
-		LLVMVerifyFunction(p->value, LLVMAbortProcessAction);
-	}
-
+	lb_verify_function(main_module, p);
 	return p;
 }
 
@@ -1256,13 +1293,7 @@ gb_internal lbProcedure *lb_create_cleanup_runtime(lbModule *main_module) { // C
 
 	lb_end_procedure_body(p);
 
-	if (!main_module->debug_builder && LLVMVerifyFunction(p->value, LLVMReturnStatusAction)) {
-		gb_printf_err("LLVM CODE GEN FAILED FOR PROCEDURE: %s\n", "main");
-		LLVMDumpValue(p->value);
-		gb_printf_err("\n\n\n\n");
-		LLVMVerifyFunction(p->value, LLVMAbortProcessAction);
-	}
-
+	lb_verify_function(main_module, p);
 	return p;
 }
 
@@ -2523,27 +2554,6 @@ gb_internal String lb_filepath_obj_for_module(lbModule *m) {
 	return concatenate_strings(permanent_allocator(), path, ext);
 }
 
-gb_internal WORKER_TASK_PROC(lb_llvm_module_verification_worker_proc) {
-	char *llvm_error = nullptr;
-	defer (LLVMDisposeMessage(llvm_error));
-	lbModule *m = cast(lbModule *)data;
-	if (LLVMVerifyModule(m->mod, LLVMReturnStatusAction, &llvm_error)) {
-		gb_printf_err("LLVM Error:\n%s\n", llvm_error);
-		if (build_context.keep_temp_files) {
-			TIME_SECTION("LLVM Print Module to File");
-			String filepath_ll = lb_filepath_ll_for_module(m);
-			if (LLVMPrintModuleToFile(m->mod, cast(char const *)filepath_ll.text, &llvm_error)) {
-				gb_printf_err("LLVM Error: %s\n", llvm_error);
-				exit_with_errors();
-				return false;
-			}
-		}
-		exit_with_errors();
-		return 1;
-	}
-	return 0;
-}
-
 
 gb_internal bool lb_llvm_module_verification(lbGenerator *gen, bool do_threading) {
 	for (auto const &entry : gen->modules) {
@@ -2777,12 +2787,7 @@ gb_internal lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *star
 	}
 
 
-	if (!m->debug_builder && LLVMVerifyFunction(p->value, LLVMReturnStatusAction)) {
-		gb_printf_err("LLVM CODE GEN FAILED FOR PROCEDURE: %s\n", "main");
-		LLVMDumpValue(p->value);
-		gb_printf_err("\n\n\n\n");
-		LLVMVerifyFunction(p->value, LLVMAbortProcessAction);
-	}
+	lb_verify_function(m, p);
 
 	lb_run_function_pass_manager(default_function_pass_manager, p, lbFunctionPassManager_default);
 	return p;
@@ -2812,19 +2817,7 @@ gb_internal void lb_generate_procedure(lbModule *m, lbProcedure *p) {
 		}
 	}
 
-	if (!m->debug_builder && LLVMVerifyFunction(p->value, LLVMReturnStatusAction)) {
-		char *llvm_error = nullptr;
-
-		gb_printf_err("LLVM CODE GEN FAILED FOR PROCEDURE: %.*s\n", LIT(p->name));
-		LLVMDumpValue(p->value);
-		gb_printf_err("\n\n\n\n");
-		String filepath_ll = lb_filepath_ll_for_module(m);
-		if (LLVMPrintModuleToFile(m->mod, cast(char const *)filepath_ll.text, &llvm_error)) {
-			gb_printf_err("LLVM Error: %s\n", llvm_error);
-		}
-		LLVMVerifyFunction(p->value, LLVMPrintMessageAction);
-		exit_with_errors();
-	}
+	lb_verify_function(m, p, true);
 }
 
 
