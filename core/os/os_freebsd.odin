@@ -140,6 +140,8 @@ RTLD_NOLOAD       :: 0x02000
 
 MAX_PATH :: 1024
 
+KINFO_FILE_SIZE :: 1392
+
 args := _alloc_command_line_arguments()
 
 Unix_File_Time :: struct {
@@ -191,6 +193,21 @@ OS_Stat :: struct {
 	lspare: [10]u64,
 }
 
+KInfo_File :: struct {
+	structsize: c.int,
+	type:       c.int,
+	fd:         c.int,
+	ref_count:  c.int,
+	flags:      c.int,
+	pad0:       c.int,
+	offset:     i64,
+
+	// NOTE(Feoramund): This field represents a complicated union that I am
+	// avoiding implementing for now. I only need the path data below.
+	_union: [336]byte,
+
+	path: [MAX_PATH]c.char,
+}
 
 // since FreeBSD v12
 Dirent :: struct {
@@ -254,6 +271,8 @@ X_OK :: 1 // Test for execute permission
 W_OK :: 2 // Test for write permission
 R_OK :: 4 // Test for read permission
 
+F_KINFO :: 22
+
 foreign libc {
 	@(link_name="__error")		__errno_location :: proc() -> ^c.int ---
 
@@ -274,6 +293,7 @@ foreign libc {
 	@(link_name="unlink")           _unix_unlink        :: proc(path: cstring) -> c.int ---
 	@(link_name="rmdir")            _unix_rmdir         :: proc(path: cstring) -> c.int ---
 	@(link_name="mkdir")            _unix_mkdir         :: proc(path: cstring, mode: mode_t) -> c.int ---
+	@(link_name="fcntl")            _unix_fcntl         :: proc(fd: Handle, cmd: c.int, arg: uintptr) -> c.int ---
 	
 	@(link_name="fdopendir")        _unix_fdopendir     :: proc(fd: Handle) -> Dir ---
 	@(link_name="closedir")         _unix_closedir      :: proc(dirp: Dir) -> c.int ---
@@ -591,9 +611,26 @@ _readlink :: proc(path: string) -> (string, Errno) {
 	return "", Errno{}
 }
 
-// XXX FreeBSD
 absolute_path_from_handle :: proc(fd: Handle) -> (string, Errno) {
-	return "", Errno(ENOSYS)
+	// NOTE(Feoramund): The situation isn't ideal, but this was the best way I
+	// could find to implement this. There are a couple outstanding bug reports
+	// regarding the desire to retrieve an absolute path from a handle, but to
+	// my knowledge, there hasn't been any work done on it.
+	//
+	// https://bugs.freebsd.org/bugzilla/show_bug.cgi?id=198570
+	//
+	// This may be unreliable, according to a comment from 2023.
+
+	kinfo: KInfo_File
+	kinfo.structsize = KINFO_FILE_SIZE
+
+	res := _unix_fcntl(fd, F_KINFO, cast(uintptr)&kinfo)
+	if res == -1 {
+		return "", Errno(get_last_error())
+	}
+
+	path := strings.clone_from_cstring_bounded(cast(cstring)&kinfo.path[0], len(kinfo.path))
+	return path, ERROR_NONE
 }
 
 absolute_path_from_relative :: proc(rel: string) -> (path: string, err: Errno) {
