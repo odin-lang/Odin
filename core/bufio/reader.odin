@@ -29,12 +29,12 @@ MIN_READ_BUFFER_SIZE :: 16
 @(private)
 DEFAULT_MAX_CONSECUTIVE_EMPTY_READS :: 128
 
-reader_init :: proc(b: ^Reader, rd: io.Reader, size: int = DEFAULT_BUF_SIZE, allocator := context.allocator) {
+reader_init :: proc(b: ^Reader, rd: io.Reader, size: int = DEFAULT_BUF_SIZE, allocator := context.allocator, loc := #caller_location) {
 	size := size
 	size = max(size, MIN_READ_BUFFER_SIZE)
 	reader_reset(b, rd)
 	b.buf_allocator = allocator
-	b.buf = make([]byte, size, allocator)
+	b.buf = make([]byte, size, allocator, loc)
 }
 
 reader_init_with_buf :: proc(b: ^Reader, rd: io.Reader, buf: []byte) {

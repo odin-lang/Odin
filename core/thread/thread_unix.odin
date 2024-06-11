@@ -1,12 +1,12 @@
-// +build linux, darwin, freebsd, openbsd, haiku
+// +build linux, darwin, freebsd, openbsd, netbsd, haiku
 // +private
 package thread
 
-import "base:intrinsics"
 import "core:sync"
 import "core:sys/unix"
+import "core:time"
 
-CAS :: intrinsics.atomic_compare_exchange_strong
+CAS :: sync.atomic_compare_exchange_strong
 
 // NOTE(tetra): Aligned here because of core/unix/pthread_linux.odin/pthread_t.
 // Also see core/sys/darwin/mach_darwin.odin/semaphore_t.
@@ -20,7 +20,7 @@ Thread_Os_Specific :: struct #align(16) {
 // It then waits for `start` to be called.
 //
 _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
-	__linux_thread_entry_proc :: proc "c" (t: rawptr) -> rawptr {
+	__unix_thread_entry_proc :: proc "c" (t: rawptr) -> rawptr {
 		t := (^Thread)(t)
 
 		when ODIN_OS != .Darwin {
@@ -32,8 +32,14 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 
 		t.id = sync.current_thread_id()
 
-		for (.Started not_in t.flags) {
-			sync.wait(&t.cond, &t.mutex)
+		for (.Started not_in sync.atomic_load(&t.flags)) {
+			// HACK: use a timeout so in the event that the condition is signalled at THIS comment's exact point
+			// (after checking flags, before starting the wait) it gets itself out of that deadlock after a ms.
+			sync.wait_with_timeout(&t.cond, &t.mutex, time.Millisecond)
+		}
+
+		if .Joined in sync.atomic_load(&t.flags) {
+			return nil
 		}
 
 		when ODIN_OS != .Darwin {
@@ -56,11 +62,11 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 			t.procedure(t)
 		}
 
-		intrinsics.atomic_store(&t.flags, t.flags + { .Done })
+		sync.atomic_or(&t.flags, { .Done })
 
 		sync.unlock(&t.mutex)
 
-		if .Self_Cleanup in t.flags {
+		if .Self_Cleanup in sync.atomic_load(&t.flags) {
 			t.unix_thread = {}
 			// NOTE(ftphikari): It doesn't matter which context 'free' received, right?
 			context = {}
@@ -78,7 +84,7 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 
 	// NOTE(tetra, 2019-11-01): These only fail if their argument is invalid.
 	assert(unix.pthread_attr_setdetachstate(&attrs, unix.PTHREAD_CREATE_JOINABLE) == 0)
-	when ODIN_OS != .Haiku {
+	when ODIN_OS != .Haiku && ODIN_OS != .NetBSD {
 		assert(unix.pthread_attr_setinheritsched(&attrs, unix.PTHREAD_EXPLICIT_SCHED) == 0)
 	}
 
@@ -91,7 +97,7 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 	// Set thread priority.
 	policy: i32
 	res: i32
-	when ODIN_OS != .Haiku {
+	when ODIN_OS != .Haiku && ODIN_OS != .NetBSD {
 		res = unix.pthread_attr_getschedpolicy(&attrs, &policy)
 		assert(res == 0)
 	}
@@ -109,7 +115,7 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 	assert(res == 0)
 
 	thread.procedure = procedure
-	if unix.pthread_create(&thread.unix_thread, &attrs, __linux_thread_entry_proc, thread) != 0 {
+	if unix.pthread_create(&thread.unix_thread, &attrs, __unix_thread_entry_proc, thread) != 0 {
 		free(thread, thread.creation_allocator)
 		return nil
 	}
@@ -118,13 +124,12 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 }
 
 _start :: proc(t: ^Thread) {
-	// sync.guard(&t.mutex)
-	t.flags += { .Started }
+	sync.atomic_or(&t.flags, { .Started })
 	sync.signal(&t.cond)
 }
 
 _is_done :: proc(t: ^Thread) -> bool {
-	return .Done in intrinsics.atomic_load(&t.flags)
+	return .Done in sync.atomic_load(&t.flags)
 }
 
 _join :: proc(t: ^Thread) {
@@ -135,13 +140,18 @@ _join :: proc(t: ^Thread) {
 	}
 
 	// Preserve other flags besides `.Joined`, like `.Started`.
-	unjoined := intrinsics.atomic_load(&t.flags) - {.Joined}
+	unjoined := sync.atomic_load(&t.flags) - {.Joined}
 	joined   := unjoined + {.Joined}
 
 	// Try to set `t.flags` from unjoined to joined. If it returns joined,
 	// it means the previous value had that flag set and we can return.
 	if res, ok := CAS(&t.flags, unjoined, joined); res == joined && !ok {
 		return
+	}
+	// Prevent non-started threads from blocking main thread with initial wait
+	// condition.
+	if .Started not_in unjoined {
+		_start(t)
 	}
 	unix.pthread_join(t.unix_thread, nil)
 }

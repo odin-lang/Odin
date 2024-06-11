@@ -18,10 +18,12 @@ enum TargetOsKind : u16 {
 	TargetOs_essence,
 	TargetOs_freebsd,
 	TargetOs_openbsd,
+	TargetOs_netbsd,
 	TargetOs_haiku,
 	
 	TargetOs_wasi,
 	TargetOs_js,
+	TargetOs_orca,
 
 	TargetOs_freestanding,
 
@@ -84,10 +86,12 @@ gb_global String target_os_names[TargetOs_COUNT] = {
 	str_lit("essence"),
 	str_lit("freebsd"),
 	str_lit("openbsd"),
+	str_lit("netbsd"),
 	str_lit("haiku"),
 	
 	str_lit("wasi"),
 	str_lit("js"),
+	str_lit("orca"),
 
 	str_lit("freestanding"),
 };
@@ -613,7 +617,6 @@ struct TargetMetrics {
 	isize          max_align;
 	isize          max_simd_align;
 	String         target_triplet;
-	String         target_data_layout;
 	TargetABIKind  abi;
 };
 
@@ -645,6 +648,7 @@ struct QueryDataSetSettings {
 enum BuildModeKind {
 	BuildMode_Executable,
 	BuildMode_DynamicLibrary,
+	BuildMode_StaticLibrary,
 	BuildMode_Object,
 	BuildMode_Assembly,
 	BuildMode_LLVM_IR,
@@ -692,6 +696,12 @@ enum TimingsExportFormat : i32 {
 	TimingsExportCSV         = 2,
 };
 
+enum DependenciesExportFormat : i32 {
+	DependenciesExportUnspecified = 0,
+	DependenciesExportMake        = 1,
+	DependenciesExportJson        = 2,
+};
+
 enum ErrorPosStyle {
 	ErrorPosStyle_Default, // path(line:column) msg
 	ErrorPosStyle_Unix,    // path:line:column: msg
@@ -731,10 +741,11 @@ enum VetFlags : u64 {
 	VetFlag_Semicolon       = 1u<<4,
 	VetFlag_UnusedVariables = 1u<<5,
 	VetFlag_UnusedImports   = 1u<<6,
+	VetFlag_Deprecated      = 1u<<7,
 
 	VetFlag_Unused = VetFlag_UnusedVariables|VetFlag_UnusedImports,
 
-	VetFlag_All = VetFlag_Unused|VetFlag_Shadowing|VetFlag_UsingStmt,
+	VetFlag_All = VetFlag_Unused|VetFlag_Shadowing|VetFlag_UsingStmt|VetFlag_Deprecated,
 
 	VetFlag_Using = VetFlag_UsingStmt|VetFlag_UsingParam,
 };
@@ -756,6 +767,8 @@ u64 get_vet_flag_from_name(String const &name) {
 		return VetFlag_Style;
 	} else if (name == "semicolon") {
 		return VetFlag_Semicolon;
+	} else if (name == "deprecated") {
+		return VetFlag_Deprecated;
 	}
 	return VetFlag_NONE;
 }
@@ -826,6 +839,8 @@ struct BuildContext {
 	bool   show_timings;
 	TimingsExportFormat export_timings_format;
 	String export_timings_file;
+	DependenciesExportFormat export_dependencies_format;
+	String export_dependencies_file;
 	bool   show_unused;
 	bool   show_unused_with_location;
 	bool   show_more_timings;
@@ -886,7 +901,6 @@ struct BuildContext {
 	u32 cmd_doc_flags;
 	Array<String> extra_packages;
 
-	StringSet test_names;
 	bool      test_all_packages;
 
 	gbAffinity affinity;
@@ -923,7 +937,18 @@ gb_internal isize MAX_ERROR_COLLECTOR_COUNT(void) {
 	return build_context.max_error_count;
 }
 
+#if defined(GB_SYSTEM_WINDOWS)
+	#include <llvm-c/Config/llvm-config.h>
+#else
+	#include <llvm/Config/llvm-config.h>
+#endif
 
+// NOTE: AMD64 targets had their alignment on 128 bit ints bumped from 8 to 16 (undocumented of course).
+#if LLVM_VERSION_MAJOR >= 18
+	#define AMD64_MAX_ALIGNMENT 16
+#else
+	#define AMD64_MAX_ALIGNMENT 8
+#endif
 
 gb_global TargetMetrics target_windows_i386 = {
 	TargetOs_windows,
@@ -934,9 +959,8 @@ gb_global TargetMetrics target_windows_i386 = {
 gb_global TargetMetrics target_windows_amd64 = {
 	TargetOs_windows,
 	TargetArch_amd64,
-	8, 8, 8, 16,
+	8, 8, AMD64_MAX_ALIGNMENT, 16,
 	str_lit("x86_64-pc-windows-msvc"),
-	str_lit("e-m:w-i64:64-f80:128-n8:16:32:64-S128"),
 };
 
 gb_global TargetMetrics target_linux_i386 = {
@@ -949,32 +973,28 @@ gb_global TargetMetrics target_linux_i386 = {
 gb_global TargetMetrics target_linux_amd64 = {
 	TargetOs_linux,
 	TargetArch_amd64,
-	8, 8, 8, 16,
+	8, 8, AMD64_MAX_ALIGNMENT, 16,
 	str_lit("x86_64-pc-linux-gnu"),
-	str_lit("e-m:w-i64:64-f80:128-n8:16:32:64-S128"),
 };
 gb_global TargetMetrics target_linux_arm64 = {
 	TargetOs_linux,
 	TargetArch_arm64,
-	8, 8, 8, 16,
+	8, 8, 16, 16,
 	str_lit("aarch64-linux-elf"),
-	str_lit("e-m:o-p:32:32-Fi8-i64:64-v128:64:128-a:0:32-n32-S64"),
 };
 
 gb_global TargetMetrics target_linux_arm32 = {
 	TargetOs_linux,
 	TargetArch_arm32,
 	4, 4, 4, 8,
-	str_lit("arm-linux-gnu"),
-	str_lit("e-m:o-p:32:32-Fi8-i64:64-v128:64:128-a:0:32-n32-S64"),
+	str_lit("arm-unknown-linux-gnueabihf"),
 };
 
 gb_global TargetMetrics target_darwin_amd64 = {
 	TargetOs_darwin,
 	TargetArch_amd64,
-	8, 8, 8, 16,
+	8, 8, AMD64_MAX_ALIGNMENT, 16,
 	str_lit("x86_64-apple-macosx"), // NOTE: Changes during initialization based on build flags.
-	str_lit("e-m:o-i64:64-f80:128-n8:16:32:64-S128"),
 };
 
 gb_global TargetMetrics target_darwin_arm64 = {
@@ -982,7 +1002,6 @@ gb_global TargetMetrics target_darwin_arm64 = {
 	TargetArch_arm64,
 	8, 8, 16, 16,
 	str_lit("arm64-apple-macosx"), // NOTE: Changes during initialization based on build flags.
-	str_lit("e-m:o-i64:64-i128:128-n32:64-S128"),
 };
 
 gb_global TargetMetrics target_freebsd_i386 = {
@@ -995,9 +1014,8 @@ gb_global TargetMetrics target_freebsd_i386 = {
 gb_global TargetMetrics target_freebsd_amd64 = {
 	TargetOs_freebsd,
 	TargetArch_amd64,
-	8, 8, 8, 16,
+	8, 8, AMD64_MAX_ALIGNMENT, 16,
 	str_lit("x86_64-unknown-freebsd-elf"),
-	str_lit("e-m:w-i64:64-f80:128-n8:16:32:64-S128"),
 };
 
 gb_global TargetMetrics target_freebsd_arm64 = {
@@ -1005,28 +1023,40 @@ gb_global TargetMetrics target_freebsd_arm64 = {
 	TargetArch_arm64,
 	8, 8, 16, 16,
 	str_lit("aarch64-unknown-freebsd-elf"),
-	str_lit("e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128"),
 };
 
 gb_global TargetMetrics target_openbsd_amd64 = {
 	TargetOs_openbsd,
 	TargetArch_amd64,
-	8, 8, 8, 16,
+	8, 8, AMD64_MAX_ALIGNMENT, 16,
 	str_lit("x86_64-unknown-openbsd-elf"),
-	str_lit("e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"),
+};
+
+gb_global TargetMetrics target_netbsd_amd64 = {
+	TargetOs_netbsd,
+	TargetArch_amd64,
+	8, 8, AMD64_MAX_ALIGNMENT, 16,
+	str_lit("x86_64-unknown-netbsd-elf"),
+};
+
+gb_global TargetMetrics target_netbsd_arm64 = {
+	TargetOs_netbsd,
+	TargetArch_arm64,
+	8, 8, 16, 16,
+	str_lit("aarch64-unknown-netbsd-elf"),
 };
 
 gb_global TargetMetrics target_haiku_amd64 = {
 	TargetOs_haiku,
 	TargetArch_amd64,
-	8, 8, 8, 16,
+	8, 8, AMD64_MAX_ALIGNMENT, 16,
 	str_lit("x86_64-unknown-haiku"),
 };
 
 gb_global TargetMetrics target_essence_amd64 = {
 	TargetOs_essence,
 	TargetArch_amd64,
-	8, 8, 8, 16,
+	8, 8, AMD64_MAX_ALIGNMENT, 16,
 	str_lit("x86_64-pc-none-elf"),
 };
 
@@ -1036,7 +1066,6 @@ gb_global TargetMetrics target_freestanding_wasm32 = {
 	TargetArch_wasm32,
 	4, 4, 8, 16,
 	str_lit("wasm32-freestanding-js"),
-	str_lit("e-m:e-p:32:32-i64:64-n32:64-S128"),
 };
 
 gb_global TargetMetrics target_js_wasm32 = {
@@ -1044,7 +1073,6 @@ gb_global TargetMetrics target_js_wasm32 = {
 	TargetArch_wasm32,
 	4, 4, 8, 16,
 	str_lit("wasm32-js-js"),
-	str_lit("e-m:e-p:32:32-i64:64-n32:64-S128"),
 };
 
 gb_global TargetMetrics target_wasi_wasm32 = {
@@ -1052,7 +1080,14 @@ gb_global TargetMetrics target_wasi_wasm32 = {
 	TargetArch_wasm32,
 	4, 4, 8, 16,
 	str_lit("wasm32-wasi-js"),
-	str_lit("e-m:e-p:32:32-i64:64-n32:64-S128"),
+};
+
+
+gb_global TargetMetrics target_orca_wasm32 = {
+	TargetOs_orca,
+	TargetArch_wasm32,
+	4, 4, 8, 16,
+	str_lit("wasm32-wasi-js"),
 };
 
 
@@ -1061,7 +1096,6 @@ gb_global TargetMetrics target_freestanding_wasm64p32 = {
 	TargetArch_wasm64p32,
 	4, 8, 8, 16,
 	str_lit("wasm32-freestanding-js"),
-	str_lit("e-m:e-p:32:32-i64:64-n32:64-S128"),
 };
 
 gb_global TargetMetrics target_js_wasm64p32 = {
@@ -1069,7 +1103,6 @@ gb_global TargetMetrics target_js_wasm64p32 = {
 	TargetArch_wasm64p32,
 	4, 8, 8, 16,
 	str_lit("wasm32-js-js"),
-	str_lit("e-m:e-p:32:32-i64:64-n32:64-S128"),
 };
 
 gb_global TargetMetrics target_wasi_wasm64p32 = {
@@ -1077,7 +1110,6 @@ gb_global TargetMetrics target_wasi_wasm64p32 = {
 	TargetArch_wasm32,
 	4, 8, 8, 16,
 	str_lit("wasm32-wasi-js"),
-	str_lit("e-m:e-p:32:32-i64:64-n32:64-S128"),
 };
 
 
@@ -1085,28 +1117,33 @@ gb_global TargetMetrics target_wasi_wasm64p32 = {
 gb_global TargetMetrics target_freestanding_amd64_sysv = {
 	TargetOs_freestanding,
 	TargetArch_amd64,
-	8, 8, 8, 16,
+	8, 8, AMD64_MAX_ALIGNMENT, 16,
 	str_lit("x86_64-pc-none-gnu"),
-	str_lit("e-m:w-i64:64-f80:128-n8:16:32:64-S128"),
 	TargetABI_SysV,
 };
 
 gb_global TargetMetrics target_freestanding_amd64_win64 = {
 	TargetOs_freestanding,
 	TargetArch_amd64,
-	8, 8, 8, 16,
+	8, 8, AMD64_MAX_ALIGNMENT, 16,
 	str_lit("x86_64-pc-none-msvc"),
-	str_lit("e-m:w-i64:64-f80:128-n8:16:32:64-S128"),
 	TargetABI_Win64,
 };
 
 gb_global TargetMetrics target_freestanding_arm64 = {
 	TargetOs_freestanding,
 	TargetArch_arm64,
-	8, 8, 8, 16,
+	8, 8, 16, 16,
 	str_lit("aarch64-none-elf"),
-	str_lit("e-m:o-p:32:32-Fi8-i64:64-v128:64:128-a:0:32-n32-S64"),
 };
+
+gb_global TargetMetrics target_freestanding_arm32 = {
+	TargetOs_freestanding,
+	TargetArch_arm32,
+	4, 4, 4, 8,
+	str_lit("arm-unknown-unknown-gnueabihf"),
+};
+
 
 struct NamedTargetMetrics {
 	String name;
@@ -1131,12 +1168,16 @@ gb_global NamedTargetMetrics named_targets[] = {
 	{ str_lit("freebsd_amd64"),       &target_freebsd_amd64  },
 	{ str_lit("freebsd_arm64"),       &target_freebsd_arm64  },
 
+	{ str_lit("netbsd_amd64"),        &target_netbsd_amd64   },
+	{ str_lit("netbsd_arm64"),        &target_netbsd_arm64   },
+
 	{ str_lit("openbsd_amd64"),       &target_openbsd_amd64  },
 	{ str_lit("haiku_amd64"),         &target_haiku_amd64    },
 
 	{ str_lit("freestanding_wasm32"), &target_freestanding_wasm32 },
 	{ str_lit("wasi_wasm32"),         &target_wasi_wasm32 },
 	{ str_lit("js_wasm32"),           &target_js_wasm32 },
+	{ str_lit("orca_wasm32"),         &target_orca_wasm32 },
 
 	{ str_lit("freestanding_wasm64p32"), &target_freestanding_wasm64p32 },
 	{ str_lit("js_wasm64p32"),           &target_js_wasm64p32 },
@@ -1146,6 +1187,7 @@ gb_global NamedTargetMetrics named_targets[] = {
 	{ str_lit("freestanding_amd64_win64"), &target_freestanding_amd64_win64 },
 
 	{ str_lit("freestanding_arm64"), &target_freestanding_arm64 },
+	{ str_lit("freestanding_arm32"), &target_freestanding_arm32 },
 };
 
 gb_global NamedTargetMetrics *selected_target_metrics;
@@ -1891,12 +1933,28 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 			#endif
 		#elif defined(GB_SYSTEM_OPENBSD)
 			metrics = &target_openbsd_amd64;
+		#elif defined(GB_SYSTEM_NETBSD)
+			#if defined(GB_CPU_ARM)
+				metrics = &target_netbsd_arm64;
+			#else
+				metrics = &target_netbsd_amd64;
+			#endif
 		#elif defined(GB_SYSTEM_HAIKU)
 			metrics = &target_haiku_amd64;
 		#elif defined(GB_CPU_ARM)
 			metrics = &target_linux_arm64;
 		#else
 			metrics = &target_linux_amd64;
+		#endif
+	#elif defined(GB_CPU_ARM)
+		#if defined(GB_SYSTEM_WINDOWS)
+			#error "Build Error: Unsupported architecture"
+		#elif defined(GB_SYSTEM_OSX)
+			#error "Build Error: Unsupported architecture"
+		#elif defined(GB_SYSTEM_FREEBSD)
+			#error "Build Error: Unsupported architecture"
+		#else
+			metrics = &target_linux_arm32;
 		#endif
 	#else
 		#if defined(GB_SYSTEM_WINDOWS)
@@ -1986,6 +2044,9 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 			bc->link_flags = str_lit("/machine:x86 ");
 			break;
 		}
+	} else if (bc->metrics.os == TargetOs_darwin) {
+		bc->link_flags = concatenate3_strings(permanent_allocator(),
+			str_lit("-target "), bc->metrics.target_triplet, str_lit(" "));
 	} else if (is_arch_wasm()) {
 		gbString link_flags = gb_string_make(heap_allocator(), " ");
 		// link_flags = gb_string_appendc(link_flags, "--export-all ");
@@ -1994,17 +2055,22 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 		// if (bc->metrics.arch == TargetArch_wasm64) {
 		// 	link_flags = gb_string_appendc(link_flags, "-mwasm64 ");
 		// }
-		if (bc->no_entry_point) {
+		if (bc->no_entry_point || bc->metrics.os == TargetOs_orca) {
 			link_flags = gb_string_appendc(link_flags, "--no-entry ");
 		}
-		
+
 		bc->link_flags = make_string_c(link_flags);
-		
+
 		// Disallow on wasm
 		bc->use_separate_modules = false;
 	} else {
-		bc->link_flags = concatenate3_strings(permanent_allocator(),
-			str_lit("-target "), bc->metrics.target_triplet, str_lit(" "));
+		// NOTE: for targets other than darwin, we don't specify a `-target` link flag.
+		// This is because we don't support cross-linking and clang is better at figuring
+		// out what the actual target for linking is,
+		// for example, on x86/alpine/musl it HAS to be `x86_64-alpine-linux-musl` to link correctly.
+		//
+		// Note that codegen will still target the triplet we specify, but the intricate details of
+		// a target shouldn't matter as much to codegen (if it does at all) as it does to linking.
 	}
 
 	// NOTE: needs to be done after adding the -target flag to the linker flags so the linker
@@ -2027,7 +2093,8 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 
 	bc->optimization_level = gb_clamp(bc->optimization_level, -1, 3);
 
-	if (bc->metrics.os != TargetOs_windows) {
+	// TODO: Static map calls are bugged on `amd64sysv` abi.
+	if (bc->metrics.os != TargetOs_windows && bc->metrics.arch == TargetArch_amd64) {
 		// ENFORCE DYNAMIC MAP CALLS
 		bc->dynamic_map_calls = true;
 	}
@@ -2043,14 +2110,6 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 
 	if (bc->metrics.os == TargetOs_freestanding) {
 		bc->ODIN_DEFAULT_TO_NIL_ALLOCATOR = !bc->ODIN_DEFAULT_TO_PANIC_ALLOCATOR;
-	} else if (is_arch_wasm()) {
-		if (bc->metrics.os == TargetOs_js || bc->metrics.os == TargetOs_wasi) {
-			// TODO(bill): Should these even have a default "heap-like" allocator?
-		}
-
-		if (!bc->ODIN_DEFAULT_TO_NIL_ALLOCATOR && !bc->ODIN_DEFAULT_TO_PANIC_ALLOCATOR) {
-			bc->ODIN_DEFAULT_TO_PANIC_ALLOCATOR = true;
-		}
 	}
 }
 
@@ -2276,7 +2335,12 @@ gb_internal bool init_build_paths(String init_filename) {
 		} else if (build_context.metrics.os == TargetOs_darwin) {
 			output_extension = STR_LIT("dylib");
 		}
-	} else if (build_context.build_mode == BuildMode_Object) {
+	} else if (build_context.build_mode == BuildMode_StaticLibrary) {
+		output_extension = STR_LIT("a");
+		if (build_context.metrics.os == TargetOs_windows) {
+			output_extension = STR_LIT("lib");
+		}
+	}else if (build_context.build_mode == BuildMode_Object) {
 		// By default use a .o object extension.
 		output_extension = STR_LIT("o");
 
@@ -2427,6 +2491,7 @@ gb_internal bool init_build_paths(String init_filename) {
 		case TargetOs_essence:
 		case TargetOs_freebsd:
 		case TargetOs_openbsd:
+		case TargetOs_netbsd:
 		case TargetOs_haiku:
 			gb_printf_err("-no-crt on unix systems requires either -default-to-nil-allocator or -default-to-panic-allocator to also be present because the default allocator requires crt\n");
 			return false;

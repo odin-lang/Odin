@@ -320,6 +320,7 @@ walk :: proc(v: ^Visitor, node: ^Node) {
 		if n.comment != nil {
 			walk(v, n.comment)
 		}
+		walk_expr_list(v, n.fullpaths)
 
 	case ^Proc_Group:
 		walk_expr_list(v, n.args)

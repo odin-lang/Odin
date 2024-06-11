@@ -76,8 +76,6 @@ save_to_buffer  :: proc(output: ^bytes.Buffer, img: ^Image, options := Options{}
 	pix  := RGBA_Pixel{0, 0, 0, 255}
 	prev := pix
 
-	seen[qoi_hash(pix)] = pix
-
 	input := img.pixels.buf[:]
 	run   := u8(0)
 
@@ -241,8 +239,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 		Decode loop starts here.
 	*/
 	seen: [64]RGBA_Pixel
-	pix := RGBA_Pixel{0, 0, 0, 255}
-	seen[qoi_hash(pix)] = pix
+	pix    := RGBA_Pixel{0, 0, 0, 255}
 	pixels := img.pixels.buf[:]
 
 	decode: for len(pixels) > 0 {

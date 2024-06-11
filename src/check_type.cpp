@@ -19,10 +19,12 @@ gb_internal void populate_using_array_index(CheckerContext *ctx, Ast *node, AstF
 		}
 	} else {
 		Token tok = make_token_ident(name);
-		if (field->names.count > 0) {
-			tok.pos = ast_token(field->names[0]).pos;
-		} else {
-			tok.pos = ast_token(field->type).pos;
+		if (field) {
+			if (field->names.count > 0) {
+				tok.pos = ast_token(field->names[0]).pos;
+			} else {
+				tok.pos = ast_token(field->type).pos;
+			}
 		}
 		Entity *f = alloc_entity_array_elem(nullptr, tok, t->Array.elem, idx);
 		add_entity(ctx, ctx->scope, nullptr, f);
@@ -191,9 +193,10 @@ gb_internal void check_struct_fields(CheckerContext *ctx, Ast *node, Slice<Entit
 
 		if (is_using && p->names.count > 0) {
 			Type *first_type = fields_array[fields_array.count-1]->type;
+			bool soa_ptr = is_type_soa_pointer(first_type);
 			Type *t = base_type(type_deref(first_type));
 
-			if (!does_field_type_allow_using(t) &&
+			if ((soa_ptr || !does_field_type_allow_using(t)) &&
 			    p->names.count >= 1 &&
 			    p->names[0]->kind == Ast_Ident) {
 				Token name_token = p->names[0]->Ident.token;
@@ -381,6 +384,7 @@ gb_internal Type *check_record_polymorphic_params(CheckerContext *ctx, Ast *poly
 			Type *type = nullptr;
 			bool is_type_param = false;
 			bool is_type_polymorphic_type = false;
+			Type *specialization = nullptr;
 			if (type_expr == nullptr && default_value == nullptr) {
 				error(param, "Expected a type for this parameter");
 				continue;
@@ -393,7 +397,6 @@ gb_internal Type *check_record_polymorphic_params(CheckerContext *ctx, Ast *poly
 				}
 				if (type_expr->kind == Ast_TypeidType) {
 					is_type_param = true;
-					Type *specialization = nullptr;
 					if (type_expr->TypeidType.specialization != nullptr) {
 						Ast *s = type_expr->TypeidType.specialization;
 						specialization = check_type(ctx, s);
@@ -471,6 +474,15 @@ gb_internal Type *check_record_polymorphic_params(CheckerContext *ctx, Ast *poly
 						if (is_type_polymorphic(base_type(operand.type))) {
 							*is_polymorphic_ = true;
 							can_check_fields = false;
+						} else if (specialization &&
+						           !check_type_specialization_to(ctx, specialization, operand.type, false, /*modify_type*/true)) {
+							if (!ctx->no_polymorphic_errors) {
+								gbString t = type_to_string(operand.type);
+								gbString s = type_to_string(specialization);
+								error(operand.expr, "Cannot convert type '%s' to the specialization '%s'", t, s);
+								gb_string_free(s);
+								gb_string_free(t);
+							}
 						}
 						e = alloc_entity_type_name(scope, token, operand.type);
 						e->TypeName.is_type_alias = true;
@@ -552,19 +564,7 @@ gb_internal bool check_record_poly_operand_specialization(CheckerContext *ctx, T
 gb_internal Entity *find_polymorphic_record_entity(GenTypesData *found_gen_types, isize param_count, Array<Operand> const &ordered_operands) {
 	for (Entity *e : found_gen_types->types) {
 		Type *t = base_type(e->type);
-		TypeTuple *tuple = nullptr;
-		switch (t->kind) {
-		case Type_Struct:
-			if (t->Struct.polymorphic_params) {
-				tuple = &t->Struct.polymorphic_params->Tuple;
-			}
-			break;
-		case Type_Union:
-			if (t->Union.polymorphic_params) {
-				tuple = &t->Union.polymorphic_params->Tuple;
-			}
-			break;
-		}
+		TypeTuple *tuple = get_record_polymorphic_params(t);
 		GB_ASSERT_MSG(tuple != nullptr, "%s :: %s", type_to_string(e->type), type_to_string(t));
 		GB_ASSERT(param_count == tuple->variables.count);
 
@@ -651,6 +651,8 @@ gb_internal void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *
 		&struct_type->Struct.is_polymorphic,
 		node, poly_operands
 	);
+	wait_signal_set(&struct_type->Struct.polymorphic_wait_signal);
+
 	struct_type->Struct.is_poly_specialized = check_record_poly_operand_specialization(ctx, struct_type, poly_operands, &struct_type->Struct.is_polymorphic);
 	if (original_type_for_poly) {
 		GB_ASSERT(named_type != nullptr);
@@ -700,6 +702,8 @@ gb_internal void check_union_type(CheckerContext *ctx, Type *union_type, Ast *no
 		&union_type->Union.is_polymorphic,
 		node, poly_operands
 	);
+	wait_signal_set(&union_type->Union.polymorphic_wait_signal);
+
 	union_type->Union.is_poly_specialized = check_record_poly_operand_specialization(ctx, union_type, poly_operands, &union_type->Union.is_polymorphic);
 	if (original_type_for_poly) {
 		GB_ASSERT(named_type != nullptr);
@@ -772,7 +776,7 @@ gb_internal void check_union_type(CheckerContext *ctx, Type *union_type, Ast *no
 			}
 		}
 		if (variants.count < 2) {
-			error(ut->align, "A union with #no_nil must have at least 2 variants");
+			error(node, "A union with #no_nil must have at least 2 variants");
 		}
 		break;
 	}
@@ -1124,18 +1128,21 @@ gb_internal void check_bit_field_type(CheckerContext *ctx, Type *bit_field_type,
 		return Endian_Native;
 	};
 
-	EndianKind backing_type_endian_kind = determine_endian_kind(core_array_type(backing_type));
+	Type *backing_type_elem = core_array_type(backing_type);
+	i64 backing_type_elem_size = type_size_of(backing_type_elem);
+	EndianKind backing_type_endian_kind = determine_endian_kind(backing_type_elem);
 	EndianKind endian_kind = Endian_Unknown;
 	for (Entity *f : fields) {
 		EndianKind field_kind = determine_endian_kind(f->type);
+		i64 field_size = type_size_of(f->type);
 
-		if (field_kind && backing_type_endian_kind != field_kind) {
+		if (field_kind && backing_type_endian_kind != field_kind && field_size > 1 && backing_type_elem_size > 1) {
 			error(f->token, "All 'bit_field' field types must match the same endian kind as the backing type, i.e. all native, all little, or all big");
 		}
 
 		if (endian_kind == Endian_Unknown) {
 			endian_kind = field_kind;
-		} else if (field_kind && endian_kind != field_kind) {
+		} else if (field_kind && endian_kind != field_kind && field_size > 1) {
 			error(f->token, "All 'bit_field' field types must be of the same endian variety, i.e. all native, all little, or all big");
 		}
 	}
@@ -1157,7 +1164,7 @@ gb_internal void check_bit_field_type(CheckerContext *ctx, Type *bit_field_type,
 				}
 			}
 			if (all_ones && all_booleans) {
-				if (build_context.vet_flags & VetFlag_Style) {
+				if (ast_file_vet_style(ctx->file)) {
 					char const *msg = "This 'bit_field' is better expressed as a 'bit_set' since all of the fields are booleans, of 1-bit in size, and the backing type is an integer (-vet-style)";
 					error(node, msg);
 				} else {
@@ -1442,8 +1449,8 @@ gb_internal bool check_type_specialization_to(CheckerContext *ctx, Type *special
 		    s->Struct.polymorphic_params != nullptr &&
 		    t->Struct.polymorphic_params != nullptr) {
 
-			TypeTuple *s_tuple = &s->Struct.polymorphic_params->Tuple;
-			TypeTuple *t_tuple = &t->Struct.polymorphic_params->Tuple;
+			TypeTuple *s_tuple = get_record_polymorphic_params(s);
+			TypeTuple *t_tuple = get_record_polymorphic_params(t);
 			GB_ASSERT(t_tuple->variables.count == s_tuple->variables.count);
 			for_array(i, s_tuple->variables) {
 				Entity *s_e = s_tuple->variables[i];
@@ -1495,8 +1502,8 @@ gb_internal bool check_type_specialization_to(CheckerContext *ctx, Type *special
 		    s->Union.polymorphic_params != nullptr &&
 		    t->Union.polymorphic_params != nullptr) {
 
-			TypeTuple *s_tuple = &s->Union.polymorphic_params->Tuple;
-			TypeTuple *t_tuple = &t->Union.polymorphic_params->Tuple;
+			TypeTuple *s_tuple = get_record_polymorphic_params(s);
+			TypeTuple *t_tuple = get_record_polymorphic_params(t);
 			GB_ASSERT(t_tuple->variables.count == s_tuple->variables.count);
 			for_array(i, s_tuple->variables) {
 				Entity *s_e = s_tuple->variables[i];
@@ -1580,7 +1587,7 @@ gb_internal bool is_expr_from_a_parameter(CheckerContext *ctx, Ast *expr) {
 		return is_expr_from_a_parameter(ctx, lhs);
 	} else if (expr->kind == Ast_Ident) {
 		Operand x= {};
-		Entity *e = check_ident(ctx, &x, expr, nullptr, nullptr, false);
+		Entity *e = check_ident(ctx, &x, expr, nullptr, nullptr, true);
 		if (e->flags & EntityFlag_Param) {
 			return true;
 		}
@@ -2067,6 +2074,7 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 					param = alloc_entity_param(scope, name->Ident.token, type, is_using, true);
 					param->Variable.param_value = param_value;
 					param->Variable.field_group_index = field_group_index;
+					param->Variable.type_expr = type_expr;
 				}
 			}
 			if (p->flags&FieldFlag_no_alias) {
@@ -2811,12 +2819,15 @@ gb_internal bool complete_soa_type(Checker *checker, Type *t, bool wait_to_finis
 				GB_ASSERT(soa_count >= 0);
 				field_type = alloc_type_array(old_field->type, soa_count);
 			} else {
-				field_type = alloc_type_pointer(old_field->type);
+				field_type = alloc_type_multi_pointer(old_field->type);
 			}
 			Entity *new_field = alloc_entity_field(scope, old_field->token, field_type, false, old_field->Variable.field_index);
 			t->Struct.fields[i] = new_field;
 			add_entity(scope, new_field);
 			new_field->flags |= EntityFlag_Used;
+			if (t->Struct.soa_kind != StructSoa_Fixed) {
+				new_field->flags |= EntityFlag_SoaPtrField;
+			}
 		} else {
 			t->Struct.fields[i] = old_field;
 		}
@@ -2932,7 +2943,7 @@ gb_internal Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_e
 				GB_ASSERT(count >= 0);
 				field_type = alloc_type_array(old_array->Array.elem, count);
 			} else {
-				field_type = alloc_type_pointer(old_array->Array.elem);
+				field_type = alloc_type_multi_pointer(old_array->Array.elem);
 			}
 			Token token = {};
 			token.string = params_xyzw[i];
@@ -2941,6 +2952,9 @@ gb_internal Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_e
 			soa_struct->Struct.fields[i] = new_field;
 			add_entity(ctx, scope, nullptr, new_field);
 			add_entity_use(ctx, nullptr, new_field);
+			if (soa_kind != StructSoa_Fixed) {
+				new_field->flags |= EntityFlag_SoaPtrField;
+			}
 		}
 
 		is_complete = true;
@@ -2964,12 +2978,15 @@ gb_internal Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_e
 						GB_ASSERT(count >= 0);
 						field_type = alloc_type_array(old_field->type, count);
 					} else {
-						field_type = alloc_type_pointer(old_field->type);
+						field_type = alloc_type_multi_pointer(old_field->type);
 					}
 					Entity *new_field = alloc_entity_field(scope, old_field->token, field_type, false, old_field->Variable.field_index);
 					soa_struct->Struct.fields[i] = new_field;
 					add_entity(ctx, scope, nullptr, new_field);
 					add_entity_use(ctx, nullptr, new_field);
+					if (soa_kind != StructSoa_Fixed) {
+						new_field->flags |= EntityFlag_SoaPtrField;
+					}
 				} else {
 					soa_struct->Struct.fields[i] = old_field;
 				}

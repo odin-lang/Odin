@@ -1,7 +1,7 @@
 //+build i386, amd64
 package simd_x86
 
-import "core:intrinsics"
+import "base:intrinsics"
 import "core:simd"
 
 // _MM_SHUFFLE(z, y, x, w) -> (z<<6 | y<<4 | x<<2 | w)

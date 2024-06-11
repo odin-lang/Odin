@@ -1,5 +1,5 @@
 //+private
-//+build darwin, freebsd, openbsd
+//+build darwin, freebsd, openbsd, netbsd
 package spall
 
 // Only for types.

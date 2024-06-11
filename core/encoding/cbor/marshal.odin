@@ -45,8 +45,8 @@ marshal :: marshal_into
 
 // Marshals the given value into a CBOR byte stream (allocated using the given allocator).
 // See docs on the `marshal_into` proc group for more info.
-marshal_into_bytes :: proc(v: any, flags := ENCODE_SMALL, allocator := context.allocator, temp_allocator := context.temp_allocator) -> (bytes: []byte, err: Marshal_Error) {
-	b, alloc_err := strings.builder_make(allocator)
+marshal_into_bytes :: proc(v: any, flags := ENCODE_SMALL, allocator := context.allocator, temp_allocator := context.temp_allocator, loc := #caller_location) -> (bytes: []byte, err: Marshal_Error) {
+	b, alloc_err := strings.builder_make(allocator, loc=loc)
  	// The builder as a stream also returns .EOF if it ran out of memory so this is consistent.
 	if alloc_err != nil {
 		return nil, .EOF
@@ -54,7 +54,7 @@ marshal_into_bytes :: proc(v: any, flags := ENCODE_SMALL, allocator := context.a
 
 	defer if err != nil { strings.builder_destroy(&b) }
 
-	if err = marshal_into_builder(&b, v, flags, temp_allocator); err != nil {
+	if err = marshal_into_builder(&b, v, flags, temp_allocator, loc=loc); err != nil {
 		return
 	}
 
@@ -63,20 +63,20 @@ marshal_into_bytes :: proc(v: any, flags := ENCODE_SMALL, allocator := context.a
 
 // Marshals the given value into a CBOR byte stream written to the given builder.
 // See docs on the `marshal_into` proc group for more info.
-marshal_into_builder :: proc(b: ^strings.Builder, v: any, flags := ENCODE_SMALL, temp_allocator := context.temp_allocator) -> Marshal_Error {
-	return marshal_into_writer(strings.to_writer(b), v, flags, temp_allocator)
+marshal_into_builder :: proc(b: ^strings.Builder, v: any, flags := ENCODE_SMALL, temp_allocator := context.temp_allocator, loc := #caller_location) -> Marshal_Error {
+	return marshal_into_writer(strings.to_writer(b), v, flags, temp_allocator, loc=loc)
 }
 
 // Marshals the given value into a CBOR byte stream written to the given writer.
 // See docs on the `marshal_into` proc group for more info.
-marshal_into_writer :: proc(w: io.Writer, v: any, flags := ENCODE_SMALL, temp_allocator := context.temp_allocator) -> Marshal_Error {
+marshal_into_writer :: proc(w: io.Writer, v: any, flags := ENCODE_SMALL, temp_allocator := context.temp_allocator, loc := #caller_location) -> Marshal_Error {
 	encoder := Encoder{flags, w, temp_allocator}
-	return marshal_into_encoder(encoder, v)
+	return marshal_into_encoder(encoder, v, loc=loc)
 }
 
 // Marshals the given value into a CBOR byte stream written to the given encoder.
 // See docs on the `marshal_into` proc group for more info.
-marshal_into_encoder :: proc(e: Encoder, v: any) -> (err: Marshal_Error) {
+marshal_into_encoder :: proc(e: Encoder, v: any, loc :=  #caller_location) -> (err: Marshal_Error) {
 	e := e
 
 	if e.temp_allocator.procedure == nil {

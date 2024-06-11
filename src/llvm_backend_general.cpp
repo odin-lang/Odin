@@ -78,7 +78,8 @@ gb_internal void lb_init_module(lbModule *m, Checker *c) {
 		array_init(&m->procedures_to_generate, a, 0, c->info.all_procedures.count);
 		map_init(&m->procedure_values,               c->info.all_procedures.count*2);
 	}
-	array_init(&m->global_procedures_and_types_to_create, a, 0, 1024);
+	array_init(&m->global_procedures_to_create, a, 0, 1024);
+	array_init(&m->global_types_to_create, a, 0, 1024);
 	array_init(&m->missing_procedures_to_check, a, 0, 16);
 	map_init(&m->debug_values);
 
@@ -1107,6 +1108,12 @@ gb_internal lbValue lb_emit_load(lbProcedure *p, lbValue value) {
 	GB_ASSERT(is_type_pointer(value.type));
 	Type *t = type_deref(value.type);
 	LLVMValueRef v = LLVMBuildLoad2(p->builder, lb_type(p->module, t), value.value, "");
+
+	u64 is_packed = lb_get_metadata_custom_u64(p->module, value.value, ODIN_METADATA_IS_PACKED);
+	if (is_packed != 0) {
+		LLVMSetAlignment(v, 1);
+	}
+
 	return lbValue{v, t};
 }
 
@@ -1174,7 +1181,7 @@ gb_internal lbValue lb_addr_load(lbProcedure *p, lbAddr const &addr) {
 		Type *t = addr.bitfield.type;
 
 		if (do_mask) {
-			GB_ASSERT(addr.bitfield.bit_size < 8*type_size_of(ct));
+			GB_ASSERT(addr.bitfield.bit_size <= 8*type_size_of(ct));
 
 			lbValue mask = lb_const_int(p->module, t, (1ull<<cast(u64)addr.bitfield.bit_size)-1);
 			r = lb_emit_arith(p, Token_And, r, mask, t);
@@ -1318,7 +1325,7 @@ gb_internal lbValue lb_addr_load(lbProcedure *p, lbAddr const &addr) {
 			for (isize i = 0; i < field_count; i++) {
 				Entity *field = t->Struct.fields[i];
 				Type *base_type = field->type;
-				GB_ASSERT(base_type->kind == Type_Pointer);
+				GB_ASSERT(base_type->kind == Type_MultiPointer);
 
 				lbValue dst = lb_emit_struct_ep(p, res.addr, cast(i32)i);
 				lbValue src_ptr = lb_emit_struct_ep(p, addr.addr, cast(i32)i);
@@ -1377,8 +1384,6 @@ gb_internal lbValue lb_addr_load(lbProcedure *p, lbAddr const &addr) {
 
 		LLVMTypeRef vector_type = nullptr;
 		if (lb_try_vector_cast(p->module, addr.addr, &vector_type)) {
-			LLVMSetAlignment(res.addr.value, cast(unsigned)lb_alignof(vector_type));
-
 			LLVMValueRef vp = LLVMBuildPointerCast(p->builder, addr.addr.value, LLVMPointerType(vector_type, 0), "");
 			LLVMValueRef v = LLVMBuildLoad2(p->builder, vector_type, vp, "");
 			LLVMValueRef scalars[4] = {};
@@ -1387,6 +1392,8 @@ gb_internal lbValue lb_addr_load(lbProcedure *p, lbAddr const &addr) {
 			}
 			LLVMValueRef mask = LLVMConstVector(scalars, addr.swizzle.count);
 			LLVMValueRef sv = llvm_basic_shuffle(p, v, mask);
+
+			LLVMSetAlignment(res.addr.value, cast(unsigned)lb_alignof(LLVMTypeOf(sv)));
 
 			LLVMValueRef dst = LLVMBuildPointerCast(p->builder, ptr.value, LLVMPointerType(LLVMTypeOf(sv), 0), "");
 			LLVMBuildStore(p->builder, sv, dst);

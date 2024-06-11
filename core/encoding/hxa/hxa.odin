@@ -160,34 +160,35 @@ CONVENTION_SOFT_TRANSFORM :: "transform"
 
 /* destroy procedures */
 
-meta_destroy :: proc(meta: Meta, allocator := context.allocator) {
+meta_destroy :: proc(meta: Meta, allocator := context.allocator, loc := #caller_location) {
 	if nested, ok := meta.value.([]Meta); ok {
 		for m in nested {
-			meta_destroy(m)
+			meta_destroy(m, loc=loc)
 		}
-		delete(nested, allocator)
+		delete(nested, allocator, loc=loc)
 	}
 }
-nodes_destroy :: proc(nodes: []Node, allocator := context.allocator) {
+nodes_destroy :: proc(nodes: []Node, allocator := context.allocator, loc := #caller_location) {
 	for node in nodes {
 		for meta in node.meta_data {
-			meta_destroy(meta)
+			meta_destroy(meta, loc=loc)
 		}
-		delete(node.meta_data, allocator)
+		delete(node.meta_data, allocator, loc=loc)
 
 		switch n in node.content {
 		case Node_Geometry:
-			delete(n.corner_stack, allocator)
-			delete(n.edge_stack, allocator)
-			delete(n.face_stack, allocator)
+			delete(n.corner_stack, allocator, loc=loc)
+			delete(n.vertex_stack, allocator, loc=loc)
+			delete(n.edge_stack,   allocator, loc=loc)
+			delete(n.face_stack,   allocator, loc=loc)
 		case Node_Image:
-			delete(n.image_stack, allocator)
+			delete(n.image_stack,  allocator, loc=loc)
 		}
 	}
-	delete(nodes, allocator)
+	delete(nodes, allocator, loc=loc)
 }
 
-file_destroy :: proc(file: File) {
-	nodes_destroy(file.nodes, file.allocator)
-	delete(file.backing, file.allocator)
+file_destroy :: proc(file: File, loc := #caller_location) {
+	nodes_destroy(file.nodes, file.allocator, loc=loc)
+	delete(file.backing, file.allocator, loc=loc)
 }

@@ -167,17 +167,23 @@ type_is_matrix           :: proc($T: typeid) -> bool ---
 
 type_has_nil :: proc($T: typeid) -> bool ---
 
+type_is_matrix_row_major    :: proc($T: typeid) -> bool where type_is_matrix(T) ---
+type_is_matrix_column_major :: proc($T: typeid) -> bool where type_is_matrix(T) ---
+
 type_is_specialization_of :: proc($T, $S: typeid) -> bool ---
 
-type_is_variant_of :: proc($U, $V: typeid) -> bool where type_is_union(U) ---
-type_union_tag_type :: proc($T: typeid) -> typeid where type_is_union(T) ---
-type_union_tag_offset :: proc($T: typeid) -> uintptr where type_is_union(T) ---
-type_union_base_tag_value :: proc($T: typeid) -> int where type_is_union(U) ---
-type_union_variant_count :: proc($T: typeid) -> int where type_is_union(T) ---
-type_variant_type_of :: proc($T: typeid, $index: int) -> typeid where type_is_union(T) ---
-type_variant_index_of :: proc($U, $V: typeid) -> int where type_is_union(U) ---
+type_is_variant_of        :: proc($U, $V: typeid)          -> bool    where type_is_union(U) ---
+type_union_tag_type       :: proc($T: typeid)              -> typeid  where type_is_union(T) ---
+type_union_tag_offset     :: proc($T: typeid)              -> uintptr where type_is_union(T) ---
+type_union_base_tag_value :: proc($T: typeid)              -> int     where type_is_union(U) ---
+type_union_variant_count  :: proc($T: typeid)              -> int     where type_is_union(T) ---
+type_variant_type_of      :: proc($T: typeid, $index: int) -> typeid  where type_is_union(T) ---
+type_variant_index_of     :: proc($U, $V: typeid)          -> int     where type_is_union(U) ---
 
-type_has_field :: proc($T: typeid, $name: string) -> bool ---
+type_bit_set_elem_type       :: proc($T: typeid) -> typeid where type_is_bit_set(T) ---
+type_bit_set_underlying_type :: proc($T: typeid) -> typeid where type_is_bit_set(T) ---
+
+type_has_field  :: proc($T: typeid, $name: string) -> bool ---
 type_field_type :: proc($T: typeid, $name: string) -> typeid ---
 
 type_proc_parameter_count :: proc($T: typeid) -> int where type_is_proc(T) ---
@@ -288,6 +294,10 @@ simd_rotate_right :: proc(a: #simd[N]T, $offset: int) -> #simd[N]T ---
 // `@(require_target_feature)` or `@(enable_target_feature)` as its input and returns a boolean indicating
 // if all listed features are supported.
 has_target_feature :: proc($test: $T) -> bool where type_is_string(T) || type_is_proc(T) ---
+
+
+// Returns the value of the procedure where `x` must be a call expression
+procedure_of :: proc(x: $T) -> T where type_is_proc(T) ---
 
 // WASM targets only
 wasm_memory_grow :: proc(index, delta: uintptr) -> int ---

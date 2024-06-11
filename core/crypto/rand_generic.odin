@@ -2,6 +2,7 @@
 //+build !windows
 //+build !openbsd
 //+build !freebsd
+//+build !netbsd
 //+build !darwin
 //+build !js
 package crypto

@@ -89,22 +89,22 @@ Error :: enum {
 
 
 
-destroy_value :: proc(value: Value, allocator := context.allocator) {
+destroy_value :: proc(value: Value, allocator := context.allocator, loc := #caller_location) {
 	context.allocator = allocator
 	#partial switch v in value {
 	case Object:
 		for key, elem in v {
-			delete(key)
-			destroy_value(elem)
+			delete(key, loc=loc)
+			destroy_value(elem, loc=loc)
 		}
-		delete(v)
+		delete(v, loc=loc)
 	case Array:
 		for elem in v {
-			destroy_value(elem)
+			destroy_value(elem, loc=loc)
 		}
-		delete(v)
+		delete(v, loc=loc)
 	case String:
-		delete(v)
+		delete(v, loc=loc)
 	}
 }
 

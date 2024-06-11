@@ -5,12 +5,9 @@ The implementation is non-intrusive, and non-recursive.
 */
 package container_avl
 
-import "base:intrinsics"
-import "base:runtime"
+@(require) import "base:intrinsics"
+@(require) import "base:runtime"
 import "core:slice"
-
-_ :: intrinsics
-_ :: runtime
 
 // Originally based on the CC0 implementation by Eric Biggers
 // See: https://github.com/ebiggers/avl_tree/

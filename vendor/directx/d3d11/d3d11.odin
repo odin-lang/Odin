@@ -3374,7 +3374,7 @@ CREATE_DEVICE_FLAG :: enum u32 {
 	DEBUGGABLE                                    = 6,
 	PREVENT_ALTERING_LAYER_SETTINGS_FROM_REGISTRY = 7,
 	DISABLE_GPU_TIMEOUT                           = 8,
-	VIDEO_SUPPORT                                 = 12,
+	VIDEO_SUPPORT                                 = 11,
 }
 
 PFN_CREATE_DEVICE :: #type proc "c" (a0: ^dxgi.IAdapter, a1: DRIVER_TYPE, a2: HMODULE, a3: u32, a4: ^FEATURE_LEVEL, a5: u32, a6: u32, a7: ^^IDevice, a8: ^FEATURE_LEVEL, a9: ^^IDeviceContext) -> HRESULT

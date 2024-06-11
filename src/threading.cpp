@@ -494,6 +494,8 @@ gb_internal u32 thread_current_id(void) {
 	thread_id = find_thread(NULL);
 #elif defined(GB_SYSTEM_FREEBSD)
 	thread_id = pthread_getthreadid_np();
+#elif defined(GB_SYSTEM_NETBSD)
+	thread_id = (u32)_lwp_self();
 #else
 	#error Unsupported architecture for thread_current_id()
 #endif
@@ -628,15 +630,23 @@ gb_internal void thread_set_name(Thread *t, char const *name) {
 	pthread_setname_np(name);
 #elif defined(GB_SYSTEM_FREEBSD) || defined(GB_SYSTEM_OPENBSD)
 	pthread_set_name_np(t->posix_handle, name);
+#elif defined(GB_SYSTEM_NETBSD)
+	pthread_setname_np(t->posix_handle, "%s", (void*)name);
 #else
 	// TODO(bill): Test if this works
 	pthread_setname_np(t->posix_handle, name);
 #endif
 }
 
-#if defined(GB_SYSTEM_LINUX)
-#include <linux/futex.h>
+#if defined(GB_SYSTEM_LINUX) || defined(GB_SYSTEM_NETBSD)
+
 #include <sys/syscall.h>
+#ifdef GB_SYSTEM_LINUX
+	#include <linux/futex.h>
+#else
+	#include <sys/futex.h>
+	#define SYS_futex SYS___futex
+#endif
 
 gb_internal void futex_signal(Futex *addr) {
 	int ret = syscall(SYS_futex, addr, FUTEX_WAKE | FUTEX_PRIVATE_FLAG, 1, NULL, NULL, 0);

@@ -57,12 +57,12 @@ _rfc3339_to_components :: proc(rfc_datetime: string) -> (res: dt.DateTime, utc_o
 	(len(rfc_datetime) >= 20) or_return
 
 	// Scan and eat YYYY-MM-DD[Tt], then scan and eat HH:MM:SS, leave separator
-	year   := scan_digits(rfc_datetime[0:], "-",  4) or_return
-	month  := scan_digits(rfc_datetime[5:], "-",  2) or_return
-	day    := scan_digits(rfc_datetime[8:], "Tt", 2) or_return
-	hour   := scan_digits(rfc_datetime[11:], ":", 2) or_return
-	minute := scan_digits(rfc_datetime[14:], ":", 2) or_return
-	second := scan_digits(rfc_datetime[17:], "",  2) or_return
+	year   := scan_digits(rfc_datetime[0:], "-",   4) or_return
+	month  := scan_digits(rfc_datetime[5:], "-",   2) or_return
+	day    := scan_digits(rfc_datetime[8:], "Tt ", 2) or_return
+	hour   := scan_digits(rfc_datetime[11:], ":",  2) or_return
+	minute := scan_digits(rfc_datetime[14:], ":",  2) or_return
+	second := scan_digits(rfc_datetime[17:], "",   2) or_return
 	nanos  := 0
 	count  := 19
 
@@ -87,7 +87,7 @@ _rfc3339_to_components :: proc(rfc_datetime: string) -> (res: dt.DateTime, utc_o
 
 	// Scan UTC offset
 	switch rfc_datetime[count] {
-	case 'Z':
+	case 'Z', 'z':
 		utc_offset = 0
 		count += 1
 	case '+', '-':

@@ -1,4 +1,4 @@
-//+build linux, darwin, freebsd, openbsd, haiku
+//+build linux, darwin, freebsd, openbsd, netbsd, haiku
 package unix
 
 foreign import "system:pthread"
@@ -116,4 +116,5 @@ foreign pthread {
 	pthread_mutexattr_setpshared :: proc(attrs: ^pthread_mutexattr_t, value: c.int) -> c.int ---
 	pthread_mutexattr_getpshared :: proc(attrs: ^pthread_mutexattr_t, result: ^c.int) -> c.int ---
 
+	pthread_testcancel :: proc () ---
 }

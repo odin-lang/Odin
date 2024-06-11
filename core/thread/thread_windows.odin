@@ -24,6 +24,10 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 	__windows_thread_entry_proc :: proc "system" (t_: rawptr) -> win32.DWORD {
 		t := (^Thread)(t_)
 
+		if .Joined in t.flags {
+			return 0
+		}
+
 		t.id = sync.current_thread_id()
 
 		{
@@ -93,11 +97,16 @@ _join :: proc(t: ^Thread) {
 		return
 	}
 
+	t.flags += {.Joined}
+
+	if .Started not_in t.flags {
+		t.flags += {.Started}
+		win32.ResumeThread(t.win32_thread)
+	}
+
 	win32.WaitForSingleObject(t.win32_thread, win32.INFINITE)
 	win32.CloseHandle(t.win32_thread)
 	t.win32_thread = win32.INVALID_HANDLE
-
-	t.flags += {.Joined}
 }
 
 _join_multiple :: proc(threads: ..^Thread) {

@@ -1,4 +1,4 @@
-//+build freebsd, openbsd
+//+build freebsd, openbsd, netbsd
 //+private
 package runtime
 
@@ -9,7 +9,11 @@ foreign libc {
 	@(link_name="write")
 	_unix_write :: proc(fd: i32, buf: rawptr, size: int) -> int ---
 
-	__error :: proc() -> ^i32 ---
+	when ODIN_OS == .NetBSD {
+		@(link_name="__errno") __error :: proc() -> ^i32 ---
+	} else {
+		__error :: proc() -> ^i32 ---
+	}
 }
 
 _stderr_write :: proc "contextless" (data: []byte) -> (int, _OS_Errno) {

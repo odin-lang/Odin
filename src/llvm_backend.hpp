@@ -1,13 +1,9 @@
 #if defined(GB_SYSTEM_WINDOWS)
-#include "llvm-c/Core.h"
-#include "llvm-c/ExecutionEngine.h"
-#include "llvm-c/Target.h"
-#include "llvm-c/Analysis.h"
-#include "llvm-c/Object.h"
-#include "llvm-c/BitWriter.h"
-#include "llvm-c/DebugInfo.h"
-#include "llvm-c/Transforms/PassBuilder.h"
+#include <llvm-c/Config/llvm-config.h>
 #else
+#include <llvm/Config/llvm-config.h>
+#endif
+
 #include <llvm-c/Core.h>
 #include <llvm-c/ExecutionEngine.h>
 #include <llvm-c/Target.h>
@@ -25,7 +21,6 @@
 #include <llvm-c/Transforms/Scalar.h>
 #include <llvm-c/Transforms/Utils.h>
 #include <llvm-c/Transforms/Vectorize.h>
-#endif
 #endif
 
 #if LLVM_VERSION_MAJOR < 11
@@ -186,7 +181,8 @@ struct lbModule {
 	std::atomic<u32> nested_type_name_guid;
 
 	Array<lbProcedure *> procedures_to_generate;
-	Array<Entity *> global_procedures_and_types_to_create;
+	Array<Entity *> global_procedures_to_create;
+	Array<Entity *> global_types_to_create;
 
 	lbProcedure *curr_procedure;
 
@@ -581,6 +577,10 @@ gb_internal LLVMTypeRef llvm_array_type(LLVMTypeRef ElementType, uint64_t Elemen
 #endif
 }
 
+
+gb_internal void lb_set_metadata_custom_u64(lbModule *m, LLVMValueRef v_ref, String name, u64 value);
+gb_internal u64 lb_get_metadata_custom_u64(lbModule *m, LLVMValueRef v_ref, String name);
+
 #define LB_STARTUP_RUNTIME_PROC_NAME   "__$startup_runtime"
 #define LB_CLEANUP_RUNTIME_PROC_NAME   "__$cleanup_runtime"
 #define LB_TYPE_INFO_DATA_NAME       "__$type_info_data"
@@ -719,4 +719,4 @@ gb_global char const *llvm_linkage_strings[] = {
 	"linker private weak linkage"
 };
 
-#define ODIN_METADATA_REQUIRE "odin-metadata-require", 21
+#define ODIN_METADATA_IS_PACKED str_lit("odin-is-packed")

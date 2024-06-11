@@ -76,6 +76,7 @@ read_entire_file :: proc{
 	read_entire_file_from_file,
 }
 
+@(require_results)
 read_entire_file_from_path :: proc(name: string, allocator: runtime.Allocator) -> (data: []byte, err: Error) {
 	f, ferr := open(name)
 	if ferr != nil {
@@ -85,14 +86,15 @@ read_entire_file_from_path :: proc(name: string, allocator: runtime.Allocator) -
 	return read_entire_file_from_file(f, allocator)
 }
 
+@(require_results)
 read_entire_file_from_file :: proc(f: ^File, allocator: runtime.Allocator) -> (data: []byte, err: Error) {
 	size: int
 	has_size := true
-	if size64, err := file_size(f); err == nil {
+	if size64, serr := file_size(f); serr == nil {
 		if i64(int(size64)) != size64 {
 			size = int(size64)
 		}
-	} else if err == .No_Size {
+	} else if serr == .No_Size {
 		has_size = false
 	} else {
 		return
@@ -135,6 +137,7 @@ read_entire_file_from_file :: proc(f: ^File, allocator: runtime.Allocator) -> (d
 	}
 }
 
+@(require_results)
 write_entire_file :: proc(name: string, data: []byte, perm: File_Mode, truncate := true) -> Error {
 	flags := O_WRONLY|O_CREATE
 	if truncate {

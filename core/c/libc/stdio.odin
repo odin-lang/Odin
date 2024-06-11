@@ -83,7 +83,7 @@ when ODIN_OS == .Linux {
 	}
 }
 
-when ODIN_OS == .OpenBSD {
+when ODIN_OS == .OpenBSD || ODIN_OS == .NetBSD {
 	fpos_t :: distinct i64
 
 	_IOFBF :: 0
@@ -102,10 +102,12 @@ when ODIN_OS == .OpenBSD {
 	SEEK_END :: 2
 
 	foreign libc {
-		stderr: ^FILE
-		stdin:  ^FILE
-		stdout: ^FILE
+		__sF: [3]FILE
 	}
+
+	stdin:  ^FILE = &__sF[0]
+	stdout: ^FILE = &__sF[1]
+	stderr: ^FILE = &__sF[2]
 }
 
 when ODIN_OS == .FreeBSD {
@@ -127,9 +129,9 @@ when ODIN_OS == .FreeBSD {
 	SEEK_END :: 2
 
 	foreign libc {
-		stderr: ^FILE
-		stdin:  ^FILE
-		stdout: ^FILE
+		@(link_name="__stderrp") stderr: ^FILE
+		@(link_name="__stdinp")  stdin:  ^FILE
+		@(link_name="__stdoutp") stdout: ^FILE
 	}
 }
 

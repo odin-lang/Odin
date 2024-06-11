@@ -91,8 +91,8 @@ Inputs:
 Returns:
 - res: A string created from the null-terminated byte pointer and length
 */
-string_from_null_terminated_ptr :: proc(ptr: ^byte, len: int) -> (res: string) {
-	s := transmute(string)mem.Raw_String{ptr, len}
+string_from_null_terminated_ptr :: proc(ptr: [^]byte, len: int) -> (res: string) {
+	s := string(ptr[:len])
 	s = truncate_to_byte(s, 0)
 	return s
 }

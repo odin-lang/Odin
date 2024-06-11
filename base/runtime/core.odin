@@ -273,14 +273,14 @@ Typeid_Kind :: enum u8 {
 }
 #assert(len(Typeid_Kind) < 32)
 
-// Typeid_Bit_Field :: bit_field #align(align_of(uintptr)) {
-// 	index:    8*size_of(uintptr) - 8,
-// 	kind:     5, // Typeid_Kind
-// 	named:    1,
-// 	special:  1, // signed, cstring, etc
-// 	reserved: 1,
-// }
-// #assert(size_of(Typeid_Bit_Field) == size_of(uintptr));
+Typeid_Bit_Field :: bit_field uintptr {
+	index:    uintptr     | 8*size_of(uintptr) - 8,
+	kind:     Typeid_Kind | 5, // Typeid_Kind
+	named:    bool        | 1,
+	special:  bool        | 1, // signed, cstring, etc
+	reserved: bool        | 1,
+}
+#assert(size_of(Typeid_Bit_Field) == size_of(uintptr))
 
 // NOTE(bill): only the ones that are needed (not all types)
 // This will be set by the compiler
@@ -470,6 +470,15 @@ Raw_Soa_Pointer :: struct {
 	index: int,
 }
 
+Raw_Complex32     :: struct {real, imag: f16}
+Raw_Complex64     :: struct {real, imag: f32}
+Raw_Complex128    :: struct {real, imag: f64}
+Raw_Quaternion64  :: struct {imag, jmag, kmag: f16, real: f16}
+Raw_Quaternion128 :: struct {imag, jmag, kmag: f32, real: f32}
+Raw_Quaternion256 :: struct {imag, jmag, kmag: f64, real: f64}
+Raw_Quaternion64_Vector_Scalar  :: struct {vector: [3]f16, scalar: f16}
+Raw_Quaternion128_Vector_Scalar :: struct {vector: [3]f32, scalar: f32}
+Raw_Quaternion256_Vector_Scalar :: struct {vector: [3]f64, scalar: f64}
 
 
 /*
@@ -481,7 +490,9 @@ Raw_Soa_Pointer :: struct {
 		Linux,
 		Essence,
 		FreeBSD,
+		Haiku,
 		OpenBSD,
+		NetBSD,
 		WASI,
 		JS,
 		Freestanding,
@@ -508,6 +519,7 @@ Odin_Arch_Type :: type_of(ODIN_ARCH)
 	Odin_Build_Mode_Type :: enum int {
 		Executable,
 		Dynamic,
+		Static,
 		Object,
 		Assembly,
 		LLVM_IR,
@@ -548,6 +560,19 @@ Odin_Platform_Subtarget_Type :: type_of(ODIN_PLATFORM_SUBTARGET)
 */
 Odin_Sanitizer_Flags :: type_of(ODIN_SANITIZER_FLAGS)
 
+/*
+	// Defined internally by the compiler
+	Odin_Optimization_Mode :: enum int {
+		None       = -1,
+		Minimal    =  0,
+		Size       =  1,
+		Speed      =  2,
+		Aggressive =  3,
+	}
+
+	ODIN_OPTIMIZATION_MODE // is a constant
+*/
+Odin_Optimization_Mode :: type_of(ODIN_OPTIMIZATION_MODE)
 
 /////////////////////////////
 // Init Startup Procedures //
@@ -689,7 +714,7 @@ default_assertion_failure_proc :: proc(prefix, message: string, loc: Source_Code
 	when ODIN_OS == .Freestanding {
 		// Do nothing
 	} else {
-		when !ODIN_DISABLE_ASSERT {
+		when ODIN_OS != .Orca && !ODIN_DISABLE_ASSERT {
 			print_caller_location(loc)
 			print_string(" ")
 		}
@@ -698,7 +723,18 @@ default_assertion_failure_proc :: proc(prefix, message: string, loc: Source_Code
 			print_string(": ")
 			print_string(message)
 		}
-		print_byte('\n')
+
+		when ODIN_OS == .Orca {
+			assert_fail(
+				cstring(raw_data(loc.file_path)),
+				cstring(raw_data(loc.procedure)),
+				loc.line,
+				"",
+				cstring(raw_data(orca_stderr_buffer[:orca_stderr_buffer_idx])),
+			)
+		} else {
+			print_byte('\n')
+		}
 	}
 	trap()
 }

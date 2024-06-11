@@ -527,7 +527,7 @@ angle_from_quaternion :: proc{
 @(require_results)
 axis_from_quaternion_f16 :: proc "contextless" (q: Quaternionf16) -> Vector3f16 {
 	t1 := 1 - q.w*q.w
-	if t1 < 0 {
+	if t1 <= 0 {
 		return {0, 0, 1}
 	}
 	t2 := 1.0 / math.sqrt(t1)
@@ -536,7 +536,7 @@ axis_from_quaternion_f16 :: proc "contextless" (q: Quaternionf16) -> Vector3f16 
 @(require_results)
 axis_from_quaternion_f32 :: proc "contextless" (q: Quaternionf32) -> Vector3f32 {
 	t1 := 1 - q.w*q.w
-	if t1 < 0 {
+	if t1 <= 0 {
 		return {0, 0, 1}
 	}
 	t2 := 1.0 / math.sqrt(t1)
@@ -545,7 +545,7 @@ axis_from_quaternion_f32 :: proc "contextless" (q: Quaternionf32) -> Vector3f32 
 @(require_results)
 axis_from_quaternion_f64 :: proc "contextless" (q: Quaternionf64) -> Vector3f64 {
 	t1 := 1 - q.w*q.w
-	if t1 < 0 {
+	if t1 <= 0 {
 		return {0, 0, 1}
 	}
 	t2 := 1.0 / math.sqrt(t1)

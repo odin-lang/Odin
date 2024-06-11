@@ -40,6 +40,24 @@ align_forward_int :: #force_inline proc(ptr, align: int) -> int {
 	return p
 }
 
+is_power_of_two_uint :: #force_inline proc "contextless" (x: uint) -> bool {
+	if x <= 0 {
+		return false
+	}
+	return (x & (x-1)) == 0
+}
+
+align_forward_uint :: #force_inline proc(ptr, align: uint) -> uint {
+	assert(is_power_of_two_uint(align))
+
+	p := ptr
+	modulo := p & (align-1)
+	if modulo != 0 {
+		p += align - modulo
+	}
+	return p
+}
+
 is_power_of_two_uintptr :: #force_inline proc "contextless" (x: uintptr) -> bool {
 	if x <= 0 {
 		return false
@@ -56,6 +74,18 @@ align_forward_uintptr :: #force_inline proc(ptr, align: uintptr) -> uintptr {
 		p += align - modulo
 	}
 	return p
+}
+
+is_power_of_two :: proc {
+	is_power_of_two_int,
+	is_power_of_two_uint,
+	is_power_of_two_uintptr,
+}
+
+align_forward :: proc {
+	align_forward_int,
+	align_forward_uint,
+	align_forward_uintptr,
 }
 
 mem_zero :: proc "contextless" (data: rawptr, len: int) -> rawptr {
@@ -453,7 +483,7 @@ quaternion256_ne :: #force_inline proc "contextless" (a, b: quaternion256) -> bo
 string_decode_rune :: #force_inline proc "contextless" (s: string) -> (rune, int) {
 	// NOTE(bill): Duplicated here to remove dependency on package unicode/utf8
 
-	@static accept_sizes := [256]u8{
+	@(static, rodata) accept_sizes := [256]u8{
 		0x00..=0x7f = 0xf0, // ascii,    size 1
 		0x80..=0xc1 = 0xf1, // invalid,  size 1
 		0xc2..=0xdf = 0x02, // accept 1, size 2
@@ -468,7 +498,7 @@ string_decode_rune :: #force_inline proc "contextless" (s: string) -> (rune, int
 	}
 	Accept_Range :: struct {lo, hi: u8}
 
-	@static accept_ranges := [5]Accept_Range{
+	@(static, rodata) accept_ranges := [5]Accept_Range{
 		{0x80, 0xbf},
 		{0xa0, 0xbf},
 		{0x80, 0x9f},
@@ -795,6 +825,10 @@ truncsfhf2 :: proc "c" (value: f32) -> __float16 {
 	}
 }
 
+@(link_name="__aeabi_d2h", linkage=RUNTIME_LINKAGE, require=RUNTIME_REQUIRE)
+aeabi_d2h :: proc "c" (value: f64) -> __float16 {
+	return truncsfhf2(f32(value))
+}
 
 @(link_name="__truncdfhf2", linkage=RUNTIME_LINKAGE, require=RUNTIME_REQUIRE)
 truncdfhf2 :: proc "c" (value: f64) -> __float16 {

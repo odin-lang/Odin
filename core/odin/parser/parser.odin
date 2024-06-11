@@ -1190,12 +1190,12 @@ parse_foreign_decl :: proc(p: ^Parser) -> ^ast.Decl {
 			error(p, name.pos, "illegal foreign import name: '_'")
 		}
 
-		fullpaths: [dynamic]string
+		fullpaths: [dynamic]^ast.Expr
 		if allow_token(p, .Open_Brace) {
 			for p.curr_tok.kind != .Close_Brace &&
 				p.curr_tok.kind != .EOF {
-				path := expect_token(p, .String)
-				append(&fullpaths, path.text)
+				path := parse_expr(p, false)
+				append(&fullpaths, path)
 
 				allow_token(p, .Comma) or_break
 			}
@@ -1203,7 +1203,9 @@ parse_foreign_decl :: proc(p: ^Parser) -> ^ast.Decl {
 		} else {
 			path := expect_token(p, .String)
 			reserve(&fullpaths, 1)
-			append(&fullpaths, path.text)
+			bl := ast.new(ast.Basic_Lit, path.pos, end_pos(path))
+			bl.tok = path
+			append(&fullpaths, bl)
 		}
 
 		if len(fullpaths) == 0 {
@@ -1453,7 +1455,7 @@ parse_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 		case "unroll":
 			return parse_unrolled_for_loop(p, tag)
 		case "reverse":
-			stmt := parse_for_stmt(p)
+			stmt := parse_stmt(p)
 
 			if range, is_range := stmt.derived.(^ast.Range_Stmt); is_range {
 				if range.reverse {
@@ -2117,7 +2119,9 @@ parse_proc_type :: proc(p: ^Parser, tok: tokenizer.Token) -> ^ast.Proc_Type {
 	}
 
 	expect_token(p, .Open_Paren)
+	p.expr_level += 1
 	params, _ := parse_field_list(p, .Close_Paren, ast.Field_Flags_Signature_Params)
+	p.expr_level -= 1
 	expect_closing_parentheses_of_field_list(p)
 	results, diverging := parse_results(p)
 
@@ -3511,6 +3515,25 @@ parse_simple_stmt :: proc(p: ^Parser, flags: Stmt_Allow_Flags) -> ^ast.Stmt {
 	case op.kind == .Colon:
 		expect_token_after(p, .Colon, "identifier list")
 		if .Label in flags && len(lhs) == 1 {
+			is_partial := false
+			is_reverse := false
+
+			partial_token: tokenizer.Token
+			if p.curr_tok.kind == .Hash {
+				name := peek_token(p)
+				if name.kind == .Ident && name.text == "partial" &&
+				   peek_token(p, 1).kind == .Switch {
+					partial_token = expect_token(p, .Hash)
+					expect_token(p, .Ident)
+					is_partial = true
+				} else if name.kind == .Ident && name.text == "reverse" &&
+				          peek_token(p, 1).kind == .For {
+					partial_token = expect_token(p, .Hash)
+					expect_token(p, .Ident)
+					is_reverse = true
+				}
+			}
+
 			#partial switch p.curr_tok.kind {
 			case .Open_Brace, .If, .For, .Switch:
 				label := lhs[0]
@@ -3524,6 +3547,22 @@ parse_simple_stmt :: proc(p: ^Parser, flags: Stmt_Allow_Flags) -> ^ast.Stmt {
 					case ^ast.Switch_Stmt:      n.label = label
 					case ^ast.Type_Switch_Stmt: n.label = label
 					case ^ast.Range_Stmt:	    n.label = label
+					}
+
+					if is_partial {
+						#partial switch n in stmt.derived_stmt {
+						case ^ast.Switch_Stmt:      n.partial = true
+						case ^ast.Type_Switch_Stmt: n.partial = true
+						case:
+							error(p, partial_token.pos, "incorrect use of directive, use '%s: #partial switch'", partial_token.text)
+						}
+					}
+					if is_reverse {
+						#partial switch n in stmt.derived_stmt {
+						case ^ast.Range_Stmt: n.reverse = true
+						case:
+							error(p, partial_token.pos, "incorrect use of directive, use '%s: #reverse for'", partial_token.text)
+						}
 					}
 				}
 

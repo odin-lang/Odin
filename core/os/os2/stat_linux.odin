@@ -3,7 +3,6 @@ package os2
 
 import "core:time"
 import "base:runtime"
-import "core:strings"
 import "core:sys/unix"
 import "core:path/filepath"
 
@@ -112,8 +111,9 @@ _fstat_internal :: proc(fd: int, allocator: runtime.Allocator) -> (File_Info, Er
 }
 
 // NOTE: _stat and _lstat are using _fstat to avoid a race condition when populating fullpath
-_stat :: proc(name: string, allocator: runtime.Allocator) -> (File_Info, Error) {
-	name_cstr := strings.clone_to_cstring(name, context.temp_allocator)
+_stat :: proc(name: string, allocator: runtime.Allocator) -> (fi: File_Info, err: Error) {
+	TEMP_ALLOCATOR_GUARD()
+	name_cstr := temp_cstring(name) or_return
 
 	fd := unix.sys_open(name_cstr, _O_RDONLY)
 	if fd < 0 {
@@ -123,8 +123,9 @@ _stat :: proc(name: string, allocator: runtime.Allocator) -> (File_Info, Error) 
 	return _fstat_internal(fd, allocator)
 }
 
-_lstat :: proc(name: string, allocator: runtime.Allocator) -> (File_Info, Error) {
-	name_cstr := strings.clone_to_cstring(name, context.temp_allocator)
+_lstat :: proc(name: string, allocator: runtime.Allocator) -> (fi: File_Info, err: Error) {
+	TEMP_ALLOCATOR_GUARD()
+	name_cstr := temp_cstring(name) or_return
 
 	fd := unix.sys_open(name_cstr, _O_RDONLY | _O_PATH | _O_NOFOLLOW)
 	if fd < 0 {
@@ -136,10 +137,4 @@ _lstat :: proc(name: string, allocator: runtime.Allocator) -> (File_Info, Error)
 
 _same_file :: proc(fi1, fi2: File_Info) -> bool {
 	return fi1.fullpath == fi2.fullpath
-}
-
-_stat_internal :: proc(name: string) -> (s: _Stat, res: int) {
-	name_cstr := strings.clone_to_cstring(name, context.temp_allocator)
-	res = unix.sys_stat(name_cstr, &s)
-	return
 }

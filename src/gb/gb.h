@@ -83,6 +83,10 @@ extern "C" {
 		#ifndef GB_SYSTEM_OPENBSD
 		#define GB_SYSTEM_OPENBSD 1
 		#endif
+	#elif defined(__NetBSD__)
+		#ifndef GB_SYSTEM_NETBSD
+		#define GB_SYSTEM_NETBSD 1
+		#endif
 	#elif defined(__HAIKU__) || defined(__haiku__)
 		#ifndef GB_SYSTEM_HAIKU
 		#define GB_SYSTEM_HAIKU 1
@@ -208,7 +212,7 @@ extern "C" {
 	#endif
 	#include <stdlib.h> // NOTE(bill): malloc on linux
 	#include <sys/mman.h>
-	#if !defined(GB_SYSTEM_OSX) && !defined(__FreeBSD__) && !defined(__OpenBSD__) && !defined(__HAIKU__)
+	#if !defined(GB_SYSTEM_OSX) && !defined(__FreeBSD__) && !defined(__OpenBSD__) && !defined(__NetBSD__) && !defined(__HAIKU__)
 		#include <sys/sendfile.h>
 	#endif
 	#include <sys/stat.h>
@@ -247,6 +251,12 @@ extern "C" {
 #if defined(GB_SYSTEM_OPENBSD)
 	#include <stdio.h>
 	#include <pthread_np.h>
+	#define lseek64 lseek
+#endif
+
+#if defined(GB_SYSTEM_NETBSD)
+	#include <stdio.h>
+	#include <lwp.h>
 	#define lseek64 lseek
 #endif
 
@@ -813,6 +823,13 @@ typedef struct gbAffinity {
 #elif defined(GB_SYSTEM_OPENBSD)
 typedef struct gbAffinity {
 	b32   is_accurate;
+	isize core_count;
+	isize thread_count;
+	isize threads_per_core;
+} gbAffinity;
+#elif defined(GB_SYSTEM_NETBSD)
+typedef struct gbAffinity {
+	b32 is_accurate;
 	isize core_count;
 	isize thread_count;
 	isize threads_per_core;
@@ -3011,6 +3028,8 @@ gb_inline u32 gb_thread_current_id(void) {
 	thread_id = find_thread(NULL);
 #elif defined(GB_SYSTEM_FREEBSD)
 	thread_id = pthread_getthreadid_np();
+#elif defined(GB_SYSTEM_NETBSD)
+	thread_id = (u32)_lwp_self();
 #else
 	#error Unsupported architecture for gb_thread_current_id()
 #endif
@@ -3269,6 +3288,31 @@ isize gb_affinity_thread_count_for_core(gbAffinity *a, isize core) {
 	GB_ASSERT(0 <= core && core < a->core_count);
 	return a->threads_per_core;
 }
+
+#elif defined(GB_SYSTEM_NETBSD)
+#include <unistd.h>
+
+void gb_affinity_init(gbAffinity *a) {
+	a->core_count       = sysconf(_SC_NPROCESSORS_ONLN);
+	a->threads_per_core = 1;
+	a->is_accurate      = a->core_count > 0;
+	a->core_count       = a->is_accurate ? a->core_count : 1;
+	a->thread_count     = a->core_count;
+}
+
+void gb_affinity_destroy(gbAffinity *a) {
+	gb_unused(a);
+}
+
+b32 gb_affinity_set(gbAffinity *a, isize core, isize thread_index) {
+	return true;
+}
+
+isize gb_affinity_thread_count_for_core(gbAffinity *a, isize core) {
+	GB_ASSERT(0 <= core && core < a->core_count);
+	return a->threads_per_core;
+}
+
 #elif defined(GB_SYSTEM_HAIKU)
 #include <unistd.h>
 
@@ -6220,11 +6264,12 @@ gb_no_inline isize gb_snprintf_va(char *text, isize max_len, char const *fmt, va
 #elif defined(__aarch64__)
 	gb_inline u64 gb_rdtsc(void) {
 		int64_t virtual_timer_value;
- 		asm volatile("mrs %0, cntvct_el0" : "=r"(virtual_timer_value));
- 		return virtual_timer_value;
+		asm volatile("mrs %0, cntvct_el0" : "=r"(virtual_timer_value));
+		return virtual_timer_value;
 	}
 #else
-#error "gb_rdtsc not supported"
+#warning "gb_rdtsc not supported"
+	gb_inline u64 gb_rdtsc(void) { return 0; }
 #endif
 
 #if defined(GB_SYSTEM_WINDOWS)

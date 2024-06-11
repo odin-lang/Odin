@@ -1,4 +1,4 @@
-//+build freebsd, openbsd
+//+build freebsd, openbsd, netbsd
 package crypto
 
 foreign import libc "system:c"

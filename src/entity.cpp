@@ -85,8 +85,6 @@ enum EntityFlag : u64 {
 	EntityFlag_Require = 1ull<<50,
 	EntityFlag_ByPtr   = 1ull<<51, // enforce parameter is passed by pointer
 
-	EntityFlag_OldForOrSwitchValue = 1ull<<52,
-
 	EntityFlag_Overridden    = 1ull<<63,
 };
 
@@ -210,6 +208,7 @@ struct Entity {
 			CommentGroup *comment;
 		} Constant;
 		struct {
+			Ast *type_expr; // only used for some variables within procedure bodies
 			Ast *init_expr; // only used for some variables within procedure bodies
 			i32  field_index;
 			i32  field_group_index;
@@ -224,12 +223,14 @@ struct Entity {
 			Ast *      foreign_library_ident;
 			String     link_name;
 			String     link_prefix;
+			String     link_suffix;
 			String     link_section;
 			CommentGroup *docs;
 			CommentGroup *comment;
 			bool       is_foreign;
 			bool       is_export;
 			bool       is_global;
+			bool       is_rodata;
 		} Variable;
 		struct {
 			Type * type_parameter_specialization;
@@ -244,6 +245,7 @@ struct Entity {
 			Ast *   foreign_library_ident;
 			String  link_name;
 			String  link_prefix;
+			String  link_suffix;
 			DeferredProcedure deferred_procedure;
 
 			struct GenProcsData *gen_procs;
@@ -254,6 +256,7 @@ struct Entity {
 			bool    generated_from_polymorphic : 1;
 			bool    entry_point_only           : 1;
 			bool    has_instrumentation        : 1;
+			bool    is_memcpy_like             : 1;
 		} Procedure;
 		struct {
 			Array<Entity *> entities;
@@ -267,6 +270,7 @@ struct Entity {
 			Scope *scope;
 		} ImportName;
 		struct {
+			Ast *decl;
 			Slice<String> paths;
 			String name;
 			i64 priority_index;

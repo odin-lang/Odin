@@ -26,6 +26,8 @@ LONG                :: win32.LONG
 RECT                :: win32.RECT
 POINT               :: win32.POINT
 SIZE                :: win32.SIZE
+WCHAR               :: win32.WCHAR
+DWORD               :: win32.DWORD
 
 IUnknown :: struct {
 	using _iunknown_vtable: ^IUnknown_VTable,
@@ -38,10 +40,11 @@ IUnknown_VTable :: struct {
 
 @(default_calling_convention="system")
 foreign dxgi {
-	CreateDXGIFactory      :: proc(riid: ^IID, ppFactory: ^rawptr) -> HRESULT ---
-	CreateDXGIFactory1     :: proc(riid: ^IID, ppFactory: ^rawptr) -> HRESULT ---
-	CreateDXGIFactory2     :: proc(Flags: CREATE_FACTORY, riid: ^IID, ppFactory: ^rawptr) -> HRESULT ---
-	DXGIGetDebugInterface1 :: proc(Flags: u32, riid: ^IID, pDebug: ^rawptr) -> HRESULT ---
+	CreateDXGIFactory            :: proc(riid: ^IID, ppFactory: ^rawptr) -> HRESULT ---
+	CreateDXGIFactory1           :: proc(riid: ^IID, ppFactory: ^rawptr) -> HRESULT ---
+	CreateDXGIFactory2           :: proc(Flags: CREATE_FACTORY, riid: ^IID, ppFactory: ^rawptr) -> HRESULT ---
+	DXGIGetDebugInterface1       :: proc(Flags: u32, riid: ^IID, pDebug: ^rawptr) -> HRESULT ---
+	DeclareAdapterRemovalSupport :: proc() -> HRESULT ---
 }
 
 STANDARD_MULTISAMPLE_QUALITY_PATTERN :: 0xffffffff
@@ -617,11 +620,11 @@ IDevice_VTable :: struct {
 	SetGPUThreadPriority:   proc "system" (this: ^IDevice, Priority: i32) -> HRESULT,
 	GetGPUThreadPriority:   proc "system" (this: ^IDevice, pPriority: ^i32) -> HRESULT,
 }
-ADAPTER_FLAG :: enum u32 { // TODO: convert to bit_set
-	NONE        = 0x0,
-	REMOTE      = 0x1,
-	SOFTWARE    = 0x2,
-	FORCE_DWORD = 0xffffffff,
+
+ADAPTER_FLAGS :: bit_set[ADAPTER_FLAG;u32]
+ADAPTER_FLAG :: enum u32 {
+	REMOTE      = 0,
+	SOFTWARE    = 1,
 }
 
 ADAPTER_DESC1 :: struct {
@@ -634,7 +637,7 @@ ADAPTER_DESC1 :: struct {
 	DedicatedSystemMemory: SIZE_T,
 	SharedSystemMemory:    SIZE_T,
 	AdapterLuid:           LUID,
-	Flags:                 ADAPTER_FLAG,
+	Flags:                 ADAPTER_FLAGS,
 }
 
 DISPLAY_COLOR_SPACE :: struct {
@@ -911,7 +914,7 @@ ADAPTER_DESC2 :: struct {
 	DedicatedSystemMemory:         SIZE_T,
 	SharedSystemMemory:            SIZE_T,
 	AdapterLuid:                   LUID,
-	Flags:                         ADAPTER_FLAG,
+	Flags:                         ADAPTER_FLAGS,
 	GraphicsPreemptionGranularity: GRAPHICS_PREEMPTION_GRANULARITY,
 	ComputePreemptionGranularity:  COMPUTE_PREEMPTION_GRANULARITY,
 }
@@ -1163,6 +1166,199 @@ IAdapter3_VTable :: struct {
 	SetVideoMemoryReservation:                            proc "system" (this: ^IAdapter3, NodeIndex: u32, MemorySegmentGroup: MEMORY_SEGMENT_GROUP, Reservation: u64) -> HRESULT,
 	RegisterVideoMemoryBudgetChangeNotificationEvent:     proc "system" (this: ^IAdapter3, hEvent: HANDLE, pdwCookie: ^u32) -> HRESULT,
 	UnregisterVideoMemoryBudgetChangeNotification:        proc "system" (this: ^IAdapter3, dwCookie: u32),
+}
+
+OUTDUPL_FLAG :: enum i32 {
+	COMPOSITED_UI_CAPTURE_ONLY = 1,
+}
+
+
+IOutput5_UUID_STRING :: "80A07424-AB52-42EB-833C-0C42FD282D98"
+IOutput5_UUID := &IID{0x80A07424, 0xAB52, 0x42EB, {0x83, 0x3C, 0x0C, 0x42, 0xFD, 0x28, 0x2D, 0x98}}
+IOutput5 :: struct #raw_union {
+	#subtype idxgioutput4: IOutput4,
+	using idxgioutput5_vtable: ^IOutput5_VTable,
+}
+IOutput5_VTable :: struct {
+	using idxgioutput4_vtable: IOutput4_VTable,
+	DuplicateOutput1: proc "system" (this: ^IOutput5, pDevice: ^IUnknown, Flags: u32, SupportedFormatsCount: u32, pSupportedFormats: ^FORMAT, ppOutputDuplication: ^^IOutputDuplication) -> HRESULT,
+}
+
+HDR_METADATA_TYPE :: enum i32 {
+	NONE      = 0,
+	HDR10     = 1,
+	HDR10PLUS = 2,
+}
+
+HDR_METADATA_HDR10 :: struct {
+	RedPrimary:                [2]u16,
+	GreenPrimary:              [2]u16,
+	BluePrimary:               [2]u16,
+	WhitePoint:                [2]u16,
+	MaxMasteringLuminance:     u32,
+	MinMasteringLuminance:     u32,
+	MaxContentLightLevel:      u16,
+	MaxFrameAverageLightLevel: u16,
+}
+
+HDR_METADATA_HDR10PLUS :: struct {
+	Data: [72]byte,
+}
+
+
+ISwapChain4_UUID_STRING :: "3D585D5A-BD4A-489E-B1F4-3DBCB6452FFB"
+ISwapChain4_UUID := &IID{0x3D585D5A, 0xBD4A, 0x489E, {0xB1, 0xF4, 0x3D, 0xBC, 0xB6, 0x45, 0x2F, 0xFB}}
+ISwapChain4 :: struct #raw_union {
+	#subtype idxgiswapchain3: ISwapChain3,
+	using idxgiswapchain4_vtable: ^ISwapChain4_VTable,
+}
+ISwapChain4_VTable :: struct {
+	using idxgiswapchain3_vtable: ISwapChain3_VTable,
+	SetHDRMetaData: proc "system" (this: ^ISwapChain4, Type: HDR_METADATA_TYPE, Size: u32, pMetaData: rawptr) -> HRESULT,
+}
+
+OFFER_RESOURCE_FLAGS :: bit_set[OFFER_RESOURCE_FLAG;u32]
+OFFER_RESOURCE_FLAG :: enum u32 {
+	ALLOW_DECOMMIT = 0,
+}
+
+RECLAIM_RESOURCE_RESULTS :: enum i32 {
+	OK            = 0,
+	DISCARDED     = 1,
+	NOT_COMMITTED = 2,
+}
+
+
+IDevice4_UUID_STRING :: "95B4F95F-D8DA-4CA4-9EE6-3B76D5968A10"
+IDevice4_UUID := &IID{0x95B4F95F, 0xD8DA, 0x4CA4, {0x9E, 0xE6, 0x3B, 0x76, 0xD5, 0x96, 0x8A, 0x10}}
+IDevice4 :: struct #raw_union {
+	#subtype idxgidevice3: IDevice3,
+	using idxgidevice4_vtable: ^IDevice4_VTable,
+}
+IDevice4_VTable :: struct {
+	using idxgidevice3_vtable: IDevice3_VTable,
+	OfferResources1:   proc "system" (this: ^IDevice4, NumResources: u32, ppResources: ^^IResource, Priority: OFFER_RESOURCE_PRIORITY, Flags: OFFER_RESOURCE_FLAGS) -> HRESULT,
+	ReclaimResources1: proc "system" (this: ^IDevice4, NumResources: u32, ppResources: ^^IResource, pResults: ^RECLAIM_RESOURCE_RESULTS) -> HRESULT,
+}
+
+FEATURE :: enum i32 {
+	PRESENT_ALLOW_TEARING = 0,
+}
+
+
+IFactory5_UUID_STRING :: "7632e1f5-ee65-4dca-87fd-84cd75f8838d"
+IFactory5_UUID := &IID{0x7632e1f5, 0xee65, 0x4dca, {0x87, 0xfd, 0x84, 0xcd, 0x75, 0xf8, 0x83, 0x8d}}
+IFactory5 :: struct #raw_union {
+	#subtype idxgifactory4: IFactory4,
+	using idxgifactory5_vtable: ^IFactory5_VTable,
+}
+IFactory5_VTable :: struct {
+	using idxgifactory4_vtable: IFactory4_VTable,
+	CheckFeatureSupport: proc "system" (this: ^IFactory5, Feature: FEATURE, pFeatureSupportData: rawptr, FeatureSupportDataSize: u32) -> HRESULT,
+}
+
+ADAPTER_FLAGS3 :: bit_set[ADAPTER_FLAG3;u32]
+ADAPTER_FLAG3 :: enum u32 {
+	REMOTE                       = 0,
+	SOFTWARE                     = 1,
+	ACG_COMPATIBLE               = 3,
+	SUPPORT_MONITORED_FENCES     = 4,
+	SUPPORT_NON_MONITORED_FENCES = 5,
+	KEYED_MUTEX_CONFORMANCE      = 6,
+}
+
+ADAPTER_DESC3 :: struct {
+	Description:                   [128]WCHAR,
+	VendorId:                      u32,
+	DeviceId:                      u32,
+	SubSysId:                      u32,
+	Revision:                      u32,
+	DedicatedVideoMemory:          u64,
+	DedicatedSystemMemory:         u64,
+	SharedSystemMemory:            u64,
+	AdapterLuid:                   LUID,
+	Flags:                         ADAPTER_FLAGS3,
+	GraphicsPreemptionGranularity: GRAPHICS_PREEMPTION_GRANULARITY,
+	ComputePreemptionGranularity:  COMPUTE_PREEMPTION_GRANULARITY,
+}
+
+
+IAdapter4_UUID_STRING :: "3c8d99d1-4fbf-4181-a82c-af66bf7bd24e"
+IAdapter4_UUID := &IID{0x3c8d99d1, 0x4fbf, 0x4181, {0xa8, 0x2c, 0xaf, 0x66, 0xbf, 0x7b, 0xd2, 0x4e}}
+IAdapter4 :: struct #raw_union {
+	#subtype idxgiadapter3: IAdapter3,
+	using idxgiadapter4_vtable: ^IAdapter4_VTable,
+}
+IAdapter4_VTable :: struct {
+	using idxgiadapter3_vtable: IAdapter3_VTable,
+	GetDesc3: proc "system" (this: ^IAdapter4, pDesc: ^ADAPTER_DESC3) -> HRESULT,
+}
+
+OUTPUT_DESC1 :: struct {
+	DeviceName:            [32]WCHAR,
+	DesktopCoordinates:    RECT,
+	AttachedToDesktop:     BOOL,
+	Rotation:              MODE_ROTATION,
+	Monitor:               HMONITOR,
+	BitsPerColor:          u32,
+	ColorSpace:            COLOR_SPACE_TYPE,
+	RedPrimary:            [2]f32,
+	GreenPrimary:          [2]f32,
+	BluePrimary:           [2]f32,
+	WhitePoint:            [2]f32,
+	MinLuminance:          f32,
+	MaxLuminance:          f32,
+	MaxFullFrameLuminance: f32,
+}
+
+HARDWARE_COMPOSITION_SUPPORT_FLAGS :: bit_set[HARDWARE_COMPOSITION_SUPPORT_FLAG;u32]
+HARDWARE_COMPOSITION_SUPPORT_FLAG :: enum u32 {
+	FULLSCREEN       = 0,
+	WINDOWED         = 1,
+	CURSOR_STRETCHED = 2,
+}
+
+
+IOutput6_UUID_STRING :: "068346e8-aaec-4b84-add7-137f513f77a1"
+IOutput6_UUID := &IID{0x068346e8, 0xaaec, 0x4b84, {0xad, 0xd7, 0x13, 0x7f, 0x51, 0x3f, 0x77, 0xa1}}
+IOutput6 :: struct #raw_union {
+	#subtype idxgioutput5: IOutput5,
+	using idxgioutput6_vtable: ^IOutput6_VTable,
+}
+IOutput6_VTable :: struct {
+	using idxgioutput5_vtable: IOutput5_VTable,
+	GetDesc1:                        proc "system" (this: ^IOutput6, pDesc: ^OUTPUT_DESC1) -> HRESULT,
+	CheckHardwareCompositionSupport: proc "system" (this: ^IOutput6, pFlags: ^HARDWARE_COMPOSITION_SUPPORT_FLAGS) -> HRESULT,
+}
+
+GPU_PREFERENCE :: enum i32 {
+	UNSPECIFIED      = 0,
+	MINIMUM_POWER    = 1,
+	HIGH_PERFORMANCE = 2,
+}
+
+
+IFactory6_UUID_STRING :: "c1b6694f-ff09-44a9-b03c-77900a0a1d17"
+IFactory6_UUID := &IID{0xc1b6694f, 0xff09, 0x44a9, {0xb0, 0x3c, 0x77, 0x90, 0x0a, 0x0a, 0x1d, 0x17}}
+IFactory6 :: struct #raw_union {
+	#subtype idxgifactory5: IFactory5,
+	using idxgifactory6_vtable: ^IFactory6_VTable,
+}
+IFactory6_VTable :: struct {
+	using idxgifactory5_vtable: IFactory5_VTable,
+	EnumAdapterByGpuPreference: proc "system" (this: ^IFactory6, Adapter: u32, GpuPreference: GPU_PREFERENCE, riid: ^IID, ppvAdapter: ^rawptr) -> HRESULT,
+}
+
+IFactory7_UUID_STRING :: "a4966eed-76db-44da-84c1-ee9a7afb20a8"
+IFactory7_UUID := &IID{0xa4966eed, 0x76db, 0x44da, {0x84, 0xc1, 0xee, 0x9a, 0x7a, 0xfb, 0x20, 0xa8}}
+IFactory7 :: struct #raw_union {
+	#subtype idxgifactory6: IFactory6,
+	using idxgifactory7_vtable: ^IFactory7_VTable,
+}
+IFactory7_VTable :: struct {
+	using idxgifactory6_vtable: IFactory6_VTable,
+	RegisterAdaptersChangedEvent:   proc "system" (this: ^IFactory7, hEvent: HANDLE, pdwCookie: ^DWORD) -> HRESULT,
+	UnregisterAdaptersChangedEvent: proc "system" (this: ^IFactory7, dwCookie: DWORD) -> HRESULT,
 }
 
 ERROR_ACCESS_DENIED                :: HRESULT(-2005270485) //0x887A002B

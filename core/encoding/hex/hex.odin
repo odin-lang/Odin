@@ -2,8 +2,8 @@ package encoding_hex
 
 import "core:strings"
 
-encode :: proc(src: []byte, allocator := context.allocator) -> []byte #no_bounds_check {
-	dst := make([]byte, len(src) * 2, allocator)
+encode :: proc(src: []byte, allocator := context.allocator, loc := #caller_location) -> []byte #no_bounds_check {
+	dst := make([]byte, len(src) * 2, allocator, loc)
 	for i, j := 0, 0; i < len(src); i += 1 {
 		v := src[i]
 		dst[j]   = HEXTABLE[v>>4]
@@ -15,12 +15,12 @@ encode :: proc(src: []byte, allocator := context.allocator) -> []byte #no_bounds
 }
 
 
-decode :: proc(src: []byte, allocator := context.allocator) -> (dst: []byte, ok: bool) #no_bounds_check {
+decode :: proc(src: []byte, allocator := context.allocator, loc := #caller_location) -> (dst: []byte, ok: bool) #no_bounds_check {
 	if len(src) % 2 == 1 {
 		return
 	}
 
-	dst = make([]byte, len(src) / 2, allocator)
+	dst = make([]byte, len(src) / 2, allocator, loc)
 	for i, j := 0, 1; j < len(src); j += 2 {
 		p := src[j-1]
 		q := src[j]
@@ -70,4 +70,3 @@ hex_digit :: proc(char: byte) -> (u8, bool) {
 	case:             return 0, false
 	}
 }
-

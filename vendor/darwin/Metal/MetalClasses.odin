@@ -4949,12 +4949,12 @@ CommandQueue_commandBuffer :: #force_inline proc "c" (self: ^CommandQueue) -> ^C
 	return msgSend(^CommandBuffer, self, "commandBuffer")
 }
 @(objc_type=CommandQueue, objc_name="commandBufferWithDescriptor")
-CommandQueue_commandBufferWithDescriptor :: #force_inline proc "c" (self: ^CommandQueue, descriptor: ^CommandBufferDescriptor) -> ^CommandQueue {
-	return msgSend(^CommandQueue, self, "commandBufferWithDescriptor:", descriptor)
+CommandQueue_commandBufferWithDescriptor :: #force_inline proc "c" (self: ^CommandQueue, descriptor: ^CommandBufferDescriptor) -> ^CommandBuffer {
+	return msgSend(^CommandBuffer, self, "commandBufferWithDescriptor:", descriptor)
 }
 @(objc_type=CommandQueue, objc_name="commandBufferWithUnretainedReferences")
-CommandQueue_commandBufferWithUnretainedReferences :: #force_inline proc "c" (self: ^CommandQueue) -> ^CommandQueue {
-	return msgSend(^CommandQueue, self, "commandBufferWithUnretainedReferences")
+CommandQueue_commandBufferWithUnretainedReferences :: #force_inline proc "c" (self: ^CommandQueue) -> ^CommandBuffer {
+	return msgSend(^CommandBuffer, self, "commandBufferWithUnretainedReferences")
 }
 @(objc_type=CommandQueue, objc_name="device")
 CommandQueue_device :: #force_inline proc "c" (self: ^CommandQueue) -> ^Device {

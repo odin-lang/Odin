@@ -1,4 +1,4 @@
-//+build linux, darwin, freebsd, openbsd, haiku
+//+build linux, darwin, freebsd, openbsd, netbsd, haiku
 package unix
 
 when ODIN_OS == .Darwin {
@@ -9,11 +9,20 @@ when ODIN_OS == .Darwin {
 
 import "core:c"
 
-@(default_calling_convention="c")
-foreign libc {
-	clock_gettime :: proc(clock_id: u64, timespec: ^timespec) -> c.int ---
-	sleep         :: proc(seconds: c.uint) -> c.int ---
-	nanosleep     :: proc(requested, remaining: ^timespec) -> c.int ---
+when ODIN_OS == .NetBSD {
+	@(default_calling_convention="c")
+		foreign libc {
+			@(link_name="__clock_gettime50") clock_gettime :: proc(clock_id: u64, timespec: ^timespec) -> c.int ---
+			@(link_name="__nanosleep50")     nanosleep     :: proc(requested, remaining: ^timespec) -> c.int ---
+			@(link_name="sleep")             sleep         :: proc(seconds: c.uint) -> c.int ---
+	}
+} else {
+	@(default_calling_convention="c")
+	foreign libc {
+		clock_gettime :: proc(clock_id: u64, timespec: ^timespec) -> c.int ---
+		sleep         :: proc(seconds: c.uint) -> c.int ---
+		nanosleep     :: proc(requested, remaining: ^timespec) -> c.int ---
+	}
 }
 
 timespec :: struct {
@@ -64,7 +73,6 @@ seconds_since_boot :: proc "c" () -> f64 {
 	clock_gettime(CLOCK_BOOTTIME, &ts_boottime)
 	return f64(ts_boottime.tv_sec) + f64(ts_boottime.tv_nsec) / 1e9
 }
-
 
 inline_nanosleep :: proc "c" (nanoseconds: i64) -> (remaining: timespec, res: i32) {
 	s, ns := nanoseconds / 1e9, nanoseconds % 1e9

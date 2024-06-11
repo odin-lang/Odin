@@ -1,5 +1,5 @@
 /*
-package fmt implemented formatted I/O with procedures similar to C's printf and Python's format.
+package fmt implements formatted I/O with procedures similar to C's printf and Python's format.
 The format 'verbs' are derived from C's but simpler.
 
 Printing
@@ -33,6 +33,8 @@ Floating-point, complex numbers, and quaternions:
 	%E    scientific notation, e.g. -1.23456E+78
 	%f    decimal point but no exponent, e.g. 123.456
 	%F    synonym for %f
+	%g    synonym for %f with default maximum precision
+	%G    synonym for %g
 	%h    hexadecimal (lower-case) representation with 0h prefix (0h01234abcd)
 	%H    hexadecimal (upper-case) representation with 0H prefix (0h01234ABCD)
 	%m    number of bytes in the best unit of measurement, e.g. 123.45mib
@@ -61,9 +63,9 @@ For compound values, the elements are printed using these rules recursively; lai
 	bit sets           {key0 = elem0, key1 = elem1, ...}
 	pointer to above:  &{}, &[], &map[]
 
-Width is specified by an optional decimal number immediately preceding the verb.
+Width is specified by an optional decimal number immediately after the '%'.
 If not present, the width is whatever is necessary to represent the value.
-Precision is specified after the (optional) width followed by a period followed by a decimal number.
+Precision is specified after the (optional) width by a period followed by a decimal number.
 If no period is present, a default precision is used.
 A period with no following number specifies a precision of 0.
 
@@ -75,7 +77,7 @@ Examples:
 	%8.f   width 8, precision 0
 
 Width and precision are measured in units of Unicode code points (runes).
-n.b. C's printf uses units of bytes
+n.b. C's printf uses units of bytes.
 
 
 Other flags:
@@ -92,7 +94,7 @@ Other flags:
 	0      pad with leading zeros rather than spaces
 
 
-Flags are ignored by verbs that don't expect them
+Flags are ignored by verbs that don't expect them.
 
 
 For each printf-like procedure, there is a print function that takes no
@@ -105,19 +107,20 @@ Explicit argument indices:
 In printf-like procedures, the default behaviour is for each formatting verb to format successive
 arguments passed in the call. However, the notation [n] immediately before the verb indicates that
 the nth zero-index argument is to be formatted instead.
-The same notation before an '*' for a width or precision selecting the argument index holding the value.
-Python-like syntax with argument indices differs for the selecting the argument index: {N:v}
+The same notation before an '*' for a width or precision specifier selects the argument index
+holding the value.
+Python-like syntax with argument indices differs for selecting the argument index: {n:v}
 
 Examples:
-	fmt.printf("%[1]d %[0]d\n", 13, 37); // C-like syntax
-	fmt.printf("{1:d} {0:d}\n", 13, 37); // Python-like syntax
+	fmt.printfln("%[1]d %[0]d", 13, 37) // C-like syntax
+	fmt.printfln("{1:d} {0:d}", 13, 37) // Python-like syntax
 prints "37 13", whilst:
-	fmt.printf("%[2]*.[1]*[0]f\n",  17.0, 2, 6); // C-like syntax
-	fmt.printf("%{0:[2]*.[1]*f}\n", 17.0, 2, 6); // Python-like syntax
-equivalent to:
-	fmt.printf("%6.2f\n",   17.0, 2, 6); // C-like syntax
-	fmt.printf("{:6.2f}\n", 17.0, 2, 6); // Python-like syntax
-prints "17.00"
+	fmt.printfln("%*[2].*[1][0]f", 17.0, 2, 6) // C-like syntax
+	fmt.printfln("{0:*[2].*[1]f}", 17.0, 2, 6) // Python-like syntax
+is equivalent to:
+	fmt.printfln("%6.2f",   17.0) // C-like syntax
+	fmt.printfln("{:6.2f}", 17.0) // Python-like syntax
+and prints "17.00".
 
 Format errors:
 

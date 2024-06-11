@@ -546,7 +546,7 @@ internal_int_shl1 :: proc(dest, src: ^Int, allocator := context.allocator) -> (e
  	Like `internal_int_mul_digit` but with an integer as the small input.
 */
 internal_int_mul_integer :: proc(dest, a: ^Int, b: $T, allocator := context.allocator) -> (err: Error)
-where intrinsics.type_is_integer(T) && T != DIGIT {
+where intrinsics.type_is_integer(T), T != DIGIT {
 	context.allocator = allocator
 
 	t := &Int{}
@@ -2806,7 +2806,7 @@ internal_int_count_lsb :: proc(a: ^Int) -> (count: int, err: Error) {
 }
 
 internal_platform_count_lsb :: #force_inline proc(a: $T) -> (count: int)
-	where intrinsics.type_is_integer(T) && intrinsics.type_is_unsigned(T) {
+	where intrinsics.type_is_integer(T), intrinsics.type_is_unsigned(T) {
 	return int(intrinsics.count_trailing_zeros(a)) if a > 0 else 0
 }
 

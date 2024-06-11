@@ -1,7 +1,7 @@
 //+build i386, amd64
 package simd_x86
 
-import "core:intrinsics"
+import "base:intrinsics"
 import "core:simd"
 
 @(enable_target_feature="sse2")

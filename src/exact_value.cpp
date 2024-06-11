@@ -121,12 +121,14 @@ gb_internal ExactValue exact_value_string(String string) {
 
 gb_internal ExactValue exact_value_i64(i64 i) {
 	ExactValue result = {ExactValue_Integer};
+	result.value_integer = {0};
 	big_int_from_i64(&result.value_integer, i);
 	return result;
 }
 
 gb_internal ExactValue exact_value_u64(u64 i) {
 	ExactValue result = {ExactValue_Integer};
+	result.value_integer = {0};
 	big_int_from_u64(&result.value_integer, i);
 	return result;
 }
@@ -177,6 +179,7 @@ gb_internal ExactValue exact_value_typeid(Type *type) {
 
 gb_internal ExactValue exact_value_integer_from_string(String const &string) {
 	ExactValue result = {ExactValue_Integer};
+	result.value_integer = {0};
 	bool success;
 	big_int_from_string(&result.value_integer, string, &success);
 	if (!success) {
@@ -585,6 +588,7 @@ gb_internal ExactValue exact_unary_operator_value(TokenKind op, ExactValue v, i3
 			return v;
 		case ExactValue_Integer: {
 			ExactValue i = {ExactValue_Integer};
+			i.value_integer = {0};
 			big_int_neg(&i.value_integer, &v.value_integer);
 			return i;
 		}
@@ -616,6 +620,7 @@ gb_internal ExactValue exact_unary_operator_value(TokenKind op, ExactValue v, i3
 		case ExactValue_Integer: {
 			GB_ASSERT(precision != 0);
 			ExactValue i = {ExactValue_Integer};
+			i.value_integer = {0};
 			big_int_not(&i.value_integer, &v.value_integer, precision, !is_unsigned);
 			return i;
 		}

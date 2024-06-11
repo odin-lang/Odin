@@ -62,8 +62,8 @@ Marshal_Options :: struct {
 	mjson_skipped_first_braces_end: bool,
 }
 
-marshal :: proc(v: any, opt: Marshal_Options = {}, allocator := context.allocator) -> (data: []byte, err: Marshal_Error) {
-	b := strings.builder_make(allocator)
+marshal :: proc(v: any, opt: Marshal_Options = {}, allocator := context.allocator, loc := #caller_location) -> (data: []byte, err: Marshal_Error) {
+	b := strings.builder_make(allocator, loc)
 	defer if err != nil {
 		strings.builder_destroy(&b)
 	}
@@ -469,12 +469,15 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 		case: panic("Invalid union tag type")
 		}
 
-		if v.data == nil || tag == 0 {
-			io.write_string(w, "null") or_return
-		} else {
-			id := info.variants[tag-1].id
-			return marshal_to_writer(w, any{v.data, id}, opt)
+		if !info.no_nil {
+			if tag == 0 {
+				io.write_string(w, "null") or_return
+				return nil
+			}
+			tag -= 1
 		}
+		id := info.variants[tag].id
+		return marshal_to_writer(w, any{v.data, id}, opt)
 
 	case runtime.Type_Info_Enum:
 		if !opt.use_enum_names || len(info.names) == 0 {
@@ -536,8 +539,6 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 		case: panic("unknown bit_size size")
 		}
 		io.write_u64(w, bit_data) or_return
-
-		return .Unsupported_Type
 	}
 
 	return
