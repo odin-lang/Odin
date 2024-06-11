@@ -174,7 +174,7 @@ struct cgProcedure {
 	TB_FunctionPrototype *proto;
 	TB_Symbol *symbol;
 
-	TB_Arena *arenas[2];
+	TB_Arena  arenas[2];
 
 	Entity *  entity;
 	cgModule *module;

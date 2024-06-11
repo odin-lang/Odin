@@ -160,11 +160,19 @@ typedef enum {
 } TB_ComdatType;
 
 typedef enum TB_MemoryOrder {
+    // atomic ops, unordered
     TB_MEM_ORDER_RELAXED,
-    TB_MEM_ORDER_CONSUME,
-    TB_MEM_ORDER_ACQUIRE,
-    TB_MEM_ORDER_RELEASE,
+
+    // acquire for loads:
+    //   loads/stores from after this load cannot be reordered
+    //   after this load.
+    //
+    // release for stores:
+    //   loads/stores from before this store on this thread
+    //   can't be reordered after this store.
     TB_MEM_ORDER_ACQ_REL,
+
+    // acquire, release and total order across threads.
     TB_MEM_ORDER_SEQ_CST,
 } TB_MemoryOrder;
 
@@ -260,6 +268,9 @@ typedef enum TB_NodeTypeEnum {
     //   0   is temporal
     //   1-3 are just cache levels
     TB_PREFETCH,      // (Memory, Ptr) & Int -> Memory
+    // this is a bookkeeping node for constructing IR while optimizing, so we
+    // don't keep track of nodes while running peeps.
+    TB_SYMBOL_TABLE,
 
     ////////////////////////////////
     // CONTROL
@@ -298,6 +309,9 @@ typedef enum TB_NodeTypeEnum {
     //
     //   CProj0 is the taken path, CProj1 is exits the loop.
     TB_NEVER_BRANCH,// (Control) -> (Control...)
+    //   this is a fake branch that lets us define multiple entry points into the function for whatever
+    //   reason.
+    TB_ENTRY_FORK,
     //   debugbreak will trap in a continuable manner.
     TB_DEBUGBREAK,  // (Control, Memory) -> (Control)
     //   trap will not be continuable but will stop execution.
@@ -351,14 +365,14 @@ typedef enum TB_NodeTypeEnum {
     //   data ops will return the value before the operation is performed.
     //   Atomic CAS return the old value and a boolean for success (true if
     //   the value was changed)
-    TB_ATOMIC_LOAD, // (Control, Memory, Ptr)        -> (Memory, Data)
-    TB_ATOMIC_XCHG, // (Control, Memory, Ptr, Data)  -> (Memory, Data)
-    TB_ATOMIC_ADD,  // (Control, Memory, Ptr, Data)  -> (Memory, Data)
-    TB_ATOMIC_SUB,  // (Control, Memory, Ptr, Data)  -> (Memory, Data)
-    TB_ATOMIC_AND,  // (Control, Memory, Ptr, Data)  -> (Memory, Data)
-    TB_ATOMIC_XOR,  // (Control, Memory, Ptr, Data)  -> (Memory, Data)
-    TB_ATOMIC_OR,   // (Control, Memory, Ptr, Data)  -> (Memory, Data)
-    TB_ATOMIC_CAS,  // (Control, Memory, Data, Data) -> (Memory, Data, Bool)
+    TB_ATOMIC_LOAD,   // (Control, Memory, Ptr)        -> (Memory, Data)
+    TB_ATOMIC_XCHG,   // (Control, Memory, Ptr, Data)  -> (Memory, Data)
+    TB_ATOMIC_ADD,    // (Control, Memory, Ptr, Data)  -> (Memory, Data)
+    TB_ATOMIC_AND,    // (Control, Memory, Ptr, Data)  -> (Memory, Data)
+    TB_ATOMIC_XOR,    // (Control, Memory, Ptr, Data)  -> (Memory, Data)
+    TB_ATOMIC_OR,     // (Control, Memory, Ptr, Data)  -> (Memory, Data)
+    TB_ATOMIC_PTROFF, // (Control, Memory, Ptr, Ptr)   -> (Memory, Ptr)
+    TB_ATOMIC_CAS,    // (Control, Memory, Data, Data) -> (Memory, Data, Bool)
 
     // like a multi-way branch but without the control flow aspect, but for data.
     TB_LOOKUP,
@@ -468,7 +482,8 @@ typedef enum TB_NodeTypeEnum {
 
     // each family of machine nodes gets 256 nodes
     // first machine op, we have some generic ops here:
-    TB_MACH_X86 = TB_ARCH_X86_64 * 0x100,
+    TB_MACH_X86  = TB_ARCH_X86_64 * 0x100,
+    TB_MACH_MIPS = TB_ARCH_MIPS32 * 0x100,
 } TB_NodeTypeEnum;
 typedef uint16_t TB_NodeType;
 static_assert(sizeof(TB_NODE_TYPE_MAX) < 0x100, "this is the bound where machine nodes start");
@@ -542,11 +557,7 @@ typedef enum {
 // TB_Function, TB_Global, and TB_External are all subtypes of TB_Symbol
 // and thus are safely allowed to cast into a symbol for operations.
 typedef struct TB_Symbol {
-    #ifdef __cplusplus
     TB_SymbolTag tag;
-    #else
-    _Atomic TB_SymbolTag tag;
-    #endif
 
     // which thread info it's tied to (we may need to remove it, this
     // is used for that)
@@ -580,7 +591,6 @@ typedef struct {
     #endif
 } TB_User;
 
-// my annotations about size are based on 64bit machines
 struct TB_Node {
     TB_NodeType type;
     TB_DataType dt;
@@ -595,7 +605,12 @@ struct TB_Node {
     uint32_t gvn;
     // use-def edges, unordered
     TB_User* users;
-    // ordered def-use edges, jolly ol' semantics
+    // ordered def-use edges, jolly ol' semantics.
+    //   after input_count (and up to input_cap) goes an unordered set of nodes which
+    //   act as extra deps, this is where anti-deps and other scheduling related edges
+    //   are placed. stole this trick from Cliff... ok if you look at my compiler impl
+    //   stuff it's either gonna be like trad compiler stuff, Cnile, LLVM or Cliff that's
+    //   just how i learned :p
     TB_Node** inputs;
 
     char extra[];
@@ -620,6 +635,10 @@ typedef struct { // TB_MACH_COPY
 typedef struct { // TB_PROJ
     int index;
 } TB_NodeProj;
+
+typedef struct { // TB_SYMBOL_TABLE
+    bool complete;
+} TB_NodeSymbolTable;
 
 typedef struct { // TB_MACH_PROJ
     int index;
@@ -820,13 +839,30 @@ typedef struct {
 #endif
 
 // defined in common/arena.h
-typedef struct TB_Arena TB_Arena;
+#ifndef TB_OPAQUE_ARENA_DEF
+#define TB_OPAQUE_ARENA_DEF
+typedef struct TB_ArenaChunk TB_ArenaChunk;
+typedef struct {
+    TB_ArenaChunk* top;
 
-// 0 for default
-TB_API TB_Arena* tb_arena_create(size_t chunk_size);
+    #ifndef NDEBUG
+    uint32_t allocs;
+    uint32_t alloc_bytes;
+    #endif
+} TB_Arena;
+
+typedef struct TB_ArenaSavepoint {
+    TB_ArenaChunk* top;
+    char* avail;
+} TB_ArenaSavepoint;
+#endif // TB_OPAQUE_ARENA_DEF
+
+TB_API void tb_arena_create(TB_Arena* restrict arena);
 TB_API void tb_arena_destroy(TB_Arena* restrict arena);
-TB_API bool tb_arena_is_empty(TB_Arena* restrict arena);
 TB_API void tb_arena_clear(TB_Arena* restrict arena);
+TB_API bool tb_arena_is_empty(TB_Arena* restrict arena);
+TB_API TB_ArenaSavepoint tb_arena_save(TB_Arena* arena);
+TB_API void tb_arena_restore(TB_Arena* arena, TB_ArenaSavepoint sp);
 
 ////////////////////////////////
 // Module management
@@ -1154,16 +1190,13 @@ TB_API void tb_inst_set_exit_location(TB_Function* f, TB_SourceFile* file, int l
 // if section is NULL, default to .text
 TB_API TB_Function* tb_function_create(TB_Module* m, ptrdiff_t len, const char* name, TB_Linkage linkage);
 
-TB_API TB_Arena* tb_function_get_arena(TB_Function* f);
+TB_API TB_Arena* tb_function_get_arena(TB_Function* f, int i);
 
 // if len is -1, it's null terminated
 TB_API void tb_symbol_set_name(TB_Symbol* s, ptrdiff_t len, const char* name);
 
 TB_API void tb_symbol_bind_ptr(TB_Symbol* s, void* ptr);
 TB_API const char* tb_symbol_get_name(TB_Symbol* s);
-
-// functions have two arenas for the majority of their allocations.
-TB_API void tb_function_set_arenas(TB_Function* f, TB_Arena* a1, TB_Arena* a2);
 
 // if arena is NULL, defaults to module arena which is freed on tb_free_thread_resources
 TB_API void tb_function_set_prototype(TB_Function* f, TB_ModuleSectionHandle section, TB_FunctionPrototype* p);
@@ -1267,7 +1300,6 @@ TB_API TB_Node* tb_inst_atomic_load(TB_Function* f, TB_Node* addr, TB_DataType d
 // the natural alignment of 'src'
 TB_API TB_Node* tb_inst_atomic_xchg(TB_Function* f, TB_Node* addr, TB_Node* src, TB_MemoryOrder order);
 TB_API TB_Node* tb_inst_atomic_add(TB_Function* f, TB_Node* addr, TB_Node* src, TB_MemoryOrder order);
-TB_API TB_Node* tb_inst_atomic_sub(TB_Function* f, TB_Node* addr, TB_Node* src, TB_MemoryOrder order);
 TB_API TB_Node* tb_inst_atomic_and(TB_Function* f, TB_Node* addr, TB_Node* src, TB_MemoryOrder order);
 TB_API TB_Node* tb_inst_atomic_xor(TB_Function* f, TB_Node* addr, TB_Node* src, TB_MemoryOrder order);
 TB_API TB_Node* tb_inst_atomic_or(TB_Function* f, TB_Node* addr, TB_Node* src, TB_MemoryOrder order);
@@ -1352,7 +1384,7 @@ TB_API void tb_inst_trap(TB_Function* f);
 TB_API void tb_inst_goto(TB_Function* f, TB_Node* target);
 TB_API void tb_inst_never_branch(TB_Function* f, TB_Node* if_true, TB_Node* if_false);
 
-TB_API const char* tb_node_get_name(TB_Node* n);
+TB_API const char* tb_node_get_name(TB_NodeTypeEnum n_type);
 
 // revised API for if, this one returns the control projections such that a target is not necessary while building
 //   projs[0] is the true case, projs[1] is false.
@@ -1364,106 +1396,7 @@ TB_API void tb_inst_set_branch_freq(TB_Function* f, TB_Node* n, int total_hits, 
 TB_API void tb_inst_ret(TB_Function* f, size_t count, TB_Node** values);
 
 ////////////////////////////////
-// Cooler IR building
-////////////////////////////////
-typedef struct TB_GraphBuilder TB_GraphBuilder;
-enum { TB_GRAPH_BUILDER_PARAMS = 0 };
-
-// arena isn't for the function, it's for the builder
-TB_API TB_GraphBuilder* tb_builder_enter(TB_Function* f, TB_Arena* arena);
-TB_API void tb_builder_exit(TB_GraphBuilder* g);
-
-// sometimes you wanna make a scope and have some shit in there... use this
-TB_API int tb_builder_save(TB_GraphBuilder* g);
-TB_API void tb_builder_restore(TB_GraphBuilder* g, int v);
-
-TB_API void tb_builder_push(TB_GraphBuilder* g, TB_Node* n);
-TB_API TB_Node* tb_builder_pop(TB_GraphBuilder* g);
-
-TB_API void tb_builder_debugbreak(TB_GraphBuilder* g);
-
-// ( -- a )
-TB_API void tb_builder_uint(TB_GraphBuilder* g, TB_DataType dt, uint64_t x);
-TB_API void tb_builder_sint(TB_GraphBuilder* g, TB_DataType dt, int64_t x);
-TB_API void tb_builder_float32(TB_GraphBuilder* g, float imm);
-TB_API void tb_builder_float64(TB_GraphBuilder* g, double imm);
-TB_API void tb_builder_string(TB_GraphBuilder* g, ptrdiff_t len, const char* str);
-
-// ( a b -- c )
-//
-// works with type: AND, OR, XOR, ADD, SUB, MUL, SHL, SHR, SAR, ROL, ROR, UDIV, SDIV, UMOD, SMOD.
-// note that arithmetic behavior is irrelevant for some of the operations (but 0 is always a good default).
-TB_API void tb_builder_binop_int(TB_GraphBuilder* g, int type, TB_ArithmeticBehavior ab);
-
-TB_API void tb_builder_cast(TB_GraphBuilder* g, TB_DataType dt, int type);
-
-// ( a b -- c )
-TB_API void tb_builder_cmp(TB_GraphBuilder* g, int type, bool flip, TB_DataType dt);
-
-// pointer arithmetic
-//   ( a b -- c )   =>   a + b*stride
-TB_API void tb_builder_array(TB_GraphBuilder* g, int64_t stride);
-//   ( a -- c )     =>   a + offset
-TB_API void tb_builder_member(TB_GraphBuilder* g, int64_t offset);
-
-// memory
-//   ( addr -- val )
-TB_API void tb_builder_load(TB_GraphBuilder* g, int mem_var, bool ctrl_dep, TB_DataType dt, int32_t offset, TB_CharUnits align);
-//   ( addr val -- )
-TB_API void tb_builder_store(TB_GraphBuilder* g, int mem_var, int32_t offset, TB_CharUnits align);
-//   ( addr -- val )
-TB_API void tb_builder_atomic_load(TB_GraphBuilder* g, int mem_var, bool ctrl_dep, TB_DataType dt, int32_t offset, TB_MemoryOrder order);
-//   ( addr val -- )
-TB_API void tb_builder_atomic_store(TB_GraphBuilder* g, int mem_var, int32_t offset, TB_MemoryOrder order);
-//   ( addr val -- old )
-TB_API void tb_builder_atomic_rmw(TB_GraphBuilder* g, int mem_var, int32_t offset, int op, TB_MemoryOrder order);
-
-// function call
-//   ( ... -- ... )
-TB_API void tb_builder_static_call(TB_GraphBuilder* g, TB_FunctionPrototype* proto, TB_Symbol* target, int mem_var, int nargs);
-
-// locals (variables but as stack vars)
-TB_API TB_Node* tb_builder_local(TB_GraphBuilder* g, TB_CharUnits size, TB_CharUnits align);
-TB_API void tb_builder_push(TB_GraphBuilder* g, TB_Node* n);
-TB_API TB_Node* tb_builder_pop(TB_GraphBuilder* g);
-
-// variables (these are just named stack slots)
-//   ( a -- )
-//
-//   we take the top item in the stack and treat it as a
-//   variable we'll might later fiddle with, the control
-//   flow primitives will diff changes to insert phis.
-TB_API int tb_builder_decl(TB_GraphBuilder* g);
-//   ( -- a )
-TB_API void tb_builder_get_var(TB_GraphBuilder* g, int id);
-//   ( a -- )
-TB_API void tb_builder_set_var(TB_GraphBuilder* g, int id);
-
-// control flow primitives
-//   ( a -- )
-//
-//   taken is the number of times we do the true case
-TB_API void tb_builder_if(TB_GraphBuilder* g, int total_hits, int taken);
-//   ( -- )
-TB_API void tb_builder_else(TB_GraphBuilder* g);
-//   ( -- )
-TB_API void tb_builder_loop(TB_GraphBuilder* g);
-//   ( -- )
-TB_API void tb_builder_block(TB_GraphBuilder* g);
-//   ( -- )
-TB_API void tb_builder_end(TB_GraphBuilder* g);
-//   ( ... -- )
-//
-//   technically TB has multiple returns, in practice it's like 2 regs before
-//   ABI runs out of shit.
-TB_API void tb_builder_ret(TB_GraphBuilder* g, int count);
-//   ( a -- )
-TB_API void tb_builder_br(TB_GraphBuilder* g, int depth);
-//   ( a -- )
-TB_API void tb_builder_br_if(TB_GraphBuilder* g, int depth);
-
-////////////////////////////////
-// New optimizer API
+// Optimizer API
 ////////////////////////////////
 // To avoid allocs, you can make a worklist and keep it across multiple functions so long
 // as they're not trying to use it at the same time.
@@ -1487,19 +1420,18 @@ TB_API TB_Node* tb_opt_peep_node(TB_Function* f, TB_Node* n);
 
 // Uses the two function arenas pretty heavily, may even flip their purposes (as a form
 // of GC compacting)
-TB_API void tb_opt(TB_Function* f, TB_Worklist* ws, bool preserve_types);
-
-// Asserts on all kinds of broken behavior, dumps to stderr (i will change that later)
-TB_API void tb_verify(TB_Function* f, TB_Arena* tmp);
+//
+// returns true if any graph rewrites were performed.
+TB_API bool tb_opt(TB_Function* f, TB_Worklist* ws, bool preserve_types);
 
 // print in SSA-CFG looking form (with BB params for the phis), if tmp is NULL it'll use the
 // function's tmp arena
-TB_API void tb_print(TB_Function* f, TB_Arena* tmp);
-TB_API void tb_print_dumb(TB_Function* f, bool use_fancy_types);
+TB_API void tb_print(TB_Function* f);
+TB_API void tb_print_dumb(TB_Function* f);
 
 // super special experimental stuff (no touchy yet)
 TB_API char* tb_c_prelude(TB_Module* mod);
-TB_API char* tb_print_c(TB_Function* f, TB_Worklist* ws, TB_Arena* tmp);
+TB_API char* tb_print_c(TB_Function* f, TB_Worklist* ws);
 
 // codegen:
 //   output goes at the top of the code_arena, feel free to place multiple functions
@@ -1511,6 +1443,129 @@ TB_API TB_FunctionOutput* tb_codegen(TB_Function* f, TB_Worklist* ws, TB_Arena* 
 
 // interprocedural optimizer iter
 TB_API bool tb_module_ipo(TB_Module* m);
+
+////////////////////////////////
+// Cooler IR building
+////////////////////////////////
+typedef struct TB_GraphBuilder TB_GraphBuilder;
+enum { TB_GRAPH_BUILDER_PARAMS = 0 };
+
+// if ws != NULL, i'll run the peepholes while you're constructing nodes. why? because it
+// avoids making junk nodes before they become a problem for memory bandwidth.
+TB_API TB_GraphBuilder* tb_builder_enter(TB_Function* f, TB_ModuleSectionHandle section, TB_FunctionPrototype* proto, TB_Worklist* ws);
+
+// parameter's addresses are available through the tb_builder_param_addr, they're not tracked as mutable vars.
+TB_API TB_GraphBuilder* tb_builder_enter_from_dbg(TB_Function* f, TB_ModuleSectionHandle section, TB_DebugType* dbg, TB_Worklist* ws);
+
+TB_API void tb_builder_exit(TB_GraphBuilder* g);
+TB_API TB_Node* tb_builder_param_addr(TB_GraphBuilder* g, int i);
+
+TB_API TB_Node* tb_builder_bool(TB_GraphBuilder* g, bool x);
+TB_API TB_Node* tb_builder_uint(TB_GraphBuilder* g, TB_DataType dt, uint64_t x);
+TB_API TB_Node* tb_builder_sint(TB_GraphBuilder* g, TB_DataType dt, int64_t x);
+TB_API TB_Node* tb_builder_float32(TB_GraphBuilder* g, float imm);
+TB_API TB_Node* tb_builder_float64(TB_GraphBuilder* g, double imm);
+TB_API TB_Node* tb_builder_symbol(TB_GraphBuilder* g, TB_Symbol* sym);
+TB_API TB_Node* tb_builder_string(TB_GraphBuilder* g, ptrdiff_t len, const char* str);
+
+// works with type: AND, OR, XOR, ADD, SUB, MUL, SHL, SHR, SAR, ROL, ROR, UDIV, SDIV, UMOD, SMOD.
+// note that arithmetic behavior is irrelevant for some of the operations (but 0 is always a good default).
+TB_API TB_Node* tb_builder_binop_int(TB_GraphBuilder* g, int type, TB_Node* a, TB_Node* b, TB_ArithmeticBehavior ab);
+TB_API TB_Node* tb_builder_binop_float(TB_GraphBuilder* g, int type, TB_Node* a, TB_Node* b);
+
+TB_API TB_Node* tb_builder_select(TB_GraphBuilder* g, TB_Node* cond, TB_Node* a, TB_Node* b);
+TB_API TB_Node* tb_builder_cast(TB_GraphBuilder* g, TB_DataType dt, int type, TB_Node* src);
+
+// ( a -- b )
+TB_API TB_Node* tb_builder_unary(TB_GraphBuilder* g, int type, TB_Node* src);
+
+TB_API TB_Node* tb_builder_neg(TB_GraphBuilder* g, TB_Node* src);
+TB_API TB_Node* tb_builder_not(TB_GraphBuilder* g, TB_Node* src);
+
+// ( a b -- c )
+TB_API TB_Node* tb_builder_cmp(TB_GraphBuilder* g, int type, TB_Node* a, TB_Node* b);
+
+// pointer arithmetic
+//   base + index*stride
+TB_API TB_Node* tb_builder_ptr_array(TB_GraphBuilder* g, TB_Node* base, TB_Node* index, int64_t stride);
+//   base + offset
+TB_API TB_Node* tb_builder_ptr_member(TB_GraphBuilder* g, TB_Node* base, int64_t offset);
+
+// memory
+TB_API TB_Node* tb_builder_load(TB_GraphBuilder* g, int mem_var, bool ctrl_dep, TB_DataType dt, TB_Node* addr, TB_CharUnits align, bool is_volatile);
+TB_API void tb_builder_store(TB_GraphBuilder* g, int mem_var, bool ctrl_dep, TB_Node* addr, TB_Node* val, TB_CharUnits align, bool is_volatile);
+TB_API void tb_builder_memcpy(TB_GraphBuilder* g, int mem_var, bool ctrl_dep, TB_Node* dst, TB_Node* src, TB_Node* size, TB_CharUnits align, bool is_volatile);
+TB_API void tb_builder_memset(TB_GraphBuilder* g, int mem_var, bool ctrl_dep, TB_Node* dst, TB_Node* val, TB_Node* size, TB_CharUnits align, bool is_volatile);
+TB_API void tb_builder_memzero(TB_GraphBuilder* g, int mem_var, bool ctrl_dep, TB_Node* dst, TB_Node* size, TB_CharUnits align, bool is_volatile);
+
+// returns initially loaded value
+TB_API TB_Node* tb_builder_atomic_rmw(TB_GraphBuilder* g, int mem_var, int op, TB_Node* addr, TB_Node* val, TB_MemoryOrder order);
+TB_API TB_Node* tb_builder_atomic_load(TB_GraphBuilder* g, int mem_var, TB_DataType dt, TB_Node* addr, TB_MemoryOrder order);
+
+// splitting/merging:
+//   splits the in_mem variable into multiple streams of the same "type".
+//
+//   returns the first newly allocated mem var (the rest are consecutive). *out_split will have the split node written to
+//   it (because merge mem needs to know which split it's attached to).
+TB_API int tb_builder_split_mem(TB_GraphBuilder* g, int in_mem, int split_count, TB_Node** out_split);
+//   this will merge the memory effects back into out_mem, split_vars being the result of a tb_builder_split_mem(...)
+TB_API void tb_builder_merge_mem(TB_GraphBuilder* g, int out_mem, int split_count, int split_vars, TB_Node* split);
+
+// function call
+TB_API TB_Node** tb_builder_call(TB_GraphBuilder* g, TB_FunctionPrototype* proto, int mem_var, TB_Node* target, int arg_count, TB_Node** args);
+TB_API TB_Node*  tb_builder_syscall(TB_GraphBuilder* g, TB_DataType dt, int mem_var, TB_Node* target, int arg_count, TB_Node** args);
+
+// locals (variables but as stack vars)
+TB_API TB_Node* tb_builder_local(TB_GraphBuilder* g, TB_CharUnits size, TB_CharUnits align);
+
+// variables:
+//   just gives you the ability to construct mutable names, from
+//   there we just slot in the phis and such for you :)
+TB_API int tb_builder_decl(TB_GraphBuilder* g);
+TB_API TB_Node* tb_builder_get_var(TB_GraphBuilder* g, int id);
+TB_API void tb_builder_set_var(TB_GraphBuilder* g, int id, TB_Node* v);
+
+// control flow primitives:
+//   makes a region we can jump to (generally for forward jumps)
+TB_API TB_Node* tb_builder_label_make(TB_GraphBuilder* g);
+//   once a label is complete you can no longer insert jumps to it, the phis
+//   are placed and you can then insert code into the label's body.
+TB_API void tb_builder_label_complete(TB_GraphBuilder* g, TB_Node* label);
+//   begin building on the label (has to be completed now)
+TB_API void tb_builder_label_set(TB_GraphBuilder* g, TB_Node* label);
+//   just makes a label from an existing label (used when making the loop body defs)
+TB_API TB_Node* tb_builder_label_clone(TB_GraphBuilder* g, TB_Node* label);
+//   active label
+TB_API TB_Node* tb_builder_label_get(TB_GraphBuilder* g);
+//   number of predecessors at that point in time
+TB_API int tb_builder_label_pred_count(TB_GraphBuilder* g, TB_Node* label);
+//   kill node
+TB_API void tb_builder_label_kill(TB_GraphBuilder* g, TB_Node* label);
+//   returns an array of TB_GraphCtrl which represent each path on the
+//   branch, [0] is the false case and [1] is the true case.
+TB_API void tb_builder_if(TB_GraphBuilder* g, TB_Node* cond, TB_Node* paths[2]);
+//   unconditional jump to target
+TB_API void tb_builder_br(TB_GraphBuilder* g, TB_Node* target);
+//   forward and backward branch target
+TB_API TB_Node* tb_builder_loop(TB_GraphBuilder* g);
+
+// technically TB has multiple returns, in practice it's like 2 regs before
+// ABI runs out of shit.
+TB_API void tb_builder_ret(TB_GraphBuilder* g, int mem_var, int arg_count, TB_Node** args);
+TB_API void tb_builder_unreachable(TB_GraphBuilder* g, int mem_var);
+TB_API void tb_builder_trap(TB_GraphBuilder* g, int mem_var);
+TB_API void tb_builder_debugbreak(TB_GraphBuilder* g, int mem_var);
+
+// allows you to define multiple entry points
+TB_API void tb_builder_entry_fork(TB_GraphBuilder* g, int count, TB_Node* paths[]);
+
+// general intrinsics
+TB_API TB_Node* tb_builder_cycle_counter(TB_GraphBuilder* g);
+TB_API TB_Node* tb_builder_prefetch(TB_GraphBuilder* g, TB_Node* addr, int level);
+
+// x86 Intrinsics
+TB_API TB_Node* tb_builder_x86_ldmxcsr(TB_GraphBuilder* g, TB_Node* a);
+TB_API TB_Node* tb_builder_x86_stmxcsr(TB_GraphBuilder* g);
 
 ////////////////////////////////
 // IR access

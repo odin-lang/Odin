@@ -2997,6 +2997,14 @@ int main(int arg_count, char const **arg_ptr) {
 			return 1;
 		}
 
+		if (true) {
+			if (build_context.show_timings) {
+				show_timings(checker, &global_timings);
+			}
+
+			return 0;
+		}
+
 		switch (build_context.build_mode) {
 		case BuildMode_Executable:
 		case BuildMode_StaticLibrary:

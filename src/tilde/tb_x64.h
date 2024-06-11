@@ -62,17 +62,17 @@ typedef enum {
     TB_X86_DWORD,   // 4
     TB_X86_QWORD,   // 8
 
-    TB_X86_PBYTE,   // int8 x 16 = 16
-    TB_X86_PWORD,   // int16 x 8 = 16
-    TB_X86_PDWORD,  // int32 x 4 = 16
-    TB_X86_PQWORD,  // int64 x 2 = 16
+    TB_X86_XMMWORD, // the generic idea of them
 
     TB_X86_F32x1,   // ss
     TB_X86_F64x1,   // sd
     TB_X86_F32x4,   // ps
     TB_X86_F64x2,   // pd
 
-    TB_X86_XMMWORD, // the generic idea of them
+    TB_X86_PBYTE,   // int8 x 16 = 16
+    TB_X86_PWORD,   // int16 x 8 = 16
+    TB_X86_PDWORD,  // int32 x 4 = 16
+    TB_X86_PQWORD,  // int64 x 2 = 16
 } TB_X86_DataType;
 
 typedef struct {

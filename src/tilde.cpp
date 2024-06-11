@@ -2,20 +2,20 @@
 
 
 struct CGArenaPair {
-	TB_Arena *arenas[2];
+	TB_Arena arenas[2];
 };
 
 gb_global Slice<CGArenaPair> global_tb_arenas;
 
 gb_internal TB_Arena *cg_arena(int index) {
-	return global_tb_arenas[current_thread_index()].arenas[index];
+	return &global_tb_arenas[current_thread_index()].arenas[index];
 }
 
 gb_internal void cg_global_arena_init(void) {
 	global_tb_arenas = slice_make<CGArenaPair>(permanent_allocator(), global_thread_pool.threads.count);
 	for (CGArenaPair &pair : global_tb_arenas) {
-		for (TB_Arena *&arena : pair.arenas) {
-			arena = tb_arena_create(1ull<<20);
+		for (TB_Arena &arena : pair.arenas) {
+			tb_arena_create(&arena);
 		}
 	}
 }
@@ -862,6 +862,8 @@ gb_internal bool cg_generate_code(Checker *c, LinkerData *linker_data) {
 
 	auto *min_dep_set = &info->minimum_dependency_set;
 
+	TIME_SECTION("Tilde Generate Procedures");
+
 	Array<cgProcedure *> procedures_to_generate = {};
 	array_init(&procedures_to_generate, heap_allocator());
 	defer (array_free(&procedures_to_generate));
@@ -889,6 +891,7 @@ gb_internal bool cg_generate_code(Checker *c, LinkerData *linker_data) {
 			array_add(&procedures_to_generate, p);
 		}
 	}
+
 	for (cgProcedure *p : procedures_to_generate) {
 		cg_add_procedure_to_queue(p);
 	}
@@ -918,6 +921,8 @@ gb_internal bool cg_generate_code(Checker *c, LinkerData *linker_data) {
 		cg_procedure_end(p);
 	}
 
+	TIME_SECTION("Tilde Module Passes");
+
 	{ // Module passes
 		if (build_context.optimization_level > 0) {
 			tb_module_ipo(m->mod);
@@ -941,12 +946,15 @@ gb_internal bool cg_generate_code(Checker *c, LinkerData *linker_data) {
 		}
 	}
 
-	TB_Arena *export_arena = tb_arena_create(0);
-	defer (tb_arena_destroy(export_arena));
+	TIME_SECTION("Tilde Object Generation");
+
+	TB_Arena export_arena = {};
+	tb_arena_create(&export_arena);
+	defer (tb_arena_destroy(&export_arena));
 
 	String filepath_obj = cg_filepath_obj_for_module(m, false);
 
-	TB_ExportBuffer export_buffer = tb_module_object_export(m->mod, export_arena, debug_format);
+	TB_ExportBuffer export_buffer = tb_module_object_export(m->mod, &export_arena, debug_format);
 	GB_ASSERT(tb_export_buffer_to_file(export_buffer, cast(char const *)filepath_obj.text));
 
 	array_add(&linker_data->output_object_paths, filepath_obj);

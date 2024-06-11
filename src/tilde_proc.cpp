@@ -96,10 +96,6 @@ gb_internal cgProcedure *cg_procedure_create(cgModule *m, Entity *entity, bool i
 
 	if (p->symbol == nullptr)  {
 		p->func = tb_function_create(m->mod, link_name.len, cast(char const *)link_name.text, linkage);
-		p->arenas[0] = tb_arena_create(0);
-		p->arenas[1] = tb_arena_create(0);
-
-		tb_function_set_arenas(p->func, p->arenas[0], p->arenas[1]);
 
 		p->debug_type = cg_debug_type_for_proc(m, p->type);
 		p->proto = tb_prototype_from_dbg(m->mod, p->debug_type);
@@ -231,11 +227,6 @@ gb_internal void cg_procedure_begin(cgProcedure *p) {
 	}
 
 	TB_ModuleSectionHandle section = tb_module_get_text(p->module->mod);
-	if (p->arenas[0] == nullptr) {
-		p->arenas[0] = tb_arena_create(0);
-		p->arenas[1] = tb_arena_create(0);
-	}
-	tb_function_set_arenas(p->func, p->arenas[0], p->arenas[1]);
 	tb_function_set_prototype(p->func, section, p->proto);
 
 	if (p->body == nullptr) {
