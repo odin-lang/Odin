@@ -125,6 +125,8 @@ gb_internal Entity *find_polymorphic_record_entity(GenTypesData *found_gen_types
 
 gb_internal bool complete_soa_type(Checker *checker, Type *t, bool wait_to_finish);
 
+gb_internal bool check_is_castable_to(CheckerContext *c, Operand *operand, Type *y);
+
 enum LoadDirectiveResult {
 	LoadDirective_Success  = 0,
 	LoadDirective_Error    = 1,
@@ -279,8 +281,20 @@ gb_internal void error_operand_not_expression(Operand *o) {
 
 gb_internal void error_operand_no_value(Operand *o) {
 	if (o->mode == Addressing_NoValue) {
-		gbString err = expr_to_string(o->expr);
 		Ast *x = unparen_expr(o->expr);
+
+		if (x->kind == Ast_CallExpr) {
+			Ast *p = unparen_expr(x->CallExpr.proc);
+			if (p->kind == Ast_BasicDirective) {
+				String tag = p->BasicDirective.name.string;
+				if (tag == "panic" ||
+				    tag == "assert") {
+					return;
+				}
+			}
+		}
+
+		gbString err = expr_to_string(o->expr);
 		if (x->kind == Ast_CallExpr) {
 			error(o->expr, "'%s' call does not return a value and cannot be used as a value", err);
 		} else {
@@ -564,6 +578,7 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 	d->defer_use_checked = false;
 
 	Entity *entity = alloc_entity_procedure(nullptr, token, final_proc_type, tags);
+	entity->state.store(EntityState_Resolved);
 	entity->identifier = ident;
 
 	add_entity_and_decl_info(&nctx, ident, entity, d);
@@ -2252,6 +2267,17 @@ gb_internal bool check_representable_as_constant(CheckerContext *c, ExactValue i
 gb_internal bool check_integer_exceed_suggestion(CheckerContext *c, Operand *o, Type *type, i64 max_bit_size=0) {
 	if (is_type_integer(type) && o->value.kind == ExactValue_Integer) {
 		gbString b = type_to_string(type);
+		defer (gb_string_free(b));
+
+		if (is_type_enum(o->type)) {
+			if (check_is_castable_to(c, o, type)) {
+				gbString ot = type_to_string(o->type);
+				error_line("\tSuggestion: Try casting the '%s' expression to '%s'", ot, b);
+				gb_string_free(ot);
+			}
+			return true;
+		}
+
 
 		i64 sz = type_size_of(type);
 		i64 bit_size = 8*sz;
@@ -2301,7 +2327,6 @@ gb_internal bool check_integer_exceed_suggestion(CheckerContext *c, Operand *o, 
 			}
 		}
 
-		gb_string_free(b);
 
 		return true;
 	}
@@ -3326,6 +3351,9 @@ gb_internal void check_cast(CheckerContext *c, Operand *x, Type *type) {
 	if (is_type_untyped(x->type)) {
 		Type *final_type = type;
 		if (is_const_expr && !is_type_constant_type(type)) {
+			if (is_type_union(type)) {
+				convert_to_typed(c, x, type);
+			}
 			final_type = default_type(x->type);
 		}
 		update_untyped_expr_type(c, x->expr, final_type, true);
@@ -4274,7 +4302,8 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 		} else {
 			switch (operand->type->Basic.kind) {
 			case Basic_UntypedBool:
-				if (!is_type_boolean(target_type)) {
+				if (!is_type_boolean(target_type) &&
+				    !is_type_integer(target_type)) {
 					operand->mode = Addressing_Invalid;
 					convert_untyped_error(c, operand, target_type);
 					return;
@@ -7319,14 +7348,9 @@ gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, O
 			gbString s = gb_string_make_reserve(heap_allocator(), e->token.string.len+3);
 			s = gb_string_append_fmt(s, "%.*s(", LIT(e->token.string));
 
-			Type *params = nullptr;
-			switch (bt->kind) {
-			case Type_Struct: params = bt->Struct.polymorphic_params; break;
-			case Type_Union:  params = bt->Union.polymorphic_params;  break;
-			}
-
-			if (params != nullptr) for_array(i, params->Tuple.variables) {
-				Entity *v = params->Tuple.variables[i];
+			TypeTuple *tuple = get_record_polymorphic_params(e->type);
+			if (tuple != nullptr) for_array(i, tuple->variables) {
+				Entity *v = tuple->variables[i];
 				String name = v->token.string;
 				if (i > 0) {
 					s = gb_string_append_fmt(s, ", ");
@@ -7408,6 +7432,7 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 		String name = bd->name.string;
 		if (
 		    name == "location" || 
+		    name == "exists" ||
 		    name == "assert" || 
 		    name == "panic" || 
 		    name == "defined" || 
@@ -7648,7 +7673,7 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 				if (decl->proc_lit) {
 					ast_node(pl, ProcLit, decl->proc_lit);
 					if (pl->inlining == ProcInlining_no_inline) {
-						error(call, "'#force_inline' cannot be applied to a procedure that has be marked as '#force_no_inline'");
+						error(call, "'#force_inline' cannot be applied to a procedure that has been marked as '#force_no_inline'");
 					}
 				}
 			}
@@ -8329,6 +8354,7 @@ gb_internal ExprKind check_basic_directive_expr(CheckerContext *c, Operand *o, A
 		    name == "assert" ||
 		    name == "defined" ||
 		    name == "config" ||
+		    name == "exists" ||
 		    name == "load" ||
 		    name == "load_hash" ||
 		    name == "load_directory" ||
@@ -8852,6 +8878,10 @@ gb_internal void check_compound_literal_field_values(CheckerContext *c, Slice<As
 					case Type_Array:
 						ft = bt->Array.elem;
 						break;
+					case Type_BitField:
+						is_constant = false;
+						ft = bt->BitField.fields[index]->type;
+						break;
 					default:
 						GB_PANIC("invalid type: %s", type_to_string(ft));
 						break;
@@ -8877,6 +8907,9 @@ gb_internal void check_compound_literal_field_values(CheckerContext *c, Slice<As
 					break;
 				case Type_Array:
 					nested_ft = bt->Array.elem;
+					break;
+				case Type_BitField:
+					nested_ft = bt->BitField.fields[index]->type;
 					break;
 				default:
 					GB_PANIC("invalid type %s", type_to_string(nested_ft));

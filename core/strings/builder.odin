@@ -350,9 +350,9 @@ Output:
 	ab
 
 */
-write_byte :: proc(b: ^Builder, x: byte) -> (n: int) {
+write_byte :: proc(b: ^Builder, x: byte, loc := #caller_location) -> (n: int) {
 	n0 := len(b.buf)
-	append(&b.buf, x)
+	append(&b.buf, x, loc)
 	n1 := len(b.buf)
 	return n1-n0
 }
@@ -380,9 +380,9 @@ NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `n` 
 Returns:
 - n: The number of bytes appended
 */
-write_bytes :: proc(b: ^Builder, x: []byte) -> (n: int) {
+write_bytes :: proc(b: ^Builder, x: []byte, loc := #caller_location) -> (n: int) {
 	n0 := len(b.buf)
-	append(&b.buf, ..x)
+	append(&b.buf, ..x, loc=loc)
 	n1 := len(b.buf)
 	return n1-n0
 }

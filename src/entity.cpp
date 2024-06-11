@@ -223,12 +223,14 @@ struct Entity {
 			Ast *      foreign_library_ident;
 			String     link_name;
 			String     link_prefix;
+			String     link_suffix;
 			String     link_section;
 			CommentGroup *docs;
 			CommentGroup *comment;
 			bool       is_foreign;
 			bool       is_export;
 			bool       is_global;
+			bool       is_rodata;
 		} Variable;
 		struct {
 			Type * type_parameter_specialization;
@@ -243,6 +245,7 @@ struct Entity {
 			Ast *   foreign_library_ident;
 			String  link_name;
 			String  link_prefix;
+			String  link_suffix;
 			DeferredProcedure deferred_procedure;
 
 			struct GenProcsData *gen_procs;

@@ -111,7 +111,7 @@ next_random :: proc(r: ^[2]u64) -> u64 {
 
 @(require_results)
 random_string :: proc(buf: []byte) -> string {
-	@static digits := "0123456789"
+	@(static, rodata) digits := "0123456789"
 
 	u := next_random(&random_string_seed)
 

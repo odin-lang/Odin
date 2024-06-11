@@ -389,6 +389,7 @@ is_leap_year :: proc "contextless" (year: int) -> (leap: bool) {
 	return year % 4 == 0 && (year % 100 != 0 || year % 400 == 0)
 }
 
+@(rodata)
 days_before := [?]i32{
 	0,
 	31,

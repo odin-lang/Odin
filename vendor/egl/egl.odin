@@ -47,7 +47,7 @@ foreign egl {
 	GetDisplay          :: proc(display: NativeDisplayType) -> Display ---
 	Initialize          :: proc(display: Display, major: ^i32, minor: ^i32) -> i32 ---
 	BindAPI             :: proc(api: u32) -> i32 ---
-	ChooseConfig        :: proc(display: Display, attrib_list: ^i32, configs: ^Context, config_size: i32, num_config: ^i32) -> i32 ---
+	ChooseConfig        :: proc(display: Display, attrib_list: ^i32, configs: ^Config, config_size: i32, num_config: ^i32) -> i32 ---
 	CreateWindowSurface :: proc(display: Display, config: Config, native_window: NativeWindowType, attrib_list: ^i32) -> Surface ---
 	CreateContext       :: proc(display: Display, config: Config, share_context: Context, attrib_list: ^i32) -> Context ---
 	MakeCurrent         :: proc(display: Display, draw: Surface, read: Surface, ctx: Context) -> i32 ---

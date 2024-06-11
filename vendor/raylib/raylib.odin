@@ -97,76 +97,32 @@ MAX_TEXT_BUFFER_LENGTH :: #config(RAYLIB_MAX_TEXT_BUFFER_LENGTH, 1024)
 RAYLIB_SHARED :: #config(RAYLIB_SHARED, false)
 
 when ODIN_OS == .Windows {
-	when RAYLIB_SHARED {
-		@(extra_linker_flags="/NODEFAULTLIB:msvcrt")
-		foreign import lib {
-			"windows/raylibdll.lib",
-			"system:Winmm.lib",
-			"system:Gdi32.lib",
-			"system:User32.lib",
-			"system:Shell32.lib",
-		}
-	} else {
-		@(extra_linker_flags="/NODEFAULTLIB:libcmt")
-		foreign import lib {
-			"windows/raylib.lib",
-			"system:Winmm.lib",
-			"system:Gdi32.lib",
-			"system:User32.lib",
-			"system:Shell32.lib",
-		}
+	@(extra_linker_flags="/NODEFAULTLIB:" + ("msvcrt" when RAYLIB_SHARED else "libcmt"))
+	foreign import lib {
+		"windows/raylibdll.lib" when RAYLIB_SHARED else "windows/raylib.lib" ,
+		"system:Winmm.lib",
+		"system:Gdi32.lib",
+		"system:User32.lib",
+		"system:Shell32.lib",
 	}
 } else when ODIN_OS == .Linux  {
-	when RAYLIB_SHARED {
-		foreign import lib { 
-			// Note(bumbread): I'm not sure why in `linux/` folder there are
-			// multiple copies of raylib.so, but since these bindings are for
-			// particular version of the library, I better specify it. Ideally,
-			// though, it's best specified in terms of major (.so.4)
-			"linux/libraylib.so.500",
-			"system:dl",
-			"system:pthread",
-		}
-	} else {
-		foreign import lib { 
-			"linux/libraylib.a",
-			"system:dl",
-			"system:pthread",
-		}
+	foreign import lib {
+		// Note(bumbread): I'm not sure why in `linux/` folder there are
+		// multiple copies of raylib.so, but since these bindings are for
+		// particular version of the library, I better specify it. Ideally,
+		// though, it's best specified in terms of major (.so.4)
+		"linux/libraylib.so.500" when RAYLIB_SHARED else "linux/libraylib.a",
+		"system:dl",
+		"system:pthread",
 	}
 } else when ODIN_OS == .Darwin {
-	when ODIN_ARCH == .arm64 {
-		when RAYLIB_SHARED {
-			foreign import lib {
-				"macos-arm64/libraylib.500.dylib",
-				"system:Cocoa.framework",
-				"system:OpenGL.framework",
-				"system:IOKit.framework",
-			}
-		} else {
-			foreign import lib {
-				"macos-arm64/libraylib.a",
-				"system:Cocoa.framework",
-				"system:OpenGL.framework",
-				"system:IOKit.framework",
-			}
-		}
-	} else {
-		when RAYLIB_SHARED {
-			foreign import lib {
-				"macos/libraylib.500.dylib",
-				"system:Cocoa.framework",
-				"system:OpenGL.framework",
-				"system:IOKit.framework",
-			}
-		} else {
-			foreign import lib {
-				"macos/libraylib.a",
-				"system:Cocoa.framework",
-				"system:OpenGL.framework",
-				"system:IOKit.framework",
-			}
-		}
+	foreign import lib {
+		"macos" +
+			("-arm64" when ODIN_ARCH == .arm64 else "") +
+			"/libraylib" + (".500.dylib" when RAYLIB_SHARED else ".a"),
+		"system:Cocoa.framework",
+		"system:OpenGL.framework",
+		"system:IOKit.framework",
 	}
 } else {
 	foreign import lib "system:raylib"
@@ -951,8 +907,8 @@ foreign lib {
 	SetWindowTitle           :: proc(title: cstring) ---                        // Set title for window (only PLATFORM_DESKTOP and PLATFORM_WEB)
 	SetWindowPosition        :: proc(x, y: c.int) ---                           // Set window position on screen (only PLATFORM_DESKTOP)
 	SetWindowMonitor         :: proc(monitor: c.int) ---                        // Set monitor for the current window
-	SetWindowMinSize         :: proc(width, height: c.int) ---                  // Set window minimum dimensions (for FLAG_WINDOW_RESIZABLE)
-	SetWindowMaxSize         :: proc(width, height: c.int) ---                  // Set window maximum dimensions (for FLAG_WINDOW_RESIZABLE)
+	SetWindowMinSize         :: proc(width, height: c.int) ---                  // Set window minimum dimensions (for WINDOW_RESIZABLE)
+	SetWindowMaxSize         :: proc(width, height: c.int) ---                  // Set window maximum dimensions (for WINDOW_RESIZABLE)
 	SetWindowSize            :: proc(width, height: c.int) ---                  // Set window dimensions
 	SetWindowOpacity         :: proc(opacity: f32) ---                          // Set window opacity [0.0f..1.0f] (only PLATFORM_DESKTOP)
 	SetWindowFocused         :: proc() ---                                      // Set window focused (only PLATFORM_DESKTOP)

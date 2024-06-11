@@ -3,6 +3,8 @@
 #include "entity.cpp"
 #include "types.cpp"
 
+String get_final_microarchitecture();
+
 gb_internal void check_expr(CheckerContext *c, Operand *operand, Ast *expression);
 gb_internal void check_expr_or_type(CheckerContext *c, Operand *operand, Ast *expression, Type *type_hint=nullptr);
 gb_internal void add_comparison_procedures_for_fields(CheckerContext *c, Type *t);
@@ -1016,6 +1018,7 @@ gb_internal void init_universal(void) {
 			{"NetBSD",       TargetOs_netbsd},
 			{"WASI",         TargetOs_wasi},
 			{"JS",           TargetOs_js},
+			{"Orca",         TargetOs_orca},
 			{"Freestanding", TargetOs_freestanding},
 		};
 
@@ -1039,6 +1042,8 @@ gb_internal void init_universal(void) {
 		add_global_enum_constant(fields, "ODIN_ARCH", bc->metrics.arch);
 		add_global_string_constant("ODIN_ARCH_STRING", target_arch_names[bc->metrics.arch]);
 	}
+
+	add_global_string_constant("ODIN_MICROARCH_STRING", get_final_microarchitecture());
 	
 	{
 		GlobalEnumValue values[BuildMode_COUNT] = {
@@ -1130,6 +1135,17 @@ gb_internal void init_universal(void) {
 	add_global_constant("ODIN_COMPILE_TIMESTAMP", t_untyped_integer, exact_value_i64(odin_compile_timestamp()));
 
 	{
+		String version = {};
+
+		#ifdef GIT_SHA
+		version.text = cast(u8 *)GIT_SHA;
+		version.len = gb_strlen(GIT_SHA);
+		#endif
+
+		add_global_string_constant("ODIN_VERSION_HASH", version);
+	}
+
+	{
 		bool f16_supported = lb_use_new_pass_system();
 		if (is_arch_wasm()) {
 			f16_supported = false;
@@ -1166,6 +1182,18 @@ gb_internal void init_universal(void) {
 		add_global_constant("ODIN_SANITIZER_FLAGS", named_type, exact_value_u64(bc->sanitizer_flags));
 	}
 
+	{
+		GlobalEnumValue values[5] = {
+			{"None",      -1},
+			{"Minimal",    0},
+			{"Size",       1},
+			{"Speed",      2},
+			{"Aggressive", 3},
+		};
+
+		auto fields = add_global_enum_type(str_lit("Odin_Optimization_Mode"), values, gb_count_of(values));
+		add_global_enum_constant(fields, "ODIN_OPTIMIZATION_MODE", bc->optimization_level);
+	}
 
 
 // Builtin Procedures
@@ -1450,6 +1478,10 @@ gb_internal Entity *entity_of_node(Ast *expr) {
 	case_end;
 	case_ast_node(cc, CaseClause, expr);
 		return cc->implicit_entity;
+	case_end;
+
+	case_ast_node(ce, CallExpr, expr);
+		return ce->entity_procedure_of;
 	case_end;
 	}
 	return nullptr;
@@ -3127,6 +3159,18 @@ gb_internal DECL_ATTRIBUTE_PROC(foreign_block_decl_attribute) {
 			error(elem, "Expected a string value for '%.*s'", LIT(name));
 		}
 		return true;
+	} else if (name == "link_suffix") {
+		if (ev.kind == ExactValue_String) {
+			String link_suffix = ev.value_string;
+			if (!is_foreign_name_valid(link_suffix)) {
+				error(elem, "Invalid link suffix: '%.*s'", LIT(link_suffix));
+			} else {
+				c->foreign_context.link_suffix = link_suffix;
+			}
+		} else {
+			error(elem, "Expected a string value for '%.*s'", LIT(name));
+		}
+		return true;
 	} else if (name == "private") {
 		EntityVisiblityKind kind = EntityVisiblity_PrivateToPackage;
 		if (ev.kind == ExactValue_Invalid) {
@@ -3421,6 +3465,18 @@ gb_internal DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 			error(elem, "Expected a string value for '%.*s'", LIT(name));
 		}
 		return true;
+	} else if (name == "link_suffix") {
+		ExactValue ev = check_decl_attribute_value(c, value);
+
+		if (ev.kind == ExactValue_String) {
+			ac->link_suffix = ev.value_string;
+			if (!is_foreign_name_valid(ac->link_suffix)) {
+				error(elem, "Invalid link suffix: %.*s", LIT(ac->link_suffix));
+			}
+		} else {
+			error(elem, "Expected a string value for '%.*s'", LIT(name));
+		}
+		return true;
 	} else if (name == "deprecated") {
 		ExactValue ev = check_decl_attribute_value(c, value);
 
@@ -3603,6 +3659,12 @@ gb_internal DECL_ATTRIBUTE_PROC(var_decl_attribute) {
 		}
 		ac->is_static = true;
 		return true;
+	} else if (name == "rodata") {
+		if (value != nullptr) {
+			error(elem, "'rodata' does not have any parameters");
+		}
+		ac->rodata = true;
+		return true;
 	} else if (name == "thread_local") {
 		ExactValue ev = check_decl_attribute_value(c, value);
 		if (ac->init_expr_list_count > 0) {
@@ -3702,6 +3764,17 @@ gb_internal DECL_ATTRIBUTE_PROC(var_decl_attribute) {
 			error(elem, "Expected a string value for '%.*s'", LIT(name));
 		}
 		return true;
+	} else if (name == "link_suffix") {
+		ExactValue ev = check_decl_attribute_value(c, value);
+		if (ev.kind == ExactValue_String) {
+			ac->link_suffix = ev.value_string;
+			if (!is_foreign_name_valid(ac->link_suffix)) {
+				error(elem, "Invalid link suffix: %.*s", LIT(ac->link_suffix));
+			}
+		} else {
+			error(elem, "Expected a string value for '%.*s'", LIT(name));
+		}
+		return true;
 	} else if (name == "link_section") {
 		ExactValue ev = check_decl_attribute_value(c, value);
 		if (ev.kind == ExactValue_String) {
@@ -3733,6 +3806,7 @@ gb_internal DECL_ATTRIBUTE_PROC(const_decl_attribute) {
 	           name == "linkage" ||
 	           name == "link_name" ||
 	           name == "link_prefix" ||
+	           name == "link_suffix" ||
 	           false) {
 		error(elem, "@(%.*s) is not supported for compile time constant value declarations", LIT(name));
 		return true;
@@ -3775,8 +3849,10 @@ gb_internal void check_decl_attributes(CheckerContext *c, Array<Ast *> const &at
 	if (attributes.count == 0) return;
 
 	String original_link_prefix = {};
+	String original_link_suffix = {};
 	if (ac) {
 		original_link_prefix = ac->link_prefix;
+		original_link_suffix = ac->link_suffix;
 	}
 
 	StringSet set = {};
@@ -3849,6 +3925,12 @@ gb_internal void check_decl_attributes(CheckerContext *c, Array<Ast *> const &at
 			if (ac->link_name.len > 0) {
 				ac->link_prefix.text = nullptr;
 				ac->link_prefix.len  = 0;
+			}
+		}
+		if (ac->link_suffix.text == original_link_suffix.text) {
+			if (ac->link_name.len > 0) {
+				ac->link_suffix.text = nullptr;
+				ac->link_suffix.len  = 0;
 			}
 		}
 	}
@@ -4145,6 +4227,7 @@ gb_internal void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 				e->Variable.foreign_library_ident = fl;
 
 				e->Variable.link_prefix = c->foreign_context.link_prefix;
+				e->Variable.link_suffix = c->foreign_context.link_suffix;
 			}
 
 			Ast *init_expr = value;
@@ -4219,6 +4302,7 @@ gb_internal void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 						}
 					}
 					e->Procedure.link_prefix = c->foreign_context.link_prefix;
+					e->Procedure.link_suffix = c->foreign_context.link_suffix;
 
 					GB_ASSERT(cc != ProcCC_Invalid);
 					pl->type->ProcType.calling_convention = cc;
@@ -5805,35 +5889,6 @@ gb_internal void remove_neighbouring_duplicate_entires_from_sorted_array(Array<E
 gb_internal void check_test_procedures(Checker *c) {
 	array_sort(c->info.testing_procedures, init_procedures_cmp);
 	remove_neighbouring_duplicate_entires_from_sorted_array(&c->info.testing_procedures);
-
-	if (build_context.test_names.entries.count == 0) {
-		return;
-	}
-
-	AstPackage *pkg = c->info.init_package;
-	Scope *s = pkg->scope;
-
-	for (String const &name : build_context.test_names) {
-		Entity *e = scope_lookup(s, name);
-		if (e == nullptr) {
-			Token tok = {};
-			if (pkg->files.count != 0) {
-				tok = pkg->files[0]->tokens[0];
-			}
-			error(tok, "Unable to find the test '%.*s' in 'package %.*s' ", LIT(name), LIT(pkg->name));
-		}
-	}
-
-	for (isize i = 0; i < c->info.testing_procedures.count; /**/) {
-		Entity *e = c->info.testing_procedures[i];
-		String name = e->token.string;
-		if (!string_set_exists(&build_context.test_names, name)) {
-			array_ordered_remove(&c->info.testing_procedures, i);
-		} else {
-			i += 1;
-		}
-	}
-
 }
 
 

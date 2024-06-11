@@ -51,6 +51,12 @@ enum StmtFlag {
 enum BuiltinProcPkg {
 	BuiltinProcPkg_builtin,
 	BuiltinProcPkg_intrinsics,
+	BuiltinProcPkg_COUNT
+};
+
+String builtin_proc_pkg_name[BuiltinProcPkg_COUNT] = {
+	str_lit("builtin"),
+	str_lit("intrinsics"),
 };
 
 struct BuiltinProc {
@@ -112,6 +118,7 @@ enum InstrumentationFlag : i32 {
 struct AttributeContext {
 	String  link_name;
 	String  link_prefix;
+	String  link_suffix;
 	String  link_section;
 	String  linkage;
 	isize   init_expr_list_count;
@@ -132,6 +139,7 @@ struct AttributeContext {
 	bool    entry_point_only      : 1;
 	bool    instrumentation_enter : 1;
 	bool    instrumentation_exit  : 1;
+	bool    rodata                : 1;
 	u32 optimization_mode; // ProcedureOptimizationMode
 	i64 foreign_import_priority_index;
 	String extra_linker_flags;
@@ -146,9 +154,10 @@ struct AttributeContext {
 	String enable_target_feature;  // will be enabled for the procedure only
 };
 
-gb_internal gb_inline AttributeContext make_attribute_context(String link_prefix) {
+gb_internal gb_inline AttributeContext make_attribute_context(String link_prefix, String link_suffix) {
 	AttributeContext ac = {};
 	ac.link_prefix = link_prefix;
+	ac.link_suffix = link_suffix;
 	return ac;
 }
 
@@ -302,6 +311,7 @@ struct ForeignContext {
 	Ast *                 curr_library;
 	ProcCallingConvention default_cc;
 	String                link_prefix;
+	String                link_suffix;
 	EntityVisiblityKind   visibility_kind;
 };
 
@@ -333,7 +343,16 @@ struct ObjcMsgData {
 	ObjcMsgKind kind;
 	Type *proc_type;
 };
+
+enum LoadFileTier {
+	LoadFileTier_Invalid,
+	LoadFileTier_Exists,
+	LoadFileTier_Contents,
+};
+
 struct LoadFileCache {
+	LoadFileTier   tier;
+	bool           exists;
 	String         path;
 	gbFileError    file_error;
 	String         data;

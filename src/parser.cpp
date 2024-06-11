@@ -555,7 +555,7 @@ gb_internal Ast *ast_unary_expr(AstFile *f, Token op, Ast *expr) {
 		syntax_error_with_verbose(expr, "'or_return' within an unary expression not wrapped in parentheses (...)");
 		break;
 	case Ast_OrBranchExpr:
-		syntax_error_with_verbose(expr, "'or_%.*s' within an unary expression not wrapped in parentheses (...)", LIT(expr->OrBranchExpr.token.string));
+		syntax_error_with_verbose(expr, "'%.*s' within an unary expression not wrapped in parentheses (...)", LIT(expr->OrBranchExpr.token.string));
 		break;
 	}
 
@@ -583,7 +583,7 @@ gb_internal Ast *ast_binary_expr(AstFile *f, Token op, Ast *left, Ast *right) {
 		syntax_error_with_verbose(left, "'or_return' within a binary expression not wrapped in parentheses (...)");
 		break;
 	case Ast_OrBranchExpr:
-		syntax_error_with_verbose(left, "'or_%.*s' within a binary expression not wrapped in parentheses (...)", LIT(left->OrBranchExpr.token.string));
+		syntax_error_with_verbose(left, "'%.*s' within a binary expression not wrapped in parentheses (...)", LIT(left->OrBranchExpr.token.string));
 		break;
 	}
 	if (right) switch (right->kind) {
@@ -591,7 +591,7 @@ gb_internal Ast *ast_binary_expr(AstFile *f, Token op, Ast *left, Ast *right) {
 		syntax_error_with_verbose(right, "'or_return' within a binary expression not wrapped in parentheses (...)");
 		break;
 	case Ast_OrBranchExpr:
-		syntax_error_with_verbose(right, "'or_%.*s' within a binary expression not wrapped in parentheses (...)", LIT(right->OrBranchExpr.token.string));
+		syntax_error_with_verbose(right, "'%.*s' within a binary expression not wrapped in parentheses (...)", LIT(right->OrBranchExpr.token.string));
 		break;
 	}
 
@@ -2091,6 +2091,9 @@ gb_internal bool ast_on_same_line(Token const &x, Ast *yp) {
 gb_internal Ast *parse_force_inlining_operand(AstFile *f, Token token) {
 	Ast *expr = parse_unary_expr(f, false);
 	Ast *e = strip_or_return_expr(expr);
+	if (e == nullptr) {
+		return expr;
+	}
 	if (e->kind != Ast_ProcLit && e->kind != Ast_CallExpr) {
 		syntax_error(expr, "%.*s must be followed by a procedure literal or call, got %.*s", LIT(token.string), LIT(ast_strings[expr->kind]));
 		return ast_bad_expr(f, token, f->curr_token);
@@ -3102,7 +3105,7 @@ gb_internal void parse_check_or_return(Ast *operand, char const *msg) {
 		syntax_error_with_verbose(operand, "'or_return' use within %s is not wrapped in parentheses (...)", msg);
 		break;
 	case Ast_OrBranchExpr:
-		syntax_error_with_verbose(operand, "'or_%.*s' use within %s is not wrapped in parentheses (...)", msg, LIT(operand->OrBranchExpr.token.string));
+		syntax_error_with_verbose(operand, "'%.*s' use within %s is not wrapped in parentheses (...)", msg, LIT(operand->OrBranchExpr.token.string));
 		break;
 	}
 }
@@ -3747,8 +3750,10 @@ gb_internal Ast *parse_simple_stmt(AstFile *f, u32 flags) {
 					case Ast_TypeSwitchStmt:
 						stmt->TypeSwitchStmt.partial = true;
 						break;
+					default:
+						syntax_error(partial_token, "Incorrect use of directive, use '%.*s: #partial switch'", LIT(ast_token(name).string));
+						break;
 					}
-					syntax_error(partial_token, "Incorrect use of directive, use '#partial %.*s: switch'", LIT(ast_token(name).string));
 				} else if (is_reverse) {
 					switch (stmt->kind) {
 					case Ast_RangeStmt:
@@ -5176,7 +5181,7 @@ gb_internal Ast *parse_stmt(AstFile *f) {
 		} else if (tag == "unroll") {
 			return parse_unrolled_for_loop(f, name);
 		} else if (tag == "reverse") {
-			Ast *for_stmt = parse_for_stmt(f);
+			Ast *for_stmt = parse_stmt(f);
 			if (for_stmt->kind == Ast_RangeStmt) {
 				if (for_stmt->RangeStmt.reverse) {
 					syntax_error(token, "#reverse already applied to a 'for in' statement");

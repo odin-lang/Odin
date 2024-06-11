@@ -504,6 +504,10 @@ gb_internal bool lb_is_matrix_simdable(Type *t) {
 	if ((mt->Matrix.row_count & 1) ^ (mt->Matrix.column_count & 1)) {
 		return false;
 	}
+	if (mt->Matrix.is_row_major) {
+		// TODO(bill): make #row_major matrices work with SIMD
+		return false;
+	}
 	
 	if (elem->kind == Type_Basic) {
 		switch (elem->Basic.kind) {
@@ -1869,13 +1873,40 @@ gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 			lbValue res_i128 = lb_emit_runtime_call(p, call, args);
 			return lb_emit_conv(p, res_i128, t);
 		}
+		i64 sz = type_size_of(src);
 
 		lbValue res = {};
 		res.type = t;
 		if (is_type_unsigned(dst)) {
-			res.value = LLVMBuildFPToUI(p->builder, value.value, lb_type(m, t), "");
+			switch (sz) {
+			case 2:
+			case 4:
+				res.value = LLVMBuildFPToUI(p->builder, value.value, lb_type(m, t_u32), "");
+				res.value = LLVMBuildIntCast2(p->builder, res.value, lb_type(m, t), false, "");
+				break;
+			case 8:
+				res.value = LLVMBuildFPToUI(p->builder, value.value, lb_type(m, t_u64), "");
+				res.value = LLVMBuildIntCast2(p->builder, res.value, lb_type(m, t), false, "");
+				break;
+			default:
+				GB_PANIC("Unhandled float type");
+				break;
+			}
 		} else {
-			res.value = LLVMBuildFPToSI(p->builder, value.value, lb_type(m, t), "");
+			switch (sz) {
+			case 2:
+			case 4:
+				res.value = LLVMBuildFPToSI(p->builder, value.value, lb_type(m, t_i32), "");
+				res.value = LLVMBuildIntCast2(p->builder, res.value, lb_type(m, t), true, "");
+				break;
+			case 8:
+				res.value = LLVMBuildFPToSI(p->builder, value.value, lb_type(m, t_i64), "");
+				res.value = LLVMBuildIntCast2(p->builder, res.value, lb_type(m, t), true, "");
+				break;
+			default:
+				GB_PANIC("Unhandled float type");
+				break;
+			}
 		}
 		return res;
 	}
@@ -4533,10 +4564,26 @@ gb_internal lbAddr lb_build_addr_compound_lit(lbProcedure *p, Ast *expr) {
 						if (lb_is_nested_possibly_constant(type, sel, elem)) {
 							continue;
 						}
-						lbValue dst = lb_emit_deep_field_gep(p, comp_lit_ptr, sel);
 						field_expr = lb_build_expr(p, elem);
 						field_expr = lb_emit_conv(p, field_expr, sel.entity->type);
-						lb_emit_store(p, dst, field_expr);
+						if (sel.is_bit_field) {
+							Selection sub_sel = trim_selection(sel);
+							lbValue trimmed_dst = lb_emit_deep_field_gep(p, comp_lit_ptr, sub_sel);
+							Type *bf = base_type(type_deref(trimmed_dst.type));
+							if (is_type_pointer(bf)) {
+								trimmed_dst = lb_emit_load(p, trimmed_dst);
+								bf = base_type(type_deref(trimmed_dst.type));
+							}
+							GB_ASSERT(bf->kind == Type_BitField);
+
+							isize idx = sel.index[sel.index.count-1];
+							lbAddr dst = lb_addr_bit_field(trimmed_dst, bf->BitField.fields[idx]->type, bf->BitField.bit_offsets[idx], bf->BitField.bit_sizes[idx]);
+							lb_addr_store(p, dst, field_expr);
+
+						} else {
+							lbValue dst = lb_emit_deep_field_gep(p, comp_lit_ptr, sel);
+							lb_emit_store(p, dst, field_expr);
+						}
 						continue;
 					}
 

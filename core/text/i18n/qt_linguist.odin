@@ -162,8 +162,6 @@ parse_qt_linguist_file :: proc(filename: string, options := DEFAULT_PARSE_OPTION
 	context.allocator = allocator
 
 	data, data_ok := os.read_entire_file(filename)
-	defer delete(data)
-
 	if !data_ok { return {}, .File_Error }
 
 	return parse_qt_linguist_from_bytes(data, options, pluralizer, allocator)

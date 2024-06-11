@@ -375,7 +375,7 @@ decimal_to_float_bits :: proc(d: ^decimal.Decimal, info: ^Float_Info) -> (b: u64
 		return
 	}
 
-	@static power_table := [?]int{1, 3, 6, 9, 13, 16, 19, 23, 26}
+	@(static, rodata) power_table := [?]int{1, 3, 6, 9, 13, 16, 19, 23, 26}
 
 	exp = 0
 	for d.decimal_point > 0 {

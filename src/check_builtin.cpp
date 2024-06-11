@@ -1079,7 +1079,7 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 	return false;
 }
 
-gb_internal bool cache_load_file_directive(CheckerContext *c, Ast *call, String const &original_string, bool err_on_not_found, LoadFileCache **cache_) {
+gb_internal bool cache_load_file_directive(CheckerContext *c, Ast *call, String const &original_string, bool err_on_not_found, LoadFileCache **cache_, LoadFileTier tier) {
 	ast_node(ce, CallExpr, call);
 	ast_node(bd, BasicDirective, ce->proc);
 	String builtin_name = bd->name.string;
@@ -1105,12 +1105,16 @@ gb_internal bool cache_load_file_directive(CheckerContext *c, Ast *call, String 
 
 	gbFileError file_error = gbFileError_None;
 	String data = {};
+	bool exists = false;
+	LoadFileTier cache_tier = LoadFileTier_Invalid;
 
 	LoadFileCache **cache_ptr = string_map_get(&c->info->load_file_cache, path);
 	LoadFileCache *cache = cache_ptr ? *cache_ptr : nullptr;
 	if (cache) {
 		file_error = cache->file_error;
 		data = cache->data;
+		exists = cache->exists;
+		cache_tier = cache->tier;
 	}
 	defer ({
 		if (cache == nullptr) {
@@ -1118,60 +1122,78 @@ gb_internal bool cache_load_file_directive(CheckerContext *c, Ast *call, String 
 			new_cache->path = path;
 			new_cache->data = data;
 			new_cache->file_error = file_error;
+			new_cache->exists = exists;
+			new_cache->tier = cache_tier;
 			string_map_init(&new_cache->hashes, 32);
 			string_map_set(&c->info->load_file_cache, path, new_cache);
 			if (cache_) *cache_ = new_cache;
 		} else {
 			cache->data = data;
 			cache->file_error = file_error;
+			cache->exists = exists;
+			cache->tier = cache_tier;
 			if (cache_) *cache_ = cache;
 		}
 	});
 
-	TEMPORARY_ALLOCATOR_GUARD();
-	char *c_str = alloc_cstring(temporary_allocator(), path);
+	if (tier > cache_tier) {
+		cache_tier = tier;
 
-	gbFile f = {};
-	if (cache == nullptr) {
+		TEMPORARY_ALLOCATOR_GUARD();
+		char *c_str = alloc_cstring(temporary_allocator(), path);
+
+		gbFile f = {};
 		file_error = gb_file_open(&f, c_str);
+		defer (gb_file_close(&f));
+
+		if (file_error == gbFileError_None) {
+			exists = true;
+
+			switch(tier) {
+			case LoadFileTier_Exists:
+				// Nothing to do.
+				break;
+			case LoadFileTier_Contents: {
+				isize file_size = cast(isize)gb_file_size(&f);
+				if (file_size > 0) {
+					u8 *ptr = cast(u8 *)gb_alloc(permanent_allocator(), file_size+1);
+					gb_file_read_at(&f, ptr, file_size, 0);
+					ptr[file_size] = '\0';
+					data.text = ptr;
+					data.len = file_size;
+				}
+				break;
+			}
+			default:
+				GB_PANIC("Unhandled LoadFileTier");
+			};
+		}
 	}
-	defer (gb_file_close(&f));
 
 	switch (file_error) {
 	default:
 	case gbFileError_Invalid:
 		if (err_on_not_found) {
-			error(ce->proc, "Failed to `#%.*s` file: %s; invalid file or cannot be found", LIT(builtin_name), c_str);
+			error(ce->proc, "Failed to `#%.*s` file: %.*s; invalid file or cannot be found", LIT(builtin_name), LIT(path));
 		}
 		call->state_flags |= StateFlag_DirectiveWasFalse;
 		return false;
 	case gbFileError_NotExists:
 		if (err_on_not_found) {
-			error(ce->proc, "Failed to `#%.*s` file: %s; file cannot be found", LIT(builtin_name), c_str);
+			error(ce->proc, "Failed to `#%.*s` file: %.*s; file cannot be found", LIT(builtin_name), LIT(path));
 		}
 		call->state_flags |= StateFlag_DirectiveWasFalse;
 		return false;
 	case gbFileError_Permission:
 		if (err_on_not_found) {
-			error(ce->proc, "Failed to `#%.*s` file: %s; file permissions problem", LIT(builtin_name), c_str);
+			error(ce->proc, "Failed to `#%.*s` file: %.*s; file permissions problem", LIT(builtin_name), LIT(path));
 		}
 		call->state_flags |= StateFlag_DirectiveWasFalse;
 		return false;
 	case gbFileError_None:
 		// Okay
 		break;
-	}
-
-	if (cache == nullptr) {
-		isize file_size = cast(isize)gb_file_size(&f);
-		if (file_size > 0) {
-			u8 *ptr = cast(u8 *)gb_alloc(permanent_allocator(), file_size+1);
-			gb_file_read_at(&f, ptr, file_size, 0);
-			ptr[file_size] = '\0';
-			data.text = ptr;
-			data.len = file_size;
-		}
-	}
+	};
 
 	return true;
 }
@@ -1263,7 +1285,7 @@ gb_internal LoadDirectiveResult check_load_directive(CheckerContext *c, Operand 
 	operand->mode = Addressing_Constant;
 
 	LoadFileCache *cache = nullptr;
-	if (cache_load_file_directive(c, call, o.value.value_string, err_on_not_found, &cache)) {
+	if (cache_load_file_directive(c, call, o.value.value_string, err_on_not_found, &cache, LoadFileTier_Contents)) {
 		operand->value = exact_value_string(cache->data);
 		return LoadDirective_Success;
 	}
@@ -1345,6 +1367,8 @@ gb_internal LoadDirectiveResult check_load_directory_directive(CheckerContext *c
 			map_set(&c->info->load_directory_map, call, new_cache);
 		} else {
 			cache->file_error = file_error;
+
+			map_set(&c->info->load_directory_map, call, cache);
 		}
 	});
 
@@ -1389,7 +1413,7 @@ gb_internal LoadDirectiveResult check_load_directory_directive(CheckerContext *c
 
 		for (FileInfo fi : list) {
 			LoadFileCache *cache = nullptr;
-			if (cache_load_file_directive(c, call, fi.fullpath, err_on_not_found, &cache)) {
+			if (cache_load_file_directive(c, call, fi.fullpath, err_on_not_found, &cache, LoadFileTier_Contents)) {
 				array_add(&file_caches, cache);
 			} else {
 				result = LoadDirective_Error;
@@ -1488,6 +1512,30 @@ gb_internal bool check_builtin_procedure_directive(CheckerContext *c, Operand *o
 
 		operand->type = t_source_code_location;
 		operand->mode = Addressing_Value;
+	} else if (name == "exists") {
+		if (ce->args.count != 1) {
+			error(ce->close, "'#exists' expects 1 argument, got %td", ce->args.count);
+			return false;
+		}
+
+		Operand o = {};
+		check_expr(c, &o, ce->args[0]);
+		if (o.mode != Addressing_Constant || !is_type_string(o.type)) {
+			error(ce->args[0], "'#exists' expected a constant string argument");
+			return false;
+		}
+
+		operand->type  = t_untyped_bool;
+		operand->mode  = Addressing_Constant;
+
+		String original_string = o.value.value_string;
+		LoadFileCache *cache = nullptr;
+		if (cache_load_file_directive(c, call, original_string, /* err_on_not_found=*/ false, &cache, LoadFileTier_Exists)) {
+			operand->value = exact_value_bool(cache->exists);
+		} else {
+			operand->value = exact_value_bool(false);
+		}
+
 	} else if (name == "load") {
 		return check_load_directive(c, operand, call, type_hint, true) == LoadDirective_Success;
 	} else if (name == "load_directory") {
@@ -1540,7 +1588,7 @@ gb_internal bool check_builtin_procedure_directive(CheckerContext *c, Operand *o
 		String hash_kind = o_hash.value.value_string;
 
 		LoadFileCache *cache = nullptr;
-		if (cache_load_file_directive(c, call, original_string, true, &cache)) {
+		if (cache_load_file_directive(c, call, original_string, true, &cache, LoadFileTier_Contents)) {
 			MUTEX_GUARD(&c->info->load_file_mutex);
 			// TODO(bill): make these procedures fast :P
 			u64 hash_value = 0;
@@ -1795,6 +1843,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 	case BuiltinProc_objc_register_class: 
 	case BuiltinProc_atomic_type_is_lock_free:
 	case BuiltinProc_has_target_feature:
+	case BuiltinProc_procedure_of:
 		// NOTE(bill): The first arg may be a Type, this will be checked case by case
 		break;
 
@@ -2370,6 +2419,9 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 
 		if (arg_count > max_count) {
 			error(call, "Too many 'swizzle' indices, %td > %td", arg_count, max_count);
+			return false;
+		} else if (arg_count < 2) {
+			error(call, "Not enough 'swizzle' indices, %td < 2", arg_count);
 			return false;
 		}
 
@@ -5864,15 +5916,9 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		if (operand->mode != Addressing_Type) {
 			error(operand->expr, "Expected a record type for '%.*s'", LIT(builtin_name));
 		} else {
-			Type *bt = base_type(operand->type);
-			if (bt->kind == Type_Struct) {
-				if (bt->Struct.polymorphic_params != nullptr) {
-					operand->value = exact_value_i64(bt->Struct.polymorphic_params->Tuple.variables.count);
-				}
-			} else if (bt->kind == Type_Union) {
-				if (bt->Union.polymorphic_params != nullptr) {
-					operand->value = exact_value_i64(bt->Union.polymorphic_params->Tuple.variables.count);
-				}
+			TypeTuple *tuple = get_record_polymorphic_params(operand->type);
+			if (tuple) {
+				operand->value = exact_value_i64(tuple->variables.count);
 			} else {
 				error(operand->expr, "Expected a record type for '%.*s'", LIT(builtin_name));
 			}
@@ -5904,20 +5950,11 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			Entity *param = nullptr;
 			i64 count = 0;
 
-			Type *bt = base_type(operand->type);
-			if (bt->kind == Type_Struct) {
-				if (bt->Struct.polymorphic_params != nullptr) {
-					count = bt->Struct.polymorphic_params->Tuple.variables.count;
-					if (index < count) {
-						param = bt->Struct.polymorphic_params->Tuple.variables[cast(isize)index];
-					}
-				}
-			} else if (bt->kind == Type_Union) {
-				if (bt->Union.polymorphic_params != nullptr) {
-					count = bt->Union.polymorphic_params->Tuple.variables.count;
-					if (index < count) {
-						param = bt->Union.polymorphic_params->Tuple.variables[cast(isize)index];
-					}
+			TypeTuple *tuple = get_record_polymorphic_params(operand->type);
+			if (tuple) {
+				count = tuple->variables.count;
+				if (index < count) {
+					param = tuple->variables[cast(isize)index];
 				}
 			} else {
 				error(operand->expr, "Expected a specialized polymorphic record type for '%.*s'", LIT(builtin_name));
@@ -6118,6 +6155,51 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 
 			operand->mode = Addressing_Value;
 			operand->type = t_map_cell_info_ptr;
+			break;
+		}
+
+	case BuiltinProc_procedure_of:
+		{
+			Ast *call_expr = unparen_expr(ce->args[0]);
+			Operand op = {};
+			check_expr_base(c, &op, ce->args[0], nullptr);
+			if (op.mode != Addressing_Value && !(call_expr && call_expr->kind == Ast_CallExpr)) {
+				error(ce->args[0], "Expected a call expression for '%.*s'", LIT(builtin_name));
+				return false;
+			}
+
+			Ast *proc = call_expr->CallExpr.proc;
+			Entity *e = entity_of_node(proc);
+
+			if (e == nullptr) {
+				error(ce->args[0], "Invalid procedure value, expected a regular/specialized procedure");
+				return false;
+			}
+
+			TypeAndValue tav = proc->tav;
+
+
+			operand->type       = e->type;
+			operand->mode       = Addressing_Value;
+			operand->value      = tav.value;
+			operand->builtin_id = BuiltinProc_Invalid;
+			operand->proc_group = nullptr;
+
+			if (tav.mode == Addressing_Builtin) {
+				operand->mode = tav.mode;
+				operand->builtin_id = cast(BuiltinProcId)e->Builtin.id;
+				break;
+			}
+
+			if (!is_type_proc(e->type)) {
+				gbString s = type_to_string(e->type);
+				error(ce->args[0], "Expected a procedure value, got '%s'", s);
+				gb_string_free(s);
+				return false;
+			}
+
+
+			ce->entity_procedure_of = e;
 			break;
 		}
 
