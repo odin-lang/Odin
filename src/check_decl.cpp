@@ -89,6 +89,9 @@ gb_internal Type *check_init_variable(CheckerContext *ctx, Entity *e, Operand *o
 			return nullptr;
 		} else if (is_type_polymorphic(t)) {
 			Entity *e = entity_of_node(operand->expr);
+			if (e == nullptr) {
+				return nullptr;
+			}
 			if (e->state.load() != EntityState_Resolved) {
 				gbString str = type_to_string(t);
 				defer (gb_string_free(str));
