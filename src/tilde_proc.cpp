@@ -1,3 +1,7 @@
+#ifndef TILDE_DO_CODEGEN
+#define TILDE_DO_CODEGEN 0
+#endif
+
 gb_internal TB_FunctionPrototype *cg_procedure_type_as_prototype(cgModule *m, Type *type) {
 	GB_ASSERT(is_type_proc(type));
 	mutex_lock(&m->proc_proto_mutex);
@@ -383,7 +387,7 @@ gb_internal WORKER_TASK_PROC(cg_procedure_compile_worker_proc) {
 		// feature_set.x64 |= TB_FEATURE_X64_LZCNT;
 	}
 
-#if 0
+#if TILDE_DO_CODEGEN
 	bool emit_asm = false;
 	TB_FunctionOutput *output = tb_codegen(p->func, cg_worklist(), cg_arena(), &feature_set, emit_asm);
 	gb_unused(output);
