@@ -9,6 +9,11 @@
 #endif
 
 
+#ifndef LLVM_IGNORE_VERIFICATION
+#define LLVM_IGNORE_VERIFICATION 0
+#endif
+
+
 #include "llvm_backend.hpp"
 #include "llvm_abi.cpp"
 #include "llvm_backend_opt.cpp"
@@ -1126,6 +1131,10 @@ gb_internal void lb_finalize_objc_names(lbProcedure *p) {
 }
 
 gb_internal void lb_verify_function(lbModule *m, lbProcedure *p, bool dump_ll=false) {
+	if (LLVM_IGNORE_VERIFICATION) {
+		return;
+	}
+
 	if (!m->debug_builder && LLVMVerifyFunction(p->value, LLVMReturnStatusAction)) {
 		char *llvm_error = nullptr;
 
@@ -2579,6 +2588,10 @@ gb_internal String lb_filepath_obj_for_module(lbModule *m) {
 
 
 gb_internal bool lb_llvm_module_verification(lbGenerator *gen, bool do_threading) {
+	if (LLVM_IGNORE_VERIFICATION) {
+		return true;
+	}
+
 	if (do_threading) {
 		for (auto const &entry : gen->modules) {
 			lbModule *m = entry.value;
