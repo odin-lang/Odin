@@ -56,7 +56,7 @@ foreign libc {
 	@(link_name="free") _unix_free :: proc(ptr: rawptr) ---
 
 }
-when ODIN_OS == .Darwin {
+when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD {
 	@(private)
 	foreign libc {
 		@(link_name="__error")          __error :: proc() -> ^i32 ---
