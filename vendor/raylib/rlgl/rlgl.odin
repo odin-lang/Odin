@@ -105,25 +105,25 @@
 **********************************************************************************************/
 
 
-package raylib
+package rlgl
 
 import "core:c"
 
-RLGL_VERSION :: "4.5"
+RLGL_VERSION :: "5.0"
 
 when ODIN_OS == .Windows {
 	foreign import lib {
-		"windows/raylib.lib",
+		"../windows/raylib.lib",
 		"system:Winmm.lib",
 		"system:Gdi32.lib",
 		"system:User32.lib",
 		"system:Shell32.lib",
 	}
 } else when ODIN_OS == .Linux  {
-	foreign import lib "linux/libraylib.a"
+	foreign import lib "../linux/libraylib.a"
 } else when ODIN_OS == .Darwin {
 	foreign import lib {
-		"macos-arm64/libraylib.a" when ODIN_ARCH == .arm64 else "macos/libraylib.a",
+		"../macos-arm64/libraylib.a" when ODIN_ARCH == .arm64 else "../macos/libraylib.a",
 		"system:Cocoa.framework",
 		"system:OpenGL.framework",
 		"system:IOKit.framework",
@@ -132,122 +132,122 @@ when ODIN_OS == .Windows {
 	foreign import lib "system:raylib"
 }
 
-RL_GRAPHICS_API_OPENGL_11  :: false
-RL_GRAPHICS_API_OPENGL_21  :: true
-RL_GRAPHICS_API_OPENGL_33  :: RL_GRAPHICS_API_OPENGL_21 // default currently
-RL_GRAPHICS_API_OPENGL_ES2 :: false
-RL_GRAPHICS_API_OPENGL_43  :: false
-RL_GRAPHICS_API_OPENGL_ES3 :: false
+GRAPHICS_API_OPENGL_11  :: false
+GRAPHICS_API_OPENGL_21  :: true
+GRAPHICS_API_OPENGL_33  :: GRAPHICS_API_OPENGL_21 // default currently
+GRAPHICS_API_OPENGL_ES2 :: false
+GRAPHICS_API_OPENGL_43  :: false
+GRAPHICS_API_OPENGL_ES3 :: false
 
-when RL_GRAPHICS_API_OPENGL_ES3 {
-	RL_GRAPHICS_API_OPENGL_ES2 :: true
+when GRAPHICS_API_OPENGL_ES3 {
+	GRAPHICS_API_OPENGL_ES2 :: true
 }
  
-when !RL_GRAPHICS_API_OPENGL_ES2 {
+when !GRAPHICS_API_OPENGL_ES2 {
 	// This is the maximum amount of elements (quads) per batch
 	// NOTE: Be careful with text, every letter maps to a quad
-	RL_DEFAULT_BATCH_BUFFER_ELEMENTS :: 8192
+	DEFAULT_BATCH_BUFFER_ELEMENTS :: 8192
 } else {
 	// We reduce memory sizes for embedded systems (RPI and HTML5)
 	// NOTE: On HTML5 (emscripten) this is allocated on heap,
 	// by default it's only 16MB!...just take care...
-	RL_DEFAULT_BATCH_BUFFER_ELEMENTS :: 2048
+	DEFAULT_BATCH_BUFFER_ELEMENTS :: 2048
 }
 
-RL_DEFAULT_BATCH_BUFFERS            :: 1                    // Default number of batch buffers (multi-buffering)
-RL_DEFAULT_BATCH_DRAWCALLS          :: 256                  // Default number of batch draw calls (by state changes: mode, texture)
-RL_DEFAULT_BATCH_MAX_TEXTURE_UNITS  :: 4                    // Maximum number of additional textures that can be activated on batch drawing (SetShaderValueTexture())
+DEFAULT_BATCH_BUFFERS            :: 1                    // Default number of batch buffers (multi-buffering)
+DEFAULT_BATCH_DRAWCALLS          :: 256                  // Default number of batch draw calls (by state changes: mode, texture)
+DEFAULT_BATCH_MAX_TEXTURE_UNITS  :: 4                    // Maximum number of additional textures that can be activated on batch drawing (SetShaderValueTexture())
 
 // Internal Matrix stack
-RL_MAX_MATRIX_STACK_SIZE          :: 32                   // Maximum size of Matrix stack
+MAX_MATRIX_STACK_SIZE          :: 32                   // Maximum size of Matrix stack
 
 // Shader limits
-RL_MAX_SHADER_LOCATIONS           :: 32                   // Maximum number of shader locations supported
+MAX_SHADER_LOCATIONS           :: 32                   // Maximum number of shader locations supported
 
 // Projection matrix culling
-RL_CULL_DISTANCE_NEAR          :: 0.01                 // Default near cull distance
-RL_CULL_DISTANCE_FAR           :: 1000.0               // Default far cull distance
+CULL_DISTANCE_NEAR          :: 0.01                 // Default near cull distance
+CULL_DISTANCE_FAR           :: 1000.0               // Default far cull distance
 
 // Texture parameters (equivalent to OpenGL defines)
-RL_TEXTURE_WRAP_S                       :: 0x2802      // GL_TEXTURE_WRAP_S
-RL_TEXTURE_WRAP_T                       :: 0x2803      // GL_TEXTURE_WRAP_T
-RL_TEXTURE_MAG_FILTER                   :: 0x2800      // GL_TEXTURE_MAG_FILTER
-RL_TEXTURE_MIN_FILTER                   :: 0x2801      // GL_TEXTURE_MIN_FILTER
+TEXTURE_WRAP_S                       :: 0x2802      // GL_TEXTURE_WRAP_S
+TEXTURE_WRAP_T                       :: 0x2803      // GL_TEXTURE_WRAP_T
+TEXTURE_MAG_FILTER                   :: 0x2800      // GL_TEXTURE_MAG_FILTER
+TEXTURE_MIN_FILTER                   :: 0x2801      // GL_TEXTURE_MIN_FILTER
 
-RL_TEXTURE_FILTER_NEAREST               :: 0x2600      // GL_NEAREST
-RL_TEXTURE_FILTER_LINEAR                :: 0x2601      // GL_LINEAR
-RL_TEXTURE_FILTER_MIP_NEAREST           :: 0x2700      // GL_NEAREST_MIPMAP_NEAREST
-RL_TEXTURE_FILTER_NEAREST_MIP_LINEAR    :: 0x2702      // GL_NEAREST_MIPMAP_LINEAR
-RL_TEXTURE_FILTER_LINEAR_MIP_NEAREST    :: 0x2701      // GL_LINEAR_MIPMAP_NEAREST
-RL_TEXTURE_FILTER_MIP_LINEAR            :: 0x2703      // GL_LINEAR_MIPMAP_LINEAR
-RL_TEXTURE_FILTER_ANISOTROPIC           :: 0x3000      // Anisotropic filter (custom identifier)
+TEXTURE_FILTER_NEAREST               :: 0x2600      // GL_NEAREST
+TEXTURE_FILTER_LINEAR                :: 0x2601      // GL_LINEAR
+TEXTURE_FILTER_MIP_NEAREST           :: 0x2700      // GL_NEAREST_MIPMAP_NEAREST
+TEXTURE_FILTER_NEAREST_MIP_LINEAR    :: 0x2702      // GL_NEAREST_MIPMAP_LINEAR
+TEXTURE_FILTER_LINEAR_MIP_NEAREST    :: 0x2701      // GL_LINEAR_MIPMAP_NEAREST
+TEXTURE_FILTER_MIP_LINEAR            :: 0x2703      // GL_LINEAR_MIPMAP_LINEAR
+TEXTURE_FILTER_ANISOTROPIC           :: 0x3000      // Anisotropic filter (custom identifier)
 
-RL_TEXTURE_WRAP_REPEAT                  :: 0x2901      // GL_REPEAT
-RL_TEXTURE_WRAP_CLAMP                   :: 0x812F      // GL_CLAMP_TO_EDGE
-RL_TEXTURE_WRAP_MIRROR_REPEAT           :: 0x8370      // GL_MIRRORED_REPEAT
-RL_TEXTURE_WRAP_MIRROR_CLAMP            :: 0x8742      // GL_MIRROR_CLAMP_EXT
+TEXTURE_WRAP_REPEAT                  :: 0x2901      // GL_REPEAT
+TEXTURE_WRAP_CLAMP                   :: 0x812F      // GL_CLAMP_TO_EDGE
+TEXTURE_WRAP_MIRROR_REPEAT           :: 0x8370      // GL_MIRRORED_REPEAT
+TEXTURE_WRAP_MIRROR_CLAMP            :: 0x8742      // GL_MIRROR_CLAMP_EXT
 
 // Matrix modes (equivalent to OpenGL)
-RL_MODELVIEW                            :: 0x1700      // GL_MODELVIEW
-RL_PROJECTION                           :: 0x1701      // GL_PROJECTION
-RL_TEXTURE                              :: 0x1702      // GL_TEXTURE
+MODELVIEW                            :: 0x1700      // GL_MODELVIEW
+PROJECTION                           :: 0x1701      // GL_PROJECTION
+TEXTURE                              :: 0x1702      // GL_TEXTURE
 
 // Primitive assembly draw modes
-RL_LINES                                :: 0x0001      // GL_LINES
-RL_TRIANGLES                            :: 0x0004      // GL_TRIANGLES
-RL_QUADS                                :: 0x0007      // GL_QUADS
+LINES                                :: 0x0001      // GL_LINES
+TRIANGLES                            :: 0x0004      // GL_TRIANGLES
+QUADS                                :: 0x0007      // GL_QUADS
 
 // GL equivalent data types
-RL_UNSIGNED_BYTE                        :: 0x1401      // GL_UNSIGNED_BYTE
-RL_FLOAT                                :: 0x1406      // GL_FLOAT
+UNSIGNED_BYTE                        :: 0x1401      // GL_UNSIGNED_BYTE
+FLOAT                                :: 0x1406      // GL_FLOAT
 
 // Buffer usage hint
-RL_STREAM_DRAW                          :: 0x88E0      // GL_STREAM_DRAW
-RL_STREAM_READ                          :: 0x88E1      // GL_STREAM_READ
-RL_STREAM_COPY                          :: 0x88E2      // GL_STREAM_COPY
-RL_STATIC_DRAW                          :: 0x88E4      // GL_STATIC_DRAW
-RL_STATIC_READ                          :: 0x88E5      // GL_STATIC_READ
-RL_STATIC_COPY                          :: 0x88E6      // GL_STATIC_COPY
-RL_DYNAMIC_DRAW                         :: 0x88E8      // GL_DYNAMIC_DRAW
-RL_DYNAMIC_READ                         :: 0x88E9      // GL_DYNAMIC_READ
-RL_DYNAMIC_COPY                         :: 0x88EA      // GL_DYNAMIC_COPY
+STREAM_DRAW                          :: 0x88E0      // GL_STREAM_DRAW
+STREAM_READ                          :: 0x88E1      // GL_STREAM_READ
+STREAM_COPY                          :: 0x88E2      // GL_STREAM_COPY
+STATIC_DRAW                          :: 0x88E4      // GL_STATIC_DRAW
+STATIC_READ                          :: 0x88E5      // GL_STATIC_READ
+STATIC_COPY                          :: 0x88E6      // GL_STATIC_COPY
+DYNAMIC_DRAW                         :: 0x88E8      // GL_DYNAMIC_DRAW
+DYNAMIC_READ                         :: 0x88E9      // GL_DYNAMIC_READ
+DYNAMIC_COPY                         :: 0x88EA      // GL_DYNAMIC_COPY
 
 // GL Shader type
-RL_FRAGMENT_SHADER                      :: 0x8B30      // GL_FRAGMENT_SHADER
-RL_VERTEX_SHADER                        :: 0x8B31      // GL_VERTEX_SHADER
-RL_COMPUTE_SHADER                       :: 0x91B9      // GL_COMPUTE_SHADER
+FRAGMENT_SHADER                      :: 0x8B30      // GL_FRAGMENT_SHADER
+VERTEX_SHADER                        :: 0x8B31      // GL_VERTEX_SHADER
+COMPUTE_SHADER                       :: 0x91B9      // GL_COMPUTE_SHADER
 
 // GL blending factors
-RL_ZERO                                 :: 0           // GL_ZERO
-RL_ONE                                  :: 1           // GL_ONE
-RL_SRC_COLOR                            :: 0x0300      // GL_SRC_COLOR
-RL_ONE_MINUS_SRC_COLOR                  :: 0x0301      // GL_ONE_MINUS_SRC_COLOR
-RL_SRC_ALPHA                            :: 0x0302      // GL_SRC_ALPHA
-RL_ONE_MINUS_SRC_ALPHA                  :: 0x0303      // GL_ONE_MINUS_SRC_ALPHA
-RL_DST_ALPHA                            :: 0x0304      // GL_DST_ALPHA
-RL_ONE_MINUS_DST_ALPHA                  :: 0x0305      // GL_ONE_MINUS_DST_ALPHA
-RL_DST_COLOR                            :: 0x0306      // GL_DST_COLOR
-RL_ONE_MINUS_DST_COLOR                  :: 0x0307      // GL_ONE_MINUS_DST_COLOR
-RL_SRC_ALPHA_SATURATE                   :: 0x0308      // GL_SRC_ALPHA_SATURATE
-RL_CONSTANT_COLOR                       :: 0x8001      // GL_CONSTANT_COLOR
-RL_ONE_MINUS_CONSTANT_COLOR             :: 0x8002      // GL_ONE_MINUS_CONSTANT_COLOR
-RL_CONSTANT_ALPHA                       :: 0x8003      // GL_CONSTANT_ALPHA
-RL_ONE_MINUS_CONSTANT_ALPHA             :: 0x8004      // GL_ONE_MINUS_CONSTANT_ALPHA
+ZERO                                 :: 0           // GL_ZERO
+ONE                                  :: 1           // GL_ONE
+SRC_COLOR                            :: 0x0300      // GL_SRC_COLOR
+ONE_MINUS_SRC_COLOR                  :: 0x0301      // GL_ONE_MINUS_SRC_COLOR
+SRC_ALPHA                            :: 0x0302      // GL_SRC_ALPHA
+ONE_MINUS_SRC_ALPHA                  :: 0x0303      // GL_ONE_MINUS_SRC_ALPHA
+DST_ALPHA                            :: 0x0304      // GL_DST_ALPHA
+ONE_MINUS_DST_ALPHA                  :: 0x0305      // GL_ONE_MINUS_DST_ALPHA
+DST_COLOR                            :: 0x0306      // GL_DST_COLOR
+ONE_MINUS_DST_COLOR                  :: 0x0307      // GL_ONE_MINUS_DST_COLOR
+SRC_ALPHA_SATURATE                   :: 0x0308      // GL_SRC_ALPHA_SATURATE
+CONSTANT_COLOR                       :: 0x8001      // GL_CONSTANT_COLOR
+ONE_MINUS_CONSTANT_COLOR             :: 0x8002      // GL_ONE_MINUS_CONSTANT_COLOR
+CONSTANT_ALPHA                       :: 0x8003      // GL_CONSTANT_ALPHA
+ONE_MINUS_CONSTANT_ALPHA             :: 0x8004      // GL_ONE_MINUS_CONSTANT_ALPHA
 
 // GL blending functions/equations
-RL_FUNC_ADD                             :: 0x8006      // GL_FUNC_ADD
-RL_MIN                                  :: 0x8007      // GL_MIN
-RL_MAX                                  :: 0x8008      // GL_MAX
-RL_FUNC_SUBTRACT                        :: 0x800A      // GL_FUNC_SUBTRACT
-RL_FUNC_REVERSE_SUBTRACT                :: 0x800B      // GL_FUNC_REVERSE_SUBTRACT
-RL_BLEND_EQUATION                       :: 0x8009      // GL_BLEND_EQUATION
-RL_BLEND_EQUATION_RGB                   :: 0x8009      // GL_BLEND_EQUATION_RGB   // (Same as BLEND_EQUATION)
-RL_BLEND_EQUATION_ALPHA                 :: 0x883D      // GL_BLEND_EQUATION_ALPHA
-RL_BLEND_DST_RGB                        :: 0x80C8      // GL_BLEND_DST_RGB
-RL_BLEND_SRC_RGB                        :: 0x80C9      // GL_BLEND_SRC_RGB
-RL_BLEND_DST_ALPHA                      :: 0x80CA      // GL_BLEND_DST_ALPHA
-RL_BLEND_SRC_ALPHA                      :: 0x80CB      // GL_BLEND_SRC_ALPHA
-RL_BLEND_COLOR                          :: 0x8005      // GL_BLEND_COLOR
+FUNC_ADD                             :: 0x8006      // GL_FUNC_ADD
+MIN                                  :: 0x8007      // GL_MIN
+MAX                                  :: 0x8008      // GL_MAX
+FUNC_SUBTRACT                        :: 0x800A      // GL_FUNC_SUBTRACT
+FUNC_REVERSE_SUBTRACT                :: 0x800B      // GL_FUNC_REVERSE_SUBTRACT
+BLEND_EQUATION                       :: 0x8009      // GL_BLEND_EQUATION
+BLEND_EQUATION_RGB                   :: 0x8009      // GL_BLEND_EQUATION_RGB   // (Same as BLEND_EQUATION)
+BLEND_EQUATION_ALPHA                 :: 0x883D      // GL_BLEND_EQUATION_ALPHA
+BLEND_DST_RGB                        :: 0x80C8      // GL_BLEND_DST_RGB
+BLEND_SRC_RGB                        :: 0x80C9      // GL_BLEND_SRC_RGB
+BLEND_DST_ALPHA                      :: 0x80CA      // GL_BLEND_DST_ALPHA
+BLEND_SRC_ALPHA                      :: 0x80CB      // GL_BLEND_SRC_ALPHA
+BLEND_COLOR                          :: 0x8005      // GL_BLEND_COLOR
 
 
 //----------------------------------------------------------------------------------
@@ -255,7 +255,7 @@ RL_BLEND_COLOR                          :: 0x8005      // GL_BLEND_COLOR
 //----------------------------------------------------------------------------------
 
 
-VertexBufferIndexType :: c.ushort when RL_GRAPHICS_API_OPENGL_ES2 else c.uint
+VertexBufferIndexType :: c.ushort when GRAPHICS_API_OPENGL_ES2 else c.uint
 
 // Dynamic vertex buffers (position + texcoords + colors + indices arrays)
 VertexBuffer :: struct {
@@ -343,36 +343,39 @@ CullMode :: enum c.int {
 	BACK,
 }
 
-@(default_calling_convention="c")
+// Matrix type (right handed, stored row major)
+Matrix :: #row_major matrix[4, 4]f32
+
+@(default_calling_convention="c", link_prefix="rl")
 foreign lib {
 	//------------------------------------------------------------------------------------
 	// Functions Declaration - Matrix operations
 	//------------------------------------------------------------------------------------
-	rlMatrixMode   :: proc(mode: c.int) ---                 // Choose the current matrix to be transformed
-	rlPushMatrix   :: proc() ---                            // Push the current matrix to stack
-	rlPopMatrix    :: proc() ---                            // Pop lattest inserted matrix from stack
-	rlLoadIdentity :: proc() ---                            // Reset current matrix to identity matrix
-	rlTranslatef   :: proc(x, y, z: f32) ---                // Multiply the current matrix by a translation matrix
-	rlRotatef      :: proc(angleDeg: f32, x, y, z: f32) --- // Multiply the current matrix by a rotation matrix
-	rlScalef       :: proc(x, y, z: f32) ---                // Multiply the current matrix by a scaling matrix
-	rlMultMatrixf  :: proc(matf: [^]f32) ---                // Multiply the current matrix by another matrix
-	rlFrustum      :: proc(left, right, bottom, top, znear, zfar: f64) ---
-	rlOrtho        :: proc(left, right, bottom, top, znear, zfar: f64) ---
-	rlViewport     :: proc(x, y, width, height: c.int) ---  // Set the viewport area
+	MatrixMode   :: proc(mode: c.int) ---                 // Choose the current matrix to be transformed
+	PushMatrix   :: proc() ---                            // Push the current matrix to stack
+	PopMatrix    :: proc() ---                            // Pop lattest inserted matrix from stack
+	LoadIdentity :: proc() ---                            // Reset current matrix to identity matrix
+	Translatef   :: proc(x, y, z: f32) ---                // Multiply the current matrix by a translation matrix
+	Rotatef      :: proc(angleDeg: f32, x, y, z: f32) --- // Multiply the current matrix by a rotation matrix
+	Scalef       :: proc(x, y, z: f32) ---                // Multiply the current matrix by a scaling matrix
+	MultMatrixf  :: proc(matf: [^]f32) ---                // Multiply the current matrix by another matrix
+	Frustum      :: proc(left, right, bottom, top, znear, zfar: f64) ---
+	Ortho        :: proc(left, right, bottom, top, znear, zfar: f64) ---
+	Viewport     :: proc(x, y, width, height: c.int) ---  // Set the viewport area
 
 	//------------------------------------------------------------------------------------
 	// Functions Declaration - Vertex level operations
 	//------------------------------------------------------------------------------------
-	rlBegin        :: proc(mode: c.int)     --- // Initialize drawing mode (how to organize vertex)
-	rlEnd          :: proc()                --- // Finish vertex providing
-	rlVertex2i     :: proc(x, y: c.int)     --- // Define one vertex (position) - 2 int
-	rlVertex2f     :: proc(x, y: f32)       --- // Define one vertex (position) - 2 f32
-	rlVertex3f     :: proc(x, y, z: f32)    --- // Define one vertex (position) - 3 f32
-	rlTexCoord2f   :: proc(x, y: f32)       --- // Define one vertex (texture coordinate) - 2 f32
-	rlNormal3f     :: proc(x, y, z: f32)    --- // Define one vertex (normal) - 3 f32
-	rlColor4ub     :: proc(r, g, b, a: u8)  --- // Define one vertex (color) - 4 byte
-	rlColor3f      :: proc(x, y, z: f32)    --- // Define one vertex (color) - 3 f32
-	rlColor4f      :: proc(x, y, z, w: f32) --- // Define one vertex (color) - 4 f32
+	Begin        :: proc(mode: c.int)     --- // Initialize drawing mode (how to organize vertex)
+	End          :: proc()                --- // Finish vertex providing
+	Vertex2i     :: proc(x, y: c.int)     --- // Define one vertex (position) - 2 int
+	Vertex2f     :: proc(x, y: f32)       --- // Define one vertex (position) - 2 f32
+	Vertex3f     :: proc(x, y, z: f32)    --- // Define one vertex (position) - 3 f32
+	TexCoord2f   :: proc(x, y: f32)       --- // Define one vertex (texture coordinate) - 2 f32
+	Normal3f     :: proc(x, y, z: f32)    --- // Define one vertex (normal) - 3 f32
+	Color4ub     :: proc(r, g, b, a: u8)  --- // Define one vertex (color) - 4 byte
+	Color3f      :: proc(x, y, z: f32)    --- // Define one vertex (color) - 3 f32
+	Color4f      :: proc(x, y, z, w: f32) --- // Define one vertex (color) - 4 f32
 
 	//------------------------------------------------------------------------------------
 	// Functions Declaration - OpenGL style functions (common to 1.1, 3.3+, ES2)
@@ -381,175 +384,177 @@ foreign lib {
 	//------------------------------------------------------------------------------------
 
 	// Vertex buffers state
-	rlEnableVertexArray          :: proc(vaoId: c.uint) -> bool --- // Enable vertex array (VAO, if supported)
-	rlDisableVertexArray         :: proc() ---                      // Disable vertex array (VAO, if supported)
-	rlEnableVertexBuffer         :: proc(id: c.uint) ---            // Enable vertex buffer (VBO)
-	rlDisableVertexBuffer        :: proc() ---                      // Disable vertex buffer (VBO)
-	rlEnableVertexBufferElement  :: proc(id: c.uint) ---            // Enable vertex buffer element (VBO element)
-	rlDisableVertexBufferElement :: proc() ---                      // Disable vertex buffer element (VBO element)
-	rlEnableVertexAttribute      :: proc(index: c.uint) ---         // Enable vertex attribute index
-	rlDisableVertexAttribute     :: proc(index: c.uint) ---         // Disable vertex attribute index
-	when RL_GRAPHICS_API_OPENGL_11 {
-		rlEnableStatePointer :: proc(vertexAttribType: c.int, buffer: rawptr) ---
-		rlDisableStatePointer :: proc(vertexAttribType: c.int) ---
+	EnableVertexArray          :: proc(vaoId: c.uint) -> bool --- // Enable vertex array (VAO, if supported)
+	DisableVertexArray         :: proc() ---                      // Disable vertex array (VAO, if supported)
+	EnableVertexBuffer         :: proc(id: c.uint) ---            // Enable vertex buffer (VBO)
+	DisableVertexBuffer        :: proc() ---                      // Disable vertex buffer (VBO)
+	EnableVertexBufferElement  :: proc(id: c.uint) ---            // Enable vertex buffer element (VBO element)
+	DisableVertexBufferElement :: proc() ---                      // Disable vertex buffer element (VBO element)
+	EnableVertexAttribute      :: proc(index: c.uint) ---         // Enable vertex attribute index
+	DisableVertexAttribute     :: proc(index: c.uint) ---         // Disable vertex attribute index
+	when GRAPHICS_API_OPENGL_11 {
+		EnableStatePointer :: proc(vertexAttribType: c.int, buffer: rawptr) ---
+		DisableStatePointer :: proc(vertexAttribType: c.int) ---
 	}
 
 	// Textures state
-	rlActiveTextureSlot     :: proc(slot: c.int) ---                            // Select and active a texture slot
-	rlEnableTexture         :: proc(id: c.uint) ---                             // Enable texture
-	rlDisableTexture        :: proc() ---                                       // Disable texture
-	rlEnableTextureCubemap  :: proc(id: c.uint) ---                             // Enable texture cubemap
-	rlDisableTextureCubemap :: proc() ---                                       // Disable texture cubemap
-	rlTextureParameters     :: proc(id: c.uint, param: c.int, value: c.int) --- // Set texture parameters (filter, wrap)
-	rlCubemapParameters     :: proc(id: i32, param: c.int, value: c.int) ---    // Set cubemap parameters (filter, wrap)
+	ActiveTextureSlot     :: proc(slot: c.int) ---                            // Select and active a texture slot
+	EnableTexture         :: proc(id: c.uint) ---                             // Enable texture
+	DisableTexture        :: proc() ---                                       // Disable texture
+	EnableTextureCubemap  :: proc(id: c.uint) ---                             // Enable texture cubemap
+	DisableTextureCubemap :: proc() ---                                       // Disable texture cubemap
+	TextureParameters     :: proc(id: c.uint, param: c.int, value: c.int) --- // Set texture parameters (filter, wrap)
+	CubemapParameters     :: proc(id: i32, param: c.int, value: c.int) ---    // Set cubemap parameters (filter, wrap)
 
 	// Shader state
-	rlEnableShader  :: proc(id: c.uint) ---                                       // Enable shader program
-	rlDisableShader :: proc() ---                                                 // Disable shader program
+	EnableShader  :: proc(id: c.uint) ---                                       // Enable shader program
+	DisableShader :: proc() ---                                                 // Disable shader program
 
 	// Framebuffer state
-	rlEnableFramebuffer  :: proc(id: c.uint) ---                                  // Enable render texture (fbo)
-	rlDisableFramebuffer :: proc() ---                                            // Disable render texture (fbo), return to default framebuffer
-	rlActiveDrawBuffers  :: proc(count: c.int) ---                                // Activate multiple draw color buffers
-	rlBlitFramebuffer	 :: proc(srcX, srcY, srcWidth, srcHeight, dstX, dstY, dstWidth, dstHeight, bufferMask: c.int) --- // Blit active framebuffer to main framebuffer
+	EnableFramebuffer  :: proc(id: c.uint) ---                                  // Enable render texture (fbo)
+	DisableFramebuffer :: proc() ---                                            // Disable render texture (fbo), return to default framebuffer
+	ActiveDrawBuffers  :: proc(count: c.int) ---                                // Activate multiple draw color buffers
+	BlitFramebuffer	 :: proc(srcX, srcY, srcWidth, srcHeight, dstX, dstY, dstWidth, dstHeight, bufferMask: c.int) --- // Blit active framebuffer to main framebuffer
 
 	// General render state
-	rlDisableColorBlend      :: proc() ---                           // Disable color blending
-	rlEnableDepthTest        :: proc() ---                           // Enable depth test
-	rlDisableDepthTest       :: proc() ---                           // Disable depth test
-	rlEnableDepthMask        :: proc() ---                           // Enable depth write
-	rlDisableDepthMask       :: proc() ---                           // Disable depth write
-	rlEnableBackfaceCulling  :: proc() ---                           // Enable backface culling
-	rlDisableBackfaceCulling :: proc() ---                           // Disable backface culling
-	rlSetCullFace            :: proc(mode: CullMode) ---             // Set face culling mode
-	rlEnableScissorTest      :: proc() ---                           // Enable scissor test
-	rlDisableScissorTest     :: proc() ---                           // Disable scissor test
-	rlScissor                :: proc(x, y, width, height: c.int) --- // Scissor test
-	rlEnableWireMode         :: proc() ---                           // Enable wire mode
-	rlEnablePointMode        :: proc() --- 							 // Enable point mode
-	rlDisableWireMode        :: proc() ---                           // Disable wire and point modes
-	rlSetLineWidth           :: proc(width: f32) ---                 // Set the line drawing width
-	rlGetLineWidth           :: proc() -> f32 ---                    // Get the line drawing width
-	rlEnableSmoothLines      :: proc() ---                           // Enable line aliasing
-	rlDisableSmoothLines     :: proc() ---                           // Disable line aliasing
-	rlEnableStereoRender     :: proc() ---                           // Enable stereo rendering
-	rlDisableStereoRender    :: proc() ---                           // Disable stereo rendering
-	rlIsStereoRenderEnabled  :: proc() -> bool ---                   // Check if stereo render is enabled
+	DisableColorBlend      :: proc() ---                           // Disable color blending
+	EnableDepthTest        :: proc() ---                           // Enable depth test
+	DisableDepthTest       :: proc() ---                           // Disable depth test
+	EnableDepthMask        :: proc() ---                           // Enable depth write
+	DisableDepthMask       :: proc() ---                           // Disable depth write
+	EnableBackfaceCulling  :: proc() ---                           // Enable backface culling
+	DisableBackfaceCulling :: proc() ---                           // Disable backface culling
+	SetCullFace            :: proc(mode: CullMode) ---             // Set face culling mode
+	EnableScissorTest      :: proc() ---                           // Enable scissor test
+	DisableScissorTest     :: proc() ---                           // Disable scissor test
+	Scissor                :: proc(x, y, width, height: c.int) --- // Scissor test
+	EnableWireMode         :: proc() ---                           // Enable wire mode
+	EnablePointMode        :: proc() --- 							 // Enable point mode
+	DisableWireMode        :: proc() ---                           // Disable wire and point modes
+	SetLineWidth           :: proc(width: f32) ---                 // Set the line drawing width
+	GetLineWidth           :: proc() -> f32 ---                    // Get the line drawing width
+	EnableSmoothLines      :: proc() ---                           // Enable line aliasing
+	DisableSmoothLines     :: proc() ---                           // Disable line aliasing
+	EnableStereoRender     :: proc() ---                           // Enable stereo rendering
+	DisableStereoRender    :: proc() ---                           // Disable stereo rendering
+	IsStereoRenderEnabled  :: proc() -> bool ---                   // Check if stereo render is enabled
 
 
-	rlClearColor              :: proc(r, g, b, a: u8) ---                                                        // Clear color buffer with color
-	rlClearScreenBuffers      :: proc() ---                                                                      // Clear used screen buffers (color and depth)
-	rlCheckErrors             :: proc() ---                                                                      // Check and log OpenGL error codes
-	rlSetBlendMode            :: proc(mode: c.int) ---                                                           // Set blending mode
-	rlSetBlendFactors         :: proc(glSrcFactor, glDstFactor, glEquation: c.int) ---                           // Set blending mode factor and equation (using OpenGL factors)
-	rlSetBlendFactorsSeparate :: proc(glSrcRGB, glDstRGB, glSrcAlpha, glDstAlpha, glEqRGB, glEqAlpha: c.int) --- // Set blending mode factors and equations separately (using OpenGL factors)
+	ClearColor              :: proc(r, g, b, a: u8) ---                                                        // Clear color buffer with color
+	ClearScreenBuffers      :: proc() ---                                                                      // Clear used screen buffers (color and depth)
+	CheckErrors             :: proc() ---                                                                      // Check and log OpenGL error codes
+	SetBlendMode            :: proc(mode: c.int) ---                                                           // Set blending mode
+	SetBlendFactors         :: proc(glSrcFactor, glDstFactor, glEquation: c.int) ---                           // Set blending mode factor and equation (using OpenGL factors)
+	SetBlendFactorsSeparate :: proc(glSrcRGB, glDstRGB, glSrcAlpha, glDstAlpha, glEqRGB, glEqAlpha: c.int) --- // Set blending mode factors and equations separately (using OpenGL factors)
 
 	//------------------------------------------------------------------------------------
 	// Functions Declaration - rlgl functionality
 	//------------------------------------------------------------------------------------
 	// rlgl initialization functions
-	rlglInit               :: proc(width, height: c.int) --- // Initialize rlgl (buffers, shaders, textures, states)
-	rlglClose              :: proc() ---                     // De-initialize rlgl (buffers, shaders, textures)
-	rlLoadExtensions       :: proc(loader: rawptr) ---       // Load OpenGL extensions (loader function required)
-	rlGetVersion           :: proc() -> GlVersion ---        // Get current OpenGL version
-	rlSetFramebufferWidth  :: proc(width: c.int) ---         // Set current framebuffer width
-	rlGetFramebufferWidth  :: proc() -> c.int ---            // Get default framebuffer width
-	rlSetFramebufferHeight :: proc(height: c.int) ---        // Set current framebuffer height
-	rlGetFramebufferHeight :: proc() -> c.int ---            // Get default framebuffer height
+	@(link_prefix="rlgl")
+	Init                 :: proc(width, height: c.int) --- // Initialize rlgl (buffers, shaders, textures, states)
+	@(link_prefix="rlgl")
+	Close                :: proc() ---                     // De-initialize rlgl (buffers, shaders, textures)
+	LoadExtensions       :: proc(loader: rawptr) ---       // Load OpenGL extensions (loader function required)
+	GetVersion           :: proc() -> GlVersion ---        // Get current OpenGL version
+	SetFramebufferWidth  :: proc(width: c.int) ---         // Set current framebuffer width
+	GetFramebufferWidth  :: proc() -> c.int ---            // Get default framebuffer width
+	SetFramebufferHeight :: proc(height: c.int) ---        // Set current framebuffer height
+	GetFramebufferHeight :: proc() -> c.int ---            // Get default framebuffer height
 
 
-	rlGetTextureIdDefault  :: proc() -> c.uint ---   // Get default texture id
-	rlGetShaderIdDefault   :: proc() -> c.uint ---   // Get default shader id
-	rlGetShaderLocsDefault :: proc() -> [^]c.int --- // Get default shader locations
+	GetTextureIdDefault  :: proc() -> c.uint ---   // Get default texture id
+	GetShaderIdDefault   :: proc() -> c.uint ---   // Get default shader id
+	GetShaderLocsDefault :: proc() -> [^]c.int --- // Get default shader locations
 
 	// Render batch management
 	// NOTE: rlgl provides a default render batch to behave like OpenGL 1.1 immediate mode
 	// but this render batch API is exposed in case of custom batches are required
-	rlLoadRenderBatch       :: proc(numBuffers, bufferElements: c.int) -> RenderBatch --- // Load a render batch system
-	rlUnloadRenderBatch     :: proc(batch: RenderBatch) ---                               // Unload render batch system
-	rlDrawRenderBatch       :: proc(batch: ^RenderBatch) ---                              // Draw render batch data (Update->Draw->Reset)
-	rlSetRenderBatchActive  :: proc(batch: ^RenderBatch) ---                              // Set the active render batch for rlgl (NULL for default internal)
-	rlDrawRenderBatchActive :: proc() ---                                                 // Update and draw internal render batch
-	rlCheckRenderBatchLimit :: proc(vCount: c.int) -> c.int ---                           // Check internal buffer overflow for a given number of vertex
+	LoadRenderBatch       :: proc(numBuffers, bufferElements: c.int) -> RenderBatch --- // Load a render batch system
+	UnloadRenderBatch     :: proc(batch: RenderBatch) ---                               // Unload render batch system
+	DrawRenderBatch       :: proc(batch: ^RenderBatch) ---                              // Draw render batch data (Update->Draw->Reset)
+	SetRenderBatchActive  :: proc(batch: ^RenderBatch) ---                              // Set the active render batch for rlgl (NULL for default internal)
+	DrawRenderBatchActive :: proc() ---                                                 // Update and draw internal render batch
+	CheckRenderBatchLimit :: proc(vCount: c.int) -> c.int ---                           // Check internal buffer overflow for a given number of vertex
 
-	rlSetTexture :: proc(id: c.uint) --- // Set current texture for render batch and check buffers limits
+	SetTexture :: proc(id: c.uint) --- // Set current texture for render batch and check buffers limits
 
 	//------------------------------------------------------------------------------------------------------------------------
 
 	// Vertex buffers management
-	rlLoadVertexArray                  :: proc() -> c.uint ---                                                      // Load vertex array (vao) if supported
-	rlLoadVertexBuffer                 :: proc(buffer: rawptr, size: c.int, is_dynamic: bool) -> c.uint ---         // Load a vertex buffer attribute
-	rlLoadVertexBufferElement          :: proc(buffer: rawptr, size: c.int, is_dynamic: bool) -> c.uint ---         // Load a new attributes element buffer
-	rlUpdateVertexBuffer               :: proc(bufferId: c.uint, data: rawptr, dataSize: c.int, offset: c.int) ---  // Update GPU buffer with new data
-	rlUpdateVertexBufferElements       :: proc(id: c.uint, data: rawptr, dataSize: c.int, offset: c.int) ---        // Update vertex buffer elements with new data
-	rlUnloadVertexArray                :: proc(vaoId: c.uint) ---
-	rlUnloadVertexBuffer               :: proc(vboId: c.uint) ---
-	rlSetVertexAttribute               :: proc(index: c.uint, compSize: c.int, type: c.int, normalized: bool, stride: c.int, pointer: rawptr) ---
-	rlSetVertexAttributeDivisor        :: proc(index: c.uint, divisor: c.int) ---
-	rlSetVertexAttributeDefault        :: proc(locIndex: c.int, value: rawptr, attribType: c.int, count: c.int) --- // Set vertex attribute default value
-	rlDrawVertexArray                  :: proc(offset: c.int, count: c.int) ---
-	rlDrawVertexArrayElements          :: proc(offset: c.int, count: c.int, buffer: rawptr) ---
-	rlDrawVertexArrayInstanced         :: proc(offset: c.int, count: c.int, instances: c.int) ---
-	rlDrawVertexArrayElementsInstanced :: proc(offset: c.int, count: c.int, buffer: rawptr, instances: c.int) ---
+	LoadVertexArray                  :: proc() -> c.uint ---                                                      // Load vertex array (vao) if supported
+	LoadVertexBuffer                 :: proc(buffer: rawptr, size: c.int, is_dynamic: bool) -> c.uint ---         // Load a vertex buffer attribute
+	LoadVertexBufferElement          :: proc(buffer: rawptr, size: c.int, is_dynamic: bool) -> c.uint ---         // Load a new attributes element buffer
+	UpdateVertexBuffer               :: proc(bufferId: c.uint, data: rawptr, dataSize: c.int, offset: c.int) ---  // Update GPU buffer with new data
+	UpdateVertexBufferElements       :: proc(id: c.uint, data: rawptr, dataSize: c.int, offset: c.int) ---        // Update vertex buffer elements with new data
+	UnloadVertexArray                :: proc(vaoId: c.uint) ---
+	UnloadVertexBuffer               :: proc(vboId: c.uint) ---
+	SetVertexAttribute               :: proc(index: c.uint, compSize: c.int, type: c.int, normalized: bool, stride: c.int, pointer: rawptr) ---
+	SetVertexAttributeDivisor        :: proc(index: c.uint, divisor: c.int) ---
+	SetVertexAttributeDefault        :: proc(locIndex: c.int, value: rawptr, attribType: c.int, count: c.int) --- // Set vertex attribute default value
+	DrawVertexArray                  :: proc(offset: c.int, count: c.int) ---
+	DrawVertexArrayElements          :: proc(offset: c.int, count: c.int, buffer: rawptr) ---
+	DrawVertexArrayInstanced         :: proc(offset: c.int, count: c.int, instances: c.int) ---
+	DrawVertexArrayElementsInstanced :: proc(offset: c.int, count: c.int, buffer: rawptr, instances: c.int) ---
 
 	// Textures management
-	rlLoadTexture         :: proc(data: rawptr, width, height: c.int, format: c.int, mipmapCount: c.int) -> c.uint ---        // Load texture in GPU
-	rlLoadTextureDepth    :: proc(width, height: c.int, useRenderBuffer: bool) -> c.uint ---                                  // Load depth texture/renderbuffer (to be attached to fbo)
-	rlLoadTextureCubemap  :: proc(data: rawptr, size: c.int, format: c.int) -> c.uint ---                                     // Load texture cubemap
-	rlUpdateTexture       :: proc(id: c.uint, offsetX, offsetY: c.int, width, height: c.int, format: c.int, data: rawptr) --- // Update GPU texture with new data
-	rlGetGlTextureFormats :: proc(format: c.int, glInternalFormat, glFormat, glType: ^c.uint) ---                             // Get OpenGL internal formats
-	rlGetPixelFormatName  :: proc(format: c.uint) -> cstring ---                                                              // Get name string for pixel format
-	rlUnloadTexture       :: proc(id: c.uint) ---                                                                             // Unload texture from GPU memory
-	rlGenTextureMipmaps   :: proc(id: c.uint, width, height: c.int, format: c.int, mipmaps: ^c.int) ---                       // Generate mipmap data for selected texture
-	rlReadTexturePixels   :: proc(id: c.uint, width, height: c.int, format: c.int) -> rawptr ---                              // Read texture pixel data
-	rlReadScreenPixels    :: proc(width, height: c.int) -> [^]byte ---                                                        // Read screen pixel data (color buffer)
+	LoadTexture         :: proc(data: rawptr, width, height: c.int, format: c.int, mipmapCount: c.int) -> c.uint ---        // Load texture in GPU
+	LoadTextureDepth    :: proc(width, height: c.int, useRenderBuffer: bool) -> c.uint ---                                  // Load depth texture/renderbuffer (to be attached to fbo)
+	LoadTextureCubemap  :: proc(data: rawptr, size: c.int, format: c.int) -> c.uint ---                                     // Load texture cubemap
+	UpdateTexture       :: proc(id: c.uint, offsetX, offsetY: c.int, width, height: c.int, format: c.int, data: rawptr) --- // Update GPU texture with new data
+	GetGlTextureFormats :: proc(format: c.int, glInternalFormat, glFormat, glType: ^c.uint) ---                             // Get OpenGL internal formats
+	GetPixelFormatName  :: proc(format: c.uint) -> cstring ---                                                              // Get name string for pixel format
+	UnloadTexture       :: proc(id: c.uint) ---                                                                             // Unload texture from GPU memory
+	GenTextureMipmaps   :: proc(id: c.uint, width, height: c.int, format: c.int, mipmaps: ^c.int) ---                       // Generate mipmap data for selected texture
+	ReadTexturePixels   :: proc(id: c.uint, width, height: c.int, format: c.int) -> rawptr ---                              // Read texture pixel data
+	ReadScreenPixels    :: proc(width, height: c.int) -> [^]byte ---                                                        // Read screen pixel data (color buffer)
 
 	// Framebuffer management (fbo)
-	rlLoadFramebuffer     :: proc(width, height: c.int) -> c.uint ---                                           // Load an empty framebuffer
-	rlFramebufferAttach   :: proc(fboId, texId: c.uint, attachType: c.int, texType: c.int, mipLevel: c.int) --- // Attach texture/renderbuffer to a framebuffer
-	rlFramebufferComplete :: proc(id: c.uint) -> bool ---                                                       // Verify framebuffer is complete
-	rlUnloadFramebuffer   :: proc(id: c.uint) ---                                                               // Delete framebuffer from GPU
+	LoadFramebuffer     :: proc(width, height: c.int) -> c.uint ---                                           // Load an empty framebuffer
+	FramebufferAttach   :: proc(fboId, texId: c.uint, attachType: c.int, texType: c.int, mipLevel: c.int) --- // Attach texture/renderbuffer to a framebuffer
+	FramebufferComplete :: proc(id: c.uint) -> bool ---                                                       // Verify framebuffer is complete
+	UnloadFramebuffer   :: proc(id: c.uint) ---                                                               // Delete framebuffer from GPU
 
 	// Shaders management
-	rlLoadShaderCode      :: proc(vsCode, fsCode: cstring) -> c.uint ---                                // Load shader from code strings
-	rlCompileShader       :: proc(shaderCode: cstring, type: c.int) -> c.uint ---                       // Compile custom shader and return shader id (type: RL_VERTEX_SHADER, RL_FRAGMENT_SHADER, RL_COMPUTE_SHADER)
-	rlLoadShaderProgram   :: proc(vShaderId, fShaderId: c.uint) -> c.uint ---                           // Load custom shader program
-	rlUnloadShaderProgram :: proc(id: c.uint) ---                                                       // Unload shader program
-	rlGetLocationUniform  :: proc(shaderId: c.uint, uniformName: cstring) -> c.int ---                  // Get shader location uniform
-	rlGetLocationAttrib   :: proc(shaderId: c.uint, attribName: cstring) -> c.int ---                   // Get shader location attribute
-	rlSetUniform          :: proc(locIndex: c.int, value: rawptr, uniformType: c.int, count: c.int) --- // Set shader value uniform
-	rlSetUniformMatrix    :: proc(locIndex: c.int, mat: Matrix) ---                                     // Set shader value matrix
-	rlSetUniformSampler   :: proc(locIndex: c.int, textureId: c.uint) ---                               // Set shader value sampler
-	rlSetShader           :: proc(id: c.uint, locs: [^]c.int) ---                                       // Set shader currently active (id and locations)
+	LoadShaderCode      :: proc(vsCode, fsCode: cstring) -> c.uint ---                                // Load shader from code strings
+	CompileShader       :: proc(shaderCode: cstring, type: c.int) -> c.uint ---                       // Compile custom shader and return shader id (type: VERTEX_SHADER, FRAGMENT_SHADER, COMPUTE_SHADER)
+	LoadShaderProgram   :: proc(vShaderId, fShaderId: c.uint) -> c.uint ---                           // Load custom shader program
+	UnloadShaderProgram :: proc(id: c.uint) ---                                                       // Unload shader program
+	GetLocationUniform  :: proc(shaderId: c.uint, uniformName: cstring) -> c.int ---                  // Get shader location uniform
+	GetLocationAttrib   :: proc(shaderId: c.uint, attribName: cstring) -> c.int ---                   // Get shader location attribute
+	SetUniform          :: proc(locIndex: c.int, value: rawptr, uniformType: c.int, count: c.int) --- // Set shader value uniform
+	SetUniformMatrix    :: proc(locIndex: c.int, mat: Matrix) ---                                     // Set shader value matrix
+	SetUniformSampler   :: proc(locIndex: c.int, textureId: c.uint) ---                               // Set shader value sampler
+	SetShader           :: proc(id: c.uint, locs: [^]c.int) ---                                       // Set shader currently active (id and locations)
 
 	// Compute shader management
-	rlLoadComputeShaderProgram :: proc(shaderId: c.uint) -> c.uint ---     // Load compute shader program
-	rlComputeShaderDispatch    :: proc(groupX, groupY, groupZ: c.uint) --- // Dispatch compute shader (equivalent to *draw* for graphics pipeline)
+	LoadComputeShaderProgram :: proc(shaderId: c.uint) -> c.uint ---     // Load compute shader program
+	ComputeShaderDispatch    :: proc(groupX, groupY, groupZ: c.uint) --- // Dispatch compute shader (equivalent to *draw* for graphics pipeline)
 
 	// Shader buffer storage object management (ssbo)
-	rlLoadShaderBuffer    :: proc(size: c.uint, data: rawptr, usageHint: c.int) -> c.uint ---              // Load shader storage buffer object (SSBO)
-	rlUnloadShaderBuffer  :: proc(ssboId: c.uint) ---                                                      // Unload shader storage buffer object (SSBO)
-	rlUpdateShaderBuffer  :: proc(id: c.uint, data: rawptr, dataSize: c.uint, offset: c.uint) ---          // Update SSBO buffer data
-	rlBindShaderBuffer    :: proc(id: c.uint, index: c.uint) ---                                           // Bind SSBO buffer
-	rlReadShaderBuffer    :: proc(id: c.uint, dest: rawptr, count: c.uint, offset: c.uint) ---             // Read SSBO buffer data (GPU->CPU)
-	rlCopyShaderBuffer    :: proc(destId, srcId: c.uint, destOffset, srcOffset: c.uint, count: c.uint) --- // Copy SSBO data between buffers
-	rlGetShaderBufferSize :: proc(id: c.uint) -> c.uint ---                                                // Get SSBO buffer size
+	LoadShaderBuffer    :: proc(size: c.uint, data: rawptr, usageHint: c.int) -> c.uint ---              // Load shader storage buffer object (SSBO)
+	UnloadShaderBuffer  :: proc(ssboId: c.uint) ---                                                      // Unload shader storage buffer object (SSBO)
+	UpdateShaderBuffer  :: proc(id: c.uint, data: rawptr, dataSize: c.uint, offset: c.uint) ---          // Update SSBO buffer data
+	BindShaderBuffer    :: proc(id: c.uint, index: c.uint) ---                                           // Bind SSBO buffer
+	ReadShaderBuffer    :: proc(id: c.uint, dest: rawptr, count: c.uint, offset: c.uint) ---             // Read SSBO buffer data (GPU->CPU)
+	CopyShaderBuffer    :: proc(destId, srcId: c.uint, destOffset, srcOffset: c.uint, count: c.uint) --- // Copy SSBO data between buffers
+	GetShaderBufferSize :: proc(id: c.uint) -> c.uint ---                                                // Get SSBO buffer size
 
 	// Buffer management
-	rlBindImageTexture :: proc(id: c.uint, index: c.uint, format: c.int, readonly: bool) ---  // Bind image texture
+	BindImageTexture :: proc(id: c.uint, index: c.uint, format: c.int, readonly: bool) ---  // Bind image texture
 
 	// Matrix state management
-	rlGetMatrixModelview        :: proc() -> Matrix ---           // Get internal modelview matrix
-	rlGetMatrixProjection       :: proc() -> Matrix ---           // Get internal projection matrix
-	rlGetMatrixTransform        :: proc() -> Matrix ---           // Get internal accumulated transform matrix
-	rlGetMatrixProjectionStereo :: proc(eye: c.int) -> Matrix --- // Get internal projection matrix for stereo render (selected eye)
-	rlGetMatrixViewOffsetStereo :: proc(eye: c.int) -> Matrix --- // Get internal view offset matrix for stereo render (selected eye)
-	rlSetMatrixProjection       :: proc(proj: Matrix) ---         // Set a custom projection matrix (replaces internal projection matrix)
-	rlSetMatrixModelview        :: proc(view: Matrix) ---         // Set a custom modelview matrix (replaces internal modelview matrix)
-	rlSetMatrixProjectionStereo :: proc(right, left: Matrix) ---  // Set eyes projection matrices for stereo rendering
-	rlSetMatrixViewOffsetStereo :: proc(right, left: Matrix) ---  // Set eyes view offsets matrices for stereo rendering
+	GetMatrixModelview        :: proc() -> Matrix ---           // Get internal modelview matrix
+	GetMatrixProjection       :: proc() -> Matrix ---           // Get internal projection matrix
+	GetMatrixTransform        :: proc() -> Matrix ---           // Get internal accumulated transform matrix
+	GetMatrixProjectionStereo :: proc(eye: c.int) -> Matrix --- // Get internal projection matrix for stereo render (selected eye)
+	GetMatrixViewOffsetStereo :: proc(eye: c.int) -> Matrix --- // Get internal view offset matrix for stereo render (selected eye)
+	SetMatrixProjection       :: proc(proj: Matrix) ---         // Set a custom projection matrix (replaces internal projection matrix)
+	SetMatrixModelview        :: proc(view: Matrix) ---         // Set a custom modelview matrix (replaces internal modelview matrix)
+	SetMatrixProjectionStereo :: proc(right, left: Matrix) ---  // Set eyes projection matrices for stereo rendering
+	SetMatrixViewOffsetStereo :: proc(right, left: Matrix) ---  // Set eyes view offsets matrices for stereo rendering
 
 	// Quick and dirty cube/quad buffers load->draw->unload
-	rlLoadDrawCube :: proc() --- // Load and draw a cube
-	rlLoadDrawQuad :: proc() --- // Load and draw a quad
+	LoadDrawCube :: proc() --- // Load and draw a cube
+	LoadDrawQuad :: proc() --- // Load and draw a quad
 }
