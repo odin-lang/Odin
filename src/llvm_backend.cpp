@@ -1300,18 +1300,14 @@ gb_internal lbProcedure *lb_create_cleanup_runtime(lbModule *main_module) { // C
 
 gb_internal WORKER_TASK_PROC(lb_generate_procedures_and_types_per_module) {
 	lbModule *m = cast(lbModule *)data;
-	for (Entity *e : m->global_procedures_and_types_to_create) {
-		if (e->kind == Entity_TypeName) {
-			(void)lb_get_entity_name(m, e);
-			lb_type(m, e->type);
-		}
+	for (Entity *e : m->global_types_to_create) {
+		(void)lb_get_entity_name(m, e);
+		(void)lb_type(m, e->type);
 	}
 
-	for (Entity *e : m->global_procedures_and_types_to_create) {
-		if (e->kind == Entity_Procedure) {
-			(void)lb_get_entity_name(m, e);
-			array_add(&m->procedures_to_generate, lb_create_procedure(m, e));
-		}
+	for (Entity *e : m->global_procedures_to_create) {
+		(void)lb_get_entity_name(m, e);
+		array_add(&m->procedures_to_generate, lb_create_procedure(m, e));
 	}
 	return 0;
 }
@@ -1365,16 +1361,24 @@ gb_internal void lb_create_global_procedures_and_types(lbGenerator *gen, Checker
 			m = lb_module_of_entity(gen, e);
 		}
 
-		array_add(&m->global_procedures_and_types_to_create, e);
+		if (e->kind == Entity_Procedure) {
+			array_add(&m->global_procedures_to_create, e);
+		} else if (e->kind == Entity_TypeName) {
+			array_add(&m->global_types_to_create, e);
+		}
 	}
 
-	for (auto const &entry : gen->modules) {
-		lbModule *m = entry.value;
-		if (do_threading) {
+	if (do_threading) {
+		for (auto const &entry : gen->modules) {
+			lbModule *m = entry.value;
 			thread_pool_add_task(lb_generate_procedures_and_types_per_module, m);
-		} else {
+		}
+	} else {
+		for (auto const &entry : gen->modules) {
+			lbModule *m = entry.value;
 			lb_generate_procedures_and_types_per_module(m);
 		}
+
 	}
 
 	thread_pool_wait();
@@ -2405,16 +2409,19 @@ gb_internal WORKER_TASK_PROC(lb_generate_procedures_worker_proc) {
 }
 
 gb_internal void lb_generate_procedures(lbGenerator *gen, bool do_threading) {
-	for (auto const &entry : gen->modules) {
-		lbModule *m = entry.value;
-		if (do_threading) {
+	if (do_threading) {
+		for (auto const &entry : gen->modules) {
+			lbModule *m = entry.value;
 			thread_pool_add_task(lb_generate_procedures_worker_proc, m);
-		} else {
+		}
+
+		thread_pool_wait();
+	} else {
+		for (auto const &entry : gen->modules) {
+			lbModule *m = entry.value;
 			lb_generate_procedures_worker_proc(m);
 		}
 	}
-
-	thread_pool_wait();
 }
 
 gb_internal WORKER_TASK_PROC(lb_generate_missing_procedures_to_check_worker_proc) {
@@ -2428,17 +2435,20 @@ gb_internal WORKER_TASK_PROC(lb_generate_missing_procedures_to_check_worker_proc
 }
 
 gb_internal void lb_generate_missing_procedures(lbGenerator *gen, bool do_threading) {
-	for (auto const &entry : gen->modules) {
-		lbModule *m = entry.value;
-		// NOTE(bill): procedures may be added during generation
-		if (do_threading) {
+	if (do_threading) {
+		for (auto const &entry : gen->modules) {
+			lbModule *m = entry.value;
+			// NOTE(bill): procedures may be added during generation
 			thread_pool_add_task(lb_generate_missing_procedures_to_check_worker_proc, m);
-		} else {
+		}
+		thread_pool_wait();
+	} else {
+		for (auto const &entry : gen->modules) {
+			lbModule *m = entry.value;
+			// NOTE(bill): procedures may be added during generation
 			lb_generate_missing_procedures_to_check_worker_proc(m);
 		}
 	}
-
-	thread_pool_wait();
 }
 
 gb_internal void lb_debug_info_complete_types_and_finalize(lbGenerator *gen) {
@@ -2451,32 +2461,45 @@ gb_internal void lb_debug_info_complete_types_and_finalize(lbGenerator *gen) {
 }
 
 gb_internal void lb_llvm_function_passes(lbGenerator *gen, bool do_threading) {
-	for (auto const &entry : gen->modules) {
-		lbModule *m = entry.value;
-		if (do_threading) {
+	if (do_threading) {
+		for (auto const &entry : gen->modules) {
+			lbModule *m = entry.value;
 			thread_pool_add_task(lb_llvm_function_pass_per_module, m);
-		} else {
+		}
+		thread_pool_wait();
+	} else {
+		for (auto const &entry : gen->modules) {
+			lbModule *m = entry.value;
 			lb_llvm_function_pass_per_module(m);
 		}
 	}
-	thread_pool_wait();
 }
 
 
 gb_internal void lb_llvm_module_passes(lbGenerator *gen, bool do_threading) {
-	for (auto const &entry : gen->modules) {
-		lbModule *m = entry.value;
-		auto wd = gb_alloc_item(permanent_allocator(), lbLLVMModulePassWorkerData);
-		wd->m = m;
-		wd->target_machine = m->target_machine;
+	if (do_threading) {
+		for (auto const &entry : gen->modules) {
+			lbModule *m = entry.value;
+			auto wd = gb_alloc_item(permanent_allocator(), lbLLVMModulePassWorkerData);
+			wd->m = m;
+			wd->target_machine = m->target_machine;
 
-		if (do_threading) {
-			thread_pool_add_task(lb_llvm_module_pass_worker_proc, wd);
-		} else {
+			if (do_threading) {
+				thread_pool_add_task(lb_llvm_module_pass_worker_proc, wd);
+			} else {
+				lb_llvm_module_pass_worker_proc(wd);
+			}
+		}
+		thread_pool_wait();
+	} else {
+		for (auto const &entry : gen->modules) {
+			lbModule *m = entry.value;
+			auto wd = gb_alloc_item(permanent_allocator(), lbLLVMModulePassWorkerData);
+			wd->m = m;
+			wd->target_machine = m->target_machine;
 			lb_llvm_module_pass_worker_proc(wd);
 		}
 	}
-	thread_pool_wait();
 }
 
 gb_internal String lb_filepath_ll_for_module(lbModule *m) {
@@ -2556,17 +2579,21 @@ gb_internal String lb_filepath_obj_for_module(lbModule *m) {
 
 
 gb_internal bool lb_llvm_module_verification(lbGenerator *gen, bool do_threading) {
-	for (auto const &entry : gen->modules) {
-		lbModule *m = entry.value;
-		if (do_threading) {
+	if (do_threading) {
+		for (auto const &entry : gen->modules) {
+			lbModule *m = entry.value;
 			thread_pool_add_task(lb_llvm_module_verification_worker_proc, m);
-		} else {
+		}
+		thread_pool_wait();
+
+	} else {
+		for (auto const &entry : gen->modules) {
+			lbModule *m = entry.value;
 			if (lb_llvm_module_verification_worker_proc(m)) {
 				return false;
 			}
 		}
 	}
-	thread_pool_wait();
 
 	return true;
 }
@@ -2808,13 +2835,8 @@ gb_internal void lb_generate_procedure(lbModule *m, lbProcedure *p) {
 	lb_end_procedure(p);
 
 	// Add Flags
-	if (p->body != nullptr) {
-		if (p->name == "memcpy" || p->name == "memmove" ||
-		    p->name == "runtime.mem_copy" || p->name == "mem_copy_non_overlapping" ||
-		    string_starts_with(p->name, str_lit("llvm.memcpy")) ||
-		    string_starts_with(p->name, str_lit("llvm.memmove"))) {
-			p->flags |= lbProcedureFlag_WithoutMemcpyPass;
-		}
+	if (p->entity && p->entity->kind == Entity_Procedure && p->entity->Procedure.is_memcpy_like) {
+		p->flags |= lbProcedureFlag_WithoutMemcpyPass;
 	}
 
 	lb_verify_function(m, p, true);

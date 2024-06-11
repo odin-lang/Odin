@@ -1142,7 +1142,14 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 	}
 
 	if (ac.link_name.len > 0) {
-		e->Procedure.link_name = ac.link_name;
+		String ln = ac.link_name;
+		e->Procedure.link_name = ln;
+		if (ln == "memcpy" ||
+		    ln == "memmove" ||
+		    ln == "mem_copy" ||
+		    ln == "mem_copy_non_overlapping") {
+			e->Procedure.is_memcpy_like = true;
+		}
 	}
 
 	if (ac.deferred_procedure.entity != nullptr) {
