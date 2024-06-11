@@ -20,7 +20,7 @@ _rand_bytes :: proc(dst: []byte) {
 				panic("crypto: BCryptGenRandom Invalid parameter")
 			case:
 				// Unknown error
-				panic(fmt.tprintf("crypto: BCryptGenRandom failed: %d\n", ret))
+				fmt.panicf("crypto: BCryptGenRandom failed: %d\n", ret)
 		}
 	}
 }
