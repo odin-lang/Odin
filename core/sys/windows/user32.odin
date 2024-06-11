@@ -17,6 +17,17 @@ foreign user32 {
 
 	GetClassNameW :: proc(hWnd: HWND, lpClassName: LPWSTR, nMaxCount: c_int) -> c_int ---
 
+	GetParent :: proc(hWnd: HWND) -> HWND ---
+	IsWindowVisible :: proc(hWnd: HWND) -> BOOL ---
+	SetWinEventHook :: proc(
+		eventMin, eventMax: DWORD,
+		hmodWinEventProc: HMODULE,
+		pfnWinEvenProc: WINEVENTPROC,
+		idProcess, idThread, dwmFlags: DWORD,
+	) -> HWINEVENTHOOK ---
+
+	IsChild :: proc(hWndParent, hWnd: HWND) -> BOOL ---
+
 	RegisterClassW :: proc(lpWndClass: ^WNDCLASSW) -> ATOM ---
 	RegisterClassExW :: proc(^WNDCLASSEXW) -> ATOM ---
 	UnregisterClassW :: proc(lpClassName: LPCWSTR, hInstance: HINSTANCE) -> BOOL ---
