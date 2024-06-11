@@ -950,7 +950,7 @@ gb_internal cgValue cg_const_value(cgProcedure *p, Type *type, ExactValue const 
 
 	case ExactValue_Integer:
 		GB_ASSERT(!TB_IS_VOID_TYPE(dt));
-		// GB_ASSERT(dt.raw != TB_TYPE_I128.raw);
+		GB_ASSERT(dt.raw != TB_TYPE_I128.raw);
 		if (is_type_unsigned(type)) {
 			u64 i = 0;
 			if (value.kind == ExactValue_Integer && value.value_integer.sign) {

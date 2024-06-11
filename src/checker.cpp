@@ -2204,7 +2204,6 @@ gb_internal void check_procedure_later(Checker *c, AstFile *file, Token token, D
 	check_procedure_later(c, info);
 }
 
-
 gb_internal void add_min_dep_type_info(Checker *c, Type *t) {
 	if (t == nullptr) {
 		return;
