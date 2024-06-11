@@ -109,7 +109,7 @@ package rlgl
 
 import "core:c"
 
-RLGL_VERSION :: "5.0"
+VERSION :: "5.0"
 
 when ODIN_OS == .Windows {
 	foreign import lib {
