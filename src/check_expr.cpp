@@ -2550,7 +2550,7 @@ gb_internal void check_unary_expr(CheckerContext *c, Operand *o, Token op, Ast *
 									error_line("\tSuggestion: Did you want to pass the iterable value to the for statement by pointer to get addressable semantics?\n");
 								}
 
-								if (is_type_map(parent_type)) {
+								if (parent_type != nullptr && is_type_map(parent_type)) {
 									error_line("\t            Prefer doing 'for key, &%.*s in ...'\n", LIT(e->token.string));
 								} else {
 									error_line("\t            Prefer doing 'for &%.*s in ...'\n", LIT(e->token.string));
