@@ -3564,12 +3564,13 @@ gb_internal void check_binary_matrix(CheckerContext *c, Token const &op, Operand
 
 				x->mode = Addressing_Value;
 				if (are_types_identical(xt, yt)) {
+					if (are_types_identical(x->type, y->type)) {
+						return;
+					}
 					if (!is_type_named(x->type) && is_type_named(y->type)) {
 						// prefer the named type
 						x->type = y->type;
 					}
-					// finish
-					return;
 				} else {
 					bool is_row_major = xt->Matrix.is_row_major && yt->Matrix.is_row_major;
 					x->type = alloc_type_matrix(xt->Matrix.elem, xt->Matrix.row_count, yt->Matrix.column_count, nullptr, nullptr, is_row_major);
