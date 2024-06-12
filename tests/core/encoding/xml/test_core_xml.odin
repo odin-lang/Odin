@@ -147,6 +147,20 @@ xml_test_entities_unbox_decode :: proc(t: ^testing.T) {
 }
 
 @(test)
+xml_test_attribute_whitespace :: proc(t: ^testing.T) {
+	run_test(t, {
+		// Same as above.
+		// Unbox CDATA in data tag.
+		filename  = "XML/attribute-whitespace.xml",
+		options   = {
+			flags = {},
+			expected_doctype = "foozle",
+		},
+		crc32     = 0x8f5fd6c1,
+	})
+}
+
+@(test)
 xml_test_invalid_doctype :: proc(t: ^testing.T) {
 	run_test(t, {
 		filename  = "XML/utf8.xml",

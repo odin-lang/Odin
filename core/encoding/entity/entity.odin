@@ -89,7 +89,7 @@ decode_xml :: proc(input: string, options := XML_Decode_Options{}, allocator := 
 	t := Tokenizer{src=input}
 	in_data := false
 
-	prev: rune
+	prev: rune = ' '
 
 	loop: for {
 		advance(&t) or_return
@@ -153,18 +153,32 @@ decode_xml :: proc(input: string, options := XML_Decode_Options{}, allocator := 
 					write_string(&builder, ";")
 				}
 			} else {
-				// https://www.w3.org/TR/2006/REC-xml11-20060816/#sec-line-ends
-				switch t.r {
-				case '\n', 0x85, 0x2028:
-					write_rune(&builder, '\n')
-				case '\r': // Do nothing until next character
-				case:
-					if prev == '\r' { // Turn a single carriage return into a \n
-						write_rune(&builder, '\n')
+				// Handle AV Normalization: https://www.w3.org/TR/2006/REC-xml11-20060816/#AVNormalize
+				if .Normalize_Whitespace in options {
+					switch t.r {
+					case ' ', '\r', '\n', '\t':
+						if prev != ' ' {
+							write_rune(&builder, ' ')
+							prev = ' '
+						}
+					case:
+						write_rune(&builder, t.r)
+						prev = t.r
 					}
-					write_rune(&builder, t.r)
+				} else {
+					// https://www.w3.org/TR/2006/REC-xml11-20060816/#sec-line-ends
+					switch t.r {
+					case '\n', 0x85, 0x2028:
+						write_rune(&builder, '\n')
+					case '\r': // Do nothing until next character
+					case:
+						if prev == '\r' { // Turn a single carriage return into a \n
+							write_rune(&builder, '\n')
+						}
+						write_rune(&builder, t.r)
+					}
+					prev = t.r
 				}
-				prev = t.r
 			}
 		}
 	}
