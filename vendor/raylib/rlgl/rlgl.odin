@@ -249,6 +249,8 @@ BLEND_DST_ALPHA                      :: 0x80CA      // GL_BLEND_DST_ALPHA
 BLEND_SRC_ALPHA                      :: 0x80CB      // GL_BLEND_SRC_ALPHA
 BLEND_COLOR                          :: 0x8005      // GL_BLEND_COLOR
 
+READ_FRAMEBUFFER                     :: 0x8CA8      // GL_READ_FRAMEBUFFER
+DRAW_FRAMEBUFFER                     :: 0x8CA9      // GL_DRAW_FRAMEBUFFER
 
 //----------------------------------------------------------------------------------
 // Types and Structures Definition
@@ -302,6 +304,105 @@ GlVersion :: enum c.int {
 	OPENGL_ES_30,            // OpenGL ES 3.0 (GLSL 300 es)
 }
 
+// Pixel formats
+// NOTE: Support depends on OpenGL version and platform
+PixelFormat :: enum c.int {
+	UNKNOWN = 0,
+	UNCOMPRESSED_GRAYSCALE = 1,       // 8 bit per pixel (no alpha)
+	UNCOMPRESSED_GRAY_ALPHA,          // 8*2 bpp (2 channels)
+	UNCOMPRESSED_R5G6B5,              // 16 bpp
+	UNCOMPRESSED_R8G8B8,              // 24 bpp
+	UNCOMPRESSED_R5G5B5A1,            // 16 bpp (1 bit alpha)
+	UNCOMPRESSED_R4G4B4A4,            // 16 bpp (4 bit alpha)
+	UNCOMPRESSED_R8G8B8A8,            // 32 bpp
+	UNCOMPRESSED_R32,                 // 32 bpp (1 channel - float)
+	UNCOMPRESSED_R32G32B32,           // 32*3 bpp (3 channels - float)
+	UNCOMPRESSED_R32G32B32A32,        // 32*4 bpp (4 channels - float)
+	UNCOMPRESSED_R16,                 // 16 bpp (1 channel - float)
+	UNCOMPRESSED_R16G16B16,           // 16*3 bpp (3 channels - float)
+	UNCOMPRESSED_R16G16B16A16,        // 16*4 bpp (4 channels - float)
+	COMPRESSED_DXT1_RGB,              // 4 bpp (no alpha)
+	COMPRESSED_DXT1_RGBA,             // 4 bpp (1 bit alpha)
+	COMPRESSED_DXT3_RGBA,             // 8 bpp
+	COMPRESSED_DXT5_RGBA,             // 8 bpp
+	COMPRESSED_ETC1_RGB,              // 4 bpp
+	COMPRESSED_ETC2_RGB,              // 4 bpp
+	COMPRESSED_ETC2_EAC_RGBA,         // 8 bpp
+	COMPRESSED_PVRT_RGB,              // 4 bpp
+	COMPRESSED_PVRT_RGBA,             // 4 bpp
+	COMPRESSED_ASTC_4x4_RGBA,         // 8 bpp
+	COMPRESSED_ASTC_8x8_RGBA,         // 2 bpp
+}
+
+// Texture parameters: filter mode
+// NOTE 1: Filtering considers mipmaps if available in the texture
+// NOTE 2: Filter is accordingly set for minification and magnification
+TextureFilter :: enum c.int {
+	POINT = 0,                        // No filter, just pixel approximation
+	BILINEAR,                         // Linear filtering
+	TRILINEAR,                        // Trilinear filtering (linear with mipmaps)
+	ANISOTROPIC_4X,                   // Anisotropic filtering 4x
+	ANISOTROPIC_8X,                   // Anisotropic filtering 8x
+	ANISOTROPIC_16X,                  // Anisotropic filtering 16x
+}
+
+// Color blending modes (pre-defined)
+BlendMode :: enum c.int {
+	ALPHA = 0,                        // Blend textures considering alpha (default)
+	ADDITIVE,                         // Blend textures adding colors
+	MULTIPLIED,                       // Blend textures multiplying colors
+	ADD_COLORS,                       // Blend textures adding colors (alternative)
+	SUBTRACT_COLORS,                  // Blend textures subtracting colors (alternative)
+	ALPHA_PREMULTIPLY,                // Blend premultiplied textures considering alpha
+	CUSTOM,                           // Blend textures using custom src/dst factors (use rlSetBlendFactors())
+	CUSTOM_SEPARATE,                  // Blend textures using custom rgb/alpha separate src/dst factors (use rlSetBlendFactorsSeparate())
+}
+
+// Shader location index
+ShaderLocationIndex :: enum c.int {
+	VERTEX_POSITION = 0,              // Shader location: vertex attribute: position
+	VERTEX_TEXCOORD01,                // Shader location: vertex attribute: texcoord01
+	VERTEX_TEXCOORD02,                // Shader location: vertex attribute: texcoord02
+	VERTEX_NORMAL,                    // Shader location: vertex attribute: normal
+	VERTEX_TANGENT,                   // Shader location: vertex attribute: tangent
+	VERTEX_COLOR,                     // Shader location: vertex attribute: color
+	MATRIX_MVP,                       // Shader location: matrix uniform: model-view-projection
+	MATRIX_VIEW,                      // Shader location: matrix uniform: view (camera transform)
+	MATRIX_PROJECTION,                // Shader location: matrix uniform: projection
+	MATRIX_MODEL,                     // Shader location: matrix uniform: model (transform)
+	MATRIX_NORMAL,                    // Shader location: matrix uniform: normal
+	VECTOR_VIEW,                      // Shader location: vector uniform: view
+	COLOR_DIFFUSE,                    // Shader location: vector uniform: diffuse color
+	COLOR_SPECULAR,                   // Shader location: vector uniform: specular color
+	COLOR_AMBIENT,                    // Shader location: vector uniform: ambient color
+	MAP_ALBEDO,                       // Shader location: sampler2d texture: albedo (same as: SHADER_LOC_MAP_DIFFUSE)
+	MAP_METALNESS,                    // Shader location: sampler2d texture: metalness (same as: SHADER_LOC_MAP_SPECULAR)
+	MAP_NORMAL,                       // Shader location: sampler2d texture: normal
+	MAP_ROUGHNESS,                    // Shader location: sampler2d texture: roughness
+	MAP_OCCLUSION,                    // Shader location: sampler2d texture: occlusion
+	MAP_EMISSION,                     // Shader location: sampler2d texture: emission
+	MAP_HEIGHT,                       // Shader location: sampler2d texture: height
+	MAP_CUBEMAP,                      // Shader location: samplerCube texture: cubemap
+	MAP_IRRADIANCE,                   // Shader location: samplerCube texture: irradiance
+	MAP_PREFILTER,                    // Shader location: samplerCube texture: prefilter
+	MAP_BRDF,                         // Shader location: sampler2d texture: brdf
+}
+
+SHADER_LOC_MAP_DIFFUSE :: ShaderLocationIndex.MAP_ALBEDO
+SHADER_LOC_MAP_SPECULAR :: ShaderLocationIndex.MAP_METALNESS
+
+// Shader uniform data type
+ShaderUniformDataType :: enum c.int {
+	FLOAT = 0,                        // Shader uniform type: float
+	VEC2,                             // Shader uniform type: vec2 (2 float)
+	VEC3,                             // Shader uniform type: vec3 (3 float)
+	VEC4,                             // Shader uniform type: vec4 (4 float)
+	INT,                              // Shader uniform type: int
+	IVEC2,                            // Shader uniform type: ivec2 (2 int)
+	IVEC3,                            // Shader uniform type: ivec3 (3 int)
+	IVEC4,                            // Shader uniform type: ivec4 (4 int)
+	SAMPLER2D,                        // Shader uniform type: sampler2d
+}
 
 // Shader attribute data types
 ShaderAttributeDataType :: enum c.int {
