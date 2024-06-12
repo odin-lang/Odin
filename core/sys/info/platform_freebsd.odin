@@ -12,7 +12,7 @@ version_string_buf: [1024]u8
 init_os_version :: proc () {
 	os_version.platform = .FreeBSD
 
-	kernel_version_buf: [129]u8
+	kernel_version_buf: [1024]u8
 
 	b := strings.builder_from_bytes(version_string_buf[:])
 	// Retrieve kernel info using `sysctl`, e.g. FreeBSD 13.1-RELEASE-p2 GENERIC
