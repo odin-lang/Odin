@@ -108,22 +108,41 @@
 package rlgl
 
 import "core:c"
+import rl "../."
 
 VERSION :: "5.0"
 
+RAYLIB_SHARED :: #config(RAYLIB_SHARED, false)
+
+// Note: We pull in the full raylib library. If you want a truly stand-alone rlgl, then:
+// - Compile a separate rlgl library and use that in the foreign import blocks below.
+// - Remove the `import rl "../."` line
+// - Copy the code from raylib.odin for any types we alias from that package (see PixelFormat etc)
+
 when ODIN_OS == .Windows {
+	@(extra_linker_flags="/NODEFAULTLIB:" + ("msvcrt" when RAYLIB_SHARED else "libcmt"))
 	foreign import lib {
-		"../windows/raylib.lib",
+		"../windows/raylibdll.lib" when RAYLIB_SHARED else "../windows/raylib.lib" ,
 		"system:Winmm.lib",
 		"system:Gdi32.lib",
 		"system:User32.lib",
 		"system:Shell32.lib",
 	}
 } else when ODIN_OS == .Linux  {
-	foreign import lib "../linux/libraylib.a"
+	foreign import lib {
+		// Note(bumbread): I'm not sure why in `linux/` folder there are
+		// multiple copies of raylib.so, but since these bindings are for
+		// particular version of the library, I better specify it. Ideally,
+		// though, it's best specified in terms of major (.so.4)
+		"../linux/libraylib.so.500" when RAYLIB_SHARED else "../linux/libraylib.a",
+		"system:dl",
+		"system:pthread",
+	}
 } else when ODIN_OS == .Darwin {
 	foreign import lib {
-		"../macos-arm64/libraylib.a" when ODIN_ARCH == .arm64 else "../macos/libraylib.a",
+		"../macos" +
+			("-arm64" when ODIN_ARCH == .arm64 else "") +
+			"/libraylib" + (".500.dylib" when RAYLIB_SHARED else ".a"),
 		"system:Cocoa.framework",
 		"system:OpenGL.framework",
 		"system:IOKit.framework",
@@ -249,7 +268,6 @@ BLEND_DST_ALPHA                      :: 0x80CA      // GL_BLEND_DST_ALPHA
 BLEND_SRC_ALPHA                      :: 0x80CB      // GL_BLEND_SRC_ALPHA
 BLEND_COLOR                          :: 0x8005      // GL_BLEND_COLOR
 
-
 //----------------------------------------------------------------------------------
 // Types and Structures Definition
 //----------------------------------------------------------------------------------
@@ -291,7 +309,6 @@ RenderBatch :: struct {
 	currentDepth:  f32,             // Current depth value for next draw
 }
 
-
 // OpenGL version
 GlVersion :: enum c.int {
 	OPENGL_11 = 1,           // OpenGL 1.1
@@ -302,6 +319,11 @@ GlVersion :: enum c.int {
 	OPENGL_ES_30,            // OpenGL ES 3.0 (GLSL 300 es)
 }
 
+PixelFormat :: rl.PixelFormat
+TextureFilter :: rl.TextureFilter
+BlendMode :: rl.BlendMode
+ShaderLocationIndex :: rl.ShaderLocationIndex
+ShaderUniformDataType :: rl.ShaderUniformDataType
 
 // Shader attribute data types
 ShaderAttributeDataType :: enum c.int {
@@ -343,8 +365,7 @@ CullMode :: enum c.int {
 	BACK,
 }
 
-// Matrix type (right handed, stored row major)
-Matrix :: #row_major matrix[4, 4]f32
+Matrix :: rl.Matrix
 
 @(default_calling_convention="c", link_prefix="rl")
 foreign lib {
