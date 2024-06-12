@@ -249,9 +249,6 @@ BLEND_DST_ALPHA                      :: 0x80CA      // GL_BLEND_DST_ALPHA
 BLEND_SRC_ALPHA                      :: 0x80CB      // GL_BLEND_SRC_ALPHA
 BLEND_COLOR                          :: 0x8005      // GL_BLEND_COLOR
 
-READ_FRAMEBUFFER                     :: 0x8CA8      // GL_READ_FRAMEBUFFER
-DRAW_FRAMEBUFFER                     :: 0x8CA9      // GL_DRAW_FRAMEBUFFER
-
 //----------------------------------------------------------------------------------
 // Types and Structures Definition
 //----------------------------------------------------------------------------------
