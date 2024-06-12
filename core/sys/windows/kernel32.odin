@@ -1153,6 +1153,19 @@ foreign kernel32 {
 	SetCommState :: proc(handle: HANDLE, dcb: ^DCB) -> BOOL ---
 }
 
+COMMTIMEOUTS :: struct {
+	ReadIntervalTimeout: DWORD,
+	ReadTotalTimeoutMultiplier: DWORD,
+	ReadTotalTimeoutConstant: DWORD,
+	WriteTotalTimeoutMultiplier: DWORD,
+	WriteTotalTimeoutConstant: DWORD,
+}
+
+@(default_calling_convention="system")
+foreign kernel32 {
+	GetCommTimeouts :: proc(handle: HANDLE, timeouts: ^COMMTIMEOUTS) -> BOOL ---
+	SetCommTimeouts :: proc(handle: HANDLE, timeouts: ^COMMTIMEOUTS) -> BOOL ---
+}
 
 LPFIBER_START_ROUTINE :: #type proc "system" (lpFiberParameter: LPVOID)
 
