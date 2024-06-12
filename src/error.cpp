@@ -323,8 +323,13 @@ gb_internal isize show_error_on_line(TokenPos const &pos, TokenPos end) {
 		}
 		error_out("\n\t");
 
-		for (i32 i = 0; i < offset; i++) {
-			error_out(" ");
+		for (i32 rune_width, off = 0; off < offset; off += rune_width) {
+			i32 rune;
+			rune_width = cast(i32)utf8proc_iterate((u8 const *)line_text + off, line_len - off, &rune);
+			int w = utf8proc_charwidth(rune);
+			if (w > 0) {
+				error_out("%.*s", w, "    ");
+			}
 		}
 
 		terminal_set_colours(TerminalStyle_Bold, TerminalColour_Green);
