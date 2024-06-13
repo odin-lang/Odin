@@ -258,6 +258,120 @@ test_pointers :: proc(t: ^testing.T) {
 	check(t, "0xFFFF", "%#4p", d)
 }
 
+@(test)
+test_odin_value_export :: proc(t: ^testing.T) {
+	E :: enum u32 {
+		A, B, C,
+	}
+
+	F :: enum i16 {
+		A, B, F,
+	}
+
+	S :: struct {
+		j, k: int,
+	}
+
+	ST :: struct {
+		x: int    `fmt:"-"`,
+		y: u8     `fmt:"r,0"`,
+		z: string `fmt:"s,0"`,
+	}
+
+	U :: union {
+		i8,
+		i16,
+	}
+
+	UEF :: union { E, F }
+
+	A :: [2]int
+
+	BSE :: distinct bit_set[E]
+
+	i    : int                          = 64
+	f    : f64                          = 3.14
+	c    : complex128                   = 7+3i
+	q    : quaternion256                = 1+2i+3j+4k
+	mat  :               matrix[2,3]f32 = {1.5, 2, 1, 0.777, 0.333, 0.8}
+	matc : #column_major matrix[2,3]f32 = {1.5, 2, 1, 0.777, 0.333, 0.8}
+	e    : enum {A, B, C}               = .B
+	en   : E                            = E.C
+	ena  : [2]E                         = {E.A, E.C}
+	s    : struct { j: int, k: int }    = { j = 16, k = 8 }
+	sn   : S                            = S{ j = 24, k = 12 }
+	st   : ST                           = { 32768, 57, "Hellope" }
+	str  : string                       = "Hellope"
+	strc : cstring                      = "Hellope"
+	bsu  : bit_set[0..<32; u32]         = {0, 1}
+	bs   : bit_set[4..<16]              = {5, 7}
+	bse  : bit_set[E]                   = { .B, .A }
+	bsE  : BSE                          = { .A, .C }
+	arr  : [3]int                       = {1, 2, 3}
+	ars  : [3]S                         = {S{j = 3, k = 2}, S{j = 2, k = 1}, S{j = 1, k = 0}}
+	darr : [dynamic]u8                  = { 128, 64, 32 }
+	dars : [dynamic]S                   = {S{j = 1, k = 2}, S{j = 3, k = 4}}
+	na   : A                            = {7, 5}
+	may0 : Maybe(int)
+	may1 : Maybe(int)                   = 1
+	uz   : union {i8, i16}              = i8(-33)
+	u0   : U                            = U(nil)
+	u1   : U                            = i16(42)
+	uef0 : UEF                          = E.A
+	uefa : [3]UEF                       = { E.A, F.A, F.F }
+	map_ : map[string]u8                = {"foo" = 8, "bar" = 4}
+
+	bf   : bit_field int {
+		a: int | 4,
+		b: int | 4,
+		e: E   | 4,
+	} = {a = 1, b = 2, e = .A}
+
+	defer {
+		delete(darr)
+		delete(dars)
+		delete(map_)
+	}
+
+	check(t, "64",                                                  "%w", i)
+	check(t, "3.14",                                                "%w", f)
+	check(t, "7+3i",                                                "%w", c)
+	check(t, "1+2i+3j+4k",                                          "%w", q)
+	check(t, "{1.5, 2, 1, 0.777, 0.333, 0.8}",                      "%w", mat)
+	check(t, "{1.5, 2, 1, 0.777, 0.333, 0.8}",                      "%w", matc)
+	check(t, ".B",                                                  "%w", e)
+	check(t, "E.C",                                                 "%w", en)
+	check(t, "{E.A, E.C}",                                          "%w", ena)
+	check(t, "{j = 16, k = 8}",                                     "%w", s)
+	check(t, "S{j = 24, k = 12}",                                   "%w", sn)
+	check(t, `ST{y = 57, z = "Hellope"}`,                           "%w", st)
+	check(t, `"Hellope"`,                                           "%w", str)
+	check(t, `"Hellope"`,                                           "%w", strc)
+	check(t, "{0, 1}",                                              "%w", bsu)
+	check(t, "{5, 7}",                                              "%w", bs)
+	check(t, "{E.A, E.B}",                                          "%w", bse)
+	check(t, "{E.A, E.C}",                                          "%w", bsE)
+	check(t, "{1, 2, 3}",                                           "%w", arr)
+	check(t, "{S{j = 3, k = 2}, S{j = 2, k = 1}, S{j = 1, k = 0}}", "%w", ars)
+	check(t, "{128, 64, 32}",                                       "%w", darr)
+	check(t, "{S{j = 1, k = 2}, S{j = 3, k = 4}}",                  "%w", dars)
+	check(t, "{7, 5}",                                              "%w", na)
+	check(t, "nil",                                                 "%w", may0)
+	check(t, "1",                                                   "%w", may1)
+	check(t, "-33",                                                 "%w", uz)
+	check(t, "nil",                                                 "%w", u0)
+	check(t, "42",                                                  "%w", u1)
+	check(t, "E.A",                                                 "%w", uef0)
+	check(t, "{E.A, F.A, F.F}",                                     "%w", uefa)
+	check(t, "{a = 1, b = 2, e = E.A}",                             "%w", bf)
+	// Check this manually due to the non-deterministic ordering of map keys.
+	switch fmt.tprintf("%w", map_) {
+	case `{"foo"=8, "bar"=4}`: break
+	case `{"bar"=4, "foo"=8}`: break
+	case: testing.fail(t)
+	}
+}
+
 @(private)
 check :: proc(t: ^testing.T, exp: string, format: string, args: ..any, loc := #caller_location) {
 	got := fmt.tprintf(format, ..args)
