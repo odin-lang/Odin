@@ -352,8 +352,7 @@ gb_internal isize show_error_on_line(TokenPos const &pos, TokenPos end) {
 					rune_width = cast(i32)utf8proc_iterate((u8 const *)line_text + off, line_len - off, &rune);
 					columns += utf8proc_charwidth(rune);
 				}
-
-				for (i32 i = 0; i < columns - 1; i++) {
+				for (i32 i = 1; i < columns; i++) {
 					error_out("~");
 				}
 				if (columns > 0 && squiggle_extra == 0) {
