@@ -1009,31 +1009,9 @@ foreign kernel32 {
 HandlerRoutine :: proc "system" (dwCtrlType: DWORD) -> BOOL
 PHANDLER_ROUTINE :: HandlerRoutine
 
+// NOTE(Jeroen, 2024-06-13): As Odin now supports bit_fields, we no longer need
+// a helper procedure. `init_dcb_with_config` and `get_dcb_config` have been removed.
 
-
-
-DCB_Config :: struct {
-	fParity: bool,
-	fOutxCtsFlow: bool,
-	fOutxDsrFlow: bool,
-	fDtrControl: DTR_Control,
-	fDsrSensitivity: bool,
-	fTXContinueOnXoff: bool,
-	fOutX: bool,
-	fInX: bool,
-	fErrorChar: bool,
-	fNull: bool,
-	fRtsControl: RTS_Control,
-	fAbortOnError: bool,
-	BaudRate: DWORD,
-	ByteSize: BYTE,
-	Parity: Parity,
-	StopBits: Stop_Bits,
-	XonChar: byte,
-	XoffChar: byte,
-	ErrorChar: byte,
-	EvtChar: byte,
-}
 DTR_Control :: enum byte {
 	Disable = 0,
 	Enable = 1,
@@ -1058,92 +1036,35 @@ Stop_Bits :: enum byte {
 	Two = 2,
 }
 
-// A helper procedure to set the values of a DCB structure.
-init_dcb_with_config :: proc "contextless" (dcb: ^DCB, config: DCB_Config) {
-	out: u32
-
-	// NOTE(tetra, 2022-09-21): On both Clang 14 on Windows, and MSVC, the bits in the bitfield
-	// appear to be defined from LSB to MSB order.
-	// i.e: `fBinary` (the first bitfield in the C source) is the LSB in the `settings` u32.
-
-	out |= u32(1) << 0 // fBinary must always be true on Windows.
-
-	out |= u32(config.fParity) << 1
-	out |= u32(config.fOutxCtsFlow) << 2
-	out |= u32(config.fOutxDsrFlow) << 3
-
-	out |= u32(config.fDtrControl) << 4
-
-	out |= u32(config.fDsrSensitivity) << 6
-	out |= u32(config.fTXContinueOnXoff) << 7
-	out |= u32(config.fOutX) << 8
-	out |= u32(config.fInX) << 9
-	out |= u32(config.fErrorChar) << 10
-	out |= u32(config.fNull) << 11
-
-	out |= u32(config.fRtsControl) << 12
-
-	out |= u32(config.fAbortOnError) << 14
-
-	dcb.settings = out
-
-	dcb.BaudRate = config.BaudRate
-	dcb.ByteSize = config.ByteSize
-	dcb.Parity = config.Parity
-	dcb.StopBits = config.StopBits
-	dcb.XonChar = config.XonChar
-	dcb.XoffChar = config.XoffChar
-	dcb.ErrorChar = config.ErrorChar
-	dcb.EvtChar = config.EvtChar
-
-	dcb.DCBlength = size_of(DCB)
-}
-get_dcb_config :: proc "contextless" (dcb: DCB) -> (config: DCB_Config) {
-	config.fParity = bool((dcb.settings >> 1) & 0x01)
-	config.fOutxCtsFlow = bool((dcb.settings >> 2) & 0x01)
-	config.fOutxDsrFlow = bool((dcb.settings >> 3) & 0x01)
-
-	config.fDtrControl = DTR_Control((dcb.settings >> 4) & 0x02)
-
-	config.fDsrSensitivity = bool((dcb.settings >> 6) & 0x01)
-	config.fTXContinueOnXoff = bool((dcb.settings >> 7) & 0x01)
-	config.fOutX = bool((dcb.settings >> 8) & 0x01)
-	config.fInX = bool((dcb.settings >> 9) & 0x01)
-	config.fErrorChar = bool((dcb.settings >> 10) & 0x01)
-	config.fNull = bool((dcb.settings >> 11) & 0x01)
-
-	config.fRtsControl = RTS_Control((dcb.settings >> 12) & 0x02)
-
-	config.fAbortOnError = bool((dcb.settings >> 14) & 0x01)
-
-	config.BaudRate = dcb.BaudRate
-	config.ByteSize = dcb.ByteSize
-	config.Parity = dcb.Parity
-	config.StopBits = dcb.StopBits
-	config.XonChar = dcb.XonChar
-	config.XoffChar = dcb.XoffChar
-	config.ErrorChar = dcb.ErrorChar
-	config.EvtChar = dcb.EvtChar
-
-	return
-}
-
-// NOTE(tetra): See get_dcb_config() and init_dcb_with_config() for help with initializing this.
 DCB :: struct {
-	DCBlength: DWORD, // NOTE(tetra): Must be set to size_of(DCB).
-	BaudRate: DWORD,
-	settings: u32, // NOTE(tetra): These are bitfields in the C struct.
-	wReserved: WORD,
-	XOnLim: WORD,
-	XOffLim: WORD,
-	ByteSize: BYTE,
-	Parity: Parity,
-	StopBits: Stop_Bits,
-	XonChar: byte,
-	XoffChar: byte,
-	ErrorChar: byte,
-	EofChar: byte,
-	EvtChar: byte,
+	DCBlength:  DWORD,
+	BaudRate:   DWORD,
+	using _: bit_field DWORD {
+		fBinary:           bool        | 1,
+		fParity:           bool        | 1,
+		fOutxCtsFlow:      bool        | 1,
+		fOutxDsrFlow:      bool        | 1,
+		fDtrControl:       DTR_Control | 2,
+		fDsrSensitivity:   bool        | 1,
+		fTXContinueOnXoff: bool        | 1,
+		fOutX:             bool        | 1,
+		fInX:              bool        | 1,
+		fErrorChar:        bool        | 1,
+		fNull:             bool        | 1,
+		fRtsControl:       RTS_Control | 2,
+		fAbortOnError:     bool        | 1,
+	},
+	wReserved:  WORD,
+	XOnLim:     WORD,
+	XOffLim:    WORD,
+	ByteSize:   BYTE,
+	Parity:     Parity,
+	StopBits:   Stop_Bits,
+	XonChar:    byte,
+	XoffChar:   byte,
+	ErrorChar:  byte,
+	EofChar:    byte,
+	EvtChar:    byte,
 	wReserved1: WORD,
 }
 
