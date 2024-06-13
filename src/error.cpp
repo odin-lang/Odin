@@ -336,15 +336,27 @@ gb_internal isize show_error_on_line(TokenPos const &pos, TokenPos end) {
 
 		error_out("^");
 		if (end.file_id == pos.file_id) {
+			i32 rune;
+
 			if (end.line > pos.line) {
-				for (i32 i = offset; i < line_len; i++) {
-					error_out("~");
+				for (i32 rune, rune_width, off = offset; off < line_len; off += rune_width) {
+					rune_width = cast(i32)utf8proc_iterate((u8 const *)line_text + off, line_len - off, &rune);
+					int w = utf8proc_charwidth(rune);
+					if (w > 0) {
+						error_out("%.*s", w, "~~~~");
+					}
 				}
 			} else if (end.line == pos.line && end.column > pos.column) {
-				for (i32 i = 1; i < error_length-1+squiggle_extra; i++) {
+				i32 columns = squiggle_extra;
+				for (i32 rune, rune_width, off = offset; off < offset + error_length - 1; off += rune_width) {
+					rune_width = cast(i32)utf8proc_iterate((u8 const *)line_text + off, line_len - off, &rune);
+					columns += utf8proc_charwidth(rune);
+				}
+
+				for (i32 i = 0; i < columns - 1; i++) {
 					error_out("~");
 				}
-				if (error_length > 1 && squiggle_extra == 0) {
+				if (columns > 0 && squiggle_extra == 0) {
 					error_out("^");
 				}
 			}
