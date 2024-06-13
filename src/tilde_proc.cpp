@@ -1,5 +1,5 @@
 #ifndef TILDE_DO_CODEGEN
-#define TILDE_DO_CODEGEN 0
+#define TILDE_DO_CODEGEN 1
 #endif
 
 gb_internal TB_FunctionPrototype *cg_procedure_type_as_prototype(cgModule *m, Type *type) {
@@ -388,9 +388,11 @@ gb_internal WORKER_TASK_PROC(cg_procedure_compile_worker_proc) {
 	}
 
 #if TILDE_DO_CODEGEN
+	// gb_printf_err("[START] %.*s\n", LIT(p->name));
 	bool emit_asm = false;
 	TB_FunctionOutput *output = tb_codegen(p->func, cg_worklist(), cg_arena(), &feature_set, emit_asm);
 	gb_unused(output);
+	// gb_printf_err("[END] %.*s\n", LIT(p->name));
 #endif
 
 	// tb_print(p->func, cg_arena());

@@ -1511,12 +1511,15 @@ TB_API int tb_builder_split_mem(TB_GraphBuilder* g, int in_mem, int split_count,
 //   this will merge the memory effects back into out_mem, split_vars being the result of a tb_builder_split_mem(...)
 TB_API void tb_builder_merge_mem(TB_GraphBuilder* g, int out_mem, int split_count, int split_vars, TB_Node* split);
 
+TB_API void tb_builder_loc(TB_GraphBuilder* g, int mem_var, TB_SourceFile* file, int line, int column);
+
 // function call
 TB_API TB_Node** tb_builder_call(TB_GraphBuilder* g, TB_FunctionPrototype* proto, int mem_var, TB_Node* target, int arg_count, TB_Node** args);
 TB_API TB_Node*  tb_builder_syscall(TB_GraphBuilder* g, TB_DataType dt, int mem_var, TB_Node* target, int arg_count, TB_Node** args);
 
 // locals (variables but as stack vars)
 TB_API TB_Node* tb_builder_local(TB_GraphBuilder* g, TB_CharUnits size, TB_CharUnits align);
+TB_API void tb_builder_local_dbg(TB_GraphBuilder* g, TB_Node* n, ptrdiff_t len, const char* name, TB_DebugType* type);
 
 // variables:
 //   just gives you the ability to construct mutable names, from
