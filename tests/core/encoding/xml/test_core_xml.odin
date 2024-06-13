@@ -36,7 +36,7 @@ xml_test_utf8_normal :: proc(t: ^testing.T) {
 			},
 			expected_doctype = "恥ずべきフクロウ",
 		},
-		crc32     = 0xe9b62f03,
+		crc32     = 0xefa55f27,
 	})
 }
 
@@ -52,7 +52,7 @@ xml_test_utf8_unbox_cdata :: proc(t: ^testing.T) {
 			},
 			expected_doctype = "恥ずべきフクロウ",
 		},
-		crc32     = 0x9c2643ed,
+		crc32     = 0x2dd27770,
 	})
 }
 
@@ -128,7 +128,7 @@ xml_test_entities_unbox :: proc(t: ^testing.T) {
 			},
 			expected_doctype = "html",
 		},
-		crc32     = 0x3b6d4a90,
+		crc32     = 0x350ca83e,
 	})
 }
 
@@ -142,7 +142,21 @@ xml_test_entities_unbox_decode :: proc(t: ^testing.T) {
 			},
 			expected_doctype = "html",
 		},
-		crc32     = 0x5be2ffdc,
+		crc32     = 0x7f58db7d,
+	})
+}
+
+@(test)
+xml_test_attribute_whitespace :: proc(t: ^testing.T) {
+	run_test(t, {
+		// Same as above.
+		// Unbox CDATA in data tag.
+		filename  = "XML/attribute-whitespace.xml",
+		options   = {
+			flags = {},
+			expected_doctype = "foozle",
+		},
+		crc32     = 0x8f5fd6c1,
 	})
 }
 
@@ -172,7 +186,7 @@ xml_test_unicode :: proc(t: ^testing.T) {
 			expected_doctype = "",
 		},
 		err       = .None,
-		crc32     = 0x0b6100ab,
+		crc32     = 0x73070b55,
 	})
 }
 
