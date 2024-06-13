@@ -1,68 +1,17 @@
 package test_core_time
 
-import "core:fmt"
-import "core:mem"
-import "core:os"
 import "core:testing"
 import "core:time"
 import dt "core:time/datetime"
 
 is_leap_year :: time.is_leap_year
 
-TEST_count := 0
-TEST_fail  := 0
-
-when ODIN_TEST {
-	expect       :: testing.expect
-	expect_value :: testing.expect_value
-	log          :: testing.log
-} else {
-	expect  :: proc(t: ^testing.T, condition: bool, message: string, loc := #caller_location) {
-		TEST_count += 1
-		if !condition {
-			TEST_fail += 1
-			fmt.printf("[%v] %v\n", loc, message)
-			return
-		}
-	}
-	log     :: proc(t: ^testing.T, v: any, loc := #caller_location) {
-		fmt.printf("[%v] ", loc)
-		fmt.printf("log: %v\n", v)
-	}
-}
-
-main :: proc() {
-	t := testing.T{}
-
-	track: mem.Tracking_Allocator
-	mem.tracking_allocator_init(&track, context.allocator)
-	defer mem.tracking_allocator_destroy(&track)
-	context.allocator = mem.tracking_allocator(&track)
-
-	test_ordinal_date_roundtrip(&t)
-	test_component_to_time_roundtrip(&t)
-	test_parse_rfc3339_string(&t)
-	test_parse_iso8601_string(&t)
-
-	for _, leak in track.allocation_map {
-		expect(&t, false, fmt.tprintf("%v leaked %m\n", leak.location, leak.size))
-	}
-	for bad_free in track.bad_free_array {
-		expect(&t, false, fmt.tprintf("%v allocation %p was freed badly\n", bad_free.location, bad_free.memory))
-	}
-
-	fmt.printf("%v/%v tests successful.\n", TEST_count - TEST_fail, TEST_count)
-	if TEST_fail > 0 {
-		os.exit(1)
-	}
-}
-
 @test
 test_ordinal_date_roundtrip :: proc(t: ^testing.T) {
-	expect(t, dt.unsafe_ordinal_to_date(dt.unsafe_date_to_ordinal(dt.MIN_DATE)) == dt.MIN_DATE, "Roundtripping MIN_DATE failed.")
-	expect(t, dt.unsafe_date_to_ordinal(dt.unsafe_ordinal_to_date(dt.MIN_ORD))  == dt.MIN_ORD,  "Roundtripping MIN_ORD failed.")
-	expect(t, dt.unsafe_ordinal_to_date(dt.unsafe_date_to_ordinal(dt.MAX_DATE)) == dt.MAX_DATE, "Roundtripping MAX_DATE failed.")
-	expect(t, dt.unsafe_date_to_ordinal(dt.unsafe_ordinal_to_date(dt.MAX_ORD))  == dt.MAX_ORD,  "Roundtripping MAX_ORD failed.")
+	testing.expect(t, dt.unsafe_ordinal_to_date(dt.unsafe_date_to_ordinal(dt.MIN_DATE)) == dt.MIN_DATE, "Roundtripping MIN_DATE failed.")
+	testing.expect(t, dt.unsafe_date_to_ordinal(dt.unsafe_ordinal_to_date(dt.MIN_ORD))  == dt.MIN_ORD,  "Roundtripping MIN_ORD failed.")
+	testing.expect(t, dt.unsafe_ordinal_to_date(dt.unsafe_date_to_ordinal(dt.MAX_DATE)) == dt.MAX_DATE, "Roundtripping MAX_DATE failed.")
+	testing.expect(t, dt.unsafe_date_to_ordinal(dt.unsafe_ordinal_to_date(dt.MAX_ORD))  == dt.MAX_ORD,  "Roundtripping MAX_ORD failed.")
 }
 
 /*
@@ -160,22 +109,51 @@ test_parse_rfc3339_string :: proc(t: ^testing.T) {
 		is_leap := false
 		if test.apply_offset {
 			res, consumed := time.rfc3339_to_time_utc(test.rfc_3339, &is_leap)
-			msg := fmt.tprintf("[apply offet] Parsing failed: %v -> %v (nsec: %v). Expected %v consumed, got %v", test.rfc_3339, res, res._nsec, test.consumed, consumed)
-			expect(t, test.consumed == consumed, msg)
+			testing.expectf(
+				t,
+				test.consumed == consumed,
+				"[apply offet] Parsing failed: %v -> %v (nsec: %v). Expected %v consumed, got %v",
+				test.rfc_3339, res, res._nsec, test.consumed, consumed,
+			)
 
 			if test.consumed == consumed {
-				expect(t, test.datetime == res,     fmt.tprintf("Time didn't match. Expected %v (%v), got %v (%v)", test.datetime, test.datetime._nsec, res, res._nsec))
-				expect(t, test.is_leap  == is_leap, "Expected a leap second, got none.")
+				testing.expectf(
+					t,
+					test.datetime == res,
+					"Time didn't match. Expected %v (%v), got %v (%v)",
+					test.datetime, test.datetime._nsec, res, res._nsec,
+				)
+				testing.expect(
+					t,
+					test.is_leap == is_leap,
+					"Expected a leap second, got none",
+				)
 			}
 		} else {
 			res, offset, consumed := time.rfc3339_to_time_and_offset(test.rfc_3339)
-			msg := fmt.tprintf("Parsing failed: %v -> %v (nsec: %v), offset: %v. Expected %v consumed, got %v", test.rfc_3339, res, res._nsec, offset, test.consumed, consumed)
-			expect(t, test.consumed == consumed, msg)
+			testing.expectf(
+				t,
+				test.consumed == consumed,
+				"Parsing failed: %v -> %v (nsec: %v), offset: %v. Expected %v consumed, got %v",
+				test.rfc_3339, res, res._nsec, offset, test.consumed, consumed,
+			)
 
 			if test.consumed == consumed {
-				expect(t, test.datetime   == res,     fmt.tprintf("Time didn't match. Expected %v (%v), got %v (%v)", test.datetime, test.datetime._nsec, res, res._nsec))
-				expect(t, test.utc_offset == offset,  fmt.tprintf("UTC offset didn't match. Expected %v, got %v", test.utc_offset, offset))
-				expect(t, test.is_leap    == is_leap, "Expected a leap second, got none.")
+				testing.expectf(
+					t, test.datetime == res,
+					"Time didn't match. Expected %v (%v), got %v (%v)",
+					test.datetime, test.datetime._nsec, res, res._nsec,
+				)
+				testing.expectf(
+					t,
+					test.utc_offset == offset,
+					"UTC offset didn't match. Expected %v, got %v",
+					test.utc_offset, offset,
+				)
+				testing.expect(
+					t, test.is_leap == is_leap,
+					"Expected a leap second, got none",
+				)
 			}
 		}
 	}
@@ -187,22 +165,52 @@ test_parse_iso8601_string :: proc(t: ^testing.T) {
 		is_leap := false
 		if test.apply_offset {
 			res, consumed := time.iso8601_to_time_utc(test.iso_8601, &is_leap)
-			msg := fmt.tprintf("[apply offet] Parsing failed: %v -> %v (nsec: %v). Expected %v consumed, got %v", test.iso_8601, res, res._nsec, test.consumed, consumed)
-			expect(t, test.consumed == consumed, msg)
+			testing.expectf(
+				t,
+				test.consumed == consumed,
+				"[apply offet] Parsing failed: %v -> %v (nsec: %v). Expected %v consumed, got %v",
+				test.iso_8601, res, res._nsec, test.consumed, consumed,
+			)
 
 			if test.consumed == consumed {
-				expect(t, test.datetime == res,     fmt.tprintf("Time didn't match. Expected %v (%v), got %v (%v)", test.datetime, test.datetime._nsec, res, res._nsec))
-				expect(t, test.is_leap  == is_leap, "Expected a leap second, got none.")
+				testing.expectf(
+					t,
+					test.datetime == res,
+					"Time didn't match. Expected %v (%v), got %v (%v)",
+					test.datetime, test.datetime._nsec, res, res._nsec,
+				)
+				testing.expect(
+					t,
+					test.is_leap == is_leap,
+					"Expected a leap second, got none",
+				)
 			}
 		} else {
 			res, offset, consumed := time.iso8601_to_time_and_offset(test.iso_8601)
-			msg := fmt.tprintf("Parsing failed: %v -> %v (nsec: %v), offset: %v. Expected %v consumed, got %v", test.iso_8601, res, res._nsec, offset, test.consumed, consumed)
-			expect(t, test.consumed == consumed, msg)
+			testing.expectf(
+				t,
+				test.consumed == consumed,
+				"Parsing failed: %v -> %v (nsec: %v), offset: %v. Expected %v consumed, got %v",
+				test.iso_8601, res, res._nsec, offset, test.consumed, consumed,
+			)
 
 			if test.consumed == consumed {
-				expect(t, test.datetime   == res,     fmt.tprintf("Time didn't match. Expected %v (%v), got %v (%v)", test.datetime, test.datetime._nsec, res, res._nsec))
-				expect(t, test.utc_offset == offset,  fmt.tprintf("UTC offset didn't match. Expected %v, got %v", test.utc_offset, offset))
-				expect(t, test.is_leap    == is_leap, "Expected a leap second, got none.")
+				testing.expectf(
+					t, test.datetime == res,
+					"Time didn't match. Expected %v (%v), got %v (%v)",
+					test.datetime, test.datetime._nsec, res, res._nsec,
+				)
+				testing.expectf(
+					t,
+					test.utc_offset == offset,
+					"UTC offset didn't match. Expected %v, got %v",
+					test.utc_offset, offset,
+				)
+				testing.expect(
+					t,
+					test.is_leap == is_leap,
+					"Expected a leap second, got none",
+				)
 			}
 		}
 	}
@@ -231,15 +239,21 @@ test_component_to_time_roundtrip :: proc(t: ^testing.T) {
 
 date_component_roundtrip_test :: proc(t: ^testing.T, moment: dt.DateTime) {
 	res, ok := time.datetime_to_time(moment.year, moment.month, moment.day, moment.hour, moment.minute, moment.second)
-	expect(t, ok, "Couldn't convert date components into date")
+	testing.expect(
+		t,
+		ok,
+		"Couldn't convert date components into date",
+	)
 
 	YYYY, MM, DD := time.date(res)
 	hh,   mm, ss := time.clock(res)
 
-	expected := fmt.tprintf("Expected %4d-%2d-%2d %2d:%2d:%2d, got %4d-%2d-%2d %2d:%2d:%2d",
-	                        moment.year, moment.month, moment.day, moment.hour, moment.minute, moment.second, YYYY, MM, DD, hh, mm, ss)
-
 	ok =  moment.year == i64(YYYY) && moment.month == i8(MM) && moment.day    == i8(DD)
 	ok &= moment.hour == i8(hh)   && moment.minute == i8(mm) && moment.second == i8(ss)
-	expect(t, ok, expected)
+	testing.expectf(
+		t,
+		ok,
+		"Expected %4d-%2d-%2d %2d:%2d:%2d, got %4d-%2d-%2d %2d:%2d:%2d",
+		moment.year, moment.month, moment.day, moment.hour, moment.minute, moment.second, YYYY, MM, DD, hh, mm, ss,
+	)
 }

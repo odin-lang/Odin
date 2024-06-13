@@ -453,9 +453,9 @@ foreign kernel32 {
 	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-setfilecompletionnotificationmodes)
 	SetFileCompletionNotificationModes :: proc(FileHandle: HANDLE, Flags: u8) -> BOOL ---
 	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/ioapiset/nf-ioapiset-createiocompletionport)
-	CreateIoCompletionPort :: proc(FileHandle: HANDLE, ExistingCompletionPort: HANDLE, CompletionKey: ^uintptr, NumberOfConcurrentThreads: DWORD) -> HANDLE ---
+	CreateIoCompletionPort :: proc(FileHandle: HANDLE, ExistingCompletionPort: HANDLE, CompletionKey: ULONG_PTR, NumberOfConcurrentThreads: DWORD) -> HANDLE ---
 	//[MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/ioapiset/nf-ioapiset-getqueuedcompletionstatus)
-	GetQueuedCompletionStatus :: proc(CompletionPort: HANDLE, lpNumberOfBytesTransferred: ^DWORD, lpCompletionKey: uintptr, lpOverlapped: ^^OVERLAPPED, dwMilliseconds: DWORD) -> BOOL ---
+	GetQueuedCompletionStatus :: proc(CompletionPort: HANDLE, lpNumberOfBytesTransferred: ^DWORD, lpCompletionKey: PULONG_PTR, lpOverlapped: ^^OVERLAPPED, dwMilliseconds: DWORD) -> BOOL ---
 	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/ioapiset/nf-ioapiset-getqueuedcompletionstatusex)
 	GetQueuedCompletionStatusEx :: proc(CompletionPort: HANDLE, lpCompletionPortEntries: ^OVERLAPPED_ENTRY, ulCount: c_ulong, ulNumEntriesRemoved: ^c_ulong, dwMilliseconds: DWORD, fAlertable: BOOL) -> BOOL ---
 	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/ioapiset/nf-ioapiset-postqueuedcompletionstatus)
@@ -1153,6 +1153,19 @@ foreign kernel32 {
 	SetCommState :: proc(handle: HANDLE, dcb: ^DCB) -> BOOL ---
 }
 
+COMMTIMEOUTS :: struct {
+	ReadIntervalTimeout: DWORD,
+	ReadTotalTimeoutMultiplier: DWORD,
+	ReadTotalTimeoutConstant: DWORD,
+	WriteTotalTimeoutMultiplier: DWORD,
+	WriteTotalTimeoutConstant: DWORD,
+}
+
+@(default_calling_convention="system")
+foreign kernel32 {
+	GetCommTimeouts :: proc(handle: HANDLE, timeouts: ^COMMTIMEOUTS) -> BOOL ---
+	SetCommTimeouts :: proc(handle: HANDLE, timeouts: ^COMMTIMEOUTS) -> BOOL ---
+}
 
 LPFIBER_START_ROUTINE :: #type proc "system" (lpFiberParameter: LPVOID)
 

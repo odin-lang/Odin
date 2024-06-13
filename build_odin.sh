@@ -71,8 +71,8 @@ Darwin)
 	fi
 
 	darwin_sysroot=
-	if [ $(which xcode-select) ]; then
-		darwin_sysroot="--sysroot $(xcode-select -p)/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk"
+	if [ $(which xcrun) ]; then
+		darwin_sysroot="--sysroot $(xcrun --sdk macosx --show-sdk-path)"
 	elif [[ -e "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk" ]]; then
 		darwin_sysroot="--sysroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk"
 	else

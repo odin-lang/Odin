@@ -13,14 +13,18 @@ function stripNewline(str) {
     return str.replace(/\n/, ' ')
 }
 
-const INT_SIZE    = 4; // NOTE: set to `8` if the target has 64 bit ints (`wasm64p32` for example).
-const STRING_SIZE = 2*INT_SIZE;
-
 class WasmMemoryInterface {
 	constructor() {
 		this.memory = null;
 		this.exports = null;
 		this.listenerMap = {};
+
+		// Size (in bytes) of the integer type, should be 4 on `js_wasm32` and 8 on `js_wasm64p32`
+		this.intSize = 4;
+	}
+
+	setIntSize(size) {
+		this.intSize = size;
 	}
 
 	setMemory(memory) {
@@ -73,21 +77,21 @@ class WasmMemoryInterface {
 	loadF32(addr) { return this.mem.getFloat32(addr, true); }
 	loadF64(addr) { return this.mem.getFloat64(addr, true); }
 	loadInt(addr) {
-		if (INT_SIZE == 8) {
+		if (this.intSize == 8) {
 			return this.loadI64(addr);
-		} else if (INT_SIZE == 4) {
+		} else if (this.intSize == 4) {
 			return this.loadI32(addr);
 		} else {
-			throw new Error('Unhandled `INT_SIZE`, expected `4` or `8`');
+			throw new Error('Unhandled `intSize`, expected `4` or `8`');
 		}
 	};
 	loadUint(addr) {
-		if (INT_SIZE == 8) {
+		if (this.intSize == 8) {
 			return this.loadU64(addr);
-		} else if (INT_SIZE == 4) {
+		} else if (this.intSize == 4) {
 			return this.loadU32(addr);
 		} else {
-			throw new Error('Unhandled `INT_SIZE`, expected `4` or `8`');
+			throw new Error('Unhandled `intSize`, expected `4` or `8`');
 		}
 	};
 	loadPtr(addr) { return this.loadU32(addr); }
@@ -108,31 +112,43 @@ class WasmMemoryInterface {
 	storeU32(addr, value) { this.mem.setUint32 (addr, value, true); }
 	storeI32(addr, value) { this.mem.setInt32  (addr, value, true); }
 	storeU64(addr, value) {
-		this.mem.setUint32(addr + 0, value, true);
-		this.mem.setUint32(addr + 4, Math.floor(value / 4294967296), true);
+		this.mem.setUint32(addr + 0, Number(value), true);
+
+		let div = 4294967296;
+		if (typeof value == 'bigint') {
+			div = BigInt(div);
+		}
+
+		this.mem.setUint32(addr + 4, Math.floor(Number(value / div)), true);
 	}
 	storeI64(addr, value) {
-		this.mem.setUint32(addr + 0, value, true);
-		this.mem.setInt32 (addr + 4, Math.floor(value / 4294967296), true);
+		this.mem.setUint32(addr + 0, Number(value), true);
+
+		let div = 4294967296;
+		if (typeof value == 'bigint') {
+			div = BigInt(div);
+		}
+
+		this.mem.setInt32(addr + 4, Math.floor(Number(value / div)), true);
 	}
 	storeF32(addr, value) { this.mem.setFloat32(addr, value, true); }
 	storeF64(addr, value) { this.mem.setFloat64(addr, value, true); }
 	storeInt(addr, value) {
-		if (INT_SIZE == 8) {
+		if (this.intSize == 8) {
 			this.storeI64(addr, value);
-		} else if (INT_SIZE == 4) {
+		} else if (this.intSize == 4) {
 			this.storeI32(addr, value);
 		} else {
-			throw new Error('Unhandled `INT_SIZE`, expected `4` or `8`');
+			throw new Error('Unhandled `intSize`, expected `4` or `8`');
 		}
 	}
 	storeUint(addr, value) {
-		if (INT_SIZE == 8) {
+		if (this.intSize == 8) {
 			this.storeU64(addr, value);
-		} else if (INT_SIZE == 4) {
+		} else if (this.intSize == 4) {
 			this.storeU32(addr, value);
 		} else {
-			throw new Error('Unhandled `INT_SIZE`, expected `4` or `8`');
+			throw new Error('Unhandled `intSize`, expected `4` or `8`');
 		}
 	}
 
@@ -241,10 +257,11 @@ class WebGLInterface {
 		}
 	}
 	getSource(shader, strings_ptr, strings_length) {
+		const stringSize = this.mem.intSize*2;
 		let source = "";
 		for (let i = 0; i < strings_length; i++) {
-			let ptr = this.mem.loadPtr(strings_ptr + i*STRING_SIZE);
-			let len = this.mem.loadPtr(strings_ptr + i*STRING_SIZE + 4);
+			let ptr = this.mem.loadPtr(strings_ptr + i*stringSize);
+			let len = this.mem.loadPtr(strings_ptr + i*stringSize + 4);
 			let str = this.mem.loadString(ptr, len);
 			source += str;
 		}
@@ -1151,10 +1168,11 @@ class WebGLInterface {
 			},
 			TransformFeedbackVaryings: (program, varyings_ptr, varyings_len, bufferMode) => {
 				this.assertWebGL2();
+				const stringSize = this.mem.intSize*2;
 				let varyings = [];
 				for (let i = 0; i < varyings_len; i++) {
-					let ptr = this.mem.loadPtr(varyings_ptr + i*STRING_SIZE + 0*4);
-					let len = this.mem.loadPtr(varyings_ptr + i*STRING_SIZE + 1*4);
+					let ptr = this.mem.loadPtr(varyings_ptr + i*stringSize + 0*4);
+					let len = this.mem.loadPtr(varyings_ptr + i*stringSize + 1*4);
 					varyings.push(this.mem.loadString(ptr, len));
 				}
 				this.ctx.transformFeedbackVaryings(this.programs[program], varyings, bufferMode);
@@ -1393,7 +1411,7 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 		},
 		"odin_dom": {
 			init_event_raw: (ep) => {
-				const W = 4;
+				const W = wasmMemoryInterface.intSize;
 				let offset = ep;
 				let off = (amount, alignment) => {
 					if (alignment === undefined) {
@@ -1405,6 +1423,13 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 					let x = offset;
 					offset += amount;
 					return x;
+				};
+
+				let align = (alignment) => {
+					const modulo = offset & (alignment-1);
+					if (modulo != 0) {
+						offset += alignment - modulo
+					}
 				};
 
 				let wmi = wasmMemoryInterface;
@@ -1427,10 +1452,12 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 					wmi.storeU32(off(4), 0);
 				}
 
-				wmi.storeUint(off(W), event_temp_data.id_ptr);
-				wmi.storeUint(off(W), event_temp_data.id_len);
-				wmi.storeUint(off(W), 0); // padding
+				align(W);
 
+				wmi.storeI32(off(W), event_temp_data.id_ptr);
+				wmi.storeUint(off(W), event_temp_data.id_len);
+
+				align(8);
 				wmi.storeF64(off(8), e.timeStamp*1e-3);
 
 				wmi.storeU8(off(1), e.eventPhase);
@@ -1442,8 +1469,13 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 				wmi.storeU8(off(1), !!e.isComposing);
 				wmi.storeU8(off(1), !!e.isTrusted);
 
-				let base = off(0, 8);
-				if (e instanceof MouseEvent) {
+				align(8);
+				if (e instanceof WheelEvent) {
+					wmi.storeF64(off(8), e.deltaX);
+					wmi.storeF64(off(8), e.deltaY);
+					wmi.storeF64(off(8), e.deltaZ);
+					wmi.storeU32(off(4), e.deltaMode);
+				} else if (e instanceof MouseEvent) {
 					wmi.storeI64(off(8), e.screenX);
 					wmi.storeI64(off(8), e.screenY);
 					wmi.storeI64(off(8), e.clientX);
@@ -1482,11 +1514,6 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 					wmi.storeI32(off(W), e.code.length)
 					wmi.storeString(off(16, 1), e.key);
 					wmi.storeString(off(16, 1), e.code);
-				} else if (e instanceof WheelEvent) {
-					wmi.storeF64(off(8), e.deltaX);
-					wmi.storeF64(off(8), e.deltaY);
-					wmi.storeF64(off(8), e.deltaZ);
-					wmi.storeU32(off(4), e.deltaMode);
 				} else if (e.type === 'scroll') {
 					wmi.storeF64(off(8), window.scrollX);
 					wmi.storeF64(off(8), window.scrollY);
@@ -1689,8 +1716,15 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 	};
 };
 
-async function runWasm(wasmPath, consoleElement, extraForeignImports) {
-	let wasmMemoryInterface = new WasmMemoryInterface();
+/**
+ * @param {string} wasmPath                          - Path to the WASM module to run
+ * @param {?HTMLPreElement} consoleElement           - Optional console/pre element to append output to, in addition to the console
+ * @param {any} extraForeignImports                  - Imports, in addition to the default runtime to provide the module
+ * @param {?int} intSize                             - Size (in bytes) of the integer type, should be 4 on `js_wasm32` and 8 on `js_wasm64p32`
+ */
+async function runWasm(wasmPath, consoleElement, extraForeignImports, intSize = 4) {
+	const wasmMemoryInterface = new WasmMemoryInterface();
+	wasmMemoryInterface.setIntSize(intSize);
 
 	let imports = odinSetupDefaultImports(wasmMemoryInterface, consoleElement);
 	let exports = {};

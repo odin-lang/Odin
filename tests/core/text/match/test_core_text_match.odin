@@ -2,31 +2,6 @@ package test_strlib
 
 import "core:text/match"
 import "core:testing"
-import "core:fmt"
-import "core:os"
-import "core:io"
-
-TEST_count: int
-TEST_fail: int
-
-// inline expect with custom props
-failed :: proc(t: ^testing.T, ok: bool, loc := #caller_location) -> bool {
-	TEST_count += 1
-	
-	if !ok {
-		fmt.wprintf(t.w, "%v: ", loc)
-		t.error_count += 1	
-		TEST_fail += 1
-	}
-
-	return !ok
-}
-
-expect :: testing.expect
-
-logf :: proc(t: ^testing.T, format: string, args: ..any) {
-	fmt.wprintf(t.w, format, ..args)
-}
 
 // find correct byte offsets 
 @test
@@ -61,18 +36,17 @@ test_find :: proc(t: ^testing.T) {
 		{ "helelo", "h.-l", 0, { 0, 3, true } },
 	}
 
-	for entry, i in ENTRIES {
+	for entry in ENTRIES {
 		matcher := match.matcher_init(entry.s, entry.p, entry.offset)
 		start, end, ok := match.matcher_find(&matcher)
 		success := entry.match.ok == ok && start == entry.match.start && end == entry.match.end
 
-		if failed(t, success) {
-			logf(t, "Find %d failed!\n", i)
-			logf(t, "\tHAYSTACK %s\tPATTERN %s\n", entry.s, entry.p)
-			logf(t, "\tSTART: %d == %d?\n", entry.match.start, start)
-			logf(t, "\tEND: %d == %d?\n", entry.match.end, end)
-			logf(t, "\tErr: %v\tLength %d\n", matcher.err, matcher.captures_length)			
-		}		
+		testing.expectf(
+			t,
+			success,
+			"HAYSTACK %q PATTERN %q, START: %d == %d? END: %d == %d? Err: %v Length %d",
+			entry.s, entry.p, entry.match.start, start, entry.match.end, end, matcher.err, matcher.captures_length,
+		)
 	}
 }
 
@@ -178,17 +152,17 @@ test_match :: proc(t: ^testing.T) {
 		{ "testing _this_ out", "%b_", "", false },
 	}
 
-	for entry, i in ENTRIES {
+	for entry in ENTRIES {
 		matcher := match.matcher_init(entry.s, entry.p)
 		result, ok := match.matcher_match(&matcher)
 		success := entry.ok == ok && result == entry.result
 
-		if failed(t, success) {
-			logf(t, "Match %d failed!\n", i)
-			logf(t, "\tHAYSTACK %s\tPATTERN %s\n", entry.s, entry.p)
-			logf(t, "\tResults: WANTED %s\tGOT %s\n", entry.result, result)
-			logf(t, "\tErr: %v\tLength %d\n", matcher.err, matcher.captures_length)
-		}
+		testing.expectf(
+			t,
+			success,
+			"HAYSTACK %q PATTERN %q WANTED %q GOT %q Err: %v Length %d",
+			entry.s, entry.p, entry.result, result, matcher.err, matcher.captures_length,
+		)
 	}
 }
 
@@ -203,19 +177,23 @@ test_captures :: proc(t: ^testing.T) {
 	compare_captures :: proc(t: ^testing.T, test: ^Temp, haystack: string, comp: []string, loc := #caller_location) {
 		length, err := match.find_aux(haystack, test.pattern, 0, false, &test.captures)
 		result := len(comp) == length && err == .OK
-		if failed(t, result == true) {
-			logf(t, "Captures Compare Failed!\n")
-			logf(t, "\tErr: %v\n", err)
-			logf(t, "\tLengths: %v != %v\n", len(comp), length)
-		}
+		testing.expectf(
+			t,
+			result,
+			"Captures Compare Failed! Lengths: %v != %v Err: %v",
+			len(comp), length, err,
+		)
 
 		for i in 0..<length {
 			cap := test.captures[i]
 			text := haystack[cap.byte_start:cap.byte_end]
 
-			if failed(t, comp[i] == text) {
-				logf(t, "Capture don't equal -> %s != %s\n", comp[i], text)
-			}
+			testing.expectf(
+				t,
+				comp[i] == text,
+				"Capture don't equal -> %q != %q\n",
+				comp[i], text,
+			)
 		}
 	}
 
@@ -224,11 +202,12 @@ test_captures :: proc(t: ^testing.T) {
 		length, err := match.find_aux(haystack, test.pattern, 0, false, &test.captures)
 		result := length > 0 && err == .OK
 
-		if failed(t, result == ok) {
-			logf(t, "Capture match failed!\n")
-			logf(t, "\tErr: %v\n", err)
-			logf(t, "\tLength: %v\n", length)
-		}
+		testing.expectf(
+			t,
+			result == ok,
+			"Capture match failed! Length: %v Pattern: %q Haystack: %q Err: %v",
+			length, test.pattern, haystack, err,
+		)
 	}
 
 	temp := Temp { pattern = "(one).+" }
@@ -253,15 +232,8 @@ test_captures :: proc(t: ^testing.T) {
 		cap2 := captures[2]
 		text1 := haystack[cap1.byte_start:cap1.byte_end]
 		text2 := haystack[cap2.byte_start:cap2.byte_end]
-		expect(t, text1 == "233", "Multi-Capture failed at 1")
-		expect(t, text2 == "hello", "Multi-Capture failed at 2")
-	}
-}
-
-gmatch_check :: proc(t: ^testing.T, index: int, a: []string, b: string) {
-	if failed(t, a[index] == b) {
-		logf(t, "GMATCH %d failed!\n", index)
-		logf(t, "\t%s != %s\n", a[index], b)
+		testing.expect(t, text1 == "233",   "Multi-Capture failed at 1")
+		testing.expect(t, text2 == "hello", "Multi-Capture failed at 2")
 	}
 }
 
@@ -298,9 +270,9 @@ test_gmatch :: proc(t: ^testing.T) {
 @test
 test_gsub :: proc(t: ^testing.T) {
 	result := match.gsub("testing123testing", "%d+", " sup ", context.temp_allocator)
-	expect(t, result == "testing sup testing", "GSUB 0: failed")
+	testing.expect(t, result == "testing sup testing", "GSUB 0: failed")
 	result = match.gsub("testing123testing", "%a+", "345", context.temp_allocator)
-	expect(t, result == "345123345", "GSUB 1: failed")
+	testing.expect(t, result == "345123345", "GSUB 1: failed")
 }
 
 @test
@@ -313,10 +285,12 @@ test_gfind :: proc(t: ^testing.T) {
 	index: int
 
 	for word in match.gfind(s, pattern, &captures) {
-		if failed(t, output[index] == word) {
-			logf(t, "GFIND %d failed!\n", index)
-			logf(t, "\t%s != %s\n", output[index], word)
-		}
+		testing.expectf(
+			t,
+			output[index] == word,
+			"GFIND %d failed! %q != %q",
+			index, output[index], word,
+		)
 		index += 1
 	}
 }
@@ -332,11 +306,12 @@ test_frontier :: proc(t: ^testing.T) {
 	call :: proc(data: rawptr, word: string, haystack: string, captures: []match.Match) {
 		temp := cast(^Temp) data
 
-		if failed(temp.t, word == temp.output[temp.index]) {
-			logf(temp.t, "GSUB_WITH %d failed!\n", temp.index)
-			logf(temp.t, "\t%s != %s\n", temp.output[temp.index], word)			
-		}
-
+		testing.expectf(
+			temp.t,
+			word == temp.output[temp.index],
+			"GSUB_WITH %d failed! %q != %q",
+			temp.index, temp.output[temp.index], word,
+		)
 		temp.index += 1
 	}
 
@@ -369,31 +344,21 @@ test_case_insensitive :: proc(t: ^testing.T) {
 		pattern := match.pattern_case_insensitive("test", 256, context.temp_allocator)
 		goal := "[tT][eE][sS][tT]"
 		
-		if failed(t, pattern == goal) {
-			logf(t, "Case Insensitive Pattern doesn't match result\n")
-			logf(t, "\t%s != %s\n", pattern, goal)
-		}
+		testing.expectf(
+			t,
+			pattern == goal,
+			"Case Insensitive Pattern doesn't match result. %q != %q",
+			pattern, goal,
+		)
 	}
 }
 
-main :: proc() {
-	t: testing.T
-	stream := os.stream_from_handle(os.stdout)
-	w := io.to_writer(stream)
-	t.w = w
-	
-	test_find(&t)
-	test_match(&t)
-	test_captures(&t)
-	test_gmatch(&t)
-	test_gsub(&t)
-	test_gfind(&t)
-	test_frontier(&t)
-	test_utf8(&t)
-	test_case_insensitive(&t)
-
-	fmt.wprintf(w, "%v/%v tests successful.\n", TEST_count - TEST_fail, TEST_count)
-	if TEST_fail > 0 {
-		os.exit(1)
-	}
+@(private)
+gmatch_check :: proc(t: ^testing.T, index: int, a: []string, b: string) {
+	testing.expectf(
+		t,
+		a[index] == b,
+		"GMATCH %d failed! %q != %q",
+		index, a[index], b,
+	)
 }

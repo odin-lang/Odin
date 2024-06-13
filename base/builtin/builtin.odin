@@ -126,3 +126,5 @@ clamp :: proc(value, minimum, maximum: T) -> T ---
 
 soa_zip :: proc(slices: ...) -> #soa[]Struct ---
 soa_unzip :: proc(value: $S/#soa[]$E) -> (slices: ...) ---
+
+unreachable :: proc() -> ! ---

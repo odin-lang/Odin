@@ -8,11 +8,15 @@ when MINIAUDIO_SHARED {
 	#panic("Shared linking for miniaudio is not supported yet")
 }
 
-when ODIN_OS == .Windows {
-	foreign import lib "lib/miniaudio.lib"
-} else {
-	foreign import lib "lib/miniaudio.a"
+@(private)
+LIB :: "lib/miniaudio.lib" when ODIN_OS == .Windows else "lib/miniaudio.a"
+
+when !#exists(LIB) {
+	// Windows library is shipped with the compiler, so a Windows specific message should not be needed.
+	#panic("Could not find the compiled miniaudio library, it can be compiled by running `make -C \"" + ODIN_ROOT + "vendor/miniaudio/src\"`")
 }
+
+foreign import lib { LIB }
 
 BINDINGS_VERSION_MAJOR    :: 0
 BINDINGS_VERSION_MINOR    :: 11

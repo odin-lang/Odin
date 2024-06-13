@@ -295,6 +295,10 @@ simd_rotate_right :: proc(a: #simd[N]T, $offset: int) -> #simd[N]T ---
 // if all listed features are supported.
 has_target_feature :: proc($test: $T) -> bool where type_is_string(T) || type_is_proc(T) ---
 
+
+// Returns the value of the procedure where `x` must be a call expression
+procedure_of :: proc(x: $T) -> T where type_is_proc(T) ---
+
 // WASM targets only
 wasm_memory_grow :: proc(index, delta: uintptr) -> int ---
 wasm_memory_size :: proc(index: uintptr)        -> int ---

@@ -1188,9 +1188,6 @@ internal_random_prime :: proc(a: ^Int, size_in_bits: int, trials: int, flags := 
 	flags  := flags
 	trials := trials
 
-	t := &Int{}
-	defer internal_destroy(t)
-
 	/*
 		Sanity check the input.
 	*/

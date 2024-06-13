@@ -5,7 +5,6 @@ foreign import libc "system:c"
 
 import "base:runtime"
 import "core:strings"
-import "core:sys/unix"
 import "core:c"
 
 Handle :: distinct i32
@@ -326,6 +325,11 @@ foreign dl {
 	@(link_name="dlsym")            _unix_dlsym         :: proc(handle: rawptr, symbol: cstring) -> rawptr ---
 	@(link_name="dlclose")          _unix_dlclose       :: proc(handle: rawptr) -> c.int ---
 	@(link_name="dlerror")          _unix_dlerror       :: proc() -> cstring ---
+}
+
+@(private)
+foreign libc {
+	_lwp_self :: proc() -> i32 ---
 }
 
 // NOTE(phix): Perhaps share the following functions with FreeBSD if they turn out to be the same in the end.
@@ -721,7 +725,7 @@ exit :: proc "contextless" (code: int) -> ! {
 }
 
 current_thread_id :: proc "contextless" () -> int {
-	return cast(int) unix.pthread_self()
+	return int(_lwp_self())
 }
 
 dlopen :: proc(filename: string, flags: int) -> rawptr {

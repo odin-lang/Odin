@@ -710,13 +710,12 @@ gb_internal void lb_begin_procedure_body(lbProcedure *p) {
 	lb_set_debug_position_to_procedure_begin(p);
 	if (p->debug_info != nullptr) {
 		if (p->context_stack.count != 0) {
+			lbBlock *prev_block = p->curr_block;
 			p->curr_block = p->decl_block;
 			lb_add_debug_context_variable(p, lb_find_or_generate_context_ptr(p));
+			p->curr_block = prev_block;
 		}
-
 	}
-
-	lb_start_block(p, p->entry_block);
 }
 
 gb_internal void lb_end_procedure_body(lbProcedure *p) {
@@ -1097,15 +1096,7 @@ gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> c
 						ptr = lb_address_from_load_or_generate_local(p, x);
 					}
 				} else {
-					if (LLVMIsConstant(x.value)) {
-						// NOTE(bill): if the value is already constant, then just it as a global variable
-						// and pass it by pointer
-						lbAddr addr = lb_add_global_generated(p->module, original_type, x);
-						lb_make_global_private_const(addr);
-						ptr = addr.addr;
-					} else {
-						ptr = lb_copy_value_to_ptr(p, x, original_type, 16);
-					}
+					ptr = lb_copy_value_to_ptr(p, x, original_type, 16);
 				}
 				array_add(&processed_args, ptr);
 			}

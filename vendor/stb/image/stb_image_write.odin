@@ -2,11 +2,24 @@ package stb_image
 
 import c "core:c/libc"
 
-     when ODIN_OS == .Windows { foreign import stbiw "../lib/stb_image_write.lib"      }
-else when ODIN_OS == .Linux   { foreign import stbiw "../lib/stb_image_write.a"        }
-else when ODIN_OS == .Darwin  { foreign import stbiw "../lib/darwin/stb_image_write.a" }
-else                          { foreign import stbiw "system:stb_image_write"           }
+@(private)
+WRITE_LIB :: (
+	     "../lib/stb_image_write.lib"      when ODIN_OS == .Windows
+	else "../lib/stb_image_write.a"        when ODIN_OS == .Linux
+	else "../lib/darwin/stb_image_write.a" when ODIN_OS == .Darwin
+	else ""
+)
 
+when WRITE_LIB != "" {
+	when !#exists(WRITE_LIB) {
+		// The STB libraries are shipped with the compiler on Windows so a Windows specific message should not be needed.
+		#panic("Could not find the compiled STB libraries, they can be compiled by running `make -C \"" + ODIN_ROOT + "vendor/stb/src\"`")
+	}
+
+	foreign import stbiw { WRITE_LIB }
+} else {
+	foreign import stbiw "system:stb_image_write"
+}
 
 write_func :: proc "c" (ctx: rawptr, data: rawptr, size: c.int)
 

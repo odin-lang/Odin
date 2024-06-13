@@ -2,11 +2,11 @@
 // +private
 package thread
 
-import "base:intrinsics"
 import "core:sync"
 import "core:sys/unix"
+import "core:time"
 
-CAS :: intrinsics.atomic_compare_exchange_strong
+CAS :: sync.atomic_compare_exchange_strong
 
 // NOTE(tetra): Aligned here because of core/unix/pthread_linux.odin/pthread_t.
 // Also see core/sys/darwin/mach_darwin.odin/semaphore_t.
@@ -32,11 +32,13 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 
 		t.id = sync.current_thread_id()
 
-		for (.Started not_in t.flags) {
-			sync.wait(&t.cond, &t.mutex)
+		for (.Started not_in sync.atomic_load(&t.flags)) {
+			// HACK: use a timeout so in the event that the condition is signalled at THIS comment's exact point
+			// (after checking flags, before starting the wait) it gets itself out of that deadlock after a ms.
+			sync.wait_with_timeout(&t.cond, &t.mutex, time.Millisecond)
 		}
 
-		if .Joined in t.flags {
+		if .Joined in sync.atomic_load(&t.flags) {
 			return nil
 		}
 
@@ -60,11 +62,11 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 			t.procedure(t)
 		}
 
-		intrinsics.atomic_store(&t.flags, t.flags + { .Done })
+		sync.atomic_or(&t.flags, { .Done })
 
 		sync.unlock(&t.mutex)
 
-		if .Self_Cleanup in t.flags {
+		if .Self_Cleanup in sync.atomic_load(&t.flags) {
 			t.unix_thread = {}
 			// NOTE(ftphikari): It doesn't matter which context 'free' received, right?
 			context = {}
@@ -122,13 +124,12 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 }
 
 _start :: proc(t: ^Thread) {
-	// sync.guard(&t.mutex)
-	t.flags += { .Started }
+	sync.atomic_or(&t.flags, { .Started })
 	sync.signal(&t.cond)
 }
 
 _is_done :: proc(t: ^Thread) -> bool {
-	return .Done in intrinsics.atomic_load(&t.flags)
+	return .Done in sync.atomic_load(&t.flags)
 }
 
 _join :: proc(t: ^Thread) {
@@ -139,7 +140,7 @@ _join :: proc(t: ^Thread) {
 	}
 
 	// Preserve other flags besides `.Joined`, like `.Started`.
-	unjoined := intrinsics.atomic_load(&t.flags) - {.Joined}
+	unjoined := sync.atomic_load(&t.flags) - {.Joined}
 	joined   := unjoined + {.Joined}
 
 	// Try to set `t.flags` from unjoined to joined. If it returns joined,

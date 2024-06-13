@@ -56,38 +56,27 @@ CDATA_END     :: "]]>"
 COMMENT_START :: "<!--"
 COMMENT_END   :: "-->"
 
-/*
-	Default: CDATA and comments are passed through unchanged.
-*/
+// Default: CDATA and comments are passed through unchanged.
 XML_Decode_Option :: enum u8 {
-	/*
-		Do not decode & entities. It decodes by default.
-		If given, overrides `Decode_CDATA`.
-	*/
+	// Do not decode & entities. It decodes by default. If given, overrides `Decode_CDATA`.
 	No_Entity_Decode,
 
-	/*
-		CDATA is unboxed.
-	*/
+	// CDATA is unboxed.
 	Unbox_CDATA,
 
-	/*
-		Unboxed CDATA is decoded as well.
-		Ignored if `.Unbox_CDATA` is not given.
-	*/
+	// Unboxed CDATA is decoded as well. Ignored if `.Unbox_CDATA` is not given.
 	Decode_CDATA,
 
-	/*
-		Comments are stripped.
-	*/
+	// Comments are stripped.
 	Comment_Strip,
+
+	// Normalize whitespace
+	Normalize_Whitespace,
 }
 XML_Decode_Options :: bit_set[XML_Decode_Option; u8]
 
-/*
-	Decode a string that may include SGML/XML/HTML entities.
-	The caller has to free the result.
-*/
+// Decode a string that may include SGML/XML/HTML entities.
+// The caller has to free the result.
 decode_xml :: proc(input: string, options := XML_Decode_Options{}, allocator := context.allocator) -> (decoded: string, err: Error) {
 	context.allocator = allocator
 
@@ -100,14 +89,14 @@ decode_xml :: proc(input: string, options := XML_Decode_Options{}, allocator := 
 	t := Tokenizer{src=input}
 	in_data := false
 
+	prev: rune = ' '
+
 	loop: for {
 		advance(&t) or_return
 		if t.r < 0 { break loop }
 
-		/*
-			Below here we're never inside a CDATA tag.
-			At most we'll see the start of one, but that doesn't affect the logic.
-		*/
+		// Below here we're never inside a CDATA tag. At most we'll see the start of one,
+		// but that doesn't affect the logic.
 		switch t.r {
 		case '<':
 			/*
@@ -126,9 +115,7 @@ decode_xml :: proc(input: string, options := XML_Decode_Options{}, allocator := 
 			in_data = _handle_xml_special(&t, &builder, options) or_return
 
 		case ']':
-			/*
-				If we're unboxing _and_ decoding CDATA, we'll have to check for the end tag.
-			*/
+			// If we're unboxing _and_ decoding CDATA, we'll have to check for the end tag.
 			if in_data {
 				if t.read_offset + len(CDATA_END) < len(t.src) {
 					if string(t.src[t.offset:][:len(CDATA_END)]) == CDATA_END {
@@ -143,22 +130,16 @@ decode_xml :: proc(input: string, options := XML_Decode_Options{}, allocator := 
 
 		case:
 			if in_data && .Decode_CDATA not_in options {
-				/*
-					Unboxed, but undecoded.
-				*/
+				// Unboxed, but undecoded.
 				write_rune(&builder, t.r)
 				continue
 			}
 
 			if t.r == '&' {
 				if entity, entity_err := _extract_xml_entity(&t); entity_err != .None {
-					/*
-						We read to the end of the string without closing the entity.
-						Pass through as-is.
-					*/
+					// We read to the end of the string without closing the entity. Pass through as-is.
 					write_string(&builder, entity)
 				} else {
-
 					if .No_Entity_Decode not_in options {
 						if decoded, ok := xml_decode_entity(entity); ok {
 							write_rune(&builder, decoded)
@@ -166,19 +147,41 @@ decode_xml :: proc(input: string, options := XML_Decode_Options{}, allocator := 
 						}
 					}
 
-					/*
-						Literal passthrough because the decode failed or we want entities not decoded.
-					*/
+					// Literal passthrough because the decode failed or we want entities not decoded.
 					write_string(&builder, "&")
 					write_string(&builder, entity)
 					write_string(&builder, ";")
 				}
 			} else {
-				write_rune(&builder, t.r)
+				// Handle AV Normalization: https://www.w3.org/TR/2006/REC-xml11-20060816/#AVNormalize
+				if .Normalize_Whitespace in options {
+					switch t.r {
+					case ' ', '\r', '\n', '\t':
+						if prev != ' ' {
+							write_rune(&builder, ' ')
+							prev = ' '
+						}
+					case:
+						write_rune(&builder, t.r)
+						prev = t.r
+					}
+				} else {
+					// https://www.w3.org/TR/2006/REC-xml11-20060816/#sec-line-ends
+					switch t.r {
+					case '\n', 0x85, 0x2028:
+						write_rune(&builder, '\n')
+					case '\r': // Do nothing until next character
+					case:
+						if prev == '\r' { // Turn a single carriage return into a \n
+							write_rune(&builder, '\n')
+						}
+						write_rune(&builder, t.r)
+					}
+					prev = t.r
+				}
 			}
 		}
 	}
-
 	return strings.clone(strings.to_string(builder), allocator), err
 }
 
@@ -253,24 +256,18 @@ xml_decode_entity :: proc(entity: string) -> (decoded: rune, ok: bool) {
 		return rune(val), true
 
 	case:
-		/*
-			Named entity.
-		*/
+		// Named entity.
 		return named_xml_entity_to_rune(entity)
 	}
 }
 
-/*
-	Private XML helper to extract `&<stuff>;` entity.
-*/
+// Private XML helper to extract `&<stuff>;` entity.
 @(private="file")
 _extract_xml_entity :: proc(t: ^Tokenizer) -> (entity: string, err: Error) {
 	assert(t != nil && t.r == '&')
 
-	/*
-		All of these would be in the ASCII range.
-		Even if one is not, it doesn't matter. All characters we need to compare to extract are.
-	*/
+	// All of these would be in the ASCII range.
+	// Even if one is not, it doesn't matter. All characters we need to compare to extract are.
 
 	length := len(t.src)
 	found  := false
@@ -292,9 +289,7 @@ _extract_xml_entity :: proc(t: ^Tokenizer) -> (entity: string, err: Error) {
 	return string(t.src[t.offset : t.read_offset]), .Invalid_Entity_Encoding
 }
 
-/*
-	Private XML helper for CDATA and comments.
-*/
+// Private XML helper for CDATA and comments.
 @(private="file")
 _handle_xml_special :: proc(t: ^Tokenizer, builder: ^strings.Builder, options: XML_Decode_Options) -> (in_data: bool, err: Error) {
 	assert(t != nil && t.r == '<')
@@ -304,20 +299,14 @@ _handle_xml_special :: proc(t: ^Tokenizer, builder: ^strings.Builder, options: X
 		t.read_offset += len(CDATA_START) - 1
 
 		if .Unbox_CDATA in options && .Decode_CDATA in options {
-			/*
-				We're unboxing _and_ decoding CDATA
-			*/
+			// We're unboxing _and_ decoding CDATA
 			return true, .None
 		}
 
-		/*
-			CDATA is passed through.
-		*/
+		// CDATA is passed through.
 		offset := t.offset
 
-		/*
-			Scan until end of CDATA.
-		*/
+		// Scan until end of CDATA.
 		for {
 			advance(t) or_return
 			if t.r < 0 { return true, .CDATA_Not_Terminated }
@@ -341,14 +330,10 @@ _handle_xml_special :: proc(t: ^Tokenizer, builder: ^strings.Builder, options: X
 
 	} else if string(t.src[t.offset:][:len(COMMENT_START)]) == COMMENT_START {
 		t.read_offset += len(COMMENT_START)
-		/*
-			Comment is passed through by default.
-		*/
+		// Comment is passed through by default.
 		offset := t.offset
 
-		/*
-			Scan until end of Comment.
-		*/
+		// Scan until end of Comment.
 		for {
 			advance(t) or_return
 			if t.r < 0 { return true, .Comment_Not_Terminated }

@@ -458,6 +458,7 @@ AST_KIND(_ExprBegin,  "",  bool) \
 		bool         optional_ok_one; \
 		bool         was_selector; \
 		AstSplitArgs *split_args; \
+		Entity *entity_procedure_of; \
 	}) \
 	AST_KIND(FieldValue,      "field value",              struct { Token eq; Ast *field, *value; }) \
 	AST_KIND(EnumFieldValue,  "enum field value",         struct { \
@@ -631,7 +632,8 @@ AST_KIND(_DeclBegin,      "", bool) \
 	}) \
 	AST_KIND(ForeignImportDecl, "foreign import declaration", struct { \
 		Token    token;           \
-		Slice<Token> filepaths;   \
+		Slice<Ast *> filepaths;   \
+		bool multiple_filepaths;  \
 		Token    library_name;    \
 		String   collection_name; \
 		Slice<String> fullpaths;  \

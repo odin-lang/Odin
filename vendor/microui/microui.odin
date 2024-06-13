@@ -319,7 +319,12 @@ default_draw_frame :: proc(ctx: ^Context, rect: Rect, colorid: Color_Type) {
 	}
 }
 
-init :: proc(ctx: ^Context, set_clipboard: proc(user_data: rawptr, text: string) -> (ok: bool), get_clipboard: proc(user_data: rawptr) -> (text: string, ok: bool), clipboard_user_data: rawptr) {
+init :: proc(
+	ctx: ^Context,
+	set_clipboard: proc(user_data: rawptr, text: string) -> (ok: bool) = nil,
+	get_clipboard: proc(user_data: rawptr) -> (text: string, ok: bool) = nil,
+	clipboard_user_data: rawptr = nil,
+) {
 	ctx^ = {} // zero memory
 	ctx.draw_frame  = default_draw_frame
 	ctx._style      = default_style
@@ -617,7 +622,7 @@ push_command :: proc(ctx: ^Context, $Type: typeid, extra_size := 0) -> ^Type {
 	return cmd
 }
 
-next_command :: proc(ctx: ^Context, pcmd: ^^Command) -> bool {
+next_command :: proc "contextless" (ctx: ^Context, pcmd: ^^Command) -> bool {
 	cmd := pcmd^
 	defer pcmd^ = cmd
 	if cmd != nil { 
@@ -625,7 +630,7 @@ next_command :: proc(ctx: ^Context, pcmd: ^^Command) -> bool {
 	} else {
 		cmd = (^Command)(&ctx.command_list.items[0])
 	}
-	invalid_command :: #force_inline proc(ctx: ^Context) -> ^Command {
+	invalid_command :: #force_inline proc "contextless" (ctx: ^Context) -> ^Command {
 		return (^Command)(&ctx.command_list.items[ctx.command_list.idx])
 	}
 	for cmd != invalid_command(ctx) {
@@ -638,7 +643,7 @@ next_command :: proc(ctx: ^Context, pcmd: ^^Command) -> bool {
 	return false
 }
 
-next_command_iterator :: proc(ctx: ^Context, pcm: ^^Command) -> (Command_Variant, bool) {
+next_command_iterator :: proc "contextless" (ctx: ^Context, pcm: ^^Command) -> (Command_Variant, bool) {
 	if next_command(ctx, pcm) {
 		return pcm^.variant, true
 	}

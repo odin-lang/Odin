@@ -88,11 +88,17 @@ gb_internal Type *check_init_variable(CheckerContext *ctx, Entity *e, Operand *o
 			e->type = t_invalid;
 			return nullptr;
 		} else if (is_type_polymorphic(t)) {
-			gbString str = type_to_string(t);
-			defer (gb_string_free(str));
-			error(e->token, "Invalid use of a polymorphic type '%s' in %.*s", str, LIT(context_name));
-			e->type = t_invalid;
-			return nullptr;
+			Entity *e = entity_of_node(operand->expr);
+			if (e == nullptr) {
+				return nullptr;
+			}
+			if (e->state.load() != EntityState_Resolved) {
+				gbString str = type_to_string(t);
+				defer (gb_string_free(str));
+				error(e->token, "Invalid use of a polymorphic type '%s' in %.*s", str, LIT(context_name));
+				e->type = t_invalid;
+				return nullptr;
+			}
 		} else if (is_type_empty_union(t)) {
 			gbString str = type_to_string(t);
 			defer (gb_string_free(str));
@@ -479,6 +485,9 @@ gb_internal void check_const_decl(CheckerContext *ctx, Entity *e, Ast *type_expr
 			entity = check_selector(ctx, &operand, init, e->type);
 		} else {
 			check_expr_or_type(ctx, &operand, init, e->type);
+			if (init->kind == Ast_CallExpr) {
+				entity = init->CallExpr.entity_procedure_of;
+			}
 		}
 
 		switch (operand.mode) {
@@ -525,6 +534,7 @@ gb_internal void check_const_decl(CheckerContext *ctx, Entity *e, Ast *type_expr
 			e->ProcGroup.entities = array_clone(heap_allocator(), operand.proc_group->ProcGroup.entities);
 			return;
 		}
+
 
 		if (entity != nullptr) {
 			if (e->type != nullptr) {
@@ -724,9 +734,10 @@ gb_internal Entity *init_entity_foreign_library(CheckerContext *ctx, Entity *e) 
 	return nullptr;
 }
 
-gb_internal String handle_link_name(CheckerContext *ctx, Token token, String link_name, String link_prefix) {
+gb_internal String handle_link_name(CheckerContext *ctx, Token token, String link_name, String link_prefix, String link_suffix) {
+	String original_link_name = link_name;
 	if (link_prefix.len > 0) {
-		if (link_name.len > 0) {
+		if (original_link_name.len > 0) {
 			error(token, "'link_name' and 'link_prefix' cannot be used together");
 		} else {
 			isize len = link_prefix.len + token.string.len;
@@ -738,8 +749,27 @@ gb_internal String handle_link_name(CheckerContext *ctx, Token token, String lin
 			link_name = make_string(name, len);
 		}
 	}
+
+	if (link_suffix.len > 0) {
+		if (original_link_name.len > 0) {
+			error(token, "'link_name' and 'link_suffix' cannot be used together");
+		} else {
+			String new_name = token.string;
+			if (link_name != original_link_name) {
+				new_name = link_name;
+			}
+
+			isize len = new_name.len + link_suffix.len;
+			u8 *name = gb_alloc_array(permanent_allocator(), u8, len+1);
+			gb_memmove(name, &new_name[0], new_name.len);
+			gb_memmove(name+new_name.len, &link_suffix[0], link_suffix.len);
+			name[len] = 0;
+			link_name = make_string(name, len);
+		}
+	}
 	return link_name;
 }
+
 
 gb_internal void check_objc_methods(CheckerContext *ctx, Entity *e, AttributeContext const &ac) {
 	if (!(ac.objc_name.len || ac.objc_is_class_method || ac.objc_type)) {
@@ -862,7 +892,7 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 	}
 
 	TypeProc *pt = &proc_type->Proc;
-	AttributeContext ac = make_attribute_context(e->Procedure.link_prefix);
+	AttributeContext ac = make_attribute_context(e->Procedure.link_prefix, e->Procedure.link_suffix);
 
 	if (d != nullptr) {
 		check_decl_attributes(ctx, d->attributes, proc_decl_attribute, &ac);
@@ -1015,7 +1045,7 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 
 	e->deprecated_message = ac.deprecated_message;
 	e->warning_message = ac.warning_message;
-	ac.link_name = handle_link_name(ctx, e->token, ac.link_name, ac.link_prefix);
+	ac.link_name = handle_link_name(ctx, e->token, ac.link_name, ac.link_prefix,ac.link_suffix);
 	if (ac.has_disabled_proc) {
 		if (ac.disabled_proc) {
 			e->flags |= EntityFlag_Disabled;
@@ -1115,7 +1145,14 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 	}
 
 	if (ac.link_name.len > 0) {
-		e->Procedure.link_name = ac.link_name;
+		String ln = ac.link_name;
+		e->Procedure.link_name = ln;
+		if (ln == "memcpy" ||
+		    ln == "memmove" ||
+		    ln == "mem_copy" ||
+		    ln == "mem_copy_non_overlapping") {
+			e->Procedure.is_memcpy_like = true;
+		}
 	}
 
 	if (ac.deferred_procedure.entity != nullptr) {
@@ -1223,7 +1260,7 @@ gb_internal void check_global_variable_decl(CheckerContext *ctx, Entity *&e, Ast
 	}
 	e->flags |= EntityFlag_Visited;
 
-	AttributeContext ac = make_attribute_context(e->Variable.link_prefix);
+	AttributeContext ac = make_attribute_context(e->Variable.link_prefix, e->Variable.link_suffix);
 	ac.init_expr_list_count = init_expr != nullptr ? 1 : 0;
 
 	DeclInfo *decl = decl_info_of_entity(e);
@@ -1244,7 +1281,10 @@ gb_internal void check_global_variable_decl(CheckerContext *ctx, Entity *&e, Ast
 	if (ac.is_static) {
 		error(e->token, "@(static) is not supported for global variables, nor required");
 	}
-	ac.link_name = handle_link_name(ctx, e->token, ac.link_name, ac.link_prefix);
+	if (ac.rodata) {
+		e->Variable.is_rodata = true;
+	}
+	ac.link_name = handle_link_name(ctx, e->token, ac.link_name, ac.link_prefix, ac.link_suffix);
 
 	if (is_arch_wasm() && e->Variable.thread_local_model.len != 0) {
 		e->Variable.thread_local_model.len = 0;
@@ -1330,6 +1370,9 @@ gb_internal void check_global_variable_decl(CheckerContext *ctx, Entity *&e, Ast
 	Operand o = {};
 	check_expr_with_type_hint(ctx, &o, init_expr, e->type);
 	check_init_variable(ctx, e, &o, str_lit("variable declaration"));
+	if (e->Variable.is_rodata && o.mode != Addressing_Constant) {
+		error(o.expr, "Variables declared with @(rodata) must have constant initialization");
+	}
 
 	check_rtti_type_disallowed(e->token, e->type, "A variable declaration is using a type, %s, which has been disallowed");
 }

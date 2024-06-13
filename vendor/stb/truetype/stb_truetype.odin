@@ -3,11 +3,23 @@ package stb_truetype
 import c "core:c"
 import stbrp "vendor:stb/rect_pack"
 
-     when ODIN_OS == .Windows { foreign import stbtt "../lib/stb_truetype.lib"      }
-else when ODIN_OS == .Linux   { foreign import stbtt "../lib/stb_truetype.a"        }
-else when ODIN_OS == .Darwin  { foreign import stbtt "../lib/darwin/stb_truetype.a" }
-else                          { foreign import stbtt "system:stb_truetype"          }
+@(private)
+LIB :: (
+	     "../lib/stb_truetype.lib"      when ODIN_OS == .Windows
+	else "../lib/stb_truetype.a"        when ODIN_OS == .Linux
+	else "../lib/darwin/stb_truetype.a" when ODIN_OS == .Darwin
+	else ""
+)
 
+when LIB != "" {
+	when !#exists(LIB) {
+		#panic("Could not find the compiled STB libraries, they can be compiled by running `make -C \"" + ODIN_ROOT + "vendor/stb/src\"`")
+	}
+
+	foreign import stbtt { LIB }
+} else {
+	foreign import stbtt "system:stb_truetype"
+}
 
 ///////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////

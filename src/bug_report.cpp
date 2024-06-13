@@ -910,6 +910,7 @@ gb_internal void report_os_info() {
 			{"23D60",    {23,  3,  0}, "macOS", {"Sonoma",        {14,  3,  1}}},
 			{"23E214",   {23,  4,  0}, "macOS", {"Sonoma",        {14,  4,  0}}},
 			{"23E224",   {23,  4,  0}, "macOS", {"Sonoma",        {14,  4,  1}}},
+			{"23F79",    {23,  5,  0}, "macOS", {"Sonoma",        {14,  5,  0}}},
 		};
 
 
