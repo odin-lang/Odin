@@ -2934,7 +2934,8 @@ int main(int arg_count, char const **arg_ptr) {
 	// TODO(jeroen): Remove the `init_filename` param.
 	// Let's put that on `build_context.build_paths[0]` instead.
 	if (parse_packages(parser, init_filename) != ParseFile_None) {
-		return 1;
+		GB_ASSERT_MSG(any_errors(), "parse_packages failed but no error was reported.");
+		// We depend on the next conditional block to return 1, after printing errors.
 	}
 
 	if (any_errors()) {
