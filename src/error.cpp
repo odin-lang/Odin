@@ -296,7 +296,7 @@ gb_internal isize show_error_on_line(TokenPos const &pos, TokenPos end) {
 		terminal_set_colours(TerminalStyle_Bold, TerminalColour_White);
 
 
-		isize squiggle_extra = 0;
+		i32 squiggle_extra = 0;
 
 		if (line_len > MAX_LINE_LENGTH_PADDED) {
 			i32 left = MAX_TAB_WIDTH;
