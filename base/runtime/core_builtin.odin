@@ -383,7 +383,7 @@ clear_map :: proc "contextless" (m: ^$T/map[$K]$V) {
 //
 // Note: Prefer the procedure group `reserve`
 @builtin
-reserve_map :: proc(m: ^$T/map[$K]$V, capacity: int, loc := #caller_location) -> Allocator_Error {
+reserve_map :: proc(m: ^$T/map[$K]$V, #any_int capacity: int, loc := #caller_location) -> Allocator_Error {
 	return __dynamic_map_reserve((^Raw_Map)(m), map_info(T), uint(capacity), loc) if m != nil else nil
 }
 
@@ -721,12 +721,12 @@ _reserve_dynamic_array :: #force_inline proc(array: ^$T/[dynamic]$E, capacity: i
 }
 
 @builtin
-reserve_dynamic_array :: proc(array: ^$T/[dynamic]$E, capacity: int, loc := #caller_location) -> Allocator_Error {
+reserve_dynamic_array :: proc(array: ^$T/[dynamic]$E, #any_int capacity: int, loc := #caller_location) -> Allocator_Error {
 	return _reserve_dynamic_array(array, capacity, true, loc)
 }
 
 @builtin
-non_zero_reserve_dynamic_array :: proc(array: ^$T/[dynamic]$E, capacity: int, loc := #caller_location) -> Allocator_Error {
+non_zero_reserve_dynamic_array :: proc(array: ^$T/[dynamic]$E, #any_int capacity: int, loc := #caller_location) -> Allocator_Error {
 	return _reserve_dynamic_array(array, capacity, false, loc)
 }
 
@@ -773,12 +773,12 @@ _resize_dynamic_array :: #force_inline proc(array: ^$T/[dynamic]$E, length: int,
 }
 
 @builtin
-resize_dynamic_array :: proc(array: ^$T/[dynamic]$E, length: int, loc := #caller_location) -> Allocator_Error {
+resize_dynamic_array :: proc(array: ^$T/[dynamic]$E, #any_int length: int, loc := #caller_location) -> Allocator_Error {
 	return _resize_dynamic_array(array, length, true, loc=loc)
 }
 
 @builtin
-non_zero_resize_dynamic_array :: proc(array: ^$T/[dynamic]$E, length: int, loc := #caller_location) -> Allocator_Error {
+non_zero_resize_dynamic_array :: proc(array: ^$T/[dynamic]$E, #any_int length: int, loc := #caller_location) -> Allocator_Error {
 	return _resize_dynamic_array(array, length, false, loc=loc)
 }
 

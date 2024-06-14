@@ -668,7 +668,7 @@ MatrixLookAt :: proc "c" (eye, target, up: Vector3) -> Matrix {
 // Get float array of matrix data
 @(require_results)
 MatrixToFloatV :: proc "c" (mat: Matrix) -> [16]f32 {
-	return transmute([16]f32)mat
+	return transmute([16]f32)linalg.transpose(mat)
 }
 
 

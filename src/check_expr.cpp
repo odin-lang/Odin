@@ -2550,7 +2550,7 @@ gb_internal void check_unary_expr(CheckerContext *c, Operand *o, Token op, Ast *
 									error_line("\tSuggestion: Did you want to pass the iterable value to the for statement by pointer to get addressable semantics?\n");
 								}
 
-								if (is_type_map(parent_type)) {
+								if (parent_type != nullptr && is_type_map(parent_type)) {
 									error_line("\t            Prefer doing 'for key, &%.*s in ...'\n", LIT(e->token.string));
 								} else {
 									error_line("\t            Prefer doing 'for &%.*s in ...'\n", LIT(e->token.string));
@@ -3564,6 +3564,9 @@ gb_internal void check_binary_matrix(CheckerContext *c, Token const &op, Operand
 
 				x->mode = Addressing_Value;
 				if (are_types_identical(xt, yt)) {
+					if (are_types_identical(x->type, y->type)) {
+						return;
+					}
 					if (!is_type_named(x->type) && is_type_named(y->type)) {
 						// prefer the named type
 						x->type = y->type;
