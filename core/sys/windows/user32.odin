@@ -23,7 +23,8 @@ foreign user32 {
 		eventMin, eventMax: DWORD,
 		hmodWinEventProc: HMODULE,
 		pfnWinEvenProc: WINEVENTPROC,
-		idProcess, idThread, dwmFlags: DWORD,
+		idProcess, idThread: DWORD,
+		dwFlags: WinEventFlags,
 	) -> HWINEVENTHOOK ---
 
 	IsChild :: proc(hWndParent, hWnd: HWND) -> BOOL ---
@@ -578,4 +579,13 @@ RedrawWindowFlags :: enum UINT {
 	RDW_ERASENOW        = 0x0200,
 	RDW_FRAME           = 0x0400,
 	RDW_NOFRAME         = 0x0800,
+}
+
+WinEventFlags :: bit_set[WinEventFlag; DWORD]
+
+WinEventFlag :: enum DWORD {
+    WINEVENT_OUTOFCONTEXT   = 0,
+    WINEVENT_SKIPOWNTHREAD  = 1,
+    WINEVENT_SKIPOWNPROCESS = 2,
+    WINEVENT_INCONTEXT      = 4,
 }

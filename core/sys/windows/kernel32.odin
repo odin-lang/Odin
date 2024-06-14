@@ -1214,13 +1214,28 @@ SYSTEM_LOGICAL_PROCESSOR_INFORMATION :: struct {
 }
 
 SYSTEM_POWER_STATUS :: struct {
-	ACLineStatus:        BYTE,
-	BatteryFlag:         BYTE,
+	ACLineStatus:        AC_Line_Status,
+	BatteryFlag:         Battery_Flags,
 	BatteryLifePercent:  BYTE,
 	SystemStatusFlag:    BYTE,
 	BatteryLifeTime:     DWORD,
 	BatteryFullLifeTime: DWORD,
-} 
+}
+
+AC_Line_Status :: enum BYTE {
+   Offline = 0,
+   Online  = 1,
+   Unknown = 255,
+}
+
+Battery_Flag :: enum BYTE {
+    High     = 0,
+    Low      = 1,
+    Critical = 2,
+    Charging = 3,
+    No_Battery = 7, 
+}
+Battery_Flags :: bit_set[Battery_Flag; BYTE] 
 
 /* Global Memory Flags */
 GMEM_FIXED          :: 0x0000
