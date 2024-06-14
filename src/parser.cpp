@@ -51,6 +51,12 @@ gb_internal gbString get_file_line_as_string(TokenPos const &pos, i32 *offset_) 
 
 	u8 *line_start = pos_offset;
 	u8 *line_end  = pos_offset;
+
+	if (offset > 0 && *line_start == '\n') {
+		// Prevent an error token that starts at the boundary of a line that
+		// leads to an empty line from advancing off its line.
+		line_start -= 1;
+	}
 	while (line_start >= start) {
 		if (*line_start == '\n') {
 			line_start += 1;
