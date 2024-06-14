@@ -581,11 +581,11 @@ RedrawWindowFlags :: enum UINT {
 	RDW_NOFRAME         = 0x0800,
 }
 
+// OUTOFCONTEXT is the zero value, use {}
 WinEventFlags :: bit_set[WinEventFlag; DWORD]
 
 WinEventFlag :: enum DWORD {
-    WINEVENT_OUTOFCONTEXT   = 0,
-    WINEVENT_SKIPOWNTHREAD  = 1,
-    WINEVENT_SKIPOWNPROCESS = 2,
-    WINEVENT_INCONTEXT      = 4,
+    SKIPOWNTHREAD  = 0,
+    SKIPOWNPROCESS = 1,
+    INCONTEXT      = 2,
 }
