@@ -6,22 +6,79 @@ import "base:intrinsics"
 
 L :: intrinsics.constant_utf16_cstring
 
-LOWORD :: #force_inline proc "contextless" (x: DWORD) -> WORD {
+// https://learn.microsoft.com/en-us/windows/win32/winmsg/makeword
+MAKEWORD :: #force_inline proc "contextless" (#any_int a, b: int) -> WORD {
+	return WORD(BYTE(DWORD_PTR(a) & 0xff)) | (WORD(BYTE(DWORD_PTR(b) & 0xff)) << 8)
+}
+
+// https://learn.microsoft.com/en-us/windows/win32/winmsg/makelong
+MAKELONG :: #force_inline proc "contextless" (#any_int a, b: int) -> LONG {
+	return LONG(WORD(DWORD_PTR(a) & 0xffff)) | (LONG(WORD(DWORD_PTR(b) & 0xffff)) << 16)
+}
+
+// https://learn.microsoft.com/en-us/windows/win32/winmsg/loword
+LOWORD :: #force_inline proc "contextless" (#any_int x: int) -> WORD {
 	return WORD(x & 0xffff)
 }
 
-HIWORD :: #force_inline proc "contextless" (x: DWORD) -> WORD {
+// https://learn.microsoft.com/en-us/windows/win32/winmsg/hiword
+HIWORD :: #force_inline proc "contextless" (#any_int x: int) -> WORD {
 	return WORD(x >> 16)
 }
 
+// https://learn.microsoft.com/en-us/windows/win32/winmsg/lobyte
+LOBYTE :: #force_inline proc "contextless" (w: WORD) -> BYTE {
+	return BYTE((DWORD_PTR(w)) & 0xff)
+}
+
+// https://learn.microsoft.com/en-us/windows/win32/winmsg/hibyte
+HIBYTE :: #force_inline proc "contextless" (w: WORD) -> BYTE {
+	return BYTE(((DWORD_PTR(w)) >> 8) & 0xff)
+}
+
+// https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-makewparam
+MAKEWPARAM :: #force_inline proc "contextless" (#any_int l, h: int) -> WPARAM {
+	return WPARAM(MAKELONG(l, h))
+}
+
+// https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-makelparam
+MAKELPARAM :: #force_inline proc "contextless" (#any_int l, h: int) -> LPARAM {
+	return LPARAM(MAKELONG(l, h))
+}
+
+// https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-makelresult
+MAKELRESULT :: #force_inline proc "contextless" (#any_int l, h: int) -> LRESULT {
+	return LRESULT(MAKELONG(l, h))
+}
+
+// https://learn.microsoft.com/en-us/windows/win32/api/windowsx/nf-windowsx-get_x_lparam
 GET_X_LPARAM :: #force_inline proc "contextless" (lp: LPARAM) -> c_int {
 	return cast(c_int)cast(c_short)LOWORD(cast(DWORD)lp)
 }
 
+// https://learn.microsoft.com/en-us/windows/win32/api/windowsx/nf-windowsx-get_y_lparam
 GET_Y_LPARAM :: #force_inline proc "contextless" (lp: LPARAM) -> c_int {
 	return cast(c_int)cast(c_short)HIWORD(cast(DWORD)lp)
 }
 
+// https://learn.microsoft.com/en-us/windows/win32/api/winnt/nf-winnt-makelcid
+MAKELCID :: #force_inline proc "contextless" (lgid, srtid: WORD) -> LCID {
+	return (DWORD(WORD(srtid)) << 16) | DWORD(WORD(lgid))
+}
+
+// https://learn.microsoft.com/en-us/windows/win32/api/winnt/nf-winnt-makelangid
+MAKELANGID :: #force_inline proc "contextless" (p, s: WORD) -> DWORD {
+	return DWORD(WORD(s)) << 10 | DWORD(WORD(p))
+}
+
+LANGIDFROMLCID :: #force_inline proc "contextless" (lcid: LCID) -> LANGID {
+	return LANGID(lcid)
+}
+
+// this one gave me trouble as it do not mask the values.
+// the _ in the name is also off comparing to the c code
+// i can't find any usage in the odin repo
+@(deprecated = "use MAKEWORD")
 MAKE_WORD :: #force_inline proc "contextless" (x, y: WORD) -> WORD {
 	return x << 8 | y
 }
