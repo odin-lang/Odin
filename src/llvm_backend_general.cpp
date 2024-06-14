@@ -78,7 +78,8 @@ gb_internal void lb_init_module(lbModule *m, Checker *c) {
 		array_init(&m->procedures_to_generate, a, 0, c->info.all_procedures.count);
 		map_init(&m->procedure_values,               c->info.all_procedures.count*2);
 	}
-	array_init(&m->global_procedures_and_types_to_create, a, 0, 1024);
+	array_init(&m->global_procedures_to_create, a, 0, 1024);
+	array_init(&m->global_types_to_create, a, 0, 1024);
 	array_init(&m->missing_procedures_to_check, a, 0, 16);
 	map_init(&m->debug_values);
 

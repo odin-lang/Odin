@@ -39,6 +39,35 @@ jobs:
           ./odin test tests/vendor -all-packages -define:ODIN_TEST_FANCY=false
           ./odin test tests/benchmark -all-packages -define:ODIN_TEST_FANCY=false
           (cd tests/issues; ./run.sh)
+  build_freebsd:
+    name: FreeBSD Build, Check, and Test
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Build, Check, and Test
+      timeout-minutes: 15
+      uses: vmactions/freebsd-vm@v1
+      with:
+        usesh: true
+        copyback: false
+        prepare: |
+          pkg install -y gmake git bash python3 libxml2 llvm17
+        run: |
+          # `set -e` is needed for test failures to register. https://github.com/vmactions/freebsd-vm/issues/72
+          set -e -x
+          git config --global --add safe.directory $(pwd)
+          gmake release
+          ./odin version
+          ./odin report
+          gmake -C vendor/stb/src
+          gmake -C vendor/cgltf/src
+          gmake -C vendor/miniaudio/src
+          ./odin check examples/all -vet -strict-style -target:freebsd_amd64
+          ./odin test tests/core/normal.odin -file -all-packages -define:ODIN_TEST_FANCY=false
+          ./odin test tests/core/speed.odin -file -all-packages -o:speed -define:ODIN_TEST_FANCY=false
+          ./odin test tests/vendor -all-packages -define:ODIN_TEST_FANCY=false
+          ./odin test tests/benchmark -all-packages -define:ODIN_TEST_FANCY=false
+          (cd tests/issues; ./run.sh)
   ci:
     strategy:
       fail-fast: false

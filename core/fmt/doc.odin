@@ -9,6 +9,7 @@ The verbs:
 General:
 	%v     the value in a default format
 	%#v    an expanded format of %v with newlines and indentation
+	%w     an Odin-syntax representation of the value
 	%T     an Odin-syntax representation of the type of the value
 	%%     a literal percent sign; consumes no value
 	{{     a literal open brace; consumes no value
