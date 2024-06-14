@@ -64,6 +64,7 @@ foreign kernel32 {
 	RemoveVectoredContinueHandler  :: proc(Handle: LPVOID) -> DWORD ---
 	RaiseException :: proc(dwExceptionCode, dwExceptionFlags, nNumberOfArguments: DWORD, lpArguments: ^ULONG_PTR) -> ! ---
 
+	SetUnhandledExceptionFilter :: proc(lpTopLevelExceptionFilter: LPTOP_LEVEL_EXCEPTION_FILTER) -> LPTOP_LEVEL_EXCEPTION_FILTER ---
 
 	CreateHardLinkW :: proc(lpSymlinkFileName: LPCWSTR,
 	                        lpTargetFileName: LPCWSTR,
@@ -464,6 +465,8 @@ foreign kernel32 {
 	GetHandleInformation :: proc(hObject: HANDLE, lpdwFlags: ^DWORD) -> BOOL ---
 
 	RtlCaptureStackBackTrace :: proc(FramesToSkip: ULONG, FramesToCapture: ULONG, BackTrace: [^]PVOID, BackTraceHash: PULONG) -> USHORT ---
+
+	GetSystemPowerStatus :: proc(lpSystemPowerStatus: ^SYSTEM_POWER_STATUS) -> BOOL ---
 }
 
 DEBUG_PROCESS                    :: 0x00000001
@@ -1223,6 +1226,30 @@ SYSTEM_LOGICAL_PROCESSOR_INFORMATION :: struct {
 	DummyUnion: DUMMYUNIONNAME_u,
 }
 
+SYSTEM_POWER_STATUS :: struct {
+	ACLineStatus:        AC_Line_Status,
+	BatteryFlag:         Battery_Flags,
+	BatteryLifePercent:  BYTE,
+	SystemStatusFlag:    BYTE,
+	BatteryLifeTime:     DWORD,
+	BatteryFullLifeTime: DWORD,
+}
+
+AC_Line_Status :: enum BYTE {
+   Offline = 0,
+   Online  = 1,
+   Unknown = 255,
+}
+
+Battery_Flag :: enum BYTE {
+    High     = 0,
+    Low      = 1,
+    Critical = 2,
+    Charging = 3,
+    No_Battery = 7, 
+}
+Battery_Flags :: bit_set[Battery_Flag; BYTE] 
+
 /* Global Memory Flags */
 GMEM_FIXED          :: 0x0000
 GMEM_MOVEABLE       :: 0x0002
@@ -1241,3 +1268,5 @@ GMEM_INVALID_HANDLE :: 0x8000
 
 GHND                :: (GMEM_MOVEABLE | GMEM_ZEROINIT)
 GPTR                :: (GMEM_FIXED | GMEM_ZEROINIT)
+
+LPTOP_LEVEL_EXCEPTION_FILTER :: PVECTORED_EXCEPTION_HANDLER

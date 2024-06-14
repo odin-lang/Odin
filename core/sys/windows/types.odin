@@ -34,6 +34,7 @@ HGDIOBJ :: distinct HANDLE
 HBITMAP :: distinct HANDLE
 HGLOBAL :: distinct HANDLE
 HHOOK :: distinct HANDLE
+HWINEVENTHOOK :: distinct HANDLE
 HKEY :: distinct HANDLE
 HDESK :: distinct HANDLE
 HFONT :: distinct HANDLE
@@ -702,6 +703,14 @@ TIMERPROC :: #type proc "system" (HWND, UINT, UINT_PTR, DWORD)
 WNDPROC :: #type proc "system" (HWND, UINT, WPARAM, LPARAM) -> LRESULT
 
 HOOKPROC :: #type proc "system" (code: c_int, wParam: WPARAM, lParam: LPARAM) -> LRESULT
+
+WINEVENTPROC :: #type proc "system" (
+	hWinEventHook: HWINEVENTHOOK,
+	event: DWORD,
+	hwnd: HWND,
+	idObject, idChild: LONG,
+	idEventThread, dwmsEventTime: DWORD,
+)
 
 CWPRETSTRUCT :: struct {
 	lResult: LRESULT,
