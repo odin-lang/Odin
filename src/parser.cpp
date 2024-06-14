@@ -64,6 +64,11 @@ gb_internal gbString get_file_line_as_string(TokenPos const &pos, i32 *offset_) 
 		}
 		line_start -= 1;
 	}
+	if (line_start == start - 1) {
+		// Prevent an error on the first line from stepping behind the boundary
+		// of the text.
+		line_start += 1;
+	}
 
 	while (line_end < end) {
 		if (*line_end == '\n') {
