@@ -180,7 +180,7 @@ binary_search_by :: proc(array: $A/[]$T, key: T, f: proc(T, T) -> Ordering) -> (
 }
 
 @(require_results)
-equal :: proc(a, b: $T/[]$E) -> bool where intrinsics.type_is_comparable(E) {
+equal :: proc(a, b: $T/[]$E) -> bool where intrinsics.type_is_comparable(E) #no_bounds_check {
 	if len(a) != len(b) {
 		return false
 	}
