@@ -2187,7 +2187,7 @@ internal_int_grow :: proc(a: ^Int, digits: int, allow_shrink := false, allocator
 			`[dynamic]DIGIT` already knows what allocator was used for it, so resize will do the right thing.
 		*/
 		resize(&a.digit, needed)
-	} else if cap > needed && allow_shrink {
+	} else if cap > needed {
 		/*
 			Same applies to builtin.shrink here as resize above
 		*/
