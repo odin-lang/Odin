@@ -237,6 +237,7 @@ enum TerminalColour {
 	TerminalColour_Blue,
 	TerminalColour_Purple,
 	TerminalColour_Black,
+	TerminalColour_Grey,
 };
 
 gb_internal void terminal_set_colours(TerminalStyle style, TerminalColour foreground) {
@@ -256,6 +257,7 @@ gb_internal void terminal_set_colours(TerminalStyle style, TerminalColour foregr
 		case TerminalColour_Blue:   error_out("\x1b[%s;34m", ss); break;
 		case TerminalColour_Purple: error_out("\x1b[%s;35m", ss); break;
 		case TerminalColour_Black:  error_out("\x1b[%s;30m", ss); break;
+		case TerminalColour_Grey:   error_out("\x1b[%s;90m", ss); break;
 		}
 	}
 }
@@ -272,85 +274,263 @@ gb_internal isize show_error_on_line(TokenPos const &pos, TokenPos end) {
 		return -1;
 	}
 
-	i32 offset = 0;
-	gbString the_line = get_file_line_as_string(pos, &offset);
+	i32 error_start_index_bytes = 0;
+	gbString the_line = get_file_line_as_string(pos, &error_start_index_bytes);
 	defer (gb_string_free(the_line));
 
-	if (the_line != nullptr) {
-		char const *line_text = the_line;
-		isize line_len = gb_string_length(the_line);
-
-		// TODO(bill): This assumes ASCII
-
-		enum {
-			MAX_LINE_LENGTH  = 80,
-			MAX_TAB_WIDTH    = 8,
-			ELLIPSIS_PADDING = 8, // `...  ...`
-			MAX_LINE_LENGTH_PADDED = MAX_LINE_LENGTH-MAX_TAB_WIDTH-ELLIPSIS_PADDING,
-		};
-
-		i32 error_length = gb_max(end.offset - pos.offset, 1);
-
-		error_out("\t");
-
-		terminal_set_colours(TerminalStyle_Bold, TerminalColour_White);
-
-
-		isize squiggle_extra = 0;
-
-		if (line_len > MAX_LINE_LENGTH_PADDED) {
-			i32 left = MAX_TAB_WIDTH;
-			i32 diff = gb_max(offset-left, 0);
-			if (diff > 0) {
-				line_text += diff;
-				line_len  -= diff;
-				offset = left + ELLIPSIS_PADDING/2;
-			}
-			if (line_len > MAX_LINE_LENGTH_PADDED) {
-				line_len = MAX_LINE_LENGTH_PADDED;
-				if (error_length > line_len-left) {
-					error_length = cast(i32)line_len - left;
-					squiggle_extra = 1;
-				}
-			}
-			if (diff > 0) {
-				error_out("... %.*s ...", cast(i32)line_len, line_text);
-			} else {
-				error_out("%.*s ...", cast(i32)line_len, line_text);
-			}
-		} else {
-			error_out("%.*s", cast(i32)line_len, line_text);
-		}
-		error_out("\n\t");
-
-		for (i32 i = 0; i < offset; i++) {
-			error_out(" ");
-		}
-
-		terminal_set_colours(TerminalStyle_Bold, TerminalColour_Green);
-
-		error_out("^");
-		if (end.file_id == pos.file_id) {
-			if (end.line > pos.line) {
-				for (i32 i = offset; i < line_len; i++) {
-					error_out("~");
-				}
-			} else if (end.line == pos.line && end.column > pos.column) {
-				for (i32 i = 1; i < error_length-1+squiggle_extra; i++) {
-					error_out("~");
-				}
-				if (error_length > 1 && squiggle_extra == 0) {
-					error_out("^");
-				}
-			}
-		}
-
+	if (the_line == nullptr || gb_string_length(the_line) == 0) {
+		terminal_set_colours(TerminalStyle_Normal, TerminalColour_Grey);
+		error_out("\t( empty line )\n");
 		terminal_reset_colours();
 
-		error_out("\n");
-		return offset;
+		// Preserve the old return behaviour. Even if we can't guarantee the
+		// exact visual space offset, there are two places that check this to
+		// change what sort of suggestion they offer.
+		if (the_line == nullptr) {
+			return -1;
+		} else {
+			return cast(isize)error_start_index_bytes;
+		}
 	}
-	return -1;
+
+	// Specfically use basic ASCII arrows here, in case the terminal
+	// doesn't support anything fancy. This is meant to be a good fallback.
+	char const *mark_error_sign  = "><";
+	char const *open_error_sign  = ">>";
+	char const *close_error_sign = "<<";
+	const TerminalColour marker_colour = TerminalColour_Yellow;
+
+	// ANSI SGR:
+	// 0      = Reset.
+	// 58:5:2 = Underline colour, 8-bit, green. (non-standard)
+	// 4:3    = Wiggly underline.               (non-standard)
+	char const *wiggly_underline_sgr  = "";
+	char const *disable_underline_sgr = "";
+	if (has_ansi_terminal_colours()) {
+		wiggly_underline_sgr  = "\x1b[0;58:5:2;4:3m";
+		disable_underline_sgr = "\x1b[24m";
+	}
+
+	// These two will be used like an Odin slice later.
+	char const *line_text = the_line;
+	i32 line_length_bytes = cast(i32)gb_string_length(the_line);
+
+	// NOTE(Feoramund): The numbers below are in Unicode codepoints
+	// (or runes), not visual glyph width. Calculating the visual width of
+	// a cluster of Unicode codepoints is vexing, and `utf8proc_charwidth`
+	// is inadequate.
+	//
+	// We're counting codepoints here so we don't slice one down the
+	// middle during truncation. It will still look strange if we slice
+	// a cluster down the middle. (i.e. a letter and a combining diacritic)
+	//
+	// Luckily, if our assumption about 1 codepoint == 1 glyph is wrong,
+	// we only suffer a shorter or longer line displayed in total, but all
+	// of our highlighting and marking will be precise.
+	// (Unless there's an invalid Unicode codepoint, in which case, no guarantees.)
+	//
+	// The line will be longer if a codepoint occupies more than one space
+	// (CJK in most cases) and shorter if a codepoint is invisible or is
+	// a type of joiner or combining codepoint.
+	//
+	// If we get a complete Unicode glyph counter, it would be as simple as
+	// replacing `utf8_decode` below to make all of this work perfectly.
+
+	enum {
+		MAX_LINE_LENGTH  = 80,
+		MAX_TAB_WIDTH    = 8,
+		ELLIPSIS_PADDING = 8, // `...  ...`
+		MAX_MARK_WIDTH   = 4, // `><` or `>>` and `<<`
+		MIN_LEFT_VIEW    = 8,
+
+		// A rough estimate of how many characters we'll insert, at most:
+		MAX_INSERTED_WIDTH     = MAX_TAB_WIDTH + ELLIPSIS_PADDING + MAX_MARK_WIDTH,
+
+		MAX_LINE_LENGTH_PADDED = MAX_LINE_LENGTH - MAX_INSERTED_WIDTH,
+	};
+
+	// For the purposes of truncating long lines, we calculate how many
+	// runes the line is composed of, first. We'll take note of at which
+	// rune index the error starts, too.
+	i32 error_start_index_runes = 0;
+
+	i32 line_length_runes = 0;
+	for (i32 i = 0; i < line_length_bytes; /**/) {
+		Rune rune;
+
+		if (i == error_start_index_bytes) {
+			error_start_index_runes = line_length_runes;
+		}
+
+		i32 bytes_read = cast(i32)utf8_decode(cast(const u8 *)line_text + i, line_length_bytes - i, &rune);
+		if (rune == GB_RUNE_INVALID || bytes_read <= 0) {
+			// Bail out; we won't even try to truncate the line later.
+			line_length_runes = 0;
+			break;
+		}
+
+		line_length_runes += 1;
+		i += bytes_read;
+	}
+
+	if (error_start_index_runes == 0 && error_start_index_bytes != 0 && line_length_runes != 0) {
+		// The error index in runes was not found, but we did find a valid Unicode string.
+		//
+		// This is an edge case where the error is sitting on a newline or the
+		// end of the line, as that is the only location we could not have checked.
+		error_start_index_runes = line_length_runes;
+	}
+
+	error_out("\t");
+
+	bool show_right_ellipsis = false;
+
+	if (line_length_runes > MAX_LINE_LENGTH_PADDED) {
+		// Now that we know the line is over the length limit, we have to
+		// compose a runic window in which to display the error.
+		i32 window_width = MAX_LINE_LENGTH_PADDED;
+
+		i32 extend_right = 0;
+		i32 extend_left = 0;
+		if (error_start_index_runes + window_width > line_length_runes - 1) {
+			// Trade space from the right to the left.
+			extend_right = line_length_runes - error_start_index_runes;
+			extend_left = window_width - extend_right;
+		} else if (MIN_LEFT_VIEW - error_start_index_runes > 0) {
+			// Trade space from the left to the right.
+			extend_left = error_start_index_runes;
+			extend_right = window_width - extend_left;
+		} else {
+			// Square in the middle somewhere.
+			extend_left = MIN_LEFT_VIEW;
+			extend_right = window_width - extend_left;
+		}
+
+		i32 window_right_runes = gb_min(error_start_index_runes + extend_right, line_length_runes);
+		i32 window_left_runes = gb_max(0, error_start_index_runes - extend_left);
+
+		i32 window_right_bytes = 0;
+		i32 window_left_bytes = 0;
+
+		i32 i_runes = 0;
+		for (i32 i = 0; i < line_length_bytes; /**/) {
+			if (i_runes == window_left_runes ) { window_left_bytes  = i; }
+			if (i_runes == window_right_runes) { window_right_bytes = i; }
+
+			// No need for error-checking.
+			//
+			// We've already validated the string at this point, otherwise
+			// `line_length_runes` would be 0, and we would not have
+			// entered this block.
+			i32 bytes_read = cast(i32)utf8_decode(cast(const u8 *)line_text + i, line_length_bytes - i, nullptr);
+
+			i_runes += 1;
+			i += bytes_read;
+		}
+
+		if (window_right_bytes == 0) {
+			// The end of the window is the end of the line.
+			window_right_bytes = line_length_bytes;
+		}
+
+		GB_ASSERT_MSG(window_right_runes >= window_left_runes, "Error line truncation window has wrong rune indices. (left, right: %i, %i)", window_left_runes, window_right_runes);
+		GB_ASSERT_MSG(window_right_bytes >= window_left_bytes, "Error line truncation window has wrong byte indices. (left, right: %i, %i)", window_left_bytes, window_right_bytes);
+
+		if (window_right_bytes != line_length_bytes) {
+			show_right_ellipsis = true;
+		}
+
+		// The text will advance; all indices and lengths will become relative.
+		// We must keep our other iterators in sync.
+		// NOTE: Uncomment the rune versions if they ever get used beyond this point.
+
+		// Close the window, going left.
+		line_length_bytes = window_right_bytes;
+
+		// Adjust the slice of text. In Odin, this would be:
+		// `line_text = line_text[window_left_bytes:]`
+		line_text += window_left_bytes;
+		line_length_bytes -= window_left_bytes;
+		// line_length_runes -= window_left_runes;
+		GB_ASSERT_MSG(line_length_bytes >= 0, "Bounds-checking error: line_length_bytes");
+
+		// Part of advancing `line_text`:
+		error_start_index_bytes -= window_left_bytes;
+		// error_start_index_runes -= window_left_runes;
+		GB_ASSERT_MSG(error_start_index_bytes >= 0, "Bounds-checking error: error_start_index_bytes");
+
+		if (window_left_bytes > 0) {
+			error_out("... ");
+		}
+	}
+
+	// Start printing code.
+
+	terminal_set_colours(TerminalStyle_Normal, TerminalColour_White);
+	error_out("%.*s", error_start_index_bytes, line_text);
+
+	// Odin-like: `line_text = line_text[error_start_index_bytes:]`
+	line_text += error_start_index_bytes;
+	line_length_bytes -= error_start_index_bytes;
+	GB_ASSERT_MSG(line_length_bytes >= 0, "Bounds-checking error: line_length_bytes");
+
+	if (end.file_id == pos.file_id) {
+		// The error has an endpoint.
+		terminal_set_colours(TerminalStyle_Bold, marker_colour);
+		error_out(open_error_sign);
+
+		if (end.line > pos.line) {
+			// Error goes to next line.
+			error_out(wiggly_underline_sgr);
+			error_out("%.*s", line_length_bytes, line_text);
+
+			error_out(disable_underline_sgr);
+
+			// Always show the ellipsis in this case
+			show_right_ellipsis = true;
+
+		} else if (end.line == pos.line && end.column > pos.column) {
+			// Error terminates before line end.
+			i32 error_length_bytes = gb_min(end.column - pos.column, line_length_bytes);
+
+			error_out(wiggly_underline_sgr);
+			error_out("%.*s", error_length_bytes, line_text);
+			line_text += error_length_bytes;
+			line_length_bytes -= error_length_bytes;
+			GB_ASSERT_MSG(line_length_bytes >= 0, "Bounds-checking error: line_length_bytes");
+
+			error_out(disable_underline_sgr);
+
+			if (!show_right_ellipsis) {
+				// The line hasn't been truncated; show the end marker.
+				terminal_set_colours(TerminalStyle_Bold, marker_colour);
+				error_out(close_error_sign);
+			}
+
+			terminal_set_colours(TerminalStyle_Normal, TerminalColour_White);
+			error_out("%.*s", line_length_bytes, line_text);
+		}
+
+	} else {
+		// The error is at one spot; no range known.
+		terminal_set_colours(TerminalStyle_Bold, marker_colour);
+		error_out(mark_error_sign);
+
+		terminal_set_colours(TerminalStyle_Normal, TerminalColour_White);
+		error_out("%.*s", line_length_bytes, line_text);
+	}
+
+	if (show_right_ellipsis) {
+		error_out(" ...");
+	}
+
+	// NOTE(Feoramund): Specifically print a newline, then reset colours,
+	// instead of the other way around. Otherwise the printing mechanism
+	// will collapse the newline for reasons currently beyond my ken.
+	error_out("\n");
+	terminal_reset_colours();
+
+	return error_start_index_bytes;
 }
 
 gb_internal void error_out_empty(void) {

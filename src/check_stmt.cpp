@@ -582,28 +582,20 @@ gb_internal Type *check_assignment_variable(CheckerContext *ctx, Operand *lhs, O
 				isize offset = show_error_on_line(e->token.pos, token_pos_end(e->token));
 				if (offset < 0) {
 					if (is_type_map(e->type)) {
-						error_line("\tSuggestion: Did you mean? 'for key, &%.*s in ...'\n", LIT(e->token.string));
+						error_line("\t\tSuggestion: Did you mean? 'for key, &%.*s in ...'\n", LIT(e->token.string));
 					} else {
-						error_line("\tSuggestion: Did you mean? 'for &%.*s in ...'\n", LIT(e->token.string));
+						error_line("\t\tSuggestion: Did you mean? 'for &%.*s in ...'\n", LIT(e->token.string));
 					}
 				} else {
-					error_line("\t");
-					for (isize i = 0; i < offset-1; i++) {
-						error_line(" ");
-					}
-					error_line("'%.*s' is immutable, declare it as '&%.*s' to make it mutable\n", LIT(e->token.string), LIT(e->token.string));
+					error_line("\t\t'%.*s' is immutable, declare it as '&%.*s' to make it mutable\n", LIT(e->token.string), LIT(e->token.string));
 				}
 
 			} else if (e && e->flags & EntityFlag_SwitchValue) {
 				isize offset = show_error_on_line(e->token.pos, token_pos_end(e->token));
 				if (offset < 0) {
-					error_line("\tSuggestion: Did you mean? 'switch &%.*s in ...'\n", LIT(e->token.string));
+					error_line("\t\tSuggestion: Did you mean? 'switch &%.*s in ...'\n", LIT(e->token.string));
 				} else {
-					error_line("\t");
-					for (isize i = 0; i < offset-1; i++) {
-						error_line(" ");
-					}
-					error_line("'%.*s' is immutable, declare it as '&%.*s' to make it mutable\n", LIT(e->token.string), LIT(e->token.string));
+					error_line("\t\t'%.*s' is immutable, declare it as '&%.*s' to make it mutable\n", LIT(e->token.string), LIT(e->token.string));
 				}
 			}
 		}
