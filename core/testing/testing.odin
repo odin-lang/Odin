@@ -48,7 +48,7 @@ T :: struct {
 	// tests during channel transmission.
 	_log_allocator: runtime.Allocator,
 
-	_fail_now: proc() -> !,
+	_fail_now_called: bool,
 }
 
 
@@ -66,15 +66,20 @@ fail :: proc(t: ^T, loc := #caller_location) {
 	pkg_log.error("FAIL", location=loc)
 }
 
-fail_now :: proc(t: ^T, msg := "", loc := #caller_location) {
+// fail_now will cause a test to immediately fail and abort, much in the same
+// way a failed assertion or panic call will stop a thread.
+//
+// It is for when you absolutely need a test to fail without calling any of its
+// deferred statements. It will be cleaner than a regular assert or panic,
+// as the test runner will know to expect the signal this procedure will raise.
+fail_now :: proc(t: ^T, msg := "", loc := #caller_location) -> ! {
+	t._fail_now_called = true
 	if msg != "" {
 		pkg_log.error("FAIL:", msg, location=loc)
 	} else {
 		pkg_log.error("FAIL", location=loc)
 	}
-	if t._fail_now != nil {
-		t._fail_now()
-	}
+	runtime.trap()
 }
 
 failed :: proc(t: ^T) -> bool {
@@ -94,7 +99,17 @@ logf :: proc(t: ^T, format: string, args: ..any, loc := #caller_location) {
 
 // cleanup registers a procedure and user_data, which will be called when the test, and all its subtests, complete.
 // Cleanup procedures will be called in LIFO (last added, first called) order.
-// Each procedure will use a copy of the context at the time of registering.
+//
+// Each procedure will use a copy of the context at the time of registering,
+// and if the test failed due to a timeout, failed assertion, panic, bounds-checking error,
+// memory access violation, or any other signal-based fault, this procedure will
+// run with greater privilege in the test runner's main thread.
+//
+// That means that any cleanup procedure absolutely must not fail in the same way,
+// or it will take down the entire test runner with it. This is for when you
+// need something to run no matter what, if a test failed.
+//
+// For almost every usual case, `defer` should be preferable and sufficient.
 cleanup :: proc(t: ^T, procedure: proc(rawptr), user_data: rawptr) {
 	append(&t.cleanups, Internal_Cleanup{procedure, user_data, context})
 }
