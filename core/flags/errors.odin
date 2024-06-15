@@ -1,7 +1,5 @@
 package flags
 
-import "base:runtime"
-import "core:net"
 import "core:os"
 
 Parse_Error_Reason :: enum {
@@ -18,12 +16,6 @@ Parse_Error_Reason :: enum {
 	Missing_Flag,
 	// The type itself isn't supported.
 	Unsupported_Type,
-}
-
-Unified_Parse_Error_Reason :: union #shared_nil {
-	Parse_Error_Reason,
-	runtime.Allocator_Error,
-	net.Parse_Endpoint_Error,
 }
 
 // Raised during parsing, naturally.
