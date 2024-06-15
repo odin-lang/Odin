@@ -6,7 +6,6 @@ package rand
 
 import "base:intrinsics"
 import "base:runtime"
-import "core:crypto"
 import "core:math"
 import "core:mem"
 

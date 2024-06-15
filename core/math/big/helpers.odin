@@ -362,11 +362,11 @@ platform_count_lsb :: #force_inline proc(a: $T) -> (count: int)
 
 count_lsb :: proc { int_count_lsb, platform_count_lsb, }
 
-int_random_digit :: proc(r: ^rnd.Rand = nil) -> (res: DIGIT) {
+int_random_digit :: proc() -> (res: DIGIT) {
 	when _DIGIT_BITS == 60 { // DIGIT = u64
-		return DIGIT(rnd.uint64(r)) & _MASK
+		return DIGIT(rnd.uint64()) & _MASK
 	} else when _DIGIT_BITS == 28 { // DIGIT = u32
-		return DIGIT(rnd.uint32(r)) & _MASK
+		return DIGIT(rnd.uint32()) & _MASK
 	} else {
 		panic("Unsupported DIGIT size.")
 	}
@@ -374,12 +374,12 @@ int_random_digit :: proc(r: ^rnd.Rand = nil) -> (res: DIGIT) {
 	return 0 // We shouldn't get here.
 }
 
-int_random :: proc(dest: ^Int, bits: int, r: ^rnd.Rand = nil, allocator := context.allocator) -> (err: Error) {
+int_random :: proc(dest: ^Int, bits: int, allocator := context.allocator) -> (err: Error) {
 	/*
 		Check that `a` is usable.
 	*/
 	assert_if_nil(dest)
-	return #force_inline internal_int_random(dest, bits, r, allocator)
+	return #force_inline internal_int_random(dest, bits, allocator)
 
 }
 random :: proc { int_random, }
