@@ -48,7 +48,7 @@ T :: struct {
 	// tests during channel transmission.
 	_log_allocator: runtime.Allocator,
 
-	_fail_now: proc() -> !,
+	_fail_now_called: bool,
 }
 
 
@@ -66,15 +66,20 @@ fail :: proc(t: ^T, loc := #caller_location) {
 	pkg_log.error("FAIL", location=loc)
 }
 
-fail_now :: proc(t: ^T, msg := "", loc := #caller_location) {
+// fail_now will cause a test to immediately fail and abort, much in the same
+// way a failed assertion or panic call will stop a thread.
+//
+// It is for when you absolutely need a test to fail without calling any of its
+// deferred statements. It will be cleaner than a regular assert or panic,
+// as the test runner will know to expect the signal this procedure will raise.
+fail_now :: proc(t: ^T, msg := "", loc := #caller_location) -> ! {
+	t._fail_now_called = true
 	if msg != "" {
 		pkg_log.error("FAIL:", msg, location=loc)
 	} else {
 		pkg_log.error("FAIL", location=loc)
 	}
-	if t._fail_now != nil {
-		t._fail_now()
-	}
+	runtime.trap()
 }
 
 failed :: proc(t: ^T) -> bool {

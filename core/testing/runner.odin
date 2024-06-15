@@ -497,6 +497,7 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 				data.it = it
 				data.t.seed = shared_random_seed
 				data.t.error_count = 0
+				data.t._fail_now_called = false
 
 				thread.pool_add_task(&pool, task.allocator, run_test_task, data, run_index)
 			}
@@ -645,27 +646,35 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 				"A signal (%v) was raised to stop test #%i %s.%s, but it was unable to be found.",
 				reason, test_index, it.pkg, it.name)
 
-			if test_index not_in failed_test_reason_map {
-				// We only write a new error message here if there wasn't one
-				// already, because the message we can provide based only on
-				// the signal won't be very useful, whereas asserts and panics
-				// will provide a user-written error message.
-				failed_test_reason_map[test_index] = fmt.aprintf("Signal caught: %v", reason, allocator = shared_log_allocator)
-				pkg_log.fatalf("Caught signal to stop test #%i %s.%s for: %v.", test_index, it.pkg, it.name, reason)
-
-			}
-
+			// The order this is handled in is a little particular.
+			task_data: ^Task_Data
 			find_task_data_for_stop_signal: for &data in task_data_slots {
 				if data.it.pkg == it.pkg && data.it.name == it.name {
-					end_t(&data.t)
+					task_data = &data
 					break find_task_data_for_stop_signal
 				}
 			}
 
-			when FANCY_OUTPUT {
-				bypass_progress_overwrite = true
-				signals_were_raised = true
+			fmt.assertf(task_data != nil, "A signal (%v) was raised to stop test #%i %s.%s, but its task data is missing.",
+				reason, test_index, it.pkg, it.name)
+
+			if !task_data.t._fail_now_called {
+				if test_index not_in failed_test_reason_map {
+					// We only write a new error message here if there wasn't one
+					// already, because the message we can provide based only on
+					// the signal won't be very useful, whereas asserts and panics
+					// will provide a user-written error message.
+					failed_test_reason_map[test_index] = fmt.aprintf("Signal caught: %v", reason, allocator = shared_log_allocator)
+					pkg_log.fatalf("Caught signal to stop test #%i %s.%s for: %v.", test_index, it.pkg, it.name, reason)
+				}
+
+				when FANCY_OUTPUT {
+					bypass_progress_overwrite = true
+					signals_were_raised = true
+				}
 			}
+
+			end_t(&task_data.t)
 
 			total_failure_count += 1
 			total_done_count += 1
