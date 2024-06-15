@@ -14,9 +14,6 @@ test_rbtree_integer :: proc(t: ^testing.T, $Key: typeid, $Value: typeid) {
 	defer mem.tracking_allocator_destroy(&track)
 	context.allocator = mem.tracking_allocator(&track)
 
-	r := rand.create(t.seed)
-	context.random_generator = rand.default_random_generator(&r)
-
 	log.infof("Testing Red-Black Tree($Key=%v,$Value=%v) using random seed %v.", type_info_of(Key), type_info_of(Value), t.seed)
 	tree: rb.Tree(Key, Value)
 	rb.init(&tree)

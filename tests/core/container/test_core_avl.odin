@@ -20,9 +20,6 @@ test_avl :: proc(t: ^testing.T) {
 	iter := avl.iterator(&tree, avl.Direction.Forward)
 	testing.expect(t, avl.iterator_get(&iter) == nil, "empty/iterator: first node should be nil")
 
-	r := rand.create(t.seed)
-	context.random_generator = rand.default_random_generator(&r)
-
 	// Test insertion.
 	NR_INSERTS :: 32 + 1 // Ensure at least 1 collision.
 	inserted_map := make(map[int]^avl.Node(int))
