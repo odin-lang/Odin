@@ -201,7 +201,7 @@ test_permutation_iterator :: proc(t: ^testing.T) {
 	permutations_counted: int
 	for slice.permute(&iter) {
 		n := 0
-		for item, index in s {
+		for item in s {
 			n *= 10
 			n += item
 		}
