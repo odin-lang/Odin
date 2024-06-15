@@ -41,6 +41,8 @@ PROGRESS_WIDTH        : int    : #config(ODIN_TEST_PROGRESS_WIDTH, 24)
 SHARED_RANDOM_SEED    : u64    : #config(ODIN_TEST_RANDOM_SEED, 0)
 // Set the lowest log level for this test run.
 LOG_LEVEL             : string : #config(ODIN_TEST_LOG_LEVEL, "info")
+// Show only the most necessary logging information.
+USING_SHORT_LOGS      : bool   : #config(ODIN_TEST_SHORT_LOGS, false)
 
 
 get_log_level :: #force_inline proc() -> runtime.Logger_Level {
