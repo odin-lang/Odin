@@ -90,6 +90,14 @@ parse_one_unix_arg :: proc(model: ^$T, parser: ^Parser, arg: string) -> (
 		if strings.has_prefix(arg, "-") {
 			// Allow `--` to function as `-`.
 			arg = arg[1:]
+
+			if len(arg) == 0 {
+				// `--`, and only `--`.
+				// Everything from now on will be treated as an argument.
+				future_args = max(int)
+				current_flag = INTERNAL_VARIADIC_FLAG
+				return
+			}
 		}
 
 		flag: string

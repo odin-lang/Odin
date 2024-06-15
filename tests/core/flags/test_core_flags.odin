@@ -1028,6 +1028,33 @@ test_unix_positional_with_variadic :: proc(t: ^testing.T) {
 	testing.expect_value(t, len(s.v), 2)
 }
 
+@(test)
+test_unix_double_dash_variadic :: proc(t: ^testing.T) {
+	S :: struct {
+		varg: [dynamic]string,
+		i: int,
+	}
+	s: S
+
+	args := [?]string { "-i", "3", "--", "hellope", "-i", "5" }
+
+	result := flags.parse(&s, args[:], .Unix)
+	defer {
+		delete(s.varg)
+	}
+	testing.expect_value(t, result, nil)
+	testing.expect_value(t, len(s.varg), 3)
+	testing.expect_value(t, s.i, 3)
+
+	if len(s.varg) != 3 {
+		return
+	}
+
+	testing.expect_value(t, s.varg[0], "hellope")
+	testing.expect_value(t, s.varg[1], "-i")
+	testing.expect_value(t, s.varg[2], "5")
+}
+
 // This test ensures there are no bad frees with cstrings.
 @(test)
 test_if_dynamic_cstrings_get_freed :: proc(t: ^testing.T) {
