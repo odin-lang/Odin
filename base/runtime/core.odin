@@ -410,8 +410,10 @@ Random_Generator_Query_Info_Flag :: enum u32 {
 }
 Random_Generator_Query_Info :: distinct bit_set[Random_Generator_Query_Info_Flag; u32]
 
+Random_Generator_Proc :: #type proc(data: rawptr, mode: Random_Generator_Mode, p: []byte)
+
 Random_Generator :: struct {
-	procedure: proc(data: rawptr, mode: Random_Generator_Mode, p: []byte),
+	procedure: Random_Generator_Proc,
 	data:      rawptr,
 }
 
@@ -727,6 +729,9 @@ __init_context :: proc "contextless" (c: ^Context) {
 
 	c.logger.procedure = default_logger_proc
 	c.logger.data = nil
+
+	c.random_generator.procedure = default_random_generator_proc
+	c.random_generator.data = nil
 }
 
 default_assertion_failure_proc :: proc(prefix, message: string, loc: Source_Code_Location) -> ! {
