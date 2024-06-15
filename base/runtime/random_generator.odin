@@ -73,7 +73,12 @@ default_random_generator_proc :: proc(data: rawptr, mode: Random_Generator_Mode,
 		_ = read_u64(r)
 	}
 
-	r := &global_rand_seed
+	r: ^Default_Random_State = ---
+	if data == nil {
+		r = &global_rand_seed
+	} else {
+		r = cast(^Default_Random_State)data
+	}
 
 	switch mode {
 	case .Read:
