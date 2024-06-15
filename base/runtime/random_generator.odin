@@ -29,6 +29,20 @@ random_generator_query_info :: proc(rg: Random_Generator) -> (info: Random_Gener
 }
 
 
+random_generator_reset_bytes :: proc(rg: Random_Generator, p: []byte) {
+	if rg.procedure != nil {
+		rg.procedure(rg.data, .Reset, p)
+	}
+}
+
+random_generator_reset_u64 :: proc(rg: Random_Generator, p: u64) {
+	if rg.procedure != nil {
+		p := p
+		rg.procedure(rg.data, .Reset, ([^]byte)(&p)[:size_of(p)])
+	}
+}
+
+
 Default_Random_State :: struct {
 	state: u64,
 	inc:   u64,
@@ -93,9 +107,9 @@ default_random_generator_proc :: proc(data: rawptr, mode: Random_Generator_Mode,
 	}
 }
 
-default_random_generator :: proc "contextless" () -> Random_Generator {
+default_random_generator :: proc "contextless" (state: ^Default_Random_State = nil) -> Random_Generator {
 	return {
 		procedure = default_random_generator_proc,
-		data = nil,
+		data = state,
 	}
 }

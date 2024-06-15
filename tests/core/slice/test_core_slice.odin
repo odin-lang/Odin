@@ -11,6 +11,7 @@ test_sort_with_indices :: proc(t: ^testing.T) {
 
 	for test_size in test_sizes {
 		r := rand.create(t.seed)
+		context.random_generator = rand.default_random_generator(&r)
 
 		vals  := make([]u64, test_size)
 		r_idx := make([]int, test_size) // Reverse index
@@ -21,7 +22,7 @@ test_sort_with_indices :: proc(t: ^testing.T) {
 
 		// Set up test values
 		for _, i in vals {
-			vals[i] = rand.uint64(&r)
+			vals[i] = rand.uint64()
 		}
 
 		// Sort
@@ -29,7 +30,7 @@ test_sort_with_indices :: proc(t: ^testing.T) {
 		defer delete(f_idx)
 
 		// Verify sorted test values
-		rand.init(&r, t.seed)
+		rand.reset(t.seed)
 
 		for v, i in f_idx {
 			r_idx[v] = i
@@ -45,7 +46,7 @@ test_sort_with_indices :: proc(t: ^testing.T) {
 				}
 			}
 
-			idx_pass := vals[r_idx[i]] == rand.uint64(&r)
+			idx_pass := vals[r_idx[i]] == rand.uint64()
 			testing.expect(t, idx_pass, "Expected index to have been sorted")
 			if !idx_pass {
 				break
@@ -62,6 +63,7 @@ test_sort_by_indices :: proc(t: ^testing.T) {
 
 	for test_size in test_sizes {
 		r := rand.create(t.seed)
+		context.random_generator = rand.default_random_generator(&r)
 
 		vals  := make([]u64, test_size)
 		r_idx := make([]int, test_size) // Reverse index
@@ -72,7 +74,7 @@ test_sort_by_indices :: proc(t: ^testing.T) {
 
 		// Set up test values
 		for _, i in vals {
-			vals[i] = rand.uint64(&r)
+			vals[i] = rand.uint64()
 		}
 
 		// Sort
@@ -80,7 +82,7 @@ test_sort_by_indices :: proc(t: ^testing.T) {
 		defer delete(f_idx)
 
 		// Verify sorted test values
-		rand.init(&r, t.seed)
+		rand.reset(t.seed)
 
 		{
 			indices := make([]int, test_size)
