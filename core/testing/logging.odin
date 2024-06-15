@@ -8,13 +8,22 @@ import "core:strings"
 import "core:sync/chan"
 import "core:time"
 
-Default_Test_Logger_Opts :: runtime.Logger_Options {
-	.Level,
-	.Terminal_Color,
-	.Short_File_Path,
-	.Line,
-	.Procedure,
-	.Date, .Time,
+when USING_SHORT_LOGS {
+	Default_Test_Logger_Opts :: runtime.Logger_Options {
+		.Level,
+		.Terminal_Color,
+		.Short_File_Path,
+		.Line,
+	}
+} else {
+	Default_Test_Logger_Opts :: runtime.Logger_Options {
+		.Level,
+		.Terminal_Color,
+		.Short_File_Path,
+		.Line,
+		.Procedure,
+		.Date, .Time,
+	}
 }
 
 Log_Message :: struct {
