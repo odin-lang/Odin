@@ -61,7 +61,7 @@ rand_bytes :: proc (dst: []byte) {
 }
 
 
-to_random_generator :: proc() -> runtime.Random_Generator {
+random_generator :: proc() -> runtime.Random_Generator {
 	return {
 		procedure = proc(data: rawptr, mode: runtime.Random_Generator_Mode, p: []byte) {
 			switch mode {
