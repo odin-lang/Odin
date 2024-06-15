@@ -3,6 +3,7 @@ package test_core_slice
 import "core:slice"
 import "core:testing"
 import "core:math/rand"
+import "core:log"
 
 @test
 test_sort_with_indices :: proc(t: ^testing.T) {
@@ -205,7 +206,7 @@ test_permutation_iterator :: proc(t: ^testing.T) {
 			n += item
 		}
 		if n in seen {
-			testing.fail_now(t, "Permutation iterator made a duplicate permutation.")
+			log.error("Permutation iterator made a duplicate permutation.")
 			return
 		}
 		seen[n] = true
