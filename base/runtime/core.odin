@@ -400,6 +400,7 @@ Logger :: struct {
 
 Random_Generator_Mode :: enum {
 	Read,
+	Reset,
 	Query_Info,
 }
 
@@ -407,6 +408,7 @@ Random_Generator_Query_Info_Flag :: enum u32 {
 	Cryptographic,
 	Uniform,
 	External_Entropy,
+	Resettable,
 }
 Random_Generator_Query_Info :: distinct bit_set[Random_Generator_Query_Info_Flag; u32]
 

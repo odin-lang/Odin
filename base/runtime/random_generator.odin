@@ -29,7 +29,6 @@ random_generator_query_info :: proc(rg: Random_Generator) -> (info: Random_Gener
 }
 
 
-@(private="file")
 Default_Random_State :: struct {
 	state: u64,
 	inc:   u64,
@@ -48,18 +47,24 @@ default_random_generator_proc :: proc(data: rawptr, mode: Random_Generator_Mode,
 	@(thread_local)
 	global_rand_seed: Default_Random_State
 
+	init :: proc "contextless" (r: ^Default_Random_State, seed: u64) {
+		seed := seed
+		if seed == 0 {
+			seed = u64(intrinsics.read_cycle_counter())
+		}
+		r.state = 0
+		r.inc = (seed << 1) | 1
+		_ = read_u64(r)
+		r.state += seed
+		_ = read_u64(r)
+	}
+
+	r := &global_rand_seed
+
 	switch mode {
 	case .Read:
-		r := &global_rand_seed
-
-		if r.state == 0 &&
-		   r.inc == 0 {
-		   	seed := u64(intrinsics.read_cycle_counter())
-		   	r.state = 0
-		   	r.inc = (seed << 1) | 1
-		   	_ = read_u64(r)
-		   	r.state += seed
-		   	_ = read_u64(r)
+		if r.state == 0 && r.inc == 0 {
+		   	init(r, 0)
 		}
 
 		pos := i8(0)
@@ -73,13 +78,18 @@ default_random_generator_proc :: proc(data: rawptr, mode: Random_Generator_Mode,
 			val >>= 8
 			pos -= 1
 		}
-		return
+
+	case .Reset:
+		seed: u64
+		mem_copy_non_overlapping(&seed, raw_data(p), min(size_of(seed), len(p)))
+	   	init(r, seed)
+
 	case .Query_Info:
 		if len(p) != size_of(Random_Generator_Query_Info) {
 			return
 		}
 		info := (^Random_Generator_Query_Info)(raw_data(p))
-		info^ += {.Uniform}
+		info^ += {.Uniform, .Resettable}
 	}
 }
 

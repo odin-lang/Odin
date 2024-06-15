@@ -23,6 +23,16 @@ to_random_generator :: proc(r: ^Rand) -> runtime.Random_Generator {
 			switch mode {
 			case .Read:
 				_ = read(p, r)
+
+			case .Reset:
+				if r.is_system {
+					return
+				}
+				seed: u64
+				runtime.mem_copy_non_overlapping(&seed, raw_data(p), min(size_of(seed), len(p)))
+				init(r, seed)
+
+
 			case .Query_Info:
 				if len(p) != size_of(runtime.Random_Generator_Query_Info) {
 					return
@@ -31,6 +41,8 @@ to_random_generator :: proc(r: ^Rand) -> runtime.Random_Generator {
 				info^ += {.Uniform}
 				if r.is_system {
 					info^ += {.External_Entropy}
+				} else {
+					info^ += {.Resettable}
 				}
 			}
 		},

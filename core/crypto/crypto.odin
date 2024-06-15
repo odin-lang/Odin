@@ -67,6 +67,8 @@ to_random_generator :: proc() -> runtime.Random_Generator {
 			switch mode {
 			case .Read:
 				rand_bytes(p)
+			case .Reset:
+				// do nothing
 			case .Query_Info:
 				if len(p) != size_of(runtime.Random_Generator_Query_Info) {
 					return
