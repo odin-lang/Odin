@@ -397,11 +397,30 @@ Logger :: struct {
 	options:      Logger_Options,
 }
 
+
+Random_Generator_Mode :: enum {
+	Read,
+	Query_Info,
+}
+
+Random_Generator_Query_Info_Flag :: enum u32 {
+	Cryptographic,
+	Uniform,
+	External_Entropy,
+}
+Random_Generator_Query_Info :: distinct bit_set[Random_Generator_Query_Info_Flag; u32]
+
+Random_Generator :: struct {
+	procedure: proc(data: rawptr, mode: Random_Generator_Mode, p: []byte),
+	data:      rawptr,
+}
+
 Context :: struct {
 	allocator:              Allocator,
 	temp_allocator:         Allocator,
 	assertion_failure_proc: Assertion_Failure_Proc,
 	logger:                 Logger,
+	random_generator:       Random_Generator,
 
 	user_ptr:   rawptr,
 	user_index: int,

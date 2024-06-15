@@ -5,6 +5,7 @@ Package core:math/rand implements various random number generators
 package rand
 
 import "base:intrinsics"
+import "base:runtime"
 import "core:crypto"
 import "core:math"
 import "core:mem"
@@ -13,6 +14,28 @@ Rand :: struct {
 	state: u64,
 	inc:   u64,
 	is_system: bool,
+}
+
+to_random_generator :: proc(r: ^Rand) -> runtime.Random_Generator {
+	return {
+		procedure = proc(data: rawptr, mode: runtime.Random_Generator_Mode, p: []byte) {
+			r := (^Rand)(data)
+			switch mode {
+			case .Read:
+				_ = read(p, r)
+			case .Query_Info:
+				if len(p) != size_of(runtime.Random_Generator_Query_Info) {
+					return
+				}
+				info := (^runtime.Random_Generator_Query_Info)(raw_data(p))
+				info^ += {.Uniform}
+				if r.is_system {
+					info^ += {.External_Entropy}
+				}
+			}
+		},
+		data = r,
+	}
 }
 
 
@@ -150,6 +173,10 @@ _random_u64 :: proc(r: ^Rand) -> u64 {
 	r := r
 	switch {
 	case r == nil:
+		if res: u64; runtime.random_generator_read_ptr(context.random_generator, &res, size_of(res)) {
+			return res
+		}
+
 		r = &global_rand
 	case r.is_system:
 		value: u64

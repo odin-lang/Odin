@@ -4,6 +4,7 @@ helper routines.
 */
 package crypto
 
+import "base:runtime"
 import "core:mem"
 
 // compare_constant_time returns 1 iff a and b are equal, 0 otherwise.
@@ -57,4 +58,23 @@ rand_bytes :: proc (dst: []byte) {
 	mem.zero_explicit(raw_data(dst), len(dst))
 
 	_rand_bytes(dst)
+}
+
+
+to_random_generator :: proc() -> runtime.Random_Generator {
+	return {
+		procedure = proc(data: rawptr, mode: runtime.Random_Generator_Mode, p: []byte) {
+			switch mode {
+			case .Read:
+				rand_bytes(p)
+			case .Query_Info:
+				if len(p) != size_of(runtime.Random_Generator_Query_Info) {
+					return
+				}
+				info := (^runtime.Random_Generator_Query_Info)(raw_data(p))
+				info^ += {.Uniform, .Cryptographic, .External_Entropy}
+			}
+		},
+		data = nil,
+	}
 }
