@@ -1055,6 +1055,23 @@ test_unix_double_dash_variadic :: proc(t: ^testing.T) {
 	testing.expect_value(t, s.varg[2], "5")
 }
 
+@(test)
+test_unix_no_value :: proc(t: ^testing.T) {
+	S :: struct {
+		i: int,
+	}
+	s: S
+
+	args := [?]string { "--i" }
+
+	result := flags.parse(&s, args[:], .Unix)
+	err, ok := result.(flags.Parse_Error)
+	testing.expectf(t, ok, "unexpected result: %v", result)
+	if ok {
+		testing.expect_value(t, err.reason, flags.Parse_Error_Reason.No_Value)
+	}
+}
+
 // This test ensures there are no bad frees with cstrings.
 @(test)
 test_if_dynamic_cstrings_get_freed :: proc(t: ^testing.T) {

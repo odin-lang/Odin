@@ -1,6 +1,7 @@
 package flags
 
 import "core:container/bit_array"
+import "core:fmt"
 
 Parsing_Style :: enum {
 	// Odin-style: `-flag`, `-flag:option`, `-map:key=value`
@@ -71,9 +72,15 @@ parse :: proc(
 				return
 			}
 
-			for /**/; future_args > 0; future_args -= 1 {
+			for starting_future_args := future_args; future_args > 0; future_args -= 1 {
 				i += 1
 				if i == len(args) {
+					if future_args == starting_future_args {
+						return Parse_Error {
+							.No_Value,
+							fmt.tprintf("Expected a value for `%s` but none was given.", current_flag),
+						}
+					}
 					break
 				}
 				#no_bounds_check arg = args[i]
