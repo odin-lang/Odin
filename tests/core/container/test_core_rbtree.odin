@@ -14,7 +14,6 @@ test_rbtree_integer :: proc(t: ^testing.T, $Key: typeid, $Value: typeid) {
 	defer mem.tracking_allocator_destroy(&track)
 	context.allocator = mem.tracking_allocator(&track)
 
-	r: rand.Rand
 	r := rand.create(t.seed)
 	context.random_generator = rand.default_random_generator(&r)
 
