@@ -9,6 +9,7 @@ import "core:encoding/ansi"
 import "core:fmt"
 import "core:io"
 @require import pkg_log "core:log"
+import "core:math/rand"
 import "core:mem"
 import "core:os"
 import "core:slice"
@@ -107,6 +108,9 @@ run_test_task :: proc(task: thread.Task) {
 	}
 
 	free_all(context.temp_allocator)
+
+	random_generator_state := rand.create(data.t.seed)
+	context.random_generator = rand.default_random_generator(&random_generator_state)
 
 	data.it.p(&data.t)
 
