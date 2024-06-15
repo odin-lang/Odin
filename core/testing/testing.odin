@@ -94,7 +94,17 @@ logf :: proc(t: ^T, format: string, args: ..any, loc := #caller_location) {
 
 // cleanup registers a procedure and user_data, which will be called when the test, and all its subtests, complete.
 // Cleanup procedures will be called in LIFO (last added, first called) order.
-// Each procedure will use a copy of the context at the time of registering.
+//
+// Each procedure will use a copy of the context at the time of registering,
+// and if the test failed due to a timeout, failed assertion, panic, bounds-checking error,
+// memory access violation, or any other signal-based fault, this procedure will
+// run with greater privilege in the test runner's main thread.
+//
+// That means that any cleanup procedure absolutely must not fail in the same way,
+// or it will take down the entire test runner with it. This is for when you
+// need something to run no matter what, if a test failed.
+//
+// For almost every usual case, `defer` should be preferable and sufficient.
 cleanup :: proc(t: ^T, procedure: proc(rawptr), user_data: rawptr) {
 	append(&t.cleanups, Internal_Cleanup{procedure, user_data, context})
 }

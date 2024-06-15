@@ -604,10 +604,10 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 			})
 			fmt.assertf(alloc_error == nil, "Error appending to log messages: %v", alloc_error)
 
-			find_task_data: for &data in task_data_slots {
+			find_task_data_for_timeout: for &data in task_data_slots {
 				if data.it.pkg == it.pkg && data.it.name == it.name {
 					end_t(&data.t)
-					break find_task_data
+					break find_task_data_for_timeout
 				}
 			}
 		}
@@ -653,6 +653,13 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 				failed_test_reason_map[test_index] = fmt.aprintf("Signal caught: %v", reason, allocator = shared_log_allocator)
 				pkg_log.fatalf("Caught signal to stop test #%i %s.%s for: %v.", test_index, it.pkg, it.name, reason)
 
+			}
+
+			find_task_data_for_stop_signal: for &data in task_data_slots {
+				if data.it.pkg == it.pkg && data.it.name == it.name {
+					end_t(&data.t)
+					break find_task_data_for_stop_signal
+				}
 			}
 
 			when FANCY_OUTPUT {
