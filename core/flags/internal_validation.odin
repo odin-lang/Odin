@@ -1,14 +1,14 @@
 //+private
 package flags
 
-import "base:runtime"
-import "core:container/bit_array"
-import "core:fmt"
-import "core:mem"
-import "core:os"
-import "core:reflect"
-import "core:strconv"
-import "core:strings"
+@require import "base:runtime"
+@require import "core:container/bit_array"
+@require import "core:fmt"
+@require import "core:mem"
+@require import "core:os"
+@require import "core:reflect"
+@require import "core:strconv"
+@require import "core:strings"
 
 // This proc is used to assert that `T` meets the expectations of the library.
 @(optimization_mode="size", disabled=ODIN_DISABLE_ASSERT)

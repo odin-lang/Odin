@@ -1,7 +1,7 @@
 package flags
 
-import "core:container/bit_array"
-import "core:fmt"
+@require import "core:container/bit_array"
+@require import "core:fmt"
 
 Parsing_Style :: enum {
 	// Odin-style: `-flag`, `-flag:option`, `-map:key=value`

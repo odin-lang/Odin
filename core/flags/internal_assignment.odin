@@ -2,13 +2,13 @@
 package flags
 
 import "base:intrinsics"
-import "base:runtime"
+@require import "base:runtime"
 import "core:container/bit_array"
-import "core:fmt"
-import "core:mem"
+@require import "core:fmt"
+@require import "core:mem"
 import "core:reflect"
-import "core:strconv"
-import "core:strings"
+@require import "core:strconv"
+@require import "core:strings"
 
 // Push a positional argument onto a data struct, checking for specified
 // positionals first before adding it to a fallback field.
