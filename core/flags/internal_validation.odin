@@ -14,6 +14,7 @@ import "core:strings"
 @(optimization_mode="size", disabled=ODIN_DISABLE_ASSERT)
 validate_structure :: proc(model_type: $T, style: Parsing_Style, loc := #caller_location) {
 	positionals_assigned_so_far: bit_array.Bit_Array
+	defer bit_array.destroy(&positionals_assigned_so_far)
 
 	check_fields: for field in reflect.struct_fields_zipped(T) {
 		if style == .Unix {
