@@ -265,16 +265,20 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 			if (!build_context.use_lld) { // msvc
 				String res_path = {};
 				defer (gb_free(heap_allocator(), res_path.text));
+
+				// TODO(Jeroen): Add ability to reuse .res file instead of recompiling, if `-resource:file.res` is given.
 				if (build_context.has_resource) {
 					String temp_res_path = path_to_string(heap_allocator(), build_context.build_paths[BuildPath_RES]);
 					res_path = concatenate3_strings(heap_allocator(), str_lit("\""), temp_res_path, str_lit("\""));
 					gb_free(heap_allocator(), temp_res_path.text);
 
-					String rc_path  = path_to_string(heap_allocator(), build_context.build_paths[BuildPath_RC]);
+					String temp_rc_path  = path_to_string(heap_allocator(), build_context.build_paths[BuildPath_RC]);
+					String rc_path = concatenate3_strings(heap_allocator(), str_lit("\""), temp_rc_path, str_lit("\""));
+					gb_free(heap_allocator(), temp_rc_path.text);
 					defer (gb_free(heap_allocator(), rc_path.text));
 
 					result = system_exec_command_line_app("msvc-link",
-						"\"%.*src.exe\" /nologo /fo \"%.*s\" \"%.*s\"",
+						"\"%.*src.exe\" /nologo /fo %.*s %.*s",
 						LIT(windows_sdk_bin_path),
 						LIT(res_path),
 						LIT(rc_path)
