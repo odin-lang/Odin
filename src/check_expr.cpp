@@ -9819,7 +9819,9 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 				if (tav.mode != Addressing_Constant) {
 					continue;
 				}
-				GB_ASSERT(tav.value.kind == ExactValue_Integer);
+				if (tav.value.kind != ExactValue_Integer) {
+					continue;
+				}
 				i64 v = big_int_to_i64(&tav.value.value_integer);
 				i64 lower = bt->BitSet.lower;
 				u64 index = cast(u64)(v-lower);
