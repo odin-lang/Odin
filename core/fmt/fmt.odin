@@ -1973,11 +1973,13 @@ fmt_struct :: proc(fi: ^Info, v: any, the_verb: rune, info: runtime.Type_Info_St
 	// fi.hash = false;
 	fi.indent += 1
 
-	if !is_soa && hash {
+	is_empty := len(info.names) == 0
+
+	if !is_soa && hash && !is_empty {
 		io.write_byte(fi.writer, '\n', &fi.n)
 	}
 	defer {
-		if hash {
+		if !is_soa && hash && !is_empty {
 			for _ in 0..<indent { io.write_byte(fi.writer, '\t', &fi.n) }
 		}
 		io.write_byte(fi.writer, ']' if is_soa && the_verb == 'v' else '}', &fi.n)
@@ -2025,9 +2027,9 @@ fmt_struct :: proc(fi: ^Info, v: any, the_verb: rune, info: runtime.Type_Info_St
 			}
 			io.write_string(fi.writer, base_type_name, &fi.n)
 			io.write_byte(fi.writer, '{', &fi.n)
-			if hash { io.write_byte(fi.writer, '\n', &fi.n) }
+			if hash && !is_empty { io.write_byte(fi.writer, '\n', &fi.n) }
 			defer {
-				if hash {
+				if hash && !is_empty {
 					fi.indent -= 1
 					fmt_write_indent(fi)
 					fi.indent += 1
@@ -2074,6 +2076,10 @@ fmt_struct :: proc(fi: ^Info, v: any, the_verb: rune, info: runtime.Type_Info_St
 
 				if hash { io.write_string(fi.writer, ",\n", &fi.n) }
 			}
+		}
+
+		if hash && n > 0 {
+			for _ in 0..<indent { io.write_byte(fi.writer, '\t', &fi.n) }
 		}
 	} else {
 		field_count := -1
