@@ -495,8 +495,10 @@ unique :: proc(s: $S/[]$T) -> S where intrinsics.type_is_comparable(T) #no_bound
 	}
 	i := 1
 	for j in 1..<len(s) {
-		if s[j] != s[j-1] && i != j {
-			s[i] = s[j]
+		if s[j] != s[j-1] {
+			if i != j {
+				s[i] = s[j]
+			}
 			i += 1
 		}
 	}
@@ -513,8 +515,10 @@ unique_proc :: proc(s: $S/[]$T, eq: proc(T, T) -> bool) -> S #no_bounds_check {
 	}
 	i := 1
 	for j in 1..<len(s) {
-		if !eq(s[j], s[j-1]) && i != j {
-			s[i] = s[j]
+		if !eq(s[j], s[j-1]) {
+			if i != j {
+				s[i] = s[j]
+			}
 			i += 1
 		}
 	}

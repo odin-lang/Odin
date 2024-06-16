@@ -203,7 +203,7 @@ test_permutation_iterator :: proc(t: ^testing.T) {
 	permutations_counted: int
 	for slice.permute(&iter) {
 		n := 0
-		for item, index in s {
+		for item in s {
 			n *= 10
 			n += item
 		}
@@ -217,4 +217,64 @@ test_permutation_iterator :: proc(t: ^testing.T) {
 
 	testing.expect_value(t, len(seen), FAC_5)
 	testing.expect_value(t, permutations_counted, FAC_5)
+}
+
+// Test inputs from #3276 and #3769
+UNIQUE_TEST_VECTORS :: [][2][]int{
+	{{2,2,2},             {2}},
+	{{1,1,1,2,2,3,3,3,3}, {1,2,3}},
+	{{1,2,4,4,5},         {1,2,4,5}},
+}
+
+@test
+test_unique :: proc(t: ^testing.T) {
+	for v in UNIQUE_TEST_VECTORS {
+		assorted := v[0]
+		expected := v[1]
+
+		uniq := slice.unique(assorted)
+		testing.expectf(t, slice.equal(uniq, expected), "Expected slice.uniq(%v) == %v, got %v", v[0], v[1], uniq)
+	}
+
+	for v in UNIQUE_TEST_VECTORS {
+		assorted := v[0]
+		expected := v[1]
+
+		uniq := slice.unique_proc(assorted, proc(a, b: int) -> bool {
+			return a == b
+		})
+		testing.expectf(t, slice.equal(uniq, expected), "Expected slice.unique_proc(%v, ...) == %v, got %v", v[0], v[1], uniq)
+	}
+
+	r := rand.create(t.seed)
+	context.random_generator = rand.default_random_generator(&r)
+
+	// 10_000 random tests
+	for _ in 0..<10_000 {
+		assorted: [dynamic]i64
+		expected: [dynamic]i64
+
+		// Prime with 1 value
+		old := rand.int63()
+		append(&assorted, old)
+		append(&expected, old)
+
+		// Add 99 additional random values
+		for _ in 1..<100 {
+			new := rand.int63()
+			append(&assorted, new)
+			if old != new {
+				append(&expected, new)
+			}
+			old = new
+		}
+
+		original := slice.clone(assorted[:])
+		uniq := slice.unique(assorted[:])
+		testing.expectf(t, slice.equal(uniq, expected[:]), "Expected slice.uniq(%v) == %v, got %v", original, expected, uniq)
+
+		delete(assorted)
+		delete(original)
+		delete(expected)
+	}
 }
