@@ -121,6 +121,7 @@ import edit             "core:text/edit"
 import thread           "core:thread"
 import time             "core:time"
 import datetime         "core:time/datetime"
+import flags            "core:flags"
 
 import sysinfo          "core:sys/info"
 
@@ -233,6 +234,7 @@ _ :: edit
 _ :: thread
 _ :: time
 _ :: datetime
+_ :: flags
 _ :: sysinfo
 _ :: unicode
 _ :: utf8
