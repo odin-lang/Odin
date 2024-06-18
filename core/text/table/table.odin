@@ -198,10 +198,6 @@ build :: proc(tbl: ^Table) {
 }
 
 write_html_table :: proc(w: io.Writer, tbl: ^Table) {
-	if tbl.dirty {
-		build(tbl)
-	}
-
 	io.write_string(w, "<table>\n")
 	if tbl.caption != "" {
 		io.write_string(w, "<caption>")
