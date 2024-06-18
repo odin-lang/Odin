@@ -200,7 +200,7 @@ build :: proc(tbl: ^Table) {
 write_html_table :: proc(w: io.Writer, tbl: ^Table) {
 	io.write_string(w, "<table>\n")
 	if tbl.caption != "" {
-		io.write_string(w, "<caption>")
+		io.write_string(w, "\t<caption>")
 		io.write_string(w, tbl.caption)
 		io.write_string(w, "</caption>\n")
 	}
@@ -215,37 +215,37 @@ write_html_table :: proc(w: io.Writer, tbl: ^Table) {
 	}
 
 	if tbl.has_header_row {
-		io.write_string(w, "<thead>\n")
-		io.write_string(w, "  <tr>\n")
+		io.write_string(w, "\t<thead>\n")
+		io.write_string(w, "\t\t<tr>\n")
 		for col in 0..<tbl.nr_cols {
 			cell := get_cell(tbl, header_row(tbl), col)
-			io.write_string(w, "    <th")
+			io.write_string(w, "\t\t\t<th")
 			io.write_string(w, align_attribute(cell))
 			io.write_string(w, ">")
 			io.write_string(w, cell.text)
 			io.write_string(w, "</th>\n")
 		}
-		io.write_string(w, "  </tr>\n")
-		io.write_string(w, "</thead>\n")
+		io.write_string(w, "\t\t</tr>\n")
+		io.write_string(w, "\t</thead>\n")
 	}
 
-	io.write_string(w, "<tbody>\n")
+	io.write_string(w, "\t<tbody>\n")
 	for row in 0..<tbl.nr_rows {
 		if tbl.has_header_row && row == header_row(tbl) {
 			continue
 		}
-		io.write_string(w, "  <tr>\n")
+		io.write_string(w, "\t\t<tr>\n")
 		for col in 0..<tbl.nr_cols {
 			cell := get_cell(tbl, row, col)
-			io.write_string(w, "    <td")
+			io.write_string(w, "\t\t\t<td")
 			io.write_string(w, align_attribute(cell))
 			io.write_string(w, ">")
 			io.write_string(w, cell.text)
 			io.write_string(w, "</td>\n")
 		}
-		io.write_string(w, "  </tr>\n")
+		io.write_string(w, "\t\t</tr>\n")
 	}
-	io.write_string(w, "  </tbody>\n")
+	io.write_string(w, "\t</tbody>\n")
 
 	io.write_string(w, "</table>\n")
 }
