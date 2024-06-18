@@ -8,6 +8,7 @@ MAX_LATIN1       :: '\u00ff'     // Maximum Latin-1 value
 ZERO_WIDTH_NON_JOINER :: '\u200C'
 ZERO_WIDTH_JOINER     :: '\u200D'
 
+@(require_results)
 binary_search :: proc(c: i32, table: []i32, length, stride: int) -> int {
 	n := length
 	t := 0
@@ -27,6 +28,7 @@ binary_search :: proc(c: i32, table: []i32, length, stride: int) -> int {
 	return -1
 }
 
+@(require_results)
 to_lower :: proc(r: rune) -> rune {
 	c := i32(r)
 	p := binary_search(c, to_lower_ranges[:], len(to_lower_ranges)/3, 3)
@@ -39,6 +41,7 @@ to_lower :: proc(r: rune) -> rune {
 	}
 	return rune(c)
 }
+@(require_results)
 to_upper :: proc(r: rune) -> rune {
 	c := i32(r)
 	p := binary_search(c, to_upper_ranges[:], len(to_upper_ranges)/3, 3)
@@ -51,6 +54,7 @@ to_upper :: proc(r: rune) -> rune {
 	}
 	return rune(c)
 }
+@(require_results)
 to_title :: proc(r: rune) -> rune {
 	c := i32(r)
 	p := binary_search(c, to_upper_singlets[:], len(to_title_singlets)/2, 2)
@@ -61,6 +65,7 @@ to_title :: proc(r: rune) -> rune {
 }
 
 
+@(require_results)
 is_lower :: proc(r: rune) -> bool {
 	if r <= MAX_ASCII {
 		return u32(r)-'a' < 26
@@ -77,6 +82,7 @@ is_lower :: proc(r: rune) -> bool {
 	return false
 }
 
+@(require_results)
 is_upper :: proc(r: rune) -> bool {
 	if r <= MAX_ASCII {
 		return u32(r)-'A' < 26
@@ -94,6 +100,7 @@ is_upper :: proc(r: rune) -> bool {
 }
 
 is_alpha :: is_letter
+@(require_results)
 is_letter :: proc(r: rune) -> bool {
 	if u32(r) <= MAX_LATIN1 {
 		return char_properties[u8(r)]&pLmask != 0
@@ -114,10 +121,12 @@ is_letter :: proc(r: rune) -> bool {
 	return false
 }
 
+@(require_results)
 is_title :: proc(r: rune) -> bool {
 	return is_upper(r) && is_lower(r)
 }
 
+@(require_results)
 is_digit :: proc(r: rune) -> bool {
 	if r <= MAX_LATIN1 {
 		return '0' <= r && r <= '9'
@@ -127,6 +136,7 @@ is_digit :: proc(r: rune) -> bool {
 
 
 is_white_space :: is_space
+@(require_results)
 is_space :: proc(r: rune) -> bool {
 	if u32(r) <= MAX_LATIN1 {
 		switch r {
@@ -143,6 +153,7 @@ is_space :: proc(r: rune) -> bool {
 	return false
 }
 
+@(require_results)
 is_combining :: proc(r: rune) -> bool {
 	c := i32(r)
 
@@ -155,6 +166,7 @@ is_combining :: proc(r: rune) -> bool {
 
 
 
+@(require_results)
 is_graphic :: proc(r: rune) -> bool {
 	if u32(r) <= MAX_LATIN1 {
 		return char_properties[u8(r)]&pg != 0
@@ -162,6 +174,7 @@ is_graphic :: proc(r: rune) -> bool {
 	return false
 }
 
+@(require_results)
 is_print :: proc(r: rune) -> bool {
 	if u32(r) <= MAX_LATIN1 {
 		return char_properties[u8(r)]&pp != 0
@@ -169,6 +182,7 @@ is_print :: proc(r: rune) -> bool {
 	return false
 }
 
+@(require_results)
 is_control :: proc(r: rune) -> bool {
 	if u32(r) <= MAX_LATIN1 {
 		return char_properties[u8(r)]&pC != 0
@@ -176,6 +190,7 @@ is_control :: proc(r: rune) -> bool {
 	return false
 }
 
+@(require_results)
 is_number :: proc(r: rune) -> bool {
 	if u32(r) <= MAX_LATIN1 {
 		return char_properties[u8(r)]&pN != 0
@@ -183,6 +198,7 @@ is_number :: proc(r: rune) -> bool {
 	return false
 }
 
+@(require_results)
 is_punct :: proc(r: rune) -> bool {
 	if u32(r) <= MAX_LATIN1 {
 		return char_properties[u8(r)]&pP != 0
@@ -190,6 +206,7 @@ is_punct :: proc(r: rune) -> bool {
 	return false
 }
 
+@(require_results)
 is_symbol :: proc(r: rune) -> bool {
 	if u32(r) <= MAX_LATIN1 {
 		return char_properties[u8(r)]&pS != 0
@@ -202,16 +219,19 @@ is_symbol :: proc(r: rune) -> bool {
 //
 
 // Emoji_Modifier
+@(require_results)
 is_emoji_modifier :: proc(r: rune) -> bool {
 	return 0x1F3FB <= r && r <= 0x1F3FF
 }
 
 // Regional_Indicator
+@(require_results)
 is_regional_indicator :: proc(r: rune) -> bool {
 	return 0x1F1E6 <= r && r <= 0x1F1FF
 }
 
 // General_Category=Enclosing_Mark
+@(require_results)
 is_enclosing_mark :: proc(r: rune) -> bool {
 	switch r {
 	case 0x0488,
@@ -226,6 +246,7 @@ is_enclosing_mark :: proc(r: rune) -> bool {
 }
 
 // Prepended_Concatenation_Mark
+@(require_results)
 is_prepended_concatenation_mark :: proc(r: rune) -> bool {
 	switch r {
 	case 0x00600 ..= 0x00605,
@@ -242,6 +263,7 @@ is_prepended_concatenation_mark :: proc(r: rune) -> bool {
 }
 
 // General_Category=Spacing_Mark
+@(require_results)
 is_spacing_mark :: proc(r: rune) -> bool {
 	c := i32(r)
 	p := binary_search(c, spacing_mark_ranges[:], len(spacing_mark_ranges)/2, 2)
@@ -252,6 +274,7 @@ is_spacing_mark :: proc(r: rune) -> bool {
 }
 
 // General_Category=Nonspacing_Mark
+@(require_results)
 is_nonspacing_mark :: proc(r: rune) -> bool {
 	c := i32(r)
 	p := binary_search(c, nonspacing_mark_ranges[:], len(nonspacing_mark_ranges)/2, 2)
@@ -262,6 +285,7 @@ is_nonspacing_mark :: proc(r: rune) -> bool {
 }
 
 // Extended_Pictographic
+@(require_results)
 is_emoji_extended_pictographic :: proc(r: rune) -> bool {
 	c := i32(r)
 	p := binary_search(c, emoji_extended_pictographic_ranges[:], len(emoji_extended_pictographic_ranges)/2, 2)
@@ -272,6 +296,7 @@ is_emoji_extended_pictographic :: proc(r: rune) -> bool {
 }
 
 // Grapheme_Extend
+@(require_results)
 is_grapheme_extend :: proc(r: rune) -> bool {
 	c := i32(r)
 	p := binary_search(c, grapheme_extend_ranges[:], len(grapheme_extend_ranges)/2, 2)
@@ -283,21 +308,25 @@ is_grapheme_extend :: proc(r: rune) -> bool {
 
 
 // Hangul_Syllable_Type=Leading_Jamo
+@(require_results)
 is_hangul_syllable_leading :: proc(r: rune) -> bool {
 	return 0x1100 <= r && r <= 0x115F || 0xA960 <= r && r <= 0xA97C
 }
 
 // Hangul_Syllable_Type=Vowel_Jamo
+@(require_results)
 is_hangul_syllable_vowel :: proc(r: rune) -> bool {
 	return 0x1160 <= r && r <= 0x11A7 || 0xD7B0 <= r && r <= 0xD7C6
 }
 
 // Hangul_Syllable_Type=Trailing_Jamo
+@(require_results)
 is_hangul_syllable_trailing :: proc(r: rune) -> bool {
 	return 0x11A8 <= r && r <= 0x11FF || 0xD7CB <= r && r <= 0xD7FB
 }
 
 // Hangul_Syllable_Type=LV_Syllable
+@(require_results)
 is_hangul_syllable_lv :: proc(r: rune) -> bool {
 	c := i32(r)
 	p := binary_search(c, hangul_syllable_lv_singlets[:], len(hangul_syllable_lv_singlets), 1)
@@ -308,6 +337,7 @@ is_hangul_syllable_lv :: proc(r: rune) -> bool {
 }
 
 // Hangul_Syllable_Type=LVT_Syllable
+@(require_results)
 is_hangul_syllable_lvt :: proc(r: rune) -> bool {
 	c := i32(r)
 	p := binary_search(c, hangul_syllable_lvt_ranges[:], len(hangul_syllable_lvt_ranges)/2, 2)
@@ -319,6 +349,7 @@ is_hangul_syllable_lvt :: proc(r: rune) -> bool {
 
 
 // Indic_Syllabic_Category=Consonant_Preceding_Repha
+@(require_results)
 is_indic_consonant_preceding_repha :: proc(r: rune) -> bool {
 	switch r {
 	case 0x00D4E,
@@ -332,6 +363,7 @@ is_indic_consonant_preceding_repha :: proc(r: rune) -> bool {
 }
 
 // Indic_Syllabic_Category=Consonant_Prefixed
+@(require_results)
 is_indic_consonant_prefixed :: proc(r: rune) -> bool {
 	switch r {
 	case 0x111C2 ..= 0x111C3,
@@ -345,6 +377,7 @@ is_indic_consonant_prefixed :: proc(r: rune) -> bool {
 }
 
 // Indic_Conjunct_Break=Linker
+@(require_results)
 is_indic_conjunct_break_linker :: proc(r: rune) -> bool {
 	switch r {
 	case 0x094D,
@@ -360,6 +393,7 @@ is_indic_conjunct_break_linker :: proc(r: rune) -> bool {
 }
 
 // Indic_Conjunct_Break=Consonant
+@(require_results)
 is_indic_conjunct_break_consonant :: proc(r: rune) -> bool {
 	c := i32(r)
 	p := binary_search(c, indic_conjunct_break_consonant_ranges[:], len(indic_conjunct_break_consonant_ranges)/2, 2)
@@ -370,6 +404,7 @@ is_indic_conjunct_break_consonant :: proc(r: rune) -> bool {
 }
 
 // Indic_Conjunct_Break=Extend
+@(require_results)
 is_indic_conjunct_break_extend :: proc(r: rune) -> bool {
 	c := i32(r)
 	p := binary_search(c, indic_conjunct_break_extend_ranges[:], len(indic_conjunct_break_extend_ranges)/2, 2)
@@ -389,6 +424,7 @@ Indic_Syllabic_Category = Consonant_Prefixed, or
 Prepended_Concatenation_Mark = Yes
 ```
 */
+@(require_results)
 is_gcb_prepend_class :: proc(r: rune) -> bool {
 	return is_indic_consonant_preceding_repha(r) || is_indic_consonant_prefixed(r) || is_prepended_concatenation_mark(r)
 }
@@ -408,6 +444,7 @@ U+200C ZERO WIDTH NON-JOINER
 plus a few General_Category = Spacing_Mark needed for canonical equivalence.
 ```
 */
+@(require_results)
 is_gcb_extend_class :: proc(r: rune) -> bool {
 	return is_grapheme_extend(r) || is_emoji_modifier(r)
 }
