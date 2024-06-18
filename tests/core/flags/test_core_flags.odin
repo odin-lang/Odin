@@ -1113,6 +1113,13 @@ test_if_map_cstrings_get_freed :: proc(t: ^testing.T) {
 
 @(test)
 test_os_handle :: proc(t: ^testing.T) {
+	defer if !testing.failed(t) {
+		// Delete the file now that we're done.
+		//
+		// This is not done all the time, just in case the file is useful to debugging.
+		testing.expect_value(t, os.remove(TEMPORARY_FILENAME), os.ERROR_NONE)
+	}
+
 	TEMPORARY_FILENAME :: "test_core_flags_write_test_output_data"
 
 	test_data := "Hellope!"
@@ -1147,14 +1154,6 @@ test_os_handle :: proc(t: ^testing.T) {
 	testing.expect_value(t, read_ok, true)
 	file_contents_equal := 0 == bytes.compare(transmute([]u8)test_data, data)
 	testing.expectf(t, file_contents_equal, "expected file contents to be the same, got %v", data)
-
-	if file_contents_equal {
-		// Delete the file now that we're done.
-		//
-		// This is not done as a defer or all the time, just in case the file
-		// is useful to debugging.
-		testing.expect_value(t, os.remove(TEMPORARY_FILENAME), os.ERROR_NONE)
-	}
 }
 
 @(test)
