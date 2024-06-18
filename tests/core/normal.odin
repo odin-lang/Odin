@@ -19,6 +19,7 @@ download_assets :: proc() {
 @(require) import "encoding/json"
 @(require) import "encoding/varint"
 @(require) import "encoding/xml"
+@(require) import "flags"
 @(require) import "fmt"
 @(require) import "math"
 @(require) import "math/big"
@@ -37,3 +38,4 @@ download_assets :: proc() {
 @(require) import "text/match"
 @(require) import "thread"
 @(require) import "time"
+@(require) import "unicode"
