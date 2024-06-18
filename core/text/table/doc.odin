@@ -59,7 +59,7 @@ This outputs:
 
 	build(tbl)
 
-	write_ascii_table(stdio_writer(), tbl)
+	write_plain_table(stdio_writer(), tbl)
 	write_markdown_table(stdio_writer(), tbl)
 
 This outputs:

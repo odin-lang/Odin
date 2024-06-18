@@ -254,7 +254,7 @@ write_html_table :: proc(w: io.Writer, tbl: ^Table) {
 	io.write_string(w, "</table>\n")
 }
 
-write_ascii_table :: proc(w: io.Writer, tbl: ^Table) {
+write_plain_table :: proc(w: io.Writer, tbl: ^Table) {
 	if tbl.dirty {
 		build(tbl)
 	}
