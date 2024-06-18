@@ -1077,7 +1077,7 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 	}
 
 
-	if (e->pkg != nullptr && e->token.string == "main") {
+	if (e->pkg != nullptr && e->token.string == "main" && !build_context.no_entry_point) {
 		if (e->pkg->kind != Package_Runtime) {
 			if (pt->param_count != 0 ||
 			    pt->result_count != 0) {
