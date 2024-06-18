@@ -79,7 +79,7 @@ init_cmp :: proc(t: ^$T/Tree($Key, $Value), cmp_fn: proc(a, b: Key) -> Ordering,
 
 // init_ordered initializes a tree containing ordered keys, with
 // a comparison function that results in an ascending order sort.
-init_ordered :: proc(t: ^$T/Tree($Key, $Value), node_allocator := context.allocator) where intrinsics.type_is_ordered_numeric(Key) {
+init_ordered :: proc(t: ^$T/Tree($Key, $Value), node_allocator := context.allocator) where intrinsics.type_is_ordered(Key) {
 	init_cmp(t, slice.cmp_proc(Key), node_allocator)
 }
 
