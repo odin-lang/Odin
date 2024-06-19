@@ -413,6 +413,7 @@ foreign kernel32 {
 	LoadLibraryW :: proc(c_str: LPCWSTR) -> HMODULE ---
 	FreeLibrary :: proc(h: HMODULE) -> BOOL ---
 	GetProcAddress :: proc(h: HMODULE, c_str: LPCSTR) -> rawptr ---
+	LoadLibraryExW :: proc(c_str: LPCWSTR, file: HANDLE, flags: LoadLibraryEx_Flags) -> HMODULE ---
 
 
 	GetFullPathNameW  :: proc(filename: LPCWSTR, buffer_length: DWORD, buffer: LPCWSTR, file_part: ^LPCWSTR) -> DWORD ---

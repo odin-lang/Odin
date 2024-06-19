@@ -2674,6 +2674,22 @@ OSVERSIONINFOEXW :: struct {
 	wReserved:           UCHAR,
 }
 
+LoadLibraryEx_Flag :: enum DWORD {
+	LOAD_LIBRARY_AS_DATAFILE            = 1,  // 1 <<  1: 0x0002,
+	LOAD_WITH_ALTERED_SEARCH_PATH       = 3,  // 1 <<  3: 0x0008,
+	LOAD_IGNORE_CODE_AUTHZ_LEVEL        = 4,  // 1 <<  4: 0x0010,
+	LOAD_LIBRARY_AS_IMAGE_RESOURCE      = 5,  // 1 <<  5: 0x0020,
+	LOAD_LIBRARY_AS_DATAFILE_EXCLUSIVE  = 6,  // 1 <<  6: 0x0040,
+	LOAD_LIBRARY_REQUIRE_SIGNED_TARGET  = 7,  // 1 <<  7: 0x0080,
+	LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR    = 8,  // 1 <<  8: 0x0100,
+	LOAD_LIBRARY_SEARCH_APPLICATION_DIR = 9,  // 1 <<  9: 0x0200,
+	LOAD_LIBRARY_SEARCH_USER_DIRS       = 10, // 1 << 10: 0x0400,
+	LOAD_LIBRARY_SEARCH_SYSTEM32        = 11, // 1 << 11: 0x0800,
+	LOAD_LIBRARY_SEARCH_DEFAULT_DIRS    = 12, // 1 << 12: 0x1000,
+	LOAD_LIBRARY_SAFE_CURRENT_DIRS      = 13, // 1 << 13: 0x2000,
+}
+LoadLibraryEx_Flags :: distinct bit_set[LoadLibraryEx_Flag]
+
 // https://docs.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-quota_limits
 // Used in LogonUserExW
 PQUOTA_LIMITS :: struct {
