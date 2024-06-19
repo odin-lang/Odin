@@ -286,7 +286,7 @@ to_string :: proc(b: Builder) -> (res: string) {
 	return string(b.buf[:])
 }
 /*
-Appends a trailing null byte if missing and then casts the Builder byte buffer to cstring
+Appends a trailing null byte after the end of the current Builder byte buffer and then casts it to a cstring
 
 Inputs:
 - b: A pointer to builder
@@ -295,21 +295,8 @@ Returns:
 - res: A cstring of the Builder's buffer
 */
 to_cstring :: proc(b: ^Builder) -> (res: cstring) {
-	if b.buf[len(b.buf)-1] != 0 {
-		append(&b.buf, 0)
-	}
-	return cstring(raw_data(b.buf))
-}
-/*
-Casts the Builder byte buffer to cstring, assuming it is already null-terminated
-
-Inputs:
-- b: A pointer to builder
-
-Returns:
-- res: A cstring of the Builder's buffer
-*/
-to_cstring_unsafe :: proc(b: Builder) -> (res: cstring) {
+	append(&b.buf, 0)
+	defer pop(&p.buf)
 	return cstring(raw_data(b.buf))
 }
 /*
