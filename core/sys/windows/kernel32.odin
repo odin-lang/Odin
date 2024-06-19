@@ -38,15 +38,29 @@ foreign kernel32 {
 	                      lpNumberOfCharsWritten: LPDWORD,
 	                      lpReserved: LPVOID) -> BOOL ---
 
+	PeekConsoleInputW :: proc(hConsoleInput: HANDLE,
+	                          lpBuffer: ^INPUT_RECORD,
+	                          nLength: DWORD,
+	                          lpNumberOfEventsRead: LPDWORD) -> BOOL ---
+
+	ReadConsoleInputW :: proc(hConsoleInput: HANDLE,
+	                          lpBuffer: ^INPUT_RECORD,
+	                          nLength: DWORD,
+	                          lpNumberOfEventsRead: LPDWORD) -> BOOL ---
+
 	GetConsoleMode :: proc(hConsoleHandle: HANDLE,
 	                       lpMode: LPDWORD) -> BOOL ---
 	SetConsoleMode :: proc(hConsoleHandle: HANDLE,
 	                       dwMode: DWORD) -> BOOL ---
 	SetConsoleCursorPosition :: proc(hConsoleHandle: HANDLE,
-						   dwCursorPosition: COORD) -> BOOL ---
+	                                 dwCursorPosition: COORD) -> BOOL ---
 	SetConsoleTextAttribute :: proc(hConsoleOutput: HANDLE,
-									wAttributes: WORD) -> BOOL ---
+	                                wAttributes: WORD) -> BOOL ---
+	GetConsoleCP :: proc() -> UINT ---
+	SetConsoleCP :: proc(wCodePageID: UINT) -> BOOL ---
+	GetConsoleOutputCP :: proc() -> UINT ---
 	SetConsoleOutputCP :: proc(wCodePageID: UINT) -> BOOL ---
+	FlushConsoleInputBuffer :: proc(hConsoleInput: HANDLE) -> BOOL ---
 	
 	GetFileInformationByHandle :: proc(hFile: HANDLE, lpFileInformation: LPBY_HANDLE_FILE_INFORMATION) -> BOOL ---
 	SetHandleInformation :: proc(hObject: HANDLE,
@@ -84,6 +98,7 @@ foreign kernel32 {
 	RemoveDirectoryW :: proc(lpPathName: LPCWSTR) -> BOOL ---
 	SetFileAttributesW :: proc(lpFileName: LPCWSTR, dwFileAttributes: DWORD) -> BOOL ---
 	SetLastError :: proc(dwErrCode: DWORD) ---
+	//ClearCommError :: proc(hFile: HANDLE, lpErrors: LPDWORD, lpStat: LPCOMSTAT) -> BOOL ---
 	GetCommandLineW :: proc() -> LPCWSTR ---
 	GetTempPathW :: proc(nBufferLength: DWORD, lpBuffer: LPCWSTR) -> DWORD ---
 	GetCurrentProcess :: proc() -> HANDLE ---
