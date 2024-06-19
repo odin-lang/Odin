@@ -107,10 +107,14 @@ run_test_task :: proc(task: thread.Task) {
 		options = Default_Test_Logger_Opts,
 	}
 
-	free_all(context.temp_allocator)
+	random_generator_state: runtime.Default_Random_State
+	context.random_generator = {
+		procedure = runtime.default_random_generator_proc,
+		data = &random_generator_state,
+	}
+	rand.reset(data.t.seed)
 
-	random_generator_state := rand.create(data.t.seed)
-	context.random_generator = rand.default_random_generator(&random_generator_state)
+	free_all(context.temp_allocator)
 
 	data.it.p(&data.t)
 
