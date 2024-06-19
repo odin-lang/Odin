@@ -10,23 +10,13 @@ package i18n
 */
 import "core:strings"
 
-/*
-	TODO:
-	- Support for more translation catalog file formats.
-*/
-
-/*
-	Currently active catalog.
-*/
+// Currently active catalog.
 ACTIVE: ^Translation
 
 // Allow between 1 and 255 plural forms. Default: 10.
 MAX_PLURALS :: min(max(#config(ODIN_i18N_MAX_PLURAL_FORMS, 10), 1), 255)
 
-/*
-	The main data structure. This can be generated from various different file formats, as long as we have a parser for them.
-*/
-
+// The main data structure. This can be generated from various different file formats, as long as we have a parser for them.
 Section :: map[string][]string
 
 Translation :: struct {
@@ -37,34 +27,24 @@ Translation :: struct {
 }
 
 Error :: enum {
-	/*
-		General return values.
-	*/
+	// General return values.
 	None = 0,
 	Empty_Translation_Catalog,
 	Duplicate_Key,
 
-	/*
-		Couldn't find, open or read file.
-	*/
+	// Couldn't find, open or read file.
 	File_Error,
 
-	/*
-		File too short.
-	*/
+	// File too short.
 	Premature_EOF,
 
-	/*
-		GNU Gettext *.MO file errors.
-	*/
+	// GNU Gettext *.MO file errors.
 	MO_File_Invalid_Signature,
 	MO_File_Unsupported_Version,
 	MO_File_Invalid,
 	MO_File_Incorrect_Plural_Count,
 
-	/*
-		Qt Linguist *.TS file errors.
-	*/
+	// Qt Linguist *.TS file errors.
 	TS_File_Parse_Error,
 	TS_File_Expected_Context,
 	TS_File_Expected_Context_Name,
@@ -84,23 +64,19 @@ DEFAULT_PARSE_OPTIONS :: Parse_Options{
 	merge_sections = false,
 }
 
-// *****************
-// get() PROC GROUP
-// *****************
-
 /*
 	Returns the first translation string for the passed `key`.
-	It is also aliases with `get( )`.
+	It is also aliased with `get()`.
 
 	Two ways to use it:
-	- get(key), which defaults to the `i18n.ACTIVE`` catalogue, or
-	- get(key, catalog) to grab text from a specific loaded catalogue.
+	- get(key), which defaults to the `i18n.ACTIVE` catalogue, or
+	- get(key, catalog) to grab text from a specific loaded catalogue
 
 	Inputs:
-	- key:     the string to translate.
+	- key:     the string to translate
 	- catalog: the catalogue to use for the translation (defaults to i18n.ACTIVE)
 
-	Returns:   the translated string or the original `key` if no translation was found.
+	Returns:   the translated string, or the original `key` if no translation was found.
 */
 get_single_section :: proc(key: string, catalog: ^Translation = ACTIVE) -> (value: string) {
 	return get_by_slot(key, 0, catalog)
@@ -108,18 +84,18 @@ get_single_section :: proc(key: string, catalog: ^Translation = ACTIVE) -> (valu
 
 /*
 	Returns the first translation string for the passed `key` in a specific section or context.
-	It is also aliases with `get( )`.
+	It is also aliases with `get()`.
 
 	Two ways to use it:
-	- get(section, key), which defaults to the `i18n.ACTIVE`` catalogue, or
-	- get(section, key, catalog) to grab text from a specific loaded catalogue.
+	- get(section, key), which defaults to the `i18n.ACTIVE` catalogue, or
+	- get(section, key, catalog) to grab text from a specific loaded catalogue
 
 	Inputs:
-	- section: the catalogue section (sometime also called 'context') from which to lookup the translation
-	- key:     the string to translate.
+	- section: the catalogue section (sometimes also called 'context') in which to look up the translation
+	- key:     the string to translate
 	- catalog: the catalogue to use for the translation (defaults to i18n.ACTIVE)
 
-	Returns:   the translated string or the original `key` if no translation was found.
+	Returns:   the translated string, or the original `key` if no translation was found.
 */
 get_by_section :: proc(section, key: string, catalog: ^Translation = ACTIVE) -> (value: string) {
 	return get_by_slot(section, key, 0, catalog)
@@ -127,26 +103,22 @@ get_by_section :: proc(section, key: string, catalog: ^Translation = ACTIVE) -> 
 
 get :: proc{get_single_section, get_by_section}
 
-// *****************
-// get_n() PROC GROUP
-// *****************
-
 /*
 	Returns the translation string for the passed `key` in a specific plural form (if present in the catalogue).
-	It is also aliases with `get_n( )`.
+	It is also aliased with `get_n()`.
 
 	Two ways to use it:
 	- get_n(key, quantity), which returns the appropriate plural from the active catalogue, or
-	- get_n(key, quantity, catalog) to grab text from a specific loaded catalogue.
+	- get_n(key, quantity, catalog) to grab text from a specific loaded catalogue
 
 	Inputs:
-	- key:     the string to translate.
-	- qantity: the quantity of item to be used to select the correct plural form.
-	- catalog: the catalogue to use for the translation (defaults to i18n.ACTIVE)
+	- key:      the string to translate
+	- quantity: the quantity of item to be used to select the correct plural form
+	- catalog:  the catalogue to use for the translation (defaults to i18n.ACTIVE)
 
-	Returns:   the translated string or the original `key` if no translation was found.
+	Returns:    the translated string, or the original `key` if no translation was found.
 */
-get_single_section_w_plural :: proc(key: string, quantity: int, catalog: ^Translation = ACTIVE) -> (value: string) {
+get_single_section_with_quantity :: proc(key: string, quantity: int, catalog: ^Translation = ACTIVE) -> (value: string) {
 	/*
 		A lot of languages use singular for 1 item and plural for 0 or more than 1 items. This is our default pluralize rule.
 	*/
@@ -161,21 +133,21 @@ get_single_section_w_plural :: proc(key: string, quantity: int, catalog: ^Transl
 /*
 	Returns the translation string for the passed `key` in a specific plural form (if present in the catalogue)
 	in a specific section or context.
-	It is also aliases with `get_n( )`.
+	It is also aliases with `get_n()`.
 
 	Two ways to use it:
 	- get(section, key, quantity), which returns the appropriate plural from the active catalogue, or
-	- get(section, key, quantity, catalog) to grab text from a specific loaded catalogue.
+	- get(section, key, quantity, catalog) to grab text from a specific loaded catalogue
 
 	Inputs:
 	- section: the catalogue section (sometime also called 'context') from which to lookup the translation
-	- key:     the string to translate.
-	- qantity: the quantity of item to be used to select the correct plural form.
+	- key:     the string to translate
+	- qantity: the quantity of item to be used to select the correct plural form
 	- catalog: the catalogue to use for the translation (defaults to i18n.ACTIVE)
 
-	Returns:   the translated string or the original `key` if no translation was found.
+	Returns:   the translated string, or the original `key` if no translation was found
 */
-get_by_section_w_plural :: proc(section, key: string, quantity: int, catalog: ^Translation = ACTIVE) -> (value: string) {
+get_by_section_with_quantity :: proc(section, key: string, quantity: int, catalog: ^Translation = ACTIVE) -> (value: string) {
 	/*
 		A lot of languages use singular for 1 item and plural for 0 or more than 1 items. This is our default pluralize rule.
 	*/
@@ -186,11 +158,7 @@ get_by_section_w_plural :: proc(section, key: string, quantity: int, catalog: ^T
 	}
 	return get_by_slot(section, key, slot, catalog)
 }
-get_n :: proc{get_single_section_w_plural, get_by_section_w_plural}
-
-// *****************
-// get_by_slot() PROC GROUP
-// *****************
+get_n :: proc{get_single_section_with_quantity, get_by_section_with_quantity}
 
 /*
 	Two ways to use:
@@ -202,10 +170,10 @@ get_n :: proc{get_single_section_w_plural, get_by_section_w_plural}
 
 	Inputs:
 	- key:     the string to translate.
-	- qantity: the translation slot to choose (slots refer to plural forms specific for each language and their meaning changes from catalogue to catalogue).
+	- slot:    the translation slot to choose (slots refer to plural forms specific for each language and their meaning changes from catalogue to catalogue).
 	- catalog: the catalogue to use for the translation (defaults to i18n.ACTIVE)
 
-	Returns:   the translated string or the original `key` if no translation was found.
+	Returns:   the translated string, or the original `key` if no translation was found.
 */
 get_by_slot_single_section :: proc(key: string, slot: int, catalog: ^Translation = ACTIVE) -> (value: string) {
 	return get_by_slot_by_section("", key, slot, catalog)
@@ -221,22 +189,18 @@ get_by_slot_single_section :: proc(key: string, slot: int, catalog: ^Translation
 	Inputs:
 	- section: the catalogue section (sometime also called 'context') from which to lookup the translation
 	- key:     the string to translate.
-	- qantity: the translation slot to choose (slots refer to plural forms specific for each language and their meaning changes from catalogue to catalogue).
+	- slot:    the translation slot to choose (slots refer to plural forms specific for each language and their meaning changes from catalogue to catalogue).
 	- catalog: the catalogue to use for the translation (defaults to i18n.ACTIVE)
 
 	Returns:   the translated string or the original `key` if no translation was found.
 */
 get_by_slot_by_section :: proc(section, key: string, slot: int, catalog: ^Translation = ACTIVE) -> (value: string) {
 	if catalog == nil || section not_in catalog.k_v {
-		/*
-			Return the key if the catalog catalog hasn't been initialized yet, or the section is not present.
-		*/
+		// Return the key if the catalog catalog hasn't been initialized yet, or the section is not present.
 		return key
 	}
 
-	/*
-		Return the translation from the requested slot if this key is known, else return the key.
-	*/
+	// Return the translation from the requested slot if this key is known, else return the key.
 	if translations, ok := catalog.k_v[section][key]; ok {
 		plural := min(max(0, slot), len(catalog.k_v[section][key]) - 1)
 		return translations[plural]
