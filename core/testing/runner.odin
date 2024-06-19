@@ -9,6 +9,7 @@ import "core:encoding/ansi"
 import "core:fmt"
 import "core:io"
 @require import pkg_log "core:log"
+import "core:math/rand"
 import "core:mem"
 import "core:os"
 import "core:slice"
@@ -105,6 +106,13 @@ run_test_task :: proc(task: thread.Task) {
 		lowest_level = get_log_level(),
 		options = Default_Test_Logger_Opts,
 	}
+
+	random_generator_state: runtime.Default_Random_State
+	context.random_generator = {
+		procedure = runtime.default_random_generator_proc,
+		data = &random_generator_state,
+	}
+	rand.reset(data.t.seed)
 
 	free_all(context.temp_allocator)
 

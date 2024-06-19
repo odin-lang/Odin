@@ -11,8 +11,7 @@ test_sort_with_indices :: proc(t: ^testing.T) {
 	test_sizes :: []int{7, 13, 347, 1031, 10111, 100003}
 
 	for test_size in test_sizes {
-		r := rand.create(t.seed)
-		context.random_generator = rand.default_random_generator(&r)
+		rand.reset(t.seed)
 
 		vals  := make([]u64, test_size)
 		r_idx := make([]int, test_size) // Reverse index
@@ -63,8 +62,7 @@ test_sort_by_indices :: proc(t: ^testing.T) {
 	test_sizes :: []int{7, 13, 347, 1031, 10111, 100003}
 
 	for test_size in test_sizes {
-		r := rand.create(t.seed)
-		context.random_generator = rand.default_random_generator(&r)
+		rand.reset(t.seed)
 
 		vals  := make([]u64, test_size)
 		r_idx := make([]int, test_size) // Reverse index
