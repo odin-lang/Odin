@@ -4025,7 +4025,7 @@ KEY_EVENT_RECORD :: struct {
 		AsciiChar: CHAR,
 	},
 	dwControlKeyState: Control_Key_State,
-};
+}
 
 MOUSE_EVENT_RECORD :: struct {
 	dwMousePosition: COORD,
