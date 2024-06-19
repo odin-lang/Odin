@@ -3999,6 +3999,70 @@ CONSOLE_CURSOR_INFO :: struct {
 PCONSOLE_SCREEN_BUFFER_INFO :: ^CONSOLE_SCREEN_BUFFER_INFO
 PCONSOLE_CURSOR_INFO :: ^CONSOLE_CURSOR_INFO
 
+Event_Type :: enum WORD {
+	KEY_EVENT = 0x0001,
+	MOUSE_EVENT = 0x0002,
+	WINDOW_BUFFER_SIZE_EVENT = 0x0004,
+	MENU_EVENT = 0x0008,
+	FOCUS_EVENT = 0x0010,
+}
+
+INPUT_RECORD :: struct {
+	EventType: Event_Type,
+	Event: struct #raw_union {
+		KeyEvent: KEY_EVENT_RECORD,
+		MouseEvent: MOUSE_EVENT_RECORD,
+		WindowBufferSizeEvent: WINDOW_BUFFER_SIZE_RECORD,
+		MenuEvent: MENU_EVENT_RECORD,
+		FocusEvent: FOCUS_EVENT_RECORD,
+	},
+}
+
+Control_Key_State_Bits :: enum {
+	RIGHT_ALT_PRESSED,
+	LEFT_ALT_PRESSED,
+	RIGHT_CTRL_PRESSED,
+	LEFT_CTRL_PRESSED,
+	SHIFT_PRESSED,
+	NUMLOCK_ON,
+	SCROLLLOCK_ON,
+	CAPSLOCK_ON,
+	ENHANCED_KEY,
+}
+Control_Key_State :: bit_set[Control_Key_State_Bits; DWORD]
+
+KEY_EVENT_RECORD :: struct {
+	bKeyDown: BOOL,
+	wRepeatCount: WORD,
+	wVirtualKeyCode: WORD,
+	wVirtualScanCode: WORD,
+	uChar: struct #raw_union {
+		UnicodeChar: WCHAR,
+		AsciiChar: CHAR,
+	},
+	dwControlKeyState: Control_Key_State,
+}
+
+MOUSE_EVENT_RECORD :: struct {
+	dwMousePosition: COORD,
+	dwButtonState: DWORD,
+	dwControlKeyState: DWORD,
+	dwEventFlags: DWORD,
+}
+
+WINDOW_BUFFER_SIZE_RECORD :: struct {
+	dwSize: COORD,
+}
+
+MENU_EVENT_RECORD :: struct {
+	dwCommandId: UINT,
+}
+
+FOCUS_EVENT_RECORD :: struct {
+	bSetFocus: BOOL,
+}
+
+
 //
 // Networking
 //
@@ -4233,3 +4297,92 @@ SOCKADDR :: struct {
 	sa_family: ADDRESS_FAMILY,
 	sa_data:   [14]CHAR,
 }
+
+DTR_Control :: enum byte {
+	Disable = 0,
+	Enable = 1,
+	Handshake = 2,
+}
+RTS_Control :: enum byte {
+	Disable   = 0,
+	Enable    = 1,
+	Handshake = 2,
+	Toggle    = 3,
+}
+Parity :: enum byte {
+	None  = 0,
+	Odd   = 1,
+	Even  = 2,
+	Mark  = 3,
+	Space = 4,
+}
+Stop_Bits :: enum byte {
+	One = 0,
+	One_And_A_Half = 1,
+	Two = 2,
+}
+
+DCB :: struct {
+	DCBlength:  DWORD,
+	BaudRate:   DWORD,
+	using _: bit_field DWORD {
+		fBinary:           bool        | 1,
+		fParity:           bool        | 1,
+		fOutxCtsFlow:      bool        | 1,
+		fOutxDsrFlow:      bool        | 1,
+		fDtrControl:       DTR_Control | 2,
+		fDsrSensitivity:   bool        | 1,
+		fTXContinueOnXoff: bool        | 1,
+		fOutX:             bool        | 1,
+		fInX:              bool        | 1,
+		fErrorChar:        bool        | 1,
+		fNull:             bool        | 1,
+		fRtsControl:       RTS_Control | 2,
+		fAbortOnError:     bool        | 1,
+	},
+	wReserved:  WORD,
+	XOnLim:     WORD,
+	XOffLim:    WORD,
+	ByteSize:   BYTE,
+	Parity:     Parity,
+	StopBits:   Stop_Bits,
+	XonChar:    byte,
+	XoffChar:   byte,
+	ErrorChar:  byte,
+	EofChar:    byte,
+	EvtChar:    byte,
+	wReserved1: WORD,
+}
+
+COMMTIMEOUTS :: struct {
+	ReadIntervalTimeout: DWORD,
+	ReadTotalTimeoutMultiplier: DWORD,
+	ReadTotalTimeoutConstant: DWORD,
+	WriteTotalTimeoutMultiplier: DWORD,
+	WriteTotalTimeoutConstant: DWORD,
+}
+
+Com_Stat_Bits :: enum {
+	fCtsHold,
+	fDsrHold,
+	fRlsdHold,
+	fXoffHold,
+	fXoffSent,
+	fEof,
+	fTxim,
+}
+COMSTAT :: struct {
+	bits: bit_set[Com_Stat_Bits; DWORD],
+	cbInQue: DWORD,
+	cbOutQue: DWORD,
+}
+
+Com_Error_Bits :: enum {
+	RXOVER,
+	OVERRUN,
+	RXPARITY,
+	FRAME,
+	BREAK,
+}
+Com_Error :: bit_set[Com_Error_Bits; DWORD]
+
