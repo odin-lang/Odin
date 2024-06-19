@@ -61,7 +61,7 @@ foreign kernel32 {
 	GetConsoleOutputCP :: proc() -> UINT ---
 	SetConsoleOutputCP :: proc(wCodePageID: UINT) -> BOOL ---
 	FlushConsoleInputBuffer :: proc(hConsoleInput: HANDLE) -> BOOL ---
-	
+
 	GetFileInformationByHandle :: proc(hFile: HANDLE, lpFileInformation: LPBY_HANDLE_FILE_INFORMATION) -> BOOL ---
 	SetHandleInformation :: proc(hObject: HANDLE,
 	                             dwMask: DWORD,
@@ -99,7 +99,12 @@ foreign kernel32 {
 	RemoveDirectoryW :: proc(lpPathName: LPCWSTR) -> BOOL ---
 	SetFileAttributesW :: proc(lpFileName: LPCWSTR, dwFileAttributes: DWORD) -> BOOL ---
 	SetLastError :: proc(dwErrCode: DWORD) ---
-	//ClearCommError :: proc(hFile: HANDLE, lpErrors: LPDWORD, lpStat: LPCOMSTAT) -> BOOL ---
+	GetCommTimeouts :: proc(handle: HANDLE, timeouts: ^COMMTIMEOUTS) -> BOOL ---
+	SetCommTimeouts :: proc(handle: HANDLE, timeouts: ^COMMTIMEOUTS) -> BOOL ---
+	ClearCommError :: proc(hFile: HANDLE, lpErrors: ^Com_Error, lpStat: ^COMSTAT) -> BOOL ---
+	GetCommState :: proc(handle: HANDLE, dcb: ^DCB) -> BOOL ---
+	SetCommState :: proc(handle: HANDLE, dcb: ^DCB) -> BOOL ---
+	GetCommPorts :: proc(lpPortNumbers: PULONG, uPortNumbersCount: ULONG, puPortNumbersFound: PULONG) -> ULONG ---
 	GetCommandLineW :: proc() -> LPCWSTR ---
 	GetTempPathW :: proc(nBufferLength: DWORD, lpBuffer: LPCWSTR) -> DWORD ---
 	GetCurrentProcess :: proc() -> HANDLE ---
@@ -1030,82 +1035,6 @@ PHANDLER_ROUTINE :: HandlerRoutine
 // NOTE(Jeroen, 2024-06-13): As Odin now supports bit_fields, we no longer need
 // a helper procedure. `init_dcb_with_config` and `get_dcb_config` have been removed.
 
-DTR_Control :: enum byte {
-	Disable = 0,
-	Enable = 1,
-	Handshake = 2,
-}
-RTS_Control :: enum byte {
-	Disable   = 0,
-	Enable    = 1,
-	Handshake = 2,
-	Toggle    = 3,
-}
-Parity :: enum byte {
-	None  = 0,
-	Odd   = 1,
-	Even  = 2,
-	Mark  = 3,
-	Space = 4,
-}
-Stop_Bits :: enum byte {
-	One = 0,
-	One_And_A_Half = 1,
-	Two = 2,
-}
-
-DCB :: struct {
-	DCBlength:  DWORD,
-	BaudRate:   DWORD,
-	using _: bit_field DWORD {
-		fBinary:           bool        | 1,
-		fParity:           bool        | 1,
-		fOutxCtsFlow:      bool        | 1,
-		fOutxDsrFlow:      bool        | 1,
-		fDtrControl:       DTR_Control | 2,
-		fDsrSensitivity:   bool        | 1,
-		fTXContinueOnXoff: bool        | 1,
-		fOutX:             bool        | 1,
-		fInX:              bool        | 1,
-		fErrorChar:        bool        | 1,
-		fNull:             bool        | 1,
-		fRtsControl:       RTS_Control | 2,
-		fAbortOnError:     bool        | 1,
-	},
-	wReserved:  WORD,
-	XOnLim:     WORD,
-	XOffLim:    WORD,
-	ByteSize:   BYTE,
-	Parity:     Parity,
-	StopBits:   Stop_Bits,
-	XonChar:    byte,
-	XoffChar:   byte,
-	ErrorChar:  byte,
-	EofChar:    byte,
-	EvtChar:    byte,
-	wReserved1: WORD,
-}
-
-@(default_calling_convention="system")
-foreign kernel32 {
-	GetCommState :: proc(handle: HANDLE, dcb: ^DCB) -> BOOL ---
-	SetCommState :: proc(handle: HANDLE, dcb: ^DCB) -> BOOL ---
-}
-
-COMMTIMEOUTS :: struct {
-	ReadIntervalTimeout: DWORD,
-	ReadTotalTimeoutMultiplier: DWORD,
-	ReadTotalTimeoutConstant: DWORD,
-	WriteTotalTimeoutMultiplier: DWORD,
-	WriteTotalTimeoutConstant: DWORD,
-}
-
-@(default_calling_convention="system")
-foreign kernel32 {
-	GetCommTimeouts :: proc(handle: HANDLE, timeouts: ^COMMTIMEOUTS) -> BOOL ---
-	SetCommTimeouts :: proc(handle: HANDLE, timeouts: ^COMMTIMEOUTS) -> BOOL ---
-}
-
 LPFIBER_START_ROUTINE :: #type proc "system" (lpFiberParameter: LPVOID)
 
 @(default_calling_convention = "system")
@@ -1182,9 +1111,9 @@ Battery_Flag :: enum BYTE {
     Low      = 1,
     Critical = 2,
     Charging = 3,
-    No_Battery = 7, 
+    No_Battery = 7,
 }
-Battery_Flags :: bit_set[Battery_Flag; BYTE] 
+Battery_Flags :: bit_set[Battery_Flag; BYTE]
 
 /* Global Memory Flags */
 GMEM_FIXED          :: 0x0000
