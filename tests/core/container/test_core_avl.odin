@@ -20,15 +20,12 @@ test_avl :: proc(t: ^testing.T) {
 	iter := avl.iterator(&tree, avl.Direction.Forward)
 	testing.expect(t, avl.iterator_get(&iter) == nil, "empty/iterator: first node should be nil")
 
-	r: rand.Rand
-	rand.init(&r, t.seed)
-
 	// Test insertion.
 	NR_INSERTS :: 32 + 1 // Ensure at least 1 collision.
 	inserted_map := make(map[int]^avl.Node(int))
 	defer delete(inserted_map)
 	for i := 0; i < NR_INSERTS; i += 1 {
-		v := int(rand.uint32(&r) & 0x1f)
+		v := int(rand.uint32() & 0x1f)
 		existing_node, in_map := inserted_map[v]
 
 		n, ok, _ := avl.find_or_insert(&tree, v)
@@ -78,7 +75,7 @@ test_avl :: proc(t: ^testing.T) {
 	testing.expect(t, visited == nrEntries, "iterator/backward: visited")
 
 	// Test removal.
-	rand.shuffle(inserted_values[:], &r)
+	rand.shuffle(inserted_values[:])
 	for v, i in inserted_values {
 		node := avl.find(&tree, v)
 		testing.expect(t, node != nil, "remove: find (pre)")

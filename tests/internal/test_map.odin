@@ -16,10 +16,10 @@ map_insert_random_key_value :: proc(t: ^testing.T) {
 		defer delete(m)
 
 		unique_keys := 0
-		r := rand.create(t.seed + seed_incr)
+		rand.reset(t.seed + seed_incr)
 		for _ in 0..<entries {
-			k := rand.int63(&r)
-			v := rand.int63(&r)
+			k := rand.int63()
+			v := rand.int63()
 
 			if k not_in m {
 				unique_keys += 1
@@ -36,12 +36,12 @@ map_insert_random_key_value :: proc(t: ^testing.T) {
 		testing.expectf(t, len(m)    == unique_keys, "Expected len(map) to equal %v, got %v",  unique_keys, len(m))
 
 		// Reset randomizer and verify
-		r = rand.create(t.seed + seed_incr)
+		rand.reset(t.seed + seed_incr)
 
 		num_fails := 0
 		for _ in 0..<entries {
-			k := rand.int63(&r)
-			v := rand.int63(&r)
+			k := rand.int63()
+			v := rand.int63()
 
 			cond := m[k] == v
 			if !cond {
@@ -66,10 +66,11 @@ map_update_random_key_value :: proc(t: ^testing.T) {
 		defer delete(m)
 
 		unique_keys := 0
-		r := rand.create(t.seed + seed_incr)
+		rand.reset(t.seed + seed_incr)
+
 		for _ in 0..<entries {
-			k := rand.int63(&r)
-			v := rand.int63(&r)
+			k := rand.int63()
+			v := rand.int63()
 
 			if k not_in m {
 				unique_keys += 1
@@ -88,21 +89,22 @@ map_update_random_key_value :: proc(t: ^testing.T) {
 		half_entries := entries / 2
 
 		// Reset randomizer and update half the entries
-		r = rand.create(t.seed + seed_incr)
+		rand.reset(t.seed + seed_incr)
+
 		for _ in 0..<half_entries {
-			k := rand.int63(&r)
-			v := rand.int63(&r)
+			k := rand.int63()
+			v := rand.int63()
 
 			m[k] = v + 42
 		}
 
 		// Reset randomizer and verify
-		r = rand.create(t.seed + seed_incr)
+		rand.reset(t.seed + seed_incr)
 
 		num_fails := 0
 		for i in 0..<entries {
-			k := rand.int63(&r)
-			v := rand.int63(&r)
+			k := rand.int63()
+			v := rand.int63()
 
 			diff := i64(42) if i < half_entries else i64(0)
 			cond := m[k] == (v + diff)
@@ -128,10 +130,11 @@ map_delete_random_key_value :: proc(t: ^testing.T) {
 		defer delete(m)
 
 		unique_keys := 0
-		r := rand.create(t.seed + seed_incr)
+		rand.reset(t.seed + seed_incr)
+
 		for _ in 0..<entries {
-			k := rand.int63(&r)
-			v := rand.int63(&r)
+			k := rand.int63()
+			v := rand.int63()
 
 			if k not_in m {
 				unique_keys += 1
@@ -150,21 +153,22 @@ map_delete_random_key_value :: proc(t: ^testing.T) {
 		half_entries := entries / 2
 
 		// Reset randomizer and delete half the entries
-		r = rand.create(t.seed + seed_incr)
+		rand.reset(t.seed + seed_incr)
+
 		for _ in 0..<half_entries {
-			k := rand.int63(&r)
-			_  = rand.int63(&r)
+			k := rand.int63()
+			_  = rand.int63()
 
 			delete_key(&m, k)
 		}
 
 		// Reset randomizer and verify
-		r = rand.create(t.seed + seed_incr)
+		rand.reset(t.seed + seed_incr)
 
 		num_fails := 0
 		for i in 0..<entries {
-			k := rand.int63(&r)
-			v := rand.int63(&r)
+			k := rand.int63()
+			v := rand.int63()
 
 			if i < half_entries {
 				if k in m {
@@ -206,9 +210,10 @@ set_insert_random_key_value :: proc(t: ^testing.T) {
 		defer delete(m)
 
 		unique_keys := 0
-		r := rand.create(t.seed + seed_incr)
+		rand.reset(t.seed + seed_incr)
+
 		for _ in 0..<entries {
-			k := rand.int63(&r)
+			k := rand.int63()
 			if k not_in m {
 				unique_keys += 1
 			}
@@ -224,11 +229,11 @@ set_insert_random_key_value :: proc(t: ^testing.T) {
 		testing.expectf(t, len(m)    == unique_keys, "Expected len(map) to equal %v, got %v",  unique_keys, len(m))
 
 		// Reset randomizer and verify
-		r = rand.create(t.seed + seed_incr)
+		rand.reset(t.seed + seed_incr)
 
 		num_fails := 0
 		for _ in 0..<entries {
-			k := rand.int63(&r)
+			k := rand.int63()
 
 			cond := k in m
 			if !cond {
@@ -253,9 +258,10 @@ set_delete_random_key_value :: proc(t: ^testing.T) {
 		defer delete(m)
 
 		unique_keys := 0
-		r := rand.create(t.seed + seed_incr)
+		rand.reset(t.seed + seed_incr)
+
 		for _ in 0..<entries {
-			k := rand.int63(&r)
+			k := rand.int63()
 
 			if k not_in m {
 				unique_keys += 1
@@ -274,18 +280,19 @@ set_delete_random_key_value :: proc(t: ^testing.T) {
 		half_entries := entries / 2
 
 		// Reset randomizer and delete half the entries
-		r = rand.create(t.seed + seed_incr)
+		rand.reset(t.seed + seed_incr)
+
 		for _ in 0..<half_entries {
-			k := rand.int63(&r)
+			k := rand.int63()
 			delete_key(&m, k)
 		}
 
 		// Reset randomizer and verify
-		r = rand.create(t.seed + seed_incr)
+		rand.reset(t.seed + seed_incr)
 
 		num_fails := 0
 		for i in 0..<entries {
-			k := rand.int63(&r)
+			k := rand.int63()
 
 			if i < half_entries {
 				if k in m {

@@ -12,7 +12,8 @@ Memory_Block :: struct {
 	capacity:  uint,
 }
 
-// NOTE: This is for internal use, prefer `Arena` from `core:mem/virtual` if necessary
+// NOTE: This is a growing arena that is only used for the default temp allocator.
+// For your own growing arena needs, prefer `Arena` from `core:mem/virtual`.
 Arena :: struct {
 	backing_allocator:  Allocator,
 	curr_block:         ^Memory_Block,
