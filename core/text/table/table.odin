@@ -11,6 +11,7 @@ package text_table
 
 import "core:io"
 import "core:fmt"
+import "core:log"
 import "core:mem"
 import "core:mem/virtual"
 import "core:unicode/utf8"
@@ -113,7 +114,7 @@ to_string :: #force_inline proc(tbl: ^Table, value: any, loc := #caller_location
 	case:
 		result = format(tbl, "%v", val)
 		if result == "" {
-			fmt.eprintf("{} text/table: format() resulted in empty string (arena out of memory?)\n", loc)
+			log.error("text/table.format() resulted in empty string (arena out of memory?)", location = loc)
 		}
 	}
 	return
