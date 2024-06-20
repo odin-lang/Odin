@@ -2606,6 +2606,11 @@ gb_internal void check_unary_expr(CheckerContext *c, Operand *o, Token op, Ast *
 	if (o->mode == Addressing_Constant) {
 		Type *type = base_type(o->type);
 		if (!is_type_constant_type(o->type)) {
+			if (is_type_array_like(o->type)) {
+				o->mode = Addressing_Value;
+				return;
+			}
+
 			gbString xt = type_to_string(o->type);
 			gbString err_str = expr_to_string(node);
 			error(op, "Invalid type, '%s', for constant unary expression '%s'", xt, err_str);
