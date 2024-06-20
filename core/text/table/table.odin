@@ -324,9 +324,8 @@ write_markdown_table :: proc(w: io.Writer, tbl: ^Table) {
 		build(tbl, WIDTH_PROC)
 	}
 
-	for row in 0..<tbl.nr_rows {
-		alignment: Cell_Alignment = .Center if tbl.has_header_row && row == header_row(tbl) else .Left
-		for col in 0..<tbl.nr_cols {
+	write_row :: proc(w: io.Writer, tbl: ^Table, row: int, alignment: Cell_Alignment = .Left) {
+		for col in 0 ..< tbl.nr_cols {
 			cell := get_cell(tbl, row, col)
 			if col == 0 {
 				io.write_byte(w, '|')
@@ -335,30 +334,42 @@ write_markdown_table :: proc(w: io.Writer, tbl: ^Table) {
 			io.write_string(w, "|")
 		}
 		io.write_byte(w, '\n')
+	}
 
-		if tbl.has_header_row && row == header_row(tbl) {
-			for col in 0..<tbl.nr_cols {
-				cell := get_cell(tbl, row, col)
-				if col == 0 {
-					io.write_byte(w, '|')
-				}
-				divider_width := tbl.colw[col] + tbl.lpad + tbl.rpad - 1
-				switch cell.alignment {
-				case .Left:
-					io.write_byte(w, ':')
-					write_byte_repeat(w, max(1, divider_width), '-')
-				case .Center:
-					io.write_byte(w, ':')
-					write_byte_repeat(w, max(1, divider_width-1), '-')
-					io.write_byte(w, ':')
-				case .Right:
-					write_byte_repeat(w, max(1, divider_width), '-')
-					io.write_byte(w, ':')
-				}
+	start := 0
+
+	if tbl.has_header_row {
+		row := header_row(tbl)
+
+		write_row(w, tbl, row, .Center)
+
+		for col in 0 ..< tbl.nr_cols {
+			cell := get_cell(tbl, row, col)
+			if col == 0 {
 				io.write_byte(w, '|')
 			}
-			io.write_byte(w, '\n')
+			divider_width := tbl.colw[col] + tbl.lpad + tbl.rpad - 1
+			switch cell.alignment {
+			case .Left:
+				io.write_byte(w, ':')
+				write_byte_repeat(w, max(1, divider_width), '-')
+			case .Center:
+				io.write_byte(w, ':')
+				write_byte_repeat(w, max(1, divider_width - 1), '-')
+				io.write_byte(w, ':')
+			case .Right:
+				write_byte_repeat(w, max(1, divider_width), '-')
+				io.write_byte(w, ':')
+			}
+			io.write_byte(w, '|')
 		}
+		io.write_byte(w, '\n')
+
+		start += row + 1
+	}
+
+	for row in start ..< tbl.nr_rows {
+		write_row(w, tbl, row)
 	}
 }
 
