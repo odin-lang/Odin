@@ -48,6 +48,9 @@ foreign kernel32 {
 	                          nLength: DWORD,
 	                          lpNumberOfEventsRead: LPDWORD) -> BOOL ---
 
+	// https://learn.microsoft.com/en-us/windows/console/getnumberofconsoleinputevents
+	GetNumberOfConsoleInputEvents :: proc(hConsoleInput: HANDLE, lpcNumberOfEvents: LPDWORD) -> BOOL ---
+
 	GetConsoleMode :: proc(hConsoleHandle: HANDLE,
 	                       lpMode: LPDWORD) -> BOOL ---
 	SetConsoleMode :: proc(hConsoleHandle: HANDLE,
@@ -63,6 +66,8 @@ foreign kernel32 {
 	FlushConsoleInputBuffer :: proc(hConsoleInput: HANDLE) -> BOOL ---
 
 	GetFileInformationByHandle :: proc(hFile: HANDLE, lpFileInformation: LPBY_HANDLE_FILE_INFORMATION) -> BOOL ---
+
+
 	SetHandleInformation :: proc(hObject: HANDLE,
 	                             dwMask: DWORD,
 	                             dwFlags: DWORD) -> BOOL ---
