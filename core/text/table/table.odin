@@ -155,7 +155,7 @@ header :: proc(tbl: ^Table, values: ..any, loc := #caller_location) {
 row :: proc(tbl: ^Table, values: ..any, loc := #caller_location) {
 	if tbl.nr_cols == 0 {
 		if len(values) == 0 {
-			panic("Cannot create row without values unless knowing amount of columns in advance")
+			panic("Cannot create empty row unless the number of columns is known in advance")
 		} else {
 			tbl.nr_cols = len(values)
 		}
