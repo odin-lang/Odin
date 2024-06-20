@@ -20,7 +20,6 @@ import MIX        "vendor:sdl2/mixer"
 import TTF        "vendor:sdl2/ttf"
 
 import vk         "vendor:vulkan"
-import wgpu       "vendor:wgpu"
 
 // NOTE(bill): only one can be checked at a time
 import lua_5_4    "vendor:lua/5.4"
@@ -51,7 +50,6 @@ _ :: MIX
 _ :: TTF
 
 _ :: vk
-_ :: wgpu
 
 _ :: lua_5_4
 
