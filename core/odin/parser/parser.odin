@@ -1438,7 +1438,7 @@ parse_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 			case: error(p, stmt.pos, "#partial can only be applied to a switch statement")
 			}
 			return stmt
-		case "assert", "panic":
+		case "assert", "panic", "warning":
 			bd := ast.new(ast.Basic_Directive, tok.pos, end_pos(tag))
 			bd.tok  = tok
 			bd.name = name
