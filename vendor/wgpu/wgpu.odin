@@ -8,12 +8,12 @@ WGPU_DEBUG  :: #config(WGPU_DEBUG,  false)
 @(private) TYPE :: "debug" when WGPU_DEBUG else "release"
 
 when ODIN_OS == .Windows {
-	@(private) ARCH :: "x86_64"   when ODIN_ARCH == .amd64 else "i686" when ODIN_ARCH == .i386 else #panic("unsupported WGPU Native architecture")
+	@(private) ARCH :: "x86_64"   when ODIN_ARCH == .amd64 else "x86_64" when ODIN_ARCH == .i386 else #panic("unsupported WGPU Native architecture")
 	@(private) EXT  :: ".dll.lib" when WGPU_SHARED else ".lib"
-	@(private) LIB  :: "lib/wgpu-windows-" + ARCH + "-" + TYPE + "/wgpu-native" + EXT
+	@(private) LIB  :: "lib/wgpu-windows-" + ARCH + "-" + TYPE + "/wgpu_native" + EXT
 
 	when !#exists(LIB) {
-		#panic("Could not find the compiled WGPU Native library at '" + ODIN_ROOT + LIB + "', these can be downloaded from https://github.com/gfx-rs/wgpu-native/releases/tag/v0.19.4.1, make sure to read the README at '" + ODIN_ROOT + "vendor/wgpu/README.md'")
+		#panic("Could not find the compiled WGPU Native library at '" + #directory + LIB + "', these can be downloaded from https://github.com/gfx-rs/wgpu-native/releases/tag/v0.19.4.1, make sure to read the README at '" + #directory + "vendor/wgpu/README.md'")
 	}
 
 	foreign import libwgpu {
@@ -32,7 +32,7 @@ when ODIN_OS == .Windows {
 	@(private) LIB  :: "lib/wgpu-macos-" + ARCH + "-" + TYPE + "/libwgpu_native" + EXT
 
 	when !#exists(LIB) {
-		#panic("Could not find the compiled WGPU Native library at '" + ODIN_ROOT + LIB + "', these can be downloaded from https://github.com/gfx-rs/wgpu-native/releases/tag/v0.19.4.1, make sure to read the README at '" + ODIN_ROOT + "vendor/wgpu/README.md'")
+		#panic("Could not find the compiled WGPU Native library at '" + #directory + LIB + "', these can be downloaded from https://github.com/gfx-rs/wgpu-native/releases/tag/v0.19.4.1, make sure to read the README at '" + #directory + "vendor/wgpu/README.md'")
 	}
 
 	foreign import libwgpu {
@@ -47,7 +47,7 @@ when ODIN_OS == .Windows {
 	@(private) LIB  :: "lib/wgpu-linux-" + ARCH + "-" + TYPE + "/libwgpu_native" + EXT
 
 	when !#exists(LIB) {
-		#panic("Could not find the compiled WGPU Native library at '" + ODIN_ROOT + LIB + "', these can be downloaded from https://github.com/gfx-rs/wgpu-native/releases/tag/v0.19.4.1, make sure to read the README at '" + ODIN_ROOT + "vendor/wgpu/README.md'")
+		#panic("Could not find the compiled WGPU Native library at '" + #directory + LIB + "', these can be downloaded from https://github.com/gfx-rs/wgpu-native/releases/tag/v0.19.4.1, make sure to read the README at '" + #directory + "vendor/wgpu/README.md'")
 	}
 
 	foreign import libwgpu {
