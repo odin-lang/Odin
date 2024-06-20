@@ -8327,6 +8327,14 @@ gb_internal ExprKind check_basic_directive_expr(CheckerContext *c, Operand *o, A
 		}
 		o->type = t_untyped_string;
 		o->value = exact_value_string(file);
+	} else if (name == "directory") {
+		String file = get_file_path_string(bd->token.pos.file_id);
+		String path = dir_from_path(file);
+		if (build_context.obfuscate_source_code_locations) {
+			path = obfuscate_string(path, "D");
+		}
+		o->type = t_untyped_string;
+		o->value = exact_value_string(path);
 	} else if (name == "line") {
 		i32 line = bd->token.pos.line;
 		if (build_context.obfuscate_source_code_locations) {
