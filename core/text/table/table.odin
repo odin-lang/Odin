@@ -127,7 +127,7 @@ set_cell_alignment :: proc(tbl: ^Table, row, col: int, alignment: Cell_Alignment
 	tbl.dirty = true
 }
 
-format :: proc(tbl: ^Table, _fmt: string, args: ..any, loc := #caller_location) -> string {
+format :: proc(tbl: ^Table, _fmt: string, args: ..any) -> string {
 	context.allocator = tbl.format_allocator
 	return fmt.aprintf(_fmt, ..args)
 }
