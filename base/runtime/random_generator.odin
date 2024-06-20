@@ -89,7 +89,7 @@ default_random_generator_proc :: proc(data: rawptr, mode: Random_Generator_Mode,
 		switch len(p) {
 		case size_of(u64):
 			// Fast path for a 64-bit destination.
-			(transmute(^u64)raw_data(p))^ = read_u64(r)
+			intrinsics.unaligned_store(transmute(^u64)raw_data(p), read_u64(r))
 		case:
 			// All other cases.
 			pos := i8(0)
