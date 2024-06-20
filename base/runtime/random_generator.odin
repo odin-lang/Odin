@@ -86,16 +86,23 @@ default_random_generator_proc :: proc(data: rawptr, mode: Random_Generator_Mode,
 		   	init(r, 0)
 		}
 
-		pos := i8(0)
-		val := u64(0)
-		for &v in p {
-			if pos == 0 {
-				val = read_u64(r)
-				pos = 7
+		switch len(p) {
+		case size_of(u64):
+			// Fast path for a 64-bit destination.
+			(transmute(^u64)raw_data(p))^ = read_u64(r)
+		case:
+			// All other cases.
+			pos := i8(0)
+			val := u64(0)
+			for &v in p {
+				if pos == 0 {
+					val = read_u64(r)
+					pos = 7
+				}
+				v = byte(val)
+				val >>= 8
+				pos -= 1
 			}
-			v = byte(val)
-			val >>= 8
-			pos -= 1
 		}
 
 	case .Reset:
