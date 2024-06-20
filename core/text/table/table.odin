@@ -4,6 +4,7 @@
 
 	List of contributors:
 		oskarnp: Initial implementation.
+		Feoramund: Unicode support.
 */
 
 package text_table
@@ -12,10 +13,12 @@ import "core:io"
 import "core:fmt"
 import "core:mem"
 import "core:mem/virtual"
+import "core:unicode/utf8"
 import "base:runtime"
 
 Cell :: struct {
 	text: string,
+	width: int,
 	alignment: Cell_Alignment,
 }
 
@@ -24,6 +27,9 @@ Cell_Alignment :: enum {
 	Center,
 	Right,
 }
+
+// Determines the width of a string used in the table for alignment purposes.
+Width_Proc :: #type proc(str: string) -> int
 
 Table :: struct {
 	lpad, rpad: int, // Cell padding (left/right)
@@ -37,8 +43,17 @@ Table :: struct {
 	dirty: bool, // True if build() needs to be called before rendering
 
 	// The following are computed on build()
-	colw: [dynamic]int, // Width of each column (including padding, excluding borders)
+	colw: [dynamic]int, // Width of each column (excluding padding and borders)
 	tblw: int,          // Width of entire table (including padding, excluding borders)
+}
+
+ascii_width_proc :: proc(str: string) -> int {
+	return len(str)
+}
+
+unicode_width_proc :: proc(str: string) -> (width: int) {
+	_, _, width = #force_inline utf8.grapheme_count(str)
+	return
 }
 
 init :: proc{init_with_allocator, init_with_virtual_arena, init_with_mem_arena}
@@ -165,7 +180,7 @@ first_row :: proc(tbl: ^Table) -> int {
 	return header_row(tbl)+1 if tbl.has_header_row else 0
 }
 
-build :: proc(tbl: ^Table) {
+build :: proc(tbl: ^Table, width_proc: Width_Proc) {
 	tbl.dirty = false
 
 	resize(&tbl.colw, tbl.nr_cols)
@@ -174,18 +189,17 @@ build :: proc(tbl: ^Table) {
 	for row in 0..<tbl.nr_rows {
 		for col in 0..<tbl.nr_cols {
 			cell := get_cell(tbl, row, col)
-			if w := len(cell.text) + tbl.lpad + tbl.rpad; w > tbl.colw[col] {
-				tbl.colw[col] = w
-			}
+			cell.width = width_proc(cell.text)
+			tbl.colw[col] = max(tbl.colw[col], cell.width)
 		}
 	}
 
 	colw_sum := 0
 	for v in tbl.colw {
-		colw_sum += v
+		colw_sum += v + tbl.lpad + tbl.rpad
 	}
 
-	tbl.tblw = max(colw_sum, len(tbl.caption) + tbl.lpad + tbl.rpad)
+	tbl.tblw = max(colw_sum, width_proc(tbl.caption) + tbl.lpad + tbl.rpad)
 
 	// Resize columns to match total width of table
 	remain := tbl.tblw-colw_sum
@@ -251,8 +265,10 @@ write_html_table :: proc(w: io.Writer, tbl: ^Table) {
 }
 
 write_plain_table :: proc(w: io.Writer, tbl: ^Table) {
+	WIDTH_PROC :: unicode_width_proc
+
 	if tbl.dirty {
-		build(tbl)
+		build(tbl, WIDTH_PROC)
 	}
 
 	write_caption_separator :: proc(w: io.Writer, tbl: ^Table) {
@@ -267,7 +283,7 @@ write_plain_table :: proc(w: io.Writer, tbl: ^Table) {
 			if col == 0 {
 				io.write_byte(w, '+')
 			}
-			write_byte_repeat(w, tbl.colw[col], '-')
+			write_byte_repeat(w, tbl.colw[col] + tbl.lpad + tbl.rpad, '-')
 			io.write_byte(w, '+')
 		}
 		io.write_byte(w, '\n')
@@ -276,8 +292,8 @@ write_plain_table :: proc(w: io.Writer, tbl: ^Table) {
 	if tbl.caption != "" {
 		write_caption_separator(w, tbl)
 		io.write_byte(w, '|')
-		write_text_align(w, tbl.tblw -  tbl.lpad - tbl.rpad + tbl.nr_cols - 1,
-		                 tbl.lpad, tbl.rpad, tbl.caption, .Center)
+		write_text_align(w, tbl.caption, .Center,
+			tbl.lpad, tbl.rpad, tbl.tblw + tbl.nr_cols - 1 - WIDTH_PROC(tbl.caption) - tbl.lpad - tbl.rpad)
 		io.write_byte(w, '|')
 		io.write_byte(w, '\n')
 	}
@@ -302,19 +318,20 @@ write_plain_table :: proc(w: io.Writer, tbl: ^Table) {
 // Renders table according to GitHub Flavored Markdown (GFM) specification
 write_markdown_table :: proc(w: io.Writer, tbl: ^Table) {
 	// NOTE(oskar): Captions or colspans are not supported by GFM as far as I can tell.
+	WIDTH_PROC :: unicode_width_proc
 
 	if tbl.dirty {
-		build(tbl)
+		build(tbl, WIDTH_PROC)
 	}
 
 	for row in 0..<tbl.nr_rows {
+		alignment: Cell_Alignment = .Center if tbl.has_header_row && row == header_row(tbl) else .Left
 		for col in 0..<tbl.nr_cols {
 			cell := get_cell(tbl, row, col)
 			if col == 0 {
 				io.write_byte(w, '|')
 			}
-			write_text_align(w, tbl.colw[col] - tbl.lpad - tbl.rpad, tbl.lpad, tbl.rpad, cell.text,
-			                 .Center if tbl.has_header_row && row == header_row(tbl) else .Left)
+			write_text_align(w, cell.text, alignment, tbl.lpad, tbl.rpad, tbl.colw[col] - cell.width)
 			io.write_string(w, "|")
 		}
 		io.write_byte(w, '\n')
@@ -325,16 +342,17 @@ write_markdown_table :: proc(w: io.Writer, tbl: ^Table) {
 				if col == 0 {
 					io.write_byte(w, '|')
 				}
+				divider_width := tbl.colw[col] + tbl.lpad + tbl.rpad - 1
 				switch cell.alignment {
 				case .Left:
 					io.write_byte(w, ':')
-					write_byte_repeat(w, max(1, tbl.colw[col]-1), '-')
+					write_byte_repeat(w, max(1, divider_width), '-')
 				case .Center:
 					io.write_byte(w, ':')
-					write_byte_repeat(w, max(1, tbl.colw[col]-2), '-')
+					write_byte_repeat(w, max(1, divider_width-1), '-')
 					io.write_byte(w, ':')
 				case .Right:
-					write_byte_repeat(w, max(1, tbl.colw[col]-1), '-')
+					write_byte_repeat(w, max(1, divider_width), '-')
 					io.write_byte(w, ':')
 				}
 				io.write_byte(w, '|')
@@ -351,27 +369,22 @@ write_byte_repeat :: proc(w: io.Writer, n: int, b: byte) {
 }
 
 write_table_cell :: proc(w: io.Writer, tbl: ^Table, row, col: int) {
-	if tbl.dirty {
-		build(tbl)
-	}
 	cell := get_cell(tbl, row, col)
-	write_text_align(w, tbl.colw[col]-tbl.lpad-tbl.rpad, tbl.lpad, tbl.rpad, cell.text, cell.alignment)
+	write_text_align(w, cell.text, cell.alignment, tbl.lpad, tbl.rpad, tbl.colw[col] - cell.width)
 }
 
-write_text_align :: proc(w: io.Writer, colw, lpad, rpad: int, text: string, alignment: Cell_Alignment) {
+write_text_align :: proc(w: io.Writer, text: string, alignment: Cell_Alignment, lpad, rpad, space: int) {
 	write_byte_repeat(w, lpad, ' ')
 	switch alignment {
 	case .Left:
 		io.write_string(w, text)
-		write_byte_repeat(w, colw - len(text), ' ')
+		write_byte_repeat(w, space, ' ')
 	case .Center:
-		pad := colw - len(text)
-		odd := pad & 1 != 0
-		write_byte_repeat(w, pad/2, ' ')
+		write_byte_repeat(w, space/2, ' ')
 		io.write_string(w, text)
-		write_byte_repeat(w, pad/2 + 1 if odd else pad/2, ' ')
+		write_byte_repeat(w, space/2 + space & 1, ' ')
 	case .Right:
-		write_byte_repeat(w, colw - len(text), ' ')
+		write_byte_repeat(w, space, ' ')
 		io.write_string(w, text)
 	}
 	write_byte_repeat(w, rpad, ' ')
