@@ -296,7 +296,7 @@ Returns:
 */
 to_cstring :: proc(b: ^Builder) -> (res: cstring) {
 	append(&b.buf, 0)
-	defer pop(&b.buf)
+	pop(&b.buf)
 	return cstring(raw_data(b.buf))
 }
 /*
