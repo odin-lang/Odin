@@ -286,6 +286,20 @@ to_string :: proc(b: Builder) -> (res: string) {
 	return string(b.buf[:])
 }
 /*
+Appends a trailing null byte after the end of the current Builder byte buffer and then casts it to a cstring
+
+Inputs:
+- b: A pointer to builder
+
+Returns:
+- res: A cstring of the Builder's buffer
+*/
+to_cstring :: proc(b: ^Builder) -> (res: cstring) {
+	append(&b.buf, 0)
+	pop(&b.buf)
+	return cstring(raw_data(b.buf))
+}
+/*
 Returns the length of the Builder's buffer, in bytes
 
 Inputs:
