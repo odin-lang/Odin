@@ -1,5 +1,5 @@
 /*
-The package `table` implements ASCII/markdown/HTML/custom rendering of tables.
+The package `table` implements plain-text/markdown/HTML/custom rendering of tables.
 
 **Custom rendering example:**
 
@@ -7,7 +7,7 @@ The package `table` implements ASCII/markdown/HTML/custom rendering of tables.
 	padding(tbl, 0, 1)
 	row(tbl, "A_LONG_ENUM", "= 54,", "// A comment about A_LONG_ENUM")
 	row(tbl, "AN_EVEN_LONGER_ENUM", "= 1,", "// A comment about AN_EVEN_LONGER_ENUM")
-	build(tbl)
+	build(tbl, table.unicode_width_proc)
 	for row in 0..<tbl.nr_rows {
 		for col in 0..<tbl.nr_cols {
 			write_table_cell(stdio_writer(), tbl, row, col)
@@ -20,7 +20,7 @@ This outputs:
 	A_LONG_ENUM         = 54, // A comment about A_LONG_ENUM
 	AN_EVEN_LONGER_ENUM = 1,  // A comment about AN_EVEN_LONGER_ENUM
 
-**ASCII rendering example:**
+**Plain-text rendering example:**
 
 	tbl := init(&Table{})
 	defer destroy(tbl)
@@ -48,16 +48,15 @@ This outputs:
 	// exist. The value and alignment of each cell can then be set
 	// individually.
 	row(tbl)
-		set_cell_value_and_alignment(tbl, last_row(tbl), 0, "a", .Center)
-		set_cell_value(tbl, last_row(tbl), 1, "bbb")
-		set_cell_value(tbl, last_row(tbl), 2, "c")
+
+	set_cell_value_and_alignment(tbl, last_row(tbl), 0, "a", .Center)
+	set_cell_value(tbl, last_row(tbl), 1, "bbb")
+	set_cell_value(tbl, last_row(tbl), 2, "c")
 
 	// Headers are regular cells, too. Use header_row() as row index to modify
 	// header cells.
 	set_cell_alignment(tbl, header_row(tbl), 1, .Center) // Sets alignment of 'B' column to Center.
 	set_cell_alignment(tbl, header_row(tbl), 2, .Right) // Sets alignment of 'C' column to Right.
-
-	build(tbl)
 
 	write_plain_table(stdio_writer(), tbl)
 	write_markdown_table(stdio_writer(), tbl)
@@ -83,5 +82,14 @@ and
 	| a                | bbb             | c        |
 
 respectively.
+
+
+Additionally, if you want to set the alignment and values in-line while
+constructing a table, you can use `aligned_row_of_values` or
+`row_of_aligned_values` like so:
+
+	table.aligned_row_of_values(&tbl, .Center, "Foo", "Bar")
+	table.row_of_aligned_values(&tbl, {{.Center, "Foo"}, {.Right, "Bar"}})
+
 */
 package text_table
