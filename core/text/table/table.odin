@@ -28,6 +28,11 @@ Cell_Alignment :: enum {
 	Right,
 }
 
+Aligned_Value :: struct {
+	alignment: Cell_Alignment,
+	value: any,
+}
+
 // Determines the width of a string used in the table for alignment purposes.
 Width_Proc :: #type proc(str: string) -> int
 
@@ -96,28 +101,27 @@ get_cell :: proc(tbl: ^Table, row, col: int, loc := #caller_location) -> ^Cell {
 	return &tbl.cells[row*tbl.nr_cols + col]
 }
 
-set_cell_value_and_alignment :: proc(tbl: ^Table, row, col: int, value: string, alignment: Cell_Alignment) {
-	cell := get_cell(tbl, row, col)
-	cell.text = format(tbl, "%v", value)
-	cell.alignment = alignment
-	tbl.dirty = true
+@private
+to_string :: #force_inline proc(tbl: ^Table, value: any, loc := #caller_location) -> (result: string) {
+	switch val in value {
+	case nil:
+		result = ""
+	case string:
+		result = val
+	case cstring:
+		result = cast(string)val
+	case:
+		result = format(tbl, "%v", val)
+		if result == "" {
+			fmt.eprintf("{} text/table: format() resulted in empty string (arena out of memory?)\n", loc)
+		}
+	}
+	return
 }
 
 set_cell_value :: proc(tbl: ^Table, row, col: int, value: any, loc := #caller_location) {
 	cell := get_cell(tbl, row, col, loc)
-	switch val in value {
-	case nil:
-		cell.text = ""
-	case string:
-		cell.text = string(val)
-	case cstring:
-		cell.text = string(val)
-	case:
-		cell.text = format(tbl, "%v", val)
-		if cell.text == "" {
-			fmt.eprintf("{} text/table: format() resulted in empty string (arena out of memory?)\n", loc)
-		}
-	}
+	cell.text = to_string(tbl, value, loc)
 	tbl.dirty = true
 }
 
@@ -127,12 +131,20 @@ set_cell_alignment :: proc(tbl: ^Table, row, col: int, alignment: Cell_Alignment
 	tbl.dirty = true
 }
 
+set_cell_value_and_alignment :: proc(tbl: ^Table, row, col: int, value: any, alignment: Cell_Alignment, loc := #caller_location) {
+	cell := get_cell(tbl, row, col, loc)
+	cell.text = to_string(tbl, value, loc)
+	cell.alignment = alignment
+	tbl.dirty = true
+}
+
 format :: proc(tbl: ^Table, _fmt: string, args: ..any) -> string {
 	context.allocator = tbl.format_allocator
 	return fmt.aprintf(_fmt, ..args)
 }
 
-header :: proc(tbl: ^Table, values: ..any, loc := #caller_location) {
+header :: header_of_values
+header_of_values :: proc(tbl: ^Table, values: ..any, loc := #caller_location) {
 	if (tbl.has_header_row && tbl.nr_rows != 1) || (!tbl.has_header_row && tbl.nr_rows != 0) {
 		panic("Cannot add headers after rows have been added", loc)
 	}
@@ -152,7 +164,48 @@ header :: proc(tbl: ^Table, values: ..any, loc := #caller_location) {
 	tbl.dirty = true
 }
 
-row :: proc(tbl: ^Table, values: ..any, loc := #caller_location) {
+aligned_header_of_values :: proc(tbl: ^Table, alignment: Cell_Alignment, values: ..any, loc := #caller_location) {
+	if (tbl.has_header_row && tbl.nr_rows != 1) || (!tbl.has_header_row && tbl.nr_rows != 0) {
+		panic("Cannot add headers after rows have been added", loc)
+	}
+
+	if tbl.nr_rows == 0 {
+		tbl.nr_rows += 1
+		tbl.has_header_row = true
+	}
+
+	col := tbl.nr_cols
+	tbl.nr_cols += len(values)
+	for val in values {
+		set_cell_value_and_alignment(tbl, header_row(tbl), col, val, alignment, loc)
+		col += 1
+	}
+
+	tbl.dirty = true
+}
+
+header_of_aligned_values :: proc(tbl: ^Table, aligned_values: []Aligned_Value, loc := #caller_location) {
+	if (tbl.has_header_row && tbl.nr_rows != 1) || (!tbl.has_header_row && tbl.nr_rows != 0) {
+		panic("Cannot add headers after rows have been added", loc)
+	}
+
+	if tbl.nr_rows == 0 {
+		tbl.nr_rows += 1
+		tbl.has_header_row = true
+	}
+
+	col := tbl.nr_cols
+	tbl.nr_cols += len(aligned_values)
+	for av in aligned_values {
+		set_cell_value_and_alignment(tbl, header_row(tbl), col, av.value, av.alignment, loc)
+		col += 1
+	}
+
+	tbl.dirty = true
+}
+
+row :: row_of_values
+row_of_values :: proc(tbl: ^Table, values: ..any, loc := #caller_location) {
 	if tbl.nr_cols == 0 {
 		if len(values) == 0 {
 			panic("Cannot create empty row unless the number of columns is known in advance")
@@ -160,13 +213,66 @@ row :: proc(tbl: ^Table, values: ..any, loc := #caller_location) {
 			tbl.nr_cols = len(values)
 		}
 	}
+
 	tbl.nr_rows += 1
-	for col in 0..<tbl.nr_cols {
+
+	for col in 0 ..< tbl.nr_cols {
 		val := values[col] if col < len(values) else nil
-		set_cell_value(tbl, last_row(tbl), col, val)
+		set_cell_value(tbl, last_row(tbl), col, val, loc)
 	}
+
 	tbl.dirty = true
 }
+
+aligned_row_of_values :: proc(tbl: ^Table, alignment: Cell_Alignment, values: ..any, loc := #caller_location) {
+	if tbl.nr_cols == 0 {
+		if len(values) == 0 {
+			panic("Cannot create empty row unless the number of columns is known in advance")
+		} else {
+			tbl.nr_cols = len(values)
+		}
+	}
+
+	tbl.nr_rows += 1
+
+	for col in 0 ..< tbl.nr_cols {
+		val := values[col] if col < len(values) else nil
+		set_cell_value_and_alignment(tbl, last_row(tbl), col, val, alignment, loc)
+	}
+
+	tbl.dirty = true
+}
+
+row_of_aligned_values :: proc(tbl: ^Table, aligned_values: []Aligned_Value, loc := #caller_location) {
+	if tbl.nr_cols == 0 {
+		if len(aligned_values) == 0 {
+			panic("Cannot create empty row unless the number of columns is known in advance")
+		} else {
+			tbl.nr_cols = len(aligned_values)
+		}
+	}
+
+	tbl.nr_rows += 1
+
+	for col in 0 ..< tbl.nr_cols {
+		if col < len(aligned_values) {
+			val := aligned_values[col].value
+			alignment := aligned_values[col].alignment
+			set_cell_value_and_alignment(tbl, last_row(tbl), col, val, alignment, loc)
+		} else {
+			set_cell_value_and_alignment(tbl, last_row(tbl), col, "", .Left, loc)
+		}
+	}
+
+	tbl.dirty = true
+}
+
+// TODO: This should work correctly when #3262 is fixed.
+// row :: proc {
+// 	row_of_values,
+// 	aligned_row_of_values,
+// 	row_of_aligned_values,
+// }
 
 last_row :: proc(tbl: ^Table) -> int {
 	return tbl.nr_rows - 1
