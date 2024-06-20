@@ -13,7 +13,7 @@ run_test_cases :: proc(t: ^testing.T, test_cases: []Test_Case, loc := #caller_lo
 	failed := 0
 	for c, i in test_cases {
 		log.debugf("(#% 4i) %q ...", i, c.str)
-		result, _ := utf8.grapheme_count(c.str)
+		result, _, _ := utf8.grapheme_count(c.str)
 		if !testing.expectf(t, result == c.expected_clusters,
 			"(#% 4i) graphemes: %i != %i, %q %s", i, result, c.expected_clusters, c.str, c.str,
 			loc = loc)
@@ -43,7 +43,7 @@ test_grapheme_byte_index_segmentation :: proc(t: ^testing.T) {
 
 	str := SAMPLE_1 + SAMPLE_2 + SAMPLE_3 + SAMPLE_2 + SAMPLE_1
 
-	graphemes, _, _ := utf8.decode_grapheme_clusters(str)
+	graphemes, _, _, _ := utf8.decode_grapheme_clusters(str)
 	defer delete(graphemes)
 
 	defer if testing.failed(t) {
@@ -70,4 +70,66 @@ test_grapheme_byte_index_segmentation :: proc(t: ^testing.T) {
 	testing.expectf(t, grapheme_3 == SAMPLE_3, "expected %q, got %q", SAMPLE_3, grapheme_3)
 	testing.expectf(t, grapheme_4 == SAMPLE_2, "expected %q, got %q", SAMPLE_2, grapheme_2)
 	testing.expectf(t, grapheme_5 == SAMPLE_1, "expected %q, got %q", SAMPLE_1, grapheme_1)
+}
+
+@test
+test_width :: proc(t: ^testing.T) {
+	{
+		str := "He\u200dllo"
+		graphemes, _, width := utf8.grapheme_count(str)
+		testing.expect_value(t, graphemes, 5)
+		testing.expect_value(t, width, 5)
+	}
+
+	{
+		// Note that a zero-width space is still considered a grapheme as far
+		// as the specification is concerned.
+		str := "He\u200bllo"
+		graphemes, _, width := utf8.grapheme_count(str)
+		testing.expect_value(t, graphemes, 6)
+		testing.expect_value(t, width, 5)
+	}
+
+	{
+		str := "\U0001F926\U0001F3FC\u200D\u2642"
+		graphemes, _, width := utf8.grapheme_count(str)
+		testing.expect_value(t, graphemes, 1)
+		testing.expect_value(t, width, 2)
+	}
+
+	{
+		str := "H̷e̶l̵l̸o̴p̵e̷ ̸w̶o̸r̵l̶d̵!̴"
+		graphemes, _, width := utf8.grapheme_count(str)
+		testing.expect_value(t, graphemes, 14)
+		testing.expect_value(t, width, 14)
+	}
+
+	{
+		str := "aカ.ヒフ"
+		graphemes, grapheme_count, _, width := utf8.decode_grapheme_clusters(str)
+		defer delete(graphemes)
+		testing.expect_value(t, grapheme_count, 5)
+		testing.expect_value(t, width, 8)
+		if grapheme_count == 5 {
+			testing.expect_value(t, graphemes[0].width, 1)
+			testing.expect_value(t, graphemes[1].width, 2)
+			testing.expect_value(t, graphemes[2].width, 1)
+			testing.expect_value(t, graphemes[3].width, 2)
+			testing.expect_value(t, graphemes[4].width, 2)
+		}
+	}
+
+	{
+		str := "いろはにほへ"
+		graphemes, _, width := utf8.grapheme_count(str)
+		testing.expect_value(t, graphemes, 6)
+		testing.expect_value(t, width, 12)
+	}
+
+	{
+		str := "舍利弗，是諸法空相，不生不滅，不垢不淨，不增不減。"
+		graphemes, _, width := utf8.grapheme_count(str)
+		testing.expect_value(t, graphemes, 25)
+		testing.expect_value(t, width, 50)
+	}
 }

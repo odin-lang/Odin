@@ -5,8 +5,10 @@ REPLACEMENT_CHAR :: '\ufffd'     // Represented an invalid code point
 MAX_ASCII        :: '\u007f'     // Maximum ASCII value
 MAX_LATIN1       :: '\u00ff'     // Maximum Latin-1 value
 
+ZERO_WIDTH_SPACE      :: '\u200B'
 ZERO_WIDTH_NON_JOINER :: '\u200C'
 ZERO_WIDTH_JOINER     :: '\u200D'
+WORD_JOINER           :: '\u2060'
 
 @(require_results)
 binary_search :: proc(c: i32, table: []i32, length, stride: int) -> int {
@@ -448,6 +450,41 @@ plus a few General_Category = Spacing_Mark needed for canonical equivalence.
 @(require_results)
 is_gcb_extend_class :: proc(r: rune) -> bool {
 	return is_grapheme_extend(r) || is_emoji_modifier(r)
+}
+
+// Return values:
+//
+// - 2 if East_Asian_Width=F or W, or
+// - 0 if non-printable / zero-width, or
+// - 1 in all other cases.
+//
+@(require_results)
+normalized_east_asian_width :: proc(r: rune) -> int {
+	// This is a different interpretation of the BOM which occurs in the middle of text.
+	ZERO_WIDTH_NO_BREAK_SPACE :: '\uFEFF'
+
+	if is_control(r) {
+		return 0
+	} else if r <= 0x10FF {
+		// Easy early out for low runes.
+		return 1
+	}
+
+	switch r {
+	case ZERO_WIDTH_NO_BREAK_SPACE,
+	     ZERO_WIDTH_SPACE,
+	     ZERO_WIDTH_NON_JOINER,
+	     ZERO_WIDTH_JOINER,
+	     WORD_JOINER:
+		return 0
+	}
+
+	c := i32(r)
+	p := binary_search(c, normalized_east_asian_width_ranges[:], len(normalized_east_asian_width_ranges)/3, 3)
+	if p >= 0 && normalized_east_asian_width_ranges[p] <= c && c <= normalized_east_asian_width_ranges[p+1] {
+		return cast(int)normalized_east_asian_width_ranges[p+2]
+	}
+	return 1
 }
 
 //

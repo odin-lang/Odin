@@ -17,11 +17,13 @@ is_spacing_mark                   :: unicode.is_spacing_mark
 is_gcb_prepend_class              :: unicode.is_gcb_prepend_class
 is_emoji_extended_pictographic    :: unicode.is_emoji_extended_pictographic
 is_regional_indicator             :: unicode.is_regional_indicator
+normalized_east_asian_width       :: unicode.normalized_east_asian_width
 
 
 Grapheme :: struct {
 	byte_index: int,
 	rune_index: int,
+	width: int,
 }
 
 /*
@@ -33,10 +35,11 @@ Inputs:
 Returns:
 - graphemes: The number of graphemes in the string.
 - runes: The number of runes in the string.
+- width: The width of the string in number of monospace cells.
 */
 @(require_results)
-grapheme_count :: proc(str: string) -> (graphemes, runes: int) {
-	_, graphemes, runes = decode_grapheme_clusters(str, false)
+grapheme_count :: proc(str: string) -> (graphemes, runes, width: int) {
+	_, graphemes, runes, width = decode_grapheme_clusters(str, false)
 	return
 }
 
@@ -54,6 +57,7 @@ Returns:
 - graphemes: Extra data about each grapheme.
 - grapheme_count: The number of graphemes in the string.
 - rune_count: The number of runes in the string.
+- width: The width of the string in number of monospace cells.
 */
 @(require_results)
 decode_grapheme_clusters :: proc(
@@ -64,6 +68,7 @@ decode_grapheme_clusters :: proc(
 	graphemes:      [dynamic]Grapheme,
 	grapheme_count: int,
 	rune_count:     int,
+	width:          int,
 ) {
 	// The following procedure implements text segmentation by breaking on
 	// Grapheme Cluster Boundaries[1], using the values[2] and rules[3] from
@@ -115,6 +120,24 @@ decode_grapheme_clusters :: proc(
 	// [3]: https://www.unicode.org/reports/tr29/#Grapheme_Cluster_Boundary_Rules
 	// [4]: https://www.unicode.org/reports/tr29/#Conformance
 
+	// Additionally, this procedure now takes into account Standard Annex #11,
+	// in order to estimate how visually wide the string will appear on a
+	// monospaced display. This can only ever be a rough guess, as this tends
+	// to be an implementation detail relating to which fonts are being used,
+	// how codepoints are interpreted and drawn, if codepoint sequences are
+	// interpreted correctly, and et cetera.
+	//
+	// For example, a program may not properly interpret an emoji modifier
+	// sequence and print the component glyphs instead of one whole glyph.
+	//
+	// See here for more information: https://www.unicode.org/reports/tr11/
+	//
+	// NOTE: There is no explicit mention of what to do with zero-width spaces
+	// as far as grapheme cluster segmentation goes, therefore this
+	// implementation may count and return graphemes with a `width` of zero.
+	//
+	// Treat them as any other space.
+
 	Grapheme_Cluster_Sequence :: enum {
 		None,
 		Indic,
@@ -127,6 +150,7 @@ decode_grapheme_clusters :: proc(
 	last_rune: rune
 	last_rune_breaks_forward: bool
 
+	last_width: int
 	last_grapheme_count: int
 
 	bypass_next_rune: bool
@@ -145,10 +169,19 @@ decode_grapheme_clusters :: proc(
 			if rune_count == 0 && grapheme_count == 0 {
 				grapheme_count += 1
 			}
-			if track_graphemes && grapheme_count > last_grapheme_count {
-				append(&graphemes, Grapheme{ byte_index, rune_count })
+
+			if grapheme_count > last_grapheme_count {
+				width += normalized_east_asian_width(this_rune)
+				if track_graphemes {
+					append(&graphemes, Grapheme{
+						byte_index,
+						rune_count,
+						width - last_width,
+					})
+				}
+				last_grapheme_count = grapheme_count
+				last_width = width
 			}
-			last_grapheme_count = grapheme_count
 
 			last_rune = this_rune
 			rune_count += 1
