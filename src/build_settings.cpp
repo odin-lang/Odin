@@ -844,6 +844,8 @@ struct BuildContext {
 	bool   show_unused;
 	bool   show_unused_with_location;
 	bool   show_more_timings;
+	bool   show_defineables;
+	String export_defineables_file;
 	bool   show_system_calls;
 	bool   keep_temp_files;
 	bool   ignore_unknown_attributes;

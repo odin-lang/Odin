@@ -1756,9 +1756,21 @@ gb_internal bool check_builtin_procedure_directive(CheckerContext *c, Operand *o
 		operand->mode = Addressing_Constant;
 		operand->value = exact_value_bool(is_defined);
 
+		// If the arg is a selector expression we don't add it, `-define` only allows identifiers.
+		if (arg->kind == Ast_Ident) {
+			Defineable defineable    = {};
+			defineable.docs          = nullptr;
+			defineable.name          = arg->Ident.token.string;
+			defineable.default_value = exact_value_bool(false);
+			defineable.pos           = arg->Ident.token.pos;
+
+			MUTEX_GUARD(&c->info->defineables_mutex);
+			array_add(&c->info->defineables, defineable);
+		}
+
 	} else if (name == "config") {
 		if (ce->args.count != 2) {
-			error(call, "'#config' expects 2 argument, got %td", ce->args.count);
+			error(call, "'#config' expects 2 arguments, got %td", ce->args.count);
 			return false;
 		}
 		Ast *arg = unparen_expr(ce->args[0]);
@@ -1793,6 +1805,20 @@ gb_internal bool check_builtin_procedure_directive(CheckerContext *c, Operand *o
 				operand->value = found->Constant.value;
 			}
 		}
+
+		Defineable defineable    = {};
+		defineable.docs          = nullptr;
+		defineable.name          = name;
+		defineable.default_value = def.value;
+		defineable.pos           = arg->Ident.token.pos;
+
+		if (c->decl) {
+			defineable.docs = c->decl->docs;
+		}
+
+		MUTEX_GUARD(&c->info->defineables_mutex);
+		array_add(&c->info->defineables, defineable);
+
 	} else {
 		error(call, "Unknown directive call: #%.*s", LIT(name));
 	}

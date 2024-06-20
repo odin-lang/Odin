@@ -1302,6 +1302,7 @@ gb_internal void init_checker_info(CheckerInfo *i) {
 	array_init(&i->init_procedures, a, 0, 0);
 	array_init(&i->fini_procedures, a, 0, 0);
 	array_init(&i->required_foreign_imports_through_force, a, 0, 0);
+	array_init(&i->defineables, a);
 
 	map_init(&i->objc_msgSend_types);
 	string_map_init(&i->load_file_cache);
@@ -1331,6 +1332,7 @@ gb_internal void destroy_checker_info(CheckerInfo *i) {
 	string_map_destroy(&i->packages);
 	array_free(&i->variable_init_order);
 	array_free(&i->required_foreign_imports_through_force);
+	array_free(&i->defineables);
 
 	mpsc_destroy(&i->entity_queue);
 	mpsc_destroy(&i->definition_queue);
