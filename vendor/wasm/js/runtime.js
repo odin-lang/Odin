@@ -96,6 +96,10 @@ class WasmMemoryInterface {
 	};
 	loadPtr(addr) { return this.loadU32(addr); }
 
+	loadB32(addr) {
+		return this.loadU32(addr) != 0;
+	}
+
 	loadBytes(ptr, len) {
 		return new Uint8Array(this.memory.buffer, ptr, Number(len));
 	}
@@ -103,6 +107,16 @@ class WasmMemoryInterface {
 	loadString(ptr, len) {
 		const bytes = this.loadBytes(ptr, Number(len));
 		return new TextDecoder().decode(bytes);
+	}
+ 
+	loadCstring(ptr) {
+		const start = this.loadPtr(ptr);
+		if (start == 0) {
+			return null;
+		}
+		let len = 0;
+		for (; this.mem.getUint8(start+len) != 0; len += 1) {}
+		return this.loadString(start, len);
 	}
 
 	storeU8(addr, value)  { this.mem.setUint8  (addr, value); }
@@ -1245,7 +1259,7 @@ class WebGLInterface {
 };
 
 
-function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
+function odinSetupDefaultImports(wasmMemoryInterface, consoleElement, memory) {
 	const MAX_INFO_CONSOLE_LINES = 512;
 	let infoConsoleLines = new Array();
 	let currentLine = {};
@@ -1366,8 +1380,15 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 	let event_temp_data = {};
 
 	let webglContext = new WebGLInterface(wasmMemoryInterface);
+	
+	const env = {};
+
+	if (memory) {
+		env.memory = memory;
+	}
+
 	return {
-		"env": {},
+		env,
 		"odin_env": {
 			write: (fd, ptr, len) => {
 				const str = wasmMemoryInterface.loadString(ptr, len);
@@ -1720,13 +1741,16 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
  * @param {string} wasmPath                          - Path to the WASM module to run
  * @param {?HTMLPreElement} consoleElement           - Optional console/pre element to append output to, in addition to the console
  * @param {any} extraForeignImports                  - Imports, in addition to the default runtime to provide the module
+ * @param {?WasmMemoryInterface} wasmMemoryInterface - Optional memory to use instead of the defaults
  * @param {?int} intSize                             - Size (in bytes) of the integer type, should be 4 on `js_wasm32` and 8 on `js_wasm64p32`
  */
-async function runWasm(wasmPath, consoleElement, extraForeignImports, intSize = 4) {
-	const wasmMemoryInterface = new WasmMemoryInterface();
+async function runWasm(wasmPath, consoleElement, extraForeignImports, wasmMemoryInterface, intSize = 4) {
+	if (!wasmMemoryInterface) {
+		wasmMemoryInterface = new WasmMemoryInterface();
+	}
 	wasmMemoryInterface.setIntSize(intSize);
 
-	let imports = odinSetupDefaultImports(wasmMemoryInterface, consoleElement);
+	let imports = odinSetupDefaultImports(wasmMemoryInterface, consoleElement, wasmMemoryInterface.memory);
 	let exports = {};
 
 	if (extraForeignImports !== undefined) {
@@ -1741,11 +1765,17 @@ async function runWasm(wasmPath, consoleElement, extraForeignImports, intSize = 
 	const wasm = await WebAssembly.instantiate(file, imports);
 	exports = wasm.instance.exports;
 	wasmMemoryInterface.setExports(exports);
-	wasmMemoryInterface.setMemory(exports.memory);
+
+	if (exports.memory) {
+		if (wasmMemoryInterface.memory) {
+			console.warn("WASM module exports memory, but `runWasm` was given an interface with existing memory too");
+		}
+		wasmMemoryInterface.setMemory(exports.memory);
+	}
 
 	exports._start();
 
-	// Define a `@export step :: proc(dt: f32) -> (continue: bool) {`
+	// Define a `@export step :: proc(dt: f32) -> (keep_going: bool) {`
 	// in your app and it will get called every frame.
 	// return `false` to stop the execution of the module.
 	if (exports.step) {
