@@ -26,7 +26,7 @@ Variant_Type :: enum {
 	Reserved_Future,        // 0b111
 }
 
-// Name string is a URL.
+// Name string is a fully-qualified domain name.
 Namespace_DNS := Identifier {
 	bytes = {
 		0x6b, 0xa7, 0xb8, 0x10, 0x9d, 0xad, 0x11, 0xd1,
@@ -34,7 +34,7 @@ Namespace_DNS := Identifier {
 	},
 }
 
-// Name string is a fully-qualified domain name.
+// Name string is a URL.
 Namespace_URL := Identifier {
 	bytes = {
 		0x6b, 0xa7, 0xb8, 0x11, 0x9d, 0xad, 0x11, 0xd1,
