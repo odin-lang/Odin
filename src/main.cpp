@@ -1082,6 +1082,9 @@ gb_internal bool parse_build_flags(Array<String> args) {
 								build_context.build_mode = BuildMode_Assembly;
 							} else if (str == "llvm" || str == "llvm-ir") {
 								build_context.build_mode = BuildMode_LLVM_IR;
+							} else if (str == "test") {
+								build_context.build_mode   = BuildMode_Executable;
+								build_context.command_kind = Command_test;
 							} else {
 								gb_printf_err("Unknown build mode '%.*s'\n", LIT(str));
 								gb_printf_err("Valid build modes:\n");
@@ -1091,6 +1094,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 								gb_printf_err("\texe\n");
 								gb_printf_err("\tasm, assembly, assembler\n");
 								gb_printf_err("\tllvm, llvm-ir\n");
+								gb_printf_err("\ttest\n");
 								bad_flags = true;
 								break;
 							}
