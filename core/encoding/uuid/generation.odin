@@ -4,6 +4,7 @@ import "core:crypto/legacy/md5"
 import "core:crypto/legacy/sha1"
 import "core:math/rand"
 import "core:mem"
+import "core:time"
 
 /*
 Generate a version 3 UUID.
@@ -157,4 +158,87 @@ generate_v5_string :: proc(
 generate_v5 :: proc {
 	generate_v5_bytes,
 	generate_v5_string,
+}
+
+/*
+Generate a version 7 UUID.
+
+This UUID will be pseudorandom, save for 6 pre-determined version and variant
+bits and a 48 bit timestamp.
+
+It is designed with time-based sorting in mind, such as for database usage, as
+the highest bits are allocated from the timestamp of when it is created.
+
+Returns:
+- result: The generated UUID.
+*/
+generate_v7 :: proc() -> (result: Identifier) {
+	unix_time_in_milliseconds := time.to_unix_nanoseconds(time.now()) / 1e6
+
+	temporary := cast(u128be)unix_time_in_milliseconds << VERSION_7_TIME_SHIFT
+
+	bytes_generated := rand.read(result[6:])
+	assert(bytes_generated == 10, "RNG failed to generate 10 bytes for UUID v7.")
+
+	result |= transmute(Identifier)temporary
+
+	result[VERSION_BYTE_INDEX] &= 0x0F
+	result[VERSION_BYTE_INDEX] |= 0x70
+
+	result[VARIANT_BYTE_INDEX] &= 0x3F
+	result[VARIANT_BYTE_INDEX] |= 0x80
+
+	return
+}
+
+/*
+Generate a version 7 UUID with an incremented counter.
+
+This UUID will be pseudorandom, save for 6 pre-determined version and variant
+bits, a 48 bit timestamp, and 12 bits of counter state.
+
+It is designed with time-based sorting in mind, such as for database usage, as
+the highest bits are allocated from the timestamp of when it is created.
+
+This procedure is preferable if you are generating hundreds or thousands of
+UUIDs as a batch within the span of a millisecond. Do note that the counter
+only has 12 bits of state, thus `counter` cannot exceed the number 4,095.
+
+Example:
+
+	import "core:uuid"
+
+	// Create a batch of UUIDs all at once.
+	batch: [dynamic]uuid.Identifier
+
+	for i: u16 = 0; i < 1000; i += 1 {
+		my_uuid := uuid.generate_v7_counter(i)
+		append(&batch, my_uuid)
+	}
+
+Inputs:
+- counter: A 12-bit value, incremented each time a UUID is generated in a batch.
+
+Returns:
+- result: The generated UUID.
+*/
+generate_v7_counter :: proc(counter: u16) -> (result: Identifier) {
+	assert(counter <= 0x0fff, "This implementation of the version 7 UUID does not support counters in excess of 12 bits (4,095).")
+	unix_time_in_milliseconds := time.to_unix_nanoseconds(time.now()) / 1e6
+
+	temporary := cast(u128be)unix_time_in_milliseconds << VERSION_7_TIME_SHIFT
+	temporary |= cast(u128be)counter << VERSION_7_COUNTER_SHIFT
+
+	bytes_generated := rand.read(result[8:])
+	assert(bytes_generated == 8, "RNG failed to generate 8 bytes for UUID v7.")
+
+	result |= transmute(Identifier)temporary
+
+	result[VERSION_BYTE_INDEX] &= 0x0F
+	result[VERSION_BYTE_INDEX] |= 0x70
+
+	result[VARIANT_BYTE_INDEX] &= 0x3F
+	result[VARIANT_BYTE_INDEX] |= 0x80
+
+	return
 }

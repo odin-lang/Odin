@@ -1,13 +1,16 @@
 package test_core_uuid
 
-import "core:testing"
 import "core:encoding/uuid"
+import "core:log"
+import "core:testing"
+import "core:time"
 
 @(test)
 test_version_and_variant :: proc(t: ^testing.T) {
     v3 := uuid.generate_v3(uuid.Namespace_DNS, "")
     v4 := uuid.generate_v4()
     v5 := uuid.generate_v5(uuid.Namespace_DNS, "")
+    v7 := uuid.generate_v7()
 
     testing.expect_value(t, uuid.version(v3), 3)
     testing.expect_value(t, uuid.variant(v3), uuid.Variant_Type.RFC_4122)
@@ -15,6 +18,8 @@ test_version_and_variant :: proc(t: ^testing.T) {
     testing.expect_value(t, uuid.variant(v4), uuid.Variant_Type.RFC_4122)
     testing.expect_value(t, uuid.version(v5), 5)
     testing.expect_value(t, uuid.variant(v5), uuid.Variant_Type.RFC_4122)
+    testing.expect_value(t, uuid.version(v7), 7)
+    testing.expect_value(t, uuid.variant(v7), uuid.Variant_Type.RFC_4122)
 }
 
 @(test)
@@ -46,6 +51,31 @@ test_namespaced_uuids :: proc(t: ^testing.T) {
         testing.expect_value(t, v3_str, exp.v3)
         testing.expect_value(t, v5_str, exp.v5)
     }
+}
+
+@(test)
+test_v7 :: proc(t: ^testing.T) {
+	v7_a := uuid.generate_v7()
+	time.sleep(10 * time.Millisecond)
+	v7_b := uuid.generate_v7()
+	time.sleep(10 * time.Millisecond)
+	v7_c := uuid.generate_v7()
+
+	time_bits_a := uuid.time_v7(v7_a)
+	time_bits_b := uuid.time_v7(v7_b)
+	time_bits_c := uuid.time_v7(v7_c)
+
+	log.debugf("A: %02x, %i", v7_a, time_bits_a)
+	log.debugf("B: %02x, %i", v7_b, time_bits_b)
+	log.debugf("C: %02x, %i", v7_c, time_bits_c)
+
+	testing.expect(t, time_bits_b > time_bits_a, "The time bits on the later-generated v7 UUID are lesser than the earlier UUID.")
+	testing.expect(t, time_bits_c > time_bits_b, "The time bits on the later-generated v7 UUID are lesser than the earlier UUID.")
+	testing.expect(t, time_bits_c > time_bits_a, "The time bits on the later-generated v7 UUID are lesser than the earlier UUID.")
+
+	v7_with_counter := uuid.generate_v7_counter(0x555)
+	log.debugf("D: %02x", v7_with_counter)
+	testing.expect_value(t, uuid.counter_v7(v7_with_counter), 0x555)
 }
 
 @(test)

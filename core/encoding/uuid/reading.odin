@@ -95,3 +95,34 @@ variant :: proc "contextless" (id: Identifier) -> (variant: Variant_Type) #no_bo
 		return .Unknown
 	}
 }
+
+/*
+Get the timestamp of a version 7 UUID.
+
+Inputs:
+- id: The identifier.
+
+Returns:
+- timestamp: The timestamp, in milliseconds since the UNIX epoch.
+*/
+time_v7 :: proc "contextless" (id: Identifier) -> (timestamp: u64) {
+	time_bits := transmute(u128be)id & VERSION_7_TIME_MASK
+	return cast(u64)(time_bits >> VERSION_7_TIME_SHIFT)
+}
+
+/*
+Get the 12-bit counter value of a version 7 UUID.
+
+The UUID must have been generated with a counter, otherwise this procedure will
+return random bits.
+
+Inputs:
+- id: The identifier.
+
+Returns:
+- counter: The 12-bit counter value.
+*/
+counter_v7 :: proc "contextless" (id: Identifier) -> (counter: u16) {
+	counter_bits := transmute(u128be)id & VERSION_7_COUNTER_MASK
+	return cast(u16)(counter_bits >> VERSION_7_COUNTER_SHIFT)
+}
