@@ -29,15 +29,15 @@ generate_v3_bytes :: proc(
 
 	ctx: md5.Context
 	md5.init(&ctx)
-	md5.update(&ctx, namespace.bytes[:])
+	md5.update(&ctx, namespace[:])
 	md5.update(&ctx, name)
-	md5.final(&ctx, result.bytes[:])
+	md5.final(&ctx, result[:])
 
-	result.bytes[VERSION_BYTE_INDEX] &= 0x0F
-	result.bytes[VERSION_BYTE_INDEX] |= 0x30
+	result[VERSION_BYTE_INDEX] &= 0x0F
+	result[VERSION_BYTE_INDEX] |= 0x30
 
-	result.bytes[VARIANT_BYTE_INDEX] &= 0x3F
-	result.bytes[VARIANT_BYTE_INDEX] |= 0x80
+	result[VARIANT_BYTE_INDEX] &= 0x3F
+	result[VARIANT_BYTE_INDEX] |= 0x80
 
 	return
 }
@@ -79,13 +79,14 @@ Returns:
 - result: The generated UUID.
 */
 generate_v4 :: proc() -> (result: Identifier) {
-	result.integer = transmute(u128be)rand.uint128()
+	bytes_generated := rand.read(result[:])
+	assert(bytes_generated == 16, "RNG failed to generate 16 bytes for UUID v4.")
 
-	result.bytes[VERSION_BYTE_INDEX] &= 0x0F
-	result.bytes[VERSION_BYTE_INDEX] |= 0x40
+	result[VERSION_BYTE_INDEX] &= 0x0F
+	result[VERSION_BYTE_INDEX] |= 0x40
 
-	result.bytes[VARIANT_BYTE_INDEX] &= 0x3F
-	result.bytes[VARIANT_BYTE_INDEX] |= 0x80
+	result[VARIANT_BYTE_INDEX] &= 0x3F
+	result[VARIANT_BYTE_INDEX] |= 0x80
 
 	return
 }
@@ -115,17 +116,17 @@ generate_v5_bytes :: proc(
 
 	ctx: sha1.Context
 	sha1.init(&ctx)
-	sha1.update(&ctx, namespace.bytes[:])
+	sha1.update(&ctx, namespace[:])
 	sha1.update(&ctx, name)
 	sha1.final(&ctx, digest[:])
 
-	mem.copy_non_overlapping(&result.bytes, &digest, 16)
+	mem.copy_non_overlapping(&result, &digest, 16)
 
-	result.bytes[VERSION_BYTE_INDEX] &= 0x0F
-	result.bytes[VERSION_BYTE_INDEX] |= 0x50
+	result[VERSION_BYTE_INDEX] &= 0x0F
+	result[VERSION_BYTE_INDEX] |= 0x50
 
-	result.bytes[VARIANT_BYTE_INDEX] &= 0x3F
-	result.bytes[VARIANT_BYTE_INDEX] |= 0x80
+	result[VARIANT_BYTE_INDEX] &= 0x3F
+	result[VARIANT_BYTE_INDEX] |= 0x80
 
 	return
 }

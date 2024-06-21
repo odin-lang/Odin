@@ -52,7 +52,7 @@ test_namespaced_uuids :: proc(t: ^testing.T) {
 test_writing :: proc(t: ^testing.T) {
     id: uuid.Identifier
 
-    for &b, i in id.bytes {
+    for &b, i in id {
         b = u8(i)
     }
 
@@ -67,7 +67,7 @@ test_reading :: proc(t: ^testing.T) {
     id, err := uuid.read("00010203-0405-0607-0809-0a0b0c0d0e0f")
     testing.expect_value(t, err, nil)
 
-    for b, i in id.bytes {
+    for b, i in id {
         testing.expect_value(t, b, u8(i))
     }
 }

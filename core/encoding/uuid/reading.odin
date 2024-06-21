@@ -49,7 +49,7 @@ read :: proc "contextless" (str: string) -> (id: Identifier, error: Read_Error) 
 				return {}, .Invalid_Hexadecimal
 			}
 
-			id.bytes[octet_index] = low | high << 4
+			id[octet_index] = low | high << 4
 			octet_index += 1
 		}
 
@@ -69,7 +69,7 @@ Returns:
 - number: The version number.
 */
 version :: proc "contextless" (id: Identifier) -> (number: int) #no_bounds_check {
-	return cast(int)(id.bytes[VERSION_BYTE_INDEX] & 0xF0 >> 4)
+	return cast(int)(id[VERSION_BYTE_INDEX] & 0xF0 >> 4)
 }
 
 /*
@@ -83,13 +83,13 @@ Returns:
 */
 variant :: proc "contextless" (id: Identifier) -> (variant: Variant_Type) #no_bounds_check {
 	switch {
-	case id.bytes[VARIANT_BYTE_INDEX] & 0x80 == 0:
+	case id[VARIANT_BYTE_INDEX] & 0x80 == 0:
 		return .Reserved_Apollo_NCS
-	case id.bytes[VARIANT_BYTE_INDEX] & 0xC0 == 0x80:
+	case id[VARIANT_BYTE_INDEX] & 0xC0 == 0x80:
 		return .RFC_4122
-	case id.bytes[VARIANT_BYTE_INDEX] & 0xE0 == 0xC0:
+	case id[VARIANT_BYTE_INDEX] & 0xE0 == 0xC0:
 		return .Reserved_Microsoft_COM
-	case id.bytes[VARIANT_BYTE_INDEX] & 0xF0 == 0xE0:
+	case id[VARIANT_BYTE_INDEX] & 0xF0 == 0xE0:
 		return .Reserved_Future
 	case:
 		return .Unknown

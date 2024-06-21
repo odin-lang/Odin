@@ -21,15 +21,15 @@ write :: proc(w: io.Writer, id: Identifier) #no_bounds_check {
 		io.write_byte(w, strconv.digits[low_nibble])
 	}
 
-	for index in  0 ..<  4 { write_octet(w, id.bytes[index]) }
+	for index in  0 ..<  4 { write_octet(w, id[index]) }
 	io.write_byte(w, '-')
-	for index in  4 ..<  6 { write_octet(w, id.bytes[index]) }
+	for index in  4 ..<  6 { write_octet(w, id[index]) }
 	io.write_byte(w, '-')
-	for index in  6 ..<  8 { write_octet(w, id.bytes[index]) }
+	for index in  6 ..<  8 { write_octet(w, id[index]) }
 	io.write_byte(w, '-')
-	for index in  8 ..< 10 { write_octet(w, id.bytes[index]) }
+	for index in  8 ..< 10 { write_octet(w, id[index]) }
 	io.write_byte(w, '-')
-	for index in 10 ..< 16 { write_octet(w, id.bytes[index]) }
+	for index in 10 ..< 16 { write_octet(w, id[index]) }
 }
 
 /*
