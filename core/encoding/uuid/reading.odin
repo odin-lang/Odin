@@ -1,5 +1,7 @@
 package uuid
 
+import "base:runtime"
+
 /*
 Convert a string to a UUID.
 
@@ -94,6 +96,59 @@ variant :: proc "contextless" (id: Identifier) -> (variant: Variant_Type) #no_bo
 	case:
 		return .Unknown
 	}
+}
+
+/*
+Get the clock sequence of a version 1 UUID.
+
+Inputs:
+- id: The identifier.
+
+Returns:
+- clock_seq: The 14-bit clock sequence field.
+*/
+clock_seq :: proc "contextless" (id: Identifier) -> (clock_seq: u16) {
+	return cast(u16)id[9] | cast(u16)id[8] & 0x3F << 8
+}
+
+/*
+Get the node of a version 1 UUID.
+
+Inputs:
+- id: The identifier.
+
+Returns:
+- node: The 48-bit spatially unique identifier.
+*/
+node :: proc "contextless" (id: Identifier) -> (node: [6]u8) {
+	mutable_id := id
+	runtime.mem_copy_non_overlapping(&node, &mutable_id[10], 6)
+	return
+}
+
+/*
+Get the timestamp of a version 1 UUID.
+
+Inputs:
+- id: The identifier.
+
+Returns:
+- timestamp: The timestamp, in 100-nanosecond intervals since 1582-10-15.
+*/
+time_v1 :: proc "contextless" (id: Identifier) -> (timestamp: u64) {
+	timestamp_octets: [8]u8
+
+	timestamp_octets[0] = id[0]
+	timestamp_octets[1] = id[1]
+	timestamp_octets[2] = id[2]
+	timestamp_octets[3] = id[3]
+	timestamp_octets[4] = id[4]
+	timestamp_octets[5] = id[5]
+
+	timestamp_octets[6] = id[6] << 4 | id[7] >> 4
+	timestamp_octets[7] = id[7] & 0xF
+
+	return cast(u64)transmute(u64le)timestamp_octets
 }
 
 /*

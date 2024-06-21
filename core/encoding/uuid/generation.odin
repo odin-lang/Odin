@@ -7,6 +7,50 @@ import "core:mem"
 import "core:time"
 
 /*
+Generate a version 1 UUID.
+
+Inputs:
+- clock_seq: The clock sequence, a number which must be initialized to a random number once in the lifetime of a system.
+- node: An optional 48-bit spatially unique identifier, specified to be the IEEE 802 address of the system.
+  If one is not provided or available, 48 bits of random state will take its place.
+
+Returns:
+- result: The generated UUID.
+*/
+generate_v1 :: proc(clock_seq: u16, node: Maybe([6]u8) = nil) -> (result: Identifier) {
+	assert(clock_seq <= 0x3FFF, "The clock sequence can only hold 14 bits of data; no number greater than 16,383.")
+	unix_time_in_hns_intervals := time.to_unix_nanoseconds(time.now()) / 100
+	timestamp := cast(u64le)(HNS_INTERVALS_BETWEEN_GREG_AND_UNIX + unix_time_in_hns_intervals)
+	timestamp_octets := transmute([8]u8)timestamp
+
+	result[0] = timestamp_octets[0]
+	result[1] = timestamp_octets[1]
+	result[2] = timestamp_octets[2]
+	result[3] = timestamp_octets[3]
+	result[4] = timestamp_octets[4]
+	result[5] = timestamp_octets[5]
+
+	result[6] = timestamp_octets[6] >> 4
+	result[7] = timestamp_octets[6] << 4 | timestamp_octets[7]
+
+	if realized_node, ok := node.?; ok {
+		mutable_node := realized_node
+		mem.copy_non_overlapping(&result[10], &mutable_node[0], 6)
+	} else {
+		bytes_generated := rand.read(result[10:])
+		assert(bytes_generated == 6, "RNG failed to generate 6 bytes for UUID v1.")
+	}
+
+	result[VERSION_BYTE_INDEX] |= 0x10
+	result[VARIANT_BYTE_INDEX] |= 0x80
+
+	result[8] |= cast(u8)(clock_seq & 0x3F00 >> 8)
+	result[9]  = cast(u8)clock_seq
+
+	return
+}
+
+/*
 Generate a version 3 UUID.
 
 This UUID is generated from a name within a namespace.

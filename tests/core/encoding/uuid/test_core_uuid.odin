@@ -7,11 +7,14 @@ import "core:time"
 
 @(test)
 test_version_and_variant :: proc(t: ^testing.T) {
+    v1 := uuid.generate_v1(0)
     v3 := uuid.generate_v3(uuid.Namespace_DNS, "")
     v4 := uuid.generate_v4()
     v5 := uuid.generate_v5(uuid.Namespace_DNS, "")
     v7 := uuid.generate_v7()
 
+    testing.expect_value(t, uuid.version(v1), 1)
+    testing.expect_value(t, uuid.variant(v1), uuid.Variant_Type.RFC_4122)
     testing.expect_value(t, uuid.version(v3), 3)
     testing.expect_value(t, uuid.variant(v3), uuid.Variant_Type.RFC_4122)
     testing.expect_value(t, uuid.version(v4), 4)
@@ -51,6 +54,34 @@ test_namespaced_uuids :: proc(t: ^testing.T) {
         testing.expect_value(t, v3_str, exp.v3)
         testing.expect_value(t, v5_str, exp.v5)
     }
+}
+
+@(test)
+test_v1 :: proc(t: ^testing.T) {
+	CLOCK :: 0x3A1A
+	v1_a := uuid.generate_v1(CLOCK)
+	time.sleep(10 * time.Millisecond)
+	v1_b := uuid.generate_v1(CLOCK)
+	time.sleep(10 * time.Millisecond)
+	v1_c := uuid.generate_v1(CLOCK)
+
+	testing.expect_value(t, uuid.clock_seq(v1_a), CLOCK)
+
+	time_bits_a := uuid.time_v1(v1_a)
+	time_bits_b := uuid.time_v1(v1_b)
+	time_bits_c := uuid.time_v1(v1_c)
+
+	time_a := time.Time { _nsec = cast(i64)((time_bits_a - uuid.HNS_INTERVALS_BETWEEN_GREG_AND_UNIX) * 100) }
+	time_b := time.Time { _nsec = cast(i64)((time_bits_b - uuid.HNS_INTERVALS_BETWEEN_GREG_AND_UNIX) * 100) }
+	time_c := time.Time { _nsec = cast(i64)((time_bits_c - uuid.HNS_INTERVALS_BETWEEN_GREG_AND_UNIX) * 100) }
+
+	log.debugf("A: %02x, %i, %v", v1_a, time_bits_a, time_a)
+	log.debugf("B: %02x, %i, %v", v1_b, time_bits_b, time_b)
+	log.debugf("C: %02x, %i, %v", v1_c, time_bits_c, time_c)
+
+	testing.expect(t, time_bits_b > time_bits_a, "The time bits on the later-generated v1 UUID are lesser than the earlier UUID.")
+	testing.expect(t, time_bits_c > time_bits_b, "The time bits on the later-generated v1 UUID are lesser than the earlier UUID.")
+	testing.expect(t, time_bits_c > time_bits_a, "The time bits on the later-generated v1 UUID are lesser than the earlier UUID.")
 }
 
 @(test)
