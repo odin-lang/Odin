@@ -17,6 +17,7 @@ download_assets :: proc() {
 @(require) import "encoding/hex"
 @(require) import "encoding/hxa"
 @(require) import "encoding/json"
+@(require) import "encoding/uuid"
 @(require) import "encoding/varint"
 @(require) import "encoding/xml"
 @(require) import "flags"
