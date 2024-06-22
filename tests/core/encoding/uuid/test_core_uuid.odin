@@ -18,7 +18,13 @@ test_version_and_variant :: proc(t: ^testing.T) {
 	v5 := uuid_legacy.generate_v5(uuid.Namespace_DNS, "")
 	v6 := uuid.generate_v6()
 	v7 := uuid.generate_v7()
-	v8 := uuid.generate_v8_hash(uuid.Namespace_DNS, "", .SHA512)
+
+	_v8_array: [16]u8 = 0xff
+	v8_int := uuid.stamp_v8(max(u128))
+	v8_array := uuid.stamp_v8(_v8_array)
+	v8_slice := uuid.stamp_v8(_v8_array[:])
+
+	v8_hash := uuid.generate_v8_hash(uuid.Namespace_DNS, "", .SHA512)
 
 	testing.expect_value(t, uuid.version(v1), 1)
 	testing.expect_value(t, uuid.variant(v1), uuid.Variant_Type.RFC_4122)
@@ -32,8 +38,16 @@ test_version_and_variant :: proc(t: ^testing.T) {
 	testing.expect_value(t, uuid.variant(v6), uuid.Variant_Type.RFC_4122)
 	testing.expect_value(t, uuid.version(v7), 7)
 	testing.expect_value(t, uuid.variant(v7), uuid.Variant_Type.RFC_4122)
-	testing.expect_value(t, uuid.version(v8), 8)
-	testing.expect_value(t, uuid.variant(v8), uuid.Variant_Type.RFC_4122)
+
+	testing.expect_value(t, uuid.version(v8_int), 8)
+	testing.expect_value(t, uuid.variant(v8_int), uuid.Variant_Type.RFC_4122)
+	testing.expect_value(t, uuid.version(v8_array), 8)
+	testing.expect_value(t, uuid.variant(v8_array), uuid.Variant_Type.RFC_4122)
+	testing.expect_value(t, uuid.version(v8_slice), 8)
+	testing.expect_value(t, uuid.variant(v8_slice), uuid.Variant_Type.RFC_4122)
+
+	testing.expect_value(t, uuid.version(v8_hash), 8)
+	testing.expect_value(t, uuid.variant(v8_hash), uuid.Variant_Type.RFC_4122)
 }
 
 @(test)
