@@ -205,6 +205,52 @@ generate_v5 :: proc {
 }
 
 /*
+Generate a version 6 UUID.
+
+Inputs:
+- clock_seq: The clock sequence from version 1, now made optional.
+  If unspecified, it will be replaced with random bits.
+- node: An optional 48-bit spatially unique identifier, specified to be the IEEE 802 address of the system.
+  If one is not provided or available, 48 bits of random state will take its place.
+
+Returns:
+- result: The generated UUID.
+*/
+generate_v6 :: proc(clock_seq: Maybe(u16) = nil, node: Maybe([6]u8) = nil) -> (result: Identifier) {
+	unix_time_in_hns_intervals := time.to_unix_nanoseconds(time.now()) / 100
+
+	timestamp := cast(u128be)(HNS_INTERVALS_BETWEEN_GREG_AND_UNIX + unix_time_in_hns_intervals)
+
+	result |= transmute(Identifier)(timestamp & 0x0FFFFFFF_FFFFF000 << 68)
+	result |= transmute(Identifier)(timestamp & 0x00000000_00000FFF << 64)
+
+	if realized_clock_seq, ok := clock_seq.?; ok {
+		assert(realized_clock_seq <= 0x3FFF, "The clock sequence can only hold 14 bits of data, therefore no number greater than 16,383.")
+		result[8] |= cast(u8)(realized_clock_seq & 0x3F00 >> 8)
+		result[9]  = cast(u8)realized_clock_seq
+	} else {
+		temporary: [2]u8
+		bytes_generated := rand.read(temporary[:])
+		assert(bytes_generated == 2, "RNG failed to generate 2 bytes for UUID v1.")
+		result[8] |= cast(u8)temporary[0] & 0x3F
+		result[9]  = cast(u8)temporary[1]
+	}
+
+	if realized_node, ok := node.?; ok {
+		mutable_node := realized_node
+		mem.copy_non_overlapping(&result[10], &mutable_node[0], 6)
+	} else {
+		bytes_generated := rand.read(result[10:])
+		assert(bytes_generated == 6, "RNG failed to generate 6 bytes for UUID v1.")
+	}
+
+	result[VERSION_BYTE_INDEX] |= 0x60
+	result[VARIANT_BYTE_INDEX] |= 0x80
+
+	return
+}
+
+/*
 Generate a version 7 UUID.
 
 This UUID will be pseudorandom, save for 6 pre-determined version and variant

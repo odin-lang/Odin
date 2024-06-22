@@ -11,6 +11,7 @@ test_version_and_variant :: proc(t: ^testing.T) {
     v3 := uuid.generate_v3(uuid.Namespace_DNS, "")
     v4 := uuid.generate_v4()
     v5 := uuid.generate_v5(uuid.Namespace_DNS, "")
+    v6 := uuid.generate_v6()
     v7 := uuid.generate_v7()
 
     testing.expect_value(t, uuid.version(v1), 1)
@@ -21,6 +22,8 @@ test_version_and_variant :: proc(t: ^testing.T) {
     testing.expect_value(t, uuid.variant(v4), uuid.Variant_Type.RFC_4122)
     testing.expect_value(t, uuid.version(v5), 5)
     testing.expect_value(t, uuid.variant(v5), uuid.Variant_Type.RFC_4122)
+    testing.expect_value(t, uuid.version(v6), 6)
+    testing.expect_value(t, uuid.variant(v6), uuid.Variant_Type.RFC_4122)
     testing.expect_value(t, uuid.version(v7), 7)
     testing.expect_value(t, uuid.variant(v7), uuid.Variant_Type.RFC_4122)
 }
@@ -82,6 +85,34 @@ test_v1 :: proc(t: ^testing.T) {
 	testing.expect(t, time_bits_b > time_bits_a, "The time bits on the later-generated v1 UUID are lesser than the earlier UUID.")
 	testing.expect(t, time_bits_c > time_bits_b, "The time bits on the later-generated v1 UUID are lesser than the earlier UUID.")
 	testing.expect(t, time_bits_c > time_bits_a, "The time bits on the later-generated v1 UUID are lesser than the earlier UUID.")
+}
+
+@(test)
+test_v6 :: proc(t: ^testing.T) {
+	CLOCK :: 0x3A1A
+	v6_a := uuid.generate_v6(CLOCK)
+	time.sleep(10 * time.Millisecond)
+	v6_b := uuid.generate_v6(CLOCK)
+	time.sleep(10 * time.Millisecond)
+	v6_c := uuid.generate_v6(CLOCK)
+
+	testing.expect_value(t, uuid.clock_seq(v6_a), CLOCK)
+
+	time_bits_a := uuid.time_v6(v6_a)
+	time_bits_b := uuid.time_v6(v6_b)
+	time_bits_c := uuid.time_v6(v6_c)
+
+	time_a := time.Time { _nsec = cast(i64)((time_bits_a - uuid.HNS_INTERVALS_BETWEEN_GREG_AND_UNIX) * 100) }
+	time_b := time.Time { _nsec = cast(i64)((time_bits_b - uuid.HNS_INTERVALS_BETWEEN_GREG_AND_UNIX) * 100) }
+	time_c := time.Time { _nsec = cast(i64)((time_bits_c - uuid.HNS_INTERVALS_BETWEEN_GREG_AND_UNIX) * 100) }
+
+	log.debugf("A: %02x, %i, %v", v6_a, time_bits_a, time_a)
+	log.debugf("B: %02x, %i, %v", v6_b, time_bits_b, time_b)
+	log.debugf("C: %02x, %i, %v", v6_c, time_bits_c, time_c)
+
+	testing.expect(t, time_bits_b > time_bits_a, "The time bits on the later-generated v6 UUID are lesser than the earlier UUID.")
+	testing.expect(t, time_bits_c > time_bits_b, "The time bits on the later-generated v6 UUID are lesser than the earlier UUID.")
+	testing.expect(t, time_bits_c > time_bits_a, "The time bits on the later-generated v6 UUID are lesser than the earlier UUID.")
 }
 
 @(test)

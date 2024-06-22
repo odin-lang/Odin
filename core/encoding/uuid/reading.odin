@@ -99,7 +99,7 @@ variant :: proc "contextless" (id: Identifier) -> (variant: Variant_Type) #no_bo
 }
 
 /*
-Get the clock sequence of a version 1 UUID.
+Get the clock sequence of a version 1 or version 6 UUID.
 
 Inputs:
 - id: The identifier.
@@ -149,6 +149,24 @@ time_v1 :: proc "contextless" (id: Identifier) -> (timestamp: u64) {
 	timestamp_octets[7] = id[7] & 0xF
 
 	return cast(u64)transmute(u64le)timestamp_octets
+}
+
+/*
+Get the timestamp of a version 6 UUID.
+
+Inputs:
+- id: The identifier.
+
+Returns:
+- timestamp: The timestamp, in 100-nanosecond intervals since 1582-10-15.
+*/
+time_v6 :: proc "contextless" (id: Identifier) -> (timestamp: u64) {
+	temporary := transmute(u128be)id
+
+	timestamp |= cast(u64)(temporary & 0xFFFFFFFF_FFFF0000_00000000_00000000 >> 68)
+	timestamp |= cast(u64)(temporary & 0x00000000_00000FFF_00000000_00000000 >> 64)
+
+	return timestamp
 }
 
 /*
