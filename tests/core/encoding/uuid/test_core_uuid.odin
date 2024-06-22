@@ -1,6 +1,7 @@
 package test_core_uuid
 
 import "core:encoding/uuid"
+import uuid_legacy "core:encoding/uuid/legacy"
 import "core:log"
 import "core:testing"
 import "core:time"
@@ -8,9 +9,9 @@ import "core:time"
 @(test)
 test_version_and_variant :: proc(t: ^testing.T) {
     v1 := uuid.generate_v1(0)
-    v3 := uuid.generate_v3(uuid.Namespace_DNS, "")
+    v3 := uuid_legacy.generate_v3(uuid.Namespace_DNS, "")
     v4 := uuid.generate_v4()
-    v5 := uuid.generate_v5(uuid.Namespace_DNS, "")
+    v5 := uuid_legacy.generate_v5(uuid.Namespace_DNS, "")
     v6 := uuid.generate_v6()
     v7 := uuid.generate_v7()
 
@@ -29,7 +30,7 @@ test_version_and_variant :: proc(t: ^testing.T) {
 }
 
 @(test)
-test_namespaced_uuids :: proc(t: ^testing.T) {
+test_legacy_namespaced_uuids :: proc(t: ^testing.T) {
     TEST_NAME :: "0123456789ABCDEF0123456789ABCDEF"
 
     Expected_Result :: struct {
@@ -45,8 +46,8 @@ test_namespaced_uuids :: proc(t: ^testing.T) {
     }
 
     for exp in Expected_Results {
-        v3 := uuid.generate_v3(exp.namespace, TEST_NAME)
-        v5 := uuid.generate_v5(exp.namespace, TEST_NAME)
+        v3 := uuid_legacy.generate_v3(exp.namespace, TEST_NAME)
+        v5 := uuid_legacy.generate_v5(exp.namespace, TEST_NAME)
 
         v3_str := uuid.to_string(v3)
         defer delete(v3_str)
