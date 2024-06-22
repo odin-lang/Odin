@@ -1727,7 +1727,7 @@ gb_internal bool check_builtin_procedure_directive(CheckerContext *c, Operand *o
 			return false;
 		}
 		warning(call, "%.*s", LIT(operand->value.value_string));
-		if (c->proc_name != "") {
+		if (!global_ignore_warnings() && c->proc_name != "") {
 			gbString str = type_to_string(c->curr_proc_sig);
 			error_line("\tCalled within '%.*s' :: %s\n", LIT(c->proc_name), str);
 			gb_string_free(str);
