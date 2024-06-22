@@ -4,6 +4,7 @@ import "core:crypto"
 import "core:encoding/uuid"
 import uuid_legacy "core:encoding/uuid/legacy"
 import "core:log"
+import "core:slice"
 import "core:testing"
 import "core:time"
 
@@ -146,7 +147,131 @@ test_v7 :: proc(t: ^testing.T) {
 	v7_with_counter := uuid.generate_v7(0x555)
 	log.debugf("D: %02x", v7_with_counter)
 	testing.expect_value(t, uuid.counter_v7(v7_with_counter), 0x555)
+}
 
+@(test)
+test_sorting_v1 :: proc(t: ^testing.T) {
+	// This test is to make sure that the v1 UUIDs do _not_ sort.
+	// They are incapable of sorting properly by the nature their time bit ordering.
+	//
+	// Something is very strange if they do sort correctly.
+	point_a := time.time_add({},  1 * time.Second)
+	point_b := time.time_add({},  3 * time.Second)
+	point_c := time.time_add({},  5 * time.Second)
+	point_d := time.time_add({},  7 * time.Second)
+	point_e := time.time_add({}, 11 * time.Second)
+
+	mac: [6]byte
+	v1_a := uuid.generate_v1(0, mac, point_a)
+	v1_b := uuid.generate_v1(0, mac, point_b)
+	v1_c := uuid.generate_v1(0, mac, point_c)
+	v1_d := uuid.generate_v1(0, mac, point_d)
+	v1_e := uuid.generate_v1(0, mac, point_e)
+
+	sort_test := [5]u128be {
+		transmute(u128be)v1_e,
+		transmute(u128be)v1_a,
+		transmute(u128be)v1_d,
+		transmute(u128be)v1_b,
+		transmute(u128be)v1_c,
+	}
+
+	log.debugf("Before: %x", sort_test)
+	slice.sort(sort_test[:])
+	log.debugf("After:  %x", sort_test)
+
+	ERROR :: "v1 UUIDs are sorting by time, despite this not being possible."
+
+	testing.expect(t, sort_test[0] != transmute(u128be)v1_a, ERROR)
+	testing.expect(t, sort_test[1] != transmute(u128be)v1_b, ERROR)
+	testing.expect(t, sort_test[2] != transmute(u128be)v1_c, ERROR)
+	testing.expect(t, sort_test[3] != transmute(u128be)v1_d, ERROR)
+	testing.expect(t, sort_test[4] != transmute(u128be)v1_e, ERROR)
+}
+
+@(test)
+test_sorting_v6 :: proc(t: ^testing.T) {
+	context.random_generator = crypto.random_generator()
+
+	point_a := time.time_add({},  1 * time.Second)
+	point_b := time.time_add({},  3 * time.Second)
+	point_c := time.time_add({},  5 * time.Second)
+	point_d := time.time_add({},  7 * time.Second)
+	point_e := time.time_add({}, 11 * time.Second)
+
+	mac: [6]byte
+	v6_a := uuid.generate_v6(0, mac, point_a)
+	v6_b := uuid.generate_v6(0, mac, point_b)
+	v6_c := uuid.generate_v6(0, mac, point_c)
+	v6_d := uuid.generate_v6(0, mac, point_d)
+	v6_e := uuid.generate_v6(0, mac, point_e)
+
+	sort_test := [5]u128be {
+		transmute(u128be)v6_e,
+		transmute(u128be)v6_a,
+		transmute(u128be)v6_d,
+		transmute(u128be)v6_b,
+		transmute(u128be)v6_c,
+	}
+
+	log.debugf("Before: %x", sort_test)
+	slice.sort(sort_test[:])
+	log.debugf("After:  %x", sort_test)
+
+	ERROR :: "v6 UUIDs are failing to sort properly."
+
+	testing.expect(t, sort_test[0] < sort_test[1], ERROR)
+	testing.expect(t, sort_test[1] < sort_test[2], ERROR)
+	testing.expect(t, sort_test[2] < sort_test[3], ERROR)
+	testing.expect(t, sort_test[3] < sort_test[4], ERROR)
+
+	testing.expect(t, sort_test[0] == transmute(u128be)v6_a, ERROR)
+	testing.expect(t, sort_test[1] == transmute(u128be)v6_b, ERROR)
+	testing.expect(t, sort_test[2] == transmute(u128be)v6_c, ERROR)
+	testing.expect(t, sort_test[3] == transmute(u128be)v6_d, ERROR)
+	testing.expect(t, sort_test[4] == transmute(u128be)v6_e, ERROR)
+}
+
+@(test)
+test_sorting_v7 :: proc(t: ^testing.T) {
+	context.random_generator = crypto.random_generator()
+
+	point_a := time.time_add({},  1 * time.Second)
+	point_b := time.time_add({},  3 * time.Second)
+	point_c := time.time_add({},  5 * time.Second)
+	point_d := time.time_add({},  7 * time.Second)
+	point_e := time.time_add({}, 11 * time.Second)
+
+	v7_a := uuid.generate_v7(point_a)
+	v7_b := uuid.generate_v7(point_b)
+	v7_c := uuid.generate_v7(point_c)
+	v7_d := uuid.generate_v7(point_d)
+	v7_e := uuid.generate_v7(point_e)
+
+	sort_test := [5]u128be {
+		transmute(u128be)v7_e,
+		transmute(u128be)v7_a,
+		transmute(u128be)v7_d,
+		transmute(u128be)v7_b,
+		transmute(u128be)v7_c,
+	}
+
+	log.debugf("Before: %x", sort_test)
+	slice.sort(sort_test[:])
+	log.debugf("After:  %x", sort_test)
+
+	ERROR :: "v7 UUIDs are failing to sort properly."
+
+	testing.expect(t, sort_test[0] < sort_test[1], ERROR)
+	testing.expect(t, sort_test[1] < sort_test[2], ERROR)
+	testing.expect(t, sort_test[2] < sort_test[3], ERROR)
+	testing.expect(t, sort_test[3] < sort_test[4], ERROR)
+
+	testing.expect(t, sort_test[0] == transmute(u128be)v7_a, ERROR)
+	testing.expect(t, sort_test[1] == transmute(u128be)v7_b, ERROR)
+	testing.expect(t, sort_test[2] == transmute(u128be)v7_c, ERROR)
+	testing.expect(t, sort_test[3] == transmute(u128be)v7_d, ERROR)
+	testing.expect(t, sort_test[4] == transmute(u128be)v7_e, ERROR)
 }
 
 @(test)
