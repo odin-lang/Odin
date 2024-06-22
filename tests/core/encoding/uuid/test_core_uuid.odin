@@ -157,10 +157,15 @@ test_writing :: proc(t: ^testing.T) {
         b = u8(i)
     }
 
-    s := uuid.to_string(id)
-    defer delete(s)
+	buf: [uuid.EXPECTED_LENGTH]u8
 
-    testing.expect_value(t, s, "00010203-0405-0607-0809-0a0b0c0d0e0f")
+    s_alloc := uuid.to_string(id)
+    defer delete(s_alloc)
+
+	s_buf := uuid.to_string(id, buf[:])
+
+    testing.expect_value(t, s_alloc, "00010203-0405-0607-0809-0a0b0c0d0e0f")
+    testing.expect_value(t, s_buf, "00010203-0405-0607-0809-0a0b0c0d0e0f")
 }
 
 @(test)
