@@ -1,7 +1,7 @@
 package uuid
 
+import "base:runtime"
 import "core:math/rand"
-import "core:mem"
 import "core:time"
 
 /*
@@ -33,8 +33,9 @@ generate_v1 :: proc(clock_seq: u16, node: Maybe([6]u8) = nil) -> (result: Identi
 
 	if realized_node, ok := node.?; ok {
 		mutable_node := realized_node
-		mem.copy_non_overlapping(&result[10], &mutable_node[0], 6)
+		runtime.mem_copy_non_overlapping(&result[10], &mutable_node[0], 6)
 	} else {
+		assert(.Cryptographic in runtime.random_generator_query_info(context.random_generator), NO_CSPRNG_ERROR)
 		bytes_generated := rand.read(result[10:])
 		assert(bytes_generated == 6, "RNG failed to generate 6 bytes for UUID v1.")
 	}
@@ -57,6 +58,7 @@ Returns:
 - result: The generated UUID.
 */
 generate_v4 :: proc() -> (result: Identifier) {
+	assert(.Cryptographic in runtime.random_generator_query_info(context.random_generator), NO_CSPRNG_ERROR)
 	bytes_generated := rand.read(result[:])
 	assert(bytes_generated == 16, "RNG failed to generate 16 bytes for UUID v4.")
 
@@ -94,6 +96,7 @@ generate_v6 :: proc(clock_seq: Maybe(u16) = nil, node: Maybe([6]u8) = nil) -> (r
 		result[8] |= cast(u8)(realized_clock_seq & 0x3F00 >> 8)
 		result[9]  = cast(u8)realized_clock_seq
 	} else {
+		assert(.Cryptographic in runtime.random_generator_query_info(context.random_generator), NO_CSPRNG_ERROR)
 		temporary: [2]u8
 		bytes_generated := rand.read(temporary[:])
 		assert(bytes_generated == 2, "RNG failed to generate 2 bytes for UUID v1.")
@@ -103,8 +106,9 @@ generate_v6 :: proc(clock_seq: Maybe(u16) = nil, node: Maybe([6]u8) = nil) -> (r
 
 	if realized_node, ok := node.?; ok {
 		mutable_node := realized_node
-		mem.copy_non_overlapping(&result[10], &mutable_node[0], 6)
+		runtime.mem_copy_non_overlapping(&result[10], &mutable_node[0], 6)
 	} else {
+		assert(.Cryptographic in runtime.random_generator_query_info(context.random_generator), NO_CSPRNG_ERROR)
 		bytes_generated := rand.read(result[10:])
 		assert(bytes_generated == 6, "RNG failed to generate 6 bytes for UUID v1.")
 	}
@@ -128,6 +132,7 @@ Returns:
 - result: The generated UUID.
 */
 generate_v7 :: proc() -> (result: Identifier) {
+	assert(.Cryptographic in runtime.random_generator_query_info(context.random_generator), NO_CSPRNG_ERROR)
 	unix_time_in_milliseconds := time.to_unix_nanoseconds(time.now()) / 1e6
 
 	temporary := cast(u128be)unix_time_in_milliseconds << VERSION_7_TIME_SHIFT
@@ -178,6 +183,7 @@ Returns:
 - result: The generated UUID.
 */
 generate_v7_counter :: proc(counter: u16) -> (result: Identifier) {
+	assert(.Cryptographic in runtime.random_generator_query_info(context.random_generator), NO_CSPRNG_ERROR)
 	assert(counter <= 0x0fff, "This implementation of the version 7 UUID does not support counters in excess of 12 bits (4,095).")
 	unix_time_in_milliseconds := time.to_unix_nanoseconds(time.now()) / 1e6
 

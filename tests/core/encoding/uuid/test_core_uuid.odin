@@ -1,5 +1,6 @@
 package test_core_uuid
 
+import "core:crypto"
 import "core:encoding/uuid"
 import uuid_legacy "core:encoding/uuid/legacy"
 import "core:log"
@@ -8,6 +9,8 @@ import "core:time"
 
 @(test)
 test_version_and_variant :: proc(t: ^testing.T) {
+	context.random_generator = crypto.random_generator()
+
     v1 := uuid.generate_v1(0)
     v3 := uuid_legacy.generate_v3(uuid.Namespace_DNS, "")
     v4 := uuid.generate_v4()
@@ -62,6 +65,8 @@ test_legacy_namespaced_uuids :: proc(t: ^testing.T) {
 
 @(test)
 test_v1 :: proc(t: ^testing.T) {
+	context.random_generator = crypto.random_generator()
+
 	CLOCK :: 0x3A1A
 	v1_a := uuid.generate_v1(CLOCK)
 	time.sleep(10 * time.Millisecond)
@@ -90,6 +95,8 @@ test_v1 :: proc(t: ^testing.T) {
 
 @(test)
 test_v6 :: proc(t: ^testing.T) {
+	context.random_generator = crypto.random_generator()
+
 	CLOCK :: 0x3A1A
 	v6_a := uuid.generate_v6(CLOCK)
 	time.sleep(10 * time.Millisecond)
@@ -118,6 +125,8 @@ test_v6 :: proc(t: ^testing.T) {
 
 @(test)
 test_v7 :: proc(t: ^testing.T) {
+	context.random_generator = crypto.random_generator()
+
 	v7_a := uuid.generate_v7()
 	time.sleep(10 * time.Millisecond)
 	v7_b := uuid.generate_v7()

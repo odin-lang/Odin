@@ -16,6 +16,9 @@ VERSION_7_TIME_SHIFT    :: 80
 VERSION_7_COUNTER_MASK  :: 0x00000000_00000fff_00000000_00000000
 VERSION_7_COUNTER_SHIFT :: 64
 
+@(private)
+NO_CSPRNG_ERROR :: "The context random generator is not cryptographic. See the documentation for an example of how to set one up."
+
 Read_Error :: enum {
 	None,
 	Invalid_Length,
