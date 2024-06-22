@@ -144,9 +144,9 @@ test_legacy_namespaced_uuids :: proc(t: ^testing.T) {
 test_v1 :: proc(t: ^testing.T) {
 	context.random_generator = crypto.random_generator()
 
-	point_a := time.time_add({}, 1 * time.Second)
-	point_b := time.time_add({}, 3 * time.Second)
-	point_c := time.time_add({}, 5 * time.Second)
+	point_a := time.unix(1, 0)
+	point_b := time.unix(3, 0)
+	point_c := time.unix(5, 0)
 
 	CLOCK :: 0x3A1A
 	mac := [6]u8{0xFF, 0x10, 0xAA, 0x55, 0x01, 0xFF}
@@ -179,9 +179,9 @@ test_v1 :: proc(t: ^testing.T) {
 test_v6 :: proc(t: ^testing.T) {
 	context.random_generator = crypto.random_generator()
 
-	point_a := time.time_add({}, 1 * time.Second)
-	point_b := time.time_add({}, 3 * time.Second)
-	point_c := time.time_add({}, 5 * time.Second)
+	point_a := time.unix(1, 0)
+	point_b := time.unix(3, 0)
+	point_c := time.unix(5, 0)
 
 	CLOCK :: 0x3A1A
 	mac := [6]u8{0xFF, 0x10, 0xAA, 0x55, 0x01, 0xFF}
@@ -214,9 +214,9 @@ test_v6 :: proc(t: ^testing.T) {
 test_v7 :: proc(t: ^testing.T) {
 	context.random_generator = crypto.random_generator()
 
-	point_a := time.time_add({}, 1 * time.Second)
-	point_b := time.time_add({}, 3 * time.Second)
-	point_c := time.time_add({}, 5 * time.Second)
+	point_a := time.unix(1, 0)
+	point_b := time.unix(3, 0)
+	point_c := time.unix(5, 0)
 
 	v7_a := uuid.generate_v7(point_a)
 	v7_b := uuid.generate_v7(point_b)
@@ -245,11 +245,11 @@ test_sorting_v1 :: proc(t: ^testing.T) {
 	// They are incapable of sorting properly by the nature their time bit ordering.
 	//
 	// Something is very strange if they do sort correctly.
-	point_a := time.time_add({},  1 * time.Second)
-	point_b := time.time_add({},  3 * time.Second)
-	point_c := time.time_add({},  5 * time.Second)
-	point_d := time.time_add({},  7 * time.Second)
-	point_e := time.time_add({}, 11 * time.Second)
+	point_a := time.unix(1, 0)
+	point_b := time.unix(3, 0)
+	point_c := time.unix(5, 0)
+	point_d := time.unix(7, 0)
+	point_e := time.unix(11, 0)
 
 	mac: [6]byte
 	v1_a := uuid.generate_v1(0, mac, point_a)
@@ -283,11 +283,11 @@ test_sorting_v1 :: proc(t: ^testing.T) {
 test_sorting_v6 :: proc(t: ^testing.T) {
 	context.random_generator = crypto.random_generator()
 
-	point_a := time.time_add({},  1 * time.Second)
-	point_b := time.time_add({},  3 * time.Second)
-	point_c := time.time_add({},  5 * time.Second)
-	point_d := time.time_add({},  7 * time.Second)
-	point_e := time.time_add({}, 11 * time.Second)
+	point_a := time.unix(1, 0)
+	point_b := time.unix(3, 0)
+	point_c := time.unix(5, 0)
+	point_d := time.unix(7, 0)
+	point_e := time.unix(11, 0)
 
 	mac: [6]byte
 	v6_a := uuid.generate_v6(0, mac, point_a)
@@ -326,11 +326,11 @@ test_sorting_v6 :: proc(t: ^testing.T) {
 test_sorting_v7 :: proc(t: ^testing.T) {
 	context.random_generator = crypto.random_generator()
 
-	point_a := time.time_add({},  1 * time.Second)
-	point_b := time.time_add({},  3 * time.Second)
-	point_c := time.time_add({},  5 * time.Second)
-	point_d := time.time_add({},  7 * time.Second)
-	point_e := time.time_add({}, 11 * time.Second)
+	point_a := time.unix(1, 0)
+	point_b := time.unix(3, 0)
+	point_c := time.unix(5, 0)
+	point_d := time.unix(7, 0)
+	point_e := time.unix(11, 0)
 
 	v7_a := uuid.generate_v7(point_a)
 	v7_b := uuid.generate_v7(point_b)

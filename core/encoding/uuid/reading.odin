@@ -163,8 +163,7 @@ Returns:
 - timestamp: The timestamp of the UUID.
 */
 time_v1 :: proc "contextless" (id: Identifier) -> (timestamp: time.Time) {
-	delta := cast(time.Duration)(raw_time_v1(id) - HNS_INTERVALS_BETWEEN_GREG_AND_UNIX) * 100
-	return time.time_add({}, delta)
+	return { _nsec = cast(i64)(raw_time_v1(id) - HNS_INTERVALS_BETWEEN_GREG_AND_UNIX) * 100 }
 }
 
 /*
@@ -195,8 +194,7 @@ Returns:
 - timestamp: The timestamp, in 100-nanosecond intervals since 1582-10-15.
 */
 time_v6 :: proc "contextless" (id: Identifier) -> (timestamp: time.Time) {
-	delta := cast(time.Duration)(raw_time_v6(id) - HNS_INTERVALS_BETWEEN_GREG_AND_UNIX) * 100
-	return time.time_add({}, delta)
+	return { _nsec = cast(i64)(raw_time_v6(id) - HNS_INTERVALS_BETWEEN_GREG_AND_UNIX) * 100 }
 }
 
 /*
@@ -223,7 +221,7 @@ Returns:
 - timestamp: The timestamp, in milliseconds since the UNIX epoch.
 */
 time_v7 :: proc "contextless" (id: Identifier) -> (timestamp: time.Time) {
-	return time.time_add({}, cast(time.Duration)(raw_time_v7(id) * 1e6))
+	return { _nsec = cast(i64)raw_time_v7(id) * 1e6 }
 }
 
 /*
