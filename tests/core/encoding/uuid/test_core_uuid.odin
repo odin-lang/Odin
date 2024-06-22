@@ -18,6 +18,7 @@ test_version_and_variant :: proc(t: ^testing.T) {
 	v5 := uuid_legacy.generate_v5(uuid.Namespace_DNS, "")
 	v6 := uuid.generate_v6()
 	v7 := uuid.generate_v7()
+	v8 := uuid.generate_v8_hash(uuid.Namespace_DNS, "", .SHA512)
 
 	testing.expect_value(t, uuid.version(v1), 1)
 	testing.expect_value(t, uuid.variant(v1), uuid.Variant_Type.RFC_4122)
@@ -31,6 +32,8 @@ test_version_and_variant :: proc(t: ^testing.T) {
 	testing.expect_value(t, uuid.variant(v6), uuid.Variant_Type.RFC_4122)
 	testing.expect_value(t, uuid.version(v7), 7)
 	testing.expect_value(t, uuid.variant(v7), uuid.Variant_Type.RFC_4122)
+	testing.expect_value(t, uuid.version(v8), 8)
+	testing.expect_value(t, uuid.variant(v8), uuid.Variant_Type.RFC_4122)
 }
 
 @(test)
@@ -79,6 +82,17 @@ test_timestamps :: proc(t: ^testing.T) {
 		time.diff(max_time_ms_resolution, v7_counter_time) == 0,
 		"v7 UUID (with counter) timestamp is invalid, expected %x, got %x",
 		max_time_ms_resolution, v7_counter_time)
+}
+
+@(test)
+test_v8_hash_implementation :: proc(t: ^testing.T) {
+	// This example and its results are derived from RFC 9562.
+	// https://www.rfc-editor.org/rfc/rfc9562.html#name-example-of-a-uuidv8-value-n
+
+	id := uuid.generate_v8_hash(uuid.Namespace_DNS, "www.example.com", .SHA256)
+	id_str := uuid.to_string(id)
+	defer delete(id_str)
+	testing.expect_value(t, id_str, "5c146b14-3c52-8afd-938a-375d0df1fbf6")
 }
 
 @(test)
