@@ -11,25 +11,27 @@ Inputs:
 - clock_seq: The clock sequence, a number which must be initialized to a random number once in the lifetime of a system.
 - node: An optional 48-bit spatially unique identifier, specified to be the IEEE 802 address of the system.
   If one is not provided or available, 48 bits of random state will take its place.
+- timestamp: A timestamp from the `core:time` package, or `nil` to use the current time.
 
 Returns:
 - result: The generated UUID.
 */
-generate_v1 :: proc(clock_seq: u16, node: Maybe([6]u8) = nil) -> (result: Identifier) {
+generate_v1 :: proc(clock_seq: u16, node: Maybe([6]u8) = nil, timestamp: Maybe(time.Time) = nil) -> (result: Identifier) {
 	assert(clock_seq <= 0x3FFF, "The clock sequence can only hold 14 bits of data; no number greater than 16,383.")
-	unix_time_in_hns_intervals := time.to_unix_nanoseconds(time.now()) / 100
-	timestamp := cast(u64le)(HNS_INTERVALS_BETWEEN_GREG_AND_UNIX + unix_time_in_hns_intervals)
-	timestamp_octets := transmute([8]u8)timestamp
+	unix_time_in_hns_intervals := time.to_unix_nanoseconds(timestamp.? or_else time.now()) / 100
 
-	result[0] = timestamp_octets[0]
-	result[1] = timestamp_octets[1]
-	result[2] = timestamp_octets[2]
-	result[3] = timestamp_octets[3]
-	result[4] = timestamp_octets[4]
-	result[5] = timestamp_octets[5]
+	uuid_timestamp := cast(u64le)(HNS_INTERVALS_BETWEEN_GREG_AND_UNIX + unix_time_in_hns_intervals)
+	uuid_timestamp_octets := transmute([8]u8)uuid_timestamp
 
-	result[6] = timestamp_octets[6] >> 4
-	result[7] = timestamp_octets[6] << 4 | timestamp_octets[7]
+	result[0] = uuid_timestamp_octets[0]
+	result[1] = uuid_timestamp_octets[1]
+	result[2] = uuid_timestamp_octets[2]
+	result[3] = uuid_timestamp_octets[3]
+	result[4] = uuid_timestamp_octets[4]
+	result[5] = uuid_timestamp_octets[5]
+
+	result[6] = uuid_timestamp_octets[6] >> 4
+	result[7] = uuid_timestamp_octets[6] << 4 | uuid_timestamp_octets[7]
 
 	if realized_node, ok := node.?; ok {
 		mutable_node := realized_node
@@ -79,12 +81,13 @@ Inputs:
   If unspecified, it will be replaced with random bits.
 - node: An optional 48-bit spatially unique identifier, specified to be the IEEE 802 address of the system.
   If one is not provided or available, 48 bits of random state will take its place.
+- timestamp: A timestamp from the `core:time` package, or `nil` to use the current time.
 
 Returns:
 - result: The generated UUID.
 */
-generate_v6 :: proc(clock_seq: Maybe(u16) = nil, node: Maybe([6]u8) = nil) -> (result: Identifier) {
-	unix_time_in_hns_intervals := time.to_unix_nanoseconds(time.now()) / 100
+generate_v6 :: proc(clock_seq: Maybe(u16) = nil, node: Maybe([6]u8) = nil, timestamp: Maybe(time.Time) = nil) -> (result: Identifier) {
+	unix_time_in_hns_intervals := time.to_unix_nanoseconds(timestamp.? or_else time.now()) / 100
 
 	timestamp := cast(u128be)(HNS_INTERVALS_BETWEEN_GREG_AND_UNIX + unix_time_in_hns_intervals)
 
@@ -128,12 +131,15 @@ bits and a 48 bit timestamp.
 It is designed with time-based sorting in mind, such as for database usage, as
 the highest bits are allocated from the timestamp of when it is created.
 
+Inputs:
+- timestamp: A timestamp from the `core:time` package, or `nil` to use the current time.
+
 Returns:
 - result: The generated UUID.
 */
-generate_v7 :: proc() -> (result: Identifier) {
+generate_v7_basic :: proc(timestamp: Maybe(time.Time) = nil) -> (result: Identifier) {
 	assert(.Cryptographic in runtime.random_generator_query_info(context.random_generator), NO_CSPRNG_ERROR)
-	unix_time_in_milliseconds := time.to_unix_nanoseconds(time.now()) / 1e6
+	unix_time_in_milliseconds := time.to_unix_nanoseconds(timestamp.? or_else time.now()) / 1e6
 
 	temporary := cast(u128be)unix_time_in_milliseconds << VERSION_7_TIME_SHIFT
 
@@ -152,7 +158,7 @@ generate_v7 :: proc() -> (result: Identifier) {
 }
 
 /*
-Generate a version 7 UUID with an incremented counter.
+Generate a version 7 UUID that has an incremented counter.
 
 This UUID will be pseudorandom, save for 6 pre-determined version and variant
 bits, a 48 bit timestamp, and 12 bits of counter state.
@@ -178,14 +184,15 @@ Example:
 
 Inputs:
 - counter: A 12-bit value, incremented each time a UUID is generated in a batch.
+- timestamp: A timestamp from the `core:time` package, or `nil` to use the current time.
 
 Returns:
 - result: The generated UUID.
 */
-generate_v7_counter :: proc(counter: u16) -> (result: Identifier) {
+generate_v7_with_counter :: proc(counter: u16, timestamp: Maybe(time.Time) = nil) -> (result: Identifier) {
 	assert(.Cryptographic in runtime.random_generator_query_info(context.random_generator), NO_CSPRNG_ERROR)
 	assert(counter <= 0x0fff, "This implementation of the version 7 UUID does not support counters in excess of 12 bits (4,095).")
-	unix_time_in_milliseconds := time.to_unix_nanoseconds(time.now()) / 1e6
+	unix_time_in_milliseconds := time.to_unix_nanoseconds(timestamp.? or_else time.now()) / 1e6
 
 	temporary := cast(u128be)unix_time_in_milliseconds << VERSION_7_TIME_SHIFT
 	temporary |= cast(u128be)counter << VERSION_7_COUNTER_SHIFT
@@ -202,4 +209,9 @@ generate_v7_counter :: proc(counter: u16) -> (result: Identifier) {
 	result[VARIANT_BYTE_INDEX] |= 0x80
 
 	return
+}
+
+generate_v7 :: proc {
+	generate_v7_basic,
+	generate_v7_with_counter,
 }

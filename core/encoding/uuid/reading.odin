@@ -1,6 +1,7 @@
 package uuid
 
 import "base:runtime"
+import "core:time"
 
 /*
 Convert a string to a UUID.
@@ -127,7 +128,7 @@ node :: proc "contextless" (id: Identifier) -> (node: [6]u8) {
 }
 
 /*
-Get the timestamp of a version 1 UUID.
+Get the raw timestamp of a version 1 UUID.
 
 Inputs:
 - id: The identifier.
@@ -135,7 +136,7 @@ Inputs:
 Returns:
 - timestamp: The timestamp, in 100-nanosecond intervals since 1582-10-15.
 */
-time_v1 :: proc "contextless" (id: Identifier) -> (timestamp: u64) {
+raw_time_v1 :: proc "contextless" (id: Identifier) -> (timestamp: u64) {
 	timestamp_octets: [8]u8
 
 	timestamp_octets[0] = id[0]
@@ -151,6 +152,39 @@ time_v1 :: proc "contextless" (id: Identifier) -> (timestamp: u64) {
 	return cast(u64)transmute(u64le)timestamp_octets
 }
 
+
+/*
+Get the timestamp of a version 1 UUID.
+
+Inputs:
+- id: The identifier.
+
+Returns:
+- timestamp: The timestamp of the UUID.
+*/
+time_v1 :: proc "contextless" (id: Identifier) -> (timestamp: time.Time) {
+	delta := cast(time.Duration)(raw_time_v1(id) - HNS_INTERVALS_BETWEEN_GREG_AND_UNIX) * 100
+	return time.time_add({}, delta)
+}
+
+/*
+Get the raw timestamp of a version 6 UUID.
+
+Inputs:
+- id: The identifier.
+
+Returns:
+- timestamp: The timestamp, in 100-nanosecond intervals since 1582-10-15.
+*/
+raw_time_v6 :: proc "contextless" (id: Identifier) -> (timestamp: u64) {
+	temporary := transmute(u128be)id
+
+	timestamp |= cast(u64)(temporary & 0xFFFFFFFF_FFFF0000_00000000_00000000 >> 68)
+	timestamp |= cast(u64)(temporary & 0x00000000_00000FFF_00000000_00000000 >> 64)
+
+	return timestamp
+}
+
 /*
 Get the timestamp of a version 6 UUID.
 
@@ -160,13 +194,23 @@ Inputs:
 Returns:
 - timestamp: The timestamp, in 100-nanosecond intervals since 1582-10-15.
 */
-time_v6 :: proc "contextless" (id: Identifier) -> (timestamp: u64) {
-	temporary := transmute(u128be)id
+time_v6 :: proc "contextless" (id: Identifier) -> (timestamp: time.Time) {
+	delta := cast(time.Duration)(raw_time_v6(id) - HNS_INTERVALS_BETWEEN_GREG_AND_UNIX) * 100
+	return time.time_add({}, delta)
+}
 
-	timestamp |= cast(u64)(temporary & 0xFFFFFFFF_FFFF0000_00000000_00000000 >> 68)
-	timestamp |= cast(u64)(temporary & 0x00000000_00000FFF_00000000_00000000 >> 64)
+/*
+Get the raw timestamp of a version 7 UUID.
 
-	return timestamp
+Inputs:
+- id: The identifier.
+
+Returns:
+- timestamp: The timestamp, in milliseconds since the UNIX epoch.
+*/
+raw_time_v7 :: proc "contextless" (id: Identifier) -> (timestamp: u64) {
+	time_bits := transmute(u128be)id & VERSION_7_TIME_MASK
+	return cast(u64)(time_bits >> VERSION_7_TIME_SHIFT)
 }
 
 /*
@@ -178,9 +222,8 @@ Inputs:
 Returns:
 - timestamp: The timestamp, in milliseconds since the UNIX epoch.
 */
-time_v7 :: proc "contextless" (id: Identifier) -> (timestamp: u64) {
-	time_bits := transmute(u128be)id & VERSION_7_TIME_MASK
-	return cast(u64)(time_bits >> VERSION_7_TIME_SHIFT)
+time_v7 :: proc "contextless" (id: Identifier) -> (timestamp: time.Time) {
+	return time.time_add({}, cast(time.Duration)(raw_time_v7(id) * 1e6))
 }
 
 /*

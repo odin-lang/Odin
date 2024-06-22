@@ -67,87 +67,86 @@ test_legacy_namespaced_uuids :: proc(t: ^testing.T) {
 test_v1 :: proc(t: ^testing.T) {
 	context.random_generator = crypto.random_generator()
 
+	point_a := time.time_add({}, 1 * time.Second)
+	point_b := time.time_add({}, 3 * time.Second)
+	point_c := time.time_add({}, 5 * time.Second)
+
 	CLOCK :: 0x3A1A
-	v1_a := uuid.generate_v1(CLOCK)
-	time.sleep(10 * time.Millisecond)
-	v1_b := uuid.generate_v1(CLOCK)
-	time.sleep(10 * time.Millisecond)
-	v1_c := uuid.generate_v1(CLOCK)
+	v1_a := uuid.generate_v1(CLOCK, nil, point_a)
+	v1_b := uuid.generate_v1(CLOCK, nil, point_b)
+	v1_c := uuid.generate_v1(CLOCK, nil, point_c)
 
 	testing.expect_value(t, uuid.clock_seq(v1_a), CLOCK)
 
-	time_bits_a := uuid.time_v1(v1_a)
-	time_bits_b := uuid.time_v1(v1_b)
-	time_bits_c := uuid.time_v1(v1_c)
+	time_a := uuid.time_v1(v1_a)
+	time_b := uuid.time_v1(v1_b)
+	time_c := uuid.time_v1(v1_c)
 
-	time_a := time.Time { _nsec = cast(i64)((time_bits_a - uuid.HNS_INTERVALS_BETWEEN_GREG_AND_UNIX) * 100) }
-	time_b := time.Time { _nsec = cast(i64)((time_bits_b - uuid.HNS_INTERVALS_BETWEEN_GREG_AND_UNIX) * 100) }
-	time_c := time.Time { _nsec = cast(i64)((time_bits_c - uuid.HNS_INTERVALS_BETWEEN_GREG_AND_UNIX) * 100) }
+	log.debugf("A: %02x, %v", v1_a, time_a)
+	log.debugf("B: %02x, %v", v1_b, time_b)
+	log.debugf("C: %02x, %v", v1_c, time_c)
 
-	log.debugf("A: %02x, %i, %v", v1_a, time_bits_a, time_a)
-	log.debugf("B: %02x, %i, %v", v1_b, time_bits_b, time_b)
-	log.debugf("C: %02x, %i, %v", v1_c, time_bits_c, time_c)
-
-	testing.expect(t, time_bits_b > time_bits_a, "The time bits on the later-generated v1 UUID are lesser than the earlier UUID.")
-	testing.expect(t, time_bits_c > time_bits_b, "The time bits on the later-generated v1 UUID are lesser than the earlier UUID.")
-	testing.expect(t, time_bits_c > time_bits_a, "The time bits on the later-generated v1 UUID are lesser than the earlier UUID.")
+	testing.expect(t, time.diff(time_a, time_b) > 0, "The time on the later-generated v1 UUID is earlier than its successor.")
+	testing.expect(t, time.diff(time_b, time_c) > 0, "The time on the later-generated v1 UUID is earlier than its successor.")
+	testing.expect(t, time.diff(time_a, time_c) > 0, "The time on the later-generated v1 UUID is earlier than its successor.")
 }
 
 @(test)
 test_v6 :: proc(t: ^testing.T) {
 	context.random_generator = crypto.random_generator()
 
+	point_a := time.time_add({}, 1 * time.Second)
+	point_b := time.time_add({}, 3 * time.Second)
+	point_c := time.time_add({}, 5 * time.Second)
+
 	CLOCK :: 0x3A1A
-	v6_a := uuid.generate_v6(CLOCK)
-	time.sleep(10 * time.Millisecond)
-	v6_b := uuid.generate_v6(CLOCK)
-	time.sleep(10 * time.Millisecond)
-	v6_c := uuid.generate_v6(CLOCK)
+	v6_a := uuid.generate_v6(CLOCK, nil, point_a)
+	v6_b := uuid.generate_v6(CLOCK, nil, point_b)
+	v6_c := uuid.generate_v6(CLOCK, nil, point_c)
 
 	testing.expect_value(t, uuid.clock_seq(v6_a), CLOCK)
 
-	time_bits_a := uuid.time_v6(v6_a)
-	time_bits_b := uuid.time_v6(v6_b)
-	time_bits_c := uuid.time_v6(v6_c)
+	time_a := uuid.time_v6(v6_a)
+	time_b := uuid.time_v6(v6_b)
+	time_c := uuid.time_v6(v6_c)
 
-	time_a := time.Time { _nsec = cast(i64)((time_bits_a - uuid.HNS_INTERVALS_BETWEEN_GREG_AND_UNIX) * 100) }
-	time_b := time.Time { _nsec = cast(i64)((time_bits_b - uuid.HNS_INTERVALS_BETWEEN_GREG_AND_UNIX) * 100) }
-	time_c := time.Time { _nsec = cast(i64)((time_bits_c - uuid.HNS_INTERVALS_BETWEEN_GREG_AND_UNIX) * 100) }
+	log.debugf("A: %02x, %v", v6_a, time_a)
+	log.debugf("B: %02x, %v", v6_b, time_b)
+	log.debugf("C: %02x, %v", v6_c, time_c)
 
-	log.debugf("A: %02x, %i, %v", v6_a, time_bits_a, time_a)
-	log.debugf("B: %02x, %i, %v", v6_b, time_bits_b, time_b)
-	log.debugf("C: %02x, %i, %v", v6_c, time_bits_c, time_c)
-
-	testing.expect(t, time_bits_b > time_bits_a, "The time bits on the later-generated v6 UUID are lesser than the earlier UUID.")
-	testing.expect(t, time_bits_c > time_bits_b, "The time bits on the later-generated v6 UUID are lesser than the earlier UUID.")
-	testing.expect(t, time_bits_c > time_bits_a, "The time bits on the later-generated v6 UUID are lesser than the earlier UUID.")
+	testing.expect(t, time.diff(time_a, time_b) > 0, "The time on the later-generated v6 UUID is earlier than its successor.")
+	testing.expect(t, time.diff(time_b, time_c) > 0, "The time on the later-generated v6 UUID is earlier than its successor.")
+	testing.expect(t, time.diff(time_a, time_c) > 0, "The time on the later-generated v6 UUID is earlier than its successor.")
 }
 
 @(test)
 test_v7 :: proc(t: ^testing.T) {
 	context.random_generator = crypto.random_generator()
 
-	v7_a := uuid.generate_v7()
-	time.sleep(10 * time.Millisecond)
-	v7_b := uuid.generate_v7()
-	time.sleep(10 * time.Millisecond)
-	v7_c := uuid.generate_v7()
+	point_a := time.time_add({}, 1 * time.Second)
+	point_b := time.time_add({}, 3 * time.Second)
+	point_c := time.time_add({}, 5 * time.Second)
 
-	time_bits_a := uuid.time_v7(v7_a)
-	time_bits_b := uuid.time_v7(v7_b)
-	time_bits_c := uuid.time_v7(v7_c)
+	v7_a := uuid.generate_v7(point_a)
+	v7_b := uuid.generate_v7(point_b)
+	v7_c := uuid.generate_v7(point_c)
 
-	log.debugf("A: %02x, %i", v7_a, time_bits_a)
-	log.debugf("B: %02x, %i", v7_b, time_bits_b)
-	log.debugf("C: %02x, %i", v7_c, time_bits_c)
+	time_a := uuid.time_v7(v7_a)
+	time_b := uuid.time_v7(v7_b)
+	time_c := uuid.time_v7(v7_c)
 
-	testing.expect(t, time_bits_b > time_bits_a, "The time bits on the later-generated v7 UUID are lesser than the earlier UUID.")
-	testing.expect(t, time_bits_c > time_bits_b, "The time bits on the later-generated v7 UUID are lesser than the earlier UUID.")
-	testing.expect(t, time_bits_c > time_bits_a, "The time bits on the later-generated v7 UUID are lesser than the earlier UUID.")
+	log.debugf("A: %02x, %v", v7_a, time_a)
+	log.debugf("B: %02x, %v", v7_b, time_b)
+	log.debugf("C: %02x, %v", v7_c, time_c)
 
-	v7_with_counter := uuid.generate_v7_counter(0x555)
+	testing.expect(t, time.diff(time_a, time_b) > 0, "The time on the later-generated v7 UUID is earlier than its successor.")
+	testing.expect(t, time.diff(time_b, time_c) > 0, "The time on the later-generated v7 UUID is earlier than its successor.")
+	testing.expect(t, time.diff(time_a, time_c) > 0, "The time on the later-generated v7 UUID is earlier than its successor.")
+
+	v7_with_counter := uuid.generate_v7(0x555)
 	log.debugf("D: %02x", v7_with_counter)
 	testing.expect_value(t, uuid.counter_v7(v7_with_counter), 0x555)
+
 }
 
 @(test)
