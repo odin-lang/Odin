@@ -7443,6 +7443,7 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 		    name == "exists" ||
 		    name == "assert" || 
 		    name == "panic" || 
+		    name == "warning" ||
 		    name == "defined" || 
 		    name == "config" || 
 		    name == "load" ||

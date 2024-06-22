@@ -1736,6 +1736,8 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 			lb_make_global_private_const(addr);
 
 			return lb_addr_load(p, addr);
+		} else if (name == "warning") {
+			return {};
 		} else {
 			GB_PANIC("UNKNOWN DIRECTIVE: %.*s", LIT(name));
 		}
