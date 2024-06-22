@@ -113,7 +113,7 @@ clock_seq :: proc "contextless" (id: Identifier) -> (clock_seq: u16) {
 }
 
 /*
-Get the node of a version 1 UUID.
+Get the node of a version 1 or version 6 UUID.
 
 Inputs:
 - id: The identifier.

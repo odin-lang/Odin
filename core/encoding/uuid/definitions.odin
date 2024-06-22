@@ -18,6 +18,10 @@ VERSION_7_COUNTER_SHIFT :: 64
 
 @(private)
 NO_CSPRNG_ERROR :: "The context random generator is not cryptographic. See the documentation for an example of how to set one up."
+@(private)
+BIG_CLOCK_ERROR :: "The clock sequence can only hold 14 bits of data, therefore no number greater than 16,383 (0x3FFF)."
+@(private)
+VERSION_7_BIG_COUNTER_ERROR :: "This implementation of the version 7 UUID counter can only hold 12 bits of data, therefore no number greater than 4,095 (0xFFF)."
 
 Read_Error :: enum {
 	None,
