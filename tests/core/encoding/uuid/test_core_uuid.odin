@@ -34,6 +34,54 @@ test_version_and_variant :: proc(t: ^testing.T) {
 }
 
 @(test)
+test_timestamps :: proc(t: ^testing.T) {
+	// This test makes sure that timestamps are recoverable and have not been
+	// overwritten by neighboring bits, taking into account precision loss.
+	context.random_generator = crypto.random_generator()
+
+	N :: max(i64)
+
+	max_time := time.Time { N }
+
+	mac: [6]byte
+	v1 := uuid.generate_v1(0, mac, max_time)
+	v6 := uuid.generate_v6(0, mac, max_time)
+	v7 := uuid.generate_v7(max_time)
+	// The counter version keeps its time in the same place as the basic version,
+	// this is just for the sake of completeness.
+	v7_counter := uuid.generate_v7(0, max_time)
+
+	v1_time := uuid.time_v1(v1)
+	v6_time := uuid.time_v6(v6)
+	v7_time := uuid.time_v7(v7)
+	v7_counter_time := uuid.time_v7(v7_counter)
+
+	// I hope the compiler doesn't ever optimize this out.
+	max_time_hns_resolution := time.Time { N / 100 * 100 }
+	max_time_ms_resolution  := time.Time { N / 1e6 * 1e6 }
+
+	testing.expectf(t,
+		time.diff(max_time_hns_resolution, v1_time) == 0,
+		"v1 UUID timestamp is invalid, expected %x, got %x",
+		max_time_hns_resolution, v1_time)
+
+	testing.expectf(t,
+		time.diff(max_time_hns_resolution, v6_time) == 0,
+		"v6 UUID timestamp is invalid, expected %x, got %x",
+		max_time_hns_resolution, v6_time)
+
+	testing.expectf(t,
+		time.diff(max_time_ms_resolution, v7_time) == 0,
+		"v7 UUID timestamp is invalid, expected %x, got %x",
+		max_time_ms_resolution, v7_time)
+
+	testing.expectf(t,
+		time.diff(max_time_ms_resolution, v7_counter_time) == 0,
+		"v7 UUID (with counter) timestamp is invalid, expected %x, got %x",
+		max_time_ms_resolution, v7_counter_time)
+}
+
+@(test)
 test_legacy_namespaced_uuids :: proc(t: ^testing.T) {
 	TEST_NAME :: "0123456789ABCDEF0123456789ABCDEF"
 
