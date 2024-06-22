@@ -8727,7 +8727,7 @@ gb_internal ExprKind check_or_branch_expr(CheckerContext *c, Operand *o, Ast *no
 			// okay
 		} else {
 			gbString s = type_to_string(right_type);
-			error(node, "'%.*s' requires a boolean or nil-able type, got %s", s);
+			error(node, "'%.*s' requires a boolean or nil-able type, got %s", LIT(name), s);
 			gb_string_free(s);
 		}
 	}
