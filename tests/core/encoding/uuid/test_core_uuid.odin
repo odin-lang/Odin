@@ -121,11 +121,18 @@ test_v1 :: proc(t: ^testing.T) {
 	point_c := time.time_add({}, 5 * time.Second)
 
 	CLOCK :: 0x3A1A
-	v1_a := uuid.generate_v1(CLOCK, nil, point_a)
-	v1_b := uuid.generate_v1(CLOCK, nil, point_b)
-	v1_c := uuid.generate_v1(CLOCK, nil, point_c)
+	mac := [6]u8{0xFF, 0x10, 0xAA, 0x55, 0x01, 0xFF}
+
+	v1_a := uuid.generate_v1(CLOCK, mac, point_a)
+	v1_b := uuid.generate_v1(CLOCK, mac, point_b)
+	v1_c := uuid.generate_v1(CLOCK, mac, point_c)
 
 	testing.expect_value(t, uuid.clock_seq(v1_a), CLOCK)
+
+	extracted_mac := uuid.node(v1_a)
+	for i in 0 ..< len(mac) {
+		testing.expect(t, mac[i] == extracted_mac[i])
+	}
 
 	time_a := uuid.time_v1(v1_a)
 	time_b := uuid.time_v1(v1_b)
@@ -149,11 +156,18 @@ test_v6 :: proc(t: ^testing.T) {
 	point_c := time.time_add({}, 5 * time.Second)
 
 	CLOCK :: 0x3A1A
-	v6_a := uuid.generate_v6(CLOCK, nil, point_a)
-	v6_b := uuid.generate_v6(CLOCK, nil, point_b)
-	v6_c := uuid.generate_v6(CLOCK, nil, point_c)
+	mac := [6]u8{0xFF, 0x10, 0xAA, 0x55, 0x01, 0xFF}
+
+	v6_a := uuid.generate_v6(CLOCK, mac, point_a)
+	v6_b := uuid.generate_v6(CLOCK, mac, point_b)
+	v6_c := uuid.generate_v6(CLOCK, mac, point_c)
 
 	testing.expect_value(t, uuid.clock_seq(v6_a), CLOCK)
+
+	extracted_mac := uuid.node(v6_a)
+	for i in 0 ..< len(mac) {
+		testing.expect(t, mac[i] == extracted_mac[i])
+	}
 
 	time_a := uuid.time_v6(v6_a)
 	time_b := uuid.time_v6(v6_b)
