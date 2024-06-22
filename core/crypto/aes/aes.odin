@@ -6,7 +6,6 @@ See:
 - https://nvlpubs.nist.gov/nistpubs/Legacy/SP/nistspecialpublication800-38a.pdf
 - https://nvlpubs.nist.gov/nistpubs/Legacy/SP/nistspecialpublication800-38d.pdf
 */
-
 package aes
 
 import "core:crypto/_aes"
