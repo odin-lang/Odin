@@ -18,13 +18,12 @@ VARIANT_BYTE_INDEX :: uuid.VARIANT_BYTE_INDEX
 /*
 Generate a version 3 UUID.
 
-This UUID is generated from a name within a namespace.
-MD5 is used to hash the name with the namespace to produce the UUID.
+This UUID is generated with a MD5 hash of a name and a namespace.
 
 Inputs:
-- namespace: Another `Identifier` that is used to represent the underlying namespace.
+- namespace: An `Identifier` that is used to represent the underlying namespace.
   This can be any one of the `Namespace_*` values provided in the `uuid` package.
-- name: The byte slice used to generate the name on top of the namespace.
+- name: The byte slice which will be hashed with the namespace.
 
 Returns:
 - result: The generated UUID.
@@ -55,13 +54,12 @@ generate_v3_bytes :: proc(
 /*
 Generate a version 3 UUID.
 
-This UUID is generated from a name within a namespace.
-MD5 is used to hash the name with the namespace to produce the UUID.
+This UUID is generated with a MD5 hash of a name and a namespace.
 
 Inputs:
-- namespace: Another `Identifier` that is used to represent the underlying namespace.
+- namespace: An `Identifier` that is used to represent the underlying namespace.
   This can be any one of the `Namespace_*` values provided in the `uuid` package.
-- name: The string used to generate the name on top of the namespace.
+- name: The string which will be hashed with the namespace.
 
 Returns:
 - result: The generated UUID.
@@ -83,13 +81,12 @@ generate_v3 :: proc {
 /*
 Generate a version 5 UUID.
 
-This UUID is generated from a name within a namespace.
-SHA1 is used to hash the name with the namespace to produce the UUID.
+This UUID is generated with a SHA1 hash of a name and a namespace.
 
 Inputs:
-- namespace: Another `Identifier` that is used to represent the underlying namespace.
+- namespace: An `Identifier` that is used to represent the underlying namespace.
   This can be any one of the `Namespace_*` values provided in the `uuid` package.
-- name: The byte slice used to generate the name on top of the namespace.
+- name: The byte slice which will be hashed with the namespace.
 
 Returns:
 - result: The generated UUID.
@@ -123,13 +120,12 @@ generate_v5_bytes :: proc(
 /*
 Generate a version 5 UUID.
 
-This UUID is generated from a name within a namespace.
-SHA1 is used to hash the name with the namespace to produce the UUID.
+This UUID is generated with a SHA1 hash of a name and a namespace.
 
 Inputs:
-- namespace: Another `Identifier` that is used to represent the underlying namespace.
+- namespace: An `Identifier` that is used to represent the underlying namespace.
   This can be any one of the `Namespace_*` values provided in the `uuid` package.
-- name: The string used to generate the name on top of the namespace.
+- name: The string which will be hashed with the namespace.
 
 Returns:
 - result: The generated UUID.
