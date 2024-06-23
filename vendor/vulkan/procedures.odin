@@ -259,7 +259,7 @@ ProcCmdResolveImage2KHR                                    :: #type proc "system
 ProcCmdSetAlphaToCoverageEnableEXT                         :: #type proc "system" (commandBuffer: CommandBuffer, alphaToCoverageEnable: b32)
 ProcCmdSetAlphaToOneEnableEXT                              :: #type proc "system" (commandBuffer: CommandBuffer, alphaToOneEnable: b32)
 ProcCmdSetAttachmentFeedbackLoopEnableEXT                  :: #type proc "system" (commandBuffer: CommandBuffer, aspectMask: ImageAspectFlags)
-ProcCmdSetBlendConstants                                   :: #type proc "system" (commandBuffer: CommandBuffer)
+ProcCmdSetBlendConstants                                   :: #type proc "system" (commandBuffer: CommandBuffer, blendConstants: [4]f32)
 ProcCmdSetCheckpointNV                                     :: #type proc "system" (commandBuffer: CommandBuffer, pCheckpointMarker: rawptr)
 ProcCmdSetCoarseSampleOrderNV                              :: #type proc "system" (commandBuffer: CommandBuffer, sampleOrderType: CoarseSampleOrderTypeNV, customSampleOrderCount: u32, pCustomSampleOrders: [^]CoarseSampleOrderCustomNV)
 ProcCmdSetColorBlendAdvancedEXT                            :: #type proc "system" (commandBuffer: CommandBuffer, firstAttachment: u32, attachmentCount: u32, pColorBlendAdvanced: ^ColorBlendAdvancedEXT)
