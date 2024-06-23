@@ -34,6 +34,7 @@ HGDIOBJ :: distinct HANDLE
 HBITMAP :: distinct HANDLE
 HGLOBAL :: distinct HANDLE
 HHOOK :: distinct HANDLE
+HWINEVENTHOOK :: distinct HANDLE
 HKEY :: distinct HANDLE
 HDESK :: distinct HANDLE
 HFONT :: distinct HANDLE
@@ -702,6 +703,14 @@ TIMERPROC :: #type proc "system" (HWND, UINT, UINT_PTR, DWORD)
 WNDPROC :: #type proc "system" (HWND, UINT, WPARAM, LPARAM) -> LRESULT
 
 HOOKPROC :: #type proc "system" (code: c_int, wParam: WPARAM, lParam: LPARAM) -> LRESULT
+
+WINEVENTPROC :: #type proc "system" (
+	hWinEventHook: HWINEVENTHOOK,
+	event: DWORD,
+	hwnd: HWND,
+	idObject, idChild: LONG,
+	idEventThread, dwmsEventTime: DWORD,
+)
 
 CWPRETSTRUCT :: struct {
 	lResult: LRESULT,
@@ -2665,6 +2674,22 @@ OSVERSIONINFOEXW :: struct {
 	wReserved:           UCHAR,
 }
 
+LoadLibraryEx_Flag :: enum DWORD {
+	LOAD_LIBRARY_AS_DATAFILE            = 1,  // 1 <<  1: 0x0002,
+	LOAD_WITH_ALTERED_SEARCH_PATH       = 3,  // 1 <<  3: 0x0008,
+	LOAD_IGNORE_CODE_AUTHZ_LEVEL        = 4,  // 1 <<  4: 0x0010,
+	LOAD_LIBRARY_AS_IMAGE_RESOURCE      = 5,  // 1 <<  5: 0x0020,
+	LOAD_LIBRARY_AS_DATAFILE_EXCLUSIVE  = 6,  // 1 <<  6: 0x0040,
+	LOAD_LIBRARY_REQUIRE_SIGNED_TARGET  = 7,  // 1 <<  7: 0x0080,
+	LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR    = 8,  // 1 <<  8: 0x0100,
+	LOAD_LIBRARY_SEARCH_APPLICATION_DIR = 9,  // 1 <<  9: 0x0200,
+	LOAD_LIBRARY_SEARCH_USER_DIRS       = 10, // 1 << 10: 0x0400,
+	LOAD_LIBRARY_SEARCH_SYSTEM32        = 11, // 1 << 11: 0x0800,
+	LOAD_LIBRARY_SEARCH_DEFAULT_DIRS    = 12, // 1 << 12: 0x1000,
+	LOAD_LIBRARY_SAFE_CURRENT_DIRS      = 13, // 1 << 13: 0x2000,
+}
+LoadLibraryEx_Flags :: distinct bit_set[LoadLibraryEx_Flag]
+
 // https://docs.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-quota_limits
 // Used in LogonUserExW
 PQUOTA_LIMITS :: struct {
@@ -3974,6 +3999,70 @@ CONSOLE_CURSOR_INFO :: struct {
 PCONSOLE_SCREEN_BUFFER_INFO :: ^CONSOLE_SCREEN_BUFFER_INFO
 PCONSOLE_CURSOR_INFO :: ^CONSOLE_CURSOR_INFO
 
+Event_Type :: enum WORD {
+	KEY_EVENT = 0x0001,
+	MOUSE_EVENT = 0x0002,
+	WINDOW_BUFFER_SIZE_EVENT = 0x0004,
+	MENU_EVENT = 0x0008,
+	FOCUS_EVENT = 0x0010,
+}
+
+INPUT_RECORD :: struct {
+	EventType: Event_Type,
+	Event: struct #raw_union {
+		KeyEvent: KEY_EVENT_RECORD,
+		MouseEvent: MOUSE_EVENT_RECORD,
+		WindowBufferSizeEvent: WINDOW_BUFFER_SIZE_RECORD,
+		MenuEvent: MENU_EVENT_RECORD,
+		FocusEvent: FOCUS_EVENT_RECORD,
+	},
+}
+
+Control_Key_State_Bits :: enum {
+	RIGHT_ALT_PRESSED,
+	LEFT_ALT_PRESSED,
+	RIGHT_CTRL_PRESSED,
+	LEFT_CTRL_PRESSED,
+	SHIFT_PRESSED,
+	NUMLOCK_ON,
+	SCROLLLOCK_ON,
+	CAPSLOCK_ON,
+	ENHANCED_KEY,
+}
+Control_Key_State :: bit_set[Control_Key_State_Bits; DWORD]
+
+KEY_EVENT_RECORD :: struct {
+	bKeyDown: BOOL,
+	wRepeatCount: WORD,
+	wVirtualKeyCode: WORD,
+	wVirtualScanCode: WORD,
+	uChar: struct #raw_union {
+		UnicodeChar: WCHAR,
+		AsciiChar: CHAR,
+	},
+	dwControlKeyState: Control_Key_State,
+}
+
+MOUSE_EVENT_RECORD :: struct {
+	dwMousePosition: COORD,
+	dwButtonState: DWORD,
+	dwControlKeyState: DWORD,
+	dwEventFlags: DWORD,
+}
+
+WINDOW_BUFFER_SIZE_RECORD :: struct {
+	dwSize: COORD,
+}
+
+MENU_EVENT_RECORD :: struct {
+	dwCommandId: UINT,
+}
+
+FOCUS_EVENT_RECORD :: struct {
+	bSetFocus: BOOL,
+}
+
+
 //
 // Networking
 //
@@ -4208,3 +4297,92 @@ SOCKADDR :: struct {
 	sa_family: ADDRESS_FAMILY,
 	sa_data:   [14]CHAR,
 }
+
+DTR_Control :: enum byte {
+	Disable = 0,
+	Enable = 1,
+	Handshake = 2,
+}
+RTS_Control :: enum byte {
+	Disable   = 0,
+	Enable    = 1,
+	Handshake = 2,
+	Toggle    = 3,
+}
+Parity :: enum byte {
+	None  = 0,
+	Odd   = 1,
+	Even  = 2,
+	Mark  = 3,
+	Space = 4,
+}
+Stop_Bits :: enum byte {
+	One = 0,
+	One_And_A_Half = 1,
+	Two = 2,
+}
+
+DCB :: struct {
+	DCBlength:  DWORD,
+	BaudRate:   DWORD,
+	using _: bit_field DWORD {
+		fBinary:           bool        | 1,
+		fParity:           bool        | 1,
+		fOutxCtsFlow:      bool        | 1,
+		fOutxDsrFlow:      bool        | 1,
+		fDtrControl:       DTR_Control | 2,
+		fDsrSensitivity:   bool        | 1,
+		fTXContinueOnXoff: bool        | 1,
+		fOutX:             bool        | 1,
+		fInX:              bool        | 1,
+		fErrorChar:        bool        | 1,
+		fNull:             bool        | 1,
+		fRtsControl:       RTS_Control | 2,
+		fAbortOnError:     bool        | 1,
+	},
+	wReserved:  WORD,
+	XOnLim:     WORD,
+	XOffLim:    WORD,
+	ByteSize:   BYTE,
+	Parity:     Parity,
+	StopBits:   Stop_Bits,
+	XonChar:    byte,
+	XoffChar:   byte,
+	ErrorChar:  byte,
+	EofChar:    byte,
+	EvtChar:    byte,
+	wReserved1: WORD,
+}
+
+COMMTIMEOUTS :: struct {
+	ReadIntervalTimeout: DWORD,
+	ReadTotalTimeoutMultiplier: DWORD,
+	ReadTotalTimeoutConstant: DWORD,
+	WriteTotalTimeoutMultiplier: DWORD,
+	WriteTotalTimeoutConstant: DWORD,
+}
+
+Com_Stat_Bits :: enum {
+	fCtsHold,
+	fDsrHold,
+	fRlsdHold,
+	fXoffHold,
+	fXoffSent,
+	fEof,
+	fTxim,
+}
+COMSTAT :: struct {
+	bits: bit_set[Com_Stat_Bits; DWORD],
+	cbInQue: DWORD,
+	cbOutQue: DWORD,
+}
+
+Com_Error_Bits :: enum {
+	RXOVER,
+	OVERRUN,
+	RXPARITY,
+	FRAME,
+	BREAK,
+}
+Com_Error :: bit_set[Com_Error_Bits; DWORD]
+

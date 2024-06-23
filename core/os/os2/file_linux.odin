@@ -121,6 +121,9 @@ _read :: proc(f: ^File, p: []byte) -> (i64, Error) {
 	if n < 0 {
 		return -1, _get_platform_error(n)
 	}
+	if n == 0 {
+		return 0, .EOF
+	}
 	return i64(n), nil
 }
 
@@ -134,6 +137,9 @@ _read_at :: proc(f: ^File, p: []byte, offset: i64) -> (n: i64, err: Error) {
 		m := unix.sys_pread(f.impl.fd, &b[0], len(b), offset)
 		if m < 0 {
 			return -1, _get_platform_error(m)
+		}
+		if m == 0 {
+			return 0, .EOF
 		}
 		n += i64(m)
 		b = b[m:]

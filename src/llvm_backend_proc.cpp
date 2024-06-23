@@ -2747,26 +2747,10 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 				{
 					GB_ASSERT(arg_count <= 7);
 
-					// FreeBSD additionally clobbers r8, r9, r10, but they
-					// can also be used to pass in arguments, so this needs
-					// to be handled in two parts.
-					bool clobber_arg_regs[7] = {
-						false, false, false, false, false, false, false
-					};
-					if (build_context.metrics.os == TargetOs_freebsd) {
-						clobber_arg_regs[4] = true; // r10
-						clobber_arg_regs[5] = true; // r8
-						clobber_arg_regs[6] = true; // r9
-					}
-
 					char asm_string[] = "syscall";
 					gbString constraints = gb_string_make(heap_allocator(), "={rax}");
 					for (unsigned i = 0; i < arg_count; i++) {
-						if (!clobber_arg_regs[i]) {
-							constraints = gb_string_appendc(constraints, ",{");
-						} else {
-							constraints = gb_string_appendc(constraints, ",+{");
-						}
+						constraints = gb_string_appendc(constraints, ",{");
 						static char const *regs[] = {
 							"rax",
 							"rdi",
@@ -2790,36 +2774,9 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 					// Some but not all system calls will additionally
 					// clobber memory.
 					//
-					// As a fix for CVE-2019-5595, FreeBSD started
-					// clobbering R8, R9, and R10, instead of restoring
-					// them.  Additionally unlike Linux, instead of
-					// returning negative errno, positive errno is
-					// returned and CF is set.
-					//
 					// TODO:
 					//  * Figure out what Darwin does.
-					//  * Add some extra handling to propagate CF back
-					//    up to the caller on FreeBSD systems so that
-					//    the caller knows that the return value is
-					//    positive errno.
 					constraints = gb_string_appendc(constraints, ",~{rcx},~{r11},~{memory}");
-					if (build_context.metrics.os == TargetOs_freebsd) {
-						// Second half of dealing with FreeBSD's system
-						// call semantics.  Explicitly clobber the registers
-						// that were not used to pass in arguments, and
-						// then clobber RFLAGS.
-						if (arg_count < 5) {
-							constraints = gb_string_appendc(constraints, ",~{r10}");
-						}
-						if (arg_count < 6) {
-							constraints = gb_string_appendc(constraints, ",~{r8}");
-						}
-						if (arg_count < 7) {
-							constraints = gb_string_appendc(constraints, ",~{r9}");
-						}
-						constraints = gb_string_appendc(constraints, ",~{cc}");
-					}
-
 					inline_asm = llvm_get_inline_asm(func_type, make_string_c(asm_string), make_string_c(constraints));
 				}
 				break;
@@ -2925,6 +2882,139 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 			lbValue res = {};
 			res.value = LLVMBuildCall2(p->builder, func_type, inline_asm, args, arg_count, "");
 			res.type = t_uintptr;
+			return res;
+		}
+	case BuiltinProc_syscall_bsd:
+		{
+			// This is a BSD-style syscall where errors are indicated by a high
+			// Carry Flag and a positive return value, allowing the kernel to
+			// return any value that fits into a machine word.
+			//
+			// This is unlike Linux, where errors are indicated by a negative
+			// return value, limiting what can be expressed in one result.
+			unsigned arg_count = cast(unsigned)ce->args.count;
+			LLVMValueRef *args = gb_alloc_array(permanent_allocator(), LLVMValueRef, arg_count);
+			for_array(i, ce->args) {
+				lbValue arg = lb_build_expr(p, ce->args[i]);
+				arg = lb_emit_conv(p, arg, t_uintptr);
+				args[i] = arg.value;
+			}
+
+			LLVMTypeRef llvm_uintptr = lb_type(p->module, t_uintptr);
+			LLVMTypeRef *llvm_arg_types = gb_alloc_array(permanent_allocator(), LLVMTypeRef, arg_count);
+			for (unsigned i = 0; i < arg_count; i++) {
+				llvm_arg_types[i] = llvm_uintptr;
+			}
+
+			LLVMTypeRef *results = gb_alloc_array(permanent_allocator(), LLVMTypeRef, 2);
+			results[0] = lb_type(p->module, t_uintptr);
+			results[1] = lb_type(p->module, t_bool);
+			LLVMTypeRef llvm_results = LLVMStructTypeInContext(p->module->ctx, results, 2, false);
+
+			LLVMTypeRef func_type = LLVMFunctionType(llvm_results, llvm_arg_types, arg_count, false);
+
+			LLVMValueRef inline_asm = nullptr;
+
+			switch (build_context.metrics.arch) {
+			case TargetArch_amd64:
+				{
+					GB_ASSERT(arg_count <= 7);
+
+					char asm_string[] = "syscall; setnb %cl";
+
+					// Using CL as an output; RCX doesn't need to get clobbered later.
+					gbString constraints = gb_string_make(heap_allocator(), "={rax},={cl}");
+					for (unsigned i = 0; i < arg_count; i++) {
+						constraints = gb_string_appendc(constraints, ",{");
+						static char const *regs[] = {
+							"rax",
+							"rdi",
+							"rsi",
+							"rdx",
+							"r10",
+							"r8",
+							"r9",
+						};
+						constraints = gb_string_appendc(constraints, regs[i]);
+						constraints = gb_string_appendc(constraints, "}");
+					}
+
+					// NOTE(Feoramund): If you're experiencing instability
+					// regarding syscalls during optimized builds, it is
+					// possible that the ABI has changed for your platform,
+					// or I've missed a register clobber.
+					//
+					// Documentation on this topic is sparse, but I was able to
+					// determine what registers were being clobbered by adding
+					// dummy values to them, setting a breakpoint after the
+					// syscall, and checking the state of the registers afterwards.
+					//
+					// Be advised that manually stepping through a debugger may
+					// cause the kernel to not return via sysret, which will
+					// preserve register state that normally would've been
+					// otherwise clobbered.
+					//
+					// It is also possible that some syscalls clobber different registers.
+
+					if (build_context.metrics.os == TargetOs_freebsd) {
+						// As a fix for CVE-2019-5595, FreeBSD started
+						// clobbering R8, R9, and R10, instead of restoring
+						// them.
+						//
+						// More info here:
+						//
+						// https://www.freebsd.org/security/advisories/FreeBSD-SA-19:01.syscall.asc
+						// https://github.com/freebsd/freebsd-src/blob/098dbd7ff7f3da9dda03802cdb2d8755f816eada/sys/amd64/amd64/exception.S#L605
+						// https://stackoverflow.com/q/66878250
+						constraints = gb_string_appendc(constraints, ",~{r8},~{r9},~{r10}");
+					}
+
+					// Both FreeBSD and NetBSD might clobber RDX.
+					//
+					// For NetBSD, it was clobbered during a call to sysctl.
+					//
+					// For FreeBSD, it's listed as "return value 2" in their
+					// AMD64 assembly, so there's no guarantee that it will persist.
+					constraints = gb_string_appendc(constraints, ",~{rdx},~{r11},~{cc},~{memory}");
+
+					inline_asm = llvm_get_inline_asm(func_type, make_string_c(asm_string), make_string_c(constraints));
+				}
+				break;
+			case TargetArch_arm64:
+				{
+					GB_ASSERT(arg_count <= 7);
+
+					char asm_string[] = "svc #0; cset x8, cc";
+					gbString constraints = gb_string_make(heap_allocator(), "={x0},={x8}");
+					for (unsigned i = 0; i < arg_count; i++) {
+						constraints = gb_string_appendc(constraints, ",{");
+						static char const *regs[] = {
+							"x8",
+							"x0",
+							"x1",
+							"x2",
+							"x3",
+							"x4",
+							"x5",
+						};
+						constraints = gb_string_appendc(constraints, regs[i]);
+						constraints = gb_string_appendc(constraints, "}");
+					}
+
+					// FreeBSD clobbered x1 on a call to sysctl.
+					constraints = gb_string_appendc(constraints, ",~{x1},~{cc},~{memory}");
+
+					inline_asm = llvm_get_inline_asm(func_type, make_string_c(asm_string), make_string_c(constraints));
+				}
+				break;
+			default:
+				GB_PANIC("Unsupported platform");
+			}
+			
+ 			lbValue res = {};
+ 			res.value = LLVMBuildCall2(p->builder, func_type, inline_asm, args, arg_count, "");
+			res.type = make_optional_ok_type(t_uintptr, true);
+
 			return res;
 		}
 

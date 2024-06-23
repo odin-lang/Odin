@@ -89,6 +89,9 @@ gb_internal Type *check_init_variable(CheckerContext *ctx, Entity *e, Operand *o
 			return nullptr;
 		} else if (is_type_polymorphic(t)) {
 			Entity *e = entity_of_node(operand->expr);
+			if (e == nullptr) {
+				return nullptr;
+			}
 			if (e->state.load() != EntityState_Resolved) {
 				gbString str = type_to_string(t);
 				defer (gb_string_free(str));
@@ -1074,7 +1077,7 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 	}
 
 
-	if (e->pkg != nullptr && e->token.string == "main") {
+	if (e->pkg != nullptr && e->token.string == "main" && !build_context.no_entry_point) {
 		if (e->pkg->kind != Package_Runtime) {
 			if (pt->param_count != 0 ||
 			    pt->result_count != 0) {
@@ -1142,7 +1145,14 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 	}
 
 	if (ac.link_name.len > 0) {
-		e->Procedure.link_name = ac.link_name;
+		String ln = ac.link_name;
+		e->Procedure.link_name = ln;
+		if (ln == "memcpy" ||
+		    ln == "memmove" ||
+		    ln == "mem_copy" ||
+		    ln == "mem_copy_non_overlapping") {
+			e->Procedure.is_memcpy_like = true;
+		}
 	}
 
 	if (ac.deferred_procedure.entity != nullptr) {

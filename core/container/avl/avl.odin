@@ -87,7 +87,7 @@ init_cmp :: proc(
 init_ordered :: proc(
 	t: ^$T/Tree($Value),
 	node_allocator := context.allocator,
-) where intrinsics.type_is_ordered_numeric(Value) {
+) where intrinsics.type_is_ordered(Value) {
 	init_cmp(t, slice.cmp_proc(Value), node_allocator)
 }
 

@@ -73,6 +73,8 @@ expect :: proc(val, expected_val: T) -> T ---
 
 // Linux and Darwin Only
 syscall :: proc(id: uintptr, args: ..uintptr) -> uintptr ---
+// FreeBSD, NetBSD, et cetera
+syscall_bsd :: proc(id: uintptr, args: ..uintptr) -> (uintptr, bool) ---
 
 
 // Atomics

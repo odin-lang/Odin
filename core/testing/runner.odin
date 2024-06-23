@@ -9,6 +9,7 @@ import "core:encoding/ansi"
 import "core:fmt"
 import "core:io"
 @require import pkg_log "core:log"
+import "core:math/rand"
 import "core:mem"
 import "core:os"
 import "core:slice"
@@ -41,6 +42,8 @@ PROGRESS_WIDTH        : int    : #config(ODIN_TEST_PROGRESS_WIDTH, 24)
 SHARED_RANDOM_SEED    : u64    : #config(ODIN_TEST_RANDOM_SEED, 0)
 // Set the lowest log level for this test run.
 LOG_LEVEL             : string : #config(ODIN_TEST_LOG_LEVEL, "info")
+// Show only the most necessary logging information.
+USING_SHORT_LOGS      : bool   : #config(ODIN_TEST_SHORT_LOGS, false)
 
 
 get_log_level :: #force_inline proc() -> runtime.Logger_Level {
@@ -103,6 +106,13 @@ run_test_task :: proc(task: thread.Task) {
 		lowest_level = get_log_level(),
 		options = Default_Test_Logger_Opts,
 	}
+
+	random_generator_state: runtime.Default_Random_State
+	context.random_generator = {
+		procedure = runtime.default_random_generator_proc,
+		data = &random_generator_state,
+	}
+	rand.reset(data.t.seed)
 
 	free_all(context.temp_allocator)
 
@@ -497,6 +507,7 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 				data.it = it
 				data.t.seed = shared_random_seed
 				data.t.error_count = 0
+				data.t._fail_now_called = false
 
 				thread.pool_add_task(&pool, task.allocator, run_test_task, data, run_index)
 			}
@@ -604,10 +615,10 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 			})
 			fmt.assertf(alloc_error == nil, "Error appending to log messages: %v", alloc_error)
 
-			find_task_data: for &data in task_data_slots {
+			find_task_data_for_timeout: for &data in task_data_slots {
 				if data.it.pkg == it.pkg && data.it.name == it.name {
 					end_t(&data.t)
-					break find_task_data
+					break find_task_data_for_timeout
 				}
 			}
 		}
@@ -645,20 +656,35 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 				"A signal (%v) was raised to stop test #%i %s.%s, but it was unable to be found.",
 				reason, test_index, it.pkg, it.name)
 
-			if test_index not_in failed_test_reason_map {
-				// We only write a new error message here if there wasn't one
-				// already, because the message we can provide based only on
-				// the signal won't be very useful, whereas asserts and panics
-				// will provide a user-written error message.
-				failed_test_reason_map[test_index] = fmt.aprintf("Signal caught: %v", reason, allocator = shared_log_allocator)
-				pkg_log.fatalf("Caught signal to stop test #%i %s.%s for: %v.", test_index, it.pkg, it.name, reason)
-
+			// The order this is handled in is a little particular.
+			task_data: ^Task_Data
+			find_task_data_for_stop_signal: for &data in task_data_slots {
+				if data.it.pkg == it.pkg && data.it.name == it.name {
+					task_data = &data
+					break find_task_data_for_stop_signal
+				}
 			}
 
-			when FANCY_OUTPUT {
-				bypass_progress_overwrite = true
-				signals_were_raised = true
+			fmt.assertf(task_data != nil, "A signal (%v) was raised to stop test #%i %s.%s, but its task data is missing.",
+				reason, test_index, it.pkg, it.name)
+
+			if !task_data.t._fail_now_called {
+				if test_index not_in failed_test_reason_map {
+					// We only write a new error message here if there wasn't one
+					// already, because the message we can provide based only on
+					// the signal won't be very useful, whereas asserts and panics
+					// will provide a user-written error message.
+					failed_test_reason_map[test_index] = fmt.aprintf("Signal caught: %v", reason, allocator = shared_log_allocator)
+					pkg_log.fatalf("Caught signal to stop test #%i %s.%s for: %v.", test_index, it.pkg, it.name, reason)
+				}
+
+				when FANCY_OUTPUT {
+					bypass_progress_overwrite = true
+					signals_were_raised = true
+				}
 			}
+
+			end_t(&task_data.t)
 
 			total_failure_count += 1
 			total_done_count += 1

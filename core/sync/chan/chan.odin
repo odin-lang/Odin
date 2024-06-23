@@ -476,10 +476,7 @@ select_raw :: proc "odin" (recvs: []^Raw_Chan, sends: []^Raw_Chan, send_msgs: []
 		return
 	}
 
-	r: ^rand.Rand = nil
-
-
-	select_idx = rand.int_max(count, r) if count > 0 else 0
+	select_idx = rand.int_max(count) if count > 0 else 0
 
 	sel := candidates[select_idx]
 	if sel.is_recv {

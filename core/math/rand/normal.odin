@@ -18,7 +18,7 @@ import "core:math"
 //    https://www.jstatsoft.org/article/view/v005i08 [web page]
 //
 @(require_results)
-norm_float64 :: proc(r: ^Rand = nil) -> f64 {
+norm_float64 :: proc() -> f64 {
 	rn :: 3.442619855899
 
 	@(static, rodata)
@@ -115,15 +115,8 @@ norm_float64 :: proc(r: ^Rand = nil) -> f64 {
 		0.008624485, 0.005548995, 0.0026696292,
 	}
 
-	r := r
-	if r == nil {
-		// NOTE(bill, 2020-09-07): Do this so that people can
-		// enforce the global random state if necessary with `nil`
-		r = &global_rand
-	}
-
 	for {
-		j := i32(uint32(r))
+		j := i32(uint32())
 		i := j & 0x7f
 		x := f64(j) * f64(wn[i])
 		if u32(abs(j)) < kn[i] {
@@ -133,15 +126,15 @@ norm_float64 :: proc(r: ^Rand = nil) -> f64 {
 
 		if i == 0 {
 			for {
-				x = -math.ln(float64(r)) * (1.0/ rn)
-				y := -math.ln(float64(r))
+				x = -math.ln(float64()) * (1.0/ rn)
+				y := -math.ln(float64())
 				if y+y >= x*x {
 					break
 				}
 			}
 			return j > 0 ? rn + x : -rn - x
 		}
-		if fn[i]+f32(float64(r))*(fn[i-1]-fn[i]) < f32(math.exp(-0.5*x*x)) {
+		if fn[i]+f32(float64())*(fn[i-1]-fn[i]) < f32(math.exp(-0.5*x*x)) {
 			return x
 		}
 	}

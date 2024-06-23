@@ -1726,10 +1726,12 @@ fmt_bit_set :: proc(fi: ^Info, v: any, name: string = "", verb: rune = 'v') {
 
 		et := runtime.type_info_base(info.elem)
 
-		if name != "" {
-			io.write_string(fi.writer, name, &fi.n)
-		} else {
-			reflect.write_type(fi.writer, type_info, &fi.n)
+		if verb != 'w' {
+			if name != "" {
+				io.write_string(fi.writer, name, &fi.n)
+			} else {
+				reflect.write_type(fi.writer, type_info, &fi.n)
+			}
 		}
 		io.write_byte(fi.writer, '{', &fi.n)
 		defer io.write_byte(fi.writer, '}', &fi.n)
@@ -1746,9 +1748,17 @@ fmt_bit_set :: proc(fi: ^Info, v: any, name: string = "", verb: rune = 'v') {
 			}
 
 			if is_enum {
+				enum_name: string
+			 	if ti_named, is_named := info.elem.variant.(runtime.Type_Info_Named); is_named {
+					enum_name = ti_named.name
+				}
 				for ev, evi in e.values {
 					v := u64(ev)
 					if v == u64(i) {
+						if verb == 'w' {
+							io.write_string(fi.writer, enum_name, &fi.n)
+							io.write_byte(fi.writer, '.', &fi.n)
+						}
 						io.write_string(fi.writer, e.names[evi], &fi.n)
 						commas += 1
 						continue loop
@@ -1963,11 +1973,13 @@ fmt_struct :: proc(fi: ^Info, v: any, the_verb: rune, info: runtime.Type_Info_St
 	// fi.hash = false;
 	fi.indent += 1
 
-	if !is_soa && hash {
+	is_empty := len(info.names) == 0
+
+	if !is_soa && hash && !is_empty {
 		io.write_byte(fi.writer, '\n', &fi.n)
 	}
 	defer {
-		if hash {
+		if !is_soa && hash && !is_empty {
 			for _ in 0..<indent { io.write_byte(fi.writer, '\t', &fi.n) }
 		}
 		io.write_byte(fi.writer, ']' if is_soa && the_verb == 'v' else '}', &fi.n)
@@ -2015,9 +2027,9 @@ fmt_struct :: proc(fi: ^Info, v: any, the_verb: rune, info: runtime.Type_Info_St
 			}
 			io.write_string(fi.writer, base_type_name, &fi.n)
 			io.write_byte(fi.writer, '{', &fi.n)
-			if hash { io.write_byte(fi.writer, '\n', &fi.n) }
+			if hash && !is_empty { io.write_byte(fi.writer, '\n', &fi.n) }
 			defer {
-				if hash {
+				if hash && !is_empty {
 					fi.indent -= 1
 					fmt_write_indent(fi)
 					fi.indent += 1
@@ -2064,6 +2076,10 @@ fmt_struct :: proc(fi: ^Info, v: any, the_verb: rune, info: runtime.Type_Info_St
 
 				if hash { io.write_string(fi.writer, ",\n", &fi.n) }
 			}
+		}
+
+		if hash && n > 0 {
+			for _ in 0..<indent { io.write_byte(fi.writer, '\t', &fi.n) }
 		}
 	} else {
 		field_count := -1
@@ -2391,7 +2407,6 @@ fmt_named :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Named) 
 			     runtime.Type_Info_Dynamic_Array,
 			     runtime.Type_Info_Slice,
 			     runtime.Type_Info_Struct,
-			     runtime.Type_Info_Union,
 			     runtime.Type_Info_Enum,
 			     runtime.Type_Info_Map,
 			     runtime.Type_Info_Bit_Set,
@@ -2498,8 +2513,9 @@ fmt_matrix :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Matrix
 		}
 	} else {
 		// Printed in Row-Major layout to match text layout
+		row_separator := ", " if verb == 'w' else "; "
 		for row in 0..<info.row_count {
-			if row > 0 { io.write_string(fi.writer, "; ", &fi.n) }
+			if row > 0 { io.write_string(fi.writer, row_separator, &fi.n) }
 			for col in 0..<info.column_count {
 				if col > 0 { io.write_string(fi.writer, ", ", &fi.n) }
 

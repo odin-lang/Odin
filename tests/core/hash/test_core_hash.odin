@@ -53,9 +53,9 @@ test_xxhash_zero_streamed_random_updates :: proc(t: ^testing.T) {
 		testing.expect(t, xxh3_128_err == nil, "Problem initializing XXH3_128 state")
 
 		// XXH3_128_update
-		random_seed := rand.create(t.seed)
+		rand.reset(t.seed)
 		for len(b) > 0 {
-			update_size := min(len(b), rand.int_max(8192, &random_seed))
+			update_size := min(len(b), rand.int_max(8192))
 			if update_size > 4096 {
 				update_size %= 73
 			}

@@ -303,7 +303,7 @@ bin/
 # - Linux/MacOS
 odin
 !odin/
-odin.dSYM
+**/*.dSYM
 *.bin
 demo.bin
 libLLVM*.so*

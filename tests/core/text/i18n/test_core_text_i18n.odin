@@ -5,6 +5,7 @@ import "core:testing"
 import "core:text/i18n"
 
 T :: i18n.get
+Tn :: i18n.get_n
 
 Test :: struct {
 	section: string,
@@ -47,7 +48,8 @@ test_custom_pluralizer :: proc(t: ^testing.T) {
 			{"", "Message1/plural",               "This is message 1",             1},
 			{"", "Message1/plural",               "This is message 1 - plural A",  1_000_000},
 			{"", "Message1/plural",               "This is message 1 - plural B",  42},
-			// This isn't in the catalog, so should ruturn the key.
+
+			// This isn't in the catalog, so should return the key.
 			{"", "Come visit us on Discord!",     "Come visit us on Discord!",      1},
 		},
 	})
@@ -61,11 +63,11 @@ test_mixed_context :: proc(t: ^testing.T) {
 		plural = nil,
 		tests  = {
 			// These are in the catalog.
-			{"",        "Message1",               "This is message 1 without Context", 1},
-			{"Context", "Message1",               "This is message 1 with Context",    1},
+			{"",        "Message1",               "This is message 1 without Context",-1},
+			{"Context", "Message1",               "This is message 1 with Context",   -1},
 
 			// This isn't in the catalog, so should ruturn the key.
-			{"", "Come visit us on Discord!",     "Come visit us on Discord!",         1},
+			{"", "Come visit us on Discord!",     "Come visit us on Discord!",        -1},
 		},
 	})
 }
@@ -90,15 +92,15 @@ test_nl_mo :: proc(t: ^testing.T) {
 		plural = nil, // Default pluralizer
 		tests  = {
 			// These are in the catalog.
-			{"", "There are 69,105 leaves here.", "Er zijn hier 69.105 bladeren.",  1},
-			{"", "Hellope, World!",               "Hallo, Wereld!",                 1},
+			{"", "There are 69,105 leaves here.", "Er zijn hier 69.105 bladeren.", -1},
+			{"", "Hellope, World!",               "Hallo, Wereld!",                -1},
 			{"", "There is %d leaf.\n",           "Er is %d blad.\n",               1},
 			{"", "There are %d leaves.\n",        "Er is %d blad.\n",               1},
 			{"", "There is %d leaf.\n",           "Er zijn %d bladeren.\n",        42},
 			{"", "There are %d leaves.\n",        "Er zijn %d bladeren.\n",        42},
 
 			// This isn't in the catalog, so should ruturn the key.
-			{"", "Come visit us on Discord!",     "Come visit us on Discord!",      1},
+			{"", "Come visit us on Discord!",     "Come visit us on Discord!",     -1},
 		},
 	})
 }
@@ -111,15 +113,15 @@ test_qt_linguist :: proc(t: ^testing.T) {
 		plural = nil, // Default pluralizer
 		tests  = {
 			// These are in the catalog.
-			{"Page",          "Text for translation",           "Tekst om te vertalen",        1},
-			{"Page",          "Also text to translate",         "Ook tekst om te vertalen",    1},
-			{"installscript", "99 bottles of beer on the wall", "99 flessen bier op de muur",  1},
+			{"Page",          "Text for translation",           "Tekst om te vertalen",       -1},
+			{"Page",          "Also text to translate",         "Ook tekst om te vertalen",   -1},
+			{"installscript", "99 bottles of beer on the wall", "99 flessen bier op de muur", -1},
 			{"apple_count",   "%d apple(s)",                    "%d appel",                    1},
 			{"apple_count",   "%d apple(s)",                    "%d appels",                  42},
 
 			// These aren't in the catalog, so should ruturn the key.
-			{"",              "Come visit us on Discord!",      "Come visit us on Discord!",   1},
-			{"Fake_Section",  "Come visit us on Discord!",      "Come visit us on Discord!",   1},
+			{"",              "Come visit us on Discord!",      "Come visit us on Discord!",  -1},
+			{"Fake_Section",  "Come visit us on Discord!",      "Come visit us on Discord!",  -1},
 		},
 	})
 }
@@ -133,16 +135,16 @@ test_qt_linguist_merge_sections :: proc(t: ^testing.T) {
 		options = {merge_sections = true},
 		tests   = {
 			// All of them are now in section "", lookup with original section should return the key.
-			{"",              "Text for translation",           "Tekst om te vertalen",            1},
-			{"",              "Also text to translate",         "Ook tekst om te vertalen",        1},
-			{"",              "99 bottles of beer on the wall", "99 flessen bier op de muur",      1},
+			{"",              "Text for translation",           "Tekst om te vertalen",           -1},
+			{"",              "Also text to translate",         "Ook tekst om te vertalen",       -1},
+			{"",              "99 bottles of beer on the wall", "99 flessen bier op de muur",     -1},
 			{"",              "%d apple(s)",                    "%d appel",                        1},
 			{"",              "%d apple(s)",                    "%d appels",                      42},
 
 			// All of them are now in section "", lookup with original section should return the key.
-			{"Page",          "Text for translation",           "Text for translation",            1},
-			{"Page",          "Also text to translate",         "Also text to translate",          1},
-			{"installscript", "99 bottles of beer on the wall", "99 bottles of beer on the wall",  1},
+			{"Page",          "Text for translation",           "Text for translation",           -1},
+			{"Page",          "Also text to translate",         "Also text to translate",         -1},
+			{"installscript", "99 bottles of beer on the wall", "99 bottles of beer on the wall", -1},
 			{"apple_count",   "%d apple(s)",                    "%d apple(s)",                     1},
 			{"apple_count",   "%d apple(s)",                    "%d apple(s)",                    42},
 		},
@@ -175,7 +177,7 @@ test :: proc(t: ^testing.T, suite: Test_Suite, loc := #caller_location) {
 
 	if err == .None {
 		for test in suite.tests {
-			val := T(test.section, test.key, test.n, cat)
+			val := test.n > -1 ? Tn(test.section, test.key, test.n, cat): T(test.section, test.key, cat)
 			testing.expectf(t, val == test.val, "Expected key `%v` from section `%v`'s form for value `%v` to equal `%v`, got `%v`", test.key, test.section, test.n, test.val, val, loc=loc)
 		}
 	}

@@ -1302,6 +1302,7 @@ gb_internal void init_checker_info(CheckerInfo *i) {
 	array_init(&i->init_procedures, a, 0, 0);
 	array_init(&i->fini_procedures, a, 0, 0);
 	array_init(&i->required_foreign_imports_through_force, a, 0, 0);
+	array_init(&i->defineables, a);
 
 	map_init(&i->objc_msgSend_types);
 	string_map_init(&i->load_file_cache);
@@ -1331,6 +1332,7 @@ gb_internal void destroy_checker_info(CheckerInfo *i) {
 	string_map_destroy(&i->packages);
 	array_free(&i->variable_init_order);
 	array_free(&i->required_foreign_imports_through_force);
+	array_free(&i->defineables);
 
 	mpsc_destroy(&i->entity_queue);
 	mpsc_destroy(&i->definition_queue);
@@ -4110,6 +4112,7 @@ gb_internal void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 	bool is_test = false;
 	bool is_init = false;
 	bool is_fini = false;
+	bool is_priv = false;
 
 	for_array(i, vd->attributes) {
 		Ast *attr = vd->attributes[i];
@@ -4154,6 +4157,8 @@ gb_internal void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 				}
 				if (!success) {
 					error(value, "'%.*s' expects no parameter, or a string literal containing \"file\" or \"package\"", LIT(name));
+				} else {
+					is_priv = true;
 				}
 
 
@@ -4173,6 +4178,11 @@ gb_internal void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 				is_fini = true;
 			}
 		}
+	}
+
+	if (is_priv && is_test) {
+		error(decl, "Attribute 'private' is not allowed on a test case");
+		return;
 	}
 
 	if (entity_visibility_kind == EntityVisiblity_Public &&
