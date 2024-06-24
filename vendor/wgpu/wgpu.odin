@@ -54,7 +54,7 @@ when ODIN_OS == .Windows {
 
 	foreign import libwgpu {
 		LIB,
-		"system:ld",
+		"system:dl",
 		"system:m",
 	}
 } else when ODIN_OS == .JS {
