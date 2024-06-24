@@ -46,8 +46,6 @@ Table :: struct {
 	table_allocator: runtime.Allocator,  // Used for allocating cells/colw
 	format_allocator: runtime.Allocator, // Used for allocating Cell.text when applicable
 
-	dirty: bool, // True if build() needs to be called before rendering
-
 	// The following are computed on build()
 	colw: [dynamic]int, // Width of each column (excluding padding and borders)
 	tblw: int,          // Width of entire table (including padding, excluding borders)
@@ -86,13 +84,11 @@ destroy :: proc(tbl: ^Table) {
 
 caption :: proc(tbl: ^Table, value: string) {
 	tbl.caption = value
-	tbl.dirty = true
 }
 
 padding :: proc(tbl: ^Table, lpad, rpad: int) {
 	tbl.lpad = lpad
 	tbl.rpad = rpad
-	tbl.dirty = true
 }
 
 get_cell :: proc(tbl: ^Table, row, col: int, loc := #caller_location) -> ^Cell {
@@ -123,20 +119,17 @@ to_string :: #force_inline proc(tbl: ^Table, value: any, loc := #caller_location
 set_cell_value :: proc(tbl: ^Table, row, col: int, value: any, loc := #caller_location) {
 	cell := get_cell(tbl, row, col, loc)
 	cell.text = to_string(tbl, value, loc)
-	tbl.dirty = true
 }
 
 set_cell_alignment :: proc(tbl: ^Table, row, col: int, alignment: Cell_Alignment, loc := #caller_location) {
 	cell := get_cell(tbl, row, col, loc)
 	cell.alignment = alignment
-	tbl.dirty = true
 }
 
 set_cell_value_and_alignment :: proc(tbl: ^Table, row, col: int, value: any, alignment: Cell_Alignment, loc := #caller_location) {
 	cell := get_cell(tbl, row, col, loc)
 	cell.text = to_string(tbl, value, loc)
 	cell.alignment = alignment
-	tbl.dirty = true
 }
 
 format :: proc(tbl: ^Table, _fmt: string, args: ..any) -> string {
@@ -161,8 +154,6 @@ header_of_values :: proc(tbl: ^Table, values: ..any, loc := #caller_location) {
 		set_cell_value(tbl, header_row(tbl), col, val, loc)
 		col += 1
 	}
-
-	tbl.dirty = true
 }
 
 aligned_header_of_values :: proc(tbl: ^Table, alignment: Cell_Alignment, values: ..any, loc := #caller_location) {
@@ -181,8 +172,6 @@ aligned_header_of_values :: proc(tbl: ^Table, alignment: Cell_Alignment, values:
 		set_cell_value_and_alignment(tbl, header_row(tbl), col, val, alignment, loc)
 		col += 1
 	}
-
-	tbl.dirty = true
 }
 
 header_of_aligned_values :: proc(tbl: ^Table, aligned_values: []Aligned_Value, loc := #caller_location) {
@@ -201,8 +190,6 @@ header_of_aligned_values :: proc(tbl: ^Table, aligned_values: []Aligned_Value, l
 		set_cell_value_and_alignment(tbl, header_row(tbl), col, av.value, av.alignment, loc)
 		col += 1
 	}
-
-	tbl.dirty = true
 }
 
 row :: row_of_values
@@ -221,8 +208,6 @@ row_of_values :: proc(tbl: ^Table, values: ..any, loc := #caller_location) {
 		val := values[col] if col < len(values) else nil
 		set_cell_value(tbl, last_row(tbl), col, val, loc)
 	}
-
-	tbl.dirty = true
 }
 
 aligned_row_of_values :: proc(tbl: ^Table, alignment: Cell_Alignment, values: ..any, loc := #caller_location) {
@@ -240,8 +225,6 @@ aligned_row_of_values :: proc(tbl: ^Table, alignment: Cell_Alignment, values: ..
 		val := values[col] if col < len(values) else nil
 		set_cell_value_and_alignment(tbl, last_row(tbl), col, val, alignment, loc)
 	}
-
-	tbl.dirty = true
 }
 
 row_of_aligned_values :: proc(tbl: ^Table, aligned_values: []Aligned_Value, loc := #caller_location) {
@@ -264,8 +247,6 @@ row_of_aligned_values :: proc(tbl: ^Table, aligned_values: []Aligned_Value, loc 
 			set_cell_value_and_alignment(tbl, last_row(tbl), col, "", .Left, loc)
 		}
 	}
-
-	tbl.dirty = true
 }
 
 // TODO: This should work correctly when #3262 is fixed.
@@ -288,8 +269,6 @@ first_row :: proc(tbl: ^Table) -> int {
 }
 
 build :: proc(tbl: ^Table, width_proc: Width_Proc) {
-	tbl.dirty = false
-
 	resize(&tbl.colw, tbl.nr_cols)
 	mem.zero_slice(tbl.colw[:])
 
@@ -372,9 +351,7 @@ write_html_table :: proc(w: io.Writer, tbl: ^Table) {
 }
 
 write_plain_table :: proc(w: io.Writer, tbl: ^Table, width_proc: Width_Proc = unicode_width_proc) {
-	if tbl.dirty {
-		build(tbl, width_proc)
-	}
+	build(tbl, width_proc)
 
 	write_caption_separator :: proc(w: io.Writer, tbl: ^Table) {
 		io.write_byte(w, '+')
@@ -423,9 +400,7 @@ write_plain_table :: proc(w: io.Writer, tbl: ^Table, width_proc: Width_Proc = un
 // Renders table according to GitHub Flavored Markdown (GFM) specification
 write_markdown_table :: proc(w: io.Writer, tbl: ^Table, width_proc: Width_Proc = unicode_width_proc) {
 	// NOTE(oskar): Captions or colspans are not supported by GFM as far as I can tell.
-	if tbl.dirty {
-		build(tbl, width_proc)
-	}
+	build(tbl, width_proc)
 
 	write_row :: proc(w: io.Writer, tbl: ^Table, row: int, alignment: Cell_Alignment = .Left) {
 		for col in 0..<tbl.nr_cols {
