@@ -91,5 +91,36 @@ constructing a table, you can use `aligned_row_of_values` or
 	table.aligned_row_of_values(&tbl, .Center, "Foo", "Bar")
 	table.row_of_aligned_values(&tbl, {{.Center, "Foo"}, {.Right, "Bar"}})
 
+**Regarding `Width_Procs`:**
+
+If you know ahead of time that all the text you're parsing is ASCII, instead of
+Unicode, it is more efficient to use `table.ascii_width_proc` instead of the
+default `unicode_width_proc`, as that procedure has to perform in-depth lookups
+to determine multiple Unicode characteristics of the codepoints parsed in order
+to get the proper alignment for a variety of different scripts.
+
+For example, you may do this instead:
+
+	table.write_plain_table(stdout, tbl, table.ascii_width_proc)
+	table.write_markdown_table(stdout, tbl, table.ascii_width_proc)
+
+The output will still be the same, but the preprocessing is much faster.
+
+
+You may also supply your own `Width_Proc`s, if you know more about how the text
+is structured than what we can assume.
+
+	simple_cjk_width_proc :: proc(str: string) -> (result: int) {
+		for r in str {
+			result += 2
+		}
+		return
+	}
+
+	table.write_plain_table(stdout, tbl, simple_cjk_width_proc)
+
+This procedure will output 2 times the number of UTF-8 runes in a string, a
+simple heuristic for CJK-only wide text.
+
 */
 package text_table
