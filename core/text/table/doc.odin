@@ -3,16 +3,25 @@ The package `table` implements plain-text/markdown/HTML/custom rendering of tabl
 
 **Custom rendering example:**
 
-	tbl := init(&Table{})
-	padding(tbl, 0, 1)
-	row(tbl, "A_LONG_ENUM", "= 54,", "// A comment about A_LONG_ENUM")
-	row(tbl, "AN_EVEN_LONGER_ENUM", "= 1,", "// A comment about AN_EVEN_LONGER_ENUM")
-	build(tbl, table.unicode_width_proc)
-	for row in 0..<tbl.nr_rows {
-		for col in 0..<tbl.nr_cols {
-			write_table_cell(stdio_writer(), tbl, row, col)
+	package main
+
+	import "core:io"
+	import "core:text/table"
+
+	main :: proc() {
+		stdout := table.stdio_writer()
+
+		tbl := table.init(&table.Table{})
+		table.padding(tbl, 0, 1)
+		table.row(tbl, "A_LONG_ENUM", "= 54,", "// A comment about A_LONG_ENUM")
+		table.row(tbl, "AN_EVEN_LONGER_ENUM", "= 1,", "// A comment about AN_EVEN_LONGER_ENUM")
+		table.build(tbl, table.unicode_width_proc)
+		for row in 0..<tbl.nr_rows {
+			for col in 0..<tbl.nr_cols {
+				table.write_table_cell(stdout, tbl, row, col)
+			}
+			io.write_byte(stdout, '\n')
 		}
-		io.write_byte(stdio_writer(), '\n')
 	}
 
 This outputs:
@@ -22,44 +31,55 @@ This outputs:
 
 **Plain-text rendering example:**
 
-	tbl := init(&Table{})
-	defer destroy(tbl)
+	package main
 
-	caption(tbl, "This is a table caption and it is very long")
+	import "core:fmt"
+	import "core:io"
+	import "core:text/table"
 
-	padding(tbl, 1, 1) // Left/right padding of cells
+	main :: proc() {
+		stdout := table.stdio_writer()
 
-	header(tbl, "AAAAAAAAA", "B")
-	header(tbl, "C") // Appends to previous header row. Same as if done header("AAAAAAAAA", "B", "C") from start.
+		tbl := table.init(&table.Table{})
+		defer table.destroy(tbl)
 
-	// Create a row with two values. Since there are three columns the third
-	// value will become the empty string.
-	//
-	// NOTE: header() is not allowed anymore after this.
-	row(tbl, 123, "foo")
+		table.caption(tbl, "This is a table caption and it is very long")
 
-	// Use `format()` if you need custom formatting. This will allocate into
-	// the arena specified at init.
-	row(tbl,
-	    format(tbl, "%09d", 5),
-	    format(tbl, "%.6f", 6.28318530717958647692528676655900576))
+		table.padding(tbl, 1, 1) // Left/right padding of cells
 
-	// A row with zero values is allowed as long as a previous row or header
-	// exist. The value and alignment of each cell can then be set
-	// individually.
-	row(tbl)
+		table.header(tbl, "AAAAAAAAA", "B")
+		table.header(tbl, "C") // Appends to previous header row. Same as if done header("AAAAAAAAA", "B", "C") from start.
 
-	set_cell_value_and_alignment(tbl, last_row(tbl), 0, "a", .Center)
-	set_cell_value(tbl, last_row(tbl), 1, "bbb")
-	set_cell_value(tbl, last_row(tbl), 2, "c")
+		// Create a row with two values. Since there are three columns the third
+		// value will become the empty string.
+		//
+		// NOTE: table.header() is not allowed anymore after this.
+		table.row(tbl, 123, "foo")
 
-	// Headers are regular cells, too. Use header_row() as row index to modify
-	// header cells.
-	set_cell_alignment(tbl, header_row(tbl), 1, .Center) // Sets alignment of 'B' column to Center.
-	set_cell_alignment(tbl, header_row(tbl), 2, .Right) // Sets alignment of 'C' column to Right.
+		// Use `format()` if you need custom formatting. This will allocate into
+		// the arena specified at init.
+		table.row(tbl,
+			table.format(tbl, "%09d", 5),
+			table.format(tbl, "%.6f", 6.28318530717958647692528676655900576))
 
-	write_plain_table(stdio_writer(), tbl)
-	write_markdown_table(stdio_writer(), tbl)
+		// A row with zero values is allowed as long as a previous row or header
+		// exist. The value and alignment of each cell can then be set
+		// individually.
+		table.row(tbl)
+
+		table.set_cell_value_and_alignment(tbl, table.last_row(tbl), 0, "a", .Center)
+		table.set_cell_value(tbl, table.last_row(tbl), 1, "bbb")
+		table.set_cell_value(tbl, table.last_row(tbl), 2, "c")
+
+		// Headers are regular cells, too. Use header_row() as row index to modify
+		// header cells.
+		table.set_cell_alignment(tbl, table.header_row(tbl), 1, .Center) // Sets alignment of 'B' column to Center.
+		table.set_cell_alignment(tbl, table.header_row(tbl), 2, .Right) // Sets alignment of 'C' column to Right.
+
+		table.write_plain_table(stdout, tbl)
+		fmt.println()
+		table.write_markdown_table(stdout, tbl)
+	}
 
 This outputs:
 
@@ -88,8 +108,8 @@ Additionally, if you want to set the alignment and values in-line while
 constructing a table, you can use `aligned_row_of_values` or
 `row_of_aligned_values` like so:
 
-	table.aligned_row_of_values(&tbl, .Center, "Foo", "Bar")
-	table.row_of_aligned_values(&tbl, {{.Center, "Foo"}, {.Right, "Bar"}})
+	table.aligned_row_of_values(tbl, .Center, "Foo", "Bar")
+	table.row_of_aligned_values(tbl, {{.Center, "Foo"}, {.Right, "Bar"}})
 
 **Regarding `Width_Procs`:**
 
