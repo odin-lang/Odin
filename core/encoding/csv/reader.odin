@@ -171,7 +171,7 @@ is_io_error :: proc(err: Error, io_err: io.Error) -> bool {
 
 // read_all reads all the remaining records from r.
 // Each record is a slice of fields.
-// read_all is defined to read until an EOF, and does not EOF as an error
+// read_all is defined to read until an EOF, and does not treat EOF as an error
 @(require_results)
 read_all :: proc(r: ^Reader, allocator := context.allocator) -> ([][]string, Error) {
 	context.allocator = allocator
