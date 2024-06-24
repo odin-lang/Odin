@@ -217,7 +217,7 @@ row_of_values :: proc(tbl: ^Table, values: ..any, loc := #caller_location) {
 
 	tbl.nr_rows += 1
 
-	for col in 0 ..< tbl.nr_cols {
+	for col in 0..<tbl.nr_cols {
 		val := values[col] if col < len(values) else nil
 		set_cell_value(tbl, last_row(tbl), col, val, loc)
 	}
@@ -236,7 +236,7 @@ aligned_row_of_values :: proc(tbl: ^Table, alignment: Cell_Alignment, values: ..
 
 	tbl.nr_rows += 1
 
-	for col in 0 ..< tbl.nr_cols {
+	for col in 0..<tbl.nr_cols {
 		val := values[col] if col < len(values) else nil
 		set_cell_value_and_alignment(tbl, last_row(tbl), col, val, alignment, loc)
 	}
@@ -255,7 +255,7 @@ row_of_aligned_values :: proc(tbl: ^Table, aligned_values: []Aligned_Value, loc 
 
 	tbl.nr_rows += 1
 
-	for col in 0 ..< tbl.nr_cols {
+	for col in 0..<tbl.nr_cols {
 		if col < len(aligned_values) {
 			val := aligned_values[col].value
 			alignment := aligned_values[col].alignment
@@ -432,7 +432,7 @@ write_markdown_table :: proc(w: io.Writer, tbl: ^Table) {
 	}
 
 	write_row :: proc(w: io.Writer, tbl: ^Table, row: int, alignment: Cell_Alignment = .Left) {
-		for col in 0 ..< tbl.nr_cols {
+		for col in 0..<tbl.nr_cols {
 			cell := get_cell(tbl, row, col)
 			if col == 0 {
 				io.write_byte(w, '|')
@@ -450,7 +450,7 @@ write_markdown_table :: proc(w: io.Writer, tbl: ^Table) {
 
 		write_row(w, tbl, row, .Center)
 
-		for col in 0 ..< tbl.nr_cols {
+		for col in 0..<tbl.nr_cols {
 			cell := get_cell(tbl, row, col)
 			if col == 0 {
 				io.write_byte(w, '|')
@@ -475,7 +475,7 @@ write_markdown_table :: proc(w: io.Writer, tbl: ^Table) {
 		start += row + 1
 	}
 
-	for row in start ..< tbl.nr_rows {
+	for row in start..<tbl.nr_rows {
 		write_row(w, tbl, row)
 	}
 }
