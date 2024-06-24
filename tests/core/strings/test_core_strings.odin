@@ -124,3 +124,25 @@ test_case_conversion :: proc(t: ^testing.T) {
 		}
 	}
 }
+
+
+@test
+test_builder_replace :: proc(t: ^testing.T) {
+	b := strings.builder_make()
+	defer strings.builder_destroy(&b)
+
+	strings.write_string(&b, "Hello World! Hello Worlds. Hello Hello?")
+
+	strings.builder_replace(&b, "World", "Earth", 1)
+	testing.expect_value(t, strings.to_string(b), "Hello Earth! Hello Worlds. Hello Hello?")
+	strings.builder_replace(&b, "Hello", "Hellope", 3)
+	testing.expect_value(t, strings.to_string(b), "Hellope Earth! Hellope Worlds. Hellope Hello?")
+	strings.builder_replace(&b, "Hell", "Heaven")
+	testing.expect_value(t, strings.to_string(b), "Heavenope Earth! Heavenope Worlds. Heavenope Heaveno?")
+	strings.builder_replace(&b, "no", "nope")
+	testing.expect_value(t, strings.to_string(b), "Heavenopepe Earth! Heavenopepe Worlds. Heavenopepe Heavenope?")
+	strings.builder_replace(&b, "pepe", "frog")
+	testing.expect_value(t, strings.to_string(b), "Heavenofrog Earth! Heavenofrog Worlds. Heavenofrog Heavenope?")
+	strings.builder_replace(&b, "Heaven", "")
+	testing.expect_value(t, strings.to_string(b), "ofrog Earth! ofrog Worlds. ofrog ope?")
+}

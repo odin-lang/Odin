@@ -812,3 +812,53 @@ Returns:
 write_int :: proc(b: ^Builder, i: int, base: int = 10) -> (n: int) {
 	return write_i64(b, i64(i), base)
 }
+
+/*
+Replaces all non-overlapping instances of `old` with `new`, in-place.
+May be less efficient than `replace` if `new` and `old` are different lengths, but avoids unnecessary allocations.
+
+Inputs:
+- b: A pointer to the Builder
+- old: the substring to replace
+- new: the string replacing it
+- n: the maximum number of replacements (or -1 if unlimited)
+
+NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `replaced_count` states the number of replacements actually made,
+even if it is less than the maximum or what could be replaced if the allocation worked.
+
+Returns:
+- replaced_count: The total number of replacements made
+*/
+builder_replace :: proc(b: ^Builder, old, new: string, n: int = -1) -> (replaced_count: int) {
+	len_diff := len(new) - len(old)
+	start := 0
+	for {
+		found_idx := index(string(b.buf[start:]), old)
+		if found_idx < 0 {
+			break
+		}
+		idx := start + found_idx
+
+		if len(new) > len(old) {
+			if !inject_at(&b.buf, idx + len(old), new[len(old):]) {return}
+			copy(b.buf[idx:idx+len(old)], new[:len(old)])
+		}
+		else if len(new) < len(old) {
+			remove_range(&b.buf, idx, idx - len_diff)
+			copy(b.buf[idx:idx + len(new)], new)
+		}
+		else {
+			copy(b.buf[idx:idx + len(new)], new)
+		}
+
+		start = idx + len(new)
+
+		replaced_count += 1
+
+		if n >= 0 && replaced_count >= n {
+			break
+		}
+	}
+
+	return
+}
