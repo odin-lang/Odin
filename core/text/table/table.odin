@@ -371,11 +371,9 @@ write_html_table :: proc(w: io.Writer, tbl: ^Table) {
 	io.write_string(w, "</table>\n")
 }
 
-write_plain_table :: proc(w: io.Writer, tbl: ^Table) {
-	WIDTH_PROC :: unicode_width_proc
-
+write_plain_table :: proc(w: io.Writer, tbl: ^Table, width_proc: Width_Proc = unicode_width_proc) {
 	if tbl.dirty {
-		build(tbl, WIDTH_PROC)
+		build(tbl, width_proc)
 	}
 
 	write_caption_separator :: proc(w: io.Writer, tbl: ^Table) {
@@ -400,7 +398,7 @@ write_plain_table :: proc(w: io.Writer, tbl: ^Table) {
 		write_caption_separator(w, tbl)
 		io.write_byte(w, '|')
 		write_text_align(w, tbl.caption, .Center,
-			tbl.lpad, tbl.rpad, tbl.tblw + tbl.nr_cols - 1 - WIDTH_PROC(tbl.caption) - tbl.lpad - tbl.rpad)
+			tbl.lpad, tbl.rpad, tbl.tblw + tbl.nr_cols - 1 - width_proc(tbl.caption) - tbl.lpad - tbl.rpad)
 		io.write_byte(w, '|')
 		io.write_byte(w, '\n')
 	}
@@ -423,12 +421,10 @@ write_plain_table :: proc(w: io.Writer, tbl: ^Table) {
 }
 
 // Renders table according to GitHub Flavored Markdown (GFM) specification
-write_markdown_table :: proc(w: io.Writer, tbl: ^Table) {
+write_markdown_table :: proc(w: io.Writer, tbl: ^Table, width_proc: Width_Proc = unicode_width_proc) {
 	// NOTE(oskar): Captions or colspans are not supported by GFM as far as I can tell.
-	WIDTH_PROC :: unicode_width_proc
-
 	if tbl.dirty {
-		build(tbl, WIDTH_PROC)
+		build(tbl, width_proc)
 	}
 
 	write_row :: proc(w: io.Writer, tbl: ^Table, row: int, alignment: Cell_Alignment = .Left) {
