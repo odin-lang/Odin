@@ -111,6 +111,48 @@ constructing a table, you can use `aligned_row_of_values` or
 	table.aligned_row_of_values(tbl, .Center, "Foo", "Bar")
 	table.row_of_aligned_values(tbl, {{.Center, "Foo"}, {.Right, "Bar"}})
 
+**Caching Results:**
+
+If you only need to build a table once but display it potentially many times,
+it may be more efficient to cache the results of your write into a string.
+
+Here's an example of how you can do that:
+
+	package main
+
+	import "core:fmt"
+	import "core:strings"
+	import "core:text/table"
+
+	main :: proc() {
+		string_buffer := strings.builder_make()
+		defer strings.builder_destroy(&string_buffer)
+
+		{
+			tbl: table.Table
+			table.init(&tbl)
+			defer table.destroy(&tbl)
+			table.caption(&tbl, "Hellope!")
+			table.row(&tbl, "Hellope", "World")
+
+			builder_writer := strings.to_writer(&string_buffer)
+
+			// The written table will be cached into the string builder after this call.
+			table.write_plain_table(builder_writer, &tbl)
+		}
+		// The table is inaccessible, now that we're back in the first-level scope.
+
+		// But now the results are stored in the string builder, which can be converted to a string.
+		my_table_string := strings.to_string(string_buffer)
+
+		// Remember that the string's allocated backing data lives in the
+		// builder and must still be freed.
+		//
+		// The deferred call to `builder_destroy` will take care of that for us
+		// in this simple example.
+		fmt.println(my_table_string)
+	}
+
 **Regarding `Width_Procs`:**
 
 If you know ahead of time that all the text you're parsing is ASCII, instead of
