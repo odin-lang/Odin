@@ -423,7 +423,8 @@ _append_elem :: #force_inline proc(array: ^$T/[dynamic]$E, arg: E, should_zero: 
 		return 1, nil
 	} else {
 		if cap(array) < len(array)+1 {
-			cap := 2 * cap(array) + max(8, 1)
+			// Same behavior as _append_elems but there's only one arg, so we always just add 8.
+			cap := 2 * cap(array) + 8
 
 			// do not 'or_return' here as it could be a partial success
 			if should_zero {
