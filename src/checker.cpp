@@ -3493,20 +3493,6 @@ gb_internal DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 			error(elem, "Expected a string value for '%.*s'", LIT(name));
 		}
 		return true;
-	} else if (name == "warning") {
-		ExactValue ev = check_decl_attribute_value(c, value);
-
-		if (ev.kind == ExactValue_String) {
-			String msg = ev.value_string;
-			if (msg.len == 0) {
-				error(elem, "Warning message cannot be an empty string");
-			} else {
-				ac->warning_message = msg;
-			}
-		} else {
-			error(elem, "Expected a string value for '%.*s'", LIT(name));
-		}
-		return true;
 	} else if (name == "require_results") {
 		if (value != nullptr) {
 			error(elem, "Expected no value for '%.*s'", LIT(name));
