@@ -16,7 +16,7 @@ foreign libc {
 	@(link_name="realloc")  _unix_realloc  :: proc(ptr: rawptr, size: int) -> rawptr ---
 }
 
-_heap_alloc :: proc(size: int, zero_memory := true) -> rawptr {
+_heap_alloc :: proc "contextless" (size: int, zero_memory := true) -> rawptr {
 	if size <= 0 {
 		return nil
 	}
@@ -27,12 +27,12 @@ _heap_alloc :: proc(size: int, zero_memory := true) -> rawptr {
 	}
 }
 
-_heap_resize :: proc(ptr: rawptr, new_size: int) -> rawptr {
+_heap_resize :: proc "contextless" (ptr: rawptr, new_size: int) -> rawptr {
 	// NOTE: _unix_realloc doesn't guarantee new memory will be zeroed on
 	// POSIX platforms. Ensure your caller takes this into account.
 	return _unix_realloc(ptr, new_size)
 }
 
-_heap_free :: proc(ptr: rawptr) {
+_heap_free :: proc "contextless" (ptr: rawptr) {
 	_unix_free(ptr)
 }

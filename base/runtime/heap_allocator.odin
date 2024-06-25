@@ -97,14 +97,14 @@ heap_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 }
 
 
-heap_alloc :: proc(size: int, zero_memory := true) -> rawptr {
+heap_alloc :: proc "contextless" (size: int, zero_memory := true) -> rawptr {
 	return _heap_alloc(size, zero_memory)
 }
 
-heap_resize :: proc(ptr: rawptr, new_size: int) -> rawptr {
+heap_resize :: proc "contextless" (ptr: rawptr, new_size: int) -> rawptr {
 	return _heap_resize(ptr, new_size)
 }
 
-heap_free :: proc(ptr: rawptr) {
+heap_free :: proc "contextless" (ptr: rawptr) {
 	_heap_free(ptr)
 }

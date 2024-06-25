@@ -9,7 +9,7 @@ foreign {
 	@(link_name="realloc")  _orca_realloc  :: proc "c" (ptr: rawptr, size: int) -> rawptr ---
 }
 
-_heap_alloc :: proc(size: int, zero_memory := true) -> rawptr {
+_heap_alloc :: proc "contextless" (size: int, zero_memory := true) -> rawptr {
 	if size <= 0 {
 		return nil
 	}
@@ -20,10 +20,10 @@ _heap_alloc :: proc(size: int, zero_memory := true) -> rawptr {
 	}
 }
 
-_heap_resize :: proc(ptr: rawptr, new_size: int) -> rawptr {
+_heap_resize :: proc "contextless" (ptr: rawptr, new_size: int) -> rawptr {
 	return _orca_realloc(ptr, new_size)
 }
 
-_heap_free :: proc(ptr: rawptr) {
+_heap_free :: proc "contextless" (ptr: rawptr) {
 	_orca_free(ptr)
 }
