@@ -368,6 +368,25 @@ caprintf :: proc(format: string, args: ..any, newline := false) -> cstring {
 caprintfln :: proc(format: string, args: ..any) -> cstring {
 	return caprintf(format, ..args, newline=true)
 }
+// 	Creates a formatted C string
+//
+// 	*Allocates Using Context's Temporary Allocator*
+//
+// 	Inputs:
+// 	- args: A variadic list of arguments to be formatted.
+// 	- sep: An optional separator string (default is a single space).
+//
+// 	Returns: A formatted C string.
+//
+@(require_results)
+ctprint :: proc(args: ..any, sep := " ") -> cstring {
+	str: strings.Builder
+	strings.builder_init(&str, context.temp_allocator)
+	sbprint(&str, ..args, sep=sep)
+	strings.write_byte(&str, 0)
+	s := strings.to_string(str)
+	return cstring(raw_data(s))
+}
 // Creates a formatted C string
 //
 // *Allocates Using Context's Temporary Allocator*
