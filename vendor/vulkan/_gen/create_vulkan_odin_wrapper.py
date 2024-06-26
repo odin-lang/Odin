@@ -629,7 +629,7 @@ def parse_procedures(f):
             curr_name = fix_arg(fname)
             ty = do_type(type_, prev_name, curr_name)
             if array_len != "":
-                ty = f"^{ty}[{array_len}]"
+                ty = f"^[{array_len}]{ty}"
             pf.append((ty, curr_name))
             prev_name = curr_name
 
