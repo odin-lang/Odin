@@ -51,6 +51,19 @@ Table :: struct {
 	tblw: int,          // Width of entire table (including padding, excluding borders)
 }
 
+Decorations :: struct {
+	// These are strings, because of multi-codepoint Unicode graphemes.
+
+	// Connecting decorations:
+	nw, n, ne,
+	 w, x,  e,
+	sw, s, se: string,
+
+	// Straight lines:
+	vert: string,
+	horz: string,
+}
+
 ascii_width_proc :: proc(str: string) -> int {
 	return len(str)
 }
@@ -395,6 +408,72 @@ write_plain_table :: proc(w: io.Writer, tbl: ^Table, width_proc: Width_Proc = un
 		}
 	}
 	write_table_separator(w, tbl)
+}
+
+write_decorated_table :: proc(w: io.Writer, tbl: ^Table, decorations: Decorations, width_proc: Width_Proc = unicode_width_proc) {
+	draw_dividing_row :: proc(w: io.Writer, tbl: ^Table, left, horz, divider, right: string) {
+		io.write_string(w, left)
+		for col in 0..<tbl.nr_cols {
+			for _ in 0..<tbl.colw[col] + tbl.lpad + tbl.rpad {
+				io.write_string(w, horz)
+			}
+			if col < tbl.nr_cols-1 {
+				io.write_string(w, divider)
+			}
+		}
+		io.write_string(w, right)
+		io.write_byte(w, '\n')
+	}
+
+	build(tbl, width_proc)
+
+	// This determines whether or not to divide the top border.
+	top_divider := decorations.n if len(tbl.caption) == 0 else decorations.horz
+
+	// Draw the north border.
+	draw_dividing_row(w, tbl, decorations.nw, decorations.horz, top_divider, decorations.ne)
+
+	if len(tbl.caption) != 0 {
+		// Draw the caption.
+		io.write_string(w, decorations.vert)
+		write_text_align(w, tbl.caption, .Center,
+			tbl.lpad, tbl.rpad, tbl.tblw + tbl.nr_cols - 1 - width_proc(tbl.caption) - tbl.lpad - tbl.rpad)
+		io.write_string(w, decorations.vert)
+		io.write_byte(w, '\n')
+
+		// Draw the divider between the caption and the table rows.
+		draw_dividing_row(w, tbl, decorations.w, decorations.horz, decorations.n, decorations.e)
+	}
+
+	// Draw the header.
+	start := 0
+	if tbl.has_header_row {
+		io.write_string(w, decorations.vert)
+		row := header_row(tbl)
+		for col in 0..<tbl.nr_cols {
+			write_table_cell(w, tbl, row, col)
+			io.write_string(w, decorations.vert)
+		}
+		io.write_byte(w, '\n')
+		start += row + 1
+
+		draw_dividing_row(w, tbl, decorations.w, decorations.horz, decorations.x, decorations.e)
+	}
+
+	// Draw the cells.
+	for row in start..<tbl.nr_rows {
+		for col in 0..<tbl.nr_cols {
+			if col == 0 {
+				io.write_string(w, decorations.vert)
+			}
+			write_table_cell(w, tbl, row, col)
+			io.write_string(w, decorations.vert)
+		}
+		io.write_byte(w, '\n')
+	}
+
+	// Draw the south border.
+	draw_dividing_row(w, tbl, decorations.sw, decorations.horz, decorations.s, decorations.se)
 }
 
 // Renders table according to GitHub Flavored Markdown (GFM) specification
