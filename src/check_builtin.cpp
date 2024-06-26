@@ -1714,26 +1714,6 @@ gb_internal bool check_builtin_procedure_directive(CheckerContext *c, Operand *o
 
 		operand->type = t_untyped_bool;
 		operand->mode = Addressing_Constant;
-	} else if (name == "warning") {
-		ERROR_BLOCK();
-		if (ce->args.count != 1) {
-			error(call, "'#warning' expects 1 argument, got %td", ce->args.count);
-			return false;
-		}
-		if (!is_type_string(operand->type) && operand->mode != Addressing_Constant) {
-			gbString str = expr_to_string(ce->args[0]);
-			error(call, "'%s' is not a constant string", str);
-			gb_string_free(str);
-			return false;
-		}
-		warning(call, "%.*s", LIT(operand->value.value_string));
-		if (c->proc_name != "") {
-			gbString str = type_to_string(c->curr_proc_sig);
-			error_line("\tCalled within '%.*s' :: %s\n", LIT(c->proc_name), str);
-			gb_string_free(str);
-		}
-		operand->type = t_invalid;
-		operand->mode = Addressing_NoValue;
 	} else if (name == "panic") {
 		ERROR_BLOCK();
 		if (ce->args.count != 1) {

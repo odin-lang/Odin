@@ -138,7 +138,9 @@ iterator_next :: proc(r: ^Reader) -> (record: []string, idx: int, err: Error, mo
 	return record, r.line_count - 1, r.last_iterator_error, r.last_iterator_error == nil
 }
 
-// Get last error if we the iterator
+// Get last CSV parse error if we ignored it in the iterator loop
+//
+// for record, row_idx in csv.iterator_next(&r) { ... }
 iterator_last_error :: proc(r: Reader) -> (err: Error) {
 	return r.last_iterator_error
 }
@@ -169,7 +171,7 @@ is_io_error :: proc(err: Error, io_err: io.Error) -> bool {
 
 // read_all reads all the remaining records from r.
 // Each record is a slice of fields.
-// read_all is defined to read until an EOF, and does not treat, and does not treat EOF as an error
+// read_all is defined to read until an EOF, and does not treat EOF as an error
 @(require_results)
 read_all :: proc(r: ^Reader, allocator := context.allocator) -> ([][]string, Error) {
 	context.allocator = allocator

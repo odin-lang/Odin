@@ -25,6 +25,8 @@ when ODIN_OS == .Windows {
 		"system:ntdll.lib",
 		"system:opengl32.lib",
 		"system:advapi32.lib",
+		"system:user32.lib",
+		"system:gdi32.lib",
 	}
 } else when ODIN_OS == .Darwin {
 	@(private) ARCH :: "x86_64" when ODIN_ARCH == .amd64 else "aarch64" when ODIN_ARCH == .arm64 else #panic("unsupported WGPU Native architecture")
@@ -52,7 +54,7 @@ when ODIN_OS == .Windows {
 
 	foreign import libwgpu {
 		LIB,
-		"system:ld",
+		"system:dl",
 		"system:m",
 	}
 } else when ODIN_OS == .JS {
