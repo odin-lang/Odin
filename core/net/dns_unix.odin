@@ -1,4 +1,4 @@
-//+build linux, darwin
+//+build linux, darwin, freebsd
 package net
 /*
 	Package net implements cross-platform Berkeley Sockets, DNS resolution and associated procedures.
