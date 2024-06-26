@@ -265,5 +265,56 @@ This will print out:
 	| Excessive Diacritics        | H̷e̶l̵l̸o̴p̵e̷ ̸w̶o̸r̵l̶d̵!̴                                                                               |
 	+-----------------------------+----------------------------------------------------------------------------------------------+
 
+**Decorated Tables:**
+
+If you'd prefer to change the borders used by the plain-text table printing,
+there is the `write_decorated_table` procedure that allows you to change the
+corners and dividers.
+
+Here is a complete example:
+
+	package main
+
+	import "core:fmt"
+	import "core:io"
+	import "core:os"
+	import "core:text/table"
+
+	box_drawing :: proc(w: io.Writer) {
+		t: table.Table
+		table.init(&t)
+		table.caption(&t, "Box Drawing Example")
+		table.padding(&t, 2, 2)
+		table.header_of_aligned_values(&t, {{.Left, "Operating System"}, {.Center, "Year Introduced"}})
+
+		table.row(&t, "UNIX",                "1973")
+		table.row(&t, "MS-DOS",              "1981")
+		table.row(&t, "Commodore 64 KERNAL", "1982")
+		table.row(&t, "Mac OS",              "1984")
+		table.row(&t, "Amiga",               "1985")
+		table.row(&t, "Windows 1.0",         "1985")
+		table.row(&t, "Linux",               "1991")
+		table.row(&t, "Windows 3.1",         "1992")
+
+		decorations := table.Decorations {
+			"┌", "┬", "┐",
+			"├", "┼", "┤",
+			"└", "┴", "┘",
+			"│", "─",
+		}
+
+		table.write_decorated_table(w, &t, decorations)
+		fmt.println()
+	}
+
+	main :: proc() {
+		stdout := os.stream_from_handle(os.stdout)
+
+		box_drawing(stdout)
+	}
+
+While the decorations support multi-codepoint Unicode graphemes, do note that
+each border character should not be larger than one monospace cell.
+
 */
 package text_table
