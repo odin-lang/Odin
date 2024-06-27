@@ -3218,7 +3218,7 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 			LLVMSetExternallyInitialized(g.value, true);
 			lb_add_foreign_library_path(m, e->Variable.foreign_library);
 			
-			lb_set_wasm_import_attributes(g.value, e, name);
+			// lb_set_wasm_import_attributes(g.value, e, name);
 		} else {
 			LLVMSetInitializer(g.value, LLVMConstNull(lb_type(m, e->type)));
 		}
