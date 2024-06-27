@@ -1,7 +1,7 @@
 //+private
 package os2
 
-import "core:sys/unix"
+import "core:sys/linux"
 import "core:sync"
 import "core:mem"
 
@@ -97,9 +97,8 @@ CURRENTLY_ACTIVE :: (^^Region)(~uintptr(0))
 
 FREE_LIST_ENTRIES_PER_BLOCK :: BLOCK_SIZE / size_of(u16)
 
-MMAP_FLAGS :: unix.MAP_ANONYMOUS | unix.MAP_PRIVATE
-MMAP_PROT :: unix.PROT_READ | unix.PROT_WRITE
-
+MMAP_FLAGS : linux.Map_Flags      : {.ANONYMOUS, .PRIVATE}
+MMAP_PROT  : linux.Mem_Protection : {.READ, .WRITE}
 
 @thread_local _local_region: ^Region
 global_regions: ^Region
@@ -324,11 +323,11 @@ heap_free :: proc(memory: rawptr) {
 // Regions
 //
 _new_region :: proc() -> ^Region #no_bounds_check {
-	res := unix.sys_mmap(nil, uint(SIZE_OF_REGION), MMAP_PROT, MMAP_FLAGS, -1, 0)
-	if res < 0 {
+	ptr, errno := linux.mmap(0, uint(SIZE_OF_REGION), MMAP_PROT, MMAP_FLAGS, -1, 0)
+	if errno != .NONE {
 		return nil
 	}
-	new_region := (^Region)(uintptr(res))
+	new_region := (^Region)(ptr)
 
 	new_region.hdr.local_addr = CURRENTLY_ACTIVE
 	new_region.hdr.reset_addr = &_local_region
@@ -634,8 +633,8 @@ _region_free_list_remove :: proc(region: ^Region, free_idx: u16) #no_bounds_chec
 //
 _direct_mmap_alloc :: proc(size: int) -> rawptr {
 	mmap_size := _round_up_to_nearest(size + BLOCK_SIZE, PAGE_SIZE)
-	new_allocation := unix.sys_mmap(nil, uint(mmap_size), MMAP_PROT, MMAP_FLAGS, -1, 0)
-	if new_allocation < 0 && new_allocation > -4096 {
+	new_allocation, errno := linux.mmap(0, uint(mmap_size), MMAP_PROT, MMAP_FLAGS, -1, 0)
+	if errno != .NONE {
 		return nil
 	}
 
@@ -655,13 +654,8 @@ _direct_mmap_resize :: proc(alloc: ^Allocation_Header, new_size: int) -> rawptr 
 		return mem.ptr_offset(alloc, 1)
 	}
 
-	new_allocation := unix.sys_mremap(
-		alloc,
-		uint(old_mmap_size),
-		uint(new_mmap_size),
-		unix.MREMAP_MAYMOVE,
-	)
-	if new_allocation < 0 && new_allocation > -4096 {
+	new_allocation, errno := linux.mremap(alloc, uint(old_mmap_size), uint(new_mmap_size), {.MAYMOVE})
+	if errno != .NONE {
 		return nil
 	}
 
@@ -702,7 +696,7 @@ _direct_mmap_to_region :: proc(alloc: ^Allocation_Header, new_size: int) -> rawp
 _direct_mmap_free :: proc(alloc: ^Allocation_Header) {
 	requested := int(alloc.requested & REQUESTED_MASK)
 	mmap_size := _round_up_to_nearest(requested + BLOCK_SIZE, PAGE_SIZE)
-	unix.sys_munmap(alloc, uint(mmap_size))
+	linux.munmap(alloc, uint(mmap_size))
 }
 
 //

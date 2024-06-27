@@ -46,10 +46,9 @@ O_SPARSE  :: File_Flags{.Sparse}
 O_CLOEXEC :: File_Flags{.Close_On_Exec}
 
 
-
-stdin:  ^File = nil // OS-Specific
-stdout: ^File = nil // OS-Specific
-stderr: ^File = nil // OS-Specific
+stdin:  ^File = &_stdin
+stdout: ^File = &_stdout
+stderr: ^File = &_stderr
 
 
 @(require_results)

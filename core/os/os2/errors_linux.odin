@@ -1,145 +1,164 @@
 //+private
 package os2
 
-import "core:sys/unix"
+import "core:sys/linux"
 
-EPERM          :: 1
-ENOENT         :: 2
-ESRCH          :: 3
-EINTR          :: 4
-EIO            :: 5
-ENXIO          :: 6
-EBADF          :: 9
-EAGAIN         :: 11
-ENOMEM         :: 12
-EACCES         :: 13
-EFAULT         :: 14
-EEXIST         :: 17
-ENODEV         :: 19
-ENOTDIR        :: 20
-EISDIR         :: 21
-EINVAL         :: 22
-ENFILE         :: 23
-EMFILE         :: 24
-ETXTBSY        :: 26
-EFBIG          :: 27
-ENOSPC         :: 28
-ESPIPE         :: 29
-EROFS          :: 30
-EPIPE          :: 32
-ERANGE         :: 34   /* Result too large */
-EDEADLK        :: 35   /* Resource deadlock would occur */
-ENAMETOOLONG   :: 36   /* File name too long */
-ENOLCK         :: 37   /* No record locks available */
-ENOSYS         :: 38   /* Invalid system call number */
-ENOTEMPTY      :: 39   /* Directory not empty */
-ELOOP          :: 40   /* Too many symbolic links encountered */
-EWOULDBLOCK    :: EAGAIN /* Operation would block */
-ENOMSG         :: 42   /* No message of desired type */
-EIDRM          :: 43   /* Identifier removed */
-ECHRNG         :: 44   /* Channel number out of range */
-EL2NSYNC       :: 45   /* Level 2 not synchronized */
-EL3HLT         :: 46   /* Level 3 halted */
-EL3RST         :: 47   /* Level 3 reset */
-ELNRNG         :: 48   /* Link number out of range */
-EUNATCH        :: 49   /* Protocol driver not attached */
-ENOCSI         :: 50   /* No CSI structure available */
-EL2HLT         :: 51   /* Level 2 halted */
-EBADE          :: 52   /* Invalid exchange */
-EBADR          :: 53   /* Invalid request descriptor */
-EXFULL         :: 54   /* Exchange full */
-ENOANO         :: 55   /* No anode */
-EBADRQC        :: 56   /* Invalid request code */
-EBADSLT        :: 57   /* Invalid slot */
-EDEADLOCK      :: EDEADLK
-EBFONT         :: 59   /* Bad font file format */
-ENOSTR         :: 60   /* Device not a stream */
-ENODATA        :: 61   /* No data available */
-ETIME          :: 62   /* Timer expired */
-ENOSR          :: 63   /* Out of streams resources */
-ENONET         :: 64   /* Machine is not on the network */
-ENOPKG         :: 65   /* Package not installed */
-EREMOTE        :: 66   /* Object is remote */
-ENOLINK        :: 67   /* Link has been severed */
-EADV           :: 68   /* Advertise error */
-ESRMNT         :: 69   /* Srmount error */
-ECOMM          :: 70   /* Communication error on send */
-EPROTO         :: 71   /* Protocol error */
-EMULTIHOP      :: 72   /* Multihop attempted */
-EDOTDOT        :: 73   /* RFS specific error */
-EBADMSG        :: 74   /* Not a data message */
-EOVERFLOW      :: 75   /* Value too large for defined data type */
-ENOTUNIQ       :: 76   /* Name not unique on network */
-EBADFD         :: 77   /* File descriptor in bad state */
-EREMCHG        :: 78   /* Remote address changed */
-ELIBACC        :: 79   /* Can not access a needed shared library */
-ELIBBAD        :: 80   /* Accessing a corrupted shared library */
-ELIBSCN        :: 81   /* .lib section in a.out corrupted */
-ELIBMAX        :: 82   /* Attempting to link in too many shared libraries */
-ELIBEXEC       :: 83   /* Cannot exec a shared library directly */
-EILSEQ         :: 84   /* Illegal byte sequence */
-ERESTART       :: 85   /* Interrupted system call should be restarted */
-ESTRPIPE       :: 86   /* Streams pipe error */
-EUSERS         :: 87   /* Too many users */
-ENOTSOCK       :: 88   /* Socket operation on non-socket */
-EDESTADDRREQ   :: 89   /* Destination address required */
-EMSGSIZE       :: 90   /* Message too long */
-EPROTOTYPE     :: 91   /* Protocol wrong type for socket */
-ENOPROTOOPT    :: 92   /* Protocol not available */
-EPROTONOSUPPORT:: 93   /* Protocol not supported */
-ESOCKTNOSUPPORT:: 94   /* Socket type not supported */
-EOPNOTSUPP     :: 95   /* Operation not supported on transport endpoint */
-EPFNOSUPPORT   :: 96   /* Protocol family not supported */
-EAFNOSUPPORT   :: 97   /* Address family not supported by protocol */
-EADDRINUSE     :: 98   /* Address already in use */
-EADDRNOTAVAIL  :: 99   /* Cannot assign requested address */
-ENETDOWN       :: 100  /* Network is down */
-ENETUNREACH    :: 101  /* Network is unreachable */
-ENETRESET      :: 102  /* Network dropped connection because of reset */
-ECONNABORTED   :: 103  /* Software caused connection abort */
-ECONNRESET     :: 104  /* Connection reset by peer */
-ENOBUFS        :: 105  /* No buffer space available */
-EISCONN        :: 106  /* Transport endpoint is already connected */
-ENOTCONN       :: 107  /* Transport endpoint is not connected */
-ESHUTDOWN      :: 108  /* Cannot send after transport endpoint shutdown */
-ETOOMANYREFS   :: 109  /* Too many references: cannot splice */
-ETIMEDOUT      :: 110  /* Connection timed out */
-ECONNREFUSED   :: 111  /* Connection refused */
-EHOSTDOWN      :: 112  /* Host is down */
-EHOSTUNREACH   :: 113  /* No route to host */
-EALREADY       :: 114  /* Operation already in progress */
-EINPROGRESS    :: 115  /* Operation now in progress */
-ESTALE         :: 116  /* Stale file handle */
-EUCLEAN        :: 117  /* Structure needs cleaning */
-ENOTNAM        :: 118  /* Not a XENIX named type file */
-ENAVAIL        :: 119  /* No XENIX semaphores available */
-EISNAM         :: 120  /* Is a named type file */
-EREMOTEIO      :: 121  /* Remote I/O error */
-EDQUOT         :: 122  /* Quota exceeded */
-ENOMEDIUM      :: 123  /* No medium found */
-EMEDIUMTYPE    :: 124  /* Wrong medium type */
-ECANCELED      :: 125  /* Operation Canceled */
-ENOKEY         :: 126  /* Required key not available */
-EKEYEXPIRED    :: 127  /* Key has expired */
-EKEYREVOKED    :: 128  /* Key has been revoked */
-EKEYREJECTED   :: 129  /* Key was rejected by service */
-EOWNERDEAD     :: 130  /* Owner died */
-ENOTRECOVERABLE:: 131  /* State not recoverable */
-ERFKILL        :: 132  /* Operation not possible due to RF-kill */
-EHWPOISON      :: 133  /* Memory page has hardware error */
+_errno_strings : [int(max(linux.Errno)) + 1]string = {
+	linux.Errno.NONE            = "Success",
+	linux.Errno.EPERM           = "Operation not permitted",
+	linux.Errno.ENOENT          = "No such file or directory",
+	linux.Errno.ESRCH           = "No such process",
+	linux.Errno.EINTR           = "Interrupted system call",
+	linux.Errno.EIO             = "Input/output error",
+	linux.Errno.ENXIO           = "No such device or address",
+	linux.Errno.E2BIG           = "Argument list too long",
+	linux.Errno.ENOEXEC         = "Exec format error",
+	linux.Errno.EBADF           = "Bad file descriptor",
+	linux.Errno.ECHILD          = "No child processes",
+	linux.Errno.EAGAIN          = "Resource temporarily unavailable",
+	linux.Errno.ENOMEM          = "Cannot allocate memory",
+	linux.Errno.EACCES          = "Permission denied",
+	linux.Errno.EFAULT          = "Bad address",
+	linux.Errno.ENOTBLK         = "Block device required",
+	linux.Errno.EBUSY           = "Device or resource busy",
+	linux.Errno.EEXIST          = "File exists",
+	linux.Errno.EXDEV           = "Invalid cross-device link",
+	linux.Errno.ENODEV          = "No such device",
+	linux.Errno.ENOTDIR         = "Not a directory",
+	linux.Errno.EISDIR          = "Is a directory",
+	linux.Errno.EINVAL          = "Invalid argument",
+	linux.Errno.ENFILE          = "Too many open files in system",
+	linux.Errno.EMFILE          = "Too many open files",
+	linux.Errno.ENOTTY          = "Inappropriate ioctl for device",
+	linux.Errno.ETXTBSY         = "Text file busy",
+	linux.Errno.EFBIG           = "File too large",
+	linux.Errno.ENOSPC          = "No space left on device",
+	linux.Errno.ESPIPE          = "Illegal seek",
+	linux.Errno.EROFS           = "Read-only file system",
+	linux.Errno.EMLINK          = "Too many links",
+	linux.Errno.EPIPE           = "Broken pipe",
+	linux.Errno.EDOM            = "Numerical argument out of domain",
+	linux.Errno.ERANGE          = "Numerical result out of range",
+	linux.Errno.EDEADLK         = "Resource deadlock avoided",
+	linux.Errno.ENAMETOOLONG    = "File name too long",
+	linux.Errno.ENOLCK          = "No locks available",
+	linux.Errno.ENOSYS          = "Function not implemented",
+	linux.Errno.ENOTEMPTY       = "Directory not empty",
+	linux.Errno.ELOOP           = "Too many levels of symbolic links",
+	41                          = "Unknown Error (41)",
+	linux.Errno.ENOMSG          = "No message of desired type",
+	linux.Errno.EIDRM           = "Identifier removed",
+	linux.Errno.ECHRNG          = "Channel number out of range",
+	linux.Errno.EL2NSYNC        = "Level 2 not synchronized",
+	linux.Errno.EL3HLT          = "Level 3 halted",
+	linux.Errno.EL3RST          = "Level 3 reset",
+	linux.Errno.ELNRNG          = "Link number out of range",
+	linux.Errno.EUNATCH         = "Protocol driver not attached",
+	linux.Errno.ENOCSI          = "No CSI structure available",
+	linux.Errno.EL2HLT          = "Level 2 halted",
+	linux.Errno.EBADE           = "Invalid exchange",
+	linux.Errno.EBADR           = "Invalid request descriptor",
+	linux.Errno.EXFULL          = "Exchange full",
+	linux.Errno.ENOANO          = "No anode",
+	linux.Errno.EBADRQC         = "Invalid request code",
+	linux.Errno.EBADSLT         = "Invalid slot",
+	58                          = "Unknown Error (58)",
+	linux.Errno.EBFONT          = "Bad font file format",
+	linux.Errno.ENOSTR          = "Device not a stream",
+	linux.Errno.ENODATA         = "No data available",
+	linux.Errno.ETIME           = "Timer expired",
+	linux.Errno.ENOSR           = "Out of streams resources",
+	linux.Errno.ENONET          = "Machine is not on the network",
+	linux.Errno.ENOPKG          = "Package not installed",
+	linux.Errno.EREMOTE         = "Object is remote",
+	linux.Errno.ENOLINK         = "Link has been severed",
+	linux.Errno.EADV            = "Advertise error",
+	linux.Errno.ESRMNT          = "Srmount error",
+	linux.Errno.ECOMM           = "Communication error on send",
+	linux.Errno.EPROTO          = "Protocol error",
+	linux.Errno.EMULTIHOP       = "Multihop attempted",
+	linux.Errno.EDOTDOT         = "RFS specific error",
+	linux.Errno.EBADMSG         = "Bad message",
+	linux.Errno.EOVERFLOW       = "Value too large for defined data type",
+	linux.Errno.ENOTUNIQ        = "Name not unique on network",
+	linux.Errno.EBADFD          = "File descriptor in bad state",
+	linux.Errno.EREMCHG         = "Remote address changed",
+	linux.Errno.ELIBACC         = "Can not access a needed shared library",
+	linux.Errno.ELIBBAD         = "Accessing a corrupted shared library",
+	linux.Errno.ELIBSCN         = ".lib section in a.out corrupted",
+	linux.Errno.ELIBMAX         = "Attempting to link in too many shared libraries",
+	linux.Errno.ELIBEXEC        = "Cannot exec a shared library directly",
+	linux.Errno.EILSEQ          = "Invalid or incomplete multibyte or wide character",
+	linux.Errno.ERESTART        = "Interrupted system call should be restarted",
+	linux.Errno.ESTRPIPE        = "Streams pipe error",
+	linux.Errno.EUSERS          = "Too many users",
+	linux.Errno.ENOTSOCK        = "Socket operation on non-socket",
+	linux.Errno.EDESTADDRREQ    = "Destination address required",
+	linux.Errno.EMSGSIZE        = "Message too long",
+	linux.Errno.EPROTOTYPE      = "Protocol wrong type for socket",
+	linux.Errno.ENOPROTOOPT     = "Protocol not available",
+	linux.Errno.EPROTONOSUPPORT = "Protocol not supported",
+	linux.Errno.ESOCKTNOSUPPORT = "Socket type not supported",
+	linux.Errno.EOPNOTSUPP      = "Operation not supported",
+	linux.Errno.EPFNOSUPPORT    = "Protocol family not supported",
+	linux.Errno.EAFNOSUPPORT    = "Address family not supported by protocol",
+	linux.Errno.EADDRINUSE      = "Address already in use",
+	linux.Errno.EADDRNOTAVAIL   = "Cannot assign requested address",
+	linux.Errno.ENETDOWN        = "Network is down",
+	linux.Errno.ENETUNREACH     = "Network is unreachable",
+	linux.Errno.ENETRESET       = "Network dropped connection on reset",
+	linux.Errno.ECONNABORTED    = "Software caused connection abort",
+	linux.Errno.ECONNRESET      = "Connection reset by peer",
+	linux.Errno.ENOBUFS         = "No buffer space available",
+	linux.Errno.EISCONN         = "Transport endpoint is already connected",
+	linux.Errno.ENOTCONN        = "Transport endpoint is not connected",
+	linux.Errno.ESHUTDOWN       = "Cannot send after transport endpoint shutdown",
+	linux.Errno.ETOOMANYREFS    = "Too many references: cannot splice",
+	linux.Errno.ETIMEDOUT       = "Connection timed out",
+	linux.Errno.ECONNREFUSED    = "Connection refused",
+	linux.Errno.EHOSTDOWN       = "Host is down",
+	linux.Errno.EHOSTUNREACH    = "No route to host",
+	linux.Errno.EALREADY        = "Operation already in progress",
+	linux.Errno.EINPROGRESS     = "Operation now in progress",
+	linux.Errno.ESTALE          = "Stale file handle",
+	linux.Errno.EUCLEAN         = "Structure needs cleaning",
+	linux.Errno.ENOTNAM         = "Not a XENIX named type file",
+	linux.Errno.ENAVAIL         = "No XENIX semaphores available",
+	linux.Errno.EISNAM          = "Is a named type file",
+	linux.Errno.EREMOTEIO       = "Remote I/O error",
+	linux.Errno.EDQUOT          = "Disk quota exceeded",
+	linux.Errno.ENOMEDIUM       = "No medium found",
+	linux.Errno.EMEDIUMTYPE     = "Wrong medium type",
+	linux.Errno.ECANCELED       = "Operation canceled",
+	linux.Errno.ENOKEY          = "Required key not available",
+	linux.Errno.EKEYEXPIRED     = "Key has expired",
+	linux.Errno.EKEYREVOKED     = "Key has been revoked",
+	linux.Errno.EKEYREJECTED    = "Key was rejected by service",
+	linux.Errno.EOWNERDEAD      = "Owner died",
+	linux.Errno.ENOTRECOVERABLE = "State not recoverable",
+	linux.Errno.ERFKILL         = "Operation not possible due to RF-kill",
+	linux.Errno.EHWPOISON       = "Memory page has hardware error",
+}
 
-_get_platform_error :: proc(res: int) -> Error {
-	errno := unix.get_errno(res)
+
+_get_platform_error :: proc(errno: linux.Errno) -> Error {
+	#partial switch errno {
+	case .NONE:
+		return nil
+	case .EPERM:
+		return .Permission_Denied
+	case .EEXIST:
+		return .Exist
+	case .ENOENT:
+		return .Not_Exist
+	}
+
 	return Platform_Error(i32(errno))
 }
 
-_ok_or_error :: proc(res: int) -> Error {
-	return res >= 0 ? nil : _get_platform_error(res)
-}
-
 _error_string :: proc(errno: i32) -> string {
-	if errno == 0 {
-		return ""
+	if errno >= 0 && errno <= i32(max(linux.Errno)) {
+		return _errno_strings[errno]
 	}
-	return "Error"
+	return "Unknown Error"
 }
