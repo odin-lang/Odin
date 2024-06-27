@@ -18,7 +18,7 @@ Gid :: distinct u32
 /*
 	Type for Process IDs, Thread IDs, Thread group ID.
 */
-Pid :: distinct int
+Pid :: distinct i32
 
 /*
 	Type for any of: pid, pidfd, pgid.
@@ -89,11 +89,11 @@ FD_Flags :: bit_set[FD_Flags_Bits; i32]
 	Represents file's permission and status bits
 **Example:**
 	When you're passing a value of this type the recommended usage is:
-	
+
 	```
 	  linux.Mode{.S_IXOTH, .S_IROTH} | linux.S_IRWXU | linux.S_IRWXG
 	```
-	  
+
 	This would generate a mode that has full permissions for the
 	file's owner and group, and only "read" and "execute" bits
 	for others.
@@ -151,9 +151,9 @@ when ODIN_ARCH == .amd64 {
 		size:       i64,
 		blksize:    uint,
 		blocks:     u64,
-		atim:       Time_Spec,
-		mtim:       Time_Spec,
-		ctim:       Time_Spec,
+		atime:      Time_Spec,
+		mtime:      Time_Spec,
+		ctime:      Time_Spec,
 		ino:        Inode,
 	}
 }
@@ -495,16 +495,15 @@ Pid_FD_Flags :: bit_set[Pid_FD_Flags_Bits; i32]
 //  1. Odin's bitfields start from 0, whereas signals start from 1
 //  2. It's unclear how bitfields act in terms of ABI (are they an array of ints or an array of longs?).
 //     it makes a difference because ARM is big endian.
-@private _SIGSET_NWORDS :: (1024 / (8 * size_of(uint)))
+@private _SIGSET_NWORDS :: (8 / size_of(uint))
 Sig_Set :: [_SIGSET_NWORDS]uint
 
 @private SI_MAX_SIZE       :: 128
-@private SI_ARCH_PREAMBLE  :: 3 * size_of(i32)
-@private SI_PAD_SIZE       :: (SI_MAX_SIZE - SI_ARCH_PREAMBLE) / size_of(i32)
-@private SI_TIMER_PAD_SIZE :: size_of(Uid) - size_of(i32)
+@private SI_ARCH_PREAMBLE  :: 4 * size_of(i32)
+@private SI_PAD_SIZE       :: SI_MAX_SIZE - SI_ARCH_PREAMBLE
 
 Sig_Handler_Fn :: #type proc "c" (sig: Signal)
-Sig_Restore_Fn :: #type proc "c" ()
+Sig_Restore_Fn :: #type proc "c" () -> !
 
 Sig_Info :: struct #packed {
 	signo: Signal,
@@ -518,8 +517,9 @@ Sig_Info :: struct #packed {
 			uid: Uid, /* sender's uid */
 		},
 		using _timer: struct {
-			timerid: i32,       /* timer id */
+			timerid: i32,   /* timer id */
 			overrun: i32,   /* overrun count */
+			value: Sig_Val, /* timer value */
 		},
 		/* POSIX.1b signals */
 		using _rt: struct {
@@ -528,8 +528,8 @@ Sig_Info :: struct #packed {
 		},
 		/* SIGCHLD */
 		using _sigchld: struct {
-			_pid1: Pid,      /* which child */
-			_uid1: Uid,      /* sender's uid */
+			_pid1: Pid,  /* which child */
+			_uid1: Uid,  /* sender's uid */
 			status: i32, /* exit code */
 			utime: uint,
 			stime: uint, //clock_t
@@ -537,7 +537,24 @@ Sig_Info :: struct #packed {
 		/* SIGILL, SIGFPE, SIGSEGV, SIGBUS */
 		using _sigfault: struct {
 			addr: rawptr, /* faulting insn/memory ref. */
-			addr_lsb: i16, /* LSB of the reported address */
+			using _: struct #raw_union {
+				trapno: i32,   /* Trap number that caused signal */
+				addr_lsb: i16, /* LSB of the reported address */
+				using _addr_bnd: struct {
+					_pad2: u64,
+					lower: rawptr, /* lower bound during fault */
+					upper: rawptr, /* upper bound during fault */
+				},
+				using _addr_pkey: struct {
+					_pad3: u64,
+					pkey: u32, /* protection key on PTE that faulted */
+				},
+				using _perf: struct {
+					perf_data: u64,
+					perf_type: u32,
+					perf_flags: u32,
+				},
+			},
 		},
 		/* SIGPOLL */
 		using _sigpoll: struct {
@@ -547,10 +564,41 @@ Sig_Info :: struct #packed {
 		/* SIGSYS */
 		using _sigsys: struct {
 			call_addr: rawptr, /* calling user insn */
-			syscall: i32,    /* triggering system call number */
-			arch: u32,      /* AUDIT_ARCH_* of syscall */
+			syscall: i32,      /* triggering system call number */
+			arch: u32,         /* AUDIT_ARCH_* of syscall */
 		},
 	},
+}
+
+#assert(size_of(Sig_Info) == 128)
+when ODIN_ARCH == .amd64 || ODIN_ARCH == .arm64 {
+	#assert(offset_of(Sig_Info, signo)      == 0x00)
+	#assert(offset_of(Sig_Info, errno)      == 0x04)
+	#assert(offset_of(Sig_Info, code)       == 0x08)
+	#assert(offset_of(Sig_Info, pid)        == 0x10)
+	#assert(offset_of(Sig_Info, uid)        == 0x14)
+	#assert(offset_of(Sig_Info, timerid)    == 0x10)
+	#assert(offset_of(Sig_Info, overrun)    == 0x14)
+	#assert(offset_of(Sig_Info, value)      == 0x18)
+	#assert(offset_of(Sig_Info, status)     == 0x18)
+	#assert(offset_of(Sig_Info, utime)      == 0x20)
+	#assert(offset_of(Sig_Info, stime)      == 0x28)
+	#assert(offset_of(Sig_Info, addr)       == 0x10)
+	#assert(offset_of(Sig_Info, addr_lsb)   == 0x18)
+	#assert(offset_of(Sig_Info, trapno)     == 0x18)
+	#assert(offset_of(Sig_Info, lower)      == 0x20)
+	#assert(offset_of(Sig_Info, upper)      == 0x28)
+	#assert(offset_of(Sig_Info, pkey)       == 0x20)
+	#assert(offset_of(Sig_Info, perf_data)  == 0x18)
+	#assert(offset_of(Sig_Info, perf_type)  == 0x20)
+	#assert(offset_of(Sig_Info, perf_flags) == 0x24)
+	#assert(offset_of(Sig_Info, band)       == 0x10)
+	#assert(offset_of(Sig_Info, fd)         == 0x18)
+	#assert(offset_of(Sig_Info, call_addr)  == 0x10)
+	#assert(offset_of(Sig_Info, syscall)    == 0x18)
+	#assert(offset_of(Sig_Info, arch)       == 0x1C)
+} else {
+	// TODO
 }
 
 SIGEV_MAX_SIZE :: 64
@@ -583,12 +631,20 @@ Sig_Stack :: struct {
 	size: uintptr,
 }
 
+Sig_Action_Special :: enum uint {
+	SIG_DFL = 0,
+	SIG_IGN = 1,
+	SIG_ERR = ~uint(0),
+}
+
+Sig_Action_Flags :: bit_set[Sig_Action_Flag; uint]
 Sig_Action :: struct($T: typeid) {
 	using _u: struct #raw_union {
 		handler: Sig_Handler_Fn,
 		sigaction: #type proc "c" (sig: Signal, si: ^Sig_Info, ctx: ^T),
+		special: Sig_Action_Special,
 	},
-	flags: uint,
+	flags: Sig_Action_Flags,
 	restorer: Sig_Restore_Fn,
 	mask: Sig_Set,
 }
@@ -733,7 +789,7 @@ RLimit :: struct {
 
 /*
 	Structure representing how much of each resource got used.
-*/	
+*/
 RUsage :: struct {
 	utime:         Time_Val,
 	stime:         Time_Val,
@@ -813,7 +869,7 @@ when size_of(int) == 8 || ODIN_ARCH == .i386 {
 		cpid:       Pid,
 		lpid:       Pid,
 		nattach:    uint,
-		_:          [2]uint,        
+		_:          [2]uint,
 	}
 }
 
