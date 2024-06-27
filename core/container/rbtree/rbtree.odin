@@ -29,7 +29,7 @@ Tree :: struct($Key: typeid, $Value: typeid) {
 
 	_root:           ^Node(Key, Value),
 	_node_allocator: runtime.Allocator,
-	_cmp_fn:          proc(Key, Key) -> Ordering,
+	_cmp_fn:         proc(Key, Key) -> Ordering,
 	_size:           int,
 }
 
