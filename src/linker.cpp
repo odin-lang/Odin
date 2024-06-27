@@ -578,9 +578,16 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 				}
 			}
 
-			gbString link_command_line = gb_string_make(heap_allocator(), "clang -Wno-unused-command-line-argument ");
+			// Link using `clang`, unless overridden by `ODIN_CLANG_PATH` environment variable.
+			const char* clang_path = gb_get_env("ODIN_CLANG_PATH", permanent_allocator());
+			if (clang_path == NULL) {
+				clang_path = "clang";
+			}
+
+			gbString link_command_line = gb_string_make(heap_allocator(), clang_path);
 			defer (gb_string_free(link_command_line));
 
+			link_command_line = gb_string_appendc(link_command_line, " -Wno-unused-command-line-argument ");
 			link_command_line = gb_string_appendc(link_command_line, object_files);
 			link_command_line = gb_string_append_fmt(link_command_line, " -o \"%.*s\" ", LIT(output_filename));
 			link_command_line = gb_string_append_fmt(link_command_line, " %s ", platform_lib_str);
