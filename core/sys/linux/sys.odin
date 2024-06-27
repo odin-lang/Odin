@@ -734,17 +734,13 @@ getsockopt :: proc {
 	getsockopt_base,
 }
 
-// TODO(flysand): clone (probably not in this PR, maybe not ever)
-
 /*
 	Creates a copy of the running process.
 	Available since Linux 1.0.
 */
 fork :: proc "contextless" () -> (Pid, Errno) {
 	when ODIN_ARCH == .arm64 {
-		// Note(flysand): this syscall is not documented, but the bottom 8 bits of flags
-		// are for exit signal
-		ret := syscall(SYS_clone, Signal.SIGCHLD)
+		ret := syscall(SYS_clone, u64(Signal.SIGCHLD), cast(rawptr) nil, cast(rawptr) nil, cast(rawptr) nil, u64(0))
 		return errno_unwrap(ret, Pid)
 	} else {
 		ret := syscall(SYS_fork)
@@ -774,8 +770,8 @@ execve :: proc "contextless" (name: cstring, argv: [^]cstring, envp: [^]cstring)
 		ret := syscall(SYS_execve, cast(rawptr) name, cast(rawptr) argv, cast(rawptr) envp)
 		return Errno(-ret)
 	} else {
-		ret := syscall(SYS_execveat, AT_FDCWD, cast(rawptr) name, cast(rawptr) argv, cast(rawptr) envp)
-		return Errno(-ret)
+		ret := syscall(SYS_execveat, AT_FDCWD, cast(rawptr) name, cast(rawptr) argv, cast(rawptr) envp, i32(0))
+	 	return Errno(-ret)
 	}
 }
 
@@ -2808,8 +2804,8 @@ getrandom :: proc "contextless" (buf: []u8, flags: Get_Random_Flags) -> (int, Er
 	Execute program relative to a directory file descriptor.
 	Available since Linux 3.19.
 */
-execveat :: proc "contextless" (dirfd: Fd, name: cstring, argv: [^]cstring, envp: [^]cstring) -> (Errno) {
-	ret := syscall(SYS_execveat, dirfd, cast(rawptr) name, cast(rawptr) argv, cast(rawptr) envp)
+execveat :: proc "contextless" (dirfd: Fd, name: cstring, argv: [^]cstring, envp: [^]cstring, flags: Execveat_Flags) -> (Errno) {
+	ret := syscall(SYS_execveat, dirfd, cast(rawptr) name, cast(rawptr) argv, cast(rawptr) envp, transmute(i32) flags)
 	return Errno(-ret)
 }
 

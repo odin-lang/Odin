@@ -1247,3 +1247,8 @@ EPoll_Event :: struct #packed {
 	events: EPoll_Event_Kind,
 	data:   EPoll_Data,
 }
+
+/*
+	Flags for execveat(2) syscall.
+*/
+Execveat_Flags :: bit_set[Execveat_Flags_Bits; i32]
