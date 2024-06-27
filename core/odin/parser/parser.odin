@@ -1103,6 +1103,9 @@ parse_attribute :: proc(p: ^Parser, tok: tokenizer.Token, open_kind, close_kind:
 	case ^ast.Foreign_Import_Decl:
 		if d.docs == nil { d.docs = docs }
 		append(&d.attributes, attribute)
+	case ^ast.Import_Decl:
+		if d.docs == nil { d.docs = docs }
+		append(&d.attributes, attribute)
 	case:
 		error(p, decl.pos, "expected a value or foreign declaration after an attribute")
 		free(attribute)
