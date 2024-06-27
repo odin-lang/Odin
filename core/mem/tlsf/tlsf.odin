@@ -97,6 +97,10 @@ init :: proc{init_from_buffer, init_from_allocator}
 destroy :: proc(control: ^Allocator) {
 	if control == nil { return }
 
+	if control.pool.allocator.procedure != nil {
+		runtime.delete(control.pool.data, control.pool.allocator)
+	}
+
 	// No need to call `pool_remove` or anything, as they're they're embedded in the backing memory.
 	// We do however need to free the `Pool` tracking entities and the backing memory itself.
 	// As `Allocator` is embedded in the first backing slice, the `control` pointer will be
@@ -132,8 +136,9 @@ allocator_proc :: proc(allocator_data: rawptr, mode: runtime.Allocator_Mode,
 		return nil, nil
 
 	case .Free_All:
-		clear(control)
-		return nil, nil
+		// NOTE: this doesn't work right at the moment, Jeroen has it on his to-do list :)
+		// clear(control)
+		return nil, .Mode_Not_Implemented
 
 	case .Resize:
 		return resize(control, old_memory, uint(old_size), uint(size), uint(alignment))
@@ -144,7 +149,7 @@ allocator_proc :: proc(allocator_data: rawptr, mode: runtime.Allocator_Mode,
 	case .Query_Features:
 		set := (^runtime.Allocator_Mode_Set)(old_memory)
 		if set != nil {
-			set^ = {.Alloc, .Alloc_Non_Zeroed, .Free, .Free_All, .Resize, .Resize_Non_Zeroed, .Query_Features}
+			set^ = {.Alloc, .Alloc_Non_Zeroed, .Free, /* .Free_All, */ .Resize, .Resize_Non_Zeroed, .Query_Features}
 		}
 		return nil, nil
 
