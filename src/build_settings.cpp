@@ -2053,10 +2053,12 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 		gbString link_flags = gb_string_make(heap_allocator(), " ");
 		// link_flags = gb_string_appendc(link_flags, "--export-all ");
 		// link_flags = gb_string_appendc(link_flags, "--export-table ");
-		link_flags = gb_string_appendc(link_flags, "--allow-undefined ");
 		// if (bc->metrics.arch == TargetArch_wasm64) {
 		// 	link_flags = gb_string_appendc(link_flags, "-mwasm64 ");
 		// }
+		if (bc->metrics.os != TargetOs_orca) {
+			link_flags = gb_string_appendc(link_flags, "--allow-undefined ");
+		}
 		if (bc->no_entry_point || bc->metrics.os == TargetOs_orca) {
 			link_flags = gb_string_appendc(link_flags, "--no-entry ");
 		}

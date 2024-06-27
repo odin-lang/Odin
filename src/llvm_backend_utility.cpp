@@ -2018,7 +2018,7 @@ gb_internal LLVMValueRef llvm_get_inline_asm(LLVMTypeRef func_type, String const
 }
 
 
-gb_internal void lb_set_wasm_import_attributes(LLVMValueRef value, Entity *entity, String import_name) {
+gb_internal void lb_set_wasm_procedure_import_attributes(LLVMValueRef value, Entity *entity, String import_name) {
 	if (!is_arch_wasm()) {
 		return;
 	}

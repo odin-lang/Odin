@@ -709,7 +709,7 @@ gb_internal Entity *init_entity_foreign_library(CheckerContext *ctx, Entity *e) 
 	}
 
 	if (ident == nullptr) {
-		error(e->token, "foreign entiies must declare which library they are from");
+		error(e->token, "foreign entities must declare which library they are from");
 	} else if (ident->kind != Ast_Ident) {
 		error(ident, "foreign library names must be an identifier");
 	} else {
@@ -1320,9 +1320,9 @@ gb_internal void check_global_variable_decl(CheckerContext *ctx, Entity *&e, Ast
 			error(e->token, "A foreign variable declaration cannot have a default value");
 		}
 		init_entity_foreign_library(ctx, e);
-		// if (is_arch_wasm()) {
-		// 	error(e->token, "A foreign variable declaration are not allowed for the '%.*s' architecture", LIT(target_arch_names[build_context.metrics.arch]));
-		// }
+		if (is_arch_wasm() && e->Variable.foreign_library != nullptr) {
+			error(e->token, "A foreign variable declaration can not be scoped to a module and must be declared in a 'foreign {' (without a library) block");
+		}
 	}
 	if (ac.link_name.len > 0) {
 		e->Variable.link_name = ac.link_name;
