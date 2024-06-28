@@ -70,10 +70,22 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 	if (is_arch_wasm()) {
 		timings_start_section(timings, str_lit("wasm-ld"));
 
+		gbString lib_str = gb_string_make(heap_allocator(), "");
+
 		gbString extra_orca_flags = gb_string_make(temporary_allocator(), "");
 
 		gbString inputs = gb_string_make(temporary_allocator(), "");
 		inputs = gb_string_append_fmt(inputs, "\"%.*s.o\"", LIT(output_filename));
+
+
+		for (Entity *e : gen->foreign_libraries) {
+			GB_ASSERT(e->kind == Entity_LibraryName);
+			// NOTE(bill): Add these before the linking values
+			String extra_linker_flags = string_trim_whitespace(e->LibraryName.extra_linker_flags);
+			if (extra_linker_flags.len != 0) {
+				lib_str = gb_string_append_fmt(lib_str, " %.*s", LIT(extra_linker_flags));
+			}
+		}
 
 		if (build_context.metrics.os == TargetOs_orca) {
 			gbString orca_sdk_path = gb_string_make(temporary_allocator(), "");
@@ -93,16 +105,18 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 
 	#if defined(GB_SYSTEM_WINDOWS)
 		result = system_exec_command_line_app("wasm-ld",
-			"\"%.*s\\bin\\wasm-ld\" %s -o \"%.*s\" %.*s %.*s %s",
+			"\"%.*s\\bin\\wasm-ld\" %s -o \"%.*s\" %.*s %.*s %s %s",
 			LIT(build_context.ODIN_ROOT),
 			inputs, LIT(output_filename), LIT(build_context.link_flags), LIT(build_context.extra_linker_flags),
+			lib_str,
 			extra_orca_flags);
 	#else
 		result = system_exec_command_line_app("wasm-ld",
-			"wasm-ld %s -o \"%.*s\" %.*s %.*s %s",
+			"wasm-ld %s -o \"%.*s\" %.*s %.*s %s %s",
 			inputs, LIT(output_filename),
 			LIT(build_context.link_flags),
 			LIT(build_context.extra_linker_flags),
+			lib_str,
 			extra_orca_flags);
 	#endif
 		return result;
