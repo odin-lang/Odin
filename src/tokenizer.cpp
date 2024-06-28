@@ -432,8 +432,10 @@ gb_internal gb_inline i32 digit_value(Rune r) {
 	return 16; // NOTE(bill): Larger than highest possible
 }
 
-gb_internal gb_inline void scan_mantissa(Tokenizer *t, i32 base) {
-	base = 16; // always check for any possible letter
+gb_internal gb_inline void scan_mantissa(Tokenizer *t, i32 base, bool force_base) {
+	if (!force_base) {
+		base = 16; // always check for any possible letter
+	}
 	while (digit_value(t->curr_rune) < base || t->curr_rune == '_') {
 		advance_to_next_rune(t);
 	}
@@ -458,7 +460,7 @@ gb_internal void scan_number_to_token(Tokenizer *t, Token *token, bool seen_deci
 		token->string.len  += 1;
 		token->pos.column -= 1;
 		token->kind = Token_Float;
-		scan_mantissa(t, 10);
+		scan_mantissa(t, 10, true);
 		goto exponent;
 	}
 
@@ -468,7 +470,7 @@ gb_internal void scan_number_to_token(Tokenizer *t, Token *token, bool seen_deci
 		switch (t->curr_rune) {
 		case 'b': // Binary
 			advance_to_next_rune(t);
-			scan_mantissa(t, 2);
+			scan_mantissa(t, 2, false);
 			if (t->curr - prev <= 2) {
 				tokenizer_err(t, "Invalid binary integer");
 				token->kind = Token_Invalid;
@@ -476,7 +478,7 @@ gb_internal void scan_number_to_token(Tokenizer *t, Token *token, bool seen_deci
 			goto end;
 		case 'o': // Octal
 			advance_to_next_rune(t);
-			scan_mantissa(t, 8);
+			scan_mantissa(t, 8, false);
 			if (t->curr - prev <= 2) {
 				tokenizer_err(t, "Invalid octal integer");
 				token->kind = Token_Invalid;
@@ -484,7 +486,7 @@ gb_internal void scan_number_to_token(Tokenizer *t, Token *token, bool seen_deci
 			goto end;
 		case 'd': // Decimal
 			advance_to_next_rune(t);
-			scan_mantissa(t, 10);
+			scan_mantissa(t, 10, false);
 			if (t->curr - prev <= 2) {
 				tokenizer_err(t, "Invalid explicitly decimal integer");
 				token->kind = Token_Invalid;
@@ -492,7 +494,7 @@ gb_internal void scan_number_to_token(Tokenizer *t, Token *token, bool seen_deci
 			goto end;
 		case 'z': // Dozenal
 			advance_to_next_rune(t);
-			scan_mantissa(t, 12);
+			scan_mantissa(t, 12, false);
 			if (t->curr - prev <= 2) {
 				tokenizer_err(t, "Invalid dozenal integer");
 				token->kind = Token_Invalid;
@@ -500,7 +502,7 @@ gb_internal void scan_number_to_token(Tokenizer *t, Token *token, bool seen_deci
 			goto end;
 		case 'x': // Hexadecimal
 			advance_to_next_rune(t);
-			scan_mantissa(t, 16);
+			scan_mantissa(t, 16, false);
 			if (t->curr - prev <= 2) {
 				tokenizer_err(t, "Invalid hexadecimal integer");
 				token->kind = Token_Invalid;
@@ -509,7 +511,7 @@ gb_internal void scan_number_to_token(Tokenizer *t, Token *token, bool seen_deci
 		case 'h': // Hexadecimal Float
 			token->kind = Token_Float;
 			advance_to_next_rune(t);
-			scan_mantissa(t, 16);
+			scan_mantissa(t, 16, false);
 			if (t->curr - prev <= 2) {
 				tokenizer_err(t, "Invalid hexadecimal float");
 				token->kind = Token_Invalid;
@@ -534,12 +536,12 @@ gb_internal void scan_number_to_token(Tokenizer *t, Token *token, bool seen_deci
 			}
 			goto end;
 		default:
-			scan_mantissa(t, 10);
+			scan_mantissa(t, 10, true);
 			goto fraction;
 		}
 	}
 
-	scan_mantissa(t, 10);
+	scan_mantissa(t, 10, true);
 
 
 fraction:
@@ -551,7 +553,7 @@ fraction:
 		advance_to_next_rune(t);
 
 		token->kind = Token_Float;
-		scan_mantissa(t, 10);
+		scan_mantissa(t, 10, true);
 	}
 
 exponent:
@@ -561,7 +563,7 @@ exponent:
 		if (t->curr_rune == '-' || t->curr_rune == '+') {
 			advance_to_next_rune(t);
 		}
-		scan_mantissa(t, 10);
+		scan_mantissa(t, 10, false);
 	}
 
 	switch (t->curr_rune) {
