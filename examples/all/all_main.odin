@@ -62,6 +62,8 @@ import varint           "core:encoding/varint"
 import xml              "core:encoding/xml"
 import endian           "core:encoding/endian"
 import cbor             "core:encoding/cbor"
+import uuid             "core:encoding/uuid"
+import uuid_legacy      "core:encoding/uuid/legacy"
 
 import fmt              "core:fmt"
 import hash             "core:hash"
@@ -237,6 +239,8 @@ _ :: datetime
 _ :: flags
 _ :: sysinfo
 _ :: unicode
+_ :: uuid
+_ :: uuid_legacy
 _ :: utf8
 _ :: utf8string
 _ :: utf16
