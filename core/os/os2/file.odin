@@ -45,12 +45,9 @@ O_TRUNC   :: File_Flags{.Trunc}
 O_SPARSE  :: File_Flags{.Sparse}
 O_CLOEXEC :: File_Flags{.Close_On_Exec}
 
-
-
 stdin:  ^File = nil // OS-Specific
 stdout: ^File = nil // OS-Specific
 stderr: ^File = nil // OS-Specific
-
 
 @(require_results)
 create :: proc(name: string) -> (^File, Error) {
