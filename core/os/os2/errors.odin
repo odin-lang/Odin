@@ -100,7 +100,7 @@ error_string :: proc(ferr: Error) -> string {
 	return "unknown error"
 }
 
-print_error :: proc(ferr: Error, msg: string) {
+print_error :: proc(f: ^File, ferr: Error, msg: string) {
 	TEMP_ALLOCATOR_GUARD()
 	err_str := error_string(ferr)
 
@@ -113,5 +113,5 @@ print_error :: proc(ferr: Error, msg: string) {
 	buf[len(msg) + 1] = ' '
 	copy(buf[len(msg) + 2:], err_str)
 	buf[length - 1] = '\n'
-	write(stderr, buf)
+	write(f, buf)
 }

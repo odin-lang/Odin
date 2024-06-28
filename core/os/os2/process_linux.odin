@@ -233,7 +233,7 @@ _process_start :: proc(name: string, argv: []string, attr: ^Process_Attributes) 
 		}
 
 		if errno = linux.execveat(dir_fd, executable, &cargs[OUT], env); errno != .NONE {
-			print_error(_get_platform_error(errno), string(executable))
+			print_error(stderr, _get_platform_error(errno), string(executable))
 			panic("execve failed to replace process")
 		}
 		unreachable()
