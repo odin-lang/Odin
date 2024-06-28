@@ -335,7 +335,7 @@ bool check_constant_parameter_value(Type *type, Ast *expr) {
 
 gb_internal Type *check_record_polymorphic_params(CheckerContext *ctx, Ast *polymorphic_params,
                                                   bool *is_polymorphic_,
-                                                  Ast *node, Array<Operand> *poly_operands) {
+                                                  Array<Operand> *poly_operands) {
 	Type *polymorphic_params_type = nullptr;
 	GB_ASSERT(is_polymorphic_ != nullptr);
 
@@ -643,13 +643,14 @@ gb_internal void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *
 		context = str_lit("struct #raw_union");
 	}
 
+	struct_type->Struct.node       = node;
 	struct_type->Struct.scope      = ctx->scope;
 	struct_type->Struct.is_packed  = st->is_packed;
 	struct_type->Struct.is_no_copy = st->is_no_copy;
 	struct_type->Struct.polymorphic_params = check_record_polymorphic_params(
 		ctx, st->polymorphic_params,
 		&struct_type->Struct.is_polymorphic,
-		node, poly_operands
+		poly_operands
 	);
 	wait_signal_set(&struct_type->Struct.polymorphic_wait_signal);
 
@@ -696,11 +697,12 @@ gb_internal void check_union_type(CheckerContext *ctx, Type *union_type, Ast *no
 	ast_node(ut, UnionType, node);
 
 
+	union_type->Union.node  = node;
 	union_type->Union.scope = ctx->scope;
 	union_type->Union.polymorphic_params = check_record_polymorphic_params(
 		ctx, ut->polymorphic_params,
 		&union_type->Union.is_polymorphic,
-		node, poly_operands
+		poly_operands
 	);
 	wait_signal_set(&union_type->Union.polymorphic_wait_signal);
 

@@ -346,6 +346,7 @@ gb_internal Scope *scope_of_node(Ast *node) {
 
 gb_internal void check_open_scope(CheckerContext *c, Ast *node) {
 	node = unparen_expr(node);
+	GB_ASSERT(node != nullptr);
 	GB_ASSERT(node->kind == Ast_Invalid ||
 	          is_ast_stmt(node) ||
 	          is_ast_type(node));
