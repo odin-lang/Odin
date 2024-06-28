@@ -1,6 +1,8 @@
 //+build !windows !linux !darwin
 package debug_trace
 
+import "base:runtime"
+
 _Context :: struct {
 }
 
