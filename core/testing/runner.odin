@@ -198,8 +198,11 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 			}
 		}
 
+		// `-vet` needs parameters to be shadowed by themselves first as an
+		// explicit declaration, to allow the next line to work.
+		internal_tests := internal_tests
 		// Intentional shadow with user-specified tests.
-		internal_tests := select_internal_tests[:]
+		internal_tests = select_internal_tests[:]
 	}
 
 	total_failure_count := 0
