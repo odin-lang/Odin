@@ -35,18 +35,38 @@ gb_internal gbString get_file_line_as_string(TokenPos const &pos, i32 *offset_) 
 	if (file == nullptr) {
 		return nullptr;
 	}
-	isize offset = pos.offset;
-
 	u8 *start = file->tokenizer.start;
 	u8 *end = file->tokenizer.end;
 	if (start == end) {
 		return nullptr;
 	}
+
+	isize offset = pos.offset;
+	if (pos.line != 0 && offset == 0) {
+		for (i32 i = 1; i < pos.line; i++) {
+			while (start+offset < end) {
+				u8 c = start[offset++];
+				if (c == '\n') {
+					break;
+				}
+			}
+		}
+		for (i32 i = 1; i < pos.column; i++) {
+			u8 *ptr = start+offset;
+			u8 c = *ptr;
+			if (c & 0x80) {
+				offset += utf8_decode(ptr, end-ptr, nullptr);
+			} else {
+				offset++;
+			}
+		}
+	}
+
+
 	isize len = end-start;
 	if (len < offset) {
 		return nullptr;
 	}
-
 	u8 *pos_offset = start+offset;
 
 	u8 *line_start = pos_offset;
@@ -69,6 +89,7 @@ gb_internal gbString get_file_line_as_string(TokenPos const &pos, i32 *offset_) 
 	the_line = string_trim_whitespace(the_line);
 
 	if (offset_) *offset_ = cast(i32)(pos_offset - the_line.text);
+
 
 	return gb_string_make_length(heap_allocator(), the_line.text, the_line.len);
 }
@@ -5417,6 +5438,7 @@ gb_internal WORKER_TASK_PROC(parser_worker_proc) {
 
 gb_internal void parser_add_file_to_process(Parser *p, AstPackage *pkg, FileInfo fi, TokenPos pos) {
 	ImportedFile f = {pkg, fi, pos, p->file_to_process_count++};
+	f.pos.file_id = cast(i32)(f.index+1);
 	auto wd = gb_alloc_item(permanent_allocator(), ParserWorkerData);
 	wd->parser = p;
 	wd->imported_file = f;
@@ -5453,6 +5475,7 @@ gb_internal WORKER_TASK_PROC(foreign_file_worker_proc) {
 gb_internal void parser_add_foreign_file_to_process(Parser *p, AstPackage *pkg, AstForeignFileKind kind, FileInfo fi, TokenPos pos) {
 	// TODO(bill): Use a better allocator
 	ImportedFile f = {pkg, fi, pos, p->file_to_process_count++};
+	f.pos.file_id = cast(i32)(f.index+1);
 	auto wd = gb_alloc_item(permanent_allocator(), ForeignFileWorkerData);
 	wd->parser = p;
 	wd->imported_file = f;
