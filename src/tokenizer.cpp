@@ -433,6 +433,7 @@ gb_internal gb_inline i32 digit_value(Rune r) {
 }
 
 gb_internal gb_inline void scan_mantissa(Tokenizer *t, i32 base) {
+	base = 16; // always check for any possible letter
 	while (digit_value(t->curr_rune) < base || t->curr_rune == '_') {
 		advance_to_next_rune(t);
 	}

@@ -718,7 +718,17 @@ gb_internal ExactValue exact_value_from_token(AstFile *f, Token const &token) {
 	}
 	ExactValue value = exact_value_from_basic_literal(token.kind, s);
 	if (value.kind == ExactValue_Invalid) {
-		syntax_error(token, "Invalid token literal");
+		switch (token.kind) {
+		case Token_Integer:
+			syntax_error(token, "Invalid integer literal");
+			break;
+		case Token_Float:
+			syntax_error(token, "Invalid float literal");
+			break;
+		default:
+			syntax_error(token, "Invalid token literal");
+			break;
+		}
 	}
 	return value;
 }
