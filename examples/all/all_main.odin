@@ -49,19 +49,21 @@ import tuplehash        "core:crypto/tuplehash"
 import x25519           "core:crypto/x25519"
 
 import pe               "core:debug/pe"
+import trace            "core:debug/trace"
 
 import dynlib           "core:dynlib"
 import net              "core:net"
 
+import ansi             "core:encoding/ansi"
 import base32           "core:encoding/base32"
 import base64           "core:encoding/base64"
+import cbor             "core:encoding/cbor"
 import csv              "core:encoding/csv"
+import endian           "core:encoding/endian"
 import hxa              "core:encoding/hxa"
 import json             "core:encoding/json"
 import varint           "core:encoding/varint"
 import xml              "core:encoding/xml"
-import endian           "core:encoding/endian"
-import cbor             "core:encoding/cbor"
 import uuid             "core:encoding/uuid"
 import uuid_legacy      "core:encoding/uuid/legacy"
 
@@ -70,6 +72,7 @@ import hash             "core:hash"
 import xxhash           "core:hash/xxhash"
 
 import image            "core:image"
+import bmp              "core:image/bmp"
 import netpbm           "core:image/netpbm"
 import png              "core:image/png"
 import qoi              "core:image/qoi"
@@ -91,6 +94,7 @@ import ease             "core:math/ease"
 import cmplx            "core:math/cmplx"
 
 import mem              "core:mem"
+import tlsf             "core:mem/tlsf"
 import virtual          "core:mem/virtual"
 
 import ast              "core:odin/ast"
@@ -105,6 +109,8 @@ import os               "core:os"
 import slashpath        "core:path/slashpath"
 import filepath         "core:path/filepath"
 
+import relative         "core:relative"
+
 import reflect          "core:reflect"
 import runtime          "base:runtime"
 import simd             "core:simd"
@@ -115,11 +121,13 @@ import strconv          "core:strconv"
 import strings          "core:strings"
 import sync             "core:sync"
 import testing          "core:testing"
-import scanner          "core:text/scanner"
+
+import edit             "core:text/edit"
 import i18n             "core:text/i18n"
 import match            "core:text/match"
+import scanner          "core:text/scanner"
 import table            "core:text/table"
-import edit             "core:text/edit"
+
 import thread           "core:thread"
 import time             "core:time"
 import datetime         "core:time/datetime"
@@ -176,8 +184,10 @@ _ :: sm3
 _ :: tuplehash
 _ :: x25519
 _ :: pe
+_ :: trace
 _ :: dynlib
 _ :: net
+_ :: ansi
 _ :: base32
 _ :: base64
 _ :: csv
@@ -191,6 +201,7 @@ _ :: fmt
 _ :: hash
 _ :: xxhash
 _ :: image
+_ :: bmp
 _ :: netpbm
 _ :: png
 _ :: qoi
@@ -209,6 +220,7 @@ _ :: rand
 _ :: ease
 _ :: cmplx
 _ :: mem
+_ :: tlsf
 _ :: virtual
 _ :: ast
 _ :: doc_format
@@ -218,6 +230,7 @@ _ :: os
 _ :: spall
 _ :: slashpath
 _ :: filepath
+_ :: relative
 _ :: reflect
 _ :: runtime
 _ :: simd
