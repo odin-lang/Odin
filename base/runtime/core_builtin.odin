@@ -65,7 +65,7 @@ copy :: proc{copy_slice, copy_from_string}
 // with the old value, and reducing the length of the dynamic array by 1.
 //
 // Note: This is an O(1) operation.
-// Note: If you the elements to remain in their order, use `ordered_remove`.
+// Note: If you want the elements to remain in their order, use `ordered_remove`.
 // Note: If the index is out of bounds, this procedure will panic.
 @builtin
 unordered_remove :: proc(array: ^$D/[dynamic]$T, index: int, loc := #caller_location) #no_bounds_check {
@@ -79,7 +79,7 @@ unordered_remove :: proc(array: ^$D/[dynamic]$T, index: int, loc := #caller_loca
 // `ordered_remove` removed the element at the specified `index` whilst keeping the order of the other elements.
 //
 // Note: This is an O(N) operation.
-// Note: If you the elements do not have to remain in their order, prefer `unordered_remove`.
+// Note: If the elements do not have to remain in their order, prefer `unordered_remove`.
 // Note: If the index is out of bounds, this procedure will panic.
 @builtin
 ordered_remove :: proc(array: ^$D/[dynamic]$T, index: int, loc := #caller_location) #no_bounds_check {
