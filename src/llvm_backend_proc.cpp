@@ -233,7 +233,7 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 
 
 	if (p->is_foreign) {
-		lb_set_wasm_import_attributes(p->value, entity, p->name);
+		lb_set_wasm_procedure_import_attributes(p->value, entity, p->name);
 	}
 
 
