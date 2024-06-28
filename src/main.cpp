@@ -61,6 +61,7 @@ gb_global Timings global_timings = {0};
 #include "llvm-c/Types.h"
 #else
 #include <llvm-c/Types.h>
+#include <signal.h>
 #endif
 
 #include "parser.hpp"
@@ -94,16 +95,13 @@ gb_global Timings global_timings = {0};
 #include "bug_report.cpp"
 
 // NOTE(bill): 'name' is used in debugging and profiling modes
-gb_internal i32 system_exec_command_line_app(char const *name, char const *fmt, ...) {
+gb_internal i32 system_exec_command_line_app_internal(bool exit_on_err, char const *name, char const *fmt, va_list va) {
 	isize const cmd_cap = 64<<20; // 64 MiB should be more than enough
 	char *cmd_line = gb_alloc_array(gb_heap_allocator(), char, cmd_cap);
 	isize cmd_len = 0;
-	va_list va;
 	i32 exit_code = 0;
 
-	va_start(va, fmt);
 	cmd_len = gb_snprintf_va(cmd_line, cmd_cap-1, fmt, va);
-	va_end(va);
 
 #if defined(GB_SYSTEM_WINDOWS)
 	STARTUPINFOW start_info = {gb_size_of(STARTUPINFOW)};
@@ -143,16 +141,34 @@ gb_internal i32 system_exec_command_line_app(char const *name, char const *fmt, 
 		gb_printf_err("%s\n\n", cmd_line);
 	}
 	exit_code = system(cmd_line);
+	if (exit_on_err && WIFSIGNALED(exit_code)) {
+		raise(WTERMSIG(exit_code));
+	}
 	if (WIFEXITED(exit_code)) {
 		exit_code = WEXITSTATUS(exit_code);
 	}
 #endif
 
-	if (exit_code) {
+	if (exit_on_err && exit_code) {
 		exit(exit_code);
 	}
 
 	return exit_code;
+}
+
+gb_internal i32 system_exec_command_line_app(char const *name, char const *fmt, ...) {
+	va_list va;
+	va_start(va, fmt);
+	i32 exit_code = system_exec_command_line_app_internal(/* exit_on_err= */ false, name, fmt, va);
+	va_end(va);
+	return exit_code;
+}
+
+gb_internal void system_must_exec_command_line_app(char const *name, char const *fmt, ...) {
+	va_list va;
+	va_start(va, fmt);
+	system_exec_command_line_app_internal(/* exit_on_err= */ true, name, fmt, va);
+	va_end(va);
 }
 
 #if defined(GB_SYSTEM_WINDOWS)
@@ -3252,7 +3268,7 @@ int main(int arg_count, char const **arg_ptr) {
 		String exe_name = path_to_string(heap_allocator(), build_context.build_paths[BuildPath_Output]);
 		defer (gb_free(heap_allocator(), exe_name.text));
 
-		return system_exec_command_line_app("odin run", "\"%.*s\" %.*s", LIT(exe_name), LIT(run_args_string));
+		system_must_exec_command_line_app("odin run", "\"%.*s\" %.*s", LIT(exe_name), LIT(run_args_string));
 	}
 	return 0;
 }
