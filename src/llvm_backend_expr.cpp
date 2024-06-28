@@ -3283,7 +3283,8 @@ gb_internal lbValue lb_build_expr_internal(lbProcedure *p, Ast *expr) {
 	Type *type = type_of_expr(expr);
 	GB_ASSERT_MSG(tv.mode != Addressing_Invalid, "invalid expression '%s' (tv.mode = %d, tv.type = %s) @ %s\n Current Proc: %.*s : %s", expr_to_string(expr), tv.mode, type_to_string(tv.type), token_pos_to_string(expr_pos), LIT(p->name), type_to_string(p->type));
 
-	if (tv.value.kind != ExactValue_Invalid) {
+
+	if (tv.value.kind != ExactValue_Invalid && !is_type_union(type)) {
 		// NOTE(bill): The commented out code below is just for debug purposes only
 		// if (is_type_untyped(type)) {
 		// 	gb_printf_err("%s %s : %s @ %p\n", token_pos_to_string(expr_pos), expr_to_string(expr), type_to_string(expr->tav.type), expr);
