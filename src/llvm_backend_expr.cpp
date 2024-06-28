@@ -2044,13 +2044,6 @@ gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 	}
 
 	if (is_type_union(dst)) {
-		for (Type *vt : dst->Union.variants) {
-			if (are_types_identical(vt, src_type)) {
-				lbAddr parent = lb_add_local_generated(p, t, true);
-				lb_emit_store_union_variant(p, parent.addr, value, vt);
-				return lb_addr_load(p, parent);
-			}
-		}
 		if (dst->Union.variants.count == 1) {
 			Type *vt = dst->Union.variants[0];
 			if (internal_check_is_assignable_to(src_type, vt)) {
@@ -2060,6 +2053,50 @@ gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 				return lb_addr_load(p, parent);
 			}
 		}
+		for (Type *vt : dst->Union.variants) {
+			if (are_types_identical(src_type, vt)) {
+				lbAddr parent = lb_add_local_generated(p, t, true);
+				lb_emit_store_union_variant(p, parent.addr, value, vt);
+				return lb_addr_load(p, parent);
+			}
+		}
+		ValidIndexAndScore *valids = gb_alloc_array(temporary_allocator(), ValidIndexAndScore, dst->Union.variants.count);
+		isize valid_count = 0;
+		isize first_success_index = -1;
+		for_array(i, dst->Union.variants) {
+			Type *vt = dst->Union.variants[i];
+			i64 score = 0;
+			if (internal_check_is_assignable_to(src_type, vt)) {
+				valids[valid_count].index = i;
+				valids[valid_count].score = score;
+				valid_count += 1;
+				if (first_success_index < 0) {
+					first_success_index = i;
+				}
+			}
+		}
+		if (valid_count > 1) {
+			gb_sort_array(valids, valid_count, valid_index_and_score_cmp);
+			i64 best_score = valids[0].score;
+			for (isize i = 1; i < valid_count; i++) {
+				auto v = valids[i];
+				if (best_score > v.score) {
+					valid_count = i;
+					break;
+				}
+				best_score = v.score;
+			}
+			first_success_index = valids[0].index;
+		}
+
+		if (valid_count == 1) {
+			Type *vt = dst->Union.variants[first_success_index];
+			value = lb_emit_conv(p, value, vt);
+			lbAddr parent = lb_add_local_generated(p, t, true);
+			lb_emit_store_union_variant(p, parent.addr, value, vt);
+			return lb_addr_load(p, parent);
+		}
+
 	}
 
 	// NOTE(bill): This has to be done before 'Pointer <-> Pointer' as it's
@@ -3284,13 +3321,7 @@ gb_internal lbValue lb_build_expr_internal(lbProcedure *p, Ast *expr) {
 	GB_ASSERT_MSG(tv.mode != Addressing_Invalid, "invalid expression '%s' (tv.mode = %d, tv.type = %s) @ %s\n Current Proc: %.*s : %s", expr_to_string(expr), tv.mode, type_to_string(tv.type), token_pos_to_string(expr_pos), LIT(p->name), type_to_string(p->type));
 
 
-	if (tv.value.kind != ExactValue_Invalid && !is_type_union(type)) {
-		// NOTE(bill): The commented out code below is just for debug purposes only
-		// if (is_type_untyped(type)) {
-		// 	gb_printf_err("%s %s : %s @ %p\n", token_pos_to_string(expr_pos), expr_to_string(expr), type_to_string(expr->tav.type), expr);
-		// 	GB_PANIC("%s\n", type_to_string(tv.type));
-		// }
-
+	if (tv.value.kind != ExactValue_Invalid) {
 		// NOTE(bill): Short on constant values
 		return lb_const_value(p->module, type, tv.value);
 	} else if (tv.mode == Addressing_Type) {
