@@ -470,6 +470,7 @@ gb_internal void scan_number_to_token(Tokenizer *t, Token *token, bool seen_deci
 			advance_to_next_rune(t);
 			scan_mantissa(t, 2);
 			if (t->curr - prev <= 2) {
+				tokenizer_err(t, "Invalid binary integer");
 				token->kind = Token_Invalid;
 			}
 			goto end;
@@ -477,6 +478,7 @@ gb_internal void scan_number_to_token(Tokenizer *t, Token *token, bool seen_deci
 			advance_to_next_rune(t);
 			scan_mantissa(t, 8);
 			if (t->curr - prev <= 2) {
+				tokenizer_err(t, "Invalid octal integer");
 				token->kind = Token_Invalid;
 			}
 			goto end;
@@ -484,6 +486,7 @@ gb_internal void scan_number_to_token(Tokenizer *t, Token *token, bool seen_deci
 			advance_to_next_rune(t);
 			scan_mantissa(t, 10);
 			if (t->curr - prev <= 2) {
+				tokenizer_err(t, "Invalid explicitly decimal integer");
 				token->kind = Token_Invalid;
 			}
 			goto end;
@@ -491,6 +494,7 @@ gb_internal void scan_number_to_token(Tokenizer *t, Token *token, bool seen_deci
 			advance_to_next_rune(t);
 			scan_mantissa(t, 12);
 			if (t->curr - prev <= 2) {
+				tokenizer_err(t, "Invalid dozenal integer");
 				token->kind = Token_Invalid;
 			}
 			goto end;
@@ -498,6 +502,7 @@ gb_internal void scan_number_to_token(Tokenizer *t, Token *token, bool seen_deci
 			advance_to_next_rune(t);
 			scan_mantissa(t, 16);
 			if (t->curr - prev <= 2) {
+				tokenizer_err(t, "Invalid hexadecimal integer");
 				token->kind = Token_Invalid;
 			}
 			goto end;
@@ -506,6 +511,7 @@ gb_internal void scan_number_to_token(Tokenizer *t, Token *token, bool seen_deci
 			advance_to_next_rune(t);
 			scan_mantissa(t, 16);
 			if (t->curr - prev <= 2) {
+				tokenizer_err(t, "Invalid hexadecimal float");
 				token->kind = Token_Invalid;
 			} else {
 				u8 *start = prev+2;
