@@ -723,11 +723,11 @@ write_f32 :: proc(b: ^Builder, f: f32, fmt: byte, always_signed := false) -> (n:
 	return write_string(b, s)
 }
 /*
-Writes a f32 value to the Builder and returns the number of characters written
+Writes a f64 value to the Builder and returns the number of characters written
 
 Inputs:
 - b: A pointer to the Builder
-- f: The f32 value to be appended
+- f: The f64 value to be appended
 - fmt: The format byte
 - always_signed: Optional boolean flag to always include the sign
 
