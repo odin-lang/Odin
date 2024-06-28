@@ -49,6 +49,10 @@ _standard_stream_init :: proc() {
 	_stdin.stream.data = &_stdin
 	_stdout.stream.data = &_stdout
 	_stderr.stream.data = &_stderr
+
+	stdin  = &_stdin
+	stdout = &_stdout
+	stderr = &_stderr
 }
 
 _file_allocator :: proc() -> runtime.Allocator {
