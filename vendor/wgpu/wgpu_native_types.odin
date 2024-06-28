@@ -79,7 +79,7 @@ RequiredLimitsExtras :: struct {
 }
 
 SupportedLimitsExtras :: struct {
-	using chain: ChainedStruct,
+	using chain: ChainedStructOut,
 	limits: NativeLimits,
 }
 
