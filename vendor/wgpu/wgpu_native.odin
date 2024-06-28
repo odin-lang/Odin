@@ -29,10 +29,9 @@ foreign {
 	RawQueueSubmitForIndex :: proc(queue: Queue, commandCount: uint, commands: [^]CommandBuffer) -> SubmissionIndex ---
 
 	// Returns true if the queue is empty, or false if there are more queue submissions still in flight.
-	@(link_name="wgpuDevicePoll")
-	RawDevicePoll :: proc(device: Device, wait: b32, /* NULLABLE */ wrappedSubmissionIndex: /* const */ ^WrappedSubmissionIndex) -> b32 ---
+	DevicePoll :: proc(device: Device, wait: b32, /* NULLABLE */ wrappedSubmissionIndex: /* const */ ^WrappedSubmissionIndex = nil) -> b32 ---
 
-	SetLogCallback :: proc "odin" (callback: LogCallback) ---
+	SetLogCallback :: proc(callback: LogCallback, userdata: rawptr) ---
 
 	SetLogLevel :: proc(level: LogLevel) ---
 
@@ -67,9 +66,3 @@ InstanceEnumerateAdapters :: proc(instance: Instance, options: ^InstanceEnumerat
 QueueSubmitForIndex :: proc(queue: Queue, commands: []CommandBuffer) -> SubmissionIndex {
 	return RawQueueSubmitForIndex(queue, len(commands), raw_data(commands))
 }
-
-DevicePoll :: proc(device: Device, wait: b32) -> (wrappedSubmissionIndex: WrappedSubmissionIndex, ok: bool) {
-	ok = bool(RawDevicePoll(device, wait, &wrappedSubmissionIndex))
-	return
-}
-

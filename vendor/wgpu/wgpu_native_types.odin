@@ -79,7 +79,7 @@ RequiredLimitsExtras :: struct {
 }
 
 SupportedLimitsExtras :: struct {
-	using chain: ChainedStruct,
+	using chain: ChainedStructOut,
 	limits: NativeLimits,
 }
 
@@ -182,7 +182,7 @@ SurfaceConfigurationExtras :: struct {
 	desiredMaximumFrameLatency: i32,
 }
 
-LogCallback :: #type proc "odin" (level: LogLevel, message: cstring)
+LogCallback :: #type proc "c" (level: LogLevel, message: cstring, userdata: rawptr)
 
 // Wrappers
 
