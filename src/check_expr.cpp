@@ -3505,17 +3505,24 @@ gb_internal bool check_transmute(CheckerContext *c, Ast *node, Operand *o, Type 
 			if (c->pkg && (c->pkg->kind == Package_Runtime || c->pkg->kind == Package_Builtin)) {
 				is_runtime = true;
 			}
-			if (are_types_identical(src_t, dst_t) && !is_runtime) {
-				gbString oper_str = expr_to_string(o->expr);
-				gbString to_type  = type_to_string(dst_t);
-				error(o->expr, "Unneeded transmute of '%s' to identical type '%s'", oper_str, to_type);
-				gb_string_free(oper_str);
-				gb_string_free(to_type);
+			if (are_types_identical(src_t, dst_t)) {
+				if (!is_runtime) {
+					gbString oper_str = expr_to_string(o->expr);
+					gbString to_type  = type_to_string(dst_t);
+					error(o->expr, "Unneeded transmute of '%s' to identical type '%s'", oper_str, to_type);
+					gb_string_free(oper_str);
+					gb_string_free(to_type);
+				}
 			} else if (is_type_internally_pointer_like(src_t) &&
 			           is_type_internally_pointer_like(dst_t)) {
-				gbString to_type  = type_to_string(dst_t);
-				error(o->expr, "Use of 'transmute' where 'cast' would be preferred since the types are pointer-like", to_type);
+				error(o->expr, "Use of 'transmute' where 'cast' would be preferred since the types are pointer-like");
+			} else if (is_type_integer(src_t) && is_type_integer(dst_t) &&
+			           types_have_same_internal_endian(src_t, dst_t)) {
+				gbString oper_type = type_to_string(src_t);
+				gbString to_type   = type_to_string(dst_t);
+				error(o->expr, "Use of 'transmute' where 'cast' would be preferred since both are integers of the same endianness, from '%s' to '%s'", oper_type, to_type);
 				gb_string_free(to_type);
+				gb_string_free(oper_type);
 			}
 		}
 	}
