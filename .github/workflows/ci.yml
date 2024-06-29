@@ -97,7 +97,7 @@ jobs:
       - name: Download LLVM (MacOS ARM)
         if: matrix.os == 'macos-14'
         run: |
-          brew install llvm@17
+          brew install llvm@17 wasmtime
           echo "/opt/homebrew/opt/llvm@17/bin" >> $GITHUB_PATH
 
       - name: Build Odin
@@ -146,6 +146,12 @@ jobs:
       - name: Odin check examples/all for OpenBSD amd64
         run: ./odin check examples/all -vet -strict-style -target:openbsd_amd64
         if: matrix.os == 'ubuntu-latest'
+
+      - name: Run demo on WASI WASM32
+        run: |
+          ./odin build examples/demo -target:wasi_wasm32 -vet -strict-style -out:demo.wasm
+          wasmtime ./demo.wasm
+        if: matrix.os == 'macos-14'
 
   build_windows:
     name: Windows Build, Check, and Test

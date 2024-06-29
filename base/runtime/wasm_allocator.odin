@@ -760,7 +760,7 @@ free :: proc(a: ^WASM_Allocator, ptr: rawptr, loc := #caller_location) {
 	defer unlock(a)
 
 	size := region.size
-	assert(region_is_in_use(region), "double free", loc=loc)
+	assert(region_is_in_use(region), "double free or corrupt region", loc=loc)
 
 	prev_region_size_field := ([^]uint)(region)[-1]
 	prev_region_size := prev_region_size_field & ~uint(FREE_REGION_FLAG)

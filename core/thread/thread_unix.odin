@@ -6,6 +6,8 @@ import "core:sync"
 import "core:sys/unix"
 import "core:time"
 
+_IS_SUPPORTED :: true
+
 CAS :: sync.atomic_compare_exchange_strong
 
 // NOTE(tetra): Aligned here because of core/unix/pthread_linux.odin/pthread_t.

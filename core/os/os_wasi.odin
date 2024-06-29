@@ -6,6 +6,8 @@ import "base:runtime"
 Handle :: distinct i32
 Errno :: distinct i32
 
+INVALID_HANDLE :: -1
+
 ERROR_NONE :: Errno(wasi.errno_t.SUCCESS)
 
 O_RDONLY   :: 0x00000
@@ -25,6 +27,16 @@ stdin:  Handle = 0
 stdout: Handle = 1
 stderr: Handle = 2
 current_dir: Handle = 3
+
+args := _alloc_command_line_arguments()
+
+_alloc_command_line_arguments :: proc() -> (args: []string) {
+	args = make([]string, len(runtime.args__))
+	for &arg, i in args {
+		arg = string(runtime.args__[i])
+	}
+	return
+}
 
 write :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 	iovs := wasi.ciovec_t(data)
