@@ -210,8 +210,11 @@ set :: proc(ba: ^Bit_Array, #any_int index: uint, set_to: bool = true, allocator
 
 	ba.max_index = max(idx, ba.max_index)
 
-	if set_to{ ba.bits[leg_index] |= 1 << uint(bit_index) }
-	else { ba.bits[leg_index] &~= 1 << uint(bit_index) }
+	if set_to {
+		ba.bits[leg_index] |=  1 << uint(bit_index)
+	} else {
+		ba.bits[leg_index] &~= 1 << uint(bit_index)
+	}
 
 	return true
 }

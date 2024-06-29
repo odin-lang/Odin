@@ -2241,8 +2241,7 @@ futex_wake :: proc "contextless" (futex: ^Futex, op: Futex_Wake_Type, flags: Fut
 	Returns the total number of waiters that have been woken up plus the number of waiters requeued.
 */
 futex_cmp_requeue :: proc "contextless" (futex: ^Futex, op: Futex_Cmp_Requeue_Type, flags: Futex_Flags, requeue_threshold: u32,
-	requeue_max: i32, requeue_futex: ^Futex, val: i32) -> (int, Errno)
-{
+	requeue_max: i32, requeue_futex: ^Futex, val: i32) -> (int, Errno) {
 	futex_flags := cast(u32) op + transmute(u32) flags
 	ret := syscall(SYS_futex, futex, futex_flags, requeue_threshold, requeue_max, requeue_futex, val)
 	return errno_unwrap(ret, int)
@@ -2253,8 +2252,7 @@ futex_cmp_requeue :: proc "contextless" (futex: ^Futex, op: Futex_Cmp_Requeue_Ty
 	Returns the total number of waiters that have been woken up.
 */
 futex_requeue :: proc "contextless" (futex: ^Futex, op: Futex_Requeue_Type, flags: Futex_Flags, requeue_threshold: u32,
-	requeue_max: i32, requeue_futex: ^Futex) -> (int, Errno)
-{
+	requeue_max: i32, requeue_futex: ^Futex) -> (int, Errno) {
 	futex_flags := cast(u32) op + transmute(u32) flags
 	ret := syscall(SYS_futex, futex, futex_flags, requeue_threshold, requeue_max, requeue_futex)
 	return errno_unwrap(ret, int)
@@ -2265,8 +2263,7 @@ futex_requeue :: proc "contextless" (futex: ^Futex, op: Futex_Requeue_Type, flag
 	purpose is to allow implementing conditional values sync primitive, it seems like.
 */
 futex_wake_op :: proc "contextless" (futex: ^Futex, op: Futex_Wake_Op_Type, flags: Futex_Flags, wakeup: i32,
-	dst_wakeup, dst: ^Futex, futex_op: u32) -> (int, Errno)
-{
+	dst_wakeup, dst: ^Futex, futex_op: u32) -> (int, Errno) {
 	futex_flags := cast(u32) op + transmute(u32) flags
 	ret := syscall(SYS_futex, futex, futex_flags, wakeup, dst_wakeup, dst, futex_op)
 	return errno_unwrap(ret, int)
@@ -2276,8 +2273,7 @@ futex_wake_op :: proc "contextless" (futex: ^Futex, op: Futex_Wake_Op_Type, flag
 	Same as wait, but mask specifies bits that must be equal for the mutex to wake up.
 */
 futex_wait_bitset :: proc "contextless" (futex: ^Futex, op: Futex_Wait_Bitset_Type, flags: Futex_Flags, val: u32,
-	timeout: ^Time_Spec, mask: u32) -> (int, Errno)
-{
+	timeout: ^Time_Spec, mask: u32) -> (int, Errno) {
 	futex_flags := cast(u32) op + transmute(u32) flags
 	ret := syscall(SYS_futex, futex, futex_flags, val, timeout, 0, mask)
 	return errno_unwrap(ret, int)
@@ -2286,8 +2282,7 @@ futex_wait_bitset :: proc "contextless" (futex: ^Futex, op: Futex_Wait_Bitset_Ty
 /*
 	Wake up on bitset.
 */
-futex_wake_bitset :: proc "contextless" (futex: ^Futex, op: Futex_Wake_Bitset_Type, flags: Futex_Flags, n_wakeup: u32, mask: u32) -> (int, Errno)
-{
+futex_wake_bitset :: proc "contextless" (futex: ^Futex, op: Futex_Wake_Bitset_Type, flags: Futex_Flags, n_wakeup: u32, mask: u32) -> (int, Errno) {
 	futex_flags := cast(u32) op + transmute(u32) flags
 	ret := syscall(SYS_futex, futex, futex_flags, n_wakeup, 0, 0, mask)
 	return errno_unwrap(ret, int)
@@ -2295,7 +2290,7 @@ futex_wake_bitset :: proc "contextless" (futex: ^Futex, op: Futex_Wake_Bitset_Ty
 
 // TODO(flysand): Priority inheritance (PI) futicees
 
-futex :: proc {
+futex :: proc{
 	futex_wait,
 	futex_wake,
 	futex_cmp_requeue,

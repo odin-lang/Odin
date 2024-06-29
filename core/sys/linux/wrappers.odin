@@ -115,7 +115,6 @@ futex_op :: proc "contextless" (arg_op: Futex_Arg_Op, cmp_op: Futex_Cmp_Op, op_a
 /// Helper function for constructing the config for caches
 perf_cache_config :: #force_inline proc "contextless" (id: Perf_Hardware_Cache_Id,
 	op: Perf_Hardware_Cache_Op_Id,
-	res: Perf_Hardware_Cache_Result_Id) -> u64
-{
+	res: Perf_Hardware_Cache_Result_Id) -> u64 {
 	return u64(id) | (u64(op) << 8) | (u64(res) << 16)
 }
