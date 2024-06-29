@@ -85,7 +85,7 @@ marshal_into_encoder :: proc(e: Encoder, v: any, loc :=  #caller_location) -> (e
 
 	if .Self_Described_CBOR in e.flags {
 		err_conv(_encode_u64(e, TAG_SELF_DESCRIBED_CBOR, .Tag)) or_return
-		e.flags &~= { .Self_Described_CBOR }
+		e.flags -= { .Self_Described_CBOR }
 	}
 
 	if v == nil {

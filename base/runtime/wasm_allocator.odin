@@ -679,7 +679,7 @@ allocate_memory :: proc(a: ^WASM_Allocator, alignment: uint, size: uint, loc := 
 			// but we just had a stale bit set to mark a populated bucket.
 			// Reset the bit to update latest status so that we do not
 			// redundantly look at this bucket again.
-			a.free_region_buckets_used &= ~(BUCKET_BITMASK_T(1) << bucket_index)
+			a.free_region_buckets_used &~= BUCKET_BITMASK_T(1) << bucket_index
 			bucket_mask ~= 1
 		}
 

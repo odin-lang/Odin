@@ -341,7 +341,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 	options := options
 
 	if .info in options {
-		options |= {.return_metadata, .do_not_decompress_image}
+		options += {.return_metadata, .do_not_decompress_image}
 		options -= {.info}
 	}
 
@@ -354,7 +354,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 	}
 
 	if .do_not_expand_channels in options {
-		options |= {.do_not_expand_grayscale, .do_not_expand_indexed}
+		options += {.do_not_expand_grayscale, .do_not_expand_indexed}
 	}
 
 	if img == nil {

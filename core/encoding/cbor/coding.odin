@@ -233,7 +233,7 @@ encode_into_encoder :: proc(e: Encoder, v: Value, loc := #caller_location) -> En
 
 	if .Self_Described_CBOR in e.flags {
 		_encode_u64(e, TAG_SELF_DESCRIBED_CBOR, .Tag) or_return
-		e.flags &~= { .Self_Described_CBOR }
+		e.flags -= { .Self_Described_CBOR }
 	}
 
 	switch v_spec in v {

@@ -176,7 +176,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 	options := options
 
 	if .info in options {
-		options |= {.return_metadata, .do_not_decompress_image}
+		options += {.return_metadata, .do_not_decompress_image}
 		options -= {.info}
 	}
 

@@ -94,7 +94,7 @@ _enumerate_interfaces :: proc(allocator := context.allocator) -> (interfaces: []
  		state := Link_State{}
 
  		if .UP in ifaddr.flags {
- 			state |= {.Up}
+ 			state += {.Up}
  		}
 
  		/*if .DORMANT in ifaddr.flags {
@@ -102,7 +102,7 @@ _enumerate_interfaces :: proc(allocator := context.allocator) -> (interfaces: []
  		}*/
 
  		if .LOOPBACK in ifaddr.flags {
- 			state |= {.Loopback}
+ 			state += {.Loopback}
  		}
 		iface.link.state = state
 	}

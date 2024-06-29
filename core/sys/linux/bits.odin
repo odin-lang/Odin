@@ -1464,16 +1464,16 @@ Futex_Flags_Bits :: enum {
 	Kind of operation on futex, see FUTEX_WAKE_OP
 */
 Futex_Arg_Op :: enum {
-	SET      = 0,  /* uaddr2 =       oparg; */
-	ADD      = 1,  /* uaddr2 +=      oparg; */
-	OR       = 2,  /* uaddr2 |=      oparg; */
-	ANDN     = 3,  /* uaddr2 &=     ~oparg; */
-	XOR      = 4,  /* uaddr2 ^=      oparg; */
-	PO2_SET  = 0,  /* uaddr2 =    1<<oparg; */
-	PO2_ADD  = 1,  /* uaddr2 +=   1<<oparg; */
-	PO2_OR   = 2,  /* uaddr2 |=   1<<oparg; */
-	PO2_ANDN = 3,  /* uaddr2 &= ~(1<<oparg); */
-	PO2_XOR  = 4,  /* uaddr2 ^=   1<<oparg; */
+	SET      = 0,  /* uaddr2 =       oparg */
+	ADD      = 1,  /* uaddr2 +=      oparg */
+	OR       = 2,  /* uaddr2 |=      oparg */
+	ANDN     = 3,  /* uaddr2 &=     ~oparg */
+	XOR      = 4,  /* uaddr2 ^=      oparg */
+	PO2_SET  = 0,  /* uaddr2 =    1<<oparg */
+	PO2_ADD  = 1,  /* uaddr2 +=   1<<oparg */
+	PO2_OR   = 2,  /* uaddr2 |=   1<<oparg */
+	PO2_ANDN = 3,  /* uaddr2 &~=  1<<oparg */
+	PO2_XOR  = 4,  /* uaddr2 ^=   1<<oparg */
 }
 
 /*

@@ -637,22 +637,20 @@ _internal_noise_4d_unskewed_base :: proc(seed: i64, coord: Vec4) -> (value: f32)
 		
 		// Next point is the closest vertex on the 4-simplex whose base vertex is the aforementioned vertex.
 		score := 1.0 + ssi * (-1.0 / UNSKEW_4D) // Seems slightly faster than 1.0-xsi-ysi-zsi-wsi
-		if si.x >= si.x && si.x >= si.z && si.x >= si.w && si.x >= score {
+		switch {
+		case si.x >= si.x && si.x >= si.z && si.x >= si.w && si.x >= score:
 			svp.x += PRIME_X
 			si.x -= 1
 			ssi -= UNSKEW_4D
-		}
-		else if si.y > si.x && si.y >= si.z && si.y >= si.w && si.y >= score {
+		case si.y > si.x && si.y >= si.z && si.y >= si.w && si.y >= score:
 			svp.y += PRIME_Y
 			si.y -= 1
 			ssi -= UNSKEW_4D
-		}
-		else if si.z > si.x && si.z > si.y && si.z >= si.w && si.z >= score {
+		case si.z > si.x && si.z > si.y && si.z >= si.w && si.z >= score:
 			svp.z += PRIME_Z
 			si.z -= 1
 			ssi -= UNSKEW_4D
-		}
-		else if si.w > si.x && si.w > si.y && si.w > si.z && si.w >= score {
+		case si.w > si.x && si.w > si.y && si.w > si.z && si.w >= score:
 			svp.w += PRIME_W
 			si.w -= 1
 			ssi -= UNSKEW_4D

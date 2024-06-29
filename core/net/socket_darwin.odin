@@ -320,7 +320,7 @@ _set_blocking :: proc(socket: Any_Socket, should_block: bool) -> (err: Network_E
 	}
 
 	if should_block {
-		flags &= ~int(os.O_NONBLOCK)
+		flags &~= int(os.O_NONBLOCK)
 	} else {
 		flags |= int(os.O_NONBLOCK)
 	}
