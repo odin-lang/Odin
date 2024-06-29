@@ -495,7 +495,7 @@ claim_more_memory :: proc(a: ^WASM_Allocator, num_bytes: uint) -> bool {
 		// we can just extend the spill.
 		spill_end := uintptr(raw_data(a.spill)) + uintptr(len(a.spill))
 		if spill_end == uintptr(raw_data(allocated)) {
-			raw_spill := transmute(^Raw_Slice)(&a.spill)
+			raw_spill := (^Raw_Slice)(&a.spill)
 			raw_spill.len += len(allocated)
 		} else {
 			// Otherwise, we have to "waste" the previous spill.
