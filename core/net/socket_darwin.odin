@@ -274,8 +274,7 @@ _set_option :: proc(s: Any_Socket, option: Socket_Option, value: any, loc := #ca
 		.Linger,
 		.Send_Timeout,
 		.Receive_Timeout:
-			t, ok := value.(time.Duration)
-			if !ok do panic("set_option() value must be a time.Duration here", loc)
+			t := value.(time.Duration) or_else panic("set_option() value must be a time.Duration here", loc)
 
 			micros := i64(time.duration_microseconds(t))
 			timeval_value.microseconds = int(micros % 1e6)

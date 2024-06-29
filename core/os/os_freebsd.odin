@@ -705,7 +705,9 @@ set_current_directory :: proc(path: string) -> (err: Errno) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	cstr := strings.clone_to_cstring(path, context.temp_allocator)
 	res := _unix_chdir(cstr)
-	if res == -1 do return Errno(get_last_error())
+	if res == -1 {
+		return Errno(get_last_error())
+	}
 	return ERROR_NONE
 }
 
@@ -743,7 +745,9 @@ get_page_size :: proc() -> int {
 	// NOTE(tetra): The page size never changes, so why do anything complicated
 	// if we don't have to.
 	@static page_size := -1
-	if page_size != -1 do return page_size
+	if page_size != -1 {
+		return page_size
+	}
 
 	page_size = int(_unix_getpagesize())
 	return page_size
