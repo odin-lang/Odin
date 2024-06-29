@@ -555,7 +555,7 @@ open :: proc(path: string, flags: int = O_RDWR, mode: int = 0) -> (Handle, Errno
 		err := fchmod(handle, cast(u16)mode)
 		if err != 0 {
 			_unix_close(handle)
-			return INVALID_HANDLE, cast(Errno)err
+			return INVALID_HANDLE, err
 		}
 	}
 

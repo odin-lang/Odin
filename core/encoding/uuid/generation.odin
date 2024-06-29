@@ -106,8 +106,8 @@ generate_v6 :: proc(clock_seq: Maybe(u16) = nil, node: Maybe([6]u8) = nil, times
 		temporary: [2]u8
 		bytes_generated := rand.read(temporary[:])
 		assert(bytes_generated == 2, "RNG failed to generate 2 bytes for UUID v1.")
-		result[8] |= cast(u8)temporary[0] & 0x3F
-		result[9]  = cast(u8)temporary[1]
+		result[8] |= temporary[0] & 0x3F
+		result[9]  = temporary[1]
 	}
 
 	if realized_node, ok := node.?; ok {

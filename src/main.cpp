@@ -300,6 +300,7 @@ enum BuildFlagKind {
 	BuildFlag_VetUsingParam,
 	BuildFlag_VetStyle,
 	BuildFlag_VetSemicolon,
+	BuildFlag_VetIdenticalCast,
 
 	BuildFlag_CustomAttribute,
 	BuildFlag_IgnoreUnknownAttributes,
@@ -499,6 +500,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_VetUsingParam,           str_lit("vet-using-param"),           BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_VetStyle,                str_lit("vet-style"),                 BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_VetSemicolon,            str_lit("vet-semicolon"),             BuildFlagParam_None,    Command__does_check);
+	add_flag(&build_flags, BuildFlag_VetIdenticalCast,        str_lit("vet-identical-cast"),        BuildFlagParam_None,    Command__does_check);
 
 	add_flag(&build_flags, BuildFlag_CustomAttribute,         str_lit("custom-attribute"),          BuildFlagParam_String,  Command__does_check, true);
 	add_flag(&build_flags, BuildFlag_IgnoreUnknownAttributes, str_lit("ignore-unknown-attributes"), BuildFlagParam_None,    Command__does_check);
@@ -1152,6 +1154,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_VetUsingParam:      build_context.vet_flags |= VetFlag_UsingParam;      break;
 						case BuildFlag_VetStyle:           build_context.vet_flags |= VetFlag_Style;           break;
 						case BuildFlag_VetSemicolon:       build_context.vet_flags |= VetFlag_Semicolon;       break;
+						case BuildFlag_VetIdenticalCast:   build_context.vet_flags |= VetFlag_IdenticalCast;   break;
 
 						case BuildFlag_CustomAttribute:
 							{
@@ -2242,6 +2245,10 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 
 		print_usage_line(1, "-vet-semicolon");
 		print_usage_line(2, "Errs on unneeded semicolons.");
+		print_usage_line(0, "");
+
+		print_usage_line(1, "-vet-identical-cast");
+		print_usage_line(2, "Errs on casting a value to its own type.");
 		print_usage_line(0, "");
 	}
 
