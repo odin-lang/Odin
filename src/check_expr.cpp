@@ -3382,18 +3382,18 @@ gb_internal void check_cast(CheckerContext *c, Operand *x, Type *type, bool forb
 				add_package_dependency(c, "runtime", "gnu_f2h_ieee",       REQUIRE);
 			}
 		}
-		if (forbid_identical && check_vet_flags(c) & VetFlag_IdenticalCast) {
+		// If we check polymorphic procedures, we risk erring on
+		// identical casts that cannot be foreseen or otherwise
+		// forbidden, so just skip them.
+		if (forbid_identical && check_vet_flags(c) & VetFlag_Cast &&
+		    (c->curr_proc_sig == nullptr || !is_type_polymorphic(c->curr_proc_sig))) {
 			Type *src_exact = x->type;
 			Type *dst_exact = type;
 
 			if (src_exact != nullptr &&
-				dst_exact != nullptr &&
-				// If we check polymorphic procedures, we risk erring on
-				// identical casts that cannot be foreseen or otherwise
-				// forbidden, so just skip them.
-				(c->curr_proc_sig == nullptr || !is_type_polymorphic(c->curr_proc_sig)) &&
-				src_exact == dst_exact)
-			{
+			    dst_exact != nullptr &&
+			    are_types_identical(src_exact, dst_exact)
+			) {
 				gbString oper_str = expr_to_string(x->expr);
 				gbString to_type  = type_to_string(dst_exact);
 				error(x->expr, "Unneeded cast of `%s` to identical type `%s`", oper_str, to_type);

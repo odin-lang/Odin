@@ -742,11 +742,11 @@ enum VetFlags : u64 {
 	VetFlag_UnusedVariables = 1u<<5,
 	VetFlag_UnusedImports   = 1u<<6,
 	VetFlag_Deprecated      = 1u<<7,
-	VetFlag_IdenticalCast   = 1u<<8,
+	VetFlag_Cast            = 1u<<8,
 
 	VetFlag_Unused = VetFlag_UnusedVariables|VetFlag_UnusedImports,
 
-	VetFlag_All = VetFlag_Unused|VetFlag_Shadowing|VetFlag_UsingStmt|VetFlag_Deprecated|VetFlag_IdenticalCast,
+	VetFlag_All = VetFlag_Unused|VetFlag_Shadowing|VetFlag_UsingStmt|VetFlag_Deprecated|VetFlag_Cast,
 
 	VetFlag_Using = VetFlag_UsingStmt|VetFlag_UsingParam,
 };
@@ -770,8 +770,8 @@ u64 get_vet_flag_from_name(String const &name) {
 		return VetFlag_Semicolon;
 	} else if (name == "deprecated") {
 		return VetFlag_Deprecated;
-	} else if (name == "identical-cast") {
-		return VetFlag_IdenticalCast;
+	} else if (name == "cast") {
+		return VetFlag_Cast;
 	}
 	return VetFlag_NONE;
 }
