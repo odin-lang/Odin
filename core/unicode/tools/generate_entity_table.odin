@@ -142,7 +142,7 @@ generate_encoding_entity_table :: proc() {
 	/*
 		Generate table.
 	*/
-	fmt.wprintln(w, "package unicode_entity")
+	fmt.wprintln(w, "package encoding_unicode_entity")
 	fmt.wprintln(w, "")
 	fmt.wprintln(w, GENERATED)
 	fmt.wprintln(w, "")
@@ -195,12 +195,12 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 
 		e := entity_map[v]
 
-		fmt.wprintf(w, "\t\t\tcase \"%v\":", e.name)
+		fmt.wprintf(w, "\t\tcase \"%v\":", e.name)
 		for i := len(e.name); i < max_name_length; i += 1 {
 			fmt.wprintf(w, " ")
 		}
 		fmt.wprintf(w, " // %v\n", e.description)
-		fmt.wprintf(w, "\t\t\t\treturn %v, true\n", rune_to_string(e.codepoint))
+		fmt.wprintf(w, "\t\t\treturn %v, true\n", rune_to_string(e.codepoint))
 
 		should_close = true
 	}
