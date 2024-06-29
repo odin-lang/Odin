@@ -268,7 +268,7 @@ new_clone :: proc(data: $T, allocator := context.allocator, loc := #caller_locat
 	return
 }
 
-DEFAULT_RESERVE_CAPACITY :: 16
+DEFAULT_DYNAMIC_ARRAY_CAPACITY :: 8
 
 @(require_results)
 make_aligned :: proc($T: typeid/[]$E, #any_int len: int, alignment: int, allocator := context.allocator, loc := #caller_location) -> (T, Allocator_Error) #optional_allocator_error {
@@ -295,7 +295,7 @@ make_slice :: proc($T: typeid/[]$E, #any_int len: int, allocator := context.allo
 // Note: Prefer using the procedure group `make`.
 @(builtin, require_results)
 make_dynamic_array :: proc($T: typeid/[dynamic]$E, allocator := context.allocator, loc := #caller_location) -> (T, Allocator_Error) #optional_allocator_error {
-	return make_dynamic_array_len_cap(T, 0, DEFAULT_RESERVE_CAPACITY, allocator, loc)
+	return make_dynamic_array_len_cap(T, 0, 0, allocator, loc)
 }
 // `make_dynamic_array_len` allocates and initializes a dynamic array. Like `new`, the first argument is a type, not a value.
 // Unlike `new`, `make`'s return value is the same as the type of its argument, not a pointer to it.
@@ -423,8 +423,8 @@ _append_elem :: #force_inline proc(array: ^$T/[dynamic]$E, arg: E, should_zero: 
 		return 1, nil
 	} else {
 		if cap(array) < len(array)+1 {
-			// Same behavior as _append_elems but there's only one arg, so we always just add 8.
-			cap := 2 * cap(array) + 8
+			// Same behavior as _append_elems but there's only one arg, so we always just add DEFAULT_DYNAMIC_ARRAY_CAPACITY.
+			cap := 2 * cap(array) + DEFAULT_DYNAMIC_ARRAY_CAPACITY
 
 			// do not 'or_return' here as it could be a partial success
 			if should_zero {
@@ -473,7 +473,7 @@ _append_elems :: #force_inline proc(array: ^$T/[dynamic]$E, should_zero: bool, l
 		return arg_len, nil
 	} else {
 		if cap(array) < len(array)+arg_len {
-			cap := 2 * cap(array) + max(8, arg_len)
+			cap := 2 * cap(array) + max(DEFAULT_DYNAMIC_ARRAY_CAPACITY, arg_len)
 
 			// do not 'or_return' here as it could be a partial success
 			if should_zero {

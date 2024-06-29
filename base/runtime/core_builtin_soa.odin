@@ -147,7 +147,7 @@ make_soa_slice :: proc($T: typeid/#soa[]$E, length: int, allocator := context.al
 @(builtin, require_results)
 make_soa_dynamic_array :: proc($T: typeid/#soa[dynamic]$E, allocator := context.allocator, loc := #caller_location) -> (array: T, err: Allocator_Error) #optional_allocator_error {
 	context.allocator = allocator
-	reserve_soa(&array, DEFAULT_RESERVE_CAPACITY, loc) or_return
+	reserve_soa(&array, 0, loc) or_return
 	return array, nil
 }
 
@@ -280,7 +280,8 @@ append_soa_elem :: proc(array: ^$T/#soa[dynamic]$E, arg: E, loc := #caller_locat
 	}
 
 	if cap(array) <= len(array) + 1 {
-		cap := 2 * cap(array) + 8
+		// Same behavior as append_soa_elems but there's only one arg, so we always just add DEFAULT_DYNAMIC_ARRAY_CAPACITY.
+		cap := 2 * cap(array) + DEFAULT_DYNAMIC_ARRAY_CAPACITY
 		err = reserve_soa(array, cap, loc) // do not 'or_return' here as it could be a partial success
 	}
 
@@ -337,7 +338,7 @@ append_soa_elems :: proc(array: ^$T/#soa[dynamic]$E, args: ..E, loc := #caller_l
 	}
 
 	if cap(array) <= len(array)+arg_len {
-		cap := 2 * cap(array) + max(8, arg_len)
+		cap := 2 * cap(array) + max(DEFAULT_DYNAMIC_ARRAY_CAPACITY, arg_len)
 		err = reserve_soa(array, cap, loc) // do not 'or_return' here as it could be a partial success
 	}
 	arg_len = min(cap(array)-len(array), arg_len)
