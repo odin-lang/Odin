@@ -128,3 +128,10 @@ soa_zip :: proc(slices: ...) -> #soa[]Struct ---
 soa_unzip :: proc(value: $S/#soa[]$E) -> (slices: ...) ---
 
 unreachable :: proc() -> ! ---
+
+@private _raw_data_string  :: proc (v: string)      -> [^]u8 ---
+@private _raw_data_slice   :: proc (v: []$E)        -> [^]E  ---
+@private _raw_data_dynamic :: proc (v: [dynamic]$E) -> [^]E  ---
+@private _raw_data_array   :: proc (v: ^[$N]$E)     -> [^]E  ---
+
+raw_data :: proc {_raw_data_string, _raw_data_slice, _raw_data_dynamic, _raw_data_array}
