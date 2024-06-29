@@ -34,20 +34,7 @@ when ODIN_OS == .Windows {
 	SIGTERM :: 15
 }
 
-when ODIN_OS == .Linux || ODIN_OS == .FreeBSD || ODIN_OS == .Haiku || ODIN_OS == .OpenBSD || ODIN_OS == .NetBSD {
-	SIG_ERR  :: rawptr(~uintptr(0))
-	SIG_DFL  :: rawptr(uintptr(0))
-	SIG_IGN  :: rawptr(uintptr(1)) 
-
-	SIGABRT  :: 6
-	SIGFPE   :: 8
-	SIGILL   :: 4
-	SIGINT   :: 2
-	SIGSEGV  :: 11
-	SIGTERM  :: 15
-}
-
-when ODIN_OS == .Darwin {
+when ODIN_OS == .Linux || ODIN_OS == .FreeBSD || ODIN_OS == .Haiku || ODIN_OS == .OpenBSD || ODIN_OS == .NetBSD || ODIN_OS == .Darwin {
 	SIG_ERR  :: rawptr(~uintptr(0))
 	SIG_DFL  :: rawptr(uintptr(0))
 	SIG_IGN  :: rawptr(uintptr(1)) 

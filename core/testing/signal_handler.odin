@@ -9,6 +9,7 @@ Stop_Reason :: enum {
 	Illegal_Instruction,
 	Arithmetic_Error,
 	Segmentation_Fault,
+	Unhandled_Trap,
 }
 
 test_assertion_failure_proc :: proc(prefix, message: string, loc: runtime.Source_Code_Location) -> ! {
