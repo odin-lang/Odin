@@ -798,10 +798,10 @@ __getVerticalAlign :: proc(
 
 	case .BOTTOMLEFT: 
 		switch av {
-			case .TOP: res = -font.ascender * f32(pixelSize) / 10
-			case .MIDDLE: res = -(font.ascender + font.descender) / 2 * f32(pixelSize) / 10
-			case .BASELINE: res = 0
-			case .BOTTOM: res = -font.descender * f32(pixelSize) / 10
+		case .TOP: res = -font.ascender * f32(pixelSize) / 10
+		case .MIDDLE: res = -(font.ascender + font.descender) / 2 * f32(pixelSize) / 10
+		case .BASELINE: res = 0
+		case .BOTTOM: res = -font.descender * f32(pixelSize) / 10
 		}
 	}
 
