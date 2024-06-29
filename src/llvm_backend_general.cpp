@@ -791,7 +791,6 @@ gb_internal void lb_addr_store(lbProcedure *p, lbAddr addr, lbValue value) {
 			lb_emit_runtime_call(p, "__write_bits", args);
 		} else if ((addr.bitfield.bit_offset % 8) == 0 &&
 		           (addr.bitfield.bit_size   % 8) == 0) {
-			gb_printf_err("Here!\n");
 			lbValue src = lb_address_from_load_or_generate_local(p, value);
 
 			lbValue byte_offset = lb_const_int(p->module, t_uintptr, addr.bitfield.bit_offset/8);
