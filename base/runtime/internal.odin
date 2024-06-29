@@ -29,7 +29,7 @@ is_power_of_two_int :: #force_inline proc "contextless" (x: int) -> bool {
 	return (x & (x-1)) == 0
 }
 
-align_forward_int :: #force_inline proc(ptr, align: int) -> int {
+align_forward_int :: #force_inline proc "odin" (ptr, align: int) -> int {
 	assert(is_power_of_two_int(align))
 
 	p := ptr
@@ -47,7 +47,7 @@ is_power_of_two_uint :: #force_inline proc "contextless" (x: uint) -> bool {
 	return (x & (x-1)) == 0
 }
 
-align_forward_uint :: #force_inline proc(ptr, align: uint) -> uint {
+align_forward_uint :: #force_inline proc "odin" (ptr, align: uint) -> uint {
 	assert(is_power_of_two_uint(align))
 
 	p := ptr
@@ -65,7 +65,7 @@ is_power_of_two_uintptr :: #force_inline proc "contextless" (x: uintptr) -> bool
 	return (x & (x-1)) == 0
 }
 
-align_forward_uintptr :: #force_inline proc(ptr, align: uintptr) -> uintptr {
+align_forward_uintptr :: #force_inline proc "odin" (ptr, align: uintptr) -> uintptr {
 	assert(is_power_of_two_uintptr(align))
 
 	p := ptr
@@ -1034,7 +1034,7 @@ divti3 :: proc "c" (a, b: i128) -> i128 {
 
 
 @(link_name="__fixdfti", linkage=RUNTIME_LINKAGE, require=RUNTIME_REQUIRE)
-fixdfti :: proc(a: u64) -> i128 {
+fixdfti :: proc "c" (a: u64) -> i128 {
 	significandBits :: 52
 	typeWidth       :: (size_of(u64)*8)
 	exponentBits    :: (typeWidth - significandBits - 1)
