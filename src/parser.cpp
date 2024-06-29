@@ -1486,7 +1486,7 @@ gb_internal bool skip_possible_newline(AstFile *f) {
 	return false;
 }
 
-gb_internal bool skip_possible_newline_for_literal(AstFile *f) {
+gb_internal bool skip_possible_newline_for_literal(AstFile *f, bool seen_where=false) {
 	Token curr = f->curr_token;
 	if (token_is_newline(curr)) {
 		Token next = peek_token(f);
@@ -1494,6 +1494,10 @@ gb_internal bool skip_possible_newline_for_literal(AstFile *f) {
 			switch (next.kind) {
 			case Token_OpenBrace:
 			case Token_else:
+				if (build_context.strict_style && !seen_where) {
+					syntax_error(next, "With '-strict-style' the attached brace style (1TBS) is enforced");
+				}
+				/*fallthrough*/
 			case Token_where:
 				advance_token(f);
 				return true;
@@ -2517,7 +2521,7 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 			return type;
 		}
 
-		skip_possible_newline_for_literal(f);
+		skip_possible_newline_for_literal(f, where_token.kind == Token_where);
 
 		if (allow_token(f, Token_Uninit)) {
 			if (where_token.kind != Token_Invalid) {
@@ -4497,6 +4501,9 @@ gb_internal bool parse_control_statement_semicolon_separator(AstFile *f) {
 	}
 	return false;
 }
+
+
+
 
 
 gb_internal Ast *parse_if_stmt(AstFile *f) {
