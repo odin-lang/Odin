@@ -24,7 +24,7 @@ Builder :: struct {
 	buf: [dynamic]byte,
 }
 /*
-Produces a Builder with a default length of 0 and cap of 16
+Produces an empty Builder
 
 *Allocates Using Provided Allocator*
 
@@ -39,7 +39,7 @@ builder_make_none :: proc(allocator := context.allocator, loc := #caller_locatio
 	return Builder{buf=make([dynamic]byte, allocator, loc) or_return }, nil
 }
 /*
-Produces a Builder with a specified length and cap of max(16,len) byte buffer
+Produces a Builder with specified length and capacity `len`.
 
 *Allocates Using Provided Allocator*
 
@@ -55,7 +55,7 @@ builder_make_len :: proc(len: int, allocator := context.allocator, loc := #calle
 	return Builder{buf=make([dynamic]byte, len, allocator, loc) or_return }, nil
 }
 /*
-Produces a Builder with a specified length and cap
+Produces a Builder with specified length `len` and capacity `cap`.
 
 *Allocates Using Provided Allocator*
 
@@ -103,7 +103,7 @@ builder_make :: proc{
 	builder_make_len_cap,
 }
 /*
-Initializes a Builder with a length of 0 and cap of 16
+Initializes an empty Builder
 It replaces the existing `buf`
 
 *Allocates Using Provided Allocator*
@@ -121,7 +121,7 @@ builder_init_none :: proc(b: ^Builder, allocator := context.allocator, loc := #c
 	return b, nil
 }
 /*
-Initializes a Builder with a specified length and cap, which is max(len,16)
+Initializes a Builder with specified length and capacity `len`.
 It replaces the existing `buf`
 
 *Allocates Using Provided Allocator*
@@ -140,7 +140,7 @@ builder_init_len :: proc(b: ^Builder, len: int, allocator := context.allocator, 
 	return b, nil
 }
 /*
-Initializes a Builder with a specified length and cap
+Initializes a Builder with specified length `len` and capacity `cap`.
 It replaces the existing `buf`
 
 Inputs:
