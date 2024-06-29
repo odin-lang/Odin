@@ -1279,7 +1279,6 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							break;
 						case BuildFlag_StrictStyle:
 							build_context.strict_style = true;
-							build_context.disallow_do = true;
 							break;
 						case BuildFlag_Short:
 							build_context.cmd_doc_flags |= CmdDocFlag_Short;
@@ -2364,7 +2363,6 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 		print_usage_line(2, "Errs on deprecated syntax.");
 		print_usage_line(2, "Errs when the attached-brace style in not adhered to (also known as 1TBS).");
 		print_usage_line(2, "Errs when 'case' labels are not in the same column as the associated 'switch' token.");
-		print_usage_line(2, "Disallows the 'do' keyword in the project (same as '-disallow-do').");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-ignore-warnings");
