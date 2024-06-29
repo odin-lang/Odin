@@ -2355,7 +2355,7 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 		print_usage_line(2, "Errs on unneeded tokens, such as unneeded semicolons.");
 		print_usage_line(2, "Errs on missing trailing commas followed by a newline.");
 		print_usage_line(2, "Errs on deprecated syntax.");
-		print_usage_line(2, "Errs when 'case' labels are not in the same column as the associated 'switch' token.");
+		print_usage_line(2, "Errs when the attached-brace style in not adhered to (also known as 1TBS).");
 		print_usage_line(2, "Errs when 'case' labels are not in the same column as the associated 'switch' token.");
 		print_usage_line(2, "Disallows the 'do' keyword in the project (same as '-disallow-do').");
 		print_usage_line(0, "");
