@@ -655,7 +655,7 @@ choice_enum :: proc($T: typeid) -> T
 	where
 		intrinsics.type_is_enum(T),
 		size_of(T) <= 8,
-		len(T) == cap(T) /* Only allow contiguous enum types */
+		len(T) == cap(T) /* Only allow contiguous enum types */ \
 {
 	when intrinsics.type_is_unsigned(intrinsics.type_core_type(T)) &&
 	     u64(max(T)) > u64(max(i64)) {

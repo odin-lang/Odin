@@ -240,8 +240,7 @@ decode_grapheme_clusters :: proc(
 			// GB8: (LVT | T)  ×   T
 			if is_hangul_syllable_leading(this_rune) ||
 			   is_hangul_syllable_lv(this_rune)      ||
-			   is_hangul_syllable_lvt(this_rune)
-			{
+			   is_hangul_syllable_lvt(this_rune) {
 				if !is_hangul_syllable_leading(last_rune) {
 					grapheme_count += 1
 				}
@@ -251,8 +250,7 @@ decode_grapheme_clusters :: proc(
 			if is_hangul_syllable_vowel(this_rune) {
 				if is_hangul_syllable_leading(last_rune) ||
 				   is_hangul_syllable_vowel(last_rune)   ||
-				   is_hangul_syllable_lv(last_rune)
-				{
+				   is_hangul_syllable_lv(last_rune) {
 					continue
 				}
 				grapheme_count += 1
@@ -263,8 +261,7 @@ decode_grapheme_clusters :: proc(
 				if is_hangul_syllable_trailing(last_rune) ||
 				   is_hangul_syllable_lvt(last_rune)      ||
 				   is_hangul_syllable_lv(last_rune)       ||
-				   is_hangul_syllable_vowel(last_rune)
-				{
+				   is_hangul_syllable_vowel(last_rune) {
 					continue
 				}
 				grapheme_count += 1
@@ -285,8 +282,7 @@ decode_grapheme_clusters :: proc(
 			if current_sequence == .Indic {
 				if is_indic_conjunct_break_extend(this_rune)    && (
 				   is_indic_conjunct_break_linker(last_rune)    ||
-				   is_indic_conjunct_break_consonant(last_rune)    )
-				{
+				   is_indic_conjunct_break_consonant(last_rune)    ) {
 					continue_sequence = true
 					continue
 				}
@@ -294,8 +290,7 @@ decode_grapheme_clusters :: proc(
 				if is_indic_conjunct_break_linker(this_rune)    && (
 				   is_indic_conjunct_break_linker(last_rune)    ||
 				   is_indic_conjunct_break_extend(last_rune)    ||
-				   is_indic_conjunct_break_consonant(last_rune)    )
-				{
+				   is_indic_conjunct_break_consonant(last_rune)    ) {
 					continue_sequence = true
 					continue
 				}
@@ -306,8 +301,7 @@ decode_grapheme_clusters :: proc(
 			// (Support for GB11.)
 			if current_sequence == .Emoji                && (
 			   is_gcb_extend_class(last_rune)            ||
-			   is_emoji_extended_pictographic(last_rune)    )
-			{
+			   is_emoji_extended_pictographic(last_rune)    ) {
 				continue_sequence = true
 			}
 
@@ -336,8 +330,7 @@ decode_grapheme_clusters :: proc(
 		if is_indic_conjunct_break_consonant(this_rune) {
 			if current_sequence == .Indic {
 				if last_rune == ZERO_WIDTH_JOINER            ||
-				   is_indic_conjunct_break_linker(last_rune)
-				{
+				   is_indic_conjunct_break_linker(last_rune) {
 					continue_sequence = true
 				} else {
 					grapheme_count += 1
@@ -353,8 +346,7 @@ decode_grapheme_clusters :: proc(
 		if is_indic_conjunct_break_extend(this_rune) {
 			if current_sequence == .Indic {
 				if is_indic_conjunct_break_consonant(last_rune) ||
-				   is_indic_conjunct_break_linker(last_rune)
-				{
+				   is_indic_conjunct_break_linker(last_rune) {
 					continue_sequence = true
 				} else {
 					grapheme_count += 1
@@ -366,8 +358,7 @@ decode_grapheme_clusters :: proc(
 		if is_indic_conjunct_break_linker(this_rune) {
 			if current_sequence == .Indic {
 				if is_indic_conjunct_break_extend(last_rune) ||
-				   is_indic_conjunct_break_linker(last_rune)
-				{
+				   is_indic_conjunct_break_linker(last_rune) {
 					continue_sequence = true
 				} else {
 					grapheme_count += 1

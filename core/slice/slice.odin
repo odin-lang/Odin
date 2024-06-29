@@ -156,8 +156,7 @@ linear_search_proc :: proc(array: $A/[]$T, f: proc(T) -> bool) -> (index: int, f
 */
 @(require_results)
 binary_search :: proc(array: $A/[]$T, key: T) -> (index: int, found: bool)
-	where intrinsics.type_is_ordered(T) #no_bounds_check
-{
+	where intrinsics.type_is_ordered(T) #no_bounds_check {
 	return binary_search_by(array, key, cmp_proc(T))
 }
 

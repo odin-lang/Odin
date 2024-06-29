@@ -897,19 +897,20 @@ XXH3_hashLong_64b_default :: #force_no_inline proc(input: []u8, seed64: xxh_u64,
 	why (uop cache maybe?), but the difference is large and easily measurable.
 */
 @(optimization_mode="speed")
-XXH3_hashLong_64b_withSeed_internal :: #force_no_inline proc(input: []u8,
-									seed:        xxh_u64,
-									f_acc512:    XXH3_accumulate_512_f,
-									f_scramble:  XXH3_scramble_accumulator_f,
-									f_init_sec:  XXH3_init_custom_secret_f) -> (hash: xxh_u64) {
+XXH3_hashLong_64b_withSeed_internal :: #force_no_inline proc(
+	input:       []u8,
+	seed:        xxh_u64,
+	f_acc512:    XXH3_accumulate_512_f,
+	f_scramble:  XXH3_scramble_accumulator_f,
+	f_init_sec:  XXH3_init_custom_secret_f,
+) -> (hash: xxh_u64) {
 	if seed == 0 {
 		return XXH3_hashLong_64b_internal(input, XXH3_kSecret[:], f_acc512, f_scramble)
 	}
-	{
-		secret: [XXH_SECRET_DEFAULT_SIZE]u8
-		f_init_sec(secret[:], seed)
-		return XXH3_hashLong_64b_internal(input, secret[:], f_acc512, f_scramble)
-	}
+
+	secret: [XXH_SECRET_DEFAULT_SIZE]u8
+	f_init_sec(secret[:], seed)
+	return XXH3_hashLong_64b_internal(input, secret[:], f_acc512, f_scramble)
 }
 
 /*
