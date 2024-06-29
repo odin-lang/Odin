@@ -98,7 +98,7 @@ decompress_slice_to_output_buffer :: proc(input: []u8, output: []u8, model := DE
 	validate_model(model) or_return
 
 	for inp < inp_end {
-		val  := transmute(i8)input[inp]
+		val  := i8(input[inp])
 		mark := int(-1)
 
 		for val < 0 {

@@ -1015,21 +1015,21 @@ modti3 :: proc "c" (a, b: i128) -> i128 {
 	bn := (b ~ s_b) - s_b
 
 	r: u128 = ---
-	_ = udivmod128(transmute(u128)an, transmute(u128)bn, &r)
-	return (transmute(i128)r ~ s_a) - s_a
+	_ = udivmod128(u128(an), u128(bn), &r)
+	return (i128(r) ~ s_a) - s_a
 }
 
 
 @(link_name="__divmodti4", linkage=RUNTIME_LINKAGE, require=RUNTIME_REQUIRE)
 divmodti4 :: proc "c" (a, b: i128, rem: ^i128) -> i128 {
-	u := udivmod128(transmute(u128)a, transmute(u128)b, cast(^u128)rem)
-	return transmute(i128)u
+	u := udivmod128(u128(a), u128(b), (^u128)(rem))
+	return i128(u)
 }
 
 @(link_name="__divti3", linkage=RUNTIME_LINKAGE, require=RUNTIME_REQUIRE)
 divti3 :: proc "c" (a, b: i128) -> i128 {
-	u := udivmodti4(transmute(u128)a, transmute(u128)b, nil)
-	return transmute(i128)u
+	u := udivmodti4(u128(a), u128(b), nil)
+	return i128(u)
 }
 
 
