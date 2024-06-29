@@ -68,12 +68,12 @@ init_512 :: proc(ctx: ^Context) {
 @(private)
 _init :: proc(ctx: ^Context) {
 	ctx.dsbyte = _sha3.DS_SHA3
-	_sha3.init(transmute(^_sha3.Context)(ctx))
+	_sha3.init((^_sha3.Context)(ctx))
 }
 
 // update adds more data to the Context.
 update :: proc(ctx: ^Context, data: []byte) {
-	_sha3.update(transmute(^_sha3.Context)(ctx), data)
+	_sha3.update((^_sha3.Context)(ctx), data)
 }
 
 // final finalizes the Context, writes the digest to hash, and calls
@@ -82,16 +82,16 @@ update :: proc(ctx: ^Context, data: []byte) {
 // Iff finalize_clone is set, final will work on a copy of the Context,
 // which is useful for for calculating rolling digests.
 final :: proc(ctx: ^Context, hash: []byte, finalize_clone: bool = false) {
-	_sha3.final(transmute(^_sha3.Context)(ctx), hash, finalize_clone)
+	_sha3.final((^_sha3.Context)(ctx), hash, finalize_clone)
 }
 
 // clone clones the Context other into ctx.
 clone :: proc(ctx, other: ^Context) {
-	_sha3.clone(transmute(^_sha3.Context)(ctx), transmute(^_sha3.Context)(other))
+	_sha3.clone((^_sha3.Context)(ctx), (^_sha3.Context)(other))
 }
 
 // reset sanitizes the Context.  The Context must be re-initialized to
 // be used again.
 reset :: proc(ctx: ^Context) {
-	_sha3.reset(transmute(^_sha3.Context)(ctx))
+	_sha3.reset((^_sha3.Context)(ctx))
 }

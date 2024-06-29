@@ -139,15 +139,13 @@ save_to_buffer  :: proc(output: ^bytes.Buffer, img: ^Image, options := Options{}
 					} else {
 						// Write RGB literal
 						output.buf[written] = u8(QOI_Opcode_Tag.RGB)
-						pix_bytes := transmute([4]u8)pix
-						copy(output.buf[written + 1:], pix_bytes[:3])
+						copy(output.buf[written + 1:], pix[:3])
 						written += 4
 					}
 				} else {
 					// Write RGBA literal
 					output.buf[written] = u8(QOI_Opcode_Tag.RGBA)
-					pix_bytes := transmute([4]u8)pix
-					copy(output.buf[written + 1:], pix_bytes[:])
+					copy(output.buf[written + 1:], pix[:])
 					written += 5
 				}
 			}

@@ -883,8 +883,8 @@ absolute_path_from_relative :: proc(rel: string) -> (path: string, err: Errno) {
 	}
 	defer _unix_free(path_ptr)
 
-	path_cstr := transmute(cstring)path_ptr
-	path = strings.clone( string(path_cstr) )
+	path_cstr := cast(cstring)path_ptr
+	path = strings.clone(string(path_cstr))
 
 	return path, ERROR_NONE
 }

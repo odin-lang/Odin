@@ -85,13 +85,13 @@ dirent_iterate_buf :: proc "contextless" (buf: []u8, offs: ^int) -> (d: ^Dirent,
 /// Obtain the name of dirent as a string
 /// The lifetime of the string is bound to the lifetime of the provided dirent structure
 dirent_name :: proc "contextless" (dirent: ^Dirent) -> string #no_bounds_check {
-	str := transmute([^]u8) &dirent.name
+	str := ([^]u8)(&dirent.name)
 	// Note(flysand): The string size calculated above applies only to the ideal case
 	// we subtract 1 byte from the string size, because a null terminator is guaranteed
 	// to be present. But! That said, the dirents are aligned to 8 bytes and the padding
 	// between the null terminator and the start of the next struct may be not initialized
 	// which means we also have to scan these garbage bytes.
-	str_size := (cast(int) dirent.reclen) - 1 - cast(int) offset_of(Dirent, name)
+	str_size := int(dirent.reclen) - 1 - cast(int)offset_of(Dirent, name)
 	// This skips *only* over the garbage, since if we're not garbage we're at nul terminator,
 	// which skips this loop
 	for str[str_size] != 0 {

@@ -117,7 +117,7 @@ init_cpu_name :: proc "c" () {
 		return
 	}
 
-	_buf := transmute(^[0x12]u32)&_cpu_name_buf
+	_buf := (^[0x12]u32)(&_cpu_name_buf)
 	_buf[ 0], _buf[ 1], _buf[ 2], _buf[ 3] = cpuid(0x8000_0002, 0)
 	_buf[ 4], _buf[ 5], _buf[ 6], _buf[ 7] = cpuid(0x8000_0003, 0)
 	_buf[ 8], _buf[ 9], _buf[10], _buf[11] = cpuid(0x8000_0004, 0)

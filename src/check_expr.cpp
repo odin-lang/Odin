@@ -3396,7 +3396,7 @@ gb_internal void check_cast(CheckerContext *c, Operand *x, Type *type, bool forb
 			) {
 				gbString oper_str = expr_to_string(x->expr);
 				gbString to_type  = type_to_string(dst_exact);
-				error(x->expr, "Unneeded cast of `%s` to identical type `%s`", oper_str, to_type);
+				error(x->expr, "Unneeded cast of '%s' to identical type '%s'", oper_str, to_type);
 				gb_string_free(oper_str);
 				gb_string_free(to_type);
 			}
@@ -3406,21 +3406,12 @@ gb_internal void check_cast(CheckerContext *c, Operand *x, Type *type, bool forb
 	x->type = type;
 }
 
-gb_internal bool check_transmute(CheckerContext *c, Ast *node, Operand *o, Type *t) {
+gb_internal bool check_transmute(CheckerContext *c, Ast *node, Operand *o, Type *t, bool forbid_identical = false) {
 	if (!is_operand_value(*o)) {
 		error(o->expr, "'transmute' can only be applied to values");
 		o->mode = Addressing_Invalid;
 		return false;
 	}
-
-	// if (o->mode == Addressing_Constant) {
-	// 	gbString expr_str = expr_to_string(o->expr);
-	// 	error(o->expr, "Cannot transmute a constant expression: '%s'", expr_str);
-	// 	gb_string_free(expr_str);
-	// 	o->mode = Addressing_Invalid;
-	// 	o->expr = node;
-	// 	return false;
-	// }
 
 	Type *src_t = o->type;
 	Type *dst_t = t;
@@ -3502,6 +3493,29 @@ gb_internal bool check_transmute(CheckerContext *c, Ast *node, Operand *o, Type 
 				o->value.kind = ExactValue_Integer;
 				o->value.value_integer = v;
 				return true;
+			}
+		}
+	} else {
+		// If we check polymorphic procedures, we risk erring on
+		// identical casts that cannot be foreseen or otherwise
+		// forbidden, so just skip them.
+		if (forbid_identical && check_vet_flags(c) & VetFlag_Cast &&
+		    (c->curr_proc_sig == nullptr || !is_type_polymorphic(c->curr_proc_sig))) {
+			bool is_runtime = false;
+			if (c->pkg && (c->pkg->kind == Package_Runtime || c->pkg->kind == Package_Builtin)) {
+				is_runtime = true;
+			}
+			if (are_types_identical(src_t, dst_t) && !is_runtime) {
+				gbString oper_str = expr_to_string(o->expr);
+				gbString to_type  = type_to_string(dst_t);
+				error(o->expr, "Unneeded transmute of '%s' to identical type '%s'", oper_str, to_type);
+				gb_string_free(oper_str);
+				gb_string_free(to_type);
+			} else if (is_type_internally_pointer_like(src_t) &&
+			           is_type_internally_pointer_like(dst_t)) {
+				gbString to_type  = type_to_string(dst_t);
+				error(o->expr, "Use of 'transmute' where 'cast' would be preferred since the types are pointer-like", to_type);
+				gb_string_free(to_type);
 			}
 		}
 	}
@@ -10734,7 +10748,7 @@ gb_internal ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast
 		if (o->mode != Addressing_Invalid) {
 			switch (tc->token.kind) {
 			case Token_transmute:
-				check_transmute(c, node, o, type);
+				check_transmute(c, node, o, type, true);
 				break;
 			case Token_cast:
 				check_cast(c, o, type, true);

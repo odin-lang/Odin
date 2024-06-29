@@ -6,13 +6,13 @@ import "core:mem"
 fe_relax_cast :: #force_inline proc "contextless" (
 	arg1: ^Tight_Field_Element,
 ) -> ^Loose_Field_Element {
-	return transmute(^Loose_Field_Element)(arg1)
+	return (^Loose_Field_Element)(arg1)
 }
 
 fe_tighten_cast :: #force_inline proc "contextless" (
 	arg1: ^Loose_Field_Element,
 ) -> ^Tight_Field_Element {
-	return transmute(^Tight_Field_Element)(arg1)
+	return (^Tight_Field_Element)(arg1)
 }
 
 fe_clear :: proc "contextless" (
