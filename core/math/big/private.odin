@@ -975,7 +975,7 @@ _private_int_div_3 :: proc(quotient, numerator: ^Int, allocator := context.alloc
 	q.sign = numerator.sign
 
 	w, t: _WORD
-	#no_bounds_check for ix := numerator.used; ix >= 0; ix -= 1 {
+	#no_bounds_check for ix := numerator.used - 1; ix >= 0; ix -= 1 {
 		w = (w << _WORD(_DIGIT_BITS)) | _WORD(numerator.digit[ix])
 		if w >= 3 {
 			/*
