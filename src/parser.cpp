@@ -5286,12 +5286,53 @@ gb_internal Ast *parse_stmt(AstFile *f) {
 	return ast_bad_stmt(f, token, f->curr_token);
 }
 
+
+
+gb_internal u64 check_vet_flags(AstFile *file) {
+	if (file && file->vet_flags_set) {
+		return file->vet_flags;
+	}
+	return build_context.vet_flags;
+}
+
+
+gb_internal void parse_enforce_tabs(AstFile *f) {
+       	Token prev = f->prev_token;
+	Token curr = f->curr_token;
+	if (prev.pos.line < curr.pos.line) {
+		u8 *start = f->tokenizer.start+prev.pos.offset;
+		u8 *end   = f->tokenizer.start+curr.pos.offset;
+		u8 *it = end;
+		while (it > start) {
+			if (*it == '\n') {
+				it++;
+				break;
+			}
+			it--;
+		}
+
+		isize len = end-it;
+		for (isize i = 0; i < len; i++) {
+			if (it[i] == ' ') {
+				syntax_error(curr, "With '-vet-tabs', tabs must be used for indentation");
+				break;
+			}
+		}
+	}
+}
+
 gb_internal Array<Ast *> parse_stmt_list(AstFile *f) {
 	auto list = array_make<Ast *>(ast_allocator(f));
 
 	while (f->curr_token.kind != Token_case &&
 	       f->curr_token.kind != Token_CloseBrace &&
 	       f->curr_token.kind != Token_EOF) {
+
+		// Checks to see if tabs have been used for indentation
+	       	if (check_vet_flags(f) & VetFlag_Tabs) {
+		       parse_enforce_tabs(f);
+		}
+
 		Ast *stmt = parse_stmt(f);
 		if (stmt && stmt->kind != Ast_EmptyStmt) {
 			array_add(&list, stmt);

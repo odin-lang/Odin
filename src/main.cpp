@@ -301,6 +301,7 @@ enum BuildFlagKind {
 	BuildFlag_VetStyle,
 	BuildFlag_VetSemicolon,
 	BuildFlag_VetCast,
+	BuildFlag_VetTabs,
 
 	BuildFlag_CustomAttribute,
 	BuildFlag_IgnoreUnknownAttributes,
@@ -502,6 +503,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_VetStyle,                str_lit("vet-style"),                 BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_VetSemicolon,            str_lit("vet-semicolon"),             BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_VetCast,                 str_lit("vet-cast"),                  BuildFlagParam_None,    Command__does_check);
+	add_flag(&build_flags, BuildFlag_VetTabs,                 str_lit("vet-tabs"),                  BuildFlagParam_None,    Command__does_check);
 
 	add_flag(&build_flags, BuildFlag_CustomAttribute,         str_lit("custom-attribute"),          BuildFlagParam_String,  Command__does_check, true);
 	add_flag(&build_flags, BuildFlag_IgnoreUnknownAttributes, str_lit("ignore-unknown-attributes"), BuildFlagParam_None,    Command__does_check);
@@ -1157,6 +1159,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_VetStyle:           build_context.vet_flags |= VetFlag_Style;           break;
 						case BuildFlag_VetSemicolon:       build_context.vet_flags |= VetFlag_Semicolon;       break;
 						case BuildFlag_VetCast:            build_context.vet_flags |= VetFlag_Cast;            break;
+						case BuildFlag_VetTabs:            build_context.vet_flags |= VetFlag_Tabs;            break;
 
 						case BuildFlag_CustomAttribute:
 							{
@@ -2255,6 +2258,10 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 
 		print_usage_line(1, "-vet-cast");
 		print_usage_line(2, "Errs on casting a value to its own type or using `transmute` rather than `cast`.");
+		print_usage_line(0, "");
+
+		print_usage_line(1, "-vet-tabs");
+		print_usage_line(2, "Errs when the use of tabs has not been used for indentation.");
 		print_usage_line(0, "");
 	}
 
