@@ -878,6 +878,7 @@ struct BuildContext {
 
 	bool   ignore_lazy;
 	bool   ignore_llvm_build;
+	bool   ignore_panic;
 
 	bool   ignore_microsoft_magic;
 	bool   linker_map_file;

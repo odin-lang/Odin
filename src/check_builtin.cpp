@@ -1726,11 +1726,13 @@ gb_internal bool check_builtin_procedure_directive(CheckerContext *c, Operand *o
 			gb_string_free(str);
 			return false;
 		}
-		error(call, "Compile time panic: %.*s", LIT(operand->value.value_string));
-		if (c->proc_name != "") {
-			gbString str = type_to_string(c->curr_proc_sig);
-			error_line("\tCalled within '%.*s' :: %s\n", LIT(c->proc_name), str);
-			gb_string_free(str);
+		if (!build_context.ignore_panic) {
+			error(call, "Compile time panic: %.*s", LIT(operand->value.value_string));
+			if (c->proc_name != "") {
+				gbString str = type_to_string(c->curr_proc_sig);
+				error_line("\tCalled within '%.*s' :: %s\n", LIT(c->proc_name), str);
+				gb_string_free(str);
+			}
 		}
 		operand->type = t_invalid;
 		operand->mode = Addressing_NoValue;
