@@ -3310,7 +3310,7 @@ gb_internal bool check_cast_internal(CheckerContext *c, Operand *x, Type *type) 
 
 }
 
-gb_internal void check_cast(CheckerContext *c, Operand *x, Type *type) {
+gb_internal void check_cast(CheckerContext *c, Operand *x, Type *type, bool forbid_identical = false) {
 	if (!is_operand_value(*x)) {
 		error(x->expr, "Only values can be casted");
 		x->mode = Addressing_Invalid;
@@ -3380,6 +3380,25 @@ gb_internal void check_cast(CheckerContext *c, Operand *x, Type *type) {
 				add_package_dependency(c, "runtime", "truncsfhf2",         REQUIRE);
 				add_package_dependency(c, "runtime", "truncdfhf2",         REQUIRE);
 				add_package_dependency(c, "runtime", "gnu_f2h_ieee",       REQUIRE);
+			}
+		}
+		if (forbid_identical && check_vet_flags(c) & VetFlag_IdenticalCast) {
+			Type *src_exact = x->type;
+			Type *dst_exact = type;
+
+			if (src_exact != nullptr &&
+				dst_exact != nullptr &&
+				// If we check polymorphic procedures, we risk erring on
+				// identical casts that cannot be foreseen or otherwise
+				// forbidden, so just skip them.
+				(c->curr_proc_sig == nullptr || !is_type_polymorphic(c->curr_proc_sig)) &&
+				src_exact == dst_exact)
+			{
+				gbString oper_str = expr_to_string(x->expr);
+				gbString to_type  = type_to_string(dst_exact);
+				error(x->expr, "Unneeded cast of `%s` to identical type `%s`", oper_str, to_type);
+				gb_string_free(oper_str);
+				gb_string_free(to_type);
 			}
 		}
 	}
@@ -10718,7 +10737,7 @@ gb_internal ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast
 				check_transmute(c, node, o, type);
 				break;
 			case Token_cast:
-				check_cast(c, o, type);
+				check_cast(c, o, type, true);
 				break;
 			default:
 				error(node, "Invalid AST: Invalid casting expression");
