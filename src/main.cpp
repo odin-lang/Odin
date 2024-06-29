@@ -2350,6 +2350,8 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-strict-style");
+		print_usage_line(2, "This enforces parts of same style as the Odin compiler, prefer '-vet-style -vet-semicolon' if you do not want to match it exactly.");
+		print_usage_line(2, "");
 		print_usage_line(2, "Errs on unneeded tokens, such as unneeded semicolons.");
 		print_usage_line(2, "Errs on missing trailing commas followed by a newline.");
 		print_usage_line(2, "Errs on deprecated syntax.");
