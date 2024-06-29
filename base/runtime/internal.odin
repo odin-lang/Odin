@@ -642,21 +642,24 @@ abs_quaternion256 :: #force_inline proc "contextless" (x: quaternion256) -> f64 
 
 
 quo_complex32 :: proc "contextless" (n, m: complex32) -> complex32 {
-	e, f: f16
+	nr, ni := f32(real(n)), f32(imag(n))
+	mr, mi := f32(real(m)), f32(imag(m))
 
-	if abs(real(m)) >= abs(imag(m)) {
-		ratio := imag(m) / real(m)
-		denom := real(m) + ratio*imag(m)
-		e = (real(n) + imag(n)*ratio) / denom
-		f = (imag(n) - real(n)*ratio) / denom
+	e, f: f32
+
+	if abs(mr) >= abs(mi) {
+		ratio := mi / mr
+		denom := mr + ratio*mi
+		e = (nr + ni*ratio) / denom
+		f = (ni - nr*ratio) / denom
 	} else {
-		ratio := real(m) / imag(m)
-		denom := imag(m) + ratio*real(m)
-		e = (real(n)*ratio + imag(n)) / denom
-		f = (imag(n)*ratio - real(n)) / denom
+		ratio := mr / mi
+		denom := mi + ratio*mr
+		e = (nr*ratio + ni) / denom
+		f = (ni*ratio - nr) / denom
 	}
 
-	return complex(e, f)
+	return complex(f16(e), f16(f))
 }
 
 
@@ -697,15 +700,15 @@ quo_complex128 :: proc "contextless" (n, m: complex128) -> complex128 {
 }
 
 mul_quaternion64 :: proc "contextless" (q, r: quaternion64) -> quaternion64 {
-	q0, q1, q2, q3 := real(q), imag(q), jmag(q), kmag(q)
-	r0, r1, r2, r3 := real(r), imag(r), jmag(r), kmag(r)
+	q0, q1, q2, q3 := f32(real(q)), f32(imag(q)), f32(jmag(q)), f32(kmag(q))
+	r0, r1, r2, r3 := f32(real(r)), f32(imag(r)), f32(jmag(r)), f32(kmag(r))
 
 	t0 := r0*q0 - r1*q1 - r2*q2 - r3*q3
 	t1 := r0*q1 + r1*q0 - r2*q3 + r3*q2
 	t2 := r0*q2 + r1*q3 + r2*q0 - r3*q1
 	t3 := r0*q3 - r1*q2 + r2*q1 + r3*q0
 
-	return quaternion(w=t0, x=t1, y=t2, z=t3)
+	return quaternion(w=f16(t0), x=f16(t1), y=f16(t2), z=f16(t3))
 }
 
 mul_quaternion128 :: proc "contextless" (q, r: quaternion128) -> quaternion128 {
@@ -733,8 +736,8 @@ mul_quaternion256 :: proc "contextless" (q, r: quaternion256) -> quaternion256 {
 }
 
 quo_quaternion64 :: proc "contextless" (q, r: quaternion64) -> quaternion64 {
-	q0, q1, q2, q3 := real(q), imag(q), jmag(q), kmag(q)
-	r0, r1, r2, r3 := real(r), imag(r), jmag(r), kmag(r)
+	q0, q1, q2, q3 := f32(real(q)), f32(imag(q)), f32(jmag(q)), f32(kmag(q))
+	r0, r1, r2, r3 := f32(real(r)), f32(imag(r)), f32(jmag(r)), f32(kmag(r))
 
 	invmag2 := 1.0 / (r0*r0 + r1*r1 + r2*r2 + r3*r3)
 
@@ -743,7 +746,7 @@ quo_quaternion64 :: proc "contextless" (q, r: quaternion64) -> quaternion64 {
 	t2 := (r0*q2 - r1*q3 - r2*q0 + r3*q1) * invmag2
 	t3 := (r0*q3 + r1*q2 + r2*q1 - r3*q0) * invmag2
 
-	return quaternion(w=t0, x=t1, y=t2, z=t3)
+	return quaternion(w=f16(t0), x=f16(t1), y=f16(t2), z=f16(t3))
 }
 
 quo_quaternion128 :: proc "contextless" (q, r: quaternion128) -> quaternion128 {
