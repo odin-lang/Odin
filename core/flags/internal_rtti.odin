@@ -184,7 +184,7 @@ parse_and_set_pointer_by_base_type :: proc(ptr: rawptr, str: string, type_info: 
 			case 16:  (cast(^u16)  ptr)^ = cast(u16)  value
 			case 32:  (cast(^u32)  ptr)^ = cast(u32)  value
 			case 64:  (cast(^u64)  ptr)^ = cast(u64)  value
-			case 128: (cast(^u128) ptr)^ = cast(u128) value
+			case 128: (cast(^u128) ptr)^ =            value
 			}
 		}
 
