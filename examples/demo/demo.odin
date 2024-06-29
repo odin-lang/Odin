@@ -1140,6 +1140,7 @@ prefix_table := [?]string{
 
 print_mutex := b64(false)
 
+@(disabled=!thread.IS_SUPPORTED)
 threading_example :: proc() {
 	fmt.println("\n# threading_example")
 

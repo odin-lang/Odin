@@ -6,6 +6,8 @@ import "base:intrinsics"
 import "core:sync"
 import win32 "core:sys/windows"
 
+_IS_SUPPORTED :: true
+
 Thread_Os_Specific :: struct {
 	win32_thread:    win32.HANDLE,
 	win32_thread_id: win32.DWORD,
