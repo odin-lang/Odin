@@ -35,12 +35,10 @@ test_split_list_windows :: proc(t: ^testing.T) {
 		assert(i == d.i, fmt.tprintf("wrong data index: i %d != d.i %d\n", i, d.i))
 		r := filepath.split_list(d.v)
 		defer delete_split(r)
-		testing.expect(t, len(r) == len(d.e), fmt.tprintf("i:%d %s(%s) len(r) %d != len(d.e) %d",
-													 i, #procedure, d.v, len(r), len(d.e)))
+		testing.expect(t, len(r) == len(d.e), fmt.tprintf("i:%d %s(%s) len(r) %d != len(d.e) %d", i, #procedure, d.v, len(r), len(d.e)))
 		if len(r) == len(d.e) {
 			for _, j in r {
-				testing.expect(t, r[j] == d.e[j], fmt.tprintf("i:%d %s(%v) -> %v[%d] != %v",
-														 i, #procedure, d.v, r[j], j, d.e[j]))
+				testing.expect(t, r[j] == d.e[j], fmt.tprintf("i:%d %s(%v) -> %v[%d] != %v", i, #procedure, d.v, r[j], j, d.e[j]))
 			}
 		}
 	}
