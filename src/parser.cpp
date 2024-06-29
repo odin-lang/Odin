@@ -4573,9 +4573,12 @@ gb_internal Ast *parse_when_stmt(AstFile *f) {
 
 	isize prev_level = f->expr_level;
 	f->expr_level = -1;
+	bool prev_allow_in_expr = f->allow_in_expr;
+	f->allow_in_expr = true;
 
 	cond = parse_expr(f, false);
 
+	f->allow_in_expr = prev_allow_in_expr;
 	f->expr_level = prev_level;
 
 	if (cond == nullptr) {

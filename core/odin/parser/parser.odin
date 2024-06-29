@@ -689,7 +689,12 @@ parse_when_stmt :: proc(p: ^Parser) -> ^ast.When_Stmt {
 
 	prev_level := p.expr_level
 	p.expr_level = -1
+	prev_allow_in_expr := p.allow_in_expr
+	p.allow_in_expr = true
+
 	cond = parse_expr(p, false)
+
+	p.allow_in_expr = prev_allow_in_expr
 	p.expr_level = prev_level
 
 	if cond == nil {
