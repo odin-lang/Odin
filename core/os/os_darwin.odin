@@ -896,7 +896,7 @@ access :: proc(path: string, mask: int) -> bool {
 }
 
 flush :: proc(fd: Handle) -> Errno {
-    return cast(Errno)_unix_fsync(fd)
+	return cast(Errno)_unix_fsync(fd)
 }
 
 lookup_env :: proc(key: string, allocator := context.allocator) -> (value: string, found: bool) {

@@ -242,7 +242,7 @@ is_enclosing_mark :: proc(r: rune) -> bool {
 	     0x20DD ..= 0x20E0,
 	     0x20E2 ..= 0x20E4,
 	     0xA670 ..= 0xA672:
-	     return true
+		return true
 	}
 
 	return false

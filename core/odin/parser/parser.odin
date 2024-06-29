@@ -308,7 +308,7 @@ consume_comment_group :: proc(p: ^Parser, n: int) -> (comments: ^ast.Comment_Gro
 	end_line = p.curr_tok.pos.line
 	for p.curr_tok.kind == .Comment &&
 	    p.curr_tok.pos.line <= end_line+n {
-	    comment: tokenizer.Token
+		comment: tokenizer.Token
 		comment, end_line = consume_comment(p)
 		append(&list, comment)
 	}
@@ -1315,8 +1315,8 @@ parse_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 	     // Unary Expressions
 	     .Add, .Sub, .Xor, .Not, .And:
 
-	    s := parse_simple_stmt(p, {Stmt_Allow_Flag.Label})
-	    expect_semicolon(p, s)
+		s := parse_simple_stmt(p, {Stmt_Allow_Flag.Label})
+		expect_semicolon(p, s)
 		return s
 
 
@@ -1853,7 +1853,7 @@ parse_ident_list :: proc(p: ^Parser, allow_poly_names: bool) -> []^ast.Expr {
 		}
 		if p.curr_tok.kind != .Comma ||
 		   p.curr_tok.kind == .EOF {
-		   	break
+			break
 		}
 		advance_token(p)
 	}
@@ -2216,10 +2216,10 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 
 	case .Integer, .Float, .Imag,
 	     .Rune, .String:
-	     tok := advance_token(p)
-	     bl := ast.new(ast.Basic_Lit, tok.pos, end_pos(tok))
-	     bl.tok = tok
-	     return bl
+		tok := advance_token(p)
+		bl := ast.new(ast.Basic_Lit, tok.pos, end_pos(tok))
+		bl.tok = tok
+		return bl
 
 	case .Open_Brace:
 		if !lhs {
@@ -3007,7 +3007,7 @@ parse_literal_value :: proc(p: ^Parser, type: ^ast.Expr) -> ^ast.Comp_Lit {
 	}
 	p.expr_level -= 1
 
-  	skip_possible_newline(p)
+	skip_possible_newline(p)
 	close := expect_closing_brace_of_field_list(p)
 
 	pos := type.pos if type != nil else open.pos

@@ -71,7 +71,7 @@ save_to_buffer  :: proc(output: ^bytes.Buffer, img: ^Image, options := Options{}
 	written := 0
 
 	if resize(&output.buf, int(header.size)) != nil {
-	 	return .Unable_To_Allocate_Or_Resize
+		return .Unable_To_Allocate_Or_Resize
 	}
 
 	header_bytes := transmute([size_of(image.BMP_Header)]u8)header
@@ -735,7 +735,7 @@ destroy :: proc(img: ^Image) {
 
 	bytes.buffer_destroy(&img.pixels)
 	if v, ok := img.metadata.(^image.BMP_Info); ok {
-	 	free(v)
+		free(v)
 	}
 	free(img)
 }

@@ -304,7 +304,7 @@ try_recv_raw :: proc "contextless" (c: ^Raw_Chan, msg_out: rawptr) -> bool {
 
 		if sync.atomic_load(&c.closed) ||
 		   sync.atomic_load(&c.w_waiting) == 0 {
-		   	return false
+			return false
 		}
 
 		mem.copy(msg_out, c.unbuffered_data, int(c.msg_size))

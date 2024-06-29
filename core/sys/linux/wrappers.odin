@@ -48,7 +48,7 @@ WCOREDUMP :: #force_inline proc "contextless" (s: u32) -> bool {
 	return 1 << ((cast(uint)(sig) - 1) % (8*size_of(uint)))
 }
 @private _sigword :: proc "contextless" (sig: Signal) -> (uint) {
-  return (cast(uint)sig - 1) / (8*size_of(uint))
+	return (cast(uint)sig - 1) / (8*size_of(uint))
 }
 
 // TODO: sigaddset etc

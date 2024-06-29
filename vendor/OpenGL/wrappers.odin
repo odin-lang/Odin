@@ -781,17 +781,17 @@ when !GL_DEBUG {
 			{
 				// add input arguments
 				for arg, arg_index in args[num_ret:] {
-				if arg_index > 0 { fmt.printf(", ") }
+					if arg_index > 0 { fmt.printf(", ") }
 
-				if v, ok := arg.(u32); ok { // TODO: Assumes all u32 are GLenum (they're not, GLbitfield and GLuint are also mapped to u32), fix later by better typing
-					if err == .INVALID_ENUM {
-						fmt.printf("INVALID_ENUM=%d", v)
+					if v, ok := arg.(u32); ok { // TODO: Assumes all u32 are GLenum (they're not, GLbitfield and GLuint are also mapped to u32), fix later by better typing
+						if err == .INVALID_ENUM {
+							fmt.printf("INVALID_ENUM=%d", v)
+						} else {
+							fmt.printf("GL_%v=%d", GL_Enum(v), v)
+						}
 					} else {
-						fmt.printf("GL_%v=%d", GL_Enum(v), v)
+						fmt.printf("%v", arg)
 					}
-				} else {
-					fmt.printf("%v", arg)
-				}
 				}
 
 				// add return arguments
@@ -810,7 +810,7 @@ when !GL_DEBUG {
 			}
 
 			// add location
-		    fmt.printf("   in:   %s(%d:%d)\n", from_loc.file_path, from_loc.line, from_loc.column)
+			fmt.printf("   in:   %s(%d:%d)\n", from_loc.file_path, from_loc.line, from_loc.column)
 		}
 	}
 

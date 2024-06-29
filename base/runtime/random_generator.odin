@@ -83,7 +83,7 @@ default_random_generator_proc :: proc(data: rawptr, mode: Random_Generator_Mode,
 	switch mode {
 	case .Read:
 		if r.state == 0 && r.inc == 0 {
-		   	init(r, 0)
+			init(r, 0)
 		}
 
 		switch len(p) {
@@ -108,7 +108,7 @@ default_random_generator_proc :: proc(data: rawptr, mode: Random_Generator_Mode,
 	case .Reset:
 		seed: u64
 		mem_copy_non_overlapping(&seed, raw_data(p), min(size_of(seed), len(p)))
-	   	init(r, seed)
+		init(r, seed)
 
 	case .Query_Info:
 		if len(p) != size_of(Random_Generator_Query_Info) {

@@ -387,17 +387,17 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 			case runtime.Type_Info_Pointer,
 			     runtime.Type_Info_Multi_Pointer,
 			     runtime.Type_Info_Procedure:
-			     	return (^rawptr)(v.data)^ == nil
+				return (^rawptr)(v.data)^ == nil
 			case runtime.Type_Info_Dynamic_Array:
-			     	return (^runtime.Raw_Dynamic_Array)(v.data).len == 0
+				return (^runtime.Raw_Dynamic_Array)(v.data).len == 0
 			case runtime.Type_Info_Slice:
-			     	return (^runtime.Raw_Slice)(v.data).len == 0
+				return (^runtime.Raw_Slice)(v.data).len == 0
 			case runtime.Type_Info_Union,
 			     runtime.Type_Info_Bit_Set,
 			     runtime.Type_Info_Soa_Pointer:
 				return reflect.is_nil(v)
 			case runtime.Type_Info_Map:
-			     	return (^runtime.Raw_Map)(v.data).len == 0
+				return (^runtime.Raw_Map)(v.data).len == 0
 			}
 			return false
 		}

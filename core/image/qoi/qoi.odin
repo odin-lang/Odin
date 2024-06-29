@@ -230,7 +230,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 	bytes_needed := image.compute_buffer_size(int(header.width), int(header.height), img.channels, 8)
 
 	if resize(&img.pixels.buf, bytes_needed) != nil {
-	 	return img, .Unable_To_Allocate_Or_Resize
+		return img, .Unable_To_Allocate_Or_Resize
 	}
 
 	/*
@@ -341,7 +341,7 @@ destroy :: proc(img: ^Image) {
 	bytes.buffer_destroy(&img.pixels)
 
 	if v, ok := img.metadata.(^image.QOI_Info); ok {
-	 	free(v)
+		free(v)
 	}
 	free(img)
 }

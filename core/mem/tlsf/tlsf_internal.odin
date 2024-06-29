@@ -214,7 +214,7 @@ block_next :: proc(block: ^Block_Header) -> (next: ^Block_Header) {
 block_link_next :: proc(block: ^Block_Header) -> (next: ^Block_Header) {
 	next = block_next(block)
 	next.prev_phys_block = block
- 	return
+	return
 }
 
 block_mark_as_free :: proc(block: ^Block_Header) {

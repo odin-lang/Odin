@@ -92,7 +92,7 @@ _user_formatters: ^map[typeid]User_Formatter
 //
 set_user_formatters :: proc(m: ^map[typeid]User_Formatter) {
 	assert(_user_formatters == nil, "set_user_formatters must not be called more than once.")
-    _user_formatters = m
+	_user_formatters = m
 }
 // Registers a user-defined formatter for a specific typeid
 //
@@ -1229,10 +1229,10 @@ _fmt_memory :: proc(fi: ^Info, u: u64, is_signed: bool, bit_size: int, units: st
 	// Add the unit at the end.
 	copy(buf[len(str):], units[off:off+unit_len])
 	str = string(buf[:len(str)+unit_len])
-	 
-	 if !fi.plus {
-	 	// Strip sign from "+<value>" but not "+Inf".
-	 	if str[0] == '+' && str[1] != 'I' {
+
+	if !fi.plus {
+		// Strip sign from "+<value>" but not "+Inf".
+		if str[0] == '+' && str[1] != 'I' {
 			str = str[1:] 
 		}
 	}
@@ -1765,7 +1765,7 @@ fmt_bit_set :: proc(fi: ^Info, v: any, name: string = "", verb: rune = 'v') {
 
 			if is_enum {
 				enum_name: string
-			 	if ti_named, is_named := info.elem.variant.(runtime.Type_Info_Named); is_named {
+				if ti_named, is_named := info.elem.variant.(runtime.Type_Info_Named); is_named {
 					enum_name = ti_named.name
 				}
 				for ev, evi in e.values {
@@ -2709,7 +2709,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 							return
 						}
 						if fi.indirection_level < 1 {
-						  	fi.indirection_level += 1
+							fi.indirection_level += 1
 							defer fi.indirection_level -= 1
 							io.write_byte(fi.writer, '&')
 							fmt_value(fi, a, verb)
@@ -2778,7 +2778,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 				     runtime.Type_Info_Dynamic_Array,
 				     runtime.Type_Info_Map:
 					if fi.indirection_level < 1 {
-					  	fi.indirection_level += 1
+						fi.indirection_level += 1
 						defer fi.indirection_level -= 1
 						io.write_byte(fi.writer, '&', &fi.n)
 						fmt_value(fi, a, verb)

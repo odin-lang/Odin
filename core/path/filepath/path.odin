@@ -432,7 +432,7 @@ rel :: proc(base_path, target_path: string, allocator := context.allocator) -> (
 	then `"."` is returned.
 */
 dir :: proc(path: string, allocator := context.allocator) -> string {
-        context.allocator = allocator
+	context.allocator = allocator
 	vol := volume_name(path)
 	i := len(path) - 1
 	for i >= len(vol) && !is_separator(path[i]) {

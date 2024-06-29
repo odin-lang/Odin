@@ -2275,7 +2275,7 @@ arbitrary_precision_mathematics :: proc() {
 		}
 		fmt.printf(as)
 		if print_extra_info {
-		 	fmt.printf(" (base: %v, bits: %v, digits: %v)", base, cb, a.used)
+			fmt.printf(" (base: %v, bits: %v, digits: %v)", base, cb, a.used)
 		}
 		if newline {
 			fmt.println()

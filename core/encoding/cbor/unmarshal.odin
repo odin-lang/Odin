@@ -273,13 +273,13 @@ _unmarshal_value :: proc(d: Decoder, v: any, hdr: Header, allocator := context.a
 
 		 // NOTE: Because this is a special type and not to be treated as a general integer,
 		 // We only put the value of it in fields that are explicitly of type `Simple`.
-		 switch &dst in v {
-		 case Simple:
-			 dst = decoded
-			 return
-		 case:
-		 	return _unsupported(v, hdr, add)
-		 }
+		switch &dst in v {
+		case Simple:
+			dst = decoded
+			return
+		case:
+			return _unsupported(v, hdr, add)
+		}
 
 	case .Tag:
 		switch &dst in v {

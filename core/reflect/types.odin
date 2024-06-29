@@ -114,7 +114,7 @@ are_types_identical :: proc(a, b: ^Type_Info) -> bool {
 
 	case Type_Info_Struct:
 		y := b.variant.(Type_Info_Struct) or_return
-	   	switch {
+		switch {
 		case len(x.types)    != len(y.types),
 		     x.is_packed     != y.is_packed,
 		     x.is_raw_union  != y.is_raw_union,
@@ -122,7 +122,7 @@ are_types_identical :: proc(a, b: ^Type_Info) -> bool {
 		     x.soa_kind      != y.soa_kind,
 		     x.soa_base_type != y.soa_base_type,
 		     x.soa_len       != y.soa_len:
-		     return false
+			return false
 		}
 		for _, i in x.types {
 			xn, yn := x.names[i], y.names[i]
