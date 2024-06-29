@@ -41,7 +41,7 @@ Returns:
 - result: A valid version 8 UUID.
 */
 stamp_v8_array :: proc(array: [16]u8) -> (result: Identifier) {
-	result = transmute(Identifier)array
+	result = Identifier(array)
 
 	result[VERSION_BYTE_INDEX] &= 0x0F
 	result[VERSION_BYTE_INDEX] |= 0x80

@@ -3501,21 +3501,21 @@ gb_internal bool check_transmute(CheckerContext *c, Ast *node, Operand *o, Type 
 		// forbidden, so just skip them.
 		if (forbid_identical && check_vet_flags(c) & VetFlag_Cast &&
 		    (c->curr_proc_sig == nullptr || !is_type_polymorphic(c->curr_proc_sig))) {
-			bool is_runtime = false;
-			if (c->pkg && (c->pkg->kind == Package_Runtime || c->pkg->kind == Package_Builtin)) {
-				is_runtime = true;
-			}
 			if (are_types_identical(src_t, dst_t)) {
-				if (!is_runtime) {
-					gbString oper_str = expr_to_string(o->expr);
-					gbString to_type  = type_to_string(dst_t);
-					error(o->expr, "Unneeded transmute of '%s' to identical type '%s'", oper_str, to_type);
-					gb_string_free(oper_str);
-					gb_string_free(to_type);
-				}
+				gbString oper_str = expr_to_string(o->expr);
+				gbString to_type  = type_to_string(dst_t);
+				error(o->expr, "Unneeded transmute of '%s' to identical type '%s'", oper_str, to_type);
+				gb_string_free(oper_str);
+				gb_string_free(to_type);
 			} else if (is_type_internally_pointer_like(src_t) &&
 			           is_type_internally_pointer_like(dst_t)) {
 				error(o->expr, "Use of 'transmute' where 'cast' would be preferred since the types are pointer-like");
+			} else if (are_types_identical(src_bt, dst_bt)) {
+				gbString oper_str = expr_to_string(o->expr);
+				gbString to_type  = type_to_string(dst_t);
+				error(o->expr, "Unneeded transmute of '%s' to identical type '%s'", oper_str, to_type);
+				gb_string_free(oper_str);
+				gb_string_free(to_type);
 			} else if (is_type_integer(src_t) && is_type_integer(dst_t) &&
 			           types_have_same_internal_endian(src_t, dst_t)) {
 				gbString oper_type = type_to_string(src_t);

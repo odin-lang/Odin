@@ -80,14 +80,14 @@ _unwrap_os_addr :: proc "contextless" (endpoint: Endpoint)->(linux.Sock_Addr_Any
 			ipv4 = {
 				sin_family = .INET,
 				sin_port = u16be(endpoint.port),
-				sin_addr = transmute([4]u8) endpoint.address.(IP4_Address),
+				sin_addr = ([4]u8)(endpoint.address.(IP4_Address)),
 			},
 		}
 	case IP6_Address:
 		return {
 			ipv6 = {
 				sin6_port = u16be(endpoint.port),
-				sin6_addr = transmute([16]u8) endpoint.address.(IP6_Address),
+				sin6_addr = transmute([16]u8)endpoint.address.(IP6_Address),
 				sin6_family = .INET6,
 			},
 		}

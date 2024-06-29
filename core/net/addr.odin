@@ -370,7 +370,7 @@ parse_ip6_address :: proc(address_and_maybe_port: string) -> (addr: IP6_Address,
 		val |= u16(ipv4[3])
 		piece_values[7] = u16be(val)
 	}
-	return transmute(IP6_Address)piece_values, true
+	return IP6_Address(piece_values), true
 }
 
 /*
@@ -522,10 +522,9 @@ address_to_string :: proc(addr: Address, allocator := context.temp_allocator) ->
 		run  := Zero_Run{-1, -1}
 		best := Zero_Run{-1, -1}
 
-		addr := transmute([8]u16be)v
 
 		last := u16be(1)
-		for val, i in addr {
+		for val, i in v {
 			/*
 				If we encounter adjacent zeroes, then start a new run if not already in one.
 				Also remember the rightmost index regardless, because it'll be the new
@@ -559,7 +558,7 @@ address_to_string :: proc(addr: Address, allocator := context.temp_allocator) ->
 			last = val
 		}
 
-		for val, i in addr {
+		for val, i in v {
 			if best.start == i || best.end == i {
 				// For the left and right side of the best zero run, print a `:`.
 				fmt.sbprint(&b, ":")
