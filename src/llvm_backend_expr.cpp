@@ -1127,12 +1127,21 @@ gb_internal lbValue lb_emit_arith(lbProcedure *p, TokenKind op, lbValue lhs, lbV
 
 		switch (op) {
 		case Token_Add:
-			real = lb_emit_arith(p, Token_Add, a, c, ft);
-			imag = lb_emit_arith(p, Token_Add, b, d, ft);
-			break;
 		case Token_Sub:
-			real = lb_emit_arith(p, Token_Sub, a, c, ft);
-			imag = lb_emit_arith(p, Token_Sub, b, d, ft);
+			if (type_size_of(ft) == 2) {
+				a = lb_emit_conv(p, a, t_f32);
+				b = lb_emit_conv(p, b, t_f32);
+				c = lb_emit_conv(p, c, t_f32);
+				d = lb_emit_conv(p, d, t_f32);
+				real = lb_emit_arith(p, op, a, c, t_f32);
+				imag = lb_emit_arith(p, op, b, d, t_f32);
+
+				real = lb_emit_conv(p, real, ft);
+				imag = lb_emit_conv(p, imag, ft);
+			} else {
+				real = lb_emit_arith(p, op, a, c, ft);
+				imag = lb_emit_arith(p, op, b, d, ft);
+			}
 			break;
 		case Token_Mul: {
 			lbValue x = lb_emit_arith(p, Token_Mul, a, c, ft);
@@ -1156,6 +1165,11 @@ gb_internal lbValue lb_emit_arith(lbProcedure *p, TokenKind op, lbValue lhs, lbV
 		Type *ft = base_complex_elem_type(type);
 
 		if (op == Token_Add || op == Token_Sub) {
+			Type *immediate_type = ft;
+			if (type_size_of(ft) == 2) {
+				immediate_type = t_f32;
+			}
+
 			lbAddr res = lb_add_local_generated(p, type, false); // NOTE: initialized in full later
 			lbValue x0 = lb_emit_struct_ev(p, lhs, 0);
 			lbValue x1 = lb_emit_struct_ev(p, lhs, 1);
@@ -1167,15 +1181,39 @@ gb_internal lbValue lb_emit_arith(lbProcedure *p, TokenKind op, lbValue lhs, lbV
 			lbValue y2 = lb_emit_struct_ev(p, rhs, 2);
 			lbValue y3 = lb_emit_struct_ev(p, rhs, 3);
 
-			lbValue z0 = lb_emit_arith(p, op, x0, y0, ft);
-			lbValue z1 = lb_emit_arith(p, op, x1, y1, ft);
-			lbValue z2 = lb_emit_arith(p, op, x2, y2, ft);
-			lbValue z3 = lb_emit_arith(p, op, x3, y3, ft);
+			if (immediate_type != ft) {
+				x0 = lb_emit_conv(p, x0, immediate_type);
+				x1 = lb_emit_conv(p, x1, immediate_type);
+				x2 = lb_emit_conv(p, x2, immediate_type);
+				x3 = lb_emit_conv(p, x3, immediate_type);
 
-			lb_emit_store(p, lb_emit_struct_ep(p, res.addr, 0), z0);
-			lb_emit_store(p, lb_emit_struct_ep(p, res.addr, 1), z1);
-			lb_emit_store(p, lb_emit_struct_ep(p, res.addr, 2), z2);
-			lb_emit_store(p, lb_emit_struct_ep(p, res.addr, 3), z3);
+				y0 = lb_emit_conv(p, y0, immediate_type);
+				y1 = lb_emit_conv(p, y1, immediate_type);
+				y2 = lb_emit_conv(p, y2, immediate_type);
+				y3 = lb_emit_conv(p, y3, immediate_type);
+			}
+
+			lbValue z0 = lb_emit_arith(p, op, x0, y0, immediate_type);
+			lbValue z1 = lb_emit_arith(p, op, x1, y1, immediate_type);
+			lbValue z2 = lb_emit_arith(p, op, x2, y2, immediate_type);
+			lbValue z3 = lb_emit_arith(p, op, x3, y3, immediate_type);
+
+			lbValue d0 = lb_emit_struct_ep(p, res.addr, 0);
+			lbValue d1 = lb_emit_struct_ep(p, res.addr, 1);
+			lbValue d2 = lb_emit_struct_ep(p, res.addr, 2);
+			lbValue d3 = lb_emit_struct_ep(p, res.addr, 3);
+
+			if (immediate_type != ft) {
+				d0 = lb_emit_conv(p, d0, ft);
+				d1 = lb_emit_conv(p, d1, ft);
+				d2 = lb_emit_conv(p, d2, ft);
+				d3 = lb_emit_conv(p, d3, ft);
+			}
+
+			lb_emit_store(p, d0, z0);
+			lb_emit_store(p, d1, z1);
+			lb_emit_store(p, d2, z2);
+			lb_emit_store(p, d3, z3);
 
 			return lb_addr_load(p, res);
 		} else if (op == Token_Mul) {
