@@ -535,28 +535,28 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 
 			ct := transmute(u8)info.header.color_type
 			switch ct {
-				case 3: // Indexed color
-					if c.header.length != 1 {
-						return {}, .BKGD_Invalid_Length
-					}
-					col := _plte.entries[c.data[0]]
-					img.background = [3]u16{
-						u16(col[0]) << 8 | u16(col[0]),
-						u16(col[1]) << 8 | u16(col[1]),
-						u16(col[2]) << 8 | u16(col[2]),
-					}
-				case 0, 4: // Grayscale, with and without Alpha
-					if c.header.length != 2 {
-						return {}, .BKGD_Invalid_Length
-					}
-					col := u16(mem.slice_data_cast([]u16be, c.data[:])[0])
-					img.background = [3]u16{col, col, col}
-				case 2, 6: // Color, with and without Alpha
-					if c.header.length != 6 {
-						return {}, .BKGD_Invalid_Length
-					}
-					col := mem.slice_data_cast([]u16be, c.data[:])
-					img.background = [3]u16{u16(col[0]), u16(col[1]), u16(col[2])}
+			case 3: // Indexed color
+				if c.header.length != 1 {
+					return {}, .BKGD_Invalid_Length
+				}
+				col := _plte.entries[c.data[0]]
+				img.background = [3]u16{
+					u16(col[0]) << 8 | u16(col[0]),
+					u16(col[1]) << 8 | u16(col[1]),
+					u16(col[2]) << 8 | u16(col[2]),
+				}
+			case 0, 4: // Grayscale, with and without Alpha
+				if c.header.length != 2 {
+					return {}, .BKGD_Invalid_Length
+				}
+				col := u16(mem.slice_data_cast([]u16be, c.data[:])[0])
+				img.background = [3]u16{col, col, col}
+			case 2, 6: // Color, with and without Alpha
+				if c.header.length != 6 {
+					return {}, .BKGD_Invalid_Length
+				}
+				col := mem.slice_data_cast([]u16be, c.data[:])
+				img.background = [3]u16{u16(col[0]), u16(col[1]), u16(col[2])}
 			}
 
 		case .tRNS:

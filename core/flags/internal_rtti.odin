@@ -45,45 +45,45 @@ parse_and_set_pointer_by_base_type :: proc(ptr: rawptr, str: string, type_info: 
 		if specific_type_info.signed {
 			value := strconv.parse_i128(str) or_return
 			switch type_info.id {
-				case i8:     (cast(^i8)    ptr)^ = cast(i8)     bounded_int(value, cast(i128)min(i8),     cast(i128)max(i8)    ) or_return
-				case i16:    (cast(^i16)   ptr)^ = cast(i16)    bounded_int(value, cast(i128)min(i16),    cast(i128)max(i16)   ) or_return
-				case i32:    (cast(^i32)   ptr)^ = cast(i32)    bounded_int(value, cast(i128)min(i32),    cast(i128)max(i32)   ) or_return
-				case i64:    (cast(^i64)   ptr)^ = cast(i64)    bounded_int(value, cast(i128)min(i64),    cast(i128)max(i64)   ) or_return
-				case i128:   (cast(^i128)  ptr)^ = value
+			case i8:     (^i8)    (ptr)^ = cast(i8)     bounded_int(value, cast(i128)min(i8),     cast(i128)max(i8)    ) or_return
+			case i16:    (^i16)   (ptr)^ = cast(i16)    bounded_int(value, cast(i128)min(i16),    cast(i128)max(i16)   ) or_return
+			case i32:    (^i32)   (ptr)^ = cast(i32)    bounded_int(value, cast(i128)min(i32),    cast(i128)max(i32)   ) or_return
+			case i64:    (^i64)   (ptr)^ = cast(i64)    bounded_int(value, cast(i128)min(i64),    cast(i128)max(i64)   ) or_return
+			case i128:   (^i128)  (ptr)^ = value
 
-				case int:    (cast(^int)   ptr)^ = cast(int)    bounded_int(value, cast(i128)min(int),    cast(i128)max(int)   ) or_return
+			case int:    (^int)   (ptr)^ = cast(int)    bounded_int(value, cast(i128)min(int),    cast(i128)max(int)   ) or_return
 
-				case i16le:  (cast(^i16le) ptr)^ = cast(i16le)  bounded_int(value, cast(i128)min(i16le),  cast(i128)max(i16le) ) or_return
-				case i32le:  (cast(^i32le) ptr)^ = cast(i32le)  bounded_int(value, cast(i128)min(i32le),  cast(i128)max(i32le) ) or_return
-				case i64le:  (cast(^i64le) ptr)^ = cast(i64le)  bounded_int(value, cast(i128)min(i64le),  cast(i128)max(i64le) ) or_return
-				case i128le: (cast(^i128le)ptr)^ = cast(i128le) bounded_int(value, cast(i128)min(i128le), cast(i128)max(i128le)) or_return
+			case i16le:  (^i16le) (ptr)^ = cast(i16le)  bounded_int(value, cast(i128)min(i16le),  cast(i128)max(i16le) ) or_return
+			case i32le:  (^i32le) (ptr)^ = cast(i32le)  bounded_int(value, cast(i128)min(i32le),  cast(i128)max(i32le) ) or_return
+			case i64le:  (^i64le) (ptr)^ = cast(i64le)  bounded_int(value, cast(i128)min(i64le),  cast(i128)max(i64le) ) or_return
+			case i128le: (^i128le)(ptr)^ = cast(i128le) bounded_int(value, cast(i128)min(i128le), cast(i128)max(i128le)) or_return
 
-				case i16be:  (cast(^i16be) ptr)^ = cast(i16be)  bounded_int(value, cast(i128)min(i16be),  cast(i128)max(i16be) ) or_return
-				case i32be:  (cast(^i32be) ptr)^ = cast(i32be)  bounded_int(value, cast(i128)min(i32be),  cast(i128)max(i32be) ) or_return
-				case i64be:  (cast(^i64be) ptr)^ = cast(i64be)  bounded_int(value, cast(i128)min(i64be),  cast(i128)max(i64be) ) or_return
-				case i128be: (cast(^i128be)ptr)^ = cast(i128be) bounded_int(value, cast(i128)min(i128be), cast(i128)max(i128be)) or_return
+			case i16be:  (^i16be) (ptr)^ = cast(i16be)  bounded_int(value, cast(i128)min(i16be),  cast(i128)max(i16be) ) or_return
+			case i32be:  (^i32be) (ptr)^ = cast(i32be)  bounded_int(value, cast(i128)min(i32be),  cast(i128)max(i32be) ) or_return
+			case i64be:  (^i64be) (ptr)^ = cast(i64be)  bounded_int(value, cast(i128)min(i64be),  cast(i128)max(i64be) ) or_return
+			case i128be: (^i128be)(ptr)^ = cast(i128be) bounded_int(value, cast(i128)min(i128be), cast(i128)max(i128be)) or_return
 			}
 		} else {
 			value := strconv.parse_u128(str) or_return
 			switch type_info.id {
-				case u8:      (cast(^u8)     ptr)^ = cast(u8)      bounded_uint(value, cast(u128)max(u8)     ) or_return
-				case u16:     (cast(^u16)    ptr)^ = cast(u16)     bounded_uint(value, cast(u128)max(u16)    ) or_return
-				case u32:     (cast(^u32)    ptr)^ = cast(u32)     bounded_uint(value, cast(u128)max(u32)    ) or_return
-				case u64:     (cast(^u64)    ptr)^ = cast(u64)     bounded_uint(value, cast(u128)max(u64)    ) or_return
-				case u128:    (cast(^u128)   ptr)^ = value
+			case u8:      (^u8)     (ptr)^ = cast(u8)      bounded_uint(value, cast(u128)max(u8)     ) or_return
+			case u16:     (^u16)    (ptr)^ = cast(u16)     bounded_uint(value, cast(u128)max(u16)    ) or_return
+			case u32:     (^u32)    (ptr)^ = cast(u32)     bounded_uint(value, cast(u128)max(u32)    ) or_return
+			case u64:     (^u64)    (ptr)^ = cast(u64)     bounded_uint(value, cast(u128)max(u64)    ) or_return
+			case u128:    (^u128)   (ptr)^ = value
 
-				case uint:    (cast(^uint)   ptr)^ = cast(uint)    bounded_uint(value, cast(u128)max(uint)   ) or_return
-				case uintptr: (cast(^uintptr)ptr)^ = cast(uintptr) bounded_uint(value, cast(u128)max(uintptr)) or_return
+			case uint:    (^uint)   (ptr)^ = cast(uint)    bounded_uint(value, cast(u128)max(uint)   ) or_return
+			case uintptr: (^uintptr)(ptr)^ = cast(uintptr) bounded_uint(value, cast(u128)max(uintptr)) or_return
 
-				case u16le:   (cast(^u16le)  ptr)^ = cast(u16le)   bounded_uint(value, cast(u128)max(u16le)  ) or_return
-				case u32le:   (cast(^u32le)  ptr)^ = cast(u32le)   bounded_uint(value, cast(u128)max(u32le)  ) or_return
-				case u64le:   (cast(^u64le)  ptr)^ = cast(u64le)   bounded_uint(value, cast(u128)max(u64le)  ) or_return
-				case u128le:  (cast(^u128le) ptr)^ = cast(u128le)  bounded_uint(value, cast(u128)max(u128le) ) or_return
+			case u16le:   (^u16le)  (ptr)^ = cast(u16le)   bounded_uint(value, cast(u128)max(u16le)  ) or_return
+			case u32le:   (^u32le)  (ptr)^ = cast(u32le)   bounded_uint(value, cast(u128)max(u32le)  ) or_return
+			case u64le:   (^u64le)  (ptr)^ = cast(u64le)   bounded_uint(value, cast(u128)max(u64le)  ) or_return
+			case u128le:  (^u128le) (ptr)^ = cast(u128le)  bounded_uint(value, cast(u128)max(u128le) ) or_return
 
-				case u16be:   (cast(^u16be)  ptr)^ = cast(u16be)   bounded_uint(value, cast(u128)max(u16be)  ) or_return
-				case u32be:   (cast(^u32be)  ptr)^ = cast(u32be)   bounded_uint(value, cast(u128)max(u32be)  ) or_return
-				case u64be:   (cast(^u64be)  ptr)^ = cast(u64be)   bounded_uint(value, cast(u128)max(u64be)  ) or_return
-				case u128be:  (cast(^u128be) ptr)^ = cast(u128be)  bounded_uint(value, cast(u128)max(u128be) ) or_return
+			case u16be:   (^u16be)  (ptr)^ = cast(u16be)   bounded_uint(value, cast(u128)max(u16be)  ) or_return
+			case u32be:   (^u32be)  (ptr)^ = cast(u32be)   bounded_uint(value, cast(u128)max(u32be)  ) or_return
+			case u64be:   (^u64be)  (ptr)^ = cast(u64be)   bounded_uint(value, cast(u128)max(u64be)  ) or_return
+			case u128be:  (^u128be) (ptr)^ = cast(u128be)  bounded_uint(value, cast(u128)max(u128be) ) or_return
 			}
 		}
 
@@ -92,60 +92,60 @@ parse_and_set_pointer_by_base_type :: proc(ptr: rawptr, str: string, type_info: 
 			return false
 		}
 
-		(cast(^rune)ptr)^ = utf8.rune_at_pos(str, 0)
+		(^rune)(ptr)^ = utf8.rune_at_pos(str, 0)
 
 	case runtime.Type_Info_Float:
 		value := strconv.parse_f64(str) or_return
 		switch type_info.id {
-			case f16:   (cast(^f16)  ptr)^ = cast(f16)   value
-			case f32:   (cast(^f32)  ptr)^ = cast(f32)   value
-			case f64:   (cast(^f64)  ptr)^ =             value
+		case f16:   (^f16)  (ptr)^ = cast(f16)   value
+		case f32:   (^f32)  (ptr)^ = cast(f32)   value
+		case f64:   (^f64)  (ptr)^ =             value
 
-			case f16le: (cast(^f16le)ptr)^ = cast(f16le) value
-			case f32le: (cast(^f32le)ptr)^ = cast(f32le) value
-			case f64le: (cast(^f64le)ptr)^ = cast(f64le) value
+		case f16le: (^f16le)(ptr)^ = cast(f16le) value
+		case f32le: (^f32le)(ptr)^ = cast(f32le) value
+		case f64le: (^f64le)(ptr)^ = cast(f64le) value
 
-			case f16be: (cast(^f16be)ptr)^ = cast(f16be) value
-			case f32be: (cast(^f32be)ptr)^ = cast(f32be) value
-			case f64be: (cast(^f64be)ptr)^ = cast(f64be) value
+		case f16be: (^f16be)(ptr)^ = cast(f16be) value
+		case f32be: (^f32be)(ptr)^ = cast(f32be) value
+		case f64be: (^f64be)(ptr)^ = cast(f64be) value
 		}
 	
 	case runtime.Type_Info_Complex:
 		value := strconv.parse_complex128(str) or_return
 		switch type_info.id {
-			case complex128: (cast(^complex128)ptr)^ = value
-			case complex64:  (cast(^complex64) ptr)^ = cast(complex64)value
-			case complex32:  (cast(^complex32) ptr)^ = cast(complex32)value
+		case complex32:  (^complex32) (ptr)^ = (complex32)(value)
+		case complex64:  (^complex64) (ptr)^ = (complex64)(value)
+		case complex128: (^complex128)(ptr)^ = value
 		}
 	
 	case runtime.Type_Info_Quaternion:
 		value := strconv.parse_quaternion256(str) or_return
 		switch type_info.id {
-			case quaternion256: (cast(^quaternion256)ptr)^ = value
-			case quaternion128: (cast(^quaternion128)ptr)^ = cast(quaternion128)value
-			case quaternion64:  (cast(^quaternion64) ptr)^ = cast(quaternion64)value
+		case quaternion64:  (^quaternion64) (ptr)^ = (quaternion64)(value)
+		case quaternion128: (^quaternion128)(ptr)^ = (quaternion128)(value)
+		case quaternion256: (^quaternion256)(ptr)^ = value
 		}
 
 	case runtime.Type_Info_String:
 		if specific_type_info.is_cstring {
-			cstr_ptr := cast(^cstring)ptr
+			cstr_ptr := (^cstring)(ptr)
 			if cstr_ptr != nil {
 				// Prevent memory leaks from us setting this value multiple times.
 				delete(cstr_ptr^)
 			}
 			cstr_ptr^ = strings.clone_to_cstring(str)
 		} else {
-			(cast(^string)ptr)^ = str
+			(^string)(ptr)^ = str
 		}
 
 	case runtime.Type_Info_Boolean:
 		value := strconv.parse_bool(str) or_return
 		switch type_info.id {
-			case bool: (cast(^bool) ptr)^ =           value
-			case b8:   (cast(^b8)   ptr)^ = cast(b8)  value
-			case b16:  (cast(^b16)  ptr)^ = cast(b16) value
-			case b32:  (cast(^b32)  ptr)^ = cast(b32) value
-			case b64:  (cast(^b64)  ptr)^ = cast(b64) value
+		case bool: (^bool)(ptr)^ =     value
+		case b8:   (^b8)  (ptr)^ =  b8(value)
+		case b16:  (^b16) (ptr)^ = b16(value)
+		case b32:  (^b32) (ptr)^ = b32(value)
+		case b64:  (^b64) (ptr)^ = b64(value)
 		}
 
 	case runtime.Type_Info_Bit_Set:
@@ -154,9 +154,9 @@ parse_and_set_pointer_by_base_type :: proc(ptr: rawptr, str: string, type_info: 
 		value: u128
 
 		// NOTE: `upper` is inclusive, i.e: `0..=31`
-		max_bit_index := cast(u128)(1 + specific_type_info.upper - specific_type_info.lower)
-		bit_index : u128 = 0
-		#no_bounds_check for string_index : uint = 0; string_index < len(str); string_index += 1 {
+		max_bit_index := u128(1 + specific_type_info.upper - specific_type_info.lower)
+		bit_index := u128(0)
+		#no_bounds_check for string_index in 0..<uint(len(str)) {
 			if bit_index == max_bit_index {
 				// The string's too long for this bit_set.
 				return false
@@ -180,11 +180,11 @@ parse_and_set_pointer_by_base_type :: proc(ptr: rawptr, str: string, type_info: 
 			set_unbounded_integer_by_type(ptr, value, specific_type_info.underlying.id)
 		} else {
 			switch 8*type_info.size {
-			case 8:   (cast(^u8)   ptr)^ = cast(u8)   value
-			case 16:  (cast(^u16)  ptr)^ = cast(u16)  value
-			case 32:  (cast(^u32)  ptr)^ = cast(u32)  value
-			case 64:  (cast(^u64)  ptr)^ = cast(u64)  value
-			case 128: (cast(^u128) ptr)^ =            value
+			case 8:   (^u8)  (ptr)^ = cast(u8)   value
+			case 16:  (^u16) (ptr)^ = cast(u16)  value
+			case 32:  (^u32) (ptr)^ = cast(u32)  value
+			case 64:  (^u64) (ptr)^ = cast(u64)  value
+			case 128: (^u128)(ptr)^ =            value
 			}
 		}
 
@@ -222,7 +222,7 @@ parse_and_set_pointer_by_named_type :: proc(ptr: rawptr, str: string, data_type:
 		mode: int
 
 		if file, ok := get_struct_subtag(arg_tag, SUBTAG_FILE); ok {
-			for i := 0; i < len(file); i += 1 {
+			for i in 0..<len(file) {
 				#no_bounds_check switch file[i] {
 				case 'r': wants_read = true
 				case 'w': wants_write = true
@@ -249,7 +249,7 @@ parse_and_set_pointer_by_named_type :: proc(ptr: rawptr, str: string, data_type:
 
 		if permstr, ok := get_struct_subtag(arg_tag, SUBTAG_PERMS); ok {
 			if value, parse_ok := strconv.parse_u64_of_base(permstr, 8); parse_ok {
-				perms = cast(int)value
+				perms = int(value)
 			}
 		}
 
@@ -271,7 +271,7 @@ parse_and_set_pointer_by_named_type :: proc(ptr: rawptr, str: string, data_type:
 			return
 		}
 
-		(cast(^os.Handle)ptr)^ = handle
+		(^os.Handle)(ptr)^ = handle
 		return
 	}
 
@@ -289,7 +289,7 @@ parse_and_set_pointer_by_named_type :: proc(ptr: rawptr, str: string, data_type:
 				return
 			}
 
-			(cast(^time.Time)ptr)^ = res
+			(^time.Time)(ptr)^ = res
 			return
 		} else if data_type == datetime.DateTime {
 			// NOTE: The UTC offset and leap second data are discarded.
@@ -302,7 +302,7 @@ parse_and_set_pointer_by_named_type :: proc(ptr: rawptr, str: string, data_type:
 				return
 			}
 
-			(cast(^datetime.DateTime)ptr)^ = res
+			(^datetime.DateTime)(ptr)^ = res
 			return
 		}
 	}
@@ -323,44 +323,44 @@ parse_and_set_pointer_by_named_type :: proc(ptr: rawptr, str: string, data_type:
 @(optimization_mode="size")
 set_unbounded_integer_by_type :: proc(ptr: rawptr, value: $T, data_type: typeid) where intrinsics.type_is_integer(T) {
 	switch data_type {
-	case i8:      (cast(^i8)     ptr)^ = cast(i8)      value
-	case i16:     (cast(^i16)    ptr)^ = cast(i16)     value
-	case i32:     (cast(^i32)    ptr)^ = cast(i32)     value
-	case i64:     (cast(^i64)    ptr)^ = cast(i64)     value
-	case i128:    (cast(^i128)   ptr)^ = cast(i128)    value
+	case i8:      (^i8)     (ptr)^ = cast(i8)      value
+	case i16:     (^i16)    (ptr)^ = cast(i16)     value
+	case i32:     (^i32)    (ptr)^ = cast(i32)     value
+	case i64:     (^i64)    (ptr)^ = cast(i64)     value
+	case i128:    (^i128)   (ptr)^ = cast(i128)    value
 
-	case int:     (cast(^int)    ptr)^ = cast(int)     value
+	case int:     (^int)    (ptr)^ = cast(int)     value
 
-	case i16le:   (cast(^i16le)  ptr)^ = cast(i16le)   value
-	case i32le:   (cast(^i32le)  ptr)^ = cast(i32le)   value
-	case i64le:   (cast(^i64le)  ptr)^ = cast(i64le)   value
-	case i128le:  (cast(^i128le) ptr)^ = cast(i128le)  value
+	case i16le:   (^i16le)  (ptr)^ = cast(i16le)   value
+	case i32le:   (^i32le)  (ptr)^ = cast(i32le)   value
+	case i64le:   (^i64le)  (ptr)^ = cast(i64le)   value
+	case i128le:  (^i128le) (ptr)^ = cast(i128le)  value
 
-	case i16be:   (cast(^i16be)  ptr)^ = cast(i16be)   value
-	case i32be:   (cast(^i32be)  ptr)^ = cast(i32be)   value
-	case i64be:   (cast(^i64be)  ptr)^ = cast(i64be)   value
-	case i128be:  (cast(^i128be) ptr)^ = cast(i128be)  value
+	case i16be:   (^i16be)  (ptr)^ = cast(i16be)   value
+	case i32be:   (^i32be)  (ptr)^ = cast(i32be)   value
+	case i64be:   (^i64be)  (ptr)^ = cast(i64be)   value
+	case i128be:  (^i128be) (ptr)^ = cast(i128be)  value
 
-	case u8:      (cast(^u8)     ptr)^ = cast(u8)      value
-	case u16:     (cast(^u16)    ptr)^ = cast(u16)     value
-	case u32:     (cast(^u32)    ptr)^ = cast(u32)     value
-	case u64:     (cast(^u64)    ptr)^ = cast(u64)     value
-	case u128:    (cast(^u128)   ptr)^ = cast(u128)    value
+	case u8:      (^u8)     (ptr)^ = cast(u8)      value
+	case u16:     (^u16)    (ptr)^ = cast(u16)     value
+	case u32:     (^u32)    (ptr)^ = cast(u32)     value
+	case u64:     (^u64)    (ptr)^ = cast(u64)     value
+	case u128:    (^u128)   (ptr)^ = cast(u128)    value
 
-	case uint:    (cast(^uint)   ptr)^ = cast(uint)    value
-	case uintptr: (cast(^uintptr)ptr)^ = cast(uintptr) value
+	case uint:    (^uint)   (ptr)^ = cast(uint)    value
+	case uintptr: (^uintptr)(ptr)^ = cast(uintptr) value
 
-	case u16le:   (cast(^u16le)  ptr)^ = cast(u16le)   value
-	case u32le:   (cast(^u32le)  ptr)^ = cast(u32le)   value
-	case u64le:   (cast(^u64le)  ptr)^ = cast(u64le)   value
-	case u128le:  (cast(^u128le) ptr)^ = cast(u128le)  value
+	case u16le:   (^u16le)  (ptr)^ = cast(u16le)   value
+	case u32le:   (^u32le)  (ptr)^ = cast(u32le)   value
+	case u64le:   (^u64le)  (ptr)^ = cast(u64le)   value
+	case u128le:  (^u128le) (ptr)^ = cast(u128le)  value
 
-	case u16be:   (cast(^u16be)  ptr)^ = cast(u16be)   value
-	case u32be:   (cast(^u32be)  ptr)^ = cast(u32be)   value
-	case u64be:   (cast(^u64be)  ptr)^ = cast(u64be)   value
-	case u128be:  (cast(^u128be) ptr)^ = cast(u128be)  value
+	case u16be:   (^u16be)  (ptr)^ = cast(u16be)   value
+	case u32be:   (^u32be)  (ptr)^ = cast(u32be)   value
+	case u64be:   (^u64be)  (ptr)^ = cast(u64be)   value
+	case u128be:  (^u128be) (ptr)^ = cast(u128be)  value
 
-	case rune:    (cast(^rune)   ptr)^ = cast(rune)    value
+	case rune:    (^rune)   (ptr)^ = cast(rune)    value
 
 	case:
 		fmt.panicf("Unsupported integer backing type: %v", data_type)
@@ -443,9 +443,9 @@ parse_and_set_pointer_by_type :: proc(ptr: rawptr, str: string, type_info: ^runt
 			}
 		}
 
-		subptr := cast(rawptr)(
-			cast(uintptr)ptr.data +
-			cast(uintptr)((ptr.len - 1) * specific_type_info.elem.size))
+		subptr := rawptr(
+			uintptr(ptr.data) +
+			uintptr((ptr.len - 1) * specific_type_info.elem.size))
 		mem.copy(subptr, raw_data(elem_backing), len(elem_backing))
 
 	case runtime.Type_Info_Enum:
@@ -490,7 +490,7 @@ get_field_pos :: proc(field: reflect.Struct_Field) -> (int, bool) {
 	if args_tag, ok := reflect.struct_tag_lookup(field.tag, TAG_ARGS); ok {
 		if pos_subtag, pos_ok := get_struct_subtag(args_tag, SUBTAG_POS); pos_ok {
 			if value, parse_ok := strconv.parse_u64_of_base(pos_subtag, 10); parse_ok {
-				return cast(int)value, true
+				return int(value), true
 			}
 		}
 	}
@@ -516,15 +516,8 @@ get_field_by_name :: proc(model: ^$T, name: string) -> (result: reflect.Struct_F
 // Get a struct field by its `pos` subtag.
 get_field_by_pos :: proc(model: ^$T, pos: int) -> (result: reflect.Struct_Field, index: int, ok: bool) {
 	for field, i in reflect.struct_fields_zipped(T) {
-		args_tag, tag_ok := reflect.struct_tag_lookup(field.tag, TAG_ARGS)
-		if !tag_ok {
-			continue
-		}
-
-		pos_subtag, pos_ok := get_struct_subtag(args_tag, SUBTAG_POS)
-		if !pos_ok {
-			continue
-		}
+		args_tag := reflect.struct_tag_lookup(field.tag, TAG_ARGS) or_continue
+		pos_subtag := get_struct_subtag(args_tag, SUBTAG_POS)      or_continue
 
 		value, parse_ok := strconv.parse_u64_of_base(pos_subtag, 10)
 		if parse_ok && cast(int)value == pos {
