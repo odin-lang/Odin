@@ -1435,6 +1435,16 @@ gb_internal bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, T
 			if (!is_polymorphic_type_assignable(c, poly->BitSet.elem, source->BitSet.elem, true, modify_type)) {
 				return false;
 			}
+			
+			// For generic types like bit_set[$T] the upper and lower of the poly type will be zeroes since
+			// it could not figure that stuff out when the poly type was created.
+			if (poly->BitSet.upper == 0 && modify_type) {
+				poly->BitSet.upper = source->BitSet.upper;
+			}
+			if (poly->BitSet.lower == 0 && modify_type) {
+				poly->BitSet.lower = source->BitSet.lower;
+			}
+
 			if (poly->BitSet.underlying == nullptr) {
 				if (modify_type) {
 					poly->BitSet.underlying = source->BitSet.underlying;
