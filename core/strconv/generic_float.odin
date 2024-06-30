@@ -164,16 +164,29 @@ format_digits :: proc(buf: []byte, shortest: bool, neg: bool, digs: Decimal_Slic
 			add_bytes(&b, '0')
 		}
 
-
 		// fractional part
 		if prec > 0 {
-			add_bytes(&b, '.')
-			for i in 0..<prec {
-				c: byte = '0'
-				if j := digs.decimal_point + i; 0 <= j && j < digs.count {
-					c = digs.digits[j]
+			has_non_zero_decimals := false
+
+			for i in max(digs.decimal_point, 0)..<digs.count {
+				if digs.digits[i] != '0' {
+					has_non_zero_decimals = true
+					break
 				}
-				add_bytes(&b, c)
+			}
+
+			if has_non_zero_decimals {
+				add_bytes(&b, '.')
+
+				// decimal_point is negative in case of numbers like 0.0001.
+				// I.e. decimal point is several digits to the left from first non-zero digit.
+				// In that case, add in the zeroes between `.` and the first digit.
+				for _ in digs.decimal_point..<0 {
+					add_bytes(&b, '0')
+				}
+
+				// Add in all the decimals
+				add_bytes(&b, ..digs.digits[max(digs.decimal_point, 0):digs.count])
 			}
 		}
 		return to_bytes(b)
@@ -188,15 +201,15 @@ format_digits :: proc(buf: []byte, shortest: bool, neg: bool, digs: Decimal_Slic
 		add_bytes(&b, ch)
 
 		if prec > 0 {
-			add_bytes(&b, '.')
 			i := 1
 			m := min(digs.count, prec+1)
 			if i < m {
+				if i == 1 {
+					add_bytes(&b, '.')
+				}
+
 				add_bytes(&b, ..digs.digits[i:m])
 				i = m
-			}
-			for ; i <= prec; i += 1 {
-				add_bytes(&b, '0')
 			}
 		}
 
