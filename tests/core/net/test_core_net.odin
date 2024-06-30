@@ -259,7 +259,7 @@ client_sends_server_data :: proc(t: ^testing.T) {
 	}
 
 	tcp_client :: proc(thread_data: rawptr) {
-		r := transmute(^Thread_Data)thread_data
+		r := cast(^Thread_Data)thread_data
 
 		defer sync.wait_group_done(r.wg)
 
@@ -274,7 +274,7 @@ client_sends_server_data :: proc(t: ^testing.T) {
 	}
 
 	tcp_server :: proc(thread_data: rawptr) {
-		r := transmute(^Thread_Data)thread_data
+		r := cast(^Thread_Data)thread_data
 
 		defer sync.wait_group_done(r.wg)
 
