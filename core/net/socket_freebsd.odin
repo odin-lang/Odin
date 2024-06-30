@@ -146,7 +146,7 @@ _recv_tcp :: proc(socket: TCP_Socket, buf: []byte) -> (bytes_read: int, err: Net
 		err = cast(TCP_Recv_Error)errno
 		return
 	}
-	return cast(int)result, nil
+	return result, nil
 }
 
 @(private)
@@ -161,7 +161,7 @@ _recv_udp :: proc(socket: UDP_Socket, buf: []byte) -> (bytes_read: int, remote_e
 		err = cast(UDP_Recv_Error)errno
 		return
 	}
-	return cast(int)result, _sockaddr_to_endpoint(&from), nil
+	return result, _sockaddr_to_endpoint(&from), nil
 }
 
 @(private)
@@ -175,7 +175,7 @@ _send_tcp :: proc(socket: TCP_Socket, buf: []byte) -> (bytes_written: int, err: 
 			err = cast(TCP_Send_Error)errno
 			return
 		}
-		bytes_written += cast(int)result
+		bytes_written += result
 	}
 	return
 }
@@ -192,7 +192,7 @@ _send_udp :: proc(socket: UDP_Socket, buf: []byte, to: Endpoint) -> (bytes_writt
 			err = cast(UDP_Send_Error)errno
 			return
 		}
-		bytes_written += cast(int)result
+		bytes_written += result
 	}
 	return
 }
@@ -349,13 +349,13 @@ _sockaddr_to_endpoint :: proc(native_addr: ^freebsd.Socket_Address_Storage) -> (
 	case .INET:
 		addr := cast(^freebsd.Socket_Address_Internet)native_addr
 		ep = {
-			address = transmute(IP4_Address)addr.addr.addr8,
+			address = cast(IP4_Address)addr.addr.addr8,
 			port = cast(int)addr.port,
 		}
 	case .INET6:
 		addr := cast(^freebsd.Socket_Address_Internet6)native_addr
 		ep = {
-			address = transmute(IP6_Address)addr.addr.addr16,
+			address = cast(IP6_Address)addr.addr.addr16,
 			port = cast(int)addr.port,
 		}
 	case:

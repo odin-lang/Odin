@@ -207,7 +207,7 @@ fcntl_setfd :: proc "contextless" (fd: Fd, close_on_exec: bool) -> Errno {
 	result, _ := intrinsics.syscall_bsd(SYS_fcntl,
 		cast(uintptr)fd,
 		cast(uintptr)File_Control_Command.SETFD,
-		cast(uintptr)(close_on_exec ? FD_CLOEXEC : 0))
+		(close_on_exec ? FD_CLOEXEC : 0))
 
 	return cast(Errno)result
 }
