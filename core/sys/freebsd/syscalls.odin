@@ -79,7 +79,10 @@ where
 		cast(uintptr)len(buf),
 		cast(uintptr)flags,
 		cast(uintptr)from,
-		cast(uintptr)fromlen)
+		cast(uintptr)&fromlen)
+
+	// `from.len` will be modified by the syscall, so we shouldn't need to pass
+	// `fromlen` back from this API.
 
 	if !ok {
 		return 0, cast(Errno)result
