@@ -316,6 +316,7 @@ shared/
 *.bc
 *.ll
 
+/ols.json
 *.sublime-workspace
 examples/bug/
 build.sh
