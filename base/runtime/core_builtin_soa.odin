@@ -55,7 +55,7 @@ raw_soa_footer_slice :: proc(array: ^$T/#soa[]$E) -> (footer: ^Raw_SOA_Footer_Sl
 	if array == nil {
 		return nil
 	}
-	field_count := uintptr(intrinsics.type_struct_field_count(E))
+	field_count := uintptr(len(E) when intrinsics.type_is_array(E) else intrinsics.type_struct_field_count(E))
 	footer = (^Raw_SOA_Footer_Slice)(uintptr(array) + field_count*size_of(rawptr))
 	return
 }
@@ -64,12 +64,7 @@ raw_soa_footer_dynamic_array :: proc(array: ^$T/#soa[dynamic]$E) -> (footer: ^Ra
 	if array == nil {
 		return nil
 	}
-	field_count: uintptr
-	when intrinsics.type_is_array(E) {
-		field_count = len(E)
-	} else {
-		field_count = uintptr(intrinsics.type_struct_field_count(E))
-	}
+	field_count := uintptr(len(E) when intrinsics.type_is_array(E) else intrinsics.type_struct_field_count(E))
 	footer = (^Raw_SOA_Footer_Dynamic_Array)(uintptr(array) + field_count*size_of(rawptr))
 	return
 }
@@ -98,7 +93,7 @@ make_soa_aligned :: proc($T: typeid/#soa[]$E, length: int, alignment: int, alloc
 	ti = type_info_base(ti)
 	si := &ti.variant.(Type_Info_Struct)
 
-	field_count := uintptr(intrinsics.type_struct_field_count(E))
+	field_count := uintptr(len(E) when intrinsics.type_is_array(E) else intrinsics.type_struct_field_count(E))
 
 	total_size := 0
 	for i in 0..<field_count {
@@ -213,12 +208,7 @@ reserve_soa :: proc(array: ^$T/#soa[dynamic]$E, capacity: int, loc := #caller_lo
 	ti = type_info_base(ti)
 	si := &ti.variant.(Type_Info_Struct)
 
-	field_count: uintptr
-	when intrinsics.type_is_array(E) {
-		field_count = len(E)
-	} else {
-		field_count = uintptr(intrinsics.type_struct_field_count(E))
-	}
+	field_count := uintptr(len(E) when intrinsics.type_is_array(E) else intrinsics.type_struct_field_count(E))
 	assert(footer.cap == old_cap)
 
 	old_size := 0
@@ -291,12 +281,7 @@ append_soa_elem :: proc(array: ^$T/#soa[dynamic]$E, arg: E, loc := #caller_locat
 		ti := type_info_of(T)
 		ti = type_info_base(ti)
 		si := &ti.variant.(Type_Info_Struct)
-		field_count: uintptr
-		when intrinsics.type_is_array(E) {
-			field_count = len(E)
-		} else {
-			field_count = uintptr(intrinsics.type_struct_field_count(E))
-		}
+		field_count := uintptr(len(E) when intrinsics.type_is_array(E) else intrinsics.type_struct_field_count(E))
 
 		data := (^rawptr)(array)^
 
@@ -348,7 +333,7 @@ append_soa_elems :: proc(array: ^$T/#soa[dynamic]$E, args: ..E, loc := #caller_l
 		ti := type_info_of(typeid_of(T))
 		ti = type_info_base(ti)
 		si := &ti.variant.(Type_Info_Struct)
-		field_count := uintptr(intrinsics.type_struct_field_count(E))
+		field_count := uintptr(len(E) when intrinsics.type_is_array(E) else intrinsics.type_struct_field_count(E))
 
 		data := (^rawptr)(array)^
 
@@ -390,7 +375,8 @@ append_soa :: proc{
 
 
 delete_soa_slice :: proc(array: $T/#soa[]$E, allocator := context.allocator, loc := #caller_location) -> Allocator_Error {
-	when intrinsics.type_struct_field_count(E) != 0 {
+	field_count :: len(E) when intrinsics.type_is_array(E) else intrinsics.type_struct_field_count(E)
+	when field_count != 0 {
 		array := array
 		ptr := (^rawptr)(&array)^
 		free(ptr, allocator, loc) or_return
@@ -399,7 +385,8 @@ delete_soa_slice :: proc(array: $T/#soa[]$E, allocator := context.allocator, loc
 }
 
 delete_soa_dynamic_array :: proc(array: $T/#soa[dynamic]$E, loc := #caller_location) -> Allocator_Error {
-	when intrinsics.type_struct_field_count(E) != 0 {
+	field_count :: len(E) when intrinsics.type_is_array(E) else intrinsics.type_struct_field_count(E)
+	when field_count != 0 {
 		array := array
 		ptr := (^rawptr)(&array)^
 		footer := raw_soa_footer(&array)
@@ -417,7 +404,8 @@ delete_soa :: proc{
 
 
 clear_soa_dynamic_array :: proc(array: ^$T/#soa[dynamic]$E) {
-	when intrinsics.type_struct_field_count(E) != 0 {
+	field_count :: len(E) when intrinsics.type_is_array(E) else intrinsics.type_struct_field_count(E)
+	when field_count != 0 {
 		footer := raw_soa_footer(array)
 		footer.len = 0
 	}
@@ -439,12 +427,7 @@ into_dynamic_soa :: proc(array: $T/#soa[]$E) -> #soa[dynamic]E {
 		allocator = nil_allocator(),
 	}
 
-	field_count: uintptr
-	when intrinsics.type_is_array(E) {
-		field_count = len(E)
-	} else {
-		field_count = uintptr(intrinsics.type_struct_field_count(E))
-	}
+	field_count := uintptr(len(E) when intrinsics.type_is_array(E) else intrinsics.type_struct_field_count(E))
 
 	array := array
 	dynamic_data := ([^]rawptr)(&d)[:field_count]
@@ -468,12 +451,7 @@ unordered_remove_soa :: proc(array: ^$T/#soa[dynamic]$E, index: int, loc := #cal
 		ti = type_info_base(ti)
 		si := &ti.variant.(Type_Info_Struct)
 
-		field_count: uintptr
-		when intrinsics.type_is_array(E) {
-			field_count = len(E)
-		} else {
-			field_count = uintptr(intrinsics.type_struct_field_count(E))
-		}
+		field_count := uintptr(len(E) when intrinsics.type_is_array(E) else intrinsics.type_struct_field_count(E))
 
 		data := uintptr(array)
 		for i in 0..<field_count {
@@ -501,12 +479,7 @@ ordered_remove_soa :: proc(array: ^$T/#soa[dynamic]$E, index: int, loc := #calle
 		ti = type_info_base(ti)
 		si := &ti.variant.(Type_Info_Struct)
 
-		field_count: uintptr
-		when intrinsics.type_is_array(E) {
-			field_count = len(E)
-		} else {
-			field_count = uintptr(intrinsics.type_struct_field_count(E))
-		}
+		field_count := uintptr(len(E) when intrinsics.type_is_array(E) else intrinsics.type_struct_field_count(E))
 
 		data := uintptr(array)
 		for i in 0..<field_count {
