@@ -364,6 +364,11 @@ make :: proc{
 	make_dynamic_array_len_cap,
 	make_map,
 	make_multi_pointer,
+
+	make_soa_slice,
+	make_soa_dynamic_array,
+	make_soa_dynamic_array_len,
+	make_soa_dynamic_array_len_cap,
 }
 
 

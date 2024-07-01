@@ -6800,9 +6800,71 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 		if (procs.count > 0) {
 			error_line("Did you mean to use one of the following:\n");
 		}
+
+		// Try to reduce the list further for `$T: typeid` like parameters
+		bool *possibly_ignore = gb_alloc_array(temporary_allocator(), bool, procs.count);
+		isize possibly_ignore_set = 0;
+
+		if (true) {
+			// NOTE(bill): This currently only checks for #soa types
+			for_array(i, procs) {
+				Entity *proc = procs[i];
+				Type *t = base_type(proc->type);
+				if (t->kind != Type_Proc) continue;
+
+				TypeProc *pt = &t->Proc;
+				if (pt->param_count == 0) {
+					continue;
+				}
+
+				for_array(j, pt->params->Tuple.variables) {
+					Entity *v = pt->params->Tuple.variables[j];
+					if (v->kind != Entity_TypeName) {
+						continue;
+					}
+
+					Type *dst_t = base_type(v->type);
+					while (dst_t->kind == Type_Generic && dst_t->Generic.specialized) {
+						dst_t = dst_t->Generic.specialized;
+					}
+
+					if (j >= positional_operands.count) {
+						continue;
+					}
+					Operand const &o = positional_operands[j];
+					if (o.mode != Addressing_Type) {
+						continue;
+					}
+					Type *t = base_type(o.type);
+					if (t->kind == dst_t->kind) {
+						continue;
+					}
+					Type *st = base_type(type_deref(o.type));
+					Type *dt = base_type(type_deref(dst_t));
+					if (st->kind == dt->kind) {
+						continue;
+					}
+					if (is_type_soa_struct(st)) {
+						possibly_ignore[i] = true;
+						possibly_ignore_set += 1;
+						continue;
+					}
+				}
+			}
+		}
+
+		if (possibly_ignore_set == procs.count) {
+			possibly_ignore_set = 0;
+		}
+
+
 		isize max_name_length = 0;
 		isize max_type_length = 0;
-		for (Entity *proc : procs) {
+		for_array(i, procs) {
+			if (possibly_ignore_set != 0 && possibly_ignore[i]) {
+				continue;
+			}
+			Entity *proc = procs[i];
 			Type *t = base_type(proc->type);
 			if (t == t_invalid) continue;
 			String prefix = {};
@@ -6832,7 +6894,11 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 		}
 		spaces[max_spaces] = 0;
 
-		for (Entity *proc : procs) {
+		for_array(i, procs) {
+			if (possibly_ignore_set != 0 && possibly_ignore[i]) {
+				continue;
+			}
+			Entity *proc = procs[i];
 			TokenPos pos = proc->token.pos;
 			Type *t = base_type(proc->type);
 			if (t == t_invalid) continue;
@@ -11414,6 +11480,9 @@ gb_internal gbString write_expr_to_string(gbString str, Ast *node, bool shorthan
 	case_end;
 
 	case_ast_node(pt, PointerType, node);
+		if (pt->tag) {
+			str = write_expr_to_string(str, pt->tag, false);
+		}
 		str = gb_string_append_rune(str, '^');
 		str = write_expr_to_string(str, pt->type, shorthand);
 	case_end;
@@ -11424,6 +11493,9 @@ gb_internal gbString write_expr_to_string(gbString str, Ast *node, bool shorthan
 	case_end;
 
 	case_ast_node(at, ArrayType, node);
+		if (at->tag) {
+			str = write_expr_to_string(str, at->tag, false);
+		}
 		str = gb_string_append_rune(str, '[');
 		if (at->count != nullptr &&
 		    at->count->kind == Ast_UnaryExpr &&
@@ -11437,6 +11509,9 @@ gb_internal gbString write_expr_to_string(gbString str, Ast *node, bool shorthan
 	case_end;
 
 	case_ast_node(at, DynamicArrayType, node);
+		if (at->tag) {
+			str = write_expr_to_string(str, at->tag, false);
+		}
 		str = gb_string_appendc(str, "[dynamic]");
 		str = write_expr_to_string(str, at->elem, shorthand);
 	case_end;
