@@ -9123,12 +9123,16 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 		type = nullptr;
 
 		// [?]Type
-		if (type_expr->kind == Ast_ArrayType && type_expr->ArrayType.count != nullptr) {
+		if (type_expr->kind == Ast_ArrayType) {
 			Ast *count = type_expr->ArrayType.count;
-			if (count->kind == Ast_UnaryExpr &&
-			    count->UnaryExpr.op.kind == Token_Question) {
-				type = alloc_type_array(check_type(c, type_expr->ArrayType.elem), -1);
-				is_to_be_determined_array_count = true;
+			if (count != nullptr) {
+				if (count->kind == Ast_UnaryExpr &&
+				    count->UnaryExpr.op.kind == Token_Question) {
+					type = alloc_type_array(check_type(c, type_expr->ArrayType.elem), -1);
+					is_to_be_determined_array_count = true;
+				}
+			} else {
+				type = alloc_type_slice(check_type(c, type_expr->ArrayType.elem));
 			}
 			if (cl->elems.count > 0) {
 				if (type_expr->ArrayType.tag != nullptr) {
@@ -9141,8 +9145,7 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 					}
 				}
 			}
-		}
-		if (type_expr->kind == Ast_DynamicArrayType && type_expr->DynamicArrayType.tag != nullptr) {
+		} else if (type_expr->kind == Ast_DynamicArrayType && type_expr->DynamicArrayType.tag != nullptr) {
 			if (cl->elems.count > 0) {
 				Ast *tag = type_expr->DynamicArrayType.tag;
 				GB_ASSERT(tag->kind == Ast_BasicDirective);
@@ -9181,6 +9184,12 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 		if (cl->elems.count == 0) {
 			break; // NOTE(bill): No need to init
 		}
+
+		if (t->Struct.soa_kind != StructSoa_None) {
+			error(node, "#soa arrays are not supported for compound literals");
+			break;
+		}
+
 		if (t->Struct.is_raw_union) {
 			if (cl->elems.count > 0) {
 				// NOTE: unions cannot be constant
