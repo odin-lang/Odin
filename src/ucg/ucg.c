@@ -1,4 +1,4 @@
-﻿/*
+/*
  * SPDX-FileCopyrightText: (c) 2024 Feoramund
  * SPDX-License-Identifier: BSD-3-Clause
  */
