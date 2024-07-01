@@ -6168,7 +6168,9 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 		Type *t = elem;
 
 		if (is_type_polymorphic(t)) {
-			error(call, "Ambiguous call to a polymorphic variadic procedure with no variadic input %s", type_to_string(final_proc_type));
+			if (show_error) {
+				error(call, "Ambiguous call to a polymorphic variadic procedure with no variadic input %s", type_to_string(final_proc_type));
+			}
 			err = CallArgumentError_AmbiguousPolymorphicVariadic;
 		}
 
