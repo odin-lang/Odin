@@ -564,6 +564,9 @@ append_string :: proc(array: ^$T/[dynamic]$E/u8, args: ..string, loc := #caller_
 	append_elem,
 	append_elems,
 	append_elem_string,
+
+	append_soa_elem,
+	append_soa_elems,
 }
 
 @builtin non_zero_append :: proc{non_zero_append_elem, non_zero_append_elems, non_zero_append_elem_string}
