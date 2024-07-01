@@ -1239,9 +1239,9 @@ namespace lbAbiWasm {
 	gb_internal LB_ABI_INFO(abi_info) {
 		lbFunctionType *ft = gb_alloc_item(permanent_allocator(), lbFunctionType);
 		ft->ctx = c;
+		ft->calling_convention = calling_convention;
 		ft->args = compute_arg_types(c, arg_types, arg_count, calling_convention, original_type);
 		ft->ret = compute_return_type(ft, c, return_type, return_is_defined, return_is_tuple);
-		ft->calling_convention = calling_convention;
 		return ft;
 	}
 
@@ -1378,14 +1378,14 @@ namespace lbAbiWasm {
 		} else if (lb_is_type_kind(return_type, LLVMStructTypeKind) || lb_is_type_kind(return_type, LLVMArrayTypeKind)) {
 			if (type_can_be_direct(return_type, ft->calling_convention)) {
 				return lb_arg_type_direct(return_type);
-			}
-
-			i64 sz = lb_sizeof(return_type);
-			switch (sz) {
-			case 1: return lb_arg_type_direct(return_type, LLVMIntTypeInContext(c, 8),  nullptr, nullptr);
-			case 2: return lb_arg_type_direct(return_type, LLVMIntTypeInContext(c, 16), nullptr, nullptr);
-			case 4: return lb_arg_type_direct(return_type, LLVMIntTypeInContext(c, 32), nullptr, nullptr);
-			case 8: return lb_arg_type_direct(return_type, LLVMIntTypeInContext(c, 64), nullptr, nullptr);
+			} else if (ft->calling_convention != ProcCC_CDecl) {
+				i64 sz = lb_sizeof(return_type);
+				switch (sz) {
+				case 1: return lb_arg_type_direct(return_type, LLVMIntTypeInContext(c, 8),  nullptr, nullptr);
+				case 2: return lb_arg_type_direct(return_type, LLVMIntTypeInContext(c, 16), nullptr, nullptr);
+				case 4: return lb_arg_type_direct(return_type, LLVMIntTypeInContext(c, 32), nullptr, nullptr);
+				case 8: return lb_arg_type_direct(return_type, LLVMIntTypeInContext(c, 64), nullptr, nullptr);
+				}
 			}
 
 			LB_ABI_MODIFY_RETURN_IF_TUPLE_MACRO();
