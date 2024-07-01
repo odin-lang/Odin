@@ -2366,6 +2366,7 @@ gb_internal bool type_has_nil(Type *t) {
 	return false;
 }
 
+
 gb_internal bool elem_type_can_be_constant(Type *t) {
 	t = base_type(t);
 	if (t == t_invalid) {

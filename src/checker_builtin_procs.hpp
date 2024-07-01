@@ -277,6 +277,7 @@ BuiltinProc__type_simple_boolean_end,
 	BuiltinProc_type_bit_set_underlying_type,
 
 	BuiltinProc_type_struct_field_count,
+	BuiltinProc_type_struct_has_implicit_padding,
 
 	BuiltinProc_type_proc_parameter_count,
 	BuiltinProc_type_proc_return_count,
@@ -593,7 +594,8 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("type_bit_set_elem_type"),       1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_bit_set_underlying_type"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
-	{STR_LIT("type_struct_field_count"),   1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("type_struct_field_count"),          1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("type_struct_has_implicit_padding"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("type_proc_parameter_count"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_proc_return_count"),    1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
