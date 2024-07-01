@@ -932,6 +932,7 @@ parse_f64_prefix :: proc(str: string) -> (value: f64, nr: int, ok: bool) {
 		nd := 0
 		nd_mant := 0
 		decimal_point := 0
+		trailing_zeroes_nd := -1
 		loop: for ; i < len(s); i += 1 {
 			switch c := s[i]; true {
 			case c == '_':
@@ -947,9 +948,16 @@ parse_f64_prefix :: proc(str: string) -> (value: f64, nr: int, ok: bool) {
 
 			case '0' <= c && c <= '9':
 				saw_digits = true
-				if c == '0' && nd == 0 {
-					decimal_point -= 1
-					continue loop
+				if c == '0' {
+					if nd == 0 {
+						decimal_point -= 1
+						continue loop
+					}
+					if trailing_zeroes_nd == -1 {
+						trailing_zeroes_nd = nd
+					}
+				} else {
+					trailing_zeroes_nd = -1
 				}
 				nd += 1
 				if nd_mant < MAX_MANT_DIGITS {
@@ -980,6 +988,14 @@ parse_f64_prefix :: proc(str: string) -> (value: f64, nr: int, ok: bool) {
 		}
 		if !saw_dot {
 			decimal_point = nd
+		}
+		if trailing_zeroes_nd > 0 {
+			trailing_zeroes_nd = nd_mant - trailing_zeroes_nd
+		}
+		for /**/; trailing_zeroes_nd > 0; trailing_zeroes_nd -= 1 {
+			mantissa /= base
+			nd_mant -= 1
+			nd -= 1
 		}
 		if base == 16 {
 			decimal_point *= 4
