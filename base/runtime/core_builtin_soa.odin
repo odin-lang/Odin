@@ -264,7 +264,7 @@ reserve_soa :: proc(array: ^$T/#soa[dynamic]$E, capacity: int, loc := #caller_lo
 }
 
 @builtin
-append_soa_elem :: proc(array: ^$T/#soa[dynamic]$E, arg: E, loc := #caller_location) -> (n: int, err: Allocator_Error) #optional_allocator_error {
+append_soa_elem :: proc(array: ^$T/#soa[dynamic]$E, #no_broadcast arg: E, loc := #caller_location) -> (n: int, err: Allocator_Error) #optional_allocator_error {
 	if array == nil {
 		return 0, nil
 	}
@@ -312,7 +312,7 @@ append_soa_elem :: proc(array: ^$T/#soa[dynamic]$E, arg: E, loc := #caller_locat
 }
 
 @builtin
-append_soa_elems :: proc(array: ^$T/#soa[dynamic]$E, args: ..E, loc := #caller_location) -> (n: int, err: Allocator_Error) #optional_allocator_error {
+append_soa_elems :: proc(array: ^$T/#soa[dynamic]$E, #no_broadcast args: ..E, loc := #caller_location) -> (n: int, err: Allocator_Error) #optional_allocator_error {
 	if array == nil {
 		return
 	}
