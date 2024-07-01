@@ -6812,7 +6812,9 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 			for_array(i, procs) {
 				Entity *proc = procs[i];
 				Type *t = base_type(proc->type);
-				if (t->kind != Type_Proc) continue;
+				if (t == nullptr || t->kind != Type_Proc) {
+					continue;
+				}
 
 				TypeProc *pt = &t->Proc;
 				if (pt->param_count == 0) {
