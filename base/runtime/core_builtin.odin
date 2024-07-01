@@ -163,18 +163,32 @@ pop_front_safe :: proc "contextless" (array: ^$T/[dynamic]$E) -> (res: E, ok: bo
 
 // `clear` will set the length of a passed dynamic array or map to `0`
 @builtin
-clear :: proc{clear_dynamic_array, clear_map}
+clear :: proc{
+	clear_dynamic_array,
+	clear_map,
+
+	clear_soa_dynamic_array,
+}
 
 // `reserve` will try to reserve memory of a passed dynamic array or map to the requested element count (setting the `cap`).
 @builtin
-reserve :: proc{reserve_dynamic_array, reserve_map}
+reserve :: proc{
+	reserve_dynamic_array,
+	reserve_map,
+
+	reserve_soa,
+}
 
 @builtin
 non_zero_reserve :: proc{non_zero_reserve_dynamic_array}
 
 // `resize` will try to resize memory of a passed dynamic array to the requested element count (setting the `len`, and possibly `cap`).
 @builtin
-resize :: proc{resize_dynamic_array}
+resize :: proc{
+	resize_dynamic_array,
+
+	resize_soa,
+}
 
 @builtin
 non_zero_resize :: proc{non_zero_resize_dynamic_array}
@@ -546,7 +560,12 @@ append_string :: proc(array: ^$T/[dynamic]$E/u8, args: ..string, loc := #caller_
 }
 
 // The append built-in procedure appends elements to the end of a dynamic array
-@builtin append :: proc{append_elem, append_elems, append_elem_string}
+@builtin append :: proc{
+	append_elem,
+	append_elems,
+	append_elem_string,
+}
+
 @builtin non_zero_append :: proc{non_zero_append_elem, non_zero_append_elems, non_zero_append_elem_string}
 
 
