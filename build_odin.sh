@@ -39,7 +39,12 @@ if [ -z "$LLVM_CONFIG" ]; then
 	elif [ -n "$(command -v llvm-config12)" ]; then  LLVM_CONFIG="llvm-config12"
 	elif [ -n "$(command -v llvm-config11)" ]; then  LLVM_CONFIG="llvm-config11"
 	# fallback
-	elif [ -n "$(command -v llvm-config)" ]; then LLVM_CONFIG="llvm-config"
+	elif [ -n "$(command -v llvm-config-14)" ]; then
+		echo "WARN: Odin does not officially support LLVM14"
+		LLVM_CONFIG="llvm-config-14"
+	elif [ -n "$(command -v llvm-config14)" ]; then
+		echo "WARN: Odin does not officially support LLVM14"
+		LLVM_CONFIG="llvm-config14"
 	else
 		error "No llvm-config command found. Set LLVM_CONFIG to proceed."
 	fi
