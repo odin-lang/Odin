@@ -3,35 +3,27 @@
 package sync
 
 import "core:c"
+import "core:sys/freebsd"
 import "core:time"
 
-UMTX_OP_WAIT :: 2
-UMTX_OP_WAKE :: 3
-
-ETIMEDOUT :: 60
-
-foreign import libc "system:c"
-
-foreign libc {
-	_umtx_op :: proc "c" (obj: rawptr, op: c.int, val: c.ulong, uaddr: rawptr, uaddr2: rawptr) -> c.int ---
-	__error :: proc "c" () -> ^c.int ---
-}
-
 _futex_wait :: proc "contextless" (f: ^Futex, expected: u32) -> bool {
-	timeout := [2]i64{14400, 0} // 4 hours
-	for {
-		res := _umtx_op(f, UMTX_OP_WAIT, c.ulong(expected), nil, &timeout)
+	timeout := freebsd.timespec {14400, 0} // 4 hours
+	timeout_size := cast(rawptr)cast(uintptr)size_of(timeout)
 
-		if res != -1 {
+	for {
+		errno := freebsd._umtx_op(f, .WAIT_UINT, cast(c.ulong)expected, timeout_size, &timeout)
+
+		if errno == nil {
 			return true
 		}
 
-		if __error()^ == ETIMEDOUT {
+		if errno == .ETIMEDOUT {
 			continue
 		}
 
 		_panic("_futex_wait failure")
 	}
+
 	unreachable()
 }
 
@@ -40,14 +32,15 @@ _futex_wait_with_timeout :: proc "contextless" (f: ^Futex, expected: u32, durati
 		return false
 	}
 
-	timeout := [2]i64{i64(duration/1e9), i64(duration%1e9)}
+	timeout := freebsd.timespec {cast(freebsd.time_t)duration / 1e9, cast(c.long)duration % 1e9}
+	timeout_size := cast(rawptr)cast(uintptr)size_of(timeout)
 
-	res := _umtx_op(f, UMTX_OP_WAIT, c.ulong(expected), nil, &timeout)
-	if res != -1 {
+	errno := freebsd._umtx_op(f, .WAIT_UINT, cast(c.ulong)expected, timeout_size, &timeout)
+	if errno == nil {
 		return true
 	}
 
-	if __error()^ == ETIMEDOUT {
+	if errno == .ETIMEDOUT {
 		return false
 	}
 
@@ -55,17 +48,17 @@ _futex_wait_with_timeout :: proc "contextless" (f: ^Futex, expected: u32, durati
 }
 
 _futex_signal :: proc "contextless" (f: ^Futex) {
-	res := _umtx_op(f, UMTX_OP_WAKE, 1, nil, nil)
+	errno := freebsd._umtx_op(f, .WAKE, 1, nil, nil)
 
-	if res == -1 {
+	if errno != nil {
 		_panic("_futex_signal failure")
 	}
 }
 
 _futex_broadcast :: proc "contextless" (f: ^Futex)  {
-	res := _umtx_op(f, UMTX_OP_WAKE, c.ulong(max(i32)), nil, nil)
+	errno := freebsd._umtx_op(f, .WAKE, cast(c.ulong)max(i32), nil, nil)
 
-	if res == -1 {
+	if errno != nil {
 		_panic("_futex_broadcast failure")
 	}
 }
