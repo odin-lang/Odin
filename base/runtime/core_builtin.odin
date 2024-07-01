@@ -180,7 +180,11 @@ reserve :: proc{
 }
 
 @builtin
-non_zero_reserve :: proc{non_zero_reserve_dynamic_array}
+non_zero_reserve :: proc{
+	non_zero_reserve_dynamic_array,
+
+	non_zero_reserve_soa,
+}
 
 // `resize` will try to resize memory of a passed dynamic array to the requested element count (setting the `len`, and possibly `cap`).
 @builtin
@@ -191,7 +195,11 @@ resize :: proc{
 }
 
 @builtin
-non_zero_resize :: proc{non_zero_resize_dynamic_array}
+non_zero_resize :: proc{
+	non_zero_resize_dynamic_array,
+
+	non_zero_resize_soa,
+}
 
 // Shrinks the capacity of a dynamic array or map down to the current length, or the given capacity.
 @builtin
@@ -569,7 +577,14 @@ append_string :: proc(array: ^$T/[dynamic]$E/u8, args: ..string, loc := #caller_
 	append_soa_elems,
 }
 
-@builtin non_zero_append :: proc{non_zero_append_elem, non_zero_append_elems, non_zero_append_elem_string}
+@builtin non_zero_append :: proc{
+	non_zero_append_elem,
+	non_zero_append_elems,
+	non_zero_append_elem_string,
+
+	non_zero_append_soa_elem,
+	non_zero_append_soa_elems,
+}
 
 
 @builtin

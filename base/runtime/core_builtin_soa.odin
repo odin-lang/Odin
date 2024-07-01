@@ -183,7 +183,27 @@ resize_soa :: proc(array: ^$T/#soa[dynamic]$E, length: int, loc := #caller_locat
 }
 
 @builtin
+non_zero_resize_soa :: proc(array: ^$T/#soa[dynamic]$E, length: int, loc := #caller_location) -> Allocator_Error {
+	if array == nil {
+		return nil
+	}
+	non_zero_reserve_soa(array, length, loc) or_return
+	footer := raw_soa_footer(array)
+	footer.len = length
+	return nil
+}
+
+@builtin
 reserve_soa :: proc(array: ^$T/#soa[dynamic]$E, capacity: int, loc := #caller_location) -> Allocator_Error {
+	return _reserve_soa(array, capacity, true, loc)
+}
+
+@builtin
+non_zero_reserve_soa :: proc(array: ^$T/#soa[dynamic]$E, capacity: int, loc := #caller_location) -> Allocator_Error {
+	return _reserve_soa(array, capacity, false, loc)
+}
+
+_reserve_soa :: proc(array: ^$T/#soa[dynamic]$E, capacity: int, zero_memory: bool, loc := #caller_location) -> Allocator_Error {
 	if array == nil {
 		return nil
 	}
@@ -228,7 +248,7 @@ reserve_soa :: proc(array: ^$T/#soa[dynamic]$E, capacity: int, loc := #caller_lo
 	old_data := (^rawptr)(array)^
 
 	new_bytes := array.allocator.procedure(
-		array.allocator.data, .Alloc, new_size, max_align,
+		array.allocator.data, .Alloc if zero_memory else .Alloc_Non_Zeroed, new_size, max_align,
 		nil, old_size, loc,
 	) or_return
 	new_data := raw_data(new_bytes)
@@ -263,8 +283,18 @@ reserve_soa :: proc(array: ^$T/#soa[dynamic]$E, capacity: int, loc := #caller_lo
 	return nil
 }
 
+
 @builtin
 append_soa_elem :: proc(array: ^$T/#soa[dynamic]$E, #no_broadcast arg: E, loc := #caller_location) -> (n: int, err: Allocator_Error) #optional_allocator_error {
+	return _append_soa_elem(array, true, arg, loc)
+}
+
+@builtin
+non_zero_append_soa_elem :: proc(array: ^$T/#soa[dynamic]$E, #no_broadcast arg: E, loc := #caller_location) -> (n: int, err: Allocator_Error) #optional_allocator_error {
+	return _append_soa_elem(array, false, arg, loc)
+}
+
+_append_soa_elem :: proc(array: ^$T/#soa[dynamic]$E, zero_memory: bool, #no_broadcast arg: E, loc := #caller_location) -> (n: int, err: Allocator_Error) #optional_allocator_error {
 	if array == nil {
 		return 0, nil
 	}
@@ -272,7 +302,7 @@ append_soa_elem :: proc(array: ^$T/#soa[dynamic]$E, #no_broadcast arg: E, loc :=
 	if cap(array) <= len(array) + 1 {
 		// Same behavior as append_soa_elems but there's only one arg, so we always just add DEFAULT_DYNAMIC_ARRAY_CAPACITY.
 		cap := 2 * cap(array) + DEFAULT_DYNAMIC_ARRAY_CAPACITY
-		err = reserve_soa(array, cap, loc) // do not 'or_return' here as it could be a partial success
+		err = _reserve_soa(array, cap, zero_memory, loc) // do not 'or_return' here as it could be a partial success
 	}
 
 	footer := raw_soa_footer(array)
@@ -313,6 +343,16 @@ append_soa_elem :: proc(array: ^$T/#soa[dynamic]$E, #no_broadcast arg: E, loc :=
 
 @builtin
 append_soa_elems :: proc(array: ^$T/#soa[dynamic]$E, #no_broadcast args: ..E, loc := #caller_location) -> (n: int, err: Allocator_Error) #optional_allocator_error {
+	return _append_soa_elems(array, true, args=args, loc=loc)
+}
+
+@builtin
+non_zero_append_soa_elems :: proc(array: ^$T/#soa[dynamic]$E, #no_broadcast args: ..E, loc := #caller_location) -> (n: int, err: Allocator_Error) #optional_allocator_error {
+	return _append_soa_elems(array, false, args=args, loc=loc)
+}
+
+
+_append_soa_elems :: proc(array: ^$T/#soa[dynamic]$E, zero_memory: bool, #no_broadcast args: ..E, loc := #caller_location) -> (n: int, err: Allocator_Error) #optional_allocator_error {
 	if array == nil {
 		return
 	}
@@ -324,7 +364,7 @@ append_soa_elems :: proc(array: ^$T/#soa[dynamic]$E, #no_broadcast args: ..E, lo
 
 	if cap(array) <= len(array)+arg_len {
 		cap := 2 * cap(array) + max(DEFAULT_DYNAMIC_ARRAY_CAPACITY, arg_len)
-		err = reserve_soa(array, cap, loc) // do not 'or_return' here as it could be a partial success
+		err = _reserve_soa(array, cap, zero_memory, loc) // do not 'or_return' here as it could be a partial success
 	}
 	arg_len = min(cap(array)-len(array), arg_len)
 
