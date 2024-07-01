@@ -786,7 +786,6 @@ gb_internal void tokenizer_get_token(Tokenizer *t, Token *token, int repeat=0) {
 		case '`': // Raw String Literal
 		case '"': // String Literal
 		{
-			bool has_carriage_return = false;
 			i32 success;
 			Rune quote = curr_rune;
 			token->kind = Token_String;
@@ -815,9 +814,6 @@ gb_internal void tokenizer_get_token(Tokenizer *t, Token *token, int repeat=0) {
 					advance_to_next_rune(t);
 					if (r == quote) {
 						break;
-					}
-					if (r == '\r') {
-						has_carriage_return = true;
 					}
 				}
 			}

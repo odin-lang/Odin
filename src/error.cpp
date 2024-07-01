@@ -237,6 +237,7 @@ enum TerminalColour {
 	TerminalColour_Blue,
 	TerminalColour_Purple,
 	TerminalColour_Black,
+	TerminalColour_Grey,
 };
 
 gb_internal void terminal_set_colours(TerminalStyle style, TerminalColour foreground) {
@@ -256,6 +257,7 @@ gb_internal void terminal_set_colours(TerminalStyle style, TerminalColour foregr
 		case TerminalColour_Blue:   error_out("\x1b[%s;34m", ss); break;
 		case TerminalColour_Purple: error_out("\x1b[%s;35m", ss); break;
 		case TerminalColour_Black:  error_out("\x1b[%s;30m", ss); break;
+		case TerminalColour_Grey:   error_out("\x1b[%s;90m", ss); break;
 		}
 	}
 }
@@ -272,85 +274,234 @@ gb_internal isize show_error_on_line(TokenPos const &pos, TokenPos end) {
 		return -1;
 	}
 
-	i32 offset = 0;
-	gbString the_line = get_file_line_as_string(pos, &offset);
+	i32 error_start_index_bytes = 0;
+	gbString the_line = get_file_line_as_string(pos, &error_start_index_bytes);
 	defer (gb_string_free(the_line));
 
-	if (the_line != nullptr) {
-		char const *line_text = the_line;
-		isize line_len = gb_string_length(the_line);
-
-		// TODO(bill): This assumes ASCII
-
-		enum {
-			MAX_LINE_LENGTH  = 80,
-			MAX_TAB_WIDTH    = 8,
-			ELLIPSIS_PADDING = 8, // `...  ...`
-			MAX_LINE_LENGTH_PADDED = MAX_LINE_LENGTH-MAX_TAB_WIDTH-ELLIPSIS_PADDING,
-		};
-
-		i32 error_length = gb_max(end.offset - pos.offset, 1);
-
-		error_out("\t");
-
-		terminal_set_colours(TerminalStyle_Bold, TerminalColour_White);
-
-
-		isize squiggle_extra = 0;
-
-		if (line_len > MAX_LINE_LENGTH_PADDED) {
-			i32 left = MAX_TAB_WIDTH;
-			i32 diff = gb_max(offset-left, 0);
-			if (diff > 0) {
-				line_text += diff;
-				line_len  -= diff;
-				offset = left + ELLIPSIS_PADDING/2;
-			}
-			if (line_len > MAX_LINE_LENGTH_PADDED) {
-				line_len = MAX_LINE_LENGTH_PADDED;
-				if (error_length > line_len-left) {
-					error_length = cast(i32)line_len - left;
-					squiggle_extra = 1;
-				}
-			}
-			if (diff > 0) {
-				error_out("... %.*s ...", cast(i32)line_len, line_text);
-			} else {
-				error_out("%.*s ...", cast(i32)line_len, line_text);
-			}
-		} else {
-			error_out("%.*s", cast(i32)line_len, line_text);
-		}
-		error_out("\n\t");
-
-		for (i32 i = 0; i < offset; i++) {
-			error_out(" ");
-		}
-
-		terminal_set_colours(TerminalStyle_Bold, TerminalColour_Green);
-
-		error_out("^");
-		if (end.file_id == pos.file_id) {
-			if (end.line > pos.line) {
-				for (i32 i = offset; i < line_len; i++) {
-					error_out("~");
-				}
-			} else if (end.line == pos.line && end.column > pos.column) {
-				for (i32 i = 1; i < error_length-1+squiggle_extra; i++) {
-					error_out("~");
-				}
-				if (error_length > 1 && squiggle_extra == 0) {
-					error_out("^");
-				}
-			}
-		}
-
+	if (the_line == nullptr || gb_string_length(the_line) == 0) {
+		terminal_set_colours(TerminalStyle_Normal, TerminalColour_Grey);
+		error_out("\t( empty line )\n");
 		terminal_reset_colours();
 
-		error_out("\n");
-		return offset;
+		if (the_line == nullptr) {
+			return -1;
+		} else {
+			return cast(isize)error_start_index_bytes;
+		}
 	}
-	return -1;
+
+	// These two will be used like an Odin slice later.
+	char const *line_text = the_line;
+	i32 line_length_bytes = cast(i32)gb_string_length(the_line);
+
+	ucg_grapheme* graphemes;
+	i32 line_length_runes = 0;
+	i32 line_length_graphemes = 0;
+	i32 line_width = 0;
+
+	int ucg_result = ucg_decode_grapheme_clusters(
+		permanent_allocator(), (const uint8_t*)line_text, line_length_bytes,
+		&graphemes, &line_length_runes, &line_length_graphemes, &line_width);
+
+	if (ucg_result < 0) {
+		// There was a UTF-8 parsing error.
+		// Insert a dummy grapheme so the start of the invalid rune can be pointed at.
+		graphemes = (ucg_grapheme*)gb_resize(permanent_allocator(),
+			graphemes,
+			sizeof(ucg_grapheme) * (line_length_graphemes),
+			sizeof(ucg_grapheme) * (1 + line_length_graphemes));
+
+		ucg_grapheme append = {
+			error_start_index_bytes,
+			line_length_runes,
+			1,
+		};
+
+		graphemes[line_length_graphemes] = append;
+	}
+
+	// The units below are counted in visual, monospace cells.
+	enum {
+		MAX_LINE_LENGTH  = 80,
+		MAX_TAB_WIDTH    = 8,
+		ELLIPSIS_PADDING = 8, // `...  ...`
+		MIN_LEFT_VIEW    = 8,
+
+		// A rough estimate of how many characters we'll insert, at most:
+		MAX_INSERTED_WIDTH     = MAX_TAB_WIDTH + ELLIPSIS_PADDING,
+
+		MAX_LINE_LENGTH_PADDED = MAX_LINE_LENGTH - MAX_INSERTED_WIDTH,
+	};
+
+	i32 error_start_index_graphemes = 0;
+	for (i32 i = 0; i < line_length_graphemes; i += 1) {
+		if (graphemes[i].byte_index == error_start_index_bytes) {
+			error_start_index_graphemes = i;
+			break;
+		}
+	}
+
+	if (error_start_index_graphemes == 0 && error_start_index_bytes != 0 && line_length_graphemes != 0) {
+		// The error index in graphemes was not found, but we did find a valid Unicode string.
+		//
+		// This is an edge case where the error is sitting on a newline or the
+		// end of the line, as that is the only location we could not have checked.
+		error_start_index_graphemes = line_length_graphemes;
+	}
+
+	error_out("\t");
+
+	bool show_right_ellipsis = false;
+
+	i32 squiggle_padding = 0;
+	i32 window_open_bytes = 0;
+	i32 window_close_bytes = 0;
+	if (line_width > MAX_LINE_LENGTH_PADDED) {
+		// Now that we know the line is over the length limit, we have to
+		// compose a visual window in which to display the error.
+		i32 window_size_left = 0;
+		i32 window_size_right = 0;
+		i32 window_open_graphemes = 0;
+
+		for (i32 i = error_start_index_graphemes - 1; i > 0; i -= 1) {
+			window_size_left += graphemes[i].width;
+			if (window_size_left >= MIN_LEFT_VIEW) {
+				window_open_graphemes = i;
+				window_open_bytes = graphemes[i].byte_index;
+				break;
+			}
+		}
+
+		for (i32 i = error_start_index_graphemes; i < line_length_graphemes; i += 1) {
+			window_size_right += graphemes[i].width;
+			if (window_size_right >= MAX_LINE_LENGTH_PADDED - MIN_LEFT_VIEW) {
+				window_close_bytes = graphemes[i].byte_index;
+				break;
+			}
+		}
+		if (window_close_bytes == 0) {
+			// The window ends at the end of the line.
+			window_close_bytes = line_length_bytes;
+		}
+
+		if (window_size_right < MAX_LINE_LENGTH_PADDED - MIN_LEFT_VIEW) {
+			// Hit the end of the string early on the right side; expand backwards.
+			for (i32 i = window_open_graphemes - 1; i > 0; i -= 1) {
+				window_size_left += graphemes[i].width;
+				if (window_size_left + window_size_right >= MAX_LINE_LENGTH_PADDED) {
+					window_open_graphemes = i;
+					window_open_bytes = graphemes[i].byte_index;
+					break;
+				}
+			}
+		}
+
+		GB_ASSERT_MSG(window_close_bytes >= window_open_bytes, "Error line truncation window has wrong byte indices. (open, close: %i, %i)", window_open_bytes, window_close_bytes);
+
+		if (window_close_bytes != line_length_bytes) {
+			show_right_ellipsis = true;
+		}
+
+		// Close the window, going left.
+		line_length_bytes = window_close_bytes;
+
+		// Adjust the slice of text. In Odin, this would be:
+		// `line_text = line_text[window_left_bytes:]`
+		line_text += window_open_bytes;
+		line_length_bytes -= window_open_bytes;
+		GB_ASSERT_MSG(line_length_bytes >= 0, "Bounds-checking error: line_length_bytes");
+
+		if (window_open_bytes > 0) {
+			error_out("... ");
+			squiggle_padding += 4;
+		}
+	} else {
+		// No truncation needed.
+		window_open_bytes = 0;
+		window_close_bytes = line_length_bytes;
+	}
+
+	for (i32 i = error_start_index_graphemes; i > 0; i -= 1) {
+		if (graphemes[i].byte_index == window_open_bytes) {
+			break;
+		}
+		squiggle_padding += graphemes[i].width;
+	}
+
+	// Start printing code.
+
+	terminal_set_colours(TerminalStyle_Normal, TerminalColour_White);
+	error_out("%.*s", line_length_bytes, line_text);
+
+	i32 squiggle_length = 0;
+	bool trailing_squiggle = false;
+
+	if (end.file_id == pos.file_id) {
+		// The error has an endpoint.
+
+		if (end.line > pos.line) {
+			// Error goes to next line.
+			// Always show the ellipsis in this case
+			show_right_ellipsis = true;
+
+			for (i32 i = error_start_index_graphemes; i < line_length_graphemes; i += 1) {
+				squiggle_length += graphemes[i].width;
+				trailing_squiggle = true;
+			}
+
+		} else if (end.line == pos.line && end.column > pos.column) {
+			// Error terminates before line end.
+			i32 adjusted_end_index = graphemes[error_start_index_graphemes].byte_index + end.column - pos.column;
+
+			for (i32 i = error_start_index_graphemes; i < line_length_graphemes; i += 1) {
+				if (graphemes[i].byte_index >= adjusted_end_index) {
+					break;
+				} else if (graphemes[i].byte_index >= window_close_bytes) {
+					trailing_squiggle = true;
+					break;
+				}
+				squiggle_length += graphemes[i].width;
+			}
+		}
+	} else {
+		// The error is at one spot; no range known.
+		squiggle_length = 1;
+	}
+
+	if (show_right_ellipsis) {
+		error_out(" ...");
+	}
+
+	error_out("\n\t");
+
+	for (i32 i = squiggle_padding; i > 0; i -= 1) {
+		error_out(" ");
+	}
+
+	terminal_set_colours(TerminalStyle_Bold, TerminalColour_Green);
+
+	if (squiggle_length > 0) {
+		error_out("^");
+		squiggle_length -= 1;
+	}
+	for (/**/; squiggle_length > 1; squiggle_length -= 1) {
+		error_out("~");
+	}
+	if (squiggle_length > 0) {
+		if (trailing_squiggle) {
+			error_out("~ ...");
+		} else {
+			error_out("^");
+		}
+	}
+
+	// NOTE(Feoramund): Specifically print a newline, then reset colours,
+	// instead of the other way around. Otherwise the printing mechanism
+	// will collapse the newline for reasons currently beyond my ken.
+	error_out("\n");
+	terminal_reset_colours();
+
+	return squiggle_padding;
 }
 
 gb_internal void error_out_empty(void) {
