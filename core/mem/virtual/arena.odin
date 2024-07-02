@@ -43,7 +43,6 @@ DEFAULT_ARENA_STATIC_RESERVE_SIZE :: mem.Gigabyte when size_of(uintptr) == 8 els
 
 // Initialization of an `Arena` to be a `.Growing` variant.
 // A growing arena is a linked list of `Memory_Block`s allocated with virtual memory.
-@(require_results)
 arena_init_growing :: proc(arena: ^Arena, reserved: uint = DEFAULT_ARENA_GROWING_MINIMUM_BLOCK_SIZE) -> (err: Allocator_Error) {
 	arena.kind           = .Growing
 	arena.curr_block     = memory_block_alloc(0, reserved, {}) or_return
@@ -55,7 +54,6 @@ arena_init_growing :: proc(arena: ^Arena, reserved: uint = DEFAULT_ARENA_GROWING
 
 // Initialization of an `Arena` to be a `.Static` variant.
 // A static arena contains a single `Memory_Block` allocated with virtual memory.
-@(require_results)
 arena_init_static :: proc(arena: ^Arena, reserved: uint = DEFAULT_ARENA_STATIC_RESERVE_SIZE, commit_size: uint = DEFAULT_ARENA_STATIC_COMMIT_SIZE) -> (err: Allocator_Error) {
 	arena.kind           = .Static
 	arena.curr_block     = memory_block_alloc(commit_size, reserved, {}) or_return
@@ -66,7 +64,6 @@ arena_init_static :: proc(arena: ^Arena, reserved: uint = DEFAULT_ARENA_STATIC_R
 
 // Initialization of an `Arena` to be a `.Buffer` variant.
 // A buffer arena contains single `Memory_Block` created from a user provided []byte.
-@(require_results)
 arena_init_buffer :: proc(arena: ^Arena, buffer: []byte) -> (err: Allocator_Error) {
 	if len(buffer) < size_of(Memory_Block) {
 		return .Out_Of_Memory
