@@ -2029,7 +2029,11 @@ gb_internal void lb_set_wasm_procedure_import_attributes(LLVMValueRef value, Ent
 		GB_ASSERT(foreign_library->LibraryName.paths.count == 1);
 		
 		module_name = foreign_library->LibraryName.paths[0];
-		
+
+		if (string_ends_with(module_name, str_lit(".o"))) {
+			return;
+		}
+
 		if (string_starts_with(import_name, module_name)) {
 			import_name = substring(import_name, module_name.len+WASM_MODULE_NAME_SEPARATOR.len, import_name.len);
 		}

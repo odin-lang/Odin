@@ -5000,9 +5000,8 @@ gb_internal void check_foreign_import_fullpaths(Checker *c) {
 
 				String file_str = op.value.value_string;
 				file_str = string_trim_whitespace(file_str);
-
 				String fullpath = file_str;
-				if (allow_check_foreign_filepath()) {
+				if (!is_arch_wasm() || string_ends_with(file_str, str_lit(".o"))) {
 					String foreign_path = {};
 					bool ok = determine_path_from_string(nullptr, decl, base_dir, file_str, &foreign_path, /*use error not syntax_error*/true);
 					if (ok) {
