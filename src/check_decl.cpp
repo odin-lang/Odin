@@ -1178,9 +1178,12 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 			if (foreign_library->LibraryName.paths.count >= 1) {
 				module_name = foreign_library->LibraryName.paths[0];
 			}
-			name = concatenate3_strings(permanent_allocator(), module_name, WASM_MODULE_NAME_SEPARATOR, name);
+
+			if (!string_ends_with(module_name, str_lit(".o"))) {
+				name = concatenate3_strings(permanent_allocator(), module_name, WASM_MODULE_NAME_SEPARATOR, name);
+			}
 		}
-		
+
 		e->Procedure.is_foreign = true;
 		e->Procedure.link_name = name;
 
