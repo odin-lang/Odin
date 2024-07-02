@@ -6,6 +6,10 @@ else
 all: unix
 endif
 
+wasm:
+	mkdir -p ../lib
+	clang -c -Os --target=wasm32 -nostdlib stb_truetype_wasm.c -o ../lib/stb_truetype_wasm.o
+
 unix:
 	mkdir -p ../lib
 	$(CC) -c -O2 -Os -fPIC stb_image.c stb_image_write.c stb_image_resize.c stb_truetype.c stb_rect_pack.c stb_vorbis.c

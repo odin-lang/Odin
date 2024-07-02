@@ -85,6 +85,20 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 			if (extra_linker_flags.len != 0) {
 				lib_str = gb_string_append_fmt(lib_str, " %.*s", LIT(extra_linker_flags));
 			}
+
+			for_array(i, e->LibraryName.paths) {
+				String lib = e->LibraryName.paths[i];
+
+				if (lib.len == 0) {
+					continue;
+				}
+
+				if (!string_ends_with(lib, str_lit(".o"))) {
+					continue;
+				}
+
+				inputs = gb_string_append_fmt(inputs, " \"%.*s\"", LIT(lib));
+			}
 		}
 
 		if (build_context.metrics.os == TargetOs_orca) {

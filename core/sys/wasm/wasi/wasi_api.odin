@@ -962,7 +962,7 @@ prestat_dir_t :: struct {
 }
 
 prestat_t :: struct {
-	tag: u8,
+	tag: preopentype_t,
 	using u: struct {
 		dir: prestat_dir_t,
 	},
@@ -1158,7 +1158,7 @@ foreign wasi {
 		/**
 		 * A buffer into which to write the preopened directory name.
 		 */
-		path: string,
+		path: []byte,
 	) -> errno_t ---
 	/**
 	 * Create a directory.

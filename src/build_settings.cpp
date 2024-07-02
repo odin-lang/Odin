@@ -860,15 +860,6 @@ gb_internal bool is_arch_x86(void) {
 	return false;
 }
 
-gb_internal bool allow_check_foreign_filepath(void) {
-	switch (build_context.metrics.arch) {
-	case TargetArch_wasm32:
-	case TargetArch_wasm64p32:
-		return false;
-	}
-	return true;
-}
-
 // TODO(bill): OS dependent versions for the BuildContext
 // join_path
 // is_dir

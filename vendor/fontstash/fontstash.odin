@@ -1,14 +1,14 @@
-//+build windows, linux, darwin
 //+vet !using-param
 package fontstash
 
 import "base:runtime"
+
 import "core:log"
-import "core:os"
 import "core:mem"
 import "core:math"
 import "core:strings"
 import "core:slice"
+
 import stbtt "vendor:stb/truetype"
 
 // This is a port from Fontstash into odin - specialized for nanovg
@@ -319,20 +319,6 @@ __AtlasAddWhiteRect :: proc(ctx: ^FontContext, w, h: int) -> bool {
 	ctx.dirtyRect[3] = f32(max(int(ctx.dirtyRect[3]), gy + h))
 
 	return true
-}
-
-AddFontPath :: proc(
-	ctx: ^FontContext,
-	name: string,
-	path: string,
-) -> int {
-	data, ok := os.read_entire_file(path)
-
-	if !ok {
-		log.panicf("FONT: failed to read font at %s", path)
-	}
-
-	return AddFontMem(ctx, name, data, true)
 }
 
 // push a font to the font stack

@@ -5824,7 +5824,6 @@ gb_internal bool determine_path_from_string(BlockingMutex *file_mutex, Ast *node
 		return false;
 	}
 
-
 	if (collection_name.len > 0) {
 		// NOTE(bill): `base:runtime` == `core:runtime`
 		if (collection_name == "core") {
@@ -5979,7 +5978,7 @@ gb_internal void parse_setup_file_decls(Parser *p, AstFile *f, String const &bas
 				Token fp_token = fp->BasicLit.token;
 				String file_str = string_trim_whitespace(string_value_from_token(f, fp_token));
 				String fullpath = file_str;
-				if (allow_check_foreign_filepath()) {
+				if (!is_arch_wasm() || string_ends_with(fullpath, str_lit(".o"))) {
 					String foreign_path = {};
 					bool ok = determine_path_from_string(&p->file_decl_mutex, node, base_dir, file_str, &foreign_path);
 					if (!ok) {
