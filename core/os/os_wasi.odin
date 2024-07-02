@@ -26,7 +26,6 @@ O_CLOEXEC  :: 0x80000
 stdin:  Handle = 0
 stdout: Handle = 1
 stderr: Handle = 2
-current_dir: Handle = 3
 
 args := _alloc_command_line_arguments()
 
@@ -51,9 +50,9 @@ Preopen :: struct {
 	prefix: string,
 }
 @(private)
-preopens: [dynamic]Preopen
+preopens: []Preopen
 
-@(private, init)
+@(init, private)
 init_preopens :: proc() {
 
 	strip_prefixes :: proc(path: string) -> string {
@@ -73,6 +72,7 @@ init_preopens :: proc() {
 		return path
 	}
 
+	dyn_preopens: [dynamic]Preopen
 	loop: for fd := wasi.fd_t(3); ; fd += 1 {
 		desc, err := wasi.fd_prestat_get(fd)
 		#partial switch err {
@@ -87,9 +87,10 @@ init_preopens :: proc() {
 			if err = wasi.fd_prestat_dir_name(fd, buf); err != .SUCCESS {
 				panic("could not get filesystem preopen dir name")
 			}
-			append(&preopens, Preopen{fd, strip_prefixes(string(buf))})
+			append(&dyn_preopens, Preopen{fd, strip_prefixes(string(buf))})
 		}
 	}
+	preopens = dyn_preopens[:]
 }
 
 wasi_match_preopen :: proc(path: string) -> (wasi.fd_t, string, bool) {
