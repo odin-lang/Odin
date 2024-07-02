@@ -8,6 +8,7 @@ import "base:runtime"
 import "core:c"
 import "core:math"
 import "core:mem"
+import "core:slice"
 import "core:sort"
 
 @(require, linkage="strong", link_name="stbtt_malloc")
@@ -33,10 +34,9 @@ qsort :: proc "c" (base: rawptr, num: uint, size: uint, cmp: proc "c" (a, b: raw
 		size: uint,
 		cmp:  proc "c" (a, b: rawptr) -> i32,
 	}
-	inputs := Inputs{base, num, size, cmp}
 
 	sort.sort({
-		collection = &inputs,
+		collection = &Inputs{base, num, size, cmp},
 		len = proc(it: sort.Interface) -> int {
 			inputs := (^Inputs)(it.collection)
 			return int(inputs.num)
@@ -53,10 +53,7 @@ qsort :: proc "c" (base: rawptr, num: uint, size: uint, cmp: proc "c" (a, b: raw
 			a := rawptr(uintptr(inputs.base) + (uintptr(i) * uintptr(inputs.size)))
 			b := rawptr(uintptr(inputs.base) + (uintptr(j) * uintptr(inputs.size)))
 
-			tmp := intrinsics.alloca(inputs.size, runtime.DEFAULT_ALIGNMENT)
-			intrinsics.mem_copy_non_overlapping(tmp, a, inputs.size)
-			intrinsics.mem_copy_non_overlapping(a, b, inputs.size)
-			intrinsics.mem_copy_non_overlapping(b, tmp, inputs.size)
+			slice.ptr_swap_non_overlapping(a, b, int(inputs.size))
 		},
 	})
 }
