@@ -68,7 +68,7 @@ MODULEENTRY32W :: struct {
 	th32ProcessID: DWORD,
 	GlblcntUsage: DWORD,
 	ProccntUsage: DWORD,
-	modBaseAddr: BYTE,
+	modBaseAddr: ^BYTE,
 	modBaseSize: DWORD,
 	hModule: HMODULE,
 	szModule: [MAX_MODULE_NAME32 + 1]WCHAR,
