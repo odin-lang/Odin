@@ -1011,7 +1011,7 @@ gb_internal void lb_emit_store(lbProcedure *p, lbValue ptr, lbValue value) {
 		return;
 	}
 
-	Type *a = type_deref(ptr.type);
+	Type *a = type_deref(ptr.type, true);
 	if (LLVMIsNull(value.value)) {
 		LLVMTypeRef src_t = llvm_addr_type(p->module, ptr);
 		if (is_type_proc(a)) {
