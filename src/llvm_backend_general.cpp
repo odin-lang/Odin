@@ -1109,9 +1109,13 @@ gb_internal lbValue lb_emit_load(lbProcedure *p, lbValue value) {
 	Type *t = type_deref(value.type);
 	LLVMValueRef v = LLVMBuildLoad2(p->builder, lb_type(p->module, t), value.value, "");
 
-	u64 is_packed = lb_get_metadata_custom_u64(p->module, value.value, ODIN_METADATA_IS_PACKED);
-	if (is_packed != 0) {
-		LLVMSetAlignment(v, 1);
+	// If it is not an instruction it isn't a GEP, so we don't need to track alignment in the metadata,
+	// which is not possible anyway (only LLVM instructions can have metadata).
+	if (LLVMIsAInstruction(value.value)) {
+		u64 is_packed = lb_get_metadata_custom_u64(p->module, value.value, ODIN_METADATA_IS_PACKED);
+		if (is_packed != 0) {
+			LLVMSetAlignment(v, 1);
+		}
 	}
 
 	return lbValue{v, t};

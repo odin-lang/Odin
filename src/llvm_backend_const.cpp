@@ -94,9 +94,6 @@ gb_internal LLVMValueRef llvm_const_cast(LLVMValueRef val, LLVMTypeRef dst) {
 	LLVMTypeKind kind = LLVMGetTypeKind(dst);
 	switch (kind) {
 	case LLVMPointerTypeKind:
-		if (LB_USE_NEW_PASS_SYSTEM) {
-			return val;
-		}
 		return LLVMConstPointerCast(val, dst);
 	case LLVMStructTypeKind:
 		// GB_PANIC("%s -> %s", LLVMPrintValueToString(val), LLVMPrintTypeToString(dst));
@@ -179,6 +176,7 @@ gb_internal LLVMValueRef llvm_const_named_struct_internal(LLVMTypeRef t, LLVMVal
 	for (unsigned i = 0; i < elem_count; i++) {
 		LLVMTypeRef elem_type = LLVMStructGetTypeAtIndex(t, i);
 		values[i] = llvm_const_cast(values[i], elem_type);
+		GB_ASSERT_MSG(elem_type == LLVMTypeOf(values[i]), "%s != %s", LLVMPrintTypeToString(LLVMTypeOf(values[i])), LLVMPrintTypeToString(elem_type));
 	}
 	return LLVMConstNamedStruct(t, values, value_count);
 }
