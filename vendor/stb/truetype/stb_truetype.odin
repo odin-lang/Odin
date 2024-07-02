@@ -17,6 +17,8 @@ when LIB != "" {
 	}
 
 	foreign import stbtt { LIB }
+} else when ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32 {
+	foreign import stbtt "../lib/stb_truetype_wasm.o"
 } else {
 	foreign import stbtt "system:stb_truetype"
 }

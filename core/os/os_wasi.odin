@@ -96,7 +96,7 @@ wasi_match_preopen :: proc(path: string) -> (wasi.fd_t, string, bool) {
 
 	prefix_matches :: proc(prefix, path: string) -> bool {
 		// Empty is valid for any relative path.
-		if len(prefix) == 0 && len(path) > 0 && path[0] == '/' {
+		if len(prefix) == 0 && len(path) > 0 && path[0] != '/' {
 			return true
 		}
 
