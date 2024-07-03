@@ -2290,6 +2290,14 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			error(o.expr, "Invalid argument to 'type_of'");
 			return false;
 		}
+
+		if (is_type_untyped(o.type)) {
+			gbString t = type_to_string(o.type);
+			error(o.expr, "'type_of' of %s cannot be determined", t);
+			gb_string_free(t);
+			return false;
+		}
+
 		// NOTE(bill): Prevent type cycles for procedure declarations
 		if (c->curr_proc_sig == o.type) {
 			gbString s = expr_to_string(o.expr);
