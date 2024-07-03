@@ -2148,7 +2148,6 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 		print_usage_line(3, "-build-mode:shared      Builds as a dynamically linked library.");
 		print_usage_line(3, "-build-mode:lib         Builds as a statically linked library.");
 		print_usage_line(3, "-build-mode:static      Builds as a statically linked library.");
-		print_usage_line(3, "-build-mode:lib         Builds as an static library.");
 		print_usage_line(3, "-build-mode:obj         Builds as an object file.");
 		print_usage_line(3, "-build-mode:object      Builds as an object file.");
 		print_usage_line(3, "-build-mode:assembly    Builds as an assembly file.");
