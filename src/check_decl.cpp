@@ -197,40 +197,8 @@ gb_internal void override_entity_in_scope(Entity *original_entity, Entity *new_e
 	gb_memmove(cast(u8 *)original_entity, cast(u8 *)new_entity, size);
 }
 
-
-gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d);
-
-gb_internal bool check_try_override_const_decl(CheckerContext *ctx, Entity *e, Entity *entity, Ast *init, Type *named_type) {
-	if (entity == nullptr) {
-	retry_proc_lit:;
-		init = unparen_expr(init);
-		if (init == nullptr) {
-			return false;
-		}
-		if (init->kind == Ast_TernaryWhenExpr) {
-			ast_node(we, TernaryWhenExpr, init);
-			if (we->cond == nullptr) {
-				return false;
-			}
-			if (we->cond->tav.value.kind != ExactValue_Bool) {
-				return false;
-			}
-			init = we->cond->tav.value.value_bool ? we->x : we->y;
-			goto retry_proc_lit;
-		} if (init->kind == Ast_ProcLit) {
-			// NOTE(bill, 2024-07-04): Override as a procedure entity because this could be within a `when` statement
-			e->kind = Entity_Procedure;
-			e->type = nullptr;
-			DeclInfo *d = decl_info_of_entity(e);
-			d->proc_lit = init;
-			check_proc_decl(ctx, e, d);
-			return true;
-		}
-
-		return false;
-	}
-	switch (entity->kind) {
-	case Entity_TypeName:
+gb_internal bool check_override_as_type_due_to_aliasing(CheckerContext *ctx, Entity *e, Entity *entity, Ast *init, Type *named_type) {
+	if (entity != nullptr && entity->kind == Entity_TypeName) {
 		// @TypeAliasingProblem
 		// NOTE(bill, 2022-02-03): This is used to solve the problem caused by type aliases
 		// being "confused" as constants
@@ -266,6 +234,47 @@ gb_internal bool check_try_override_const_decl(CheckerContext *ctx, Entity *e, E
 		e->kind = Entity_TypeName;
 		check_type_decl(ctx, e, init, named_type);
 		return true;
+	}
+	return false;
+}
+
+gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d);
+
+gb_internal bool check_try_override_const_decl(CheckerContext *ctx, Entity *e, Entity *entity, Ast *init, Type *named_type) {
+	if (entity == nullptr) {
+	retry_proc_lit:;
+		init = unparen_expr(init);
+		if (init == nullptr) {
+			return false;
+		}
+		if (init->kind == Ast_TernaryWhenExpr) {
+			ast_node(we, TernaryWhenExpr, init);
+			if (we->cond == nullptr) {
+				return false;
+			}
+			if (we->cond->tav.value.kind != ExactValue_Bool) {
+				return false;
+			}
+			init = we->cond->tav.value.value_bool ? we->x : we->y;
+			goto retry_proc_lit;
+		} if (init->kind == Ast_ProcLit) {
+			// NOTE(bill, 2024-07-04): Override as a procedure entity because this could be within a `when` statement
+			e->kind = Entity_Procedure;
+			e->type = nullptr;
+			DeclInfo *d = decl_info_of_entity(e);
+			d->proc_lit = init;
+			check_proc_decl(ctx, e, d);
+			return true;
+		}
+
+		return false;
+	}
+	switch (entity->kind) {
+	case Entity_TypeName:
+		if (check_override_as_type_due_to_aliasing(ctx, e, entity, init, named_type)) {
+			return true;
+		}
+		break;
 	case Entity_Builtin:
 		if (e->type != nullptr) {
 			return false;
@@ -273,12 +282,6 @@ gb_internal bool check_try_override_const_decl(CheckerContext *ctx, Entity *e, E
 		e->kind = Entity_Builtin;
 		e->Builtin.id = entity->Builtin.id;
 		e->type = t_invalid;
-		return true;
-	case Entity_ProcGroup:
-		// NOTE(bill, 2020-06-10): It is better to just clone the contents than overriding the entity in the scope
-		// Thank goodness I made entities a tagged union to allow for this implace patching
-		e->kind = Entity_ProcGroup;
-		e->ProcGroup.entities = array_clone(heap_allocator(), entity->ProcGroup.entities);
 		return true;
 	}
 
@@ -551,7 +554,7 @@ gb_internal void check_const_decl(CheckerContext *ctx, Entity *e, Ast *type_expr
 
 	if (init != nullptr) {
 		Entity *entity = check_entity_from_ident_or_selector(ctx, init, false);
-		if (check_try_override_const_decl(ctx, e, entity, init, named_type)) {
+		if (check_override_as_type_due_to_aliasing(ctx, e, entity, init, named_type)) {
 			return;
 		}
 		entity = nullptr;
