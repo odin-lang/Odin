@@ -740,7 +740,7 @@ gb_internal void check_union_type(CheckerContext *ctx, Type *union_type, Ast *no
 				gb_string_free(str);
 			} else {
 				for_array(j, variants) {
-					if (are_types_identical(t, variants[j])) {
+					if (union_variant_index_types_equal(t, variants[j])) {
 						ok = false;
 						ERROR_BLOCK();
 						gbString str = type_to_string(t);
