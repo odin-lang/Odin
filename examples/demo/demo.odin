@@ -2577,7 +2577,7 @@ bit_field_type :: proc() {
 	{
 		// A `bit_field` is different from a struct in that you must specify the backing type.
 		// This backing type must be an integer or a fixed-length array of integers.
-		// This is useful if ther eneeds to be a specific alignment or access pattern for the record.
+		// This is useful if there needs to be a specific alignment or access pattern for the record.
 
 		Bar :: bit_field u32   {}
 		Baz :: bit_field [4]u8 {}
