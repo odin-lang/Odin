@@ -6342,8 +6342,6 @@ gb_internal bool parse_file(Parser *p, AstFile *f) {
 					} else if (lc == "+lazy") {
 						if (build_context.ignore_lazy) {
 							// Ignore
-						} else if (f->flags & AstFile_IsTest) {
-							// Ignore
 						} else if (f->pkg->kind == Package_Init && build_context.command_kind == Command_doc) {
 							// Ignore
 						} else {
@@ -6461,11 +6459,6 @@ gb_internal ParseFileError process_imported_file(Parser *p, ImportedFile importe
 	if (build_context.command_kind == Command_test) {
 		String name = file->fullpath;
 		name = remove_extension_from_path(name);
-
-		String test_suffix = str_lit("_test");
-		if (string_ends_with(name, test_suffix) && name != test_suffix) {
-			file->flags |= AstFile_IsTest;
-		}
 	}
 
 
