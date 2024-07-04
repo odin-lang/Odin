@@ -295,8 +295,6 @@ gb_internal bool check_try_override_const_decl(CheckerContext *ctx, Entity *e, E
 	switch (entity->kind) {
 	case Entity_ProcGroup:
 	case Entity_Procedure:
-	case Entity_LibraryName:
-	case Entity_ImportName:
 		override_entity_in_scope(e, entity);
 		return true;
 	}
