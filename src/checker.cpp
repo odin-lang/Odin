@@ -1470,6 +1470,7 @@ gb_internal Entity *implicit_entity_of_node(Ast *clause) {
 }
 
 gb_internal Entity *entity_of_node(Ast *expr) {
+retry:;
 	expr = unparen_expr(expr);
 	switch (expr->kind) {
 	case_ast_node(ident, Ident, expr);
@@ -1489,6 +1490,17 @@ gb_internal Entity *entity_of_node(Ast *expr) {
 
 	case_ast_node(ce, CallExpr, expr);
 		return ce->entity_procedure_of;
+	case_end;
+
+	case_ast_node(we, TernaryWhenExpr, expr);
+		if (we->cond == nullptr) {
+			break;
+		}
+		if (we->cond->tav.value.kind != ExactValue_Bool) {
+			break;
+		}
+		expr = we->cond->tav.value.value_bool ? we->x : we->y;
+		goto retry;
 	case_end;
 	}
 	return nullptr;

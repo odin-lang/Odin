@@ -4968,7 +4968,27 @@ gb_internal bool is_entity_declared_for_selector(Entity *entity, Scope *import_s
 
 // NOTE(bill, 2022-02-03): see `check_const_decl` for why it exists reasoning
 gb_internal Entity *check_entity_from_ident_or_selector(CheckerContext *c, Ast *node, bool ident_only) {
-	if (node->kind == Ast_Ident) {
+	if (node == nullptr) {
+		return nullptr;
+	}
+	if (node->kind == Ast_TernaryWhenExpr) {
+		ast_node(we, TernaryWhenExpr, node);
+		if (we->cond == nullptr) {
+			return nullptr;
+		}
+		if (we->cond->tav.mode != Addressing_Constant) {
+			return nullptr;
+		}
+		if (we->cond->tav.value.kind != ExactValue_Bool) {
+			return nullptr;
+		}
+		if (we->cond->tav.value.value_bool) {
+			return check_entity_from_ident_or_selector(c, we->x, ident_only);
+		} else {
+			Entity *e = check_entity_from_ident_or_selector(c, we->y, ident_only);
+			return e;
+		}
+	} else if (node->kind == Ast_Ident) {
 		String name = node->Ident.token.string;
 		return scope_lookup(c->scope, name);
 	} else if (!ident_only) if (node->kind == Ast_SelectorExpr) {
