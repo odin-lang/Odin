@@ -847,6 +847,10 @@ gb_internal void add_declaration_dependency(CheckerContext *c, Entity *e) {
 	if (e == nullptr) {
 		return;
 	}
+	if (e->flags & EntityFlag_Disabled) {
+		// ignore the dependencies if it has been `@(disabled=true)`
+		return;
+	}
 	if (c->decl != nullptr) {
 		add_dependency(c->info, c->decl, e);
 	}
