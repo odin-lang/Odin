@@ -4971,7 +4971,7 @@ gb_internal Entity *check_entity_from_ident_or_selector(CheckerContext *c, Ast *
 	if (node == nullptr) {
 		return nullptr;
 	}
-	if (node->kind == Ast_TernaryWhenExpr) {
+	/*if (node->kind == Ast_TernaryWhenExpr) {
 		ast_node(we, TernaryWhenExpr, node);
 		if (we->cond == nullptr) {
 			return nullptr;
@@ -4988,7 +4988,7 @@ gb_internal Entity *check_entity_from_ident_or_selector(CheckerContext *c, Ast *
 			Entity *e = check_entity_from_ident_or_selector(c, we->y, ident_only);
 			return e;
 		}
-	} else if (node->kind == Ast_Ident) {
+	} else */if (node->kind == Ast_Ident) {
 		String name = node->Ident.token.string;
 		return scope_lookup(c->scope, name);
 	} else if (!ident_only) if (node->kind == Ast_SelectorExpr) {
