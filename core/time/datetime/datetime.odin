@@ -48,7 +48,7 @@ ordinal_to_datetime :: proc "contextless" (ordinal: Ordinal) -> (datetime: DateT
 }
 
 day_of_week :: proc "contextless" (ordinal: Ordinal) -> (day: Weekday) {
-	return Weekday((ordinal - EPOCH) %% 7)
+	return Weekday((ordinal - EPOCH + 1) %% 7)
 }
 
 subtract_dates :: proc "contextless" (a, b: Date) -> (delta: Delta, err: Error) {
