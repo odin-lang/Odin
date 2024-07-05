@@ -1733,9 +1733,9 @@ getpgrp :: proc "contextless" () -> (Pid, Errno) {
 	Create a session and set the process group ID.
 	Available since Linux 2.0.
 */
-setsid :: proc "contextless" () -> (Errno) {
+setsid :: proc "contextless" () -> (Pid, Errno) {
 	ret := syscall(SYS_setsid)
-	return Errno(-ret)
+	return errno_unwrap(ret, Pid)
 }
 
 /*
