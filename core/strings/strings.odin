@@ -1001,11 +1001,6 @@ Returns:
 */
 @private
 _split_iterator :: proc(s: ^string, sep: string, sep_save: int) -> (res: string, ok: bool) {
-	// stop once the string is empty or nil
-	if s == nil || len(s^) == 0 {
-		return
-	}
-
 	if sep == "" {
 		res = s[:]
 		ok = true
@@ -2414,9 +2409,6 @@ trim_right_proc_with_state :: proc(s: string, p: proc(rawptr, rune) -> bool, sta
 }
 // Procedure for `trim_*_proc` variants, which has a string rawptr cast + rune comparison
 is_in_cutset :: proc(state: rawptr, r: rune) -> (res: bool) {
-	if state == nil {
-		return false
-	}
 	cutset := (^string)(state)^
 	for c in cutset {
 		if r == c {
@@ -2714,7 +2706,7 @@ Output:
 
 */
 split_multi_iterate :: proc(it: ^string, substrs: []string) -> (res: string, ok: bool) #no_bounds_check {
-	if it == nil || len(it) == 0 || len(substrs) <= 0 {
+	if len(it) == 0 || len(substrs) <= 0 {
 		return
 	}
 
