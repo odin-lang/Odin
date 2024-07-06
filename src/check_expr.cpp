@@ -7185,6 +7185,8 @@ gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, O
 	Array<Operand> operands = {};
 	defer (array_free(&operands));
 
+	CallArgumentError err = CallArgumentError_None;
+
 	bool named_fields = false;
 	{
 		// NOTE(bill, 2019-10-26): Allow a cycle in the parameters but not in the fields themselves
@@ -7202,6 +7204,11 @@ gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, O
 				Ast *arg = ce->args[i];
 				ast_node(fv, FieldValue, arg);
 
+				if (fv->value == nullptr) {
+					error(fv->eq, "Expected a value");
+					err = CallArgumentError_InvalidFieldValue; 
+					continue;
+				}
 				if (fv->field->kind == Ast_Ident) {
 					String name = fv->field->Ident.token.string;
 					isize index = lookup_polymorphic_record_parameter(original_type, name);
@@ -7240,7 +7247,10 @@ gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, O
 
 	}
 
-	CallArgumentError err = CallArgumentError_None;
+	if (err != 0) {
+		operand->mode = Addressing_Invalid;
+		return err;
+	}
 
 	TypeTuple *tuple = get_record_polymorphic_params(original_type);
 	isize param_count = tuple->variables.count;
