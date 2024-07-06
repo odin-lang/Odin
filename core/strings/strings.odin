@@ -1059,6 +1059,11 @@ Output:
 
 */
 split_by_byte_iterator :: proc(s: ^string, sep: u8) -> (res: string, ok: bool) {
+	// stop once the string is empty or nil
+	if s == nil || len(s^) == 0 {
+		return
+	}
+	
 	m := index_byte(s^, sep)
 	if m < 0 {
 		// not found
