@@ -520,9 +520,7 @@ _unmarshal_array :: proc(d: Decoder, v: any, ti: ^reflect.Type_Info, hdr: Header
 		return
 
 	case reflect.Type_Info_Array:
-		_, scap := err_conv(_decode_len_container(d, add)) or_return
-		length := min(scap, t.count)
-	
+		length, _ := err_conv(_decode_len_container(d, add)) or_return
 		if length > t.count {
 			return _unsupported(v, hdr)
 		}
@@ -534,9 +532,7 @@ _unmarshal_array :: proc(d: Decoder, v: any, ti: ^reflect.Type_Info, hdr: Header
 		return
 
 	case reflect.Type_Info_Enumerated_Array:
-		_, scap := err_conv(_decode_len_container(d, add)) or_return
-		length := min(scap, t.count)
-	
+		length, _ := err_conv(_decode_len_container(d, add)) or_return
 		if length > t.count {
 			return _unsupported(v, hdr)
 		}
@@ -548,9 +544,7 @@ _unmarshal_array :: proc(d: Decoder, v: any, ti: ^reflect.Type_Info, hdr: Header
 		return
 
 	case reflect.Type_Info_Complex:
-		_, scap := err_conv(_decode_len_container(d, add)) or_return
-		length := min(scap, 2)
-	
+		length, _ := err_conv(_decode_len_container(d, add)) or_return
 		if length > 2 {
 			return _unsupported(v, hdr)
 		}
@@ -570,9 +564,7 @@ _unmarshal_array :: proc(d: Decoder, v: any, ti: ^reflect.Type_Info, hdr: Header
 		return
 	
 	case reflect.Type_Info_Quaternion:
-		_, scap := err_conv(_decode_len_container(d, add)) or_return
-		length := min(scap, 4)
-	
+		length, _ := err_conv(_decode_len_container(d, add)) or_return
 		if length > 4 {
 			return _unsupported(v, hdr)
 		}
@@ -633,7 +625,7 @@ _unmarshal_map :: proc(d: Decoder, v: any, ti: ^reflect.Type_Info, hdr: Header, 
 		length, _ := err_conv(_decode_len_container(d, add)) or_return
 		unknown := length == -1
 		fields := reflect.struct_fields_zipped(ti.id)
-	
+
 		for idx := 0; idx < len(fields) && (unknown || idx < length); idx += 1 {
 			// Decode key, keys can only be strings.
 			key: string
@@ -646,7 +638,7 @@ _unmarshal_map :: proc(d: Decoder, v: any, ti: ^reflect.Type_Info, hdr: Header, 
 				key = keyv
 			}
 			defer delete(key, context.temp_allocator)
-			
+
 			// Find matching field.
 			use_field_idx := -1
 			{
