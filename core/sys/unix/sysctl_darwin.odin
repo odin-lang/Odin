@@ -3,29 +3,60 @@ package unix
 
 import "base:intrinsics"
 
-import "core:c"
 import "core:sys/darwin"
 
 _ :: darwin
 
 sysctl :: proc "contextless" (mib: []i32, val: ^$T) -> (ok: bool) {
-	result_size := c.size_t(size_of(T))
-	res := darwin.syscall_sysctl(
-		raw_data(mib), len(mib),
-		val, &result_size,
-		nil, 0,
-	)
-	return res == 0
+	result_size := uint(size_of(T))
+	when ODIN_NO_CRT {
+		res := darwin.syscall_sysctl(
+			raw_data(mib), len(mib),
+			val, &result_size,
+			nil, 0,
+		)
+		return res == 0
+	} else {
+		foreign {
+			@(link_name="sysctl") _sysctl :: proc(
+				name: [^]i32, namelen: u32,
+				oldp: rawptr, oldlenp: ^uint,
+				newp: rawptr, newlen: uint,
+			) -> i32 ---
+		}
+		res := _sysctl(
+			raw_data(mib), u32(len(mib)),
+			val, &result_size,
+			nil, 0,
+		)
+		return res == 0
+	}
 }
 
-sysctlbyname :: proc "contextless" (name: string, val: ^$T) -> (ok: bool) {
-	result_size := c.size_t(size_of(T))
-	res := darwin.syscall_sysctlbyname(
-		name,
-		val, &result_size,
-		nil, 0,
-	)
-	return res == 0
+sysctlbyname :: proc "contextless" (name: cstring, val: ^$T) -> (ok: bool) {
+	result_size := uint(size_of(T))
+	when ODIN_NO_CRT {
+		res := darwin.syscall_sysctlbyname(
+			string(name),
+			val, &result_size,
+			nil, 0,
+		)
+		return res == 0
+	} else {
+		foreign {
+			@(link_name="sysctlbyname") _sysctlbyname :: proc(
+				name: cstring,
+				oldp: rawptr, oldlenp: ^uint,
+				newp: rawptr, newlen: uint,
+			) -> i32 ---
+		}
+		res := _sysctlbyname(
+			name,
+			val, &result_size,
+			nil, 0,
+		)
+		return res == 0
+	}
 }
 
 // See sysctl.h for darwin for details
