@@ -544,11 +544,10 @@ gb_internal String string16_to_string(gbAllocator a, String16 s) {
 
 
 gb_internal String temporary_directory(gbAllocator allocator) {
-	String res = {};
 #if defined(GB_SYSTEM_WINDOWS)
 	DWORD n = GetTempPathW(0, nullptr);
 	if (n == 0) {
-		return res;
+		return String{0};
 	}
 	DWORD len = gb_max(MAX_PATH, n);
 	wchar_t *b = gb_alloc_array(heap_allocator(), wchar_t, len+1);
@@ -561,9 +560,22 @@ gb_internal String temporary_directory(gbAllocator allocator) {
 	}
 	b[n] = 0;
 	String16 s = make_string16(b, n);
-	res = string16_to_string(allocator, s);
+	return string16_to_string(allocator, s);
+#else
+	char const *tmp_env = gb_get_env("TMPDIR", allocator);
+	if (tmp_env) {
+		return make_string_c(tmp_env);
+	}
+
+#if defined(P_tmpdir)
+	String tmp_macro = make_string_c(P_tmpdir);
+	if (tmp_macro.len != 0) {
+		return copy_string(allocator, tmp_macro);
+	}
 #endif
-	return res;
+
+	return copy_string(allocator, str_lit("/tmp"));
+#endif
 }
 
 
