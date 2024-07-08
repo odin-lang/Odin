@@ -1486,10 +1486,6 @@ gb_internal WORKER_TASK_PROC(lb_llvm_function_pass_per_module) {
 		lb_populate_function_pass_manager(m, m->function_pass_managers[lbFunctionPassManager_default],                false, build_context.optimization_level);
 		lb_populate_function_pass_manager(m, m->function_pass_managers[lbFunctionPassManager_default_without_memcpy], true,  build_context.optimization_level);
 		lb_populate_function_pass_manager_specific(m, m->function_pass_managers[lbFunctionPassManager_none],      -1);
-		lb_populate_function_pass_manager_specific(m, m->function_pass_managers[lbFunctionPassManager_minimal],    0);
-		lb_populate_function_pass_manager_specific(m, m->function_pass_managers[lbFunctionPassManager_size],       1);
-		lb_populate_function_pass_manager_specific(m, m->function_pass_managers[lbFunctionPassManager_speed],      2);
-		lb_populate_function_pass_manager_specific(m, m->function_pass_managers[lbFunctionPassManager_aggressive], 3);
 
 		for (i32 i = 0; i < lbFunctionPassManager_COUNT; i++) {
 			LLVMFinalizeFunctionPassManager(m->function_pass_managers[i]);
@@ -1513,15 +1509,12 @@ gb_internal WORKER_TASK_PROC(lb_llvm_function_pass_per_module) {
 				if (p->entity && p->entity->kind == Entity_Procedure) {
 					switch (p->entity->Procedure.optimization_mode) {
 					case ProcedureOptimizationMode_None:
-					case ProcedureOptimizationMode_Minimal:
-						pass_manager_kind = lbFunctionPassManager_minimal;
+						pass_manager_kind = lbFunctionPassManager_none;
+						GB_ASSERT(lb_proc_has_attribute(p->module, p->value, "optnone"));
+						GB_ASSERT(lb_proc_has_attribute(p->module, p->value, "noinline"));
 						break;
-					case ProcedureOptimizationMode_Size:
-						pass_manager_kind = lbFunctionPassManager_size;
-						lb_add_attribute_to_proc(p->module, p->value, "optsize");
-						break;
-					case ProcedureOptimizationMode_Speed:
-						pass_manager_kind = lbFunctionPassManager_speed;
+					case ProcedureOptimizationMode_FavorSize:
+						GB_ASSERT(lb_proc_has_attribute(p->module, p->value, "optsize"));
 						break;
 					}
 				}

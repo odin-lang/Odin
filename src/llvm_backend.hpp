@@ -134,11 +134,6 @@ enum lbFunctionPassManagerKind {
 	lbFunctionPassManager_default,
 	lbFunctionPassManager_default_without_memcpy,
 	lbFunctionPassManager_none,
-	lbFunctionPassManager_minimal,
-	lbFunctionPassManager_size,
-	lbFunctionPassManager_speed,
-	lbFunctionPassManager_aggressive,
-
 	lbFunctionPassManager_COUNT
 };
 
