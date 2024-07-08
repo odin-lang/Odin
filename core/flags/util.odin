@@ -19,7 +19,7 @@ Inputs:
 - allocator: (default: context.allocator)
 - loc: The caller location for debugging purposes (default: #caller_location)
 */
-@(optimization_mode="size")
+@(optimization_mode="favor_size")
 parse_or_exit :: proc(
 	model: ^$T,
 	program_args: []string,
@@ -63,7 +63,7 @@ Inputs:
 - error: The error returned from `parse`.
 - style: The argument parsing style, required to show flags in the proper style, when usage is shown.
 */
-@(optimization_mode="size")
+@(optimization_mode="favor_size")
 print_errors :: proc(data_type: typeid, error: Error, program: string, style: Parsing_Style = .Odin) {
 	stderr := os.stream_from_handle(os.stderr)
 	stdout := os.stream_from_handle(os.stdout)
