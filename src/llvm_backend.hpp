@@ -218,6 +218,8 @@ struct lbGenerator : LinkerData {
 	std::atomic<u32> global_array_index;
 	std::atomic<u32> global_generated_index;
 
+	isize used_module_count;
+
 	lbProcedure *startup_runtime;
 	lbProcedure *cleanup_runtime;
 	lbProcedure *objc_names;
