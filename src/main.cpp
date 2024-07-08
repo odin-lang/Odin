@@ -1918,7 +1918,16 @@ gb_internal void show_timings(Checker *c, Timings *t) {
 	}
 }
 
-gb_internal void export_dependencies(Parser *p) {
+gb_internal GB_COMPARE_PROC(file_path_cmp) {
+	AstFile *x = *(AstFile **)a;
+	AstFile *y = *(AstFile **)b;
+	if (x == y) {
+		return 0;
+	}
+	return string_compare(x->fullpath, y->fullpath);
+}
+
+gb_internal void export_dependencies(Checker *c) {
 	GB_ASSERT(build_context.export_dependencies_format != DependenciesExportUnspecified);
 
 	if (build_context.export_dependencies_file.len <= 0) {
@@ -1926,6 +1935,8 @@ gb_internal void export_dependencies(Parser *p) {
 		exit_with_errors();
 		return;
 	}
+
+	Parser *p = c->parser;
 
 	gbFile f = {};
 	char * fileName = (char *)build_context.export_dependencies_file.text;
@@ -1937,6 +1948,26 @@ gb_internal void export_dependencies(Parser *p) {
 	}
 	defer (gb_file_close(&f));
 
+
+	auto files = array_make<AstFile *>(heap_allocator());
+	for (AstPackage *pkg : p->packages) {
+		for (AstFile *f : pkg->files) {
+			array_add(&files, f);
+		}
+	}
+	array_sort(files, file_path_cmp);
+
+
+	auto load_files = array_make<LoadFileCache *>(heap_allocator());
+	for (auto const &entry : c->info.load_file_cache) {
+		auto *cache = entry.value;
+		if (!cache || !cache->exists) {
+			continue;
+		}
+		array_add(&load_files, cache);
+	}
+	array_sort(files, file_cache_sort_cmp);
+
 	if (build_context.export_dependencies_format == DependenciesExportMake) {
 		String exe_name = path_to_string(heap_allocator(), build_context.build_paths[BuildPath_Output]);
 		defer (gb_free(heap_allocator(), exe_name.text));
@@ -1945,26 +1976,25 @@ gb_internal void export_dependencies(Parser *p) {
 
 		isize current_line_length = exe_name.len + 1;
 
-		for(AstPackage *pkg : p->packages) {
-			for(AstFile *file : pkg->files) {
-				/* Arbitrary line break value. Maybe make this better? */
-				if (current_line_length >= 80-2) {
-					gb_file_write(&f, " \\\n ", 4);
-					current_line_length = 1;
-				}
+		for_array(i, files) {
+			AstFile *file = files[i];
+			/* Arbitrary line break value. Maybe make this better? */
+			if (current_line_length >= 80-2) {
+				gb_file_write(&f, " \\\n ", 4);
+				current_line_length = 1;
+			}
 
-				gb_file_write(&f, " ", 1);
-				current_line_length++;
+			gb_file_write(&f, " ", 1);
+			current_line_length++;
 
-				for (isize k = 0; k < file->fullpath.len; k++) {
-					char part = file->fullpath.text[k];
-					if (part == ' ') {
-						gb_file_write(&f, "\\", 1);
-						current_line_length++;
-					}
-					gb_file_write(&f, &part, 1);
+			for (isize k = 0; k < file->fullpath.len; k++) {
+				char part = file->fullpath.text[k];
+				if (part == ' ') {
+					gb_file_write(&f, "\\", 1);
 					current_line_length++;
 				}
+				gb_file_write(&f, &part, 1);
+				current_line_length++;
 			}
 		}
 
@@ -1974,13 +2004,29 @@ gb_internal void export_dependencies(Parser *p) {
 
 		gb_fprintf(&f, "\t\"source_files\": [\n");
 
-		for(AstPackage *pkg : p->packages) {
-			for(AstFile *file : pkg->files) {
-				gb_fprintf(&f, "\t\t\"%.*s\",\n", LIT(file->fullpath));
+		for_array(i, files) {
+			AstFile *file = files[i];
+			gb_fprintf(&f, "\t\t\"%.*s\"", LIT(file->fullpath));
+			if (i+1 == files.count) {
+				gb_fprintf(&f, ",");
 			}
+			gb_fprintf(&f, "\n");
 		}
 
 		gb_fprintf(&f, "\t],\n");
+
+		gb_fprintf(&f, "\t\"load_files\": [\n");
+
+		for_array(i, load_files) {
+			LoadFileCache *cache = load_files[i];
+			gb_fprintf(&f, "\t\t\"%.*s\"", LIT(cache->path));
+			if (i+1 == load_files.count) {
+				gb_fprintf(&f, ",");
+			}
+			gb_fprintf(&f, "\n");
+		}
+
+		gb_fprintf(&f, "\t]\n");
 
 		gb_fprintf(&f, "}\n");
 	}
@@ -3295,7 +3341,7 @@ int main(int arg_count, char const **arg_ptr) {
 				}
 
 				if (build_context.export_dependencies_format != DependenciesExportUnspecified) {
-					export_dependencies(parser);
+					export_dependencies(checker);
 				}
 				return result;
 			}
@@ -3326,7 +3372,7 @@ int main(int arg_count, char const **arg_ptr) {
 					}
 
 					if (build_context.export_dependencies_format != DependenciesExportUnspecified) {
-						export_dependencies(parser);
+						export_dependencies(checker);
 					}
 					return result;
 				}
@@ -3342,7 +3388,7 @@ int main(int arg_count, char const **arg_ptr) {
 	}
 
 	if (build_context.export_dependencies_format != DependenciesExportUnspecified) {
-		export_dependencies(parser);
+		export_dependencies(checker);
 	}
 
 	if (run_output) {

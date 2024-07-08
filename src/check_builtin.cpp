@@ -1296,6 +1296,9 @@ gb_internal LoadDirectiveResult check_load_directive(CheckerContext *c, Operand 
 gb_internal int file_cache_sort_cmp(void const *x, void const *y) {
 	LoadFileCache const *a = *(LoadFileCache const **)(x);
 	LoadFileCache const *b = *(LoadFileCache const **)(y);
+	if (a == b) {
+		return 0;
+	}
 	return string_compare(a->path, b->path);
 }
 
