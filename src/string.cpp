@@ -329,22 +329,22 @@ gb_internal bool string_contains_char(String const &s, u8 c) {
 }
 
 gb_internal bool string_contains_string(String const &haystack, String const &needle) {
-    if (needle.len == 0) return true;
-    if (needle.len > haystack.len) return false;
+	if (needle.len == 0) return true;
+	if (needle.len > haystack.len) return false;
 
-    for (isize i = 0; i <= haystack.len - needle.len; i++) {
-        bool found = true;
-        for (isize j = 0; j < needle.len; j++) {
-            if (haystack[i + j] != needle[j]) {
-                found = false;
-                break;
-            }
-        }
-        if (found) {
-            return true;
-        }
-    }
-    return false;
+	for (isize i = 0; i <= haystack.len - needle.len; i++) {
+		bool found = true;
+		for (isize j = 0; j < needle.len; j++) {
+			if (haystack[i + j] != needle[j]) {
+				found = false;
+				break;
+			}
+		}
+		if (found) {
+			return true;
+		}
+	}
+	return false;
 }
 
 gb_internal String filename_from_path(String s) {
@@ -543,6 +543,28 @@ gb_internal String string16_to_string(gbAllocator a, String16 s) {
 
 
 
+gb_internal String temporary_directory(gbAllocator allocator) {
+	String res = {};
+#if defined(GB_SYSTEM_WINDOWS)
+	DWORD n = GetTempPathW(0, nullptr);
+	if (n == 0) {
+		return res;
+	}
+	DWORD len = gb_max(MAX_PATH, n);
+	wchar_t *b = gb_alloc_array(heap_allocator(), wchar_t, len+1);
+	defer (gb_free(heap_allocator(), b));
+	n = GetTempPathW(len, b);
+	if (n == 3 && b[1] == ':' && b[2] == '\\') {
+
+	} else if (n > 0 && b[n-1] == '\\') {
+		n -= 1;
+	}
+	b[n] = 0;
+	String16 s = make_string16(b, n);
+	res = string16_to_string(allocator, s);
+#endif
+	return res;
+}
 
 
 

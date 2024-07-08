@@ -2556,20 +2556,37 @@ gb_internal String lb_filepath_ll_for_module(lbModule *m) {
 
 	return path;
 }
+
 gb_internal String lb_filepath_obj_for_module(lbModule *m) {
-	String path = concatenate3_strings(permanent_allocator(),
-		build_context.build_paths[BuildPath_Output].basename,
-		STR_LIT("/"),
-		build_context.build_paths[BuildPath_Output].name
-	);
+	String basename = build_context.build_paths[BuildPath_Output].basename;
+	String name = build_context.build_paths[BuildPath_Output].name;
+
+	bool use_temporary_directory = false;
+	if (USE_SEPARATE_MODULES && build_context.build_mode == BuildMode_Executable) {
+		// NOTE(bill): use a temporary directory
+		String dir = temporary_directory(permanent_allocator());
+		if (dir.len != 0) {
+			basename = dir;
+			use_temporary_directory = true;
+		}
+	}
+
+	gbString path = gb_string_make_length(heap_allocator(), basename.text, basename.len);
+	path = gb_string_appendc(path, "/");
+	path = gb_string_append_length(path, name.text, name.len);
 
 	if (m->file) {
 		char buf[32] = {};
 		isize n = gb_snprintf(buf, gb_size_of(buf), "-%u", m->file->id);
 		String suffix = make_string((u8 *)buf, n-1);
-		path = concatenate_strings(permanent_allocator(), path, suffix);
+		path = gb_string_append_length(path, suffix.text, suffix.len);
 	} else if (m->pkg) {
-		path = concatenate3_strings(permanent_allocator(), path, STR_LIT("-"), m->pkg->name);
+		path = gb_string_appendc(path, "-");
+		path = gb_string_append_length(path, m->pkg->name.text, m->pkg->name.len);
+	}
+
+	if (use_temporary_directory) {
+		path = gb_string_append_fmt(path, "-%p", m);
 	}
 
 	String ext = {};
@@ -2607,7 +2624,10 @@ gb_internal String lb_filepath_obj_for_module(lbModule *m) {
 		}
 	}
 
-	return concatenate_strings(permanent_allocator(), path, ext);
+	path = gb_string_append_length(path, ext.text, ext.len);
+
+	return make_string(cast(u8 *)path, gb_string_length(path));
+
 }
 
 
@@ -2666,7 +2686,6 @@ gb_internal bool lb_llvm_object_generation(lbGenerator *gen, bool do_threading) 
 
 			String filepath_ll = lb_filepath_ll_for_module(m);
 			String filepath_obj = lb_filepath_obj_for_module(m);
-			// gb_printf_err("%.*s\n", LIT(filepath_obj));
 			array_add(&gen->output_object_paths, filepath_obj);
 			array_add(&gen->output_temp_paths, filepath_ll);
 
