@@ -103,6 +103,31 @@ gb_internal i32 system_exec_command_line_app_internal(bool exit_on_err, char con
 
 	cmd_len = gb_snprintf_va(cmd_line, cmd_cap-1, fmt, va);
 
+	if (build_context.print_linker_flags) {
+		// NOTE(bill): remove the first argument (the executable) from the executable list
+		// and then print it for the "linker flags"
+		while (*cmd_line && gb_char_is_space(*cmd_line)) {
+			cmd_line++;
+		}
+		if (*cmd_line == '\"') for (cmd_line++; *cmd_line; cmd_line++) {
+			if (*cmd_line == '\\') {
+				cmd_line++;
+				if (*cmd_line == '\"') {
+					cmd_line++;
+				}
+			} else if (*cmd_line == '\"') {
+				cmd_line++;
+				break;
+			}
+		}
+		while (*cmd_line && gb_char_is_space(*cmd_line)) {
+			cmd_line++;
+		}
+
+		fprintf(stdout, "%s\n", cmd_line);
+		return exit_code;
+	}
+
 #if defined(GB_SYSTEM_WINDOWS)
 	STARTUPINFOW start_info = {gb_size_of(STARTUPINFOW)};
 	PROCESS_INFORMATION pi = {0};
@@ -359,6 +384,8 @@ enum BuildFlagKind {
 
 	BuildFlag_MinLinkLibs,
 
+	BuildFlag_PrintLinkerFlags,
+
 	// internal use only
 	BuildFlag_InternalIgnoreLazy,
 	BuildFlag_InternalIgnoreLLVMBuild,
@@ -559,6 +586,8 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_MaxErrorCount,           str_lit("max-error-count"),           BuildFlagParam_Integer, Command_all);
 
 	add_flag(&build_flags, BuildFlag_MinLinkLibs,             str_lit("min-link-libs"),             BuildFlagParam_None,    Command__does_build);
+
+	add_flag(&build_flags, BuildFlag_PrintLinkerFlags,        str_lit("print-linker-flags"),        BuildFlagParam_None,    Command_build);
 
 	add_flag(&build_flags, BuildFlag_InternalIgnoreLazy,      str_lit("internal-ignore-lazy"),      BuildFlagParam_None,    Command_all);
 	add_flag(&build_flags, BuildFlag_InternalIgnoreLLVMBuild, str_lit("internal-ignore-llvm-build"),BuildFlagParam_None,    Command_all);
@@ -828,8 +857,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 								gb_printf_err("\tjson\n");
 								bad_flags = true;
 							}
-
-							break;	
+							break;
 						}
 						case BuildFlag_ExportDependenciesFile: {
 							GB_ASSERT(value.kind == ExactValue_String);
@@ -1367,6 +1395,10 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							build_context.min_link_libs = true;
 							break;
 
+						case BuildFlag_PrintLinkerFlags:
+							build_context.print_linker_flags = true;
+							break;
+
 						case BuildFlag_InternalIgnoreLazy:
 							build_context.ignore_lazy = true;
 							break;
@@ -1535,6 +1567,16 @@ gb_internal bool parse_build_flags(Array<String> args) {
 		gb_printf_err("`-export-timings:<format>` requires `-show-timings` or `-show-more-timings` to be present\n");
 		bad_flags = true;
 	}
+
+
+	if (build_context.export_dependencies_format != DependenciesExportUnspecified && build_context.print_linker_flags) {
+		gb_printf_err("-export-dependencies cannot be used with -print-linker-flags\n");
+		bad_flags = true;
+	} else if (build_context.show_timings && build_context.print_linker_flags) {
+		gb_printf_err("-show-timings/-show-more-timings cannot be used with -print-linker-flags\n");
+		bad_flags = true;
+	}
+
 	return !bad_flags;
 }
 
@@ -2358,6 +2400,12 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 
 		print_usage_line(1, "-dynamic-map-calls");
 		print_usage_line(2, "Uses dynamic map calls to minimize code generation at the cost of runtime execution.");
+		print_usage_line(0, "");
+	}
+
+	if (build) {
+		print_usage_line(1, "-print-linker-flags");
+		print_usage_line(2, "Prints the all of the flags/arguments that will be passed to the linker.");
 		print_usage_line(0, "");
 	}
 
