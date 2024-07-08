@@ -519,7 +519,7 @@ gb_internal Entity *scope_insert_no_mutex(Scope *s, Entity *entity) {
 }
 
 
-GB_COMPARE_PROC(entity_variable_pos_cmp) {
+gb_internal GB_COMPARE_PROC(entity_variable_pos_cmp) {
 	Entity *x = *cast(Entity **)a;
 	Entity *y = *cast(Entity **)b;
 

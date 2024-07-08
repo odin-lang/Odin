@@ -1321,6 +1321,24 @@ gb_internal WORKER_TASK_PROC(lb_generate_procedures_and_types_per_module) {
 	return 0;
 }
 
+gb_internal GB_COMPARE_PROC(llvm_global_entity_cmp) {
+	Entity *x = *cast(Entity **)a;
+	Entity *y = *cast(Entity **)b;
+	if (x == y) {
+		return 0;
+	}
+	if (x->kind != y->kind) {
+		return cast(i32)(x->kind - y->kind);
+	}
+
+	i32 cmp = 0;
+	cmp = token_pos_cmp(x->token.pos, y->token.pos);
+	if (!cmp) {
+		return cmp;
+	}
+	return cmp;
+}
+
 gb_internal void lb_create_global_procedures_and_types(lbGenerator *gen, CheckerInfo *info, bool do_threading) {
 	auto *min_dep_set = &info->minimum_dependency_set;
 
@@ -1375,6 +1393,12 @@ gb_internal void lb_create_global_procedures_and_types(lbGenerator *gen, Checker
 		} else if (e->kind == Entity_TypeName) {
 			array_add(&m->global_types_to_create, e);
 		}
+	}
+
+	for (auto const &entry : gen->modules) {
+		lbModule *m = entry.value;
+		gb_sort_array(m->global_types_to_create.data, m->global_types_to_create.count, llvm_global_entity_cmp);
+		gb_sort_array(m->global_procedures_to_create.data, m->global_procedures_to_create.count, llvm_global_entity_cmp);
 	}
 
 	if (do_threading) {
