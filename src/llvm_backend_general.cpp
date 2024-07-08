@@ -118,6 +118,7 @@ gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c) {
 	map_init(&gen->anonymous_proc_lits, 1024);
 
 	if (USE_SEPARATE_MODULES) {
+		bool module_per_file = build_context.module_per_file && build_context.optimization_level <= 0;
 		for (auto const &entry : gen->info->packages) {
 			AstPackage *pkg = entry.value;
 			auto m = gb_alloc_item(permanent_allocator(), lbModule);
@@ -125,7 +126,7 @@ gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c) {
 			m->gen = gen;
 			map_set(&gen->modules, cast(void *)pkg, m);
 			lb_init_module(m, c);
-			if (build_context.module_per_file) {
+			if (module_per_file) {
 				// NOTE(bill): Probably per file is not a good idea, so leave this for later
 				for (AstFile *file : pkg->files) {
 					auto m = gb_alloc_item(permanent_allocator(), lbModule);

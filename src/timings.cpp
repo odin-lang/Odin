@@ -146,9 +146,10 @@ gb_internal f64 time_stamp_as_us(TimeStamp const &ts, u64 freq) {
 	return 1000000.0*time_stamp_as_s(ts, freq);
 }
 
-#define MAIN_TIME_SECTION(str)          do { debugf("[Section] %s\n", str);                                      timings_start_section(&global_timings, str_lit(str));                } while (0)
-#define TIME_SECTION(str)               do { debugf("[Section] %s\n", str); if (build_context.show_more_timings) timings_start_section(&global_timings, str_lit(str));                } while (0)
-#define TIME_SECTION_WITH_LEN(str, len) do { debugf("[Section] %s\n", str); if (build_context.show_more_timings) timings_start_section(&global_timings, make_string((u8 *)str, len)); } while (0)
+#define MAIN_TIME_SECTION(str)               do { debugf("[Section] %s\n", str);                                      timings_start_section(&global_timings, str_lit(str));                } while (0)
+#define MAIN_TIME_SECTION_WITH_LEN(str, len) do { debugf("[Section] %s\n", str);                                      timings_start_section(&global_timings, make_string((u8 *)str, len)); } while (0)
+#define TIME_SECTION(str)                    do { debugf("[Section] %s\n", str); if (build_context.show_more_timings) timings_start_section(&global_timings, str_lit(str));                } while (0)
+#define TIME_SECTION_WITH_LEN(str, len)      do { debugf("[Section] %s\n", str); if (build_context.show_more_timings) timings_start_section(&global_timings, make_string((u8 *)str, len)); } while (0)
 
 
 enum TimingUnit {

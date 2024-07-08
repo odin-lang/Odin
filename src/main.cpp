@@ -3304,11 +3304,16 @@ int main(int arg_count, char const **arg_ptr) {
 	} else
 #endif
 	{
-		MAIN_TIME_SECTION("LLVM API Code Gen");
 		lbGenerator *gen = gb_alloc_item(permanent_allocator(), lbGenerator);
 		if (!lb_init_generator(gen, checker)) {
 			return 1;
 		}
+
+		gbString label_code_gen = gb_string_make(heap_allocator(), "LLVM API Code Gen");
+		if (gen->modules.count > 1) {
+			label_code_gen = gb_string_append_fmt(label_code_gen, " ( %4td modules )", gen->modules.count);
+		}
+		MAIN_TIME_SECTION_WITH_LEN(label_code_gen, gb_string_length(label_code_gen));
 		if (lb_generate_code(gen)) {
 			switch (build_context.build_mode) {
 			case BuildMode_Executable:

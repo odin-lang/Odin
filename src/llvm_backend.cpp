@@ -3439,7 +3439,7 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 
 	gbString label_object_generation = gb_string_make(heap_allocator(), "LLVM Object Generation");
 	if (gen->modules.count > 1) {
-		label_object_generation = gb_string_append_fmt(label_object_generation, " (%d modules)", gen->modules.count);
+		label_object_generation = gb_string_append_fmt(label_object_generation, " (%td modules)", gen->modules.count);
 	}
 	TIME_SECTION_WITH_LEN(label_object_generation, gb_string_length(label_object_generation));
 	
