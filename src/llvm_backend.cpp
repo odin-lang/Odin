@@ -1397,8 +1397,8 @@ gb_internal void lb_create_global_procedures_and_types(lbGenerator *gen, Checker
 
 	for (auto const &entry : gen->modules) {
 		lbModule *m = entry.value;
-		gb_sort_array(m->global_types_to_create.data, m->global_types_to_create.count, llvm_global_entity_cmp);
-		gb_sort_array(m->global_procedures_to_create.data, m->global_procedures_to_create.count, llvm_global_entity_cmp);
+		array_sort(m->global_types_to_create, llvm_global_entity_cmp);
+		array_sort(m->global_procedures_to_create, llvm_global_entity_cmp);
 	}
 
 	if (do_threading) {

@@ -71,6 +71,8 @@ gb_global Timings global_timings = {0};
 #include "checker.cpp"
 #include "docs.cpp"
 
+#include "cached.cpp"
+
 #include "linker.cpp"
 
 #if defined(GB_SYSTEM_WINDOWS) && defined(ODIN_TILDE_BACKEND)
@@ -391,6 +393,7 @@ enum BuildFlagKind {
 	BuildFlag_InternalIgnoreLLVMBuild,
 	BuildFlag_InternalIgnorePanic,
 	BuildFlag_InternalModulePerFile,
+	BuildFlag_InternalCached,
 
 	BuildFlag_Tilde,
 
@@ -594,6 +597,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_InternalIgnoreLLVMBuild, str_lit("internal-ignore-llvm-build"),BuildFlagParam_None,    Command_all);
 	add_flag(&build_flags, BuildFlag_InternalIgnorePanic,     str_lit("internal-ignore-panic"),     BuildFlagParam_None,    Command_all);
 	add_flag(&build_flags, BuildFlag_InternalModulePerFile,   str_lit("internal-module-per-file"),  BuildFlagParam_None,    Command_all);
+	add_flag(&build_flags, BuildFlag_InternalCached,          str_lit("internal-cached"),           BuildFlagParam_None,    Command_all);
 
 #if ALLOW_TILDE
 	add_flag(&build_flags, BuildFlag_Tilde,                   str_lit("tilde"),                     BuildFlagParam_None,    Command__does_build);
@@ -1413,6 +1417,10 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_InternalModulePerFile:
 							build_context.module_per_file = true;
 							break;
+						case BuildFlag_InternalCached:
+							build_context.cached = true;
+							build_context.use_separate_modules = true;
+							break;
 
 						case BuildFlag_Tilde:
 							build_context.tilde_backend = true;
@@ -1921,9 +1929,6 @@ gb_internal void show_timings(Checker *c, Timings *t) {
 gb_internal GB_COMPARE_PROC(file_path_cmp) {
 	AstFile *x = *(AstFile **)a;
 	AstFile *y = *(AstFile **)b;
-	if (x == y) {
-		return 0;
-	}
 	return string_compare(x->fullpath, y->fullpath);
 }
 
@@ -3322,6 +3327,13 @@ int main(int arg_count, char const **arg_ptr) {
 		return 0;
 	}
 
+	if (build_context.cached) {
+		MAIN_TIME_SECTION("check cached build");
+		if (try_cached_build(checker)) {
+			goto end_of_code_gen;
+		}
+	}
+
 #if ALLOW_TILDE
 	if (build_context.tilde_backend) {
 		LinkerData linker_data = {};
@@ -3383,12 +3395,20 @@ int main(int arg_count, char const **arg_ptr) {
 		remove_temp_files(gen);
 	}
 
+end_of_code_gen:;
+
 	if (build_context.show_timings) {
 		show_timings(checker, &global_timings);
 	}
 
 	if (build_context.export_dependencies_format != DependenciesExportUnspecified) {
 		export_dependencies(checker);
+	}
+
+
+	if (!build_context.build_cache_data.copy_already_done &&
+	    build_context.cached) {
+		try_copy_executable_to_cache();
 	}
 
 	if (run_output) {
