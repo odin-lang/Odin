@@ -390,6 +390,7 @@ enum BuildFlagKind {
 	BuildFlag_InternalIgnoreLazy,
 	BuildFlag_InternalIgnoreLLVMBuild,
 	BuildFlag_InternalIgnorePanic,
+	BuildFlag_InternalModulePerFile,
 
 	BuildFlag_Tilde,
 
@@ -591,7 +592,8 @@ gb_internal bool parse_build_flags(Array<String> args) {
 
 	add_flag(&build_flags, BuildFlag_InternalIgnoreLazy,      str_lit("internal-ignore-lazy"),      BuildFlagParam_None,    Command_all);
 	add_flag(&build_flags, BuildFlag_InternalIgnoreLLVMBuild, str_lit("internal-ignore-llvm-build"),BuildFlagParam_None,    Command_all);
-	add_flag(&build_flags, BuildFlag_InternalIgnorePanic,    str_lit("internal-ignore-panic"),     BuildFlagParam_None,    Command_all);
+	add_flag(&build_flags, BuildFlag_InternalIgnorePanic,     str_lit("internal-ignore-panic"),     BuildFlagParam_None,    Command_all);
+	add_flag(&build_flags, BuildFlag_InternalModulePerFile,   str_lit("internal-module-per-file"),  BuildFlagParam_None,    Command_all);
 
 #if ALLOW_TILDE
 	add_flag(&build_flags, BuildFlag_Tilde,                   str_lit("tilde"),                     BuildFlagParam_None,    Command__does_build);
@@ -1408,6 +1410,10 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_InternalIgnorePanic:
 							build_context.ignore_panic = true;
 							break;
+						case BuildFlag_InternalModulePerFile:
+							build_context.module_per_file = true;
+							break;
+
 						case BuildFlag_Tilde:
 							build_context.tilde_backend = true;
 							break;

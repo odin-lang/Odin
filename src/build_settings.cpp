@@ -426,6 +426,7 @@ struct BuildContext {
 	bool   linker_map_file;
 
 	bool   use_separate_modules;
+	bool   module_per_file;
 	bool   no_threaded_checker;
 
 	bool   show_debug_messages;

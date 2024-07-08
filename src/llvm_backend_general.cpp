@@ -120,23 +120,22 @@ gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c) {
 	if (USE_SEPARATE_MODULES) {
 		for (auto const &entry : gen->info->packages) {
 			AstPackage *pkg = entry.value;
-		#if 1
 			auto m = gb_alloc_item(permanent_allocator(), lbModule);
 			m->pkg = pkg;
 			m->gen = gen;
 			map_set(&gen->modules, cast(void *)pkg, m);
 			lb_init_module(m, c);
-		#else
-			// NOTE(bill): Probably per file is not a good idea, so leave this for later
-			for (AstFile *file : pkg->files) {
-				auto m = gb_alloc_item(permanent_allocator(), lbModule);
-				m->file = file;
-				m->pkg = pkg;
-				m->gen = gen;
-				map_set(&gen->modules, cast(void *)file, m);
-				lb_init_module(m, c);
+			if (build_context.module_per_file) {
+				// NOTE(bill): Probably per file is not a good idea, so leave this for later
+				for (AstFile *file : pkg->files) {
+					auto m = gb_alloc_item(permanent_allocator(), lbModule);
+					m->file = file;
+					m->pkg = pkg;
+					m->gen = gen;
+					map_set(&gen->modules, cast(void *)file, m);
+					lb_init_module(m, c);
+				}
 			}
-		#endif
 		}
 	}
 
