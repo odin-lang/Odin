@@ -7,7 +7,7 @@ init_cpu_features :: proc "contextless" () {
 	@(static) features: CPU_Features
 	defer cpu_features = features
 
-	try_set :: proc "contextless" (name: string, feature: CPU_Feature) -> (ok: bool) {
+	try_set :: proc "contextless" (name: cstring, feature: CPU_Feature) -> (ok: bool) {
 		support: b32
 		if ok = unix.sysctlbyname(name, &support); ok && support {
 			features += { feature }
