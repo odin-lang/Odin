@@ -1006,6 +1006,767 @@ XConnectionWatchProc :: #type proc "c" (
 	opening: b32,
 	watch_data: rawptr)
 
+/* ----  X11/extensions/XKBlib.h ---------------------------------------------------------*/
+
+XkbAnyEvent :: struct {
+	type: i32,
+	serial: u64,
+	send_event: b32,
+	display: ^Display,
+	time: Time,
+	xkb_type: XkbEventType,
+	device: u32,
+}
+
+XkbNewKeyboardNotifyEvent :: struct {
+	type: i32,
+	serial: u64,
+	send_event: b32,
+	display: ^Display,
+	time: Time,
+	xkb_type: XkbEventType,
+	device: i32,
+	old_device: i32,
+	min_key_code: i32,
+	max_key_code: i32,
+	old_min_key_code: i32,
+	old_max_key_code: i32,
+	changed: u32,
+	req_major: i8,
+	req_minor: i8,
+}
+
+XkbMapNotifyEvent :: struct {
+	type: i32,
+	serial: u64,
+	send_event: b32,
+	display: ^Display,
+	time: Time,
+	xkb_type: XkbEventType,
+	device: i32,
+	changed: u32,
+	flags: u32,
+	first_type: i32,
+	num_types: i32,
+	min_key_code: KeyCode,
+	max_key_code: KeyCode,
+	first_key_sym: KeyCode,
+	first_key_act: KeyCode,
+	first_key_behavior: KeyCode,
+	first_key_explicit: KeyCode,
+	first_modmap_key: KeyCode,
+	first_vmodmap_key: KeyCode,
+	num_key_syms: i32,
+	num_key_acts: i32,
+	num_key_behaviors: i32,
+	num_key_explicit: i32,
+	num_modmap_keys: i32,
+	num_vmodmap_keys: i32,
+	vmods: u32,
+}
+
+XkbStateNotifyEvent :: struct {
+	type: i32,
+	serial: u64,
+	send_event: b32,
+	display: ^Display,
+	time: Time,
+	xkb_type: XkbEventType,
+	device: i32,
+	changed: u32,
+	group: i32,
+	base_group: i32,
+	latched_group: i32,
+	locked_group: i32,
+	mods: u32,
+	base_mods: u32,
+	latched_mods: u32,
+	locked_mods: u32,
+	compat_state: i32,
+	grab_mods: u8,
+	compat_grab_mods: u8,
+	lookup_mods: u8,
+	compat_lookup_mods: u8,
+	ptr_buttons: i32,
+	keycode: KeyCode,
+	event_type: i8, // should be EventType but needs to be i8 instead of i32
+	req_major: i8,
+	req_minor: i8,
+}
+
+XkbControlsNotifyEvent :: struct {
+	type: i32,
+	serial: u64,
+	send_event: b32,
+	display: ^Display,
+	time: Time,
+	xkb_type: XkbEventType,
+	device: i32,
+	changed_ctrls: u32,
+	enabled_ctrls: u32,
+	enabled_ctrls_changes: u32,
+	num_groups: i32,
+	keycode: KeyCode,
+	event_type: i8,
+	req_major: i8,
+	req_minor: i8,
+}
+
+XkbIndicatorNotifyEvent :: struct {
+	type: i32,
+	serial: u64,
+	send_event: b32,
+	display: ^Display,
+	time: Time,
+	xkb_type: XkbEventType,
+	device: i32,
+	changed: u32,
+	state: u32,
+}
+
+XkbNamesNotifyEvent :: struct {
+	type: i32,
+	serial: u64,
+	send_event: b32,
+	display: ^Display,
+	time: Time,
+	xkb_type: XkbEventType,
+	device: i32,
+	changed: u32,
+	first_type: i32,
+	num_types: i32,
+	first_lvl: i32,
+	num_lvls: i32,
+	num_aliases: i32,
+	num_radio_groups: i32,
+	changed_vmods: u32,
+	changed_groups: u32,
+	changed_indicators: u32,
+	first_key: i32,
+	num_keys: i32,
+}
+
+XkbCompatMapNotifyEvent :: struct {
+	type: i32,
+	serial: u64,
+	send_event: b32,
+	display: ^Display,
+	time: Time,
+	xkb_type: XkbEventType,
+	device: i32,
+	changed_groups: u32,
+	first_si: i32,
+	num_si: i32,
+	num_total_si: i32,
+}
+
+XkbBellNotifyEvent :: struct {
+	type: i32,
+	serial: u64,
+	send_event: b32,
+	display: ^Display,
+	time: Time,
+	xkb_type: XkbEventType,
+	device: i32,
+	percent: i32,
+	pitch: i32,
+	duration: i32,
+	bell_class: i32,
+	bell_id: i32,
+	name: Atom,
+	window: Window,
+	event_only: b32,
+}
+
+XkbActionMessageEvent :: struct {
+	type: i32,
+	serial: u64,
+	send_event: b32,
+	display: ^Display,
+	time: Time,
+	xkb_type: XkbEventType,
+	device: i32,
+	keycode: KeyCode,
+	press: b32,
+	key_event_follows: b32,
+	group: i32,
+	mods: u32,
+	message: [XkbActionMessageLength+1]i8,
+}
+
+XkbAccessXNotifyEvent :: struct {
+	type: i32,
+	serial: u64,
+	send_event: b32,
+	display: ^Display,
+	time: Time,
+	xkb_type: XkbEventType,
+	device: i32,
+	detail: i32,
+	keycode: i32,
+	sk_delay: i32,
+	debounce_delay: i32,
+}
+
+XkbExtensionDeviceNotifyEvent :: struct {
+	type: i32,
+	serial: u64,
+	send_event: b32,
+	display: ^Display,
+	time: Time,
+	xkb_type: XkbEventType,
+	device: i32,
+	reason: u32,
+	supported: u32,
+	unsupported: u32,
+	first_btn: i32,
+	num_btns: i32,
+	leds_defined: u32,
+	led_state: u32,
+	led_class: i32,
+	led_id: i32,
+}
+
+XkbEvent :: struct #raw_union {
+	type: XkbEventType,
+	any: XkbAnyEvent,
+	new_kbd: XkbNewKeyboardNotifyEvent,
+	_map: XkbMapNotifyEvent,
+	state: XkbStateNotifyEvent,
+	ctrls: XkbControlsNotifyEvent,
+	indicators: XkbIndicatorNotifyEvent,
+	names: XkbNamesNotifyEvent,
+	compat: XkbCompatMapNotifyEvent,
+	bell: XkbBellNotifyEvent,
+	message: XkbActionMessageEvent,
+	accessx: XkbAccessXNotifyEvent,
+	device: XkbExtensionDeviceNotifyEvent,
+	core: XEvent,
+}
+
+/* ----  X11/extensions/XKBgeom.h ---------------------------------------------------------*/
+
+XkbPointRec :: struct {
+	x: i16,
+	y: i16,
+}
+XkbPointPtr :: ^XkbPointRec
+
+XkbBoundsRec :: struct {
+	x1, x2: i16,
+	y1, y2: i16,
+}
+XkbBoundsPtr :: ^XkbBoundsRec
+
+XkbOutlineRec :: struct {
+	num_points: u16,
+	sz_points: u16,
+	corner_radius: u16,
+	points: [^]XkbPointRec,
+}
+XkbOutlinePtr :: ^XkbOutlineRec
+
+XkbShapeRec :: struct {
+	name: Atom,
+	num_outlines: u16,
+	sz_outlines: u16,
+	outlines: [^]XkbOutlineRec,
+	approx: XkbOutlinePtr,
+	primary: XkbOutlinePtr,
+	bounds: XkbBoundsRec,
+}
+XkbShapePtr :: ^XkbShapeRec
+
+XkbPropertyRec :: struct {
+	name: cstring,
+	value: cstring,
+}
+XkbPropertyPtr :: ^XkbPropertyRec
+
+XkbColorRec :: struct {
+	pixel: u32,
+	spec: ^u8, // cstring?
+}
+XkbColorPtr :: ^XkbColorRec
+
+XkbKeyRec :: struct {
+	name: XkbKeyNameRec,
+	gap: i16,
+	shape_ndx: u8,
+	color_ndx: u8,
+}
+XkbKeyPtr :: ^XkbKeyRec
+
+XkbRowRec :: struct {
+	top: i16,
+	left: i16,
+	num_keys: u16,
+	sz_keys: u16,
+	vertical: i32,
+	keys: [^]XkbKeyRec,
+	bounds: XkbBoundsRec,
+}
+XkbRowPtr :: ^XkbRowRec
+
+XkbAnyDoodadRec :: struct {
+	name: Atom,
+	type: u8,
+	priority: u8,
+	top: i16,
+	left: i16,
+	angle: i16,
+}
+XkbAnyDoodadPtr :: ^XkbAnyDoodadRec
+
+XkbShapeDoodadRec :: struct {
+	name: Atom,
+	type: u8,
+	priority: u8,
+	top: i16,
+	left: i16,
+	angle: i16,
+	color_ndx: u16,
+	shape_ndx: u16,
+}
+XkbShapeDoodadPtr :: ^XkbShapeDoodadRec
+
+XkbTextDoodadRec :: struct {
+	name: Atom,
+	type: u8,
+	priority: u8,
+	top: i16,
+	left: i16,
+	angle: i16,
+	color_ndx: u16,
+	text: cstring,
+	font: cstring,
+}
+XkbTextDoodadPtr :: ^XkbTextDoodadRec
+
+XkbIndicatorDoodadRec :: struct {
+	name: Atom,
+	type: u8,
+	priority: u8,
+	top: i16,
+	left: i16,
+	angle: i16,
+	color_ndx: u16,
+	on_color_ndx: u16,
+	off_color_ndx: u16,
+}
+XkbIndicatorDoodadPtr :: ^XkbIndicatorDoodadRec
+
+XkbLogoDoodadRec :: struct {
+	name: Atom,
+	type: u8,
+	priority: u8,
+	top: i16,
+	left: i16,
+	angle: i16,
+	color_ndx: u16,
+	shape_ndx: u16,
+	logo_name: cstring,
+}
+XkbLogoDoodadPtr :: ^XkbLogoDoodadRec
+
+XkbDoodadRec :: struct #raw_union {
+	any: XkbAnyDoodadRec,
+	shape: XkbShapeDoodadRec,
+	text: XkbTextDoodadRec,
+	indicator: XkbIndicatorDoodadRec,
+	logo: XkbLogoDoodadRec,
+}
+XkbDoodadPtr :: ^XkbDoodadRec
+
+XkbOverlayKeyRec :: struct {
+	over: XkbKeyNameRec,
+	under: XkbKeyNameRec,
+}
+XkbOverlayKeyPtr :: ^XkbOverlayKeyRec
+
+XkbOverlayRowRec :: struct {
+	row_under: u16,
+	num_keys: u16,
+	sz_keys: u16,
+	keys: [^]XkbOverlayKeyRec,
+}
+XkbOverlayRowPtr :: ^XkbOverlayRowRec
+
+XkbOverlayRec :: struct {
+	name: Atom,
+	section_under: XkbSectionPtr,
+	num_rows: u16,
+	sz_rows: u16,
+	rows: [^]XkbOverlayRowRec,
+	bounds: [^]XkbBoundsRec,
+}
+XkbOverlayPtr :: ^XkbOverlayRec
+
+XkbSectionRec :: struct {
+	name: Atom,
+	priority: u8,
+	top: i16,
+	left: i16,
+	width: u16,
+	height: u16,
+	angle: i16,
+	num_rows: u16,
+	num_doodads: u16,
+	num_overlays: u16,
+	sz_rows: u16,
+	sz_doodads: u16,
+	sz_overlays: u16,
+	rows: [^]XkbRowRec,
+	doodads: [^]XkbDoodadRec,
+	bounds: XkbBoundsRec,
+	overlays: [^]XkbOverlayRec,
+}
+XkbSectionPtr :: ^XkbSectionRec
+
+XkbGeometryRec :: struct {
+	name: Atom,
+	width_mm: u16,
+	height_mm: u16,
+	label_font: cstring,
+	label_color: XkbColorPtr,
+	base_color: XkbColorPtr,
+	sz_properties: u16,
+	sz_colors: u16,
+	sz_shapes: u16,
+	sz_sections: u16,
+	sz_doodads: u16,
+	sz_key_aliases: u16,
+	num_properties: u16,
+	num_colors: u16,
+	num_shapes: u16,
+	num_sections: u16,
+	num_doodads: u16,
+	num_key_aliases: u16,
+	properties: [^]XkbPropertyRec,
+	colors: [^]XkbColorRec,
+	shapes: [^]XkbShapeRec,
+	sections: [^]XkbSectionRec,
+	doodads: [^]XkbDoodadRec,
+	key_aliases: [^]XkbKeyAliasRec,
+}
+XkbGeometryPtr :: ^XkbGeometryRec
+
+
+/* ----  X11/extensions/XKBstr.h ---------------------------------------------------------*/
+
+XkbStateRec :: struct {
+	group: u8,
+	locked_group: u8,
+	base_group: u16,
+	latched_group: u16,
+	mods: u8,
+	base_mods: u8,
+	latched_mods: u8,
+	locked_mods: u8,
+	compat_state: u8,
+	grab_mods: u8,
+	compat_grab_mods: u8,
+	lookup_mods: u8,
+	compat_lookup_mods: u8,
+	ptr_buttons: u16,
+}
+XkbStatePtr :: ^XkbStateRec
+
+XkbModsRec :: struct {
+	mask: u8,	/* effective mods */
+	real_mods: u8,
+	vmods: u16,
+}
+XkbModsPtr :: ^XkbModsRec
+
+XkbKTMapEntryRec :: struct {
+	active: b32,
+	level: u8,
+	mods: XkbModsRec,
+}
+XkbKTMapEntryPtr :: ^XkbKTMapEntryRec
+
+XkbKeyTypeRec :: struct {
+	mod: XkbModsRec,
+	num_levels: u8,
+	map_count: u8,
+	_map: [^]XkbKTMapEntryRec,
+	preserve: [^]XkbModsRec,
+	name: Atom,
+	level_names: [^]Atom,
+}
+XkbKeyTypePtr :: ^XkbKeyTypeRec
+
+XkbBehavior :: struct {
+	type: u8,
+	data: u8,
+}
+
+XkbAnyAction :: struct {
+	type: u8,
+	data: [XkbAnyActionDataSize]u8,
+}
+
+XkbModAction :: struct {
+	type: u8,
+	flags: u8,
+	mask: u8,
+	real_mods: u8,
+	vmods1: u8,
+	vmods2: u8,
+}
+
+XkbGroupAction :: struct {
+	type: u8,
+	flags: u8,
+	group_XXX: i8,
+}
+
+XkbISOAction :: struct {
+	type: u8,
+	flags: u8,
+	mask: u8,
+	real_mods: u8,
+	group_XXX: i8,
+	affect: u8,
+	vmods1: u8,
+	vmods2: u8,
+}
+
+XkbPtrAction :: struct {
+	type: u8,
+	flags: u8,
+	high_XXX: u8,
+	low_XXX: u8,
+	high_YYY: u8,
+	low_YYY: u8,
+}
+
+XkbPtrBtnAction :: struct {
+	type: u8,
+	flags: u8,
+	count: u8,
+	button: u8,
+}
+
+XkbPtrDfltAction :: struct {
+	type: u8,
+	flags: u8,
+	affect: u8,
+	value_XXX: u8,
+}
+
+XkbSwitchScreenAction :: struct {
+	type: u8,
+	flags: u8,
+	screenXXX: i8,
+}
+
+XkbCtrlsAction :: struct {
+	type: u8,
+	flags: u8,
+	ctrls3: u8,
+	ctrls2: u8,
+	ctrls1: u8,
+	ctrls0: u8,
+}
+
+XkbMessageAction :: struct {
+	type: u8,
+	flags: u8,
+	message: [6]u8,
+}
+
+XkbRedirectKeyAction :: struct {
+	type: u8,
+	new_key: u8,
+	mods_mask: u8,
+	mods: u8,
+	vmods_mask0: u8,
+	vmods_mask1: u8,
+	vmods0: u8,
+	vmods1: u8,
+}
+
+XkbDeviceBtnAction :: struct {
+	type: u8,
+	flags: u8,
+	count: u8,
+	button: u8,
+	device: u8,
+}
+
+XkbDeviceValuatorAction :: struct {
+	type: u8,
+	device: u8,
+	v1_what: u8,
+	v1_ndx: u8,
+	v1_value: u8,
+	v2_what: u8,
+	v2_ndx: u8,
+	v2_value: u8,
+}
+
+XkbAction :: struct #raw_union {
+	any: XkbAnyAction,
+	mod: XkbModAction,
+	group: XkbGroupAction,
+	iso: XkbISOAction,
+	ptr: XkbPtrAction,
+	btn: XkbPtrBtnAction,
+	dflt: XkbPtrDfltAction,
+	screen: XkbSwitchScreenAction,
+	ctrls: XkbCtrlsAction,
+	msg: XkbMessageAction,
+	redirect: XkbRedirectKeyAction,
+	devbtn: XkbDeviceBtnAction,
+	devval: XkbDeviceValuatorAction,
+	type: u8,
+}
+
+XkbControlsRec :: struct {
+	mk_dflt_btn: u8,
+	num_groups: u8,
+	groups_wrap: u8,
+	internal: XkbModsRec,
+	ignore_lock: XkbModsRec,
+	enabled_ctrls: u32,
+	repeat_delay: u16,
+	repeat_interval: u16,
+	slow_keys_delay: u16,
+	debounce_delay: u16,
+	mk_delay: u16,
+	mk_interval: u16,
+	mk_time_to_max: u16,
+	mk_max_speed: u16,
+	mk_curve: i16,
+	ax_options: u16,
+	ax_timeout: u16,
+	axt_opts_mask: u16,
+	axt_opts_values: u16,
+	axt_ctrls_mask: u32,
+	axt_ctrls_values: u32,
+	per_key_repeat: [XkbPerKeyBitArraySize]u8,
+}
+XkbControlsPtr :: ^XkbControlsRec
+
+XkbServerMapRec :: struct {
+	num_acts: u16,
+	size_acts: u16,
+	acts: [^]XkbAction,
+
+	behaviors: [^]XkbBehavior,
+	key_acts: [^]u16,
+	explicit: [^]u8,
+	vmods: [XkbNumVirtualMods]u8,
+	vmodmap: [^]u16,
+}
+XkbServerMapPtr :: ^XkbServerMapRec
+
+XkbSymMapRec :: struct {
+	kt_index: [XkbNumKbdGroups]u8,
+	group_info: u8,
+	width: u8,
+	offset: u16,
+}
+XkbSymMapPtr :: ^XkbSymMapRec
+
+XkbClientMapRec :: struct {
+	size_types: u8,
+	num_types: u8,
+	types: [^]XkbKeyTypeRec,
+
+	size_syms: u16,
+	num_syms: u16,
+	syms: [^]XID, // Keysym
+	key_sym_map: [^]XkbSymMapRec,
+
+	modmap: [^]u8,
+}
+XkbClientMapPtr :: ^XkbClientMapRec
+
+XkbSymInterpretRec :: struct {
+	sym: XID, // KeySym
+	flags: u8,
+	match: u8,
+	mods: u8,
+	virtual_mod: u8,
+	act: XkbAnyAction,
+}
+XkbSymInterpretPtr :: ^XkbSymInterpretRec
+
+XkbCompatMapRec :: struct {
+	sym_interpret: [^]XkbSymInterpretRec,
+	groups: [XkbNumKbdGroups]XkbModsRec,
+	num_si: u16,
+	size_si: u16,
+}
+XkbCompatMapPtr :: ^XkbCompatMapRec
+
+XkbIndicatorMapRec :: struct {
+	flags: u8,
+	which_groups: u8,
+	groups: u8,
+	which_mods: u8,
+	mods: XkbModsRec,
+	ctrls: u32,
+}
+XkbIndicatorMapPtr :: ^XkbIndicatorMapRec
+
+XkbIndicatorRec :: struct {
+	phys_indicators: u64,
+	maps: [XkbNumIndicators]XkbIndicatorMapRec,
+}
+XkbIndicatorPtr :: ^XkbIndicatorRec
+
+XkbKeyNameRec :: struct {
+	name: [XkbKeyNameLength]i8, // Non nul-terminated string
+}
+XkbKeyNamePtr :: ^XkbKeyNameRec
+
+XkbKeyAliasRec :: struct {
+	real: [XkbKeyNameLength]i8, // Non nul-terminated string
+	alias: [XkbKeyNameLength]i8, // Non nul-terminated string
+}
+XkbKeyAliasPtr :: ^XkbKeyAliasRec
+
+XkbNamesRec :: struct {
+	keycodes: Atom,
+	geometry: Atom,
+	symbols: Atom,
+	types: Atom,
+	compat: Atom,
+	vmods: [XkbNumVirtualMods]Atom,
+	indicators: [XkbNumIndicators]Atom,
+	groups: [XkbNumKbdGroups]Atom,
+	keys: [^]XkbKeyNameRec,
+	key_aliases: [^]XkbKeyAliasRec,
+	radio_groups: [^]Atom,
+	phys_symbol: Atom,
+	num_keys: u8,
+	num_key_aliases: u8,
+	num_rg: u16,
+}
+XkbNamesPtr :: ^XkbNamesRec
+
+XkbDescRec :: struct {
+	display: ^Display,
+	flags: u16,
+	device_spec: u16,
+	min_key_code: KeyCode,
+	max_key_code: KeyCode,
+
+	ctrls: XkbControlsPtr,
+	server: XkbServerMapPtr,
+	_map: XkbClientMapPtr,
+	indicators: XkbIndicatorPtr,
+	names: XkbNamesPtr,
+	compat: XkbCompatMapPtr,
+	geom: XkbGeometryPtr,
+}
+XkbDescPtr :: ^XkbDescRec
+
+
 /* ----  X11/Xcms.h ---------------------------------------------------------*/
 
 XcmsColorFormat :: uint

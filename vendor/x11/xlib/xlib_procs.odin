@@ -79,7 +79,7 @@ foreign xlib {
 	DoesBackingStore    :: proc(screen: ^Screen) -> BackingStore ---
 	DoesSaveUnders      :: proc(screen: ^Screen) -> b32 ---
 	DisplayOfScreen     :: proc(screen: ^Screen) -> ^Display ---
-	ScreenNumberOfScreens :: proc(screen: ^Screen) -> i32 ---
+	ScreenNumberOfScreen :: proc(screen: ^Screen) -> i32 ---
 	EventMaskOfScreen   :: proc(screen: ^Screen) -> EventMask ---
 	WidthOfScreen       :: proc(screen: ^Screen) -> i32 ---
 	HeightOfScreen      :: proc(screen: ^Screen) -> i32 ---
@@ -1637,6 +1637,13 @@ foreign xlib {
 		wm_hints:     ^XWMHints,
 		class_hints:  ^XClassHint,
 	) ---
+	OpenIM :: proc(
+		display: ^Display,
+		rdb:      XrmHashBucket,
+		res_name: cstring,
+		res_class: cstring,
+	) -> XIM ---
+	SetLocaleModifiers :: proc(modifiers: cstring) -> cstring ---
 }
 
 @(default_calling_convention="c")
@@ -1938,4 +1945,52 @@ foreign xlib {
 	XrmInitialize :: proc() ---
 	XrmGetStringDatabase :: proc(data: cstring) -> XrmDatabase ---
 	XrmGetResource :: proc(db: XrmDatabase, name: cstring, class: cstring, type_return: ^cstring, val_return: ^XrmValue) -> b32 ---
+
+	/* ----  X11/XKBlib.h ---------------------------------------------------------*/
+
+	XkbQueryExtension :: proc(
+		display: ^Display,
+		opcode_return: ^i32,
+		event_base_return: ^i32,
+		error_base_return: ^i32,
+		major_return: ^i32,
+		minor_return: ^i32,
+	) -> b32 ---
+	XkbUseExtension :: proc(
+		display: ^Display,
+		major_return: ^i32,
+		minor_return: ^i32,
+	) -> b32 ---
+	XkbGetMap :: proc(
+		display: ^Display,
+		which: XkbInfoMask,
+		device_spec: i32,
+	) -> XkbDescPtr ---
+	XkbGetUpdatedMap :: proc(
+		display: ^Display,
+		which: XkbInfoMask,
+		desc: XkbDescPtr,
+	) -> b32 ---
+	XkbSelectEvents :: proc(
+		display: ^Display,
+		deviceID: u32,
+		bits_to_change: XkbEventMask,
+		values: XkbEventMask,
+	) -> b32 ---
+	XkbSetDetectableAutoRepeat :: proc(
+		display: ^Display,
+		detectable: b32,
+		supported: ^b32,
+	) -> b32 ---
+	XkbGetState :: proc (
+		display: ^Display,
+		device_spec: u32,
+		return_state: XkbStatePtr,
+	) -> Status ---
+	XkbGetKeySyms :: proc(
+		display: ^Display,
+		first: u32,
+		num: u32,
+		xkb: XkbDescPtr,
+	) -> Status ---
 }
