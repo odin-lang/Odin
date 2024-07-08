@@ -951,10 +951,10 @@ fmt_bad_verb :: proc(fi: ^Info, verb: rune) {
 	io.write_string(fi.writer, "%!", &fi.n)
 	io.write_rune(fi.writer, verb, &fi.n)
 	io.write_byte(fi.writer, '(', &fi.n)
-	if fi.arg.id != nil {
-		reflect.write_typeid(fi.writer, fi.arg.id, &fi.n)
+	if arg := fi.arg; arg != nil {
+		reflect.write_typeid(fi.writer, arg.id, &fi.n)
 		io.write_byte(fi.writer, '=', &fi.n)
-		fmt_value(fi, fi.arg, 'v')
+		fmt_value(fi, arg, 'v')
 	} else {
 		io.write_string(fi.writer, "<nil>", &fi.n)
 	}
