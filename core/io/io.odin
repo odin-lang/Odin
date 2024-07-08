@@ -375,10 +375,6 @@ write_at_least :: proc(w: Writer, buf: []byte, min: int) -> (n: int, err: Error)
 		nn, err = write(w, buf[n:])
 		n += nn
 	}
-
-	if err == nil && n < min {
-		err = .Short_Write
-	}
 	return
 }
 
