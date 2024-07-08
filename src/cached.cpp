@@ -57,6 +57,11 @@ bool try_copy_executable_cache_internal(bool to_cache) {
 		cache_name = gb_string_appendc(cache_name, "-");
 		cache_name = gb_string_append_length(cache_name, selected_target_metrics->name.text, selected_target_metrics->name.len);
 	}
+	if (selected_subtarget) {
+		String st = subtarget_strings[selected_subtarget];
+		cache_name = gb_string_appendc(cache_name, "-");
+		cache_name = gb_string_append_length(cache_name, st.text, st.len);
+	}
 	cache_name = gb_string_appendc(cache_name, ".bin");
 
 	if (to_cache) {
