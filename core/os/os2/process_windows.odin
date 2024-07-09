@@ -2,6 +2,7 @@
 package os2
 
 import "core:sys/windows"
+import "base:runtime"
 
 _exit :: proc "contextless" (code: int) -> ! {
 	windows.ExitProcess(u32(code))
@@ -43,4 +44,19 @@ _get_ppid :: proc() -> int {
 		status = windows.Process32NextW(snap, &entry)
 	}
 	return -1
+}
+
+_process_list :: proc(allocator: runtime.Allocator) -> ([]int, Error) {
+	pid_list := make([dynamic]int, allocator)
+	snap := windows.CreateToolhelp32Snapshot(windows.TH32CS_SNAPPROCESS, 0)
+	if snap == windows.INVALID_HANDLE_VALUE {
+		return pid_list[:], _get_platform_error()
+	}
+	entry := windows.PROCESSENTRY32W { dwSize = size_of(windows.PROCESSENTRY32W) }
+	status := windows.Process32FirstW(snap, &entry)
+	for status {
+		append(&pid_list, cast(int) entry.th32ProcessID)
+		status = windows.Process32NextW(snap, &entry)
+	}
+	return pid_list[:], nil
 }
