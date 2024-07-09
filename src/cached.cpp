@@ -115,7 +115,8 @@ gb_internal bool check_if_exists_directory_otherwise_create(String const &str) {
 #else
 	char const *str_c = alloc_cstring(permanent_allocator(), str);
 	if (!gb_file_exists(str_c)) {
-		return false;
+		int status = mkdir(str_c, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+		return status == 0;
 	}
 	return false;
 #endif
@@ -244,6 +245,11 @@ gb_internal bool try_cached_build(Checker *c, Array<String> const &args) {
 				continue;
 			}
 			array_add(&envs, str);
+		}
+	#else
+		char **curr_env = environ;
+		while (curr_env && *curr_env) {
+			array_add(&envs, make_string_c(*curr_env++));
 		}
 	#endif
 	}
