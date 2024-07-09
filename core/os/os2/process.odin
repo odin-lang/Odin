@@ -111,12 +111,25 @@ process_list :: proc(allocator: runtime.Allocator) -> ([]int, Error) {
 	return _process_list(allocator)
 }
 
-
+/*
+	Handle to a process.
+*/
 Process :: struct {
-	pid:          int,
-	handle:       uintptr,
-	is_done:      b32,
-	signal_mutex: sync.RW_Mutex,
+	handle: _Process_Handle,
+}
+
+/*
+	Obtain a process handle.
+*/
+process_open :: proc(pid: int) -> (Process, Error) {
+	return _process_open(pid)
+}
+
+/*
+	Close a process handle
+*/
+process_close :: proc(process: Process) -> (Error) {
+	return _process_close(process)
 }
 
 
