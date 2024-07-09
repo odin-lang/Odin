@@ -183,7 +183,9 @@ gb_internal bool try_copy_executable_from_cache(void) {
 }
 
 
-
+#if !defined(GB_SYSTEM_WINDOWS)
+extern char **environ;
+#endif
 
 // returns false if different, true if it is the same
 gb_internal bool try_cached_build(Checker *c, Array<String> const &args) {
@@ -244,15 +246,20 @@ gb_internal bool try_cached_build(Checker *c, Array<String> const &args) {
 			if (string_starts_with(str, str_lit("CURR_DATE_TIME="))) {
 				continue;
 			}
+			if (string_starts_with(str, str_lit("PROMPT="))) {
+				continue;
+			}
 			array_add(&envs, str);
 		}
-	#elif defined(GB_SYSTEM_LINUX)
+	#else
 		char **curr_env = environ;
 		while (curr_env && *curr_env) {
-			array_add(&envs, make_string_c(*curr_env++));
+			String str = make_string_c(*curr_env++);
+			if (string_starts_with(str, str_lit("PROMPT="))) {
+				continue;
+			}
+			array_add(&envs, str);
 		}
-	#else
-		// TODO(bill): environment variables on all other platforms
 	#endif
 	}
 	array_sort(envs, string_cmp);
