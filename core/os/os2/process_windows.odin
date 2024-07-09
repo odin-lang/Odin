@@ -4,6 +4,8 @@ package os2
 import "core:sys/windows"
 import "base:runtime"
 
+_Process_Handle :: windows.HANDLE
+
 _exit :: proc "contextless" (code: int) -> ! {
 	windows.ExitProcess(u32(code))
 }
@@ -59,4 +61,20 @@ _process_list :: proc(allocator: runtime.Allocator) -> ([]int, Error) {
 		status = windows.Process32NextW(snap, &entry)
 	}
 	return pid_list[:], nil
+}
+
+_process_open :: proc(pid: int) -> (Process, Error) {
+	handle := windows.OpenProcess(windows.PROCESS_QUERY_LIMITED_INFORMATION, false, cast(u32) pid)
+	if handle == windows.INVALID_HANDLE_VALUE {
+		return {}, _get_platform_error()
+	}
+	return Process {
+		handle = handle,
+	}, nil
+}
+
+_process_close :: proc(process: Process) -> (Error) {
+	if !windows.CloseHandle(process.handle) {
+		return _get_platform_error()
+	}
 }
