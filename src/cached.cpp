@@ -246,11 +246,13 @@ gb_internal bool try_cached_build(Checker *c, Array<String> const &args) {
 			}
 			array_add(&envs, str);
 		}
-	#else
+	#elif defined(GB_SYSTEM_LINUX)
 		char **curr_env = environ;
 		while (curr_env && *curr_env) {
 			array_add(&envs, make_string_c(*curr_env++));
 		}
+	#else
+		// TODO(bill): environment variables on all other platforms
 	#endif
 	}
 	array_sort(envs, string_cmp);
