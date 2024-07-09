@@ -104,6 +104,13 @@ get_ppid :: proc() -> int {
 	return _get_ppid()
 }
 
+/*
+	Obtain ID's of all processes running in the system.
+*/
+process_list :: proc(allocator: runtime.Allocator) -> ([]int, Error) {
+	return _process_list(allocator)
+}
+
 
 Process :: struct {
 	pid:          int,
