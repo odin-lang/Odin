@@ -259,6 +259,9 @@ bool try_cached_build(Checker *c) {
 			timestamp_str = string_trim_whitespace(timestamp_str);
 			path_str = string_trim_whitespace(path_str);
 
+			if (file_count >= files.count) {
+				goto do_write_file;
+			}
 			if (files[file_count] != path_str) {
 				goto do_write_file;
 			}
