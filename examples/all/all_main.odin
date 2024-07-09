@@ -114,6 +114,7 @@ import relative         "core:relative"
 import reflect          "core:reflect"
 import runtime          "base:runtime"
 import simd             "core:simd"
+import x86              "core:simd/x86"
 import slice            "core:slice"
 import slice_heap       "core:slice/heap"
 import sort             "core:sort"
@@ -234,6 +235,7 @@ _ :: relative
 _ :: reflect
 _ :: runtime
 _ :: simd
+_ :: x86
 _ :: slice
 _ :: slice_heap
 _ :: sort

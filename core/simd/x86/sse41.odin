@@ -106,7 +106,7 @@ _mm_packus_epi32 :: #force_inline proc "c" (a, b: __m128i) -> __m128i {
 }
 @(require_results, enable_target_feature="sse4.1")
 _mm_cmpeq_epi64 :: #force_inline proc "c" (a, b: __m128i) -> __m128i {
-	return transmute(__m128i)simd.lanes_eq(transmute(i64x2)a, transmute(i64x2)b)
+	return transmute(__m128i)simd.lanes_eq(a, b)
 }
 @(require_results, enable_target_feature="sse4.1")
 _mm_cvtepi8_epi16 :: #force_inline proc "c" (a: __m128i) -> __m128i {
@@ -124,7 +124,7 @@ _mm_cvtepi8_epi32 :: #force_inline proc "c" (a: __m128i) -> __m128i {
 _mm_cvtepi8_epi64 :: #force_inline proc "c" (a: __m128i) -> __m128i {
 	x := transmute(i8x16)a
 	y := simd.shuffle(x, x, 0, 1)
-	return transmute(__m128i)i64x2(y)
+	return i64x2(y)
 }
 @(require_results, enable_target_feature="sse4.1")
 _mm_cvtepi16_epi32 :: #force_inline proc "c" (a: __m128i) -> __m128i {
@@ -136,13 +136,13 @@ _mm_cvtepi16_epi32 :: #force_inline proc "c" (a: __m128i) -> __m128i {
 _mm_cvtepi16_epi64 :: #force_inline proc "c" (a: __m128i) -> __m128i {
 	x := transmute(i16x8)a
 	y := simd.shuffle(x, x, 0, 1)
-	return transmute(__m128i)i64x2(y)
+	return i64x2(y)
 }
 @(require_results, enable_target_feature="sse4.1")
 _mm_cvtepi32_epi64 :: #force_inline proc "c" (a: __m128i) -> __m128i {
 	x := transmute(i32x4)a
 	y := simd.shuffle(x, x, 0, 1)
-	return transmute(__m128i)i64x2(y)
+	return i64x2(y)
 }
 @(require_results, enable_target_feature="sse4.1")
 _mm_cvtepu8_epi16 :: #force_inline proc "c" (a: __m128i) -> __m128i {
@@ -160,7 +160,7 @@ _mm_cvtepu8_epi32 :: #force_inline proc "c" (a: __m128i) -> __m128i {
 _mm_cvtepu8_epi64 :: #force_inline proc "c" (a: __m128i) -> __m128i {
 	x := transmute(u8x16)a
 	y := simd.shuffle(x, x, 0, 1)
-	return transmute(__m128i)i64x2(y)
+	return i64x2(y)
 }
 @(require_results, enable_target_feature="sse4.1")
 _mm_cvtepu16_epi32 :: #force_inline proc "c" (a: __m128i) -> __m128i {
@@ -172,13 +172,13 @@ _mm_cvtepu16_epi32 :: #force_inline proc "c" (a: __m128i) -> __m128i {
 _mm_cvtepu16_epi64 :: #force_inline proc "c" (a: __m128i) -> __m128i {
 	x := transmute(u16x8)a
 	y := simd.shuffle(x, x, 0, 1)
-	return transmute(__m128i)i64x2(y)
+	return i64x2(y)
 }
 @(require_results, enable_target_feature="sse4.1")
 _mm_cvtepu32_epi64 :: #force_inline proc "c" (a: __m128i) -> __m128i {
 	x := transmute(u32x4)a
 	y := simd.shuffle(x, x, 0, 1)
-	return transmute(__m128i)i64x2(y)
+	return i64x2(y)
 }
 @(require_results, enable_target_feature="sse4.1")
 _mm_dp_pd :: #force_inline proc "c" (a, b: __m128d, $IMM8: u8) -> __m128d {
@@ -242,7 +242,7 @@ _mm_minpos_epu16 :: #force_inline proc "c" (a: __m128i) -> __m128i {
 }
 @(require_results, enable_target_feature="sse4.1")
 _mm_mul_epi32 :: #force_inline proc "c" (a, b: __m128i) -> __m128i {
-	return transmute(__m128i)pmuldq(transmute(i32x4)a, transmute(i32x4)b)
+	return pmuldq(transmute(i32x4)a, transmute(i32x4)b)
 }
 @(require_results, enable_target_feature="sse4.1")
 _mm_mullo_epi32 :: #force_inline proc "c" (a, b: __m128i) -> __m128i {
@@ -254,15 +254,15 @@ _mm_mpsadbw_epu8 :: #force_inline proc "c" (a, b: __m128i, $IMM8: u8) -> __m128i
 }
 @(require_results, enable_target_feature="sse4.1")
 _mm_testz_si128 :: #force_inline proc "c" (a: __m128i, mask: __m128i) -> i32 {
-	return ptestz(transmute(i64x2)a, transmute(i64x2)mask)
+	return ptestz(a, mask)
 }
 @(require_results, enable_target_feature="sse4.1")
 _mm_testc_si128 :: #force_inline proc "c" (a: __m128i, mask: __m128i) -> i32 {
-	return ptestc(transmute(i64x2)a, transmute(i64x2)mask)
+	return ptestc(a, mask)
 }
 @(require_results, enable_target_feature="sse4.1")
 _mm_testnzc_si128 :: #force_inline proc "c" (a: __m128i, mask: __m128i) -> i32 {
-	return ptestnzc(transmute(i64x2)a, transmute(i64x2)mask)
+	return ptestnzc(a, mask)
 }
 @(require_results, enable_target_feature="sse4.1")
 _mm_test_all_zeros :: #force_inline proc "c" (a: __m128i, mask: __m128i) -> i32 {
