@@ -4,7 +4,7 @@ gb_internal GB_COMPARE_PROC(string_cmp) {
 	return string_compare(x, y);
 }
 
-bool recursively_delete_directory(wchar_t *wpath_c) {
+gb_internal bool recursively_delete_directory(wchar_t *wpath_c) {
 #if defined(GB_SYSTEM_WINDOWS)
 	auto const is_dots_w = [](wchar_t const *str) -> bool {
 		if (!str) {
@@ -70,7 +70,7 @@ bool recursively_delete_directory(wchar_t *wpath_c) {
 #endif
 }
 
-bool recursively_delete_directory(String const &path) {
+gb_internal bool recursively_delete_directory(String const &path) {
 #if defined(GB_SYSTEM_WINDOWS)
 	String16 wpath = string_to_string16(permanent_allocator(), path);
 	wchar_t *wpath_c = alloc_wstring(permanent_allocator(), wpath);
@@ -80,13 +80,12 @@ bool recursively_delete_directory(String const &path) {
 #endif
 }
 
-int try_clear_cache(void) {
-	bool ok = recursively_delete_directory(str_lit(".odin-cache"));
-	return ok ? 0 : 1;
+gb_internal bool try_clear_cache(void) {
+	return recursively_delete_directory(str_lit(".odin-cache"));
 }
 
 
-u64 crc64_with_seed(void const *data, isize len, u64 seed) {
+gb_internal u64 crc64_with_seed(void const *data, isize len, u64 seed) {
 	isize remaining;
 	u64 result = ~seed;
 	u8 const *c = cast(u8 const *)data;
@@ -96,7 +95,7 @@ u64 crc64_with_seed(void const *data, isize len, u64 seed) {
 	return ~result;
 }
 
-bool check_if_exists_file_otherwise_create(String const &str) {
+gb_internal bool check_if_exists_file_otherwise_create(String const &str) {
 	char const *str_c = alloc_cstring(permanent_allocator(), str);
 	if (!gb_file_exists(str_c)) {
 		gbFile f = {};
@@ -108,7 +107,7 @@ bool check_if_exists_file_otherwise_create(String const &str) {
 }
 
 
-bool check_if_exists_directory_otherwise_create(String const &str) {
+gb_internal bool check_if_exists_directory_otherwise_create(String const &str) {
 #if defined(GB_SYSTEM_WINDOWS)
 	String16 wstr = string_to_string16(permanent_allocator(), str);
 	wchar_t *wstr_c = alloc_wstring(permanent_allocator(), wstr);
@@ -121,7 +120,7 @@ bool check_if_exists_directory_otherwise_create(String const &str) {
 	return false;
 #endif
 }
-bool try_copy_executable_cache_internal(bool to_cache) {
+gb_internal bool try_copy_executable_cache_internal(bool to_cache) {
 	String exe_name = path_to_string(heap_allocator(), build_context.build_paths[BuildPath_Output]);
 	defer (gb_free(heap_allocator(), exe_name.text));
 
@@ -162,7 +161,7 @@ bool try_copy_executable_cache_internal(bool to_cache) {
 
 
 
-bool try_copy_executable_to_cache(void) {
+gb_internal bool try_copy_executable_to_cache(void) {
 	debugf("Cache: try_copy_executable_to_cache\n");
 
 	if (try_copy_executable_cache_internal(true)) {
@@ -172,7 +171,7 @@ bool try_copy_executable_to_cache(void) {
 	return false;
 }
 
-bool try_copy_executable_from_cache(void) {
+gb_internal bool try_copy_executable_from_cache(void) {
 	debugf("Cache: try_copy_executable_from_cache\n");
 
 	if (try_copy_executable_cache_internal(false)) {
@@ -186,7 +185,7 @@ bool try_copy_executable_from_cache(void) {
 
 
 // returns false if different, true if it is the same
-bool try_cached_build(Checker *c, Array<String> const &args) {
+gb_internal bool try_cached_build(Checker *c, Array<String> const &args) {
 	TEMPORARY_ALLOCATOR_GUARD();
 
 	Parser *p = c->parser;
