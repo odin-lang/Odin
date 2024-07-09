@@ -246,9 +246,6 @@ gb_internal bool try_cached_build(Checker *c, Array<String> const &args) {
 			if (string_starts_with(str, str_lit("CURR_DATE_TIME="))) {
 				continue;
 			}
-			if (string_starts_with(str, str_lit("PROMPT="))) {
-				continue;
-			}
 			array_add(&envs, str);
 		}
 	#else
@@ -256,6 +253,9 @@ gb_internal bool try_cached_build(Checker *c, Array<String> const &args) {
 		while (curr_env && *curr_env) {
 			String str = make_string_c(*curr_env++);
 			if (string_starts_with(str, str_lit("PROMPT="))) {
+				continue;
+			}
+			if (string_starts_with(str, str_lit("RPROMPT="))) {
 				continue;
 			}
 			array_add(&envs, str);
