@@ -4,6 +4,87 @@ gb_internal GB_COMPARE_PROC(cached_file_cmp) {
 	return string_compare(x, y);
 }
 
+bool recursively_delete_directory(wchar_t *wpath_c) {
+#if defined(GB_SYSTEM_WINDOWS)
+	auto const is_dots_w = [](wchar_t const *str) -> bool {
+		if (!str) {
+			return false;
+		}
+		return wcscmp(str, L".") == 0 || wcscmp(str, L"..") == 0;
+	};
+
+	TEMPORARY_ALLOCATOR_GUARD();
+
+	wchar_t dir_path[MAX_PATH] = {};
+	wchar_t filename[MAX_PATH] = {};
+	wcscpy(dir_path, wpath_c);
+	wcscat(dir_path, L"\\*");
+
+	wcscpy(filename, wpath_c);
+	wcscat(filename, L"\\");
+
+
+	WIN32_FIND_DATAW find_file_data = {};
+	HANDLE hfind = FindFirstFileW(dir_path, &find_file_data);
+	if (hfind == INVALID_HANDLE_VALUE) {
+		return false;
+	}
+	defer (FindClose(hfind));
+
+	wcscpy(dir_path, filename);
+
+	for (;;) {
+		if (FindNextFileW(hfind, &find_file_data)) {
+			if (is_dots_w(find_file_data.cFileName)) {
+				continue;
+			}
+			wcscat(filename, find_file_data.cFileName);
+
+			if (find_file_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+				if (!recursively_delete_directory(filename)) {
+					return false;
+				}
+				RemoveDirectoryW(filename);
+				wcscpy(filename, dir_path);
+			} else {
+				if (find_file_data.dwFileAttributes & FILE_ATTRIBUTE_READONLY) {
+					_wchmod(filename, _S_IWRITE);
+				}
+				if (!DeleteFileW(filename)) {
+					return false;
+				}
+				wcscpy(filename, dir_path);
+			}
+		} else {
+			if (GetLastError() == ERROR_NO_MORE_FILES) {
+				break;
+			}
+			return false;
+		}
+	}
+
+
+	return RemoveDirectoryW(wpath_c);
+#else
+	return false;
+#endif
+}
+
+bool recursively_delete_directory(String const &path) {
+#if defined(GB_SYSTEM_WINDOWS)
+	String16 wpath = string_to_string16(permanent_allocator(), path);
+	wchar_t *wpath_c = alloc_wstring(permanent_allocator(), wpath);
+	return recursively_delete_directory(wpath_c);
+#else
+	return false;
+#endif
+}
+
+int try_clear_cache(void) {
+	bool ok = recursively_delete_directory(str_lit(".odin-cache"));
+	return ok ? 0 : 1;
+}
+
 
 u64 crc64_with_seed(void const *data, isize len, u64 seed) {
 	isize remaining;

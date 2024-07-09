@@ -3057,6 +3057,8 @@ int main(int arg_count, char const **arg_ptr) {
 	} else if (command == "root") {
 		gb_printf("%.*s", LIT(odin_root_dir()));
 		return 0;
+	} else if (command == "clear-cache") {
+		return try_clear_cache();
 	} else {
 		String argv1 = {};
 		if (args.count > 1) {
