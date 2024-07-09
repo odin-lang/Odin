@@ -1,4 +1,4 @@
-gb_internal GB_COMPARE_PROC(cached_file_cmp) {
+gb_internal GB_COMPARE_PROC(string_cmp) {
 	String const &x = *(String *)a;
 	String const &y = *(String *)b;
 	return string_compare(x, y);
@@ -182,7 +182,9 @@ bool try_copy_executable_from_cache(void) {
 
 
 // returns false if different, true if it is the same
-bool try_cached_build(Checker *c) {
+bool try_cached_build(Checker *c, Array<String> const &args) {
+	TEMPORARY_ALLOCATOR_GUARD();
+
 	Parser *p = c->parser;
 
 	auto files = array_make<String>(heap_allocator());
@@ -200,7 +202,7 @@ bool try_cached_build(Checker *c) {
 		array_add(&files, cache->path);
 	}
 
-	array_sort(files, cached_file_cmp);
+	array_sort(files, string_cmp);
 
 	u64 crc = 0;
 	for (String const &path : files) {
@@ -213,28 +215,58 @@ bool try_cached_build(Checker *c) {
 
 	gbString crc_str = gb_string_make_reserve(permanent_allocator(), 16);
 	crc_str = gb_string_append_fmt(crc_str, "%016llx", crc);
-	String cache_dir = concatenate3_strings(permanent_allocator(), base_cache_dir, str_lit("/"), make_string_c(crc_str));
-	String manifest_path = concatenate3_strings(permanent_allocator(), cache_dir, str_lit("/"), str_lit("odin.manifest"));
+	String cache_dir  = concatenate3_strings(permanent_allocator(), base_cache_dir, str_lit("/"), make_string_c(crc_str));
+	String files_path = concatenate3_strings(permanent_allocator(), cache_dir, str_lit("/"), str_lit("files.manifest"));
+	String args_path  = concatenate3_strings(permanent_allocator(), cache_dir, str_lit("/"), str_lit("args.manifest"));
+	String env_path   = concatenate3_strings(permanent_allocator(), cache_dir, str_lit("/"), str_lit("env.manifest"));
 
 	build_context.build_cache_data.cache_dir = cache_dir;
-	build_context.build_cache_data.manifest_path = manifest_path;
+	build_context.build_cache_data.files_path = files_path;
+	build_context.build_cache_data.args_path = args_path;
+	build_context.build_cache_data.env_path = env_path;
+
+	auto envs = array_make<String>(heap_allocator());
+	defer (array_free(&envs));
+	{
+	#if defined(GB_SYSTEM_WINDOWS)
+		wchar_t *strings = GetEnvironmentStringsW();
+		defer (FreeEnvironmentStringsW(strings));
+
+		wchar_t *curr_string = strings;
+		while (curr_string && *curr_string) {
+			String16 wstr = make_string16_c(curr_string);
+			curr_string += wstr.len+1;
+			String str = string16_to_string(temporary_allocator(), wstr);
+			array_add(&envs, str);
+		}
+	#endif
+	}
+	array_sort(envs, string_cmp);
 
 	if (check_if_exists_directory_otherwise_create(cache_dir)) {
-		goto do_write_file;
+		goto write_cache;
 	}
 
-	if (check_if_exists_file_otherwise_create(manifest_path)) {
-		goto do_write_file;
-	} else {
+	if (check_if_exists_file_otherwise_create(files_path)) {
+		goto write_cache;
+	}
+	if (check_if_exists_file_otherwise_create(args_path)) {
+		goto write_cache;
+	}
+	if (check_if_exists_file_otherwise_create(env_path)) {
+		goto write_cache;
+	}
+
+	{
 		// exists already
 		LoadedFile loaded_file = {};
 
 		LoadedFileError file_err = load_file_32(
-			alloc_cstring(temporary_allocator(), manifest_path),
+			alloc_cstring(temporary_allocator(), files_path),
 			&loaded_file,
 			false
 		);
-		if (file_err) {
+		if (file_err > LoadedFile_Empty) {
 			return false;
 		}
 
@@ -250,7 +282,7 @@ bool try_cached_build(Checker *c) {
 			}
 			isize sep = string_index_byte(line, ' ');
 			if (sep < 0) {
-				goto do_write_file;
+				goto write_cache;
 			}
 
 			String timestamp_str = substring(line, 0, sep);
@@ -260,43 +292,131 @@ bool try_cached_build(Checker *c) {
 			path_str = string_trim_whitespace(path_str);
 
 			if (file_count >= files.count) {
-				goto do_write_file;
+				goto write_cache;
 			}
 			if (files[file_count] != path_str) {
-				goto do_write_file;
+				goto write_cache;
 			}
 
 			u64 timestamp = exact_value_to_u64(exact_value_integer_from_string(timestamp_str));
 			gbFileTime last_write_time = gb_file_last_write_time(alloc_cstring(temporary_allocator(), path_str));
 			if (last_write_time != timestamp) {
-				goto do_write_file;
+				goto write_cache;
 			}
 		}
 
 		if (file_count != files.count) {
-			goto do_write_file;
+			goto write_cache;
+		}
+	}
+	{
+		LoadedFile loaded_file = {};
+
+		LoadedFileError file_err = load_file_32(
+			alloc_cstring(temporary_allocator(), args_path),
+			&loaded_file,
+			false
+		);
+		if (file_err > LoadedFile_Empty) {
+			return false;
 		}
 
-		goto try_copy_executable;
+		String data = {cast(u8 *)loaded_file.data, loaded_file.size};
+		String_Iterator it = {data, 0};
+
+		isize args_count = 0;
+
+		for (; it.pos < data.len; args_count++) {
+			String line = string_split_iterator(&it, '\n');
+			line = string_trim_whitespace(line);
+			if (line.len == 0) {
+				break;
+			}
+			if (args_count >= args.count) {
+				goto write_cache;
+			}
+
+			if (line != args[args_count]) {
+				goto write_cache;
+			}
+		}
+	}
+	{
+		LoadedFile loaded_file = {};
+
+		LoadedFileError file_err = load_file_32(
+			alloc_cstring(temporary_allocator(), env_path),
+			&loaded_file,
+			false
+		);
+		if (file_err > LoadedFile_Empty) {
+			return false;
+		}
+
+		String data = {cast(u8 *)loaded_file.data, loaded_file.size};
+		String_Iterator it = {data, 0};
+
+		isize env_count = 0;
+
+		for (; it.pos < data.len; env_count++) {
+			String line = string_split_iterator(&it, '\n');
+			line = string_trim_whitespace(line);
+			if (line.len == 0) {
+				break;
+			}
+			if (env_count >= envs.count) {
+				goto write_cache;
+			}
+
+			if (line != envs[env_count]) {
+				goto write_cache;
+			}
+		}
 	}
 
-do_write_file:;
+	return try_copy_executable_from_cache();
+
+write_cache:;
 	{
-		char const *manifest_path_c = alloc_cstring(temporary_allocator(), manifest_path);
-		gb_file_remove(manifest_path_c);
+		char const *path_c = alloc_cstring(temporary_allocator(), files_path);
+		gb_file_remove(path_c);
 
 		gbFile f = {};
 		defer (gb_file_close(&f));
-		gb_file_open_mode(&f, gbFileMode_Write, manifest_path_c);
+		gb_file_open_mode(&f, gbFileMode_Write, path_c);
 
 		for (String const &path : files) {
 			gbFileTime ft = gb_file_last_write_time(alloc_cstring(temporary_allocator(), path));
 			gb_fprintf(&f, "%llu %.*s\n", cast(unsigned long long)ft, LIT(path));
 		}
-		return false;
+	}
+	{
+		char const *path_c = alloc_cstring(temporary_allocator(), args_path);
+		gb_file_remove(path_c);
+
+		gbFile f = {};
+		defer (gb_file_close(&f));
+		gb_file_open_mode(&f, gbFileMode_Write, path_c);
+
+		for (String const &arg : args) {
+			String targ = string_trim_whitespace(arg);
+			gb_fprintf(&f, "%.*s\n", LIT(targ));
+		}
+	}
+	{
+		char const *path_c = alloc_cstring(temporary_allocator(), env_path);
+		gb_file_remove(path_c);
+
+		gbFile f = {};
+		defer (gb_file_close(&f));
+		gb_file_open_mode(&f, gbFileMode_Write, path_c);
+
+		for (String const &env : envs) {
+			gb_fprintf(&f, "%.*s\n", LIT(env));
+		}
 	}
 
-try_copy_executable:;
-	return try_copy_executable_from_cache();
+
+	return false;
 }
 

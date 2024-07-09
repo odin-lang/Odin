@@ -140,6 +140,8 @@ struct AstFile {
 	// This is effectively a queue but does not require any multi-threading capabilities
 	Array<Ast *> delayed_decls_queues[AstDelayQueue_COUNT];
 
+	std::atomic<isize> seen_load_directive_count;
+
 #define PARSER_MAX_FIX_COUNT 6
 	isize    fix_count;
 	TokenPos fix_prev_pos;
@@ -209,6 +211,8 @@ struct Parser {
 	std::atomic<isize>     file_to_process_count;
 	std::atomic<isize>     total_token_count;
 	std::atomic<isize>     total_line_count;
+
+	std::atomic<isize>     total_seen_load_directive_count;
 
 	// TODO(bill): What should this mutex be per?
 	//  * Parser

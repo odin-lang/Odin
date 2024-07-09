@@ -3271,12 +3271,19 @@ int main(int arg_count, char const **arg_ptr) {
 		print_all_errors();
 	}
 
-	MAIN_TIME_SECTION("type check");
 
 	checker->parser = parser;
 	init_checker(checker);
-	defer (destroy_checker(checker));
+	defer (destroy_checker(checker)); // this is here because of a `goto`
 
+	if (build_context.cached && parser->total_seen_load_directive_count.load() == 0) {
+		MAIN_TIME_SECTION("check cached build (pre-semantic check)");
+		if (try_cached_build(checker, args)) {
+			goto end_of_code_gen;
+		}
+	}
+
+	MAIN_TIME_SECTION("type check");
 	check_parsed_files(checker);
 	check_defines(&build_context, checker);
 	if (any_errors()) {
@@ -3331,7 +3338,7 @@ int main(int arg_count, char const **arg_ptr) {
 
 	if (build_context.cached) {
 		MAIN_TIME_SECTION("check cached build");
-		if (try_cached_build(checker)) {
+		if (try_cached_build(checker, args)) {
 			goto end_of_code_gen;
 		}
 	}

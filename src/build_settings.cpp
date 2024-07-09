@@ -329,7 +329,12 @@ enum SanitizerFlags : u32 {
 struct BuildCacheData {
 	u64 crc;
 	String cache_dir;
-	String manifest_path;
+
+	// manifests
+	String files_path;
+	String args_path;
+	String env_path;
+
 	bool copy_already_done;
 };
 
