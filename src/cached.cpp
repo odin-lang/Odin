@@ -163,6 +163,8 @@ bool try_copy_executable_cache_internal(bool to_cache) {
 
 
 bool try_copy_executable_to_cache(void) {
+	debugf("Cache: try_copy_executable_to_cache\n");
+
 	if (try_copy_executable_cache_internal(true)) {
 		build_context.build_cache_data.copy_already_done = true;
 		return true;
@@ -171,6 +173,8 @@ bool try_copy_executable_to_cache(void) {
 }
 
 bool try_copy_executable_from_cache(void) {
+	debugf("Cache: try_copy_executable_from_cache\n");
+
 	if (try_copy_executable_cache_internal(false)) {
 		build_context.build_cache_data.copy_already_done = true;
 		return true;
@@ -220,10 +224,10 @@ bool try_cached_build(Checker *c, Array<String> const &args) {
 	String args_path  = concatenate3_strings(permanent_allocator(), cache_dir, str_lit("/"), str_lit("args.manifest"));
 	String env_path   = concatenate3_strings(permanent_allocator(), cache_dir, str_lit("/"), str_lit("env.manifest"));
 
-	build_context.build_cache_data.cache_dir = cache_dir;
+	build_context.build_cache_data.cache_dir  = cache_dir;
 	build_context.build_cache_data.files_path = files_path;
-	build_context.build_cache_data.args_path = args_path;
-	build_context.build_cache_data.env_path = env_path;
+	build_context.build_cache_data.args_path  = args_path;
+	build_context.build_cache_data.env_path   = env_path;
 
 	auto envs = array_make<String>(heap_allocator());
 	defer (array_free(&envs));
@@ -384,6 +388,8 @@ write_cache:;
 		char const *path_c = alloc_cstring(temporary_allocator(), files_path);
 		gb_file_remove(path_c);
 
+		debugf("Cache: updating %s\n", path_c);
+
 		gbFile f = {};
 		defer (gb_file_close(&f));
 		gb_file_open_mode(&f, gbFileMode_Write, path_c);
@@ -397,6 +403,8 @@ write_cache:;
 		char const *path_c = alloc_cstring(temporary_allocator(), args_path);
 		gb_file_remove(path_c);
 
+		debugf("Cache: updating %s\n", path_c);
+
 		gbFile f = {};
 		defer (gb_file_close(&f));
 		gb_file_open_mode(&f, gbFileMode_Write, path_c);
@@ -409,6 +417,8 @@ write_cache:;
 	{
 		char const *path_c = alloc_cstring(temporary_allocator(), env_path);
 		gb_file_remove(path_c);
+
+		debugf("Cache: updating %s\n", path_c);
 
 		gbFile f = {};
 		defer (gb_file_close(&f));
