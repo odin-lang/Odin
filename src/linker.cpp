@@ -222,7 +222,21 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 					if (has_asm_extension(lib)) {
 						if (!string_set_update(&asm_files, lib)) {
 							String asm_file = lib;
-							String obj_file = concatenate_strings(permanent_allocator(), asm_file, str_lit(".obj"));
+							String obj_file = {};
+							String temp_dir = temporary_directory(temporary_allocator());
+							if (temp_dir.len != 0) {
+								String filename = filename_without_directory(asm_file);
+
+								gbString str = gb_string_make(heap_allocator(), "");
+								str = gb_string_append_length(str, temp_dir.text, temp_dir.len);
+								str = gb_string_appendc(str, "/");
+								str = gb_string_append_length(str, filename.text, filename.len);
+								str = gb_string_append_fmt(str, "-%p.obj", asm_file.text);
+								obj_file = make_string_c(str);
+							} else {
+								obj_file = concatenate_strings(permanent_allocator(), asm_file, str_lit(".obj"));
+							}
+
 							String obj_format = str_lit("win64");
 						#if defined(GB_ARCH_32_BIT)
 							obj_format = str_lit("win32");
@@ -413,7 +427,22 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 							continue; // already handled
 						}
 						String asm_file = lib;
-						String obj_file = concatenate_strings(permanent_allocator(), asm_file, str_lit(".o"));
+						String obj_file = {};
+
+						String temp_dir = temporary_directory(temporary_allocator());
+						if (temp_dir.len != 0) {
+							String filename = filename_without_directory(asm_file);
+
+							gbString str = gb_string_make(heap_allocator(), "");
+							str = gb_string_append_length(str, temp_dir.text, temp_dir.len);
+							str = gb_string_appendc(str, "/");
+							str = gb_string_append_length(str, filename.text, filename.len);
+							str = gb_string_append_fmt(str, "-%p.o", asm_file.text);
+							obj_file = make_string_c(str);
+						} else {
+							obj_file = concatenate_strings(permanent_allocator(), asm_file, str_lit(".o"));
+						}
+
 						String obj_format;
 					#if defined(GB_ARCH_64_BIT)
 						if (is_osx) {
