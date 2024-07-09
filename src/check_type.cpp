@@ -1120,6 +1120,8 @@ gb_internal void check_bit_field_type(CheckerContext *ctx, Type *bit_field_type,
 			// NOTE(bill): it doesn't matter, and when it does,
 			// that api is absolutely stupid
 			return Endian_Unknown;
+		} else if (type_size_of(type) < 2) {
+			return Endian_Unknown;
 		} else if (is_type_endian_specific(type)) {
 			if (is_type_endian_little(type)) {
 				return Endian_Little;
