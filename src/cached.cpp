@@ -237,6 +237,9 @@ bool try_cached_build(Checker *c, Array<String> const &args) {
 			String16 wstr = make_string16_c(curr_string);
 			curr_string += wstr.len+1;
 			String str = string16_to_string(temporary_allocator(), wstr);
+			if (string_starts_with(str, str_lit("CURR_DATE_TIME="))) {
+				continue;
+			}
 			array_add(&envs, str);
 		}
 	#endif
