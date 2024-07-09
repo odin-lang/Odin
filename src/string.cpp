@@ -88,6 +88,13 @@ gb_internal char *alloc_cstring(gbAllocator a, String s) {
 	return c_str;
 }
 
+gb_internal wchar_t *alloc_wstring(gbAllocator a, String16 s) {
+	wchar_t *c_str = gb_alloc_array(a, wchar_t, s.len+1);
+	gb_memmove(c_str, s.text, s.len*2);
+	c_str[s.len] = '\0';
+	return c_str;
+}
+
 
 gb_internal gb_inline bool str_eq_ignore_case(String const &a, String const &b) {
 	if (a.len == b.len) {

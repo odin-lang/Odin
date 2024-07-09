@@ -787,6 +787,9 @@ gb_internal Ast *ast_basic_directive(AstFile *f, Token token, Token name) {
 	Ast *result = alloc_ast_node(f, Ast_BasicDirective);
 	result->BasicDirective.token = token;
 	result->BasicDirective.name = name;
+	if (string_starts_with(name.string, str_lit("load"))) {
+		f->seen_load_directive_count++;
+	}
 	return result;
 }
 
@@ -6576,6 +6579,13 @@ gb_internal ParseFileError parse_packages(Parser *p, String init_filename) {
 			}
 		}
 	}
+
+	for (AstPackage *pkg : p->packages) {
+		for (AstFile *file : pkg->files) {
+			p->total_seen_load_directive_count += file->seen_load_directive_count;
+		}
+	}
+
 	return ParseFile_None;
 }
 

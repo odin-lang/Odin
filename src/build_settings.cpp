@@ -326,7 +326,17 @@ enum SanitizerFlags : u32 {
 	SanitizerFlag_Thread  = 1u<<2,
 };
 
+struct BuildCacheData {
+	u64 crc;
+	String cache_dir;
 
+	// manifests
+	String files_path;
+	String args_path;
+	String env_path;
+
+	bool copy_already_done;
+};
 
 // This stores the information for the specify architecture of this build
 struct BuildContext {
@@ -427,6 +437,9 @@ struct BuildContext {
 
 	bool   use_separate_modules;
 	bool   module_per_file;
+	bool   cached;
+	BuildCacheData build_cache_data;
+
 	bool   no_threaded_checker;
 
 	bool   show_debug_messages;

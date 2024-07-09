@@ -126,16 +126,17 @@ gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c) {
 			m->gen = gen;
 			map_set(&gen->modules, cast(void *)pkg, m);
 			lb_init_module(m, c);
-			if (module_per_file) {
-				// NOTE(bill): Probably per file is not a good idea, so leave this for later
-				for (AstFile *file : pkg->files) {
-					auto m = gb_alloc_item(permanent_allocator(), lbModule);
-					m->file = file;
-					m->pkg = pkg;
-					m->gen = gen;
-					map_set(&gen->modules, cast(void *)file, m);
-					lb_init_module(m, c);
-				}
+			if (!module_per_file) {
+				continue;
+			}
+			// NOTE(bill): Probably per file is not a good idea, so leave this for later
+			for (AstFile *file : pkg->files) {
+				auto m = gb_alloc_item(permanent_allocator(), lbModule);
+				m->file = file;
+				m->pkg = pkg;
+				m->gen = gen;
+				map_set(&gen->modules, cast(void *)file, m);
+				lb_init_module(m, c);
 			}
 		}
 	}
@@ -143,7 +144,6 @@ gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c) {
 	gen->default_module.gen = gen;
 	map_set(&gen->modules, cast(void *)1, &gen->default_module);
 	lb_init_module(&gen->default_module, c);
-
 
 	for (auto const &entry : gen->modules) {
 		lbModule *m = entry.value;
