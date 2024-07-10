@@ -3138,7 +3138,7 @@ gb_internal Ast *parse_call_expr(AstFile *f, Ast *operand) {
 	Ast *call = ast_call_expr(f, operand, args, open_paren, close_paren, ellipsis);
 
 	Ast *o = unparen_expr(operand);
-	if (o->kind == Ast_SelectorExpr && o->SelectorExpr.token.kind == Token_ArrowRight) {
+	if (o && o->kind == Ast_SelectorExpr && o->SelectorExpr.token.kind == Token_ArrowRight) {
 		return ast_selector_call_expr(f, o->SelectorExpr.token, o, call);
 	}
 
@@ -5257,6 +5257,38 @@ gb_internal Ast *parse_stmt(AstFile *f) {
 		} else if (tag == "include") {
 			syntax_error(token, "#include is not a valid import declaration kind. Did you mean 'import'?");
 			s = ast_bad_stmt(f, token, f->curr_token);
+		} else if (tag == "define") {
+			s = ast_bad_stmt(f, token, f->curr_token);
+
+			if (name.pos.line == f->curr_token.pos.line) {
+				bool call_like = false;
+				Ast *macro_expr = nullptr;
+				Token ident = f->curr_token;
+				if (allow_token(f, Token_Ident) &&
+				    name.pos.line == f->curr_token.pos.line) {
+					if (f->curr_token.kind == Token_OpenParen && f->curr_token.pos.column == ident.pos.column+ident.string.len) {
+						call_like = true;
+						(void)parse_call_expr(f, nullptr);
+					}
+
+					if (name.pos.line == f->curr_token.pos.line && f->curr_token.kind != Token_Semicolon) {
+						macro_expr = parse_expr(f, false);
+					}
+				}
+
+				ERROR_BLOCK();
+				syntax_error(ident, "#define is not a valid declaration, Odin does not have a C-like preprocessor.");
+				if (macro_expr == nullptr || call_like) {
+					error_line("\tNote: Odin does not support macros\n");
+				} else {
+					gbString s = expr_to_string(macro_expr);
+					error_line("\tSuggestion: Did you mean '%.*s :: %s'?\n", LIT(ident.string), s);
+					gb_string_free(s);
+				}
+			} else {
+				syntax_error(token, "#define is not a valid declaration, Odin does not have a C-like preprocessor.");
+			}
+
 		} else {
 			syntax_error(token, "Unknown tag directive used: '%.*s'", LIT(tag));
 			s = ast_bad_stmt(f, token, f->curr_token);
