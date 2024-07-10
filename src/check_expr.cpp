@@ -587,6 +587,16 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 	entity->file = base_entity->file;
 	entity->pkg = base_entity->pkg;
 	entity->flags = 0;
+
+	entity->Procedure.optimization_mode = base_entity->Procedure.optimization_mode;
+
+	if (base_entity->flags & EntityFlag_Cold) {
+		entity->flags |= EntityFlag_Cold;
+	}
+	if (base_entity->flags & EntityFlag_Disabled) {
+		entity->flags |= EntityFlag_Disabled;
+	}
+
 	d->entity = entity;
 
 	AstFile *file = nullptr;
