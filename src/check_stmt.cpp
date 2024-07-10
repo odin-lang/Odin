@@ -2031,6 +2031,12 @@ gb_internal void check_value_decl_stmt(CheckerContext *ctx, Ast *node, u32 mod_f
 			gb_string_free(str);
 			init_type = t_invalid;
 		}
+		if (init_type == t_invalid && entity_count == 1 && (mod_flags & (Stmt_BreakAllowed|Stmt_FallthroughAllowed))) {
+			Entity *e = entities[0];
+			if (e != nullptr && e->token.string == "default") {
+				warning(e->token, "Did you mean 'case:'?");
+			}
+		}
 	}
 
 
