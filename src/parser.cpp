@@ -1507,6 +1507,13 @@ gb_internal bool skip_possible_newline_for_literal(AstFile *f, bool ignore_stric
 		if (curr.pos.line+1 >= next.pos.line) {
 			switch (next.kind) {
 			case Token_OpenBrace:
+				if (build_context.strict_style && !ignore_strict_style) {
+					Token prev = f->prev_token;
+					if (prev.kind == Token_if || prev.kind == Token_else) {
+						syntax_error(next, "With '-strict-style' the attached brace style (1TBS) is enforced");
+					}
+				}
+				break;
 			case Token_else:
 				if (build_context.strict_style && !ignore_strict_style) {
 					syntax_error(next, "With '-strict-style' the attached brace style (1TBS) is enforced");
