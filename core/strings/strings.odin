@@ -531,6 +531,9 @@ Output:
 has_prefix :: proc(s, prefix: string) -> (result: bool) {
 	return len(s) >= len(prefix) && s[0:len(prefix)] == prefix
 }
+
+starts_with :: has_prefix
+
 /*
 Determines if a string `s` ends with a given `suffix`
 
@@ -562,6 +565,9 @@ Output:
 has_suffix :: proc(s, suffix: string) -> (result: bool) {
 	return len(s) >= len(suffix) && s[len(s)-len(suffix):] == suffix
 }
+
+ends_with :: has_suffix
+
 /*
 Joins a slice of strings `a` with a `sep` string
 
