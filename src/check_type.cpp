@@ -3337,6 +3337,10 @@ gb_internal bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, T
 				gbString s = expr_to_string(pt->type);
 				error(e, "^ is used for pointer types, did you mean '&%s'?", s);
 				gb_string_free(s);
+			} else if (is_type_pointer(o.type)) {
+				gbString s = expr_to_string(pt->type);
+				error(e, "^ is used for pointer types, did you mean a dereference: '%s^'?", s);
+				gb_string_free(s);
 			} else {
 				// NOTE(bill): call check_type_expr again to get a consistent error message
 				elem = check_type_expr(&c, pt->type, nullptr);
