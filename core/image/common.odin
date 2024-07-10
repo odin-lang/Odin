@@ -1376,7 +1376,7 @@ expand_grayscale :: proc(img: ^Image, allocator := context.allocator) -> (ok: bo
 /*
 	Helper functions to read and write data from/to a Context, etc.
 */
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 read_data :: proc(z: $C, $T: typeid) -> (res: T, err: compress.General_Error) {
 	if r, e := compress.read_data(z, T); e != .None {
 		return {}, .Stream_Too_Short
@@ -1385,7 +1385,7 @@ read_data :: proc(z: $C, $T: typeid) -> (res: T, err: compress.General_Error) {
 	}
 }
 
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 read_u8 :: proc(z: $C) -> (res: u8, err: compress.General_Error) {
 	if r, e := compress.read_u8(z); e != .None {
 		return {}, .Stream_Too_Short

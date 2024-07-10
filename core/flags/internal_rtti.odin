@@ -13,7 +13,7 @@ import "core:strings"
 @require import "core:time/datetime"
 import "core:unicode/utf8"
 
-@(optimization_mode="size")
+@(optimization_mode="favor_size")
 parse_and_set_pointer_by_base_type :: proc(ptr: rawptr, str: string, type_info: ^runtime.Type_Info) -> bool {
 	bounded_int :: proc(value, min, max: i128) -> (result: i128, ok: bool) {
 		return value, min <= value && value <= max
@@ -202,7 +202,7 @@ parse_and_set_pointer_by_base_type :: proc(ptr: rawptr, str: string, type_info: 
 // especially with files.
 //
 // We want to provide as informative as an error as we can.
-@(optimization_mode="size", disabled=NO_CORE_NAMED_TYPES)
+@(optimization_mode="favor_size", disabled=NO_CORE_NAMED_TYPES)
 parse_and_set_pointer_by_named_type :: proc(ptr: rawptr, str: string, data_type: typeid, arg_tag: string, out_error: ^Error) {
 	// Core types currently supported:
 	//
@@ -320,7 +320,7 @@ parse_and_set_pointer_by_named_type :: proc(ptr: rawptr, str: string, data_type:
 	}
 }
 
-@(optimization_mode="size")
+@(optimization_mode="favor_size")
 set_unbounded_integer_by_type :: proc(ptr: rawptr, value: $T, data_type: typeid) where intrinsics.type_is_integer(T) {
 	switch data_type {
 	case i8:      (^i8)     (ptr)^ = cast(i8)      value
@@ -367,7 +367,7 @@ set_unbounded_integer_by_type :: proc(ptr: rawptr, value: $T, data_type: typeid)
 	}
 }
 
-@(optimization_mode="size")
+@(optimization_mode="favor_size")
 parse_and_set_pointer_by_type :: proc(ptr: rawptr, str: string, type_info: ^runtime.Type_Info, arg_tag: string) -> (error: Error) {
 	#partial switch specific_type_info in type_info.variant {
 	case runtime.Type_Info_Named:

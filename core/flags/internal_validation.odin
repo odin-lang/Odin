@@ -11,7 +11,7 @@ package flags
 @require import "core:strings"
 
 // This proc is used to assert that `T` meets the expectations of the library.
-@(optimization_mode="size", disabled=ODIN_DISABLE_ASSERT)
+@(optimization_mode="favor_size", disabled=ODIN_DISABLE_ASSERT)
 validate_structure :: proc(model_type: $T, style: Parsing_Style, loc := #caller_location) {
 	positionals_assigned_so_far: bit_array.Bit_Array
 	defer bit_array.destroy(&positionals_assigned_so_far)
@@ -162,7 +162,7 @@ validate_structure :: proc(model_type: $T, style: Parsing_Style, loc := #caller_
 
 // Validate that all the required arguments are set and that the set arguments
 // are up to the program's expectations.
-@(optimization_mode="size")
+@(optimization_mode="favor_size")
 validate_arguments :: proc(model: ^$T, parser: ^Parser) -> Error {
 	check_fields: for field, index in reflect.struct_fields_zipped(T) {
 		was_set := bit_array.get(&parser.fields_set, index)

@@ -284,7 +284,7 @@ adjust_request_size_with_err :: proc(size, align: uint) -> (adjusted: uint, err:
 // TLSF utility functions. In most cases these are direct translations of
 // the documentation in the research paper.
 
-@(optimization_mode="speed", require_results)
+@(optimization_mode="favor_size", require_results)
 mapping_insert :: proc(size: uint) -> (fl, sl: i32) {
 	if size < SMALL_BLOCK_SIZE {
 		// Store small blocks in first list.
@@ -297,7 +297,7 @@ mapping_insert :: proc(size: uint) -> (fl, sl: i32) {
 	return
 }
 
-@(optimization_mode="speed", require_results)
+@(optimization_mode="favor_size", require_results)
 mapping_round :: #force_inline proc(size: uint) -> (rounded: uint) {
 	rounded = size
 	if size >= SMALL_BLOCK_SIZE {
@@ -308,7 +308,7 @@ mapping_round :: #force_inline proc(size: uint) -> (rounded: uint) {
 }
 
 // This version rounds up to the next block size (for allocations)
-@(optimization_mode="speed", require_results)
+@(optimization_mode="favor_size", require_results)
 mapping_search :: proc(size: uint) -> (fl, sl: i32) {
 	return mapping_insert(mapping_round(size))
 }
