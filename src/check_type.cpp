@@ -1765,6 +1765,7 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 		if (type_expr == nullptr) {
 			param_value = handle_parameter_value(ctx, nullptr, &type, default_value, true);
 		} else {
+			Ast *original_type_expr = type_expr;
 			if (type_expr->kind == Ast_Ellipsis) {
 				type_expr = type_expr->Ellipsis.expr;
 				is_variadic = true;
@@ -1773,6 +1774,9 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 					error(param, "Invalid AST: Invalid variadic parameter with multiple names");
 					success = false;
 				}
+
+				GB_ASSERT(original_type_expr->kind == Ast_Ellipsis);
+				type_expr = ast_array_type(type_expr->file(), original_type_expr->Ellipsis.token, nullptr, type_expr);
 			}
 			if (type_expr->kind == Ast_TypeidType)  {
 				ast_node(tt, TypeidType, type_expr);
@@ -1796,6 +1800,7 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 				if (operands != nullptr) {
 					ctx->allow_polymorphic_types = true;
 				}
+
 				type = check_type(ctx, type_expr);
 
 				ctx->allow_polymorphic_types = prev;
@@ -1828,12 +1833,12 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 			}
 			type = t_invalid;
 		}
-		if (is_type_empty_union(type)) {
-			gbString str = type_to_string(type);
-			error(param, "Invalid use of an empty union '%s'", str);
-			gb_string_free(str);
-			type = t_invalid;
-		}
+		// if (is_type_empty_union(type)) {
+		// 	gbString str = type_to_string(type);
+		// 	error(param, "Invalid use of an empty union '%s'", str);
+		// 	gb_string_free(str);
+		// 	type = t_invalid;
+		// }
 
 		if (is_type_polymorphic(type)) {
 			switch (param_value.kind) {
@@ -2081,6 +2086,14 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 					param->Variable.type_expr = type_expr;
 				}
 			}
+
+			if (is_variadic && variadic_index == variables.count) {
+				param->flags |= EntityFlag_Ellipsis;
+				if (is_c_vararg) {
+					param->flags |= EntityFlag_CVarArg;
+				}
+			}
+
 			if (p->flags&FieldFlag_no_alias) {
 				param->flags |= EntityFlag_NoAlias;
 			}
@@ -2115,18 +2128,7 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 
 	if (is_variadic) {
 		GB_ASSERT(variadic_index >= 0);
-	}
-
-	if (is_variadic) {
 		GB_ASSERT(params.count > 0);
-		// NOTE(bill): Change last variadic parameter to be a slice
-		// Custom Calling convention for variadic parameters
-		Entity *end = variables[variadic_index];
-		end->type = alloc_type_slice(end->type);
-		end->flags |= EntityFlag_Ellipsis;
-		if (is_c_vararg) {
-			end->flags |= EntityFlag_CVarArg;
-		}
 	}
 
 	isize specialization_count = 0;
