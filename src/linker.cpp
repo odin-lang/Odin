@@ -305,18 +305,13 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 			defer (gb_free(heap_allocator(), windows_sdk_bin_path.text));
 
 			if (!build_context.use_lld) { // msvc
-				String temp_res_path = path_to_string(heap_allocator(), build_context.build_paths[BuildPath_RES]);
-				String temp_rc_path  = path_to_string(heap_allocator(), build_context.build_paths[BuildPath_RC]);
-				defer (gb_free(heap_allocator(), temp_res_path.text));
-				defer (gb_free(heap_allocator(), temp_rc_path.text));
-
-				String res_path = concatenate3_strings(heap_allocator(), str_lit("\""), temp_res_path, str_lit("\""));
-				String rc_path  = concatenate3_strings(heap_allocator(), str_lit("\""), temp_rc_path,  str_lit("\""));
+				String res_path = quote_path(heap_allocator(), build_context.build_paths[BuildPath_RES]);
+				String rc_path  = quote_path(heap_allocator(), build_context.build_paths[BuildPath_RC]);
 				defer (gb_free(heap_allocator(), res_path.text));
 				defer (gb_free(heap_allocator(), rc_path.text));
 
 				if (build_context.has_resource) {
-					if (temp_rc_path == "")  {
+					if (build_context.build_paths[BuildPath_RC].basename == "")  {
 						debugf("Using precompiled resource %.*s\n", LIT(res_path));
 					} else {
 						debugf("Compiling resource %.*s\n", LIT(res_path));

@@ -200,6 +200,17 @@ gb_internal bool try_cached_build(Checker *c, Array<String> const &args) {
 		}
 	}
 
+	// Add Windows resource file to file list, if applicable
+	if (build_context.has_resource) {
+		String res_path = {};
+		if (build_context.build_paths[BuildPath_RC].basename == "")  {
+			res_path = path_to_string(heap_allocator(), build_context.build_paths[BuildPath_RES]);
+		} else {
+			res_path = path_to_string(heap_allocator(), build_context.build_paths[BuildPath_RC]);
+		}
+		array_add(&files, res_path);
+	}
+
 	for (auto const &entry : c->info.load_file_cache) {
 		auto *cache = entry.value;
 		if (!cache || !cache->exists) {
