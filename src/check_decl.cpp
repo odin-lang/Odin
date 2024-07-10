@@ -1030,7 +1030,6 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 
 	switch (e->Procedure.optimization_mode) {
 	case ProcedureOptimizationMode_None:
-	case ProcedureOptimizationMode_Minimal:
 		if (pl->inlining == ProcInlining_inline) {
 			error(e->token, "#force_inline cannot be used in conjunction with the attribute 'optimization_mode' with neither \"none\" nor \"minimal\"");
 		}

@@ -3544,19 +3544,19 @@ gb_internal DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 			String mode = ev.value_string;
 			if (mode == "none") {
 				ac->optimization_mode = ProcedureOptimizationMode_None;
+			} else if (mode == "favor_size") {
+				ac->optimization_mode = ProcedureOptimizationMode_FavorSize;
 			} else if (mode == "minimal") {
-				ac->optimization_mode = ProcedureOptimizationMode_Minimal;
+				error(elem, "Invalid optimization_mode 'minimal' for '%.*s', mode has been removed due to confusion, but 'none' has the same behaviour", LIT(name));
 			} else if (mode == "size") {
-				ac->optimization_mode = ProcedureOptimizationMode_Size;
+				error(elem, "Invalid optimization_mode 'size' for '%.*s', mode has been removed due to confusion, but 'favor_size' has the same behaviour", LIT(name));
 			} else if (mode == "speed") {
-				ac->optimization_mode = ProcedureOptimizationMode_Speed;
+				error(elem, "Invalid optimization_mode 'speed' for '%.*s', mode has been removed due to confusion, but 'favor_size' has the same behaviour", LIT(name));
 			} else {
 				ERROR_BLOCK();
 				error(elem, "Invalid optimization_mode for '%.*s'. Valid modes:", LIT(name));
 				error_line("\tnone\n");
-				error_line("\tminimal\n");
-				error_line("\tsize\n");
-				error_line("\tspeed\n");
+				error_line("\tfavor_size\n");
 			}
 		} else {
 			error(elem, "Expected a string for '%.*s'", LIT(name));

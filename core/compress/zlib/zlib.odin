@@ -120,7 +120,7 @@ Huffman_Table :: struct {
 }
 
 // Implementation starts here
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 z_bit_reverse :: #force_inline proc(n: u16, bits: u8) -> (r: u16) {
 	assert(bits <= 16)
 	// NOTE: Can optimize with llvm.bitreverse.i64 or some bit twiddling
@@ -136,7 +136,7 @@ z_bit_reverse :: #force_inline proc(n: u16, bits: u8) -> (r: u16) {
 }
 
 
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 grow_buffer :: proc(buf: ^[dynamic]u8) -> (err: compress.Error) {
 	/*
 		That we get here at all means that we didn't pass an expected output size,
@@ -154,7 +154,7 @@ grow_buffer :: proc(buf: ^[dynamic]u8) -> (err: compress.Error) {
 	TODO: Make these return compress.Error.
 */
 
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 write_byte :: #force_inline proc(z: ^$C, c: u8) -> (err: io.Error) #no_bounds_check {
 	/*
 		Resize if needed.
@@ -173,7 +173,7 @@ write_byte :: #force_inline proc(z: ^$C, c: u8) -> (err: io.Error) #no_bounds_ch
 	return .None
 }
 
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 repl_byte :: proc(z: ^$C, count: u16, c: u8) -> (err: io.Error) #no_bounds_check {
 	/*
 		TODO(Jeroen): Once we have a magic ring buffer, we can just peek/write into it
@@ -201,7 +201,7 @@ repl_byte :: proc(z: ^$C, count: u16, c: u8) -> (err: io.Error) #no_bounds_check
 	return .None
 }
 
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 repl_bytes :: proc(z: ^$C, count: u16, distance: u16) -> (err: io.Error) {
 	/*
 		TODO(Jeroen): Once we have a magic ring buffer, we can just peek/write into it
@@ -234,7 +234,7 @@ allocate_huffman_table :: proc(allocator := context.allocator) -> (z: ^Huffman_T
 	return new(Huffman_Table, allocator), nil
 }
 
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 build_huffman :: proc(z: ^Huffman_Table, code_lengths: []u8) -> (err: Error) {
 	sizes:     [HUFFMAN_MAX_BITS+1]int
 	next_code: [HUFFMAN_MAX_BITS+1]int
@@ -293,7 +293,7 @@ build_huffman :: proc(z: ^Huffman_Table, code_lengths: []u8) -> (err: Error) {
 	return nil
 }
 
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 decode_huffman_slowpath :: proc(z: ^$C, t: ^Huffman_Table) -> (r: u16, err: Error) #no_bounds_check {
 	code := u16(compress.peek_bits_lsb(z,16))
 
@@ -324,7 +324,7 @@ decode_huffman_slowpath :: proc(z: ^$C, t: ^Huffman_Table) -> (r: u16, err: Erro
 	return r, nil
 }
 
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 decode_huffman :: proc(z: ^$C, t: ^Huffman_Table) -> (r: u16, err: Error) #no_bounds_check {
 	if z.num_bits < 16 {
 		if z.num_bits > 63 {
@@ -344,7 +344,7 @@ decode_huffman :: proc(z: ^$C, t: ^Huffman_Table) -> (r: u16, err: Error) #no_bo
 	return decode_huffman_slowpath(z, t)
 }
 
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 parse_huffman_block :: proc(z: ^$C, z_repeat, z_offset: ^Huffman_Table) -> (err: Error) #no_bounds_check {
 	#no_bounds_check for {
 		value, e := decode_huffman(z, z_repeat)
@@ -413,7 +413,7 @@ parse_huffman_block :: proc(z: ^$C, z_repeat, z_offset: ^Huffman_Table) -> (err:
 	}
 }
 
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 inflate_from_context :: proc(using ctx: ^compress.Context_Memory_Input, raw := false, expected_output_size := -1, allocator := context.allocator) -> (err: Error) #no_bounds_check {
 	/*
 		ctx.output must be a bytes.Buffer for now. We'll add a separate implementation that writes to a stream.
@@ -486,7 +486,7 @@ inflate_from_context :: proc(using ctx: ^compress.Context_Memory_Input, raw := f
 
 // TODO: Check alignment of reserve/resize.
 
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 inflate_raw :: proc(z: ^$C, expected_output_size := -1, allocator := context.allocator) -> (err: Error) #no_bounds_check {
 	context.allocator = allocator
 	expected_output_size := expected_output_size

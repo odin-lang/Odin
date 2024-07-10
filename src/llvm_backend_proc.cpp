@@ -163,16 +163,10 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 
 	switch (entity->Procedure.optimization_mode) {
 	case ProcedureOptimizationMode_None:
-		break;
-	case ProcedureOptimizationMode_Minimal:
 		lb_add_attribute_to_proc(m, p->value, "optnone");
 		lb_add_attribute_to_proc(m, p->value, "noinline");
 		break;
-	case ProcedureOptimizationMode_Size:
-		lb_add_attribute_to_proc(m, p->value, "optsize");
-		break;
-	case ProcedureOptimizationMode_Speed:
-		// TODO(bill): handle this correctly
+	case ProcedureOptimizationMode_FavorSize:
 		lb_add_attribute_to_proc(m, p->value, "optsize");
 		break;
 	}

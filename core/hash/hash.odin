@@ -3,7 +3,7 @@ package hash
 import "core:mem"
 import "base:intrinsics"
 
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 adler32 :: proc "contextless" (data: []byte, seed := u32(1)) -> u32 #no_bounds_check {
 
 	ADLER_CONST :: 65521
@@ -46,7 +46,7 @@ adler32 :: proc "contextless" (data: []byte, seed := u32(1)) -> u32 #no_bounds_c
 	return (u32(b) << 16) | u32(a)
 }
 
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 djb2 :: proc "contextless" (data: []byte, seed := u32(5381)) -> u32 {
 	hash: u32 = seed
 	for b in data {
@@ -73,7 +73,7 @@ djbx33a :: proc "contextless" (data: []byte, seed := u32(5381)) -> (result: [16]
 }
 
 // If you have a choice, prefer fnv32a
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 fnv32_no_a :: proc "contextless" (data: []byte, seed := u32(0x811c9dc5)) -> u32 {
 	h: u32 = seed
 	for b in data {
@@ -86,7 +86,7 @@ fnv32 :: fnv32_no_a // NOTE(bill): Not a fan of these aliases but seems necessar
 fnv64 :: fnv64_no_a // NOTE(bill): Not a fan of these aliases but seems necessary
 
 // If you have a choice, prefer fnv64a
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 fnv64_no_a :: proc "contextless" (data: []byte, seed := u64(0xcbf29ce484222325)) -> u64 {
 	h: u64 = seed
 	for b in data {
@@ -94,7 +94,7 @@ fnv64_no_a :: proc "contextless" (data: []byte, seed := u64(0xcbf29ce484222325))
 	}
 	return h
 }
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 fnv32a :: proc "contextless" (data: []byte, seed := u32(0x811c9dc5)) -> u32 {
 	h: u32 = seed
 	for b in data {
@@ -103,7 +103,7 @@ fnv32a :: proc "contextless" (data: []byte, seed := u32(0x811c9dc5)) -> u32 {
 	return h
 }
 
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 fnv64a :: proc "contextless" (data: []byte, seed := u64(0xcbf29ce484222325)) -> u64 {
 	h: u64 = seed
 	for b in data {
@@ -112,7 +112,7 @@ fnv64a :: proc "contextless" (data: []byte, seed := u64(0xcbf29ce484222325)) -> 
 	return h
 }
 
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 jenkins :: proc "contextless" (data: []byte, seed := u32(0)) -> u32 {
 	hash: u32 = seed
 	for b in data {
@@ -126,7 +126,7 @@ jenkins :: proc "contextless" (data: []byte, seed := u32(0)) -> u32 {
 	return hash
 }
 
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 murmur32 :: proc "contextless" (data: []byte, seed := u32(0)) -> u32 {
 	c1_32: u32 : 0xcc9e2d51
 	c2_32: u32 : 0x1b873593
@@ -177,7 +177,7 @@ murmur32 :: proc "contextless" (data: []byte, seed := u32(0)) -> u32 {
 }
 
 // See https://github.com/aappleby/smhasher/blob/master/src/MurmurHash2.cpp#L96
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 murmur64a :: proc "contextless" (data: []byte, seed := u64(0x9747b28c)) -> u64 {
 	m :: 0xc6a4a7935bd1e995
 	r :: 47
@@ -218,7 +218,7 @@ murmur64a :: proc "contextless" (data: []byte, seed := u64(0x9747b28c)) -> u64 {
 }
 
 // See https://github.com/aappleby/smhasher/blob/master/src/MurmurHash2.cpp#L140
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 murmur64b :: proc "contextless" (data: []byte, seed := u64(0x9747b28c)) -> u64 {
 	m :: 0x5bd1e995
 	r :: 24
@@ -286,7 +286,7 @@ murmur64b :: proc "contextless" (data: []byte, seed := u64(0x9747b28c)) -> u64 {
 	return u64(h1)<<32 | u64(h2)
 }
 
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 sdbm :: proc "contextless" (data: []byte, seed := u32(0)) -> u32 {
 	hash: u32 = seed
 	for b in data {

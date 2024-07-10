@@ -12,7 +12,7 @@ import "core:reflect"
 
 // Push a positional argument onto a data struct, checking for specified
 // positionals first before adding it to a fallback field.
-@(optimization_mode="size")
+@(optimization_mode="favor_size")
 push_positional :: #force_no_inline proc (model: ^$T, parser: ^Parser, arg: string) -> (error: Error) {
 	if bit_array.get(&parser.filled_pos, parser.filled_pos.max_index) {
 		// The max index is set, which means we're out of space.
@@ -74,7 +74,7 @@ register_field :: proc(parser: ^Parser, field: reflect.Struct_Field, index: int)
 }
 
 // Set a `-flag` argument, Odin-style.
-@(optimization_mode="size")
+@(optimization_mode="favor_size")
 set_odin_flag :: proc(model: ^$T, parser: ^Parser, name: string) -> (error: Error) {
 	// We make a special case for help requests.
 	switch name {
@@ -100,7 +100,7 @@ set_odin_flag :: proc(model: ^$T, parser: ^Parser, name: string) -> (error: Erro
 }
 
 // Set a `-flag` argument, UNIX-style.
-@(optimization_mode="size")
+@(optimization_mode="favor_size")
 set_unix_flag :: proc(model: ^$T, parser: ^Parser, name: string) -> (future_args: int, error: Error) {
 	// We make a special case for help requests.
 	switch name {
@@ -137,7 +137,7 @@ set_unix_flag :: proc(model: ^$T, parser: ^Parser, name: string) -> (future_args
 }
 
 // Set a `-flag:option` argument.
-@(optimization_mode="size")
+@(optimization_mode="favor_size")
 set_option :: proc(model: ^$T, parser: ^Parser, name, option: string) -> (error: Error) {
 	field, index := get_field_by_name(model, name) or_return
 
@@ -176,7 +176,7 @@ set_option :: proc(model: ^$T, parser: ^Parser, name, option: string) -> (error:
 }
 
 // Set a `-map:key=value` argument.
-@(optimization_mode="size")
+@(optimization_mode="favor_size")
 set_key_value :: proc(model: ^$T, parser: ^Parser, name, key, value: string) -> (error: Error) {
 	field, index := get_field_by_name(model, name) or_return
 

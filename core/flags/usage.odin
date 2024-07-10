@@ -17,7 +17,7 @@ Inputs:
 - program: The name of the program, usually the first argument to `os.args`.
 - style: The argument parsing style, required to show flags in the proper style.
 */
-@(optimization_mode="size")
+@(optimization_mode="favor_size")
 write_usage :: proc(out: io.Writer, data_type: typeid, program: string = "", style: Parsing_Style = .Odin) {
 	// All flags get their tags parsed so they can be reasoned about later.
 	Flag :: struct {

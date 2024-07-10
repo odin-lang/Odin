@@ -122,7 +122,7 @@ load_from_bytes :: proc(data: []byte, options := Options{}, allocator := context
 	return img, err
 }
 
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.allocator) -> (img: ^Image, err: Error) {
 	context.allocator = allocator
 	options := options
