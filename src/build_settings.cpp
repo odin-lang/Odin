@@ -1805,10 +1805,11 @@ gb_internal bool init_build_paths(String init_filename) {
 	#if defined(GB_SYSTEM_WINDOWS)
 	if (bc->metrics.os == TargetOs_windows) {
 		if (bc->resource_filepath.len > 0) {
-			bc->build_paths[BuildPath_RC]      = path_from_string(ha, bc->resource_filepath);
-			bc->build_paths[BuildPath_RES]     = path_from_string(ha, bc->resource_filepath);
-			bc->build_paths[BuildPath_RC].ext  = copy_string(ha, STR_LIT("rc"));
-			bc->build_paths[BuildPath_RES].ext = copy_string(ha, STR_LIT("res"));
+			bc->build_paths[BuildPath_RES] = path_from_string(ha, bc->resource_filepath);
+			if (!string_ends_with(bc->resource_filepath, str_lit(".res"))) {
+				bc->build_paths[BuildPath_RC]      = path_from_string(ha, bc->resource_filepath);
+				bc->build_paths[BuildPath_RC].ext  = copy_string(ha, STR_LIT("rc"));
+			}
 		}
 
 		if (bc->pdb_filepath.len > 0) {

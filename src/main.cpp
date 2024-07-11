@@ -1452,8 +1452,9 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							String path = value.value_string;
 							path = string_trim_whitespace(path);
 							if (is_build_flag_path_valid(path)) {
-								if(!string_ends_with(path, str_lit(".rc"))) {
-									gb_printf_err("Invalid -resource path %.*s, missing .rc\n", LIT(path));
+								bool is_resource = string_ends_with(path, str_lit(".rc")) || string_ends_with(path, str_lit(".res"));
+								if(!is_resource) {
+									gb_printf_err("Invalid -resource path %.*s, missing .rc or .res file\n", LIT(path));
 									bad_flags = true;
 									break;
 								} else if (!gb_file_exists((const char *)path.text)) {
@@ -2552,6 +2553,7 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 		print_usage_line(2, "[Windows only]");
 		print_usage_line(2, "Defines the resource file for the executable.");
 		print_usage_line(2, "Example: -resource:path/to/file.rc");
+		print_usage_line(2, "or:      -resource:path/to/file.res for a precompiled one.");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-pdb-name:<filepath>");
