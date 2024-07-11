@@ -48,6 +48,7 @@ push_positional :: #force_no_inline proc (model: ^$T, parser: ^Parser, arg: stri
 	args_tag, _ := reflect.struct_tag_lookup(field.tag, TAG_ARGS)
 	field_name := get_field_name(field)
 	error = parse_and_set_pointer_by_type(ptr, arg, field.type, args_tag)
+
 	#partial switch &specific_error in error {
 	case Parse_Error:
 		specific_error.message = fmt.tprintf("Unable to set positional #%i (%s) of type %v to `%s`.%s%s",
@@ -160,6 +161,7 @@ set_option :: proc(model: ^$T, parser: ^Parser, name, option: string) -> (error:
 	ptr := cast(rawptr)(cast(uintptr)model + field.offset)
 	args_tag := reflect.struct_tag_get(field.tag, TAG_ARGS)
 	error = parse_and_set_pointer_by_type(ptr, option, field.type, args_tag)
+
 	#partial switch &specific_error in error {
 	case Parse_Error:
 		specific_error.message = fmt.tprintf("Unable to set `%s` of type %v to `%s`.%s%s",

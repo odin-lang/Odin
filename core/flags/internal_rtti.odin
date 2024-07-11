@@ -486,16 +486,12 @@ get_field_name :: proc(field: reflect.Struct_Field) -> string {
 	return name
 }
 
-get_field_pos :: proc(field: reflect.Struct_Field) -> (int, bool) {
-	if args_tag, ok := reflect.struct_tag_lookup(field.tag, TAG_ARGS); ok {
-		if pos_subtag, pos_ok := get_struct_subtag(args_tag, SUBTAG_POS); pos_ok {
-			if value, parse_ok := strconv.parse_u64_of_base(pos_subtag, 10); parse_ok {
-				return int(value), true
-			}
-		}
-	}
-
-	return 0, false
+get_field_pos :: proc(field: reflect.Struct_Field) -> (pos: int, ok: bool) {
+	args_tag := reflect.struct_tag_lookup(field.tag, TAG_ARGS) or_return
+	pos_subtag := get_struct_subtag(args_tag, SUBTAG_POS) or_return
+	value := strconv.parse_u64_of_base(pos_subtag, 10) or_return
+	pos, ok = int(value), true
+	return
 }
 
 // Get a struct field by its field name or `name` subtag.
