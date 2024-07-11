@@ -75,7 +75,7 @@ reset_bytes :: proc(bytes: []byte, gen := context.random_generator) {
 	runtime.random_generator_reset_bytes(gen, bytes)
 }
 
-query_info :: proc(gen: context.random_generator) -> Generator_Query_Info {
+query_info :: proc(gen := context.random_generator) -> Generator_Query_Info {
 	return runtime.random_generator_query_info(gen)
 }
 
