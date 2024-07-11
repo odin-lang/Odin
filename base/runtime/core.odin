@@ -299,6 +299,8 @@ when ODIN_OS == .Windows {
 		Thread_Detach  = 3,
 	}
 	dll_forward_reason: DLL_Forward_Reason
+
+	dll_instance: rawptr
 }
 
 // IMPORTANT NOTE(bill): Must be in this order (as the compiler relies upon it)
