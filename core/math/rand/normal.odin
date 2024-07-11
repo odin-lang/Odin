@@ -18,7 +18,7 @@ import "core:math"
 //    https://www.jstatsoft.org/article/view/v005i08 [web page]
 //
 @(require_results)
-norm_float64 :: proc() -> f64 {
+norm_float64 :: proc(gen := context.random_generator) -> f64 {
 	rn :: 3.442619855899
 
 	@(static, rodata)
@@ -116,7 +116,7 @@ norm_float64 :: proc() -> f64 {
 	}
 
 	for {
-		j := i32(uint32())
+		j := i32(uint32(gen))
 		i := j & 0x7f
 		x := f64(j) * f64(wn[i])
 		if u32(abs(j)) < kn[i] {
@@ -126,15 +126,15 @@ norm_float64 :: proc() -> f64 {
 
 		if i == 0 {
 			for {
-				x = -math.ln(float64()) * (1.0/ rn)
-				y := -math.ln(float64())
+				x = -math.ln(float64(gen)) * (1.0/ rn)
+				y := -math.ln(float64(gen))
 				if y+y >= x*x {
 					break
 				}
 			}
 			return j > 0 ? rn + x : -rn - x
 		}
-		if fn[i]+f32(float64())*(fn[i-1]-fn[i]) < f32(math.exp(-0.5*x*x)) {
+		if fn[i]+f32(float64(gen))*(fn[i-1]-fn[i]) < f32(math.exp(-0.5*x*x)) {
 			return x
 		}
 	}

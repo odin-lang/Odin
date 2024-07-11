@@ -16,7 +16,7 @@ import "core:math"
 //    https://www.jstatsoft.org/article/view/v005i08 [web page]
 //
 @(require_results)
-exp_float64 :: proc() -> f64 {
+exp_float64 :: proc(gen := context.random_generator) -> f64 {
 	re :: 7.69711747013104972
 
 	@(static, rodata)
@@ -199,16 +199,16 @@ exp_float64 :: proc() -> f64 {
 	}
 
 	for {
-		j := uint32()
+		j := uint32(gen)
 		i := j & 0xFF
 		x := f64(j) * f64(we[i])
 		if j < ke[i] {
 			return x
 		}
 		if i == 0 {
-			return re - math.ln(float64())
+			return re - math.ln(float64(gen))
 		}
-		if fe[i]+f32(float64())*(fe[i-1]-fe[i]) < f32(math.exp(-x)) {
+		if fe[i]+f32(float64(gen))*(fe[i-1]-fe[i]) < f32(math.exp(-x)) {
 			return x
 		}
 	}
