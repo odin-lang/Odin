@@ -1163,11 +1163,12 @@ gb_internal lbValue lb_addr_load(lbProcedure *p, lbAddr const &addr) {
 			r = lb_addr_load(p, dst);
 			r.value = LLVMBuildShl(p->builder, r.value, shift_amount, "");
 		} else if ((addr.bitfield.bit_offset % 8) == 0) {
+			do_mask = 8*dst_byte_size != addr.bitfield.bit_size;
+
 			lbValue copy_size = byte_size;
 			lbValue src_offset = lb_emit_conv(p, src, t_u8_ptr);
 			src_offset = lb_emit_ptr_offset(p, src_offset, byte_offset);
 			if (addr.bitfield.bit_offset + 8*dst_byte_size <= total_bitfield_bit_size) {
-				do_mask = true;
 				copy_size = lb_const_int(p->module, t_uintptr, dst_byte_size);
 			}
 			lb_mem_copy_non_overlapping(p, dst.addr, src_offset, copy_size, false);
