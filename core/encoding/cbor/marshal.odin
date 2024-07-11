@@ -54,7 +54,7 @@ marshal_into_bytes :: proc(v: any, flags := ENCODE_SMALL, allocator := context.a
 
 	defer if err != nil { strings.builder_destroy(&b) }
 
-	if err = marshal_into_builder(&b, v, flags, temp_allocator, loc=loc); err != nil {
+	if err = marshal_into_builder(&b, v, flags, temp_allocator); err != nil {
 		return
 	}
 
@@ -63,20 +63,20 @@ marshal_into_bytes :: proc(v: any, flags := ENCODE_SMALL, allocator := context.a
 
 // Marshals the given value into a CBOR byte stream written to the given builder.
 // See docs on the `marshal_into` proc group for more info.
-marshal_into_builder :: proc(b: ^strings.Builder, v: any, flags := ENCODE_SMALL, temp_allocator := context.temp_allocator, loc := #caller_location) -> Marshal_Error {
-	return marshal_into_writer(strings.to_writer(b), v, flags, temp_allocator, loc=loc)
+marshal_into_builder :: proc(b: ^strings.Builder, v: any, flags := ENCODE_SMALL, temp_allocator := context.temp_allocator) -> Marshal_Error {
+	return marshal_into_writer(strings.to_writer(b), v, flags, temp_allocator)
 }
 
 // Marshals the given value into a CBOR byte stream written to the given writer.
 // See docs on the `marshal_into` proc group for more info.
-marshal_into_writer :: proc(w: io.Writer, v: any, flags := ENCODE_SMALL, temp_allocator := context.temp_allocator, loc := #caller_location) -> Marshal_Error {
+marshal_into_writer :: proc(w: io.Writer, v: any, flags := ENCODE_SMALL, temp_allocator := context.temp_allocator) -> Marshal_Error {
 	encoder := Encoder{flags, w, temp_allocator}
-	return marshal_into_encoder(encoder, v, loc=loc)
+	return marshal_into_encoder(encoder, v)
 }
 
 // Marshals the given value into a CBOR byte stream written to the given encoder.
 // See docs on the `marshal_into` proc group for more info.
-marshal_into_encoder :: proc(e: Encoder, v: any, loc :=  #caller_location) -> (err: Marshal_Error) {
+marshal_into_encoder :: proc(e: Encoder, v: any) -> (err: Marshal_Error) {
 	e := e
 
 	if e.temp_allocator.procedure == nil {
@@ -85,7 +85,7 @@ marshal_into_encoder :: proc(e: Encoder, v: any, loc :=  #caller_location) -> (e
 
 	if .Self_Described_CBOR in e.flags {
 		err_conv(_encode_u64(e, TAG_SELF_DESCRIBED_CBOR, .Tag)) or_return
-		e.flags &~= { .Self_Described_CBOR }
+		e.flags -= { .Self_Described_CBOR }
 	}
 
 	if v == nil {
@@ -97,11 +97,14 @@ marshal_into_encoder :: proc(e: Encoder, v: any, loc :=  #caller_location) -> (e
 		return impl->marshal(e, v)
 	}
 
-	ti := runtime.type_info_base(type_info_of(v.id))
-	a := any{v.data, ti.id}
+	ti := runtime.type_info_core(type_info_of(v.id))
+	return _marshal_into_encoder(e, v, ti)
+}
 
+_marshal_into_encoder :: proc(e: Encoder, v: any, ti: ^runtime.Type_Info) -> (err: Marshal_Error) {
+	a := any{v.data, ti.id}
 	#partial switch info in ti.variant {
-	case runtime.Type_Info_Named:
+	case runtime.Type_Info_Named, runtime.Type_Info_Enum, runtime.Type_Info_Bit_Field:
 		unreachable()
 
 	case runtime.Type_Info_Pointer:
@@ -223,18 +226,38 @@ marshal_into_encoder :: proc(e: Encoder, v: any, loc :=  #caller_location) -> (e
 		}
 
 		err_conv(_encode_u64(e, u64(info.count), .Array)) or_return
+
+		if impl, ok := _tag_implementations_type[info.elem.id]; ok {
+			for i in 0..<info.count {
+				data := uintptr(v.data) + uintptr(i*info.elem_size)
+				impl->marshal(e, any{rawptr(data), info.elem.id}) or_return
+			}
+			return
+		}
+
+		elem_ti := runtime.type_info_core(type_info_of(info.elem.id))
 		for i in 0..<info.count {
 			data := uintptr(v.data) + uintptr(i*info.elem_size)
-			marshal_into(e, any{rawptr(data), info.elem.id}) or_return
+			_marshal_into_encoder(e, any{rawptr(data), info.elem.id}, elem_ti) or_return
 		}
 		return
 
 	case runtime.Type_Info_Enumerated_Array:
 		// index := runtime.type_info_base(info.index).variant.(runtime.Type_Info_Enum)
 		err_conv(_encode_u64(e, u64(info.count), .Array)) or_return
+
+		if impl, ok := _tag_implementations_type[info.elem.id]; ok {
+			for i in 0..<info.count {
+				data := uintptr(v.data) + uintptr(i*info.elem_size)
+				impl->marshal(e, any{rawptr(data), info.elem.id}) or_return
+			}
+			return
+		}
+
+		elem_ti := runtime.type_info_core(type_info_of(info.elem.id))
 		for i in 0..<info.count {
 			data := uintptr(v.data) + uintptr(i*info.elem_size)
-			marshal_into(e, any{rawptr(data), info.elem.id}) or_return
+			_marshal_into_encoder(e, any{rawptr(data), info.elem.id}, elem_ti) or_return
 		}
 		return
 		
@@ -246,9 +269,19 @@ marshal_into_encoder :: proc(e: Encoder, v: any, loc :=  #caller_location) -> (e
 
 		array := (^mem.Raw_Dynamic_Array)(v.data)
 		err_conv(_encode_u64(e, u64(array.len), .Array)) or_return
+
+		if impl, ok := _tag_implementations_type[info.elem.id]; ok {
+			for i in 0..<array.len {
+				data := uintptr(array.data) + uintptr(i*info.elem_size)
+				impl->marshal(e, any{rawptr(data), info.elem.id}) or_return
+			}
+			return
+		}
+
+		elem_ti := runtime.type_info_core(type_info_of(info.elem.id))
 		for i in 0..<array.len {
 			data := uintptr(array.data) + uintptr(i*info.elem_size)
-			marshal_into(e, any{rawptr(data), info.elem.id}) or_return
+			_marshal_into_encoder(e, any{rawptr(data), info.elem.id}, elem_ti) or_return
 		}
 		return
 
@@ -260,9 +293,19 @@ marshal_into_encoder :: proc(e: Encoder, v: any, loc :=  #caller_location) -> (e
 
 		array := (^mem.Raw_Slice)(v.data)
 		err_conv(_encode_u64(e, u64(array.len), .Array)) or_return
+
+		if impl, ok := _tag_implementations_type[info.elem.id]; ok {
+			for i in 0..<array.len {
+				data := uintptr(array.data) + uintptr(i*info.elem_size)
+				impl->marshal(e, any{rawptr(data), info.elem.id}) or_return
+			}
+			return
+		}
+
+		elem_ti := runtime.type_info_core(type_info_of(info.elem.id))
 		for i in 0..<array.len {
 			data := uintptr(array.data) + uintptr(i*info.elem_size)
-			marshal_into(e, any{rawptr(data), info.elem.id}) or_return
+			_marshal_into_encoder(e, any{rawptr(data), info.elem.id}, elem_ti) or_return
 		}
 		return
 
@@ -541,9 +584,6 @@ marshal_into_encoder :: proc(e: Encoder, v: any, loc :=  #caller_location) -> (e
 		}
 
 		return marshal_into(e, any{v.data, vti.id})
-
-	case runtime.Type_Info_Enum:
-		return marshal_into(e, any{v.data, info.base.id})
 
 	case runtime.Type_Info_Bit_Set:
 		// Store bit_set as big endian just like the protocol.

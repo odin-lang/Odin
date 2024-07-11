@@ -40,7 +40,7 @@ XXH_PRIME32_3 :: 0xC2B2AE3D     /*!< 0b11000010101100101010111000111101 */
 XXH_PRIME32_4 :: 0x27D4EB2F     /*!< 0b00100111110101001110101100101111 */
 XXH_PRIME32_5 :: 0x165667B1     /*!< 0b00010110010101100110011110110001 */
 
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 XXH32_round :: #force_inline proc(seed, input: XXH32_hash) -> (res: XXH32_hash) {
 	seed := seed
 
@@ -53,7 +53,7 @@ XXH32_round :: #force_inline proc(seed, input: XXH32_hash) -> (res: XXH32_hash) 
 /*
 	Mix all bits
 */
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 XXH32_avalanche :: #force_inline proc(h32: u32) -> (res: u32) {
 	h32 := h32
 
@@ -65,7 +65,7 @@ XXH32_avalanche :: #force_inline proc(h32: u32) -> (res: u32) {
 	return h32
 }
 
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 XXH32_finalize :: #force_inline proc(h32: u32, buf: []u8, alignment: Alignment) -> (res: u32) {
 	process_1 :: #force_inline proc(h32: u32, buf: []u8) -> (h32_res: u32, buf_res: []u8) {
 		#no_bounds_check b := u32(buf[0])
@@ -143,7 +143,7 @@ XXH32_finalize :: #force_inline proc(h32: u32, buf: []u8, alignment: Alignment) 
 	unreachable()
 }
 
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 XXH32_endian_align :: #force_inline proc(input: []u8, seed := XXH32_DEFAULT_SEED, alignment: Alignment) -> (res: XXH32_hash) {
 	buf := input
 	length := len(input)

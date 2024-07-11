@@ -118,15 +118,17 @@ gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c) {
 	map_init(&gen->anonymous_proc_lits, 1024);
 
 	if (USE_SEPARATE_MODULES) {
+		bool module_per_file = build_context.module_per_file && build_context.optimization_level <= 0;
 		for (auto const &entry : gen->info->packages) {
 			AstPackage *pkg = entry.value;
-		#if 1
 			auto m = gb_alloc_item(permanent_allocator(), lbModule);
 			m->pkg = pkg;
 			m->gen = gen;
 			map_set(&gen->modules, cast(void *)pkg, m);
 			lb_init_module(m, c);
-		#else
+			if (!module_per_file) {
+				continue;
+			}
 			// NOTE(bill): Probably per file is not a good idea, so leave this for later
 			for (AstFile *file : pkg->files) {
 				auto m = gb_alloc_item(permanent_allocator(), lbModule);
@@ -136,14 +138,12 @@ gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c) {
 				map_set(&gen->modules, cast(void *)file, m);
 				lb_init_module(m, c);
 			}
-		#endif
 		}
 	}
 
 	gen->default_module.gen = gen;
 	map_set(&gen->modules, cast(void *)1, &gen->default_module);
 	lb_init_module(&gen->default_module, c);
-
 
 	for (auto const &entry : gen->modules) {
 		lbModule *m = entry.value;
@@ -1011,7 +1011,7 @@ gb_internal void lb_emit_store(lbProcedure *p, lbValue ptr, lbValue value) {
 		return;
 	}
 
-	Type *a = type_deref(ptr.type);
+	Type *a = type_deref(ptr.type, true);
 	if (LLVMIsNull(value.value)) {
 		LLVMTypeRef src_t = llvm_addr_type(p->module, ptr);
 		if (is_type_proc(a)) {
@@ -1109,9 +1109,13 @@ gb_internal lbValue lb_emit_load(lbProcedure *p, lbValue value) {
 	Type *t = type_deref(value.type);
 	LLVMValueRef v = LLVMBuildLoad2(p->builder, lb_type(p->module, t), value.value, "");
 
-	u64 is_packed = lb_get_metadata_custom_u64(p->module, value.value, ODIN_METADATA_IS_PACKED);
-	if (is_packed != 0) {
-		LLVMSetAlignment(v, 1);
+	// If it is not an instruction it isn't a GEP, so we don't need to track alignment in the metadata,
+	// which is not possible anyway (only LLVM instructions can have metadata).
+	if (LLVMIsAInstruction(value.value)) {
+		u64 is_packed = lb_get_metadata_custom_u64(p->module, value.value, ODIN_METADATA_IS_PACKED);
+		if (is_packed != 0) {
+			LLVMSetAlignment(v, 1);
+		}
 	}
 
 	return lbValue{v, t};
@@ -1159,11 +1163,12 @@ gb_internal lbValue lb_addr_load(lbProcedure *p, lbAddr const &addr) {
 			r = lb_addr_load(p, dst);
 			r.value = LLVMBuildShl(p->builder, r.value, shift_amount, "");
 		} else if ((addr.bitfield.bit_offset % 8) == 0) {
+			do_mask = 8*dst_byte_size != addr.bitfield.bit_size;
+
 			lbValue copy_size = byte_size;
 			lbValue src_offset = lb_emit_conv(p, src, t_u8_ptr);
 			src_offset = lb_emit_ptr_offset(p, src_offset, byte_offset);
-			if (addr.bitfield.bit_offset + dst_byte_size <= total_bitfield_bit_size) {
-				do_mask = true;
+			if (addr.bitfield.bit_offset + 8*dst_byte_size <= total_bitfield_bit_size) {
 				copy_size = lb_const_int(p->module, t_uintptr, dst_byte_size);
 			}
 			lb_mem_copy_non_overlapping(p, dst.addr, src_offset, copy_size, false);
@@ -2519,6 +2524,12 @@ gb_internal void lb_add_proc_attribute_at_index(lbProcedure *p, isize index, cha
 gb_internal void lb_add_attribute_to_proc(lbModule *m, LLVMValueRef proc_value, char const *name, u64 value=0) {
 	LLVMAddAttributeAtIndex(proc_value, LLVMAttributeIndex_FunctionIndex, lb_create_enum_attribute(m->ctx, name, value));
 }
+
+gb_internal bool lb_proc_has_attribute(lbModule *m, LLVMValueRef proc_value, char const *name) {
+	LLVMAttributeRef ref = LLVMGetEnumAttributeAtIndex(proc_value, LLVMAttributeIndex_FunctionIndex, LLVMGetEnumAttributeKindForName(name, gb_strlen(name)));
+	return ref != nullptr;
+}
+
 gb_internal void lb_add_attribute_to_proc_with_string(lbModule *m, LLVMValueRef proc_value, String const &name, String const &value) {
 	LLVMAttributeRef attr = lb_create_string_attribute(m->ctx, name, value);
 	LLVMAddAttributeAtIndex(proc_value, LLVMAttributeIndex_FunctionIndex, attr);

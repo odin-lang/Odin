@@ -22,6 +22,11 @@ when !ODIN_TEST && !ODIN_NO_ENTRY_POINT {
 		@(link_name="_start", linkage="strong", require, export)
 		_start :: proc "c" () {
 			context = default_context()
+
+			when ODIN_OS == .WASI {
+				_wasi_setup_args()
+			}
+
 			#force_no_inline _startup_runtime()
 			intrinsics.__entry_point()
 		}

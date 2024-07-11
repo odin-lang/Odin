@@ -192,7 +192,7 @@ StringCopyToOdinString :: proc(
 	max := StringGetMaximumSizeForEncoding(length, StringEncoding(StringBuiltInEncodings.UTF8))
 
 	buf, err := make([]byte, max, allocator)
-	if err != nil do return
+	if err != nil { return }
 
 	raw_str := runtime.Raw_String {
 		data = raw_data(buf),

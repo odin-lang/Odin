@@ -8,7 +8,7 @@ API_VERSION_1_2 :: (1<<22) | (2<<12) | (0)
 API_VERSION_1_3 :: (1<<22) | (3<<12) | (0)
 
 MAKE_VERSION :: proc(major, minor, patch: u32) -> u32 {
-    return (major<<22) | (minor<<12) | (patch)
+	return (major<<22) | (minor<<12) | (patch)
 }
 
 // Base types

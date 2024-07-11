@@ -111,7 +111,7 @@ read_entire_file_from_handle :: proc(fd: Handle, allocator := context.allocator,
 	length: i64
 	err: Errno
 	if length, err = file_size(fd); err != 0 {
-	    return nil, false
+		return nil, false
 	}
 
 	if length <= 0 {
@@ -120,7 +120,7 @@ read_entire_file_from_handle :: proc(fd: Handle, allocator := context.allocator,
 
 	data = make([]byte, int(length), allocator, loc)
 	if data == nil {
-	    return nil, false
+		return nil, false
 	}
 
 	bytes_read, read_err := read_full(fd, data)

@@ -110,8 +110,8 @@ utf8_to_utf16 :: proc(s: string, allocator := context.temp_allocator) -> []u16 {
 	return text[:n]
 }
 utf8_to_wstring :: proc(s: string, allocator := context.temp_allocator) -> wstring {
-	if res := utf8_to_utf16(s, allocator); res != nil {
-		return &res[0]
+	if res := utf8_to_utf16(s, allocator); len(res) > 0 {
+		return raw_data(res)
 	}
 	return nil
 }

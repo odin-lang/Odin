@@ -69,7 +69,7 @@ close :: proc "contextless" (fd: Fd) -> (Errno) {
 stat :: proc "contextless" (filename: cstring, stat: ^Stat) -> (Errno) {
 	when size_of(int) == 8 {
 		when ODIN_ARCH == .arm64 {
-			ret := syscall(SYS_fstatat, AT_FDCWD, cast(rawptr) filename, stat)
+			ret := syscall(SYS_fstatat, AT_FDCWD, cast(rawptr) filename, stat, 0)
 			return Errno(-ret)
 		} else {
 			ret := syscall(SYS_stat, cast(rawptr) filename, stat)
@@ -201,9 +201,24 @@ brk :: proc "contextless" (addr: uintptr) -> (Errno) {
 }
 
 /*
+	Returns from signal handlers on some archs.
+*/
+rt_sigreturn :: proc "c" () -> ! {
+	intrinsics.syscall(uintptr(SYS_rt_sigreturn))
+	unreachable()
+}
+
+/*
 	Alter an action taken by a process.
 */
-rt_sigaction :: proc "contextless" (sig: Signal, sigaction: ^Sig_Action, old_sigaction: ^Sig_Action) -> Errno {
+rt_sigaction :: proc "contextless" (sig: Signal, sigaction: ^Sig_Action($T), old_sigaction: ^Sig_Action) -> Errno {
+	// NOTE(jason): It appears that the restorer is required for i386 and amd64
+	when ODIN_ARCH == .i386 || ODIN_ARCH == .amd64 {
+		sigaction.flags += {.RESTORER}
+	}
+	if sigaction != nil && sigaction.restorer == nil && .RESTORER in sigaction.flags {
+		sigaction.restorer = rt_sigreturn
+	}
 	ret := syscall(SYS_rt_sigaction, sig, sigaction, old_sigaction, size_of(Sig_Set))
 	return Errno(-ret)
 }
@@ -1123,7 +1138,7 @@ ftruncate :: proc "contextless" (fd: Fd, length: i64) -> (Errno) {
 		ret := syscall(SYS_ftruncate64, fd, compat64_arg_pair(length))
 		return Errno(-ret)
 	} else {
-		ret := syscall(SYS_truncate, fd, compat64_arg_pair(length))
+		ret := syscall(SYS_ftruncate, fd, compat64_arg_pair(length))
 		return Errno(-ret)
 	}
 }
@@ -1231,7 +1246,7 @@ creat :: proc "contextless" (name: cstring, mode: Mode) -> (Fd, Errno) {
 */
 link :: proc "contextless" (target: cstring, linkpath: cstring) -> (Errno) {
 	when ODIN_ARCH == .arm64 {
-		ret := syscall(SYS_linkat, AT_FDCWD, cast(rawptr) target, AT_FDCWD, cast(rawptr) linkpath)
+		ret := syscall(SYS_linkat, AT_FDCWD, cast(rawptr) target, AT_FDCWD, cast(rawptr) linkpath, 0)
 		return Errno(-ret)
 	} else {
 		ret := syscall(SYS_link, cast(rawptr) target, cast(rawptr) linkpath)
@@ -1261,7 +1276,7 @@ unlink :: proc "contextless" (name: cstring) -> (Errno) {
 */
 symlink :: proc "contextless" (target: cstring, linkpath: cstring) -> (Errno) {
 	when ODIN_ARCH == .arm64 {
-		ret := syscall(SYS_symlinkat, AT_FDCWD, cast(rawptr) target, cast(rawptr) linkpath)
+		ret := syscall(SYS_symlinkat, cast(rawptr) target, AT_FDCWD, cast(rawptr) linkpath)
 		return Errno(-ret)
 	} else {
 		ret := syscall(SYS_symlink, cast(rawptr) target, cast(rawptr) linkpath)
@@ -1291,7 +1306,7 @@ readlink :: proc "contextless" (name: cstring, buf: []u8) -> (int, Errno) {
 */
 chmod :: proc "contextless" (name: cstring, mode: Mode) -> (Errno) {
 	when ODIN_ARCH == .arm64 {
-		ret := syscall(SYS_fchmodat, cast(rawptr) name, transmute(u32) mode, 0)
+		ret := syscall(SYS_fchmodat, AT_FDCWD, cast(rawptr) name, transmute(u32) mode)
 		return Errno(-ret)
 	} else {
 		ret := syscall(SYS_chmod, cast(rawptr) name, transmute(u32) mode)
@@ -1718,9 +1733,9 @@ getpgrp :: proc "contextless" () -> (Pid, Errno) {
 	Create a session and set the process group ID.
 	Available since Linux 2.0.
 */
-setsid :: proc "contextless" () -> (Errno) {
+setsid :: proc "contextless" () -> (Pid, Errno) {
 	ret := syscall(SYS_setsid)
-	return Errno(-ret)
+	return errno_unwrap(ret, Pid)
 }
 
 /*
@@ -2226,8 +2241,7 @@ futex_wake :: proc "contextless" (futex: ^Futex, op: Futex_Wake_Type, flags: Fut
 	Returns the total number of waiters that have been woken up plus the number of waiters requeued.
 */
 futex_cmp_requeue :: proc "contextless" (futex: ^Futex, op: Futex_Cmp_Requeue_Type, flags: Futex_Flags, requeue_threshold: u32,
-	requeue_max: i32, requeue_futex: ^Futex, val: i32) -> (int, Errno)
-{
+	requeue_max: i32, requeue_futex: ^Futex, val: i32) -> (int, Errno) {
 	futex_flags := cast(u32) op + transmute(u32) flags
 	ret := syscall(SYS_futex, futex, futex_flags, requeue_threshold, requeue_max, requeue_futex, val)
 	return errno_unwrap(ret, int)
@@ -2238,8 +2252,7 @@ futex_cmp_requeue :: proc "contextless" (futex: ^Futex, op: Futex_Cmp_Requeue_Ty
 	Returns the total number of waiters that have been woken up.
 */
 futex_requeue :: proc "contextless" (futex: ^Futex, op: Futex_Requeue_Type, flags: Futex_Flags, requeue_threshold: u32,
-	requeue_max: i32, requeue_futex: ^Futex) -> (int, Errno)
-{
+	requeue_max: i32, requeue_futex: ^Futex) -> (int, Errno) {
 	futex_flags := cast(u32) op + transmute(u32) flags
 	ret := syscall(SYS_futex, futex, futex_flags, requeue_threshold, requeue_max, requeue_futex)
 	return errno_unwrap(ret, int)
@@ -2250,8 +2263,7 @@ futex_requeue :: proc "contextless" (futex: ^Futex, op: Futex_Requeue_Type, flag
 	purpose is to allow implementing conditional values sync primitive, it seems like.
 */
 futex_wake_op :: proc "contextless" (futex: ^Futex, op: Futex_Wake_Op_Type, flags: Futex_Flags, wakeup: i32,
-	dst_wakeup, dst: ^Futex, futex_op: u32) -> (int, Errno)
-{
+	dst_wakeup, dst: ^Futex, futex_op: u32) -> (int, Errno) {
 	futex_flags := cast(u32) op + transmute(u32) flags
 	ret := syscall(SYS_futex, futex, futex_flags, wakeup, dst_wakeup, dst, futex_op)
 	return errno_unwrap(ret, int)
@@ -2261,8 +2273,7 @@ futex_wake_op :: proc "contextless" (futex: ^Futex, op: Futex_Wake_Op_Type, flag
 	Same as wait, but mask specifies bits that must be equal for the mutex to wake up.
 */
 futex_wait_bitset :: proc "contextless" (futex: ^Futex, op: Futex_Wait_Bitset_Type, flags: Futex_Flags, val: u32,
-	timeout: ^Time_Spec, mask: u32) -> (int, Errno)
-{
+	timeout: ^Time_Spec, mask: u32) -> (int, Errno) {
 	futex_flags := cast(u32) op + transmute(u32) flags
 	ret := syscall(SYS_futex, futex, futex_flags, val, timeout, 0, mask)
 	return errno_unwrap(ret, int)
@@ -2271,8 +2282,7 @@ futex_wait_bitset :: proc "contextless" (futex: ^Futex, op: Futex_Wait_Bitset_Ty
 /*
 	Wake up on bitset.
 */
-futex_wake_bitset :: proc "contextless" (futex: ^Futex, op: Futex_Wake_Bitset_Type, flags: Futex_Flags, n_wakeup: u32, mask: u32) -> (int, Errno)
-{
+futex_wake_bitset :: proc "contextless" (futex: ^Futex, op: Futex_Wake_Bitset_Type, flags: Futex_Flags, n_wakeup: u32, mask: u32) -> (int, Errno) {
 	futex_flags := cast(u32) op + transmute(u32) flags
 	ret := syscall(SYS_futex, futex, futex_flags, n_wakeup, 0, 0, mask)
 	return errno_unwrap(ret, int)
@@ -2280,7 +2290,7 @@ futex_wake_bitset :: proc "contextless" (futex: ^Futex, op: Futex_Wake_Bitset_Ty
 
 // TODO(flysand): Priority inheritance (PI) futicees
 
-futex :: proc {
+futex :: proc{
 	futex_wait,
 	futex_wake,
 	futex_cmp_requeue,
@@ -2476,8 +2486,8 @@ tgkill :: proc "contextless" (tgid, tid: Pid, sig: Signal) -> (Errno) {
 	Wait on process, process group or pid file descriptor.
 	Available since Linux 2.6.10.
 */
-waitid :: proc "contextless" (id_type: Id_Type, id: Id, sig_info: ^Sig_Info, options: Wait_Options) -> (Errno) {
-	ret := syscall(SYS_waitid, id_type, id, sig_info, transmute(i32) options)
+waitid :: proc "contextless" (id_type: Id_Type, id: Id, sig_info: ^Sig_Info, options: Wait_Options, rusage: ^RUsage) -> (Errno) {
+	ret := syscall(SYS_waitid, id_type, id, sig_info, transmute(i32) options, rusage)
 	return Errno(-ret)
 }
 
@@ -2504,7 +2514,7 @@ waitid :: proc "contextless" (id_type: Id_Type, id: Id, sig_info: ^Sig_Info, opt
 	Available since Linux 2.6.16.
 */
 openat :: proc "contextless" (fd: Fd, name: cstring, flags: Open_Flags, mode: Mode = {}) -> (Fd, Errno) {
-	ret := syscall(SYS_openat, fd, AT_FDCWD, transmute(uintptr) name, transmute(u32) mode)
+	ret := syscall(SYS_openat, fd, transmute(uintptr) name, transmute(u32) flags, transmute(u32) mode)
 	return errno_unwrap(ret, Fd)
 }
 
@@ -2583,8 +2593,8 @@ linkat :: proc "contextless" (target_dirfd: Fd, oldpath: cstring, link_dirfd: Fd
 	Create a symbolic link at specified dirfd.
 	Available since Linux 2.6.16.
 */
-symlinkat :: proc "contextless" (dirfd: Fd, target: cstring, linkpath: cstring) -> (Errno) {
-	ret := syscall(SYS_symlinkat, dirfd, cast(rawptr) target, cast(rawptr) linkpath)
+symlinkat :: proc "contextless" (target: cstring, dirfd: Fd, linkpath: cstring) -> (Errno) {
+	ret := syscall(SYS_symlinkat, cast(rawptr) target, dirfd, cast(rawptr) linkpath)
 	return Errno(-ret)
 }
 
@@ -2619,13 +2629,13 @@ faccessat :: proc "contextless" (dirfd: Fd, name: cstring, mode: Mode = F_OK) ->
 	Wait for events on a file descriptor.
 	Available since Linux 2.6.16.
 */
-ppoll :: proc "contextless" (fds: []Poll_Fd, timeout: ^Time_Spec, sigmask: ^Sig_Set) -> (Errno) {
+ppoll :: proc "contextless" (fds: []Poll_Fd, timeout: ^Time_Spec, sigmask: ^Sig_Set) -> (i32, Errno) {
 	when size_of(int) == 8 {
 		ret := syscall(SYS_ppoll, raw_data(fds), len(fds), timeout, sigmask, size_of(Sig_Set))
-		return Errno(-ret)
+		return errno_unwrap(ret, i32)
 	} else {
 		ret := syscall(SYS_ppoll_time64, raw_data(fds), len(fds), timeout, sigmask, size_of(Sig_Set))
-		return Errno(-ret)
+		return errno_unwrap(ret, i32)
 	}
 }
 
@@ -2808,8 +2818,8 @@ getrandom :: proc "contextless" (buf: []u8, flags: Get_Random_Flags) -> (int, Er
 	Execute program relative to a directory file descriptor.
 	Available since Linux 3.19.
 */
-execveat :: proc "contextless" (dirfd: Fd, name: cstring, argv: [^]cstring, envp: [^]cstring) -> (Errno) {
-	ret := syscall(SYS_execveat, dirfd, cast(rawptr) name, cast(rawptr) argv, cast(rawptr) envp)
+execveat :: proc "contextless" (dirfd: Fd, name: cstring, argv: [^]cstring, envp: [^]cstring, flags: FD_Flags = {}) -> (Errno) {
+	ret := syscall(SYS_execveat, dirfd, cast(rawptr) name, cast(rawptr) argv, cast(rawptr) envp, transmute(i32) flags)
 	return Errno(-ret)
 }
 

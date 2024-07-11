@@ -513,6 +513,7 @@ Package_Decl :: struct {
 Import_Decl :: struct {
 	using node: Decl,
 	docs:       ^Comment_Group,
+	attributes:  [dynamic]^Attribute, // dynamic as parsing will add to them lazily
 	is_using:    bool,
 	import_tok:  tokenizer.Token,
 	name:        tokenizer.Token,

@@ -19,6 +19,11 @@ import "core:os"
 @(private="file", thread_local)
 local_test_index: libc.sig_atomic_t
 
+// Windows does not appear to have a SIGTRAP, so this is defined here, instead
+// of in the libc package, just so there's no confusion about it being
+// available there.
+SIGTRAP :: 5
+
 @(private="file")
 stop_runner_callback :: proc "c" (sig: libc.int) {
 	prev := intrinsics.atomic_add(&stop_runner_flag, 1)
@@ -110,6 +115,10 @@ _setup_signal_handler :: proc() {
 	// For tests:
 	// Catch asserts and panics.
 	libc.signal(libc.SIGILL, stop_test_callback)
+	when ODIN_OS == .Linux || ODIN_OS == .FreeBSD || ODIN_OS == .Haiku || ODIN_OS == .OpenBSD || ODIN_OS == .NetBSD || ODIN_OS == .Darwin {
+		// Catch panics on Darwin and unhandled calls to `debug_trap`.
+		libc.signal(SIGTRAP, stop_test_callback)
+	}
 	// Catch arithmetic errors.
 	libc.signal(libc.SIGFPE, stop_test_callback)
 	// Catch segmentation faults (illegal memory access).
@@ -141,6 +150,7 @@ _should_stop_test :: proc() -> (test_index: int, reason: Stop_Reason, ok: bool) 
 		case libc.SIGFPE: reason = .Arithmetic_Error
 		case libc.SIGILL: reason = .Illegal_Instruction
 		case libc.SIGSEGV: reason = .Segmentation_Fault
+		case      SIGTRAP: reason = .Unhandled_Trap
 		}
 		ok = true
 	}

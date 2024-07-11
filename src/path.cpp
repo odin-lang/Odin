@@ -152,6 +152,13 @@ gb_internal String path_to_string(gbAllocator a, Path path) {
 	return res;
 }
 
+gb_internal String quote_path(gbAllocator a, Path path) {
+	String temp   = path_to_string(a, path);
+	String quoted = concatenate3_strings(a, str_lit("\""), temp, str_lit("\""));
+	gb_free(a, temp.text);
+	return quoted;
+}
+
 // NOTE(Jeroen): Naively turns a Path into a string, then normalizes it using `path_to_full_path`.
 gb_internal String path_to_full_path(gbAllocator a, Path path) {
 	String temp = path_to_string(heap_allocator(), path);

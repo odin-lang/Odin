@@ -10,8 +10,9 @@ when ODIN_BUILD_MODE == .Dynamic {
 	DllMain :: proc "system" (hinstDLL: rawptr, fdwReason: u32, lpReserved: rawptr) -> b32 {
 		context = default_context()
 
-		// Populate Windows DLL-specific global
+		// Populate Windows DLL-specific globals
 		dll_forward_reason = DLL_Forward_Reason(fdwReason)
+		dll_instance       = hinstDLL
 
 		switch dll_forward_reason {
 		case .Process_Attach:

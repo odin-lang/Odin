@@ -134,11 +134,6 @@ enum lbFunctionPassManagerKind {
 	lbFunctionPassManager_default,
 	lbFunctionPassManager_default_without_memcpy,
 	lbFunctionPassManager_none,
-	lbFunctionPassManager_minimal,
-	lbFunctionPassManager_size,
-	lbFunctionPassManager_speed,
-	lbFunctionPassManager_aggressive,
-
 	lbFunctionPassManager_COUNT
 };
 
@@ -217,6 +212,8 @@ struct lbGenerator : LinkerData {
 
 	std::atomic<u32> global_array_index;
 	std::atomic<u32> global_generated_index;
+
+	isize used_module_count;
 
 	lbProcedure *startup_runtime;
 	lbProcedure *cleanup_runtime;

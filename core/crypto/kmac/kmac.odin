@@ -61,7 +61,7 @@ init_256 :: proc(ctx: ^Context, key, domain_sep: []byte) {
 update :: proc(ctx: ^Context, data: []byte) {
 	assert(ctx.is_initialized)
 
-	shake.write(transmute(^shake.Context)(ctx), data)
+	shake.write((^shake.Context)(ctx), data)
 }
 
 // final finalizes the Context, writes the tag to dst, and calls reset
@@ -75,7 +75,7 @@ final :: proc(ctx: ^Context, dst: []byte) {
 		panic("crypto/kmac: invalid KMAC tag_size, too short")
 	}
 
-	_sha3.final_cshake(transmute(^_sha3.Context)(ctx), dst)
+	_sha3.final_cshake((^_sha3.Context)(ctx), dst)
 }
 
 // clone clones the Context other into ctx.
@@ -84,7 +84,7 @@ clone :: proc(ctx, other: ^Context) {
 		return
 	}
 
-	shake.clone(transmute(^shake.Context)(ctx), transmute(^shake.Context)(other))
+	shake.clone((^shake.Context)(ctx), (^shake.Context)(other))
 }
 
 // reset sanitizes the Context.  The Context must be re-initialized to
@@ -94,7 +94,7 @@ reset :: proc(ctx: ^Context) {
 		return
 	}
 
-	shake.reset(transmute(^shake.Context)(ctx))
+	shake.reset((^shake.Context)(ctx))
 }
 
 @(private)
@@ -107,7 +107,7 @@ _init_kmac :: proc(ctx: ^Context, key, s: []byte, sec_strength: int) {
 		panic("crypto/kmac: invalid KMAC key, too short")
 	}
 
-	ctx_ := transmute(^_sha3.Context)(ctx)
+	ctx_ := (^_sha3.Context)(ctx)
 	_sha3.init_cshake(ctx_, N_KMAC, s, sec_strength)
 	_sha3.bytepad(ctx_, [][]byte{key}, _sha3.rate_cshake(sec_strength))
 }

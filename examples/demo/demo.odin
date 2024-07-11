@@ -1140,6 +1140,7 @@ prefix_table := [?]string{
 
 print_mutex := b64(false)
 
+@(disabled=!thread.IS_SUPPORTED)
 threading_example :: proc() {
 	fmt.println("\n# threading_example")
 
@@ -2275,7 +2276,7 @@ arbitrary_precision_mathematics :: proc() {
 		}
 		fmt.printf(as)
 		if print_extra_info {
-		 	fmt.printf(" (base: %v, bits: %v, digits: %v)", base, cb, a.used)
+			fmt.printf(" (base: %v, bits: %v, digits: %v)", base, cb, a.used)
 		}
 		if newline {
 			fmt.println()
@@ -2550,6 +2551,50 @@ matrix_type :: proc() {
 	// 	matrix_minor(m)
 }
 
+bit_field_type :: proc() {
+	fmt.println("\n# bit_field type")
+	// A `bit_field` is a record type in Odin that is akin to a bit-packed struct.
+	// IMPORTNAT NOTE: `bit_field` is NOT equivalent to `bit_set` as it has different sematics and use cases.
+
+	{
+		// `bit_field` fields are accessed by using a dot:
+		Foo :: bit_field u16 {          // backing type must be an integer or array of integers
+		    x: i32     | 3,             // signed integers will be signed extended on use
+		    y: u16     | 2 + 3,         // general expressions
+		    z: My_Enum | SOME_CONSTANT, // ability to define the bit-width elsewhere
+		    w: bool    | 2 when SOME_CONSTANT > 10 else 1,
+		}
+
+		v := Foo{}
+		v.x = 3 // truncates the value to fit into 3 bits
+		fmt.println(v.x) // accessing will convert `v.x` to an `i32` and do an appropriate sign extension
+
+
+		My_Enum :: enum u8 {A, B, C, D}
+		SOME_CONSTANT :: 7
+	}
+
+	{
+		// A `bit_field` is different from a struct in that you must specify the backing type.
+		// This backing type must be an integer or a fixed-length array of integers.
+		// This is useful if there needs to be a specific alignment or access pattern for the record.
+
+		Bar :: bit_field u32   {}
+		Baz :: bit_field [4]u8 {}
+	}
+
+	// IMPORTANT NOTES:
+	//  * If _all_ of the fields in a bit_field are 1-bit in size and they are all booleans,
+	//    please consider using a `bit_set` instead.
+	//  * Odin's `bit_field` and C's bit-fields might not be compatible
+	//     * Odin's `bit_field`s have a well defined layout (Least-Significant-Bit)
+	//     * C's bit-fields on `struct`s are undefined and are not portable across targets and compilers
+	//  * A `bit_field`'s field type can only be one of the following:
+	//     * Integer
+	//     * Boolean
+	//     * Enum
+}
+
 main :: proc() {
 	/*
 		For More Odin Examples - https://github.com/odin-lang/examples
@@ -2595,5 +2640,6 @@ main :: proc() {
 		or_break_and_or_continue_operators()
 		arbitrary_precision_mathematics()
 		matrix_type()
+		bit_field_type()
 	}
 }

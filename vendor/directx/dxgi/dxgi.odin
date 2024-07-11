@@ -29,14 +29,9 @@ SIZE                :: win32.SIZE
 WCHAR               :: win32.WCHAR
 DWORD               :: win32.DWORD
 
-IUnknown :: struct {
-	using _iunknown_vtable: ^IUnknown_VTable,
-}
-IUnknown_VTable :: struct {
-	QueryInterface: proc "system" (this: ^IUnknown, riid: ^IID, ppvObject: ^rawptr) -> HRESULT,
-	AddRef:         proc "system" (this: ^IUnknown) -> ULONG,
-	Release:        proc "system" (this: ^IUnknown) -> ULONG,
-}
+IUnknown :: win32.IUnknown
+IUnknown_VTable :: win32.IUnknown_VTable
+LPUNKNOWN :: win32.LPUNKNOWN
 
 @(default_calling_convention="system")
 foreign dxgi {

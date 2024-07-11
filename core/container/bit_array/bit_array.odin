@@ -210,8 +210,11 @@ set :: proc(ba: ^Bit_Array, #any_int index: uint, set_to: bool = true, allocator
 
 	ba.max_index = max(idx, ba.max_index)
 
-	if set_to{ ba.bits[leg_index] |= 1 << uint(bit_index) }
-	else { ba.bits[leg_index] &= ~(1 << uint(bit_index)) }
+	if set_to {
+		ba.bits[leg_index] |=  1 << uint(bit_index)
+	} else {
+		ba.bits[leg_index] &~= 1 << uint(bit_index)
+	}
 
 	return true
 }
@@ -253,7 +256,7 @@ Inputs:
 - index: Which bit in the array
 */
 unsafe_unset :: proc(b: ^Bit_Array, bit: int) #no_bounds_check {
-	b.bits[bit >> INDEX_SHIFT] &= ~(1 << uint(bit & INDEX_MASK))
+	b.bits[bit >> INDEX_SHIFT] &~= 1 << uint(bit & INDEX_MASK)
 }
 /*
 A helper function to create a Bit Array with optional bias, in case your smallest index is non-zero (including negative).

@@ -65,7 +65,7 @@ copy :: proc{copy_slice, copy_from_string}
 // with the old value, and reducing the length of the dynamic array by 1.
 //
 // Note: This is an O(1) operation.
-// Note: If you the elements to remain in their order, use `ordered_remove`.
+// Note: If you want the elements to remain in their order, use `ordered_remove`.
 // Note: If the index is out of bounds, this procedure will panic.
 @builtin
 unordered_remove :: proc(array: ^$D/[dynamic]$T, index: int, loc := #caller_location) #no_bounds_check {
@@ -79,7 +79,7 @@ unordered_remove :: proc(array: ^$D/[dynamic]$T, index: int, loc := #caller_loca
 // `ordered_remove` removed the element at the specified `index` whilst keeping the order of the other elements.
 //
 // Note: This is an O(N) operation.
-// Note: If you the elements do not have to remain in their order, prefer `unordered_remove`.
+// Note: If the elements do not have to remain in their order, prefer `unordered_remove`.
 // Note: If the index is out of bounds, this procedure will panic.
 @builtin
 ordered_remove :: proc(array: ^$D/[dynamic]$T, index: int, loc := #caller_location) #no_bounds_check {
@@ -163,21 +163,43 @@ pop_front_safe :: proc "contextless" (array: ^$T/[dynamic]$E) -> (res: E, ok: bo
 
 // `clear` will set the length of a passed dynamic array or map to `0`
 @builtin
-clear :: proc{clear_dynamic_array, clear_map}
+clear :: proc{
+	clear_dynamic_array,
+	clear_map,
+
+	clear_soa_dynamic_array,
+}
 
 // `reserve` will try to reserve memory of a passed dynamic array or map to the requested element count (setting the `cap`).
 @builtin
-reserve :: proc{reserve_dynamic_array, reserve_map}
+reserve :: proc{
+	reserve_dynamic_array,
+	reserve_map,
+
+	reserve_soa,
+}
 
 @builtin
-non_zero_reserve :: proc{non_zero_reserve_dynamic_array}
+non_zero_reserve :: proc{
+	non_zero_reserve_dynamic_array,
+
+	non_zero_reserve_soa,
+}
 
 // `resize` will try to resize memory of a passed dynamic array to the requested element count (setting the `len`, and possibly `cap`).
 @builtin
-resize :: proc{resize_dynamic_array}
+resize :: proc{
+	resize_dynamic_array,
+
+	resize_soa,
+}
 
 @builtin
-non_zero_resize :: proc{non_zero_resize_dynamic_array}
+non_zero_resize :: proc{
+	non_zero_resize_dynamic_array,
+
+	non_zero_resize_soa,
+}
 
 // Shrinks the capacity of a dynamic array or map down to the current length, or the given capacity.
 @builtin
@@ -268,7 +290,7 @@ new_clone :: proc(data: $T, allocator := context.allocator, loc := #caller_locat
 	return
 }
 
-DEFAULT_RESERVE_CAPACITY :: 16
+DEFAULT_DYNAMIC_ARRAY_CAPACITY :: 8
 
 @(require_results)
 make_aligned :: proc($T: typeid/[]$E, #any_int len: int, alignment: int, allocator := context.allocator, loc := #caller_location) -> (T, Allocator_Error) #optional_allocator_error {
@@ -295,7 +317,7 @@ make_slice :: proc($T: typeid/[]$E, #any_int len: int, allocator := context.allo
 // Note: Prefer using the procedure group `make`.
 @(builtin, require_results)
 make_dynamic_array :: proc($T: typeid/[dynamic]$E, allocator := context.allocator, loc := #caller_location) -> (T, Allocator_Error) #optional_allocator_error {
-	return make_dynamic_array_len_cap(T, 0, DEFAULT_RESERVE_CAPACITY, allocator, loc)
+	return make_dynamic_array_len_cap(T, 0, 0, allocator, loc)
 }
 // `make_dynamic_array_len` allocates and initializes a dynamic array. Like `new`, the first argument is a type, not a value.
 // Unlike `new`, `make`'s return value is the same as the type of its argument, not a pointer to it.
@@ -364,6 +386,11 @@ make :: proc{
 	make_dynamic_array_len_cap,
 	make_map,
 	make_multi_pointer,
+
+	make_soa_slice,
+	make_soa_dynamic_array,
+	make_soa_dynamic_array_len,
+	make_soa_dynamic_array_len_cap,
 }
 
 
@@ -423,7 +450,8 @@ _append_elem :: #force_inline proc(array: ^$T/[dynamic]$E, arg: E, should_zero: 
 		return 1, nil
 	} else {
 		if cap(array) < len(array)+1 {
-			cap := 2 * cap(array) + max(8, 1)
+			// Same behavior as _append_elems but there's only one arg, so we always just add DEFAULT_DYNAMIC_ARRAY_CAPACITY.
+			cap := 2 * cap(array) + DEFAULT_DYNAMIC_ARRAY_CAPACITY
 
 			// do not 'or_return' here as it could be a partial success
 			if should_zero {
@@ -472,7 +500,7 @@ _append_elems :: #force_inline proc(array: ^$T/[dynamic]$E, should_zero: bool, l
 		return arg_len, nil
 	} else {
 		if cap(array) < len(array)+arg_len {
-			cap := 2 * cap(array) + max(8, arg_len)
+			cap := 2 * cap(array) + max(DEFAULT_DYNAMIC_ARRAY_CAPACITY, arg_len)
 
 			// do not 'or_return' here as it could be a partial success
 			if should_zero {
@@ -540,8 +568,23 @@ append_string :: proc(array: ^$T/[dynamic]$E/u8, args: ..string, loc := #caller_
 }
 
 // The append built-in procedure appends elements to the end of a dynamic array
-@builtin append :: proc{append_elem, append_elems, append_elem_string}
-@builtin non_zero_append :: proc{non_zero_append_elem, non_zero_append_elems, non_zero_append_elem_string}
+@builtin append :: proc{
+	append_elem,
+	append_elems,
+	append_elem_string,
+
+	append_soa_elem,
+	append_soa_elems,
+}
+
+@builtin non_zero_append :: proc{
+	non_zero_append_elem,
+	non_zero_append_elems,
+	non_zero_append_elem_string,
+
+	non_zero_append_soa_elem,
+	non_zero_append_soa_elems,
+}
 
 
 @builtin

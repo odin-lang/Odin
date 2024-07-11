@@ -23,7 +23,7 @@ import "core:c"
 }
 
 @(private="file") FD_CLR :: #force_inline proc(d: i32, s: ^fd_set) {
-	s.fds_bits[d / (8 * size_of(c.long))] &= ~(c.ulong(1) << (c.ulong(d) % (8 * size_of(c.ulong))))
+	s.fds_bits[d / (8 * size_of(c.long))] &~= c.ulong(1) << (c.ulong(d) % (8 * size_of(c.ulong)))
 }
 
 @(private="file") FD_ISSET :: #force_inline proc(d: i32, s: ^fd_set) -> bool {

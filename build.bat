@@ -48,6 +48,9 @@ if "%2" == "1" (
 set odin_version_raw="dev-%curr_year%-%curr_month%"
 
 set compiler_flags= -nologo -Oi -TP -fp:precise -Gm- -MP -FC -EHsc- -GR- -GF
+rem Parse source code as utf-8 even on shift-jis and other codepages
+rem See https://learn.microsoft.com/en-us/cpp/build/reference/utf-8-set-source-and-executable-character-sets-to-utf-8?view=msvc-170
+set compiler_flags= %compiler_flags% /utf-8
 set compiler_defines= -DODIN_VERSION_RAW=\"%odin_version_raw%\"
 
 if not exist .git\ goto skip_git_hash
@@ -111,7 +114,7 @@ call build_vendor.bat
 if %errorlevel% neq 0 goto end_of_build
 
 rem If the demo doesn't run for you and your CPU is more than a decade old, try -microarch:native
-if %release_mode% EQU 0 odin run examples/demo -- Hellope World
+if %release_mode% EQU 0 odin run examples/demo -vet -strict-style -- Hellope World
 
 del *.obj > NUL 2> NUL
 

@@ -346,6 +346,7 @@ gb_internal Scope *scope_of_node(Ast *node) {
 
 gb_internal void check_open_scope(CheckerContext *c, Ast *node) {
 	node = unparen_expr(node);
+	GB_ASSERT(node != nullptr);
 	GB_ASSERT(node->kind == Ast_Invalid ||
 	          is_ast_stmt(node) ||
 	          is_ast_type(node));
@@ -518,7 +519,7 @@ gb_internal Entity *scope_insert_no_mutex(Scope *s, Entity *entity) {
 }
 
 
-GB_COMPARE_PROC(entity_variable_pos_cmp) {
+gb_internal GB_COMPARE_PROC(entity_variable_pos_cmp) {
 	Entity *x = *cast(Entity **)a;
 	Entity *y = *cast(Entity **)b;
 
@@ -844,6 +845,10 @@ gb_internal void try_to_add_package_dependency(CheckerContext *c, char const *pa
 
 gb_internal void add_declaration_dependency(CheckerContext *c, Entity *e) {
 	if (e == nullptr) {
+		return;
+	}
+	if (e->flags & EntityFlag_Disabled) {
+		// ignore the dependencies if it has been `@(disabled=true)`
 		return;
 	}
 	if (c->decl != nullptr) {
@@ -1302,6 +1307,7 @@ gb_internal void init_checker_info(CheckerInfo *i) {
 	array_init(&i->init_procedures, a, 0, 0);
 	array_init(&i->fini_procedures, a, 0, 0);
 	array_init(&i->required_foreign_imports_through_force, a, 0, 0);
+	array_init(&i->defineables, a);
 
 	map_init(&i->objc_msgSend_types);
 	string_map_init(&i->load_file_cache);
@@ -1331,6 +1337,7 @@ gb_internal void destroy_checker_info(CheckerInfo *i) {
 	string_map_destroy(&i->packages);
 	array_free(&i->variable_init_order);
 	array_free(&i->required_foreign_imports_through_force);
+	array_free(&i->defineables);
 
 	mpsc_destroy(&i->entity_queue);
 	mpsc_destroy(&i->definition_queue);
@@ -1463,6 +1470,7 @@ gb_internal Entity *implicit_entity_of_node(Ast *clause) {
 }
 
 gb_internal Entity *entity_of_node(Ast *expr) {
+retry:;
 	expr = unparen_expr(expr);
 	switch (expr->kind) {
 	case_ast_node(ident, Ident, expr);
@@ -1482,6 +1490,17 @@ gb_internal Entity *entity_of_node(Ast *expr) {
 
 	case_ast_node(ce, CallExpr, expr);
 		return ce->entity_procedure_of;
+	case_end;
+
+	case_ast_node(we, TernaryWhenExpr, expr);
+		if (we->cond == nullptr) {
+			break;
+		}
+		if (we->cond->tav.value.kind != ExactValue_Bool) {
+			break;
+		}
+		expr = we->cond->tav.value.value_bool ? we->x : we->y;
+		goto retry;
 	case_end;
 	}
 	return nullptr;
@@ -3491,20 +3510,6 @@ gb_internal DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 			error(elem, "Expected a string value for '%.*s'", LIT(name));
 		}
 		return true;
-	} else if (name == "warning") {
-		ExactValue ev = check_decl_attribute_value(c, value);
-
-		if (ev.kind == ExactValue_String) {
-			String msg = ev.value_string;
-			if (msg.len == 0) {
-				error(elem, "Warning message cannot be an empty string");
-			} else {
-				ac->warning_message = msg;
-			}
-		} else {
-			error(elem, "Expected a string value for '%.*s'", LIT(name));
-		}
-		return true;
 	} else if (name == "require_results") {
 		if (value != nullptr) {
 			error(elem, "Expected no value for '%.*s'", LIT(name));
@@ -3539,19 +3544,19 @@ gb_internal DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 			String mode = ev.value_string;
 			if (mode == "none") {
 				ac->optimization_mode = ProcedureOptimizationMode_None;
+			} else if (mode == "favor_size") {
+				ac->optimization_mode = ProcedureOptimizationMode_FavorSize;
 			} else if (mode == "minimal") {
-				ac->optimization_mode = ProcedureOptimizationMode_Minimal;
+				error(elem, "Invalid optimization_mode 'minimal' for '%.*s', mode has been removed due to confusion, but 'none' has the same behaviour", LIT(name));
 			} else if (mode == "size") {
-				ac->optimization_mode = ProcedureOptimizationMode_Size;
+				error(elem, "Invalid optimization_mode 'size' for '%.*s', mode has been removed due to confusion, but 'favor_size' has the same behaviour", LIT(name));
 			} else if (mode == "speed") {
-				ac->optimization_mode = ProcedureOptimizationMode_Speed;
+				error(elem, "Invalid optimization_mode 'speed' for '%.*s', mode has been removed due to confusion, but 'favor_size' has the same behaviour", LIT(name));
 			} else {
 				ERROR_BLOCK();
 				error(elem, "Invalid optimization_mode for '%.*s'. Valid modes:", LIT(name));
 				error_line("\tnone\n");
-				error_line("\tminimal\n");
-				error_line("\tsize\n");
-				error_line("\tspeed\n");
+				error_line("\tfavor_size\n");
 			}
 		} else {
 			error(elem, "Expected a string for '%.*s'", LIT(name));
@@ -3911,10 +3916,11 @@ gb_internal void check_decl_attributes(CheckerContext *c, Array<Ast *> const &at
 			}
 
 			if (!proc(c, elem, name, value, ac)) {
-				if (!build_context.ignore_unknown_attributes) {
+				if (!build_context.ignore_unknown_attributes &&
+				    !string_set_exists(&build_context.custom_attributes, name)) {
 					ERROR_BLOCK();
 					error(elem, "Unknown attribute element name '%.*s'", LIT(name));
-					error_line("\tDid you forget to use build flag '-ignore-unknown-attributes'?\n");
+					error_line("\tDid you forget to use the build flag '-ignore-unknown-attributes' or '-custom-attribute:%.*s'?\n", LIT(name));
 				}
 			}
 		}
@@ -4110,6 +4116,7 @@ gb_internal void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 	bool is_test = false;
 	bool is_init = false;
 	bool is_fini = false;
+	bool is_priv = false;
 
 	for_array(i, vd->attributes) {
 		Ast *attr = vd->attributes[i];
@@ -4154,6 +4161,8 @@ gb_internal void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 				}
 				if (!success) {
 					error(value, "'%.*s' expects no parameter, or a string literal containing \"file\" or \"package\"", LIT(name));
+				} else {
+					is_priv = true;
 				}
 
 
@@ -4173,6 +4182,11 @@ gb_internal void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 				is_fini = true;
 			}
 		}
+	}
+
+	if (is_priv && is_test) {
+		error(decl, "Attribute 'private' is not allowed on a test case");
+		return;
 	}
 
 	if (entity_visibility_kind == EntityVisiblity_Public &&
@@ -5002,9 +5016,8 @@ gb_internal void check_foreign_import_fullpaths(Checker *c) {
 
 				String file_str = op.value.value_string;
 				file_str = string_trim_whitespace(file_str);
-
 				String fullpath = file_str;
-				if (allow_check_foreign_filepath()) {
+				if (!is_arch_wasm() || string_ends_with(file_str, str_lit(".o"))) {
 					String foreign_path = {};
 					bool ok = determine_path_from_string(nullptr, decl, base_dir, file_str, &foreign_path, /*use error not syntax_error*/true);
 					if (ok) {

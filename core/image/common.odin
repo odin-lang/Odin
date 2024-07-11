@@ -1313,55 +1313,55 @@ expand_grayscale :: proc(img: ^Image, allocator := context.allocator) -> (ok: bo
 	}
 
 	switch img.depth {
-		case 8:
-			switch img.channels {
-			case 1: // Turn Gray into RGB
-				out := mem.slice_data_cast([]RGB_Pixel, buf.buf[:])
+	case 8:
+		switch img.channels {
+		case 1: // Turn Gray into RGB
+			out := mem.slice_data_cast([]RGB_Pixel, buf.buf[:])
 
-				for p in img.pixels.buf {
-					out[0] = p // Broadcast gray value into RGB components.
-					out    = out[1:]
-				}
-
-			case 2: // Turn Gray + Alpha into RGBA
-				inp := mem.slice_data_cast([]GA_Pixel,   img.pixels.buf[:])
-				out := mem.slice_data_cast([]RGBA_Pixel, buf.buf[:])
-
-				for p in inp {
-					out[0].rgb = p.r // Gray component.
-					out[0].a   = p.g // Alpha component.
-				}
-
-			case:
-				unreachable()
+			for p in img.pixels.buf {
+				out[0] = p // Broadcast gray value into RGB components.
+				out    = out[1:]
 			}
 
-		case 16:
-			switch img.channels {
-			case 1: // Turn Gray into RGB
-				inp := mem.slice_data_cast([]u16, img.pixels.buf[:])
-				out := mem.slice_data_cast([]RGB_Pixel_16, buf.buf[:])
+		case 2: // Turn Gray + Alpha into RGBA
+			inp := mem.slice_data_cast([]GA_Pixel,   img.pixels.buf[:])
+			out := mem.slice_data_cast([]RGBA_Pixel, buf.buf[:])
 
-				for p in inp {
-					out[0] = p // Broadcast gray value into RGB components.
-					out    = out[1:]
-				}
-
-			case 2: // Turn Gray + Alpha into RGBA
-				inp := mem.slice_data_cast([]GA_Pixel_16,   img.pixels.buf[:])
-				out := mem.slice_data_cast([]RGBA_Pixel_16, buf.buf[:])
-
-				for p in inp {
-					out[0].rgb = p.r // Gray component.
-					out[0].a   = p.g // Alpha component.
-				}
-
-			case:
-				unreachable()
+			for p in inp {
+				out[0].rgb = p.r // Gray component.
+				out[0].a   = p.g // Alpha component.
 			}
 
 		case:
 			unreachable()
+		}
+
+	case 16:
+		switch img.channels {
+		case 1: // Turn Gray into RGB
+			inp := mem.slice_data_cast([]u16, img.pixels.buf[:])
+			out := mem.slice_data_cast([]RGB_Pixel_16, buf.buf[:])
+
+			for p in inp {
+				out[0] = p // Broadcast gray value into RGB components.
+				out    = out[1:]
+			}
+
+		case 2: // Turn Gray + Alpha into RGBA
+			inp := mem.slice_data_cast([]GA_Pixel_16,   img.pixels.buf[:])
+			out := mem.slice_data_cast([]RGBA_Pixel_16, buf.buf[:])
+
+			for p in inp {
+				out[0].rgb = p.r // Gray component.
+				out[0].a   = p.g // Alpha component.
+			}
+
+		case:
+			unreachable()
+		}
+
+	case:
+		unreachable()
 	}
 
 
@@ -1376,7 +1376,7 @@ expand_grayscale :: proc(img: ^Image, allocator := context.allocator) -> (ok: bo
 /*
 	Helper functions to read and write data from/to a Context, etc.
 */
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 read_data :: proc(z: $C, $T: typeid) -> (res: T, err: compress.General_Error) {
 	if r, e := compress.read_data(z, T); e != .None {
 		return {}, .Stream_Too_Short
@@ -1385,7 +1385,7 @@ read_data :: proc(z: $C, $T: typeid) -> (res: T, err: compress.General_Error) {
 	}
 }
 
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 read_u8 :: proc(z: $C) -> (res: u8, err: compress.General_Error) {
 	if r, e := compress.read_u8(z); e != .None {
 		return {}, .Stream_Too_Short

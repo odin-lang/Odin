@@ -1409,7 +1409,7 @@ as_pointer :: proc(a: any) -> (value: rawptr, valid: bool) {
 	#partial switch info in ti.variant {
 	case Type_Info_Pointer:
 		valid = true
-		value = a.data
+		value = (^rawptr)(a.data)^
 
 	case Type_Info_String:
 		valid = true

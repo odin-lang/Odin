@@ -135,6 +135,7 @@ TCP_Send_Error :: enum c.int {
 	No_Buffer_Space_Available = win.WSAENOBUFS,
 	Network_Subsystem_Failure = win.WSAENETDOWN,
 	Host_Unreachable          = win.WSAEHOSTUNREACH,
+	Would_Block               = win.WSAEWOULDBLOCK,
 
 	// TODO: verify possible, as not mentioned in docs
 	Offline                   = win.WSAENETUNREACH,  

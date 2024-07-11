@@ -2366,6 +2366,7 @@ gb_internal bool type_has_nil(Type *t) {
 	return false;
 }
 
+
 gb_internal bool elem_type_can_be_constant(Type *t) {
 	t = base_type(t);
 	if (t == t_invalid) {
@@ -3224,7 +3225,7 @@ gb_internal Selection lookup_field_with_selection(Type *type_, String field_name
 				}
 			}
 			if (type->kind == Type_Struct) {
-				wait_signal_until_available(&type->Struct.fields_wait_signal);
+				// wait_signal_until_available(&type->Struct.fields_wait_signal);
 				isize field_count = type->Struct.fields.count;
 				if (field_count != 0) for_array(i, type->Struct.fields) {
 					Entity *f = type->Struct.fields[i];
@@ -3254,7 +3255,7 @@ gb_internal Selection lookup_field_with_selection(Type *type_, String field_name
 		}
 
 		if (type->kind == Type_Struct) {
-			wait_signal_until_available(&type->Struct.fields_wait_signal);
+			// wait_signal_until_available(&type->Struct.fields_wait_signal);
 			Scope *s = type->Struct.scope;
 			if (s != nullptr) {
 				Entity *found = scope_lookup_current(s, field_name);

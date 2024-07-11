@@ -1,6 +1,6 @@
 package hash
 
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 crc64_ecma_182 :: proc "contextless" (data: []byte, seed := u64(0)) -> (result: u64) #no_bounds_check {
 	result = seed
 	#no_bounds_check for b in data {
@@ -14,7 +14,7 @@ crc64_ecma_182 :: proc "contextless" (data: []byte, seed := u64(0)) -> (result: 
 	bit-reversed, with one's complement pre and post processing.
 	Based on Mark Adler's v1.4 implementation in C under the ZLIB license.
 */
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 crc64_xz :: proc "contextless" (data: []byte, seed := u64(0)) -> u64 #no_bounds_check {
 	data := data
 	result := ~u64le(seed)
@@ -52,7 +52,7 @@ crc64_xz :: proc "contextless" (data: []byte, seed := u64(0)) -> u64 #no_bounds_
 /*
 	Generator polynomial: x^64 + x^4 + x^3 + x + 1
 */
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 crc64_iso_3306 :: proc "contextless" (data: []byte, seed := u64(0)) -> u64 #no_bounds_check {
 
 	result := seed

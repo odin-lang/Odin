@@ -3,6 +3,10 @@ package darwin
 import "core:c"
 import "base:runtime"
 
+// IMPORTANT NOTE: direct syscall usage is not allowed by Apple's review process of apps and should
+// be entirely avoided in the builtin Odin collections, these are here for users if they don't
+// care about the Apple review process.
+
 // this package uses the sys prefix for the proc names to indicate that these aren't native syscalls but directly call such
 sys_write_string ::  proc (fd: c.int, message: string) -> bool {
 	return syscall_write(fd, raw_data(message), cast(u64)len(message))

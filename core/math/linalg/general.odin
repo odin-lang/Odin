@@ -3,7 +3,7 @@ package linalg
 import "core:math"
 import "base:builtin"
 import "base:intrinsics"
-import "base:runtime"
+@require import "base:runtime"
 
 // Generic
 

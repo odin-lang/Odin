@@ -220,6 +220,10 @@ unix :: proc "contextless" (sec: i64, nsec: i64) -> Time {
 	return Time{(sec*1e9 + nsec)}
 }
 
+from_nanoseconds :: #force_inline proc "contextless" (nsec: i64) -> Time {
+	return Time{nsec}
+}
+
 to_unix_seconds :: time_to_unix
 time_to_unix :: proc "contextless" (t: Time) -> i64 {
 	return t._nsec/1e9

@@ -178,8 +178,8 @@ WINDOWS_11_BUILD_CUTOFF :: 22_000
 get_windows_version_w :: proc() -> win32.OSVERSIONINFOEXW {
 	osvi : win32.OSVERSIONINFOEXW
 	osvi.dwOSVersionInfoSize = size_of(win32.OSVERSIONINFOEXW)
-    win32.RtlGetVersion(&osvi)
-    return osvi
+	win32.RtlGetVersion(&osvi)
+	return osvi
 }
 
 is_windows_xp :: proc() -> bool {

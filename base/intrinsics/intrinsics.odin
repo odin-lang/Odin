@@ -73,6 +73,8 @@ expect :: proc(val, expected_val: T) -> T ---
 
 // Linux and Darwin Only
 syscall :: proc(id: uintptr, args: ..uintptr) -> uintptr ---
+// FreeBSD, NetBSD, et cetera
+syscall_bsd :: proc(id: uintptr, args: ..uintptr) -> (uintptr, bool) ---
 
 
 // Atomics
@@ -192,7 +194,8 @@ type_proc_return_count    :: proc($T: typeid) -> int where type_is_proc(T) ---
 type_proc_parameter_type  :: proc($T: typeid, index: int) -> typeid where type_is_proc(T) ---
 type_proc_return_type     :: proc($T: typeid, index: int) -> typeid where type_is_proc(T) ---
 
-type_struct_field_count :: proc($T: typeid) -> int where type_is_struct(T) ---
+type_struct_field_count          :: proc($T: typeid) -> int  where type_is_struct(T) ---
+type_struct_has_implicit_padding :: proc($T: typeid) -> bool where type_is_struct(T) ---
 
 type_polymorphic_record_parameter_count :: proc($T: typeid) -> typeid ---
 type_polymorphic_record_parameter_value :: proc($T: typeid, index: int) -> $V ---

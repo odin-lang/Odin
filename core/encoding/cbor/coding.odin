@@ -233,7 +233,7 @@ encode_into_encoder :: proc(e: Encoder, v: Value, loc := #caller_location) -> En
 
 	if .Self_Described_CBOR in e.flags {
 		_encode_u64(e, TAG_SELF_DESCRIBED_CBOR, .Tag) or_return
-		e.flags &~= { .Self_Described_CBOR }
+		e.flags -= { .Self_Described_CBOR }
 	}
 
 	switch v_spec in v {
@@ -423,7 +423,7 @@ _decode_bytes :: proc(d: Decoder, add: Add, type: Major = .Bytes, allocator := c
 _encode_bytes :: proc(e: Encoder, val: Bytes, major: Major = .Bytes) -> (err: Encode_Error) {
 	assert(len(val) >= 0)
 	_encode_u64(e, u64(len(val)), major) or_return
-    _, err = io.write_full(e.writer, val[:])
+	_, err = io.write_full(e.writer, val[:])
 	return
 }
 
@@ -440,7 +440,7 @@ _decode_text :: proc(d: Decoder, add: Add, allocator := context.allocator, loc :
 }
 
 _encode_text :: proc(e: Encoder, val: Text) -> Encode_Error {
-    return _encode_bytes(e, transmute([]byte)val, .Text)
+	return _encode_bytes(e, transmute([]byte)val, .Text)
 }
 
 _decode_array_ptr :: proc(d: Decoder, add: Add, allocator := context.allocator, loc := #caller_location) -> (v: ^Array, err: Decode_Error) {
@@ -480,10 +480,10 @@ _decode_array :: proc(d: Decoder, add: Add, allocator := context.allocator, loc 
 _encode_array :: proc(e: Encoder, arr: Array) -> Encode_Error {
 	assert(len(arr) >= 0)
 	_encode_u64(e, u64(len(arr)), .Array)
-    for val in arr {
-        encode(e, val) or_return
-    }
-    return nil
+	for val in arr {
+		encode(e, val) or_return
+	}
+	return nil
 }
 
 _decode_map_ptr :: proc(d: Decoder, add: Add, allocator := context.allocator, loc := #caller_location) -> (v: ^Map, err: Decode_Error) {
@@ -576,7 +576,7 @@ _encode_map :: proc(e: Encoder, m: Map) -> (err: Encode_Error) {
 		encode(e, entry.entry.value) or_return
 	}
 
-    return nil
+	return nil
 }
 
 _decode_tag_ptr :: proc(d: Decoder, add: Add, allocator := context.allocator, loc := #caller_location) -> (v: Value, err: Decode_Error) {
@@ -626,7 +626,7 @@ _decode_uint_as_u64 :: proc(r: io.Reader, add: Add) -> (nr: u64, err: Decode_Err
 
 _encode_tag :: proc(e: Encoder, val: Tag) -> Encode_Error {
 	_encode_u64(e, val.number, .Tag) or_return
-    return encode(e, val.value)
+	return encode(e, val.value)
 }
 
 _decode_simple :: proc(r: io.Reader) -> (v: Simple, err: io.Error) {
@@ -739,16 +739,16 @@ _encode_nil :: proc(w: io.Writer) -> io.Error {
 // Streaming
 
 encode_stream_begin :: proc(w: io.Writer, major: Major) -> (err: io.Error) {
-    assert(major >= Major(.Bytes) && major <= Major(.Map), "illegal stream type")
+	assert(major >= Major(.Bytes) && major <= Major(.Map), "illegal stream type")
 
-    header := (u8(major) << 5) | u8(Add.Length_Unknown)
-    _, err = io.write_full(w, {header})
+	header := (u8(major) << 5) | u8(Add.Length_Unknown)
+	_, err = io.write_full(w, {header})
 	return
 }
 
 encode_stream_end :: proc(w: io.Writer) -> io.Error {
-    header := (u8(Major.Other) << 5) | u8(Add.Break)
-    _, err := io.write_full(w, {header})
+	header := (u8(Major.Other) << 5) | u8(Add.Break)
+	_, err := io.write_full(w, {header})
 	return err
 }
 
@@ -757,8 +757,8 @@ encode_stream_text       :: _encode_text
 encode_stream_array_item :: encode
 
 encode_stream_map_entry :: proc(e: Encoder, key: Value, val: Value) -> Encode_Error {
-    encode(e, key) or_return
-    return encode(e, val)
+	encode(e, key) or_return
+	return encode(e, val)
 }
 
 // For `Bytes` and `Text` strings: Decodes the number of items the header says follows.

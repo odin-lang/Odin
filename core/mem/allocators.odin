@@ -748,9 +748,7 @@ dynamic_pool_alloc_bytes :: proc(p: ^Dynamic_Pool, bytes: int) -> ([]byte, Alloc
 		return
 	}
 
-	n := bytes
-	extra := p.alignment - (n % p.alignment)
-	n += extra
+	n := align_formula(bytes, p.alignment)
 	if n > p.block_size {
 		return nil, .Invalid_Argument
 	}

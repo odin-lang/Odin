@@ -94,7 +94,7 @@ _mm_crc32_u32 :: #force_inline proc "c" (crc: u32, v: u32) -> u32 {
 }
 @(require_results, enable_target_feature="sse4.2")
 _mm_cmpgt_epi64 :: #force_inline proc "c" (a: __m128i, b: __m128i) -> __m128i {
-	return transmute(__m128i)simd.lanes_gt(transmute(i64x2)a, transmute(i64x2)b)
+	return transmute(__m128i)simd.lanes_gt(a, b)
 }
 
 when ODIN_ARCH == .amd64 {

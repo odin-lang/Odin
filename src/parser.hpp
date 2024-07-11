@@ -74,7 +74,6 @@ enum AstFileFlag : u32 {
 	AstFile_IsPrivatePkg = 1<<0,
 	AstFile_IsPrivateFile = 1<<1,
 
-	AstFile_IsTest    = 1<<3,
 	AstFile_IsLazy    = 1<<4,
 
 	AstFile_NoInstrumentation = 1<<5,
@@ -140,6 +139,8 @@ struct AstFile {
 
 	// This is effectively a queue but does not require any multi-threading capabilities
 	Array<Ast *> delayed_decls_queues[AstDelayQueue_COUNT];
+
+	std::atomic<isize> seen_load_directive_count;
 
 #define PARSER_MAX_FIX_COUNT 6
 	isize    fix_count;
@@ -210,6 +211,8 @@ struct Parser {
 	std::atomic<isize>     file_to_process_count;
 	std::atomic<isize>     total_token_count;
 	std::atomic<isize>     total_line_count;
+
+	std::atomic<isize>     total_seen_load_directive_count;
 
 	// TODO(bill): What should this mutex be per?
 	//  * Parser

@@ -14,9 +14,6 @@ test_rbtree_integer :: proc(t: ^testing.T, $Key: typeid, $Value: typeid) {
 	defer mem.tracking_allocator_destroy(&track)
 	context.allocator = mem.tracking_allocator(&track)
 
-	r: rand.Rand
-	rand.init(&r, t.seed)
-
 	log.infof("Testing Red-Black Tree($Key=%v,$Value=%v) using random seed %v.", type_info_of(Key), type_info_of(Value), t.seed)
 	tree: rb.Tree(Key, Value)
 	rb.init(&tree)
@@ -35,9 +32,9 @@ test_rbtree_integer :: proc(t: ^testing.T, $Key: typeid, $Value: typeid) {
 	max_key := min(Key)
 
 	for i := 0; i < NR_INSERTS; i += 1 {
-		k := Key(rand.uint32(&r)) & 0x1f
+		k := Key(rand.uint32()) & 0x1f
 		min_key = min(min_key, k); max_key = max(max_key, k)
-		v := Value(rand.uint32(&r))
+		v := Value(rand.uint32())
 
 		existing_node, in_map := inserted_map[k]
 		n, inserted, _ := rb.find_or_insert(&tree, k, v)
@@ -92,7 +89,7 @@ test_rbtree_integer :: proc(t: ^testing.T, $Key: typeid, $Value: typeid) {
 	testing.expect(t, visited == entry_count, "iterator/backward: visited")
 
 	// Test removal (and on_remove callback)
-	rand.shuffle(inserted_keys[:], &r)
+	rand.shuffle(inserted_keys[:])
 	callback_count := entry_count
 	tree.user_data = &callback_count
 	tree.on_remove = proc(key: Key, value: Value, user_data: rawptr) {

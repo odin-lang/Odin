@@ -248,7 +248,7 @@ SEVERITY :: enum DWORD {
 }
 
 // Generic test for success on any status value (non-negative numbers indicate success).
-SUCCEEDED :: #force_inline proc(#any_int result: int) -> bool { return result >= S_OK }
+SUCCEEDED :: #force_inline proc "contextless" (#any_int result: int) -> bool { return result >= S_OK }
 // and the inverse
 FAILED :: #force_inline proc(#any_int result: int) -> bool { return result < S_OK }
 

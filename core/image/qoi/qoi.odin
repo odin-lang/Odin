@@ -139,15 +139,13 @@ save_to_buffer  :: proc(output: ^bytes.Buffer, img: ^Image, options := Options{}
 					} else {
 						// Write RGB literal
 						output.buf[written] = u8(QOI_Opcode_Tag.RGB)
-						pix_bytes := transmute([4]u8)pix
-						copy(output.buf[written + 1:], pix_bytes[:3])
+						copy(output.buf[written + 1:], pix[:3])
 						written += 4
 					}
 				} else {
 					// Write RGBA literal
 					output.buf[written] = u8(QOI_Opcode_Tag.RGBA)
-					pix_bytes := transmute([4]u8)pix
-					copy(output.buf[written + 1:], pix_bytes[:])
+					copy(output.buf[written + 1:], pix[:])
 					written += 5
 				}
 			}
@@ -172,13 +170,13 @@ load_from_bytes :: proc(data: []byte, options := Options{}, allocator := context
 	return img, err
 }
 
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.allocator) -> (img: ^Image, err: Error) {
 	context.allocator = allocator
 	options := options
 
 	if .info in options {
-		options |= {.return_metadata, .do_not_decompress_image}
+		options += {.return_metadata, .do_not_decompress_image}
 		options -= {.info}
 	}
 
@@ -232,7 +230,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 	bytes_needed := image.compute_buffer_size(int(header.width), int(header.height), img.channels, 8)
 
 	if resize(&img.pixels.buf, bytes_needed) != nil {
-	 	return img, .Unable_To_Allocate_Or_Resize
+		return img, .Unable_To_Allocate_Or_Resize
 	}
 
 	/*
@@ -343,7 +341,7 @@ destroy :: proc(img: ^Image) {
 	bytes.buffer_destroy(&img.pixels)
 
 	if v, ok := img.metadata.(^image.QOI_Info); ok {
-	 	free(v)
+		free(v)
 	}
 	free(img)
 }

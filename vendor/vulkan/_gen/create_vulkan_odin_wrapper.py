@@ -94,15 +94,13 @@ def convert_type(t, prev_name, curr_name):
     if t == "":
         return t
 
+    if t.startswith("const"):
+        t = convert_type(t[6:], prev_name, curr_name)
+
     elif t.endswith("*"):
-        elem = ""
         pointer = "^"
-        if t.startswith("const"):
-            ttype = t[6:len(t)-1]
-            elem = convert_type(ttype, prev_name, curr_name)
-        else:
-            ttype = t[:len(t)-1]
-            elem = convert_type(ttype, prev_name, curr_name)
+        ttype = t[:len(t)-1]
+        elem = convert_type(ttype, prev_name, curr_name)    
 
         if curr_name.endswith("s") or curr_name.endswith("Table"):
             if prev_name.endswith("Count") or prev_name.endswith("Counts"):
@@ -625,12 +623,14 @@ def parse_procedures(f):
 
     for rt, name, fields in data:
         proc_name = no_vk(name)
-
         pf = []
         prev_name = ""
-        for type_, fname in re.findall(r"(?:\s*|)(.+?)\s*(\w+)(?:,|$)", fields):
+        for type_, fname, array_len in re.findall(r"(?:\s*|)(.+?)\s*(\w+)(?:\[(\d+)\])?(?:,|$)", fields):
             curr_name = fix_arg(fname)
-            pf.append((do_type(type_, prev_name, curr_name), curr_name))
+            ty = do_type(type_, prev_name, curr_name)
+            if array_len != "":
+                ty = f"^[{array_len}]{ty}"
+            pf.append((ty, curr_name))
             prev_name = curr_name
 
         data_fields = ', '.join(["{}: {}".format(n, t) for t, n in pf if t != ""])
@@ -798,7 +798,7 @@ API_VERSION_1_2 :: (1<<22) | (2<<12) | (0)
 API_VERSION_1_3 :: (1<<22) | (3<<12) | (0)
 
 MAKE_VERSION :: proc(major, minor, patch: u32) -> u32 {
-    return (major<<22) | (minor<<12) | (patch)
+\treturn (major<<22) | (minor<<12) | (patch)
 }
 
 // Base types

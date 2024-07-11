@@ -335,7 +335,7 @@ bool check_constant_parameter_value(Type *type, Ast *expr) {
 
 gb_internal Type *check_record_polymorphic_params(CheckerContext *ctx, Ast *polymorphic_params,
                                                   bool *is_polymorphic_,
-                                                  Ast *node, Array<Operand> *poly_operands) {
+                                                  Array<Operand> *poly_operands) {
 	Type *polymorphic_params_type = nullptr;
 	GB_ASSERT(is_polymorphic_ != nullptr);
 
@@ -643,13 +643,14 @@ gb_internal void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *
 		context = str_lit("struct #raw_union");
 	}
 
+	struct_type->Struct.node       = node;
 	struct_type->Struct.scope      = ctx->scope;
 	struct_type->Struct.is_packed  = st->is_packed;
 	struct_type->Struct.is_no_copy = st->is_no_copy;
 	struct_type->Struct.polymorphic_params = check_record_polymorphic_params(
 		ctx, st->polymorphic_params,
 		&struct_type->Struct.is_polymorphic,
-		node, poly_operands
+		poly_operands
 	);
 	wait_signal_set(&struct_type->Struct.polymorphic_wait_signal);
 
@@ -696,11 +697,12 @@ gb_internal void check_union_type(CheckerContext *ctx, Type *union_type, Ast *no
 	ast_node(ut, UnionType, node);
 
 
+	union_type->Union.node  = node;
 	union_type->Union.scope = ctx->scope;
 	union_type->Union.polymorphic_params = check_record_polymorphic_params(
 		ctx, ut->polymorphic_params,
 		&union_type->Union.is_polymorphic,
-		node, poly_operands
+		poly_operands
 	);
 	wait_signal_set(&union_type->Union.polymorphic_wait_signal);
 
@@ -738,7 +740,7 @@ gb_internal void check_union_type(CheckerContext *ctx, Type *union_type, Ast *no
 				gb_string_free(str);
 			} else {
 				for_array(j, variants) {
-					if (are_types_identical(t, variants[j])) {
+					if (union_variant_index_types_equal(t, variants[j])) {
 						ok = false;
 						ERROR_BLOCK();
 						gbString str = type_to_string(t);
@@ -1117,6 +1119,8 @@ gb_internal void check_bit_field_type(CheckerContext *ctx, Type *bit_field_type,
 		if (is_type_boolean(type)) {
 			// NOTE(bill): it doesn't matter, and when it does,
 			// that api is absolutely stupid
+			return Endian_Unknown;
+		} else if (type_size_of(type) < 2) {
 			return Endian_Unknown;
 		} else if (is_type_endian_specific(type)) {
 			if (is_type_endian_little(type)) {
@@ -1761,6 +1765,7 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 		if (type_expr == nullptr) {
 			param_value = handle_parameter_value(ctx, nullptr, &type, default_value, true);
 		} else {
+			Ast *original_type_expr = type_expr;
 			if (type_expr->kind == Ast_Ellipsis) {
 				type_expr = type_expr->Ellipsis.expr;
 				is_variadic = true;
@@ -1769,6 +1774,9 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 					error(param, "Invalid AST: Invalid variadic parameter with multiple names");
 					success = false;
 				}
+
+				GB_ASSERT(original_type_expr->kind == Ast_Ellipsis);
+				type_expr = ast_array_type(type_expr->file(), original_type_expr->Ellipsis.token, nullptr, type_expr);
 			}
 			if (type_expr->kind == Ast_TypeidType)  {
 				ast_node(tt, TypeidType, type_expr);
@@ -1792,6 +1800,7 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 				if (operands != nullptr) {
 					ctx->allow_polymorphic_types = true;
 				}
+
 				type = check_type(ctx, type_expr);
 
 				ctx->allow_polymorphic_types = prev;
@@ -1824,12 +1833,12 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 			}
 			type = t_invalid;
 		}
-		if (is_type_empty_union(type)) {
-			gbString str = type_to_string(type);
-			error(param, "Invalid use of an empty union '%s'", str);
-			gb_string_free(str);
-			type = t_invalid;
-		}
+		// if (is_type_empty_union(type)) {
+		// 	gbString str = type_to_string(type);
+		// 	error(param, "Invalid use of an empty union '%s'", str);
+		// 	gb_string_free(str);
+		// 	type = t_invalid;
+		// }
 
 		if (is_type_polymorphic(type)) {
 			switch (param_value.kind) {
@@ -2077,6 +2086,14 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 					param->Variable.type_expr = type_expr;
 				}
 			}
+
+			if (is_variadic && variadic_index == variables.count) {
+				param->flags |= EntityFlag_Ellipsis;
+				if (is_c_vararg) {
+					param->flags |= EntityFlag_CVarArg;
+				}
+			}
+
 			if (p->flags&FieldFlag_no_alias) {
 				param->flags |= EntityFlag_NoAlias;
 			}
@@ -2111,18 +2128,7 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 
 	if (is_variadic) {
 		GB_ASSERT(variadic_index >= 0);
-	}
-
-	if (is_variadic) {
 		GB_ASSERT(params.count > 0);
-		// NOTE(bill): Change last variadic parameter to be a slice
-		// Custom Calling convention for variadic parameters
-		Entity *end = variables[variadic_index];
-		end->type = alloc_type_slice(end->type);
-		end->flags |= EntityFlag_Ellipsis;
-		if (is_c_vararg) {
-			end->flags |= EntityFlag_CVarArg;
-		}
 	}
 
 	isize specialization_count = 0;
@@ -3330,6 +3336,10 @@ gb_internal bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, T
 			if (o.mode == Addressing_Variable) {
 				gbString s = expr_to_string(pt->type);
 				error(e, "^ is used for pointer types, did you mean '&%s'?", s);
+				gb_string_free(s);
+			} else if (is_type_pointer(o.type)) {
+				gbString s = expr_to_string(pt->type);
+				error(e, "^ is used for pointer types, did you mean a dereference: '%s^'?", s);
 				gb_string_free(s);
 			} else {
 				// NOTE(bill): call check_type_expr again to get a consistent error message

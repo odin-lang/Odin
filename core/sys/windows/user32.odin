@@ -17,6 +17,17 @@ foreign user32 {
 
 	GetClassNameW :: proc(hWnd: HWND, lpClassName: LPWSTR, nMaxCount: INT) -> INT ---
 
+	GetParent :: proc(hWnd: HWND) -> HWND ---
+	SetWinEventHook :: proc(
+		eventMin, eventMax: DWORD,
+		hmodWinEventProc: HMODULE,
+		pfnWinEvenProc: WINEVENTPROC,
+		idProcess, idThread: DWORD,
+		dwFlags: WinEventFlags,
+	) -> HWINEVENTHOOK ---
+
+	IsChild :: proc(hWndParent, hWnd: HWND) -> BOOL ---
+
 	RegisterClassW :: proc(lpWndClass: ^WNDCLASSW) -> ATOM ---
 	RegisterClassExW :: proc(^WNDCLASSEXW) -> ATOM ---
 	UnregisterClassW :: proc(lpClassName: LPCWSTR, hInstance: HINSTANCE) -> BOOL ---
@@ -703,3 +714,12 @@ DISPLAY_DEVICEW :: struct {
 	DeviceKey: [128]WCHAR,
 }
 PDISPLAY_DEVICEW :: ^DISPLAY_DEVICEW
+
+// OUTOFCONTEXT is the zero value, use {}
+WinEventFlags :: bit_set[WinEventFlag; DWORD]
+
+WinEventFlag :: enum DWORD {
+    SKIPOWNTHREAD  = 0,
+    SKIPOWNPROCESS = 1,
+    INCONTEXT      = 2,
+}

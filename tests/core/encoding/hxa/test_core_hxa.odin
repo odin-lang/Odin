@@ -134,14 +134,11 @@ test_write :: proc(t: ^testing.T) {
 	testing.expectf(t, read_err == read_e, fmt.tprintf("read_err %v != %v", read_err, read_e))
 	defer hxa.file_destroy(file)
 
-	testing.expectf(t, file.magic_number == 0x417848, fmt.tprintf("file.magic_number %v != %v",
-															file.magic_number, 0x417848))
+	testing.expectf(t, file.magic_number == 0x417848, fmt.tprintf("file.magic_number %v != %v", file.magic_number, 0x417848))
 	testing.expectf(t, file.version == 3, fmt.tprintf("file.version %v != %v", file.version, 3))
-	testing.expectf(t, file.internal_node_count == 1, fmt.tprintf("file.internal_node_count %v != %v",
-															file.internal_node_count, 1))
+	testing.expectf(t, file.internal_node_count == 1, fmt.tprintf("file.internal_node_count %v != %v", file.internal_node_count, 1))
 
-	testing.expectf(t, len(file.nodes) == len(w_file.nodes), fmt.tprintf("len(file.nodes) %v != %v",
-																   len(file.nodes), len(w_file.nodes)))
+	testing.expectf(t, len(file.nodes) == len(w_file.nodes), fmt.tprintf("len(file.nodes) %v != %v", len(file.nodes), len(w_file.nodes)))
 
 	m := &file.nodes[0].meta_data
 	w_m := &w_file.nodes[0].meta_data
@@ -150,20 +147,16 @@ test_write :: proc(t: ^testing.T) {
 
 	m_v, m_v_ok := m[0].value.([]f64le)
 	testing.expectf(t, m_v_ok, fmt.tprintf("m_v_ok %v != %v", m_v_ok, true))
-	testing.expectf(t, len(m_v) == len(n1_m1_value), fmt.tprintf("%v != len(m_v) %v",
-														   len(m_v), len(n1_m1_value)))
+	testing.expectf(t, len(m_v) == len(n1_m1_value), fmt.tprintf("%v != len(m_v) %v", len(m_v), len(n1_m1_value)))
 	for i := 0; i < len(m_v); i += 1 {
-		testing.expectf(t, m_v[i] == n1_m1_value[i], fmt.tprintf("m_v[%d] %v != %v",
-														   i, m_v[i], n1_m1_value[i]))
+		testing.expectf(t, m_v[i] == n1_m1_value[i], fmt.tprintf("m_v[%d] %v != %v", i, m_v[i], n1_m1_value[i]))
 	}
 
 	v, v_ok := file.nodes[0].content.(hxa.Node_Image)
 	testing.expectf(t, v_ok, fmt.tprintf("v_ok %v != %v", v_ok, true))
 	testing.expectf(t, v.type == n1_content.type, fmt.tprintf("v.type %v != %v", v.type, n1_content.type))
-	testing.expectf(t, len(v.resolution) == 3, fmt.tprintf("len(v.resolution) %v != %v",
-													 len(v.resolution), 3))
-	testing.expectf(t, len(v.image_stack) == len(n1_content.image_stack), fmt.tprintf("len(v.image_stack) %v != %v",
-			  len(v.image_stack), len(n1_content.image_stack)))
+	testing.expectf(t, len(v.resolution) == 3, fmt.tprintf("len(v.resolution) %v != %v", len(v.resolution), 3))
+	testing.expectf(t, len(v.image_stack) == len(n1_content.image_stack), fmt.tprintf("len(v.image_stack) %v != %v", len(v.image_stack), len(n1_content.image_stack)))
 	for i := 0; i < len(v.image_stack); i += 1 {
 		testing.expectf(t, v.image_stack[i].name == n1_content.image_stack[i].name,
 				  fmt.tprintf("v.image_stack[%d].name %v != %v",
@@ -182,8 +175,7 @@ test_write :: proc(t: ^testing.T) {
 			testing.expectf(t, l_ok, fmt.tprintf("l_ok %v != %v", l_ok, true))
 			testing.expectf(t, len(l) == len(n1_t), fmt.tprintf("len(l) %v != %v", len(l), len(n1_t)))
 			for j := 0; j < len(l); j += 1 {
-				testing.expectf(t, l[j] == n1_t[j], fmt.tprintf("l[%d] %v (%h) != %v (%h)",
-														  j, l[j], l[j], n1_t[j], n1_t[j]))
+				testing.expectf(t, l[j] == n1_t[j], fmt.tprintf("l[%d] %v (%h) != %v (%h)", j, l[j], l[j], n1_t[j], n1_t[j]))
 			}
 		case []f64le:
 			l, l_ok := v.image_stack[i].data.([]f64le)

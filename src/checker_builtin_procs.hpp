@@ -192,6 +192,7 @@ BuiltinProc__simd_end,
 	
 	// Platform specific intrinsics
 	BuiltinProc_syscall,
+	BuiltinProc_syscall_bsd,
 
 	BuiltinProc_x86_cpuid,
 	BuiltinProc_x86_xgetbv,
@@ -276,6 +277,7 @@ BuiltinProc__type_simple_boolean_end,
 	BuiltinProc_type_bit_set_underlying_type,
 
 	BuiltinProc_type_struct_field_count,
+	BuiltinProc_type_struct_has_implicit_padding,
 
 	BuiltinProc_type_proc_parameter_count,
 	BuiltinProc_type_proc_return_count,
@@ -512,7 +514,8 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT(""), 0, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
 
 
-	{STR_LIT("syscall"), 1, true, Expr_Expr, BuiltinProcPkg_intrinsics, false, true},
+	{STR_LIT("syscall"),     1, true, Expr_Expr, BuiltinProcPkg_intrinsics, false, true},
+	{STR_LIT("syscall_bsd"), 1, true, Expr_Expr, BuiltinProcPkg_intrinsics, false, true},
 	{STR_LIT("x86_cpuid"),  2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("x86_xgetbv"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
@@ -591,7 +594,8 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("type_bit_set_elem_type"),       1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_bit_set_underlying_type"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
-	{STR_LIT("type_struct_field_count"),   1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("type_struct_field_count"),          1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("type_struct_has_implicit_padding"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("type_proc_parameter_count"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_proc_return_count"),    1, false, Expr_Expr, BuiltinProcPkg_intrinsics},

@@ -25,7 +25,7 @@ Marshal_Options :: struct {
 	spec: Specification,
 
 	// Use line breaks & tabs/spaces
-	pretty: bool, 
+	pretty: bool,
 
 	// Use spaces for indentation instead of tabs
 	use_spaces: bool,
@@ -34,7 +34,7 @@ Marshal_Options :: struct {
 	spaces: int,
 
 	// Output uint as hex in JSON5 & MJSON
-	write_uint_as_hex: bool, 
+	write_uint_as_hex: bool,
 
 	// If spec is MJSON and this is true, then keys will be quoted.
 	//
@@ -138,7 +138,7 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 		// allow uints to be printed as hex
 		if opt.write_uint_as_hex && (opt.spec == .JSON5 || opt.spec == .MJSON) {
 			switch i in a {
-			case u8, u16, u32, u64, u128: 
+			case u8, u16, u32, u64, u128:
 				s = strconv.append_bits_128(buf[:], u, 16, info.signed, 8*ti.size, "0123456789abcdef", { .Prefix })
 
 			case:
@@ -239,7 +239,7 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 	case runtime.Type_Info_Array:
 		opt_write_start(w, opt, '[') or_return
 		for i in 0..<info.count {
-			opt_write_iteration(w, opt, i) or_return
+			opt_write_iteration(w, opt, i == 0) or_return
 			data := uintptr(v.data) + uintptr(i*info.elem_size)
 			marshal_to_writer(w, any{rawptr(data), info.elem.id}, opt) or_return
 		}
@@ -248,7 +248,7 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 	case runtime.Type_Info_Enumerated_Array:
 		opt_write_start(w, opt, '[') or_return
 		for i in 0..<info.count {
-			opt_write_iteration(w, opt, i) or_return
+			opt_write_iteration(w, opt, i == 0) or_return
 			data := uintptr(v.data) + uintptr(i*info.elem_size)
 			marshal_to_writer(w, any{rawptr(data), info.elem.id}, opt) or_return
 		}
@@ -258,7 +258,7 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 		opt_write_start(w, opt, '[') or_return
 		array := cast(^mem.Raw_Dynamic_Array)v.data
 		for i in 0..<array.len {
-			opt_write_iteration(w, opt, i) or_return
+			opt_write_iteration(w, opt, i == 0) or_return
 			data := uintptr(array.data) + uintptr(i*info.elem_size)
 			marshal_to_writer(w, any{rawptr(data), info.elem.id}, opt) or_return
 		}
@@ -268,7 +268,7 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 		opt_write_start(w, opt, '[') or_return
 		slice := cast(^mem.Raw_Slice)v.data
 		for i in 0..<slice.len {
-			opt_write_iteration(w, opt, i) or_return
+			opt_write_iteration(w, opt, i == 0) or_return
 			data := uintptr(slice.data) + uintptr(i*info.elem_size)
 			marshal_to_writer(w, any{rawptr(data), info.elem.id}, opt) or_return
 		}
@@ -290,7 +290,7 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 				for bucket_index in 0..<map_cap {
 					runtime.map_hash_is_valid(hs[bucket_index]) or_continue
 
-					opt_write_iteration(w, opt, i) or_return
+					opt_write_iteration(w, opt, i == 0) or_return
 					i += 1
 
 					key   := rawptr(runtime.map_cell_index_dynamic(ks, info.map_info.ks, bucket_index))
@@ -356,7 +356,7 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 				slice.sort_by(sorted[:], proc(i, j: Entry) -> bool { return i.key < j.key })
 
 				for s, i in sorted {
-					opt_write_iteration(w, opt, i) or_return
+					opt_write_iteration(w, opt, i == 0) or_return
 					opt_write_key(w, opt, s.key) or_return
 					marshal_to_writer(w, s.value, opt) or_return
 				}
@@ -387,17 +387,17 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 			case runtime.Type_Info_Pointer,
 			     runtime.Type_Info_Multi_Pointer,
 			     runtime.Type_Info_Procedure:
-			     	return (^rawptr)(v.data)^ == nil
+				return (^rawptr)(v.data)^ == nil
 			case runtime.Type_Info_Dynamic_Array:
-			     	return (^runtime.Raw_Dynamic_Array)(v.data).len == 0
+				return (^runtime.Raw_Dynamic_Array)(v.data).len == 0
 			case runtime.Type_Info_Slice:
-			     	return (^runtime.Raw_Slice)(v.data).len == 0
+				return (^runtime.Raw_Slice)(v.data).len == 0
 			case runtime.Type_Info_Union,
 			     runtime.Type_Info_Bit_Set,
 			     runtime.Type_Info_Soa_Pointer:
 				return reflect.is_nil(v)
 			case runtime.Type_Info_Map:
-			     	return (^runtime.Raw_Map)(v.data).len == 0
+				return (^runtime.Raw_Map)(v.data).len == 0
 			}
 			return false
 		}
@@ -405,6 +405,7 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 		marshal_struct_fields :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: Marshal_Error) {
 			ti := runtime.type_info_base(type_info_of(v.id))
 			info := ti.variant.(runtime.Type_Info_Struct)
+			first_iteration := true
 			for name, i in info.names {
 				omitempty := false
 
@@ -424,7 +425,8 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 					continue
 				}
 
-				opt_write_iteration(w, opt, i) or_return
+				opt_write_iteration(w, opt, first_iteration) or_return
+				first_iteration = false
 				if json_name != "" {
 					opt_write_key(w, opt, json_name) or_return
 				} else {
@@ -588,10 +590,10 @@ opt_write_start :: proc(w: io.Writer, opt: ^Marshal_Options, c: byte) -> (err: i
 }
 
 // insert comma separation and write indentations
-opt_write_iteration :: proc(w: io.Writer, opt: ^Marshal_Options, iteration: int) -> (err: io.Error) {
+opt_write_iteration :: proc(w: io.Writer, opt: ^Marshal_Options, first_iteration: bool) -> (err: io.Error) {
 	switch opt.spec {
-	case .JSON, .JSON5: 
-		if iteration > 0 {
+	case .JSON, .JSON5:
+		if !first_iteration {
 			io.write_byte(w, ',') or_return
 
 			if opt.pretty {
@@ -601,8 +603,8 @@ opt_write_iteration :: proc(w: io.Writer, opt: ^Marshal_Options, iteration: int)
 
 		opt_write_indentation(w, opt) or_return
 
-	case .MJSON: 
-		if iteration > 0 {
+	case .MJSON:
+		if !first_iteration {
 			// on pretty no commas necessary
 			if opt.pretty {
 				io.write_byte(w, '\n') or_return

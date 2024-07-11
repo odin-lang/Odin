@@ -59,24 +59,21 @@ _enumerate_interfaces :: proc(allocator := context.allocator) -> (interfaces: []
 			switch int(ifaddr.address.family) {
 			case os.AF_INET, os.AF_INET6:
 				address = _sockaddr_basic_to_endpoint(ifaddr.address).address
-			case:
 			}
 		}
 
 		if ifaddr.netmask != nil {
 			switch int(ifaddr.netmask.family) {
 			case os.AF_INET, os.AF_INET6:
-			 	netmask = Netmask(_sockaddr_basic_to_endpoint(ifaddr.netmask).address)
-			case:
+				netmask = Netmask(_sockaddr_basic_to_endpoint(ifaddr.netmask).address)
 			}
 		}
 
 		if ifaddr.broadcast_or_dest != nil && .BROADCAST in ifaddr.flags {
 			switch int(ifaddr.broadcast_or_dest.family) {
 			case os.AF_INET, os.AF_INET6:
-			 	broadcast := _sockaddr_basic_to_endpoint(ifaddr.broadcast_or_dest).address
-			 	append(&iface.multicast, broadcast)
-			case:
+				broadcast := _sockaddr_basic_to_endpoint(ifaddr.broadcast_or_dest).address
+				append(&iface.multicast, broadcast)
 			}
 		}
 
@@ -91,19 +88,19 @@ _enumerate_interfaces :: proc(allocator := context.allocator) -> (interfaces: []
 		/*
 			TODO: Refine this based on the type of adapter.
 		*/
- 		state := Link_State{}
+		state := Link_State{}
 
- 		if .UP in ifaddr.flags {
- 			state |= {.Up}
- 		}
+		if .UP in ifaddr.flags {
+			state += {.Up}
+		}
 
- 		/*if .DORMANT in ifaddr.flags {
- 			state |= {.Dormant}
- 		}*/
+		/*if .DORMANT in ifaddr.flags {
+			state |= {.Dormant}
+		}*/
 
- 		if .LOOPBACK in ifaddr.flags {
- 			state |= {.Loopback}
- 		}
+		if .LOOPBACK in ifaddr.flags {
+			state += {.Loopback}
+		}
 		iface.link.state = state
 	}
 

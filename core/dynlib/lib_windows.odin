@@ -4,14 +4,12 @@ package dynlib
 
 import win32 "core:sys/windows"
 import "core:strings"
-import "base:runtime"
 import "core:reflect"
 
-_load_library :: proc(path: string, global_symbols := false) -> (Library, bool) {
+_load_library :: proc(path: string, global_symbols := false, allocator := context.temp_allocator) -> (Library, bool) {
 	// NOTE(bill): 'global_symbols' is here only for consistency with POSIX which has RTLD_GLOBAL
-
-	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
-	wide_path := win32.utf8_to_wstring(path, context.temp_allocator)
+	wide_path := win32.utf8_to_wstring(path, allocator)
+	defer free(wide_path, allocator)
 	handle := cast(Library)win32.LoadLibraryW(wide_path)
 	return handle, handle != nil
 }
@@ -21,9 +19,9 @@ _unload_library :: proc(library: Library) -> bool {
 	return bool(ok)
 }
 
-_symbol_address :: proc(library: Library, symbol: string) -> (ptr: rawptr, found: bool) {
-	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
-	c_str := strings.clone_to_cstring(symbol, context.temp_allocator)
+_symbol_address :: proc(library: Library, symbol: string, allocator := context.temp_allocator) -> (ptr: rawptr, found: bool) {
+	c_str := strings.clone_to_cstring(symbol, allocator)
+	defer delete(c_str, allocator)
 	ptr = win32.GetProcAddress(cast(win32.HMODULE)library, c_str)
 	found = ptr != nil
 	return

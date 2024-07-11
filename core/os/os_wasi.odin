@@ -6,6 +6,8 @@ import "base:runtime"
 Handle :: distinct i32
 Errno :: distinct i32
 
+INVALID_HANDLE :: -1
+
 ERROR_NONE :: Errno(wasi.errno_t.SUCCESS)
 
 O_RDONLY   :: 0x00000
@@ -24,7 +26,124 @@ O_CLOEXEC  :: 0x80000
 stdin:  Handle = 0
 stdout: Handle = 1
 stderr: Handle = 2
-current_dir: Handle = 3
+
+args := _alloc_command_line_arguments()
+
+_alloc_command_line_arguments :: proc() -> (args: []string) {
+	args = make([]string, len(runtime.args__))
+	for &arg, i in args {
+		arg = string(runtime.args__[i])
+	}
+	return
+}
+
+// WASI works with "preopened" directories, the environment retrieves directories
+// (for example with `wasmtime --dir=. module.wasm`) and those given directories
+// are the only ones accessible by the application.
+//
+// So in order to facilitate the `os` API (absolute paths etc.) we keep a list
+// of the given directories and match them when needed (notably `os.open`).
+
+@(private)
+Preopen :: struct {
+	fd:     wasi.fd_t,
+	prefix: string,
+}
+@(private)
+preopens: []Preopen
+
+@(init, private)
+init_preopens :: proc() {
+
+	strip_prefixes :: proc(path: string) -> string {
+		path := path
+		loop: for len(path) > 0 {
+			switch {
+			case path[0] == '/':
+				path = path[1:]
+			case len(path) > 2  && path[0] == '.' && path[1] == '/':
+				path = path[2:]
+			case len(path) == 1 && path[0] == '.':
+				path = path[1:]
+			case:
+				break loop
+			}
+		}
+		return path
+	}
+
+	dyn_preopens: [dynamic]Preopen
+	loop: for fd := wasi.fd_t(3); ; fd += 1 {
+		desc, err := wasi.fd_prestat_get(fd)
+		#partial switch err {
+		case .BADF: break loop
+		case:       panic("fd_prestat_get returned an unexpected error")
+		case .SUCCESS:
+		}
+
+		switch desc.tag {
+		case .DIR:
+			buf := make([]byte, desc.dir.pr_name_len) or_else panic("could not allocate memory for filesystem preopens")
+			if err = wasi.fd_prestat_dir_name(fd, buf); err != .SUCCESS {
+				panic("could not get filesystem preopen dir name")
+			}
+			append(&dyn_preopens, Preopen{fd, strip_prefixes(string(buf))})
+		}
+	}
+	preopens = dyn_preopens[:]
+}
+
+wasi_match_preopen :: proc(path: string) -> (wasi.fd_t, string, bool) {
+
+	prefix_matches :: proc(prefix, path: string) -> bool {
+		// Empty is valid for any relative path.
+		if len(prefix) == 0 && len(path) > 0 && path[0] != '/' {
+			return true
+		}
+
+		if len(path) < len(prefix) {
+			return false
+		}
+
+		if path[:len(prefix)] != prefix {
+			return false
+		}
+
+		// Only match on full components.
+		i := len(prefix)
+		for i > 0 && prefix[i-1] == '/' {
+			i -= 1
+		}
+		return path[i] == '/'
+	}
+
+	path := path
+	for len(path) > 0 && path[0] == '/' {
+		path = path[1:]
+	}
+
+	match: Preopen
+	#reverse for preopen in preopens {
+		if (match.fd == 0 || len(preopen.prefix) > len(match.prefix)) && prefix_matches(preopen.prefix, path) {
+			match = preopen
+		}
+	}
+
+	if match.fd == 0 {
+		return 0, "", false
+	}
+
+	relative := path[len(match.prefix):]
+	for len(relative) > 0 && relative[0] == '/' {
+		relative = relative[1:]
+	}
+
+	if len(relative) == 0 {
+		relative = "."
+	}
+
+	return match.fd, relative, true
+}
 
 write :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 	iovs := wasi.ciovec_t(data)
@@ -75,7 +194,13 @@ open :: proc(path: string, mode: int = O_RDONLY, perm: int = 0) -> (Handle, Errn
 	if mode & O_SYNC == O_SYNC {
 		fdflags += {.SYNC}
 	}
-	fd, err := wasi.path_open(wasi.fd_t(current_dir),{.SYMLINK_FOLLOW},path,oflags,rights,{},fdflags)
+
+	dir_fd, relative, ok := wasi_match_preopen(path)
+	if !ok {
+		return INVALID_HANDLE, Errno(wasi.errno_t.BADF)
+	}
+
+	fd, err := wasi.path_open(dir_fd, {.SYMLINK_FOLLOW}, relative, oflags, rights, {}, fdflags)
 	return Handle(fd), Errno(err)
 }
 close :: proc(fd: Handle) -> Errno {

@@ -1258,6 +1258,20 @@ gb_internal void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags
 			error_line("\tSuggestion: Was '#partial switch' wanted?\n");
 		}
 	}
+
+	if (build_context.strict_style) {
+		Token stok = ss->token;
+		for_array(i, bs->stmts) {
+			Ast *stmt = bs->stmts[i];
+			if (stmt->kind != Ast_CaseClause) {
+				continue;
+			}
+			Token ctok = stmt->CaseClause.token;
+			if (ctok.pos.column > stok.pos.column) {
+				error(ctok, "With '-strict-style', 'case' statements must share the same column as the 'switch' token");
+			}
+		}
+	}
 }
 
 
@@ -2016,6 +2030,12 @@ gb_internal void check_value_decl_stmt(CheckerContext *ctx, Ast *node, u32 mod_f
 			error(vd->type, "Invalid use of a polymorphic type '%s' in variable declaration", str);
 			gb_string_free(str);
 			init_type = t_invalid;
+		}
+		if (init_type == t_invalid && entity_count == 1 && (mod_flags & (Stmt_BreakAllowed|Stmt_FallthroughAllowed))) {
+			Entity *e = entities[0];
+			if (e != nullptr && e->token.string == "default") {
+				warning(e->token, "Did you mean 'case:'?");
+			}
 		}
 	}
 

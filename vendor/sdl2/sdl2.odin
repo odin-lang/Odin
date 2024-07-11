@@ -235,8 +235,8 @@ foreign lib {
 // quit
 
 QuitRequested :: #force_inline proc "c" () -> bool {
-        PumpEvents()
-        return bool(PeepEvents(nil, 0, .PEEKEVENT, .QUIT, .QUIT) > 0)
+	PumpEvents()
+	return bool(PeepEvents(nil, 0, .PEEKEVENT, .QUIT, .QUIT) > 0)
 }
 
 

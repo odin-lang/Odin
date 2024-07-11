@@ -787,8 +787,8 @@ _private_int_sqr_comba :: proc(dest, src: ^Int, allocator := context.allocator) 
 /*
 	Karatsuba squaring, computes `dest` = `src` * `src` using three half-size squarings.
  
- 	See comments of `_private_int_mul_karatsuba` for details.
- 	It is essentially the same algorithm but merely tuned to perform recursive squarings.
+	See comments of `_private_int_mul_karatsuba` for details.
+	It is essentially the same algorithm but merely tuned to perform recursive squarings.
 */
 _private_int_sqr_karatsuba :: proc(dest, src: ^Int, allocator := context.allocator) -> (err: Error) {
 	context.allocator = allocator
@@ -967,7 +967,7 @@ _private_int_div_3 :: proc(quotient, numerator: ^Int, allocator := context.alloc
 	/*
 		b = 2^_DIGIT_BITS / 3
 	*/
- 	b := _WORD(1) << _WORD(_DIGIT_BITS) / _WORD(3)
+	b := _WORD(1) << _WORD(_DIGIT_BITS) / _WORD(3)
 
 	q := &Int{}
 	internal_grow(q, numerator.used) or_return
@@ -975,7 +975,7 @@ _private_int_div_3 :: proc(quotient, numerator: ^Int, allocator := context.alloc
 	q.sign = numerator.sign
 
 	w, t: _WORD
-	#no_bounds_check for ix := numerator.used; ix >= 0; ix -= 1 {
+	#no_bounds_check for ix := numerator.used - 1; ix >= 0; ix -= 1 {
 		w = (w << _WORD(_DIGIT_BITS)) | _WORD(numerator.digit[ix])
 		if w >= 3 {
 			/*
@@ -1007,8 +1007,8 @@ _private_int_div_3 :: proc(quotient, numerator: ^Int, allocator := context.alloc
 	*/
 	if quotient != nil {
 		err = clamp(q)
- 		internal_swap(q, quotient)
- 	}
+		internal_swap(q, quotient)
+	}
 	internal_destroy(q)
 	return remainder, nil
 }
@@ -1555,24 +1555,24 @@ _private_int_gcd_lcm :: proc(res_gcd, res_lcm, a, b: ^Int, allocator := context.
 
 	/*
 		If neither `a` or `b` was zero, we need to compute `gcd`.
- 		Get copies of `a` and `b` we can modify.
- 	*/
+		Get copies of `a` and `b` we can modify.
+	*/
 	u, v := &Int{}, &Int{}
 	defer internal_destroy(u, v)
 	internal_copy(u, a) or_return
 	internal_copy(v, b) or_return
 
- 	/*
- 		Must be positive for the remainder of the algorithm.
- 	*/
+	/*
+		Must be positive for the remainder of the algorithm.
+	*/
 	u.sign = .Zero_or_Positive; v.sign = .Zero_or_Positive
 
- 	/*
- 		B1.  Find the common power of two for `u` and `v`.
- 	*/
- 	u_lsb, _ := internal_count_lsb(u)
- 	v_lsb, _ := internal_count_lsb(v)
- 	k        := min(u_lsb, v_lsb)
+	/*
+		B1.  Find the common power of two for `u` and `v`.
+	*/
+	u_lsb, _ := internal_count_lsb(u)
+	v_lsb, _ := internal_count_lsb(v)
+	k        := min(u_lsb, v_lsb)
 
 	if k > 0 {
 		/*
@@ -1615,11 +1615,11 @@ _private_int_gcd_lcm :: proc(res_gcd, res_lcm, a, b: ^Int, allocator := context.
 		internal_shr(v, v, b) or_return
 	}
 
- 	/*
- 		Multiply by 2**k which we divided out at the beginning.
- 	*/
- 	internal_shl(temp_gcd_res, u, k) or_return
- 	temp_gcd_res.sign = .Zero_or_Positive
+	/*
+		Multiply by 2**k which we divided out at the beginning.
+	*/
+	internal_shl(temp_gcd_res, u, k) or_return
+	temp_gcd_res.sign = .Zero_or_Positive
 
 	/*
 		We've computed `gcd`, either the long way, or because one of the inputs was zero.
@@ -1786,8 +1786,8 @@ _private_montgomery_reduce_comba :: proc(x, n: ^Int, rho: DIGIT, allocator := co
 			`a = a + mu * m * b**i`
 		
 			This is computed in place and on the fly.  The multiplication
-		 	by b**i is handled by offseting which columns the results
-		 	are added to.
+			by b**i is handled by offseting which columns the results
+			are added to.
 		
 			Note the comba method normally doesn't handle carries in the
 			inner loop In this case we fix the carry from the previous

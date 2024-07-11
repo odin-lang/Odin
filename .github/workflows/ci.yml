@@ -32,8 +32,8 @@ jobs:
           gmake -C vendor/stb/src
           gmake -C vendor/cgltf/src
           gmake -C vendor/miniaudio/src
-          ./odin check examples/all -vet -strict-style -target:netbsd_amd64
-          ./odin check examples/all -vet -strict-style -target:netbsd_arm64
+          ./odin check examples/all -vet -strict-style -disallow-do -target:netbsd_amd64
+          ./odin check examples/all -vet -strict-style -disallow-do -target:netbsd_arm64
           ./odin test tests/core/normal.odin -file -all-packages -define:ODIN_TEST_FANCY=false
           ./odin test tests/core/speed.odin -file -all-packages -o:speed -define:ODIN_TEST_FANCY=false
           ./odin test tests/vendor -all-packages -define:ODIN_TEST_FANCY=false
@@ -62,7 +62,7 @@ jobs:
           gmake -C vendor/stb/src
           gmake -C vendor/cgltf/src
           gmake -C vendor/miniaudio/src
-          ./odin check examples/all -vet -strict-style -target:freebsd_amd64
+          ./odin check examples/all -vet -strict-style -disallow-do -target:freebsd_amd64
           ./odin test tests/core/normal.odin -file -all-packages -define:ODIN_TEST_FANCY=false
           ./odin test tests/core/speed.odin -file -all-packages -o:speed -define:ODIN_TEST_FANCY=false
           ./odin test tests/vendor -all-packages -define:ODIN_TEST_FANCY=false
@@ -97,7 +97,7 @@ jobs:
       - name: Download LLVM (MacOS ARM)
         if: matrix.os == 'macos-14'
         run: |
-          brew install llvm@17
+          brew install llvm@17 wasmtime
           echo "/opt/homebrew/opt/llvm@17/bin" >> $GITHUB_PATH
 
       - name: Build Odin
@@ -135,17 +135,23 @@ jobs:
           ./run.sh
 
       - name: Odin check examples/all for Linux i386
-        run: ./odin check examples/all -vet -strict-style -target:linux_i386
+        run: ./odin check examples/all -vet -strict-style -disallow-do -target:linux_i386
         if: matrix.os == 'ubuntu-latest'
       - name: Odin check examples/all for Linux arm64
-        run: ./odin check examples/all -vet -strict-style -target:linux_arm64
+        run: ./odin check examples/all -vet -strict-style -disallow-do -target:linux_arm64
         if: matrix.os == 'ubuntu-latest'
       - name: Odin check examples/all for FreeBSD amd64
-        run: ./odin check examples/all -vet -strict-style -target:freebsd_amd64
+        run: ./odin check examples/all -vet -strict-style -disallow-do -target:freebsd_amd64
         if: matrix.os == 'ubuntu-latest'
       - name: Odin check examples/all for OpenBSD amd64
-        run: ./odin check examples/all -vet -strict-style -target:openbsd_amd64
+        run: ./odin check examples/all -vet -strict-style -disallow-do -target:openbsd_amd64
         if: matrix.os == 'ubuntu-latest'
+
+      - name: Run demo on WASI WASM32
+        run: |
+          ./odin build examples/demo -target:wasi_wasm32 -vet -strict-style -disallow-do -out:demo.wasm
+          wasmtime ./demo.wasm
+        if: matrix.os == 'macos-14'
 
   build_windows:
     name: Windows Build, Check, and Test

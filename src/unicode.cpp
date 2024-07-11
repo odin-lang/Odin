@@ -162,3 +162,8 @@ end:
 	if (codepoint_out) *codepoint_out = codepoint;
 	return width;
 }
+
+// NOTE(Feoramund): It's down here because I made UCG use the utf8_decode above to avoid duplicating code.
+extern "C" {
+#include "ucg/ucg.c"
+}

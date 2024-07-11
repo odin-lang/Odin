@@ -39,7 +39,9 @@ foreign WinSock2 {
 			return
 		}
 	}
-	if s.fd_count >= FD_SETSIZE do return
+	if s.fd_count >= FD_SETSIZE {
+		return
+	}
 	s.fd_array[s.fd_count] = fd
 	s.fd_count += 1
 }

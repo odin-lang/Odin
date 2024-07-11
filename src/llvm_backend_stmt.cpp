@@ -1579,7 +1579,8 @@ gb_internal void lb_store_type_case_implicit(lbProcedure *p, Ast *clause, lbValu
 		lb_addr_store(p, x, value);
 	} else {
 		if (!is_default_case) {
-			GB_ASSERT_MSG(are_types_identical(e->type, type_deref(value.type)), "%s %s", type_to_string(e->type), type_to_string(value.type));
+			Type *clause_type = e->type;
+			GB_ASSERT_MSG(are_types_identical(type_deref(clause_type), type_deref(value.type)), "%s %s", type_to_string(clause_type), type_to_string(value.type));
 		}
 		lb_add_entity(p->module, e, value);
 	}

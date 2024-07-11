@@ -6,6 +6,8 @@ import "core:sync"
 import "core:sys/unix"
 import "core:time"
 
+_IS_SUPPORTED :: true
+
 CAS :: sync.atomic_compare_exchange_strong
 
 // NOTE(tetra): Aligned here because of core/unix/pthread_linux.odin/pthread_t.
@@ -23,10 +25,8 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 	__unix_thread_entry_proc :: proc "c" (t: rawptr) -> rawptr {
 		t := (^Thread)(t)
 
-		when ODIN_OS != .Darwin {
-			// We need to give the thread a moment to start up before we enable cancellation.
-			can_set_thread_cancel_state := unix.pthread_setcancelstate(unix.PTHREAD_CANCEL_ENABLE, nil) == 0
-		}
+		// We need to give the thread a moment to start up before we enable cancellation.
+		can_set_thread_cancel_state := unix.pthread_setcancelstate(unix.PTHREAD_CANCEL_ENABLE, nil) == 0
 
 		sync.lock(&t.mutex)
 
@@ -42,12 +42,10 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 			return nil
 		}
 
-		when ODIN_OS != .Darwin {
-			// Enable thread's cancelability.
-			if can_set_thread_cancel_state {
-				unix.pthread_setcanceltype (unix.PTHREAD_CANCEL_ASYNCHRONOUS, nil)
-				unix.pthread_setcancelstate(unix.PTHREAD_CANCEL_ENABLE,       nil)
-			}
+		// Enable thread's cancelability.
+		if can_set_thread_cancel_state {
+			unix.pthread_setcanceltype (unix.PTHREAD_CANCEL_ASYNCHRONOUS, nil)
+			unix.pthread_setcancelstate(unix.PTHREAD_CANCEL_ENABLE,       nil)
 		}
 
 		{
@@ -169,10 +167,17 @@ _destroy :: proc(t: ^Thread) {
 }
 
 _terminate :: proc(t: ^Thread, exit_code: int) {
-	// `pthread_cancel` is unreliable on Darwin for unknown reasons.
-	when ODIN_OS != .Darwin {
-		unix.pthread_cancel(t.unix_thread)
-	}
+	// NOTE(Feoramund): For thread cancellation to succeed on BSDs and
+	// possibly Darwin systems, the thread must call one of the pthread
+	// cancelation points at some point after this.
+	//
+	// The most obvious one of these is `pthread_cancel`, but there is an
+	// entire list of functions that act as cancelation points available in the
+	// pthreads manual page.
+	//
+	// This is in contrast to behavior I have seen on Linux where the thread is
+	// just terminated.
+	unix.pthread_cancel(t.unix_thread)
 }
 
 _yield :: proc() {

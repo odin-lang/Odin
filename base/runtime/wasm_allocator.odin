@@ -495,7 +495,7 @@ claim_more_memory :: proc(a: ^WASM_Allocator, num_bytes: uint) -> bool {
 		// we can just extend the spill.
 		spill_end := uintptr(raw_data(a.spill)) + uintptr(len(a.spill))
 		if spill_end == uintptr(raw_data(allocated)) {
-			raw_spill := transmute(^Raw_Slice)(&a.spill)
+			raw_spill := (^Raw_Slice)(&a.spill)
 			raw_spill.len += len(allocated)
 		} else {
 			// Otherwise, we have to "waste" the previous spill.
@@ -679,7 +679,7 @@ allocate_memory :: proc(a: ^WASM_Allocator, alignment: uint, size: uint, loc := 
 			// but we just had a stale bit set to mark a populated bucket.
 			// Reset the bit to update latest status so that we do not
 			// redundantly look at this bucket again.
-			a.free_region_buckets_used &= ~(BUCKET_BITMASK_T(1) << bucket_index)
+			a.free_region_buckets_used &~= BUCKET_BITMASK_T(1) << bucket_index
 			bucket_mask ~= 1
 		}
 
@@ -760,7 +760,7 @@ free :: proc(a: ^WASM_Allocator, ptr: rawptr, loc := #caller_location) {
 	defer unlock(a)
 
 	size := region.size
-	assert(region_is_in_use(region), "double free", loc=loc)
+	assert(region_is_in_use(region), "double free or corrupt region", loc=loc)
 
 	prev_region_size_field := ([^]uint)(region)[-1]
 	prev_region_size := prev_region_size_field & ~uint(FREE_REGION_FLAG)

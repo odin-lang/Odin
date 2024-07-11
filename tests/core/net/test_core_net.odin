@@ -18,6 +18,7 @@ import "core:sync"
 import "core:time"
 import "core:thread"
 import "core:fmt"
+import "core:log"
 
 @test
 address_parsing_test :: proc(t: ^testing.T) {
@@ -216,6 +217,8 @@ IP_Address_Parsing_Test_Vectors :: []IP_Address_Parsing_Test_Vector{
 ENDPOINT_TWO_SERVERS  := net.Endpoint{net.IP4_Address{127, 0, 0, 1}, 9991}
 ENDPOINT_CLOSED_PORT  := net.Endpoint{net.IP4_Address{127, 0, 0, 1}, 9992}
 ENDPOINT_SERVER_SENDS := net.Endpoint{net.IP4_Address{127, 0, 0, 1}, 9993}
+ENDPOINT_UDP_ECHO     := net.Endpoint{net.IP4_Address{127, 0, 0, 1}, 9994}
+ENDPOINT_NONBLOCK     := net.Endpoint{net.IP4_Address{127, 0, 0, 1}, 9995}
 
 @(test)
 two_servers_binding_same_endpoint :: proc(t: ^testing.T) {
@@ -256,7 +259,7 @@ client_sends_server_data :: proc(t: ^testing.T) {
 	}
 
 	tcp_client :: proc(thread_data: rawptr) {
-		r := transmute(^Thread_Data)thread_data
+		r := cast(^Thread_Data)thread_data
 
 		defer sync.wait_group_done(r.wg)
 
@@ -271,7 +274,7 @@ client_sends_server_data :: proc(t: ^testing.T) {
 	}
 
 	tcp_server :: proc(thread_data: rawptr) {
-		r := transmute(^Thread_Data)thread_data
+		r := cast(^Thread_Data)thread_data
 
 		defer sync.wait_group_done(r.wg)
 
@@ -513,6 +516,102 @@ join_url_test :: proc(t: ^testing.T) {
 			pass |= url == test_url
 		}
 		testing.expectf(t, pass, "Expected `net.join_url` to return one of %s, got %s", test.url, url)
+	}
+}
+
+@test
+test_udp_echo :: proc(t: ^testing.T) {
+	server, make_server_err := net.make_unbound_udp_socket(.IP4)
+	if !testing.expect_value(t, make_server_err, nil) {
+		return
+	}
+	defer net.close(server)
+
+	bind_server_err := net.bind(server, ENDPOINT_UDP_ECHO)
+	if !testing.expect_value(t, bind_server_err, nil) {
+		return
+	}
+
+	client, make_client_err := net.make_unbound_udp_socket(.IP4)
+	if !testing.expect_value(t, make_client_err, nil) {
+		return
+	}
+	defer net.close(client)
+
+	msg := "Hellope world!"
+	buf: [64]u8
+
+	bytes_written, send_err := net.send_udp(client, transmute([]u8)msg[:], ENDPOINT_UDP_ECHO)
+	if !testing.expect_value(t, send_err, nil) {
+		return
+	}
+	if !testing.expect_value(t, bytes_written, len(msg)) {
+		return
+	}
+
+	bytes_read, _, read_err := net.recv_udp(server, buf[:])
+	if !testing.expect_value(t, read_err, nil) {
+		return
+	}
+	if !testing.expect_value(t, bytes_read, len(msg)) {
+		return
+	}
+
+	testing.expect_value(t, msg, transmute(string)buf[:bytes_read])
+}
+
+@test
+test_dns_resolve :: proc(t: ^testing.T) {
+	// NOTE: This test depends on external factors, so if it fails, an IP
+	// address may have changed or become unavailable.
+
+	// The net API returns only one address per protocol version, and DNS
+	// records can store many, so we'll have to check all possibilities.
+	ep4, ep6, resolve_err := net.resolve("dns.quad9.net")
+	if !testing.expect_value(t, resolve_err, nil) {
+		return
+	}
+
+	ip4, ip4_ok := ep4.address.(net.IP4_Address)
+	if !testing.expect(t, ip4_ok, "Unable to resolve IP4") {
+		return
+	}
+
+	valid_ip4_a := net.IP4_Address{  9,   9,   9,   9}
+	valid_ip4_b := net.IP4_Address{149, 112, 112, 112}
+	if ip4 != valid_ip4_a && ip4 != valid_ip4_b {
+		log.errorf("DNS resolved to invalid IP4: %v, expected %v or %v", ip4, valid_ip4_a, valid_ip4_b)
+	}
+
+	ip6, ip6_ok := ep6.address.(net.IP6_Address)
+	if !testing.expect(t, ip6_ok, "Unable to resolve IP6") {
+		return
+	}
+
+	valid_ip6_a := net.IP6_Address{0x2620, 0xfe, 0, 0, 0, 0, 0,    9}
+	valid_ip6_b := net.IP6_Address{0x2620, 0xfe, 0, 0, 0, 0, 0, 0xfe}
+	if ip6 != valid_ip6_a && ip6 != valid_ip6_b {
+		log.errorf("DNS resolved to invalid IP6: %v, expected %v or %v", ip6, valid_ip6_a, valid_ip6_b)
+	}
+}
+
+@test
+test_nonblocking_option :: proc(t: ^testing.T) {
+	server, listen_err := net.listen_tcp(ENDPOINT_NONBLOCK)
+	if !testing.expect_value(t, listen_err, nil) {
+		return
+	}
+	defer net.close(server)
+
+	testing.set_fail_timeout(t, 2 * time.Second)
+
+	// If the nonblocking option isn't set correctly in the operating system,
+	// this should block until the timeout hits.
+	net.set_blocking(server, false)
+
+	_, _, accept_err := net.accept_tcp(server)
+	if !testing.expect_value(t, accept_err, net.Accept_Error.Would_Block) {
+		return
 	}
 }
 
