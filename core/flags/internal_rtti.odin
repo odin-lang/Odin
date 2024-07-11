@@ -368,12 +368,12 @@ set_unbounded_integer_by_type :: proc(ptr: rawptr, value: $T, data_type: typeid)
 }
 
 @(optimization_mode="size")
-parse_and_set_pointer_by_type :: proc(ptr: rawptr, str: string, type_info: ^runtime.Type_Info, arg_tag: string) -> (error: Error) {
+parse_and_set_pointer_by_type :: proc(ptr: rawptr, str: string, type_info: ^runtime.Type_Info, field_name, arg_tag: string) -> (error: Error) {
 	#partial switch specific_type_info in type_info.variant {
 	case runtime.Type_Info_Named:
 		if global_custom_type_setter != nil {
 			// The program gets to go first.
-			error_message, handled, alloc_error := global_custom_type_setter(ptr, type_info.id, str, arg_tag)
+			error_message, handled, alloc_error := global_custom_type_setter(ptr, type_info.id, field_name, str, arg_tag)
 
 			if alloc_error != nil {
 				// There was an allocation error. Bail out.
@@ -415,7 +415,7 @@ parse_and_set_pointer_by_type :: proc(ptr: rawptr, str: string, type_info: ^runt
 				// So far, it's none of the types that we recognize.
 				// Check to see if we can set it by base type, if allowed.
 				if _, is_indistinct := get_struct_subtag(arg_tag, SUBTAG_INDISTINCT); is_indistinct {
-					return parse_and_set_pointer_by_type(ptr, str, specific_type_info.base, arg_tag)
+					return parse_and_set_pointer_by_type(ptr, str, specific_type_info.base, field_name, arg_tag)
 				}
 			}
 		}
@@ -432,7 +432,7 @@ parse_and_set_pointer_by_type :: proc(ptr: rawptr, str: string, type_info: ^runt
 			}
 		}
 		defer delete(elem_backing)
-		parse_and_set_pointer_by_type(raw_data(elem_backing), str, specific_type_info.elem, arg_tag) or_return
+		parse_and_set_pointer_by_type(raw_data(elem_backing), str, specific_type_info.elem, field_name, arg_tag) or_return
 
 		if !runtime.__dynamic_array_resize(ptr, specific_type_info.elem.size, specific_type_info.elem.align, ptr.len + 1) {
 			// NOTE: This is purely an assumption that it's OOM.

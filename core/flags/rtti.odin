@@ -8,6 +8,7 @@ Handle setting custom data types.
 Inputs:
 - data: A raw pointer to the field where the data will go.
 - data_type: Type information on the underlying field.
+- field_name: The name of the underlying field.
 - unparsed_value: The unparsed string that the flag is being set to.
 - args_tag: The `args` tag from the struct's field.
 
@@ -19,6 +20,7 @@ Returns:
 Custom_Type_Setter :: #type proc(
 	data:           rawptr,
 	data_type:      typeid,
+	field_name:		string,
 	unparsed_value: string,
 	args_tag:       string,
 ) -> (
