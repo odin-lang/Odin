@@ -9,6 +9,10 @@ import "base:runtime"
 import "core:math"
 import "core:mem"
 
+Generator :: runtime.Random_Generator
+
+Generator_Query_Info :: runtime.Random_Generator_Query_Info
+
 Default_Random_State :: runtime.Default_Random_State
 default_random_generator :: runtime.default_random_generator
 
@@ -64,6 +68,15 @@ Possible Output:
 */
 reset :: proc(seed: u64, gen := context.random_generator) {
 	runtime.random_generator_reset_u64(gen, seed)
+}
+
+
+reset_bytes :: proc(bytes: []byte, gen := context.random_generator) {
+	runtime.random_generator_reset_bytes(gen, bytes)
+}
+
+query_info :: proc(gen: context.random_generator) -> Generator_Query_Info {
+	return runtime.random_generator_query_info(gen)
 }
 
 
