@@ -1,5 +1,6 @@
 package aes
 
+import "core:bytes"
 import "core:crypto"
 import "core:crypto/_aes"
 import "core:crypto/_aes/ct64"
@@ -39,6 +40,9 @@ seal_gcm :: proc(ctx: ^Context_GCM, dst, tag, nonce, aad, plaintext: []byte) {
 	if len(dst) != len(plaintext) {
 		panic("crypto/aes: invalid destination ciphertext size")
 	}
+	if bytes.alias_inexactly(dst, plaintext) {
+		panic("crypto/aes: dst and plaintext alias inexactly")
+	}
 
 	if impl, is_hw := ctx._impl.(Context_Impl_Hardware); is_hw {
 		gcm_seal_hw(&impl, dst, tag, nonce, aad, plaintext)
@@ -72,6 +76,9 @@ open_gcm :: proc(ctx: ^Context_GCM, dst, nonce, aad, ciphertext, tag: []byte) ->
 	gcm_validate_common_slice_sizes(tag, nonce, aad, ciphertext)
 	if len(dst) != len(ciphertext) {
 		panic("crypto/aes: invalid destination plaintext size")
+	}
+	if bytes.alias_inexactly(dst, ciphertext) {
+		panic("crypto/aes: dst and ciphertext alias inexactly")
 	}
 
 	if impl, is_hw := ctx._impl.(Context_Impl_Hardware); is_hw {

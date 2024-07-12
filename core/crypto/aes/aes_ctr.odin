@@ -1,5 +1,6 @@
 package aes
 
+import "core:bytes"
 import "core:crypto/_aes/ct64"
 import "core:encoding/endian"
 import "core:math/bits"
@@ -37,12 +38,13 @@ init_ctr :: proc(ctx: ^Context_CTR, key, iv: []byte, impl := Implementation.Hard
 xor_bytes_ctr :: proc(ctx: ^Context_CTR, dst, src: []byte) {
 	assert(ctx._is_initialized)
 
-	// TODO: Enforcing that dst and src alias exactly or not at all
-	// is a good idea, though odd aliasing should be extremely uncommon.
-
 	src, dst := src, dst
 	if dst_len := len(dst); dst_len < len(src) {
 		src = src[:dst_len]
+	}
+
+	if bytes.alias_inexactly(dst, src) {
+		panic("crypto/aes: dst and src alias inexactly")
 	}
 
 	for remaining := len(src); remaining > 0; {
