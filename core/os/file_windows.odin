@@ -125,7 +125,7 @@ read_console :: proc(handle: win32.HANDLE, b: []byte) -> (n: int, err: Errno) {
 		src := buf8[:buf8_len]
 
 		ctrl_z := false
-		for i := 0; i < len(src) && n+i < len(b); i += 1 {
+		for i := 0; i < len(src) && n < len(b); i += 1 {
 			x := src[i]
 			if x == 0x1a { // ctrl-z
 				ctrl_z = true
