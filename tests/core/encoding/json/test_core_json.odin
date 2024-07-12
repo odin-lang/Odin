@@ -400,8 +400,7 @@ map_with_integer_keys :: proc(t: ^testing.T) {
 	for key, item in my_map {
 		testing.expectf(t, key in my_map2, "Expected key %v to be present in unmarshaled map", key)
 		
-		value_from_map2, ok := my_map2[key]
-		if ok {
+		if key in my_map2 {
 			testing.expectf(t, runtime.string_eq(item, my_map2[key]), "Expected value %s to be present in unmarshaled map", key)
 		}
 	}
