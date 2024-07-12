@@ -410,14 +410,15 @@ _get_process_user :: proc(process_handle: windows.HANDLE, allocator: runtime.All
 @(private)
 _parse_environment_block :: proc(block: [^]u16, allocator: runtime.Allocator) -> ([]string, Error) {
 	zt_count := 0
-	for idx := 0; true; idx += 1 {
+	for idx := 0; true; {
 		if block[idx] == 0x0000 {
 			zt_count += 1
+			if block[idx+1] == 0x0000 {
+				zt_count += 1
+				break
+			}
 		}
-		if block[idx] == 0x0000 {
-			zt_count += 1
-			break
-		}
+		idx += 1
 	}
 	// Note(flysand): Each string in the environment block is terminated
 	// by a NUL character. In addition, the environment block itself is
