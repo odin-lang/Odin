@@ -20,7 +20,7 @@ Returns:
 Custom_Type_Setter :: #type proc(
 	data:           rawptr,
 	data_type:      typeid,
-	field_name:		string,
+	field_name:			string,
 	unparsed_value: string,
 	args_tag:       string,
 ) -> (
