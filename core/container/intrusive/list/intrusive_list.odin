@@ -212,7 +212,7 @@ Iterator :: struct($T: typeid) {
 }
 
 /*
-Creates an iterator pointing at the head of the given list.
+Creates an iterator pointing at the head of the given list. For an example, see `iterate_next`.
 
 **Inputs**
 - list: The container list
@@ -221,16 +221,6 @@ Creates an iterator pointing at the head of the given list.
 
 **Returns** An iterator pointing at the head of `list`
 
-Example:
-
-	My_Struct :: struct {
-		node : list.Node,
-		value: int,
-	}
-	
-	l: list.List
-	it := list.iterator_head(l, My_Struct, "node")
-
 */
 iterator_head :: proc "contextless" (list: List, $T: typeid, $field_name: string) -> Iterator(T)
 	where intrinsics.type_has_field(T, field_name),
@@ -238,7 +228,7 @@ iterator_head :: proc "contextless" (list: List, $T: typeid, $field_name: string
 	return {list.head, offset_of_by_string(T, field_name)}
 }
 /*
-Creates an iterator pointing at the tail of the given list.
+Creates an iterator pointing at the tail of the given list. For an example, see `iterate_prev`.
 
 **Inputs**
 - list: The container list
@@ -246,16 +236,6 @@ Creates an iterator pointing at the tail of the given list.
 - field_name: The name of the node field in the `T` structure
 
 **Returns** An iterator pointing at the tail of `list`
-
-Example:
-
-	My_Struct :: struct {
-		node : list.Node,
-		value: int,
-	}
-	
-	l: list.List
-	it := list.iterator_tail(l, My_Struct, "node")
 
 */
 iterator_tail :: proc "contextless" (list: List, $T: typeid, $field_name: string) -> Iterator(T)
@@ -304,9 +284,9 @@ Example:
 		list.push_back(&l, &one.node)
 		list.push_back(&l, &two.node)
 
-		it := list.iterator_head(&l, My_Struct, "node")
+		it := list.iterator_head(l, My_Struct, "node")
 		for num in list.iterate_next(&it) {
-			fmt.println(num)
+			fmt.println(num.value)
 		}
 	}
 
@@ -354,9 +334,9 @@ Example:
 		list.push_back(&l, &one.node)
 		list.push_back(&l, &two.node)
 
-		it := list.iterator_tail(&l, My_Struct, "node")
+		it := list.iterator_tail(l, My_Struct, "node")
 		for num in list.iterate_prev(&it) {
-			fmt.println(num)
+			fmt.println(num.value)
 		}
 	}
 
