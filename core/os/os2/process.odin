@@ -112,80 +112,142 @@ process_list :: proc(allocator: runtime.Allocator) -> ([]int, Error) {
 }
 
 /*
-	Handle to a process.
+	Bit set specifying which fields of the `Process_Info` struct need to be
+	obtained by the `process_info()` procedure. Each bit corresponds to a
+	field in the `Process_Info` struct.
 */
-Process :: struct {
-	handle: _Process_Handle,
+Process_Info_Fields :: bit_set[Process_Info_Field]
+Process_Info_Field :: enum {
+	Executable_Path,
+	PPid,
+	Priority,
+	Command_Line,
+	Command_Args,
+	Environment,
+	Username,
+	CWD,
 }
 
 /*
-	Obtain a process handle.
+	Contains information about the process as obtained by the `process_info()`
+	procedure.
 */
-process_open :: proc(pid: int) -> (Process, Error) {
-	return _process_open(pid)
+Process_Info :: struct {
+	fields: Process_Info_Fields,
+	// The ID of the process.
+	pid: int,
+	// The ID of the parent process.
+	ppid: int,
+	// The process priority.
+	priority: int,
+	// The path to the executable, which the process runs.
+	executable_path: string,
+	// The command line supplied to the process.
+	command_line: string,
+	// The arguments supplied to the process.
+	command_args: []string,
+	// The environment of the process.
+	environment: []string,
+	// The username of the user who started the process.
+	username: string,
+	// The current working directory of the process.
+	cwd: string,
 }
 
 /*
-	Close a process handle
+	Obtain information about a process.
+
+	This procedure obtains an information, given by `selection` parameter of
+	a process given by `pid`.
+	
+	Use `free_process_info` to free memory allocated by this function. In case
+	the function returns an error all temporary allocations would be freed and
+	as such, calling `free_process_info()` is not needed.
+
+	**Note**: The resulting information may or may not contain the
+	selected fields. Please check the `fields` field of the `Process_Info`
+	struct to see if the struct contains the desired fields **before** checking
+	the error return of this function.
 */
-process_close :: proc(process: Process) -> (Error) {
-	return _process_close(process)
+process_info :: proc(pid: int, selection: Process_Info_Fields, allocator: runtime.Allocator) -> (Process_Info, Error) {
+	return _process_info(pid, selection, allocator)
 }
 
-
-Process_Attributes :: struct {
-	dir: string,
-	env: []string,
-	files: []^File,
-	sys: ^Process_Attributes_OS_Specific,
+current_process_info :: proc(selection: Process_Info_Fields, allocator: runtime.Allocator) -> (Process_Info, Error) {
+	return _current_process_info(selection, allocator)
 }
 
-Process_Attributes_OS_Specific :: struct{}
+/*
+	Free the information about the process.
 
-Process_Error :: enum {
-	None,
+	This procedure frees the memory occupied by process info using the provided
+	allocator. The allocator needs to be the same allocator that was supplied
+	to the `process_info` function.
+*/
+free_process_info :: proc(pi: Process_Info, allocator: runtime.Allocator) {
+	delete(pi.executable_path, allocator)
+	delete(pi.command_line, allocator)
+	delete(pi.command_args, allocator)
+	for s in pi.environment {
+		delete(s, allocator)
+	}
+	delete(pi.environment, allocator)
+	delete(pi.cwd, allocator)
 }
 
-Process_State :: struct {
-	pid:         int,
-	exit_code:   int,
-	exited:      bool,
-	success:     bool,
-	system_time: time.Duration,
-	user_time:   time.Duration,
-	sys:         rawptr,
-}
+// Process_Attributes :: struct {
+// 	dir: string,
+// 	env: []string,
+// 	files: []^File,
+// 	sys: ^Process_Attributes_OS_Specific,
+// }
 
-Signal :: #type proc()
+// Process_Attributes_OS_Specific :: struct{}
 
-Kill:      Signal = nil
-Interrupt: Signal = nil
+// Process_Error :: enum {
+// 	None,
+// }
+
+// Process_State :: struct {
+// 	pid:         int,
+// 	exit_code:   int,
+// 	exited:      bool,
+// 	success:     bool,
+// 	system_time: time.Duration,
+// 	user_time:   time.Duration,
+// 	sys:         rawptr,
+// }
+
+// Signal :: #type proc()
+
+// Kill:      Signal = nil
+// Interrupt: Signal = nil
 
 
-find_process :: proc(pid: int) -> (^Process, Process_Error) {
-	return nil, .None
-}
+// find_process :: proc(pid: int) -> (^Process, Process_Error) {
+// 	return nil, .None
+// }
 
 
-process_start :: proc(name: string, argv: []string, attr: ^Process_Attributes) -> (^Process, Process_Error) {
-	return nil, .None
-}
+// process_start :: proc(name: string, argv: []string, attr: ^Process_Attributes) -> (^Process, Process_Error) {
+// 	return nil, .None
+// }
 
-process_release :: proc(p: ^Process) -> Process_Error {
-	return .None
-}
+// process_release :: proc(p: ^Process) -> Process_Error {
+// 	return .None
+// }
 
-process_kill :: proc(p: ^Process) -> Process_Error {
-	return .None
-}
+// process_kill :: proc(p: ^Process) -> Process_Error {
+// 	return .None
+// }
 
-process_signal :: proc(p: ^Process, sig: Signal) -> Process_Error {
-	return .None
-}
+// process_signal :: proc(p: ^Process, sig: Signal) -> Process_Error {
+// 	return .None
+// }
 
-process_wait :: proc(p: ^Process) -> (Process_State, Process_Error) {
-	return {}, .None
-}
+// process_wait :: proc(p: ^Process) -> (Process_State, Process_Error) {
+// 	return {}, .None
+// }
 
 
 
