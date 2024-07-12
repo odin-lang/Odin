@@ -3,10 +3,7 @@ package test_core_json
 import "core:encoding/json"
 import "core:testing"
 import "core:mem/virtual"
-import "core:fmt"
 import "base:runtime"
-import "core:log"
-import "core:strings"
 
 @test
 parse_json :: proc(t: ^testing.T) {
