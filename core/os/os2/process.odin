@@ -133,6 +133,8 @@ Process_Info_Field :: enum {
 	procedure.
 */
 Process_Info :: struct {
+	// The information about a process the struct contains. `pid` is always
+	// stored, no matter what.
 	fields: Process_Info_Fields,
 	// The ID of the process.
 	pid: int,
@@ -157,22 +159,37 @@ Process_Info :: struct {
 /*
 	Obtain information about a process.
 
-	This procedure obtains an information, given by `selection` parameter of
+	This procedure obtains an information, specified by `selection` parameter of
 	a process given by `pid`.
 	
-	Use `free_process_info` to free memory allocated by this function. In case
-	the function returns an error all temporary allocations would be freed and
-	as such, calling `free_process_info()` is not needed.
+	Use `free_process_info` to free the memory allocated by this function. In
+	case the function returns an error all temporary allocations would be freed
+	and as such, calling `free_process_info()` is not needed.
 
 	**Note**: The resulting information may or may not contain the
 	selected fields. Please check the `fields` field of the `Process_Info`
 	struct to see if the struct contains the desired fields **before** checking
-	the error return of this function.
+	the error code returned by this function.
 */
 process_info :: proc(pid: int, selection: Process_Info_Fields, allocator: runtime.Allocator) -> (Process_Info, Error) {
 	return _process_info(pid, selection, allocator)
 }
 
+/*
+	Obtain information about the current process.
+
+	This procedure obtains the information, specified by `selection` parameter
+	about the currently running process.
+
+	Use `free_process_info` to free the memory allocated by this function. In
+	case this function returns an error, all temporary allocations would be
+	freed and as such calling `free_process_info()` is not needed.
+
+	**Note**: The resulting `Process_Info` may or may not contain the selected
+	fields. Check the `fields` field of the `Process_Info` struct to see, if the
+	struct contains the selected fields **before** checking the error code
+	returned by this function.
+*/
 current_process_info :: proc(selection: Process_Info_Fields, allocator: runtime.Allocator) -> (Process_Info, Error) {
 	return _current_process_info(selection, allocator)
 }
