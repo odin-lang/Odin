@@ -66,6 +66,9 @@ _process_list :: proc(allocator: runtime.Allocator) -> ([]int, Error) {
 
 _process_info :: proc(pid: int, selection: Process_Info_Fields, allocator: runtime.Allocator) -> (info: Process_Info, err: Error) {
 	info.pid = pid
+	defer if err != nil {
+		free_process_info(info, allocator)
+	}
 	need_snapprocess := \
 		.PPid in selection ||
 		.Priority in selection
@@ -135,9 +138,6 @@ _process_info :: proc(pid: int, selection: Process_Info_Fields, allocator: runti
 		info.fields |= {.Executable_Path}
 		info.executable_path = exe_path
 	}
-	defer if .Executable_Path in info.fields && err != nil {
-		delete(info.executable_path, allocator)
-	}
 	ph := windows.INVALID_HANDLE_VALUE
 	if need_process_handle {
 		ph = windows.OpenProcess(
@@ -152,24 +152,6 @@ _process_info :: proc(pid: int, selection: Process_Info_Fields, allocator: runti
 	}
 	defer if ph != windows.INVALID_HANDLE_VALUE {
 		windows.CloseHandle(ph)
-	}
-	defer if .CWD in info.fields && err != nil {
-		delete(info.cwd, allocator)
-	}
-	defer if .Environment in info.fields && err != nil {
-		for s in info.environment {
-			delete(s, allocator)
-		}
-		delete(info.environment, allocator)
-	}
-	defer if .Command_Line in info.fields && err != nil {
-		delete(info.command_line, allocator)
-	}
-	defer if .Command_Args in selection && err != nil {
-		for arg in info.command_args {
-			delete(arg, allocator)
-		}
-		delete(info.command_args, allocator)
 	}
 	if need_peb {
 		ntdll_lib := windows.LoadLibraryW(windows.L("ntdll.dll"))
@@ -287,6 +269,9 @@ _process_info :: proc(pid: int, selection: Process_Info_Fields, allocator: runti
 
 _current_process_info :: proc(selection: Process_Info_Fields, allocator: runtime.Allocator) -> (info: Process_Info, err: Error) {
 	info.pid = cast(int) windows.GetCurrentProcessId()
+	defer if err != nil {
+		free_process_info(info, allocator)
+	}
 	need_snapprocess := .PPid in selection || .Priority in selection
 	if need_snapprocess {
 		snap := windows.CreateToolhelp32Snapshot(windows.TH32CS_SNAPPROCESS, 0)
@@ -326,9 +311,6 @@ _current_process_info :: proc(selection: Process_Info_Fields, allocator: runtime
 		info.fields += {.Executable_Path}
 		info.executable_path = exe_filename
 	}
-	defer if .Executable_Path in selection && err != nil {
-		delete(info.executable_path, allocator)
-	}
 	if .Command_Line in selection  || .Command_Args in selection {
 		command_line_w := windows.GetCommandLineW()
 		if .Command_Line in selection {
@@ -350,15 +332,6 @@ _current_process_info :: proc(selection: Process_Info_Fields, allocator: runtime
 			info.command_args = args
 		}
 	}
-	defer if .Command_Line in selection && err != nil {
-		delete(info.command_line, allocator)
-	}
-	defer if .Command_Args in selection && err != nil {
-		for arg in info.command_args {
-			delete(arg, allocator)
-		}
-		delete(info.command_args, allocator)
-	}
 	if .Environment in selection {
 		env_block := windows.GetEnvironmentStringsW()
 		envs, envs_err := _parse_environment_block(env_block, allocator)
@@ -369,12 +342,6 @@ _current_process_info :: proc(selection: Process_Info_Fields, allocator: runtime
 		info.fields += {.Environment}
 		info.environment = envs
 	}
-	defer if .Environment in selection && err != nil {
-		for s in info.environment {
-			delete(s, allocator)
-		}
-		delete(info.environment)
-	}
 	if .Username in selection {
 		process_handle := windows.GetCurrentProcess()
 		username, username_err := _get_process_user(process_handle, allocator)
@@ -384,9 +351,6 @@ _current_process_info :: proc(selection: Process_Info_Fields, allocator: runtime
 		}
 		info.fields += {.Username}
 		info.username = username
-	}
-	defer if .Username in selection && err != nil {
-		delete(info.username)
 	}
 	err = nil
 	return
@@ -455,6 +419,10 @@ _parse_argv :: proc(cmd_line_w: [^]u16, allocator: runtime.Allocator) -> ([]stri
 	for arg_w, i in argv_w[:argc] {
 		arg, arg_err := windows.wstring_to_utf8(arg_w, -1, allocator)
 		if arg_err != nil {
+			for arg in argv[:i] {
+				delete(arg, allocator)
+			}
+			delete(argv, allocator)
 			return nil, arg_err
 		}
 		argv[i] = arg
