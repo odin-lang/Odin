@@ -18,6 +18,14 @@ foreign advapi32 {
 	                        OpenAsSelf:    BOOL,
 	                        TokenHandle:   ^HANDLE) -> BOOL ---
 
+	GetTokenInformation :: proc (
+		TokenHandle: HANDLE,
+		TokenInformationClass: TOKEN_INFORMATION_CLASS,
+		TokenInformation: LPVOID,
+		TokenInformationLength: DWORD,
+		ReturnLength: PDWORD,
+	) -> BOOL ---
+
 	CryptAcquireContextW :: proc(hProv: ^HCRYPTPROV, szContainer, szProvider: wstring, dwProvType, dwFlags: DWORD) -> DWORD ---
 	CryptGenRandom       :: proc(hProv: HCRYPTPROV, dwLen: DWORD, buf: LPVOID) -> DWORD ---
 	CryptReleaseContext  :: proc(hProv: HCRYPTPROV, dwFlags: DWORD) -> DWORD ---
@@ -44,7 +52,17 @@ foreign advapi32 {
 		cbSid: ^DWORD,
 		ReferencedDomainName: wstring,
 		cchReferencedDomainName: ^DWORD,
-		peUse: ^SID_TYPE,
+		peUse: PSID_NAME_USE,
+	) -> BOOL ---
+
+	LookupAccountSidW :: proc (
+		lpSystemName: LPCWSTR,
+		Sid: PSID,
+		Name: LPWSTR,
+		cchName: LPDWORD,
+		ReferencedDomainName: LPWSTR,
+		cchReferencedDomainName: LPDWORD,
+		peUse: PSID_NAME_USE,
 	) -> BOOL ---
 
 	CreateProcessWithLogonW :: proc(
@@ -163,4 +181,157 @@ foreign advapi32 {
 		GrantedAccess: LPDWORD,
 		AccessStatus: LPBOOL,
 	) -> BOOL ---
+}
+
+PTOKEN_INFORMATION_CLASS :: ^TOKEN_INFORMATION_CLASS
+TOKEN_INFORMATION_CLASS :: enum i32 {
+	TokenUser = 1,
+	TokenGroups,
+	TokenPrivileges,
+	TokenOwner,
+	TokenPrimaryGroup,
+	TokenDefaultDacl,
+	TokenSource,
+	TokenType,
+	TokenImpersonationLevel,
+	TokenStatistics,
+	TokenRestrictedSids,
+	TokenSessionId,
+	TokenGroupsAndPrivileges,
+	TokenSessionReference,
+	TokenSandBoxInert,
+	TokenAuditPolicy,
+	TokenOrigin,
+	TokenElevationType,
+	TokenLinkedToken,
+	TokenElevation,
+	TokenHasRestrictions,
+	TokenAccessInformation,
+	TokenVirtualizationAllowed,
+	TokenVirtualizationEnabled,
+	TokenIntegrityLevel,
+	TokenUIAccess,
+	TokenMandatoryPolicy,
+	TokenLogonSid,
+	TokenIsAppContainer,
+	TokenCapabilities,
+	TokenAppContainerSid,
+	TokenAppContainerNumber,
+	TokenUserClaimAttributes,
+	TokenDeviceClaimAttributes,
+	TokenRestrictedUserClaimAttributes,
+	TokenRestrictedDeviceClaimAttributes,
+	TokenDeviceGroups,
+	TokenRestrictedDeviceGroups,
+	TokenSecurityAttributes,
+	TokenIsRestricted,
+	TokenProcessTrustLevel,
+	TokenPrivateNameSpace,
+	TokenSingletonAttributes,
+	TokenBnoIsolation,
+	TokenChildProcessFlags,
+	TokenIsLessPrivilegedAppContainer,
+	TokenIsSandboxed,
+	TokenIsAppSilo,
+	TokenLoggingInformation,
+	MaxTokenInfoClass,
+}
+
+PSID_NAME_USE :: ^SID_NAME_USE
+SID_NAME_USE :: enum i32 {
+	SidTypeUser = 1,
+	SidTypeGroup,
+	SidTypeDomain,
+	SidTypeAlias,
+	SidTypeWellKnownGroup,
+	SidTypeDeletedAccount,
+	SidTypeInvalid,
+	SidTypeUnknown,
+	SidTypeComputer,
+	SidTypeLabel,
+	SidTypeLogonSession,
+}
+
+PTOKEN_USER :: ^TOKEN_USER
+TOKEN_USER :: struct {
+	User: SID_AND_ATTRIBUTES,
+}
+
+PSID_AND_ATTRIBUTES :: ^SID_AND_ATTRIBUTES
+SID_AND_ATTRIBUTES :: struct {
+	Sid: rawptr,
+	Attributes: ULONG,
+}
+
+PTOKEN_TYPE :: ^TOKEN_TYPE
+TOKEN_TYPE :: enum {
+	TokenPrimary = 1,
+	TokenImpersonation = 2,
+}
+
+PTOKEN_STATISTICS :: ^TOKEN_STATISTICS
+TOKEN_STATISTICS :: struct {
+	TokenId: LUID,
+	AuthenticationId: LUID,
+	ExpirationTime: LARGE_INTEGER,
+	TokenType: TOKEN_TYPE,
+	ImpersonationLevel: SECURITY_IMPERSONATION_LEVEL,
+	DynamicCharged: DWORD,
+	DynamicAvailable: DWORD,
+	GroupCount: DWORD,
+	PrivilegeCount: DWORD,
+	ModifiedId: LUID,
+}
+
+
+TOKEN_SOURCE_LENGTH :: 8
+PTOKEN_SOURCE :: ^TOKEN_SOURCE
+TOKEN_SOURCE :: struct {
+	SourceName: [TOKEN_SOURCE_LENGTH]CHAR,
+	SourceIdentifier: LUID,
+}
+
+
+PTOKEN_PRIVILEGES :: ^TOKEN_PRIVILEGES
+TOKEN_PRIVILEGES :: struct {
+	PrivilegeCount: DWORD,
+	Privileges: [0]LUID_AND_ATTRIBUTES,
+}
+
+PTOKEN_PRIMARY_GROUP :: ^TOKEN_PRIMARY_GROUP
+TOKEN_PRIMARY_GROUP :: struct {
+	PrimaryGroup: PSID,
+}
+
+PTOKEN_OWNER :: ^TOKEN_OWNER
+TOKEN_OWNER :: struct {
+	Owner: PSID,
+}
+
+PTOKEN_GROUPS_AND_PRIVILEGES :: ^TOKEN_GROUPS_AND_PRIVILEGES
+TOKEN_GROUPS_AND_PRIVILEGES :: struct {
+	SidCount: DWORD,
+	SidLength: DWORD,
+	Sids: PSID_AND_ATTRIBUTES,
+	RestrictedSidCount: DWORD,
+	RestrictedSidLength: DWORD,
+	RestrictedSids: PSID_AND_ATTRIBUTES,
+	PrivilegeCount: DWORD,
+	PrivilegeLength: DWORD,
+	Privileges: PLUID_AND_ATTRIBUTES,
+	AuthenticationId: LUID,
+}
+
+PTOKEN_DEFAULT_DACL :: ^TOKEN_DEFAULT_DACL
+TOKEN_DEFAULT_DACL :: struct {
+	DefaultDacl: PACL,
+}
+
+PACL :: ^ACL
+ACL :: struct {
+	AclRevision: BYTE,
+	Sbz1: BYTE,
+	AclSize: WORD,
+	AceCount: WORD,
+	Sbz2: WORD,
 }

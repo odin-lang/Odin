@@ -64,6 +64,7 @@ LONG_PTR :: int
 UINT_PTR :: uintptr
 ULONG :: c_ulong
 ULONGLONG :: c_ulonglong
+LONGLONG :: c_longlong
 UCHAR :: BYTE
 NTSTATUS :: c.long
 COLORREF :: DWORD
@@ -2145,6 +2146,7 @@ SECURITY_IMPERSONATION_LEVEL :: enum {
 SECURITY_INFORMATION :: DWORD
 ANYSIZE_ARRAY :: 1
 
+PLUID_AND_ATTRIBUTES :: ^LUID_AND_ATTRIBUTES
 LUID_AND_ATTRIBUTES :: struct {
 	Luid: LUID,
 	Attributes: DWORD,
@@ -2570,7 +2572,139 @@ EXCEPTION_RECORD :: struct {
 	ExceptionInformation: [EXCEPTION_MAXIMUM_PARAMETERS]LPVOID,
 }
 
-CONTEXT :: struct{} // TODO(bill)
+
+CONTEXT :: struct {
+	P1Home: DWORD64,
+	P2Home: DWORD64,
+	P3Home: DWORD64,
+	P4Home: DWORD64,
+	P5Home: DWORD64,
+	P6Home: DWORD64,
+	ContextFlags: DWORD,
+	MxCsr: DWORD,
+	SegCs: WORD,
+	SegDs: WORD,
+	SegEs: WORD,
+	SegFs: WORD,
+	SegGs: WORD,
+	SegSs: WORD,
+	EFlags: DWORD,
+	Dr0: DWORD64,
+	Dr1: DWORD64,
+	Dr2: DWORD64,
+	Dr3: DWORD64,
+	Dr6: DWORD64,
+	Dr7: DWORD64,
+	Rax: DWORD64,
+	Rcx: DWORD64,
+	Rdx: DWORD64,
+	Rbx: DWORD64,
+	Rsp: DWORD64,
+	Rbp: DWORD64,
+	Rsi: DWORD64,
+	Rdi: DWORD64,
+	R8: DWORD64,
+	R9: DWORD64,
+	R10: DWORD64,
+	R11: DWORD64,
+	R12: DWORD64,
+	R13: DWORD64,
+	R14: DWORD64,
+	R15: DWORD64,
+	Rip: DWORD64,
+	_: struct #raw_union {
+		FltSave: XMM_SAVE_AREA32,
+		Q: [16]NEON128,
+		D: [32]ULONGLONG,
+		_: struct {
+			Header: [2]M128A,
+			Legacy: [8]M128A,
+			Xmm0: M128A,
+			Xmm1: M128A,
+			Xmm2: M128A,
+			Xmm3: M128A,
+			Xmm4: M128A,
+			Xmm5: M128A,
+			Xmm6: M128A,
+			Xmm7: M128A,
+			Xmm8: M128A,
+			Xmm9: M128A,
+			Xmm10: M128A,
+			Xmm11: M128A,
+			Xmm12: M128A,
+			Xmm13: M128A,
+			Xmm14: M128A,
+			Xmm15: M128A,
+		},
+		S: [32]DWORD,
+	},
+	VectorRegister: [26]M128A,
+	VectorControl: DWORD64,
+	DebugControl: DWORD64,
+	LastBranchToRip: DWORD64,
+	LastBranchFromRip: DWORD64,
+	LastExceptionToRip: DWORD64,
+	LastExceptionFromRip: DWORD64,
+}
+
+PCONTEXT :: ^CONTEXT
+LPCONTEXT :: ^CONTEXT
+
+when size_of(uintptr) == 32 { 
+	XSAVE_FORMAT :: struct #align(16) {
+		ControlWord: WORD,
+		StatusWord: WORD,
+		TagWord: BYTE,
+		Reserved1: BYTE,
+		ErrorOpcode: WORD,
+		ErrorOffset: DWORD,
+		ErrorSelector: WORD,
+		Reserved2: WORD,
+		DataOffset: DWORD,
+		DataSelector: WORD,
+		Reserved3: WORD,
+		MxCsr: DWORD,
+		MxCsr_Mask: DWORD,
+		FloatRegisters: [8]M128A,
+		// 32-bit specific
+		XmmRegisters: [8]M128A,
+		Reserved4: [192]BYTE,
+		StackControl: [7]DWORD,
+		Cr0NpxState: DWORD,
+	}
+} else {
+	XSAVE_FORMAT :: struct #align(16) {
+		ControlWord: WORD,
+		StatusWord: WORD,
+		TagWord: BYTE,
+		Reserved1: BYTE,
+		ErrorOpcode: WORD,
+		ErrorOffset: DWORD,
+		ErrorSelector: WORD,
+		Reserved2: WORD,
+		DataOffset: DWORD,
+		DataSelector: WORD,
+		Reserved3: WORD,
+		MxCsr: DWORD,
+		MxCsr_Mask: DWORD,
+		FloatRegisters: [8]M128A,
+		// 64-bit specific
+		XmmRegisters: [16]M128A,
+		Reserved4: [96]BYTE,
+	}
+}
+
+XMM_SAVE_AREA32 :: XSAVE_FORMAT
+
+M128A :: struct {
+	Low: ULONGLONG,
+	High: LONGLONG,
+}
+
+NEON128 :: struct {
+	Low: ULONGLONG,
+	High: LONGLONG,
+}
 
 EXCEPTION_POINTERS :: struct {
 	ExceptionRecord: ^EXCEPTION_RECORD,
@@ -2731,23 +2865,6 @@ PROFILEINFOW :: struct {
 	lpServerName: LPWSTR,
 	lpPolicyPath: LPWSTR,
 	hProfile: HANDLE,
-}
-
-// Used in LookupAccountNameW
-SID_NAME_USE :: distinct DWORD
-
-SID_TYPE :: enum SID_NAME_USE {
-	User = 1,
-	Group,
-	Domain,
-	Alias,
-	WellKnownGroup,
-	DeletedAccount,
-	Invalid,
-	Unknown,
-	Computer,
-	Label,
-	LogonSession,
 }
 
 SECURITY_MAX_SID_SIZE :: 68
