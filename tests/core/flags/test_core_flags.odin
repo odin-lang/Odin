@@ -11,6 +11,8 @@ import "core:os"
 import "core:strings"
 import "core:testing"
 import "core:time/datetime"
+import "core:reflect"
+import "core:slice"
 
 @(test)
 test_no_args :: proc(t: ^testing.T) {
@@ -1240,10 +1242,16 @@ test_custom_type_setter :: proc(t: ^testing.T) {
 	}
 	s: S
 
+	context.user_ptr = t
+
 	// NOTE: Mind that this setter is global state, and the test runner is multi-threaded.
-	// It should be fine so long as all type setter tests are in this one test proc.
-	flags.register_type_setter(proc (data: rawptr, data_type: typeid, _, _: string) -> (string, bool, runtime.Allocator_Error) {
+	// It should be fine as long as all type setter tests are in this one test proc.
+	flags.register_type_setter(proc (data: rawptr, data_type: typeid, field_name, _, _: string) -> (string, bool, runtime.Allocator_Error) {
 		if data_type == Custom_Data {
+			field_names := reflect.struct_field_names(Custom_Data)
+			t := cast(^testing.T)context.user_ptr
+			testing.expect(t, slice.contains(field_names, field_name), "field_name should be a valid field name of struct Custom_Data")
+
 			(cast(^Custom_Data)data).a = 32
 			return "", true, nil
 		}
