@@ -165,6 +165,12 @@ _process_info :: proc(pid: int, selection: Process_Info_Fields, allocator: runti
 	defer if .Command_Line in info.fields && err != nil {
 		delete(info.command_line, allocator)
 	}
+	defer if .Command_Args in selection && err != nil {
+		for arg in info.command_args {
+			delete(arg, allocator)
+		}
+		delete(info.command_args, allocator)
+	}
 	if need_peb {
 		ntdll_lib := windows.LoadLibraryW(windows.L("ntdll.dll"))
 		if ntdll_lib == nil {
@@ -208,20 +214,31 @@ _process_info :: proc(pid: int, selection: Process_Info_Fields, allocator: runti
 			err = _get_platform_error()
 			return
 		}
-		if .Command_Line in selection {
+		if .Command_Line in selection || .Command_Args in selection {
 			TEMP_ALLOCATOR_GUARD()
 			cmdline_w := make([]u16, process_params.CommandLine.Length, temp_allocator())
 			if !read_slice(ph, process_params.CommandLine.Buffer, cmdline_w, &bytes_read) {
 				err = _get_platform_error()
 				return
 			}
-			cmdline, cmdline_err := windows.utf16_to_utf8(cmdline_w, allocator)
-			if cmdline_err != nil {
-				err = cmdline_err
-				return
+			if .Command_Line in selection {
+				cmdline, cmdline_err := windows.utf16_to_utf8(cmdline_w, allocator)
+				if cmdline_err != nil {
+					err = cmdline_err
+					return
+				}
+				info.fields |= {.Command_Line}
+				info.command_line = cmdline
 			}
-			info.fields |= {.Command_Line}
-			info.command_line = cmdline
+			if .Command_Args in selection {
+				args, args_err := _parse_argv(raw_data(cmdline_w), allocator)
+				if args_err != nil {
+					err = args_err
+					return
+				}
+				info.fields += {.Command_Args}
+				info.command_args = args
+			}
 		}
 		if .Environment in selection {
 			TEMP_ALLOCATOR_GUARD()
@@ -312,18 +329,35 @@ _current_process_info :: proc(selection: Process_Info_Fields, allocator: runtime
 	defer if .Executable_Path in selection && err != nil {
 		delete(info.executable_path, allocator)
 	}
-	if .Command_Line in selection {
+	if .Command_Line in selection  || .Command_Args in selection {
 		command_line_w := windows.GetCommandLineW()
-		command_line, command_line_err := windows.wstring_to_utf8(command_line_w, -1, allocator)
-		if command_line_err != nil {
-			err = command_line_err
-			return
+		if .Command_Line in selection {
+			command_line, command_line_err := windows.wstring_to_utf8(command_line_w, -1, allocator)
+			if command_line_err != nil {
+				err = command_line_err
+				return
+			}
+			info.fields += {.Command_Line}
+			info.command_line = command_line
 		}
-		info.fields += {.Command_Line}
-		info.command_line = command_line
+		if .Command_Args in selection {
+			args, args_err := _parse_argv(command_line_w, allocator)
+			if args_err != nil {
+				err = args_err
+				return
+			}
+			info.fields += {.Command_Args}
+			info.command_args = args
+		}
 	}
 	defer if .Command_Line in selection && err != nil {
 		delete(info.command_line, allocator)
+	}
+	defer if .Command_Args in selection && err != nil {
+		for arg in info.command_args {
+			delete(arg, allocator)
+		}
+		delete(info.command_args, allocator)
 	}
 	if .Environment in selection {
 		env_block := windows.GetEnvironmentStringsW()
@@ -405,6 +439,27 @@ _get_process_user :: proc(process_handle: windows.HANDLE, allocator: runtime.All
 		return
 	}
 	return full_name, nil
+}
+
+@(private)
+_parse_argv :: proc(cmd_line_w: [^]u16, allocator: runtime.Allocator) -> ([]string, Error) {
+	argc: i32 = ---
+	argv_w := windows.CommandLineToArgvW(cmd_line_w, &argc)
+	if argv_w == nil {
+		return nil, _get_platform_error()
+	}
+	argv, argv_err := make([]string, argc, allocator)
+	if argv_err != nil {
+		return nil, argv_err
+	}
+	for arg_w, i in argv_w[:argc] {
+		arg, arg_err := windows.wstring_to_utf8(arg_w, -1, allocator)
+		if arg_err != nil {
+			return nil, arg_err
+		}
+		argv[i] = arg
+	}
+	return argv, nil
 }
 
 @(private)
