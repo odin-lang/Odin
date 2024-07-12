@@ -568,7 +568,7 @@ foreign stbtt {
 	// some of the values for the IDs are below; for more see the truetype spec:
 	//     http://developer.apple.com/textfonts/TTRefMan/RM06/Chap6name.html
 	//     http://www.microsoft.com/typography/otspec/name.htm
-	GetFontNameString :: proc(font: ^fontinfo, length: c.int, platformID: PLATFORM_ID, encodingID, languageID, nameID: c.int) -> cstring ---
+	GetFontNameString :: proc(font: ^fontinfo, length: ^c.int, platformID: PLATFORM_ID, encodingID, languageID, nameID: c.int) -> cstring ---
 }
 
 
