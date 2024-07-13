@@ -10,15 +10,15 @@ Small_Array :: struct($N: int, $T: typeid) where N >= 0 {
 }
 
 
-len :: proc "contextless" (a: $A/Small_Array) -> int {
+len :: proc "contextless" (#by_ptr a: $A/Small_Array) -> int {
 	return a.len
 }
 
-cap :: proc "contextless" (a: $A/Small_Array) -> int {
+cap :: proc "contextless" (#by_ptr a: $A/Small_Array) -> int {
 	return builtin.len(a.data)
 }
 
-space :: proc "contextless" (a: $A/Small_Array) -> int {
+space :: proc "contextless" (#by_ptr a: $A/Small_Array) -> int {
 	return builtin.len(a.data) - a.len
 }
 
@@ -27,21 +27,21 @@ slice :: proc "contextless" (a: ^$A/Small_Array($N, $T)) -> []T {
 }
 
 
-get :: proc "contextless" (a: $A/Small_Array($N, $T), index: int) -> T {
+get :: proc "contextless" (#by_ptr a: $A/Small_Array($N, $T), index: int) -> T {
 	return a.data[index]
 }
 get_ptr :: proc "contextless" (a: ^$A/Small_Array($N, $T), index: int) -> ^T {
 	return &a.data[index]
 }
 
-get_safe :: proc(a: $A/Small_Array($N, $T), index: int) -> (T, bool) #no_bounds_check {
+get_safe :: proc "contextless" (#by_ptr a: $A/Small_Array($N, $T), index: int) -> (T, bool) #no_bounds_check {
 	if index < 0 || index >= a.len {
 		return {}, false
 	}
 	return a.data[index], true
 }
 
-get_ptr_safe :: proc(a: ^$A/Small_Array($N, $T), index: int) -> (^T, bool) #no_bounds_check {
+get_ptr_safe :: proc "contextless" (a: ^$A/Small_Array($N, $T), index: int) -> (^T, bool) #no_bounds_check {
 	if index < 0 || index >= a.len {
 		return {}, false
 	}
