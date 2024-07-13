@@ -406,16 +406,19 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 			ti := runtime.type_info_base(type_info_of(v.id))
 			info := ti.variant.(runtime.Type_Info_Struct)
 			first_iteration := true
-			fields_loop: for name, i in info.names {
+			for name, i in info.names {
 				omitempty := false
 
 				json_name, extra := json_name_from_tag_value(reflect.struct_tag_get(reflect.Struct_Tag(info.tags[i]), "json"))
+
+				if json_name == "-" {
+					continue
+				}
+
 				for flag in strings.split_iterator(&extra, ",") {
 					switch flag {
 					case "omitempty":
 						omitempty = true
-					case "ignore":
-						continue fields_loop
 					}
 				}
 

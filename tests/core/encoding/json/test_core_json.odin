@@ -373,7 +373,7 @@ utf8_string_of_multibyte_characters :: proc(t: ^testing.T) {
 @test
 struct_with_ignore_tags :: proc(t: ^testing.T) {
 	My_Struct :: struct {
-		a: string `json:"_,ignore"`,
+		a: string `json:"-"`,
 	}
 
 	my_struct := My_Struct{
