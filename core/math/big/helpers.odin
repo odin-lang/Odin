@@ -404,7 +404,7 @@ clear_if_uninitialized_single :: proc(arg: ^Int, allocator := context.allocator)
 	return #force_inline internal_clear_if_uninitialized_single(arg, allocator)
 }
 
-clear_if_uninitialized_multi :: proc(#no_capture args: ..^Int, allocator := context.allocator) -> (err: Error) {
+clear_if_uninitialized_multi :: proc(args: ..^Int, allocator := context.allocator) -> (err: Error) {
 	args := args
 	assert_if_nil(..args)
 
@@ -420,7 +420,7 @@ error_if_immutable_single :: proc(arg: ^Int) -> (err: Error) {
 	return nil
 }
 
-error_if_immutable_multi :: proc(#no_capture args: ..^Int) -> (err: Error) {
+error_if_immutable_multi :: proc(args: ..^Int) -> (err: Error) {
 	for i in args {
 		if i != nil && .Immutable in i.flags { return .Assignment_To_Immutable }
 	}
@@ -431,7 +431,7 @@ error_if_immutable :: proc {error_if_immutable_single, error_if_immutable_multi,
 /*
 	Allocates several `Int`s at once.
 */
-int_init_multi :: proc(#no_capture integers: ..^Int, allocator := context.allocator) -> (err: Error) {
+int_init_multi :: proc(integers: ..^Int, allocator := context.allocator) -> (err: Error) {
 	assert_if_nil(..integers)
 
 	integers := integers
@@ -812,13 +812,13 @@ assert_if_nil :: proc{
 	assert_if_nil_rat,
 }
 
-assert_if_nil_int :: #force_inline proc(#no_capture integers: ..^Int, loc := #caller_location) {
+assert_if_nil_int :: #force_inline proc(integers: ..^Int, loc := #caller_location) {
 	for i in integers {
 		assert(i != nil, "(nil)", loc)
 	}
 }
 
-assert_if_nil_rat :: #force_inline proc(#no_capture rationals: ..^Rat, loc := #caller_location) {
+assert_if_nil_rat :: #force_inline proc(rationals: ..^Rat, loc := #caller_location) {
 	for r in rationals {
 		assert(r != nil, "(nil)", loc)
 	}

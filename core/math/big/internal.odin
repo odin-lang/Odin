@@ -1844,7 +1844,7 @@ internal_root_n :: proc { internal_int_root_n, }
 	Deallocates the backing memory of one or more `Int`s.
 	Asssumes none of the `integers` to be a `nil`.
 */
-internal_int_destroy :: proc(#no_capture integers: ..^Int) {
+internal_int_destroy :: proc(integers: ..^Int) {
 	integers := integers
 
 	for &a in integers {
@@ -2872,7 +2872,7 @@ internal_clear_if_uninitialized_single :: proc(arg: ^Int, allocator := context.a
 	return err
 }
 
-internal_clear_if_uninitialized_multi :: proc(#no_capture args: ..^Int, allocator := context.allocator) -> (err: Error) {
+internal_clear_if_uninitialized_multi :: proc(args: ..^Int, allocator := context.allocator) -> (err: Error) {
 	context.allocator = allocator
 
 	for i in args {
@@ -2890,7 +2890,7 @@ internal_error_if_immutable_single :: proc(arg: ^Int) -> (err: Error) {
 	return nil
 }
 
-internal_error_if_immutable_multi :: proc(#no_capture args: ..^Int) -> (err: Error) {
+internal_error_if_immutable_multi :: proc(args: ..^Int) -> (err: Error) {
 	for i in args {
 		if i != nil && .Immutable in i.flags { return .Assignment_To_Immutable }
 	}
@@ -2901,7 +2901,7 @@ internal_error_if_immutable :: proc {internal_error_if_immutable_single, interna
 /*
 	Allocates several `Int`s at once.
 */
-internal_int_init_multi :: proc(#no_capture integers: ..^Int, allocator := context.allocator) -> (err: Error) {
+internal_int_init_multi :: proc(integers: ..^Int, allocator := context.allocator) -> (err: Error) {
 	context.allocator = allocator
 
 	integers := integers

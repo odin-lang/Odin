@@ -373,7 +373,7 @@ test_odin_value_export :: proc(t: ^testing.T) {
 }
 
 @(private)
-check :: proc(t: ^testing.T, exp: string, format: string, #no_capture args: ..any, loc := #caller_location) {
+check :: proc(t: ^testing.T, exp: string, format: string, args: ..any, loc := #caller_location) {
 	got := fmt.tprintf(format, ..args)
 	testing.expectf(t, got == exp, "(%q, %v): %q != %q", format, args, got, exp, loc = loc)
 }

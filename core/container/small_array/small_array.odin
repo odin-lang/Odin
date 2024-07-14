@@ -139,7 +139,7 @@ clear :: proc "contextless" (a: ^$A/Small_Array($N, $T)) {
 	resize(a, 0)
 }
 
-push_back_elems :: proc "contextless" (a: ^$A/Small_Array($N, $T), #no_capture items: ..T) {
+push_back_elems :: proc "contextless" (a: ^$A/Small_Array($N, $T), items: ..T) {
 	n := copy(a.data[a.len:], items[:])
 	a.len += n
 }

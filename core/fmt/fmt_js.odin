@@ -43,7 +43,7 @@ fd_to_writer :: proc(fd: os.Handle, loc := #caller_location) -> io.Writer {
 }
 
 // fprint formats using the default print settings and writes to fd
-fprint :: proc(fd: os.Handle, #no_capture args: ..any, sep := " ", flush := true, loc := #caller_location) -> int {
+fprint :: proc(fd: os.Handle, args: ..any, sep := " ", flush := true, loc := #caller_location) -> int {
 	buf: [1024]byte
 	b: bufio.Writer
 	defer bufio.writer_flush(&b)
@@ -54,7 +54,7 @@ fprint :: proc(fd: os.Handle, #no_capture args: ..any, sep := " ", flush := true
 }
 
 // fprintln formats using the default print settings and writes to fd
-fprintln :: proc(fd: os.Handle, #no_capture args: ..any, sep := " ", flush := true, loc := #caller_location) -> int {
+fprintln :: proc(fd: os.Handle, args: ..any, sep := " ", flush := true, loc := #caller_location) -> int {
 	buf: [1024]byte
 	b: bufio.Writer
 	defer bufio.writer_flush(&b)
@@ -66,7 +66,7 @@ fprintln :: proc(fd: os.Handle, #no_capture args: ..any, sep := " ", flush := tr
 }
 
 // fprintf formats according to the specified format string and writes to fd
-fprintf :: proc(fd: os.Handle, fmt: string, #no_capture args: ..any, flush := true, newline := false, loc := #caller_location) -> int {
+fprintf :: proc(fd: os.Handle, fmt: string, args: ..any, flush := true, newline := false, loc := #caller_location) -> int {
 	buf: [1024]byte
 	b: bufio.Writer
 	defer bufio.writer_flush(&b)
@@ -78,24 +78,24 @@ fprintf :: proc(fd: os.Handle, fmt: string, #no_capture args: ..any, flush := tr
 }
 
 // fprintfln formats according to the specified format string and writes to fd, followed by a newline.
-fprintfln :: proc(fd: os.Handle, fmt: string, #no_capture args: ..any, flush := true, loc := #caller_location) -> int {
+fprintfln :: proc(fd: os.Handle, fmt: string, args: ..any, flush := true, loc := #caller_location) -> int {
 	return fprintf(fd, fmt, ..args, flush=flush, newline=true, loc=loc)
 }
 
 // print formats using the default print settings and writes to stdout
-print   :: proc(#no_capture args: ..any, sep := " ", flush := true) -> int { return wprint(w=stdout, args=args, sep=sep, flush=flush) }
+print   :: proc(args: ..any, sep := " ", flush := true) -> int { return wprint(w=stdout, args=args, sep=sep, flush=flush) }
 // println formats using the default print settings and writes to stdout
-println :: proc(#no_capture args: ..any, sep := " ", flush := true) -> int { return wprintln(w=stdout, args=args, sep=sep, flush=flush) }
+println :: proc(args: ..any, sep := " ", flush := true) -> int { return wprintln(w=stdout, args=args, sep=sep, flush=flush) }
 // printf formats according to the specififed format string and writes to stdout
-printf  :: proc(fmt: string, #no_capture args: ..any, flush := true) -> int { return wprintf(stdout, fmt, ..args, flush=flush) }
+printf  :: proc(fmt: string, args: ..any, flush := true) -> int { return wprintf(stdout, fmt, ..args, flush=flush) }
 // printfln formats according to the specified format string and writes to stdout, followed by a newline.
-printfln :: proc(fmt: string, #no_capture args: ..any, flush := true) -> int { return wprintf(stdout, fmt, ..args, flush=flush, newline=true) }
+printfln :: proc(fmt: string, args: ..any, flush := true) -> int { return wprintf(stdout, fmt, ..args, flush=flush, newline=true) }
 
 // eprint formats using the default print settings and writes to stderr
-eprint   :: proc(#no_capture args: ..any, sep := " ", flush := true) -> int { return wprint(w=stderr, args=args, sep=sep, flush=flush) }
+eprint   :: proc(args: ..any, sep := " ", flush := true) -> int { return wprint(w=stderr, args=args, sep=sep, flush=flush) }
 // eprintln formats using the default print settings and writes to stderr
-eprintln :: proc(#no_capture args: ..any, sep := " ", flush := true) -> int { return wprintln(w=stderr, args=args, sep=sep, flush=flush) }
+eprintln :: proc(args: ..any, sep := " ", flush := true) -> int { return wprintln(w=stderr, args=args, sep=sep, flush=flush) }
 // eprintf formats according to the specififed format string and writes to stderr
-eprintf  :: proc(fmt: string, #no_capture args: ..any, flush := true) -> int { return wprintf(stderr, fmt, ..args, flush=flush) }
+eprintf  :: proc(fmt: string, args: ..any, flush := true) -> int { return wprintf(stderr, fmt, ..args, flush=flush) }
 // eprintfln formats according to the specified format string and writes to stderr, followed by a newline.
-eprintfln :: proc(fmt: string, #no_capture args: ..any, flush := true) -> int { return wprintf(stdout, fmt, ..args, flush=flush, newline=true) }
+eprintfln :: proc(fmt: string, args: ..any, flush := true) -> int { return wprintf(stdout, fmt, ..args, flush=flush, newline=true) }

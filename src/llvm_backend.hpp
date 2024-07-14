@@ -344,7 +344,6 @@ struct lbProcedure {
 	Array<lbNoCaptureData> no_captures;
 
 	LLVMValueRef temp_callee_return_struct_memory;
-
 	Ast *curr_stmt;
 
 	Array<Scope *>       scope_stack;

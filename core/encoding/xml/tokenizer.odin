@@ -17,7 +17,7 @@ import "core:fmt"
 import "core:unicode"
 import "core:unicode/utf8"
 
-Error_Handler :: #type proc(pos: Pos, fmt: string, #no_capture args: ..any)
+Error_Handler :: #type proc(pos: Pos, fmt: string, args: ..any)
 
 Token :: struct {
 	kind: Token_Kind,
@@ -112,13 +112,13 @@ offset_to_pos :: proc(t: ^Tokenizer, offset: int) -> Pos {
 	}
 }
 
-default_error_handler :: proc(pos: Pos, msg: string, #no_capture args: ..any) {
+default_error_handler :: proc(pos: Pos, msg: string, args: ..any) {
 	fmt.eprintf("%s(%d:%d) ", pos.file, pos.line, pos.column)
 	fmt.eprintf(msg, ..args)
 	fmt.eprintf("\n")
 }
 
-error :: proc(t: ^Tokenizer, offset: int, msg: string, #no_capture args: ..any) {
+error :: proc(t: ^Tokenizer, offset: int, msg: string, args: ..any) {
 	pos := offset_to_pos(t, offset)
 	if t.err != nil {
 		t.err(pos, msg, ..args)

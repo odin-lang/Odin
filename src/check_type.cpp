@@ -2065,9 +2065,10 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 					} else if (p->flags & FieldFlag_c_vararg) {
 						error(name, "'#no_capture' cannot be applied to a #c_vararg parameter");
 						p->flags &= ~FieldFlag_no_capture;
+					} else {
+						error(name, "'#no_capture' is already implied on all variadic parameter");
 					}
 				}
-
 				if (is_poly_name) {
 					if (p->flags&FieldFlag_no_alias) {
 						error(name, "'#no_alias' can only be applied to non constant values");
@@ -2085,6 +2086,11 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 						error(name, "'#by_ptr' can only be applied to variable fields");
 						p->flags &= ~FieldFlag_by_ptr;
 					}
+					if (p->flags&FieldFlag_no_capture) {
+						error(name, "'#no_capture' can only be applied to variable fields");
+						p->flags &= ~FieldFlag_no_capture;
+					}
+
 
 					if (!is_type_polymorphic(type) && check_constant_parameter_value(type, params[i])) {
 						// failed
@@ -2104,6 +2110,8 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 				param->flags |= EntityFlag_Ellipsis;
 				if (is_c_vararg) {
 					param->flags |= EntityFlag_CVarArg;
+				} else {
+					param->flags |= EntityFlag_NoCapture;
 				}
 			}
 

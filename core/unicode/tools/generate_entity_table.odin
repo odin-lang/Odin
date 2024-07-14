@@ -12,7 +12,7 @@ import "core:fmt"
 /*
 	Silent error handler for the parser.
 */
-Error_Handler :: proc(pos: xml.Pos, fmt: string, #no_capture args: ..any) {}
+Error_Handler :: proc(pos: xml.Pos, fmt: string, args: ..any) {}
 
 OPTIONS :: xml.Options{ flags = { .Ignore_Unsupported, }, expected_doctype = "unicode", }
 

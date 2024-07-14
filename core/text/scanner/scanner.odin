@@ -250,7 +250,7 @@ error :: proc(s: ^Scanner, msg: string) {
 	}
 }
 
-errorf :: proc(s: ^Scanner, format: string, #no_capture args: ..any) {
+errorf :: proc(s: ^Scanner, format: string, args: ..any) {
 	error(s, fmt.tprintf(format, ..args))
 }
 

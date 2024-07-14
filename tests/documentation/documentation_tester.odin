@@ -51,7 +51,7 @@ common_prefix :: proc(strs: []string) -> string {
 	return prefix
 }
 
-errorf :: proc(format: string, #no_capture args: ..any) -> ! {
+errorf :: proc(format: string, args: ..any) -> ! {
 	fmt.eprintf("%s ", os.args[0])
 	fmt.eprintf(format, ..args)
 	fmt.eprintln()

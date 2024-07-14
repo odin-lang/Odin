@@ -330,10 +330,11 @@ enum FieldFlag : u32 {
 	FieldFlag_subtype   = 1<<7,
 	FieldFlag_by_ptr    = 1<<8,
 	FieldFlag_no_broadcast = 1<<9, // disallow array programming
-	FieldFlag_no_capture  = 1<<10,
+
+	FieldFlag_no_capture  = 1<<11,
 
 	// Internal use by the parser only
-	FieldFlag_Tags      = 1<<11,
+	FieldFlag_Tags      = 1<<15,
 	FieldFlag_Results   = 1<<16,
 
 
