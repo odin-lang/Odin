@@ -442,7 +442,7 @@ delete_key :: proc(m: ^$T/map[$K]$V, key: K) -> (deleted_key: K, deleted_value: 
 
 _append_elem :: #force_inline proc(array: ^Raw_Dynamic_Array, size_of_elem, align_of_elem: int, arg_ptr: rawptr, should_zero: bool, loc := #caller_location) -> (n: int, err: Allocator_Error) #optional_allocator_error {
 	if array == nil {
-		return 0, nil
+		return
 	}
 
 	if array.cap < array.len+1 {
@@ -458,9 +458,9 @@ _append_elem :: #force_inline proc(array: ^Raw_Dynamic_Array, size_of_elem, alig
 		data = data[array.len*size_of_elem:]
 		intrinsics.mem_copy_non_overlapping(data, arg_ptr, size_of_elem)
 		array.len += 1
-		return 1, err
+		n = 1
 	}
-	return 0, err
+	return
 }
 
 @builtin
@@ -832,10 +832,13 @@ non_zero_resize_dynamic_array :: proc(array: ^$T/[dynamic]$E, #any_int length: i
 	Note: Prefer the procedure group `shrink`
 */
 shrink_dynamic_array :: proc(array: ^$T/[dynamic]$E, new_cap := -1, loc := #caller_location) -> (did_shrink: bool, err: Allocator_Error) {
-	if array == nil {
+	return _shrink_dynamic_array((^Raw_Dynamic_Array)(array), size_of(E), align_of(E), new_cap, loc)
+}
+
+_shrink_dynamic_array :: proc(a: ^Raw_Dynamic_Array, size_of_elem, align_of_elem: int, new_cap := -1, loc := #caller_location) -> (did_shrink: bool, err: Allocator_Error) {
+	if a == nil {
 		return
 	}
-	a := (^Raw_Dynamic_Array)(array)
 
 	new_cap := new_cap if new_cap >= 0 else a.len
 
@@ -848,10 +851,10 @@ shrink_dynamic_array :: proc(array: ^$T/[dynamic]$E, new_cap := -1, loc := #call
 	}
 	assert(a.allocator.procedure != nil)
 
-	old_size := a.cap * size_of(E)
-	new_size := new_cap * size_of(E)
+	old_size := a.cap * size_of_elem
+	new_size := new_cap * size_of_elem
 
-	new_data := mem_resize(a.data, old_size, new_size, align_of(E), a.allocator, loc) or_return
+	new_data := mem_resize(a.data, old_size, new_size, align_of_elem, a.allocator, loc) or_return
 
 	a.data = raw_data(new_data)
 	a.len = min(new_cap, a.len)
