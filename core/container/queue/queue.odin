@@ -95,11 +95,11 @@ front_ptr :: proc(q: ^$Q/Queue($T)) -> ^T {
 }
 
 back :: proc(q: ^$Q/Queue($T)) -> T {
-	idx := (q.offset+uint(q.len))%builtin.len(q.data)
+	idx := (q.offset+uint(q.len - 1))%builtin.len(q.data)
 	return q.data[idx]
 }
 back_ptr :: proc(q: ^$Q/Queue($T)) -> ^T {
-	idx := (q.offset+uint(q.len))%builtin.len(q.data)
+	idx := (q.offset+uint(q.len - 1))%builtin.len(q.data)
 	return &q.data[idx]
 }
 
