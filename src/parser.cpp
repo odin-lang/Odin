@@ -112,7 +112,7 @@ gb_internal isize ast_node_size(AstKind kind) {
 
 }
 
-gb_global std::atomic<isize> global_total_node_memory_allocated;
+// gb_global std::atomic<isize> global_total_node_memory_allocated;
 
 // NOTE(bill): And this below is why is I/we need a new language! Discriminated unions are a pain in C/C++
 gb_internal Ast *alloc_ast_node(AstFile *f, AstKind kind) {
@@ -122,7 +122,7 @@ gb_internal Ast *alloc_ast_node(AstFile *f, AstKind kind) {
 	node->kind = kind;
 	node->file_id = f ? f->id : 0;
 
-	global_total_node_memory_allocated.fetch_add(size);
+	// global_total_node_memory_allocated.fetch_add(size);
 
 	return node;
 }
