@@ -517,7 +517,7 @@ gb_internal void lb_begin_procedure_body(lbProcedure *p) {
 	lb_start_block(p, p->entry_block);
 
 	map_init(&p->direct_parameters);
-	p->no_captures.allocator = heap_allocator();
+	p->variadic_reuses.allocator = heap_allocator();
 
 	GB_ASSERT(p->type != nullptr);
 
@@ -3452,27 +3452,21 @@ gb_internal lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr) {
 					isize slice_len = var_args.count;
 					if (slice_len > 0) {
 						lbAddr base_array = {};
-						if (e->flags & EntityFlag_NoCapture) {
-							for (lbNoCaptureData const &nc : p->no_captures) {
-								if (are_types_identical(nc.slice_type, slice_type)) {
-									base_array = nc.base_array;
+						for (auto const &vr : p->variadic_reuses) {
+							if (are_types_identical(vr.slice_type, slice_type)) {
+								base_array = vr.base_array;
+								break;
+							}
+						}
+						DeclInfo *d = decl_info_of_entity(p->entity);
+						if (d != nullptr && base_array.addr.value == nullptr) {
+							for (auto const &vr : d->variadic_reuses) {
+								if (are_types_identical(vr.slice_type, slice_type)) {
+									base_array = lb_add_local_generated(p, alloc_type_array(elem_type, vr.max_count), true);
+									array_add(&p->variadic_reuses, lbVariadicReuseData{slice_type, base_array});
 									break;
 								}
 							}
-							DeclInfo *d = decl_info_of_entity(p->entity);
-							if (d != nullptr && base_array.addr.value == nullptr) {
-								for (NoCaptureData const &nc : d->no_captures) {
-									if (are_types_identical(nc.slice_type, slice_type)) {
-										base_array = lb_add_local_generated(p, alloc_type_array(elem_type, nc.max_count), true);
-										array_add(&p->no_captures, lbNoCaptureData{slice_type, base_array});
-										break;
-									}
-								}
-							}
-						}
-
-						if (base_array.addr.value == nullptr) {
-							base_array = lb_add_local_generated(p, alloc_type_array(elem_type, slice_len), true);
 						}
 						GB_ASSERT(base_array.addr.value != nullptr);
 

@@ -181,7 +181,7 @@ char const *ProcCheckedState_strings[ProcCheckedState_COUNT] {
 	"Checked",
 };
 
-struct NoCaptureData {
+struct VariadicReuseData {
 	Type *slice_type; // ..elem_type
 	isize max_count;
 };
@@ -224,7 +224,7 @@ struct DeclInfo {
 
 	Array<BlockLabel> labels;
 
-	Array<NoCaptureData> no_captures;
+	Array<VariadicReuseData> variadic_reuses;
 
 	// NOTE(bill): this is to prevent a race condition since these procedure literals can be created anywhere at any time
 	struct lbModule *code_gen_module;

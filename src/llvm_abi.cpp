@@ -15,6 +15,7 @@ struct lbArgType {
 	LLVMAttributeRef align_attribute; // Optional
 	i64 byval_alignment;
 	bool is_byval;
+	bool no_capture;
 };
 
 
@@ -158,6 +159,11 @@ gb_internal void lb_add_function_type_attributes(LLVMValueRef fn, lbFunctionType
 		if (arg->align_attribute) {
 			LLVMAddAttributeAtIndex(fn, arg_index+1, arg->align_attribute);
 		}
+
+		if (arg->no_capture) {
+			LLVMAddAttributeAtIndex(fn, arg_index+1, nocapture_attr);
+		}
+
 
 		if (ft->multiple_return_original_type) {
 			if (ft->original_arg_count <= i) {

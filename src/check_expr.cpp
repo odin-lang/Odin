@@ -6034,19 +6034,18 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 					Entity *vt = pt->params->Tuple.variables[pt->variadic_index];
 					o.type = vt->type;
 
-					// NOTE(bill, 2024-07-14): minimize the stack usage for variadic parameter that use `#no_capture`
-					// on the variadic parameter
-					if (c->decl && (vt->flags & EntityFlag_NoCapture)) {
+					// NOTE(bill, 2024-07-14): minimize the stack usage for variadic parameters with the backing array
+					if (c->decl) {
 						bool found = false;
-						for (NoCaptureData &nc : c->decl->no_captures) {
-							if (are_types_identical(vt->type, nc.slice_type)) {
-								nc.max_count = gb_max(nc.max_count, variadic_operands.count);
+						for (auto &vr : c->decl->variadic_reuses) {
+							if (are_types_identical(vt->type, vr.slice_type)) {
+								vr.max_count = gb_max(vr.max_count, variadic_operands.count);
 								found = true;
 								break;
 							}
 						}
 						if (!found) {
-							array_add(&c->decl->no_captures, NoCaptureData{vt->type, variadic_operands.count});
+							array_add(&c->decl->variadic_reuses, VariadicReuseData{vt->type, variadic_operands.count});
 						}
 					}
 

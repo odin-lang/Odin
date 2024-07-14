@@ -184,7 +184,7 @@ gb_internal void init_decl_info(DeclInfo *d, Scope *scope, DeclInfo *parent) {
 	ptr_set_init(&d->deps, 0);
 	ptr_set_init(&d->type_info_deps, 0);
 	d->labels.allocator = heap_allocator();
-	d->no_captures.allocator = heap_allocator();
+	d->variadic_reuses.allocator = heap_allocator();
 }
 
 gb_internal DeclInfo *make_decl_info(Scope *scope, DeclInfo *parent) {

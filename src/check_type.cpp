@@ -1954,7 +1954,7 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 					p->flags &= ~FieldFlag_by_ptr;
 				}
 				if (p->flags&FieldFlag_no_capture) {
-					error(name, "'#no_capture' can only be applied to variable variadic fields");
+					error(name, "'#no_capture' can only be applied to variable fields");
 					p->flags &= ~FieldFlag_no_capture;
 				}
 
@@ -2059,16 +2059,32 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 					}
 				}
 				if (p->flags&FieldFlag_no_capture) {
-					if (!(is_variadic && variadic_index == variables.count)) {
-						error(name, "'#no_capture' can only be applied to a variadic parameter");
-						p->flags &= ~FieldFlag_no_capture;
-					} else if (p->flags & FieldFlag_c_vararg) {
-						error(name, "'#no_capture' cannot be applied to a #c_vararg parameter");
-						p->flags &= ~FieldFlag_no_capture;
+					if (is_variadic && variadic_index == variables.count) {
+						if (p->flags & FieldFlag_c_vararg) {
+							error(name, "'#no_capture' cannot be applied to a #c_vararg parameter");
+							p->flags &= ~FieldFlag_no_capture;
+						} else {
+							error(name, "'#no_capture' is already implied on all variadic parameter");
+						}
+					} else if (is_type_polymorphic(type)) {
+						// ignore
 					} else {
-						error(name, "'#no_capture' is already implied on all variadic parameter");
+						if (is_type_internally_pointer_like(type)) {
+							// okay
+						} else if (is_type_slice(type) || is_type_string(type)) {
+							// okay
+						} else if (is_type_dynamic_array(type)) {
+							// okay
+						} else {
+							ERROR_BLOCK();
+							error(name, "'#no_capture' can only be applied to pointer-like types, slices, strings, and dynamic arrays");
+							error_line("\t'#no_capture' does not currently do anything useful\n");
+							p->flags &= ~FieldFlag_no_capture;
+						}
 					}
 				}
+
+
 				if (is_poly_name) {
 					if (p->flags&FieldFlag_no_alias) {
 						error(name, "'#no_alias' can only be applied to non constant values");
