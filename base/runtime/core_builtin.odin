@@ -729,11 +729,10 @@ clear_dynamic_array :: proc "contextless" (array: ^$T/[dynamic]$E) {
 // `reserve_dynamic_array` will try to reserve memory of a passed dynamic array or map to the requested element count (setting the `cap`).
 //
 // Note: Prefer the procedure group `reserve`.
-_reserve_dynamic_array :: #force_inline proc(array: ^$T/[dynamic]$E, capacity: int, should_zero: bool, loc := #caller_location) -> Allocator_Error {
-	if array == nil {
+_reserve_dynamic_array :: #force_inline proc(a: ^Raw_Dynamic_Array, size_of_elem, align_of_elem: int, capacity: int, should_zero: bool, loc := #caller_location) -> Allocator_Error {
+	if a == nil {
 		return nil
 	}
-	a := (^Raw_Dynamic_Array)(array)
 
 	if capacity <= a.cap {
 		return nil
@@ -744,15 +743,15 @@ _reserve_dynamic_array :: #force_inline proc(array: ^$T/[dynamic]$E, capacity: i
 	}
 	assert(a.allocator.procedure != nil)
 
-	old_size  := a.cap * size_of(E)
-	new_size  := capacity * size_of(E)
+	old_size  := a.cap * size_of_elem
+	new_size  := capacity * size_of_elem
 	allocator := a.allocator
 
 	new_data: []byte
 	if should_zero {
-		new_data = mem_resize(a.data, old_size, new_size, align_of(E), allocator, loc) or_return
+		new_data = mem_resize(a.data, old_size, new_size, align_of_elem, allocator, loc) or_return
 	} else {
-		new_data = non_zero_mem_resize(a.data, old_size, new_size, align_of(E), allocator, loc) or_return
+		new_data = non_zero_mem_resize(a.data, old_size, new_size, align_of_elem, allocator, loc) or_return
 	}
 	if new_data == nil && new_size > 0 {
 		return .Out_Of_Memory
@@ -765,26 +764,23 @@ _reserve_dynamic_array :: #force_inline proc(array: ^$T/[dynamic]$E, capacity: i
 
 @builtin
 reserve_dynamic_array :: proc(array: ^$T/[dynamic]$E, #any_int capacity: int, loc := #caller_location) -> Allocator_Error {
-	return _reserve_dynamic_array(array, capacity, true, loc)
+	return _reserve_dynamic_array((^Raw_Dynamic_Array)(array), size_of(E), align_of(E), capacity, true, loc)
 }
 
 @builtin
 non_zero_reserve_dynamic_array :: proc(array: ^$T/[dynamic]$E, #any_int capacity: int, loc := #caller_location) -> Allocator_Error {
-	return _reserve_dynamic_array(array, capacity, false, loc)
+	return _reserve_dynamic_array((^Raw_Dynamic_Array)(array), size_of(E), align_of(E), capacity, false, loc)
 }
 
-// `resize_dynamic_array` will try to resize memory of a passed dynamic array or map to the requested element count (setting the `len`, and possibly `cap`).
-//
-// Note: Prefer the procedure group `resize`
-_resize_dynamic_array :: #force_inline proc(array: ^$T/[dynamic]$E, length: int, should_zero: bool, loc := #caller_location) -> Allocator_Error {
-	if array == nil {
+
+_resize_dynamic_array :: #force_inline proc(a: ^Raw_Dynamic_Array, size_of_elem, align_of_elem: int, length: int, should_zero: bool, loc := #caller_location) -> Allocator_Error {
+	if a == nil {
 		return nil
 	}
-	a := (^Raw_Dynamic_Array)(array)
 
 	if length <= a.cap {
 		if should_zero && a.len < length {
-			intrinsics.mem_zero(([^]E)(a.data)[a.len:], (length-a.len)*size_of(E))
+			intrinsics.mem_zero(([^]byte)(a.data)[a.len*size_of_elem:], (length-a.len)*size_of_elem)
 		}
 		a.len = max(length, 0)
 		return nil
@@ -795,15 +791,15 @@ _resize_dynamic_array :: #force_inline proc(array: ^$T/[dynamic]$E, length: int,
 	}
 	assert(a.allocator.procedure != nil)
 
-	old_size  := a.cap * size_of(E)
-	new_size  := length * size_of(E)
+	old_size  := a.cap  * size_of_elem
+	new_size  := length * size_of_elem
 	allocator := a.allocator
 
 	new_data : []byte
 	if should_zero {
-		new_data = mem_resize(a.data, old_size, new_size, align_of(E), allocator, loc) or_return
+		new_data = mem_resize(a.data, old_size, new_size, align_of_elem, allocator, loc) or_return
 	} else {
-		new_data = non_zero_mem_resize(a.data, old_size, new_size, align_of(E), allocator, loc) or_return
+		new_data = non_zero_mem_resize(a.data, old_size, new_size, align_of_elem, allocator, loc) or_return
 	}
 	if new_data == nil && new_size > 0 {
 		return .Out_Of_Memory
@@ -815,14 +811,17 @@ _resize_dynamic_array :: #force_inline proc(array: ^$T/[dynamic]$E, length: int,
 	return nil
 }
 
+// `resize_dynamic_array` will try to resize memory of a passed dynamic array or map to the requested element count (setting the `len`, and possibly `cap`).
+//
+// Note: Prefer the procedure group `resize`
 @builtin
 resize_dynamic_array :: proc(array: ^$T/[dynamic]$E, #any_int length: int, loc := #caller_location) -> Allocator_Error {
-	return _resize_dynamic_array(array, length, true, loc=loc)
+	return _resize_dynamic_array((^Raw_Dynamic_Array)(array), size_of(E), align_of(E), length, true, loc=loc)
 }
 
 @builtin
 non_zero_resize_dynamic_array :: proc(array: ^$T/[dynamic]$E, #any_int length: int, loc := #caller_location) -> Allocator_Error {
-	return _resize_dynamic_array(array, length, false, loc=loc)
+	return _resize_dynamic_array((^Raw_Dynamic_Array)(array), size_of(E), align_of(E), length, false, loc=loc)
 }
 
 /*
