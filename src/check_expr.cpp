@@ -7905,7 +7905,7 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 			// NOTE: Due to restrictions in LLVM you can not inline calls with a superset of features.
 			if (is_call_inlined) {
 				if (c->curr_proc_decl == nullptr) {
-					error(call, "Inlined procedure which enables target feature '%.*s' cannot be used at the global/file scope", LIT(invalid));
+					error(call, "Calling a '#force_inline' procedure that enables target features is not allowed at file scope");
 				} else {
 					GB_ASSERT(c->curr_proc_decl->entity);
 					GB_ASSERT(c->curr_proc_decl->entity->type->kind == Type_Proc);
