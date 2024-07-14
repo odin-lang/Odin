@@ -2312,9 +2312,9 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-use-separate-modules");
-		print_usage_line(1, "[EXPERIMENTAL]");
 		print_usage_line(2, "The backend generates multiple build units which are then linked together.");
 		print_usage_line(2, "Normally, a single build unit is generated for a standard project.");
+		print_usage_line(2, "This is the default behaviour for '-o:none' and '-o:minimal' builds");
 		print_usage_line(0, "");
 
 	}

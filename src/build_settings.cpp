@@ -1658,6 +1658,13 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 
 	bc->optimization_level = gb_clamp(bc->optimization_level, -1, 3);
 
+	if (bc->optimization_level <= 0) {
+		if (!is_arch_wasm()) {
+			bc->use_separate_modules = true;
+		}
+	}
+
+
 	// TODO: Static map calls are bugged on `amd64sysv` abi.
 	if (bc->metrics.os != TargetOs_windows && bc->metrics.arch == TargetArch_amd64) {
 		// ENFORCE DYNAMIC MAP CALLS
