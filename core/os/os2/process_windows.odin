@@ -66,7 +66,7 @@ _process_list :: proc(allocator: runtime.Allocator) -> ([]int, Error) {
 	return pid_list[:], nil
 }
 
-_process_info :: proc(pid: int, selection: Process_Info_Fields, allocator: runtime.Allocator) -> (info: Process_Info, err: Error) {
+_process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator: runtime.Allocator) -> (info: Process_Info, err: Error) {
 	info.pid = pid
 	defer if err != nil {
 		free_process_info(info, allocator)
@@ -83,22 +83,8 @@ _process_info :: proc(pid: int, selection: Process_Info_Fields, allocator: runti
 	need_process_handle := need_peb || .Username in selection
 	// Data obtained from process snapshots
 	if need_snapprocess {
-		snap := windows.CreateToolhelp32Snapshot(windows.TH32CS_SNAPPROCESS, 0)
-		if snap == windows.INVALID_HANDLE_VALUE {
-			return info, _get_platform_error()
-		}
-		defer windows.CloseHandle(snap)
-		entry := windows.PROCESSENTRY32W { dwSize = size_of(windows.PROCESSENTRY32W) }
-		status := windows.Process32FirstW(snap, &entry)
-		found := false
-		for status {
-			if u32(pid) == entry.th32ProcessID {
-				found = true
-				break
-			}
-			status = windows.Process32NextW(snap, &entry)
-		}
-		if !found {
+		entry, entry_err := _process_entry_by_pid(info.pid)
+		if entry_err != nil {
 			err = General_Error.Not_Exist
 			return
 		}
@@ -111,30 +97,10 @@ _process_info :: proc(pid: int, selection: Process_Info_Fields, allocator: runti
 			info.priority = int(entry.pcPriClassBase)
 		}
 	}
-	// Note(flysand): Not sure which way it's better to get the executable path:
-	// via toolhelp snapshots or by reading other process' PEB memory. I have
-	// a slight suspicion that if both exe path and command line are desired,
-	// it's faster to just read both from PEB, but maybe the toolhelp snapshots
-	// are just better...?
 	if need_snapmodule {
-		snap := windows.CreateToolhelp32Snapshot(
-			windows.TH32CS_SNAPMODULE|windows.TH32CS_SNAPMODULE32,
-			u32(pid),
-		)
-		if snap == windows.INVALID_HANDLE_VALUE {
-			err = _get_platform_error()
-			return
-		}
-		defer windows.CloseHandle(snap)
-		entry := windows.MODULEENTRY32W { dwSize = size_of(windows.MODULEENTRY32W) }
-		status := windows.Module32FirstW(snap, &entry)
-		if !status {
-			err = _get_platform_error()
-			return
-		}
-		exe_path: string
-		exe_path, err = windows.wstring_to_utf8(raw_data(entry.szExePath[:]), -1,  allocator)
-		if err != nil {
+		exe_path, exe_path_err := _process_exe_by_pid(pid, allocator)
+		if exe_path_err != nil {
+			err = exe_path_err
 			return
 		}
 		info.fields |= {.Executable_Path}
@@ -269,6 +235,161 @@ _process_info :: proc(pid: int, selection: Process_Info_Fields, allocator: runti
 	return
 }
 
+_process_info_by_handle :: proc(process: Process, selection: Process_Info_Fields, allocator: runtime.Allocator) -> (info: Process_Info, err: Error) {
+	pid := process.pid
+	info.pid = pid
+	defer if err != nil {
+		free_process_info(info, allocator)
+	}
+	need_snapprocess := \
+		.PPid in selection ||
+		.Priority in selection
+	need_snapmodule := \
+		.Executable_Path in selection
+	need_peb := \
+		.Command_Line in selection ||
+		.Environment in selection ||
+		.CWD in selection
+	// Data obtained from process snapshots
+	if need_snapprocess {
+		entry, entry_err := _process_entry_by_pid(info.pid)
+		if entry_err != nil {
+			err = General_Error.Not_Exist
+			return
+		}
+		if .PPid in selection {
+			info.fields |= {.PPid}
+			info.ppid = int(entry.th32ParentProcessID)
+		}
+		if .Priority in selection {
+			info.fields |= {.Priority}
+			info.priority = int(entry.pcPriClassBase)
+		}
+	}
+	if need_snapmodule {
+		exe_path, exe_path_err := _process_exe_by_pid(pid, allocator)
+		if exe_path_err != nil {
+			err = exe_path_err
+			return
+		}
+		info.fields |= {.Executable_Path}
+		info.executable_path = exe_path
+	}
+	ph := cast(windows.HANDLE) process.handle
+	if need_peb {
+		ntdll_lib := windows.LoadLibraryW(windows.L("ntdll.dll"))
+		if ntdll_lib == nil {
+			err = _get_platform_error()
+			return
+		}
+		defer windows.FreeLibrary(ntdll_lib)
+		NtQueryInformationProcess := cast(NtQueryInformationProcess_T) windows.GetProcAddress(ntdll_lib, "NtQueryInformationProcess")
+		if NtQueryInformationProcess == nil {
+			err = _get_platform_error()
+			return
+		}
+		process_info_size: u32 = ---
+		process_info: PROCESS_BASIC_INFORMATION = ---
+		status := NtQueryInformationProcess(ph, .ProcessBasicInformation, &process_info, size_of(process_info), &process_info_size)
+		if status != 0 {
+			// TODO(flysand): There's probably a mismatch between NTSTATUS and
+			// windows userland error codes, I haven't checked.
+			err = Platform_Error(status)
+			return
+		}
+		if process_info.PebBaseAddress == nil {
+			// Not sure what the error is
+			err = General_Error.Unsupported
+			return
+		}
+		process_peb: PEB = ---
+		bytes_read: uint = ---
+		read_struct :: proc(h: windows.HANDLE, addr: rawptr, dest: ^$T, br: ^uint) -> windows.BOOL {
+			return windows.ReadProcessMemory(h, addr, dest, size_of(T), br)
+		}
+		read_slice :: proc(h: windows.HANDLE, addr: rawptr, dest: []$T, br: ^uint) -> windows.BOOL {
+			return windows.ReadProcessMemory(h, addr, raw_data(dest), len(dest)*size_of(T), br)
+		}
+		if !read_struct(ph, process_info.PebBaseAddress, &process_peb, &bytes_read) {
+			err = _get_platform_error()
+			return
+		}
+		process_params: RTL_USER_PROCESS_PARAMETERS = ---
+		if !read_struct(ph, process_peb.ProcessParameters, &process_params, &bytes_read) {
+			err = _get_platform_error()
+			return
+		}
+		if .Command_Line in selection || .Command_Args in selection {
+			TEMP_ALLOCATOR_GUARD()
+			cmdline_w := make([]u16, process_params.CommandLine.Length, temp_allocator())
+			if !read_slice(ph, process_params.CommandLine.Buffer, cmdline_w, &bytes_read) {
+				err = _get_platform_error()
+				return
+			}
+			if .Command_Line in selection {
+				cmdline, cmdline_err := windows.utf16_to_utf8(cmdline_w, allocator)
+				if cmdline_err != nil {
+					err = cmdline_err
+					return
+				}
+				info.fields |= {.Command_Line}
+				info.command_line = cmdline
+			}
+			if .Command_Args in selection {
+				args, args_err := _parse_command_line(raw_data(cmdline_w), allocator)
+				if args_err != nil {
+					err = args_err
+					return
+				}
+				info.fields += {.Command_Args}
+				info.command_args = args
+			}
+		}
+		if .Environment in selection {
+			TEMP_ALLOCATOR_GUARD()
+			env_len := process_params.EnvironmentSize / 2
+			envs_w := make([]u16, env_len, temp_allocator())
+			if !read_slice(ph, process_params.Environment, envs_w, &bytes_read) {
+				err = _get_platform_error()
+				return
+			}
+			envs, envs_err := _parse_environment_block(raw_data(envs_w), allocator)
+			if envs_err != nil {
+				err = envs_err
+				return
+			}
+			info.fields |= {.Environment}
+			info.environment = envs
+		}
+		if .CWD in selection {
+			TEMP_ALLOCATOR_GUARD()
+			cwd_w := make([]u16, process_params.CurrentDirectoryPath.Length, temp_allocator())
+			if !read_slice(ph, process_params.CurrentDirectoryPath.Buffer, cwd_w, &bytes_read) {
+				err = _get_platform_error()
+				return
+			}
+			cwd, cwd_err := windows.utf16_to_utf8(cwd_w, allocator)
+			if cwd_err != nil {
+				err = cwd_err
+				return
+			}
+			info.fields |= {.CWD}
+			info.cwd = cwd
+		}
+	}
+	if .Username in selection {
+		username, username_err := _get_process_user(ph, allocator)
+		if username_err != nil {
+			err = username_err
+			return
+		}
+		info.fields |= {.Username}
+		info.username = username
+	}
+	err = nil
+	return
+}
+
 _current_process_info :: proc(selection: Process_Info_Fields, allocator: runtime.Allocator) -> (info: Process_Info, err: Error) {
 	info.pid = cast(int) windows.GetCurrentProcessId()
 	defer if err != nil {
@@ -276,20 +397,8 @@ _current_process_info :: proc(selection: Process_Info_Fields, allocator: runtime
 	}
 	need_snapprocess := .PPid in selection || .Priority in selection
 	if need_snapprocess {
-		snap := windows.CreateToolhelp32Snapshot(windows.TH32CS_SNAPPROCESS, 0)
-		if snap == windows.INVALID_HANDLE_VALUE {
-			return
-		}
-		defer windows.CloseHandle(snap)
-		entry := windows.PROCESSENTRY32W { dwSize = size_of(windows.PROCESSENTRY32W) }
-		status := windows.Process32FirstW(snap, &entry)
-		for status {
-			if entry.th32ProcessID == u32(info.pid) {
-				break
-			}
-			status = windows.Process32NextW(snap, &entry)
-		}
-		if entry.th32ProcessID != u32(info.pid) {
+		entry, entry_err := _process_entry_by_pid(info.pid)
+		if entry_err != nil {
 			err = General_Error.Not_Exist
 			return
 		}
@@ -472,6 +581,56 @@ _process_close :: proc(process: Process) -> (Error) {
 _filetime_to_duration :: proc(filetime: windows.FILETIME) -> time.Duration {
 	ticks := u64(filetime.dwHighDateTime)<<32 | u64(filetime.dwLowDateTime)
 	return time.Duration(ticks * 100)
+}
+
+@(private)
+_process_entry_by_pid :: proc(pid: int) -> (windows.PROCESSENTRY32W, Error) {
+	snap := windows.CreateToolhelp32Snapshot(windows.TH32CS_SNAPPROCESS, 0)
+	if snap == windows.INVALID_HANDLE_VALUE {
+		return {}, _get_platform_error()
+	}
+	defer windows.CloseHandle(snap)
+	entry := windows.PROCESSENTRY32W { dwSize = size_of(windows.PROCESSENTRY32W) }
+	status := windows.Process32FirstW(snap, &entry)
+	found := false
+	for status {
+		if u32(pid) == entry.th32ProcessID {
+			found = true
+			break
+		}
+		status = windows.Process32NextW(snap, &entry)
+	}
+	if !found {
+		return {}, General_Error.Not_Exist
+	}
+	return entry, nil
+}
+
+// Note(flysand): Not sure which way it's better to get the executable path:
+// via toolhelp snapshots or by reading other process' PEB memory. I have
+// a slight suspicion that if both exe path and command line are desired,
+// it's faster to just read both from PEB, but maybe the toolhelp snapshots
+// are just better...?
+@(private)
+_process_exe_by_pid :: proc(pid: int, allocator: runtime.Allocator) -> (string, Error) {
+	snap := windows.CreateToolhelp32Snapshot(
+		windows.TH32CS_SNAPMODULE|windows.TH32CS_SNAPMODULE32,
+		u32(pid),
+	)
+	if snap == windows.INVALID_HANDLE_VALUE {
+		return "", _get_platform_error()
+	}
+	defer windows.CloseHandle(snap)
+	entry := windows.MODULEENTRY32W { dwSize = size_of(windows.MODULEENTRY32W) }
+	status := windows.Module32FirstW(snap, &entry)
+	if !status {
+		return "", _get_platform_error()
+	}
+	exe_path, err := windows.wstring_to_utf8(raw_data(entry.szExePath[:]), -1,  allocator)
+	if err != nil {
+		return "", err
+	}
+	return exe_path, nil
 }
 
 @(private)
