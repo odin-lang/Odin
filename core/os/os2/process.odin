@@ -351,7 +351,8 @@ process_wait :: proc(process: Process, timeout := TIMEOUT_INFINITE) -> (Process_
 
 	This procedure closes the handle associated with a process. It **does not**
 	terminate a process, in case it was running. In case a termination is
-	desired, kill the process first, then close the handle.
+	desired, kill the process first, wait for the process to finish,
+	then close the handle.
 */
 process_close :: proc(process: Process) -> (Error) {
 	return _process_close(process)
