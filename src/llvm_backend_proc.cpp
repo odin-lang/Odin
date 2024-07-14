@@ -517,6 +517,7 @@ gb_internal void lb_begin_procedure_body(lbProcedure *p) {
 	lb_start_block(p, p->entry_block);
 
 	map_init(&p->direct_parameters);
+	p->no_captures.allocator = heap_allocator();
 
 	GB_ASSERT(p->type != nullptr);
 
@@ -3450,8 +3451,32 @@ gb_internal lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr) {
 					}
 					isize slice_len = var_args.count;
 					if (slice_len > 0) {
+						lbAddr base_array = {};
+						if (e->flags & EntityFlag_NoCapture) {
+							for (lbNoCaptureData const &nc : p->no_captures) {
+								if (are_types_identical(nc.slice_type, slice_type)) {
+									base_array = nc.base_array;
+									break;
+								}
+							}
+							DeclInfo *d = decl_info_of_entity(p->entity);
+							if (d != nullptr && base_array.addr.value == nullptr) {
+								for (NoCaptureData const &nc : d->no_captures) {
+									if (are_types_identical(nc.slice_type, slice_type)) {
+										base_array = lb_add_local_generated(p, alloc_type_array(elem_type, nc.max_count), true);
+										array_add(&p->no_captures, lbNoCaptureData{slice_type, base_array});
+										break;
+									}
+								}
+							}
+						}
+
+						if (base_array.addr.value == nullptr) {
+							base_array = lb_add_local_generated(p, alloc_type_array(elem_type, slice_len), true);
+						}
+						GB_ASSERT(base_array.addr.value != nullptr);
+
 						lbAddr slice = lb_add_local_generated(p, slice_type, true);
-						lbAddr base_array = lb_add_local_generated(p, alloc_type_array(elem_type, slice_len), true);
 
 						for (isize i = 0; i < var_args.count; i++) {
 							lbValue addr = lb_emit_array_epi(p, base_array.addr, cast(i32)i);

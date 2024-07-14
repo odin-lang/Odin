@@ -4014,6 +4014,7 @@ struct ParseFieldPrefixMapping {
 gb_global ParseFieldPrefixMapping const parse_field_prefix_mappings[] = {
 	{str_lit("using"),        Token_using,     FieldFlag_using},
 	{str_lit("no_alias"),     Token_Hash,      FieldFlag_no_alias},
+	{str_lit("no_capture"),   Token_Hash,      FieldFlag_no_capture},
 	{str_lit("c_vararg"),     Token_Hash,      FieldFlag_c_vararg},
 	{str_lit("const"),        Token_Hash,      FieldFlag_const},
 	{str_lit("any_int"),      Token_Hash,      FieldFlag_any_int},

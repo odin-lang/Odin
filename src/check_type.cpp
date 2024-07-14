@@ -1953,6 +1953,10 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 					error(name, "'#by_ptr' can only be applied to variable fields");
 					p->flags &= ~FieldFlag_by_ptr;
 				}
+				if (p->flags&FieldFlag_no_capture) {
+					error(name, "'#no_capture' can only be applied to variable variadic fields");
+					p->flags &= ~FieldFlag_no_capture;
+				}
 
 				param = alloc_entity_type_name(scope, name->Ident.token, type, EntityState_Resolved);
 				param->TypeName.is_type_alias = true;
@@ -2054,6 +2058,15 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 						p->flags &= ~FieldFlag_by_ptr; // Remove the flag
 					}
 				}
+				if (p->flags&FieldFlag_no_capture) {
+					if (!(is_variadic && variadic_index == variables.count)) {
+						error(name, "'#no_capture' can only be applied to a variadic parameter");
+						p->flags &= ~FieldFlag_no_capture;
+					} else if (p->flags & FieldFlag_c_vararg) {
+						error(name, "'#no_capture' cannot be applied to a #c_vararg parameter");
+						p->flags &= ~FieldFlag_no_capture;
+					}
+				}
 
 				if (is_poly_name) {
 					if (p->flags&FieldFlag_no_alias) {
@@ -2115,6 +2128,10 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 			if (p->flags&FieldFlag_by_ptr) {
 				param->flags |= EntityFlag_ByPtr;
 			}
+			if (p->flags&FieldFlag_no_capture) {
+				param->flags |= EntityFlag_NoCapture;
+			}
+
 
 			param->state = EntityState_Resolved; // NOTE(bill): This should have be resolved whilst determining it
 			add_entity(ctx, scope, name, param);

@@ -125,7 +125,7 @@ register_user_formatter :: proc(id: typeid, formatter: User_Formatter) -> Regist
 // 	Returns: A formatted string. 
 //
 @(require_results)
-aprint :: proc(args: ..any, sep := " ", allocator := context.allocator) -> string {
+aprint :: proc(#no_capture args: ..any, sep := " ", allocator := context.allocator) -> string {
 	str: strings.Builder
 	strings.builder_init(&str, allocator)
 	return sbprint(&str, ..args, sep=sep)
@@ -141,7 +141,7 @@ aprint :: proc(args: ..any, sep := " ", allocator := context.allocator) -> strin
 // 	Returns: A formatted string with a newline character at the end.
 //
 @(require_results)
-aprintln :: proc(args: ..any, sep := " ", allocator := context.allocator) -> string {
+aprintln :: proc(#no_capture args: ..any, sep := " ", allocator := context.allocator) -> string {
 	str: strings.Builder
 	strings.builder_init(&str, allocator)
 	return sbprintln(&str, ..args, sep=sep)
@@ -158,7 +158,7 @@ aprintln :: proc(args: ..any, sep := " ", allocator := context.allocator) -> str
 // 	Returns: A formatted string. The returned string must be freed accordingly.
 //
 @(require_results)
-aprintf :: proc(fmt: string, args: ..any, allocator := context.allocator, newline := false) -> string {
+aprintf :: proc(fmt: string, #no_capture args: ..any, allocator := context.allocator, newline := false) -> string {
 	str: strings.Builder
 	strings.builder_init(&str, allocator)
 	return sbprintf(&str, fmt, ..args, newline=newline)
@@ -174,7 +174,7 @@ aprintf :: proc(fmt: string, args: ..any, allocator := context.allocator, newlin
 // 	Returns: A formatted string. The returned string must be freed accordingly.
 //
 @(require_results)
-aprintfln :: proc(fmt: string, args: ..any, allocator := context.allocator) -> string {
+aprintfln :: proc(fmt: string, #no_capture args: ..any, allocator := context.allocator) -> string {
 	return aprintf(fmt, ..args, allocator=allocator, newline=true)
 }
 // 	Creates a formatted string
@@ -188,7 +188,7 @@ aprintfln :: proc(fmt: string, args: ..any, allocator := context.allocator) -> s
 // 	Returns: A formatted string.
 //
 @(require_results)
-tprint :: proc(args: ..any, sep := " ") -> string {
+tprint :: proc(#no_capture args: ..any, sep := " ") -> string {
 	str: strings.Builder
 	strings.builder_init(&str, context.temp_allocator)
 	return sbprint(&str, ..args, sep=sep)
@@ -204,7 +204,7 @@ tprint :: proc(args: ..any, sep := " ") -> string {
 // 	Returns: A formatted string with a newline character at the end.
 //
 @(require_results)
-tprintln :: proc(args: ..any, sep := " ") -> string {
+tprintln :: proc(#no_capture args: ..any, sep := " ") -> string {
 	str: strings.Builder
 	strings.builder_init(&str, context.temp_allocator)
 	return sbprintln(&str, ..args, sep=sep)
@@ -221,7 +221,7 @@ tprintln :: proc(args: ..any, sep := " ") -> string {
 // 	Returns: A formatted string.
 //
 @(require_results)
-tprintf :: proc(fmt: string, args: ..any, newline := false) -> string {
+tprintf :: proc(fmt: string, #no_capture args: ..any, newline := false) -> string {
 	str: strings.Builder
 	strings.builder_init(&str, context.temp_allocator)
 	return sbprintf(&str, fmt, ..args, newline=newline)
@@ -237,7 +237,7 @@ tprintf :: proc(fmt: string, args: ..any, newline := false) -> string {
 // 	Returns: A formatted string.
 //
 @(require_results)
-tprintfln :: proc(fmt: string, args: ..any) -> string {
+tprintfln :: proc(fmt: string, #no_capture args: ..any) -> string {
 	return tprintf(fmt, ..args, newline=true)
 }
 // Creates a formatted string using a supplied buffer as the backing array. Writes into the buffer.
@@ -249,7 +249,7 @@ tprintfln :: proc(fmt: string, args: ..any) -> string {
 //
 // Returns: A formatted string
 //
-bprint :: proc(buf: []byte, args: ..any, sep := " ") -> string {
+bprint :: proc(buf: []byte, #no_capture args: ..any, sep := " ") -> string {
 	sb := strings.builder_from_bytes(buf)
 	return sbprint(&sb, ..args, sep=sep)
 }
@@ -262,7 +262,7 @@ bprint :: proc(buf: []byte, args: ..any, sep := " ") -> string {
 //
 // Returns: A formatted string with a newline character at the end
 //
-bprintln :: proc(buf: []byte, args: ..any, sep := " ") -> string {
+bprintln :: proc(buf: []byte, #no_capture args: ..any, sep := " ") -> string {
 	sb := strings.builder_from_bytes(buf)
 	return sbprintln(&sb, ..args, sep=sep)
 }
@@ -276,7 +276,7 @@ bprintln :: proc(buf: []byte, args: ..any, sep := " ") -> string {
 //
 // Returns: A formatted string
 //
-bprintf :: proc(buf: []byte, fmt: string, args: ..any, newline := false) -> string {
+bprintf :: proc(buf: []byte, fmt: string, #no_capture args: ..any, newline := false) -> string {
 	sb := strings.builder_from_bytes(buf)
 	return sbprintf(&sb, fmt, ..args, newline=newline)
 }
@@ -289,7 +289,7 @@ bprintf :: proc(buf: []byte, fmt: string, args: ..any, newline := false) -> stri
 //
 // Returns: A formatted string
 //
-bprintfln :: proc(buf: []byte, fmt: string, args: ..any) -> string {
+bprintfln :: proc(buf: []byte, fmt: string, #no_capture args: ..any) -> string {
 	return bprintf(buf, fmt, ..args, newline=true)
 }
 // Runtime assertion with a formatted message
@@ -301,14 +301,14 @@ bprintfln :: proc(buf: []byte, fmt: string, args: ..any) -> string {
 // - loc: The location of the caller
 //
 @(disabled=ODIN_DISABLE_ASSERT)
-assertf :: proc(condition: bool, fmt: string, args: ..any, loc := #caller_location) {
+assertf :: proc(condition: bool, fmt: string, #no_capture args: ..any, loc := #caller_location) {
 	if !condition {
 		// NOTE(dragos): We are using the same trick as in builtin.assert
 		// to improve performance to make the CPU not
 		// execute speculatively, making it about an order of
 		// magnitude faster
 		@(cold)
-		internal :: proc(loc: runtime.Source_Code_Location, fmt: string, args: ..any) {
+		internal :: proc(loc: runtime.Source_Code_Location, fmt: string, #no_capture args: ..any) {
 			p := context.assertion_failure_proc
 			if p == nil {
 				p = runtime.default_assertion_failure_proc
@@ -326,7 +326,7 @@ assertf :: proc(condition: bool, fmt: string, args: ..any, loc := #caller_locati
 // - args: A variadic list of arguments to be formatted
 // - loc: The location of the caller
 //
-panicf :: proc(fmt: string, args: ..any, loc := #caller_location) -> ! {
+panicf :: proc(fmt: string, #no_capture args: ..any, loc := #caller_location) -> ! {
 	p := context.assertion_failure_proc
 	if p == nil {
 		p = runtime.default_assertion_failure_proc
@@ -346,7 +346,7 @@ panicf :: proc(fmt: string, args: ..any, loc := #caller_location) -> ! {
 // Returns: A formatted C string
 //
 @(require_results)
-caprintf :: proc(format: string, args: ..any, newline := false) -> cstring {
+caprintf :: proc(format: string, #no_capture args: ..any, newline := false) -> cstring {
 	str: strings.Builder
 	strings.builder_init(&str)
 	sbprintf(&str, format, ..args, newline=newline)
@@ -365,7 +365,7 @@ caprintf :: proc(format: string, args: ..any, newline := false) -> cstring {
 // Returns: A formatted C string
 //
 @(require_results)
-caprintfln :: proc(format: string, args: ..any) -> cstring {
+caprintfln :: proc(format: string, #no_capture args: ..any) -> cstring {
 	return caprintf(format, ..args, newline=true)
 }
 // 	Creates a formatted C string
@@ -379,7 +379,7 @@ caprintfln :: proc(format: string, args: ..any) -> cstring {
 // 	Returns: A formatted C string.
 //
 @(require_results)
-ctprint :: proc(args: ..any, sep := " ") -> cstring {
+ctprint :: proc(#no_capture args: ..any, sep := " ") -> cstring {
 	str: strings.Builder
 	strings.builder_init(&str, context.temp_allocator)
 	sbprint(&str, ..args, sep=sep)
@@ -399,7 +399,7 @@ ctprint :: proc(args: ..any, sep := " ") -> cstring {
 // Returns: A formatted C string
 //
 @(require_results)
-ctprintf :: proc(format: string, args: ..any, newline := false) -> cstring {
+ctprintf :: proc(format: string, #no_capture args: ..any, newline := false) -> cstring {
 	str: strings.Builder
 	strings.builder_init(&str, context.temp_allocator)
 	sbprintf(&str, format, ..args, newline=newline)
@@ -418,7 +418,7 @@ ctprintf :: proc(format: string, args: ..any, newline := false) -> cstring {
 // Returns: A formatted C string
 //
 @(require_results)
-ctprintfln :: proc(format: string, args: ..any) -> cstring {
+ctprintfln :: proc(format: string, #no_capture args: ..any) -> cstring {
 	return ctprintf(format, ..args, newline=true)
 }
 // Formats using the default print settings and writes to the given strings.Builder
@@ -430,7 +430,7 @@ ctprintfln :: proc(format: string, args: ..any) -> cstring {
 //
 // Returns: A formatted string
 //
-sbprint :: proc(buf: ^strings.Builder, args: ..any, sep := " ") -> string {
+sbprint :: proc(buf: ^strings.Builder, #no_capture args: ..any, sep := " ") -> string {
 	wprint(strings.to_writer(buf), ..args, sep=sep, flush=true)
 	return strings.to_string(buf^)
 }
@@ -443,7 +443,7 @@ sbprint :: proc(buf: ^strings.Builder, args: ..any, sep := " ") -> string {
 //
 // Returns: The resulting formatted string
 //
-sbprintln :: proc(buf: ^strings.Builder, args: ..any, sep := " ") -> string {
+sbprintln :: proc(buf: ^strings.Builder, #no_capture args: ..any, sep := " ") -> string {
 	wprintln(strings.to_writer(buf), ..args, sep=sep, flush=true)
 	return strings.to_string(buf^)
 }
@@ -457,7 +457,7 @@ sbprintln :: proc(buf: ^strings.Builder, args: ..any, sep := " ") -> string {
 //
 // Returns: The resulting formatted string
 //
-sbprintf :: proc(buf: ^strings.Builder, fmt: string, args: ..any, newline := false) -> string {
+sbprintf :: proc(buf: ^strings.Builder, fmt: string, #no_capture args: ..any, newline := false) -> string {
 	wprintf(strings.to_writer(buf), fmt, ..args, flush=true, newline=newline)
 	return strings.to_string(buf^)
 }
@@ -469,7 +469,7 @@ sbprintf :: proc(buf: ^strings.Builder, fmt: string, args: ..any, newline := fal
 //
 // Returns: A formatted string
 //
-sbprintfln :: proc(buf: ^strings.Builder, format: string, args: ..any) -> string {
+sbprintfln :: proc(buf: ^strings.Builder, format: string, #no_capture args: ..any) -> string {
 	return sbprintf(buf, format, ..args, newline=true)
 }
 // Formats and writes to an io.Writer using the default print settings
@@ -481,7 +481,7 @@ sbprintfln :: proc(buf: ^strings.Builder, format: string, args: ..any) -> string
 //
 // Returns: The number of bytes written
 //
-wprint :: proc(w: io.Writer, args: ..any, sep := " ", flush := true) -> int {
+wprint :: proc(w: io.Writer, #no_capture args: ..any, sep := " ", flush := true) -> int {
 	fi: Info
 	fi.writer = w
 
@@ -522,7 +522,7 @@ wprint :: proc(w: io.Writer, args: ..any, sep := " ", flush := true) -> int {
 //
 // Returns: The number of bytes written
 //
-wprintln :: proc(w: io.Writer, args: ..any, sep := " ", flush := true) -> int {
+wprintln :: proc(w: io.Writer, #no_capture args: ..any, sep := " ", flush := true) -> int {
 	fi: Info
 	fi.writer = w
 
@@ -549,11 +549,11 @@ wprintln :: proc(w: io.Writer, args: ..any, sep := " ", flush := true) -> int {
 //
 // Returns: The number of bytes written
 //
-wprintf :: proc(w: io.Writer, fmt: string, args: ..any, flush := true, newline := false) -> int {
+wprintf :: proc(w: io.Writer, fmt: string, #no_capture args: ..any, flush := true, newline := false) -> int {
 	MAX_CHECKED_ARGS :: 64
 	assert(len(args) <= MAX_CHECKED_ARGS, "number of args > 64 is unsupported")
 
-	parse_options :: proc(fi: ^Info, fmt: string, index, end: int, unused_args: ^bit_set[0 ..< MAX_CHECKED_ARGS], args: ..any) -> int {
+	parse_options :: proc(fi: ^Info, fmt: string, index, end: int, unused_args: ^bit_set[0 ..< MAX_CHECKED_ARGS], #no_capture args: ..any) -> int {
 		i := index
 
 		// Prefix
@@ -809,7 +809,7 @@ wprintf :: proc(w: io.Writer, fmt: string, args: ..any, flush := true, newline :
 //
 // Returns: The number of bytes written.
 //
-wprintfln :: proc(w: io.Writer, format: string, args: ..any, flush := true) -> int {
+wprintfln :: proc(w: io.Writer, format: string, #no_capture args: ..any, flush := true) -> int {
 	return wprintf(w, format, ..args, flush=flush, newline=true)
 }
 // Writes a ^runtime.Type_Info value to an io.Writer

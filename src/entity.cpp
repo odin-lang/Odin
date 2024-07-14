@@ -45,7 +45,7 @@ enum EntityFlag : u64 {
 	EntityFlag_Value         = 1ull<<11,
 	EntityFlag_BitFieldField = 1ull<<12,
 
-
+	EntityFlag_NoCapture = 1ull<<13, // #no_capture
 
 	EntityFlag_PolyConst     = 1ull<<15,
 	EntityFlag_NotExported   = 1ull<<16,

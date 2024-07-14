@@ -181,6 +181,11 @@ char const *ProcCheckedState_strings[ProcCheckedState_COUNT] {
 	"Checked",
 };
 
+struct NoCaptureData {
+	Type *slice_type; // ..elem_type
+	isize max_count;
+};
+
 // DeclInfo is used to store information of certain declarations to allow for "any order" usage
 struct DeclInfo {
 	DeclInfo *    parent; // NOTE(bill): only used for procedure literals at the moment
@@ -218,6 +223,8 @@ struct DeclInfo {
 	BlockingMutex type_and_value_mutex;
 
 	Array<BlockLabel> labels;
+
+	Array<NoCaptureData> no_captures;
 
 	// NOTE(bill): this is to prevent a race condition since these procedure literals can be created anywhere at any time
 	struct lbModule *code_gen_module;

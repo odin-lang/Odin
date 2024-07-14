@@ -330,9 +330,10 @@ enum FieldFlag : u32 {
 	FieldFlag_subtype   = 1<<7,
 	FieldFlag_by_ptr    = 1<<8,
 	FieldFlag_no_broadcast = 1<<9, // disallow array programming
+	FieldFlag_no_capture  = 1<<10,
 
 	// Internal use by the parser only
-	FieldFlag_Tags      = 1<<10,
+	FieldFlag_Tags      = 1<<11,
 	FieldFlag_Results   = 1<<16,
 
 
@@ -340,7 +341,10 @@ enum FieldFlag : u32 {
 	FieldFlag_Invalid   = 1u<<31,
 
 	// Parameter List Restrictions
-	FieldFlag_Signature = FieldFlag_ellipsis|FieldFlag_using|FieldFlag_no_alias|FieldFlag_c_vararg|FieldFlag_const|FieldFlag_any_int|FieldFlag_by_ptr|FieldFlag_no_broadcast,
+	FieldFlag_Signature = FieldFlag_ellipsis|FieldFlag_using|FieldFlag_no_alias|FieldFlag_c_vararg|
+	                      FieldFlag_const|FieldFlag_any_int|FieldFlag_by_ptr|FieldFlag_no_broadcast|
+	                      FieldFlag_no_capture,
+
 	FieldFlag_Struct    = FieldFlag_using|FieldFlag_subtype|FieldFlag_Tags,
 };
 

@@ -296,6 +296,11 @@ enum lbProcedureFlag : u32 {
 	lbProcedureFlag_DebugAllocaCopy = 1<<1,
 };
 
+struct lbNoCaptureData {
+	Type *slice_type;
+	lbAddr base_array;
+};
+
 struct lbProcedure {
 	u32 flags;
 	u16 state_flags;
@@ -335,6 +340,8 @@ struct lbProcedure {
 	PtrMap<Entity *, lbValue> direct_parameters;
 	bool             in_multi_assignment;
 	Array<LLVMValueRef> raw_input_parameters;
+
+	Array<lbNoCaptureData> no_captures;
 
 	LLVMValueRef temp_callee_return_struct_memory;
 
