@@ -75,11 +75,9 @@ _open_internal :: proc(name: string, flags: File_Flags, perm: File_Mode) -> (han
 		access |= win32.FILE_APPEND_DATA
 	}
 	share_mode := u32(win32.FILE_SHARE_READ | win32.FILE_SHARE_WRITE)
-	sa: ^win32.SECURITY_ATTRIBUTES
-	if .Close_On_Exec not_in flags {
-		sa = &win32.SECURITY_ATTRIBUTES{}
-		sa.nLength = size_of(win32.SECURITY_ATTRIBUTES)
-		sa.bInheritHandle = true
+	sa := win32.SECURITY_ATTRIBUTES {
+		nLength = size_of(win32.SECURITY_ATTRIBUTES),
+		bInheritHandle = .Close_On_Exec not_in flags,
 	}
 
 	create_mode: u32 = win32.OPEN_EXISTING
@@ -101,7 +99,7 @@ _open_internal :: proc(name: string, flags: File_Flags, perm: File_Mode) -> (han
 			// NOTE(bill): Open has just asked to create a file in read-only mode.
 			// If the file already exists, to make it akin to a *nix open call,
 			// the call preserves the existing permissions.
-			h := win32.CreateFileW(path, access, share_mode, sa, win32.TRUNCATE_EXISTING, win32.FILE_ATTRIBUTE_NORMAL, nil)
+			h := win32.CreateFileW(path, access, share_mode, &sa, win32.TRUNCATE_EXISTING, win32.FILE_ATTRIBUTE_NORMAL, nil)
 			if h == win32.INVALID_HANDLE {
 				switch e := win32.GetLastError(); e {
 				case win32.ERROR_FILE_NOT_FOUND, _ERROR_BAD_NETPATH, win32.ERROR_PATH_NOT_FOUND:
@@ -114,7 +112,7 @@ _open_internal :: proc(name: string, flags: File_Flags, perm: File_Mode) -> (han
 			}
 		}
 	}
-	h := win32.CreateFileW(path, access, share_mode, sa, create_mode, attrs, nil)
+	h := win32.CreateFileW(path, access, share_mode, &sa, create_mode, attrs, nil)
 	if h == win32.INVALID_HANDLE {
 		return 0, _get_platform_error()
 	}
@@ -124,7 +122,7 @@ _open_internal :: proc(name: string, flags: File_Flags, perm: File_Mode) -> (han
 
 _open :: proc(name: string, flags: File_Flags, perm: File_Mode) -> (f: ^File, err: Error) {
 	flags := flags if flags != nil else {.Read}
-	handle := _open_internal(name, flags + {.Close_On_Exec}, perm) or_return
+	handle := _open_internal(name, flags, perm) or_return
 	return _new_file(handle, name), nil
 }
 
