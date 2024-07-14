@@ -14,6 +14,8 @@
 #undef NOMINMAX
 #endif
 
+#include <string.h>
+
 #define GB_WINDOWS_H_INCLUDED
 #define GB_IMPLEMENTATION
 #include "gb/gb.h"

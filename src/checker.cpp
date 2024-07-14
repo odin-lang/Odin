@@ -1117,7 +1117,11 @@ gb_internal void init_universal(void) {
 		int minimum_os_version = 0;
 		if (build_context.minimum_os_version_string != "") {
 			int major, minor, revision = 0;
+		#if defined(GB_SYSTEM_WINDOWS)
+			sscanf_s(cast(const char *)(build_context.minimum_os_version_string.text), "%d.%d.%d", &major, &minor, &revision);
+		#else
 			sscanf(cast(const char *)(build_context.minimum_os_version_string.text), "%d.%d.%d", &major, &minor, &revision);
+		#endif
 			minimum_os_version = (major*10000)+(minor*100)+revision;
 		}
 		add_global_constant("ODIN_MINIMUM_OS_VERSION", t_untyped_integer, exact_value_i64(minimum_os_version));

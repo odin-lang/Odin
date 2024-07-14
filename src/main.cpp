@@ -399,8 +399,6 @@ enum BuildFlagKind {
 
 	BuildFlag_Sanitize,
 
-	BuildFlag_FastBuild,
-
 #if defined(GB_SYSTEM_WINDOWS)
 	BuildFlag_IgnoreVsSearch,
 	BuildFlag_ResourceFile,
@@ -606,8 +604,6 @@ gb_internal bool parse_build_flags(Array<String> args) {
 #endif
 
 	add_flag(&build_flags, BuildFlag_Sanitize,                str_lit("sanitize"),                  BuildFlagParam_String,  Command__does_build, true);
-
-	add_flag(&build_flags, BuildFlag_FastBuild,               str_lit("fast-build"),                BuildFlagParam_None,    Command__does_build);
 
 
 #if defined(GB_SYSTEM_WINDOWS)
@@ -1446,12 +1442,6 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							}
 							break;
 
-
-						case BuildFlag_FastBuild:
-							build_context.custom_optimization_level = true;
-							build_context.optimization_level = -1;
-							build_context.use_separate_modules = true;
-							break;
 
 					#if defined(GB_SYSTEM_WINDOWS)
 						case BuildFlag_IgnoreVsSearch: {
