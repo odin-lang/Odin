@@ -8,7 +8,7 @@ import "core:fmt"
 import "core:log"
 import "core:hash"
 
-Silent :: proc(pos: xml.Pos, format: string, args: ..any) {}
+Silent :: proc(pos: xml.Pos, format: string, #no_capture args: ..any) {}
 
 OPTIONS :: xml.Options{ flags = { .Ignore_Unsupported, .Intern_Comments, },
 	expected_doctype = "",

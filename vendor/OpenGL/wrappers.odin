@@ -754,7 +754,7 @@ when !GL_DEBUG {
 	MultiDrawElementsIndirectCount :: proc "c" (mode: i32, type: i32, indirect: [^]DrawElementsIndirectCommand, drawcount: i32, maxdrawcount, stride: i32)      { impl_MultiDrawElementsIndirectCount(mode, type, indirect, drawcount, maxdrawcount, stride)             }
 	PolygonOffsetClamp             :: proc "c" (factor, units, clamp: f32)                                                                                      { impl_PolygonOffsetClamp(factor, units, clamp)                                                          }
 } else {
-	debug_helper :: proc"c"(from_loc: runtime.Source_Code_Location, num_ret: int, args: ..any, loc := #caller_location) {
+	debug_helper :: proc"c"(from_loc: runtime.Source_Code_Location, num_ret: int, #no_capture args: ..any, loc := #caller_location) {
 		context = runtime.default_context()
 
 		Error_Enum :: enum {

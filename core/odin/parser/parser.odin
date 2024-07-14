@@ -5,8 +5,8 @@ import "core:odin/tokenizer"
 
 import "core:fmt"
 
-Warning_Handler :: #type proc(pos: tokenizer.Pos, fmt: string, args: ..any)
-Error_Handler   :: #type proc(pos: tokenizer.Pos, fmt: string, args: ..any)
+Warning_Handler :: #type proc(pos: tokenizer.Pos, fmt: string, #no_capture args: ..any)
+Error_Handler   :: #type proc(pos: tokenizer.Pos, fmt: string, #no_capture args: ..any)
 
 Flag :: enum u32 {
 	Optional_Semicolons,
@@ -67,25 +67,25 @@ Import_Decl_Kind :: enum {
 
 
 
-default_warning_handler :: proc(pos: tokenizer.Pos, msg: string, args: ..any) {
+default_warning_handler :: proc(pos: tokenizer.Pos, msg: string, #no_capture args: ..any) {
 	fmt.eprintf("%s(%d:%d): Warning: ", pos.file, pos.line, pos.column)
 	fmt.eprintf(msg, ..args)
 	fmt.eprintf("\n")
 }
-default_error_handler :: proc(pos: tokenizer.Pos, msg: string, args: ..any) {
+default_error_handler :: proc(pos: tokenizer.Pos, msg: string, #no_capture args: ..any) {
 	fmt.eprintf("%s(%d:%d): ", pos.file, pos.line, pos.column)
 	fmt.eprintf(msg, ..args)
 	fmt.eprintf("\n")
 }
 
-warn :: proc(p: ^Parser, pos: tokenizer.Pos, msg: string, args: ..any) {
+warn :: proc(p: ^Parser, pos: tokenizer.Pos, msg: string, #no_capture args: ..any) {
 	if p.warn != nil {
 		p.warn(pos, msg, ..args)
 	}
 	p.file.syntax_warning_count += 1
 }
 
-error :: proc(p: ^Parser, pos: tokenizer.Pos, msg: string, args: ..any) {
+error :: proc(p: ^Parser, pos: tokenizer.Pos, msg: string, #no_capture args: ..any) {
 	if p.err != nil {
 		p.err(pos, msg, ..args)
 	}

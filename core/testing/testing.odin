@@ -53,12 +53,12 @@ T :: struct {
 
 
 @(deprecated="prefer `log.error`")
-error :: proc(t: ^T, args: ..any, loc := #caller_location) {
+error :: proc(t: ^T, #no_capture args: ..any, loc := #caller_location) {
 	pkg_log.error(..args, location = loc)
 }
 
 @(deprecated="prefer `log.errorf`")
-errorf :: proc(t: ^T, format: string, args: ..any, loc := #caller_location) {
+errorf :: proc(t: ^T, format: string, #no_capture args: ..any, loc := #caller_location) {
 	pkg_log.errorf(format, ..args, location = loc)
 }
 
@@ -87,12 +87,12 @@ failed :: proc(t: ^T) -> bool {
 }
 
 @(deprecated="prefer `log.info`")
-log :: proc(t: ^T, args: ..any, loc := #caller_location) {
+log :: proc(t: ^T, #no_capture args: ..any, loc := #caller_location) {
 	pkg_log.info(..args, location = loc)
 }
 
 @(deprecated="prefer `log.infof`")
-logf :: proc(t: ^T, format: string, args: ..any, loc := #caller_location) {
+logf :: proc(t: ^T, format: string, #no_capture args: ..any, loc := #caller_location) {
 	pkg_log.infof(format, ..args, location = loc)
 }
 
@@ -121,7 +121,7 @@ expect :: proc(t: ^T, ok: bool, msg: string = "", loc := #caller_location) -> bo
 	return ok
 }
 
-expectf :: proc(t: ^T, ok: bool, format: string, args: ..any, loc := #caller_location) -> bool {
+expectf :: proc(t: ^T, ok: bool, format: string, #no_capture args: ..any, loc := #caller_location) -> bool {
 	if !ok {
 		pkg_log.errorf(format, ..args, location=loc)
 	}

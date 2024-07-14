@@ -484,7 +484,7 @@ non_zero_append_elem :: proc(array: ^$T/[dynamic]$E, #no_broadcast arg: E, loc :
 	return _append_elem(array, arg, false, loc=loc)
 }
 
-_append_elems :: #force_inline proc(array: ^$T/[dynamic]$E, should_zero: bool, loc := #caller_location, args: ..E) -> (n: int, err: Allocator_Error) #optional_allocator_error {
+_append_elems :: #force_inline proc(array: ^$T/[dynamic]$E, should_zero: bool, loc := #caller_location, args: []E) -> (n: int, err: Allocator_Error) #optional_allocator_error {
 	if array == nil {
 		return 0, nil
 	}
@@ -524,13 +524,13 @@ _append_elems :: #force_inline proc(array: ^$T/[dynamic]$E, should_zero: bool, l
 }
 
 @builtin
-append_elems :: proc(array: ^$T/[dynamic]$E, #no_broadcast args: ..E, loc := #caller_location) -> (n: int, err: Allocator_Error) #optional_allocator_error {
-	return _append_elems(array, true, loc, ..args)
+append_elems :: proc(array: ^$T/[dynamic]$E, #no_broadcast #no_capture args: ..E, loc := #caller_location) -> (n: int, err: Allocator_Error) #optional_allocator_error {
+	return _append_elems(array, true, loc, args)
 }
 
 @builtin
-non_zero_append_elems :: proc(array: ^$T/[dynamic]$E, #no_broadcast args: ..E, loc := #caller_location) -> (n: int, err: Allocator_Error) #optional_allocator_error {
-	return _append_elems(array, false, loc, ..args)
+non_zero_append_elems :: proc(array: ^$T/[dynamic]$E, #no_broadcast #no_capture args: ..E, loc := #caller_location) -> (n: int, err: Allocator_Error) #optional_allocator_error {
+	return _append_elems(array, false, loc, args)
 }
 
 // The append_string built-in procedure appends a string to the end of a [dynamic]u8 like type
@@ -617,7 +617,7 @@ inject_at_elem :: proc(array: ^$T/[dynamic]$E, index: int, #no_broadcast arg: E,
 }
 
 @builtin
-inject_at_elems :: proc(array: ^$T/[dynamic]$E, index: int, #no_broadcast args: ..E, loc := #caller_location) -> (ok: bool, err: Allocator_Error) #no_bounds_check #optional_allocator_error {
+inject_at_elems :: proc(array: ^$T/[dynamic]$E, index: int, #no_broadcast #no_capture args: ..E, loc := #caller_location) -> (ok: bool, err: Allocator_Error) #no_bounds_check #optional_allocator_error {
 	if array == nil {
 		return
 	}
@@ -679,7 +679,7 @@ assign_at_elem :: proc(array: ^$T/[dynamic]$E, index: int, arg: E, loc := #calle
 
 
 @builtin
-assign_at_elems :: proc(array: ^$T/[dynamic]$E, index: int, args: ..E, loc := #caller_location) -> (ok: bool, err: Allocator_Error) #no_bounds_check #optional_allocator_error {
+assign_at_elems :: proc(array: ^$T/[dynamic]$E, index: int, #no_broadcast #no_capture args: ..E, loc := #caller_location) -> (ok: bool, err: Allocator_Error) #no_bounds_check #optional_allocator_error {
 	new_size := index + len(args)
 	if len(args) == 0 {
 		ok = true

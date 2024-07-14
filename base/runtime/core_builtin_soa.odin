@@ -342,17 +342,17 @@ _append_soa_elem :: proc(array: ^$T/#soa[dynamic]$E, zero_memory: bool, #no_broa
 }
 
 @builtin
-append_soa_elems :: proc(array: ^$T/#soa[dynamic]$E, #no_broadcast args: ..E, loc := #caller_location) -> (n: int, err: Allocator_Error) #optional_allocator_error {
+append_soa_elems :: proc(array: ^$T/#soa[dynamic]$E, #no_broadcast #no_capture args: ..E, loc := #caller_location) -> (n: int, err: Allocator_Error) #optional_allocator_error {
 	return _append_soa_elems(array, true, args=args, loc=loc)
 }
 
 @builtin
-non_zero_append_soa_elems :: proc(array: ^$T/#soa[dynamic]$E, #no_broadcast args: ..E, loc := #caller_location) -> (n: int, err: Allocator_Error) #optional_allocator_error {
+non_zero_append_soa_elems :: proc(array: ^$T/#soa[dynamic]$E, #no_broadcast #no_capture args: ..E, loc := #caller_location) -> (n: int, err: Allocator_Error) #optional_allocator_error {
 	return _append_soa_elems(array, false, args=args, loc=loc)
 }
 
 
-_append_soa_elems :: proc(array: ^$T/#soa[dynamic]$E, zero_memory: bool, #no_broadcast args: ..E, loc := #caller_location) -> (n: int, err: Allocator_Error) #optional_allocator_error {
+_append_soa_elems :: proc(array: ^$T/#soa[dynamic]$E, zero_memory: bool, #no_broadcast args: []E, loc := #caller_location) -> (n: int, err: Allocator_Error) #optional_allocator_error {
 	if array == nil {
 		return
 	}

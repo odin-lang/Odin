@@ -72,7 +72,7 @@ when !ODIN_NO_RTTI {
 			print_string("<invalid-value>")
 		}
 	}
-	println_any :: #force_no_inline proc "contextless" (args: ..any) {
+	println_any :: #force_no_inline proc "contextless" (#no_capture args: ..any) {
 		context = default_context()
 		loop: for arg, i in args {
 			assert(arg.id != nil)
@@ -127,7 +127,7 @@ print_string :: #force_no_inline proc "contextless" (str: string) -> (n: int) {
 	return
 }
 
-print_strings :: #force_no_inline proc "contextless" (args: ..string) -> (n: int) {
+print_strings :: #force_no_inline proc "contextless" (#no_capture args: ..string) -> (n: int) {
 	for str in args {
 		m, err := stderr_write(transmute([]byte)str)
 		n += m

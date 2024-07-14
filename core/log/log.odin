@@ -75,43 +75,43 @@ nil_logger :: proc() -> Logger {
 	return Logger{nil_logger_proc, nil, Level.Debug, nil}
 }
 
-debugf :: proc(fmt_str: string, args: ..any, location := #caller_location) {
+debugf :: proc(fmt_str: string, #no_capture args: ..any, location := #caller_location) {
 	logf(.Debug,   fmt_str, ..args, location=location)
 }
-infof  :: proc(fmt_str: string, args: ..any, location := #caller_location) {
+infof  :: proc(fmt_str: string, #no_capture args: ..any, location := #caller_location) {
 	logf(.Info,    fmt_str, ..args, location=location)
 }
-warnf  :: proc(fmt_str: string, args: ..any, location := #caller_location) {
+warnf  :: proc(fmt_str: string, #no_capture args: ..any, location := #caller_location) {
 	logf(.Warning, fmt_str, ..args, location=location)
 }
-errorf :: proc(fmt_str: string, args: ..any, location := #caller_location) {
+errorf :: proc(fmt_str: string, #no_capture args: ..any, location := #caller_location) {
 	logf(.Error,   fmt_str, ..args, location=location)
 }
-fatalf :: proc(fmt_str: string, args: ..any, location := #caller_location) {
+fatalf :: proc(fmt_str: string, #no_capture args: ..any, location := #caller_location) {
 	logf(.Fatal,   fmt_str, ..args, location=location)
 }
 
-debug :: proc(args: ..any, sep := " ", location := #caller_location) {
+debug :: proc(#no_capture args: ..any, sep := " ", location := #caller_location) {
 	log(.Debug,   ..args, sep=sep, location=location)
 }
-info  :: proc(args: ..any, sep := " ", location := #caller_location) {
+info  :: proc(#no_capture args: ..any, sep := " ", location := #caller_location) {
 	log(.Info,    ..args, sep=sep, location=location)
 }
-warn  :: proc(args: ..any, sep := " ", location := #caller_location) {
+warn  :: proc(#no_capture args: ..any, sep := " ", location := #caller_location) {
 	log(.Warning, ..args, sep=sep, location=location)
 }
-error :: proc(args: ..any, sep := " ", location := #caller_location) {
+error :: proc(#no_capture args: ..any, sep := " ", location := #caller_location) {
 	log(.Error,   ..args, sep=sep, location=location)
 }
-fatal :: proc(args: ..any, sep := " ", location := #caller_location) {
+fatal :: proc(#no_capture args: ..any, sep := " ", location := #caller_location) {
 	log(.Fatal,   ..args, sep=sep, location=location)
 }
 
-panic :: proc(args: ..any, location := #caller_location) -> ! {
+panic :: proc(#no_capture args: ..any, location := #caller_location) -> ! {
 	log(.Fatal, ..args, location=location)
 	runtime.panic("log.panic", location)
 }
-panicf :: proc(fmt_str: string, args: ..any, location := #caller_location) -> ! {
+panicf :: proc(fmt_str: string, #no_capture args: ..any, location := #caller_location) -> ! {
 	logf(.Fatal, fmt_str, ..args, location=location)
 	runtime.panic("log.panicf", location)
 }
@@ -133,14 +133,14 @@ assert :: proc(condition: bool, message := "", loc := #caller_location) {
 }
 
 @(disabled=ODIN_DISABLE_ASSERT)
-assertf :: proc(condition: bool, fmt_str: string, args: ..any, loc := #caller_location) {
+assertf :: proc(condition: bool, fmt_str: string, #no_capture args: ..any, loc := #caller_location) {
 	if !condition {
 		// NOTE(dragos): We are using the same trick as in builtin.assert
 		// to improve performance to make the CPU not
 		// execute speculatively, making it about an order of
 		// magnitude faster
 		@(cold)
-		internal :: proc(loc: runtime.Source_Code_Location, fmt_str: string, args: ..any) {
+		internal :: proc(loc: runtime.Source_Code_Location, fmt_str: string, #no_capture args: ..any) {
 			p := context.assertion_failure_proc
 			if p == nil {
 				p = runtime.default_assertion_failure_proc
@@ -155,7 +155,7 @@ assertf :: proc(condition: bool, fmt_str: string, args: ..any, loc := #caller_lo
 
 
 
-log :: proc(level: Level, args: ..any, sep := " ", location := #caller_location) {
+log :: proc(level: Level, #no_capture args: ..any, sep := " ", location := #caller_location) {
 	logger := context.logger
 	if logger.procedure == nil {
 		return
@@ -167,7 +167,7 @@ log :: proc(level: Level, args: ..any, sep := " ", location := #caller_location)
 	logger.procedure(logger.data, level, str, logger.options, location)
 }
 
-logf :: proc(level: Level, fmt_str: string, args: ..any, location := #caller_location) {
+logf :: proc(level: Level, fmt_str: string, #no_capture args: ..any, location := #caller_location) {
 	logger := context.logger
 	if logger.procedure == nil {
 		return

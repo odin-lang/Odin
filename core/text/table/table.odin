@@ -145,7 +145,7 @@ set_cell_value_and_alignment :: proc(tbl: ^Table, row, col: int, value: any, ali
 	cell.alignment = alignment
 }
 
-format :: proc(tbl: ^Table, _fmt: string, args: ..any) -> string {
+format :: proc(tbl: ^Table, _fmt: string, #no_capture args: ..any) -> string {
 	context.allocator = tbl.format_allocator
 	return fmt.aprintf(_fmt, ..args)
 }
