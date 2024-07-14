@@ -536,12 +536,7 @@ non_zero_append_elems :: proc(array: ^$T/[dynamic]$E, #no_broadcast args: ..E, l
 
 // The append_string built-in procedure appends a string to the end of a [dynamic]u8 like type
 _append_elem_string :: proc(array: ^$T/[dynamic]$E/u8, arg: $A/string, should_zero: bool, loc := #caller_location) -> (n: int, err: Allocator_Error) #optional_allocator_error {
-	args := transmute([]E)arg
-	if should_zero { 
-		return append_elems(array, ..args, loc=loc)
-	} else {
-		return non_zero_append_elems(array, ..args, loc=loc)
-	}
+	return _append_elems((^Raw_Dynamic_Array)(array), 1, 1, should_zero, loc, raw_data(arg), len(arg))
 }
 
 @builtin
