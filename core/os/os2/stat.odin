@@ -29,10 +29,12 @@ file_info_delete :: proc(fi: File_Info, allocator: runtime.Allocator) {
 
 @(require_results)
 fstat :: proc(f: ^File, allocator: runtime.Allocator) -> (File_Info, Error) {
-	if f != nil && f.user_fstat != nil {
-		return f->user_fstat(allocator)
+	if f == nil {
+		return {}, nil
+	} else if f.fstat != nil {
+		return f->fstat(allocator)
 	}
-	return _fstat(f, allocator)
+	return {}, .Invalid_Callback
 }
 
 @(require_results)

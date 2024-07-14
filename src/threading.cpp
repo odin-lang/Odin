@@ -46,6 +46,18 @@ typedef struct WorkerTask {
 	void           *data;
 } WorkerTask;
 
+typedef struct TaskRingBuffer {
+	std::atomic<isize> size;
+	std::atomic<WorkerTask *> buffer;
+} TaskRingBuffer;
+
+typedef struct TaskQueue {
+	std::atomic<isize> top;
+	std::atomic<isize> bottom;
+
+	std::atomic<TaskRingBuffer *> ring;
+} TaskQueue;
+
 struct Thread {
 #if defined(GB_SYSTEM_WINDOWS)
 	void *win32_handle;
@@ -54,12 +66,9 @@ struct Thread {
 #endif
 
 	isize idx;
+	isize stack_size;
 
-	WorkerTask *queue;
-	size_t capacity;
-	std::atomic<uint64_t> head_and_tail;
-
-	isize  stack_size;
+	struct TaskQueue   queue;
 	struct ThreadPool *pool;
 };
 
@@ -551,6 +560,18 @@ gb_internal void *internal_thread_proc(void *arg) {
 }
 #endif
 
+TaskRingBuffer *task_ring_init(isize size) {
+	TaskRingBuffer *ring = gb_alloc_item(heap_allocator(), TaskRingBuffer);
+	ring->size = size;
+	ring->buffer = gb_alloc_array(heap_allocator(), WorkerTask, ring->size);
+	return ring;
+}
+
+void thread_queue_destroy(TaskQueue *q) {
+	gb_free(heap_allocator(), (*q->ring).buffer);
+	gb_free(heap_allocator(), q->ring);
+}
+
 gb_internal void thread_init(ThreadPool *pool, Thread *t, isize idx) {
 	gb_zero_item(t);
 #if defined(GB_SYSTEM_WINDOWS)
@@ -559,13 +580,11 @@ gb_internal void thread_init(ThreadPool *pool, Thread *t, isize idx) {
 	t->posix_handle = 0;
 #endif
 
-	t->capacity = 1 << 14; // must be a power of 2
-	t->queue = gb_alloc_array(heap_allocator(), WorkerTask, t->capacity);
-	t->head_and_tail = 0;
+	// Size must be a power of 2
+	t->queue.ring = task_ring_init(1 << 14);
 	t->pool = pool;
 	t->idx = idx;
 }
-
 
 gb_internal void thread_init_and_start(ThreadPool *pool, Thread *t, isize idx) {
 	thread_init(pool, t, idx);
@@ -598,7 +617,7 @@ gb_internal void thread_join_and_destroy(Thread *t) {
 	t->posix_handle = 0;
 #endif
 
-	gb_free(heap_allocator(), t->queue);
+	thread_queue_destroy(&t->queue);
 }
 
 gb_internal void thread_set_name(Thread *t, char const *name) {

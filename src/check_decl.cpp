@@ -1869,5 +1869,14 @@ gb_internal bool check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *de
 
 	add_deps_from_child_to_parent(decl);
 
+	for (VariadicReuseData const &vr : decl->variadic_reuses) {
+		GB_ASSERT(vr.slice_type->kind == Type_Slice);
+		Type *elem = vr.slice_type->Slice.elem;
+		i64 size = type_size_of(elem);
+		i64 align = type_align_of(elem);
+		decl->variadic_reuse_max_bytes = gb_max(decl->variadic_reuse_max_bytes, size*vr.max_count);
+		decl->variadic_reuse_max_align = gb_max(decl->variadic_reuse_max_align, align);
+	}
+
 	return true;
 }

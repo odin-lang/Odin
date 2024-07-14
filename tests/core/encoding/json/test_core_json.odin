@@ -372,6 +372,27 @@ utf8_string_of_multibyte_characters :: proc(t: ^testing.T) {
 }
 
 @test
+struct_with_ignore_tags :: proc(t: ^testing.T) {
+	My_Struct :: struct {
+		a: string `json:"-"`,
+	}
+
+	my_struct := My_Struct{
+		a = "test",
+	}
+
+	my_struct_marshaled, marshal_err := json.marshal(my_struct)
+	defer delete(my_struct_marshaled)
+
+	testing.expectf(t, marshal_err == nil, "Expected `json.marshal` to return nil error, got %v", marshal_err)
+
+	my_struct_json := transmute(string)my_struct_marshaled
+	expected_json := `{}`
+
+	testing.expectf(t, expected_json == my_struct_json, "Expected `json.marshal` to return %s, got %s", expected_json, my_struct_json)
+}
+
+@test
 map_with_integer_keys :: proc(t: ^testing.T) {
 	my_map := make(map[i32]string)
 	defer delete_map(my_map)

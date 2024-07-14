@@ -202,7 +202,7 @@ get_computer_name_and_account_sid :: proc(username: string) -> (computer_name: s
 	username_w := utf8_to_utf16(username, context.temp_allocator)
 	cbsid: DWORD
 	computer_name_size: DWORD
-	pe_use := SID_TYPE.User
+	pe_use := SID_NAME_USE.SidTypeUser
 
 	res := LookupAccountNameW(
 		nil, // Look on this computer first
@@ -244,7 +244,7 @@ get_sid :: proc(username: string, sid: ^SID) -> (ok: bool) {
 	username_w := utf8_to_utf16(username, context.temp_allocator)
 	cbsid: DWORD
 	computer_name_size: DWORD
-	pe_use := SID_TYPE.User
+	pe_use := SID_NAME_USE.SidTypeUser
 
 	res := LookupAccountNameW(
 		nil, // Look on this computer first

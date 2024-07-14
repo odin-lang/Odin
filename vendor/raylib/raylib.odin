@@ -1667,7 +1667,7 @@ IsGestureDetected :: proc "c" (gesture: Gesture) -> bool {
 
 
 // Text formatting with variables (sprintf style)
-TextFormat :: proc(text: cstring, args: ..any) -> cstring { 
+TextFormat :: proc(text: cstring, args: ..any) -> cstring {
 	@static buffers: [MAX_TEXTFORMAT_BUFFERS][MAX_TEXT_BUFFER_LENGTH]byte
 	@static index: u32
 	
@@ -1683,7 +1683,7 @@ TextFormat :: proc(text: cstring, args: ..any) -> cstring {
 }
 
 // Text formatting with variables (sprintf style) and allocates (must be freed with 'MemFree')
-TextFormatAlloc :: proc(text: cstring, args: ..any) -> cstring { 
+TextFormatAlloc :: proc(text: cstring, args: ..any) -> cstring {
 	str := fmt.tprintf(string(text), ..args)
 	return strings.clone_to_cstring(str, MemAllocator())
 }

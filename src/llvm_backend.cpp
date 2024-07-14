@@ -1570,6 +1570,7 @@ gb_internal WORKER_TASK_PROC(lb_llvm_module_pass_worker_proc) {
 
 	switch (build_context.optimization_level) {
 	case -1:
+		array_add(&passes, "function(annotation-remarks)");
 		break;
 	case 0:
 		array_add(&passes, "always-inline");

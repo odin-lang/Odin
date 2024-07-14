@@ -7,7 +7,7 @@ import "core:strings"
 import win32 "core:sys/windows"
 
 _fstat :: proc(f: ^File, allocator: runtime.Allocator) -> (File_Info, Error) {
-	if f == nil || f.impl.fd == nil {
+	if f == nil || (^File_Impl)(f.impl).fd == nil {
 		return {}, nil
 	}
 
@@ -122,7 +122,7 @@ _cleanpath_strip_prefix :: proc(buf: []u16) -> []u16 {
 
 
 _cleanpath_from_handle :: proc(f: ^File, allocator: runtime.Allocator) -> (string, Error) {
-	if f == nil || f.impl.fd == nil {
+	if f == nil {
 		return "", nil
 	}
 	h := _handle(f)
@@ -138,7 +138,7 @@ _cleanpath_from_handle :: proc(f: ^File, allocator: runtime.Allocator) -> (strin
 }
 
 _cleanpath_from_handle_u16 :: proc(f: ^File) -> ([]u16, Error) {
-	if f == nil || f.impl.fd == nil {
+	if f  == nil {
 		return nil, nil
 	}
 	h := _handle(f)
