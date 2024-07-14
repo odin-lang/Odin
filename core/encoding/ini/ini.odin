@@ -121,7 +121,7 @@ load_map_from_path :: proc(path: string, allocator: runtime.Allocator, options :
 	data := os.read_entire_file(path, allocator) or_return
 	defer delete(data, allocator)
 	m, err = load_map_from_string(string(data), allocator, options)
-	ok = err != nil
+	ok = err == nil
 	defer if !ok {
 		delete_map(m)
 	}
