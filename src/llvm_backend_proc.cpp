@@ -3496,6 +3496,10 @@ gb_internal lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr) {
 							base_array_ptr = p->variadic_reuse_base_array_ptr.addr;
 						}
 
+						if (slice.addr.value == nullptr) {
+							slice = lb_add_local_generated(p, slice_type, true);
+						}
+
 						GB_ASSERT(base_array_ptr.value != nullptr);
 						GB_ASSERT(slice.addr.value != nullptr);
 
