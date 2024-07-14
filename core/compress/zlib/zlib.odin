@@ -235,7 +235,7 @@ allocate_huffman_table :: proc(allocator := context.allocator) -> (z: ^Huffman_T
 }
 
 @(optimization_mode="favor_size")
-build_huffman :: proc(z: ^Huffman_Table, code_lengths: []u8) -> (err: Error) {
+build_huffman :: #force_no_inline proc(z: ^Huffman_Table, code_lengths: []u8) -> (err: Error) {
 	sizes:     [HUFFMAN_MAX_BITS+1]int
 	next_code: [HUFFMAN_MAX_BITS+1]int
 
