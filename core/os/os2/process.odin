@@ -26,11 +26,11 @@ args := get_args()
 	typically is the path to the currently running executable.
 */
 get_args :: proc() -> []string {
-	args := make([]string, len(runtime.args__), allocator = context.allocator)
+	result := make([]string, len(runtime.args__), allocator = context.allocator)
 	for rt_arg, i in runtime.args__ {
-		args[i] = cast(string) rt_arg
+		result[i] = cast(string) rt_arg
 	}
-	return args[:]
+	return result[:]
 }
 
 /*
@@ -387,42 +387,12 @@ process_close :: proc(process: Process) -> (Error) {
 	return _process_close(process)
 }
 
-// Process_Attributes :: struct {
-// 	dir: string,
-// 	env: []string,
-// 	files: []^File,
-// 	sys: ^Process_Attributes_OS_Specific,
-// }
+/*
+	Terminate a process.
 
-// Process_Attributes_OS_Specific :: struct{}
+	This procedure terminates a process, specified by it's handle, `process`.
 
-// Process_Error :: enum {
-// 	None,
-// }
-
-
-
-// Signal :: #type proc()
-
-// Kill:      Signal = nil
-// Interrupt: Signal = nil
-
-// process_start :: proc(name: string, argv: []string, attr: ^Process_Attributes) -> (^Process, Process_Error) {
-// 	return nil, .None
-// }
-
-// process_release :: proc(p: ^Process) -> Process_Error {
-// 	return .None
-// }
-
-// process_kill :: proc(p: ^Process) -> Process_Error {
-// 	return .None
-// }
-
-// process_signal :: proc(p: ^Process, sig: Signal) -> Process_Error {
-// 	return .None
-// }
-
-
-
-
+*/
+process_kill :: proc(process: Process) -> (Error) {
+	return _process_kill(process)
+}

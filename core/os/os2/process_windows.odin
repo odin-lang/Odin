@@ -577,6 +577,13 @@ _process_close :: proc(process: Process) -> (Error) {
 	return nil
 }
 
+_process_kill :: proc(process: Process) -> (Error) {
+	if !windows.TerminateProcess(windows.HANDLE(process.handle), 9) {
+		return _get_platform_error()
+	}
+	return nil
+}
+
 @(private)
 _filetime_to_duration :: proc(filetime: windows.FILETIME) -> time.Duration {
 	ticks := u64(filetime.dwHighDateTime)<<32 | u64(filetime.dwLowDateTime)
@@ -695,8 +702,8 @@ _parse_command_line :: proc(cmd_line_w: [^]u16, allocator: runtime.Allocator) ->
 	for arg_w, i in argv_w[:argc] {
 		arg, arg_err := windows.wstring_to_utf8(arg_w, -1, allocator)
 		if arg_err != nil {
-			for arg in argv[:i] {
-				delete(arg, allocator)
+			for s in argv[:i] {
+				delete(s, allocator)
 			}
 			delete(argv, allocator)
 			return nil, arg_err
