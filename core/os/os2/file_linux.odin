@@ -6,15 +6,15 @@ import "core:time"
 import "base:runtime"
 import "core:sys/linux"
 
-_File :: struct {
-	using file: File,
+File_Impl :: struct {
+	file: File,
 	name: string,
 	fd: linux.Fd,
 	allocator: runtime.Allocator,
 }
 
 _stdin := File{
-	impl = &_File{
+	impl = &File_Impl{
 		name = "/proc/self/fd/0",
 		fd = 0,
 		allocator = _file_allocator(),
@@ -25,7 +25,7 @@ _stdin := File{
 	fstat = _fstat,
 }
 _stdout := File{
-	impl = &_File{
+	impl = &File_Impl{
 		name = "/proc/self/fd/1",
 		fd = 1,
 		allocator = _file_allocator(),
@@ -36,7 +36,7 @@ _stdout := File{
 	fstat = _fstat,
 }
 _stderr := File{
-	impl = &_File{
+	impl = &File_Impl{
 		name = "/proc/self/fd/2",
 		fd = 2,
 		allocator = _file_allocator(),
@@ -93,35 +93,35 @@ _open :: proc(name: string, flags: File_Flags, perm: File_Mode) -> (f: ^File, er
 }
 
 _new_file :: proc(fd: uintptr, _: string = "") -> ^File {
-	impl := new(_File, file_allocator())
+	impl := new(File_Impl, file_allocator())
+	impl.file.impl = impl
 	impl.fd = linux.Fd(fd)
 	impl.allocator = file_allocator()
 	impl.name = _get_full_path(impl.fd, impl.allocator)
 	impl.file.stream = {
-		data = &impl.file,
+		data = impl,
 		procedure = _file_stream_proc,
 	}
-	impl.fstat = _fstat
-	return impl
+	impl.file.fstat = _fstat
+	return &impl.file
 }
 
-_destroy :: proc(f: ^File) -> Error {
-	if f == nil || f.impl == nil {
+_destroy :: proc(f: ^File_Impl) -> Error {
+	if f == nil {
 		return nil
 	}
-	impl := (^_File)(f.impl)
-	delete(impl.name, impl.allocator)
-	free(f, impl.allocator)
+	a := f.allocator
+	delete(f.name, a)
+	free(f, a)
 	return nil
 }
 
 
-_close :: proc(f: ^File) -> Error {
-	if f == nil || f.impl == nil {
+_close :: proc(f: ^File_Impl) -> Error {
+	if f == nil{
 		return nil
 	}
-	impl := (^_File)(f.impl)
-	errno := linux.close(impl.fd)
+	errno := linux.close(f.fd)
 	if errno == .EBADF { // avoid possible double free
 		return _get_platform_error(errno)
 	}
@@ -133,41 +133,38 @@ _fd :: proc(f: ^File) -> uintptr {
 	if f == nil || f.impl == nil {
 		return ~uintptr(0)
 	}
-	impl := (^_File)(f.impl)
+	impl := (^File_Impl)(f.impl)
 	return uintptr(impl.fd)
 }
 
 _name :: proc(f: ^File) -> string {
-	return (^_File)(f.impl).name if f != nil && f.impl != nil else ""
+	return (^File_Impl)(f.impl).name if f != nil && f.impl != nil else ""
 }
 
-_seek :: proc(f: ^File, offset: i64, whence: io.Seek_From) -> (ret: i64, err: Error) {
-	impl := (^_File)(f.impl)
-	n, errno := linux.lseek(impl.fd, offset, linux.Seek_Whence(whence))
+_seek :: proc(f: ^File_Impl, offset: i64, whence: io.Seek_From) -> (ret: i64, err: Error) {
+	n, errno := linux.lseek(f.fd, offset, linux.Seek_Whence(whence))
 	if errno != .NONE {
 		return -1, _get_platform_error(errno)
 	}
 	return n, nil
 }
 
-_read :: proc(f: ^File, p: []byte) -> (i64, Error) {
+_read :: proc(f: ^File_Impl, p: []byte) -> (i64, Error) {
 	if len(p) == 0 {
 		return 0, nil
 	}
-	impl := (^_File)(f.impl)
-	n, errno := linux.read(impl.fd, p[:])
+	n, errno := linux.read(f.fd, p[:])
 	if errno != .NONE {
 		return -1, _get_platform_error(errno)
 	}
 	return i64(n), n == 0 ? io.Error.EOF : nil
 }
 
-_read_at :: proc(f: ^File, p: []byte, offset: i64) -> (i64, Error) {
+_read_at :: proc(f: ^File_Impl, p: []byte, offset: i64) -> (i64, Error) {
 	if offset < 0 {
 		return 0, .Invalid_Offset
 	}
-	impl := (^_File)(f.impl)
-	n, errno := linux.pread(impl.fd, p[:], offset)
+	n, errno := linux.pread(f.fd, p[:], offset)
 	if errno != .NONE {
 		return -1, _get_platform_error(errno)
 	}
@@ -177,35 +174,31 @@ _read_at :: proc(f: ^File, p: []byte, offset: i64) -> (i64, Error) {
 	return i64(n), nil
 }
 
-_write :: proc(f: ^File, p: []byte) -> (i64, Error) {
+_write :: proc(f: ^File_Impl, p: []byte) -> (i64, Error) {
 	if len(p) == 0 {
 		return 0, nil
 	}
-	impl := (^_File)(f.impl)
-	n, errno := linux.write(impl.fd, p[:])
+	n, errno := linux.write(f.fd, p[:])
 	if errno != .NONE {
 		return -1, _get_platform_error(errno)
 	}
 	return i64(n), nil
 }
 
-_write_at :: proc(f: ^File, p: []byte, offset: i64) -> (i64, Error) {
+_write_at :: proc(f: ^File_Impl, p: []byte, offset: i64) -> (i64, Error) {
 	if offset < 0 {
 		return 0, .Invalid_Offset
 	}
-
-	impl := (^_File)(f.impl)
-	n, errno := linux.pwrite(impl.fd, p[:], offset)
+	n, errno := linux.pwrite(f.fd, p[:], offset)
 	if errno != .NONE {
 		return -1, _get_platform_error(errno)
 	}
 	return i64(n), nil
 }
 
-_file_size :: proc(f: ^File) -> (n: i64, err: Error) {
+_file_size :: proc(f: ^File_Impl) -> (n: i64, err: Error) {
 	s: linux.Stat = ---
-	impl := (^_File)(f.impl)
-	errno := linux.fstat(impl.fd, &s)
+	errno := linux.fstat(f.fd, &s)
 	if errno != .NONE {
 		return -1, _get_platform_error(errno)
 	}
@@ -213,17 +206,16 @@ _file_size :: proc(f: ^File) -> (n: i64, err: Error) {
 }
 
 _sync :: proc(f: ^File) -> Error {
-	impl := (^_File)(f.impl)
+	impl := (^File_Impl)(f.impl)
 	return _get_platform_error(linux.fsync(impl.fd))
 }
 
-_flush :: proc(f: ^File) -> Error {
-	impl := (^_File)(f.impl)
-	return _get_platform_error(linux.fsync(impl.fd))
+_flush :: proc(f: ^File_Impl) -> Error {
+	return _get_platform_error(linux.fsync(f.fd))
 }
 
 _truncate :: proc(f: ^File, size: i64) -> Error {
-	impl := (^_File)(f.impl)
+	impl := (^File_Impl)(f.impl)
 	return _get_platform_error(linux.ftruncate(impl.fd, size))
 }
 
@@ -300,7 +292,7 @@ _chdir :: proc(name: string) -> Error {
 }
 
 _fchdir :: proc(f: ^File) -> Error {
-	impl := (^_File)(f.impl)
+	impl := (^File_Impl)(f.impl)
 	return _get_platform_error(linux.fchdir(impl.fd))
 }
 
@@ -311,7 +303,7 @@ _chmod :: proc(name: string, mode: File_Mode) -> Error {
 }
 
 _fchmod :: proc(f: ^File, mode: File_Mode) -> Error {
-	impl := (^_File)(f.impl)
+	impl := (^File_Impl)(f.impl)
 	return _get_platform_error(linux.fchmod(impl.fd, transmute(linux.Mode)(u32(mode))))
 }
 
@@ -331,7 +323,7 @@ _lchown :: proc(name: string, uid, gid: int) -> Error {
 
 // NOTE: will throw error without super user priviledges
 _fchown :: proc(f: ^File, uid, gid: int) -> Error {
-	impl := (^_File)(f.impl)
+	impl := (^File_Impl)(f.impl)
 	return _get_platform_error(linux.fchown(impl.fd, linux.Uid(uid), linux.Gid(gid)))
 }
 
@@ -362,7 +354,7 @@ _fchtimes :: proc(f: ^File, atime, mtime: time.Time) -> Error {
 			uint(mtime._nsec) % uint(time.Second),
 		},
 	}
-	impl := (^_File)(f.impl)
+	impl := (^File_Impl)(f.impl)
 	return _get_platform_error(linux.utimensat(impl.fd, nil, &times[0], nil))
 }
 
@@ -455,7 +447,7 @@ _read_entire_pseudo_file_cstring :: proc(name: cstring, allocator: runtime.Alloc
 
 @(private="package")
 _file_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, offset: i64, whence: io.Seek_From) -> (n: i64, err: io.Error) {
-	f := (^File)(stream_data)
+	f := (^File_Impl)(stream_data)
 	ferr: Error
 	switch mode {
 	case .Read:

@@ -7,7 +7,7 @@ import "core:sys/linux"
 import "core:path/filepath"
 
 _fstat :: proc(f: ^File, allocator: runtime.Allocator) -> (File_Info, Error) {
-	impl := (^_File)(f.impl)
+	impl := (^File_Impl)(f.impl)
 	return _fstat_internal(impl.fd, allocator)
 }
 

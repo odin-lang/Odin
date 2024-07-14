@@ -17,19 +17,19 @@ _ERROR_BAD_NETPATH :: 53
 MAX_RW :: 1<<30
 
 
-_File_Kind :: enum u8 {
+File_Impl_Kind :: enum u8 {
 	File,
 	Console,
 	Pipe,
 }
 
-_File :: struct {
-	using file: File,
+File_Impl :: struct {
+	file: File,
 
 	fd:   rawptr,
 	name: string,
 	wname: win32.wstring,
-	kind: _File_Kind,
+	kind: File_Impl_Kind,
 
 	allocator: runtime.Allocator,
 
@@ -132,79 +132,81 @@ _new_file :: proc(handle: uintptr, name: string) -> ^File {
 	if handle == INVALID_HANDLE {
 		return nil
 	}
-	f := new(_File, file_allocator())
+	impl := new(File_Impl, file_allocator())
+	impl.file.impl = impl
 
-	f.allocator = file_allocator()
-	f.fd = rawptr(handle)
-	f.name, _ = clone_string(name, f.allocator)
-	f.wname = win32.utf8_to_wstring(name, f.allocator)
+	impl.allocator = file_allocator()
+	impl.fd = rawptr(handle)
+	impl.name, _ = clone_string(name, impl.allocator)
+	impl.wname = win32.utf8_to_wstring(name, impl.allocator)
 
-	handle := _handle(f)
-	kind := _File_Kind.File
+	handle := _handle(&impl.file)
+	kind := File_Impl_Kind.File
 	if m: u32; win32.GetConsoleMode(handle, &m) {
 		kind = .Console
 	}
 	if win32.GetFileType(handle) == win32.FILE_TYPE_PIPE {
 		kind = .Pipe
 	}
-	f.kind = kind
+	impl.kind = kind
 
-	f.stream = {
-		data = f,
+	impl.file.stream = {
+		data = impl,
 		procedure = _file_stream_proc,
 	}
-	f.fstat = _fstat
+	impl.file.fstat = _fstat
 
-	return f
+	return &impl.file
 }
 
 _fd :: proc(f: ^File) -> uintptr {
 	if f == nil || f.impl == nil {
 		return INVALID_HANDLE
 	}
-	return uintptr((^_File)(f.impl).fd)
+	return uintptr((^File_Impl)(f.impl).fd)
 }
 
-_destroy :: proc(f: ^File) -> Error {
-	if f == nil || f.impl == nil {
+_destroy :: proc(f: ^File_Impl) -> Error {
+	if f == nil {
 		return nil
 	}
 
-	_f := (^_File)(f.impl)
-	a := _f.allocator
-	free(_f.wname, a)
-	delete(_f.name, a)
-	free(_f, a)
+	a := f.allocator
+	err0 := free(f.wname, a)
+	err1 := delete(f.name, a)
+	err2 := free(f, a)
+	err0 or_return
+	err1 or_return
+	err2 or_return
 	return nil
 }
 
 
-_close :: proc(f: ^File) -> Error {
-	if f == nil || f.impl == nil {
+_close :: proc(f: ^File_Impl) -> Error {
+	if f == nil  {
 		return nil
 	}
-	if !win32.CloseHandle(win32.HANDLE((^_File)(f.impl).fd)) {
+	if !win32.CloseHandle(win32.HANDLE(f.fd)) {
 		return .Closed
 	}
 	return _destroy(f)
 }
 
 _name :: proc(f: ^File) -> string {
-	return (^_File)(f.impl).name if f != nil && f.impl != nil else ""
+	return (^File_Impl)(f.impl).name if f != nil && f.impl != nil else ""
 }
 
-_seek :: proc(f: ^File, offset: i64, whence: io.Seek_From) -> (ret: i64, err: Error) {
-	handle := _handle(f)
+_seek :: proc(f: ^File_Impl, offset: i64, whence: io.Seek_From) -> (ret: i64, err: Error) {
+	handle := _handle(&f.file)
 	if handle == win32.INVALID_HANDLE {
 		return 0, .Invalid_File
 	}
-	impl := (^_File)(f.impl)
 
-	if impl.kind == .Pipe {
+	if f.kind == .Pipe {
 		return 0, .Invalid_File
 	}
 
-	sync.guard(&impl.rw_mutex)
+	sync.guard(&f.rw_mutex)
 
 	w: u32
 	switch whence {
@@ -222,7 +224,7 @@ _seek :: proc(f: ^File, offset: i64, whence: io.Seek_From) -> (ret: i64, err: Er
 	return i64(hi)<<32 + i64(dw_ptr), nil
 }
 
-_read :: proc(f: ^File, p: []byte) -> (n: i64, err: Error) {
+_read :: proc(f: ^File_Impl, p: []byte) -> (n: i64, err: Error) {
 	read_console :: proc(handle: win32.HANDLE, b: []byte) -> (n: int, err: Error) {
 		if len(b) == 0 {
 			return 0, nil
@@ -273,19 +275,18 @@ _read :: proc(f: ^File, p: []byte) -> (n: i64, err: Error) {
 		return
 	}
 
-	handle := _handle(f)
+	handle := _handle(&f.file)
 
 	single_read_length: win32.DWORD
 	total_read: int
 	length := len(p)
 
-	impl := (^_File)(f.impl)
-	sync.shared_guard(&impl.rw_mutex) // multiple readers
+	sync.shared_guard(&f.rw_mutex) // multiple readers
 
-	if sync.guard(&impl.p_mutex) {
+	if sync.guard(&f.p_mutex) {
 		to_read := min(win32.DWORD(length), MAX_RW)
 		ok: win32.BOOL
-		if impl.kind == .Console {
+		if f.kind == .Console {
 			n, cerr := read_console(handle, p[total_read:][:to_read])
 			total_read += n
 			if cerr != nil {
@@ -305,15 +306,15 @@ _read :: proc(f: ^File, p: []byte) -> (n: i64, err: Error) {
 	return i64(total_read), err
 }
 
-_read_at :: proc(f: ^File, p: []byte, offset: i64) -> (n: i64, err: Error) {
-	pread :: proc(f: ^File, data: []byte, offset: i64) -> (n: i64, err: Error) {
+_read_at :: proc(f: ^File_Impl, p: []byte, offset: i64) -> (n: i64, err: Error) {
+	pread :: proc(f: ^File_Impl, data: []byte, offset: i64) -> (n: i64, err: Error) {
 		buf := data
 		if len(buf) > MAX_RW {
 			buf = buf[:MAX_RW]
 
 		}
-		curr_offset := seek(f, offset, .Current) or_return
-		defer seek(f, curr_offset, .Start)
+		curr_offset := _seek(f, offset, .Current) or_return
+		defer _seek(f, curr_offset, .Start)
 
 		o := win32.OVERLAPPED{
 			OffsetHigh = u32(offset>>32),
@@ -322,7 +323,7 @@ _read_at :: proc(f: ^File, p: []byte, offset: i64) -> (n: i64, err: Error) {
 
 		// TODO(bill): Determine the correct behaviour for consoles
 
-		h := _handle(f)
+		h := _handle(&f.file)
 		done: win32.DWORD
 		if !win32.ReadFile(h, raw_data(buf), u32(len(buf)), &done, &o) {
 			err = _get_platform_error()
@@ -332,8 +333,7 @@ _read_at :: proc(f: ^File, p: []byte, offset: i64) -> (n: i64, err: Error) {
 		return
 	}
 
-	impl := (^_File)(f.impl)
-	sync.guard(&impl.p_mutex)
+	sync.guard(&f.p_mutex)
 
 	p, offset := p, offset
 	for len(p) > 0 {
@@ -345,7 +345,7 @@ _read_at :: proc(f: ^File, p: []byte, offset: i64) -> (n: i64, err: Error) {
 	return
 }
 
-_write :: proc(f: ^File, p: []byte) -> (n: i64, err: Error) {
+_write :: proc(f: ^File_Impl, p: []byte) -> (n: i64, err: Error) {
 	if len(p) == 0 {
 		return
 	}
@@ -354,10 +354,9 @@ _write :: proc(f: ^File, p: []byte) -> (n: i64, err: Error) {
 	total_write: i64
 	length := i64(len(p))
 
-	handle := _handle(f)
+	handle := _handle(&f.file)
 
-	impl := (^_File)(f.impl)
-	sync.guard(&impl.rw_mutex)
+	sync.guard(&f.rw_mutex)
 	for total_write < length {
 		remaining := length - total_write
 		to_write := win32.DWORD(min(i32(remaining), MAX_RW))
@@ -373,22 +372,22 @@ _write :: proc(f: ^File, p: []byte) -> (n: i64, err: Error) {
 	return i64(total_write), nil
 }
 
-_write_at :: proc(f: ^File, p: []byte, offset: i64) -> (n: i64, err: Error) {
-	pwrite :: proc(f: ^File, data: []byte, offset: i64) -> (n: i64, err: Error) {
+_write_at :: proc(f: ^File_Impl, p: []byte, offset: i64) -> (n: i64, err: Error) {
+	pwrite :: proc(f: ^File_Impl, data: []byte, offset: i64) -> (n: i64, err: Error) {
 		buf := data
 		if len(buf) > MAX_RW {
 			buf = buf[:MAX_RW]
 
 		}
-		curr_offset := seek(f, offset, .Current) or_return
-		defer seek(f, curr_offset, .Start)
+		curr_offset := _seek(f, offset, .Current) or_return
+		defer _seek(f, curr_offset, .Start)
 
 		o := win32.OVERLAPPED{
 			OffsetHigh = u32(offset>>32),
 			Offset = u32(offset),
 		}
 
-		h := _handle(f)
+		h := _handle(&f.file)
 		done: win32.DWORD
 		if !win32.WriteFile(h, raw_data(buf), u32(len(buf)), &done, &o) {
 			err = _get_platform_error()
@@ -398,8 +397,7 @@ _write_at :: proc(f: ^File, p: []byte, offset: i64) -> (n: i64, err: Error) {
 		return
 	}
 
-	impl := (^_File)(f.impl)
-	sync.guard(&impl.p_mutex)
+	sync.guard(&f.p_mutex)
 	p, offset := p, offset
 	for len(p) > 0 {
 		m := pwrite(f, p, offset) or_return
@@ -410,13 +408,12 @@ _write_at :: proc(f: ^File, p: []byte, offset: i64) -> (n: i64, err: Error) {
 	return
 }
 
-_file_size :: proc(f: ^File) -> (n: i64, err: Error) {
+_file_size :: proc(f: ^File_Impl) -> (n: i64, err: Error) {
 	length: win32.LARGE_INTEGER
-	impl := (^_File)(f.impl)
-	if impl.kind == .Pipe {
+	if f.kind == .Pipe {
 		return 0, .No_Size
 	}
-	handle := _handle(f)
+	handle := _handle(&f.file)
 	if !win32.GetFileSizeEx(handle, &length) {
 		err = _get_platform_error()
 	}
@@ -426,11 +423,14 @@ _file_size :: proc(f: ^File) -> (n: i64, err: Error) {
 
 
 _sync :: proc(f: ^File) -> Error {
-	return _flush(f)
+	if f != nil && f.impl != nil {
+		return _flush((^File_Impl)(f.impl))
+	}
+	return nil
 }
 
-_flush :: proc(f: ^File) -> Error {
-	handle := _handle(f)
+_flush :: proc(f: ^File_Impl) -> Error {
+	handle := _handle(&f.file)
 	if !win32.FlushFileBuffers(handle) {
 		return _get_platform_error()
 	}
@@ -628,7 +628,7 @@ _fchdir :: proc(f: ^File) -> Error {
 	if f == nil || f.impl == nil {
 		return nil
 	}
-	impl := (^_File)(f.impl)
+	impl := (^File_Impl)(f.impl)
 	if !win32.SetCurrentDirectoryW(impl.wname) {
 		return _get_platform_error()
 	}
@@ -747,7 +747,7 @@ _is_dir :: proc(path: string) -> bool {
 
 @(private="package")
 _file_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, offset: i64, whence: io.Seek_From) -> (n: i64, err: io.Error) {
-	f := (^File)(stream_data)
+	f := (^File_Impl)(stream_data)
 	ferr: Error
 	switch mode {
 	case .Read:
