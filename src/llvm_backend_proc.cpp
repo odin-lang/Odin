@@ -253,6 +253,9 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 			if (e->flags&EntityFlag_NoAlias) {
 				lb_add_proc_attribute_at_index(p, offset+parameter_index, "noalias");
 			}
+			if (e->flags&EntityFlag_NoCapture) {
+				lb_add_proc_attribute_at_index(p, offset+parameter_index, "nocapture");
+			}
 			parameter_index += 1;
 		}
 	}
