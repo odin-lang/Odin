@@ -651,10 +651,10 @@ namespace lbAbiAmd64SysV {
 		if (is_mem_cls(cls, attribute_kind)) {
 			LLVMAttributeRef attribute = nullptr;
 			if (attribute_kind == Amd64TypeAttribute_ByVal) {
-				// if (!is_calling_convention_odin(calling_convention)) {
-					return lb_arg_type_indirect_byval(c, type);
-				// }
-				// attribute = nullptr;
+				if (is_calling_convention_odin(calling_convention)) {
+					return lb_arg_type_indirect(type, attribute);
+				}
+				return lb_arg_type_indirect_byval(c, type);
 			} else if (attribute_kind == Amd64TypeAttribute_StructRect) {
 				attribute = lb_create_enum_attribute_with_type(c, "sret", type);
 			}
