@@ -493,7 +493,7 @@ write_type_builder :: proc(buf: ^strings.Builder, ti: ^Type_Info) -> int {
 	n, _ := write_type_writer(strings.to_writer(buf), ti)
 	return n
 }
-write_type_writer :: proc(w: io.Writer, ti: ^Type_Info, n_written: ^int = nil) -> (n: int, err: io.Error) {
+write_type_writer :: #force_no_inline proc(w: io.Writer, ti: ^Type_Info, n_written: ^int = nil) -> (n: int, err: io.Error) {
 	defer if n_written != nil {
 		n_written^ += n
 	}
