@@ -607,7 +607,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 
 	add_flag(&build_flags, BuildFlag_Sanitize,                str_lit("sanitize"),                  BuildFlagParam_String,  Command__does_build, true);
 
-	add_flag(&build_flags, BuildFlag_FastBuild,               str_lit("fast-build"),                BuildFlagParam_String,  Command__does_build);
+	add_flag(&build_flags, BuildFlag_FastBuild,               str_lit("fast-build"),                BuildFlagParam_None,    Command__does_build);
 
 
 #if defined(GB_SYSTEM_WINDOWS)
