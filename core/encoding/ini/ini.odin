@@ -82,7 +82,7 @@ Map :: distinct map[string]map[string]string
 
 load_map_from_string :: proc(src: string, allocator: runtime.Allocator, options := DEFAULT_OPTIONS) -> (m: Map, err: runtime.Allocator_Error) {
 	unquote :: proc(val: string) -> (string, runtime.Allocator_Error) {
-		if strings.has_prefix(val, `"`) || strings.has_prefix(val, `'`) {
+		if len(val) > 0 && (val[0] == '"' || val[0] == '\'') {
 			v, allocated, ok := strconv.unquote_string(val)
 			if !ok {
 				return strings.clone(val)
