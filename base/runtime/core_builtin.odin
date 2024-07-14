@@ -453,9 +453,10 @@ _append_elem :: #force_inline proc(array: ^Raw_Dynamic_Array, size_of_elem, alig
 		err = _reserve_dynamic_array(array, size_of_elem, align_of_elem, cap, should_zero, loc)
 	}
 	if array.cap-array.len > 0 {
-		assert(array.data != nil, loc=loc)
-		dst := ([^]byte)(array.data)[array.len*size_of_elem:]
-		intrinsics.mem_copy_non_overlapping(dst, arg_ptr, size_of_elem)
+		data := ([^]byte)(array.data)
+		assert(data != nil, loc=loc)
+		data = data[array.len*size_of_elem:]
+		intrinsics.mem_copy_non_overlapping(data, arg_ptr, size_of_elem)
 		array.len += 1
 		return 1, err
 	}
@@ -484,53 +485,53 @@ non_zero_append_elem :: proc(array: ^$T/[dynamic]$E, #no_broadcast arg: E, loc :
 	}
 }
 
-_append_elems :: #force_inline proc(array: ^$T/[dynamic]$E, should_zero: bool, loc := #caller_location, args: []E) -> (n: int, err: Allocator_Error) #optional_allocator_error {
+_append_elems :: #force_inline proc(array: ^Raw_Dynamic_Array, size_of_elem, align_of_elem: int, should_zero: bool, loc := #caller_location, args: rawptr, arg_len: int) -> (n: int, err: Allocator_Error) #optional_allocator_error {
 	if array == nil {
 		return 0, nil
 	}
 
-	arg_len := len(args)
 	if arg_len <= 0 {
 		return 0, nil
 	}
 
-	when size_of(E) == 0 {
-		array := (^Raw_Dynamic_Array)(array)
-		array.len += arg_len
-		return arg_len, nil
-	} else {
-		if cap(array) < len(array)+arg_len {
-			cap := 2 * cap(array) + max(DEFAULT_DYNAMIC_ARRAY_CAPACITY, arg_len)
+	if array.cap < array.len+arg_len {
+		cap := 2 * array.cap + max(DEFAULT_DYNAMIC_ARRAY_CAPACITY, arg_len)
 
-			// do not 'or_return' here as it could be a partial success
-			if should_zero {
-				err = reserve(array, cap, loc)
-			} else {
-				err = non_zero_reserve(array, cap, loc)
-			}
-		}
-		arg_len = min(cap(array)-len(array), arg_len)
-		if arg_len > 0 {
-			a := (^Raw_Dynamic_Array)(array)
-			when size_of(E) != 0 {
-				data := ([^]E)(a.data)
-				assert(data != nil, loc=loc)
-				intrinsics.mem_copy(&data[a.len], raw_data(args), size_of(E) * arg_len)
-			}
-			a.len += arg_len
-		}
-		return arg_len, err
+		// do not 'or_return' here as it could be a partial success
+		err = _reserve_dynamic_array(array, size_of_elem, align_of_elem, cap, should_zero, loc)
 	}
+	arg_len := arg_len
+	arg_len = min(array.cap-array.len, arg_len)
+	if arg_len > 0 {
+		data := ([^]byte)(array.data)
+		assert(data != nil, loc=loc)
+		data = data[array.len*size_of_elem:]
+		intrinsics.mem_copy(data, args, size_of_elem * arg_len) // must be mem_copy (overlapping)
+		array.len += arg_len
+	}
+	return arg_len, err
 }
 
 @builtin
 append_elems :: proc(array: ^$T/[dynamic]$E, #no_broadcast args: ..E, loc := #caller_location) -> (n: int, err: Allocator_Error) #optional_allocator_error {
-	return _append_elems(array, true, loc, args)
+	when size_of(E) == 0 {
+		a := (^Raw_Dynamic_Array)(array)
+		a.len += len(args)
+		return len(args), nil
+	} else {
+		return _append_elems((^Raw_Dynamic_Array)(array), size_of(E), align_of(E), true, loc, raw_data(args), len(args))
+	}
 }
 
 @builtin
 non_zero_append_elems :: proc(array: ^$T/[dynamic]$E, #no_broadcast args: ..E, loc := #caller_location) -> (n: int, err: Allocator_Error) #optional_allocator_error {
-	return _append_elems(array, false, loc, args)
+	when size_of(E) == 0 {
+		a := (^Raw_Dynamic_Array)(array)
+		a.len += len(args)
+		return len(args), nil
+	} else {
+		return _append_elems((^Raw_Dynamic_Array)(array), size_of(E), align_of(E), false, loc, raw_data(args), len(args))
+	}
 }
 
 // The append_string built-in procedure appends a string to the end of a [dynamic]u8 like type
