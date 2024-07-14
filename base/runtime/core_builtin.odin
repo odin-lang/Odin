@@ -333,16 +333,23 @@ make_dynamic_array_len :: proc($T: typeid/[dynamic]$E, #any_int len: int, alloca
 // Note: Prefer using the procedure group `make`.
 @(builtin, require_results)
 make_dynamic_array_len_cap :: proc($T: typeid/[dynamic]$E, #any_int len: int, #any_int cap: int, allocator := context.allocator, loc := #caller_location) -> (array: T, err: Allocator_Error) #optional_allocator_error {
-	make_dynamic_array_error_loc(loc, len, cap)
-	array.allocator = allocator // initialize allocator before just in case it fails to allocate any memory
-	data := mem_alloc_bytes(size_of(E)*cap, align_of(E), allocator, loc) or_return
-	s := Raw_Dynamic_Array{raw_data(data), len, cap, allocator}
-	if data == nil && size_of(E) != 0 {
-		s.len, s.cap = 0, 0
-	}
-	array = transmute(T)s
+	err = _make_dynamic_array_len_cap((^Raw_Dynamic_Array)(&array), size_of(E), align_of(E), len, cap, allocator, loc)
 	return
 }
+
+@(require_results)
+_make_dynamic_array_len_cap :: proc(array: ^Raw_Dynamic_Array, size_of_elem, align_of_elem: int, #any_int len: int, #any_int cap: int, allocator := context.allocator, loc := #caller_location) -> (err: Allocator_Error) {
+	make_dynamic_array_error_loc(loc, len, cap)
+	array.allocator = allocator // initialize allocator before just in case it fails to allocate any memory
+	data := mem_alloc_bytes(size_of_elem*cap, align_of_elem, allocator, loc) or_return
+	use_zero := data == nil && size_of_elem != 0
+	array.data = raw_data(data)
+	array.len = 0 if use_zero else len
+	array.cap = 0 if use_zero else cap
+	array.allocator = allocator
+	return
+}
+
 // `make_map` allocates and initializes a dynamic array. Like `new`, the first argument is a type, not a value.
 // Unlike `new`, `make`'s return value is the same as the type of its argument, not a pointer to it.
 //
