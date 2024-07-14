@@ -59,20 +59,20 @@ gb_internal void thread_pool_destroy(ThreadPool *pool) {
 	gb_free(pool->threads_allocator, pool->threads.data);
 }
 
-TaskRingBuffer *taskring_grow(TaskRingBuffer *ring, ssize_t bottom, ssize_t top) {
+TaskRingBuffer *taskring_grow(TaskRingBuffer *ring, isize bottom, isize top) {
 	TaskRingBuffer *new_ring = taskring_init(ring->size * 2);
-	for (ssize_t i = top; i < bottom; i++) {
+	for (isize i = top; i < bottom; i++) {
 		new_ring->buffer[i % new_ring->size] = ring->buffer[i % ring->size];
 	}
 	return new_ring;
 }
 
 void thread_pool_queue_push(Thread *thread, WorkerTask task) {
-	ssize_t bot                = thread->queue.bottom.load(std::memory_order_relaxed);
-	ssize_t top                = thread->queue.top.load(std::memory_order_acquire);
+	isize bot                = thread->queue.bottom.load(std::memory_order_relaxed);
+	isize top                = thread->queue.top.load(std::memory_order_acquire);
 	TaskRingBuffer *cur_ring   = thread->queue.ring.load(std::memory_order_relaxed);
 
-	ssize_t size = bot - top;
+	isize size = bot - top;
 	if (size > (cur_ring->size - 1)) {
 		// Queue is full
 		thread->queue.ring = taskring_grow(thread->queue.ring, bot, top);
@@ -89,12 +89,12 @@ void thread_pool_queue_push(Thread *thread, WorkerTask task) {
 }
 
 GrabState thread_pool_queue_take(Thread *thread, WorkerTask *task) {
-	ssize_t bot = thread->queue.bottom.load(std::memory_order_relaxed) - 1;
+	isize bot = thread->queue.bottom.load(std::memory_order_relaxed) - 1;
 	TaskRingBuffer *cur_ring = thread->queue.ring.load(std::memory_order_relaxed);
 	thread->queue.bottom.store(bot, std::memory_order_relaxed);
 	std::atomic_thread_fence(std::memory_order_seq_cst);
 
-	ssize_t top = thread->queue.top.load(std::memory_order_relaxed);
+	isize top = thread->queue.top.load(std::memory_order_relaxed);
 	if (top <= bot) {
 
 		// Queue is not empty
@@ -121,9 +121,9 @@ GrabState thread_pool_queue_take(Thread *thread, WorkerTask *task) {
 }
 
 GrabState thread_pool_queue_steal(Thread *thread, WorkerTask *task) {
-	ssize_t top = thread->queue.top.load(std::memory_order_acquire);
+	isize top = thread->queue.top.load(std::memory_order_acquire);
 	std::atomic_thread_fence(std::memory_order_seq_cst);
-	ssize_t bot = thread->queue.bottom.load(std::memory_order_acquire);
+	isize bot = thread->queue.bottom.load(std::memory_order_acquire);
 
 	GrabState ret = GrabEmpty;
 	if (top < bot) {

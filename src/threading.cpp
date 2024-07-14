@@ -47,13 +47,13 @@ typedef struct WorkerTask {
 } WorkerTask;
 
 typedef struct TaskRingBuffer {
-	std::atomic<ssize_t> size;
+	std::atomic<isize> size;
 	std::atomic<WorkerTask *> buffer;
 } TaskRingBuffer;
 
 typedef struct TaskQueue {
-	std::atomic<ssize_t> top;
-	std::atomic<ssize_t> bottom;
+	std::atomic<isize> top;
+	std::atomic<isize> bottom;
 
 	std::atomic<TaskRingBuffer *> ring;
 } TaskQueue;
@@ -560,7 +560,7 @@ gb_internal void *internal_thread_proc(void *arg) {
 }
 #endif
 
-TaskRingBuffer *taskring_init(ssize_t size) {
+TaskRingBuffer *taskring_init(isize size) {
 	TaskRingBuffer *ring = (TaskRingBuffer *)gb_alloc(heap_allocator(), sizeof(TaskRingBuffer));
 	ring->size = size;
 	ring->buffer = (WorkerTask *)gb_alloc_array(heap_allocator(), WorkerTask, ring->size);
