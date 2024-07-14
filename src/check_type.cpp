@@ -2070,7 +2070,7 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 						// ignore
 					} else {
 						if (is_type_internally_pointer_like(type)) {
-							// okay
+							error(name, "'#no_capture' is currently reserved for future use");
 						} else {
 							ERROR_BLOCK();
 							error(name, "'#no_capture' can only be applied to pointer-like types");
