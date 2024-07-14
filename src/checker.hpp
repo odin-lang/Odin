@@ -183,7 +183,7 @@ char const *ProcCheckedState_strings[ProcCheckedState_COUNT] {
 
 struct VariadicReuseData {
 	Type *slice_type; // ..elem_type
-	isize max_count;
+	i64 max_count;
 };
 
 // DeclInfo is used to store information of certain declarations to allow for "any order" usage
@@ -225,6 +225,8 @@ struct DeclInfo {
 	Array<BlockLabel> labels;
 
 	Array<VariadicReuseData> variadic_reuses;
+	i64 variadic_reuse_max_bytes;
+	i64 variadic_reuse_max_align;
 
 	// NOTE(bill): this is to prevent a race condition since these procedure literals can be created anywhere at any time
 	struct lbModule *code_gen_module;

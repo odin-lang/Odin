@@ -3456,39 +3456,48 @@ gb_internal lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr) {
 					}
 					isize slice_len = var_args.count;
 					if (slice_len > 0) {
-						lbAddr base_array = {};
 						lbAddr slice = {};
 
 						for (auto const &vr : p->variadic_reuses) {
 							if (are_types_identical(vr.slice_type, slice_type)) {
-								base_array = vr.base_array;
 								slice = vr.slice_addr;
 								break;
 							}
 						}
+
 						DeclInfo *d = decl_info_of_entity(p->entity);
-						if (d != nullptr && base_array.addr.value == nullptr) {
+						if (d != nullptr && slice.addr.value == nullptr) {
 							for (auto const &vr : d->variadic_reuses) {
 								if (are_types_identical(vr.slice_type, slice_type)) {
-									base_array = lb_add_local_generated(p, alloc_type_array(elem_type, vr.max_count), true);
 									slice = lb_add_local_generated(p, slice_type, true);
-									array_add(&p->variadic_reuses, lbVariadicReuseData{slice_type, base_array, slice});
+									array_add(&p->variadic_reuses, lbVariadicReuseSlices{slice_type, slice});
 									break;
 								}
 							}
 						}
-						GB_ASSERT(base_array.addr.value != nullptr);
+
+						lbValue base_array_ptr = p->variadic_reuse_base_array_ptr.addr;
+						if (d != nullptr && base_array_ptr.value == nullptr) {
+							i64 max_bytes = d->variadic_reuse_max_bytes;
+							i64 max_align = gb_max(d->variadic_reuse_max_align, 16);
+							p->variadic_reuse_base_array_ptr = lb_add_local_generated(p, alloc_type_array(t_u8, max_bytes), true);
+							lb_try_update_alignment(p->variadic_reuse_base_array_ptr.addr, cast(unsigned)max_align);
+							base_array_ptr = p->variadic_reuse_base_array_ptr.addr;
+						}
+
+						GB_ASSERT(base_array_ptr.value != nullptr);
 						GB_ASSERT(slice.addr.value != nullptr);
 
+						base_array_ptr = lb_emit_conv(p, base_array_ptr, alloc_type_pointer(alloc_type_array(elem_type, slice_len)));
 
 						for (isize i = 0; i < var_args.count; i++) {
-							lbValue addr = lb_emit_array_epi(p, base_array.addr, cast(i32)i);
+							lbValue addr = lb_emit_array_epi(p, base_array_ptr, cast(i32)i);
 							lbValue var_arg = var_args[i];
 							var_arg = lb_emit_conv(p, var_arg, elem_type);
 							lb_emit_store(p, addr, var_arg);
 						}
 
-						lbValue base_elem = lb_emit_array_epi(p, base_array.addr, 0);
+						lbValue base_elem = lb_emit_array_epi(p, base_array_ptr, 0);
 						lbValue len = lb_const_int(p->module, t_int, slice_len);
 						lb_fill_slice(p, slice, base_elem, len);
 

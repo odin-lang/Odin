@@ -296,9 +296,8 @@ enum lbProcedureFlag : u32 {
 	lbProcedureFlag_DebugAllocaCopy = 1<<1,
 };
 
-struct lbVariadicReuseData {
+struct lbVariadicReuseSlices {
 	Type *slice_type;
-	lbAddr base_array;
 	lbAddr slice_addr;
 };
 
@@ -342,7 +341,8 @@ struct lbProcedure {
 	bool             in_multi_assignment;
 	Array<LLVMValueRef> raw_input_parameters;
 
-	Array<lbVariadicReuseData> variadic_reuses;
+	Array<lbVariadicReuseSlices> variadic_reuses;
+	lbAddr variadic_reuse_base_array_ptr;
 
 	LLVMValueRef temp_callee_return_struct_memory;
 	Ast *curr_stmt;
