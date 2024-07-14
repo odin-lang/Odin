@@ -2923,11 +2923,14 @@ gb_internal Type *c_vararg_promote_type(Type *type) {
 
 	if (core->kind == Type_Basic) {
 		switch (core->Basic.kind) {
+		case Basic_f16:
 		case Basic_f32:
 		case Basic_UntypedFloat:
 			return t_f64;
+		case Basic_f16le:
 		case Basic_f32le:
 			return t_f64le;
+		case Basic_f16be:
 		case Basic_f32be:
 			return t_f64be;
 
