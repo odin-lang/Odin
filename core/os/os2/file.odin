@@ -5,9 +5,9 @@ import "core:time"
 import "base:runtime"
 
 File :: struct {
-	impl:   _File,
+	impl:   rawptr,
 	stream: io.Stream,
-	fstat: Fstat_Callback,
+	fstat:  Fstat_Callback,
 }
 
 File_Mode :: distinct u32
