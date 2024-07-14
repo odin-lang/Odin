@@ -440,48 +440,48 @@ delete_key :: proc(m: ^$T/map[$K]$V, key: K) -> (deleted_key: K, deleted_value: 
 	return
 }
 
-_append_elem :: #force_inline proc(array: ^$T/[dynamic]$E, arg: E, should_zero: bool, loc := #caller_location) -> (n: int, err: Allocator_Error) #optional_allocator_error {
+_append_elem :: #force_inline proc(array: ^Raw_Dynamic_Array, size_of_elem, align_of_elem: int, arg_ptr: rawptr, should_zero: bool, loc := #caller_location) -> (n: int, err: Allocator_Error) #optional_allocator_error {
 	if array == nil {
 		return 0, nil
 	}
-	when size_of(E) == 0 {
-		array := (^Raw_Dynamic_Array)(array)
-		array.len += 1
-		return 1, nil
-	} else {
-		if cap(array) < len(array)+1 {
-			// Same behavior as _append_elems but there's only one arg, so we always just add DEFAULT_DYNAMIC_ARRAY_CAPACITY.
-			cap := 2 * cap(array) + DEFAULT_DYNAMIC_ARRAY_CAPACITY
 
-			// do not 'or_return' here as it could be a partial success
-			if should_zero {
-				err = reserve(array, cap, loc)
-			} else {
-				err = non_zero_reserve(array, cap, loc) 
-			}
-		}
-		if cap(array)-len(array) > 0 {
-			a := (^Raw_Dynamic_Array)(array)
-			when size_of(E) != 0 {
-				data := ([^]E)(a.data)
-				assert(data != nil, loc=loc)
-				data[a.len] = arg
-			}
-			a.len += 1
-			return 1, err
-		}
-		return 0, err
+	if array.cap < array.len+1 {
+		// Same behavior as _append_elems but there's only one arg, so we always just add DEFAULT_DYNAMIC_ARRAY_CAPACITY.
+		cap := 2 * array.cap + DEFAULT_DYNAMIC_ARRAY_CAPACITY
+
+		// do not 'or_return' here as it could be a partial success
+		err = _reserve_dynamic_array(array, size_of_elem, align_of_elem, cap, should_zero, loc)
 	}
+	if array.cap-array.len > 0 {
+		assert(array.data != nil, loc=loc)
+		dst := ([^]byte)(array.data)[array.len*size_of_elem:]
+		intrinsics.mem_copy_non_overlapping(dst, arg_ptr, size_of_elem)
+		array.len += 1
+		return 1, err
+	}
+	return 0, err
 }
 
 @builtin
 append_elem :: proc(array: ^$T/[dynamic]$E, #no_broadcast arg: E, loc := #caller_location) -> (n: int, err: Allocator_Error) #optional_allocator_error {
-	return _append_elem(array, arg, true, loc=loc)
+	when size_of(E) == 0 {
+		(^Raw_Dynamic_Array)(array).len += 1
+		return 1, nil
+	} else {
+		arg := arg
+		return _append_elem((^Raw_Dynamic_Array)(array), size_of(E), align_of(E), &arg, true, loc=loc)
+	}
 }
 
 @builtin
 non_zero_append_elem :: proc(array: ^$T/[dynamic]$E, #no_broadcast arg: E, loc := #caller_location) -> (n: int, err: Allocator_Error) #optional_allocator_error {
-	return _append_elem(array, arg, false, loc=loc)
+	when size_of(E) == 0 {
+		(^Raw_Dynamic_Array)(array).len += 1
+		return 1, nil
+	} else {
+		arg := arg
+		return _append_elem((^Raw_Dynamic_Array)(array), size_of(E), align_of(E), &arg, false, loc=loc)
+	}
 }
 
 _append_elems :: #force_inline proc(array: ^$T/[dynamic]$E, should_zero: bool, loc := #caller_location, args: []E) -> (n: int, err: Allocator_Error) #optional_allocator_error {
