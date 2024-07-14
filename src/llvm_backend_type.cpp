@@ -830,7 +830,7 @@ gb_internal void lb_setup_type_info_data_giant_array(lbModule *m, i64 global_typ
 
 					lbValue soa_kind = lb_const_value(m, kind_type, exact_value_i64(t->Struct.soa_kind));
 					LLVMValueRef soa_type = get_type_info_ptr(m, t->Struct.soa_elem);
-					lbValue soa_len = lb_const_int(m, t_u16, t->Struct.soa_count);
+					lbValue soa_len = lb_const_int(m, t_i32, t->Struct.soa_count);
 
 					vals[7] = soa_kind.value;
 					vals[8] = soa_len.value;
