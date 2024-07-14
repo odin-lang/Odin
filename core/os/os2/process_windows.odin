@@ -3,6 +3,8 @@ package os2
 
 import "core:sys/windows"
 import "core:strings"
+import "core:time"
+
 import "base:runtime"
 
 _Process_Handle :: windows.HANDLE
@@ -213,7 +215,7 @@ _process_info :: proc(pid: int, selection: Process_Info_Fields, allocator: runti
 				info.command_line = cmdline
 			}
 			if .Command_Args in selection {
-				args, args_err := _parse_argv(raw_data(cmdline_w), allocator)
+				args, args_err := _parse_command_line(raw_data(cmdline_w), allocator)
 				if args_err != nil {
 					err = args_err
 					return
@@ -323,7 +325,7 @@ _current_process_info :: proc(selection: Process_Info_Fields, allocator: runtime
 			info.command_line = command_line
 		}
 		if .Command_Args in selection {
-			args, args_err := _parse_argv(command_line_w, allocator)
+			args, args_err := _parse_command_line(command_line_w, allocator)
 			if args_err != nil {
 				err = args_err
 				return
@@ -356,6 +358,121 @@ _current_process_info :: proc(selection: Process_Info_Fields, allocator: runtime
 	return
 }
 
+_process_open :: proc(pid: int, flags: Process_Open_Flags) -> (Process, Error) {
+	dwDesiredAccess := windows.PROCESS_QUERY_LIMITED_INFORMATION | windows.SYNCHRONIZE
+	if .Mem_Read in flags {
+		dwDesiredAccess |= windows.PROCESS_VM_READ
+	}
+	if .Mem_Write in flags {
+		dwDesiredAccess |= windows.PROCESS_VM_WRITE
+	}
+	handle := windows.OpenProcess(
+		dwDesiredAccess,
+		false,
+		u32(pid),
+	)
+	if handle == windows.INVALID_HANDLE_VALUE {
+		return {}, _get_platform_error()
+	}
+	return Process {
+		pid = pid,
+		handle = cast(uintptr) handle,
+	}, nil
+}
+
+_Sys_Process_Attributes :: struct {}
+
+_process_start :: proc(desc: Process_Desc) -> (Process, Error) {
+	TEMP_ALLOCATOR_GUARD()
+	command_line := _build_command_line(desc.command, temp_allocator())
+	command_line_w := windows.utf8_to_wstring(command_line, temp_allocator())
+	environment := desc.env
+	if desc.env == nil {
+		environment = environ(temp_allocator())
+	}
+	environment_block := _build_environment_block(environment, temp_allocator())
+	environment_block_w := windows.utf8_to_utf16(environment_block, temp_allocator())
+	stderr_handle := windows.GetStdHandle(windows.STD_ERROR_HANDLE)
+	stdout_handle := windows.GetStdHandle(windows.STD_OUTPUT_HANDLE)
+	stdin_handle := windows.GetStdHandle(windows.STD_INPUT_HANDLE)
+	if desc.stdout != nil {
+		stdout_handle = windows.HANDLE(desc.stdout.impl.fd)
+	}
+	if desc.stderr != nil {
+		stderr_handle = windows.HANDLE(desc.stderr.impl.fd)
+	}
+	process_info: windows.PROCESS_INFORMATION = ---
+	process_ok := windows.CreateProcessW(
+		nil,
+		command_line_w,
+		nil,
+		nil,
+		true,
+		windows.CREATE_UNICODE_ENVIRONMENT|windows.NORMAL_PRIORITY_CLASS,
+		raw_data(environment_block_w),
+		nil,
+		&windows.STARTUPINFOW {
+			cb = size_of(windows.STARTUPINFOW),
+			hStdError = stderr_handle,
+			hStdOutput = stdout_handle,
+			hStdInput = stdin_handle,
+			dwFlags = windows.STARTF_USESTDHANDLES,
+		},
+		&process_info,
+	)
+	if !process_ok {
+		return {}, _get_platform_error()
+	}
+	return Process {
+		pid = cast(int) process_info.dwProcessId,
+		handle = cast(uintptr) process_info.hProcess,
+	}, nil
+}
+
+_process_wait :: proc(process: Process, timeout: time.Duration) -> (Process_State, Error) {
+	handle := windows.HANDLE(process.handle)
+	timeout_ms := u32(timeout / time.Millisecond) if timeout > 0 else windows.INFINITE
+	wait_result := windows.WaitForSingleObject(handle, timeout_ms)
+	switch wait_result {
+	case windows.WAIT_OBJECT_0:
+		exit_code: u32 = ---
+		if !windows.GetExitCodeProcess(handle, &exit_code) {
+			return {}, _get_platform_error()
+		}
+		time_created: windows.FILETIME = ---
+		time_exited: windows.FILETIME = ---
+		time_kernel: windows.FILETIME = ---
+		time_user: windows.FILETIME = ---
+		if !windows.GetProcessTimes(handle, &time_created, &time_exited, &time_kernel, &time_user) {
+			return {}, _get_platform_error()
+		}
+		return Process_State {
+			exit_code = cast(int) exit_code,
+			exited = true,
+			pid = process.pid,
+			success = true,
+			system_time = _filetime_to_duration(time_kernel),
+			user_time = _filetime_to_duration(time_user),
+		}, nil
+	case windows.WAIT_TIMEOUT:
+		return {}, General_Error.Timeout
+	case:
+		return {}, _get_platform_error()
+	}
+}
+
+_process_close :: proc(process: Process) -> (Error) {
+	if !windows.CloseHandle(cast(windows.HANDLE) process.handle) {
+		return _get_platform_error()
+	}
+	return nil
+}
+
+@(private)
+_filetime_to_duration :: proc(filetime: windows.FILETIME) -> time.Duration {
+	ticks := u64(filetime.dwHighDateTime)<<32 | u64(filetime.dwLowDateTime)
+	return time.Duration(ticks * 100)
+}
 
 @(private)
 _get_process_user :: proc(process_handle: windows.HANDLE, allocator: runtime.Allocator) -> (full_username: string, err: Error) {
@@ -406,7 +523,7 @@ _get_process_user :: proc(process_handle: windows.HANDLE, allocator: runtime.All
 }
 
 @(private)
-_parse_argv :: proc(cmd_line_w: [^]u16, allocator: runtime.Allocator) -> ([]string, Error) {
+_parse_command_line :: proc(cmd_line_w: [^]u16, allocator: runtime.Allocator) -> ([]string, Error) {
 	argc: i32 = ---
 	argv_w := windows.CommandLineToArgvW(cmd_line_w, &argc)
 	if argv_w == nil {
@@ -428,6 +545,43 @@ _parse_argv :: proc(cmd_line_w: [^]u16, allocator: runtime.Allocator) -> ([]stri
 		argv[i] = arg
 	}
 	return argv, nil
+}
+
+@(private)
+_build_command_line :: proc(command: []string, allocator: runtime.Allocator) -> string {
+	_write_byte_n_times :: #force_inline proc(builder: ^strings.Builder, b: byte, n: int) {
+		for _ in 0 ..< n {
+			strings.write_byte(builder, b)
+		}
+	}
+	builder := strings.builder_make(allocator)
+	for arg, i in command {
+		if i != 0 {
+			strings.write_byte(&builder, ' ')
+		}
+		j := 0
+		strings.write_byte(&builder, '"')
+		for j < len(arg) {
+			backslashes := 0
+			for j < len(arg) && arg[j] == '\\' {
+				backslashes += 1
+				j += 1
+			}
+			if j == len(arg) {
+				_write_byte_n_times(&builder, '\\', 2*backslashes)
+				break
+			} else if arg[j] == '"' {
+				_write_byte_n_times(&builder, '\\', 2*backslashes+1)
+				strings.write_byte(&builder, '"')
+			} else {
+				_write_byte_n_times(&builder, '\\', backslashes)
+				strings.write_byte(&builder, arg[j])
+			}
+			j += 1
+		}
+		strings.write_byte(&builder, '"')
+	}
+	return strings.to_string(builder)
 }
 
 @(private)
@@ -470,6 +624,32 @@ _parse_environment_block :: proc(block: [^]u16, allocator: runtime.Allocator) ->
 	return envs, nil
 }
 
+@(private)
+_build_environment_block :: proc(environment: []string, allocator: runtime.Allocator) -> string {
+	builder := strings.builder_make(allocator)
+	#reverse for kv, cur_idx in environment {
+		eq_idx := strings.index_byte(kv, '=')
+		assert(eq_idx != -1, "Malformed environment string. Expected '=' to separate keys and values")
+		key := kv[:eq_idx]
+		already_handled := false
+		for old_kv in environment[cur_idx+1:] {
+			old_key := old_kv[:strings.index_byte(old_kv, '=')]
+			if key == old_key {
+				already_handled = true
+				break
+			}
+		}
+		if already_handled {
+			continue
+		}
+		strings.write_bytes(&builder, transmute([]byte) kv)
+		strings.write_byte(&builder, 0)
+	}
+	// Note(flysand): In addition to the NUL-terminator for each string, the
+	// environment block itself is NUL-terminated.
+	strings.write_byte(&builder, 0)
+	return strings.to_string(builder)
+}
 
 @(private="file")
 PROCESSINFOCLASS :: enum i32 {

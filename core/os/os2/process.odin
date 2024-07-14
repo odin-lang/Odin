@@ -6,6 +6,12 @@ import "base:runtime"
 import "core:strings"
 
 /*
+	In procedures that explicitly state this as one of the allowed values,
+	specifies an infinite timeout.
+*/
+TIMEOUT_INFINITE :: time.MIN_DURATION // Note(flysand): Any negative duration will be treated as infinity
+
+/*
 	Arguments to the current process.
 
 	See `get_args()` for description of the slice.
@@ -212,6 +218,145 @@ free_process_info :: proc(pi: Process_Info, allocator: runtime.Allocator) {
 	delete(pi.cwd, allocator)
 }
 
+/*
+	Represents a process handle.
+
+	When a process dies, the OS is free to re-use the pid of that process. The
+	`Process` struct represents a handle to the process that will refer to a
+	specific process, even after it has died.
+
+	**Note(linux)**: The `handle` will be referring to pidfd.
+*/
+Process :: struct {
+	pid: int,
+	handle: uintptr,
+}
+
+Process_Open_Flags :: bit_set[Process_Open_Flag]
+Process_Open_Flag :: enum {
+	// Request for reading from the virtual memory of another process.
+	Mem_Read,
+	// Request for writing to the virtual memory of another process.
+	Mem_Write,
+}
+
+/*
+	Open a process handle using it's pid.
+
+	This procedure obtains a process handle of a process specified by `pid`.
+	This procedure can be subject to race conditions. See the description of
+	`Process`.
+
+	Use `process_close()` function to close the process handle.
+*/
+process_open :: proc(pid: int, flags := Process_Open_Flags {}) -> (Process, Error) {
+	return _process_open(pid, flags)
+}
+
+/*
+	The description of how a process should be created.
+*/
+Process_Desc :: struct {
+	// OS-specific attributes.
+	sys_attr: _Sys_Process_Attributes,
+	// The working directory of the process.
+	dir: string,
+	// The command to run. Each element of the slice is a separate argument to
+	// the process. The first element of the slice would be the executable.
+	command: []string,
+	// A slice of strings, each having the format `KEY=VALUE` representing the
+	// full environment that the child process will receive.
+	// In case this slice is `nil`, the current process' environment is used.
+	env: []string,
+	// The `stderr` handle to give to the child process. It can be either a file
+	// or a writeable end of a pipe. Passing `nil` will shut down the process'
+	// stderr output.
+	stderr: ^File,
+	// The `stdout` handle to give to the child process. It can be either a file
+	// or a writeabe end of a pipe. Passing a `nil` will shut down the process'
+	// stdout output.
+	stdout: ^File,
+	// The `stdin` handle to give to the child process. It can either be a file
+	// or a readable end of a pipe. Passing a `nil` will shut down the process'
+	// input.
+	stdin: ^File,
+}
+
+/*
+	Create a new process and obtain its handle.
+
+	This procedure creates a new process, with a given command and environment
+	strings as parameters. Use `environ()` to inherit the environment of the
+	current process.
+
+	The `desc` parameter specifies the description of how the process should
+	be created. It contains information such as the command line, the
+	environment of the process, the starting directory and many other options.
+	Most of the fields in the struct can be set to `nil` or an empty value.
+	
+	Use `process_close` to close the handle to the process. Note, that this
+	is not the same as terminating the process. One can terminate the process
+	and not close the handle, in which case the handle would be leaked. In case
+	the function returns an error, an invalid handle is returned.
+
+	This procedure is not thread-safe. It may alter the inheritance properties
+	of file handles.
+*/
+process_start :: proc(desc := Process_Desc {}) -> (Process, Error) {
+	return _process_start(desc)
+}
+
+/*
+	The state of the process after it has finished execution.
+*/
+Process_State :: struct {
+	// The ID of the process.
+	pid: int,
+	// Specifies whether the process has terminated or is still running.
+	exited: bool,
+	// The exit code of the process, if it has exited.
+	// Will also store the number of the exception or signal that has crashed the
+	// process.
+	exit_code: int,
+	// Specifies whether the termination of the process was successfull or not,
+	// i.e. whether it has crashed or not.
+	// **Note(windows)**: On windows `true` is always returned, as there is no
+	// reliable way to obtain information about whether the process has crashed.
+	success: bool,
+	// The time the process has spend executing in kernel time.
+	system_time: time.Duration,
+	// The time the process has spend executing in userspace.
+	user_time: time.Duration,
+}
+
+/*
+	Wait for a process event.
+
+	This procedure blocks the execution until the process has exited or the
+	timeout (if specified) has reached zero. If the timeout is `TIMEOUT_INFINITE`,
+	no timeout restriction is imposed and the procedure can block indefinately.
+
+	If the timeout has expired, the `General_Error.Timeout` is returned as
+	the error.
+
+	If an error is returned for any other reason, other than timeout, the
+	process state is considered undetermined.
+*/
+process_wait :: proc(process: Process, timeout := TIMEOUT_INFINITE) -> (Process_State, Error) {
+	return _process_wait(process, timeout)
+}
+
+/*
+	Close the handle to a process.
+
+	This procedure closes the handle associated with a process. It **does not**
+	terminate a process, in case it was running. In case a termination is
+	desired, kill the process first, then close the handle.
+*/
+process_close :: proc(process: Process) -> (Error) {
+	return _process_close(process)
+}
+
 // Process_Attributes :: struct {
 // 	dir: string,
 // 	env: []string,
@@ -225,26 +370,12 @@ free_process_info :: proc(pi: Process_Info, allocator: runtime.Allocator) {
 // 	None,
 // }
 
-// Process_State :: struct {
-// 	pid:         int,
-// 	exit_code:   int,
-// 	exited:      bool,
-// 	success:     bool,
-// 	system_time: time.Duration,
-// 	user_time:   time.Duration,
-// 	sys:         rawptr,
-// }
+
 
 // Signal :: #type proc()
 
 // Kill:      Signal = nil
 // Interrupt: Signal = nil
-
-
-// find_process :: proc(pid: int) -> (^Process, Process_Error) {
-// 	return nil, .None
-// }
-
 
 // process_start :: proc(name: string, argv: []string, attr: ^Process_Attributes) -> (^Process, Process_Error) {
 // 	return nil, .None
@@ -260,10 +391,6 @@ free_process_info :: proc(pi: Process_Info, allocator: runtime.Allocator) {
 
 // process_signal :: proc(p: ^Process, sig: Signal) -> Process_Error {
 // 	return .None
-// }
-
-// process_wait :: proc(p: ^Process) -> (Process_State, Process_Error) {
-// 	return {}, .None
 // }
 
 
