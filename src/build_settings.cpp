@@ -1649,7 +1649,11 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 	if (!bc->custom_optimization_level) {
 		// NOTE(bill): when building with `-debug` but not specifying an optimization level
 		// default to `-o:none` to improve the debug symbol generation by default
-		bc->optimization_level = -1; // -o:none
+		if (bc->ODIN_DEBUG) {
+			bc->optimization_level = -1; // -o:none
+		} else {
+			bc->optimization_level = 0; // -o:minimal
+		}
 	}
 
 	bc->optimization_level = gb_clamp(bc->optimization_level, -1, 3);
