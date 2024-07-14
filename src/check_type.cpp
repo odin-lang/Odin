@@ -2071,13 +2071,9 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 					} else {
 						if (is_type_internally_pointer_like(type)) {
 							// okay
-						} else if (is_type_slice(type) || is_type_string(type)) {
-							// okay
-						} else if (is_type_dynamic_array(type)) {
-							// okay
 						} else {
 							ERROR_BLOCK();
-							error(name, "'#no_capture' can only be applied to pointer-like types, slices, strings, and dynamic arrays");
+							error(name, "'#no_capture' can only be applied to pointer-like types");
 							error_line("\t'#no_capture' does not currently do anything useful\n");
 							p->flags &= ~FieldFlag_no_capture;
 						}
