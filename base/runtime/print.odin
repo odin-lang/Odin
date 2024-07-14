@@ -401,15 +401,16 @@ print_type :: #force_no_inline proc "contextless" (ti: ^Type_Info) {
 		}
 
 		print_string("struct ")
-		if info.is_packed    { print_string("#packed ") }
-		if info.is_raw_union { print_string("#raw_union ") }
-		if info.custom_align {
+		if .packed    in info.flags { print_string("#packed ") }
+		if .raw_union in info.flags { print_string("#raw_union ") }
+		if .no_copy   in info.flags { print_string("#no_copy ") }
+		if .align in info.flags {
 			print_string("#align(")
 			print_u64(u64(ti.align))
 			print_string(") ")
 		}
 		print_byte('{')
-		for name, i in info.names {
+		for name, i in info.names[:info.field_count] {
 			if i > 0 { print_string(", ") }
 			print_string(name)
 			print_string(": ")
@@ -469,7 +470,7 @@ print_type :: #force_no_inline proc "contextless" (ti: ^Type_Info) {
 		print_string("bit_field ")
 		print_type(info.backing_type)
 		print_string(" {")
-		for name, i in info.names {
+		for name, i in info.names[:info.field_count] {
 			if i > 0 { print_string(", ") }
 			print_string(name)
 			print_string(": ")

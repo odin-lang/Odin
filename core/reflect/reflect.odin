@@ -391,7 +391,7 @@ Struct_Field :: struct {
 struct_field_at :: proc(T: typeid, i: int) -> (field: Struct_Field) {
 	ti := runtime.type_info_base(type_info_of(T))
 	if s, ok := ti.variant.(runtime.Type_Info_Struct); ok {
-		if 0 <= i && i < len(s.names) {
+		if 0 <= i && i < int(s.field_count) {
 			field.name     = s.names[i]
 			field.type     = s.types[i]
 			field.tag      = Struct_Tag(s.tags[i])
@@ -406,7 +406,7 @@ struct_field_at :: proc(T: typeid, i: int) -> (field: Struct_Field) {
 struct_field_by_name :: proc(T: typeid, name: string) -> (field: Struct_Field) {
 	ti := runtime.type_info_base(type_info_of(T))
 	if s, ok := ti.variant.(runtime.Type_Info_Struct); ok {
-		for fname, i in s.names {
+		for fname, i in s.names[:s.field_count] {
 			if fname == name {
 				field.name     = s.names[i]
 				field.type     = s.types[i]
@@ -427,7 +427,7 @@ struct_field_value_by_name :: proc(a: any, field: string, allow_using := false) 
 	ti := runtime.type_info_base(type_info_of(a.id))
 
 	if s, ok := ti.variant.(runtime.Type_Info_Struct); ok {
-		for name, i in s.names {
+		for name, i in s.names[:s.field_count] {
 			if name == field {
 				return any{
 					rawptr(uintptr(a.data) + s.offsets[i]),
@@ -463,7 +463,7 @@ struct_field_value :: proc(a: any, field: Struct_Field) -> any {
 struct_field_names :: proc(T: typeid) -> []string {
 	ti := runtime.type_info_base(type_info_of(T))
 	if s, ok := ti.variant.(runtime.Type_Info_Struct); ok {
-		return s.names
+		return s.names[:s.field_count]
 	}
 	return nil
 }
@@ -472,7 +472,7 @@ struct_field_names :: proc(T: typeid) -> []string {
 struct_field_types :: proc(T: typeid) -> []^Type_Info {
 	ti := runtime.type_info_base(type_info_of(T))
 	if s, ok := ti.variant.(runtime.Type_Info_Struct); ok {
-		return s.types
+		return s.types[:s.field_count]
 	}
 	return nil
 }
@@ -482,7 +482,7 @@ struct_field_types :: proc(T: typeid) -> []^Type_Info {
 struct_field_tags :: proc(T: typeid) -> []Struct_Tag {
 	ti := runtime.type_info_base(type_info_of(T))
 	if s, ok := ti.variant.(runtime.Type_Info_Struct); ok {
-		return transmute([]Struct_Tag)s.tags
+		return transmute([]Struct_Tag)s.tags[:s.field_count]
 	}
 	return nil
 }
@@ -491,7 +491,7 @@ struct_field_tags :: proc(T: typeid) -> []Struct_Tag {
 struct_field_offsets :: proc(T: typeid) -> []uintptr {
 	ti := runtime.type_info_base(type_info_of(T))
 	if s, ok := ti.variant.(runtime.Type_Info_Struct); ok {
-		return s.offsets
+		return s.offsets[:s.field_count]
 	}
 	return nil
 }
@@ -501,11 +501,11 @@ struct_fields_zipped :: proc(T: typeid) -> (fields: #soa[]Struct_Field) {
 	ti := runtime.type_info_base(type_info_of(T))
 	if s, ok := ti.variant.(runtime.Type_Info_Struct); ok {
 		return soa_zip(
-			name     = s.names,
-			type     = s.types,
-			tag      = transmute([]Struct_Tag)s.tags,
-			offset   = s.offsets,
-			is_using = s.usings,
+			name     = s.names[:s.field_count],
+			type     = s.types[:s.field_count],
+			tag      = ([^]Struct_Tag)(s.tags)[:s.field_count],
+			offset   = s.offsets[:s.field_count],
+			is_using = s.usings[:s.field_count],
 		)
 	}
 	return nil
@@ -1569,7 +1569,7 @@ equal :: proc(a, b: any, including_indirect_array_recursion := false, recursion_
 		if v.equal != nil {
 			return v.equal(a.data, b.data)
 		} else {
-			for offset, i in v.offsets {
+			for offset, i in v.offsets[:v.field_count] {
 				x := rawptr(uintptr(a.data) + offset)
 				y := rawptr(uintptr(b.data) + offset)
 				id := v.types[i].id

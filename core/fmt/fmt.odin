@@ -1861,7 +1861,7 @@ handle_tag :: proc(state: ^Info_State, data: rawptr, info: reflect.Type_Info_Str
 		if optional_len == nil {
 			return
 		}
-		for f, i in info.names {
+		for f, i in info.names[:info.field_count] {
 			if f != field_name {
 				continue
 			}
@@ -1965,7 +1965,7 @@ fmt_struct :: proc(fi: ^Info, v: any, the_verb: rune, info: runtime.Type_Info_St
 		fmt_bad_verb(fi, the_verb)
 		return
 	}
-	if info.is_raw_union {
+	if .raw_union in info.flags {
 		if type_name == "" {
 			io.write_string(fi.writer, "(raw union)", &fi.n)
 		} else {
@@ -1989,7 +1989,7 @@ fmt_struct :: proc(fi: ^Info, v: any, the_verb: rune, info: runtime.Type_Info_St
 	// fi.hash = false;
 	fi.indent += 1
 
-	is_empty := len(info.names) == 0
+	is_empty := info.field_count == 0
 
 	if !is_soa && hash && !is_empty {
 		io.write_byte(fi.writer, '\n', &fi.n)
@@ -2010,17 +2010,17 @@ fmt_struct :: proc(fi: ^Info, v: any, the_verb: rune, info: runtime.Type_Info_St
 			base_type_name = v.name
 		}
 
-		actual_field_count := len(info.names)
+		actual_field_count := info.field_count
 
 		n := uintptr(info.soa_len)
 
 		if info.soa_kind == .Slice {
-			actual_field_count = len(info.names)-1 // len
+			actual_field_count = info.field_count-1 // len
 
 			n = uintptr((^int)(uintptr(v.data) + info.offsets[actual_field_count])^)
 
 		} else if info.soa_kind == .Dynamic {
-			actual_field_count = len(info.names)-3 // len, cap, allocator
+			actual_field_count = info.field_count-3 // len, cap, allocator
 
 			n = uintptr((^int)(uintptr(v.data) + info.offsets[actual_field_count])^)
 		}
@@ -2099,7 +2099,7 @@ fmt_struct :: proc(fi: ^Info, v: any, the_verb: rune, info: runtime.Type_Info_St
 		}
 	} else {
 		field_count := -1
-		for name, i in info.names {
+		for name, i in info.names[:info.field_count] {
 			optional_len: int = -1
 			use_nul_termination: bool = false
 			verb := the_verb if the_verb == 'w' else 'v'
@@ -2605,7 +2605,7 @@ fmt_bit_field :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Bit
 
 
 	field_count := -1
-	for name, i in info.names {
+	for name, i in info.names[:info.field_count] {
 		field_verb := verb
 		if handle_bit_field_tag(v.data, info, i, &field_verb) {
 			continue

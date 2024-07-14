@@ -368,7 +368,7 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 	
 	#partial switch t in ti.variant {
 	case reflect.Type_Info_Struct:
-		if t.is_raw_union {
+		if .raw_union in t.flags {
 			return UNSUPPORTED_TYPE
 		}
 	

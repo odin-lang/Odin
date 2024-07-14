@@ -338,6 +338,15 @@ gb_internal lbValue lb_emit_source_code_location_as_global_ptr(lbProcedure *p, S
 	return addr.addr;
 }
 
+gb_internal lbValue lb_const_source_code_location_as_global_ptr(lbModule *m, String const &procedure, TokenPos const &pos) {
+	lbValue loc = lb_const_source_code_location_const(m, procedure, pos);
+	lbAddr addr = lb_add_global_generated(m, loc.type, loc, nullptr);
+	lb_make_global_private_const(addr);
+	return addr.addr;
+}
+
+
+
 
 gb_internal lbValue lb_emit_source_code_location_as_global_ptr(lbProcedure *p, Ast *node) {
 	lbValue loc = lb_emit_source_code_location_const(p, node);
