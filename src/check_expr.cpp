@@ -7904,12 +7904,15 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 
 			// NOTE: Due to restrictions in LLVM you can not inline calls with a superset of features.
 			if (is_call_inlined) {
-				GB_ASSERT(c->curr_proc_decl);
-				GB_ASSERT(c->curr_proc_decl->entity);
-				GB_ASSERT(c->curr_proc_decl->entity->type->kind == Type_Proc);
-				String scope_features = c->curr_proc_decl->entity->type->Proc.enable_target_feature;
-				if (!check_target_feature_is_superset_of(scope_features, pt->Proc.enable_target_feature, &invalid)) {
-					error(call, "Inlined procedure enables target feature '%.*s', this requires the calling procedure to at least enable the same feature", LIT(invalid));
+				if (c->curr_proc_decl == nullptr) {
+					error(call, "Calling a '#force_inline' procedure that enables target features is not allowed at file scope");
+				} else {
+					GB_ASSERT(c->curr_proc_decl->entity);
+					GB_ASSERT(c->curr_proc_decl->entity->type->kind == Type_Proc);
+					String scope_features = c->curr_proc_decl->entity->type->Proc.enable_target_feature;
+					if (!check_target_feature_is_superset_of(scope_features, pt->Proc.enable_target_feature, &invalid)) {
+						error(call, "Inlined procedure enables target feature '%.*s', this requires the calling procedure to at least enable the same feature", LIT(invalid));
+					}
 				}
 			}
 		}
