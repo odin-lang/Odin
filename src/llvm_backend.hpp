@@ -299,6 +299,7 @@ enum lbProcedureFlag : u32 {
 struct lbVariadicReuseData {
 	Type *slice_type;
 	lbAddr base_array;
+	lbAddr slice_addr;
 };
 
 struct lbProcedure {
