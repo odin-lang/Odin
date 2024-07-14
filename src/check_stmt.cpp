@@ -1060,6 +1060,9 @@ gb_internal void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags
 	if (ss->tag != nullptr) {
 		check_expr(ctx, &x, ss->tag);
 		check_assignment(ctx, &x, nullptr, str_lit("switch expression"));
+		if (x.type == nullptr) {
+			return;
+		}
 	} else {
 		x.mode  = Addressing_Constant;
 		x.type  = t_bool;
