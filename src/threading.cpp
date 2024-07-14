@@ -66,9 +66,9 @@ struct Thread {
 #endif
 
 	isize idx;
-	isize  stack_size;
+	isize stack_size;
 
-	struct TaskQueue queue;
+	struct TaskQueue   queue;
 	struct ThreadPool *pool;
 };
 
@@ -560,10 +560,10 @@ gb_internal void *internal_thread_proc(void *arg) {
 }
 #endif
 
-TaskRingBuffer *taskring_init(isize size) {
-	TaskRingBuffer *ring = (TaskRingBuffer *)gb_alloc(heap_allocator(), sizeof(TaskRingBuffer));
+TaskRingBuffer *task_ring_init(isize size) {
+	TaskRingBuffer *ring = gb_alloc_item(heap_allocator(), TaskRingBuffer);
 	ring->size = size;
-	ring->buffer = (WorkerTask *)gb_alloc_array(heap_allocator(), WorkerTask, ring->size);
+	ring->buffer = gb_alloc_array(heap_allocator(), WorkerTask, ring->size);
 	return ring;
 }
 
@@ -581,7 +581,7 @@ gb_internal void thread_init(ThreadPool *pool, Thread *t, isize idx) {
 #endif
 
 	// Size must be a power of 2
-	t->queue.ring = taskring_init(1 << 14);
+	t->queue.ring = task_ring_init(1 << 14);
 	t->pool = pool;
 	t->idx = idx;
 }

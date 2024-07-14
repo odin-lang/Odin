@@ -11,14 +11,14 @@ gb_internal bool thread_pool_add_task(ThreadPool *pool, WorkerTaskProc *proc, vo
 gb_internal void thread_pool_wait(ThreadPool *pool);
 
 enum GrabState {
-	GrabSuccess = 0,
-	GrabEmpty   = 1,
-	GrabFailed  = 2,
+	Grab_Success = 0,
+	Grab_Empty   = 1,
+	Grab_Failed  = 2,
 };
 
 struct ThreadPool {
-	gbAllocator threads_allocator;
-	Slice<Thread> threads;
+	gbAllocator       threads_allocator;
+	Slice<Thread>     threads;
 	std::atomic<bool> running;
 
 	Futex tasks_available;
@@ -59,8 +59,8 @@ gb_internal void thread_pool_destroy(ThreadPool *pool) {
 	gb_free(pool->threads_allocator, pool->threads.data);
 }
 
-TaskRingBuffer *taskring_grow(TaskRingBuffer *ring, isize bottom, isize top) {
-	TaskRingBuffer *new_ring = taskring_init(ring->size * 2);
+TaskRingBuffer *task_ring_grow(TaskRingBuffer *ring, isize bottom, isize top) {
+	TaskRingBuffer *new_ring = task_ring_init(ring->size * 2);
 	for (isize i = top; i < bottom; i++) {
 		new_ring->buffer[i % new_ring->size] = ring->buffer[i % ring->size];
 	}
@@ -75,7 +75,7 @@ void thread_pool_queue_push(Thread *thread, WorkerTask task) {
 	isize size = bot - top;
 	if (size > (cur_ring->size - 1)) {
 		// Queue is full
-		thread->queue.ring = taskring_grow(thread->queue.ring, bot, top);
+		thread->queue.ring = task_ring_grow(thread->queue.ring, bot, top);
 		cur_ring = thread->queue.ring.load(std::memory_order_relaxed);
 	}
 
@@ -104,19 +104,19 @@ GrabState thread_pool_queue_take(Thread *thread, WorkerTask *task) {
 			if (!thread->queue.top.compare_exchange_strong(top, top + 1, std::memory_order_seq_cst, std::memory_order_relaxed)) {
 				// Race failed
 				thread->queue.bottom.store(bot + 1, std::memory_order_relaxed);
-				return GrabEmpty;
+				return Grab_Empty;
 			}
 
 			thread->queue.bottom.store(bot + 1, std::memory_order_relaxed);
-			return GrabSuccess;
+			return Grab_Success;
 		}
 
 		// We got a task without hitting a race
-		return GrabSuccess;
+		return Grab_Success;
 	} else {
 		// Queue is empty
 		thread->queue.bottom.store(bot + 1, std::memory_order_relaxed);
-		return GrabEmpty;
+		return Grab_Empty;
 	}
 }
 
@@ -125,7 +125,7 @@ GrabState thread_pool_queue_steal(Thread *thread, WorkerTask *task) {
 	std::atomic_thread_fence(std::memory_order_seq_cst);
 	isize bot = thread->queue.bottom.load(std::memory_order_acquire);
 
-	GrabState ret = GrabEmpty;
+	GrabState ret = Grab_Empty;
 	if (top < bot) {
 		// Queue is not empty
 		TaskRingBuffer *cur_ring = thread->queue.ring.load(std::memory_order_consume);
@@ -133,9 +133,9 @@ GrabState thread_pool_queue_steal(Thread *thread, WorkerTask *task) {
 
 		if (!thread->queue.top.compare_exchange_strong(top, top + 1, std::memory_order_seq_cst, std::memory_order_relaxed)) {
 			// Race failed
-			ret = GrabFailed;
+			ret = Grab_Failed;
 		} else {
-			ret = GrabSuccess;
+			ret = Grab_Success;
 		}
 	}
 	return ret;
@@ -208,11 +208,10 @@ gb_internal THREAD_PROC(thread_pool_thread_proc) {
 				WorkerTask task;
 
 				GrabState ret = thread_pool_queue_steal(thread, &task);
-				if (ret == GrabFailed) {
-					goto main_loop_continue;
-				} else if (ret == GrabEmpty) {
+				switch (ret) {
+				case Grab_Empty:
 					continue;
-				} else if (ret == GrabSuccess) {
+				case Grab_Success:
 					task.do_work(task.data);
 					pool->tasks_left.fetch_sub(1, std::memory_order_release);
 
@@ -220,6 +219,8 @@ gb_internal THREAD_PROC(thread_pool_thread_proc) {
 						futex_signal(&pool->tasks_left);
 					}
 
+					/*fallthrough*/
+				case Grab_Failed:
 					goto main_loop_continue;
 				}
 			}
