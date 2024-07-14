@@ -151,6 +151,7 @@ _new_file :: proc(handle: uintptr, name: string) -> ^File {
 		data = f,
 		procedure = _file_stream_proc,
 	}
+	f.fstat = _fstat
 
 	return f
 }
