@@ -410,6 +410,11 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 				omitempty := false
 
 				json_name, extra := json_name_from_tag_value(reflect.struct_tag_get(reflect.Struct_Tag(info.tags[i]), "json"))
+
+				if json_name == "-" {
+					continue
+				}
+
 				for flag in strings.split_iterator(&extra, ",") {
 					switch flag {
 					case "omitempty":
