@@ -5413,7 +5413,7 @@ gb_internal ParseFileError init_ast_file(AstFile *f, String const &fullpath, Tok
 	if (!string_ends_with(f->fullpath, str_lit(".odin"))) {
 		return ParseFile_WrongExtension;
 	}
-	zero_item(&f->tokenizer);
+	gb_zero_item(&f->tokenizer);
 	f->tokenizer.curr_file_id = f->id;
 
 	TokenizerInitError err = init_tokenizer_from_fullpath(&f->tokenizer, f->fullpath, build_context.copy_file_contents);

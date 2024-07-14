@@ -658,7 +658,7 @@ gb_internal bool check_vet_shadowing(Checker *c, Entity *e, VettedEntity *ve) {
 		}
 	}
 
-	zero_item(ve);
+	gb_zero_item(ve);
 	ve->kind = VettedEntity_Shadowed;
 	ve->entity = e;
 	ve->other = shadowed;
@@ -677,7 +677,7 @@ gb_internal bool check_vet_unused(Checker *c, Entity *e, VettedEntity *ve) {
 			}
 		case Entity_ImportName:
 		case Entity_LibraryName:
-			zero_item(ve);
+			gb_zero_item(ve);
 			ve->kind = VettedEntity_Unused;
 			ve->entity = e;
 			return true;
@@ -1389,7 +1389,7 @@ gb_internal void reset_checker_context(CheckerContext *ctx, AstFile *file, Untyp
 	auto type_path = ctx->type_path;
 	array_clear(type_path);
 
-	zero_size(&ctx->pkg, gb_size_of(CheckerContext) - gb_offset_of(CheckerContext, pkg));
+	gb_zero_size(&ctx->pkg, gb_size_of(CheckerContext) - gb_offset_of(CheckerContext, pkg));
 
 	ctx->file = nullptr;
 	ctx->scope = builtin_pkg->scope;

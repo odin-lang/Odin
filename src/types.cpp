@@ -964,7 +964,7 @@ gb_internal Type *alloc_type(TypeKind kind) {
 	// gbAllocator a = heap_allocator();
 	gbAllocator a = permanent_allocator();
 	Type *t = gb_alloc_item(a, Type);
-	zero_item(t);
+	gb_zero_item(t);
 	t->kind = kind;
 	t->cached_size  = -1;
 	t->cached_align = -1;

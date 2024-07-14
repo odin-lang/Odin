@@ -2534,7 +2534,7 @@ gb_inline void const *gb_pointer_add_const(void const *ptr, isize bytes)       {
 gb_inline void const *gb_pointer_sub_const(void const *ptr, isize bytes)       { return cast(void const *)(cast(u8 const *)ptr - bytes); }
 gb_inline isize       gb_pointer_diff     (void const *begin, void const *end) { return cast(isize)(cast(u8 const *)end - cast(u8 const *)begin); }
 
-gb_inline void gb_zero_size(void *ptr, isize size) { gb_memset(ptr, 0, size); }
+gb_inline void gb_zero_size(void *ptr, isize size) { memset(ptr, 0, size); }
 
 
 #if defined(_MSC_VER) && !defined(__clang__)

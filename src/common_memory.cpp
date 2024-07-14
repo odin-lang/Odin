@@ -2,13 +2,6 @@
 #include <malloc.h>
 #endif
 
-gb_internal gb_inline void zero_size(void *ptr, isize len) {
-	memset(ptr, 0, len);
-}
-
-#define zero_item(ptr) zero_size((ptr), gb_size_of(ptr))
-
-
 template <typename U, typename V>
 gb_internal gb_inline U bit_cast(V &v) { return reinterpret_cast<U &>(v); }
 
