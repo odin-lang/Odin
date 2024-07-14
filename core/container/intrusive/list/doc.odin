@@ -8,6 +8,13 @@ An intrusive container requires a `Node` to be embedded in your own structure, l
 		value: string,
 	}
 
+Embedding the members of a `list.Node` in your structure with the `using` keyword is also allowed:
+
+	My_String :: struct {
+		using node: list.Node,
+		value: string,
+	}
+
 Here is a full example:
 
 	package test

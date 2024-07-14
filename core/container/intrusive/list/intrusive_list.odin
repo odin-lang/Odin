@@ -82,7 +82,7 @@ remove :: proc "contextless" (list: ^List, node: ^Node) {
 	}
 }
 /*
-Removes from the given list all elements that satisfy a condition.
+Removes from the given list all elements that satisfy a condition with O(N) time complexity.
 
 **Inputs**
 - list: The container list
@@ -109,7 +109,7 @@ remove_by_proc :: proc(list: ^List, to_erase: proc(^Node) -> bool) {
 	}
 }
 /*
-Removes from the given list all elements that satisfy a condition.
+Removes from the given list all elements that satisfy a condition with O(N) time complexity.
 
 **Inputs**
 - list: The container list
@@ -137,7 +137,7 @@ remove_by_proc_contextless :: proc(list: ^List, to_erase: proc "contextless" (^N
 }
 
 /*
-Checks if the given list does not contain any element.
+Checks whether the given list does not contain any element.
 
 **Inputs**
 - list: The container list
