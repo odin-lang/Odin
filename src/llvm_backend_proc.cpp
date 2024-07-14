@@ -3469,7 +3469,18 @@ gb_internal lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr) {
 						if (d != nullptr && slice.addr.value == nullptr) {
 							for (auto const &vr : d->variadic_reuses) {
 								if (are_types_identical(vr.slice_type, slice_type)) {
+								#if LLVM_VERSION_MAJOR >= 13
+									// NOTE(bill): No point wasting even more memory, just reuse this stack variable too
+									if (p->variadic_reuses.count > 0) {
+										slice = p->variadic_reuses[0].slice_addr;
+									} else {
+										slice = lb_add_local_generated(p, slice_type, true);
+									}
+									// NOTE(bill): Change the underlying type to match the specific type
+									slice.addr.type = alloc_type_pointer(slice_type);
+								#else
 									slice = lb_add_local_generated(p, slice_type, true);
+								#endif
 									array_add(&p->variadic_reuses, lbVariadicReuseSlices{slice_type, slice});
 									break;
 								}
