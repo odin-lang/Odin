@@ -100,38 +100,7 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 
 	case runtime.Type_Info_Integer:
 		buf: [40]byte
-		u: u128
-		switch i in a {
-		case i8:      u = u128(i)
-		case i16:     u = u128(i)
-		case i32:     u = u128(i)
-		case i64:     u = u128(i)
-		case i128:    u = u128(i)
-		case int:     u = u128(i)
-		case u8:      u = u128(i)
-		case u16:     u = u128(i)
-		case u32:     u = u128(i)
-		case u64:     u = u128(i)
-		case u128:    u = u128(i)
-		case uint:    u = u128(i)
-		case uintptr: u = u128(i)
-
-		case i16le:  u = u128(i)
-		case i32le:  u = u128(i)
-		case i64le:  u = u128(i)
-		case u16le:  u = u128(i)
-		case u32le:  u = u128(i)
-		case u64le:  u = u128(i)
-		case u128le: u = u128(i)
-
-		case i16be:  u = u128(i)
-		case i32be:  u = u128(i)
-		case i64be:  u = u128(i)
-		case u16be:  u = u128(i)
-		case u32be:  u = u128(i)
-		case u64be:  u = u128(i)
-		case u128be: u = u128(i)
-		}
+		u := cast_any_int_to_u128(a)
 
 		s: string
 
@@ -310,7 +279,12 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 							case cstring: name = string(s)
 							}
 							opt_write_key(w, opt, name) or_return
-
+						case runtime.Type_Info_Integer:
+							buf: [40]byte
+							u := cast_any_int_to_u128(ka)
+							name = strconv.append_bits_128(buf[:], u, 10, info.signed, 8*kti.size, "0123456789", nil)
+							
+							opt_write_key(w, opt, name) or_return
 						case: return .Unsupported_Type
 						}
 					}
@@ -661,4 +635,42 @@ opt_write_indentation :: proc(w: io.Writer, opt: ^Marshal_Options) -> (err: io.E
 	}
 
 	return
+}
+
+@(private)
+cast_any_int_to_u128 :: proc(any_int_value: any) -> u128 {
+	u: u128 = 0
+	switch i in any_int_value {
+	case i8:      u = u128(i)
+	case i16:     u = u128(i)
+	case i32:     u = u128(i)
+	case i64:     u = u128(i)
+	case i128:    u = u128(i)
+	case int:     u = u128(i)
+	case u8:      u = u128(i)
+	case u16:     u = u128(i)
+	case u32:     u = u128(i)
+	case u64:     u = u128(i)
+	case u128:    u = u128(i)
+	case uint:    u = u128(i)
+	case uintptr: u = u128(i)
+
+	case i16le:  u = u128(i)
+	case i32le:  u = u128(i)
+	case i64le:  u = u128(i)
+	case u16le:  u = u128(i)
+	case u32le:  u = u128(i)
+	case u64le:  u = u128(i)
+	case u128le: u = u128(i)
+
+	case i16be:  u = u128(i)
+	case i32be:  u = u128(i)
+	case i64be:  u = u128(i)
+	case u16be:  u = u128(i)
+	case u32be:  u = u128(i)
+	case u64be:  u = u128(i)
+	case u128be: u = u128(i)
+	}
+
+	return u
 }
