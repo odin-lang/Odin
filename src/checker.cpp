@@ -1,7 +1,5 @@
 #define DEBUG_CHECK_ALL_PROCEDURES 1
 
-gb_global bool in_single_threaded_checker_stage = false;
-
 #include "entity.cpp"
 #include "types.cpp"
 
@@ -164,10 +162,10 @@ gb_internal void import_graph_node_swap(ImportGraphNode **data, isize i, isize j
 gb_internal void init_decl_info(DeclInfo *d, Scope *scope, DeclInfo *parent) {
 	gb_zero_item(d);
 	if (parent) {
-		if (!in_single_threaded_checker_stage) mutex_lock(&parent->next_mutex);
+		mutex_lock(&parent->next_mutex);
 		d->next_sibling = parent->next_child;
 		parent->next_child = d;
-		if (!in_single_threaded_checker_stage) mutex_unlock(&parent->next_mutex);
+		mutex_unlock(&parent->next_mutex);
 	}
 	d->parent = parent;
 	d->scope  = scope;
@@ -382,9 +380,9 @@ gb_internal void scope_lookup_parent(Scope *scope, String const &name, Scope **s
 		StringHashKey key = string_hash_string(name);
 		for (Scope *s = scope; s != nullptr; s = s->parent) {
 			Entity **found = nullptr;
-			if (!in_single_threaded_checker_stage) rw_mutex_shared_lock(&s->mutex);
+			rw_mutex_shared_lock(&s->mutex);
 			found = string_map_get(&s->elements, key);
-			if (!in_single_threaded_checker_stage) rw_mutex_shared_unlock(&s->mutex);
+			rw_mutex_shared_unlock(&s->mutex);
 			if (found) {
 				Entity *e = *found;
 				if (gone_thru_proc) {
@@ -501,6 +499,8 @@ end:;
 
 	return result;
 }
+
+gb_global bool in_single_threaded_checker_stage = false;
 
 gb_internal Entity *scope_insert(Scope *s, Entity *entity) {
 	String name = entity->token.string;
@@ -762,17 +762,17 @@ gb_internal void check_scope_usage(Checker *c, Scope *scope, u64 vet_flags) {
 
 
 gb_internal void add_dependency(CheckerInfo *info, DeclInfo *d, Entity *e) {
-	if (!in_single_threaded_checker_stage) rw_mutex_lock(&d->deps_mutex);
+	rw_mutex_lock(&d->deps_mutex);
 	ptr_set_add(&d->deps, e);
-	if (!in_single_threaded_checker_stage) rw_mutex_unlock(&d->deps_mutex);
+	rw_mutex_unlock(&d->deps_mutex);
 }
 gb_internal void add_type_info_dependency(CheckerInfo *info, DeclInfo *d, Type *type) {
 	if (d == nullptr) {
 		return;
 	}
-	if (!in_single_threaded_checker_stage) rw_mutex_lock(&d->type_info_deps_mutex);
+	rw_mutex_lock(&d->type_info_deps_mutex);
 	ptr_set_add(&d->type_info_deps, type);
-	if (!in_single_threaded_checker_stage) rw_mutex_unlock(&d->type_info_deps_mutex);
+	rw_mutex_unlock(&d->type_info_deps_mutex);
 }
 
 
@@ -1383,7 +1383,7 @@ gb_internal void reset_checker_context(CheckerContext *ctx, AstFile *file, Untyp
 		return;
 	}
 	GB_ASSERT(ctx->checker != nullptr);
-	if (!in_single_threaded_checker_stage) mutex_lock(&ctx->mutex);
+	mutex_lock(&ctx->mutex);
 
 	auto type_path = ctx->type_path;
 	array_clear(type_path);
@@ -1402,7 +1402,7 @@ gb_internal void reset_checker_context(CheckerContext *ctx, AstFile *file, Untyp
 
 	ctx->untyped = untyped;
 
-	if (!in_single_threaded_checker_stage) mutex_unlock(&ctx->mutex);
+	mutex_unlock(&ctx->mutex);
 }
 
 
@@ -1548,9 +1548,9 @@ gb_internal void check_set_expr_info(CheckerContext *c, Ast *expr, AddressingMod
 	if (c->untyped != nullptr) {
 		map_set(c->untyped, expr, make_expr_info(mode, type, value, false));
 	} else {
-		if (!in_single_threaded_checker_stage) rw_mutex_lock(&c->info->global_untyped_mutex);
+		rw_mutex_lock(&c->info->global_untyped_mutex);
 		map_set(&c->info->global_untyped, expr, make_expr_info(mode, type, value, false));
-		if (!in_single_threaded_checker_stage) rw_mutex_unlock(&c->info->global_untyped_mutex);
+		rw_mutex_unlock(&c->info->global_untyped_mutex);
 	}
 }
 
@@ -1560,10 +1560,10 @@ gb_internal void check_remove_expr_info(CheckerContext *c, Ast *e) {
 		GB_ASSERT(map_get(c->untyped, e) == nullptr);
 	} else {
 		auto *untyped = &c->info->global_untyped;
-		if (!in_single_threaded_checker_stage) rw_mutex_lock(&c->info->global_untyped_mutex);
+		rw_mutex_lock(&c->info->global_untyped_mutex);
 		map_remove(untyped, e);
 		GB_ASSERT(map_get(untyped, e) == nullptr);
-		if (!in_single_threaded_checker_stage) rw_mutex_unlock(&c->info->global_untyped_mutex);
+		rw_mutex_unlock(&c->info->global_untyped_mutex);
 	}
 }
 
