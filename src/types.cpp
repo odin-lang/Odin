@@ -808,9 +808,9 @@ gb_internal void type_path_init(TypePath *tp) {
 }
 
 gb_internal void type_path_free(TypePath *tp) {
-	mutex_lock(&tp->mutex);
+	if (!in_single_threaded_checker_stage) mutex_lock(&tp->mutex);
 	array_free(&tp->path);
-	mutex_unlock(&tp->mutex);
+	if (!in_single_threaded_checker_stage) mutex_unlock(&tp->mutex);
 }
 
 gb_internal void type_path_print_illegal_cycle(TypePath *tp, isize start_index) {
@@ -839,7 +839,7 @@ gb_internal bool type_path_push(TypePath *tp, Type *t) {
 	}
 	Entity *e = t->Named.type_name;
 
-	mutex_lock(&tp->mutex);
+	if (!in_single_threaded_checker_stage) mutex_lock(&tp->mutex);
 
 	for (isize i = 0; i < tp->path.count; i++) {
 		Entity *p = tp->path[i];
@@ -850,18 +850,18 @@ gb_internal bool type_path_push(TypePath *tp, Type *t) {
 
 	array_add(&tp->path, e);
 
-	mutex_unlock(&tp->mutex);
+	if (!in_single_threaded_checker_stage) mutex_unlock(&tp->mutex);
 
 	return true;
 }
 
 gb_internal void type_path_pop(TypePath *tp) {
 	if (tp != nullptr) {
-		mutex_lock(&tp->mutex);
+		if (!in_single_threaded_checker_stage) mutex_lock(&tp->mutex);
 		if (tp->path.count > 0) {
 			array_pop(&tp->path);
 		}
-		mutex_unlock(&tp->mutex);
+		if (!in_single_threaded_checker_stage) mutex_unlock(&tp->mutex);
 	}
 }
 
@@ -3216,8 +3216,8 @@ gb_internal Selection lookup_field_with_selection(Type *type_, String field_name
 			GB_ASSERT(e->kind == Entity_TypeName);
 			if (e->TypeName.objc_metadata) {
 				auto *md = e->TypeName.objc_metadata;
-				mutex_lock(md->mutex);
-				defer (mutex_unlock(md->mutex));
+				if (!in_single_threaded_checker_stage) mutex_lock(md->mutex);
+				defer (if (!in_single_threaded_checker_stage) mutex_unlock(md->mutex));
 				for (TypeNameObjCMetadataEntry const &entry : md->type_entries) {
 					GB_ASSERT(entry.entity->kind == Entity_Procedure || entry.entity->kind == Entity_ProcGroup);
 					if (entry.name == field_name) {
@@ -3294,8 +3294,8 @@ gb_internal Selection lookup_field_with_selection(Type *type_, String field_name
 			GB_ASSERT(e->kind == Entity_TypeName);
 			if (e->TypeName.objc_metadata) {
 				auto *md = e->TypeName.objc_metadata;
-				mutex_lock(md->mutex);
-				defer (mutex_unlock(md->mutex));
+				if (!in_single_threaded_checker_stage) mutex_lock(md->mutex);
+				defer (if (!in_single_threaded_checker_stage) mutex_unlock(md->mutex));
 				for (TypeNameObjCMetadataEntry const &entry : md->value_entries) {
 					GB_ASSERT(entry.entity->kind == Entity_Procedure || entry.entity->kind == Entity_ProcGroup);
 					if (entry.name == field_name) {

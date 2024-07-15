@@ -500,7 +500,9 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 		nctx.no_polymorphic_errors = false;
 
 		// NOTE(bill): Reset scope from the failed procedure type
-		scope_reset(scope);
+		scope->head_child.store(nullptr, std::memory_order_relaxed);
+		string_map_clear(&scope->elements);
+		ptr_set_clear(&scope->imported);
 
 		// LEAK NOTE(bill): Cloning this AST may be leaky but this is not really an issue due to arena-based allocation
 		Ast *cloned_proc_type_node = clone_ast(pt->node);
