@@ -1110,7 +1110,7 @@ gb_internal lbValue lb_emit_load(lbProcedure *p, lbValue value) {
 		return lb_addr_load(p, addr);
 	}
 
-	GB_ASSERT(is_type_pointer(value.type));
+	GB_ASSERT_MSG(is_type_pointer(value.type), "%s", type_to_string(value.type));
 	Type *t = type_deref(value.type);
 	LLVMValueRef v = LLVMBuildLoad2(p->builder, lb_type(p->module, t), value.value, "");
 
