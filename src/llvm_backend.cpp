@@ -144,11 +144,14 @@ gb_internal void lb_correct_entity_linkage(lbGenerator *gen) {
 		LLVMValueRef other_global = nullptr;
 		if (ec.e->kind == Entity_Variable) {
 			other_global = LLVMGetNamedGlobal(ec.other_module->mod, ec.cname);
+			if (other_global) {
+				LLVMSetLinkage(other_global, LLVMWeakAnyLinkage);
+			}
 		} else if (ec.e->kind == Entity_Procedure) {
 			other_global = LLVMGetNamedFunction(ec.other_module->mod, ec.cname);
-		}
-		if (other_global) {
-			LLVMSetLinkage(other_global, LLVMExternalLinkage);
+			if (other_global) {
+				LLVMSetLinkage(other_global, LLVMWeakAnyLinkage);
+			}
 		}
 	}
 }
@@ -1437,7 +1440,9 @@ gb_internal bool lb_is_module_empty(lbModule *m) {
 	}
 
 	for (auto g = LLVMGetFirstGlobal(m->mod); g != nullptr; g = LLVMGetNextGlobal(g)) {
-		if (LLVMGetLinkage(g) == LLVMExternalLinkage) {
+		LLVMLinkage linkage = LLVMGetLinkage(g);
+		if (linkage == LLVMExternalLinkage ||
+		    linkage == LLVMWeakAnyLinkage) {
 			continue;
 		}
 		if (!LLVMIsExternallyInitialized(g)) {
@@ -3266,7 +3271,7 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 			LLVMSetLinkage(g.value, LLVMDLLExportLinkage);
 			LLVMSetDLLStorageClass(g.value, LLVMDLLExportStorageClass);
 		} else if (!is_foreign) {
-			LLVMSetLinkage(g.value, USE_SEPARATE_MODULES ? LLVMExternalLinkage : LLVMInternalLinkage);
+			LLVMSetLinkage(g.value, USE_SEPARATE_MODULES ? LLVMWeakAnyLinkage : LLVMInternalLinkage);
 		}
 		lb_set_linkage_from_entity_flags(m, g.value, e->flags);
 		
