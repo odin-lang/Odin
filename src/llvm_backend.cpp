@@ -137,17 +137,22 @@ gb_internal void lb_set_entity_from_other_modules_linkage_correctly(lbModule *ot
 	}
 	char const *cname = alloc_cstring(permanent_allocator(), name);
 	mpsc_enqueue(&other_module->gen->entities_to_correct_linkage, lbEntityCorrection{other_module, e, cname});
-
-	// LLVMValueRef other_global = nullptr;
-	// if (e->kind == Entity_Variable) {
-	// 	other_global = LLVMGetNamedGlobal(other_module->mod, cname);
-	// } else if (e->kind == Entity_Procedure) {
-	// 	other_global = LLVMGetNamedFunction(other_module->mod, cname);
-	// }
-	// if (other_global) {
-	// 	LLVMSetLinkage(other_global, LLVMExternalLinkage);
-	// }
 }
+
+gb_internal void lb_correct_entity_linkage(lbGenerator *gen) {
+	for (lbEntityCorrection ec = {}; mpsc_dequeue(&gen->entities_to_correct_linkage, &ec); /**/) {
+		LLVMValueRef other_global = nullptr;
+		if (ec.e->kind == Entity_Variable) {
+			other_global = LLVMGetNamedGlobal(ec.other_module->mod, ec.cname);
+		} else if (ec.e->kind == Entity_Procedure) {
+			other_global = LLVMGetNamedFunction(ec.other_module->mod, ec.cname);
+		}
+		if (other_global) {
+			LLVMSetLinkage(other_global, LLVMExternalLinkage);
+		}
+	}
+}
+
 
 gb_internal void lb_emit_init_context(lbProcedure *p, lbAddr addr) {
 	TEMPORARY_ALLOCATOR_GUARD();
@@ -1386,6 +1391,7 @@ gb_internal void lb_create_global_procedures_and_types(lbGenerator *gen, Checker
 		if (USE_SEPARATE_MODULES) {
 			m = lb_module_of_entity(gen, e);
 		}
+		GB_ASSERT(m != nullptr);
 
 		if (e->kind == Entity_Procedure) {
 			array_add(&m->global_procedures_to_create, e);
@@ -3431,18 +3437,7 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 	lb_add_foreign_library_paths(gen);
 
 	TIME_SECTION("LLVM Correct Entity Linkage");
-	for (lbEntityCorrection ec = {}; mpsc_dequeue(&gen->entities_to_correct_linkage, &ec); /**/) {
-		LLVMValueRef other_global = nullptr;
-		if (ec.e->kind == Entity_Variable) {
-			other_global = LLVMGetNamedGlobal(ec.other_module->mod, ec.cname);
-		} else if (ec.e->kind == Entity_Procedure) {
-			other_global = LLVMGetNamedFunction(ec.other_module->mod, ec.cname);
-		}
-		if (other_global) {
-			LLVMSetLinkage(other_global, LLVMExternalLinkage);
-		}
-	}
-
+	lb_correct_entity_linkage(gen);
 
 	////////////////////////////////////////////
 	for (auto const &entry: gen->modules) {

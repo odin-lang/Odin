@@ -29,8 +29,9 @@ gb_internal void lb_init_module(lbModule *m, Checker *c) {
 		module_name = gb_string_appendc(module_name, "-builtin");
 	}
 
+	m->module_name = module_name ? module_name : "odin_package";
 	m->ctx = LLVMContextCreate();
-	m->mod = LLVMModuleCreateWithNameInContext(module_name ? module_name : "odin_package", m->ctx);
+	m->mod = LLVMModuleCreateWithNameInContext(m->module_name, m->ctx);
 	// m->debug_builder = nullptr;
 	if (build_context.ODIN_DEBUG) {
 		enum {DEBUG_METADATA_VERSION = 3};
@@ -389,12 +390,14 @@ gb_internal lbModule *lb_module_of_entity(lbGenerator *gen, Entity *e) {
 	if (e->file) {
 		found = map_get(&gen->modules, cast(void *)e->file);
 		if (found) {
+			GB_ASSERT(*found != nullptr);
 			return *found;
 		}
 	}
 	if (e->pkg) {
 		found = map_get(&gen->modules, cast(void *)e->pkg);
 		if (found) {
+			GB_ASSERT(*found != nullptr);
 			return *found;
 		}
 	}
@@ -1532,7 +1535,7 @@ gb_internal void lb_clone_struct_type(LLVMTypeRef dst, LLVMTypeRef src) {
 	LLVMStructSetBody(dst, fields, field_count, LLVMIsPackedStruct(src));
 }
 
-gb_internal String lb_mangle_name(lbModule *m, Entity *e) {
+gb_internal String lb_mangle_name(Entity *e) {
 	String name = e->token.string;
 
 	AstPackage *pkg = e->pkg;
@@ -1632,6 +1635,7 @@ gb_internal String lb_set_nested_type_name_ir_mangled_name(Entity *e, lbProcedur
 }
 
 gb_internal String lb_get_entity_name(lbModule *m, Entity *e, String default_name) {
+	GB_ASSERT(m != nullptr);
 	if (e != nullptr && e->kind == Entity_TypeName && e->TypeName.ir_mangled_name.len != 0) {
 		return e->TypeName.ir_mangled_name;
 	}
@@ -1663,7 +1667,7 @@ gb_internal String lb_get_entity_name(lbModule *m, Entity *e, String default_nam
 	}
 
 	if (!no_name_mangle) {
-		name = lb_mangle_name(m, e);
+		name = lb_mangle_name(e);
 	}
 	if (name.len == 0) {
 		name = e->token.string;
@@ -3039,58 +3043,63 @@ gb_internal lbValue lb_find_value_from_entity(lbModule *m, Entity *e) {
 		return *found;
 	}
 
-	if (USE_SEPARATE_MODULES) {
-		lbModule *other_module = lb_module_of_entity(m->gen, e);
+	lbValue g = {};
+	String name = {};
 
-		bool is_external = other_module != m;
-		if (!is_external) {
-			if (e->code_gen_module != nullptr) {
-				other_module = e->code_gen_module;
-			} else {
-				other_module = nullptr;
-			}
-			is_external = other_module != m;
-		}
-
-		if (is_external) {
-			String name = lb_get_entity_name(other_module, e);
-
-			lbValue g = {};
-			g.value = LLVMAddGlobal(m->mod, lb_type(m, e->type), alloc_cstring(permanent_allocator(), name));
-			g.type = alloc_type_pointer(e->type);
-			lb_add_entity(m, e, g);
-			lb_add_member(m, name, g);
-
-			LLVMSetLinkage(g.value, LLVMExternalLinkage);
-
-			lb_set_entity_from_other_modules_linkage_correctly(other_module, e, name);
-
-			// LLVMSetLinkage(other_g.value, LLVMExternalLinkage);
-
-			if (e->Variable.thread_local_model != "") {
-				LLVMSetThreadLocal(g.value, true);
-
-				String m = e->Variable.thread_local_model;
-				LLVMThreadLocalMode mode = LLVMGeneralDynamicTLSModel;
-				if (m == "default") {
-					mode = LLVMGeneralDynamicTLSModel;
-				} else if (m == "localdynamic") {
-					mode = LLVMLocalDynamicTLSModel;
-				} else if (m == "initialexec") {
-					mode = LLVMInitialExecTLSModel;
-				} else if (m == "localexec") {
-					mode = LLVMLocalExecTLSModel;
-				} else {
-					GB_PANIC("Unhandled thread local mode %.*s", LIT(m));
-				}
-				LLVMSetThreadLocalMode(g.value, mode);
-			}
-
-
-			return g;
-		}
+	if (!USE_SEPARATE_MODULES) {
+		goto failed;
 	}
-	GB_PANIC("\n\tError in: %s, missing value '%.*s'\n", token_pos_to_string(e->token.pos), LIT(e->token.string));
+	lbModule *other_module = lb_module_of_entity(m->gen, e);
+
+	bool is_external = other_module != m;
+	if (!is_external) {
+		if (e->code_gen_module != nullptr) {
+			other_module = e->code_gen_module;
+		} else {
+			other_module = &m->gen->default_module;
+		}
+		is_external = other_module != m;
+	}
+
+	if (!is_external) {
+		goto failed;
+	}
+	name = lb_get_entity_name(other_module, e);
+
+	g.value = LLVMAddGlobal(m->mod, lb_type(m, e->type), alloc_cstring(permanent_allocator(), name));
+	g.type = alloc_type_pointer(e->type);
+	lb_add_entity(m, e, g);
+	lb_add_member(m, name, g);
+
+	LLVMSetLinkage(g.value, LLVMExternalLinkage);
+
+	lb_set_entity_from_other_modules_linkage_correctly(other_module, e, name);
+
+	if (e->Variable.thread_local_model != "") {
+		LLVMSetThreadLocal(g.value, true);
+
+		String m = e->Variable.thread_local_model;
+		LLVMThreadLocalMode mode = LLVMGeneralDynamicTLSModel;
+		if (m == "default") {
+			mode = LLVMGeneralDynamicTLSModel;
+		} else if (m == "localdynamic") {
+			mode = LLVMLocalDynamicTLSModel;
+		} else if (m == "initialexec") {
+			mode = LLVMInitialExecTLSModel;
+		} else if (m == "localexec") {
+			mode = LLVMLocalExecTLSModel;
+		} else {
+			GB_PANIC("Unhandled thread local mode %.*s", LIT(m));
+		}
+		LLVMSetThreadLocalMode(g.value, mode);
+	}
+
+
+	return g;
+
+failed:;
+	GB_PANIC("\n\tError in: %s, missing value '%.*s' in module %s\n",
+	         token_pos_to_string(e->token.pos), LIT(e->token.string), m->module_name);
 	return {};
 }
 

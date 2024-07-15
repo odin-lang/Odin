@@ -147,6 +147,7 @@ struct lbModule {
 	CheckerInfo *info;
 	AstPackage *pkg; // possibly associated
 	AstFile *file;   // possibly associated
+	char const *module_name;
 
 	PtrMap<Type *, LLVMTypeRef> types;                             // mutex: types_mutex
 	PtrMap<void *, lbStructFieldRemapping> struct_field_remapping; // Key: LLVMTypeRef or Type *, mutex: types_mutex
@@ -379,7 +380,7 @@ struct lbProcedure {
 
 gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c);
 
-gb_internal String lb_mangle_name(lbModule *m, Entity *e);
+gb_internal String lb_mangle_name(Entity *e);
 gb_internal String lb_get_entity_name(lbModule *m, Entity *e, String name = {});
 
 gb_internal LLVMAttributeRef lb_create_enum_attribute(LLVMContextRef ctx, char const *name, u64 value=0);
