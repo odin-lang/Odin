@@ -1419,6 +1419,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							break;
 						case BuildFlag_InternalModulePerFile:
 							build_context.module_per_file = true;
+							build_context.use_separate_modules = true;
 							break;
 						case BuildFlag_InternalCached:
 							build_context.cached = true;
