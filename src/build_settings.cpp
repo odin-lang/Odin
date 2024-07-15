@@ -1658,7 +1658,7 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 
 	bc->optimization_level = gb_clamp(bc->optimization_level, -1, 3);
 
-#if !defined(GB_SYSTEM_OSX)
+#if defined(GB_SYSTEM_WINDOWS)
 	if (bc->optimization_level <= 0) {
 		if (!is_arch_wasm()) {
 			bc->use_separate_modules = true;
