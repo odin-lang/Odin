@@ -1,13 +1,11 @@
 #define MULTITHREAD_OBJECT_GENERATION 1
-
-#ifndef USE_SEPARATE_MODULES
-#define USE_SEPARATE_MODULES build_context.use_separate_modules
-#endif
-
 #ifndef MULTITHREAD_OBJECT_GENERATION
 #define MULTITHREAD_OBJECT_GENERATION 0
 #endif
 
+#ifndef USE_SEPARATE_MODULES
+#define USE_SEPARATE_MODULES build_context.use_separate_modules
+#endif
 
 #ifndef LLVM_IGNORE_VERIFICATION
 #define LLVM_IGNORE_VERIFICATION 0
@@ -137,17 +135,18 @@ gb_internal void lb_set_entity_from_other_modules_linkage_correctly(lbModule *ot
 	if (other_module == nullptr) {
 		return;
 	}
-	char const *cname = alloc_cstring(temporary_allocator(), name);
+	char const *cname = alloc_cstring(permanent_allocator(), name);
+	mpsc_enqueue(&other_module->gen->entities_to_correct_linkage, lbEntityCorrection{other_module, e, cname});
 
-	LLVMValueRef other_global = nullptr;
-	if (e->kind == Entity_Variable) {
-		other_global = LLVMGetNamedGlobal(other_module->mod, cname);
-	} else if (e->kind == Entity_Procedure) {
-		other_global = LLVMGetNamedFunction(other_module->mod, cname);
-	}
-	if (other_global) {
-		LLVMSetLinkage(other_global, LLVMExternalLinkage);
-	}
+	// LLVMValueRef other_global = nullptr;
+	// if (e->kind == Entity_Variable) {
+	// 	other_global = LLVMGetNamedGlobal(other_module->mod, cname);
+	// } else if (e->kind == Entity_Procedure) {
+	// 	other_global = LLVMGetNamedFunction(other_module->mod, cname);
+	// }
+	// if (other_global) {
+	// 	LLVMSetLinkage(other_global, LLVMExternalLinkage);
+	// }
 }
 
 gb_internal void lb_emit_init_context(lbProcedure *p, lbAddr addr) {
@@ -3430,6 +3429,19 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 
 	TIME_SECTION("LLVM Add Foreign Library Paths");
 	lb_add_foreign_library_paths(gen);
+
+	TIME_SECTION("LLVM Correct Entity Linkage");
+	for (lbEntityCorrection ec = {}; mpsc_dequeue(&gen->entities_to_correct_linkage, &ec); /**/) {
+		LLVMValueRef other_global = nullptr;
+		if (ec.e->kind == Entity_Variable) {
+			other_global = LLVMGetNamedGlobal(ec.other_module->mod, ec.cname);
+		} else if (ec.e->kind == Entity_Procedure) {
+			other_global = LLVMGetNamedFunction(ec.other_module->mod, ec.cname);
+		}
+		if (other_global) {
+			LLVMSetLinkage(other_global, LLVMExternalLinkage);
+		}
+	}
 
 
 	////////////////////////////////////////////

@@ -71,7 +71,7 @@ gb_internal void lb_init_module(lbModule *m, Checker *c) {
 	map_init(&m->hasher_procs);
 	map_init(&m->map_get_procs);
 	map_init(&m->map_set_procs);
-	if (build_context.use_separate_modules) {
+	if (USE_SEPARATE_MODULES) {
 		array_init(&m->procedures_to_generate, a, 0, 1<<10);
 		map_init(&m->procedure_values,               1<<11);
 	} else {
@@ -150,6 +150,8 @@ gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c) {
 		LLVMContextRef ctx = LLVMGetModuleContext(m->mod);
 		map_set(&gen->modules_through_ctx, ctx, m);
 	}
+
+	mpsc_init(&gen->entities_to_correct_linkage, heap_allocator());
 
 	return true;
 }

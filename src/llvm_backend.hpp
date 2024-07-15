@@ -200,6 +200,12 @@ struct lbModule {
 	LLVMPassManagerRef function_pass_managers[lbFunctionPassManager_COUNT];
 };
 
+struct lbEntityCorrection {
+	lbModule *  other_module;
+	Entity *    e;
+	char const *cname;
+};
+
 struct lbGenerator : LinkerData {
 	CheckerInfo *info;
 
@@ -218,6 +224,8 @@ struct lbGenerator : LinkerData {
 	lbProcedure *startup_runtime;
 	lbProcedure *cleanup_runtime;
 	lbProcedure *objc_names;
+
+	MPSCQueue<lbEntityCorrection> entities_to_correct_linkage;
 };
 
 
