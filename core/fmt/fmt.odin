@@ -2751,9 +2751,11 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 			elem := runtime.type_info_base(info.elem)
 			if elem != nil {
 				if n, ok := fi.optional_len.?; ok {
+					fi.optional_len = nil
 					fmt_array(fi, ptr, n, elem.size, elem, verb)
 					return
 				} else if fi.use_nul_termination {
+					fi.use_nul_termination = false
 					fmt_array_nul_terminated(fi, ptr, -1, elem.size, elem, verb)
 					return
 				}
@@ -2855,8 +2857,10 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 		n := info.count
 		ptr := v.data
 		if ol, ok := fi.optional_len.?; ok {
+			fi.optional_len = nil
 			n = min(n, ol)
 		} else if fi.use_nul_termination {
+			fi.use_nul_termination = false
 			fmt_array_nul_terminated(fi, ptr, n, info.elem_size, info.elem, verb)
 			return
 		}
@@ -2867,8 +2871,10 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 		n := slice.len
 		ptr := slice.data
 		if ol, ok := fi.optional_len.?; ok {
+			fi.optional_len = nil
 			n = min(n, ol)
 		} else if fi.use_nul_termination {
+			fi.use_nul_termination = false
 			fmt_array_nul_terminated(fi, ptr, n, info.elem_size, info.elem, verb)
 			return
 		}
@@ -2879,8 +2885,10 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 		n := array.len
 		ptr := array.data
 		if ol, ok := fi.optional_len.?; ok {
+			fi.optional_len = nil
 			n = min(n, ol)
 		} else if fi.use_nul_termination {
+			fi.use_nul_termination = false
 			fmt_array_nul_terminated(fi, ptr, n, info.elem_size, info.elem, verb)
 			return
 		}
