@@ -1079,7 +1079,7 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 	return false;
 }
 
-gb_internal bool cache_load_file_directive(CheckerContext *c, Ast *call, String const &original_string, bool err_on_not_found, LoadFileCache **cache_, LoadFileTier tier) {
+gb_internal bool cache_load_file_directive(CheckerContext *c, Ast *call, String const &original_string, bool err_on_not_found, LoadFileCache **cache_, LoadFileTier tier, bool use_mutex=true) {
 	ast_node(ce, CallExpr, call);
 	ast_node(bd, BasicDirective, ce->proc);
 	String builtin_name = bd->name.string;
@@ -1101,7 +1101,8 @@ gb_internal bool cache_load_file_directive(CheckerContext *c, Ast *call, String 
 		}
 	}
 
-	MUTEX_GUARD(&c->info->load_file_mutex);
+	if (use_mutex) mutex_lock(&c->info->load_file_mutex);
+	defer (if (use_mutex) mutex_unlock(&c->info->load_file_mutex));
 
 	gbFileError file_error = gbFileError_None;
 	String data = {};
@@ -1414,9 +1415,12 @@ gb_internal LoadDirectiveResult check_load_directory_directive(CheckerContext *c
 
 		file_caches = array_make<LoadFileCache *>(heap_allocator(), 0, files_to_reserve);
 
+		mutex_lock(&c->info->load_file_mutex);
+		defer (mutex_unlock(&c->info->load_file_mutex));
+
 		for (FileInfo fi : list) {
 			LoadFileCache *cache = nullptr;
-			if (cache_load_file_directive(c, call, fi.fullpath, err_on_not_found, &cache, LoadFileTier_Contents)) {
+			if (cache_load_file_directive(c, call, fi.fullpath, err_on_not_found, &cache, LoadFileTier_Contents, /*use_mutex*/false)) {
 				array_add(&file_caches, cache);
 			} else {
 				result = LoadDirective_Error;
