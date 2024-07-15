@@ -32,6 +32,8 @@ gb_internal void virtual_memory_init(void) {
 }
 
 
+gb_internal Thread *get_current_thread(void);
+
 
 struct MemoryBlock {
 	MemoryBlock *prev;
@@ -45,6 +47,7 @@ struct Arena {
 	isize         minimum_block_size;
 	BlockingMutex mutex;
 	isize         temp_count;
+	Thread *      parent_thread;
 };
 
 enum { DEFAULT_MINIMUM_BLOCK_SIZE = 8ll*1024ll*1024ll };
@@ -70,6 +73,9 @@ gb_internal void thread_init_arenas(Thread *t) {
 	t->permanent_arena = gb_alloc_item(heap_allocator(), Arena);
 	t->temporary_arena = gb_alloc_item(heap_allocator(), Arena);
 
+	t->permanent_arena->parent_thread = t;
+	t->temporary_arena->parent_thread = t;
+
 	t->permanent_arena->minimum_block_size = DEFAULT_MINIMUM_BLOCK_SIZE;
 	t->temporary_arena->minimum_block_size = DEFAULT_MINIMUM_BLOCK_SIZE;
 }
@@ -77,7 +83,11 @@ gb_internal void thread_init_arenas(Thread *t) {
 gb_internal void *arena_alloc(Arena *arena, isize min_size, isize alignment) {
 	GB_ASSERT(gb_is_power_of_two(alignment));
 	
-	mutex_lock(&arena->mutex);
+	if (arena->parent_thread == nullptr) {
+		mutex_lock(&arena->mutex);
+	} else {
+		GB_ASSERT(arena->parent_thread == get_current_thread());
+	}
 
 	isize size = 0;
 	if (arena->curr_block != nullptr) {
@@ -104,7 +114,9 @@ gb_internal void *arena_alloc(Arena *arena, isize min_size, isize alignment) {
 	curr_block->used += size;
 	GB_ASSERT(curr_block->used <= curr_block->size);
 	
-	mutex_unlock(&arena->mutex);
+	if (arena->parent_thread == nullptr) {
+		mutex_unlock(&arena->mutex);
+	}
 	
 	// NOTE(bill): memory will be zeroed by default due to virtual memory 
 	return ptr;	
@@ -260,7 +272,7 @@ struct ArenaTemp {
 
 ArenaTemp arena_temp_begin(Arena *arena) {
 	GB_ASSERT(arena);
-	MUTEX_GUARD(&arena->mutex);
+	GB_ASSERT(arena->parent_thread == get_current_thread());
 
 	ArenaTemp temp = {};
 	temp.arena = arena;
@@ -275,7 +287,7 @@ ArenaTemp arena_temp_begin(Arena *arena) {
 void arena_temp_end(ArenaTemp const &temp) {
 	GB_ASSERT(temp.arena);
 	Arena *arena = temp.arena;
-	MUTEX_GUARD(&arena->mutex);
+	GB_ASSERT(arena->parent_thread == get_current_thread());
 
 	if (temp.block) {
 		bool memory_block_found = false;
@@ -311,7 +323,7 @@ void arena_temp_end(ArenaTemp const &temp) {
 void arena_temp_ignore(ArenaTemp const &temp) {
 	GB_ASSERT(temp.arena);
 	Arena *arena = temp.arena;
-	MUTEX_GUARD(&arena->mutex);
+	GB_ASSERT(arena->parent_thread == get_current_thread());
 
 	GB_ASSERT_MSG(arena->temp_count > 0, "double-use of arena_temp_end");
 	arena->temp_count -= 1;
@@ -379,8 +391,6 @@ enum ThreadArenaKind : uintptr {
 gb_global Arena default_permanent_arena = {nullptr, DEFAULT_MINIMUM_BLOCK_SIZE};
 gb_global Arena default_temporary_arena = {nullptr, DEFAULT_MINIMUM_BLOCK_SIZE};
 
-
-gb_internal Thread *get_current_thread(void);
 
 gb_internal Arena *get_arena(ThreadArenaKind kind) {
 	Thread *t = get_current_thread();
