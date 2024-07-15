@@ -878,10 +878,8 @@ gb_internal gb_inline bool is_ast_when_stmt(Ast *node) {
 	return node->kind == Ast_WhenStmt;
 }
 
-gb_global gb_thread_local Arena global_thread_local_ast_arena = {};
-
 gb_internal gb_inline gbAllocator ast_allocator(AstFile *f) {
-	return arena_allocator(&global_thread_local_ast_arena);
+	return permanent_allocator();
 }
 
 gb_internal Ast *alloc_ast_node(AstFile *f, AstKind kind);

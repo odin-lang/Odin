@@ -118,7 +118,7 @@ gb_internal isize ast_node_size(AstKind kind) {
 gb_internal Ast *alloc_ast_node(AstFile *f, AstKind kind) {
 	isize size = ast_node_size(kind);
 
-	Ast *node = cast(Ast *)arena_alloc(&global_thread_local_ast_arena, size, 16);
+	Ast *node = cast(Ast *)arena_alloc(get_arena(ThreadArena_Permanent), size, 16);
 	node->kind = kind;
 	node->file_id = f ? f->id : 0;
 

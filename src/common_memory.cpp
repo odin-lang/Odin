@@ -45,7 +45,7 @@ struct MemoryBlock {
 struct Arena {
 	MemoryBlock * curr_block;
 	isize         minimum_block_size;
-	BlockingMutex mutex;
+	// BlockingMutex mutex;
 	isize         temp_count;
 	Thread *      parent_thread;
 };
@@ -82,12 +82,7 @@ gb_internal void thread_init_arenas(Thread *t) {
 
 gb_internal void *arena_alloc(Arena *arena, isize min_size, isize alignment) {
 	GB_ASSERT(gb_is_power_of_two(alignment));
-	
-	if (arena->parent_thread == nullptr) {
-		mutex_lock(&arena->mutex);
-	} else {
-		GB_ASSERT(arena->parent_thread == get_current_thread());
-	}
+	GB_ASSERT(arena->parent_thread == get_current_thread());
 
 	isize size = 0;
 	if (arena->curr_block != nullptr) {
@@ -113,11 +108,7 @@ gb_internal void *arena_alloc(Arena *arena, isize min_size, isize alignment) {
 	
 	curr_block->used += size;
 	GB_ASSERT(curr_block->used <= curr_block->size);
-	
-	if (arena->parent_thread == nullptr) {
-		mutex_unlock(&arena->mutex);
-	}
-	
+
 	// NOTE(bill): memory will be zeroed by default due to virtual memory 
 	return ptr;	
 }
