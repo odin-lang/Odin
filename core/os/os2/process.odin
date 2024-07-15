@@ -13,20 +13,12 @@ TIMEOUT_INFINITE :: time.MIN_DURATION // Note(flysand): Any negative duration wi
 
 /*
 	Arguments to the current process.
-
-	See `get_args()` for description of the slice.
 */
 args := get_args()
 
-/*
-	Obtain the process argument array from the OS.
-
-	Slice, containing arguments to the current process. Each element of the
-	slice contains a single argument. The first element of the slice would
-	typically is the path to the currently running executable.
-*/
+@(private="file")
 get_args :: proc() -> []string {
-	result := make([]string, len(runtime.args__), allocator = context.allocator)
+	result := make([]string, len(runtime.args__), heap_allocator())
 	for rt_arg, i in runtime.args__ {
 		result[i] = cast(string) rt_arg
 	}
