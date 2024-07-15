@@ -122,11 +122,11 @@ Type_Info_Struct_Flag :: enum u8 {
 
 Type_Info_Struct :: struct {
 	// Slice these with `field_count`
-	types:   [^]^Type_Info,
-	names:   [^]string,
-	offsets: [^]uintptr,
-	usings:  [^]bool,
-	tags:    [^]string,
+	types:   [^]^Type_Info `fmt:"v,field_count"`,
+	names:   [^]string     `fmt:"v,field_count"`,
+	offsets: [^]uintptr    `fmt:"v,field_count"`,
+	usings:  [^]bool       `fmt:"v,field_count"`,
+	tags:    [^]string     `fmt:"v,field_count"`,
 
 	field_count: i32,
 
@@ -196,11 +196,11 @@ Type_Info_Soa_Pointer :: struct {
 }
 Type_Info_Bit_Field :: struct {
 	backing_type: ^Type_Info,
-	names:        [^]string,
-	types:        [^]^Type_Info,
-	bit_sizes:    [^]uintptr,
-	bit_offsets:  [^]uintptr,
-	tags:         [^]string,
+	names:        [^]string     `fmt:"v,field_count"`,
+	types:        [^]^Type_Info `fmt:"v,field_count"`,
+	bit_sizes:    [^]uintptr    `fmt:"v,field_count"`,
+	bit_offsets:  [^]uintptr    `fmt:"v,field_count"`,
+	tags:         [^]string     `fmt:"v,field_count"`,
 	field_count:  int,
 }
 
