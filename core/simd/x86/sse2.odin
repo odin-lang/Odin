@@ -144,19 +144,26 @@ _mm_subs_epu16 :: #force_inline proc "c" (a, b: __m128i) -> __m128i {
 _mm_slli_si128_impl :: #force_inline proc "c" (a: __m128i, $IMM8: u32) -> __m128i {
 	shift :: IMM8 & 0xff
 
+	// This needs to emit behavior identical to PSLLDQ which is as follows:
+	//
+	// TEMP := COUNT
+	// IF (TEMP > 15) THEN TEMP := 16; FI
+	// DEST := DEST << (TEMP * 8)
+	// DEST[MAXVL-1:128] (Unmodified)
+
 	return transmute(__m128i)simd.shuffle(
-		transmute(i8x16)a,
 		i8x16(0),
-		0  when shift > 15 else (16 - shift + 0),
-		1  when shift > 15 else (16 - shift + 1),
-		2  when shift > 15 else (16 - shift + 2),
-		3  when shift > 15 else (16 - shift + 3),
-		4  when shift > 15 else (16 - shift + 4),
-		5  when shift > 15 else (16 - shift + 5),
-		6  when shift > 15 else (16 - shift + 6),
-		7  when shift > 15 else (16 - shift + 7),
-		8  when shift > 15 else (16 - shift + 8),
-		9  when shift > 15 else (16 - shift + 9),
+		transmute(i8x16)a,
+		0 when shift > 15 else (16 - shift + 0),
+		1 when shift > 15 else (16 - shift + 1),
+		2 when shift > 15 else (16 - shift + 2),
+		3 when shift > 15 else (16 - shift + 3),
+		4 when shift > 15 else (16 - shift + 4),
+		5 when shift > 15 else (16 - shift + 5),
+		6 when shift > 15 else (16 - shift + 6),
+		7 when shift > 15 else (16 - shift + 7),
+		8 when shift > 15 else (16 - shift + 8),
+		9 when shift > 15 else (16 - shift + 9),
 		10 when shift > 15 else (16 - shift + 10),
 		11 when shift > 15 else (16 - shift + 11),
 		12 when shift > 15 else (16 - shift + 12),
@@ -435,7 +442,7 @@ _mm_store_si128 :: #force_inline proc "c" (mem_addr: ^__m128i, a: __m128i) {
 }
 @(enable_target_feature="sse2")
 _mm_storeu_si128 :: #force_inline proc "c" (mem_addr: ^__m128i, a: __m128i) {
-	storeudq(mem_addr, a)
+	intrinsics.unaligned_store(mem_addr, a)
 }
 @(enable_target_feature="sse2")
 _mm_storel_epi64 :: #force_inline proc "c" (mem_addr: ^__m128i, a: __m128i) {
@@ -1178,8 +1185,6 @@ foreign _ {
 	cvttsd2si  :: proc(a: __m128d) -> i32 ---
 	@(link_name="llvm.x86.sse2.cvttps2dq")
 	cvttps2dq  :: proc(a: __m128) -> i32x4 ---
-	@(link_name="llvm.x86.sse2.storeu.dq")
-	storeudq   :: proc(mem_addr: rawptr, a: __m128i) ---
 	@(link_name="llvm.x86.sse2.storeu.pd")
 	storeupd   :: proc(mem_addr: rawptr, a: __m128d) ---
 

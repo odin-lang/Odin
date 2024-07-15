@@ -24,38 +24,6 @@ bld/
 ![Cc]ore/[Ll]og/
 tests/documentation/verify/
 tests/documentation/all.odin-doc
-tests/internal/test_map
-tests/internal/test_pow
-tests/internal/test_rtti
-tests/core/test_base64
-tests/core/test_cbor
-tests/core/test_core_compress
-tests/core/test_core_container
-tests/core/test_core_filepath
-tests/core/test_core_fmt
-tests/core/test_core_i18n
-tests/core/test_core_image
-tests/core/test_core_libc
-tests/core/test_core_match
-tests/core/test_core_math
-tests/core/test_core_net
-tests/core/test_core_os_exit
-tests/core/test_core_reflect
-tests/core/test_core_strings
-tests/core/test_core_time
-tests/core/test_crypto
-tests/core/test_hash
-tests/core/test_hex
-tests/core/test_hxa
-tests/core/test_json
-tests/core/test_linalg_glsl_math
-tests/core/test_noise
-tests/core/test_varint
-tests/core/test_xml
-tests/core/test_core_slice
-tests/core/test_core_thread
-tests/core/test_core_runtime
-tests/vendor/vendor_botan
 # Visual Studio 2015 cache/options directory
 .vs/
 # Visual Studio Code options directory
@@ -63,6 +31,7 @@ tests/vendor/vendor_botan
 # Uncomment if you have tasks that create the project's static files in wwwroot
 #wwwroot/
 demo
+benchmark
 
 # MSTest test Results
 [Tt]est[Rr]esult*/

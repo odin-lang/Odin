@@ -58,9 +58,9 @@ test_sqrt_ratio_m1 :: proc(t: ^testing.T) {
 		v_bytes, _ := hex.decode(transmute([]byte)(v.v), context.temp_allocator)
 		r_bytes, _ := hex.decode(transmute([]byte)(v.r), context.temp_allocator)
 
-		u_ := transmute(^[32]byte)(raw_data(u_bytes))
-		v_ := transmute(^[32]byte)(raw_data(v_bytes))
-		r_ := transmute(^[32]byte)(raw_data(r_bytes))
+		u_ := (^[32]byte)(raw_data(u_bytes))
+		v_ := (^[32]byte)(raw_data(v_bytes))
+		r_ := (^[32]byte)(raw_data(r_bytes))
 
 		u, vee, r: field.Tight_Field_Element
 		field.fe_from_bytes(&u, u_)

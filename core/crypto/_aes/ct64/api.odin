@@ -7,9 +7,8 @@ STRIDE :: 4
 
 // Context is a keyed AES (ECB) instance.
 Context :: struct {
-	_sk_exp:         [120]u64,
-	_num_rounds:     int,
-	_is_initialized: bool,
+	_sk_exp:     [120]u64,
+	_num_rounds: int,
 }
 
 // init initializes a context for AES with the provided key.
@@ -18,13 +17,10 @@ init :: proc(ctx: ^Context, key: []byte) {
 
 	ctx._num_rounds = keysched(skey[:], key)
 	skey_expand(ctx._sk_exp[:], skey[:], ctx._num_rounds)
-	ctx._is_initialized = true
 }
 
 // encrypt_block sets `dst` to `AES-ECB-Encrypt(src)`.
 encrypt_block :: proc(ctx: ^Context, dst, src: []byte) {
-	assert(ctx._is_initialized)
-
 	q: [8]u64
 	load_blockx1(&q, src)
 	_encrypt(&q, ctx._sk_exp[:], ctx._num_rounds)
@@ -33,8 +29,6 @@ encrypt_block :: proc(ctx: ^Context, dst, src: []byte) {
 
 // encrypt_block sets `dst` to `AES-ECB-Decrypt(src)`.
 decrypt_block :: proc(ctx: ^Context, dst, src: []byte) {
-	assert(ctx._is_initialized)
-
 	q: [8]u64
 	load_blockx1(&q, src)
 	_decrypt(&q, ctx._sk_exp[:], ctx._num_rounds)
@@ -43,8 +37,6 @@ decrypt_block :: proc(ctx: ^Context, dst, src: []byte) {
 
 // encrypt_blocks sets `dst` to `AES-ECB-Encrypt(src[0], .. src[n])`.
 encrypt_blocks :: proc(ctx: ^Context, dst, src: [][]byte) {
-	assert(ctx._is_initialized)
-
 	q: [8]u64 = ---
 	src, dst := src, dst
 
@@ -67,8 +59,6 @@ encrypt_blocks :: proc(ctx: ^Context, dst, src: [][]byte) {
 
 // decrypt_blocks sets dst to `AES-ECB-Decrypt(src[0], .. src[n])`.
 decrypt_blocks :: proc(ctx: ^Context, dst, src: [][]byte) {
-	assert(ctx._is_initialized)
-
 	q: [8]u64 = ---
 	src, dst := src, dst
 

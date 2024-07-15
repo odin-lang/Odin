@@ -29,6 +29,32 @@ benchmark_crypto :: proc(t: ^testing.T) {
 	}
 
 	{
+		name := "AES256-CTR 64 bytes"
+		options := &time.Benchmark_Options {
+			rounds = 1_000,
+			bytes = 64,
+			setup = _setup_sized_buf,
+			bench = _benchmark_aes256_ctr,
+			teardown = _teardown_sized_buf,
+		}
+
+		err := time.benchmark(options, context.allocator)
+		testing.expect(t, err == nil, name)
+		benchmark_print(&str, name, options)
+
+		name = "AES256-CTR 1024 bytes"
+		options.bytes = 1024
+		err = time.benchmark(options, context.allocator)
+		testing.expect(t, err == nil, name)
+		benchmark_print(&str, name, options)
+
+		name = "AES256-CTR 65536 bytes"
+		options.bytes = 65536
+		err = time.benchmark(options, context.allocator)
+		testing.expect(t, err == nil, name)
+		benchmark_print(&str, name, options)
+	}
+	{
 		name := "ChaCha20 64 bytes"
 		options := &time.Benchmark_Options {
 			rounds = 1_000,
@@ -317,6 +343,36 @@ _benchmark_chacha20poly1305 :: proc(
 
 	for _ in 0 ..= options.rounds {
 		chacha20poly1305.encrypt(buf, tag[:], key[:], nonce[:], nil, buf)
+	}
+	options.count = options.rounds
+	options.processed = options.rounds * options.bytes
+	return nil
+}
+
+@(private)
+_benchmark_aes256_ctr :: proc(
+	options: ^time.Benchmark_Options,
+	allocator := context.allocator,
+) -> (
+	err: time.Benchmark_Error,
+) {
+	buf := options.input
+	key := [aes.KEY_SIZE_256]byte {
+		0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef,
+		0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef,
+		0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef,
+		0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef,
+	}
+	nonce := [aes.CTR_IV_SIZE]byte {
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	}
+
+	ctx: aes.Context_CTR = ---
+	aes.init_ctr(&ctx, key[:], nonce[:])
+
+	for _ in 0 ..= options.rounds {
+		aes.xor_bytes_ctr(&ctx, buf, buf)
 	}
 	options.count = options.rounds
 	options.processed = options.rounds * options.bytes
