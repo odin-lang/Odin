@@ -440,6 +440,8 @@ struct BuildContext {
 	bool   cached;
 	BuildCacheData build_cache_data;
 
+	bool internal_no_inline;
+
 	bool   no_threaded_checker;
 
 	bool   show_debug_messages;

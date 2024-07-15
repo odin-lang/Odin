@@ -9947,8 +9947,12 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 		}
 		Type *et = base_type(t->BitSet.elem);
 		isize field_count = 0;
-		if (et->kind == Type_Enum) {
+		if (et != nullptr && et->kind == Type_Enum) {
 			field_count = et->Enum.fields.count;
+		}
+
+		if (is_type_array(bit_set_to_int(t))) {
+			is_constant = false;
 		}
 
 		if (cl->elems[0]->kind == Ast_FieldValue) {

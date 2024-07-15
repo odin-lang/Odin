@@ -159,6 +159,11 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 	case ProcInlining_no_inline:
 		lb_add_attribute_to_proc(m, p->value, "noinline");
 		break;
+	default:
+		if (build_context.internal_no_inline) {
+			lb_add_attribute_to_proc(m, p->value, "noinline");
+			break;
+		}
 	}
 
 	switch (entity->Procedure.optimization_mode) {

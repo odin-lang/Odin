@@ -2011,11 +2011,32 @@ gb_internal bool is_type_valid_bit_set_elem(Type *t) {
 	return false;
 }
 
+
+gb_internal bool is_valid_bit_field_backing_type(Type *type) {
+	if (type == nullptr) {
+		return false;
+	}
+	type = base_type(type);
+	if (is_type_untyped(type)) {
+		return false;
+	}
+	if (is_type_integer(type)) {
+		return true;
+	}
+	if (type->kind == Type_Array) {
+		return is_type_integer(type->Array.elem);
+	}
+	return false;
+}
+
 gb_internal Type *bit_set_to_int(Type *t) {
 	GB_ASSERT(is_type_bit_set(t));
 	Type *bt = base_type(t);
 	Type *underlying = bt->BitSet.underlying;
 	if (underlying != nullptr && is_type_integer(underlying)) {
+		return underlying;
+	}
+	if (underlying != nullptr && is_valid_bit_field_backing_type(underlying)) {
 		return underlying;
 	}
 
