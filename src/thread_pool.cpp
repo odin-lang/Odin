@@ -3,7 +3,10 @@
 struct WorkerTask;
 struct ThreadPool;
 
-gb_thread_local Thread *current_thread;
+gb_global gb_thread_local Thread *current_thread;
+gb_internal Thread *get_current_thread(void) {
+	return current_thread;
+}
 
 gb_internal void thread_pool_init(ThreadPool *pool, isize worker_count, char const *worker_name);
 gb_internal void thread_pool_destroy(ThreadPool *pool);

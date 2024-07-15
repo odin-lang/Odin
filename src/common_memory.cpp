@@ -66,6 +66,14 @@ gb_internal isize arena_align_forward_offset(Arena *arena, isize alignment) {
 	return alignment_offset;
 }
 
+gb_internal void thread_init_arenas(Thread *t) {
+	t->permanent_arena = gb_alloc_item(heap_allocator(), Arena);
+	t->temporary_arena = gb_alloc_item(heap_allocator(), Arena);
+
+	t->permanent_arena->minimum_block_size = DEFAULT_MINIMUM_BLOCK_SIZE;
+	t->temporary_arena->minimum_block_size = DEFAULT_MINIMUM_BLOCK_SIZE;
+}
+
 gb_internal void *arena_alloc(Arena *arena, isize min_size, isize alignment) {
 	GB_ASSERT(gb_is_power_of_two(alignment));
 	
@@ -363,14 +371,67 @@ gb_internal GB_ALLOCATOR_PROC(arena_allocator_proc) {
 }
 
 
-gb_global gb_thread_local Arena permanent_arena = {nullptr, DEFAULT_MINIMUM_BLOCK_SIZE};
-gb_internal gbAllocator permanent_allocator() {
-	return arena_allocator(&permanent_arena);
+enum ThreadArenaKind : uintptr {
+	ThreadArena_Permanent,
+	ThreadArena_Temporary,
+};
+
+gb_global Arena default_permanent_arena = {nullptr, DEFAULT_MINIMUM_BLOCK_SIZE};
+gb_global Arena default_temporary_arena = {nullptr, DEFAULT_MINIMUM_BLOCK_SIZE};
+
+
+gb_internal Thread *get_current_thread(void);
+
+gb_internal Arena *get_arena(ThreadArenaKind kind) {
+	Thread *t = get_current_thread();
+	switch (kind) {
+	case ThreadArena_Permanent: return t ? t->permanent_arena : &default_permanent_arena;
+	case ThreadArena_Temporary: return t ? t->temporary_arena : &default_temporary_arena;
+	}
+	GB_PANIC("INVALID ARENA KIND");
+	return nullptr;
 }
 
-gb_global gb_thread_local Arena temporary_arena = {nullptr, DEFAULT_MINIMUM_BLOCK_SIZE};
+
+
+gb_internal GB_ALLOCATOR_PROC(thread_arena_allocator_proc) {
+	void *ptr = nullptr;
+	ThreadArenaKind kind = cast(ThreadArenaKind)cast(uintptr)allocator_data;
+	Arena *arena = get_arena(kind);
+
+	switch (type) {
+	case gbAllocation_Alloc:
+		ptr = arena_alloc(arena, size, alignment);
+		break;
+	case gbAllocation_Free:
+		break;
+	case gbAllocation_Resize:
+		if (size == 0) {
+			ptr = nullptr;
+		} else if (size <= old_size) {
+			ptr = old_memory;
+		} else {
+			ptr = arena_alloc(arena, size, alignment);
+			gb_memmove(ptr, old_memory, old_size);
+		}
+		break;
+	case gbAllocation_FreeAll:
+		GB_PANIC("use arena_free_all directly");
+		arena_free_all(arena);
+		break;
+	}
+
+	return ptr;
+}
+
+
+
+gb_internal gbAllocator permanent_allocator() {
+	return {thread_arena_allocator_proc, cast(void *)cast(uintptr)ThreadArena_Permanent};
+}
+
 gb_internal gbAllocator temporary_allocator() {
-	return arena_allocator(&temporary_arena);
+	return {thread_arena_allocator_proc, cast(void *)cast(uintptr)ThreadArena_Permanent};
 }
 
 
@@ -378,7 +439,7 @@ gb_internal gbAllocator temporary_allocator() {
 
 
 // #define TEMPORARY_ALLOCATOR_GUARD()
-#define TEMPORARY_ALLOCATOR_GUARD() TEMP_ARENA_GUARD(&temporary_arena)
+#define TEMPORARY_ALLOCATOR_GUARD() TEMP_ARENA_GUARD(get_arena(ThreadArena_Temporary))
 #define PERMANENT_ALLOCATOR_GUARD()
 
 

@@ -70,6 +70,9 @@ struct Thread {
 
 	struct TaskQueue   queue;
 	struct ThreadPool *pool;
+
+	struct Arena *permanent_arena;
+	struct Arena *temporary_arena;
 };
 
 typedef std::atomic<i32> Futex;
@@ -560,17 +563,19 @@ gb_internal void *internal_thread_proc(void *arg) {
 }
 #endif
 
-TaskRingBuffer *task_ring_init(isize size) {
+gb_internal TaskRingBuffer *task_ring_init(isize size) {
 	TaskRingBuffer *ring = gb_alloc_item(heap_allocator(), TaskRingBuffer);
 	ring->size = size;
 	ring->buffer = gb_alloc_array(heap_allocator(), WorkerTask, ring->size);
 	return ring;
 }
 
-void thread_queue_destroy(TaskQueue *q) {
+gb_internal void thread_queue_destroy(TaskQueue *q) {
 	gb_free(heap_allocator(), (*q->ring).buffer);
 	gb_free(heap_allocator(), q->ring);
 }
+
+gb_internal void thread_init_arenas(Thread *t);
 
 gb_internal void thread_init(ThreadPool *pool, Thread *t, isize idx) {
 	gb_zero_item(t);
@@ -584,6 +589,8 @@ gb_internal void thread_init(ThreadPool *pool, Thread *t, isize idx) {
 	t->queue.ring = task_ring_init(1 << 14);
 	t->pool = pool;
 	t->idx = idx;
+
+	thread_init_arenas(t);
 }
 
 gb_internal void thread_init_and_start(ThreadPool *pool, Thread *t, isize idx) {
