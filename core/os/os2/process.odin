@@ -131,7 +131,7 @@ Process_Info_Field :: enum {
 	Command_Args,
 	Environment,
 	Username,
-	CWD,
+	Working_Dir,
 }
 
 /*
@@ -159,7 +159,7 @@ Process_Info :: struct {
 	// The username of the user who started the process.
 	username: string,
 	// The current working directory of the process.
-	cwd: string,
+	working_dir: string,
 }
 
 /*
@@ -244,7 +244,7 @@ free_process_info :: proc(pi: Process_Info, allocator: runtime.Allocator) {
 		delete(s, allocator)
 	}
 	delete(pi.environment, allocator)
-	delete(pi.cwd, allocator)
+	delete(pi.working_dir, allocator)
 }
 
 /*
@@ -288,8 +288,10 @@ process_open :: proc(pid: int, flags := Process_Open_Flags {}) -> (Process, Erro
 Process_Desc :: struct {
 	// OS-specific attributes.
 	sys_attr: _Sys_Process_Attributes,
-	// The working directory of the process.
-	dir: string,
+	// The working directory of the process. If the string has length 0, the
+	// working directory is assumed to be the current working directory of the
+	// current process.
+	working_dir: string,
 	// The command to run. Each element of the slice is a separate argument to
 	// the process. The first element of the slice would be the executable.
 	command: []string,
@@ -329,7 +331,8 @@ Process_Desc :: struct {
 	the function returns an error, an invalid handle is returned.
 
 	This procedure is not thread-safe. It may alter the inheritance properties
-	of file handles.
+	of file handles in an unpredictable manner. In case multiple threads change
+	handle inheritance properties, make sure to serialize all those calls.
 */
 process_start :: proc(desc := Process_Desc {}) -> (Process, Error) {
 	return _process_start(desc)

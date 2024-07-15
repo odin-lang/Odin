@@ -79,7 +79,7 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 	need_peb := \
 		.Command_Line in selection ||
 		.Environment in selection ||
-		.CWD in selection
+		.Working_Dir in selection
 	need_process_handle := need_peb || .Username in selection
 	// Data obtained from process snapshots
 	if need_snapprocess {
@@ -122,6 +122,8 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 		windows.CloseHandle(ph)
 	}
 	if need_peb {
+		// TODO(flysand): This was not tested with WOW64 or 32-bit processes,
+		// might need to be revised later when issues occur.
 		ntdll_lib := windows.LoadLibraryW(windows.L("ntdll.dll"))
 		if ntdll_lib == nil {
 			err = _get_platform_error()
@@ -206,7 +208,7 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 			info.fields |= {.Environment}
 			info.environment = envs
 		}
-		if .CWD in selection {
+		if .Working_Dir in selection {
 			TEMP_ALLOCATOR_GUARD()
 			cwd_w := make([]u16, process_params.CurrentDirectoryPath.Length, temp_allocator())
 			if !read_slice(ph, process_params.CurrentDirectoryPath.Buffer, cwd_w, &bytes_read) {
@@ -218,8 +220,8 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 				err = cwd_err
 				return
 			}
-			info.fields |= {.CWD}
-			info.cwd = cwd
+			info.fields |= {.Working_Dir}
+			info.working_dir = cwd
 		}
 	}
 	if .Username in selection {
@@ -249,7 +251,7 @@ _process_info_by_handle :: proc(process: Process, selection: Process_Info_Fields
 	need_peb := \
 		.Command_Line in selection ||
 		.Environment in selection ||
-		.CWD in selection
+		.Working_Dir in selection
 	// Data obtained from process snapshots
 	if need_snapprocess {
 		entry, entry_err := _process_entry_by_pid(info.pid)
@@ -361,7 +363,7 @@ _process_info_by_handle :: proc(process: Process, selection: Process_Info_Fields
 			info.fields |= {.Environment}
 			info.environment = envs
 		}
-		if .CWD in selection {
+		if .Working_Dir in selection {
 			TEMP_ALLOCATOR_GUARD()
 			cwd_w := make([]u16, process_params.CurrentDirectoryPath.Length, temp_allocator())
 			if !read_slice(ph, process_params.CurrentDirectoryPath.Buffer, cwd_w, &bytes_read) {
@@ -373,8 +375,8 @@ _process_info_by_handle :: proc(process: Process, selection: Process_Info_Fields
 				err = cwd_err
 				return
 			}
-			info.fields |= {.CWD}
-			info.cwd = cwd
+			info.fields |= {.Working_Dir}
+			info.working_dir = cwd
 		}
 	}
 	if .Username in selection {
@@ -463,11 +465,18 @@ _current_process_info :: proc(selection: Process_Info_Fields, allocator: runtime
 		info.fields += {.Username}
 		info.username = username
 	}
+	if .Working_Dir in selection {
+		// TODO(flysand): Implement this by reading PEB
+		err = .Mode_Not_Implemented
+		return
+	}
 	err = nil
 	return
 }
 
 _process_open :: proc(pid: int, flags: Process_Open_Flags) -> (Process, Error) {
+	// Note(flysand): The handle will be used for querying information so we
+	// take the necessary permissions right away.
 	dwDesiredAccess := windows.PROCESS_QUERY_LIMITED_INFORMATION | windows.SYNCHRONIZE
 	if .Mem_Read in flags {
 		dwDesiredAccess |= windows.PROCESS_VM_READ
@@ -505,10 +514,17 @@ _process_start :: proc(desc: Process_Desc) -> (Process, Error) {
 	stdout_handle := windows.GetStdHandle(windows.STD_OUTPUT_HANDLE)
 	stdin_handle := windows.GetStdHandle(windows.STD_INPUT_HANDLE)
 	if desc.stdout != nil {
-		stdout_handle = windows.HANDLE(desc.stdout.impl.fd)
+		stdout_handle = windows.HANDLE((^File_Impl)(desc.stdout.impl).fd)
 	}
 	if desc.stderr != nil {
-		stderr_handle = windows.HANDLE(desc.stderr.impl.fd)
+		stderr_handle = windows.HANDLE((^File_Impl)(desc.stderr.impl).fd)
+	}
+	if desc.stdin != nil {
+		stdin_handle = windows.HANDLE((^File_Impl)(desc.stderr.impl).fd)
+	}
+	working_dir_w := windows.wstring(nil)
+	if len(desc.working_dir) > 0 {
+		working_dir_w = windows.utf8_to_wstring(desc.working_dir, temp_allocator())
 	}
 	process_info: windows.PROCESS_INFORMATION = ---
 	process_ok := windows.CreateProcessW(
@@ -519,7 +535,7 @@ _process_start :: proc(desc: Process_Desc) -> (Process, Error) {
 		true,
 		windows.CREATE_UNICODE_ENVIRONMENT|windows.NORMAL_PRIORITY_CLASS,
 		raw_data(environment_block_w),
-		nil,
+		working_dir_w,
 		&windows.STARTUPINFOW {
 			cb = size_of(windows.STARTUPINFOW),
 			hStdError = stderr_handle,
@@ -578,6 +594,10 @@ _process_close :: proc(process: Process) -> (Error) {
 }
 
 _process_kill :: proc(process: Process) -> (Error) {
+	// Note(flysand): This is different than what the task manager's "kill process"
+	// functionality does, as we don't try to send WM_CLOSE message first. This
+	// is quite a rough way to kill the process, which should be consistent with
+	// linux. The error code 9 is to mimic SIGKILL event.
 	if !windows.TerminateProcess(windows.HANDLE(process.handle), 9) {
 		return _get_platform_error()
 	}
