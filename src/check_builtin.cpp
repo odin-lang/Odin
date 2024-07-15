@@ -4261,6 +4261,8 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 	case BuiltinProc_overflow_add:
 	case BuiltinProc_overflow_sub:
 	case BuiltinProc_overflow_mul:
+	case BuiltinProc_add_sat:
+	case BuiltinProc_sub_sat:
 		{
 			Operand x = {};
 			Operand y = {};

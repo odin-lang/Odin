@@ -70,6 +70,9 @@ enum BuiltinProcId {
 	BuiltinProc_overflow_sub,
 	BuiltinProc_overflow_mul,
 
+	BuiltinProc_add_sat,
+	BuiltinProc_sub_sat,
+
 	BuiltinProc_sqrt,
 	BuiltinProc_fused_mul_add,
 
@@ -392,6 +395,9 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("overflow_add"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("overflow_sub"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("overflow_mul"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+
+	{STR_LIT("add_sat"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("sub_sat"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("sqrt"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("fused_mul_add"), 3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
