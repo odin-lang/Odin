@@ -372,6 +372,22 @@ test_odin_value_export :: proc(t: ^testing.T) {
 	}
 }
 
+@(test)
+leaking_struct_tag :: proc(t: ^testing.T) {
+	My_Struct :: struct {
+		names:      [^]string `fmt:"v,name_count"`,
+		name_count: int,
+	}
+
+	name := "hello?"
+	foo := My_Struct {
+		names = &name,
+		name_count = 1,
+	}
+
+	check(t, "My_Struct{names = [\"hello?\"], name_count = 1}", "%v", foo)
+}
+
 @(private)
 check :: proc(t: ^testing.T, exp: string, format: string, args: ..any, loc := #caller_location) {
 	got := fmt.tprintf(format, ..args)
