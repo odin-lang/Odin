@@ -13,29 +13,32 @@ import "core:simd/x86"
 gcm_seal_hw :: proc(ctx: ^Context_Impl_Hardware, dst, tag, nonce, aad, plaintext: []byte) {
 	h: [_aes.GHASH_KEY_SIZE]byte
 	j0: [_aes.GHASH_BLOCK_SIZE]byte
+	j0_enc: [_aes.GHASH_BLOCK_SIZE]byte
 	s: [_aes.GHASH_TAG_SIZE]byte
-	init_ghash_hw(ctx, &h, &j0, nonce)
+	init_ghash_hw(ctx, &h, &j0, &j0_enc, nonce)
 
 	// Note: Our GHASH implementation handles appending padding.
 	hw_intel.ghash(s[:], h[:], aad)
-	gctr_hw(ctx, dst, &s, plaintext, &h, nonce, true)
-	final_ghash_hw(&s, &h, &j0, len(aad), len(plaintext))
+	gctr_hw(ctx, dst, &s, plaintext, &h, &j0, true)
+	final_ghash_hw(&s, &h, &j0_enc, len(aad), len(plaintext))
 	copy(tag, s[:])
 
 	mem.zero_explicit(&h, len(h))
 	mem.zero_explicit(&j0, len(j0))
+	mem.zero_explicit(&j0_enc, len(j0_enc))
 }
 
 @(private)
 gcm_open_hw :: proc(ctx: ^Context_Impl_Hardware, dst, nonce, aad, ciphertext, tag: []byte) -> bool {
 	h: [_aes.GHASH_KEY_SIZE]byte
 	j0: [_aes.GHASH_BLOCK_SIZE]byte
+	j0_enc: [_aes.GHASH_BLOCK_SIZE]byte
 	s: [_aes.GHASH_TAG_SIZE]byte
-	init_ghash_hw(ctx, &h, &j0, nonce)
+	init_ghash_hw(ctx, &h, &j0, &j0_enc, nonce)
 
 	hw_intel.ghash(s[:], h[:], aad)
-	gctr_hw(ctx, dst, &s, ciphertext, &h, nonce, false)
-	final_ghash_hw(&s, &h, &j0, len(aad), len(ciphertext))
+	gctr_hw(ctx, dst, &s, ciphertext, &h, &j0, false)
+	final_ghash_hw(&s, &h, &j0_enc, len(aad), len(ciphertext))
 
 	ok := crypto.compare_constant_time(s[:], tag) == 1
 	if !ok {
@@ -44,6 +47,7 @@ gcm_open_hw :: proc(ctx: ^Context_Impl_Hardware, dst, nonce, aad, ciphertext, ta
 
 	mem.zero_explicit(&h, len(h))
 	mem.zero_explicit(&j0, len(j0))
+	mem.zero_explicit(&j0_enc, len(j0_enc))
 	mem.zero_explicit(&s, len(s))
 
 	return ok
@@ -54,15 +58,29 @@ init_ghash_hw :: proc(
 	ctx: ^Context_Impl_Hardware,
 	h: ^[_aes.GHASH_KEY_SIZE]byte,
 	j0: ^[_aes.GHASH_BLOCK_SIZE]byte,
+	j0_enc: ^[_aes.GHASH_BLOCK_SIZE]byte,
 	nonce: []byte,
 ) {
 	// 1. Let H = CIPH(k, 0^128)
 	encrypt_block_hw(ctx, h[:], h[:])
 
+	// Define a block, J0, as follows:
+	if l := len(nonce); l == GCM_NONCE_SIZE {
+		// if len(IV) = 96, then let J0 = IV || 0^31 || 1
+		copy(j0[:], nonce)
+		j0[_aes.GHASH_BLOCK_SIZE - 1] = 1
+	} else {
+		// If len(IV) != 96, then let s = 128 ceil(len(IV)/128) - len(IV),
+		// and let J0 = GHASHH(IV || 0^(s+64) || ceil(len(IV))^64).
+		hw_intel.ghash(j0[:], h[:], nonce)
+
+		tmp: [_aes.GHASH_BLOCK_SIZE]byte
+		endian.unchecked_put_u64be(tmp[8:], u64(l) * 8)
+		hw_intel.ghash(j0[:], h[:], tmp[:])
+	}
+
 	// ECB encrypt j0, so that we can just XOR with the tag.
-	copy(j0[:], nonce)
-	j0[_aes.GHASH_BLOCK_SIZE - 1] = 1
-	encrypt_block_hw(ctx, j0[:], j0[:])
+	encrypt_block_hw(ctx, j0_enc[:], j0[:])
 }
 
 @(private = "file", enable_target_feature = "sse2")
@@ -91,7 +109,7 @@ gctr_hw :: proc(
 	s: ^[_aes.GHASH_BLOCK_SIZE]byte,
 	src: []byte,
 	h: ^[_aes.GHASH_KEY_SIZE]byte,
-	nonce: []byte,
+	nonce: ^[_aes.GHASH_BLOCK_SIZE]byte,
 	is_seal: bool,
 ) #no_bounds_check {
 	sks: [15]x86.__m128i = ---
@@ -99,15 +117,9 @@ gctr_hw :: proc(
 		sks[i] = intrinsics.unaligned_load((^x86.__m128i)(&ctx._sk_exp_enc[i]))
 	}
 
-	// 2. Define a block J_0 as follows:
-	//    if len(IV) = 96, then let J0 = IV || 0^31 || 1
-	//
-	// Note: We only support 96 bit IVs.
-	tmp: [BLOCK_SIZE]byte
-	ctr_blk: x86.__m128i
-	copy(tmp[:], nonce)
-	ctr_blk = intrinsics.unaligned_load((^x86.__m128i)(&tmp))
-	ctr: u32 = 2
+	// Setup the counter block
+	ctr_blk := intrinsics.unaligned_load((^x86.__m128i)(nonce))
+	ctr := endian.unchecked_get_u32be(nonce[GCM_NONCE_SIZE:]) + 1
 
 	src, dst := src, dst
 
