@@ -182,8 +182,7 @@ gb_internal void override_entity_in_scope(Entity *original_entity, Entity *new_e
 	original_entity->type = new_entity->type;
 	original_entity->aliased_of = new_entity;
 
-	Ast *empty_ident = nullptr;
-	original_entity->identifier.compare_exchange_strong(empty_ident, new_entity->identifier);
+	original_entity->identifier.store(new_entity->identifier);
 
 	if (original_entity->identifier.load() != nullptr &&
 	    original_entity->identifier.load()->kind == Ast_Ident) {

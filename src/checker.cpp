@@ -384,6 +384,8 @@ gb_internal Entity *scope_lookup_current(Scope *s, String const &name) {
 	return nullptr;
 }
 
+gb_global bool in_single_threaded_mode_scopes = false;
+
 gb_internal void scope_lookup_parent(Scope *scope, String const &name, Scope **scope_, Entity **entity_) {
 	if (scope != nullptr) {
 		bool gone_thru_proc = false;
@@ -391,9 +393,9 @@ gb_internal void scope_lookup_parent(Scope *scope, String const &name, Scope **s
 		StringHashKey key = string_hash_string(name);
 		for (Scope *s = scope; s != nullptr; s = s->parent) {
 			Entity **found = nullptr;
-			rw_mutex_shared_lock(&s->mutex);
+			if (!in_single_threaded_mode_scopes) rw_mutex_shared_lock(&s->mutex);
 			found = string_map_get(&s->elements, key);
-			rw_mutex_shared_unlock(&s->mutex);
+			if (!in_single_threaded_mode_scopes) rw_mutex_shared_unlock(&s->mutex);
 			if (found) {
 				Entity *e = *found;
 				if (gone_thru_proc) {
@@ -513,7 +515,11 @@ end:;
 
 gb_internal Entity *scope_insert(Scope *s, Entity *entity) {
 	String name = entity->token.string;
-	return scope_insert_with_name(s, name, entity);
+	if (in_single_threaded_mode_scopes) {
+		return scope_insert_with_name_no_mutex(s, name, entity);
+	} else {
+		return scope_insert_with_name(s, name, entity);
+	}
 }
 
 gb_internal Entity *scope_insert_no_mutex(Scope *s, Entity *entity) {
@@ -1795,8 +1801,7 @@ gb_internal void add_entity_use(CheckerContext *c, Ast *identifier, Entity *enti
 	if (identifier == nullptr || identifier->kind != Ast_Ident) {
 		return;
 	}
-	Ast *empty_ident = nullptr;
-	entity->identifier.compare_exchange_strong(empty_ident, identifier);
+	entity->identifier.store(identifier);
 
 	identifier->Ident.entity = entity;
 
@@ -4591,6 +4596,8 @@ gb_internal void check_single_global_entity(Checker *c, Entity *e, DeclInfo *d) 
 }
 
 gb_internal void check_all_global_entities(Checker *c) {
+	in_single_threaded_mode_scopes = true;
+
 	// NOTE(bill): This must be single threaded
 	// Don't bother trying
 	for_array(i, c->info.entities) {
@@ -4610,6 +4617,8 @@ gb_internal void check_all_global_entities(Checker *c) {
 			(void)type_align_of(e->type);
 		}
 	}
+
+	in_single_threaded_mode_scopes = false;
 }
 
 
