@@ -3488,12 +3488,16 @@ gb_internal lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr) {
 						}
 
 						lbValue base_array_ptr = p->variadic_reuse_base_array_ptr.addr;
-						if (d != nullptr && base_array_ptr.value == nullptr) {
-							i64 max_bytes = d->variadic_reuse_max_bytes;
-							i64 max_align = gb_max(d->variadic_reuse_max_align, 16);
-							p->variadic_reuse_base_array_ptr = lb_add_local_generated(p, alloc_type_array(t_u8, max_bytes), true);
-							lb_try_update_alignment(p->variadic_reuse_base_array_ptr.addr, cast(unsigned)max_align);
-							base_array_ptr = p->variadic_reuse_base_array_ptr.addr;
+						if (base_array_ptr.value == nullptr) {
+							if (d != nullptr) {
+								i64 max_bytes = d->variadic_reuse_max_bytes;
+								i64 max_align = gb_max(d->variadic_reuse_max_align, 16);
+								p->variadic_reuse_base_array_ptr = lb_add_local_generated(p, alloc_type_array(t_u8, max_bytes), true);
+								lb_try_update_alignment(p->variadic_reuse_base_array_ptr.addr, cast(unsigned)max_align);
+								base_array_ptr = p->variadic_reuse_base_array_ptr.addr;
+							} else {
+								base_array_ptr = lb_add_local_generated(p, alloc_type_array(elem_type, slice_len), true).addr;
+							}
 						}
 
 						if (slice.addr.value == nullptr) {
