@@ -4955,10 +4955,6 @@ gb_internal lbAddr lb_build_addr_compound_lit(lbProcedure *p, Ast *expr) {
 				for (Ast *elem : cl->elems) {
 					GB_ASSERT(elem->kind != Ast_FieldValue);
 
-					if (lb_is_elem_const(elem, et)) {
-						continue;
-					}
-
 					lbValue expr = lb_build_expr(p, elem);
 					GB_ASSERT(expr.type->kind != Type_Tuple);
 
