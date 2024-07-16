@@ -2290,9 +2290,6 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 		{
 			Type *main_type = tv.type;
 			Type *type = main_type;
-			if (is_type_tuple(main_type)) {
-				type = main_type->Tuple.variables[0]->type;
-			}
 
 			lbValue x = lb_build_expr(p, ce->args[0]);
 			lbValue y = lb_build_expr(p, ce->args[1]);
