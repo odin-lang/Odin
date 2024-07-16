@@ -618,7 +618,7 @@ shuffle :: proc(array: $T/[]$E, gen := context.random_generator) {
 		return
 	}
 
-	for i := i64(n - 1); i > 0; i -= 1 {
+	for i := i64(n - 2); i >= 0; i -= 1 {
 		j := int63_max(i + 1, gen)
 		array[i], array[j] = array[j], array[i]
 	}
