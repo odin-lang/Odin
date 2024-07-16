@@ -1015,8 +1015,8 @@ foreign lib {
 
 	SetRandomSeed  		 :: proc(seed: c.uint) ---                      // Set the seed for the random number generator
 	GetRandomValue 		 :: proc(min, max: c.int) -> c.int ---          // Get a random value between min and max (both included)
-	LoadRandomSequence 	 :: proc(count : c.uint, min, max: c.int) --- 	// Load random values sequence, no values repeated
-	UnloadRandomSequence :: proc(sequence : ^c.int) ---             	// Unload random values sequence
+	LoadRandomSequence 	 :: proc(count: c.uint, min, max: c.int) --- 	// Load random values sequence, no values repeated
+	UnloadRandomSequence     :: proc(sequence: ^c.int) ---                  // Unload random values sequence
 
 	// Misc. functions
 	TakeScreenshot :: proc(fileName: cstring) ---        // Takes a screenshot of current screen (filename extension defines format)
@@ -1426,7 +1426,7 @@ foreign lib {
 	UnloadUTF8           :: proc(text: [^]byte) ---                                 // Unload UTF-8 text encoded from codepoints array
 	LoadCodepoints       :: proc(text: cstring, count: ^c.int) -> [^]rune ---       // Load all codepoints from a UTF-8 text string, codepoints count returned by parameter
 	UnloadCodepoints     :: proc(codepoints: [^]rune) ---                           // Unload codepoints data from memory
-	GetCodepointCount    :: proc(text : cstring) -> c.int ---                       // Get total number of codepoints in a UTF-8 encoded string
+	GetCodepointCount    :: proc(text: cstring) -> c.int ---                        // Get total number of codepoints in a UTF-8 encoded string
 	GetCodepoint         :: proc(text: cstring, codepointSize: ^c.int) -> rune ---  // Get next codepoint in a UTF-8 encoded string, 0x3f('?') is returned on failure
 	GetCodepointNext     :: proc(text: cstring, codepointSize: ^c.int) -> rune ---  // Get next codepoint in a UTF-8 encoded string, 0x3f('?') is returned on failure
 	GetCodepointPrevious :: proc(text: cstring, codepointSize: ^c.int) -> rune ---  // Get previous codepoint in a UTF-8 encoded string, 0x3f('?') is returned on failure
