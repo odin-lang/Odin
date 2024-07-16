@@ -38,9 +38,12 @@ count_leading_zeros  :: proc(x: $T) -> T where type_is_integer(T) || type_is_sim
 reverse_bits         :: proc(x: $T) -> T where type_is_integer(T) || type_is_simd_vector(T) ---
 byte_swap            :: proc(x: $T) -> T where type_is_integer(T) || type_is_float(T) ---
 
-overflow_add :: proc(lhs, rhs: $T) -> (T, bool) ---
-overflow_sub :: proc(lhs, rhs: $T) -> (T, bool) ---
-overflow_mul :: proc(lhs, rhs: $T) -> (T, bool) ---
+overflow_add :: proc(lhs, rhs: $T) -> (T, bool) where type_is_integer(T) #optional_ok ---
+overflow_sub :: proc(lhs, rhs: $T) -> (T, bool) where type_is_integer(T) #optional_ok ---
+overflow_mul :: proc(lhs, rhs: $T) -> (T, bool) where type_is_integer(T) #optional_ok ---
+
+add_sat :: proc(lhs, rhs: $T) -> T where type_is_integer(T) ---
+sub_sat :: proc(lhs, rhs: $T) -> T where type_is_integer(T) ---
 
 sqrt :: proc(x: $T) -> T where type_is_float(T) || (type_is_simd_vector(T) && type_is_float(type_elem_type(T))) ---
 
