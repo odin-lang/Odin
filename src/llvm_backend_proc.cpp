@@ -2236,8 +2236,6 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 	case BuiltinProc_overflow_add:
 	case BuiltinProc_overflow_sub:
 	case BuiltinProc_overflow_mul:
-	case BuiltinProc_add_sat:
-	case BuiltinProc_sub_sat:
 		{
 			Type *main_type = tv.type;
 			Type *type = main_type;
@@ -2256,16 +2254,12 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 				case BuiltinProc_overflow_add: name = "llvm.uadd.with.overflow"; break;
 				case BuiltinProc_overflow_sub: name = "llvm.usub.with.overflow"; break;
 				case BuiltinProc_overflow_mul: name = "llvm.umul.with.overflow"; break;
-				case BuiltinProc_add_sat:      name = "llvm.uadd.sat"; break;
-				case BuiltinProc_sub_sat:      name = "llvm.usub.sat"; break;
 				}
 			} else {
 				switch (id) {
 				case BuiltinProc_overflow_add: name = "llvm.sadd.with.overflow"; break;
 				case BuiltinProc_overflow_sub: name = "llvm.ssub.with.overflow"; break;
 				case BuiltinProc_overflow_mul: name = "llvm.smul.with.overflow"; break;
-				case BuiltinProc_add_sat:      name = "llvm.sadd.sat"; break;
-				case BuiltinProc_sub_sat:      name = "llvm.ssub.sat"; break;
 				}
 			}
 			LLVMTypeRef types[1] = {lb_type(p->module, type)};
@@ -2288,6 +2282,42 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 				res.value = LLVMBuildExtractValue(p->builder, res.value, 0, "");
 				res.type = type;
 			}
+			return res;
+		}
+
+	case BuiltinProc_add_sat:
+	case BuiltinProc_sub_sat:
+		{
+			Type *main_type = tv.type;
+			Type *type = main_type;
+			if (is_type_tuple(main_type)) {
+				type = main_type->Tuple.variables[0]->type;
+			}
+
+			lbValue x = lb_build_expr(p, ce->args[0]);
+			lbValue y = lb_build_expr(p, ce->args[1]);
+			x = lb_emit_conv(p, x, type);
+			y = lb_emit_conv(p, y, type);
+
+			char const *name = nullptr;
+			if (is_type_unsigned(type)) {
+				switch (id) {
+				case BuiltinProc_add_sat: name = "llvm.uadd.sat"; break;
+				case BuiltinProc_sub_sat: name = "llvm.usub.sat"; break;
+				}
+			} else {
+				switch (id) {
+				case BuiltinProc_add_sat: name = "llvm.sadd.sat"; break;
+				case BuiltinProc_sub_sat: name = "llvm.ssub.sat"; break;
+				}
+			}
+			LLVMTypeRef types[1] = {lb_type(p->module, type)};
+
+			LLVMValueRef args[2] = { x.value, y.value };
+
+			lbValue res = {};
+			res.value = lb_call_intrinsic(p, name, args, gb_count_of(args), types, gb_count_of(types));
+			res.type = type;
 			return res;
 		}
 

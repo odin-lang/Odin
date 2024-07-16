@@ -4261,6 +4261,47 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 	case BuiltinProc_overflow_add:
 	case BuiltinProc_overflow_sub:
 	case BuiltinProc_overflow_mul:
+		{
+			Operand x = {};
+			Operand y = {};
+			check_expr(c, &x, ce->args[0]);
+			check_expr(c, &y, ce->args[1]);
+			if (x.mode == Addressing_Invalid) {
+				return false;
+			}
+			if (y.mode == Addressing_Invalid) {
+				return false;
+			}
+			convert_to_typed(c, &y, x.type); if (y.mode == Addressing_Invalid) return false;
+			convert_to_typed(c, &x, y.type);
+			if (is_type_untyped(x.type)) {
+				gbString xts = type_to_string(x.type);
+				error(x.expr, "Expected a typed integer for '%.*s', got %s", LIT(builtin_name), xts);
+				gb_string_free(xts);
+				return false;
+			}
+			if (!is_type_integer(x.type)) {
+				gbString xts = type_to_string(x.type);
+				error(x.expr, "Expected an integer for '%.*s', got %s", LIT(builtin_name), xts);
+				gb_string_free(xts);
+				return false;
+			}
+			Type *ct = core_type(x.type);
+			if (is_type_different_to_arch_endianness(ct)) {
+				GB_ASSERT(ct->kind == Type_Basic);
+				if (ct->Basic.flags & (BasicFlag_EndianLittle|BasicFlag_EndianBig)) {
+					gbString xts = type_to_string(x.type);
+					error(x.expr, "Expected an integer which does not specify the explicit endianness for '%.*s', got %s", LIT(builtin_name), xts);
+					gb_string_free(xts);
+					return false;
+				}
+			}
+
+			operand->mode = Addressing_Value;
+			operand->type = make_optional_ok_type(default_type(x.type));
+		}
+		break;
+
 	case BuiltinProc_add_sat:
 	case BuiltinProc_sub_sat:
 		{
@@ -4300,7 +4341,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			}
 
 			operand->mode = Addressing_Value;
-			operand->type = make_optional_ok_type(default_type(x.type));
+			operand->type = default_type(x.type);
 		}
 		break;
 
