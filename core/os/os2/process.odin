@@ -14,7 +14,7 @@ TIMEOUT_INFINITE :: time.MIN_DURATION // Note(flysand): Any negative duration wi
 */
 args := get_args()
 
-@(private="file")
+@(private="file", require_results)
 get_args :: proc() -> []string {
 	result := make([]string, len(runtime.args__), heap_allocator())
 	for rt_arg, i in runtime.args__ {
@@ -36,6 +36,7 @@ exit :: proc "contextless" (code: int) -> ! {
 	**Note(windows)**: Windows doesn't follow the posix permissions model, so
 	the function simply returns -1.
 */
+@(require_results)
 get_uid :: proc() -> int {
 	return _get_uid()
 }
@@ -51,6 +52,7 @@ get_uid :: proc() -> int {
 	**Note(windows)**: Windows doesn't follow the posix permissions model, so
 	the function simply returns -1.
 */
+@(require_results)
 get_euid :: proc() -> int {
 	return _get_euid()
 }
@@ -61,6 +63,7 @@ get_euid :: proc() -> int {
 	**Note(windows)**: Windows doesn't follow the posix permissions model, so
 	the function simply returns -1.
 */
+@(require_results)
 get_gid :: proc() -> int {
 	return _get_gid()
 }
@@ -76,6 +79,7 @@ get_gid :: proc() -> int {
 	**Note(windows)**: Windows doesn't follow the posix permissions model, so
 	the function simply returns -1.
 */
+@(require_results)
 get_egid :: proc() -> int {
 	return _get_egid()
 }
@@ -83,6 +87,7 @@ get_egid :: proc() -> int {
 /*
 	Obtain the ID of the current process.
 */
+@(require_results)
 get_pid :: proc() -> int {
 	return _get_pid()
 }
@@ -96,6 +101,7 @@ get_pid :: proc() -> int {
 	returned by this function can identify a non-existent or a different
 	process.
 */
+@(require_results)
 get_ppid :: proc() -> int {
 	return _get_ppid()
 }
@@ -103,6 +109,7 @@ get_ppid :: proc() -> int {
 /*
 	Obtain ID's of all processes running in the system.
 */
+@(require_results)
 process_list :: proc(allocator: runtime.Allocator) -> ([]int, Error) {
 	return _process_list(allocator)
 }
@@ -167,6 +174,7 @@ Process_Info :: struct {
 	`Process_Info` struct has the required fields before checking the error code
 	returned by this function.
 */
+@(require_results)
 process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator: runtime.Allocator) -> (Process_Info, Error) {
 	return _process_info_by_pid(pid, selection, allocator)
 }
@@ -187,6 +195,7 @@ process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator:
 	`Process_Info` struct has the required fields before checking the error code
 	returned by this function.
 */
+@(require_results)
 process_info_by_handle :: proc(process: Process, selection: Process_Info_Fields, allocator: runtime.Allocator) -> (Process_Info, Error) {
 	return _process_info_by_handle(process, selection, allocator)
 }
@@ -206,6 +215,7 @@ process_info_by_handle :: proc(process: Process, selection: Process_Info_Fields,
 	`Process_Info` struct has the required fields before checking the error code
 	returned by this function.
 */
+@(require_results)
 current_process_info :: proc(selection: Process_Info_Fields, allocator: runtime.Allocator) -> (Process_Info, Error) {
 	return _current_process_info(selection, allocator)
 }
@@ -268,6 +278,7 @@ Process_Open_Flag :: enum {
 
 	Use `process_close()` function to close the process handle.
 */
+@(require_results)
 process_open :: proc(pid: int, flags := Process_Open_Flags {}) -> (Process, Error) {
 	return _process_open(pid, flags)
 }
@@ -324,6 +335,7 @@ Process_Desc :: struct {
 	of file handles in an unpredictable manner. In case multiple threads change
 	handle inheritance properties, make sure to serialize all those calls.
 */
+@(require_results)
 process_start :: proc(desc := Process_Desc {}) -> (Process, Error) {
 	return _process_start(desc)
 }
@@ -364,6 +376,7 @@ Process_State :: struct {
 	If an error is returned for any other reason, other than timeout, the
 	process state is considered undetermined.
 */
+@(require_results)
 process_wait :: proc(process: Process, timeout := TIMEOUT_INFINITE) -> (Process_State, Error) {
 	return _process_wait(process, timeout)
 }
@@ -376,6 +389,7 @@ process_wait :: proc(process: Process, timeout := TIMEOUT_INFINITE) -> (Process_
 	desired, kill the process first, wait for the process to finish,
 	then close the handle.
 */
+@(require_results)
 process_close :: proc(process: Process) -> (Error) {
 	return _process_close(process)
 }
@@ -386,6 +400,7 @@ process_close :: proc(process: Process) -> (Error) {
 	This procedure terminates a process, specified by it's handle, `process`.
 
 */
+@(require_results)
 process_kill :: proc(process: Process) -> (Error) {
 	return _process_kill(process)
 }
