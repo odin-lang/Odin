@@ -550,7 +550,7 @@ _get_process_user :: proc(process_handle: win32.HANDLE, allocator: runtime.Alloc
 	if !win32.GetTokenInformation(token_handle, .TokenUser, nil, 0, &token_user_size) {
 		// Note(flysand): Make sure the buffer too small error comes out, and not any other error
 		err = _get_platform_error()
-		if v, ok := err.(Platform_Error); !ok || int(v) != 0x7a {
+		if v, ok := is_platform_error(err); !ok || v != i32(win32.ERROR_INSUFFICIENT_BUFFER) {
 			return
 		}
 		err = nil
