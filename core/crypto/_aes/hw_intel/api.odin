@@ -3,7 +3,7 @@ package aes_hw_intel
 
 import "core:sys/info"
 
-// is_supporte returns true iff hardware accelerated AES
+// is_supported returns true iff hardware accelerated AES
 // is supported.
 is_supported :: proc "contextless" () -> bool {
 	features, ok := info.cpu_features.?
