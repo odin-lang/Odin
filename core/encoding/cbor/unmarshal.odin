@@ -96,7 +96,8 @@ _unmarshal_value :: proc(d: Decoder, v: any, hdr: Header, allocator := context.a
 			ti = reflect.type_info_base(variant)
 			if !reflect.is_pointer_internally(variant) {
 				tag := any{rawptr(uintptr(v.data) + u.tag_offset), u.tag_type.id}
-				assert(_assign_int(tag, 1))
+				assigned := _assign_int(tag, 1)
+				assert(assigned)
 			}
 		}
 	}
