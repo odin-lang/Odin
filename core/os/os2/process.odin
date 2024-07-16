@@ -1,9 +1,7 @@
 package os2
 
-import "core:sync"
-import "core:time"
 import "base:runtime"
-import "core:strings"
+import "core:time"
 
 /*
 	In procedures that explicitly state this as one of the allowed values,
@@ -20,9 +18,9 @@ args := get_args()
 get_args :: proc() -> []string {
 	result := make([]string, len(runtime.args__), heap_allocator())
 	for rt_arg, i in runtime.args__ {
-		result[i] = cast(string) rt_arg
+		result[i] = string(rt_arg)
 	}
-	return result[:]
+	return result
 }
 
 /*

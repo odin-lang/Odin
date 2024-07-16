@@ -2495,9 +2495,9 @@ OBJECT_ATTRIBUTES :: struct {
 }
 
 UNICODE_STRING :: struct {
-	Length:        u16,
-	MaximumLength: u16,
-	Buffer:        ^u16,
+	Length:        u16    `fmt:"-"`,
+	MaximumLength: u16    `fmt:"-"`,
+	Buffer:        [^]u16 `fmt:"s,Length"`,
 }
 
 OVERLAPPED :: struct {
