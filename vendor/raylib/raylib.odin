@@ -1424,7 +1424,7 @@ foreign lib {
 
 	LoadUTF8             :: proc(codepoints: [^]rune, length: c.int) -> [^]byte --- // Load UTF-8 text encoded from codepoints array
 	UnloadUTF8           :: proc(text: [^]byte) ---                                 // Unload UTF-8 text encoded from codepoints array
-	LoadCodepoints       :: proc(text: rawptr, count: ^c.int) -> [^]rune ---        // Load all codepoints from a UTF-8 text string, codepoints count returned by parameter
+	LoadCodepoints       :: proc(text: cstring, count: ^c.int) -> [^]rune ---       // Load all codepoints from a UTF-8 text string, codepoints count returned by parameter
 	UnloadCodepoints     :: proc(codepoints: [^]rune) ---                           // Unload codepoints data from memory
 	GetCodepointCount    :: proc(text : cstring) -> c.int ---                       // Get total number of codepoints in a UTF-8 encoded string
 	GetCodepoint         :: proc(text: cstring, codepointSize: ^c.int) -> rune ---  // Get next codepoint in a UTF-8 encoded string, 0x3f('?') is returned on failure
