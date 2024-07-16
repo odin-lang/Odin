@@ -654,8 +654,8 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 			#no_bounds_check pkg := report.packages_by_name[it.pkg]
 			pkg.frame_ready = false
 
-			fmt.assertf(thread.pool_stop_task(&pool, test_index),
-				"A signal (%v) was raised to stop test #%i %s.%s, but it was unable to be found.",
+			found := thread.pool_stop_task(&pool, test_index)
+			fmt.assertf(found, "A signal (%v) was raised to stop test #%i %s.%s, but it was unable to be found.",
 				reason, test_index, it.pkg, it.name)
 
 			// The order this is handled in is a little particular.

@@ -22,5 +22,6 @@ wgpu_alloc :: proc "contextless" (size: i32) -> [^]byte {
 @(private="file", export)
 wgpu_free :: proc "contextless" (ptr: rawptr) {
 	context = g_context
-	assert(free(ptr) == nil, "wgpu_free failed")
+	err := free(ptr)
+	assert(err == nil, "wgpu_free failed")
 }

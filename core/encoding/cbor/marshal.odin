@@ -351,7 +351,8 @@ _marshal_into_encoder :: proc(e: Encoder, v: any, ti: ^runtime.Type_Info) -> (er
 				builder := strings.builder_from_slice(res[:])
 				e.writer = strings.to_stream(&builder)
 
-				assert(_encode_u64(e, u64(len(str)), .Text) == nil)
+				err := _encode_u64(e, u64(len(str)), .Text)
+				assert(err == nil)
 				res[9] = u8(len(builder.buf))
 				assert(res[9] < 10)
 				return
