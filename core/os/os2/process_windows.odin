@@ -98,13 +98,8 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 		free_process_info(info, allocator)
 	}
 
-	need_snapprocess    := selection >= {.PPid, .Priority}
-	need_snapmodule     := .Executable_Path in selection
-	need_peb            := selection >= {.Command_Line, .Environment, .Working_Dir}
-	need_process_handle := need_peb || .Username in selection
-
 	// Data obtained from process snapshots
-	if need_snapprocess {
+	if selection >= {.PPid, .Priority} {
 		entry, entry_err := _process_entry_by_pid(info.pid)
 		if entry_err != nil {
 			err = General_Error.Not_Exist
@@ -119,12 +114,14 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 			info.priority = int(entry.pcPriClassBase)
 		}
 	}
-	if need_snapmodule {
+	if .Executable_Path in selection { // snap module
 		info.executable_path = _process_exe_by_pid(pid, allocator) or_return
 		info.fields += {.Executable_Path}
 	}
+
 	ph := win32.INVALID_HANDLE_VALUE
-	if need_process_handle {
+
+	if selection >= {.Command_Line, .Environment, .Working_Dir, .Username} { // need process handle
 		ph = win32.OpenProcess(
 			win32.PROCESS_QUERY_LIMITED_INFORMATION | win32.PROCESS_VM_READ,
 			false,
@@ -139,7 +136,7 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 		win32.CloseHandle(ph)
 	}
 
-	if need_peb {
+	if selection >= {.Command_Line, .Environment, .Working_Dir} { // need peb
 		process_info_size: u32
 		process_info: win32.PROCESS_BASIC_INFORMATION
 		status := win32.NtQueryInformationProcess(ph, .ProcessBasicInformation, &process_info, size_of(process_info), &process_info_size)
@@ -161,7 +158,7 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 		process_params: win32.RTL_USER_PROCESS_PARAMETERS
 		_ = read_memory_as_struct(ph, process_peb.ProcessParameters, &process_params) or_return
 
-		if .Command_Line in selection || .Command_Args in selection {
+		if selection >= {.Command_Line, .Command_Args} {
 			TEMP_ALLOCATOR_GUARD()
 			cmdline_w := make([]u16, process_params.CommandLine.Length, temp_allocator()) or_return
 			_ = read_memory_as_slice(ph, process_params.CommandLine.Buffer, cmdline_w) or_return
@@ -209,11 +206,9 @@ _process_info_by_handle :: proc(process: Process, selection: Process_Info_Fields
 	defer if err != nil {
 		free_process_info(info, allocator)
 	}
-	need_snapprocess := selection >= {.PPid, .Priority}
-	need_snapmodule :=  .Executable_Path in selection
-	need_peb := selection >= {.Command_Line, .Environment, .Working_Dir}
+
 	// Data obtained from process snapshots
-	if need_snapprocess {
+	if selection >= {.PPid, .Priority} { // snap process
 		entry, entry_err := _process_entry_by_pid(info.pid)
 		if entry_err != nil {
 			err = General_Error.Not_Exist
@@ -228,12 +223,12 @@ _process_info_by_handle :: proc(process: Process, selection: Process_Info_Fields
 			info.priority = int(entry.pcPriClassBase)
 		}
 	}
-	if need_snapmodule {
+	if .Executable_Path in selection { // snap module
 		info.executable_path = _process_exe_by_pid(pid, allocator) or_return
 		info.fields += {.Executable_Path}
 	}
 	ph := win32.HANDLE(process.handle)
-	if need_peb {
+	if selection >= {.Command_Line, .Environment, .Working_Dir} { // need peb
 		process_info_size: u32
 		process_info: win32.PROCESS_BASIC_INFORMATION
 		status := win32.NtQueryInformationProcess(ph, .ProcessBasicInformation, &process_info, size_of(process_info), &process_info_size)
@@ -255,7 +250,7 @@ _process_info_by_handle :: proc(process: Process, selection: Process_Info_Fields
 		process_params: win32.RTL_USER_PROCESS_PARAMETERS
 		_ = read_memory_as_struct(ph, process_peb.ProcessParameters, &process_params) or_return
 
-		if .Command_Line in selection || .Command_Args in selection {
+		if selection >= {.Command_Line, .Command_Args} {
 			TEMP_ALLOCATOR_GUARD()
 			cmdline_w := make([]u16, process_params.CommandLine.Length, temp_allocator()) or_return
 			_ = read_memory_as_slice(ph, process_params.CommandLine.Buffer, cmdline_w) or_return
@@ -303,8 +298,8 @@ _current_process_info :: proc(selection: Process_Info_Fields, allocator: runtime
 	defer if err != nil {
 		free_process_info(info, allocator)
 	}
-	need_snapprocess := .PPid in selection || .Priority in selection
-	if need_snapprocess {
+
+	if selection >= {.PPid, .Priority} { // snap process
 		entry, entry_err := _process_entry_by_pid(info.pid)
 		if entry_err != nil {
 			err = General_Error.Not_Exist
@@ -325,7 +320,7 @@ _current_process_info :: proc(selection: Process_Info_Fields, allocator: runtime
 		info.executable_path = win32.utf16_to_utf8(exe_filename_w[:path_len], allocator) or_return
 		info.fields += {.Executable_Path}
 	}
-	if .Command_Line in selection  || .Command_Args in selection {
+	if selection >= {.Command_Line,  .Command_Args} {
 		command_line_w := win32.GetCommandLineW()
 		if .Command_Line in selection {
 			info.command_line = win32.wstring_to_utf8(command_line_w, -1, allocator) or_return
