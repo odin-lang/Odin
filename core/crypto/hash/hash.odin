@@ -28,20 +28,26 @@ hash_bytes :: proc(algorithm: Algorithm, data: []byte, allocator := context.allo
 
 // hash_string_to_buffer will hash the given input and assign the
 // computed digest to the third parameter.  It requires that the
-// destination buffer is at least as big as the digest size.
-hash_string_to_buffer :: proc(algorithm: Algorithm, data: string, hash: []byte) {
-	hash_bytes_to_buffer(algorithm, transmute([]byte)(data), hash)
+// destination buffer is at least as big as the digest size.  The
+// provided destination buffer is returned to match the behavior of
+// `hash_string`.
+hash_string_to_buffer :: proc(algorithm: Algorithm, data: string, hash: []byte) -> []byte {
+	return hash_bytes_to_buffer(algorithm, transmute([]byte)(data), hash)
 }
 
 // hash_bytes_to_buffer will hash the given input and write the
 // computed digest into the third parameter.  It requires that the
-// destination buffer is at least as big as the digest size.
-hash_bytes_to_buffer :: proc(algorithm: Algorithm, data, hash: []byte) {
+// destination buffer is at least as big as the digest size.  The
+// provided destination buffer is returned to match the behavior of
+// `hash_bytes`.
+hash_bytes_to_buffer :: proc(algorithm: Algorithm, data, hash: []byte) -> []byte {
 	ctx: Context
 
 	init(&ctx, algorithm)
 	update(&ctx, data)
 	final(&ctx, hash)
+
+	return hash
 }
 
 // hash_stream will incrementally fully consume a stream, and return the
