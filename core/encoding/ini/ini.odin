@@ -92,7 +92,6 @@ load_map_from_string :: proc(src: string, allocator: runtime.Allocator, options 
 			}
 		}
 		return strings.clone(val)
-
 	}
 
 	context.allocator = allocator
@@ -114,7 +113,10 @@ load_map_from_string :: proc(src: string, allocator: runtime.Allocator, options 
 			new_key = strings.to_lower(key) or_return
 			delete(old_key) or_return
 		}
-		pairs[new_key] = unquote(value) or_return
+		pairs[new_key], err = unquote(value)
+		if err != nil {
+			return
+		}
 	}
 	return
 }
@@ -144,6 +146,7 @@ delete_map :: proc(m: Map) {
 			delete(value, allocator)
 		}
 		delete(section)
+		delete(pairs)
 	}
 	delete(m)
 }
