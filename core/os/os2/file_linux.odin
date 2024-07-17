@@ -70,7 +70,7 @@ _open :: proc(name: string, flags: File_Flags, perm: File_Mode) -> (f: ^File, er
 	// Just default to using O_NOCTTY because needing to open a controlling
 	// terminal would be incredibly rare. This has no effect on files while
 	// allowing us to open serial devices.
-	sys_flags: linux.Open_Flags = {.NOCTTY}
+	sys_flags: linux.Open_Flags = {.NOCTTY, .CLOEXEC}
 	switch flags & O_RDONLY|O_WRONLY|O_RDWR {
 	case O_RDONLY:
 	case O_WRONLY: sys_flags += {.WRONLY}
@@ -82,7 +82,7 @@ _open :: proc(name: string, flags: File_Flags, perm: File_Mode) -> (f: ^File, er
 	if .Excl in flags          { sys_flags += {.EXCL} }
 	if .Sync in flags          { sys_flags += {.DSYNC} }
 	if .Trunc in flags         { sys_flags += {.TRUNC} }
-	if .Close_On_Exec in flags { sys_flags += {.CLOEXEC} }
+	if .Inheritable in flags   { sys_flags -= {.CLOEXEC} }
 
 	fd, errno := linux.open(name_cstr, sys_flags, transmute(linux.Mode)(u32(perm)))
 	if errno != .NONE {
