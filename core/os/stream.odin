@@ -22,7 +22,7 @@ _file_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, 
 		when ODIN_OS == .Windows {
 			flush(fd)
 		} else {
-			// TOOD(bill): other operating systems
+			// TODO(bill): other operating systems
 		}
 	case .Read:
 		n_int, os_err = read(fd, p)
