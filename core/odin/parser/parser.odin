@@ -2261,17 +2261,17 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 			hp.type = type
 			return hp
 
-		case "file", "line", "procedure", "caller_location":
+		case "file", "directory", "line", "procedure", "caller_location":
 			bd := ast.new(ast.Basic_Directive, tok.pos, end_pos(name))
 			bd.tok  = tok
 			bd.name = name.text
 			return bd
-		case "location", "load", "assert", "defined", "config":
+
+		case "location", "exists", "load", "load_directory", "load_hash", "hash", "assert", "panic", "defined", "config":
 			bd := ast.new(ast.Basic_Directive, tok.pos, end_pos(name))
 			bd.tok  = tok
 			bd.name = name.text
 			return parse_call_expr(p, bd)
-
 
 		case "soa":
 			bd := ast.new(ast.Basic_Directive, tok.pos, end_pos(name))
