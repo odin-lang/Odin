@@ -41,8 +41,14 @@ It exports one procedure `GetSurface(wgpu.Instance, glfw.WindowHandle) -> glfw.S
 The procedure will call the needed target specific procedures and return a surface configured
 for the given window.
 
-To support Wayland on Linux, you need to have GLFW compiled to support it, and use
-`-define:WGPU_GFLW_GLUE_SUPPORT_WAYLAND=true` to enable the package to check for Wayland.
-
 Do note that wgpu does not require GLFW, you can use native windows or another windowing library too.
 For that you can take inspiration from `glfwglue` on glueing them together.
+
+### Wayland
+
+GLFW supports Wayland from version 3.4 onwards and only if it is compiled with `-DGLFW_EXPOSE_NATIVE_WAYLAND`.
+
+Odin links against your system's glfw library (probably installed through a package manager).
+If that version is lower than 3.4 or hasn't been compiled with the previously mentioned define,
+you will have to compile glfw from source yourself and adjust the `foreign import` declarations in `vendor:glfw/bindings` to
+point to it.
