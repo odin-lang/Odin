@@ -39,11 +39,11 @@ PRIO_MIN :: -20
 SIGRTMIN :: Signal(32)
 SIGRTMAX :: Signal(64)
 
-S_IFMT   :: Mode{.IFREG, .IFDIR, .IFCHR, .IFFIFO}
+S_IFMT   :: Mode{.IFREG, .IFDIR, .IFCHR, .IFIFO}
 S_IFSOCK :: Mode{.IFREG, .IFDIR}
 S_IFLNK  :: Mode{.IFREG, .IFCHR}
 S_IFBLK  :: Mode{.IFDIR, .IFCHR}
-S_IFFIFO :: Mode{.IFFIFO}
+S_IFIFO  :: Mode{.IFIFO}
 S_IFCHR  :: Mode{.IFCHR}
 S_IFDIR  :: Mode{.IFDIR}
 S_IFREG  :: Mode{.IFREG}
@@ -51,7 +51,7 @@ S_IFREG  :: Mode{.IFREG}
 /*
 	Checks the Mode bits to see if the file is a named pipe (FIFO).
 */
-S_ISFIFO :: #force_inline proc "contextless" (m: Mode) -> bool {return (S_IFFIFO  == (m & S_IFMT))}
+S_ISFIFO :: #force_inline proc "contextless" (m: Mode) -> bool {return (S_IFIFO  == (m & S_IFMT))}
 
 /*
 	Check the Mode bits to see if the file is a character device.

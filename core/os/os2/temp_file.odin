@@ -26,7 +26,7 @@ create_temp_file :: proc(dir, pattern: string) -> (f: ^File, err: Error) {
 	attempts := 0
 	for {
 		name := concatenate_strings_from_buffer(name_buf[:], prefix, random_string(rand_buf[:]), suffix)
-		f, err = open(name, {.Read, .Write, .Create, .Excl}, File_Mode(0o666))
+		f, err = open(name, {.Read, .Write, .Create, .Excl}, 0o666)
 		if err == .Exist {
 			close(f)
 			attempts += 1

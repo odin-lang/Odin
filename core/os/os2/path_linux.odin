@@ -15,19 +15,13 @@ _is_path_separator :: proc(c: byte) -> bool {
 	return c == '/'
 }
 
-_mkdir :: proc(path: string, perm: File_Mode) -> Error {
-	// TODO: These modes would require mknod, however, that would also
-	//       require additional arguments to this function..
-	if perm & (File_Mode_Named_Pipe | File_Mode_Device | File_Mode_Char_Device | File_Mode_Sym_Link) != 0 {
-		return .Invalid_Argument
-	}
-
+_mkdir :: proc(path: string, perm: int) -> Error {
 	TEMP_ALLOCATOR_GUARD()
 	path_cstr := temp_cstring(path) or_return
-	return _get_platform_error(linux.mkdir(path_cstr, transmute(linux.Mode)(u32(perm) & 0o777)))
+	return _get_platform_error(linux.mkdir(path_cstr, transmute(linux.Mode)u32(perm)))
 }
 
-_mkdir_all :: proc(path: string, perm: File_Mode) -> Error {
+_mkdir_all :: proc(path: string, perm: int) -> Error {
 	mkdirat :: proc(dfd: linux.Fd, path: []u8, perm: int, has_created: ^bool) -> Error {
 		i: int
 		for ; i < len(path) - 1 && path[i] != '/'; i += 1 {}
@@ -38,7 +32,7 @@ _mkdir_all :: proc(path: string, perm: File_Mode) -> Error {
 		new_dfd, errno := linux.openat(dfd, cstring(&path[0]), _OPENDIR_FLAGS)
 		#partial switch errno {
 		case .ENOENT:
-			if errno = linux.mkdirat(dfd, cstring(&path[0]), transmute(linux.Mode)(u32(perm))); errno != .NONE {
+			if errno = linux.mkdirat(dfd, cstring(&path[0]), transmute(linux.Mode)u32(perm)); errno != .NONE {
 				return _get_platform_error(errno)
 			}
 			has_created^ = true
@@ -58,12 +52,6 @@ _mkdir_all :: proc(path: string, perm: File_Mode) -> Error {
 		}
 		unreachable()
 	}
-
-	// TODO
-	if perm & (File_Mode_Named_Pipe | File_Mode_Device | File_Mode_Char_Device | File_Mode_Sym_Link) != 0 {
-		return .Invalid_Argument
-	}
-
 	TEMP_ALLOCATOR_GUARD()
 	// need something we can edit, and use to generate cstrings
 	path_bytes := make([]u8, len(path) + 1, temp_allocator())
@@ -85,7 +73,7 @@ _mkdir_all :: proc(path: string, perm: File_Mode) -> Error {
 	}
 	
 	has_created: bool
-	mkdirat(dfd, path_bytes, int(perm & 0o777), &has_created) or_return
+	mkdirat(dfd, path_bytes, perm, &has_created) or_return
 	if has_created {
 		return nil
 	}

@@ -9,8 +9,8 @@ File_Info :: struct {
 	fullpath:          string,
 	name:              string,
 	size:              i64,
-	mode:              File_Mode,
-	is_directory:      bool,
+	mode:              int,
+	type:              File_Type,
 	creation_time:     time.Time,
 	modification_time: time.Time,
 	access_time:       time.Time,
@@ -43,6 +43,7 @@ stat :: proc(name: string, allocator: runtime.Allocator) -> (File_Info, Error) {
 }
 
 lstat :: stat_do_not_follow_links
+
 @(require_results)
 stat_do_not_follow_links :: proc(name: string, allocator: runtime.Allocator) -> (File_Info, Error) {
 	return _lstat(name, allocator)

@@ -55,7 +55,7 @@ _handle :: proc(f: ^File) -> win32.HANDLE {
 	return win32.HANDLE(_fd(f))
 }
 
-_open_internal :: proc(name: string, flags: File_Flags, perm: File_Mode) -> (handle: uintptr, err: Error) {
+_open_internal :: proc(name: string, flags: File_Flags, perm: int) -> (handle: uintptr, err: Error) {
 	if len(name) == 0 {
 		err = .Not_Exist
 		return
@@ -122,7 +122,7 @@ _open_internal :: proc(name: string, flags: File_Flags, perm: File_Mode) -> (han
 }
 
 
-_open :: proc(name: string, flags: File_Flags, perm: File_Mode) -> (f: ^File, err: Error) {
+_open :: proc(name: string, flags: File_Flags, perm: int) -> (f: ^File, err: Error) {
 	flags := flags if flags != nil else {.Read}
 	handle := _open_internal(name, flags, perm) or_return
 	return _new_file(handle, name), nil
@@ -498,7 +498,6 @@ _rename :: proc(old_path, new_path: string) -> Error {
 
 }
 
-
 _link :: proc(old_name, new_name: string) -> Error {
 	o := _fix_long_path(old_name)
 	n := _fix_long_path(new_name)
@@ -635,7 +634,7 @@ _fchdir :: proc(f: ^File) -> Error {
 	return nil
 }
 
-_fchmod :: proc(f: ^File, mode: File_Mode) -> Error {
+_fchmod :: proc(f: ^File, mode: int) -> Error {
 	if f == nil || f.impl == nil {
 		return nil
 	}
@@ -670,7 +669,7 @@ _chdir :: proc(name: string) -> Error {
 	return nil
 }
 
-_chmod :: proc(name: string, mode: File_Mode) -> Error {
+_chmod :: proc(name: string, mode: int) -> Error {
 	f := open(name, {.Write}) or_return
 	defer close(f)
 	return _fchmod(f, mode)
@@ -717,8 +716,6 @@ _fchtimes :: proc(f: ^File, atime, mtime: time.Time) -> Error {
 	}
 	return nil
 }
-
-
 
 _exists :: proc(path: string) -> bool {
 	wpath := _fix_long_path(path)

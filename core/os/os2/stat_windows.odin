@@ -19,27 +19,28 @@ _fstat :: proc(f: ^File, allocator: runtime.Allocator) -> (File_Info, Error) {
 	h := _handle(f)
 	switch win32.GetFileType(h) {
 	case win32.FILE_TYPE_PIPE, win32.FILE_TYPE_CHAR:
-		fi: File_Info
-		fi.fullpath = path
-		fi.name = basename(path)
-		fi.mode |= file_type_mode(h)
+		fi := File_Info {
+			fullpath = path,
+			name = basename(path),
+			type = file_type(h),
+		}
 		return fi, nil
 	}
 
 	return _file_info_from_get_file_information_by_handle(path, h, allocator)
 }
+
 _stat :: proc(name: string, allocator: runtime.Allocator) -> (File_Info, Error) {
 	return internal_stat(name, win32.FILE_FLAG_BACKUP_SEMANTICS, allocator)
 }
+
 _lstat :: proc(name: string, allocator: runtime.Allocator) -> (File_Info, Error) {
 	return internal_stat(name, win32.FILE_FLAG_BACKUP_SEMANTICS|win32.FILE_FLAG_OPEN_REPARSE_POINT, allocator)
 }
+
 _same_file :: proc(fi1, fi2: File_Info) -> bool {
 	return fi1.fullpath == fi2.fullpath
 }
-
-
-
 
 full_path_from_name :: proc(name: string, allocator: runtime.Allocator) -> (path: string, err: Error) {
 	name := name
@@ -61,7 +62,6 @@ full_path_from_name :: proc(name: string, allocator: runtime.Allocator) -> (path
 	}
 	return win32.utf16_to_utf8(buf[:n], allocator)
 }
-
 
 internal_stat :: proc(name: string, create_file_attributes: u32, allocator: runtime.Allocator) -> (fi: File_Info, e: Error) {
 	if len(name) == 0 {
@@ -99,7 +99,6 @@ internal_stat :: proc(name: string, create_file_attributes: u32, allocator: runt
 	return _file_info_from_get_file_information_by_handle(name, h, allocator)
 }
 
-
 _cleanpath_strip_prefix :: proc(buf: []u16) -> []u16 {
 	buf := buf
 	N := 0
@@ -119,7 +118,6 @@ _cleanpath_strip_prefix :: proc(buf: []u16) -> []u16 {
 	}
 	return buf
 }
-
 
 _cleanpath_from_handle :: proc(f: ^File, allocator: runtime.Allocator) -> (string, Error) {
 	if f == nil {
@@ -159,7 +157,6 @@ _cleanpath_from_buf :: proc(buf: []u16, allocator: runtime.Allocator) -> (string
 	return win32.utf16_to_utf8(buf, allocator)
 }
 
-
 basename :: proc(name: string) -> (base: string) {
 	name := name
 	if len(name) > 3 && name[:3] == `\\?` {
@@ -185,82 +182,66 @@ basename :: proc(name: string) -> (base: string) {
 	return name
 }
 
-
-file_type_mode :: proc(h: win32.HANDLE) -> File_Mode {
+file_type :: proc(h: win32.HANDLE) -> File_Type {
 	switch win32.GetFileType(h) {
-	case win32.FILE_TYPE_PIPE:
-		return File_Mode_Named_Pipe
-	case win32.FILE_TYPE_CHAR:
-		return File_Mode_Device | File_Mode_Char_Device
+	case win32.FILE_TYPE_PIPE: return .Named_Pipe
+	case win32.FILE_TYPE_CHAR: return .Character_Device
+	case win32.FILE_TYPE_DISK: return .Regular
 	}
-	return 0
+	return .Undetermined
 }
 
-
-
-_file_mode_from_file_attributes :: proc(file_attributes: win32.DWORD, h: win32.HANDLE, ReparseTag: win32.DWORD) -> (mode: File_Mode) {
+_file_type_mode_from_file_attributes :: proc(file_attributes: win32.DWORD, h: win32.HANDLE, ReparseTag: win32.DWORD) -> (type: File_Type, mode: int) {
 	if file_attributes & win32.FILE_ATTRIBUTE_READONLY != 0 {
 		mode |= 0o444
 	} else {
 		mode |= 0o666
 	}
-
 	is_sym := false
 	if file_attributes & win32.FILE_ATTRIBUTE_REPARSE_POINT == 0 {
 		is_sym = false
 	} else {
 		is_sym = ReparseTag == win32.IO_REPARSE_TAG_SYMLINK || ReparseTag == win32.IO_REPARSE_TAG_MOUNT_POINT
 	}
-
 	if is_sym {
-		mode |= File_Mode_Sym_Link
+		type = .Symlink
 	} else {
 		if file_attributes & win32.FILE_ATTRIBUTE_DIRECTORY != 0 {
-			mode |= 0o111 | File_Mode_Dir
+			type = .Directory
+			mode |= 0o111
 		}
-
 		if h != nil {
-			mode |= file_type_mode(h)
+			type = file_type(h)
 		}
 	}
-
 	return
 }
-
 
 _file_info_from_win32_file_attribute_data :: proc(d: ^win32.WIN32_FILE_ATTRIBUTE_DATA, name: string, allocator: runtime.Allocator) -> (fi: File_Info, e: Error) {
 	fi.size = i64(d.nFileSizeHigh)<<32 + i64(d.nFileSizeLow)
-
-	fi.mode |= _file_mode_from_file_attributes(d.dwFileAttributes, nil, 0)
-	fi.is_directory = fi.mode & File_Mode_Dir != 0
-
+	type, mode := _file_type_mode_from_file_attributes(d.dwFileAttributes, nil, 0)
+	fi.type = type
+	fi.mode |= mode
 	fi.creation_time     = time.unix(0, win32.FILETIME_as_unix_nanoseconds(d.ftCreationTime))
 	fi.modification_time = time.unix(0, win32.FILETIME_as_unix_nanoseconds(d.ftLastWriteTime))
 	fi.access_time       = time.unix(0, win32.FILETIME_as_unix_nanoseconds(d.ftLastAccessTime))
-
 	fi.fullpath, e = full_path_from_name(name, allocator)
 	fi.name = basename(fi.fullpath)
-
 	return
 }
-
 
 _file_info_from_win32_find_data :: proc(d: ^win32.WIN32_FIND_DATAW, name: string, allocator: runtime.Allocator) -> (fi: File_Info, e: Error) {
 	fi.size = i64(d.nFileSizeHigh)<<32 + i64(d.nFileSizeLow)
-
-	fi.mode |= _file_mode_from_file_attributes(d.dwFileAttributes, nil, 0)
-	fi.is_directory = fi.mode & File_Mode_Dir != 0
-
+	type, mode := _file_type_mode_from_file_attributes(d.dwFileAttributes, nil, 0)
+	fi.type = type
+	fi.mode |= mode
 	fi.creation_time     = time.unix(0, win32.FILETIME_as_unix_nanoseconds(d.ftCreationTime))
 	fi.modification_time = time.unix(0, win32.FILETIME_as_unix_nanoseconds(d.ftLastWriteTime))
 	fi.access_time       = time.unix(0, win32.FILETIME_as_unix_nanoseconds(d.ftLastAccessTime))
-
 	fi.fullpath, e = full_path_from_name(name, allocator)
 	fi.name = basename(fi.fullpath)
-
 	return
 }
-
 
 _file_info_from_get_file_information_by_handle :: proc(path: string, h: win32.HANDLE, allocator: runtime.Allocator) -> (File_Info, Error) {
 	d: win32.BY_HANDLE_FILE_INFORMATION
@@ -278,24 +259,18 @@ _file_info_from_get_file_information_by_handle :: proc(path: string, h: win32.HA
 		// Indicate this is a symlink on FAT file systems
 		ti.ReparseTag = 0
 	}
-
 	fi: File_Info
-
 	fi.fullpath = path
 	fi.name = basename(path)
 	fi.size = i64(d.nFileSizeHigh)<<32 + i64(d.nFileSizeLow)
-
-	fi.mode |= _file_mode_from_file_attributes(ti.FileAttributes, h, ti.ReparseTag)
-	fi.is_directory = fi.mode & File_Mode_Dir != 0
-
+	type, mode := _file_type_mode_from_file_attributes(d.dwFileAttributes, nil, 0)
+	fi.type = type
+	fi.mode |= mode
 	fi.creation_time     = time.unix(0, win32.FILETIME_as_unix_nanoseconds(d.ftCreationTime))
 	fi.modification_time = time.unix(0, win32.FILETIME_as_unix_nanoseconds(d.ftLastWriteTime))
 	fi.access_time       = time.unix(0, win32.FILETIME_as_unix_nanoseconds(d.ftLastAccessTime))
-
 	return fi, nil
 }
-
-
 
 reserved_names := [?]string{
 	"CON", "PRN", "AUX", "NUL",
@@ -356,7 +331,6 @@ _volume_name_len :: proc(path: string) -> int {
 	}
 	return 0
 }
-
 
 _is_abs :: proc(path: string) -> bool {
 	if _is_reserved_name(path) {
