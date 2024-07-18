@@ -2179,22 +2179,25 @@ parse_inlining_operand :: proc(p: ^Parser, lhs: bool, tok: tokenizer.Token) -> ^
 		}
 	}
 
-	#partial switch e in ast.strip_or_return_expr(expr).derived_expr {
-	case ^ast.Proc_Lit:
-		if e.inlining != .None && e.inlining != pi {
-			error(p, expr.pos, "both 'inline' and 'no_inline' cannot be applied to a procedure literal")
+	if expr != nil {
+		#partial switch e in ast.strip_or_return_expr(expr).derived_expr {
+		case ^ast.Proc_Lit:
+			if e.inlining != .None && e.inlining != pi {
+				error(p, expr.pos, "both 'inline' and 'no_inline' cannot be applied to a procedure literal")
+			}
+			e.inlining = pi
+			return expr
+		case ^ast.Call_Expr:
+			if e.inlining != .None && e.inlining != pi {
+				error(p, expr.pos, "both 'inline' and 'no_inline' cannot be applied to a procedure call")
+			}
+			e.inlining = pi
+			return expr
 		}
-		e.inlining = pi
-	case ^ast.Call_Expr:
-		if e.inlining != .None && e.inlining != pi {
-			error(p, expr.pos, "both 'inline' and 'no_inline' cannot be applied to a procedure call")
-		}
-		e.inlining = pi
-	case:
-		error(p, tok.pos, "'%s' must be followed by a procedure literal or call", tok.text)
-		return ast.new(ast.Bad_Expr, tok.pos, expr)
 	}
-	return expr
+
+	error(p, tok.pos, "'%s' must be followed by a procedure literal or call", tok.text)
+	return ast.new(ast.Bad_Expr, tok.pos, expr)
 }
 
 parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
