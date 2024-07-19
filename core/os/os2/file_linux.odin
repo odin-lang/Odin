@@ -63,7 +63,7 @@ _file_allocator :: proc() -> runtime.Allocator {
 	return heap_allocator()
 }
 
-_open :: proc(name: string, flags: File_Flags, perm: File_Mode) -> (f: ^File, err: Error) {
+_open :: proc(name: string, flags: File_Flags, perm: int) -> (f: ^File, err: Error) {
 	TEMP_ALLOCATOR_GUARD()
 	name_cstr := temp_cstring(name) or_return
 
@@ -76,7 +76,6 @@ _open :: proc(name: string, flags: File_Flags, perm: File_Mode) -> (f: ^File, er
 	case O_WRONLY: sys_flags += {.WRONLY}
 	case O_RDWR:   sys_flags += {.RDWR}
 	}
-
 	if .Append in flags        { sys_flags += {.APPEND} }
 	if .Create in flags        { sys_flags += {.CREAT} }
 	if .Excl in flags          { sys_flags += {.EXCL} }
@@ -84,7 +83,7 @@ _open :: proc(name: string, flags: File_Flags, perm: File_Mode) -> (f: ^File, er
 	if .Trunc in flags         { sys_flags += {.TRUNC} }
 	if .Close_On_Exec in flags { sys_flags += {.CLOEXEC} }
 
-	fd, errno := linux.open(name_cstr, sys_flags, transmute(linux.Mode)(u32(perm)))
+	fd, errno := linux.open(name_cstr, sys_flags, transmute(linux.Mode)u32(perm))
 	if errno != .NONE {
 		return nil, _get_platform_error(errno)
 	}
@@ -296,13 +295,13 @@ _fchdir :: proc(f: ^File) -> Error {
 	return _get_platform_error(linux.fchdir(impl.fd))
 }
 
-_chmod :: proc(name: string, mode: File_Mode) -> Error {
+_chmod :: proc(name: string, mode: int) -> Error {
 	TEMP_ALLOCATOR_GUARD()
 	name_cstr := temp_cstring(name) or_return
 	return _get_platform_error(linux.chmod(name_cstr, transmute(linux.Mode)(u32(mode))))
 }
 
-_fchmod :: proc(f: ^File, mode: File_Mode) -> Error {
+_fchmod :: proc(f: ^File, mode: int) -> Error {
 	impl := (^File_Impl)(f.impl)
 	return _get_platform_error(linux.fchmod(impl.fd, transmute(linux.Mode)(u32(mode))))
 }
