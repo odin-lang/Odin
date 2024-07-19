@@ -12,7 +12,7 @@ import "base:intrinsics"
 
 @(private)
 syscall0 :: #force_inline proc "contextless" (nr: uintptr) -> int {
-	return cast(int) intrinsics.syscall(nr)
+	return int(intrinsics.syscall(nr))
 }
 
 @(private)
@@ -20,7 +20,7 @@ syscall1 :: #force_inline proc "contextless" (nr: uintptr, p1: $T) -> int
 where
 	size_of(p1) <= size_of(uintptr)
 {
-	return cast(int) intrinsics.syscall(nr, cast(uintptr) p1)
+	return int(intrinsics.syscall(nr, uintptr(p1)))
 }
 
 @(private)
@@ -29,8 +29,7 @@ where
 	size_of(p1) <= size_of(uintptr),
 	size_of(p2) <= size_of(uintptr) 
 {
-	return cast(int) intrinsics.syscall(nr,
-		cast(uintptr) p1, cast(uintptr) p2)
+	return int(intrinsics.syscall(nr, uintptr(p1), uintptr(p2)))
 }
 
 @(private)
@@ -40,10 +39,11 @@ where
 	size_of(p2) <= size_of(uintptr),
 	size_of(p3) <= size_of(uintptr)
 {
-	return cast(int) intrinsics.syscall(nr,
-		cast(uintptr) p1,
-		cast(uintptr) p2,
-		cast(uintptr) p3)
+	return int(intrinsics.syscall(nr,
+		uintptr(p1),
+		uintptr(p2),
+		uintptr(p3),
+	))
 }
 
 @(private)
@@ -54,11 +54,12 @@ where
 	size_of(p3) <= size_of(uintptr),
 	size_of(p4) <= size_of(uintptr)
 {
-	return cast(int) intrinsics.syscall(nr,
-		cast(uintptr) p1,
-		cast(uintptr) p2,
-		cast(uintptr) p3,
-		cast(uintptr) p4)
+	return int(intrinsics.syscall(nr,
+		uintptr(p1),
+		uintptr(p2),
+		uintptr(p3),
+		uintptr(p4),
+	))
 }
 
 @(private)
@@ -70,12 +71,13 @@ where
 	size_of(p4) <= size_of(uintptr),
 	size_of(p5) <= size_of(uintptr)
 {
-	return cast(int) intrinsics.syscall(nr,
-		cast(uintptr) p1,
-		cast(uintptr) p2,
-		cast(uintptr) p3,
-		cast(uintptr) p4,
-		cast(uintptr) p5)
+	return int(intrinsics.syscall(nr,
+		uintptr(p1),
+		uintptr(p2),
+		uintptr(p3),
+		uintptr(p4),
+		uintptr(p5),
+	))
 }
 
 @(private)
@@ -88,13 +90,14 @@ where
 	size_of(p5) <= size_of(uintptr),
 	size_of(p6) <= size_of(uintptr)
 {
-	return cast(int) intrinsics.syscall(nr,
-		cast(uintptr) p1,
-		cast(uintptr) p2,
-		cast(uintptr) p3,
-		cast(uintptr) p4,
-		cast(uintptr) p5,
-		cast(uintptr) p6)
+	return int(intrinsics.syscall(nr,
+		uintptr(p1),
+		uintptr(p2),
+		uintptr(p3),
+		uintptr(p4),
+		uintptr(p5),
+		uintptr(p6),
+	))
 }
 
 syscall :: proc {syscall0, syscall1, syscall2, syscall3, syscall4, syscall5, syscall6}
@@ -113,7 +116,7 @@ where
 		default_value: T
 		return default_value, Errno(-ret)
 	} else {
-		return cast(T) transmute(U) ret, Errno(.NONE)
+		return T(transmute(U)ret), Errno(.NONE)
 	}
 }
 
@@ -123,7 +126,7 @@ errno_unwrap2 :: #force_inline proc "contextless" (ret: $P, $T: typeid) -> (T, E
 		default_value: T
 		return default_value, Errno(-ret)
 	} else {
-		return cast(T) ret, Errno(.NONE)
+		return T(ret), Errno(.NONE)
 	}
 }
 

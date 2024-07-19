@@ -688,7 +688,7 @@ Sock_Addr_In6 :: struct #packed {
 }
 
 /*
-  Struct representing Unix Domain Socket address
+	Struct representing Unix Domain Socket address
 */
 Sock_Addr_Un :: struct #packed {
 	sun_family: Address_Family,
