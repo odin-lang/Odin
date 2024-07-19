@@ -66,7 +66,7 @@ File_Flag :: enum {
 	Sync,
 	Trunc,
 	Sparse,
-	Close_On_Exec,
+	Inheritable,
 
 	Unbuffered_IO,
 }
@@ -80,7 +80,15 @@ O_EXCL    :: File_Flags{.Excl}
 O_SYNC    :: File_Flags{.Sync}
 O_TRUNC   :: File_Flags{.Trunc}
 O_SPARSE  :: File_Flags{.Sparse}
-O_CLOEXEC :: File_Flags{.Close_On_Exec}
+
+/*
+	If specified, the file handle is inherited upon the creation of a child
+	process. By default all handles are created non-inheritable.
+
+	**Note**: The standard file handles (stderr, stdout and stdin) are always
+	initialized as inheritable.
+*/
+O_INHERITABLE :: File_Flags{.Inheritable}
 
 stdin:  ^File = nil // OS-Specific
 stdout: ^File = nil // OS-Specific

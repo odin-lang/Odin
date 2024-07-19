@@ -79,7 +79,7 @@ _open_internal :: proc(name: string, flags: File_Flags, perm: int) -> (handle: u
 	share_mode := u32(win32.FILE_SHARE_READ | win32.FILE_SHARE_WRITE)
 	sa := win32.SECURITY_ATTRIBUTES {
 		nLength = size_of(win32.SECURITY_ATTRIBUTES),
-		bInheritHandle = .Close_On_Exec not_in flags,
+		bInheritHandle = .Inheritable in flags,
 	}
 
 	create_mode: u32 = win32.OPEN_EXISTING
