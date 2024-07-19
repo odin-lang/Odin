@@ -4,6 +4,7 @@ helper routines.
 */
 package crypto
 
+import "base:runtime"
 import "core:mem"
 
 // compare_constant_time returns 1 iff a and b are equal, 0 otherwise.
@@ -49,6 +50,9 @@ compare_byte_ptrs_constant_time :: proc "contextless" (a, b: ^byte, n: int) -> i
 // the system entropy source.  This routine will block if the system entropy
 // source is not ready yet.  All system entropy source failures are treated
 // as catastrophic, resulting in a panic.
+//
+// Support for the system entropy source can be checked with the
+// `HAS_RAND_BYTES` boolean constant.
 rand_bytes :: proc (dst: []byte) {
 	// zero-fill the buffer first
 	mem.zero_explicit(raw_data(dst), len(dst))
@@ -56,8 +60,27 @@ rand_bytes :: proc (dst: []byte) {
 	_rand_bytes(dst)
 }
 
-// has_rand_bytes returns true iff the target has support for accessing the
-// system entropty source.
-has_rand_bytes :: proc () -> bool {
-	return _has_rand_bytes()
+// random_generator returns a `runtime.Random_Generator` backed by the
+// system entropy source.
+//
+// Support for the system entropy source can be checked with the
+// `HAS_RAND_BYTES` boolean constant.
+random_generator :: proc() -> runtime.Random_Generator {
+	return {
+		procedure = proc(data: rawptr, mode: runtime.Random_Generator_Mode, p: []byte) {
+			switch mode {
+			case .Read:
+				rand_bytes(p)
+			case .Reset:
+				// do nothing
+			case .Query_Info:
+				if len(p) != size_of(runtime.Random_Generator_Query_Info) {
+					return
+				}
+				info := (^runtime.Random_Generator_Query_Info)(raw_data(p))
+				info^ += {.Uniform, .Cryptographic, .External_Entropy}
+			}
+		},
+		data = nil,
+	}
 }

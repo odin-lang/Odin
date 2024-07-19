@@ -1,7 +1,9 @@
 //+build js
 package fmt
 
+import "core:bufio"
 import "core:io"
+import "core:os"
 
 foreign import "odin_env"
 
@@ -29,6 +31,55 @@ stdout := io.Writer{
 stderr := io.Writer{
 	procedure = write_stream_proc,
 	data      = rawptr(uintptr(2)),
+}
+
+@(private="file")
+fd_to_writer :: proc(fd: os.Handle, loc := #caller_location) -> io.Writer {
+	switch fd {
+	case 1: return stdout
+	case 2: return stderr
+	case:   panic("`fmt.fprint` variant called with invalid file descriptor for JS, only 1 (stdout) and 2 (stderr) are supported", loc)
+	}
+}
+
+// fprint formats using the default print settings and writes to fd
+fprint :: proc(fd: os.Handle, args: ..any, sep := " ", flush := true, loc := #caller_location) -> int {
+	buf: [1024]byte
+	b: bufio.Writer
+	defer bufio.writer_flush(&b)
+
+	bufio.writer_init_with_buf(&b, fd_to_writer(fd, loc), buf[:])
+	w := bufio.writer_to_writer(&b)
+	return wprint(w, ..args, sep=sep, flush=flush)
+}
+
+// fprintln formats using the default print settings and writes to fd
+fprintln :: proc(fd: os.Handle, args: ..any, sep := " ", flush := true, loc := #caller_location) -> int {
+	buf: [1024]byte
+	b: bufio.Writer
+	defer bufio.writer_flush(&b)
+
+	bufio.writer_init_with_buf(&b, fd_to_writer(fd, loc), buf[:])
+
+	w := bufio.writer_to_writer(&b)
+	return wprintln(w, ..args, sep=sep, flush=flush)
+}
+
+// fprintf formats according to the specified format string and writes to fd
+fprintf :: proc(fd: os.Handle, fmt: string, args: ..any, flush := true, newline := false, loc := #caller_location) -> int {
+	buf: [1024]byte
+	b: bufio.Writer
+	defer bufio.writer_flush(&b)
+
+	bufio.writer_init_with_buf(&b, fd_to_writer(fd, loc), buf[:])
+
+	w := bufio.writer_to_writer(&b)
+	return wprintf(w, fmt, ..args, flush=flush, newline=newline)
+}
+
+// fprintfln formats according to the specified format string and writes to fd, followed by a newline.
+fprintfln :: proc(fd: os.Handle, fmt: string, args: ..any, flush := true, loc := #caller_location) -> int {
+	return fprintf(fd, fmt, ..args, flush=flush, newline=true, loc=loc)
 }
 
 // print formats using the default print settings and writes to stdout

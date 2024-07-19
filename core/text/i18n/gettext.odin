@@ -60,10 +60,6 @@ parse_mo_from_bytes :: proc(data: []byte, options := DEFAULT_PARSE_OPTIONS, plur
 	translation.pluralize = pluralizer
 	strings.intern_init(&translation.intern, allocator, allocator)
 
-	// Gettext MO files only have one section.
-	translation.k_v[""] = {}
-	section := &translation.k_v[""]
-
 	for n := u32(0); n < count; n += 1 {
 		/*
 			Grab string's original length and offset.
@@ -83,37 +79,60 @@ parse_mo_from_bytes :: proc(data: []byte, options := DEFAULT_PARSE_OPTIONS, plur
 		max_offset := int(max(o_offset + o_length + 1, t_offset + t_length + 1))
 		if len(data) < max_offset { return translation, .Premature_EOF }
 
-		key := data[o_offset:][:o_length]
-		val := data[t_offset:][:t_length]
+		key_data := data[o_offset:][:o_length]
+		val_data := data[t_offset:][:t_length]
 
 		/*
 			Could be a pluralized string.
 		*/
 		zero := []byte{0}
+		keys := bytes.split(key_data, zero); defer delete(keys)
+		vals := bytes.split(val_data, zero); defer delete(vals)
 
-		keys := bytes.split(key, zero)
-		vals := bytes.split(val, zero)
-	
-		if len(keys) != len(vals) || max(len(keys), len(vals)) > MAX_PLURALS {
+		if (len(keys) != 1 && len(keys) != 2) || len(vals) > MAX_PLURALS {
 			return translation, .MO_File_Incorrect_Plural_Count
 		}
 
 		for k in keys {
-			interned_key, _ := strings.intern_get(&translation.intern, string(k))
+			section_name := ""
+			key          := string(k)
 
-			interned_vals := make([]string, len(keys))
+			// Scan for <context>EOT<key>
+			for ch, i in k {
+				if ch == 0x04 {
+					section_name = string(k[:i])
+					key          = string(k[i+1:])
+					break
+				}
+			}
+
+			// If we merge sections, then all entries end in the "" context.
+			if options.merge_sections {
+				section_name = ""
+			}
+
+			section_name, _ = strings.intern_get(&translation.intern, section_name)
+			if section_name not_in translation.k_v {
+				translation.k_v[section_name] = {}
+			}
+
+			section         := &translation.k_v[section_name]
+			interned_key, _ := strings.intern_get(&translation.intern, string(key))
+
+			// Duplicate key should not be allowed.
+			if interned_key in section {
+				return translation, .Duplicate_Key
+			}
+
+			interned_vals := make([]string, len(vals))
 			last_val: string
 
-			i := 0
-			for v in vals {
+			for v, i in vals {
 				interned_vals[i], _ = strings.intern_get(&translation.intern, string(v))
 				last_val = interned_vals[i]
-				i += 1
 			}
 			section[interned_key] = interned_vals
 		}
-		delete(vals)
-		delete(keys)
 	}
 	return
 }

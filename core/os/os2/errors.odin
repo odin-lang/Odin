@@ -22,6 +22,9 @@ General_Error :: enum u32 {
 	Invalid_File,
 	Invalid_Dir,
 	Invalid_Path,
+	Invalid_Callback,
+
+	Pattern_Has_Separator,
 
 	Unsupported,
 }
@@ -62,7 +65,9 @@ error_string :: proc(ferr: Error) -> string {
 		case .Invalid_File:      return "invalid file"
 		case .Invalid_Dir:       return "invalid directory"
 		case .Invalid_Path:      return "invalid path"
+		case .Invalid_Callback:  return "invalid callback"
 		case .Unsupported:       return "unsupported"
+		case .Pattern_Has_Separator: return "pattern has separator"
 		}
 	case io.Error:
 		switch e {
@@ -95,4 +100,20 @@ error_string :: proc(ferr: Error) -> string {
 	}
 
 	return "unknown error"
+}
+
+print_error :: proc(f: ^File, ferr: Error, msg: string) {
+	TEMP_ALLOCATOR_GUARD()
+	err_str := error_string(ferr)
+
+	// msg + ": " + err_str + '\n'
+	length := len(msg) + 2 + len(err_str) + 1
+	buf := make([]u8, length, temp_allocator())
+
+	copy(buf, msg)
+	buf[len(msg)] = ':'
+	buf[len(msg) + 1] = ' '
+	copy(buf[len(msg) + 2:], err_str)
+	buf[length - 1] = '\n'
+	write(f, buf)
 }

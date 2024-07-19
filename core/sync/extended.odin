@@ -433,7 +433,7 @@ One_Shot_Event :: struct #no_copy {
 // Blocks the current thread until the event is made available with `one_shot_event_signal`.
 one_shot_event_wait :: proc "contextless" (e: ^One_Shot_Event) {
 	for atomic_load_explicit(&e.state, .Acquire) == 0 {
-		futex_wait(&e.state, 1)
+		futex_wait(&e.state, 0)
 	}
 }
 

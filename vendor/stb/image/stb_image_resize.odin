@@ -2,11 +2,24 @@ package stb_image
 
 import c "core:c/libc"
 
-     when ODIN_OS == .Windows { foreign import lib "../lib/stb_image_resize.lib"      }
-else when ODIN_OS == .Linux   { foreign import lib "../lib/stb_image_resize.a"        }
-else when ODIN_OS == .Darwin  { foreign import lib "../lib/darwin/stb_image_resize.a" }
-else                          { foreign import lib "system:stb_image_resize"         }
+@(private)
+RESIZE_LIB :: (
+	     "../lib/stb_image_resize.lib"      when ODIN_OS == .Windows
+	else "../lib/stb_image_resize.a"        when ODIN_OS == .Linux
+	else "../lib/darwin/stb_image_resize.a" when ODIN_OS == .Darwin
+	else ""
+)
 
+when RESIZE_LIB != "" {
+	when !#exists(RESIZE_LIB) {
+		// The STB libraries are shipped with the compiler on Windows so a Windows specific message should not be needed.
+		#panic("Could not find the compiled STB libraries, they can be compiled by running `make -C \"" + ODIN_ROOT + "vendor/stb/src\"`")
+	}
+
+	foreign import lib { RESIZE_LIB }
+} else {
+	foreign import lib "system:stb_image_resize"
+}
 
 //////////////////////////////////////////////////////////////////////////////
 //

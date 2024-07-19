@@ -17,6 +17,18 @@ foreign user32 {
 
 	GetClassNameW :: proc(hWnd: HWND, lpClassName: LPWSTR, nMaxCount: c_int) -> c_int ---
 
+	GetParent :: proc(hWnd: HWND) -> HWND ---
+	IsWindowVisible :: proc(hWnd: HWND) -> BOOL ---
+	SetWinEventHook :: proc(
+		eventMin, eventMax: DWORD,
+		hmodWinEventProc: HMODULE,
+		pfnWinEvenProc: WINEVENTPROC,
+		idProcess, idThread: DWORD,
+		dwFlags: WinEventFlags,
+	) -> HWINEVENTHOOK ---
+
+	IsChild :: proc(hWndParent, hWnd: HWND) -> BOOL ---
+
 	RegisterClassW :: proc(lpWndClass: ^WNDCLASSW) -> ATOM ---
 	RegisterClassExW :: proc(^WNDCLASSEXW) -> ATOM ---
 	UnregisterClassW :: proc(lpClassName: LPCWSTR, hInstance: HINSTANCE) -> BOOL ---
@@ -126,6 +138,7 @@ foreign user32 {
 	CreatePopupMenu :: proc() -> HMENU ---
 	DestroyMenu :: proc(hMenu: HMENU) -> BOOL ---
 	AppendMenuW :: proc(hMenu: HMENU, uFlags: UINT, uIDNewItem: UINT_PTR, lpNewItem: LPCWSTR) -> BOOL ---
+	SetMenu :: proc(hWnd: HWND, hMenu: HMENU) -> BOOL ---
 	TrackPopupMenu :: proc(hMenu: HMENU, uFlags: UINT, x: int, y: int, nReserved: int, hWnd: HWND, prcRect: ^RECT) -> i32 ---
 	RegisterWindowMessageW :: proc(lpString: LPCWSTR) -> UINT ---
 
@@ -355,9 +368,9 @@ RAWHID :: struct {
 
 RAWMOUSE :: struct {
 	usFlags: USHORT,
-	DUMMYUNIONNAME: struct #raw_union {
+	using DUMMYUNIONNAME: struct #raw_union {
 		ulButtons: ULONG,
-		DUMMYSTRUCTNAME: struct {
+		using DUMMYSTRUCTNAME: struct {
 			usButtonFlags: USHORT,
 			usButtonData: USHORT,
 		},
@@ -433,7 +446,7 @@ RID_DEVICE_INFO_MOUSE :: struct {
 RID_DEVICE_INFO :: struct {
 	cbSize: DWORD,
 	dwType: DWORD,
-	DUMMYUNIONNAME: struct #raw_union {
+	using DUMMYUNIONNAME: struct #raw_union {
 		mouse: RID_DEVICE_INFO_MOUSE,
 		keyboard: RID_DEVICE_INFO_KEYBOARD,
 		hid: RID_DEVICE_INFO_HID,
@@ -454,9 +467,20 @@ RIDEV_DEVNOTIFY :: 0x00002000
 RID_HEADER :: 0x10000005
 RID_INPUT :: 0x10000003
 
+RIDI_PREPARSEDDATA :: 0x20000005
+RIDI_DEVICENAME :: 0x20000007
+RIDI_DEVICEINFO :: 0x2000000b
+
 RIM_TYPEMOUSE :: 0
 RIM_TYPEKEYBOARD :: 1
 RIM_TYPEHID :: 2
+
+RI_KEY_MAKE :: 0
+RI_KEY_BREAK :: 1
+RI_KEY_E0 :: 2
+RI_KEY_E1 :: 4
+RI_KEY_TERMSRV_SET_LED :: 8
+RI_KEY_TERMSRV_SHADOW :: 0x10
 
 MOUSE_MOVE_RELATIVE :: 0x00
 MOUSE_MOVE_ABSOLUTE :: 0x01
@@ -483,19 +507,6 @@ RI_MOUSE_BUTTON_5_UP :: 0x0200
 RI_MOUSE_WHEEL :: 0x0400
 RI_MOUSE_HWHEEL :: 0x0800
 
-HID_USAGE_PAGE_GENERIC :: 0x01
-HID_USAGE_PAGE_GAME :: 0x05
-HID_USAGE_PAGE_LED :: 0x08
-HID_USAGE_PAGE_BUTTON :: 0x09
-
-HID_USAGE_GENERIC_POINTER :: 0x01
-HID_USAGE_GENERIC_MOUSE :: 0x02
-HID_USAGE_GENERIC_JOYSTICK :: 0x04
-HID_USAGE_GENERIC_GAMEPAD :: 0x05
-HID_USAGE_GENERIC_KEYBOARD :: 0x06
-HID_USAGE_GENERIC_KEYPAD :: 0x07
-HID_USAGE_GENERIC_MULTI_AXIS_CONTROLLER :: 0x08
-
 WINDOWPLACEMENT :: struct {
 	length: UINT,
 	flags: UINT,
@@ -520,11 +531,11 @@ WINDOWINFO :: struct {
 PWINDOWINFO :: ^WINDOWINFO
 
 DRAWTEXTPARAMS :: struct {
-       cbSize         : UINT ,
-       iTabLength: int  ,
-       iLeftMargin: int  ,
-       iRightMargin: int  ,
-       uiLengthDrawn: UINT ,
+	cbSize: UINT,
+	iTabLength: int,
+	iLeftMargin: int,
+	iRightMargin: int,
+	uiLengthDrawn: UINT,
 }
 PDRAWTEXTPARAMS :: ^DRAWTEXTPARAMS
 
@@ -568,4 +579,13 @@ RedrawWindowFlags :: enum UINT {
 	RDW_ERASENOW        = 0x0200,
 	RDW_FRAME           = 0x0400,
 	RDW_NOFRAME         = 0x0800,
+}
+
+// OUTOFCONTEXT is the zero value, use {}
+WinEventFlags :: bit_set[WinEventFlag; DWORD]
+
+WinEventFlag :: enum DWORD {
+    SKIPOWNTHREAD  = 0,
+    SKIPOWNPROCESS = 1,
+    INCONTEXT      = 2,
 }

@@ -132,7 +132,7 @@ Application_nextEventMatchingMask :: proc "c" (self: ^Application, mask: EventMa
 
 @(objc_type=Application, objc_name="sendEvent")
 Application_sendEvent :: proc "c" (self: ^Application, event: ^Event) {
-	msgSend(Event, self, "sendEvent:", event)
+	msgSend(nil, self, "sendEvent:", event)
 }
 @(objc_type=Application, objc_name="updateWindows")
 Application_updateWindows :: proc "c" (self: ^Application) {

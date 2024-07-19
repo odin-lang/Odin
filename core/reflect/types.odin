@@ -114,17 +114,15 @@ are_types_identical :: proc(a, b: ^Type_Info) -> bool {
 
 	case Type_Info_Struct:
 		y := b.variant.(Type_Info_Struct) or_return
-	   	switch {
-		case len(x.types)    != len(y.types),
-		     x.is_packed     != y.is_packed,
-		     x.is_raw_union  != y.is_raw_union,
-		     x.custom_align  != y.custom_align,
+		switch {
+		case x.field_count   != y.field_count,
+		     x.flags         != y.flags,
 		     x.soa_kind      != y.soa_kind,
 		     x.soa_base_type != y.soa_base_type,
 		     x.soa_len       != y.soa_len:
-		     return false
+			return false
 		}
-		for _, i in x.types {
+		for i in 0..<x.field_count {
 			xn, yn := x.names[i], y.names[i]
 			xt, yt := x.types[i], y.types[i]
 			xl, yl := x.tags[i],  y.tags[i]
@@ -179,8 +177,8 @@ are_types_identical :: proc(a, b: ^Type_Info) -> bool {
 	case Type_Info_Bit_Field:
 		y := b.variant.(Type_Info_Bit_Field) or_return
 		if !are_types_identical(x.backing_type, y.backing_type) { return false }
-		if len(x.names) != len(y.names) { return false }
-		for _, i in x.names {
+		if x.field_count != y.field_count { return false }
+		for _, i in x.names[:x.field_count] {
 			if x.names[i] != y.names[i] {
 				return false
 			}
@@ -368,13 +366,13 @@ is_tuple :: proc(info: ^Type_Info) -> bool {
 is_struct :: proc(info: ^Type_Info) -> bool {
 	if info == nil { return false }
 	s, ok := type_info_base(info).variant.(Type_Info_Struct)
-	return ok && !s.is_raw_union
+	return ok && .raw_union not_in s.flags
 }
 @(require_results)
 is_raw_union :: proc(info: ^Type_Info) -> bool {
 	if info == nil { return false }
 	s, ok := type_info_base(info).variant.(Type_Info_Struct)
-	return ok && s.is_raw_union
+	return ok && .raw_union in s.flags
 }
 @(require_results)
 is_union :: proc(info: ^Type_Info) -> bool {
@@ -408,7 +406,68 @@ is_relative_multi_pointer :: proc(info: ^Type_Info) -> bool {
 }
 
 
+@(require_results)
+is_endian_platform :: proc(info: ^Type_Info) -> bool {
+	if info == nil { return false}
+	info := info
+	info = type_info_core(info)
+	#partial switch v in info.variant {
+	case Type_Info_Integer:
+		return v.endianness == .Platform
+	case Type_Info_Bit_Set:
+		if v.underlying != nil {
+			return is_endian_platform(v.underlying)
+		}
+		return true
+	case Type_Info_Pointer:
+		return true
+	}
+	return false
+}
 
+@(require_results)
+is_endian_little :: proc(info: ^Type_Info) -> bool {
+	if info == nil { return false}
+	info := info
+	info = type_info_core(info)
+	#partial switch v in info.variant {
+	case Type_Info_Integer:
+		if v.endianness == .Platform {
+			return ODIN_ENDIAN == .Little
+		}
+		return v.endianness == .Little
+	case Type_Info_Bit_Set:
+		if v.underlying != nil {
+			return is_endian_platform(v.underlying)
+		}
+		return ODIN_ENDIAN == .Little
+	case Type_Info_Pointer:
+		return ODIN_ENDIAN == .Little
+	}
+	return ODIN_ENDIAN == .Little
+}
+
+@(require_results)
+is_endian_big :: proc(info: ^Type_Info) -> bool {
+	if info == nil { return false}
+	info := info
+	info = type_info_core(info)
+	#partial switch v in info.variant {
+	case Type_Info_Integer:
+		if v.endianness == .Platform {
+			return ODIN_ENDIAN == .Big
+		}
+		return v.endianness == .Big
+	case Type_Info_Bit_Set:
+		if v.underlying != nil {
+			return is_endian_platform(v.underlying)
+		}
+		return ODIN_ENDIAN == .Big
+	case Type_Info_Pointer:
+		return ODIN_ENDIAN == .Big
+	}
+	return ODIN_ENDIAN == .Big
+}
 
 
 
@@ -434,7 +493,7 @@ write_type_builder :: proc(buf: ^strings.Builder, ti: ^Type_Info) -> int {
 	n, _ := write_type_writer(strings.to_writer(buf), ti)
 	return n
 }
-write_type_writer :: proc(w: io.Writer, ti: ^Type_Info, n_written: ^int = nil) -> (n: int, err: io.Error) {
+write_type_writer :: #force_no_inline proc(w: io.Writer, ti: ^Type_Info, n_written: ^int = nil) -> (n: int, err: io.Error) {
 	defer if n_written != nil {
 		n_written^ += n
 	}
@@ -595,15 +654,16 @@ write_type_writer :: proc(w: io.Writer, ti: ^Type_Info, n_written: ^int = nil) -
 		}
 
 		io.write_string(w, "struct ", &n) or_return
-		if info.is_packed    { io.write_string(w, "#packed ",    &n) or_return }
-		if info.is_raw_union { io.write_string(w, "#raw_union ", &n) or_return }
-		if info.custom_align {
+		if .packed    in info.flags { io.write_string(w, "#packed ",    &n) or_return }
+		if .raw_union in info.flags { io.write_string(w, "#raw_union ", &n) or_return }
+		if .no_copy   in info.flags { io.write_string(w, "#no_copy ", &n) or_return }
+		if .align in info.flags {
 			io.write_string(w, "#align(",      &n) or_return
 			io.write_i64(w, i64(ti.align), 10, &n) or_return
 			io.write_string(w, ") ",           &n) or_return
 		}
 		io.write_byte(w, '{', &n) or_return
-		for name, i in info.names {
+		for name, i in info.names[:info.field_count] {
 			if i > 0 { io.write_string(w, ", ", &n) or_return }
 			io.write_string(w, name,     &n) or_return
 			io.write_string(w, ": ",     &n) or_return
@@ -661,7 +721,7 @@ write_type_writer :: proc(w: io.Writer, ti: ^Type_Info, n_written: ^int = nil) -
 		io.write_string(w, "bit_field ", &n) or_return
 		write_type(w, info.backing_type, &n) or_return
 		io.write_string(w, " {",         &n) or_return
-		for name, i in info.names {
+		for name, i in info.names[:info.field_count] {
 			if i > 0 { io.write_string(w, ", ", &n) or_return }
 			io.write_string(w, name,     &n) or_return
 			io.write_string(w, ": ",     &n) or_return

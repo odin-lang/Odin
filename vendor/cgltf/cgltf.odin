@@ -1,9 +1,23 @@
 package cgltf
 
-when ODIN_OS == .Windows      { foreign import lib "lib/cgltf.lib" } 
-else when ODIN_OS == .Linux   { foreign import lib "lib/cgltf.a"        }
-else when ODIN_OS == .Darwin  { foreign import lib "lib/darwin/cgltf.a" }
-else                          { foreign import lib "system:cgltf"          }
+@(private)
+LIB :: (
+	     "lib/cgltf.lib"      when ODIN_OS == .Windows
+	else "lib/cgltf.a"        when ODIN_OS == .Linux
+	else "lib/darwin/cgltf.a" when ODIN_OS == .Darwin
+	else ""
+)
+
+when LIB != "" {
+	when !#exists(LIB) {
+		// Windows library is shipped with the compiler, so a Windows specific message should not be needed.
+		#panic("Could not find the compiled cgltf library, it can be compiled by running `make -C \"" + ODIN_ROOT + "vendor/cgltf/src\"`")
+	}
+
+	foreign import lib { LIB }
+} else {
+	foreign import lib "system:cgltf"
+}
 
 import "core:c"
 

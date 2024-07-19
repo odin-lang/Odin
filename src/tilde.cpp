@@ -363,7 +363,6 @@ gb_internal bool cg_global_variables_create(cgModule *m, Array<cgGlobalVariable>
 		if (is_foreign) {
 			linkage = TB_LINKAGE_PUBLIC;
 			// lb_add_foreign_library_path(m, e->Variable.foreign_library);
-			// lb_set_wasm_import_attributes(g.value, e, name);
 		} else if (is_export) {
 			linkage = TB_LINKAGE_PUBLIC;
 		}

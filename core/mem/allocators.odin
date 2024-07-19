@@ -748,9 +748,7 @@ dynamic_pool_alloc_bytes :: proc(p: ^Dynamic_Pool, bytes: int) -> ([]byte, Alloc
 		return
 	}
 
-	n := bytes
-	extra := p.alignment - (n % p.alignment)
-	n += extra
+	n := align_formula(bytes, p.alignment)
 	if n > p.block_size {
 		return nil, .Invalid_Argument
 	}
@@ -1124,7 +1122,7 @@ buddy_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 	case .Query_Info:
 		info := (^Allocator_Query_Info)(old_memory)
 		if info != nil && info.pointer != nil {
-			ptr := old_memory
+			ptr := info.pointer
 			if !(b.head <= ptr && ptr <= b.tail) {
 				return nil, .Invalid_Pointer
 			}

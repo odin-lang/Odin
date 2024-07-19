@@ -82,6 +82,7 @@ FEATURE_LEVEL :: enum i32 {
 	_11_1     = 45312,
 	_12_0     = 49152,
 	_12_1     = 49408,
+	_12_2     = 49664,
 }
 
 PRIMITIVE_TOPOLOGY :: enum i32 {
@@ -833,6 +834,9 @@ FEATURE :: enum i32 {
 	OPTIONS7                              = 32,
 	PROTECTED_RESOURCE_SESSION_TYPE_COUNT = 33,
 	PROTECTED_RESOURCE_SESSION_TYPES      = 34,
+	OPTIONS8                              = 36,
+	OPTIONS9                              = 37,
+	WAVE_MMA                              = 38,
 }
 
 SHADER_MIN_PRECISION_SUPPORT :: enum i32 {
@@ -1017,6 +1021,7 @@ SHADER_MODEL :: enum i32 {
 	_6_4 = 100,
 	_6_5 = 101,
 	_6_6 = 102,
+	_6_7 = 103,
 }
 
 FEATURE_DATA_SHADER_MODEL :: struct {
@@ -1052,6 +1057,7 @@ SHADER_CACHE_SUPPORT_FLAG :: enum u32 {
 	LIBRARY                = 1,
 	AUTOMATIC_INPROC_CACHE = 2,
 	AUTOMATIC_DISK_CACHE   = 3,
+	DRIVER_MANAGED_CACHE   = 4,
 }
 
 FEATURE_DATA_SHADER_CACHE :: struct {
@@ -1171,6 +1177,55 @@ FEATURE_DATA_QUERY_META_COMMAND :: struct {
 	QueryOutputDataSizeInBytes: SIZE_T,
 }
 
+FEATURE_DATA_OPTIONS8 :: struct {
+	UnalignedBlockTexturesSupported: BOOL,
+}
+
+WAVE_MMA_TIER :: enum i32 {
+	NOT_SUPPORTED = 0,
+	_1_0          = 10,
+}
+
+FEATURE_DATA_OPTIONS9 :: struct {
+	MeshShaderPipelineStatsSupported:                  BOOL,
+	MeshShaderSupportsFullRangeRenderTargetArrayIndex: BOOL,
+	AtomicInt64OnTypedResourceSupported:               BOOL,
+	AtomicInt64OnGroupSharedSupported:                 BOOL,
+	DerivativesInMeshAndAmplificationShadersSupported: BOOL,
+	WaveMMATier:                                       WAVE_MMA_TIER,
+}
+
+WAVE_MMA_INPUT_DATATYPE :: enum i32 {
+	INVALID = 0,
+	BYTE    = 1,
+	FLOAT16 = 2,
+	FLOAT   = 3,
+}
+
+WAVE_MMA_DIMENSION :: enum i32 {
+	INVALID = 0,
+	_16     = 1,
+	_64     = 2,
+}
+
+WAVE_MMA_ACCUM_DATATYPE :: enum i32 {
+	NONE    = 0,
+	INT32   = 1,
+	FLOAT16 = 2,
+	FLOAT   = 4,
+}
+
+FEATURE_DATA_WAVE_MMA :: struct {
+	InputDataType:            WAVE_MMA_INPUT_DATATYPE,
+	M:                        WAVE_MMA_DIMENSION,
+	N:                        WAVE_MMA_DIMENSION,
+	Supported:                BOOL,
+	K:                        u32,
+	AccumDataTypes:           WAVE_MMA_ACCUM_DATATYPE,
+	RequiredWaveLaneCountMin: u32,
+	RequiredWaveLaneCountMax: u32,
+}
+
 RESOURCE_ALLOCATION_INFO :: struct {
 	SizeInBytes: u64,
 	Alignment:   u64,
@@ -1261,6 +1316,7 @@ RESOURCE_FLAG :: enum u32 {
 	ALLOW_CROSS_ADAPTER         = 4,
 	ALLOW_SIMULTANEOUS_ACCESS   = 5,
 	VIDEO_DECODE_REFERENCE_ONLY = 6,
+	VIDEO_ENCODE_REFERENCE_ONLY = 7,
 }
 
 MIP_REGION :: struct {
@@ -2140,6 +2196,7 @@ QUERY_HEAP_TYPE :: enum i32 {
 	SO_STATISTICS           = 3,
 	VIDEO_DECODE_STATISTICS = 4,
 	COPY_QUEUE_TIMESTAMP    = 5,
+	PIPELINE_STATISTICS1    = 7,
 }
 
 QUERY_HEAP_DESC :: struct {
@@ -2158,6 +2215,7 @@ QUERY_TYPE :: enum i32 {
 	SO_STATISTICS_STREAM2   = 6,
 	SO_STATISTICS_STREAM3   = 7,
 	VIDEO_DECODE_STATISTICS = 8,
+	PIPELINE_STATISTICS1    = 10,
 }
 
 PREDICATION_OP :: enum i32 {
@@ -2177,6 +2235,23 @@ QUERY_DATA_PIPELINE_STATISTICS :: struct {
 	HSInvocations: u64,
 	DSInvocations: u64,
 	CSInvocations: u64,
+}
+
+QUERY_DATA_PIPELINE_STATISTICS1 :: struct {
+	IAVertices:    u64,
+	IAPrimitives:  u64,
+	VSInvocations: u64,
+	GSInvocations: u64,
+	GSPrimitives:  u64,
+	CInvocations:  u64,
+	CPrimitives:   u64,
+	PSInvocations: u64,
+	HSInvocations: u64,
+	DSInvocations: u64,
+	CSInvocations: u64,
+	ASInvocations: u64,
+	MSInvocations: u64,
+	MSPrimitives:  u64,
 }
 
 QUERY_DATA_SO_STATISTICS :: struct {
@@ -3244,6 +3319,8 @@ AUTO_BREADCRUMB_OP :: enum i32 {
 	INITIALIZEEXTENSIONCOMMAND                       = 40,
 	EXECUTEEXTENSIONCOMMAND                          = 41,
 	DISPATCHMESH                                     = 42,
+	ENCODEFRAME                                      = 43,
+	RESOLVEENCODEROUTPUTMETADATA                     = 44,
 }
 
 AUTO_BREADCRUMB_NODE :: struct {
@@ -3283,6 +3360,7 @@ DRED_VERSION :: enum i32 {
 	_1_0 = 1,
 	_1_1 = 2,
 	_1_2 = 3,
+	_1_3 = 4,
 }
 
 DRED_FLAGS :: distinct bit_set[DRED_FLAG; u32]
@@ -3329,6 +3407,8 @@ DRED_ALLOCATION_TYPE :: enum i32 {
 	VIDEO_MOTION_ESTIMATOR   = 45,
 	VIDEO_MOTION_VECTOR_HEAP = 46,
 	VIDEO_EXTENSION_COMMAND  = 47,
+	VIDEO_ENCODER            = 48,
+	VIDEO_ENCODER_HEAP       = 49,
 	INVALID                  = -1,
 }
 
@@ -3367,6 +3447,24 @@ DRED_PAGE_FAULT_OUTPUT1 :: struct {
 	pHeadRecentFreedAllocationNode: ^DRED_ALLOCATION_NODE1,
 }
 
+DRED_PAGE_FAULT_FLAGS :: bit_set[DRED_PAGE_FAULT_FLAG;u32]
+DRED_PAGE_FAULT_FLAG :: enum u32 {
+}
+
+DRED_DEVICE_STATE :: enum i32 {
+	UNKNOWN   = 0,
+	HUNG      = 3,
+	FAULT     = 6,
+	PAGEFAULT = 7,
+}
+
+DRED_PAGE_FAULT_OUTPUT2 :: struct {
+    PageFaultVA:                    GPU_VIRTUAL_ADDRESS,
+    pHeadExistingAllocationNode:    ^DRED_ALLOCATION_NODE1,
+    pHeadRecentFreedAllocationNode: ^DRED_ALLOCATION_NODE1,
+    PageFaultFlags:                 DRED_PAGE_FAULT_FLAGS,
+}
+
 DEVICE_REMOVED_EXTENDED_DATA1 :: struct {
 	DeviceRemovedReason:   HRESULT,
 	AutoBreadcrumbsOutput: DRED_AUTO_BREADCRUMBS_OUTPUT,
@@ -3379,12 +3477,20 @@ DEVICE_REMOVED_EXTENDED_DATA2 :: struct {
 	PageFaultOutput:       DRED_PAGE_FAULT_OUTPUT1,
 }
 
+DEVICE_REMOVED_EXTENDED_DATA3 :: struct {
+	DeviceRemovedReason:   HRESULT,
+	AutoBreadcrumbsOutput: DRED_AUTO_BREADCRUMBS_OUTPUT1,
+	PageFaultOutput:       DRED_PAGE_FAULT_OUTPUT2,
+	DeviceState:           DRED_DEVICE_STATE,
+}
+
 VERSIONED_DEVICE_REMOVED_EXTENDED_DATA :: struct {
 	Version: DRED_VERSION,
 	using _: struct #raw_union {
 		Dred_1_0: DEVICE_REMOVED_EXTENDED_DATA,
 		Dred_1_1: DEVICE_REMOVED_EXTENDED_DATA1,
 		Dred_1_2: DEVICE_REMOVED_EXTENDED_DATA2,
+		Dred_1_3: DEVICE_REMOVED_EXTENDED_DATA3,
 	},
 }
 
@@ -3438,6 +3544,18 @@ IDeviceRemovedExtendedData1_VTable :: struct {
 	using id3d12deviceremovedextendeddata_vtable: IDeviceRemovedExtendedData_VTable,
 	GetAutoBreadcrumbsOutput1:     proc "system" (this: ^IDeviceRemovedExtendedData1, pOutput: ^DRED_AUTO_BREADCRUMBS_OUTPUT1) -> HRESULT,
 	GetPageFaultAllocationOutput1: proc "system" (this: ^IDeviceRemovedExtendedData1, pOutput: ^DRED_PAGE_FAULT_OUTPUT1) -> HRESULT,
+}
+
+IDeviceRemovedExtendedData2_UUID_STRING :: "67FC5816-E4CA-4915-BF18-42541272DA54"
+IDeviceRemovedExtendedData2_UUID := &IID{0x67FC5816, 0xE4CA, 0x4915, {0xBF, 0x18, 0x42, 0x54, 0x12, 0x72, 0xDA, 0x54}}
+IDeviceRemovedExtendedData2 :: struct #raw_union {
+	#subtype id3d12deviceremovedextendeddata1: IDeviceRemovedExtendedData1,
+	using id3d12deviceremovedextendeddata2_vtable: ^IDeviceRemovedExtendedData2_VTable,
+}
+IDeviceRemovedExtendedData2_VTable :: struct {
+	using id3d12deviceremovedextendeddata1_vtable: IDeviceRemovedExtendedData1_VTable,
+	GetPageFaultAllocationOutput2: proc "system" (this: ^IDeviceRemovedExtendedData2, pOutput: ^DRED_PAGE_FAULT_OUTPUT2) -> HRESULT,
+	GetDeviceState:                proc "system" (this: ^IDeviceRemovedExtendedData2) -> DRED_DEVICE_STATE,
 }
 
 BACKGROUND_PROCESSING_MODE :: enum i32 {
@@ -3686,6 +3804,71 @@ IGraphicsCommandList4_VTable :: struct {
 }
 
 
+SHADER_CACHE_MODE :: enum i32 {
+	MEMORY = 0,
+	DISK   = 1,
+}
+
+SHADER_CACHE_FLAGS :: bit_set[SHADER_CACHE_FLAG;u32]
+SHADER_CACHE_FLAG :: enum u32 {
+	DRIVER_VERSIONED = 0,
+	USE_WORKING_DIR  = 1,
+}
+
+SHADER_CACHE_SESSION_DESC :: struct {
+	Identifier:                    GUID,
+	Mode:                          SHADER_CACHE_MODE,
+	Flags:                         SHADER_CACHE_FLAGS,
+	MaximumInMemoryCacheSizeBytes: u32,
+	MaximumInMemoryCacheEntries:   u32,
+	MaximumValueFileSizeBytes:     u32,
+	Version:                       u64,
+}
+
+IShaderCacheSession_UUID_STRING :: "28E2495D-0F64-4AE4-A6EC-129255DC49A8"
+IShaderCacheSession_UUID := &IID{0x28E2495D, 0x0F64, 0x4AE4, {0xA6, 0xEC, 0x12, 0x92, 0x55, 0xDC, 0x49, 0xA8}}
+IShaderCacheSession :: struct #raw_union {
+	#subtype idevicechild: IDeviceChild,
+	using id3d12shadercachesession_vtable: ^IShaderCacheSession_VTable,
+}
+IShaderCacheSession_VTable :: struct {
+	using idevicechild_vtable: IDeviceChild_VTable,
+	FindValue:          proc "system" (this: ^IShaderCacheSession, pKey: rawptr, KeySize: u32, pValue: rawptr, pValueSize: ^u32) -> HRESULT,
+	StoreValue:         proc "system" (this: ^IShaderCacheSession, pKey: rawptr, KeySize: u32, pValue: rawptr, ValueSize: u32) -> HRESULT,
+	SetDeleteOnDestroy: proc "system" (this: ^IShaderCacheSession),
+	GetDesc:            proc "system" (this: ^IShaderCacheSession, pRetValue: ^SHADER_CACHE_SESSION_DESC) -> ^SHADER_CACHE_SESSION_DESC,
+}
+
+
+SHADER_CACHE_KIND_FLAGS :: bit_set[SHADER_CACHE_KIND_FLAG;u32]
+SHADER_CACHE_KIND_FLAG :: enum u32 {
+	IMPLICIT_D3D_CACHE_FOR_DRIVER = 0,
+	IMPLICIT_D3D_CONVERSIONS      = 1,
+	IMPLICIT_DRIVER_MANAGED       = 2,
+	APPLICATION_MANAGED           = 3,
+}
+
+SHADER_CACHE_CONTROL_FLAGS :: bit_set[SHADER_CACHE_CONTROL_FLAG;u32]
+SHADER_CACHE_CONTROL_FLAG :: enum u32 {
+	DISABLE = 0,
+	ENABLE  = 1,
+	CLEAR   = 2,
+}
+
+IDevice9_UUID_STRING :: "4C80E962-F032-4F60-BC9E-EBC2CFA1D83C"
+IDevice9_UUID := &IID{0x4C80E962, 0xF032, 0x4F60, {0xBC, 0x9E, 0xEB, 0xC2, 0xCF, 0xA1, 0xD8, 0x3C}}
+IDevice9 :: struct #raw_union {
+	#subtype id3d12device8: IDevice8,
+	using id3d12device9_vtable: ^IDevice9_VTable,
+}
+IDevice9_VTable :: struct {
+	using id3d12device8_vtable: IDevice8_VTable,
+	CreateShaderCacheSession: proc "system" (this: ^IDevice9, pDesc: ^SHADER_CACHE_SESSION_DESC , riid: ^IID, ppvSession: ^rawptr) -> HRESULT,
+	ShaderCacheControl:       proc "system" (this: ^IDevice9, Kinds: SHADER_CACHE_KIND_FLAGS, Control: SHADER_CACHE_CONTROL_FLAGS) -> HRESULT,
+	CreateCommandQueue1:      proc "system" (this: ^IDevice9, pDesc: ^COMMAND_QUEUE_DESC, CreatorID: ^IID, riid: ^IID, ppCommandQueue: ^rawptr) -> HRESULT,
+}
+
+
 ITools_UUID_STRING :: "7071e1f0-e84b-4b33-974f-12fa49de65c5"
 ITools_UUID := &IID{0x7071e1f0, 0xe84b, 0x4b33, {0x97, 0x4f, 0x12, 0xfa, 0x49, 0xde, 0x65, 0xc5}}
 ITools :: struct #raw_union {
@@ -3764,6 +3947,30 @@ IDebug3_VTable :: struct {
 	SetEnableGPUBasedValidation:                 proc "system" (this: ^IDebug3, Enable: BOOL),
 	SetEnableSynchronizedCommandQueueValidation: proc "system" (this: ^IDebug3, Enable: BOOL),
 	SetGPUBasedValidationFlags:                  proc "system" (this: ^IDebug3, Flags: GPU_BASED_VALIDATION_FLAGS),
+}
+
+
+IDebug4_UUID_STRING :: "014B816E-9EC5-4A2F-A845-FFBE441CE13A"
+IDebug4_UUID := &IID{0x014B816E, 0x9EC5, 0x4A2F, {0xA8, 0x45, 0xFF, 0xBE, 0x44, 0x1C, 0xE1, 0x3A}}
+IDebug4 :: struct #raw_union {
+	#subtype id3d12debug3: IDebug3,
+	using id3d12debug4_vtable: ^IDebug4_VTable,
+}
+IDebug4_VTable :: struct {
+	using id3d12debug3_vtable: IDebug3_VTable,
+	DisableDebugLayer: proc "system" (this: ^IDebug4),
+}
+
+
+IDebug5_UUID_STRING :: "548D6B12-09FA-40E0-9069-5DCD589A52C9"
+IDebug5_UUID := &IID{0x548D6B12, 0x09FA, 0x40E0, {0x90, 0x69, 0x5D, 0xCD, 0x58, 0x9A, 0x52, 0xC9}}
+IDebug5 :: struct #raw_union {
+	#subtype id3d12debug4: IDebug4,
+	using id3d12debug5_vtable: ^IDebug5_VTable,
+}
+IDebug5_VTable :: struct {
+	using id3d12debug4_vtable: IDebug4_VTable,
+	SetEnableAutoName: proc "system" (this: ^IDebug5, Enable: BOOL),
 }
 
 RLDO_FLAGS :: distinct bit_set[RLDO_FLAG; u32]
@@ -4889,6 +5096,19 @@ IInfoQueue1_VTable :: struct {
 	RegisterMessageCallback: proc "system" (this: ^IInfoQueue1, CallbackFunc: PFN_MESSAGE_CALLBACK, CallbackFilterFlags: MESSAGE_CALLBACK_FLAGS, pContext: rawptr, pCallbackCookie: ^u32) -> HRESULT,
 	UnregisterMessageCallback: proc "system" (this: ^IInfoQueue1, pCallbackCookie: u32) -> HRESULT,
 }
+
+
+ISDKConfiguration_UUID_STRING :: "E9EB5314-33AA-42B2-A718-D77F58B1F1C7"
+ISDKConfiguration_UUID := &IID{0xE9EB5314, 0x33AA, 0x42B2, {0xA7, 0x18, 0xD7, 0x7F, 0x58, 0xB1, 0xF1, 0xC7}}
+ISDKConfiguration :: struct #raw_union {
+	#subtype iunknown: IUnknown,
+	using id3d12sdkconfiguration_vtable: ^ISDKConfiguration_VTable,
+}
+ISDKConfiguration_VTable :: struct {
+	using iunknown_vtable: IUnknown_VTable,
+	SetSDKVersion: proc "system" (this: ^ISDKConfiguration, SDKVersion: u32, SDKPath: cstring) -> HRESULT,
+}
+
 
 PFN_CREATE_DEVICE :: #type proc "c" (a0: ^IUnknown, a1: FEATURE_LEVEL, a2: ^IID, a3: ^rawptr) -> HRESULT
 PFN_GET_DEBUG_INTERFACE :: #type proc "c" (a0: ^IID, a1: ^rawptr) -> HRESULT

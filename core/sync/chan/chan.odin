@@ -75,6 +75,7 @@ create_raw_unbuffered :: proc(#any_int msg_size, msg_alignment: int, allocator: 
 
 	ptr := mem.alloc(size, align, allocator) or_return
 	c = (^Raw_Chan)(ptr)
+	c.allocator = allocator
 	c.allocation_size = size
 	c.unbuffered_data = ([^]byte)(ptr)[offset:]
 	c.msg_size = u16(msg_size)
@@ -99,6 +100,7 @@ create_raw_buffered :: proc(#any_int msg_size, msg_alignment: int, #any_int cap:
 
 	ptr := mem.alloc(size, align, allocator) or_return
 	c = (^Raw_Chan)(ptr)
+	c.allocator = allocator
 	c.allocation_size = size
 
 	bptr := ([^]byte)(ptr)
@@ -302,7 +304,7 @@ try_recv_raw :: proc "contextless" (c: ^Raw_Chan, msg_out: rawptr) -> bool {
 
 		if sync.atomic_load(&c.closed) ||
 		   sync.atomic_load(&c.w_waiting) == 0 {
-		   	return false
+			return false
 		}
 
 		mem.copy(msg_out, c.unbuffered_data, int(c.msg_size))
@@ -474,10 +476,7 @@ select_raw :: proc "odin" (recvs: []^Raw_Chan, sends: []^Raw_Chan, send_msgs: []
 		return
 	}
 
-	r: ^rand.Rand = nil
-
-
-	select_idx = rand.int_max(count, r) if count > 0 else 0
+	select_idx = rand.int_max(count) if count > 0 else 0
 
 	sel := candidates[select_idx]
 	if sel.is_recv {

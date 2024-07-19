@@ -54,37 +54,50 @@ gb_global ExactValue const empty_exact_value = {};
 gb_internal uintptr hash_exact_value(ExactValue v) {
 	mutex_lock(&hash_exact_value_mutex);
 	defer (mutex_unlock(&hash_exact_value_mutex));
+
+	uintptr res = 0;
 	
 	switch (v.kind) {
 	case ExactValue_Invalid:
 		return 0;
 	case ExactValue_Bool:
-		return gb_fnv32a(&v.value_bool, gb_size_of(v.value_bool));
+		res = gb_fnv32a(&v.value_bool, gb_size_of(v.value_bool));
+		break;
 	case ExactValue_String:
-		return gb_fnv32a(v.value_string.text, v.value_string.len);
+		res = gb_fnv32a(v.value_string.text, v.value_string.len);
+		break;
 	case ExactValue_Integer:
 		{
 			u32 key = gb_fnv32a(v.value_integer.dp, gb_size_of(*v.value_integer.dp) * v.value_integer.used);
 			u8 last = (u8)v.value_integer.sign;
-			return (key ^ last) * 0x01000193;
+			res = (key ^ last) * 0x01000193;
+			break;
 		}
 	case ExactValue_Float:
-		return gb_fnv32a(&v.value_float, gb_size_of(v.value_float));
+		res = gb_fnv32a(&v.value_float, gb_size_of(v.value_float));
+		break;
 	case ExactValue_Pointer:
-		return ptr_map_hash_key(v.value_pointer);
+		res = ptr_map_hash_key(v.value_pointer);
+		break;
 	case ExactValue_Complex:
-		return gb_fnv32a(v.value_complex, gb_size_of(Complex128));
+		res = gb_fnv32a(v.value_complex, gb_size_of(Complex128));
+		break;
 	case ExactValue_Quaternion:
-		return gb_fnv32a(v.value_quaternion, gb_size_of(Quaternion256));
+		res = gb_fnv32a(v.value_quaternion, gb_size_of(Quaternion256));
+		break;
 	case ExactValue_Compound:
-		return ptr_map_hash_key(v.value_compound);
+		res = ptr_map_hash_key(v.value_compound);
+		break;
 	case ExactValue_Procedure:
-		return ptr_map_hash_key(v.value_procedure);
+		res = ptr_map_hash_key(v.value_procedure);
+		break;
 	case ExactValue_Typeid:
-		return ptr_map_hash_key(v.value_typeid);
+		res = ptr_map_hash_key(v.value_typeid);
+		break;
+	default:
+		res = gb_fnv32a(&v, gb_size_of(ExactValue));
 	}
-	return gb_fnv32a(&v, gb_size_of(ExactValue));
-
+	return res & 0x7fffffff;
 }
 
 
@@ -108,12 +121,14 @@ gb_internal ExactValue exact_value_string(String string) {
 
 gb_internal ExactValue exact_value_i64(i64 i) {
 	ExactValue result = {ExactValue_Integer};
+	result.value_integer = {0};
 	big_int_from_i64(&result.value_integer, i);
 	return result;
 }
 
 gb_internal ExactValue exact_value_u64(u64 i) {
 	ExactValue result = {ExactValue_Integer};
+	result.value_integer = {0};
 	big_int_from_u64(&result.value_integer, i);
 	return result;
 }
@@ -164,6 +179,7 @@ gb_internal ExactValue exact_value_typeid(Type *type) {
 
 gb_internal ExactValue exact_value_integer_from_string(String const &string) {
 	ExactValue result = {ExactValue_Integer};
+	result.value_integer = {0};
 	bool success;
 	big_int_from_string(&result.value_integer, string, &success);
 	if (!success) {
@@ -572,6 +588,7 @@ gb_internal ExactValue exact_unary_operator_value(TokenKind op, ExactValue v, i3
 			return v;
 		case ExactValue_Integer: {
 			ExactValue i = {ExactValue_Integer};
+			i.value_integer = {0};
 			big_int_neg(&i.value_integer, &v.value_integer);
 			return i;
 		}
@@ -603,6 +620,7 @@ gb_internal ExactValue exact_unary_operator_value(TokenKind op, ExactValue v, i3
 		case ExactValue_Integer: {
 			GB_ASSERT(precision != 0);
 			ExactValue i = {ExactValue_Integer};
+			i.value_integer = {0};
 			big_int_not(&i.value_integer, &v.value_integer, precision, !is_unsigned);
 			return i;
 		}

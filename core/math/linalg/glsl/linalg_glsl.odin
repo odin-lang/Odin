@@ -1724,7 +1724,7 @@ quatFromMat4 :: proc "c" (m: mat4) -> (q: quat) {
 @(require_results)
 quatMulVec3 :: proc "c" (q: quat, v: vec3) -> vec3 {
 	xyz := vec3{q.x, q.y, q.z}
-	t := cross(xyz, v)
+	t := cross(2.0 * xyz, v)
 	return v + q.w*t + cross(xyz, t)
 }
 
@@ -1832,7 +1832,7 @@ dquatFromDmat4 :: proc "c" (m: dmat4) -> (q: dquat) {
 @(require_results)
 dquatMulDvec3 :: proc "c" (q: dquat, v: dvec3) -> dvec3 {
 	xyz := dvec3{q.x, q.y, q.z}
-	t := cross(xyz, v)
+	t := cross(2.0 * xyz, v)
 	return v + q.w*t + cross(xyz, t)
 }
 

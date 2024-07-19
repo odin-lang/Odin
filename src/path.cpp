@@ -152,6 +152,13 @@ gb_internal String path_to_string(gbAllocator a, Path path) {
 	return res;
 }
 
+gb_internal String quote_path(gbAllocator a, Path path) {
+	String temp   = path_to_string(a, path);
+	String quoted = concatenate3_strings(a, str_lit("\""), temp, str_lit("\""));
+	gb_free(a, temp.text);
+	return quoted;
+}
+
 // NOTE(Jeroen): Naively turns a Path into a string, then normalizes it using `path_to_full_path`.
 gb_internal String path_to_full_path(gbAllocator a, Path path) {
 	String temp = path_to_string(heap_allocator(), path);
@@ -341,7 +348,7 @@ gb_internal ReadDirectoryError read_directory(String path, Array<FileInfo> *fi) 
 
 	return ReadDirectory_None;
 }
-#elif defined(GB_SYSTEM_LINUX) || defined(GB_SYSTEM_OSX) || defined(GB_SYSTEM_FREEBSD) || defined(GB_SYSTEM_OPENBSD) || defined(GB_SYSTEM_HAIKU)
+#elif defined(GB_SYSTEM_LINUX) || defined(GB_SYSTEM_OSX) || defined(GB_SYSTEM_FREEBSD) || defined(GB_SYSTEM_OPENBSD) || defined(GB_SYSTEM_NETBSD) || defined(GB_SYSTEM_HAIKU)
 
 #include <dirent.h>
 
@@ -400,16 +407,13 @@ gb_internal ReadDirectoryError read_directory(String path, Array<FileInfo> *fi) 
 			continue;
 		}
 
-		if (S_ISDIR(dir_stat.st_mode)) {
-			continue;
-		}
-
 		i64 size = dir_stat.st_size;
 
 		FileInfo info = {};
 		info.name = copy_string(a, name);
 		info.fullpath = path_to_full_path(a, filepath);
 		info.size = size;
+		info.is_dir = S_ISDIR(dir_stat.st_mode);
 		array_add(fi, info);
 	}
 

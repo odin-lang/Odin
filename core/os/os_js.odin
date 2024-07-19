@@ -1,9 +1,7 @@
 //+build js
 package os
 
-import "base:intrinsics"
 import "base:runtime"
-import "core:unicode/utf16"
 
 is_path_separator :: proc(c: byte) -> bool {
 	return c == '/' || c == '\\'
@@ -64,13 +62,8 @@ write_at :: proc(fd: Handle, data: []byte, offset: i64) -> (n: int, err: Errno) 
 	unimplemented("core:os procedure not supported on JS target")
 }
 
-
-
-// NOTE(bill): Uses startup to initialize it
-//stdin  := get_std_handle(uint(win32.STD_INPUT_HANDLE))
-//stdout := get_std_handle(uint(win32.STD_OUTPUT_HANDLE))
-//stderr := get_std_handle(uint(win32.STD_ERROR_HANDLE))
-
+stdout: Handle = 1
+stderr: Handle = 2
 
 get_std_handle :: proc "contextless" (h: uint) -> Handle {
 	context = runtime.default_context()

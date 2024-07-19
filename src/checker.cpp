@@ -3,6 +3,8 @@
 #include "entity.cpp"
 #include "types.cpp"
 
+String get_final_microarchitecture();
+
 gb_internal void check_expr(CheckerContext *c, Operand *operand, Ast *expression);
 gb_internal void check_expr_or_type(CheckerContext *c, Operand *operand, Ast *expression, Type *type_hint=nullptr);
 gb_internal void add_comparison_procedures_for_fields(CheckerContext *c, Type *t);
@@ -48,15 +50,6 @@ gb_internal bool check_rtti_type_disallowed(Ast *expr, Type *type, char const *f
 	return check_rtti_type_disallowed(ast_token(expr), type, format);
 }
 
-gb_internal void scope_reset(Scope *scope) {
-	if (scope == nullptr) return;
-
-	rw_mutex_lock(&scope->mutex);
-	scope->head_child.store(nullptr, std::memory_order_relaxed);
-	string_map_clear(&scope->elements);
-	ptr_set_clear(&scope->imported);
-	rw_mutex_unlock(&scope->mutex);
-}
 
 gb_internal void scope_reserve(Scope *scope, isize count) {
 	string_map_reserve(&scope->elements, 2*count);
@@ -166,9 +159,6 @@ gb_internal void import_graph_node_swap(ImportGraphNode **data, isize i, isize j
 }
 
 
-
-
-
 gb_internal void init_decl_info(DeclInfo *d, Scope *scope, DeclInfo *parent) {
 	gb_zero_item(d);
 	if (parent) {
@@ -182,6 +172,9 @@ gb_internal void init_decl_info(DeclInfo *d, Scope *scope, DeclInfo *parent) {
 	ptr_set_init(&d->deps, 0);
 	ptr_set_init(&d->type_info_deps, 0);
 	d->labels.allocator = heap_allocator();
+	d->variadic_reuses.allocator = heap_allocator();
+	d->variadic_reuse_max_bytes = 0;
+	d->variadic_reuse_max_align = 1;
 }
 
 gb_internal DeclInfo *make_decl_info(Scope *scope, DeclInfo *parent) {
@@ -344,6 +337,7 @@ gb_internal Scope *scope_of_node(Ast *node) {
 
 gb_internal void check_open_scope(CheckerContext *c, Ast *node) {
 	node = unparen_expr(node);
+	GB_ASSERT(node != nullptr);
 	GB_ASSERT(node->kind == Ast_Invalid ||
 	          is_ast_stmt(node) ||
 	          is_ast_type(node));
@@ -377,6 +371,7 @@ gb_internal Entity *scope_lookup_current(Scope *s, String const &name) {
 	}
 	return nullptr;
 }
+
 
 gb_internal void scope_lookup_parent(Scope *scope, String const &name, Scope **scope_, Entity **entity_) {
 	if (scope != nullptr) {
@@ -505,9 +500,15 @@ end:;
 	return result;
 }
 
+gb_global bool in_single_threaded_checker_stage = false;
+
 gb_internal Entity *scope_insert(Scope *s, Entity *entity) {
 	String name = entity->token.string;
-	return scope_insert_with_name(s, name, entity);
+	if (in_single_threaded_checker_stage) {
+		return scope_insert_with_name_no_mutex(s, name, entity);
+	} else {
+		return scope_insert_with_name(s, name, entity);
+	}
 }
 
 gb_internal Entity *scope_insert_no_mutex(Scope *s, Entity *entity) {
@@ -516,7 +517,7 @@ gb_internal Entity *scope_insert_no_mutex(Scope *s, Entity *entity) {
 }
 
 
-GB_COMPARE_PROC(entity_variable_pos_cmp) {
+gb_internal GB_COMPARE_PROC(entity_variable_pos_cmp) {
 	Entity *x = *cast(Entity **)a;
 	Entity *y = *cast(Entity **)b;
 
@@ -652,7 +653,7 @@ gb_internal bool check_vet_shadowing(Checker *c, Entity *e, VettedEntity *ve) {
 		}
 	}
 
-	zero_item(ve);
+	gb_zero_item(ve);
 	ve->kind = VettedEntity_Shadowed;
 	ve->entity = e;
 	ve->other = shadowed;
@@ -671,7 +672,7 @@ gb_internal bool check_vet_unused(Checker *c, Entity *e, VettedEntity *ve) {
 			}
 		case Entity_ImportName:
 		case Entity_LibraryName:
-			zero_item(ve);
+			gb_zero_item(ve);
 			ve->kind = VettedEntity_Unused;
 			ve->entity = e;
 			return true;
@@ -844,6 +845,10 @@ gb_internal void add_declaration_dependency(CheckerContext *c, Entity *e) {
 	if (e == nullptr) {
 		return;
 	}
+	if (e->flags & EntityFlag_Disabled) {
+		// ignore the dependencies if it has been `@(disabled=true)`
+		return;
+	}
 	if (c->decl != nullptr) {
 		add_dependency(c->info, c->decl, e);
 	}
@@ -1013,8 +1018,10 @@ gb_internal void init_universal(void) {
 			{"FreeBSD",      TargetOs_freebsd},
 			{"Haiku",        TargetOs_haiku},
 			{"OpenBSD",      TargetOs_openbsd},
+			{"NetBSD",       TargetOs_netbsd},
 			{"WASI",         TargetOs_wasi},
 			{"JS",           TargetOs_js},
+			{"Orca",         TargetOs_orca},
 			{"Freestanding", TargetOs_freestanding},
 		};
 
@@ -1038,11 +1045,14 @@ gb_internal void init_universal(void) {
 		add_global_enum_constant(fields, "ODIN_ARCH", bc->metrics.arch);
 		add_global_string_constant("ODIN_ARCH_STRING", target_arch_names[bc->metrics.arch]);
 	}
+
+	add_global_string_constant("ODIN_MICROARCH_STRING", get_final_microarchitecture());
 	
 	{
 		GlobalEnumValue values[BuildMode_COUNT] = {
 			{"Executable", BuildMode_Executable},
 			{"Dynamic",    BuildMode_DynamicLibrary},
+			{"Static",     BuildMode_StaticLibrary},
 			{"Object",     BuildMode_Object},
 			{"Assembly",   BuildMode_Assembly},
 			{"LLVM_IR",    BuildMode_LLVM_IR},
@@ -1102,7 +1112,11 @@ gb_internal void init_universal(void) {
 		int minimum_os_version = 0;
 		if (build_context.minimum_os_version_string != "") {
 			int major, minor, revision = 0;
+		#if defined(GB_SYSTEM_WINDOWS)
+			sscanf_s(cast(const char *)(build_context.minimum_os_version_string.text), "%d.%d.%d", &major, &minor, &revision);
+		#else
 			sscanf(cast(const char *)(build_context.minimum_os_version_string.text), "%d.%d.%d", &major, &minor, &revision);
+		#endif
 			minimum_os_version = (major*10000)+(minor*100)+revision;
 		}
 		add_global_constant("ODIN_MINIMUM_OS_VERSION", t_untyped_integer, exact_value_i64(minimum_os_version));
@@ -1126,6 +1140,17 @@ gb_internal void init_universal(void) {
 	add_global_bool_constant("ODIN_TILDE",                      bc->tilde_backend);
 
 	add_global_constant("ODIN_COMPILE_TIMESTAMP", t_untyped_integer, exact_value_i64(odin_compile_timestamp()));
+
+	{
+		String version = {};
+
+		#ifdef GIT_SHA
+		version.text = cast(u8 *)GIT_SHA;
+		version.len = gb_strlen(GIT_SHA);
+		#endif
+
+		add_global_string_constant("ODIN_VERSION_HASH", version);
+	}
 
 	{
 		bool f16_supported = lb_use_new_pass_system();
@@ -1164,6 +1189,18 @@ gb_internal void init_universal(void) {
 		add_global_constant("ODIN_SANITIZER_FLAGS", named_type, exact_value_u64(bc->sanitizer_flags));
 	}
 
+	{
+		GlobalEnumValue values[5] = {
+			{"None",      -1},
+			{"Minimal",    0},
+			{"Size",       1},
+			{"Speed",      2},
+			{"Aggressive", 3},
+		};
+
+		auto fields = add_global_enum_type(str_lit("Odin_Optimization_Mode"), values, gb_count_of(values));
+		add_global_enum_constant(fields, "ODIN_OPTIMIZATION_MODE", bc->optimization_level);
+	}
 
 
 // Builtin Procedures
@@ -1272,6 +1309,7 @@ gb_internal void init_checker_info(CheckerInfo *i) {
 	array_init(&i->init_procedures, a, 0, 0);
 	array_init(&i->fini_procedures, a, 0, 0);
 	array_init(&i->required_foreign_imports_through_force, a, 0, 0);
+	array_init(&i->defineables, a);
 
 	map_init(&i->objc_msgSend_types);
 	string_map_init(&i->load_file_cache);
@@ -1281,6 +1319,7 @@ gb_internal void init_checker_info(CheckerInfo *i) {
 	mpsc_init(&i->definition_queue, a); //); // 1<<20);
 	mpsc_init(&i->required_global_variable_queue, a); // 1<<10);
 	mpsc_init(&i->required_foreign_imports_through_force_queue, a); // 1<<10);
+	mpsc_init(&i->foreign_imports_to_check_fullpaths, a); // 1<<10);
 	mpsc_init(&i->intrinsics_entry_point_usage, a); // 1<<10); // just waste some memory here, even if it probably never used
 
 	string_map_init(&i->load_directory_cache);
@@ -1300,11 +1339,13 @@ gb_internal void destroy_checker_info(CheckerInfo *i) {
 	string_map_destroy(&i->packages);
 	array_free(&i->variable_init_order);
 	array_free(&i->required_foreign_imports_through_force);
+	array_free(&i->defineables);
 
 	mpsc_destroy(&i->entity_queue);
 	mpsc_destroy(&i->definition_queue);
 	mpsc_destroy(&i->required_global_variable_queue);
 	mpsc_destroy(&i->required_foreign_imports_through_force_queue);
+	mpsc_destroy(&i->foreign_imports_to_check_fullpaths);
 
 	map_destroy(&i->objc_msgSend_types);
 	string_map_destroy(&i->load_file_cache);
@@ -1347,7 +1388,7 @@ gb_internal void reset_checker_context(CheckerContext *ctx, AstFile *file, Untyp
 	auto type_path = ctx->type_path;
 	array_clear(type_path);
 
-	zero_size(&ctx->pkg, gb_size_of(CheckerContext) - gb_offset_of(CheckerContext, pkg));
+	gb_zero_size(&ctx->pkg, gb_size_of(CheckerContext) - gb_offset_of(CheckerContext, pkg));
 
 	ctx->file = nullptr;
 	ctx->scope = builtin_pkg->scope;
@@ -1431,6 +1472,7 @@ gb_internal Entity *implicit_entity_of_node(Ast *clause) {
 }
 
 gb_internal Entity *entity_of_node(Ast *expr) {
+retry:;
 	expr = unparen_expr(expr);
 	switch (expr->kind) {
 	case_ast_node(ident, Ident, expr);
@@ -1446,6 +1488,21 @@ gb_internal Entity *entity_of_node(Ast *expr) {
 	case_end;
 	case_ast_node(cc, CaseClause, expr);
 		return cc->implicit_entity;
+	case_end;
+
+	case_ast_node(ce, CallExpr, expr);
+		return ce->entity_procedure_of;
+	case_end;
+
+	case_ast_node(we, TernaryWhenExpr, expr);
+		if (we->cond == nullptr) {
+			break;
+		}
+		if (we->cond->tav.value.kind != ExactValue_Bool) {
+			break;
+		}
+		expr = we->cond->tav.value.value_bool ? we->x : we->y;
+		goto retry;
 	case_end;
 	}
 	return nullptr;
@@ -1733,8 +1790,7 @@ gb_internal void add_entity_use(CheckerContext *c, Ast *identifier, Entity *enti
 	if (identifier == nullptr || identifier->kind != Ast_Ident) {
 		return;
 	}
-	Ast *empty_ident = nullptr;
-	entity->identifier.compare_exchange_strong(empty_ident, identifier);
+	entity->identifier.store(identifier);
 
 	identifier->Ident.entity = entity;
 
@@ -1897,8 +1953,7 @@ gb_internal void add_type_info_type_internal(CheckerContext *c, Type *t) {
 	add_type_info_dependency(c->info, c->decl, t);
 
 	MUTEX_GUARD_BLOCK(&c->info->type_info_mutex) {
-		MapFindResult fr;
-		auto found = map_try_get(&c->info->type_info_map, t, &fr);
+		auto found = map_get(&c->info->type_info_map, t);
 		if (found != nullptr) {
 			// Types have already been added
 			return;
@@ -1922,7 +1977,7 @@ gb_internal void add_type_info_type_internal(CheckerContext *c, Type *t) {
 			ti_index = c->info->type_info_types.count;
 			array_add(&c->info->type_info_types, t);
 		}
-		map_set_internal_from_try_get(&c->checker->info.type_info_map, t, ti_index, fr);
+		map_set(&c->checker->info.type_info_map, t, ti_index);
 
 		if (prev) {
 			// NOTE(bill): If a previous one exists already, no need to continue
@@ -2193,7 +2248,7 @@ gb_internal void add_min_dep_type_info(Checker *c, Type *t) {
 	// IMPORTANT NOTE(bill): this must be copied as `map_set` takes a const ref
 	// and effectively assigns the `+1` of the value
 	isize const count = set->count;
-	if (map_set_if_not_previously_exists(set, ti_index, count)) {
+	if (map_set_if_not_previously_exists(set, ti_index+1, count)) {
 		// Type already exists;
 		return;
 	}
@@ -2536,6 +2591,11 @@ gb_internal void generate_minimum_dependency_set_internal(Checker *c, Entity *st
 					is_init = false;
 				}
 
+				if ((e->flags & EntityFlag_Disabled) != 0) {
+					warning(e->token, "This @(init) procedure is disabled; you must call it manually");
+					is_init = false;
+				}
+
 				if (is_init) {
 					add_dependency_to_set(c, e);
 					array_add(&c->info.init_procedures, e);
@@ -2637,6 +2697,10 @@ gb_internal void generate_minimum_dependency_set(Checker *c, Entity *start) {
 	FORCE_ADD_RUNTIME_ENTITIES(build_context.no_crt,
 		str_lit("memcpy"),
 		str_lit("memmove"),
+	);
+
+	FORCE_ADD_RUNTIME_ENTITIES(build_context.metrics.arch == TargetArch_arm32,
+		str_lit("aeabi_d2h")
 	);
 
 	FORCE_ADD_RUNTIME_ENTITIES(is_arch_wasm() && !build_context.tilde_backend,
@@ -2926,6 +2990,8 @@ gb_internal void init_core_type_info(Checker *c) {
 		return;
 	}
 	Entity *type_info_entity = find_core_entity(c, str_lit("Type_Info"));
+	GB_ASSERT(type_info_entity != nullptr);
+	GB_ASSERT(type_info_entity->type != nullptr);
 
 	t_type_info = type_info_entity->type;
 	t_type_info_ptr = alloc_type_pointer(t_type_info);
@@ -3108,6 +3174,18 @@ gb_internal DECL_ATTRIBUTE_PROC(foreign_block_decl_attribute) {
 				error(elem, "Invalid link prefix: '%.*s'", LIT(link_prefix));
 			} else {
 				c->foreign_context.link_prefix = link_prefix;
+			}
+		} else {
+			error(elem, "Expected a string value for '%.*s'", LIT(name));
+		}
+		return true;
+	} else if (name == "link_suffix") {
+		if (ev.kind == ExactValue_String) {
+			String link_suffix = ev.value_string;
+			if (!is_foreign_name_valid(link_suffix)) {
+				error(elem, "Invalid link suffix: '%.*s'", LIT(link_suffix));
+			} else {
+				c->foreign_context.link_suffix = link_suffix;
 			}
 		} else {
 			error(elem, "Expected a string value for '%.*s'", LIT(name));
@@ -3407,6 +3485,18 @@ gb_internal DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 			error(elem, "Expected a string value for '%.*s'", LIT(name));
 		}
 		return true;
+	} else if (name == "link_suffix") {
+		ExactValue ev = check_decl_attribute_value(c, value);
+
+		if (ev.kind == ExactValue_String) {
+			ac->link_suffix = ev.value_string;
+			if (!is_foreign_name_valid(ac->link_suffix)) {
+				error(elem, "Invalid link suffix: %.*s", LIT(ac->link_suffix));
+			}
+		} else {
+			error(elem, "Expected a string value for '%.*s'", LIT(name));
+		}
+		return true;
 	} else if (name == "deprecated") {
 		ExactValue ev = check_decl_attribute_value(c, value);
 
@@ -3416,20 +3506,6 @@ gb_internal DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 				error(elem, "Deprecation message cannot be an empty string");
 			} else {
 				ac->deprecated_message = msg;
-			}
-		} else {
-			error(elem, "Expected a string value for '%.*s'", LIT(name));
-		}
-		return true;
-	} else if (name == "warning") {
-		ExactValue ev = check_decl_attribute_value(c, value);
-
-		if (ev.kind == ExactValue_String) {
-			String msg = ev.value_string;
-			if (msg.len == 0) {
-				error(elem, "Warning message cannot be an empty string");
-			} else {
-				ac->warning_message = msg;
 			}
 		} else {
 			error(elem, "Expected a string value for '%.*s'", LIT(name));
@@ -3469,19 +3545,19 @@ gb_internal DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 			String mode = ev.value_string;
 			if (mode == "none") {
 				ac->optimization_mode = ProcedureOptimizationMode_None;
+			} else if (mode == "favor_size") {
+				ac->optimization_mode = ProcedureOptimizationMode_FavorSize;
 			} else if (mode == "minimal") {
-				ac->optimization_mode = ProcedureOptimizationMode_Minimal;
+				error(elem, "Invalid optimization_mode 'minimal' for '%.*s', mode has been removed due to confusion, but 'none' has the same behaviour", LIT(name));
 			} else if (mode == "size") {
-				ac->optimization_mode = ProcedureOptimizationMode_Size;
+				error(elem, "Invalid optimization_mode 'size' for '%.*s', mode has been removed due to confusion, but 'favor_size' has the same behaviour", LIT(name));
 			} else if (mode == "speed") {
-				ac->optimization_mode = ProcedureOptimizationMode_Speed;
+				error(elem, "Invalid optimization_mode 'speed' for '%.*s', mode has been removed due to confusion, but 'favor_size' has the same behaviour", LIT(name));
 			} else {
 				ERROR_BLOCK();
 				error(elem, "Invalid optimization_mode for '%.*s'. Valid modes:", LIT(name));
 				error_line("\tnone\n");
-				error_line("\tminimal\n");
-				error_line("\tsize\n");
-				error_line("\tspeed\n");
+				error_line("\tfavor_size\n");
 			}
 		} else {
 			error(elem, "Expected a string for '%.*s'", LIT(name));
@@ -3589,6 +3665,12 @@ gb_internal DECL_ATTRIBUTE_PROC(var_decl_attribute) {
 		}
 		ac->is_static = true;
 		return true;
+	} else if (name == "rodata") {
+		if (value != nullptr) {
+			error(elem, "'rodata' does not have any parameters");
+		}
+		ac->rodata = true;
+		return true;
 	} else if (name == "thread_local") {
 		ExactValue ev = check_decl_attribute_value(c, value);
 		if (ac->init_expr_list_count > 0) {
@@ -3688,6 +3770,17 @@ gb_internal DECL_ATTRIBUTE_PROC(var_decl_attribute) {
 			error(elem, "Expected a string value for '%.*s'", LIT(name));
 		}
 		return true;
+	} else if (name == "link_suffix") {
+		ExactValue ev = check_decl_attribute_value(c, value);
+		if (ev.kind == ExactValue_String) {
+			ac->link_suffix = ev.value_string;
+			if (!is_foreign_name_valid(ac->link_suffix)) {
+				error(elem, "Invalid link suffix: %.*s", LIT(ac->link_suffix));
+			}
+		} else {
+			error(elem, "Expected a string value for '%.*s'", LIT(name));
+		}
+		return true;
 	} else if (name == "link_section") {
 		ExactValue ev = check_decl_attribute_value(c, value);
 		if (ev.kind == ExactValue_String) {
@@ -3719,6 +3812,7 @@ gb_internal DECL_ATTRIBUTE_PROC(const_decl_attribute) {
 	           name == "linkage" ||
 	           name == "link_name" ||
 	           name == "link_prefix" ||
+	           name == "link_suffix" ||
 	           false) {
 		error(elem, "@(%.*s) is not supported for compile time constant value declarations", LIT(name));
 		return true;
@@ -3761,8 +3855,10 @@ gb_internal void check_decl_attributes(CheckerContext *c, Array<Ast *> const &at
 	if (attributes.count == 0) return;
 
 	String original_link_prefix = {};
+	String original_link_suffix = {};
 	if (ac) {
 		original_link_prefix = ac->link_prefix;
+		original_link_suffix = ac->link_suffix;
 	}
 
 	StringSet set = {};
@@ -3821,10 +3917,11 @@ gb_internal void check_decl_attributes(CheckerContext *c, Array<Ast *> const &at
 			}
 
 			if (!proc(c, elem, name, value, ac)) {
-				if (!build_context.ignore_unknown_attributes) {
+				if (!build_context.ignore_unknown_attributes &&
+				    !string_set_exists(&build_context.custom_attributes, name)) {
 					ERROR_BLOCK();
 					error(elem, "Unknown attribute element name '%.*s'", LIT(name));
-					error_line("\tDid you forget to use build flag '-ignore-unknown-attributes'?\n");
+					error_line("\tDid you forget to use the build flag '-ignore-unknown-attributes' or '-custom-attribute:%.*s'?\n", LIT(name));
 				}
 			}
 		}
@@ -3835,6 +3932,12 @@ gb_internal void check_decl_attributes(CheckerContext *c, Array<Ast *> const &at
 			if (ac->link_name.len > 0) {
 				ac->link_prefix.text = nullptr;
 				ac->link_prefix.len  = 0;
+			}
+		}
+		if (ac->link_suffix.text == original_link_suffix.text) {
+			if (ac->link_name.len > 0) {
+				ac->link_suffix.text = nullptr;
+				ac->link_suffix.len  = 0;
 			}
 		}
 	}
@@ -4014,6 +4117,7 @@ gb_internal void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 	bool is_test = false;
 	bool is_init = false;
 	bool is_fini = false;
+	bool is_priv = false;
 
 	for_array(i, vd->attributes) {
 		Ast *attr = vd->attributes[i];
@@ -4058,6 +4162,8 @@ gb_internal void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 				}
 				if (!success) {
 					error(value, "'%.*s' expects no parameter, or a string literal containing \"file\" or \"package\"", LIT(name));
+				} else {
+					is_priv = true;
 				}
 
 
@@ -4077,6 +4183,11 @@ gb_internal void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 				is_fini = true;
 			}
 		}
+	}
+
+	if (is_priv && is_test) {
+		error(decl, "Attribute 'private' is not allowed on a test case");
+		return;
 	}
 
 	if (entity_visibility_kind == EntityVisiblity_Public &&
@@ -4131,6 +4242,7 @@ gb_internal void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 				e->Variable.foreign_library_ident = fl;
 
 				e->Variable.link_prefix = c->foreign_context.link_prefix;
+				e->Variable.link_suffix = c->foreign_context.link_suffix;
 			}
 
 			Ast *init_expr = value;
@@ -4205,6 +4317,7 @@ gb_internal void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 						}
 					}
 					e->Procedure.link_prefix = c->foreign_context.link_prefix;
+					e->Procedure.link_suffix = c->foreign_context.link_suffix;
 
 					GB_ASSERT(cc != ProcCC_Invalid);
 					pl->type->ProcType.calling_convention = cc;
@@ -4309,17 +4422,22 @@ gb_internal bool correct_single_type_alias(CheckerContext *c, Entity *e) {
 
 gb_internal bool correct_type_alias_in_scope_backwards(CheckerContext *c, Scope *s) {
 	bool correction = false;
-	u32 n = s->elements.count;
-	for (u32 i = n-1; i < n; i--) {
-		correction |= correct_single_type_alias(c, s->elements.entries[i].value);
+	for (u32 n = s->elements.count, i = n-1; i < n; i--) {
+		auto const &entry = s->elements.entries[i];
+		Entity *e = entry.value;
+		if (entry.hash && e != nullptr) {
+			correction |= correct_single_type_alias(c, e);
+		}
 	}
 	return correction;
 }
 gb_internal bool correct_type_alias_in_scope_forwards(CheckerContext *c, Scope *s) {
 	bool correction = false;
-	u32 n = s->elements.count;
-	for (isize i = 0; i < n; i++) {
-		correction |= correct_single_type_alias(c, s->elements.entries[i].value);
+	for (auto const &entry : s->elements) {
+		Entity *e = entry.value;
+		if (e != nullptr) {
+			correction |= correct_single_type_alias(c, entry.value);
+		}
 	}
 	return correction;
 }
@@ -4467,6 +4585,8 @@ gb_internal void check_single_global_entity(Checker *c, Entity *e, DeclInfo *d) 
 }
 
 gb_internal void check_all_global_entities(Checker *c) {
+	in_single_threaded_checker_stage = true;
+
 	// NOTE(bill): This must be single threaded
 	// Don't bother trying
 	for_array(i, c->info.entities) {
@@ -4486,6 +4606,8 @@ gb_internal void check_all_global_entities(Checker *c) {
 			(void)type_align_of(e->type);
 		}
 	}
+
+	in_single_threaded_checker_stage = false;
 }
 
 
@@ -4857,6 +4979,82 @@ gb_internal DECL_ATTRIBUTE_PROC(foreign_import_decl_attribute) {
 	return false;
 }
 
+gb_internal void check_foreign_import_fullpaths(Checker *c) {
+	CheckerContext ctx = make_checker_context(c);
+
+	UntypedExprInfoMap untyped = {};
+	defer (map_destroy(&untyped));
+
+	for (Entity *e = nullptr; mpsc_dequeue(&c->info.foreign_imports_to_check_fullpaths, &e); /**/) {
+		GB_ASSERT(e != nullptr);
+		GB_ASSERT(e->kind == Entity_LibraryName);
+		Ast *decl = e->LibraryName.decl;
+		ast_node(fl, ForeignImportDecl, decl);
+
+		AstFile *f = decl->file();
+
+		reset_checker_context(&ctx, f, &untyped);
+		ctx.collect_delayed_decls = false;
+
+		GB_ASSERT(ctx.scope == e->scope);
+
+		if (fl->fullpaths.count == 0) {
+			String base_dir = dir_from_path(decl->file()->fullpath);
+
+			auto fullpaths = array_make<String>(permanent_allocator(), 0, fl->filepaths.count);
+
+			for (Ast *fp_node : fl->filepaths) {
+				Operand op = {};
+				check_expr(&ctx, &op, fp_node);
+				if (op.mode != Addressing_Constant && op.value.kind != ExactValue_String) {
+					gbString s = expr_to_string(op.expr);
+					error(fp_node, "Expected a constant string value, got '%s'", s);
+					gb_string_free(s);
+					continue;
+				}
+				if (!is_type_string(op.type)) {
+					gbString s = type_to_string(op.type);
+					error(fp_node, "Expected a constant string value, got value of type '%s'", s);
+					gb_string_free(s);
+					continue;
+				}
+
+				String file_str = op.value.value_string;
+				file_str = string_trim_whitespace(file_str);
+				String fullpath = file_str;
+				if (!is_arch_wasm() || string_ends_with(file_str, str_lit(".o"))) {
+					String foreign_path = {};
+					bool ok = determine_path_from_string(nullptr, decl, base_dir, file_str, &foreign_path, /*use error not syntax_error*/true);
+					if (ok) {
+						fullpath = foreign_path;
+					}
+				}
+				array_add(&fullpaths, fullpath);
+			}
+			fl->fullpaths = slice_from_array(fullpaths);
+		}
+
+		for (String const &path : fl->fullpaths) {
+			String ext = path_extension(path);
+			if (str_eq_ignore_case(ext, ".c") ||
+			    str_eq_ignore_case(ext, ".cpp") ||
+			    str_eq_ignore_case(ext, ".cxx") ||
+			    str_eq_ignore_case(ext, ".h") ||
+			    str_eq_ignore_case(ext, ".hpp") ||
+			    str_eq_ignore_case(ext, ".hxx") ||
+			    false
+			) {
+				error(fl->token, "With 'foreign import', you cannot import a %.*s file/directory, you must precompile the library and link against that", LIT(ext));
+				break;
+			}
+		}
+
+		add_untyped_expressions(ctx.info, &untyped);
+
+		e->LibraryName.paths = fl->fullpaths;
+	}
+}
+
 gb_internal void check_add_foreign_import_decl(CheckerContext *ctx, Ast *decl) {
 	if (decl->state_flags & StateFlag_BeenHandled) return;
 	decl->state_flags |= StateFlag_BeenHandled;
@@ -4866,58 +5064,25 @@ gb_internal void check_add_foreign_import_decl(CheckerContext *ctx, Ast *decl) {
 	Scope *parent_scope = ctx->scope;
 	GB_ASSERT(parent_scope->flags&ScopeFlag_File);
 
-	GB_ASSERT(fl->fullpaths.count > 0);
-	String fullpath = fl->fullpaths[0];
-	String library_name = path_to_entity_name(fl->library_name.string, fullpath);
-	if (is_blank_ident(library_name)) {
-		error(fl->token, "File name, %.*s, cannot be as a library name as it is not a valid identifier", LIT(fl->library_name.string));
+	String library_name = fl->library_name.string;
+	if (library_name.len == 0 && fl->fullpaths.count != 0) {
+		String fullpath = fl->fullpaths[0];
+		library_name = path_to_entity_name(fl->library_name.string, fullpath);
+	}
+	if (library_name.len == 0 || is_blank_ident(library_name)) {
+		error(fl->token, "File name, '%.*s', cannot be as a library name as it is not a valid identifier", LIT(library_name));
 		return;
 	}
 
-	for (String const &path : fl->fullpaths) {
-		String ext = path_extension(path);
-		if (str_eq_ignore_case(ext, ".c") ||
-		    str_eq_ignore_case(ext, ".cpp") ||
-		    str_eq_ignore_case(ext, ".cxx") ||
-		    str_eq_ignore_case(ext, ".h") ||
-		    str_eq_ignore_case(ext, ".hpp") ||
-		    str_eq_ignore_case(ext, ".hxx") ||
-		    false
-		) {
-			error(fl->token, "With 'foreign import', you cannot import a %.*s file directory, you must precompile the library and link against that", LIT(ext));
-			break;
-		}
-	}
-
-
-	// if (fl->collection_name != "system") {
-	// 	char *c_str = gb_alloc_array(heap_allocator(), char, fullpath.len+1);
-	// 	defer (gb_free(heap_allocator(), c_str));
-	// 	gb_memmove(c_str, fullpath.text, fullpath.len);
-	// 	c_str[fullpath.len] = '\0';
-
-	// 	gbFile f = {};
-	// 	gbFileError file_err = gb_file_open(&f, c_str);
-	// 	defer (gb_file_close(&f));
-
-	// 	switch (file_err) {
-	// 	case gbFileError_Invalid:
-	// 		error(decl, "Invalid file or cannot be found ('%.*s')", LIT(fullpath));
-	// 		return;
-	// 	case gbFileError_NotExists:
-	// 		error(decl, "File cannot be found ('%.*s')", LIT(fullpath));
-	// 		return;
-	// 	}
-	// }
 
 	GB_ASSERT(fl->library_name.pos.line != 0);
 	fl->library_name.string = library_name;
 
 	Entity *e = alloc_entity_library_name(parent_scope, fl->library_name, t_invalid,
 	                                      fl->fullpaths, library_name);
+	e->LibraryName.decl = decl;
 	add_entity_flags_from_file(ctx, e, parent_scope);
 	add_entity(ctx, parent_scope, nullptr, e);
-
 
 	AttributeContext ac = {};
 	check_decl_attributes(ctx, fl->attributes, foreign_import_decl_attribute, &ac);
@@ -4933,12 +5098,8 @@ gb_internal void check_add_foreign_import_decl(CheckerContext *ctx, Ast *decl) {
 		e->LibraryName.extra_linker_flags = extra_linker_flags;
 	}
 
-	if (has_asm_extension(fullpath)) {
-		if (build_context.metrics.arch != TargetArch_amd64 && build_context.metrics.os != TargetOs_darwin) {
-			error(decl, "Assembly files are not yet supported on this platform: %.*s_%.*s",
-			      LIT(target_os_names[build_context.metrics.os]), LIT(target_arch_names[build_context.metrics.arch]));
-		}
-	}
+	mpsc_enqueue(&ctx->info->foreign_imports_to_check_fullpaths, e);
+
 }
 
 // Returns true if a new package is present
@@ -5746,35 +5907,6 @@ gb_internal void remove_neighbouring_duplicate_entires_from_sorted_array(Array<E
 gb_internal void check_test_procedures(Checker *c) {
 	array_sort(c->info.testing_procedures, init_procedures_cmp);
 	remove_neighbouring_duplicate_entires_from_sorted_array(&c->info.testing_procedures);
-
-	if (build_context.test_names.entries.count == 0) {
-		return;
-	}
-
-	AstPackage *pkg = c->info.init_package;
-	Scope *s = pkg->scope;
-
-	for (String const &name : build_context.test_names) {
-		Entity *e = scope_lookup(s, name);
-		if (e == nullptr) {
-			Token tok = {};
-			if (pkg->files.count != 0) {
-				tok = pkg->files[0]->tokens[0];
-			}
-			error(tok, "Unable to find the test '%.*s' in 'package %.*s' ", LIT(name), LIT(pkg->name));
-		}
-	}
-
-	for (isize i = 0; i < c->info.testing_procedures.count; /**/) {
-		Entity *e = c->info.testing_procedures[i];
-		String name = e->token.string;
-		if (!string_set_exists(&build_context.test_names, name)) {
-			array_ordered_remove(&c->info.testing_procedures, i);
-		} else {
-			i += 1;
-		}
-	}
-
 }
 
 
@@ -6299,6 +6431,9 @@ gb_internal void check_parsed_files(Checker *c) {
 
 	TIME_SECTION("check procedure bodies");
 	check_procedure_bodies(c);
+
+	TIME_SECTION("check foreign import fullpaths");
+	check_foreign_import_fullpaths(c);
 
 	TIME_SECTION("add entities from procedure bodies");
 	check_merge_queues_into_arrays(c);

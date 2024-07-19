@@ -6,6 +6,10 @@ else
 all: unix
 endif
 
+wasm:
+	mkdir -p ../lib
+	clang -c -Os --target=wasm32 -nostdlib stb_truetype_wasm.c -o ../lib/stb_truetype_wasm.o
+
 unix:
 	mkdir -p ../lib
 	$(CC) -c -O2 -Os -fPIC stb_image.c stb_image_write.c stb_image_resize.c stb_truetype.c stb_rect_pack.c stb_vorbis.c
@@ -14,7 +18,7 @@ unix:
 	$(AR) rcs ../lib/stb_image_resize.a stb_image_resize.o
 	$(AR) rcs ../lib/stb_truetype.a     stb_truetype.o
 	$(AR) rcs ../lib/stb_rect_pack.a    stb_rect_pack.o
-	#$(AR) rcs ../lib/stb_vorbis_pack.a  stb_vorbis_pack.o
+	$(AR) rcs ../lib/stb_vorbis.a       stb_vorbis.o
 	#$(CC) -fPIC -shared -Wl,-soname=stb_image.so         -o ../lib/stb_image.so        stb_image.o
 	#$(CC) -fPIC -shared -Wl,-soname=stb_image_write.so   -o ../lib/stb_image_write.so  stb_image_write.o
 	#$(CC) -fPIC -shared -Wl,-soname=stb_image_resize.so  -o ../lib/stb_image_resize.so stb_image_resize.o

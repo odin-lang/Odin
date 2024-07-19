@@ -53,8 +53,8 @@ utf8_to_utf16 :: proc(s: string, allocator := context.temp_allocator) -> []u16 {
 	return text[:n]
 }
 utf8_to_wstring :: proc(s: string, allocator := context.temp_allocator) -> wstring {
-	if res := utf8_to_utf16(s, allocator); res != nil {
-		return &res[0]
+	if res := utf8_to_utf16(s, allocator); len(res) > 0 {
+		return raw_data(res)
 	}
 	return nil
 }
@@ -202,7 +202,7 @@ get_computer_name_and_account_sid :: proc(username: string) -> (computer_name: s
 	username_w := utf8_to_utf16(username, context.temp_allocator)
 	cbsid: DWORD
 	computer_name_size: DWORD
-	pe_use := SID_TYPE.User
+	pe_use := SID_NAME_USE.SidTypeUser
 
 	res := LookupAccountNameW(
 		nil, // Look on this computer first
@@ -244,7 +244,7 @@ get_sid :: proc(username: string, sid: ^SID) -> (ok: bool) {
 	username_w := utf8_to_utf16(username, context.temp_allocator)
 	cbsid: DWORD
 	computer_name_size: DWORD
-	pe_use := SID_TYPE.User
+	pe_use := SID_NAME_USE.SidTypeUser
 
 	res := LookupAccountNameW(
 		nil, // Look on this computer first

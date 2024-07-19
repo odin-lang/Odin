@@ -48,7 +48,7 @@ ordinal_to_datetime :: proc "contextless" (ordinal: Ordinal) -> (datetime: DateT
 }
 
 day_of_week :: proc "contextless" (ordinal: Ordinal) -> (day: Weekday) {
-	return Weekday((ordinal - EPOCH) %% 7)
+	return Weekday((ordinal - EPOCH + 1) %% 7)
 }
 
 subtract_dates :: proc "contextless" (a, b: Date) -> (delta: Delta, err: Error) {
@@ -127,13 +127,13 @@ days_remaining :: proc "contextless" (date: Date) -> (days_remaining: i64, err: 
 	return delta.days, .None
 }
 
-last_day_of_month :: proc "contextless" (#any_int year: i64, #any_int month: i8) -> (day: i64, err: Error) {
+last_day_of_month :: proc "contextless" (#any_int year: i64, #any_int month: i8) -> (day: i8, err: Error) {
 	// Not using formula 2.27 from the book. This is far simpler and gives the same answer.
 
 	validate(Date{year, month, 1}) or_return
 	month_days := MONTH_DAYS
 
-	day = i64(month_days[month])
+	day = month_days[month]
 	if month == 2 && is_leap_year(year) {
 		day += 1
 	}

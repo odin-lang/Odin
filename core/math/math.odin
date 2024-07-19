@@ -130,10 +130,10 @@ pow10 :: proc{
 
 @(require_results)
 pow10_f16 :: proc "contextless" (n: f16) -> f16 {
-	@static pow10_pos_tab := [?]f16{
+	@(static, rodata) pow10_pos_tab := [?]f16{
 		1e00, 1e01, 1e02, 1e03, 1e04,
 	}
-	@static pow10_neg_tab := [?]f16{
+	@(static, rodata) pow10_neg_tab := [?]f16{
 		1e-00, 1e-01, 1e-02, 1e-03, 1e-04, 1e-05, 1e-06, 1e-07,
 	}
 
@@ -151,13 +151,13 @@ pow10_f16 :: proc "contextless" (n: f16) -> f16 {
 
 @(require_results)
 pow10_f32 :: proc "contextless" (n: f32) -> f32 {
-	@static pow10_pos_tab := [?]f32{
+	@(static, rodata) pow10_pos_tab := [?]f32{
 		1e00, 1e01, 1e02, 1e03, 1e04, 1e05, 1e06, 1e07, 1e08, 1e09,
 		1e10, 1e11, 1e12, 1e13, 1e14, 1e15, 1e16, 1e17, 1e18, 1e19,
 		1e20, 1e21, 1e22, 1e23, 1e24, 1e25, 1e26, 1e27, 1e28, 1e29,
 		1e30, 1e31, 1e32, 1e33, 1e34, 1e35, 1e36, 1e37, 1e38,
 	}
-	@static pow10_neg_tab := [?]f32{
+	@(static, rodata) pow10_neg_tab := [?]f32{
 		1e-00, 1e-01, 1e-02, 1e-03, 1e-04, 1e-05, 1e-06, 1e-07, 1e-08, 1e-09,
 		1e-10, 1e-11, 1e-12, 1e-13, 1e-14, 1e-15, 1e-16, 1e-17, 1e-18, 1e-19,
 		1e-20, 1e-21, 1e-22, 1e-23, 1e-24, 1e-25, 1e-26, 1e-27, 1e-28, 1e-29,
@@ -179,16 +179,16 @@ pow10_f32 :: proc "contextless" (n: f32) -> f32 {
 
 @(require_results)
 pow10_f64 :: proc "contextless" (n: f64) -> f64 {
-	@static pow10_tab := [?]f64{
+	@(static, rodata) pow10_tab := [?]f64{
 		1e00, 1e01, 1e02, 1e03, 1e04, 1e05, 1e06, 1e07, 1e08, 1e09,
 		1e10, 1e11, 1e12, 1e13, 1e14, 1e15, 1e16, 1e17, 1e18, 1e19,
 		1e20, 1e21, 1e22, 1e23, 1e24, 1e25, 1e26, 1e27, 1e28, 1e29,
 		1e30, 1e31,
 	}
-	@static pow10_pos_tab32 := [?]f64{
+	@(static, rodata) pow10_pos_tab32 := [?]f64{
 		1e00, 1e32, 1e64, 1e96, 1e128, 1e160, 1e192, 1e224, 1e256, 1e288,
 	}
-	@static pow10_neg_tab32 := [?]f64{
+	@(static, rodata) pow10_neg_tab32 := [?]f64{
 		1e-00, 1e-32, 1e-64, 1e-96, 1e-128, 1e-160, 1e-192, 1e-224, 1e-256, 1e-288, 1e-320,
 	}
 
@@ -1274,7 +1274,7 @@ binomial :: proc "contextless" (n, k: int) -> int {
 @(require_results)
 factorial :: proc "contextless" (n: int) -> int {
 	when size_of(int) == size_of(i64) {
-		@static table := [21]int{
+		@(static, rodata) table := [21]int{
 			1,
 			1,
 			2,
@@ -1298,7 +1298,7 @@ factorial :: proc "contextless" (n: int) -> int {
 			2_432_902_008_176_640_000,
 		}
 	} else {
-		@static table := [13]int{
+		@(static, rodata) table := [13]int{
 			1,
 			1,
 			2,

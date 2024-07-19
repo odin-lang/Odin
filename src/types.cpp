@@ -140,6 +140,7 @@ struct TypeStruct {
 	i64             custom_field_align;
 	Type *          polymorphic_params; // Type_Tuple
 	Type *          polymorphic_parent;
+	Wait_Signal     polymorphic_wait_signal;
 
 	Type *          soa_elem;
 	i32             soa_count;
@@ -167,6 +168,7 @@ struct TypeUnion {
 	i64           custom_align;
 	Type *        polymorphic_params; // Type_Tuple
 	Type *        polymorphic_parent;
+	Wait_Signal   polymorphic_wait_signal;
 
 	i16           tag_size;
 	bool          is_polymorphic;
@@ -184,6 +186,8 @@ struct TypeProc {
 	isize    specialization_count;
 	ProcCallingConvention calling_convention;
 	i32      variadic_index;
+	String   require_target_feature;
+	String   enable_target_feature;
 	// TODO(bill): Make this a flag set rather than bools
 	bool     variadic;
 	bool     require_results;
@@ -454,6 +458,15 @@ gb_internal Selection sub_selection(Selection const &sel, isize offset) {
 	res.index.capacity = res.index.count;
 	return res;
 }
+
+gb_internal Selection trim_selection(Selection const &sel) {
+	Selection res = {};
+	res.index.data = sel.index.data;
+	res.index.count = gb_max(sel.index.count - 1, 0);
+	res.index.capacity = res.index.count;
+	return res;
+}
+
 
 gb_global Type basic_types[] = {
 	{Type_Basic, {Basic_Invalid,           0,                                          0, STR_LIT("invalid type")}},
@@ -951,7 +964,7 @@ gb_internal Type *alloc_type(TypeKind kind) {
 	// gbAllocator a = heap_allocator();
 	gbAllocator a = permanent_allocator();
 	Type *t = gb_alloc_item(a, Type);
-	zero_item(t);
+	gb_zero_item(t);
 	t->kind = kind;
 	t->cached_size  = -1;
 	t->cached_align = -1;
@@ -986,6 +999,27 @@ gb_internal Type *alloc_type_soa_pointer(Type *elem) {
 	return t;
 }
 
+gb_internal Type *alloc_type_pointer_to_multi_pointer(Type *ptr) {
+	Type *original_type = ptr;
+	ptr = base_type(ptr);
+	if (ptr->kind == Type_Pointer) {
+		return alloc_type_multi_pointer(ptr->Pointer.elem);
+	} else if (ptr->kind != Type_MultiPointer) {
+		GB_PANIC("Invalid type: %s", type_to_string(original_type));
+	}
+	return original_type;
+}
+
+gb_internal Type *alloc_type_multi_pointer_to_pointer(Type *ptr) {
+	Type *original_type = ptr;
+	ptr = base_type(ptr);
+	if (ptr->kind == Type_MultiPointer) {
+		return alloc_type_pointer(ptr->MultiPointer.elem);
+	} else if (ptr->kind != Type_Pointer) {
+		GB_PANIC("Invalid type: %s", type_to_string(original_type));
+	}
+	return original_type;
+}
 
 gb_internal Type *alloc_type_array(Type *elem, i64 count, Type *generic_count = nullptr) {
 	if (generic_count != nullptr) {
@@ -1061,6 +1095,7 @@ gb_internal Type *alloc_type_struct() {
 gb_internal Type *alloc_type_struct_complete() {
 	Type *t = alloc_type(Type_Struct);
 	wait_signal_set(&t->Struct.fields_wait_signal);
+	wait_signal_set(&t->Struct.polymorphic_wait_signal);
 	return t;
 }
 
@@ -1459,10 +1494,10 @@ gb_internal i64 matrix_align_of(Type *t, struct TypePath *tp) {
 	i64 total_expected_size = row_count*t->Matrix.column_count*elem_size;
 	// i64 min_alignment = prev_pow2(elem_align * row_count);
 	i64 min_alignment = prev_pow2(total_expected_size);
-	while ((total_expected_size % min_alignment) != 0) {
+	while (total_expected_size != 0 && (total_expected_size % min_alignment) != 0) {
 		min_alignment >>= 1;
 	}
-	GB_ASSERT(min_alignment >= elem_align);
+	min_alignment = gb_max(min_alignment, elem_align);
 	
 	i64 align = gb_min(min_alignment, build_context.max_simd_align);
 	return align;
@@ -1976,11 +2011,32 @@ gb_internal bool is_type_valid_bit_set_elem(Type *t) {
 	return false;
 }
 
+
+gb_internal bool is_valid_bit_field_backing_type(Type *type) {
+	if (type == nullptr) {
+		return false;
+	}
+	type = base_type(type);
+	if (is_type_untyped(type)) {
+		return false;
+	}
+	if (is_type_integer(type)) {
+		return true;
+	}
+	if (type->kind == Type_Array) {
+		return is_type_integer(type->Array.elem);
+	}
+	return false;
+}
+
 gb_internal Type *bit_set_to_int(Type *t) {
 	GB_ASSERT(is_type_bit_set(t));
 	Type *bt = base_type(t);
 	Type *underlying = bt->BitSet.underlying;
 	if (underlying != nullptr && is_type_integer(underlying)) {
+		return underlying;
+	}
+	if (underlying != nullptr && is_valid_bit_field_backing_type(underlying)) {
 		return underlying;
 	}
 
@@ -2098,21 +2154,24 @@ gb_internal bool is_type_polymorphic_record_unspecialized(Type *t) {
 	t = base_type(t);
 	if (t->kind == Type_Struct) {
 		return t->Struct.is_polymorphic && !t->Struct.is_poly_specialized;
-	} else if (t->kind == Type_Struct) {
-		return t->Struct.is_polymorphic && !t->Struct.is_poly_specialized;
+	} else if (t->kind == Type_Union) {
+		return t->Union.is_polymorphic && !t->Union.is_poly_specialized;
 	}
 	return false;
 }
+
 
 gb_internal TypeTuple *get_record_polymorphic_params(Type *t) {
 	t = base_type(t);
 	switch (t->kind) {
 	case Type_Struct:
+		wait_signal_until_available(&t->Struct.polymorphic_wait_signal);
 		if (t->Struct.polymorphic_params) {
 			return &t->Struct.polymorphic_params->Tuple;
 		}
 		break;
 	case Type_Union:
+		wait_signal_until_available(&t->Union.polymorphic_wait_signal);
 		if (t->Union.polymorphic_params) {
 			return &t->Union.polymorphic_params->Tuple;
 		}
@@ -2327,6 +2386,7 @@ gb_internal bool type_has_nil(Type *t) {
 	}
 	return false;
 }
+
 
 gb_internal bool elem_type_can_be_constant(Type *t) {
 	t = base_type(t);
@@ -2884,11 +2944,14 @@ gb_internal Type *c_vararg_promote_type(Type *type) {
 
 	if (core->kind == Type_Basic) {
 		switch (core->Basic.kind) {
+		case Basic_f16:
 		case Basic_f32:
 		case Basic_UntypedFloat:
 			return t_f64;
+		case Basic_f16le:
 		case Basic_f32le:
 			return t_f64le;
+		case Basic_f16be:
 		case Basic_f32be:
 			return t_f64be;
 
@@ -2991,7 +3054,22 @@ gb_internal Type *union_tag_type(Type *u) {
 	return t_uint;
 }
 
+gb_internal int matched_target_features(TypeProc *t) {
+	if (t->require_target_feature.len == 0) {
+		return 0;
+	}
 
+	int matches = 0;
+	String_Iterator it = {t->require_target_feature, 0};
+	for (;;) {
+		String str = string_split_iterator(&it, ',');
+		if (str == "") break;
+		if (check_target_feature_is_valid_for_target_arch(str, nullptr)) {
+			matches += 1;
+		}
+	}
+	return matches;
+}
 
 enum ProcTypeOverloadKind {
 	ProcOverload_Identical, // The types are identical
@@ -3003,6 +3081,7 @@ enum ProcTypeOverloadKind {
 	ProcOverload_ResultCount,
 	ProcOverload_ResultTypes,
 	ProcOverload_Polymorphic,
+	ProcOverload_TargetFeatures,
 
 	ProcOverload_NotProcedure,
 
@@ -3058,6 +3137,10 @@ gb_internal ProcTypeOverloadKind are_proc_types_overload_safe(Type *x, Type *y) 
 		if (!are_types_identical(ex->type, ey->type)) {
 			return ProcOverload_ResultTypes;
 		}
+	}
+
+	if (matched_target_features(&px) != matched_target_features(&py)) {
+		return ProcOverload_TargetFeatures;
 	}
 
 	if (px.params != nullptr && py.params != nullptr) {
@@ -3166,7 +3249,7 @@ gb_internal Selection lookup_field_with_selection(Type *type_, String field_name
 				}
 			}
 			if (type->kind == Type_Struct) {
-				wait_signal_until_available(&type->Struct.fields_wait_signal);
+				// wait_signal_until_available(&type->Struct.fields_wait_signal);
 				isize field_count = type->Struct.fields.count;
 				if (field_count != 0) for_array(i, type->Struct.fields) {
 					Entity *f = type->Struct.fields[i];
@@ -3196,7 +3279,7 @@ gb_internal Selection lookup_field_with_selection(Type *type_, String field_name
 		}
 
 		if (type->kind == Type_Struct) {
-			wait_signal_until_available(&type->Struct.fields_wait_signal);
+			// wait_signal_until_available(&type->Struct.fields_wait_signal);
 			Scope *s = type->Struct.scope;
 			if (s != nullptr) {
 				Entity *found = scope_lookup_current(s, field_name);
@@ -3245,6 +3328,10 @@ gb_internal Selection lookup_field_with_selection(Type *type_, String field_name
 			}
 		}
 
+		if (is_type_polymorphic(type)) {
+			// NOTE(bill): A polymorphic struct has no fields, this only hits in the case of an error
+			return sel;
+		}
 		wait_signal_until_available(&type->Struct.fields_wait_signal);
 		isize field_count = type->Struct.fields.count;
 		if (field_count != 0) for_array(i, type->Struct.fields) {

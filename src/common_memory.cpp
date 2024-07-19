@@ -2,13 +2,6 @@
 #include <malloc.h>
 #endif
 
-gb_internal gb_inline void zero_size(void *ptr, isize len) {
-	memset(ptr, 0, len);
-}
-
-#define zero_item(ptr) zero_size((ptr), gb_size_of(ptr))
-
-
 template <typename U, typename V>
 gb_internal gb_inline U bit_cast(V &v) { return reinterpret_cast<U &>(v); }
 
@@ -39,6 +32,8 @@ gb_internal void virtual_memory_init(void) {
 }
 
 
+gb_internal Thread *get_current_thread(void);
+
 
 struct MemoryBlock {
 	MemoryBlock *prev;
@@ -50,8 +45,9 @@ struct MemoryBlock {
 struct Arena {
 	MemoryBlock * curr_block;
 	isize         minimum_block_size;
-	BlockingMutex mutex;
+	// BlockingMutex mutex;
 	isize         temp_count;
+	Thread *      parent_thread;
 };
 
 enum { DEFAULT_MINIMUM_BLOCK_SIZE = 8ll*1024ll*1024ll };
@@ -73,10 +69,20 @@ gb_internal isize arena_align_forward_offset(Arena *arena, isize alignment) {
 	return alignment_offset;
 }
 
+gb_internal void thread_init_arenas(Thread *t) {
+	t->permanent_arena = gb_alloc_item(heap_allocator(), Arena);
+	t->temporary_arena = gb_alloc_item(heap_allocator(), Arena);
+
+	t->permanent_arena->parent_thread = t;
+	t->temporary_arena->parent_thread = t;
+
+	t->permanent_arena->minimum_block_size = DEFAULT_MINIMUM_BLOCK_SIZE;
+	t->temporary_arena->minimum_block_size = DEFAULT_MINIMUM_BLOCK_SIZE;
+}
+
 gb_internal void *arena_alloc(Arena *arena, isize min_size, isize alignment) {
 	GB_ASSERT(gb_is_power_of_two(alignment));
-	
-	mutex_lock(&arena->mutex);
+	GB_ASSERT(arena->parent_thread == get_current_thread());
 
 	isize size = 0;
 	if (arena->curr_block != nullptr) {
@@ -102,9 +108,7 @@ gb_internal void *arena_alloc(Arena *arena, isize min_size, isize alignment) {
 	
 	curr_block->used += size;
 	GB_ASSERT(curr_block->used <= curr_block->size);
-	
-	mutex_unlock(&arena->mutex);
-	
+
 	// NOTE(bill): memory will be zeroed by default due to virtual memory 
 	return ptr;	
 }
@@ -259,7 +263,7 @@ struct ArenaTemp {
 
 ArenaTemp arena_temp_begin(Arena *arena) {
 	GB_ASSERT(arena);
-	MUTEX_GUARD(&arena->mutex);
+	GB_ASSERT(arena->parent_thread == get_current_thread());
 
 	ArenaTemp temp = {};
 	temp.arena = arena;
@@ -274,7 +278,7 @@ ArenaTemp arena_temp_begin(Arena *arena) {
 void arena_temp_end(ArenaTemp const &temp) {
 	GB_ASSERT(temp.arena);
 	Arena *arena = temp.arena;
-	MUTEX_GUARD(&arena->mutex);
+	GB_ASSERT(arena->parent_thread == get_current_thread());
 
 	if (temp.block) {
 		bool memory_block_found = false;
@@ -310,7 +314,7 @@ void arena_temp_end(ArenaTemp const &temp) {
 void arena_temp_ignore(ArenaTemp const &temp) {
 	GB_ASSERT(temp.arena);
 	Arena *arena = temp.arena;
-	MUTEX_GUARD(&arena->mutex);
+	GB_ASSERT(arena->parent_thread == get_current_thread());
 
 	GB_ASSERT_MSG(arena->temp_count > 0, "double-use of arena_temp_end");
 	arena->temp_count -= 1;
@@ -370,14 +374,65 @@ gb_internal GB_ALLOCATOR_PROC(arena_allocator_proc) {
 }
 
 
-gb_global gb_thread_local Arena permanent_arena = {nullptr, DEFAULT_MINIMUM_BLOCK_SIZE};
-gb_internal gbAllocator permanent_allocator() {
-	return arena_allocator(&permanent_arena);
+enum ThreadArenaKind : uintptr {
+	ThreadArena_Permanent,
+	ThreadArena_Temporary,
+};
+
+gb_global Arena default_permanent_arena = {nullptr, DEFAULT_MINIMUM_BLOCK_SIZE};
+gb_global Arena default_temporary_arena = {nullptr, DEFAULT_MINIMUM_BLOCK_SIZE};
+
+
+gb_internal Arena *get_arena(ThreadArenaKind kind) {
+	Thread *t = get_current_thread();
+	switch (kind) {
+	case ThreadArena_Permanent: return t ? t->permanent_arena : &default_permanent_arena;
+	case ThreadArena_Temporary: return t ? t->temporary_arena : &default_temporary_arena;
+	}
+	GB_PANIC("INVALID ARENA KIND");
+	return nullptr;
 }
 
-gb_global gb_thread_local Arena temporary_arena = {nullptr, DEFAULT_MINIMUM_BLOCK_SIZE};
+
+
+gb_internal GB_ALLOCATOR_PROC(thread_arena_allocator_proc) {
+	void *ptr = nullptr;
+	ThreadArenaKind kind = cast(ThreadArenaKind)cast(uintptr)allocator_data;
+	Arena *arena = get_arena(kind);
+
+	switch (type) {
+	case gbAllocation_Alloc:
+		ptr = arena_alloc(arena, size, alignment);
+		break;
+	case gbAllocation_Free:
+		break;
+	case gbAllocation_Resize:
+		if (size == 0) {
+			ptr = nullptr;
+		} else if (size <= old_size) {
+			ptr = old_memory;
+		} else {
+			ptr = arena_alloc(arena, size, alignment);
+			gb_memmove(ptr, old_memory, old_size);
+		}
+		break;
+	case gbAllocation_FreeAll:
+		GB_PANIC("use arena_free_all directly");
+		arena_free_all(arena);
+		break;
+	}
+
+	return ptr;
+}
+
+
+
+gb_internal gbAllocator permanent_allocator() {
+	return {thread_arena_allocator_proc, cast(void *)cast(uintptr)ThreadArena_Permanent};
+}
+
 gb_internal gbAllocator temporary_allocator() {
-	return arena_allocator(&temporary_arena);
+	return {thread_arena_allocator_proc, cast(void *)cast(uintptr)ThreadArena_Permanent};
 }
 
 
@@ -385,7 +440,7 @@ gb_internal gbAllocator temporary_allocator() {
 
 
 // #define TEMPORARY_ALLOCATOR_GUARD()
-#define TEMPORARY_ALLOCATOR_GUARD() TEMP_ARENA_GUARD(&temporary_arena)
+#define TEMPORARY_ALLOCATOR_GUARD() TEMP_ARENA_GUARD(get_arena(ThreadArena_Temporary))
 #define PERMANENT_ALLOCATOR_GUARD()
 
 

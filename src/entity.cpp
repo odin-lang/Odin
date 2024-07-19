@@ -45,7 +45,7 @@ enum EntityFlag : u64 {
 	EntityFlag_Value         = 1ull<<11,
 	EntityFlag_BitFieldField = 1ull<<12,
 
-
+	EntityFlag_NoCapture = 1ull<<13, // #no_capture
 
 	EntityFlag_PolyConst     = 1ull<<15,
 	EntityFlag_NotExported   = 1ull<<16,
@@ -84,8 +84,6 @@ enum EntityFlag : u64 {
 	
 	EntityFlag_Require = 1ull<<50,
 	EntityFlag_ByPtr   = 1ull<<51, // enforce parameter is passed by pointer
-
-	EntityFlag_OldForOrSwitchValue = 1ull<<52,
 
 	EntityFlag_Overridden    = 1ull<<63,
 };
@@ -135,9 +133,7 @@ enum EntityConstantFlags : u32 {
 enum ProcedureOptimizationMode : u8 {
 	ProcedureOptimizationMode_Default,
 	ProcedureOptimizationMode_None,
-	ProcedureOptimizationMode_Minimal,
-	ProcedureOptimizationMode_Size,
-	ProcedureOptimizationMode_Speed,
+	ProcedureOptimizationMode_FavorSize,
 };
 
 
@@ -210,6 +206,7 @@ struct Entity {
 			CommentGroup *comment;
 		} Constant;
 		struct {
+			Ast *type_expr; // only used for some variables within procedure bodies
 			Ast *init_expr; // only used for some variables within procedure bodies
 			i32  field_index;
 			i32  field_group_index;
@@ -224,12 +221,14 @@ struct Entity {
 			Ast *      foreign_library_ident;
 			String     link_name;
 			String     link_prefix;
+			String     link_suffix;
 			String     link_section;
 			CommentGroup *docs;
 			CommentGroup *comment;
 			bool       is_foreign;
 			bool       is_export;
 			bool       is_global;
+			bool       is_rodata;
 		} Variable;
 		struct {
 			Type * type_parameter_specialization;
@@ -244,6 +243,7 @@ struct Entity {
 			Ast *   foreign_library_ident;
 			String  link_name;
 			String  link_prefix;
+			String  link_suffix;
 			DeferredProcedure deferred_procedure;
 
 			struct GenProcsData *gen_procs;
@@ -252,10 +252,9 @@ struct Entity {
 			bool    is_foreign                 : 1;
 			bool    is_export                  : 1;
 			bool    generated_from_polymorphic : 1;
-			bool    target_feature_disabled    : 1;
 			bool    entry_point_only           : 1;
 			bool    has_instrumentation        : 1;
-			String  target_feature;
+			bool    is_memcpy_like             : 1;
 		} Procedure;
 		struct {
 			Array<Entity *> entities;
@@ -269,6 +268,7 @@ struct Entity {
 			Scope *scope;
 		} ImportName;
 		struct {
+			Ast *decl;
 			Slice<String> paths;
 			String name;
 			i64 priority_index;
@@ -336,6 +336,9 @@ gb_internal Entity *alloc_entity(EntityKind kind, Scope *scope, Token token, Typ
 	entity->token  = token;
 	entity->type   = type;
 	entity->id     = 1 + global_entity_id.fetch_add(1);
+	if (token.pos.file_id) {
+		entity->file = thread_safe_get_ast_file_from_id(token.pos.file_id);
+	}
 	return entity;
 }
 

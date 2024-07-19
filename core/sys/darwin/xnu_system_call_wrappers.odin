@@ -3,6 +3,10 @@ package darwin
 import "core:c"
 import "base:intrinsics"
 
+// IMPORTANT NOTE: direct syscall usage is not allowed by Apple's review process of apps and should
+// be entirely avoided in the builtin Odin collections, these are here for users if they don't
+// care about the Apple review process.
+
 /* flock */
 LOCK_SH :: 1 /* shared lock */
 LOCK_EX :: 2 /* exclusive lock */
@@ -337,7 +341,7 @@ syscall_ftruncate :: #force_inline proc "contextless" (fd: c.int, length: off_t)
 	return cast(c.int)intrinsics.syscall(unix_offset_syscall(.ftruncate), uintptr(fd), uintptr(length))
 }
 
-syscall_sysctl :: #force_inline proc "contextless" (name: ^c.int, namelen: c.uint, oldp: rawptr, oldlenp: ^i64, newp: ^i8, newlen: i64) -> c.int {
+syscall_sysctl :: #force_inline proc "contextless" (name: [^]c.int, namelen: c.size_t, oldp: rawptr, oldlenp: ^c.size_t, newp: rawptr, newlen: c.size_t) -> c.int {
 	return cast(c.int)intrinsics.syscall(unix_offset_syscall(.sysctl), uintptr(name), uintptr(namelen), uintptr(oldp), uintptr(oldlenp), uintptr(newp), uintptr(newlen))
 }
 
@@ -390,8 +394,8 @@ syscall_adjtime :: #force_inline proc "contextless" (delta: ^timeval, old_delta:
 	return cast(c.int)intrinsics.syscall(unix_offset_syscall(.adjtime), uintptr(delta), uintptr(old_delta))
 }
 
-syscall_sysctlbyname :: #force_inline proc "contextless" (name: cstring, oldp: rawptr, oldlenp: ^i64, newp: rawptr, newlen: i64) -> c.int {
-	return cast(c.int)intrinsics.syscall(unix_offset_syscall(.sysctlbyname), transmute(uintptr)name, uintptr(oldp), uintptr(oldlenp), uintptr(newp), uintptr(newlen))
+syscall_sysctlbyname :: #force_inline proc "contextless" (name: string, oldp: rawptr, oldlenp: ^c.size_t, newp: rawptr, newlen: c.size_t) -> c.int {
+	return cast(c.int)intrinsics.syscall(unix_offset_syscall(.sysctlbyname), uintptr(raw_data(name)), uintptr(len(name)), uintptr(oldp), uintptr(oldlenp), uintptr(newp), uintptr(newlen))
 }
 
 syscall_proc_info :: #force_inline proc "contextless" (num: c.int, pid: u32, flavor: c.int, arg: u64, buffer: rawptr, buffer_size: c.int) -> c.int {

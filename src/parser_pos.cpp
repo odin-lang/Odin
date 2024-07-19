@@ -278,7 +278,7 @@ Token ast_end_token(Ast *node) {
 	case Ast_ImportDecl:         return node->ImportDecl.relpath;
 	case Ast_ForeignImportDecl:
 		if (node->ForeignImportDecl.filepaths.count > 0) {
-			return node->ForeignImportDecl.filepaths[node->ForeignImportDecl.filepaths.count-1];
+			return ast_end_token(node->ForeignImportDecl.filepaths[node->ForeignImportDecl.filepaths.count-1]);
 		}
 		if (node->ForeignImportDecl.library_name.kind != Token_Invalid) {
 			return node->ForeignImportDecl.library_name;

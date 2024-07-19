@@ -442,20 +442,20 @@ F_GETPATH :: 50 // return the full path of the fd
 foreign libc {
 	@(link_name="__error") __error :: proc() -> ^c.int ---
 
-	@(link_name="open")             _unix_open          :: proc(path: cstring, flags: i32, mode: u16) -> Handle ---
+	@(link_name="open")             _unix_open          :: proc(path: cstring, flags: i32, #c_vararg args: ..any) -> Handle ---
 	@(link_name="close")            _unix_close         :: proc(handle: Handle) -> c.int ---
 	@(link_name="read")             _unix_read          :: proc(handle: Handle, buffer: rawptr, count: c.size_t) -> int ---
 	@(link_name="write")            _unix_write         :: proc(handle: Handle, buffer: rawptr, count: c.size_t) -> int ---
 	@(link_name="pread")            _unix_pread         :: proc(handle: Handle, buffer: rawptr, count: c.size_t, offset: i64) -> int ---
 	@(link_name="pwrite")           _unix_pwrite        :: proc(handle: Handle, buffer: rawptr, count: c.size_t, offset: i64) -> int ---
-	@(link_name="lseek")            _unix_lseek         :: proc(fs: Handle, offset: int, whence: int) -> int ---
+	@(link_name="lseek")            _unix_lseek         :: proc(fs: Handle, offset: int, whence: c.int) -> int ---
 	@(link_name="gettid")           _unix_gettid        :: proc() -> u64 ---
 	@(link_name="getpagesize")      _unix_getpagesize   :: proc() -> i32 ---
 	@(link_name="stat64")           _unix_stat          :: proc(path: cstring, stat: ^OS_Stat) -> c.int ---
 	@(link_name="lstat64")          _unix_lstat         :: proc(path: cstring, stat: ^OS_Stat) -> c.int ---
 	@(link_name="fstat64")          _unix_fstat         :: proc(fd: Handle, stat: ^OS_Stat) -> c.int ---
 	@(link_name="readlink")         _unix_readlink      :: proc(path: cstring, buf: ^byte, bufsiz: c.size_t) -> c.ssize_t ---
-	@(link_name="access")           _unix_access        :: proc(path: cstring, mask: int) -> int ---
+	@(link_name="access")           _unix_access        :: proc(path: cstring, mask: c.int) -> c.int ---
         @(link_name="fsync")            _unix_fsync         :: proc(handle: Handle) -> c.int ---
 
 	@(link_name="fdopendir$INODE64") _unix_fdopendir_amd64 :: proc(fd: Handle) -> Dir ---
@@ -477,7 +477,11 @@ foreign libc {
 	@(link_name="calloc")   _unix_calloc   :: proc(num, size: int) -> rawptr ---
 	@(link_name="free")     _unix_free     :: proc(ptr: rawptr) ---
 	@(link_name="realloc")  _unix_realloc  :: proc(ptr: rawptr, size: int) -> rawptr ---
+
 	@(link_name="getenv")   _unix_getenv   :: proc(cstring) -> cstring ---
+	@(link_name="unsetenv") _unix_unsetenv :: proc(cstring) -> c.int ---
+	@(link_name="setenv")   _unix_setenv   :: proc(key: cstring, value: cstring, overwrite: c.int) -> c.int ---
+
 	@(link_name="getcwd")   _unix_getcwd   :: proc(buf: cstring, len: c.size_t) -> cstring ---
 	@(link_name="chdir")    _unix_chdir    :: proc(buf: cstring) -> c.int ---
 	@(link_name="mkdir")    _unix_mkdir    :: proc(buf: cstring, mode: u16) -> c.int ---
@@ -555,7 +559,7 @@ open :: proc(path: string, flags: int = O_RDWR, mode: int = 0) -> (Handle, Errno
 		err := fchmod(handle, cast(u16)mode)
 		if err != 0 {
 			_unix_close(handle)
-			return INVALID_HANDLE, cast(Errno)err
+			return INVALID_HANDLE, err
 		}
 	}
 
@@ -639,7 +643,7 @@ write_at :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Errno) {
 seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
 	assert(fd != -1)
 
-	final_offset := i64(_unix_lseek(fd, int(offset), whence))
+	final_offset := i64(_unix_lseek(fd, int(offset), c.int(whence)))
 	if final_offset == -1 {
 		return 0, 1
 	}
@@ -883,8 +887,8 @@ absolute_path_from_relative :: proc(rel: string) -> (path: string, err: Errno) {
 	}
 	defer _unix_free(path_ptr)
 
-	path_cstr := transmute(cstring)path_ptr
-	path = strings.clone( string(path_cstr) )
+	path_cstr := cast(cstring)path_ptr
+	path = strings.clone(string(path_cstr))
 
 	return path, ERROR_NONE
 }
@@ -892,11 +896,11 @@ absolute_path_from_relative :: proc(rel: string) -> (path: string, err: Errno) {
 access :: proc(path: string, mask: int) -> bool {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	cstr := strings.clone_to_cstring(path, context.temp_allocator)
-	return _unix_access(cstr, mask) == 0
+	return _unix_access(cstr, c.int(mask)) == 0
 }
 
 flush :: proc(fd: Handle) -> Errno {
-    return cast(Errno)_unix_fsync(fd)
+	return cast(Errno)_unix_fsync(fd)
 }
 
 lookup_env :: proc(key: string, allocator := context.allocator) -> (value: string, found: bool) {
@@ -912,6 +916,27 @@ lookup_env :: proc(key: string, allocator := context.allocator) -> (value: strin
 get_env :: proc(key: string, allocator := context.allocator) -> (value: string) {
 	value, _ = lookup_env(key, allocator)
 	return
+}
+
+set_env :: proc(key, value: string) -> Errno {
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
+	key_cstring := strings.clone_to_cstring(key, context.temp_allocator)
+	value_cstring := strings.clone_to_cstring(value, context.temp_allocator)
+	res := _unix_setenv(key_cstring, value_cstring, 1)
+	if res < 0 {
+		return Errno(get_last_error())
+	}
+	return ERROR_NONE
+}
+
+unset_env :: proc(key: string) -> Errno {
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
+	s := strings.clone_to_cstring(key, context.temp_allocator)
+	res := _unix_unsetenv(s)
+	if res < 0 {
+		return Errno(get_last_error())
+	}
+	return ERROR_NONE
 }
 
 get_current_directory :: proc() -> string {

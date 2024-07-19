@@ -12,8 +12,6 @@
 
 package math_big
 
-import rnd "core:math/rand"
-
 /*
 	Determines if an Integer is divisible by one of the _PRIME_TABLE primes.
 	Returns true if it is, false if not. 
@@ -315,7 +313,7 @@ internal_int_prime_miller_rabin :: proc(a, b: ^Int, allocator := context.allocat
 
 	Assumes `a` not to be `nil` and to have been initialized.
 */
-internal_int_is_prime :: proc(a: ^Int, miller_rabin_trials := int(-1), miller_rabin_only := USE_MILLER_RABIN_ONLY, r: ^rnd.Rand = nil, allocator := context.allocator) -> (is_prime: bool, err: Error) {
+internal_int_is_prime :: proc(a: ^Int, miller_rabin_trials := int(-1), miller_rabin_only := USE_MILLER_RABIN_ONLY, allocator := context.allocator) -> (is_prime: bool, err: Error) {
 	context.allocator = allocator
 	miller_rabin_trials := miller_rabin_trials
 
@@ -461,7 +459,7 @@ internal_int_is_prime :: proc(a: ^Int, miller_rabin_trials := int(-1), miller_ra
 		for ix := 0; ix < miller_rabin_trials; ix += 1 {
 
 			// rand() guarantees the first digit to be non-zero
-			internal_random(b, _DIGIT_TYPE_BITS, r) or_return
+			internal_random(b, _DIGIT_TYPE_BITS) or_return
 
 			// Reduce digit before casting because DIGIT might be bigger than
 			// an unsigned int and "mask" on the other side is most probably not.
@@ -1183,13 +1181,10 @@ internal_int_prime_next_prime :: proc(a: ^Int, trials: int, bbs_style: bool, all
 
 	This is possibly the mother of all prime generation functions, muahahahahaha!
 */
-internal_random_prime :: proc(a: ^Int, size_in_bits: int, trials: int, flags := Primality_Flags{}, r: ^rnd.Rand = nil, allocator := context.allocator) -> (err: Error) {
+internal_random_prime :: proc(a: ^Int, size_in_bits: int, trials: int, flags := Primality_Flags{}, allocator := context.allocator) -> (err: Error) {
 	context.allocator = allocator
 	flags  := flags
 	trials := trials
-
-	t := &Int{}
-	defer internal_destroy(t)
 
 	/*
 		Sanity check the input.

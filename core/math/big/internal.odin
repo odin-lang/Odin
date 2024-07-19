@@ -546,7 +546,7 @@ internal_int_shl1 :: proc(dest, src: ^Int, allocator := context.allocator) -> (e
  	Like `internal_int_mul_digit` but with an integer as the small input.
 */
 internal_int_mul_integer :: proc(dest, a: ^Int, b: $T, allocator := context.allocator) -> (err: Error)
-where intrinsics.type_is_integer(T) && T != DIGIT {
+where intrinsics.type_is_integer(T), T != DIGIT {
 	context.allocator = allocator
 
 	t := &Int{}
@@ -2178,15 +2178,20 @@ internal_int_grow :: proc(a: ^Int, digits: int, allow_shrink := false, allocator
 	}
 
 	/*
-		If not yet iniialized, initialize the `digit` backing with the allocator we were passed.
+		If not yet initialized, initialize the `digit` backing with the allocator we were passed.
 	*/
 	if cap == 0 {
 		a.digit = make([dynamic]DIGIT, needed, allocator)
-	} else if cap != needed {
+	} else if cap < needed {
 		/*
 			`[dynamic]DIGIT` already knows what allocator was used for it, so resize will do the right thing.
 		*/
 		resize(&a.digit, needed)
+	} else if cap > needed {
+		/*
+			Same applies to builtin.shrink here as resize above
+		*/
+		builtin.shrink(&a.digit, needed)
 	}
 	/*
 		Let's see if the allocation/resize worked as expected.
@@ -2806,17 +2811,17 @@ internal_int_count_lsb :: proc(a: ^Int) -> (count: int, err: Error) {
 }
 
 internal_platform_count_lsb :: #force_inline proc(a: $T) -> (count: int)
-	where intrinsics.type_is_integer(T) && intrinsics.type_is_unsigned(T) {
+	where intrinsics.type_is_integer(T), intrinsics.type_is_unsigned(T) {
 	return int(intrinsics.count_trailing_zeros(a)) if a > 0 else 0
 }
 
 internal_count_lsb :: proc { internal_int_count_lsb, internal_platform_count_lsb, }
 
-internal_int_random_digit :: proc(r: ^rnd.Rand = nil) -> (res: DIGIT) {
+internal_int_random_digit :: proc() -> (res: DIGIT) {
 	when _DIGIT_BITS == 60 { // DIGIT = u64
-		return DIGIT(rnd.uint64(r)) & _MASK
+		return DIGIT(rnd.uint64()) & _MASK
 	} else when _DIGIT_BITS == 28 { // DIGIT = u32
-		return DIGIT(rnd.uint32(r)) & _MASK
+		return DIGIT(rnd.uint32()) & _MASK
 	} else {
 		panic("Unsupported DIGIT size.")
 	}
@@ -2824,7 +2829,7 @@ internal_int_random_digit :: proc(r: ^rnd.Rand = nil) -> (res: DIGIT) {
 	return 0 // We shouldn't get here.
 }
 
-internal_int_random :: proc(dest: ^Int, bits: int, r: ^rnd.Rand = nil, allocator := context.allocator) -> (err: Error) {
+internal_int_random :: proc(dest: ^Int, bits: int, allocator := context.allocator) -> (err: Error) {
 	context.allocator = allocator
 
 	bits := bits
@@ -2841,7 +2846,7 @@ internal_int_random :: proc(dest: ^Int, bits: int, r: ^rnd.Rand = nil, allocator
 	#force_inline internal_grow(dest, digits) or_return
 
 	for i := 0; i < digits; i += 1 {
-		dest.digit[i] = int_random_digit(r) & _MASK
+		dest.digit[i] = int_random_digit() & _MASK
 	}
 	if bits > 0 {
 		dest.digit[digits - 1] &= ((1 << uint(bits)) - 1)

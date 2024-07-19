@@ -38,17 +38,36 @@ foreign kernel32 {
 	                      lpNumberOfCharsWritten: LPDWORD,
 	                      lpReserved: LPVOID) -> BOOL ---
 
+	PeekConsoleInputW :: proc(hConsoleInput: HANDLE,
+	                          lpBuffer: ^INPUT_RECORD,
+	                          nLength: DWORD,
+	                          lpNumberOfEventsRead: LPDWORD) -> BOOL ---
+
+	ReadConsoleInputW :: proc(hConsoleInput: HANDLE,
+	                          lpBuffer: ^INPUT_RECORD,
+	                          nLength: DWORD,
+	                          lpNumberOfEventsRead: LPDWORD) -> BOOL ---
+
+	// https://learn.microsoft.com/en-us/windows/console/getnumberofconsoleinputevents
+	GetNumberOfConsoleInputEvents :: proc(hConsoleInput: HANDLE, lpcNumberOfEvents: LPDWORD) -> BOOL ---
+
 	GetConsoleMode :: proc(hConsoleHandle: HANDLE,
 	                       lpMode: LPDWORD) -> BOOL ---
 	SetConsoleMode :: proc(hConsoleHandle: HANDLE,
 	                       dwMode: DWORD) -> BOOL ---
 	SetConsoleCursorPosition :: proc(hConsoleHandle: HANDLE,
-						   dwCursorPosition: COORD) -> BOOL ---
+	                                 dwCursorPosition: COORD) -> BOOL ---
 	SetConsoleTextAttribute :: proc(hConsoleOutput: HANDLE,
-									wAttributes: WORD) -> BOOL ---
+	                                wAttributes: WORD) -> BOOL ---
+	GetConsoleCP :: proc() -> UINT ---
+	SetConsoleCP :: proc(wCodePageID: UINT) -> BOOL ---
+	GetConsoleOutputCP :: proc() -> UINT ---
 	SetConsoleOutputCP :: proc(wCodePageID: UINT) -> BOOL ---
-	
+	FlushConsoleInputBuffer :: proc(hConsoleInput: HANDLE) -> BOOL ---
+
 	GetFileInformationByHandle :: proc(hFile: HANDLE, lpFileInformation: LPBY_HANDLE_FILE_INFORMATION) -> BOOL ---
+
+
 	SetHandleInformation :: proc(hObject: HANDLE,
 	                             dwMask: DWORD,
 	                             dwFlags: DWORD) -> BOOL ---
@@ -64,6 +83,7 @@ foreign kernel32 {
 	RemoveVectoredContinueHandler  :: proc(Handle: LPVOID) -> DWORD ---
 	RaiseException :: proc(dwExceptionCode, dwExceptionFlags, nNumberOfArguments: DWORD, lpArguments: ^ULONG_PTR) -> ! ---
 
+	SetUnhandledExceptionFilter :: proc(lpTopLevelExceptionFilter: LPTOP_LEVEL_EXCEPTION_FILTER) -> LPTOP_LEVEL_EXCEPTION_FILTER ---
 
 	CreateHardLinkW :: proc(lpSymlinkFileName: LPCWSTR,
 	                        lpTargetFileName: LPCWSTR,
@@ -84,6 +104,12 @@ foreign kernel32 {
 	RemoveDirectoryW :: proc(lpPathName: LPCWSTR) -> BOOL ---
 	SetFileAttributesW :: proc(lpFileName: LPCWSTR, dwFileAttributes: DWORD) -> BOOL ---
 	SetLastError :: proc(dwErrCode: DWORD) ---
+	GetCommTimeouts :: proc(handle: HANDLE, timeouts: ^COMMTIMEOUTS) -> BOOL ---
+	SetCommTimeouts :: proc(handle: HANDLE, timeouts: ^COMMTIMEOUTS) -> BOOL ---
+	ClearCommError :: proc(hFile: HANDLE, lpErrors: ^Com_Error, lpStat: ^COMSTAT) -> BOOL ---
+	GetCommState :: proc(handle: HANDLE, dcb: ^DCB) -> BOOL ---
+	SetCommState :: proc(handle: HANDLE, dcb: ^DCB) -> BOOL ---
+	GetCommPorts :: proc(lpPortNumbers: PULONG, uPortNumbersCount: ULONG, puPortNumbersFound: PULONG) -> ULONG ---
 	GetCommandLineW :: proc() -> LPCWSTR ---
 	GetTempPathW :: proc(nBufferLength: DWORD, lpBuffer: LPCWSTR) -> DWORD ---
 	GetCurrentProcess :: proc() -> HANDLE ---
@@ -207,6 +233,12 @@ foreign kernel32 {
 	QueryPerformanceCounter :: proc(lpPerformanceCount: ^LARGE_INTEGER) -> BOOL ---
 	GetExitCodeProcess :: proc(hProcess: HANDLE, lpExitCode: LPDWORD) -> BOOL ---
 	TerminateProcess :: proc(hProcess: HANDLE, uExitCode: UINT) -> BOOL ---
+	OpenProcess :: proc(dwDesiredAccess: DWORD, bInheritHandle: BOOL, dwProcessId: DWORD) -> HANDLE ---
+	OpenThread :: proc(dwDesiredAccess: DWORD, bInheritHandle: BOOL, dwThreadId: DWORD) -> HANDLE ---
+	GetThreadContext :: proc(
+		hThread: HANDLE,
+		lpContext: LPCONTEXT,
+	) -> BOOL ---
 	CreateProcessW :: proc(
 		lpApplicationName: LPCWSTR,
 		lpCommandLine: LPWSTR,
@@ -412,6 +444,7 @@ foreign kernel32 {
 	LoadLibraryW :: proc(c_str: LPCWSTR) -> HMODULE ---
 	FreeLibrary :: proc(h: HMODULE) -> BOOL ---
 	GetProcAddress :: proc(h: HMODULE, c_str: LPCSTR) -> rawptr ---
+	LoadLibraryExW :: proc(c_str: LPCWSTR, file: HANDLE, flags: LoadLibraryEx_Flags) -> HMODULE ---
 
 
 	GetFullPathNameW  :: proc(filename: LPCWSTR, buffer_length: DWORD, buffer: LPCWSTR, file_part: ^LPCWSTR) -> DWORD ---
@@ -429,6 +462,8 @@ foreign kernel32 {
 	DisconnectNamedPipe :: proc(hNamedPipe: HANDLE) -> BOOL ---
 	WaitNamedPipeW :: proc(lpNamedPipeName: LPCWSTR, nTimeOut: DWORD) -> BOOL ---
 
+	AllocConsole :: proc() -> BOOL ---
+	AttachConsole :: proc(dwProcessId: DWORD) -> BOOL ---
 	SetConsoleCtrlHandler :: proc(HandlerRoutine: PHANDLER_ROUTINE, Add: BOOL) -> BOOL ---
 	GenerateConsoleCtrlEvent :: proc(dwCtrlEvent: DWORD, dwProcessGroupId: DWORD) -> BOOL ---
 	FreeConsole :: proc() -> BOOL ---
@@ -451,15 +486,19 @@ foreign kernel32 {
 	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-setfilecompletionnotificationmodes)
 	SetFileCompletionNotificationModes :: proc(FileHandle: HANDLE, Flags: u8) -> BOOL ---
 	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/ioapiset/nf-ioapiset-createiocompletionport)
-	CreateIoCompletionPort :: proc(FileHandle: HANDLE, ExistingCompletionPort: HANDLE, CompletionKey: ^uintptr, NumberOfConcurrentThreads: DWORD) -> HANDLE ---
+	CreateIoCompletionPort :: proc(FileHandle: HANDLE, ExistingCompletionPort: HANDLE, CompletionKey: ULONG_PTR, NumberOfConcurrentThreads: DWORD) -> HANDLE ---
 	//[MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/ioapiset/nf-ioapiset-getqueuedcompletionstatus)
-	GetQueuedCompletionStatus :: proc(CompletionPort: HANDLE, lpNumberOfBytesTransferred: ^DWORD, lpCompletionKey: uintptr, lpOverlapped: ^^OVERLAPPED, dwMilliseconds: DWORD) -> BOOL ---
+	GetQueuedCompletionStatus :: proc(CompletionPort: HANDLE, lpNumberOfBytesTransferred: ^DWORD, lpCompletionKey: PULONG_PTR, lpOverlapped: ^^OVERLAPPED, dwMilliseconds: DWORD) -> BOOL ---
 	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/ioapiset/nf-ioapiset-getqueuedcompletionstatusex)
 	GetQueuedCompletionStatusEx :: proc(CompletionPort: HANDLE, lpCompletionPortEntries: ^OVERLAPPED_ENTRY, ulCount: c_ulong, ulNumEntriesRemoved: ^c_ulong, dwMilliseconds: DWORD, fAlertable: BOOL) -> BOOL ---
 	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/ioapiset/nf-ioapiset-postqueuedcompletionstatus)
 	PostQueuedCompletionStatus :: proc(CompletionPort: HANDLE, dwNumberOfBytesTransferred: DWORD, dwCompletionKey: c_ulong, lpOverlapped: ^OVERLAPPED) -> BOOL ---
 	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/handleapi/nf-handleapi-gethandleinformation)
 	GetHandleInformation :: proc(hObject: HANDLE, lpdwFlags: ^DWORD) -> BOOL ---
+
+	RtlCaptureStackBackTrace :: proc(FramesToSkip: ULONG, FramesToCapture: ULONG, BackTrace: [^]PVOID, BackTraceHash: PULONG) -> USHORT ---
+
+	GetSystemPowerStatus :: proc(lpSystemPowerStatus: ^SYSTEM_POWER_STATUS) -> BOOL ---
 }
 
 DEBUG_PROCESS                    :: 0x00000001
@@ -509,6 +548,45 @@ THREAD_PRIORITY_TIME_CRITICAL :: THREAD_BASE_PRIORITY_LOWRT
 THREAD_PRIORITY_IDLE          :: THREAD_BASE_PRIORITY_IDLE
 THREAD_MODE_BACKGROUND_BEGIN  :: 0x00010000
 THREAD_MODE_BACKGROUND_END    :: 0x00020000
+
+PROCESS_ALL_ACCESS :: 0x000F0000 | SYNCHRONIZE | 0xFFFF
+PROCESS_CREATE_PROCESS :: 0x0080
+PROCESS_CREATE_THREAD :: 0x0002
+PROCESS_DUP_HANDLE :: 0x0040
+PROCESS_QUERY_INFORMATION :: 0x0400
+PROCESS_QUERY_LIMITED_INFORMATION :: 0x1000
+PROCESS_SET_INFORMATION :: 0x0200
+PROCESS_SET_QUOTA :: 0x0100
+PROCESS_SUSPEND_RESUME :: 0x0800
+PROCESS_TERMINATE :: 0x0001
+PROCESS_VM_OPERATION :: 0x0008
+PROCESS_VM_READ :: 0x0010
+PROCESS_VM_WRITE :: 0x0020
+
+THREAD_ALL_ACCESS :: \
+	THREAD_DIRECT_IMPERSONATION |
+	THREAD_GET_CONTEXT |
+	THREAD_IMPERSONATE |
+	THREAD_QUERY_INFORMATION |
+	THREAD_QUERY_LIMITED_INFORMATION |
+	THREAD_SET_CONTEXT |
+	THREAD_SET_INFORMATION |
+	THREAD_SET_LIMITED_INFORMATION |
+	THREAD_SET_THREAD_TOKEN |
+	THREAD_SUSPEND_RESUME |
+	THREAD_TERMINATE |
+	SYNCHRONIZE
+THREAD_DIRECT_IMPERSONATION :: 0x0200
+THREAD_GET_CONTEXT :: 0x0008
+THREAD_IMPERSONATE :: 0x0100
+THREAD_QUERY_INFORMATION :: 0x0040
+THREAD_QUERY_LIMITED_INFORMATION :: 0x0800
+THREAD_SET_CONTEXT :: 0x0010
+THREAD_SET_INFORMATION :: 0x0020
+THREAD_SET_LIMITED_INFORMATION :: 0x0400
+THREAD_SET_THREAD_TOKEN :: 0x0080
+THREAD_SUSPEND_RESUME :: 0x0002
+THREAD_TERMINATE :: 0x0001
 
 COPY_FILE_FAIL_IF_EXISTS              :: 0x00000001
 COPY_FILE_RESTARTABLE                 :: 0x00000002
@@ -1005,150 +1083,8 @@ foreign kernel32 {
 HandlerRoutine :: proc "system" (dwCtrlType: DWORD) -> BOOL
 PHANDLER_ROUTINE :: HandlerRoutine
 
-
-
-
-DCB_Config :: struct {
-	fParity: bool,
-	fOutxCtsFlow: bool,
-	fOutxDsrFlow: bool,
-	fDtrControl: DTR_Control,
-	fDsrSensitivity: bool,
-	fTXContinueOnXoff: bool,
-	fOutX: bool,
-	fInX: bool,
-	fErrorChar: bool,
-	fNull: bool,
-	fRtsControl: RTS_Control,
-	fAbortOnError: bool,
-	BaudRate: DWORD,
-	ByteSize: BYTE,
-	Parity: Parity,
-	StopBits: Stop_Bits,
-	XonChar: byte,
-	XoffChar: byte,
-	ErrorChar: byte,
-	EvtChar: byte,
-}
-DTR_Control :: enum byte {
-	Disable = 0,
-	Enable = 1,
-	Handshake = 2,
-}
-RTS_Control :: enum byte {
-	Disable   = 0,
-	Enable    = 1,
-	Handshake = 2,
-	Toggle    = 3,
-}
-Parity :: enum byte {
-	None  = 0,
-	Odd   = 1,
-	Even  = 2,
-	Mark  = 3,
-	Space = 4,
-}
-Stop_Bits :: enum byte {
-	One = 0,
-	One_And_A_Half = 1,
-	Two = 2,
-}
-
-// A helper procedure to set the values of a DCB structure.
-init_dcb_with_config :: proc "contextless" (dcb: ^DCB, config: DCB_Config) {
-	out: u32
-
-	// NOTE(tetra, 2022-09-21): On both Clang 14 on Windows, and MSVC, the bits in the bitfield
-	// appear to be defined from LSB to MSB order.
-	// i.e: `fBinary` (the first bitfield in the C source) is the LSB in the `settings` u32.
-
-	out |= u32(1) << 0 // fBinary must always be true on Windows.
-
-	out |= u32(config.fParity) << 1
-	out |= u32(config.fOutxCtsFlow) << 2
-	out |= u32(config.fOutxDsrFlow) << 3
-
-	out |= u32(config.fDtrControl) << 4
-
-	out |= u32(config.fDsrSensitivity) << 6
-	out |= u32(config.fTXContinueOnXoff) << 7
-	out |= u32(config.fOutX) << 8
-	out |= u32(config.fInX) << 9
-	out |= u32(config.fErrorChar) << 10
-	out |= u32(config.fNull) << 11
-
-	out |= u32(config.fRtsControl) << 12
-
-	out |= u32(config.fAbortOnError) << 14
-
-	dcb.settings = out
-
-	dcb.BaudRate = config.BaudRate
-	dcb.ByteSize = config.ByteSize
-	dcb.Parity = config.Parity
-	dcb.StopBits = config.StopBits
-	dcb.XonChar = config.XonChar
-	dcb.XoffChar = config.XoffChar
-	dcb.ErrorChar = config.ErrorChar
-	dcb.EvtChar = config.EvtChar
-
-	dcb.DCBlength = size_of(DCB)
-}
-get_dcb_config :: proc "contextless" (dcb: DCB) -> (config: DCB_Config) {
-	config.fParity = bool((dcb.settings >> 1) & 0x01)
-	config.fOutxCtsFlow = bool((dcb.settings >> 2) & 0x01)
-	config.fOutxDsrFlow = bool((dcb.settings >> 3) & 0x01)
-
-	config.fDtrControl = DTR_Control((dcb.settings >> 4) & 0x02)
-
-	config.fDsrSensitivity = bool((dcb.settings >> 6) & 0x01)
-	config.fTXContinueOnXoff = bool((dcb.settings >> 7) & 0x01)
-	config.fOutX = bool((dcb.settings >> 8) & 0x01)
-	config.fInX = bool((dcb.settings >> 9) & 0x01)
-	config.fErrorChar = bool((dcb.settings >> 10) & 0x01)
-	config.fNull = bool((dcb.settings >> 11) & 0x01)
-
-	config.fRtsControl = RTS_Control((dcb.settings >> 12) & 0x02)
-
-	config.fAbortOnError = bool((dcb.settings >> 14) & 0x01)
-
-	config.BaudRate = dcb.BaudRate
-	config.ByteSize = dcb.ByteSize
-	config.Parity = dcb.Parity
-	config.StopBits = dcb.StopBits
-	config.XonChar = dcb.XonChar
-	config.XoffChar = dcb.XoffChar
-	config.ErrorChar = dcb.ErrorChar
-	config.EvtChar = dcb.EvtChar
-
-	return
-}
-
-// NOTE(tetra): See get_dcb_config() and init_dcb_with_config() for help with initializing this.
-DCB :: struct {
-	DCBlength: DWORD, // NOTE(tetra): Must be set to size_of(DCB).
-	BaudRate: DWORD,
-	settings: u32, // NOTE(tetra): These are bitfields in the C struct.
-	wReserved: WORD,
-	XOnLim: WORD,
-	XOffLim: WORD,
-	ByteSize: BYTE,
-	Parity: Parity,
-	StopBits: Stop_Bits,
-	XonChar: byte,
-	XoffChar: byte,
-	ErrorChar: byte,
-	EofChar: byte,
-	EvtChar: byte,
-	wReserved1: WORD,
-}
-
-@(default_calling_convention="system")
-foreign kernel32 {
-	GetCommState :: proc(handle: HANDLE, dcb: ^DCB) -> BOOL ---
-	SetCommState :: proc(handle: HANDLE, dcb: ^DCB) -> BOOL ---
-}
-
+// NOTE(Jeroen, 2024-06-13): As Odin now supports bit_fields, we no longer need
+// a helper procedure. `init_dcb_with_config` and `get_dcb_config` have been removed.
 
 LPFIBER_START_ROUTINE :: #type proc "system" (lpFiberParameter: LPVOID)
 
@@ -1206,6 +1142,30 @@ SYSTEM_LOGICAL_PROCESSOR_INFORMATION :: struct {
 	DummyUnion: DUMMYUNIONNAME_u,
 }
 
+SYSTEM_POWER_STATUS :: struct {
+	ACLineStatus:        AC_Line_Status,
+	BatteryFlag:         Battery_Flags,
+	BatteryLifePercent:  BYTE,
+	SystemStatusFlag:    BYTE,
+	BatteryLifeTime:     DWORD,
+	BatteryFullLifeTime: DWORD,
+}
+
+AC_Line_Status :: enum BYTE {
+   Offline = 0,
+   Online  = 1,
+   Unknown = 255,
+}
+
+Battery_Flag :: enum BYTE {
+    High     = 0,
+    Low      = 1,
+    Critical = 2,
+    Charging = 3,
+    No_Battery = 7,
+}
+Battery_Flags :: bit_set[Battery_Flag; BYTE]
+
 /* Global Memory Flags */
 GMEM_FIXED          :: 0x0000
 GMEM_MOVEABLE       :: 0x0002
@@ -1224,3 +1184,5 @@ GMEM_INVALID_HANDLE :: 0x8000
 
 GHND                :: (GMEM_MOVEABLE | GMEM_ZEROINIT)
 GPTR                :: (GMEM_FIXED | GMEM_ZEROINIT)
+
+LPTOP_LEVEL_EXCEPTION_FILTER :: PVECTORED_EXCEPTION_HANDLER

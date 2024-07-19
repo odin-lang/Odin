@@ -6,6 +6,8 @@ import "base:intrinsics"
 
 _ :: intrinsics
 
+IS_SUPPORTED :: _IS_SUPPORTED
+
 Thread_Proc :: #type proc(^Thread)
 
 MAX_USER_ARGUMENTS :: 8
@@ -58,7 +60,9 @@ Thread :: struct {
 	creation_allocator: mem.Allocator,
 }
 
-#assert(size_of(Thread{}.user_index) == size_of(uintptr))
+when IS_SUPPORTED {
+	#assert(size_of(Thread{}.user_index) == size_of(uintptr))
+}
 
 Thread_Priority :: enum {
 	Normal,

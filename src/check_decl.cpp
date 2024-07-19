@@ -88,11 +88,17 @@ gb_internal Type *check_init_variable(CheckerContext *ctx, Entity *e, Operand *o
 			e->type = t_invalid;
 			return nullptr;
 		} else if (is_type_polymorphic(t)) {
-			gbString str = type_to_string(t);
-			defer (gb_string_free(str));
-			error(e->token, "Invalid use of a polymorphic type '%s' in %.*s", str, LIT(context_name));
-			e->type = t_invalid;
-			return nullptr;
+			Entity *e = entity_of_node(operand->expr);
+			if (e == nullptr) {
+				return nullptr;
+			}
+			if (e->state.load() != EntityState_Resolved) {
+				gbString str = type_to_string(t);
+				defer (gb_string_free(str));
+				error(e->token, "Invalid use of a polymorphic type '%s' in %.*s", str, LIT(context_name));
+				e->type = t_invalid;
+				return nullptr;
+			}
 		} else if (is_type_empty_union(t)) {
 			gbString str = type_to_string(t);
 			defer (gb_string_free(str));
@@ -149,6 +155,154 @@ gb_internal void check_init_variables(CheckerContext *ctx, Entity **lhs, isize l
 	}
 }
 
+
+gb_internal void override_entity_in_scope(Entity *original_entity, Entity *new_entity) {
+	// NOTE(bill): The original_entity's scope may not be same scope that it was inserted into
+	// e.g. file entity inserted into its package scope
+	String original_name = original_entity->token.string;
+	Scope *found_scope = nullptr;
+	Entity *found_entity = nullptr;
+	scope_lookup_parent(original_entity->scope, original_name, &found_scope, &found_entity);
+	if (found_scope == nullptr) {
+		return;
+	}
+	rw_mutex_lock(&found_scope->mutex);
+	defer (rw_mutex_unlock(&found_scope->mutex));
+
+	// IMPORTANT NOTE(bill, 2021-04-10): Overriding behaviour was flawed in that the
+	// original entity was still used check checked, but the checking was only
+	// relying on "constant" data such as the Entity.type and Entity.Constant.value
+	//
+	// Therefore two things can be done: the type can be assigned to state that it
+	// has been "evaluated" and the variant data can be copied across
+
+	string_map_set(&found_scope->elements, original_name, new_entity);
+
+	original_entity->flags |= EntityFlag_Overridden;
+	original_entity->type = new_entity->type;
+	original_entity->aliased_of = new_entity;
+
+	original_entity->identifier.store(new_entity->identifier);
+
+	if (original_entity->identifier.load() != nullptr &&
+	    original_entity->identifier.load()->kind == Ast_Ident) {
+		original_entity->identifier.load()->Ident.entity = new_entity;
+	}
+
+	// IMPORTANT NOTE(bill, 2021-04-10): copy only the variants
+	// This is most likely NEVER required, but it does not at all hurt to keep
+	isize offset = cast(u8 *)&original_entity->Dummy.start - cast(u8 *)original_entity;
+	isize size = gb_size_of(*original_entity) - offset;
+	gb_memmove(cast(u8 *)original_entity, cast(u8 *)new_entity, size);
+}
+
+gb_internal bool check_override_as_type_due_to_aliasing(CheckerContext *ctx, Entity *e, Entity *entity, Ast *init, Type *named_type) {
+	if (entity != nullptr && entity->kind == Entity_TypeName) {
+		// @TypeAliasingProblem
+		// NOTE(bill, 2022-02-03): This is used to solve the problem caused by type aliases
+		// being "confused" as constants
+		//
+		//         A :: B
+		//         C :: proc "c" (^A)
+		//         B :: struct {x: C}
+		//
+		//     A gets evaluated first, and then checks B.
+		//     B then checks C.
+		//     C then tries to check A which is unresolved but thought to be a constant.
+		//     Therefore within C's check, A errs as "not a type".
+		//
+		// This is because a const declaration may or may not be a type and this cannot
+		// be determined from a syntactical standpoint.
+		// This check allows the compiler to override the entity to be checked as a type.
+		//
+		// There is no problem if B is prefixed with the `#type` helper enforcing at
+		// both a syntax and semantic level that B must be a type.
+		//
+		//         A :: #type B
+		//
+		// This approach is not fool proof and can fail in case such as:
+		//
+		//         X :: type_of(x)
+		//         X :: Foo(int).Type
+		//
+		// Since even these kind of declarations may cause weird checking cycles.
+		// For the time being, these are going to be treated as an unfortunate error
+		// until there is a proper delaying system to try declaration again if they
+		// have failed.
+
+		e->kind = Entity_TypeName;
+		check_type_decl(ctx, e, init, named_type);
+		return true;
+	}
+	return false;
+}
+
+gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d);
+
+gb_internal bool check_try_override_const_decl(CheckerContext *ctx, Entity *e, Entity *entity, Ast *init, Type *named_type) {
+	if (entity == nullptr) {
+	retry_proc_lit:;
+		init = unparen_expr(init);
+		if (init == nullptr) {
+			return false;
+		}
+		if (init->kind == Ast_TernaryWhenExpr) {
+			ast_node(we, TernaryWhenExpr, init);
+			if (we->cond == nullptr) {
+				return false;
+			}
+			if (we->cond->tav.value.kind != ExactValue_Bool) {
+				return false;
+			}
+			init = we->cond->tav.value.value_bool ? we->x : we->y;
+			goto retry_proc_lit;
+		} if (init->kind == Ast_ProcLit) {
+			// NOTE(bill, 2024-07-04): Override as a procedure entity because this could be within a `when` statement
+			e->kind = Entity_Procedure;
+			e->type = nullptr;
+			DeclInfo *d = decl_info_of_entity(e);
+			d->proc_lit = init;
+			check_proc_decl(ctx, e, d);
+			return true;
+		}
+
+		return false;
+	}
+	switch (entity->kind) {
+	case Entity_TypeName:
+		if (check_override_as_type_due_to_aliasing(ctx, e, entity, init, named_type)) {
+			return true;
+		}
+		break;
+	case Entity_Builtin:
+		if (e->type != nullptr) {
+			return false;
+		}
+		e->kind = Entity_Builtin;
+		e->Builtin.id = entity->Builtin.id;
+		e->type = t_invalid;
+		return true;
+	}
+
+	if (e->type != nullptr && entity->type != nullptr) {
+		Operand x = {};
+		x.type = entity->type;
+		x.mode = Addressing_Variable;
+		if (!check_is_assignable_to(ctx, &x, e->type)) {
+			return false;
+		}
+	}
+
+	// NOTE(bill): Override aliased entity
+	switch (entity->kind) {
+	case Entity_ProcGroup:
+	case Entity_Procedure:
+		override_entity_in_scope(e, entity);
+		return true;
+	}
+	return false;
+}
+
 gb_internal void check_init_constant(CheckerContext *ctx, Entity *e, Operand *operand) {
 	if (operand->mode == Addressing_Invalid ||
 		operand->type == t_invalid ||
@@ -157,6 +311,13 @@ gb_internal void check_init_constant(CheckerContext *ctx, Entity *e, Operand *op
 			e->type = t_invalid;
 		}
 		return;
+	}
+
+	if (operand->mode != Addressing_Constant) {
+		Entity *entity = entity_of_node(operand->expr);
+		if (check_try_override_const_decl(ctx, e, entity, operand->expr, nullptr)) {
+			return;
+		}
 	}
 
 	if (operand->mode != Addressing_Constant) {
@@ -367,49 +528,6 @@ gb_internal void check_type_decl(CheckerContext *ctx, Entity *e, Ast *init_expr,
 }
 
 
-gb_internal void override_entity_in_scope(Entity *original_entity, Entity *new_entity) {
-	// NOTE(bill): The original_entity's scope may not be same scope that it was inserted into
-	// e.g. file entity inserted into its package scope
-	String original_name = original_entity->token.string;
-	Scope *found_scope = nullptr;
-	Entity *found_entity = nullptr;
-	scope_lookup_parent(original_entity->scope, original_name, &found_scope, &found_entity);
-	if (found_scope == nullptr) {
-		return;
-	}
-	rw_mutex_lock(&found_scope->mutex);
-	defer (rw_mutex_unlock(&found_scope->mutex));
-
-	// IMPORTANT NOTE(bill, 2021-04-10): Overriding behaviour was flawed in that the
-	// original entity was still used check checked, but the checking was only
-	// relying on "constant" data such as the Entity.type and Entity.Constant.value
-	//
-	// Therefore two things can be done: the type can be assigned to state that it
-	// has been "evaluated" and the variant data can be copied across
-
-	string_map_set(&found_scope->elements, original_name, new_entity);
-
-	original_entity->flags |= EntityFlag_Overridden;
-	original_entity->type = new_entity->type;
-	original_entity->aliased_of = new_entity;
-
-	Ast *empty_ident = nullptr;
-	original_entity->identifier.compare_exchange_strong(empty_ident, new_entity->identifier);
-
-	if (original_entity->identifier.load() != nullptr &&
-	    original_entity->identifier.load()->kind == Ast_Ident) {
-		original_entity->identifier.load()->Ident.entity = new_entity;
-	}
-
-	// IMPORTANT NOTE(bill, 2021-04-10): copy only the variants
-	// This is most likely NEVER required, but it does not at all hurt to keep
-	isize offset = cast(u8 *)&original_entity->Dummy.start - cast(u8 *)original_entity;
-	isize size = gb_size_of(*original_entity) - offset;
-	gb_memmove(cast(u8 *)original_entity, cast(u8 *)new_entity, size);
-}
-
-
-
 gb_internal void check_const_decl(CheckerContext *ctx, Entity *e, Ast *type_expr, Ast *init, Type *named_type) {
 	GB_ASSERT(e->type == nullptr);
 	GB_ASSERT(e->kind == Entity_Constant);
@@ -435,41 +553,7 @@ gb_internal void check_const_decl(CheckerContext *ctx, Entity *e, Ast *type_expr
 
 	if (init != nullptr) {
 		Entity *entity = check_entity_from_ident_or_selector(ctx, init, false);
-		if (entity != nullptr && entity->kind == Entity_TypeName) {
-			// @TypeAliasingProblem
-			// NOTE(bill, 2022-02-03): This is used to solve the problem caused by type aliases
-			// being "confused" as constants
-			//
-			//         A :: B
-			//         C :: proc "c" (^A)
-			//         B :: struct {x: C}
-			//
-			//     A gets evaluated first, and then checks B.
-			//     B then checks C.
-			//     C then tries to check A which is unresolved but thought to be a constant.
-			//     Therefore within C's check, A errs as "not a type".
-			//
-			// This is because a const declaration may or may not be a type and this cannot
-			// be determined from a syntactical standpoint.
-			// This check allows the compiler to override the entity to be checked as a type.
-			//
-			// There is no problem if B is prefixed with the `#type` helper enforcing at
-			// both a syntax and semantic level that B must be a type.
-			//
-			//         A :: #type B
-			//
-			// This approach is not fool proof and can fail in case such as:
-			//
-			//         X :: type_of(x)
-			//         X :: Foo(int).Type
-			//
-			// Since even these kind of declarations may cause weird checking cycles.
-			// For the time being, these are going to be treated as an unfortunate error
-			// until there is a proper delaying system to try declaration again if they
-			// have failed.
-
-			e->kind = Entity_TypeName;
-			check_type_decl(ctx, e, init, named_type);
+		if (check_override_as_type_due_to_aliasing(ctx, e, entity, init, named_type)) {
 			return;
 		}
 		entity = nullptr;
@@ -479,6 +563,9 @@ gb_internal void check_const_decl(CheckerContext *ctx, Entity *e, Ast *type_expr
 			entity = check_selector(ctx, &operand, init, e->type);
 		} else {
 			check_expr_or_type(ctx, &operand, init, e->type);
+			if (init->kind == Ast_CallExpr) {
+				entity = init->CallExpr.entity_procedure_of;
+			}
 		}
 
 		switch (operand.mode) {
@@ -525,6 +612,7 @@ gb_internal void check_const_decl(CheckerContext *ctx, Entity *e, Ast *type_expr
 			e->ProcGroup.entities = array_clone(heap_allocator(), operand.proc_group->ProcGroup.entities);
 			return;
 		}
+
 
 		if (entity != nullptr) {
 			if (e->type != nullptr) {
@@ -699,7 +787,7 @@ gb_internal Entity *init_entity_foreign_library(CheckerContext *ctx, Entity *e) 
 	}
 
 	if (ident == nullptr) {
-		error(e->token, "foreign entiies must declare which library they are from");
+		error(e->token, "foreign entities must declare which library they are from");
 	} else if (ident->kind != Ast_Ident) {
 		error(ident, "foreign library names must be an identifier");
 	} else {
@@ -724,9 +812,10 @@ gb_internal Entity *init_entity_foreign_library(CheckerContext *ctx, Entity *e) 
 	return nullptr;
 }
 
-gb_internal String handle_link_name(CheckerContext *ctx, Token token, String link_name, String link_prefix) {
+gb_internal String handle_link_name(CheckerContext *ctx, Token token, String link_name, String link_prefix, String link_suffix) {
+	String original_link_name = link_name;
 	if (link_prefix.len > 0) {
-		if (link_name.len > 0) {
+		if (original_link_name.len > 0) {
 			error(token, "'link_name' and 'link_prefix' cannot be used together");
 		} else {
 			isize len = link_prefix.len + token.string.len;
@@ -738,8 +827,27 @@ gb_internal String handle_link_name(CheckerContext *ctx, Token token, String lin
 			link_name = make_string(name, len);
 		}
 	}
+
+	if (link_suffix.len > 0) {
+		if (original_link_name.len > 0) {
+			error(token, "'link_name' and 'link_suffix' cannot be used together");
+		} else {
+			String new_name = token.string;
+			if (link_name != original_link_name) {
+				new_name = link_name;
+			}
+
+			isize len = new_name.len + link_suffix.len;
+			u8 *name = gb_alloc_array(permanent_allocator(), u8, len+1);
+			gb_memmove(name, &new_name[0], new_name.len);
+			gb_memmove(name+new_name.len, &link_suffix[0], link_suffix.len);
+			name[len] = 0;
+			link_name = make_string(name, len);
+		}
+	}
 	return link_name;
 }
+
 
 gb_internal void check_objc_methods(CheckerContext *ctx, Entity *e, AttributeContext const &ac) {
 	if (!(ac.objc_name.len || ac.objc_is_class_method || ac.objc_type)) {
@@ -862,7 +970,7 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 	}
 
 	TypeProc *pt = &proc_type->Proc;
-	AttributeContext ac = make_attribute_context(e->Procedure.link_prefix);
+	AttributeContext ac = make_attribute_context(e->Procedure.link_prefix, e->Procedure.link_suffix);
 
 	if (d != nullptr) {
 		check_decl_attributes(ctx, d->attributes, proc_decl_attribute, &ac);
@@ -886,22 +994,41 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 
 	check_objc_methods(ctx, e, ac);
 
-	if (ac.require_target_feature.len != 0 && ac.enable_target_feature.len != 0) {
-		error(e->token, "Attributes @(require_target_feature=...) and @(enable_target_feature=...) cannot be used together");
-	} else if (ac.require_target_feature.len != 0) {
-		if (check_target_feature_is_enabled(e->token.pos, ac.require_target_feature)) {
-			e->Procedure.target_feature = ac.require_target_feature;
-		} else {
-			e->Procedure.target_feature_disabled = true;
+	{
+		if (ac.require_target_feature.len != 0 && ac.enable_target_feature.len != 0) {
+			error(e->token, "A procedure cannot have both @(require_target_feature=\"...\") and @(enable_target_feature=\"...\")");
 		}
-	} else if (ac.enable_target_feature.len != 0) {
-		enable_target_feature(e->token.pos, ac.enable_target_feature);
-		e->Procedure.target_feature = ac.enable_target_feature;
+
+		if (build_context.strict_target_features && ac.enable_target_feature.len != 0) {
+			ac.require_target_feature = ac.enable_target_feature;
+			ac.enable_target_feature.len = 0;
+		}
+
+		if (ac.require_target_feature.len != 0) {
+			pt->require_target_feature = ac.require_target_feature;
+			String invalid;
+			if (!check_target_feature_is_valid_globally(ac.require_target_feature, &invalid)) {
+				error(e->token, "Required target feature '%.*s' is not a valid target feature", LIT(invalid));
+			} else if (!check_target_feature_is_enabled(ac.require_target_feature, nullptr)) {
+				e->flags |= EntityFlag_Disabled;
+			}
+		} else if (ac.enable_target_feature.len != 0) {
+
+			// NOTE: disallow wasm, features on that arch are always global to the module.
+			if (is_arch_wasm()) {
+				error(e->token, "@(enable_target_feature=\"...\") is not allowed on wasm, features for wasm must be declared globally");
+			}
+
+			pt->enable_target_feature = ac.enable_target_feature;
+			String invalid;
+			if (!check_target_feature_is_valid_globally(ac.enable_target_feature, &invalid)) {
+				error(e->token, "Procedure enabled target feature '%.*s' is not a valid target feature", LIT(invalid));
+			}
+		}
 	}
 
 	switch (e->Procedure.optimization_mode) {
 	case ProcedureOptimizationMode_None:
-	case ProcedureOptimizationMode_Minimal:
 		if (pl->inlining == ProcInlining_inline) {
 			error(e->token, "#force_inline cannot be used in conjunction with the attribute 'optimization_mode' with neither \"none\" nor \"minimal\"");
 		}
@@ -995,7 +1122,7 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 
 	e->deprecated_message = ac.deprecated_message;
 	e->warning_message = ac.warning_message;
-	ac.link_name = handle_link_name(ctx, e->token, ac.link_name, ac.link_prefix);
+	ac.link_name = handle_link_name(ctx, e->token, ac.link_name, ac.link_prefix,ac.link_suffix);
 	if (ac.has_disabled_proc) {
 		if (ac.disabled_proc) {
 			e->flags |= EntityFlag_Disabled;
@@ -1027,7 +1154,7 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 	}
 
 
-	if (e->pkg != nullptr && e->token.string == "main") {
+	if (e->pkg != nullptr && e->token.string == "main" && !build_context.no_entry_point) {
 		if (e->pkg->kind != Package_Runtime) {
 			if (pt->param_count != 0 ||
 			    pt->result_count != 0) {
@@ -1095,7 +1222,14 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 	}
 
 	if (ac.link_name.len > 0) {
-		e->Procedure.link_name = ac.link_name;
+		String ln = ac.link_name;
+		e->Procedure.link_name = ln;
+		if (ln == "memcpy" ||
+		    ln == "memmove" ||
+		    ln == "mem_copy" ||
+		    ln == "mem_copy_non_overlapping") {
+			e->Procedure.is_memcpy_like = true;
+		}
 	}
 
 	if (ac.deferred_procedure.entity != nullptr) {
@@ -1121,9 +1255,12 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 			if (foreign_library->LibraryName.paths.count >= 1) {
 				module_name = foreign_library->LibraryName.paths[0];
 			}
-			name = concatenate3_strings(permanent_allocator(), module_name, WASM_MODULE_NAME_SEPARATOR, name);
+
+			if (!string_ends_with(module_name, str_lit(".o"))) {
+				name = concatenate3_strings(permanent_allocator(), module_name, WASM_MODULE_NAME_SEPARATOR, name);
+			}
 		}
-		
+
 		e->Procedure.is_foreign = true;
 		e->Procedure.link_name = name;
 
@@ -1203,7 +1340,7 @@ gb_internal void check_global_variable_decl(CheckerContext *ctx, Entity *&e, Ast
 	}
 	e->flags |= EntityFlag_Visited;
 
-	AttributeContext ac = make_attribute_context(e->Variable.link_prefix);
+	AttributeContext ac = make_attribute_context(e->Variable.link_prefix, e->Variable.link_suffix);
 	ac.init_expr_list_count = init_expr != nullptr ? 1 : 0;
 
 	DeclInfo *decl = decl_info_of_entity(e);
@@ -1224,7 +1361,10 @@ gb_internal void check_global_variable_decl(CheckerContext *ctx, Entity *&e, Ast
 	if (ac.is_static) {
 		error(e->token, "@(static) is not supported for global variables, nor required");
 	}
-	ac.link_name = handle_link_name(ctx, e->token, ac.link_name, ac.link_prefix);
+	if (ac.rodata) {
+		e->Variable.is_rodata = true;
+	}
+	ac.link_name = handle_link_name(ctx, e->token, ac.link_name, ac.link_prefix, ac.link_suffix);
 
 	if (is_arch_wasm() && e->Variable.thread_local_model.len != 0) {
 		e->Variable.thread_local_model.len = 0;
@@ -1260,8 +1400,8 @@ gb_internal void check_global_variable_decl(CheckerContext *ctx, Entity *&e, Ast
 			error(e->token, "A foreign variable declaration cannot have a default value");
 		}
 		init_entity_foreign_library(ctx, e);
-		if (is_arch_wasm()) {
-			error(e->token, "A foreign variable declaration are not allowed for the '%.*s' architecture", LIT(target_arch_names[build_context.metrics.arch]));
+		if (is_arch_wasm() && e->Variable.foreign_library != nullptr) {
+			error(e->token, "A foreign variable declaration can not be scoped to a module and must be declared in a 'foreign {' (without a library) block");
 		}
 	}
 	if (ac.link_name.len > 0) {
@@ -1310,6 +1450,9 @@ gb_internal void check_global_variable_decl(CheckerContext *ctx, Entity *&e, Ast
 	Operand o = {};
 	check_expr_with_type_hint(ctx, &o, init_expr, e->type);
 	check_init_variable(ctx, e, &o, str_lit("variable declaration"));
+	if (e->Variable.is_rodata && o.mode != Addressing_Constant) {
+		error(o.expr, "Variables declared with @(rodata) must have constant initialization");
+	}
 
 	check_rtti_type_disallowed(e->token, e->type, "A variable declaration is using a type, %s, which has been disallowed");
 }
@@ -1370,6 +1513,10 @@ gb_internal void check_proc_group_decl(CheckerContext *ctx, Entity *pg_entity, D
 			continue;
 		}
 
+		if (p->flags & EntityFlag_Disabled) {
+			continue;
+		}
+
 		String name = p->token.string;
 
 		for (isize k = j+1; k < pge->entities.count; k++) {
@@ -1386,6 +1533,10 @@ gb_internal void check_proc_group_decl(CheckerContext *ctx, Entity *pg_entity, D
 
 
 			ERROR_BLOCK();
+
+			if (q->flags & EntityFlag_Disabled) {
+				continue;
+			}
 
 			ProcTypeOverloadKind kind = are_proc_types_overload_safe(p->type, q->type);
 			bool both_have_where_clauses = false;
@@ -1423,6 +1574,7 @@ gb_internal void check_proc_group_decl(CheckerContext *ctx, Entity *pg_entity, D
 				break;
 			case ProcOverload_ParamCount:
 			case ProcOverload_ParamTypes:
+			case ProcOverload_TargetFeatures:
 				// This is okay :)
 				break;
 
@@ -1590,6 +1742,17 @@ gb_internal bool check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *de
 				if (e->kind != Entity_Variable) {
 					continue;
 				}
+				if (is_type_polymorphic(e->type) && is_type_polymorphic_record_unspecialized(e->type)) {
+					gbString s = type_to_string(e->type);
+					char const *msg = "Unspecialized polymorphic types are not allowed in procedure parameters, got %s";
+					if (e->Variable.type_expr) {
+						error(e->Variable.type_expr, msg, s);
+					} else {
+						error(e->token, msg, s);
+					}
+					gb_string_free(s);
+				}
+
 				if (!(e->flags & EntityFlag_Using)) {
 					continue;
 				}
@@ -1704,6 +1867,15 @@ gb_internal bool check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *de
 	check_scope_usage(ctx->checker, ctx->scope, check_vet_flags(body));
 
 	add_deps_from_child_to_parent(decl);
+
+	for (VariadicReuseData const &vr : decl->variadic_reuses) {
+		GB_ASSERT(vr.slice_type->kind == Type_Slice);
+		Type *elem = vr.slice_type->Slice.elem;
+		i64 size = type_size_of(elem);
+		i64 align = type_align_of(elem);
+		decl->variadic_reuse_max_bytes = gb_max(decl->variadic_reuse_max_bytes, size*vr.max_count);
+		decl->variadic_reuse_max_align = gb_max(decl->variadic_reuse_max_align, align);
+	}
 
 	return true;
 }

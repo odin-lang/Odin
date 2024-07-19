@@ -16,15 +16,12 @@ Library :: distinct rawptr
 Loads a dynamic library from the filesystem. The paramater `global_symbols` makes the symbols in the loaded
 library available to resolve references in subsequently loaded libraries.
 
-The paramater `global_symbols` is only used for the platforms `linux`, `darwin`, `freebsd` and `openbsd`.
+The parameter `global_symbols` is only used for the platforms `linux`, `darwin`, `freebsd` and `openbsd`.
 On `windows` this paramater is ignored.
 
 The underlying behaviour is platform specific.
 On `linux`, `darwin`, `freebsd` and `openbsd` refer to `dlopen`.
-On `windows` refer to `LoadLibraryW`.
-
-**Implicit Allocators**
-`context.temp_allocator`
+On `windows` refer to `LoadLibraryW`. Also temporarily needs an allocator to convert a string.
 
 Example:
 	import "core:dynlib"
@@ -79,10 +76,7 @@ Loads the address of a procedure/variable from a dynamic library.
 
 The underlying behaviour is platform specific.
 On `linux`, `darwin`, `freebsd` and `openbsd` refer to `dlsym`.
-On `windows` refer to `GetProcAddress`.
-
-**Implicit Allocators**
-`context.temp_allocator`
+On `windows` refer to `GetProcAddress`. Also temporarily needs an allocator to convert a string.
 
 Example:
 	import "core:dynlib"
@@ -177,9 +171,7 @@ initialize_symbols :: proc(
 	return count, count > 0
 }
 
-/*
-Returns an error message for the last failed procedure call.
-*/
+// Returns an error message for the last failed procedure call.
 last_error :: proc() -> string {
 	return _last_error()
 }

@@ -61,8 +61,7 @@ atanh :: proc{
 
 
 acos_complex32 :: proc "contextless" (x: complex32) -> complex32 {
-	w := asin(x)
-	return complex(math.PI/2 - real(w), -imag(w))
+	return complex32(acos_complex64(complex64(x)))
 }
 acos_complex64 :: proc "contextless" (x: complex64) -> complex64 {
 	w := asin(x)
@@ -75,14 +74,7 @@ acos_complex128 :: proc "contextless" (x: complex128) -> complex128 {
 
 
 acosh_complex32 :: proc "contextless" (x: complex32) -> complex32 {
-	if x == 0 {
-		return complex(0, math.copy_sign(math.PI/2, imag(x)))
-	}
-	w := acos(x)
-	if imag(w) <= 0 {
-		return complex(-imag(w), real(w))
-	}
-	return complex(imag(w), -real(w))
+	return complex32(acosh_complex64(complex64(x)))
 }
 acosh_complex64 :: proc "contextless" (x: complex64) -> complex64 {
 	if x == 0 {
@@ -257,9 +249,7 @@ atan_complex128 :: proc "contextless" (x: complex128) -> complex128 {
 }
 
 atanh_complex32 :: proc "contextless" (x: complex32) -> complex32 {
-	z := complex(-imag(x), real(x)) // z = i * x
-	z = atan(z)
-	return complex(imag(z), -real(z)) // z = -i * z
+	return complex32(atanh_complex64(complex64(x)))
 }
 atanh_complex64 :: proc "contextless" (x: complex64) -> complex64 {
 	z := complex(-imag(x), real(x)) // z = i * x

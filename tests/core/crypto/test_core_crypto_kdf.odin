@@ -2,28 +2,14 @@ package test_core_crypto
 
 import "base:runtime"
 import "core:encoding/hex"
-import "core:fmt"
 import "core:testing"
-
 import "core:crypto/hash"
 import "core:crypto/hkdf"
 import "core:crypto/pbkdf2"
 
-import tc "tests:common"
-
-@(test)
-test_kdf :: proc(t: ^testing.T) {
-	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
-
-	tc.log(t, "Testing KDFs")
-
-	test_hkdf(t)
-	test_pbkdf2(t)
-}
-
 @(test)
 test_hkdf :: proc(t: ^testing.T) {
-	tc.log(t, "Testing HKDF")
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 
 	tmp: [128]byte // Good enough.
 
@@ -70,25 +56,23 @@ test_hkdf :: proc(t: ^testing.T) {
 
 		dst_str := string(hex.encode(dst, context.temp_allocator))
 
-		tc.expect(
+		testing.expectf(
 			t,
 			dst_str == v.okm,
-			fmt.tprintf(
-				"HKDF-%s: Expected: %s for input of (%s, %s, %s), but got %s instead",
-				algo_name,
-				v.okm,
-				v.ikm,
-				v.salt,
-				v.info,
-				dst_str,
-			),
+			"HKDF-%s: Expected: %s for input of (%s, %s, %s), but got %s instead",
+			algo_name,
+			v.okm,
+			v.ikm,
+			v.salt,
+			v.info,
+			dst_str,
 		)
 	}
 }
 
 @(test)
 test_pbkdf2 :: proc(t: ^testing.T) {
-	tc.log(t, "Testing PBKDF2")
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 
 	tmp: [64]byte // 512-bits is enough for every output for now.
 
@@ -174,18 +158,16 @@ test_pbkdf2 :: proc(t: ^testing.T) {
 
 		dst_str := string(hex.encode(dst, context.temp_allocator))
 
-		tc.expect(
+		testing.expectf(
 			t,
 			dst_str == v.dk,
-			fmt.tprintf(
-				"HMAC-%s: Expected: %s for input of (%s, %s, %d), but got %s instead",
-				algo_name,
-				v.dk,
-				v.password,
-				v.salt,
-				v.iterations,
-				dst_str,
-			),
+			"PBKDF2-%s: Expected: %s for input of (%s, %s, %d), but got %s instead",
+			algo_name,
+			v.dk,
+			v.password,
+			v.salt,
+			v.iterations,
+			dst_str,
 		)
 	}
 }

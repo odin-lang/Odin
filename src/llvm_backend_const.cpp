@@ -94,9 +94,6 @@ gb_internal LLVMValueRef llvm_const_cast(LLVMValueRef val, LLVMTypeRef dst) {
 	LLVMTypeKind kind = LLVMGetTypeKind(dst);
 	switch (kind) {
 	case LLVMPointerTypeKind:
-		if (LB_USE_NEW_PASS_SYSTEM) {
-			return val;
-		}
 		return LLVMConstPointerCast(val, dst);
 	case LLVMStructTypeKind:
 		// GB_PANIC("%s -> %s", LLVMPrintValueToString(val), LLVMPrintTypeToString(dst));
@@ -341,6 +338,15 @@ gb_internal lbValue lb_emit_source_code_location_as_global_ptr(lbProcedure *p, S
 	return addr.addr;
 }
 
+gb_internal lbValue lb_const_source_code_location_as_global_ptr(lbModule *m, String const &procedure, TokenPos const &pos) {
+	lbValue loc = lb_const_source_code_location_const(m, procedure, pos);
+	lbAddr addr = lb_add_global_generated(m, loc.type, loc, nullptr);
+	lb_make_global_private_const(addr);
+	return addr.addr;
+}
+
+
+
 
 gb_internal lbValue lb_emit_source_code_location_as_global_ptr(lbProcedure *p, Ast *node) {
 	lbValue loc = lb_emit_source_code_location_const(p, node);
@@ -427,6 +433,8 @@ gb_internal LLVMValueRef lb_big_int_to_llvm(lbModule *m, Type *original_type, Bi
 			rop[sz-1-i] = tmp;
 		}
 	}
+
+	GB_ASSERT(!is_type_array(original_type));
 
 	LLVMValueRef value = LLVMConstIntOfArbitraryPrecision(lb_type(m, original_type), cast(unsigned)((sz+7)/8), cast(u64 *)rop);
 	if (big_int_is_neg(a)) {
@@ -539,7 +547,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bo
 					LLVMValueRef ptr = LLVMBuildInBoundsGEP2(p->builder, llvm_type, array_data, indices, 2, "");
 					LLVMValueRef len = LLVMConstInt(lb_type(m, t_int), count, true);
 
-					lbAddr slice = lb_add_local_generated(p, type, false);
+					lbAddr slice = lb_add_local_generated(p, original_type, false);
 					map_set(&m->exact_value_compound_literal_addr_map, value.value_compound, slice);
 
 					lb_fill_slice(p, slice, {ptr, alloc_type_pointer(elem)}, {len, t_int});

@@ -2,8 +2,6 @@
 //+build wasi
 package time
 
-import wasi "core:sys/wasm/wasi"
-
 _IS_SUPPORTED :: false
 
 _now :: proc "contextless" () -> Time {

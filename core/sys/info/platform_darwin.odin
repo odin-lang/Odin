@@ -1,4 +1,3 @@
-// +build darwin
 package sysinfo
 
 import sys "core:sys/unix"
@@ -76,6 +75,8 @@ init_os_version :: proc () {
 	os_version.minor = rel.darwin.y
 	os_version.patch = rel.darwin.z
 
+	macos_version = transmute(Version)rel.release.version
+
 	strings.write_string(&b, rel.os_name)
 	if match == .Exact || match == .Nearest {
 		strings.write_rune(&b, ' ')
@@ -113,7 +114,7 @@ init_os_version :: proc () {
 	os_version.as_string = strings.to_string(b)
 }
 
-@(init)
+@(init, private)
 init_ram :: proc() {
 	// Retrieve RAM info using `sysctl`
 
@@ -526,6 +527,7 @@ macos_release_map: map[string]Darwin_To_Release = {
 	"23D60"      = {{23, 3, 0}, "macOS", {"Sonoma",         {14, 3, 1}}},
 	"23E214"     = {{23, 4, 0}, "macOS", {"Sonoma",         {14, 4, 0}}},
 	"23E224"     = {{23, 4, 0}, "macOS", {"Sonoma",         {14, 4, 1}}},
+	"23F79"      = {{23, 5, 0}, "macOS", {"Sonoma",         {14, 5, 0}}},
 }
 
 @(private)

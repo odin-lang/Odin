@@ -58,7 +58,7 @@ udivmod128 :: proc "c" (a, b: u128, rem: ^u128) -> u128 {
 			return u128(n[high] >> _ctz(d[high]))
 		}
 
-		sr = transmute(u32)(i32(_clz(d[high])) - i32(_clz(n[high])))
+		sr = u32(i32(_clz(d[high])) - i32(_clz(n[high])))
 		if sr > U64_BITS - 2 {
 			if rem != nil {
 				rem^ = a
@@ -107,7 +107,7 @@ udivmod128 :: proc "c" (a, b: u128, rem: ^u128) -> u128 {
 				r[low]  = n[high] >> (sr - U64_BITS)
 			}
 		} else {
-			sr = transmute(u32)(i32(_clz(d[high])) - i32(_clz(n[high])))
+			sr = u32(i32(_clz(d[high])) - i32(_clz(n[high])))
 
 			if sr > U64_BITS - 1 {
 				if rem != nil {
@@ -143,7 +143,7 @@ udivmod128 :: proc "c" (a, b: u128, rem: ^u128) -> u128 {
 		r_all = transmute(u128)r
 		s := i128(b - r_all - 1) >> (U128_BITS - 1)
 		carry = u32(s & 1)
-		r_all -= b & transmute(u128)s
+		r_all -= b & u128(s)
 		r = transmute([2]u64)r_all
 	}
 

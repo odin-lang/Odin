@@ -119,20 +119,20 @@ consume :: proc "odin" (a: ^$A/Small_Array($N, $T), count: int, loc := #caller_l
 }
 
 ordered_remove :: proc "contextless" (a: ^$A/Small_Array($N, $T), index: int, loc := #caller_location) #no_bounds_check {
-    runtime.bounds_check_error_loc(loc, index, a.len)
-    if index+1 < a.len {
+	runtime.bounds_check_error_loc(loc, index, a.len)
+	if index+1 < a.len {
 		copy(a.data[index:], a.data[index+1:])
 	}
 	a.len -= 1
 }
 
 unordered_remove :: proc "contextless" (a: ^$A/Small_Array($N, $T), index: int, loc := #caller_location) #no_bounds_check {
-    runtime.bounds_check_error_loc(loc, index, a.len)
+	runtime.bounds_check_error_loc(loc, index, a.len)
 	n := a.len-1
 	if index != n {
 		a.data[index] = a.data[n]
 	}
-    a.len -= 1
+	a.len -= 1
 }
 
 clear :: proc "contextless" (a: ^$A/Small_Array($N, $T)) {

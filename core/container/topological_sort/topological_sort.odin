@@ -61,7 +61,7 @@ add_dependency :: proc(sorter: ^$S/Sorter($K), key, dependency: K) -> bool {
 	}
 	find.dependents[key] = true
 
- 	find = &sorter.relations[key]
+	find = &sorter.relations[key]
 	if find == nil {
 		find = map_insert(&sorter.relations, key, make_relations(sorter))
 	}

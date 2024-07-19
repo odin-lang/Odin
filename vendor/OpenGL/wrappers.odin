@@ -454,20 +454,13 @@ when !GL_DEBUG {
 	BeginQueryIndexed              :: proc "c" (target: u32, index: u32, id: u32)                                                   {        impl_BeginQueryIndexed(target, index, id)                                                           }
 	EndQueryIndexed                :: proc "c" (target: u32, index: u32)                                                            {        impl_EndQueryIndexed(target, index)                                                                 }
 	GetQueryIndexediv              :: proc "c" (target: u32, index: u32, pname: u32, params: [^]i32)                                {        impl_GetQueryIndexediv(target, index, pname, params)                                                }
-	GetTextureHandleARB            :: proc "c" (texture: u32) -> u64
-	{        return impl_GetTextureHandleARB(texture)                                                }
-	GetTextureSamplerHandleARB     :: proc "c" (texture, sampler: u32) -> u64
-	{        return impl_GetTextureSamplerHandleARB(texture, sampler)                                                }
-	GetImageHandleARB              :: proc "c" (texture: u32, level: i32, layered: bool, layer: i32, format: u32) -> u64
-	{        return impl_GetImageHandleARB(texture, level, layered, layer, format)                                                }
-	MakeTextureHandleResidentARB   :: proc "c" (handle: u64)
-	{        impl_MakeTextureHandleResidentARB(handle)                                                }
-	MakeImageHandleResidentARB     :: proc "c" (handle: u64, access: u32)
-	{        impl_MakeImageHandleResidentARB(handle, access)                                                }
-	MakeTextureHandleNonResidentARB:: proc "c" (handle: u64)
-	{        impl_MakeTextureHandleNonResidentARB(handle)                                                }
-	MakeImageHandleNonResidentARB  :: proc "c" (handle: u64)
-	{        impl_MakeImageHandleNonResidentARB(handle)                                                }
+	GetTextureHandleARB            :: proc "c" (texture: u32) -> u64 {        return impl_GetTextureHandleARB(texture)                                                }
+	GetTextureSamplerHandleARB     :: proc "c" (texture, sampler: u32) -> u64 {        return impl_GetTextureSamplerHandleARB(texture, sampler)                                                }
+	GetImageHandleARB              :: proc "c" (texture: u32, level: i32, layered: bool, layer: i32, format: u32) -> u64 {        return impl_GetImageHandleARB(texture, level, layered, layer, format)                                                }
+	MakeTextureHandleResidentARB   :: proc "c" (handle: u64) {        impl_MakeTextureHandleResidentARB(handle)                                                }
+	MakeImageHandleResidentARB     :: proc "c" (handle: u64, access: u32) {        impl_MakeImageHandleResidentARB(handle, access)                                                }
+	MakeTextureHandleNonResidentARB:: proc "c" (handle: u64) {        impl_MakeTextureHandleNonResidentARB(handle)                                                }
+	MakeImageHandleNonResidentARB  :: proc "c" (handle: u64) {        impl_MakeImageHandleNonResidentARB(handle)                                                }
 
 	// VERSION_4_1
 	ReleaseShaderCompiler     :: proc "c" ()                                                                             {        impl_ReleaseShaderCompiler()                                                             }
@@ -788,17 +781,17 @@ when !GL_DEBUG {
 			{
 				// add input arguments
 				for arg, arg_index in args[num_ret:] {
-				if arg_index > 0 { fmt.printf(", ") }
+					if arg_index > 0 { fmt.printf(", ") }
 
-				if v, ok := arg.(u32); ok { // TODO: Assumes all u32 are GLenum (they're not, GLbitfield and GLuint are also mapped to u32), fix later by better typing
-					if err == .INVALID_ENUM {
-						fmt.printf("INVALID_ENUM=%d", v)
+					if v, ok := arg.(u32); ok { // TODO: Assumes all u32 are GLenum (they're not, GLbitfield and GLuint are also mapped to u32), fix later by better typing
+						if err == .INVALID_ENUM {
+							fmt.printf("INVALID_ENUM=%d", v)
+						} else {
+							fmt.printf("GL_%v=%d", GL_Enum(v), v)
+						}
 					} else {
-						fmt.printf("GL_%v=%d", GL_Enum(v), v)
+						fmt.printf("%v", arg)
 					}
-				} else {
-					fmt.printf("%v", arg)
-				}
 				}
 
 				// add return arguments
@@ -817,7 +810,7 @@ when !GL_DEBUG {
 			}
 
 			// add location
-		    fmt.printf("   in:   %s(%d:%d)\n", from_loc.file_path, from_loc.line, from_loc.column)
+			fmt.printf("   in:   %s(%d:%d)\n", from_loc.file_path, from_loc.line, from_loc.column)
 		}
 	}
 
@@ -1265,20 +1258,13 @@ when !GL_DEBUG {
 	BeginQueryIndexed              :: proc "c" (target: u32, index: u32, id: u32, loc := #caller_location)                                                   {        impl_BeginQueryIndexed(target, index, id);                                               debug_helper(loc, 0, target, index, id)                                              }
 	EndQueryIndexed                :: proc "c" (target: u32, index: u32, loc := #caller_location)                                                            {        impl_EndQueryIndexed(target, index);                                                     debug_helper(loc, 0, target, index)                                                  }
 	GetQueryIndexediv              :: proc "c" (target: u32, index: u32, pname: u32, params: [^]i32, loc := #caller_location)                                {        impl_GetQueryIndexediv(target, index, pname, params);                                    debug_helper(loc, 0, target, index, pname, params)                                   }
-	GetTextureHandleARB              :: proc "c" (target: u32, loc := #caller_location) -> u64
-	{ ret := impl_GetTextureHandleARB(target);   debug_helper(loc, 0, target); return ret }
-	GetTextureSamplerHandleARB     :: proc "c" (texture, sampler: u32, loc := #caller_location) -> u64
-	{        ret := impl_GetTextureSamplerHandleARB(texture, sampler);   debug_helper(loc, 0, texture, sampler); return ret                                                }
-	GetImageHandleARB              :: proc "c" (texture: u32, level: i32, layered: bool, layer: i32, format: u32, loc := #caller_location) -> u64
-	{        ret := impl_GetImageHandleARB(texture, level, layered, layer, format);   debug_helper(loc, 0, texture, level, layered, layer, format); return ret                                                }
-	MakeTextureHandleResidentARB   :: proc "c" (handle: u64, loc := #caller_location)
-	{        impl_MakeTextureHandleResidentARB(handle);   debug_helper(loc, 0, handle)                                                }
-	MakeImageHandleResidentARB     :: proc "c" (handle: u64, access: u32, loc := #caller_location)
-	{        impl_MakeImageHandleResidentARB(handle, access);   debug_helper(loc, 0, handle, access)                                                }
-	MakeTextureHandleNonResidentARB:: proc "c" (handle: u64, loc := #caller_location)
-	{        impl_MakeTextureHandleNonResidentARB(handle);   debug_helper(loc, 0, handle)                                                }
-	MakeImageHandleNonResidentARB  :: proc "c" (handle: u64, loc := #caller_location)
-	{        impl_MakeImageHandleNonResidentARB(handle);   debug_helper(loc, 0, handle)                                                }
+	GetTextureHandleARB              :: proc "c" (target: u32, loc := #caller_location) -> u64 { ret := impl_GetTextureHandleARB(target);   debug_helper(loc, 0, target); return ret }
+	GetTextureSamplerHandleARB     :: proc "c" (texture, sampler: u32, loc := #caller_location) -> u64 {        ret := impl_GetTextureSamplerHandleARB(texture, sampler);   debug_helper(loc, 0, texture, sampler); return ret                                                }
+	GetImageHandleARB              :: proc "c" (texture: u32, level: i32, layered: bool, layer: i32, format: u32, loc := #caller_location) -> u64 {        ret := impl_GetImageHandleARB(texture, level, layered, layer, format);   debug_helper(loc, 0, texture, level, layered, layer, format); return ret                                                }
+	MakeTextureHandleResidentARB   :: proc "c" (handle: u64, loc := #caller_location) {        impl_MakeTextureHandleResidentARB(handle);   debug_helper(loc, 0, handle)                                                }
+	MakeImageHandleResidentARB     :: proc "c" (handle: u64, access: u32, loc := #caller_location) {        impl_MakeImageHandleResidentARB(handle, access);   debug_helper(loc, 0, handle, access)                                                }
+	MakeTextureHandleNonResidentARB:: proc "c" (handle: u64, loc := #caller_location) {        impl_MakeTextureHandleNonResidentARB(handle);   debug_helper(loc, 0, handle)                                                }
+	MakeImageHandleNonResidentARB  :: proc "c" (handle: u64, loc := #caller_location) {        impl_MakeImageHandleNonResidentARB(handle);   debug_helper(loc, 0, handle)                                                }
 
 
 

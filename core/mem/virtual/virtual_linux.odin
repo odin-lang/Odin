@@ -36,9 +36,9 @@ _release :: proc "contextless" (data: rawptr, size: uint) {
 _protect :: proc "contextless" (data: rawptr, size: uint, flags: Protect_Flags) -> bool {
 	pflags: linux.Mem_Protection
 	pflags = {}
-	if .Read    in flags { pflags |= {.READ}  }
-	if .Write   in flags { pflags |= {.WRITE} }
-	if .Execute in flags { pflags |= {.EXEC}  }
+	if .Read    in flags { pflags += {.READ}  }
+	if .Write   in flags { pflags += {.WRITE} }
+	if .Execute in flags { pflags += {.EXEC}  }
 	errno := linux.mprotect(data, size, pflags)
 	return errno == .NONE
 }

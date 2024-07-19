@@ -76,7 +76,7 @@ foreign lib {
 	GetRenderer                  :: proc(window:   ^Window) -> ^Renderer ---
 	GetRendererInfo              :: proc(renderer: ^Renderer, info: ^RendererInfo) -> c.int ---
 	GetRendererOutputSize        :: proc(renderer: ^Renderer, w, h: ^c.int) -> c.int ---
-	CreateTexture                :: proc(renderer: ^Renderer, format: u32, access: TextureAccess, w, h: c.int) -> ^Texture ---
+	CreateTexture                :: proc(renderer: ^Renderer, format: PixelFormatEnum, access: TextureAccess, w, h: c.int) -> ^Texture ---
 	CreateTextureFromSurface     :: proc(renderer: ^Renderer, surface: ^Surface) -> ^Texture ---
 	QueryTexture                 :: proc(texture:  ^Texture, format: ^u32, access, w, h: ^c.int) -> c.int ---
 	SetTextureColorMod           :: proc(texture:  ^Texture, r, g, b: u8) -> c.int ---

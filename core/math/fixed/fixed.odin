@@ -41,7 +41,7 @@ init_from_f64 :: proc(x: ^$T/Fixed($Backing, $Fraction_Width), val: f64) {
 init_from_parts :: proc(x: ^$T/Fixed($Backing, $Fraction_Width), integer, fraction: Backing) {
 	x.i  = fraction
 	x.i &= 1<<Fraction_Width - 1
-	x.i |= integer
+	x.i |= (integer << Fraction_Width)
 }
 
 to_f64 :: proc(x: $T/Fixed($Backing, $Fraction_Width)) -> f64 {

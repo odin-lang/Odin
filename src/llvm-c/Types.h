@@ -14,8 +14,8 @@
 #ifndef LLVM_C_TYPES_H
 #define LLVM_C_TYPES_H
 
-#include "llvm-c/DataTypes.h"
-#include "llvm-c/ExternC.h"
+#include "DataTypes.h"
+#include "ExternC.h"
 
 LLVM_C_EXTERN_C_BEGIN
 
@@ -131,6 +131,11 @@ typedef struct LLVMOpaquePassManager *LLVMPassManagerRef;
  *
  * @see llvm::Use */
 typedef struct LLVMOpaqueUse *LLVMUseRef;
+
+/**
+ * @see llvm::OperandBundleDef
+ */
+typedef struct LLVMOpaqueOperandBundle *LLVMOperandBundleRef;
 
 /**
  * Used to represent an attributes.

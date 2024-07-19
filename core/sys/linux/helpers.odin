@@ -26,7 +26,7 @@ where
 @(private)
 syscall2 :: #force_inline proc "contextless" (nr: uintptr,p1: $T1, p2: $T2) -> int
 where
-	size_of(p1) <= size_of(uintptr) &&
+	size_of(p1) <= size_of(uintptr),
 	size_of(p2) <= size_of(uintptr) 
 {
 	return cast(int) intrinsics.syscall(nr,
@@ -36,8 +36,8 @@ where
 @(private)
 syscall3 :: #force_inline proc "contextless" (nr: uintptr, p1: $T1, p2: $T2, p3: $T3) -> int
 where
-	size_of(p1) <= size_of(uintptr) &&
-	size_of(p2) <= size_of(uintptr) &&
+	size_of(p1) <= size_of(uintptr),
+	size_of(p2) <= size_of(uintptr),
 	size_of(p3) <= size_of(uintptr)
 {
 	return cast(int) intrinsics.syscall(nr,
@@ -49,9 +49,9 @@ where
 @(private)
 syscall4 :: #force_inline proc "contextless" (nr: uintptr, p1: $T1, p2: $T2, p3: $T3, p4: $T4) -> int
 where
-	size_of(p1) <= size_of(uintptr) &&
-	size_of(p2) <= size_of(uintptr) &&
-	size_of(p3) <= size_of(uintptr) &&
+	size_of(p1) <= size_of(uintptr),
+	size_of(p2) <= size_of(uintptr),
+	size_of(p3) <= size_of(uintptr),
 	size_of(p4) <= size_of(uintptr)
 {
 	return cast(int) intrinsics.syscall(nr,
@@ -64,10 +64,10 @@ where
 @(private)
 syscall5 :: #force_inline proc "contextless" (nr: uintptr, p1: $T1, p2: $T2, p3: $T3, p4: $T4, p5: $T5) -> int
 where
-	size_of(p1) <= size_of(uintptr) &&
-	size_of(p2) <= size_of(uintptr) &&
-	size_of(p3) <= size_of(uintptr) &&
-	size_of(p4) <= size_of(uintptr) &&
+	size_of(p1) <= size_of(uintptr),
+	size_of(p2) <= size_of(uintptr),
+	size_of(p3) <= size_of(uintptr),
+	size_of(p4) <= size_of(uintptr),
 	size_of(p5) <= size_of(uintptr)
 {
 	return cast(int) intrinsics.syscall(nr,
@@ -81,11 +81,11 @@ where
 @(private)
 syscall6 :: #force_inline proc "contextless" (nr: uintptr, p1: $T1, p2: $T2, p3: $T3, p4: $T4, p5: $T5, p6: $T6) -> int
 where
-	size_of(p1) <= size_of(uintptr) &&
-	size_of(p2) <= size_of(uintptr) &&
-	size_of(p3) <= size_of(uintptr) &&
-	size_of(p4) <= size_of(uintptr) &&
-	size_of(p5) <= size_of(uintptr) &&
+	size_of(p1) <= size_of(uintptr),
+	size_of(p2) <= size_of(uintptr),
+	size_of(p3) <= size_of(uintptr),
+	size_of(p4) <= size_of(uintptr),
+	size_of(p5) <= size_of(uintptr),
 	size_of(p6) <= size_of(uintptr)
 {
 	return cast(int) intrinsics.syscall(nr,

@@ -348,7 +348,7 @@ json_name_from_tag_value :: proc(value: string) -> (json_name, extra: string) {
 	json_name = value
 	if comma_index := strings.index_byte(json_name, ','); comma_index >= 0 {
 		json_name = json_name[:comma_index]
-		extra = json_name[comma_index:]
+		extra = value[1 + comma_index:]
 	}
 	return
 }
@@ -368,7 +368,7 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 	
 	#partial switch t in ti.variant {
 	case reflect.Type_Info_Struct:
-		if t.is_raw_union {
+		if .raw_union in t.flags {
 			return UNSUPPORTED_TYPE
 		}
 	
@@ -475,7 +475,7 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 		}
 		
 	case reflect.Type_Info_Map:
-		if !reflect.is_string(t.key) {
+		if !reflect.is_string(t.key) && !reflect.is_integer(t.key) {
 			return UNSUPPORTED_TYPE
 		}
 		raw_map := (^mem.Raw_Map)(v.data)
@@ -492,25 +492,39 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 			key, _ := parse_object_key(p, p.allocator)
 			unmarshal_expect_token(p, .Colon)
 			
-			
+
 			mem.zero_slice(elem_backing)
 			if uerr := unmarshal_value(p, map_backing_value); uerr != nil {
 				delete(key, p.allocator)
 				return uerr
 			}
 
-			key_ptr := rawptr(&key)
+			key_ptr: rawptr
 
-			key_cstr: cstring
-			if reflect.is_cstring(t.key) {
-				key_cstr = cstring(raw_data(key))
-				key_ptr = &key_cstr
+			#partial switch tk in t.key.variant {
+				case runtime.Type_Info_String:			
+					key_ptr = rawptr(&key)
+					key_cstr: cstring
+					if reflect.is_cstring(t.key) {
+						key_cstr = cstring(raw_data(key))
+						key_ptr = &key_cstr
+					}
+				case runtime.Type_Info_Integer:
+					i, ok := strconv.parse_i128(key)
+					if !ok	{ return UNSUPPORTED_TYPE }
+					key_ptr = rawptr(&i)
+				case: return UNSUPPORTED_TYPE
 			}
-			
+
 			set_ptr := runtime.__dynamic_map_set_without_hash(raw_map, t.map_info, key_ptr, map_backing_value.data)
 			if set_ptr == nil {
 				delete(key, p.allocator)
 			} 
+
+			// there's no need to keep string value on the heap, since it was copied into map 
+			if reflect.is_integer(t.key) {
+				delete(key, p.allocator)
+			}
 			
 			if parse_comma(p) {
 				break map_loop

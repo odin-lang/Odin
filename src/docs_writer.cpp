@@ -26,11 +26,11 @@ struct OdinDocWriter {
 
 	StringMap<OdinDocString> string_cache;
 
-	PtrMap<AstFile *,    OdinDocFileIndex>   file_cache;
-	PtrMap<AstPackage *, OdinDocPkgIndex>    pkg_cache;
-	PtrMap<Entity *,     OdinDocEntityIndex> entity_cache;
-	PtrMap<Type *,       OdinDocTypeIndex>   type_cache;
-	PtrMap<Type *,       Type *>             stable_type_cache;
+	OrderedInsertPtrMap<AstFile *,    OdinDocFileIndex>   file_cache;
+	OrderedInsertPtrMap<AstPackage *, OdinDocPkgIndex>    pkg_cache;
+	OrderedInsertPtrMap<Entity *,     OdinDocEntityIndex> entity_cache;
+	OrderedInsertPtrMap<Type *,       OdinDocTypeIndex>   type_cache;
+	OrderedInsertPtrMap<Type *,       Type *>             stable_type_cache;
 
 	OdinDocWriterItemTracker<OdinDocFile>   files;
 	OdinDocWriterItemTracker<OdinDocPkg>    pkgs;
@@ -57,11 +57,11 @@ gb_internal void odin_doc_writer_prepare(OdinDocWriter *w) {
 
 	string_map_init(&w->string_cache);
 
-	map_init(&w->file_cache);
-	map_init(&w->pkg_cache);
-	map_init(&w->entity_cache);
-	map_init(&w->type_cache);
-	map_init(&w->stable_type_cache);
+	map_init(&w->file_cache,        1<<10);
+	map_init(&w->pkg_cache,         1<<10);
+	map_init(&w->entity_cache,      1<<18);
+	map_init(&w->type_cache,        1<<18);
+	map_init(&w->stable_type_cache, 1<<18);
 
 	odin_doc_writer_item_tracker_init(&w->files,    1);
 	odin_doc_writer_item_tracker_init(&w->pkgs,     1);
@@ -485,6 +485,13 @@ gb_internal OdinDocTypeIndex odin_doc_type(OdinDocWriter *w, Type *type) {
 		return 0;
 	}
 
+	if (type->kind == Type_Named) {
+		Entity *e = type->Named.type_name;
+		if (e->TypeName.is_type_alias) {
+			type = type->Named.base;
+		}
+	}
+
 	// Type **mapped_type = map_get(&w->stable_type_cache, type); // may map to itself
 	// if (mapped_type && *mapped_type) {
 	// 	type = *mapped_type;
@@ -505,13 +512,6 @@ gb_internal OdinDocTypeIndex odin_doc_type(OdinDocWriter *w, Type *type) {
 
 		if (!x | !y) {
 			continue;
-		}
-
-		if (x->kind == Type_Named) {
-			Entity *e = x->Named.type_name;
-			if (e->TypeName.is_type_alias) {
-				x = x->Named.base;
-			}
 		}
 		if (y->kind == Type_Named) {
 			Entity *e = y->Named.type_name;
@@ -987,9 +987,8 @@ gb_internal void odin_doc_update_entities(OdinDocWriter *w) {
 		auto entities = array_make<Entity *>(heap_allocator(), 0, w->entity_cache.count);
 		defer (array_free(&entities));
 
-		for (u32 i = 0; i < w->entity_cache.count; i++) {
-			Entity *e = w->entity_cache.entries[i].key;
-			array_add(&entities, e);
+		for (auto const &entry : w->entity_cache) {
+			array_add(&entities, entry.key);
 		}
 		for (Entity *e : entities) {
 			GB_ASSERT(e != nullptr);
@@ -998,9 +997,9 @@ gb_internal void odin_doc_update_entities(OdinDocWriter *w) {
 		}
 	}
 
-	for (u32 i = 0; i < w->entity_cache.count; i++) {
-		Entity *e = w->entity_cache.entries[i].key;
-		OdinDocEntityIndex entity_index = w->entity_cache.entries[i].value;
+	for (auto const &entry : w->entity_cache) {
+		Entity *e = entry.key;
+		OdinDocEntityIndex entity_index = entry.value;
 		OdinDocTypeIndex type_index = odin_doc_type(w, e->type);
 
 		OdinDocEntityIndex foreign_library = 0;

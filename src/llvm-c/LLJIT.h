@@ -1,4 +1,4 @@
-/*===----------- llvm-c/LLJIT.h - OrcV2 LLJIT C bindings --------*- C++ -*-===*\
+/*===----------- llvm-c/LLJIT.h - OrcV2 LLJIT C bindings ----------*- C -*-===*\
 |*                                                                            *|
 |* Part of the LLVM Project, under the Apache License v2.0 with LLVM          *|
 |* Exceptions.                                                                *|
@@ -24,10 +24,10 @@
 #ifndef LLVM_C_LLJIT_H
 #define LLVM_C_LLJIT_H
 
-#include "llvm-c/Error.h"
-#include "llvm-c/Orc.h"
-#include "llvm-c/TargetMachine.h"
-#include "llvm-c/Types.h"
+#include "Error.h"
+#include "Orc.h"
+#include "TargetMachine.h"
+#include "Types.h"
 
 LLVM_C_EXTERN_C_BEGIN
 

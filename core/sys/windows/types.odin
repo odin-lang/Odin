@@ -34,6 +34,7 @@ HGDIOBJ :: distinct HANDLE
 HBITMAP :: distinct HANDLE
 HGLOBAL :: distinct HANDLE
 HHOOK :: distinct HANDLE
+HWINEVENTHOOK :: distinct HANDLE
 HKEY :: distinct HANDLE
 HDESK :: distinct HANDLE
 HFONT :: distinct HANDLE
@@ -63,6 +64,7 @@ LONG_PTR :: int
 UINT_PTR :: uintptr
 ULONG :: c_ulong
 ULONGLONG :: c_ulonglong
+LONGLONG :: c_longlong
 UCHAR :: BYTE
 NTSTATUS :: c.long
 COLORREF :: DWORD
@@ -93,10 +95,14 @@ LONG32  :: i32
 ULONG64 :: u64
 LONG64  :: i64
 
+DWORD64 :: u64
+PDWORD64 :: ^DWORD64
+
 PDWORD_PTR :: ^DWORD_PTR
 ATOM :: distinct WORD
 
 wstring :: [^]WCHAR
+PWSTR   :: [^]WCHAR
 
 PBYTE :: ^BYTE
 LPBYTE :: ^BYTE
@@ -698,6 +704,14 @@ TIMERPROC :: #type proc "system" (HWND, UINT, UINT_PTR, DWORD)
 WNDPROC :: #type proc "system" (HWND, UINT, WPARAM, LPARAM) -> LRESULT
 
 HOOKPROC :: #type proc "system" (code: c_int, wParam: WPARAM, lParam: LPARAM) -> LRESULT
+
+WINEVENTPROC :: #type proc "system" (
+	hWinEventHook: HWINEVENTHOOK,
+	event: DWORD,
+	hwnd: HWND,
+	idObject, idChild: LONG,
+	idEventThread, dwmsEventTime: DWORD,
+)
 
 CWPRETSTRUCT :: struct {
 	lResult: LRESULT,
@@ -2132,6 +2146,7 @@ SECURITY_IMPERSONATION_LEVEL :: enum {
 SECURITY_INFORMATION :: DWORD
 ANYSIZE_ARRAY :: 1
 
+PLUID_AND_ATTRIBUTES :: ^LUID_AND_ATTRIBUTES
 LUID_AND_ATTRIBUTES :: struct {
 	Luid: LUID,
 	Attributes: DWORD,
@@ -2480,9 +2495,9 @@ OBJECT_ATTRIBUTES :: struct {
 }
 
 UNICODE_STRING :: struct {
-	Length:        u16,
-	MaximumLength: u16,
-	Buffer:        ^u16,
+	Length:        u16    `fmt:"-"`,
+	MaximumLength: u16    `fmt:"-"`,
+	Buffer:        [^]u16 `fmt:"s,Length"`,
 }
 
 OVERLAPPED :: struct {
@@ -2557,7 +2572,139 @@ EXCEPTION_RECORD :: struct {
 	ExceptionInformation: [EXCEPTION_MAXIMUM_PARAMETERS]LPVOID,
 }
 
-CONTEXT :: struct{} // TODO(bill)
+
+CONTEXT :: struct {
+	P1Home: DWORD64,
+	P2Home: DWORD64,
+	P3Home: DWORD64,
+	P4Home: DWORD64,
+	P5Home: DWORD64,
+	P6Home: DWORD64,
+	ContextFlags: DWORD,
+	MxCsr: DWORD,
+	SegCs: WORD,
+	SegDs: WORD,
+	SegEs: WORD,
+	SegFs: WORD,
+	SegGs: WORD,
+	SegSs: WORD,
+	EFlags: DWORD,
+	Dr0: DWORD64,
+	Dr1: DWORD64,
+	Dr2: DWORD64,
+	Dr3: DWORD64,
+	Dr6: DWORD64,
+	Dr7: DWORD64,
+	Rax: DWORD64,
+	Rcx: DWORD64,
+	Rdx: DWORD64,
+	Rbx: DWORD64,
+	Rsp: DWORD64,
+	Rbp: DWORD64,
+	Rsi: DWORD64,
+	Rdi: DWORD64,
+	R8: DWORD64,
+	R9: DWORD64,
+	R10: DWORD64,
+	R11: DWORD64,
+	R12: DWORD64,
+	R13: DWORD64,
+	R14: DWORD64,
+	R15: DWORD64,
+	Rip: DWORD64,
+	_: struct #raw_union {
+		FltSave: XMM_SAVE_AREA32,
+		Q: [16]NEON128,
+		D: [32]ULONGLONG,
+		_: struct {
+			Header: [2]M128A,
+			Legacy: [8]M128A,
+			Xmm0: M128A,
+			Xmm1: M128A,
+			Xmm2: M128A,
+			Xmm3: M128A,
+			Xmm4: M128A,
+			Xmm5: M128A,
+			Xmm6: M128A,
+			Xmm7: M128A,
+			Xmm8: M128A,
+			Xmm9: M128A,
+			Xmm10: M128A,
+			Xmm11: M128A,
+			Xmm12: M128A,
+			Xmm13: M128A,
+			Xmm14: M128A,
+			Xmm15: M128A,
+		},
+		S: [32]DWORD,
+	},
+	VectorRegister: [26]M128A,
+	VectorControl: DWORD64,
+	DebugControl: DWORD64,
+	LastBranchToRip: DWORD64,
+	LastBranchFromRip: DWORD64,
+	LastExceptionToRip: DWORD64,
+	LastExceptionFromRip: DWORD64,
+}
+
+PCONTEXT :: ^CONTEXT
+LPCONTEXT :: ^CONTEXT
+
+when size_of(uintptr) == 32 { 
+	XSAVE_FORMAT :: struct #align(16) {
+		ControlWord: WORD,
+		StatusWord: WORD,
+		TagWord: BYTE,
+		Reserved1: BYTE,
+		ErrorOpcode: WORD,
+		ErrorOffset: DWORD,
+		ErrorSelector: WORD,
+		Reserved2: WORD,
+		DataOffset: DWORD,
+		DataSelector: WORD,
+		Reserved3: WORD,
+		MxCsr: DWORD,
+		MxCsr_Mask: DWORD,
+		FloatRegisters: [8]M128A,
+		// 32-bit specific
+		XmmRegisters: [8]M128A,
+		Reserved4: [192]BYTE,
+		StackControl: [7]DWORD,
+		Cr0NpxState: DWORD,
+	}
+} else {
+	XSAVE_FORMAT :: struct #align(16) {
+		ControlWord: WORD,
+		StatusWord: WORD,
+		TagWord: BYTE,
+		Reserved1: BYTE,
+		ErrorOpcode: WORD,
+		ErrorOffset: DWORD,
+		ErrorSelector: WORD,
+		Reserved2: WORD,
+		DataOffset: DWORD,
+		DataSelector: WORD,
+		Reserved3: WORD,
+		MxCsr: DWORD,
+		MxCsr_Mask: DWORD,
+		FloatRegisters: [8]M128A,
+		// 64-bit specific
+		XmmRegisters: [16]M128A,
+		Reserved4: [96]BYTE,
+	}
+}
+
+XMM_SAVE_AREA32 :: XSAVE_FORMAT
+
+M128A :: struct {
+	Low: ULONGLONG,
+	High: LONGLONG,
+}
+
+NEON128 :: struct {
+	Low: ULONGLONG,
+	High: LONGLONG,
+}
 
 EXCEPTION_POINTERS :: struct {
 	ExceptionRecord: ^EXCEPTION_RECORD,
@@ -2661,6 +2808,22 @@ OSVERSIONINFOEXW :: struct {
 	wReserved:           UCHAR,
 }
 
+LoadLibraryEx_Flag :: enum DWORD {
+	LOAD_LIBRARY_AS_DATAFILE            = 1,  // 1 <<  1: 0x0002,
+	LOAD_WITH_ALTERED_SEARCH_PATH       = 3,  // 1 <<  3: 0x0008,
+	LOAD_IGNORE_CODE_AUTHZ_LEVEL        = 4,  // 1 <<  4: 0x0010,
+	LOAD_LIBRARY_AS_IMAGE_RESOURCE      = 5,  // 1 <<  5: 0x0020,
+	LOAD_LIBRARY_AS_DATAFILE_EXCLUSIVE  = 6,  // 1 <<  6: 0x0040,
+	LOAD_LIBRARY_REQUIRE_SIGNED_TARGET  = 7,  // 1 <<  7: 0x0080,
+	LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR    = 8,  // 1 <<  8: 0x0100,
+	LOAD_LIBRARY_SEARCH_APPLICATION_DIR = 9,  // 1 <<  9: 0x0200,
+	LOAD_LIBRARY_SEARCH_USER_DIRS       = 10, // 1 << 10: 0x0400,
+	LOAD_LIBRARY_SEARCH_SYSTEM32        = 11, // 1 << 11: 0x0800,
+	LOAD_LIBRARY_SEARCH_DEFAULT_DIRS    = 12, // 1 << 12: 0x1000,
+	LOAD_LIBRARY_SAFE_CURRENT_DIRS      = 13, // 1 << 13: 0x2000,
+}
+LoadLibraryEx_Flags :: distinct bit_set[LoadLibraryEx_Flag]
+
 // https://docs.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-quota_limits
 // Used in LogonUserExW
 PQUOTA_LIMITS :: struct {
@@ -2702,23 +2865,6 @@ PROFILEINFOW :: struct {
 	lpServerName: LPWSTR,
 	lpPolicyPath: LPWSTR,
 	hProfile: HANDLE,
-}
-
-// Used in LookupAccountNameW
-SID_NAME_USE :: distinct DWORD
-
-SID_TYPE :: enum SID_NAME_USE {
-	User = 1,
-	Group,
-	Domain,
-	Alias,
-	WellKnownGroup,
-	DeletedAccount,
-	Invalid,
-	Unknown,
-	Computer,
-	Label,
-	LogonSession,
 }
 
 SECURITY_MAX_SID_SIZE :: 68
@@ -3970,6 +4116,70 @@ CONSOLE_CURSOR_INFO :: struct {
 PCONSOLE_SCREEN_BUFFER_INFO :: ^CONSOLE_SCREEN_BUFFER_INFO
 PCONSOLE_CURSOR_INFO :: ^CONSOLE_CURSOR_INFO
 
+Event_Type :: enum WORD {
+	KEY_EVENT = 0x0001,
+	MOUSE_EVENT = 0x0002,
+	WINDOW_BUFFER_SIZE_EVENT = 0x0004,
+	MENU_EVENT = 0x0008,
+	FOCUS_EVENT = 0x0010,
+}
+
+INPUT_RECORD :: struct {
+	EventType: Event_Type,
+	Event: struct #raw_union {
+		KeyEvent: KEY_EVENT_RECORD,
+		MouseEvent: MOUSE_EVENT_RECORD,
+		WindowBufferSizeEvent: WINDOW_BUFFER_SIZE_RECORD,
+		MenuEvent: MENU_EVENT_RECORD,
+		FocusEvent: FOCUS_EVENT_RECORD,
+	},
+}
+
+Control_Key_State_Bits :: enum {
+	RIGHT_ALT_PRESSED,
+	LEFT_ALT_PRESSED,
+	RIGHT_CTRL_PRESSED,
+	LEFT_CTRL_PRESSED,
+	SHIFT_PRESSED,
+	NUMLOCK_ON,
+	SCROLLLOCK_ON,
+	CAPSLOCK_ON,
+	ENHANCED_KEY,
+}
+Control_Key_State :: bit_set[Control_Key_State_Bits; DWORD]
+
+KEY_EVENT_RECORD :: struct {
+	bKeyDown: BOOL,
+	wRepeatCount: WORD,
+	wVirtualKeyCode: WORD,
+	wVirtualScanCode: WORD,
+	uChar: struct #raw_union {
+		UnicodeChar: WCHAR,
+		AsciiChar: CHAR,
+	},
+	dwControlKeyState: Control_Key_State,
+}
+
+MOUSE_EVENT_RECORD :: struct {
+	dwMousePosition: COORD,
+	dwButtonState: DWORD,
+	dwControlKeyState: DWORD,
+	dwEventFlags: DWORD,
+}
+
+WINDOW_BUFFER_SIZE_RECORD :: struct {
+	dwSize: COORD,
+}
+
+MENU_EVENT_RECORD :: struct {
+	dwCommandId: UINT,
+}
+
+FOCUS_EVENT_RECORD :: struct {
+	bSetFocus: BOOL,
+}
+
+
 //
 // Networking
 //
@@ -4204,3 +4414,92 @@ SOCKADDR :: struct {
 	sa_family: ADDRESS_FAMILY,
 	sa_data:   [14]CHAR,
 }
+
+DTR_Control :: enum byte {
+	Disable = 0,
+	Enable = 1,
+	Handshake = 2,
+}
+RTS_Control :: enum byte {
+	Disable   = 0,
+	Enable    = 1,
+	Handshake = 2,
+	Toggle    = 3,
+}
+Parity :: enum byte {
+	None  = 0,
+	Odd   = 1,
+	Even  = 2,
+	Mark  = 3,
+	Space = 4,
+}
+Stop_Bits :: enum byte {
+	One = 0,
+	One_And_A_Half = 1,
+	Two = 2,
+}
+
+DCB :: struct {
+	DCBlength:  DWORD,
+	BaudRate:   DWORD,
+	using _: bit_field DWORD {
+		fBinary:           bool        | 1,
+		fParity:           bool        | 1,
+		fOutxCtsFlow:      bool        | 1,
+		fOutxDsrFlow:      bool        | 1,
+		fDtrControl:       DTR_Control | 2,
+		fDsrSensitivity:   bool        | 1,
+		fTXContinueOnXoff: bool        | 1,
+		fOutX:             bool        | 1,
+		fInX:              bool        | 1,
+		fErrorChar:        bool        | 1,
+		fNull:             bool        | 1,
+		fRtsControl:       RTS_Control | 2,
+		fAbortOnError:     bool        | 1,
+	},
+	wReserved:  WORD,
+	XOnLim:     WORD,
+	XOffLim:    WORD,
+	ByteSize:   BYTE,
+	Parity:     Parity,
+	StopBits:   Stop_Bits,
+	XonChar:    byte,
+	XoffChar:   byte,
+	ErrorChar:  byte,
+	EofChar:    byte,
+	EvtChar:    byte,
+	wReserved1: WORD,
+}
+
+COMMTIMEOUTS :: struct {
+	ReadIntervalTimeout: DWORD,
+	ReadTotalTimeoutMultiplier: DWORD,
+	ReadTotalTimeoutConstant: DWORD,
+	WriteTotalTimeoutMultiplier: DWORD,
+	WriteTotalTimeoutConstant: DWORD,
+}
+
+Com_Stat_Bits :: enum {
+	fCtsHold,
+	fDsrHold,
+	fRlsdHold,
+	fXoffHold,
+	fXoffSent,
+	fEof,
+	fTxim,
+}
+COMSTAT :: struct {
+	bits: bit_set[Com_Stat_Bits; DWORD],
+	cbInQue: DWORD,
+	cbOutQue: DWORD,
+}
+
+Com_Error_Bits :: enum {
+	RXOVER,
+	OVERRUN,
+	RXPARITY,
+	FRAME,
+	BREAK,
+}
+Com_Error :: bit_set[Com_Error_Bits; DWORD]
+

@@ -97,76 +97,32 @@ MAX_TEXT_BUFFER_LENGTH :: #config(RAYLIB_MAX_TEXT_BUFFER_LENGTH, 1024)
 RAYLIB_SHARED :: #config(RAYLIB_SHARED, false)
 
 when ODIN_OS == .Windows {
-	when RAYLIB_SHARED {
-		@(extra_linker_flags="/NODEFAULTLIB:msvcrt")
-		foreign import lib {
-			"windows/raylibdll.lib",
-			"system:Winmm.lib",
-			"system:Gdi32.lib",
-			"system:User32.lib",
-			"system:Shell32.lib",
-		}
-	} else {
-		@(extra_linker_flags="/NODEFAULTLIB:libcmt")
-		foreign import lib {
-			"windows/raylib.lib",
-			"system:Winmm.lib",
-			"system:Gdi32.lib",
-			"system:User32.lib",
-			"system:Shell32.lib",
-		}
+	@(extra_linker_flags="/NODEFAULTLIB:" + ("msvcrt" when RAYLIB_SHARED else "libcmt"))
+	foreign import lib {
+		"windows/raylibdll.lib" when RAYLIB_SHARED else "windows/raylib.lib" ,
+		"system:Winmm.lib",
+		"system:Gdi32.lib",
+		"system:User32.lib",
+		"system:Shell32.lib",
 	}
 } else when ODIN_OS == .Linux  {
-	when RAYLIB_SHARED {
-		foreign import lib { 
-			// Note(bumbread): I'm not sure why in `linux/` folder there are
-			// multiple copies of raylib.so, but since these bindings are for
-			// particular version of the library, I better specify it. Ideally,
-			// though, it's best specified in terms of major (.so.4)
-			"linux/libraylib.so.500",
-			"system:dl",
-			"system:pthread",
-		}
-	} else {
-		foreign import lib { 
-			"linux/libraylib.a",
-			"system:dl",
-			"system:pthread",
-		}
+	foreign import lib {
+		// Note(bumbread): I'm not sure why in `linux/` folder there are
+		// multiple copies of raylib.so, but since these bindings are for
+		// particular version of the library, I better specify it. Ideally,
+		// though, it's best specified in terms of major (.so.4)
+		"linux/libraylib.so.500" when RAYLIB_SHARED else "linux/libraylib.a",
+		"system:dl",
+		"system:pthread",
 	}
 } else when ODIN_OS == .Darwin {
-	when ODIN_ARCH == .arm64 {
-		when RAYLIB_SHARED {
-			foreign import lib {
-				"macos-arm64/libraylib.500.dylib",
-				"system:Cocoa.framework",
-				"system:OpenGL.framework",
-				"system:IOKit.framework",
-			}
-		} else {
-			foreign import lib {
-				"macos-arm64/libraylib.a",
-				"system:Cocoa.framework",
-				"system:OpenGL.framework",
-				"system:IOKit.framework",
-			}
-		}
-	} else {
-		when RAYLIB_SHARED {
-			foreign import lib {
-				"macos/libraylib.500.dylib",
-				"system:Cocoa.framework",
-				"system:OpenGL.framework",
-				"system:IOKit.framework",
-			}
-		} else {
-			foreign import lib {
-				"macos/libraylib.a",
-				"system:Cocoa.framework",
-				"system:OpenGL.framework",
-				"system:IOKit.framework",
-			}
-		}
+	foreign import lib {
+		"macos" +
+			("-arm64" when ODIN_ARCH == .arm64 else "") +
+			"/libraylib" + (".500.dylib" when RAYLIB_SHARED else ".a"),
+		"system:Cocoa.framework",
+		"system:OpenGL.framework",
+		"system:IOKit.framework",
 	}
 } else {
 	foreign import lib "system:raylib"
@@ -951,8 +907,8 @@ foreign lib {
 	SetWindowTitle           :: proc(title: cstring) ---                        // Set title for window (only PLATFORM_DESKTOP and PLATFORM_WEB)
 	SetWindowPosition        :: proc(x, y: c.int) ---                           // Set window position on screen (only PLATFORM_DESKTOP)
 	SetWindowMonitor         :: proc(monitor: c.int) ---                        // Set monitor for the current window
-	SetWindowMinSize         :: proc(width, height: c.int) ---                  // Set window minimum dimensions (for FLAG_WINDOW_RESIZABLE)
-	SetWindowMaxSize         :: proc(width, height: c.int) ---                  // Set window maximum dimensions (for FLAG_WINDOW_RESIZABLE)
+	SetWindowMinSize         :: proc(width, height: c.int) ---                  // Set window minimum dimensions (for WINDOW_RESIZABLE)
+	SetWindowMaxSize         :: proc(width, height: c.int) ---                  // Set window maximum dimensions (for WINDOW_RESIZABLE)
 	SetWindowSize            :: proc(width, height: c.int) ---                  // Set window dimensions
 	SetWindowOpacity         :: proc(opacity: f32) ---                          // Set window opacity [0.0f..1.0f] (only PLATFORM_DESKTOP)
 	SetWindowFocused         :: proc() ---                                      // Set window focused (only PLATFORM_DESKTOP)
@@ -1028,12 +984,14 @@ foreign lib {
 	LoadShader              :: proc(vsFileName, fsFileName: cstring) -> Shader ---                                                        // Load shader from files and bind default locations
 	LoadShaderFromMemory    :: proc(vsCode, fsCode: cstring) -> Shader ---                                                                // Load shader from code strings and bind default locations
 	IsShaderReady           :: proc(shader: Shader) -> bool ---                                                                           // Check if a shader is ready
-	GetShaderLocation       :: proc(shader: Shader, uniformName: cstring) -> ShaderLocationIndex ---                                                    // Get shader uniform location
-	GetShaderLocationAttrib :: proc(shader: Shader, attribName: cstring)  -> ShaderLocationIndex ---                                                    // Get shader attribute location
-	SetShaderValue          :: proc(shader: Shader, locIndex: ShaderLocationIndex, value: rawptr, uniformType: ShaderUniformDataType) ---               // Set shader uniform value
-	SetShaderValueV         :: proc(shader: Shader, locIndex: ShaderLocationIndex, value: rawptr, uniformType: ShaderUniformDataType, count: c.int) --- // Set shader uniform value vector
-	SetShaderValueMatrix    :: proc(shader: Shader, locIndex: ShaderLocationIndex, mat: Matrix) ---                                                     // Set shader uniform value (matrix 4x4)
-	SetShaderValueTexture   :: proc(shader: Shader, locIndex: ShaderLocationIndex, texture: Texture2D) ---                                              // Set shader uniform value for texture (sampler2d)
+	GetShaderLocation       :: proc(shader: Shader, uniformName: cstring) -> c.int ---                                                    // Get shader uniform location
+	GetShaderLocationAttrib :: proc(shader: Shader, attribName: cstring)  -> c.int ---                                                    // Get shader attribute location
+
+	// We use #any_int here so we can pass ShaderLocationIndex
+	SetShaderValue          :: proc(shader: Shader, #any_int locIndex: c.int, value: rawptr, uniformType: ShaderUniformDataType) ---               // Set shader uniform value
+	SetShaderValueV         :: proc(shader: Shader, #any_int locIndex: c.int, value: rawptr, uniformType: ShaderUniformDataType, count: c.int) --- // Set shader uniform value vector
+	SetShaderValueMatrix    :: proc(shader: Shader, #any_int locIndex: c.int, mat: Matrix) ---                                                     // Set shader uniform value (matrix 4x4)
+	SetShaderValueTexture   :: proc(shader: Shader, #any_int locIndex: c.int, texture: Texture2D) ---                                              // Set shader uniform value for texture (sampler2d)
 	UnloadShader            :: proc(shader: Shader) ---                                                                                   // Unload shader from GPU memory (VRAM)
 
 	// Screen-space-related functions
@@ -1057,8 +1015,8 @@ foreign lib {
 
 	SetRandomSeed  		 :: proc(seed: c.uint) ---                      // Set the seed for the random number generator
 	GetRandomValue 		 :: proc(min, max: c.int) -> c.int ---          // Get a random value between min and max (both included)
-	LoadRandomSequence 	 :: proc(count : c.uint, min, max: c.int) --- 	// Load random values sequence, no values repeated
-	UnloadRandomSequence :: proc(sequence : ^c.int) ---             	// Unload random values sequence
+	LoadRandomSequence 	 :: proc(count: c.uint, min, max: c.int) --- 	// Load random values sequence, no values repeated
+	UnloadRandomSequence     :: proc(sequence: ^c.int) ---                  // Unload random values sequence
 
 	// Misc. functions
 	TakeScreenshot :: proc(fileName: cstring) ---        // Takes a screenshot of current screen (filename extension defines format)
@@ -1466,9 +1424,9 @@ foreign lib {
 
 	LoadUTF8             :: proc(codepoints: [^]rune, length: c.int) -> [^]byte --- // Load UTF-8 text encoded from codepoints array
 	UnloadUTF8           :: proc(text: [^]byte) ---                                 // Unload UTF-8 text encoded from codepoints array
-	LoadCodepoints       :: proc(text: rawptr, count: ^c.int) -> [^]rune ---        // Load all codepoints from a UTF-8 text string, codepoints count returned by parameter
+	LoadCodepoints       :: proc(text: cstring, count: ^c.int) -> [^]rune ---       // Load all codepoints from a UTF-8 text string, codepoints count returned by parameter
 	UnloadCodepoints     :: proc(codepoints: [^]rune) ---                           // Unload codepoints data from memory
-	GetCodepointCount    :: proc(text : cstring) -> c.int ---                       // Get total number of codepoints in a UTF-8 encoded string
+	GetCodepointCount    :: proc(text: cstring) -> c.int ---                        // Get total number of codepoints in a UTF-8 encoded string
 	GetCodepoint         :: proc(text: cstring, codepointSize: ^c.int) -> rune ---  // Get next codepoint in a UTF-8 encoded string, 0x3f('?') is returned on failure
 	GetCodepointNext     :: proc(text: cstring, codepointSize: ^c.int) -> rune ---  // Get next codepoint in a UTF-8 encoded string, 0x3f('?') is returned on failure
 	GetCodepointPrevious :: proc(text: cstring, codepointSize: ^c.int) -> rune ---  // Get previous codepoint in a UTF-8 encoded string, 0x3f('?') is returned on failure
@@ -1709,7 +1667,7 @@ IsGestureDetected :: proc "c" (gesture: Gesture) -> bool {
 
 
 // Text formatting with variables (sprintf style)
-TextFormat :: proc(text: cstring, args: ..any) -> cstring { 
+TextFormat :: proc(text: cstring, args: ..any) -> cstring {
 	@static buffers: [MAX_TEXTFORMAT_BUFFERS][MAX_TEXT_BUFFER_LENGTH]byte
 	@static index: u32
 	
@@ -1725,7 +1683,7 @@ TextFormat :: proc(text: cstring, args: ..any) -> cstring {
 }
 
 // Text formatting with variables (sprintf style) and allocates (must be freed with 'MemFree')
-TextFormatAlloc :: proc(text: cstring, args: ..any) -> cstring { 
+TextFormatAlloc :: proc(text: cstring, args: ..any) -> cstring {
 	str := fmt.tprintf(string(text), ..args)
 	return strings.clone_to_cstring(str, MemAllocator())
 }

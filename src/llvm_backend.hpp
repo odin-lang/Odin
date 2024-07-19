@@ -1,13 +1,9 @@
 #if defined(GB_SYSTEM_WINDOWS)
-#include "llvm-c/Core.h"
-#include "llvm-c/ExecutionEngine.h"
-#include "llvm-c/Target.h"
-#include "llvm-c/Analysis.h"
-#include "llvm-c/Object.h"
-#include "llvm-c/BitWriter.h"
-#include "llvm-c/DebugInfo.h"
-#include "llvm-c/Transforms/PassBuilder.h"
+#include <llvm-c/Config/llvm-config.h>
 #else
+#include <llvm/Config/llvm-config.h>
+#endif
+
 #include <llvm-c/Core.h>
 #include <llvm-c/ExecutionEngine.h>
 #include <llvm-c/Target.h>
@@ -25,7 +21,6 @@
 #include <llvm-c/Transforms/Scalar.h>
 #include <llvm-c/Transforms/Utils.h>
 #include <llvm-c/Transforms/Vectorize.h>
-#endif
 #endif
 
 #if LLVM_VERSION_MAJOR < 11
@@ -122,7 +117,6 @@ struct lbAddr {
 		} swizzle_large;
 		struct {
 			Type *type;
-			i64 index;
 			i64 bit_offset;
 			i64 bit_size;
 		} bitfield;
@@ -140,11 +134,6 @@ enum lbFunctionPassManagerKind {
 	lbFunctionPassManager_default,
 	lbFunctionPassManager_default_without_memcpy,
 	lbFunctionPassManager_none,
-	lbFunctionPassManager_minimal,
-	lbFunctionPassManager_size,
-	lbFunctionPassManager_speed,
-	lbFunctionPassManager_aggressive,
-
 	lbFunctionPassManager_COUNT
 };
 
@@ -158,6 +147,7 @@ struct lbModule {
 	CheckerInfo *info;
 	AstPackage *pkg; // possibly associated
 	AstFile *file;   // possibly associated
+	char const *module_name;
 
 	PtrMap<Type *, LLVMTypeRef> types;                             // mutex: types_mutex
 	PtrMap<void *, lbStructFieldRemapping> struct_field_remapping; // Key: LLVMTypeRef or Type *, mutex: types_mutex
@@ -187,7 +177,8 @@ struct lbModule {
 	std::atomic<u32> nested_type_name_guid;
 
 	Array<lbProcedure *> procedures_to_generate;
-	Array<Entity *> global_procedures_and_types_to_create;
+	Array<Entity *> global_procedures_to_create;
+	Array<Entity *> global_types_to_create;
 
 	lbProcedure *curr_procedure;
 
@@ -210,6 +201,12 @@ struct lbModule {
 	LLVMPassManagerRef function_pass_managers[lbFunctionPassManager_COUNT];
 };
 
+struct lbEntityCorrection {
+	lbModule *  other_module;
+	Entity *    e;
+	char const *cname;
+};
+
 struct lbGenerator : LinkerData {
 	CheckerInfo *info;
 
@@ -223,9 +220,13 @@ struct lbGenerator : LinkerData {
 	std::atomic<u32> global_array_index;
 	std::atomic<u32> global_generated_index;
 
+	isize used_module_count;
+
 	lbProcedure *startup_runtime;
 	lbProcedure *cleanup_runtime;
 	lbProcedure *objc_names;
+
+	MPSCQueue<lbEntityCorrection> entities_to_correct_linkage;
 };
 
 
@@ -304,6 +305,11 @@ enum lbProcedureFlag : u32 {
 	lbProcedureFlag_DebugAllocaCopy = 1<<1,
 };
 
+struct lbVariadicReuseSlices {
+	Type *slice_type;
+	lbAddr slice_addr;
+};
+
 struct lbProcedure {
 	u32 flags;
 	u16 state_flags;
@@ -344,8 +350,10 @@ struct lbProcedure {
 	bool             in_multi_assignment;
 	Array<LLVMValueRef> raw_input_parameters;
 
-	LLVMValueRef temp_callee_return_struct_memory;
+	Array<lbVariadicReuseSlices> variadic_reuses;
+	lbAddr variadic_reuse_base_array_ptr;
 
+	LLVMValueRef temp_callee_return_struct_memory;
 	Ast *curr_stmt;
 
 	Array<Scope *>       scope_stack;
@@ -372,7 +380,7 @@ struct lbProcedure {
 
 gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c);
 
-gb_internal String lb_mangle_name(lbModule *m, Entity *e);
+gb_internal String lb_mangle_name(Entity *e);
 gb_internal String lb_get_entity_name(lbModule *m, Entity *e, String name = {});
 
 gb_internal LLVMAttributeRef lb_create_enum_attribute(LLVMContextRef ctx, char const *name, u64 value=0);
@@ -582,6 +590,10 @@ gb_internal LLVMTypeRef llvm_array_type(LLVMTypeRef ElementType, uint64_t Elemen
 #endif
 }
 
+
+gb_internal void lb_set_metadata_custom_u64(lbModule *m, LLVMValueRef v_ref, String name, u64 value);
+gb_internal u64 lb_get_metadata_custom_u64(lbModule *m, LLVMValueRef v_ref, String name);
+
 #define LB_STARTUP_RUNTIME_PROC_NAME   "__$startup_runtime"
 #define LB_CLEANUP_RUNTIME_PROC_NAME   "__$cleanup_runtime"
 #define LB_TYPE_INFO_DATA_NAME       "__$type_info_data"
@@ -720,4 +732,4 @@ gb_global char const *llvm_linkage_strings[] = {
 	"linker private weak linkage"
 };
 
-#define ODIN_METADATA_REQUIRE "odin-metadata-require", 21
+#define ODIN_METADATA_IS_PACKED str_lit("odin-is-packed")
