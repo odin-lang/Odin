@@ -61,6 +61,7 @@ import cbor             "core:encoding/cbor"
 import csv              "core:encoding/csv"
 import endian           "core:encoding/endian"
 import hxa              "core:encoding/hxa"
+import ini              "core:encoding/ini"
 import json             "core:encoding/json"
 import varint           "core:encoding/varint"
 import xml              "core:encoding/xml"
@@ -193,6 +194,7 @@ _ :: base32
 _ :: base64
 _ :: csv
 _ :: hxa
+_ :: ini
 _ :: json
 _ :: varint
 _ :: xml
