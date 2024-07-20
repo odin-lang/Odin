@@ -7,7 +7,7 @@ import "core:strings"
 import "core:testing"
 
 @test
-prase_ini :: proc(t: ^testing.T) {
+parse_ini :: proc(t: ^testing.T) {
 	ini_data := `
 		[LOG]
 		level = "devel"
