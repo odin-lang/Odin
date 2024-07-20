@@ -363,8 +363,7 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 	}
 
 	v := v
-	v = reflect.any_base(v)
-	ti := type_info_of(v.id)
+	ti := reflect.type_info_base(type_info_of(v.id))
 	
 	#partial switch t in ti.variant {
 	case reflect.Type_Info_Struct:
