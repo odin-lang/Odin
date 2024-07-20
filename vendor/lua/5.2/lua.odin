@@ -15,16 +15,20 @@ when LUA_SHARED {
 		foreign import lib "windows/lua52dll.lib"
 	} else when ODIN_OS == .Linux {
 		foreign import lib "linux/liblua52.so"
+	} else when ODIN_OS == .Darwin {
+		foreign import lib "system:lua5.2"
 	} else {
-		foreign import lib "system:liblua.so.5.2"
+		#panic("LUA import not defined for this platform")
 	}
 } else {
 	when ODIN_OS == .Windows {
 		foreign import lib "windows/lua52dll.lib"
 	} else when ODIN_OS == .Linux {
 		foreign import lib "linux/liblua52.a"
+	} else when ODIN_OS == .Darwin {
+		foreign import lib "system:lua5.2"
 	} else {
-		foreign import lib "system:liblua52.a"
+		#panic("LUA import not defined for this platform")
 	}
 }
 
