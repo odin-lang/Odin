@@ -1,8 +1,8 @@
 package utf8string
 
 import "core:unicode/utf8"
-import "core:runtime"
-import "core:builtin"
+import "base:runtime"
+import "base:builtin"
 
 String :: struct {
 	contents:   string,

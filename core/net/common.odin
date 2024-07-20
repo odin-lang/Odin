@@ -21,7 +21,7 @@ package net
 		Jeroen van Rijn: Cross platform unification, code style, documentation
 */
 
-import "core:runtime"
+import "base:runtime"
 
 /*
 	TUNEABLES - See also top of `dns.odin` for DNS configuration.
@@ -137,8 +137,8 @@ IP4_Address :: distinct [4]u8
 IP6_Address :: distinct [8]u16be
 Address :: union {IP4_Address, IP6_Address}
 
-IP4_Loopback := IP4_Address{127, 0, 0, 1}
-IP6_Loopback := IP6_Address{0, 0, 0, 0, 0, 0, 0, 1}
+IP4_Loopback :: IP4_Address{127, 0, 0, 1}
+IP6_Loopback :: IP6_Address{0, 0, 0, 0, 0, 0, 0, 1}
 
 IP4_Any := IP4_Address{}
 IP6_Any := IP6_Address{}

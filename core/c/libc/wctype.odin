@@ -22,14 +22,18 @@ when ODIN_OS == .Windows {
 	wctrans_t :: distinct int
 	wctype_t  :: distinct u32
 
-} else when ODIN_OS == .OpenBSD {
+} else when ODIN_OS == .OpenBSD || ODIN_OS == .NetBSD {
 	wctrans_t :: distinct rawptr
 	wctype_t  :: distinct rawptr
 
 } else when ODIN_OS == .FreeBSD {
 	wctrans_t :: distinct int
 	wctype_t  :: distinct ulong
-	
+
+} else when ODIN_OS == .Haiku {
+	wctrans_t :: distinct i32
+	wctype_t  :: distinct i32
+
 }
 
 @(default_calling_convention="c")

@@ -2,13 +2,7 @@ package miniaudio
 
 import "core:c"
 
-when ODIN_OS == .Windows {
-	foreign import lib "lib/miniaudio.lib"
-} else when ODIN_OS == .Linux {
-	foreign import lib "lib/miniaudio.a"
-} else {
-	foreign import lib "system:miniaudio"
-}
+foreign import lib { LIB }
 
 /************************************************************************************************************************************************************
 
@@ -41,7 +35,7 @@ encoder :: struct {
 	onUninit:         encoder_uninit_proc,
 	onWritePCMFrames: encoder_write_pcm_frames_proc,
 	pUserData:        rawptr,
-	pInternalEncoder: rawptr, /* <-- The drwav/drflac/stb_vorbis/etc. objects. */
+	pInternalEncoder: rawptr,
 	data: struct #raw_union {
 		vfs: struct {
 			pVFS: ^vfs,

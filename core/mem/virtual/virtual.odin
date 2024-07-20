@@ -1,8 +1,8 @@
 package mem_virtual
 
 import "core:mem"
-import "core:intrinsics"
-import "core:runtime"
+import "base:intrinsics"
+import "base:runtime"
 _ :: runtime
 
 DEFAULT_PAGE_SIZE := uint(4096)
@@ -68,7 +68,7 @@ align_formula :: #force_inline proc "contextless" (size, align: uint) -> uint {
 }
 
 @(require_results)
-memory_block_alloc :: proc(committed, reserved: uint, flags: Memory_Block_Flags) -> (block: ^Memory_Block, err: Allocator_Error) {
+memory_block_alloc :: proc(committed, reserved: uint, alignment: uint = 0, flags: Memory_Block_Flags = {}) -> (block: ^Memory_Block, err: Allocator_Error) {
 	page_size := DEFAULT_PAGE_SIZE
 	assert(mem.is_power_of_two(uintptr(page_size)))
 
@@ -79,8 +79,8 @@ memory_block_alloc :: proc(committed, reserved: uint, flags: Memory_Block_Flags)
 	reserved  = align_formula(reserved, page_size)
 	committed = clamp(committed, 0, reserved)
 	
-	total_size     := uint(reserved + size_of(Platform_Memory_Block))
-	base_offset    := uintptr(size_of(Platform_Memory_Block))
+	total_size     := uint(reserved + max(alignment, size_of(Platform_Memory_Block)))
+	base_offset    := uintptr(max(alignment, size_of(Platform_Memory_Block)))
 	protect_offset := uintptr(0)
 	
 	do_protection := false
@@ -112,7 +112,7 @@ memory_block_alloc :: proc(committed, reserved: uint, flags: Memory_Block_Flags)
 }
 
 @(require_results)
-alloc_from_memory_block :: proc(block: ^Memory_Block, min_size, alignment: uint) -> (data: []byte, err: Allocator_Error) {
+alloc_from_memory_block :: proc(block: ^Memory_Block, min_size, alignment: uint, default_commit_size: uint = 0) -> (data: []byte, err: Allocator_Error) {
 	calc_alignment_offset :: proc "contextless" (block: ^Memory_Block, alignment: uintptr) -> uint {
 		alignment_offset := uint(0)
 		ptr := uintptr(block.base[block.used:])
@@ -123,7 +123,7 @@ alloc_from_memory_block :: proc(block: ^Memory_Block, min_size, alignment: uint)
 		return alignment_offset
 		
 	}
-	do_commit_if_necessary :: proc(block: ^Memory_Block, size: uint) -> (err: Allocator_Error) {
+	do_commit_if_necessary :: proc(block: ^Memory_Block, size: uint, default_commit_size: uint) -> (err: Allocator_Error) {
 		if block.committed - block.used < size {
 			pmblock := (^Platform_Memory_Block)(block)
 			base_offset := uint(uintptr(pmblock.block.base) - uintptr(pmblock))
@@ -133,7 +133,7 @@ alloc_from_memory_block :: proc(block: ^Memory_Block, min_size, alignment: uint)
 			extra_size := max(size, block.committed>>1)
 			platform_total_commit := base_offset + block.used + extra_size
 			platform_total_commit = align_formula(platform_total_commit, DEFAULT_PAGE_SIZE)
-			platform_total_commit = min(platform_total_commit, pmblock.reserved)
+			platform_total_commit = min(max(platform_total_commit, default_commit_size), pmblock.reserved)
 
 			assert(pmblock.committed <= pmblock.reserved)
 			assert(pmblock.committed < platform_total_commit)
@@ -163,7 +163,7 @@ alloc_from_memory_block :: proc(block: ^Memory_Block, min_size, alignment: uint)
 		return
 	}
 	assert(block.committed <= block.reserved)
-	do_commit_if_necessary(block, size) or_return
+	do_commit_if_necessary(block, size, default_commit_size) or_return
 
 	data = block.base[block.used+alignment_offset:][:min_size]
 	block.used += size

@@ -1,6 +1,6 @@
 package unix
 
-import "core:intrinsics"
+import "base:intrinsics"
 
 // Linux has inconsistent system call numbering across architectures,
 // for largely historical reasons.  This attempts to provide a unified

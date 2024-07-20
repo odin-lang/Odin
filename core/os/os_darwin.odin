@@ -1,10 +1,10 @@
 package os
 
 foreign import dl   "system:dl"
-foreign import libc "System.framework"
-foreign import pthread "System.framework"
+foreign import libc "system:System.framework"
+foreign import pthread "system:System.framework"
 
-import "core:runtime"
+import "base:runtime"
 import "core:strings"
 import "core:c"
 
@@ -442,20 +442,21 @@ F_GETPATH :: 50 // return the full path of the fd
 foreign libc {
 	@(link_name="__error") __error :: proc() -> ^c.int ---
 
-	@(link_name="open")             _unix_open          :: proc(path: cstring, flags: i32, mode: u16) -> Handle ---
+	@(link_name="open")             _unix_open          :: proc(path: cstring, flags: i32, #c_vararg args: ..any) -> Handle ---
 	@(link_name="close")            _unix_close         :: proc(handle: Handle) -> c.int ---
 	@(link_name="read")             _unix_read          :: proc(handle: Handle, buffer: rawptr, count: c.size_t) -> int ---
 	@(link_name="write")            _unix_write         :: proc(handle: Handle, buffer: rawptr, count: c.size_t) -> int ---
 	@(link_name="pread")            _unix_pread         :: proc(handle: Handle, buffer: rawptr, count: c.size_t, offset: i64) -> int ---
 	@(link_name="pwrite")           _unix_pwrite        :: proc(handle: Handle, buffer: rawptr, count: c.size_t, offset: i64) -> int ---
-	@(link_name="lseek")            _unix_lseek         :: proc(fs: Handle, offset: int, whence: int) -> int ---
+	@(link_name="lseek")            _unix_lseek         :: proc(fs: Handle, offset: int, whence: c.int) -> int ---
 	@(link_name="gettid")           _unix_gettid        :: proc() -> u64 ---
 	@(link_name="getpagesize")      _unix_getpagesize   :: proc() -> i32 ---
 	@(link_name="stat64")           _unix_stat          :: proc(path: cstring, stat: ^OS_Stat) -> c.int ---
 	@(link_name="lstat64")          _unix_lstat         :: proc(path: cstring, stat: ^OS_Stat) -> c.int ---
 	@(link_name="fstat64")          _unix_fstat         :: proc(fd: Handle, stat: ^OS_Stat) -> c.int ---
 	@(link_name="readlink")         _unix_readlink      :: proc(path: cstring, buf: ^byte, bufsiz: c.size_t) -> c.ssize_t ---
-	@(link_name="access")           _unix_access        :: proc(path: cstring, mask: int) -> int ---
+	@(link_name="access")           _unix_access        :: proc(path: cstring, mask: c.int) -> c.int ---
+        @(link_name="fsync")            _unix_fsync         :: proc(handle: Handle) -> c.int ---
 
 	@(link_name="fdopendir$INODE64") _unix_fdopendir_amd64 :: proc(fd: Handle) -> Dir ---
 	@(link_name="readdir_r$INODE64") _unix_readdir_r_amd64 :: proc(dirp: Dir, entry: ^Dirent, result: ^^Dirent) -> c.int ---
@@ -476,7 +477,11 @@ foreign libc {
 	@(link_name="calloc")   _unix_calloc   :: proc(num, size: int) -> rawptr ---
 	@(link_name="free")     _unix_free     :: proc(ptr: rawptr) ---
 	@(link_name="realloc")  _unix_realloc  :: proc(ptr: rawptr, size: int) -> rawptr ---
+
 	@(link_name="getenv")   _unix_getenv   :: proc(cstring) -> cstring ---
+	@(link_name="unsetenv") _unix_unsetenv :: proc(cstring) -> c.int ---
+	@(link_name="setenv")   _unix_setenv   :: proc(key: cstring, value: cstring, overwrite: c.int) -> c.int ---
+
 	@(link_name="getcwd")   _unix_getcwd   :: proc(buf: cstring, len: c.size_t) -> cstring ---
 	@(link_name="chdir")    _unix_chdir    :: proc(buf: cstring) -> c.int ---
 	@(link_name="mkdir")    _unix_mkdir    :: proc(buf: cstring, mode: u16) -> c.int ---
@@ -527,6 +532,7 @@ get_last_error_string :: proc() -> string {
 	return cast(string)_darwin_string_error(cast(c.int)get_last_error())
 }
 
+
 open :: proc(path: string, flags: int = O_RDWR, mode: int = 0) -> (Handle, Errno) {
 	isDir := is_dir_path(path)
 	flags := flags
@@ -553,7 +559,7 @@ open :: proc(path: string, flags: int = O_RDWR, mode: int = 0) -> (Handle, Errno
 		err := fchmod(handle, cast(u16)mode)
 		if err != 0 {
 			_unix_close(handle)
-			return INVALID_HANDLE, cast(Errno)err
+			return INVALID_HANDLE, err
 		}
 	}
 
@@ -564,19 +570,28 @@ fchmod :: proc(fd: Handle, mode: u16) -> Errno {
 	return cast(Errno)_unix_fchmod(fd, mode)
 }
 
-close :: proc(fd: Handle) -> bool {
-	return _unix_close(fd) == 0
+close :: proc(fd: Handle) -> Errno {
+	return cast(Errno)_unix_close(fd)
 }
 
+// If you read or write more than `SSIZE_MAX` bytes, most darwin implementations will return `EINVAL`
+// but it is really implementation defined. `SSIZE_MAX` is also implementation defined but usually
+// the max of an i32 on Darwin.
+// In practice a read/write call would probably never read/write these big buffers all at once,
+// which is why the number of bytes is returned and why there are procs that will call this in a
+// loop for you.
+// We set a max of 1GB to keep alignment and to be safe.
 @(private)
-MAX_RW :: 0x7fffffff // The limit on Darwin is max(i32), trying to read/write more than that fails.
+MAX_RW :: 1 << 30
 
 write :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 	if len(data) == 0 {
 		return 0, ERROR_NONE
 	}
 
-	bytes_written := _unix_write(fd, raw_data(data), c.size_t(len(data)))
+	to_write := min(c.size_t(len(data)), MAX_RW)
+
+	bytes_written := _unix_write(fd, raw_data(data), to_write)
 	if bytes_written < 0 {
 		return -1, Errno(get_last_error())
 	}
@@ -588,18 +603,23 @@ read :: proc(fd: Handle, data: []u8) -> (int, Errno) {
 		return 0, ERROR_NONE
 	}
 
-	bytes_read := _unix_read(fd, raw_data(data), c.size_t(len(data)))
+	to_read := min(c.size_t(len(data)), MAX_RW)
+
+	bytes_read := _unix_read(fd, raw_data(data), to_read)
 	if bytes_read < 0 {
 		return -1, Errno(get_last_error())
 	}
 	return bytes_read, ERROR_NONE
 }
+
 read_at :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Errno) {
 	if len(data) == 0 {
 		return 0, ERROR_NONE
 	}
 
-	bytes_read := _unix_pread(fd, raw_data(data), c.size_t(len(data)), offset)
+	to_read := min(c.size_t(len(data)), MAX_RW)
+
+	bytes_read := _unix_pread(fd, raw_data(data), to_read, offset)
 	if bytes_read < 0 {
 		return -1, Errno(get_last_error())
 	}
@@ -611,7 +631,9 @@ write_at :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Errno) {
 		return 0, ERROR_NONE
 	}
 
-	bytes_written := _unix_pwrite(fd, raw_data(data), c.size_t(len(data)), offset)
+	to_write := min(c.size_t(len(data)), MAX_RW)
+
+	bytes_written := _unix_pwrite(fd, raw_data(data), to_write, offset)
 	if bytes_written < 0 {
 		return -1, Errno(get_last_error())
 	}
@@ -621,7 +643,7 @@ write_at :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Errno) {
 seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
 	assert(fd != -1)
 
-	final_offset := i64(_unix_lseek(fd, int(offset), whence))
+	final_offset := i64(_unix_lseek(fd, int(offset), c.int(whence)))
 	if final_offset == -1 {
 		return 0, 1
 	}
@@ -642,10 +664,24 @@ stdin:  Handle = 0 // get_std_handle(win32.STD_INPUT_HANDLE);
 stdout: Handle = 1 // get_std_handle(win32.STD_OUTPUT_HANDLE);
 stderr: Handle = 2 // get_std_handle(win32.STD_ERROR_HANDLE);
 
-/* TODO(zangent): Implement these!
-last_write_time :: proc(fd: Handle) -> File_Time {}
-last_write_time_by_name :: proc(name: string) -> File_Time {}
-*/
+last_write_time :: proc(fd: Handle) -> (File_Time, Errno) {
+	s, err := _fstat(fd)
+	if err != ERROR_NONE {
+		return 0, err
+	}
+	modified := s.modified.seconds * 1_000_000_000 + s.modified.nanoseconds
+	return File_Time(modified), ERROR_NONE
+}
+
+last_write_time_by_name :: proc(name: string) -> (File_Time, Errno) {
+	s, err := _stat(name)
+	if err != ERROR_NONE {
+		return 0, err
+	}
+	modified := s.modified.seconds * 1_000_000_000 + s.modified.nanoseconds
+	return File_Time(modified), ERROR_NONE
+}
+
 
 is_path_separator :: proc(r: rune) -> bool {
 	return r == '/'
@@ -713,10 +749,14 @@ rename :: proc(old: string, new: string) -> bool {
 	return _unix_rename(old_cstr, new_cstr) != -1
 }
 
-remove :: proc(path: string) -> bool {
+remove :: proc(path: string) -> Errno {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	path_cstr := strings.clone_to_cstring(path, context.temp_allocator)
-	return _unix_remove(path_cstr) != -1
+	res := _unix_remove(path_cstr)
+	if res == -1 {
+		return Errno(get_last_error())
+	}
+	return ERROR_NONE
 }
 
 @private
@@ -847,8 +887,8 @@ absolute_path_from_relative :: proc(rel: string) -> (path: string, err: Errno) {
 	}
 	defer _unix_free(path_ptr)
 
-	path_cstr := transmute(cstring)path_ptr
-	path = strings.clone( string(path_cstr) )
+	path_cstr := cast(cstring)path_ptr
+	path = strings.clone(string(path_cstr))
 
 	return path, ERROR_NONE
 }
@@ -856,26 +896,11 @@ absolute_path_from_relative :: proc(rel: string) -> (path: string, err: Errno) {
 access :: proc(path: string, mask: int) -> bool {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	cstr := strings.clone_to_cstring(path, context.temp_allocator)
-	return _unix_access(cstr, mask) == 0
+	return _unix_access(cstr, c.int(mask)) == 0
 }
 
-heap_alloc :: proc(size: int, zero_memory := true) -> rawptr {
-	if size <= 0 {
-		return nil
-	}
-	if zero_memory {
-		return _unix_calloc(1, size)
-	} else {
-		return _unix_malloc(size)
-	}
-}
-heap_resize :: proc(ptr: rawptr, new_size: int) -> rawptr {
-	// NOTE: _unix_realloc doesn't guarantee new memory will be zeroed on
-	// POSIX platforms. Ensure your caller takes this into account.
-	return _unix_realloc(ptr, new_size)
-}
-heap_free :: proc(ptr: rawptr) {
-	_unix_free(ptr)
+flush :: proc(fd: Handle) -> Errno {
+	return cast(Errno)_unix_fsync(fd)
 }
 
 lookup_env :: proc(key: string, allocator := context.allocator) -> (value: string, found: bool) {
@@ -891,6 +916,27 @@ lookup_env :: proc(key: string, allocator := context.allocator) -> (value: strin
 get_env :: proc(key: string, allocator := context.allocator) -> (value: string) {
 	value, _ = lookup_env(key, allocator)
 	return
+}
+
+set_env :: proc(key, value: string) -> Errno {
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
+	key_cstring := strings.clone_to_cstring(key, context.temp_allocator)
+	value_cstring := strings.clone_to_cstring(value, context.temp_allocator)
+	res := _unix_setenv(key_cstring, value_cstring, 1)
+	if res < 0 {
+		return Errno(get_last_error())
+	}
+	return ERROR_NONE
+}
+
+unset_env :: proc(key: string) -> Errno {
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
+	s := strings.clone_to_cstring(key, context.temp_allocator)
+	res := _unix_unsetenv(s)
+	if res < 0 {
+		return Errno(get_last_error())
+	}
+	return ERROR_NONE
 }
 
 get_current_directory :: proc() -> string {

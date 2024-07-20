@@ -2,8 +2,7 @@ package spall
 
 import "core:os"
 import "core:time"
-import "core:intrinsics"
-import "core:mem"
+import "base:intrinsics"
 
 // File Format
 
@@ -111,9 +110,10 @@ buffer_create :: proc(data: []byte, tid: u32 = 0, pid: u32 = 0) -> (buffer: Buff
 	return
 }
 
-buffer_flush :: proc(ctx: ^Context, buffer: ^Buffer) {
+@(no_instrumentation)
+buffer_flush :: proc "contextless" (ctx: ^Context, buffer: ^Buffer) #no_bounds_check /* bounds check would segfault instrumentation */ {
 	start := _trace_now(ctx)
-	os.write(ctx.fd, buffer.data[:buffer.head])
+	write(ctx.fd, buffer.data[:buffer.head])
 	buffer.head = 0
 	end := _trace_now(ctx)
 
@@ -140,15 +140,16 @@ _scoped_buffer_end :: proc(ctx: ^Context, buffer: ^Buffer, _, _: string, _ := #c
 	_buffer_end(ctx, buffer)
 }
 
-
+@(no_instrumentation)
 _trace_now :: proc "contextless" (ctx: ^Context) -> f64 {
 	if !ctx.precise_time {
-		return f64(time.tick_now()._nsec) / 1_000
+		return f64(tick_now()) / 1_000
 	}
 
 	return f64(intrinsics.read_cycle_counter())
 }
 
+@(no_instrumentation)
 _build_header :: proc "contextless" (buffer: []u8, timestamp_scale: f64) -> (header_size: int, ok: bool) #optional_ok {
 	header_size = size_of(Manual_Header)
 	if header_size > len(buffer) {
@@ -164,7 +165,8 @@ _build_header :: proc "contextless" (buffer: []u8, timestamp_scale: f64) -> (hea
 	return
 }
 
-_build_begin :: proc "contextless" (buffer: []u8, name: string, args: string, ts: f64, tid: u32, pid: u32) -> (event_size: int, ok: bool) #optional_ok {
+@(no_instrumentation)
+_build_begin :: #force_inline proc "contextless" (buffer: []u8, name: string, args: string, ts: f64, tid: u32, pid: u32) -> (event_size: int, ok: bool) #optional_ok #no_bounds_check /* bounds check would segfault instrumentation */ {
 	ev := (^Begin_Event)(raw_data(buffer))
 	name_len := min(len(name), 255)
 	args_len := min(len(args), 255)
@@ -180,13 +182,14 @@ _build_begin :: proc "contextless" (buffer: []u8, name: string, args: string, ts
 	ev.ts   = f64le(ts)
 	ev.name_len = u8(name_len)
 	ev.args_len = u8(args_len)
-	mem.copy(raw_data(buffer[size_of(Begin_Event):]), raw_data(name), name_len)
-	mem.copy(raw_data(buffer[size_of(Begin_Event)+name_len:]), raw_data(args), args_len)
+	intrinsics.mem_copy_non_overlapping(raw_data(buffer[size_of(Begin_Event):]), raw_data(name), name_len)
+	intrinsics.mem_copy_non_overlapping(raw_data(buffer[size_of(Begin_Event)+name_len:]), raw_data(args), args_len)
 	ok = true
 
 	return
 }
 
+@(no_instrumentation)
 _build_end :: proc "contextless" (buffer: []u8, ts: f64, tid: u32, pid: u32) -> (event_size: int, ok: bool) #optional_ok {
 	ev := (^End_Event)(raw_data(buffer))
 	event_size = size_of(End_Event)
@@ -203,7 +206,8 @@ _build_end :: proc "contextless" (buffer: []u8, ts: f64, tid: u32, pid: u32) -> 
 	return
 }
 
-_buffer_begin :: proc(ctx: ^Context, buffer: ^Buffer, name: string, args: string = "", location := #caller_location) {
+@(no_instrumentation)
+_buffer_begin :: proc "contextless" (ctx: ^Context, buffer: ^Buffer, name: string, args: string = "", location := #caller_location) #no_bounds_check /* bounds check would segfault instrumentation */ {
 	if buffer.head + BEGIN_EVENT_MAX > len(buffer.data) {
 		buffer_flush(ctx, buffer)
 	}
@@ -211,7 +215,8 @@ _buffer_begin :: proc(ctx: ^Context, buffer: ^Buffer, name: string, args: string
 	buffer.head += _build_begin(buffer.data[buffer.head:], name, args, _trace_now(ctx), buffer.tid, buffer.pid)
 }
 
-_buffer_end :: proc(ctx: ^Context, buffer: ^Buffer) {
+@(no_instrumentation)
+_buffer_end :: proc "contextless" (ctx: ^Context, buffer: ^Buffer) #no_bounds_check /* bounds check would segfault instrumentation */ {
 	ts := _trace_now(ctx)
 
 	if buffer.head + size_of(End_Event) > len(buffer.data) {
@@ -219,4 +224,14 @@ _buffer_end :: proc(ctx: ^Context, buffer: ^Buffer) {
 	}
 
 	buffer.head += _build_end(buffer.data[buffer.head:], ts, buffer.tid, buffer.pid)
+}
+
+@(no_instrumentation)
+write :: proc "contextless" (fd: os.Handle, buf: []byte) -> (n: int, err: os.Errno) {
+	return _write(fd, buf)
+}
+
+@(no_instrumentation)
+tick_now :: proc "contextless" () -> (ns: i64) {
+	return _tick_now()
 }

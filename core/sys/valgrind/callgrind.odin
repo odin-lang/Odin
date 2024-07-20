@@ -1,7 +1,7 @@
 //+build amd64
 package sys_valgrind
 
-import "core:intrinsics"
+import "base:intrinsics"
 
 Callgrind_Client_Request :: enum uintptr {
 	Dump_Stats = 'C'<<24 | 'T'<<16,

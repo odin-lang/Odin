@@ -263,12 +263,15 @@ _set_option :: proc(s: Any_Socket, option: Socket_Option, value: any, loc := #ca
 			ptr = &bool_value
 			len = size_of(bool_value)
 	case .Linger:
-		t, ok := value.(time.Duration)
-		if !ok do panic("set_option() value must be a time.Duration here", loc)
+		t := value.(time.Duration) or_else panic("set_option() value must be a time.Duration here", loc)
 
 		num_secs := i64(time.duration_seconds(t))
-		if time.Duration(num_secs * 1e9) != t do return .Linger_Only_Supports_Whole_Seconds
-		if num_secs > i64(max(u16)) do return .Value_Out_Of_Range
+		if time.Duration(num_secs * 1e9) != t {
+			return .Linger_Only_Supports_Whole_Seconds
+		}
+		if num_secs > i64(max(u16)) {
+			return .Value_Out_Of_Range
+		}
 		linger_value.l_onoff = 1
 		linger_value.l_linger = c.ushort(num_secs)
 
@@ -277,8 +280,7 @@ _set_option :: proc(s: Any_Socket, option: Socket_Option, value: any, loc := #ca
 	case
 		.Receive_Timeout,
 		.Send_Timeout:
-			t, ok := value.(time.Duration)
-			if !ok do panic("set_option() value must be a time.Duration here", loc)
+			t := value.(time.Duration) or_else panic("set_option() value must be a time.Duration here", loc)
 
 			int_value = i32(time.duration_milliseconds(t))
 			ptr = &int_value

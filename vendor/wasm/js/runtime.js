@@ -18,6 +18,13 @@ class WasmMemoryInterface {
 		this.memory = null;
 		this.exports = null;
 		this.listenerMap = {};
+
+		// Size (in bytes) of the integer type, should be 4 on `js_wasm32` and 8 on `js_wasm64p32`
+		this.intSize = 4;
+	}
+
+	setIntSize(size) {
+		this.intSize = size;
 	}
 
 	setMemory(memory) {
@@ -67,20 +74,49 @@ class WasmMemoryInterface {
 		const hi = this.mem.getInt32 (addr + 4, true);
 		return lo + hi*4294967296;
 	};
-	loadF32(addr)  { return this.mem.getFloat32(addr, true); }
-	loadF64(addr)  { return this.mem.getFloat64(addr, true); }
-	loadInt(addr)  { return this.mem.getInt32  (addr, true); }
-	loadUint(addr) { return this.mem.getUint32 (addr, true); }
+	loadF32(addr) { return this.mem.getFloat32(addr, true); }
+	loadF64(addr) { return this.mem.getFloat64(addr, true); }
+	loadInt(addr) {
+		if (this.intSize == 8) {
+			return this.loadI64(addr);
+		} else if (this.intSize == 4) {
+			return this.loadI32(addr);
+		} else {
+			throw new Error('Unhandled `intSize`, expected `4` or `8`');
+		}
+	};
+	loadUint(addr) {
+		if (this.intSize == 8) {
+			return this.loadU64(addr);
+		} else if (this.intSize == 4) {
+			return this.loadU32(addr);
+		} else {
+			throw new Error('Unhandled `intSize`, expected `4` or `8`');
+		}
+	};
+	loadPtr(addr) { return this.loadU32(addr); }
 
-	loadPtr(addr) { return this.loadUint(addr); }
+	loadB32(addr) {
+		return this.loadU32(addr) != 0;
+	}
 
 	loadBytes(ptr, len) {
-		return new Uint8Array(this.memory.buffer, ptr, len);
+		return new Uint8Array(this.memory.buffer, ptr, Number(len));
 	}
 
 	loadString(ptr, len) {
-		const bytes = this.loadBytes(ptr, len);
+		const bytes = this.loadBytes(ptr, Number(len));
 		return new TextDecoder().decode(bytes);
+	}
+ 
+	loadCstring(ptr) {
+		const start = this.loadPtr(ptr);
+		if (start == 0) {
+			return null;
+		}
+		let len = 0;
+		for (; this.mem.getUint8(start+len) != 0; len += 1) {}
+		return this.loadString(start, len);
 	}
 
 	storeU8(addr, value)  { this.mem.setUint8  (addr, value); }
@@ -90,21 +126,52 @@ class WasmMemoryInterface {
 	storeU32(addr, value) { this.mem.setUint32 (addr, value, true); }
 	storeI32(addr, value) { this.mem.setInt32  (addr, value, true); }
 	storeU64(addr, value) {
-		this.mem.setUint32(addr + 0, value, true);
-		this.mem.setUint32(addr + 4, Math.floor(value / 4294967296), true);
+		this.mem.setUint32(addr + 0, Number(value), true);
+
+		let div = 4294967296;
+		if (typeof value == 'bigint') {
+			div = BigInt(div);
+		}
+
+		this.mem.setUint32(addr + 4, Math.floor(Number(value / div)), true);
 	}
 	storeI64(addr, value) {
-		this.mem.setUint32(addr + 0, value, true);
-		this.mem.setInt32 (addr + 4, Math.floor(value / 4294967296), true);
-	}
-	storeF32(addr, value)  { this.mem.setFloat32(addr, value, true); }
-	storeF64(addr, value)  { this.mem.setFloat64(addr, value, true); }
-	storeInt(addr, value)  { this.mem.setInt32  (addr, value, true); }
-	storeUint(addr, value) { this.mem.setUint32 (addr, value, true); }
+		this.mem.setUint32(addr + 0, Number(value), true);
 
+		let div = 4294967296;
+		if (typeof value == 'bigint') {
+			div = BigInt(div);
+		}
+
+		this.mem.setInt32(addr + 4, Math.floor(Number(value / div)), true);
+	}
+	storeF32(addr, value) { this.mem.setFloat32(addr, value, true); }
+	storeF64(addr, value) { this.mem.setFloat64(addr, value, true); }
+	storeInt(addr, value) {
+		if (this.intSize == 8) {
+			this.storeI64(addr, value);
+		} else if (this.intSize == 4) {
+			this.storeI32(addr, value);
+		} else {
+			throw new Error('Unhandled `intSize`, expected `4` or `8`');
+		}
+	}
+	storeUint(addr, value) {
+		if (this.intSize == 8) {
+			this.storeU64(addr, value);
+		} else if (this.intSize == 4) {
+			this.storeU32(addr, value);
+		} else {
+			throw new Error('Unhandled `intSize`, expected `4` or `8`');
+		}
+	}
+
+	// Returned length might not be the same as `value.length` if non-ascii strings are given.
 	storeString(addr, value) {
-		const bytes = this.loadBytes(addr, value.length);
-		new TextEncoder().encodeInto(value, bytes);
+		const src = new TextEncoder().encode(value);
+		const dst = new Uint8Array(this.memory.buffer, addr, src.length);
+		dst.set(src);
+		return src.length;
 	}
 };
 
@@ -204,11 +271,11 @@ class WebGLInterface {
 		}
 	}
 	getSource(shader, strings_ptr, strings_length) {
-		const STRING_SIZE = 2*4;
+		const stringSize = this.mem.intSize*2;
 		let source = "";
 		for (let i = 0; i < strings_length; i++) {
-			let ptr = this.mem.loadPtr(strings_ptr + i*STRING_SIZE);
-			let len = this.mem.loadPtr(strings_ptr + i*STRING_SIZE + 4);
+			let ptr = this.mem.loadPtr(strings_ptr + i*stringSize);
+			let len = this.mem.loadPtr(strings_ptr + i*stringSize + 4);
 			let str = this.mem.loadString(ptr, len);
 			source += str;
 		}
@@ -395,7 +462,7 @@ class WebGLInterface {
 				this.ctx.copyTexImage2D(target, level, internalformat, x, y, width, height, border);
 			},
 			CopyTexSubImage2D: (target, level, xoffset, yoffset, x, y, width, height) => {
-				this.ctx.copyTexImage2D(target, level, xoffset, yoffset, x, y, width, height);
+				this.ctx.copyTexSubImage2D(target, level, xoffset, yoffset, x, y, width, height);
 			},
 
 
@@ -538,8 +605,8 @@ class WebGLInterface {
 			Flush: () => {
 				this.ctx.flush();
 			},
-			FramebufferRenderBuffer: (target, attachment, renderbuffertarget, renderbuffer) => {
-				this.ctx.framebufferRenderBuffer(target, attachment, renderbuffertarget, this.renderbuffers[renderbuffer]);
+			FramebufferRenderbuffer: (target, attachment, renderbuffertarget, renderbuffer) => {
+				this.ctx.framebufferRenderbuffer(target, attachment, renderbuffertarget, this.renderbuffers[renderbuffer]);
 			},
 			FramebufferTexture2D: (target, attachment, textarget, texture, level) => {
 				this.ctx.framebufferTexture2D(target, attachment, textarget, this.textures[texture], level);
@@ -645,7 +712,7 @@ class WebGLInterface {
 
 
 			IsBuffer:       (buffer)       => this.ctx.isBuffer(this.buffers[buffer]),
-			IsEnabled:      (enabled)      => this.ctx.isEnabled(this.enableds[enabled]),
+			IsEnabled:      (cap)          => this.ctx.isEnabled(cap),
 			IsFramebuffer:  (framebuffer)  => this.ctx.isFramebuffer(this.framebuffers[framebuffer]),
 			IsProgram:      (program)      => this.ctx.isProgram(this.programs[program]),
 			IsRenderbuffer: (renderbuffer) => this.ctx.isRenderbuffer(this.renderbuffers[renderbuffer]),
@@ -669,7 +736,7 @@ class WebGLInterface {
 
 
 			ReadnPixels: (x, y, width, height, format, type, bufSize, data) => {
-				this.ctx.readPixels(x, y, width, format, type, this.mem.loadBytes(data, bufSize));
+				this.ctx.readPixels(x, y, width, height, format, type, this.mem.loadBytes(data, bufSize));
 			},
 			RenderbufferStorage: (target, internalformat, width, height) => {
 				this.ctx.renderbufferStorage(target, internalformat, width, height);
@@ -735,11 +802,11 @@ class WebGLInterface {
 
 			UniformMatrix2fv: (location, addr) => {
 				let array = this.mem.loadF32Array(addr, 2*2);
-				this.ctx.uniformMatrix4fv(this.uniforms[location], false, array);
+				this.ctx.uniformMatrix2fv(this.uniforms[location], false, array);
 			},
 			UniformMatrix3fv: (location, addr) => {
 				let array = this.mem.loadF32Array(addr, 3*3);
-				this.ctx.uniformMatrix4fv(this.uniforms[location], false, array);
+				this.ctx.uniformMatrix3fv(this.uniforms[location], false, array);
 			},
 			UniformMatrix4fv: (location, addr) => {
 				let array = this.mem.loadF32Array(addr, 4*4);
@@ -791,7 +858,7 @@ class WebGLInterface {
 			/* Framebuffer objects */
 			BlitFramebuffer: (srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, mask, filter) => {
 				this.assertWebGL2();
-				this.ctx.glitFramebuffer(srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, mask, filter);
+				this.ctx.blitFramebuffer(srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, mask, filter);
 			},
 			FramebufferTextureLayer: (target, attachment, texture, level, layer) => {
 				this.assertWebGL2();
@@ -822,7 +889,7 @@ class WebGLInterface {
 
 			TexStorage3D: (target, levels, internalformat, width, height, depth) => {
 				this.assertWebGL2();
-				this.ctx.texStorage3D(target, level, internalformat, width, heigh, depth);
+				this.ctx.texStorage3D(target, levels, internalformat, width, height, depth);
 			},
 			TexImage3D: (target, level, internalformat, width, height, depth, border, format, type, size, data) => {
 				this.assertWebGL2();
@@ -855,7 +922,7 @@ class WebGLInterface {
 
 			CopyTexSubImage3D: (target, level, xoffset, yoffset, zoffset, x, y, width, height) => {
 				this.assertWebGL2();
-				this.ctx.copyTexImage3D(target, level, xoffset, yoffset, zoffset, x, y, width, height);
+				this.ctx.copyTexSubImage3D(target, level, xoffset, yoffset, zoffset, x, y, width, height);
 			},
 
 			/* Programs and shaders */
@@ -982,10 +1049,10 @@ class WebGLInterface {
 			},
 			DeleteQuery: (id) => {
 				this.assertWebGL2();
-				let obj = this.querys[id];
+				let obj = this.queries[id];
 				if (obj && id != 0) {
 					this.ctx.deleteQuery(obj);
-					this.querys[id] = null;
+					this.queries[id] = null;
 				}
 			},
 			IsQuery: (query) => {
@@ -1038,7 +1105,7 @@ class WebGLInterface {
 			},
 			BindSampler: (unit, sampler) => {
 				this.assertWebGL2();
-				this.ctx.bindSampler(unit, this.samplers[Sampler]);
+				this.ctx.bindSampler(unit, this.samplers[sampler]);
 			},
 			SamplerParameteri: (sampler, pname, param) => {
 				this.assertWebGL2();
@@ -1083,7 +1150,7 @@ class WebGLInterface {
 			/* Transform Feedback */
 			CreateTransformFeedback: () => {
 				this.assertWebGL2();
-				let transformFeedback = this.ctx.createtransformFeedback();
+				let transformFeedback = this.ctx.createTransformFeedback();
 				let id = this.getNewId(this.transformFeedbacks);
 				transformFeedback.name = id;
 				this.transformFeedbacks[id] = transformFeedback;
@@ -1115,10 +1182,11 @@ class WebGLInterface {
 			},
 			TransformFeedbackVaryings: (program, varyings_ptr, varyings_len, bufferMode) => {
 				this.assertWebGL2();
+				const stringSize = this.mem.intSize*2;
 				let varyings = [];
 				for (let i = 0; i < varyings_len; i++) {
-					let ptr = this.mem.loadPtr(varyings_ptr + i*STRING_SIZE + 0*4);
-					let len = this.mem.loadPtr(varyings_ptr + i*STRING_SIZE + 1*4);
+					let ptr = this.mem.loadPtr(varyings_ptr + i*stringSize + 0*4);
+					let len = this.mem.loadPtr(varyings_ptr + i*stringSize + 1*4);
 					varyings.push(this.mem.loadString(ptr, len));
 				}
 				this.ctx.transformFeedbackVaryings(this.programs[program], varyings, bufferMode);
@@ -1191,7 +1259,7 @@ class WebGLInterface {
 };
 
 
-function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
+function odinSetupDefaultImports(wasmMemoryInterface, consoleElement, memory) {
 	const MAX_INFO_CONSOLE_LINES = 512;
 	let infoConsoleLines = new Array();
 	let currentLine = {};
@@ -1312,8 +1380,15 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 	let event_temp_data = {};
 
 	let webglContext = new WebGLInterface(wasmMemoryInterface);
+	
+	const env = {};
+
+	if (memory) {
+		env.memory = memory;
+	}
+
 	return {
-		"env": {},
+		env,
 		"odin_env": {
 			write: (fd, ptr, len) => {
 				const str = wasmMemoryInterface.loadString(ptr, len);
@@ -1334,7 +1409,7 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 
 			// return a bigint to be converted to i64
 			time_now: () => BigInt(Date.now()),
-			tick_now: () => BigInt(performance.now()),
+			tick_now: () => performance.now(),
 			time_sleep: (duration_ms) => {
 				if (duration_ms > 0) {
 					// TODO(bill): Does this even make any sense?
@@ -1357,7 +1432,7 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 		},
 		"odin_dom": {
 			init_event_raw: (ep) => {
-				const W = 4;
+				const W = wasmMemoryInterface.intSize;
 				let offset = ep;
 				let off = (amount, alignment) => {
 					if (alignment === undefined) {
@@ -1369,6 +1444,13 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 					let x = offset;
 					offset += amount;
 					return x;
+				};
+
+				let align = (alignment) => {
+					const modulo = offset & (alignment-1);
+					if (modulo != 0) {
+						offset += alignment - modulo
+					}
 				};
 
 				let wmi = wasmMemoryInterface;
@@ -1391,10 +1473,12 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 					wmi.storeU32(off(4), 0);
 				}
 
-				wmi.storeUint(off(W), event_temp_data.id_ptr);
-				wmi.storeUint(off(W), event_temp_data.id_len);
-				wmi.storeUint(off(W), 0); // padding
+				align(W);
 
+				wmi.storeI32(off(W), event_temp_data.id_ptr);
+				wmi.storeUint(off(W), event_temp_data.id_len);
+
+				align(8);
 				wmi.storeF64(off(8), e.timeStamp*1e-3);
 
 				wmi.storeU8(off(1), e.eventPhase);
@@ -1406,8 +1490,13 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 				wmi.storeU8(off(1), !!e.isComposing);
 				wmi.storeU8(off(1), !!e.isTrusted);
 
-				let base = off(0, 8);
-				if (e instanceof MouseEvent) {
+				align(8);
+				if (e instanceof WheelEvent) {
+					wmi.storeF64(off(8), e.deltaX);
+					wmi.storeF64(off(8), e.deltaY);
+					wmi.storeF64(off(8), e.deltaZ);
+					wmi.storeU32(off(4), e.deltaMode);
+				} else if (e instanceof MouseEvent) {
 					wmi.storeI64(off(8), e.screenX);
 					wmi.storeI64(off(8), e.screenY);
 					wmi.storeI64(off(8), e.clientX);
@@ -1446,16 +1535,11 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 					wmi.storeI32(off(W), e.code.length)
 					wmi.storeString(off(16, 1), e.key);
 					wmi.storeString(off(16, 1), e.code);
-				} else if (e instanceof WheelEvent) {
-					wmi.storeF64(off(8), e.deltaX);
-					wmi.storeF64(off(8), e.deltaY);
-					wmi.storeF64(off(8), e.deltaZ);
-					wmi.storeU32(off(4), e.deltaMode);
-				} else if (e instanceof Event) {
-					if ('scrollX' in e) {
-						wmi.storeF64(off(8), e.scrollX);
-						wmi.storeF64(off(8), e.scrollY);
-					}
+				} else if (e.type === 'scroll') {
+					wmi.storeF64(off(8), window.scrollX);
+					wmi.storeF64(off(8), window.scrollY);
+				} else if (e.type === 'visibilitychange') {
+					wmi.storeU8(off(1), !document.hidden);
 				}
 			},
 
@@ -1529,12 +1613,12 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 
 			event_stop_propagation: () => {
 				if (event_temp_data && event_temp_data.event) {
-					event_temp_data.event.eventStopPropagation();
+					event_temp_data.event.stopPropagation();
 				}
 			},
 			event_stop_immediate_propagation: () => {
 				if (event_temp_data && event_temp_data.event) {
-					event_temp_data.event.eventStopImmediatePropagation();
+					event_temp_data.event.stopImmediatePropagation();
 				}
 			},
 			event_prevent_default: () => {
@@ -1547,9 +1631,9 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 				let id = wasmMemoryInterface.loadString(id_ptr, id_len);
 				let name = wasmMemoryInterface.loadString(name_ptr, name_len);
 				let options = {
-					bubbles:   (options_bits & (1<<0)) !== 0,
-					cancelabe: (options_bits & (1<<1)) !== 0,
-					composed:  (options_bits & (1<<2)) !== 0,
+					bubbles:    (options_bits & (1<<0)) !== 0,
+					cancelable: (options_bits & (1<<1)) !== 0,
+					composed:   (options_bits & (1<<2)) !== 0,
 				};
 
 				let element = getElement(id);
@@ -1603,7 +1687,7 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 					element.value = value;
 				}
 			},
-			set_element_value_string: (id_ptr, id_len, value_ptr, value_id) => {
+			set_element_value_string: (id_ptr, id_len, value_ptr, value_len) => {
 				let id = wasmMemoryInterface.loadString(id_ptr, id_len);
 				let value = wasmMemoryInterface.loadString(value_ptr, value_len);
 				let element = getElement(id);
@@ -1653,10 +1737,20 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 	};
 };
 
-async function runWasm(wasmPath, consoleElement, extraForeignImports) {
-	let wasmMemoryInterface = new WasmMemoryInterface();
+/**
+ * @param {string} wasmPath                          - Path to the WASM module to run
+ * @param {?HTMLPreElement} consoleElement           - Optional console/pre element to append output to, in addition to the console
+ * @param {any} extraForeignImports                  - Imports, in addition to the default runtime to provide the module
+ * @param {?WasmMemoryInterface} wasmMemoryInterface - Optional memory to use instead of the defaults
+ * @param {?int} intSize                             - Size (in bytes) of the integer type, should be 4 on `js_wasm32` and 8 on `js_wasm64p32`
+ */
+async function runWasm(wasmPath, consoleElement, extraForeignImports, wasmMemoryInterface, intSize = 4) {
+	if (!wasmMemoryInterface) {
+		wasmMemoryInterface = new WasmMemoryInterface();
+	}
+	wasmMemoryInterface.setIntSize(intSize);
 
-	let imports = odinSetupDefaultImports(wasmMemoryInterface, consoleElement);
+	let imports = odinSetupDefaultImports(wasmMemoryInterface, consoleElement, wasmMemoryInterface.memory);
 	let exports = {};
 
 	if (extraForeignImports !== undefined) {
@@ -1671,10 +1765,19 @@ async function runWasm(wasmPath, consoleElement, extraForeignImports) {
 	const wasm = await WebAssembly.instantiate(file, imports);
 	exports = wasm.instance.exports;
 	wasmMemoryInterface.setExports(exports);
-	wasmMemoryInterface.setMemory(exports.memory);
+
+	if (exports.memory) {
+		if (wasmMemoryInterface.memory) {
+			console.warn("WASM module exports memory, but `runWasm` was given an interface with existing memory too");
+		}
+		wasmMemoryInterface.setMemory(exports.memory);
+	}
 
 	exports._start();
 
+	// Define a `@export step :: proc(dt: f32) -> (keep_going: bool) {`
+	// in your app and it will get called every frame.
+	// return `false` to stop the execution of the module.
 	if (exports.step) {
 		const odin_ctx = exports.default_context_ptr();
 
@@ -1686,14 +1789,19 @@ async function runWasm(wasmPath, consoleElement, extraForeignImports) {
 
 			const dt = (currTimeStamp - prevTimeStamp)*0.001;
 			prevTimeStamp = currTimeStamp;
-			exports.step(dt, odin_ctx);
+
+			if (!exports.step(dt, odin_ctx)) {
+				exports._end();
+				return;
+			}
+
 			window.requestAnimationFrame(step);
 		};
 
 		window.requestAnimationFrame(step);
+	} else {
+		exports._end();
 	}
-
-	exports._end();
 
 	return;
 };

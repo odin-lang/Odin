@@ -1,6 +1,6 @@
 package reflect
 
-import "core:runtime"
+import "base:runtime"
 
 @(require_results)
 iterate_array :: proc(val: any, it: ^int) -> (elem: any, index: int, ok: bool) {

@@ -20,7 +20,7 @@ example :: proc() {
 		xml.destroy(docs[round])
 	}
 
-	DOC :: #load("../../../../tests/core/assets/XML/unicode.xml")
+	DOC :: #load("../../../../tests/core/assets/XML/utf8.xml")
 	input := DOC
 
 	for round in 0..<N {

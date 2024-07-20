@@ -1,6 +1,6 @@
 package text_match
 
-import "core:runtime"
+import "base:runtime"
 import "core:unicode"
 import "core:unicode/utf8"
 import "core:strings"

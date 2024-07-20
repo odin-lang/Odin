@@ -3,11 +3,11 @@ package os
 foreign import dl   "system:dl"
 foreign import libc "system:c"
 
-import "core:runtime"
+import "base:runtime"
 import "core:strings"
 import "core:c"
 import "core:strconv"
-import "core:intrinsics"
+import "base:intrinsics"
 
 // NOTE(flysand): For compatibility we'll make core:os package
 // depend on the old (scheduled for removal) linux package.
@@ -263,26 +263,48 @@ Unix_File_Time :: struct {
 	nanoseconds: i64,
 }
 
-OS_Stat :: struct {
-	device_id:     u64, // ID of device containing file
-	serial:        u64, // File serial number
-	nlink:         u64, // Number of hard links
-	mode:          u32, // Mode of the file
-	uid:           u32, // User ID of the file's owner
-	gid:           u32, // Group ID of the file's group
-	_padding:      i32, // 32 bits of padding
-	rdev:          u64, // Device ID, if device
-	size:          i64, // Size of the file, in bytes
-	block_size:    i64, // Optimal bllocksize for I/O
-	blocks:        i64, // Number of 512-byte blocks allocated
+when ODIN_ARCH == .arm64 {
+	OS_Stat :: struct {
+		device_id:     u64, // ID of device containing file
+		serial:        u64, // File serial number
+		mode:          u32, // Mode of the file
+		nlink:         u32, // Number of hard links
+		uid:           u32, // User ID of the file's owner
+		gid:           u32, // Group ID of the file's group
+		rdev:          u64, // Device ID, if device
+		_:             u64, // Padding
+		size:          i64, // Size of the file, in bytes
+		block_size:    i32, // Optimal blocksize for I/O
+		_:             i32, // Padding
+		blocks:        i64, // Number of 512-byte blocks allocated
 
-	last_access:   Unix_File_Time, // Time of last access
-	modified:      Unix_File_Time, // Time of last modification
-	status_change: Unix_File_Time, // Time of last status change
+		last_access:   Unix_File_Time, // Time of last access
+		modified:      Unix_File_Time, // Time of last modification
+		status_change: Unix_File_Time, // Time of last status change
 
-	_reserve1,
-	_reserve2,
-	_reserve3:     i64,
+		_reserved:     [2]i32,
+	}
+	#assert(size_of(OS_Stat) == 128)
+} else {
+	OS_Stat :: struct {
+		device_id:     u64, // ID of device containing file
+		serial:        u64, // File serial number
+		nlink:         u64, // Number of hard links
+		mode:          u32, // Mode of the file
+		uid:           u32, // User ID of the file's owner
+		gid:           u32, // Group ID of the file's group
+		_:             i32, // 32 bits of padding
+		rdev:          u64, // Device ID, if device
+		size:          i64, // Size of the file, in bytes
+		block_size:    i64, // Optimal bllocksize for I/O
+		blocks:        i64, // Number of 512-byte blocks allocated
+
+		last_access:   Unix_File_Time, // Time of last access
+		modified:      Unix_File_Time, // Time of last modification
+		status_change: Unix_File_Time, // Time of last status change
+
+		_reserved:     [3]i64,
+	}
 }
 
 // NOTE(laleksic, 2021-01-21): Comment and rename these to match OS_Stat above
@@ -547,12 +569,23 @@ close :: proc(fd: Handle) -> Errno {
 	return _get_errno(unix.sys_close(int(fd)))
 }
 
+// If you read or write more than `SSIZE_MAX` bytes, result is implementation defined (probably an error).
+// `SSIZE_MAX` is also implementation defined but usually the max of a `ssize_t` which is `max(int)` in Odin.
+// In practice a read/write call would probably never read/write these big buffers all at once,
+// which is why the number of bytes is returned and why there are procs that will call this in a
+// loop for you.
+// We set a max of 1GB to keep alignment and to be safe.
+@(private)
+MAX_RW :: 1 << 30
+
 read :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 	if len(data) == 0 {
 		return 0, ERROR_NONE
 	}
 
-	bytes_read := unix.sys_read(int(fd), raw_data(data), len(data))
+	to_read := min(uint(len(data)), MAX_RW)
+
+	bytes_read := unix.sys_read(int(fd), raw_data(data), to_read)
 	if bytes_read < 0 {
 		return -1, _get_errno(bytes_read)
 	}
@@ -564,18 +597,23 @@ write :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 		return 0, ERROR_NONE
 	}
 
-	bytes_written := unix.sys_write(int(fd), raw_data(data), len(data))
+	to_write := min(uint(len(data)), MAX_RW)
+
+	bytes_written := unix.sys_write(int(fd), raw_data(data), to_write)
 	if bytes_written < 0 {
 		return -1, _get_errno(bytes_written)
 	}
 	return bytes_written, ERROR_NONE
 }
+
 read_at :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Errno) {
 	if len(data) == 0 {
 		return 0, ERROR_NONE
 	}
 
-	bytes_read := unix.sys_pread(int(fd), raw_data(data), len(data), offset)
+	to_read := min(uint(len(data)), MAX_RW)
+
+	bytes_read := unix.sys_pread(int(fd), raw_data(data), to_read, offset)
 	if bytes_read < 0 {
 		return -1, _get_errno(bytes_read)
 	}
@@ -587,7 +625,9 @@ write_at :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Errno) {
 		return 0, ERROR_NONE
 	}
 
-	bytes_written := unix.sys_pwrite(int(fd), raw_data(data), uint(len(data)), offset)
+	to_write := min(uint(len(data)), MAX_RW)
+
+	bytes_written := unix.sys_pwrite(int(fd), raw_data(data), to_write, offset)
 	if bytes_written < 0 {
 		return -1, _get_errno(bytes_written)
 	}
@@ -850,8 +890,7 @@ absolute_path_from_relative :: proc(rel: string) -> (path: string, err: Errno) {
 	}
 	defer _unix_free(path_ptr)
 
-	path_cstr := transmute(cstring)path_ptr
-	path = strings.clone( string(path_cstr) )
+	path = strings.clone(string(cstring(path_ptr)))
 
 	return path, ERROR_NONE
 }
@@ -864,27 +903,6 @@ access :: proc(path: string, mask: int) -> (bool, Errno) {
 		return false, _get_errno(result)
 	}
 	return true, ERROR_NONE
-}
-
-heap_alloc :: proc(size: int, zero_memory := true) -> rawptr {
-	if size <= 0 {
-		return nil
-	}
-	if zero_memory {
-		return _unix_calloc(1, c.size_t(size))
-	} else {
-		return _unix_malloc(c.size_t(size))
-	}
-}
-
-heap_resize :: proc(ptr: rawptr, new_size: int) -> rawptr {
-	// NOTE: _unix_realloc doesn't guarantee new memory will be zeroed on
-	// POSIX platforms. Ensure your caller takes this into account.
-	return _unix_realloc(ptr, c.size_t(new_size))
-}
-
-heap_free :: proc(ptr: rawptr) {
-	_unix_free(ptr)
 }
 
 lookup_env :: proc(key: string, allocator := context.allocator) -> (value: string, found: bool) {

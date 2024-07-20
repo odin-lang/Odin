@@ -16,7 +16,7 @@ struct MPSCQueue {
 	std::atomic<isize> count;
 };
 
-template <typename T> gb_internal void  mpsc_init   (MPSCQueue<T> *q);
+template <typename T> gb_internal void  mpsc_init   (MPSCQueue<T> *q, gbAllocator const &allocator);
 template <typename T> gb_internal void  mpsc_destroy(MPSCQueue<T> *q);
 template <typename T> gb_internal isize mpsc_enqueue(MPSCQueue<T> *q, T const &value);
 template <typename T> gb_internal bool  mpsc_dequeue(MPSCQueue<T> *q, T *value_);

@@ -14,8 +14,8 @@
 #ifndef LLVM_C_LINKER_H
 #define LLVM_C_LINKER_H
 
-#include "llvm-c/ExternC.h"
-#include "llvm-c/Types.h"
+#include "ExternC.h"
+#include "Types.h"
 
 LLVM_C_EXTERN_C_BEGIN
 

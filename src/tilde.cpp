@@ -215,7 +215,7 @@ gb_internal void cg_set_debug_pos_from_node(cgProcedure *p, Ast *node) {
 		TokenPos pos = ast_token(node).pos;
 		TB_SourceFile **file = map_get(&p->module->file_id_map, cast(uintptr)pos.file_id);
 		if (file) {
-			tb_inst_set_location(p->func, *file, pos.line, pos.column);
+			tb_inst_location(p->func, *file, pos.line, pos.column);
 		}
 	}
 }
@@ -363,7 +363,6 @@ gb_internal bool cg_global_variables_create(cgModule *m, Array<cgGlobalVariable>
 		if (is_foreign) {
 			linkage = TB_LINKAGE_PUBLIC;
 			// lb_add_foreign_library_path(m, e->Variable.foreign_library);
-			// lb_set_wasm_import_attributes(g.value, e, name);
 		} else if (is_export) {
 			linkage = TB_LINKAGE_PUBLIC;
 		}
@@ -373,7 +372,7 @@ gb_internal bool cg_global_variables_create(cgModule *m, Array<cgGlobalVariable>
 		TB_Global *global = tb_global_create(m->mod, name.len, cast(char const *)name.text, debug_type, linkage);
 		cgValue g = cg_value(global, alloc_type_pointer(e->type));
 
-		TB_ModuleSection *section = tb_module_get_data(m->mod);
+		TB_ModuleSectionHandle section = tb_module_get_data(m->mod);
 
 		if (e->Variable.thread_local_model != "") {
 			section = tb_module_get_tls(m->mod);
@@ -726,6 +725,10 @@ gb_internal bool cg_generate_code(Checker *c, LinkerData *linker_data) {
 
 	linker_data_init(linker_data, info, c->parser->init_fullpath);
 
+	#if defined(GB_SYSTEM_OSX)
+		linker_enable_system_library_linking(linker_data);
+	#endif
+
 	cg_global_arena_init();
 
 	cgModule *m = cg_module_create(c);
@@ -821,6 +824,7 @@ gb_internal bool cg_generate_code(Checker *c, LinkerData *linker_data) {
 		case TargetOs_essence:
 		case TargetOs_freebsd:
 		case TargetOs_openbsd:
+		case TargetOs_haiku:
 			debug_format = TB_DEBUGFMT_DWARF;
 			break;
 		}

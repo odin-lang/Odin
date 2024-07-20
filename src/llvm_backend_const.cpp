@@ -94,9 +94,6 @@ gb_internal LLVMValueRef llvm_const_cast(LLVMValueRef val, LLVMTypeRef dst) {
 	LLVMTypeKind kind = LLVMGetTypeKind(dst);
 	switch (kind) {
 	case LLVMPointerTypeKind:
-		if (LB_USE_NEW_PASS_SYSTEM) {
-			return val;
-		}
 		return LLVMConstPointerCast(val, dst);
 	case LLVMStructTypeKind:
 		// GB_PANIC("%s -> %s", LLVMPrintValueToString(val), LLVMPrintTypeToString(dst));
@@ -287,11 +284,26 @@ gb_internal lbValue lb_expr_untyped_const_to_typed(lbModule *m, Ast *expr, Type 
 	return lb_const_value(m, t, tv.value);
 }
 
-gb_internal lbValue lb_const_source_code_location_const(lbModule *m, String const &procedure, TokenPos const &pos) {
+
+gb_internal lbValue lb_const_source_code_location_const(lbModule *m, String const &procedure_, TokenPos const &pos) {
+	String file = get_file_path_string(pos.file_id);
+	String procedure = procedure_;
+
+	i32 line   = pos.line;
+	i32 column = pos.column;
+
+	if (build_context.obfuscate_source_code_locations) {
+		file = obfuscate_string(file, "F");
+		procedure = obfuscate_string(procedure, "P");
+
+		line   = obfuscate_i32(line);
+		column = obfuscate_i32(column);
+	}
+
 	LLVMValueRef fields[4] = {};
-	fields[0]/*file*/      = lb_find_or_add_entity_string(m, get_file_path_string(pos.file_id)).value;
-	fields[1]/*line*/      = lb_const_int(m, t_i32, pos.line).value;
-	fields[2]/*column*/    = lb_const_int(m, t_i32, pos.column).value;
+	fields[0]/*file*/      = lb_find_or_add_entity_string(m, file).value;
+	fields[1]/*line*/      = lb_const_int(m, t_i32, line).value;
+	fields[2]/*column*/    = lb_const_int(m, t_i32, column).value;
 	fields[3]/*procedure*/ = lb_find_or_add_entity_string(m, procedure).value;
 
 	lbValue res = {};
@@ -325,6 +337,15 @@ gb_internal lbValue lb_emit_source_code_location_as_global_ptr(lbProcedure *p, S
 	lb_make_global_private_const(addr);
 	return addr.addr;
 }
+
+gb_internal lbValue lb_const_source_code_location_as_global_ptr(lbModule *m, String const &procedure, TokenPos const &pos) {
+	lbValue loc = lb_const_source_code_location_const(m, procedure, pos);
+	lbAddr addr = lb_add_global_generated(m, loc.type, loc, nullptr);
+	lb_make_global_private_const(addr);
+	return addr.addr;
+}
+
+
 
 
 gb_internal lbValue lb_emit_source_code_location_as_global_ptr(lbProcedure *p, Ast *node) {
@@ -412,6 +433,8 @@ gb_internal LLVMValueRef lb_big_int_to_llvm(lbModule *m, Type *original_type, Bi
 			rop[sz-1-i] = tmp;
 		}
 	}
+
+	GB_ASSERT(!is_type_array(original_type));
 
 	LLVMValueRef value = LLVMConstIntOfArbitraryPrecision(lb_type(m, original_type), cast(unsigned)((sz+7)/8), cast(u64 *)rop);
 	if (big_int_is_neg(a)) {
@@ -524,7 +547,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bo
 					LLVMValueRef ptr = LLVMBuildInBoundsGEP2(p->builder, llvm_type, array_data, indices, 2, "");
 					LLVMValueRef len = LLVMConstInt(lb_type(m, t_int), count, true);
 
-					lbAddr slice = lb_add_local_generated(p, type, false);
+					lbAddr slice = lb_add_local_generated(p, original_type, false);
 					map_set(&m->exact_value_compound_literal_addr_map, value.value_compound, slice);
 
 					lb_fill_slice(p, slice, {ptr, alloc_type_pointer(elem)}, {len, t_int});
@@ -697,9 +720,21 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bo
 		return res;
 	case ExactValue_Float:
 		if (is_type_different_to_arch_endianness(type)) {
-			u64 u = bit_cast<u64>(value.value_float);
-			u = gb_endian_swap64(u);
-			res.value = LLVMConstReal(lb_type(m, original_type), bit_cast<f64>(u));
+			if (type->Basic.kind == Basic_f32le || type->Basic.kind == Basic_f32be) {
+				f32 f = static_cast<float>(value.value_float);
+				u32 u = bit_cast<u32>(f);
+				u = gb_endian_swap32(u);
+				res.value = LLVMConstReal(lb_type(m, original_type), bit_cast<f32>(u));
+			} else if (type->Basic.kind == Basic_f16le || type->Basic.kind == Basic_f16be) {
+				f32 f = static_cast<float>(value.value_float);
+				u16 u = f32_to_f16(f);
+				u = gb_endian_swap16(u);
+				res.value = LLVMConstReal(lb_type(m, original_type), f16_to_f32(u));
+			} else {
+				u64 u = bit_cast<u64>(value.value_float);
+				u = gb_endian_swap64(u);
+				res.value = LLVMConstReal(lb_type(m, original_type), bit_cast<f64>(u));
+			}
 		} else {
 			res.value = LLVMConstReal(lb_type(m, original_type), value.value_float);
 		}
@@ -1269,11 +1304,11 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bo
 				GB_ASSERT_MSG(elem_count == max_count, "%td != %td", elem_count, max_count);
 
 				LLVMValueRef *values = gb_alloc_array(temporary_allocator(), LLVMValueRef, cast(isize)total_count);
-				
 				for_array(i, cl->elems) {
 					TypeAndValue tav = cl->elems[i]->tav;
 					GB_ASSERT(tav.mode != Addressing_Invalid);
-					i64 offset = matrix_row_major_index_to_offset(type, i);
+					i64 offset = 0;
+					offset = matrix_row_major_index_to_offset(type, i);
 					values[offset] = lb_const_value(m, elem_type, tav.value, allow_local).value;
 				}
 				for (isize i = 0; i < total_count; i++) {

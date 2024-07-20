@@ -1,4 +1,4 @@
-//+build linux, darwin, freebsd, openbsd
+//+build linux, darwin, freebsd, openbsd, netbsd, haiku
 package os
 
 import "core:time"

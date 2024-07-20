@@ -1,3 +1,5 @@
+package encoding_xml
+
 /*
 	An XML 1.0 / 1.1 parser
 
@@ -9,7 +11,7 @@
 	List of contributors:
 		Jeroen van Rijn: Initial implementation.
 */
-package xml
+
 
 import "core:io"
 import "core:fmt"
@@ -31,7 +33,7 @@ print :: proc(writer: io.Writer, doc: ^Document) -> (written: int, err: io.Error
 		written += fmt.wprintf(writer, "[DOCTYPE]  %v\n", doc.doctype.ident)
 
 		if len(doc.doctype.rest) > 0 {
-		 	fmt.wprintf(writer, "\t%v\n", doc.doctype.rest)
+			fmt.wprintf(writer, "\t%v\n", doc.doctype.rest)
 		}
 	}
 
@@ -40,10 +42,10 @@ print :: proc(writer: io.Writer, doc: ^Document) -> (written: int, err: io.Error
 	}
 
 	if len(doc.elements) > 0 {
-	 	fmt.wprintln(writer, " --- ")
-	 	print_element(writer, doc, 0)
-	 	fmt.wprintln(writer, " --- ")
-	 }
+		fmt.wprintln(writer, " --- ")
+		print_element(writer, doc, 0)
+		fmt.wprintln(writer, " --- ")
+	}
 
 	return written, .None
 }

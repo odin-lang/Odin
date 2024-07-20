@@ -1,12 +1,26 @@
 package stb_rect_pack
 
-import c "core:c/libc"
+import "core:c"
 
 #assert(size_of(b32) == size_of(c.int))
 
-when ODIN_OS == .Windows { foreign import lib "../lib/stb_rect_pack.lib" }
-when ODIN_OS == .Linux   { foreign import lib "../lib/stb_rect_pack.a"   }
-when ODIN_OS == .Darwin  { foreign import lib "../lib/darwin/stb_rect_pack.a"   }
+@(private)
+LIB :: (
+	     "../lib/stb_rect_pack.lib"      when ODIN_OS == .Windows
+	else "../lib/stb_rect_pack.a"        when ODIN_OS == .Linux
+	else "../lib/darwin/stb_rect_pack.a" when ODIN_OS == .Darwin
+	else ""
+)
+
+when LIB != "" {
+	when !#exists(LIB) {
+		#panic("Could not find the compiled STB libraries, they can be compiled by running `make -C \"" + ODIN_ROOT + "vendor/stb/src\"`")
+	}
+
+	foreign import lib { LIB }
+} else {
+	foreign import lib "system:stb_rect_pack"
+}
 
 Coord :: distinct c.int
 _MAXVAL :: max(Coord)

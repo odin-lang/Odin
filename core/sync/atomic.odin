@@ -1,6 +1,6 @@
 package sync
 
-import "core:intrinsics"
+import "base:intrinsics"
 
 cpu_relax :: intrinsics.cpu_relax
 

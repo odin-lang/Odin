@@ -1,8 +1,9 @@
 package linalg
 
 import "core:math"
-import "core:builtin"
-import "core:intrinsics"
+import "base:builtin"
+import "base:intrinsics"
+@require import "base:runtime"
 
 // Generic
 
@@ -66,11 +67,11 @@ quaternion256_dot :: proc "contextless" (a, b: $T/quaternion256) -> (c: f64) {
 dot :: proc{scalar_dot, vector_dot, quaternion64_dot, quaternion128_dot, quaternion256_dot}
 
 inner_product :: dot
-outer_product :: builtin.outer_product
+outer_product :: intrinsics.outer_product
 
 @(require_results)
 quaternion_inverse :: proc "contextless" (q: $Q) -> Q where IS_QUATERNION(Q) {
-	return conj(q) * quaternion(1.0/dot(q, q), 0, 0, 0)
+	return conj(q) * quaternion(w=1.0/dot(q, q), x=0, y=0, z=0)
 }
 
 
@@ -172,15 +173,24 @@ projection :: proc "contextless" (x, normal: $T/[$N]$E) -> T where IS_NUMERIC(E)
 }
 
 @(require_results)
-identity :: proc "contextless" ($T: typeid/[$N][N]$E) -> (m: T) #no_bounds_check {
+identity_array_based_matrix :: proc "contextless" ($T: typeid/[$N][N]$E) -> (m: T) #no_bounds_check {
 	for i in 0..<N {
 		m[i][i] = E(1)
 	}
 	return m
 }
 
-trace :: builtin.matrix_trace
-transpose :: builtin.transpose
+@(require_results)
+identity_matrix :: proc "contextless" ($T: typeid/matrix[$N, N]$E) -> T #no_bounds_check {
+	return 1
+}
+
+identity :: proc{
+	identity_array_based_matrix,
+	identity_matrix,
+}
+
+transpose :: intrinsics.transpose
 
 @(require_results)
 matrix_mul :: proc "contextless" (a, b: $M/matrix[$N, N]$E) -> (c: M)
@@ -214,33 +224,27 @@ quaternion_mul_quaternion :: proc "contextless" (q1, q2: $Q) -> Q where IS_QUATE
 
 @(require_results)
 quaternion64_mul_vector3 :: proc "contextless" (q: $Q/quaternion64, v: $V/[3]$F/f16) -> V {
-	Raw_Quaternion :: struct {xyz: [3]f16, r: f16}
+	q := transmute(runtime.Raw_Quaternion64_Vector_Scalar)q
+	v := v
 
-	q := transmute(Raw_Quaternion)q
-	v := transmute([3]f16)v
-
-	t := cross(2*q.xyz, v)
-	return V(v + q.r*t + cross(q.xyz, t))
+	t := cross(2*q.vector, v)
+	return V(v + q.scalar*t + cross(q.vector, t))
 }
 @(require_results)
 quaternion128_mul_vector3 :: proc "contextless" (q: $Q/quaternion128, v: $V/[3]$F/f32) -> V {
-	Raw_Quaternion :: struct {xyz: [3]f32, r: f32}
+	q := transmute(runtime.Raw_Quaternion128_Vector_Scalar)q
+	v := v
 
-	q := transmute(Raw_Quaternion)q
-	v := transmute([3]f32)v
-
-	t := cross(2*q.xyz, v)
-	return V(v + q.r*t + cross(q.xyz, t))
+	t := cross(2*q.vector, v)
+	return V(v + q.scalar*t + cross(q.vector, t))
 }
 @(require_results)
 quaternion256_mul_vector3 :: proc "contextless" (q: $Q/quaternion256, v: $V/[3]$F/f64) -> V {
-	Raw_Quaternion :: struct {xyz: [3]f64, r: f64}
+	q := transmute(runtime.Raw_Quaternion256_Vector_Scalar)q
+	v := v
 
-	q := transmute(Raw_Quaternion)q
-	v := transmute([3]f64)v
-
-	t := cross(2*q.xyz, v)
-	return V(v + q.r*t + cross(q.xyz, t))
+	t := cross(2*q.vector, v)
+	return V(v + q.scalar*t + cross(q.vector, t))
 }
 quaternion_mul_vector3 :: proc{quaternion64_mul_vector3, quaternion128_mul_vector3, quaternion256_mul_vector3}
 
@@ -268,11 +272,36 @@ to_ptr :: proc{vector_to_ptr, matrix_to_ptr}
 
 
 
+vector_angle_between :: proc "contextless" (a, b: $V/[$N]$E) -> E {
+	a0 := normalize0(a)
+	b0 := normalize0(b)
+	return math.acos(dot(a0, b0))
+}
+quaternion64_angle_between :: proc "contextless" (a, b: $Q/quaternion64) -> f16 {
+	c := normalize0(conj(a) * b)
+	return math.acos(c.w)
+}
+quaternion128_angle_between :: proc "contextless" (a, b: $Q/quaternion128) -> f32 {
+	c := normalize0(conj(a) * b)
+	return math.acos(c.w)
+}
+quaternion256_angle_between :: proc "contextless" (a, b: $Q/quaternion256) -> f64 {
+	c := normalize0(conj(a) * b)
+	return math.acos(c.w)
+}
+angle_between :: proc{
+	vector_angle_between,
+	quaternion64_angle_between,
+	quaternion128_angle_between,
+	quaternion256_angle_between,
+}
+
+
 
 // Splines
 
 @(require_results)
-vector_slerp :: proc "contextless" (x, y: $T/[$N]$E, a: E) -> T {
+vector_slerp :: proc "contextless" (x, y: $T/[$N]$E, a: E) -> T #no_bounds_check {
 	cos_alpha := dot(x, y)
 	alpha := math.acos(cos_alpha)
 	sin_alpha := math.sin(alpha)
@@ -284,7 +313,7 @@ vector_slerp :: proc "contextless" (x, y: $T/[$N]$E, a: E) -> T {
 }
 
 @(require_results)
-catmull_rom :: proc "contextless" (v1, v2, v3, v4: $T/[$N]$E, s: E) -> T {
+catmull_rom :: proc "contextless" (v1, v2, v3, v4: $T/[$N]$E, s: E) -> T #no_bounds_check {
 	s2 := s*s
 	s3 := s2*s
 
@@ -297,7 +326,7 @@ catmull_rom :: proc "contextless" (v1, v2, v3, v4: $T/[$N]$E, s: E) -> T {
 }
 
 @(require_results)
-hermite :: proc "contextless" (v1, t1, v2, t2: $T/[$N]$E, s: E) -> T {
+hermite :: proc "contextless" (v1, t1, v2, t2: $T/[$N]$E, s: E) -> T #no_bounds_check {
 	s2 := s*s
 	s3 := s2*s
 
@@ -310,7 +339,7 @@ hermite :: proc "contextless" (v1, t1, v2, t2: $T/[$N]$E, s: E) -> T {
 }
 
 @(require_results)
-cubic :: proc "contextless" (v1, v2, v3, v4: $T/[$N]$E, s: E) -> T {
+cubic :: proc "contextless" (v1, v2, v3, v4: $T/[$N]$E, s: E) -> T #no_bounds_check {
 	return ((v1 * s + v2) * s + v3) * s + v4
 }
 
@@ -355,3 +384,273 @@ matrix_cast :: proc "contextless" (v: $A/matrix[$M, $N]$T, $Elem_Type: typeid) -
 @(require_results) to_quaternion64  :: #force_inline proc(v: $A/[$N]$T) -> [N]quaternion64  { return array_cast(v, quaternion64)  }
 @(require_results) to_quaternion128 :: #force_inline proc(v: $A/[$N]$T) -> [N]quaternion128 { return array_cast(v, quaternion128) }
 @(require_results) to_quaternion256 :: #force_inline proc(v: $A/[$N]$T) -> [N]quaternion256 { return array_cast(v, quaternion256) }
+
+
+hadamard_product :: intrinsics.hadamard_product
+matrix_flatten   :: intrinsics.matrix_flatten
+
+
+determinant :: proc{
+	matrix1x1_determinant,
+	matrix2x2_determinant,
+	matrix3x3_determinant,
+	matrix4x4_determinant,
+}
+
+adjugate :: proc{
+	matrix1x1_adjugate,
+	matrix2x2_adjugate,
+	matrix3x3_adjugate,
+	matrix4x4_adjugate,
+}
+
+inverse_transpose :: proc{
+	matrix1x1_inverse_transpose,
+	matrix2x2_inverse_transpose,
+	matrix3x3_inverse_transpose,
+	matrix4x4_inverse_transpose,
+}
+
+
+inverse :: proc{
+	matrix1x1_inverse,
+	matrix2x2_inverse,
+	matrix3x3_inverse,
+	matrix4x4_inverse,
+}
+
+@(require_results)
+hermitian_adjoint :: proc "contextless" (m: $M/matrix[$N, N]$T) -> M where intrinsics.type_is_complex(T), N >= 1 #no_bounds_check {
+	return conj(transpose(m))
+}
+
+@(require_results)
+trace :: proc "contextless" (m: $M/matrix[$N, N]$T) -> (trace: T) #no_bounds_check {
+	for i in 0..<N {
+		trace += m[i, i]
+	}
+	return
+}
+
+@(require_results)
+matrix_minor :: proc "contextless" (m: $M/matrix[$N, N]$T, #any_int row, column: int) -> (minor: T) where N > 1 #no_bounds_check {
+	K :: int(N-1)
+	cut_down: matrix[K, K]T
+	for col_idx in 0..<K {
+		j := col_idx + int(col_idx >= column)
+		for row_idx in 0..<K {
+			i := row_idx + int(row_idx >= row)
+			cut_down[row_idx, col_idx] = m[i, j]
+		}
+	}
+	return determinant(cut_down)
+}
+
+
+
+@(require_results)
+matrix1x1_determinant :: proc "contextless" (m: $M/matrix[1, 1]$T) -> (det: T) #no_bounds_check {
+	return m[0, 0]
+}
+
+@(require_results)
+matrix2x2_determinant :: proc "contextless" (m: $M/matrix[2, 2]$T) -> (det: T) #no_bounds_check {
+	return m[0, 0]*m[1, 1] - m[0, 1]*m[1, 0]
+}
+@(require_results)
+matrix3x3_determinant :: proc "contextless" (m: $M/matrix[3, 3]$T) -> (det: T) #no_bounds_check {
+	a := +m[0, 0] * (m[1, 1] * m[2, 2] - m[1, 2] * m[2, 1])
+	b := -m[0, 1] * (m[1, 0] * m[2, 2] - m[1, 2] * m[2, 0])
+	c := +m[0, 2] * (m[1, 0] * m[2, 1] - m[1, 1] * m[2, 0])
+	return a + b + c
+}
+@(require_results)
+matrix4x4_determinant :: proc "contextless" (m: $M/matrix[4, 4]$T) -> (det: T) #no_bounds_check {
+	a := adjugate(m)
+	for i in 0..<4 {
+		det += m[0, i] * a[0, i]
+	}
+	return
+}
+
+
+
+
+@(require_results)
+matrix1x1_adjugate :: proc "contextless" (x: $M/matrix[1, 1]$T) -> (y: M) #no_bounds_check {
+	y = x
+	return
+}
+
+@(require_results)
+matrix2x2_adjugate :: proc "contextless" (x: $M/matrix[2, 2]$T) -> (y: M) #no_bounds_check {
+	y[0, 0] = +x[1, 1]
+	y[0, 1] = -x[1, 0]
+	y[1, 0] = -x[0, 1]
+	y[1, 1] = +x[0, 0]
+	return
+}
+
+@(require_results)
+matrix3x3_adjugate :: proc "contextless" (m: $M/matrix[3, 3]$T) -> (y: M) #no_bounds_check {
+	y[0, 0] = +(m[1, 1] * m[2, 2] - m[2, 1] * m[1, 2])
+	y[0, 1] = -(m[1, 0] * m[2, 2] - m[2, 0] * m[1, 2])
+	y[0, 2] = +(m[1, 0] * m[2, 1] - m[2, 0] * m[1, 1])
+	y[1, 0] = -(m[0, 1] * m[2, 2] - m[2, 1] * m[0, 2])
+	y[1, 1] = +(m[0, 0] * m[2, 2] - m[2, 0] * m[0, 2])
+	y[1, 2] = -(m[0, 0] * m[2, 1] - m[2, 0] * m[0, 1])
+	y[2, 0] = +(m[0, 1] * m[1, 2] - m[1, 1] * m[0, 2])
+	y[2, 1] = -(m[0, 0] * m[1, 2] - m[1, 0] * m[0, 2])
+	y[2, 2] = +(m[0, 0] * m[1, 1] - m[1, 0] * m[0, 1])
+	return
+}
+
+
+@(require_results)
+matrix4x4_adjugate :: proc "contextless" (x: $M/matrix[4, 4]$T) -> (y: M) #no_bounds_check {
+	for i in 0..<4 {
+		for j in 0..<4 {
+			sign: T = 1 if (i + j) % 2 == 0 else -1
+			y[i, j] = sign * matrix_minor(x, i, j)
+		}
+	}
+	return
+}
+
+@(require_results)
+matrix1x1_inverse_transpose :: proc "contextless" (x: $M/matrix[1, 1]$T) -> (y: M) #no_bounds_check {
+	y[0, 0] = 1/x[0, 0]
+	return
+}
+
+@(require_results)
+matrix2x2_inverse_transpose :: proc "contextless" (x: $M/matrix[2, 2]$T) -> (y: M) #no_bounds_check {
+	d := x[0, 0]*x[1, 1] - x[0, 1]*x[1, 0]
+	when intrinsics.type_is_integer(T) {
+		y[0, 0] = +x[1, 1] / d
+		y[1, 0] = -x[0, 1] / d
+		y[0, 1] = -x[1, 0] / d
+		y[1, 1] = +x[0, 0] / d
+	} else {
+		id := 1 / d
+		y[0, 0] = +x[1, 1] * id
+		y[1, 0] = -x[0, 1] * id
+		y[0, 1] = -x[1, 0] * id
+		y[1, 1] = +x[0, 0] * id
+	}
+	return
+}
+
+@(require_results)
+matrix3x3_inverse_transpose :: proc "contextless" (x: $M/matrix[3, 3]$T) -> (y: M) #no_bounds_check {
+	a := adjugate(x)
+	d := determinant(x)
+	when intrinsics.type_is_integer(T) {
+		for i in 0..<3 {
+			for j in 0..<3 {
+				y[i, j] = a[i, j] / d
+			}
+		}
+	} else {
+		id := 1/d
+		for i in 0..<3 {
+			for j in 0..<3 {
+				y[i, j] = a[i, j] * id
+			}
+		}
+	}
+	return
+}
+
+@(require_results)
+matrix4x4_inverse_transpose :: proc "contextless" (x: $M/matrix[4, 4]$T) -> (y: M) #no_bounds_check {
+	a := adjugate(x)
+	d: T
+	for i in 0..<4 {
+		d += x[0, i] * a[0, i]
+	}
+	when intrinsics.type_is_integer(T) {
+		for i in 0..<4 {
+			for j in 0..<4 {
+				y[i, j] = a[i, j] / d
+			}
+		}
+	} else {
+		id := 1/d
+		for i in 0..<4 {
+			for j in 0..<4 {
+				y[i, j] = a[i, j] * id
+			}
+		}
+	}
+	return
+}
+
+@(require_results)
+matrix1x1_inverse :: proc "contextless" (x: $M/matrix[1, 1]$T) -> (y: M) #no_bounds_check {
+	y[0, 0] = 1/x[0, 0]
+	return
+}
+
+@(require_results)
+matrix2x2_inverse :: proc "contextless" (x: $M/matrix[2, 2]$T) -> (y: M) #no_bounds_check {
+	d := x[0, 0]*x[1, 1] - x[0, 1]*x[1, 0]
+	when intrinsics.type_is_integer(T) {
+		y[0, 0] = +x[1, 1] / d
+		y[0, 1] = -x[0, 1] / d
+		y[1, 0] = -x[1, 0] / d
+		y[1, 1] = +x[0, 0] / d
+	} else {
+		id := 1 / d
+		y[0, 0] = +x[1, 1] * id
+		y[0, 1] = -x[0, 1] * id
+		y[1, 0] = -x[1, 0] * id
+		y[1, 1] = +x[0, 0] * id
+	}
+	return
+}
+
+@(require_results)
+matrix3x3_inverse :: proc "contextless" (x: $M/matrix[3, 3]$T) -> (y: M) #no_bounds_check {
+	a := adjugate(x)
+	d := determinant(x)
+	when intrinsics.type_is_integer(T) {
+		for i in 0..<3 {
+			for j in 0..<3 {
+				y[i, j] = a[j, i] / d
+			}
+		}
+	} else {
+		id := 1/d
+		for i in 0..<3 {
+			for j in 0..<3 {
+				y[i, j] = a[j, i] * id
+			}
+		}
+	}
+	return
+}
+
+@(require_results)
+matrix4x4_inverse :: proc "contextless" (x: $M/matrix[4, 4]$T) -> (y: M) #no_bounds_check {
+	a := adjugate(x)
+	d: T
+	for i in 0..<4 {
+		d += x[0, i] * a[0, i]
+	}
+	when intrinsics.type_is_integer(T) {
+		for i in 0..<4 {
+			for j in 0..<4 {
+				y[i, j] = a[j, i] / d
+			}
+		}
+	} else {
+		id := 1/d
+		for i in 0..<4 {
+			for j in 0..<4 {
+				y[i, j] = a[j, i] * id
+			}
+		}
+	}
+	return
+}

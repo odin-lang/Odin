@@ -12,8 +12,6 @@
 
 package math_big
 
-import rnd "core:math/rand"
-
 /*
 	Determines if an Integer is divisible by one of the _PRIME_TABLE primes.
 	Returns true if it is, false if not. 
@@ -44,7 +42,7 @@ internal_int_prime_is_divisible :: proc(a: ^Int, allocator := context.allocator)
 	Computes res == G**X mod P.
 	Assumes `res`, `G`, `X` and `P` to not be `nil` and for `G`, `X` and `P` to have been initialized.
 */
-internal_int_exponent_mod :: proc(res, G, X, P: ^Int, allocator := context.allocator) -> (err: Error) {
+internal_int_power_modulo :: proc(res, G, X, P: ^Int, allocator := context.allocator) -> (err: Error) {
 	context.allocator = allocator
 
 	dr: int
@@ -112,6 +110,9 @@ internal_int_exponent_mod :: proc(res, G, X, P: ^Int, allocator := context.alloc
 	*/
 	return _private_int_exponent_mod(res, G, X, P, 0)
 }
+internal_int_exponent_mod :: internal_int_power_modulo
+internal_int_powmod :: internal_int_power_modulo
+internal_powmod :: proc { internal_int_power_modulo, }
 
 /*
 	Kronecker/Legendre symbol (a|p)
@@ -312,7 +313,7 @@ internal_int_prime_miller_rabin :: proc(a, b: ^Int, allocator := context.allocat
 
 	Assumes `a` not to be `nil` and to have been initialized.
 */
-internal_int_is_prime :: proc(a: ^Int, miller_rabin_trials := int(-1), miller_rabin_only := USE_MILLER_RABIN_ONLY, r: ^rnd.Rand = nil, allocator := context.allocator) -> (is_prime: bool, err: Error) {
+internal_int_is_prime :: proc(a: ^Int, miller_rabin_trials := int(-1), miller_rabin_only := USE_MILLER_RABIN_ONLY, allocator := context.allocator) -> (is_prime: bool, err: Error) {
 	context.allocator = allocator
 	miller_rabin_trials := miller_rabin_trials
 
@@ -458,7 +459,7 @@ internal_int_is_prime :: proc(a: ^Int, miller_rabin_trials := int(-1), miller_ra
 		for ix := 0; ix < miller_rabin_trials; ix += 1 {
 
 			// rand() guarantees the first digit to be non-zero
-			internal_random(b, _DIGIT_TYPE_BITS, r) or_return
+			internal_random(b, _DIGIT_TYPE_BITS) or_return
 
 			// Reduce digit before casting because DIGIT might be bigger than
 			// an unsigned int and "mask" on the other side is most probably not.
@@ -1109,7 +1110,7 @@ internal_int_prime_next_prime :: proc(a: ^Int, trials: int, bbs_style: bool, all
 		Generate the restable.
 	*/
 	for x := 1; x < _PRIME_TAB_SIZE; x += 1 {
-		res_tab = internal_mod(a, _private_prime_table[x]) or_return
+		res_tab = cast(type_of(res_tab))(internal_mod(a, _private_prime_table[x]) or_return)
 	}
 
 	for {
@@ -1180,13 +1181,10 @@ internal_int_prime_next_prime :: proc(a: ^Int, trials: int, bbs_style: bool, all
 
 	This is possibly the mother of all prime generation functions, muahahahahaha!
 */
-internal_random_prime :: proc(a: ^Int, size_in_bits: int, trials: int, flags := Primality_Flags{}, r: ^rnd.Rand = nil, allocator := context.allocator) -> (err: Error) {
+internal_random_prime :: proc(a: ^Int, size_in_bits: int, trials: int, flags := Primality_Flags{}, allocator := context.allocator) -> (err: Error) {
 	context.allocator = allocator
 	flags  := flags
 	trials := trials
-
-	t := &Int{}
-	defer internal_destroy(t)
 
 	/*
 		Sanity check the input.
@@ -1244,6 +1242,20 @@ internal_random_prime :: proc(a: ^Int, size_in_bits: int, trials: int, flags := 
 			a.digit[0] |= 3
 		}
 		if .Second_MSB_On in flags {
+			/*
+				Ensure there's enough space for the bit to be set.
+			*/
+			if a.used * _DIGIT_BITS < size_in_bits - 1 {
+				new_size := (size_in_bits - 1) / _DIGIT_BITS
+
+				if new_size % _DIGIT_BITS > 0 {
+					new_size += 1
+				}
+
+				internal_grow(a, new_size) or_return
+				a.used = new_size
+			}
+
 			internal_int_bitfield_set_single(a, size_in_bits - 2) or_return
 		}
 

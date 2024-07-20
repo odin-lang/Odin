@@ -80,14 +80,14 @@ _unwrap_os_addr :: proc "contextless" (endpoint: Endpoint)->(linux.Sock_Addr_Any
 			ipv4 = {
 				sin_family = .INET,
 				sin_port = u16be(endpoint.port),
-				sin_addr = transmute([4]u8) endpoint.address.(IP4_Address),
+				sin_addr = ([4]u8)(endpoint.address.(IP4_Address)),
 			},
 		}
 	case IP6_Address:
 		return {
 			ipv6 = {
 				sin6_port = u16be(endpoint.port),
-				sin6_addr = transmute([16]u8) endpoint.address.(IP6_Address),
+				sin6_addr = transmute([16]u8)endpoint.address.(IP6_Address),
 				sin6_family = .INET6,
 			},
 		}
@@ -117,7 +117,7 @@ _wrap_os_addr :: proc "contextless" (addr: linux.Sock_Addr_Any)->(Endpoint) {
 _create_socket :: proc(family: Address_Family, protocol: Socket_Protocol) -> (Any_Socket, Network_Error) {
 	family := _unwrap_os_family(family)
 	proto, socktype := _unwrap_os_proto_socktype(protocol)
-	sock, errno := linux.socket(family, socktype, {}, proto)
+	sock, errno := linux.socket(family, socktype, {.CLOEXEC}, proto)
 	if errno != .NONE {
 		return {}, Create_Socket_Error(errno)
 	}
@@ -132,7 +132,7 @@ _dial_tcp_from_endpoint :: proc(endpoint: Endpoint, options := default_tcp_optio
 	}
 	// Create new TCP socket
 	os_sock: linux.Fd
-	os_sock, errno = linux.socket(_unwrap_os_family(family_from_endpoint(endpoint)), .STREAM, {}, .TCP)
+	os_sock, errno = linux.socket(_unwrap_os_family(family_from_endpoint(endpoint)), .STREAM, {.CLOEXEC}, .TCP)
 	if errno != .NONE {
 		// TODO(flysand): should return invalid file descriptor here casted as TCP_Socket
 		return {}, Create_Socket_Error(errno)
@@ -172,7 +172,7 @@ _listen_tcp :: proc(endpoint: Endpoint, backlog := 1000) -> (TCP_Socket, Network
 	ep_address := _unwrap_os_addr(endpoint)
 	// Create TCP socket
 	os_sock: linux.Fd
-	os_sock, errno = linux.socket(ep_family, .STREAM, {}, .TCP)
+	os_sock, errno = linux.socket(ep_family, .STREAM, {.CLOEXEC}, .TCP)
 	if errno != .NONE {
 		// TODO(flysand): should return invalid file descriptor here casted as TCP_Socket
 		return {}, Create_Socket_Error(errno)
@@ -258,8 +258,12 @@ _send_tcp :: proc(tcp_sock: TCP_Socket, buf: []byte) -> (int, Network_Error) {
 	for total_written < len(buf) {
 		limit := min(int(max(i32)), len(buf) - total_written)
 		remaining := buf[total_written:][:limit]
-		res, errno := linux.send(linux.Fd(tcp_sock), remaining, {})
-		if errno != .NONE {
+		res, errno := linux.send(linux.Fd(tcp_sock), remaining, {.NOSIGNAL})
+		if errno == .EPIPE {
+			// If the peer is disconnected when we are trying to send we will get an `EPIPE` error,
+			// so we turn that into a clearer error
+			return total_written, TCP_Send_Error.Connection_Closed
+		} else if errno != .NONE {
 			return total_written, TCP_Send_Error(errno)
 		}
 		total_written += int(res)
@@ -373,9 +377,9 @@ _set_blocking :: proc(sock: Any_Socket, should_block: bool) -> (err: Network_Err
 		return Set_Blocking_Error(errno)
 	}
 	if should_block {
-		flags &= ~{.NONBLOCK}
+		flags -= {.NONBLOCK}
 	} else {
-		flags |= {.NONBLOCK}
+		flags += {.NONBLOCK}
 	}
 	errno = linux.fcntl(os_sock, linux.F_SETFL, flags)
 	if errno != .NONE {

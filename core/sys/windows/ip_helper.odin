@@ -217,7 +217,7 @@ NL_DAD_STATE :: enum i32 {
 	IpDadStatePreferred  = 4,
 }
 
-@(default_calling_convention = "std")
+@(default_calling_convention = "system")
 foreign iphlpapi {
 	/*
 		The GetAdaptersAddresses function retrieves the addresses associated with the adapters on the local computer.

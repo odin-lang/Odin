@@ -159,7 +159,7 @@ roll_from_quaternion_f16 :: proc "contextless" (q: Quaternionf16) -> f16 {
 
 @(require_results)
 pitch_from_quaternion_f16 :: proc "contextless" (q: Quaternionf16) -> f16 {
-	y := 2 * (q.y*q.z + q.w*q.w)
+	y := 2 * (q.y*q.z + q.w*q.x)
 	x := q.w*q.w - q.x*q.x - q.y*q.y + q.z*q.z
 
 	if abs(x) <= F16_EPSILON && abs(y) <= F16_EPSILON {

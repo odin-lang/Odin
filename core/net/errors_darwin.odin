@@ -34,7 +34,7 @@ Create_Socket_Error :: enum c.int {
 
 Dial_Error :: enum c.int {
 	None                      = 0,
-	Port_Required             = -1,
+	Port_Required             = -1, // Attempted to dial an endpointing without a port being set.
 
 	Address_In_Use            = c.int(os.EADDRINUSE),
 	In_Progress               = c.int(os.EINPROGRESS),
@@ -54,7 +54,9 @@ Dial_Error :: enum c.int {
 }
 
 Bind_Error :: enum c.int {
-	None                    = 0,
+	None                         = 0,
+	Privileged_Port_Without_Root = -1, // Attempted to bind to a port less than 1024 without root access.
+
 	Address_In_Use          = c.int(os.EADDRINUSE),    // Another application is currently bound to this endpoint.
 	Given_Nonlocal_Address  = c.int(os.EADDRNOTAVAIL), // The address is not a local address on this machine.
 	Broadcast_Disabled      = c.int(os.EACCES),        // To bind a UDP socket to the broadcast address, the appropriate socket option must be set.

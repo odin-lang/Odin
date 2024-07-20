@@ -30,7 +30,7 @@ when ODIN_OS == .Windows {
 		resolv_conf        = "",
 		hosts_file         = "%WINDIR%\\system32\\drivers\\etc\\hosts",
 	}
-} else when ODIN_OS == .Linux || ODIN_OS == .Darwin || ODIN_OS == .OpenBSD {
+} else when ODIN_OS == .Linux || ODIN_OS == .Darwin || ODIN_OS == .OpenBSD || ODIN_OS == .NetBSD {
 	DEFAULT_DNS_CONFIGURATION :: DNS_Configuration{
 		resolv_conf        = "/etc/resolv.conf",
 		hosts_file         = "/etc/hosts",
@@ -816,7 +816,6 @@ parse_response :: proc(response: []u8, filter: DNS_Record_Type = nil, allocator 
 
 		dq_sz :: 4
 		hn_sz := skip_hostname(response, cur_idx) or_return
-		dns_query := mem.slice_data_cast([]u16be, response[cur_idx+hn_sz:cur_idx+hn_sz+dq_sz])
 
 		cur_idx += hn_sz + dq_sz
 	}

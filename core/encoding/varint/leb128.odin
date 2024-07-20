@@ -8,7 +8,7 @@
 
 // package varint implements variable length integer encoding and decoding using
 // the LEB128 format as used by DWARF debug info, Android .dex and other file formats.
-package varint
+package encoding_varint
 
 // In theory we should use the bigint package. In practice, varints bigger than this indicate a corrupted file.
 // Instead we'll set limits on the values we'll encode/decode

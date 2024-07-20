@@ -67,7 +67,7 @@ foreign libc {
 	crealf  :: proc(z: complex_float) -> float ---
 }
 
-import builtin "core:builtin"
+import builtin "base:builtin"
 
 complex_float  :: distinct builtin.complex64
 complex_double :: distinct builtin.complex128

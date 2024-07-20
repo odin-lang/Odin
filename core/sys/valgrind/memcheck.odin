@@ -1,7 +1,7 @@
 //+build amd64
 package sys_valgrind
 
-import "core:intrinsics"
+import "base:intrinsics"
 
 Mem_Check_Client_Request :: enum uintptr {
 	Make_Mem_No_Access = 'M'<<24 | 'C'<<16,

@@ -6,7 +6,7 @@ package text_edit
 		* https://rxi.github.io/a_simple_undo_system.html
 */
 
-import "core:runtime"
+import "base:runtime"
 import "core:time"
 import "core:mem"
 import "core:strings"
@@ -137,6 +137,9 @@ clear_all :: proc(s: ^State) -> (cleared: bool) {
 
 // push current text state to the wanted undo|redo stack
 undo_state_push :: proc(s: ^State, undo: ^[dynamic]^Undo_State) -> mem.Allocator_Error {
+	if s.builder != nil {
+		return nil
+	}
 	text := string(s.builder.buf[:])
 	item := (^Undo_State)(mem.alloc(size_of(Undo_State) + len(text), align_of(Undo_State), s.undo_text_allocator) or_return)
 	item.selection = s.selection
@@ -154,7 +157,7 @@ undo :: proc(s: ^State, undo, redo: ^[dynamic]^Undo_State) {
 		undo_state_push(s, redo)
 		item := pop(undo)
 		s.selection = item.selection
-		#no_bounds_check {
+		#no_bounds_check if s.builder != nil {
 			strings.builder_reset(s.builder)
 			strings.write_string(s.builder, string(item.text[:item.len]))
 		}
@@ -180,16 +183,17 @@ undo_check :: proc(s: ^State) {
 }
 
 // insert text into the edit state - deletes the current selection
-input_text :: proc(s: ^State, text: string) {
+input_text :: proc(s: ^State, text: string) -> int {
 	if len(text) == 0 {
-		return
+		return 0
 	}
 	if has_selection(s) {
 		selection_delete(s)
 	}
-	insert(s, s.selection[0], text)
-	offset := s.selection[0] + len(text)
+	n := insert(s, s.selection[0], text)
+	offset := s.selection[0] + n
 	s.selection = {offset, offset}
+	return n
 }
 
 // insert slice of runes into the edit state - deletes the current selection
@@ -203,8 +207,11 @@ input_runes :: proc(s: ^State, text: []rune) {
 	offset := s.selection[0]
 	for r in text {
 		b, w := utf8.encode_rune(r)
-		insert(s, offset, string(b[:w]))
-		offset += w
+		n := insert(s, offset, string(b[:w]))
+		offset += n
+		if n != w {
+			break
+		}
 	}
 	s.selection = {offset, offset}
 }
@@ -216,21 +223,37 @@ input_rune :: proc(s: ^State, r: rune) {
 	}
 	offset := s.selection[0]
 	b, w := utf8.encode_rune(r)
-	insert(s, offset, string(b[:w]))
-	offset += w
+	n := insert(s, offset, string(b[:w]))
+	offset += n
 	s.selection = {offset, offset}
 }
 
 // insert a single rune into the edit state - deletes the current selection
-insert :: proc(s: ^State, at: int, text: string) {
+insert :: proc(s: ^State, at: int, text: string) -> int {
 	undo_check(s)
-	inject_at(&s.builder.buf, at, text)
+	if s.builder != nil {
+		if ok, _ := inject_at(&s.builder.buf, at, text); !ok {
+			n := cap(s.builder.buf) - len(s.builder.buf)
+			assert(n < len(text))
+			for is_continuation_byte(text[n]) {
+				n -= 1
+			}
+			if ok2, _ := inject_at(&s.builder.buf, at, text[:n]); !ok2 {
+				n = 0
+			}
+			return n
+		}
+		return len(text)
+	}
+	return 0
 }
 
 // remove the wanted range withing, usually the selection within byte indices
 remove :: proc(s: ^State, lo, hi: int) {
 	undo_check(s)
-	remove_range(&s.builder.buf, lo, hi)
+	if s.builder != nil {
+		remove_range(&s.builder.buf, lo, hi)
+	}
 }
 
 // true if selection head and tail dont match and form a selection of multiple characters
@@ -244,8 +267,8 @@ has_selection :: proc(s: ^State) -> bool {
 sorted_selection :: proc(s: ^State) -> (lo, hi: int) {
 	lo = min(s.selection[0], s.selection[1])
 	hi = max(s.selection[0], s.selection[1])
-	lo = clamp(lo, 0, len(s.builder.buf))
-	hi = clamp(hi, 0, len(s.builder.buf))
+	lo = clamp(lo, 0, len(s.builder.buf) if s.builder != nil else 0)
+	hi = clamp(hi, 0, len(s.builder.buf) if s.builder != nil else 0)
 	return
 }
 
@@ -256,16 +279,20 @@ selection_delete :: proc(s: ^State) {
 	s.selection = {lo, lo}
 }
 
+is_continuation_byte :: proc(b: byte) -> bool {
+	return b >= 0x80 && b < 0xc0
+}
+
 // translates the caret position 
 translate_position :: proc(s: ^State, t: Translation) -> int {
-	is_continuation_byte :: proc(b: byte) -> bool {
-		return b >= 0x80 && b < 0xc0
-	}
 	is_space :: proc(b: byte) -> bool {
 		return b == ' ' || b == '\t' || b == '\n'
 	}
 
-	buf := s.builder.buf[:]
+	buf: []byte
+	if s.builder != nil {
+		buf = s.builder.buf[:]
+	}
 	pos := clamp(s.selection[0], 0, len(buf))
 
 	switch t {
@@ -352,7 +379,10 @@ delete_to :: proc(s: ^State, t: Translation) {
 // return the currently selected text
 current_selected_text :: proc(s: ^State) -> string {
 	lo, hi := sorted_selection(s)
-	return string(s.builder.buf[lo:hi])
+	if s.builder != nil {
+		return string(s.builder.buf[lo:hi])
+	}
+	return ""
 }
 
 // copy & delete the current selection when copy() succeeds
@@ -431,7 +461,7 @@ perform_command :: proc(s: ^State, cmd: Command) {
 	case .Cut:               cut(s)
 	case .Copy:              copy(s)
 	case .Paste:             paste(s)
-	case .Select_All:        s.selection = {len(s.builder.buf), 0}
+	case .Select_All:        s.selection = {len(s.builder.buf) if s.builder != nil else 0, 0}
 	case .Backspace:         delete_to(s, .Left)
 	case .Delete:            delete_to(s, .Right)
 	case .Delete_Word_Left:  delete_to(s, .Word_Left)

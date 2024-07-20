@@ -45,18 +45,18 @@ accept_ranges := [5]Accept_Range{
 	{0x80, 0x8f},
 }
 
-accept_sizes := [256]u8{
-	0x00..=0x7f = 0xf0,
-	0x80..=0xc1 = 0xf1,
-	0xc2..=0xdf = 0x02,
-	0xe0        = 0x13,
-	0xe1..=0xec = 0x03,
-	0xed        = 0x23,
-	0xee..=0xef = 0x03,
-	0xf0        = 0x34,
-	0xf1..=0xf3 = 0x04,
-	0xf4        = 0x44,
-	0xf5..=0xff = 0xf1,
+accept_sizes :=  [256]u8{
+	0x00..=0x7f = 0xf0, // ascii,    size 1
+	0x80..=0xc1 = 0xf1, // invalid,  size 1
+	0xc2..=0xdf = 0x02, // accept 1, size 2
+	0xe0        = 0x13, // accept 1, size 3
+	0xe1..=0xec = 0x03, // accept 0, size 3
+	0xed        = 0x23, // accept 2, size 3
+	0xee..=0xef = 0x03, // accept 0, size 3
+	0xf0        = 0x34, // accept 3, size 4
+	0xf1..=0xf3 = 0x04, // accept 0, size 4
+	0xf4        = 0x44, // accept 4, size 4
+	0xf5..=0xff = 0xf1, // ascii,    size 1
 }
 
 encode_rune :: proc "contextless" (c: rune) -> ([4]u8, int) {
@@ -385,7 +385,7 @@ full_rune_in_bytes :: proc "contextless" (b: []byte) -> bool {
 	if n == 0 {
 		return false
 	}
-	x := _first[b[0]]
+	x := accept_sizes[b[0]]
 	if n >= int(x & 7) {
 		return true
 	}
@@ -402,19 +402,4 @@ full_rune_in_bytes :: proc "contextless" (b: []byte) -> bool {
 // An invalid encoding is considered a full rune since it will convert as an error rune of width 1 (RUNE_ERROR)
 full_rune_in_string :: proc "contextless" (s: string) -> bool {
 	return full_rune_in_bytes(transmute([]byte)s)
-}
-
-
-_first := [256]u8{
-	0x00..=0x7f = 0xf0, // ascii,    size 1
-	0x80..=0xc1 = 0xf1, // invalid,  size 1
-	0xc2..=0xdf = 0x02, // accept 1, size 2
-	0xe0        = 0x13, // accept 1, size 3
-	0xe1..=0xec = 0x03, // accept 0, size 3
-	0xed        = 0x23, // accept 2, size 3
-	0xee..=0xef = 0x03, // accept 0, size 3
-	0xf0        = 0x34, // accept 3, size 4
-	0xf1..=0xf3 = 0x04, // accept 0, size 4
-	0xf4        = 0x44, // accept 4, size 4
-	0xf5..=0xff = 0xf1, // ascii,    size 1
 }

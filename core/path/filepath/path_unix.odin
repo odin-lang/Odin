@@ -1,13 +1,13 @@
-//+build linux, darwin, freebsd, openbsd
+//+build linux, darwin, freebsd, openbsd, netbsd
 package filepath
 
 when ODIN_OS == .Darwin {
-	foreign import libc "System.framework"
+	foreign import libc "system:System.framework"
 } else {
 	foreign import libc "system:c"
 }
 
-import "core:runtime"
+import "base:runtime"
 import "core:strings"
 
 SEPARATOR :: '/'
@@ -56,12 +56,12 @@ foreign libc {
 	@(link_name="free") _unix_free :: proc(ptr: rawptr) ---
 
 }
-when ODIN_OS == .Darwin {
+when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD {
 	@(private)
 	foreign libc {
 		@(link_name="__error")          __error :: proc() -> ^i32 ---
 	}
-} else when ODIN_OS == .OpenBSD {
+} else when ODIN_OS == .OpenBSD || ODIN_OS == .NetBSD {
 	@(private)
 	foreign libc {
 		@(link_name="__errno")		__error :: proc() -> ^i32 ---

@@ -2,28 +2,28 @@
 package os2
 
 import win32 "core:sys/windows"
-import "core:runtime"
-import "core:strings"
+import "base:runtime"
 
-_Path_Separator      :: '\\'
-_Path_List_Separator :: ';'
+_Path_Separator        :: '\\'
+_Path_Separator_String :: "\\"
+_Path_List_Separator   :: ';'
 
 _is_path_separator :: proc(c: byte) -> bool {
 	return c == '\\' || c == '/'
 }
 
-_mkdir :: proc(name: string, perm: File_Mode) -> Error {
+_mkdir :: proc(name: string, perm: int) -> Error {
 	if !win32.CreateDirectoryW(_fix_long_path(name), nil) {
 		return _get_platform_error()
 	}
 	return nil
 }
 
-_mkdir_all :: proc(path: string, perm: File_Mode) -> Error {
+_mkdir_all :: proc(path: string, perm: int) -> Error {
 	fix_root_directory :: proc(p: string) -> (s: string, allocated: bool, err: runtime.Allocator_Error) {
 		if len(p) == len(`\\?\c:`) {
 			if is_path_separator(p[0]) && is_path_separator(p[1]) && p[2] == '?' && is_path_separator(p[3]) && p[5] == ':' {
-				s = strings.concatenate({p, `\`}, _file_allocator()) or_return
+				s = concatenate({p, `\`}, file_allocator()) or_return
 				allocated = true
 				return
 			}
@@ -31,9 +31,11 @@ _mkdir_all :: proc(path: string, perm: File_Mode) -> Error {
 		return p, false, nil
 	}
 
-	dir, err := stat(path, _temp_allocator())
+	TEMP_ALLOCATOR_GUARD()
+
+	dir_stat, err := stat(path, temp_allocator())
 	if err == nil {
-		if dir.is_dir {
+		if dir_stat.type == .Directory {
 			return nil
 		}
 		return .Exist
@@ -52,15 +54,15 @@ _mkdir_all :: proc(path: string, perm: File_Mode) -> Error {
 	if j > 1 {
 		new_path, allocated := fix_root_directory(path[:j-1]) or_return
 		defer if allocated {
-			delete(new_path, _file_allocator())
+			delete(new_path, file_allocator())
 		}
 		mkdir_all(new_path, perm) or_return
 	}
 
 	err = mkdir(path, perm)
 	if err != nil {
-		dir1, err1 := lstat(path, _temp_allocator())
-		if err1 == nil && dir1.is_dir {
+		new_dir_stat, err1 := lstat(path, temp_allocator())
+		if err1 == nil && new_dir_stat.type == .Directory {
 			return nil
 		}
 		return err
@@ -83,7 +85,6 @@ _setwd :: proc(dir: string) -> (err: Error) {
 	return nil
 }
 
-
 can_use_long_paths: bool
 
 @(init)
@@ -94,7 +95,6 @@ init_long_path_support :: proc() {
 	can_use_long_paths = false
 }
 
-
 _fix_long_path_slice :: proc(path: string) -> []u16 {
 	return win32.utf8_to_utf16(_fix_long_path_internal(path))
 }
@@ -102,7 +102,6 @@ _fix_long_path_slice :: proc(path: string) -> []u16 {
 _fix_long_path :: proc(path: string) -> win32.wstring {
 	return win32.utf8_to_wstring(_fix_long_path_internal(path))
 }
-
 
 _fix_long_path_internal :: proc(path: string) -> string {
 	if can_use_long_paths {
@@ -125,8 +124,10 @@ _fix_long_path_internal :: proc(path: string) -> string {
 		return path
 	}
 
+	TEMP_ALLOCATOR_GUARD()
+
 	PREFIX :: `\\?`
-	path_buf := make([]byte, len(PREFIX)+len(path)+1, _temp_allocator())
+	path_buf := make([]byte, len(PREFIX)+len(path)+1, temp_allocator())
 	copy(path_buf, PREFIX)
 	n := len(path)
 	r, w := 0, len(PREFIX)
@@ -158,5 +159,4 @@ _fix_long_path_internal :: proc(path: string) -> string {
 	}
 
 	return string(path_buf[:w])
-
 }

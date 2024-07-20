@@ -40,7 +40,7 @@ when ODIN_OS == .FreeBSD {
 	ERANGE :: 34
 }
 
-when ODIN_OS == .OpenBSD {
+when ODIN_OS == .OpenBSD || ODIN_OS == .NetBSD {
 	@(private="file")
 	@(default_calling_convention="c")
 	foreign libc {
@@ -78,6 +78,24 @@ when ODIN_OS == .Darwin {
 	EDOM   :: 33
 	EILSEQ :: 92
 	ERANGE :: 34
+}
+
+when ODIN_OS == .Haiku {
+	@(private="file")
+	@(default_calling_convention="c")
+	foreign libc {
+		@(link_name="_errnop")
+		_get_errno :: proc() -> ^int ---
+	}
+
+	@(private="file")
+	B_GENERAL_ERROR_BASE :: min(i32)
+	@(private="file")
+	B_POSIX_ERROR_BASE   :: B_GENERAL_ERROR_BASE + 0x7000
+
+	EDOM   :: B_POSIX_ERROR_BASE + 16
+	EILSEQ :: B_POSIX_ERROR_BASE + 38
+	ERANGE :: B_POSIX_ERROR_BASE + 17
 }
 
 // Odin has no way to make an identifier "errno" behave as a function call to

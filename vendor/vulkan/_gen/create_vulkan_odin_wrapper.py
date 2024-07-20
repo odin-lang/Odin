@@ -94,15 +94,13 @@ def convert_type(t, prev_name, curr_name):
     if t == "":
         return t
 
+    if t.startswith("const"):
+        t = convert_type(t[6:], prev_name, curr_name)
+
     elif t.endswith("*"):
-        elem = ""
         pointer = "^"
-        if t.startswith("const"):
-            ttype = t[6:len(t)-1]
-            elem = convert_type(ttype, prev_name, curr_name)
-        else:
-            ttype = t[:len(t)-1]
-            elem = convert_type(ttype, prev_name, curr_name)
+        ttype = t[:len(t)-1]
+        elem = convert_type(ttype, prev_name, curr_name)    
 
         if curr_name.endswith("s") or curr_name.endswith("Table"):
             if prev_name.endswith("Count") or prev_name.endswith("Counts"):
@@ -522,26 +520,53 @@ def parse_structs(f):
     data += re.findall(r"typedef (struct|union) Std(\w+?) {(.+?)} \w+?;", src, re.S)
 
     for _type, name, fields in data:
-        fields = re.findall(r"\s+(.+?)\s+([_a-zA-Z0-9[\]]+);", fields)
+        fields = re.findall(r"\s+(.+?)[\s:]+([_a-zA-Z0-9[\]]+);", fields)
         f.write("{} :: struct ".format(name))
         if _type == "union":
             f.write("#raw_union ")
         f.write("{\n")
 
+
         prev_name = ""
         ffields = []
         for type_, fname in fields:
 
-            # If the typename has a colon in it, then it is a C bit field.
-            if ":" in type_:
+            # If the field name only has a number in it, then it is a C bit field.
+            if is_int(fname):
+                comment = None
                 bit_field = type_.split(' ')
                 # Get rid of empty spaces
                 bit_field = list(filter(bool, bit_field))
-                # [type, typename, :] 
-                assert len(bit_field) == 3, "Failed to parse the bit field!"
-                bit_field_type = do_type(bit_field[0], prev_name, fname)
-                f.write("\tbit_field: {},{}\n".format(bit_field_type, comment or ""))
-                break
+                # [type, fieldname]
+                assert len(bit_field) == 2, "Failed to parse the bit field!"
+
+
+                bit_field_type = ""
+                # Right now there are only two ways that C bit fields exist in
+                # the header files.
+
+                # First one uses the 8 MOST significant bits for one field, and
+                # 24 bits for the other field.
+                # In the bindings these two fields are merged into one u32.
+                if int(fname) == 24:
+                    prev_name = bit_field[1]
+                    continue
+
+                elif prev_name:
+                    bit_field_type = do_type("uint32_t")
+                    bit_field_name = prev_name + "And" + bit_field[1].capitalize()
+                    comment = " // Most significant byte is {}".format(bit_field[1])
+                    ffields.append(tuple([bit_field_name, bit_field_type, comment]))
+                    prev_name = ""
+                    continue
+                
+                # The second way has many fields that are each 1 bit
+                elif int(fname) == 1:
+                    bit_field_type = do_type(bit_field[0], prev_name, fname)
+                    ffields.append(tuple(["bitfield", bit_field_type, comment]))
+                    break
+                    
+
 
             if '[' in fname:
                 fname, type_ = parse_array(fname, type_)
@@ -598,12 +623,14 @@ def parse_procedures(f):
 
     for rt, name, fields in data:
         proc_name = no_vk(name)
-
         pf = []
         prev_name = ""
-        for type_, fname in re.findall(r"(?:\s*|)(.+?)\s*(\w+)(?:,|$)", fields):
+        for type_, fname, array_len in re.findall(r"(?:\s*|)(.+?)\s*(\w+)(?:\[(\d+)\])?(?:,|$)", fields):
             curr_name = fix_arg(fname)
-            pf.append((do_type(type_, prev_name, curr_name), curr_name))
+            ty = do_type(type_, prev_name, curr_name)
+            if array_len != "":
+                ty = f"^[{array_len}]{ty}"
+            pf.append((ty, curr_name))
             prev_name = curr_name
 
         data_fields = ', '.join(["{}: {}".format(n, t) for t, n in pf if t != ""])
@@ -771,7 +798,7 @@ API_VERSION_1_2 :: (1<<22) | (2<<12) | (0)
 API_VERSION_1_3 :: (1<<22) | (3<<12) | (0)
 
 MAKE_VERSION :: proc(major, minor, patch: u32) -> u32 {
-    return (major<<22) | (minor<<12) | (patch)
+\treturn (major<<22) | (minor<<12) | (patch)
 }
 
 // Base types

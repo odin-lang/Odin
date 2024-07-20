@@ -2,7 +2,7 @@
 package wasm_js_interface
 
 import "core:mem"
-import "core:intrinsics"
+import "base:intrinsics"
 
 PAGE_SIZE :: 64 * 1024
 page_alloc :: proc(page_count: int) -> (data: []byte, err: mem.Allocator_Error) {
@@ -24,7 +24,7 @@ page_allocator :: proc() -> mem.Allocator {
 		case .Alloc, .Alloc_Non_Zeroed:
 			assert(size % PAGE_SIZE == 0)
 			return page_alloc(size/PAGE_SIZE)
-		case .Resize, .Free, .Free_All, .Query_Info:
+		case .Resize, .Free, .Free_All, .Query_Info, .Resize_Non_Zeroed:
 			return nil, .Mode_Not_Implemented
 		case .Query_Features:
 			set := (^mem.Allocator_Mode_Set)(old_memory)

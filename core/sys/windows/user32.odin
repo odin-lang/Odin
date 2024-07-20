@@ -1,9 +1,10 @@
 // +build windows
 package sys_windows
 
+import "base:intrinsics"
 foreign import user32 "system:User32.lib"
 
-@(default_calling_convention="stdcall")
+@(default_calling_convention="system")
 foreign user32 {
 	GetClassInfoW :: proc(hInstance: HINSTANCE, lpClassNAme: LPCWSTR, lpWndClass: ^WNDCLASSW) -> BOOL ---
 	GetClassInfoExW :: proc(hInsatnce: HINSTANCE, lpszClass: LPCWSTR, lpwcx: ^WNDCLASSEXW) -> BOOL ---
@@ -15,6 +16,18 @@ foreign user32 {
 	SetWindowLongW :: proc(hWnd: HWND, nIndex: c_int, dwNewLong: LONG) -> LONG ---
 
 	GetClassNameW :: proc(hWnd: HWND, lpClassName: LPWSTR, nMaxCount: c_int) -> c_int ---
+
+	GetParent :: proc(hWnd: HWND) -> HWND ---
+	IsWindowVisible :: proc(hWnd: HWND) -> BOOL ---
+	SetWinEventHook :: proc(
+		eventMin, eventMax: DWORD,
+		hmodWinEventProc: HMODULE,
+		pfnWinEvenProc: WINEVENTPROC,
+		idProcess, idThread: DWORD,
+		dwFlags: WinEventFlags,
+	) -> HWINEVENTHOOK ---
+
+	IsChild :: proc(hWndParent, hWnd: HWND) -> BOOL ---
 
 	RegisterClassW :: proc(lpWndClass: ^WNDCLASSW) -> ATOM ---
 	RegisterClassExW :: proc(^WNDCLASSEXW) -> ATOM ---
@@ -46,6 +59,7 @@ foreign user32 {
 	UpdateWindow :: proc(hWnd: HWND) -> BOOL ---
 	SetActiveWindow :: proc(hWnd: HWND) -> HWND ---
 	GetActiveWindow :: proc() -> HWND ---
+	RedrawWindow :: proc(hwnd: HWND, lprcUpdate: LPRECT, hrgnUpdate: HRGN, flags: RedrawWindowFlags) -> BOOL ---
 
 	GetMessageW :: proc(lpMsg: ^MSG, hWnd: HWND, wMsgFilterMin: UINT, wMsgFilterMax: UINT) -> BOOL ---
 
@@ -53,6 +67,7 @@ foreign user32 {
 	DispatchMessageW :: proc(lpMsg: ^MSG) -> LRESULT ---
 
 	WaitMessage :: proc() -> BOOL ---
+	MsgWaitForMultipleObjects :: proc(nCount: DWORD, pHandles: ^HANDLE, fWaitAll: bool, dwMilliseconds: DWORD, dwWakeMask: DWORD) -> DWORD ---
 
 	PeekMessageA :: proc(lpMsg: ^MSG, hWnd: HWND, wMsgFilterMin: UINT, wMsgFilterMax: UINT, wRemoveMsg: UINT) -> BOOL ---
 	PeekMessageW :: proc(lpMsg: ^MSG, hWnd: HWND, wMsgFilterMin: UINT, wMsgFilterMax: UINT, wRemoveMsg: UINT) -> BOOL ---
@@ -82,6 +97,14 @@ foreign user32 {
 	LoadCursorA :: proc(hInstance: HINSTANCE, lpCursorName: LPCSTR) -> HCURSOR ---
 	LoadCursorW :: proc(hInstance: HINSTANCE, lpCursorName: LPCWSTR) -> HCURSOR ---
 	LoadImageW :: proc(hInst: HINSTANCE, name: LPCWSTR, type: UINT, cx: c_int, cy: c_int, fuLoad: UINT) -> HANDLE ---
+
+	CreateIcon :: proc(hInstance: HINSTANCE, nWidth: c_int, nHeight: c_int, cPlanes: BYTE, cBitsPixel: BYTE, lpbANDbits: PBYTE, lpbXORbits: PBYTE) -> HICON ---
+	CreateIconFromResource :: proc(presbits: PBYTE, dwResSize: DWORD, fIcon: BOOL, dwVer: DWORD) -> HICON ---
+	DestroyIcon :: proc(hIcon: HICON) -> BOOL ---
+	DrawIcon :: proc(hDC: HDC, X: c_int, Y: c_int, hIcon: HICON) -> BOOL ---
+
+	CreateCursor :: proc(hInst: HINSTANCE, xHotSpot: c_int, yHotSpot: c_int, nWidth: c_int, nHeight: c_int, pvANDPlane: PVOID, pvXORPlane: PVOID) -> HCURSOR ---
+	DestroyCursor :: proc(hCursor: HCURSOR) -> BOOL ---
 
 	GetWindowRect :: proc(hWnd: HWND, lpRect: LPRECT) -> BOOL ---
 	GetClientRect :: proc(hWnd: HWND, lpRect: LPRECT) -> BOOL ---
@@ -115,6 +138,7 @@ foreign user32 {
 	CreatePopupMenu :: proc() -> HMENU ---
 	DestroyMenu :: proc(hMenu: HMENU) -> BOOL ---
 	AppendMenuW :: proc(hMenu: HMENU, uFlags: UINT, uIDNewItem: UINT_PTR, lpNewItem: LPCWSTR) -> BOOL ---
+	SetMenu :: proc(hWnd: HWND, hMenu: HMENU) -> BOOL ---
 	TrackPopupMenu :: proc(hMenu: HMENU, uFlags: UINT, x: int, y: int, nReserved: int, hWnd: HWND, prcRect: ^RECT) -> i32 ---
 	RegisterWindowMessageW :: proc(lpString: LPCWSTR) -> UINT ---
 
@@ -132,7 +156,7 @@ foreign user32 {
 
 	GetKeyState :: proc(nVirtKey: c_int) -> SHORT ---
 	GetAsyncKeyState :: proc(vKey: c_int) -> SHORT ---
-	
+
 	GetKeyboardState :: proc(lpKeyState: PBYTE) -> BOOL ---
 
 	MapVirtualKeyW :: proc(uCode: UINT, uMapType: UINT) -> UINT ---
@@ -154,6 +178,9 @@ foreign user32 {
 	GetCursorPos :: proc(lpPoint: LPPOINT) -> BOOL ---
 	SetCursorPos :: proc(X: c_int, Y: c_int) -> BOOL ---
 	SetCursor :: proc(hCursor: HCURSOR) -> HCURSOR ---
+	when !intrinsics.is_package_imported("raylib") {
+		ShowCursor :: proc(bShow: BOOL) -> INT ---
+	}
 
 	EnumDisplaySettingsW :: proc(lpszDeviceName: LPCWSTR, iModeNum: DWORD, lpDevMode: ^DEVMODEW) -> BOOL ---
 
@@ -161,7 +188,7 @@ foreign user32 {
 	MonitorFromRect   :: proc(lprc: LPRECT, dwFlags: Monitor_From_Flags) -> HMONITOR ---
 	MonitorFromWindow :: proc(hwnd: HWND, dwFlags: Monitor_From_Flags) -> HMONITOR ---
 	EnumDisplayMonitors :: proc(hdc: HDC, lprcClip: LPRECT, lpfnEnum: Monitor_Enum_Proc, dwData: LPARAM) -> BOOL ---
-	
+
 	EnumWindows :: proc(lpEnumFunc: Window_Enum_Proc, lParam: LPARAM) -> BOOL ---
 
 	SetThreadDpiAwarenessContext :: proc(dpiContext: DPI_AWARENESS_CONTEXT) -> DPI_AWARENESS_CONTEXT ---
@@ -234,9 +261,12 @@ foreign user32 {
 
 	GetSystemMenu :: proc(hWnd: HWND, bRevert: BOOL) -> HMENU ---
 	EnableMenuItem :: proc(hMenu: HMENU, uIDEnableItem: UINT, uEnable: UINT) -> BOOL ---
+
+	DrawTextW :: proc(hdc: HDC, lpchText: LPCWSTR, cchText: INT, lprc: LPRECT, format: DrawTextFormat) -> INT ---
+	DrawTextExW :: proc(hdc: HDC, lpchText: LPCWSTR, cchText: INT, lprc: LPRECT, format: DrawTextFormat, lpdtp: PDRAWTEXTPARAMS) -> INT ---
 }
 
-CreateWindowW :: #force_inline proc "stdcall" (
+CreateWindowW :: #force_inline proc "system" (
 	lpClassName: LPCTSTR,
 	lpWindowName: LPCTSTR,
 	dwStyle: DWORD,
@@ -266,7 +296,7 @@ CreateWindowW :: #force_inline proc "stdcall" (
 }
 
 when ODIN_ARCH == .amd64 {
-	@(default_calling_convention="stdcall")
+	@(default_calling_convention="system")
 	foreign user32 {
 		GetClassLongPtrW :: proc(hWnd: HWND, nIndex: c_int) -> ULONG_PTR ---
 		SetClassLongPtrW :: proc(hWnd: HWND, nIndex: c_int, dwNewLong: LONG_PTR) -> ULONG_PTR ---
@@ -312,8 +342,8 @@ Monitor_From_Flags :: enum DWORD {
 	MONITOR_DEFAULTTONEAREST = 0x00000002, // Returns a handle to the display monitor that is nearest to the window
 }
 
-Monitor_Enum_Proc :: #type proc "stdcall" (HMONITOR, HDC, LPRECT, LPARAM) -> BOOL
-Window_Enum_Proc :: #type proc "stdcall" (HWND, LPARAM) -> BOOL
+Monitor_Enum_Proc :: #type proc "system" (HMONITOR, HDC, LPRECT, LPARAM) -> BOOL
+Window_Enum_Proc :: #type proc "system" (HWND, LPARAM) -> BOOL
 
 USER_DEFAULT_SCREEN_DPI                    :: 96
 DPI_AWARENESS_CONTEXT                      :: distinct HANDLE
@@ -338,9 +368,9 @@ RAWHID :: struct {
 
 RAWMOUSE :: struct {
 	usFlags: USHORT,
-	DUMMYUNIONNAME: struct #raw_union {
+	using DUMMYUNIONNAME: struct #raw_union {
 		ulButtons: ULONG,
-		DUMMYSTRUCTNAME: struct {
+		using DUMMYSTRUCTNAME: struct {
 			usButtonFlags: USHORT,
 			usButtonData: USHORT,
 		},
@@ -416,7 +446,7 @@ RID_DEVICE_INFO_MOUSE :: struct {
 RID_DEVICE_INFO :: struct {
 	cbSize: DWORD,
 	dwType: DWORD,
-	DUMMYUNIONNAME: struct #raw_union {
+	using DUMMYUNIONNAME: struct #raw_union {
 		mouse: RID_DEVICE_INFO_MOUSE,
 		keyboard: RID_DEVICE_INFO_KEYBOARD,
 		hid: RID_DEVICE_INFO_HID,
@@ -437,9 +467,20 @@ RIDEV_DEVNOTIFY :: 0x00002000
 RID_HEADER :: 0x10000005
 RID_INPUT :: 0x10000003
 
+RIDI_PREPARSEDDATA :: 0x20000005
+RIDI_DEVICENAME :: 0x20000007
+RIDI_DEVICEINFO :: 0x2000000b
+
 RIM_TYPEMOUSE :: 0
 RIM_TYPEKEYBOARD :: 1
 RIM_TYPEHID :: 2
+
+RI_KEY_MAKE :: 0
+RI_KEY_BREAK :: 1
+RI_KEY_E0 :: 2
+RI_KEY_E1 :: 4
+RI_KEY_TERMSRV_SET_LED :: 8
+RI_KEY_TERMSRV_SHADOW :: 0x10
 
 MOUSE_MOVE_RELATIVE :: 0x00
 MOUSE_MOVE_ABSOLUTE :: 0x01
@@ -488,3 +529,63 @@ WINDOWINFO :: struct {
 	wCreatorVersion: WORD,
 }
 PWINDOWINFO :: ^WINDOWINFO
+
+DRAWTEXTPARAMS :: struct {
+	cbSize: UINT,
+	iTabLength: int,
+	iLeftMargin: int,
+	iRightMargin: int,
+	uiLengthDrawn: UINT,
+}
+PDRAWTEXTPARAMS :: ^DRAWTEXTPARAMS
+
+DrawTextFormat :: enum UINT {
+	DT_TOP                  = 0x00000000,
+	DT_LEFT                 = 0x00000000,
+	DT_CENTER               = 0x00000001,
+	DT_RIGHT                = 0x00000002,
+	DT_VCENTER              = 0x00000004,
+	DT_BOTTOM               = 0x00000008,
+	DT_WORDBREAK            = 0x00000010,
+	DT_SINGLELINE           = 0x00000020,
+	DT_EXPANDTABS           = 0x00000040,
+	DT_TABSTOP              = 0x00000080,
+	DT_NOCLIP               = 0x00000100,
+	DT_EXTERNALLEADING      = 0x00000200,
+	DT_CALCRECT             = 0x00000400,
+	DT_NOPREFIX             = 0x00000800,
+	DT_INTERNAL             = 0x00001000,
+	DT_EDITCONTROL          = 0x00002000,
+	DT_PATH_ELLIPSIS        = 0x00004000,
+	DT_END_ELLIPSIS         = 0x00008000,
+	DT_MODIFYSTRING         = 0x00010000,
+	DT_RTLREADING           = 0x00020000,
+	DT_WORD_ELLIPSIS        = 0x00040000,
+	DT_NOFULLWIDTHCHARBREAK = 0x00080000,
+	DT_HIDEPREFIX           = 0x00100000,
+	DT_PREFIXONLY           = 0x00200000,
+}
+
+RedrawWindowFlags :: enum UINT {
+	RDW_INVALIDATE      = 0x0001,
+	RDW_INTERNALPAINT   = 0x0002,
+	RDW_ERASE           = 0x0004,
+	RDW_VALIDATE        = 0x0008,
+	RDW_NOINTERNALPAINT = 0x0010,
+	RDW_NOERASE         = 0x0020,
+	RDW_NOCHILDREN      = 0x0040,
+	RDW_ALLCHILDREN     = 0x0080,
+	RDW_UPDATENOW       = 0x0100,
+	RDW_ERASENOW        = 0x0200,
+	RDW_FRAME           = 0x0400,
+	RDW_NOFRAME         = 0x0800,
+}
+
+// OUTOFCONTEXT is the zero value, use {}
+WinEventFlags :: bit_set[WinEventFlag; DWORD]
+
+WinEventFlag :: enum DWORD {
+    SKIPOWNTHREAD  = 0,
+    SKIPOWNPROCESS = 1,
+    INCONTEXT      = 2,
+}

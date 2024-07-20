@@ -1,7 +1,7 @@
 package math_big
 
-import "core:builtin"
-import "core:intrinsics"
+import "base:builtin"
+import "base:intrinsics"
 import "core:math"
 
 Rat :: struct {

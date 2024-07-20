@@ -1,4 +1,4 @@
-package gzip
+package compress_gzip
 
 /*
 	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.

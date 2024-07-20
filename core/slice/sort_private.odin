@@ -1,7 +1,7 @@
 //+private
 package slice
 
-import "core:intrinsics"
+import "base:intrinsics"
 _ :: intrinsics
 
 ORD :: intrinsics.type_is_ordered

@@ -26,11 +26,11 @@ struct OdinDocWriter {
 
 	StringMap<OdinDocString> string_cache;
 
-	PtrMap<AstFile *,    OdinDocFileIndex>   file_cache;
-	PtrMap<AstPackage *, OdinDocPkgIndex>    pkg_cache;
-	PtrMap<Entity *,     OdinDocEntityIndex> entity_cache;
-	PtrMap<Type *,       OdinDocTypeIndex>   type_cache;
-	PtrMap<Type *,       Type *>             stable_type_cache;
+	OrderedInsertPtrMap<AstFile *,    OdinDocFileIndex>   file_cache;
+	OrderedInsertPtrMap<AstPackage *, OdinDocPkgIndex>    pkg_cache;
+	OrderedInsertPtrMap<Entity *,     OdinDocEntityIndex> entity_cache;
+	OrderedInsertPtrMap<Type *,       OdinDocTypeIndex>   type_cache;
+	OrderedInsertPtrMap<Type *,       Type *>             stable_type_cache;
 
 	OdinDocWriterItemTracker<OdinDocFile>   files;
 	OdinDocWriterItemTracker<OdinDocPkg>    pkgs;
@@ -57,11 +57,11 @@ gb_internal void odin_doc_writer_prepare(OdinDocWriter *w) {
 
 	string_map_init(&w->string_cache);
 
-	map_init(&w->file_cache);
-	map_init(&w->pkg_cache);
-	map_init(&w->entity_cache);
-	map_init(&w->type_cache);
-	map_init(&w->stable_type_cache);
+	map_init(&w->file_cache,        1<<10);
+	map_init(&w->pkg_cache,         1<<10);
+	map_init(&w->entity_cache,      1<<18);
+	map_init(&w->type_cache,        1<<18);
+	map_init(&w->stable_type_cache, 1<<18);
 
 	odin_doc_writer_item_tracker_init(&w->files,    1);
 	odin_doc_writer_item_tracker_init(&w->pkgs,     1);
@@ -485,6 +485,13 @@ gb_internal OdinDocTypeIndex odin_doc_type(OdinDocWriter *w, Type *type) {
 		return 0;
 	}
 
+	if (type->kind == Type_Named) {
+		Entity *e = type->Named.type_name;
+		if (e->TypeName.is_type_alias) {
+			type = type->Named.base;
+		}
+	}
+
 	// Type **mapped_type = map_get(&w->stable_type_cache, type); // may map to itself
 	// if (mapped_type && *mapped_type) {
 	// 	type = *mapped_type;
@@ -505,13 +512,6 @@ gb_internal OdinDocTypeIndex odin_doc_type(OdinDocWriter *w, Type *type) {
 
 		if (!x | !y) {
 			continue;
-		}
-
-		if (x->kind == Type_Named) {
-			Entity *e = x->Named.type_name;
-			if (e->TypeName.is_type_alias) {
-				x = x->Named.base;
-			}
 		}
 		if (y->kind == Type_Named) {
 			Entity *e = y->Named.type_name;
@@ -615,6 +615,20 @@ gb_internal OdinDocTypeIndex odin_doc_type(OdinDocWriter *w, Type *type) {
 			doc_type.types = odin_write_slice(w, types, gb_count_of(types));
 		}
 		break;
+	case Type_BitField:
+		doc_type.kind = OdinDocType_BitField;
+		{
+			auto fields = array_make<OdinDocEntityIndex>(heap_allocator(), type->BitField.fields.count);
+			defer (array_free(&fields));
+
+			for_array(i, type->BitField.fields) {
+				fields[i] = odin_doc_add_entity(w, type->BitField.fields[i]);
+			}
+			doc_type.entities = odin_write_slice(w, fields.data, fields.count);
+			doc_type.types = odin_doc_type_as_slice(w, type->BitField.backing_type);
+		}
+		break;
+
 	case Type_Struct:
 		doc_type.kind = OdinDocType_Struct;
 		if (type->Struct.soa_kind != StructSoa_None) {
@@ -863,6 +877,10 @@ gb_internal OdinDocEntityIndex odin_doc_add_entity(OdinDocWriter *w, Entity *e) 
 		}
 		break;
 	case Entity_Variable:
+		if (e->flags & EntityFlag_BitFieldField) {
+			flags |= OdinDocEntityFlag_BitField_Field;
+		}
+
 		if (e->Variable.is_foreign) { flags |= OdinDocEntityFlag_Foreign; }
 		if (e->Variable.is_export)  { flags |= OdinDocEntityFlag_Export;  }
 		if (e->Variable.thread_local_model != "") {
@@ -873,7 +891,12 @@ gb_internal OdinDocEntityIndex odin_doc_add_entity(OdinDocWriter *w, Entity *e) 
 		if (init_expr == nullptr) {
 			init_expr = e->Variable.init_expr;
 		}
-		field_group_index = e->Variable.field_group_index;
+
+		if (e->flags & EntityFlag_BitFieldField) {
+			field_group_index = -cast(i32)e->Variable.bit_field_bit_size;
+		} else {
+			field_group_index = e->Variable.field_group_index;
+		}
 		break;
 	case Entity_Constant:
 		field_group_index = e->Constant.field_group_index;
@@ -902,11 +925,13 @@ gb_internal OdinDocEntityIndex odin_doc_add_entity(OdinDocWriter *w, Entity *e) 
 		break;
 	}
 
-	if (e->flags & EntityFlag_Using)      { flags |= OdinDocEntityFlag_Param_Using;    }
-	if (e->flags & EntityFlag_ConstInput) { flags |= OdinDocEntityFlag_Param_Const;    }
-	if (e->flags & EntityFlag_Ellipsis)   { flags |= OdinDocEntityFlag_Param_Ellipsis; }
-	if (e->flags & EntityFlag_NoAlias)    { flags |= OdinDocEntityFlag_Param_NoAlias;  }
-	if (e->flags & EntityFlag_AnyInt)     { flags |= OdinDocEntityFlag_Param_AnyInt;   }
+	if (e->flags & EntityFlag_Using)       { flags |= OdinDocEntityFlag_Param_Using;       }
+	if (e->flags & EntityFlag_ConstInput)  { flags |= OdinDocEntityFlag_Param_Const;       }
+	if (e->flags & EntityFlag_Ellipsis)    { flags |= OdinDocEntityFlag_Param_Ellipsis;    }
+	if (e->flags & EntityFlag_NoAlias)     { flags |= OdinDocEntityFlag_Param_NoAlias;     }
+	if (e->flags & EntityFlag_AnyInt)      { flags |= OdinDocEntityFlag_Param_AnyInt;      }
+	if (e->flags & EntityFlag_ByPtr)       { flags |= OdinDocEntityFlag_Param_ByPtr;       }
+	if (e->flags & EntityFlag_NoBroadcast) { flags |= OdinDocEntityFlag_Param_NoBroadcast; }
 
 	if (e->scope && (e->scope->flags & (ScopeFlag_File|ScopeFlag_Pkg)) && !is_entity_exported(e)) {
 		flags |= OdinDocEntityFlag_Private;
@@ -962,9 +987,8 @@ gb_internal void odin_doc_update_entities(OdinDocWriter *w) {
 		auto entities = array_make<Entity *>(heap_allocator(), 0, w->entity_cache.count);
 		defer (array_free(&entities));
 
-		for (u32 i = 0; i < w->entity_cache.count; i++) {
-			Entity *e = w->entity_cache.entries[i].key;
-			array_add(&entities, e);
+		for (auto const &entry : w->entity_cache) {
+			array_add(&entities, entry.key);
 		}
 		for (Entity *e : entities) {
 			GB_ASSERT(e != nullptr);
@@ -973,9 +997,9 @@ gb_internal void odin_doc_update_entities(OdinDocWriter *w) {
 		}
 	}
 
-	for (u32 i = 0; i < w->entity_cache.count; i++) {
-		Entity *e = w->entity_cache.entries[i].key;
-		OdinDocEntityIndex entity_index = w->entity_cache.entries[i].value;
+	for (auto const &entry : w->entity_cache) {
+		Entity *e = entry.key;
+		OdinDocEntityIndex entity_index = entry.value;
 		OdinDocTypeIndex type_index = odin_doc_type(w, e->type);
 
 		OdinDocEntityIndex foreign_library = 0;
@@ -1084,7 +1108,7 @@ gb_internal void odin_doc_write_docs(OdinDocWriter *w) {
 	}
 
 	debugf("odin_doc_update_entities sort pkgs %s\n", w->state ? "preparing" : "writing");
-	gb_sort_array(pkgs.data, pkgs.count, cmp_ast_package_by_name);
+	array_sort(pkgs, cmp_ast_package_by_name);
 
 	for_array(i, pkgs) {
 		gbAllocator allocator = heap_allocator();
@@ -1147,7 +1171,7 @@ gb_internal void odin_doc_write_to_file(OdinDocWriter *w, char const *filename) 
 	gbFileError err = gb_file_open_mode(&f, gbFileMode_Write, filename);
 	if (err != gbFileError_None) {
 		gb_printf_err("Failed to write .odin-doc to: %s\n", filename);
-		gb_exit(1);
+		exit_with_errors();
 		return;
 	}
 	defer (gb_file_close(&f));

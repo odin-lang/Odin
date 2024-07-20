@@ -4417,8 +4417,10 @@ AabbPositionsKHR :: struct {
 }
 
 AccelerationStructureInstanceKHR :: struct {
-	transform:                      TransformMatrixKHR,
-	accelerationStructureReference: u64,
+	transform:                                      TransformMatrixKHR,
+	instanceCustomIndexAndMask:                     u32, // Most significant byte is mask
+	instanceShaderBindingTableRecordOffsetAndFlags: u32, // Most significant byte is flags
+	accelerationStructureReference:                 u64,
 }
 
 PhysicalDeviceRepresentativeFragmentTestFeaturesNV :: struct {
@@ -5436,9 +5438,11 @@ AccelerationStructureMotionInfoNV :: struct {
 }
 
 AccelerationStructureMatrixMotionInstanceNV :: struct {
-	transformT0:                    TransformMatrixKHR,
-	transformT1:                    TransformMatrixKHR,
-	accelerationStructureReference: u64,
+	transformT0:                                    TransformMatrixKHR,
+	transformT1:                                    TransformMatrixKHR,
+	instanceCustomIndexAndMask:                     u32, // Most significant byte is mask
+	instanceShaderBindingTableRecordOffsetAndFlags: u32, // Most significant byte is flags
+	accelerationStructureReference:                 u64,
 }
 
 SRTDataNV :: struct {
@@ -5461,9 +5465,11 @@ SRTDataNV :: struct {
 }
 
 AccelerationStructureSRTMotionInstanceNV :: struct {
-	transformT0:                    SRTDataNV,
-	transformT1:                    SRTDataNV,
-	accelerationStructureReference: u64,
+	transformT0:                                    SRTDataNV,
+	transformT1:                                    SRTDataNV,
+	instanceCustomIndexAndMask:                     u32, // Most significant byte is mask
+	instanceShaderBindingTableRecordOffsetAndFlags: u32, // Most significant byte is flags
+	accelerationStructureReference:                 u64,
 }
 
 AccelerationStructureMotionInstanceDataNV :: struct #raw_union {
@@ -7026,7 +7032,7 @@ WaylandSurfaceCreateInfoKHR :: struct {
 }
 
 VideoH264SpsVuiFlags :: struct {
-	bit_field: u32,
+	bitfield: u32,
 }
 
 VideoH264HrdParameters :: struct {
@@ -7063,7 +7069,7 @@ VideoH264SequenceParameterSetVui :: struct {
 }
 
 VideoH264SpsFlags :: struct {
-	bit_field: u32,
+	bitfield: u32,
 }
 
 VideoH264ScalingLists :: struct {
@@ -7102,7 +7108,7 @@ VideoH264SequenceParameterSet :: struct {
 }
 
 VideoH264PpsFlags :: struct {
-	bit_field: u32,
+	bitfield: u32,
 }
 
 VideoH264PictureParameterSet :: struct {
@@ -7134,7 +7140,7 @@ VideoH265SubLayerHrdParameters :: struct {
 }
 
 VideoH265HrdFlags :: struct {
-	bit_field: u32,
+	bitfield: u32,
 }
 
 VideoH265HrdParameters :: struct {
@@ -7156,11 +7162,11 @@ VideoH265HrdParameters :: struct {
 }
 
 VideoH265VpsFlags :: struct {
-	bit_field: u32,
+	bitfield: u32,
 }
 
 VideoH265ProfileTierLevelFlags :: struct {
-	bit_field: u32,
+	bitfield: u32,
 }
 
 VideoH265ProfileTierLevel :: struct {
@@ -7194,7 +7200,7 @@ VideoH265ScalingLists :: struct {
 }
 
 VideoH265SpsVuiFlags :: struct {
-	bit_field: u32,
+	bitfield: u32,
 }
 
 VideoH265SequenceParameterSetVui :: struct {
@@ -7231,11 +7237,11 @@ VideoH265PredictorPaletteEntries :: struct {
 }
 
 VideoH265SpsFlags :: struct {
-	bit_field: u32,
+	bitfield: u32,
 }
 
 VideoH265ShortTermRefPicSetFlags :: struct {
-	bit_field: u32,
+	bitfield: u32,
 }
 
 VideoH265ShortTermRefPicSet :: struct {
@@ -7303,7 +7309,7 @@ VideoH265SequenceParameterSet :: struct {
 }
 
 VideoH265PpsFlags :: struct {
-	bit_field: u32,
+	bitfield: u32,
 }
 
 VideoH265PictureParameterSet :: struct {
@@ -7346,7 +7352,7 @@ VideoH265PictureParameterSet :: struct {
 }
 
 VideoDecodeH264PictureInfoFlags :: struct {
-	bit_field: u32,
+	bitfield: u32,
 }
 
 VideoDecodeH264PictureInfo :: struct {
@@ -7361,7 +7367,7 @@ VideoDecodeH264PictureInfo :: struct {
 }
 
 VideoDecodeH264ReferenceInfoFlags :: struct {
-	bit_field: u32,
+	bitfield: u32,
 }
 
 VideoDecodeH264ReferenceInfo :: struct {
@@ -7372,7 +7378,7 @@ VideoDecodeH264ReferenceInfo :: struct {
 }
 
 VideoDecodeH265PictureInfoFlags :: struct {
-	bit_field: u32,
+	bitfield: u32,
 }
 
 VideoDecodeH265PictureInfo :: struct {
@@ -7390,7 +7396,7 @@ VideoDecodeH265PictureInfo :: struct {
 }
 
 VideoDecodeH265ReferenceInfoFlags :: struct {
-	bit_field: u32,
+	bitfield: u32,
 }
 
 VideoDecodeH265ReferenceInfo :: struct {

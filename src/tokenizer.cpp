@@ -106,6 +106,7 @@ TOKEN_KIND(Token__KeywordBegin, ""), \
 	TOKEN_KIND(Token_union,       "union"),       \
 	TOKEN_KIND(Token_enum,        "enum"),        \
 	TOKEN_KIND(Token_bit_set,     "bit_set"),     \
+	TOKEN_KIND(Token_bit_field,   "bit_field"),   \
 	TOKEN_KIND(Token_map,         "map"),         \
 	TOKEN_KIND(Token_dynamic,     "dynamic"),     \
 	TOKEN_KIND(Token_auto_cast,   "auto_cast"),   \
@@ -192,6 +193,7 @@ gb_internal void init_keyword_hash_table(void) {
 
 gb_global Array<String>           global_file_path_strings; // index is file id
 gb_global Array<struct AstFile *> global_files; // index is file id
+gb_global BlockingMutex           global_files_mutex;
 
 gb_internal String   get_file_path_string(i32 index);
 gb_internal struct AstFile *thread_safe_get_ast_file_from_id(i32 index);
@@ -430,7 +432,10 @@ gb_internal gb_inline i32 digit_value(Rune r) {
 	return 16; // NOTE(bill): Larger than highest possible
 }
 
-gb_internal gb_inline void scan_mantissa(Tokenizer *t, i32 base) {
+gb_internal gb_inline void scan_mantissa(Tokenizer *t, i32 base, bool force_base) {
+	if (!force_base) {
+		base = 16; // always check for any possible letter
+	}
 	while (digit_value(t->curr_rune) < base || t->curr_rune == '_') {
 		advance_to_next_rune(t);
 	}
@@ -455,7 +460,7 @@ gb_internal void scan_number_to_token(Tokenizer *t, Token *token, bool seen_deci
 		token->string.len  += 1;
 		token->pos.column -= 1;
 		token->kind = Token_Float;
-		scan_mantissa(t, 10);
+		scan_mantissa(t, 10, true);
 		goto exponent;
 	}
 
@@ -465,44 +470,50 @@ gb_internal void scan_number_to_token(Tokenizer *t, Token *token, bool seen_deci
 		switch (t->curr_rune) {
 		case 'b': // Binary
 			advance_to_next_rune(t);
-			scan_mantissa(t, 2);
+			scan_mantissa(t, 2, false);
 			if (t->curr - prev <= 2) {
+				tokenizer_err(t, "Invalid binary integer");
 				token->kind = Token_Invalid;
 			}
 			goto end;
 		case 'o': // Octal
 			advance_to_next_rune(t);
-			scan_mantissa(t, 8);
+			scan_mantissa(t, 8, false);
 			if (t->curr - prev <= 2) {
+				tokenizer_err(t, "Invalid octal integer");
 				token->kind = Token_Invalid;
 			}
 			goto end;
 		case 'd': // Decimal
 			advance_to_next_rune(t);
-			scan_mantissa(t, 10);
+			scan_mantissa(t, 10, false);
 			if (t->curr - prev <= 2) {
+				tokenizer_err(t, "Invalid explicitly decimal integer");
 				token->kind = Token_Invalid;
 			}
 			goto end;
 		case 'z': // Dozenal
 			advance_to_next_rune(t);
-			scan_mantissa(t, 12);
+			scan_mantissa(t, 12, false);
 			if (t->curr - prev <= 2) {
+				tokenizer_err(t, "Invalid dozenal integer");
 				token->kind = Token_Invalid;
 			}
 			goto end;
 		case 'x': // Hexadecimal
 			advance_to_next_rune(t);
-			scan_mantissa(t, 16);
+			scan_mantissa(t, 16, false);
 			if (t->curr - prev <= 2) {
+				tokenizer_err(t, "Invalid hexadecimal integer");
 				token->kind = Token_Invalid;
 			}
 			goto end;
 		case 'h': // Hexadecimal Float
 			token->kind = Token_Float;
 			advance_to_next_rune(t);
-			scan_mantissa(t, 16);
+			scan_mantissa(t, 16, false);
 			if (t->curr - prev <= 2) {
+				tokenizer_err(t, "Invalid hexadecimal float");
 				token->kind = Token_Invalid;
 			} else {
 				u8 *start = prev+2;
@@ -525,12 +536,12 @@ gb_internal void scan_number_to_token(Tokenizer *t, Token *token, bool seen_deci
 			}
 			goto end;
 		default:
-			scan_mantissa(t, 10);
+			scan_mantissa(t, 10, true);
 			goto fraction;
 		}
 	}
 
-	scan_mantissa(t, 10);
+	scan_mantissa(t, 10, true);
 
 
 fraction:
@@ -542,7 +553,7 @@ fraction:
 		advance_to_next_rune(t);
 
 		token->kind = Token_Float;
-		scan_mantissa(t, 10);
+		scan_mantissa(t, 10, true);
 	}
 
 exponent:
@@ -552,7 +563,7 @@ exponent:
 		if (t->curr_rune == '-' || t->curr_rune == '+') {
 			advance_to_next_rune(t);
 		}
-		scan_mantissa(t, 10);
+		scan_mantissa(t, 10, false);
 	}
 
 	switch (t->curr_rune) {
@@ -765,9 +776,8 @@ gb_internal void tokenizer_get_token(Tokenizer *t, Token *token, int repeat=0) {
 				}
 			}
 
-			// TODO(bill): Better Error Handling
 			if (valid && n != 1) {
-				tokenizer_err(t, "Invalid rune literal");
+				tokenizer_err(t, token->pos, "Invalid rune literal");
 			}
 			token->string.len = t->curr - token->string.text;
 			goto semicolon_check;
@@ -776,7 +786,6 @@ gb_internal void tokenizer_get_token(Tokenizer *t, Token *token, int repeat=0) {
 		case '`': // Raw String Literal
 		case '"': // String Literal
 		{
-			bool has_carriage_return = false;
 			i32 success;
 			Rune quote = curr_rune;
 			token->kind = Token_String;
@@ -805,9 +814,6 @@ gb_internal void tokenizer_get_token(Tokenizer *t, Token *token, int repeat=0) {
 					advance_to_next_rune(t);
 					if (r == quote) {
 						break;
-					}
-					if (r == '\r') {
-						has_carriage_return = true;
 					}
 				}
 			}

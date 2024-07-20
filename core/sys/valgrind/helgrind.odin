@@ -1,7 +1,7 @@
 //+build amd64
 package sys_valgrind
 
-import "core:intrinsics"
+import "base:intrinsics"
 
 Helgrind_Client_Request :: enum uintptr {
 	Clean_Memory = 'H'<<24 | 'G'<<16,

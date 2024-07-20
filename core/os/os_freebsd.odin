@@ -3,7 +3,7 @@ package os
 foreign import dl "system:dl"
 foreign import libc "system:c"
 
-import "core:runtime"
+import "base:runtime"
 import "core:strings"
 import "core:c"
 
@@ -112,15 +112,15 @@ EOWNERDEAD:      Errno : 96
 O_RDONLY   :: 0x00000
 O_WRONLY   :: 0x00001
 O_RDWR     :: 0x00002
-O_CREATE   :: 0x00040
-O_EXCL     :: 0x00080
-O_NOCTTY   :: 0x00100
-O_TRUNC    :: 0x00200
-O_NONBLOCK :: 0x00800
-O_APPEND   :: 0x00400
-O_SYNC     :: 0x01000
-O_ASYNC    :: 0x02000
-O_CLOEXEC  :: 0x80000
+O_NONBLOCK :: 0x00004
+O_APPEND   :: 0x00008
+O_ASYNC    :: 0x00040
+O_SYNC     :: 0x00080
+O_CREATE   :: 0x00200
+O_TRUNC    :: 0x00400
+O_EXCL     :: 0x00800
+O_NOCTTY   :: 0x08000
+O_CLOEXEC  :: 0100000
 
 
 SEEK_DATA  :: 3
@@ -139,6 +139,8 @@ RTLD_NODELETE     :: 0x01000
 RTLD_NOLOAD       :: 0x02000
 
 MAX_PATH :: 1024
+
+KINFO_FILE_SIZE :: 1392
 
 args := _alloc_command_line_arguments()
 
@@ -159,7 +161,7 @@ blkcnt_t :: i64
 blksize_t :: i32
 fflags_t :: u32
 
-when ODIN_ARCH == .amd64 /* LP64 */ {
+when ODIN_ARCH == .amd64 || ODIN_ARCH == .arm64 /* LP64 */ {
 	time_t :: i64
 } else {
 	time_t :: i32
@@ -191,6 +193,21 @@ OS_Stat :: struct {
 	lspare: [10]u64,
 }
 
+KInfo_File :: struct {
+	structsize: c.int,
+	type:       c.int,
+	fd:         c.int,
+	ref_count:  c.int,
+	flags:      c.int,
+	pad0:       c.int,
+	offset:     i64,
+
+	// NOTE(Feoramund): This field represents a complicated union that I am
+	// avoiding implementing for now. I only need the path data below.
+	_union: [336]byte,
+
+	path: [MAX_PATH]c.char,
+}
 
 // since FreeBSD v12
 Dirent :: struct {
@@ -254,8 +271,10 @@ X_OK :: 1 // Test for execute permission
 W_OK :: 2 // Test for write permission
 R_OK :: 4 // Test for read permission
 
+F_KINFO :: 22
+
 foreign libc {
-	@(link_name="__error")		__errno_location :: proc() -> ^int ---
+	@(link_name="__error")		__errno_location :: proc() -> ^c.int ---
 
 	@(link_name="open")             _unix_open          :: proc(path: cstring, flags: c.int, mode: c.int) -> Handle ---
 	@(link_name="close")            _unix_close         :: proc(fd: Handle) -> c.int ---
@@ -274,6 +293,7 @@ foreign libc {
 	@(link_name="unlink")           _unix_unlink        :: proc(path: cstring) -> c.int ---
 	@(link_name="rmdir")            _unix_rmdir         :: proc(path: cstring) -> c.int ---
 	@(link_name="mkdir")            _unix_mkdir         :: proc(path: cstring, mode: mode_t) -> c.int ---
+	@(link_name="fcntl")            _unix_fcntl         :: proc(fd: Handle, cmd: c.int, arg: uintptr) -> c.int ---
 	
 	@(link_name="fdopendir")        _unix_fdopendir     :: proc(fd: Handle) -> Dir ---
 	@(link_name="closedir")         _unix_closedir      :: proc(dirp: Dir) -> c.int ---
@@ -305,7 +325,7 @@ is_path_separator :: proc(r: rune) -> bool {
 }
 
 get_last_error :: proc "contextless" () -> int {
-	return __errno_location()^
+	return int(__errno_location()^)
 }
 
 open :: proc(path: string, flags: int = O_RDONLY, mode: int = 0) -> (Handle, Errno) {
@@ -326,8 +346,17 @@ close :: proc(fd: Handle) -> Errno {
 	return ERROR_NONE
 }
 
+// If you read or write more than `INT_MAX` bytes, FreeBSD returns `EINVAL`.
+// In practice a read/write call would probably never read/write these big buffers all at once,
+// which is why the number of bytes is returned and why there are procs that will call this in a
+// loop for you.
+// We set a max of 1GB to keep alignment and to be safe.
+@(private)
+MAX_RW :: 1 << 30
+
 read :: proc(fd: Handle, data: []byte) -> (int, Errno) {
-	bytes_read := _unix_read(fd, &data[0], c.size_t(len(data)))
+	to_read    := min(c.size_t(len(data)), MAX_RW)
+	bytes_read := _unix_read(fd, &data[0], to_read)
 	if bytes_read == -1 {
 		return -1, Errno(get_last_error())
 	}
@@ -338,7 +367,9 @@ write :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 	if len(data) == 0 {
 		return 0, ERROR_NONE
 	}
-	bytes_written := _unix_write(fd, &data[0], c.size_t(len(data)))
+
+	to_write      := min(c.size_t(len(data)), MAX_RW)
+	bytes_written := _unix_write(fd, &data[0], to_write)
 	if bytes_written == -1 {
 		return -1, Errno(get_last_error())
 	}
@@ -354,7 +385,7 @@ seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
 }
 
 file_size :: proc(fd: Handle) -> (i64, Errno) {
-	s, err := fstat(fd)
+	s, err := _fstat(fd)
 	if err != ERROR_NONE {
 		return -1, err
 	}
@@ -580,9 +611,26 @@ _readlink :: proc(path: string) -> (string, Errno) {
 	return "", Errno{}
 }
 
-// XXX FreeBSD
 absolute_path_from_handle :: proc(fd: Handle) -> (string, Errno) {
-	return "", Errno(ENOSYS)
+	// NOTE(Feoramund): The situation isn't ideal, but this was the best way I
+	// could find to implement this. There are a couple outstanding bug reports
+	// regarding the desire to retrieve an absolute path from a handle, but to
+	// my knowledge, there hasn't been any work done on it.
+	//
+	// https://bugs.freebsd.org/bugzilla/show_bug.cgi?id=198570
+	//
+	// This may be unreliable, according to a comment from 2023.
+
+	kinfo: KInfo_File
+	kinfo.structsize = KINFO_FILE_SIZE
+
+	res := _unix_fcntl(fd, F_KINFO, cast(uintptr)&kinfo)
+	if res == -1 {
+		return "", Errno(get_last_error())
+	}
+
+	path := strings.clone_from_cstring_bounded(cast(cstring)&kinfo.path[0], len(kinfo.path))
+	return path, ERROR_NONE
 }
 
 absolute_path_from_relative :: proc(rel: string) -> (path: string, err: Errno) {
@@ -600,8 +648,8 @@ absolute_path_from_relative :: proc(rel: string) -> (path: string, err: Errno) {
 	}
 	defer _unix_free(path_ptr)
 
-	path_cstr := transmute(cstring)path_ptr
-	path = strings.clone( string(path_cstr) )
+
+	path = strings.clone(string(cstring(path_ptr)))
 
 	return path, ERROR_NONE
 }
@@ -615,27 +663,6 @@ access :: proc(path: string, mask: int) -> (bool, Errno) {
 		return false, Errno(get_last_error())
 	}
 	return true, ERROR_NONE
-}
-
-heap_alloc :: proc(size: int, zero_memory := true) -> rawptr {
-	if size <= 0 {
-		return nil
-	}
-	if zero_memory {
-		return _unix_calloc(1, c.size_t(size))
-	} else {
-		return _unix_malloc(c.size_t(size))
-	}
-}
-
-heap_resize :: proc(ptr: rawptr, new_size: int) -> rawptr {
-	// NOTE: _unix_realloc doesn't guarantee new memory will be zeroed on
-	// POSIX platforms. Ensure your caller takes this into account.
-	return _unix_realloc(ptr, c.size_t(new_size))
-}
-
-heap_free :: proc(ptr: rawptr) {
-	_unix_free(ptr)
 }
 
 lookup_env :: proc(key: string, allocator := context.allocator) -> (value: string, found: bool) {
@@ -678,7 +705,9 @@ set_current_directory :: proc(path: string) -> (err: Errno) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	cstr := strings.clone_to_cstring(path, context.temp_allocator)
 	res := _unix_chdir(cstr)
-	if res == -1 do return Errno(get_last_error())
+	if res == -1 {
+		return Errno(get_last_error())
+	}
 	return ERROR_NONE
 }
 
@@ -716,7 +745,9 @@ get_page_size :: proc() -> int {
 	// NOTE(tetra): The page size never changes, so why do anything complicated
 	// if we don't have to.
 	@static page_size := -1
-	if page_size != -1 do return page_size
+	if page_size != -1 {
+		return page_size
+	}
 
 	page_size = int(_unix_getpagesize())
 	return page_size

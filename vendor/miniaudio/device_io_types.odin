@@ -84,6 +84,7 @@ device_notification_type :: enum c.int {
 	rerouted,
 	interruption_began,
 	interruption_ended,
+	unlocked,
 }
 
 device_notification :: struct {
@@ -195,7 +196,7 @@ DEPRECATED. Use ma_device_notification_proc instead.
 The callback for when the device has been stopped.
 
 This will be called when the device is stopped explicitly with `ma_device_stop()` and also called implicitly when the device is stopped through external forces
-such as being unplugged or an internal error occuring.
+such as being unplugged or an internal error occurring.
 
 
 Parameters
@@ -225,7 +226,7 @@ share_mode :: enum c.int {
 
 /* iOS/tvOS/watchOS session categories. */
 ios_session_category :: enum c.int {
-	default = 0,        /* AVAudioSessionCategoryPlayAndRecord with AVAudioSessionCategoryOptionDefaultToSpeaker. */
+	default = 0,        /* AVAudioSessionCategoryPlayAndRecord. */
 	none,               /* Leave the session category unchanged. */
 	ambient,            /* AVAudioSessionCategoryAmbient */
 	solo_ambient,       /* AVAudioSessionCategorySoloAmbient */
@@ -267,34 +268,41 @@ opensl_recording_preset :: enum c.int {
 	voice_unprocessed,   /* SL_ANDROID_RECORDING_PRESET_UNPROCESSED */
 }
 
+/* WASAPI audio thread priority characteristics. */
+wasapi_usage :: enum c.int {
+	default = 0,
+	games,
+	pro_audio,
+}
+
 /* AAudio usage types. */
 aaudio_usage :: enum c.int {
 	default = 0,                    /* Leaves the usage type unset. */
-	announcement,                   /* AAUDIO_SYSTEM_USAGE_ANNOUNCEMENT */
-	emergency,                      /* AAUDIO_SYSTEM_USAGE_EMERGENCY */
-	safety,                         /* AAUDIO_SYSTEM_USAGE_SAFETY */
-	vehicle_status,                 /* AAUDIO_SYSTEM_USAGE_VEHICLE_STATUS */
+	media,                          /* AAUDIO_USAGE_MEDIA */
+	voice_communication,            /* AAUDIO_USAGE_VOICE_COMMUNICATION */
+	voice_communication_signalling, /* AAUDIO_USAGE_VOICE_COMMUNICATION_SIGNALLING */
 	alarm,                          /* AAUDIO_USAGE_ALARM */
+	notification,                   /* AAUDIO_USAGE_NOTIFICATION */
+	notification_ringtone,          /* AAUDIO_USAGE_NOTIFICATION_RINGTONE */
+	notification_event,             /* AAUDIO_USAGE_NOTIFICATION_EVENT */
 	assistance_accessibility,       /* AAUDIO_USAGE_ASSISTANCE_ACCESSIBILITY */
 	assistance_navigation_guidance, /* AAUDIO_USAGE_ASSISTANCE_NAVIGATION_GUIDANCE */
 	assistance_sonification,        /* AAUDIO_USAGE_ASSISTANCE_SONIFICATION */
-	assitant,                       /* AAUDIO_USAGE_ASSISTANT */
 	game,                           /* AAUDIO_USAGE_GAME */
-	media,                          /* AAUDIO_USAGE_MEDIA */
-	notification,                   /* AAUDIO_USAGE_NOTIFICATION */
-	notification_event,             /* AAUDIO_USAGE_NOTIFICATION_EVENT */
-	notification_ringtone,          /* AAUDIO_USAGE_NOTIFICATION_RINGTONE */
-	voice_communication,            /* AAUDIO_USAGE_VOICE_COMMUNICATION */
-	voice_communication_signalling, /* AAUDIO_USAGE_VOICE_COMMUNICATION_SIGNALLING */
+	assitant,                       /* AAUDIO_USAGE_ASSISTANT */
+	emergency,                      /* AAUDIO_SYSTEM_USAGE_EMERGENCY */
+	safety,                         /* AAUDIO_SYSTEM_USAGE_SAFETY */
+	vehicle_status,                 /* AAUDIO_SYSTEM_USAGE_VEHICLE_STATUS */
+	announcement,                   /* AAUDIO_SYSTEM_USAGE_ANNOUNCEMENT */
 }
 
 /* AAudio content types. */
 aaudio_content_type :: enum c.int {
 	default = 0,             /* Leaves the content type unset. */
-	movie,                   /* AAUDIO_CONTENT_TYPE_MOVIE */
-	music,                   /* AAUDIO_CONTENT_TYPE_MUSIC */
-	sonification,            /* AAUDIO_CONTENT_TYPE_SONIFICATION */
 	speech,                  /* AAUDIO_CONTENT_TYPE_SPEECH */
+	music,                   /* AAUDIO_CONTENT_TYPE_MUSIC */
+	movie,                   /* AAUDIO_CONTENT_TYPE_MOVIE */
+	sonification,            /* AAUDIO_CONTENT_TYPE_SONIFICATION */
 }
 
 /* AAudio input presets. */
@@ -302,10 +310,17 @@ aaudio_input_preset :: enum c.int {
 	default = 0,             /* Leaves the input preset unset. */
 	generic,                 /* AAUDIO_INPUT_PRESET_GENERIC */
 	camcorder,               /* AAUDIO_INPUT_PRESET_CAMCORDER */
-	unprocessed,             /* AAUDIO_INPUT_PRESET_UNPROCESSED */
 	voice_recognition,       /* AAUDIO_INPUT_PRESET_VOICE_RECOGNITION */
 	voice_communication,     /* AAUDIO_INPUT_PRESET_VOICE_COMMUNICATION */
+	unprocessed,             /* AAUDIO_INPUT_PRESET_UNPROCESSED */
 	voice_performance,       /* AAUDIO_INPUT_PRESET_VOICE_PERFORMANCE */
+}
+
+aaudio_allowed_capture_policy :: enum c.int {
+	default = 0, /* Leaves the allowed capture policy unset. */
+	all,         /* AAUDIO_ALLOW_CAPTURE_BY_ALL */
+	system,      /* AAUDIO_ALLOW_CAPTURE_BY_SYSTEM */
+	none,        /* AAUDIO_ALLOW_CAPTURE_BY_NONE */
 }
 
 
@@ -364,36 +379,41 @@ device_config :: struct {
 	periods:                    u32,
 	performanceProfile:         performance_profile,
 	noPreSilencedOutputBuffer:  b8,   /* When set to true, the contents of the output buffer passed into the data callback will be left undefined rather than initialized to zero. */
-	noClip:                     b8,   /* When set to true, the contents of the output buffer passed into the data callback will be clipped after returning. Only applies when the playback sample format is f32. */
+	noClip:                     b8,   /* When set to true, the contents of the output buffer passed into the data callback will not be clipped after returning. Only applies when the playback sample format is f32. */
 	noDisableDenormals:         b8,   /* Do not disable denormals when firing the data callback. */
-  noFixedSizedCallback:       b8,   /* Disables strict fixed-sized data callbacks. Setting this to true will result in the period size being treated only as a hint to the backend. This is an optimization for those who don't need fixed sized callbacks. */
+  	noFixedSizedCallback:       b8,   /* Disables strict fixed-sized data callbacks. Setting this to true will result in the period size being treated only as a hint to the backend. This is an optimization for those who don't need fixed sized callbacks. */
 	dataCallback:               device_data_proc,
 	notificationCallback:       device_notification_proc,
 	stopCallback:               stop_proc,
 	pUserData:                  rawptr,
 	resampling:                 resampler_config,
 	playback: struct {
-		pDeviceID:      ^device_id,
-		format:         format,
-		channels:       u32,
-		channelMap:     [^]channel,
-		channelMixMode: channel_mix_mode,
-		shareMode:      share_mode,
+		pDeviceID:                       ^device_id,
+		format:                          format,
+		channels:                        u32,
+		channelMap:                      [^]channel,
+		channelMixMode:                  channel_mix_mode,
+		calculateLFEFromSpatialChannels: b32, /* When an output LFE channel is present, but no input LFE, set to true to set the output LFE to the average of all spatial channels (LR, FR, etc.). Ignored when an input LFE is present. */
+		shareMode:                       share_mode,
 	},
 	capture: struct {
-		pDeviceID:      ^device_id,
-		format:         format,
-		channels:       u32,
-		channelMap:     [^]channel,
-		channelMixMode: channel_mix_mode,
-		shareMode:      share_mode,
+		pDeviceID:                       ^device_id,
+		format:                          format,
+		channels:                        u32,
+		channelMap:                      [^]channel,
+		channelMixMode:                  channel_mix_mode,
+		calculateLFEFromSpatialChannels: b32, /* When an output LFE channel is present, but no input LFE, set to true to set the output LFE to the average of all spatial channels (LR, FR, etc.). Ignored when an input LFE is present. */
+		shareMode:                       share_mode,
 	},
 
 	wasapi: struct {
-		noAutoConvertSRC:     b8, /* When set to true, disables the use of AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM. */
-		noDefaultQualitySRC:  b8, /* When set to true, disables the use of AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY. */
-		noAutoStreamRouting:  b8, /* Disables automatic stream routing. */
-		noHardwareOffloading: b8, /* Disables WASAPI's hardware offloading feature. */
+		usage:                  wasapi_usage, /* When configured, uses Avrt APIs to set the thread characteristics. */
+		noAutoConvertSRC:       b8, /* When set to true, disables the use of AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM. */
+		noDefaultQualitySRC:    b8, /* When set to true, disables the use of AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY. */
+		noAutoStreamRouting:    b8, /* Disables automatic stream routing. */
+		noHardwareOffloading:   b8, /* Disables WASAPI's hardware offloading feature. */
+		loopbackProcessID:      u32, /* The process ID to include or exclude for loopback mode. Set to 0 to capture audio from all processes. Ignored when an explicit device ID is specified. */
+		loopbackProcessExclude: b8, /* When set to true, excludes the process specified by loopbackProcessID. By default, the process will be included. */
 	},
 	alsa: struct {
 		noMMap:         b32, /* Disables MMap mode. */
@@ -409,20 +429,23 @@ device_config :: struct {
 		allowNominalSampleRateChange: b32, /* Desktop only. When enabled, allows changing of the sample rate at the operating system level. */
 	},
 	opensl: struct {
-		streamType:      opensl_stream_type,
-		recordingPreset: opensl_recording_preset,
+		streamType:                     opensl_stream_type,
+		recordingPreset:                opensl_recording_preset,
+		enableCompatibilityWorkarounds: b32,
 	},
 	aaudio: struct {
-		usage:                   aaudio_usage,
-		contentType:             aaudio_content_type,
-		inputPreset:             aaudio_input_preset,
-		noAutoStartAfterReroute: b32,
+		usage:                          aaudio_usage,
+		contentType:                    aaudio_content_type,
+		inputPreset:                    aaudio_input_preset,
+		allowedCapturePolicy:           aaudio_allowed_capture_policy,
+		noAutoStartAfterReroute:        b32,
+		enableCompatibilityWorkarounds: b32,
 	},
 }
 
 
 /*
-The callback for handling device enumeration. This is fired from `ma_context_enumerated_devices()`.
+The callback for handling device enumeration. This is fired from `ma_context_enumerate_devices()`.
 
 
 Parameters
@@ -500,7 +523,7 @@ sample rate. For the channel map, the default should be used when `ma_channel_ma
 `MA_CHANNEL_NONE`). On input, the `periodSizeInFrames` or `periodSizeInMilliseconds` option should always be set. The backend should
 inspect both of these variables. If `periodSizeInFrames` is set, it should take priority, otherwise it needs to be derived from the period
 size in milliseconds (`periodSizeInMilliseconds`) and the sample rate, keeping in mind that the sample rate may be 0, in which case the
-sample rate will need to be determined before calculating the period size in frames. On output, all members of the `ma_device_data_format`
+sample rate will need to be determined before calculating the period size in frames. On output, all members of the `ma_device_descriptor`
 object should be set to a valid value, except for `periodSizeInMilliseconds` which is optional (`periodSizeInFrames` *must* be set).
 
 Starting and stopping of the device is done with `onDeviceStart()` and `onDeviceStop()` and should be self-explanatory. If the backend uses
@@ -516,7 +539,7 @@ If the backend requires absolute flexibility with it's data delivery, it can opt
 which will allow it to implement the logic that will run on the audio thread. This is much more advanced and is completely optional.
 
 The audio thread should run data delivery logic in a loop while `ma_device_get_state() == ma_device_state_started` and no errors have been
-encounted. Do not start or stop the device here. That will be handled from outside the `onDeviceDataLoop()` callback.
+encountered. Do not start or stop the device here. That will be handled from outside the `onDeviceDataLoop()` callback.
 
 The invocation of the `onDeviceDataLoop()` callback will be handled by miniaudio. When you start the device, miniaudio will fire this
 callback. When the device is stopped, the `ma_device_get_state() == ma_device_state_started` condition will fail and the loop will be terminated
@@ -609,12 +632,17 @@ context_type :: struct {
 
 	using _: struct #raw_union {
 		wasapi: (struct {
-			commandThread: thread,
-			commandLock:   mutex,
-			commandSem:    semaphore,
-			commandIndex:  u32,
-			commandCount:  u32,
-			commands:      [4]context_command__wasapi,
+			commandThread:                   thread,
+			commandLock:                     mutex,
+			commandSem:                      semaphore,
+			commandIndex:                    u32,
+			commandCount:                    u32,
+			commands:                        [4]context_command__wasapi,
+			hAvrt:                           handle,
+			AvSetMmThreadCharacteristicsA:   proc "system" (),
+			AvRevertMmThreadCharacteristics: proc "system" (),
+			hMMDevapi:                       handle,
+			ActivateAudioInterfaceAsync:     proc "system" (),
 		} when SUPPORT_WASAPI else struct {}),
 		
 		dsound: (struct {
@@ -888,6 +916,7 @@ context_type :: struct {
 			AAudioStreamBuilder_setUsage:                  proc "system" (),
 			AAudioStreamBuilder_setContentType:            proc "system" (),
 			AAudioStreamBuilder_setInputPreset:            proc "system" (),
+			AAudioStreamBuilder_setAllowedCapturePolicy:   proc "system" (),
 			AAudioStreamBuilder_openStream:                proc "system" (),
 			AAudioStream_close:                            proc "system" (),
 			AAudioStream_getState:                         proc "system" (),
@@ -926,6 +955,7 @@ context_type :: struct {
 	using _: struct #raw_union {
 		win32: (struct {
 			/*HMODULE*/ hOle32DLL:       handle,
+			CoInitialize:                proc "system" (),
 			CoInitializeEx:              proc "system" (),
 			CoUninitialize:              proc "system" (),
 			CoCreateInstance:            proc "system" (),
@@ -941,25 +971,12 @@ context_type :: struct {
 			RegOpenKeyExA:               proc "system" (),
 			RegCloseKey:                 proc "system" (),
 			RegQueryValueExA:            proc "system" (),
+
+			/*HRESULT*/ CoInitializeResult: c.long,
 		} when ODIN_OS == .Windows else struct {}),
 		
 		posix: (struct {
-			pthreadSO:                   handle,
-			pthread_create:              proc "system" (),
-			pthread_join:                proc "system" (),
-			pthread_mutex_init:          proc "system" (),
-			pthread_mutex_destroy:       proc "system" (),
-			pthread_mutex_lock:          proc "system" (),
-			pthread_mutex_unlock:        proc "system" (),
-			pthread_cond_init:           proc "system" (),
-			pthread_cond_destroy:        proc "system" (),
-			pthread_cond_wait:           proc "system" (),
-			pthread_cond_signal:         proc "system" (),
-			pthread_attr_init:           proc "system" (),
-			pthread_attr_destroy:        proc "system" (),
-			pthread_attr_setschedpolicy: proc "system" (),
-			pthread_attr_getschedparam:  proc "system" (),
-			pthread_attr_setschedparam:  proc "system" (),
+			_unused: c.int,
 		} when ODIN_OS != .Windows else struct {}),
 		
 		_unused: c.int,
@@ -997,48 +1014,50 @@ device :: struct {
 		},
 	},
 	playback: struct {
-		pID:                        ^device_id,                           /* Set to NULL if using default ID, otherwise set to the address of "id". */
-		id:                         device_id,                            /* If using an explicit device, will be set to a copy of the ID used for initialization. Otherwise cleared to 0. */
-		name:                       [MAX_DEVICE_NAME_LENGTH + 1]c.char,   /* Maybe temporary. Likely to be replaced with a query API. */
-		shareMode:                  share_mode,                           /* Set to whatever was passed in when the device was initialized. */
-		playback_format:            format,
-		channels:                   u32,
-		channelMap:                 [MAX_CHANNELS]channel,
-		internalFormat:             format,
-		internalChannels:           u32,
-		internalSampleRate:         u32,
-		internalChannelMap:         [MAX_CHANNELS]channel,
-		internalPeriodSizeInFrames: u32,
-		internalPeriods:            u32,
-		channelMixMode:             channel_mix_mode,
-		converter:                  data_converter,
-		pIntermediaryBuffer:        rawptr,  /* For implementing fixed sized buffer callbacks. Will be null if using variable sized callbacks. */
-		intermediaryBufferCap:      u32,
-		intermediaryBufferLen:      u32,     /* How many valid frames are sitting in the intermediary buffer. */
-		pInputCache:                rawptr,  /* In external format. Can be null. */
-		inputCacheCap:              u64,
-		inputCacheConsumed:         u64,
-		inputCacheRemaining:        u64,
+		pID:                             ^device_id,                           /* Set to NULL if using default ID, otherwise set to the address of "id". */
+		id:                              device_id,                            /* If using an explicit device, will be set to a copy of the ID used for initialization. Otherwise cleared to 0. */
+		name:                            [MAX_DEVICE_NAME_LENGTH + 1]c.char,   /* Maybe temporary. Likely to be replaced with a query API. */
+		shareMode:                       share_mode,                           /* Set to whatever was passed in when the device was initialized. */
+		playback_format:                 format,
+		channels:                        u32,
+		channelMap:                      [MAX_CHANNELS]channel,
+		internalFormat:                  format,
+		internalChannels:                u32,
+		internalSampleRate:              u32,
+		internalChannelMap:              [MAX_CHANNELS]channel,
+		internalPeriodSizeInFrames:      u32,
+		internalPeriods:                 u32,
+		channelMixMode:                  channel_mix_mode,
+		calculateLFEFromSpatialChannels: b32,
+		converter:                       data_converter,
+		pIntermediaryBuffer:             rawptr,  /* For implementing fixed sized buffer callbacks. Will be null if using variable sized callbacks. */
+		intermediaryBufferCap:           u32,
+		intermediaryBufferLen:           u32,     /* How many valid frames are sitting in the intermediary buffer. */
+		pInputCache:                     rawptr,  /* In external format. Can be null. */
+		inputCacheCap:                   u64,
+		inputCacheConsumed:              u64,
+		inputCacheRemaining:             u64,
 	},
 	capture: struct {
-		pID:                        ^device_id,                           /* Set to NULL if using default ID, otherwise set to the address of "id". */
-		id:                         device_id,                            /* If using an explicit device, will be set to a copy of the ID used for initialization. Otherwise cleared to 0. */
-		name:                       [MAX_DEVICE_NAME_LENGTH + 1]c.char,   /* Maybe temporary. Likely to be replaced with a query API. */
-		shareMode:                  share_mode,                           /* Set to whatever was passed in when the device was initialized. */
-		capture_format:             format,
-		channels:                   u32,
-		channelMap:                 [MAX_CHANNELS]channel,
-		internalFormat:             format,
-		internalChannels:           u32,
-		internalSampleRate:         u32,
-		internalChannelMap:         [MAX_CHANNELS]channel,
-		internalPeriodSizeInFrames: u32,
-		internalPeriods:            u32,
-		channelMixMode:             channel_mix_mode,
-		converter:                  data_converter,
-		pIntermediaryBuffer:        rawptr,  /* For implementing fixed sized buffer callbacks. Will be null if using variable sized callbacks. */
-		intermediaryBufferCap:      u32,
-		intermediaryBufferLen:      u32,     /* How many valid frames are sitting in the intermediary buffer. */
+		pID:                             ^device_id,                           /* Set to NULL if using default ID, otherwise set to the address of "id". */
+		id:                              device_id,                            /* If using an explicit device, will be set to a copy of the ID used for initialization. Otherwise cleared to 0. */
+		name:                            [MAX_DEVICE_NAME_LENGTH + 1]c.char,   /* Maybe temporary. Likely to be replaced with a query API. */
+		shareMode:                       share_mode,                           /* Set to whatever was passed in when the device was initialized. */
+		capture_format:                  format,
+		channels:                        u32,
+		channelMap:                      [MAX_CHANNELS]channel,
+		internalFormat:                  format,
+		internalChannels:                u32,
+		internalSampleRate:              u32,
+		internalChannelMap:              [MAX_CHANNELS]channel,
+		internalPeriodSizeInFrames:      u32,
+		internalPeriods:                 u32,
+		channelMixMode:                  channel_mix_mode,
+		calculateLFEFromSpatialChannels: b32,
+		converter:                       data_converter,
+		pIntermediaryBuffer:             rawptr,  /* For implementing fixed sized buffer callbacks. Will be null if using variable sized callbacks. */
+		intermediaryBufferCap:           u32,
+		intermediaryBufferLen:           u32,     /* How many valid frames are sitting in the intermediary buffer. */
 	},
 
 	using _: struct #raw_union {
@@ -1067,6 +1086,8 @@ device :: struct {
 			mappedBufferPlaybackLen: u32,
 			isStartedCapture: b32, /*atomic*/                  /* Can be read and written simultaneously across different threads. Must be used atomically, and must be 32-bit. */
 			isStartedPlayback: b32, /*atomic*/                 /* Can be read and written simultaneously across different threads. Must be used atomically, and must be 32-bit. */
+			loopbackProcessID: u32,
+			loopbackProcessExclude: b8,
 			noAutoConvertSRC: b8,                              /* When set to true, disables the use of AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM. */
 			noDefaultQualitySRC: b8,                           /* When set to true, disables the use of AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY. */
 			noHardwareOffloading: b8,
@@ -1074,6 +1095,9 @@ device :: struct {
 			allowPlaybackAutoStreamRouting: b8,
 			isDetachedPlayback: b8,
 			isDetachedCapture: b8,
+			usage: wasapi_usage,
+			hAvrtHandle: rawptr,
+			rerouteLock: mutex,
 		} when SUPPORT_WASAPI else struct {}),
 		
 		dsound: (struct {
@@ -1171,6 +1195,7 @@ device :: struct {
 			usage: aaudio_usage,
 			contentType: aaudio_content_type,
 			inputPreset: aaudio_input_preset,
+			allowedCapturePolicy: aaudio_allowed_capture_policy,
 			noAutoStartAfterReroute: b32,
 		} when SUPPORT_AAUDIO else struct {}),
 
@@ -1192,8 +1217,13 @@ device :: struct {
 		} when SUPPORT_OPENSL else struct {}),
 
 		webaudio: (struct {
-			indexPlayback: c.int,              /* We use a factory on the JavaScript side to manage devices and use an index for JS/C interop. */
-			indexCapture: c.int,
+			/* audioWorklets path. */
+			/* EMSCRIPTEN_WEBAUDIO_T */ audioContext: c.int,
+			/* EMSCRIPTEN_WEBAUDIO_T */ audioWorklet: c.int,
+			pIntermediaryBuffer: ^f32,
+			pStackBuffer: rawptr,
+			initResult: result, /* Set to MA_BUSY while initializing is in progress. */
+			deviceIndex: c.int, /* We store the device in a list on the JavaScript side. This is used to map our C object to the JS object. */
 		} when SUPPORT_WEBAUDIO else struct {}),
 
 		null_device: (struct {

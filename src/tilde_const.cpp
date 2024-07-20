@@ -705,7 +705,7 @@ gb_internal TB_Global *cg_global_const_comp_literal(cgModule *m, Type *original_
 		i64 align = type_align_of(original_type);
 
 		// READ ONLY?
-		TB_ModuleSection *section = nullptr;
+		TB_ModuleSectionHandle section = 0;
 		if (is_type_string(original_type) || is_type_cstring(original_type)) {
 			section = tb_module_get_rdata(m->mod);
 		} else {

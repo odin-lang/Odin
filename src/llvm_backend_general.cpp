@@ -29,8 +29,9 @@ gb_internal void lb_init_module(lbModule *m, Checker *c) {
 		module_name = gb_string_appendc(module_name, "-builtin");
 	}
 
+	m->module_name = module_name ? module_name : "odin_package";
 	m->ctx = LLVMContextCreate();
-	m->mod = LLVMModuleCreateWithNameInContext(module_name ? module_name : "odin_package", m->ctx);
+	m->mod = LLVMModuleCreateWithNameInContext(m->module_name, m->ctx);
 	// m->debug_builder = nullptr;
 	if (build_context.ODIN_DEBUG) {
 		enum {DEBUG_METADATA_VERSION = 3};
@@ -71,17 +72,17 @@ gb_internal void lb_init_module(lbModule *m, Checker *c) {
 	map_init(&m->hasher_procs);
 	map_init(&m->map_get_procs);
 	map_init(&m->map_set_procs);
-	if (build_context.use_separate_modules) {
+	if (USE_SEPARATE_MODULES) {
 		array_init(&m->procedures_to_generate, a, 0, 1<<10);
 		map_init(&m->procedure_values,               1<<11);
 	} else {
 		array_init(&m->procedures_to_generate, a, 0, c->info.all_procedures.count);
 		map_init(&m->procedure_values,               c->info.all_procedures.count*2);
 	}
-	array_init(&m->global_procedures_and_types_to_create, a, 0, 1024);
+	array_init(&m->global_procedures_to_create, a, 0, 1024);
+	array_init(&m->global_types_to_create, a, 0, 1024);
 	array_init(&m->missing_procedures_to_check, a, 0, 16);
 	map_init(&m->debug_values);
-	array_init(&m->debug_incomplete_types, a, 0, 1024);
 
 	string_map_init(&m->objc_classes);
 	string_map_init(&m->objc_selectors);
@@ -107,6 +108,10 @@ gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c) {
 	String init_fullpath = c->parser->init_fullpath;
 	linker_data_init(gen, &c->info, init_fullpath);
 
+	#if defined(GB_SYSTEM_OSX) && (LLVM_VERSION_MAJOR < 14)
+	linker_enable_system_library_linking(gen);
+	#endif
+
 	gen->info = &c->info;
 
 	map_init(&gen->modules, gen->info->packages.count*2);
@@ -114,15 +119,17 @@ gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c) {
 	map_init(&gen->anonymous_proc_lits, 1024);
 
 	if (USE_SEPARATE_MODULES) {
+		bool module_per_file = build_context.module_per_file && build_context.optimization_level <= 0;
 		for (auto const &entry : gen->info->packages) {
 			AstPackage *pkg = entry.value;
-		#if 1
 			auto m = gb_alloc_item(permanent_allocator(), lbModule);
 			m->pkg = pkg;
 			m->gen = gen;
 			map_set(&gen->modules, cast(void *)pkg, m);
 			lb_init_module(m, c);
-		#else
+			if (!module_per_file) {
+				continue;
+			}
 			// NOTE(bill): Probably per file is not a good idea, so leave this for later
 			for (AstFile *file : pkg->files) {
 				auto m = gb_alloc_item(permanent_allocator(), lbModule);
@@ -132,20 +139,20 @@ gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c) {
 				map_set(&gen->modules, cast(void *)file, m);
 				lb_init_module(m, c);
 			}
-		#endif
 		}
 	}
 
 	gen->default_module.gen = gen;
-	map_set(&gen->modules, cast(void *)nullptr, &gen->default_module);
+	map_set(&gen->modules, cast(void *)1, &gen->default_module);
 	lb_init_module(&gen->default_module, c);
-
 
 	for (auto const &entry : gen->modules) {
 		lbModule *m = entry.value;
 		LLVMContextRef ctx = LLVMGetModuleContext(m->mod);
 		map_set(&gen->modules_through_ctx, ctx, m);
 	}
+
+	mpsc_init(&gen->entities_to_correct_linkage, heap_allocator());
 
 	return true;
 }
@@ -208,7 +215,7 @@ gb_internal void lb_loop_end(lbProcedure *p, lbLoopData const &data) {
 
 
 gb_internal void lb_make_global_private_const(LLVMValueRef global_data) {
-	LLVMSetLinkage(global_data, LLVMPrivateLinkage);
+	LLVMSetLinkage(global_data, LLVMLinkerPrivateLinkage);
 	LLVMSetUnnamedAddress(global_data, LLVMGlobalUnnamedAddr);
 	LLVMSetGlobalConstant(global_data, true);
 }
@@ -383,12 +390,14 @@ gb_internal lbModule *lb_module_of_entity(lbGenerator *gen, Entity *e) {
 	if (e->file) {
 		found = map_get(&gen->modules, cast(void *)e->file);
 		if (found) {
+			GB_ASSERT(*found != nullptr);
 			return *found;
 		}
 	}
 	if (e->pkg) {
 		found = map_get(&gen->modules, cast(void *)e->pkg);
 		if (found) {
+			GB_ASSERT(*found != nullptr);
 			return *found;
 		}
 	}
@@ -430,7 +439,7 @@ gb_internal lbAddr lb_addr_soa_variable(lbValue addr, lbValue index, Ast *index_
 }
 
 gb_internal lbAddr lb_addr_swizzle(lbValue addr, Type *array_type, u8 swizzle_count, u8 swizzle_indices[4]) {
-	GB_ASSERT(is_type_array(array_type));
+	GB_ASSERT(is_type_array(array_type) || is_type_simd_vector(array_type));
 	GB_ASSERT(1 < swizzle_count && swizzle_count <= 4);
 	lbAddr v = {lbAddr_Swizzle, addr};
 	v.swizzle.type = array_type;
@@ -446,6 +455,19 @@ gb_internal lbAddr lb_addr_swizzle_large(lbValue addr, Type *array_type, Slice<i
 	v.swizzle_large.indices = swizzle_indices;
 	return v;
 }
+
+gb_internal lbAddr lb_addr_bit_field(lbValue addr, Type *type, i64 bit_offset, i64 bit_size) {
+	GB_ASSERT(is_type_pointer(addr.type));
+	Type *mt = type_deref(addr.type);
+	GB_ASSERT_MSG(is_type_bit_field(mt), "%s", type_to_string(mt));
+
+	lbAddr v = {lbAddr_BitField, addr};
+	v.bitfield.type       = type;
+	v.bitfield.bit_offset = bit_offset;
+	v.bitfield.bit_size   = bit_size;
+	return v;
+}
+
 
 gb_internal Type *lb_addr_type(lbAddr const &addr) {
 	if (addr.addr.value == nullptr) {
@@ -755,7 +777,44 @@ gb_internal void lb_addr_store(lbProcedure *p, lbAddr addr, lbValue value) {
 		addr = lb_addr(lb_address_from_load(p, lb_addr_load(p, addr)));
 	}
 
-	if (addr.kind == lbAddr_RelativePointer) {
+	if (addr.kind == lbAddr_BitField) {
+		lbValue dst = addr.addr;
+		if (is_type_endian_big(addr.bitfield.type)) {
+			i64 shift_amount = 8*type_size_of(value.type) - addr.bitfield.bit_size;
+			lbValue shifted_value = value;
+			shifted_value.value = LLVMBuildLShr(p->builder,
+				shifted_value.value,
+				LLVMConstInt(LLVMTypeOf(shifted_value.value), shift_amount, false), "");
+
+			lbValue src = lb_address_from_load_or_generate_local(p, shifted_value);
+
+			auto args = array_make<lbValue>(temporary_allocator(), 4);
+			args[0] = dst;
+			args[1] = src;
+			args[2] = lb_const_int(p->module, t_uintptr, addr.bitfield.bit_offset);
+			args[3] = lb_const_int(p->module, t_uintptr, addr.bitfield.bit_size);
+			lb_emit_runtime_call(p, "__write_bits", args);
+		} else if ((addr.bitfield.bit_offset % 8) == 0 &&
+		           (addr.bitfield.bit_size   % 8) == 0) {
+			lbValue src = lb_address_from_load_or_generate_local(p, value);
+
+			lbValue byte_offset = lb_const_int(p->module, t_uintptr, addr.bitfield.bit_offset/8);
+			lbValue byte_size = lb_const_int(p->module, t_uintptr, addr.bitfield.bit_size/8);
+			lbValue dst_offset = lb_emit_conv(p, dst, t_u8_ptr);
+			dst_offset = lb_emit_ptr_offset(p, dst_offset, byte_offset);
+			lb_mem_copy_non_overlapping(p, dst_offset, src, byte_size);
+		} else {
+			lbValue src = lb_address_from_load_or_generate_local(p, value);
+
+			auto args = array_make<lbValue>(temporary_allocator(), 4);
+			args[0] = dst;
+			args[1] = src;
+			args[2] = lb_const_int(p->module, t_uintptr, addr.bitfield.bit_offset);
+			args[3] = lb_const_int(p->module, t_uintptr, addr.bitfield.bit_size);
+			lb_emit_runtime_call(p, "__write_bits", args);
+		}
+		return;
+	} else if (addr.kind == lbAddr_RelativePointer) {
 		Type *rel_ptr = base_type(lb_addr_type(addr));
 		GB_ASSERT(rel_ptr->kind == Type_RelativePointer ||
 		          rel_ptr->kind == Type_RelativeMultiPointer);
@@ -927,16 +986,6 @@ gb_internal void lb_addr_store(lbProcedure *p, lbAddr addr, lbValue value) {
 	GB_ASSERT(value.value != nullptr);
 	value = lb_emit_conv(p, value, lb_addr_type(addr));
 
-	// if (lb_is_const_or_global(value)) {
-	// 	// NOTE(bill): Just bypass the actual storage and set the initializer
-	// 	if (LLVMGetValueKind(addr.addr.value) == LLVMGlobalVariableValueKind) {
-	// 		LLVMValueRef dst = addr.addr.value;
-	// 		LLVMValueRef src = value.value;
-	// 		LLVMSetInitializer(dst, src);
-	// 		return;
-	// 	}
-	// }
-
 	lb_emit_store(p, addr.addr, value);
 }
 
@@ -967,13 +1016,15 @@ gb_internal void lb_emit_store(lbProcedure *p, lbValue ptr, lbValue value) {
 		return;
 	}
 
-	Type *a = type_deref(ptr.type);
+	Type *a = type_deref(ptr.type, true);
 	if (LLVMIsNull(value.value)) {
 		LLVMTypeRef src_t = llvm_addr_type(p->module, ptr);
 		if (is_type_proc(a)) {
 			LLVMTypeRef rawptr_type = lb_type(p->module, t_rawptr);
 			LLVMTypeRef rawptr_ptr_type = LLVMPointerType(rawptr_type, 0);
 			LLVMBuildStore(p->builder, LLVMConstNull(rawptr_type), LLVMBuildBitCast(p->builder, ptr.value, rawptr_ptr_type, ""));
+		} else if (is_type_bit_set(a)) {
+			lb_mem_zero_ptr(p, ptr.value, a, 1);
 		} else if (lb_sizeof(src_t) <= lb_max_zero_init_size()) {
 			LLVMBuildStore(p->builder, LLVMConstNull(src_t), ptr.value);
 		} else {
@@ -1061,17 +1112,104 @@ gb_internal lbValue lb_emit_load(lbProcedure *p, lbValue value) {
 		return lb_addr_load(p, addr);
 	}
 
-	GB_ASSERT(is_type_pointer(value.type));
+	GB_ASSERT_MSG(is_type_pointer(value.type), "%s", type_to_string(value.type));
 	Type *t = type_deref(value.type);
 	LLVMValueRef v = LLVMBuildLoad2(p->builder, lb_type(p->module, t), value.value, "");
+
+	// If it is not an instruction it isn't a GEP, so we don't need to track alignment in the metadata,
+	// which is not possible anyway (only LLVM instructions can have metadata).
+	if (LLVMIsAInstruction(value.value)) {
+		u64 is_packed = lb_get_metadata_custom_u64(p->module, value.value, ODIN_METADATA_IS_PACKED);
+		if (is_packed != 0) {
+			LLVMSetAlignment(v, 1);
+		}
+	}
+
 	return lbValue{v, t};
 }
 
 gb_internal lbValue lb_addr_load(lbProcedure *p, lbAddr const &addr) {
 	GB_ASSERT(addr.addr.value != nullptr);
 
+	if (addr.kind == lbAddr_BitField) {
+		Type *ct = core_type(addr.bitfield.type);
+		bool do_mask = false;
+		if (is_type_unsigned(ct) || is_type_boolean(ct)) {
+			// Mask
+			if (addr.bitfield.bit_size != 8*type_size_of(ct)) {
+				do_mask = true;
+			}
+		}
 
-	if (addr.kind == lbAddr_RelativePointer) {
+		i64 total_bitfield_bit_size = 8*type_size_of(lb_addr_type(addr));
+		i64 dst_byte_size = type_size_of(addr.bitfield.type);
+		lbAddr dst = lb_add_local_generated(p, addr.bitfield.type, true);
+		lbValue src = addr.addr;
+
+		lbValue bit_offset  = lb_const_int(p->module, t_uintptr, addr.bitfield.bit_offset);
+		lbValue bit_size    = lb_const_int(p->module, t_uintptr, addr.bitfield.bit_size);
+		lbValue byte_offset = lb_const_int(p->module, t_uintptr, (addr.bitfield.bit_offset+7)/8);
+		lbValue byte_size   = lb_const_int(p->module, t_uintptr, (addr.bitfield.bit_size+7)/8);
+
+		GB_ASSERT(type_size_of(addr.bitfield.type) >= ((addr.bitfield.bit_size+7)/8));
+
+		lbValue r = {};
+		if (is_type_endian_big(addr.bitfield.type)) {
+			auto args = array_make<lbValue>(temporary_allocator(), 4);
+			args[0] = dst.addr;
+			args[1] = src;
+			args[2] = bit_offset;
+			args[3] = bit_size;
+			lb_emit_runtime_call(p, "__read_bits", args);
+
+			LLVMValueRef shift_amount = LLVMConstInt(
+				lb_type(p->module, lb_addr_type(dst)),
+				8*dst_byte_size - addr.bitfield.bit_size,
+				false
+			);
+			r = lb_addr_load(p, dst);
+			r.value = LLVMBuildShl(p->builder, r.value, shift_amount, "");
+		} else if ((addr.bitfield.bit_offset % 8) == 0) {
+			do_mask = 8*dst_byte_size != addr.bitfield.bit_size;
+
+			lbValue copy_size = byte_size;
+			lbValue src_offset = lb_emit_conv(p, src, t_u8_ptr);
+			src_offset = lb_emit_ptr_offset(p, src_offset, byte_offset);
+			if (addr.bitfield.bit_offset + 8*dst_byte_size <= total_bitfield_bit_size) {
+				copy_size = lb_const_int(p->module, t_uintptr, dst_byte_size);
+			}
+			lb_mem_copy_non_overlapping(p, dst.addr, src_offset, copy_size, false);
+			r = lb_addr_load(p, dst);
+		} else {
+			auto args = array_make<lbValue>(temporary_allocator(), 4);
+			args[0] = dst.addr;
+			args[1] = src;
+			args[2] = bit_offset;
+			args[3] = bit_size;
+			lb_emit_runtime_call(p, "__read_bits", args);
+			r = lb_addr_load(p, dst);
+		}
+
+		Type *t = addr.bitfield.type;
+
+		if (do_mask) {
+			GB_ASSERT(addr.bitfield.bit_size <= 8*type_size_of(ct));
+
+			lbValue mask = lb_const_int(p->module, t, (1ull<<cast(u64)addr.bitfield.bit_size)-1);
+			r = lb_emit_arith(p, Token_And, r, mask, t);
+		}
+
+		if (!is_type_unsigned(ct) && !is_type_boolean(ct)) {
+			// Sign extension
+			// m := 1<<(bit_size-1)
+			// r = (r XOR m) - m
+			lbValue m = lb_const_int(p->module, t, 1ull<<(addr.bitfield.bit_size-1));
+			r = lb_emit_arith(p, Token_Xor, r, m, t);
+			r = lb_emit_arith(p, Token_Sub, r, m, t);
+		}
+
+		return r;
+	} else if (addr.kind == lbAddr_RelativePointer) {
 		Type *rel_ptr = base_type(lb_addr_type(addr));
 		Type *base_integer = nullptr;
 		Type *pointer_type = nullptr;
@@ -1199,7 +1337,7 @@ gb_internal lbValue lb_addr_load(lbProcedure *p, lbAddr const &addr) {
 			for (isize i = 0; i < field_count; i++) {
 				Entity *field = t->Struct.fields[i];
 				Type *base_type = field->type;
-				GB_ASSERT(base_type->kind == Type_Pointer);
+				GB_ASSERT(base_type->kind == Type_MultiPointer);
 
 				lbValue dst = lb_emit_struct_ep(p, res.addr, cast(i32)i);
 				lbValue src_ptr = lb_emit_struct_ep(p, addr.addr, cast(i32)i);
@@ -1213,6 +1351,30 @@ gb_internal lbValue lb_addr_load(lbProcedure *p, lbAddr const &addr) {
 		return lb_addr_load(p, res);
 	} else if (addr.kind == lbAddr_Swizzle) {
 		Type *array_type = base_type(addr.swizzle.type);
+		if (array_type->kind == Type_SimdVector) {
+			lbValue vec = lb_emit_load(p, addr.addr);
+			u8 index_count = addr.swizzle.count;
+			if (index_count == 0) {
+				return vec;
+			}
+
+			unsigned mask_len = cast(unsigned)index_count;
+			LLVMValueRef *mask_elems = gb_alloc_array(permanent_allocator(), LLVMValueRef, index_count);
+			for (isize i = 0; i < index_count; i++) {
+				mask_elems[i] = LLVMConstInt(lb_type(p->module, t_u32), addr.swizzle.indices[i], false);
+			}
+
+			LLVMValueRef mask = LLVMConstVector(mask_elems, mask_len);
+
+			LLVMValueRef v1 = vec.value;
+			LLVMValueRef v2 = vec.value;
+
+			lbValue res = {};
+			res.type = addr.swizzle.type;
+			res.value = LLVMBuildShuffleVector(p->builder, v1, v2, mask, "");
+			return res;
+		}
+
 		GB_ASSERT(array_type->kind == Type_Array);
 
 		unsigned res_align = cast(unsigned)type_align_of(addr.swizzle.type);
@@ -1234,8 +1396,6 @@ gb_internal lbValue lb_addr_load(lbProcedure *p, lbAddr const &addr) {
 
 		LLVMTypeRef vector_type = nullptr;
 		if (lb_try_vector_cast(p->module, addr.addr, &vector_type)) {
-			LLVMSetAlignment(res.addr.value, cast(unsigned)lb_alignof(vector_type));
-
 			LLVMValueRef vp = LLVMBuildPointerCast(p->builder, addr.addr.value, LLVMPointerType(vector_type, 0), "");
 			LLVMValueRef v = LLVMBuildLoad2(p->builder, vector_type, vp, "");
 			LLVMValueRef scalars[4] = {};
@@ -1244,6 +1404,8 @@ gb_internal lbValue lb_addr_load(lbProcedure *p, lbAddr const &addr) {
 			}
 			LLVMValueRef mask = LLVMConstVector(scalars, addr.swizzle.count);
 			LLVMValueRef sv = llvm_basic_shuffle(p, v, mask);
+
+			LLVMSetAlignment(res.addr.value, cast(unsigned)lb_alignof(LLVMTypeOf(sv)));
 
 			LLVMValueRef dst = LLVMBuildPointerCast(p->builder, ptr.value, LLVMPointerType(LLVMTypeOf(sv), 0), "");
 			LLVMBuildStore(p->builder, sv, dst);
@@ -1375,7 +1537,7 @@ gb_internal void lb_clone_struct_type(LLVMTypeRef dst, LLVMTypeRef src) {
 	LLVMStructSetBody(dst, fields, field_count, LLVMIsPackedStruct(src));
 }
 
-gb_internal String lb_mangle_name(lbModule *m, Entity *e) {
+gb_internal String lb_mangle_name(Entity *e) {
 	String name = e->token.string;
 
 	AstPackage *pkg = e->pkg;
@@ -1440,9 +1602,11 @@ gb_internal String lb_set_nested_type_name_ir_mangled_name(Entity *e, lbProcedur
 			GB_ASSERT(scope->flags & ScopeFlag_Proc);
 			proc = scope->procedure_entity;
 		}
-		GB_ASSERT(proc->kind == Entity_Procedure);
-		if (proc->code_gen_procedure != nullptr) {
-			p = proc->code_gen_procedure;
+		if (proc != nullptr) {
+			GB_ASSERT(proc->kind == Entity_Procedure);
+			if (proc->code_gen_procedure != nullptr) {
+				p = proc->code_gen_procedure;
+			}
 		}
 	}
 
@@ -1473,6 +1637,7 @@ gb_internal String lb_set_nested_type_name_ir_mangled_name(Entity *e, lbProcedur
 }
 
 gb_internal String lb_get_entity_name(lbModule *m, Entity *e, String default_name) {
+	GB_ASSERT(m != nullptr);
 	if (e != nullptr && e->kind == Entity_TypeName && e->TypeName.ir_mangled_name.len != 0) {
 		return e->TypeName.ir_mangled_name;
 	}
@@ -1504,7 +1669,7 @@ gb_internal String lb_get_entity_name(lbModule *m, Entity *e, String default_nam
 	}
 
 	if (!no_name_mangle) {
-		name = lb_mangle_name(m, e);
+		name = lb_mangle_name(e);
 	}
 	if (name.len == 0) {
 		name = e->token.string;
@@ -2004,7 +2169,7 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 		break;
 
 	case Type_Map:
-		init_map_internal_types(type);
+		init_map_internal_debug_types(type);
 		GB_ASSERT(t_raw_map != nullptr);
 		return lb_type_internal(m, t_raw_map);
 
@@ -2044,16 +2209,18 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 				array_add(&fields, padding_type);
 			}
 			
-			i64 padding_offset = 0;
+			i64 prev_offset = 0;
 			for (i32 field_index : struct_fields_index_by_increasing_offset(temporary_allocator(), type)) {
 				Entity *field = type->Struct.fields[field_index];
-				i64 padding = type->Struct.offsets[field_index] - padding_offset;
+				i64 offset = type->Struct.offsets[field_index];
+				GB_ASSERT(offset >= prev_offset);
 
+				i64 padding = offset - prev_offset;
 				if (padding != 0) {
 					LLVMTypeRef padding_type = lb_type_padding_filler(m, padding, type_align_of(field->type));
 					array_add(&fields, padding_type);
 				}
-				
+
 				field_remapping[field_index] = cast(i32)fields.count;
 
 				Type *field_type = field->type;
@@ -2064,14 +2231,11 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 				}
 
 				array_add(&fields, lb_type(m, field_type));
-				
-				if (!type->Struct.is_packed) {
-					padding_offset = align_formula(padding_offset, type_align_of(field->type));
-				}
-				padding_offset += type_size_of(field->type);
+
+				prev_offset = offset + type_size_of(field->type);
 			}
 			
-			i64 end_padding = full_type_size-padding_offset;
+			i64 end_padding = full_type_size-prev_offset;
 			if (end_padding > 0) {
 				array_add(&fields, lb_type_padding_filler(m, end_padding, 1));
 			}
@@ -2212,7 +2376,9 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 			}
 			return LLVMStructTypeInContext(ctx, fields, field_count, false);
 		}
-	
+
+	case Type_BitField:
+		return lb_type_internal(m, type->BitField.backing_type);
 	}
 
 	GB_PANIC("Invalid type %s", type_to_string(type));
@@ -2344,6 +2510,15 @@ gb_internal LLVMAttributeRef lb_create_enum_attribute(LLVMContextRef ctx, char c
 	return LLVMCreateEnumAttribute(ctx, kind, value);
 }
 
+gb_internal LLVMAttributeRef lb_create_string_attribute(LLVMContextRef ctx, String const &key, String const &value) {
+	LLVMAttributeRef attr = LLVMCreateStringAttribute(
+		ctx,
+		cast(char const *)key.text,   cast(unsigned)key.len,
+		cast(char const *)value.text, cast(unsigned)value.len);
+	return attr;
+}
+
+
 gb_internal void lb_add_proc_attribute_at_index(lbProcedure *p, isize index, char const *name, u64 value) {
 	LLVMAttributeRef attr = lb_create_enum_attribute(p->module->ctx, name, value);
 	GB_ASSERT(attr != nullptr);
@@ -2356,6 +2531,16 @@ gb_internal void lb_add_proc_attribute_at_index(lbProcedure *p, isize index, cha
 
 gb_internal void lb_add_attribute_to_proc(lbModule *m, LLVMValueRef proc_value, char const *name, u64 value=0) {
 	LLVMAddAttributeAtIndex(proc_value, LLVMAttributeIndex_FunctionIndex, lb_create_enum_attribute(m->ctx, name, value));
+}
+
+gb_internal bool lb_proc_has_attribute(lbModule *m, LLVMValueRef proc_value, char const *name) {
+	LLVMAttributeRef ref = LLVMGetEnumAttributeAtIndex(proc_value, LLVMAttributeIndex_FunctionIndex, LLVMGetEnumAttributeKindForName(name, gb_strlen(name)));
+	return ref != nullptr;
+}
+
+gb_internal void lb_add_attribute_to_proc_with_string(lbModule *m, LLVMValueRef proc_value, String const &name, String const &value) {
+	LLVMAttributeRef attr = lb_create_string_attribute(m->ctx, name, value);
+	LLVMAddAttributeAtIndex(proc_value, LLVMAttributeIndex_FunctionIndex, attr);
 }
 
 
@@ -2868,7 +3053,7 @@ gb_internal lbValue lb_find_value_from_entity(lbModule *m, Entity *e) {
 			if (e->code_gen_module != nullptr) {
 				other_module = e->code_gen_module;
 			} else {
-				other_module = nullptr;
+				other_module = &m->gen->default_module;
 			}
 			is_external = other_module != m;
 		}
@@ -2885,8 +3070,6 @@ gb_internal lbValue lb_find_value_from_entity(lbModule *m, Entity *e) {
 			LLVMSetLinkage(g.value, LLVMExternalLinkage);
 
 			lb_set_entity_from_other_modules_linkage_correctly(other_module, e, name);
-
-			// LLVMSetLinkage(other_g.value, LLVMExternalLinkage);
 
 			if (e->Variable.thread_local_model != "") {
 				LLVMSetThreadLocal(g.value, true);
@@ -2911,7 +3094,9 @@ gb_internal lbValue lb_find_value_from_entity(lbModule *m, Entity *e) {
 			return g;
 		}
 	}
-	GB_PANIC("\n\tError in: %s, missing value '%.*s'\n", token_pos_to_string(e->token.pos), LIT(e->token.string));
+
+	GB_PANIC("\n\tError in: %s, missing value '%.*s' in module %s\n",
+	         token_pos_to_string(e->token.pos), LIT(e->token.string), m->module_name);
 	return {};
 }
 

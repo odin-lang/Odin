@@ -1,6 +1,6 @@
 // package csv reads and writes comma-separated values (CSV) files.
 // This package supports the format described in RFC 4180 <https://tools.ietf.org/html/rfc4180.html>
-package csv
+package encoding_csv
 
 import "core:bufio"
 import "core:bytes"
@@ -57,6 +57,9 @@ Reader :: struct {
 	field_indices: [dynamic]int,
 	last_record:   [dynamic]string,
 	sr: strings.Reader, // used by reader_init_with_string
+
+	// Set and used by the iterator. Query using `iterator_last_error`
+	last_iterator_error: Error,
 }
 
 
@@ -91,7 +94,10 @@ DEFAULT_RECORD_BUFFER_CAPACITY :: 256
 
 // reader_init initializes a new Reader from r
 reader_init :: proc(reader: ^Reader, r: io.Reader, buffer_allocator := context.allocator) {
-	reader.comma = ','
+	switch reader.comma {
+	case '\x00', '\n', '\r', 0xfffd:
+		reader.comma = ','
+	}
 
 	context.allocator = buffer_allocator
 	reserve(&reader.record_buffer, DEFAULT_RECORD_BUFFER_CAPACITY)
@@ -118,9 +124,31 @@ reader_destroy :: proc(r: ^Reader) {
 	bufio.reader_destroy(&r.r)
 }
 
+/*
+	Returns a record at a time.
+
+	for record, row_idx in csv.iterator_next(&r) { ... }
+
+	TIP: If you process the results within the loop and don't need to own the results,
+	you can set the Reader's `reuse_record` and `reuse_record_reuse_record_buffer` to true;
+	you won't need to delete the record or its fields.
+*/
+iterator_next :: proc(r: ^Reader) -> (record: []string, idx: int, err: Error, more: bool) {
+	record, r.last_iterator_error = read(r)
+	return record, r.line_count - 1, r.last_iterator_error, r.last_iterator_error == nil
+}
+
+// Get last CSV parse error if we ignored it in the iterator loop
+//
+// for record, row_idx in csv.iterator_next(&r) { ... }
+iterator_last_error :: proc(r: Reader) -> (err: Error) {
+	return r.last_iterator_error
+}
+
 // read reads a single record (a slice of fields) from r
 //
 // All \r\n sequences are normalized to \n, including multi-line field
+@(require_results)
 read :: proc(r: ^Reader, allocator := context.allocator) -> (record: []string, err: Error) {
 	if r.reuse_record {
 		record, err = _read_record(r, &r.last_record, allocator)
@@ -133,6 +161,7 @@ read :: proc(r: ^Reader, allocator := context.allocator) -> (record: []string, e
 }
 
 // is_io_error checks where an Error is a specific io.Error kind
+@(require_results)
 is_io_error :: proc(err: Error, io_err: io.Error) -> bool {
 	if v, ok := err.(io.Error); ok {
 		return v == io_err
@@ -140,10 +169,10 @@ is_io_error :: proc(err: Error, io_err: io.Error) -> bool {
 	return false
 }
 
-
 // read_all reads all the remaining records from r.
 // Each record is a slice of fields.
-// read_all is defined to read until an EOF, and does not treat, and does not treat EOF as an error
+// read_all is defined to read until an EOF, and does not treat EOF as an error
+@(require_results)
 read_all :: proc(r: ^Reader, allocator := context.allocator) -> ([][]string, Error) {
 	context.allocator = allocator
 	records: [dynamic][]string
@@ -153,13 +182,18 @@ read_all :: proc(r: ^Reader, allocator := context.allocator) -> ([][]string, Err
 			return records[:], nil
 		}
 		if rerr != nil {
-			return nil, rerr
+			// allow for a partial read
+			if record != nil {
+				append(&records, record)
+			}
+			return records[:], rerr
 		}
 		append(&records, record)
 	}
 }
 
 // read reads a single record (a slice of fields) from the provided input.
+@(require_results)
 read_from_string :: proc(input: string, record_allocator := context.allocator, buffer_allocator := context.allocator) -> (record: []string, n: int, err: Error) {
 	ir: strings.Reader
 	strings.reader_init(&ir, input)
@@ -175,6 +209,7 @@ read_from_string :: proc(input: string, record_allocator := context.allocator, b
 
 
 // read_all reads all the remaining records from the provided input.
+@(require_results)
 read_all_from_string :: proc(input: string, records_allocator := context.allocator, buffer_allocator := context.allocator) -> ([][]string, Error) {
 	ir: strings.Reader
 	strings.reader_init(&ir, input)
@@ -186,7 +221,7 @@ read_all_from_string :: proc(input: string, records_allocator := context.allocat
 	return read_all(&r, records_allocator)
 }
 
-@private
+@(private, require_results)
 is_valid_delim :: proc(r: rune) -> bool {
 	switch r {
 	case 0, '"', '\r', '\n', utf8.RUNE_ERROR:
@@ -195,8 +230,9 @@ is_valid_delim :: proc(r: rune) -> bool {
 	return utf8.valid_rune(r)
 }
 
-@private
+@(private, require_results)
 _read_record :: proc(r: ^Reader, dst: ^[dynamic]string, allocator := context.allocator) -> ([]string, Error) {
+	@(require_results)
 	read_line :: proc(r: ^Reader) -> ([]byte, io.Error) {
 		if !r.multiline_fields {
 			line, err := bufio.reader_read_slice(&r.r, '\n')
@@ -266,6 +302,7 @@ _read_record :: proc(r: ^Reader, dst: ^[dynamic]string, allocator := context.all
 		unreachable()
 	}
 
+	@(require_results)
 	length_newline :: proc(b: []byte) -> int {
 		if len(b) > 0 && b[len(b)-1] == '\n' {
 			return 1
@@ -273,6 +310,7 @@ _read_record :: proc(r: ^Reader, dst: ^[dynamic]string, allocator := context.all
 		return 0
 	}
 
+	@(require_results)
 	next_rune :: proc(b: []byte) -> rune {
 		r, _ := utf8.decode_rune(b)
 		return r
@@ -446,5 +484,4 @@ _read_record :: proc(r: ^Reader, dst: ^[dynamic]string, allocator := context.all
 		r.fields_per_record = len(dst)
 	}
 	return dst[:], err
-
 }

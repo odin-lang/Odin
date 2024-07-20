@@ -47,8 +47,6 @@ _entities :: proc() {
 }
 
 _main :: proc() {
-	using fmt
-
 	options := xml.Options{ flags = { .Ignore_Unsupported, .Intern_Comments, .Unbox_CDATA, .Decode_SGML_Entities }}
 
 	doc, _ := xml.parse(#load("test.html"), options)
@@ -58,8 +56,6 @@ _main :: proc() {
 }
 
 main :: proc() {
-	using fmt
-
 	track: mem.Tracking_Allocator
 	mem.tracking_allocator_init(&track, context.allocator)
 	context.allocator = mem.tracking_allocator(&track)
@@ -68,9 +64,9 @@ main :: proc() {
 	_entities()
 
 	if len(track.allocation_map) > 0 {
-		println()
+		fmt.println()
 		for _, v in track.allocation_map {
-			printf("%v Leaked %v bytes.\n", v.location, v.size)
+			fmt.printf("%v Leaked %v bytes.\n", v.location, v.size)
 		}
 	}	
 }

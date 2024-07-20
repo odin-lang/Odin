@@ -1,7 +1,7 @@
 //+build js
 package math
 
-import "core:intrinsics"
+import "base:intrinsics"
 
 foreign import "odin_env"
 

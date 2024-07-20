@@ -1,7 +1,7 @@
 //+build i386, amd64
 package simd_x86
 
-import "core:intrinsics"
+import "base:intrinsics"
 import "core:simd"
 _ :: simd
 
@@ -105,7 +105,7 @@ _mm_sign_epi32 :: #force_inline proc "c" (a, b: __m128i) -> __m128i {
 
 
 
-@(private, default_calling_convention="c")
+@(private, default_calling_convention="none")
 foreign _ {
 	@(link_name = "llvm.x86.ssse3.pabs.b.128")
 	pabsb128     :: proc(a: i8x16) -> u8x16 ---

@@ -27,8 +27,19 @@ typedef enum {
     TB_X86_INSTR_DIRECTION = (1u << 6u),
 
     // uses the second data type because the instruction is weird like MOVSX or MOVZX
-    TB_X86_INSTR_TWO_DATA_TYPES = (1u << 7u)
+    TB_X86_INSTR_TWO_DATA_TYPES = (1u << 7u),
+
+    // REP prefix is present
+    TB_X86_INSTR_REP = (1u << 8u),
+
+    // REPNE prefix is present
+    TB_X86_INSTR_REPNE = (1u << 9u),
 } TB_X86_InstFlags;
+
+typedef enum {
+    TB_X86_RAX, TB_X86_RCX, TB_X86_RDX, TB_X86_RBX, TB_X86_RSP, TB_X86_RBP, TB_X86_RSI, TB_X86_RDI,
+    TB_X86_R8,  TB_X86_R9,  TB_X86_R10, TB_X86_R11, TB_X86_R12, TB_X86_R13, TB_X86_R14, TB_X86_R15,
+} TB_X86_GPR;
 
 typedef enum {
     TB_X86_SEGMENT_DEFAULT = 0,
@@ -60,20 +71,21 @@ typedef enum {
 } TB_X86_DataType;
 
 typedef struct {
-    int16_t type;
+    int32_t opcode;
 
-    // registers (there's 4 max taking up 4bit slots each)
-    uint16_t regs;
-    uint8_t flags;
+    // registers (there's 4 max taking up 8bit slots each)
+    int8_t regs[4];
+    uint16_t flags;
 
     // bitpacking amirite
-    TB_X86_DataType data_type  : 4;
-    TB_X86_DataType data_type2 : 4;
+    TB_X86_DataType data_type  : 8;
+    TB_X86_DataType data_type2 : 8;
     TB_X86_Segment segment     : 4;
     uint8_t length             : 4;
 
     // memory operand
     //   X86_INSTR_USE_MEMOP
+    uint8_t base, index, scale;
     int32_t disp;
 
     // immediate operand
@@ -85,6 +97,9 @@ typedef struct {
     };
 } TB_X86_Inst;
 
-TB_X86_Inst tb_x86_disasm(size_t length, const uint8_t data[length]);
+bool tb_x86_disasm(TB_X86_Inst* restrict inst, size_t length, const uint8_t* data);
+const char* tb_x86_reg_name(int8_t reg, TB_X86_DataType dt);
+const char* tb_x86_type_name(TB_X86_DataType dt);
+const char* tb_x86_mnemonic(TB_X86_Inst* inst);
 
 #endif /* TB_X64_H */

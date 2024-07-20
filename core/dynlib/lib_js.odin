@@ -13,3 +13,7 @@ _unload_library :: proc(library: Library) -> bool {
 _symbol_address :: proc(library: Library, symbol: string) -> (ptr: rawptr, found: bool) {
 	return nil, false
 }
+
+_last_error :: proc() -> string {
+	return ""
+}

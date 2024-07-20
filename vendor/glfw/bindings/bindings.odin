@@ -21,14 +21,21 @@ when ODIN_OS == .Windows {
 			"system:shell32.lib",
 		}
 	}
-} else when ODIN_OS == .Linux {
-	foreign import glfw "system:glfw"
 } else when ODIN_OS == .Darwin {
-	foreign import glfw { 
-		"../lib/darwin/libglfw3.a",
-		"system:Cocoa.framework",
-		"system:IOKit.framework",
-		"system:OpenGL.framework",
+	when GLFW_SHARED {
+		foreign import glfw {
+			"system:glfw",
+			"system:Cocoa.framework",
+			"system:IOKit.framework",
+			"system:OpenGL.framework",
+		}
+	} else {
+		foreign import glfw { 
+			"../lib/darwin/libglfw3.a",
+			"system:Cocoa.framework",
+			"system:IOKit.framework",
+			"system:OpenGL.framework",
+		}
 	}
 } else {
 	foreign import glfw "system:glfw"
@@ -43,6 +50,10 @@ foreign glfw {
 	Terminate :: proc() ---
 	
 	InitHint  :: proc(hint, value: c.int) ---
+
+	InitAllocator :: proc(#by_ptr allocator: Allocator) ---
+
+	InitVulkanLoader :: proc(loader: vk.ProcGetInstanceProcAddr) ---
 
 	GetVersion :: proc(major, minor, rev: ^c.int) ---
 	GetError   :: proc(description: ^cstring) -> c.int ---
@@ -94,6 +105,7 @@ foreign glfw {
 	GetKey               :: proc(window: ^Window, key: c.int) -> c.int ---
 	GetKeyName           :: proc(key, scancode: c.int) -> cstring ---
 	SetWindowShouldClose :: proc(window: ^Window, value: b32) ---
+	GetWindowTitle       :: proc(window: ^Window) -> cstring ---
 	JoystickPresent      :: proc(joy: c.int) -> b32 ---
 	GetJoystickName      :: proc(joy: c.int) -> cstring ---
 	GetKeyScancode       :: proc(key: c.int) -> c.int ---
@@ -181,8 +193,16 @@ foreign glfw {
 	SetCharCallback        :: proc(window: ^Window, cbfun: CharProc)        -> CharProc ---
 	SetCharModsCallback    :: proc(window: ^Window, cbfun: CharModsProc)    -> CharModsProc ---
 	SetCursorEnterCallback :: proc(window: ^Window, cbfun: CursorEnterProc) -> CursorEnterProc ---
-	SetJoystickCallback    :: proc(window: ^Window, cbfun: JoystickProc)    -> JoystickProc ---
+	SetJoystickCallback    :: proc(cbfun: JoystickProc)    -> JoystickProc ---
 
 	SetErrorCallback :: proc(cbfun: ErrorProc) -> ErrorProc ---
+
+	// Functions added in 3.4, Linux links against system glfw so we define these as weak to be able
+	// to check at runtime if they are available.
+
+	@(linkage="weak")
+	GetPlatform       :: proc() -> c.int ---
+	@(linkage="weak")
+	PlatformSupported :: proc(platform: c.int) -> b32 ---
 }
 

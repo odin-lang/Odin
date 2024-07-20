@@ -1,7 +1,7 @@
 //+build i386, amd64
 package sysinfo
 
-import "core:intrinsics"
+import "base:intrinsics"
 
 // cpuid :: proc(ax, cx: u32) -> (eax, ebc, ecx, edx: u32) ---
 cpuid :: intrinsics.x86_cpuid
@@ -37,11 +37,11 @@ cpu_name:     Maybe(string)
 
 @(init, private)
 init_cpu_features :: proc "c" () {
-	is_set :: #force_inline proc "c" (hwc: u32, value: u32) -> bool {
-		return hwc&(1 << value) != 0
+	is_set :: #force_inline proc "c" (bit: u32, value: u32) -> bool {
+		return (value>>bit) & 0x1 != 0
 	}
-	try_set :: #force_inline proc "c" (set: ^CPU_Features, feature: CPU_Feature, hwc: u32, value: u32) {
-		if is_set(hwc, value) {
+	try_set :: #force_inline proc "c" (set: ^CPU_Features, feature: CPU_Feature, bit: u32, value: u32) {
+		if is_set(bit, value) {
 			set^ += {feature}
 		}
 	}
@@ -67,8 +67,8 @@ init_cpu_features :: proc "c" () {
 	try_set(&set, .os_xsave,  27, ecx1)
 	try_set(&set, .rdrand,    30, ecx1)
 
-	when ODIN_OS == .FreeBSD || ODIN_OS == .OpenBSD {
-		// xgetbv is an illegal instruction under FreeBSD 13 & OpenBSD 7.1
+	when ODIN_OS == .FreeBSD || ODIN_OS == .OpenBSD || ODIN_OS == .NetBSD {
+		// xgetbv is an illegal instruction under FreeBSD 13, OpenBSD 7.1 and NetBSD 10
 		// return before probing further
 		cpu_features = set
 		return
@@ -117,7 +117,7 @@ init_cpu_name :: proc "c" () {
 		return
 	}
 
-	_buf := transmute(^[0x12]u32)&_cpu_name_buf
+	_buf := (^[0x12]u32)(&_cpu_name_buf)
 	_buf[ 0], _buf[ 1], _buf[ 2], _buf[ 3] = cpuid(0x8000_0002, 0)
 	_buf[ 4], _buf[ 5], _buf[ 6], _buf[ 7] = cpuid(0x8000_0003, 0)
 	_buf[ 8], _buf[ 9], _buf[10], _buf[11] = cpuid(0x8000_0004, 0)

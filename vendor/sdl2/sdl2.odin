@@ -23,7 +23,7 @@ package sdl2
 
 
 import "core:c"
-import "core:intrinsics"
+import "base:intrinsics"
 
 when ODIN_OS == .Windows {
 	foreign import lib "SDL2.lib"
@@ -235,8 +235,8 @@ foreign lib {
 // quit
 
 QuitRequested :: #force_inline proc "c" () -> bool {
-        PumpEvents()
-        return bool(PeepEvents(nil, 0, .PEEKEVENT, .QUIT, .QUIT) > 0)
+	PumpEvents()
+	return bool(PeepEvents(nil, 0, .PEEKEVENT, .QUIT, .QUIT) > 0)
 }
 
 

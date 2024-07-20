@@ -1,10 +1,9 @@
-// +build freebsd
 package sysinfo
 
 import sys "core:sys/unix"
 import "core:strings"
 import "core:strconv"
-import "core:runtime"
+import "base:runtime"
 
 @(private)
 version_string_buf: [1024]u8
@@ -13,7 +12,7 @@ version_string_buf: [1024]u8
 init_os_version :: proc () {
 	os_version.platform = .FreeBSD
 
-	kernel_version_buf: [129]u8
+	kernel_version_buf: [1024]u8
 
 	b := strings.builder_from_bytes(version_string_buf[:])
 	// Retrieve kernel info using `sysctl`, e.g. FreeBSD 13.1-RELEASE-p2 GENERIC
@@ -68,7 +67,7 @@ init_os_version :: proc () {
 	}
 }
 
-@(init)
+@(init, private)
 init_ram :: proc() {
 	// Retrieve RAM info using `sysctl`
 	mib := []i32{sys.CTL_HW, sys.HW_PHYSMEM}

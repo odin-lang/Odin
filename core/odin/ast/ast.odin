@@ -513,6 +513,7 @@ Package_Decl :: struct {
 Import_Decl :: struct {
 	using node: Decl,
 	docs:       ^Comment_Group,
+	attributes:  [dynamic]^Attribute, // dynamic as parsing will add to them lazily
 	is_using:    bool,
 	import_tok:  tokenizer.Token,
 	name:        tokenizer.Token,
@@ -538,7 +539,7 @@ Foreign_Import_Decl :: struct {
 	import_tok:      tokenizer.Token,
 	name:            ^Ident,
 	collection_name: string,
-	fullpaths:       []string,
+	fullpaths:       []^Expr,
 	comment:         ^Comment_Group,
 }
 
@@ -597,6 +598,8 @@ Field_Flag :: enum {
 	Any_Int,
 	Subtype,
 	By_Ptr,
+	No_Broadcast,
+	No_Capture,
 
 	Results,
 	Tags,
@@ -616,6 +619,8 @@ field_flag_strings := [Field_Flag]string{
 	.Any_Int            = "#any_int",
 	.Subtype            = "#subtype",
 	.By_Ptr             = "#by_ptr",
+	.No_Broadcast       = "#no_broadcast",
+	.No_Capture         = "#no_capture",
 
 	.Results            = "results",
 	.Tags               = "field tag",
@@ -624,12 +629,14 @@ field_flag_strings := [Field_Flag]string{
 }
 
 field_hash_flag_strings := []struct{key: string, flag: Field_Flag}{
-	{"no_alias", .No_Alias},
-	{"c_vararg", .C_Vararg},
-	{"const",    .Const},
-	{"any_int",  .Any_Int},
-	{"subtype",  .Subtype},
-	{"by_ptr",   .By_Ptr},
+	{"no_alias",     .No_Alias},
+	{"c_vararg",     .C_Vararg},
+	{"const",        .Const},
+	{"any_int",      .Any_Int},
+	{"subtype",      .Subtype},
+	{"by_ptr",       .By_Ptr},
+	{"no_broadcast", .No_Broadcast},
+	{"no_capture",   .No_Capture},
 }
 
 
@@ -650,6 +657,7 @@ Field_Flags_Signature :: Field_Flags{
 	.Const,
 	.Any_Int,
 	.By_Ptr,
+	.No_Broadcast,
 	.Default_Parameters,
 }
 
@@ -749,7 +757,7 @@ Array_Type :: struct {
 	using node: Expr,
 	open:  tokenizer.Pos,
 	tag:   ^Expr,
-	len:   ^Expr, // Ellipsis node for [?]T arrray types, nil for slice types
+	len:   ^Expr, // Ellipsis node for [?]T array types, nil for slice types
 	close: tokenizer.Pos,
 	elem:  ^Expr,
 }
@@ -768,6 +776,7 @@ Struct_Type :: struct {
 	tok_pos:       tokenizer.Pos,
 	poly_params:   ^Field_List,
 	align:         ^Expr,
+	field_align:   ^Expr,
 	where_token:   tokenizer.Token,
 	where_clauses: []^Expr,
 	is_packed:     bool,
@@ -837,6 +846,23 @@ Matrix_Type :: struct {
 	elem:         ^Expr,
 }
 
+Bit_Field_Type :: struct {
+	using node:   Expr,
+	tok_pos:      tokenizer.Pos,
+	backing_type: ^Expr,
+	open:         tokenizer.Pos,
+	fields:       []^Bit_Field_Field,
+	close:        tokenizer.Pos,
+}
+
+Bit_Field_Field :: struct {
+	using node: Node,
+	docs:       ^Comment_Group,
+	name:       ^Expr,
+	type:       ^Expr,
+	bit_size:   ^Expr,
+	comments:   ^Comment_Group,
+}
 
 Any_Node :: union {
 	^Package,
@@ -893,6 +919,7 @@ Any_Node :: union {
 	^Map_Type,
 	^Relative_Type,
 	^Matrix_Type,
+	^Bit_Field_Type,
 
 	^Bad_Stmt,
 	^Empty_Stmt,
@@ -923,6 +950,7 @@ Any_Node :: union {
 	^Attribute,
 	^Field,
 	^Field_List,
+	^Bit_Field_Field,
 }
 
 
@@ -977,6 +1005,7 @@ Any_Expr :: union {
 	^Map_Type,
 	^Relative_Type,
 	^Matrix_Type,
+	^Bit_Field_Type,
 }
 
 

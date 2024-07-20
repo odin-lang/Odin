@@ -1,6 +1,6 @@
 package strings
 
-import "core:runtime"
+import "base:runtime"
 import "core:mem"
 
 // Custom string entry struct
@@ -37,7 +37,7 @@ Returns:
 intern_init :: proc(m: ^Intern, allocator := context.allocator, map_allocator := context.allocator, loc := #caller_location) -> (err: mem.Allocator_Error) {
 	m.allocator = allocator
 	m.entries = make(map[string]^Intern_Entry, 16, map_allocator, loc) or_return
-    return nil
+	return nil
 }
 /*
 Frees the map and all its content allocated using the `.allocator`.

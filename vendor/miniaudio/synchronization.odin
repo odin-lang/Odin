@@ -1,12 +1,6 @@
 package miniaudio
 
-when ODIN_OS == .Windows {
-	foreign import lib "lib/miniaudio.lib"
-} else when ODIN_OS == .Linux {
-	foreign import lib "lib/miniaudio.a"
-} else {
-	foreign import lib "system:miniaudio"
-}
+foreign import lib { LIB }
 
 @(default_calling_convention="c", link_prefix="ma_")
 foreign lib {

@@ -11,6 +11,7 @@ package _blake2
 */
 
 import "core:encoding/endian"
+import "core:mem"
 
 BLAKE2S_BLOCK_SIZE :: 64
 BLAKE2S_SIZE :: 32
@@ -28,7 +29,6 @@ Blake2s_Context :: struct {
 	is_keyed:     bool,
 	size:         byte,
 	is_last_node: bool,
-	cfg:          Blake2_Config,
 
 	is_initialized: bool,
 }
@@ -44,7 +44,6 @@ Blake2b_Context :: struct {
 	is_keyed:     bool,
 	size:         byte,
 	is_last_node: bool,
-	cfg:          Blake2_Config,
 
 	is_initialized: bool,
 }
@@ -83,62 +82,61 @@ BLAKE2B_IV := [8]u64 {
 	0x1f83d9abfb41bd6b, 0x5be0cd19137e2179,
 }
 
-init :: proc(ctx: ^$T) {
+init :: proc(ctx: ^$T, cfg: ^Blake2_Config) {
 	when T == Blake2s_Context {
-		block_size :: BLAKE2S_BLOCK_SIZE
 		max_size :: BLAKE2S_SIZE
 	} else when T == Blake2b_Context {
-		block_size :: BLAKE2B_BLOCK_SIZE
 		max_size :: BLAKE2B_SIZE
 	}
 
-	if ctx.cfg.size > max_size {
+	if cfg.size > max_size {
 		panic("blake2: requested output size exceeeds algorithm max")
 	}
 
-	p := make([]byte, block_size)
-	defer delete(p)
+	// To save having to allocate a scratch buffer, use the internal
+	// data buffer (`ctx.x`), as it is exactly the correct size.
+	p := ctx.x[:]
 
-	p[0] = ctx.cfg.size
-	p[1] = byte(len(ctx.cfg.key))
+	p[0] = cfg.size
+	p[1] = byte(len(cfg.key))
 
-	if ctx.cfg.salt != nil {
+	if cfg.salt != nil {
 		when T == Blake2s_Context {
-			copy(p[16:], ctx.cfg.salt)
+			copy(p[16:], cfg.salt)
 		} else when T == Blake2b_Context {
-			copy(p[32:], ctx.cfg.salt)
+			copy(p[32:], cfg.salt)
 		}
 	}
-	if ctx.cfg.person != nil {
+	if cfg.person != nil {
 		when T == Blake2s_Context {
-			copy(p[24:], ctx.cfg.person)
+			copy(p[24:], cfg.person)
 		} else when T == Blake2b_Context {
-			copy(p[48:], ctx.cfg.person)
+			copy(p[48:], cfg.person)
 		}
 	}
 
-	if ctx.cfg.tree != nil {
-		p[2] = ctx.cfg.tree.(Blake2_Tree).fanout
-		p[3] = ctx.cfg.tree.(Blake2_Tree).max_depth
-		endian.unchecked_put_u32le(p[4:], ctx.cfg.tree.(Blake2_Tree).leaf_size)
+	if cfg.tree != nil {
+		p[2] = cfg.tree.(Blake2_Tree).fanout
+		p[3] = cfg.tree.(Blake2_Tree).max_depth
+		endian.unchecked_put_u32le(p[4:], cfg.tree.(Blake2_Tree).leaf_size)
 		when T == Blake2s_Context {
-			p[8] = byte(ctx.cfg.tree.(Blake2_Tree).node_offset)
-			p[9] = byte(ctx.cfg.tree.(Blake2_Tree).node_offset >> 8)
-			p[10] = byte(ctx.cfg.tree.(Blake2_Tree).node_offset >> 16)
-			p[11] = byte(ctx.cfg.tree.(Blake2_Tree).node_offset >> 24)
-			p[12] = byte(ctx.cfg.tree.(Blake2_Tree).node_offset >> 32)
-			p[13] = byte(ctx.cfg.tree.(Blake2_Tree).node_offset >> 40)
-			p[14] = ctx.cfg.tree.(Blake2_Tree).node_depth
-			p[15] = ctx.cfg.tree.(Blake2_Tree).inner_hash_size
+			p[8] = byte(cfg.tree.(Blake2_Tree).node_offset)
+			p[9] = byte(cfg.tree.(Blake2_Tree).node_offset >> 8)
+			p[10] = byte(cfg.tree.(Blake2_Tree).node_offset >> 16)
+			p[11] = byte(cfg.tree.(Blake2_Tree).node_offset >> 24)
+			p[12] = byte(cfg.tree.(Blake2_Tree).node_offset >> 32)
+			p[13] = byte(cfg.tree.(Blake2_Tree).node_offset >> 40)
+			p[14] = cfg.tree.(Blake2_Tree).node_depth
+			p[15] = cfg.tree.(Blake2_Tree).inner_hash_size
 		} else when T == Blake2b_Context {
-			endian.unchecked_put_u64le(p[8:], ctx.cfg.tree.(Blake2_Tree).node_offset)
-			p[16] = ctx.cfg.tree.(Blake2_Tree).node_depth
-			p[17] = ctx.cfg.tree.(Blake2_Tree).inner_hash_size
+			endian.unchecked_put_u64le(p[8:], cfg.tree.(Blake2_Tree).node_offset)
+			p[16] = cfg.tree.(Blake2_Tree).node_depth
+			p[17] = cfg.tree.(Blake2_Tree).inner_hash_size
 		}
 	} else {
 		p[2], p[3] = 1, 1
 	}
-	ctx.size = ctx.cfg.size
+	ctx.size = cfg.size
 	for i := 0; i < 8; i += 1 {
 		when T == Blake2s_Context {
 			ctx.h[i] = BLAKE2S_IV[i] ~ endian.unchecked_get_u32le(p[i * 4:])
@@ -147,11 +145,14 @@ init :: proc(ctx: ^$T) {
 			ctx.h[i] = BLAKE2B_IV[i] ~ endian.unchecked_get_u64le(p[i * 8:])
 		}
 	}
-	if ctx.cfg.tree != nil && ctx.cfg.tree.(Blake2_Tree).is_last_node {
+
+	mem.zero(&ctx.x, size_of(ctx.x)) // Done with the scratch space, no barrier.
+
+	if cfg.tree != nil && cfg.tree.(Blake2_Tree).is_last_node {
 		ctx.is_last_node = true
 	}
-	if len(ctx.cfg.key) > 0 {
-		copy(ctx.padded_key[:], ctx.cfg.key)
+	if len(cfg.key) > 0 {
+		copy(ctx.padded_key[:], cfg.key)
 		update(ctx, ctx.padded_key[:])
 		ctx.is_keyed = true
 	}
@@ -194,22 +195,40 @@ update :: proc(ctx: ^$T, p: []byte) {
 	ctx.nx += copy(ctx.x[ctx.nx:], p)
 }
 
-final :: proc(ctx: ^$T, hash: []byte) {
+final :: proc(ctx: ^$T, hash: []byte, finalize_clone: bool = false) {
 	assert(ctx.is_initialized)
 
+	ctx := ctx
+	if finalize_clone {
+		tmp_ctx: T
+		clone(&tmp_ctx, ctx)
+		ctx = &tmp_ctx
+	}
+	defer(reset(ctx))
+
 	when T == Blake2s_Context {
-		if len(hash) < int(ctx.cfg.size) {
+		if len(hash) < int(ctx.size) {
 			panic("crypto/blake2s: invalid destination digest size")
 		}
 		blake2s_final(ctx, hash)
 	} else when T == Blake2b_Context {
-		if len(hash) < int(ctx.cfg.size) {
+		if len(hash) < int(ctx.size) {
 			panic("crypto/blake2b: invalid destination digest size")
 		}
 		blake2b_final(ctx, hash)
 	}
+}
 
-	ctx.is_initialized = false
+clone :: proc(ctx, other: ^$T) {
+	ctx^ = other^
+}
+
+reset :: proc(ctx: ^$T) {
+	if !ctx.is_initialized {
+		return
+	}
+
+	mem.zero_explicit(ctx, size_of(ctx^))
 }
 
 @(private)

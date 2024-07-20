@@ -1,6 +1,6 @@
 package sync
 
-import "core:runtime"
+import "base:runtime"
 import "core:time"
 
 current_thread_id :: proc "contextless" () -> int {

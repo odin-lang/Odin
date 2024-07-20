@@ -1,6 +1,7 @@
 package time
 
-import "core:intrinsics"
+import    "base:intrinsics"
+import dt "core:time/datetime"
 
 Duration :: distinct i64
 
@@ -219,6 +220,10 @@ unix :: proc "contextless" (sec: i64, nsec: i64) -> Time {
 	return Time{(sec*1e9 + nsec)}
 }
 
+from_nanoseconds :: #force_inline proc "contextless" (nsec: i64) -> Time {
+	return Time{nsec}
+}
+
 to_unix_seconds :: time_to_unix
 time_to_unix :: proc "contextless" (t: Time) -> i64 {
 	return t._nsec/1e9
@@ -237,8 +242,9 @@ time_add :: proc "contextless" (t: Time, d: Duration) -> Time {
 //
 // Accuracy seems to be pretty good out of the box on Linux, to within around 4µs worst case.
 // On Windows it depends but is comparable with regular sleep in the worst case.
-// To get the same kind of accuracy as on Linux, have your program call `win32.time_begin_period(1)` to
+// To get the same kind of accuracy as on Linux, have your program call `windows.timeBeginPeriod(1)` to
 // tell Windows to use a more accurate timer for your process.
+// Additionally your program should call `windows.timeEndPeriod(1)` once you're done with `accurate_sleep`. 
 accurate_sleep :: proc "contextless" (d: Duration) {
 	to_sleep, estimate, mean, m2, count: Duration
 
@@ -299,10 +305,6 @@ _time_abs :: proc "contextless" (t: Time) -> u64 {
 
 @(private)
 _abs_date :: proc "contextless" (abs: u64, full: bool) -> (year: int, month: Month, day: int, yday: int) {
-	_is_leap_year :: proc "contextless" (year: int) -> bool {
-		return year%4 == 0 && (year%100 != 0 || year%400 == 0)
-	}
-
 	d := abs / SECONDS_PER_DAY
 
 	// 400 year cycles
@@ -335,7 +337,7 @@ _abs_date :: proc "contextless" (abs: u64, full: bool) -> (year: int, month: Mon
 
 	day = yday
 
-	if _is_leap_year(year) {
+	if is_leap_year(year) {
 		switch {
 		case day > 31+29-1:
 			day -= 1
@@ -360,51 +362,38 @@ _abs_date :: proc "contextless" (abs: u64, full: bool) -> (year: int, month: Mon
 	return
 }
 
-datetime_to_time :: proc "contextless" (year, month, day, hour, minute, second: int, nsec := int(0)) -> (t: Time, ok: bool) {
-	divmod :: proc "contextless" (year: int, divisor: int) -> (div: int, mod: int) {
-		if divisor <= 0 {
-			intrinsics.debug_trap()
-		}
-		div = int(year / divisor)
-		mod = year % divisor
+components_to_time :: proc "contextless" (#any_int year, #any_int month, #any_int day, #any_int hour, #any_int minute, #any_int second: i64, #any_int nsec := i64(0)) -> (t: Time, ok: bool) {
+	this_date, err := dt.components_to_datetime(year, month, day, hour, minute, second, nsec)
+	if err != .None {
 		return
 	}
-
-	ok = true
-
-	_y := year  - 1970
-	_m := month - 1
-	_d := day   - 1
-
-	if month < 1 || month > 12 {
-		_m %= 12; ok = false
-	}
-	if day   < 1 || day   > 31 {
-		_d %= 31; ok = false
-	}
-
-	s := i64(0)
-	div, mod := divmod(_y, 400)
-	days := div * DAYS_PER_400_YEARS
-
-	div, mod = divmod(mod, 100)
-	days += div * DAYS_PER_100_YEARS
-
-	div, mod = divmod(mod, 4)
-	days += (div * DAYS_PER_4_YEARS) + (mod * 365)
-
-	days += int(days_before[_m]) + _d
-
-	s += i64(days)   * SECONDS_PER_DAY
-	s += i64(hour)   * SECONDS_PER_HOUR
-	s += i64(minute) * SECONDS_PER_MINUTE
-	s += i64(second)
-
-	t._nsec = (s * 1e9) + i64(nsec)
-
-	return
+	return compound_to_time(this_date)
 }
 
+compound_to_time :: proc "contextless" (datetime: dt.DateTime) -> (t: Time, ok: bool) {
+	unix_epoch := dt.DateTime{{1970, 1, 1}, {0, 0, 0, 0}}
+	delta, err := dt.sub(datetime, unix_epoch)
+	ok = err == .None
+
+	seconds     := delta.days    * 86_400 + delta.seconds
+	nanoseconds := i128(seconds) * 1e9    + i128(delta.nanos)
+
+	// Can this moment be represented in i64 worth of nanoseconds?
+	// min(Time): 1677-09-21 00:12:44.145224192 +0000 UTC
+	// max(Time): 2262-04-11 23:47:16.854775807 +0000 UTC
+	if nanoseconds < i128(min(i64)) || nanoseconds > i128(max(i64)) {
+		return {}, false
+	}
+	return Time{_nsec=i64(nanoseconds)}, true
+}
+
+datetime_to_time :: proc{components_to_time, compound_to_time}
+
+is_leap_year :: proc "contextless" (year: int) -> (leap: bool) {
+	return year % 4 == 0 && (year % 100 != 0 || year % 400 == 0)
+}
+
+@(rodata)
 days_before := [?]i32{
 	0,
 	31,

@@ -8,13 +8,13 @@
 
 	This file exports procedures for use with the test.py test suite.
 */
-package math_big_tests
+package test_core_math_big
 
 /*
 	TODO: Write tests for `internal_*` and test reusing parameters with the public implementations.
 */
 
-import "core:runtime"
+import "base:runtime"
 import "core:strings"
 import "core:math/big"
 

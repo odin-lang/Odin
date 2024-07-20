@@ -1,8 +1,22 @@
-//+build windows
 package cgltf
 
-when ODIN_OS == .Windows {
-	foreign import lib "lib/cgltf.lib"
+@(private)
+LIB :: (
+	     "lib/cgltf.lib"      when ODIN_OS == .Windows
+	else "lib/cgltf.a"        when ODIN_OS == .Linux
+	else "lib/darwin/cgltf.a" when ODIN_OS == .Darwin
+	else ""
+)
+
+when LIB != "" {
+	when !#exists(LIB) {
+		// Windows library is shipped with the compiler, so a Windows specific message should not be needed.
+		#panic("Could not find the compiled cgltf library, it can be compiled by running `make -C \"" + ODIN_ROOT + "vendor/cgltf/src\"`")
+	}
+
+	foreign import lib { LIB }
+} else {
+	foreign import lib "system:cgltf"
 }
 
 import "core:c"
@@ -34,7 +48,7 @@ memory_options :: struct {
 }
 
 file_options :: struct {
-	read:      proc "c" (memory_options: ^/*const*/memory_options, file_options: ^/*const*/file_options, path: cstring, size: uint, data: ^rawptr) -> result,
+	read:      proc "c" (memory_options: ^/*const*/memory_options, file_options: ^/*const*/file_options, path: cstring, size: ^uint, data: ^rawptr) -> result,
 	release:   proc "c" (memory_options: ^/*const*/memory_options, file_options: ^/*const*/file_options, data: rawptr),
 	user_data: rawptr,
 }

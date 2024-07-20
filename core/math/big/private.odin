@@ -19,7 +19,7 @@
 
 package math_big
 
-import "core:intrinsics"
+import "base:intrinsics"
 import "core:mem"
 
 /*
@@ -787,8 +787,8 @@ _private_int_sqr_comba :: proc(dest, src: ^Int, allocator := context.allocator) 
 /*
 	Karatsuba squaring, computes `dest` = `src` * `src` using three half-size squarings.
  
- 	See comments of `_private_int_mul_karatsuba` for details.
- 	It is essentially the same algorithm but merely tuned to perform recursive squarings.
+	See comments of `_private_int_mul_karatsuba` for details.
+	It is essentially the same algorithm but merely tuned to perform recursive squarings.
 */
 _private_int_sqr_karatsuba :: proc(dest, src: ^Int, allocator := context.allocator) -> (err: Error) {
 	context.allocator = allocator
@@ -967,7 +967,7 @@ _private_int_div_3 :: proc(quotient, numerator: ^Int, allocator := context.alloc
 	/*
 		b = 2^_DIGIT_BITS / 3
 	*/
- 	b := _WORD(1) << _WORD(_DIGIT_BITS) / _WORD(3)
+	b := _WORD(1) << _WORD(_DIGIT_BITS) / _WORD(3)
 
 	q := &Int{}
 	internal_grow(q, numerator.used) or_return
@@ -975,7 +975,7 @@ _private_int_div_3 :: proc(quotient, numerator: ^Int, allocator := context.alloc
 	q.sign = numerator.sign
 
 	w, t: _WORD
-	#no_bounds_check for ix := numerator.used; ix >= 0; ix -= 1 {
+	#no_bounds_check for ix := numerator.used - 1; ix >= 0; ix -= 1 {
 		w = (w << _WORD(_DIGIT_BITS)) | _WORD(numerator.digit[ix])
 		if w >= 3 {
 			/*
@@ -1007,8 +1007,8 @@ _private_int_div_3 :: proc(quotient, numerator: ^Int, allocator := context.alloc
 	*/
 	if quotient != nil {
 		err = clamp(q)
- 		internal_swap(q, quotient)
- 	}
+		internal_swap(q, quotient)
+	}
 	internal_destroy(q)
 	return remainder, nil
 }
@@ -1555,24 +1555,24 @@ _private_int_gcd_lcm :: proc(res_gcd, res_lcm, a, b: ^Int, allocator := context.
 
 	/*
 		If neither `a` or `b` was zero, we need to compute `gcd`.
- 		Get copies of `a` and `b` we can modify.
- 	*/
+		Get copies of `a` and `b` we can modify.
+	*/
 	u, v := &Int{}, &Int{}
 	defer internal_destroy(u, v)
 	internal_copy(u, a) or_return
 	internal_copy(v, b) or_return
 
- 	/*
- 		Must be positive for the remainder of the algorithm.
- 	*/
+	/*
+		Must be positive for the remainder of the algorithm.
+	*/
 	u.sign = .Zero_or_Positive; v.sign = .Zero_or_Positive
 
- 	/*
- 		B1.  Find the common power of two for `u` and `v`.
- 	*/
- 	u_lsb, _ := internal_count_lsb(u)
- 	v_lsb, _ := internal_count_lsb(v)
- 	k        := min(u_lsb, v_lsb)
+	/*
+		B1.  Find the common power of two for `u` and `v`.
+	*/
+	u_lsb, _ := internal_count_lsb(u)
+	v_lsb, _ := internal_count_lsb(v)
+	k        := min(u_lsb, v_lsb)
 
 	if k > 0 {
 		/*
@@ -1615,11 +1615,11 @@ _private_int_gcd_lcm :: proc(res_gcd, res_lcm, a, b: ^Int, allocator := context.
 		internal_shr(v, v, b) or_return
 	}
 
- 	/*
- 		Multiply by 2**k which we divided out at the beginning.
- 	*/
- 	internal_shl(temp_gcd_res, u, k) or_return
- 	temp_gcd_res.sign = .Zero_or_Positive
+	/*
+		Multiply by 2**k which we divided out at the beginning.
+	*/
+	internal_shl(temp_gcd_res, u, k) or_return
+	temp_gcd_res.sign = .Zero_or_Positive
 
 	/*
 		We've computed `gcd`, either the long way, or because one of the inputs was zero.
@@ -1786,8 +1786,8 @@ _private_montgomery_reduce_comba :: proc(x, n: ^Int, rho: DIGIT, allocator := co
 			`a = a + mu * m * b**i`
 		
 			This is computed in place and on the fly.  The multiplication
-		 	by b**i is handled by offseting which columns the results
-		 	are added to.
+			by b**i is handled by offseting which columns the results
+			are added to.
 		
 			Note the comba method normally doesn't handle carries in the
 			inner loop In this case we fix the carry from the previous
@@ -2865,147 +2865,100 @@ _private_inverse_modulo :: proc(dest, a, b: ^Int, allocator := context.allocator
 	x, y, u, v, A, B, C, D := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}
 	defer internal_destroy(x, y, u, v, A, B, C, D)
 
-	/*
-		`b` cannot be negative.
-	*/
+	// `b` cannot be negative.
 	if b.sign == .Negative || internal_is_zero(b) {
 		return .Invalid_Argument
 	}
 
-	/*
-		init temps.
-	*/
+	// init temps.
 	internal_init_multi(x, y, u, v, A, B, C, D) or_return
 
-	/*
-		`x` = `a` % `b`, `y` = `b`
-	*/
+	// `x` = `a` % `b`, `y` = `b`
 	internal_mod(x, a, b) or_return
 	internal_copy(y, b) or_return
 
-	/*
-		2. [modified] if x,y are both even then return an error!
-	*/
+	// 2. [modified] if x,y are both even then return an error!
 	if internal_is_even(x) && internal_is_even(y) {
 		return .Invalid_Argument
 	}
 
-	/*
-		3. u=x, v=y, A=1, B=0, C=0, D=1
-	*/
+	// 3. u=x, v=y, A=1, B=0, C=0, D=1
 	internal_copy(u, x) or_return
 	internal_copy(v, y) or_return
 	internal_one(A) or_return
 	internal_one(D) or_return
 
 	for {
-		/*
-			4.  while `u` is even do:
-		*/
+		// 4.  while `u` is even do:
 		for internal_is_even(u) {
-			/*
-				4.1 `u` = `u` / 2
-			*/
+			// 4.1 `u` = `u` / 2
 			internal_int_shr1(u, u) or_return
 
-			/*
-				4.2 if `A` or `B` is odd then:
-			*/
+			// 4.2 if `A` or `B` is odd then:
 			if internal_is_odd(A) || internal_is_odd(B) {
-				/*
-					`A` = (`A`+`y`) / 2, `B` = (`B`-`x`) / 2
-				*/
+				// `A` = (`A`+`y`) / 2, `B` = (`B`-`x`) / 2
 				internal_add(A, A, y) or_return
-				internal_add(B, B, x) or_return
+				internal_sub(B, B, x) or_return
 			}
-			/*
-				`A` = `A` / 2, `B` = `B` / 2
-			*/
+			// `A` = `A` / 2, `B` = `B` / 2
 			internal_int_shr1(A, A) or_return
 			internal_int_shr1(B, B) or_return
 		}
 
-		/*
-			5.  while `v` is even do:
-		*/
+		// 5.  while `v` is even do:
 		for internal_is_even(v) {
-			/*
-				5.1 `v` = `v` / 2
-			*/
+			// 5.1 `v` = `v` / 2
 			internal_int_shr1(v, v) or_return
 
-			/*
-				5.2 if `C` or `D` is odd then:
-			*/
+			// 5.2 if `C` or `D` is odd then:
 			if internal_is_odd(C) || internal_is_odd(D) {
-				/*
-					`C` = (`C`+`y`) / 2, `D` = (`D`-`x`) / 2
-				*/
+				// `C` = (`C`+`y`) / 2, `D` = (`D`-`x`) / 2
 				internal_add(C, C, y) or_return
-				internal_add(D, D, x) or_return
+				internal_sub(D, D, x) or_return
 			}
-			/*
-				`C` = `C` / 2, `D` = `D` / 2
-			*/
+			// `C` = `C` / 2, `D` = `D` / 2
 			internal_int_shr1(C, C) or_return
 			internal_int_shr1(D, D) or_return
 		}
 
-		/*
-			6.  if `u` >= `v` then:
-		*/
+		// 6.  if `u` >= `v` then:
 		if internal_cmp(u, v) != -1 {
-			/*
-				`u` = `u` - `v`, `A` = `A` - `C`, `B` = `B` - `D`
-			*/
+			// `u` = `u` - `v`, `A` = `A` - `C`, `B` = `B` - `D`
 			internal_sub(u, u, v) or_return
 			internal_sub(A, A, C) or_return
 			internal_sub(B, B, D) or_return
 		} else {
-			/* v - v - u, C = C - A, D = D - B */
+			// v - v - u, C = C - A, D = D - B
 			internal_sub(v, v, u) or_return
 			internal_sub(C, C, A) or_return
 			internal_sub(D, D, B) or_return
 		}
 
-		/*
-			If not zero goto step 4
-		*/
+		// If not zero goto step 4
 		if internal_is_zero(u) {
 			break
 		}
 	}
 
-	/*
-		Now `a` = `C`, `b` = `D`, `gcd` == `g`*`v`
-	*/
+	// Now `a` = `C`, `b` = `D`, `gcd` == `g`*`v`
 
-	/*
-		If `v` != `1` then there is no inverse.
-	*/
+	// If `v` != `1` then there is no inverse.
 	if !internal_eq(v, 1) {
 		return .Invalid_Argument
 	}
 
-	/*
-		If its too low.
-	*/
-	if internal_is_negative(C) {
+	// If its too low.
+	for internal_is_negative(C) {
 		internal_add(C, C, b) or_return
 	}
 
-	/*
-		Too big.
-	*/
-	if internal_gte(C, 0) {
+	// Too big.
+	for internal_cmp_mag(C, b) > -1 {
 		internal_sub(C, C, b) or_return
 	}
 
-	/*
-		`C` is now the inverse.
-	*/
+	// `C` is now the inverse.
 	swap(dest, C)
-
 	return
 }
 

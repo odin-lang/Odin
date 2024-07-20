@@ -3,7 +3,7 @@
 // operations into an abstracted stream interface.
 package io
 
-import "core:intrinsics"
+import "base:intrinsics"
 import "core:unicode/utf8"
 
 // Seek whence values
@@ -29,7 +29,7 @@ Error :: enum i32 {
 	// Invalid_Write means that a write returned an impossible count
 	Invalid_Write,
 
-	// Short_Buffer means that a read required a longer buffer than was provided
+	// Short_Buffer means that a read/write required a longer buffer than was provided
 	Short_Buffer,
 
 	// No_Progress is returned by some implementations of `io.Reader` when many calls
@@ -355,6 +355,25 @@ read_at_least :: proc(r: Reader, buf: []byte, min: int) -> (n: int, err: Error) 
 		err = nil
 	} else if n > 0 && err == .EOF {
 		err = .Unexpected_EOF
+	}
+	return
+}
+
+// write_full writes until the entire contents of `buf` has been written or an error occurs.
+write_full :: proc(w: Writer, buf: []byte) -> (n: int, err: Error) {
+	return write_at_least(w, buf, len(buf))
+}
+
+// write_at_least writes at least `buf[:min]` to the writer and returns the amount written.
+// If an error occurs before writing everything it is returned.
+write_at_least :: proc(w: Writer, buf: []byte, min: int) -> (n: int, err: Error) {
+	if len(buf) < min {
+		return 0, .Short_Buffer
+	}
+	for n < min && err == nil {
+		nn: int
+		nn, err = write(w, buf[n:])
+		n += nn
 	}
 	return
 }

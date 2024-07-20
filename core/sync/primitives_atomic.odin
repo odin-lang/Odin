@@ -169,7 +169,7 @@ atomic_rw_mutex_shared_unlock :: proc "contextless" (rw: ^Atomic_RW_Mutex) {
 
 	if (state & Atomic_RW_Mutex_State_Reader_Mask == Atomic_RW_Mutex_State_Reader) &&
 	   (state & Atomic_RW_Mutex_State_Is_Writing != 0) {
-	   	atomic_sema_post(&rw.sema)
+		atomic_sema_post(&rw.sema)
 	}
 }
 

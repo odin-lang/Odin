@@ -91,8 +91,8 @@ Inputs:
 Returns:
 - res: A string created from the null-terminated byte pointer and length
 */
-string_from_null_terminated_ptr :: proc(ptr: ^byte, len: int) -> (res: string) {
-	s := transmute(string)mem.Raw_String{ptr, len}
+string_from_null_terminated_ptr :: proc(ptr: [^]byte, len: int) -> (res: string) {
+	s := string(ptr[:len])
 	s = truncate_to_byte(s, 0)
 	return s
 }
@@ -531,6 +531,9 @@ Output:
 has_prefix :: proc(s, prefix: string) -> (result: bool) {
 	return len(s) >= len(prefix) && s[0:len(prefix)] == prefix
 }
+
+starts_with :: has_prefix
+
 /*
 Determines if a string `s` ends with a given `suffix`
 
@@ -562,6 +565,9 @@ Output:
 has_suffix :: proc(s, suffix: string) -> (result: bool) {
 	return len(s) >= len(suffix) && s[len(s)-len(suffix):] == suffix
 }
+
+ends_with :: has_suffix
+
 /*
 Joins a slice of strings `a` with a `sep` string
 
@@ -809,7 +815,7 @@ _split :: proc(s_, sep: string, sep_save, n_: int, allocator := context.allocato
 			n = l
 		}
 
-		res := make([]string, n, allocator, loc) or_return
+		res = make([]string, n, allocator, loc) or_return
 		for i := 0; i < n-1; i += 1 {
 			_, w := utf8.decode_rune_in_string(s)
 			res[i] = s[:w]
@@ -885,6 +891,7 @@ Splits a string into parts based on a separator. If n < count of seperators, the
 Inputs:
 - s: The string to split.
 - sep: The separator string used to split the input string.
+- n: The maximum amount of parts to split the string into.
 - allocator: (default is context.allocator)
 
 Returns:
@@ -1000,11 +1007,6 @@ Returns:
 */
 @private
 _split_iterator :: proc(s: ^string, sep: string, sep_save: int) -> (res: string, ok: bool) {
-	// stop once the string is empty or nil
-	if s == nil || len(s^) == 0 {
-		return
-	}
-
 	if sep == "" {
 		res = s[:]
 		ok = true
@@ -1791,7 +1793,8 @@ last_index_any :: proc(s, chars: string) -> (res: int) {
 		if r >= utf8.RUNE_SELF {
 			r = utf8.RUNE_ERROR
 		}
-		return index_rune(chars, r)
+		i := index_rune(chars, r)
+		return i if i < 0 else 0
 	}
 	
 	if len(s) > 8 {
@@ -2412,9 +2415,6 @@ trim_right_proc_with_state :: proc(s: string, p: proc(rawptr, rune) -> bool, sta
 }
 // Procedure for `trim_*_proc` variants, which has a string rawptr cast + rune comparison
 is_in_cutset :: proc(state: rawptr, r: rune) -> (res: bool) {
-	if state == nil {
-		return false
-	}
 	cutset := (^string)(state)^
 	for c in cutset {
 		if r == c {
@@ -2712,7 +2712,7 @@ Output:
 
 */
 split_multi_iterate :: proc(it: ^string, substrs: []string) -> (res: string, ok: bool) #no_bounds_check {
-	if it == nil || len(it) == 0 || len(substrs) <= 0 {
+	if len(it) == 0 || len(substrs) <= 0 {
 		return
 	}
 

@@ -1,9 +1,9 @@
 package slice
 
-import "core:intrinsics"
-import "core:builtin"
+import "base:intrinsics"
+import "base:builtin"
 import "core:math/bits"
-import "core:runtime"
+import "base:runtime"
 
 _ :: intrinsics
 _ :: builtin
@@ -156,59 +156,30 @@ linear_search_proc :: proc(array: $A/[]$T, f: proc(T) -> bool) -> (index: int, f
 */
 @(require_results)
 binary_search :: proc(array: $A/[]$T, key: T) -> (index: int, found: bool)
-	where intrinsics.type_is_ordered(T) #no_bounds_check
-{
-	// I would like to use binary_search_by(array, key, cmp) here, but it doesn't like it:
-	// Cannot assign value 'cmp' of type 'proc($E, $E) -> Ordering' to 'proc(i32, i32) -> Ordering' in argument
-	return binary_search_by(array, key, proc(key: T, element: T) -> Ordering {
-		switch {
-			case element < key: return .Less
-			case element > key: return .Greater
-			case:               return .Equal
-		}
-	})
+	where intrinsics.type_is_ordered(T) #no_bounds_check {
+	return binary_search_by(array, key, cmp_proc(T))
 }
 
 @(require_results)
-binary_search_by :: proc(array: $A/[]$T, key: T, f: proc(T, T) -> Ordering) -> (index: int, found: bool)
-	where intrinsics.type_is_ordered(T) #no_bounds_check
-{
-	// INVARIANTS:
-	// - 0 <= left <= (left + size = right) <= len(array)
-	// - f returns .Less    for everything in array[:left]
-	// - f returns .Greater for everything in array[right:]
-	size  := len(array)
-	left  := 0
-	right := size
-
+binary_search_by :: proc(array: $A/[]$T, key: T, f: proc(T, T) -> Ordering) -> (index: int, found: bool) #no_bounds_check {
+	n := len(array)
+	left, right := 0, n
 	for left < right {
-		mid := left + size / 2
-
-		// Steps to verify this is in-bounds:
-		// 1. We note that `size` is strictly positive due to the loop condition
-		// 2. Therefore `size/2 < size`
-		// 3. Adding `left` to both sides yields `(left + size/2) < (left + size)`
-		// 4. We know from the invariant that `left + size <= len(array)`
-		// 5. Therefore `left + size/2 < self.len()`
-		cmp := f(key, array[mid])
-
-		left  = mid + 1 if cmp == .Less    else left
-		right = mid     if cmp == .Greater else right
-
-		switch cmp {
-			case .Equal:   return mid, true
-			case .Less:    left  = mid + 1
-			case .Greater: right = mid
+		mid := int(uint(left+right) >> 1)
+		if f(array[mid], key) == .Less {
+			left = mid+1
+		} else {
+			// .Equal or .Greater
+			right = mid
 		}
-
-		size = right - left
 	}
-
-	return left, false
+	// left == right
+	// f(array[left-1], key) == .Less (if left > 0)
+	return left, left < n && f(array[left], key) == .Equal
 }
 
 @(require_results)
-equal :: proc(a, b: $T/[]$E) -> bool where intrinsics.type_is_comparable(E) {
+equal :: proc(a, b: $T/[]$E) -> bool where intrinsics.type_is_comparable(E) #no_bounds_check {
 	if len(a) != len(b) {
 		return false
 	}
@@ -250,7 +221,7 @@ prefix_length :: proc(a, b: $T/[]$E) -> (n: int) where intrinsics.type_is_compar
 }
 
 @(require_results)
-has_prefix :: proc(array: $T/[]$E, needle: E) -> bool where intrinsics.type_is_comparable(E) {
+has_prefix :: proc(array: $T/[]$E, needle: T) -> bool where intrinsics.type_is_comparable(E) {
 	n := len(needle)
 	if len(array) >= n {
 		return equal(array[:n], needle)
@@ -260,7 +231,7 @@ has_prefix :: proc(array: $T/[]$E, needle: E) -> bool where intrinsics.type_is_c
 
 
 @(require_results)
-has_suffix :: proc(array: $T/[]$E, needle: E) -> bool where intrinsics.type_is_comparable(E) {
+has_suffix :: proc(array: $T/[]$E, needle: T) -> bool where intrinsics.type_is_comparable(E) {
 	array := array
 	m, n := len(array), len(needle)
 	if m >= n {
@@ -446,14 +417,35 @@ reduce :: proc(s: $S/[]$U, initializer: $V, f: proc(V, U) -> V) -> V {
 }
 
 @(require_results)
-filter :: proc(s: $S/[]$U, f: proc(U) -> bool, allocator := context.allocator) -> S {
-	r := make([dynamic]U, 0, 0, allocator)
+reduce_reverse :: proc(s: $S/[]$U, initializer: $V, f: proc(V, U) -> V) -> V {
+	r := initializer
+	for i := len(s)-1; i >= 0; i -= 1 {
+		#no_bounds_check r = f(r, s[i])
+	}
+	return r
+}
+
+@(require_results)
+filter :: proc(s: $S/[]$U, f: proc(U) -> bool, allocator := context.allocator) -> (res: S, err: runtime.Allocator_Error) #optional_allocator_error {
+	r := make([dynamic]U, 0, 0, allocator) or_return
 	for v in s {
 		if f(v) {
 			append(&r, v)
 		}
 	}
-	return r[:]
+	return r[:], nil
+}
+
+@(require_results)
+filter_reverse :: proc(s: $S/[]$U, f: proc(U) -> bool, allocator := context.allocator) -> (res: S, err: runtime.Allocator_Error) #optional_allocator_error {
+	r := make([dynamic]U, 0, 0, allocator) or_return
+	for i := len(s)-1; i >= 0; i -= 1 {
+		#no_bounds_check v := s[i]
+		if f(v) {
+			append(&r, v)
+		}
+	}
+	return r[:], nil
 }
 
 @(require_results)
@@ -473,6 +465,64 @@ scanner :: proc (s: $S/[]$U, initializer: $V, f: proc(V, U) -> V, allocator := c
 	}
 
 	return
+}
+
+
+@(require_results)
+repeat :: proc(s: $S/[]$U, count: int, allocator := context.allocator) -> (b: S, err: runtime.Allocator_Error) #optional_allocator_error {
+	if count < 0 {
+		panic("slice: negative repeat count")
+	} else if count > 0 && (len(s)*count)/count != len(s) {
+		panic("slice: repeat count will cause an overflow")
+	}
+
+	b = make(S, len(s)*count, allocator) or_return
+	i := copy(b, s)
+	for i < len(b) { // 2^N trick to reduce the need to copy
+		copy(b[i:], b[:i])
+		i *= 2
+	}
+	return
+}
+
+// 'unique' replaces consecutive runs of equal elements with a single copy.
+// The procedures modifies the slice in-place and returns the modified slice.
+@(require_results)
+unique :: proc(s: $S/[]$T) -> S where intrinsics.type_is_comparable(T) #no_bounds_check {
+	if len(s) < 2 {
+		return s
+	}
+	i := 1
+	for j in 1..<len(s) {
+		if s[j] != s[j-1] {
+			if i != j {
+				s[i] = s[j]
+			}
+			i += 1
+		}
+	}
+
+	return s[:i]
+}
+
+// 'unique_proc' replaces consecutive runs of equal elements with a single copy using a comparison procedure
+// The procedures modifies the slice in-place and returns the modified slice.
+@(require_results)
+unique_proc :: proc(s: $S/[]$T, eq: proc(T, T) -> bool) -> S #no_bounds_check {
+	if len(s) < 2 {
+		return s
+	}
+	i := 1
+	for j in 1..<len(s) {
+		if !eq(s[j], s[j-1]) {
+			if i != j {
+				s[i] = s[j]
+			}
+			i += 1
+		}
+	}
+
+	return s[:i]
 }
 
 
@@ -654,3 +704,39 @@ enumerated_array :: proc(ptr: ^$T) -> []intrinsics.type_elem_type(T)
 	where intrinsics.type_is_enumerated_array(T) {
 	return ([^]intrinsics.type_elem_type(T))(ptr)[:len(T)]
 }
+
+// Turn a `[]E` into `bit_set[E]`
+// e.g.:
+//    bs := slice.enum_slice_to_bitset(my_flag_slice, rl.ConfigFlags)
+@(require_results)
+enum_slice_to_bitset :: proc(enums: []$E, $T: typeid/bit_set[E]) -> (bits: T) where intrinsics.type_is_enum(E), intrinsics.type_bit_set_elem_type(T) == E {
+	for v in enums {
+		bits += {v}
+	}
+	return
+}
+
+// Turn a `bit_set[E]` into a `[]E`
+// e.g.:
+//    sl := slice.bitset_to_enum_slice(flag_buf[:], bs)
+@(require_results)
+bitset_to_enum_slice_with_buffer :: proc(buf: []$E, bs: $T) -> (slice: []E) where intrinsics.type_is_enum(E), intrinsics.type_bit_set_elem_type(T) == E {
+	count := 0
+	for v in bs {
+		buf[count] = v
+		count += 1
+	}
+	return buf[:count]
+}
+
+// Turn a `bit_set[E]` into a `[]E`, allocates
+// e.g.:
+//    sl := slice.bitset_to_enum_slice(bs)
+@(require_results)
+bitset_to_enum_slice_with_make :: proc(bs: $T, $E: typeid, allocator := context.allocator) -> (slice: []E) where intrinsics.type_is_enum(E), intrinsics.type_bit_set_elem_type(T) == E {
+	ones := intrinsics.count_ones(transmute(E)bs)
+	buf  := make([]E, int(ones), allocator)
+	return bitset_to_enum_slice(buf, bs)
+}
+
+bitset_to_enum_slice :: proc{bitset_to_enum_slice_with_make, bitset_to_enum_slice_with_buffer}

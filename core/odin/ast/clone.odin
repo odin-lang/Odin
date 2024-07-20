@@ -1,6 +1,6 @@
 package odin_ast
 
-import "core:intrinsics"
+import "base:intrinsics"
 import "core:mem"
 import "core:fmt"
 import "core:reflect"
@@ -278,7 +278,9 @@ clone_node :: proc(node: ^Node) -> ^Node {
 			r.foreign_library = clone(r.foreign_library)
 			r.body            = clone(r.body)
 		case ^Foreign_Import_Decl:
+			r.attributes = clone_dynamic_array(r.attributes)
 			r.name = auto_cast clone(r.name)
+			r.fullpaths  = clone_array(r.fullpaths)
 		case ^Proc_Group:
 			r.args = clone(r.args)
 		case ^Attribute:
@@ -314,6 +316,7 @@ clone_node :: proc(node: ^Node) -> ^Node {
 		case ^Struct_Type:
 			r.poly_params = auto_cast clone(r.poly_params)
 			r.align = clone(r.align)
+			r.field_align = clone(r.field_align)
 			r.fields = auto_cast clone(r.fields)
 		case ^Union_Type:
 			r.poly_params = auto_cast clone(r.poly_params)
@@ -335,6 +338,13 @@ clone_node :: proc(node: ^Node) -> ^Node {
 		case ^Relative_Type:
 			r.tag = clone(r.tag)
 			r.type = clone(r.type)
+		case ^Bit_Field_Type:
+			r.backing_type = clone(r.backing_type)
+			r.fields       = auto_cast clone(r.fields)
+		case ^Bit_Field_Field:
+			r.name     = clone(r.name)
+			r.type     = clone(r.type)
+			r.bit_size = clone(r.bit_size)
 		case:
 			fmt.panicf("Unhandled node kind: %v", r)
 		}

@@ -2,13 +2,7 @@ package miniaudio
 
 import "core:c"
 
-when ODIN_OS == .Windows {
-	foreign import lib "lib/miniaudio.lib"
-} else when ODIN_OS == .Linux {
-	foreign import lib "lib/miniaudio.a"
-} else {
-	foreign import lib "system:miniaudio"
-}
+foreign import lib { LIB }
 
 /************************************************************************************************************************************************************
 
@@ -192,6 +186,7 @@ resource_manager_config :: struct {
 	decodedChannels:                u32,       /* The decoded channel count to use. Set to 0 (default) to use the file's native channel count. */
 	decodedSampleRate:              u32,       /* the decoded sample rate to use. Set to 0 (default) to use the file's native sample rate. */
 	jobThreadCount:                 u32,       /* Set to 0 if you want to self-manage your job threads. Defaults to 1. */
+	jobThreadStackSize:             uint,
 	jobQueueCapacity:               u32,       /* The maximum number of jobs that can fit in the queue at a time. Defaults to MA_JOB_TYPE_RESOURCE_MANAGER_QUEUE_CAPACITY. Cannot be zero. */
 	flags:                          u32,
 	pVFS:                           ^vfs,      /* Can be NULL in which case defaults will be used. */

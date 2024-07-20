@@ -7,9 +7,19 @@ struct LinkerData {
 	Array<String> output_temp_paths;
 	String   output_base;
 	String   output_name;
+#if defined(GB_SYSTEM_OSX)
+	b8       needs_system_library_linked;
+#endif
 };
 
 gb_internal i32 system_exec_command_line_app(char const *name, char const *fmt, ...);
+gb_internal bool system_exec_command_line_app_output(char const *command, gbString *output);
+
+#if defined(GB_SYSTEM_OSX)
+gb_internal void linker_enable_system_library_linking(LinkerData *ld) {
+	ld->needs_system_library_linked = 1;
+}
+#endif
 
 gb_internal void linker_data_init(LinkerData *ld, CheckerInfo *info, String const &init_fullpath) {
 	gbAllocator ha = heap_allocator();
@@ -17,6 +27,10 @@ gb_internal void linker_data_init(LinkerData *ld, CheckerInfo *info, String cons
 	array_init(&ld->output_temp_paths,   ha);
 	array_init(&ld->foreign_libraries,   ha, 0, 1024);
 	ptr_set_init(&ld->foreign_libraries_set, 1024);
+
+#if defined(GB_SYSTEM_OSX)
+	ld->needs_system_library_linked = 0;
+#endif 
 
 	if (build_context.out_filepath.len == 0) {
 		ld->output_name = remove_directory_from_path(init_fullpath);
@@ -56,15 +70,68 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 	if (is_arch_wasm()) {
 		timings_start_section(timings, str_lit("wasm-ld"));
 
+		gbString lib_str = gb_string_make(heap_allocator(), "");
+
+		gbString extra_orca_flags = gb_string_make(temporary_allocator(), "");
+
+		gbString inputs = gb_string_make(temporary_allocator(), "");
+		inputs = gb_string_append_fmt(inputs, "\"%.*s.o\"", LIT(output_filename));
+
+
+		for (Entity *e : gen->foreign_libraries) {
+			GB_ASSERT(e->kind == Entity_LibraryName);
+			// NOTE(bill): Add these before the linking values
+			String extra_linker_flags = string_trim_whitespace(e->LibraryName.extra_linker_flags);
+			if (extra_linker_flags.len != 0) {
+				lib_str = gb_string_append_fmt(lib_str, " %.*s", LIT(extra_linker_flags));
+			}
+
+			for_array(i, e->LibraryName.paths) {
+				String lib = e->LibraryName.paths[i];
+
+				if (lib.len == 0) {
+					continue;
+				}
+
+				if (!string_ends_with(lib, str_lit(".o"))) {
+					continue;
+				}
+
+				inputs = gb_string_append_fmt(inputs, " \"%.*s\"", LIT(lib));
+			}
+		}
+
+		if (build_context.metrics.os == TargetOs_orca) {
+			gbString orca_sdk_path = gb_string_make(temporary_allocator(), "");
+			if (!system_exec_command_line_app_output("orca sdk-path", &orca_sdk_path)) {
+				gb_printf_err("executing `orca sdk-path` failed, make sure Orca is installed and added to your path\n");
+				return 1;
+			}
+			if (gb_string_length(orca_sdk_path) == 0) {
+				gb_printf_err("executing `orca sdk-path` did not produce output\n");
+				return 1;
+			}
+			inputs = gb_string_append_fmt(inputs, " \"%s/orca-libc/lib/crt1.o\" \"%s/orca-libc/lib/libc.o\"", orca_sdk_path, orca_sdk_path);
+
+			extra_orca_flags = gb_string_append_fmt(extra_orca_flags, " -L \"%s/bin\" -lorca_wasm --export-dynamic", orca_sdk_path);
+		}
+
+
 	#if defined(GB_SYSTEM_WINDOWS)
 		result = system_exec_command_line_app("wasm-ld",
-			"\"%.*s\\bin\\wasm-ld\" \"%.*s.o\" -o \"%.*s\" %.*s %.*s",
+			"\"%.*s\\bin\\wasm-ld\" %s -o \"%.*s\" %.*s %.*s %s %s",
 			LIT(build_context.ODIN_ROOT),
-			LIT(output_filename), LIT(output_filename), LIT(build_context.link_flags), LIT(build_context.extra_linker_flags));
+			inputs, LIT(output_filename), LIT(build_context.link_flags), LIT(build_context.extra_linker_flags),
+			lib_str,
+			extra_orca_flags);
 	#else
 		result = system_exec_command_line_app("wasm-ld",
-			"wasm-ld \"%.*s.o\" -o \"%.*s\" %.*s %.*s",
-			LIT(output_filename), LIT(output_filename), LIT(build_context.link_flags), LIT(build_context.extra_linker_flags));
+			"wasm-ld %s -o \"%.*s\" %.*s %.*s %s %s",
+			inputs, LIT(output_filename),
+			LIT(build_context.link_flags),
+			LIT(build_context.extra_linker_flags),
+			lib_str,
+			extra_orca_flags);
 	#endif
 		return result;
 	}
@@ -126,9 +193,11 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 			}
 
 
-			StringSet libs = {};
-			string_set_init(&libs, 64);
-			defer (string_set_destroy(&libs));
+			StringSet min_libs_set = {};
+			string_set_init(&min_libs_set, 64);
+			defer (string_set_destroy(&min_libs_set));
+
+			String prev_lib = {};
 
 			StringSet asm_files = {};
 			string_set_init(&asm_files, 64);
@@ -136,6 +205,11 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 
 			for (Entity *e : gen->foreign_libraries) {
 				GB_ASSERT(e->kind == Entity_LibraryName);
+				// NOTE(bill): Add these before the linking values
+				String extra_linker_flags = string_trim_whitespace(e->LibraryName.extra_linker_flags);
+				if (extra_linker_flags.len != 0) {
+					lib_str = gb_string_append_fmt(lib_str, " %.*s", LIT(extra_linker_flags));
+				}
 				for_array(i, e->LibraryName.paths) {
 					String lib = string_trim_whitespace(e->LibraryName.paths[i]);
 					// IMPORTANT NOTE(bill): calling `string_to_lower` here is not an issue because
@@ -147,14 +221,27 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 
 					if (has_asm_extension(lib)) {
 						if (!string_set_update(&asm_files, lib)) {
-							String asm_file = asm_files.entries[i].value;
-							String obj_file = concatenate_strings(permanent_allocator(), asm_file, str_lit(".obj"));
-							String obj_format;
-#if defined(GB_ARCH_64_BIT)
-							obj_format = str_lit("win64");
-#elif defined(GB_ARCH_32_BIT)
+							String asm_file = lib;
+							String obj_file = {};
+							String temp_dir = temporary_directory(temporary_allocator());
+							if (temp_dir.len != 0) {
+								String filename = filename_without_directory(asm_file);
+
+								gbString str = gb_string_make(heap_allocator(), "");
+								str = gb_string_append_length(str, temp_dir.text, temp_dir.len);
+								str = gb_string_appendc(str, "/");
+								str = gb_string_append_length(str, filename.text, filename.len);
+								str = gb_string_append_fmt(str, "-%p.obj", asm_file.text);
+								obj_file = make_string_c(str);
+							} else {
+								obj_file = concatenate_strings(permanent_allocator(), asm_file, str_lit(".obj"));
+							}
+
+							String obj_format = str_lit("win64");
+						#if defined(GB_ARCH_32_BIT)
 							obj_format = str_lit("win32");
-#endif // GB_ARCH_*_BIT
+						#endif
+
 							result = system_exec_command_line_app("nasm",
 								"\"%.*s\\bin\\nasm\\windows\\nasm.exe\" \"%.*s\" "
 								"-f \"%.*s\" "
@@ -172,18 +259,13 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 							}
 							array_add(&gen->output_object_paths, obj_file);
 						}
-					} else {
-						if (!string_set_update(&libs, lib)) {
+					} else if (!string_set_update(&min_libs_set, lib) ||
+					           !build_context.min_link_libs) {
+						if (prev_lib != lib) {
 							lib_str = gb_string_append_fmt(lib_str, " \"%.*s\"", LIT(lib));
 						}
+						prev_lib = lib;
 					}
-				}
-			}
-
-			for (Entity *e : gen->foreign_libraries) {
-				GB_ASSERT(e->kind == Entity_LibraryName);
-				if (e->LibraryName.extra_linker_flags.len != 0) {
-					lib_str = gb_string_append_fmt(lib_str, " %.*s", LIT(e->LibraryName.extra_linker_flags));
 				}
 			}
 
@@ -195,13 +277,15 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 
 			if (build_context.pdb_filepath != "") {
 				String pdb_path = path_to_string(heap_allocator(), build_context.build_paths[BuildPath_PDB]);
-				link_settings = gb_string_append_fmt(link_settings, " /PDB:%.*s", LIT(pdb_path));
+				link_settings = gb_string_append_fmt(link_settings, " /PDB:\"%.*s\"", LIT(pdb_path));
 			}
 
-			if (build_context.no_crt) {
-				link_settings = gb_string_append_fmt(link_settings, " /nodefaultlib");
-			} else {
-				link_settings = gb_string_append_fmt(link_settings, " /defaultlib:libcmt");
+			if (build_context.build_mode != BuildMode_StaticLibrary) {
+				if (build_context.no_crt) {
+					link_settings = gb_string_append_fmt(link_settings, " /nodefaultlib");
+				} else {
+					link_settings = gb_string_append_fmt(link_settings, " /defaultlib:libcmt");
+				}
 			}
 
 			if (build_context.ODIN_DEBUG) {
@@ -220,46 +304,60 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 			String windows_sdk_bin_path = path_to_string(heap_allocator(), build_context.build_paths[BuildPath_Win_SDK_Bin_Path]);
 			defer (gb_free(heap_allocator(), windows_sdk_bin_path.text));
 
-			char const *subsystem_str = build_context.use_subsystem_windows ? "WINDOWS" : "CONSOLE";
 			if (!build_context.use_lld) { // msvc
-				String res_path = {};
+				String res_path = quote_path(heap_allocator(), build_context.build_paths[BuildPath_RES]);
+				String rc_path  = quote_path(heap_allocator(), build_context.build_paths[BuildPath_RC]);
 				defer (gb_free(heap_allocator(), res_path.text));
+				defer (gb_free(heap_allocator(), rc_path.text));
+
 				if (build_context.has_resource) {
-					String temp_res_path = path_to_string(heap_allocator(), build_context.build_paths[BuildPath_RES]);
-					res_path = concatenate3_strings(heap_allocator(), str_lit("\""), temp_res_path, str_lit("\""));
-					gb_free(heap_allocator(), temp_res_path.text);
+					if (build_context.build_paths[BuildPath_RC].basename == "")  {
+						debugf("Using precompiled resource %.*s\n", LIT(res_path));
+					} else {
+						debugf("Compiling resource %.*s\n", LIT(res_path));
 
-					String rc_path  = path_to_string(heap_allocator(), build_context.build_paths[BuildPath_RC]);
-					defer (gb_free(heap_allocator(), rc_path.text));
+						result = system_exec_command_line_app("msvc-link",
+							"\"%.*src.exe\" /nologo /fo %.*s %.*s",
+							LIT(windows_sdk_bin_path),
+							LIT(res_path),
+							LIT(rc_path)
+						);
 
-					result = system_exec_command_line_app("msvc-link",
-						"\"%.*src.exe\" /nologo /fo \"%.*s\" \"%.*s\"",
-						LIT(windows_sdk_bin_path),
-						LIT(res_path),
-						LIT(rc_path)
-					);
-
-					if (result) {
-						return result;
+						if (result) {
+							return result;
+						}
 					}
+				} else {
+					res_path = {};
 				}
 
+				String linker_name = str_lit("link.exe");
 				switch (build_context.build_mode) {
 				case BuildMode_Executable:
 					link_settings = gb_string_append_fmt(link_settings, " /NOIMPLIB /NOEXP");
 					break;
 				}
 
+				switch (build_context.build_mode) {
+				case BuildMode_StaticLibrary:
+					linker_name = str_lit("lib.exe");
+					break;
+				default:
+					link_settings = gb_string_append_fmt(link_settings, " /incremental:no /opt:ref");
+					break;
+				}
+
+
 				result = system_exec_command_line_app("msvc-link",
-					"\"%.*slink.exe\" %s %.*s -OUT:\"%.*s\" %s "
-					"/nologo /incremental:no /opt:ref /subsystem:%s "
+					"\"%.*s%.*s\" %s %.*s -OUT:\"%.*s\" %s "
+					"/nologo /subsystem:%.*s "
 					"%.*s "
 					"%.*s "
 					"%s "
 					"",
-					LIT(vs_exe_path), object_files, LIT(res_path), LIT(output_filename),
+					LIT(vs_exe_path), LIT(linker_name), object_files, LIT(res_path), LIT(output_filename),
 					link_settings,
-					subsystem_str,
+					LIT(build_context.ODIN_WINDOWS_SUBSYSTEM),
 					LIT(build_context.link_flags),
 					LIT(build_context.extra_linker_flags),
 					lib_str
@@ -270,14 +368,14 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 			} else { // lld
 				result = system_exec_command_line_app("msvc-lld-link",
 					"\"%.*s\\bin\\lld-link\" %s -OUT:\"%.*s\" %s "
-					"/nologo /incremental:no /opt:ref /subsystem:%s "
+					"/nologo /incremental:no /opt:ref /subsystem:%.*s "
 					"%.*s "
 					"%.*s "
 					"%s "
 					"",
 					LIT(build_context.ODIN_ROOT), object_files, LIT(output_filename),
 					link_settings,
-					subsystem_str,
+					LIT(build_context.ODIN_WINDOWS_SUBSYSTEM),
 					LIT(build_context.link_flags),
 					LIT(build_context.extra_linker_flags),
 					lib_str
@@ -306,12 +404,19 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 			string_set_init(&asm_files, 64);
 			defer (string_set_destroy(&asm_files));
 			
-			StringSet libs = {};
-			string_set_init(&libs, 64);
-			defer (string_set_destroy(&libs));
+			StringSet min_libs_set = {};
+			string_set_init(&min_libs_set, 64);
+			defer (string_set_destroy(&min_libs_set));
+
+			String prev_lib = {};
 			
 			for (Entity *e : gen->foreign_libraries) {
 				GB_ASSERT(e->kind == Entity_LibraryName);
+				// NOTE(bill): Add these before the linking values
+				String extra_linker_flags = string_trim_whitespace(e->LibraryName.extra_linker_flags);
+				if (extra_linker_flags.len != 0) {
+					lib_str = gb_string_append_fmt(lib_str, " %.*s", LIT(extra_linker_flags));
+				}
 				for (String lib : e->LibraryName.paths) {
 					lib = string_trim_whitespace(lib);
 					if (lib.len == 0) {
@@ -322,21 +427,36 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 							continue; // already handled
 						}
 						String asm_file = lib;
-						String obj_file = concatenate_strings(permanent_allocator(), asm_file, str_lit(".o"));
+						String obj_file = {};
+
+						String temp_dir = temporary_directory(temporary_allocator());
+						if (temp_dir.len != 0) {
+							String filename = filename_without_directory(asm_file);
+
+							gbString str = gb_string_make(heap_allocator(), "");
+							str = gb_string_append_length(str, temp_dir.text, temp_dir.len);
+							str = gb_string_appendc(str, "/");
+							str = gb_string_append_length(str, filename.text, filename.len);
+							str = gb_string_append_fmt(str, "-%p.o", asm_file.text);
+							obj_file = make_string_c(str);
+						} else {
+							obj_file = concatenate_strings(permanent_allocator(), asm_file, str_lit(".o"));
+						}
+
 						String obj_format;
-#if defined(GB_ARCH_64_BIT)
+					#if defined(GB_ARCH_64_BIT)
 						if (is_osx) {
 							obj_format = str_lit("macho64");
 						} else {
 							obj_format = str_lit("elf64");
 						}
-#elif defined(GB_ARCH_32_BIT)
+					#elif defined(GB_ARCH_32_BIT)
 						if (is_osx) {
 							obj_format = str_lit("macho32");
 						} else {
 							obj_format = str_lit("elf32");
 						}
-#endif // GB_ARCH_*_BIT
+					#endif // GB_ARCH_*_BIT
 
 						if (is_osx) {
 							// `as` comes with MacOS.
@@ -364,16 +484,29 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 								LIT(obj_file),
 								LIT(build_context.extra_assembler_flags)
 							);						
+							if (result) {
+								gb_printf_err("executing `nasm` to assemble foreing import of %.*s failed.\n\tSuggestion: `nasm` does not ship with the compiler and should be installed with your system's package manager.\n", LIT(asm_file));
+								return result;
+							}
 						}
 						array_add(&gen->output_object_paths, obj_file);
 					} else {
-						if (string_set_update(&libs, lib)) {
+						if (string_set_update(&min_libs_set, lib) && build_context.min_link_libs) {
 							continue;
 						}
 
-						// NOTE(zangent): Sometimes, you have to use -framework on MacOS.
-						//   This allows you to specify '-f' in a #foreign_system_library,
-						//   without having to implement any new syntax specifically for MacOS.
+						if (prev_lib == lib) {
+							continue;
+						}
+						prev_lib = lib;
+
+						// Do not add libc again, this is added later already, and omitted with
+						// the `-no-crt` flag, not skipping here would cause duplicate library
+						// warnings when linking on darwin and might link libc silently even with `-no-crt`.
+						if (lib == str_lit("System.framework") || lib == str_lit("c")) {
+							continue;
+						}
+
 						if (build_context.metrics.os == TargetOs_darwin) {
 							if (string_ends_with(lib, str_lit(".framework"))) {
 								// framework thingie
@@ -399,7 +532,7 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 							if (string_ends_with(lib, str_lit(".a")) || string_ends_with(lib, str_lit(".o"))) {
 								// static libs and object files, absolute full path relative to the file in which the lib was imported from
 								lib_str = gb_string_append_fmt(lib_str, " -l:\"%.*s\" ", LIT(lib));
-							} else if (string_ends_with(lib, str_lit(".so"))) {
+							} else if (string_ends_with(lib, str_lit(".so")) || string_contains_string(lib, str_lit(".so."))) {
 								// dynamic lib, relative path to executable
 								// NOTE(vassvik): it is the user's responsibility to make sure the shared library files are visible
 								//                at runtime to the executable
@@ -413,13 +546,6 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 				}
 			}
 
-			for (Entity *e : gen->foreign_libraries) {
-				GB_ASSERT(e->kind == Entity_LibraryName);
-				if (e->LibraryName.extra_linker_flags.len != 0) {
-					lib_str = gb_string_append_fmt(lib_str, " %.*s", LIT(e->LibraryName.extra_linker_flags));
-				}
-			}
-
 			gbString object_files = gb_string_make(heap_allocator(), "");
 			defer (gb_string_free(object_files));
 			for (String object_path : gen->output_object_paths) {
@@ -430,6 +556,10 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 
 			if (build_context.no_crt) {
 				link_settings = gb_string_append_fmt(link_settings, "-nostdlib ");
+			}
+
+			if (build_context.build_mode == BuildMode_StaticLibrary) {
+				compiler_error("TODO(bill): -build-mode:static on non-windows targets");
 			}
 
 			// NOTE(dweiler): We use clang as a frontend for the linker as there are
@@ -462,35 +592,59 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 					link_settings = gb_string_appendc(link_settings, "-Wl,-fini,'_odin_exit_point' ");
 				}
 
-			} else if (build_context.metrics.os != TargetOs_openbsd) {
-				// OpenBSD defaults to PIE executable. do not pass -no-pie for it.
+			} else if (build_context.metrics.os != TargetOs_openbsd && build_context.metrics.os != TargetOs_haiku) {
+				// OpenBSD and Haiku default to PIE executable. do not pass -no-pie for it.
 				link_settings = gb_string_appendc(link_settings, "-no-pie ");
 			}
 
 			gbString platform_lib_str = gb_string_make(heap_allocator(), "");
 			defer (gb_string_free(platform_lib_str));
 			if (build_context.metrics.os == TargetOs_darwin) {
-				platform_lib_str = gb_string_appendc(platform_lib_str, "-lSystem -lm -Wl,-syslibroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk -L/usr/local/lib");
-			} else {
-				platform_lib_str = gb_string_appendc(platform_lib_str, "-lc -lm");
-			}
+				platform_lib_str = gb_string_appendc(platform_lib_str, "-Wl,-syslibroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk -L/usr/local/lib ");
 
-			if (build_context.metrics.os == TargetOs_darwin) {
-				// This sets a requirement of Mountain Lion and up, but the compiler doesn't work without this limit.
-				if (build_context.minimum_os_version_string.len) {
-					link_settings = gb_string_append_fmt(link_settings, " -mmacosx-version-min=%.*s ", LIT(build_context.minimum_os_version_string));
-				} else if (build_context.metrics.arch == TargetArch_arm64) {
-					link_settings = gb_string_appendc(link_settings, " -mmacosx-version-min=12.0.0  ");
-				} else {
-					link_settings = gb_string_appendc(link_settings, " -mmacosx-version-min=10.12.0 ");
+				// Homebrew's default library path, checking if it exists to avoid linking warnings.
+				if (gb_file_exists("/opt/homebrew/lib")) {
+					platform_lib_str = gb_string_appendc(platform_lib_str, "-L/opt/homebrew/lib ");
 				}
-				// This points the linker to where the entry point is
-				link_settings = gb_string_appendc(link_settings, " -e _main ");
+
+				// MacPort's default library path, checking if it exists to avoid linking warnings.
+				if (gb_file_exists("/opt/local/lib")) {
+					platform_lib_str = gb_string_appendc(platform_lib_str, "-L/opt/local/lib ");
+				}
+
+				// Only specify this flag if the user has given a minimum version to target.
+				// This will cause warnings to show up for mismatched libraries.
+				if (build_context.minimum_os_version_string_given) {
+					link_settings = gb_string_append_fmt(link_settings, "-mmacosx-version-min=%.*s ", LIT(build_context.minimum_os_version_string));
+				}
+
+				if (build_context.build_mode != BuildMode_DynamicLibrary) {
+					// This points the linker to where the entry point is
+					link_settings = gb_string_appendc(link_settings, "-e _main ");
+				}
 			}
 
-			gbString link_command_line = gb_string_make(heap_allocator(), "clang -Wno-unused-command-line-argument ");
+			if (!build_context.no_crt) {
+				platform_lib_str = gb_string_appendc(platform_lib_str, "-lm ");
+				if (build_context.metrics.os == TargetOs_darwin) {
+					// NOTE: adding this causes a warning about duplicate libraries, I think it is
+					// automatically assumed/added by clang when you don't do `-nostdlib`.
+					// platform_lib_str = gb_string_appendc(platform_lib_str, "-lSystem ");
+				} else {
+					platform_lib_str = gb_string_appendc(platform_lib_str, "-lc ");
+				}
+			}
+
+			// Link using `clang`, unless overridden by `ODIN_CLANG_PATH` environment variable.
+			const char* clang_path = gb_get_env("ODIN_CLANG_PATH", permanent_allocator());
+			if (clang_path == NULL) {
+				clang_path = "clang";
+			}
+
+			gbString link_command_line = gb_string_make(heap_allocator(), clang_path);
 			defer (gb_string_free(link_command_line));
 
+			link_command_line = gb_string_appendc(link_command_line, " -Wno-unused-command-line-argument ");
 			link_command_line = gb_string_appendc(link_command_line, object_files);
 			link_command_line = gb_string_append_fmt(link_command_line, " -o \"%.*s\" ", LIT(output_filename));
 			link_command_line = gb_string_append_fmt(link_command_line, " %s ", platform_lib_str);
@@ -499,7 +653,12 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 			link_command_line = gb_string_append_fmt(link_command_line, " %.*s ", LIT(build_context.extra_linker_flags));
 			link_command_line = gb_string_append_fmt(link_command_line, " %s ", link_settings);
 
-			result = system_exec_command_line_app("ld-link", link_command_line);
+			if (build_context.use_lld) {
+				link_command_line = gb_string_append_fmt(link_command_line, " -fuse-ld=lld");
+				result = system_exec_command_line_app("lld-link", link_command_line);
+			} else {
+				result = system_exec_command_line_app("ld-link", link_command_line);
+			}
 
 			if (result) {
 				return result;

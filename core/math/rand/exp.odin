@@ -16,10 +16,10 @@ import "core:math"
 //    https://www.jstatsoft.org/article/view/v005i08 [web page]
 //
 @(require_results)
-exp_float64 :: proc(r: ^Rand = nil) -> f64 {
+exp_float64 :: proc(gen := context.random_generator) -> f64 {
 	re :: 7.69711747013104972
 
-	@(static)
+	@(static, rodata)
 	ke := [256]u32{
 		0xe290a139, 0x0, 0x9beadebc, 0xc377ac71, 0xd4ddb990,
 		0xde893fb8, 0xe4a8e87c, 0xe8dff16a, 0xebf2deab, 0xee49a6e8,
@@ -74,7 +74,7 @@ exp_float64 :: proc(r: ^Rand = nil) -> f64 {
 		0xf7b577d2, 0xf69c650c, 0xf51530f0, 0xf2cb0e3c, 0xeeefb15d,
 		0xe6da6ecf,
 	}
-	@(static)
+	@(static, rodata)
 	we := [256]f32{
 		2.0249555e-09, 1.486674e-11, 2.4409617e-11, 3.1968806e-11,
 		3.844677e-11, 4.4228204e-11, 4.9516443e-11, 5.443359e-11,
@@ -141,7 +141,7 @@ exp_float64 :: proc(r: ^Rand = nil) -> f64 {
 		1.2393786e-09, 1.276585e-09, 1.3193139e-09, 1.3695435e-09,
 		1.4305498e-09, 1.508365e-09, 1.6160854e-09, 1.7921248e-09,
 	}
-	@(static)
+	@(static, rodata)
 	fe := [256]f32{
 		1, 0.9381437, 0.90046996, 0.87170434, 0.8477855, 0.8269933,
 		0.8084217, 0.7915276, 0.77595687, 0.7614634, 0.7478686,
@@ -199,16 +199,16 @@ exp_float64 :: proc(r: ^Rand = nil) -> f64 {
 	}
 
 	for {
-		j := uint32(r)
+		j := uint32(gen)
 		i := j & 0xFF
 		x := f64(j) * f64(we[i])
 		if j < ke[i] {
 			return x
 		}
 		if i == 0 {
-			return re - math.ln(float64(r))
+			return re - math.ln(float64(gen))
 		}
-		if fe[i]+f32(float64(r))*(fe[i-1]-fe[i]) < f32(math.exp(-x)) {
+		if fe[i]+f32(float64(gen))*(fe[i-1]-fe[i]) < f32(math.exp(-x)) {
 			return x
 		}
 	}

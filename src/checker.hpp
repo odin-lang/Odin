@@ -51,6 +51,12 @@ enum StmtFlag {
 enum BuiltinProcPkg {
 	BuiltinProcPkg_builtin,
 	BuiltinProcPkg_intrinsics,
+	BuiltinProcPkg_COUNT
+};
+
+String builtin_proc_pkg_name[BuiltinProcPkg_COUNT] = {
+	str_lit("builtin"),
+	str_lit("intrinsics"),
 };
 
 struct BuiltinProc {
@@ -103,9 +109,16 @@ struct DeferredProcedure {
 };
 
 
+enum InstrumentationFlag : i32 {
+	Instrumentation_Enabled  = -1,
+	Instrumentation_Default  = 0,
+	Instrumentation_Disabled = +1,
+};
+
 struct AttributeContext {
 	String  link_name;
 	String  link_prefix;
+	String  link_suffix;
 	String  link_section;
 	String  linkage;
 	isize   init_expr_list_count;
@@ -113,19 +126,24 @@ struct AttributeContext {
 	String  deprecated_message;
 	String  warning_message;
 	DeferredProcedure deferred_procedure;
-	bool    is_export           : 1;
-	bool    is_static           : 1;
-	bool    require_results     : 1;
-	bool    require_declaration : 1;
-	bool    has_disabled_proc   : 1;
-	bool    disabled_proc       : 1;
-	bool    test                : 1;
-	bool    init                : 1;
-	bool    fini                : 1;
-	bool    set_cold            : 1;
+	bool    is_export             : 1;
+	bool    is_static             : 1;
+	bool    require_results       : 1;
+	bool    require_declaration   : 1;
+	bool    has_disabled_proc     : 1;
+	bool    disabled_proc         : 1;
+	bool    test                  : 1;
+	bool    init                  : 1;
+	bool    fini                  : 1;
+	bool    set_cold              : 1;
+	bool    entry_point_only      : 1;
+	bool    instrumentation_enter : 1;
+	bool    instrumentation_exit  : 1;
+	bool    rodata                : 1;
 	u32 optimization_mode; // ProcedureOptimizationMode
 	i64 foreign_import_priority_index;
 	String extra_linker_flags;
+	InstrumentationFlag no_instrumentation;
 
 	String  objc_class;
 	String  objc_name;
@@ -136,9 +154,10 @@ struct AttributeContext {
 	String enable_target_feature;  // will be enabled for the procedure only
 };
 
-gb_internal gb_inline AttributeContext make_attribute_context(String link_prefix) {
+gb_internal gb_inline AttributeContext make_attribute_context(String link_prefix, String link_suffix) {
 	AttributeContext ac = {};
 	ac.link_prefix = link_prefix;
+	ac.link_suffix = link_suffix;
 	return ac;
 }
 
@@ -160,6 +179,11 @@ char const *ProcCheckedState_strings[ProcCheckedState_COUNT] {
 	"Unchecked",
 	"In Progress",
 	"Checked",
+};
+
+struct VariadicReuseData {
+	Type *slice_type; // ..elem_type
+	i64 max_count;
 };
 
 // DeclInfo is used to store information of certain declarations to allow for "any order" usage
@@ -199,6 +223,10 @@ struct DeclInfo {
 	BlockingMutex type_and_value_mutex;
 
 	Array<BlockLabel> labels;
+
+	Array<VariadicReuseData> variadic_reuses;
+	i64 variadic_reuse_max_bytes;
+	i64 variadic_reuse_max_align;
 
 	// NOTE(bill): this is to prevent a race condition since these procedure literals can be created anywhere at any time
 	struct lbModule *code_gen_module;
@@ -292,6 +320,7 @@ struct ForeignContext {
 	Ast *                 curr_library;
 	ProcCallingConvention default_cc;
 	String                link_prefix;
+	String                link_suffix;
 	EntityVisiblityKind   visibility_kind;
 };
 
@@ -323,12 +352,34 @@ struct ObjcMsgData {
 	ObjcMsgKind kind;
 	Type *proc_type;
 };
+
+enum LoadFileTier {
+	LoadFileTier_Invalid,
+	LoadFileTier_Exists,
+	LoadFileTier_Contents,
+};
+
 struct LoadFileCache {
+	LoadFileTier   tier;
+	bool           exists;
 	String         path;
 	gbFileError    file_error;
 	String         data;
 	StringMap<u64> hashes;
 };
+
+
+struct LoadDirectoryFile {
+	String file_name;
+	String data;
+};
+
+struct LoadDirectoryCache {
+	String                 path;
+	gbFileError            file_error;
+	Array<LoadFileCache *> files;
+};
+
 
 struct GenProcsData {
 	Array<Entity *> procs;
@@ -337,7 +388,18 @@ struct GenProcsData {
 
 struct GenTypesData {
 	Array<Entity *> types;
-	RwMutex         mutex;
+	RecursiveMutex  mutex;
+};
+
+struct Defineable {
+	String        name;
+	ExactValue    default_value;
+	TokenPos      pos;
+	CommentGroup *docs;
+
+	// These strings are only computed from previous fields when defineables are being shown or exported.
+	String default_value_str;
+	String pos_str;
 };
 
 // CheckerInfo stores all the symbol information for a type-checked program
@@ -366,6 +428,9 @@ struct CheckerInfo {
 	Array<Entity *> entities;
 	Array<Entity *> required_foreign_imports_through_force;
 
+	BlockingMutex     defineables_mutex;
+	Array<Defineable> defineables;
+
 
 	// Below are accessed within procedures
 	RwMutex            global_untyped_mutex;
@@ -377,8 +442,8 @@ struct CheckerInfo {
 
 	RecursiveMutex lazy_mutex; // Mutex required for lazy type checking of specific files
 
-	RwMutex       gen_types_mutex;
-	PtrMap<Type *, GenTypesData > gen_types;
+	BlockingMutex                  gen_types_mutex;
+	PtrMap<Type *, GenTypesData *> gen_types;
 
 	BlockingMutex type_info_mutex; // NOT recursive
 	Array<Type *> type_info_types;
@@ -391,6 +456,7 @@ struct CheckerInfo {
 	MPSCQueue<Entity *> entity_queue;
 	MPSCQueue<Entity *> required_global_variable_queue;
 	MPSCQueue<Entity *> required_foreign_imports_through_force_queue;
+	MPSCQueue<Entity *> foreign_imports_to_check_fullpaths;
 
 	MPSCQueue<Ast *> intrinsics_entry_point_usage;
 
@@ -402,6 +468,17 @@ struct CheckerInfo {
 
 	BlockingMutex all_procedures_mutex;
 	Array<ProcInfo *> all_procedures;
+
+	BlockingMutex instrumentation_mutex;
+	Entity *instrumentation_enter_entity;
+	Entity *instrumentation_exit_entity;
+
+
+	BlockingMutex                       load_directory_mutex;
+	StringMap<LoadDirectoryCache *>     load_directory_cache;
+	PtrMap<Ast *, LoadDirectoryCache *> load_directory_map; // Key: Ast_CallExpr *
+
+
 };
 
 struct CheckerContext {
@@ -419,6 +496,7 @@ struct CheckerContext {
 	u32            state_flags;
 	bool           in_defer;
 	Type *         type_hint;
+	Ast *          type_hint_expr;
 
 	String         proc_name;
 	DeclInfo *     curr_proc_decl;
@@ -443,6 +521,7 @@ struct CheckerContext {
 	bool       hide_polymorphic_errors;
 	bool       in_polymorphic_specialization;
 	bool       allow_arrow_right_selector_expr;
+	u8         bit_field_bit_size;
 	Scope *    polymorphic_scope;
 
 	Ast *assignment_lhs_hint;
@@ -466,6 +545,7 @@ struct Checker {
 
 
 	MPSCQueue<UntypedExprInfo> global_untyped_queue;
+	MPSCQueue<Type *> soa_types_to_complete;
 };
 
 
@@ -526,3 +606,9 @@ gb_internal void init_core_context(Checker *c);
 gb_internal void init_mem_allocator(Checker *c);
 
 gb_internal void add_untyped_expressions(CheckerInfo *cinfo, UntypedExprInfoMap *untyped);
+
+
+gb_internal GenTypesData *ensure_polymorphic_record_entity_has_gen_types(CheckerContext *ctx, Type *original_type);
+
+
+gb_internal void init_map_internal_types(Type *type);

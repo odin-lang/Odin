@@ -52,6 +52,13 @@ template <typename T> gb_internal T *array_end_ptr(Array<T> *array);
 
 
 template <typename T>
+gb_internal void array_sort(Array<T> &array, gbCompareProc compare_proc) {
+	gb_sort_array(array.data, array.count, compare_proc);
+}
+
+
+
+template <typename T>
 struct Slice {
 	T *data;
 	isize count;

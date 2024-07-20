@@ -2,7 +2,7 @@
 package os2
 
 import win32 "core:sys/windows"
-import "core:runtime"
+import "base:runtime"
 
 _lookup_env :: proc(key: string, allocator: runtime.Allocator) -> (value: string, found: bool) {
 	if key == "" {
@@ -18,7 +18,10 @@ _lookup_env :: proc(key: string, allocator: runtime.Allocator) -> (value: string
 		}
 		return "", true
 	}
-	b := make([]u16, n+1, _temp_allocator())
+
+	TEMP_ALLOCATOR_GUARD()
+
+	b := make([]u16, n+1, temp_allocator())
 
 	n = win32.GetEnvironmentVariableW(wkey, raw_data(b), u32(len(b)))
 	if n == 0 {
@@ -47,7 +50,8 @@ _unset_env :: proc(key: string) -> bool {
 }
 
 _clear_env :: proc() {
-	envs := environ(_temp_allocator())
+	TEMP_ALLOCATOR_GUARD()
+	envs := environ(temp_allocator())
 	for env in envs {
 		for j in 1..<len(env) {
 			if env[j] == '=' {

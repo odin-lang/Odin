@@ -66,7 +66,7 @@ GetExtensionsStringARBType  :: #type proc "c" (HDC) -> cstring
 	wglGetExtensionsStringARB:  GetExtensionsStringARBType
 
 
-@(default_calling_convention="stdcall")
+@(default_calling_convention="system")
 foreign Opengl32 {
 	wglCreateContext          :: proc(hdc: HDC) -> HGLRC ---
 	wglMakeCurrent            :: proc(hdc: HDC, HGLRC: HGLRC) -> BOOL ---

@@ -7,8 +7,8 @@ import "core:os"
 import "core:thread"
 import "core:time"
 import "core:reflect"
-import "core:runtime"
-import "core:intrinsics"
+import "base:runtime"
+import "base:intrinsics"
 import "core:math/big"
 
 /*
@@ -48,7 +48,7 @@ the_basics :: proc() {
 		// os.args holds the path to the current executable and any arguments passed to it.
 		if len(os.args) == 1 {
 			fmt.printf("Hellope from %v.\n", os.args[0])
-		} else {
+		} else if len(os.args) > 2 {
 			fmt.printf("%v, %v! from %v.\n", os.args[1], os.args[2], os.args[0])
 		}
 
@@ -541,7 +541,7 @@ struct_type :: proc() {
 		p.x = 1335
 		fmt.println(v)
 
-		// We could write p^.x, however, it is to nice abstract the ability
+		// We could write p^.x, however, it is nice to abstract the ability
 		// to not explicitly dereference the pointer. This is very useful when
 		// refactoring code to use a pointer rather than a value, and vice versa.
 	}
@@ -1140,6 +1140,7 @@ prefix_table := [?]string{
 
 print_mutex := b64(false)
 
+@(disabled=!thread.IS_SUPPORTED)
 threading_example :: proc() {
 	fmt.println("\n# threading_example")
 
@@ -1514,7 +1515,7 @@ quaternions :: proc() {
 
 	{ // Quaternion operations
 		q := 1 + 2i + 3j + 4k
-		r := quaternion(5, 6, 7, 8)
+		r := quaternion(real=5, imag=6, jmag=7, kmag=8)
 		t := q * r
 		fmt.printf("(%v) * (%v) = %v\n", q, r, t)
 		v := q / r
@@ -1527,8 +1528,10 @@ quaternions :: proc() {
 	{ // The quaternion types
 		q128: quaternion128 // 4xf32
 		q256: quaternion256 // 4xf64
-		q128 = quaternion(1, 0, 0, 0)
-		q256 = 1 // quaternion(1, 0, 0, 0)
+		q128 = quaternion(w=1, x=0, y=0, z=0)
+		q256 = 1 // quaternion(x=0, y=0, z=0, w=1)
+
+		// NOTE: The internal memory layout of a quaternion is xyzw
 	}
 	{ // Built-in procedures
 		q := 1 + 2i + 3j + 4k
@@ -2273,7 +2276,7 @@ arbitrary_precision_mathematics :: proc() {
 		}
 		fmt.printf(as)
 		if print_extra_info {
-		 	fmt.printf(" (base: %v, bits: %v, digits: %v)", base, cb, a.used)
+			fmt.printf(" (base: %v, bits: %v, digits: %v)", base, cb, a.used)
 		}
 		if newline {
 			fmt.println()
@@ -2383,7 +2386,7 @@ matrix_type :: proc() {
 
 		c := a * b
 		#assert(type_of(c) == matrix[2, 2]f32)
-		fmt.tprintln("c = a * b", c)
+		fmt.println("c = a * b", c)
 	}
 
 	{ // Matrices support multiplication between matrices and arrays
@@ -2436,7 +2439,7 @@ matrix_type :: proc() {
 
 		// component-wise multiplication
 		// since a * b would be a standard matrix multiplication
-		c6 := hadamard_product(a, b)
+		c6 := intrinsics.hadamard_product(a, b)
 
 
 		fmt.println("a + b",  c0)
@@ -2478,7 +2481,7 @@ matrix_type :: proc() {
 			5, 0, 6, 0,
 			0, 7, 0, 8,
 		}
-		fmt.println("b4", matrix_flatten(b4))
+		fmt.println("b4", intrinsics.matrix_flatten(b4))
 	}
 
 	{ // Casting non-square matrices
@@ -2517,7 +2520,7 @@ matrix_type :: proc() {
 	// This is because matrices are stored as values (not a reference type), and thus operations on them will
 	// be stored on the stack. Restricting the maximum element count minimizing the possibility of stack overflows.
 
-	// Built-in Procedures (Compiler Level)
+	// 'intrinsics' Procedures (Compiler Level)
 	// 	transpose(m)
 	//		transposes a matrix
 	// 	outer_product(a, b)
@@ -2538,14 +2541,58 @@ matrix_type :: proc() {
 	//	conj(x)
 	//		conjugates the elements of a matrix for complex element types only
 
-	// Built-in Procedures (Runtime Level) (all square matrix procedures)
+	// Procedures in "core:math/linalg" and related (Runtime Level) (all square matrix procedures)
 	// 	determinant(m)
 	// 	adjugate(m)
 	// 	inverse(m)
 	// 	inverse_transpose(m)
 	// 	hermitian_adjoint(m)
-	// 	matrix_trace(m)
+	// 	trace(m)
 	// 	matrix_minor(m)
+}
+
+bit_field_type :: proc() {
+	fmt.println("\n# bit_field type")
+	// A `bit_field` is a record type in Odin that is akin to a bit-packed struct.
+	// IMPORTNAT NOTE: `bit_field` is NOT equivalent to `bit_set` as it has different sematics and use cases.
+
+	{
+		// `bit_field` fields are accessed by using a dot:
+		Foo :: bit_field u16 {          // backing type must be an integer or array of integers
+		    x: i32     | 3,             // signed integers will be signed extended on use
+		    y: u16     | 2 + 3,         // general expressions
+		    z: My_Enum | SOME_CONSTANT, // ability to define the bit-width elsewhere
+		    w: bool    | 2 when SOME_CONSTANT > 10 else 1,
+		}
+
+		v := Foo{}
+		v.x = 3 // truncates the value to fit into 3 bits
+		fmt.println(v.x) // accessing will convert `v.x` to an `i32` and do an appropriate sign extension
+
+
+		My_Enum :: enum u8 {A, B, C, D}
+		SOME_CONSTANT :: 7
+	}
+
+	{
+		// A `bit_field` is different from a struct in that you must specify the backing type.
+		// This backing type must be an integer or a fixed-length array of integers.
+		// This is useful if there needs to be a specific alignment or access pattern for the record.
+
+		Bar :: bit_field u32   {}
+		Baz :: bit_field [4]u8 {}
+	}
+
+	// IMPORTANT NOTES:
+	//  * If _all_ of the fields in a bit_field are 1-bit in size and they are all booleans,
+	//    please consider using a `bit_set` instead.
+	//  * Odin's `bit_field` and C's bit-fields might not be compatible
+	//     * Odin's `bit_field`s have a well defined layout (Least-Significant-Bit)
+	//     * C's bit-fields on `struct`s are undefined and are not portable across targets and compilers
+	//  * A `bit_field`'s field type can only be one of the following:
+	//     * Integer
+	//     * Boolean
+	//     * Enum
 }
 
 main :: proc() {
@@ -2593,5 +2640,6 @@ main :: proc() {
 		or_break_and_or_continue_operators()
 		arbitrary_precision_mathematics()
 		matrix_type()
+		bit_field_type()
 	}
 }

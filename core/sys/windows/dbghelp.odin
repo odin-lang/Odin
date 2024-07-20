@@ -44,7 +44,7 @@ MINIDUMP_USER_STREAM_INFORMATION :: struct {
 	UserStreamArray: ^MINIDUMP_USER_STREAM,
 }
 
-MINIDUMP_CALLBACK_ROUTINE :: #type proc "stdcall" (
+MINIDUMP_CALLBACK_ROUTINE :: #type proc "system" (
 	CallbackParam: PVOID,
 	CallbackInput: ^MINIDUMP_CALLBACK_INPUT,
 	CallbackOutpu: ^MINIDUMP_CALLBACK_OUTPUT,
@@ -228,7 +228,39 @@ MINIDUMP_TYPE :: enum u32 {
 	ValidTypeFlags                 = 0x01ffffff,
 }
 
-@(default_calling_convention = "stdcall")
+
+SYMBOL_INFOW :: struct {
+	SizeOfStruct: ULONG,
+	TypeIndex:    ULONG,
+	Reserved:     [2]ULONG64,
+	Index:        ULONG,
+	Size:         ULONG,
+	ModBase:      ULONG64,
+	Flags:        ULONG,
+	Value:        ULONG64,
+	Address:      ULONG64,
+	Register:     ULONG,
+	Scope:        ULONG,
+	Tag:          ULONG,
+	NameLen:      ULONG,
+	MaxNameLen:   ULONG,
+	Name:         [1]WCHAR,
+}
+
+IMAGEHLP_LINE64 :: struct {
+	SizeOfStruct: DWORD,
+	Key:          PVOID,
+	LineNumber:   DWORD,
+	FileName:     PWSTR,
+	Address:      DWORD64,
+}
+
+PSYMBOL_INFOW     :: ^SYMBOL_INFOW
+PIMAGEHLP_LINEW64 :: ^IMAGEHLP_LINE64
+
+SYMOPT_LOAD_LINES :: 0x00000010
+
+@(default_calling_convention = "system")
 foreign Dbghelp {
 	MiniDumpWriteDump :: proc(
 		hProcess:        HANDLE,
@@ -247,4 +279,10 @@ foreign Dbghelp {
 		StreamPointer: ^PVOID,
 		StreamSize:    ^ULONG,
 	) -> BOOL ---
+
+	SymInitialize         :: proc(hProcess: HANDLE, UserSearchPath: PCSTR, fInvadeProcess: BOOL) -> BOOL ---
+	SymCleanup            :: proc(hProcess: HANDLE) -> BOOL ---
+	SymSetOptions         :: proc(SymOptions: DWORD) -> DWORD ---
+	SymFromAddrW          :: proc(hProcess: HANDLE, Address: DWORD64, Displacement: PDWORD64, Symbol: PSYMBOL_INFOW) -> BOOL ---
+	SymGetLineFromAddrW64 :: proc(hProcess: HANDLE, dwAddr: DWORD64, pdwDisplacement: PDWORD, Line: PIMAGEHLP_LINEW64) -> BOOL ---
 }

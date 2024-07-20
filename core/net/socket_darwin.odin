@@ -92,13 +92,20 @@ _dial_tcp_from_endpoint :: proc(endpoint: Endpoint, options := default_tcp_optio
 	return
 }
 
+// On Darwin, any port below 1024 is 'privileged' - which means that you need root access in order to use it.
+MAX_PRIVILEGED_PORT :: 1023
+
 @(private)
 _bind :: proc(skt: Any_Socket, ep: Endpoint) -> (err: Network_Error) {
 	sockaddr := _endpoint_to_sockaddr(ep)
 	s := any_socket_to_socket(skt)
 	res := os.bind(os.Socket(s), (^os.SOCKADDR)(&sockaddr), i32(sockaddr.len))
 	if res != os.ERROR_NONE {
-		err = Bind_Error(res)
+		if res == os.EACCES && ep.port <= MAX_PRIVILEGED_PORT {
+			err = .Privileged_Port_Without_Root
+		} else {
+			err = Bind_Error(res)
+		}
 	}
 	return
 }
@@ -267,8 +274,7 @@ _set_option :: proc(s: Any_Socket, option: Socket_Option, value: any, loc := #ca
 		.Linger,
 		.Send_Timeout,
 		.Receive_Timeout:
-			t, ok := value.(time.Duration)
-			if !ok do panic("set_option() value must be a time.Duration here", loc)
+			t := value.(time.Duration) or_else panic("set_option() value must be a time.Duration here", loc)
 
 			micros := i64(time.duration_microseconds(t))
 			timeval_value.microseconds = int(micros % 1e6)
@@ -313,7 +319,7 @@ _set_blocking :: proc(socket: Any_Socket, should_block: bool) -> (err: Network_E
 	}
 
 	if should_block {
-		flags &= ~int(os.O_NONBLOCK)
+		flags &~= int(os.O_NONBLOCK)
 	} else {
 		flags |= int(os.O_NONBLOCK)
 	}

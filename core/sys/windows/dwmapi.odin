@@ -38,7 +38,7 @@ DWMNCRENDERINGPOLICY :: enum {
 	DWMNCRP_LAST,
 }
 
-@(default_calling_convention="stdcall")
+@(default_calling_convention="system")
 foreign dwmapi {
 	DwmFlush :: proc() -> HRESULT ---
 	DwmIsCompositionEnabled :: proc(pfEnabled: ^BOOL) -> HRESULT ---

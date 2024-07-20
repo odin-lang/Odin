@@ -1,7 +1,9 @@
 package linux
 
 
-/// Represents an error returned by most of syscalls
+/*
+	Represents an error returned by most of syscalls
+*/
 Errno :: enum i32 {
 	NONE = 0,
 	// Errno-base
@@ -46,6 +48,7 @@ Errno :: enum i32 {
 	ENOSYS          = 38,
 	ENOTEMPTY       = 39,
 	ELOOP           = 40,
+	EUNKNOWN_41     = 41,
 	ENOMSG          = 42,
 	EIDRM           = 43,
 	ECHRNG          = 44,
@@ -62,6 +65,7 @@ Errno :: enum i32 {
 	ENOANO          = 55,
 	EBADRQC         = 56,
 	EBADSLT         = 57,
+	EUNKNOWN_58     = 58,
 	EBFONT          = 59,
 	ENOSTR          = 60,
 	ENODATA         = 61,
@@ -142,29 +146,76 @@ Errno :: enum i32 {
 	EDEADLOCK       = EDEADLK,
 }
 
+/*
+	Bits for Open_Flags.
 
-/// Bits for Open_Flags
-Open_Flags_Bits :: enum {
-	RDONLY    = 0,
-	WRONLY    = 1,
-	RDWR      = 2,
-	CREAT     = 6,
-	EXCL      = 7,
-	NOCTTY    = 8,
-	TRUNC     = 9,
-	APPEND    = 10,
-	NONBLOCK  = 11,
-	DSYNC     = 12,
-	ASYNC     = 13,
-	DIRECT    = 14,
-	DIRECTORY = 16,
-	NOFOLLOW  = 17,
-	NOATIME   = 18,
-	CLOEXEC   = 19,
-	PATH      = 21,
+	RDONLY flag is not present, because it has the value of 0, i.e. it is the
+	default, unless WRONLY or RDWR is specified.
+*/
+when ODIN_ARCH != .arm64 && ODIN_ARCH != .arm32 {
+	Open_Flags_Bits :: enum {
+		WRONLY    = 0,
+		RDWR      = 1,
+		CREAT     = 6,
+		EXCL      = 7,
+		NOCTTY    = 8,
+		TRUNC     = 9,
+		APPEND    = 10,
+		NONBLOCK  = 11,
+		DSYNC     = 12,
+		ASYNC     = 13,
+		DIRECT    = 14,
+		LARGEFILE = 15,
+		DIRECTORY = 16,
+		NOFOLLOW  = 17,
+		NOATIME   = 18,
+		CLOEXEC   = 19,
+		PATH      = 21,
+	}
+	// https://github.com/torvalds/linux/blob/7367539ad4b0f8f9b396baf02110962333719a48/include/uapi/asm-generic/fcntl.h#L19
+	#assert(1 << uint(Open_Flags_Bits.WRONLY)    == 0o0000000_1)
+	#assert(1 << uint(Open_Flags_Bits.RDWR)      == 0o0000000_2)
+	#assert(1 << uint(Open_Flags_Bits.CREAT)     == 0o00000_100)
+	#assert(1 << uint(Open_Flags_Bits.EXCL)      == 0o00000_200)
+	#assert(1 << uint(Open_Flags_Bits.NOCTTY)    == 0o00000_400)
+	#assert(1 << uint(Open_Flags_Bits.TRUNC)     == 0o0000_1000)
+	#assert(1 << uint(Open_Flags_Bits.APPEND)    == 0o0000_2000)
+	#assert(1 << uint(Open_Flags_Bits.NONBLOCK)  == 0o0000_4000)
+	#assert(1 << uint(Open_Flags_Bits.DSYNC)     == 0o000_10000)
+	#assert(1 << uint(Open_Flags_Bits.ASYNC)     == 0o000_20000)
+	#assert(1 << uint(Open_Flags_Bits.DIRECT)    == 0o000_40000)
+	#assert(1 << uint(Open_Flags_Bits.LARGEFILE) == 0o00_100000)
+	#assert(1 << uint(Open_Flags_Bits.DIRECTORY) == 0o00_200000)
+	#assert(1 << uint(Open_Flags_Bits.NOFOLLOW)  == 0o00_400000)
+	#assert(1 << uint(Open_Flags_Bits.NOATIME)   == 0o0_1000000)
+	#assert(1 << uint(Open_Flags_Bits.CLOEXEC)   == 0o0_2000000)
+	#assert(1 << uint(Open_Flags_Bits.PATH)      == 0o_10000000)
+
+} else {
+	Open_Flags_Bits :: enum {
+		WRONLY    = 0,
+		RDWR      = 1,
+		CREAT     = 6,
+		EXCL      = 7,
+		NOCTTY    = 8,
+		TRUNC     = 9,
+		APPEND    = 10,
+		NONBLOCK  = 11,
+		DSYNC     = 12,
+		ASYNC     = 13,
+		DIRECTORY = 14,
+		NOFOLLOW  = 15,
+		DIRECT    = 16,
+		LARGEFILE = 17,
+		NOATIME   = 18,
+		CLOEXEC   = 19,
+		PATH      = 21,
+	}
 }
 
-/// Bits for FD_Flags bitset
+/*
+	Bits for FD_Flags bitset
+*/
 FD_Flags_Bits :: enum {
 	SYMLINK_NOFOLLOW   = 8,
 	REMOVEDIR          = 9,
@@ -177,7 +228,9 @@ FD_Flags_Bits :: enum {
 	RECURSIVE          = 15,
 }
 
-/// The bits for the Mode bitset.
+/*
+	The bits for the Mode bitset.
+*/
 Mode_Bits :: enum {
 	IXOTH  = 0,  // 0o0000001
 	IWOTH  = 1,  // 0o0000002
@@ -191,13 +244,15 @@ Mode_Bits :: enum {
 	ISVTX  = 9,  // 0o0001000
 	ISGID  = 10, // 0o0002000
 	ISUID  = 11, // 0o0004000
-	IFFIFO = 12, // 0o0010000
+	IFIFO = 12, // 0o0010000
 	IFCHR  = 13, // 0o0020000
 	IFDIR  = 14, // 0o0040000
 	IFREG  = 15, // 0o0100000
 }
 
-/// The bits used by the Statx_Mask bitset
+/*
+	The bits used by the Statx_Mask bitset
+*/
 Statx_Mask_Bits :: enum {
 	TYPE         = 0,
 	MODE         = 1,
@@ -215,8 +270,10 @@ Statx_Mask_Bits :: enum {
 	DIOALIGN     = 13,
 }
 
-/// Bits found in Statx_Attr bitset
-/// You should not use these directly
+/*
+	Bits found in Statx_Attr bitset
+	You should not use these directly
+*/
 Statx_Attr_Bits :: enum {
 	COMPRESSED = 2,  // 0x00000004
 	IMMUTABLE  = 4,  // 0x00000010
@@ -229,7 +286,9 @@ Statx_Attr_Bits :: enum {
 	DAX        = 21, // 0x00200000
 }
 
-/// Magic bits for filesystems returned by Stat_FS
+/*
+	Magic bits for filesystems returned by Stat_FS
+*/
 FS_Magic :: enum u32 {
 	ADFS_SUPER_MAGIC      = 0xadf5,
 	AFFS_SUPER_MAGIC      = 0xadff,
@@ -317,7 +376,9 @@ FS_Magic :: enum u32 {
 	_XIAFS_SUPER_MAGIC    = 0x012fd16d,
 }
 
-/// Bits for FS_Flags bitset
+/*
+	Bits for FS_Flags bitset
+*/
 FS_Flags_Bits :: enum {
 	RDONLY       = 0,
 	NOSUID       = 1,
@@ -340,20 +401,26 @@ Seek_Whence :: enum i16 {
 	HOLE = 4,
 }
 
-/// Bits for Close_Range_Flags
+/*
+	Bits for Close_Range_Flags
+*/
 Close_Range_Flags_Bits :: enum {
 	CLOEXEC = 2,
 	UNSHARE = 1,
 }
 
-/// Bits for Rename_Flags
+/*
+	Bits for Rename_Flags
+*/
 Rename_Flags_Bits :: enum {
 	EXCHANGE  = 1,
 	NOREPLACE = 0,
 	WHITEOUT  = 2,
 }
 
-/// Type of the file in a directory entry
+/*
+	Type of the file in a directory entry
+*/
 Dirent_Type :: enum u8 {
 	UNKNOWN = 0,
 	FIFO    = 1,
@@ -366,14 +433,18 @@ Dirent_Type :: enum u8 {
 	WHT     = 14,
 }
 
-/// Type of a lock for fcntl.2
+/*
+	Type of a lock for fcntl(2)
+*/
 FLock_Type :: enum i16 {
 	RDLCK = 0,
 	WRLCK = 1,
 	UNLCK = 2,
 }
 
-/// Bits for FD_Notifications
+/*
+	Bits for FD_Notifications
+*/
 FD_Notifications_Bits :: enum {
 	ACCESS    = 0,
 	MODIFY    = 1,
@@ -384,7 +455,9 @@ FD_Notifications_Bits :: enum {
 	MULTISHOT = 31,
 }
 
-/// Bits for seal
+/*
+	Bits for seal
+*/
 Seal_Bits :: enum {
 	SEAL         = 0,
 	SHRINK       = 1,
@@ -408,14 +481,18 @@ FD_Lease :: enum {
 	UNLCK = 2,
 }
 
-/// Kind of owner for FD_Owner
+/*
+	Kind of owner for FD_Owner
+*/
 F_Owner_Type :: enum i32 {
 	OWNER_TID  = 0,
 	OWNER_PID  = 1,
 	OWNER_PGRP = 2,
 }
 
-/// Command for fcntl.2
+/*
+	Command for fcntl(2)
+*/
 FCntl_Command :: enum {
 	DUPFD             = 0,
 	GETFD             = 1,
@@ -465,7 +542,9 @@ Fd_Poll_Events_Bits :: enum {
 	RDHUP  = 13,
 }
 
-/// Bits for Mem_Protection bitfield
+/*
+	Bits for Mem_Protection bitfield
+*/
 Mem_Protection_Bits :: enum{
 	READ      = 0,
 	WRITE     = 1,
@@ -479,7 +558,9 @@ Mem_Protection_Bits :: enum{
 	GROWSUP   = 25,
 }
 
-/// Bits for Map_Flags
+/*
+	Bits for Map_Flags
+*/
 Map_Flags_Bits :: enum {
 	SHARED          = 0,
 	PRIVATE         = 1,
@@ -504,19 +585,25 @@ Map_Flags_Bits :: enum {
 	UNINITIALIZED   = 26,
 }
 
-/// Bits for MLock_Flags
+/*
+	Bits for MLock_Flags
+*/
 MLock_Flags_Bits :: enum {
 	ONFAULT   = 0,
 }
 
-/// Bits for MSync_Flags
+/*
+	Bits for MSync_Flags
+*/
 MSync_Flags_Bits :: enum {
 	ASYNC      = 0,
 	INVALIDATE = 1,
 	SYNC       = 2,
 }
 
-/// Argument for madvice.2
+/*
+	Argument for madvice(2)
+*/
 MAdvice :: enum {
 	NORMAL           = 0,
 	RANDOM           = 1,
@@ -545,27 +632,35 @@ MAdvice :: enum {
 	SOFT_OFFLINE     = 101,
 }
 
-/// Bits for PKey_Access_Rights
+/*
+	Bits for PKey_Access_Rights
+*/
 PKey_Access_Bits :: enum {
 	DISABLE_ACCESS = 0,
 	DISABLE_WRITE  = 2,
 }
 
-/// Bits for MRemap_Flags
+/*
+	Bits for MRemap_Flags
+*/
 MRemap_Flags_Bits :: enum {
 	MAYMOVE   = 0,
 	FIXED     = 1,
 	DONTUNMAP = 2,
 }
 
-/// Bits for Get_Random_Flags
+/*
+	Bits for Get_Random_Flags
+*/
 Get_Random_Flags_Bits :: enum {
 	RANDOM   = 0,
 	NONBLOCK = 1,
 	INSECURE = 2,
 }
 
-/// Bits for Perf_Flags
+/*
+	Bits for Perf_Flags
+*/
 Perf_Flags_Bits :: enum {
 	FD_NO_GROUP = 0,
 	FD_OUTPUT   = 1,
@@ -573,7 +668,9 @@ Perf_Flags_Bits :: enum {
 	FD_CLOEXEC  = 3,
 }
 
-///  Union tag for Perf_Event_Attr struct
+/*
+	Union tag for Perf_Event_Attr struct
+*/
 Perf_Event_Type :: enum u32 {
 	HARDWARE   = 0,
 	SOFTWARE   = 1,
@@ -633,7 +730,9 @@ Perf_Cap_Flags_Bits :: enum u64 {
 	User_Time_Short    = 5,
 }
 
-/// Specifies the type of the hardware event that you want to get info about
+/*
+	Specifies the type of the hardware event that you want to get info about
+*/
 Perf_Hardware_Id :: enum u64 {
 	CPU_CYCLES              = 0,
 	INSTRUCTIONS            = 1,
@@ -647,7 +746,9 @@ Perf_Hardware_Id :: enum u64 {
 	REF_CPU_CYCLES          = 9,
 }
 
-/// Specifies the cache for the particular cache event that you want to get info about
+/*
+	Specifies the cache for the particular cache event that you want to get info about
+*/
 Perf_Hardware_Cache_Id :: enum u64 {
 	L1D      = 0,
 	L1I      = 1,
@@ -658,20 +759,26 @@ Perf_Hardware_Cache_Id :: enum u64 {
 	NODE     = 6,
 }
 
-/// Specifies the cache op that you want to get info about
+/*
+	Specifies the cache op that you want to get info about
+*/
 Perf_Hardware_Cache_Op_Id :: enum u64 {
 	READ     = 0,
 	WRITE    = 1,
 	PREFETCH = 2,
 }
 
-/// Specifies the cache operation result that you want to get info about
+/*
+	Specifies the cache operation result that you want to get info about
+*/
 Perf_Hardware_Cache_Result_Id :: enum u64 {
 	ACCESS   = 0,
 	MISS     = 1,
 }
 
-/// Specifies the particular software event that you want to get info about
+/*
+	Specifies the particular software event that you want to get info about
+*/
 Perf_Software_Id :: enum u64 {
 	CPU_CLOCK         = 0,
 	TASK_CLOCK        = 1,
@@ -688,7 +795,9 @@ Perf_Software_Id :: enum u64 {
 
 }
 
-/// Specifies which values to include in the sample
+/*
+	Specifies which values to include in the sample
+*/
 Perf_Event_Sample_Type_Bits :: enum {
 	IP              = 0,
 	TID             = 1,
@@ -726,7 +835,9 @@ Perf_Read_Format_Bits :: enum {
 	LOST               = 4,
 }
 
-/// Chooses the breakpoint type
+/*
+	Chooses the breakpoint type
+*/
 Hardware_Breakpoint_Type :: enum u32 {
 	EMPTY   = 0,
 	R       = 1,
@@ -736,7 +847,9 @@ Hardware_Breakpoint_Type :: enum u32 {
 	INVALID = RW | X,
 }
 
-/// Bits for Branch_Sample_Type
+/*
+	Bits for Branch_Sample_Type
+*/
 Branch_Sample_Type_Bits :: enum {
 	USER       = 0,
 	KERNEL     = 1,
@@ -759,7 +872,9 @@ Branch_Sample_Type_Bits :: enum {
 	PRIV_SAVE  = 18,
 }
 
-/// Represent the type of Id
+/*
+	Represent the type of Id
+*/
 Id_Type :: enum uint {
 	ALL    = 0,
 	PID    = 1,
@@ -767,26 +882,32 @@ Id_Type :: enum uint {
 	PIDFD  = 3,
 }
 
-/// Options for wait syscalls
+/*
+	Options for wait syscalls
+*/
 Wait_Option :: enum {
 	WNOHANG     = 0,
 	WUNTRACED   = 1,
 	WSTOPPED    = 1,
 	WEXITED     = 2,
 	WCONTINUED  = 3,
-	WNOWAIT     = 24, 
+	WNOWAIT     = 24,
 	// // For processes created using clone
 	__WNOTHREAD = 29,
 	__WALL      = 30,
 	__WCLONE    = 31,
 }
 
-/// Bits for flags for pidfd
+/*
+	Bits for flags for pidfd
+*/
 Pid_FD_Flags_Bits :: enum {
 	NONBLOCK = 11,
 }
 
-/// Priority for process, process group, user
+/*
+	Priority for process, process group, user
+*/
 Priority_Which :: enum i32 {
 	PROCESS = 0,
 	PGRP    = 1,
@@ -849,10 +970,25 @@ Sig_Stack_Flag :: enum i32 {
 	AUTODISARM = 31,
 }
 
-/// Type of socket to create
-///   For TCP you want to use SOCK_STREAM
-///   For UDP you want to use SOCK_DGRAM
-/// Also see Protocol
+Sig_Action_Flag :: enum u32 {
+	NOCLDSTOP      = 0,
+	NOCLDWAIT      = 1,
+	SIGINFO        = 2,
+	UNSUPPORTED    = 10,
+	EXPOSE_TAGBITS = 11,
+	RESTORER       = 26,
+	ONSTACK        = 27,
+	RESTART        = 28,
+	NODEFER        = 30,
+	RESETHAND      = 31,
+}
+
+/*
+	Type of socket to create
+	- For TCP you want to use SOCK_STREAM
+	- For UDP you want to use SOCK_DGRAM
+	Also see `Protocol`
+*/
 Socket_Type :: enum {
 	STREAM    = 1,
 	DGRAM     = 2,
@@ -863,13 +999,17 @@ Socket_Type :: enum {
 	PACKET    = 10,
 }
 
-/// Bits for Socket_FD_Flags
+/*
+	Bits for Socket_FD_Flags
+*/
 Socket_FD_Flags_Bits :: enum {
-	NONBLOCK  = 14,
-	CLOEXEC   = 25,
+	NONBLOCK  = 11,
+	CLOEXEC   = 19,
 }
 
-/// Protocol family
+/*
+	Protocol family
+*/
 Protocol_Family :: enum u16 {
 	UNSPEC       = 0,
 	LOCAL        = 1,
@@ -922,11 +1062,13 @@ Protocol_Family :: enum u16 {
 	MCTP         = 45,
 }
 
-/// The protocol number according to IANA protocol number list
-/// Full list of protocol numbers:
-///   https://www.iana.org/assignments/protocol-numbers/protocol-numbers.xhtml
-/// Supported by the OS protocols can be queried by reading:
-///   /etc/protocols
+/*
+	The protocol number according to IANA protocol number list
+	Full list of protocol numbers:
+	  https://www.iana.org/assignments/protocol-numbers/protocol-numbers.xhtml
+	Supported by the OS protocols can be queried by reading:
+	  /etc/protocols
+*/
 Protocol :: enum {
 	HOPOPT          = 0,
 	ICMP            = 1,
@@ -1066,7 +1208,9 @@ Protocol :: enum {
 	Reserved        = 255,
 }
 
-/// API Level for get/setsockopt.2
+/*
+	API Level for getsockopt(2)/setsockopt(2)
+*/
 Socket_API_Level :: enum {
 	// Comes from <bits/socket-constants.h>
 	SOCKET          = 1,
@@ -1103,8 +1247,10 @@ Socket_API_Level :: enum {
 	SMC             = 286,
 }
 
-/// If Socket_API_Level == .SOCKET, these are the options
-/// you can specify in get/setsockopt.2
+/*
+	If Socket_API_Level == .SOCKET, these are the options
+	you can specify in getsockopt(2)/setsockopt(2)
+*/
 Socket_Option :: enum {
 	DEBUG                         = 1,
 	REUSEADDR                     = 2,
@@ -1249,7 +1395,9 @@ Socket_TCP_Option :: enum {
 	TX_DELAY             = 37,
 }
 
-/// Bits for Socket_Msg
+/*
+	Bits for Socket_Msg
+*/
 Socket_Msg_Bits :: enum {
 	OOB             = 0,
 	PEEK            = 1,
@@ -1275,14 +1423,18 @@ Socket_Msg_Bits :: enum {
 	CMSG_CLOEXEC    = 30,
 }
 
-/// Argument to shutdown.2
+/*
+	Argument to shutdown(2)
+*/
 Shutdown_How :: enum i32 {
 	RD   = 0,
 	WR   = 1,
 	RDWR = 2,
 }
 
-/// Second argument to futex.2 syscall
+/*
+	Second argument to futex(2) syscall
+*/
 Futex_Op :: enum u32 {
 	WAIT              = 0,
 	WAKE              = 1,
@@ -1300,27 +1452,33 @@ Futex_Op :: enum u32 {
 	LOCK_PI2          = 13,
 }
 
-/// Bits for Futex_Flags
+/*
+	Bits for Futex_Flags
+*/
 Futex_Flags_Bits :: enum {
 	PRIVATE    = 7,
 	REALTIME   = 8,
 }
 
-/// Kind of operation on futex, see FUTEX_WAKE_OP
+/*
+	Kind of operation on futex, see FUTEX_WAKE_OP
+*/
 Futex_Arg_Op :: enum {
-	SET      = 0,  /* uaddr2 =       oparg; */
-	ADD      = 1,  /* uaddr2 +=      oparg; */
-	OR       = 2,  /* uaddr2 |=      oparg; */
-	ANDN     = 3,  /* uaddr2 &=     ~oparg; */
-	XOR      = 4,  /* uaddr2 ^=      oparg; */
-	PO2_SET  = 0,  /* uaddr2 =    1<<oparg; */
-	PO2_ADD  = 1,  /* uaddr2 +=   1<<oparg; */
-	PO2_OR   = 2,  /* uaddr2 |=   1<<oparg; */
-	PO2_ANDN = 3,  /* uaddr2 &= ~(1<<oparg); */
-	PO2_XOR  = 4,  /* uaddr2 ^=   1<<oparg; */
+	SET      = 0,  /* uaddr2 =       oparg */
+	ADD      = 1,  /* uaddr2 +=      oparg */
+	OR       = 2,  /* uaddr2 |=      oparg */
+	ANDN     = 3,  /* uaddr2 &=     ~oparg */
+	XOR      = 4,  /* uaddr2 ^=      oparg */
+	PO2_SET  = 0,  /* uaddr2 =    1<<oparg */
+	PO2_ADD  = 1,  /* uaddr2 +=   1<<oparg */
+	PO2_OR   = 2,  /* uaddr2 |=   1<<oparg */
+	PO2_ANDN = 3,  /* uaddr2 &~=  1<<oparg */
+	PO2_XOR  = 4,  /* uaddr2 ^=   1<<oparg */
 }
 
-/// Kind of comparison operation on futex, see FUTEX_WAKE_OP
+/*
+	Kind of comparison operation on futex, see FUTEX_WAKE_OP
+*/
 Futex_Cmp_Op :: enum {
 	EQ = 0,  /* if (oldval == cmparg) wake */
 	NE = 1,  /* if (oldval != cmparg) wake */
@@ -1330,7 +1488,9 @@ Futex_Cmp_Op :: enum {
 	GE = 5,  /* if (oldval >= cmparg) wake */
 }
 
-/// The kind of resource limits
+/*
+	The kind of resource limits
+*/
 RLimit_Kind :: enum i32 {
 	CPU        = 0,
 	FSIZE      = 1,
@@ -1351,7 +1511,9 @@ RLimit_Kind :: enum i32 {
 	NLIMITS    = 16,
 }
 
-/// Represents the user of resources
+/*
+	Represents the user of resources
+*/
 RUsage_Who :: enum i32 {
 	CHILDREN = -1,
 	SELF     =  0,
@@ -1359,7 +1521,9 @@ RUsage_Who :: enum i32 {
 	LWP      =  THREAD,
 }
 
-/// Bits for Personality_Flags
+/*
+	Bits for Personality_Flags
+*/
 UNAME26            :: 17
 ADDR_NO_RANDOMIZE  :: 18
 FDPIC_FUNCPTRS     :: 19
@@ -1372,8 +1536,10 @@ WHOLE_SECONDS      :: 25
 STICKY_TIMEOUTS    :: 26
 ADDR_LIMIT_3GB     :: 27
 
-/// Personality type
-/// These go into the bottom 8 bits of the personality value
+/*
+	Personality type
+	These go into the bottom 8 bits of the personality value
+*/
 PER_LINUX       :: 0x0000
 PER_LINUX_32BIT :: 0x0000 | ADDR_LIMIT_32BIT
 PER_LINUX_FDPIC :: 0x0000 | FDPIC_FUNCPTRS
@@ -1398,3 +1564,254 @@ PER_OSF4        :: 0x000f
 PER_HPUX        :: 0x0010
 PER_MASK        :: 0x00ff
 
+/*
+	Bits for access modes for shared memory
+*/
+IPC_Mode_Bits :: enum {
+	WROTH  = 1,
+	RDOTH  = 2,
+	WRGRP  = 4,
+	RDGRP  = 5,
+	WRUSR  = 7,
+	RDUSR  = 8,
+	DEST   = 9,
+	LOCKED = 10,
+}
+
+/*
+	Shared memory flags bits
+*/
+IPC_Flags_Bits :: enum {
+	IPC_CREAT     = 9,
+	IPC_EXCL      = 10,
+	IPC_NOWAIT    = 11,
+	// Semaphore
+	SEM_UNDO      = 9,
+	// Shared memory
+	SHM_HUGETLB   = 11,
+	SHM_NORESERVE = 12,
+	SHM_RDONLY    = 12,
+	SHM_RND       = 13,
+	SHM_REMAP     = 14,
+	SHM_EXEC      = 15,
+	// Message queue
+	MSG_NOERROR   = 12,
+	MSG_EXCEPT    = 13,
+	MSG_COPY      = 14,
+}
+
+/*
+	IPC memory commands
+*/
+IPC_Cmd :: enum i16 {
+	// IPC common
+	IPC_RMID     = 0,
+	IPC_SET      = 1,
+	IPC_STAT     = 2,
+	// Shared memory
+	SHM_LOCK     = 11,
+	SHM_UNLOCK   = 12,
+	SHM_STAT     = 13,
+	SHM_INFO     = 14,
+	SHM_STAT_ANY = 15,
+	// Semaphore
+	GETPID       = 11,
+	GETVAL       = 12,
+	GETALL       = 13,
+	GETNCNT      = 14,
+	GETZCNT      = 15,
+	SETVAL       = 16,
+	SETALL       = 17,
+	SEM_STAT     = 18,
+	SEM_INFO     = 19,
+	SEM_STAT_ANY = 20,
+	// Message queue
+	MSG_STAT     = 11,
+	MSG_INFO     = 12,
+	MSG_STAT_ANY = 13,
+}
+
+/*
+	File locking operation bits
+*/
+FLock_Op_Bits :: enum {
+	SH = 1,
+	EX = 2,
+	NB = 4,
+	UN = 8,
+}
+
+/*
+	ptrace requests
+*/
+PTrace_Request :: enum {
+	TRACEME                = 0,
+	PEEKTEXT               = 1,
+	PEEKDATA               = 2,
+	PEEKUSER               = 3,
+	POKETEXT               = 4,
+	POKEDATA               = 5,
+	POKEUSER               = 6,
+	CONT                   = 7,
+	KILL                   = 8,
+	SINGLESTEP             = 9,
+	GETREGS                = 12,
+	SETREGS                = 13,
+	GETFPREGS              = 14,
+	SETFPREGS              = 15,
+	ATTACH                 = 16,
+	DETACH                 = 17,
+	GETFPXREGS             = 18,
+	SETFPXREGS             = 19,
+	SYSCALL                = 24,
+	GET_THREAD_AREA        = 25,
+	SET_THREAD_AREA        = 26,
+	ARCH_PRCTL             = 30,
+	SYSEMU                 = 31,
+	SYSEMU_SINGLESTEP      = 32,
+	SINGLEBLOCK            = 33,
+	SETOPTIONS             = 0x4200,
+	GETEVENTMSG            = 0x4201,
+	GETSIGINFO             = 0x4202,
+	SETSIGINFO             = 0x4203,
+	GETREGSET              = 0x4204,
+	SETREGSET              = 0x4205,
+	SEIZE                  = 0x4206,
+	INTERRUPT              = 0x4207,
+	LISTEN                 = 0x4208,
+	PEEKSIGINFO            = 0x4209,
+	GETSIGMASK             = 0x420a,
+	SETSIGMASK             = 0x420b,
+	SECCOMP_GET_FILTER     = 0x420c,
+	SECCOMP_GET_METADATA   = 0x420d,
+	GET_SYSCALL_INFO       = 0x420e,
+	GET_RSEQ_CONFIGURATION = 0x420f,
+}
+
+/*
+	ptrace options
+*/
+PTrace_Options_Bits :: enum {
+	TRACESYSGOOD    = 0,
+	TRACEFORK       = 1,
+	TRACEVFORK      = 2,
+	TRACECLONE      = 3,
+	TRACEEXEC       = 4,
+	TRACEVFORKDONE  = 5,
+	TRACEEXIT       = 6,
+	TRACESECCOMP    = 7,
+	EXITKILL        = 20,
+	SUSPEND_SECCOMP = 21,
+}
+
+/*
+	ptrace event codes.
+*/
+PTrace_Event_Code :: enum {
+	EVENT_FORK       = 1,
+	EVENT_VFORK      = 2,
+	EVENT_CLONE      = 3,
+	EVENT_EXEC       = 4,
+	EVENT_VFORK_DONE = 5,
+	EVENT_EXIT       = 6,
+	EVENT_SECCOMP    = 7,
+	EVENT_STOP       = 128,
+}
+
+/*
+	ptrace's get syscall info operation.
+*/
+PTrace_Get_Syscall_Info_Op :: enum u8 {
+	NONE    = 0,
+	ENTRY   = 1,
+	EXIT    = 2,
+	SECCOMP = 3,
+}
+
+/*
+	ptrace's PEEKSIGINFO flags bits
+*/
+PTrace_Peek_Sig_Info_Flags_Bits :: enum {
+	SHARED = 0,
+}
+
+/*
+	Syslog actions.
+*/
+Syslog_Action :: enum i32 {
+	CLOSE         = 0,
+	OPEN          = 1,
+	READ          = 2,
+	READ_ALL      = 3,
+	READ_CLEAR    = 4,
+	CLEAR         = 5,
+	CONSOLE_OFF   = 6,
+	CONSOLE_ON    = 7,
+	CONSOLE_LEVEL = 8,
+	SIZE_UNREAD   = 9,
+	SIZE_BUFFER   = 10,
+}
+
+/*
+	Bits for splice flags.
+*/
+Splice_Flags_Bits :: enum {
+	MOVE     = 0x01,
+	NONBLOCK = 0x02,
+	MORE     = 0x04,
+	GIFT     = 0x08,
+}
+
+/*
+	Clock IDs for various system clocks.
+*/
+Clock_Id :: enum {
+	REALTIME           = 0,
+	MONOTONIC          = 1,
+	PROCESS_CPUTIME_ID = 2,
+	THREAD_CPUTIME_ID  = 3,
+	MONOTONIC_RAW      = 4,
+	REALTIME_COARSE    = 5,
+	MONOTONIC_COARSE   = 6,
+	BOOTTIME           = 7,
+	REALTIME_ALARM     = 8,
+	BOOTTIME_ALARM     = 9,
+}
+
+/*
+	Bits for POSIX interval timer flags.
+*/
+ITimer_Flags_Bits :: enum {
+	ABSTIME = 1,
+}
+
+/*
+	Bits for epoll_create(2) flags.
+*/
+EPoll_Flags_Bits :: enum {
+	FDCLOEXEC = 19,
+}
+
+EPoll_Event_Kind :: enum u32 {
+	IN        = 0x001,
+	PRI       = 0x002,
+	OUT       = 0x004,
+	RDNORM    = 0x040,
+	RDBAND    = 0x080,
+	WRNORM    = 0x100,
+	WRBAND    = 0x200,
+	MSG       = 0x400,
+	ERR       = 0x008,
+	HUP       = 0x010,
+	RDHUP     = 0x2000,
+	EXCLUSIVE = 1<<28,
+	WAKEUP    = 1<<29,
+	ONESHOT   = 1<<30,
+	ET        = 1<<31,
+}
+
+EPoll_Ctl_Opcode :: enum i32 {
+	ADD = 1,
+	DEL = 2,
+	MOD = 3,
+}

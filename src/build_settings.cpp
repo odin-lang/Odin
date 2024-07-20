@@ -18,9 +18,12 @@ enum TargetOsKind : u16 {
 	TargetOs_essence,
 	TargetOs_freebsd,
 	TargetOs_openbsd,
+	TargetOs_netbsd,
+	TargetOs_haiku,
 	
 	TargetOs_wasi,
 	TargetOs_js,
+	TargetOs_orca,
 
 	TargetOs_freestanding,
 
@@ -56,6 +59,24 @@ enum TargetABIKind : u16 {
 	TargetABI_COUNT,
 };
 
+enum Windows_Subsystem : u8 {
+ 	Windows_Subsystem_BOOT_APPLICATION,
+	Windows_Subsystem_CONSOLE,                 // Default,
+	Windows_Subsystem_EFI_APPLICATION,
+	Windows_Subsystem_EFI_BOOT_SERVICE_DRIVER,
+	Windows_Subsystem_EFI_ROM,
+	Windows_Subsystem_EFI_RUNTIME_DRIVER,
+	Windows_Subsystem_NATIVE,
+	Windows_Subsystem_POSIX,
+	Windows_Subsystem_WINDOWS,
+	Windows_Subsystem_WINDOWSCE,
+	Windows_Subsystem_COUNT,
+};
+
+struct MicroarchFeatureList {
+	String microarch;
+	String features;
+};
 
 gb_global String target_os_names[TargetOs_COUNT] = {
 	str_lit(""),
@@ -65,9 +86,12 @@ gb_global String target_os_names[TargetOs_COUNT] = {
 	str_lit("essence"),
 	str_lit("freebsd"),
 	str_lit("openbsd"),
+	str_lit("netbsd"),
+	str_lit("haiku"),
 	
 	str_lit("wasi"),
 	str_lit("js"),
+	str_lit("orca"),
 
 	str_lit("freestanding"),
 };
@@ -82,22 +106,7 @@ gb_global String target_arch_names[TargetArch_COUNT] = {
 	str_lit("wasm64p32"),
 };
 
-gb_global String target_microarch_list[TargetArch_COUNT] = {
-	// TargetArch_Invalid,
-	str_lit("Invalid!"),
-	// TargetArch_amd64,
-	str_lit("alderlake,amdfam10,athlon-fx,athlon64,athlon64-sse3,atom_sse4_2,atom_sse4_2_movbe,barcelona,bdver1,bdver2,bdver3,bdver4,broadwell,btver1,btver2,cannonlake,cascadelake,cooperlake,core-avx-i,core-avx2,core2,core_2_duo_sse4_1,core_2_duo_ssse3,core_2nd_gen_avx,core_3rd_gen_avx,core_4th_gen_avx,core_4th_gen_avx_tsx,core_5th_gen_avx,core_5th_gen_avx_tsx,core_aes_pclmulqdq,core_i7_sse4_2,corei7,corei7-avx,generic,goldmont,goldmont-plus,goldmont_plus,grandridge,graniterapids,graniterapids-d,graniterapids_d,haswell,icelake-client,icelake-server,icelake_client,icelake_server,ivybridge,k8,k8-sse3,knl,knm,meteorlake,mic_avx512,native,nehalem,nocona,opteron,opteron-sse3,penryn,raptorlake,rocketlake,sandybridge,sapphirerapids,sierraforest,silvermont,skx,skylake,skylake-avx512,skylake_avx512,slm,tigerlake,tremont,westmere,x86-64,x86-64-v2,x86-64-v3,x86-64-v4,znver1,znver2,znver3,znver4"),
-	// TargetArch_i386,
-	str_lit("athlon,athlon-4,athlon-mp,athlon-tbird,athlon-xp,atom,bonnell,c3,c3-2,generic,geode,i386,i486,i586,i686,k6,k6-2,k6-3,lakemont,native,pentium,pentium-m,pentium-mmx,pentium2,pentium3,pentium3m,pentium4,pentium4m,pentium_4,pentium_4_sse3,pentium_ii,pentium_iii,pentium_iii_no_xmm_regs,pentium_m,pentium_mmx,pentium_pro,pentiumpro,prescott,winchip-c6,winchip2,yonah"),
-	// TargetArch_arm32,
-	str_lit("arm1020e,arm1020t,arm1022e,arm10e,arm10tdmi,arm1136j-s,arm1136jf-s,arm1156t2-s,arm1156t2f-s,arm1176jz-s,arm1176jzf-s,arm710t,arm720t,arm7tdmi,arm7tdmi-s,arm8,arm810,arm9,arm920,arm920t,arm922t,arm926ej-s,arm940t,arm946e-s,arm966e-s,arm968e-s,arm9e,arm9tdmi,cortex-a12,cortex-a15,cortex-a17,cortex-a32,cortex-a35,cortex-a5,cortex-a53,cortex-a55,cortex-a57,cortex-a7,cortex-a710,cortex-a72,cortex-a73,cortex-a75,cortex-a76,cortex-a76ae,cortex-a77,cortex-a78,cortex-a78c,cortex-a8,cortex-a9,cortex-m0,cortex-m0plus,cortex-m1,cortex-m23,cortex-m3,cortex-m33,cortex-m35p,cortex-m4,cortex-m55,cortex-m7,cortex-m85,cortex-r4,cortex-r4f,cortex-r5,cortex-r52,cortex-r7,cortex-r8,cortex-x1,cortex-x1c,cyclone,ep9312,exynos-m3,exynos-m4,exynos-m5,generic,iwmmxt,krait,kryo,mpcore,mpcorenovfp,native,neoverse-n1,neoverse-n2,neoverse-v1,sc000,sc300,strongarm,strongarm110,strongarm1100,strongarm1110,swift,xscale"),
-	// TargetArch_arm64,
-	str_lit("a64fx,ampere1,ampere1a,apple-a10,apple-a11,apple-a12,apple-a13,apple-a14,apple-a15,apple-a16,apple-a7,apple-a8,apple-a9,apple-latest,apple-m1,apple-m2,apple-s4,apple-s5,carmel,cortex-a34,cortex-a35,cortex-a510,cortex-a53,cortex-a55,cortex-a57,cortex-a65,cortex-a65ae,cortex-a710,cortex-a715,cortex-a72,cortex-a73,cortex-a75,cortex-a76,cortex-a76ae,cortex-a77,cortex-a78,cortex-a78c,cortex-r82,cortex-x1,cortex-x1c,cortex-x2,cortex-x3,cyclone,exynos-m3,exynos-m4,exynos-m5,falkor,generic,kryo,native,neoverse-512tvb,neoverse-e1,neoverse-n1,neoverse-n2,neoverse-v1,neoverse-v2,saphira,thunderx,thunderx2t99,thunderx3t110,thunderxt81,thunderxt83,thunderxt88,tsv110"),
-	// TargetArch_wasm32,
-	str_lit("generic"),
-	// TargetArch_wasm64p32,
-	str_lit("generic"),
-};
+#include "build_settings_microarch.cpp"
 
 gb_global String target_endian_names[TargetEndian_COUNT] = {
 	str_lit("little"),
@@ -120,6 +129,19 @@ gb_global TargetEndianKind target_endians[TargetArch_COUNT] = {
 	TargetEndian_Little,
 };
 
+gb_global String windows_subsystem_names[Windows_Subsystem_COUNT] = {
+	str_lit("BOOT_APPLICATION"),
+	str_lit("CONSOLE"),                 // Default
+	str_lit("EFI_APPLICATION"),
+	str_lit("EFI_BOOT_SERVICE_DRIVER"),
+	str_lit("EFI_ROM"),
+	str_lit("EFI_RUNTIME_DRIVER"),
+	str_lit("NATIVE"),
+	str_lit("POSIX"),
+	str_lit("WINDOWS"),
+	str_lit("WINDOWSCE"),
+};
+
 #ifndef ODIN_VERSION_RAW
 #define ODIN_VERSION_RAW "dev-unknown-unknown"
 #endif
@@ -134,7 +156,6 @@ struct TargetMetrics {
 	isize          max_align;
 	isize          max_simd_align;
 	String         target_triplet;
-	String         target_data_layout;
 	TargetABIKind  abi;
 };
 
@@ -166,6 +187,7 @@ struct QueryDataSetSettings {
 enum BuildModeKind {
 	BuildMode_Executable,
 	BuildMode_DynamicLibrary,
+	BuildMode_StaticLibrary,
 	BuildMode_Object,
 	BuildMode_Assembly,
 	BuildMode_LLVM_IR,
@@ -213,6 +235,12 @@ enum TimingsExportFormat : i32 {
 	TimingsExportCSV         = 2,
 };
 
+enum DependenciesExportFormat : i32 {
+	DependenciesExportUnspecified = 0,
+	DependenciesExportMake        = 1,
+	DependenciesExportJson        = 2,
+};
+
 enum ErrorPosStyle {
 	ErrorPosStyle_Default, // path(line:column) msg
 	ErrorPosStyle_Unix,    // path:line:column: msg
@@ -244,15 +272,21 @@ enum BuildPath : u8 {
 };
 
 enum VetFlags : u64 {
-	VetFlag_NONE       = 0,
-	VetFlag_Unused     = 1u<<0, // 1
-	VetFlag_Shadowing  = 1u<<1, // 2
-	VetFlag_UsingStmt  = 1u<<2, // 4
-	VetFlag_UsingParam = 1u<<3, // 8
-	VetFlag_Style      = 1u<<4, // 16
-	VetFlag_Semicolon  = 1u<<5, // 32
+	VetFlag_NONE            = 0,
+	VetFlag_Shadowing       = 1u<<0,
+	VetFlag_UsingStmt       = 1u<<1,
+	VetFlag_UsingParam      = 1u<<2,
+	VetFlag_Style           = 1u<<3,
+	VetFlag_Semicolon       = 1u<<4,
+	VetFlag_UnusedVariables = 1u<<5,
+	VetFlag_UnusedImports   = 1u<<6,
+	VetFlag_Deprecated      = 1u<<7,
+	VetFlag_Cast            = 1u<<8,
+	VetFlag_Tabs            = 1u<<9,
 
-	VetFlag_All = VetFlag_Unused|VetFlag_Shadowing|VetFlag_UsingStmt,
+	VetFlag_Unused = VetFlag_UnusedVariables|VetFlag_UnusedImports,
+
+	VetFlag_All = VetFlag_Unused|VetFlag_Shadowing|VetFlag_UsingStmt|VetFlag_Deprecated|VetFlag_Cast,
 
 	VetFlag_Using = VetFlag_UsingStmt|VetFlag_UsingParam,
 };
@@ -260,6 +294,10 @@ enum VetFlags : u64 {
 u64 get_vet_flag_from_name(String const &name) {
 	if (name == "unused") {
 		return VetFlag_Unused;
+	} else if (name == "unused-variables") {
+		return VetFlag_UnusedVariables;
+	} else if (name == "unused-imports") {
+		return VetFlag_UnusedImports;
 	} else if (name == "shadowing") {
 		return VetFlag_Shadowing;
 	} else if (name == "using-stmt") {
@@ -270,6 +308,12 @@ u64 get_vet_flag_from_name(String const &name) {
 		return VetFlag_Style;
 	} else if (name == "semicolon") {
 		return VetFlag_Semicolon;
+	} else if (name == "deprecated") {
+		return VetFlag_Deprecated;
+	} else if (name == "cast") {
+		return VetFlag_Cast;
+	} else if (name == "tabs") {
+		return VetFlag_Tabs;
 	}
 	return VetFlag_NONE;
 }
@@ -282,20 +326,32 @@ enum SanitizerFlags : u32 {
 	SanitizerFlag_Thread  = 1u<<2,
 };
 
+struct BuildCacheData {
+	u64 crc;
+	String cache_dir;
 
+	// manifests
+	String files_path;
+	String args_path;
+	String env_path;
+
+	bool copy_already_done;
+};
 
 // This stores the information for the specify architecture of this build
 struct BuildContext {
 	// Constants
-	String ODIN_OS;      // target operating system
-	String ODIN_ARCH;    // target architecture
-	String ODIN_VENDOR;  // compiler vendor
-	String ODIN_VERSION; // compiler version
-	String ODIN_ROOT;    // Odin ROOT
-	String ODIN_BUILD_PROJECT_NAME; // Odin main/initial package's directory name
-	bool   ODIN_DEBUG;   // Odin in debug mode
-	bool   ODIN_DISABLE_ASSERT; // Whether the default 'assert' et al is disabled in code or not
+	String ODIN_OS;                       // Target operating system
+	String ODIN_ARCH;                     // Target architecture
+	String ODIN_VENDOR;                   // Compiler vendor
+	String ODIN_VERSION;                  // Compiler version
+	String ODIN_ROOT;                     // Odin ROOT
+	String ODIN_BUILD_PROJECT_NAME;       // Odin main/initial package's directory name
+	String ODIN_WINDOWS_SUBSYSTEM;        // Empty string for non-Windows targets
+	bool   ODIN_DEBUG;                    // Odin in debug mode
+	bool   ODIN_DISABLE_ASSERT;           // Whether the default 'assert' et al is disabled in code or not
 	bool   ODIN_DEFAULT_TO_NIL_ALLOCATOR; // Whether the default allocator is a "nil" allocator or not (i.e. it does nothing)
+	bool   ODIN_DEFAULT_TO_PANIC_ALLOCATOR; // Whether the default allocator is a "panic" allocator or not (i.e. panics on any call to it)
 	bool   ODIN_FOREIGN_ERROR_PROCEDURES;
 	bool   ODIN_VALGRIND_SUPPORT;
 
@@ -338,13 +394,18 @@ struct BuildContext {
 	bool   show_timings;
 	TimingsExportFormat export_timings_format;
 	String export_timings_file;
+	DependenciesExportFormat export_dependencies_format;
+	String export_dependencies_file;
 	bool   show_unused;
 	bool   show_unused_with_location;
 	bool   show_more_timings;
+	bool   show_defineables;
+	String export_defineables_file;
 	bool   show_system_calls;
 	bool   keep_temp_files;
 	bool   ignore_unknown_attributes;
 	bool   no_bounds_check;
+	bool   no_type_assert;
 	bool   no_dynamic_literals;
 	bool   no_output_files;
 	bool   no_crt;
@@ -356,21 +417,31 @@ struct BuildContext {
 	bool   keep_object_files;
 	bool   disallow_do;
 
+	StringSet custom_attributes;
+
 	bool   strict_style;
 
 	bool   ignore_warnings;
 	bool   warnings_as_errors;
 	bool   hide_error_line;
+	bool   terse_errors;
+	bool   json_errors;
 	bool   has_ansi_terminal_colours;
 
 	bool   ignore_lazy;
 	bool   ignore_llvm_build;
+	bool   ignore_panic;
 
-	bool   use_subsystem_windows;
 	bool   ignore_microsoft_magic;
 	bool   linker_map_file;
 
 	bool   use_separate_modules;
+	bool   module_per_file;
+	bool   cached;
+	BuildCacheData build_cache_data;
+
+	bool internal_no_inline;
+
 	bool   no_threaded_checker;
 
 	bool   show_debug_messages;
@@ -380,6 +451,12 @@ struct BuildContext {
 	bool   no_rtti;
 
 	bool   dynamic_map_calls;
+
+	bool   obfuscate_source_code_locations;
+
+	bool   min_link_libs;
+
+	bool   print_linker_flags;
 
 	RelocMode reloc_mode;
 	bool   disable_red_zone;
@@ -392,17 +469,19 @@ struct BuildContext {
 	u32 cmd_doc_flags;
 	Array<String> extra_packages;
 
-	StringSet test_names;
+	bool      test_all_packages;
 
 	gbAffinity affinity;
 	isize      thread_count;
 
 	PtrMap<char const *, ExactValue> defined_values;
 
-	BlockingMutex target_features_mutex;
 	StringSet target_features_set;
 	String target_features_string;
+	bool strict_target_features;
+
 	String minimum_os_version_string;
+	bool   minimum_os_version_string_given;
 };
 
 gb_global BuildContext build_context = {0};
@@ -426,7 +505,18 @@ gb_internal isize MAX_ERROR_COLLECTOR_COUNT(void) {
 	return build_context.max_error_count;
 }
 
+#if defined(GB_SYSTEM_WINDOWS)
+	#include <llvm-c/Config/llvm-config.h>
+#else
+	#include <llvm/Config/llvm-config.h>
+#endif
 
+// NOTE: AMD64 targets had their alignment on 128 bit ints bumped from 8 to 16 (undocumented of course).
+#if LLVM_VERSION_MAJOR >= 18
+	#define AMD64_MAX_ALIGNMENT 16
+#else
+	#define AMD64_MAX_ALIGNMENT 8
+#endif
 
 gb_global TargetMetrics target_windows_i386 = {
 	TargetOs_windows,
@@ -437,9 +527,8 @@ gb_global TargetMetrics target_windows_i386 = {
 gb_global TargetMetrics target_windows_amd64 = {
 	TargetOs_windows,
 	TargetArch_amd64,
-	8, 8, 8, 16,
+	8, 8, AMD64_MAX_ALIGNMENT, 16,
 	str_lit("x86_64-pc-windows-msvc"),
-	str_lit("e-m:w-i64:64-f80:128-n8:16:32:64-S128"),
 };
 
 gb_global TargetMetrics target_linux_i386 = {
@@ -452,40 +541,35 @@ gb_global TargetMetrics target_linux_i386 = {
 gb_global TargetMetrics target_linux_amd64 = {
 	TargetOs_linux,
 	TargetArch_amd64,
-	8, 8, 8, 16,
+	8, 8, AMD64_MAX_ALIGNMENT, 16,
 	str_lit("x86_64-pc-linux-gnu"),
-	str_lit("e-m:w-i64:64-f80:128-n8:16:32:64-S128"),
 };
 gb_global TargetMetrics target_linux_arm64 = {
 	TargetOs_linux,
 	TargetArch_arm64,
-	8, 8, 8, 16,
+	8, 8, 16, 16,
 	str_lit("aarch64-linux-elf"),
-	str_lit("e-m:o-p:32:32-Fi8-i64:64-v128:64:128-a:0:32-n32-S64"),
 };
 
 gb_global TargetMetrics target_linux_arm32 = {
 	TargetOs_linux,
 	TargetArch_arm32,
 	4, 4, 4, 8,
-	str_lit("arm-linux-gnu"),
-	str_lit("e-m:o-p:32:32-Fi8-i64:64-v128:64:128-a:0:32-n32-S64"),
+	str_lit("arm-unknown-linux-gnueabihf"),
 };
 
 gb_global TargetMetrics target_darwin_amd64 = {
 	TargetOs_darwin,
 	TargetArch_amd64,
-	8, 8, 8, 16,
-	str_lit("x86_64-apple-darwin"),
-	str_lit("e-m:o-i64:64-f80:128-n8:16:32:64-S128"),
+	8, 8, AMD64_MAX_ALIGNMENT, 16,
+	str_lit("x86_64-apple-macosx"), // NOTE: Changes during initialization based on build flags.
 };
 
 gb_global TargetMetrics target_darwin_arm64 = {
 	TargetOs_darwin,
 	TargetArch_arm64,
-	8, 8, 8, 16,
-	str_lit("arm64-apple-macosx11.0.0"),
-	str_lit("e-m:o-i64:64-i128:128-n32:64-S128"),
+	8, 8, 16, 16,
+	str_lit("arm64-apple-macosx"), // NOTE: Changes during initialization based on build flags.
 };
 
 gb_global TargetMetrics target_freebsd_i386 = {
@@ -498,23 +582,49 @@ gb_global TargetMetrics target_freebsd_i386 = {
 gb_global TargetMetrics target_freebsd_amd64 = {
 	TargetOs_freebsd,
 	TargetArch_amd64,
-	8, 8, 8, 16,
+	8, 8, AMD64_MAX_ALIGNMENT, 16,
 	str_lit("x86_64-unknown-freebsd-elf"),
-	str_lit("e-m:w-i64:64-f80:128-n8:16:32:64-S128"),
+};
+
+gb_global TargetMetrics target_freebsd_arm64 = {
+	TargetOs_freebsd,
+	TargetArch_arm64,
+	8, 8, 16, 16,
+	str_lit("aarch64-unknown-freebsd-elf"),
 };
 
 gb_global TargetMetrics target_openbsd_amd64 = {
 	TargetOs_openbsd,
 	TargetArch_amd64,
-	8, 8, 8, 16,
+	8, 8, AMD64_MAX_ALIGNMENT, 16,
 	str_lit("x86_64-unknown-openbsd-elf"),
-	str_lit("e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"),
+};
+
+gb_global TargetMetrics target_netbsd_amd64 = {
+	TargetOs_netbsd,
+	TargetArch_amd64,
+	8, 8, AMD64_MAX_ALIGNMENT, 16,
+	str_lit("x86_64-unknown-netbsd-elf"),
+};
+
+gb_global TargetMetrics target_netbsd_arm64 = {
+	TargetOs_netbsd,
+	TargetArch_arm64,
+	8, 8, 16, 16,
+	str_lit("aarch64-unknown-netbsd-elf"),
+};
+
+gb_global TargetMetrics target_haiku_amd64 = {
+	TargetOs_haiku,
+	TargetArch_amd64,
+	8, 8, AMD64_MAX_ALIGNMENT, 16,
+	str_lit("x86_64-unknown-haiku"),
 };
 
 gb_global TargetMetrics target_essence_amd64 = {
 	TargetOs_essence,
 	TargetArch_amd64,
-	8, 8, 8, 16,
+	8, 8, AMD64_MAX_ALIGNMENT, 16,
 	str_lit("x86_64-pc-none-elf"),
 };
 
@@ -524,7 +634,6 @@ gb_global TargetMetrics target_freestanding_wasm32 = {
 	TargetArch_wasm32,
 	4, 4, 8, 16,
 	str_lit("wasm32-freestanding-js"),
-	str_lit("e-m:e-p:32:32-i64:64-n32:64-S128"),
 };
 
 gb_global TargetMetrics target_js_wasm32 = {
@@ -532,7 +641,6 @@ gb_global TargetMetrics target_js_wasm32 = {
 	TargetArch_wasm32,
 	4, 4, 8, 16,
 	str_lit("wasm32-js-js"),
-	str_lit("e-m:e-p:32:32-i64:64-n32:64-S128"),
 };
 
 gb_global TargetMetrics target_wasi_wasm32 = {
@@ -540,7 +648,14 @@ gb_global TargetMetrics target_wasi_wasm32 = {
 	TargetArch_wasm32,
 	4, 4, 8, 16,
 	str_lit("wasm32-wasi-js"),
-	str_lit("e-m:e-p:32:32-i64:64-n32:64-S128"),
+};
+
+
+gb_global TargetMetrics target_orca_wasm32 = {
+	TargetOs_orca,
+	TargetArch_wasm32,
+	4, 4, 8, 16,
+	str_lit("wasm32-wasi-js"),
 };
 
 
@@ -549,7 +664,6 @@ gb_global TargetMetrics target_freestanding_wasm64p32 = {
 	TargetArch_wasm64p32,
 	4, 8, 8, 16,
 	str_lit("wasm32-freestanding-js"),
-	str_lit("e-m:e-p:32:32-i64:64-n32:64-S128"),
 };
 
 gb_global TargetMetrics target_js_wasm64p32 = {
@@ -557,7 +671,6 @@ gb_global TargetMetrics target_js_wasm64p32 = {
 	TargetArch_wasm64p32,
 	4, 8, 8, 16,
 	str_lit("wasm32-js-js"),
-	str_lit("e-m:e-p:32:32-i64:64-n32:64-S128"),
 };
 
 gb_global TargetMetrics target_wasi_wasm64p32 = {
@@ -565,7 +678,6 @@ gb_global TargetMetrics target_wasi_wasm64p32 = {
 	TargetArch_wasm32,
 	4, 8, 8, 16,
 	str_lit("wasm32-wasi-js"),
-	str_lit("e-m:e-p:32:32-i64:64-n32:64-S128"),
 };
 
 
@@ -573,12 +685,32 @@ gb_global TargetMetrics target_wasi_wasm64p32 = {
 gb_global TargetMetrics target_freestanding_amd64_sysv = {
 	TargetOs_freestanding,
 	TargetArch_amd64,
-	8, 8, 8, 16,
+	8, 8, AMD64_MAX_ALIGNMENT, 16,
 	str_lit("x86_64-pc-none-gnu"),
-	str_lit("e-m:w-i64:64-f80:128-n8:16:32:64-S128"),
 	TargetABI_SysV,
 };
 
+gb_global TargetMetrics target_freestanding_amd64_win64 = {
+	TargetOs_freestanding,
+	TargetArch_amd64,
+	8, 8, AMD64_MAX_ALIGNMENT, 16,
+	str_lit("x86_64-pc-none-msvc"),
+	TargetABI_Win64,
+};
+
+gb_global TargetMetrics target_freestanding_arm64 = {
+	TargetOs_freestanding,
+	TargetArch_arm64,
+	8, 8, 16, 16,
+	str_lit("aarch64-none-elf"),
+};
+
+gb_global TargetMetrics target_freestanding_arm32 = {
+	TargetOs_freestanding,
+	TargetArch_arm32,
+	4, 4, 4, 8,
+	str_lit("arm-unknown-unknown-gnueabihf"),
+};
 
 
 struct NamedTargetMetrics {
@@ -602,18 +734,28 @@ gb_global NamedTargetMetrics named_targets[] = {
 
 	{ str_lit("freebsd_i386"),        &target_freebsd_i386   },
 	{ str_lit("freebsd_amd64"),       &target_freebsd_amd64  },
+	{ str_lit("freebsd_arm64"),       &target_freebsd_arm64  },
+
+	{ str_lit("netbsd_amd64"),        &target_netbsd_amd64   },
+	{ str_lit("netbsd_arm64"),        &target_netbsd_arm64   },
 
 	{ str_lit("openbsd_amd64"),       &target_openbsd_amd64  },
+	{ str_lit("haiku_amd64"),         &target_haiku_amd64    },
 
 	{ str_lit("freestanding_wasm32"), &target_freestanding_wasm32 },
 	{ str_lit("wasi_wasm32"),         &target_wasi_wasm32 },
 	{ str_lit("js_wasm32"),           &target_js_wasm32 },
+	{ str_lit("orca_wasm32"),         &target_orca_wasm32 },
 
 	{ str_lit("freestanding_wasm64p32"), &target_freestanding_wasm64p32 },
 	{ str_lit("js_wasm64p32"),           &target_js_wasm64p32 },
 	{ str_lit("wasi_wasm64p32"),         &target_wasi_wasm64p32 },
 
-	{ str_lit("freestanding_amd64_sysv"), &target_freestanding_amd64_sysv },
+	{ str_lit("freestanding_amd64_sysv"),  &target_freestanding_amd64_sysv },
+	{ str_lit("freestanding_amd64_win64"), &target_freestanding_amd64_win64 },
+
+	{ str_lit("freestanding_arm64"), &target_freestanding_arm64 },
+	{ str_lit("freestanding_arm32"), &target_freestanding_arm32 },
 };
 
 gb_global NamedTargetMetrics *selected_target_metrics;
@@ -736,15 +878,6 @@ gb_internal bool is_arch_x86(void) {
 	return false;
 }
 
-gb_internal bool allow_check_foreign_filepath(void) {
-	switch (build_context.metrics.arch) {
-	case TargetArch_wasm32:
-	case TargetArch_wasm64p32:
-		return false;
-	}
-	return true;
-}
-
 // TODO(bill): OS dependent versions for the BuildContext
 // join_path
 // is_dir
@@ -768,13 +901,11 @@ gb_internal String odin_root_dir(void) {
 	char const *found = gb_get_env("ODIN_ROOT", a);
 	if (found) {
 		String path = path_to_full_path(a, make_string_c(found));
-		if (path[path.len-1] != '/' && path[path.len-1] != '\\') {
 		#if defined(GB_SYSTEM_WINDOWS)
-			path = concatenate_strings(a, path, WIN32_SEPARATOR_STRING);
+			path = normalize_path(a, path, WIN32_SEPARATOR_STRING);
 		#else
-			path = concatenate_strings(a, path, NIX_SEPARATOR_STRING);
+			path = normalize_path(a, path, NIX_SEPARATOR_STRING);
 		#endif
-		}
 
 		global_module_path = path;
 		global_module_path_set = true;
@@ -834,11 +965,11 @@ gb_internal String internal_odin_root_dir(void) {
 	return path;
 }
 
-#elif defined(GB_SYSTEM_OSX)
+#elif defined(GB_SYSTEM_HAIKU)
 
-#include <mach-o/dyld.h>
+#include <FindDirectory.h>
 
-gb_internal String path_to_fullpath(gbAllocator a, String s);
+gb_internal String path_to_fullpath(gbAllocator a, String s, bool *ok_);
 
 gb_internal String internal_odin_root_dir(void) {
 	String path = global_module_path;
@@ -850,6 +981,59 @@ gb_internal String internal_odin_root_dir(void) {
 	}
 
 	auto path_buf = array_make<char>(heap_allocator(), 300);
+	defer (array_free(&path_buf));
+
+	len = 0;
+	for (;;) {
+		u32 sz = path_buf.count;
+		int res = find_path(B_APP_IMAGE_SYMBOL, B_FIND_PATH_IMAGE_PATH, nullptr, &path_buf[0], sz);
+		if(res == B_OK) {
+			len = sz;
+			break;
+		} else {
+			array_resize(&path_buf, sz + 1);
+		}
+	}
+
+	mutex_lock(&string_buffer_mutex);
+	defer (mutex_unlock(&string_buffer_mutex));
+
+	text = gb_alloc_array(permanent_allocator(), u8, len + 1);
+	gb_memmove(text, &path_buf[0], len);
+
+	path = path_to_fullpath(heap_allocator(), make_string(text, len), nullptr);
+
+	for (i = path.len-1; i >= 0; i--) {
+		u8 c = path[i];
+		if (c == '/' || c == '\\') {
+			break;
+		}
+		path.len--;
+	}
+
+	global_module_path = path;
+	global_module_path_set = true;
+
+	return path;
+}
+
+#elif defined(GB_SYSTEM_OSX)
+
+#include <mach-o/dyld.h>
+
+gb_internal String path_to_fullpath(gbAllocator a, String s, bool *ok_);
+
+gb_internal String internal_odin_root_dir(void) {
+	String path = global_module_path;
+	isize len, i;
+	u8 *text;
+
+	if (global_module_path_set) {
+		return global_module_path;
+	}
+
+	auto path_buf = array_make<char>(heap_allocator(), 300);
+	defer (array_free(&path_buf));
 
 	len = 0;
 	for (;;) {
@@ -869,7 +1053,7 @@ gb_internal String internal_odin_root_dir(void) {
 	text = gb_alloc_array(permanent_allocator(), u8, len + 1);
 	gb_memmove(text, &path_buf[0], len);
 
-	path = path_to_fullpath(heap_allocator(), make_string(text, len));
+	path = path_to_fullpath(heap_allocator(), make_string(text, len), nullptr);
 
 	for (i = path.len-1; i >= 0; i--) {
 		u8 c = path[i];
@@ -882,9 +1066,6 @@ gb_internal String internal_odin_root_dir(void) {
 	global_module_path = path;
 	global_module_path_set = true;
 
-
-	// array_free(&path_buf);
-
 	return path;
 }
 #else
@@ -892,7 +1073,7 @@ gb_internal String internal_odin_root_dir(void) {
 // NOTE: Linux / Unix is unfinished and not tested very well.
 #include <sys/stat.h>
 
-gb_internal String path_to_fullpath(gbAllocator a, String s);
+gb_internal String path_to_fullpath(gbAllocator a, String s, bool *ok_);
 
 gb_internal String internal_odin_root_dir(void) {
 	String path = global_module_path;
@@ -1034,7 +1215,7 @@ gb_internal String internal_odin_root_dir(void) {
 
 	gb_memmove(text, &path_buf[0], len);
 
-	path = path_to_fullpath(heap_allocator(), make_string(text, len));
+	path = path_to_fullpath(heap_allocator(), make_string(text, len), nullptr);
 	for (i = path.len-1; i >= 0; i--) {
 		u8 c = path[i];
 		if (c == '/' || c == '\\') {
@@ -1053,7 +1234,7 @@ gb_internal String internal_odin_root_dir(void) {
 gb_global BlockingMutex fullpath_mutex;
 
 #if defined(GB_SYSTEM_WINDOWS)
-gb_internal String path_to_fullpath(gbAllocator a, String s) {
+gb_internal String path_to_fullpath(gbAllocator a, String s, bool *ok_) {
 	String result = {};
 
 	String16 string16 = string_to_string16(heap_allocator(), s);
@@ -1079,27 +1260,70 @@ gb_internal String path_to_fullpath(gbAllocator a, String s) {
 				result.text[i] = '/';
 			}
 		}
+		if (ok_) *ok_ = true;
 	} else {
+		if (ok_) *ok_ = false;
 		mutex_unlock(&fullpath_mutex);
 	}
 
 	return result;
 }
 #elif defined(GB_SYSTEM_OSX) || defined(GB_SYSTEM_UNIX)
-gb_internal String path_to_fullpath(gbAllocator a, String s) {
+
+struct PathToFullpathResult {
+	String result;
+	bool   ok;
+};
+
+gb_internal String path_to_fullpath(gbAllocator a, String s, bool *ok_) {
+	static gb_thread_local StringMap<PathToFullpathResult> cache;
+
+	PathToFullpathResult *cached = string_map_get(&cache, s);
+	if (cached != nullptr) {
+		if (ok_) *ok_ = cached->ok;
+		return copy_string(a, cached->result);
+	}
+
 	char *p;
-	mutex_lock(&fullpath_mutex);
 	p = realpath(cast(char *)s.text, 0);
-	mutex_unlock(&fullpath_mutex);
-	if(p == nullptr) return String{};
-	return make_string_c(p);
+	defer (free(p));
+	if(p == nullptr) {
+		if (ok_) *ok_ = false;
+
+		// Path doesn't exist or is malformed, Windows's `GetFullPathNameW` does not check for
+		// existence of the file where `realpath` does, which causes different behaviour between platforms.
+		// Two things could be done here:
+		// 1. clean the path and resolve it manually, just like the Windows function does,
+		//    probably requires porting `filepath.clean` from Odin and doing some more processing.
+		// 2. just return a copy of the original path.
+		//
+		// I have opted for 2 because it is much simpler + we already return `ok = false` + further
+		// checks and processes will use the path and cause errors (which we want).
+		String result = copy_string(a, s);
+
+		PathToFullpathResult cached_result = {};
+		cached_result.result = copy_string(permanent_allocator(), result);
+		cached_result.ok     = false;
+		string_map_set(&cache, copy_string(permanent_allocator(), s), cached_result);
+
+		return result;
+	}
+	if (ok_) *ok_ = true;
+	String result = copy_string(a, make_string_c(p));
+
+	PathToFullpathResult cached_result = {};
+	cached_result.result = copy_string(permanent_allocator(), result);
+	cached_result.ok     = true;
+	string_map_set(&cache, copy_string(permanent_allocator(), s), cached_result);
+
+	return result;
 }
 #else
 #error Implement system
 #endif
 
 
-gb_internal String get_fullpath_relative(gbAllocator a, String base_dir, String path) {
+gb_internal String get_fullpath_relative(gbAllocator a, String base_dir, String path, bool *ok_) {
 	u8 *str = gb_alloc_array(heap_allocator(), u8, base_dir.len+1+path.len+1);
 	defer (gb_free(heap_allocator(), str));
 
@@ -1121,11 +1345,31 @@ gb_internal String get_fullpath_relative(gbAllocator a, String base_dir, String 
 
 	String res = make_string(str, i);
 	res = string_trim_whitespace(res);
-	return path_to_fullpath(a, res);
+	return path_to_fullpath(a, res, ok_);
 }
 
 
-gb_internal String get_fullpath_core(gbAllocator a, String path) {
+gb_internal String get_fullpath_base_collection(gbAllocator a, String path, bool *ok_) {
+	String module_dir = odin_root_dir();
+
+	String base = str_lit("base/");
+
+	isize str_len = module_dir.len + base.len + path.len;
+	u8 *str = gb_alloc_array(heap_allocator(), u8, str_len+1);
+	defer (gb_free(heap_allocator(), str));
+
+	isize i = 0;
+	gb_memmove(str+i, module_dir.text, module_dir.len); i += module_dir.len;
+	gb_memmove(str+i, base.text, base.len);             i += base.len;
+	gb_memmove(str+i, path.text, path.len);             i += path.len;
+	str[i] = 0;
+
+	String res = make_string(str, i);
+	res = string_trim_whitespace(res);
+	return path_to_fullpath(a, res, ok_);
+}
+
+gb_internal String get_fullpath_core_collection(gbAllocator a, String path, bool *ok_) {
 	String module_dir = odin_root_dir();
 
 	String core = str_lit("core/");
@@ -1142,14 +1386,21 @@ gb_internal String get_fullpath_core(gbAllocator a, String path) {
 
 	String res = make_string(str, i);
 	res = string_trim_whitespace(res);
-	return path_to_fullpath(a, res);
+	return path_to_fullpath(a, res, ok_);
 }
 
 gb_internal bool show_error_line(void) {
-	return !build_context.hide_error_line;
+	return !build_context.hide_error_line && !build_context.json_errors;
+}
+
+gb_internal bool terse_errors(void) {
+	return build_context.terse_errors;
+}
+gb_internal bool json_errors(void) {
+	return build_context.json_errors;
 }
 gb_internal bool has_ansi_terminal_colours(void) {
-	return build_context.has_ansi_terminal_colours;
+	return build_context.has_ansi_terminal_colours && !json_errors();
 }
 
 gb_internal bool has_asm_extension(String const &path) {
@@ -1187,6 +1438,8 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 	if (bc->thread_count == 0) {
 		bc->thread_count = gb_max(bc->affinity.thread_count, 1);
 	}
+
+	string_set_init(&bc->custom_attributes);
 
 	bc->ODIN_VENDOR  = str_lit("odin");
 	bc->ODIN_VERSION = ODIN_VERSION;
@@ -1234,13 +1487,35 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 				metrics = &target_darwin_amd64;
 			#endif
 		#elif defined(GB_SYSTEM_FREEBSD)
-			metrics = &target_freebsd_amd64;
+			#if defined(GB_CPU_ARM)
+				metrics = &target_freebsd_arm64;
+			#else
+				metrics = &target_freebsd_amd64;
+			#endif
 		#elif defined(GB_SYSTEM_OPENBSD)
 			metrics = &target_openbsd_amd64;
+		#elif defined(GB_SYSTEM_NETBSD)
+			#if defined(GB_CPU_ARM)
+				metrics = &target_netbsd_arm64;
+			#else
+				metrics = &target_netbsd_amd64;
+			#endif
+		#elif defined(GB_SYSTEM_HAIKU)
+			metrics = &target_haiku_amd64;
 		#elif defined(GB_CPU_ARM)
 			metrics = &target_linux_arm64;
 		#else
 			metrics = &target_linux_amd64;
+		#endif
+	#elif defined(GB_CPU_ARM)
+		#if defined(GB_SYSTEM_WINDOWS)
+			#error "Build Error: Unsupported architecture"
+		#elif defined(GB_SYSTEM_OSX)
+			#error "Build Error: Unsupported architecture"
+		#elif defined(GB_SYSTEM_FREEBSD)
+			#error "Build Error: Unsupported architecture"
+		#else
+			metrics = &target_linux_arm32;
 		#endif
 	#else
 		#if defined(GB_SYSTEM_WINDOWS)
@@ -1272,32 +1547,16 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 		GB_ASSERT(metrics->int_size == 2*metrics->ptr_size);
 	}
 
-
-
 	bc->metrics = *metrics;
-	switch (subtarget) {
-	case Subtarget_Default:
-		break;
-	case Subtarget_iOS:
-		GB_ASSERT(metrics->os == TargetOs_darwin);
-		if (metrics->arch == TargetArch_arm64) {
-			bc->metrics.target_triplet = str_lit("arm64-apple-ios");
-		} else if (metrics->arch == TargetArch_amd64) {
-			bc->metrics.target_triplet = str_lit("x86_64-apple-ios");
-		} else {
-			GB_PANIC("Unknown architecture for darwin");
-		}
-		break;
-	}
 
-	bc->ODIN_OS        = target_os_names[metrics->os];
-	bc->ODIN_ARCH      = target_arch_names[metrics->arch];
-	bc->endian_kind    = target_endians[metrics->arch];
-	bc->ptr_size       = metrics->ptr_size;
-	bc->int_size       = metrics->int_size;
-	bc->max_align      = metrics->max_align;
-	bc->max_simd_align = metrics->max_simd_align;
-	bc->link_flags  = str_lit(" ");
+	bc->ODIN_OS           = target_os_names[metrics->os];
+	bc->ODIN_ARCH         = target_arch_names[metrics->arch];
+	bc->endian_kind       = target_endians[metrics->arch];
+	bc->ptr_size          = metrics->ptr_size;
+	bc->int_size          = metrics->int_size;
+	bc->max_align         = metrics->max_align;
+	bc->max_simd_align    = metrics->max_simd_align;
+	bc->link_flags        = str_lit(" ");
 
 	#if defined(DEFAULT_TO_THREADED_CHECKER)
 	bc->threaded_checker = true;
@@ -1319,90 +1578,99 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 		}
 	}
 
-	// NOTE(zangent): The linker flags to set the build architecture are different
-	// across OSs. It doesn't make sense to allocate extra data on the heap
-	// here, so I just #defined the linker flags to keep things concise.
-	if (bc->metrics.arch == TargetArch_amd64) {
-		switch (bc->metrics.os) {
-		case TargetOs_windows:
-			bc->link_flags = str_lit("/machine:x64 ");
+	// Default to subsystem:CONSOLE on Windows targets
+	if (bc->ODIN_WINDOWS_SUBSYSTEM == "" && bc->metrics.os == TargetOs_windows) {
+		bc->ODIN_WINDOWS_SUBSYSTEM = windows_subsystem_names[Windows_Subsystem_CONSOLE];
+	}
+
+	if (metrics->os == TargetOs_darwin && subtarget == Subtarget_iOS) {
+		switch (metrics->arch) {
+		case TargetArch_arm64:
+			bc->metrics.target_triplet = str_lit("arm64-apple-ios");
 			break;
-		case TargetOs_darwin:
-			break;
-		case TargetOs_linux:
-			bc->link_flags = str_lit("-arch x86-64 ");
-			break;
-		case TargetOs_freebsd:
-			bc->link_flags = str_lit("-arch x86-64 ");
-			break;
-		case TargetOs_openbsd:
-			bc->link_flags = str_lit("-arch x86-64 ");
-			break;
-		}
-	} else if (bc->metrics.arch == TargetArch_i386) {
-		switch (bc->metrics.os) {
-		case TargetOs_windows:
-			bc->link_flags = str_lit("/machine:x86 ");
-			break;
-		case TargetOs_darwin:
-			gb_printf_err("Unsupported architecture\n");
-			gb_exit(1);
-			break;
-		case TargetOs_linux:
-			bc->link_flags = str_lit("-arch x86 ");
-			break;
-		case TargetOs_freebsd:
-			bc->link_flags = str_lit("-arch x86 ");
-			break;
-		}
-	} else if (bc->metrics.arch == TargetArch_arm32) {
-		switch (bc->metrics.os) {
-		case TargetOs_linux:
-			bc->link_flags = str_lit("-arch arm ");
+		case TargetArch_amd64:
+			bc->metrics.target_triplet = str_lit("x86_64-apple-ios");
 			break;
 		default:
-			gb_printf_err("Compiler Error: Unsupported architecture\n");
-			gb_exit(1);
+			GB_PANIC("Unknown architecture for darwin");
 		}
-	} else if (bc->metrics.arch == TargetArch_arm64) {
-		switch (bc->metrics.os) {
-		case TargetOs_darwin:
-			bc->link_flags = str_lit("-arch arm64 ");
+	}
+
+	if (bc->metrics.os == TargetOs_windows) {
+		switch (bc->metrics.arch) {
+		case TargetArch_amd64:
+			bc->link_flags = str_lit("/machine:x64 ");
 			break;
-		case TargetOs_linux:
-			bc->link_flags = str_lit("-arch aarch64 ");
+		case TargetArch_i386:
+			bc->link_flags = str_lit("/machine:x86 ");
 			break;
 		}
+	} else if (bc->metrics.os == TargetOs_darwin) {
+		bc->link_flags = concatenate3_strings(permanent_allocator(),
+			str_lit("-target "), bc->metrics.target_triplet, str_lit(" "));
 	} else if (is_arch_wasm()) {
 		gbString link_flags = gb_string_make(heap_allocator(), " ");
 		// link_flags = gb_string_appendc(link_flags, "--export-all ");
 		// link_flags = gb_string_appendc(link_flags, "--export-table ");
-		link_flags = gb_string_appendc(link_flags, "--allow-undefined ");
 		// if (bc->metrics.arch == TargetArch_wasm64) {
 		// 	link_flags = gb_string_appendc(link_flags, "-mwasm64 ");
 		// }
-		if (bc->no_entry_point) {
+		if (bc->metrics.os != TargetOs_orca) {
+			link_flags = gb_string_appendc(link_flags, "--allow-undefined ");
+		}
+		if (bc->no_entry_point || bc->metrics.os == TargetOs_orca) {
 			link_flags = gb_string_appendc(link_flags, "--no-entry ");
 		}
-		
+
 		bc->link_flags = make_string_c(link_flags);
-		
+
 		// Disallow on wasm
 		bc->use_separate_modules = false;
 	} else {
-		gb_printf_err("Compiler Error: Unsupported architecture\n");
-		gb_exit(1);
+		// NOTE: for targets other than darwin, we don't specify a `-target` link flag.
+		// This is because we don't support cross-linking and clang is better at figuring
+		// out what the actual target for linking is,
+		// for example, on x86/alpine/musl it HAS to be `x86_64-alpine-linux-musl` to link correctly.
+		//
+		// Note that codegen will still target the triplet we specify, but the intricate details of
+		// a target shouldn't matter as much to codegen (if it does at all) as it does to linking.
 	}
 
-	if (bc->ODIN_DEBUG && !bc->custom_optimization_level) {
+	// NOTE: needs to be done after adding the -target flag to the linker flags so the linker
+	// does not annoy the user with version warnings.
+	if (metrics->os == TargetOs_darwin) {
+		if (!bc->minimum_os_version_string_given) {
+			bc->minimum_os_version_string = str_lit("11.0.0");
+		}
+
+		if (subtarget == Subtarget_Default) {
+			bc->metrics.target_triplet = concatenate_strings(permanent_allocator(), bc->metrics.target_triplet, bc->minimum_os_version_string);
+		}
+	}
+
+	if (!bc->custom_optimization_level) {
 		// NOTE(bill): when building with `-debug` but not specifying an optimization level
 		// default to `-o:none` to improve the debug symbol generation by default
-		bc->optimization_level = -1; // -o:none
+		if (bc->ODIN_DEBUG) {
+			bc->optimization_level = -1; // -o:none
+		} else {
+			bc->optimization_level = 0; // -o:minimal
+		}
 	}
 
 	bc->optimization_level = gb_clamp(bc->optimization_level, -1, 3);
 
-	if (bc->metrics.os != TargetOs_windows) {
+#if defined(GB_SYSTEM_WINDOWS)
+	if (bc->optimization_level <= 0) {
+		if (!is_arch_wasm()) {
+			bc->use_separate_modules = true;
+		}
+	}
+#endif
+
+
+	// TODO: Static map calls are bugged on `amd64sysv` abi.
+	if (bc->metrics.os != TargetOs_windows && bc->metrics.arch == TargetArch_amd64) {
 		// ENFORCE DYNAMIC MAP CALLS
 		bc->dynamic_map_calls = true;
 	}
@@ -1415,6 +1683,10 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 			break;
 		}
 	}
+
+	if (bc->metrics.os == TargetOs_freestanding) {
+		bc->ODIN_DEFAULT_TO_NIL_ALLOCATOR = !bc->ODIN_DEFAULT_TO_PANIC_ALLOCATOR;
+	}
 }
 
 #if defined(GB_SYSTEM_WINDOWS)
@@ -1423,48 +1695,30 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 #include "microsoft_craziness.h"
 #endif
 
+// NOTE: the target feature and microarch lists are all sorted, so if it turns out to be slow (I don't think it will)
+// a binary search is possible.
 
-gb_internal Array<String> split_by_comma(String const &list) {
-	isize n = 1;
-	for (isize i = 0; i < list.len; i++) {
-		if (list.text[i] == ',') {
-			n++;
+gb_internal bool check_single_target_feature_is_valid(String const &feature_list, String const &feature) {
+	String_Iterator it = {feature_list, 0};
+	for (;;) {
+		String str = string_split_iterator(&it, ',');
+		if (str == "") break;
+		if (str == feature) {
+			return true;
 		}
 	}
-	auto res = array_make<String>(heap_allocator(), n);
 
-	String s = list;
-	for (isize i = 0; i < n; i++) {
-		isize m = string_index_byte(s, ',');
-		if (m < 0) {
-			res[i] = s;
-			break;
-		}
-		res[i] = substring(s, 0, m);
-		s = substring(s, m+1, s.len);
-	}
-	return res;
+	return false;
 }
 
-gb_internal bool check_target_feature_is_valid(TokenPos pos, String const &feature) {
-	// TODO(bill): check_target_feature_is_valid
-	return true;
-}
-
-gb_internal bool check_target_feature_is_enabled(TokenPos pos, String const &target_feature_list) {
-	BuildContext *bc = &build_context;
-	mutex_lock(&bc->target_features_mutex);
-	defer (mutex_unlock(&bc->target_features_mutex));
-
-	auto items = split_by_comma(target_feature_list);
-	array_free(&items);
-	for (String const &item : items) {
-		if (!check_target_feature_is_valid(pos, item)) {
-			error(pos, "Target feature '%.*s' is not valid", LIT(item));
-			return false;
-		}
-		if (!string_set_exists(&bc->target_features_set, item)) {
-			error(pos, "Target feature '%.*s' is not enabled", LIT(item));
+gb_internal bool check_target_feature_is_valid(String const &feature, TargetArchKind arch, String *invalid) {
+	String feature_list = target_features_list[arch];
+	String_Iterator it = {feature, 0};
+	for (;;) {
+		String str = string_split_iterator(&it, ',');
+		if (str == "") break;
+		if (!check_single_target_feature_is_valid(feature_list, str)) {
+			if (invalid) *invalid = str;
 			return false;
 		}
 	}
@@ -1472,52 +1726,58 @@ gb_internal bool check_target_feature_is_enabled(TokenPos pos, String const &tar
 	return true;
 }
 
-gb_internal void enable_target_feature(TokenPos pos, String const &target_feature_list) {
-	BuildContext *bc = &build_context;
-	mutex_lock(&bc->target_features_mutex);
-	defer (mutex_unlock(&bc->target_features_mutex));
+gb_internal bool check_target_feature_is_valid_globally(String const &feature, String *invalid) {
+	String_Iterator it = {feature, 0};
+	for (;;) {
+		String str = string_split_iterator(&it, ',');
+		if (str == "") break;
 
-	auto items = split_by_comma(target_feature_list);
-	for (String const &item : items) {
-		if (!check_target_feature_is_valid(pos, item)) {
-			error(pos, "Target feature '%.*s' is not valid", LIT(item));
-			continue;
+		bool valid = false;
+		for (int arch = TargetArch_Invalid; arch < TargetArch_COUNT; arch += 1) {
+			if (check_target_feature_is_valid(str, cast(TargetArchKind)arch, invalid)) {
+				valid = true;
+				break;
+			}
 		}
 
-		string_set_add(&bc->target_features_set, item);
+		if (!valid) {
+			if (invalid) *invalid = str;
+			return false;
+		}
 	}
-	array_free(&items);
+
+	return true;
 }
 
+gb_internal bool check_target_feature_is_valid_for_target_arch(String const &feature, String *invalid) {
+	return check_target_feature_is_valid(feature, build_context.metrics.arch, invalid);
+}
 
-gb_internal char const *target_features_set_to_cstring(gbAllocator allocator, bool with_quotes) {
-	isize len = 0;
-	isize i = 0;
-	for (String const &feature : build_context.target_features_set) {
-		if (i != 0) {
-			len += 1;
+gb_internal bool check_target_feature_is_enabled(String const &feature, String *not_enabled) {
+	String_Iterator it = {feature, 0};
+	for (;;) {
+		String str = string_split_iterator(&it, ',');
+		if (str == "") break;
+		if (!string_set_exists(&build_context.target_features_set, str)) {
+			if (not_enabled) *not_enabled = str;
+			return false;
 		}
-		len += feature.len;
-		if (with_quotes) len += 2;
-		i += 1;
 	}
-	char *features = gb_alloc_array(allocator, char, len+1);
-	len = 0;
-	i = 0;
-	for (String const &feature : build_context.target_features_set) {
-		if (i != 0) {
-			features[len++] = ',';
+
+	return true;
+}
+
+gb_internal bool check_target_feature_is_superset_of(String const &superset, String const &of, String *missing) {
+	String_Iterator it = {of, 0};
+	for (;;) {
+		String str = string_split_iterator(&it, ',');
+		if (str == "") break;
+		if (!check_single_target_feature_is_valid(superset, str)) {
+			if (missing) *missing = str;
+			return false;
 		}
-
-		if (with_quotes) features[len++] = '"';
-		gb_memmove(features + len, feature.text, feature.len);
-		len += feature.len;
-		if (with_quotes) features[len++] = '"';
-		i += 1;
 	}
-	features[len++] = 0;
-
-	return features;
+	return true;
 }
 
 // NOTE(Jeroen): Set/create the output and other paths and report an error as appropriate.
@@ -1547,8 +1807,8 @@ gb_internal bool init_build_paths(String init_filename) {
 		produces_output_file = true;
 	}
 
-
-	if (build_context.ODIN_DEFAULT_TO_NIL_ALLOCATOR) {
+	if (build_context.ODIN_DEFAULT_TO_NIL_ALLOCATOR ||
+	    build_context.ODIN_DEFAULT_TO_PANIC_ALLOCATOR) {
 		bc->no_dynamic_literals = true;
 	}
 
@@ -1560,10 +1820,11 @@ gb_internal bool init_build_paths(String init_filename) {
 	#if defined(GB_SYSTEM_WINDOWS)
 	if (bc->metrics.os == TargetOs_windows) {
 		if (bc->resource_filepath.len > 0) {
-			bc->build_paths[BuildPath_RC]      = path_from_string(ha, bc->resource_filepath);
-			bc->build_paths[BuildPath_RES]     = path_from_string(ha, bc->resource_filepath);
-			bc->build_paths[BuildPath_RC].ext  = copy_string(ha, STR_LIT("rc"));
-			bc->build_paths[BuildPath_RES].ext = copy_string(ha, STR_LIT("res"));
+			bc->build_paths[BuildPath_RES] = path_from_string(ha, bc->resource_filepath);
+			if (!string_ends_with(bc->resource_filepath, str_lit(".res"))) {
+				bc->build_paths[BuildPath_RC]      = path_from_string(ha, bc->resource_filepath);
+				bc->build_paths[BuildPath_RC].ext  = copy_string(ha, STR_LIT("rc"));
+			}
 		}
 
 		if (bc->pdb_filepath.len > 0) {
@@ -1651,7 +1912,12 @@ gb_internal bool init_build_paths(String init_filename) {
 		} else if (build_context.metrics.os == TargetOs_darwin) {
 			output_extension = STR_LIT("dylib");
 		}
-	} else if (build_context.build_mode == BuildMode_Object) {
+	} else if (build_context.build_mode == BuildMode_StaticLibrary) {
+		output_extension = STR_LIT("a");
+		if (build_context.metrics.os == TargetOs_windows) {
+			output_extension = STR_LIT("lib");
+		}
+	}else if (build_context.build_mode == BuildMode_Object) {
 		// By default use a .o object extension.
 		output_extension = STR_LIT("o");
 
@@ -1795,9 +2061,18 @@ gb_internal bool init_build_paths(String init_filename) {
 		}
 	}
 
-
-	if (bc->target_features_string.len != 0) {
-		enable_target_feature({}, bc->target_features_string);
+	if (build_context.no_crt && !build_context.ODIN_DEFAULT_TO_NIL_ALLOCATOR && !build_context.ODIN_DEFAULT_TO_PANIC_ALLOCATOR) {
+		switch (build_context.metrics.os) {
+		case TargetOs_linux:
+		case TargetOs_darwin:
+		case TargetOs_essence:
+		case TargetOs_freebsd:
+		case TargetOs_openbsd:
+		case TargetOs_netbsd:
+		case TargetOs_haiku:
+			gb_printf_err("-no-crt on unix systems requires either -default-to-nil-allocator or -default-to-panic-allocator to also be present because the default allocator requires crt\n");
+			return false;
+		}
 	}
 
 	return true;

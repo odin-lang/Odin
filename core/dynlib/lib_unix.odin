@@ -1,4 +1,4 @@
-//+build linux, darwin, freebsd, openbsd
+//+build linux, darwin, freebsd, openbsd, netbsd
 //+private
 package dynlib
 
@@ -21,4 +21,9 @@ _symbol_address :: proc(library: Library, symbol: string) -> (ptr: rawptr, found
 	ptr = os.dlsym(rawptr(library), symbol)
 	found = ptr != nil
 	return
+}
+
+_last_error :: proc() -> string {
+	err := os.dlerror()
+	return "unknown" if err == "" else err
 }

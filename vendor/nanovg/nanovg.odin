@@ -2009,7 +2009,7 @@ __expandStroke :: proc(
 			}
 		}
 
-		for j in start..<end {
+		for _ in start..<end {
 			// TODO check this
 			// if ((p1.flags & (NVG_PT_BEVEL | NVG_PR_INNERBEVEL)) != 0) {
 			if (.BEVEL in p1.flags) || (.INNER_BEVEL in p1.flags) {
@@ -2172,7 +2172,7 @@ __expandFill :: proc(
 			__vset(&dst, verts[dst_index + 0].x, verts[dst_index + 0].y, lu, 1)
 			__vset(&dst, verts[dst_index + 1].x, verts[dst_index + 1].y, ru, 1)
 
-			dst_diff := dst_start_length - len(dst) 
+			dst_diff = dst_start_length - len(dst) 
 			path.stroke = verts[dst_index:dst_index + dst_diff]
 
 			// advance
@@ -3361,7 +3361,7 @@ TextBoxBounds :: proc(
 	rows_mod := rows[:]
 	y := y
 
-	for nrows, input_last in TextBreakLines(ctx, &input, breakRowWidth, &rows_mod) {
+	for nrows in TextBreakLines(ctx, &input, breakRowWidth, &rows_mod) {
 		for row in rows[:nrows] {
 			rminx, rmaxx, dx: f32
 			

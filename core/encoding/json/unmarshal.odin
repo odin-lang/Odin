@@ -1,11 +1,12 @@
-package json
+package encoding_json
 
 import "core:mem"
 import "core:math"
 import "core:reflect"
 import "core:strconv"
 import "core:strings"
-import "core:runtime"
+import "base:runtime"
+import "base:intrinsics"
 
 Unmarshal_Data_Error :: enum {
 	Invalid_Data,
@@ -137,9 +138,9 @@ assign_float :: proc(val: any, f: $T) -> bool {
 	case complex64:  dst = complex(f32(f), 0)
 	case complex128: dst = complex(f64(f), 0)
 	
-	case quaternion64:  dst = quaternion(f16(f), 0, 0, 0)
-	case quaternion128: dst = quaternion(f32(f), 0, 0, 0)
-	case quaternion256: dst = quaternion(f64(f), 0, 0, 0)
+	case quaternion64:  dst = quaternion(w=f16(f), x=0, y=0, z=0)
+	case quaternion128: dst = quaternion(w=f32(f), x=0, y=0, z=0)
+	case quaternion256: dst = quaternion(w=f64(f), x=0, y=0, z=0)
 	
 	case: return false
 	}
@@ -201,20 +202,37 @@ unmarshal_string_token :: proc(p: ^Parser, val: any, str: string, ti: ^reflect.T
 unmarshal_value :: proc(p: ^Parser, v: any) -> (err: Unmarshal_Error) {
 	UNSUPPORTED_TYPE := Unsupported_Type_Error{v.id, p.curr_token}
 	token := p.curr_token
-	
+
 	v := v
 	ti := reflect.type_info_base(type_info_of(v.id))
-	// NOTE: If it's a union with only one variant, then treat it as that variant
-	if u, ok := ti.variant.(reflect.Type_Info_Union); ok && len(u.variants) == 1 && token.kind != .Null {
-		variant := u.variants[0]
-		v.id = variant.id
-		ti = reflect.type_info_base(variant)
-		if !reflect.is_pointer_internally(variant) {
-			tag := any{rawptr(uintptr(v.data) + u.tag_offset), u.tag_type.id}
-			assign_int(tag, 1)
+	if u, ok := ti.variant.(reflect.Type_Info_Union); ok && token.kind != .Null {
+		// NOTE: If it's a union with only one variant, then treat it as that variant
+		if len(u.variants) == 1 {
+			variant := u.variants[0]
+			v.id = variant.id
+			ti = reflect.type_info_base(variant)
+			if !reflect.is_pointer_internally(variant) {
+				tag := any{rawptr(uintptr(v.data) + u.tag_offset), u.tag_type.id}
+				assign_int(tag, 1)
+			}
+		} else if v.id != Value {
+			for variant, i in u.variants {
+				variant_any := any{v.data, variant.id}
+				variant_p := p^
+				if err = unmarshal_value(&variant_p, variant_any); err == nil {
+					p^ = variant_p
+
+					raw_tag := i
+					if !u.no_nil { raw_tag += 1 }
+					tag := any{rawptr(uintptr(v.data) + u.tag_offset), u.tag_type.id}
+					assign_int(tag, raw_tag)
+					return
+				}
+			}
+			return UNSUPPORTED_TYPE
 		}
 	}
-	
+
 	switch &dst in v {
 	// Handle json.Value as an unknown type
 	case Value:
@@ -325,6 +343,16 @@ unmarshal_expect_token :: proc(p: ^Parser, kind: Token_Kind, loc := #caller_loca
 	return prev
 }
 
+@(private)
+json_name_from_tag_value :: proc(value: string) -> (json_name, extra: string) {
+	json_name = value
+	if comma_index := strings.index_byte(json_name, ','); comma_index >= 0 {
+		json_name = json_name[:comma_index]
+		extra = value[1 + comma_index:]
+	}
+	return
+}
+
 
 @(private)
 unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unmarshal_Error) {
@@ -340,7 +368,7 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 	
 	#partial switch t in ti.variant {
 	case reflect.Type_Info_Struct:
-		if t.is_raw_union {
+		if .raw_union in t.flags {
 			return UNSUPPORTED_TYPE
 		}
 	
@@ -351,16 +379,23 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 			unmarshal_expect_token(p, .Colon)						
 			
 			fields := reflect.struct_fields_zipped(ti.id)
-			
-			runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD(ignore = context.temp_allocator == context.allocator)
 
-			field_used := make([]bool, len(fields), context.temp_allocator)
-			
+			field_test :: #force_inline proc "contextless" (field_used: [^]byte, offset: uintptr) -> bool {
+				prev_set := field_used[offset/8] & byte(offset&7) != 0
+				field_used[offset/8] |= byte(offset&7)
+				return prev_set
+			}
+
+			field_used_bytes := (reflect.size_of_typeid(ti.id)+7)/8
+			field_used := intrinsics.alloca(field_used_bytes, 1)
+			intrinsics.mem_zero(field_used, field_used_bytes)
+
 			use_field_idx := -1
 			
 			for field, field_idx in fields {
 				tag_value := string(reflect.struct_tag_get(field.tag, "json"))
-				if key == tag_value {
+				json_name, _ := json_name_from_tag_value(tag_value)
+				if key == json_name {
 					use_field_idx = field_idx
 					break
 				}
@@ -375,14 +410,45 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 				}
 			}
 			
-			if use_field_idx >= 0 {
-				if field_used[use_field_idx] {
+			check_children_using_fields :: proc(key: string, parent: typeid) -> (
+				offset: uintptr,
+				type: ^reflect.Type_Info,
+				found: bool,
+			) {
+				for field in reflect.struct_fields_zipped(parent) {
+					if field.is_using && field.name == "_" {
+						offset, type, found = check_children_using_fields(key, field.type.id)
+						if found {
+							offset += field.offset
+							return
+						}
+					}
+
+					if field.name == key {
+						offset = field.offset
+						type = field.type
+						found = true
+						return
+					}
+				}
+				return
+			}
+
+			offset: uintptr
+			type: ^reflect.Type_Info
+			field_found: bool = use_field_idx >= 0
+
+			if field_found {
+				offset = fields[use_field_idx].offset
+				type = fields[use_field_idx].type
+			} else {
+				offset, type, field_found = check_children_using_fields(key, ti.id)
+			}
+
+			if field_found {
+				if field_test(field_used, offset) {
 					return .Multiple_Use_Field
 				}
-				field_used[use_field_idx] = true
-				offset := fields[use_field_idx].offset
-				type := fields[use_field_idx].type
-				name := fields[use_field_idx].name
 				
 				field_ptr := rawptr(uintptr(v.data) + offset)
 				field := any{field_ptr, type.id}
@@ -394,6 +460,12 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 				continue struct_loop
 			} else {
 				// allows skipping unused struct fields
+
+				// NOTE(bill): prevent possible memory leak if a string is unquoted
+				allocator := p.allocator
+				defer p.allocator = allocator
+				p.allocator = mem.nil_allocator()
+
 				parse_value(p) or_return
 				if parse_comma(p) {
 					break struct_loop
@@ -403,7 +475,7 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 		}
 		
 	case reflect.Type_Info_Map:
-		if !reflect.is_string(t.key) {
+		if !reflect.is_string(t.key) && !reflect.is_integer(t.key) {
 			return UNSUPPORTED_TYPE
 		}
 		raw_map := (^mem.Raw_Map)(v.data)
@@ -420,25 +492,39 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 			key, _ := parse_object_key(p, p.allocator)
 			unmarshal_expect_token(p, .Colon)
 			
-			
+
 			mem.zero_slice(elem_backing)
-			if err := unmarshal_value(p, map_backing_value); err != nil {
+			if uerr := unmarshal_value(p, map_backing_value); uerr != nil {
 				delete(key, p.allocator)
-				return err
+				return uerr
 			}
 
-			key_ptr := rawptr(&key)
+			key_ptr: rawptr
 
-			key_cstr: cstring
-			if reflect.is_cstring(t.key) {
-				key_cstr = cstring(raw_data(key))
-				key_ptr = &key_cstr
+			#partial switch tk in t.key.variant {
+				case runtime.Type_Info_String:			
+					key_ptr = rawptr(&key)
+					key_cstr: cstring
+					if reflect.is_cstring(t.key) {
+						key_cstr = cstring(raw_data(key))
+						key_ptr = &key_cstr
+					}
+				case runtime.Type_Info_Integer:
+					i, ok := strconv.parse_i128(key)
+					if !ok	{ return UNSUPPORTED_TYPE }
+					key_ptr = rawptr(&i)
+				case: return UNSUPPORTED_TYPE
 			}
-			
+
 			set_ptr := runtime.__dynamic_map_set_without_hash(raw_map, t.map_info, key_ptr, map_backing_value.data)
 			if set_ptr == nil {
 				delete(key, p.allocator)
 			} 
+
+			// there's no need to keep string value on the heap, since it was copied into map 
+			if reflect.is_integer(t.key) {
+				delete(key, p.allocator)
+			}
 			
 			if parse_comma(p) {
 				break map_loop
@@ -475,7 +561,6 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 			}
 		}
 
-		return nil
 	case:
 		return UNSUPPORTED_TYPE
 	}

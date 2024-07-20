@@ -16,7 +16,7 @@ import coretime "core:time"
 import "core:strings"
 import "core:bytes"
 import "core:mem"
-import "core:runtime"
+import "base:runtime"
 
 /*
 	Cleanup of image-specific data.

@@ -1,7 +1,7 @@
 package os
 
 import "core:time"
-import "core:runtime"
+import "base:runtime"
 import win32 "core:sys/windows"
 
 @(private)

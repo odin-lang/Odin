@@ -50,19 +50,39 @@ PAGE_WRITECOPY         :: 0x08
 PAGE_TARGETS_INVALID   :: 0x40000000
 PAGE_TARGETS_NO_UPDATE :: 0x40000000
 
+SECTION_MAP_WRITE :: 0x0002
+SECTION_MAP_READ  :: 0x0004
+FILE_MAP_WRITE    :: SECTION_MAP_WRITE
+FILE_MAP_READ     :: SECTION_MAP_READ
+
 ERROR_INVALID_ADDRESS :: 487
 ERROR_COMMITMENT_LIMIT :: 1455
 
-@(default_calling_convention="stdcall")
+@(default_calling_convention="system")
 foreign Kernel32 {
 	GetSystemInfo  :: proc(lpSystemInfo: LPSYSTEM_INFO) ---
 	VirtualAlloc   :: proc(lpAddress: rawptr, dwSize: uint, flAllocationType: u32, flProtect: u32) -> rawptr ---
 	VirtualFree    :: proc(lpAddress: rawptr, dwSize: uint, dwFreeType: u32) -> b32 ---
 	VirtualProtect :: proc(lpAddress: rawptr, dwSize: uint, flNewProtect: u32, lpflOldProtect: ^u32) -> b32 ---
 	GetLastError   :: proc() -> u32 ---
+
+	CreateFileMappingW :: proc(
+		hFile:                   rawptr,
+		lpFileMappingAttributes: rawptr,
+		flProtect:               u32,
+		dwMaximumSizeHigh:       u32,
+		dwMaximumSizeLow:        u32,
+		lpName:                  [^]u16,
+	) -> rawptr ---
+
+	MapViewOfFile :: proc(
+		hFileMappingObject:   rawptr,
+		dwDesiredAccess:      u32,
+		dwFileOffsetHigh:     u32,
+		dwFileOffsetLow:      u32,
+		dwNumberOfBytesToMap: uint,
+	) -> rawptr ---
 }
-
-
 _reserve :: proc "contextless" (size: uint) -> (data: []byte, err: Allocator_Error) {
 	result := VirtualAlloc(nil, size, MEM_RESERVE, PAGE_READWRITE)
 	if result == nil {
@@ -124,4 +144,34 @@ _platform_memory_init :: proc() {
 	
 	// is power of two
 	assert(DEFAULT_PAGE_SIZE != 0 && (DEFAULT_PAGE_SIZE & (DEFAULT_PAGE_SIZE-1)) == 0)
+}
+
+
+_map_file :: proc "contextless" (fd: uintptr, size: i64, flags: Map_File_Flags) -> (data: []byte, error: Map_File_Error) {
+	page_flags: u32
+	if flags == {.Read} {
+		page_flags = PAGE_READONLY
+	} else if flags == {.Write} {
+		page_flags = PAGE_READWRITE
+	} else if flags == {.Read, .Write} {
+		page_flags = PAGE_READWRITE
+	} else {
+		page_flags = PAGE_NOACCESS
+	}
+	maximum_size := transmute([2]u32)size
+	handle := CreateFileMappingW(rawptr(fd), nil, page_flags, maximum_size[1], maximum_size[0], nil)
+	if handle == nil {
+		return nil, .Map_Failure
+	}
+
+	desired_access: u32
+	if .Read in flags {
+		desired_access |= FILE_MAP_READ
+	}
+	if .Write in flags {
+		desired_access |= FILE_MAP_WRITE
+	}
+
+	file_data := MapViewOfFile(handle, desired_access, 0, 0, uint(size))
+	return ([^]byte)(file_data)[:size], nil
 }

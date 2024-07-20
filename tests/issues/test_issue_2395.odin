@@ -5,8 +5,6 @@
 // exactly 2 errors from the invalid unions
 package test_issues
 
-import "core:testing"
-
 ValidUnion :: union($T: typeid) #no_nil {
     T,
     f32,

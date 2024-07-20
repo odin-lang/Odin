@@ -1,9 +1,7 @@
 //+build js
 package os
 
-import "core:intrinsics"
-import "core:runtime"
-import "core:unicode/utf16"
+import "base:runtime"
 
 is_path_separator :: proc(c: byte) -> bool {
 	return c == '/' || c == '\\'
@@ -64,13 +62,8 @@ write_at :: proc(fd: Handle, data: []byte, offset: i64) -> (n: int, err: Errno) 
 	unimplemented("core:os procedure not supported on JS target")
 }
 
-
-
-// NOTE(bill): Uses startup to initialize it
-//stdin  := get_std_handle(uint(win32.STD_INPUT_HANDLE))
-//stdout := get_std_handle(uint(win32.STD_OUTPUT_HANDLE))
-//stderr := get_std_handle(uint(win32.STD_ERROR_HANDLE))
-
+stdout: Handle = 1
+stderr: Handle = 2
 
 get_std_handle :: proc "contextless" (h: uint) -> Handle {
 	context = runtime.default_context()
@@ -236,17 +229,6 @@ last_write_time_by_name :: proc(name: string) -> (File_Time, Errno) {
 	unimplemented("core:os procedure not supported on JS target")
 }
 
-
-
-heap_alloc :: proc(size: int, zero_memory := true) -> rawptr {
-	unimplemented("core:os procedure not supported on JS target")
-}
-heap_resize :: proc(ptr: rawptr, new_size: int) -> rawptr {
-	unimplemented("core:os procedure not supported on JS target")
-}
-heap_free :: proc(ptr: rawptr) {
-	unimplemented("core:os procedure not supported on JS target")
-}
 
 get_page_size :: proc() -> int {
 	unimplemented("core:os procedure not supported on JS target")

@@ -39,6 +39,7 @@ init :: proc(t: ^Tokenizer, src: string, path: string, err: Error_Handler = defa
 	t.read_offset = 0
 	t.line_offset = 0
 	t.line_count = len(src) > 0 ? 1 : 0
+	t.insert_semicolon = false
 	t.error_count = 0
 	t.path = path
 
