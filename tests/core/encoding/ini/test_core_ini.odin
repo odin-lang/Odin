@@ -19,7 +19,7 @@ parse_ini :: proc(t: ^testing.T) {
 	`
 
 	m, err := ini.load_map_from_string(ini_data, context.allocator)
-	ini.delete_map(m)
+	defer ini.delete_map(m)
 
 	testing.expectf(
 		t,
