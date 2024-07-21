@@ -143,7 +143,7 @@ when !ODIN_NO_RTTI {
 @(require_results)
 any_base :: proc(v: any) -> any {
 	v := v
-	if v != nil {
+	if v.id != nil {
 		v.id = typeid_base(v.id)
 	}
 	return v
@@ -151,7 +151,7 @@ any_base :: proc(v: any) -> any {
 @(require_results)
 any_core :: proc(v: any) -> any {
 	v := v
-	if v != nil {
+	if v.id != nil {
 		v.id = typeid_core(v.id)
 	}
 	return v
