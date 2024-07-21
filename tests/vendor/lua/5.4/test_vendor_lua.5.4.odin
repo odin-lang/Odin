@@ -31,7 +31,7 @@ dofile_factorial :: proc(t: ^testing.T) {
 
 	FACT_10 :: 3628800
 
-	res := lua.L_dofile(state, "factorial.lua")
+	res := lua.L_dofile(state, #directory + "/factorial.lua")
 	testing.expectf(t, lua.Status(res) == .OK, "Expected L_dofile to return OKAY")
 
 	fact := lua.L_checkinteger(state, -1)
