@@ -38,6 +38,7 @@ download_assets :: proc() {
 @(require) import "strings"
 @(require) import "text/i18n"
 @(require) import "text/match"
+@(require) import "text/regex"
 @(require) import "thread"
 @(require) import "time"
 @(require) import "unicode"
