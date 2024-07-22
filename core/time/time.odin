@@ -5,6 +5,7 @@ import dt "core:time/datetime"
 
 /*
 Type representing duration, with nanosecond precision.
+This is the regular Unix timestamp, scaled to nanosecond precision.
 */
 Duration :: distinct i64
 
@@ -425,7 +426,7 @@ Alias for `time_to_unix`.
 to_unix_seconds :: time_to_unix
 
 /*
-Obtain the unix seconds from a time.
+Obtain the Unix timestamp in seconds from a Time.
 */
 time_to_unix :: proc "contextless" (t: Time) -> i64 {
 	return t._nsec/1e9
@@ -437,7 +438,7 @@ Alias for `time_to_unix_nano`.
 to_unix_nanoseconds :: time_to_unix_nano
 
 /*
-Obtain the unix nanoseconds from a time.
+Obtain the Unix timestamp in nanoseconds from a Time.
 */
 time_to_unix_nano :: proc "contextless" (t: Time) -> i64 {
 	return t._nsec
