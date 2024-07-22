@@ -2517,7 +2517,7 @@ gb_internal void check_return_stmt(CheckerContext *ctx, Ast *node) {
 			Entity *e = entity_of_node(x);
 			if (is_entity_local_variable(e)) {
 				unsafe_return_error(o, "the address of a local variable");
-			} else if(x->kind == Ast_CompoundLit) {
+			} else if (x->kind == Ast_CompoundLit) {
 				unsafe_return_error(o, "the address of a compound literal");
 			} else if (x->kind == Ast_IndexExpr) {
 				Entity *f = entity_of_node(x->IndexExpr.expr);
@@ -2531,6 +2531,14 @@ gb_internal void check_return_stmt(CheckerContext *ctx, Ast *node) {
 				if (f && (is_type_matrix(f->type) && is_entity_local_variable(f))) {
 					unsafe_return_error(o, "the address of an indexed variable", f->type);
 				}
+			}
+		} else if (expr->kind == Ast_SliceExpr) {
+			Ast *x = unparen_expr(expr->SliceExpr.expr);
+			Entity *e = entity_of_node(x);
+			if (is_entity_local_variable(e) && is_type_array(e->type)) {
+				unsafe_return_error(o, "a slice of a local variable");
+			} else if (x->kind == Ast_CompoundLit) {
+				unsafe_return_error(o, "a slice of a compound literal");
 			}
 		} else if (o.mode == Addressing_Constant && is_type_slice(o.type)) {
 			ERROR_BLOCK();
