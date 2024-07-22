@@ -2172,7 +2172,7 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 		if (LB_USE_NEW_PASS_SYSTEM) {
 			print_usage_line(3, "-o:aggressive");
 		}
-		print_usage_line(2, "The default is -o:none.");
+		print_usage_line(2, "The default is -o:minimal.");
 		print_usage_line(0, "");
 	}
 

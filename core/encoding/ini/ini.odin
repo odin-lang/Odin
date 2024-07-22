@@ -90,6 +90,7 @@ load_map_from_string :: proc(src: string, allocator: runtime.Allocator, options 
 			if allocated {
 				return v, nil
 			}
+			return strings.clone(v), nil
 		}
 		return strings.clone(val)
 	}

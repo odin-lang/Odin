@@ -16,7 +16,7 @@ when LUA_SHARED {
 	} else when ODIN_OS == .Linux {
 		foreign import lib "linux/liblua52.so"
 	} else {
-		foreign import lib "system:liblua.so.5.2"
+		foreign import lib "system:lua5.2"
 	}
 } else {
 	when ODIN_OS == .Windows {
@@ -24,7 +24,7 @@ when LUA_SHARED {
 	} else when ODIN_OS == .Linux {
 		foreign import lib "linux/liblua52.a"
 	} else {
-		foreign import lib "system:liblua52.a"
+		foreign import lib "system:lua5.2"
 	}
 }
 

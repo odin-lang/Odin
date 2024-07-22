@@ -5609,7 +5609,7 @@ gb_internal AstPackage *try_add_import_path(Parser *p, String path, String const
 	pkg->foreign_files.allocator = permanent_allocator();
 
 	// NOTE(bill): Single file initial package
-	if (kind == Package_Init && string_ends_with(path, FILE_EXT)) {
+	if (kind == Package_Init && !path_is_directory(path) && string_ends_with(path, FILE_EXT)) {
 		FileInfo fi = {};
 		fi.name = filename_from_path(path);
 		fi.fullpath = path;
@@ -6529,6 +6529,7 @@ gb_internal ParseFileError parse_packages(Parser *p, String init_filename) {
 	GB_ASSERT(init_filename.text[init_filename.len] == 0);
 
 	String init_fullpath = path_to_full_path(permanent_allocator(), init_filename);
+
 	if (!path_is_directory(init_fullpath)) {
 		String const ext = str_lit(".odin");
 		if (!string_ends_with(init_fullpath, ext)) {
@@ -6542,9 +6543,8 @@ gb_internal ParseFileError parse_packages(Parser *p, String init_filename) {
 		}
 		if ((build_context.command_kind & Command__does_build) &&
 		    build_context.build_mode == BuildMode_Executable) {
-			String short_path = filename_from_path(path);
-			char *cpath = alloc_cstring(temporary_allocator(), short_path);
-			if (gb_file_exists(cpath)) {
+			String output_path = path_to_string(temporary_allocator(), build_context.build_paths[8]);
+			if (path_is_directory(output_path)) {
 			    	error({}, "Please specify the executable name with -out:<string> as a directory exists with the same name in the current working directory");
 			    	return ParseFile_DirectoryAlreadyExists;
 			}

@@ -3,23 +3,62 @@ package time
 
 import dt "core:time/datetime"
 
-// Parses an ISO 8601 string and returns Time in UTC, with any UTC offset applied to it.
-// Only 4-digit years are accepted.
-// Optional pointer to boolean `is_leap` will return `true` if the moment was a leap second.
-// Leap seconds are smeared into 23:59:59.
+/*
+Parse an ISO 8601 string into a time with UTC offset applied to it.
+
+This procedure parses an ISO 8601 string of roughly the following format:
+
+```text
+YYYY-MM-DD[Tt]HH:mm:ss[.nn][Zz][+-]HH:mm
+```
+
+And returns time, in UTC represented by that string. In case the timezone offset
+is specified in the string, that timezone is applied to time.
+
+**Inputs**:
+- `iso_datetime`: The string to be parsed.
+- `is_leap`: Optional output parameter, specifying if the moment was a leap second.
+
+**Returns**:
+- `res`: The time represented by `iso_datetime`, with UTC offset applied.
+- `consumed`: Number of bytes consumed by parsing the string.
+
+**Notes**:
+- Only 4-digit years are accepted.
+- Leap seconds are smeared into 23:59:59.
+*/
 iso8601_to_time_utc :: proc(iso_datetime: string, is_leap: ^bool = nil) -> (res: Time, consumed: int) {
 	offset: int
-
 	res, offset, consumed = iso8601_to_time_and_offset(iso_datetime, is_leap)
 	res._nsec += (i64(-offset) * i64(Minute))
 	return res, consumed
 }
 
-// Parses an ISO 8601 string and returns Time and a UTC offset in minutes.
-// e.g. 1985-04-12T23:20:50.52Z
-// Note: Only 4-digit years are accepted.
-// Optional pointer to boolean `is_leap` will return `true` if the moment was a leap second.
-// Leap seconds are smeared into 23:59:59.
+/*
+Parse an ISO 8601 string into a time and a UTC offset in minutes.
+
+This procedure parses an ISO 8601 string of roughly the following format:
+
+```text
+YYYY-MM-DD[Tt]HH:mm:ss[.nn][Zz][+-]HH:mm
+```
+
+And returns time, in UTC represented by that string, and the UTC offset, in
+minutes.
+
+**Inputs**:
+- `iso_datetime`: The string to be parsed.
+- `is_leap`: Optional output parameter, specifying if the moment was a leap second.
+
+**Returns**:
+- `res`: The time in UTC.
+- `utc_offset`: The UTC offset of the time, in minutes.
+- `consumed`: Number of bytes consumed by parsing the string.
+
+**Notes**:
+- Only 4-digit years are accepted.
+- Leap seconds are smeared into 23:59:59.
+*/
 iso8601_to_time_and_offset :: proc(iso_datetime: string, is_leap: ^bool = nil) -> (res: Time, utc_offset: int, consumed: int) {
 	moment, offset, leap_second, count := iso8601_to_components(iso_datetime)
 	if count == 0 {
@@ -37,9 +76,32 @@ iso8601_to_time_and_offset :: proc(iso_datetime: string, is_leap: ^bool = nil) -
 	}
 }
 
-// Parses an ISO 8601 string and returns Time and a UTC offset in minutes.
-// e.g. 1985-04-12T23:20:50.52Z
-// Performs no validation on whether components are valid, e.g. it'll return hour = 25 if that's what it's given
+/*
+Parse an ISO 8601 string into a datetime and a UTC offset in minutes.
+
+This procedure parses an ISO 8601 string of roughly the following format:
+
+```text
+YYYY-MM-DD[Tt]HH:mm:ss[.nn][Zz][+-]HH:mm
+```
+
+And returns datetime, in UTC represented by that string, and the UTC offset, in
+minutes.
+
+**Inputs**:
+- `iso_datetime`: The string to be parsed
+
+**Returns**:
+- `res`: The parsed datetime, in UTC.
+- `utc_offset`: The UTC offset, in minutes.
+- `is_leap`: Specifies whether the moment was a leap second.
+- `consumed`: The number of bytes consumed by parsing the string.
+
+**Notes**:
+- This procedure performs no validation on whether components are valid,
+  e.g. it'll return hour = 25 if that's what it's given in the specified
+  string.
+*/
 iso8601_to_components :: proc(iso_datetime: string) -> (res: dt.DateTime, utc_offset: int, is_leap: bool, consumed: int) {
 	moment, offset, count, leap_second, ok := _iso8601_to_components(iso_datetime)
 	if !ok {

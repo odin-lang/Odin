@@ -350,6 +350,24 @@ unmarshal_json :: proc(t: ^testing.T) {
 }
 
 @test
+unmarshal_empty_struct :: proc(t: ^testing.T) {
+	TestStruct :: struct {}
+	test := make(map[string]TestStruct)
+	input: = `{
+		"test_1": {},
+		"test_2": {}
+	}`
+	err := json.unmarshal(transmute([]u8)input, &test)
+	defer {
+		for k in test {
+			delete(k)
+		}
+		delete(test)
+	}
+	testing.expect(t, err == nil, "Expected empty struct to unmarshal without error")
+}
+
+@test
 surrogate :: proc(t: ^testing.T) {
 	input := `+ + * 😃 - /`
 

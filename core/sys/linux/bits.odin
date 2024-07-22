@@ -1815,3 +1815,11 @@ EPoll_Ctl_Opcode :: enum i32 {
 	DEL = 2,
 	MOD = 3,
 }
+
+/*
+	Bits for execveat(2) flags.
+*/
+Execveat_Flags_Bits :: enum {
+	AT_SYMLINK_NOFOLLOW = 8,
+	AT_EMPTY_PATH       = 12,
+}

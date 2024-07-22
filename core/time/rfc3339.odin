@@ -4,10 +4,33 @@ package time
 
 import dt "core:time/datetime"
 
-// Parses an RFC 3339 string and returns Time in UTC, with any UTC offset applied to it.
-// Only 4-digit years are accepted.
-// Optional pointer to boolean `is_leap` will return `true` if the moment was a leap second.
-// Leap seconds are smeared into 23:59:59.
+/*
+Parse an RFC 3339 string into time with a UTC offset applied to it.
+
+This procedure parses the specified RFC 3339 strings of roughly the following
+format:
+
+```text
+YYYY-MM-DD[Tt]HH:mm:ss[.nn][Zz][+-]HH:mm
+```
+
+And returns the time that was represented by the RFC 3339 string, with the UTC
+offset applied to it.
+
+**Inputs**:
+- `rfc_datetime`: An RFC 3339 string to parse.
+- `is_leap`: Optional output parameter specifying whether the moment was a leap
+  second.
+
+**Returns**:
+- `res`: The time, with UTC offset applied, that was parsed from the RFC 3339
+  string.
+- `consumed`: The number of bytes consumed by parsing the RFC 3339 string.
+
+**Notes**:
+- Only 4-digit years are accepted.
+- Leap seconds are smeared into 23:59:59.
+*/
 rfc3339_to_time_utc :: proc(rfc_datetime: string, is_leap: ^bool = nil) -> (res: Time, consumed: int) {
 	offset: int
 
@@ -16,11 +39,34 @@ rfc3339_to_time_utc :: proc(rfc_datetime: string, is_leap: ^bool = nil) -> (res:
 	return res, consumed
 }
 
-// Parses an RFC 3339 string and returns Time and a UTC offset in minutes.
-// e.g. 1985-04-12T23:20:50.52Z
-// Note: Only 4-digit years are accepted.
-// Optional pointer to boolean `is_leap` will return `true` if the moment was a leap second.
-// Leap seconds are smeared into 23:59:59.
+/*
+Parse an RFC 3339 string into a time and a UTC offset in minutes.
+
+This procedure parses the specified RFC 3339 strings of roughly the following
+format:
+
+```text
+YYYY-MM-DD[Tt]HH:mm:ss[.nn][Zz][+-]HH:mm
+```
+
+And returns the time, in UTC and a UTC offset, in minutes, that were represented
+by the RFC 3339 string.
+
+**Inputs**:
+- `rfc_datetime`: The RFC 3339 string to be parsed.
+- `is_leap`: Optional output parameter specifying whether the moment was a
+  leap second.
+
+**Returns**:
+- `res`: The time, in UTC, that was parsed from the RFC 3339 string.
+- `utc_offset`: The UTC offset, in minutes, that was parsed from the RFC 3339
+  string.
+- `consumed`: The number of bytes consumed by parsing the string.
+
+**Notes**:
+- Only 4-digit years are accepted.
+- Leap seconds are smeared into 23:59:59.
+*/
 rfc3339_to_time_and_offset :: proc(rfc_datetime: string, is_leap: ^bool = nil) -> (res: Time, utc_offset: int, consumed: int) {
 	moment, offset, leap_second, count := rfc3339_to_components(rfc_datetime)
 	if count == 0 {
@@ -38,9 +84,31 @@ rfc3339_to_time_and_offset :: proc(rfc_datetime: string, is_leap: ^bool = nil) -
 	}
 }
 
-// Parses an RFC 3339 string and returns Time and a UTC offset in minutes.
-// e.g. 1985-04-12T23:20:50.52Z
-// Performs no validation on whether components are valid, e.g. it'll return hour = 25 if that's what it's given
+/*
+Parse an RFC 3339 string into a datetime and a UTC offset in minutes.
+
+This procedure parses the specified RFC 3339 strings of roughly the following
+format:
+
+```text
+YYYY-MM-DD[Tt]HH:mm:ss[.nn][Zz][+-]HH:mm
+```
+
+And returns the datetime, in UTC and the UTC offset, in minutes, that were
+represented by the RFC 3339 string.
+
+**Inputs**:
+- `rfc_datetime`: The RFC 3339 string to parse.
+
+**Returns**:
+- `res`: The datetime, in UTC, that was parsed from the RFC 3339 string.
+- `utc_offset`: The UTC offset, in minutes, that was parsed from the RFC 3339
+  string.
+- `is_leap`: Specifies whether the moment was a leap second.
+- `consumed`: Number of bytes consumed by parsing the string.
+
+Performs no validation on whether components are valid, e.g. it'll return hour = 25 if that's what it's given
+*/
 rfc3339_to_components :: proc(rfc_datetime: string) -> (res: dt.DateTime, utc_offset: int, is_leap: bool, consumed: int) {
 	moment, offset, count, leap_second, ok := _rfc3339_to_components(rfc_datetime)
 	if !ok {
