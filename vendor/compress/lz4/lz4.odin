@@ -1,7 +1,8 @@
 package vendor_compress_lz4
 
 when ODIN_OS == .Windows {
-	foreign import lib "lib/libz4_static.lib"
+	@(extra_linker_flags="/NODEFAULTLIB:libcmt")
+	foreign import lib "lib/liblz4_static.lib"
 }
 
 import "core:c"
