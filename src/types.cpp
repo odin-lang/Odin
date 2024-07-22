@@ -1637,6 +1637,26 @@ gb_internal Type *base_array_type(Type *t) {
 	return t;
 }
 
+
+gb_internal Type *base_any_array_type(Type *t) {
+	Type *bt = base_type(t);
+	if (is_type_array(bt)) {
+		return bt->Array.elem;
+	} else if (is_type_slice(bt)) {
+		return bt->Slice.elem;
+	} else if (is_type_dynamic_array(bt)) {
+		return bt->DynamicArray.elem;
+	} else if (is_type_enumerated_array(bt)) {
+		return bt->EnumeratedArray.elem;
+	} else if (is_type_simd_vector(bt)) {
+		return bt->SimdVector.elem;
+	} else if (is_type_matrix(bt)) {
+		return bt->Matrix.elem;
+	}
+	return t;
+}
+
+
 gb_internal bool is_type_generic(Type *t) {
 	t = base_type(t);
 	return t->kind == Type_Generic;
