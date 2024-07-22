@@ -127,6 +127,7 @@ import testing          "core:testing"
 import edit             "core:text/edit"
 import i18n             "core:text/i18n"
 import match            "core:text/match"
+import regex            "core:text/regex"
 import scanner          "core:text/scanner"
 import table            "core:text/table"
 
@@ -248,6 +249,7 @@ _ :: testing
 _ :: scanner
 _ :: i18n
 _ :: match
+_ :: regex
 _ :: table
 _ :: edit
 _ :: thread
