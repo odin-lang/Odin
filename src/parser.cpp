@@ -6544,8 +6544,7 @@ gb_internal ParseFileError parse_packages(Parser *p, String init_filename) {
 		if ((build_context.command_kind & Command__does_build) &&
 		    build_context.build_mode == BuildMode_Executable) {
 			String output_path = path_to_string(temporary_allocator(), build_context.build_paths[8]);
-			char *cpath = alloc_cstring(temporary_allocator(), output_path);
-			if (path_is_directory(output_path) && gb_file_exists(cpath)) {
+			if (path_is_directory(output_path)) {
 			    	error({}, "Please specify the executable name with -out:<string> as a directory exists with the same name in the current working directory");
 			    	return ParseFile_DirectoryAlreadyExists;
 			}
