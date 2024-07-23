@@ -11,7 +11,6 @@ import "vendor:wgpu/sdl2glue"
 State :: struct {
 	ctx: runtime.Context,
 	window: ^sdl2.Window,
-	running: bool,
 
 	instance:        wgpu.Instance,
 	surface:         wgpu.Surface,
