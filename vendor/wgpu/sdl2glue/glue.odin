@@ -1,3 +1,4 @@
+//+build !linux
 //+build !windows
 //+build !darwin
 package wgpu_sdl2_glue
