@@ -786,7 +786,7 @@ execve :: proc "contextless" (name: cstring, argv: [^]cstring, envp: [^]cstring)
 		return Errno(-ret)
 	} else {
 		ret := syscall(SYS_execveat, AT_FDCWD, cast(rawptr) name, cast(rawptr) argv, cast(rawptr) envp, i32(0))
-	 	return Errno(-ret)
+		return Errno(-ret)
 	}
 }
 
