@@ -1091,6 +1091,11 @@ NMHDR :: struct {
 	code:     UINT,      // NM_ code
 }
 
+NCCALCSIZE_PARAMS :: struct {
+	rgrc: [3]RECT,
+	lppos: PWINDOWPOS,
+}
+
 // Generic WM_NOTIFY notification codes
 NM_OUTOFMEMORY          :: ~uintptr(0) // -1
 NM_CLICK                :: NM_OUTOFMEMORY-1  // uses NMCLICK struct
@@ -2204,6 +2209,7 @@ FILE_TYPE_PIPE :: 0x0003
 RECT  :: struct {left, top, right, bottom: LONG}
 POINT :: struct {x, y: LONG}
 
+PWINDOWPOS :: ^WINDOWPOS;
 WINDOWPOS :: struct {
 	hwnd: HWND,
 	hwndInsertAfter: HWND,
