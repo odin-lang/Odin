@@ -85,7 +85,7 @@ _open :: proc(name: string, flags: File_Flags, perm: int) -> (f: ^File, err: Err
 	// terminal would be incredibly rare. This has no effect on files while
 	// allowing us to open serial devices.
 	sys_flags: linux.Open_Flags = {.NOCTTY, .CLOEXEC}
-	switch flags & O_RDONLY|O_WRONLY|O_RDWR {
+	switch flags & (O_RDONLY|O_WRONLY|O_RDWR) {
 	case O_RDONLY:
 	case O_WRONLY: sys_flags += {.WRONLY}
 	case O_RDWR:   sys_flags += {.RDWR}

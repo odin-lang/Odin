@@ -120,7 +120,7 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 		s: linux.Stat
 		linux.fstat(proc_fd, &s)
 
-		passwd_bytes := read_entire_file("/etc/passwd", temp_allocator()) or_return
+		passwd_bytes := _read_entire_pseudo_file_cstring("/etc/passwd", temp_allocator()) or_return
 		passwd := string(passwd_bytes)
 		for len(passwd) > 0 {
 			n := strings.index_byte(passwd, ':')
@@ -128,13 +128,12 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 				break
 			}
 			username := passwd[:n]
-			passwd = passwd[:n+1]
+			passwd = passwd[n+1:]
 
 			// skip password field
-			passwd = passwd[:strings.index_byte(passwd, ':') + 1]
+			passwd = passwd[strings.index_byte(passwd, ':') + 1:]
 
 			n = strings.index_byte(passwd, ':')
-			username = passwd
 			if uid, ok := strconv.parse_int(passwd[:n]); ok && uid == int(s.uid) {
 				info.username = strings.clone(username, allocator)
 				break
@@ -148,14 +147,9 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 		}
 	}
 
-	if .Executable_Path in selection {
-		_ = fmt.bprintf(path_slice, "/proc/%d/exe", pid)
-		info.executable_path = _read_link_cstr(path_cstr, allocator) or_return
-	}
-
 	if .Working_Dir in selection {
 		_ = fmt.bprintf(path_slice, "/proc/%d/cwd", pid)
-		info.working_dir = _read_link_cstr(path_cstr, allocator) or_return
+		info.working_dir, _ = _read_link_cstr(path_cstr, allocator) // allowed to fail
 	}
 
 	stat_if: if selection & {.PPid, .Priority} != {} {
@@ -172,7 +166,7 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 		stats = stats[strings.index_byte(stats, ' ') + 1:]
 
 		if .PPid in selection {
-			ppid_str := stats[:strings.index_byte(stats, ' ')]
+			ppid_str := stats[strings.index_byte(stats, ' '):]
 			if ppid, ok := strconv.parse_int(ppid_str); ok {
 				info.ppid = ppid
 			}
@@ -183,15 +177,15 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 			for i := 4; i < 19; i += 1 {
 				stats = stats[strings.index_byte(stats, ' ') + 1:]
 			}
-			nice_str := stats[:strings.index_byte(stats, ' ')]
+			nice_str := stats[strings.index_byte(stats, ' '):]
 			if nice, ok := strconv.parse_int(nice_str); ok {
 				info.priority = nice
 			}
 		}
 	}
 
-	cmdline_if: if selection & {.Command_Line, .Command_Args} != {} {
-		_ = fmt.bprintf(path_slice, "/proc/%d/cmdline")
+	cmdline_if: if selection & {.Command_Line, .Command_Args, .Executable_Path} != {} {
+		_ = fmt.bprintf(path_slice, "/proc/%d/cmdline", pid)
 		cmdline_bytes := _read_entire_pseudo_file(path_cstr, temp_allocator()) or_return
 		if len(cmdline_bytes) == 0 {
 			break cmdline_if
@@ -199,6 +193,9 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 		cmdline := string(cmdline_bytes)
 
 		terminator := strings.index_byte(cmdline, 0)
+		if .Executable_Path in selection {
+			info.executable_path = strings.clone(cmdline[:terminator], allocator)
+		}
 		if .Command_Line in selection {
 			info.command_line = strings.clone(cmdline[:terminator], allocator)
 		}
@@ -219,17 +216,19 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 
 	if .Environment in selection {
 		_ = fmt.bprintf(path_slice, "/proc/%d/environ", pid)
-		env_bytes := _read_entire_pseudo_file(path_cstr, temp_allocator()) or_return
-		env := string(env_bytes)
+		if env_bytes, env_err := _read_entire_pseudo_file(path_cstr, temp_allocator()); env_err == nil {
+			env := string(env_bytes)
 
-		env_list := make([dynamic]string, allocator)
-		for len(env) > 0 {
-			terminator := strings.index_byte(env, 0)
-			if terminator == -1 || terminator == 0 {
-				break
+			env_list := make([dynamic]string, allocator)
+			for len(env) > 0 {
+				terminator := strings.index_byte(env, 0)
+				if terminator == -1 || terminator == 0 {
+					break
+				}
+				append(&env_list, strings.clone(env[:terminator], allocator))
+				env = env[terminator + 1:]
 			}
-			append(&env_list, strings.clone(env[:terminator], allocator))
-			env = env[:terminator + 1]
+			info.environment = env_list[:]
 		}
 	}
 
@@ -326,7 +325,7 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 		cargs[i] = temp_cstring(desc.command[i]) or_return
 	}
 
-	// Use current process's environment if descibutes not provided
+	// Use current process's environment if description not provided
 	env: [^]cstring
 	if desc.env == nil {
 		// take this process's current environment
