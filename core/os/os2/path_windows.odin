@@ -75,72 +75,31 @@ _remove_all :: proc(path: string) -> Error {
 		return nil
 	}
 
-
 	err := remove(path)
 	if err == nil || err == .Not_Exist {
 		return nil
 	}
 
 	TEMP_ALLOCATOR_GUARD()
-	dir, serr := stat_do_not_follow_links(path, temp_allocator())
-	if serr != nil {
-		if serr == .Not_Exist || serr == .Invalid_Dir {
-			return nil
-		}
-		return serr
-	}
-	if dir.type != .Directory {
-		return err
-	}
+	dir := win32_utf8_to_wstring(path, temp_allocator()) or_return
 
-	err = nil
-	remove_contents: {
-		f: ^File
-		f, err = open(path)
-		if err != nil {
-			if err == .Not_Exist {
-				return nil
-			}
-			return err
-		}
+	empty: [1]u16
 
-		files, read_err := read_all_directory(f, temp_allocator())
-		for file in files {
-			err1 := remove_all(file.fullpath)
-			if err == nil {
-				err = err1
-			}
-		}
-		close(f)
-
-		if read_err == .EOF {
-			break remove_contents
-		}
-
-		if err == nil {
-			err = read_err
-		}
-		if len(files) == 0 {
-			break remove_contents
-		}
+	file_op := win32.SHFILEOPSTRUCTW {
+		nil,
+		win32.FO_DELETE,
+		dir,
+		&empty[0],
+		win32.FOF_NOCONFIRMATION | win32.FOF_NOERRORUI | win32.FOF_SILENT,
+		false,
+		nil,
+		&empty[0],
 	}
-
-	err1 := remove(path)
-	if err1 == nil || err1 == .Not_Exist {
-		return nil
+	res := win32.SHFileOperationW(&file_op)
+	if res != 0 {
+		return _get_platform_error()
 	}
-
-	if ODIN_OS == .Windows && err1 == .Permission_Denied {
-		if fi, err2 := stat(path, temp_allocator()); err2 == nil {
-			if err2 = chmod(path, 0o200|fi.mode); err2 == nil {
-				err1 = remove(path)
-			}
-		}
-	}
-	if err == nil {
-		err = err1
-	}
-	return err
+	return nil
 }
 
 @private cwd_lock: win32.SRWLOCK // zero is initialized

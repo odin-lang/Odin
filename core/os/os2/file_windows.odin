@@ -109,11 +109,12 @@ _open_internal :: proc(name: string, flags: File_Flags, perm: int) -> (handle: u
 				case 0:
 					return uintptr(h), nil
 				case:
-					return 0, Platform_Error(e)
+					return 0, _get_platform_error()
 				}
 			}
 		}
 	}
+
 	h := win32.CreateFileW(path, access, share_mode, &sa, create_mode, attrs, nil)
 	if h == win32.INVALID_HANDLE {
 		return 0, _get_platform_error()
