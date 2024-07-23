@@ -163,7 +163,7 @@ _remove_all :: proc(path: string) -> Error {
 	return _get_platform_error(linux.rmdir(path_cstr))
 }
 
-_getwd :: proc(allocator: runtime.Allocator) -> (string, Error) {
+_get_working_directory :: proc(allocator: runtime.Allocator) -> (string, Error) {
 	// NOTE(tetra): I would use PATH_MAX here, but I was not able to find
 	// an authoritative value for it across all systems.
 	// The largest value I could find was 4096, so might as well use the page size.
@@ -183,7 +183,7 @@ _getwd :: proc(allocator: runtime.Allocator) -> (string, Error) {
 	unreachable()
 }
 
-_setwd :: proc(dir: string) -> Error {
+_set_working_directory :: proc(dir: string) -> Error {
 	dir_cstr := temp_cstring(dir) or_return
 	return _get_platform_error(linux.chdir(dir_cstr))
 }

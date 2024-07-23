@@ -31,11 +31,11 @@ getwd :: get_working_directory
 
 @(require_results)
 get_working_directory :: proc(allocator: runtime.Allocator) -> (dir: string, err: Error) {
-	return _getwd(allocator)
+	return _get_working_directory(allocator)
 }
 
 setwd :: set_working_directory
 
 set_working_directory :: proc(dir: string) -> (err: Error) {
-	return _setwd(dir)
+	return _set_working_directory(dir)
 }

@@ -71,18 +71,109 @@ _mkdir_all :: proc(path: string, perm: int) -> Error {
 }
 
 _remove_all :: proc(path: string) -> Error {
-	// TODO(bill): _remove_all for windows
-	return nil
+	if path == "" {
+		return nil
+	}
+
+
+	err := remove(path)
+	if err == nil || err == .Not_Exist {
+		return nil
+	}
+
+	TEMP_ALLOCATOR_GUARD()
+	dir, serr := stat_do_not_follow_links(path, temp_allocator())
+	if serr != nil {
+		if serr == .Not_Exist || serr == .Invalid_Dir {
+			return nil
+		}
+		return serr
+	}
+	if dir.type != .Directory {
+		return err
+	}
+
+	err = nil
+	remove_contents: {
+		f: ^File
+		f, err = open(path)
+		if err != nil {
+			if err == .Not_Exist {
+				return nil
+			}
+			return err
+		}
+
+		files, read_err := read_all_directory(f, temp_allocator())
+		for file in files {
+			err1 := remove_all(file.fullpath)
+			if err == nil {
+				err = err1
+			}
+		}
+		close(f)
+
+		if read_err == .EOF {
+			break remove_contents
+		}
+
+		if err == nil {
+			err = read_err
+		}
+		if len(files) == 0 {
+			break remove_contents
+		}
+	}
+
+	err1 := remove(path)
+	if err1 == nil || err1 == .Not_Exist {
+		return nil
+	}
+
+	if ODIN_OS == .Windows && err1 == .Permission_Denied {
+		if fi, err2 := stat(path, temp_allocator()); err2 == nil {
+			if err2 = chmod(path, 0o200|fi.mode); err2 == nil {
+				err1 = remove(path)
+			}
+		}
+	}
+	if err == nil {
+		err = err1
+	}
+	return err
 }
 
-_getwd :: proc(allocator: runtime.Allocator) -> (dir: string, err: Error) {
-	// TODO(bill)
-	return "", nil
+@private cwd_lock: win32.SRWLOCK // zero is initialized
+
+_get_working_directory :: proc(allocator: runtime.Allocator) -> (dir: string, err: Error) {
+	win32.AcquireSRWLockExclusive(&cwd_lock)
+
+	TEMP_ALLOCATOR_GUARD()
+
+	sz_utf16 := win32.GetCurrentDirectoryW(0, nil)
+	dir_buf_wstr := make([]u16, sz_utf16, temp_allocator()) or_return
+
+	sz_utf16 = win32.GetCurrentDirectoryW(win32.DWORD(len(dir_buf_wstr)), raw_data(dir_buf_wstr))
+	assert(int(sz_utf16)+1 == len(dir_buf_wstr)) // the second time, it _excludes_ the NUL.
+
+	win32.ReleaseSRWLockExclusive(&cwd_lock)
+
+	return win32_utf16_to_utf8(dir_buf_wstr, allocator)
 }
 
-_setwd :: proc(dir: string) -> (err: Error) {
-	// TODO(bill)
-	return nil
+_set_working_directory :: proc(dir: string) -> (err: Error) {
+	TEMP_ALLOCATOR_GUARD()
+	wstr := win32_utf8_to_wstring(dir, temp_allocator()) or_return
+
+	win32.AcquireSRWLockExclusive(&cwd_lock)
+
+	if !win32.SetCurrentDirectoryW(wstr) {
+		err = _get_platform_error()
+	}
+
+	win32.ReleaseSRWLockExclusive(&cwd_lock)
+
+	return
 }
 
 can_use_long_paths: bool
