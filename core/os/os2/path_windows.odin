@@ -139,10 +139,33 @@ can_use_long_paths: bool
 
 @(init)
 init_long_path_support :: proc() {
-	// TODO(bill): init_long_path_support
-	// ADD THIS SHIT
-	// registry_path := win32.L(`Computer\HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\FileSystem\LongPathsEnabled`)
 	can_use_long_paths = false
+
+	key: win32.HKEY
+	res := win32.RegOpenKeyExW(win32.HKEY_LOCAL_MACHINE, win32.L(`SYSTEM\CurrentControlSet\Control\FileSystem`), 0, win32.KEY_READ, &key)
+	defer win32.RegCloseKey(key)
+	if res != 0 {
+		return
+	}
+
+	value: u32
+	size := u32(size_of(value))
+	res = win32.RegGetValueW(
+		key,
+		nil,
+		win32.L("LongPathsEnabled"),
+		win32.RRF_RT_ANY,
+		nil,
+		&value,
+		&size,
+	)
+	if res != 0 {
+		return
+	}
+	if value == 1 {
+		can_use_long_paths = true
+	}
+
 }
 
 @(require_results)

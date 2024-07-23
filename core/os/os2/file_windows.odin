@@ -231,7 +231,7 @@ _read :: proc(f: ^File_Impl, p: []byte) -> (n: i64, err: Error) {
 			return 0, nil
 		}
 
-		// TODO(bill): should this be moved to `_File` instead?
+		// TODO(bill): should this be moved to `File_Impl` instead?
 		BUF_SIZE :: 386
 		buf16: [BUF_SIZE]u16
 		buf8: [4*BUF_SIZE]u8
