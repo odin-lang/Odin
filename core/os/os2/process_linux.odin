@@ -325,7 +325,7 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 		cargs[i] = temp_cstring(desc.command[i]) or_return
 	}
 
-	// Use current process's environment if description not provided
+	// Use current process' environment if description didn't provide it.
 	env: [^]cstring
 	if desc.env == nil {
 		// take this process's current environment
@@ -354,9 +354,6 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 	if pid, errno = linux.fork(); errno != .NONE {
 		return process, _get_platform_error(errno)
 	}
-
-	READ  :: 0
-	WRITE :: 1
 
 	STDIN  :: linux.Fd(0)
 	STDOUT :: linux.Fd(1)
