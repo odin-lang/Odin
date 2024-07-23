@@ -47,7 +47,7 @@ xor_bytes_ctr :: proc(ctx: ^Context_CTR, dst, src: []byte) {
 		panic("crypto/aes: dst and src alias inexactly")
 	}
 
-	for remaining := len(src); remaining > 0; {
+	#no_bounds_check for remaining := len(src); remaining > 0; {
 		// Process multiple blocks at once
 		if ctx._off == BLOCK_SIZE {
 			if nr_blocks := remaining / BLOCK_SIZE; nr_blocks > 0 {
@@ -85,7 +85,7 @@ keystream_bytes_ctr :: proc(ctx: ^Context_CTR, dst: []byte) {
 	assert(ctx._is_initialized)
 
 	dst := dst
-	for remaining := len(dst); remaining > 0; {
+	#no_bounds_check for remaining := len(dst); remaining > 0; {
 		// Process multiple blocks at once
 		if ctx._off == BLOCK_SIZE {
 			if nr_blocks := remaining / BLOCK_SIZE; nr_blocks > 0 {

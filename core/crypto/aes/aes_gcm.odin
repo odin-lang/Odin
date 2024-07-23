@@ -112,7 +112,7 @@ open_gcm :: proc(ctx: ^Context_GCM, dst, nonce, aad, ciphertext, tag: []byte) ->
 	return ok
 }
 
-// reset_ctr sanitizes the Context_GCM.  The Context_GCM must be
+// reset_gcm sanitizes the Context_GCM.  The Context_GCM must be
 // re-initialized to be used again.
 reset_gcm :: proc "contextless" (ctx: ^Context_GCM) {
 	reset_impl(&ctx._impl)
