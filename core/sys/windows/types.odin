@@ -2209,7 +2209,7 @@ FILE_TYPE_PIPE :: 0x0003
 RECT  :: struct {left, top, right, bottom: LONG}
 POINT :: struct {x, y: LONG}
 
-PWINDOWPOS :: ^WINDOWPOS;
+PWINDOWPOS :: ^WINDOWPOS
 WINDOWPOS :: struct {
 	hwnd: HWND,
 	hwndInsertAfter: HWND,
