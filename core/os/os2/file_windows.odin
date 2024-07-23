@@ -723,25 +723,6 @@ _exists :: proc(path: string) -> bool {
 	return attribs != win32.INVALID_FILE_ATTRIBUTES
 }
 
-_is_file :: proc(path: string) -> bool {
-	wpath := _fix_long_path(path)
-	attribs := win32.GetFileAttributesW(wpath)
-	if attribs != win32.INVALID_FILE_ATTRIBUTES {
-		return attribs & win32.FILE_ATTRIBUTE_DIRECTORY == 0
-	}
-	return false
-}
-
-_is_dir :: proc(path: string) -> bool {
-	wpath := _fix_long_path(path)
-	attribs := win32.GetFileAttributesW(wpath)
-	if attribs != win32.INVALID_FILE_ATTRIBUTES {
-		return attribs & win32.FILE_ATTRIBUTE_DIRECTORY != 0
-	}
-	return false
-}
-
-
 @(private="package")
 _file_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, offset: i64, whence: io.Seek_From) -> (n: i64, err: io.Error) {
 	f := (^File_Impl)(stream_data)

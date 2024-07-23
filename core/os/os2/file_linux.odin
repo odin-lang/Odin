@@ -219,15 +219,24 @@ _truncate :: proc(f: ^File, size: i64) -> Error {
 }
 
 _remove :: proc(name: string) -> Error {
+	is_dir_fd :: proc(fd: linux.Fd) -> bool {
+		s: linux.Stat
+		if linux.fstat(fd, &s) != .NONE {
+			return false
+		}
+		return linux.S_ISDIR(s.mode)
+	}
+
 	TEMP_ALLOCATOR_GUARD()
 	name_cstr := temp_cstring(name) or_return
 
 	fd, errno := linux.open(name_cstr, {.NOFOLLOW})
 	#partial switch (errno) {
-	case .ELOOP: /* symlink */
+	case .ELOOP:
+		/* symlink */
 	case .NONE:
 		defer linux.close(fd)
-		if _is_dir_fd(fd) {
+		if is_dir_fd(fd) {
 			return _get_platform_error(linux.rmdir(name_cstr))
 		}
 	case:
@@ -362,42 +371,6 @@ _exists :: proc(name: string) -> bool {
 	name_cstr, _ := temp_cstring(name)
 	res, errno := linux.access(name_cstr, linux.F_OK)
 	return !res && errno == .NONE
-}
-
-_is_file :: proc(name: string) -> bool {
-	TEMP_ALLOCATOR_GUARD()
-	name_cstr, _ := temp_cstring(name)
-	s: linux.Stat
-	if linux.stat(name_cstr, &s) != .NONE {
-		return false
-	}
-	return linux.S_ISREG(s.mode)
-}
-
-_is_file_fd :: proc(fd: linux.Fd) -> bool {
-	s: linux.Stat
-	if linux.fstat(fd, &s) != .NONE {
-		return false
-	}
-	return linux.S_ISREG(s.mode)
-}
-
-_is_dir :: proc(name: string) -> bool {
-	TEMP_ALLOCATOR_GUARD()
-	name_cstr, _ := temp_cstring(name)
-	s: linux.Stat
-	if linux.stat(name_cstr, &s) != .NONE {
-		return false
-	}
-	return linux.S_ISDIR(s.mode)
-}
-
-_is_dir_fd :: proc(fd: linux.Fd) -> bool {
-	s: linux.Stat
-	if linux.fstat(fd, &s) != .NONE {
-		return false
-	}
-	return linux.S_ISDIR(s.mode)
 }
 
 /* Certain files in the Linux file system are not actual

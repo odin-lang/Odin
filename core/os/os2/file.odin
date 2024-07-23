@@ -267,14 +267,24 @@ exists :: proc(path: string) -> bool {
 
 @(require_results)
 is_file :: proc(path: string) -> bool {
-	return _is_file(path)
+	TEMP_ALLOCATOR_GUARD()
+	fi, err := stat(path, temp_allocator())
+	if err != nil {
+		return false
+	}
+	return fi.type == .Regular
 }
 
 is_dir :: is_directory
 
 @(require_results)
 is_directory :: proc(path: string) -> bool {
-	return _is_dir(path)
+	TEMP_ALLOCATOR_GUARD()
+	fi, err := stat(path, temp_allocator())
+	if err != nil {
+		return false
+	}
+	return fi.type == .Directory
 }
 
 

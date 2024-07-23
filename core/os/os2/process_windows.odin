@@ -1,4 +1,3 @@
-//+build windows
 //+private file
 package os2
 

@@ -19,15 +19,15 @@ _fstat_internal :: proc(fd: linux.Fd, allocator: runtime.Allocator) -> (File_Inf
 	}
 	type := File_Type.Regular
 	switch s.mode & linux.S_IFMT {
-		case linux.S_IFBLK: type = .Block_Device
-		case linux.S_IFCHR: type = .Character_Device
-		case linux.S_IFDIR: type = .Directory
-		case linux.S_IFIFO: type = .Named_Pipe
-		case linux.S_IFLNK: type = .Symlink
-		case linux.S_IFREG: type = .Regular
-		case linux.S_IFSOCK: type = .Socket 
+	case linux.S_IFBLK:  type = .Block_Device
+	case linux.S_IFCHR:  type = .Character_Device
+	case linux.S_IFDIR:  type = .Directory
+	case linux.S_IFIFO:  type = .Named_Pipe
+	case linux.S_IFLNK:  type = .Symlink
+	case linux.S_IFREG:  type = .Regular
+	case linux.S_IFSOCK: type = .Socket
 	}
-	mode := int(s.mode) & 0o7777
+	mode := int(0o7777 & transmute(u32)s.mode)
 	// TODO: As of Linux 4.11, the new statx syscall can retrieve creation_time
 	fi := File_Info {
 		fullpath = _get_full_path(fd, allocator),
