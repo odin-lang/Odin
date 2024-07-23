@@ -6,41 +6,32 @@ import "core:time"
 import "base:runtime"
 import "core:sys/linux"
 
+File_Impl_Kind :: enum u8 {
+	File,
+	Pipe,
+}
+
 File_Impl :: struct {
 	file: File,
 	name: string,
 	fd: linux.Fd,
+	kind: File_Impl_Kind,
 	allocator: runtime.Allocator,
 }
 
 _stdin := File{
-	impl = &File_Impl{
-		name = "/proc/self/fd/0",
-		fd = 0,
-		allocator = _file_allocator(),
-	},
 	stream = {
 		procedure = _file_stream_proc,
 	},
 	fstat = _fstat,
 }
 _stdout := File{
-	impl = &File_Impl{
-		name = "/proc/self/fd/1",
-		fd = 1,
-		allocator = _file_allocator(),
-	},
 	stream = {
 		procedure = _file_stream_proc,
 	},
 	fstat = _fstat,
 }
 _stderr := File{
-	impl = &File_Impl{
-		name = "/proc/self/fd/2",
-		fd = 2,
-		allocator = _file_allocator(),
-	},
 	stream = {
 		procedure = _file_stream_proc,
 	},
@@ -49,10 +40,33 @@ _stderr := File{
 
 @init
 _standard_stream_init :: proc() {
-	// cannot define these manually because cyclic reference
-	_stdin.stream.data = &_stdin
-	_stdout.stream.data = &_stdout
-	_stderr.stream.data = &_stderr
+	@static stdin_impl := File_Impl {
+		name = "/proc/self/fd/0",
+		fd = 0,
+	}
+
+	@static stdout_impl := File_Impl {
+		name = "/proc/self/fd/1",
+		fd = 1,
+	}
+
+	@static stderr_impl := File_Impl {
+		name = "/proc/self/fd/2",
+		fd = 2,
+	}
+
+	stdin_impl.allocator  = _file_allocator()
+	stdout_impl.allocator = _file_allocator()
+	stderr_impl.allocator = _file_allocator()
+
+	_stdin.impl  = &stdin_impl
+	_stdout.impl = &stdout_impl
+	_stderr.impl = &stderr_impl
+
+	// cannot define these initially because cyclic reference
+	_stdin.stream.data  = &stdin_impl
+	_stdout.stream.data = &stdout_impl
+	_stderr.stream.data = &stderr_impl
 
 	stdin  = &_stdin
 	stdout = &_stdout
@@ -196,6 +210,12 @@ _write_at :: proc(f: ^File_Impl, p: []byte, offset: i64) -> (i64, Error) {
 }
 
 _file_size :: proc(f: ^File_Impl) -> (n: i64, err: Error) {
+	if f.kind == .Pipe {
+		return 0, .No_Size
+	}
+	// TODO: Identify 0-sized "pseudo" files and return No_Size. This would
+	//       eliminate the need for the _read_entire_pseudo_file procs.
+
 	s: linux.Stat = ---
 	errno := linux.fstat(f.fd, &s)
 	if errno != .NONE {
@@ -373,17 +393,13 @@ _exists :: proc(name: string) -> bool {
 	return !res && errno == .NONE
 }
 
-/* Certain files in the Linux file system are not actual
- * files (e.g. everything in /proc/). Therefore, the
- * read_entire_file procs fail to actually read anything
- * since these "files" stat to a size of 0.  Here, we just
- * read until there is nothing left.
- */
+/* For reading Linux system files that stat to size 0 */
 _read_entire_pseudo_file :: proc { _read_entire_pseudo_file_string, _read_entire_pseudo_file_cstring }
 
 _read_entire_pseudo_file_string :: proc(name: string, allocator: runtime.Allocator) -> (b: []u8, e: Error) {
-	name_cstr := clone_to_cstring(name, allocator) or_return
-	defer delete(name, allocator)
+	TEMP_ALLOCATOR_GUARD()
+	name_cstr := clone_to_cstring(name, temp_allocator()) or_return
+	defer delete(name, temp_allocator())
 	return _read_entire_pseudo_file_cstring(name_cstr, allocator)
 }
 
@@ -413,7 +429,6 @@ _read_entire_pseudo_file_cstring :: proc(name: cstring, allocator: runtime.Alloc
 	}
 
 	resize(&contents, i + n)
-
 	return contents[:], nil
 }
 

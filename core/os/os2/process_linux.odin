@@ -1,68 +1,269 @@
+//+build linux
 //+private file
 package os2
 
 import "base:runtime"
+
+import "core:fmt"
+import "core:mem"
 import "core:time"
+import "core:strings"
+import "core:strconv"
 import "core:sys/linux"
+import "core:path/filepath"
+
+PIDFD_UNASSIGNED  :: ~uintptr(0)
+
+_has_pidfd_open: bool = true // pidfd is still fairly new (Linux 5.3)
 
 @(private="package")
 _exit :: proc "contextless" (code: int) -> ! {
-	linux.exit(i32(code))
+	linux.exit_group(i32(code))
 }
-
 
 @(private="package")
 _get_uid :: proc() -> int {
-	return -1
+	return int(linux.getuid())
 }
 
 @(private="package")
 _get_euid :: proc() -> int {
-	return -1
+	return int(linux.geteuid())
 }
 
 @(private="package")
 _get_gid :: proc() -> int {
-	return -1
+	return int(linux.getgid())
 }
 
 @(private="package")
 _get_egid :: proc() -> int {
-	return -1
+	return int(linux.getegid())
 }
 
 @(private="package")
 _get_pid :: proc() -> int {
-	return -1
+	return int(linux.getpid())
 }
 
 @(private="package")
 _get_ppid :: proc() -> int {
-	return -1
+	return int(linux.getppid())
 }
 
 @(private="package")
-_process_list :: proc(allocator: runtime.Allocator) -> (list: []int, err: Error) {
-	return
+_process_list :: proc(allocator: runtime.Allocator) -> ([]int, Error) {
+	TEMP_ALLOCATOR_GUARD()
+
+	dir_fd: linux.Fd
+	errno:  linux.Errno
+	#partial switch dir_fd, errno = linux.open("/proc/", _OPENDIR_FLAGS); errno {
+	case .ENOTDIR:
+		return {}, .Invalid_Dir
+	case .ENOENT:
+		return {}, .Not_Exist
+	}
+	defer linux.close(dir_fd)
+
+	dynamic_list := make([dynamic]int, allocator)
+
+	buf := make([dynamic]u8, 128, 128, temp_allocator())
+	loop: for {
+		buflen: int
+		buflen, errno = linux.getdents(dir_fd, buf[:])
+		#partial switch errno {
+		case .EINVAL:
+			resize(&buf, len(buf) * 2)
+			continue loop
+		case .NONE:
+			if buflen == 0 { break loop }
+		case:
+			return {}, _get_platform_error(errno)
+		}
+
+		d: ^dirent64
+
+		for i := 0; i < buflen; i += int(d.d_reclen) {
+			d = (^dirent64)(rawptr(&buf[i]))
+			d_name_cstr := cstring(&d.d_name[0])
+			#no_bounds_check d_name_str := string(d.d_name[:len(d_name_cstr)])
+
+			if pid, ok := strconv.parse_int(d_name_str); ok {
+				append(&dynamic_list, pid)
+			}
+		}
+	}
+
+	return dynamic_list[:], nil
 }
 
 @(private="package")
 _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator: runtime.Allocator) -> (info: Process_Info, err: Error) {
+	TEMP_ALLOCATOR_GUARD()
+
+	info.fields = selection
+
+	// Use this so we can use bprintf to make cstrings with less copying
+	path_backing: [48]u8
+	path_slice := path_backing[:len(path_backing) - 1]
+	path_cstr := cstring(&path_slice[0])
+
+	_ = fmt.bprintf(path_slice, "/proc/%d", pid)
+	proc_fd, errno := linux.open(path_cstr, _OPENDIR_FLAGS)
+	if errno != .NONE {
+		err = _get_platform_error(errno)
+		return
+	}
+	defer linux.close(proc_fd)
+
+	if .Username in selection {
+		s: linux.Stat
+		linux.fstat(proc_fd, &s)
+
+		passwd_bytes := read_entire_file("/etc/passwd", temp_allocator()) or_return
+		passwd := string(passwd_bytes)
+		for len(passwd) > 0 {
+			n := strings.index_byte(passwd, ':')
+			if n == -1 {
+				break
+			}
+			username := passwd[:n]
+			passwd = passwd[:n+1]
+
+			// skip password field
+			passwd = passwd[:strings.index_byte(passwd, ':') + 1]
+
+			n = strings.index_byte(passwd, ':')
+			username = passwd
+			if uid, ok := strconv.parse_int(passwd[:n]); ok && uid == int(s.uid) {
+				info.username = strings.clone(username, allocator)
+				break
+			}
+
+			eol := strings.index_byte(passwd, '\n')
+			if eol == -1 {
+				break
+			}
+			passwd = passwd[eol + 1:]
+		}
+	}
+
+	if .Executable_Path in selection {
+		_ = fmt.bprintf(path_slice, "/proc/%d/exe", pid)
+		info.executable_path = _read_link_cstr(path_cstr, allocator) or_return
+	}
+
+	if .Working_Dir in selection {
+		_ = fmt.bprintf(path_slice, "/proc/%d/cwd", pid)
+		info.working_dir = _read_link_cstr(path_cstr, allocator) or_return
+	}
+
+	stat_if: if selection & {.PPid, .Priority} != {} {
+		_ = fmt.bprintf(path_slice, "/proc/%d/stat", pid)
+		proc_stat_bytes := _read_entire_pseudo_file(path_cstr, temp_allocator()) or_return
+		if len(proc_stat_bytes) <= 0 {
+			break stat_if
+		}
+
+		start := strings.last_index_byte(string(proc_stat_bytes), ')')
+		stats := string(proc_stat_bytes[start + 2:])
+
+		// We are now on the 3rd field (skip)
+		stats = stats[strings.index_byte(stats, ' ') + 1:]
+
+		if .PPid in selection {
+			ppid_str := stats[:strings.index_byte(stats, ' ')]
+			if ppid, ok := strconv.parse_int(ppid_str); ok {
+				info.ppid = ppid
+			}
+		}
+
+		if .Priority in selection {
+			// On 4th field. Priority is field 18 and niceness is field 19.
+			for i := 4; i < 19; i += 1 {
+				stats = stats[strings.index_byte(stats, ' ') + 1:]
+			}
+			nice_str := stats[:strings.index_byte(stats, ' ')]
+			if nice, ok := strconv.parse_int(nice_str); ok {
+				info.priority = nice
+			}
+		}
+	}
+
+	cmdline_if: if selection & {.Command_Line, .Command_Args} != {} {
+		_ = fmt.bprintf(path_slice, "/proc/%d/cmdline")
+		cmdline_bytes := _read_entire_pseudo_file(path_cstr, temp_allocator()) or_return
+		if len(cmdline_bytes) == 0 {
+			break cmdline_if
+		}
+		cmdline := string(cmdline_bytes)
+
+		terminator := strings.index_byte(cmdline, 0)
+		if .Command_Line in selection {
+			info.command_line = strings.clone(cmdline[:terminator], allocator)
+		}
+
+		if .Command_Args in selection {
+			// skip to first arg
+			cmdline = cmdline[terminator + 1:]
+
+			arg_list := make([dynamic]string, allocator)
+			for len(cmdline) > 0 {
+				terminator = strings.index_byte(cmdline, 0)
+				append(&arg_list, strings.clone(cmdline[:terminator], allocator))
+				cmdline = cmdline[terminator + 1:]
+			}
+			info.command_args = arg_list[:]
+		}
+	}
+
+	if .Environment in selection {
+		_ = fmt.bprintf(path_slice, "/proc/%d/environ", pid)
+		env_bytes := _read_entire_pseudo_file(path_cstr, temp_allocator()) or_return
+		env := string(env_bytes)
+
+		env_list := make([dynamic]string, allocator)
+		for len(env) > 0 {
+			terminator := strings.index_byte(env, 0)
+			if terminator == -1 || terminator == 0 {
+				break
+			}
+			append(&env_list, strings.clone(env[:terminator], allocator))
+			env = env[:terminator + 1]
+		}
+	}
+
 	return
 }
 
 @(private="package")
 _process_info_by_handle :: proc(process: Process, selection: Process_Info_Fields, allocator: runtime.Allocator) -> (info: Process_Info, err: Error) {
-	return
+	return _process_info_by_pid(process.pid, selection, allocator)
 }
 
 @(private="package")
 _current_process_info :: proc(selection: Process_Info_Fields, allocator: runtime.Allocator) -> (info: Process_Info, err: Error) {
-	return
+	return _process_info_by_pid(get_pid(), selection, allocator)
 }
 
 @(private="package")
-_process_open :: proc(pid: int, flags: Process_Open_Flags) -> (process: Process, err: Error) {
+_process_open :: proc(pid: int, _: Process_Open_Flags) -> (process: Process, err: Error) {
+	process.pid = pid
+	process.handle = PIDFD_UNASSIGNED
+	if !_has_pidfd_open {
+		return process, .Unsupported
+	}
+
+	pidfd, errno := linux.pidfd_open(linux.Pid(pid), {})
+	if errno == .ENOSYS {
+		_has_pidfd_open = false
+		return process, .Unsupported
+	}
+	if errno != nil {
+		return process, _get_platform_error(errno)
+	}
+
+	process.handle = uintptr(pidfd)
 	return
 }
 
@@ -71,25 +272,304 @@ _Sys_Process_Attributes :: struct {}
 
 @(private="package")
 _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
+	TEMP_ALLOCATOR_GUARD()
+
+	if len(desc.command) == 0 {
+		return process, .Invalid_File
+	}
+
+	dir_fd := linux.AT_FDCWD
+	errno: linux.Errno
+	if desc.working_dir != "" {
+		dir_cstr := temp_cstring(desc.working_dir) or_return
+		if dir_fd, errno = linux.open(dir_cstr, _OPENDIR_FLAGS); errno != .NONE {
+			return process, _get_platform_error(errno)
+		}
+	}
+
+	// search PATH if just a plain name is provided
+	executable_name := desc.command[0]
+	executable_path: cstring
+	if !strings.contains_rune(executable_name, '/') {
+		path_env := get_env("PATH", temp_allocator())
+		path_dirs := filepath.split_list(path_env, temp_allocator())
+		found: bool
+		for dir in path_dirs {
+			executable_path = ctprintf("%s/%s", dir, executable_name)
+			fail: bool
+			if fail, errno = linux.faccessat(dir_fd, executable_path, linux.F_OK); errno == .NONE && !fail {
+				found = true
+				break
+			}
+		}
+		if !found {
+			// check in cwd to match windows behavior
+			executable_path = ctprintf("./%s", name)
+			fail: bool
+			if fail, errno = linux.faccessat(dir_fd, executable_path, linux.F_OK); errno != .NONE || fail {
+				return process, .Not_Exist
+			}
+		}
+	} else {
+		executable_path = temp_cstring(executable_name) or_return
+	}
+
+	not_exec: bool
+	if not_exec, errno = linux.faccessat(dir_fd, executable_path, linux.F_OK | linux.X_OK); errno != .NONE || not_exec {
+		return process, errno == .NONE ? .Permission_Denied : _get_platform_error(errno)
+	}
+
+	// args and environment need to be a list of cstrings
+	// that are terminated by a nil pointer.
+	cargs := make([]cstring, len(desc.command) + 1, temp_allocator())
+	for i := 0; i < len(desc.command); i += 1{
+		cargs[i] = temp_cstring(desc.command[i]) or_return
+	}
+
+	// Use current process's environment if descibutes not provided
+	env: [^]cstring
+	if desc.env == nil {
+		// take this process's current environment
+		env = raw_data(export_cstring_environment(temp_allocator()))
+	} else {
+		cenv := make([]cstring, len(desc.env) + 1, temp_allocator())
+		for i := 0; i < len(desc.env); i += 1 {
+			cenv[i] = temp_cstring(desc.env[i]) or_return
+		}
+		env = &cenv[0]
+	}
+
+	// TODO: This is the traditional textbook implementation with fork.
+	//       A more efficient implementation with vfork:
+	//
+	//       1. retrieve signal handlers
+	//       2. block all signals
+	//       3. allocate some stack space
+	//       4. vfork (waits for child exit or execve); In child:
+	//           a. set child signal handlers
+	//           b. set up any necessary pipes
+	//           c. execve
+	//       5. restore signal handlers
+	//
+	pid: linux.Pid
+	if pid, errno = linux.fork(); errno != .NONE {
+		return process, _get_platform_error(errno)
+	}
+
+	READ  :: 0
+	WRITE :: 1
+
+	STDIN  :: linux.Fd(0)
+	STDOUT :: linux.Fd(1)
+	STDERR :: linux.Fd(2)
+
+	if pid == 0 {
+		// in child process now
+		if desc.stdin != nil {
+			fd := linux.Fd(fd(desc.stdin))
+			if _, errno = linux.dup2(fd, STDIN); errno != .NONE {
+				linux.exit(1)
+			}
+		}
+		if desc.stdout != nil {
+			fd := linux.Fd(fd(desc.stdout))
+			if _, errno = linux.dup2(fd, STDOUT); errno != .NONE {
+				linux.exit(1)
+			}
+		}
+		if desc.stderr != nil {
+			fd := linux.Fd(fd(desc.stderr))
+			if _, errno = linux.dup2(fd, STDERR); errno != .NONE {
+				linux.exit(1)
+			}
+		}
+
+		if errno = linux.execveat(dir_fd, executable_path, &cargs[0], env); errno != .NONE {
+			print_error(stderr, _get_platform_error(errno), string(executable_path))
+			panic("execve failed to replace process")
+		}
+		unreachable()
+	}
+
+	process.pid = int(pid)
+	process.handle = PIDFD_UNASSIGNED
+	return
+}
+
+_process_state_update_times :: proc(p: Process, state: ^Process_State) -> (err: Error) {
+	TEMP_ALLOCATOR_GUARD()
+
+	stat_path_buf: [32]u8
+	_ = fmt.bprintf(stat_path_buf[:], "/proc/%d/stat", p.pid)
+	stat_buf: []u8
+	stat_buf, err = _read_entire_pseudo_file(cstring(&stat_path_buf[0]), temp_allocator())
+	if err != nil {
+		return
+	}
+
+	// ')' will be the end of the executable name (item 2)
+	idx := strings.last_index_byte(string(stat_buf), ')')
+	stats := string(stat_buf[idx + 2:])
+
+	// utime and stime are the 14 and 15th items, respectively, and we are
+	// currently on item 3. Skip 11 items here.
+	for i := 0; i < 11; i += 1 {
+		stats = stats[strings.index_byte(stats, ' ') + 1:]
+	}
+
+	idx = strings.index_byte(stats, ' ')
+	utime_str := stats[:idx]
+
+	stats = stats[idx + 1:]
+	stime_str := stats[:strings.index_byte(stats, ' ')]
+
+	utime, _ := strconv.parse_int(utime_str, 10)
+	stime, _ := strconv.parse_int(stime_str, 10)
+
+	// NOTE: Assuming HZ of 100, 1 jiffy == 10 ms
+	state.user_time = time.Duration(utime) * 10 * time.Millisecond
+	state.system_time = time.Duration(stime) * 10 * time.Millisecond
+
 	return
 }
 
 @(private="package")
 _process_wait :: proc(process: Process, timeout: time.Duration) -> (process_state: Process_State, err: Error) {
+	process_state.pid = process.pid
+
+	options: linux.Wait_Options
+	big_if: if timeout == 0 {
+		options += {.WNOHANG}
+	} else if timeout > 0 {
+		ts: linux.Time_Spec = {
+			time_sec  = uint(timeout / time.Second),
+			time_nsec = uint(timeout % time.Second),
+		}
+
+		// pidfd_open is fairly new, so don't error out on ENOSYS
+		pid_fd: linux.Pid_FD
+		errno: linux.Errno
+		if _has_pidfd_open {
+			if process.handle == PIDFD_UNASSIGNED {
+				pid_fd, errno = linux.pidfd_open(linux.Pid(process.pid), nil)
+				if errno != .NONE && errno != .ENOSYS {
+					return process_state, _get_platform_error(errno)
+				}
+			} else {
+				pid_fd = linux.Pid_FD(process.handle)
+			}
+		}
+
+		if errno != .ENOSYS {
+			defer if process.handle == PIDFD_UNASSIGNED {
+				linux.close(linux.Fd(pid_fd))
+			}
+			pollfd: [1]linux.Poll_Fd = {
+				{
+					fd = linux.Fd(pid_fd),
+					events = {.IN},
+				},
+			}
+			for {
+				n, e := linux.ppoll(pollfd[:], &ts, nil)
+				if e == .EINTR {
+					continue
+				}
+				if e != .NONE {
+					return process_state, _get_platform_error(errno)
+				}
+				if n == 0 {
+					_process_state_update_times(process, &process_state)
+					return
+				}
+				break
+			}
+		} else {
+			mask: bit_set[0..=63]
+			mask += { int(linux.Signal.SIGCHLD) - 1 }
+
+			org_sigset: linux.Sig_Set
+			sigset: linux.Sig_Set
+			mem.copy(&sigset, &mask, size_of(mask))
+			errno = linux.rt_sigprocmask(.SIG_BLOCK, &sigset, &org_sigset)
+			if errno != .NONE {
+				return process_state, _get_platform_error(errno)
+			}
+			defer linux.rt_sigprocmask(.SIG_SETMASK, &org_sigset, nil)
+
+			// In case there was a signal handler on SIGCHLD, avoid race
+			// condition by checking wait first.
+			options += {.WNOHANG}
+			waitid_options := options + {.WNOWAIT, .WEXITED}
+			info: linux.Sig_Info
+			errno = linux.waitid(.PID, linux.Id(process.pid), &info, waitid_options, nil)
+			if errno == .NONE && info.code != 0 {
+				break big_if
+			}
+
+			loop: for {
+				sigset = {}
+				mem.copy(&sigset, &mask, size_of(mask))
+
+				_, errno = linux.rt_sigtimedwait(&sigset, &info, &ts)
+				#partial switch errno {
+				case .EAGAIN: // timeout
+					_process_state_update_times(process, &process_state)
+					return
+				case .EINVAL:
+					return process_state, _get_platform_error(errno)
+				case .EINTR:
+					continue
+				case:
+					if info.pid == linux.Pid(process.pid) {
+						break loop
+					}
+				}
+			}
+		}
+	}
+
+	status: u32
+	errno: linux.Errno = .EINTR
+	for errno == .EINTR {
+		_, errno = linux.wait4(linux.Pid(process.pid), &status, options, nil)
+		if errno != .NONE {
+			_process_state_update_times(process, &process_state)
+			return process_state, _get_platform_error(errno)
+		}
+	}
+
+	_process_state_update_times(process, &process_state)
+
+	// terminated by exit
+	if linux.WIFEXITED(status) {
+		process_state.exited = true
+		process_state.exit_code = int(linux.WEXITSTATUS(status))
+		process_state.success = process_state.exit_code == 0
+		return
+	}
+
+	// terminated by signal
+	if linux.WIFSIGNALED(status) {
+		process_state.exited = false
+		process_state.exit_code = int(linux.WTERMSIG(status))
+		process_state.success = false
+		return
+	}
 	return
 }
 
 @(private="package")
 _process_close :: proc(process: Process) -> Error {
-	return nil
+	pidfd := linux.Fd(process.handle)
+	if pidfd < 0 {
+		return nil
+	}
+	return _get_platform_error(linux.close(pidfd))
 }
 
 @(private="package")
 _process_kill :: proc(process: Process) -> Error {
-	return nil
+	return _get_platform_error(linux.kill(linux.Pid(process.pid), .SIGKILL))
 }
 
-@(private="package")
-_process_exe_by_pid :: proc(pid: int, allocator: runtime.Allocator) -> (exe_path: string, err: Error) {
-	return
-}
