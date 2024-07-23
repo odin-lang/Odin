@@ -47,10 +47,8 @@ _mkdir_all :: proc(path: string, perm: int) -> Error {
 			// skip consecutive '/'
 			for i += 1; i < len(path) && path[i] == '/'; i += 1 {}
 			return mkdirat(new_dfd, path[i:], perm, has_created)
-		case:
-			return _get_platform_error(errno)
 		}
-		unreachable()
+		return _get_platform_error(errno)
 	}
 	TEMP_ALLOCATOR_GUARD()
 	// need something we can edit, and use to generate cstrings
@@ -74,11 +72,7 @@ _mkdir_all :: proc(path: string, perm: int) -> Error {
 	
 	has_created: bool
 	mkdirat(dfd, path_bytes, perm, &has_created) or_return
-	if has_created {
-		return nil
-	}
-	return .Exist
-	//return has_created ? nil : .Exist
+	return nil if has_created else .Exist
 }
 
 dirent64 :: struct {

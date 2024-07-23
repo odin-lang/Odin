@@ -156,7 +156,7 @@ _read :: proc(f: ^File_Impl, p: []byte) -> (i64, Error) {
 	if errno != .NONE {
 		return -1, _get_platform_error(errno)
 	}
-	return i64(n), n == 0 ? io.Error.EOF : nil
+	return i64(n), io.Error.EOF if n == 0 else nil
 }
 
 _read_at :: proc(f: ^File_Impl, p: []byte, offset: i64) -> (i64, Error) {
