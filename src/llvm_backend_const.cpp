@@ -365,7 +365,11 @@ gb_internal lbValue lb_emit_source_code_location_as_global(lbProcedure *p, Ast *
 
 
 
-gb_internal LLVMValueRef lb_build_constant_array_values(lbModule *m, Type *type, Type *elem_type, isize count, LLVMValueRef *values, bool allow_local) {
+gb_internal LLVMValueRef lb_build_constant_array_values(lbModule *m, Type *type, Type *elem_type, isize count, LLVMValueRef *values, bool allow_local, bool is_rodata) {
+	if (allow_local) {
+		is_rodata = false;
+	}
+
 	bool is_local = allow_local && m->curr_procedure != nullptr;
 	bool is_const = true;
 	if (is_local) {
@@ -471,6 +475,10 @@ gb_internal bool lb_is_nested_possibly_constant(Type *ft, Selection const &sel, 
 }
 
 gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_local, bool is_rodata) {
+	if (allow_local) {
+		is_rodata = false;
+	}
+
 	LLVMContextRef ctx = m->ctx;
 
 	type = default_type(type);
@@ -528,7 +536,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bo
 			count = gb_max(cast(isize)cl->max_count, count);
 			Type *elem = base_type(type)->Slice.elem;
 			Type *t = alloc_type_array(elem, count);
-			lbValue backing_array = lb_const_value(m, t, value, allow_local);
+			lbValue backing_array = lb_const_value(m, t, value, allow_local, is_rodata);
 
 			LLVMValueRef array_data = nullptr;
 
@@ -616,7 +624,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bo
 		}
 		// NOTE(bill, 2021-10-07): Allow for array programming value constants
 		Type *core_elem = core_array_type(type);
-		return lb_const_value(m, core_elem, value, allow_local);		
+		return lb_const_value(m, core_elem, value, allow_local, is_rodata);
 	} else if (is_type_u8_array(type) && value.kind == ExactValue_String) {
 		GB_ASSERT(type->Array.count == value.value_string.len);
 		LLVMValueRef data = LLVMConstStringInContext(ctx,
@@ -634,7 +642,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bo
 		Type *elem = type->Array.elem;
 
 
-		lbValue single_elem = lb_const_value(m, elem, value, allow_local);
+		lbValue single_elem = lb_const_value(m, elem, value, allow_local, is_rodata);
 
 		LLVMValueRef *elems = gb_alloc_array(permanent_allocator(), LLVMValueRef, cast(isize)count);
 		for (i64 i = 0; i < count; i++) {
@@ -652,7 +660,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bo
 		
 		Type *elem = type->Matrix.elem;
 		
-		lbValue single_elem = lb_const_value(m, elem, value, allow_local);
+		lbValue single_elem = lb_const_value(m, elem, value, allow_local, is_rodata);
 		single_elem.value = llvm_const_cast(single_elem.value, lb_type(m, elem));
 				
 		i64 total_elem_count = matrix_type_total_internal_elems(type);
@@ -674,7 +682,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bo
 		i64 count = type->SimdVector.count;
 		Type *elem = type->SimdVector.elem;
 
-		lbValue single_elem = lb_const_value(m, elem, value, allow_local);
+		lbValue single_elem = lb_const_value(m, elem, value, allow_local, is_rodata);
 		single_elem.value = llvm_const_cast(single_elem.value, lb_type(m, elem));
 
 		LLVMValueRef *elems = gb_alloc_array(permanent_allocator(), LLVMValueRef, count);
@@ -803,7 +811,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bo
 
 	case ExactValue_Compound:
 		if (is_type_slice(type)) {
-			return lb_const_value(m, type, value, allow_local);
+			return lb_const_value(m, type, value, allow_local, is_rodata);
 		} else if (is_type_array(type)) {
 			ast_node(cl, CompoundLit, value.value_compound);
 			Type *elem_type = type->Array.elem;
@@ -837,7 +845,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bo
 							}
 							if (lo == i) {
 								TypeAndValue tav = fv->value->tav;
-								LLVMValueRef val = lb_const_value(m, elem_type, tav.value, allow_local).value;
+								LLVMValueRef val = lb_const_value(m, elem_type, tav.value, allow_local, is_rodata).value;
 								for (i64 k = lo; k < hi; k++) {
 									values[value_index++] = val;
 								}
@@ -852,7 +860,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bo
 							i64 index = exact_value_to_i64(index_tav.value);
 							if (index == i) {
 								TypeAndValue tav = fv->value->tav;
-								LLVMValueRef val = lb_const_value(m, elem_type, tav.value, allow_local).value;
+								LLVMValueRef val = lb_const_value(m, elem_type, tav.value, allow_local, is_rodata).value;
 								values[value_index++] = val;
 								found = true;
 								break;
@@ -865,7 +873,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bo
 					}
 				}
 
-				res.value = lb_build_constant_array_values(m, type, elem_type, cast(isize)type->Array.count, values, allow_local);
+				res.value = lb_build_constant_array_values(m, type, elem_type, cast(isize)type->Array.count, values, allow_local, is_rodata);
 				return res;
 			} else {
 				GB_ASSERT_MSG(elem_count == type->Array.count, "%td != %td", elem_count, type->Array.count);
@@ -875,13 +883,13 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bo
 				for (isize i = 0; i < elem_count; i++) {
 					TypeAndValue tav = cl->elems[i]->tav;
 					GB_ASSERT(tav.mode != Addressing_Invalid);
-					values[i] = lb_const_value(m, elem_type, tav.value, allow_local).value;
+					values[i] = lb_const_value(m, elem_type, tav.value, allow_local, is_rodata).value;
 				}
 				for (isize i = elem_count; i < type->Array.count; i++) {
 					values[i] = LLVMConstNull(lb_type(m, elem_type));
 				}
 
-				res.value = lb_build_constant_array_values(m, type, elem_type, cast(isize)type->Array.count, values, allow_local);
+				res.value = lb_build_constant_array_values(m, type, elem_type, cast(isize)type->Array.count, values, allow_local, is_rodata);
 				return res;
 			}
 		} else if (is_type_enumerated_array(type)) {
@@ -921,7 +929,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bo
 							}
 							if (lo == i) {
 								TypeAndValue tav = fv->value->tav;
-								LLVMValueRef val = lb_const_value(m, elem_type, tav.value, allow_local).value;
+								LLVMValueRef val = lb_const_value(m, elem_type, tav.value, allow_local, is_rodata).value;
 								for (i64 k = lo; k < hi; k++) {
 									values[value_index++] = val;
 								}
@@ -936,7 +944,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bo
 							i64 index = exact_value_to_i64(index_tav.value);
 							if (index == i) {
 								TypeAndValue tav = fv->value->tav;
-								LLVMValueRef val = lb_const_value(m, elem_type, tav.value, allow_local).value;
+								LLVMValueRef val = lb_const_value(m, elem_type, tav.value, allow_local, is_rodata).value;
 								values[value_index++] = val;
 								found = true;
 								break;
@@ -949,7 +957,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bo
 					}
 				}
 
-				res.value = lb_build_constant_array_values(m, type, elem_type, cast(isize)type->EnumeratedArray.count, values, allow_local);
+				res.value = lb_build_constant_array_values(m, type, elem_type, cast(isize)type->EnumeratedArray.count, values, allow_local, is_rodata);
 				return res;
 			} else {
 				GB_ASSERT_MSG(elem_count == type->EnumeratedArray.count, "%td != %td", elem_count, type->EnumeratedArray.count);
@@ -959,13 +967,13 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bo
 				for (isize i = 0; i < elem_count; i++) {
 					TypeAndValue tav = cl->elems[i]->tav;
 					GB_ASSERT(tav.mode != Addressing_Invalid);
-					values[i] = lb_const_value(m, elem_type, tav.value, allow_local).value;
+					values[i] = lb_const_value(m, elem_type, tav.value, allow_local, is_rodata).value;
 				}
 				for (isize i = elem_count; i < type->EnumeratedArray.count; i++) {
 					values[i] = LLVMConstNull(lb_type(m, elem_type));
 				}
 
-				res.value = lb_build_constant_array_values(m, type, elem_type, cast(isize)type->EnumeratedArray.count, values, allow_local);
+				res.value = lb_build_constant_array_values(m, type, elem_type, cast(isize)type->EnumeratedArray.count, values, allow_local, is_rodata);
 				return res;
 			}
 		} else if (is_type_simd_vector(type)) {
@@ -1004,7 +1012,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bo
 							}
 							if (lo == i) {
 								TypeAndValue tav = fv->value->tav;
-								LLVMValueRef val = lb_const_value(m, elem_type, tav.value, allow_local).value;
+								LLVMValueRef val = lb_const_value(m, elem_type, tav.value, allow_local, is_rodata).value;
 								for (i64 k = lo; k < hi; k++) {
 									values[value_index++] = val;
 								}
@@ -1019,7 +1027,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bo
 							i64 index = exact_value_to_i64(index_tav.value);
 							if (index == i) {
 								TypeAndValue tav = fv->value->tav;
-								LLVMValueRef val = lb_const_value(m, elem_type, tav.value, allow_local).value;
+								LLVMValueRef val = lb_const_value(m, elem_type, tav.value, allow_local, is_rodata).value;
 								values[value_index++] = val;
 								found = true;
 								break;
@@ -1038,7 +1046,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bo
 				for (isize i = 0; i < elem_count; i++) {
 					TypeAndValue tav = cl->elems[i]->tav;
 					GB_ASSERT(tav.mode != Addressing_Invalid);
-					values[i] = lb_const_value(m, elem_type, tav.value, allow_local).value;
+					values[i] = lb_const_value(m, elem_type, tav.value, allow_local, is_rodata).value;
 				}
 				LLVMTypeRef et = lb_type(m, elem_type);
 
@@ -1087,7 +1095,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bo
 					i32 index = field_remapping[f->Variable.field_index];
 					if (elem_type_can_be_constant(f->type)) {
 						if (sel.index.count == 1) {
-							values[index]  = lb_const_value(m, f->type, tav.value, allow_local).value;
+							values[index]  = lb_const_value(m, f->type, tav.value, allow_local, is_rodata).value;
 							visited[index] = true;
 						} else {
 							if (!visited[index]) {
@@ -1129,7 +1137,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bo
 									}
 								}
 								if (is_constant) {
-									LLVMValueRef elem_value = lb_const_value(m, tav.type, tav.value, allow_local).value;
+									LLVMValueRef elem_value = lb_const_value(m, tav.type, tav.value, allow_local, is_rodata).value;
 									if (LLVMIsConstant(elem_value)) {
 										values[index] = llvm_const_insert_value(m, values[index], elem_value, idx_list, idx_list_len);
 									} else {
@@ -1151,7 +1159,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bo
 
 					i32 index = field_remapping[f->Variable.field_index];
 					if (elem_type_can_be_constant(f->type)) {
-						values[index]  = lb_const_value(m, f->type, val, allow_local).value;
+						values[index]  = lb_const_value(m, f->type, val, allow_local, is_rodata).value;
 						visited[index] = true;
 					}
 				}
@@ -1277,7 +1285,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bo
 						
 						
 						TypeAndValue tav = fv->value->tav;
-						LLVMValueRef val = lb_const_value(m, elem_type, tav.value, allow_local).value;
+						LLVMValueRef val = lb_const_value(m, elem_type, tav.value, allow_local, is_rodata).value;
 						for (i64 k = lo; k < hi; k++) {
 							i64 offset = matrix_row_major_index_to_offset(type, k);
 							GB_ASSERT(values[offset] == nullptr);
@@ -1289,7 +1297,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bo
 						i64 index = exact_value_to_i64(index_tav.value);
 						GB_ASSERT(index < max_count);
 						TypeAndValue tav = fv->value->tav;
-						LLVMValueRef val = lb_const_value(m, elem_type, tav.value, allow_local).value;
+						LLVMValueRef val = lb_const_value(m, elem_type, tav.value, allow_local, is_rodata).value;
 						i64 offset = matrix_row_major_index_to_offset(type, index);
 						GB_ASSERT(values[offset] == nullptr);
 						values[offset] = val;
@@ -1302,7 +1310,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bo
 					}
 				}
 
-				res.value = lb_build_constant_array_values(m, type, elem_type, cast(isize)total_count, values, allow_local);
+				res.value = lb_build_constant_array_values(m, type, elem_type, cast(isize)total_count, values, allow_local, is_rodata);
 				return res;
 			} else {
 				GB_ASSERT_MSG(elem_count == max_count, "%td != %td", elem_count, max_count);
@@ -1313,7 +1321,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bo
 					GB_ASSERT(tav.mode != Addressing_Invalid);
 					i64 offset = 0;
 					offset = matrix_row_major_index_to_offset(type, i);
-					values[offset] = lb_const_value(m, elem_type, tav.value, allow_local).value;
+					values[offset] = lb_const_value(m, elem_type, tav.value, allow_local, is_rodata).value;
 				}
 				for (isize i = 0; i < total_count; i++) {
 					if (values[i] == nullptr) {
@@ -1321,7 +1329,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bo
 					}
 				}
 
-				res.value = lb_build_constant_array_values(m, type, elem_type, cast(isize)total_count, values, allow_local);
+				res.value = lb_build_constant_array_values(m, type, elem_type, cast(isize)total_count, values, allow_local, is_rodata);
 				return res;
 			}
 		} else {
