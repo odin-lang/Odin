@@ -57,7 +57,7 @@ same_file :: proc(fi1, fi2: File_Info) -> bool {
 
 
 last_write_time         :: modification_time
-last_write_time_by_name :: modification_time_by_name
+last_write_time_by_name :: modification_time_by_path
 
 @(require_results)
 modification_time :: proc(f: ^File) -> (time.Time, Error) {
@@ -67,7 +67,7 @@ modification_time :: proc(f: ^File) -> (time.Time, Error) {
 }
 
 @(require_results)
-modification_time_by_name :: proc(path: string) -> (time.Time, Error) {
+modification_time_by_path :: proc(path: string) -> (time.Time, Error) {
 	TEMP_ALLOCATOR_GUARD()
 	fi, err := stat(path, temp_allocator())
 	return fi.modification_time, err

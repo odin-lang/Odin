@@ -8,7 +8,8 @@ _lookup_env :: proc(key: string, allocator: runtime.Allocator) -> (value: string
 	if key == "" {
 		return
 	}
-	wkey := win32.utf8_to_wstring(key)
+	TEMP_ALLOCATOR_GUARD()
+	wkey, _ := win32_utf8_to_wstring(key, temp_allocator())
 
 	n := win32.GetEnvironmentVariableW(wkey, nil, 0)
 	if n == 0 {
@@ -32,20 +33,22 @@ _lookup_env :: proc(key: string, allocator: runtime.Allocator) -> (value: string
 		return "", false
 	}
 
-	value = win32.utf16_to_utf8(b[:n], allocator) or_else ""
+	value = win32_utf16_to_utf8(b[:n], allocator) or_else ""
 	found = true
 	return
 }
 
 _set_env :: proc(key, value: string) -> bool {
-	k := win32.utf8_to_wstring(key)
-	v := win32.utf8_to_wstring(value)
+	TEMP_ALLOCATOR_GUARD()
+	k, _ := win32_utf8_to_wstring(key,   temp_allocator())
+	v, _ := win32_utf8_to_wstring(value, temp_allocator())
 
 	return bool(win32.SetEnvironmentVariableW(k, v))
 }
 
 _unset_env :: proc(key: string) -> bool {
-	k := win32.utf8_to_wstring(key)
+	TEMP_ALLOCATOR_GUARD()
+	k, _ := win32_utf8_to_wstring(key, temp_allocator())
 	return bool(win32.SetEnvironmentVariableW(k, nil))
 }
 
@@ -89,7 +92,7 @@ _environ :: proc(allocator: runtime.Allocator) -> []string {
 				break
 			}
 			w := ([^]u16)(p)[from:i]
-			append(&r, win32.utf16_to_utf8(w, allocator) or_else "")
+			append(&r, win32_utf16_to_utf8(w, allocator) or_else "")
 			from = i + 1
 		}
 	}

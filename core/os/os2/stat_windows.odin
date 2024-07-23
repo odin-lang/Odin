@@ -49,7 +49,7 @@ full_path_from_name :: proc(name: string, allocator: runtime.Allocator) -> (path
 	}
 	TEMP_ALLOCATOR_GUARD()
 
-	p := win32.utf8_to_utf16(name, temp_allocator())
+	p := win32_utf8_to_utf16(name, temp_allocator()) or_return
 
 	n := win32.GetFullPathNameW(raw_data(p), 0, nil, nil)
 	if n == 0 {
@@ -60,7 +60,7 @@ full_path_from_name :: proc(name: string, allocator: runtime.Allocator) -> (path
 	if n == 0 {
 		return "", _get_platform_error()
 	}
-	return win32.utf16_to_utf8(buf[:n], allocator)
+	return win32_utf16_to_utf8(buf[:n], allocator)
 }
 
 internal_stat :: proc(name: string, create_file_attributes: u32, allocator: runtime.Allocator) -> (fi: File_Info, e: Error) {
@@ -68,7 +68,7 @@ internal_stat :: proc(name: string, create_file_attributes: u32, allocator: runt
 		return {}, .Not_Exist
 	}
 
-	wname := _fix_long_path(name)
+	wname := _fix_long_path(name) or_return
 	fa: win32.WIN32_FILE_ATTRIBUTE_DATA
 	ok := win32.GetFileAttributesExW(wname, win32.GetFileExInfoStandard, &fa)
 	if ok && fa.dwFileAttributes & win32.FILE_ATTRIBUTE_REPARSE_POINT == 0 {
@@ -154,7 +154,7 @@ _cleanpath_from_handle_u16 :: proc(f: ^File) -> ([]u16, Error) {
 _cleanpath_from_buf :: proc(buf: []u16, allocator: runtime.Allocator) -> (string, runtime.Allocator_Error) {
 	buf := buf
 	buf = _cleanpath_strip_prefix(buf)
-	return win32.utf16_to_utf8(buf, allocator)
+	return win32_utf16_to_utf8(buf, allocator)
 }
 
 basename :: proc(name: string) -> (base: string) {

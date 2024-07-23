@@ -61,7 +61,7 @@ _open_internal :: proc(name: string, flags: File_Flags, perm: int) -> (handle: u
 		return
 	}
 
-	path := _fix_long_path(name)
+	path := _fix_long_path(name) or_return
 	access: u32
 	switch flags & {.Read, .Write} {
 	case {.Read}:         access = win32.FILE_GENERIC_READ
@@ -138,7 +138,7 @@ _new_file :: proc(handle: uintptr, name: string) -> ^File {
 	impl.allocator = file_allocator()
 	impl.fd = rawptr(handle)
 	impl.name, _ = clone_string(name, impl.allocator)
-	impl.wname = win32.utf8_to_wstring(name, impl.allocator)
+	impl.wname, _ = win32_utf8_to_wstring(name, impl.allocator)
 
 	handle := _handle(&impl.file)
 	kind := File_Impl_Kind.File
@@ -452,7 +452,7 @@ _truncate :: proc(f: ^File, size: i64) -> Error {
 }
 
 _remove :: proc(name: string) -> Error {
-	p := _fix_long_path(name)
+	p := _fix_long_path(name) or_return
 	err, err1: Error
 	if !win32.DeleteFileW(p) {
 		err = _get_platform_error()
@@ -489,8 +489,8 @@ _remove :: proc(name: string) -> Error {
 }
 
 _rename :: proc(old_path, new_path: string) -> Error {
-	from := _fix_long_path(old_path)
-	to := _fix_long_path(new_path)
+	from := _fix_long_path(old_path) or_return
+	to   := _fix_long_path(new_path) or_return
 	if win32.MoveFileExW(from, to, win32.MOVEFILE_REPLACE_EXISTING) {
 		return nil
 	}
@@ -499,8 +499,8 @@ _rename :: proc(old_path, new_path: string) -> Error {
 }
 
 _link :: proc(old_name, new_name: string) -> Error {
-	o := _fix_long_path(old_name)
-	n := _fix_long_path(new_name)
+	o := _fix_long_path(old_name) or_return
+	n := _fix_long_path(new_name) or_return
 	if win32.CreateHardLinkW(n, o, nil) {
 		return nil
 	}
@@ -540,16 +540,16 @@ _normalize_link_path :: proc(p: []u16, allocator: runtime.Allocator) -> (str: st
 	}
 
 	if !has_unc_prefix(p) {
-		return win32.utf16_to_utf8(p, allocator)
+		return win32_utf16_to_utf8(p, allocator)
 	}
 
 	ws := p[4:]
 	switch {
 	case len(ws) >= 2 && ws[1] == ':':
-		return win32.utf16_to_utf8(ws, allocator)
+		return win32_utf16_to_utf8(ws, allocator)
 	case has_prefix(ws, `UNC\`):
 		ws[3] = '\\' // override data in buffer
-		return win32.utf16_to_utf8(ws[3:], allocator)
+		return win32_utf16_to_utf8(ws[3:], allocator)
 	}
 
 
@@ -574,9 +574,9 @@ _normalize_link_path :: proc(p: []u16, allocator: runtime.Allocator) -> (str: st
 		ws = ws[4:]
 		if len(ws) > 3 && has_prefix(ws, `UNC`) {
 			ws[2] = '\\'
-			return win32.utf16_to_utf8(ws[2:], allocator)
+			return win32_utf16_to_utf8(ws[2:], allocator)
 		}
-		return win32.utf16_to_utf8(ws, allocator)
+		return win32_utf16_to_utf8(ws, allocator)
 	}
 	return "", .Invalid_Path
 }
@@ -587,8 +587,8 @@ _read_link :: proc(name: string, allocator: runtime.Allocator) -> (s: string, er
 	@thread_local
 	rdb_buf: [MAXIMUM_REPARSE_DATA_BUFFER_SIZE]byte
 
-	p := _fix_long_path(name)
-	handle := _open_sym_link(p) or_return
+	p      := _fix_long_path(name) or_return
+	handle := _open_sym_link(p)    or_return
 	defer win32.CloseHandle(handle)
 
 	bytes_returned: u32
@@ -607,7 +607,7 @@ _read_link :: proc(name: string, allocator: runtime.Allocator) -> (s: string, er
 		pb[rb.SubstituteNameOffset+rb.SubstituteNameLength] = 0
 		p := pb[rb.SubstituteNameOffset:][:rb.SubstituteNameLength]
 		if rb.Flags & win32.SYMLINK_FLAG_RELATIVE != 0 {
-			return win32.utf16_to_utf8(p, allocator)
+			return win32_utf16_to_utf8(p, allocator)
 		}
 		return _normalize_link_path(p, allocator)
 
@@ -662,7 +662,7 @@ _fchown :: proc(f: ^File, uid, gid: int) -> Error {
 }
 
 _chdir :: proc(name: string) -> Error {
-	p := _fix_long_path(name)
+	p := _fix_long_path(name) or_return
 	if !win32.SetCurrentDirectoryW(p) {
 		return _get_platform_error()
 	}
@@ -718,7 +718,7 @@ _fchtimes :: proc(f: ^File, atime, mtime: time.Time) -> Error {
 }
 
 _exists :: proc(path: string) -> bool {
-	wpath := _fix_long_path(path)
+	wpath, _ := _fix_long_path(path)
 	attribs := win32.GetFileAttributesW(wpath)
 	return attribs != win32.INVALID_FILE_ATTRIBUTES
 }
@@ -766,3 +766,85 @@ _file_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, 
 	return 0, .Empty
 }
 
+
+
+@(private="package", require_results)
+win32_utf8_to_wstring :: proc(s: string, allocator: runtime.Allocator) -> (ws: [^]u16, err: runtime.Allocator_Error) {
+	ws = raw_data(win32_utf8_to_utf16(s, allocator) or_return)
+	return
+}
+
+@(private="package", require_results)
+win32_utf8_to_utf16 :: proc(s: string, allocator: runtime.Allocator) -> (ws: []u16, err: runtime.Allocator_Error) {
+	if len(s) < 1 {
+		return
+	}
+
+	b := transmute([]byte)s
+	cstr := raw_data(b)
+	n := win32.MultiByteToWideChar(win32.CP_UTF8, win32.MB_ERR_INVALID_CHARS, cstr, i32(len(s)), nil, 0)
+	if n == 0 {
+		return nil, nil
+	}
+
+	text := make([]u16, n+1, allocator) or_return
+
+	n1 := win32.MultiByteToWideChar(win32.CP_UTF8, win32.MB_ERR_INVALID_CHARS, cstr, i32(len(s)), raw_data(text), n)
+	if n1 == 0 {
+		delete(text, allocator)
+		return
+	}
+
+	text[n] = 0
+	for n >= 1 && text[n-1] == 0 {
+		n -= 1
+	}
+	ws = text[:n]
+	return
+}
+
+@(private="package", require_results)
+win32_wstring_to_utf8 :: proc(s: [^]u16, allocator: runtime.Allocator) -> (res: string, err: runtime.Allocator_Error) {
+	if s == nil || s[0] == 0 {
+		return "", nil
+	}
+	n := 0
+	for s[n] != 0 {
+		n += 1
+	}
+	return win32_utf16_to_utf8(s[:n], allocator)
+}
+
+@(private="package", require_results)
+win32_utf16_to_utf8 :: proc(s: []u16, allocator: runtime.Allocator) -> (res: string, err: runtime.Allocator_Error) {
+	if len(s) == 0 {
+		return
+	}
+
+	n := win32.WideCharToMultiByte(win32.CP_UTF8, win32.WC_ERR_INVALID_CHARS, raw_data(s), i32(len(s)), nil, 0, nil, nil)
+	if n == 0 {
+		return
+	}
+
+	// If N < 0 the call to WideCharToMultiByte assume the wide string is null terminated
+	// and will scan it to find the first null terminated character. The resulting string will
+	// also be null terminated.
+	// If N > 0 it assumes the wide string is not null terminated and the resulting string
+	// will not be null terminated.
+	text := make([]byte, n, allocator) or_return
+
+	n1 := win32.WideCharToMultiByte(win32.CP_UTF8, win32.WC_ERR_INVALID_CHARS, raw_data(s), i32(len(s)), raw_data(text), n, nil, nil)
+	if n1 == 0 {
+		delete(text, allocator)
+		return
+	}
+
+	for i in 0..<n {
+		if text[i] == 0 {
+			n = i
+			break
+		}
+	}
+	res = string(text[:n])
+	return
+}

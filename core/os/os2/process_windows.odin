@@ -163,7 +163,7 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 			_ = read_memory_as_slice(ph, process_params.CommandLine.Buffer, cmdline_w) or_return
 
 			if .Command_Line in selection {
-				info.command_line = win32.utf16_to_utf8(cmdline_w, allocator) or_return
+				info.command_line = win32_utf16_to_utf8(cmdline_w, allocator) or_return
 				info.fields += {.Command_Line}
 			}
 			if .Command_Args in selection {
@@ -185,7 +185,7 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 			cwd_w := make([]u16, process_params.CurrentDirectoryPath.Length, temp_allocator()) or_return
 			_ = read_memory_as_slice(ph, process_params.CurrentDirectoryPath.Buffer, cwd_w) or_return
 
-			info.working_dir = win32.utf16_to_utf8(cwd_w, allocator) or_return
+			info.working_dir = win32_utf16_to_utf8(cwd_w, allocator) or_return
 			info.fields += {.Working_Dir}
 		}
 	}
@@ -255,7 +255,7 @@ _process_info_by_handle :: proc(process: Process, selection: Process_Info_Fields
 			_ = read_memory_as_slice(ph, process_params.CommandLine.Buffer, cmdline_w) or_return
 
 			if .Command_Line in selection {
-				info.command_line = win32.utf16_to_utf8(cmdline_w, allocator) or_return
+				info.command_line = win32_utf16_to_utf8(cmdline_w, allocator) or_return
 				info.fields += {.Command_Line}
 			}
 			if .Command_Args in selection {
@@ -279,7 +279,7 @@ _process_info_by_handle :: proc(process: Process, selection: Process_Info_Fields
 			cwd_w := make([]u16, process_params.CurrentDirectoryPath.Length, temp_allocator()) or_return
 			_ = read_memory_as_slice(ph, process_params.CurrentDirectoryPath.Buffer, cwd_w) or_return
 
-			info.working_dir = win32.utf16_to_utf8(cwd_w, allocator) or_return
+			info.working_dir = win32_utf16_to_utf8(cwd_w, allocator) or_return
 			info.fields += {.Working_Dir}
 		}
 	}
@@ -316,13 +316,13 @@ _current_process_info :: proc(selection: Process_Info_Fields, allocator: runtime
 	if .Executable_Path in selection {
 		exe_filename_w: [256]u16
 		path_len := win32.GetModuleFileNameW(nil, raw_data(exe_filename_w[:]), len(exe_filename_w))
-		info.executable_path = win32.utf16_to_utf8(exe_filename_w[:path_len], allocator) or_return
+		info.executable_path = win32_utf16_to_utf8(exe_filename_w[:path_len], allocator) or_return
 		info.fields += {.Executable_Path}
 	}
 	if selection >= {.Command_Line,  .Command_Args} {
 		command_line_w := win32.GetCommandLineW()
 		if .Command_Line in selection {
-			info.command_line = win32.wstring_to_utf8(command_line_w, -1, allocator) or_return
+			info.command_line = win32_wstring_to_utf8(command_line_w, allocator) or_return
 			info.fields += {.Command_Line}
 		}
 		if .Command_Args in selection {
@@ -380,13 +380,13 @@ _Sys_Process_Attributes :: struct {}
 _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 	TEMP_ALLOCATOR_GUARD()
 	command_line   := _build_command_line(desc.command, temp_allocator())
-	command_line_w := win32.utf8_to_wstring(command_line, temp_allocator())
+	command_line_w := win32_utf8_to_wstring(command_line, temp_allocator()) or_return
 	environment := desc.env
 	if desc.env == nil {
 		environment = environ(temp_allocator())
 	}
 	environment_block   := _build_environment_block(environment, temp_allocator())
-	environment_block_w := win32.utf8_to_utf16(environment_block, temp_allocator())
+	environment_block_w := win32_utf8_to_utf16(environment_block, temp_allocator()) or_return
 	stderr_handle       := win32.GetStdHandle(win32.STD_ERROR_HANDLE)
 	stdout_handle       := win32.GetStdHandle(win32.STD_OUTPUT_HANDLE)
 	stdin_handle        := win32.GetStdHandle(win32.STD_INPUT_HANDLE)
@@ -401,7 +401,7 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 		stdin_handle = win32.HANDLE((^File_Impl)(desc.stderr.impl).fd)
 	}
 
-	working_dir_w := win32.utf8_to_wstring(desc.working_dir, temp_allocator()) if len(desc.working_dir) > 0 else nil
+	working_dir_w := (win32_utf8_to_wstring(desc.working_dir, temp_allocator()) or_else nil) if len(desc.working_dir) > 0 else nil
 	process_info: win32.PROCESS_INFORMATION
 	ok := win32.CreateProcessW(
 		nil,
@@ -535,7 +535,7 @@ _process_exe_by_pid :: proc(pid: int, allocator: runtime.Allocator) -> (exe_path
 		err =_get_platform_error()
 		return
 	}
-	return win32.wstring_to_utf8(raw_data(entry.szExePath[:]), -1, allocator)
+	return win32_wstring_to_utf8(raw_data(entry.szExePath[:]), allocator)
 }
 
 _get_process_user :: proc(process_handle: win32.HANDLE, allocator: runtime.Allocator) -> (full_username: string, err: Error) {
@@ -570,8 +570,8 @@ _get_process_user :: proc(process_handle: win32.HANDLE, allocator: runtime.Alloc
 		err = _get_platform_error()
 		return
 	}
-	username := win32.utf16_to_utf8(username_w[:username_chrs], temp_allocator()) or_return
-	domain   := win32.utf16_to_utf8(domain_w[:domain_chrs], temp_allocator()) or_return
+	username := win32_utf16_to_utf8(username_w[:username_chrs], temp_allocator()) or_return
+	domain   := win32_utf16_to_utf8(domain_w[:domain_chrs], temp_allocator()) or_return
 	return strings.concatenate({domain, "\\", username}, allocator)
 }
 
@@ -589,7 +589,7 @@ _parse_command_line :: proc(cmd_line_w: [^]u16, allocator: runtime.Allocator) ->
 		delete(argv, allocator)
 	}
 	for arg_w, i in argv_w[:argc] {
-		argv[i] = win32.wstring_to_utf8(arg_w, -1, allocator) or_return
+		argv[i] = win32_wstring_to_utf8(arg_w, allocator) or_return
 	}
 	return
 }
@@ -665,7 +665,7 @@ _parse_environment_block :: proc(block: [^]u16, allocator: runtime.Allocator) ->
 			idx += 1
 		}
 		env_w := block[last_idx:idx]
-		envs[env_idx] = win32.utf16_to_utf8(env_w, allocator) or_return
+		envs[env_idx] = win32_utf16_to_utf8(env_w, allocator) or_return
 		env_idx += 1
 		idx += 1
 		last_idx = idx

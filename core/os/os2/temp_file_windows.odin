@@ -19,5 +19,5 @@ _temp_dir :: proc(allocator: runtime.Allocator) -> (string, runtime.Allocator_Er
 	} else if n > 0 && b[n-1] == '\\' {
 		n -= 1
 	}
-	return win32.utf16_to_utf8(b[:n], allocator)
+	return win32_utf16_to_utf8(b[:n], allocator)
 }
