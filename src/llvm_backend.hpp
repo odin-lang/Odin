@@ -398,7 +398,7 @@ gb_internal lbBlock *lb_create_block(lbProcedure *p, char const *name, bool appe
 
 gb_internal lbValue lb_const_nil(lbModule *m, Type *type);
 gb_internal lbValue lb_const_undef(lbModule *m, Type *type);
-gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_local=true);
+gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_local=true, bool is_rodata=false);
 gb_internal lbValue lb_const_bool(lbModule *m, Type *type, bool value);
 gb_internal lbValue lb_const_int(lbModule *m, Type *type, u64 value);
 

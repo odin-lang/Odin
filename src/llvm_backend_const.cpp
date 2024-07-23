@@ -470,7 +470,7 @@ gb_internal bool lb_is_nested_possibly_constant(Type *ft, Selection const &sel, 
 	return lb_is_elem_const(elem, ft);
 }
 
-gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_local) {
+gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_local, bool is_rodata) {
 	LLVMContextRef ctx = m->ctx;
 
 	type = default_type(type);
@@ -564,6 +564,10 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bo
 				Entity *e = alloc_entity_constant(nullptr, make_token_ident(name), t, value);
 				array_data = LLVMAddGlobal(m->mod, lb_type(m, t), str);
 				LLVMSetInitializer(array_data, backing_array.value);
+
+				if (is_rodata) {
+					LLVMSetGlobalConstant(array_data, true);
+				}
 
 				lbValue g = {};
 				g.value = array_data;

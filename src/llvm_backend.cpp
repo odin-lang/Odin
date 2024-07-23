@@ -3288,11 +3288,12 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 			if (!is_type_any(e->type) && !is_type_union(e->type)) {
 				if (tav.mode != Addressing_Invalid) {
 					if (tav.value.kind != ExactValue_Invalid) {
+						bool is_rodata = e->kind == Entity_Variable && e->Variable.is_rodata;
 						ExactValue v = tav.value;
-						lbValue init = lb_const_value(m, tav.type, v);
+						lbValue init = lb_const_value(m, tav.type, v, false, is_rodata);
 						LLVMSetInitializer(g.value, init.value);
 						var.is_initialized = true;
-						if (e->kind == Entity_Variable && e->Variable.is_rodata) {
+						if (is_rodata) {
 							LLVMSetGlobalConstant(g.value, true);
 						}
 					}
