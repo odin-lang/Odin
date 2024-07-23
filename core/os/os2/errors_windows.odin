@@ -17,10 +17,7 @@ _error_string :: proc(errno: i32) -> string {
 	if idx, ok := slice.binary_search(ti.values, err); ok {
 		return ti.names[idx]
 	}
-
-	// TODO(bill): _error_string for windows
-	// FormatMessageW
-	return ""
+	return "<unknown platform error>"
 }
 
 _get_platform_error :: proc() -> Error {
