@@ -39,6 +39,8 @@ Error :: union #shared_nil {
 }
 #assert(size_of(Error) == size_of(u64))
 
+ERROR_NONE :: Error{}
+
 
 
 is_platform_error :: proc(ferr: Error) -> (err: i32, ok: bool) {
