@@ -1027,16 +1027,28 @@ TRACKMOUSEEVENT :: struct {
 }
 
 WIN32_FIND_DATAW :: struct {
-	dwFileAttributes: DWORD,
-	ftCreationTime: FILETIME,
-	ftLastAccessTime: FILETIME,
-	ftLastWriteTime: FILETIME,
-	nFileSizeHigh: DWORD,
-	nFileSizeLow: DWORD,
-	dwReserved0: DWORD,
-	dwReserved1: DWORD,
-	cFileName: [260]wchar_t, // #define MAX_PATH 260
-	cAlternateFileName: [14]wchar_t,
+	dwFileAttributes:   DWORD,
+	ftCreationTime:     FILETIME,
+	ftLastAccessTime:   FILETIME,
+	ftLastWriteTime:    FILETIME,
+	nFileSizeHigh:      DWORD,
+	nFileSizeLow:       DWORD,
+	dwReserved0:        DWORD,
+	dwReserved1:        DWORD,
+	cFileName:          [MAX_PATH]WCHAR,
+	cAlternateFileName: [14]WCHAR,
+	_OBSOLETE_dwFileType:    DWORD, // Obsolete. Do not use.
+	_OBSOLETE_dwCreatorType: DWORD, // Obsolete. Do not use
+	_OBSOLETE_wFinderFlags:  WORD,  // Obsolete. Do not use
+}
+
+FILE_ID_128 :: struct {
+	Identifier: [16]BYTE,
+}
+
+FILE_ID_INFO :: struct {
+	VolumeSerialNumber: ULONGLONG,
+	FileId:             FILE_ID_128,
 }
 
 CREATESTRUCTA :: struct {
