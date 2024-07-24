@@ -21,11 +21,11 @@ os_init :: proc(os: ^OS) {
 	
 	window_flags: sdl2.WindowFlags = {.SHOWN, .ALLOW_HIGHDPI, .RESIZABLE}
 	os.window = sdl2.CreateWindow(
-		"wgpu triangle",
+		"WGPU Native Triangle",
 		sdl2.WINDOWPOS_CENTERED,
 		sdl2.WINDOWPOS_CENTERED,
-		800,
-		600,
+		960,
+		540,
 		window_flags,
 	)
 	if os.window == nil {
