@@ -1,8 +1,20 @@
+//+private
 package os2
 
-import "base:runtime"
+Read_Directory_Iterator_Impl :: struct {
 
-@(private)
-_read_directory :: proc(f: ^File, n: int, allocator: runtime.Allocator) -> (files: []File_Info, err: Error) {
+}
+
+
+@(require_results)
+_read_directory_iterator :: proc(it: ^Read_Directory_Iterator) -> (fi: File_Info, index: int, ok: bool) {
 	return
+}
+
+@(require_results)
+_read_directory_iterator_create :: proc(f: ^File) -> (Read_Directory_Iterator, Error) {
+	return {}, nil
+}
+
+_read_directory_iterator_destroy :: proc(it: ^Read_Directory_Iterator) {
 }

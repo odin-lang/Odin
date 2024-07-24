@@ -1027,16 +1027,28 @@ TRACKMOUSEEVENT :: struct {
 }
 
 WIN32_FIND_DATAW :: struct {
-	dwFileAttributes: DWORD,
-	ftCreationTime: FILETIME,
-	ftLastAccessTime: FILETIME,
-	ftLastWriteTime: FILETIME,
-	nFileSizeHigh: DWORD,
-	nFileSizeLow: DWORD,
-	dwReserved0: DWORD,
-	dwReserved1: DWORD,
-	cFileName: [260]wchar_t, // #define MAX_PATH 260
-	cAlternateFileName: [14]wchar_t,
+	dwFileAttributes:   DWORD,
+	ftCreationTime:     FILETIME,
+	ftLastAccessTime:   FILETIME,
+	ftLastWriteTime:    FILETIME,
+	nFileSizeHigh:      DWORD,
+	nFileSizeLow:       DWORD,
+	dwReserved0:        DWORD,
+	dwReserved1:        DWORD,
+	cFileName:          [MAX_PATH]WCHAR,
+	cAlternateFileName: [14]WCHAR,
+	_OBSOLETE_dwFileType:    DWORD, // Obsolete. Do not use.
+	_OBSOLETE_dwCreatorType: DWORD, // Obsolete. Do not use
+	_OBSOLETE_wFinderFlags:  WORD,  // Obsolete. Do not use
+}
+
+FILE_ID_128 :: struct {
+	Identifier: [16]BYTE,
+}
+
+FILE_ID_INFO :: struct {
+	VolumeSerialNumber: ULONGLONG,
+	FileId:             FILE_ID_128,
 }
 
 CREATESTRUCTA :: struct {
@@ -2714,41 +2726,41 @@ NEON128 :: struct {
 
 EXCEPTION_POINTERS :: struct {
 	ExceptionRecord: ^EXCEPTION_RECORD,
-	ContextRecord: ^CONTEXT,
+	ContextRecord:   ^CONTEXT,
 }
 
 PVECTORED_EXCEPTION_HANDLER :: #type proc "system" (ExceptionInfo: ^EXCEPTION_POINTERS) -> LONG
 
 CONSOLE_READCONSOLE_CONTROL :: struct {
-	nLength: ULONG,
-	nInitialChars: ULONG,
-	dwCtrlWakeupMask: ULONG,
+	nLength:           ULONG,
+	nInitialChars:     ULONG,
+	dwCtrlWakeupMask:  ULONG,
 	dwControlKeyState: ULONG,
 }
 
 PCONSOLE_READCONSOLE_CONTROL :: ^CONSOLE_READCONSOLE_CONTROL
 
 BY_HANDLE_FILE_INFORMATION :: struct {
-	dwFileAttributes: DWORD,
-	ftCreationTime: FILETIME,
-	ftLastAccessTime: FILETIME,
-	ftLastWriteTime: FILETIME,
+	dwFileAttributes:     DWORD,
+	ftCreationTime:       FILETIME,
+	ftLastAccessTime:     FILETIME,
+	ftLastWriteTime:      FILETIME,
 	dwVolumeSerialNumber: DWORD,
-	nFileSizeHigh: DWORD,
-	nFileSizeLow: DWORD,
-	nNumberOfLinks: DWORD,
-	nFileIndexHigh: DWORD,
-	nFileIndexLow: DWORD,
+	nFileSizeHigh:        DWORD,
+	nFileSizeLow:         DWORD,
+	nNumberOfLinks:       DWORD,
+	nFileIndexHigh:       DWORD,
+	nFileIndexLow:        DWORD,
 }
 
 LPBY_HANDLE_FILE_INFORMATION :: ^BY_HANDLE_FILE_INFORMATION
 
 FILE_STANDARD_INFO :: struct {
 	AllocationSize: LARGE_INTEGER,
-	EndOfFile: LARGE_INTEGER,
-	NumberOfLinks: DWORD,
-	DeletePending: BOOLEAN,
-	Directory: BOOLEAN,
+	EndOfFile:      LARGE_INTEGER,
+	NumberOfLinks:  DWORD,
+	DeletePending:  BOOLEAN,
+	Directory:      BOOLEAN,
 }
 
 FILE_ATTRIBUTE_TAG_INFO :: struct {

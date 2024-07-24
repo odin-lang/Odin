@@ -6,6 +6,7 @@ import "base:runtime"
 import "core:bytes"
 import "core:encoding/ansi"
 @require import "core:encoding/base64"
+@require import "core:encoding/json"
 import "core:fmt"
 import "core:io"
 @require import pkg_log "core:log"
@@ -44,7 +45,8 @@ SHARED_RANDOM_SEED    : u64    : #config(ODIN_TEST_RANDOM_SEED, 0)
 LOG_LEVEL             : string : #config(ODIN_TEST_LOG_LEVEL, "info")
 // Show only the most necessary logging information.
 USING_SHORT_LOGS      : bool   : #config(ODIN_TEST_SHORT_LOGS, false)
-
+// Output a report of the tests to the given path.
+JSON_REPORT           : string : #config(ODIN_TEST_JSON_REPORT, "")
 
 get_log_level :: #force_inline proc() -> runtime.Logger_Level {
 	when ODIN_DEBUG {
@@ -59,6 +61,18 @@ get_log_level :: #force_inline proc() -> runtime.Logger_Level {
 			#panic("Unknown `ODIN_TEST_LOG_LEVEL`: \"" + LOG_LEVEL + "\", possible levels are: \"debug\", \"info\", \"warning\", \"error\", or \"fatal\".")
 		}
 	}
+}
+
+JSON :: struct {
+	total:    int,
+	success:  int,
+	duration: time.Duration,
+	packages: map[string][dynamic]JSON_Test,
+}
+
+JSON_Test :: struct {
+	success: bool,
+	name:    string,
 }
 
 end_t :: proc(t: ^T) {
@@ -846,6 +860,36 @@ To partly mitigate this, redirect STDERR to a file or use the -define:ODIN_TEST_
 	}
 
 	fmt.wprintln(stderr, bytes.buffer_to_string(&batch_buffer))
+
+	when JSON_REPORT != "" {
+		json_report: JSON
+
+		mode: int
+		when ODIN_OS != .Windows {
+			mode = os.S_IRUSR|os.S_IWUSR|os.S_IRGRP|os.S_IROTH
+		}
+		json_fd, errno := os.open(JSON_REPORT, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, mode)
+		fmt.assertf(errno == os.ERROR_NONE, "unable to open file %q for writing of JSON report, error: %v", JSON_REPORT, errno)
+		defer os.close(json_fd)
+
+		for test, i in report.all_tests {
+			#no_bounds_check state := report.all_test_states[i]
+
+			if test.pkg not_in json_report.packages {
+				json_report.packages[test.pkg] = {}
+			}
+
+			tests := &json_report.packages[test.pkg]
+			append(tests, JSON_Test{name = test.name, success = state == .Successful})
+		}
+
+		json_report.total    = len(internal_tests)
+		json_report.success  = total_success_count
+		json_report.duration = finished_in
+
+		err := json.marshal_to_writer(os.stream_from_handle(json_fd), json_report, &{ pretty = true })
+		fmt.assertf(err == nil, "Error writing JSON report: %v", err)
+	}
 
 	return total_success_count == total_test_count
 }

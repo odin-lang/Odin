@@ -94,7 +94,7 @@ _open_internal :: proc(name: string, flags: File_Flags, perm: int) -> (handle: u
 		create_mode = win32.TRUNCATE_EXISTING
 	}
 
-	attrs: u32 = win32.FILE_ATTRIBUTE_NORMAL
+	attrs: u32 = win32.FILE_ATTRIBUTE_NORMAL|win32.FILE_FLAG_BACKUP_SEMANTICS
 	if perm & S_IWRITE == 0 {
 		attrs = win32.FILE_ATTRIBUTE_READONLY
 		if create_mode == win32.CREATE_ALWAYS {
@@ -126,20 +126,24 @@ _open_internal :: proc(name: string, flags: File_Flags, perm: int) -> (handle: u
 _open :: proc(name: string, flags: File_Flags, perm: int) -> (f: ^File, err: Error) {
 	flags := flags if flags != nil else {.Read}
 	handle := _open_internal(name, flags, perm) or_return
-	return _new_file(handle, name), nil
+	return _new_file(handle, name)
 }
 
-_new_file :: proc(handle: uintptr, name: string) -> ^File {
+_new_file :: proc(handle: uintptr, name: string) -> (f: ^File, err: Error) {
 	if handle == INVALID_HANDLE {
-		return nil
+		return
 	}
-	impl := new(File_Impl, file_allocator())
+	impl := new(File_Impl, file_allocator()) or_return
+	defer if err != nil {
+		free(impl, file_allocator())
+	}
+
 	impl.file.impl = impl
 
 	impl.allocator = file_allocator()
 	impl.fd = rawptr(handle)
-	impl.name, _ = clone_string(name, impl.allocator)
-	impl.wname, _ = win32_utf8_to_wstring(name, impl.allocator)
+	impl.name = clone_string(name, impl.allocator) or_return
+	impl.wname = win32_utf8_to_wstring(name, impl.allocator) or_return
 
 	handle := _handle(&impl.file)
 	kind := File_Impl_Kind.File
@@ -157,7 +161,7 @@ _new_file :: proc(handle: uintptr, name: string) -> ^File {
 	}
 	impl.file.fstat = _fstat
 
-	return &impl.file
+	return &impl.file, nil
 }
 
 _fd :: proc(f: ^File) -> uintptr {

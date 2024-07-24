@@ -102,21 +102,24 @@ _open :: proc(name: string, flags: File_Flags, perm: int) -> (f: ^File, err: Err
 		return nil, _get_platform_error(errno)
 	}
 
-	return _new_file(uintptr(fd), name), nil
+	return _new_file(uintptr(fd), name)
 }
 
-_new_file :: proc(fd: uintptr, _: string = "") -> ^File {
-	impl := new(File_Impl, file_allocator())
+_new_file :: proc(fd: uintptr, _: string = "") -> (f: ^File, err: Error) {
+	impl := new(File_Impl, file_allocator()) or_return
+	defer if err != nil {
+		free(impl, file_allocator())
+	}
 	impl.file.impl = impl
 	impl.fd = linux.Fd(fd)
 	impl.allocator = file_allocator()
-	impl.name = _get_full_path(impl.fd, impl.allocator)
+	impl.name = _get_full_path(impl.fd, file_allocator()) or_return
 	impl.file.stream = {
 		data = impl,
 		procedure = _file_stream_proc,
 	}
 	impl.file.fstat = _fstat
-	return &impl.file
+	return &impl.file, nil
 }
 
 _destroy :: proc(f: ^File_Impl) -> Error {

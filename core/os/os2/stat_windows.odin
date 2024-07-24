@@ -262,7 +262,8 @@ _file_info_from_get_file_information_by_handle :: proc(path: string, h: win32.HA
 	fi: File_Info
 	fi.fullpath = path
 	fi.name = basename(path)
-	fi.size = i64(d.nFileSizeHigh)<<32 + i64(d.nFileSizeLow)
+	fi.inode = u128(u64(d.nFileIndexHigh)<<32 + u64(d.nFileIndexLow))
+	fi.size  = i64(d.nFileSizeHigh)<<32  + i64(d.nFileSizeLow)
 	type, mode := _file_type_mode_from_file_attributes(d.dwFileAttributes, nil, 0)
 	fi.type = type
 	fi.mode |= mode
