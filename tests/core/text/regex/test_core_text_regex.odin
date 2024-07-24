@@ -276,9 +276,58 @@ test_optional_capture_group :: proc(t: ^testing.T) {
 
 @test
 test_max_capture_groups :: proc(t: ^testing.T) {
-	EXPR :: "(1)(2)(3)(4)(5)(6)(7)(8)(9)"
-	check_expression(t, EXPR, "123456789", "123456789",
-		"1", "2", "3", "4", "5", "6", "7", "8", "9")
+	sb_pattern := strings.builder_make()
+	sb_haystack := strings.builder_make()
+	expected_captures: [dynamic]string
+	defer {
+		strings.builder_destroy(&sb_pattern)
+		strings.builder_destroy(&sb_haystack)
+		delete(expected_captures)
+	}
+
+	w_pattern := strings.to_writer(&sb_pattern)
+	w_haystack := strings.to_writer(&sb_haystack)
+
+	// The full expression capture, capture 0:
+	for i in 1..<common.MAX_CAPTURE_GROUPS {
+		io.write_int(w_pattern, i)
+	}
+	append(&expected_captures, fmt.tprint(strings.to_string(sb_pattern)))
+	strings.builder_reset(&sb_pattern)
+
+	// The individual captures:
+	for i in 1..<common.MAX_CAPTURE_GROUPS {
+		io.write_byte(w_pattern, '(')
+		io.write_int(w_pattern, i)
+		io.write_byte(w_pattern, ')')
+
+		io.write_int(w_haystack, i)
+
+		append(&expected_captures, fmt.tprint(i))
+	}
+
+	pattern := strings.to_string(sb_pattern)
+	haystack := strings.to_string(sb_haystack)
+
+	rex, err := regex.create(pattern)
+	defer regex.destroy(rex)
+	if !testing.expect_value(t, err, nil) {
+		return
+	}
+
+	capture, ok := regex.match(rex, haystack)
+	defer regex.destroy(capture)
+	if !testing.expectf(t, ok, "expected %q to match %q", pattern, haystack) {
+		return
+	}
+
+	if !testing.expect_value(t, len(capture.groups), common.MAX_CAPTURE_GROUPS) {
+		return
+	}
+
+	for g, i in capture.groups {
+		testing.expect_value(t, g, expected_captures[i])
+	}
 }
 
 @test
@@ -692,9 +741,18 @@ test_error_invalid_unicode_in_string :: proc(t: ^testing.T) {
 
 @test
 test_error_too_many_capture_groups :: proc(t: ^testing.T) {
-	// NOTE: There are 1 + 9 + 1 capture groups in this pattern.
-	// Remember the implicit capture group 0.
-	expect_error(t, "(1)(2)(3)(4)(5)(6)(7)(8)(9) (A)", parser.Too_Many_Capture_Groups)
+	sb := strings.builder_make()
+	defer strings.builder_destroy(&sb)
+	w := strings.to_writer(&sb)
+
+	for i in 1..<common.MAX_CAPTURE_GROUPS+1 {
+		io.write_byte(w, '(')
+		io.write_int(w, i)
+		io.write_byte(w, ')')
+	}
+
+	pattern := strings.to_string(sb)
+	expect_error(t, pattern, parser.Too_Many_Capture_Groups)
 }
 
 @test
