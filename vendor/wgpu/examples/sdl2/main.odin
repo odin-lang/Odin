@@ -4,13 +4,11 @@ import "base:runtime"
 
 import "core:fmt"
 
-import "vendor:sdl2"
 import "vendor:wgpu"
-import "vendor:wgpu/sdl2glue"
 
 State :: struct {
 	ctx: runtime.Context,
-	window: ^sdl2.Window,
+	os:  OS,
 
 	instance:        wgpu.Instance,
 	surface:         wgpu.Surface,
@@ -29,32 +27,13 @@ state: State
 main :: proc() {
 	state.ctx = context
 	
-	sdl_flags := sdl2.InitFlags{.VIDEO, .JOYSTICK, .GAMECONTROLLER, .EVENTS}
-	if res := sdl2.Init(sdl_flags); res != 0 {
-		fmt.eprintf("ERROR: Failed to initialize SDL: [%s]\n", sdl2.GetError())
-		return
-	}
-	
-	window_flags: sdl2.WindowFlags = {.SHOWN, .ALLOW_HIGHDPI, .RESIZABLE}
-	state.window = sdl2.CreateWindow(
-		"wgpu triangle",
-		sdl2.WINDOWPOS_CENTERED,
-		sdl2.WINDOWPOS_CENTERED,
-		800,
-		600,
-		window_flags,
-	)
-	if state.window == nil {
-		fmt.eprintf("ERROR: Failed to create the SDL Window: [%s]\n", sdl2.GetError())
-		return
-	}
+	os_init(&state.os)
 
 	state.instance = wgpu.CreateInstance(nil)
 	if state.instance == nil {
 		panic("WebGPU is not supported")
 	}
-	
-	state.surface = sdl2glue.GetSurface(state.instance, state.window)
+	state.surface = os_get_surface(&state.os, state.instance)
 
 	wgpu.InstanceRequestAdapter(state.instance, &{ compatibleSurface = state.surface }, on_adapter, nil)
 
@@ -135,35 +114,15 @@ main :: proc() {
 			},
 		})
 
-		now := sdl2.GetPerformanceCounter()
-		last : u64 = 0
-		dt: f32 = 0
- 		main_loop: for {
-			last = now
-			now := sdl2.GetPerformanceCounter()
-			dt = auto_cast((now - last)*1000 / sdl2.GetPerformanceFrequency())
-
-			e: sdl2.Event
-	
-			for sdl2.PollEvent(&e) {
-				#partial switch (e.type) {
-				case .QUIT:
-					break main_loop
-	
-				case .WINDOWEVENT:
-					#partial switch (e.window.event) {
-					case .SIZE_CHANGED:
-					case .RESIZED:
-						state.config.width = cast(u32)e.window.data1
-						state.config.height = cast(u32)e.window.data2
-						wgpu.SurfaceConfigure(state.surface, &state.config)
-					}
-				}
-			}
-
-			frame(dt)
-		}
+		os_run(&state.os)
 	}
+}
+
+resize :: proc "c" () {
+	context = state.ctx
+	
+	state.config.width, state.config.height = os_get_render_bounds(&state.os)
+	wgpu.SurfaceConfigure(state.surface, &state.config)
 }
 
 frame :: proc "c" (dt: f32) {
@@ -178,7 +137,7 @@ frame :: proc "c" (dt: f32) {
 		if surface_texture.texture != nil {
 			wgpu.TextureRelease(surface_texture.texture)
 		}
-		// todo - resize()
+		resize()
 		return
 	case .OutOfMemory, .DeviceLost:
 		// Fatal error
