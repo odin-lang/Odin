@@ -396,7 +396,7 @@ gb_internal LLVMValueRef lb_run_instrumentation_pass_insert_call(lbProcedure *p,
 	lbValue cc = lb_find_procedure_value_from_entity(m, entity);
 
 	LLVMValueRef args[3] = {};
-	args[0] = p->value;
+	args[0] = LLVMConstPointerCast(p->value, lb_type(m, t_rawptr));
 
 	if (is_arch_wasm()) {
 		args[1] = LLVMConstPointerNull(lb_type(m, t_rawptr));
