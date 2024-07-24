@@ -334,6 +334,27 @@ panicf :: proc(fmt: string, args: ..any, loc := #caller_location) -> ! {
 	message := tprintf(fmt, ..args)
 	p("Panic", message, loc)
 }
+
+// 	Creates a formatted C string
+//
+// 	*Allocates Using Context's Allocator*
+//
+// 	Inputs:
+// 	- args: A variadic list of arguments to be formatted.
+// 	- sep: An optional separator string (default is a single space).
+//
+// 	Returns: A formatted C string.
+//
+@(require_results)
+caprint :: proc(args: ..any, sep := " ", allocator := context.allocator) -> cstring {
+	str: strings.Builder
+	strings.builder_init(&str, allocator)
+	sbprint(&str, ..args, sep=sep)
+	strings.write_byte(&str, 0)
+	s := strings.to_string(str)
+	return cstring(raw_data(s))
+}
+
 // Creates a formatted C string
 //
 // *Allocates Using Context's Allocator*
@@ -346,9 +367,9 @@ panicf :: proc(fmt: string, args: ..any, loc := #caller_location) -> ! {
 // Returns: A formatted C string
 //
 @(require_results)
-caprintf :: proc(format: string, args: ..any, newline := false) -> cstring {
+caprintf :: proc(format: string, args: ..any, allocator := context.allocator, newline := false) -> cstring {
 	str: strings.Builder
-	strings.builder_init(&str)
+	strings.builder_init(&str, allocator)
 	sbprintf(&str, format, ..args, newline=newline)
 	strings.write_byte(&str, 0)
 	s := strings.to_string(str)
@@ -365,8 +386,8 @@ caprintf :: proc(format: string, args: ..any, newline := false) -> cstring {
 // Returns: A formatted C string
 //
 @(require_results)
-caprintfln :: proc(format: string, args: ..any) -> cstring {
-	return caprintf(format, ..args, newline=true)
+caprintfln :: proc(format: string, args: ..any, allocator := context.allocator) -> cstring {
+	return caprintf(format, ..args, allocator=allocator, newline=true)
 }
 // 	Creates a formatted C string
 //
@@ -380,12 +401,7 @@ caprintfln :: proc(format: string, args: ..any) -> cstring {
 //
 @(require_results)
 ctprint :: proc(args: ..any, sep := " ") -> cstring {
-	str: strings.Builder
-	strings.builder_init(&str, context.temp_allocator)
-	sbprint(&str, ..args, sep=sep)
-	strings.write_byte(&str, 0)
-	s := strings.to_string(str)
-	return cstring(raw_data(s))
+	return caprint(args=args, sep=sep, allocator=context.temp_allocator)
 }
 // Creates a formatted C string
 //
@@ -400,12 +416,7 @@ ctprint :: proc(args: ..any, sep := " ") -> cstring {
 //
 @(require_results)
 ctprintf :: proc(format: string, args: ..any, newline := false) -> cstring {
-	str: strings.Builder
-	strings.builder_init(&str, context.temp_allocator)
-	sbprintf(&str, format, ..args, newline=newline)
-	strings.write_byte(&str, 0)
-	s := strings.to_string(str)
-	return cstring(raw_data(s))
+	return caprintf(format=format, args=args, allocator=context.temp_allocator, newline=newline)
 }
 // Creates a formatted C string, followed by a newline.
 //
@@ -419,7 +430,7 @@ ctprintf :: proc(format: string, args: ..any, newline := false) -> cstring {
 //
 @(require_results)
 ctprintfln :: proc(format: string, args: ..any) -> cstring {
-	return ctprintf(format, ..args, newline=true)
+	return caprintf(format=format, args=args, allocator=context.temp_allocator, newline=true)
 }
 // Formats using the default print settings and writes to the given strings.Builder
 //
