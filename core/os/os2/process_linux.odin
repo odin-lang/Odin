@@ -285,7 +285,7 @@ _current_process_info :: proc(selection: Process_Info_Fields, allocator: runtime
 _process_open :: proc(pid: int, _: Process_Open_Flags) -> (process: Process, err: Error) {
 	process.pid = pid
 	process.handle = PIDFD_UNASSIGNED
-	if _has_pidfd_open() {
+	if !_has_pidfd_open() {
 		return process, .Unsupported
 	}
 
