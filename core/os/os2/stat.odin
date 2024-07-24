@@ -1,7 +1,9 @@
 package os2
 
-import "core:time"
 import "base:runtime"
+import "core:path/filepath"
+import "core:strings"
+import "core:time"
 
 Fstat_Callback :: proc(f: ^File, allocator: runtime.Allocator) -> (File_Info, Error)
 
@@ -17,6 +19,14 @@ File_Info :: struct {
 	creation_time:     time.Time,
 	modification_time: time.Time,
 	access_time:       time.Time,
+}
+
+@(require_results)
+file_info_clone :: proc(fi: File_Info, allocator: runtime.Allocator) -> (cloned: File_Info, err: runtime.Allocator_Error) {
+	cloned = fi
+	cloned.fullpath = strings.clone(fi.fullpath) or_return
+	cloned.name = filepath.base(cloned.fullpath)
+	return
 }
 
 file_info_slice_delete :: proc(infos: []File_Info, allocator: runtime.Allocator) {
