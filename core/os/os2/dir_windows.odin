@@ -23,10 +23,21 @@ find_data_to_file_info :: proc(base_path: string, d: ^win32.WIN32_FIND_DATAW, al
 
 	fi.type, fi.mode = _file_type_mode_from_file_attributes(d.dwFileAttributes, nil, d.dwReserved0)
 
-	// fi.inode             = u128(u64(d.nFileIndexHigh)<<32 + u64(d.nFileIndexLow))
 	fi.creation_time     = time.unix(0, win32.FILETIME_as_unix_nanoseconds(d.ftCreationTime))
 	fi.modification_time = time.unix(0, win32.FILETIME_as_unix_nanoseconds(d.ftLastWriteTime))
 	fi.access_time       = time.unix(0, win32.FILETIME_as_unix_nanoseconds(d.ftLastAccessTime))
+
+
+	handle := win32.HANDLE(_open_internal(path, {.Read}, 0o666) or_else 0)
+	defer win32.CloseHandle(handle)
+
+	if file_id_info: win32.FILE_ID_INFO; handle != nil && win32.GetFileInformationByHandleEx(handle, .FileIdInfo, &file_id_info, size_of(file_id_info)) {
+		#assert(size_of(fi.inode) == size_of(file_id_info.FileId))
+		#assert(size_of(fi.inode) == 16)
+		runtime.mem_copy_non_overlapping(&fi.inode, &file_id_info.FileId, 16)
+	}
+
+
 	return
 }
 
@@ -45,6 +56,8 @@ _read_directory_iterator :: proc(it: ^Read_Directory_Iterator) -> (fi: File_Info
 	if it.f == nil {
 		return
 	}
+
+	TEMP_ALLOCATOR_GUARD()
 
 	for !it.impl.no_more_files {
 		err: Error

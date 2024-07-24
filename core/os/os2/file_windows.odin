@@ -60,8 +60,9 @@ _open_internal :: proc(name: string, flags: File_Flags, perm: int) -> (handle: u
 		err = .Not_Exist
 		return
 	}
+	TEMP_ALLOCATOR_GUARD()
 
-	path := _fix_long_path(name) or_return
+	path := _fix_long_path(name, temp_allocator()) or_return
 	access: u32
 	switch flags & {.Read, .Write} {
 	case {.Read}:         access = win32.FILE_GENERIC_READ
@@ -457,7 +458,8 @@ _truncate :: proc(f: ^File, size: i64) -> Error {
 }
 
 _remove :: proc(name: string) -> Error {
-	p := _fix_long_path(name) or_return
+	TEMP_ALLOCATOR_GUARD()
+	p := _fix_long_path(name, temp_allocator()) or_return
 	err, err1: Error
 	if !win32.DeleteFileW(p) {
 		err = _get_platform_error()
@@ -494,8 +496,9 @@ _remove :: proc(name: string) -> Error {
 }
 
 _rename :: proc(old_path, new_path: string) -> Error {
-	from := _fix_long_path(old_path) or_return
-	to   := _fix_long_path(new_path) or_return
+	TEMP_ALLOCATOR_GUARD()
+	from := _fix_long_path(old_path, temp_allocator()) or_return
+	to   := _fix_long_path(new_path, temp_allocator()) or_return
 	if win32.MoveFileExW(from, to, win32.MOVEFILE_REPLACE_EXISTING) {
 		return nil
 	}
@@ -504,8 +507,9 @@ _rename :: proc(old_path, new_path: string) -> Error {
 }
 
 _link :: proc(old_name, new_name: string) -> Error {
-	o := _fix_long_path(old_name) or_return
-	n := _fix_long_path(new_name) or_return
+	TEMP_ALLOCATOR_GUARD()
+	o := _fix_long_path(old_name, temp_allocator()) or_return
+	n := _fix_long_path(new_name, temp_allocator()) or_return
 	if win32.CreateHardLinkW(n, o, nil) {
 		return nil
 	}
@@ -592,8 +596,10 @@ _read_link :: proc(name: string, allocator: runtime.Allocator) -> (s: string, er
 	@thread_local
 	rdb_buf: [MAXIMUM_REPARSE_DATA_BUFFER_SIZE]byte
 
-	p      := _fix_long_path(name) or_return
-	handle := _open_sym_link(p)    or_return
+	TEMP_ALLOCATOR_GUARD()
+
+	p      := _fix_long_path(name, temp_allocator()) or_return
+	handle := _open_sym_link(p) or_return
 	defer win32.CloseHandle(handle)
 
 	bytes_returned: u32
@@ -667,7 +673,8 @@ _fchown :: proc(f: ^File, uid, gid: int) -> Error {
 }
 
 _chdir :: proc(name: string) -> Error {
-	p := _fix_long_path(name) or_return
+	TEMP_ALLOCATOR_GUARD()
+	p := _fix_long_path(name, temp_allocator()) or_return
 	if !win32.SetCurrentDirectoryW(p) {
 		return _get_platform_error()
 	}
@@ -723,7 +730,8 @@ _fchtimes :: proc(f: ^File, atime, mtime: time.Time) -> Error {
 }
 
 _exists :: proc(path: string) -> bool {
-	wpath, _ := _fix_long_path(path)
+	TEMP_ALLOCATOR_GUARD()
+	wpath, _ := _fix_long_path(path, temp_allocator())
 	attribs := win32.GetFileAttributesW(wpath)
 	return attribs != win32.INVALID_FILE_ATTRIBUTES
 }

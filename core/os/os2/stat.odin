@@ -12,8 +12,8 @@ File_Info :: struct {
 	name:              string,
 
 	inode:             u128, // might be zero if cannot be determined
-	size:              i64,
-	mode:              int,
+	size:              i64 `fmt:"M"`,
+	mode:              int `fmt:"o"`,
 	type:              File_Type,
 
 	creation_time:     time.Time,

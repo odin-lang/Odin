@@ -13,7 +13,8 @@ _is_path_separator :: proc(c: byte) -> bool {
 }
 
 _mkdir :: proc(name: string, perm: int) -> Error {
-	if !win32.CreateDirectoryW(_fix_long_path(name) or_return, nil) {
+	TEMP_ALLOCATOR_GUARD()
+	if !win32.CreateDirectoryW(_fix_long_path(name, temp_allocator()) or_return, nil) {
 		return _get_platform_error()
 	}
 	return nil
@@ -169,13 +170,13 @@ init_long_path_support :: proc() {
 }
 
 @(require_results)
-_fix_long_path_slice :: proc(path: string) -> ([]u16, runtime.Allocator_Error) {
-	return win32_utf8_to_utf16(_fix_long_path_internal(path), temp_allocator())
+_fix_long_path_slice :: proc(path: string, allocator: runtime.Allocator) -> ([]u16, runtime.Allocator_Error) {
+	return win32_utf8_to_utf16(_fix_long_path_internal(path), allocator)
 }
 
 @(require_results)
-_fix_long_path :: proc(path: string) -> (win32.wstring, runtime.Allocator_Error) {
-	return win32_utf8_to_wstring(_fix_long_path_internal(path), temp_allocator())
+_fix_long_path :: proc(path: string, allocator: runtime.Allocator) -> (win32.wstring, runtime.Allocator_Error) {
+	return win32_utf8_to_wstring(_fix_long_path_internal(path), allocator)
 }
 
 @(require_results)
