@@ -76,12 +76,10 @@ os_get_surface :: proc(os: ^OS, instance: wgpu.Instance) -> wgpu.Surface {
 
 @(private="file")
 size_callback :: proc "c" (userdata: rawptr, event: ^sdl2.Event) -> c.int {
-	
 	if event.type == .WINDOWEVENT {
 		if event.window.event == .SIZE_CHANGED || event.window.event == .RESIZED {
 			resize()
 		}
 	}
-
 	return 0
 }
