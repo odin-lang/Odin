@@ -2714,41 +2714,41 @@ NEON128 :: struct {
 
 EXCEPTION_POINTERS :: struct {
 	ExceptionRecord: ^EXCEPTION_RECORD,
-	ContextRecord: ^CONTEXT,
+	ContextRecord:   ^CONTEXT,
 }
 
 PVECTORED_EXCEPTION_HANDLER :: #type proc "system" (ExceptionInfo: ^EXCEPTION_POINTERS) -> LONG
 
 CONSOLE_READCONSOLE_CONTROL :: struct {
-	nLength: ULONG,
-	nInitialChars: ULONG,
-	dwCtrlWakeupMask: ULONG,
+	nLength:           ULONG,
+	nInitialChars:     ULONG,
+	dwCtrlWakeupMask:  ULONG,
 	dwControlKeyState: ULONG,
 }
 
 PCONSOLE_READCONSOLE_CONTROL :: ^CONSOLE_READCONSOLE_CONTROL
 
 BY_HANDLE_FILE_INFORMATION :: struct {
-	dwFileAttributes: DWORD,
-	ftCreationTime: FILETIME,
-	ftLastAccessTime: FILETIME,
-	ftLastWriteTime: FILETIME,
+	dwFileAttributes:     DWORD,
+	ftCreationTime:       FILETIME,
+	ftLastAccessTime:     FILETIME,
+	ftLastWriteTime:      FILETIME,
 	dwVolumeSerialNumber: DWORD,
-	nFileSizeHigh: DWORD,
-	nFileSizeLow: DWORD,
-	nNumberOfLinks: DWORD,
-	nFileIndexHigh: DWORD,
-	nFileIndexLow: DWORD,
+	nFileSizeHigh:        DWORD,
+	nFileSizeLow:         DWORD,
+	nNumberOfLinks:       DWORD,
+	nFileIndexHigh:       DWORD,
+	nFileIndexLow:        DWORD,
 }
 
 LPBY_HANDLE_FILE_INFORMATION :: ^BY_HANDLE_FILE_INFORMATION
 
 FILE_STANDARD_INFO :: struct {
 	AllocationSize: LARGE_INTEGER,
-	EndOfFile: LARGE_INTEGER,
-	NumberOfLinks: DWORD,
-	DeletePending: BOOLEAN,
-	Directory: BOOLEAN,
+	EndOfFile:      LARGE_INTEGER,
+	NumberOfLinks:  DWORD,
+	DeletePending:  BOOLEAN,
+	Directory:      BOOLEAN,
 }
 
 FILE_ATTRIBUTE_TAG_INFO :: struct {
