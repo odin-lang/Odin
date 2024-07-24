@@ -11,7 +11,7 @@ File_Info :: struct {
 	fullpath:          string,
 	name:              string,
 
-	inode:             u64,
+	inode:             u128, // might be zero if cannot be determined
 	size:              i64,
 	mode:              int,
 	type:              File_Type,
