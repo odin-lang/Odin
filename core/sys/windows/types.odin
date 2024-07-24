@@ -2512,6 +2512,7 @@ OBJECT_ATTRIBUTES :: struct {
 	SecurityQualityOfService: rawptr,
 }
 
+PUNICODE_STRING :: ^UNICODE_STRING
 UNICODE_STRING :: struct {
 	Length:        u16    `fmt:"-"`,
 	MaximumLength: u16    `fmt:"-"`,
