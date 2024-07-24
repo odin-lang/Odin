@@ -1,6 +1,7 @@
 package regex_vm
 
 @require import "core:io"
+import "core:slice"
 import "core:text/regex/common"
 import "core:text/regex/parser"
 import "core:unicode/utf8"
@@ -348,9 +349,7 @@ run :: proc(vm: ^Machine, $UNICODE_MODE: bool) -> (saved: ^[2 * common.MAX_CAPTU
 	}
 
 	for {
-		for i := 0; i < len(vm.busy_map); i += 1 {
-			vm.busy_map[i] = 0
-		}
+		slice.zero(vm.busy_map[:])
 
 		assert(vm.string_pointer <= len(vm.memory), "VM string pointer went out of bounds.")
 
