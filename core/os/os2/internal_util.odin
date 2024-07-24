@@ -3,8 +3,7 @@ package os2
 
 import "base:intrinsics"
 import "base:runtime"
-import "core:fmt"
-import "core:strings"
+
 
 // Splits pattern by the last wildcard "*", if it exists, and returns the prefix and suffix
 // parts which are split by the last "*"
@@ -46,16 +45,6 @@ clone_to_cstring :: proc(s: string, allocator: runtime.Allocator) -> (res: cstri
 @(require_results)
 temp_cstring :: proc(s: string) -> (cstring, runtime.Allocator_Error) {
 	return clone_to_cstring(s, temp_allocator())
-}
-
-@(require_results)
-ctprintf :: proc(format: string, args: ..any, newline := false) -> cstring {
-	str: strings.Builder
-	strings.builder_init(&str, temp_allocator())
-	fmt.sbprintf(&str, format, ..args, newline=newline)
-	strings.write_byte(&str, 0)
-	s := strings.to_string(str)
-	return cstring(raw_data(s))
 }
 
 @(require_results)

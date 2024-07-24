@@ -330,7 +330,7 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 		path_dirs := filepath.split_list(path_env, temp_allocator())
 		found: bool
 		for dir in path_dirs {
-			executable_path = ctprintf("%s/%s", dir, executable_name)
+			executable_path = fmt.caprintf("%s/%s", dir, executable_name, temp_allocator())
 			fail: bool
 			if fail, errno = linux.faccessat(dir_fd, executable_path, linux.F_OK); errno == .NONE && !fail {
 				found = true
@@ -339,7 +339,7 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 		}
 		if !found {
 			// check in cwd to match windows behavior
-			executable_path = ctprintf("./%s", name)
+			executable_path = fmt.caprintf("./%s", name, temp_allocator())
 			fail: bool
 			if fail, errno = linux.faccessat(dir_fd, executable_path, linux.F_OK); errno != .NONE || fail {
 				return process, .Not_Exist
