@@ -114,12 +114,15 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 
 	info.fields = selection
 
-	// Use this so we can use bprintf to make cstrings with less copying
+	// Use this so we can use bprintf to make cstrings with less copying.
+	// The path_backing is manually zero terminated as we go.
 	path_backing: [48]u8
-	path_slice := path_backing[:len(path_backing) - 1]
-	path_cstr := cstring(&path_slice[0])
 
-	_ = fmt.bprintf(path_slice, "/proc/%d", pid)
+	path_slice := path_backing[:len(path_backing) - 1]
+	path_cstr  := cstring(&path_slice[0])
+	path_len   := len(fmt.bprintf(path_slice, "/proc/%d", pid))
+	// path_len unused here as path_backing[path_len] = 0 is assumed.
+
 	proc_fd, errno := linux.open(path_cstr, _OPENDIR_FLAGS)
 	if errno != .NONE {
 		err = _get_platform_error(errno)
@@ -158,13 +161,63 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 		}
 	}
 
-	if .Working_Dir in selection {
-		_ = fmt.bprintf(path_slice, "/proc/%d/cwd", pid)
-		info.working_dir, _ = _read_link_cstr(path_cstr, allocator) // allowed to fail
+	cmdline_if: if selection & {.Working_Dir, .Command_Line, .Command_Args, .Executable_Path} != {} {
+		path_len = len(fmt.bprintf(path_slice, "/proc/%d/cmdline", pid))
+		path_backing[path_len] = 0
+
+		cmdline_bytes := _read_entire_pseudo_file(path_cstr, temp_allocator()) or_return
+		if len(cmdline_bytes) == 0 {
+			break cmdline_if
+		}
+		cmdline := string(cmdline_bytes)
+
+		terminator := strings.index_byte(cmdline, 0)
+
+		command_line_exec := cmdline[:terminator]
+
+		// Still need cwd if the execution on the command line is relative.
+		cwd: string
+		cwd_err: Error
+		if .Working_Dir in selection || (.Executable_Path in selection && command_line_exec[0] != '/') {
+			path_len = len(fmt.bprintf(path_slice, "/proc/%d/cwd", pid))
+			path_backing[path_len] = 0
+
+			cwd, cwd_err = _read_link_cstr(path_cstr, temp_allocator()) // allowed to fail
+			if cwd_err == nil && .Working_Dir in selection {
+				info.working_dir = strings.clone(cwd, allocator)
+			}
+		}
+
+		if .Executable_Path in selection {
+			if cmdline[0] == '/' {
+				info.executable_path = strings.clone(cmdline[:terminator], allocator)
+			} else if cwd_err == nil {
+				join_paths: [2]string = { cwd, cmdline[:terminator] }
+				info.executable_path = filepath.join(join_paths[:], allocator)
+			}
+		}
+		if .Command_Line in selection {
+			info.command_line = strings.clone(cmdline[:terminator], allocator)
+		}
+
+		if .Command_Args in selection {
+			// skip to first arg
+			cmdline = cmdline[terminator + 1:]
+
+			arg_list := make([dynamic]string, allocator)
+			for len(cmdline) > 0 {
+				terminator = strings.index_byte(cmdline, 0)
+				append(&arg_list, strings.clone(cmdline[:terminator], allocator))
+				cmdline = cmdline[terminator + 1:]
+			}
+			info.command_args = arg_list[:]
+		}
 	}
 
 	stat_if: if selection & {.PPid, .Priority} != {} {
-		_ = fmt.bprintf(path_slice, "/proc/%d/stat", pid)
+		path_len = len(fmt.bprintf(path_slice, "/proc/%d/stat", pid))
+		path_backing[path_len] = 0
+
 		proc_stat_bytes := _read_entire_pseudo_file(path_cstr, temp_allocator()) or_return
 		if len(proc_stat_bytes) <= 0 {
 			break stat_if
@@ -195,38 +248,10 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 		}
 	}
 
-	cmdline_if: if selection & {.Command_Line, .Command_Args, .Executable_Path} != {} {
-		_ = fmt.bprintf(path_slice, "/proc/%d/cmdline", pid)
-		cmdline_bytes := _read_entire_pseudo_file(path_cstr, temp_allocator()) or_return
-		if len(cmdline_bytes) == 0 {
-			break cmdline_if
-		}
-		cmdline := string(cmdline_bytes)
-
-		terminator := strings.index_byte(cmdline, 0)
-		if .Executable_Path in selection {
-			info.executable_path = strings.clone(cmdline[:terminator], allocator)
-		}
-		if .Command_Line in selection {
-			info.command_line = strings.clone(cmdline[:terminator], allocator)
-		}
-
-		if .Command_Args in selection {
-			// skip to first arg
-			cmdline = cmdline[terminator + 1:]
-
-			arg_list := make([dynamic]string, allocator)
-			for len(cmdline) > 0 {
-				terminator = strings.index_byte(cmdline, 0)
-				append(&arg_list, strings.clone(cmdline[:terminator], allocator))
-				cmdline = cmdline[terminator + 1:]
-			}
-			info.command_args = arg_list[:]
-		}
-	}
-
 	if .Environment in selection {
-		_ = fmt.bprintf(path_slice, "/proc/%d/environ", pid)
+		path_len = len(fmt.bprintf(path_slice, "/proc/%d/environ", pid))
+		path_backing[path_len] = 0
+
 		if env_bytes, env_err := _read_entire_pseudo_file(path_cstr, temp_allocator()); env_err == nil {
 			env := string(env_bytes)
 
