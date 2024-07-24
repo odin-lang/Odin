@@ -11,7 +11,7 @@ _fstat :: proc(f: ^File, allocator: runtime.Allocator) -> (File_Info, Error) {
 	return _fstat_internal(impl.fd, allocator)
 }
 
-_fstat_internal :: proc(fd: linux.Fd, allocator: runtime.Allocator) -> (File_Info, Error) {
+_fstat_internal :: proc(fd: linux.Fd, allocator: runtime.Allocator) -> (fi: File_Info, err: Error) {
 	s: linux.Stat
 	errno := linux.fstat(fd, &s)
 	if errno != .NONE {
@@ -30,20 +30,20 @@ _fstat_internal :: proc(fd: linux.Fd, allocator: runtime.Allocator) -> (File_Inf
 	mode := int(0o7777 & transmute(u32)s.mode)
 
 	// TODO: As of Linux 4.11, the new statx syscall can retrieve creation_time
-	fi := File_Info {
-		fullpath = _get_full_path(fd, allocator),
-		name = "",
-		inode = u64(s.ino),
-		size = i64(s.size),
-		mode = mode,
-		type = type,
+	fi = File_Info {
+		fullpath          = _get_full_path(fd, allocator) or_return,
+		name              = "",
+		inode             = u64(s.ino),
+		size              = i64(s.size),
+		mode              = mode,
+		type              = type,
 		modification_time = time.Time {i64(s.mtime.time_sec) * i64(time.Second) + i64(s.mtime.time_nsec)},
-		access_time = time.Time {i64(s.atime.time_sec) * i64(time.Second) + i64(s.atime.time_nsec)},
-		creation_time = time.Time{i64(s.ctime.time_sec) * i64(time.Second) + i64(s.ctime.time_nsec)}, // regular stat does not provide this
+		access_time       = time.Time {i64(s.atime.time_sec) * i64(time.Second) + i64(s.atime.time_nsec)},
+		creation_time     = time.Time{i64(s.ctime.time_sec) * i64(time.Second) + i64(s.ctime.time_nsec)}, // regular stat does not provide this
 	}
 	fi.creation_time = fi.modification_time
 	fi.name = filepath.base(fi.fullpath)
-	return fi, nil
+	return
 }
 
 // NOTE: _stat and _lstat are using _fstat to avoid a race condition when populating fullpath

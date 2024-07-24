@@ -188,7 +188,7 @@ _set_working_directory :: proc(dir: string) -> Error {
 	return _get_platform_error(linux.chdir(dir_cstr))
 }
 
-_get_full_path :: proc(fd: linux.Fd, allocator: runtime.Allocator) -> string {
+_get_full_path :: proc(fd: linux.Fd, allocator: runtime.Allocator) -> (fullpath: string, err: Error) {
 	PROC_FD_PATH :: "/proc/self/fd/"
 
 	buf: [32]u8
@@ -196,10 +196,9 @@ _get_full_path :: proc(fd: linux.Fd, allocator: runtime.Allocator) -> string {
 
 	strconv.itoa(buf[len(PROC_FD_PATH):], int(fd))
 
-	fullpath: string
-	err: Error
 	if fullpath, err = _read_link_cstr(cstring(&buf[0]), allocator); err != nil || fullpath[0] != '/' {
-		return ""
+		delete(fullpath, allocator)
+		fullpath = ""
 	}
-	return fullpath
+	return
 }

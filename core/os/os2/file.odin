@@ -106,7 +106,7 @@ open :: proc(name: string, flags := File_Flags{.Read}, perm := 0o777) -> (^File,
 
 @(require_results)
 new_file :: proc(handle: uintptr, name: string) -> ^File {
-	return _new_file(handle, name)
+	return _new_file(handle, name) or_else panic("Out of memory")
 }
 
 @(require_results)
