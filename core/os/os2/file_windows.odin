@@ -94,7 +94,7 @@ _open_internal :: proc(name: string, flags: File_Flags, perm: int) -> (handle: u
 		create_mode = win32.TRUNCATE_EXISTING
 	}
 
-	attrs: u32 = win32.FILE_ATTRIBUTE_NORMAL
+	attrs: u32 = win32.FILE_ATTRIBUTE_NORMAL|win32.FILE_FLAG_BACKUP_SEMANTICS
 	if perm & S_IWRITE == 0 {
 		attrs = win32.FILE_ATTRIBUTE_READONLY
 		if create_mode == win32.CREATE_ALWAYS {
