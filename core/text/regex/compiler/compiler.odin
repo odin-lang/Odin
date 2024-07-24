@@ -1,5 +1,6 @@
 package regex_compiler
 
+import "base:intrinsics"
 import "core:text/regex/common"
 import "core:text/regex/parser"
 import "core:text/regex/tokenizer"
@@ -408,7 +409,7 @@ compile :: proc(tree: Node, flags: common.Flags) -> (code: Program, class_data: 
 				break add_global
 
 			case .Rune:
-				operand := (cast(^rune)&code[pc+1])^
+				operand := intrinsics.unaligned_load(cast(^rune)&code[pc+1])
 				inject_at(&code, pc_open, Opcode.Wait_For_Rune)
 				pc_open += size_of(Opcode)
 				inject_raw(&code, pc_open, operand)
@@ -490,20 +491,20 @@ compile :: proc(tree: Node, flags: common.Flags) -> (code: Program, class_data: 
 				case .Jump:
 					jmp   := cast(^i16)&code[pc+size_of(Opcode)]
 					if code[cast(i16)pc+jmp^] == .Jump {
-						next_jmp := (cast(^i16)&code[cast(i16)pc+jmp^+size_of(Opcode)])^
+						next_jmp := intrinsics.unaligned_load(cast(^i16)&code[cast(i16)pc+jmp^+size_of(Opcode)])
 						jmp^ = jmp^ + next_jmp
 						do_another_pass = true
 					}
 				case .Split:
 					jmp_x := cast(^i16)&code[pc+size_of(Opcode)]
 					if code[cast(i16)pc+jmp_x^] == .Jump {
-						next_jmp := (cast(^i16)&code[cast(i16)pc+jmp_x^+size_of(Opcode)])^
+						next_jmp := intrinsics.unaligned_load(cast(^i16)&code[cast(i16)pc+jmp_x^+size_of(Opcode)])
 						jmp_x^ = jmp_x^ + next_jmp
 						do_another_pass = true
 					}
 					jmp_y := cast(^i16)&code[pc+size_of(Opcode)+size_of(i16)]
 					if code[cast(i16)pc+jmp_y^] == .Jump {
-						next_jmp := (cast(^i16)&code[cast(i16)pc+jmp_y^+size_of(Opcode)])^
+						next_jmp := intrinsics.unaligned_load(cast(^i16)&code[cast(i16)pc+jmp_y^+size_of(Opcode)])
 						jmp_y^ = jmp_y^ + next_jmp
 						do_another_pass = true
 					}

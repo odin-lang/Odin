@@ -1,5 +1,6 @@
 package regex_compiler
 
+import "base:intrinsics"
 import "core:io"
 import "core:text/regex/common"
 import "core:text/regex/virtual_machine"
@@ -9,11 +10,11 @@ get_jump_targets :: proc(code: []Opcode) -> (jump_targets: map[int]int) {
 	for opcode, pc in virtual_machine.iterate_opcodes(&iter) {
 		#partial switch opcode {
 		case .Jump:
-			jmp   := cast(int)(cast(^u16)&code[pc+1])^
+			jmp   := cast(int)intrinsics.unaligned_load(cast(^u16)&code[pc+1])
 			jump_targets[jmp] = pc
 		case .Split:
-			jmp_x := cast(int)(cast(^u16)&code[pc+1])^
-			jmp_y := cast(int)(cast(^u16)&code[pc+3])^
+			jmp_x := cast(int)intrinsics.unaligned_load(cast(^u16)&code[pc+1])
+			jmp_y := cast(int)intrinsics.unaligned_load(cast(^u16)&code[pc+3])
 			jump_targets[jmp_x] = pc
 			jump_targets[jmp_y] = pc
 		}
@@ -46,18 +47,18 @@ trace :: proc(w: io.Writer, code: []Opcode) {
 			operand := cast(rune)code[pc+1]
 			io.write_encoded_rune(w, operand)
 		case .Rune:
-			operand := (cast(^rune)&code[pc+1])^
+			operand := intrinsics.unaligned_load(cast(^rune)&code[pc+1])
 			io.write_encoded_rune(w, operand)
 		case .Rune_Class, .Rune_Class_Negated:
 			operand := cast(u8)code[pc+1]
 			common.write_padded_hex(w, operand, 2)
 		case .Jump:
-			jmp   := (cast(^u16)&code[pc+1])^
+			jmp   := intrinsics.unaligned_load(cast(^u16)&code[pc+1])
 			io.write_string(w, "-> $")
 			common.write_padded_hex(w, jmp, 4)
 		case .Split:
-			jmp_x := (cast(^u16)&code[pc+1])^
-			jmp_y := (cast(^u16)&code[pc+3])^
+			jmp_x := intrinsics.unaligned_load(cast(^u16)&code[pc+1])
+			jmp_y := intrinsics.unaligned_load(cast(^u16)&code[pc+3])
 			io.write_string(w, "=> $")
 			common.write_padded_hex(w, jmp_x, 4)
 			io.write_string(w, ", $")

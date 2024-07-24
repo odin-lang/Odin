@@ -1,5 +1,6 @@
 package regex_vm
 
+import "base:intrinsics"
 @require import "core:io"
 import "core:slice"
 import "core:text/regex/common"
@@ -121,12 +122,12 @@ add_thread :: proc(vm: ^Machine, saved: ^[2 * common.MAX_CAPTURE_GROUPS]int, pc:
 
 		#partial switch vm.code[pc] {
 		case .Jump:
-			pc = cast(int)(cast(^u16)&vm.code[pc + size_of(Opcode)])^
+			pc = cast(int)intrinsics.unaligned_load(cast(^u16)&vm.code[pc + size_of(Opcode)])
 			continue
 
 		case .Split:
-			jmp_x := cast(int)(cast(^u16)&vm.code[pc + size_of(Opcode)])^
-			jmp_y := cast(int)(cast(^u16)&vm.code[pc + size_of(Opcode) + size_of(u16)])^
+			jmp_x := cast(int)intrinsics.unaligned_load(cast(^u16)&vm.code[pc + size_of(Opcode)])
+			jmp_y := cast(int)intrinsics.unaligned_load(cast(^u16)&vm.code[pc + size_of(Opcode) + size_of(u16)])
 
 			add_thread(vm, saved, jmp_x)
 			pc = jmp_y
@@ -236,7 +237,7 @@ add_thread :: proc(vm: ^Machine, saved: ^[2 * common.MAX_CAPTURE_GROUPS]int, pc:
 			vm.top_thread += 1
 
 		case .Wait_For_Rune:
-			operand := (cast(^rune)&vm.code[pc + size_of(Opcode)])^
+			operand := intrinsics.unaligned_load(cast(^rune)&vm.code[pc + size_of(Opcode)])
 			if vm.next_rune == operand {
 				add_thread(vm, saved, pc + size_of(Opcode) + size_of(rune))
 			}
@@ -409,7 +410,7 @@ run :: proc(vm: ^Machine, $UNICODE_MODE: bool) -> (saved: ^[2 * common.MAX_CAPTU
 				}
 
 			case .Rune:
-				operand := (cast(^rune)&vm.code[t.pc + size_of(Opcode)])^
+				operand := intrinsics.unaligned_load(cast(^rune)&vm.code[t.pc + size_of(Opcode)])
 				if current_rune == operand {
 					add_thread(vm, t.saved, t.pc + size_of(Opcode) + size_of(rune))
 				}
@@ -482,7 +483,7 @@ run :: proc(vm: ^Machine, $UNICODE_MODE: bool) -> (saved: ^[2 * common.MAX_CAPTU
 				vm.top_thread += 1
 
 			case .Wait_For_Rune:
-				operand := (cast(^rune)&vm.code[t.pc + size_of(Opcode)])^
+				operand := intrinsics.unaligned_load(cast(^rune)&vm.code[t.pc + size_of(Opcode)])
 				if vm.next_rune == operand {
 					add_thread(vm, t.saved, t.pc + size_of(Opcode) + size_of(rune))
 				}
@@ -558,7 +559,7 @@ run :: proc(vm: ^Machine, $UNICODE_MODE: bool) -> (saved: ^[2 * common.MAX_CAPTU
 						break escape_loop
 
 					case .Jump:
-						t.pc = cast(int)(cast(^u16)&vm.code[t.pc + size_of(Opcode)])^
+						t.pc = cast(int)intrinsics.unaligned_load(cast(^u16)&vm.code[t.pc + size_of(Opcode)])
 
 					case .Save:
 						index := vm.code[t.pc + size_of(Opcode)]
