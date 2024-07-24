@@ -3,6 +3,7 @@ package test_core_text_regex
 import "core:fmt"
 import "core:io"
 import "core:log"
+import "core:reflect"
 import "core:strings"
 import "core:testing"
 import "core:text/regex"
@@ -54,6 +55,17 @@ check_expression :: proc(t: ^testing.T, pattern, haystack: string, needles: ..st
 		haystack, ..needles, loc = loc)
 	check_expression_with_flags(t, pattern, { .Global, .Unicode, .No_Optimization } + extra_flags,
 		haystack, ..needles, loc = loc)
+}
+
+expect_error :: proc(t: ^testing.T, pattern: string, expected_error: typeid, flags: regex.Flags = {}, loc := #caller_location) {
+	rex, err := regex.create(pattern, flags)
+	regex.destroy(rex)
+
+	variant := reflect.get_union_variant(err)
+	variant_ti := reflect.union_variant_type_info(variant)
+	expected_ti := type_info_of(expected_error)
+
+	testing.expect_value(t, variant_ti, expected_ti, loc = loc)
 }
 
 
@@ -109,12 +121,18 @@ test_rune_range_terminal_dash :: proc(t: ^testing.T) {
 
 @test
 test_rune_range_escaping_class :: proc(t: ^testing.T) {
-	EXPR :: `[\]a\[\.]`
-	check_expression(t, EXPR, "a", "a")
-	check_expression(t, EXPR, "[", "[")
-	check_expression(t, EXPR, "]", "]")
-	check_expression(t, EXPR, ".", ".")
-	check_expression(t, EXPR, "b")
+	{
+		EXPR :: `[\]a\[\.]`
+		check_expression(t, EXPR, "a", "a")
+		check_expression(t, EXPR, "[", "[")
+		check_expression(t, EXPR, "]", "]")
+		check_expression(t, EXPR, ".", ".")
+		check_expression(t, EXPR, "b")
+	}
+	{
+		EXPR :: `a[\\]b`
+		check_expression(t, EXPR, `a\b`, `a\b`)
+	}
 }
 
 @test
@@ -546,8 +564,8 @@ test_unicode_explicitly :: proc(t: ^testing.T) {
 test_no_capture_match :: proc(t: ^testing.T) {
 	EXPR :: "^abc$"
 
-	rex, parse_err := regex.create(EXPR, { .No_Capture })
-	if !testing.expect_value(t, parse_err, nil) {
+	rex, err := regex.create(EXPR, { .No_Capture })
+	if !testing.expect_value(t, err, nil) {
 		return
 	}
 	defer regex.destroy(rex)
@@ -616,7 +634,7 @@ test_optional_inside_optional :: proc(t: ^testing.T) {
 
 @test
 test_printing :: proc(t: ^testing.T) {
-	rex, parse_err := regex.create(`^/a$`, {
+	rex, err := regex.create(`^/a$`, {
 		.Global,
 		.Multiline,
 		.Case_Insensitive,
@@ -625,7 +643,7 @@ test_printing :: proc(t: ^testing.T) {
 		.No_Optimization,
 		.No_Capture,
 	})
-	if !testing.expect_value(t, parse_err, nil) {
+	if !testing.expect_value(t, err, nil) {
 		return
 	}
 	defer regex.destroy(rex)
@@ -640,36 +658,28 @@ test_printing :: proc(t: ^testing.T) {
 
 @test
 test_error_bad_repetitions :: proc(t: ^testing.T) {
-	check_repetition_error :: proc(t: ^testing.T, pattern: string, loc := #caller_location) {
-		rex, err := regex.create(pattern)
-		regex.destroy(rex)
-		parse_err, _ := err.(regex.Parser_Error)
-		_, ok := parse_err.(parser.Invalid_Repetition)
-		if !ok {
-			log.errorf("expected error Invalid_Repetition, got %v", parse_err, location = loc)
-		}
-	}
+	expect_error(t, "a{-1,2}", parser.Invalid_Repetition)
+	expect_error(t, "a{2,1}",  parser.Invalid_Repetition)
+	expect_error(t, "a{bc}",   parser.Invalid_Repetition)
+	expect_error(t, "a{,-3}",  parser.Invalid_Repetition)
+	expect_error(t, "a{d,}",   parser.Invalid_Repetition)
+	expect_error(t, "a{}",     parser.Invalid_Repetition)
+	expect_error(t, "a{0,0}",  parser.Invalid_Repetition)
+	expect_error(t, "a{,0}",   parser.Invalid_Repetition)
+	expect_error(t, "a{,}",    parser.Invalid_Repetition)
 
-	check_repetition_error(t, "a{-1,2}")
-	check_repetition_error(t, "a{2,1}")
-	check_repetition_error(t, "a{bc}")
-	check_repetition_error(t, "a{,-3}")
-	check_repetition_error(t, "a{d,}")
-	check_repetition_error(t, "a{}")
-	check_repetition_error(t, "a{0,0}")
-	check_repetition_error(t, "a{,0}")
-	check_repetition_error(t, "a{,}")
+	// Unclosed braces
+	expect_error(t, "a{",    parser.Unexpected_EOF)
+	expect_error(t, "a{",    parser.Unexpected_EOF)
+	expect_error(t, "a{1,2", parser.Unexpected_EOF)
+	expect_error(t, "a{0,",  parser.Unexpected_EOF)
+	expect_error(t, "a{,3",  parser.Unexpected_EOF)
+	expect_error(t, "a{,",   parser.Unexpected_EOF)
 }
 
 @test
 test_error_invalid_unicode_in_pattern :: proc(t: ^testing.T) {
-	rex, err := regex.create("\xC0", { .Unicode })
-	regex.destroy(rex)
-	parse_err := err.(regex.Parser_Error)
-	_, ok := parse_err.(parser.Invalid_Unicode)
-	if !ok {
-		log.errorf("expected error Invalid_Unicode, got %v", parse_err)
-	}
+	expect_error(t, "\xC0", parser.Invalid_Unicode)
 }
 
 @test
@@ -684,50 +694,26 @@ test_error_invalid_unicode_in_string :: proc(t: ^testing.T) {
 test_error_too_many_capture_groups :: proc(t: ^testing.T) {
 	// NOTE: There are 1 + 9 + 1 capture groups in this pattern.
 	// Remember the implicit capture group 0.
-	rex, err := regex.create("(1)(2)(3)(4)(5)(6)(7)(8)(9) (A)")
-	regex.destroy(rex)
-
-	parse_err, _ := err.(regex.Parser_Error)
-	_, ok := parse_err.(parser.Too_Many_Capture_Groups)
-	if !ok {
-		log.errorf("expected error Too_Many_Capture_Groups, got %v", parse_err)
-	}
+	expect_error(t, "(1)(2)(3)(4)(5)(6)(7)(8)(9) (A)", parser.Too_Many_Capture_Groups)
 }
 
 @test
 test_error_unclosed_paren :: proc(t: ^testing.T) {
-	rex, err := regex.create("(Hellope")
-	regex.destroy(rex)
-
-	parse_err, _ := err.(regex.Parser_Error)
-	_, ok := parse_err.(parser.Expected_Token)
-	if !ok {
-		log.errorf("expected error Expected_Token, got %v", parse_err)
-	}
+	expect_error(t, "(Hellope", parser.Expected_Token)
 }
 
 @test
 test_error_unclosed_class :: proc(t: ^testing.T) {
-	rex, err := regex.create("[helope")
-	regex.destroy(rex)
-
-	parse_err, _ := err.(regex.Parser_Error)
-	_, ok := parse_err.(parser.Unexpected_EOF)
-	if !ok {
-		log.errorf("expected error Unexpected_EOF, got %v", parse_err)
-	}
+	expect_error(t, "[helope", parser.Unexpected_EOF)
+	expect_error(t, `a[\]b`,   parser.Unexpected_EOF)
+	expect_error(t, `a[\b`,    parser.Unexpected_EOF)
+	expect_error(t, `a[\`,     parser.Unexpected_EOF)
+	expect_error(t, `a[`,      parser.Unexpected_EOF)
 }
 
 @test
 test_error_invalid_unicode_in_unclosed_class :: proc(t: ^testing.T) {
-	rex, err := regex.create("[\xC0", { .Unicode })
-	regex.destroy(rex)
-
-	parse_err, _ := err.(regex.Parser_Error)
-	_, ok := parse_err.(parser.Invalid_Unicode)
-	if !ok {
-		log.errorf("expected error Invalid_Unicode, got %v", parse_err)
-	}
+	expect_error(t, "[\xC0", parser.Invalid_Unicode, { .Unicode })
 }
 
 @test
@@ -794,35 +780,18 @@ test_lone_enders :: proc(t: ^testing.T) {
 
 @test
 test_invalid_unary_tokens :: proc(t: ^testing.T) {
-	check_token_error :: proc(t: ^testing.T, pattern: string, loc := #caller_location) {
-		rex, err := regex.create(pattern)
-		regex.destroy(rex)
-		parse_err, _ := err.(regex.Parser_Error)
-		_, ok := parse_err.(parser.Invalid_Token)
-		if !ok {
-			log.errorf("expected error Invalid_Token, got %v", parse_err, location = loc)
-		}
-	}
-	check_token_error(t, `*`)
-	check_token_error(t, `*?`)
-	check_token_error(t, `+`)
-	check_token_error(t, `+?`)
-	check_token_error(t, `?`)
-	check_token_error(t, `??`)
-	check_token_error(t, `{}`)
-	check_token_error(t, `{1,}`)
-	check_token_error(t, `{1,2}`)
-	check_token_error(t, `{,2}`)
+	expect_error(t, `*`,     parser.Invalid_Token)
+	expect_error(t, `*?`,    parser.Invalid_Token)
+	expect_error(t, `+`,     parser.Invalid_Token)
+	expect_error(t, `+?`,    parser.Invalid_Token)
+	expect_error(t, `?`,     parser.Invalid_Token)
+	expect_error(t, `??`,    parser.Invalid_Token)
+	expect_error(t, `{}`,    parser.Invalid_Token)
+	expect_error(t, `{1,}`,  parser.Invalid_Token)
+	expect_error(t, `{1,2}`, parser.Invalid_Token)
+	expect_error(t, `{,2}`,  parser.Invalid_Token)
 
-	{
-		rex, err := regex.create(`\`)
-		regex.destroy(rex)
-		parse_err, _ := err.(regex.Parser_Error)
-		_, ok := parse_err.(parser.Unexpected_EOF)
-		if !ok {
-			log.errorf("expected error Unexpected_EOF, got %v", parse_err)
-		}
-	}
+	expect_error(t, `\`, parser.Unexpected_EOF)
 }
 
 @test
