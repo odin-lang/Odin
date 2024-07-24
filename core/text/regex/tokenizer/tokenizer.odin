@@ -267,7 +267,7 @@ scan :: proc(t: ^Tokenizer) -> (token: Token) {
 				kind = .Rune_Class
 				lit = text
 			} else {
-				return { .EOF, "", pos }
+				kind = .EOF
 			}
 
 		case '{':
@@ -275,7 +275,7 @@ scan :: proc(t: ^Tokenizer) -> (token: Token) {
 				kind = .Repeat_N
 				lit = text
 			} else {
-				return { .EOF, "", pos }
+				kind = .EOF
 			}
 
 		case '(':
