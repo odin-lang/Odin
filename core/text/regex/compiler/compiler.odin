@@ -490,22 +490,25 @@ compile :: proc(tree: Node, flags: common.Flags) -> (code: Program, class_data: 
 				#partial switch opcode {
 				case .Jump:
 					jmp   := cast(^i16)&code[pc+size_of(Opcode)]
-					if code[cast(i16)pc+jmp^] == .Jump {
-						next_jmp := intrinsics.unaligned_load(cast(^i16)&code[cast(i16)pc+jmp^+size_of(Opcode)])
-						jmp^ = jmp^ + next_jmp
+					jmp_value := intrinsics.unaligned_load(jmp)
+					if code[cast(i16)pc+jmp_value] == .Jump {
+						next_jmp := intrinsics.unaligned_load(cast(^i16)&code[cast(i16)pc+jmp_value+size_of(Opcode)])
+						intrinsics.unaligned_store(jmp, jmp_value + next_jmp)
 						do_another_pass = true
 					}
 				case .Split:
 					jmp_x := cast(^i16)&code[pc+size_of(Opcode)]
-					if code[cast(i16)pc+jmp_x^] == .Jump {
-						next_jmp := intrinsics.unaligned_load(cast(^i16)&code[cast(i16)pc+jmp_x^+size_of(Opcode)])
-						jmp_x^ = jmp_x^ + next_jmp
+					jmp_x_value := intrinsics.unaligned_load(jmp_x)
+					if code[cast(i16)pc+jmp_x_value] == .Jump {
+						next_jmp := intrinsics.unaligned_load(cast(^i16)&code[cast(i16)pc+jmp_x_value+size_of(Opcode)])
+						intrinsics.unaligned_store(jmp_x, jmp_x_value + next_jmp)
 						do_another_pass = true
 					}
 					jmp_y := cast(^i16)&code[pc+size_of(Opcode)+size_of(i16)]
-					if code[cast(i16)pc+jmp_y^] == .Jump {
-						next_jmp := intrinsics.unaligned_load(cast(^i16)&code[cast(i16)pc+jmp_y^+size_of(Opcode)])
-						jmp_y^ = jmp_y^ + next_jmp
+					jmp_y_value := intrinsics.unaligned_load(jmp_y)
+					if code[cast(i16)pc+jmp_y_value] == .Jump {
+						next_jmp := intrinsics.unaligned_load(cast(^i16)&code[cast(i16)pc+jmp_y_value+size_of(Opcode)])
+						intrinsics.unaligned_store(jmp_y, jmp_y_value + next_jmp)
 						do_another_pass = true
 					}
 				}
@@ -526,12 +529,12 @@ compile :: proc(tree: Node, flags: common.Flags) -> (code: Program, class_data: 
 		#partial switch opcode {
 		case .Jump:
 			jmp   := cast(^u16)&code[pc+size_of(Opcode)]
-			jmp^   = jmp^   + cast(u16)pc
+			intrinsics.unaligned_store(jmp, intrinsics.unaligned_load(jmp) + cast(u16)pc)
 		case .Split:
 			jmp_x := cast(^u16)&code[pc+size_of(Opcode)]
-			jmp_x^ = jmp_x^ + cast(u16)pc
+			intrinsics.unaligned_store(jmp_x, intrinsics.unaligned_load(jmp_x) + cast(u16)pc)
 			jmp_y := cast(^u16)&code[pc+size_of(Opcode)+size_of(i16)]
-			jmp_y^ = jmp_y^ + cast(u16)pc
+			intrinsics.unaligned_store(jmp_y, intrinsics.unaligned_load(jmp_y) + cast(u16)pc)
 		}
 	}
 
