@@ -28,10 +28,12 @@ _fstat_internal :: proc(fd: linux.Fd, allocator: runtime.Allocator) -> (File_Inf
 	case linux.S_IFSOCK: type = .Socket
 	}
 	mode := int(0o7777 & transmute(u32)s.mode)
+
 	// TODO: As of Linux 4.11, the new statx syscall can retrieve creation_time
 	fi := File_Info {
 		fullpath = _get_full_path(fd, allocator),
 		name = "",
+		inode = u64(s.ino),
 		size = i64(s.size),
 		mode = mode,
 		type = type,

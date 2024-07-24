@@ -8,9 +8,12 @@ Fstat_Callback :: proc(f: ^File, allocator: runtime.Allocator) -> (File_Info, Er
 File_Info :: struct {
 	fullpath:          string,
 	name:              string,
+
+	inode:             u64,
 	size:              i64,
 	mode:              int,
 	type:              File_Type,
+
 	creation_time:     time.Time,
 	modification_time: time.Time,
 	access_time:       time.Time,
