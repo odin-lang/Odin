@@ -681,28 +681,6 @@ test_optional_inside_optional :: proc(t: ^testing.T) {
 	check_expression(t, EXPR, "", "")
 }
 
-@test
-test_printing :: proc(t: ^testing.T) {
-	rex, err := regex.create(`^/a$`, {
-		.Global,
-		.Multiline,
-		.Case_Insensitive,
-		.Unicode,
-		.Ignore_Whitespace,
-		.No_Optimization,
-		.No_Capture,
-	})
-	if !testing.expect_value(t, err, nil) {
-		return
-	}
-	defer regex.destroy(rex)
-
-	str := fmt.tprint(rex)
-	str_hash := fmt.tprintf("%#v", rex)
-	testing.expect_value(t, str, `/^\/a$/gmixun-`)
-	testing.expect_value(t, str_hash, `/^\/a$/gmixun-`)
-}
-
 
 
 @test

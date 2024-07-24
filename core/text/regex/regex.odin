@@ -30,7 +30,6 @@ Capture :: struct {
 }
 
 Regular_Expression :: struct {
-	original_pattern: string,
 	flags: Flags,
 	class_data: []virtual_machine.Rune_Class_Data,
 	program: []virtual_machine.Opcode `fmt:"-"`,
@@ -92,7 +91,6 @@ create :: proc(
 	// allocator so everything can be tightly packed.
 	context.allocator = permanent_allocator
 
-	result.original_pattern = pattern
 	result.flags = flags
 
 	if len(class_data) > 0 {

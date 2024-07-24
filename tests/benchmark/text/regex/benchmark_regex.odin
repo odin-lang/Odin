@@ -111,7 +111,7 @@ global_capture_end_word :: proc(t: ^testing.T) {
 	}
 	defer regex.destroy(rex)
 
-	report := fmt.tprintf("Matching %v over a block of random ASCII text.", rex)
+	report := fmt.tprintf("Matching %q over a block of random ASCII text.", EXPR)
 
 	for size in sizes {
 		data := make([]u8, size)
@@ -151,7 +151,7 @@ global_capture_end_word_unicode :: proc(t: ^testing.T) {
 	}
 	defer regex.destroy(rex)
 
-	report := fmt.tprintf("Matching %v over a block of random Unicode text.", rex)
+	report := fmt.tprintf("Matching %q over a block of random Unicode text.", EXPR)
 
 	for size in sizes {
 		data := make([]u8, size)
@@ -191,7 +191,7 @@ alternations :: proc(t: ^testing.T) {
 	}
 	defer regex.destroy(rex)
 
-	report := fmt.tprintf("Matching %v over a text block of only `a`s.", rex)
+	report := fmt.tprintf("Matching %q over a text block of only `a`s.", EXPR)
 
 	for size in sizes {
 		data := make([]u8, size)
@@ -225,7 +225,7 @@ classes :: proc(t: ^testing.T) {
 	}
 	defer regex.destroy(rex)
 
-	report := fmt.tprintf("Matching %v over a string of spaces with %q at the end.", rex, NEEDLE)
+	report := fmt.tprintf("Matching %q over a string of spaces with %q at the end.", EXPR, NEEDLE)
 
 	for size in sizes {
 		data := make([]u8, size)

@@ -9,7 +9,6 @@ import "core:io"
 import "core:reflect"
 import "core:strconv"
 import "core:strings"
-import "core:text/regex"
 import "core:time"
 import "core:unicode/utf8"
 
@@ -2405,21 +2404,6 @@ fmt_named :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Named) 
 			io.write_byte(fi.writer, '.', &fi.n)
 			write_padded_number(fi, (ns), 9)
 			io.write_string(fi.writer, " +0000 UTC", &fi.n)
-			return
-
-		case regex.Regular_Expression:
-			io.write_byte(fi.writer, '/')
-			for r in a.original_pattern {
-				if r == '/' {
-					io.write_string(fi.writer, `\/`)
-				} else {
-					io.write_rune(fi.writer, r)
-				}
-			}
-			io.write_byte(fi.writer, '/')
-			for flag in a.flags {
-				io.write_byte(fi.writer, regex.Flag_To_Letter[flag])
-			}
 			return
 		}
 	}
