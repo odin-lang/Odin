@@ -399,7 +399,6 @@ _read_entire_pseudo_file :: proc { _read_entire_pseudo_file_string, _read_entire
 _read_entire_pseudo_file_string :: proc(name: string, allocator: runtime.Allocator) -> (b: []u8, e: Error) {
 	TEMP_ALLOCATOR_GUARD()
 	name_cstr := clone_to_cstring(name, temp_allocator()) or_return
-	defer delete(name, temp_allocator())
 	return _read_entire_pseudo_file_cstring(name_cstr, allocator)
 }
 

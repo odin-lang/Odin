@@ -6,7 +6,9 @@ import "base:runtime"
 
 import "core:fmt"
 import "core:mem"
+import "core:sync"
 import "core:time"
+import "core:slice"
 import "core:strings"
 import "core:strconv"
 import "core:sys/linux"
@@ -14,7 +16,16 @@ import "core:path/filepath"
 
 PIDFD_UNASSIGNED  :: ~uintptr(0)
 
-_has_pidfd_open: bool = true // pidfd is still fairly new (Linux 5.3)
+_default_has_pidfd_open: bool = true
+
+// pidfd is still fairly new (Linux 5.3)
+_has_pidfd_open :: proc () -> bool {
+	@thread_local has_pidfd_open: bool = true
+	if has_pidfd_open {
+		has_pidfd_open = sync.atomic_load(&_default_has_pidfd_open)
+	}
+	return has_pidfd_open
+}
 
 @(private="package")
 _exit :: proc "contextless" (code: int) -> ! {
@@ -65,7 +76,7 @@ _process_list :: proc(allocator: runtime.Allocator) -> ([]int, Error) {
 	}
 	defer linux.close(dir_fd)
 
-	dynamic_list := make([dynamic]int, allocator)
+	dynamic_list := make([dynamic]int, temp_allocator())
 
 	buf := make([dynamic]u8, 128, 128, temp_allocator())
 	loop: for {
@@ -94,7 +105,7 @@ _process_list :: proc(allocator: runtime.Allocator) -> ([]int, Error) {
 		}
 	}
 
-	return dynamic_list[:], nil
+	return slice.clone(dynamic_list[:], allocator), nil
 }
 
 @(private="package")
@@ -174,7 +185,7 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 
 		if .Priority in selection {
 			// On 4th field. Priority is field 18 and niceness is field 19.
-			for i := 4; i < 19; i += 1 {
+			for _ in 4..<19 {
 				stats = stats[strings.index_byte(stats, ' ') + 1:]
 			}
 			nice_str := stats[strings.index_byte(stats, ' '):]
@@ -249,13 +260,13 @@ _current_process_info :: proc(selection: Process_Info_Fields, allocator: runtime
 _process_open :: proc(pid: int, _: Process_Open_Flags) -> (process: Process, err: Error) {
 	process.pid = pid
 	process.handle = PIDFD_UNASSIGNED
-	if !_has_pidfd_open {
+	if _has_pidfd_open() {
 		return process, .Unsupported
 	}
 
 	pidfd, errno := linux.pidfd_open(linux.Pid(pid), {})
 	if errno == .ENOSYS {
-		_has_pidfd_open = false
+		sync.atomic_store(&_default_has_pidfd_open, false)
 		return process, .Unsupported
 	}
 	if errno != nil {
@@ -289,7 +300,7 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 	// search PATH if just a plain name is provided
 	executable_name := desc.command[0]
 	executable_path: cstring
-	if !strings.contains_rune(executable_name, '/') {
+	if strings.index_byte(executable_name, '/') == -1 {
 		path_env := get_env("PATH", temp_allocator())
 		path_dirs := filepath.split_list(path_env, temp_allocator())
 		found: bool
@@ -321,8 +332,8 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 	// args and environment need to be a list of cstrings
 	// that are terminated by a nil pointer.
 	cargs := make([]cstring, len(desc.command) + 1, temp_allocator())
-	for i := 0; i < len(desc.command); i += 1{
-		cargs[i] = temp_cstring(desc.command[i]) or_return
+	for command, i in desc.command {
+		cargs[i] = temp_cstring(command) or_return
 	}
 
 	// Use current process' environment if description didn't provide it.
@@ -332,8 +343,8 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 		env = raw_data(export_cstring_environment(temp_allocator()))
 	} else {
 		cenv := make([]cstring, len(desc.env) + 1, temp_allocator())
-		for i := 0; i < len(desc.env); i += 1 {
-			cenv[i] = temp_cstring(desc.env[i]) or_return
+		for env, i in desc.env {
+			cenv[i] = temp_cstring(env) or_return
 		}
 		env = &cenv[0]
 	}
@@ -409,7 +420,7 @@ _process_state_update_times :: proc(p: Process, state: ^Process_State) -> (err: 
 
 	// utime and stime are the 14 and 15th items, respectively, and we are
 	// currently on item 3. Skip 11 items here.
-	for i := 0; i < 11; i += 1 {
+	for _ in 0..<11 {
 		stats = stats[strings.index_byte(stats, ' ') + 1:]
 	}
 
@@ -445,7 +456,7 @@ _process_wait :: proc(process: Process, timeout: time.Duration) -> (process_stat
 		// pidfd_open is fairly new, so don't error out on ENOSYS
 		pid_fd: linux.Pid_FD
 		errno: linux.Errno
-		if _has_pidfd_open {
+		if _has_pidfd_open() {
 			if process.handle == PIDFD_UNASSIGNED {
 				pid_fd, errno = linux.pidfd_open(linux.Pid(process.pid), nil)
 				if errno != .NONE && errno != .ENOSYS {
@@ -481,7 +492,9 @@ _process_wait :: proc(process: Process, timeout: time.Duration) -> (process_stat
 				break
 			}
 		} else {
-			mask: bit_set[0..=63]
+			sync.atomic_store(&_default_has_pidfd_open, false)
+
+			mask: bit_set[0..<64; u64]
 			mask += { int(linux.Signal.SIGCHLD) - 1 }
 
 			org_sigset: linux.Sig_Set
