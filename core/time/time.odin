@@ -390,6 +390,342 @@ clock_from_seconds :: proc "contextless" (nsec: u64) -> (hour, min, sec: int) {
 }
 
 /*
+Formats a `Time` as a 24-hour `HH:MM:SS` string.
+
+**Inputs**:
+- `t`:   The `Time` to format.
+- `buf`: The backing buffer to use.
+
+**Returns**:
+- The formatted string `res`, backed by `buf`.
+
+**Example**:
+
+In order to format the current time, the following code can be used:
+
+```odin
+buf: [8]u8
+now := time.now()
+fmt.println(time.to_string_hms(now, buf[:]))
+```
+*/
+time_to_string_hms :: proc(t: Time, buf: []u8) -> (res: string) #no_bounds_check {
+	assert(len(buf) >= 8)
+	h, m, s := clock(t)
+
+	buf[7] = '0' + u8(s % 10); s /= 10
+	buf[6] = '0' + u8(s)
+	buf[5] = ':'
+	buf[4] = '0' + u8(m % 10); m /= 10
+	buf[3] = '0' + u8(m)
+	buf[2] = ':'
+	buf[1] = '0' + u8(h % 10); h /= 10
+	buf[0] = '0' + u8(h)
+
+	return string(buf[:8])
+}
+
+/*
+Formats a `Duration` as a 24-hour `HH:MM:SS` string.
+
+**Inputs**:
+- `d`:   The `Duration` to format.
+- `buf`: The backing buffer to use.
+
+**Returns**:
+- The formatted string `res`, backed by `buf`.
+
+**Example**:
+
+In order to format a duration, the following code can be used:
+
+```odin
+buf: [8]u8
+d := time.since(earlier)
+fmt.println(time.to_string_hms(d, buf[:]))
+```
+*/
+duration_to_string_hms :: proc(d: Duration, buf: []u8) -> (res: string) #no_bounds_check {
+	return time_to_string_hms(Time{_nsec=i64(d)}, buf)
+}
+
+to_string_hms :: proc{time_to_string_hms, duration_to_string_hms}
+
+
+/*
+Formats a `Time` as a 12-hour `HH:MM:SS pm` string.
+
+**Inputs**:
+- `t`:    The `Time` to format.
+- `buf`:  The backing buffer to use.
+- `ampm`: An optional pair of AM/PM strings to use in place of the default.
+
+**Returns**:
+- The formatted string `res`, backed by `buf`.
+
+**Example**:
+
+In order to format the current time, the following code can be used:
+
+```odin
+buf: [64]u8
+now := time.now()
+fmt.println(time.to_string_hms_12(now, buf[:]))
+fmt.println(time.to_string_hms_12(now, buf[:], {"㏂", "㏘"}))
+```
+*/
+to_string_hms_12 :: proc(t: Time, buf: []u8, ampm: [2]string = {" am", " pm"}) -> (res: string) #no_bounds_check {
+	assert(len(buf) >= 8 + max(len(ampm[0]), len(ampm[1])))
+	h, m, s := clock(t)
+
+	_h := h % 12
+	buf[7] = '0' + u8(s % 10); s /= 10
+	buf[6] = '0' + u8(s)
+	buf[5] = ':'
+	buf[4] = '0' + u8(m % 10); m /= 10
+	buf[3] = '0' + u8(m)
+	buf[2] = ':'
+	buf[1] = '0' + u8(_h% 10); _h /= 10
+	buf[0] = '0' + u8(_h)
+
+	if h < 13 {
+		copy(buf[8:], ampm[0])
+		return string(buf[:8+len(ampm[0])])
+	} else {
+		copy(buf[8:], ampm[1])
+		return string(buf[:8+len(ampm[1])])
+	}
+}
+
+/*
+Formats a `Time` as a `yyyy-mm-dd` date string.
+
+**Inputs**:
+- `t`:    The `Time` to format.
+- `buf`:  The backing buffer to use.
+
+**Returns**:
+- The formatted string `res`, backed by `buf`.
+
+**Example**:
+
+In order to format the current date, the following code can be used:
+
+```odin
+buf: [10]u8
+now := time.now()
+fmt.println(time.to_string_yyyy_mm_dd(now, buf[:]))
+```
+*/
+to_string_yyyy_mm_dd :: proc(t: Time, buf: []u8) -> (res: string) #no_bounds_check {
+	assert(len(buf) >= 10)
+	y, _m, d := date(t)
+	m := u8(_m)
+
+	buf[9] = '0' + u8(d % 10); d /= 10
+	buf[8] = '0' + u8(d % 10)
+	buf[7] = '-'
+	buf[6] = '0' + u8(m % 10); m /= 10
+	buf[5] = '0' + u8(m % 10)
+	buf[4] = '-'
+	buf[3] = '0' + u8(y % 10); y /= 10
+	buf[2] = '0' + u8(y % 10); y /= 10
+	buf[1] = '0' + u8(y % 10); y /= 10
+	buf[0] = '0' + u8(y)
+
+	return string(buf[:10])
+}
+
+/*
+Formats a `Time` as a `yy-mm-dd` date string.
+
+**Inputs**:
+- `t`:    The `Time` to format.
+- `buf`:  The backing buffer to use.
+
+**Returns**:
+- The formatted string `res`, backed by `buf`.
+
+**Example**:
+
+In order to format the current date, the following code can be used:
+
+```odin
+buf: [8]u8
+now := time.now()
+fmt.println(time.to_string_yy_mm_dd(now, buf[:]))
+```
+*/
+to_string_yy_mm_dd :: proc(t: Time, buf: []u8) -> (res: string) #no_bounds_check {
+	assert(len(buf) >= 8)
+	y, _m, d := date(t)
+	y %= 100; m := u8(_m)
+
+	buf[7] = '0' + u8(d % 10); d /= 10
+	buf[6] = '0' + u8(d % 10)
+	buf[5] = '-'
+	buf[4] = '0' + u8(m % 10); m /= 10
+	buf[3] = '0' + u8(m % 10)
+	buf[2] = '-'
+	buf[1] = '0' + u8(y % 10); y /= 10
+	buf[0] = '0' + u8(y)
+
+	return string(buf[:8])
+}
+
+/*
+Formats a `Time` as a `dd-mm-yyyy` date string.
+
+**Inputs**:
+- `t`:    The `Time` to format.
+- `buf`:  The backing buffer to use.
+
+**Returns**:
+- The formatted string `res`, backed by `buf`.
+
+**Example**:
+
+In order to format the current date, the following code can be used:
+
+```odin
+buf: [10]u8
+now := time.now()
+fmt.println(time.to_string_dd_mm_yyyy(now, buf[:]))
+```
+*/
+to_string_dd_mm_yyyy :: proc(t: Time, buf: []u8) -> (res: string) #no_bounds_check {
+	assert(len(buf) >= 10)
+	y, _m, d := date(t)
+	m := u8(_m)
+
+	buf[9] = '0' + u8(y % 10); y /= 10
+	buf[8] = '0' + u8(y % 10); y /= 10
+	buf[7] = '0' + u8(y % 10); y /= 10
+	buf[6] = '0' + u8(y)
+	buf[5] = '-'
+	buf[4] = '0' + u8(m % 10); m /= 10
+	buf[3] = '0' + u8(m % 10)
+	buf[2] = '-'
+	buf[1] = '0' + u8(d % 10); d /= 10
+	buf[0] = '0' + u8(d % 10)
+
+	return string(buf[:10])
+}
+
+/*
+Formats a `Time` as a `dd-mm-yy` date string.
+
+**Inputs**:
+- `t`:    The `Time` to format.
+- `buf`:  The backing buffer to use.
+
+**Returns**:
+- The formatted string `res`, backed by `buf`.
+
+**Example**:
+
+In order to format the current date, the following code can be used:
+
+```odin
+buf: [8]u8
+now := time.now()
+fmt.println(time.to_string_dd_mm_yy(now, buf[:]))
+```
+*/
+to_string_dd_mm_yy :: proc(t: Time, buf: []u8) -> (res: string) #no_bounds_check {
+	assert(len(buf) >= 8)
+	y, _m, d := date(t)
+	y %= 100; m := u8(_m)
+
+	buf[7] = '0' + u8(y % 10); y /= 10
+	buf[6] = '0' + u8(y)
+	buf[5] = '-'
+	buf[4] = '0' + u8(m % 10); m /= 10
+	buf[3] = '0' + u8(m % 10)
+	buf[2] = '-'
+	buf[1] = '0' + u8(d % 10); d /= 10
+	buf[0] = '0' + u8(d % 10)
+
+	return string(buf[:8])
+}
+
+/*
+Formats a `Time` as a `mm-dd-yyyy` date string.
+
+**Inputs**:
+- `t`:    The `Time` to format.
+- `buf`:  The backing buffer to use.
+
+**Returns**:
+- The formatted string `res`, backed by `buf`.
+
+**Example**:
+
+In order to format the current date, the following code can be used:
+
+```odin
+buf: [10]u8
+now := time.now()
+fmt.println(time.to_string_mm_dd_yyyy(now, buf[:]))
+```
+*/
+to_string_mm_dd_yyyy :: proc(t: Time, buf: []u8) -> (res: string) #no_bounds_check {
+	assert(len(buf) >= 10)
+	y, _m, d := date(t)
+	m := u8(_m)
+
+	buf[9] = '0' + u8(y % 10); y /= 10
+	buf[8] = '0' + u8(y % 10); y /= 10
+	buf[7] = '0' + u8(y % 10); y /= 10
+	buf[6] = '0' + u8(y)
+	buf[5] = '-'
+	buf[4] = '0' + u8(d % 10); d /= 10
+	buf[3] = '0' + u8(d % 10)
+	buf[2] = '-'
+	buf[1] = '0' + u8(m % 10); m /= 10
+	buf[0] = '0' + u8(m % 10)
+
+	return string(buf[:10])
+}
+
+/*
+Formats a `Time` as a `mm-dd-yy` date string.
+
+**Inputs**:
+- `t`:    The `Time` to format.
+- `buf`:  The backing buffer to use.
+
+**Returns**:
+- The formatted string `res`, backed by `buf`.
+
+**Example**:
+
+In order to format the current date, the following code can be used:
+
+```odin
+buf: [8]u8
+now := time.now()
+fmt.println(time.to_string_mm_dd_yy(now, buf[:]))
+```
+*/
+to_string_mm_dd_yy :: proc(t: Time, buf: []u8) -> (res: string) #no_bounds_check {
+	assert(len(buf) >= 8)
+	y, _m, d := date(t)
+	y %= 100; m := u8(_m)
+
+	buf[7] = '0' + u8(y % 10); y /= 10
+	buf[6] = '0' + u8(y)
+	buf[5] = '-'
+	buf[4] = '0' + u8(d % 10); d /= 10
+	buf[3] = '0' + u8(d % 10)
+	buf[2] = '-'
+	buf[1] = '0' + u8(m % 10); m /= 10
+	buf[0] = '0' + u8(m % 10)
+
+	return string(buf[:8])
+}
+
+/*
 Read the timestamp counter of the CPU.
 */
 read_cycle_counter :: proc "contextless" () -> u64 {
