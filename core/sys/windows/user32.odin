@@ -570,7 +570,7 @@ WINDOWINFO :: struct {
 PWINDOWINFO :: ^WINDOWINFO
 
 DRAWTEXTPARAMS :: struct {
-	cbSize : UINT,
+	cbSize: UINT,
 	iTabLength: INT,
 	iLeftMargin: INT,
 	iRightMargin: INT,
@@ -631,9 +631,9 @@ GetUserObjectInformationFlags :: enum INT {
 }
 
 USEROBJECTFLAGS :: struct  {
-    fInherit: BOOL,
-    fReserved: BOOL,
-    dwFlags: DWORD,
+	fInherit: BOOL,
+	fReserved: BOOL,
+	dwFlags: DWORD,
 }
 
 PROPENUMPROCW :: #type proc(unnamedParam1: HWND, unnamedParam2: LPCWSTR, unnamedParam3: HANDLE) -> BOOL
@@ -688,18 +688,18 @@ MIIM_BITMAP :: 0x00000080
 MIIM_FTYPE  :: 0x00000100
 
 MENUITEMINFOW :: struct {
-    cbSize: UINT,
-    fMask: UINT,
-    fType: UINT,         // used if MIIM_TYPE (4.0) or MIIM_FTYPE (>4.0)
-    fState: UINT,        // used if MIIM_STATE
-    wID: UINT,           // used if MIIM_ID
-    hSubMenu: HMENU,      // used if MIIM_SUBMENU
-    hbmpChecked: HBITMAP,   // used if MIIM_CHECKMARKS
-    hbmpUnchecked: HBITMAP, // used if MIIM_CHECKMARKS
-    dwItemData: ULONG_PTR,   // used if MIIM_DATA
-    dwTypeData: LPWSTR,    // used if MIIM_TYPE (4.0) or MIIM_STRING (>4.0)
-    cch: UINT,           // used if MIIM_TYPE (4.0) or MIIM_STRING (>4.0)
-    hbmpItem: HBITMAP,      // used if MIIM_BITMAP
+	cbSize: UINT,
+	fMask: UINT,
+	fType: UINT,         // used if MIIM_TYPE (4.0) or MIIM_FTYPE (>4.0)
+	fState: UINT,        // used if MIIM_STATE
+	wID: UINT,           // used if MIIM_ID
+	hSubMenu: HMENU,      // used if MIIM_SUBMENU
+	hbmpChecked: HBITMAP,   // used if MIIM_CHECKMARKS
+	hbmpUnchecked: HBITMAP, // used if MIIM_CHECKMARKS
+	dwItemData: ULONG_PTR,   // used if MIIM_DATA
+	dwTypeData: LPWSTR,    // used if MIIM_TYPE (4.0) or MIIM_STRING (>4.0)
+	cch: UINT,           // used if MIIM_TYPE (4.0) or MIIM_STRING (>4.0)
+	hbmpItem: HBITMAP,      // used if MIIM_BITMAP
 }
 LPMENUITEMINFOW :: ^MENUITEMINFOW
 DISPLAY_DEVICEW :: struct {
@@ -716,7 +716,7 @@ PDISPLAY_DEVICEW :: ^DISPLAY_DEVICEW
 WinEventFlags :: bit_set[WinEventFlag; DWORD]
 
 WinEventFlag :: enum DWORD {
-    SKIPOWNTHREAD  = 0,
-    SKIPOWNPROCESS = 1,
-    INCONTEXT      = 2,
+	SKIPOWNTHREAD  = 0,
+	SKIPOWNPROCESS = 1,
+	INCONTEXT      = 2,
 }
