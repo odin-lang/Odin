@@ -6,7 +6,7 @@ jobs:
     name: NetBSD Build, Check, and Test
     runs-on: ubuntu-latest
     env:
-      PKGSRC_BRANCH: 2024Q1
+      PKGSRC_BRANCH: 2024Q2
     steps:
     - uses: actions/checkout@v4
     - name: Build, Check, and Test
@@ -19,10 +19,7 @@ jobs:
         copyback: false
         prepare: |
           PKG_PATH="https://cdn.NetBSD.org/pub/pkgsrc/packages/NetBSD/$(uname -p)/$(uname -r | cut -d_ -f1)_${PKGSRC_BRANCH}/All" /usr/sbin/pkg_add pkgin
-          pkgin -y in gmake git bash python311
-          pkgin -y in libxml2 perl zstd
-          /usr/sbin/pkg_add https://github.com/andreas-jonsson/llvm17-netbsd-bin/releases/download/pkgsrc-current/llvm-17.0.6.tgz
-          /usr/sbin/pkg_add https://github.com/andreas-jonsson/llvm17-netbsd-bin/releases/download/pkgsrc-current/clang-17.0.6.tgz
+          pkgin -y in gmake git bash python311 llvm clang
           ln -s /usr/pkg/bin/python3.11 /usr/bin/python3
         run: |
           git config --global --add safe.directory $(pwd)
@@ -91,13 +88,13 @@ jobs:
       - name: Download LLVM (MacOS Intel)
         if: matrix.os == 'macos-13'
         run: |
-          brew install llvm@17
+          brew install llvm@17 lua@5.4
           echo "/usr/local/opt/llvm@17/bin" >> $GITHUB_PATH
 
       - name: Download LLVM (MacOS ARM)
         if: matrix.os == 'macos-14'
         run: |
-          brew install llvm@17 wasmtime
+          brew install llvm@17 wasmtime lua@5.4
           echo "/opt/homebrew/opt/llvm@17/bin" >> $GITHUB_PATH
 
       - name: Build Odin
@@ -207,6 +204,7 @@ jobs:
         shell: cmd
         run: |
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat
+          copy vendor\lua\5.4\windows\*.dll .
           odin test tests/vendor -all-packages -define:ODIN_TEST_FANCY=false
       - name: Odin internals tests
         shell: cmd

@@ -1,3 +1,4 @@
+//+build !amd64
 package aes
 
 @(private = "file")

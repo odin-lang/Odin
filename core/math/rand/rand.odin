@@ -618,8 +618,14 @@ shuffle :: proc(array: $T/[]$E, gen := context.random_generator) {
 		return
 	}
 
-	for i := i64(n - 1); i > 0; i -= 1 {
+	i := n - 1
+	for ; i > (1<<31 - 2); i -= 1 {
 		j := int63_max(i + 1, gen)
+		array[i], array[j] = array[j], array[i]
+	}
+
+	for ; i > 0; i -= 1 {
+		j := int31_max(i32(i + 1), gen)
 		array[i], array[j] = array[j], array[i]
 	}
 }

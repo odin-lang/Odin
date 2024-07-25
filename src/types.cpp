@@ -964,7 +964,7 @@ gb_internal Type *alloc_type(TypeKind kind) {
 	// gbAllocator a = heap_allocator();
 	gbAllocator a = permanent_allocator();
 	Type *t = gb_alloc_item(a, Type);
-	zero_item(t);
+	gb_zero_item(t);
 	t->kind = kind;
 	t->cached_size  = -1;
 	t->cached_align = -1;
@@ -1637,6 +1637,26 @@ gb_internal Type *base_array_type(Type *t) {
 	return t;
 }
 
+
+gb_internal Type *base_any_array_type(Type *t) {
+	Type *bt = base_type(t);
+	if (is_type_array(bt)) {
+		return bt->Array.elem;
+	} else if (is_type_slice(bt)) {
+		return bt->Slice.elem;
+	} else if (is_type_dynamic_array(bt)) {
+		return bt->DynamicArray.elem;
+	} else if (is_type_enumerated_array(bt)) {
+		return bt->EnumeratedArray.elem;
+	} else if (is_type_simd_vector(bt)) {
+		return bt->SimdVector.elem;
+	} else if (is_type_matrix(bt)) {
+		return bt->Matrix.elem;
+	}
+	return t;
+}
+
+
 gb_internal bool is_type_generic(Type *t) {
 	t = base_type(t);
 	return t->kind == Type_Generic;
@@ -2011,11 +2031,32 @@ gb_internal bool is_type_valid_bit_set_elem(Type *t) {
 	return false;
 }
 
+
+gb_internal bool is_valid_bit_field_backing_type(Type *type) {
+	if (type == nullptr) {
+		return false;
+	}
+	type = base_type(type);
+	if (is_type_untyped(type)) {
+		return false;
+	}
+	if (is_type_integer(type)) {
+		return true;
+	}
+	if (type->kind == Type_Array) {
+		return is_type_integer(type->Array.elem);
+	}
+	return false;
+}
+
 gb_internal Type *bit_set_to_int(Type *t) {
 	GB_ASSERT(is_type_bit_set(t));
 	Type *bt = base_type(t);
 	Type *underlying = bt->BitSet.underlying;
 	if (underlying != nullptr && is_type_integer(underlying)) {
+		return underlying;
+	}
+	if (underlying != nullptr && is_valid_bit_field_backing_type(underlying)) {
 		return underlying;
 	}
 
@@ -2923,11 +2964,14 @@ gb_internal Type *c_vararg_promote_type(Type *type) {
 
 	if (core->kind == Type_Basic) {
 		switch (core->Basic.kind) {
+		case Basic_f16:
 		case Basic_f32:
 		case Basic_UntypedFloat:
 			return t_f64;
+		case Basic_f16le:
 		case Basic_f32le:
 			return t_f64le;
+		case Basic_f16be:
 		case Basic_f32be:
 			return t_f64be;
 

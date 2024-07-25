@@ -244,7 +244,7 @@ Mode_Bits :: enum {
 	ISVTX  = 9,  // 0o0001000
 	ISGID  = 10, // 0o0002000
 	ISUID  = 11, // 0o0004000
-	IFFIFO = 12, // 0o0010000
+	IFIFO = 12, // 0o0010000
 	IFCHR  = 13, // 0o0020000
 	IFDIR  = 14, // 0o0040000
 	IFREG  = 15, // 0o0100000
@@ -1814,4 +1814,12 @@ EPoll_Ctl_Opcode :: enum i32 {
 	ADD = 1,
 	DEL = 2,
 	MOD = 3,
+}
+
+/*
+	Bits for execveat(2) flags.
+*/
+Execveat_Flags_Bits :: enum {
+	AT_SYMLINK_NOFOLLOW = 8,
+	AT_EMPTY_PATH       = 12,
 }

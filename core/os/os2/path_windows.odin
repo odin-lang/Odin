@@ -12,14 +12,15 @@ _is_path_separator :: proc(c: byte) -> bool {
 	return c == '\\' || c == '/'
 }
 
-_mkdir :: proc(name: string, perm: File_Mode) -> Error {
-	if !win32.CreateDirectoryW(_fix_long_path(name), nil) {
+_mkdir :: proc(name: string, perm: int) -> Error {
+	TEMP_ALLOCATOR_GUARD()
+	if !win32.CreateDirectoryW(_fix_long_path(name, temp_allocator()) or_return, nil) {
 		return _get_platform_error()
 	}
 	return nil
 }
 
-_mkdir_all :: proc(path: string, perm: File_Mode) -> Error {
+_mkdir_all :: proc(path: string, perm: int) -> Error {
 	fix_root_directory :: proc(p: string) -> (s: string, allocated: bool, err: runtime.Allocator_Error) {
 		if len(p) == len(`\\?\c:`) {
 			if is_path_separator(p[0]) && is_path_separator(p[1]) && p[2] == '?' && is_path_separator(p[3]) && p[5] == ':' {
@@ -33,9 +34,9 @@ _mkdir_all :: proc(path: string, perm: File_Mode) -> Error {
 
 	TEMP_ALLOCATOR_GUARD()
 
-	dir, err := stat(path, temp_allocator())
+	dir_stat, err := stat(path, temp_allocator())
 	if err == nil {
-		if dir.is_directory {
+		if dir_stat.type == .Directory {
 			return nil
 		}
 		return .Exist
@@ -61,8 +62,8 @@ _mkdir_all :: proc(path: string, perm: File_Mode) -> Error {
 
 	err = mkdir(path, perm)
 	if err != nil {
-		dir1, err1 := lstat(path, temp_allocator())
-		if err1 == nil && dir1.is_directory {
+		new_dir_stat, err1 := lstat(path, temp_allocator())
+		if err1 == nil && new_dir_stat.type == .Directory {
 			return nil
 		}
 		return err
@@ -71,41 +72,114 @@ _mkdir_all :: proc(path: string, perm: File_Mode) -> Error {
 }
 
 _remove_all :: proc(path: string) -> Error {
-	// TODO(bill): _remove_all for windows
+	if path == "" {
+		return nil
+	}
+
+	err := remove(path)
+	if err == nil || err == .Not_Exist {
+		return nil
+	}
+
+	TEMP_ALLOCATOR_GUARD()
+	dir := win32_utf8_to_wstring(path, temp_allocator()) or_return
+
+	empty: [1]u16
+
+	file_op := win32.SHFILEOPSTRUCTW {
+		nil,
+		win32.FO_DELETE,
+		dir,
+		&empty[0],
+		win32.FOF_NOCONFIRMATION | win32.FOF_NOERRORUI | win32.FOF_SILENT,
+		false,
+		nil,
+		&empty[0],
+	}
+	res := win32.SHFileOperationW(&file_op)
+	if res != 0 {
+		return _get_platform_error()
+	}
 	return nil
 }
 
-_getwd :: proc(allocator: runtime.Allocator) -> (dir: string, err: Error) {
-	// TODO(bill)
-	return "", nil
+@private cwd_lock: win32.SRWLOCK // zero is initialized
+
+_get_working_directory :: proc(allocator: runtime.Allocator) -> (dir: string, err: Error) {
+	win32.AcquireSRWLockExclusive(&cwd_lock)
+
+	TEMP_ALLOCATOR_GUARD()
+
+	sz_utf16 := win32.GetCurrentDirectoryW(0, nil)
+	dir_buf_wstr := make([]u16, sz_utf16, temp_allocator()) or_return
+
+	sz_utf16 = win32.GetCurrentDirectoryW(win32.DWORD(len(dir_buf_wstr)), raw_data(dir_buf_wstr))
+	assert(int(sz_utf16)+1 == len(dir_buf_wstr)) // the second time, it _excludes_ the NUL.
+
+	win32.ReleaseSRWLockExclusive(&cwd_lock)
+
+	return win32_utf16_to_utf8(dir_buf_wstr, allocator)
 }
 
-_setwd :: proc(dir: string) -> (err: Error) {
-	// TODO(bill)
-	return nil
-}
+_set_working_directory :: proc(dir: string) -> (err: Error) {
+	TEMP_ALLOCATOR_GUARD()
+	wstr := win32_utf8_to_wstring(dir, temp_allocator()) or_return
 
+	win32.AcquireSRWLockExclusive(&cwd_lock)
+
+	if !win32.SetCurrentDirectoryW(wstr) {
+		err = _get_platform_error()
+	}
+
+	win32.ReleaseSRWLockExclusive(&cwd_lock)
+
+	return
+}
 
 can_use_long_paths: bool
 
 @(init)
 init_long_path_support :: proc() {
-	// TODO(bill): init_long_path_support
-	// ADD THIS SHIT
-	// registry_path := win32.L(`Computer\HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\FileSystem\LongPathsEnabled`)
 	can_use_long_paths = false
+
+	key: win32.HKEY
+	res := win32.RegOpenKeyExW(win32.HKEY_LOCAL_MACHINE, win32.L(`SYSTEM\CurrentControlSet\Control\FileSystem`), 0, win32.KEY_READ, &key)
+	defer win32.RegCloseKey(key)
+	if res != 0 {
+		return
+	}
+
+	value: u32
+	size := u32(size_of(value))
+	res = win32.RegGetValueW(
+		key,
+		nil,
+		win32.L("LongPathsEnabled"),
+		win32.RRF_RT_ANY,
+		nil,
+		&value,
+		&size,
+	)
+	if res != 0 {
+		return
+	}
+	if value == 1 {
+		can_use_long_paths = true
+	}
+
 }
 
-
-_fix_long_path_slice :: proc(path: string) -> []u16 {
-	return win32.utf8_to_utf16(_fix_long_path_internal(path))
+@(require_results)
+_fix_long_path_slice :: proc(path: string, allocator: runtime.Allocator) -> ([]u16, runtime.Allocator_Error) {
+	return win32_utf8_to_utf16(_fix_long_path_internal(path), allocator)
 }
 
-_fix_long_path :: proc(path: string) -> win32.wstring {
-	return win32.utf8_to_wstring(_fix_long_path_internal(path))
+@(require_results)
+_fix_long_path :: proc(path: string, allocator: runtime.Allocator) -> (win32.wstring, runtime.Allocator_Error) {
+	return win32_utf8_to_wstring(_fix_long_path_internal(path), allocator)
 }
 
-
+@(require_results)
 _fix_long_path_internal :: proc(path: string) -> string {
 	if can_use_long_paths {
 		return path
@@ -162,5 +236,4 @@ _fix_long_path_internal :: proc(path: string) -> string {
 	}
 
 	return string(path_buf[:w])
-
 }

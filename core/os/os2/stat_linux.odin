@@ -7,31 +7,43 @@ import "core:sys/linux"
 import "core:path/filepath"
 
 _fstat :: proc(f: ^File, allocator: runtime.Allocator) -> (File_Info, Error) {
-	return _fstat_internal(f.impl.fd, allocator)
+	impl := (^File_Impl)(f.impl)
+	return _fstat_internal(impl.fd, allocator)
 }
 
-_fstat_internal :: proc(fd: linux.Fd, allocator: runtime.Allocator) -> (File_Info, Error) {
+_fstat_internal :: proc(fd: linux.Fd, allocator: runtime.Allocator) -> (fi: File_Info, err: Error) {
 	s: linux.Stat
 	errno := linux.fstat(fd, &s)
 	if errno != .NONE {
 		return {}, _get_platform_error(errno)
 	}
+	type := File_Type.Regular
+	switch s.mode & linux.S_IFMT {
+	case linux.S_IFBLK:  type = .Block_Device
+	case linux.S_IFCHR:  type = .Character_Device
+	case linux.S_IFDIR:  type = .Directory
+	case linux.S_IFIFO:  type = .Named_Pipe
+	case linux.S_IFLNK:  type = .Symlink
+	case linux.S_IFREG:  type = .Regular
+	case linux.S_IFSOCK: type = .Socket
+	}
+	mode := int(0o7777 & transmute(u32)s.mode)
 
 	// TODO: As of Linux 4.11, the new statx syscall can retrieve creation_time
-	fi := File_Info {
-		fullpath = _get_full_path(fd, allocator),
-		name = "",
-		size = i64(s.size),
-		mode = 0,
-		is_directory = linux.S_ISDIR(s.mode),
+	fi = File_Info {
+		fullpath          = _get_full_path(fd, allocator) or_return,
+		name              = "",
+		inode             = u128(u64(s.ino)),
+		size              = i64(s.size),
+		mode              = mode,
+		type              = type,
 		modification_time = time.Time {i64(s.mtime.time_sec) * i64(time.Second) + i64(s.mtime.time_nsec)},
-		access_time = time.Time {i64(s.atime.time_sec) * i64(time.Second) + i64(s.atime.time_nsec)},
-		creation_time = time.Time{i64(s.ctime.time_sec) * i64(time.Second) + i64(s.ctime.time_nsec)}, // regular stat does not provide this
+		access_time       = time.Time {i64(s.atime.time_sec) * i64(time.Second) + i64(s.atime.time_nsec)},
+		creation_time     = time.Time{i64(s.ctime.time_sec) * i64(time.Second) + i64(s.ctime.time_nsec)}, // regular stat does not provide this
 	}
 	fi.creation_time = fi.modification_time
-
 	fi.name = filepath.base(fi.fullpath)
-	return fi, nil
+	return
 }
 
 // NOTE: _stat and _lstat are using _fstat to avoid a race condition when populating fullpath

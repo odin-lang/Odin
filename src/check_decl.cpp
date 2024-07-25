@@ -182,8 +182,7 @@ gb_internal void override_entity_in_scope(Entity *original_entity, Entity *new_e
 	original_entity->type = new_entity->type;
 	original_entity->aliased_of = new_entity;
 
-	Ast *empty_ident = nullptr;
-	original_entity->identifier.compare_exchange_strong(empty_ident, new_entity->identifier);
+	original_entity->identifier.store(new_entity->identifier);
 
 	if (original_entity->identifier.load() != nullptr &&
 	    original_entity->identifier.load()->kind == Ast_Ident) {
@@ -1868,6 +1867,15 @@ gb_internal bool check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *de
 	check_scope_usage(ctx->checker, ctx->scope, check_vet_flags(body));
 
 	add_deps_from_child_to_parent(decl);
+
+	for (VariadicReuseData const &vr : decl->variadic_reuses) {
+		GB_ASSERT(vr.slice_type->kind == Type_Slice);
+		Type *elem = vr.slice_type->Slice.elem;
+		i64 size = type_size_of(elem);
+		i64 align = type_align_of(elem);
+		decl->variadic_reuse_max_bytes = gb_max(decl->variadic_reuse_max_bytes, size*vr.max_count);
+		decl->variadic_reuse_max_align = gb_max(decl->variadic_reuse_max_align, align);
+	}
 
 	return true;
 }

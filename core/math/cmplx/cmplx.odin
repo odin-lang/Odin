@@ -229,7 +229,7 @@ sqrt_complex128 :: proc "contextless" (x: complex128) -> complex128 {
 }
 
 ln_complex32 :: proc "contextless" (x: complex32) -> complex32 {
-	return complex(math.ln(abs(x)), phase(x))
+	return complex32(ln_complex64(complex64(x)))
 }
 ln_complex64 :: proc "contextless" (x: complex64) -> complex64 {
 	return complex(math.ln(abs(x)), phase(x))
@@ -240,26 +240,7 @@ ln_complex128 :: proc "contextless" (x: complex128) -> complex128 {
 
 
 exp_complex32 :: proc "contextless" (x: complex32) -> complex32 {
-	switch re, im := real(x), imag(x); {
-	case math.is_inf(re, 0):
-		switch {
-		case re > 0 && im == 0:
-			return x
-		case math.is_inf(im, 0) || math.is_nan(im):
-			if re < 0 {
-				return complex(0, math.copy_sign(0, im))
-			} else {
-				return complex(math.inf_f64(1.0), math.nan_f64())
-			}
-		}
-	case math.is_nan(re):
-		if im == 0 {
-			return complex(math.nan_f16(), im)
-		}
-	}
-	r := math.exp(real(x))
-	s, c := math.sincos(imag(x))
-	return complex(r*c, r*s)
+	return complex32(exp_complex64(complex64(x)))
 }
 exp_complex64 :: proc "contextless" (x: complex64) -> complex64 {
 	switch re, im := real(x), imag(x); {
@@ -308,37 +289,7 @@ exp_complex128 :: proc "contextless" (x: complex128) -> complex128 {
 
 
 pow_complex32 :: proc "contextless" (x, y: complex32) -> complex32 {
-	if x == 0 { // Guaranteed also true for x == -0.
-		if is_nan(y) {
-			return nan_complex32()
-		}
-		r, i := real(y), imag(y)
-		switch {
-		case r == 0:
-			return 1
-		case r < 0:
-			if i == 0 {
-				return complex(math.inf_f16(1), 0)
-			}
-			return inf_complex32()
-		case r > 0:
-			return 0
-		}
-		unreachable()
-	}
-	modulus := abs(x)
-	if modulus == 0 {
-		return complex(0, 0)
-	}
-	r := math.pow(modulus, real(y))
-	arg := phase(x)
-	theta := real(y) * arg
-	if imag(y) != 0 {
-		r *= math.exp(-imag(y) * arg)
-		theta += imag(y) * math.ln(modulus)
-	}
-	s, c := math.sincos(theta)
-	return complex(r*c, r*s)
+	return complex32(pow_complex64(complex64(x), complex64(y)))
 }
 pow_complex64 :: proc "contextless" (x, y: complex64) -> complex64 {
 	if x == 0 { // Guaranteed also true for x == -0.
@@ -410,7 +361,7 @@ pow_complex128 :: proc "contextless" (x, y: complex128) -> complex128 {
 
 
 log10_complex32 :: proc "contextless" (x: complex32) -> complex32 {
-	return math.LN10*ln(x)
+	return complex32(log10_complex64(complex64(x)))
 }
 log10_complex64 :: proc "contextless" (x: complex64) -> complex64 {
 	return math.LN10*ln(x)
@@ -421,7 +372,7 @@ log10_complex128 :: proc "contextless" (x: complex128) -> complex128 {
 
 
 phase_complex32 :: proc "contextless" (x:  complex32) -> f16 {
-	return math.atan2(imag(x), real(x))
+	return f16(phase_complex64(complex64(x)))
 }
 phase_complex64 :: proc "contextless" (x:  complex64) -> f32 {
 	return math.atan2(imag(x), real(x))
@@ -432,8 +383,7 @@ phase_complex128 :: proc "contextless" (x:  complex128) -> f64 {
 
 
 rect_complex32 :: proc "contextless" (r, θ: f16) -> complex32 {
-	s, c := math.sincos(θ)
-	return complex(r*c, r*s)
+	return complex32(rect_complex64(f32(r), f32(θ)))
 }
 rect_complex64 :: proc "contextless" (r, θ: f32) -> complex64 {
 	s, c := math.sincos(θ)

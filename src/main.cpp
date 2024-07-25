@@ -394,6 +394,7 @@ enum BuildFlagKind {
 	BuildFlag_InternalIgnorePanic,
 	BuildFlag_InternalModulePerFile,
 	BuildFlag_InternalCached,
+	BuildFlag_InternalNoInline,
 
 	BuildFlag_Tilde,
 
@@ -598,12 +599,14 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_InternalIgnorePanic,     str_lit("internal-ignore-panic"),     BuildFlagParam_None,    Command_all);
 	add_flag(&build_flags, BuildFlag_InternalModulePerFile,   str_lit("internal-module-per-file"),  BuildFlagParam_None,    Command_all);
 	add_flag(&build_flags, BuildFlag_InternalCached,          str_lit("internal-cached"),           BuildFlagParam_None,    Command_all);
+	add_flag(&build_flags, BuildFlag_InternalNoInline,        str_lit("internal-no-inline"),        BuildFlagParam_None,    Command_all);
 
 #if ALLOW_TILDE
 	add_flag(&build_flags, BuildFlag_Tilde,                   str_lit("tilde"),                     BuildFlagParam_None,    Command__does_build);
 #endif
 
 	add_flag(&build_flags, BuildFlag_Sanitize,                str_lit("sanitize"),                  BuildFlagParam_String,  Command__does_build, true);
+
 
 #if defined(GB_SYSTEM_WINDOWS)
 	add_flag(&build_flags, BuildFlag_IgnoreVsSearch,          str_lit("ignore-vs-search"),          BuildFlagParam_None,    Command__does_build);
@@ -1416,10 +1419,14 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							break;
 						case BuildFlag_InternalModulePerFile:
 							build_context.module_per_file = true;
+							build_context.use_separate_modules = true;
 							break;
 						case BuildFlag_InternalCached:
 							build_context.cached = true;
 							build_context.use_separate_modules = true;
+							break;
+						case BuildFlag_InternalNoInline:
+							build_context.internal_no_inline = true;
 							break;
 
 						case BuildFlag_Tilde:
@@ -1440,6 +1447,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 								bad_flags = true;
 							}
 							break;
+
 
 					#if defined(GB_SYSTEM_WINDOWS)
 						case BuildFlag_IgnoreVsSearch: {
@@ -2164,7 +2172,7 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 		if (LB_USE_NEW_PASS_SYSTEM) {
 			print_usage_line(3, "-o:aggressive");
 		}
-		print_usage_line(2, "The default is -o:none.");
+		print_usage_line(2, "The default is -o:minimal.");
 		print_usage_line(0, "");
 	}
 
@@ -2310,9 +2318,9 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-use-separate-modules");
-		print_usage_line(1, "[EXPERIMENTAL]");
 		print_usage_line(2, "The backend generates multiple build units which are then linked together.");
 		print_usage_line(2, "Normally, a single build unit is generated for a standard project.");
+		print_usage_line(2, "This is the default behaviour on Windows for '-o:none' and '-o:minimal' builds.");
 		print_usage_line(0, "");
 
 	}

@@ -688,7 +688,7 @@ Sock_Addr_In6 :: struct #packed {
 }
 
 /*
-  Struct representing Unix Domain Socket address
+	Struct representing Unix Domain Socket address
 */
 Sock_Addr_Un :: struct #packed {
 	sun_family: Address_Family,
@@ -1303,3 +1303,8 @@ EPoll_Event :: struct #packed {
 	events: EPoll_Event_Kind,
 	data:   EPoll_Data,
 }
+
+/*
+	Flags for execveat(2) syscall.
+*/
+Execveat_Flags :: bit_set[Execveat_Flags_Bits; i32]

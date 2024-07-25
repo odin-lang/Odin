@@ -161,7 +161,7 @@ test_pbkdf2 :: proc(t: ^testing.T) {
 		testing.expectf(
 			t,
 			dst_str == v.dk,
-			"HMAC-%s: Expected: %s for input of (%s, %s, %d), but got %s instead",
+			"PBKDF2-%s: Expected: %s for input of (%s, %s, %d), but got %s instead",
 			algo_name,
 			v.dk,
 			v.password,

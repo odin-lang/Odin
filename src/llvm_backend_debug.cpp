@@ -1187,6 +1187,7 @@ gb_internal void add_debug_info_for_global_constant_from_entity(lbGenerator *gen
 	if (USE_SEPARATE_MODULES) {
 		m = lb_module_of_entity(gen, e);
 	}
+	GB_ASSERT(m != nullptr);
 
 	if (is_type_integer(e->type)) {
 		ExactValue const &value = e->Constant.value;

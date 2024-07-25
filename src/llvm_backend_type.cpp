@@ -421,7 +421,7 @@ gb_internal void lb_setup_type_info_data_giant_array(lbModule *m, i64 global_typ
 			}
 			TokenPos pos = t->Named.type_name->token.pos;
 
-			lbValue loc = lb_const_source_code_location_const(m, proc_name, pos);
+			lbValue loc = lb_const_source_code_location_as_global_ptr(m, proc_name, pos);
 
 			LLVMValueRef vals[4] = {
 				lb_const_string(m, t->Named.type_name->token.string).value,
@@ -810,19 +810,18 @@ gb_internal void lb_setup_type_info_data_giant_array(lbModule *m, i64 global_typ
 		case Type_Struct: {
 			tag_type = t_type_info_struct;
 
-			LLVMValueRef vals[13] = {};
+			LLVMValueRef vals[11] = {};
 
 			{
-				lbValue is_packed       = lb_const_bool(m, t_bool, t->Struct.is_packed);
-				lbValue is_raw_union    = lb_const_bool(m, t_bool, t->Struct.is_raw_union);
-				lbValue is_no_copy      = lb_const_bool(m, t_bool, t->Struct.is_no_copy);
-				lbValue is_custom_align = lb_const_bool(m, t_bool, t->Struct.custom_align != 0);
-				vals[5] = is_packed.value;
-				vals[6] = is_raw_union.value;
-				vals[7] = is_no_copy.value;
-				vals[8] = is_custom_align.value;
+				u8 flags = 0;
+				if (t->Struct.is_packed)    flags |= 1<<0;
+				if (t->Struct.is_raw_union) flags |= 1<<1;
+				if (t->Struct.is_no_copy)   flags |= 1<<2;
+				if (t->Struct.custom_align) flags |= 1<<3;
+
+				vals[6] = lb_const_int(m, t_u8, flags).value;
 				if (is_type_comparable(t) && !is_type_simple_compare(t)) {
-					vals[9] = lb_equal_proc_for_type(m, t).value;
+					vals[10] = lb_equal_proc_for_type(m, t).value;
 				}
 
 
@@ -831,11 +830,11 @@ gb_internal void lb_setup_type_info_data_giant_array(lbModule *m, i64 global_typ
 
 					lbValue soa_kind = lb_const_value(m, kind_type, exact_value_i64(t->Struct.soa_kind));
 					LLVMValueRef soa_type = get_type_info_ptr(m, t->Struct.soa_elem);
-					lbValue soa_len = lb_const_int(m, t_int, t->Struct.soa_count);
+					lbValue soa_len = lb_const_int(m, t_i32, t->Struct.soa_count);
 
-					vals[10] = soa_kind.value;
-					vals[11] = soa_type;
-					vals[12] = soa_len.value;
+					vals[7] = soa_kind.value;
+					vals[8] = soa_len.value;
+					vals[9] = soa_type;
 				}
 			}
 
@@ -882,12 +881,13 @@ gb_internal void lb_setup_type_info_data_giant_array(lbModule *m, i64 global_typ
 
 				}
 
-				lbValue cv = lb_const_int(m, t_int, count);
-				vals[0] = llvm_const_slice(m, memory_types,   cv);
-				vals[1] = llvm_const_slice(m, memory_names,   cv);
-				vals[2] = llvm_const_slice(m, memory_offsets, cv);
-				vals[3] = llvm_const_slice(m, memory_usings,  cv);
-				vals[4] = llvm_const_slice(m, memory_tags,    cv);
+				lbValue cv = lb_const_int(m, t_i32, count);
+				vals[0] = memory_types.value;
+				vals[1] = memory_names.value;
+				vals[2] = memory_offsets.value;
+				vals[3] = memory_usings.value;
+				vals[4] = memory_tags.value;
+				vals[5] = cv.value;
 			}
 			for (isize i = 0; i < gb_count_of(vals); i++) {
 				if (vals[i] == nullptr) {
@@ -994,7 +994,7 @@ gb_internal void lb_setup_type_info_data_giant_array(lbModule *m, i64 global_typ
 			{
 				tag_type = t_type_info_bit_field;
 
-				LLVMValueRef vals[6] = {};
+				LLVMValueRef vals[7] = {};
 				vals[0] = get_type_info_ptr(m, t->BitField.backing_type);
 				isize count = t->BitField.fields.count;
 				if (count > 0) {
@@ -1035,11 +1035,12 @@ gb_internal void lb_setup_type_info_data_giant_array(lbModule *m, i64 global_typ
 					}
 
 					lbValue cv = lb_const_int(m, t_int, count);
-					vals[1] = llvm_const_slice(m, memory_names,       cv);
-					vals[2] = llvm_const_slice(m, memory_types,       cv);
-					vals[3] = llvm_const_slice(m, memory_bit_sizes,   cv);
-					vals[4] = llvm_const_slice(m, memory_bit_offsets, cv);
-					vals[5] = llvm_const_slice(m, memory_tags,        cv);
+					vals[1] =  memory_names.value;
+					vals[2] =  memory_types.value;
+					vals[3] =  memory_bit_sizes.value;
+					vals[4] =  memory_bit_offsets.value;
+					vals[5] =  memory_tags.value;
+					vals[6] =  cv.value;
 				}
 
 

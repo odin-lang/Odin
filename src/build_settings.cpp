@@ -440,6 +440,8 @@ struct BuildContext {
 	bool   cached;
 	BuildCacheData build_cache_data;
 
+	bool internal_no_inline;
+
 	bool   no_threaded_checker;
 
 	bool   show_debug_messages;
@@ -1649,10 +1651,23 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 	if (!bc->custom_optimization_level) {
 		// NOTE(bill): when building with `-debug` but not specifying an optimization level
 		// default to `-o:none` to improve the debug symbol generation by default
-		bc->optimization_level = -1; // -o:none
+		if (bc->ODIN_DEBUG) {
+			bc->optimization_level = -1; // -o:none
+		} else {
+			bc->optimization_level = 0; // -o:minimal
+		}
 	}
 
 	bc->optimization_level = gb_clamp(bc->optimization_level, -1, 3);
+
+#if defined(GB_SYSTEM_WINDOWS)
+	if (bc->optimization_level <= 0) {
+		if (!is_arch_wasm()) {
+			bc->use_separate_modules = true;
+		}
+	}
+#endif
+
 
 	// TODO: Static map calls are bugged on `amd64sysv` abi.
 	if (bc->metrics.os != TargetOs_windows && bc->metrics.arch == TargetArch_amd64) {

@@ -29,8 +29,9 @@ gb_internal void lb_init_module(lbModule *m, Checker *c) {
 		module_name = gb_string_appendc(module_name, "-builtin");
 	}
 
+	m->module_name = module_name ? module_name : "odin_package";
 	m->ctx = LLVMContextCreate();
-	m->mod = LLVMModuleCreateWithNameInContext(module_name ? module_name : "odin_package", m->ctx);
+	m->mod = LLVMModuleCreateWithNameInContext(m->module_name, m->ctx);
 	// m->debug_builder = nullptr;
 	if (build_context.ODIN_DEBUG) {
 		enum {DEBUG_METADATA_VERSION = 3};
@@ -71,7 +72,7 @@ gb_internal void lb_init_module(lbModule *m, Checker *c) {
 	map_init(&m->hasher_procs);
 	map_init(&m->map_get_procs);
 	map_init(&m->map_set_procs);
-	if (build_context.use_separate_modules) {
+	if (USE_SEPARATE_MODULES) {
 		array_init(&m->procedures_to_generate, a, 0, 1<<10);
 		map_init(&m->procedure_values,               1<<11);
 	} else {
@@ -150,6 +151,8 @@ gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c) {
 		LLVMContextRef ctx = LLVMGetModuleContext(m->mod);
 		map_set(&gen->modules_through_ctx, ctx, m);
 	}
+
+	mpsc_init(&gen->entities_to_correct_linkage, heap_allocator());
 
 	return true;
 }
@@ -387,12 +390,14 @@ gb_internal lbModule *lb_module_of_entity(lbGenerator *gen, Entity *e) {
 	if (e->file) {
 		found = map_get(&gen->modules, cast(void *)e->file);
 		if (found) {
+			GB_ASSERT(*found != nullptr);
 			return *found;
 		}
 	}
 	if (e->pkg) {
 		found = map_get(&gen->modules, cast(void *)e->pkg);
 		if (found) {
+			GB_ASSERT(*found != nullptr);
 			return *found;
 		}
 	}
@@ -1018,6 +1023,8 @@ gb_internal void lb_emit_store(lbProcedure *p, lbValue ptr, lbValue value) {
 			LLVMTypeRef rawptr_type = lb_type(p->module, t_rawptr);
 			LLVMTypeRef rawptr_ptr_type = LLVMPointerType(rawptr_type, 0);
 			LLVMBuildStore(p->builder, LLVMConstNull(rawptr_type), LLVMBuildBitCast(p->builder, ptr.value, rawptr_ptr_type, ""));
+		} else if (is_type_bit_set(a)) {
+			lb_mem_zero_ptr(p, ptr.value, a, 1);
 		} else if (lb_sizeof(src_t) <= lb_max_zero_init_size()) {
 			LLVMBuildStore(p->builder, LLVMConstNull(src_t), ptr.value);
 		} else {
@@ -1105,7 +1112,7 @@ gb_internal lbValue lb_emit_load(lbProcedure *p, lbValue value) {
 		return lb_addr_load(p, addr);
 	}
 
-	GB_ASSERT(is_type_pointer(value.type));
+	GB_ASSERT_MSG(is_type_pointer(value.type), "%s", type_to_string(value.type));
 	Type *t = type_deref(value.type);
 	LLVMValueRef v = LLVMBuildLoad2(p->builder, lb_type(p->module, t), value.value, "");
 
@@ -1530,7 +1537,7 @@ gb_internal void lb_clone_struct_type(LLVMTypeRef dst, LLVMTypeRef src) {
 	LLVMStructSetBody(dst, fields, field_count, LLVMIsPackedStruct(src));
 }
 
-gb_internal String lb_mangle_name(lbModule *m, Entity *e) {
+gb_internal String lb_mangle_name(Entity *e) {
 	String name = e->token.string;
 
 	AstPackage *pkg = e->pkg;
@@ -1630,6 +1637,7 @@ gb_internal String lb_set_nested_type_name_ir_mangled_name(Entity *e, lbProcedur
 }
 
 gb_internal String lb_get_entity_name(lbModule *m, Entity *e, String default_name) {
+	GB_ASSERT(m != nullptr);
 	if (e != nullptr && e->kind == Entity_TypeName && e->TypeName.ir_mangled_name.len != 0) {
 		return e->TypeName.ir_mangled_name;
 	}
@@ -1661,7 +1669,7 @@ gb_internal String lb_get_entity_name(lbModule *m, Entity *e, String default_nam
 	}
 
 	if (!no_name_mangle) {
-		name = lb_mangle_name(m, e);
+		name = lb_mangle_name(e);
 	}
 	if (name.len == 0) {
 		name = e->token.string;
@@ -3045,7 +3053,7 @@ gb_internal lbValue lb_find_value_from_entity(lbModule *m, Entity *e) {
 			if (e->code_gen_module != nullptr) {
 				other_module = e->code_gen_module;
 			} else {
-				other_module = nullptr;
+				other_module = &m->gen->default_module;
 			}
 			is_external = other_module != m;
 		}
@@ -3062,8 +3070,6 @@ gb_internal lbValue lb_find_value_from_entity(lbModule *m, Entity *e) {
 			LLVMSetLinkage(g.value, LLVMExternalLinkage);
 
 			lb_set_entity_from_other_modules_linkage_correctly(other_module, e, name);
-
-			// LLVMSetLinkage(other_g.value, LLVMExternalLinkage);
 
 			if (e->Variable.thread_local_model != "") {
 				LLVMSetThreadLocal(g.value, true);
@@ -3088,7 +3094,9 @@ gb_internal lbValue lb_find_value_from_entity(lbModule *m, Entity *e) {
 			return g;
 		}
 	}
-	GB_PANIC("\n\tError in: %s, missing value '%.*s'\n", token_pos_to_string(e->token.pos), LIT(e->token.string));
+
+	GB_PANIC("\n\tError in: %s, missing value '%.*s' in module %s\n",
+	         token_pos_to_string(e->token.pos), LIT(e->token.string), m->module_name);
 	return {};
 }
 

@@ -17,11 +17,11 @@ gb_internal bool recursively_delete_directory(wchar_t *wpath_c) {
 
 	wchar_t dir_path[MAX_PATH] = {};
 	wchar_t filename[MAX_PATH] = {};
-	wcscpy(dir_path, wpath_c);
-	wcscat(dir_path, L"\\*");
+	wcscpy_s(dir_path, wpath_c);
+	wcscat_s(dir_path, L"\\*");
 
-	wcscpy(filename, wpath_c);
-	wcscat(filename, L"\\");
+	wcscpy_s(filename, wpath_c);
+	wcscat_s(filename, L"\\");
 
 
 	WIN32_FIND_DATAW find_file_data = {};
@@ -31,21 +31,21 @@ gb_internal bool recursively_delete_directory(wchar_t *wpath_c) {
 	}
 	defer (FindClose(hfind));
 
-	wcscpy(dir_path, filename);
+	wcscpy_s(dir_path, filename);
 
 	for (;;) {
 		if (FindNextFileW(hfind, &find_file_data)) {
 			if (is_dots_w(find_file_data.cFileName)) {
 				continue;
 			}
-			wcscat(filename, find_file_data.cFileName);
+			wcscat_s(filename, find_file_data.cFileName);
 
 			if (find_file_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
 				if (!recursively_delete_directory(filename)) {
 					return false;
 				}
 				RemoveDirectoryW(filename);
-				wcscpy(filename, dir_path);
+				wcscpy_s(filename, dir_path);
 			} else {
 				if (find_file_data.dwFileAttributes & FILE_ATTRIBUTE_READONLY) {
 					_wchmod(filename, _S_IWRITE);
@@ -53,7 +53,7 @@ gb_internal bool recursively_delete_directory(wchar_t *wpath_c) {
 				if (!DeleteFileW(filename)) {
 					return false;
 				}
-				wcscpy(filename, dir_path);
+				wcscpy_s(filename, dir_path);
 			}
 		} else {
 			if (GetLastError() == ERROR_NO_MORE_FILES) {

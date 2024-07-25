@@ -334,6 +334,27 @@ panicf :: proc(fmt: string, args: ..any, loc := #caller_location) -> ! {
 	message := tprintf(fmt, ..args)
 	p("Panic", message, loc)
 }
+
+// 	Creates a formatted C string
+//
+// 	*Allocates Using Context's Allocator*
+//
+// 	Inputs:
+// 	- args: A variadic list of arguments to be formatted.
+// 	- sep: An optional separator string (default is a single space).
+//
+// 	Returns: A formatted C string.
+//
+@(require_results)
+caprint :: proc(args: ..any, sep := " ", allocator := context.allocator) -> cstring {
+	str: strings.Builder
+	strings.builder_init(&str, allocator)
+	sbprint(&str, ..args, sep=sep)
+	strings.write_byte(&str, 0)
+	s := strings.to_string(str)
+	return cstring(raw_data(s))
+}
+
 // Creates a formatted C string
 //
 // *Allocates Using Context's Allocator*
@@ -346,9 +367,9 @@ panicf :: proc(fmt: string, args: ..any, loc := #caller_location) -> ! {
 // Returns: A formatted C string
 //
 @(require_results)
-caprintf :: proc(format: string, args: ..any, newline := false) -> cstring {
+caprintf :: proc(format: string, args: ..any, allocator := context.allocator, newline := false) -> cstring {
 	str: strings.Builder
-	strings.builder_init(&str)
+	strings.builder_init(&str, allocator)
 	sbprintf(&str, format, ..args, newline=newline)
 	strings.write_byte(&str, 0)
 	s := strings.to_string(str)
@@ -365,8 +386,8 @@ caprintf :: proc(format: string, args: ..any, newline := false) -> cstring {
 // Returns: A formatted C string
 //
 @(require_results)
-caprintfln :: proc(format: string, args: ..any) -> cstring {
-	return caprintf(format, ..args, newline=true)
+caprintfln :: proc(format: string, args: ..any, allocator := context.allocator) -> cstring {
+	return caprintf(format, ..args, allocator=allocator, newline=true)
 }
 // 	Creates a formatted C string
 //
@@ -380,12 +401,7 @@ caprintfln :: proc(format: string, args: ..any) -> cstring {
 //
 @(require_results)
 ctprint :: proc(args: ..any, sep := " ") -> cstring {
-	str: strings.Builder
-	strings.builder_init(&str, context.temp_allocator)
-	sbprint(&str, ..args, sep=sep)
-	strings.write_byte(&str, 0)
-	s := strings.to_string(str)
-	return cstring(raw_data(s))
+	return caprint(args=args, sep=sep, allocator=context.temp_allocator)
 }
 // Creates a formatted C string
 //
@@ -400,12 +416,7 @@ ctprint :: proc(args: ..any, sep := " ") -> cstring {
 //
 @(require_results)
 ctprintf :: proc(format: string, args: ..any, newline := false) -> cstring {
-	str: strings.Builder
-	strings.builder_init(&str, context.temp_allocator)
-	sbprintf(&str, format, ..args, newline=newline)
-	strings.write_byte(&str, 0)
-	s := strings.to_string(str)
-	return cstring(raw_data(s))
+	return caprintf(format=format, args=args, allocator=context.temp_allocator, newline=newline)
 }
 // Creates a formatted C string, followed by a newline.
 //
@@ -419,7 +430,7 @@ ctprintf :: proc(format: string, args: ..any, newline := false) -> cstring {
 //
 @(require_results)
 ctprintfln :: proc(format: string, args: ..any) -> cstring {
-	return ctprintf(format, ..args, newline=true)
+	return caprintf(format=format, args=args, allocator=context.temp_allocator, newline=true)
 }
 // Formats using the default print settings and writes to the given strings.Builder
 //
@@ -1861,7 +1872,7 @@ handle_tag :: proc(state: ^Info_State, data: rawptr, info: reflect.Type_Info_Str
 		if optional_len == nil {
 			return
 		}
-		for f, i in info.names {
+		for f, i in info.names[:info.field_count] {
 			if f != field_name {
 				continue
 			}
@@ -1965,7 +1976,7 @@ fmt_struct :: proc(fi: ^Info, v: any, the_verb: rune, info: runtime.Type_Info_St
 		fmt_bad_verb(fi, the_verb)
 		return
 	}
-	if info.is_raw_union {
+	if .raw_union in info.flags {
 		if type_name == "" {
 			io.write_string(fi.writer, "(raw union)", &fi.n)
 		} else {
@@ -1989,7 +2000,7 @@ fmt_struct :: proc(fi: ^Info, v: any, the_verb: rune, info: runtime.Type_Info_St
 	// fi.hash = false;
 	fi.indent += 1
 
-	is_empty := len(info.names) == 0
+	is_empty := info.field_count == 0
 
 	if !is_soa && hash && !is_empty {
 		io.write_byte(fi.writer, '\n', &fi.n)
@@ -2010,17 +2021,17 @@ fmt_struct :: proc(fi: ^Info, v: any, the_verb: rune, info: runtime.Type_Info_St
 			base_type_name = v.name
 		}
 
-		actual_field_count := len(info.names)
+		actual_field_count := info.field_count
 
 		n := uintptr(info.soa_len)
 
 		if info.soa_kind == .Slice {
-			actual_field_count = len(info.names)-1 // len
+			actual_field_count = info.field_count-1 // len
 
 			n = uintptr((^int)(uintptr(v.data) + info.offsets[actual_field_count])^)
 
 		} else if info.soa_kind == .Dynamic {
-			actual_field_count = len(info.names)-3 // len, cap, allocator
+			actual_field_count = info.field_count-3 // len, cap, allocator
 
 			n = uintptr((^int)(uintptr(v.data) + info.offsets[actual_field_count])^)
 		}
@@ -2099,7 +2110,7 @@ fmt_struct :: proc(fi: ^Info, v: any, the_verb: rune, info: runtime.Type_Info_St
 		}
 	} else {
 		field_count := -1
-		for name, i in info.names {
+		for name, i in info.names[:info.field_count] {
 			optional_len: int = -1
 			use_nul_termination: bool = false
 			verb := the_verb if the_verb == 'w' else 'v'
@@ -2605,7 +2616,7 @@ fmt_bit_field :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Bit
 
 
 	field_count := -1
-	for name, i in info.names {
+	for name, i in info.names[:info.field_count] {
 		field_verb := verb
 		if handle_bit_field_tag(v.data, info, i, &field_verb) {
 			continue
@@ -2751,9 +2762,11 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 			elem := runtime.type_info_base(info.elem)
 			if elem != nil {
 				if n, ok := fi.optional_len.?; ok {
+					fi.optional_len = nil
 					fmt_array(fi, ptr, n, elem.size, elem, verb)
 					return
 				} else if fi.use_nul_termination {
+					fi.use_nul_termination = false
 					fmt_array_nul_terminated(fi, ptr, -1, elem.size, elem, verb)
 					return
 				}
@@ -2855,8 +2868,10 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 		n := info.count
 		ptr := v.data
 		if ol, ok := fi.optional_len.?; ok {
+			fi.optional_len = nil
 			n = min(n, ol)
 		} else if fi.use_nul_termination {
+			fi.use_nul_termination = false
 			fmt_array_nul_terminated(fi, ptr, n, info.elem_size, info.elem, verb)
 			return
 		}
@@ -2867,8 +2882,10 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 		n := slice.len
 		ptr := slice.data
 		if ol, ok := fi.optional_len.?; ok {
+			fi.optional_len = nil
 			n = min(n, ol)
 		} else if fi.use_nul_termination {
+			fi.use_nul_termination = false
 			fmt_array_nul_terminated(fi, ptr, n, info.elem_size, info.elem, verb)
 			return
 		}
@@ -2879,8 +2896,10 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 		n := array.len
 		ptr := array.data
 		if ol, ok := fi.optional_len.?; ok {
+			fi.optional_len = nil
 			n = min(n, ol)
 		} else if fi.use_nul_termination {
+			fi.use_nul_termination = false
 			fmt_array_nul_terminated(fi, ptr, n, info.elem_size, info.elem, verb)
 			return
 		}

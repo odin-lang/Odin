@@ -112,17 +112,17 @@ gb_internal isize ast_node_size(AstKind kind) {
 
 }
 
-gb_global std::atomic<isize> global_total_node_memory_allocated;
+// gb_global std::atomic<isize> global_total_node_memory_allocated;
 
 // NOTE(bill): And this below is why is I/we need a new language! Discriminated unions are a pain in C/C++
 gb_internal Ast *alloc_ast_node(AstFile *f, AstKind kind) {
 	isize size = ast_node_size(kind);
 
-	Ast *node = cast(Ast *)arena_alloc(&global_thread_local_ast_arena, size, 16);
+	Ast *node = cast(Ast *)arena_alloc(get_arena(ThreadArena_Permanent), size, 16);
 	node->kind = kind;
 	node->file_id = f ? f->id : 0;
 
-	global_total_node_memory_allocated.fetch_add(size);
+	// global_total_node_memory_allocated.fetch_add(size);
 
 	return node;
 }
@@ -4014,6 +4014,7 @@ struct ParseFieldPrefixMapping {
 gb_global ParseFieldPrefixMapping const parse_field_prefix_mappings[] = {
 	{str_lit("using"),        Token_using,     FieldFlag_using},
 	{str_lit("no_alias"),     Token_Hash,      FieldFlag_no_alias},
+	{str_lit("no_capture"),   Token_Hash,      FieldFlag_no_capture},
 	{str_lit("c_vararg"),     Token_Hash,      FieldFlag_c_vararg},
 	{str_lit("const"),        Token_Hash,      FieldFlag_const},
 	{str_lit("any_int"),      Token_Hash,      FieldFlag_any_int},
@@ -5412,7 +5413,7 @@ gb_internal ParseFileError init_ast_file(AstFile *f, String const &fullpath, Tok
 	if (!string_ends_with(f->fullpath, str_lit(".odin"))) {
 		return ParseFile_WrongExtension;
 	}
-	zero_item(&f->tokenizer);
+	gb_zero_item(&f->tokenizer);
 	f->tokenizer.curr_file_id = f->id;
 
 	TokenizerInitError err = init_tokenizer_from_fullpath(&f->tokenizer, f->fullpath, build_context.copy_file_contents);
@@ -5608,7 +5609,7 @@ gb_internal AstPackage *try_add_import_path(Parser *p, String path, String const
 	pkg->foreign_files.allocator = permanent_allocator();
 
 	// NOTE(bill): Single file initial package
-	if (kind == Package_Init && string_ends_with(path, FILE_EXT)) {
+	if (kind == Package_Init && !path_is_directory(path) && string_ends_with(path, FILE_EXT)) {
 		FileInfo fi = {};
 		fi.name = filename_from_path(path);
 		fi.fullpath = path;
@@ -6528,6 +6529,7 @@ gb_internal ParseFileError parse_packages(Parser *p, String init_filename) {
 	GB_ASSERT(init_filename.text[init_filename.len] == 0);
 
 	String init_fullpath = path_to_full_path(permanent_allocator(), init_filename);
+
 	if (!path_is_directory(init_fullpath)) {
 		String const ext = str_lit(".odin");
 		if (!string_ends_with(init_fullpath, ext)) {
@@ -6541,9 +6543,8 @@ gb_internal ParseFileError parse_packages(Parser *p, String init_filename) {
 		}
 		if ((build_context.command_kind & Command__does_build) &&
 		    build_context.build_mode == BuildMode_Executable) {
-			String short_path = filename_from_path(path);
-			char *cpath = alloc_cstring(temporary_allocator(), short_path);
-			if (gb_file_exists(cpath)) {
+			String output_path = path_to_string(temporary_allocator(), build_context.build_paths[8]);
+			if (path_is_directory(output_path)) {
 			    	error({}, "Please specify the executable name with -out:<string> as a directory exists with the same name in the current working directory");
 			    	return ParseFile_DirectoryAlreadyExists;
 			}

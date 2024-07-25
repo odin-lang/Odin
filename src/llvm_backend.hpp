@@ -147,6 +147,7 @@ struct lbModule {
 	CheckerInfo *info;
 	AstPackage *pkg; // possibly associated
 	AstFile *file;   // possibly associated
+	char const *module_name;
 
 	PtrMap<Type *, LLVMTypeRef> types;                             // mutex: types_mutex
 	PtrMap<void *, lbStructFieldRemapping> struct_field_remapping; // Key: LLVMTypeRef or Type *, mutex: types_mutex
@@ -200,6 +201,12 @@ struct lbModule {
 	LLVMPassManagerRef function_pass_managers[lbFunctionPassManager_COUNT];
 };
 
+struct lbEntityCorrection {
+	lbModule *  other_module;
+	Entity *    e;
+	char const *cname;
+};
+
 struct lbGenerator : LinkerData {
 	CheckerInfo *info;
 
@@ -218,6 +225,8 @@ struct lbGenerator : LinkerData {
 	lbProcedure *startup_runtime;
 	lbProcedure *cleanup_runtime;
 	lbProcedure *objc_names;
+
+	MPSCQueue<lbEntityCorrection> entities_to_correct_linkage;
 };
 
 
@@ -296,6 +305,11 @@ enum lbProcedureFlag : u32 {
 	lbProcedureFlag_DebugAllocaCopy = 1<<1,
 };
 
+struct lbVariadicReuseSlices {
+	Type *slice_type;
+	lbAddr slice_addr;
+};
+
 struct lbProcedure {
 	u32 flags;
 	u16 state_flags;
@@ -336,8 +350,10 @@ struct lbProcedure {
 	bool             in_multi_assignment;
 	Array<LLVMValueRef> raw_input_parameters;
 
-	LLVMValueRef temp_callee_return_struct_memory;
+	Array<lbVariadicReuseSlices> variadic_reuses;
+	lbAddr variadic_reuse_base_array_ptr;
 
+	LLVMValueRef temp_callee_return_struct_memory;
 	Ast *curr_stmt;
 
 	Array<Scope *>       scope_stack;
@@ -364,7 +380,7 @@ struct lbProcedure {
 
 gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c);
 
-gb_internal String lb_mangle_name(lbModule *m, Entity *e);
+gb_internal String lb_mangle_name(Entity *e);
 gb_internal String lb_get_entity_name(lbModule *m, Entity *e, String name = {});
 
 gb_internal LLVMAttributeRef lb_create_enum_attribute(LLVMContextRef ctx, char const *name, u64 value=0);
@@ -382,7 +398,7 @@ gb_internal lbBlock *lb_create_block(lbProcedure *p, char const *name, bool appe
 
 gb_internal lbValue lb_const_nil(lbModule *m, Type *type);
 gb_internal lbValue lb_const_undef(lbModule *m, Type *type);
-gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_local=true);
+gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_local=true, bool is_rodata=false);
 gb_internal lbValue lb_const_bool(lbModule *m, Type *type, bool value);
 gb_internal lbValue lb_const_int(lbModule *m, Type *type, u64 value);
 

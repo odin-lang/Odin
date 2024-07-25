@@ -50,15 +50,6 @@ gb_internal bool check_rtti_type_disallowed(Ast *expr, Type *type, char const *f
 	return check_rtti_type_disallowed(ast_token(expr), type, format);
 }
 
-gb_internal void scope_reset(Scope *scope) {
-	if (scope == nullptr) return;
-
-	rw_mutex_lock(&scope->mutex);
-	scope->head_child.store(nullptr, std::memory_order_relaxed);
-	string_map_clear(&scope->elements);
-	ptr_set_clear(&scope->imported);
-	rw_mutex_unlock(&scope->mutex);
-}
 
 gb_internal void scope_reserve(Scope *scope, isize count) {
 	string_map_reserve(&scope->elements, 2*count);
@@ -168,9 +159,6 @@ gb_internal void import_graph_node_swap(ImportGraphNode **data, isize i, isize j
 }
 
 
-
-
-
 gb_internal void init_decl_info(DeclInfo *d, Scope *scope, DeclInfo *parent) {
 	gb_zero_item(d);
 	if (parent) {
@@ -184,6 +172,9 @@ gb_internal void init_decl_info(DeclInfo *d, Scope *scope, DeclInfo *parent) {
 	ptr_set_init(&d->deps, 0);
 	ptr_set_init(&d->type_info_deps, 0);
 	d->labels.allocator = heap_allocator();
+	d->variadic_reuses.allocator = heap_allocator();
+	d->variadic_reuse_max_bytes = 0;
+	d->variadic_reuse_max_align = 1;
 }
 
 gb_internal DeclInfo *make_decl_info(Scope *scope, DeclInfo *parent) {
@@ -381,6 +372,7 @@ gb_internal Entity *scope_lookup_current(Scope *s, String const &name) {
 	return nullptr;
 }
 
+
 gb_internal void scope_lookup_parent(Scope *scope, String const &name, Scope **scope_, Entity **entity_) {
 	if (scope != nullptr) {
 		bool gone_thru_proc = false;
@@ -508,9 +500,15 @@ end:;
 	return result;
 }
 
+gb_global bool in_single_threaded_checker_stage = false;
+
 gb_internal Entity *scope_insert(Scope *s, Entity *entity) {
 	String name = entity->token.string;
-	return scope_insert_with_name(s, name, entity);
+	if (in_single_threaded_checker_stage) {
+		return scope_insert_with_name_no_mutex(s, name, entity);
+	} else {
+		return scope_insert_with_name(s, name, entity);
+	}
 }
 
 gb_internal Entity *scope_insert_no_mutex(Scope *s, Entity *entity) {
@@ -655,7 +653,7 @@ gb_internal bool check_vet_shadowing(Checker *c, Entity *e, VettedEntity *ve) {
 		}
 	}
 
-	zero_item(ve);
+	gb_zero_item(ve);
 	ve->kind = VettedEntity_Shadowed;
 	ve->entity = e;
 	ve->other = shadowed;
@@ -674,7 +672,7 @@ gb_internal bool check_vet_unused(Checker *c, Entity *e, VettedEntity *ve) {
 			}
 		case Entity_ImportName:
 		case Entity_LibraryName:
-			zero_item(ve);
+			gb_zero_item(ve);
 			ve->kind = VettedEntity_Unused;
 			ve->entity = e;
 			return true;
@@ -1114,7 +1112,11 @@ gb_internal void init_universal(void) {
 		int minimum_os_version = 0;
 		if (build_context.minimum_os_version_string != "") {
 			int major, minor, revision = 0;
+		#if defined(GB_SYSTEM_WINDOWS)
+			sscanf_s(cast(const char *)(build_context.minimum_os_version_string.text), "%d.%d.%d", &major, &minor, &revision);
+		#else
 			sscanf(cast(const char *)(build_context.minimum_os_version_string.text), "%d.%d.%d", &major, &minor, &revision);
+		#endif
 			minimum_os_version = (major*10000)+(minor*100)+revision;
 		}
 		add_global_constant("ODIN_MINIMUM_OS_VERSION", t_untyped_integer, exact_value_i64(minimum_os_version));
@@ -1386,7 +1388,7 @@ gb_internal void reset_checker_context(CheckerContext *ctx, AstFile *file, Untyp
 	auto type_path = ctx->type_path;
 	array_clear(type_path);
 
-	zero_size(&ctx->pkg, gb_size_of(CheckerContext) - gb_offset_of(CheckerContext, pkg));
+	gb_zero_size(&ctx->pkg, gb_size_of(CheckerContext) - gb_offset_of(CheckerContext, pkg));
 
 	ctx->file = nullptr;
 	ctx->scope = builtin_pkg->scope;
@@ -1788,8 +1790,7 @@ gb_internal void add_entity_use(CheckerContext *c, Ast *identifier, Entity *enti
 	if (identifier == nullptr || identifier->kind != Ast_Ident) {
 		return;
 	}
-	Ast *empty_ident = nullptr;
-	entity->identifier.compare_exchange_strong(empty_ident, identifier);
+	entity->identifier.store(identifier);
 
 	identifier->Ident.entity = entity;
 
@@ -4584,6 +4585,8 @@ gb_internal void check_single_global_entity(Checker *c, Entity *e, DeclInfo *d) 
 }
 
 gb_internal void check_all_global_entities(Checker *c) {
+	in_single_threaded_checker_stage = true;
+
 	// NOTE(bill): This must be single threaded
 	// Don't bother trying
 	for_array(i, c->info.entities) {
@@ -4603,6 +4606,8 @@ gb_internal void check_all_global_entities(Checker *c) {
 			(void)type_align_of(e->type);
 		}
 	}
+
+	in_single_threaded_checker_stage = false;
 }
 
 

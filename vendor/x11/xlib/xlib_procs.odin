@@ -49,7 +49,7 @@ foreign xlib {
 	DisplayString     :: proc(display: ^Display) -> cstring ---
 	// Display macros (defaults)
 	DefaultColormap   :: proc(display: ^Display, screen_no: i32) -> Colormap ---
-	DefaultDepth      :: proc(display: ^Display) -> i32 ---
+	DefaultDepth      :: proc(display: ^Display, screen_no: i32) -> i32 ---
 	DefaultGC         :: proc(display: ^Display, screen_no: i32) -> GC ---
 	DefaultRootWindow :: proc(display: ^Display) -> Window ---
 	DefaultScreen     :: proc(display: ^Display) -> i32 ---
@@ -138,8 +138,8 @@ foreign xlib {
 		width:     u32,
 		height:    u32,
 		bordersz:  u32,
-		border:    int,
-		bg:        int,
+		border:    uint,
+		bg:        uint,
 		) -> Window ---
 	DestroyWindow     :: proc(display: ^Display, window: Window) ---
 	DestroySubwindows :: proc(display: ^Display, window: Window) ---

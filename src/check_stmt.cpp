@@ -1060,6 +1060,9 @@ gb_internal void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags
 	if (ss->tag != nullptr) {
 		check_expr(ctx, &x, ss->tag);
 		check_assignment(ctx, &x, nullptr, str_lit("switch expression"));
+		if (x.type == nullptr) {
+			return;
+		}
 	} else {
 		x.mode  = Addressing_Constant;
 		x.type  = t_bool;
@@ -1834,7 +1837,7 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 
 			if (rs->vals.count == 1) {
 				Type *t = type_deref(operand.type);
-				if (is_type_map(t) || is_type_bit_set(t)) {
+				if (t != NULL && (is_type_map(t) || is_type_bit_set(t))) {
 					gbString v = expr_to_string(rs->vals[0]);
 					defer (gb_string_free(v));
 					error_line("\tSuggestion: place parentheses around the expression\n");
@@ -2514,7 +2517,7 @@ gb_internal void check_return_stmt(CheckerContext *ctx, Ast *node) {
 			Entity *e = entity_of_node(x);
 			if (is_entity_local_variable(e)) {
 				unsafe_return_error(o, "the address of a local variable");
-			} else if(x->kind == Ast_CompoundLit) {
+			} else if (x->kind == Ast_CompoundLit) {
 				unsafe_return_error(o, "the address of a compound literal");
 			} else if (x->kind == Ast_IndexExpr) {
 				Entity *f = entity_of_node(x->IndexExpr.expr);
@@ -2528,6 +2531,14 @@ gb_internal void check_return_stmt(CheckerContext *ctx, Ast *node) {
 				if (f && (is_type_matrix(f->type) && is_entity_local_variable(f))) {
 					unsafe_return_error(o, "the address of an indexed variable", f->type);
 				}
+			}
+		} else if (expr->kind == Ast_SliceExpr) {
+			Ast *x = unparen_expr(expr->SliceExpr.expr);
+			Entity *e = entity_of_node(x);
+			if (is_entity_local_variable(e) && is_type_array(e->type)) {
+				unsafe_return_error(o, "a slice of a local variable");
+			} else if (x->kind == Ast_CompoundLit) {
+				unsafe_return_error(o, "a slice of a compound literal");
 			}
 		} else if (o.mode == Addressing_Constant && is_type_slice(o.type)) {
 			ERROR_BLOCK();

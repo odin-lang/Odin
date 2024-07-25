@@ -939,22 +939,6 @@ gb_internal void check_enum_type(CheckerContext *ctx, Type *enum_type, Type *nam
 	enum_type->Enum.max_value_index = max_value_index;
 }
 
-gb_internal bool is_valid_bit_field_backing_type(Type *type) {
-	if (type == nullptr) {
-		return false;
-	}
-	type = base_type(type);
-	if (is_type_untyped(type)) {
-		return false;
-	}
-	if (is_type_integer(type)) {
-		return true;
-	}
-	if (type->kind == Type_Array) {
-		return is_type_integer(type->Array.elem);
-	}
-	return false;
-}
 
 gb_internal void check_bit_field_type(CheckerContext *ctx, Type *bit_field_type, Type *named_type, Ast *node) {
 	ast_node(bf, BitFieldType, node);
@@ -1268,11 +1252,14 @@ gb_internal void check_bit_set_type(CheckerContext *c, Type *type, Type *named_t
 		Type *t = default_type(lhs.type);
 		if (bs->underlying != nullptr) {
 			Type *u = check_type(c, bs->underlying);
+			// if (!is_valid_bit_field_backing_type(u)) {
 			if (!is_type_integer(u)) {
 				gbString ts = type_to_string(u);
 				error(bs->underlying, "Expected an underlying integer for the bit set, got %s", ts);
 				gb_string_free(ts);
-				return;
+				if (!is_valid_bit_field_backing_type(u)) {
+					return;
+				}
 			}
 			type->BitSet.underlying = u;
 		}
@@ -1572,11 +1559,30 @@ gb_internal Type *determine_type_from_polymorphic(CheckerContext *ctx, Type *pol
 		return poly_type;
 	}
 	if (show_error) {
+		ERROR_BLOCK();
 		gbString pts = type_to_string(poly_type);
 		gbString ots = type_to_string(operand.type, true);
 		defer (gb_string_free(pts));
 		defer (gb_string_free(ots));
 		error(operand.expr, "Cannot determine polymorphic type from parameter: '%s' to '%s'", ots, pts);
+
+		Type *pt = poly_type;
+		while (pt && pt->kind == Type_Generic && pt->Generic.specialized) {
+			pt = pt->Generic.specialized;
+		}
+		if (is_type_slice(pt) &&
+		    (is_type_dynamic_array(operand.type) || is_type_array(operand.type))) {
+			Ast *expr = unparen_expr(operand.expr);
+			if (expr->kind == Ast_CompoundLit) {
+				gbString es = type_to_string(base_any_array_type(operand.type));
+				error_line("\tSuggestion: Try using a slice compound literal instead '[]%s{...}'\n", es);
+				gb_string_free(es);
+			} else {
+				gbString os = expr_to_string(operand.expr);
+				error_line("\tSuggestion: Try slicing the value with '%s[:]'\n", os);
+				gb_string_free(os);
+			}
+		}
 	}
 	return t_invalid;
 }
@@ -1953,6 +1959,10 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 					error(name, "'#by_ptr' can only be applied to variable fields");
 					p->flags &= ~FieldFlag_by_ptr;
 				}
+				if (p->flags&FieldFlag_no_capture) {
+					error(name, "'#no_capture' can only be applied to variable fields");
+					p->flags &= ~FieldFlag_no_capture;
+				}
 
 				param = alloc_entity_type_name(scope, name->Ident.token, type, EntityState_Resolved);
 				param->TypeName.is_type_alias = true;
@@ -2054,6 +2064,28 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 						p->flags &= ~FieldFlag_by_ptr; // Remove the flag
 					}
 				}
+				if (p->flags&FieldFlag_no_capture) {
+					if (is_variadic && variadic_index == variables.count) {
+						if (p->flags & FieldFlag_c_vararg) {
+							error(name, "'#no_capture' cannot be applied to a #c_vararg parameter");
+							p->flags &= ~FieldFlag_no_capture;
+						} else {
+							error(name, "'#no_capture' is already implied on all variadic parameter");
+						}
+					} else if (is_type_polymorphic(type)) {
+						// ignore
+					} else {
+						if (is_type_internally_pointer_like(type)) {
+							error(name, "'#no_capture' is currently reserved for future use");
+						} else {
+							ERROR_BLOCK();
+							error(name, "'#no_capture' can only be applied to pointer-like types");
+							error_line("\t'#no_capture' does not currently do anything useful\n");
+							p->flags &= ~FieldFlag_no_capture;
+						}
+					}
+				}
+
 
 				if (is_poly_name) {
 					if (p->flags&FieldFlag_no_alias) {
@@ -2072,6 +2104,11 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 						error(name, "'#by_ptr' can only be applied to variable fields");
 						p->flags &= ~FieldFlag_by_ptr;
 					}
+					if (p->flags&FieldFlag_no_capture) {
+						error(name, "'#no_capture' can only be applied to variable fields");
+						p->flags &= ~FieldFlag_no_capture;
+					}
+
 
 					if (!is_type_polymorphic(type) && check_constant_parameter_value(type, params[i])) {
 						// failed
@@ -2091,6 +2128,8 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 				param->flags |= EntityFlag_Ellipsis;
 				if (is_c_vararg) {
 					param->flags |= EntityFlag_CVarArg;
+				} else {
+					param->flags |= EntityFlag_NoCapture;
 				}
 			}
 
@@ -2115,6 +2154,10 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 			if (p->flags&FieldFlag_by_ptr) {
 				param->flags |= EntityFlag_ByPtr;
 			}
+			if (p->flags&FieldFlag_no_capture) {
+				param->flags |= EntityFlag_NoCapture;
+			}
+
 
 			param->state = EntityState_Resolved; // NOTE(bill): This should have be resolved whilst determining it
 			add_entity(ctx, scope, name, param);
@@ -2430,9 +2473,15 @@ gb_internal i64 check_array_count(CheckerContext *ctx, Operand *o, Ast *e) {
 	if (e == nullptr) {
 		return 0;
 	}
-	if (e->kind == Ast_UnaryExpr &&
-	    e->UnaryExpr.op.kind == Token_Question) {
-		return -1;
+	if (e->kind == Ast_UnaryExpr) {
+		Token op = e->UnaryExpr.op;
+		if (op.kind == Token_Question) {
+			return -1;
+		}
+		if (e->UnaryExpr.expr == nullptr) {
+			error(op, "Invalid array count '[%.*s]'", LIT(op.string));
+			return 0;
+		}
 	}
 
 	check_expr_or_type(ctx, o, e);

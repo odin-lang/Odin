@@ -1,13 +1,11 @@
 #define MULTITHREAD_OBJECT_GENERATION 1
-
-#ifndef USE_SEPARATE_MODULES
-#define USE_SEPARATE_MODULES build_context.use_separate_modules
-#endif
-
 #ifndef MULTITHREAD_OBJECT_GENERATION
 #define MULTITHREAD_OBJECT_GENERATION 0
 #endif
 
+#ifndef USE_SEPARATE_MODULES
+#define USE_SEPARATE_MODULES build_context.use_separate_modules
+#endif
 
 #ifndef LLVM_IGNORE_VERIFICATION
 #define LLVM_IGNORE_VERIFICATION 0
@@ -137,18 +135,27 @@ gb_internal void lb_set_entity_from_other_modules_linkage_correctly(lbModule *ot
 	if (other_module == nullptr) {
 		return;
 	}
-	char const *cname = alloc_cstring(temporary_allocator(), name);
+	char const *cname = alloc_cstring(permanent_allocator(), name);
+	mpsc_enqueue(&other_module->gen->entities_to_correct_linkage, lbEntityCorrection{other_module, e, cname});
+}
 
-	LLVMValueRef other_global = nullptr;
-	if (e->kind == Entity_Variable) {
-		other_global = LLVMGetNamedGlobal(other_module->mod, cname);
-	} else if (e->kind == Entity_Procedure) {
-		other_global = LLVMGetNamedFunction(other_module->mod, cname);
-	}
-	if (other_global) {
-		LLVMSetLinkage(other_global, LLVMExternalLinkage);
+gb_internal void lb_correct_entity_linkage(lbGenerator *gen) {
+	for (lbEntityCorrection ec = {}; mpsc_dequeue(&gen->entities_to_correct_linkage, &ec); /**/) {
+		LLVMValueRef other_global = nullptr;
+		if (ec.e->kind == Entity_Variable) {
+			other_global = LLVMGetNamedGlobal(ec.other_module->mod, ec.cname);
+			if (other_global) {
+				LLVMSetLinkage(other_global, LLVMWeakAnyLinkage);
+			}
+		} else if (ec.e->kind == Entity_Procedure) {
+			other_global = LLVMGetNamedFunction(ec.other_module->mod, ec.cname);
+			if (other_global) {
+				LLVMSetLinkage(other_global, LLVMWeakAnyLinkage);
+			}
+		}
 	}
 }
+
 
 gb_internal void lb_emit_init_context(lbProcedure *p, lbAddr addr) {
 	TEMPORARY_ALLOCATOR_GUARD();
@@ -1387,6 +1394,7 @@ gb_internal void lb_create_global_procedures_and_types(lbGenerator *gen, Checker
 		if (USE_SEPARATE_MODULES) {
 			m = lb_module_of_entity(gen, e);
 		}
+		GB_ASSERT(m != nullptr);
 
 		if (e->kind == Entity_Procedure) {
 			array_add(&m->global_procedures_to_create, e);
@@ -1432,7 +1440,9 @@ gb_internal bool lb_is_module_empty(lbModule *m) {
 	}
 
 	for (auto g = LLVMGetFirstGlobal(m->mod); g != nullptr; g = LLVMGetNextGlobal(g)) {
-		if (LLVMGetLinkage(g) == LLVMExternalLinkage) {
+		LLVMLinkage linkage = LLVMGetLinkage(g);
+		if (linkage == LLVMExternalLinkage ||
+		    linkage == LLVMWeakAnyLinkage) {
 			continue;
 		}
 		if (!LLVMIsExternallyInitialized(g)) {
@@ -1570,6 +1580,7 @@ gb_internal WORKER_TASK_PROC(lb_llvm_module_pass_worker_proc) {
 
 	switch (build_context.optimization_level) {
 	case -1:
+		array_add(&passes, "function(annotation-remarks)");
 		break;
 	case 0:
 		array_add(&passes, "always-inline");
@@ -3260,7 +3271,7 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 			LLVMSetLinkage(g.value, LLVMDLLExportLinkage);
 			LLVMSetDLLStorageClass(g.value, LLVMDLLExportStorageClass);
 		} else if (!is_foreign) {
-			LLVMSetLinkage(g.value, USE_SEPARATE_MODULES ? LLVMExternalLinkage : LLVMInternalLinkage);
+			LLVMSetLinkage(g.value, USE_SEPARATE_MODULES ? LLVMWeakAnyLinkage : LLVMInternalLinkage);
 		}
 		lb_set_linkage_from_entity_flags(m, g.value, e->flags);
 		
@@ -3277,11 +3288,12 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 			if (!is_type_any(e->type) && !is_type_union(e->type)) {
 				if (tav.mode != Addressing_Invalid) {
 					if (tav.value.kind != ExactValue_Invalid) {
+						bool is_rodata = e->kind == Entity_Variable && e->Variable.is_rodata;
 						ExactValue v = tav.value;
-						lbValue init = lb_const_value(m, tav.type, v);
+						lbValue init = lb_const_value(m, tav.type, v, false, is_rodata);
 						LLVMSetInitializer(g.value, init.value);
 						var.is_initialized = true;
-						if (e->kind == Entity_Variable && e->Variable.is_rodata) {
+						if (is_rodata) {
 							LLVMSetGlobalConstant(g.value, true);
 						}
 					}
@@ -3430,6 +3442,8 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 	TIME_SECTION("LLVM Add Foreign Library Paths");
 	lb_add_foreign_library_paths(gen);
 
+	TIME_SECTION("LLVM Correct Entity Linkage");
+	lb_correct_entity_linkage(gen);
 
 	////////////////////////////////////////////
 	for (auto const &entry: gen->modules) {

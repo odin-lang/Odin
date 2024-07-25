@@ -60,7 +60,11 @@ rand_bytes :: proc (dst: []byte) {
 	_rand_bytes(dst)
 }
 
-
+// random_generator returns a `runtime.Random_Generator` backed by the
+// system entropy source.
+//
+// Support for the system entropy source can be checked with the
+// `HAS_RAND_BYTES` boolean constant.
 random_generator :: proc() -> runtime.Random_Generator {
 	return {
 		procedure = proc(data: rawptr, mode: runtime.Random_Generator_Mode, p: []byte) {

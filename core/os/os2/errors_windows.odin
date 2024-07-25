@@ -1,6 +1,8 @@
 //+private
 package os2
 
+import "base:runtime"
+import "core:slice"
 import win32 "core:sys/windows"
 
 _error_string :: proc(errno: i32) -> string {
@@ -8,9 +10,14 @@ _error_string :: proc(errno: i32) -> string {
 	if e == 0 {
 		return ""
 	}
-	// TODO(bill): _error_string for windows
-	// FormatMessageW
-	return ""
+
+	err := runtime.Type_Info_Enum_Value(e)
+
+	ti := &runtime.type_info_base(type_info_of(win32.System_Error)).variant.(runtime.Type_Info_Enum)
+	if idx, ok := slice.binary_search(ti.values, err); ok {
+		return ti.names[idx]
+	}
+	return "<unknown platform error>"
 }
 
 _get_platform_error :: proc() -> Error {

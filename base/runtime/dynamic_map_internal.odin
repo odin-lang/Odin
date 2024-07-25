@@ -577,7 +577,7 @@ map_grow_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Inf
 
 
 @(require_results)
-map_reserve_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, new_capacity: uintptr, loc := #caller_location) -> Allocator_Error {
+map_reserve_dynamic :: #force_no_inline proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, new_capacity: uintptr, loc := #caller_location) -> Allocator_Error {
 	@(require_results)
 	ceil_log2 :: #force_inline proc "contextless" (x: uintptr) -> uintptr {
 		z := intrinsics.count_leading_zeros(x)
@@ -641,7 +641,7 @@ map_reserve_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_
 
 
 @(require_results)
-map_shrink_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, loc := #caller_location) -> (did_shrink: bool, err: Allocator_Error) {
+map_shrink_dynamic :: #force_no_inline proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, loc := #caller_location) -> (did_shrink: bool, err: Allocator_Error) {
 	if m.allocator.procedure == nil {
 		m.allocator = context.allocator
 	}
@@ -688,7 +688,7 @@ map_shrink_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_I
 }
 
 @(require_results)
-map_free_dynamic :: proc "odin" (m: Raw_Map, info: ^Map_Info, loc := #caller_location) -> Allocator_Error {
+map_free_dynamic :: #force_no_inline proc "odin" (m: Raw_Map, info: ^Map_Info, loc := #caller_location) -> Allocator_Error {
 	ptr := rawptr(map_data(m))
 	size := int(map_total_allocation_size(uintptr(map_cap(m)), info))
 	err := mem_free_with_size(ptr, size, m.allocator, loc)
@@ -700,7 +700,7 @@ map_free_dynamic :: proc "odin" (m: Raw_Map, info: ^Map_Info, loc := #caller_loc
 }
 
 @(require_results)
-map_lookup_dynamic :: proc "contextless" (m: Raw_Map, #no_alias info: ^Map_Info, k: uintptr) -> (index: uintptr, ok: bool) {
+map_lookup_dynamic :: #force_no_inline proc "contextless" (m: Raw_Map, #no_alias info: ^Map_Info, k: uintptr) -> (index: uintptr, ok: bool) {
 	if map_len(m) == 0 {
 		return 0, false
 	}
@@ -723,7 +723,7 @@ map_lookup_dynamic :: proc "contextless" (m: Raw_Map, #no_alias info: ^Map_Info,
 	}
 }
 @(require_results)
-map_exists_dynamic :: proc "contextless" (m: Raw_Map, #no_alias info: ^Map_Info, k: uintptr) -> (ok: bool) {
+map_exists_dynamic :: #force_no_inline proc "contextless" (m: Raw_Map, #no_alias info: ^Map_Info, k: uintptr) -> (ok: bool) {
 	if map_len(m) == 0 {
 		return false
 	}
@@ -749,7 +749,7 @@ map_exists_dynamic :: proc "contextless" (m: Raw_Map, #no_alias info: ^Map_Info,
 
 
 @(require_results)
-map_erase_dynamic :: #force_inline proc "contextless" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, k: uintptr) -> (old_k, old_v: uintptr, ok: bool) {
+map_erase_dynamic :: #force_no_inline proc "contextless" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, k: uintptr) -> (old_k, old_v: uintptr, ok: bool) {
 	index := map_lookup_dynamic(m^, info, k) or_return
 	ks, vs, hs, _, _ := map_kvh_data_dynamic(m^, info)
 	hs[index] |= TOMBSTONE_MASK

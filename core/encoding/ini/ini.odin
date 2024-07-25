@@ -82,15 +82,17 @@ Map :: distinct map[string]map[string]string
 
 load_map_from_string :: proc(src: string, allocator: runtime.Allocator, options := DEFAULT_OPTIONS) -> (m: Map, err: runtime.Allocator_Error) {
 	unquote :: proc(val: string) -> (string, runtime.Allocator_Error) {
-		v, allocated, ok := strconv.unquote_string(val)
-		if !ok {
-			return strings.clone(val)
+		if len(val) > 0 && (val[0] == '"' || val[0] == '\'') {
+			v, allocated, ok := strconv.unquote_string(val)
+			if !ok {
+				return strings.clone(val)
+			}
+			if allocated {
+				return v, nil
+			}
+			return strings.clone(v), nil
 		}
-		if allocated {
-			return v, nil
-		}
-		return strings.clone(v)
-
+		return strings.clone(val)
 	}
 
 	context.allocator = allocator
@@ -121,7 +123,7 @@ load_map_from_path :: proc(path: string, allocator: runtime.Allocator, options :
 	data := os.read_entire_file(path, allocator) or_return
 	defer delete(data, allocator)
 	m, err = load_map_from_string(string(data), allocator, options)
-	ok = err != nil
+	ok = err == nil
 	defer if !ok {
 		delete_map(m)
 	}
@@ -142,6 +144,7 @@ delete_map :: proc(m: Map) {
 			delete(value, allocator)
 		}
 		delete(section)
+		delete(pairs)
 	}
 	delete(m)
 }

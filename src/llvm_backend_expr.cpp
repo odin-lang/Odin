@@ -296,12 +296,6 @@ gb_internal bool lb_try_direct_vector_arith(lbProcedure *p, TokenKind op, lbValu
 		GB_ASSERT(vector_type0 == vector_type1);
 		LLVMTypeRef vector_type = vector_type0;
 
-		LLVMValueRef lhs_vp = LLVMBuildPointerCast(p->builder, lhs_ptr.value, LLVMPointerType(vector_type, 0), "");
-		LLVMValueRef rhs_vp = LLVMBuildPointerCast(p->builder, rhs_ptr.value, LLVMPointerType(vector_type, 0), "");
-		LLVMValueRef x = LLVMBuildLoad2(p->builder, vector_type, lhs_vp, "");
-		LLVMValueRef y = LLVMBuildLoad2(p->builder, vector_type, rhs_vp, "");
-		LLVMValueRef z = nullptr;
-
 		Type *integral_type = base_type(elem_type);
 		if (is_type_simd_vector(integral_type)) {
 			integral_type = core_array_type(integral_type);
@@ -311,7 +305,17 @@ gb_internal bool lb_try_direct_vector_arith(lbProcedure *p, TokenKind op, lbValu
 			case Token_Add: op = Token_Or;     break;
 			case Token_Sub: op = Token_AndNot; break;
 			}
+			Type *u = bit_set_to_int(type);
+			if (is_type_array(u)) {
+				return false;
+			}
 		}
+
+		LLVMValueRef lhs_vp = LLVMBuildPointerCast(p->builder, lhs_ptr.value, LLVMPointerType(vector_type, 0), "");
+		LLVMValueRef rhs_vp = LLVMBuildPointerCast(p->builder, rhs_ptr.value, LLVMPointerType(vector_type, 0), "");
+		LLVMValueRef x = LLVMBuildLoad2(p->builder, vector_type, lhs_vp, "");
+		LLVMValueRef y = LLVMBuildLoad2(p->builder, vector_type, rhs_vp, "");
+		LLVMValueRef z = nullptr;
 
 		if (is_type_float(integral_type)) {
 			switch (op) {
@@ -1286,6 +1290,14 @@ handle_op:;
 		case Token_Add: op = Token_Or;     break;
 		case Token_Sub: op = Token_AndNot; break;
 		}
+		Type *u = bit_set_to_int(type);
+		if (is_type_array(u)) {
+			lhs.type = u;
+			rhs.type = u;
+			res = lb_emit_arith(p, op, lhs, rhs, u);
+			res.type = type;
+			return res;
+		}
 	}
 
 	Type *integral_type = type;
@@ -1441,6 +1453,7 @@ gb_internal lbValue lb_build_binary_in(lbProcedure *p, lbValue left, lbValue rig
 			GB_ASSERT(are_types_identical(left.type, key_type));
 
 			Type *it = bit_set_to_int(rt);
+
 			left = lb_emit_conv(p, left, it);
 			if (is_type_different_to_arch_endianness(it)) {
 				left = lb_emit_byte_swap(p, left, integer_endian_type_to_platform_type(it));
@@ -2047,6 +2060,26 @@ gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 	}
 	if (is_type_bit_field(dst)) {
 		if (are_types_identical(src, dst->BitField.backing_type)) {
+			lbValue res = {};
+			res.type = t;
+			res.value = value.value;
+			return res;
+		}
+	}
+
+	// bit_set <-> backing type
+	if (is_type_bit_set(src)) {
+		Type *backing = bit_set_to_int(src);
+		if (are_types_identical(backing, dst)) {
+			lbValue res = {};
+			res.type = t;
+			res.value = value.value;
+			return res;
+		}
+	}
+	if (is_type_bit_set(dst)) {
+		Type *backing = bit_set_to_int(dst);
+		if (are_types_identical(src, backing)) {
 			lbValue res = {};
 			res.type = t;
 			res.value = value.value;
@@ -2951,13 +2984,32 @@ gb_internal lbValue lb_emit_comp_against_nil(lbProcedure *p, TokenKind op_kind, 
 	case Type_Pointer:
 	case Type_MultiPointer:
 	case Type_Proc:
-	case Type_BitSet:
 		if (op_kind == Token_CmpEq) {
 			res.value = LLVMBuildIsNull(p->builder, x.value, "");
 		} else if (op_kind == Token_NotEq) {
 			res.value = LLVMBuildIsNotNull(p->builder, x.value, "");
 		}
 		return res;
+	case Type_BitSet:
+		{
+			Type *u = bit_set_to_int(bt);
+			if (is_type_array(u)) {
+				auto args = array_make<lbValue>(permanent_allocator(), 2);
+				lbValue lhs = lb_address_from_load_or_generate_local(p, x);
+				args[0] = lb_emit_conv(p, lhs, t_rawptr);
+				args[1] = lb_const_int(p->module, t_int, type_size_of(t));
+				lbValue val = lb_emit_runtime_call(p, "memory_compare_zero", args);
+				lbValue res = lb_emit_comp(p, op_kind, val, lb_const_int(p->module, t_int, 0));
+				return res;
+			} else {
+				if (op_kind == Token_CmpEq) {
+					res.value = LLVMBuildIsNull(p->builder, x.value, "");
+				} else if (op_kind == Token_NotEq) {
+					res.value = LLVMBuildIsNotNull(p->builder, x.value, "");
+				}
+			}
+			return res;
+		}
 
 	case Type_Slice:
 		{
@@ -4878,29 +4930,43 @@ gb_internal lbAddr lb_build_addr_compound_lit(lbProcedure *p, Ast *expr) {
 	case Type_BitSet: {
 		i64 sz = type_size_of(type);
 		if (cl->elems.count > 0 && sz > 0) {
-			lb_addr_store(p, v, lb_const_value(p->module, type, exact_value_compound(expr)));
-
 			lbValue lower = lb_const_value(p->module, t_int, exact_value_i64(bt->BitSet.lower));
-			for (Ast *elem : cl->elems) {
-				GB_ASSERT(elem->kind != Ast_FieldValue);
 
-				if (lb_is_elem_const(elem, et)) {
-					continue;
+			Type *backing = bit_set_to_int(type);
+			if (is_type_array(backing)) {
+				GB_PANIC("TODO: bit_set [N]T");
+				Type *base_it = core_array_type(backing);
+				i64 bits_per_elem = 8*type_size_of(base_it);
+				gb_unused(bits_per_elem);
+				lbValue one = lb_const_value(p->module, t_i64, exact_value_i64(1));
+				for (Ast *elem : cl->elems) {
+					GB_ASSERT(elem->kind != Ast_FieldValue);
+					lbValue expr = lb_build_expr(p, elem);
+					GB_ASSERT(expr.type->kind != Type_Tuple);
+
+					lbValue e = lb_emit_conv(p, expr, t_i64);
+					e = lb_emit_arith(p, Token_Sub, e, lower, t_i64);
+					// lbValue idx = lb_emit_arith(p, Token_Div, e, bits_per_elem, t_i64);
+					// lbValue val = lb_emit_arith(p, Token_Div, e, bits_per_elem, t_i64);
 				}
-
-				lbValue expr = lb_build_expr(p, elem);
-				GB_ASSERT(expr.type->kind != Type_Tuple);
-
+			} else {
 				Type *it = bit_set_to_int(bt);
 				lbValue one = lb_const_value(p->module, it, exact_value_i64(1));
-				lbValue e = lb_emit_conv(p, expr, it);
-				e = lb_emit_arith(p, Token_Sub, e, lower, it);
-				e = lb_emit_arith(p, Token_Shl, one, e, it);
+				for (Ast *elem : cl->elems) {
+					GB_ASSERT(elem->kind != Ast_FieldValue);
 
-				lbValue old_value = lb_emit_transmute(p, lb_addr_load(p, v), it);
-				lbValue new_value = lb_emit_arith(p, Token_Or, old_value, e, it);
-				new_value = lb_emit_transmute(p, new_value, type);
-				lb_addr_store(p, v, new_value);
+					lbValue expr = lb_build_expr(p, elem);
+					GB_ASSERT(expr.type->kind != Type_Tuple);
+
+					lbValue e = lb_emit_conv(p, expr, it);
+					e = lb_emit_arith(p, Token_Sub, e, lower, it);
+					e = lb_emit_arith(p, Token_Shl, one, e, it);
+
+					lbValue old_value = lb_emit_transmute(p, lb_addr_load(p, v), it);
+					lbValue new_value = lb_emit_arith(p, Token_Or, old_value, e, it);
+					new_value = lb_emit_transmute(p, new_value, type);
+					lb_addr_store(p, v, new_value);
+				}
 			}
 		}
 		break;

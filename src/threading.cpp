@@ -46,6 +46,18 @@ typedef struct WorkerTask {
 	void           *data;
 } WorkerTask;
 
+typedef struct TaskRingBuffer {
+	std::atomic<isize> size;
+	std::atomic<WorkerTask *> buffer;
+} TaskRingBuffer;
+
+typedef struct TaskQueue {
+	std::atomic<isize> top;
+	std::atomic<isize> bottom;
+
+	std::atomic<TaskRingBuffer *> ring;
+} TaskQueue;
+
 struct Thread {
 #if defined(GB_SYSTEM_WINDOWS)
 	void *win32_handle;
@@ -54,13 +66,13 @@ struct Thread {
 #endif
 
 	isize idx;
+	isize stack_size;
 
-	WorkerTask *queue;
-	size_t capacity;
-	std::atomic<uint64_t> head_and_tail;
-
-	isize  stack_size;
+	struct TaskQueue   queue;
 	struct ThreadPool *pool;
+
+	struct Arena *permanent_arena;
+	struct Arena *temporary_arena;
 };
 
 typedef std::atomic<i32> Futex;
@@ -551,6 +563,20 @@ gb_internal void *internal_thread_proc(void *arg) {
 }
 #endif
 
+gb_internal TaskRingBuffer *task_ring_init(isize size) {
+	TaskRingBuffer *ring = gb_alloc_item(heap_allocator(), TaskRingBuffer);
+	ring->size = size;
+	ring->buffer = gb_alloc_array(heap_allocator(), WorkerTask, ring->size);
+	return ring;
+}
+
+gb_internal void thread_queue_destroy(TaskQueue *q) {
+	gb_free(heap_allocator(), (*q->ring).buffer);
+	gb_free(heap_allocator(), q->ring);
+}
+
+gb_internal void thread_init_arenas(Thread *t);
+
 gb_internal void thread_init(ThreadPool *pool, Thread *t, isize idx) {
 	gb_zero_item(t);
 #if defined(GB_SYSTEM_WINDOWS)
@@ -559,13 +585,13 @@ gb_internal void thread_init(ThreadPool *pool, Thread *t, isize idx) {
 	t->posix_handle = 0;
 #endif
 
-	t->capacity = 1 << 14; // must be a power of 2
-	t->queue = gb_alloc_array(heap_allocator(), WorkerTask, t->capacity);
-	t->head_and_tail = 0;
+	// Size must be a power of 2
+	t->queue.ring = task_ring_init(1 << 14);
 	t->pool = pool;
 	t->idx = idx;
-}
 
+	thread_init_arenas(t);
+}
 
 gb_internal void thread_init_and_start(ThreadPool *pool, Thread *t, isize idx) {
 	thread_init(pool, t, idx);
@@ -598,7 +624,7 @@ gb_internal void thread_join_and_destroy(Thread *t) {
 	t->posix_handle = 0;
 #endif
 
-	gb_free(heap_allocator(), t->queue);
+	thread_queue_destroy(&t->queue);
 }
 
 gb_internal void thread_set_name(Thread *t, char const *name) {
@@ -770,13 +796,27 @@ gb_internal void futex_wait(Futex *f, Footex val) {
 
 #elif defined(GB_SYSTEM_OSX)
 
+// IMPORTANT NOTE(laytan): We use `OS_SYNC_*_SHARED` and `UL_COMPARE_AND_WAIT_SHARED` flags here.
+// these flags tell the kernel that we are using these futexes across different processes which
+// causes it to opt-out of some optimisations.
+//
+// BUT this is not actually the case! We should be using the normal non-shared version and letting
+// the kernel optimize (I've measured it to be about 10% faster at the parsing/type checking stages).
+//
+// However we have reports of people on MacOS running into kernel panics, and this seems to fix it for them.
+// Which means there is probably a bug in the kernel in one of these non-shared optimisations causing the panic.
+//
+// The panic also doesn't seem to happen on normal M1 CPUs, and happen more on later CPUs or pro/max series.
+// Probably because they have more going on in terms of threads etc.
+
 #if __has_include(<os/os_sync_wait_on_address.h>)
 	#define DARWIN_WAIT_ON_ADDRESS_AVAILABLE
 	#include <os/os_sync_wait_on_address.h>
 #endif
 
-#define UL_COMPARE_AND_WAIT	0x00000001
-#define ULF_NO_ERRNO        0x01000000
+#define UL_COMPARE_AND_WAIT        0x00000001
+#define UL_COMPARE_AND_WAIT_SHARED 0x00000003
+#define ULF_NO_ERRNO               0x01000000
 
 extern "C" int __ulock_wait(uint32_t operation, void *addr, uint64_t value, uint32_t timeout); /* timeout is specified in microseconds */
 extern "C" int __ulock_wake(uint32_t operation, void *addr, uint64_t wake_value);
@@ -785,7 +825,7 @@ gb_internal void futex_signal(Futex *f) {
 	#ifdef DARWIN_WAIT_ON_ADDRESS_AVAILABLE
 	if (__builtin_available(macOS 14.4, *)) {
 		for (;;) {
-			int ret = os_sync_wake_by_address_any(f, sizeof(Futex), OS_SYNC_WAKE_BY_ADDRESS_NONE);
+			int ret = os_sync_wake_by_address_any(f, sizeof(Futex), OS_SYNC_WAKE_BY_ADDRESS_SHARED);
 			if (ret >= 0) {
 				return;
 			}
@@ -800,7 +840,7 @@ gb_internal void futex_signal(Futex *f) {
 	} else {
 	#endif
 	for (;;) {
-		int ret = __ulock_wake(UL_COMPARE_AND_WAIT | ULF_NO_ERRNO, f, 0);
+		int ret = __ulock_wake(UL_COMPARE_AND_WAIT_SHARED | ULF_NO_ERRNO, f, 0);
 		if (ret >= 0) {
 			return;
 		}
@@ -821,7 +861,7 @@ gb_internal void futex_broadcast(Futex *f) {
 	#ifdef DARWIN_WAIT_ON_ADDRESS_AVAILABLE
 	if (__builtin_available(macOS 14.4, *)) {
 		for (;;) {
-			int ret = os_sync_wake_by_address_all(f, sizeof(Footex), OS_SYNC_WAKE_BY_ADDRESS_NONE);
+			int ret = os_sync_wake_by_address_all(f, sizeof(Footex), OS_SYNC_WAKE_BY_ADDRESS_SHARED);
 			if (ret >= 0) {
 				return;
 			}
@@ -837,7 +877,7 @@ gb_internal void futex_broadcast(Futex *f) {
 	#endif
 	for (;;) {
 		enum { ULF_WAKE_ALL = 0x00000100 };
-		int ret = __ulock_wake(UL_COMPARE_AND_WAIT | ULF_NO_ERRNO | ULF_WAKE_ALL, f, 0);
+		int ret = __ulock_wake(UL_COMPARE_AND_WAIT_SHARED | ULF_NO_ERRNO | ULF_WAKE_ALL, f, 0);
 		if (ret == 0) {
 			return;
 		}
@@ -858,7 +898,7 @@ gb_internal void futex_wait(Futex *f, Footex val) {
 	#ifdef DARWIN_WAIT_ON_ADDRESS_AVAILABLE
 	if (__builtin_available(macOS 14.4, *)) {
 		for (;;) {
-			int ret = os_sync_wait_on_address(f, cast(uint64_t)(val), sizeof(Footex), OS_SYNC_WAIT_ON_ADDRESS_NONE);
+			int ret = os_sync_wait_on_address(f, cast(uint64_t)(val), sizeof(Footex), OS_SYNC_WAIT_ON_ADDRESS_SHARED);
 			if (ret >= 0) {
 				if (*f != val) {
 					return;
@@ -876,7 +916,7 @@ gb_internal void futex_wait(Futex *f, Footex val) {
 	} else {
 	#endif
 	for (;;) {
-		int ret = __ulock_wait(UL_COMPARE_AND_WAIT | ULF_NO_ERRNO, f, val, 0);
+		int ret = __ulock_wait(UL_COMPARE_AND_WAIT_SHARED | ULF_NO_ERRNO, f, val, 0);
 		if (ret >= 0) {
 			if (*f != val) {
 				return;

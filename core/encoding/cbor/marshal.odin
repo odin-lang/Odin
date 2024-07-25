@@ -351,7 +351,8 @@ _marshal_into_encoder :: proc(e: Encoder, v: any, ti: ^runtime.Type_Info) -> (er
 				builder := strings.builder_from_slice(res[:])
 				e.writer = strings.to_stream(&builder)
 
-				assert(_encode_u64(e, u64(len(str)), .Text) == nil)
+				err := _encode_u64(e, u64(len(str)), .Text)
+				assert(err == nil)
 				res[9] = u8(len(builder.buf))
 				assert(res[9] < 10)
 				return
@@ -506,7 +507,7 @@ _marshal_into_encoder :: proc(e: Encoder, v: any, ti: ^runtime.Type_Info) -> (er
 		}
 		
 		n: u64; {
-			for _, i in info.names {
+			for _, i in info.names[:info.field_count] {
 				if field_name(info, i) != "-" {
 					n += 1
 				}
@@ -522,7 +523,7 @@ _marshal_into_encoder :: proc(e: Encoder, v: any, ti: ^runtime.Type_Info) -> (er
 			entries := make([dynamic]Name, 0, n, e.temp_allocator) or_return
 			defer delete(entries)
 
-			for _, i in info.names {
+			for _, i in info.names[:info.field_count] {
 				fname := field_name(info, i)
 				if fname == "-" {
 					continue
@@ -540,7 +541,7 @@ _marshal_into_encoder :: proc(e: Encoder, v: any, ti: ^runtime.Type_Info) -> (er
 				marshal_entry(e, info, v, entry.name, entry.field) or_return
 			}
 		} else {
-			for _, i in info.names {
+			for _, i in info.names[:info.field_count] {
 				fname := field_name(info, i)
 				if fname == "-" {
 					continue

@@ -15,6 +15,7 @@ struct lbArgType {
 	LLVMAttributeRef align_attribute; // Optional
 	i64 byval_alignment;
 	bool is_byval;
+	bool no_capture;
 };
 
 
@@ -158,6 +159,11 @@ gb_internal void lb_add_function_type_attributes(LLVMValueRef fn, lbFunctionType
 		if (arg->align_attribute) {
 			LLVMAddAttributeAtIndex(fn, arg_index+1, arg->align_attribute);
 		}
+
+		if (arg->no_capture) {
+			LLVMAddAttributeAtIndex(fn, arg_index+1, nocapture_attr);
+		}
+
 
 		if (ft->multiple_return_original_type) {
 			if (ft->original_arg_count <= i) {
@@ -645,10 +651,10 @@ namespace lbAbiAmd64SysV {
 		if (is_mem_cls(cls, attribute_kind)) {
 			LLVMAttributeRef attribute = nullptr;
 			if (attribute_kind == Amd64TypeAttribute_ByVal) {
-				// if (!is_calling_convention_odin(calling_convention)) {
-					return lb_arg_type_indirect_byval(c, type);
-				// }
-				// attribute = nullptr;
+				if (is_calling_convention_odin(calling_convention)) {
+					return lb_arg_type_indirect(type, attribute);
+				}
+				return lb_arg_type_indirect_byval(c, type);
 			} else if (attribute_kind == Amd64TypeAttribute_StructRect) {
 				attribute = lb_create_enum_attribute_with_type(c, "sret", type);
 			}

@@ -6,14 +6,15 @@ import "core:time"
 import "base:runtime"
 import "core:sys/linux"
 
-_File :: struct {
+File_Impl :: struct {
+	file: File,
 	name: string,
 	fd: linux.Fd,
 	allocator: runtime.Allocator,
 }
 
-_stdin : File = {
-	impl = {
+_stdin := File{
+	impl = &File_Impl{
 		name = "/proc/self/fd/0",
 		fd = 0,
 		allocator = _file_allocator(),
@@ -21,9 +22,10 @@ _stdin : File = {
 	stream = {
 		procedure = _file_stream_proc,
 	},
+	fstat = _fstat,
 }
-_stdout : File = {
-	impl = {
+_stdout := File{
+	impl = &File_Impl{
 		name = "/proc/self/fd/1",
 		fd = 1,
 		allocator = _file_allocator(),
@@ -31,9 +33,10 @@ _stdout : File = {
 	stream = {
 		procedure = _file_stream_proc,
 	},
+	fstat = _fstat,
 }
-_stderr : File = {
-	impl = {
+_stderr := File{
+	impl = &File_Impl{
 		name = "/proc/self/fd/2",
 		fd = 2,
 		allocator = _file_allocator(),
@@ -41,6 +44,7 @@ _stderr : File = {
 	stream = {
 		procedure = _file_stream_proc,
 	},
+	fstat = _fstat,
 }
 
 @init
@@ -59,70 +63,67 @@ _file_allocator :: proc() -> runtime.Allocator {
 	return heap_allocator()
 }
 
-_open :: proc(name: string, flags: File_Flags, perm: File_Mode) -> (f: ^File, err: Error) {
+_open :: proc(name: string, flags: File_Flags, perm: int) -> (f: ^File, err: Error) {
 	TEMP_ALLOCATOR_GUARD()
 	name_cstr := temp_cstring(name) or_return
 
 	// Just default to using O_NOCTTY because needing to open a controlling
 	// terminal would be incredibly rare. This has no effect on files while
 	// allowing us to open serial devices.
-	sys_flags: linux.Open_Flags = {.NOCTTY}
+	sys_flags: linux.Open_Flags = {.NOCTTY, .CLOEXEC}
 	switch flags & O_RDONLY|O_WRONLY|O_RDWR {
 	case O_RDONLY:
 	case O_WRONLY: sys_flags += {.WRONLY}
 	case O_RDWR:   sys_flags += {.RDWR}
 	}
-
 	if .Append in flags        { sys_flags += {.APPEND} }
 	if .Create in flags        { sys_flags += {.CREAT} }
 	if .Excl in flags          { sys_flags += {.EXCL} }
 	if .Sync in flags          { sys_flags += {.DSYNC} }
 	if .Trunc in flags         { sys_flags += {.TRUNC} }
-	if .Close_On_Exec in flags { sys_flags += {.CLOEXEC} }
+	if .Inheritable in flags   { sys_flags -= {.CLOEXEC} }
 
-	fd, errno := linux.open(name_cstr, sys_flags, transmute(linux.Mode)(u32(perm)))
+	fd, errno := linux.open(name_cstr, sys_flags, transmute(linux.Mode)u32(perm))
 	if errno != .NONE {
 		return nil, _get_platform_error(errno)
 	}
 
-	return _new_file(uintptr(fd), name), nil
+	return _new_file(uintptr(fd), name)
 }
 
-_new_file :: proc(fd: uintptr, _: string = "") -> ^File {
-	file := new(File, file_allocator())
-	_construct_file(file, fd, "")
-	return file
-}
-
-_construct_file :: proc(file: ^File, fd: uintptr, _: string = "") {
-	file^ = {
-		impl = {
-			fd = linux.Fd(fd),
-			allocator = file_allocator(),
-			name = _get_full_path(file.impl.fd, file.impl.allocator),
-		},
-		stream = {
-			data = file,
-			procedure = _file_stream_proc,
-		},
+_new_file :: proc(fd: uintptr, _: string = "") -> (f: ^File, err: Error) {
+	impl := new(File_Impl, file_allocator()) or_return
+	defer if err != nil {
+		free(impl, file_allocator())
 	}
+	impl.file.impl = impl
+	impl.fd = linux.Fd(fd)
+	impl.allocator = file_allocator()
+	impl.name = _get_full_path(impl.fd, file_allocator()) or_return
+	impl.file.stream = {
+		data = impl,
+		procedure = _file_stream_proc,
+	}
+	impl.file.fstat = _fstat
+	return &impl.file, nil
 }
 
-_destroy :: proc(f: ^File) -> Error {
+_destroy :: proc(f: ^File_Impl) -> Error {
 	if f == nil {
 		return nil
 	}
-	delete(f.impl.name, f.impl.allocator)
-	free(f, f.impl.allocator)
+	a := f.allocator
+	delete(f.name, a)
+	free(f, a)
 	return nil
 }
 
 
-_close :: proc(f: ^File) -> Error {
-	if f == nil {
+_close :: proc(f: ^File_Impl) -> Error {
+	if f == nil{
 		return nil
 	}
-	errno := linux.close(f.impl.fd)
+	errno := linux.close(f.fd)
 	if errno == .EBADF { // avoid possible double free
 		return _get_platform_error(errno)
 	}
@@ -131,41 +132,41 @@ _close :: proc(f: ^File) -> Error {
 }
 
 _fd :: proc(f: ^File) -> uintptr {
-	if f == nil {
+	if f == nil || f.impl == nil {
 		return ~uintptr(0)
 	}
-	return uintptr(f.impl.fd)
+	impl := (^File_Impl)(f.impl)
+	return uintptr(impl.fd)
 }
 
 _name :: proc(f: ^File) -> string {
-	return f.impl.name if f != nil else ""
+	return (^File_Impl)(f.impl).name if f != nil && f.impl != nil else ""
 }
 
-_seek :: proc(f: ^File, offset: i64, whence: io.Seek_From) -> (ret: i64, err: Error) {
-	n, errno := linux.lseek(f.impl.fd, offset, linux.Seek_Whence(whence))
+_seek :: proc(f: ^File_Impl, offset: i64, whence: io.Seek_From) -> (ret: i64, err: Error) {
+	n, errno := linux.lseek(f.fd, offset, linux.Seek_Whence(whence))
 	if errno != .NONE {
 		return -1, _get_platform_error(errno)
 	}
 	return n, nil
 }
 
-_read :: proc(f: ^File, p: []byte) -> (i64, Error) {
+_read :: proc(f: ^File_Impl, p: []byte) -> (i64, Error) {
 	if len(p) == 0 {
 		return 0, nil
 	}
-	n, errno := linux.read(f.impl.fd, p[:])
+	n, errno := linux.read(f.fd, p[:])
 	if errno != .NONE {
 		return -1, _get_platform_error(errno)
 	}
-	return i64(n), n == 0 ? io.Error.EOF : nil
+	return i64(n), io.Error.EOF if n == 0 else nil
 }
 
-_read_at :: proc(f: ^File, p: []byte, offset: i64) -> (i64, Error) {
+_read_at :: proc(f: ^File_Impl, p: []byte, offset: i64) -> (i64, Error) {
 	if offset < 0 {
 		return 0, .Invalid_Offset
 	}
-
-	n, errno := linux.pread(f.impl.fd, p[:], offset)
+	n, errno := linux.pread(f.fd, p[:], offset)
 	if errno != .NONE {
 		return -1, _get_platform_error(errno)
 	}
@@ -175,32 +176,31 @@ _read_at :: proc(f: ^File, p: []byte, offset: i64) -> (i64, Error) {
 	return i64(n), nil
 }
 
-_write :: proc(f: ^File, p: []byte) -> (i64, Error) {
+_write :: proc(f: ^File_Impl, p: []byte) -> (i64, Error) {
 	if len(p) == 0 {
 		return 0, nil
 	}
-	n, errno := linux.write(f.impl.fd, p[:])
+	n, errno := linux.write(f.fd, p[:])
 	if errno != .NONE {
 		return -1, _get_platform_error(errno)
 	}
 	return i64(n), nil
 }
 
-_write_at :: proc(f: ^File, p: []byte, offset: i64) -> (i64, Error) {
+_write_at :: proc(f: ^File_Impl, p: []byte, offset: i64) -> (i64, Error) {
 	if offset < 0 {
 		return 0, .Invalid_Offset
 	}
-
-	n, errno := linux.pwrite(f.impl.fd, p[:], offset)
+	n, errno := linux.pwrite(f.fd, p[:], offset)
 	if errno != .NONE {
 		return -1, _get_platform_error(errno)
 	}
 	return i64(n), nil
 }
 
-_file_size :: proc(f: ^File) -> (n: i64, err: Error) {
+_file_size :: proc(f: ^File_Impl) -> (n: i64, err: Error) {
 	s: linux.Stat = ---
-	errno := linux.fstat(f.impl.fd, &s)
+	errno := linux.fstat(f.fd, &s)
 	if errno != .NONE {
 		return -1, _get_platform_error(errno)
 	}
@@ -208,27 +208,38 @@ _file_size :: proc(f: ^File) -> (n: i64, err: Error) {
 }
 
 _sync :: proc(f: ^File) -> Error {
-	return _get_platform_error(linux.fsync(f.impl.fd))
+	impl := (^File_Impl)(f.impl)
+	return _get_platform_error(linux.fsync(impl.fd))
 }
 
-_flush :: proc(f: ^File) -> Error {
-	return _get_platform_error(linux.fsync(f.impl.fd))
+_flush :: proc(f: ^File_Impl) -> Error {
+	return _get_platform_error(linux.fsync(f.fd))
 }
 
 _truncate :: proc(f: ^File, size: i64) -> Error {
-	return _get_platform_error(linux.ftruncate(f.impl.fd, size))
+	impl := (^File_Impl)(f.impl)
+	return _get_platform_error(linux.ftruncate(impl.fd, size))
 }
 
 _remove :: proc(name: string) -> Error {
+	is_dir_fd :: proc(fd: linux.Fd) -> bool {
+		s: linux.Stat
+		if linux.fstat(fd, &s) != .NONE {
+			return false
+		}
+		return linux.S_ISDIR(s.mode)
+	}
+
 	TEMP_ALLOCATOR_GUARD()
 	name_cstr := temp_cstring(name) or_return
 
 	fd, errno := linux.open(name_cstr, {.NOFOLLOW})
 	#partial switch (errno) {
-	case .ELOOP: /* symlink */
+	case .ELOOP:
+		/* symlink */
 	case .NONE:
 		defer linux.close(fd)
-		if _is_dir_fd(fd) {
+		if is_dir_fd(fd) {
 			return _get_platform_error(linux.rmdir(name_cstr))
 		}
 	case:
@@ -292,17 +303,19 @@ _chdir :: proc(name: string) -> Error {
 }
 
 _fchdir :: proc(f: ^File) -> Error {
-	return _get_platform_error(linux.fchdir(f.impl.fd))
+	impl := (^File_Impl)(f.impl)
+	return _get_platform_error(linux.fchdir(impl.fd))
 }
 
-_chmod :: proc(name: string, mode: File_Mode) -> Error {
+_chmod :: proc(name: string, mode: int) -> Error {
 	TEMP_ALLOCATOR_GUARD()
 	name_cstr := temp_cstring(name) or_return
 	return _get_platform_error(linux.chmod(name_cstr, transmute(linux.Mode)(u32(mode))))
 }
 
-_fchmod :: proc(f: ^File, mode: File_Mode) -> Error {
-	return _get_platform_error(linux.fchmod(f.impl.fd, transmute(linux.Mode)(u32(mode))))
+_fchmod :: proc(f: ^File, mode: int) -> Error {
+	impl := (^File_Impl)(f.impl)
+	return _get_platform_error(linux.fchmod(impl.fd, transmute(linux.Mode)(u32(mode))))
 }
 
 // NOTE: will throw error without super user priviledges
@@ -321,7 +334,8 @@ _lchown :: proc(name: string, uid, gid: int) -> Error {
 
 // NOTE: will throw error without super user priviledges
 _fchown :: proc(f: ^File, uid, gid: int) -> Error {
-	return _get_platform_error(linux.fchown(f.impl.fd, linux.Uid(uid), linux.Gid(gid)))
+	impl := (^File_Impl)(f.impl)
+	return _get_platform_error(linux.fchown(impl.fd, linux.Uid(uid), linux.Gid(gid)))
 }
 
 _chtimes :: proc(name: string, atime, mtime: time.Time) -> Error {
@@ -351,7 +365,8 @@ _fchtimes :: proc(f: ^File, atime, mtime: time.Time) -> Error {
 			uint(mtime._nsec) % uint(time.Second),
 		},
 	}
-	return _get_platform_error(linux.utimensat(f.impl.fd, nil, &times[0], nil))
+	impl := (^File_Impl)(f.impl)
+	return _get_platform_error(linux.utimensat(impl.fd, nil, &times[0], nil))
 }
 
 _exists :: proc(name: string) -> bool {
@@ -359,42 +374,6 @@ _exists :: proc(name: string) -> bool {
 	name_cstr, _ := temp_cstring(name)
 	res, errno := linux.access(name_cstr, linux.F_OK)
 	return !res && errno == .NONE
-}
-
-_is_file :: proc(name: string) -> bool {
-	TEMP_ALLOCATOR_GUARD()
-	name_cstr, _ := temp_cstring(name)
-	s: linux.Stat
-	if linux.stat(name_cstr, &s) != .NONE {
-		return false
-	}
-	return linux.S_ISREG(s.mode)
-}
-
-_is_file_fd :: proc(fd: linux.Fd) -> bool {
-	s: linux.Stat
-	if linux.fstat(fd, &s) != .NONE {
-		return false
-	}
-	return linux.S_ISREG(s.mode)
-}
-
-_is_dir :: proc(name: string) -> bool {
-	TEMP_ALLOCATOR_GUARD()
-	name_cstr, _ := temp_cstring(name)
-	s: linux.Stat
-	if linux.stat(name_cstr, &s) != .NONE {
-		return false
-	}
-	return linux.S_ISDIR(s.mode)
-}
-
-_is_dir_fd :: proc(fd: linux.Fd) -> bool {
-	s: linux.Stat
-	if linux.fstat(fd, &s) != .NONE {
-		return false
-	}
-	return linux.S_ISDIR(s.mode)
 }
 
 /* Certain files in the Linux file system are not actual
@@ -443,7 +422,7 @@ _read_entire_pseudo_file_cstring :: proc(name: cstring, allocator: runtime.Alloc
 
 @(private="package")
 _file_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, offset: i64, whence: io.Seek_From) -> (n: i64, err: io.Error) {
-	f := (^File)(stream_data)
+	f := (^File_Impl)(stream_data)
 	ferr: Error
 	switch mode {
 	case .Read:

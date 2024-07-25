@@ -1131,16 +1131,28 @@ TRACKMOUSEEVENT :: struct {
 }
 
 WIN32_FIND_DATAW :: struct {
-	dwFileAttributes: DWORD,
-	ftCreationTime: FILETIME,
-	ftLastAccessTime: FILETIME,
-	ftLastWriteTime: FILETIME,
-	nFileSizeHigh: DWORD,
-	nFileSizeLow: DWORD,
-	dwReserved0: DWORD,
-	dwReserved1: DWORD,
-	cFileName: [260]wchar_t, // #define MAX_PATH 260
-	cAlternateFileName: [14]wchar_t,
+	dwFileAttributes:   DWORD,
+	ftCreationTime:     FILETIME,
+	ftLastAccessTime:   FILETIME,
+	ftLastWriteTime:    FILETIME,
+	nFileSizeHigh:      DWORD,
+	nFileSizeLow:       DWORD,
+	dwReserved0:        DWORD,
+	dwReserved1:        DWORD,
+	cFileName:          [MAX_PATH]WCHAR,
+	cAlternateFileName: [14]WCHAR,
+	_OBSOLETE_dwFileType:    DWORD, // Obsolete. Do not use.
+	_OBSOLETE_dwCreatorType: DWORD, // Obsolete. Do not use
+	_OBSOLETE_wFinderFlags:  WORD,  // Obsolete. Do not use
+}
+
+FILE_ID_128 :: struct {
+	Identifier: [16]BYTE,
+}
+
+FILE_ID_INFO :: struct {
+	VolumeSerialNumber: ULONGLONG,
+	FileId:             FILE_ID_128,
 }
 
 CREATESTRUCTA :: struct {
@@ -1194,6 +1206,11 @@ NMHDR :: struct {
 	hwndFrom: HWND,
 	idFrom:   UINT_PTR,
 	code:     UINT,      // NM_ code
+}
+
+NCCALCSIZE_PARAMS :: struct {
+	rgrc: [3]RECT,
+	lppos: PWINDOWPOS,
 }
 
 // Generic WM_NOTIFY notification codes
@@ -2318,6 +2335,7 @@ FILE_TYPE_PIPE :: 0x0003
 RECT  :: struct {left, top, right, bottom: LONG}
 POINT :: struct {x, y: LONG}
 
+PWINDOWPOS :: ^WINDOWPOS
 WINDOWPOS :: struct {
 	hwnd: HWND,
 	hwndInsertAfter: HWND,
@@ -2549,6 +2567,7 @@ CLSCTX_RESERVED6                      :: 0x1000000
 CLSCTX_ACTIVATE_ARM32_SERVER          :: 0x2000000
 CLSCTX_ALLOW_LOWER_TRUST_REGISTRATION :: 0x4000000
 CLSCTX_PS_DLL                         :: 0x80000000
+CLSCTX_ALL                            :: CLSCTX_INPROC_SERVER | CLSCTX_INPROC_HANDLER | CLSCTX_LOCAL_SERVER | CLSCTX_REMOTE_SERVER
 
 WSAPROTOCOLCHAIN :: struct {
 	ChainLen: c_int,
@@ -2608,10 +2627,11 @@ OBJECT_ATTRIBUTES :: struct {
 	SecurityQualityOfService: rawptr,
 }
 
+PUNICODE_STRING :: ^UNICODE_STRING
 UNICODE_STRING :: struct {
-	Length:        u16,
-	MaximumLength: u16,
-	Buffer:        ^u16,
+	Length:        u16    `fmt:"-"`,
+	MaximumLength: u16    `fmt:"-"`,
+	Buffer:        [^]u16 `fmt:"s,Length"`,
 }
 
 OVERLAPPED :: struct {
@@ -2822,41 +2842,41 @@ NEON128 :: struct {
 
 EXCEPTION_POINTERS :: struct {
 	ExceptionRecord: ^EXCEPTION_RECORD,
-	ContextRecord: ^CONTEXT,
+	ContextRecord:   ^CONTEXT,
 }
 
 PVECTORED_EXCEPTION_HANDLER :: #type proc "system" (ExceptionInfo: ^EXCEPTION_POINTERS) -> LONG
 
 CONSOLE_READCONSOLE_CONTROL :: struct {
-	nLength: ULONG,
-	nInitialChars: ULONG,
-	dwCtrlWakeupMask: ULONG,
+	nLength:           ULONG,
+	nInitialChars:     ULONG,
+	dwCtrlWakeupMask:  ULONG,
 	dwControlKeyState: ULONG,
 }
 
 PCONSOLE_READCONSOLE_CONTROL :: ^CONSOLE_READCONSOLE_CONTROL
 
 BY_HANDLE_FILE_INFORMATION :: struct {
-	dwFileAttributes: DWORD,
-	ftCreationTime: FILETIME,
-	ftLastAccessTime: FILETIME,
-	ftLastWriteTime: FILETIME,
+	dwFileAttributes:     DWORD,
+	ftCreationTime:       FILETIME,
+	ftLastAccessTime:     FILETIME,
+	ftLastWriteTime:      FILETIME,
 	dwVolumeSerialNumber: DWORD,
-	nFileSizeHigh: DWORD,
-	nFileSizeLow: DWORD,
-	nNumberOfLinks: DWORD,
-	nFileIndexHigh: DWORD,
-	nFileIndexLow: DWORD,
+	nFileSizeHigh:        DWORD,
+	nFileSizeLow:         DWORD,
+	nNumberOfLinks:       DWORD,
+	nFileIndexHigh:       DWORD,
+	nFileIndexLow:        DWORD,
 }
 
 LPBY_HANDLE_FILE_INFORMATION :: ^BY_HANDLE_FILE_INFORMATION
 
 FILE_STANDARD_INFO :: struct {
 	AllocationSize: LARGE_INTEGER,
-	EndOfFile: LARGE_INTEGER,
-	NumberOfLinks: DWORD,
-	DeletePending: BOOLEAN,
-	Directory: BOOLEAN,
+	EndOfFile:      LARGE_INTEGER,
+	NumberOfLinks:  DWORD,
+	DeletePending:  BOOLEAN,
+	Directory:      BOOLEAN,
 }
 
 FILE_ATTRIBUTE_TAG_INFO :: struct {

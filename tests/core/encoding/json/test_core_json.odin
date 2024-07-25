@@ -3,6 +3,7 @@ package test_core_json
 import "core:encoding/json"
 import "core:testing"
 import "core:mem/virtual"
+import "base:runtime"
 
 @test
 parse_json :: proc(t: ^testing.T) {
@@ -349,6 +350,24 @@ unmarshal_json :: proc(t: ^testing.T) {
 }
 
 @test
+unmarshal_empty_struct :: proc(t: ^testing.T) {
+	TestStruct :: struct {}
+	test := make(map[string]TestStruct)
+	input: = `{
+		"test_1": {},
+		"test_2": {}
+	}`
+	err := json.unmarshal(transmute([]u8)input, &test)
+	defer {
+		for k in test {
+			delete(k)
+		}
+		delete(test)
+	}
+	testing.expect(t, err == nil, "Expected empty struct to unmarshal without error")
+}
+
+@test
 surrogate :: proc(t: ^testing.T) {
 	input := `+ + * 😃 - /`
 
@@ -368,4 +387,60 @@ utf8_string_of_multibyte_characters :: proc(t: ^testing.T) {
 	val, err := json.parse_string(`"🐛✅"`)
 	defer json.destroy_value(val)
 	testing.expectf(t, err == nil, "Expected `json.parse` to return nil, got %v", err)
+}
+
+@test
+struct_with_ignore_tags :: proc(t: ^testing.T) {
+	My_Struct :: struct {
+		a: string `json:"-"`,
+	}
+
+	my_struct := My_Struct{
+		a = "test",
+	}
+
+	my_struct_marshaled, marshal_err := json.marshal(my_struct)
+	defer delete(my_struct_marshaled)
+
+	testing.expectf(t, marshal_err == nil, "Expected `json.marshal` to return nil error, got %v", marshal_err)
+
+	my_struct_json := transmute(string)my_struct_marshaled
+	expected_json := `{}`
+
+	testing.expectf(t, expected_json == my_struct_json, "Expected `json.marshal` to return %s, got %s", expected_json, my_struct_json)
+}
+
+@test
+map_with_integer_keys :: proc(t: ^testing.T) {
+	my_map := make(map[i32]string)
+	defer delete_map(my_map)
+
+	my_map[-1] = "a"
+	my_map[0] = "b"
+	my_map[42] = "c"
+	my_map[99999999] = "d"
+
+	marshaled_data, marshal_err := json.marshal(my_map)
+	defer delete(marshaled_data)
+	
+	testing.expectf(t, marshal_err == nil, "Expected `json.marshal` to return nil error, got %v", marshal_err)
+
+	my_map2 := make(map[i32]string)
+	defer delete_map(my_map2)
+
+	unmarshal_err := json.unmarshal(marshaled_data, &my_map2)
+	defer for key, item in my_map2 {
+		runtime.delete_string(item)
+	}
+	testing.expectf(t, unmarshal_err == nil, "Expected `json.unmarshal` to return nil, got %v", unmarshal_err)
+
+	testing.expectf(t, len(my_map) == len(my_map2), "Expected %v map items to have been unmarshaled, got %v", len(my_map), len(my_map2))
+
+	for key, item in my_map {
+		testing.expectf(t, key in my_map2, "Expected key %v to be present in unmarshaled map", key)
+		
+		if key in my_map2 {
+			testing.expectf(t, runtime.string_eq(item, my_map2[key]), "Expected value %s to be present in unmarshaled map", key)
+		}
+	}
 }

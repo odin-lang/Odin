@@ -8,6 +8,18 @@ write_string :: proc(f: ^File, s: string) -> (n: int, err: Error) {
 	return write(f, transmute([]byte)s)
 }
 
+write_strings :: proc(f: ^File, strings: ..string) -> (n: int, err: Error) {
+	for s in strings {
+		m: int
+		m, err = write_string(f, s)
+		n += m
+		if err != nil {
+			return
+		}
+	}
+	return
+}
+
 write_byte :: proc(f: ^File, b: byte) -> (n: int, err: Error) {
 	return write(f, []byte{b})
 }
@@ -138,7 +150,7 @@ read_entire_file_from_file :: proc(f: ^File, allocator: runtime.Allocator) -> (d
 }
 
 @(require_results)
-write_entire_file :: proc(name: string, data: []byte, perm: File_Mode, truncate := true) -> Error {
+write_entire_file :: proc(name: string, data: []byte, perm: int, truncate := true) -> Error {
 	flags := O_WRONLY|O_CREATE
 	if truncate {
 		flags |= O_TRUNC

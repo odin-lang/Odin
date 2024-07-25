@@ -297,7 +297,8 @@ lock :: proc(a: ^WASM_Allocator) {
 					return
 				}
 
-				assert(intrinsics.wasm_memory_atomic_wait32((^u32)(&a.mu), u32(new_state), -1) != 0)
+				ret := intrinsics.wasm_memory_atomic_wait32((^u32)(&a.mu), u32(new_state), -1)
+				assert(ret != 0)
 				intrinsics.cpu_relax()
 			}
 		}

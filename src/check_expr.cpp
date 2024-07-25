@@ -500,7 +500,9 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 		nctx.no_polymorphic_errors = false;
 
 		// NOTE(bill): Reset scope from the failed procedure type
-		scope_reset(scope);
+		scope->head_child.store(nullptr, std::memory_order_relaxed);
+		string_map_clear(&scope->elements);
+		ptr_set_clear(&scope->imported);
 
 		// LEAK NOTE(bill): Cloning this AST may be leaky but this is not really an issue due to arena-based allocation
 		Ast *cloned_proc_type_node = clone_ast(pt->node);
@@ -6033,6 +6035,22 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 
 					Entity *vt = pt->params->Tuple.variables[pt->variadic_index];
 					o.type = vt->type;
+
+					// NOTE(bill, 2024-07-14): minimize the stack usage for variadic parameters with the backing array
+					if (c->decl) {
+						bool found = false;
+						for (auto &vr : c->decl->variadic_reuses) {
+							if (are_types_identical(vt->type, vr.slice_type)) {
+								vr.max_count = gb_max(vr.max_count, variadic_operands.count);
+								found = true;
+								break;
+							}
+						}
+						if (!found) {
+							array_add(&c->decl->variadic_reuses, VariadicReuseData{vt->type, variadic_operands.count});
+						}
+					}
+
 				} else {
 					dummy_argument_count += 1;
 					o.type = t_untyped_nil;
@@ -7888,12 +7906,15 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 
 			// NOTE: Due to restrictions in LLVM you can not inline calls with a superset of features.
 			if (is_call_inlined) {
-				GB_ASSERT(c->curr_proc_decl);
-				GB_ASSERT(c->curr_proc_decl->entity);
-				GB_ASSERT(c->curr_proc_decl->entity->type->kind == Type_Proc);
-				String scope_features = c->curr_proc_decl->entity->type->Proc.enable_target_feature;
-				if (!check_target_feature_is_superset_of(scope_features, pt->Proc.enable_target_feature, &invalid)) {
-					error(call, "Inlined procedure enables target feature '%.*s', this requires the calling procedure to at least enable the same feature", LIT(invalid));
+				if (c->curr_proc_decl == nullptr) {
+					error(call, "Calling a '#force_inline' procedure that enables target features is not allowed at file scope");
+				} else {
+					GB_ASSERT(c->curr_proc_decl->entity);
+					GB_ASSERT(c->curr_proc_decl->entity->type->kind == Type_Proc);
+					String scope_features = c->curr_proc_decl->entity->type->Proc.enable_target_feature;
+					if (!check_target_feature_is_superset_of(scope_features, pt->Proc.enable_target_feature, &invalid)) {
+						error(call, "Inlined procedure enables target feature '%.*s', this requires the calling procedure to at least enable the same feature", LIT(invalid));
+					}
 				}
 			}
 		}
@@ -9926,8 +9947,12 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 		}
 		Type *et = base_type(t->BitSet.elem);
 		isize field_count = 0;
-		if (et->kind == Type_Enum) {
+		if (et != nullptr && et->kind == Type_Enum) {
 			field_count = et->Enum.fields.count;
+		}
+
+		if (is_type_array(bit_set_to_int(t))) {
+			is_constant = false;
 		}
 
 		if (cl->elems[0]->kind == Ast_FieldValue) {
