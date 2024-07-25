@@ -525,7 +525,7 @@ Returns:
 - res: The formatted string, backed by `buf`.
 
 Example:
-	buf: [8]u8
+	buf: [MIN_YY_DATE_LEN]u8
 	now := time.now()
 	fmt.println(time.to_string_yy_mm_dd(now, buf[:]))
 */
@@ -557,7 +557,7 @@ Returns:
 - res: The formatted string, backed by `buf`.
 
 Example:
-	buf: [10]u8
+	buf: [MIN_YYYY_DATE_LEN]u8
 	now := time.now()
 	fmt.println(time.to_string_dd_mm_yyyy(now, buf[:]))
 */
@@ -591,7 +591,7 @@ Returns:
 - res: The formatted string, backed by `buf`.
 
 Example:
-	buf: [8]u8
+	buf: [MIN_YY_DATE_LEN]u8
 	now := time.now()
 	fmt.println(time.to_string_dd_mm_yy(now, buf[:]))
 */
@@ -623,7 +623,7 @@ Returns:
 - res: The formatted string, backed by `buf`.
 
 Example:
-	buf: [10]u8
+	buf: [MIN_YYYY_DATE_LEN]u8
 	now := time.now()
 	fmt.println(time.to_string_mm_dd_yyyy(now, buf[:]))
 */
@@ -657,7 +657,7 @@ Returns:
 - res: The formatted string, backed by `buf`.
 
 Example:
-	buf: [8]u8
+	buf: [MIN_YY_DATE_LEN]u8
 	now := time.now()
 	fmt.println(time.to_string_mm_dd_yy(now, buf[:]))
 */
