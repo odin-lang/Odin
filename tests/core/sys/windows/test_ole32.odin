@@ -60,8 +60,3 @@ verify_coinit :: proc(t: ^testing.T) {
 	expect_value(t, win32.COINIT.DISABLE_OLE1DDE, 0x00000004)
 	expect_value(t, win32.COINIT.SPEED_OVER_MEMORY, 0x00000008)
 }
-
-// hr := CoInitializeEx(nil, .MULTITHREADED);
-// testing.expectf(t, hr == 0, "%x (should be: %v)", u32(hr), 0)
-// assert(SUCCEEDED(hr))
-// defer CoUninitialize()
