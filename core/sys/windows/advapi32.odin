@@ -152,6 +152,43 @@ foreign advapi32 {
 		cbData: DWORD,
 	) -> LSTATUS ---
 
+	RegQueryInfoKeyW :: proc(
+		hKey: HKEY,
+		lpClass: LPWSTR,
+		lpcchClass: LPDWORD,
+		lpReserved: LPDWORD,
+		lpcSubKeys: LPDWORD,
+		lpcbMaxSubKeyLen: LPDWORD,
+		lpcbMaxClassLen: LPDWORD,
+		lpcValues: LPDWORD,
+		lpcbMaxValueNameLen: LPDWORD,
+		lpcbMaxValueLen: LPDWORD,
+		lpcbSecurityDescriptor: LPDWORD,
+		lpftLastWriteTime: ^FILETIME,
+	) -> LSTATUS ---
+
+	RegEnumKeyExW :: proc(
+		hKey: HKEY,
+		dwIndex: DWORD,
+		lpName: LPWSTR,
+		lpcchName: LPDWORD,
+		lpReserved: LPDWORD,
+		lpClass: LPWSTR,
+		lpcchClass: LPDWORD,
+		lpftLastWriteTime: ^FILETIME,
+	  ) -> LSTATUS ---
+
+	RegEnumValueW :: proc(
+		hKey: HKEY,
+		dwIndex: DWORD,
+		lpValueName: LPWSTR,
+		lpcchValueName: LPDWORD,
+		lpReserved: LPDWORD,
+		lpType: LPDWORD,
+		lpData: LPBYTE,
+		lpcbData: LPDWORD,
+	) -> LSTATUS ---
+
 	GetFileSecurityW :: proc(
 		lpFileName: LPCWSTR,
 		RequestedInformation: SECURITY_INFORMATION,

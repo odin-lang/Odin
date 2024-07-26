@@ -51,18 +51,14 @@ foreign kernel32 {
 	// https://learn.microsoft.com/en-us/windows/console/getnumberofconsoleinputevents
 	GetNumberOfConsoleInputEvents :: proc(hConsoleInput: HANDLE, lpcNumberOfEvents: LPDWORD) -> BOOL ---
 
-	GetConsoleMode :: proc(hConsoleHandle: HANDLE,
-	                       lpMode: LPDWORD) -> BOOL ---
-	SetConsoleMode :: proc(hConsoleHandle: HANDLE,
-	                       dwMode: DWORD) -> BOOL ---
-	SetConsoleCursorPosition :: proc(hConsoleHandle: HANDLE,
-	                                 dwCursorPosition: COORD) -> BOOL ---
-	SetConsoleTextAttribute :: proc(hConsoleOutput: HANDLE,
-	                                wAttributes: WORD) -> BOOL ---
-	GetConsoleCP :: proc() -> UINT ---
-	SetConsoleCP :: proc(wCodePageID: UINT) -> BOOL ---
-	GetConsoleOutputCP :: proc() -> UINT ---
-	SetConsoleOutputCP :: proc(wCodePageID: UINT) -> BOOL ---
+	GetConsoleMode :: proc(hConsoleHandle: HANDLE, lpMode: LPDWORD) -> BOOL ---
+	SetConsoleMode :: proc(hConsoleHandle: HANDLE, dwMode: DWORD) -> BOOL ---
+	SetConsoleCursorPosition :: proc(hConsoleHandle: HANDLE, dwCursorPosition: COORD) -> BOOL ---
+	SetConsoleTextAttribute :: proc(hConsoleOutput: HANDLE, wAttributes: WORD) -> BOOL ---
+	GetConsoleCP :: proc() -> CODEPAGE ---
+	SetConsoleCP :: proc(wCodePageID: CODEPAGE) -> BOOL ---
+	GetConsoleOutputCP :: proc() -> CODEPAGE ---
+	SetConsoleOutputCP :: proc(wCodePageID: CODEPAGE) -> BOOL ---
 	FlushConsoleInputBuffer :: proc(hConsoleInput: HANDLE) -> BOOL ---
 
 	GetFileInformationByHandle :: proc(hFile: HANDLE, lpFileInformation: LPBY_HANDLE_FILE_INFORMATION) -> BOOL ---
@@ -256,6 +252,7 @@ foreign kernel32 {
 	SetEnvironmentVariableW :: proc(n: LPCWSTR, v: LPCWSTR) -> BOOL ---
 	GetEnvironmentStringsW :: proc() -> LPWCH ---
 	FreeEnvironmentStringsW :: proc(env_ptr: LPWCH) -> BOOL ---
+	ExpandEnvironmentStringsW :: proc(lpSrc: LPCWSTR, lpDst: LPWSTR, nSize: DWORD) -> DWORD ---
 	GetModuleFileNameW :: proc(hModule: HMODULE, lpFilename: LPWSTR, nSize: DWORD) -> DWORD ---
 	CreateDirectoryW :: proc(
 		lpPathName: LPCWSTR,
@@ -440,12 +437,34 @@ foreign kernel32 {
 	GetFileAttributesExW :: proc(lpFileName: LPCWSTR, fInfoLevelId: GET_FILEEX_INFO_LEVELS, lpFileInformation: LPVOID) -> BOOL ---
 	GetSystemInfo :: proc(system_info: ^SYSTEM_INFO) ---
 	GetVersionExW :: proc(osvi: ^OSVERSIONINFOEXW) ---
-
+	GetSystemDirectoryW :: proc(lpBuffer: LPWSTR, uSize: UINT) -> UINT ---
+	GetWindowsDirectoryW :: proc(lpBuffer: LPWSTR, uSize: UINT) -> UINT ---
+	GetSystemDefaultLangID :: proc() -> LANGID ---
+	GetSystemDefaultLCID :: proc() -> LCID ---
+	GetSystemDefaultLocaleName :: proc(lpLocaleName: LPWSTR, cchLocaleName: INT) -> INT ---
+	LCIDToLocaleName :: proc(Locale: LCID, lpName: LPWSTR, cchName: INT, dwFlags: DWORD) -> INT ---
+	LocaleNameToLCID :: proc(lpName: LPCWSTR, dwFlags: DWORD) -> LCID ---
+	SetDllDirectoryW :: proc(lpPathName: LPCWSTR) -> BOOL ---
+	AddDllDirectory :: proc(NewDirectory: PCWSTR) -> rawptr ---
+	RemoveDllDirectory :: proc(Cookie: rawptr) -> BOOL ---
 	LoadLibraryW :: proc(c_str: LPCWSTR) -> HMODULE ---
+	LoadLibraryExW :: proc(c_str: LPCWSTR, hFile: HANDLE, dwFlags: LoadLibraryEx_Flags) -> HMODULE ---
 	FreeLibrary :: proc(h: HMODULE) -> BOOL ---
 	GetProcAddress :: proc(h: HMODULE, c_str: LPCSTR) -> rawptr ---
-	LoadLibraryExW :: proc(c_str: LPCWSTR, file: HANDLE, flags: LoadLibraryEx_Flags) -> HMODULE ---
 
+	LoadResource :: proc(hModule: HMODULE, hResInfo: HRSRC) -> HGLOBAL ---
+	FreeResource :: proc(hResData: HGLOBAL) -> BOOL ---
+	LockResource :: proc(hResData: HGLOBAL) -> LPVOID ---
+	SizeofResource :: proc(hModule: HMODULE, hResInfo: HRSRC) -> DWORD ---
+	FindResourceW :: proc(hModule: HMODULE, lpName: LPCWSTR, lpType: LPCWSTR) -> HRSRC ---
+	FindResourceExW :: proc(hModule: HMODULE, lpType: LPCWSTR, lpName: LPCWSTR, wLanguage: LANGID) -> HRSRC ---
+	EnumResourceNamesW :: proc(hModule: HMODULE, lpType: LPCWSTR, lpEnumFunc: ENUMRESNAMEPROCW, lParam: LONG_PTR) -> BOOL ---
+	EnumResourceNamesExW :: proc(hModule: HMODULE, lpType: LPCWSTR, lpEnumFunc: ENUMRESNAMEPROCW, lParam: LONG_PTR, dwFlags: DWORD, LangId: LANGID) -> BOOL ---
+	EnumResourceTypesExW :: proc(hModule: HMODULE, lpEnumFunc: ENUMRESTYPEPROCW, lParam: LONG_PTR, dwFlags: DWORD, LangId: LANGID) -> BOOL ---
+	EnumResourceLanguagesExW :: proc(hModule: HMODULE, lpType: LPCWSTR, lpName: LPCWSTR, lpEnumFunc: ENUMRESLANGPROCW, lParam: LONG_PTR, dwFlags: DWORD, LangId: LANGID) -> BOOL ---
+	LookupIconIdFromDirectory :: proc(presbits: PBYTE, fIcon: BOOL) -> INT ---
+	LookupIconIdFromDirectoryEx :: proc(presbits: PBYTE, fIcon: BOOL, cxDesired: INT, cyDesired: INT, Flags: UINT) -> INT ---
+	CreateIconFromResourceEx :: proc(presbits: PBYTE, dwResSize: DWORD, fIcon: BOOL, dwVer: DWORD, cxDesired: INT, cyDesired: INT, Flags: UINT) -> HICON ---
 
 	GetFullPathNameW  :: proc(filename: LPCWSTR, buffer_length: DWORD, buffer: LPCWSTR, file_part: ^LPCWSTR) -> DWORD ---
 	GetLongPathNameW  :: proc(short, long: LPCWSTR, len: DWORD) -> DWORD ---

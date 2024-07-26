@@ -40,7 +40,8 @@ LPUNKNOWN :: ^IUnknown
 
 @(default_calling_convention="system")
 foreign Ole32 {
-	CoInitializeEx :: proc(reserved: rawptr, co_init: COINIT) -> HRESULT ---
+	CoInitialize :: proc(reserved: rawptr = nil) -> HRESULT ---
+	CoInitializeEx :: proc(reserved: rawptr = nil, co_init: COINIT = .APARTMENTTHREADED) -> HRESULT ---
 	CoUninitialize :: proc() ---
 
 	CoCreateInstance :: proc(
@@ -52,4 +53,17 @@ foreign Ole32 {
 	) -> HRESULT ---
 
 	CoTaskMemFree :: proc(pv: rawptr) ---
+
+	CLSIDFromProgID :: proc(lpszProgID: LPCOLESTR, lpclsid: LPCLSID) -> HRESULT ---
+	CLSIDFromProgIDEx :: proc(lpszProgID, LPCOLESTR, lpclsid: LPCLSID) -> HRESULT ---
+	CLSIDFromString :: proc(lpsz: LPOLESTR, pclsid: LPCLSID) -> HRESULT ---
+	IIDFromString :: proc(lpsz: LPOLESTR, lpiid: LPIID) -> HRESULT ---
+	ProgIDFromCLSID :: proc(clsid: REFCLSID, lplpszProgID: ^LPOLESTR) -> HRESULT ---
+	StringFromCLSID :: proc(rclsid: REFCLSID, lplpsz: ^LPOLESTR) -> HRESULT ---
+	StringFromGUID2 :: proc(rclsid: REFCLSID, lplpsz: LPOLESTR, cchMax: INT) -> INT ---
+	StringFromIID :: proc(rclsid: REFIID, lplpsz: ^LPOLESTR) -> HRESULT ---
+
+	PropVariantClear :: proc(pvar: ^PROPVARIANT) -> HRESULT ---
+	PropVariantCopy :: proc(pvarDest: ^PROPVARIANT, pvarSrc: ^PROPVARIANT) -> HRESULT ---
+	FreePropVariantArray :: proc(cVariants: ULONG, rgvars: ^PROPVARIANT) -> HRESULT ---
 }
