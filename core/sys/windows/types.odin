@@ -1141,9 +1141,6 @@ WIN32_FIND_DATAW :: struct {
 	dwReserved1:        DWORD,
 	cFileName:          [MAX_PATH]WCHAR,
 	cAlternateFileName: [14]WCHAR,
-	_OBSOLETE_dwFileType:    DWORD, // Obsolete. Do not use.
-	_OBSOLETE_dwCreatorType: DWORD, // Obsolete. Do not use
-	_OBSOLETE_wFinderFlags:  WORD,  // Obsolete. Do not use
 }
 
 FILE_ID_128 :: struct {
