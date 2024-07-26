@@ -287,6 +287,8 @@ foreign user32 {
 	CreateRectRgnIndirect :: proc(lprect: ^RECT) -> HRGN ---
 	GetSystemMetricsForDpi :: proc(nIndex: int, dpi: UINT) -> int ---
 
+	GetCursorInfo :: proc(pci: PCURSORINFO) -> BOOL ---
+
 	GetSystemMenu :: proc(hWnd: HWND, bRevert: BOOL) -> HMENU ---
 	EnableMenuItem :: proc(hMenu: HMENU, uIDEnableItem: UINT, uEnable: UINT) -> BOOL ---
 	MenuItemFromPoint :: proc(hWnd: HWND, hMenu: HMENU, ptScreen: POINT) -> INT ---
@@ -369,6 +371,10 @@ GET_NCHITTEST_WPARAM :: #force_inline proc "contextless" (wParam: WPARAM) -> c_s
 
 GET_XBUTTON_WPARAM :: #force_inline proc "contextless" (wParam: WPARAM) -> WORD {
 	return HIWORD(cast(DWORD)wParam)
+}
+
+GET_RAWINPUT_CODE_WPARAM :: #force_inline proc "contextless" (wParam: WPARAM) -> BYTE {
+	return BYTE(wParam) & 0xFF
 }
 
 MAKEINTRESOURCEW :: #force_inline proc "contextless" (#any_int i: int) -> LPWSTR {
@@ -568,6 +574,15 @@ WINDOWINFO :: struct {
 	wCreatorVersion: WORD,
 }
 PWINDOWINFO :: ^WINDOWINFO
+
+CURSORINFO :: struct {
+	cbSize: DWORD,
+	flags: DWORD,
+	hCursor: HCURSOR,
+	ptScreenPos: POINT,
+}
+PCURSORINFO :: ^CURSORINFO
+
 
 DRAWTEXTPARAMS :: struct {
 	cbSize: UINT,
