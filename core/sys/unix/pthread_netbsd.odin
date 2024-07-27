@@ -2,7 +2,7 @@ package unix
 
 import "core:c"
 
-pthread_t :: distinct u64
+pthread_t :: distinct rawptr
 
 SEM_T_SIZE :: 8
 

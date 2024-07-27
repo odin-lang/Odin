@@ -379,7 +379,7 @@ foreign libc {
 	@(link_name="realloc")	_unix_realloc	:: proc(ptr: rawptr, size: c.size_t) -> rawptr ---
 
 	@(link_name="getenv")	_unix_getenv	:: proc(cstring) -> cstring ---
-	@(link_name="realpath")	_unix_realpath	:: proc(path: cstring, resolved_path: rawptr) -> rawptr ---
+	@(link_name="realpath")	_unix_realpath	:: proc(path: cstring, resolved_path: [^]byte = nil) -> cstring ---
 
 	@(link_name="exit")	_unix_exit	:: proc(status: c.int) -> ! ---
 
@@ -746,9 +746,9 @@ absolute_path_from_relative :: proc(rel: string) -> (path: string, err: Error) {
 	if path_ptr == nil {
 		return "", get_last_error()
 	}
-	defer _unix_free(path_ptr)
+	defer _unix_free(rawptr(path_ptr))
 
-	path = strings.clone(string(cstring(path_ptr)))
+	path = strings.clone(string(path_ptr))
 
 	return path, nil
 }

@@ -621,3 +621,7 @@ gb_internal String big_int_to_string(gbAllocator allocator, BigInt const *x, u64
 	}
 	return make_string(cast(u8 *)buf.data, buf.count);
 }
+
+gb_internal int big_int_log2(BigInt const *x) {
+	return mp_count_bits(x) - 1;
+}
