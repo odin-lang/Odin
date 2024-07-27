@@ -40,7 +40,7 @@ foreign libc {
 	strtok   :: proc(s1: [^]char, s2: cstring) -> [^]char ---
 
 	// 7.24.6 Miscellaneous functions
-	strerror :: proc(errnum: int) -> [^]char ---
+	strerror :: proc(errnum: int) -> cstring ---
 	strlen   :: proc(s: cstring) -> size_t ---
 }
 memset :: proc "c" (s: rawptr, c: int, n: size_t) -> rawptr {

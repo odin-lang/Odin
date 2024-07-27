@@ -47,8 +47,8 @@ foreign libc {
 	clogf   :: proc(z: complex_float) -> complex_float ---
 
 	// 7.3.8 Power and absolute-value functions
-	cabs    :: proc(z: complex_double) -> complex_double ---
-	cabsf   :: proc(z: complex_float) -> complex_float ---
+	cabs    :: proc(z: complex_double) -> double ---
+	cabsf   :: proc(z: complex_float) -> float ---
 	cpow    :: proc(x, y: complex_double) -> complex_double ---
 	cpowf   :: proc(x, y: complex_float) -> complex_float ---
 	csqrt   :: proc(z: complex_double) -> complex_double ---

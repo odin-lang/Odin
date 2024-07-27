@@ -50,17 +50,39 @@ when ODIN_OS == .Linux || ODIN_OS == .FreeBSD || ODIN_OS == .Darwin || ODIN_OS =
 	foreign libc {
 		// 7.27.2 Time manipulation functions
 		clock        :: proc() -> clock_t ---
+		@(link_name=LDIFFTIME)
 		difftime     :: proc(time1, time2: time_t) -> double ---
+		@(link_name=LMKTIME)
 		mktime       :: proc(timeptr: ^tm) -> time_t ---
+		@(link_name=LTIME)
 		time         :: proc(timer: ^time_t) -> time_t ---
 		timespec_get :: proc(ts: ^timespec, base: int) -> int ---
 
 		// 7.27.3 Time conversion functions
 		asctime      :: proc(timeptr: ^tm) -> [^]char ---
+		@(link_name=LCTIME)
 		ctime        :: proc(timer: ^time_t) -> [^]char ---
+		@(link_name=LGMTIME)
 		gmtime       :: proc(timer: ^time_t) -> ^tm ---
+		@(link_name=LLOCALTIME)
 		localtime    :: proc(timer: ^time_t) -> ^tm ---
 		strftime     :: proc(s: [^]char, maxsize: size_t, format: cstring, timeptr: ^tm) -> size_t ---
+	}
+
+	when ODIN_OS == .NetBSD {
+		@(private) LDIFFTIME  :: "__difftime50"
+		@(private) LMKTIME    :: "__mktime50"
+		@(private) LTIME      :: "__time50"
+		@(private) LCTIME     :: "__ctime50"
+		@(private) LGMTIME    :: "__gmtime50"
+		@(private) LLOCALTIME :: "__localtime50"
+	} else {
+		@(private) LDIFFTIME  :: "difftime"
+		@(private) LMKTIME    :: "mktime"
+		@(private) LTIME      :: "ltime"
+		@(private) LCTIME     :: "ctime"
+		@(private) LGMTIME    :: "gmtime"
+		@(private) LLOCALTIME :: "localtime"
 	}
 
 	when ODIN_OS == .OpenBSD {
@@ -69,11 +91,15 @@ when ODIN_OS == .Linux || ODIN_OS == .FreeBSD || ODIN_OS == .Darwin || ODIN_OS =
 		CLOCKS_PER_SEC :: 1000000
 	}
 
-	TIME_UTC       :: 1
+	TIME_UTC :: 1
 
-	time_t         :: distinct i64
+	time_t :: distinct i64
 
-	clock_t        :: long
+	when ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD {
+		clock_t :: distinct int32_t
+	} else {
+		clock_t :: distinct long
+	}
 
 	timespec :: struct {
 		tv_sec:  time_t,

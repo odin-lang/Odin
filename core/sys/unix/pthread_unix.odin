@@ -5,6 +5,11 @@ foreign import "system:pthread"
 
 import "core:c"
 
+timespec :: struct {
+	tv_sec:  i64,
+	tv_nsec: i64,
+}
+
 //
 // On success, these functions return 0.
 //

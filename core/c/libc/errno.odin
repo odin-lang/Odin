@@ -102,6 +102,6 @@ when ODIN_OS == .Haiku {
 // read the value, or to produce an lvalue such that you can assign a different
 // error value to errno. To work around this, just expose it as a function like
 // it actually is.
-errno :: #force_inline proc() -> ^int {
+errno :: #force_inline proc "contextless" () -> ^int {
 	return _get_errno()
 }
