@@ -1,4 +1,5 @@
 /*
+	import "base:runtime"
 	import "core:prof/spall"
 	import "core:sync"
 
@@ -14,7 +15,7 @@
 		defer spall.context_destroy(&spall_ctx)
 
 		buffer_backing := make([]u8, spall.BUFFER_DEFAULT_SIZE)
-		spall_buffer = spall.buffer_create(buffer_backing, sync.current_thread_id)
+		spall_buffer = spall.buffer_create(buffer_backing, u32(sync.current_thread_id()))
 		defer spall.buffer_destroy(&spall_ctx, &spall_buffer)
 
 		spall.SCOPED_EVENT(&spall_ctx, &spall_buffer, #procedure)
