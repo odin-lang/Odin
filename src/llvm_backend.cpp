@@ -976,14 +976,16 @@ gb_internal lbValue lb_const_hash(lbModule *m, lbValue key, Type *key_type) {
 gb_internal lbValue lb_gen_map_key_hash(lbProcedure *p, lbValue const &map_ptr, lbValue key, lbValue *key_ptr_) {
 	TEMPORARY_ALLOCATOR_GUARD();
 
-	lbValue key_ptr = lb_address_from_load_or_generate_local(p, key);
+	Type* key_type = base_type(type_deref(map_ptr.type))->Map.key;
+
+	lbValue real_key = lb_emit_conv(p, key, key_type);
+
+	lbValue key_ptr = lb_address_from_load_or_generate_local(p, real_key);
 	key_ptr = lb_emit_conv(p, key_ptr, t_rawptr);
 
 	if (key_ptr_) *key_ptr_ = key_ptr;
 
-	Type* key_type = base_type(type_deref(map_ptr.type))->Map.key;
-
-	lbValue hashed_key = lb_const_hash(p->module, key, key_type);
+	lbValue hashed_key = lb_const_hash(p->module, real_key, key_type);
 	if (hashed_key.value == nullptr) {
 		lbValue hasher = lb_hasher_proc_for_type(p->module, key_type);
 
