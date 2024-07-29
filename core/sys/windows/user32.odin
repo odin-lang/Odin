@@ -373,8 +373,9 @@ GET_XBUTTON_WPARAM :: #force_inline proc "contextless" (wParam: WPARAM) -> WORD 
 	return HIWORD(cast(DWORD)wParam)
 }
 
-GET_RAWINPUT_CODE_WPARAM :: #force_inline proc "contextless" (wParam: WPARAM) -> BYTE {
-	return BYTE(wParam) & 0xFF
+// Retrieves the input code from wParam in WM_INPUT message.
+GET_RAWINPUT_CODE_WPARAM :: #force_inline proc "contextless" (wParam: WPARAM) -> RAWINPUT_CODE {
+	return RAWINPUT_CODE(wParam & 0xFF)
 }
 
 MAKEINTRESOURCEW :: #force_inline proc "contextless" (#any_int i: int) -> LPWSTR {
@@ -397,6 +398,16 @@ DPI_AWARENESS_CONTEXT_SYSTEM_AWARE         :: DPI_AWARENESS_CONTEXT(~uintptr(1))
 DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE    :: DPI_AWARENESS_CONTEXT(~uintptr(2)) // -3
 DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 :: DPI_AWARENESS_CONTEXT(~uintptr(3)) // -4
 DPI_AWARENESS_CONTEXT_UNAWARE_GDISCALED    :: DPI_AWARENESS_CONTEXT(~uintptr(4)) // -5
+
+RAWINPUT_CODE :: enum {
+	// The input is in the regular message flow,
+	// the app is required to call DefWindowProc
+	// so that the system can perform clean ups.
+	RIM_INPUT       = 0,
+	// The input is sink only. The app is expected
+	// to behave nicely.
+	RIM_INPUTSINK   = 1,
+}
 
 RAWINPUTHEADER :: struct {
 	dwType: DWORD,
