@@ -1778,6 +1778,7 @@ parse_var_type :: proc(p: ^Parser, flags: ast.Field_Flags) -> ^ast.Expr {
 			type = ast.new(ast.Bad_Expr, tok.pos, end_pos(tok))
 		}
 		e := ast.new(ast.Ellipsis, type.pos, type)
+		e.tok = tok.kind
 		e.expr = type
 		return e
 	}
