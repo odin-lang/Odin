@@ -6,7 +6,6 @@ import "base:runtime"
 
 import "core:fmt"
 import "core:mem"
-import "core:sync"
 import "core:time"
 import "core:slice"
 import "core:strings"
@@ -15,17 +14,6 @@ import "core:sys/linux"
 import "core:path/filepath"
 
 PIDFD_UNASSIGNED  :: ~uintptr(0)
-
-_default_has_pidfd_open: bool = true
-
-// pidfd is still fairly new (Linux 5.3)
-_has_pidfd_open :: proc () -> bool {
-	@thread_local has_pidfd_open: bool = true
-	if has_pidfd_open {
-		has_pidfd_open = sync.atomic_load(&_default_has_pidfd_open)
-	}
-	return has_pidfd_open
-}
 
 @(private="package")
 _exit :: proc "contextless" (code: int) -> ! {
@@ -300,19 +288,14 @@ _current_process_info :: proc(selection: Process_Info_Fields, allocator: runtime
 _process_open :: proc(pid: int, _: Process_Open_Flags) -> (process: Process, err: Error) {
 	process.pid = pid
 	process.handle = PIDFD_UNASSIGNED
-	if !_has_pidfd_open() {
-		return process, .Unsupported
-	}
 
 	pidfd, errno := linux.pidfd_open(linux.Pid(pid), {})
 	if errno == .ENOSYS {
-		sync.atomic_store(&_default_has_pidfd_open, false)
 		return process, .Unsupported
 	}
 	if errno != nil {
 		return process, _get_platform_error(errno)
 	}
-
 	process.handle = uintptr(pidfd)
 	return
 }
@@ -439,8 +422,10 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 
 	// TODO: We need to come up with a way to detect the execve failure from here.
 
-	process.pid = int(pid)
-	process.handle = PIDFD_UNASSIGNED
+	process, err = process_open(int(pid))
+	if err == .Unsupported {
+		return process, nil
+	}
 	return
 }
 
@@ -491,6 +476,7 @@ _process_state_update_times :: proc(p: Process, state: ^Process_State) -> (err: 
 _process_wait :: proc(process: Process, timeout: time.Duration) -> (process_state: Process_State, err: Error) {
 	process_state.pid = process.pid
 
+	errno: linux.Errno
 	options: linux.Wait_Options
 	big_if: if timeout == 0 {
 		options += {.WNOHANG}
@@ -500,30 +486,14 @@ _process_wait :: proc(process: Process, timeout: time.Duration) -> (process_stat
 			time_nsec = uint(timeout % time.Second),
 		}
 
-		// pidfd_open is fairly new, so don't error out on ENOSYS
-		pid_fd: linux.Pid_FD
-		errno: linux.Errno
-		if _has_pidfd_open() {
-			if process.handle == PIDFD_UNASSIGNED {
-				pid_fd, errno = linux.pidfd_open(linux.Pid(process.pid), nil)
-				if errno != .NONE && errno != .ENOSYS {
-					return process_state, _get_platform_error(errno)
-				}
-			} else {
-				pid_fd = linux.Pid_FD(process.handle)
-			}
-		}
-
-		if errno != .ENOSYS {
-			defer if process.handle == PIDFD_UNASSIGNED {
-				linux.close(linux.Fd(pid_fd))
-			}
+		if process.handle != PIDFD_UNASSIGNED {
 			pollfd: [1]linux.Poll_Fd = {
 				{
-					fd = linux.Fd(pid_fd),
+					fd = linux.Fd(process.handle),
 					events = {.IN},
 				},
 			}
+
 			for {
 				n, e := linux.ppoll(pollfd[:], &ts, nil)
 				if e == .EINTR {
@@ -539,8 +509,6 @@ _process_wait :: proc(process: Process, timeout: time.Duration) -> (process_stat
 				break
 			}
 		} else {
-			sync.atomic_store(&_default_has_pidfd_open, false)
-
 			mask: bit_set[0..<64; u64]
 			mask += { int(linux.Signal.SIGCHLD) - 1 }
 
@@ -586,7 +554,7 @@ _process_wait :: proc(process: Process, timeout: time.Duration) -> (process_stat
 	}
 
 	status: u32
-	errno: linux.Errno = .EINTR
+	errno = .EINTR
 	for errno == .EINTR {
 		_, errno = linux.wait4(linux.Pid(process.pid), &status, options, nil)
 		if errno != .NONE {
