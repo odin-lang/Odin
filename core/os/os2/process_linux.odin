@@ -80,17 +80,12 @@ _process_list :: proc(allocator: runtime.Allocator) -> (list: []int, err: Error)
 			return {}, _get_platform_error(errno)
 		}
 
-		d: ^dirent64
-
-		for i := 0; i < buflen; i += int(d.d_reclen) {
-			d = (^dirent64)(rawptr(&buf[i]))
-			d_name_cstr := cstring(&d.d_name[0])
-			#no_bounds_check d_name_str := string(d.d_name[:len(d_name_cstr)])
+		offset: int
+		for d in linux.dirent_iterate_buf(buf[:buflen], &offset) {
+			d_name_str := linux.dirent_name(d)
 
 			if pid, ok := strconv.parse_int(d_name_str); ok {
 				append(&dynamic_list, pid)
-			} else {
-				return nil, .Invalid_File
 			}
 		}
 	}
