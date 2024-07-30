@@ -6,16 +6,10 @@ import "core:time"
 import "base:runtime"
 import "core:sys/linux"
 
-File_Impl_Kind :: enum u8 {
-	File,
-	Pipe,
-}
-
 File_Impl :: struct {
 	file: File,
 	name: string,
 	fd: linux.Fd,
-	kind: File_Impl_Kind,
 	allocator: runtime.Allocator,
 }
 
@@ -213,18 +207,18 @@ _write_at :: proc(f: ^File_Impl, p: []byte, offset: i64) -> (i64, Error) {
 }
 
 _file_size :: proc(f: ^File_Impl) -> (n: i64, err: Error) {
-	if f.kind == .Pipe {
-		return 0, .No_Size
-	}
 	// TODO: Identify 0-sized "pseudo" files and return No_Size. This would
 	//       eliminate the need for the _read_entire_pseudo_file procs.
-
 	s: linux.Stat = ---
 	errno := linux.fstat(f.fd, &s)
 	if errno != .NONE {
 		return -1, _get_platform_error(errno)
 	}
-	return i64(s.size), nil
+
+	if s.mode & linux.S_IFMT == linux.S_IFREG {
+		return i64(s.size), nil
+	}
+	return 0, .No_Size
 }
 
 _sync :: proc(f: ^File) -> Error {
