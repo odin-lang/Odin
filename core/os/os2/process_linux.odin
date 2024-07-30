@@ -63,7 +63,7 @@ _get_ppid :: proc() -> int {
 }
 
 @(private="package")
-_process_list :: proc(allocator: runtime.Allocator) -> ([]int, Error) {
+_process_list :: proc(allocator: runtime.Allocator) -> (list: []int, err: Error) {
 	TEMP_ALLOCATOR_GUARD()
 
 	dir_fd: linux.Fd
@@ -101,17 +101,21 @@ _process_list :: proc(allocator: runtime.Allocator) -> ([]int, Error) {
 
 			if pid, ok := strconv.parse_int(d_name_str); ok {
 				append(&dynamic_list, pid)
+			} else {
+				return nil, .Invalid_File
 			}
 		}
 	}
 
-	return slice.clone(dynamic_list[:], allocator), nil
+	list, err = slice.clone(dynamic_list[:], allocator)
+	return
 }
 
 @(private="package")
 _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator: runtime.Allocator) -> (info: Process_Info, err: Error) {
 	TEMP_ALLOCATOR_GUARD()
 
+	info.pid = pid
 	info.fields = selection
 
 	// Use this so we can use bprintf to make cstrings with less copying.
@@ -148,9 +152,14 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 			passwd = passwd[strings.index_byte(passwd, ':') + 1:]
 
 			n = strings.index_byte(passwd, ':')
-			if uid, ok := strconv.parse_int(passwd[:n]); ok && uid == int(s.uid) {
-				info.username = strings.clone(username, allocator)
+			uid: int
+			ok: bool
+			if uid, ok = strconv.parse_int(passwd[:n]); ok && uid == int(s.uid) {
+				info.username = strings.clone(username, allocator) or_return
 				break
+			}
+			if !ok {
+				return info, .Invalid_File
 			}
 
 			eol := strings.index_byte(passwd, '\n')
@@ -184,30 +193,31 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 
 			cwd, cwd_err = _read_link_cstr(path_cstr, temp_allocator()) // allowed to fail
 			if cwd_err == nil && .Working_Dir in selection {
-				info.working_dir = strings.clone(cwd, allocator)
+				info.working_dir = strings.clone(cwd, allocator) or_return
 			}
 		}
 
 		if .Executable_Path in selection {
 			if cmdline[0] == '/' {
-				info.executable_path = strings.clone(cmdline[:terminator], allocator)
+				info.executable_path = strings.clone(cmdline[:terminator], allocator) or_return
 			} else if cwd_err == nil {
 				join_paths: [2]string = { cwd, cmdline[:terminator] }
 				info.executable_path = filepath.join(join_paths[:], allocator)
 			}
 		}
 		if .Command_Line in selection {
-			info.command_line = strings.clone(cmdline[:terminator], allocator)
+			info.command_line = strings.clone(cmdline[:terminator], allocator) or_return
 		}
 
 		if .Command_Args in selection {
 			// skip to first arg
 			cmdline = cmdline[terminator + 1:]
 
-			arg_list := make([dynamic]string, allocator)
+			arg_list := make([dynamic]string, allocator) or_return
 			for len(cmdline) > 0 {
 				terminator = strings.index_byte(cmdline, 0)
-				append(&arg_list, strings.clone(cmdline[:terminator], allocator))
+				arg := strings.clone(cmdline[:terminator], allocator) or_return
+				append(&arg_list, arg) or_return
 				cmdline = cmdline[terminator + 1:]
 			}
 			info.command_args = arg_list[:]
@@ -230,9 +240,11 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 		stats = stats[strings.index_byte(stats, ' ') + 1:]
 
 		if .PPid in selection {
-			ppid_str := stats[strings.index_byte(stats, ' '):]
+			ppid_str := stats[:strings.index_byte(stats, ' ')]
 			if ppid, ok := strconv.parse_int(ppid_str); ok {
 				info.ppid = ppid
+			} else {
+				return info, .Invalid_File
 			}
 		}
 
@@ -241,9 +253,11 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 			for _ in 4..<19 {
 				stats = stats[strings.index_byte(stats, ' ') + 1:]
 			}
-			nice_str := stats[strings.index_byte(stats, ' '):]
+			nice_str := stats[:strings.index_byte(stats, ' ')]
 			if nice, ok := strconv.parse_int(nice_str); ok {
 				info.priority = nice
+			} else {
+				return info, .Invalid_File
 			}
 		}
 	}
@@ -255,13 +269,14 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 		if env_bytes, env_err := _read_entire_pseudo_file(path_cstr, temp_allocator()); env_err == nil {
 			env := string(env_bytes)
 
-			env_list := make([dynamic]string, allocator)
+			env_list := make([dynamic]string, allocator) or_return
 			for len(env) > 0 {
 				terminator := strings.index_byte(env, 0)
 				if terminator == -1 || terminator == 0 {
 					break
 				}
-				append(&env_list, strings.clone(env[:terminator], allocator))
+				e := strings.clone(env[:terminator], allocator) or_return
+				append(&env_list, e) or_return
 				env = env[terminator + 1:]
 			}
 			info.environment = env_list[:]
@@ -417,11 +432,12 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 		}
 
 		if errno = linux.execveat(dir_fd, executable_path, &cargs[0], env); errno != .NONE {
-			print_error(stderr, _get_platform_error(errno), string(executable_path))
-			panic("execve failed to replace process")
+			linux.exit(1)
 		}
 		unreachable()
 	}
+
+	// TODO: We need to come up with a way to detect the execve failure from here.
 
 	process.pid = int(pid)
 	process.handle = PIDFD_UNASSIGNED
@@ -455,8 +471,14 @@ _process_state_update_times :: proc(p: Process, state: ^Process_State) -> (err: 
 	stats = stats[idx + 1:]
 	stime_str := stats[:strings.index_byte(stats, ' ')]
 
-	utime, _ := strconv.parse_int(utime_str, 10)
-	stime, _ := strconv.parse_int(stime_str, 10)
+	utime, stime: int
+	ok: bool
+	if utime, ok = strconv.parse_int(utime_str, 10); !ok {
+		return .Invalid_File
+	}
+	if stime, ok = strconv.parse_int(stime_str, 10); !ok {
+		return .Invalid_File
+	}
 
 	// NOTE: Assuming HZ of 100, 1 jiffy == 10 ms
 	state.user_time = time.Duration(utime) * 10 * time.Millisecond
