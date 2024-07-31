@@ -18,7 +18,7 @@ jobs:
         usesh: true
         copyback: false
         prepare: |
-          PKG_PATH="https://cdn.NetBSD.org/pub/pkgsrc/packages/NetBSD/$(uname -p)/$(uname -r | cut -d_ -f1)_${PKGSRC_BRANCH}/All" /usr/sbin/pkg_add pkgin
+          PKG_PATH="https://cdn.NetBSD.org/pub/pkgsrc/packages/NetBSD/$(uname -p)/10.0_2024Q2/All" /usr/sbin/pkg_add pkgin
           pkgin -y in gmake git bash python311 llvm clang
           ln -s /usr/pkg/bin/python3.11 /usr/bin/python3
         run: |
