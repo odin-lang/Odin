@@ -58,7 +58,7 @@ Example:
 	import "core:fmt"
 
 	set_global_seed_example :: proc() {
-		rand.set_global_seed(1)
+		rand.reset(1)
 		fmt.println(rand.uint64())
 	}
 
