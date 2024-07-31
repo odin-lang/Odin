@@ -525,11 +525,12 @@ Raw_Quaternion256_Vector_Scalar :: struct {vector: [3]f64, scalar: f64}
 		Linux,
 		Essence,
 		FreeBSD,
-		Haiku,
 		OpenBSD,
 		NetBSD,
+		Haiku,
 		WASI,
 		JS,
+		Orca,
 		Freestanding,
 	}
 */
@@ -589,7 +590,7 @@ Odin_Platform_Subtarget_Type :: type_of(ODIN_PLATFORM_SUBTARGET)
 		Memory  = 1,
 		Thread  = 2,
 	}
-	Odin_Sanitizer_Flags :: distinct bitset[Odin_Sanitizer_Flag; u32]
+	Odin_Sanitizer_Flags :: distinct bit_set[Odin_Sanitizer_Flag; u32]
 
 	ODIN_SANITIZER_FLAGS // is a constant
 */
