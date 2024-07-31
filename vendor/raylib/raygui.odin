@@ -28,13 +28,6 @@ when ODIN_OS == .Windows {
 
 RAYGUI_VERSION :: "4.0"
 
-// Style property
-GuiStyleProp :: struct {
-	controlId:     u16,
-	propertyId:    u16,
-	propertyValue: c.int,
-}
-
 // Gui control state
 GuiState :: enum c.int {
 	STATE_NORMAL = 0,
@@ -236,8 +229,8 @@ foreign lib {
 	
 	// Style set/get functions
 	
-	GuiSetStyle         :: proc(control: GuiControl, property: GuiStyleProp, value: c.int) ---                // Set one style property
-	GuiGetStyle         :: proc(control: GuiControl, property: GuiStyleProp) -> c.int ---                     // Get one style property
+	GuiSetStyle         :: proc(control: GuiControl, property: GuiControlProperty, value: c.int) ---          // Set one style property
+	GuiGetStyle         :: proc(control: GuiControl, property: GuiControlProperty) -> c.int ---               // Get one style property
 	
 	// Styles loading functions
 	
