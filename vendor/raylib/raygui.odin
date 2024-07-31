@@ -229,8 +229,8 @@ foreign lib {
 	
 	// Style set/get functions
 	
-	GuiSetStyle         :: proc(control: GuiControl, property: c.int, value: c.int) ---                       // Set one style property
-	GuiGetStyle         :: proc(control: GuiControl, property: c.int) -> c.int ---                            // Get one style property
+	GuiSetStyle         :: proc(control: GuiControl, property: GuiControlProperty, value: c.int) ---          // Set one style property
+	GuiGetStyle         :: proc(control: GuiControl, property: GuiControlProperty) -> c.int ---               // Get one style property
 	
 	// Styles loading functions
 	
