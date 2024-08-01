@@ -44,8 +44,8 @@ test_chacha20 :: proc(t: ^testing.T) {
 
 	for impl in impls {
 		test_chacha20_stream(t, impl)
+		test_chacha20poly1305(t, impl)
 	}
-	test_chacha20poly1305(t) // TODO: Move into loop.
 }
 
 test_chacha20_stream :: proc(t: ^testing.T, impl: chacha20.Implementation) {
@@ -93,7 +93,8 @@ test_chacha20_stream :: proc(t: ^testing.T, impl: chacha20.Implementation) {
 	testing.expectf(
 		t,
 		derived_ciphertext_str == ciphertext_str,
-		"Expected %s for xor_bytes(plaintext_str), but got %s instead",
+		"chacha20/%v: Expected %s for xor_bytes(plaintext_str), but got %s instead",
+		impl,
 		ciphertext_str,
 		derived_ciphertext_str,
 	)
@@ -138,7 +139,8 @@ test_chacha20_stream :: proc(t: ^testing.T, impl: chacha20.Implementation) {
 	testing.expectf(
 		t,
 		derived_ciphertext_str == xciphertext_str,
-		"Expected %s for xor_bytes(plaintext_str), but got %s instead",
+		"chacha20/%v: Expected %s for xor_bytes(plaintext_str), but got %s instead",
+		impl,
 		xciphertext_str,
 		derived_ciphertext_str,
 	)
@@ -170,14 +172,16 @@ test_chacha20_stream :: proc(t: ^testing.T, impl: chacha20.Implementation) {
 	testing.expectf(
 		t,
 		expected_digest_str == digest_str,
-		"Expected %s for keystream digest, but got %s instead",
+		"chacha20/%v: Expected %s for keystream digest, but got %s instead",
+		impl,
 		expected_digest_str,
 		digest_str,
 	)
 }
 
-test_chacha20poly1305 :: proc(t: ^testing.T) {
+test_chacha20poly1305 :: proc(t: ^testing.T, impl: chacha20.Implementation) {
 	plaintext := transmute([]byte)(_PLAINTEXT_SUNSCREEN_STR)
+	plaintext_str := string(hex.encode(plaintext, context.temp_allocator))
 
 	aad := [12]byte {
 		0x50, 0x51, 0x52, 0x53, 0xc0, 0xc1, 0xc2, 0xc3,
@@ -221,76 +225,62 @@ test_chacha20poly1305 :: proc(t: ^testing.T) {
 	}
 	tag_str := string(hex.encode(tag[:], context.temp_allocator))
 
-	derived_tag: [chacha20poly1305.TAG_SIZE]byte
-	derived_ciphertext: [114]byte
+	tag_ := make([]byte, chacha20poly1305.TAG_SIZE, context.temp_allocator)
+	dst := make([]byte, len(ciphertext), context.temp_allocator)
 
-	chacha20poly1305.encrypt(
-		derived_ciphertext[:],
-		derived_tag[:],
-		key[:],
-		nonce[:],
-		aad[:],
-		plaintext,
-	)
+	ctx: chacha20poly1305.Context
+	chacha20poly1305.init(&ctx, key[:])
 
-	derived_ciphertext_str := string(hex.encode(derived_ciphertext[:], context.temp_allocator))
+	chacha20poly1305.seal(&ctx, dst, tag_, nonce[:], aad[:], plaintext)
+	dst_str := string(hex.encode(dst, context.temp_allocator))
+	tag_str_ := string(hex.encode(tag_, context.temp_allocator))
+
 	testing.expectf(
 		t,
-		derived_ciphertext_str == ciphertext_str,
-		"Expected ciphertext %s for encrypt(aad, plaintext), but got %s instead",
+		dst_str == ciphertext_str && tag_str_ == tag_str,
+		"chacha20poly1305/%v: Expected: (%s, %s) for seal(%x, %x, %x, %x), but got (%s, %s) instead",
+		impl,
 		ciphertext_str,
-		derived_ciphertext_str,
-	)
-
-	derived_tag_str := string(hex.encode(derived_tag[:], context.temp_allocator))
-	testing.expectf(
-		t,
-		derived_tag_str == tag_str,
-		"Expected tag %s for encrypt(aad, plaintext), but got %s instead",
 		tag_str,
-		derived_tag_str,
+		key,
+		nonce,
+		aad,
+		plaintext,
+		dst_str,
+		tag_str_,
 	)
 
-	derived_plaintext: [114]byte
-	ok := chacha20poly1305.decrypt(
-		derived_plaintext[:],
-		tag[:],
-		key[:],
-		nonce[:],
-		aad[:],
-		ciphertext[:],
-	)
-	derived_plaintext_str := string(derived_plaintext[:])
-	testing.expect(t, ok, "Expected true for decrypt(tag, aad, ciphertext)")
+	ok := chacha20poly1305.open(&ctx, dst, nonce[:], aad[:], ciphertext[:], tag[:])
+	dst_str = string(hex.encode(dst, context.temp_allocator))
+
 	testing.expectf(
 		t,
-		derived_plaintext_str == _PLAINTEXT_SUNSCREEN_STR,
-		"Expected plaintext %s for decrypt(tag, aad, ciphertext), but got %s instead",
-		_PLAINTEXT_SUNSCREEN_STR,
-		derived_plaintext_str,
+		ok && dst_str == plaintext_str,
+		"chacha20poly1305/%v: Expected: (%s, true) for open(%x, %x, %x, %x, %s), but got (%s, %v) instead",
+		impl,
+		plaintext_str,
+		key,
+		nonce,
+		aad,
+		ciphertext,
+		tag_str,
+		dst_str,
+		ok,
 	)
 
-	derived_ciphertext[0] ~= 0xa5
-	ok = chacha20poly1305.decrypt(
-		derived_plaintext[:],
-		tag[:],
-		key[:],
-		nonce[:],
-		aad[:],
-		derived_ciphertext[:],
-	)
-	testing.expect(t, !ok, "Expected false for decrypt(tag, aad, corrupted_ciphertext)")
+	copy(dst, ciphertext[:])
+	tag_[0] ~= 0xa5
+	ok = chacha20poly1305.open(&ctx, dst, nonce[:], aad[:], dst[:], tag_)
+	testing.expectf(t, !ok, "chacha20poly1305/%v: Expected false for open(bad_tag, aad, ciphertext)", impl)
 
+	dst[0] ~= 0xa5
+	ok = chacha20poly1305.open(&ctx, dst, nonce[:], aad[:], dst[:], tag[:])
+	testing.expectf(t, !ok, "chacha20poly1305/%v: Expected false for open(tag, aad, bad_ciphertext)", impl)
+
+	copy(dst, ciphertext[:])
 	aad[0] ~= 0xa5
-	ok = chacha20poly1305.decrypt(
-		derived_plaintext[:],
-		tag[:],
-		key[:],
-		nonce[:],
-		aad[:],
-		ciphertext[:],
-	)
-	testing.expect(t, !ok, "Expected false for decrypt(tag, corrupted_aad, ciphertext)")
+	ok = chacha20poly1305.open(&ctx, dst, nonce[:], aad[:], dst[:], tag[:])
+	testing.expectf(t, !ok, "chacha20poly1305/%v: Expected false for open(tag, bad_aad, ciphertext)", impl)
 }
 
 @(test)

@@ -24,12 +24,9 @@ TAG_SIZE :: poly1305.TAG_SIZE
 _P_MAX :: 64 * 0xffffffff // 64 * (2^32-1)
 
 @(private)
-_validate_common_slice_sizes :: proc (tag, key, nonce, aad, text: []byte) {
+_validate_common_slice_sizes :: proc (tag, nonce, aad, text: []byte) {
 	if len(tag) != TAG_SIZE {
 		panic("crypto/chacha20poly1305: invalid destination tag size")
-	}
-	if len(key) != KEY_SIZE {
-		panic("crypto/chacha20poly1305: invalid key size")
 	}
 	if len(nonce) != NONCE_SIZE {
 		panic("crypto/chacha20poly1305: invalid nonce size")
@@ -59,16 +56,37 @@ _update_mac_pad16 :: #force_inline proc (ctx: ^poly1305.Context, x_len: int) {
 	}
 }
 
-// encrypt encrypts the plaintext and authenticates the aad and ciphertext,
-// with the provided key and nonce, stores the output in ciphertext and tag.
-encrypt :: proc (ciphertext, tag, key, nonce, aad, plaintext: []byte) {
-	_validate_common_slice_sizes(tag, key, nonce, aad, plaintext)
+// Context is a keyed Chacha20Poly1305 instance.
+Context :: struct {
+	_key:  [KEY_SIZE]byte,
+	_impl: chacha20.Implementation,
+	_is_initialized: bool,
+}
+
+// init initializes a Context with the provided key.
+init :: proc(ctx: ^Context, key: []byte, impl := chacha20.Implementation.Simd256) {
+	if len(key) != KEY_SIZE {
+		panic("crypto/chacha20poly1305: invalid key size")
+	}
+
+	copy(ctx._key[:], key)
+	ctx._impl = impl
+	ctx._is_initialized = true
+}
+
+// seal encrypts the plaintext and authenticates the aad and ciphertext,
+// with the provided Context and nonce, stores the output in dst and tag.
+//
+// dst and plaintext MUST alias exactly or not at all.
+seal :: proc(ctx: ^Context, dst, tag, nonce, aad, plaintext: []byte) {
+	ciphertext := dst
+	_validate_common_slice_sizes(tag, nonce, aad, plaintext)
 	if len(ciphertext) != len(plaintext) {
 		panic("crypto/chacha20poly1305: invalid destination ciphertext size")
 	}
 
 	stream_ctx: chacha20.Context = ---
-	chacha20.init(&stream_ctx, key, nonce)
+	chacha20.init(&stream_ctx, ctx._key[:], nonce, ctx._impl)
 
 	// otk = poly1305_key_gen(key, nonce)
 	otk: [poly1305.KEY_SIZE]byte = ---
@@ -107,13 +125,15 @@ encrypt :: proc (ciphertext, tag, key, nonce, aad, plaintext: []byte) {
 	poly1305.final(&mac_ctx, tag) // Implicitly sanitizes context.
 }
 
-// decrypt authenticates the aad and ciphertext, and decrypts the ciphertext,
-// with the provided key, nonce, and tag, and stores the output in plaintext,
-// returning true iff the authentication was successful.
+// open authenticates the aad and ciphertext, and decrypts the ciphertext,
+// with the provided Context, nonce, and tag, and stores the output in dst,
+// returning true iff the authentication was successful.  If authentication
+// fails, the destination buffer will be zeroed.
 //
-// If authentication fails, the destination plaintext buffer will be zeroed.
-decrypt :: proc (plaintext, tag, key, nonce, aad, ciphertext: []byte) -> bool {
-	_validate_common_slice_sizes(tag, key, nonce, aad, ciphertext)
+// dst and plaintext MUST alias exactly or not at all.
+open :: proc(ctx: ^Context, dst, nonce, aad, ciphertext, tag: []byte) -> bool {
+	plaintext := dst
+	_validate_common_slice_sizes(tag, nonce, aad, ciphertext)
 	if len(ciphertext) != len(plaintext) {
 		panic("crypto/chacha20poly1305: invalid destination plaintext size")
 	}
@@ -123,7 +143,7 @@ decrypt :: proc (plaintext, tag, key, nonce, aad, ciphertext: []byte) -> bool {
 	// points where needed.
 
 	stream_ctx: chacha20.Context = ---
-	chacha20.init(&stream_ctx, key, nonce)
+	chacha20.init(&stream_ctx, ctx._key[:], nonce, ctx._impl)
 
 	// otk = poly1305_key_gen(key, nonce)
 	otk: [poly1305.KEY_SIZE]byte = ---
@@ -165,4 +185,11 @@ decrypt :: proc (plaintext, tag, key, nonce, aad, ciphertext: []byte) -> bool {
 	chacha20.xor_bytes(&stream_ctx, plaintext, ciphertext)
 
 	return true
+}
+
+// reset sanitizes the Context.  The Context must be
+// re-initialized to be used again.
+reset :: proc "contextless" (ctx: ^Context) {
+	mem.zero_explicit(&ctx._key, len(ctx._key))
+	ctx._is_initialized = false
 }
