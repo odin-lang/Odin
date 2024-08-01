@@ -211,7 +211,7 @@ foreign lib {
 
 	[[ More; https://pubs.opengroup.org/onlinepubs/9699919799/functions/_exit.html ]]
 	*/
-	_exit :: proc(status: c.int) ---
+	_exit :: proc(status: c.int) -> ! ---
 
 	/*
 	The exec family of functions shall replace the current process image with a new process image.
@@ -416,8 +416,11 @@ foreign lib {
 			}
 
 			cwd = posix.getcwd(raw_data(buf), len(buf))
-			if errno := posix.errno(); cwd == nil && errno != .ERANGE {
-				fmt.panicf("getcwd failure: %v", posix.strerror(errno))
+			if cwd == nil {
+				errno := posix.errno()
+				if errno != .ERANGE {
+					fmt.panicf("getcwd failure: %v", posix.strerror(errno))
+				}
 			}
 		}
 
