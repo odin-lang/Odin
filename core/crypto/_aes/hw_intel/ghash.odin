@@ -240,8 +240,8 @@ ghash :: proc "contextless" (dst, key, data: []byte) #no_bounds_check {
 	}
 
 	// Process 1 block at a time
-	src: []byte
 	for l > 0 {
+		src: []byte = ---
 		if l >= _aes.GHASH_BLOCK_SIZE {
 			src = buf
 			buf = buf[_aes.GHASH_BLOCK_SIZE:]
