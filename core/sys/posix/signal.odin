@@ -559,7 +559,7 @@ when ODIN_OS == .Darwin {
 		},
 		si_pid:    pid_t,      /* [PSX] sending process ID */
 		si_uid:    uid_t,      /* [PSX] real user ID of sending process */
-		si_status: c.int,      /* [PSX] exit value of signal */
+		si_status: c.int,      /* [PSX] exit value or signal */
 		si_addr:   rawptr,     /* [PSX] address of faulting instruction */
 		si_value:  sigval,     /* [PSX] signal value */
 		si_band:   c.long,     /* [PSX] band event for SIGPOLL */
@@ -709,7 +709,7 @@ when ODIN_OS == .Darwin {
 		},
 		si_pid:    pid_t,      /* [PSX] sending process ID */
 		si_uid:    uid_t,      /* [PSX] real user ID of sending process */
-		si_status: c.int,      /* [PSX] exit value of signal */
+		si_status: c.int,      /* [PSX] exit value or signal */
 		si_addr:   rawptr,     /* [PSX] address of faulting instruction */
 		si_value:  sigval,     /* [PSX] signal value */
 		using _reason: struct #raw_union {
@@ -889,7 +889,7 @@ when ODIN_OS == .Darwin {
 				using _child: struct {
 					si_pid:    pid_t,   /* [PSX] sending process ID */
 					si_uid:    uid_t,   /* [PSX] real user ID of sending process */
-					si_status: c.int,   /* [PSX] exit value of signal */
+					si_status: c.int,   /* [PSX] exit value or signal */
 					_utime:    clock_t,
 					_stime:    clock_t,
 				},

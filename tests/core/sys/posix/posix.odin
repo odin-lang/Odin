@@ -1,11 +1,15 @@
 //+build darwin, freebsd, openbsd, netbsd
 package tests_core_posix
 
+import "base:runtime"
+
+import "core:log"
+import "core:path/filepath"
+import "core:strings"
+import "core:sync"
 import "core:sys/posix"
 import "core:testing"
-import "core:log"
-import "core:strings"
-import "core:path/filepath"
+import "core:time"
 
 @(test)
 test_arpa_inet :: proc(t: ^testing.T) {
@@ -196,6 +200,14 @@ test_stat :: proc(t: ^testing.T) {
 	testing.expect_value(t, posix.S_IRWXG, transmute(posix.mode_t)posix._mode_t(posix._S_IRWXG))
 	testing.expect_value(t, posix.S_IRWXO, transmute(posix.mode_t)posix._mode_t(posix._S_IRWXO))
 	testing.expect_value(t, posix._S_IFMT, transmute(posix.mode_t)posix._mode_t(posix.__S_IFMT))
+
+	stat: posix.stat_t
+	testing.expect_value(t, posix.stat(#file, &stat), posix.result.OK)
+	testing.expect(t, posix.S_ISREG(stat.st_mode))
+	testing.expect_value(t, stat.st_mode, posix.mode_t{.IROTH, .IRGRP, .IRUSR, .IWUSR, .IFREG})
+
+	CONTENT := #load(#file)
+	testing.expect_value(t, stat.st_size, posix.off_t(len(CONTENT)))
 }
 
 @(test)
@@ -208,4 +220,63 @@ test_termios :: proc(t: ^testing.T) {
 	testing.expect_value(t, transmute(posix.COutput_Flags)posix.tcflag_t(posix._BSDLY),  posix.BSDLY)
 	testing.expect_value(t, transmute(posix.COutput_Flags)posix.tcflag_t(posix._VTDLY),  posix.VTDLY)
 	testing.expect_value(t, transmute(posix.COutput_Flags)posix.tcflag_t(posix._FFDLY),  posix.FFDLY)
+}
+
+@(test)
+test_signal :: proc(t: ^testing.T) {
+	@static tt: ^testing.T
+	tt = t
+
+	@static ctx: runtime.Context
+	ctx = context
+
+	act: posix.sigaction_t
+	act.sa_flags = {.SIGINFO, .RESETHAND}
+	act.sa_sigaction = handler
+	testing.expect_value(t, posix.sigaction(.SIGCHLD, &act, nil), posix.result.OK)
+
+	handler :: proc "c" (sig: posix.Signal, info: ^posix.siginfo_t, address: rawptr) {
+		context = ctx
+		testing.expect_value(tt, sig, posix.Signal.SIGCHLD)
+		testing.expect_value(tt, info.si_signo, posix.Signal.SIGCHLD)
+		testing.expect_value(tt, info.si_status, 69)
+		testing.expect_value(tt, info.si_code.chld, posix.CLD_Code.EXITED)
+	}
+
+	switch pid := posix.fork(); pid {
+	case -1:
+		log.errorf("fork() failure: %v", posix.strerror())
+	case 0:
+		posix.exit(69)
+	case:
+		status: i32
+		posix.waitpid(pid, &status, {})
+		testing.expect(t, posix.WIFEXITED(status))
+		testing.expect(t, posix.WEXITSTATUS(status) == 69)
+	}
+}
+
+@(test)
+test_pthreads :: proc(t: ^testing.T) {
+	testing.set_fail_timeout(t, time.Second)
+
+	NTHREADS :: 3
+	thread_ids: [NTHREADS]posix.pthread_t
+
+	@static counter: int
+
+	for &tid in thread_ids {
+		posix.pthread_create(&tid, nil, thread_function, nil)
+	}
+
+	for tid in thread_ids {
+		posix.pthread_join(tid, nil)
+	}
+
+	testing.expect_value(t, counter, NTHREADS)
+
+	thread_function :: proc "c" (_: rawptr) -> rawptr {
+		sync.atomic_add(&counter, 1)		
+		return nil
+	}
 }
