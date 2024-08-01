@@ -1,12 +1,19 @@
-//+build darwin
+//+build darwin, netbsd, freebsd, openbsd
 //+private
 package mem_virtual
 
 import "core:sys/posix"
 
-MAP_ANONYMOUS :: 0x1000 /* allocated from memory, swap space */
+// Define non-posix needed flags:
+when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD {
+	MAP_ANONYMOUS :: 0x1000 /* allocated from memory, swap space */
 
-MADV_FREE     :: 5      /* pages unneeded, discard contents */
+	MADV_FREE     :: 5      /* pages unneeded, discard contents */
+} else when ODIN_OS == .OpenBSD || ODIN_OS == .NetBSD {
+	MAP_ANONYMOUS :: 0x1000
+
+	MADV_FREE     :: 6
+}
 
 _reserve :: proc "contextless" (size: uint) -> (data: []byte, err: Allocator_Error) {
 	flags  := posix.Map_Flags{ .PRIVATE } + transmute(posix.Map_Flags)i32(MAP_ANONYMOUS)
@@ -43,14 +50,12 @@ _protect :: proc "contextless" (data: rawptr, size: uint, flags: Protect_Flags) 
 	return posix.mprotect(data, size, transmute(posix.Prot_Flags)flags) == .OK
 }
 
-
 _platform_memory_init :: proc() {
-	DEFAULT_PAGE_SIZE = 4096
+	DEFAULT_PAGE_SIZE = posix.PAGE_SIZE
 	
 	// is power of two
 	assert(DEFAULT_PAGE_SIZE != 0 && (DEFAULT_PAGE_SIZE & (DEFAULT_PAGE_SIZE-1)) == 0)
 }
-
 
 _map_file :: proc "contextless" (fd: uintptr, size: i64, flags: Map_File_Flags) -> (data: []byte, error: Map_File_Error) {
 	#assert(i32(posix.Prot_Flag_Bits.READ)  == i32(Map_File_Flag.Read))
