@@ -4,6 +4,8 @@ import "core:c"
 
 when ODIN_OS == .Darwin {
 	foreign import lib "system:System.framework"
+} else when ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD {
+	foreign import lib "system:dl"
 } else {
 	foreign import lib "system:c"
 }
