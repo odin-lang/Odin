@@ -61,4 +61,3 @@ TEMP_ALLOCATOR_GUARD :: #force_inline proc(loc := #caller_location) -> (runtime.
 	global_default_temp_allocator_index = (global_default_temp_allocator_index+1)%MAX_TEMP_ARENA_COUNT
 	return tmp, loc
 }
-

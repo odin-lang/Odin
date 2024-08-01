@@ -23,6 +23,8 @@ CTL_KERN   :: 1
 	KERN_OSRELEASE :: 2
 	KERN_OSREV     :: 3
 	KERN_VERSION   :: 4
+	KERN_PROC      :: 14
+		KERN_PROC_PATHNAME :: 12
 CTL_VM     :: 2
 CTL_VFS    :: 3
 CTL_NET    :: 4

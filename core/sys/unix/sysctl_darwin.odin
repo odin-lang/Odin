@@ -67,6 +67,8 @@ CTL_KERN    :: 1
 	KERN_VERSION   :: 4  // Darwin Kernel Version 21.5.0: Tue Apr 26 21:08:22 PDT 2022; root:darwin-8020.121.3~4/RELEASE_X86_64
 	KERN_OSRELDATE :: 26 // i32: OS release date
 	KERN_OSVERSION :: 65 // Build number, e.g. 21F79
+	KERN_PROCARGS  :: 38
+	KERN_PROCARGS2 :: 49
 CTL_VM      :: 2
 CTL_VFS     :: 3
 CTL_NET     :: 4
