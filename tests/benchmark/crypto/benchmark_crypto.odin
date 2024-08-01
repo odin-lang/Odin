@@ -339,10 +339,13 @@ _benchmark_chacha20poly1305 :: proc(
 		0x00, 0x00, 0x00, 0x00,
 	}
 
+	ctx: chacha20poly1305.Context = ---
+	chacha20poly1305.init(&ctx, key[:]) // Basically 0 overhead.
+
 	tag: [chacha20poly1305.TAG_SIZE]byte = ---
 
 	for _ in 0 ..= options.rounds {
-		chacha20poly1305.encrypt(buf, tag[:], key[:], nonce[:], nil, buf)
+		chacha20poly1305.seal(&ctx, buf, tag[:], nonce[:], nil, buf)
 	}
 	options.count = options.rounds
 	options.processed = options.rounds * options.bytes
