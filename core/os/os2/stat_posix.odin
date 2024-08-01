@@ -3,6 +3,7 @@
 package os2
 
 import "base:runtime"
+
 import "core:path/filepath"
 import "core:sys/posix"
 import "core:time"
@@ -63,7 +64,6 @@ _fstat :: proc(f: ^File, allocator: runtime.Allocator) -> (fi: File_Info, err: E
 	return internal_stat(stat, fullpath), nil
 }
 
-// NOTE: _stat and _lstat are using _fstat to avoid a race condition when populating fullpath
 _stat :: proc(name: string, allocator: runtime.Allocator) -> (fi: File_Info, err: Error) {
 	if name == "" {
 		err = .Invalid_Path
@@ -75,6 +75,11 @@ _stat :: proc(name: string, allocator: runtime.Allocator) -> (fi: File_Info, err
 	cname := temp_cstring(name) or_return
 
 	rcname := posix.realpath(cname)
+	if rcname == nil {
+		err = .Invalid_Path
+		return
+	}
+	defer posix.free(rcname)
 
 	stat: posix.stat_t
 	if posix.stat(rcname, &stat) != .OK {
@@ -97,6 +102,11 @@ _lstat :: proc(name: string, allocator: runtime.Allocator) -> (fi: File_Info, er
 	cname := temp_cstring(name) or_return
 
 	rcname := posix.realpath(cname)
+	if rcname == nil {
+		err = .Invalid_Path
+		return
+	}
+	defer posix.free(rcname)
 
 	stat: posix.stat_t
 	if posix.lstat(rcname, &stat) != .OK {

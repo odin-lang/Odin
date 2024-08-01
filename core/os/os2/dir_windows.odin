@@ -57,6 +57,7 @@ _read_directory_iterator :: proc(it: ^Read_Directory_Iterator) -> (fi: File_Info
 		return
 	}
 
+	assert(!is_temp(allocator))
 	TEMP_ALLOCATOR_GUARD()
 
 	for !it.impl.no_more_files {
