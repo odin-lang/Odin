@@ -8,6 +8,7 @@ _lookup_env :: proc(key: string, allocator: runtime.Allocator) -> (value: string
 	if key == "" {
 		return
 	}
+	assert(!is_temp(allocator))
 	TEMP_ALLOCATOR_GUARD()
 	wkey, _ := win32_utf8_to_wstring(key, temp_allocator())
 
@@ -19,8 +20,6 @@ _lookup_env :: proc(key: string, allocator: runtime.Allocator) -> (value: string
 		}
 		return "", true
 	}
-
-	TEMP_ALLOCATOR_GUARD()
 
 	b := make([]u16, n+1, temp_allocator())
 
