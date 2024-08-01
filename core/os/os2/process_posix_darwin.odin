@@ -54,7 +54,7 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 	// other errors usually mean other parts of the info could be retrieved though, so in those cases we keep trying to get the other information.
 
 	pidinfo: {
-		if selection >= {.PPid, .Priority, .Username } {
+		if selection & {.PPid, .Priority, .Username } != {} {
 			ppid, mnice, uid, ok := get_pidinfo(pid, selection)
 			if !ok {
 				if err == nil {
@@ -111,7 +111,7 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 		}
 	}
 
-	args: if selection >= { .Command_Line, .Command_Args, .Environment } {
+	args: if selection & { .Command_Line, .Command_Args, .Environment } != {} {
 		mib := []i32{
 			unix.CTL_KERN,
 			unix.KERN_PROCARGS2,
@@ -129,6 +129,11 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 		if sysctl(raw_data(mib), 3, raw_data(buf), &length, nil, 0) != .OK {
 			if err == nil {
 				err = _get_platform_error()
+
+				// Looks like EINVAL is returned here if you don't have permission.
+				if err == Platform_Error(posix.Errno.EINVAL) {
+					err = .Permission_Denied
+				}
 			}
 			break args
 		}
