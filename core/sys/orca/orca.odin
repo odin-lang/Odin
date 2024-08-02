@@ -1,4 +1,3 @@
-//+build orca
 package orca
 
 import "core:c"
@@ -28,7 +27,7 @@ foreign {
 SYS_MAX_ERROR :: 1024
 
 sys_err_def :: struct {
-	msg: [SYS_MAX_ERROR]u8,
+	msg: [SYS_MAX_ERROR]u8 `fmt:"s,0"`,
 	code: i32,
 }
 
@@ -245,7 +244,7 @@ rect :: struct { x, y, w, h: f32 }
 @(default_calling_convention="c", link_prefix="oc_")
 foreign {
 	// Check if two 2D vectors are equal.
-	vec2_equal :: proc(v0: vec2, v1: vec2) -> c.bool ---
+	vec2_equal :: proc(v0: vec2, v1: vec2) -> bool ---
 	// Multiply a 2D vector by a scalar.
 	vec2_mul :: proc(f: f32, v: vec2) -> vec2 ---
 	// Add two 2D vectors
@@ -324,7 +323,7 @@ list :: struct {
 @(default_calling_convention="c", link_prefix="oc_")
 foreign {
 	// Check if a list is empty.
-	list_empty :: proc(list: list) -> c.bool ---
+	list_empty :: proc(list: list) -> bool ---
 	// Zero-initializes a linked list.
 	list_init :: proc(list: ^list) ---
 	// Insert an element in a list after a given element.
@@ -348,10 +347,10 @@ foreign {
 ////////////////////////////////////////////////////////////////////////////////
 
 // The prototype of a procedure to reserve memory from the system.
-mem_reserve_proc :: proc(_context: ^base_allocator, size: u64) -> rawptr
+mem_reserve_proc :: proc "c" (_context: ^base_allocator, size: u64) -> rawptr
 
 // The prototype of a procedure to modify a memory reservation.
-mem_modify_proc :: proc(_context: ^base_allocator, ptr: rawptr, size: u64)
+mem_modify_proc :: proc "c" (_context: ^base_allocator, ptr: rawptr, size: u64)
 
 // A structure that defines how to allocate memory from the system.
 base_allocator :: struct {
@@ -445,7 +444,7 @@ str8_elt :: struct {
 	// The string element is linked into its parent string list through this field.
 	listElt: list_elt,
 	// The string for this element.
-	_string: str8,
+	string: str8,
 }
 
 // A type representing a string list.
@@ -466,7 +465,7 @@ str16_elt :: struct {
 	// The string element is linked into its parent string list through this field.
 	listElt: list_elt,
 	// The string for this element.
-	_string: str16,
+	string: str16,
 }
 
 str16_list :: struct {
@@ -486,7 +485,7 @@ str32_elt :: struct {
 	// The string element is linked into its parent string list through this field.
 	listElt: list_elt,
 	// The string for this element.
-	_string: str32,
+	string: str32,
 }
 
 str32_list :: struct {
@@ -512,14 +511,10 @@ foreign {
 	str8_push_copy :: proc(arena: ^arena, s: str8) -> str8 ---
 	// Make a copy of a string slice. This function copies a subsequence of the input string onto an arena, and returns a new string referring to the copied content.
 	str8_push_slice :: proc(arena: ^arena, s: str8, start: u64, end: u64) -> str8 ---
-	// Build a string from a null-terminated format string and a variadic argument list, similar to `vasprintf()`.
-	str8_pushfv :: proc(arena: ^arena, format: cstring, #c_vararg args: ..any) -> str8 ---
-	// Build a string from a null-terminated format string and variadic arguments, similar to `asprintf()`.
-	str8_pushf :: proc(arena: ^arena, format: cstring, #c_vararg args: ..any) -> str8 ---
 	// Lexicographically compare the contents of two strings.
 	str8_cmp :: proc(s1: str8, s2: str8) -> i32 ---
 	// Create a null-terminated C-string from an `oc_str8` string.
-	str8_to_cstring :: proc(arena: ^arena, _string: str8) -> cstring ---
+	str8_to_cstring :: proc(arena: ^arena, string: str8) -> cstring ---
 	// Push a string element to the back of a string list. This creates a `oc_str8_elt` element referring to the contents of the input string, and links that element at the end of the string list.
 	str8_list_push :: proc(arena: ^arena, list: ^str8_list, str: str8) ---
 	// Build a string from a null-terminated format string an variadic arguments, and append it to a string list.
@@ -605,25 +600,25 @@ foreign {
 	utf8_size_from_leading_char :: proc(leadingChar: char) -> u32 ---
 	// Get the size of the utf8 encoding of a codepoint.
 	utf8_codepoint_size :: proc(codePoint: utf32) -> u32 ---
-	utf8_codepoint_count_for_string :: proc(_string: str8) -> u64 ---
+	utf8_codepoint_count_for_string :: proc(string: str8) -> u64 ---
 	// Get the length of the utf8 encoding of a sequence of unicode codepoints.
 	utf8_byte_count_for_codepoints :: proc(codePoints: str32) -> u64 ---
 	// Get the offset of the next codepoint after a given offset, in a utf8 encoded string.
-	utf8_next_offset :: proc(_string: str8, byteOffset: u64) -> u64 ---
+	utf8_next_offset :: proc(string: str8, byteOffset: u64) -> u64 ---
 	// Get the offset of the previous codepoint before a given offset, in a utf8 encoded string.
-	utf8_prev_offset :: proc(_string: str8, byteOffset: u64) -> u64 ---
+	utf8_prev_offset :: proc(string: str8, byteOffset: u64) -> u64 ---
 	// Decode a utf8 encoded codepoint.
-	utf8_decode :: proc(_string: str8) -> utf8_dec ---
+	utf8_decode :: proc(string: str8) -> utf8_dec ---
 	// Decode a codepoint at a given offset in a utf8 encoded string.
-	utf8_decode_at :: proc(_string: str8, offset: u64) -> utf8_dec ---
+	utf8_decode_at :: proc(string: str8, offset: u64) -> utf8_dec ---
 	// Encode a unicode codepoint into a utf8 sequence.
 	utf8_encode :: proc(dst: cstring, codePoint: utf32) -> str8 ---
 	// Decode a utf8 string to a string of unicode codepoints using memory passed by the caller.
-	utf8_to_codepoints :: proc(maxCount: u64, backing: ^utf32, _string: str8) -> str32 ---
+	utf8_to_codepoints :: proc(maxCount: u64, backing: ^utf32, string: str8) -> str32 ---
 	// Encode a string of unicode codepoints into a utf8 string using memory passed by the caller.
 	utf8_from_codepoints :: proc(maxBytes: u64, backing: cstring, codePoints: str32) -> str8 ---
 	// Decode a utf8 encoded string to a string of unicode codepoints using an arena.
-	utf8_push_to_codepoints :: proc(arena: ^arena, _string: str8) -> str32 ---
+	utf8_push_to_codepoints :: proc(arena: ^arena, string: str8) -> str32 ---
 	// Encode a string of unicode codepoints into a utf8 string using an arena.
 	utf8_push_from_codepoints :: proc(arena: ^arena, codePoints: str32) -> str8 ---
 }
@@ -945,7 +940,7 @@ key_code :: enum u32 {
 }
 
 keymod_flag :: enum u32 {
-	ALT = 1,
+	ALT = 0,
 	SHIFT,
 	CTRL,
 	CMD,
@@ -1017,7 +1012,7 @@ event :: struct {
 	window: window,
 	// The type of the event. This determines which member of the event union is active.
 	type: event_type,
-	_: struct #raw_union {
+	using _: struct #raw_union {
 		key: key_event,
 		character: char_event,
 		mouse: mouse_event,
@@ -1095,7 +1090,7 @@ foreign {
 	// Convert a scancode to a keycode, according to current keyboard layout.
 	scancode_to_keycode :: proc(scanCode: scan_code) -> key_code ---
 	// Put a string in the clipboard.
-	clipboard_set_string :: proc(_string: str8) ---
+	clipboard_set_string :: proc(string: str8) ---
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1180,11 +1175,11 @@ io_req :: struct {
 	offset: i64,
 	// A size indicating the capacity of the buffer pointed to by `buffer`, in bytes.
 	size: u64,
-	_: struct #raw_union {
+	using _: struct #raw_union {
 		buffer: [^]char,
 		unused: u64,
 	},
-	_: struct #raw_union {
+	using _: struct #raw_union {
 		open: struct {
 			// The access permissions requested on the file to open.
 			rights: file_access,
@@ -1252,7 +1247,7 @@ io_cmp :: struct {
 	id: io_req_id,
 	// The error value for the operation.
 	error: io_error,
-	_: struct #raw_union {
+	using _: struct #raw_union {
 		result: i64,
 		size: u64,
 		offset: i64,
@@ -1319,7 +1314,7 @@ foreign {
 	// Returns a `nil` file handle
 	file_nil :: proc() -> file ---
 	// Test if a file handle is `nil`.
-	file_is_nil :: proc(handle: file) -> c.bool ---
+	file_is_nil :: proc(handle: file) -> bool ---
 	// Open a file in the applications' default directory subtree.
 	file_open :: proc(path: str8, rights: file_access, flags: file_open_flags) -> file ---
 	// Open a file in a given directory's subtree.
@@ -1384,7 +1379,7 @@ foreign {
 	// Append a path to another path.
 	path_append :: proc(arena: ^arena, parent: str8, relPath: str8) -> str8 ---
 	// Test wether a path is an absolute path.
-	path_is_absolute :: proc(path: str8) -> c.bool ---
+	path_is_absolute :: proc(path: str8) -> bool ---
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1458,19 +1453,19 @@ image_region :: struct {
 @(default_calling_convention="c", link_prefix="oc_")
 foreign {
 	surface_nil :: proc() -> surface ---
-	surface_is_nil :: proc(surface: surface) -> c.bool ---
+	surface_is_nil :: proc(surface: surface) -> bool ---
 	surface_destroy :: proc(surface: surface) ---
 	surface_get_size :: proc(surface: surface) -> vec2 ---
 	surface_contents_scaling :: proc(surface: surface) -> vec2 ---
 	surface_bring_to_front :: proc(surface: surface) ---
 	surface_send_to_back :: proc(surface: surface) ---
-	surface_get_hidden :: proc(surface: surface) -> c.bool ---
-	surface_set_hidden :: proc(surface: surface, hidden: c.bool) ---
+	surface_get_hidden :: proc(surface: surface) -> bool ---
+	surface_set_hidden :: proc(surface: surface, hidden: bool) ---
 	color_rgba :: proc(r: f32, g: f32, b: f32, a: f32) -> color ---
 	color_srgba :: proc(r: f32, g: f32, b: f32, a: f32) -> color ---
 	color_convert :: proc(_color: color, colorSpace: color_space) -> color ---
 	canvas_renderer_nil :: proc() -> canvas_renderer ---
-	canvas_renderer_is_nil :: proc(renderer: canvas_renderer) -> c.bool ---
+	canvas_renderer_is_nil :: proc(renderer: canvas_renderer) -> bool ---
 	canvas_renderer_create :: proc() -> canvas_renderer ---
 	canvas_renderer_destroy :: proc(renderer: canvas_renderer) ---
 	canvas_render :: proc(renderer: canvas_renderer, _context: canvas_context, surface: surface) ---
@@ -1478,13 +1473,13 @@ foreign {
 	canvas_surface_create :: proc(renderer: canvas_renderer) -> surface ---
 	canvas_surface_swap_interval :: proc(surface: surface, swap: i32) ---
 	canvas_context_nil :: proc() -> canvas_context ---
-	canvas_context_is_nil :: proc(_context: canvas_context) -> c.bool ---
+	canvas_context_is_nil :: proc(_context: canvas_context) -> bool ---
 	canvas_context_create :: proc() -> canvas_context ---
 	canvas_context_destroy :: proc(_context: canvas_context) ---
 	canvas_context_select :: proc(_context: canvas_context) -> canvas_context ---
 	canvas_context_set_msaa_sample_count :: proc(_context: canvas_context, sampleCount: u32) ---
 	font_nil :: proc() -> font ---
-	font_is_nil :: proc(font: font) -> c.bool ---
+	font_is_nil :: proc(font: font) -> bool ---
 	font_create_from_memory :: proc(mem: str8, rangeCount: u32, ranges: ^unicode_range) -> font ---
 	font_create_from_file :: proc(file: file, rangeCount: u32, ranges: ^unicode_range) -> font ---
 	font_create_from_path :: proc(path: str8, rangeCount: u32, ranges: ^unicode_range) -> font ---
@@ -1498,22 +1493,22 @@ foreign {
 	font_text_metrics_utf32 :: proc(font: font, fontSize: f32, codepoints: str32) -> text_metrics ---
 	font_text_metrics :: proc(font: font, fontSize: f32, text: str8) -> text_metrics ---
 	image_nil :: proc() -> image ---
-	image_is_nil :: proc(a: image) -> c.bool ---
+	image_is_nil :: proc(a: image) -> bool ---
 	image_create :: proc(renderer: canvas_renderer, width: u32, height: u32) -> image ---
-	image_create_from_rgba8 :: proc(renderer: canvas_renderer, width: u32, height: u32, pixels: ^u8) -> image ---
-	image_create_from_memory :: proc(renderer: canvas_renderer, mem: str8, flip: c.bool) -> image ---
-	image_create_from_file :: proc(renderer: canvas_renderer, file: file, flip: c.bool) -> image ---
-	image_create_from_path :: proc(renderer: canvas_renderer, path: str8, flip: c.bool) -> image ---
+	image_create_from_rgba8 :: proc(renderer: canvas_renderer, width: u32, height: u32, pixels: [^]u8) -> image ---
+	image_create_from_memory :: proc(renderer: canvas_renderer, mem: str8, flip: bool) -> image ---
+	image_create_from_file :: proc(renderer: canvas_renderer, file: file, flip: bool) -> image ---
+	image_create_from_path :: proc(renderer: canvas_renderer, path: str8, flip: bool) -> image ---
 	image_destroy :: proc(image: image) ---
-	image_upload_region_rgba8 :: proc(image: image, region: rect, pixels: ^u8) ---
+	image_upload_region_rgba8 :: proc(image: image, region: rect, pixels: [^]u8) ---
 	image_size :: proc(image: image) -> vec2 ---
 	rect_atlas_create :: proc(arena: ^arena, width: i32, height: i32) -> ^rect_atlas ---
 	rect_atlas_alloc :: proc(atlas: ^rect_atlas, width: i32, height: i32) -> rect ---
 	rect_atlas_recycle :: proc(atlas: ^rect_atlas, rect: rect) ---
-	image_atlas_alloc_from_rgba8 :: proc(atlas: ^rect_atlas, backingImage: image, width: u32, height: u32, pixels: ^u8) -> image_region ---
-	image_atlas_alloc_from_memory :: proc(atlas: ^rect_atlas, backingImage: image, mem: str8, flip: c.bool) -> image_region ---
-	image_atlas_alloc_from_file :: proc(atlas: ^rect_atlas, backingImage: image, file: file, flip: c.bool) -> image_region ---
-	image_atlas_alloc_from_path :: proc(atlas: ^rect_atlas, backingImage: image, path: str8, flip: c.bool) -> image_region ---
+	image_atlas_alloc_from_rgba8 :: proc(atlas: ^rect_atlas, backingImage: image, width: u32, height: u32, pixels: [^]u8) -> image_region ---
+	image_atlas_alloc_from_memory :: proc(atlas: ^rect_atlas, backingImage: image, mem: str8, flip: bool) -> image_region ---
+	image_atlas_alloc_from_file :: proc(atlas: ^rect_atlas, backingImage: image, file: file, flip: bool) -> image_region ---
+	image_atlas_alloc_from_path :: proc(atlas: ^rect_atlas, backingImage: image, path: str8, flip: bool) -> image_region ---
 	image_atlas_recycle :: proc(atlas: ^rect_atlas, imageRgn: image_region) ---
 	matrix_push :: proc(_matrix: mat2x3) ---
 	matrix_multiply_push :: proc(_matrix: mat2x3) ---
@@ -1533,7 +1528,7 @@ foreign {
 	set_cap :: proc(cap: cap_type) ---
 	set_font :: proc(font: font) ---
 	set_font_size :: proc(size: f32) ---
-	set_text_flip :: proc(flip: c.bool) ---
+	set_text_flip :: proc(flip: bool) ---
 	set_image :: proc(image: image) ---
 	set_image_source_region :: proc(region: rect) ---
 	get_color :: proc() -> color ---
@@ -1544,7 +1539,7 @@ foreign {
 	get_cap :: proc() -> cap_type ---
 	get_font :: proc() -> font ---
 	get_font_size :: proc() -> f32 ---
-	get_text_flip :: proc() -> c.bool ---
+	get_text_flip :: proc() -> bool ---
 	get_image :: proc() -> image ---
 	get_image_source_region :: proc() -> rect ---
 	get_position :: proc() -> vec2 ---
@@ -1554,8 +1549,8 @@ foreign {
 	cubic_to :: proc(x1: f32, y1: f32, x2: f32, y2: f32, x3: f32, y3: f32) ---
 	close_path :: proc() ---
 	glyph_outlines :: proc(glyphIndices: str32) -> rect ---
-	codepoints_outlines :: proc(_string: str32) ---
-	text_outlines :: proc(_string: str8) ---
+	codepoints_outlines :: proc(string: str32) ---
+	text_outlines :: proc(string: str8) ---
 	clear :: proc() ---
 	fill :: proc() ---
 	stroke :: proc() ---
@@ -1593,10 +1588,10 @@ key_state :: struct {
 	lastUpdate: u64,
 	transitionCount: u32,
 	repeatCount: u32,
-	down: c.bool,
-	sysClicked: c.bool,
-	sysDoubleClicked: c.bool,
-	sysTripleClicked: c.bool,
+	down: bool,
+	sysClicked: bool,
+	sysDoubleClicked: bool,
+	sysTripleClicked: bool,
 }
 
 keyboard_state :: struct {
@@ -1606,11 +1601,11 @@ keyboard_state :: struct {
 
 mouse_state :: struct {
 	lastUpdate: u64,
-	posValid: c.bool,
+	posValid: bool,
 	pos: vec2,
 	delta: vec2,
 	wheel: vec2,
-	_: struct #raw_union {
+	using _: struct #raw_union {
 		buttons: [5]key_state,
 		_: struct {
 			left: key_state,
@@ -1924,7 +1919,7 @@ ui_selector :: struct {
 	listElt: list_elt,
 	kind: ui_selector_kind,
 	op: ui_selector_op,
-	data: struct #raw_union {
+	using _: struct #raw_union {
 		text: str8,
 		key: ui_key,
 		tag: ui_tag,
@@ -1945,7 +1940,7 @@ ui_box :: struct {
 	key: ui_key,
 	frameCounter: u64,
 	flags: ui_flags,
-	_string: str8,
+	string: str8,
 	tags: list,
 	drawProc: ui_box_draw_proc,
 	drawData: rawptr,
@@ -1960,12 +1955,12 @@ ui_box :: struct {
 	minSize: [2]f32,
 	rect: rect,
 	sig: ^ui_sig,
-	fresh: c.bool,
-	closed: c.bool,
-	parentClosed: c.bool,
-	dragging: c.bool,
-	hot: c.bool,
-	active: c.bool,
+	fresh: bool,
+	closed: bool,
+	parentClosed: bool,
+	dragging: bool,
+	hot: bool,
+	active: bool,
 	scroll: vec2,
 	pressedMouse: vec2,
 	hotTransition: f32,
@@ -1987,15 +1982,15 @@ ui_sig :: struct {
 	mouse: vec2,
 	delta: vec2,
 	wheel: vec2,
-	pressed: c.bool,
-	released: c.bool,
-	clicked: c.bool,
-	doubleClicked: c.bool,
-	tripleClicked: c.bool,
-	rightPressed: c.bool,
-	dragging: c.bool,
-	hovering: c.bool,
-	pasted: c.bool,
+	pressed: bool,
+	released: bool,
+	clicked: bool,
+	doubleClicked: bool,
+	tripleClicked: bool,
+	rightPressed: bool,
+	dragging: bool,
+	hovering: bool,
+	pasted: bool,
 }
 
 ui_box_draw_proc :: proc "c" (arg0: ^ui_box, arg1: rawptr)
@@ -2022,13 +2017,13 @@ ui_flags :: bit_set[ui_flag; u32]
 MAX_INPUT_CHAR_PER_FRAME :: 64
 
 ui_input_text :: struct {
-	count: u8,
-	codePoints: [64]utf32,
+	count: u8 `fmt:"-"`,
+	codePoints: [64]utf32 `fmt:"s,count"`,
 }
 
 ui_stack_elt :: struct {
 	parent: ^ui_stack_elt,
-	_: struct #raw_union {
+	using _: struct #raw_union {
 		box: ^ui_box,
 		size: ui_size,
 		clip: rect,
@@ -2050,7 +2045,7 @@ ui_edit_move :: enum u32 {
 }
 
 ui_context :: struct {
-	init: c.bool,
+	init: bool,
 	input: input_state,
 	frameCounter: u64,
 	frameTime: f64,
@@ -2080,49 +2075,49 @@ ui_context :: struct {
 }
 
 ui_text_box_result :: struct {
-	changed: c.bool,
-	accepted: c.bool,
+	changed: bool,
+	accepted: bool,
 	text: str8,
 }
 
 ui_select_popup_info :: struct {
-	changed: c.bool,
+	changed: bool,
 	selectedIndex: i32,
-	optionCount: i32,
-	options: [^]str8,
+	optionCount: i32 `fmt:"-"`,
+	options: [^]str8 `fmt:"s,optionCount"`,
 	placeholder: str8,
 }
 
 ui_radio_group_info :: struct {
-	changed: c.bool,
+	changed: bool,
 	selectedIndex: i32,
-	optionCount: i32,
-	options: [^]str8,
+	optionCount: i32 `fmt:"-"`,
+	options: [^]str8 `fmt:"s,optionCount"`,
 }
 
 @(default_calling_convention="c", link_prefix="oc_")
 foreign {
 	input_process_event :: proc(arena: ^arena, state: ^input_state, event: ^event) ---
 	input_next_frame :: proc(state: ^input_state) ---
-	key_down :: proc(state: ^input_state, key: key_code) -> c.bool ---
+	key_down :: proc(state: ^input_state, key: key_code) -> bool ---
 	key_press_count :: proc(state: ^input_state, key: key_code) -> u8 ---
 	key_release_count :: proc(state: ^input_state, key: key_code) -> u8 ---
 	key_repeat_count :: proc(state: ^input_state, key: key_code) -> u8 ---
-	key_down_scancode :: proc(state: ^input_state, key: scan_code) -> c.bool ---
+	key_down_scancode :: proc(state: ^input_state, key: scan_code) -> bool ---
 	key_press_count_scancode :: proc(state: ^input_state, key: scan_code) -> u8 ---
 	key_release_count_scancode :: proc(state: ^input_state, key: scan_code) -> u8 ---
 	key_repeat_count_scancode :: proc(state: ^input_state, key: scan_code) -> u8 ---
-	mouse_down :: proc(state: ^input_state, button: mouse_button) -> c.bool ---
+	mouse_down :: proc(state: ^input_state, button: mouse_button) -> bool ---
 	mouse_pressed :: proc(state: ^input_state, button: mouse_button) -> u8 ---
 	mouse_released :: proc(state: ^input_state, button: mouse_button) -> u8 ---
-	mouse_clicked :: proc(state: ^input_state, button: mouse_button) -> c.bool ---
-	mouse_double_clicked :: proc(state: ^input_state, button: mouse_button) -> c.bool ---
+	mouse_clicked :: proc(state: ^input_state, button: mouse_button) -> bool ---
+	mouse_double_clicked :: proc(state: ^input_state, button: mouse_button) -> bool ---
 	mouse_position :: proc(state: ^input_state) -> vec2 ---
 	mouse_delta :: proc(state: ^input_state) -> vec2 ---
 	mouse_wheel :: proc(state: ^input_state) -> vec2 ---
 	input_text_utf32 :: proc(arena: ^arena, state: ^input_state) -> str32 ---
 	input_text_utf8 :: proc(arena: ^arena, state: ^input_state) -> str8 ---
-	clipboard_pasted :: proc(state: ^input_state) -> c.bool ---
+	clipboard_pasted :: proc(state: ^input_state) -> bool ---
 	clipboard_pasted_text :: proc(state: ^input_state) -> str8 ---
 	key_mods :: proc(state: ^input_state) -> keymod_flags ---
 	ui_init :: proc(_context: ^ui_context) ---
@@ -2133,28 +2128,28 @@ foreign {
 	ui_end_frame :: proc() ---
 	ui_draw :: proc() ---
 	ui_set_theme :: proc(theme: ^ui_theme) ---
-	ui_key_make_str8 :: proc(_string: str8) -> ui_key ---
+	ui_key_make_str8 :: proc(string: str8) -> ui_key ---
 	ui_key_make_path :: proc(path: str8_list) -> ui_key ---
-	ui_box_make_str8 :: proc(_string: str8, flags: ui_flags) -> ^ui_box ---
-	ui_box_begin_str8 :: proc(_string: str8, flags: ui_flags) -> ^ui_box ---
+	ui_box_make_str8 :: proc(string: str8, flags: ui_flags) -> ^ui_box ---
+	ui_box_begin_str8 :: proc(string: str8, flags: ui_flags) -> ^ui_box ---
 	ui_box_end :: proc() -> ^ui_box ---
 	ui_box_push :: proc(box: ^ui_box) ---
 	ui_box_pop :: proc() ---
 	ui_box_top :: proc() -> ^ui_box ---
 	ui_box_lookup_key :: proc(key: ui_key) -> ^ui_box ---
-	ui_box_lookup_str8 :: proc(_string: str8) -> ^ui_box ---
+	ui_box_lookup_str8 :: proc(string: str8) -> ^ui_box ---
 	ui_box_set_draw_proc :: proc(box: ^ui_box, _proc: ui_box_draw_proc, data: rawptr) ---
-	ui_box_closed :: proc(box: ^ui_box) -> c.bool ---
-	ui_box_set_closed :: proc(box: ^ui_box, closed: c.bool) ---
-	ui_box_active :: proc(box: ^ui_box) -> c.bool ---
+	ui_box_closed :: proc(box: ^ui_box) -> bool ---
+	ui_box_set_closed :: proc(box: ^ui_box, closed: bool) ---
+	ui_box_active :: proc(box: ^ui_box) -> bool ---
 	ui_box_activate :: proc(box: ^ui_box) ---
 	ui_box_deactivate :: proc(box: ^ui_box) ---
-	ui_box_hot :: proc(box: ^ui_box) -> c.bool ---
-	ui_box_set_hot :: proc(box: ^ui_box, hot: c.bool) ---
+	ui_box_hot :: proc(box: ^ui_box) -> bool ---
+	ui_box_set_hot :: proc(box: ^ui_box, hot: bool) ---
 	ui_box_sig :: proc(box: ^ui_box) -> ui_sig ---
-	ui_tag_make_str8 :: proc(_string: str8) -> ui_tag ---
-	ui_tag_box_str8 :: proc(box: ^ui_box, _string: str8) ---
-	ui_tag_next_str8 :: proc(_string: str8) ---
+	ui_tag_make_str8 :: proc(string: str8) -> ui_tag ---
+	ui_tag_box_str8 :: proc(box: ^ui_box, string: str8) ---
+	ui_tag_next_str8 :: proc(string: str8) ---
 	ui_apply_style_with_mask :: proc(dst: ^ui_style, src: ^ui_style, mask: ui_style_mask) ---
 	ui_pattern_push :: proc(arena: ^arena, pattern: ^ui_pattern, selector: ui_selector) ---
 	ui_pattern_all :: proc() -> ui_pattern ---
@@ -2165,7 +2160,7 @@ foreign {
 	ui_label :: proc(label: cstring) -> ui_sig ---
 	ui_label_str8 :: proc(label: str8) -> ui_sig ---
 	ui_button :: proc(label: cstring) -> ui_sig ---
-	ui_checkbox :: proc(name: cstring, checked: ^c.bool) -> ui_sig ---
+	ui_checkbox :: proc(name: cstring, checked: ^bool) -> ui_sig ---
 	ui_slider :: proc(name: cstring, value: ^f32) -> ^ui_box ---
 	ui_scrollbar :: proc(name: cstring, thumbRatio: f32, scrollValue: ^f32) -> ^ui_box ---
 	ui_tooltip :: proc(label: cstring) ---

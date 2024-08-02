@@ -192,7 +192,7 @@ arena_push_type :: proc "contextless" (arena: ^arena, $T: typeid) -> ^T {
 }
 
 arena_push_array :: proc "contextless" (arena: ^arena, $T: typeid, count: u64) -> []T {
-	return (^T)(arena_push_aligned(arena, size_of(T) * count, align_of(T)))[:count]
+	return ([^]T)(arena_push_aligned(arena, size_of(T) * count, align_of(T)))[:count]
 }
 
 scratch_end :: arena_scope_end
@@ -206,7 +206,7 @@ str8_list_first :: proc "contextless" (sl: ^str8_list) -> str8 {
 		return ""
 	}
 
-	return list_first_entry(&sl.list, str8_elt, "listElt")._string
+	return list_first_entry(&sl.list, str8_elt, "listElt").string
 }
 
 str8_list_last :: proc "contextless" (sl: ^str8_list) -> str8 {
@@ -214,7 +214,7 @@ str8_list_last :: proc "contextless" (sl: ^str8_list) -> str8 {
 		return ""
 	}
 
-	return list_last_entry(&sl.list, str8_elt, "listElt")._string
+	return list_last_entry(&sl.list, str8_elt, "listElt").string
 }
 
 str8_list_for :: proc "contextless" (list: ^str8_list, elt: ^^list_elt) -> (^str8_elt, bool) {
@@ -232,7 +232,7 @@ str16_list_first :: proc "contextless" (sl: ^str16_list) -> str16 {
 		return {}
 	}
 
-	return list_first_entry(&sl.list, str16_elt, "listElt")._string
+	return list_first_entry(&sl.list, str16_elt, "listElt").string
 }
 
 str16_list_last :: proc "contextless" (sl: ^str16_list) -> str16 {
@@ -240,7 +240,7 @@ str16_list_last :: proc "contextless" (sl: ^str16_list) -> str16 {
 		return {}
 	}
 
-	return list_last_entry(&sl.list, str16_elt, "listElt")._string
+	return list_last_entry(&sl.list, str16_elt, "listElt").string
 }
 
 str16_list_for :: proc "contextless" (list: ^str16_list, elt: ^^list_elt) -> (^str16_elt, bool) {
@@ -252,7 +252,7 @@ str32_list_first :: proc "contextless" (sl: ^str32_list) -> str32 {
 		return {}
 	}
 
-	return list_first_entry(&sl.list, str32_elt, "listElt")._string
+	return list_first_entry(&sl.list, str32_elt, "listElt").string
 }
 
 str32_list_last :: proc "contextless" (sl: ^str32_list) -> str32 {
@@ -260,7 +260,7 @@ str32_list_last :: proc "contextless" (sl: ^str32_list) -> str32 {
 		return {}
 	}
 
-	return list_last_entry(&sl.list, str32_elt, "listElt")._string
+	return list_last_entry(&sl.list, str32_elt, "listElt").string
 }
 
 str32_list_for :: proc "contextless" (list: ^str32_list, elt: ^^list_elt) -> (^str32_elt, bool) {
