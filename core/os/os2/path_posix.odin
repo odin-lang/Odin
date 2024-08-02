@@ -96,8 +96,7 @@ _remove_all :: proc(path: string) -> Error {
 }
 
 _get_working_directory :: proc(allocator: runtime.Allocator) -> (dir: string, err: Error) {
-	assert(!is_temp(allocator))
-	TEMP_ALLOCATOR_GUARD()
+	TEMP_ALLOCATOR_GUARD(ignore=is_temp(allocator))
 
 	buf: [dynamic]byte
 	buf.allocator = temp_allocator()
