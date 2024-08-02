@@ -147,6 +147,8 @@ _cleanpath_from_handle_u16 :: proc(f: ^File) -> ([]u16, Error) {
 		return nil, _get_platform_error()
 	}
 
+	TEMP_ALLOCATOR_GUARD()
+
 	buf := make([]u16, max(n, 260)+1, temp_allocator())
 	n = win32.GetFinalPathNameByHandleW(h, raw_data(buf), u32(len(buf)), 0)
 	return _cleanpath_strip_prefix(buf[:n]), nil
