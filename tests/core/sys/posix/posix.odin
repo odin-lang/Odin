@@ -249,10 +249,21 @@ test_signal :: proc(t: ^testing.T) {
 	case 0:
 		posix.exit(69)
 	case:
-		status: i32
-		posix.waitpid(pid, &status, {})
-		testing.expect(t, posix.WIFEXITED(status))
-		testing.expect(t, posix.WEXITSTATUS(status) == 69)
+		for {
+			status: i32
+			res := posix.waitpid(pid, &status, {})
+			if res == -1 {
+				if !testing.expect_value(t, posix.errno(), posix.Errno.EINTR) {
+					break
+				}
+			}
+
+			if posix.WIFEXITED(status) || posix.WIFSIGNALED(status) {
+				testing.expect(t, posix.WIFEXITED(status))
+				testing.expect(t, posix.WEXITSTATUS(status) == 69)
+				break
+			}
+        }
 	}
 }
 

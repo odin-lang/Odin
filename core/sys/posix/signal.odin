@@ -408,7 +408,7 @@ SA_Flags_Bits :: enum c.int {
 	RESTART    = log2(SA_RESTART),
 	// Cause extra information to be passed to signal handlers at the time of receipt of a signal.
 	SIGINFO    = log2(SA_SIGINFO),
-	// Cause implemention not to create zombie processes or status information on child termination.
+	// Cause implementation not to create zombie processes or status information on child termination.
 	NOCLDWAIT  = log2(SA_NOCLDWAIT),
 	// Cause signal not to be automatically blocked on entry to signal handler.
 	SA_NODEFER = log2(SA_NODEFER),

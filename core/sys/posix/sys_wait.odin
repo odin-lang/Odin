@@ -290,7 +290,7 @@ when ODIN_OS == .Darwin {
 
 	@(private)
 	_WEXITSTATUS :: #force_inline proc "contextless" (x: c.int) -> c.int {
-		return (x >> 8) & 0x000000ff
+		return c.int((c.uint(x) >> 8) & 0xff)
 	}
 
 	@(private)
@@ -310,7 +310,7 @@ when ODIN_OS == .Darwin {
 
 	@(private)
 	_WSTOPSIG :: #force_inline proc "contextless" (x: c.int) -> Signal {
-		return Signal((x >> 8) & 0xff)
+		return Signal(c.int((c.uint(x) >> 8) & 0xff))
 	}
 
 	@(private)
