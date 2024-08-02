@@ -374,7 +374,7 @@ _file_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, 
 		p := p
 		for len(p) > 0 {
 			to_write := uint(min(len(p), MAX_RW))
-			if _n := i64(posix.write(fd, raw_data(p), to_write)); n <= 0 {
+			if _n := i64(posix.write(fd, raw_data(p), to_write)); _n <= 0 {
 				err = .Unknown
 				return
 			} else {
@@ -395,7 +395,7 @@ _file_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, 
 
 		for len(p) > 0 {
 			to_write := uint(min(len(p), MAX_RW))
-			if _n := i64(posix.pwrite(fd, raw_data(p), to_write, posix.off_t(offset))); n <= 0 {
+			if _n := i64(posix.pwrite(fd, raw_data(p), to_write, posix.off_t(offset))); _n <= 0 {
 				err = .Unknown
 				return
 			} else {
