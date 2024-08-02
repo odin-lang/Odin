@@ -30,6 +30,7 @@ download_assets :: proc() {
 @(require) import "mem"
 @(require) import "net"
 @(require) import "odin"
+@(require) import "os"
 @(require) import "path/filepath"
 @(require) import "reflect"
 @(require) import "runtime"
