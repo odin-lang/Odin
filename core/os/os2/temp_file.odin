@@ -47,7 +47,7 @@ mkdir_temp :: make_directory_temp
 // If `dir` is an empty tring, `temp_directory()` will be used.
 @(require_results)
 make_directory_temp :: proc(dir, pattern: string, allocator: runtime.Allocator) -> (temp_path: string, err: Error) {
-	TEMP_ALLOCATOR_GUARD()
+	TEMP_ALLOCATOR_GUARD(ignore=is_temp(allocator))
 	dir := dir if dir != "" else temp_directory(temp_allocator()) or_return
 	prefix, suffix := _prefix_and_suffix(pattern) or_return
 	prefix = temp_join_path(dir, prefix) or_return

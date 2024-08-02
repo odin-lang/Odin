@@ -108,7 +108,7 @@ _remove_all :: proc(path: string) -> Error {
 _get_working_directory :: proc(allocator: runtime.Allocator) -> (dir: string, err: Error) {
 	win32.AcquireSRWLockExclusive(&cwd_lock)
 
-	TEMP_ALLOCATOR_GUARD()
+	TEMP_ALLOCATOR_GUARD(ignore=is_temp(allocator))
 
 	sz_utf16 := win32.GetCurrentDirectoryW(0, nil)
 	dir_buf_wstr := make([]u16, sz_utf16, temp_allocator()) or_return

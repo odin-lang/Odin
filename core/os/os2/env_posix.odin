@@ -12,8 +12,7 @@ _lookup_env :: proc(key: string, allocator: runtime.Allocator) -> (value: string
 		return
 	}
 
-	assert(!is_temp(allocator))
-	TEMP_ALLOCATOR_GUARD()
+	TEMP_ALLOCATOR_GUARD(ignore=is_temp(allocator))
 
 	ckey := strings.clone_to_cstring(key, temp_allocator())
 	cval := posix.getenv(ckey)

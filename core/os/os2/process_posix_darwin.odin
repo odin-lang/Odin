@@ -237,8 +237,7 @@ _process_list :: proc(allocator: runtime.Allocator) -> (list: []int, err: Error)
 		return
 	}
 
-	assert(!is_temp(allocator))
-	TEMP_ALLOCATOR_GUARD()
+	TEMP_ALLOCATOR_GUARD(ignore=is_temp(allocator))
 
 	buffer := make([]i32, ret, temp_allocator())
 	ret = darwin.proc_listallpids(raw_data(buffer), ret*size_of(i32))

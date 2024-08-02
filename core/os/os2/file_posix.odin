@@ -189,8 +189,7 @@ _symlink :: proc(old_name, new_name: string) -> Error {
 }
 
 _read_link :: proc(name: string, allocator: runtime.Allocator) -> (s: string, err: Error) {
-	assert(!is_temp(allocator))
-	TEMP_ALLOCATOR_GUARD()
+	TEMP_ALLOCATOR_GUARD(ignore=is_temp(allocator))
 	cname := temp_cstring(name)
 
 	buf: [dynamic]byte
