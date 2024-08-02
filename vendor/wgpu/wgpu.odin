@@ -716,7 +716,7 @@ BufferDescriptor :: struct {
 	mappedAtCreation: b32,
 }
 
-Color :: [4]f32
+Color :: [4]f64
 
 CommandBufferDescriptor :: struct {
 	nextInChain: ^ChainedStruct,
