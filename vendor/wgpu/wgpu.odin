@@ -716,12 +716,7 @@ BufferDescriptor :: struct {
 	mappedAtCreation: b32,
 }
 
-Color :: struct {
-	r: f64,
-	g: f64,
-	b: f64,
-	a: f64,
-}
+Color :: [4]f64
 
 CommandBufferDescriptor :: struct {
 	nextInChain: ^ChainedStruct,
