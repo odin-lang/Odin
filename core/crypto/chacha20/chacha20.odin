@@ -26,7 +26,7 @@ Context :: struct {
 
 // init inititializes a Context for ChaCha20 or XChaCha20 with the provided
 // key and iv.
-init :: proc(ctx: ^Context, key, iv: []byte, impl := Implementation.Simd256) {
+init :: proc(ctx: ^Context, key, iv: []byte, impl := DEFAULT_IMPLEMENTATION) {
 	if len(key) != KEY_SIZE {
 		panic("crypto/chacha20: invalid (X)ChaCha20 key size")
 	}

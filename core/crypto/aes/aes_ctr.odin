@@ -20,7 +20,7 @@ Context_CTR :: struct {
 }
 
 // init_ctr initializes a Context_CTR with the provided key and IV.
-init_ctr :: proc(ctx: ^Context_CTR, key, iv: []byte, impl := Implementation.Hardware) {
+init_ctr :: proc(ctx: ^Context_CTR, key, iv: []byte, impl := DEFAULT_IMPLEMENTATION) {
 	if len(iv) != CTR_IV_SIZE {
 		panic("crypto/aes: invalid CTR IV size")
 	}

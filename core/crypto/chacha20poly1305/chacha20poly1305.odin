@@ -70,7 +70,7 @@ Context :: struct {
 }
 
 // init initializes a Context with the provided key, for AEAD_CHACHA20_POLY1305.
-init :: proc(ctx: ^Context, key: []byte, impl := chacha20.Implementation.Simd256) {
+init :: proc(ctx: ^Context, key: []byte, impl := chacha20.DEFAULT_IMPLEMENTATION) {
 	if len(key) != KEY_SIZE {
 		panic("crypto/chacha20poly1305: invalid key size")
 	}
@@ -86,7 +86,7 @@ init :: proc(ctx: ^Context, key: []byte, impl := chacha20.Implementation.Simd256
 //
 // Note: While there are multiple definitions of XChaCha20-Poly1305
 // this sticks to the IETF draft and uses a 32-bit counter.
-init_xchacha :: proc(ctx: ^Context, key: []byte, impl := chacha20.Implementation.Simd256) {
+init_xchacha :: proc(ctx: ^Context, key: []byte, impl := chacha20.DEFAULT_IMPLEMENTATION) {
 	init(ctx, key, impl)
 	ctx._is_xchacha = true
 }

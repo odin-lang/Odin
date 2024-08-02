@@ -25,6 +25,7 @@ import rbtree           "core:container/rbtree"
 import topological_sort "core:container/topological_sort"
 
 import crypto           "core:crypto"
+import aead             "core:crypto/aead"
 import aes              "core:crypto/aes"
 import blake2b          "core:crypto/blake2b"
 import blake2s          "core:crypto/blake2s"
@@ -164,6 +165,7 @@ _ :: rbtree
 _ :: topological_sort
 _ :: crypto
 _ :: crypto_hash
+_ :: aead
 _ :: aes
 _ :: blake2b
 _ :: blake2s

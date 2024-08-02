@@ -10,6 +10,10 @@ Context_Impl :: union {
 	Context_Impl_Hardware,
 }
 
+// DEFAULT_IMPLEMENTATION is the implementation that will be used by
+// default if possible.
+DEFAULT_IMPLEMENTATION :: Implementation.Hardware
+
 // Implementation is an AES implementation.  Most callers will not need
 // to use this as the package will automatically select the most performant
 // implementation available (See `is_hardware_accelerated()`).

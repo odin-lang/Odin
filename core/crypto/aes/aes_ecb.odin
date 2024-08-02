@@ -12,7 +12,7 @@ Context_ECB :: struct {
 }
 
 // init_ecb initializes a Context_ECB with the provided key.
-init_ecb :: proc(ctx: ^Context_ECB, key: []byte, impl := Implementation.Hardware) {
+init_ecb :: proc(ctx: ^Context_ECB, key: []byte, impl := DEFAULT_IMPLEMENTATION) {
 	init_impl(&ctx._impl, key, impl)
 	ctx._is_initialized = true
 }
