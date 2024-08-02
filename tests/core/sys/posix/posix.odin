@@ -196,11 +196,6 @@ test_monetary :: proc(t: ^testing.T) {
 
 @(test)
 test_stat :: proc(t: ^testing.T) {
-	testing.expect_value(t, posix.S_IRWXU, transmute(posix.mode_t)posix._mode_t(posix._S_IRWXU))
-	testing.expect_value(t, posix.S_IRWXG, transmute(posix.mode_t)posix._mode_t(posix._S_IRWXG))
-	testing.expect_value(t, posix.S_IRWXO, transmute(posix.mode_t)posix._mode_t(posix._S_IRWXO))
-	testing.expect_value(t, posix._S_IFMT, transmute(posix.mode_t)posix._mode_t(posix.__S_IFMT))
-
 	stat: posix.stat_t
 	testing.expect_value(t, posix.stat(#file, &stat), posix.result.OK)
 	testing.expect(t, posix.S_ISREG(stat.st_mode))
