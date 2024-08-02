@@ -158,7 +158,7 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 		_ = read_memory_as_struct(ph, process_peb.ProcessParameters, &process_params) or_return
 
 		if selection >= {.Command_Line, .Command_Args} {
-			TEMP_ALLOCATOR_GUARD()
+			TEMP_ALLOCATOR_GUARD(ignore=is_temp(allocator))
 			cmdline_w := make([]u16, process_params.CommandLine.Length, temp_allocator()) or_return
 			_ = read_memory_as_slice(ph, process_params.CommandLine.Buffer, cmdline_w) or_return
 
@@ -172,7 +172,7 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 			}
 		}
 		if .Environment in selection {
-			TEMP_ALLOCATOR_GUARD()
+			TEMP_ALLOCATOR_GUARD(ignore=is_temp(allocator))
 			env_len := process_params.EnvironmentSize / 2
 			envs_w := make([]u16, env_len, temp_allocator()) or_return
 			_ = read_memory_as_slice(ph, process_params.Environment, envs_w) or_return
@@ -181,7 +181,7 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 			info.fields += {.Environment}
 		}
 		if .Working_Dir in selection {
-			TEMP_ALLOCATOR_GUARD()
+			TEMP_ALLOCATOR_GUARD(ignore=is_temp(allocator))
 			cwd_w := make([]u16, process_params.CurrentDirectoryPath.Length, temp_allocator()) or_return
 			_ = read_memory_as_slice(ph, process_params.CurrentDirectoryPath.Buffer, cwd_w) or_return
 
@@ -250,7 +250,7 @@ _process_info_by_handle :: proc(process: Process, selection: Process_Info_Fields
 		_ = read_memory_as_struct(ph, process_peb.ProcessParameters, &process_params) or_return
 
 		if selection >= {.Command_Line, .Command_Args} {
-			TEMP_ALLOCATOR_GUARD()
+			TEMP_ALLOCATOR_GUARD(ignore=is_temp(allocator))
 			cmdline_w := make([]u16, process_params.CommandLine.Length, temp_allocator()) or_return
 			_ = read_memory_as_slice(ph, process_params.CommandLine.Buffer, cmdline_w) or_return
 
@@ -265,7 +265,7 @@ _process_info_by_handle :: proc(process: Process, selection: Process_Info_Fields
 		}
 
 		if .Environment in selection {
-			TEMP_ALLOCATOR_GUARD()
+			TEMP_ALLOCATOR_GUARD(ignore=is_temp(allocator))
 			env_len := process_params.EnvironmentSize / 2
 			envs_w := make([]u16, env_len, temp_allocator()) or_return
 			_ = read_memory_as_slice(ph, process_params.Environment, envs_w) or_return
@@ -275,7 +275,7 @@ _process_info_by_handle :: proc(process: Process, selection: Process_Info_Fields
 		}
 
 		if .Working_Dir in selection {
-			TEMP_ALLOCATOR_GUARD()
+			TEMP_ALLOCATOR_GUARD(ignore=is_temp(allocator))
 			cwd_w := make([]u16, process_params.CurrentDirectoryPath.Length, temp_allocator()) or_return
 			_ = read_memory_as_slice(ph, process_params.CurrentDirectoryPath.Buffer, cwd_w) or_return
 
@@ -539,7 +539,7 @@ _process_exe_by_pid :: proc(pid: int, allocator: runtime.Allocator) -> (exe_path
 }
 
 _get_process_user :: proc(process_handle: win32.HANDLE, allocator: runtime.Allocator) -> (full_username: string, err: Error) {
-	TEMP_ALLOCATOR_GUARD()
+	TEMP_ALLOCATOR_GUARD(ignore=is_temp(allocator))
 	token_handle: win32.HANDLE
 	if !win32.OpenProcessToken(process_handle, win32.TOKEN_QUERY, &token_handle) {
 		err = _get_platform_error()

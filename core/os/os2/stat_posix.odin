@@ -70,8 +70,7 @@ _stat :: proc(name: string, allocator: runtime.Allocator) -> (fi: File_Info, err
 		return
 	}
 
-	assert(!is_temp(allocator))
-	TEMP_ALLOCATOR_GUARD()
+	TEMP_ALLOCATOR_GUARD(ignore=is_temp(allocator))
 	cname := temp_cstring(name) or_return
 
 	rcname := posix.realpath(cname)
