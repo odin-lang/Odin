@@ -17,36 +17,36 @@ _read_directory_iterator :: proc(it: ^Read_Directory_Iterator) -> (fi: File_Info
 	index = it.impl.idx
 	it.impl.idx += 1
 
-	entry := posix.readdir(it.impl.dir)
-	if entry == nil {
-		// NOTE(laytan): would be good to have an `error` field on the `Read_Directory_Iterator`
-		// There isn't a way to now know if it failed or if we are at the end.
+	for {
+		entry := posix.readdir(it.impl.dir)
+		if entry == nil {
+			// NOTE(laytan): would be good to have an `error` field on the `Read_Directory_Iterator`
+			// There isn't a way to now know if it failed or if we are at the end.
+			return
+		}
+
+		cname := cstring(raw_data(entry.d_name[:]))
+		if cname == "." || cname == ".." {
+			continue
+		}
+
+		stat: posix.stat_t
+		if posix.fstatat(posix.dirfd(it.impl.dir), cname, &stat, { .SYMLINK_NOFOLLOW }) != .OK {
+			// NOTE(laytan): would be good to have an `error` field on the `Read_Directory_Iterator`
+			// There isn't a way to now know if it failed or if we are at the end.
+			return
+		}
+
+		fimpl := (^File_Impl)(it.f.impl)
+
+		n := copy(it.impl.fullpath[:],  fimpl.name)
+		n += copy(it.impl.fullpath[n:], "/")
+		n += copy(it.impl.fullpath[n:], string(cname))
+
+		fi = internal_stat(stat, string(it.impl.fullpath[:n]))
+		ok = true
 		return
 	}
-
-	cname := cstring(raw_data(entry.d_name[:]))
-
-	// NOTE: these shouldn't be given back, but how?
-	// if cname == "." || cname == ".." {
-	//     continue
-	// }
-
-	stat: posix.stat_t
-	if posix.fstatat(posix.dirfd(it.impl.dir), cname, &stat, { .SYMLINK_NOFOLLOW }) != .OK {
-		// NOTE(laytan): would be good to have an `error` field on the `Read_Directory_Iterator`
-		// There isn't a way to now know if it failed or if we are at the end.
-		return
-	}
-
-	fimpl := (^File_Impl)(it.f.impl)
-
-	n := copy(it.impl.fullpath[:],  fimpl.name)
-	n += copy(it.impl.fullpath[n:], "/")
-	n += copy(it.impl.fullpath[n:], string(cname))
-
-	fi = internal_stat(stat, string(it.impl.fullpath[:n]))
-	ok = true
-	return
 }
 
 @(require_results)
