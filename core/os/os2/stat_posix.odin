@@ -97,24 +97,38 @@ _lstat :: proc(name: string, allocator: runtime.Allocator) -> (fi: File_Info, er
 		return
 	}
 
-	assert(!is_temp(allocator))
-	TEMP_ALLOCATOR_GUARD()
-	cname := temp_cstring(name) or_return
+	TEMP_ALLOCATOR_GUARD(ignore=is_temp(allocator))
 
-	rcname := posix.realpath(cname)
-	if rcname == nil {
-		err = .Invalid_Path
-		return
+	// NOTE: can't use realpath here because it tries to resolve symlinks.
+
+	// NOTE: This might not be correct when given "/symlink/foo.txt",
+	// you would want that to resolve "/symlink", but not resolve "foo.txt".
+
+	fullpath := filepath.clean(name, temp_allocator())
+	assert(len(fullpath) > 0)
+	switch {
+	case fullpath[0] == '/':
+		// nothing.
+	case fullpath == ".":
+		fullpath = getwd(temp_allocator()) or_return
+	case len(fullpath) > 1 && fullpath[0] == '.' && fullpath[1] == '/':
+		fullpath = fullpath[2:]
+		fallthrough
+	case:
+		fullpath = concatenate({
+			getwd(temp_allocator()) or_return,
+			"/",
+			fullpath,
+		}, temp_allocator()) or_return
 	}
-	defer posix.free(rcname)
 
 	stat: posix.stat_t
-	if posix.lstat(rcname, &stat) != .OK {
+	if posix.lstat(temp_cstring(fullpath), &stat) != .OK {
 		err = _get_platform_error()
 		return
 	}
 
-	fullpath := clone_string(string(rcname), allocator) or_return
+	fullpath = clone_string(fullpath, allocator) or_return
 	return internal_stat(stat, fullpath), nil
 }
 
