@@ -1,8 +1,7 @@
+//+build darwin, linux, netbsd, freebsd, openbsd
 package os
 
 import "core:strings"
-import "core:mem"
-import "base:runtime"
 
 read_dir :: proc(fd: Handle, n: int, allocator := context.allocator) -> (fi: []File_Info, err: Errno) {
 	dirp: Dir
@@ -15,7 +14,6 @@ read_dir :: proc(fd: Handle, n: int, allocator := context.allocator) -> (fi: []F
 
 	dirpath: string
 	dirpath, err = absolute_path_from_handle(fd)
-
 	if err != ERROR_NONE {
 		return
 	}
@@ -30,40 +28,41 @@ read_dir :: proc(fd: Handle, n: int, allocator := context.allocator) -> (fi: []F
 	}
 
 	dfi := make([dynamic]File_Info, 0, size, allocator)
+	defer if err != ERROR_NONE {
+		for fi_ in dfi {
+			file_info_delete(fi_, allocator)
+		}
+		delete(dfi)
+	}
 
 	for {
 		entry: Dirent
 		end_of_stream: bool
 		entry, err, end_of_stream = _readdir(dirp)
 		if err != ERROR_NONE {
-			for fi_ in dfi {
-				file_info_delete(fi_, allocator)
-			}
-			delete(dfi)
 			return
 		} else if end_of_stream {
 			break
 		}
 
 		fi_: File_Info
-		filename := cast(string)(transmute(cstring)mem.Raw_Cstring{ data = &entry.name[0] })
+		filename := string(cstring(&entry.name[0]))
 
 		if filename == "." || filename == ".." {
 			continue
 		}
 
-		runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD(ignore = context.temp_allocator == allocator)
-		fullpath := strings.join( []string{ dirpath, filename }, "/", context.temp_allocator)
-		defer delete(fullpath, context.temp_allocator)
+		fullpath := strings.join({ dirpath, filename }, "/", allocator)
 
-		fi_, err = stat(fullpath, allocator)
+		s: OS_Stat
+		s, err = _lstat(fullpath)
 		if err != ERROR_NONE {
-			for fi__ in dfi {
-				file_info_delete(fi__, allocator)
-			}
-			delete(dfi)
+			delete(fullpath, allocator)
 			return
 		}
+		_fill_file_info_from_stat(&fi_, s)
+		fi_.fullpath = fullpath
+		fi_.name = path_base(fi_.fullpath)
 
 		append(&dfi, fi_)
 	}
