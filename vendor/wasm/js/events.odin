@@ -33,6 +33,7 @@ Event_Kind :: enum u32 {
 	Submit,
 	Blur,
 	Change,
+	HashChange,
 	Select,
 
 	Animation_Start,
@@ -112,6 +113,7 @@ event_kind_string := [Event_Kind]string{
 	.Submit       = "submit",
 	.Blur         = "blur",
 	.Change       = "change",
+	.HashChange   = "hashchange",
 	.Select       = "select",
 
 	.Animation_Start     = "animationstart",
