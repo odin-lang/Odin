@@ -53,7 +53,7 @@ main :: proc() {
 		}
 		state.device = device 
 
-		width, height : u32 = 800, 600 // os_get_render_bounds(&state.os)
+		width, height := os_get_render_bounds(&state.os)
 
 		state.config = wgpu.SurfaceConfiguration {
 			device      = state.device,
