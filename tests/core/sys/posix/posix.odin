@@ -256,6 +256,7 @@ test_signal :: proc(t: ^testing.T) {
 				if !testing.expect_value(t, posix.errno(), posix.Errno.EINTR) {
 					break
 				}
+				continue
 			}
 
 			if posix.WIFEXITED(status) || posix.WIFSIGNALED(status) {
