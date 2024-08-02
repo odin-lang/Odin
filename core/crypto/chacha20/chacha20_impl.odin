@@ -5,6 +5,10 @@ import "core:crypto/_chacha20/ref"
 import "core:crypto/_chacha20/simd128"
 import "core:crypto/_chacha20/simd256"
 
+// DEFAULT_IMPLEMENTATION is the implementation that will be used by
+// default if possible.
+DEFAULT_IMPLEMENTATION :: Implementation.Simd256
+
 // Implementation is a ChaCha20 implementation.  Most callers will not need
 // to use this as the package will automatically select the most performant
 // implementation available.

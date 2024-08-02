@@ -26,7 +26,7 @@ Context_GCM :: struct {
 }
 
 // init_gcm initializes a Context_GCM with the provided key.
-init_gcm :: proc(ctx: ^Context_GCM, key: []byte, impl := Implementation.Hardware) {
+init_gcm :: proc(ctx: ^Context_GCM, key: []byte, impl := DEFAULT_IMPLEMENTATION) {
 	init_impl(&ctx._impl, key, impl)
 	ctx._is_initialized = true
 }

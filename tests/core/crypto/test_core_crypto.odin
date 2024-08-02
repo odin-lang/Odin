@@ -22,18 +22,24 @@ import "core:crypto"
 import chacha_simd128 "core:crypto/_chacha20/simd128"
 import chacha_simd256 "core:crypto/_chacha20/simd256"
 import "core:crypto/chacha20"
-import "core:crypto/chacha20poly1305"
 import "core:crypto/sha2"
 
-@(private = "file")
+@(private)
 _PLAINTEXT_SUNSCREEN_STR := "Ladies and Gentlemen of the class of '99: If I could offer you only one tip for the future, sunscreen would be it."
 
 @(test)
 test_chacha20 :: proc(t: ^testing.T) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 
-	impls := make([dynamic]chacha20.Implementation, 0, 3)
-	defer delete(impls)
+	impls := supported_chacha_impls()
+
+	for impl in impls {
+		test_chacha20_stream(t, impl)
+	}
+}
+
+supported_chacha_impls :: proc() -> [dynamic]chacha20.Implementation {
+	impls := make([dynamic]chacha20.Implementation, 0, 3, context.temp_allocator)
 	append(&impls, chacha20.Implementation.Portable)
 	if chacha_simd128.is_performant() {
 		append(&impls, chacha20.Implementation.Simd128)
@@ -42,11 +48,7 @@ test_chacha20 :: proc(t: ^testing.T) {
 		append(&impls, chacha20.Implementation.Simd256)
 	}
 
-	for impl in impls {
-		test_chacha20_stream(t, impl)
-		test_chacha20poly1305(t, impl)
-		test_xchacha20poly1305(t, impl)
-	}
+	return impls
 }
 
 test_chacha20_stream :: proc(t: ^testing.T, impl: chacha20.Implementation) {
@@ -177,171 +179,6 @@ test_chacha20_stream :: proc(t: ^testing.T, impl: chacha20.Implementation) {
 		impl,
 		expected_digest_str,
 		digest_str,
-	)
-}
-
-test_chacha20poly1305 :: proc(t: ^testing.T, impl: chacha20.Implementation) {
-	plaintext := transmute([]byte)(_PLAINTEXT_SUNSCREEN_STR)
-	plaintext_str := string(hex.encode(plaintext, context.temp_allocator))
-
-	aad := [12]byte {
-		0x50, 0x51, 0x52, 0x53, 0xc0, 0xc1, 0xc2, 0xc3,
-		0xc4, 0xc5, 0xc6, 0xc7,
-	}
-
-	key := [chacha20poly1305.KEY_SIZE]byte {
-		0x80, 0x81, 0x82, 0x83, 0x84, 0x85, 0x86, 0x87,
-		0x88, 0x89, 0x8a, 0x8b, 0x8c, 0x8d, 0x8e, 0x8f,
-		0x90, 0x91, 0x92, 0x93, 0x94, 0x95, 0x96, 0x97,
-		0x98, 0x99, 0x9a, 0x9b, 0x9c, 0x9d, 0x9e, 0x9f,
-	}
-
-	nonce := [chacha20poly1305.IV_SIZE]byte {
-		0x07, 0x00, 0x00, 0x00, 0x40, 0x41, 0x42, 0x43,
-		0x44, 0x45, 0x46, 0x47,
-	}
-
-	ciphertext := [114]byte {
-		0xd3, 0x1a, 0x8d, 0x34, 0x64, 0x8e, 0x60, 0xdb,
-		0x7b, 0x86, 0xaf, 0xbc, 0x53, 0xef, 0x7e, 0xc2,
-		0xa4, 0xad, 0xed, 0x51, 0x29, 0x6e, 0x08, 0xfe,
-		0xa9, 0xe2, 0xb5, 0xa7, 0x36, 0xee, 0x62, 0xd6,
-		0x3d, 0xbe, 0xa4, 0x5e, 0x8c, 0xa9, 0x67, 0x12,
-		0x82, 0xfa, 0xfb, 0x69, 0xda, 0x92, 0x72, 0x8b,
-		0x1a, 0x71, 0xde, 0x0a, 0x9e, 0x06, 0x0b, 0x29,
-		0x05, 0xd6, 0xa5, 0xb6, 0x7e, 0xcd, 0x3b, 0x36,
-		0x92, 0xdd, 0xbd, 0x7f, 0x2d, 0x77, 0x8b, 0x8c,
-		0x98, 0x03, 0xae, 0xe3, 0x28, 0x09, 0x1b, 0x58,
-		0xfa, 0xb3, 0x24, 0xe4, 0xfa, 0xd6, 0x75, 0x94,
-		0x55, 0x85, 0x80, 0x8b, 0x48, 0x31, 0xd7, 0xbc,
-		0x3f, 0xf4, 0xde, 0xf0, 0x8e, 0x4b, 0x7a, 0x9d,
-		0xe5, 0x76, 0xd2, 0x65, 0x86, 0xce, 0xc6, 0x4b,
-		0x61, 0x16,
-	}
-	ciphertext_str := string(hex.encode(ciphertext[:], context.temp_allocator))
-
-	tag := [chacha20poly1305.TAG_SIZE]byte {
-		0x1a, 0xe1, 0x0b, 0x59, 0x4f, 0x09, 0xe2, 0x6a,
-		0x7e, 0x90, 0x2e, 0xcb, 0xd0, 0x60, 0x06, 0x91,
-	}
-	tag_str := string(hex.encode(tag[:], context.temp_allocator))
-
-	tag_ := make([]byte, chacha20poly1305.TAG_SIZE, context.temp_allocator)
-	dst := make([]byte, len(ciphertext), context.temp_allocator)
-
-	ctx: chacha20poly1305.Context
-	chacha20poly1305.init(&ctx, key[:])
-
-	chacha20poly1305.seal(&ctx, dst, tag_, nonce[:], aad[:], plaintext)
-	dst_str := string(hex.encode(dst, context.temp_allocator))
-	tag_str_ := string(hex.encode(tag_, context.temp_allocator))
-
-	testing.expectf(
-		t,
-		dst_str == ciphertext_str && tag_str_ == tag_str,
-		"chacha20poly1305/%v: Expected: (%s, %s) for seal(%x, %x, %x, %x), but got (%s, %s) instead",
-		impl,
-		ciphertext_str,
-		tag_str,
-		key,
-		nonce,
-		aad,
-		plaintext,
-		dst_str,
-		tag_str_,
-	)
-
-	ok := chacha20poly1305.open(&ctx, dst, nonce[:], aad[:], ciphertext[:], tag[:])
-	dst_str = string(hex.encode(dst, context.temp_allocator))
-
-	testing.expectf(
-		t,
-		ok && dst_str == plaintext_str,
-		"chacha20poly1305/%v: Expected: (%s, true) for open(%x, %x, %x, %x, %s), but got (%s, %v) instead",
-		impl,
-		plaintext_str,
-		key,
-		nonce,
-		aad,
-		ciphertext,
-		tag_str,
-		dst_str,
-		ok,
-	)
-
-	copy(dst, ciphertext[:])
-	tag_[0] ~= 0xa5
-	ok = chacha20poly1305.open(&ctx, dst, nonce[:], aad[:], dst[:], tag_)
-	testing.expectf(t, !ok, "chacha20poly1305/%v: Expected false for open(bad_tag, aad, ciphertext)", impl)
-
-	dst[0] ~= 0xa5
-	ok = chacha20poly1305.open(&ctx, dst, nonce[:], aad[:], dst[:], tag[:])
-	testing.expectf(t, !ok, "chacha20poly1305/%v: Expected false for open(tag, aad, bad_ciphertext)", impl)
-
-	copy(dst, ciphertext[:])
-	aad[0] ~= 0xa5
-	ok = chacha20poly1305.open(&ctx, dst, nonce[:], aad[:], dst[:], tag[:])
-	testing.expectf(t, !ok, "chacha20poly1305/%v: Expected false for open(tag, bad_aad, ciphertext)", impl)
-}
-
-test_xchacha20poly1305 :: proc(t: ^testing.T, impl: chacha20.Implementation) {
-	// Test case taken from:
-	// - https://datatracker.ietf.org/doc/html/draft-arciszewski-xchacha-03
-	key_str := "808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9f"
-	iv_str := "404142434445464748494a4b4c4d4e4f5051525354555657"
-	aad_str := "50515253c0c1c2c3c4c5c6c7"
-	plaintext_str := "4c616469657320616e642047656e746c656d656e206f662074686520636c617373206f66202739393a204966204920636f756c64206f6666657220796f75206f6e6c79206f6e652074697020666f7220746865206675747572652c2073756e73637265656e20776f756c642062652069742e"
-	ciphertext_str := "bd6d179d3e83d43b9576579493c0e939572a1700252bfaccbed2902c21396cbb731c7f1b0b4aa6440bf3a82f4eda7e39ae64c6708c54c216cb96b72e1213b4522f8c9ba40db5d945b11b69b982c1bb9e3f3fac2bc369488f76b2383565d3fff921f9664c97637da9768812f615c68b13b52e"
-	tag_str := "c0875924c1c7987947deafd8780acf49"
-
-	key, _ := hex.decode(transmute([]byte)(key_str), context.temp_allocator)
-	iv, _ := hex.decode(transmute([]byte)(iv_str), context.temp_allocator)
-	aad, _ := hex.decode(transmute([]byte)(aad_str), context.temp_allocator)
-	plaintext, _ := hex.decode(transmute([]byte)(plaintext_str), context.temp_allocator)
-	ciphertext, _ := hex.decode(transmute([]byte)(ciphertext_str), context.temp_allocator)
-	tag, _ := hex.decode(transmute([]byte)(tag_str), context.temp_allocator)
-
-	tag_ := make([]byte, len(tag), context.temp_allocator)
-	dst := make([]byte, len(ciphertext), context.temp_allocator)
-
-	ctx: chacha20poly1305.Context
-	chacha20poly1305.init_xchacha(&ctx, key, impl)
-
-	chacha20poly1305.seal(&ctx, dst, tag_, iv, aad, plaintext)
-	dst_str := string(hex.encode(dst, context.temp_allocator))
-	tag_str_ := string(hex.encode(tag_, context.temp_allocator))
-
-	testing.expectf(
-		t,
-		dst_str == ciphertext_str && tag_str_ == tag_str,
-		"xchacha20poly1305/%v: Expected: (%s, %s) for seal(%s, %s, %s, %s), but got (%s, %s) instead",
-		impl,
-		ciphertext_str,
-		tag_str,
-		key_str,
-		iv_str,
-		aad_str,
-		plaintext_str,
-		dst_str,
-		tag_str_,
-	)
-
-	ok := chacha20poly1305.open(&ctx, dst, iv, aad, ciphertext, tag)
-	dst_str = string(hex.encode(dst, context.temp_allocator))
-
-	testing.expectf(
-		t,
-		ok && dst_str == plaintext_str,
-		"xchacha20poly1305/%v: Expected: (%s, true) for open(%s, %s, %s, %s, %s), but got (%s, %v) instead",
-		impl,
-		plaintext_str,
-		key_str,
-		iv_str,
-		aad_str,
-		ciphertext_str,
-		tag_str,
-		dst_str,
-		ok,
 	)
 }
 
