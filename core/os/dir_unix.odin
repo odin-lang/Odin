@@ -1,7 +1,6 @@
 //+build darwin, linux, netbsd, freebsd, openbsd
 package os
 
-import "base:runtime"
 import "core:strings"
 
 @(require_results)
