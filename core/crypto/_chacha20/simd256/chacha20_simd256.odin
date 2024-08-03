@@ -198,7 +198,7 @@ _store_simd256_x1 :: #force_inline proc "contextless" (
 
 @(enable_target_feature = "sse2,ssse3,avx,avx2")
 stream_blocks :: proc(ctx: ^_chacha20.Context, dst, src: []byte, nr_blocks: int) {
-	// Enforce the maximum consumed keystream per nonce.
+	// Enforce the maximum consumed keystream per IV.
 	_chacha20.check_counter_limit(ctx, nr_blocks)
 
 	dst_v := ([^]simd.u32x8)(raw_data(dst))
@@ -311,9 +311,9 @@ stream_blocks :: proc(ctx: ^_chacha20.Context, dst, src: []byte, nr_blocks: int)
 }
 
 @(enable_target_feature = "sse2,ssse3,avx")
-hchacha20 :: proc "contextless" (dst, key, nonce: []byte) {
+hchacha20 :: proc "contextless" (dst, key, iv: []byte) {
 	// We can just enable AVX and call the simd128 code as going
 	// wider has 0 performance benefit, but VEX encoded instructions
 	// is nice.
-	#force_inline chacha_simd128.hchacha20(dst, key, nonce)
+	#force_inline chacha_simd128.hchacha20(dst, key, iv)
 }

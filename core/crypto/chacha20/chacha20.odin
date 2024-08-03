@@ -13,10 +13,10 @@ import "core:mem"
 
 // KEY_SIZE is the (X)ChaCha20 key size in bytes.
 KEY_SIZE :: _chacha20.KEY_SIZE
-// NONCE_SIZE is the ChaCha20 nonce size in bytes.
-NONCE_SIZE :: _chacha20.NONCE_SIZE
-// XNONCE_SIZE is the XChaCha20 nonce size in bytes.
-XNONCE_SIZE :: _chacha20.XNONCE_SIZE
+// IV_SIZE is the ChaCha20 IV size in bytes.
+IV_SIZE :: _chacha20.IV_SIZE
+// XIV_SIZE is the XChaCha20 IV size in bytes.
+XIV_SIZE :: _chacha20.XIV_SIZE
 
 // Context is a ChaCha20 or XChaCha20 instance.
 Context :: struct {
@@ -25,27 +25,27 @@ Context :: struct {
 }
 
 // init inititializes a Context for ChaCha20 or XChaCha20 with the provided
-// key and nonce.
-init :: proc(ctx: ^Context, key, nonce: []byte, impl := Implementation.Simd256) {
+// key and iv.
+init :: proc(ctx: ^Context, key, iv: []byte, impl := Implementation.Simd256) {
 	if len(key) != KEY_SIZE {
 		panic("crypto/chacha20: invalid (X)ChaCha20 key size")
 	}
-	if l := len(nonce); l != NONCE_SIZE && l != XNONCE_SIZE {
-		panic("crypto/chacha20: invalid (X)ChaCha20 nonce size")
+	if l := len(iv); l != IV_SIZE && l != XIV_SIZE {
+		panic("crypto/chacha20: invalid (X)ChaCha20 IV size")
 	}
 
-	k, n := key, nonce
+	k, n := key, iv
 
 	init_impl(ctx, impl)
 
-	is_xchacha := len(nonce) == XNONCE_SIZE
+	is_xchacha := len(iv) == XIV_SIZE
 	if is_xchacha {
-		sub_nonce: [NONCE_SIZE]byte
+		sub_iv: [IV_SIZE]byte
 		sub_key := ctx._state._buffer[:KEY_SIZE]
 		hchacha20(sub_key, k, n, ctx._impl)
 		k = sub_key
-		copy(sub_nonce[4:], n[16:])
-		n = sub_nonce[:]
+		copy(sub_iv[4:], n[16:])
+		n = sub_iv[:]
 	}
 
 	_chacha20.init(&ctx._state, k, n, is_xchacha)

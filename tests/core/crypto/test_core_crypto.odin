@@ -60,7 +60,7 @@ test_chacha20_stream :: proc(t: ^testing.T, impl: chacha20.Implementation) {
 		0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f,
 	}
 
-	nonce := [chacha20.NONCE_SIZE]byte {
+	iv := [chacha20.IV_SIZE]byte {
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x4a,
 		0x00, 0x00, 0x00, 0x00,
 	}
@@ -86,7 +86,7 @@ test_chacha20_stream :: proc(t: ^testing.T, impl: chacha20.Implementation) {
 
 	derived_ciphertext: [114]byte
 	ctx: chacha20.Context = ---
-	chacha20.init(&ctx, key[:], nonce[:], impl)
+	chacha20.init(&ctx, key[:], iv[:], impl)
 	chacha20.seek(&ctx, 1) // The test vectors start the counter at 1.
 	chacha20.xor_bytes(&ctx, derived_ciphertext[:], plaintext[:])
 
@@ -107,7 +107,7 @@ test_chacha20_stream :: proc(t: ^testing.T, impl: chacha20.Implementation) {
 		0x98, 0x99, 0x9a, 0x9b, 0x9c, 0x9d, 0x9e, 0x9f,
 	}
 
-	xnonce := [chacha20.XNONCE_SIZE]byte {
+	xiv := [chacha20.XIV_SIZE]byte {
 		0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47,
 		0x48, 0x49, 0x4a, 0x4b, 0x4c, 0x4d, 0x4e, 0x4f,
 		0x50, 0x51, 0x52, 0x53, 0x54, 0x55, 0x56, 0x57,
@@ -132,7 +132,7 @@ test_chacha20_stream :: proc(t: ^testing.T, impl: chacha20.Implementation) {
 	}
 	xciphertext_str := string(hex.encode(xciphertext[:], context.temp_allocator))
 
-	chacha20.init(&ctx, xkey[:], xnonce[:], impl)
+	chacha20.init(&ctx, xkey[:], xiv[:], impl)
 	chacha20.seek(&ctx, 1)
 	chacha20.xor_bytes(&ctx, derived_ciphertext[:], plaintext[:])
 
@@ -154,8 +154,8 @@ test_chacha20_stream :: proc(t: ^testing.T, impl: chacha20.Implementation) {
 	tmp := make([]byte, 2048, context.temp_allocator)
 
 	mem.zero(&key, size_of(key))
-	mem.zero(&nonce, size_of(nonce))
-	chacha20.init(&ctx, key[:], nonce[:], impl)
+	mem.zero(&iv, size_of(iv))
+	chacha20.init(&ctx, key[:], iv[:], impl)
 
 	h_ctx: sha2.Context_512
 	sha2.init_512_256(&h_ctx)
@@ -196,7 +196,7 @@ test_chacha20poly1305 :: proc(t: ^testing.T, impl: chacha20.Implementation) {
 		0x98, 0x99, 0x9a, 0x9b, 0x9c, 0x9d, 0x9e, 0x9f,
 	}
 
-	nonce := [chacha20poly1305.NONCE_SIZE]byte {
+	nonce := [chacha20poly1305.IV_SIZE]byte {
 		0x07, 0x00, 0x00, 0x00, 0x40, 0x41, 0x42, 0x43,
 		0x44, 0x45, 0x46, 0x47,
 	}

@@ -40,13 +40,13 @@ stream_blocks :: proc(ctx: ^Context, dst, src: []byte, nr_blocks: int) {
 }
 
 @(private)
-hchacha20 :: proc "contextless" (dst, key, nonce: []byte, impl: Implementation) {
+hchacha20 :: proc "contextless" (dst, key, iv: []byte, impl: Implementation) {
 	switch impl {
 	case .Simd256:
-		simd256.hchacha20(dst, key, nonce)
+		simd256.hchacha20(dst, key, iv)
 	case .Simd128:
-		simd128.hchacha20(dst, key, nonce)
+		simd128.hchacha20(dst, key, iv)
 	case .Portable:
-		ref.hchacha20(dst, key, nonce)
+		ref.hchacha20(dst, key, iv)
 	}
 }

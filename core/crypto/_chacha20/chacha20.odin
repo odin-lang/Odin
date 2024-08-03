@@ -7,10 +7,10 @@ import "core:mem"
 
 // KEY_SIZE is the (X)ChaCha20 key size in bytes.
 KEY_SIZE :: 32
-// NONCE_SIZE is the ChaCha20 nonce size in bytes.
-NONCE_SIZE :: 12
-// XNONCE_SIZE is the XChaCha20 nonce size in bytes.
-XNONCE_SIZE :: 24
+// IV_SIZE is the ChaCha20 IV size in bytes.
+IV_SIZE :: 12
+// XIV_SIZE is the XChaCha20 IV size in bytes.
+XIV_SIZE :: 24
 
 // MAX_CTR_IETF is the maximum counter value for the IETF flavor ChaCha20.
 MAX_CTR_IETF :: 0xffffffff
@@ -40,17 +40,17 @@ Context :: struct {
 }
 
 // init inititializes a Context for ChaCha20 with the provided key and
-// nonce.
+// iv.
 //
-// WARNING: This ONLY handles ChaCha20.  XChaCha20 sub-key and nonce
+// WARNING: This ONLY handles ChaCha20.  XChaCha20 sub-key and IV
 // derivation is expected to be handled by the caller, so that the
 // HChaCha call can be suitably accelerated.
-init :: proc "contextless" (ctx: ^Context, key, nonce: []byte, is_xchacha: bool) {
-	if len(key) != KEY_SIZE || len(nonce) != NONCE_SIZE {
+init :: proc "contextless" (ctx: ^Context, key, iv: []byte, is_xchacha: bool) {
+	if len(key) != KEY_SIZE || len(iv) != IV_SIZE {
 		intrinsics.trap()
 	}
 
-	k, n := key, nonce
+	k, n := key, iv
 
 	ctx._s[0] = SIGMA_0
 	ctx._s[1] = SIGMA_1
@@ -99,7 +99,7 @@ reset :: proc(ctx: ^Context) {
 }
 
 check_counter_limit :: proc(ctx: ^Context, nr_blocks: int) {
-	// Enforce the maximum consumed keystream per nonce.
+	// Enforce the maximum consumed keystream per IV.
 	//
 	// While all modern "standard" definitions of ChaCha20 use
 	// the IETF 32-bit counter, for XChaCha20 most common
@@ -108,7 +108,7 @@ check_counter_limit :: proc(ctx: ^Context, nr_blocks: int) {
 	// Honestly, the answer here is "use a MRAE primitive", but
 	// go with "common" practice in the case of XChaCha20.
 
-	ERR_CTR_EXHAUSTED :: "crypto/chacha20: maximum (X)ChaCha20 keystream per nonce reached"
+	ERR_CTR_EXHAUSTED :: "crypto/chacha20: maximum (X)ChaCha20 keystream per IV reached"
 
 	if ctx._is_ietf_flavor {
 		if u64(ctx._s[12]) + u64(nr_blocks) > MAX_CTR_IETF {
