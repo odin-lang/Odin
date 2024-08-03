@@ -61,6 +61,7 @@ _remove_all :: proc(path: string) -> Error {
 	if dir == nil {
 		return _get_platform_error()
 	}
+	defer posix.closedir(dir)
 
 	for {
 		posix.set_errno(.NONE)
@@ -91,7 +92,6 @@ _remove_all :: proc(path: string) -> Error {
 	if posix.rmdir(cpath) != .OK {
 		return _get_platform_error()
 	}
-	posix.closedir(dir)
 	return nil
 }
 

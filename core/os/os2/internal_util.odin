@@ -76,7 +76,7 @@ concatenate :: proc(strings: []string, allocator: runtime.Allocator) -> (res: st
 	for s in strings {
 		n += len(s)
 	}
-	buf := make([]byte, n) or_return
+	buf := make([]byte, n, allocator) or_return
 	n = 0
 	for s in strings {
 		n += copy(buf[n:], s)
