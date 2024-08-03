@@ -141,8 +141,7 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 			if uid, ok = strconv.parse_int(passwd[:n]); ok && uid == int(s.uid) {
 				info.username = strings.clone(username, allocator) or_return
 				break
-			}
-			if !ok {
+			} else if !ok {
 				return info, .Invalid_File
 			}
 
@@ -413,7 +412,7 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 		if errno = linux.execveat(dir_fd, executable_path, &cargs[0], env); errno != .NONE {
 			intrinsics.trap()
 		}
-		intrinsics.trap()  // unreachable
+		unreachable()
 	}
 
 	// TODO: We need to come up with a way to detect the execve failure from here.
