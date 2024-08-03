@@ -3,6 +3,7 @@
 package os2
 
 import "base:runtime"
+import "base:intrinsics"
 
 import "core:fmt"
 import "core:mem"
@@ -393,26 +394,26 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 		if desc.stdin != nil {
 			fd := linux.Fd(fd(desc.stdin))
 			if _, errno = linux.dup2(fd, STDIN); errno != .NONE {
-				linux.exit(1)
+				intrinsics.trap()
 			}
 		}
 		if desc.stdout != nil {
 			fd := linux.Fd(fd(desc.stdout))
 			if _, errno = linux.dup2(fd, STDOUT); errno != .NONE {
-				linux.exit(1)
+				intrinsics.trap()
 			}
 		}
 		if desc.stderr != nil {
 			fd := linux.Fd(fd(desc.stderr))
 			if _, errno = linux.dup2(fd, STDERR); errno != .NONE {
-				linux.exit(1)
+				intrinsics.trap()
 			}
 		}
 
 		if errno = linux.execveat(dir_fd, executable_path, &cargs[0], env); errno != .NONE {
-			linux.exit(1)
+			intrinsics.trap()
 		}
-		unreachable()
+		intrinsics.trap()  // unreachable
 	}
 
 	// TODO: We need to come up with a way to detect the execve failure from here.
