@@ -98,6 +98,32 @@ vinfo_stat :: struct {
 	vst_qspare:        [2]i64,
 }
 
+proc_taskinfo :: struct {
+	pti_virtual_size:      u64 `fmt:"M"`,
+	pti_resident_size:     u64 `fmt:"M"`,
+	pti_total_user:        u64,
+	pti_total_system:      u64,
+	pti_threads_user:      u64,
+	pti_threads_system:    u64,
+	pti_policy:            i32,
+	pti_faults:            i32,
+	pti_pageins:           i32,
+	pti_cow_faults:        i32,
+	pti_messages_sent:     i32,
+	pti_messages_received: i32,
+	pti_syscalls_mach:     i32,
+	pti_syscalls_unix:     i32,
+	pti_csw:               i32,
+	pti_threadnum:         i32,
+	pti_numrunning:        i32,
+	pti_priority:          i32,
+}
+
+proc_taskallinfo :: struct {
+	pbsd:   proc_bsdinfo,
+	ptinfo: proc_taskinfo,
+}
+
 fsid_t :: distinct [2]i32
 
 PBI_Flag_Bits :: enum u32 {
