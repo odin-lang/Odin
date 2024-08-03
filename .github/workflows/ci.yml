@@ -22,6 +22,7 @@ jobs:
           pkgin -y in gmake git bash python311 llvm clang
           ln -s /usr/pkg/bin/python3.11 /usr/bin/python3
         run: |
+          set -e -x
           git config --global --add safe.directory $(pwd)
           gmake release
           ./odin version
