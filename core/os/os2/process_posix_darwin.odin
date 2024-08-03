@@ -22,16 +22,16 @@ foreign lib {
 _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator: runtime.Allocator) -> (info: Process_Info, err: Error) {
 	info.pid = pid
 
-	get_pidinfo :: proc(pid: int, selection: Process_Info_Fields) -> (ppid: u32, nice: Maybe(i32), uid: posix.uid_t, ok: bool) {
+	get_pidinfo :: proc(pid: int, selection: Process_Info_Fields) -> (ppid: u32, prio: Maybe(i32), uid: posix.uid_t, ok: bool) {
 		// Short info is enough and requires less permissions if the priority isn't requested.
 		if .Priority in selection {
-			pinfo: darwin.proc_bsdinfo
-			ret := darwin.proc_pidinfo(posix.pid_t(pid), .BSDINFO, 0, &pinfo, size_of(pinfo))
+			info: darwin.proc_taskallinfo
+			ret := darwin.proc_pidinfo(posix.pid_t(pid), .TASKALLINFO, 0, &info, size_of(info))
 			if ret > 0 {
-				assert(ret == size_of(pinfo))
-				ppid = pinfo.pbi_ppid
-				nice = pinfo.pbi_nice
-				uid  = pinfo.pbi_uid
+				assert(ret == size_of(info))
+				ppid = info.pbsd.pbi_ppid
+				prio = info.ptinfo.pti_priority
+				uid  = info.pbsd.pbi_uid
 				ok   = true
 				return
 			}
@@ -55,7 +55,7 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 
 	pidinfo: {
 		if selection & {.PPid, .Priority, .Username } != {} {
-			ppid, mnice, uid, ok := get_pidinfo(pid, selection)
+			ppid, mprio, uid, ok := get_pidinfo(pid, selection)
 			if !ok {
 				if err == nil {
 					err = _get_platform_error()
@@ -68,8 +68,8 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 				info.fields += {.PPid}
 			}
 
-			if nice, has_nice := mnice.?; has_nice && .Priority in selection {
-				info.priority = int(nice)
+			if prio, has_prio := mprio.?; has_prio && .Priority in selection {
+				info.priority = int(prio)
 				info.fields += {.Priority}
 			}
 
