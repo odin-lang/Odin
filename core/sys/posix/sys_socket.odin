@@ -437,8 +437,12 @@ when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS 
 	SO_SNDLOWAT   :: 0x1003
 	SO_TYPE       :: 0x1008
 
-	when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD {
+	when ODIN_OS == .Darwin {
 		SO_LINGER   :: 0x1080
+		SO_RCVTIMEO :: 0x1006
+		SO_SNDTIMEO :: 0x1005
+	} else when ODIN_OS == .FreeBSD {
+		SO_LINGER   :: 0x0080
 		SO_RCVTIMEO :: 0x1006
 		SO_SNDTIMEO :: 0x1005
 	} else when ODIN_OS == .NetBSD {

@@ -254,15 +254,15 @@ when ODIN_OS == .Darwin {
 	O_NONBLOCK :: 0x0004
 	O_SYNC     :: 0x0080
 	_O_RSYNC   :: 0
-	O_RSYNC    :: O_Flags{}
+	O_RSYNC    :: O_Flags{} // NOTE: not defined in headers
 
 	O_EXEC    :: 0x00040000
 	O_RDONLY  :: 0
 	O_RDWR    :: 0x0002
 	O_WRONLY  :: 0x0001
 
-	_O_SEARCH :: O_EXEC|O_DIRECTORY
-	O_SEARCH  :: O_Flags{ .EXEC, .DIRECTORY }
+	_O_SEARCH :: O_EXEC
+	O_SEARCH  :: O_Flags{ .EXEC }
 
 	AT_FDCWD: FD: -100
 
