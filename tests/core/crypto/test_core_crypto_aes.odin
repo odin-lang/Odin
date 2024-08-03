@@ -197,8 +197,8 @@ test_aes_ctr :: proc(t: ^testing.T, impl: aes.Implementation) {
 
 	ctx: aes.Context_CTR
 	key: [aes.KEY_SIZE_256]byte
-	nonce: [aes.CTR_IV_SIZE]byte
-	aes.init_ctr(&ctx, key[:], nonce[:], impl)
+	iv: [aes.CTR_IV_SIZE]byte
+	aes.init_ctr(&ctx, key[:], iv[:], impl)
 
 	h_ctx: sha2.Context_512
 	sha2.init_512_256(&h_ctx)

@@ -10,12 +10,12 @@ import "core:mem"
 import "core:simd/x86"
 
 @(private)
-gcm_seal_hw :: proc(ctx: ^Context_Impl_Hardware, dst, tag, nonce, aad, plaintext: []byte) {
+gcm_seal_hw :: proc(ctx: ^Context_Impl_Hardware, dst, tag, iv, aad, plaintext: []byte) {
 	h: [_aes.GHASH_KEY_SIZE]byte
 	j0: [_aes.GHASH_BLOCK_SIZE]byte
 	j0_enc: [_aes.GHASH_BLOCK_SIZE]byte
 	s: [_aes.GHASH_TAG_SIZE]byte
-	init_ghash_hw(ctx, &h, &j0, &j0_enc, nonce)
+	init_ghash_hw(ctx, &h, &j0, &j0_enc, iv)
 
 	// Note: Our GHASH implementation handles appending padding.
 	hw_intel.ghash(s[:], h[:], aad)
@@ -29,12 +29,12 @@ gcm_seal_hw :: proc(ctx: ^Context_Impl_Hardware, dst, tag, nonce, aad, plaintext
 }
 
 @(private)
-gcm_open_hw :: proc(ctx: ^Context_Impl_Hardware, dst, nonce, aad, ciphertext, tag: []byte) -> bool {
+gcm_open_hw :: proc(ctx: ^Context_Impl_Hardware, dst, iv, aad, ciphertext, tag: []byte) -> bool {
 	h: [_aes.GHASH_KEY_SIZE]byte
 	j0: [_aes.GHASH_BLOCK_SIZE]byte
 	j0_enc: [_aes.GHASH_BLOCK_SIZE]byte
 	s: [_aes.GHASH_TAG_SIZE]byte
-	init_ghash_hw(ctx, &h, &j0, &j0_enc, nonce)
+	init_ghash_hw(ctx, &h, &j0, &j0_enc, iv)
 
 	hw_intel.ghash(s[:], h[:], aad)
 	gctr_hw(ctx, dst, &s, ciphertext, &h, &j0, false)
@@ -59,20 +59,20 @@ init_ghash_hw :: proc(
 	h: ^[_aes.GHASH_KEY_SIZE]byte,
 	j0: ^[_aes.GHASH_BLOCK_SIZE]byte,
 	j0_enc: ^[_aes.GHASH_BLOCK_SIZE]byte,
-	nonce: []byte,
+	iv: []byte,
 ) {
 	// 1. Let H = CIPH(k, 0^128)
 	encrypt_block_hw(ctx, h[:], h[:])
 
 	// Define a block, J0, as follows:
-	if l := len(nonce); l == GCM_NONCE_SIZE {
+	if l := len(iv); l == GCM_IV_SIZE {
 		// if len(IV) = 96, then let J0 = IV || 0^31 || 1
-		copy(j0[:], nonce)
+		copy(j0[:], iv)
 		j0[_aes.GHASH_BLOCK_SIZE - 1] = 1
 	} else {
 		// If len(IV) != 96, then let s = 128 ceil(len(IV)/128) - len(IV),
 		// and let J0 = GHASHH(IV || 0^(s+64) || ceil(len(IV))^64).
-		hw_intel.ghash(j0[:], h[:], nonce)
+		hw_intel.ghash(j0[:], h[:], iv)
 
 		tmp: [_aes.GHASH_BLOCK_SIZE]byte
 		endian.unchecked_put_u64be(tmp[8:], u64(l) * 8)
@@ -109,7 +109,7 @@ gctr_hw :: proc(
 	s: ^[_aes.GHASH_BLOCK_SIZE]byte,
 	src: []byte,
 	h: ^[_aes.GHASH_KEY_SIZE]byte,
-	nonce: ^[_aes.GHASH_BLOCK_SIZE]byte,
+	iv: ^[_aes.GHASH_BLOCK_SIZE]byte,
 	is_seal: bool,
 ) #no_bounds_check {
 	sks: [15]x86.__m128i = ---
@@ -118,8 +118,8 @@ gctr_hw :: proc(
 	}
 
 	// Setup the counter block
-	ctr_blk := intrinsics.unaligned_load((^x86.__m128i)(nonce))
-	ctr := endian.unchecked_get_u32be(nonce[GCM_NONCE_SIZE:]) + 1
+	ctr_blk := intrinsics.unaligned_load((^x86.__m128i)(iv))
+	ctr := endian.unchecked_get_u32be(iv[GCM_IV_SIZE:]) + 1
 
 	src, dst := src, dst
 
