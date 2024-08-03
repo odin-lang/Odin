@@ -122,16 +122,6 @@ parse_file_tags :: proc(file: ast.File) -> (tags: File_Tags) {
 			}
 		}
 	}
-	skip_rest_of_line :: proc(src: string, i: ^int) {
-		for {
-			switch next_char(src, i) {
-			case '\n', 0:
-				return
-			case:
-				continue
-			}
-		}
-	}
 	scan_value :: proc(src: string, i: ^int) -> string {
 		start := i^
 		for {
@@ -245,8 +235,6 @@ parse_file_tags :: proc(file: ast.File) -> (tags: File_Tags) {
 				}
 			}
 		}
-
-		skip_rest_of_line(text, &i)
 	}
 
 	tags.build = build_kinds[:]
