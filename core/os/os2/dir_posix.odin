@@ -7,13 +7,13 @@ import "core:sys/posix"
 Read_Directory_Iterator_Impl :: struct {
 	dir:      posix.DIR,
 	idx:      int,
-
-	// NOTE: could there be paths bigger than this, maybe, probably, but why does it exist then?
-	fullpath: [posix.PATH_MAX]byte,
+	fullpath: [dynamic]byte,
 }
 
 @(require_results)
 _read_directory_iterator :: proc(it: ^Read_Directory_Iterator) -> (fi: File_Info, index: int, ok: bool) {
+	fimpl := (^File_Impl)(it.f.impl)
+
 	index = it.impl.idx
 	it.impl.idx += 1
 
@@ -29,6 +29,7 @@ _read_directory_iterator :: proc(it: ^Read_Directory_Iterator) -> (fi: File_Info
 		if cname == "." || cname == ".." {
 			continue
 		}
+		sname := string(cname)
 
 		stat: posix.stat_t
 		if posix.fstatat(posix.dirfd(it.impl.dir), cname, &stat, { .SYMLINK_NOFOLLOW }) != .OK {
@@ -37,13 +38,11 @@ _read_directory_iterator :: proc(it: ^Read_Directory_Iterator) -> (fi: File_Info
 			return
 		}
 
-		fimpl := (^File_Impl)(it.f.impl)
+		n := len(fimpl.name)+1
+		non_zero_resize(&it.impl.fullpath, n+len(sname))
+		n += copy(it.impl.fullpath[n:], sname)
 
-		n := copy(it.impl.fullpath[:],  fimpl.name)
-		n += copy(it.impl.fullpath[n:], "/")
-		n += copy(it.impl.fullpath[n:], string(cname))
-
-		fi = internal_stat(stat, string(it.impl.fullpath[:n]))
+		fi = internal_stat(stat, string(it.impl.fullpath[:]))
 		ok = true
 		return
 	}
@@ -55,10 +54,15 @@ _read_directory_iterator_create :: proc(f: ^File) -> (iter: Read_Directory_Itera
 		err = .Invalid_File
 		return
 	}
+
+	impl := (^File_Impl)(f.impl)
+
 	iter.f = f
 	iter.impl.idx = 0
 
-	impl := (^File_Impl)(f.impl)
+	iter.impl.fullpath.allocator = file_allocator()
+	append(&iter.impl.fullpath, impl.name)
+	append(&iter.impl.fullpath, "/")
 
 	iter.impl.dir = posix.fdopendir(impl.fd)
 	if iter.impl.dir == nil {
@@ -75,4 +79,5 @@ _read_directory_iterator_destroy :: proc(it: ^Read_Directory_Iterator) {
 	}
 
 	posix.closedir(it.impl.dir)
+	delete(it.impl.fullpath)
 }
