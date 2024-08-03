@@ -19,6 +19,8 @@ foreign lib {
 	) -> posix.result ---
 }
 
+import "core:fmt"
+
 _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator: runtime.Allocator) -> (info: Process_Info, err: Error) {
 	get_pidinfo :: proc(pid: int, selection: Process_Info_Fields) -> (ppid: u32, prio: Maybe(i32), uid: posix.uid_t, ok: bool) {
 		// Short info is enough and requires less permissions if the priority isn't requested.
@@ -253,4 +255,34 @@ _process_list :: proc(allocator: runtime.Allocator) -> (list: []int, err: Error)
 	}
 
 	return
+}
+
+_process_open :: proc(pid: int, flags: Process_Open_Flags) -> (process: Process, err: Error) {
+
+	// NOTE(laytan): pids can get reused, and afaik posix/macos doesn't have a unique identifier
+	// for a specific process execution, next best thing to me is checking the time the process
+	// started as some extra "uniqueness". We could also hash a bunch of the fields in this info.
+
+	// This incidentally also checks if the pid is actually valid so that's nice.
+
+	pinfo: darwin.proc_bsdinfo
+	ret := darwin.proc_pidinfo(posix.pid_t(pid), .BSDINFO, 0, &pinfo, size_of(pinfo))
+	if ret <= 0 {
+		err = _get_platform_error()
+		return
+	}
+
+	assert(ret == size_of(pinfo))
+	process = { int(pid), uintptr(pinfo.pbi_start_tvusec) }
+	return
+}
+
+process_posix_handle_still_valid :: proc(p: Process) -> bool {
+	pinfo: darwin.proc_bsdinfo
+	ret := darwin.proc_pidinfo(posix.pid_t(p.pid), .BSDINFO, 0, &pinfo, size_of(pinfo))
+	if ret <= 0 {
+		return false
+	}
+
+	return uintptr(pinfo.pbi_start_tvusec) == p.handle
 }
