@@ -5,7 +5,7 @@ import "core:encoding/endian"
 import "core:math/bits"
 
 stream_blocks :: proc(ctx: ^_chacha20.Context, dst, src: []byte, nr_blocks: int) {
-	// Enforce the maximum consumed keystream per nonce.
+	// Enforce the maximum consumed keystream per IV.
 	_chacha20.check_counter_limit(ctx, nr_blocks)
 
 	dst, src := dst, src
@@ -220,7 +220,7 @@ stream_blocks :: proc(ctx: ^_chacha20.Context, dst, src: []byte, nr_blocks: int)
 	}
 }
 
-hchacha20 :: proc "contextless" (dst, key, nonce: []byte) {
+hchacha20 :: proc "contextless" (dst, key, iv: []byte) {
 	x0, x1, x2, x3 := _chacha20.SIGMA_0, _chacha20.SIGMA_1, _chacha20.SIGMA_2, _chacha20.SIGMA_3
 	x4 := endian.unchecked_get_u32le(key[0:4])
 	x5 := endian.unchecked_get_u32le(key[4:8])
@@ -230,10 +230,10 @@ hchacha20 :: proc "contextless" (dst, key, nonce: []byte) {
 	x9 := endian.unchecked_get_u32le(key[20:24])
 	x10 := endian.unchecked_get_u32le(key[24:28])
 	x11 := endian.unchecked_get_u32le(key[28:32])
-	x12 := endian.unchecked_get_u32le(nonce[0:4])
-	x13 := endian.unchecked_get_u32le(nonce[4:8])
-	x14 := endian.unchecked_get_u32le(nonce[8:12])
-	x15 := endian.unchecked_get_u32le(nonce[12:16])
+	x12 := endian.unchecked_get_u32le(iv[0:4])
+	x13 := endian.unchecked_get_u32le(iv[4:8])
+	x14 := endian.unchecked_get_u32le(iv[8:12])
+	x15 := endian.unchecked_get_u32le(iv[12:16])
 
 	for i := _chacha20.ROUNDS; i > 0; i = i - 2 {
 		// quarterround(x, 0, 4, 8, 12)

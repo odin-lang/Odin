@@ -279,13 +279,13 @@ _benchmark_chacha20 :: proc(
 		0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef,
 		0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef,
 	}
-	nonce := [chacha20.NONCE_SIZE]byte {
+	iv := [chacha20.IV_SIZE]byte {
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 		0x00, 0x00, 0x00, 0x00,
 	}
 
 	ctx: chacha20.Context = ---
-	chacha20.init(&ctx, key[:], nonce[:])
+	chacha20.init(&ctx, key[:], iv[:])
 
 	for _ in 0 ..= options.rounds {
 		chacha20.xor_bytes(&ctx, buf, buf)
@@ -334,7 +334,7 @@ _benchmark_chacha20poly1305 :: proc(
 		0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef,
 		0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef,
 	}
-	nonce := [chacha20.NONCE_SIZE]byte {
+	iv := [chacha20.IV_SIZE]byte {
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 		0x00, 0x00, 0x00, 0x00,
 	}
@@ -345,7 +345,7 @@ _benchmark_chacha20poly1305 :: proc(
 	tag: [chacha20poly1305.TAG_SIZE]byte = ---
 
 	for _ in 0 ..= options.rounds {
-		chacha20poly1305.seal(&ctx, buf, tag[:], nonce[:], nil, buf)
+		chacha20poly1305.seal(&ctx, buf, tag[:], iv[:], nil, buf)
 	}
 	options.count = options.rounds
 	options.processed = options.rounds * options.bytes
@@ -366,13 +366,13 @@ _benchmark_aes256_ctr :: proc(
 		0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef,
 		0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef,
 	}
-	nonce := [aes.CTR_IV_SIZE]byte {
+	iv := [aes.CTR_IV_SIZE]byte {
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 	}
 
 	ctx: aes.Context_CTR = ---
-	aes.init_ctr(&ctx, key[:], nonce[:])
+	aes.init_ctr(&ctx, key[:], iv[:])
 
 	for _ in 0 ..= options.rounds {
 		aes.xor_bytes_ctr(&ctx, buf, buf)
@@ -389,13 +389,13 @@ _benchmark_aes256_gcm :: proc(
 	err: time.Benchmark_Error,
 ) {
 	buf := options.input
-	nonce: [aes.GCM_NONCE_SIZE]byte
+	iv: [aes.GCM_IV_SIZE]byte
 	tag: [aes.GCM_TAG_SIZE]byte = ---
 
 	ctx := transmute(^aes.Context_GCM)context.user_ptr
 
 	for _ in 0 ..= options.rounds {
-		aes.seal_gcm(ctx, buf, tag[:], nonce[:], nil, buf)
+		aes.seal_gcm(ctx, buf, tag[:], iv[:], nil, buf)
 	}
 	options.count = options.rounds
 	options.processed = options.rounds * options.bytes

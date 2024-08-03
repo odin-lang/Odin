@@ -227,7 +227,7 @@ is_performant :: proc "contextless" () -> bool {
 
 @(enable_target_feature = TARGET_SIMD_FEATURES)
 stream_blocks :: proc(ctx: ^_chacha20.Context, dst, src: []byte, nr_blocks: int) {
-	// Enforce the maximum consumed keystream per nonce.
+	// Enforce the maximum consumed keystream per IV.
 	_chacha20.check_counter_limit(ctx, nr_blocks)
 
 	dst_v := ([^]simd.u32x4)(raw_data(dst))
@@ -454,11 +454,11 @@ stream_blocks :: proc(ctx: ^_chacha20.Context, dst, src: []byte, nr_blocks: int)
 }
 
 @(enable_target_feature = TARGET_SIMD_FEATURES)
-hchacha20 :: proc "contextless" (dst, key, nonce: []byte) {
+hchacha20 :: proc "contextless" (dst, key, iv: []byte) {
 	v0 := simd.u32x4{_chacha20.SIGMA_0, _chacha20.SIGMA_1, _chacha20.SIGMA_2, _chacha20.SIGMA_3}
 	v1 := intrinsics.unaligned_load((^simd.u32x4)(&key[0]))
 	v2 := intrinsics.unaligned_load((^simd.u32x4)(&key[16]))
-	v3 := intrinsics.unaligned_load((^simd.u32x4)(&nonce[0]))
+	v3 := intrinsics.unaligned_load((^simd.u32x4)(&iv[0]))
 
 	when ODIN_ENDIAN == .Big {
 		v1 = _byteswap_u32x4(v1)
