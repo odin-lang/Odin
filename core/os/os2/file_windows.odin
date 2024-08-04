@@ -33,7 +33,11 @@ File_Impl :: struct {
 
 	allocator: runtime.Allocator,
 
-	buffer: []byte,
+	r_buf: []byte,
+	w_buf: []byte,
+	w_n:   int,
+	max_consecutive_empty_writes: int,
+
 	rw_mutex: sync.RW_Mutex, // read write calls
 	p_mutex:  sync.Mutex, // pread pwrite calls
 }
@@ -179,8 +183,8 @@ _new_file_buffered :: proc(handle: uintptr, name: string, buffer_size: uint) -> 
 	f, err = _new_file(handle, name)
 	if f != nil && err == nil {
 		impl := (^File_Impl)(f.impl)
-		impl.buffer = make([]byte, buffer_size, file_allocator())
-		f.stream.procedure = _file_stream_buffered_proc
+		impl.r_buf = make([]byte, buffer_size, file_allocator())
+		impl.w_buf = make([]byte, buffer_size, file_allocator())
 	}
 	return
 }
@@ -202,11 +206,13 @@ _destroy :: proc(f: ^File_Impl) -> Error {
 	err0 := free(f.wname, a)
 	err1 := delete(f.name, a)
 	err2 := free(f, a)
-	err3 := delete(f.buffer, a)
+	err3 := delete(f.r_buf, a)
+	err4 := delete(f.w_buf, a)
 	err0 or_return
 	err1 or_return
 	err2 or_return
 	err3 or_return
+	err4 or_return
 	return nil
 }
 
@@ -254,6 +260,10 @@ _seek :: proc(f: ^File_Impl, offset: i64, whence: io.Seek_From) -> (ret: i64, er
 }
 
 _read :: proc(f: ^File_Impl, p: []byte) -> (n: i64, err: Error) {
+	return _read_internal(f, p)
+}
+
+_read_internal :: proc(f: ^File_Impl, p: []byte) -> (n: i64, err: Error) {
 	read_console :: proc(handle: win32.HANDLE, b: []byte) -> (n: int, err: Error) {
 		if len(b) == 0 {
 			return 0, nil
@@ -375,6 +385,9 @@ _read_at :: proc(f: ^File_Impl, p: []byte, offset: i64) -> (n: i64, err: Error) 
 }
 
 _write :: proc(f: ^File_Impl, p: []byte) -> (n: i64, err: Error) {
+	return _write_internal(f, p)
+}
+_write_internal :: proc(f: ^File_Impl, p: []byte) -> (n: i64, err: Error) {
 	if len(p) == 0 {
 		return
 	}
@@ -459,6 +472,9 @@ _sync :: proc(f: ^File) -> Error {
 }
 
 _flush :: proc(f: ^File_Impl) -> Error {
+	return _flush(f)
+}
+_flush_internal :: proc(f: ^File_Impl) -> Error {
 	handle := _handle(&f.file)
 	if !win32.FlushFileBuffers(handle) {
 		return _get_platform_error()
@@ -801,51 +817,6 @@ _file_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, 
 	}
 	return 0, .Empty
 }
-
-
-@(private="package")
-_file_stream_buffered_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, offset: i64, whence: io.Seek_From) -> (n: i64, err: io.Error) {
-	f := (^File_Impl)(stream_data)
-	ferr: Error
-	switch mode {
-	case .Read:
-		n, ferr = _read(f, p)
-		err = error_to_io_error(ferr)
-		return
-	case .Read_At:
-		n, ferr = _read_at(f, p, offset)
-		err = error_to_io_error(ferr)
-		return
-	case .Write:
-		n, ferr = _write(f, p)
-		err = error_to_io_error(ferr)
-		return
-	case .Write_At:
-		n, ferr = _write_at(f, p, offset)
-		err = error_to_io_error(ferr)
-		return
-	case .Seek:
-		n, ferr = _seek(f, offset, whence)
-		err = error_to_io_error(ferr)
-		return
-	case .Size:
-		n, ferr = _file_size(f)
-		err = error_to_io_error(ferr)
-		return
-	case .Flush:
-		ferr = _flush(f)
-		err = error_to_io_error(ferr)
-		return
-	case .Close, .Destroy:
-		ferr = _close(f)
-		err = error_to_io_error(ferr)
-		return
-	case .Query:
-		return io.query_utility({.Read, .Read_At, .Write, .Write_At, .Seek, .Size, .Flush, .Close, .Query})
-	}
-	return 0, .Empty
-}
-
 
 
 
