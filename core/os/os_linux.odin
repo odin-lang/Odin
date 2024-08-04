@@ -520,6 +520,7 @@ _get_errno :: proc(res: int) -> Error {
 }
 
 // get errno from libc
+@(require_results, no_instrumentation)
 get_last_error :: proc "contextless" () -> Error {
 	err := Platform_Error(__errno_location()^)
 	#partial switch err {

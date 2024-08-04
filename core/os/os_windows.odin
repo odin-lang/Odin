@@ -63,6 +63,7 @@ ERROR_NEGATIVE_OFFSET     :: _Platform_Error(1<<29 + 2)
 // "Argv" arguments converted to Odin strings
 args := _alloc_command_line_arguments()
 
+@(require_results, no_instrumentation)
 get_last_error :: proc "contextless" () -> Error {
 	err := win32.GetLastError()
 	if err == 0 {
@@ -114,6 +115,7 @@ get_last_error :: proc "contextless" () -> Error {
 }
 
 
+@(require_results)
 last_write_time :: proc(fd: Handle) -> (File_Time, Error) {
 	file_info: win32.BY_HANDLE_FILE_INFORMATION
 	if !win32.GetFileInformationByHandle(win32.HANDLE(fd), &file_info) {
@@ -124,6 +126,7 @@ last_write_time :: proc(fd: Handle) -> (File_Time, Error) {
 	return lo | hi << 32, nil
 }
 
+@(require_results)
 last_write_time_by_name :: proc(name: string) -> (File_Time, Error) {
 	data: win32.WIN32_FILE_ATTRIBUTE_DATA
 
@@ -138,6 +141,7 @@ last_write_time_by_name :: proc(name: string) -> (File_Time, Error) {
 }
 
 
+@(require_results)
 get_page_size :: proc() -> int {
 	// NOTE(tetra): The page size never changes, so why do anything complicated
 	// if we don't have to.

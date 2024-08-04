@@ -12,19 +12,19 @@ MAX_RW :: 0x7fffffff
 @(no_instrumentation)
 _write :: proc "contextless" (fd: os.Handle, data: []byte) -> (n: int, err: os.Error) #no_bounds_check /* bounds check would segfault instrumentation */ {
 	if len(data) == 0 {
-		return 0, os.ERROR_NONE
+		return 0, nil
 	}
 	
 	for n < len(data) {
 		chunk := data[:min(len(data), MAX_RW)]
 		written, errno := linux.write(linux.Fd(fd), chunk)
-		if errno != .NONE {
-			return n, os.Error(errno)
+		if errno != nil {
+			return n, os.Platform_Error(errno)
 		}
 		n += written
 	}
 
-	return n, os.ERROR_NONE
+	return n, nil
 }
 
 CLOCK_MONOTONIC_RAW :: 4 // NOTE(tetra): "RAW" means: Not adjusted by NTP.

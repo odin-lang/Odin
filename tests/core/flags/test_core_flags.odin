@@ -1117,7 +1117,7 @@ test_os_handle :: proc(t: ^testing.T) {
 		// Delete the file now that we're done.
 		//
 		// This is not done all the time, just in case the file is useful to debugging.
-		testing.expect_value(t, os.remove(TEMPORARY_FILENAME), os.ERROR_NONE)
+		testing.expect_value(t, os.remove(TEMPORARY_FILENAME), nil)
 	}
 
 	TEMPORARY_FILENAME :: "test_core_flags_write_test_output_data"

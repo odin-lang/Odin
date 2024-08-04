@@ -53,9 +53,9 @@ _create_socket :: proc(family: Address_Family, protocol: Socket_Protocol) -> (so
 		unreachable()
 	}
 
-	sock, ok := os.socket(c_family, c_type, c_protocol)
-	if ok != os.ERROR_NONE {
-		err = Create_Socket_Error(ok)
+	sock, sock_err := os.socket(c_family, c_type, c_protocol)
+	if sock_err != nil {
+		err = Create_Socket_Error(os.is_platform_error(sock_err) or_else -1)
 		return
 	}
 
@@ -84,7 +84,7 @@ _dial_tcp_from_endpoint :: proc(endpoint: Endpoint, options := default_tcp_optio
 
 	sockaddr := _endpoint_to_sockaddr(endpoint)
 	res := os.connect(os.Socket(skt), (^os.SOCKADDR)(&sockaddr), i32(sockaddr.len))
-	if res != os.ERROR_NONE {
+	if res != nil {
 		err = Dial_Error(res)
 		return
 	}
@@ -100,7 +100,7 @@ _bind :: proc(skt: Any_Socket, ep: Endpoint) -> (err: Network_Error) {
 	sockaddr := _endpoint_to_sockaddr(ep)
 	s := any_socket_to_socket(skt)
 	res := os.bind(os.Socket(s), (^os.SOCKADDR)(&sockaddr), i32(sockaddr.len))
-	if res != os.ERROR_NONE {
+	if res != nil {
 		if res == os.EACCES && ep.port <= MAX_PRIVILEGED_PORT {
 			err = .Privileged_Port_Without_Root
 		} else {
@@ -128,7 +128,7 @@ _listen_tcp :: proc(interface_endpoint: Endpoint, backlog := 1000) -> (skt: TCP_
 	bind(sock, interface_endpoint) or_return
 
 	res := os.listen(os.Socket(skt), backlog)
-	if res != os.ERROR_NONE {
+	if res != nil {
 		err = Listen_Error(res)
 		return
 	}
@@ -141,9 +141,9 @@ _accept_tcp :: proc(sock: TCP_Socket, options := default_tcp_options) -> (client
 	sockaddr: os.SOCKADDR_STORAGE_LH
 	sockaddrlen := c.int(size_of(sockaddr))
 
-	client_sock, ok := os.accept(os.Socket(sock), cast(^os.SOCKADDR) &sockaddr, &sockaddrlen)
-	if ok != os.ERROR_NONE {
-		err = Accept_Error(ok)
+	client_sock, client_sock_err := os.accept(os.Socket(sock), cast(^os.SOCKADDR) &sockaddr, &sockaddrlen)
+	if client_sock_err != nil {
+		err = Accept_Error(os.is_platform_error(client_sock_err) or_else -1)
 		return
 	}
 	client = TCP_Socket(client_sock)

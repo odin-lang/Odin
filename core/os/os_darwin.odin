@@ -635,6 +635,7 @@ foreign dl {
 	@(link_name="dlerror") _unix_dlerror :: proc() -> cstring ---
 }
 
+@(require_results, no_instrumentation)
 get_last_error :: proc "contextless" () -> Error {
 	return Platform_Error(__error()^)
 }
