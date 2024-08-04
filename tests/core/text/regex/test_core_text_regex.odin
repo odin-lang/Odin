@@ -44,6 +44,13 @@ check_expression_with_flags :: proc(t: ^testing.T, pattern: string, flags: regex
 	} else {
 		log.infof("match groups were: %v", capture.groups, location = loc)
 	}
+
+	for pos, g in capture.pos {
+		pos_str := haystack[pos[0]:pos[1]]
+		if !testing.expectf(t, pos_str == capture.groups[g], "position string %v %q does not correspond to group string %q", pos, pos_str, capture.groups[g]) {
+			break
+		}
+	}
 }
 
 check_expression :: proc(t: ^testing.T, pattern, haystack: string, needles: ..string, extra_flags: regex.Flags = {}, loc := #caller_location) {
