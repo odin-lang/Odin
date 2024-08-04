@@ -4470,7 +4470,10 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 				if (is_exact_value_zero(operand->value) &&
 				    (operand->value.kind == ExactValue_Integer ||
 				     operand->value.kind == ExactValue_Float)) {
-					update_untyped_expr_value(c, operand->expr, empty_exact_value);
+					operand->mode = Addressing_Value;
+					target_type = t_untyped_nil;
+				     	operand->value = empty_exact_value;
+					update_untyped_expr_value(c, operand->expr, operand->value);
 					break;
 				}
 			}
