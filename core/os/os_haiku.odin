@@ -208,7 +208,7 @@ close :: proc(fd: Handle) -> Errno {
 	if result == -1 {
 		return Errno(get_last_error())
 	}
-	return ERROR_NONE
+	return nil
 }
 
 // In practice a read/write call would probably never read/write these big buffers all at once,
@@ -321,7 +321,7 @@ _closedir :: proc(dirp: Dir) -> Errno {
 	if rc != 0 {
 		return Errno(get_last_error())
 	}
-	return ERROR_NONE
+	return nil
 }
 
 @private

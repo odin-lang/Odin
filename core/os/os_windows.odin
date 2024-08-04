@@ -71,11 +71,11 @@ get_last_error :: proc "contextless" () -> Error {
 last_write_time :: proc(fd: Handle) -> (File_Time, Errno) {
 	file_info: win32.BY_HANDLE_FILE_INFORMATION
 	if !win32.GetFileInformationByHandle(win32.HANDLE(fd), &file_info) {
-		return 0, Platform_Error(win32.GetLastError())
+		return 0, get_last_error()
 	}
 	lo := File_Time(file_info.ftLastWriteTime.dwLowDateTime)
 	hi := File_Time(file_info.ftLastWriteTime.dwHighDateTime)
-	return lo | hi << 32, ERROR_NONE
+	return lo | hi << 32, nil
 }
 
 last_write_time_by_name :: proc(name: string) -> (File_Time, Errno) {
@@ -83,12 +83,12 @@ last_write_time_by_name :: proc(name: string) -> (File_Time, Errno) {
 
 	wide_path := win32.utf8_to_wstring(name)
 	if !win32.GetFileAttributesExW(wide_path, win32.GetFileExInfoStandard, &data) {
-		return 0, Platform_Error(win32.GetLastError())
+		return 0, get_last_error()
 	}
 
 	l := File_Time(data.ftLastWriteTime.dwLowDateTime)
 	h := File_Time(data.ftLastWriteTime.dwHighDateTime)
-	return l | h << 32, ERROR_NONE
+	return l | h << 32, nil
 }
 
 

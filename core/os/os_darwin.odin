@@ -668,13 +668,13 @@ open :: proc(path: string, flags: int = O_RDWR, mode: int = 0) -> (Handle, Errno
 	*/
 	if mode != 0 && !isDir {
 		err := fchmod(handle, cast(u16)mode)
-		if err != 0 {
+		if err != nil {
 			_unix_close(handle)
 			return INVALID_HANDLE, err
 		}
 	}
 
-	return handle, 0
+	return handle, nil
 }
 
 fchmod :: proc(fd: Handle, mode: u16) -> Errno {
@@ -758,7 +758,7 @@ seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
 	if final_offset == -1 {
 		return 0, Platform_Error.EPERM
 	}
-	return final_offset, 0
+	return final_offset, nil
 }
 
 file_size :: proc(fd: Handle) -> (i64, Errno) {
@@ -867,7 +867,7 @@ remove :: proc(path: string) -> Errno {
 	if res == -1 {
 		return Errno(get_last_error())
 	}
-	return ERROR_NONE
+	return nil
 }
 
 @private
@@ -921,7 +921,7 @@ _closedir :: proc(dirp: Dir) -> Errno {
 	if rc != 0 {
 		return Errno(get_last_error())
 	}
-	return ERROR_NONE
+	return nil
 }
 
 @private
@@ -1037,7 +1037,7 @@ set_env :: proc(key, value: string) -> Errno {
 	if res < 0 {
 		return Errno(get_last_error())
 	}
-	return ERROR_NONE
+	return nil
 }
 
 unset_env :: proc(key: string) -> Errno {
@@ -1047,7 +1047,7 @@ unset_env :: proc(key: string) -> Errno {
 	if res < 0 {
 		return Errno(get_last_error())
 	}
-	return ERROR_NONE
+	return nil
 }
 
 get_current_directory :: proc() -> string {
@@ -1074,7 +1074,7 @@ set_current_directory :: proc(path: string) -> (err: Errno) {
 	if res == -1 {
 		return Errno(get_last_error())
 	}
-	return ERROR_NONE
+	return nil
 }
 
 make_directory :: proc(path: string, mode: u16 = 0o775) -> Errno {
@@ -1084,7 +1084,7 @@ make_directory :: proc(path: string, mode: u16 = 0o775) -> Errno {
 	if res == -1 {
 		return Errno(get_last_error())
 	}
-	return ERROR_NONE
+	return nil
 }
 
 exit :: proc "contextless" (code: int) -> ! {
@@ -1169,7 +1169,7 @@ connect :: proc(sd: Socket, addr: ^SOCKADDR, len: socklen_t) -> (Errno) {
 	if result < 0 {
 		return Errno(get_last_error())
 	}
-	return ERROR_NONE
+	return nil
 }
 
 bind :: proc(sd: Socket, addr: ^SOCKADDR, len: socklen_t) -> (Errno) {
@@ -1177,7 +1177,7 @@ bind :: proc(sd: Socket, addr: ^SOCKADDR, len: socklen_t) -> (Errno) {
 	if result < 0 {
 		return Errno(get_last_error())
 	}
-	return ERROR_NONE
+	return nil
 }
 
 accept :: proc(sd: Socket, addr: ^SOCKADDR, len: rawptr) -> (Socket, Errno) {
@@ -1193,7 +1193,7 @@ listen :: proc(sd: Socket, backlog: int) -> (Errno) {
 	if result < 0 {
 		return Errno(get_last_error())
 	}
-	return ERROR_NONE
+	return nil
 }
 
 setsockopt :: proc(sd: Socket, level: int, optname: int, optval: rawptr, optlen: socklen_t) -> (Errno) {
@@ -1201,7 +1201,7 @@ setsockopt :: proc(sd: Socket, level: int, optname: int, optval: rawptr, optlen:
 	if result < 0 {
 		return Errno(get_last_error())
 	}
-	return ERROR_NONE
+	return nil
 }
 
 getsockopt :: proc(sd: Socket, level: int, optname: int, optval: rawptr, optlen: socklen_t) -> Errno {
@@ -1209,7 +1209,7 @@ getsockopt :: proc(sd: Socket, level: int, optname: int, optval: rawptr, optlen:
 	if result < 0 {
 		return Errno(get_last_error())
 	}
-	return ERROR_NONE
+	return nil
 }
 
 recvfrom :: proc(sd: Socket, data: []byte, flags: int, addr: ^SOCKADDR, addr_size: ^socklen_t) -> (u32, Errno) {
@@ -1249,7 +1249,7 @@ shutdown :: proc(sd: Socket, how: int) -> (Errno) {
 	if result < 0 {
 		return Errno(get_last_error())
 	}
-	return ERROR_NONE
+	return nil
 }
 
 fcntl :: proc(fd: int, cmd: int, arg: int) -> (int, Errno) {

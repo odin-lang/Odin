@@ -496,7 +496,7 @@ close :: proc(fd: Handle) -> Errno {
 	if result == -1 {
 		return Errno(get_last_error())
 	}
-	return ERROR_NONE
+	return nil
 }
 
 // We set a max of 1GB to keep alignment and to be safe.
@@ -549,7 +549,7 @@ rename :: proc(old_path, new_path: string) -> Errno {
 	if res == -1 {
 		return Errno(get_last_error())
 	}
-	return ERROR_NONE
+	return nil
 }
 
 remove :: proc(path: string) -> Errno {
@@ -559,7 +559,7 @@ remove :: proc(path: string) -> Errno {
 	if res == -1 {
 		return Errno(get_last_error())
 	}
-	return ERROR_NONE
+	return nil
 }
 
 make_directory :: proc(path: string, mode: mode_t = 0o775) -> Errno {
@@ -569,7 +569,7 @@ make_directory :: proc(path: string, mode: mode_t = 0o775) -> Errno {
 	if res == -1 {
 		return Errno(get_last_error())
 	}
-	return ERROR_NONE
+	return nil
 }
 
 remove_directory :: proc(path: string) -> Errno {
@@ -579,7 +579,7 @@ remove_directory :: proc(path: string) -> Errno {
 	if res == -1 {
 		return Errno(get_last_error())
 	}
-	return ERROR_NONE
+	return nil
 }
 
 is_file_handle :: proc(fd: Handle) -> bool {
@@ -719,7 +719,7 @@ _closedir :: proc(dirp: Dir) -> Errno {
 	if rc != 0 {
 		return Errno(get_last_error())
 	}
-	return ERROR_NONE
+	return nil
 }
 
 @private
@@ -856,7 +856,7 @@ set_current_directory :: proc(path: string) -> (err: Errno) {
 	if res == -1 {
 		return Errno(get_last_error())
 	}
-	return ERROR_NONE
+	return nil
 }
 
 exit :: proc "contextless" (code: int) -> ! {

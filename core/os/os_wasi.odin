@@ -224,7 +224,7 @@ file_size :: proc(fd: Handle) -> (i64, Errno) {
 	if err != nil {
 		return 0, Platform_Error(err)
 	}
-	return i64(stat.size), 0
+	return i64(stat.size), nil
 }
 
 

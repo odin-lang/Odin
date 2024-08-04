@@ -88,6 +88,9 @@ read_at_least :: proc(f: ^File, buf: []byte, min: int) -> (n: int, err: Error) {
 	return
 }
 
+read_full :: proc(f: ^File, buf: []byte) -> (n: int, err: Error) {
+	return read_at_least(f, buf, len(buf))
+}
 
 write_ptr :: proc(f: ^File, data: rawptr, len: int) -> (n: int, err: Error) {
 	return write(f, ([^]byte)(data)[:len])

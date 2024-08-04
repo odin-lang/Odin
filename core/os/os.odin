@@ -91,7 +91,7 @@ read_at_least :: proc(fd: Handle, buf: []byte, min: int) -> (n: int, err: Errno)
 		return 0, io.Error.Short_Buffer
 	}
 	nn := max(int)
-	for nn > 0 && n < min && err == 0 {
+	for nn > 0 && n < min && err == nil {
 		nn, err = read(fd, buf[n:])
 		n += nn
 	}
@@ -108,13 +108,13 @@ read_full :: proc(fd: Handle, buf: []byte) -> (n: int, err: Errno) {
 
 file_size_from_path :: proc(path: string) -> i64 {
 	fd, err := open(path, O_RDONLY, 0)
-	if err != 0 {
+	if err != nil {
 		return -1
 	}
 	defer close(fd)
 
 	length: i64
-	if length, err = file_size(fd); err != 0 {
+	if length, err = file_size(fd); err != nil {
 		return -1
 	}
 	return length
@@ -124,7 +124,7 @@ read_entire_file_from_filename :: proc(name: string, allocator := context.alloca
 	context.allocator = allocator
 
 	fd, err := open(name, O_RDONLY, 0)
-	if err != 0 {
+	if err != nil {
 		return nil, false
 	}
 	defer close(fd)
@@ -137,7 +137,7 @@ read_entire_file_from_handle :: proc(fd: Handle, allocator := context.allocator,
 
 	length: i64
 	err: Errno
-	if length, err = file_size(fd); err != 0 {
+	if length, err = file_size(fd); err != nil {
 		return nil, false
 	}
 
@@ -176,13 +176,13 @@ write_entire_file :: proc(name: string, data: []byte, truncate := true) -> (succ
 	}
 
 	fd, err := open(name, flags, mode)
-	if err != 0 {
+	if err != nil {
 		return false
 	}
 	defer close(fd)
 
 	_, write_err := write(fd, data)
-	return write_err == 0
+	return write_err == nil
 }
 
 write_ptr :: proc(fd: Handle, data: rawptr, len: int) -> (int, Errno) {

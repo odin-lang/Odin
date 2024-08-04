@@ -19,7 +19,7 @@ full_path_from_name :: proc(name: string, allocator := context.allocator) -> (pa
 	for {
 		n := win32.GetFullPathNameW(raw_data(p), u32(len(buf)), raw_data(buf), nil)
 		if n == 0 {
-			return "", Platform_Error(win32.GetLastError())
+			return "", get_last_error()
 		}
 		if n <= u32(len(buf)) {
 			return win32.utf16_to_utf8(buf[:n], allocator) or_else "", ERROR_NONE
@@ -54,7 +54,7 @@ _stat :: proc(name: string, create_file_attributes: u32, allocator := context.al
 		fd: win32.WIN32_FIND_DATAW
 		sh := win32.FindFirstFileW(wname, &fd)
 		if sh == win32.INVALID_HANDLE_VALUE {
-			e = Platform_Error(win32.GetLastError())
+			e = get_last_error()
 			return
 		}
 		win32.FindClose(sh)
@@ -64,7 +64,7 @@ _stat :: proc(name: string, create_file_attributes: u32, allocator := context.al
 
 	h := win32.CreateFileW(wname, 0, 0, nil, win32.OPEN_EXISTING, create_file_attributes, nil)
 	if h == win32.INVALID_HANDLE_VALUE {
-		e = Platform_Error(win32.GetLastError())
+		e = get_last_error()
 		return
 	}
 	defer win32.CloseHandle(h)
@@ -134,13 +134,10 @@ cleanpath_strip_prefix :: proc(buf: []u16) -> []u16 {
 }
 
 @(private)
-cleanpath_from_handle :: proc(fd: Handle) -> (string, Errno) {
+cleanpath_from_handle :: proc(fd: Handle) -> (s: string, err: Errno) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD(ignore = context.temp_allocator == context.allocator)
-	buf, err := cleanpath_from_handle_u16(fd, context.temp_allocator)
-	if err != 0 {
-		return "", err
-	}
-	return win32.utf16_to_utf8(buf, context.allocator) or_else "", err
+	buf := cleanpath_from_handle_u16(fd, context.temp_allocator) or_return
+	return win32.utf16_to_utf8(buf, context.allocator)
 }
 @(private)
 cleanpath_from_handle_u16 :: proc(fd: Handle, allocator: runtime.Allocator) -> ([]u16, Errno) {
@@ -151,7 +148,7 @@ cleanpath_from_handle_u16 :: proc(fd: Handle, allocator: runtime.Allocator) -> (
 
 	n := win32.GetFinalPathNameByHandleW(h, nil, 0, 0)
 	if n == 0 {
-		return nil, Platform_Error(win32.GetLastError())
+		return nil, get_last_error()
 	}
 	buf := make([]u16, max(n, win32.DWORD(260))+1, allocator)
 	buf_len := win32.GetFinalPathNameByHandleW(h, raw_data(buf), n, 0)
@@ -273,14 +270,14 @@ file_info_from_win32_find_data :: proc(d: ^win32.WIN32_FIND_DATAW, name: string)
 file_info_from_get_file_information_by_handle :: proc(path: string, h: win32.HANDLE) -> (File_Info, Errno) {
 	d: win32.BY_HANDLE_FILE_INFORMATION
 	if !win32.GetFileInformationByHandle(h, &d) {
-		err := Platform_Error(win32.GetLastError())
+		err := get_last_error()
 		return {}, err
 
 	}
 
 	ti: win32.FILE_ATTRIBUTE_TAG_INFO
 	if !win32.GetFileInformationByHandleEx(h, .FileAttributeTagInfo, &ti, size_of(ti)) {
-		err := Platform_Error(win32.GetLastError())
+		err := get_last_error()
 		if err != ERROR_INVALID_PARAMETER {
 			return {}, err
 		}

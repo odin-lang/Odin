@@ -529,7 +529,7 @@ personality :: proc(persona: u64) -> (Errno) {
 	if res == -1 {
 		return _get_errno(res)
 	}
-	return ERROR_NONE
+	return nil
 }
 
 fork :: proc() -> (Pid, Errno) {
@@ -814,7 +814,7 @@ _closedir :: proc(dirp: Dir) -> Errno {
 	if rc != 0 {
 		return Errno(get_last_error())
 	}
-	return ERROR_NONE
+	return nil
 }
 
 @private
@@ -930,7 +930,7 @@ set_env :: proc(key, value: string) -> Errno {
 	if res < 0 {
 		return Errno(get_last_error())
 	}
-	return ERROR_NONE
+	return nil
 }
 
 unset_env :: proc(key: string) -> Errno {
@@ -940,7 +940,7 @@ unset_env :: proc(key: string) -> Errno {
 	if res < 0 {
 		return Errno(get_last_error())
 	}
-	return ERROR_NONE
+	return nil
 }
 
 get_current_directory :: proc() -> string {
@@ -971,7 +971,7 @@ set_current_directory :: proc(path: string) -> (err: Errno) {
 	if res < 0 {
 		return _get_errno(res)
 	}
-	return ERROR_NONE
+	return nil
 }
 
 exit :: proc "contextless" (code: int) -> ! {
@@ -1042,7 +1042,7 @@ bind :: proc(sd: Socket, addr: ^SOCKADDR, len: socklen_t) -> (Errno) {
 	if result < 0 {
 		return _get_errno(result)
 	}
-	return ERROR_NONE
+	return nil
 }
 
 
@@ -1051,7 +1051,7 @@ connect :: proc(sd: Socket, addr: ^SOCKADDR, len: socklen_t) -> (Errno) {
 	if result < 0 {
 		return _get_errno(result)
 	}
-	return ERROR_NONE
+	return nil
 }
 
 accept :: proc(sd: Socket, addr: ^SOCKADDR, len: rawptr) -> (Socket, Errno) {
@@ -1067,7 +1067,7 @@ listen :: proc(sd: Socket, backlog: int) -> (Errno) {
 	if result < 0 {
 		return _get_errno(result)
 	}
-	return ERROR_NONE
+	return nil
 }
 
 setsockopt :: proc(sd: Socket, level: int, optname: int, optval: rawptr, optlen: socklen_t) -> (Errno) {
@@ -1075,7 +1075,7 @@ setsockopt :: proc(sd: Socket, level: int, optname: int, optval: rawptr, optlen:
 	if result < 0 {
 		return _get_errno(result)
 	}
-	return ERROR_NONE
+	return nil
 }
 
 
@@ -1117,7 +1117,7 @@ shutdown :: proc(sd: Socket, how: int) -> (Errno) {
 	if result < 0 {
 		return _get_errno(result)
 	}
-	return ERROR_NONE
+	return nil
 }
 
 fcntl :: proc(fd: int, cmd: int, arg: int) -> (int, Errno) {
