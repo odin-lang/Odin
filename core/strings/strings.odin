@@ -1,7 +1,9 @@
 // Procedures to manipulate UTF-8 encoded strings
 package strings
 
+import "base:intrinsics"
 import "core:io"
+@require import simd_util "core:simd/util"
 import "core:mem"
 import "core:unicode"
 import "core:unicode/utf8"
@@ -1424,12 +1426,29 @@ Output:
 
 */
 index_byte :: proc(s: string, c: byte) -> (res: int) {
-	for i := 0; i < len(s); i += 1 {
-		if s[i] == c {
-			return i
+	_index_byte :: #force_inline proc(s: string, c: byte) -> int {
+		for i := 0; i < len(s); i += 1 {
+			if s[i] == c {
+				return i
+			}
 		}
+		return -1
 	}
-	return -1
+
+	// NOTE(Feoramund): On my Alder Lake CPU, I have only witnessed a
+	// significant speedup when compiling in either Size or Speed mode.
+	// The SIMD version is usually 2-3x slower without optimizations on.
+	when ODIN_OPTIMIZATION_MODE > .Minimal && intrinsics.has_target_feature("sse2") {
+		// SIMD's benefits are noticeable only past a certain threshold of data.
+		// For small data, use the plain old algorithm.
+		if len(s) >= simd_util.RECOMMENDED_SCAN_SIZE {
+			return simd_util.index_byte(transmute([]u8)s, c)
+		} else {
+			return _index_byte(s, c)
+		}
+	} else {
+		return _index_byte(s, c)
+	}
 }
 /*
 Returns the byte offset of the last byte `c` in the string `s`, -1 when not found.
@@ -1464,12 +1483,24 @@ Output:
 
 */
 last_index_byte :: proc(s: string, c: byte) -> (res: int) {
-	for i := len(s)-1; i >= 0; i -= 1 {
-		if s[i] == c {
-			return i
+	_last_index_byte :: #force_inline proc(s: string, c: byte) -> int {
+		for i := len(s)-1; i >= 0; i -= 1 {
+			if s[i] == c {
+				return i
+			}
 		}
+		return -1
 	}
-	return -1
+
+	when ODIN_OPTIMIZATION_MODE > .Minimal && intrinsics.has_target_feature("sse2") {
+		if len(s) >= simd_util.RECOMMENDED_SCAN_SIZE {
+			return simd_util.last_index_byte(transmute([]u8)s, c)
+		} else {
+			return _last_index_byte(s, c)
+		}
+	} else {
+		return _last_index_byte(s, c)
+	}
 }
 /*
 Returns the byte offset of the first rune `r` in the string `s` it finds, -1 when not found.
