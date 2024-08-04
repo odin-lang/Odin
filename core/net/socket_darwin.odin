@@ -85,7 +85,7 @@ _dial_tcp_from_endpoint :: proc(endpoint: Endpoint, options := default_tcp_optio
 	sockaddr := _endpoint_to_sockaddr(endpoint)
 	res := os.connect(os.Socket(skt), (^os.SOCKADDR)(&sockaddr), i32(sockaddr.len))
 	if res != nil {
-		err = Dial_Error(res)
+		err = Dial_Error(os.is_platform_error(res) or_else -1)
 		return
 	}
 
@@ -104,7 +104,7 @@ _bind :: proc(skt: Any_Socket, ep: Endpoint) -> (err: Network_Error) {
 		if res == os.EACCES && ep.port <= MAX_PRIVILEGED_PORT {
 			err = .Privileged_Port_Without_Root
 		} else {
-			err = Bind_Error(res)
+			err = Bind_Error(os.is_platform_error(res) or_else -1)
 		}
 	}
 	return
@@ -129,7 +129,7 @@ _listen_tcp :: proc(interface_endpoint: Endpoint, backlog := 1000) -> (skt: TCP_
 
 	res := os.listen(os.Socket(skt), backlog)
 	if res != nil {
-		err = Listen_Error(res)
+		err = Listen_Error(os.is_platform_error(res) or_else -1)
 		return
 	}
 
@@ -162,9 +162,9 @@ _recv_tcp :: proc(skt: TCP_Socket, buf: []byte) -> (bytes_read: int, err: Networ
 	if len(buf) <= 0 {
 		return
 	}
-	res, ok := os.recv(os.Socket(skt), buf, 0)
-	if ok != os.ERROR_NONE {
-		err = TCP_Recv_Error(ok)
+	res, res_err := os.recv(os.Socket(skt), buf, 0)
+	if res_err != nil {
+		err = TCP_Recv_Error(os.is_platform_error(res_err) or_else -1)
 		return
 	}
 	return int(res), nil
@@ -178,9 +178,9 @@ _recv_udp :: proc(skt: UDP_Socket, buf: []byte) -> (bytes_read: int, remote_endp
 
 	from: os.SOCKADDR_STORAGE_LH
 	fromsize := c.int(size_of(from))
-	res, ok := os.recvfrom(os.Socket(skt), buf, 0, cast(^os.SOCKADDR) &from, &fromsize)
-	if ok != os.ERROR_NONE {
-		err = UDP_Recv_Error(ok)
+	res, res_err := os.recvfrom(os.Socket(skt), buf, 0, cast(^os.SOCKADDR) &from, &fromsize)
+	if res_err != nil {
+		err = UDP_Recv_Error(os.is_platform_error(res_err) or_else -1)
 		return
 	}
 
@@ -194,9 +194,9 @@ _send_tcp :: proc(skt: TCP_Socket, buf: []byte) -> (bytes_written: int, err: Net
 	for bytes_written < len(buf) {
 		limit := min(int(max(i32)), len(buf) - bytes_written)
 		remaining := buf[bytes_written:][:limit]
-		res, ok := os.send(os.Socket(skt), remaining, 0)
-		if ok != os.ERROR_NONE {
-			err = TCP_Send_Error(ok)
+		res, res_err := os.send(os.Socket(skt), remaining, 0)
+		if res_err != nil {
+			err = TCP_Send_Error(os.is_platform_error(res_err) or_else -1)
 			return
 		}
 		bytes_written += int(res)
@@ -210,9 +210,9 @@ _send_udp :: proc(skt: UDP_Socket, buf: []byte, to: Endpoint) -> (bytes_written:
 	for bytes_written < len(buf) {
 		limit := min(1<<31, len(buf) - bytes_written)
 		remaining := buf[bytes_written:][:limit]
-		res, ok := os.sendto(os.Socket(skt), remaining, 0, cast(^os.SOCKADDR)&toaddr, i32(toaddr.len))
-		if ok != os.ERROR_NONE {
-			err = UDP_Send_Error(ok)
+		res, res_err := os.sendto(os.Socket(skt), remaining, 0, cast(^os.SOCKADDR)&toaddr, i32(toaddr.len))
+		if res_err != nil {
+			err = UDP_Send_Error(os.is_platform_error(res_err) or_else -1)
 			return
 		}
 		bytes_written += int(res)
@@ -224,8 +224,8 @@ _send_udp :: proc(skt: UDP_Socket, buf: []byte, to: Endpoint) -> (bytes_written:
 _shutdown :: proc(skt: Any_Socket, manner: Shutdown_Manner) -> (err: Network_Error) {
 	s := any_socket_to_socket(skt)
 	res := os.shutdown(os.Socket(s), int(manner))
-	if res != os.ERROR_NONE {
-		return Shutdown_Error(res)
+	if res != nil {
+		return Shutdown_Error(os.is_platform_error(res) or_else -1)
 	}
 	return
 }
@@ -302,8 +302,8 @@ _set_option :: proc(s: Any_Socket, option: Socket_Option, value: any, loc := #ca
 
 	skt := any_socket_to_socket(s)
 	res := os.setsockopt(os.Socket(skt), int(level), int(option), ptr, len)
-	if res != os.ERROR_NONE {
-		return Socket_Option_Error(res)
+	if res != nil {
+		return Socket_Option_Error(os.is_platform_error(res) or_else -1)
 	}
 
 	return nil
@@ -314,8 +314,8 @@ _set_blocking :: proc(socket: Any_Socket, should_block: bool) -> (err: Network_E
 	socket := any_socket_to_socket(socket)
 
 	flags, getfl_err := os.fcntl(int(socket), os.F_GETFL, 0)
-	if getfl_err != os.ERROR_NONE {
-		return Set_Blocking_Error(getfl_err)
+	if getfl_err != nil {
+		return Set_Blocking_Error(os.is_platform_error(getfl_err) or_else -1)
 	}
 
 	if should_block {
@@ -325,8 +325,8 @@ _set_blocking :: proc(socket: Any_Socket, should_block: bool) -> (err: Network_E
 	}
 
 	_, setfl_err := os.fcntl(int(socket), os.F_SETFL, flags)
-	if setfl_err != os.ERROR_NONE {
-		return Set_Blocking_Error(setfl_err)
+	if setfl_err != nil {
+		return Set_Blocking_Error(os.is_platform_error(setfl_err) or_else -1)
 	}
 
 	return nil
