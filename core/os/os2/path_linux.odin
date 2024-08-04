@@ -59,7 +59,7 @@ _mkdir_all :: proc(path: string, perm: int) -> Error {
 	path_bytes[len(path)] = 0
 
 	dfd: linux.Fd
-	errno: linux.Error
+	errno: linux.Errno
 	if path_bytes[0] == '/' {
 		dfd, errno = linux.open("/", _OPENDIR_FLAGS)
 		path_bytes = path_bytes[1:]

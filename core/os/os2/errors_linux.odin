@@ -4,7 +4,7 @@ package os2
 import "core:sys/linux"
 
 @(rodata)
-_errno_strings := [linux.Error]string{
+_errno_strings := [linux.Errno]string{
 	.NONE            = "",
 	.EPERM           = "Operation not permitted",
 	.ENOENT          = "No such file or directory",
@@ -142,7 +142,7 @@ _errno_strings := [linux.Error]string{
 }
 
 
-_get_platform_error :: proc(errno: linux.Error) -> Error {
+_get_platform_error :: proc(errno: linux.Errno) -> Error {
 	#partial switch errno {
 	case .NONE:
 		return nil
@@ -158,8 +158,8 @@ _get_platform_error :: proc(errno: linux.Error) -> Error {
 }
 
 _error_string :: proc(errno: i32) -> string {
-	if errno >= 0 && errno <= i32(max(linux.Error)) {
-		return _errno_strings[linux.Error(errno)]
+	if errno >= 0 && errno <= i32(max(linux.Errno)) {
+		return _errno_strings[linux.Errno(errno)]
 	}
 	return "Unknown Error"
 }
