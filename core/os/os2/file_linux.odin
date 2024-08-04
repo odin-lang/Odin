@@ -1,9 +1,10 @@
 //+private
 package os2
 
+import "base:runtime"
 import "core:io"
 import "core:time"
-import "base:runtime"
+import "core:sync"
 import "core:sys/linux"
 
 File_Impl :: struct {
@@ -11,13 +12,17 @@ File_Impl :: struct {
 	name: string,
 	fd: linux.Fd,
 	allocator: runtime.Allocator,
+
+	buffer:   []byte,
+	rw_mutex: sync.RW_Mutex, // read write calls
+	p_mutex:  sync.Mutex, // pread pwrite calls
 }
 
 _stdin := File{
 	impl = &File_Impl{
 		name = "/proc/self/fd/0",
 		fd = 0,
-		allocator = _file_allocator(),
+		allocator = file_allocator(),
 	},
 	stream = {
 		procedure = _file_stream_proc,
@@ -28,7 +33,7 @@ _stdout := File{
 	impl = &File_Impl{
 		name = "/proc/self/fd/1",
 		fd = 1,
-		allocator = _file_allocator(),
+		allocator = file_allocator(),
 	},
 	stream = {
 		procedure = _file_stream_proc,
@@ -39,7 +44,7 @@ _stderr := File{
 	impl = &File_Impl{
 		name = "/proc/self/fd/2",
 		fd = 2,
-		allocator = _file_allocator(),
+		allocator = file_allocator(),
 	},
 	stream = {
 		procedure = _file_stream_proc,
@@ -57,10 +62,6 @@ _standard_stream_init :: proc() {
 	stdin  = &_stdin
 	stdout = &_stdout
 	stderr = &_stderr
-}
-
-_file_allocator :: proc() -> runtime.Allocator {
-	return heap_allocator()
 }
 
 _open :: proc(name: string, flags: File_Flags, perm: int) -> (f: ^File, err: Error) {
@@ -108,13 +109,30 @@ _new_file :: proc(fd: uintptr, _: string = "") -> (f: ^File, err: Error) {
 	return &impl.file, nil
 }
 
+
+@(require_results)
+_open_buffered :: proc(name: string, buffer_size: uint, flags := File_Flags{.Read}, perm := 0o777) -> (f: ^File, err: Error) {
+	assert(buffer_size > 0)
+	f, err = _open(name, flags, perm)
+	if f != nil && err == nil {
+		impl := (^File_Impl)(f.impl)
+		impl.buffer = make([]byte, buffer_size, file_allocator())
+		f.stream.procedure = _file_stream_buffered_proc
+	}
+	return
+}
+
 _destroy :: proc(f: ^File_Impl) -> Error {
 	if f == nil {
 		return nil
 	}
 	a := f.allocator
-	delete(f.name, a)
-	free(f, a)
+	err0 := delete(f.name, a)
+	err1 := delete(f.buffer, a)
+	err2 := free(f, a)
+	err0 or_return
+	err1 or_return
+	err2 or_return
 	return nil
 }
 
@@ -422,6 +440,50 @@ _read_entire_pseudo_file_cstring :: proc(name: cstring, allocator: runtime.Alloc
 
 @(private="package")
 _file_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, offset: i64, whence: io.Seek_From) -> (n: i64, err: io.Error) {
+	f := (^File_Impl)(stream_data)
+	ferr: Error
+	switch mode {
+	case .Read:
+		n, ferr = _read(f, p)
+		err = error_to_io_error(ferr)
+		return
+	case .Read_At:
+		n, ferr = _read_at(f, p, offset)
+		err = error_to_io_error(ferr)
+		return
+	case .Write:
+		n, ferr = _write(f, p)
+		err = error_to_io_error(ferr)
+		return
+	case .Write_At:
+		n, ferr = _write_at(f, p, offset)
+		err = error_to_io_error(ferr)
+		return
+	case .Seek:
+		n, ferr = _seek(f, offset, whence)
+		err = error_to_io_error(ferr)
+		return
+	case .Size:
+		n, ferr = _file_size(f)
+		err = error_to_io_error(ferr)
+		return
+	case .Flush:
+		ferr = _flush(f)
+		err = error_to_io_error(ferr)
+		return
+	case .Close, .Destroy:
+		ferr = _close(f)
+		err = error_to_io_error(ferr)
+		return
+	case .Query:
+		return io.query_utility({.Read, .Read_At, .Write, .Write_At, .Seek, .Size, .Flush, .Close, .Destroy, .Query})
+	}
+	return 0, .Empty
+}
+
+
+@(private="package")
+_file_stream_buffered_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, offset: i64, whence: io.Seek_From) -> (n: i64, err: io.Error) {
 	f := (^File_Impl)(stream_data)
 	ferr: Error
 	switch mode {

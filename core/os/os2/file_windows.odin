@@ -33,6 +33,7 @@ File_Impl :: struct {
 
 	allocator: runtime.Allocator,
 
+	buffer: []byte,
 	rw_mutex: sync.RW_Mutex, // read write calls
 	p_mutex:  sync.Mutex, // pread pwrite calls
 }
@@ -165,6 +166,26 @@ _new_file :: proc(handle: uintptr, name: string) -> (f: ^File, err: Error) {
 	return &impl.file, nil
 }
 
+
+@(require_results)
+_open_buffered :: proc(name: string, buffer_size: uint, flags := File_Flags{.Read}, perm := 0o777) -> (f: ^File, err: Error) {
+	assert(buffer_size > 0)
+	flags := flags if flags != nil else {.Read}
+	handle := _open_internal(name, flags, perm) or_return
+	return _new_file_buffered(handle, name, buffer_size)
+}
+
+_new_file_buffered :: proc(handle: uintptr, name: string, buffer_size: uint) -> (f: ^File, err: Error) {
+	f, err = _new_file(handle, name)
+	if f != nil && err == nil {
+		impl := (^File_Impl)(f.impl)
+		impl.buffer = make([]byte, buffer_size, file_allocator())
+		f.stream.procedure = _file_stream_buffered_proc
+	}
+	return
+}
+
+
 _fd :: proc(f: ^File) -> uintptr {
 	if f == nil || f.impl == nil {
 		return INVALID_HANDLE
@@ -181,9 +202,11 @@ _destroy :: proc(f: ^File_Impl) -> Error {
 	err0 := free(f.wname, a)
 	err1 := delete(f.name, a)
 	err2 := free(f, a)
+	err3 := delete(f.buffer, a)
 	err0 or_return
 	err1 or_return
 	err2 or_return
+	err3 or_return
 	return nil
 }
 
@@ -778,6 +801,52 @@ _file_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, 
 	}
 	return 0, .Empty
 }
+
+
+@(private="package")
+_file_stream_buffered_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, offset: i64, whence: io.Seek_From) -> (n: i64, err: io.Error) {
+	f := (^File_Impl)(stream_data)
+	ferr: Error
+	switch mode {
+	case .Read:
+		n, ferr = _read(f, p)
+		err = error_to_io_error(ferr)
+		return
+	case .Read_At:
+		n, ferr = _read_at(f, p, offset)
+		err = error_to_io_error(ferr)
+		return
+	case .Write:
+		n, ferr = _write(f, p)
+		err = error_to_io_error(ferr)
+		return
+	case .Write_At:
+		n, ferr = _write_at(f, p, offset)
+		err = error_to_io_error(ferr)
+		return
+	case .Seek:
+		n, ferr = _seek(f, offset, whence)
+		err = error_to_io_error(ferr)
+		return
+	case .Size:
+		n, ferr = _file_size(f)
+		err = error_to_io_error(ferr)
+		return
+	case .Flush:
+		ferr = _flush(f)
+		err = error_to_io_error(ferr)
+		return
+	case .Close, .Destroy:
+		ferr = _close(f)
+		err = error_to_io_error(ferr)
+		return
+	case .Query:
+		return io.query_utility({.Read, .Read_At, .Write, .Write_At, .Seek, .Size, .Flush, .Close, .Query})
+	}
+	return 0, .Empty
+}
+
+
 
 
 
