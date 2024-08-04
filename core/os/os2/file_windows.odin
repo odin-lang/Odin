@@ -609,7 +609,7 @@ _normalize_link_path :: proc(p: []u16, allocator: runtime.Allocator) -> (str: st
 		return "", _get_platform_error()
 	}
 
-	TEMP_ALLOCATOR_GUARD(ignore=is_temp(allocator))
+	TEMP_ALLOCATOR_GUARD()
 
 	buf := make([]u16, n+1, temp_allocator())
 	n = win32.GetFinalPathNameByHandleW(handle, raw_data(buf), u32(len(buf)), win32.VOLUME_NAME_DOS)
@@ -635,7 +635,7 @@ _read_link :: proc(name: string, allocator: runtime.Allocator) -> (s: string, er
 	@thread_local
 	rdb_buf: [MAXIMUM_REPARSE_DATA_BUFFER_SIZE]byte
 
-	TEMP_ALLOCATOR_GUARD(ignore=is_temp(allocator))
+	TEMP_ALLOCATOR_GUARD()
 
 	p      := _fix_long_path(name, temp_allocator()) or_return
 	handle := _open_sym_link(p) or_return
