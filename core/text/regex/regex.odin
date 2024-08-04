@@ -30,8 +30,8 @@ Capture :: struct {
 }
 
 Regular_Expression :: struct {
-	flags: Flags,
-	class_data: []virtual_machine.Rune_Class_Data,
+	flags: Flags `fmt:"-"`,
+	class_data: []virtual_machine.Rune_Class_Data `fmt:"-"`,
 	program: []virtual_machine.Opcode `fmt:"-"`,
 }
 
