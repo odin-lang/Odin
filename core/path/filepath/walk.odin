@@ -14,7 +14,7 @@ import "core:slice"
 // The sole exception is if 'skip_dir' is returned as true:
 // 	when 'skip_dir' is invoked on a directory. 'walk' skips directory contents
 // 	when 'skip_dir' is invoked on a non-directory. 'walk' skips the remaining files in the containing directory
-Walk_Proc :: #type proc(info: os.File_Info, in_err: os.Errno, user_data: rawptr) -> (err: os.Errno, skip_dir: bool)
+Walk_Proc :: #type proc(info: os.File_Info, in_err: os.Error, user_data: rawptr) -> (err: os.Error, skip_dir: bool)
 
 // walk walks the file tree rooted at 'root', calling 'walk_proc' for each file or directory in the tree, including 'root'
 // All errors that happen visiting files and directories are filtered by walk_proc
@@ -22,7 +22,7 @@ Walk_Proc :: #type proc(info: os.File_Info, in_err: os.Errno, user_data: rawptr)
 // NOTE: Walking large directories can be inefficient due to the lexical sort
 // NOTE: walk does not follow symbolic links
 // NOTE: os.File_Info uses the 'context.temp_allocator' to allocate, and will delete when it is done
-walk :: proc(root: string, walk_proc: Walk_Proc, user_data: rawptr) -> os.Errno {
+walk :: proc(root: string, walk_proc: Walk_Proc, user_data: rawptr) -> os.Error {
 	info, err := os.lstat(root, context.temp_allocator)
 	defer os.file_info_delete(info, context.temp_allocator)
 
@@ -37,7 +37,7 @@ walk :: proc(root: string, walk_proc: Walk_Proc, user_data: rawptr) -> os.Errno 
 
 
 @(private)
-_walk :: proc(info: os.File_Info, walk_proc: Walk_Proc, user_data: rawptr) -> (err: os.Errno, skip_dir: bool) {
+_walk :: proc(info: os.File_Info, walk_proc: Walk_Proc, user_data: rawptr) -> (err: os.Error, skip_dir: bool) {
 	if !info.is_dir {
 		if info.fullpath == "" && info.name == "" {
 			// ignore empty things
@@ -47,7 +47,7 @@ _walk :: proc(info: os.File_Info, walk_proc: Walk_Proc, user_data: rawptr) -> (e
 	}
 
 	fis: []os.File_Info
-	err1: os.Errno
+	err1: os.Error
 	fis, err = read_dir(info.fullpath, context.temp_allocator)
 	defer os.file_info_slice_delete(fis, context.temp_allocator)
 
@@ -70,7 +70,7 @@ _walk :: proc(info: os.File_Info, walk_proc: Walk_Proc, user_data: rawptr) -> (e
 }
 
 @(private)
-read_dir :: proc(dir_name: string, allocator := context.temp_allocator) -> ([]os.File_Info, os.Errno) {
+read_dir :: proc(dir_name: string, allocator := context.temp_allocator) -> ([]os.File_Info, os.Error) {
 	f, err := os.open(dir_name, os.O_RDONLY)
 	if err != 0 {
 		return nil, err

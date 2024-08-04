@@ -52,7 +52,7 @@ is_abs :: proc(path: string) -> bool {
 
 
 @(private)
-temp_full_path :: proc(name: string) -> (path: string, err: os.Errno) {
+temp_full_path :: proc(name: string) -> (path: string, err: os.Error) {
 	ta := context.temp_allocator
 
 	name := name

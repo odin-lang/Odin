@@ -30,7 +30,7 @@ get_last_error :: proc "contextless" () -> os.Platform_Error {
 MAX_RW :: 0x7fffffff
 
 @(no_instrumentation)
-_write :: proc "contextless" (fd: os.Handle, data: []byte) -> (n: int, err: os.Errno) #no_bounds_check /* bounds check would segfault instrumentation */ {
+_write :: proc "contextless" (fd: os.Handle, data: []byte) -> (n: int, err: os.Error) #no_bounds_check /* bounds check would segfault instrumentation */ {
 	if len(data) == 0 {
 		return 0, os.ERROR_NONE
 	}
@@ -39,7 +39,7 @@ _write :: proc "contextless" (fd: os.Handle, data: []byte) -> (n: int, err: os.E
 		chunk := data[:min(len(data), MAX_RW)]
 		written := _unix_write(fd, raw_data(chunk), len(chunk))
 		if written < 0 {
-			return n, os.Errno(get_last_error())
+			return n, os.Error(get_last_error())
 		}
 		n += written
 	}

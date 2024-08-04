@@ -4463,6 +4463,7 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 		// as a kind of transition period
 		if (operand->mode == Addressing_Constant &&
 		    target_type->kind == Type_Named &&
+		    (c->pkg == nullptr || c->pkg->name != "os") &&
 		    target_type->Named.name == "Error") {
 			Entity *e = target_type->Named.type_name;
 			if (e->pkg && e->pkg->name == "os") {

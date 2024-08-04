@@ -10,7 +10,7 @@ import win32 "core:sys/windows"
 MAX_RW :: 1<<30
 
 @(no_instrumentation)
-_write :: proc "contextless" (fd: os.Handle, data: []byte) -> (int, os.Errno) #no_bounds_check /* bounds check would segfault instrumentation */ {
+_write :: proc "contextless" (fd: os.Handle, data: []byte) -> (int, os.Error) #no_bounds_check /* bounds check would segfault instrumentation */ {
 	if len(data) == 0 {
 		return 0, os.ERROR_NONE
 	}

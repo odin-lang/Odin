@@ -227,7 +227,7 @@ _buffer_end :: proc "contextless" (ctx: ^Context, buffer: ^Buffer) #no_bounds_ch
 }
 
 @(no_instrumentation)
-write :: proc "contextless" (fd: os.Handle, buf: []byte) -> (n: int, err: os.Errno) {
+write :: proc "contextless" (fd: os.Handle, buf: []byte) -> (n: int, err: os.Error) {
 	return _write(fd, buf)
 }
 

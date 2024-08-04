@@ -10,7 +10,7 @@ import "core:sys/linux"
 MAX_RW :: 0x7fffffff
 
 @(no_instrumentation)
-_write :: proc "contextless" (fd: os.Handle, data: []byte) -> (n: int, err: os.Errno) #no_bounds_check /* bounds check would segfault instrumentation */ {
+_write :: proc "contextless" (fd: os.Handle, data: []byte) -> (n: int, err: os.Error) #no_bounds_check /* bounds check would segfault instrumentation */ {
 	if len(data) == 0 {
 		return 0, os.ERROR_NONE
 	}
@@ -19,7 +19,7 @@ _write :: proc "contextless" (fd: os.Handle, data: []byte) -> (n: int, err: os.E
 		chunk := data[:min(len(data), MAX_RW)]
 		written, errno := linux.write(linux.Fd(fd), chunk)
 		if errno != .NONE {
-			return n, os.Errno(errno)
+			return n, os.Error(errno)
 		}
 		n += written
 	}
