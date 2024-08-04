@@ -114,7 +114,7 @@ get_last_error :: proc "contextless" () -> Error {
 }
 
 
-last_write_time :: proc(fd: Handle) -> (File_Time, Errno) {
+last_write_time :: proc(fd: Handle) -> (File_Time, Error) {
 	file_info: win32.BY_HANDLE_FILE_INFORMATION
 	if !win32.GetFileInformationByHandle(win32.HANDLE(fd), &file_info) {
 		return 0, get_last_error()
@@ -124,7 +124,7 @@ last_write_time :: proc(fd: Handle) -> (File_Time, Errno) {
 	return lo | hi << 32, nil
 }
 
-last_write_time_by_name :: proc(name: string) -> (File_Time, Errno) {
+last_write_time_by_name :: proc(name: string) -> (File_Time, Error) {
 	data: win32.WIN32_FILE_ATTRIBUTE_DATA
 
 	wide_path := win32.utf8_to_wstring(name)

@@ -14,7 +14,7 @@ stream_from_handle :: proc(fd: Handle) -> io.Stream {
 _file_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, offset: i64, whence: io.Seek_From) -> (n: i64, err: io.Error) {
 	fd := Handle(uintptr(stream_data))
 	n_int: int
-	os_err: Errno
+	os_err: Error
 	switch mode {
 	case .Close:
 		close(fd)

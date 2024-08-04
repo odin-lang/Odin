@@ -7,38 +7,38 @@ is_path_separator :: proc(c: byte) -> bool {
 	return c == '/' || c == '\\'
 }
 
-open :: proc(path: string, mode: int = O_RDONLY, perm: int = 0) -> (Handle, Errno) {
+open :: proc(path: string, mode: int = O_RDONLY, perm: int = 0) -> (Handle, Error) {
 	unimplemented("core:os procedure not supported on JS target")
 }
 
-close :: proc(fd: Handle) -> Errno {
+close :: proc(fd: Handle) -> Error {
 	unimplemented("core:os procedure not supported on JS target")
 }
 
-flush :: proc(fd: Handle) -> (err: Errno) {
+flush :: proc(fd: Handle) -> (err: Error) {
 	unimplemented("core:os procedure not supported on JS target")
 }
 
 
 
-write :: proc(fd: Handle, data: []byte) -> (int, Errno) {
+write :: proc(fd: Handle, data: []byte) -> (int, Error) {
 	unimplemented("core:os procedure not supported on JS target")
 }
 
 @(private="file")
-read_console :: proc(handle: Handle, b: []byte) -> (n: int, err: Errno) {
+read_console :: proc(handle: Handle, b: []byte) -> (n: int, err: Error) {
 	unimplemented("core:os procedure not supported on JS target")
 }
 
-read :: proc(fd: Handle, data: []byte) -> (int, Errno) {
+read :: proc(fd: Handle, data: []byte) -> (int, Error) {
 	unimplemented("core:os procedure not supported on JS target")
 }
 
-seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
+seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Error) {
 	unimplemented("core:os procedure not supported on JS target")
 }
 
-file_size :: proc(fd: Handle) -> (i64, Errno) {
+file_size :: proc(fd: Handle) -> (i64, Error) {
 	unimplemented("core:os procedure not supported on JS target")
 }
 
@@ -47,18 +47,18 @@ file_size :: proc(fd: Handle) -> (i64, Errno) {
 MAX_RW :: 1<<30
 
 @(private)
-pread :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Errno) {
+pread :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Error) {
 	unimplemented("core:os procedure not supported on JS target")
 }
 @(private)
-pwrite :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Errno) {
+pwrite :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Error) {
 	unimplemented("core:os procedure not supported on JS target")
 }
 
-read_at :: proc(fd: Handle, data: []byte, offset: i64) -> (n: int, err: Errno) {
+read_at :: proc(fd: Handle, data: []byte, offset: i64) -> (n: int, err: Error) {
 	unimplemented("core:os procedure not supported on JS target")
 }
-write_at :: proc(fd: Handle, data: []byte, offset: i64) -> (n: int, err: Errno) {
+write_at :: proc(fd: Handle, data: []byte, offset: i64) -> (n: int, err: Error) {
 	unimplemented("core:os procedure not supported on JS target")
 }
 
@@ -90,22 +90,22 @@ get_current_directory :: proc(allocator := context.allocator) -> string {
 	unimplemented("core:os procedure not supported on JS target")
 }
 
-set_current_directory :: proc(path: string) -> (err: Errno) {
+set_current_directory :: proc(path: string) -> (err: Error) {
 	unimplemented("core:os procedure not supported on JS target")
 }
 
 
 
-change_directory :: proc(path: string) -> (err: Errno) {
+change_directory :: proc(path: string) -> (err: Error) {
 	unimplemented("core:os procedure not supported on JS target")
 }
 
-make_directory :: proc(path: string, mode: u32 = 0) -> (err: Errno) {
+make_directory :: proc(path: string, mode: u32 = 0) -> (err: Error) {
 	unimplemented("core:os procedure not supported on JS target")
 }
 
 
-remove_directory :: proc(path: string) -> (err: Errno) {
+remove_directory :: proc(path: string) -> (err: Error) {
 	unimplemented("core:os procedure not supported on JS target")
 }
 
@@ -122,40 +122,40 @@ fix_long_path :: proc(path: string) -> string {
 }
 
 
-link :: proc(old_name, new_name: string) -> (err: Errno) {
+link :: proc(old_name, new_name: string) -> (err: Error) {
 	unimplemented("core:os procedure not supported on JS target")
 }
 
-unlink :: proc(path: string) -> (err: Errno) {
-	unimplemented("core:os procedure not supported on JS target")
-}
-
-
-
-rename :: proc(old_path, new_path: string) -> (err: Errno) {
+unlink :: proc(path: string) -> (err: Error) {
 	unimplemented("core:os procedure not supported on JS target")
 }
 
 
-ftruncate :: proc(fd: Handle, length: i64) -> (err: Errno) {
-	unimplemented("core:os procedure not supported on JS target")
-}
 
-truncate :: proc(path: string, length: i64) -> (err: Errno) {
-	unimplemented("core:os procedure not supported on JS target")
-}
-
-
-remove :: proc(name: string) -> Errno {
+rename :: proc(old_path, new_path: string) -> (err: Error) {
 	unimplemented("core:os procedure not supported on JS target")
 }
 
 
-pipe :: proc() -> (r, w: Handle, err: Errno) {
+ftruncate :: proc(fd: Handle, length: i64) -> (err: Error) {
 	unimplemented("core:os procedure not supported on JS target")
 }
 
-read_dir :: proc(fd: Handle, n: int, allocator := context.allocator) -> (fi: []File_Info, err: Errno) {
+truncate :: proc(path: string, length: i64) -> (err: Error) {
+	unimplemented("core:os procedure not supported on JS target")
+}
+
+
+remove :: proc(name: string) -> Error {
+	unimplemented("core:os procedure not supported on JS target")
+}
+
+
+pipe :: proc() -> (r, w: Handle, err: Error) {
+	unimplemented("core:os procedure not supported on JS target")
+}
+
+read_dir :: proc(fd: Handle, n: int, allocator := context.allocator) -> (fi: []File_Info, err: Error) {
 	unimplemented("core:os procedure not supported on JS target")
 }
 
@@ -253,11 +253,11 @@ args := _alloc_command_line_arguments()
 
 
 
-last_write_time :: proc(fd: Handle) -> (File_Time, Errno) {
+last_write_time :: proc(fd: Handle) -> (File_Time, Error) {
 	unimplemented("core:os procedure not supported on JS target")
 }
 
-last_write_time_by_name :: proc(name: string) -> (File_Time, Errno) {
+last_write_time_by_name :: proc(name: string) -> (File_Time, Error) {
 	unimplemented("core:os procedure not supported on JS target")
 }
 

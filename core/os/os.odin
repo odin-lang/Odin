@@ -64,15 +64,15 @@ is_platform_error :: proc(ferr: Error) -> (err: i32, ok: bool) {
 	return i32(v), i32(v) != 0
 }
 
-write_string :: proc(fd: Handle, str: string) -> (int, Errno) {
+write_string :: proc(fd: Handle, str: string) -> (int, Error) {
 	return write(fd, transmute([]byte)str)
 }
 
-write_byte :: proc(fd: Handle, b: byte) -> (int, Errno) {
+write_byte :: proc(fd: Handle, b: byte) -> (int, Error) {
 	return write(fd, []byte{b})
 }
 
-write_rune :: proc(fd: Handle, r: rune) -> (int, Errno) {
+write_rune :: proc(fd: Handle, r: rune) -> (int, Error) {
 	if r < utf8.RUNE_SELF {
 		return write_byte(fd, byte(r))
 	}
@@ -120,7 +120,7 @@ write_encoded_rune :: proc(f: Handle, r: rune) -> (n: int, err: Error) {
 	return
 }
 
-read_at_least :: proc(fd: Handle, buf: []byte, min: int) -> (n: int, err: Errno) {
+read_at_least :: proc(fd: Handle, buf: []byte, min: int) -> (n: int, err: Error) {
 	if len(buf) < min {
 		return 0, io.Error.Short_Buffer
 	}
@@ -135,7 +135,7 @@ read_at_least :: proc(fd: Handle, buf: []byte, min: int) -> (n: int, err: Errno)
 	return
 }
 
-read_full :: proc(fd: Handle, buf: []byte) -> (n: int, err: Errno) {
+read_full :: proc(fd: Handle, buf: []byte) -> (n: int, err: Error) {
 	return read_at_least(fd, buf, len(buf))
 }
 
@@ -170,7 +170,7 @@ read_entire_file_from_handle :: proc(fd: Handle, allocator := context.allocator,
 	context.allocator = allocator
 
 	length: i64
-	err: Errno
+	err: Error
 	if length, err = file_size(fd); err != nil {
 		return nil, false
 	}
@@ -219,11 +219,11 @@ write_entire_file :: proc(name: string, data: []byte, truncate := true) -> (succ
 	return write_err == nil
 }
 
-write_ptr :: proc(fd: Handle, data: rawptr, len: int) -> (int, Errno) {
+write_ptr :: proc(fd: Handle, data: rawptr, len: int) -> (int, Error) {
 	return write(fd, ([^]byte)(data)[:len])
 }
 
-read_ptr :: proc(fd: Handle, data: rawptr, len: int) -> (int, Errno) {
+read_ptr :: proc(fd: Handle, data: rawptr, len: int) -> (int, Error) {
 	return read(fd, ([^]byte)(data)[:len])
 }
 

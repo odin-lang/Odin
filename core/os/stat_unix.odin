@@ -100,7 +100,7 @@ path_base :: proc(path: string) -> string {
 }
 
 
-lstat :: proc(name: string, allocator := context.allocator) -> (fi: File_Info, err: Errno) {
+lstat :: proc(name: string, allocator := context.allocator) -> (fi: File_Info, err: Error) {
 	context.allocator = allocator
 
 	s := _lstat(name) or_return
@@ -110,7 +110,7 @@ lstat :: proc(name: string, allocator := context.allocator) -> (fi: File_Info, e
 	return
 }
 
-stat :: proc(name: string, allocator := context.allocator) -> (fi: File_Info, err: Errno) {
+stat :: proc(name: string, allocator := context.allocator) -> (fi: File_Info, err: Error) {
 	context.allocator = allocator
 
 	s := _stat(name) or_return
@@ -120,7 +120,7 @@ stat :: proc(name: string, allocator := context.allocator) -> (fi: File_Info, er
 	return
 }
 
-fstat :: proc(fd: Handle, allocator := context.allocator) -> (fi: File_Info, err: Errno) {
+fstat :: proc(fd: Handle, allocator := context.allocator) -> (fi: File_Info, err: Error) {
 	context.allocator = allocator
 
 	s := _fstat(fd) or_return

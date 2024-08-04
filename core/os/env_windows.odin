@@ -41,7 +41,7 @@ get_env :: proc(key: string, allocator := context.allocator) -> (value: string) 
 }
 
 // set_env sets the value of the environment variable named by the key
-set_env :: proc(key, value: string) -> Errno {
+set_env :: proc(key, value: string) -> Error {
 	k := win32.utf8_to_wstring(key)
 	v := win32.utf8_to_wstring(value)
 
@@ -52,7 +52,7 @@ set_env :: proc(key, value: string) -> Errno {
 }
 
 // unset_env unsets a single environment variable
-unset_env :: proc(key: string) -> Errno {
+unset_env :: proc(key: string) -> Error {
 	k := win32.utf8_to_wstring(key)
 	if !win32.SetEnvironmentVariableW(k, nil) {
 		return get_last_error()

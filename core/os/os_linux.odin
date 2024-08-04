@@ -512,7 +512,7 @@ is_path_separator :: proc(r: rune) -> bool {
 
 // determine errno from syscall return value
 @private
-_get_errno :: proc(res: int) -> Errno {
+_get_errno :: proc(res: int) -> Error {
 	if res < 0 && res > -4096 {
 		return Platform_Error(-res)
 	}
@@ -535,7 +535,7 @@ get_last_error :: proc "contextless" () -> Error {
 	return err
 }
 
-personality :: proc(persona: u64) -> (Errno) {
+personality :: proc(persona: u64) -> (Error) {
 	res := unix.sys_personality(persona)
 	if res == -1 {
 		return _get_errno(res)
@@ -543,7 +543,7 @@ personality :: proc(persona: u64) -> (Errno) {
 	return nil
 }
 
-fork :: proc() -> (Pid, Errno) {
+fork :: proc() -> (Pid, Error) {
 	pid := unix.sys_fork()
 	if pid == -1 {
 		return -1, _get_errno(pid)
@@ -551,7 +551,7 @@ fork :: proc() -> (Pid, Errno) {
 	return Pid(pid), nil
 }
 
-execvp :: proc(path: string, args: []string) -> Errno {
+execvp :: proc(path: string, args: []string) -> Error {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	path_cstr := strings.clone_to_cstring(path, context.temp_allocator)
 
@@ -562,11 +562,11 @@ execvp :: proc(path: string, args: []string) -> Errno {
 	}
 
 	_unix_execvp(path_cstr, raw_data(args_cstrs))
-	return Errno(get_last_error())
+	return Error(get_last_error())
 }
 
 
-open :: proc(path: string, flags: int = O_RDONLY, mode: int = 0o000) -> (Handle, Errno) {
+open :: proc(path: string, flags: int = O_RDONLY, mode: int = 0o000) -> (Handle, Error) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	cstr := strings.clone_to_cstring(path, context.temp_allocator)
 	handle := unix.sys_open(cstr, flags, uint(mode))
@@ -576,7 +576,7 @@ open :: proc(path: string, flags: int = O_RDONLY, mode: int = 0o000) -> (Handle,
 	return Handle(handle), nil
 }
 
-close :: proc(fd: Handle) -> Errno {
+close :: proc(fd: Handle) -> Error {
 	return _get_errno(unix.sys_close(int(fd)))
 }
 
@@ -589,7 +589,7 @@ close :: proc(fd: Handle) -> Errno {
 @(private)
 MAX_RW :: 1 << 30
 
-read :: proc(fd: Handle, data: []byte) -> (int, Errno) {
+read :: proc(fd: Handle, data: []byte) -> (int, Error) {
 	if len(data) == 0 {
 		return 0, nil
 	}
@@ -603,7 +603,7 @@ read :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 	return bytes_read, nil
 }
 
-write :: proc(fd: Handle, data: []byte) -> (int, Errno) {
+write :: proc(fd: Handle, data: []byte) -> (int, Error) {
 	if len(data) == 0 {
 		return 0, nil
 	}
@@ -617,7 +617,7 @@ write :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 	return bytes_written, nil
 }
 
-read_at :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Errno) {
+read_at :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Error) {
 	if len(data) == 0 {
 		return 0, nil
 	}
@@ -631,7 +631,7 @@ read_at :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Errno) {
 	return bytes_read, nil
 }
 
-write_at :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Errno) {
+write_at :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Error) {
 	if len(data) == 0 {
 		return 0, nil
 	}
@@ -645,7 +645,7 @@ write_at :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Errno) {
 	return bytes_written, nil
 }
 
-seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
+seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Error) {
 	res := unix.sys_lseek(int(fd), offset, whence)
 	if res < 0 {
 		return -1, _get_errno(int(res))
@@ -653,7 +653,7 @@ seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
 	return i64(res), nil
 }
 
-file_size :: proc(fd: Handle) -> (i64, Errno) {
+file_size :: proc(fd: Handle) -> (i64, Error) {
 	// deliberately uninitialized; the syscall fills this buffer for us
 	s: OS_Stat = ---
 	result := unix.sys_fstat(int(fd), rawptr(&s))
@@ -663,26 +663,26 @@ file_size :: proc(fd: Handle) -> (i64, Errno) {
 	return max(s.size, 0), nil
 }
 
-rename :: proc(old_path, new_path: string) -> Errno {
+rename :: proc(old_path, new_path: string) -> Error {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	old_path_cstr := strings.clone_to_cstring(old_path, context.temp_allocator)
 	new_path_cstr := strings.clone_to_cstring(new_path, context.temp_allocator)
 	return _get_errno(unix.sys_rename(old_path_cstr, new_path_cstr))
 }
 
-remove :: proc(path: string) -> Errno {
+remove :: proc(path: string) -> Error {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	path_cstr := strings.clone_to_cstring(path, context.temp_allocator)
 	return _get_errno(unix.sys_unlink(path_cstr))
 }
 
-make_directory :: proc(path: string, mode: u32 = 0o775) -> Errno {
+make_directory :: proc(path: string, mode: u32 = 0o775) -> Error {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	path_cstr := strings.clone_to_cstring(path, context.temp_allocator)
 	return _get_errno(unix.sys_mkdir(path_cstr, uint(mode)))
 }
 
-remove_directory :: proc(path: string) -> Errno {
+remove_directory :: proc(path: string) -> Error {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	path_cstr := strings.clone_to_cstring(path, context.temp_allocator)
 	return _get_errno(unix.sys_rmdir(path_cstr))
@@ -698,7 +698,7 @@ is_file_handle :: proc(fd: Handle) -> bool {
 
 is_file_path :: proc(path: string, follow_links: bool = true) -> bool {
 	s: OS_Stat
-	err: Errno
+	err: Error
 	if follow_links {
 		s, err = _stat(path)
 	} else {
@@ -721,7 +721,7 @@ is_dir_handle :: proc(fd: Handle) -> bool {
 
 is_dir_path :: proc(path: string, follow_links: bool = true) -> bool {
 	s: OS_Stat
-	err: Errno
+	err: Error
 	if follow_links {
 		s, err = _stat(path)
 	} else {
@@ -753,20 +753,20 @@ stderr: Handle = 2
 last_write_time :: proc(fd: Handle) -> File_Time {}
 last_write_time_by_name :: proc(name: string) -> File_Time {}
 */
-last_write_time :: proc(fd: Handle) -> (time: File_Time, err: Errno) {
+last_write_time :: proc(fd: Handle) -> (time: File_Time, err: Error) {
 	s := _fstat(fd) or_return
 	modified := s.modified.seconds * 1_000_000_000 + s.modified.nanoseconds
 	return File_Time(modified), nil
 }
 
-last_write_time_by_name :: proc(name: string) -> (time: File_Time, err: Errno) {
+last_write_time_by_name :: proc(name: string) -> (time: File_Time, err: Error) {
 	s := _stat(name) or_return
 	modified := s.modified.seconds * 1_000_000_000 + s.modified.nanoseconds
 	return File_Time(modified), nil
 }
 
 @private
-_stat :: proc(path: string) -> (OS_Stat, Errno) {
+_stat :: proc(path: string) -> (OS_Stat, Error) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	cstr := strings.clone_to_cstring(path, context.temp_allocator)
 
@@ -780,7 +780,7 @@ _stat :: proc(path: string) -> (OS_Stat, Errno) {
 }
 
 @private
-_lstat :: proc(path: string) -> (OS_Stat, Errno) {
+_lstat :: proc(path: string) -> (OS_Stat, Error) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	cstr := strings.clone_to_cstring(path, context.temp_allocator)
 
@@ -794,7 +794,7 @@ _lstat :: proc(path: string) -> (OS_Stat, Errno) {
 }
 
 @private
-_fstat :: proc(fd: Handle) -> (OS_Stat, Errno) {
+_fstat :: proc(fd: Handle) -> (OS_Stat, Error) {
 	// deliberately uninitialized; the syscall fills this buffer for us
 	s: OS_Stat = ---
 	result := unix.sys_fstat(int(fd), rawptr(&s))
@@ -805,19 +805,19 @@ _fstat :: proc(fd: Handle) -> (OS_Stat, Errno) {
 }
 
 @private
-_fdopendir :: proc(fd: Handle) -> (Dir, Errno) {
+_fdopendir :: proc(fd: Handle) -> (Dir, Error) {
 	dirp := _unix_fdopendir(fd)
 	if dirp == cast(Dir)nil {
-		return nil, Errno(get_last_error())
+		return nil, Error(get_last_error())
 	}
 	return dirp, nil
 }
 
 @private
-_closedir :: proc(dirp: Dir) -> Errno {
+_closedir :: proc(dirp: Dir) -> Error {
 	rc := _unix_closedir(dirp)
 	if rc != 0 {
-		return Errno(get_last_error())
+		return Error(get_last_error())
 	}
 	return nil
 }
@@ -828,12 +828,12 @@ _rewinddir :: proc(dirp: Dir) {
 }
 
 @private
-_readdir :: proc(dirp: Dir) -> (entry: Dirent, err: Errno, end_of_stream: bool) {
+_readdir :: proc(dirp: Dir) -> (entry: Dirent, err: Error, end_of_stream: bool) {
 	result: ^Dirent
 	rc := _unix_readdir_r(dirp, &entry, &result)
 
 	if rc != 0 {
-		err = Errno(get_last_error())
+		err = Error(get_last_error())
 		return
 	}
 	err = nil
@@ -848,7 +848,7 @@ _readdir :: proc(dirp: Dir) -> (entry: Dirent, err: Errno, end_of_stream: bool) 
 }
 
 @private
-_readlink :: proc(path: string) -> (string, Errno) {
+_readlink :: proc(path: string) -> (string, Error) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD(ignore = context.temp_allocator == context.allocator)
 	path_cstr := strings.clone_to_cstring(path, context.temp_allocator)
 
@@ -870,7 +870,7 @@ _readlink :: proc(path: string) -> (string, Errno) {
 	}
 }
 
-absolute_path_from_handle :: proc(fd: Handle) -> (string, Errno) {
+absolute_path_from_handle :: proc(fd: Handle) -> (string, Error) {
 	buf : [256]byte
 	fd_str := strconv.itoa( buf[:], cast(int)fd )
 
@@ -880,7 +880,7 @@ absolute_path_from_handle :: proc(fd: Handle) -> (string, Errno) {
 	return _readlink(procfs_path)
 }
 
-absolute_path_from_relative :: proc(rel: string) -> (path: string, err: Errno) {
+absolute_path_from_relative :: proc(rel: string) -> (path: string, err: Error) {
 	rel := rel
 	if rel == "" {
 		rel = "."
@@ -891,7 +891,7 @@ absolute_path_from_relative :: proc(rel: string) -> (path: string, err: Errno) {
 
 	path_ptr := _unix_realpath(rel_cstr, nil)
 	if path_ptr == nil {
-		return "", Errno(get_last_error())
+		return "", Error(get_last_error())
 	}
 	defer _unix_free(path_ptr)
 
@@ -900,7 +900,7 @@ absolute_path_from_relative :: proc(rel: string) -> (path: string, err: Errno) {
 	return path, nil
 }
 
-access :: proc(path: string, mask: int) -> (bool, Errno) {
+access :: proc(path: string, mask: int) -> (bool, Error) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	cstr := strings.clone_to_cstring(path, context.temp_allocator)
 	result := unix.sys_access(cstr, mask)
@@ -926,24 +926,24 @@ get_env :: proc(key: string, allocator := context.allocator) -> (value: string) 
 	return
 }
 
-set_env :: proc(key, value: string) -> Errno {
+set_env :: proc(key, value: string) -> Error {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	key_cstring := strings.clone_to_cstring(key, context.temp_allocator)
 	value_cstring := strings.clone_to_cstring(value, context.temp_allocator)
 	// NOTE(GoNZooo): `setenv` instead of `putenv` because it copies both key and value more commonly
 	res := _unix_setenv(key_cstring, value_cstring, 1)
 	if res < 0 {
-		return Errno(get_last_error())
+		return Error(get_last_error())
 	}
 	return nil
 }
 
-unset_env :: proc(key: string) -> Errno {
+unset_env :: proc(key: string) -> Error {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	s := strings.clone_to_cstring(key, context.temp_allocator)
 	res := _unix_putenv(s)
 	if res < 0 {
-		return Errno(get_last_error())
+		return Error(get_last_error())
 	}
 	return nil
 }
@@ -969,7 +969,7 @@ get_current_directory :: proc() -> string {
 	unreachable()
 }
 
-set_current_directory :: proc(path: string) -> (err: Errno) {
+set_current_directory :: proc(path: string) -> (err: Error) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	cstr := strings.clone_to_cstring(path, context.temp_allocator)
 	res := unix.sys_chdir(cstr)
@@ -1034,7 +1034,7 @@ _alloc_command_line_arguments :: proc() -> []string {
 	return res
 }
 
-socket :: proc(domain: int, type: int, protocol: int) -> (Socket, Errno) {
+socket :: proc(domain: int, type: int, protocol: int) -> (Socket, Error) {
 	result := unix.sys_socket(domain, type, protocol)
 	if result < 0 {
 		return 0, _get_errno(result)
@@ -1042,7 +1042,7 @@ socket :: proc(domain: int, type: int, protocol: int) -> (Socket, Errno) {
 	return Socket(result), nil
 }
 
-bind :: proc(sd: Socket, addr: ^SOCKADDR, len: socklen_t) -> (Errno) {
+bind :: proc(sd: Socket, addr: ^SOCKADDR, len: socklen_t) -> (Error) {
 	result := unix.sys_bind(int(sd), addr, len)
 	if result < 0 {
 		return _get_errno(result)
@@ -1051,7 +1051,7 @@ bind :: proc(sd: Socket, addr: ^SOCKADDR, len: socklen_t) -> (Errno) {
 }
 
 
-connect :: proc(sd: Socket, addr: ^SOCKADDR, len: socklen_t) -> (Errno) {
+connect :: proc(sd: Socket, addr: ^SOCKADDR, len: socklen_t) -> (Error) {
 	result := unix.sys_connect(int(sd), addr, len)
 	if result < 0 {
 		return _get_errno(result)
@@ -1059,7 +1059,7 @@ connect :: proc(sd: Socket, addr: ^SOCKADDR, len: socklen_t) -> (Errno) {
 	return nil
 }
 
-accept :: proc(sd: Socket, addr: ^SOCKADDR, len: rawptr) -> (Socket, Errno) {
+accept :: proc(sd: Socket, addr: ^SOCKADDR, len: rawptr) -> (Socket, Error) {
 	result := unix.sys_accept(int(sd), rawptr(addr), len)
 	if result < 0 {
 		return 0, _get_errno(result)
@@ -1067,7 +1067,7 @@ accept :: proc(sd: Socket, addr: ^SOCKADDR, len: rawptr) -> (Socket, Errno) {
 	return Socket(result), nil
 }
 
-listen :: proc(sd: Socket, backlog: int) -> (Errno) {
+listen :: proc(sd: Socket, backlog: int) -> (Error) {
 	result := unix.sys_listen(int(sd), backlog)
 	if result < 0 {
 		return _get_errno(result)
@@ -1075,7 +1075,7 @@ listen :: proc(sd: Socket, backlog: int) -> (Errno) {
 	return nil
 }
 
-setsockopt :: proc(sd: Socket, level: int, optname: int, optval: rawptr, optlen: socklen_t) -> (Errno) {
+setsockopt :: proc(sd: Socket, level: int, optname: int, optval: rawptr, optlen: socklen_t) -> (Error) {
 	result := unix.sys_setsockopt(int(sd), level, optname, optval, optlen)
 	if result < 0 {
 		return _get_errno(result)
@@ -1084,7 +1084,7 @@ setsockopt :: proc(sd: Socket, level: int, optname: int, optval: rawptr, optlen:
 }
 
 
-recvfrom :: proc(sd: Socket, data: []byte, flags: int, addr: ^SOCKADDR, addr_size: ^socklen_t) -> (u32, Errno) {
+recvfrom :: proc(sd: Socket, data: []byte, flags: int, addr: ^SOCKADDR, addr_size: ^socklen_t) -> (u32, Error) {
 	result := unix.sys_recvfrom(int(sd), raw_data(data), len(data), flags, addr, uintptr(addr_size))
 	if result < 0 {
 		return 0, _get_errno(int(result))
@@ -1092,7 +1092,7 @@ recvfrom :: proc(sd: Socket, data: []byte, flags: int, addr: ^SOCKADDR, addr_siz
 	return u32(result), nil
 }
 
-recv :: proc(sd: Socket, data: []byte, flags: int) -> (u32, Errno) {
+recv :: proc(sd: Socket, data: []byte, flags: int) -> (u32, Error) {
 	result := unix.sys_recvfrom(int(sd), raw_data(data), len(data), flags, nil, 0)
 	if result < 0 {
 		return 0, _get_errno(int(result))
@@ -1101,7 +1101,7 @@ recv :: proc(sd: Socket, data: []byte, flags: int) -> (u32, Errno) {
 }
 
 
-sendto :: proc(sd: Socket, data: []u8, flags: int, addr: ^SOCKADDR, addrlen: socklen_t) -> (u32, Errno) {
+sendto :: proc(sd: Socket, data: []u8, flags: int, addr: ^SOCKADDR, addrlen: socklen_t) -> (u32, Error) {
 	result := unix.sys_sendto(int(sd), raw_data(data), len(data), flags, addr, addrlen)
 	if result < 0 {
 		return 0, _get_errno(int(result))
@@ -1109,7 +1109,7 @@ sendto :: proc(sd: Socket, data: []u8, flags: int, addr: ^SOCKADDR, addrlen: soc
 	return u32(result), nil
 }
 
-send :: proc(sd: Socket, data: []byte, flags: int) -> (u32, Errno) {
+send :: proc(sd: Socket, data: []byte, flags: int) -> (u32, Error) {
 	result := unix.sys_sendto(int(sd), raw_data(data), len(data), 0, nil, 0)
 	if result < 0 {
 		return 0, _get_errno(int(result))
@@ -1117,7 +1117,7 @@ send :: proc(sd: Socket, data: []byte, flags: int) -> (u32, Errno) {
 	return u32(result), nil
 }
 
-shutdown :: proc(sd: Socket, how: int) -> (Errno) {
+shutdown :: proc(sd: Socket, how: int) -> (Error) {
 	result := unix.sys_shutdown(int(sd), how)
 	if result < 0 {
 		return _get_errno(result)
@@ -1125,7 +1125,7 @@ shutdown :: proc(sd: Socket, how: int) -> (Errno) {
 	return nil
 }
 
-fcntl :: proc(fd: int, cmd: int, arg: int) -> (int, Errno) {
+fcntl :: proc(fd: int, cmd: int, arg: int) -> (int, Error) {
 	result := unix.sys_fcntl(fd, cmd, arg)
 	if result < 0 {
 		return 0, _get_errno(result)
@@ -1133,7 +1133,7 @@ fcntl :: proc(fd: int, cmd: int, arg: int) -> (int, Errno) {
 	return result, nil
 }
 
-poll :: proc(fds: []pollfd, timeout: int) -> (int, Errno) {
+poll :: proc(fds: []pollfd, timeout: int) -> (int, Error) {
 	result := unix.sys_poll(raw_data(fds), uint(len(fds)), timeout)
 	if result < 0 {
 		return 0, _get_errno(result)
@@ -1141,7 +1141,7 @@ poll :: proc(fds: []pollfd, timeout: int) -> (int, Errno) {
 	return result, nil
 }
 
-ppoll :: proc(fds: []pollfd, timeout: ^unix.timespec, sigmask: ^sigset_t) -> (int, Errno) {
+ppoll :: proc(fds: []pollfd, timeout: ^unix.timespec, sigmask: ^sigset_t) -> (int, Error) {
 	result := unix.sys_ppoll(raw_data(fds), uint(len(fds)), timeout, sigmask, size_of(sigset_t))
 	if result < 0 {
 		return 0, _get_errno(result)
