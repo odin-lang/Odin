@@ -36,17 +36,6 @@ Regular_Expression :: struct {
 }
 
 
-@(rodata)
-Flag_To_Letter := #sparse[Flag]u8 {
-	.Global            = 'g',
-	.Multiline         = 'm',
-	.Case_Insensitive  = 'i',
-	.Ignore_Whitespace = 'x',
-	.Unicode           = 'u',
-	.No_Capture        = 'n',
-	.No_Optimization   = '-',
-}
-
 /*
 Create a regular expression from a string pattern and a set of flags.
 
