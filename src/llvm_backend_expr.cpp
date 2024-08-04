@@ -2524,9 +2524,16 @@ gb_internal lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left
 	if (are_types_identical(a, b)) {
 		// NOTE(bill): No need for a conversion
 	} else if (lb_is_const(left) || lb_is_const_nil(left)) {
+		if (lb_is_const_nil(left)) {
+			return lb_emit_comp_against_nil(p, op_kind, right);
+		}
 		left = lb_emit_conv(p, left, right.type);
 	} else if (lb_is_const(right) || lb_is_const_nil(right)) {
+		if (lb_is_const_nil(right)) {
+			return lb_emit_comp_against_nil(p, op_kind, left);
+		}
 		right = lb_emit_conv(p, right, left.type);
+
 	} else {
 		Type *lt = left.type;
 		Type *rt = right.type;
