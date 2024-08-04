@@ -309,7 +309,7 @@ _read_link_cstr :: proc(name_cstr: cstring, allocator: runtime.Allocator) -> (st
 }
 
 _read_link :: proc(name: string, allocator: runtime.Allocator) -> (s: string, e: Error) {
-	TEMP_ALLOCATOR_GUARD(ignore=is_temp(allocator))
+	TEMP_ALLOCATOR_GUARD()
 	name_cstr := temp_cstring(name) or_return
 	return _read_link_cstr(name_cstr, allocator)
 }

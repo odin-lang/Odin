@@ -8,7 +8,7 @@ _lookup_env :: proc(key: string, allocator: runtime.Allocator) -> (value: string
 	if key == "" {
 		return
 	}
-	TEMP_ALLOCATOR_GUARD(ignore=is_temp(allocator))
+	TEMP_ALLOCATOR_GUARD()
 	wkey, _ := win32_utf8_to_wstring(key, temp_allocator())
 
 	n := win32.GetEnvironmentVariableW(wkey, nil, 0)

@@ -45,7 +45,7 @@ full_path_from_name :: proc(name: string, allocator: runtime.Allocator) -> (path
 		name = "."
 	}
 
-	TEMP_ALLOCATOR_GUARD(ignore=is_temp(allocator))
+	TEMP_ALLOCATOR_GUARD()
 
 	p := win32_utf8_to_utf16(name, temp_allocator()) or_return
 
@@ -65,7 +65,7 @@ internal_stat :: proc(name: string, create_file_attributes: u32, allocator: runt
 	if len(name) == 0 {
 		return {}, .Not_Exist
 	}
-	TEMP_ALLOCATOR_GUARD(ignore=is_temp(allocator))
+	TEMP_ALLOCATOR_GUARD()
 
 	wname := _fix_long_path(name, temp_allocator()) or_return
 	fa: win32.WIN32_FILE_ATTRIBUTE_DATA
@@ -129,7 +129,7 @@ _cleanpath_from_handle :: proc(f: ^File, allocator: runtime.Allocator) -> (strin
 		return "", _get_platform_error()
 	}
 
-	TEMP_ALLOCATOR_GUARD(ignore=is_temp(allocator))
+	TEMP_ALLOCATOR_GUARD()
 
 	buf := make([]u16, max(n, 260)+1, temp_allocator())
 	n = win32.GetFinalPathNameByHandleW(h, raw_data(buf), u32(len(buf)), 0)

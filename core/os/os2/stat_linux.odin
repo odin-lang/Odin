@@ -48,7 +48,7 @@ _fstat_internal :: proc(fd: linux.Fd, allocator: runtime.Allocator) -> (fi: File
 
 // NOTE: _stat and _lstat are using _fstat to avoid a race condition when populating fullpath
 _stat :: proc(name: string, allocator: runtime.Allocator) -> (fi: File_Info, err: Error) {
-	TEMP_ALLOCATOR_GUARD(ignore=is_temp(allocator))
+	TEMP_ALLOCATOR_GUARD()
 	name_cstr := temp_cstring(name) or_return
 
 	fd, errno := linux.open(name_cstr, {})
@@ -60,7 +60,7 @@ _stat :: proc(name: string, allocator: runtime.Allocator) -> (fi: File_Info, err
 }
 
 _lstat :: proc(name: string, allocator: runtime.Allocator) -> (fi: File_Info, err: Error) {
-	TEMP_ALLOCATOR_GUARD(ignore=is_temp(allocator))
+	TEMP_ALLOCATOR_GUARD()
 	name_cstr := temp_cstring(name) or_return
 
 	fd, errno := linux.open(name_cstr, {.PATH, .NOFOLLOW})
