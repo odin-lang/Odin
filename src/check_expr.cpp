@@ -4461,7 +4461,8 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 	case Type_Union:
 		// IMPORTANT NOTE HACK(bill): This is just to allow for comparisons against `0` with the `os.Error` type
 		// as a kind of transition period
-		if (operand->mode == Addressing_Constant &&
+		if (!build_context.strict_style &&
+		    operand->mode == Addressing_Constant &&
 		    target_type->kind == Type_Named &&
 		    (c->pkg == nullptr || c->pkg->name != "os") &&
 		    target_type->Named.name == "Error") {
