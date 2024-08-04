@@ -35,7 +35,7 @@ ERROR_INVALID_HANDLE      :: _Platform_Error(6)
 ERROR_NOT_ENOUGH_MEMORY   :: _Platform_Error(8)
 ERROR_NO_MORE_FILES       :: _Platform_Error(18)
 ERROR_HANDLE_EOF          :: _Platform_Error(38)
-ERROR_EOF                 :: ERROR_HANDLE_EOF
+ERROR_EOF                 :: General_Error.EOF
 ERROR_NETNAME_DELETED     :: _Platform_Error(64)
 ERROR_FILE_EXISTS         :: _Platform_Error(80)
 ERROR_INVALID_PARAMETER   :: _Platform_Error(87)

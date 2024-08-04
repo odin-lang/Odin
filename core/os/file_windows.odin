@@ -173,7 +173,7 @@ read :: proc(fd: Handle, data: []byte) -> (total_read: int, err: Error) {
 			// Successful read can mean two things, including EOF, see:
 			// https://learn.microsoft.com/en-us/windows/win32/fileio/testing-for-the-end-of-a-file
 			if bytes_read == 0 {
-				return 0, ERROR_HANDLE_EOF
+				return 0, .EOF
 			} else {
 				return int(bytes_read), nil
 			}

@@ -60,11 +60,6 @@ _file_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, 
 	}
 
 	if err == nil && os_err != nil {
-		when ODIN_OS == .Windows {
-			if os_err == ERROR_HANDLE_EOF {
-				return n, .EOF
-			}
-		}
 		err = error_to_io_error(os_err)
 	}
 	return
