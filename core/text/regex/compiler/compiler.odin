@@ -41,7 +41,6 @@ SPLIT_SIZE :: size_of(Opcode) + 2 * size_of(u16)
 
 Compiler :: struct {
 	flags: common.Flags,
-	anchor_start_seen: bool,
 	class_data: [dynamic]Rune_Class_Data,
 }
 
@@ -192,7 +191,6 @@ generate_code :: proc(c: ^Compiler, node: Node) -> (code: Program) {
 			append(&code, Opcode.Multiline_Close)
 		} else {
 			if specific.start {
-				c.anchor_start_seen = true
 				append(&code, Opcode.Assert_Start)
 			} else {
 				append(&code, Opcode.Assert_End)
