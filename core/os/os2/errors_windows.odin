@@ -20,7 +20,7 @@ _error_string :: proc(errno: i32) -> string {
 	return "<unknown platform error>"
 }
 
-_get_platform_Platform_Error :: proc() -> Error {
+_get_platform_error :: proc() -> Error {
 	err := win32.GetLastError()
 	if err == 0 {
 		return nil

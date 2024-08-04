@@ -15,7 +15,7 @@ to_reader :: to_stream
 
 
 @(private)
-error_to_io_Platform_Error :: proc(ferr: Error) -> io.Error {
+error_to_io_error :: proc(ferr: Error) -> io.Error {
 	if ferr == nil {
 		return .None
 	}
