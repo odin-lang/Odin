@@ -785,7 +785,7 @@ seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Error) {
 
 	final_offset := i64(_unix_lseek(fd, int(offset), c.int(whence)))
 	if final_offset == -1 {
-		return 0, Platform_Error.EPERM
+		return 0, get_last_error()
 	}
 	return final_offset, nil
 }
