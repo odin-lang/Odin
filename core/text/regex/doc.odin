@@ -9,12 +9,16 @@ Odin's regex library implements the following features:
 
 	Alternation:           `apple|cherry`
 	Classes:               `[0-9_]`
+	Classes, negated:      `[^0-9_]`
+	Shorthands:            `\d\s\w`
+	Shorthands, negated:   `\D\S\W`
 	Wildcards:             `.`
 	Repeat, optional:      `a*`
 	Repeat, at least once: `a+`
+	Repetition:            `a{1,2}`
 	Optional:              `a?`
-	Group Capture:         `([0-9])`
-	Group Non-Capture:     `(?:[0-9])`
+	Group, capture:        `([0-9])`
+	Group, non-capture:    `(?:[0-9])`
 	Start & End Anchors:   `^hello$`
 	Word Boundaries:       `\bhello\b`
 	Non-Word Boundaries:   `hello\B`
