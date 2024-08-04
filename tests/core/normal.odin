@@ -34,6 +34,7 @@ download_assets :: proc() {
 @(require) import "path/filepath"
 @(require) import "reflect"
 @(require) import "runtime"
+@(require) import "simd/util"
 @(require) import "slice"
 @(require) import "strconv"
 @(require) import "strings"
