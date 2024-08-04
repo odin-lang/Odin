@@ -23,8 +23,8 @@ foreign libc {
 }
 
 @(no_instrumentation)
-get_last_error :: proc "contextless" () -> int {
-	return int(__error()^)
+get_last_error :: proc "contextless" () -> os.Platform_Error {
+	return os.Platform_Error(__error()^)
 }
 
 MAX_RW :: 0x7fffffff

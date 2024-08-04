@@ -142,7 +142,7 @@ _errno_strings : [linux.Errno]string = {
 }
 
 
-_get_platform_error :: proc(errno: linux.Errno) -> Error {
+_get_platform_Platform_Error :: proc(errno: linux.Errno) -> Error {
 	#partial switch errno {
 	case .NONE:
 		return nil

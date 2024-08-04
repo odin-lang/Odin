@@ -10,146 +10,257 @@ import "core:c"
 
 Handle    :: distinct i32
 File_Time :: distinct u64
-Errno     :: distinct int
 
 INVALID_HANDLE :: ~Handle(0)
 
-ERROR_NONE: Errno : 0
-EPERM:		Errno : 1		/* Operation not permitted */
-ENOENT:		Errno : 2		/* No such file or directory */
-ESRCH:		Errno : 3		/* No such process */
-EINTR:		Errno : 4		/* Interrupted system call */
-EIO:		Errno : 5		/* Input/output error */
-ENXIO:		Errno : 6		/* Device not configured */
-E2BIG:		Errno : 7		/* Argument list too long */
-ENOEXEC:	Errno : 8		/* Exec format error */
-EBADF:		Errno : 9		/* Bad file descriptor */
-ECHILD:		Errno : 10		/* No child processes */
-EDEADLK:	Errno : 11		/* Resource deadlock avoided */
-ENOMEM:		Errno : 12		/* Cannot allocate memory */
-EACCES:		Errno : 13		/* Permission denied */
-EFAULT:		Errno : 14		/* Bad address */
-ENOTBLK:	Errno : 15		/* Block device required */
-EBUSY:		Errno : 16		/* Device / Resource busy */
-EEXIST:		Errno : 17		/* File exists */
-EXDEV:		Errno : 18		/* Cross-device link */
-ENODEV:		Errno : 19		/* Operation not supported by device */
-ENOTDIR:	Errno : 20		/* Not a directory */
-EISDIR:		Errno : 21		/* Is a directory */
-EINVAL:		Errno : 22		/* Invalid argument */
-ENFILE:		Errno : 23		/* Too many open files in system */
-EMFILE:		Errno : 24		/* Too many open files */
-ENOTTY:		Errno : 25		/* Inappropriate ioctl for device */
-ETXTBSY:	Errno : 26		/* Text file busy */
-EFBIG:		Errno : 27		/* File too large */
-ENOSPC:		Errno : 28		/* No space left on device */
-ESPIPE:		Errno : 29		/* Illegal seek */
-EROFS:		Errno : 30		/* Read-only file system */
-EMLINK:		Errno : 31		/* Too many links */
-EPIPE:		Errno : 32		/* Broken pipe */
+_Platform_Error :: enum i32  {
+	NONE       = 0,
+	EPERM      = 1,       /* Operation not permitted */
+	ENOENT     = 2,       /* No such file or directory */
+	ESRCH      = 3,       /* No such process */
+	EINTR      = 4,       /* Interrupted system call */
+	EIO        = 5,       /* Input/output error */
+	ENXIO      = 6,       /* Device not configured */
+	E2BIG      = 7,       /* Argument list too long */
+	ENOEXEC    = 8,       /* Exec format error */
+	EBADF      = 9,       /* Bad file descriptor */
+	ECHILD     = 10,      /* No child processes */
+	EDEADLK    = 11,      /* Resource deadlock avoided */
+	ENOMEM     = 12,      /* Cannot allocate memory */
+	EACCES     = 13,      /* Permission denied */
+	EFAULT     = 14,      /* Bad address */
+	ENOTBLK    = 15,      /* Block device required */
+	EBUSY      = 16,      /* Device / Resource busy */
+	EEXIST     = 17,      /* File exists */
+	EXDEV      = 18,      /* Cross-device link */
+	ENODEV     = 19,      /* Operation not supported by device */
+	ENOTDIR    = 20,      /* Not a directory */
+	EISDIR     = 21,      /* Is a directory */
+	EINVAL     = 22,      /* Invalid argument */
+	ENFILE     = 23,      /* Too many open files in system */
+	EMFILE     = 24,      /* Too many open files */
+	ENOTTY     = 25,      /* Inappropriate ioctl for device */
+	ETXTBSY    = 26,      /* Text file busy */
+	EFBIG      = 27,      /* File too large */
+	ENOSPC     = 28,      /* No space left on device */
+	ESPIPE     = 29,      /* Illegal seek */
+	EROFS      = 30,      /* Read-only file system */
+	EMLINK     = 31,      /* Too many links */
+	EPIPE      = 32,      /* Broken pipe */
 
-/* math software */
-EDOM:		Errno : 33		/* Numerical argument out of domain */
-ERANGE:		Errno : 34		/* Result too large */
+	/* math software */
+	EDOM   = 33,          /* Numerical argument out of domain */
+	ERANGE = 34,          /* Result too large */
 
-/* non-blocking and interrupt i/o */
-EAGAIN:			Errno : 35		/* Resource temporarily unavailable */
-EWOULDBLOCK: 	Errno : EAGAIN		/* Operation would block */
-EINPROGRESS: 	Errno : 36		/* Operation now in progress */
-EALREADY:		Errno : 37		/* Operation already in progress */
+	/* non-blocking and interrupt i/o */
+	EAGAIN      = 35,         /* Resource temporarily unavailable */
+	EWOULDBLOCK = EAGAIN, /* Operation would block */
+	EINPROGRESS = 36,         /* Operation now in progress */
+	EALREADY    = 37,         /* Operation already in progress */
 
-/* ipc/network software -- argument errors */
-ENOTSOCK:			Errno : 38		/* Socket operation on non-socket */
-EDESTADDRREQ:		Errno : 39		/* Destination address required */
-EMSGSIZE:			Errno : 40		/* Message too long */
-EPROTOTYPE:			Errno : 41		/* Protocol wrong type for socket */
-ENOPROTOOPT:		Errno : 42		/* Protocol not available */
-EPROTONOSUPPORT:	Errno : 43		/* Protocol not supported */
-ESOCKTNOSUPPORT:	Errno : 44		/* Socket type not supported */
-ENOTSUP:			Errno : 45		/* Operation not supported */
-EOPNOTSUPP::		ENOTSUP
-EPFNOSUPPORT:		Errno : 46		/* Protocol family not supported */
-EAFNOSUPPORT:		Errno : 47		/* Address family not supported by protocol family */
-EADDRINUSE:			Errno : 48		/* Address already in use */
-EADDRNOTAVAIL:		Errno : 49		/* Can't assign requested address */
+	/* ipc/network software -- argument errors */
+	ENOTSOCK       = 38,    /* Socket operation on non-socket */
+	EDESTADDRREQ   = 39,    /* Destination address required */
+	EMSGSIZE       = 40,    /* Message too long */
+	EPROTOTYPE     = 41,    /* Protocol wrong type for socket */
+	ENOPROTOOPT    = 42,    /* Protocol not available */
+	EPROTONOSUPPOR = 43,    /* Protocol not supported */
+	ESOCKTNOSUPPOR = 44,    /* Socket type not supported */
+	ENOTSUP        = 45,    /* Operation not supported */
+	EOPNOTSUPP     = ENOTSUP,
+	EPFNOSUPPORT   = 46,    /* Protocol family not supported */
+	EAFNOSUPPORT   = 47,    /* Address family not supported by protocol family */
+	EADDRINUSE     = 48,    /* Address already in use */
+	EADDRNOTAVAIL  = 49,    /* Can't assign requested address */
 
-/* ipc/network software -- operational errors */
-ENETDOWN:		Errno : 50		/* Network is down */
-ENETUNREACH:	Errno : 51		/* Network is unreachable */
-ENETRESET:		Errno : 52		/* Network dropped connection on reset */
-ECONNABORTED:	Errno : 53		/* Software caused connection abort */
-ECONNRESET:		Errno : 54		/* Connection reset by peer */
-ENOBUFS:		Errno : 55		/* No buffer space available */
-EISCONN:		Errno : 56		/* Socket is already connected */
-ENOTCONN:		Errno : 57		/* Socket is not connected */
-ESHUTDOWN:		Errno : 58		/* Can't send after socket shutdown */
-ETOOMANYREFS:	Errno : 59		/* Too many references: can't splice */
-ETIMEDOUT:		Errno : 60		/* Operation timed out */
-ECONNREFUSED:	Errno : 61		/* Connection refused */
+	/* ipc/network software -- operational errors */
+	ENETDOWN       = 50,    /* Network is down */
+	ENETUNREAC     = 51,    /* Network is unreachable */
+	ENETRESET      = 52,    /* Network dropped connection on reset */
+	ECONNABORTE    = 53,    /* Software caused connection abort */
+	ECONNRESET     = 54,    /* Connection reset by peer */
+	ENOBUFS        = 55,    /* No buffer space available */
+	EISCONN        = 56,    /* Socket is already connected */
+	ENOTCONN       = 57,    /* Socket is not connected */
+	ESHUTDOWN      = 58,    /* Can't send after socket shutdown */
+	ETOOMANYREF    = 59,    /* Too many references: can't splice */
+	ETIMEDOUT      = 60,    /* Operation timed out */
+	ECONNREFUSE    = 61,    /* Connection refused */
 
-ELOOP:			Errno : 62		/* Too many levels of symbolic links */
-ENAMETOOLONG:	Errno : 63		/* File name too long */
+	ELOOP          = 62,    /* Too many levels of symbolic links */
+	ENAMETOOLON    = 63,    /* File name too long */
 
-/* should be rearranged */
-EHOSTDOWN:		Errno : 64		/* Host is down */
-EHOSTUNREACH:	Errno : 65		/* No route to host */
-ENOTEMPTY:		Errno : 66		/* Directory not empty */
+	/* should be rearranged */
+	EHOSTDOWN      = 64,    /* Host is down */
+	EHOSTUNREAC    = 65,    /* No route to host */
+	ENOTEMPTY      = 66,    /* Directory not empty */
 
-/* quotas & mush */
-EPROCLIM:		Errno : 67		/* Too many processes */
-EUSERS:			Errno : 68		/* Too many users */
-EDQUOT:			Errno : 69		/* Disc quota exceeded */
+	/* quotas & mush */
+	EPROCLIM       = 67,    /* Too many processes */
+	EUSERS         = 68,    /* Too many users */
+	EDQUOT         = 69,    /* Disc quota exceeded */
 
-/* Network File System */
-ESTALE:			Errno : 70		/* Stale NFS file handle */
-EREMOTE:		Errno : 71		/* Too many levels of remote in path */
-EBADRPC:		Errno : 72		/* RPC struct is bad */
-ERPCMISMATCH:	Errno : 73		/* RPC version wrong */
-EPROGUNAVAIL:	Errno : 74		/* RPC prog. not avail */
-EPROGMISMATCH:	Errno : 75		/* Program version wrong */
-EPROCUNAVAIL:	Errno : 76		/* Bad procedure for program */
+	/* Network File System */
+	ESTALE         = 70,    /* Stale NFS file handle */
+	EREMOTE        = 71,    /* Too many levels of remote in path */
+	EBADRPC        = 72,    /* RPC struct is bad */
+	ERPCMISMATC    = 73,    /* RPC version wrong */
+	EPROGUNAVAI    = 74,    /* RPC prog. not avail */
+	EPROGMISMATC   = 75,    /* Program version wrong */
+	EPROCUNAVAI    = 76,    /* Bad procedure for program */
 
-ENOLCK:	Errno : 77		/* No locks available */
-ENOSYS:	Errno : 78		/* Function not implemented */
+	ENOLC          = 77,    /* No locks available */
+	ENOSY          = 78,    /* Function not implemented */
 
-EFTYPE:	Errno : 79		/* Inappropriate file type or format */
-EAUTH:	Errno : 80		/* Authentication error */
-ENEEDAUTH:	Errno : 81		/* Need authenticator */
+	EFTYP          = 79,    /* Inappropriate file type or format */
+	EAUT           = 80,    /* Authentication error */
+	ENEEDAUT       = 81,    /* Need authenticator */
 
-/* Intelligent device errors */
-EPWROFF:	Errno : 82	/* Device power is off */
-EDEVERR:	Errno : 83	/* Device error, e.g. paper out */
-EOVERFLOW:	Errno : 84		/* Value too large to be stored in data type */
+	/* Intelligent device errors */
+	EPWROF         = 82,    /* Device power is off */
+	EDEVER         = 83,    /* Device error, e.g. paper out */
+	EOVERFLO       = 84,    /* Value too large to be stored in data type */
 
-/* Program loading errors */
-EBADEXEC:	Errno : 85	/* Bad executable */
-EBADARCH:	Errno : 86	/* Bad CPU type in executable */
-ESHLIBVERS:	Errno : 87	/* Shared library version mismatch */
-EBADMACHO:	Errno : 88	/* Malformed Macho file */
+	/* Program loading errors */
+	EBADEXE        = 85,    /* Bad executable */
+	EBADARC        = 86,    /* Bad CPU type in executable */
+	ESHLIBVER      = 87,    /* Shared library version mismatch */
+	EBADMACH       = 88,    /* Malformed Macho file */
 
-ECANCELED:	Errno : 89		/* Operation canceled */
+	ECANCELE       = 89,    /* Operation canceled */
 
-EIDRM:		Errno : 90		/* Identifier removed */
-ENOMSG:		Errno : 91		/* No message of desired type */
-EILSEQ:		Errno : 92		/* Illegal byte sequence */
-ENOATTR:	Errno : 93		/* Attribute not found */
+	EIDRM          = 90,    /* Identifier removed */
+	ENOMSG         = 91,    /* No message of desired type */
+	EILSEQ         = 92,    /* Illegal byte sequence */
+	ENOATT         = 93,    /* Attribute not found */
 
-EBADMSG:	Errno : 94		/* Bad message */
-EMULTIHOP:	Errno : 95		/* Reserved */
-ENODATA:	Errno : 96		/* No message available on STREAM */
-ENOLINK:	Errno : 97		/* Reserved */
-ENOSR:		Errno : 98		/* No STREAM resources */
-ENOSTR:		Errno : 99		/* Not a STREAM */
-EPROTO:		Errno : 100		/* Protocol error */
-ETIME:		Errno : 101		/* STREAM ioctl timeout */
+	EBADMS         = 94,    /* Bad message */
+	EMULTIHO       = 95,    /* Reserved */
+	ENODAT         = 96,    /* No message available on STREAM */
+	ENOLIN         = 97,    /* Reserved */
+	ENOSR          = 98,    /* No STREAM resources */
+	ENOSTR         = 99,    /* Not a STREAM */
+	EPROTO         = 100,  /* Protocol error */
+	ETIME          = 101,  /* STREAM ioctl timeout */
 
-ENOPOLICY:	Errno : 103		/* No such policy registered */
+	ENOPOLIC       = 103,  /* No such policy registered */
 
-ENOTRECOVERABLE:	Errno : 104		/* State not recoverable */
-EOWNERDEAD:			Errno : 105		/* Previous owner died */
+	ENOTRECOVERABL = 104,  /* State not recoverable */
+	EOWNERDEAD     = 105,  /* Previous owner died */
 
-EQFULL:	Errno : 106		/* Interface output queue is full */
-ELAST:	Errno : 106		/* Must be equal largest errno */
+	EQFUL          = 106,  /* Interface output queue is full */
+	ELAS           = 106,  /* Must be equal largest errno */
+}
+
+
+EPERM          :: Platform_Error.EPERM
+ENOENT         :: Platform_Error.ENOENT
+ESRCH          :: Platform_Error.ESRCH
+EINTR          :: Platform_Error.EINTR
+EIO            :: Platform_Error.EIO
+ENXIO          :: Platform_Error.ENXIO
+E2BIG          :: Platform_Error.E2BIG
+ENOEXEC        :: Platform_Error.ENOEXEC
+EBADF          :: Platform_Error.EBADF
+ECHILD         :: Platform_Error.ECHILD
+EDEADLK        :: Platform_Error.EDEADLK
+ENOMEM         :: Platform_Error.ENOMEM
+EACCES         :: Platform_Error.EACCES
+EFAULT         :: Platform_Error.EFAULT
+ENOTBLK        :: Platform_Error.ENOTBLK
+EBUSY          :: Platform_Error.EBUSY
+EEXIST         :: Platform_Error.EEXIST
+EXDEV          :: Platform_Error.EXDEV
+ENODEV         :: Platform_Error.ENODEV
+ENOTDIR        :: Platform_Error.ENOTDIR
+EISDIR         :: Platform_Error.EISDIR
+EINVAL         :: Platform_Error.EINVAL
+ENFILE         :: Platform_Error.ENFILE
+EMFILE         :: Platform_Error.EMFILE
+ENOTTY         :: Platform_Error.ENOTTY
+ETXTBSY        :: Platform_Error.ETXTBSY
+EFBIG          :: Platform_Error.EFBIG
+ENOSPC         :: Platform_Error.ENOSPC
+ESPIPE         :: Platform_Error.ESPIPE
+EROFS          :: Platform_Error.EROFS
+EMLINK         :: Platform_Error.EMLINK
+EPIPE          :: Platform_Error.EPIPE
+EDOM           :: Platform_Error.EDOM
+ERANGE         :: Platform_Error.ERANGE
+EAGAIN         :: Platform_Error.EAGAIN
+EWOULDBLOCK    :: Platform_Error.EWOULDBLOCK
+EINPROGRESS    :: Platform_Error.EINPROGRESS
+EALREADY       :: Platform_Error.EALREADY
+ENOTSOCK       :: Platform_Error.ENOTSOCK
+EDESTADDRREQ   :: Platform_Error.EDESTADDRREQ
+EMSGSIZE       :: Platform_Error.EMSGSIZE
+EPROTOTYPE     :: Platform_Error.EPROTOTYPE
+ENOPROTOOPT    :: Platform_Error.ENOPROTOOPT
+EPROTONOSUPPOR :: Platform_Error.EPROTONOSUPPOR
+ESOCKTNOSUPPOR :: Platform_Error.ESOCKTNOSUPPOR
+ENOTSUP        :: Platform_Error.ENOTSUP
+EOPNOTSUPP     :: Platform_Error.EOPNOTSUPP
+EPFNOSUPPORT   :: Platform_Error.EPFNOSUPPORT
+EAFNOSUPPORT   :: Platform_Error.EAFNOSUPPORT
+EADDRINUSE     :: Platform_Error.EADDRINUSE
+EADDRNOTAVAIL  :: Platform_Error.EADDRNOTAVAIL
+ENETDOWN       :: Platform_Error.ENETDOWN
+ENETUNREAC     :: Platform_Error.ENETUNREAC
+ENETRESET      :: Platform_Error.ENETRESET
+ECONNABORTE    :: Platform_Error.ECONNABORTE
+ECONNRESET     :: Platform_Error.ECONNRESET
+ENOBUFS        :: Platform_Error.ENOBUFS
+EISCONN        :: Platform_Error.EISCONN
+ENOTCONN       :: Platform_Error.ENOTCONN
+ESHUTDOWN      :: Platform_Error.ESHUTDOWN
+ETOOMANYREF    :: Platform_Error.ETOOMANYREF
+ETIMEDOUT      :: Platform_Error.ETIMEDOUT
+ECONNREFUSE    :: Platform_Error.ECONNREFUSE
+ELOOP          :: Platform_Error.ELOOP
+ENAMETOOLON    :: Platform_Error.ENAMETOOLON
+EHOSTDOWN      :: Platform_Error.EHOSTDOWN
+EHOSTUNREAC    :: Platform_Error.EHOSTUNREAC
+ENOTEMPTY      :: Platform_Error.ENOTEMPTY
+EPROCLIM       :: Platform_Error.EPROCLIM
+EUSERS         :: Platform_Error.EUSERS
+EDQUOT         :: Platform_Error.EDQUOT
+ESTALE         :: Platform_Error.ESTALE
+EREMOTE        :: Platform_Error.EREMOTE
+EBADRPC        :: Platform_Error.EBADRPC
+ERPCMISMATC    :: Platform_Error.ERPCMISMATC
+EPROGUNAVAI    :: Platform_Error.EPROGUNAVAI
+EPROGMISMATC   :: Platform_Error.EPROGMISMATC
+EPROCUNAVAI    :: Platform_Error.EPROCUNAVAI
+ENOLC          :: Platform_Error.ENOLC
+ENOSY          :: Platform_Error.ENOSY
+EFTYP          :: Platform_Error.EFTYP
+EAUT           :: Platform_Error.EAUT
+ENEEDAUT       :: Platform_Error.ENEEDAUT
+EPWROF         :: Platform_Error.EPWROF
+EDEVER         :: Platform_Error.EDEVER
+EOVERFLO       :: Platform_Error.EOVERFLO
+EBADEXE        :: Platform_Error.EBADEXE
+EBADARC        :: Platform_Error.EBADARC
+ESHLIBVER      :: Platform_Error.ESHLIBVER
+EBADMACH       :: Platform_Error.EBADMACH
+ECANCELE       :: Platform_Error.ECANCELE
+EIDRM          :: Platform_Error.EIDRM
+ENOMSG         :: Platform_Error.ENOMSG
+EILSEQ         :: Platform_Error.EILSEQ
+ENOATT         :: Platform_Error.ENOATT
+EBADMS         :: Platform_Error.EBADMS
+EMULTIHO       :: Platform_Error.EMULTIHO
+ENODAT         :: Platform_Error.ENODAT
+ENOLIN         :: Platform_Error.ENOLIN
+ENOSR          :: Platform_Error.ENOSR
+ENOSTR         :: Platform_Error.ENOSTR
+EPROTO         :: Platform_Error.EPROTO
+ETIME          :: Platform_Error.ETIME
+ENOPOLIC       :: Platform_Error.ENOPOLIC
+ENOTRECOVERABL :: Platform_Error.ENOTRECOVERABL
+EOWNERDEAD     :: Platform_Error.EOWNERDEAD
+EQFUL          :: Platform_Error.EQFUL
+ELAS           :: Platform_Error.ELAS
 
 O_RDONLY   :: 0x0000
 O_WRONLY   :: 0x0001
@@ -524,12 +635,12 @@ foreign dl {
 	@(link_name="dlerror") _unix_dlerror :: proc() -> cstring ---
 }
 
-get_last_error :: proc "contextless" () -> int {
-	return int(__error()^)
+get_last_error :: proc "contextless" () -> Error {
+	return Error(__error()^)
 }
 
 get_last_error_string :: proc() -> string {
-	return cast(string)_darwin_string_error(cast(c.int)get_last_error())
+	return string(_darwin_string_error(__error()^))
 }
 
 
@@ -548,7 +659,7 @@ open :: proc(path: string, flags: int = O_RDWR, mode: int = 0) -> (Handle, Errno
 	cstr := strings.clone_to_cstring(path, context.temp_allocator)
 	handle := _unix_open(cstr, i32(flags), u16(mode))
 	if handle == -1 {
-		return INVALID_HANDLE, cast(Errno)get_last_error()
+		return INVALID_HANDLE, get_last_error()
 	}
 
 	/*

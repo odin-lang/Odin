@@ -13,6 +13,12 @@ SEEK_SET :: 0
 SEEK_CUR :: 1
 SEEK_END :: 2
 
+Platform_Error :: _Platform_Error
+Error :: Platform_Error
+Errno :: Error // alias
+
+ERROR_NONE :: Errno(0)
+
 write_string :: proc(fd: Handle, str: string) -> (int, Errno) {
 	return write(fd, transmute([]byte)str)
 }

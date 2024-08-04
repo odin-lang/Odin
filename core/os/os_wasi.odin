@@ -4,11 +4,13 @@ import "core:sys/wasm/wasi"
 import "base:runtime"
 
 Handle :: distinct i32
-Errno :: distinct i32
+_Platform_Error :: enum i32 {
+	NONE = 0,
+}
 
 INVALID_HANDLE :: -1
 
-ERROR_NONE :: Errno(wasi.errno_t.SUCCESS)
+// ERROR_NONE :: Errno(wasi.errno_t.SUCCESS) // that is a weird error code. Probably better to remap it
 
 O_RDONLY   :: 0x00000
 O_WRONLY   :: 0x00001

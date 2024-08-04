@@ -10,15 +10,13 @@ import "core:sys/haiku"
 Handle    :: i32
 Pid       :: i32
 File_Time :: i64
-Errno     :: i32
+_Platform_Error :: haiku.Errno
 
 MAX_PATH :: haiku.PATH_MAX
 
-ENOSYS :: int(haiku.Errno.POSIX_ERROR_BASE) + 9
+ENOSYS :: _Platform_Error(i32(haiku.Errno.POSIX_ERROR_BASE) + 9)
 
 INVALID_HANDLE :: ~Handle(0)
-
-ERROR_NONE: Errno: 0
 
 stdin:  Handle = 0
 stdout: Handle = 1
@@ -183,8 +181,8 @@ is_path_separator :: proc(r: rune) -> bool {
 	return r == '/'
 }
 
-get_last_error :: proc "contextless" () -> int {
-	return int(__error()^)
+get_last_error :: proc "contextless" () -> Error {
+	return Error(__error()^)
 }
 
 fork :: proc() -> (Pid, Errno) {
@@ -391,8 +389,8 @@ absolute_path_from_relative :: proc(rel: string) -> (path: string, err: Errno) {
 	}
 	defer _unix_free(path_ptr)
 
-	path_cstr := transmute(cstring)path_ptr
-	path = strings.clone( string(path_cstr) )
+	path_cstr := cstring(path_ptr)
+	path = strings.clone(string(path_cstr))
 
 	return path, ERROR_NONE
 }

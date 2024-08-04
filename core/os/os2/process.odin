@@ -370,7 +370,7 @@ Process_State :: struct {
 	timeout (if specified) has reached zero. If the timeout is `TIMEOUT_INFINITE`,
 	no timeout restriction is imposed and the procedure can block indefinately.
 
-	If the timeout has expired, the `General_Error.Timeout` is returned as
+	If the timeout has expired, the `GeneralPlatform_Error.Timeout` is returned as
 	the error.
 
 	If an error is returned for any other reason, other than timeout, the

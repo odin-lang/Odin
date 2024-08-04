@@ -20,148 +20,148 @@ import "base:intrinsics"
 // all that about compatibility. But we don't want to push experimental changes
 // and have people's code break while it's still work in progress.
 import unix "core:sys/unix"
+import linux "core:sys/linux"
 
 Handle    :: distinct i32
 Pid       :: distinct i32
 File_Time :: distinct u64
-Errno     :: distinct i32
 Socket    :: distinct int
 
 INVALID_HANDLE :: ~Handle(0)
 
-ERROR_NONE:     Errno : 0
-EPERM:          Errno : 1
-ENOENT:         Errno : 2
-ESRCH:          Errno : 3
-EINTR:          Errno : 4
-EIO:            Errno : 5
-ENXIO:          Errno : 6
-EBADF:          Errno : 9
-EAGAIN:         Errno : 11
-ENOMEM:         Errno : 12
-EACCES:         Errno : 13
-EFAULT:         Errno : 14
-EEXIST:         Errno : 17
-ENODEV:         Errno : 19
-ENOTDIR:        Errno : 20
-EISDIR:         Errno : 21
-EINVAL:         Errno : 22
-ENFILE:         Errno : 23
-EMFILE:         Errno : 24
-ETXTBSY:        Errno : 26
-EFBIG:          Errno : 27
-ENOSPC:         Errno : 28
-ESPIPE:         Errno : 29
-EROFS:          Errno : 30
-EPIPE:          Errno : 32
+_Platform_Error :: linux.Errno
+EPERM           :: Platform_Error.EPERM
+ENOENT          :: Platform_Error.ENOENT
+ESRCH           :: Platform_Error.ESRCH
+EINTR           :: Platform_Error.EINTR
+EIO             :: Platform_Error.EIO
+ENXIO           :: Platform_Error.ENXIO
+EBADF           :: Platform_Error.EBADF
+EAGAIN          :: Platform_Error.EAGAIN
+ENOMEM          :: Platform_Error.ENOMEM
+EACCES          :: Platform_Error.EACCES
+EFAULT          :: Platform_Error.EFAULT
+EEXIST          :: Platform_Error.EEXIST
+ENODEV          :: Platform_Error.ENODEV
+ENOTDIR         :: Platform_Error.ENOTDIR
+EISDIR          :: Platform_Error.EISDIR
+EINVAL          :: Platform_Error.EINVAL
+ENFILE          :: Platform_Error.ENFILE
+EMFILE          :: Platform_Error.EMFILE
+ETXTBSY         :: Platform_Error.ETXTBSY
+EFBIG           :: Platform_Error.EFBIG
+ENOSPC          :: Platform_Error.ENOSPC
+ESPIPE          :: Platform_Error.ESPIPE
+EROFS           :: Platform_Error.EROFS
+EPIPE           :: Platform_Error.EPIPE
 
-ERANGE:         Errno : 34 /* Result too large */
-EDEADLK:        Errno : 35 /* Resource deadlock would occur */
-ENAMETOOLONG:   Errno : 36 /* File name too long */
-ENOLCK:         Errno : 37 /* No record locks available */
+ERANGE          :: Platform_Error.ERANGE          /* Result too large */
+EDEADLK         :: Platform_Error.EDEADLK         /* Resource deadlock would occur */
+ENAMETOOLONG    :: Platform_Error.ENAMETOOLONG    /* File name too long */
+ENOLCK          :: Platform_Error.ENOLCK          /* No record locks available */
 
-ENOSYS:         Errno : 38	/* Invalid system call number */
+ENOSYS          :: Platform_Error.ENOSYS          /* Invalid system call number */
 
-ENOTEMPTY:      Errno : 39	/* Directory not empty */
-ELOOP:          Errno : 40	/* Too many symbolic links encountered */
-EWOULDBLOCK:    Errno : EAGAIN /* Operation would block */
-ENOMSG:         Errno : 42	/* No message of desired type */
-EIDRM:          Errno : 43	/* Identifier removed */
-ECHRNG:         Errno : 44	/* Channel number out of range */
-EL2NSYNC:       Errno : 45	/* Level 2 not synchronized */
-EL3HLT:         Errno : 46	/* Level 3 halted */
-EL3RST:         Errno : 47	/* Level 3 reset */
-ELNRNG:         Errno : 48	/* Link number out of range */
-EUNATCH:        Errno : 49	/* Protocol driver not attached */
-ENOCSI:         Errno : 50	/* No CSI structure available */
-EL2HLT:         Errno : 51	/* Level 2 halted */
-EBADE:          Errno : 52	/* Invalid exchange */
-EBADR:          Errno : 53	/* Invalid request descriptor */
-EXFULL:         Errno : 54	/* Exchange full */
-ENOANO:         Errno : 55	/* No anode */
-EBADRQC:        Errno : 56	/* Invalid request code */
-EBADSLT:        Errno : 57	/* Invalid slot */
-EDEADLOCK:      Errno : EDEADLK
-EBFONT:         Errno : 59	/* Bad font file format */
-ENOSTR:         Errno : 60	/* Device not a stream */
-ENODATA:        Errno : 61	/* No data available */
-ETIME:          Errno : 62	/* Timer expired */
-ENOSR:          Errno : 63	/* Out of streams resources */
-ENONET:         Errno : 64	/* Machine is not on the network */
-ENOPKG:         Errno : 65	/* Package not installed */
-EREMOTE:        Errno : 66	/* Object is remote */
-ENOLINK:        Errno : 67	/* Link has been severed */
-EADV:           Errno : 68	/* Advertise error */
-ESRMNT:         Errno : 69	/* Srmount error */
-ECOMM:          Errno : 70	/* Communication error on send */
-EPROTO:         Errno : 71	/* Protocol error */
-EMULTIHOP:      Errno : 72	/* Multihop attempted */
-EDOTDOT:        Errno : 73	/* RFS specific error */
-EBADMSG:        Errno : 74	/* Not a data message */
-EOVERFLOW:      Errno : 75	/* Value too large for defined data type */
-ENOTUNIQ:       Errno : 76	/* Name not unique on network */
-EBADFD:         Errno : 77	/* File descriptor in bad state */
-EREMCHG:        Errno : 78	/* Remote address changed */
-ELIBACC:        Errno : 79	/* Can not access a needed shared library */
-ELIBBAD:        Errno : 80	/* Accessing a corrupted shared library */
-ELIBSCN:        Errno : 81	/* .lib section in a.out corrupted */
-ELIBMAX:        Errno : 82	/* Attempting to link in too many shared libraries */
-ELIBEXEC:       Errno : 83	/* Cannot exec a shared library directly */
-EILSEQ:         Errno : 84	/* Illegal byte sequence */
-ERESTART:       Errno : 85	/* Interrupted system call should be restarted */
-ESTRPIPE:       Errno : 86	/* Streams pipe error */
-EUSERS:         Errno : 87	/* Too many users */
-ENOTSOCK:       Errno : 88	/* Socket operation on non-socket */
-EDESTADDRREQ:   Errno : 89	/* Destination address required */
-EMSGSIZE:       Errno : 90	/* Message too long */
-EPROTOTYPE:     Errno : 91	/* Protocol wrong type for socket */
-ENOPROTOOPT:    Errno : 92	/* Protocol not available */
-EPROTONOSUPPORT:Errno : 93	/* Protocol not supported */
-ESOCKTNOSUPPORT:Errno : 94	/* Socket type not supported */
-EOPNOTSUPP: 	Errno : 95	/* Operation not supported on transport endpoint */
-EPFNOSUPPORT: 	Errno : 96	/* Protocol family not supported */
-EAFNOSUPPORT: 	Errno : 97	/* Address family not supported by protocol */
-EADDRINUSE: 	Errno : 98	/* Address already in use */
-EADDRNOTAVAIL: 	Errno : 99	/* Cannot assign requested address */
-ENETDOWN: 		Errno : 100	/* Network is down */
-ENETUNREACH: 	Errno : 101	/* Network is unreachable */
-ENETRESET: 		Errno : 102	/* Network dropped connection because of reset */
-ECONNABORTED: 	Errno : 103	/* Software caused connection abort */
-ECONNRESET: 	Errno : 104	/* Connection reset by peer */
-ENOBUFS: 		Errno : 105	/* No buffer space available */
-EISCONN: 		Errno : 106	/* Transport endpoint is already connected */
-ENOTCONN: 		Errno : 107	/* Transport endpoint is not connected */
-ESHUTDOWN: 		Errno : 108	/* Cannot send after transport endpoint shutdown */
-ETOOMANYREFS: 	Errno : 109	/* Too many references: cannot splice */
-ETIMEDOUT: 		Errno : 110	/* Connection timed out */
-ECONNREFUSED: 	Errno : 111	/* Connection refused */
-EHOSTDOWN: 		Errno : 112	/* Host is down */
-EHOSTUNREACH: 	Errno : 113	/* No route to host */
-EALREADY: 		Errno : 114	/* Operation already in progress */
-EINPROGRESS: 	Errno : 115	/* Operation now in progress */
-ESTALE: 		Errno : 116	/* Stale file handle */
-EUCLEAN: 		Errno : 117	/* Structure needs cleaning */
-ENOTNAM: 		Errno : 118	/* Not a XENIX named type file */
-ENAVAIL: 		Errno : 119	/* No XENIX semaphores available */
-EISNAM: 		Errno : 120	/* Is a named type file */
-EREMOTEIO: 		Errno : 121	/* Remote I/O error */
-EDQUOT: 		Errno : 122	/* Quota exceeded */
+ENOTEMPTY       :: Platform_Error.ENOTEMPTY       /* Directory not empty */
+ELOOP           :: Platform_Error.ELOOP           /* Too many symbolic links encountered */
+EWOULDBLOCK     :: Platform_Error.EWOULDBLOCK     /* Operation would block */
+ENOMSG          :: Platform_Error.ENOMSG          /* No message of desired type */
+EIDRM           :: Platform_Error.EIDRM           /* Identifier removed */
+ECHRNG          :: Platform_Error.ECHRNG          /* Channel number out of range */
+EL2NSYNC        :: Platform_Error.EL2NSYNC        /* Level 2 not synchronized */
+EL3HLT          :: Platform_Error.EL3HLT          /* Level 3 halted */
+EL3RST          :: Platform_Error.EL3RST          /* Level 3 reset */
+ELNRNG          :: Platform_Error.ELNRNG          /* Link number out of range */
+EUNATCH         :: Platform_Error.EUNATCH         /* Protocol driver not attached */
+ENOCSI          :: Platform_Error.ENOCSI          /* No CSI structure available */
+EL2HLT          :: Platform_Error.EL2HLT          /* Level 2 halted */
+EBADE           :: Platform_Error.EBADE           /* Invalid exchange */
+EBADR           :: Platform_Error.EBADR           /* Invalid request descriptor */
+EXFULL          :: Platform_Error.EXFULL          /* Exchange full */
+ENOANO          :: Platform_Error.ENOANO          /* No anode */
+EBADRQC         :: Platform_Error.EBADRQC         /* Invalid request code */
+EBADSLT         :: Platform_Error.EBADSLT         /* Invalid slot */
+EDEADLOCK       :: Platform_Error.EDEADLOCK
+EBFONT          :: Platform_Error.EBFONT          /* Bad font file format */
+ENOSTR          :: Platform_Error.ENOSTR          /* Device not a stream */
+ENODATA         :: Platform_Error.ENODATA         /* No data available */
+ETIME           :: Platform_Error.ETIME           /* Timer expired */
+ENOSR           :: Platform_Error.ENOSR           /* Out of streams resources */
+ENONET          :: Platform_Error.ENONET          /* Machine is not on the network */
+ENOPKG          :: Platform_Error.ENOPKG          /* Package not installed */
+EREMOTE         :: Platform_Error.EREMOTE         /* Object is remote */
+ENOLINK         :: Platform_Error.ENOLINK         /* Link has been severed */
+EADV            :: Platform_Error.EADV            /* Advertise error */
+ESRMNT          :: Platform_Error.ESRMNT          /* Srmount error */
+ECOMM           :: Platform_Error.ECOMM           /* Communication error on send */
+EPROTO          :: Platform_Error.EPROTO          /* Protocol error */
+EMULTIHOP       :: Platform_Error.EMULTIHOP       /* Multihop attempted */
+EDOTDOT         :: Platform_Error.EDOTDOT         /* RFS specific error */
+EBADMSG         :: Platform_Error.EBADMSG         /* Not a data message */
+EOVERFLOW       :: Platform_Error.EOVERFLOW       /* Value too large for defined data type */
+ENOTUNIQ        :: Platform_Error.ENOTUNIQ        /* Name not unique on network */
+EBADFD          :: Platform_Error.EBADFD          /* File descriptor in bad state */
+EREMCHG         :: Platform_Error.EREMCHG         /* Remote address changed */
+ELIBACC         :: Platform_Error.ELIBACC         /* Can not access a needed shared library */
+ELIBBAD         :: Platform_Error.ELIBBAD         /* Accessing a corrupted shared library */
+ELIBSCN         :: Platform_Error.ELIBSCN         /* .lib section in a.out corrupted */
+ELIBMAX         :: Platform_Error.ELIBMAX         /* Attempting to link in too many shared libraries */
+ELIBEXEC        :: Platform_Error.ELIBEXEC        /* Cannot exec a shared library directly */
+EILSEQ          :: Platform_Error.EILSEQ          /* Illegal byte sequence */
+ERESTART        :: Platform_Error.ERESTART        /* Interrupted system call should be restarted */
+ESTRPIPE        :: Platform_Error.ESTRPIPE        /* Streams pipe error */
+EUSERS          :: Platform_Error.EUSERS          /* Too many users */
+ENOTSOCK        :: Platform_Error.ENOTSOCK        /* Socket operation on non-socket */
+EDESTADDRREQ    :: Platform_Error.EDESTADDRREQ    /* Destination address required */
+EMSGSIZE        :: Platform_Error.EMSGSIZE        /* Message too long */
+EPROTOTYPE      :: Platform_Error.EPROTOTYPE      /* Protocol wrong type for socket */
+ENOPROTOOPT     :: Platform_Error.ENOPROTOOPT     /* Protocol not available */
+EPROTONOSUPPOR  :: Platform_Error.EPROTONOSUPPORT /* Protocol not supported */
+ESOCKTNOSUPPOR  :: Platform_Error.ESOCKTNOSUPPORT /* Socket type not supported */
+EOPNOTSUPP      :: Platform_Error.EOPNOTSUPP      /* Operation not supported on transport endpoint */
+EPFNOSUPPORT    :: Platform_Error.EPFNOSUPPORT    /* Protocol family not supported */
+EAFNOSUPPORT    :: Platform_Error.EAFNOSUPPORT    /* Address family not supported by protocol */
+EADDRINUSE      :: Platform_Error.EADDRINUSE      /* Address already in use */
+EADDRNOTAVAIL   :: Platform_Error.EADDRNOTAVAIL   /* Cannot assign requested address */
+ENETDOWN        :: Platform_Error.ENETDOWN        /* Network is down */
+ENETUNREACH     :: Platform_Error.ENETUNREACH     /* Network is unreachable */
+ENETRESET       :: Platform_Error.ENETRESET       /* Network dropped connection because of reset */
+ECONNABORTED    :: Platform_Error.ECONNABORTED    /* Software caused connection abort */
+ECONNRESET      :: Platform_Error.ECONNRESET      /* Connection reset by peer */
+ENOBUFS         :: Platform_Error.ENOBUFS         /* No buffer space available */
+EISCONN         :: Platform_Error.EISCONN         /* Transport endpoint is already connected */
+ENOTCONN        :: Platform_Error.ENOTCONN        /* Transport endpoint is not connected */
+ESHUTDOWN       :: Platform_Error.ESHUTDOWN       /* Cannot send after transport endpoint shutdown */
+ETOOMANYREFS    :: Platform_Error.ETOOMANYREFS    /* Too many references: cannot splice */
+ETIMEDOUT       :: Platform_Error.ETIMEDOUT       /* Connection timed out */
+ECONNREFUSED    :: Platform_Error.ECONNREFUSED    /* Connection refused */
+EHOSTDOWN       :: Platform_Error.EHOSTDOWN       /* Host is down */
+EHOSTUNREACH    :: Platform_Error.EHOSTUNREACH    /* No route to host */
+EALREADY        :: Platform_Error.EALREADY        /* Operation already in progress */
+EINPROGRESS     :: Platform_Error.EINPROGRESS     /* Operation now in progress */
+ESTALE          :: Platform_Error.ESTALE          /* Stale file handle */
+EUCLEAN         :: Platform_Error.EUCLEAN         /* Structure needs cleaning */
+ENOTNAM         :: Platform_Error.ENOTNAM         /* Not a XENIX named type file */
+ENAVAIL         :: Platform_Error.ENAVAIL         /* No XENIX semaphores available */
+EISNAM          :: Platform_Error.EISNAM          /* Is a named type file */
+EREMOTEIO       :: Platform_Error.EREMOTEIO       /* Remote I/O error */
+EDQUOT          :: Platform_Error.EDQUOT          /* Quota exceeded */
 
-ENOMEDIUM: 		Errno : 123	/* No medium found */
-EMEDIUMTYPE: 	Errno : 124	/* Wrong medium type */
-ECANCELED: 		Errno : 125	/* Operation Canceled */
-ENOKEY: 		Errno : 126	/* Required key not available */
-EKEYEXPIRED: 	Errno : 127	/* Key has expired */
-EKEYREVOKED: 	Errno : 128	/* Key has been revoked */
-EKEYREJECTED: 	Errno : 129	/* Key was rejected by service */
+ENOMEDIUM       :: Platform_Error.ENOMEDIUM       /* No medium found */
+EMEDIUMTYPE     :: Platform_Error.EMEDIUMTYPE     /* Wrong medium type */
+ECANCELED       :: Platform_Error.ECANCELED       /* Operation Canceled */
+ENOKEY          :: Platform_Error.ENOKEY          /* Required key not available */
+EKEYEXPIRED     :: Platform_Error.EKEYEXPIRED     /* Key has expired */
+EKEYREVOKED     :: Platform_Error.EKEYREVOKED     /* Key has been revoked */
+EKEYREJECTED    :: Platform_Error.EKEYREJECTED    /* Key was rejected by service */
 
 /* for robust mutexes */
-EOWNERDEAD: 	Errno : 130	/* Owner died */
-ENOTRECOVERABLE: Errno : 131	/* State not recoverable */
+EOWNERDEAD      :: Platform_Error.EOWNERDEAD      /* Owner died */
+ENOTRECOVERABLE :: Platform_Error.ENOTRECOVERABLE /* State not recoverable */
 
-ERFKILL: 		Errno : 132	/* Operation not possible due to RF-kill */
+ERFKILL   :: Platform_Error.ERFKILL               /* Operation not possible due to RF-kill */
 
-EHWPOISON: 		Errno : 133	/* Memory page has hardware error */
+EHWPOISON :: Platform_Error.EHWPOISON             /* Memory page has hardware error */
 
 ADDR_NO_RANDOMIZE :: 0x40000
 
@@ -520,8 +520,8 @@ _get_errno :: proc(res: int) -> Errno {
 }
 
 // get errno from libc
-get_last_error :: proc "contextless" () -> int {
-	return int(__errno_location()^)
+get_last_error :: proc "contextless" () -> Error {
+	return Error(__errno_location()^)
 }
 
 personality :: proc(persona: u64) -> (Errno) {

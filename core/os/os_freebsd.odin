@@ -9,105 +9,200 @@ import "core:c"
 
 Handle :: distinct i32
 File_Time :: distinct u64
-Errno :: distinct i32
 
 INVALID_HANDLE :: ~Handle(0)
 
-ERROR_NONE:      Errno : 0
-EPERM:           Errno : 1
-ENOENT:          Errno : 2
-ESRCH:           Errno : 3
-EINTR:           Errno : 4
-EIO:             Errno : 5
-ENXIO:           Errno : 6
-E2BIG:           Errno : 7
-ENOEXEC:         Errno : 8
-EBADF:           Errno : 9
-ECHILD:          Errno : 10
-EBEADLK:         Errno : 11
-ENOMEM:          Errno : 12
-EACCESS:         Errno : 13
-EFAULT:          Errno : 14
-ENOTBLK:         Errno : 15
-EBUSY:           Errno : 16
-EEXIST:          Errno : 17
-EXDEV:           Errno : 18
-ENODEV:          Errno : 19
-ENOTDIR:         Errno : 20
-EISDIR:          Errno : 21
-EINVAL:          Errno : 22
-ENFILE:          Errno : 23
-EMFILE:          Errno : 24
-ENOTTY:          Errno : 25
-ETXTBSY:         Errno : 26
-EFBIG:           Errno : 27
-ENOSPC:          Errno : 28
-ESPIPE:          Errno : 29
-EROFS:           Errno : 30
-EMLINK:          Errno : 31
-EPIPE:           Errno : 32
-EDOM:            Errno : 33
-ERANGE:          Errno : 34 /* Result too large */
-EAGAIN:          Errno : 35
-EINPROGRESS:     Errno : 36
-EALREADY:        Errno : 37
-ENOTSOCK:        Errno : 38
-EDESTADDRREQ:    Errno : 39
-EMSGSIZE:        Errno : 40
-EPROTOTYPE:      Errno : 41
-ENOPROTOOPT:     Errno : 42
-EPROTONOSUPPORT: Errno : 43
-ESOCKTNOSUPPORT: Errno : 44
-EOPNOTSUPP:      Errno : 45
-EPFNOSUPPORT:    Errno : 46
-EAFNOSUPPORT:    Errno : 47
-EADDRINUSE:      Errno : 48
-EADDRNOTAVAIL:   Errno : 49
-ENETDOWN:        Errno : 50
-ENETUNREACH:     Errno : 51
-ENETRESET:       Errno : 52
-ECONNABORTED:    Errno : 53
-ECONNRESET:      Errno : 54
-ENOBUFS:         Errno : 55
-EISCONN:         Errno : 56
-ENOTCONN:        Errno : 57
-ESHUTDOWN:       Errno : 58
-ETIMEDOUT:       Errno : 60
-ECONNREFUSED:    Errno : 61
-ELOOP:           Errno : 62
-ENAMETOOLING:    Errno : 63
-EHOSTDOWN:       Errno : 64
-EHOSTUNREACH:    Errno : 65
-ENOTEMPTY:       Errno : 66
-EPROCLIM:        Errno : 67
-EUSERS:          Errno : 68
-EDQUOT:          Errno : 69
-ESTALE:          Errno : 70
-EBADRPC:         Errno : 72
-ERPCMISMATCH:    Errno : 73
-EPROGUNAVAIL:    Errno : 74
-EPROGMISMATCH:   Errno : 75
-EPROCUNAVAIL:    Errno : 76
-ENOLCK:          Errno : 77
-ENOSYS:          Errno : 78
-EFTYPE:          Errno : 79
-EAUTH:           Errno : 80
-ENEEDAUTH:       Errno : 81
-EIDRM:           Errno : 82
-ENOMSG:          Errno : 83
-EOVERFLOW:       Errno : 84
-ECANCELED:       Errno : 85
-EILSEQ:          Errno : 86
-ENOATTR:         Errno : 87
-EDOOFUS:         Errno : 88
-EBADMSG:         Errno : 89
-EMULTIHOP:       Errno : 90
-ENOLINK:         Errno : 91
-EPROTO:          Errno : 92
-ENOTCAPABLE:     Errno : 93
-ECAPMODE:        Errno : 94
-ENOTRECOVERABLE: Errno : 95
-EOWNERDEAD:      Errno : 96
+_Platform_Error :: enum i32 {
+	NONE            = 0,
+	EPERM           = 1,
+	ENOENT          = 2,
+	ESRCH           = 3,
+	EINTR           = 4,
+	EIO             = 5,
+	ENXIO           = 6,
+	E2BIG           = 7,
+	ENOEXEC         = 8,
+	EBADF           = 9,
+	ECHILD          = 10,
+	EBEADLK         = 11,
+	ENOMEM          = 12,
+	EACCESS         = 13,
+	EFAULT          = 14,
+	ENOTBLK         = 15,
+	EBUSY           = 16,
+	EEXIST          = 17,
+	EXDEV           = 18,
+	ENODEV          = 19,
+	ENOTDIR         = 20,
+	EISDIR          = 21,
+	EINVAL          = 22,
+	ENFILE          = 23,
+	EMFILE          = 24,
+	ENOTTY          = 25,
+	ETXTBSY         = 26,
+	EFBIG           = 27,
+	ENOSPC          = 28,
+	ESPIPE          = 29,
+	EROFS           = 30,
+	EMLINK          = 31,
+	EPIPE           = 32,
+	EDOM            = 33,
+	ERANGE          = 34, /* Result too large */
+	EAGAIN          = 35,
+	EINPROGRESS     = 36,
+	EALREADY        = 37,
+	ENOTSOCK        = 38,
+	EDESTADDRREQ    = 39,
+	EMSGSIZE        = 40,
+	EPROTOTYPE      = 41,
+	ENOPROTOOPT     = 42,
+	EPROTONOSUPPORT = 43,
+	ESOCKTNOSUPPORT = 44,
+	EOPNOTSUPP      = 45,
+	EPFNOSUPPORT    = 46,
+	EAFNOSUPPORT    = 47,
+	EADDRINUSE      = 48,
+	EADDRNOTAVAIL   = 49,
+	ENETDOWN        = 50,
+	ENETUNREACH     = 51,
+	ENETRESET       = 52,
+	ECONNABORTED    = 53,
+	ECONNRESET      = 54,
+	ENOBUFS         = 55,
+	EISCONN         = 56,
+	ENOTCONN        = 57,
+	ESHUTDOWN       = 58,
+	ETIMEDOUT       = 60,
+	ECONNREFUSED    = 61,
+	ELOOP           = 62,
+	ENAMETOOLING    = 63,
+	EHOSTDOWN       = 64,
+	EHOSTUNREACH    = 65,
+	ENOTEMPTY       = 66,
+	EPROCLIM        = 67,
+	EUSERS          = 68,
+	EDQUOT          = 69,
+	ESTALE          = 70,
+	EBADRPC         = 72,
+	ERPCMISMATCH    = 73,
+	EPROGUNAVAIL    = 74,
+	EPROGMISMATCH   = 75,
+	EPROCUNAVAIL    = 76,
+	ENOLCK          = 77,
+	ENOSYS          = 78,
+	EFTYPE          = 79,
+	EAUTH           = 80,
+	ENEEDAUTH       = 81,
+	EIDRM           = 82,
+	ENOMSG          = 83,
+	EOVERFLOW       = 84,
+	ECANCELED       = 85,
+	EILSEQ          = 86,
+	ENOATTR         = 87,
+	EDOOFUS         = 88,
+	EBADMSG         = 89,
+	EMULTIHOP       = 90,
+	ENOLINK         = 91,
+	EPROTO          = 92,
+	ENOTCAPABLE     = 93,
+	ECAPMODE        = 94,
+	ENOTRECOVERABLE = 95,
+	EOWNERDEAD      = 96,
+}
+EPERM           :: Platform_Error.EPERM
+ENOENT          :: Platform_Error.ENOENT
+ESRCH           :: Platform_Error.ESRCH
+EINTR           :: Platform_Error.EINTR
+EIO             :: Platform_Error.EIO
+ENXIO           :: Platform_Error.ENXIO
+E2BIG           :: Platform_Error.E2BIG
+ENOEXEC         :: Platform_Error.ENOEXEC
+EBADF           :: Platform_Error.EBADF
+ECHILD          :: Platform_Error.ECHILD
+EBEADLK         :: Platform_Error.EBEADLK
+ENOMEM          :: Platform_Error.ENOMEM
+EACCESS         :: Platform_Error.EACCESS
+EFAULT          :: Platform_Error.EFAULT
+ENOTBLK         :: Platform_Error.ENOTBLK
+EBUSY           :: Platform_Error.EBUSY
+EEXIST          :: Platform_Error.EEXIST
+EXDEV           :: Platform_Error.EXDEV
+ENODEV          :: Platform_Error.ENODEV
+ENOTDIR         :: Platform_Error.ENOTDIR
+EISDIR          :: Platform_Error.EISDIR
+EINVAL          :: Platform_Error.EINVAL
+ENFILE          :: Platform_Error.ENFILE
+EMFILE          :: Platform_Error.EMFILE
+ENOTTY          :: Platform_Error.ENOTTY
+ETXTBSY         :: Platform_Error.ETXTBSY
+EFBIG           :: Platform_Error.EFBIG
+ENOSPC          :: Platform_Error.ENOSPC
+ESPIPE          :: Platform_Error.ESPIPE
+EROFS           :: Platform_Error.EROFS
+EMLINK          :: Platform_Error.EMLINK
+EPIPE           :: Platform_Error.EPIPE
+EDOM            :: Platform_Error.EDOM
+ERANGE          :: Platform_Error.ERANGE
+EAGAIN          :: Platform_Error.EAGAIN
+EINPROGRESS     :: Platform_Error.EINPROGRESS
+EALREADY        :: Platform_Error.EALREADY
+ENOTSOCK        :: Platform_Error.ENOTSOCK
+EDESTADDRREQ    :: Platform_Error.EDESTADDRREQ
+EMSGSIZE        :: Platform_Error.EMSGSIZE
+EPROTOTYPE      :: Platform_Error.EPROTOTYPE
+ENOPROTOOPT     :: Platform_Error.ENOPROTOOPT
+EPROTONOSUPPORT :: Platform_Error.EPROTONOSUPPORT
+ESOCKTNOSUPPORT :: Platform_Error.ESOCKTNOSUPPORT
+EOPNOTSUPP      :: Platform_Error.EOPNOTSUPP
+EPFNOSUPPORT    :: Platform_Error.EPFNOSUPPORT
+EAFNOSUPPORT    :: Platform_Error.EAFNOSUPPORT
+EADDRINUSE      :: Platform_Error.EADDRINUSE
+EADDRNOTAVAIL   :: Platform_Error.EADDRNOTAVAIL
+ENETDOWN        :: Platform_Error.ENETDOWN
+ENETUNREACH     :: Platform_Error.ENETUNREACH
+ENETRESET       :: Platform_Error.ENETRESET
+ECONNABORTED    :: Platform_Error.ECONNABORTED
+ECONNRESET      :: Platform_Error.ECONNRESET
+ENOBUFS         :: Platform_Error.ENOBUFS
+EISCONN         :: Platform_Error.EISCONN
+ENOTCONN        :: Platform_Error.ENOTCONN
+ESHUTDOWN       :: Platform_Error.ESHUTDOWN
+ETIMEDOUT       :: Platform_Error.ETIMEDOUT
+ECONNREFUSED    :: Platform_Error.ECONNREFUSED
+ELOOP           :: Platform_Error.ELOOP
+ENAMETOOLING    :: Platform_Error.ENAMETOOLING
+EHOSTDOWN       :: Platform_Error.EHOSTDOWN
+EHOSTUNREACH    :: Platform_Error.EHOSTUNREACH
+ENOTEMPTY       :: Platform_Error.ENOTEMPTY
+EPROCLIM        :: Platform_Error.EPROCLIM
+EUSERS          :: Platform_Error.EUSERS
+EDQUOT          :: Platform_Error.EDQUOT
+ESTALE          :: Platform_Error.ESTALE
+EBADRPC         :: Platform_Error.EBADRPC
+ERPCMISMATCH    :: Platform_Error.ERPCMISMATCH
+EPROGUNAVAIL    :: Platform_Error.EPROGUNAVAIL
+EPROGMISMATCH   :: Platform_Error.EPROGMISMATCH
+EPROCUNAVAIL    :: Platform_Error.EPROCUNAVAIL
+ENOLCK          :: Platform_Error.ENOLCK
+ENOSYS          :: Platform_Error.ENOSYS
+EFTYPE          :: Platform_Error.EFTYPE
+EAUTH           :: Platform_Error.EAUTH
+ENEEDAUTH       :: Platform_Error.ENEEDAUTH
+EIDRM           :: Platform_Error.EIDRM
+ENOMSG          :: Platform_Error.ENOMSG
+EOVERFLOW       :: Platform_Error.EOVERFLOW
+ECANCELED       :: Platform_Error.ECANCELED
+EILSEQ          :: Platform_Error.EILSEQ
+ENOATTR         :: Platform_Error.ENOATTR
+EDOOFUS         :: Platform_Error.EDOOFUS
+EBADMSG         :: Platform_Error.EBADMSG
+EMULTIHOP       :: Platform_Error.EMULTIHOP
+ENOLINK         :: Platform_Error.ENOLINK
+EPROTO          :: Platform_Error.EPROTO
+ENOTCAPABLE     :: Platform_Error.ENOTCAPABLE
+ECAPMODE        :: Platform_Error.ECAPMODE
+ENOTRECOVERABLE :: Platform_Error.ENOTRECOVERABLE
+EOWNERDEAD      :: Platform_Error.EOWNERDEAD
 
 O_RDONLY   :: 0x00000
 O_WRONLY   :: 0x00001
@@ -324,8 +419,8 @@ is_path_separator :: proc(r: rune) -> bool {
 	return r == '/'
 }
 
-get_last_error :: proc "contextless" () -> int {
-	return int(__errno_location()^)
+get_last_error :: proc "contextless" () -> Error {
+	return Error(__errno_location()^)
 }
 
 open :: proc(path: string, flags: int = O_RDONLY, mode: int = 0) -> (Handle, Errno) {

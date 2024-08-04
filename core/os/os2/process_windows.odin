@@ -101,7 +101,7 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 	if selection >= {.PPid, .Priority} {
 		entry, entry_err := _process_entry_by_pid(info.pid)
 		if entry_err != nil {
-			err = General_Error.Not_Exist
+			err = GeneralPlatform_Error.Not_Exist
 			return
 		}
 		if .PPid in selection {
@@ -147,7 +147,7 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 		}
 		if process_info.PebBaseAddress == nil {
 			// Not sure what the error is
-			err = General_Error.Unsupported
+			err = GeneralPlatform_Error.Unsupported
 			return
 		}
 		process_peb: win32.PEB
@@ -210,7 +210,7 @@ _process_info_by_handle :: proc(process: Process, selection: Process_Info_Fields
 	if selection >= {.PPid, .Priority} { // snap process
 		entry, entry_err := _process_entry_by_pid(info.pid)
 		if entry_err != nil {
-			err = General_Error.Not_Exist
+			err = GeneralPlatform_Error.Not_Exist
 			return
 		}
 		if .PPid in selection {
@@ -239,7 +239,7 @@ _process_info_by_handle :: proc(process: Process, selection: Process_Info_Fields
 		}
 		if process_info.PebBaseAddress == nil {
 			// Not sure what the error is
-			err = General_Error.Unsupported
+			err = GeneralPlatform_Error.Unsupported
 			return
 		}
 
@@ -301,7 +301,7 @@ _current_process_info :: proc(selection: Process_Info_Fields, allocator: runtime
 	if selection >= {.PPid, .Priority} { // snap process
 		entry, entry_err := _process_entry_by_pid(info.pid)
 		if entry_err != nil {
-			err = General_Error.Not_Exist
+			err = GeneralPlatform_Error.Not_Exist
 			return
 		}
 		if .PPid in selection {
@@ -459,7 +459,7 @@ _process_wait :: proc(process: Process, timeout: time.Duration) -> (process_stat
 		}
 		return
 	case win32.WAIT_TIMEOUT:
-		err = General_Error.Timeout
+		err = GeneralPlatform_Error.Timeout
 		return
 	case:
 		err = _get_platform_error()
@@ -508,7 +508,7 @@ _process_entry_by_pid :: proc(pid: int) -> (entry: win32.PROCESSENTRY32W, err: E
 		}
 		status = win32.Process32NextW(snap, &entry)
 	}
-	err = General_Error.Not_Exist
+	err = GeneralPlatform_Error.Not_Exist
 	return
 }
 

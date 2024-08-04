@@ -399,7 +399,7 @@ cpu_topology_node_info :: struct {
 		},
 		_package: struct {
 			vendor:          cpu_vendor,
-			cache_line_size: u32
+			cache_line_size: u32,
 		},
 		_core: struct {
 			model:             u32,

@@ -127,6 +127,8 @@ gb_internal bool complete_soa_type(Checker *checker, Type *t, bool wait_to_finis
 
 gb_internal bool check_is_castable_to(CheckerContext *c, Operand *operand, Type *y);
 
+gb_internal bool is_exact_value_zero(ExactValue const &v);
+
 enum LoadDirectiveResult {
 	LoadDirective_Success  = 0,
 	LoadDirective_Error    = 1,
@@ -4364,6 +4366,25 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 	}
 
 	switch (t->kind) {
+	// IMPORTANT NOTE HACK(bill): This is just to allow for comparisons against `0` with the `os.Error` type
+	// as a kind of transition period
+	case Type_Enum:
+		if (operand->mode == Addressing_Constant &&
+		    target_type->kind == Type_Named &&
+		    target_type->Named.name == "Error") {
+			Entity *e = target_type->Named.type_name;
+			if (e->pkg && e->pkg->name == "os") {
+				if (is_exact_value_zero(operand->value)) {
+					check_is_expressible(c, operand, t);
+					if (operand->mode == Addressing_Invalid) {
+						return;
+					}
+					update_untyped_expr_value(c, operand->expr, operand->value);
+				}
+			}
+		}
+		break;
+
 	case Type_Basic:
 		if (operand->mode == Addressing_Constant) {
 			check_is_expressible(c, operand, t);

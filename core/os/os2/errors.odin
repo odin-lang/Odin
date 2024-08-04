@@ -3,7 +3,7 @@ package os2
 import "core:io"
 import "base:runtime"
 
-General_Error :: enum u32 {
+General_Platform_Error :: enum u32 {
 	None,
 
 	Permission_Denied,
@@ -29,7 +29,7 @@ General_Error :: enum u32 {
 	Unsupported,
 }
 
-Platform_Error :: enum i32 {None=0}
+Platform_Platform_Error :: enum i32 {None=0}
 
 Error :: union #shared_nil {
 	General_Error,
@@ -43,7 +43,7 @@ ERROR_NONE :: Error{}
 
 
 
-is_platform_error :: proc(ferr: Error) -> (err: i32, ok: bool) {
+is_platform_Platform_Error :: proc(ferr: Error) -> (err: i32, ok: bool) {
 	v := ferr.(Platform_Error) or_else {}
 	return i32(v), i32(v) != 0
 }
@@ -104,7 +104,7 @@ error_string :: proc(ferr: Error) -> string {
 	return "unknown error"
 }
 
-print_error :: proc(f: ^File, ferr: Error, msg: string) {
+print_Platform_Error :: proc(f: ^File, ferr: Error, msg: string) {
 	TEMP_ALLOCATOR_GUARD()
 	err_str := error_string(ferr)
 
