@@ -119,7 +119,7 @@ S_ISSOCK :: #force_inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFSOCK
 
 
 foreign libc {
-	@(link_name="_Errorp")	__error		:: proc() -> ^c.int ---
+	@(link_name="_errorp")	__error		:: proc() -> ^c.int ---
 
 	@(link_name="fork")	_unix_fork	:: proc() -> pid_t ---
 	@(link_name="getthrid")	_unix_getthrid	:: proc() -> int ---
