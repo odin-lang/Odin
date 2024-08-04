@@ -29,6 +29,24 @@ These specifiers can be composed together, such as an optional group:
 This package also supports the non-greedy variants of the repeating and
 optional specifiers by appending a `?` to them.
 
+Of the shorthand classes that are supported, they are all ASCII-based, even
+when compiling in Unicode mode. This is for the sake of general performance and
+simplicity, as there are thousands of Unicode codepoints which would qualify as
+either a digit, space, or word character which could be irrelevant depending on
+what is being matched.
+
+Here are the shorthand class equivalencies:
+	\d: [0-9]
+	\s: [\t\n\f\r ]
+	\w: [0-9A-Z_a-z]
+
+If you need your own shorthands, you can compose strings together like so:
+	MY_HEX :: "[0-9A-Fa-f]"
+	PATTERN :: MY_HEX + "-" + MY_HEX
+
+The compiler will handle turning multiple identical classes into references to
+the same set of matching runes, so there's no penalty for doing it like this.
+
 
 
 	``Some people, when confronted with a problem, think
