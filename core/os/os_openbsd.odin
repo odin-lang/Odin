@@ -389,12 +389,12 @@ foreign libc {
 }
 
 @(require_results)
-is_path_separator :: proc(r: rune) -> bool {
+_is_path_separator :: proc "contextless" (r: rune) -> bool {
 	return r == '/'
 }
 
 @(require_results, no_instrumentation)
-get_last_error :: proc "contextless" () -> Error {
+_get_last_error :: proc "contextless" () -> Error {
 	return Platform_Error(__error()^)
 }
 
@@ -408,7 +408,7 @@ fork :: proc() -> (Pid, Error) {
 }
 
 @(require_results)
-open :: proc(path: string, flags: int = O_RDONLY, mode: int = 0) -> (Handle, Error) {
+_open :: proc(path: string, flags: int = O_RDONLY, mode: int = 0) -> (Handle, Error) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	cstr := strings.clone_to_cstring(path, context.temp_allocator)
 	handle := _unix_open(cstr, c.int(flags), c.int(mode))
@@ -418,7 +418,7 @@ open :: proc(path: string, flags: int = O_RDONLY, mode: int = 0) -> (Handle, Err
 	return handle, nil
 }
 
-close :: proc(fd: Handle) -> Error {
+_close :: proc(fd: Handle) -> Error {
 	result := _unix_close(fd)
 	if result == -1 {
 		return get_last_error()
@@ -426,7 +426,7 @@ close :: proc(fd: Handle) -> Error {
 	return nil
 }
 
-flush :: proc(fd: Handle) -> Error {
+_flush :: proc(fd: Handle) -> Error {
 	// do nothing
 	return nil
 }
@@ -439,7 +439,7 @@ flush :: proc(fd: Handle) -> Error {
 @(private)
 MAX_RW :: 1 << 30
 
-read :: proc(fd: Handle, data: []byte) -> (int, Error) {
+_read :: proc(fd: Handle, data: []byte) -> (int, Error) {
 	to_read    := min(c.size_t(len(data)), MAX_RW)
 	bytes_read := _unix_read(fd, &data[0], to_read)
 	if bytes_read == -1 {
@@ -448,7 +448,7 @@ read :: proc(fd: Handle, data: []byte) -> (int, Error) {
 	return int(bytes_read), nil
 }
 
-write :: proc(fd: Handle, data: []byte) -> (int, Error) {
+_write :: proc(fd: Handle, data: []byte) -> (int, Error) {
 	if len(data) == 0 {
 		return 0, nil
 	}
@@ -461,7 +461,7 @@ write :: proc(fd: Handle, data: []byte) -> (int, Error) {
 	return int(bytes_written), nil
 }
 
-read_at :: proc(fd: Handle, data: []byte, offset: i64) -> (n: int, err: Error) {
+_read_at :: proc(fd: Handle, data: []byte, offset: i64) -> (n: int, err: Error) {
 	curr := seek(fd, offset, SEEK_CUR) or_return
 	n, err = read(fd, data)
 	_, err1 := seek(fd, curr, SEEK_SET)
@@ -471,7 +471,7 @@ read_at :: proc(fd: Handle, data: []byte, offset: i64) -> (n: int, err: Error) {
 	return
 }
 
-write_at :: proc(fd: Handle, data: []byte, offset: i64) -> (n: int, err: Error) {
+_write_at :: proc(fd: Handle, data: []byte, offset: i64) -> (n: int, err: Error) {
 	curr := seek(fd, offset, SEEK_CUR) or_return
 	n, err = write(fd, data)
 	_, err1 := seek(fd, curr, SEEK_SET)
@@ -481,7 +481,7 @@ write_at :: proc(fd: Handle, data: []byte, offset: i64) -> (n: int, err: Error) 
 	return
 }
 
-seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Error) {
+_seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Error) {
 	res := _unix_seek(fd, offset, c.int(whence))
 	if res == -1 {
 		return -1, get_last_error()
@@ -490,14 +490,18 @@ seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Error) {
 }
 
 @(require_results)
-file_size :: proc(fd: Handle) -> (size: i64, err: Error) {
+_file_size :: proc(fd: Handle) -> (size: i64, err: Error) {
 	size = -1
 	s :=  _fstat(fd) or_return
 	size = s.size
 	return
 }
 
-rename :: proc(old_path, new_path: string) -> Error {
+_exists :: proc(path: string) -> bool {
+	unimplemented("TODO: _exists")
+}
+
+_rename :: proc(old_path, new_path: string) -> Error {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	old_path_cstr := strings.clone_to_cstring(old_path, context.temp_allocator)
 	new_path_cstr := strings.clone_to_cstring(new_path, context.temp_allocator)
@@ -508,7 +512,7 @@ rename :: proc(old_path, new_path: string) -> Error {
 	return nil
 }
 
-remove :: proc(path: string) -> Error {
+_remove :: proc(path: string) -> Error {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	path_cstr := strings.clone_to_cstring(path, context.temp_allocator)
 	res := _unix_unlink(path_cstr)
@@ -518,7 +522,7 @@ remove :: proc(path: string) -> Error {
 	return nil
 }
 
-make_directory :: proc(path: string, mode: mode_t = 0o775) -> Error {
+_make_directory :: proc(path: string, mode: mode_t = 0o775) -> Error {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	path_cstr := strings.clone_to_cstring(path, context.temp_allocator)
 	res := _unix_mkdir(path_cstr, mode)
@@ -528,7 +532,7 @@ make_directory :: proc(path: string, mode: mode_t = 0o775) -> Error {
 	return nil
 }
 
-remove_directory :: proc(path: string) -> Error {
+_remove_directory :: proc(path: string) -> Error {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	path_cstr := strings.clone_to_cstring(path, context.temp_allocator)
 	res := _unix_rmdir(path_cstr)
@@ -539,7 +543,28 @@ remove_directory :: proc(path: string) -> Error {
 }
 
 @(require_results)
-is_file_handle :: proc(fd: Handle) -> bool {
+_pipe :: proc() -> (r, w: Handle, err: Error) {
+	// TODO
+	return
+}
+
+_link :: proc(old_name, new_name: string) -> (err: Error) {
+	unimplemented("TODO: _link")
+}
+_unlink :: proc(path: string) -> (err: Error) {
+	unimplemented("TODO: _unlink")
+}
+_ftruncate :: proc(fd: Handle, length: i64) -> (err: Error) {
+	unimplemented("TODO: _ftruncate")
+}
+
+_truncate :: proc(path: string, length: i64) -> (err: Error) {
+	unimplemented("TODO: _truncate")
+}
+
+
+@(require_results)
+_is_file_handle :: proc(fd: Handle) -> bool {
 	s, err := _fstat(fd)
 	if err != nil {
 		return false
@@ -548,7 +573,7 @@ is_file_handle :: proc(fd: Handle) -> bool {
 }
 
 @(require_results)
-is_file_path :: proc(path: string, follow_links: bool = true) -> bool {
+_is_file_path :: proc(path: string, follow_links: bool = true) -> bool {
 	s: OS_Stat
 	err: Error
 	if follow_links {
@@ -563,7 +588,7 @@ is_file_path :: proc(path: string, follow_links: bool = true) -> bool {
 }
 
 @(require_results)
-is_dir_handle :: proc(fd: Handle) -> bool {
+_is_dir_handle :: proc(fd: Handle) -> bool {
 	s, err := _fstat(fd)
 	if err != nil {
 		return false
@@ -572,7 +597,7 @@ is_dir_handle :: proc(fd: Handle) -> bool {
 }
 
 @(require_results)
-is_dir_path :: proc(path: string, follow_links: bool = true) -> bool {
+_is_dir_path :: proc(path: string, follow_links: bool = true) -> bool {
 	s: OS_Stat
 	err: Error
 	if follow_links {
@@ -585,9 +610,6 @@ is_dir_path :: proc(path: string, follow_links: bool = true) -> bool {
 	}
 	return S_ISDIR(s.mode)
 }
-
-is_file :: proc {is_file_path, is_file_handle}
-is_dir :: proc {is_dir_path, is_dir_handle}
 
 // NOTE(bill): Uses startup to initialize it
 
@@ -600,14 +622,14 @@ last_write_time :: proc(fd: Handle) -> File_Time {}
 last_write_time_by_name :: proc(name: string) -> File_Time {}                                                     
 */
 @(require_results)
-last_write_time :: proc(fd: Handle) -> (time: File_Time, err: Error) {
+_last_write_time :: proc(fd: Handle) -> (time: File_Time, err: Error) {
 	s := _fstat(fd) or_return
 	modified := s.modified.seconds * 1_000_000_000 + s.modified.nanoseconds
 	return File_Time(modified), nil
 }
 
 @(require_results)
-last_write_time_by_name :: proc(name: string) -> (time: File_Time, err: Error) {
+_last_write_time_by_name :: proc(name: string) -> (time: File_Time, err: Error) {
 	s := _stat(name) or_return
 	modified := s.modified.seconds * 1_000_000_000 + s.modified.nanoseconds
 	return File_Time(modified), nil
@@ -718,12 +740,12 @@ _readlink :: proc(path: string) -> (string, Error) {
 
 // XXX OpenBSD
 @(require_results)
-absolute_path_from_handle :: proc(fd: Handle) -> (string, Error) {
+_absolute_path_from_handle :: proc(fd: Handle) -> (string, Error) {
 	return "", Error(ENOSYS)
 }
 
 @(require_results)
-absolute_path_from_relative :: proc(rel: string) -> (path: string, err: Error) {
+_absolute_path_from_relative :: proc(rel: string) -> (path: string, err: Error) {
 	rel := rel
 	if rel == "" {
 		rel = "."
@@ -743,7 +765,7 @@ absolute_path_from_relative :: proc(rel: string) -> (path: string, err: Error) {
 	return path, nil
 }
 
-access :: proc(path: string, mask: int) -> (bool, Error) {
+_access :: proc(path: string, mask: int) -> (bool, Error) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	cstr := strings.clone_to_cstring(path, context.temp_allocator)
 	res := _unix_access(cstr, c.int(mask))
@@ -754,7 +776,7 @@ access :: proc(path: string, mask: int) -> (bool, Error) {
 }
 
 @(require_results)
-lookup_env :: proc(key: string, allocator := context.allocator) -> (value: string, found: bool) {
+_lookup_env :: proc(key: string, allocator := context.allocator) -> (value: string, found: bool) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD(ignore = context.temp_allocator == allocator)
 	path_str := strings.clone_to_cstring(key, context.temp_allocator)
 	cstr := _unix_getenv(path_str)
@@ -765,13 +787,30 @@ lookup_env :: proc(key: string, allocator := context.allocator) -> (value: strin
 }
 
 @(require_results)
-get_env :: proc(key: string, allocator := context.allocator) -> (value: string) {
+_get_env :: proc(key: string, allocator := context.allocator) -> (value: string) {
 	value, _ = lookup_env(key, allocator)
 	return
 }
 
 @(require_results)
-get_current_directory :: proc() -> string {
+_environ :: proc(allocator := context.allocator) -> []string {
+	unimplemented("TODO: _environ")
+}
+
+_set_env :: proc(key, value: string) -> Error {
+	unimplemented("TODO: _set_env")
+}
+_unset_env :: proc(key: string) -> Error {
+	unimplemented("TODO: _unset_env")
+}
+
+_clear_env :: proc() {
+	unimplemented("TODO: _clear_env")
+}
+
+
+@(require_results)
+_get_current_directory :: proc() -> string {
 	buf := make([dynamic]u8, MAX_PATH)
 	for {
 		cwd := _unix_getcwd(cstring(raw_data(buf)), c.size_t(len(buf)))
@@ -787,7 +826,7 @@ get_current_directory :: proc() -> string {
 	unreachable()
 }
 
-set_current_directory :: proc(path: string) -> (err: Error) {
+_set_current_directory :: proc(path: string) -> (err: Error) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	cstr := strings.clone_to_cstring(path, context.temp_allocator)
 	res := _unix_chdir(cstr)
@@ -797,13 +836,13 @@ set_current_directory :: proc(path: string) -> (err: Error) {
 	return nil
 }
 
-exit :: proc "contextless" (code: int) -> ! {
+_exit :: proc "contextless" (code: int) -> ! {
 	runtime._cleanup_runtime_contextless()
 	_unix_exit(c.int(code))
 }
 
 @(require_results)
-current_thread_id :: proc "contextless" () -> int {
+_current_thread_id :: proc "contextless" () -> int {
 	return _unix_getthrid()
 }
 
@@ -832,7 +871,7 @@ dlerror :: proc() -> string {
 }
 
 @(require_results)
-get_page_size :: proc() -> int {
+_get_page_size :: proc() -> int {
 	// NOTE(tetra): The page size never changes, so why do anything complicated
 	// if we don't have to.
 	@static page_size := -1

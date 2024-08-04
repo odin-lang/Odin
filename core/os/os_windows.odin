@@ -61,7 +61,7 @@ ERROR_FILE_IS_NOT_DIR     :: General_Error.Not_Dir
 args := _alloc_command_line_arguments()
 
 @(require_results, no_instrumentation)
-get_last_error :: proc "contextless" () -> Error {
+_get_last_error :: proc "contextless" () -> Error {
 	err := win32.GetLastError()
 	if err == 0 {
 		return nil
@@ -113,7 +113,7 @@ get_last_error :: proc "contextless" () -> Error {
 
 
 @(require_results)
-last_write_time :: proc(fd: Handle) -> (File_Time, Error) {
+_last_write_time :: proc(fd: Handle) -> (File_Time, Error) {
 	file_info: win32.BY_HANDLE_FILE_INFORMATION
 	if !win32.GetFileInformationByHandle(win32.HANDLE(fd), &file_info) {
 		return 0, get_last_error()
@@ -124,7 +124,7 @@ last_write_time :: proc(fd: Handle) -> (File_Time, Error) {
 }
 
 @(require_results)
-last_write_time_by_name :: proc(name: string) -> (File_Time, Error) {
+_last_write_time_by_name :: proc(name: string) -> (File_Time, Error) {
 	data: win32.WIN32_FILE_ATTRIBUTE_DATA
 
 	wide_path := win32.utf8_to_wstring(name)
@@ -139,7 +139,7 @@ last_write_time_by_name :: proc(name: string) -> (File_Time, Error) {
 
 
 @(require_results)
-get_page_size :: proc() -> int {
+_get_page_size :: proc() -> int {
 	// NOTE(tetra): The page size never changes, so why do anything complicated
 	// if we don't have to.
 	@static page_size := -1
@@ -177,7 +177,7 @@ _processor_core_count :: proc() -> int {
 	return thread_count
 }
 
-exit :: proc "contextless" (code: int) -> ! {
+_exit :: proc "contextless" (code: int) -> ! {
 	runtime._cleanup_runtime_contextless()
 	win32.ExitProcess(win32.DWORD(code))
 }
@@ -185,10 +185,23 @@ exit :: proc "contextless" (code: int) -> ! {
 
 
 @(require_results)
-current_thread_id :: proc "contextless" () -> int {
+_current_thread_id :: proc "contextless" () -> int {
 	return int(win32.GetCurrentThreadId())
 }
 
+@(require_results)
+_absolute_path_from_handle :: proc(fd: Handle) -> (path: string, err: Error) {
+	unimplemented("TODO: _absolute_path_from_handle")
+}
+@(require_results)
+_absolute_path_from_relative :: proc(rel: string) -> (path: string, err: Error) {
+	unimplemented("TODO: _absolute_path_from_relative")
+}
+
+@(require_results)
+_access :: proc(path: string, mask: int) -> (bool, Error) {
+	return false, nil
+}
 
 
 @(require_results)

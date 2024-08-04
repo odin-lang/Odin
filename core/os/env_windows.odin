@@ -8,7 +8,7 @@ import "base:runtime"
 // Otherwise the returned value will be empty and the boolean will be false
 // NOTE: the value will be allocated with the supplied allocator
 @(require_results)
-lookup_env :: proc(key: string, allocator := context.allocator) -> (value: string, found: bool) {
+_lookup_env :: proc(key: string, allocator := context.allocator) -> (value: string, found: bool) {
 	if key == "" {
 		return
 	}
@@ -35,13 +35,13 @@ lookup_env :: proc(key: string, allocator := context.allocator) -> (value: strin
 // To distinguish between an empty value and an unset value, use lookup_env
 // NOTE: the value will be allocated with the supplied allocator
 @(require_results)
-get_env :: proc(key: string, allocator := context.allocator) -> (value: string) {
+_get_env :: proc(key: string, allocator := context.allocator) -> (value: string) {
 	value, _ = lookup_env(key, allocator)
 	return
 }
 
 // set_env sets the value of the environment variable named by the key
-set_env :: proc(key, value: string) -> Error {
+_set_env :: proc(key, value: string) -> Error {
 	k := win32.utf8_to_wstring(key)
 	v := win32.utf8_to_wstring(value)
 
@@ -52,7 +52,7 @@ set_env :: proc(key, value: string) -> Error {
 }
 
 // unset_env unsets a single environment variable
-unset_env :: proc(key: string) -> Error {
+_unset_env :: proc(key: string) -> Error {
 	k := win32.utf8_to_wstring(key)
 	if !win32.SetEnvironmentVariableW(k, nil) {
 		return get_last_error()
@@ -63,7 +63,7 @@ unset_env :: proc(key: string) -> Error {
 // environ returns a copy of strings representing the environment, in the form "key=value"
 // NOTE: the slice of strings and the strings with be allocated using the supplied allocator
 @(require_results)
-environ :: proc(allocator := context.allocator) -> []string {
+_environ :: proc(allocator := context.allocator) -> []string {
 	envs := ([^]win32.WCHAR)(win32.GetEnvironmentStringsW())
 	if envs == nil {
 		return nil
@@ -89,7 +89,7 @@ environ :: proc(allocator := context.allocator) -> []string {
 
 
 // clear_env deletes all environment variables
-clear_env :: proc() {
+_clear_env :: proc() {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	envs := environ(context.temp_allocator)
 	for env in envs {

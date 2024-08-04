@@ -6,6 +6,8 @@ import "base:runtime"
 Handle :: distinct i32
 _Platform_Error :: wasi.errno_t
 
+File_Time :: i64
+
 INVALID_HANDLE :: -1
 
 O_RDONLY   :: 0x00000
@@ -145,28 +147,33 @@ wasi_match_preopen :: proc(path: string) -> (wasi.fd_t, string, bool) {
 	return match.fd, relative, true
 }
 
-write :: proc(fd: Handle, data: []byte) -> (int, Errno) {
+@(require_results, no_instrumentation)
+_get_last_error :: proc "contextless" () -> Error {
+	return nil
+}
+
+_write :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 	iovs := wasi.ciovec_t(data)
 	n, err := wasi.fd_write(wasi.fd_t(fd), {iovs})
 	return int(n), Platform_Error(err)
 }
-read :: proc(fd: Handle, data: []byte) -> (int, Errno) {
+_read :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 	iovs := wasi.iovec_t(data)
 	n, err := wasi.fd_read(wasi.fd_t(fd), {iovs})
 	return int(n), Platform_Error(err)
 }
-write_at :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Errno) {
+_write_at :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Errno) {
 	iovs := wasi.ciovec_t(data)
 	n, err := wasi.fd_pwrite(wasi.fd_t(fd), {iovs}, wasi.filesize_t(offset))
 	return int(n), Platform_Error(err)
 }
-read_at :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Errno) {
+_read_at :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Errno) {
 	iovs := wasi.iovec_t(data)
 	n, err := wasi.fd_pread(wasi.fd_t(fd), {iovs}, wasi.filesize_t(offset))
 	return int(n), Platform_Error(err)
 }
 @(require_results)
-open :: proc(path: string, mode: int = O_RDONLY, perm: int = 0) -> (Handle, Errno) {
+_open :: proc(path: string, mode: int = O_RDONLY, perm: int = 0) -> (Handle, Errno) {
 	oflags: wasi.oflags_t
 	if mode & O_CREATE == O_CREATE {
 		oflags += {.CREATE}
@@ -204,22 +211,22 @@ open :: proc(path: string, mode: int = O_RDONLY, perm: int = 0) -> (Handle, Errn
 	fd, err := wasi.path_open(dir_fd, {.SYMLINK_FOLLOW}, relative, oflags, rights, {}, fdflags)
 	return Handle(fd), Platform_Error(err)
 }
-close :: proc(fd: Handle) -> Errno {
+_close :: proc(fd: Handle) -> Errno {
 	err := wasi.fd_close(wasi.fd_t(fd))
 	return Platform_Error(err)
 }
 
-flush :: proc(fd: Handle) -> Error {
+_flush :: proc(fd: Handle) -> Error {
 	// do nothing
 	return nil
 }
 
-seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
+_seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
 	n, err := wasi.fd_seek(wasi.fd_t(fd), wasi.filedelta_t(offset), wasi.whence_t(whence))
 	return i64(n), Platform_Error(err)
 }
 @(require_results)
-current_thread_id :: proc "contextless" () -> int {
+_current_thread_id :: proc "contextless" () -> int {
 	return 0
 }
 @(private, require_results)
@@ -228,14 +235,156 @@ _processor_core_count :: proc() -> int {
 }
 
 @(require_results)
-file_size :: proc(fd: Handle) -> (size: i64, err: Errno) {
+_file_size :: proc(fd: Handle) -> (size: i64, err: Errno) {
 	stat := wasi.fd_filestat_get(wasi.fd_t(fd)) or_return
 	size = i64(stat.size)
 	return
 }
 
 
-exit :: proc "contextless" (code: int) -> ! {
+_exit :: proc "contextless" (code: int) -> ! {
 	runtime._cleanup_runtime_contextless()
 	wasi.proc_exit(wasi.exitcode_t(code))
+}
+
+
+
+@(require_results)
+_last_write_time :: proc(fd: Handle) -> (time: File_Time, err: Error) {
+	unimplemented("TODO: _last_write_time")
+}
+
+@(require_results)
+_last_write_time_by_name :: proc(name: string) -> (time: File_Time, err: Error) {
+	unimplemented("TODO: _last_write_time_by_name")
+}
+
+
+_is_path_separator :: proc "contextless" (r: rune) -> bool {
+	return r == '/'
+}
+
+@(require_results)
+_is_file_handle :: proc(fd: Handle) -> bool {
+	unimplemented("TODO: _is_file_handle")
+}
+
+@(require_results)
+_is_file_path :: proc(path: string, follow_links: bool = true) -> bool {
+	unimplemented("TODO: _is_file_path")
+}
+
+@(require_results)
+_is_dir_handle :: proc(fd: Handle) -> bool {
+	unimplemented("TODO: _is_dir_handle")
+}
+
+@(require_results)
+_is_dir_path :: proc(path: string, follow_links: bool = true) -> bool {
+	unimplemented("TODO: _is_dir_path")
+}
+
+
+@(require_results)
+_exists :: proc(path: string) -> bool {
+	unimplemented("TODO: _exists")
+}
+
+_rename :: proc(old, new: string) -> Error {
+	unimplemented("TODO: _rename")
+}
+
+_remove :: proc(path: string) -> Error {
+	unimplemented("TODO: _remove")
+}
+
+_link :: proc(old_name, new_name: string) -> (err: Error) {
+	unimplemented("TODO: _link")
+}
+_unlink :: proc(path: string) -> (err: Error) {
+	unimplemented("TODO: _unlink")
+}
+_ftruncate :: proc(fd: Handle, length: i64) -> (err: Error) {
+	unimplemented("TODO: _ftruncate")
+}
+
+_truncate :: proc(path: string, length: i64) -> (err: Error) {
+	unimplemented("TODO: _truncate")
+}
+
+
+@(require_results)
+_pipe :: proc() -> (r, w: Handle, err: Error) {
+	return
+}
+
+
+@(require_results)
+_read_dir :: proc(fd: Handle, n: int, allocator := context.allocator) -> (fi: []File_Info, err: Error) {
+	unimplemented("TODO: __read_dir")
+}
+
+@(require_results)
+_absolute_path_from_handle :: proc(fd: Handle) -> (path: string, err: Error) {
+	unimplemented("TODO: _absolute_path_from_handle")
+}
+@(require_results)
+_absolute_path_from_relative :: proc(rel: string) -> (path: string, err: Error) {
+	unimplemented("TODO: _absolute_path_from_relative")
+}
+
+_access :: proc(path: string, mask: int) -> (bool, Error) {
+	unimplemented("TODO: _access")
+}
+
+
+@(require_results)
+_environ :: proc(allocator := context.allocator) -> []string {
+	unimplemented("TODO: _environ")
+}
+@(require_results)
+_lookup_env :: proc(key: string, allocator := context.allocator) -> (value: string, found: bool) {
+	unimplemented("TODO: _lookup_env")
+}
+
+@(require_results)
+_get_env :: proc(key: string, allocator := context.allocator) -> (value: string) {
+	unimplemented("TODO: _get_env")
+}
+
+_set_env :: proc(key, value: string) -> Error {
+	unimplemented("TODO: _set_env")
+}
+_unset_env :: proc(key: string) -> Error {
+	unimplemented("TODO: _unset_env")
+}
+
+_clear_env :: proc() {
+	unimplemented("TODO: _clear_env")
+}
+
+@(require_results)
+_get_current_directory :: proc() -> string {
+	unimplemented("TODO: _get_current_directory")
+}
+
+
+_set_current_directory :: proc(path: string) -> (err: Error) {
+	unimplemented("TODO: _set_current_directory")
+}
+
+
+
+_make_directory :: proc(path: string, mode: u32 = 0o775) -> Error {
+	unimplemented("TODO: _make_directory")
+}
+
+_remove_directory :: proc(path: string) -> Error {
+	unimplemented("TODO: _remove_directory")
+}
+
+
+@(require_results)
+_get_page_size :: proc() -> int {
+	return 1<<16
 }

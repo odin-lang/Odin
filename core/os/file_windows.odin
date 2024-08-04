@@ -6,12 +6,12 @@ import "base:runtime"
 import "core:unicode/utf16"
 
 @(require_results)
-is_path_separator :: proc(c: byte) -> bool {
+_is_path_separator :: proc "contextless" (c: rune) -> bool {
 	return c == '/' || c == '\\'
 }
 
 @(require_results)
-open :: proc(path: string, mode: int = O_RDONLY, perm: int = 0) -> (Handle, Error) {
+_open :: proc(path: string, mode: int = O_RDONLY, perm: int = 0) -> (Handle, Error) {
 	if len(path) == 0 {
 		return INVALID_HANDLE, General_Error.Not_Exist
 	}
@@ -60,14 +60,14 @@ open :: proc(path: string, mode: int = O_RDONLY, perm: int = 0) -> (Handle, Erro
 	return INVALID_HANDLE, get_last_error()
 }
 
-close :: proc(fd: Handle) -> Error {
+_close :: proc(fd: Handle) -> Error {
 	if !win32.CloseHandle(win32.HANDLE(fd)) {
 		return get_last_error()
 	}
 	return nil
 }
 
-flush :: proc(fd: Handle) -> (err: Error) {
+_flush :: proc(fd: Handle) -> (err: Error) {
 	if !win32.FlushFileBuffers(win32.HANDLE(fd)) {
 		err = get_last_error()
 	}
@@ -76,7 +76,7 @@ flush :: proc(fd: Handle) -> (err: Error) {
 
 
 
-write :: proc(fd: Handle, data: []byte) -> (int, Error) {
+_write :: proc(fd: Handle, data: []byte) -> (int, Error) {
 	if len(data) == 0 {
 		return 0, nil
 	}
@@ -149,7 +149,7 @@ read_console :: proc(handle: win32.HANDLE, b: []byte) -> (n: int, err: Error) {
 	return
 }
 
-read :: proc(fd: Handle, data: []byte) -> (total_read: int, err: Error) {
+_read :: proc(fd: Handle, data: []byte) -> (total_read: int, err: Error) {
 	if len(data) == 0 {
 		return 0, nil
 	}
@@ -186,7 +186,7 @@ read :: proc(fd: Handle, data: []byte) -> (total_read: int, err: Error) {
 	return total_read, nil
 }
 
-seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Error) {
+_seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Error) {
 	w: u32
 	switch whence {
 	case 0: w = win32.FILE_BEGIN
@@ -209,7 +209,7 @@ seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Error) {
 }
 
 @(require_results)
-file_size :: proc(fd: Handle) -> (i64, Error) {
+_file_size :: proc(fd: Handle) -> (i64, Error) {
 	length: win32.LARGE_INTEGER
 	err: Error
 	if !win32.GetFileSizeEx(win32.HANDLE(fd), &length) {
@@ -279,7 +279,7 @@ on Windows, read_at changes the position of the file cursor, on *nix, it does no
 
 will read from the location twice on *nix, and from two different locations on Windows
 */
-read_at :: proc(fd: Handle, data: []byte, offset: i64) -> (n: int, err: Error) {
+_read_at :: proc(fd: Handle, data: []byte, offset: i64) -> (n: int, err: Error) {
 	if offset < 0 {
 		return 0, .Invalid_Offset
 	}
@@ -311,7 +311,7 @@ on Windows, write_at changes the position of the file cursor, on *nix, it does n
 
 will write to the location twice on *nix, and to two different locations on Windows
 */
-write_at :: proc(fd: Handle, data: []byte, offset: i64) -> (n: int, err: Error) {
+_write_at :: proc(fd: Handle, data: []byte, offset: i64) -> (n: int, err: Error) {
 	if offset < 0 {
 		return 0, .Invalid_Offset
 	}
@@ -341,7 +341,7 @@ get_std_handle :: proc "contextless" (h: uint) -> Handle {
 }
 
 
-exists :: proc(path: string) -> bool {
+_exists :: proc(path: string) -> bool {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	wpath := win32.utf8_to_wstring(path, context.temp_allocator)
 	attribs := win32.GetFileAttributesW(wpath)
@@ -350,7 +350,7 @@ exists :: proc(path: string) -> bool {
 }
 
 @(require_results)
-is_file :: proc(path: string) -> bool {
+_is_file_path :: proc(path: string, _: bool) -> bool {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	wpath := win32.utf8_to_wstring(path, context.temp_allocator)
 	attribs := win32.GetFileAttributesW(wpath)
@@ -362,7 +362,7 @@ is_file :: proc(path: string) -> bool {
 }
 
 @(require_results)
-is_dir :: proc(path: string) -> bool {
+_is_dir_path :: proc(path: string, _: bool) -> bool {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	wpath := win32.utf8_to_wstring(path, context.temp_allocator)
 	attribs := win32.GetFileAttributesW(wpath)
@@ -373,11 +373,21 @@ is_dir :: proc(path: string) -> bool {
 	return false
 }
 
+@(require_results)
+_is_file_handle :: proc(fd: Handle) -> bool {
+	return false
+}
+
+@(require_results)
+_is_dir_handle :: proc(fd: Handle) -> bool {
+	return false
+}
+
 // NOTE(tetra): GetCurrentDirectory is not thread safe with SetCurrentDirectory and GetFullPathName
 @private cwd_lock := win32.SRWLOCK{} // zero is initialized
 
 @(require_results)
-get_current_directory :: proc(allocator := context.allocator) -> string {
+_get_current_directory :: proc(allocator := context.allocator) -> string {
 	win32.AcquireSRWLockExclusive(&cwd_lock)
 
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD(ignore = context.temp_allocator == allocator)
@@ -393,7 +403,7 @@ get_current_directory :: proc(allocator := context.allocator) -> string {
 	return win32.utf16_to_utf8(dir_buf_wstr, allocator) or_else ""
 }
 
-set_current_directory :: proc(path: string) -> (err: Error) {
+_set_current_directory :: proc(path: string) -> (err: Error) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	wstr := win32.utf8_to_wstring(path, context.temp_allocator)
 
@@ -407,9 +417,8 @@ set_current_directory :: proc(path: string) -> (err: Error) {
 
 	return
 }
-change_directory :: set_current_directory
 
-make_directory :: proc(path: string, mode: u32 = 0) -> (err: Error) {
+_make_directory :: proc(path: string, mode: u32 = 0) -> (err: Error) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	// Mode is unused on Windows, but is needed on *nix
 	wpath := win32.utf8_to_wstring(path, context.temp_allocator)
@@ -421,7 +430,7 @@ make_directory :: proc(path: string, mode: u32 = 0) -> (err: Error) {
 }
 
 
-remove_directory :: proc(path: string) -> (err: Error) {
+_remove_directory :: proc(path: string) -> (err: Error) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	wpath := win32.utf8_to_wstring(path, context.temp_allocator)
 
@@ -494,14 +503,14 @@ fix_long_path :: proc(path: string) -> string {
 }
 
 
-link :: proc(old_name, new_name: string) -> (err: Error) {
+_link :: proc(old_name, new_name: string) -> (err: Error) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	n := win32.utf8_to_wstring(fix_long_path(new_name))
 	o := win32.utf8_to_wstring(fix_long_path(old_name))
 	return Platform_Error(win32.CreateHardLinkW(n, o, nil))
 }
 
-unlink :: proc(path: string) -> (err: Error) {
+_unlink :: proc(path: string) -> (err: Error) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	wpath := win32.utf8_to_wstring(path, context.temp_allocator)
 
@@ -513,7 +522,7 @@ unlink :: proc(path: string) -> (err: Error) {
 
 
 
-rename :: proc(old_path, new_path: string) -> (err: Error) {
+_rename :: proc(old_path, new_path: string) -> (err: Error) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	from := win32.utf8_to_wstring(old_path, context.temp_allocator)
 	to := win32.utf8_to_wstring(new_path, context.temp_allocator)
@@ -525,7 +534,7 @@ rename :: proc(old_path, new_path: string) -> (err: Error) {
 }
 
 
-ftruncate :: proc(fd: Handle, length: i64) -> (err: Error) {
+_ftruncate :: proc(fd: Handle, length: i64) -> (err: Error) {
 	curr_off := seek(fd, 0, 1) or_return
 	defer seek(fd, curr_off, 0)
 	_= seek(fd, length, 0) or_return
@@ -536,14 +545,14 @@ ftruncate :: proc(fd: Handle, length: i64) -> (err: Error) {
 	return nil
 }
 
-truncate :: proc(path: string, length: i64) -> (err: Error) {
+_truncate :: proc(path: string, length: i64) -> (err: Error) {
 	fd := open(path, O_WRONLY|O_CREATE, 0o666) or_return
 	defer close(fd)
 	return ftruncate(fd, length)
 }
 
 
-remove :: proc(name: string) -> Error {
+_remove :: proc(name: string) -> Error {
 	p := win32.utf8_to_wstring(fix_long_path(name))
 	err, err1: win32.DWORD
 	if !win32.DeleteFileW(p) {
@@ -582,7 +591,7 @@ remove :: proc(name: string) -> Error {
 
 
 @(require_results)
-pipe :: proc() -> (r, w: Handle, err: Error) {
+_pipe :: proc() -> (r, w: Handle, err: Error) {
 	sa: win32.SECURITY_ATTRIBUTES
 	sa.nLength = size_of(win32.SECURITY_ATTRIBUTES)
 	sa.bInheritHandle = true
