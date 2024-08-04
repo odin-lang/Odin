@@ -7,12 +7,12 @@ import "core:testing"
 
 @(test)
 read_dir :: proc(t: ^testing.T) {
-	fd, errno := os.open(#directory + "/dir")
-	testing.expect_value(t, errno, os.ERROR_NONE)
+	fd, err := os.open(#directory + "/dir")
+	testing.expect_value(t, err, nil)
 	defer os.close(fd)
 
-	dir, errno2 := os.read_dir(fd, -1)
-	testing.expect_value(t, errno2, os.ERROR_NONE)
+	dir, err2 := os.read_dir(fd, -1)
+	testing.expect_value(t, err2, nil)
 	defer os.file_info_slice_delete(dir)
 
 	slice.sort_by_key(dir, proc(fi: os.File_Info) -> string { return fi.name })

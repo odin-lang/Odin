@@ -38,9 +38,9 @@ iterate_csv_from_stream :: proc(filename: string) {
 	r.reuse_record_buffer = true // Without it you have to each of the fields within it
 	defer csv.reader_destroy(&r)
 
-	handle, errno := os.open(filename)
-	if errno != os.ERROR_NONE {
-		fmt.printfln("Error opening file: %v", filename)
+	handle, err := os.open(filename)
+	if err != nil {
+		fmt.eprintfln("Error opening file: %v", filename)
 		return
 	}
 	defer os.close(handle)

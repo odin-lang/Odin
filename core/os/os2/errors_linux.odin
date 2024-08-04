@@ -4,8 +4,8 @@ package os2
 import "core:sys/linux"
 
 @(rodata)
-_errno_strings : [linux.Errno]string = {
-	.NONE            = "Success",
+_errno_strings := [linux.Error]string{
+	.NONE            = "",
 	.EPERM           = "Operation not permitted",
 	.ENOENT          = "No such file or directory",
 	.ESRCH           = "No such process",
@@ -142,7 +142,7 @@ _errno_strings : [linux.Errno]string = {
 }
 
 
-_get_platform_error :: proc(errno: linux.Errno) -> Error {
+_get_platform_error :: proc(errno: linux.Error) -> Error {
 	#partial switch errno {
 	case .NONE:
 		return nil
@@ -158,8 +158,8 @@ _get_platform_error :: proc(errno: linux.Errno) -> Error {
 }
 
 _error_string :: proc(errno: i32) -> string {
-	if errno >= 0 && errno <= i32(max(linux.Errno)) {
-		return _errno_strings[linux.Errno(errno)]
+	if errno >= 0 && errno <= i32(max(linux.Error)) {
+		return _errno_strings[linux.Error(errno)]
 	}
 	return "Unknown Error"
 }

@@ -28,7 +28,7 @@ Parse_Error :: struct {
 // Provides more granular information than what just a string could hold.
 Open_File_Error :: struct {
 	filename: string,
-	errno: os.Errno,
+	errno: os.Error,
 	mode: int,
 	perms: int,
 }

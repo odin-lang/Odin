@@ -4,7 +4,9 @@ import win32 "core:sys/windows"
 import "core:strings"
 import "base:runtime"
 
-read_dir :: proc(fd: Handle, n: int, allocator := context.allocator) -> (fi: []File_Info, err: Errno) {
+@(require_results)
+read_dir :: proc(fd: Handle, n: int, allocator := context.allocator) -> (fi: []File_Info, err: Error) {
+	@(require_results)
 	find_data_to_file_info :: proc(base_path: string, d: ^win32.WIN32_FIND_DATAW) -> (fi: File_Info) {
 		// Ignore "." and ".."
 		if d.cFileName[0] == '.' && d.cFileName[1] == 0 {
@@ -57,7 +59,7 @@ read_dir :: proc(fd: Handle, n: int, allocator := context.allocator) -> (fi: []F
 
 	dir_fi, _ := file_info_from_get_file_information_by_handle("", h)
 	if !dir_fi.is_dir {
-		return nil, ERROR_FILE_IS_NOT_DIR
+		return nil, .Not_Dir
 	}
 
 	n := n
@@ -68,15 +70,14 @@ read_dir :: proc(fd: Handle, n: int, allocator := context.allocator) -> (fi: []F
 	}
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD(ignore = context.temp_allocator == allocator)
 
-	wpath: []u16
-	wpath, err = cleanpath_from_handle_u16(fd, context.temp_allocator)
-	if len(wpath) == 0 || err != ERROR_NONE {
+	wpath := cleanpath_from_handle_u16(fd, context.temp_allocator) or_return
+	if len(wpath) == 0 {
 		return
 	}
 
-	dfi := make([dynamic]File_Info, 0, size)
+	dfi := make([dynamic]File_Info, 0, size) or_return
 
-	wpath_search := make([]u16, len(wpath)+3, context.temp_allocator)
+	wpath_search := make([]u16, len(wpath)+3, context.temp_allocator) or_return
 	copy(wpath_search, wpath)
 	wpath_search[len(wpath)+0] = '\\'
 	wpath_search[len(wpath)+1] = '*'
@@ -88,7 +89,7 @@ read_dir :: proc(fd: Handle, n: int, allocator := context.allocator) -> (fi: []F
 	find_data := &win32.WIN32_FIND_DATAW{}
 	find_handle := win32.FindFirstFileW(raw_data(wpath_search), find_data)
 	if find_handle == win32.INVALID_HANDLE_VALUE {
-		err = Errno(win32.GetLastError())
+		err = get_last_error()
 		return dfi[:], err
 	}
 	defer win32.FindClose(find_handle)
@@ -101,7 +102,7 @@ read_dir :: proc(fd: Handle, n: int, allocator := context.allocator) -> (fi: []F
 		}
 
 		if !win32.FindNextFileW(find_handle, find_data) {
-			e := Errno(win32.GetLastError())
+			e := get_last_error()
 			if e == ERROR_NO_MORE_FILES {
 				break
 			}
@@ -109,5 +110,5 @@ read_dir :: proc(fd: Handle, n: int, allocator := context.allocator) -> (fi: []F
 		}
 	}
 
-	return dfi[:], ERROR_NONE
+	return dfi[:], nil
 }

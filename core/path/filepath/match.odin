@@ -271,7 +271,7 @@ _glob :: proc(dir, pattern: string, matches: ^[dynamic]string, allocator := cont
 
 
 	d, derr := os.open(dir, os.O_RDONLY)
-	if derr != 0 {
+	if derr != nil {
 		return
 	}
 	defer os.close(d)
@@ -280,7 +280,7 @@ _glob :: proc(dir, pattern: string, matches: ^[dynamic]string, allocator := cont
 		file_info, ferr := os.fstat(d)
 		defer os.file_info_delete(file_info)
 
-		if ferr != 0 {
+		if ferr != nil {
 			return
 		}
 		if !file_info.is_dir {

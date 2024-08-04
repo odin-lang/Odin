@@ -73,6 +73,24 @@ write_encoded_rune :: proc(f: ^File, r: rune) -> (n: int, err: Error) {
 	return
 }
 
+read_at_least :: proc(f: ^File, buf: []byte, min: int) -> (n: int, err: Error) {
+	if len(buf) < min {
+		return 0, .Short_Buffer
+	}
+	nn := max(int)
+	for nn > 0 && n < min && err == nil {
+		nn, err = read(f, buf[n:])
+		n += nn
+	}
+	if n >= min {
+		err = nil
+	}
+	return
+}
+
+read_full :: proc(f: ^File, buf: []byte) -> (n: int, err: Error) {
+	return read_at_least(f, buf, len(buf))
+}
 
 write_ptr :: proc(f: ^File, data: rawptr, len: int) -> (n: int, err: Error) {
 	return write(f, ([^]byte)(data)[:len])
@@ -155,11 +173,8 @@ write_entire_file :: proc(name: string, data: []byte, perm: int, truncate := tru
 	if truncate {
 		flags |= O_TRUNC
 	}
-	f, err := open(name, flags, perm)
-	if err != nil {
-		return err
-	}
-	_, err = write(f, data)
+	f := open(name, flags, perm) or_return
+	_, err := write(f, data)
 	if cerr := close(f); cerr != nil && err == nil {
 		err = cerr
 	}

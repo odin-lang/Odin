@@ -3,21 +3,12 @@ package os
 
 import "core:strings"
 
-read_dir :: proc(fd: Handle, n: int, allocator := context.allocator) -> (fi: []File_Info, err: Errno) {
-	dirp: Dir
-	dirp, err = _fdopendir(fd)
-	if err != ERROR_NONE {
-		return
-	}
-
+@(require_results)
+read_dir :: proc(fd: Handle, n: int, allocator := context.allocator) -> (fi: []File_Info, err: Error) {
+	dirp := _fdopendir(fd) or_return
 	defer _closedir(dirp)
 
-	dirpath: string
-	dirpath, err = absolute_path_from_handle(fd)
-	if err != ERROR_NONE {
-		return
-	}
-
+	dirpath := absolute_path_from_handle(fd) or_return
 	defer delete(dirpath)
 
 	n := n
@@ -27,8 +18,8 @@ read_dir :: proc(fd: Handle, n: int, allocator := context.allocator) -> (fi: []F
 		size = 100
 	}
 
-	dfi := make([dynamic]File_Info, 0, size, allocator)
-	defer if err != ERROR_NONE {
+	dfi := make([dynamic]File_Info, 0, size, allocator) or_return
+	defer if err != nil {
 		for fi_ in dfi {
 			file_info_delete(fi_, allocator)
 		}
@@ -39,7 +30,7 @@ read_dir :: proc(fd: Handle, n: int, allocator := context.allocator) -> (fi: []F
 		entry: Dirent
 		end_of_stream: bool
 		entry, err, end_of_stream = _readdir(dirp)
-		if err != ERROR_NONE {
+		if err != nil {
 			return
 		} else if end_of_stream {
 			break
@@ -56,7 +47,7 @@ read_dir :: proc(fd: Handle, n: int, allocator := context.allocator) -> (fi: []F
 
 		s: OS_Stat
 		s, err = _lstat(fullpath)
-		if err != ERROR_NONE {
+		if err != nil {
 			delete(fullpath, allocator)
 			return
 		}
@@ -67,5 +58,5 @@ read_dir :: proc(fd: Handle, n: int, allocator := context.allocator) -> (fi: []F
 		append(&dfi, fi_)
 	}
 
-	return dfi[:], ERROR_NONE
+	return dfi[:], nil
 }

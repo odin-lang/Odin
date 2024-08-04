@@ -439,7 +439,7 @@ main :: proc() {
 		}
 		save_path := fmt.tprintf("verify/test_%v_%v.odin", test.package_name, code_test_name)
 
-		test_file_handle, err := os.open(save_path, os.O_WRONLY | os.O_CREATE); if err != 0 {
+		test_file_handle, err := os.open(save_path, os.O_WRONLY | os.O_CREATE); if err != nil {
 			fmt.eprintf("We could not open the file to the path %q for writing\n", save_path)
 			g_bad_doc = true
 			continue

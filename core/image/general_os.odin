@@ -27,7 +27,7 @@ which :: proc{
 
 which_file :: proc(path: string) -> Which_File_Type {
 	f, err := os.open(path)
-	if err != 0 {
+	if err != nil {
 		return .Unknown
 	}
 	header: [128]byte

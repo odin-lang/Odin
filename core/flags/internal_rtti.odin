@@ -254,8 +254,8 @@ parse_and_set_pointer_by_named_type :: proc(ptr: rawptr, str: string, data_type:
 		}
 
 		handle, errno := os.open(str, mode, perms)
-		if errno != 0 {
-			// NOTE(Feoramund): os.Errno is system-dependent, and there's
+		if errno != nil {
+			// NOTE(Feoramund): os.Error is system-dependent, and there's
 			// currently no good way to translate them all into strings.
 			//
 			// The upcoming `os2` package will hopefully solve this.

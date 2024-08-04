@@ -22,29 +22,24 @@ foreign libc {
 	@(link_name="clock_gettime") _unix_clock_gettime :: proc(clock_id: u64, timespec: ^timespec) -> i32 ---
 }
 
-@(no_instrumentation)
-get_last_error :: proc "contextless" () -> int {
-	return int(__error()^)
-}
-
 MAX_RW :: 0x7fffffff
 
 @(no_instrumentation)
-_write :: proc "contextless" (fd: os.Handle, data: []byte) -> (n: int, err: os.Errno) #no_bounds_check /* bounds check would segfault instrumentation */ {
+_write :: proc "contextless" (fd: os.Handle, data: []byte) -> (n: int, err: os.Error) #no_bounds_check /* bounds check would segfault instrumentation */ {
 	if len(data) == 0 {
-		return 0, os.ERROR_NONE
+		return 0, nil
 	}
 
 	for n < len(data) {
 		chunk := data[:min(len(data), MAX_RW)]
 		written := _unix_write(fd, raw_data(chunk), len(chunk))
 		if written < 0 {
-			return n, os.Errno(get_last_error())
+			return n, os.get_last_error()
 		}
 		n += written
 	}
 
-	return n, os.ERROR_NONE
+	return n, nil
 }
 
 CLOCK_MONOTONIC_RAW :: 4 // NOTE(tetra): "RAW" means: Not adjusted by NTP.
