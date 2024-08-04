@@ -27,6 +27,7 @@ stderr: Handle = 2
 
 args := _alloc_command_line_arguments()
 
+@(require_results)
 _alloc_command_line_arguments :: proc() -> (args: []string) {
 	args = make([]string, len(runtime.args__))
 	for &arg, i in args {
@@ -91,8 +92,9 @@ init_preopens :: proc() {
 	preopens = dyn_preopens[:]
 }
 
+@(require_results)
 wasi_match_preopen :: proc(path: string) -> (wasi.fd_t, string, bool) {
-
+	@(require_results)
 	prefix_matches :: proc(prefix, path: string) -> bool {
 		// Empty is valid for any relative path.
 		if len(prefix) == 0 && len(path) > 0 && path[0] != '/' {
@@ -163,6 +165,7 @@ read_at :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Errno) {
 	n, err := wasi.fd_pread(wasi.fd_t(fd), {iovs}, wasi.filesize_t(offset))
 	return int(n), Platform_Error(err)
 }
+@(require_results)
 open :: proc(path: string, mode: int = O_RDONLY, perm: int = 0) -> (Handle, Errno) {
 	oflags: wasi.oflags_t
 	if mode & O_CREATE == O_CREATE {
@@ -215,14 +218,16 @@ seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
 	n, err := wasi.fd_seek(wasi.fd_t(fd), wasi.filedelta_t(offset), wasi.whence_t(whence))
 	return i64(n), Platform_Error(err)
 }
+@(require_results)
 current_thread_id :: proc "contextless" () -> int {
 	return 0
 }
-@(private)
+@(private, require_results)
 _processor_core_count :: proc() -> int {
 	return 1
 }
 
+@(require_results)
 file_size :: proc(fd: Handle) -> (size: i64, err: Errno) {
 	stat := wasi.fd_filestat_get(wasi.fd_t(fd)) or_return
 	size = i64(stat.size)

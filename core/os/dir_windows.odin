@@ -6,6 +6,7 @@ import "base:runtime"
 
 @(require_results)
 read_dir :: proc(fd: Handle, n: int, allocator := context.allocator) -> (fi: []File_Info, err: Error) {
+	@(require_results)
 	find_data_to_file_info :: proc(base_path: string, d: ^win32.WIN32_FIND_DATAW) -> (fi: File_Info) {
 		// Ignore "." and ".."
 		if d.cFileName[0] == '.' && d.cFileName[1] == 0 {

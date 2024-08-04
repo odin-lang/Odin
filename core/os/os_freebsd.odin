@@ -353,13 +353,13 @@ S_ISGID :: 0o2000 // Set group id on execution
 S_ISVTX :: 0o1000 // Directory restrcted delete
 
 
-S_ISLNK  :: #force_inline proc(m: mode_t) -> bool { return (m & S_IFMT) == S_IFLNK  }
-S_ISREG  :: #force_inline proc(m: mode_t) -> bool { return (m & S_IFMT) == S_IFREG  }
-S_ISDIR  :: #force_inline proc(m: mode_t) -> bool { return (m & S_IFMT) == S_IFDIR  }
-S_ISCHR  :: #force_inline proc(m: mode_t) -> bool { return (m & S_IFMT) == S_IFCHR  }
-S_ISBLK  :: #force_inline proc(m: mode_t) -> bool { return (m & S_IFMT) == S_IFBLK  }
-S_ISFIFO :: #force_inline proc(m: mode_t) -> bool { return (m & S_IFMT) == S_IFIFO  }
-S_ISSOCK :: #force_inline proc(m: mode_t) -> bool { return (m & S_IFMT) == S_IFSOCK }
+@(require_results) S_ISLNK  :: #force_inline proc(m: mode_t) -> bool { return (m & S_IFMT) == S_IFLNK  }
+@(require_results) S_ISREG  :: #force_inline proc(m: mode_t) -> bool { return (m & S_IFMT) == S_IFREG  }
+@(require_results) S_ISDIR  :: #force_inline proc(m: mode_t) -> bool { return (m & S_IFMT) == S_IFDIR  }
+@(require_results) S_ISCHR  :: #force_inline proc(m: mode_t) -> bool { return (m & S_IFMT) == S_IFCHR  }
+@(require_results) S_ISBLK  :: #force_inline proc(m: mode_t) -> bool { return (m & S_IFMT) == S_IFBLK  }
+@(require_results) S_ISFIFO :: #force_inline proc(m: mode_t) -> bool { return (m & S_IFMT) == S_IFIFO  }
+@(require_results) S_ISSOCK :: #force_inline proc(m: mode_t) -> bool { return (m & S_IFMT) == S_IFSOCK }
 
 F_OK :: 0 // Test for file existance
 X_OK :: 1 // Test for execute permission
@@ -415,6 +415,7 @@ foreign dl {
 	@(link_name="pthread_getthreadid_np") pthread_getthreadid_np :: proc() -> c.int ---
 }
 
+@(require_results)
 is_path_separator :: proc(r: rune) -> bool {
 	return r == '/'
 }
@@ -424,6 +425,7 @@ get_last_error :: proc "contextless" () -> Error {
 	return Platform_Error(__Error_location()^)
 }
 
+@(require_results)
 open :: proc(path: string, flags: int = O_RDONLY, mode: int = 0) -> (Handle, Error) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	cstr := strings.clone_to_cstring(path, context.temp_allocator)
@@ -505,6 +507,7 @@ seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Error) {
 	return res, nil
 }
 
+@(require_results)
 file_size :: proc(fd: Handle) -> (size: i64, err: Error) {
 	size = -1
 	s := _fstat(fd) or_return
@@ -553,6 +556,7 @@ remove_directory :: proc(path: string) -> Error {
 	return nil
 }
 
+@(require_results)
 is_file_handle :: proc(fd: Handle) -> bool {
 	s, err := _fstat(fd)
 	if err != nil {
@@ -561,6 +565,7 @@ is_file_handle :: proc(fd: Handle) -> bool {
 	return S_ISREG(s.mode)
 }
 
+@(require_results)
 is_file_path :: proc(path: string, follow_links: bool = true) -> bool {
 	s: OS_Stat
 	err: Error
@@ -575,6 +580,7 @@ is_file_path :: proc(path: string, follow_links: bool = true) -> bool {
 	return S_ISREG(s.mode)
 }
 
+@(require_results)
 is_dir_handle :: proc(fd: Handle) -> bool {
 	s, err := _fstat(fd)
 	if err != nil {
@@ -583,6 +589,7 @@ is_dir_handle :: proc(fd: Handle) -> bool {
 	return S_ISDIR(s.mode)
 }
 
+@(require_results)
 is_dir_path :: proc(path: string, follow_links: bool = true) -> bool {
 	s: OS_Stat
 	err: Error
@@ -610,6 +617,7 @@ stderr: Handle = 2
 last_write_time :: proc(fd: Handle) -> File_Time {}                                                                  
 last_write_time_by_name :: proc(name: string) -> File_Time {}                                                        
 */
+@(require_results)
 last_write_time :: proc(fd: Handle) -> (File_Time, Error) {
 	s, err := _fstat(fd)
 	if err != nil {
@@ -619,6 +627,7 @@ last_write_time :: proc(fd: Handle) -> (File_Time, Error) {
 	return File_Time(modified), nil
 }
 
+@(require_results)
 last_write_time_by_name :: proc(name: string) -> (File_Time, Error) {
 	s, err := _stat(name)
 	if err != nil {
@@ -628,7 +637,7 @@ last_write_time_by_name :: proc(name: string) -> (File_Time, Error) {
 	return File_Time(modified), nil
 }
 
-@private
+@(private, require_results)
 _stat :: proc(path: string) -> (OS_Stat, Error) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	cstr := strings.clone_to_cstring(path, context.temp_allocator)
@@ -640,7 +649,7 @@ _stat :: proc(path: string) -> (OS_Stat, Error) {
 	return s, nil
 }
 
-@private
+@(private, require_results)
 _lstat :: proc(path: string) -> (OS_Stat, Error) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	cstr := strings.clone_to_cstring(path, context.temp_allocator)
@@ -654,7 +663,7 @@ _lstat :: proc(path: string) -> (OS_Stat, Error) {
 	return s, nil
 }
 
-@private
+@(private, require_results)
 _fstat :: proc(fd: Handle) -> (OS_Stat, Error) {
 	s: OS_Stat = ---
 	result := _unix_fstat(fd, &s)
@@ -664,7 +673,7 @@ _fstat :: proc(fd: Handle) -> (OS_Stat, Error) {
 	return s, nil
 }
 
-@private
+@(private, require_results)
 _fdopendir :: proc(fd: Handle) -> (Dir, Error) {
 	dirp := _unix_fdopendir(fd)
 	if dirp == cast(Dir)nil {
@@ -673,7 +682,7 @@ _fdopendir :: proc(fd: Handle) -> (Dir, Error) {
 	return dirp, nil
 }
 
-@private
+@(private)
 _closedir :: proc(dirp: Dir) -> Error {
 	rc := _unix_closedir(dirp)
 	if rc != 0 {
@@ -682,12 +691,12 @@ _closedir :: proc(dirp: Dir) -> Error {
 	return nil
 }
 
-@private
+@(private)
 _rewinddir :: proc(dirp: Dir) {
 	_unix_rewinddir(dirp)
 }
 
-@private
+@(private, require_results)
 _readdir :: proc(dirp: Dir) -> (entry: Dirent, err: Error, end_of_stream: bool) {
 	result: ^Dirent
 	rc := _unix_readdir_r(dirp, &entry, &result)
@@ -705,7 +714,7 @@ _readdir :: proc(dirp: Dir) -> (entry: Dirent, err: Error, end_of_stream: bool) 
 	return
 }
 
-@private
+@(private, require_results)
 _readlink :: proc(path: string) -> (string, Error) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD(ignore = context.temp_allocator == context.allocator)
 
@@ -730,6 +739,7 @@ _readlink :: proc(path: string) -> (string, Error) {
 	return "", Error{}
 }
 
+@(require_results)
 absolute_path_from_handle :: proc(fd: Handle) -> (string, Error) {
 	// NOTE(Feoramund): The situation isn't ideal, but this was the best way I
 	// could find to implement this. There are a couple outstanding bug reports
@@ -752,6 +762,7 @@ absolute_path_from_handle :: proc(fd: Handle) -> (string, Error) {
 	return path, nil
 }
 
+@(require_results)
 absolute_path_from_relative :: proc(rel: string) -> (path: string, err: Error) {
 	rel := rel
 	if rel == "" {
@@ -784,6 +795,7 @@ access :: proc(path: string, mask: int) -> (bool, Error) {
 	return true, nil
 }
 
+@(require_results)
 lookup_env :: proc(key: string, allocator := context.allocator) -> (value: string, found: bool) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD(ignore = context.temp_allocator == allocator)
 
@@ -795,11 +807,13 @@ lookup_env :: proc(key: string, allocator := context.allocator) -> (value: strin
 	return strings.clone(string(cstr), allocator), true
 }
 
+@(require_results)
 get_env :: proc(key: string, allocator := context.allocator) -> (value: string) {
 	value, _ = lookup_env(key, allocator)
 	return
 }
 
+@(require_results)
 get_current_directory :: proc() -> string {
 	// NOTE(tetra): I would use PATH_MAX here, but I was not able to find
 	// an authoritative value for it across all systems.
@@ -835,16 +849,19 @@ exit :: proc "contextless" (code: int) -> ! {
 	_unix_exit(c.int(code))
 }
 
+@(require_results)
 current_thread_id :: proc "contextless" () -> int {
 	return cast(int) pthread_getthreadid_np()
 }
 
+@(require_results)
 dlopen :: proc(filename: string, flags: int) -> rawptr {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	cstr := strings.clone_to_cstring(filename, context.temp_allocator)
 	handle := _unix_dlopen(cstr, c.int(flags))
 	return handle
 }
+@(require_results)
 dlsym :: proc(handle: rawptr, symbol: string) -> rawptr {
 	assert(handle != nil)
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
@@ -860,6 +877,7 @@ dlerror :: proc() -> string {
 	return string(_unix_dlerror())
 }
 
+@(require_results)
 get_page_size :: proc() -> int {
 	// NOTE(tetra): The page size never changes, so why do anything complicated
 	// if we don't have to.
@@ -872,7 +890,7 @@ get_page_size :: proc() -> int {
 	return page_size
 }
 
-@(private)
+@(private, require_results)
 _processor_core_count :: proc() -> int {
 	count : int = 0
 	count_size := size_of(count)
@@ -886,6 +904,7 @@ _processor_core_count :: proc() -> int {
 }
 
 
+@(require_results)
 _alloc_command_line_arguments :: proc() -> []string {
 	res := make([]string, len(runtime.args__))
 	for arg, i in runtime.args__ {

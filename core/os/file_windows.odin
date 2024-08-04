@@ -5,10 +5,12 @@ import "base:intrinsics"
 import "base:runtime"
 import "core:unicode/utf16"
 
+@(require_results)
 is_path_separator :: proc(c: byte) -> bool {
 	return c == '/' || c == '\\'
 }
 
+@(require_results)
 open :: proc(path: string, mode: int = O_RDONLY, perm: int = 0) -> (Handle, Error) {
 	if len(path) == 0 {
 		return INVALID_HANDLE, General_Error.Not_Exist
@@ -96,7 +98,7 @@ write :: proc(fd: Handle, data: []byte) -> (int, Error) {
 	return int(total_write), nil
 }
 
-@(private="file")
+@(private="file", require_results)
 read_console :: proc(handle: win32.HANDLE, b: []byte) -> (n: int, err: Error) {
 	if len(b) == 0 {
 		return 0, nil
@@ -206,6 +208,7 @@ seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Error) {
 	return i64(hi)<<32 + i64(dw_ptr), nil
 }
 
+@(require_results)
 file_size :: proc(fd: Handle) -> (i64, Error) {
 	length: win32.LARGE_INTEGER
 	err: Error
@@ -331,6 +334,7 @@ stdout := get_std_handle(uint(win32.STD_OUTPUT_HANDLE))
 stderr := get_std_handle(uint(win32.STD_ERROR_HANDLE))
 
 
+@(require_results)
 get_std_handle :: proc "contextless" (h: uint) -> Handle {
 	fd := win32.GetStdHandle(win32.DWORD(h))
 	return Handle(fd)
@@ -345,6 +349,7 @@ exists :: proc(path: string) -> bool {
 	return attribs != win32.INVALID_FILE_ATTRIBUTES
 }
 
+@(require_results)
 is_file :: proc(path: string) -> bool {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	wpath := win32.utf8_to_wstring(path, context.temp_allocator)
@@ -356,6 +361,7 @@ is_file :: proc(path: string) -> bool {
 	return false
 }
 
+@(require_results)
 is_dir :: proc(path: string) -> bool {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	wpath := win32.utf8_to_wstring(path, context.temp_allocator)
@@ -370,6 +376,7 @@ is_dir :: proc(path: string) -> bool {
 // NOTE(tetra): GetCurrentDirectory is not thread safe with SetCurrentDirectory and GetFullPathName
 @private cwd_lock := win32.SRWLOCK{} // zero is initialized
 
+@(require_results)
 get_current_directory :: proc(allocator := context.allocator) -> string {
 	win32.AcquireSRWLockExclusive(&cwd_lock)
 
@@ -426,7 +433,7 @@ remove_directory :: proc(path: string) -> (err: Error) {
 
 
 
-@(private)
+@(private, require_results)
 is_abs :: proc(path: string) -> bool {
 	if len(path) > 0 && path[0] == '/' {
 		return true
@@ -442,7 +449,7 @@ is_abs :: proc(path: string) -> bool {
 	return false
 }
 
-@(private)
+@(private, require_results)
 fix_long_path :: proc(path: string) -> string {
 	if len(path) < 248 {
 		return path
@@ -574,6 +581,7 @@ remove :: proc(name: string) -> Error {
 }
 
 
+@(require_results)
 pipe :: proc() -> (r, w: Handle, err: Error) {
 	sa: win32.SECURITY_ATTRIBUTES
 	sa.nLength = size_of(win32.SECURITY_ATTRIBUTES)

@@ -139,6 +139,12 @@ _error_string :: proc "contextless" (e: Platform_Error) -> string where intrinsi
 		return ""
 	}
 
+	when ODIN_OS == .Darwin {
+		if s := string(_darwin_string_error(i32(e))); s != "" {
+			return s
+		}
+	}
+
 	when ODIN_OS != .Linux {
 		@(require_results)
 		binary_search :: proc "contextless" (array: $A/[]$T, key: T) -> (index: int, found: bool) #no_bounds_check {

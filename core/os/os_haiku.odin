@@ -177,6 +177,7 @@ Dirent :: struct {
 
 Dir :: distinct rawptr // DIR*
 
+@(require_results)
 is_path_separator :: proc(r: rune) -> bool {
 	return r == '/'
 }
@@ -186,6 +187,7 @@ get_last_error :: proc "contextless" () -> Error {
 	return Platform_Error(__error()^)
 }
 
+@(require_results)
 fork :: proc() -> (Pid, Error) {
 	pid := _unix_fork()
 	if pid == -1 {
@@ -194,6 +196,7 @@ fork :: proc() -> (Pid, Error) {
 	return Pid(pid), nil
 }
 
+@(require_results)
 open :: proc(path: string, flags: int = O_RDONLY, mode: int = 0) -> (Handle, Error) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	cstr := strings.clone_to_cstring(path, context.temp_allocator)
@@ -274,6 +277,7 @@ seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Error) {
 	return res, nil
 }
 
+@(require_results)
 file_size :: proc(fd: Handle) -> (i64, Error) {
 	s, err := _fstat(fd)
 	if err != nil {
@@ -285,6 +289,7 @@ file_size :: proc(fd: Handle) -> (i64, Error) {
 // "Argv" arguments converted to Odin strings
 args := _alloc_command_line_arguments()
 
+@(require_results)
 _alloc_command_line_arguments :: proc() -> []string {
 	res := make([]string, len(runtime.args__))
 	for arg, i in runtime.args__ {
@@ -293,7 +298,7 @@ _alloc_command_line_arguments :: proc() -> []string {
 	return res
 }
 
-@private
+@(private, require_results)
 _stat :: proc(path: string) -> (OS_Stat, Error) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	cstr := strings.clone_to_cstring(path, context.temp_allocator)
@@ -307,7 +312,7 @@ _stat :: proc(path: string) -> (OS_Stat, Error) {
 	return s, nil
 }
 
-@private
+@(private, require_results)
 _lstat :: proc(path: string) -> (OS_Stat, Error) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	cstr := strings.clone_to_cstring(path, context.temp_allocator)
@@ -321,7 +326,7 @@ _lstat :: proc(path: string) -> (OS_Stat, Error) {
 	return s, nil
 }
 
-@private
+@(private, require_results)
 _fstat :: proc(fd: Handle) -> (OS_Stat, Error) {
 	// deliberately uninitialized
 	s: OS_Stat = ---
@@ -332,7 +337,7 @@ _fstat :: proc(fd: Handle) -> (OS_Stat, Error) {
 	return s, nil
 }
 
-@private
+@(private)
 _fdopendir :: proc(fd: Handle) -> (Dir, Error) {
 	dirp := _unix_fdopendir(fd)
 	if dirp == cast(Dir)nil {
@@ -341,7 +346,7 @@ _fdopendir :: proc(fd: Handle) -> (Dir, Error) {
 	return dirp, nil
 }
 
-@private
+@(private)
 _closedir :: proc(dirp: Dir) -> Error {
 	rc := _unix_closedir(dirp)
 	if rc != 0 {
@@ -350,12 +355,12 @@ _closedir :: proc(dirp: Dir) -> Error {
 	return nil
 }
 
-@private
+@(private)
 _rewinddir :: proc(dirp: Dir) {
 	_unix_rewinddir(dirp)
 }
 
-@private
+@(private, require_results)
 _readdir :: proc(dirp: Dir) -> (entry: Dirent, err: Error, end_of_stream: bool) {
 	result: ^Dirent
 	rc := _unix_readdir_r(dirp, &entry, &result)
@@ -373,7 +378,7 @@ _readdir :: proc(dirp: Dir) -> (entry: Dirent, err: Error, end_of_stream: bool) 
 	return
 }
 
-@private
+@(private, require_results)
 _readlink :: proc(path: string) -> (string, Error) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD(ignore = context.temp_allocator == context.allocator)
 	path_cstr := strings.clone_to_cstring(path, context.temp_allocator)
@@ -395,10 +400,12 @@ _readlink :: proc(path: string) -> (string, Error) {
 	}
 }
 
+@(require_results)
 absolute_path_from_handle :: proc(fd: Handle) -> (string, Error) {
 	return "", Error(ENOSYS)
 }
 
+@(require_results)
 absolute_path_from_relative :: proc(rel: string) -> (path: string, err: Error) {
 	rel := rel
 	if rel == "" {
@@ -430,6 +437,7 @@ access :: proc(path: string, mask: int) -> (bool, Error) {
 	return true, nil
 }
 
+@(require_results)
 lookup_env :: proc(key: string, allocator := context.allocator) -> (value: string, found: bool) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD(ignore = context.temp_allocator == allocator)
 	path_str := strings.clone_to_cstring(key, context.temp_allocator)
@@ -440,12 +448,13 @@ lookup_env :: proc(key: string, allocator := context.allocator) -> (value: strin
 	return strings.clone(string(cstr), allocator), true
 }
 
+@(require_results)
 get_env :: proc(key: string, allocator := context.allocator) -> (value: string) {
 	value, _ = lookup_env(key, allocator)
 	return
 }
 
-@(private)
+@(private, require_results)
 _processor_core_count :: proc() -> int {
 	info: haiku.system_info
 	haiku.get_system_info(&info)

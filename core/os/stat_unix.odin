@@ -50,14 +50,14 @@ File_Info :: struct {
 }
 */
 
-@private
+@(private, require_results)
 _make_time_from_unix_file_time :: proc(uft: Unix_File_Time) -> time.Time {
 	return time.Time{
 		_nsec = uft.nanoseconds + uft.seconds * 1_000_000_000,
 	}
 }
 
-@private
+@(private)
 _fill_file_info_from_stat :: proc(fi: ^File_Info, s: OS_Stat) {
 	fi.size = s.size
 	fi.mode = cast(File_Mode)s.mode
@@ -71,7 +71,7 @@ _fill_file_info_from_stat :: proc(fi: ^File_Info, s: OS_Stat) {
 }
 
 
-@private
+@(private, require_results)
 path_base :: proc(path: string) -> string {
 	is_separator :: proc(c: byte) -> bool {
 		return c == '/'
@@ -100,6 +100,7 @@ path_base :: proc(path: string) -> string {
 }
 
 
+@(require_results)
 lstat :: proc(name: string, allocator := context.allocator) -> (fi: File_Info, err: Error) {
 	context.allocator = allocator
 
@@ -110,6 +111,7 @@ lstat :: proc(name: string, allocator := context.allocator) -> (fi: File_Info, e
 	return
 }
 
+@(require_results)
 stat :: proc(name: string, allocator := context.allocator) -> (fi: File_Info, err: Error) {
 	context.allocator = allocator
 
@@ -120,6 +122,7 @@ stat :: proc(name: string, allocator := context.allocator) -> (fi: File_Info, er
 	return
 }
 
+@(require_results)
 fstat :: proc(fd: Handle, allocator := context.allocator) -> (fi: File_Info, err: Error) {
 	context.allocator = allocator
 

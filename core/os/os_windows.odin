@@ -153,7 +153,7 @@ get_page_size :: proc() -> int {
 	return page_size
 }
 
-@(private)
+@(private, require_results)
 _processor_core_count :: proc() -> int {
 	length : win32.DWORD = 0
 	result := win32.GetLogicalProcessorInformation(nil, &length)
@@ -184,12 +184,14 @@ exit :: proc "contextless" (code: int) -> ! {
 
 
 
+@(require_results)
 current_thread_id :: proc "contextless" () -> int {
 	return int(win32.GetCurrentThreadId())
 }
 
 
 
+@(require_results)
 _alloc_command_line_arguments :: proc() -> []string {
 	arg_count: i32
 	arg_list_ptr := win32.CommandLineToArgvW(win32.GetCommandLineW(), &arg_count)
@@ -223,44 +225,52 @@ _alloc_command_line_arguments :: proc() -> []string {
 */
 WINDOWS_11_BUILD_CUTOFF :: 22_000
 
-get_windows_version_w :: proc() -> win32.OSVERSIONINFOEXW {
+@(require_results)
+get_windows_version_w :: proc "contextless" () -> win32.OSVERSIONINFOEXW {
 	osvi : win32.OSVERSIONINFOEXW
 	osvi.dwOSVersionInfoSize = size_of(win32.OSVERSIONINFOEXW)
 	win32.RtlGetVersion(&osvi)
 	return osvi
 }
 
-is_windows_xp :: proc() -> bool {
+@(require_results)
+is_windows_xp :: proc "contextless" () -> bool {
 	osvi := get_windows_version_w()
 	return (osvi.dwMajorVersion == 5 && osvi.dwMinorVersion == 1)
 }
 
-is_windows_vista :: proc() -> bool {
+@(require_results)
+is_windows_vista :: proc "contextless" () -> bool {
 	osvi := get_windows_version_w()
 	return (osvi.dwMajorVersion == 6 && osvi.dwMinorVersion == 0)
 }
 
-is_windows_7 :: proc() -> bool {
+@(require_results)
+is_windows_7 :: proc "contextless" () -> bool {
 	osvi := get_windows_version_w()
 	return (osvi.dwMajorVersion == 6 && osvi.dwMinorVersion == 1)
 }
 
-is_windows_8 :: proc() -> bool {
+@(require_results)
+is_windows_8 :: proc "contextless" () -> bool {
 	osvi := get_windows_version_w()
 	return (osvi.dwMajorVersion == 6 && osvi.dwMinorVersion == 2)
 }
 
-is_windows_8_1 :: proc() -> bool {
+@(require_results)
+is_windows_8_1 :: proc "contextless" () -> bool {
 	osvi := get_windows_version_w()
 	return (osvi.dwMajorVersion == 6 && osvi.dwMinorVersion == 3)
 }
 
-is_windows_10 :: proc() -> bool {
+@(require_results)
+is_windows_10 :: proc "contextless" () -> bool {
 	osvi := get_windows_version_w()
 	return (osvi.dwMajorVersion == 10 && osvi.dwMinorVersion == 0 && osvi.dwBuildNumber <  WINDOWS_11_BUILD_CUTOFF)
 }
 
-is_windows_11 :: proc() -> bool {
+@(require_results)
+is_windows_11 :: proc "contextless" () -> bool {
 	osvi := get_windows_version_w()
 	return (osvi.dwMajorVersion == 10 && osvi.dwMinorVersion == 0 && osvi.dwBuildNumber >= WINDOWS_11_BUILD_CUTOFF)
 }

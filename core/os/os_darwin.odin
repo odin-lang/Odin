@@ -562,13 +562,13 @@ S_ISUID :: 0o4000 // Set user id on execution
 S_ISGID :: 0o2000 // Set group id on execution
 S_ISVTX :: 0o1000 // Directory restrcted delete
 
-S_ISLNK  :: #force_inline proc(m: u16) -> bool { return (m & S_IFMT) == S_IFLNK  }
-S_ISREG  :: #force_inline proc(m: u16) -> bool { return (m & S_IFMT) == S_IFREG  }
-S_ISDIR  :: #force_inline proc(m: u16) -> bool { return (m & S_IFMT) == S_IFDIR  }
-S_ISCHR  :: #force_inline proc(m: u16) -> bool { return (m & S_IFMT) == S_IFCHR  }
-S_ISBLK  :: #force_inline proc(m: u16) -> bool { return (m & S_IFMT) == S_IFBLK  }
-S_ISFIFO :: #force_inline proc(m: u16) -> bool { return (m & S_IFMT) == S_IFIFO  }
-S_ISSOCK :: #force_inline proc(m: u16) -> bool { return (m & S_IFMT) == S_IFSOCK }
+@(require_results) S_ISLNK  :: #force_inline proc(m: u16) -> bool { return (m & S_IFMT) == S_IFLNK  }
+@(require_results) S_ISREG  :: #force_inline proc(m: u16) -> bool { return (m & S_IFMT) == S_IFREG  }
+@(require_results) S_ISDIR  :: #force_inline proc(m: u16) -> bool { return (m & S_IFMT) == S_IFDIR  }
+@(require_results) S_ISCHR  :: #force_inline proc(m: u16) -> bool { return (m & S_IFMT) == S_IFCHR  }
+@(require_results) S_ISBLK  :: #force_inline proc(m: u16) -> bool { return (m & S_IFMT) == S_IFBLK  }
+@(require_results) S_ISFIFO :: #force_inline proc(m: u16) -> bool { return (m & S_IFMT) == S_IFIFO  }
+@(require_results) S_ISSOCK :: #force_inline proc(m: u16) -> bool { return (m & S_IFMT) == S_IFSOCK }
 
 R_OK :: 4 // Test for read permission
 W_OK :: 2 // Test for write permission
@@ -667,11 +667,13 @@ get_last_error :: proc "contextless" () -> Error {
 	return Platform_Error(__error()^)
 }
 
+@(require_results)
 get_last_error_string :: proc() -> string {
 	return string(_darwin_string_error(__error()^))
 }
 
 
+@(require_results)
 open :: proc(path: string, flags: int = O_RDWR, mode: int = 0) -> (handle: Handle, err: Error) {
 	isDir := is_dir_path(path)
 	flags := flags
@@ -790,6 +792,7 @@ seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Error) {
 	return final_offset, nil
 }
 
+@(require_results)
 file_size :: proc(fd: Handle) -> (i64, Error) {
 	prev, _   := seek(fd, 0, SEEK_CUR)
 	size, err := seek(fd, 0, SEEK_END)
@@ -804,12 +807,14 @@ stdin:  Handle = 0 // get_std_handle(win32.STD_INPUT_HANDLE);
 stdout: Handle = 1 // get_std_handle(win32.STD_OUTPUT_HANDLE);
 stderr: Handle = 2 // get_std_handle(win32.STD_ERROR_HANDLE);
 
+@(require_results)
 last_write_time :: proc(fd: Handle) -> (time: File_Time, err: Error) {
 	s := _fstat(fd) or_return
 	modified := s.modified.seconds * 1_000_000_000 + s.modified.nanoseconds
 	return File_Time(modified), nil
 }
 
+@(require_results)
 last_write_time_by_name :: proc(name: string) -> (time: File_Time, err: Error) {
 	s := _stat(name) or_return
 	modified := s.modified.seconds * 1_000_000_000 + s.modified.nanoseconds
@@ -817,10 +822,12 @@ last_write_time_by_name :: proc(name: string) -> (time: File_Time, err: Error) {
 }
 
 
+@(require_results)
 is_path_separator :: proc(r: rune) -> bool {
 	return r == '/'
 }
 
+@(require_results)
 is_file_handle :: proc(fd: Handle) -> bool {
 	s, err := _fstat(fd)
 	if err != nil {
@@ -829,6 +836,7 @@ is_file_handle :: proc(fd: Handle) -> bool {
 	return S_ISREG(s.mode)
 }
 
+@(require_results)
 is_file_path :: proc(path: string, follow_links: bool = true) -> bool {
 	s: OS_Stat
 	err: Error
@@ -844,6 +852,7 @@ is_file_path :: proc(path: string, follow_links: bool = true) -> bool {
 }
 
 
+@(require_results)
 is_dir_handle :: proc(fd: Handle) -> bool {
 	s, err := _fstat(fd)
 	if err != nil {
@@ -852,6 +861,7 @@ is_dir_handle :: proc(fd: Handle) -> bool {
 	return S_ISDIR(s.mode)
 }
 
+@(require_results)
 is_dir_path :: proc(path: string, follow_links: bool = true) -> bool {
 	s: OS_Stat
 	err: Error
@@ -869,6 +879,7 @@ is_dir_path :: proc(path: string, follow_links: bool = true) -> bool {
 is_file :: proc {is_file_path, is_file_handle}
 is_dir :: proc {is_dir_path, is_dir_handle}
 
+@(require_results)
 exists :: proc(path: string) -> bool {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	cpath := strings.clone_to_cstring(path, context.temp_allocator)
@@ -893,7 +904,7 @@ remove :: proc(path: string) -> Error {
 	return nil
 }
 
-@private
+@(private, require_results)
 _stat :: proc(path: string) -> (OS_Stat, Error) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	cstr := strings.clone_to_cstring(path, context.temp_allocator)
@@ -906,7 +917,7 @@ _stat :: proc(path: string) -> (OS_Stat, Error) {
 	return s, nil
 }
 
-@private
+@(private, require_results)
 _lstat :: proc(path: string) -> (OS_Stat, Error) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	cstr := strings.clone_to_cstring(path, context.temp_allocator)
@@ -919,7 +930,7 @@ _lstat :: proc(path: string) -> (OS_Stat, Error) {
 	return s, nil
 }
 
-@private
+@(private, require_results)
 _fstat :: proc(fd: Handle) -> (OS_Stat, Error) {
 	s: OS_Stat
 	result := _unix_fstat(fd, &s)
@@ -929,7 +940,7 @@ _fstat :: proc(fd: Handle) -> (OS_Stat, Error) {
 	return s, nil
 }
 
-@private
+@(private, require_results)
 _fdopendir :: proc(fd: Handle) -> (Dir, Error) {
 	dirp := _unix_fdopendir(fd)
 	if dirp == cast(Dir)nil {
@@ -938,7 +949,7 @@ _fdopendir :: proc(fd: Handle) -> (Dir, Error) {
 	return dirp, nil
 }
 
-@private
+@(private)
 _closedir :: proc(dirp: Dir) -> Error {
 	rc := _unix_closedir(dirp)
 	if rc != 0 {
@@ -947,12 +958,12 @@ _closedir :: proc(dirp: Dir) -> Error {
 	return nil
 }
 
-@private
+@(private)
 _rewinddir :: proc(dirp: Dir) {
 	_unix_rewinddir(dirp)
 }
 
-@private
+@(private, require_results)
 _readdir :: proc(dirp: Dir) -> (entry: Dirent, err: Error, end_of_stream: bool) {
 	result: ^Dirent
 	rc := _unix_readdir_r(dirp, &entry, &result)
@@ -971,7 +982,7 @@ _readdir :: proc(dirp: Dir) -> (entry: Dirent, err: Error, end_of_stream: bool) 
 	return
 }
 
-@private
+@(private, require_results)
 _readlink :: proc(path: string) -> (string, Error) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD(ignore = context.temp_allocator == context.allocator)
 	path_cstr := strings.clone_to_cstring(path, context.temp_allocator)
@@ -994,12 +1005,14 @@ _readlink :: proc(path: string) -> (string, Error) {
 	}
 }
 
+@(require_results)
 absolute_path_from_handle :: proc(fd: Handle) -> (path: string, err: Error) {
 	buf: [DARWIN_MAXPATHLEN]byte
 	_ = fcntl(int(fd), F_GETPATH, int(uintptr(&buf[0]))) or_return
 	return strings.clone_from_cstring(cstring(&buf[0]))
 }
 
+@(require_results)
 absolute_path_from_relative :: proc(rel: string) -> (path: string, err: Error) {
 	rel := rel
 	if rel == "" {
@@ -1031,6 +1044,7 @@ flush :: proc(fd: Handle) -> Error {
 	return cast(Platform_Error)_unix_fsync(fd)
 }
 
+@(require_results)
 lookup_env :: proc(key: string, allocator := context.allocator) -> (value: string, found: bool) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD(ignore = context.temp_allocator == allocator)
 	path_str := strings.clone_to_cstring(key, context.temp_allocator)
@@ -1041,6 +1055,7 @@ lookup_env :: proc(key: string, allocator := context.allocator) -> (value: strin
 	return strings.clone(string(cstr), allocator), true
 }
 
+@(require_results)
 get_env :: proc(key: string, allocator := context.allocator) -> (value: string) {
 	value, _ = lookup_env(key, allocator)
 	return
@@ -1067,6 +1082,7 @@ unset_env :: proc(key: string) -> Error {
 	return nil
 }
 
+@(require_results)
 get_current_directory :: proc() -> string {
 	page_size := get_page_size() // NOTE(tetra): See note in os_linux.odin/get_current_directory.
 	buf := make([dynamic]u8, page_size)
@@ -1109,6 +1125,7 @@ exit :: proc "contextless" (code: int) -> ! {
 	_unix_exit(i32(code))
 }
 
+@(require_results)
 current_thread_id :: proc "contextless" () -> int {
 	tid: u64
 	// NOTE(Oskar): available from OSX 10.6 and iOS 3.2.
@@ -1119,12 +1136,14 @@ current_thread_id :: proc "contextless" () -> int {
 	return int(tid)
 }
 
+@(require_results)
 dlopen :: proc(filename: string, flags: int) -> rawptr {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	cstr := strings.clone_to_cstring(filename, context.temp_allocator)
 	handle := _unix_dlopen(cstr, flags)
 	return handle
 }
+@(require_results)
 dlsym :: proc(handle: rawptr, symbol: string) -> rawptr {
 	assert(handle != nil)
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
@@ -1140,6 +1159,7 @@ dlerror :: proc() -> string {
 	return string(_unix_dlerror())
 }
 
+@(require_results)
 get_page_size :: proc() -> int {
 	// NOTE(tetra): The page size never changes, so why do anything complicated
 	// if we don't have to.
@@ -1152,7 +1172,7 @@ get_page_size :: proc() -> int {
 	return page_size
 }
 
-@(private)
+@(private, require_results)
 _processor_core_count :: proc() -> int {
 	count : int = 0
 	count_size := size_of(count)
@@ -1165,6 +1185,7 @@ _processor_core_count :: proc() -> int {
 	return 1
 }
 
+@(require_results)
 _alloc_command_line_arguments :: proc() -> []string {
 	res := make([]string, len(runtime.args__))
 	for _, i in res {
@@ -1173,6 +1194,7 @@ _alloc_command_line_arguments :: proc() -> []string {
 	return res
 }
 
+@(require_results)
 socket :: proc(domain: int, type: int, protocol: int) -> (Socket, Error) {
 	result := _unix_socket(domain, type, protocol)
 	if result < 0 {
@@ -1181,7 +1203,8 @@ socket :: proc(domain: int, type: int, protocol: int) -> (Socket, Error) {
 	return Socket(result), nil
 }
 
-connect :: proc(sd: Socket, addr: ^SOCKADDR, len: socklen_t) -> (Error) {
+@(require_results)
+connect :: proc(sd: Socket, addr: ^SOCKADDR, len: socklen_t) -> Error {
 	result := _unix_connect(int(sd), addr, len)
 	if result < 0 {
 		return get_last_error()
@@ -1189,7 +1212,7 @@ connect :: proc(sd: Socket, addr: ^SOCKADDR, len: socklen_t) -> (Error) {
 	return nil
 }
 
-bind :: proc(sd: Socket, addr: ^SOCKADDR, len: socklen_t) -> (Error) {
+bind :: proc(sd: Socket, addr: ^SOCKADDR, len: socklen_t) -> Error {
 	result := _unix_bind(int(sd), addr, len)
 	if result < 0 {
 		return get_last_error()
@@ -1205,7 +1228,7 @@ accept :: proc(sd: Socket, addr: ^SOCKADDR, len: rawptr) -> (Socket, Error) {
 	return Socket(result), nil
 }
 
-listen :: proc(sd: Socket, backlog: int) -> (Error) {
+listen :: proc(sd: Socket, backlog: int) -> Error {
 	result := _unix_listen(int(sd), backlog)
 	if result < 0 {
 		return get_last_error()
@@ -1213,7 +1236,7 @@ listen :: proc(sd: Socket, backlog: int) -> (Error) {
 	return nil
 }
 
-setsockopt :: proc(sd: Socket, level: int, optname: int, optval: rawptr, optlen: socklen_t) -> (Error) {
+setsockopt :: proc(sd: Socket, level: int, optname: int, optval: rawptr, optlen: socklen_t) -> Error {
 	result := _unix_setsockopt(int(sd), level, optname, optval, optlen)
 	if result < 0 {
 		return get_last_error()
@@ -1261,7 +1284,7 @@ send :: proc(sd: Socket, data: []byte, flags: int) -> (u32, Error) {
 	return u32(result), nil
 }
 
-shutdown :: proc(sd: Socket, how: int) -> (Error) {
+shutdown :: proc(sd: Socket, how: int) -> Error {
 	result := _unix_shutdown(int(sd), how)
 	if result < 0 {
 		return get_last_error()

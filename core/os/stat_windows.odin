@@ -4,7 +4,7 @@ import "core:time"
 import "base:runtime"
 import win32 "core:sys/windows"
 
-@(private)
+@(private, require_results)
 full_path_from_name :: proc(name: string, allocator := context.allocator) -> (path: string, err: Errno) {
 	context.allocator = allocator
 	
@@ -30,7 +30,7 @@ full_path_from_name :: proc(name: string, allocator := context.allocator) -> (pa
 	return
 }
 
-@(private)
+@(private, require_results)
 _stat :: proc(name: string, create_file_attributes: u32, allocator := context.allocator) -> (fi: File_Info, e: Errno) {
 	if len(name) == 0 {
 		return {}, ERROR_PATH_NOT_FOUND
@@ -72,17 +72,20 @@ _stat :: proc(name: string, create_file_attributes: u32, allocator := context.al
 }
 
 
+@(require_results)
 lstat :: proc(name: string, allocator := context.allocator) -> (File_Info, Errno) {
 	attrs := win32.FILE_FLAG_BACKUP_SEMANTICS
 	attrs |= win32.FILE_FLAG_OPEN_REPARSE_POINT
 	return _stat(name, attrs, allocator)
 }
 
+@(require_results)
 stat :: proc(name: string, allocator := context.allocator) -> (File_Info, Errno) {
 	attrs := win32.FILE_FLAG_BACKUP_SEMANTICS
 	return _stat(name, attrs, allocator)
 }
 
+@(require_results)
 fstat :: proc(fd: Handle, allocator := context.allocator) -> (fi: File_Info, err: Errno) {
 	if fd == 0 {
 		err = ERROR_INVALID_HANDLE
@@ -108,7 +111,7 @@ fstat :: proc(fd: Handle, allocator := context.allocator) -> (fi: File_Info, err
 }
 
 
-@(private)
+@(private, require_results)
 cleanpath_strip_prefix :: proc(buf: []u16) -> []u16 {
 	buf := buf
 	N := 0
@@ -133,13 +136,13 @@ cleanpath_strip_prefix :: proc(buf: []u16) -> []u16 {
 	return buf
 }
 
-@(private)
+@(private, require_results)
 cleanpath_from_handle :: proc(fd: Handle) -> (s: string, err: Errno) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD(ignore = context.temp_allocator == context.allocator)
 	buf := cleanpath_from_handle_u16(fd, context.temp_allocator) or_return
 	return win32.utf16_to_utf8(buf, context.allocator)
 }
-@(private)
+@(private, require_results)
 cleanpath_from_handle_u16 :: proc(fd: Handle, allocator: runtime.Allocator) -> ([]u16, Errno) {
 	if fd == 0 {
 		return nil, ERROR_INVALID_HANDLE
@@ -154,14 +157,14 @@ cleanpath_from_handle_u16 :: proc(fd: Handle, allocator: runtime.Allocator) -> (
 	buf_len := win32.GetFinalPathNameByHandleW(h, raw_data(buf), n, 0)
 	return buf[:buf_len], nil
 }
-@(private)
+@(private, require_results)
 cleanpath_from_buf :: proc(buf: []u16) -> string {
 	buf := buf
 	buf = cleanpath_strip_prefix(buf)
 	return win32.utf16_to_utf8(buf, context.allocator) or_else ""
 }
 
-@(private)
+@(private, require_results)
 basename :: proc(name: string) -> (base: string) {
 	name := name
 	if len(name) > 3 && name[:3] == `\\?` {
@@ -187,7 +190,7 @@ basename :: proc(name: string) -> (base: string) {
 	return name
 }
 
-@(private)
+@(private, require_results)
 file_type_mode :: proc(h: win32.HANDLE) -> File_Mode {
 	switch win32.GetFileType(h) {
 	case win32.FILE_TYPE_PIPE:
@@ -199,7 +202,7 @@ file_type_mode :: proc(h: win32.HANDLE) -> File_Mode {
 }
 
 
-@(private)
+@(private, require_results)
 file_mode_from_file_attributes :: proc(FileAttributes: win32.DWORD, h: win32.HANDLE, ReparseTag: win32.DWORD) -> (mode: File_Mode) {
 	if FileAttributes & win32.FILE_ATTRIBUTE_READONLY != 0 {
 		mode |= 0o444
@@ -236,7 +239,7 @@ windows_set_file_info_times :: proc(fi: ^File_Info, d: ^$T) {
 	fi.access_time       = time.unix(0, win32.FILETIME_as_unix_nanoseconds(d.ftLastAccessTime))
 }
 
-@(private)
+@(private, require_results)
 file_info_from_win32_file_attribute_data :: proc(d: ^win32.WIN32_FILE_ATTRIBUTE_DATA, name: string) -> (fi: File_Info, e: Errno) {
 	fi.size = i64(d.nFileSizeHigh)<<32 + i64(d.nFileSizeLow)
 
@@ -251,7 +254,7 @@ file_info_from_win32_file_attribute_data :: proc(d: ^win32.WIN32_FILE_ATTRIBUTE_
 	return
 }
 
-@(private)
+@(private, require_results)
 file_info_from_win32_find_data :: proc(d: ^win32.WIN32_FIND_DATAW, name: string) -> (fi: File_Info, e: Errno) {
 	fi.size = i64(d.nFileSizeHigh)<<32 + i64(d.nFileSizeLow)
 
@@ -266,7 +269,7 @@ file_info_from_win32_find_data :: proc(d: ^win32.WIN32_FIND_DATAW, name: string)
 	return
 }
 
-@(private)
+@(private, require_results)
 file_info_from_get_file_information_by_handle :: proc(path: string, h: win32.HANDLE) -> (File_Info, Errno) {
 	d: win32.BY_HANDLE_FILE_INFORMATION
 	if !win32.GetFileInformationByHandle(h, &d) {
