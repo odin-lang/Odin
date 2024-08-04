@@ -421,7 +421,7 @@ W_OK :: 2 // Test for write permission
 R_OK :: 4 // Test for read permission
 
 foreign libc {
-	@(link_name="__Error")          __Error_location    :: proc() -> ^c.int ---
+	@(link_name="__error")          __error_location    :: proc() -> ^c.int ---
 
 	@(link_name="open")             _unix_open          :: proc(path: cstring, flags: c.int, mode: c.int) -> Handle ---
 	@(link_name="close")            _unix_close         :: proc(fd: Handle) -> c.int ---
@@ -480,7 +480,7 @@ is_path_separator :: proc(r: rune) -> bool {
 
 @(require_results, no_instrumentation)
 get_last_error :: proc "contextless" () -> Error {
-	return Platform_Error(__Error_location()^)
+	return Platform_Error(__error_location()^)
 }
 
 @(require_results)
