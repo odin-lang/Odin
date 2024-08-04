@@ -91,6 +91,7 @@ read_full :: proc(fd: Handle, buf: []byte) -> (n: int, err: Error) {
 }
 
 
+@(require_results)
 file_size_from_path :: proc(path: string) -> i64 {
 	fd, err := open(path, O_RDONLY, 0)
 	if err != nil {
@@ -105,42 +106,20 @@ file_size_from_path :: proc(path: string) -> i64 {
 	return length
 }
 
+@(require_results)
 read_entire_file_from_filename :: proc(name: string, allocator := context.allocator, loc := #caller_location) -> (data: []byte, success: bool) {
-	context.allocator = allocator
-
-	fd, err := open(name, O_RDONLY, 0)
-	if err != nil {
-		return nil, false
-	}
-	defer close(fd)
-
-	return read_entire_file_from_handle(fd, allocator, loc)
+	err: Error
+	data, err = read_entire_file_from_filename_or_err(name, allocator, loc)
+	success = err == nil
+	return
 }
 
+@(require_results)
 read_entire_file_from_handle :: proc(fd: Handle, allocator := context.allocator, loc := #caller_location) -> (data: []byte, success: bool) {
-	context.allocator = allocator
-
-	length: i64
 	err: Error
-	if length, err = file_size(fd); err != nil {
-		return nil, false
-	}
-
-	if length <= 0 {
-		return nil, true
-	}
-
-	data, err = make([]byte, int(length), allocator, loc)
-	if data == nil || err != nil {
-		return nil, false
-	}
-
-	bytes_read, read_err := read_full(fd, data)
-	if read_err != nil {
-		delete(data)
-		return nil, false
-	}
-	return data[:bytes_read], true
+	data, err = read_entire_file_from_handle_or_err(fd, allocator, loc)
+	success = err == nil
+	return
 }
 
 read_entire_file :: proc {
@@ -148,7 +127,50 @@ read_entire_file :: proc {
 	read_entire_file_from_handle,
 }
 
+@(require_results)
+read_entire_file_from_filename_or_err :: proc(name: string, allocator := context.allocator, loc := #caller_location) -> (data: []byte, err: Error) {
+	context.allocator = allocator
+
+	fd := open(name, O_RDONLY, 0) or_return
+	defer close(fd)
+
+	return read_entire_file_from_handle_or_err(fd, allocator, loc)
+}
+
+@(require_results)
+read_entire_file_from_handle_or_err :: proc(fd: Handle, allocator := context.allocator, loc := #caller_location) -> (data: []byte, err: Error) {
+	context.allocator = allocator
+
+	length := file_size(fd) or_return
+	if length <= 0 {
+		return nil, nil
+	}
+
+	data = make([]byte, int(length), allocator, loc) or_return
+	if data == nil {
+		return nil, nil
+	}
+	defer if err != nil {
+		delete(data, allocator)
+	}
+
+	bytes_read := read_full(fd, data) or_return
+	data = data[:bytes_read]
+	return
+}
+
+read_entire_file_or_err :: proc {
+	read_entire_file_from_filename_or_err,
+	read_entire_file_from_handle_or_err,
+}
+
+
 write_entire_file :: proc(name: string, data: []byte, truncate := true) -> (success: bool) {
+	return write_entire_file_or_err(name, data, truncate) == nil
+}
+
+@(require_results)
+write_entire_file_or_err :: proc(name: string, data: []byte, truncate := true) -> Error {
 	flags: int = O_WRONLY|O_CREATE
 	if truncate {
 		flags |= O_TRUNC
@@ -160,14 +182,11 @@ write_entire_file :: proc(name: string, data: []byte, truncate := true) -> (succ
 		mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH
 	}
 
-	fd, err := open(name, flags, mode)
-	if err != nil {
-		return false
-	}
+	fd := open(name, flags, mode) or_return
 	defer close(fd)
 
-	_, write_err := write(fd, data)
-	return write_err == nil
+	_ = write(fd, data) or_return
+	return nil
 }
 
 write_ptr :: proc(fd: Handle, data: rawptr, len: int) -> (int, Error) {
@@ -185,6 +204,7 @@ heap_alloc  :: runtime.heap_alloc
 heap_resize :: runtime.heap_resize
 heap_free   :: runtime.heap_free
 
+@(require_results)
 processor_core_count :: proc() -> int {
 	return _processor_core_count()
 }
