@@ -5,7 +5,7 @@ import "core:sys/es"
 Handle :: distinct int
 _Platform_Error :: enum i32 {NONE}
 
-ERROR_NONE :: Errno(es.SUCCESS)
+// ERROR_NONE :: Errno(es.SUCCESS)
 
 O_RDONLY :: 0x1
 O_WRONLY :: 0x2

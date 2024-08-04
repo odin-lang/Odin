@@ -145,13 +145,13 @@ read_entire_file_from_handle :: proc(fd: Handle, allocator := context.allocator,
 		return nil, true
 	}
 
-	data = make([]byte, int(length), allocator, loc)
-	if data == nil {
+	data, err = make([]byte, int(length), allocator, loc)
+	if data == nil || err != nil {
 		return nil, false
 	}
 
 	bytes_read, read_err := read_full(fd, data)
-	if read_err != ERROR_NONE {
+	if read_err != nil {
 		delete(data)
 		return nil, false
 	}

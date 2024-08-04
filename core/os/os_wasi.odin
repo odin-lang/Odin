@@ -8,8 +8,6 @@ _Platform_Error :: wasi.errno_t
 
 INVALID_HANDLE :: -1
 
-// ERROR_NONE :: Errno(wasi.errno_t.SUCCESS) // that is a weird error code. Probably better to remap it
-
 O_RDONLY   :: 0x00000
 O_WRONLY   :: 0x00001
 O_RDWR     :: 0x00002

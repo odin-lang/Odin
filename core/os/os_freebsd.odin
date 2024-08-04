@@ -430,7 +430,7 @@ open :: proc(path: string, flags: int = O_RDONLY, mode: int = 0) -> (Handle, Err
 	if handle == -1 {
 		return INVALID_HANDLE, Errno(get_last_error())
 	}
-	return handle, ERROR_NONE
+	return handle, nil
 }
 
 close :: proc(fd: Handle) -> Errno {
@@ -455,12 +455,12 @@ read :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 	if bytes_read == -1 {
 		return -1, Errno(get_last_error())
 	}
-	return int(bytes_read), ERROR_NONE
+	return int(bytes_read), nil
 }
 
 write :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 	if len(data) == 0 {
-		return 0, ERROR_NONE
+		return 0, nil
 	}
 
 	to_write      := min(c.size_t(len(data)), MAX_RW)
@@ -468,7 +468,7 @@ write :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 	if bytes_written == -1 {
 		return -1, Errno(get_last_error())
 	}
-	return int(bytes_written), ERROR_NONE
+	return int(bytes_written), nil
 }
 
 seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
@@ -476,15 +476,14 @@ seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
 	if res == -1 {
 		return -1, Errno(get_last_error())
 	}
-	return res, ERROR_NONE
+	return res, nil
 }
 
-file_size :: proc(fd: Handle) -> (i64, Errno) {
-	s, err := _fstat(fd)
-	if err != ERROR_NONE {
-		return -1, err
-	}
-	return s.size, ERROR_NONE
+file_size :: proc(fd: Handle) -> (size: i64, err: Errno) {
+	size = -1
+	s := _fstat(fd) or_return
+	size = s.size
+	return
 }
 
 rename :: proc(old_path, new_path: string) -> Errno {
@@ -530,7 +529,7 @@ remove_directory :: proc(path: string) -> Errno {
 
 is_file_handle :: proc(fd: Handle) -> bool {
 	s, err := _fstat(fd)
-	if err != ERROR_NONE {
+	if err != nil {
 		return false
 	}
 	return S_ISREG(s.mode)
@@ -544,7 +543,7 @@ is_file_path :: proc(path: string, follow_links: bool = true) -> bool {
 	} else {
 		s, err = _lstat(path)
 	}
-	if err != ERROR_NONE {
+	if err != nil {
 		return false
 	}
 	return S_ISREG(s.mode)
@@ -552,7 +551,7 @@ is_file_path :: proc(path: string, follow_links: bool = true) -> bool {
 
 is_dir_handle :: proc(fd: Handle) -> bool {
 	s, err := _fstat(fd)
-	if err != ERROR_NONE {
+	if err != nil {
 		return false
 	}
 	return S_ISDIR(s.mode)
@@ -566,7 +565,7 @@ is_dir_path :: proc(path: string, follow_links: bool = true) -> bool {
 	} else {
 		s, err = _lstat(path)
 	}
-	if err != ERROR_NONE {
+	if err != nil {
 		return false
 	}
 	return S_ISDIR(s.mode)
@@ -587,20 +586,20 @@ last_write_time_by_name :: proc(name: string) -> File_Time {}
 */
 last_write_time :: proc(fd: Handle) -> (File_Time, Errno) {
 	s, err := _fstat(fd)
-	if err != ERROR_NONE {
+	if err != nil {
 		return 0, err
 	}
 	modified := s.modified.seconds * 1_000_000_000 + s.modified.nanoseconds
-	return File_Time(modified), ERROR_NONE
+	return File_Time(modified), nil
 }
 
 last_write_time_by_name :: proc(name: string) -> (File_Time, Errno) {
 	s, err := _stat(name)
-	if err != ERROR_NONE {
+	if err != nil {
 		return 0, err
 	}
 	modified := s.modified.seconds * 1_000_000_000 + s.modified.nanoseconds
-	return File_Time(modified), ERROR_NONE
+	return File_Time(modified), nil
 }
 
 @private
@@ -612,7 +611,7 @@ _stat :: proc(path: string) -> (OS_Stat, Errno) {
 	if result == -1 {
 		return s, Errno(get_last_error())
 	}
-	return s, ERROR_NONE
+	return s, nil
 }
 
 @private
@@ -626,7 +625,7 @@ _lstat :: proc(path: string) -> (OS_Stat, Errno) {
 	if res == -1 {
 		return s, Errno(get_last_error())
 	}
-	return s, ERROR_NONE
+	return s, nil
 }
 
 @private
@@ -636,7 +635,7 @@ _fstat :: proc(fd: Handle) -> (OS_Stat, Errno) {
 	if result == -1 {
 		return s, Errno(get_last_error())
 	}
-	return s, ERROR_NONE
+	return s, nil
 }
 
 @private
@@ -645,7 +644,7 @@ _fdopendir :: proc(fd: Handle) -> (Dir, Errno) {
 	if dirp == cast(Dir)nil {
 		return nil, Errno(get_last_error())
 	}
-	return dirp, ERROR_NONE
+	return dirp, nil
 }
 
 @private
@@ -671,7 +670,6 @@ _readdir :: proc(dirp: Dir) -> (entry: Dirent, err: Errno, end_of_stream: bool) 
 		err = Errno(get_last_error())
 		return
 	}
-	err = ERROR_NONE
 
 	if result == nil {
 		end_of_stream = true
@@ -699,7 +697,7 @@ _readlink :: proc(path: string) -> (string, Errno) {
 			delete(buf)
 			buf = make([]byte, bufsz)
 		} else {
-			return strings.string_from_ptr(&buf[0], rc), ERROR_NONE
+			return strings.string_from_ptr(&buf[0], rc), nil
 		}	
 	}
 
@@ -725,7 +723,7 @@ absolute_path_from_handle :: proc(fd: Handle) -> (string, Errno) {
 	}
 
 	path := strings.clone_from_cstring_bounded(cast(cstring)&kinfo.path[0], len(kinfo.path))
-	return path, ERROR_NONE
+	return path, nil
 }
 
 absolute_path_from_relative :: proc(rel: string) -> (path: string, err: Errno) {
@@ -746,7 +744,7 @@ absolute_path_from_relative :: proc(rel: string) -> (path: string, err: Errno) {
 
 	path = strings.clone(string(cstring(path_ptr)))
 
-	return path, ERROR_NONE
+	return path, nil
 }
 
 access :: proc(path: string, mask: int) -> (bool, Errno) {
@@ -757,7 +755,7 @@ access :: proc(path: string, mask: int) -> (bool, Errno) {
 	if result == -1 {
 		return false, Errno(get_last_error())
 	}
-	return true, ERROR_NONE
+	return true, nil
 }
 
 lookup_env :: proc(key: string, allocator := context.allocator) -> (value: string, found: bool) {

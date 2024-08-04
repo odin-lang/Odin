@@ -101,54 +101,31 @@ path_base :: proc(path: string) -> string {
 
 
 lstat :: proc(name: string, allocator := context.allocator) -> (fi: File_Info, err: Errno) {
-
 	context.allocator = allocator
 
-	s: OS_Stat
-	s, err = _lstat(name)
-	if err != ERROR_NONE {
-		return fi, err
-	}
+	s := _lstat(name) or_return
 	_fill_file_info_from_stat(&fi, s)
-	fi.fullpath, err = absolute_path_from_relative(name)
-	if err != ERROR_NONE {
-		return
-	}
+	fi.fullpath = absolute_path_from_relative(name) or_return
 	fi.name = path_base(fi.fullpath)
-	return fi, ERROR_NONE
+	return
 }
 
 stat :: proc(name: string, allocator := context.allocator) -> (fi: File_Info, err: Errno) {
 	context.allocator = allocator
 
-	s: OS_Stat
-	s, err = _stat(name)
-	if err != ERROR_NONE {
-		return fi, err
-	}
+	s := _stat(name) or_return
 	_fill_file_info_from_stat(&fi, s)
-	fi.fullpath, err = absolute_path_from_relative(name)
-	if err != ERROR_NONE {
-		return
-	}
+	fi.fullpath = absolute_path_from_relative(name) or_return
 	fi.name = path_base(fi.fullpath)
-	return fi, ERROR_NONE
+	return
 }
 
 fstat :: proc(fd: Handle, allocator := context.allocator) -> (fi: File_Info, err: Errno) {
-
 	context.allocator = allocator
 
-	s: OS_Stat
-	s, err = _fstat(fd)
-	if err != ERROR_NONE {
-		return fi, err
-	}
+	s := _fstat(fd) or_return
 	_fill_file_info_from_stat(&fi, s)
-	fi.fullpath, err = absolute_path_from_handle(fd)
-	if err != ERROR_NONE {
-		return
-	}
+	fi.fullpath = absolute_path_from_handle(fd) or_return
 	fi.name = path_base(fi.fullpath)
-	return fi, ERROR_NONE
+	return
 }

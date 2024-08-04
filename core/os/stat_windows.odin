@@ -22,7 +22,7 @@ full_path_from_name :: proc(name: string, allocator := context.allocator) -> (pa
 			return "", get_last_error()
 		}
 		if n <= u32(len(buf)) {
-			return win32.utf16_to_utf8(buf[:n], allocator) or_else "", ERROR_NONE
+			return win32.utf16_to_utf8(buf[:n], allocator) or_else "", nil
 		}
 		resize(&buf, len(buf)*2)
 	}
@@ -83,15 +83,15 @@ stat :: proc(name: string, allocator := context.allocator) -> (File_Info, Errno)
 	return _stat(name, attrs, allocator)
 }
 
-fstat :: proc(fd: Handle, allocator := context.allocator) -> (fi: File_Info, errno: Errno) {
+fstat :: proc(fd: Handle, allocator := context.allocator) -> (fi: File_Info, err: Errno) {
 	if fd == 0 {
-		return {}, ERROR_INVALID_HANDLE
+		err = ERROR_INVALID_HANDLE
 	}
 	context.allocator = allocator
 
-	path, err := cleanpath_from_handle(fd)
-	if err != ERROR_NONE {
-		return {}, err
+	path := cleanpath_from_handle(fd) or_return
+	defer if err != nil {
+		delete(path)
 	}
 
 	h := win32.HANDLE(fd)
@@ -99,9 +99,9 @@ fstat :: proc(fd: Handle, allocator := context.allocator) -> (fi: File_Info, err
 	case win32.FILE_TYPE_PIPE, win32.FILE_TYPE_CHAR:
 		fi.name = basename(path)
 		fi.mode |= file_type_mode(h)
-		errno = ERROR_NONE
+		err = nil
 	case:
-		fi, errno = file_info_from_get_file_information_by_handle(path, h)
+		fi  = file_info_from_get_file_information_by_handle(path, h) or_return
 	}
 	fi.fullpath = path
 	return
@@ -152,7 +152,7 @@ cleanpath_from_handle_u16 :: proc(fd: Handle, allocator: runtime.Allocator) -> (
 	}
 	buf := make([]u16, max(n, win32.DWORD(260))+1, allocator)
 	buf_len := win32.GetFinalPathNameByHandleW(h, raw_data(buf), n, 0)
-	return buf[:buf_len], ERROR_NONE
+	return buf[:buf_len], nil
 }
 @(private)
 cleanpath_from_buf :: proc(buf: []u16) -> string {
@@ -296,5 +296,5 @@ file_info_from_get_file_information_by_handle :: proc(path: string, h: win32.HAN
 
 	windows_set_file_info_times(&fi, &d)
 
-	return fi, ERROR_NONE
+	return fi, nil
 }

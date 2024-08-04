@@ -68,15 +68,14 @@ read_dir :: proc(fd: Handle, n: int, allocator := context.allocator) -> (fi: []F
 	}
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD(ignore = context.temp_allocator == allocator)
 
-	wpath: []u16
-	wpath, err = cleanpath_from_handle_u16(fd, context.temp_allocator)
-	if len(wpath) == 0 || err != ERROR_NONE {
+	wpath := cleanpath_from_handle_u16(fd, context.temp_allocator) or_return
+	if len(wpath) == 0 {
 		return
 	}
 
-	dfi := make([dynamic]File_Info, 0, size)
+	dfi := make([dynamic]File_Info, 0, size) or_return
 
-	wpath_search := make([]u16, len(wpath)+3, context.temp_allocator)
+	wpath_search := make([]u16, len(wpath)+3, context.temp_allocator) or_return
 	copy(wpath_search, wpath)
 	wpath_search[len(wpath)+0] = '\\'
 	wpath_search[len(wpath)+1] = '*'
@@ -109,5 +108,5 @@ read_dir :: proc(fd: Handle, n: int, allocator := context.allocator) -> (fi: []F
 		}
 	}
 
-	return dfi[:], ERROR_NONE
+	return dfi[:], nil
 }

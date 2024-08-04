@@ -190,7 +190,7 @@ fork :: proc() -> (Pid, Errno) {
 	if pid == -1 {
 		return Pid(-1), Errno(get_last_error())
 	}
-	return Pid(pid), ERROR_NONE
+	return Pid(pid), nil
 }
 
 open :: proc(path: string, flags: int = O_RDONLY, mode: int = 0) -> (Handle, Errno) {
@@ -200,7 +200,7 @@ open :: proc(path: string, flags: int = O_RDONLY, mode: int = 0) -> (Handle, Err
 	if handle == -1 {
 		return INVALID_HANDLE, Errno(get_last_error())
 	}
-	return handle, ERROR_NONE
+	return handle, nil
 }
 
 close :: proc(fd: Handle) -> Errno {
@@ -224,12 +224,12 @@ read :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 	if bytes_read == -1 {
 		return -1, Errno(get_last_error())
 	}
-	return int(bytes_read), ERROR_NONE
+	return int(bytes_read), nil
 }
 
 write :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 	if len(data) == 0 {
-		return 0, ERROR_NONE
+		return 0, nil
 	}
 
 	to_write      := min(c.size_t(len(data)), MAX_RW)
@@ -237,7 +237,7 @@ write :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 	if bytes_written == -1 {
 		return -1, Errno(get_last_error())
 	}
-	return int(bytes_written), ERROR_NONE
+	return int(bytes_written), nil
 }
 
 seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
@@ -245,15 +245,15 @@ seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
 	if res == -1 {
 		return -1, Errno(get_last_error())
 	}
-	return res, ERROR_NONE
+	return res, nil
 }
 
 file_size :: proc(fd: Handle) -> (i64, Errno) {
 	s, err := _fstat(fd)
-	if err != ERROR_NONE {
+	if err != nil {
 		return -1, err
 	}
-	return s.size, ERROR_NONE
+	return s.size, nil
 }
 
 // "Argv" arguments converted to Odin strings
@@ -278,7 +278,7 @@ _stat :: proc(path: string) -> (OS_Stat, Errno) {
 	if res == -1 {
 		return s, Errno(get_last_error())
 	}
-	return s, ERROR_NONE
+	return s, nil
 }
 
 @private
@@ -292,7 +292,7 @@ _lstat :: proc(path: string) -> (OS_Stat, Errno) {
 	if res == -1 {
 		return s, Errno(get_last_error())
 	}
-	return s, ERROR_NONE
+	return s, nil
 }
 
 @private
@@ -303,7 +303,7 @@ _fstat :: proc(fd: Handle) -> (OS_Stat, Errno) {
 	if res == -1 {
 		return s, Errno(get_last_error())
 	}
-	return s, ERROR_NONE
+	return s, nil
 }
 
 @private
@@ -312,7 +312,7 @@ _fdopendir :: proc(fd: Handle) -> (Dir, Errno) {
 	if dirp == cast(Dir)nil {
 		return nil, Errno(get_last_error())
 	}
-	return dirp, ERROR_NONE
+	return dirp, nil
 }
 
 @private
@@ -338,7 +338,6 @@ _readdir :: proc(dirp: Dir) -> (entry: Dirent, err: Errno, end_of_stream: bool) 
 		err = Errno(get_last_error())
 		return
 	}
-	err = ERROR_NONE
 
 	if result == nil {
 		end_of_stream = true
@@ -365,7 +364,7 @@ _readlink :: proc(path: string) -> (string, Errno) {
 			delete(buf)
 			buf = make([]byte, bufsz)
 		} else {
-			return strings.string_from_ptr(&buf[0], rc), ERROR_NONE
+			return strings.string_from_ptr(&buf[0], rc), nil
 		}	
 	}
 }
@@ -392,7 +391,7 @@ absolute_path_from_relative :: proc(rel: string) -> (path: string, err: Errno) {
 	path_cstr := cstring(path_ptr)
 	path = strings.clone(string(path_cstr))
 
-	return path, ERROR_NONE
+	return path, nil
 }
 
 access :: proc(path: string, mask: int) -> (bool, Errno) {
@@ -402,7 +401,7 @@ access :: proc(path: string, mask: int) -> (bool, Errno) {
 	if res == -1 {
 		return false, Errno(get_last_error())
 	}
-	return true, ERROR_NONE
+	return true, nil
 }
 
 lookup_env :: proc(key: string, allocator := context.allocator) -> (value: string, found: bool) {

@@ -52,7 +52,7 @@ open :: proc(path: string, mode: int = O_RDONLY, perm: int = 0) -> (Handle, Errn
 	wide_path := win32.utf8_to_wstring(path)
 	handle := Handle(win32.CreateFileW(wide_path, access, share_mode, sa, create_mode, win32.FILE_ATTRIBUTE_NORMAL|win32.FILE_FLAG_BACKUP_SEMANTICS, nil))
 	if handle != INVALID_HANDLE {
-		return handle, ERROR_NONE
+		return handle, nil
 	}
 
 	err := get_last_error()
@@ -77,7 +77,7 @@ flush :: proc(fd: Handle) -> (err: Errno) {
 
 write :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 	if len(data) == 0 {
-		return 0, ERROR_NONE
+		return 0, nil
 	}
 
 	single_write_length: win32.DWORD
@@ -94,7 +94,7 @@ write :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 		}
 		total_write += i64(single_write_length)
 	}
-	return int(total_write), ERROR_NONE
+	return int(total_write), nil
 }
 
 @(private="file")
@@ -150,7 +150,7 @@ read_console :: proc(handle: win32.HANDLE, b: []byte) -> (n: int, err: Errno) {
 
 read :: proc(fd: Handle, data: []byte) -> (total_read: int, err: Errno) {
 	if len(data) == 0 {
-		return 0, ERROR_NONE
+		return 0, nil
 	}
 	
 	handle := win32.HANDLE(fd)
@@ -176,7 +176,7 @@ read :: proc(fd: Handle, data: []byte) -> (total_read: int, err: Errno) {
 			if bytes_read == 0 {
 				return 0, ERROR_HANDLE_EOF
 			} else {
-				return int(bytes_read), ERROR_NONE
+				return int(bytes_read), nil
 			}
 		} else {
 			return 0, get_last_error()
@@ -204,7 +204,7 @@ seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
 		err := get_last_error()
 		return 0, err
 	}
-	return i64(hi)<<32 + i64(dw_ptr), ERROR_NONE
+	return i64(hi)<<32 + i64(dw_ptr), nil
 }
 
 file_size :: proc(fd: Handle) -> (i64, Errno) {
@@ -377,7 +377,7 @@ get_current_directory :: proc(allocator := context.allocator) -> string {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD(ignore = context.temp_allocator == allocator)
 
 	sz_utf16 := win32.GetCurrentDirectoryW(0, nil)
-	dir_buf_wstr := make([]u16, sz_utf16, context.temp_allocator) // the first time, it _includes_ the NUL.
+	dir_buf_wstr, _ := make([]u16, sz_utf16, context.temp_allocator) // the first time, it _includes_ the NUL.
 
 	sz_utf16 = win32.GetCurrentDirectoryW(win32.DWORD(len(dir_buf_wstr)), raw_data(dir_buf_wstr))
 	assert(int(sz_utf16)+1 == len(dir_buf_wstr)) // the second time, it _excludes_ the NUL.
@@ -458,7 +458,7 @@ fix_long_path :: proc(path: string) -> string {
 
 	prefix :: `\\?`
 
-	path_buf := make([]byte, len(prefix)+len(path)+len(`\`), context.temp_allocator)
+	path_buf, _ := make([]byte, len(prefix)+len(path)+len(`\`), context.temp_allocator)
 	copy(path_buf, prefix)
 	n := len(path)
 	r, w := 0, len(prefix)

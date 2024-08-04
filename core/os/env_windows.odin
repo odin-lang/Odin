@@ -18,7 +18,7 @@ lookup_env :: proc(key: string, allocator := context.allocator) -> (value: strin
 	}
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD(ignore = context.temp_allocator == allocator)
 
-	b := make([dynamic]u16, n, context.temp_allocator)
+	b, _ := make([dynamic]u16, n, context.temp_allocator)
 	n = win32.GetEnvironmentVariableW(wkey, raw_data(b), u32(len(b)))
 	if n == 0 && get_last_error() == ERROR_ENVVAR_NOT_FOUND {
 		return "", false
@@ -61,13 +61,16 @@ unset_env :: proc(key: string) -> Errno {
 // environ returns a copy of strings representing the environment, in the form "key=value"
 // NOTE: the slice of strings and the strings with be allocated using the supplied allocator
 environ :: proc(allocator := context.allocator) -> []string {
-	envs := cast([^]win32.WCHAR)(win32.GetEnvironmentStringsW())
+	envs := ([^]win32.WCHAR)(win32.GetEnvironmentStringsW())
 	if envs == nil {
 		return nil
 	}
 	defer win32.FreeEnvironmentStringsW(envs)
 
-	r := make([dynamic]string, 0, 50, allocator)
+	r, err := make([dynamic]string, 0, 50, allocator)
+	if err != nil {
+		return nil
+	}
 	for from, i := 0, 0; true; i += 1 {
 		if c := envs[i]; c == 0 {
 			if i <= from {

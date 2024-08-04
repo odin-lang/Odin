@@ -698,7 +698,7 @@ MAX_RW :: 1 << 30
 
 write :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 	if len(data) == 0 {
-		return 0, ERROR_NONE
+		return 0, nil
 	}
 
 	to_write := min(c.size_t(len(data)), MAX_RW)
@@ -707,12 +707,12 @@ write :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 	if bytes_written < 0 {
 		return -1, Errno(get_last_error())
 	}
-	return bytes_written, ERROR_NONE
+	return bytes_written, nil
 }
 
 read :: proc(fd: Handle, data: []u8) -> (int, Errno) {
 	if len(data) == 0 {
-		return 0, ERROR_NONE
+		return 0, nil
 	}
 
 	to_read := min(c.size_t(len(data)), MAX_RW)
@@ -721,12 +721,12 @@ read :: proc(fd: Handle, data: []u8) -> (int, Errno) {
 	if bytes_read < 0 {
 		return -1, Errno(get_last_error())
 	}
-	return bytes_read, ERROR_NONE
+	return bytes_read, nil
 }
 
 read_at :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Errno) {
 	if len(data) == 0 {
-		return 0, ERROR_NONE
+		return 0, nil
 	}
 
 	to_read := min(c.size_t(len(data)), MAX_RW)
@@ -735,12 +735,12 @@ read_at :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Errno) {
 	if bytes_read < 0 {
 		return -1, Errno(get_last_error())
 	}
-	return bytes_read, ERROR_NONE
+	return bytes_read, nil
 }
 
 write_at :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Errno) {
 	if len(data) == 0 {
-		return 0, ERROR_NONE
+		return 0, nil
 	}
 
 	to_write := min(c.size_t(len(data)), MAX_RW)
@@ -749,7 +749,7 @@ write_at :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Errno) {
 	if bytes_written < 0 {
 		return -1, Errno(get_last_error())
 	}
-	return bytes_written, ERROR_NONE
+	return bytes_written, nil
 }
 
 seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
@@ -776,22 +776,16 @@ stdin:  Handle = 0 // get_std_handle(win32.STD_INPUT_HANDLE);
 stdout: Handle = 1 // get_std_handle(win32.STD_OUTPUT_HANDLE);
 stderr: Handle = 2 // get_std_handle(win32.STD_ERROR_HANDLE);
 
-last_write_time :: proc(fd: Handle) -> (File_Time, Errno) {
-	s, err := _fstat(fd)
-	if err != ERROR_NONE {
-		return 0, err
-	}
+last_write_time :: proc(fd: Handle) -> (time: File_Time, err: Errno) {
+	s := _fstat(fd) or_return
 	modified := s.modified.seconds * 1_000_000_000 + s.modified.nanoseconds
-	return File_Time(modified), ERROR_NONE
+	return File_Time(modified), nil
 }
 
-last_write_time_by_name :: proc(name: string) -> (File_Time, Errno) {
-	s, err := _stat(name)
-	if err != ERROR_NONE {
-		return 0, err
-	}
+last_write_time_by_name :: proc(name: string) -> (time: File_Time, err: Errno) {
+	s := _stat(name) or_return
 	modified := s.modified.seconds * 1_000_000_000 + s.modified.nanoseconds
-	return File_Time(modified), ERROR_NONE
+	return File_Time(modified), nil
 }
 
 
@@ -801,7 +795,7 @@ is_path_separator :: proc(r: rune) -> bool {
 
 is_file_handle :: proc(fd: Handle) -> bool {
 	s, err := _fstat(fd)
-	if err != ERROR_NONE {
+	if err != nil {
 		return false
 	}
 	return S_ISREG(s.mode)
@@ -815,7 +809,7 @@ is_file_path :: proc(path: string, follow_links: bool = true) -> bool {
 	} else {
 		s, err = _lstat(path)
 	}
-	if err != ERROR_NONE {
+	if err != nil {
 		return false
 	}
 	return S_ISREG(s.mode)
@@ -824,7 +818,7 @@ is_file_path :: proc(path: string, follow_links: bool = true) -> bool {
 
 is_dir_handle :: proc(fd: Handle) -> bool {
 	s, err := _fstat(fd)
-	if err != ERROR_NONE {
+	if err != nil {
 		return false
 	}
 	return S_ISDIR(s.mode)
@@ -838,7 +832,7 @@ is_dir_path :: proc(path: string, follow_links: bool = true) -> bool {
 	} else {
 		s, err = _lstat(path)
 	}
-	if err != ERROR_NONE {
+	if err != nil {
 		return false
 	}
 	return S_ISDIR(s.mode)
@@ -881,7 +875,7 @@ _stat :: proc(path: string) -> (OS_Stat, Errno) {
 	if result == -1 {
 		return s, Errno(get_last_error())
 	}
-	return s, ERROR_NONE
+	return s, nil
 }
 
 @private
@@ -894,7 +888,7 @@ _lstat :: proc(path: string) -> (OS_Stat, Errno) {
 	if result == -1 {
 		return s, Errno(get_last_error())
 	}
-	return s, ERROR_NONE
+	return s, nil
 }
 
 @private
@@ -904,7 +898,7 @@ _fstat :: proc(fd: Handle) -> (OS_Stat, Errno) {
 	if result == -1 {
 		return s, Errno(get_last_error())
 	}
-	return s, ERROR_NONE
+	return s, nil
 }
 
 @private
@@ -913,7 +907,7 @@ _fdopendir :: proc(fd: Handle) -> (Dir, Errno) {
 	if dirp == cast(Dir)nil {
 		return nil, Errno(get_last_error())
 	}
-	return dirp, ERROR_NONE
+	return dirp, nil
 }
 
 @private
@@ -939,7 +933,6 @@ _readdir :: proc(dirp: Dir) -> (entry: Dirent, err: Errno, end_of_stream: bool) 
 		err = Errno(get_last_error())
 		return
 	}
-	err = ERROR_NONE
 
 	if result == nil {
 		end_of_stream = true
@@ -968,20 +961,15 @@ _readlink :: proc(path: string) -> (string, Errno) {
 			delete(buf)
 			buf = make([]byte, bufsz)
 		} else {
-			return strings.string_from_ptr(&buf[0], rc), ERROR_NONE
+			return strings.string_from_ptr(&buf[0], rc), nil
 		}
 	}
 }
 
-absolute_path_from_handle :: proc(fd: Handle) -> (string, Errno) {
+absolute_path_from_handle :: proc(fd: Handle) -> (path: string, err: Errno) {
 	buf: [DARWIN_MAXPATHLEN]byte
-	_, err := fcntl(int(fd), F_GETPATH, int(uintptr(&buf[0])))
-	if err != ERROR_NONE {
-		return "", err
-	}
-
-	path := strings.clone_from_cstring(cstring(&buf[0]))
-	return path, err
+	_ = fcntl(int(fd), F_GETPATH, int(uintptr(&buf[0]))) or_return
+	return strings.clone_from_cstring(cstring(&buf[0]))
 }
 
 absolute_path_from_relative :: proc(rel: string) -> (path: string, err: Errno) {
@@ -1002,7 +990,7 @@ absolute_path_from_relative :: proc(rel: string) -> (path: string, err: Errno) {
 	path_cstr := cast(cstring)path_ptr
 	path = strings.clone(string(path_cstr))
 
-	return path, ERROR_NONE
+	return path, nil
 }
 
 access :: proc(path: string, mask: int) -> bool {
@@ -1162,7 +1150,7 @@ socket :: proc(domain: int, type: int, protocol: int) -> (Socket, Errno) {
 	if result < 0 {
 		return 0, Errno(get_last_error())
 	}
-	return Socket(result), ERROR_NONE
+	return Socket(result), nil
 }
 
 connect :: proc(sd: Socket, addr: ^SOCKADDR, len: socklen_t) -> (Errno) {
@@ -1186,7 +1174,7 @@ accept :: proc(sd: Socket, addr: ^SOCKADDR, len: rawptr) -> (Socket, Errno) {
 	if result < 0 {
 		return 0, Errno(get_last_error())
 	}
-	return Socket(result), ERROR_NONE
+	return Socket(result), nil
 }
 
 listen :: proc(sd: Socket, backlog: int) -> (Errno) {
@@ -1218,7 +1206,7 @@ recvfrom :: proc(sd: Socket, data: []byte, flags: int, addr: ^SOCKADDR, addr_siz
 	if result < 0 {
 		return 0, Errno(get_last_error())
 	}
-	return u32(result), ERROR_NONE
+	return u32(result), nil
 }
 
 recv :: proc(sd: Socket, data: []byte, flags: int) -> (u32, Errno) {
@@ -1226,7 +1214,7 @@ recv :: proc(sd: Socket, data: []byte, flags: int) -> (u32, Errno) {
 	if result < 0 {
 		return 0, Errno(get_last_error())
 	}
-	return u32(result), ERROR_NONE
+	return u32(result), nil
 }
 
 sendto :: proc(sd: Socket, data: []u8, flags: int, addr: ^SOCKADDR, addrlen: socklen_t) -> (u32, Errno) {
@@ -1234,7 +1222,7 @@ sendto :: proc(sd: Socket, data: []u8, flags: int, addr: ^SOCKADDR, addrlen: soc
 	if result < 0 {
 		return 0, Errno(get_last_error())
 	}
-	return u32(result), ERROR_NONE
+	return u32(result), nil
 }
 
 send :: proc(sd: Socket, data: []byte, flags: int) -> (u32, Errno) {
@@ -1242,7 +1230,7 @@ send :: proc(sd: Socket, data: []byte, flags: int) -> (u32, Errno) {
 	if result < 0 {
 		return 0, Errno(get_last_error())
 	}
-	return u32(result), ERROR_NONE
+	return u32(result), nil
 }
 
 shutdown :: proc(sd: Socket, how: int) -> (Errno) {
@@ -1258,5 +1246,5 @@ fcntl :: proc(fd: int, cmd: int, arg: int) -> (int, Errno) {
 	if result < 0 {
 		return 0, Errno(get_last_error())
 	}
-	return int(result), ERROR_NONE
+	return int(result), nil
 }
