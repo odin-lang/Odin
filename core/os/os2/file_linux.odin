@@ -386,8 +386,7 @@ _fchtimes :: proc(f: ^File, atime, mtime: time.Time) -> Error {
 _exists :: proc(name: string) -> bool {
 	TEMP_ALLOCATOR_GUARD()
 	name_cstr, _ := temp_cstring(name)
-	res, errno := linux.access(name_cstr, linux.F_OK)
-	return !res && errno == .NONE
+	return linux.access(name_cstr, linux.F_OK) == .NONE
 }
 
 /* For reading Linux system files that stat to size 0 */

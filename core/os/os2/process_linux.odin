@@ -300,6 +300,12 @@ _Sys_Process_Attributes :: struct {}
 
 @(private="package")
 _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
+	_has_executable_permissions :: proc(fd: linux.Fd) -> bool {
+		backing: [48]u8
+		_ = fmt.bprintf(backing[:], "/proc/self/fd/%d", fd)
+		return linux.access(cstring(&backing[0]), linux.X_OK) == .NONE
+	}
+
 	TEMP_ALLOCATOR_GUARD()
 
 	if len(desc.command) == 0 {
@@ -314,38 +320,54 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 			return process, _get_platform_error(errno)
 		}
 	}
+	defer if desc.working_dir != "" {
+		linux.close(dir_fd)
+	}
 
 	// search PATH if just a plain name is provided
+	exe_fd: linux.Fd
 	executable_name := desc.command[0]
-	executable_path: cstring
 	if strings.index_byte(executable_name, '/') == -1 {
 		path_env := get_env("PATH", temp_allocator())
 		path_dirs := filepath.split_list(path_env, temp_allocator())
+
 		found: bool
 		for dir in path_dirs {
-			executable_path = fmt.caprintf("%s/%s", dir, executable_name, temp_allocator())
-			fail: bool
-			if fail, errno = linux.faccessat(dir_fd, executable_path, linux.F_OK); errno == .NONE && !fail {
-				found = true
-				break
+			exe_path := fmt.caprintf("%s/%s", dir, executable_name, allocator=temp_allocator())
+			if exe_fd, errno = linux.openat(dir_fd, exe_path, {.PATH, .CLOEXEC}); errno != .NONE {
+				continue
 			}
+			if !_has_executable_permissions(exe_fd) {
+				linux.close(exe_fd)
+				continue
+			}
+			found = true
+			break
 		}
 		if !found {
 			// check in cwd to match windows behavior
-			executable_path = fmt.caprintf("./%s", name, temp_allocator())
-			fail: bool
-			if fail, errno = linux.faccessat(dir_fd, executable_path, linux.F_OK); errno != .NONE || fail {
+			exe_path := fmt.caprintf("./%s", executable_name, allocator=temp_allocator())
+			if exe_fd, errno = linux.openat(dir_fd, exe_path, {.PATH, .CLOEXEC}); errno != .NONE {
 				return process, .Not_Exist
+			}
+			if !_has_executable_permissions(exe_fd) {
+				linux.close(exe_fd)
+				return process, .Permission_Denied
 			}
 		}
 	} else {
-		executable_path = temp_cstring(executable_name) or_return
+		exe_path := temp_cstring(executable_name) or_return
+		if exe_fd, errno = linux.openat(dir_fd, exe_path, {.PATH, .CLOEXEC}); errno != .NONE {
+			return process, _get_platform_error(errno)
+		}
+		if !_has_executable_permissions(exe_fd) {
+			linux.close(exe_fd)
+			return process, .Permission_Denied
+		}
 	}
 
-	not_exec: bool
-	if not_exec, errno = linux.faccessat(dir_fd, executable_path, linux.F_OK | linux.X_OK); errno != .NONE || not_exec {
-		return process, errno == .NONE ? .Permission_Denied : _get_platform_error(errno)
-	}
+	// At this point, we have an executable.
+	defer linux.close(exe_fd)
 
 	// args and environment need to be a list of cstrings
 	// that are terminated by a nil pointer.
@@ -409,7 +431,7 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 			}
 		}
 
-		if errno = linux.execveat(dir_fd, executable_path, &cargs[0], env); errno != .NONE {
+		if errno = linux.execveat(exe_fd, "", &cargs[0], env, {.AT_EMPTY_PATH}); errno != .NONE {
 			intrinsics.trap()
 		}
 		unreachable()
