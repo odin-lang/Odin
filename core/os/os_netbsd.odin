@@ -528,6 +528,26 @@ write :: proc(fd: Handle, data: []byte) -> (int, Error) {
 	return int(bytes_written), nil
 }
 
+read_at :: proc(fd: Handle, data: []byte, offset: i64) -> (n: int, err: Error) {
+	curr := seek(fd, offset, SEEK_CUR) or_return
+	n, err = read(fd, data)
+	_, err1 := seek(fd, curr, SEEK_SET)
+	if err1 != nil && err == nil {
+		err = err1
+	}
+	return
+}
+
+write_at :: proc(fd: Handle, data: []byte, offset: i64) -> (n: int, err: Error) {
+	curr := seek(fd, offset, SEEK_CUR) or_return
+	n, err = write(fd, data)
+	_, err1 := seek(fd, curr, SEEK_SET)
+	if err1 != nil && err == nil {
+		err = err1
+	}
+	return
+}
+
 seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Error) {
 	res := _unix_seek(fd, offset, c.int(whence))
 	if res == -1 {

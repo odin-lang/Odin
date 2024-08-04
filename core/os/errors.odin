@@ -157,3 +157,11 @@ _error_string :: proc "contextless" (e: Platform_Error) -> string where intrinsi
 	}
 	return "<unknown platform error>"
 }
+
+@(private, require_results)
+error_to_io_error :: proc(ferr: Error) -> io.Error {
+	if ferr == nil {
+		return .None
+	}
+	return ferr.(io.Error) or_else .Unknown
+}
