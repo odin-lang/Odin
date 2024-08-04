@@ -1,5 +1,13 @@
 package regex_vm
 
+/*
+	(c) Copyright 2024 Feoramund <rune@swevencraft.org>.
+	Made available under Odin's BSD-3 license.
+
+	List of contributors:
+		Feoramund: Initial implementation.
+*/
+
 Opcode_Iterator :: struct {
 	code: Program,
 	pc: int,

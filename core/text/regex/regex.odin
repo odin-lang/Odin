@@ -1,5 +1,13 @@
 package regex
 
+/*
+	(c) Copyright 2024 Feoramund <rune@swevencraft.org>.
+	Made available under Odin's BSD-3 license.
+
+	List of contributors:
+		Feoramund: Initial implementation.
+*/
+
 import "core:text/regex/common"
 import "core:text/regex/compiler"
 import "core:text/regex/optimizer"

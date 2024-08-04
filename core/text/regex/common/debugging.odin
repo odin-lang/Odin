@@ -1,5 +1,13 @@
 package regex_common
 
+/*
+	(c) Copyright 2024 Feoramund <rune@swevencraft.org>.
+	Made available under Odin's BSD-3 license.
+
+	List of contributors:
+		Feoramund: Initial implementation.
+*/
+
 @require import "core:os"
 import "core:io"
 import "core:strings"

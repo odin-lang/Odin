@@ -1,5 +1,13 @@
 package regex_parser
 
+/*
+	(c) Copyright 2024 Feoramund <rune@swevencraft.org>.
+	Made available under Odin's BSD-3 license.
+
+	List of contributors:
+		Feoramund: Initial implementation.
+*/
+
 import "core:io"
 
 write_node :: proc(w: io.Writer, node: Node) {

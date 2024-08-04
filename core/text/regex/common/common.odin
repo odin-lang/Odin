@@ -1,6 +1,14 @@
 // This package helps break dependency cycles.
 package regex_common
 
+/*
+	(c) Copyright 2024 Feoramund <rune@swevencraft.org>.
+	Made available under Odin's BSD-3 license.
+
+	List of contributors:
+		Feoramund: Initial implementation.
+*/
+
 // VM limitations
 MAX_CAPTURE_GROUPS :: max(#config(ODIN_REGEX_MAX_CAPTURE_GROUPS, 10), 10)
 MAX_PROGRAM_SIZE   :: int(max(i16))

@@ -1,5 +1,13 @@
 package regex_compiler
 
+/*
+	(c) Copyright 2024 Feoramund <rune@swevencraft.org>.
+	Made available under Odin's BSD-3 license.
+
+	List of contributors:
+		Feoramund: Initial implementation.
+*/
+
 import "base:intrinsics"
 import "core:text/regex/common"
 import "core:text/regex/parser"
