@@ -13,22 +13,43 @@ Compiler_Error :: compiler.Error
 
 Creation_Error :: enum {
 	None,
+	// A `\` was supplied as the delimiter to `create_by_user`.
 	Bad_Delimiter,
+	// A pair of delimiters for `create_by_user` was not found.
 	Expected_Delimiter,
+	// An unknown letter was supplied to `create_by_user` after the last delimiter.
 	Unknown_Flag,
 }
 
 Error :: union #shared_nil {
+	// An error that can occur in the pattern parsing phase.
+	//
+	// Most of these are regular expression syntax errors and are either
+	// context-dependent as to what they mean or have self-explanatory names.
 	Parser_Error,
+	// An error that can occur in the pattern compiling phase.
+	//
+	// Of the two that can be returned, they have to do with exceeding the
+	// limitations of the Virtual Machine.
 	Compiler_Error,
+	// An error that occurs only for `create_by_user`.
 	Creation_Error,
 }
 
+/*
+This struct corresponds to a set of string captures from a RegEx match.
+
+`pos` will contain the start and end positions for each string in `groups`,
+such that `str[pos[0][0]:pos[0][1]] == groups[0]`.
+*/
 Capture :: struct {
 	pos: [][2]int,
 	groups: []string,
 }
 
+/*
+A compiled Regular Expression value, to be used with the `match_*` procedures.
+*/
 Regular_Expression :: struct {
 	flags: Flags `fmt:"-"`,
 	class_data: []virtual_machine.Rune_Class_Data `fmt:"-"`,
