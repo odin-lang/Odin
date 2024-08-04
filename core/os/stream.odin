@@ -19,7 +19,7 @@ _file_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, 
 	case .Close:
 		close(fd)
 	case .Flush:
-		when ODIN_OS == .Windows {
+		when ODIN_OS == .Windows || ODIN_OS == .Darwin || ODIN_OS == .JS {
 			flush(fd)
 		} else {
 			// TOOD(bill): other operating systems
