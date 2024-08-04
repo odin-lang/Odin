@@ -3,6 +3,7 @@ package os
 
 import "core:strings"
 
+@(require_results)
 read_dir :: proc(fd: Handle, n: int, allocator := context.allocator) -> (fi: []File_Info, err: Errno) {
 	dirp := _fdopendir(fd) or_return
 	defer _closedir(dirp)

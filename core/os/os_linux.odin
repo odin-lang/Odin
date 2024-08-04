@@ -521,7 +521,18 @@ _get_errno :: proc(res: int) -> Errno {
 
 // get errno from libc
 get_last_error :: proc "contextless" () -> Error {
-	return Platform_Error(__errno_location()^)
+	err := Platform_Error(__errno_location()^)
+	#partial switch err {
+	case .NONE:
+		return nil
+	case .EPERM:
+		return .Permission_Denied
+	case .EEXIST:
+		return .Exist
+	case .ENOENT:
+		return .Not_Exist
+	}
+	return err
 }
 
 personality :: proc(persona: u64) -> (Errno) {

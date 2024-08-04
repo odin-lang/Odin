@@ -11,7 +11,7 @@ is_path_separator :: proc(c: byte) -> bool {
 
 open :: proc(path: string, mode: int = O_RDONLY, perm: int = 0) -> (Handle, Errno) {
 	if len(path) == 0 {
-		return INVALID_HANDLE, ERROR_FILE_NOT_FOUND
+		return INVALID_HANDLE, General_Error.Not_Exist
 	}
 
 	access: u32
@@ -55,8 +55,7 @@ open :: proc(path: string, mode: int = O_RDONLY, perm: int = 0) -> (Handle, Errn
 		return handle, nil
 	}
 
-	err := get_last_error()
-	return INVALID_HANDLE, err
+	return INVALID_HANDLE, get_last_error()
 }
 
 close :: proc(fd: Handle) -> Errno {

@@ -4,6 +4,7 @@ import win32 "core:sys/windows"
 import "core:strings"
 import "base:runtime"
 
+@(require_results)
 read_dir :: proc(fd: Handle, n: int, allocator := context.allocator) -> (fi: []File_Info, err: Errno) {
 	find_data_to_file_info :: proc(base_path: string, d: ^win32.WIN32_FIND_DATAW) -> (fi: File_Info) {
 		// Ignore "." and ".."
