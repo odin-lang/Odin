@@ -73,6 +73,21 @@ write_encoded_rune :: proc(f: ^File, r: rune) -> (n: int, err: Error) {
 	return
 }
 
+read_at_least :: proc(f: ^File, buf: []byte, min: int) -> (n: int, err: Error) {
+	if len(buf) < min {
+		return 0, .Short_Buffer
+	}
+	nn := max(int)
+	for nn > 0 && n < min && err == nil {
+		nn, err = read(f, buf[n:])
+		n += nn
+	}
+	if n >= min {
+		err = nil
+	}
+	return
+}
+
 
 write_ptr :: proc(f: ^File, data: rawptr, len: int) -> (n: int, err: Error) {
 	return write(f, ([^]byte)(data)[:len])

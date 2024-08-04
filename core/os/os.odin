@@ -2,6 +2,7 @@ package os
 
 import "base:intrinsics"
 import "base:runtime"
+import "core:io"
 import "core:strconv"
 import "core:unicode/utf8"
 
@@ -21,8 +22,9 @@ Platform_Error :: _Platform_Error
 Errno :: Error // alias for legacy use
 
 Error :: union #shared_nil {
-	Platform_Error,
+	io.Error,
 	runtime.Allocator_Error,
+	Platform_Error,
 }
 #assert(size_of(Error) <= 8)
 
@@ -45,38 +47,48 @@ write_rune :: proc(fd: Handle, r: rune) -> (int, Errno) {
 	return write(fd, b[:n])
 }
 
-write_encoded_rune :: proc(fd: Handle, r: rune) {
-	write_byte(fd, '\'')
+write_encoded_rune :: proc(f: Handle, r: rune) -> (n: int, err: Error) {
+	wrap :: proc(m: int, merr: Error, n: ^int, err: ^Error) -> bool {
+		n^ += m
+		if merr != nil {
+			err^ = merr
+			return true
+		}
+		return false
+	}
+
+	if wrap(write_byte(f, '\''), &n, &err) { return }
 
 	switch r {
-	case '\a': write_string(fd, "\\a")
-	case '\b': write_string(fd, "\\b")
-	case '\e': write_string(fd, "\\e")
-	case '\f': write_string(fd, "\\f")
-	case '\n': write_string(fd, "\\n")
-	case '\r': write_string(fd, "\\r")
-	case '\t': write_string(fd, "\\t")
-	case '\v': write_string(fd, "\\v")
+	case '\a': if wrap(write_string(f, "\\a"), &n, &err) { return }
+	case '\b': if wrap(write_string(f, "\\b"), &n, &err) { return }
+	case '\e': if wrap(write_string(f, "\\e"), &n, &err) { return }
+	case '\f': if wrap(write_string(f, "\\f"), &n, &err) { return }
+	case '\n': if wrap(write_string(f, "\\n"), &n, &err) { return }
+	case '\r': if wrap(write_string(f, "\\r"), &n, &err) { return }
+	case '\t': if wrap(write_string(f, "\\t"), &n, &err) { return }
+	case '\v': if wrap(write_string(f, "\\v"), &n, &err) { return }
 	case:
 		if r < 32 {
-			write_string(fd, "\\x")
+			if wrap(write_string(f, "\\x"), &n, &err) { return }
 			b: [2]byte
 			s := strconv.append_bits(b[:], u64(r), 16, true, 64, strconv.digits, nil)
 			switch len(s) {
-			case 0: write_string(fd, "00")
-			case 1: write_rune(fd, '0')
-			case 2: write_string(fd, s)
+			case 0: if wrap(write_string(f, "00"), &n, &err) { return }
+			case 1: if wrap(write_rune(f, '0'), &n, &err)    { return }
+			case 2: if wrap(write_string(f, s), &n, &err)    { return }
 			}
 		} else {
-			write_rune(fd, r)
+			if wrap(write_rune(f, r), &n, &err) { return }
 		}
 	}
-	write_byte(fd, '\'')
+	_ = wrap(write_byte(f, '\''), &n, &err)
+	return
 }
 
 read_at_least :: proc(fd: Handle, buf: []byte, min: int) -> (n: int, err: Errno) {
 	if len(buf) < min {
-		return 0, Platform_Error(~intrinsics.type_core_type(Platform_Error)(0)) // TODO(bill): replace this error
+		return 0, io.Error.Short_Buffer
 	}
 	nn := max(int)
 	for nn > 0 && n < min && err == 0 {
@@ -84,7 +96,7 @@ read_at_least :: proc(fd: Handle, buf: []byte, min: int) -> (n: int, err: Errno)
 		n += nn
 	}
 	if n >= min {
-		err = 0
+		err = nil
 	}
 	return
 }
