@@ -48,9 +48,11 @@ temp_allocator_fini :: proc() {
 	global_default_temp_allocator_arenas = {}
 }
 
-TEMP_ALLOCATOR_GUARD_END :: proc(temp: runtime.Arena_Temp loc := #caller_location) {
+TEMP_ALLOCATOR_GUARD_END :: proc(temp: runtime.Arena_Temp, loc := #caller_location) {
 	runtime.arena_temp_end(temp, loc)
-	global_default_temp_allocator_index = (global_default_temp_allocator_index-1)%MAX_TEMP_ARENA_COUNT
+	if temp.arena != nil {
+		global_default_temp_allocator_index = (global_default_temp_allocator_index-1)%MAX_TEMP_ARENA_COUNT
+	}
 }
 
 @(deferred_out=TEMP_ALLOCATOR_GUARD_END)
