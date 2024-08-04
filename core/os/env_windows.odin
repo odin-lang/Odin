@@ -50,7 +50,7 @@ set_env :: proc(key, value: string) -> Errno {
 	v := win32.utf8_to_wstring(value)
 
 	if !win32.SetEnvironmentVariableW(k, v) {
-		return Errno(win32.GetLastError())
+		return Platform_Error(win32.GetLastError())
 	}
 	return 0
 }
@@ -59,7 +59,7 @@ set_env :: proc(key, value: string) -> Errno {
 unset_env :: proc(key: string) -> Errno {
 	k := win32.utf8_to_wstring(key)
 	if !win32.SetEnvironmentVariableW(k, nil) {
-		return Errno(win32.GetLastError())
+		return Platform_Error(win32.GetLastError())
 	}
 	return 0
 }

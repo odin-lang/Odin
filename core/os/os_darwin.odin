@@ -636,7 +636,7 @@ foreign dl {
 }
 
 get_last_error :: proc "contextless" () -> Error {
-	return Error(__error()^)
+	return Platform_Error(__error()^)
 }
 
 get_last_error_string :: proc() -> string {
@@ -678,11 +678,11 @@ open :: proc(path: string, flags: int = O_RDWR, mode: int = 0) -> (Handle, Errno
 }
 
 fchmod :: proc(fd: Handle, mode: u16) -> Errno {
-	return cast(Errno)_unix_fchmod(fd, mode)
+	return cast(Platform_Error)_unix_fchmod(fd, mode)
 }
 
 close :: proc(fd: Handle) -> Errno {
-	return cast(Errno)_unix_close(fd)
+	return cast(Platform_Error)_unix_close(fd)
 }
 
 // If you read or write more than `SSIZE_MAX` bytes, most darwin implementations will return `EINVAL`
@@ -756,7 +756,7 @@ seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
 
 	final_offset := i64(_unix_lseek(fd, int(offset), c.int(whence)))
 	if final_offset == -1 {
-		return 0, 1
+		return 0, Platform_Error.EPERM
 	}
 	return final_offset, 0
 }
@@ -1011,7 +1011,7 @@ access :: proc(path: string, mask: int) -> bool {
 }
 
 flush :: proc(fd: Handle) -> Errno {
-	return cast(Errno)_unix_fsync(fd)
+	return cast(Platform_Error)_unix_fsync(fd)
 }
 
 lookup_env :: proc(key: string, allocator := context.allocator) -> (value: string, found: bool) {

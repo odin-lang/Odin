@@ -393,7 +393,7 @@ is_path_separator :: proc(r: rune) -> bool {
 }
 
 get_last_error :: proc "contextless" () -> Error {
-	return Error(__error()^)
+	return Platform_Error(__error()^)
 }
 
 fork :: proc() -> (Pid, Errno) {

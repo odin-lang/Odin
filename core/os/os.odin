@@ -1,5 +1,6 @@
 package os
 
+import "base:intrinsics"
 import "base:runtime"
 import "core:strconv"
 import "core:unicode/utf8"
@@ -14,10 +15,18 @@ SEEK_CUR :: 1
 SEEK_END :: 2
 
 Platform_Error :: _Platform_Error
-Error :: Platform_Error
-Errno :: Error // alias
+#assert(size_of(Platform_Error) <= 4)
+#assert(intrinsics.type_has_nil(Platform_Error))
 
-ERROR_NONE :: Errno(0)
+Errno :: Error // alias for legacy use
+
+Error :: union #shared_nil {
+	Platform_Error,
+	runtime.Allocator_Error,
+}
+#assert(size_of(Error) <= 8)
+
+ERROR_NONE :: Error{}
 
 write_string :: proc(fd: Handle, str: string) -> (int, Errno) {
 	return write(fd, transmute([]byte)str)
@@ -67,7 +76,7 @@ write_encoded_rune :: proc(fd: Handle, r: rune) {
 
 read_at_least :: proc(fd: Handle, buf: []byte, min: int) -> (n: int, err: Errno) {
 	if len(buf) < min {
-		return 0, -1
+		return 0, Platform_Error(~intrinsics.type_core_type(Platform_Error)(0)) // TODO(bill): replace this error
 	}
 	nn := max(int)
 	for nn > 0 && n < min && err == 0 {

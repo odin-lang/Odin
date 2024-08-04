@@ -420,7 +420,7 @@ is_path_separator :: proc(r: rune) -> bool {
 }
 
 get_last_error :: proc "contextless" () -> Error {
-	return Error(__errno_location()^)
+	return Platform_Error(__errno_location()^)
 }
 
 open :: proc(path: string, flags: int = O_RDONLY, mode: int = 0) -> (Handle, Errno) {

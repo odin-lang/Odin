@@ -514,14 +514,14 @@ is_path_separator :: proc(r: rune) -> bool {
 @private
 _get_errno :: proc(res: int) -> Errno {
 	if res < 0 && res > -4096 {
-		return Errno(-res)
+		return Platform_Error(-res)
 	}
-	return 0
+	return nil
 }
 
 // get errno from libc
 get_last_error :: proc "contextless" () -> Error {
-	return Error(__errno_location()^)
+	return Platform_Error(__errno_location()^)
 }
 
 personality :: proc(persona: u64) -> (Errno) {

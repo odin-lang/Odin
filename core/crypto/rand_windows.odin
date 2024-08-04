@@ -8,8 +8,8 @@ HAS_RAND_BYTES :: true
 
 @(private)
 _rand_bytes :: proc(dst: []byte) {
-	ret := (os.Errno)(win32.BCryptGenRandom(nil, raw_data(dst), u32(len(dst)), win32.BCRYPT_USE_SYSTEM_PREFERRED_RNG))
-	if ret != os.ERROR_NONE {
+	ret := os.Platform_Error(win32.BCryptGenRandom(nil, raw_data(dst), u32(len(dst)), win32.BCRYPT_USE_SYSTEM_PREFERRED_RNG))
+	if ret != nil {
 		#partial switch ret {
 		case os.ERROR_INVALID_HANDLE:
 			// The handle to the first parameter is invalid.

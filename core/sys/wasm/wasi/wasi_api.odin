@@ -16,6 +16,7 @@ CLOCK_REALTIME           :: clockid_t(2)
 CLOCK_THREAD_CPUTIME_ID  :: clockid_t(3)
 
 errno_t :: enum u16 {
+	NONE = 0,
 	// No error occurred. System call completed successfully.
 	SUCCESS = 0,
 	// Argument list too long.

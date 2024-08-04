@@ -35,6 +35,7 @@ ERROR_INVALID_HANDLE      :: _Platform_Error(6)
 ERROR_NOT_ENOUGH_MEMORY   :: _Platform_Error(8)
 ERROR_NO_MORE_FILES       :: _Platform_Error(18)
 ERROR_HANDLE_EOF          :: _Platform_Error(38)
+ERROR_EOF                 :: ERROR_HANDLE_EOF
 ERROR_NETNAME_DELETED     :: _Platform_Error(64)
 ERROR_FILE_EXISTS         :: _Platform_Error(80)
 ERROR_INVALID_PARAMETER   :: _Platform_Error(87)
@@ -62,14 +63,15 @@ ERROR_NEGATIVE_OFFSET     :: _Platform_Error(1<<29 + 2)
 // "Argv" arguments converted to Odin strings
 args := _alloc_command_line_arguments()
 
-
-
+get_last_error :: proc "contextless" () -> Error {
+	return Platform_Error(win32.GetLastError())
+}
 
 
 last_write_time :: proc(fd: Handle) -> (File_Time, Errno) {
 	file_info: win32.BY_HANDLE_FILE_INFORMATION
 	if !win32.GetFileInformationByHandle(win32.HANDLE(fd), &file_info) {
-		return 0, Errno(win32.GetLastError())
+		return 0, Platform_Error(win32.GetLastError())
 	}
 	lo := File_Time(file_info.ftLastWriteTime.dwLowDateTime)
 	hi := File_Time(file_info.ftLastWriteTime.dwHighDateTime)
@@ -81,7 +83,7 @@ last_write_time_by_name :: proc(name: string) -> (File_Time, Errno) {
 
 	wide_path := win32.utf8_to_wstring(name)
 	if !win32.GetFileAttributesExW(wide_path, win32.GetFileExInfoStandard, &data) {
-		return 0, Errno(win32.GetLastError())
+		return 0, Platform_Error(win32.GetLastError())
 	}
 
 	l := File_Time(data.ftLastWriteTime.dwLowDateTime)

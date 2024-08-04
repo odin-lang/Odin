@@ -88,7 +88,7 @@ read_dir :: proc(fd: Handle, n: int, allocator := context.allocator) -> (fi: []F
 	find_data := &win32.WIN32_FIND_DATAW{}
 	find_handle := win32.FindFirstFileW(raw_data(wpath_search), find_data)
 	if find_handle == win32.INVALID_HANDLE_VALUE {
-		err = Errno(win32.GetLastError())
+		err = Platform_Error(win32.GetLastError())
 		return dfi[:], err
 	}
 	defer win32.FindClose(find_handle)
@@ -101,7 +101,7 @@ read_dir :: proc(fd: Handle, n: int, allocator := context.allocator) -> (fi: []F
 		}
 
 		if !win32.FindNextFileW(find_handle, find_data) {
-			e := Errno(win32.GetLastError())
+			e := Platform_Error(win32.GetLastError())
 			if e == ERROR_NO_MORE_FILES {
 				break
 			}

@@ -4,9 +4,7 @@ import "core:sys/wasm/wasi"
 import "base:runtime"
 
 Handle :: distinct i32
-_Platform_Error :: enum i32 {
-	NONE = 0,
-}
+_Platform_Error :: wasi.errno_t
 
 INVALID_HANDLE :: -1
 
@@ -150,22 +148,22 @@ wasi_match_preopen :: proc(path: string) -> (wasi.fd_t, string, bool) {
 write :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 	iovs := wasi.ciovec_t(data)
 	n, err := wasi.fd_write(wasi.fd_t(fd), {iovs})
-	return int(n), Errno(err)
+	return int(n), Platform_Error(err)
 }
 read :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 	iovs := wasi.iovec_t(data)
 	n, err := wasi.fd_read(wasi.fd_t(fd), {iovs})
-	return int(n), Errno(err)
+	return int(n), Platform_Error(err)
 }
 write_at :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Errno) {
 	iovs := wasi.ciovec_t(data)
 	n, err := wasi.fd_pwrite(wasi.fd_t(fd), {iovs}, wasi.filesize_t(offset))
-	return int(n), Errno(err)
+	return int(n), Platform_Error(err)
 }
 read_at :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Errno) {
 	iovs := wasi.iovec_t(data)
 	n, err := wasi.fd_pread(wasi.fd_t(fd), {iovs}, wasi.filesize_t(offset))
-	return int(n), Errno(err)
+	return int(n), Platform_Error(err)
 }
 open :: proc(path: string, mode: int = O_RDONLY, perm: int = 0) -> (Handle, Errno) {
 	oflags: wasi.oflags_t
@@ -203,15 +201,15 @@ open :: proc(path: string, mode: int = O_RDONLY, perm: int = 0) -> (Handle, Errn
 	}
 
 	fd, err := wasi.path_open(dir_fd, {.SYMLINK_FOLLOW}, relative, oflags, rights, {}, fdflags)
-	return Handle(fd), Errno(err)
+	return Handle(fd), Platform_Error(err)
 }
 close :: proc(fd: Handle) -> Errno {
 	err := wasi.fd_close(wasi.fd_t(fd))
-	return Errno(err)
+	return Platform_Error(err)
 }
 seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
 	n, err := wasi.fd_seek(wasi.fd_t(fd), wasi.filedelta_t(offset), wasi.whence_t(whence))
-	return i64(n), Errno(err)
+	return i64(n), Platform_Error(err)
 }
 current_thread_id :: proc "contextless" () -> int {
 	return 0
@@ -224,7 +222,7 @@ _processor_core_count :: proc() -> int {
 file_size :: proc(fd: Handle) -> (i64, Errno) {
 	stat, err := wasi.fd_filestat_get(wasi.fd_t(fd))
 	if err != nil {
-		return 0, Errno(err)
+		return 0, Platform_Error(err)
 	}
 	return i64(stat.size), 0
 }

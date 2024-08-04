@@ -4366,25 +4366,6 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 	}
 
 	switch (t->kind) {
-	// IMPORTANT NOTE HACK(bill): This is just to allow for comparisons against `0` with the `os.Error` type
-	// as a kind of transition period
-	case Type_Enum:
-		if (operand->mode == Addressing_Constant &&
-		    target_type->kind == Type_Named &&
-		    target_type->Named.name == "Error") {
-			Entity *e = target_type->Named.type_name;
-			if (e->pkg && e->pkg->name == "os") {
-				if (is_exact_value_zero(operand->value)) {
-					check_is_expressible(c, operand, t);
-					if (operand->mode == Addressing_Invalid) {
-						return;
-					}
-					update_untyped_expr_value(c, operand->expr, operand->value);
-				}
-			}
-		}
-		break;
-
 	case Type_Basic:
 		if (operand->mode == Addressing_Constant) {
 			check_is_expressible(c, operand, t);
@@ -4478,6 +4459,22 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 		
 
 	case Type_Union:
+		// IMPORTANT NOTE HACK(bill): This is just to allow for comparisons against `0` with the `os.Error` type
+		// as a kind of transition period
+		if (operand->mode == Addressing_Constant &&
+		    target_type->kind == Type_Named &&
+		    target_type->Named.name == "Error") {
+			Entity *e = target_type->Named.type_name;
+			if (e->pkg && e->pkg->name == "os") {
+				if (is_exact_value_zero(operand->value) &&
+				    (operand->value.kind == ExactValue_Integer ||
+				     operand->value.kind == ExactValue_Float)) {
+					update_untyped_expr_value(c, operand->expr, empty_exact_value);
+					break;
+				}
+			}
+		}
+		// "fallthrough"
 		if (!is_operand_nil(*operand) && !is_operand_uninit(*operand)) {
 			TEMPORARY_ALLOCATOR_GUARD();
 

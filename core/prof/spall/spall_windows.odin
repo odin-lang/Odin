@@ -25,7 +25,7 @@ _write :: proc "contextless" (fd: os.Handle, data: []byte) -> (int, os.Errno) #n
 
 		e := win32.WriteFile(win32.HANDLE(fd), &data[total_write], to_write, &single_write_length, nil)
 		if single_write_length <= 0 || !e {
-			err := os.Errno(win32.GetLastError())
+			err := os.Platform_Error(win32.GetLastError())
 			return int(total_write), err
 		}
 		total_write += i64(single_write_length)

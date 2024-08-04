@@ -63,14 +63,14 @@ temp_full_path :: proc(name: string) -> (path: string, err: os.Errno) {
 	p := win32.utf8_to_utf16(name, ta)
 	n := win32.GetFullPathNameW(raw_data(p), 0, nil, nil)
 	if n == 0 {
-		return "", os.Errno(win32.GetLastError())
+		return "", os.Platform_Error(win32.GetLastError())
 	}
 
 	buf := make([]u16, n, ta)
 	n = win32.GetFullPathNameW(raw_data(p), u32(len(buf)), raw_data(buf), nil)
 	if n == 0 {
 		delete(buf)
-		return "", os.Errno(win32.GetLastError())
+		return "", os.Platform_Error(win32.GetLastError())
 	}
 
 	return win32.utf16_to_utf8(buf[:n], ta) or_else "", os.ERROR_NONE
