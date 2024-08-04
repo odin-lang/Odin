@@ -23,7 +23,7 @@ foreign lib {
 
 	[[ More; https://pubs.opengroup.org/onlinepubs/9699919799/functions/fcntl.html ]]
 	*/
-	fcntl :: proc(fd: FD, cmd: FCNTL_Cmd, arg: rawptr = nil) -> c.int ---
+	fcntl :: proc(fd: FD, cmd: FCNTL_Cmd, #c_vararg args: ..any) -> c.int ---
 
 	/*
 	Establish the connection between a file and a file descriptor.
