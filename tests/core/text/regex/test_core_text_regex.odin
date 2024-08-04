@@ -21,10 +21,7 @@ check_expression_with_flags :: proc(t: ^testing.T, pattern: string, flags: regex
 	defer regex.destroy(rex)
 
 	capture, success := regex.match(rex, haystack)
-	defer {
-		delete(capture.groups)
-		delete(capture.pos)
-	}
+	defer regex.destroy(capture)
 
 	if len(needles) > 0 {
 		testing.expect(t, success, "match failed", loc = loc)
