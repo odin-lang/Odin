@@ -81,7 +81,7 @@ temp_full_path :: proc(name: string) -> (path: string, err: os.Error) {
 abs :: proc(path: string, allocator := context.allocator) -> (string, bool) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD(ignore = allocator == context.temp_allocator)
 	full_path, err := temp_full_path(path)
-	if err != 0 {
+	if err != nil {
 		return "", false
 	}
 	p := clean(full_path, allocator)

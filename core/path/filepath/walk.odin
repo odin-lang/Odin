@@ -27,12 +27,12 @@ walk :: proc(root: string, walk_proc: Walk_Proc, user_data: rawptr) -> os.Error 
 	defer os.file_info_delete(info, context.temp_allocator)
 
 	skip_dir: bool
-	if err != 0 {
+	if err != nil {
 		err, skip_dir = walk_proc(info, err, user_data)
 	} else {
 		err, skip_dir = _walk(info, walk_proc, user_data)
 	}
-	return 0 if skip_dir else err
+	return nil if skip_dir else err
 }
 
 
@@ -43,7 +43,7 @@ _walk :: proc(info: os.File_Info, walk_proc: Walk_Proc, user_data: rawptr) -> (e
 			// ignore empty things
 			return
 		}
-		return walk_proc(info, 0, user_data)
+		return walk_proc(info, nil, user_data)
 	}
 
 	fis: []os.File_Info
@@ -52,14 +52,14 @@ _walk :: proc(info: os.File_Info, walk_proc: Walk_Proc, user_data: rawptr) -> (e
 	defer os.file_info_slice_delete(fis, context.temp_allocator)
 
 	err1, skip_dir = walk_proc(info, err, user_data)
-	if err != 0 || err1 != 0 || skip_dir {
+	if err != nil || err1 != nil || skip_dir {
 		err = err1
 		return
 	}
 
 	for fi in fis {
 		err, skip_dir = _walk(fi, walk_proc, user_data)
-		if err != 0 || skip_dir {
+		if err != nil || skip_dir {
 			if !fi.is_dir || !skip_dir {
 				return
 			}
@@ -70,19 +70,12 @@ _walk :: proc(info: os.File_Info, walk_proc: Walk_Proc, user_data: rawptr) -> (e
 }
 
 @(private)
-read_dir :: proc(dir_name: string, allocator := context.temp_allocator) -> ([]os.File_Info, os.Error) {
-	f, err := os.open(dir_name, os.O_RDONLY)
-	if err != 0 {
-		return nil, err
-	}
-	fis: []os.File_Info
-	fis, err = os.read_dir(f, -1, allocator)
-	os.close(f)
-	if err != 0 {
-		return nil, err
-	}
+read_dir :: proc(dir_name: string, allocator := context.temp_allocator) -> (fis: []os.File_Info, err: os.Error) {
+	f := os.open(dir_name, os.O_RDONLY) or_return
+	defer os.close(f)
+	fis = os.read_dir(f, -1, allocator) or_return
 	slice.sort_by(fis, proc(a, b: os.File_Info) -> bool {
 		return a.name < b.name
 	})
-	return fis, 0
+	return
 }
