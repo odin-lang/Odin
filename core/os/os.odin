@@ -15,55 +15,6 @@ SEEK_SET :: 0
 SEEK_CUR :: 1
 SEEK_END :: 2
 
-Platform_Error :: _Platform_Error
-#assert(size_of(Platform_Error) <= 4)
-#assert(intrinsics.type_has_nil(Platform_Error))
-
-General_Error :: enum u32 {
-	None,
-
-	Permission_Denied,
-	Exist,
-	Not_Exist,
-	Closed,
-
-	Timeout,
-
-	Broken_Pipe,
-
-	// Indicates that an attempt to retrieve a file's size was made, but the
-	// file doesn't have a size.
-	No_Size,
-
-	Invalid_File,
-	Invalid_Dir,
-	Invalid_Path,
-	Invalid_Callback,
-
-	Pattern_Has_Separator,
-
-	Unsupported,
-}
-
-
-Errno :: Error // alias for legacy use
-
-Error :: union #shared_nil {
-	General_Error,
-	io.Error,
-	runtime.Allocator_Error,
-	Platform_Error,
-}
-#assert(size_of(Error) == 8)
-
-ERROR_NONE :: Error{}
-
-@(require_results)
-is_platform_error :: proc(ferr: Error) -> (err: i32, ok: bool) {
-	v := ferr.(Platform_Error) or_else {}
-	return i32(v), i32(v) != 0
-}
-
 write_string :: proc(fd: Handle, str: string) -> (int, Error) {
 	return write(fd, transmute([]byte)str)
 }
