@@ -58,7 +58,7 @@ read_dir :: proc(fd: Handle, n: int, allocator := context.allocator) -> (fi: []F
 
 	dir_fi, _ := file_info_from_get_file_information_by_handle("", h)
 	if !dir_fi.is_dir {
-		return nil, ERROR_FILE_IS_NOT_DIR
+		return nil, .Not_Dir
 	}
 
 	n := n

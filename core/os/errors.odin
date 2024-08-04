@@ -32,6 +32,9 @@ General_Error :: enum u32 {
 	Pattern_Has_Separator,
 
 	Unsupported,
+
+	File_Is_Pipe,
+	Not_Dir,
 }
 
 
@@ -77,6 +80,8 @@ error_string :: proc "contextless" (ferr: Error) -> string {
 		case .Invalid_Callback:  return "invalid callback"
 		case .Unsupported:       return "unsupported"
 		case .Pattern_Has_Separator: return "pattern has separator"
+		case .File_Is_Pipe:      return "file is pipe"
+		case .Not_Dir:           return "file is not directory"
 		}
 	case io.Error:
 		switch e {

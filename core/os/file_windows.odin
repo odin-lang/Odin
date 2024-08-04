@@ -195,7 +195,7 @@ seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Error) {
 	lo := i32(offset)
 	ft := win32.GetFileType(win32.HANDLE(fd))
 	if ft == win32.FILE_TYPE_PIPE {
-		return 0, ERROR_FILE_IS_PIPE
+		return 0, .File_Is_Pipe
 	}
 
 	dw_ptr := win32.SetFilePointer(win32.HANDLE(fd), lo, &hi, w)
@@ -278,7 +278,7 @@ will read from the location twice on *nix, and from two different locations on W
 */
 read_at :: proc(fd: Handle, data: []byte, offset: i64) -> (n: int, err: Error) {
 	if offset < 0 {
-		return 0, ERROR_NEGATIVE_OFFSET
+		return 0, .Invalid_Offset
 	}
 
 	b, offset := data, offset
@@ -310,7 +310,7 @@ will write to the location twice on *nix, and to two different locations on Wind
 */
 write_at :: proc(fd: Handle, data: []byte, offset: i64) -> (n: int, err: Error) {
 	if offset < 0 {
-		return 0, ERROR_NEGATIVE_OFFSET
+		return 0, .Invalid_Offset
 	}
 
 	b, offset := data, offset

@@ -241,10 +241,8 @@ ERROR_PRIVILEGE_NOT_HELD  :: Platform_Error.PRIVILEGE_NOT_HELD
 WSAEACCES                 :: Platform_Error.WSAEACCES
 WSAECONNRESET             :: Platform_Error.WSAECONNRESET
 
-// Windows reserves errors >= 1<<29 for application use
-ERROR_FILE_IS_PIPE        :: Platform_Error.FILE_IS_PIPE
-ERROR_FILE_IS_NOT_DIR     :: Platform_Error.FILE_IS_NOT_DIR
-ERROR_NEGATIVE_OFFSET     :: Platform_Error.NEGATIVE_OFFSET
+ERROR_FILE_IS_PIPE        :: General_Error.File_Is_Pipe
+ERROR_FILE_IS_NOT_DIR     :: General_Error.Not_Dir
 
 // "Argv" arguments converted to Odin strings
 args := _alloc_command_line_arguments()
