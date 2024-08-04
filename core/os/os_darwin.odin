@@ -733,7 +733,7 @@ write :: proc(fd: Handle, data: []byte) -> (int, Error) {
 
 	bytes_written := _unix_write(fd, raw_data(data), to_write)
 	if bytes_written < 0 {
-		return -1, Error(get_last_error())
+		return -1, get_last_error()
 	}
 	return bytes_written, nil
 }
@@ -747,7 +747,7 @@ read :: proc(fd: Handle, data: []u8) -> (int, Error) {
 
 	bytes_read := _unix_read(fd, raw_data(data), to_read)
 	if bytes_read < 0 {
-		return -1, Error(get_last_error())
+		return -1, get_last_error()
 	}
 	return bytes_read, nil
 }
@@ -761,7 +761,7 @@ read_at :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Error) {
 
 	bytes_read := _unix_pread(fd, raw_data(data), to_read, offset)
 	if bytes_read < 0 {
-		return -1, Error(get_last_error())
+		return -1, get_last_error()
 	}
 	return bytes_read, nil
 }
@@ -775,7 +775,7 @@ write_at :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Error) {
 
 	bytes_written := _unix_pwrite(fd, raw_data(data), to_write, offset)
 	if bytes_written < 0 {
-		return -1, Error(get_last_error())
+		return -1, get_last_error()
 	}
 	return bytes_written, nil
 }
@@ -888,7 +888,7 @@ remove :: proc(path: string) -> Error {
 	path_cstr := strings.clone_to_cstring(path, context.temp_allocator)
 	res := _unix_remove(path_cstr)
 	if res == -1 {
-		return Error(get_last_error())
+		return get_last_error()
 	}
 	return nil
 }
@@ -901,7 +901,7 @@ _stat :: proc(path: string) -> (OS_Stat, Error) {
 	s: OS_Stat
 	result := _unix_stat(cstr, &s)
 	if result == -1 {
-		return s, Error(get_last_error())
+		return s, get_last_error()
 	}
 	return s, nil
 }
@@ -914,7 +914,7 @@ _lstat :: proc(path: string) -> (OS_Stat, Error) {
 	s: OS_Stat
 	result := _unix_lstat(cstr, &s)
 	if result == -1 {
-		return s, Error(get_last_error())
+		return s, get_last_error()
 	}
 	return s, nil
 }
@@ -924,7 +924,7 @@ _fstat :: proc(fd: Handle) -> (OS_Stat, Error) {
 	s: OS_Stat
 	result := _unix_fstat(fd, &s)
 	if result == -1 {
-		return s, Error(get_last_error())
+		return s, get_last_error()
 	}
 	return s, nil
 }
@@ -933,7 +933,7 @@ _fstat :: proc(fd: Handle) -> (OS_Stat, Error) {
 _fdopendir :: proc(fd: Handle) -> (Dir, Error) {
 	dirp := _unix_fdopendir(fd)
 	if dirp == cast(Dir)nil {
-		return nil, Error(get_last_error())
+		return nil, get_last_error()
 	}
 	return dirp, nil
 }
@@ -942,7 +942,7 @@ _fdopendir :: proc(fd: Handle) -> (Dir, Error) {
 _closedir :: proc(dirp: Dir) -> Error {
 	rc := _unix_closedir(dirp)
 	if rc != 0 {
-		return Error(get_last_error())
+		return get_last_error()
 	}
 	return nil
 }
@@ -958,7 +958,7 @@ _readdir :: proc(dirp: Dir) -> (entry: Dirent, err: Error, end_of_stream: bool) 
 	rc := _unix_readdir_r(dirp, &entry, &result)
 
 	if rc != 0 {
-		err = Error(get_last_error())
+		err = get_last_error()
 		return
 	}
 
@@ -982,7 +982,7 @@ _readlink :: proc(path: string) -> (string, Error) {
 		rc := _unix_readlink(path_cstr, &(buf[0]), bufsz)
 		if rc == -1 {
 			delete(buf)
-			return "", Error(get_last_error())
+			return "", get_last_error()
 		} else if rc == int(bufsz) {
 			// NOTE(laleksic, 2021-01-21): Any cleaner way to resize the slice?
 			bufsz *= 2
@@ -1011,7 +1011,7 @@ absolute_path_from_relative :: proc(rel: string) -> (path: string, err: Error) {
 
 	path_ptr := _unix_realpath(rel_cstr, nil)
 	if path_ptr == nil {
-		return "", Error(get_last_error())
+		return "", get_last_error()
 	}
 	defer _unix_free(path_ptr)
 
@@ -1052,7 +1052,7 @@ set_env :: proc(key, value: string) -> Error {
 	value_cstring := strings.clone_to_cstring(value, context.temp_allocator)
 	res := _unix_setenv(key_cstring, value_cstring, 1)
 	if res < 0 {
-		return Error(get_last_error())
+		return get_last_error()
 	}
 	return nil
 }
@@ -1062,7 +1062,7 @@ unset_env :: proc(key: string) -> Error {
 	s := strings.clone_to_cstring(key, context.temp_allocator)
 	res := _unix_unsetenv(s)
 	if res < 0 {
-		return Error(get_last_error())
+		return get_last_error()
 	}
 	return nil
 }
@@ -1075,7 +1075,7 @@ get_current_directory :: proc() -> string {
 		if cwd != nil {
 			return string(cwd)
 		}
-		if Error(get_last_error()) != ERANGE {
+		if get_last_error() != ERANGE {
 			delete(buf)
 			return ""
 		}
@@ -1089,7 +1089,7 @@ set_current_directory :: proc(path: string) -> (err: Error) {
 	cstr := strings.clone_to_cstring(path, context.temp_allocator)
 	res := _unix_chdir(cstr)
 	if res == -1 {
-		return Error(get_last_error())
+		return get_last_error()
 	}
 	return nil
 }
@@ -1099,7 +1099,7 @@ make_directory :: proc(path: string, mode: u16 = 0o775) -> Error {
 	path_cstr := strings.clone_to_cstring(path, context.temp_allocator)
 	res := _unix_mkdir(path_cstr, mode)
 	if res == -1 {
-		return Error(get_last_error())
+		return get_last_error()
 	}
 	return nil
 }
@@ -1176,7 +1176,7 @@ _alloc_command_line_arguments :: proc() -> []string {
 socket :: proc(domain: int, type: int, protocol: int) -> (Socket, Error) {
 	result := _unix_socket(domain, type, protocol)
 	if result < 0 {
-		return 0, Error(get_last_error())
+		return 0, get_last_error()
 	}
 	return Socket(result), nil
 }
@@ -1184,7 +1184,7 @@ socket :: proc(domain: int, type: int, protocol: int) -> (Socket, Error) {
 connect :: proc(sd: Socket, addr: ^SOCKADDR, len: socklen_t) -> (Error) {
 	result := _unix_connect(int(sd), addr, len)
 	if result < 0 {
-		return Error(get_last_error())
+		return get_last_error()
 	}
 	return nil
 }
@@ -1192,7 +1192,7 @@ connect :: proc(sd: Socket, addr: ^SOCKADDR, len: socklen_t) -> (Error) {
 bind :: proc(sd: Socket, addr: ^SOCKADDR, len: socklen_t) -> (Error) {
 	result := _unix_bind(int(sd), addr, len)
 	if result < 0 {
-		return Error(get_last_error())
+		return get_last_error()
 	}
 	return nil
 }
@@ -1200,7 +1200,7 @@ bind :: proc(sd: Socket, addr: ^SOCKADDR, len: socklen_t) -> (Error) {
 accept :: proc(sd: Socket, addr: ^SOCKADDR, len: rawptr) -> (Socket, Error) {
 	result := _unix_accept(int(sd), rawptr(addr), len)
 	if result < 0 {
-		return 0, Error(get_last_error())
+		return 0, get_last_error()
 	}
 	return Socket(result), nil
 }
@@ -1208,7 +1208,7 @@ accept :: proc(sd: Socket, addr: ^SOCKADDR, len: rawptr) -> (Socket, Error) {
 listen :: proc(sd: Socket, backlog: int) -> (Error) {
 	result := _unix_listen(int(sd), backlog)
 	if result < 0 {
-		return Error(get_last_error())
+		return get_last_error()
 	}
 	return nil
 }
@@ -1216,7 +1216,7 @@ listen :: proc(sd: Socket, backlog: int) -> (Error) {
 setsockopt :: proc(sd: Socket, level: int, optname: int, optval: rawptr, optlen: socklen_t) -> (Error) {
 	result := _unix_setsockopt(int(sd), level, optname, optval, optlen)
 	if result < 0 {
-		return Error(get_last_error())
+		return get_last_error()
 	}
 	return nil
 }
@@ -1224,7 +1224,7 @@ setsockopt :: proc(sd: Socket, level: int, optname: int, optval: rawptr, optlen:
 getsockopt :: proc(sd: Socket, level: int, optname: int, optval: rawptr, optlen: socklen_t) -> Error {
 	result := _unix_getsockopt(int(sd), level, optname, optval, optlen)
 	if result < 0 {
-		return Error(get_last_error())
+		return get_last_error()
 	}
 	return nil
 }
@@ -1232,7 +1232,7 @@ getsockopt :: proc(sd: Socket, level: int, optname: int, optval: rawptr, optlen:
 recvfrom :: proc(sd: Socket, data: []byte, flags: int, addr: ^SOCKADDR, addr_size: ^socklen_t) -> (u32, Error) {
 	result := _unix_recvfrom(int(sd), raw_data(data), len(data), flags, addr, addr_size)
 	if result < 0 {
-		return 0, Error(get_last_error())
+		return 0, get_last_error()
 	}
 	return u32(result), nil
 }
@@ -1240,7 +1240,7 @@ recvfrom :: proc(sd: Socket, data: []byte, flags: int, addr: ^SOCKADDR, addr_siz
 recv :: proc(sd: Socket, data: []byte, flags: int) -> (u32, Error) {
 	result := _unix_recv(int(sd), raw_data(data), len(data), flags)
 	if result < 0 {
-		return 0, Error(get_last_error())
+		return 0, get_last_error()
 	}
 	return u32(result), nil
 }
@@ -1248,7 +1248,7 @@ recv :: proc(sd: Socket, data: []byte, flags: int) -> (u32, Error) {
 sendto :: proc(sd: Socket, data: []u8, flags: int, addr: ^SOCKADDR, addrlen: socklen_t) -> (u32, Error) {
 	result := _unix_sendto(int(sd), raw_data(data), len(data), flags, addr, addrlen)
 	if result < 0 {
-		return 0, Error(get_last_error())
+		return 0, get_last_error()
 	}
 	return u32(result), nil
 }
@@ -1256,7 +1256,7 @@ sendto :: proc(sd: Socket, data: []u8, flags: int, addr: ^SOCKADDR, addrlen: soc
 send :: proc(sd: Socket, data: []byte, flags: int) -> (u32, Error) {
 	result := _unix_send(int(sd), raw_data(data), len(data), 0)
 	if result < 0 {
-		return 0, Error(get_last_error())
+		return 0, get_last_error()
 	}
 	return u32(result), nil
 }
@@ -1264,7 +1264,7 @@ send :: proc(sd: Socket, data: []byte, flags: int) -> (u32, Error) {
 shutdown :: proc(sd: Socket, how: int) -> (Error) {
 	result := _unix_shutdown(int(sd), how)
 	if result < 0 {
-		return Error(get_last_error())
+		return get_last_error()
 	}
 	return nil
 }
@@ -1272,7 +1272,7 @@ shutdown :: proc(sd: Socket, how: int) -> (Error) {
 fcntl :: proc(fd: int, cmd: int, arg: int) -> (int, Error) {
 	result := _unix__fcntl(Handle(fd), c.int(cmd), uintptr(arg))
 	if result < 0 {
-		return 0, Error(get_last_error())
+		return 0, get_last_error()
 	}
 	return int(result), nil
 }

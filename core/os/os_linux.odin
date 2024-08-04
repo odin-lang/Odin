@@ -563,7 +563,7 @@ execvp :: proc(path: string, args: []string) -> Error {
 	}
 
 	_unix_execvp(path_cstr, raw_data(args_cstrs))
-	return Error(get_last_error())
+	return get_last_error()
 }
 
 
@@ -809,7 +809,7 @@ _fstat :: proc(fd: Handle) -> (OS_Stat, Error) {
 _fdopendir :: proc(fd: Handle) -> (Dir, Error) {
 	dirp := _unix_fdopendir(fd)
 	if dirp == cast(Dir)nil {
-		return nil, Error(get_last_error())
+		return nil, get_last_error()
 	}
 	return dirp, nil
 }
@@ -818,7 +818,7 @@ _fdopendir :: proc(fd: Handle) -> (Dir, Error) {
 _closedir :: proc(dirp: Dir) -> Error {
 	rc := _unix_closedir(dirp)
 	if rc != 0 {
-		return Error(get_last_error())
+		return get_last_error()
 	}
 	return nil
 }
@@ -834,7 +834,7 @@ _readdir :: proc(dirp: Dir) -> (entry: Dirent, err: Error, end_of_stream: bool) 
 	rc := _unix_readdir_r(dirp, &entry, &result)
 
 	if rc != 0 {
-		err = Error(get_last_error())
+		err = get_last_error()
 		return
 	}
 	err = nil
@@ -892,7 +892,7 @@ absolute_path_from_relative :: proc(rel: string) -> (path: string, err: Error) {
 
 	path_ptr := _unix_realpath(rel_cstr, nil)
 	if path_ptr == nil {
-		return "", Error(get_last_error())
+		return "", get_last_error()
 	}
 	defer _unix_free(path_ptr)
 
@@ -934,7 +934,7 @@ set_env :: proc(key, value: string) -> Error {
 	// NOTE(GoNZooo): `setenv` instead of `putenv` because it copies both key and value more commonly
 	res := _unix_setenv(key_cstring, value_cstring, 1)
 	if res < 0 {
-		return Error(get_last_error())
+		return get_last_error()
 	}
 	return nil
 }
@@ -944,7 +944,7 @@ unset_env :: proc(key: string) -> Error {
 	s := strings.clone_to_cstring(key, context.temp_allocator)
 	res := _unix_putenv(s)
 	if res < 0 {
-		return Error(get_last_error())
+		return get_last_error()
 	}
 	return nil
 }

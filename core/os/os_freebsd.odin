@@ -429,7 +429,7 @@ open :: proc(path: string, flags: int = O_RDONLY, mode: int = 0) -> (Handle, Err
 	cstr := strings.clone_to_cstring(path, context.temp_allocator)
 	handle := _unix_open(cstr, c.int(flags), c.int(mode))
 	if handle == -1 {
-		return INVALID_HANDLE, Error(get_last_error())
+		return INVALID_HANDLE, get_last_error()
 	}
 	return handle, nil
 }
@@ -437,7 +437,7 @@ open :: proc(path: string, flags: int = O_RDONLY, mode: int = 0) -> (Handle, Err
 close :: proc(fd: Handle) -> Error {
 	result := _unix_close(fd)
 	if result == -1 {
-		return Error(get_last_error())
+		return get_last_error()
 	}
 	return nil
 }
@@ -454,7 +454,7 @@ read :: proc(fd: Handle, data: []byte) -> (int, Error) {
 	to_read    := min(c.size_t(len(data)), MAX_RW)
 	bytes_read := _unix_read(fd, &data[0], to_read)
 	if bytes_read == -1 {
-		return -1, Error(get_last_error())
+		return -1, get_last_error()
 	}
 	return int(bytes_read), nil
 }
@@ -467,7 +467,7 @@ write :: proc(fd: Handle, data: []byte) -> (int, Error) {
 	to_write      := min(c.size_t(len(data)), MAX_RW)
 	bytes_written := _unix_write(fd, &data[0], to_write)
 	if bytes_written == -1 {
-		return -1, Error(get_last_error())
+		return -1, get_last_error()
 	}
 	return int(bytes_written), nil
 }
@@ -475,7 +475,7 @@ write :: proc(fd: Handle, data: []byte) -> (int, Error) {
 seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Error) {
 	res := _unix_seek(fd, offset, c.int(whence))
 	if res == -1 {
-		return -1, Error(get_last_error())
+		return -1, get_last_error()
 	}
 	return res, nil
 }
@@ -493,7 +493,7 @@ rename :: proc(old_path, new_path: string) -> Error {
 	new_path_cstr := strings.clone_to_cstring(new_path, context.temp_allocator)
 	res := _unix_rename(old_path_cstr, new_path_cstr)
 	if res == -1 {
-		return Error(get_last_error())
+		return get_last_error()
 	}
 	return nil
 }
@@ -503,7 +503,7 @@ remove :: proc(path: string) -> Error {
 	path_cstr := strings.clone_to_cstring(path, context.temp_allocator)
 	res := _unix_unlink(path_cstr)
 	if res == -1 {
-		return Error(get_last_error())
+		return get_last_error()
 	}
 	return nil
 }
@@ -513,7 +513,7 @@ make_directory :: proc(path: string, mode: mode_t = 0o775) -> Error {
 	path_cstr := strings.clone_to_cstring(path, context.temp_allocator)
 	res := _unix_mkdir(path_cstr, mode)
 	if res == -1 {
-		return Error(get_last_error())
+		return get_last_error()
 	}
 	return nil
 }
@@ -523,7 +523,7 @@ remove_directory :: proc(path: string) -> Error {
 	path_cstr := strings.clone_to_cstring(path, context.temp_allocator)
 	res := _unix_rmdir(path_cstr)
 	if res == -1 {
-		return Error(get_last_error())
+		return get_last_error()
 	}
 	return nil
 }
@@ -610,7 +610,7 @@ _stat :: proc(path: string) -> (OS_Stat, Error) {
 	s: OS_Stat = ---
 	result := _unix_lstat(cstr, &s)
 	if result == -1 {
-		return s, Error(get_last_error())
+		return s, get_last_error()
 	}
 	return s, nil
 }
@@ -624,7 +624,7 @@ _lstat :: proc(path: string) -> (OS_Stat, Error) {
 	s: OS_Stat = ---
 	res := _unix_lstat(cstr, &s)
 	if res == -1 {
-		return s, Error(get_last_error())
+		return s, get_last_error()
 	}
 	return s, nil
 }
@@ -634,7 +634,7 @@ _fstat :: proc(fd: Handle) -> (OS_Stat, Error) {
 	s: OS_Stat = ---
 	result := _unix_fstat(fd, &s)
 	if result == -1 {
-		return s, Error(get_last_error())
+		return s, get_last_error()
 	}
 	return s, nil
 }
@@ -643,7 +643,7 @@ _fstat :: proc(fd: Handle) -> (OS_Stat, Error) {
 _fdopendir :: proc(fd: Handle) -> (Dir, Error) {
 	dirp := _unix_fdopendir(fd)
 	if dirp == cast(Dir)nil {
-		return nil, Error(get_last_error())
+		return nil, get_last_error()
 	}
 	return dirp, nil
 }
@@ -652,7 +652,7 @@ _fdopendir :: proc(fd: Handle) -> (Dir, Error) {
 _closedir :: proc(dirp: Dir) -> Error {
 	rc := _unix_closedir(dirp)
 	if rc != 0 {
-		return Error(get_last_error())
+		return get_last_error()
 	}
 	return nil
 }
@@ -668,7 +668,7 @@ _readdir :: proc(dirp: Dir) -> (entry: Dirent, err: Error, end_of_stream: bool) 
 	rc := _unix_readdir_r(dirp, &entry, &result)
 
 	if rc != 0 {
-		err = Error(get_last_error())
+		err = get_last_error()
 		return
 	}
 
@@ -692,7 +692,7 @@ _readlink :: proc(path: string) -> (string, Error) {
 		rc := _unix_readlink(path_cstr, &(buf[0]), bufsz)
 		if rc == -1 {
 			delete(buf)
-			return "", Error(get_last_error())
+			return "", get_last_error()
 		} else if rc == int(bufsz) {
 			bufsz += MAX_PATH
 			delete(buf)
@@ -720,7 +720,7 @@ absolute_path_from_handle :: proc(fd: Handle) -> (string, Error) {
 
 	res := _unix_fcntl(fd, F_KINFO, cast(uintptr)&kinfo)
 	if res == -1 {
-		return "", Error(get_last_error())
+		return "", get_last_error()
 	}
 
 	path := strings.clone_from_cstring_bounded(cast(cstring)&kinfo.path[0], len(kinfo.path))
@@ -738,7 +738,7 @@ absolute_path_from_relative :: proc(rel: string) -> (path: string, err: Error) {
 
 	path_ptr := _unix_realpath(rel_cstr, nil)
 	if path_ptr == nil {
-		return "", Error(get_last_error())
+		return "", get_last_error()
 	}
 	defer _unix_free(path_ptr)
 
@@ -754,7 +754,7 @@ access :: proc(path: string, mask: int) -> (bool, Error) {
 	cstr := strings.clone_to_cstring(path, context.temp_allocator)
 	result := _unix_access(cstr, c.int(mask))
 	if result == -1 {
-		return false, Error(get_last_error())
+		return false, get_last_error()
 	}
 	return true, nil
 }
@@ -786,7 +786,7 @@ get_current_directory :: proc() -> string {
 		if cwd != nil {
 			return string(cwd)
 		}
-		if Error(get_last_error()) != ERANGE {
+		if get_last_error() != ERANGE {
 			delete(buf)
 			return ""
 		}
@@ -800,7 +800,7 @@ set_current_directory :: proc(path: string) -> (err: Error) {
 	cstr := strings.clone_to_cstring(path, context.temp_allocator)
 	res := _unix_chdir(cstr)
 	if res == -1 {
-		return Error(get_last_error())
+		return get_last_error()
 	}
 	return nil
 }
