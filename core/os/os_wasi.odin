@@ -219,12 +219,10 @@ _processor_core_count :: proc() -> int {
 	return 1
 }
 
-file_size :: proc(fd: Handle) -> (i64, Errno) {
-	stat, err := wasi.fd_filestat_get(wasi.fd_t(fd))
-	if err != nil {
-		return 0, Platform_Error(err)
-	}
-	return i64(stat.size), nil
+file_size :: proc(fd: Handle) -> (size: i64, err: Errno) {
+	stat := wasi.fd_filestat_get(wasi.fd_t(fd)) or_return
+	size = i64(stat.size)
+	return
 }
 
 

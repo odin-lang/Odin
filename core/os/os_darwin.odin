@@ -644,7 +644,7 @@ get_last_error_string :: proc() -> string {
 }
 
 
-open :: proc(path: string, flags: int = O_RDWR, mode: int = 0) -> (Handle, Errno) {
+open :: proc(path: string, flags: int = O_RDWR, mode: int = 0) -> (handle: Handle, err: Errno) {
 	isDir := is_dir_path(path)
 	flags := flags
 	if isDir {
@@ -657,9 +657,10 @@ open :: proc(path: string, flags: int = O_RDWR, mode: int = 0) -> (Handle, Errno
 
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	cstr := strings.clone_to_cstring(path, context.temp_allocator)
-	handle := _unix_open(cstr, i32(flags), u16(mode))
-	if handle == -1 {
-		return INVALID_HANDLE, get_last_error()
+	handle = _unix_open(cstr, i32(flags), u16(mode))
+	if handle == INVALID_HANDLE {
+		err = get_last_error()
+		return
 	}
 
 	/*
@@ -667,14 +668,14 @@ open :: proc(path: string, flags: int = O_RDWR, mode: int = 0) -> (Handle, Errno
 		               should not happen if the handle is a directory
 	*/
 	if mode != 0 && !isDir {
-		err := fchmod(handle, cast(u16)mode)
+		err = fchmod(handle, cast(u16)mode)
 		if err != nil {
 			_unix_close(handle)
-			return INVALID_HANDLE, err
+			handle = INVALID_HANDLE
 		}
 	}
 
-	return handle, nil
+	return
 }
 
 fchmod :: proc(fd: Handle, mode: u16) -> Errno {

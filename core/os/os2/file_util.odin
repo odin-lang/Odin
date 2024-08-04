@@ -173,11 +173,8 @@ write_entire_file :: proc(name: string, data: []byte, perm: int, truncate := tru
 	if truncate {
 		flags |= O_TRUNC
 	}
-	f, err := open(name, flags, perm)
-	if err != nil {
-		return err
-	}
-	_, err = write(f, data)
+	f := open(name, flags, perm) or_return
+	_, err := write(f, data)
 	if cerr := close(f); cerr != nil && err == nil {
 		err = cerr
 	}

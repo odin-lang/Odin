@@ -531,14 +531,9 @@ ftruncate :: proc(fd: Handle, length: i64) -> (err: Errno) {
 }
 
 truncate :: proc(path: string, length: i64) -> (err: Errno) {
-	fd: Handle
-	fd, err = open(path, O_WRONLY|O_CREATE, 0o666)
-	if err != nil {
-		return
-	}
+	fd := open(path, O_WRONLY|O_CREATE, 0o666) or_return
 	defer close(fd)
-	err = ftruncate(fd, length)
-	return
+	return ftruncate(fd, length)
 }
 
 
