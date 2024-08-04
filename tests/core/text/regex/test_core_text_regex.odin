@@ -500,6 +500,31 @@ test_word_boundaries :: proc(t: ^testing.T) {
 }
 
 @test
+test_pos_index_explicitly :: proc(t: ^testing.T) {
+	STR :: "This is an island."
+	EXPR :: `\bis\b`
+
+	rex, err := regex.create(EXPR, { .Global })
+	if !testing.expect_value(t, err, nil) {
+		return
+	}
+	defer regex.destroy(rex)
+
+	capture, success := regex.match(rex, STR)
+	log.info(capture, success)
+	if !testing.expect(t, success) {
+		return
+	}
+	defer regex.destroy(capture)
+
+	if !testing.expect_value(t, len(capture.pos), 1) {
+		return
+	}
+	testing.expect_value(t, capture.pos[0][0], 5)
+	testing.expect_value(t, capture.pos[0][1], 7)
+}
+
+@test
 test_non_word_boundaries :: proc(t: ^testing.T) {
 	{
 		EXPR :: `.\B.`
