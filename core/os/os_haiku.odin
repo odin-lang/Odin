@@ -212,6 +212,11 @@ close :: proc(fd: Handle) -> Error {
 	return nil
 }
 
+flush :: proc(fd: Handle) -> Error {
+	// do nothing
+	return nil
+}
+
 // In practice a read/write call would probably never read/write these big buffers all at once,
 // which is why the number of bytes is returned and why there are procs that will call this in a
 // loop for you.

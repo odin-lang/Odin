@@ -205,6 +205,12 @@ close :: proc(fd: Handle) -> Errno {
 	err := wasi.fd_close(wasi.fd_t(fd))
 	return Platform_Error(err)
 }
+
+flush :: proc(fd: Handle) -> Error {
+	// do nothing
+	return nil
+}
+
 seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
 	n, err := wasi.fd_seek(wasi.fd_t(fd), wasi.filedelta_t(offset), wasi.whence_t(whence))
 	return i64(n), Platform_Error(err)

@@ -53,3 +53,8 @@ write :: proc(fd: Handle, data: []u8) -> (int, Error) {
 seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Error) {
 	return (i64) (0), (Error) (1)
 }
+
+flush :: proc(fd: Handle) -> Error {
+	// do nothing
+	return nil
+}

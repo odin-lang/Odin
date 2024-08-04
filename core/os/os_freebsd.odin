@@ -442,6 +442,11 @@ close :: proc(fd: Handle) -> Error {
 	return nil
 }
 
+flush :: proc(fd: Handle) -> Error {
+	// do nothing
+	return nil
+}
+
 // If you read or write more than `INT_MAX` bytes, FreeBSD returns `EINVAL`.
 // In practice a read/write call would probably never read/write these big buffers all at once,
 // which is why the number of bytes is returned and why there are procs that will call this in a

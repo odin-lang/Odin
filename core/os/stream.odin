@@ -17,13 +17,9 @@ _file_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, 
 	os_err: Error
 	switch mode {
 	case .Close:
-		close(fd)
+		os_err = close(fd)
 	case .Flush:
-		when ODIN_OS == .Windows || ODIN_OS == .Darwin || ODIN_OS == .JS {
-			flush(fd)
-		} else {
-			// TOOD(bill): other operating systems
-		}
+		os_err = flush(fd)
 	case .Read:
 		n_int, os_err = read(fd, p)
 		n = i64(n_int)

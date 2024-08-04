@@ -581,6 +581,11 @@ close :: proc(fd: Handle) -> Error {
 	return _get_errno(unix.sys_close(int(fd)))
 }
 
+flush :: proc(fd: Handle) -> Error {
+	// do nothing
+	return nil
+}
+
 // If you read or write more than `SSIZE_MAX` bytes, result is implementation defined (probably an error).
 // `SSIZE_MAX` is also implementation defined but usually the max of a `ssize_t` which is `max(int)` in Odin.
 // In practice a read/write call would probably never read/write these big buffers all at once,

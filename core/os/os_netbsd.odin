@@ -502,6 +502,11 @@ close :: proc(fd: Handle) -> Error {
 	return nil
 }
 
+flush :: proc(fd: Handle) -> Error {
+	// do nothing
+	return nil
+}
+
 // We set a max of 1GB to keep alignment and to be safe.
 @(private)
 MAX_RW :: 1 << 30
