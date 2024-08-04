@@ -388,7 +388,7 @@ foreign libc {
 	@(link_name="unlink")           _unix_unlink        :: proc(path: cstring) -> c.int ---
 	@(link_name="rmdir")            _unix_rmdir         :: proc(path: cstring) -> c.int ---
 	@(link_name="mkdir")            _unix_mkdir         :: proc(path: cstring, mode: mode_t) -> c.int ---
-	@(link_name="fcntl")            _unix_fcntl         :: proc(fd: Handle, cmd: c.int, arg: uintptr) -> c.int ---
+	@(link_name="fcntl")            _unix_fcntl         :: proc(fd: Handle, cmd: c.int, #c_vararg args: ..any) -> c.int ---
 	@(link_name="dup")              _unix_dup           :: proc(fd: Handle) -> Handle ---
 	
 	@(link_name="fdopendir")        _unix_fdopendir     :: proc(fd: Handle) -> Dir ---

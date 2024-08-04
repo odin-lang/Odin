@@ -26,9 +26,18 @@ File_Impl :: struct {
 @(init)
 init_std_files :: proc() {
 	// NOTE: is this (paths) also the case on non darwin?
-	stdin  = new_file(posix.STDIN_FILENO,  "/dev/stdin") 
-	stdout = new_file(posix.STDOUT_FILENO, "/dev/stdout")
-	stderr = new_file(posix.STDERR_FILENO, "/dev/stdout")
+
+	stdin = __new_file(posix.STDIN_FILENO)
+	(^File_Impl)(stdin.impl).name  = "/dev/stdin"
+	(^File_Impl)(stdin.impl).cname = "/dev/stdin"
+
+	stdout = __new_file(posix.STDIN_FILENO)
+	(^File_Impl)(stdout.impl).name  = "/dev/stdout"
+	(^File_Impl)(stdout.impl).cname = "/dev/stdout"
+
+	stderr = __new_file(posix.STDIN_FILENO)
+	(^File_Impl)(stderr.impl).name  = "/dev/stderr"
+	(^File_Impl)(stderr.impl).cname = "/dev/stderr"
 }
 
 _open :: proc(name: string, flags: File_Flags, perm: int) -> (f: ^File, err: Error) {
@@ -75,19 +84,12 @@ _new_file :: proc(handle: uintptr, name: string) -> (f: ^File, err: Error) {
 		return
 	}
 
-	TEMP_ALLOCATOR_GUARD()
-	cname := temp_cstring(name)
+	crname := _posix_absolute_path(posix.FD(handle), name, file_allocator()) or_return
+	rname  := string(crname)
 
-	crname := posix.realpath(cname, nil)
-	if crname == nil {
-		err = _get_platform_error()
-		return
-	}
-	rname := string(crname)
-
-	f     = __new_file(posix.FD(handle))
+	f = __new_file(posix.FD(handle))
 	impl := (^File_Impl)(f.impl)
-	impl.name = rname
+	impl.name  = rname
 	impl.cname = crname
 
 	return f, nil

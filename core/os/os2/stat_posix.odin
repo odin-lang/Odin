@@ -73,21 +73,22 @@ _stat :: proc(name: string, allocator: runtime.Allocator) -> (fi: File_Info, err
 	TEMP_ALLOCATOR_GUARD(ignore=is_temp(allocator))
 	cname := temp_cstring(name) or_return
 
-	rcname := posix.realpath(cname)
-	if rcname == nil {
-		err = .Invalid_Path
+	fd := posix.open(cname, {})
+	if fd == -1 {
+		err = _get_platform_error()
 		return
 	}
-	defer posix.free(rcname)
+	defer posix.close(fd)
+
+	fullpath := _posix_absolute_path(fd, name, allocator) or_return
 
 	stat: posix.stat_t
-	if posix.stat(rcname, &stat) != .OK {
+	if posix.stat(fullpath, &stat) != .OK {
 		err = _get_platform_error()
 		return
 	}
 
-	fullpath := clone_string(string(rcname), allocator) or_return
-	return internal_stat(stat, fullpath), nil
+	return internal_stat(stat, string(fullpath)), nil
 }
 
 _lstat :: proc(name: string, allocator: runtime.Allocator) -> (fi: File_Info, err: Error) {
@@ -98,7 +99,7 @@ _lstat :: proc(name: string, allocator: runtime.Allocator) -> (fi: File_Info, er
 
 	TEMP_ALLOCATOR_GUARD(ignore=is_temp(allocator))
 
-	// NOTE: can't use realpath here because it tries to resolve symlinks.
+	// NOTE: can't use realpath or open (+ fcntl F_GETPATH) here because it tries to resolve symlinks.
 
 	// NOTE: This might not be correct when given "/symlink/foo.txt",
 	// you would want that to resolve "/symlink", but not resolve "foo.txt".
