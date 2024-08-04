@@ -412,23 +412,51 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 
 	if pid == 0 {
 		// in child process now
+		stdin_fd: linux.Fd
+		stdout_fd: linux.Fd
+		stderr_fd: linux.Fd
+
 		if desc.stdin != nil {
-			fd := linux.Fd(fd(desc.stdin))
-			if _, errno = linux.dup2(fd, STDIN); errno != .NONE {
-				intrinsics.trap()
+			stdin_fd = linux.Fd(fd(desc.stdin))
+		} else {
+			stdin_fd, errno = linux.open("/dev/null", {})
+			if errno != nil {
+				intrinsics.trap()  // TODO: our own special pipe
 			}
 		}
+
+		write_devnull: linux.Fd = -1
+
 		if desc.stdout != nil {
-			fd := linux.Fd(fd(desc.stdout))
-			if _, errno = linux.dup2(fd, STDOUT); errno != .NONE {
-				intrinsics.trap()
+			stdout_fd = linux.Fd(fd(desc.stdout))
+		} else {
+			write_devnull, errno = linux.open("/dev/null", {.WRONLY})
+			if errno != nil {
+				intrinsics.trap()  // TODO
 			}
+			stdout_fd = write_devnull
 		}
+
 		if desc.stderr != nil {
-			fd := linux.Fd(fd(desc.stderr))
-			if _, errno = linux.dup2(fd, STDERR); errno != .NONE {
-				intrinsics.trap()
+			stderr_fd = linux.Fd(fd(desc.stderr))
+		} else {
+			if write_devnull == -1 {
+				write_devnull, errno = linux.open("/dev/null", {.WRONLY})
+				if errno != nil {
+					intrinsics.trap()  // TODO
+				}
 			}
+			stderr_fd = write_devnull
+		}
+
+		if _, errno = linux.dup2(stdin_fd, STDIN); errno != .NONE {
+			intrinsics.trap()
+		}
+		if _, errno = linux.dup2(stdout_fd, STDOUT); errno != .NONE {
+			intrinsics.trap()
+		}
+		if _, errno = linux.dup2(stderr_fd, STDERR); errno != .NONE {
+			intrinsics.trap()
 		}
 
 		if errno = linux.execveat(exe_fd, "", &cargs[0], env, {.AT_EMPTY_PATH}); errno != .NONE {
@@ -436,8 +464,6 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 		}
 		unreachable()
 	}
-
-	// TODO: We need to come up with a way to detect the execve failure from here.
 
 	process, err = process_open(int(pid))
 	if err == .Unsupported {
