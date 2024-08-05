@@ -10,7 +10,7 @@ Create_Socket_Error :: enum c.int {
 	Family_Not_Supported_For_This_Socket = cast(c.int)freebsd.Errno.EAFNOSUPPORT,
 	Full_Per_Process_Descriptor_Table    = cast(c.int)freebsd.Errno.EMFILE,
 	Full_System_File_Table               = cast(c.int)freebsd.Errno.ENFILE,
-	Insufficient_Buffer_Space            = cast(c.int)freebsd.Errno.ENOBUFS,
+	No_Buffer_Space_Available            = cast(c.int)freebsd.Errno.ENOBUFS,
 	Insufficient_Permission              = cast(c.int)freebsd.Errno.EPERM,
 	Protocol_Unsupported_In_Family       = cast(c.int)freebsd.Errno.EPROTONOSUPPORT,
 	Socket_Type_Unsupported_By_Protocol  = cast(c.int)freebsd.Errno.EPROTOTYPE,
