@@ -1728,7 +1728,6 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 				args[1] = align;
 				args[2] = mask;
 				args[3] = val;
-				// res.type = arg1.type;
 				break;
 
 			case BuiltinProc_simd_masked_store:
