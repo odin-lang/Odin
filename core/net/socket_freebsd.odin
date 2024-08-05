@@ -304,6 +304,8 @@ _set_option :: proc(socket: Any_Socket, option: Socket_Option, value: any, loc :
 			case:
 				panic("set_option() value must be an integer here", loc)
 			}
+			ptr = &int_value
+			len = size_of(int_value)
 	case:
 		unimplemented("set_option() option not yet implemented", loc)
 	}
