@@ -1,5 +1,13 @@
 package sys_freebsd
 
+/*
+	(c) Copyright 2024 Feoramund <rune@swevencraft.org>.
+	Made available under Odin's BSD-3 license.
+
+	List of contributors:
+		Feoramund: Initial implementation.
+*/
+
 import "core:c"
 
 // These definitions have been extracted from a system running FreeBSD 14.0-RELEASE.
