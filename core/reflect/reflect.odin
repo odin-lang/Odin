@@ -518,9 +518,11 @@ Returns:
 - The `count`, enumerated using the `method`, which will be `0` if the type is not a struct
 
 Example:
-	expected_count := reflect.struct_field_count(Game_API) - API_PRIVATE_COUNT
-	if symbols_loaded != expected_count {
-		fmt.eprintf("Expected %v symbols, got %v", expected_count, symbols_loaded)
+	symbols_loaded, ok := dynlib.initialize_symbols(&game_api, "game.dll")
+	symbols_expected   := reflect.struct_field_count(Game_Api) - API_PRIVATE_COUNT
+
+	if symbols_loaded != symbols_expected {
+		fmt.eprintf("Expected %v symbols, got %v", symbols_expected, symbols_loaded)
 		return
 	}
 */
