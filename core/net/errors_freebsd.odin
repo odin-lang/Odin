@@ -105,6 +105,8 @@ Accept_Error :: enum c.int {
 
 	// NOTE: This is the same as EWOULDBLOCK.
 	No_Connections_Available          = cast(c.int)freebsd.Errno.EAGAIN,
+	// `Would_Block` alias for `core:net` tests.
+	Would_Block                       = cast(c.int)freebsd.Errno.EAGAIN,
 
 	New_Connection_Aborted            = cast(c.int)freebsd.Errno.ECONNABORTED,
 }
