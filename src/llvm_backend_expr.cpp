@@ -2028,7 +2028,11 @@ gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 			} else if (is_type_integer(src_elem) && is_type_boolean(dst_elem)) {
 				LLVMValueRef i1vector = LLVMBuildICmp(p->builder, LLVMIntNE, value.value, LLVMConstNull(LLVMTypeOf(value.value)), "");
 				res.value = LLVMBuildIntCast2(p->builder, i1vector, lb_type(m, t), !is_type_unsigned(src_elem), "");
-			} else {
+			} else if (is_type_pointer(src_elem) && is_type_integer(dst_elem)) {
+				res.value = LLVMBuildPtrToInt(p->builder, value.value, lb_type(m, t), "");
+			} else if (is_type_integer(src_elem) && is_type_pointer(dst_elem)) {
+				res.value = LLVMBuildIntToPtr(p->builder, value.value, lb_type(m, t), "");
+			}else {
 				GB_PANIC("Unhandled simd vector conversion: %s -> %s", type_to_string(src), type_to_string(dst));
 			}
 			return res;
