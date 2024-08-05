@@ -3814,7 +3814,7 @@ gb_internal lbAddr lb_build_array_swizzle_addr(lbProcedure *p, AstCallExpr *ce, 
 	Type *type = base_type(lb_addr_type(addr));
 	GB_ASSERT(type->kind == Type_Array);
 	i64 count = type->Array.count;
-	if (count <= 4) {
+	if (count <= 4 && index_count <= 4) {
 		u8 indices[4] = {};
 		u8 index_count = 0;
 		for (i32 i = 1; i < ce->args.count; i++) {

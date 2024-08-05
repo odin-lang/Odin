@@ -2460,7 +2460,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			arg_count++;
 		}
 
-		if (arg_count > max_count) {
+		if (false && arg_count > max_count) {
 			error(call, "Too many 'swizzle' indices, %td > %td", arg_count, max_count);
 			return false;
 		} else if (arg_count < 2) {
