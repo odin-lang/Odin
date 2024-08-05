@@ -1527,6 +1527,23 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 			return res;
 		}
 
+	case BuiltinProc_simd_reduce_any:
+	case BuiltinProc_simd_reduce_all:
+		{
+			char const *name = nullptr;
+			switch (builtin_id) {
+			case BuiltinProc_simd_reduce_any: name = "llvm.vector.reduce.and"; break;
+			case BuiltinProc_simd_reduce_all: name = "llvm.vector.reduce.or";  break;
+			}
+
+			LLVMTypeRef types[1] = { lb_type(p->module, arg0.type) };
+			LLVMValueRef args[1] = { arg0.value };
+
+			res.value = lb_call_intrinsic(p, name, args, gb_count_of(args), types, gb_count_of(types));
+			return res;
+		}
+
+
 	case BuiltinProc_simd_shuffle:
 		{
 			Type *vt = arg0.type;

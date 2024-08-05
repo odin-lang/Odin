@@ -268,13 +268,17 @@ simd_lanes_ge :: proc(a, b: #simd[N]T) -> #simd[N]Integer ---
 simd_extract :: proc(a: #simd[N]T, idx: uint) -> T ---
 simd_replace :: proc(a: #simd[N]T, idx: uint, elem: T) -> #simd[N]T ---
 
-simd_reduce_add_ordered :: proc(a: #simd[N]T) -> T ---
-simd_reduce_mul_ordered :: proc(a: #simd[N]T) -> T ---
-simd_reduce_min         :: proc(a: #simd[N]T) -> T ---
-simd_reduce_max         :: proc(a: #simd[N]T) -> T ---
-simd_reduce_and         :: proc(a: #simd[N]T) -> T ---
-simd_reduce_or          :: proc(a: #simd[N]T) -> T ---
-simd_reduce_xor         :: proc(a: #simd[N]T) -> T ---
+simd_reduce_add_ordered :: proc(a: #simd[N]T) -> T where type_is_integer(T) || type_is_float(T)---
+simd_reduce_mul_ordered :: proc(a: #simd[N]T) -> T where type_is_integer(T) || type_is_float(T)---
+simd_reduce_min         :: proc(a: #simd[N]T) -> T where type_is_integer(T) || type_is_float(T)---
+simd_reduce_max         :: proc(a: #simd[N]T) -> T where type_is_integer(T) || type_is_float(T)---
+simd_reduce_and         :: proc(a: #simd[N]T) -> T where type_is_integer(T) || type_is_float(T)---
+simd_reduce_or          :: proc(a: #simd[N]T) -> T where type_is_integer(T) || type_is_float(T)---
+simd_reduce_xor         :: proc(a: #simd[N]T) -> T where type_is_integer(T) || type_is_float(T)---
+
+simd_reduce_any         :: proc(a: #simd[N]T) -> T where type_is_boolean(T) ---
+simd_reduce_all         :: proc(a: #simd[N]T) -> T where type_is_boolean(T) ---
+
 
 simd_shuffle :: proc(a, b: #simd[N]T, indices: ..int) -> #simd[len(indices)]T ---
 simd_select  :: proc(cond: #simd[N]boolean_or_integer, true, false: #simd[N]T) -> #simd[N]T ---

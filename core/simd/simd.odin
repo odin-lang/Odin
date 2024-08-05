@@ -115,6 +115,9 @@ reduce_and         :: intrinsics.simd_reduce_and
 reduce_or          :: intrinsics.simd_reduce_or
 reduce_xor         :: intrinsics.simd_reduce_xor
 
+reduce_any         :: intrinsics.simd_reduce_any
+reduce_all         :: intrinsics.simd_reduce_all
+
 // swizzle :: proc(a: #simd[N]T, indices: ..int) -> #simd[len(indices)]T
 swizzle :: builtin.swizzle
 
