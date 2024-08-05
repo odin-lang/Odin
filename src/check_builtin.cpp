@@ -470,8 +470,8 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 		}
 
 	// Integer only
-	case BuiltinProc_simd_add_sat:
-	case BuiltinProc_simd_sub_sat:
+	case BuiltinProc_simd_saturating_add:
+	case BuiltinProc_simd_saturating_sub:
 	case BuiltinProc_simd_bit_and:
 	case BuiltinProc_simd_bit_or:
 	case BuiltinProc_simd_bit_xor:
@@ -501,8 +501,8 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 			Type *elem = base_array_type(x.type);
 
 			switch (id) {
-			case BuiltinProc_simd_add_sat:
-			case BuiltinProc_simd_sub_sat:
+			case BuiltinProc_simd_saturating_add:
+			case BuiltinProc_simd_saturating_sub:
 				if (!is_type_integer(elem)) {
 					gbString xs = type_to_string(x.type);
 					error(x.expr, "'%.*s' expected a #simd type with an integer element, got '%s'", LIT(builtin_name), xs);
@@ -4325,8 +4325,8 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		}
 		break;
 
-	case BuiltinProc_add_sat:
-	case BuiltinProc_sub_sat:
+	case BuiltinProc_saturating_add:
+	case BuiltinProc_saturating_sub:
 		{
 			Operand x = {};
 			Operand y = {};

@@ -70,8 +70,8 @@ enum BuiltinProcId {
 	BuiltinProc_overflow_sub,
 	BuiltinProc_overflow_mul,
 
-	BuiltinProc_add_sat,
-	BuiltinProc_sub_sat,
+	BuiltinProc_saturating_add,
+	BuiltinProc_saturating_sub,
 
 	BuiltinProc_sqrt,
 	BuiltinProc_fused_mul_add,
@@ -141,8 +141,8 @@ BuiltinProc__simd_begin,
 	BuiltinProc_simd_shl_masked, // C logic
 	BuiltinProc_simd_shr_masked, // C logic
 
-	BuiltinProc_simd_add_sat, // saturation arithmetic
-	BuiltinProc_simd_sub_sat, // saturation arithmetic
+	BuiltinProc_simd_saturating_add, // saturation arithmetic
+	BuiltinProc_simd_saturating_sub, // saturation arithmetic
 
 	BuiltinProc_simd_bit_and,
 	BuiltinProc_simd_bit_or,
@@ -399,8 +399,8 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("overflow_sub"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("overflow_mul"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
-	{STR_LIT("add_sat"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
-	{STR_LIT("sub_sat"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("saturating_add"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("saturating_sub"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("sqrt"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("fused_mul_add"), 3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
@@ -470,8 +470,8 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("simd_shl_masked"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("simd_shr_masked"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
-	{STR_LIT("simd_add_sat"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
-	{STR_LIT("simd_sub_sat"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_saturating_add"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_saturating_sub"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("simd_bit_and"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("simd_bit_or"),  2, false, Expr_Expr, BuiltinProcPkg_intrinsics},

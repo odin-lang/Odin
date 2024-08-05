@@ -42,8 +42,8 @@ overflow_add :: proc(lhs, rhs: $T) -> (T, bool) where type_is_integer(T) #option
 overflow_sub :: proc(lhs, rhs: $T) -> (T, bool) where type_is_integer(T) #optional_ok ---
 overflow_mul :: proc(lhs, rhs: $T) -> (T, bool) where type_is_integer(T) #optional_ok ---
 
-add_sat :: proc(lhs, rhs: $T) -> T where type_is_integer(T) ---
-sub_sat :: proc(lhs, rhs: $T) -> T where type_is_integer(T) ---
+saturating_add :: proc(lhs, rhs: $T) -> T where type_is_integer(T) ---
+saturating_sub :: proc(lhs, rhs: $T) -> T where type_is_integer(T) ---
 
 sqrt :: proc(x: $T) -> T where type_is_float(T) || (type_is_simd_vector(T) && type_is_float(type_elem_type(T))) ---
 
@@ -226,6 +226,9 @@ simd_add  :: proc(a, b: #simd[N]T) -> #simd[N]T ---
 simd_sub  :: proc(a, b: #simd[N]T) -> #simd[N]T ---
 simd_mul  :: proc(a, b: #simd[N]T) -> #simd[N]T ---
 simd_div  :: proc(a, b: #simd[N]T) -> #simd[N]T where type_is_float(T) ---
+
+simd_saturating_add  :: proc(a, b: #simd[N]T) -> #simd[N]T where type_is_integer(T) ---
+simd_saturating_sub  :: proc(a, b: #simd[N]T) -> #simd[N]T where type_is_integer(T) ---
 
 // Keeps Odin's Behaviour
 // (x << y) if y <= mask else 0

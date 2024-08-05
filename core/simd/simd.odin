@@ -74,8 +74,8 @@ shl_masked :: intrinsics.simd_shl_masked
 shr_masked :: intrinsics.simd_shr_masked
 
 // Saturation Arithmetic
-add_sat :: intrinsics.simd_add_sat
-sub_sat :: intrinsics.simd_sub_sat
+saturating_add :: intrinsics.simd_saturating_add
+saturating_sub :: intrinsics.simd_saturating_sub
 
 bit_and     :: intrinsics.simd_bit_and
 bit_or      :: intrinsics.simd_bit_or

@@ -1646,13 +1646,13 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 		}
 
 
-	case BuiltinProc_simd_add_sat:
-	case BuiltinProc_simd_sub_sat:
+	case BuiltinProc_simd_saturating_add:
+	case BuiltinProc_simd_saturating_sub:
 		{
 			char const *name = nullptr;
 			switch (builtin_id) {
-			case BuiltinProc_simd_add_sat: name = is_signed ? "llvm.sadd.sat" : "llvm.uadd.sat"; break;
-			case BuiltinProc_simd_sub_sat: name = is_signed ? "llvm.ssub.sat" : "llvm.usub.sat"; break;
+			case BuiltinProc_simd_saturating_add: name = is_signed ? "llvm.sadd.sat" : "llvm.uadd.sat"; break;
+			case BuiltinProc_simd_saturating_sub: name = is_signed ? "llvm.ssub.sat" : "llvm.usub.sat"; break;
 			}
 
 			LLVMTypeRef types[1] = {lb_type(p->module, arg0.type)};
@@ -2302,8 +2302,8 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 			return res;
 		}
 
-	case BuiltinProc_add_sat:
-	case BuiltinProc_sub_sat:
+	case BuiltinProc_saturating_add:
+	case BuiltinProc_saturating_sub:
 		{
 			Type *main_type = tv.type;
 			Type *type = main_type;
@@ -2316,13 +2316,13 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 			char const *name = nullptr;
 			if (is_type_unsigned(type)) {
 				switch (id) {
-				case BuiltinProc_add_sat: name = "llvm.uadd.sat"; break;
-				case BuiltinProc_sub_sat: name = "llvm.usub.sat"; break;
+				case BuiltinProc_saturating_add: name = "llvm.uadd.sat"; break;
+				case BuiltinProc_saturating_sub: name = "llvm.usub.sat"; break;
 				}
 			} else {
 				switch (id) {
-				case BuiltinProc_add_sat: name = "llvm.sadd.sat"; break;
-				case BuiltinProc_sub_sat: name = "llvm.ssub.sat"; break;
+				case BuiltinProc_saturating_add: name = "llvm.sadd.sat"; break;
+				case BuiltinProc_saturating_sub: name = "llvm.ssub.sat"; break;
 				}
 			}
 			LLVMTypeRef types[1] = {lb_type(p->module, type)};
