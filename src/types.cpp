@@ -2091,6 +2091,9 @@ gb_internal bool is_type_valid_vector_elem(Type *t) {
 		if (is_type_boolean(t)) {
 			return true;
 		}
+		if (t->Basic.kind == Basic_rawptr) {
+			return true;
+		}
 	}
 	return false;
 }
