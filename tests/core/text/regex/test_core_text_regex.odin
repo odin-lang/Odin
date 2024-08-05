@@ -511,7 +511,6 @@ test_pos_index_explicitly :: proc(t: ^testing.T) {
 	defer regex.destroy(rex)
 
 	capture, success := regex.match(rex, STR)
-	log.info(capture, success)
 	if !testing.expect(t, success) {
 		return
 	}
