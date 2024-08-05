@@ -667,12 +667,16 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 	case BuiltinProc_simd_scatter:
 	case BuiltinProc_simd_masked_load:
 	case BuiltinProc_simd_masked_store:
+	case BuiltinProc_simd_masked_expand_load:
+	case BuiltinProc_simd_masked_compress_store:
 		{
 			// gather (ptr: #simd[N]rawptr, values: #simd[N]T, mask: #simd[N]int_or_bool) -> #simd[N]T
 			// scatter(ptr: #simd[N]rawptr, values: #simd[N]T, mask: #simd[N]int_or_bool)
 
 			// masked_load (ptr: rawptr, values: #simd[N]T, mask: #simd[N]int_or_bool) -> #simd[N]T
 			// masked_store(ptr: rawptr, values: #simd[N]T, mask: #simd[N]int_or_bool)
+			// masked_expand_load (ptr: rawptr, values: #simd[N]T, mask: #simd[N]int_or_bool) -> #simd[N]T
+			// masked_compress_store(ptr: rawptr, values: #simd[N]T, mask: #simd[N]int_or_bool)
 
 			Operand ptr    = {};
 			Operand values = {};
@@ -733,7 +737,8 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 			}
 
 			if (id == BuiltinProc_simd_gather ||
-			    id == BuiltinProc_simd_masked_load) {
+			    id == BuiltinProc_simd_masked_load ||
+			    id == BuiltinProc_simd_masked_expand_load) {
 				operand->mode = Addressing_Value;
 				operand->type = values.type;
 			} else {

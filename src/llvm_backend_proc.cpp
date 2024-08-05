@@ -1693,6 +1693,8 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 	case BuiltinProc_simd_scatter:
 	case BuiltinProc_simd_masked_load:
 	case BuiltinProc_simd_masked_store:
+	case BuiltinProc_simd_masked_expand_load:
+	case BuiltinProc_simd_masked_compress_store:
 		{
 			LLVMValueRef ptr = arg0.value;
 			LLVMValueRef val = arg1.value;
@@ -1705,11 +1707,14 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 
 			char const *name = nullptr;
 			switch (builtin_id) {
-			case BuiltinProc_simd_gather:       name = "llvm.masked.gather";  break;
-			case BuiltinProc_simd_scatter:      name = "llvm.masked.scatter"; break;
-			case BuiltinProc_simd_masked_load:  name = "llvm.masked.load";    break;
-			case BuiltinProc_simd_masked_store: name = "llvm.masked.store";   break;
+			case BuiltinProc_simd_gather:                name = "llvm.masked.gather";        break;
+			case BuiltinProc_simd_scatter:               name = "llvm.masked.scatter";       break;
+			case BuiltinProc_simd_masked_load:           name = "llvm.masked.load";          break;
+			case BuiltinProc_simd_masked_store:          name = "llvm.masked.store";         break;
+			case BuiltinProc_simd_masked_expand_load:    name = "llvm.masked.expandload";    break;
+			case BuiltinProc_simd_masked_compress_store: name = "llvm.masked.compressstore"; break;
 			}
+			unsigned type_count = 2;
 			LLVMTypeRef types[2] = {
 				lb_type(p->module, arg1.type),
 				lb_type(p->module, arg0.type)
@@ -1718,6 +1723,7 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 			auto alignment = cast(unsigned long long)type_align_of(base_array_type(arg1.type));
 			LLVMValueRef align = LLVMConstInt(LLVMInt32TypeInContext(p->module->ctx), alignment, false);
 
+			unsigned arg_count = 4;
 			LLVMValueRef args[4] = {};
 			switch (builtin_id) {
 			case BuiltinProc_simd_masked_load:
@@ -1739,9 +1745,25 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 				args[2] = align;
 				args[3] = mask;
 				break;
+
+			case BuiltinProc_simd_masked_expand_load:
+				arg_count = 3;
+				type_count = 1;
+				args[0] = ptr;
+				args[1] = mask;
+				args[2] = val;
+				break;
+
+			case BuiltinProc_simd_masked_compress_store:
+				arg_count = 3;
+				type_count = 1;
+				args[0] = val;
+				args[1] = ptr;
+				args[2] = mask;
+				break;
 			}
 
-			res.value = lb_call_intrinsic(p, name, args, gb_count_of(args), types, gb_count_of(types));
+			res.value = lb_call_intrinsic(p, name, args, arg_count, types, type_count);
 			return res;
 
 		}

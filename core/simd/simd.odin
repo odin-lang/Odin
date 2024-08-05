@@ -108,7 +108,8 @@ gather  :: intrinsics.simd_gather
 scatter :: intrinsics.simd_scatter
 masked_load  :: intrinsics.simd_masked_load
 masked_store :: intrinsics.simd_masked_store
-
+masked_expand_load    :: intrinsics.simd_masked_expand_load
+masked_compress_store :: intrinsics.simd_masked_compress_store
 
 // extract :: proc(a: #simd[N]T, idx: uint) -> T
 extract :: intrinsics.simd_extract
