@@ -57,6 +57,23 @@ _create_socket :: proc(family: Address_Family, protocol: Socket_Protocol) -> (so
 		return
 	}
 
+	// NOTE(Feoramund): By default, FreeBSD will generate SIGPIPE if an EPIPE
+	// error is raised during the writing of a socket that may be closed.
+	// This behavior is unlikely to be expected by general users.
+	//
+	// There are two workarounds. One is to apply the .NOSIGNAL flag when using
+	// the `sendto` syscall. However, that would prevent users of this library
+	// from re-enabling the SIGPIPE-raising functionality, if they really
+	// wanted it.
+	//
+	// So I have disabled it here with this socket option for all sockets.
+	truth: b32 = true
+	errno = freebsd.setsockopt(new_socket, .SOCKET, .NOSIGPIPE, &truth, size_of(truth))
+	if errno != nil {
+		err = cast(Socket_Option_Error)errno
+		return
+	}
+
 	switch protocol {
 	case .TCP: return cast(TCP_Socket)new_socket, nil
 	case .UDP: return cast(UDP_Socket)new_socket, nil
