@@ -5158,6 +5158,14 @@ gb_internal Entity *check_selector(CheckerContext *c, Operand *operand, Ast *nod
 			Scope *import_scope = e->ImportName.scope;
 			String entity_name = selector->Ident.token.string;
 
+			if (import_scope == nullptr) {
+				ERROR_BLOCK();
+				error(node, "'%.*s' is not imported in this file, '%.*s' is unavailable", LIT(import_name), LIT(entity_name));
+				operand->mode = Addressing_Invalid;
+				operand->expr = node;
+				return nullptr;
+			}
+
 			check_op_expr = false;
 			entity = scope_lookup_current(import_scope, entity_name);
 			bool allow_builtin = false;
