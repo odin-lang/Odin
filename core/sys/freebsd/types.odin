@@ -1546,7 +1546,7 @@ Socket_Address_Internet6 :: struct #packed {
 
 /* op code for _umtx_op */
 // #define UMTX_OP_*
-Mutex_Operation :: enum c.int {
+Userland_Mutex_Operation :: enum c.int {
 	LOCK              = 0,  /* COMPAT10 */
 	UNLOCK            = 1,  /* COMPAT10 */
 	WAIT              = 2,

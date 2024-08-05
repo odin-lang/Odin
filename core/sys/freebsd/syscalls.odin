@@ -450,7 +450,7 @@ sysctl :: proc "contextless" (mib: []MIB_Identifier, oldp: rawptr, oldlenp: ^c.s
 // The _umtx_op() system call is non-standard and is used by the 1:1 Threading
 // Library (libthr, -lthr) to implement IEEE Std 1003.1-2001 (“POSIX.1”)
 // pthread(3) functionality.
-_umtx_op :: proc "contextless" (obj: rawptr, op: Mutex_Operation, val: c.ulong, uaddr, uaddr2: rawptr) -> Errno {
+_umtx_op :: proc "contextless" (obj: rawptr, op: Userland_Mutex_Operation, val: c.ulong, uaddr, uaddr2: rawptr) -> Errno {
 	result, _ := intrinsics.syscall_bsd(SYS__umtx_op,
 		cast(uintptr)obj,
 		cast(uintptr)op,
