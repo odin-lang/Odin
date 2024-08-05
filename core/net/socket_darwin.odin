@@ -35,6 +35,10 @@ Socket_Option :: enum c.int {
 	Send_Timeout              = c.int(os.SO_SNDTIMEO),
 }
 
+// https://github.com/apple/darwin-xnu/blob/2ff845c2e033bd0ff64b5b6aa6063a1f8f65aa32/bsd/sys/socket.h#L1025-L1027
+// Prevent the raising of SIGPIPE on writing to a closed network socket.
+@private MSG_NOSIGNAL :: 0x80000
+
 @(private)
 _create_socket :: proc(family: Address_Family, protocol: Socket_Protocol) -> (socket: Any_Socket, err: Network_Error) {
 	c_type, c_protocol, c_family: int
@@ -194,7 +198,7 @@ _send_tcp :: proc(skt: TCP_Socket, buf: []byte) -> (bytes_written: int, err: Net
 	for bytes_written < len(buf) {
 		limit := min(int(max(i32)), len(buf) - bytes_written)
 		remaining := buf[bytes_written:][:limit]
-		res, res_err := os.send(os.Socket(skt), remaining, 0)
+		res, res_err := os.send(os.Socket(skt), remaining, MSG_NOSIGNAL)
 		if res_err != nil {
 			err = TCP_Send_Error(os.is_platform_error(res_err) or_else -1)
 			return
@@ -210,7 +214,7 @@ _send_udp :: proc(skt: UDP_Socket, buf: []byte, to: Endpoint) -> (bytes_written:
 	for bytes_written < len(buf) {
 		limit := min(1<<31, len(buf) - bytes_written)
 		remaining := buf[bytes_written:][:limit]
-		res, res_err := os.sendto(os.Socket(skt), remaining, 0, cast(^os.SOCKADDR)&toaddr, i32(toaddr.len))
+		res, res_err := os.sendto(os.Socket(skt), remaining, MSG_NOSIGNAL, cast(^os.SOCKADDR)&toaddr, i32(toaddr.len))
 		if res_err != nil {
 			err = UDP_Send_Error(os.is_platform_error(res_err) or_else -1)
 			return
