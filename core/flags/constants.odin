@@ -12,7 +12,7 @@ IMPORTING_TIME      :: #config(ODIN_CORE_FLAGS_USE_TIME, time.IS_SUPPORTED)
 
 // Override support for parsing `net` types.
 // TODO: Update this when the BSDs are supported.
-IMPORTING_NET       :: #config(ODIN_CORE_FLAGS_USE_NET, ODIN_OS == .Windows || ODIN_OS == .Linux || ODIN_OS == .Darwin)
+IMPORTING_NET       :: #config(ODIN_CORE_FLAGS_USE_NET, ODIN_OS == .Windows || ODIN_OS == .Linux || ODIN_OS == .Darwin || ODIN_OS == .FreeBSD)
 
 TAG_ARGS          :: "args"
 SUBTAG_NAME       :: "name"
