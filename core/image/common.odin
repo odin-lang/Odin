@@ -590,7 +590,7 @@ Channel :: enum u8 {
 
 // Take a slice of pixels (`[]RGBA_Pixel`, etc), and return an `Image`
 // Don't call `destroy` on the resulting `Image`. Instead, delete the original `pixels` slice.
-pixels_to_image :: proc(pixels: [][$N]$E, width: int, height: int) -> (img: Image, ok: bool) where E == u8 || E == u16, N >= 1 && N <= 4 {
+pixels_to_image :: proc(pixels: [][$N]$E, width: int, height: int) -> (img: Image, ok: bool) where E == u8 || E == u16, N >= 1, N <= 4 {
 	if len(pixels) != width * height {
 		return {}, false
 	}
