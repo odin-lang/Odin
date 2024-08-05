@@ -10,7 +10,6 @@ Fd :: freebsd.Fd
 Socket_Option :: enum c.int {
 	// TODO: Test and implement more socket options.
 	// DEBUG
-	// ACCEPTCONN
 	Reuse_Address             = cast(c.int)freebsd.Socket_Option.REUSEADDR,
 	Keep_Alive                = cast(c.int)freebsd.Socket_Option.KEEPALIVE,
 	// DONTROUTE
@@ -18,14 +17,14 @@ Socket_Option :: enum c.int {
 	Use_Loopback              = cast(c.int)freebsd.Socket_Option.USELOOPBACK,
 	Linger                    = cast(c.int)freebsd.Socket_Option.LINGER,
 	Out_Of_Bounds_Data_Inline = cast(c.int)freebsd.Socket_Option.OOBINLINE,
-	// REUSEPORT
+	Reuse_Port                = cast(c.int)freebsd.Socket_Option.REUSEPORT,
 	// TIMESTAMP
-	// NOSIGPIPE
+	No_SIGPIPE_From_EPIPE     = cast(c.int)freebsd.Socket_Option.NOSIGPIPE,
 	// ACCEPTFILTER
 	// BINTIME
 	// NO_OFFLOAD
 	// NO_DDP
-	// REUSEPORT_LB
+	Reuse_Port_Load_Balancing = cast(c.int)freebsd.Socket_Option.REUSEPORT_LB,
 	// RERROR
 
 	Send_Buffer_Size          = cast(c.int)freebsd.Socket_Option.SNDBUF,
@@ -219,14 +218,16 @@ _set_option :: proc(socket: Any_Socket, option: Socket_Option, value: any, loc :
 	ptr: rawptr
 	len: freebsd.socklen_t
 
-	// TODO: Verify that these options perform adequately.
 	switch option {
 	case
 		.Reuse_Address,
 		.Keep_Alive,
 		.Broadcast,
 		.Use_Loopback,
-		.Out_Of_Bounds_Data_Inline:
+		.Out_Of_Bounds_Data_Inline,
+		.Reuse_Port,
+		.No_SIGPIPE_From_EPIPE,
+		.Reuse_Port_Load_Balancing:
 		switch real in value {
 		case bool: bool_value = cast(b32)real
 		case b8:   bool_value = cast(b32)real
