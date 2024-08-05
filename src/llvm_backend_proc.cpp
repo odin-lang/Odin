@@ -1688,6 +1688,52 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 			return res;
 		}
 
+
+	case BuiltinProc_simd_gather:
+	case BuiltinProc_simd_scatter:
+		{
+			LLVMValueRef ptr = arg0.value;
+			LLVMValueRef val = arg1.value;
+			LLVMValueRef mask = arg2.value;
+
+			unsigned count = cast(unsigned)get_array_type_count(arg0.type);
+
+			LLVMTypeRef mask_type = LLVMVectorType(LLVMInt1TypeInContext(p->module->ctx), count);
+			mask = LLVMBuildTrunc(p->builder, mask, mask_type, "");
+
+			char const *name = nullptr;
+			switch (builtin_id) {
+			case BuiltinProc_simd_gather:  name = "llvm.masked.gather";  break;
+			case BuiltinProc_simd_scatter: name = "llvm.masked.scatter"; break;
+			}
+			LLVMTypeRef types[2] = {
+				lb_type(p->module, arg1.type),
+				lb_type(p->module, arg0.type)
+			};
+
+			auto alignment = cast(unsigned long long)type_align_of(base_array_type(arg1.type));
+			LLVMValueRef align = LLVMConstInt(LLVMInt32TypeInContext(p->module->ctx), alignment, false);
+
+			LLVMValueRef args[4] = {};
+			switch (builtin_id) {
+			case BuiltinProc_simd_gather:
+				args[0] = ptr;
+				args[1] = align;
+				args[2] = mask;
+				args[3] = val;
+				break;
+			case BuiltinProc_simd_scatter:
+				args[0] = val;
+				args[1] = ptr;
+				args[2] = align;
+				args[3] = mask;
+				break;
+			}
+
+			res.value = lb_call_intrinsic(p, name, args, gb_count_of(args), types, gb_count_of(types));
+			return res;
+
+		}
 	}
 	GB_PANIC("Unhandled simd intrinsic: '%.*s'", LIT(builtin_procs[builtin_id].name));
 

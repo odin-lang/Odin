@@ -102,6 +102,11 @@ lanes_le :: intrinsics.simd_lanes_le
 lanes_gt :: intrinsics.simd_lanes_gt
 lanes_ge :: intrinsics.simd_lanes_ge
 
+
+// Gather and Scatter intrinsics
+gather  :: intrinsics.simd_gather
+scatter :: intrinsics.simd_scatter
+
 // extract :: proc(a: #simd[N]T, idx: uint) -> T
 extract :: intrinsics.simd_extract
 // replace :: proc(a: #simd[N]T, idx: uint, elem: T) -> #simd[N]T

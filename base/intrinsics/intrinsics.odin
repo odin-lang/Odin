@@ -283,6 +283,10 @@ simd_reduce_any         :: proc(a: #simd[N]T) -> T where type_is_boolean(T) ---
 simd_reduce_all         :: proc(a: #simd[N]T) -> T where type_is_boolean(T) ---
 
 
+simd_gather  :: proc(ptr: #simd[N]rawptr, val: #simd[N]T, mask: #simd[N]U) -> #simd[N]T where type_is_integer(U) || type_is_boolean(U) ---
+simd_scatter :: proc(ptr: #simd[N]rawptr, val: #simd[N]T, mask: #simd[N]U)              where type_is_integer(U) || type_is_boolean(U) ---
+
+
 simd_shuffle :: proc(a, b: #simd[N]T, indices: ..int) -> #simd[len(indices)]T ---
 simd_select  :: proc(cond: #simd[N]boolean_or_integer, true, false: #simd[N]T) -> #simd[N]T ---
 

@@ -663,6 +663,60 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 			return true;
 		}
 
+	case BuiltinProc_simd_gather:
+	case BuiltinProc_simd_scatter:
+		{
+			// gather (ptr: #simd[N]rawptr, values: #simd[N]T, mask: #simd[N]int_or_bool) -> #simd[N]T
+			// scatter(ptr: #simd[N]rawptr, values: #simd[N]T, mask: #simd[N]int_or_bool)
+
+			Operand ptr    = {};
+			Operand values = {};
+			Operand mask   = {};
+			check_expr(c, &ptr,    ce->args[0]); if (ptr.mode    == Addressing_Invalid) return false;
+			check_expr(c, &values, ce->args[1]); if (values.mode == Addressing_Invalid) return false;
+			check_expr(c, &mask,   ce->args[2]); if (mask.mode   == Addressing_Invalid) return false;
+			if (!is_type_simd_vector(ptr.type))    { error(ptr.expr,    "'%.*s' expected a simd vector type", LIT(builtin_name)); return false; }
+			if (!is_type_simd_vector(values.type)) { error(values.expr, "'%.*s' expected a simd vector type", LIT(builtin_name)); return false; }
+			if (!is_type_simd_vector(mask.type))   { error(mask.expr,   "'%.*s' expected a simd vector type", LIT(builtin_name)); return false; }
+
+			Type *ptr_elem = base_array_type(ptr.type);
+			if (!is_type_rawptr(ptr_elem)) {
+				gbString s = type_to_string(ptr.type);
+				error(ptr.expr, "Expected a simd vector of 'rawptr' for the addresses, got %s", s);
+				gb_string_free(s);
+				return false;
+			}
+			Type *mask_elem = base_array_type(mask.type);
+
+			if (!is_type_integer(mask_elem) && !is_type_boolean(mask_elem)) {
+				gbString s = type_to_string(mask.type);
+				error(mask.expr, "Expected a simd vector of integers or booleans for the mask, got %s", s);
+				gb_string_free(s);
+				return false;
+			}
+
+			i64 ptr_count    = get_array_type_count(ptr.type);
+			i64 values_count = get_array_type_count(values.type);
+			i64 mask_count   = get_array_type_count(mask.type);
+			if (ptr_count != values_count ||
+			    values_count != mask_count ||
+			    mask_count != ptr_count) {
+				gbString s = type_to_string(mask.type);
+				error(mask.expr, "All simd vectors must be of the same length, got %lld vs %lld vs %lld", cast(long long)ptr_count, cast(long long)values_count, cast(long long)mask_count);
+				gb_string_free(s);
+				return false;
+			}
+
+			if (id == BuiltinProc_simd_gather) {
+				operand->mode = Addressing_Value;
+				operand->type = values.type;
+			} else {
+				operand->mode = Addressing_NoValue;
+				operand->type = nullptr;
+			}
+			return true;
+		}
+
 	case BuiltinProc_simd_extract:
 		{
 			Operand x = {};
