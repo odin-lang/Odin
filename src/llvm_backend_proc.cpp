@@ -1691,20 +1691,24 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 
 	case BuiltinProc_simd_gather:
 	case BuiltinProc_simd_scatter:
+	case BuiltinProc_simd_masked_load:
+	case BuiltinProc_simd_masked_store:
 		{
 			LLVMValueRef ptr = arg0.value;
 			LLVMValueRef val = arg1.value;
 			LLVMValueRef mask = arg2.value;
 
-			unsigned count = cast(unsigned)get_array_type_count(arg0.type);
+			unsigned count = cast(unsigned)get_array_type_count(arg1.type);
 
 			LLVMTypeRef mask_type = LLVMVectorType(LLVMInt1TypeInContext(p->module->ctx), count);
 			mask = LLVMBuildTrunc(p->builder, mask, mask_type, "");
 
 			char const *name = nullptr;
 			switch (builtin_id) {
-			case BuiltinProc_simd_gather:  name = "llvm.masked.gather";  break;
-			case BuiltinProc_simd_scatter: name = "llvm.masked.scatter"; break;
+			case BuiltinProc_simd_gather:       name = "llvm.masked.gather";  break;
+			case BuiltinProc_simd_scatter:      name = "llvm.masked.scatter"; break;
+			case BuiltinProc_simd_masked_load:  name = "llvm.masked.load";    break;
+			case BuiltinProc_simd_masked_store: name = "llvm.masked.store";   break;
 			}
 			LLVMTypeRef types[2] = {
 				lb_type(p->module, arg1.type),
@@ -1716,12 +1720,20 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 
 			LLVMValueRef args[4] = {};
 			switch (builtin_id) {
+			case BuiltinProc_simd_masked_load:
+				types[1] = lb_type(p->module, t_rawptr);
+				/*fallthrough*/
 			case BuiltinProc_simd_gather:
 				args[0] = ptr;
 				args[1] = align;
 				args[2] = mask;
 				args[3] = val;
+				// res.type = arg1.type;
 				break;
+
+			case BuiltinProc_simd_masked_store:
+				types[1] = lb_type(p->module, t_rawptr);
+				/*fallthrough*/
 			case BuiltinProc_simd_scatter:
 				args[0] = val;
 				args[1] = ptr;

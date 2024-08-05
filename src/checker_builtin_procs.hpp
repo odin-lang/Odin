@@ -193,7 +193,8 @@ BuiltinProc__simd_begin,
 
 	BuiltinProc_simd_gather,
 	BuiltinProc_simd_scatter,
-
+	BuiltinProc_simd_masked_load,
+	BuiltinProc_simd_masked_store,
 
 	// Platform specific SIMD intrinsics
 	BuiltinProc_simd_x86__MM_SHUFFLE,
@@ -525,8 +526,10 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("simd_lanes_rotate_left"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("simd_lanes_rotate_right"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
-	{STR_LIT("simd_gather"),  3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
-	{STR_LIT("simd_scatter"), 3, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_gather"),       3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_scatter"),      3, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_masked_load"),  3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_masked_store"), 3, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("simd_x86__MM_SHUFFLE"), 4, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
