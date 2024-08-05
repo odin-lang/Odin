@@ -125,6 +125,7 @@ UDP_Recv_Error :: enum c.int {
 
 TCP_Send_Error :: enum c.int {
 	None                              = 0,
+	Connection_Closed                 = cast(c.int)freebsd.Errno.ECONNRESET,
 	Not_Descriptor                    = cast(c.int)freebsd.Errno.EBADF,
 	Broadcast_Status_Mismatch         = cast(c.int)freebsd.Errno.EACCES,
 	Not_Connected                     = cast(c.int)freebsd.Errno.ENOTCONN,
