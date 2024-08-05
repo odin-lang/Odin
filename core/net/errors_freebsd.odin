@@ -180,7 +180,8 @@ Socket_Option_Error :: enum c.int {
 	Not_Socket                                           = cast(c.int)freebsd.Errno.ENOTSOCK,
 	Unknown_Option_For_Level                             = cast(c.int)freebsd.Errno.ENOPROTOOPT,
 	Argument_In_Invalid_Address_Space                    = cast(c.int)freebsd.Errno.EFAULT,
-	Cannot_Install_Accept_Filter_On_Non_Listening_Socket = cast(c.int)freebsd.Errno.EINVAL,
+	// This error can arise for many different reasons.
+	Invalid_Value                                        = cast(c.int)freebsd.Errno.EINVAL,
 	System_Memory_Allocation_Failed                      = cast(c.int)freebsd.Errno.ENOMEM,
 	Insufficient_System_Resources                        = cast(c.int)freebsd.Errno.ENOBUFS,
 }
