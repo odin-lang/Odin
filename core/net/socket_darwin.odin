@@ -195,7 +195,11 @@ _send_tcp :: proc(skt: TCP_Socket, buf: []byte) -> (bytes_written: int, err: Net
 		limit := min(int(max(i32)), len(buf) - bytes_written)
 		remaining := buf[bytes_written:][:limit]
 		res, res_err := os.send(os.Socket(skt), remaining, os.MSG_NOSIGNAL)
-		if res_err != nil {
+		if res_err == os.EPIPE {
+			// EPIPE arises if the socket has been closed remotely.
+			err = TCP_Send_Error.Connection_Closed
+			return
+		} else if res_err != nil {
 			err = TCP_Send_Error(os.is_platform_error(res_err) or_else -1)
 			return
 		}
@@ -211,7 +215,11 @@ _send_udp :: proc(skt: UDP_Socket, buf: []byte, to: Endpoint) -> (bytes_written:
 		limit := min(1<<31, len(buf) - bytes_written)
 		remaining := buf[bytes_written:][:limit]
 		res, res_err := os.sendto(os.Socket(skt), remaining, os.MSG_NOSIGNAL, cast(^os.SOCKADDR)&toaddr, i32(toaddr.len))
-		if res_err != nil {
+		if res_err == os.EPIPE {
+			// EPIPE arises if the socket has been closed remotely.
+			err = UDP_Send_Error.Not_Socket
+			return
+		} else if res_err != nil {
 			err = UDP_Send_Error(os.is_platform_error(res_err) or_else -1)
 			return
 		}
