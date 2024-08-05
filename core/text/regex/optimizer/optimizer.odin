@@ -86,7 +86,7 @@ optimize_subtree :: proc(tree: Node, flags: common.Flags) -> (result: Node, chan
 		}
 
 		// Only recursive optimizations:
-		for i := 0; i < len(specific.nodes); i += 1 {
+		#no_bounds_check for i := 0; i < len(specific.nodes); i += 1 {
 			subnode, subnode_changes := optimize_subtree(specific.nodes[i], flags)
 			changes += subnode_changes
 			if subnode == nil {
@@ -194,7 +194,7 @@ optimize_subtree :: proc(tree: Node, flags: common.Flags) -> (result: Node, chan
 			new_range.lower = specific.runes[0]
 			new_range.upper = specific.runes[0]
 
-			for i := 1; i < len(specific.runes); i += 1 {
+			#no_bounds_check for i := 1; i < len(specific.runes); i += 1 {
 				r := specific.runes[i]
 				if new_range.lower == -1 {
 					new_range = { r, r }
@@ -228,7 +228,7 @@ optimize_subtree :: proc(tree: Node, flags: common.Flags) -> (result: Node, chan
 		//
 		// DO: `[aa-c]` => `[a-c]`
 		for range in specific.ranges {
-			for i := 0; i < len(specific.runes); i += 1 {
+			#no_bounds_check for i := 0; i < len(specific.runes); i += 1 {
 				r := specific.runes[i]
 				if range.lower <= r && r <= range.upper {
 					ordered_remove(&specific.runes, i)
@@ -244,7 +244,7 @@ optimize_subtree :: proc(tree: Node, flags: common.Flags) -> (result: Node, chan
 		// DO: `[a-cd-e]` => `[a-e]`
 		// DO: `[a-cb-e]` => `[a-e]`
 		slice.sort_by(specific.ranges[:], class_range_sorter)
-		for i := 0; i < len(specific.ranges) - 1; i += 1 {
+		#no_bounds_check for i := 0; i < len(specific.ranges) - 1; i += 1 {
 			for j := i + 1; j < len(specific.ranges); j += 1 {
 				left_range  := &specific.ranges[i]
 				right_range :=  specific.ranges[j]

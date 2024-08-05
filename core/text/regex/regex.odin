@@ -291,7 +291,7 @@ match_and_allocate_capture :: proc(
 		context.allocator = permanent_allocator
 
 		num_groups := 0
-		for i := 0; i < len(saved); i += 2 {
+		#no_bounds_check for i := 0; i < len(saved); i += 2 {
 			a, b := saved[i], saved[i + 1]
 			if a == -1 || b == -1 {
 				continue

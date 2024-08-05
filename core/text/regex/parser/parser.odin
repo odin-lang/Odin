@@ -225,7 +225,7 @@ null_denotation :: proc(p: ^Parser, token: Token) -> (result: Node, err: Error) 
 
 		node := new(Node_Rune_Class)
 
-		for i := 0; i < len(token.text); /**/ {
+		#no_bounds_check for i := 0; i < len(token.text); /**/ {
 			r, size := utf8.decode_rune(token.text[i:])
 			if i == 0 && r == '^' {
 				node.negating = true
@@ -298,6 +298,8 @@ null_denotation :: proc(p: ^Parser, token: Token) -> (result: Node, err: Error) 
 		}
 
 		if .Case_Insensitive in p.flags {
+			// These two loops cannot be in the form of `for x in y` because
+			// they append to the data that they iterate over.
 			length := len(node.runes)
 			#no_bounds_check for i := 0; i < length; i += 1 {
 				r := node.runes[i]
