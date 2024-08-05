@@ -39,19 +39,19 @@ _mm_add_epi64 :: #force_inline proc "c" (a, b: __m128i)  -> __m128i {
 }
 @(require_results, enable_target_feature="sse2")
 _mm_adds_epi8 :: #force_inline proc "c" (a, b: __m128i)  -> __m128i {
-	return transmute(__m128i)simd.add_sat(transmute(i8x16)a, transmute(i8x16)b)
+	return transmute(__m128i)simd.saturating_add(transmute(i8x16)a, transmute(i8x16)b)
 }
 @(require_results, enable_target_feature="sse2")
 _mm_adds_epi16 :: #force_inline proc "c" (a, b: __m128i)  -> __m128i {
-	return transmute(__m128i)simd.add_sat(transmute(i16x8)a, transmute(i16x8)b)
+	return transmute(__m128i)simd.saturating_add(transmute(i16x8)a, transmute(i16x8)b)
 }
 @(require_results, enable_target_feature="sse2")
 _mm_adds_epu8 :: #force_inline proc "c" (a, b: __m128i)  -> __m128i {
-	return transmute(__m128i)simd.add_sat(transmute(u8x16)a, transmute(u8x16)b)
+	return transmute(__m128i)simd.saturating_add(transmute(u8x16)a, transmute(u8x16)b)
 }
 @(require_results, enable_target_feature="sse2")
 _mm_adds_epu16 :: #force_inline proc "c" (a, b: __m128i)  -> __m128i {
-	return transmute(__m128i)simd.add_sat(transmute(u16x8)a, transmute(u16x8)b)
+	return transmute(__m128i)simd.saturating_add(transmute(u16x8)a, transmute(u16x8)b)
 }
 @(require_results, enable_target_feature="sse2")
 _mm_avg_epu8 :: #force_inline proc "c" (a, b: __m128i)  -> __m128i {
@@ -122,19 +122,19 @@ _mm_sub_epi64 :: #force_inline proc "c" (a, b: __m128i) -> __m128i {
 }
 @(require_results, enable_target_feature="sse2")
 _mm_subs_epi8 :: #force_inline proc "c" (a, b: __m128i) -> __m128i {
-	return transmute(__m128i)simd.sub_sat(transmute(i8x16)a, transmute(i8x16)b)
+	return transmute(__m128i)simd.saturating_sub(transmute(i8x16)a, transmute(i8x16)b)
 }
 @(require_results, enable_target_feature="sse2")
 _mm_subs_epi16 :: #force_inline proc "c" (a, b: __m128i) -> __m128i {
-	return transmute(__m128i)simd.sub_sat(transmute(i16x8)a, transmute(i16x8)b)
+	return transmute(__m128i)simd.saturating_sub(transmute(i16x8)a, transmute(i16x8)b)
 }
 @(require_results, enable_target_feature="sse2")
 _mm_subs_epu8 :: #force_inline proc "c" (a, b: __m128i) -> __m128i {
-	return transmute(__m128i)simd.sub_sat(transmute(u8x16)a, transmute(u8x16)b)
+	return transmute(__m128i)simd.saturating_sub(transmute(u8x16)a, transmute(u8x16)b)
 }
 @(require_results, enable_target_feature="sse2")
 _mm_subs_epu16 :: #force_inline proc "c" (a, b: __m128i) -> __m128i {
-	return transmute(__m128i)simd.sub_sat(transmute(u16x8)a, transmute(u16x8)b)
+	return transmute(__m128i)simd.saturating_sub(transmute(u16x8)a, transmute(u16x8)b)
 }
 
 
