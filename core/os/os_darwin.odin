@@ -492,6 +492,10 @@ in6_addr :: struct #packed {
 	s6_addr: [16]u8,
 }
 
+// https://github.com/apple/darwin-xnu/blob/2ff845c2e033bd0ff64b5b6aa6063a1f8f65aa32/bsd/sys/socket.h#L1025-L1027
+// Prevent the raising of SIGPIPE on writing to a closed network socket.
+MSG_NOSIGNAL :: 0x80000
+
 SIOCGIFFLAG :: enum c.int {
 	UP             = 0,  /* Interface is up.  */
 	BROADCAST      = 1,  /* Broadcast address valid.  */
