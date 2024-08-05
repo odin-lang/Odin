@@ -58,7 +58,7 @@ close :: proc "contextless" (fd: Fd) -> Errno {
 //
 // The getpid() function appeared in Version 7 AT&T UNIX.
 getpid :: proc "contextless" () -> pid_t {
-	// always succeeds
+	// This always succeeds.
 	result, _ := intrinsics.syscall_bsd(SYS_getpid)
 	return cast(pid_t)result
 }
@@ -468,7 +468,7 @@ accept4_T :: proc "contextless" (s: Fd, sockaddr: ^$T, flags: Socket_Flags = {})
 where
 	intrinsics.type_is_subtype_of(T, Socket_Address_Header)
 {
-	// sockaddr must contain a valid pointer, or this will segfault because
+	// `sockaddr` must contain a valid pointer, or this will segfault because
 	// we're telling the syscall that there's memory available to write to.
 	addrlen: u32 = size_of(T)
 

@@ -27,8 +27,9 @@ Dial_Error :: enum c.int {
 	Already_Connected           = cast(c.int)freebsd.Errno.EISCONN,
 	Timeout                     = cast(c.int)freebsd.Errno.ETIMEDOUT,
 	Refused_By_Remote_Host      = cast(c.int)freebsd.Errno.ECONNREFUSED,
-	// `Refused` alias for core:net tests.
-	Refused                     = cast(c.int)freebsd.Errno.ECONNREFUSED,
+	// `Refused` alias for `core:net` tests.
+	// The above default name `Refused_By_Remote_Host` is more explicit.
+	Refused                     = Refused_By_Remote_Host,
 	Reset_By_Remote_Host        = cast(c.int)freebsd.Errno.ECONNRESET,
 	Network_Unreachable         = cast(c.int)freebsd.Errno.ENETUNREACH,
 	Host_Unreachable            = cast(c.int)freebsd.Errno.EHOSTUNREACH,
@@ -138,13 +139,15 @@ TCP_Send_Error :: enum c.int {
 	   specified, and the requested operation would block. */
 	Would_Block                       = cast(c.int)freebsd.Errno.EAGAIN,
 
-	// NOTE: This error arises for two distinct reasons.
-	/* The system was unable to allocate an internal buffer.
-	   The operation may succeed when buffers become available. */
+	/* NOTE: This error arises for two distinct reasons:
 
-	/* The output queue for a network interface was full.
-	   This generally indicates that the interface has stopped
-	   sending, but may be caused by transient congestion. */
+	   1. The system was unable to allocate an internal buffer.
+	      The operation may succeed when buffers become available.
+
+	   2. The output queue for a network interface was full.
+	      This generally indicates that the interface has stopped
+	      sending, but may be caused by transient congestion.
+	*/
 	No_Buffer_Space_Available         = cast(c.int)freebsd.Errno.ENOBUFS,
 
 	Host_Unreachable                  = cast(c.int)freebsd.Errno.EHOSTUNREACH,
@@ -174,16 +177,16 @@ Shutdown_Error :: enum c.int {
 }
 
 Socket_Option_Error :: enum c.int {
-	None                                                 = 0,
-	Value_Out_Of_Range                                   = -1,
-	Not_Descriptor                                       = cast(c.int)freebsd.Errno.EBADF,
-	Not_Socket                                           = cast(c.int)freebsd.Errno.ENOTSOCK,
-	Unknown_Option_For_Level                             = cast(c.int)freebsd.Errno.ENOPROTOOPT,
-	Argument_In_Invalid_Address_Space                    = cast(c.int)freebsd.Errno.EFAULT,
+	None                              = 0,
+	Value_Out_Of_Range                = -1,
+	Not_Descriptor                    = cast(c.int)freebsd.Errno.EBADF,
+	Not_Socket                        = cast(c.int)freebsd.Errno.ENOTSOCK,
+	Unknown_Option_For_Level          = cast(c.int)freebsd.Errno.ENOPROTOOPT,
+	Argument_In_Invalid_Address_Space = cast(c.int)freebsd.Errno.EFAULT,
 	// This error can arise for many different reasons.
-	Invalid_Value                                        = cast(c.int)freebsd.Errno.EINVAL,
-	System_Memory_Allocation_Failed                      = cast(c.int)freebsd.Errno.ENOMEM,
-	Insufficient_System_Resources                        = cast(c.int)freebsd.Errno.ENOBUFS,
+	Invalid_Value                     = cast(c.int)freebsd.Errno.EINVAL,
+	System_Memory_Allocation_Failed   = cast(c.int)freebsd.Errno.ENOMEM,
+	Insufficient_System_Resources     = cast(c.int)freebsd.Errno.ENOBUFS,
 }
 
 Set_Blocking_Error :: enum c.int {

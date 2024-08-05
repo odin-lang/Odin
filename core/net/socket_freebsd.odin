@@ -245,17 +245,17 @@ _set_option :: proc(socket: Any_Socket, option: Socket_Option, value: any, loc :
 		.Reuse_Port,
 		.No_SIGPIPE_From_EPIPE,
 		.Reuse_Port_Load_Balancing:
-		switch real in value {
-		case bool: bool_value = cast(b32)real
-		case b8:   bool_value = cast(b32)real
-		case b16:  bool_value = cast(b32)real
-		case b32:  bool_value = real
-		case b64:  bool_value = cast(b32)real
-		case:
-			panic("set_option() value must be a boolean here", loc)
-		}
-		ptr = &bool_value
-		len = size_of(bool_value)
+			switch real in value {
+			case bool: bool_value = cast(b32)real
+			case b8:   bool_value = cast(b32)real
+			case b16:  bool_value = cast(b32)real
+			case b32:  bool_value = real
+			case b64:  bool_value = cast(b32)real
+			case:
+				panic("set_option() value must be a boolean here", loc)
+			}
+			ptr = &bool_value
+			len = size_of(bool_value)
 	case
 		.Linger,
 		.Send_Timeout,
