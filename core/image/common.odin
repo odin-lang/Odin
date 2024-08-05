@@ -1293,7 +1293,7 @@ blend_single_channel :: #force_inline proc(fg, alpha, bg: $T) -> (res: T) where 
 	return T(c & (MAX - 1))
 }
 
-blend_pixel :: #force_inline proc(fg: [$N]$T, alpha: T, bg: [N]T) -> (res: [N]T) where (T == u8 || T == u16), N >= 1 && N <= 4 {
+blend_pixel :: #force_inline proc(fg: [$N]$T, alpha: T, bg: [N]T) -> (res: [N]T) where (T == u8 || T == u16), N >= 1, N <= 4 {
 	MAX :: 256 when T == u8 else 65536
 
 	when N == 1 {
