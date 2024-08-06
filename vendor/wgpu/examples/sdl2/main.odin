@@ -158,7 +158,7 @@ frame :: proc "c" (dt: f32) {
 				view       = frame,
 				loadOp     = .Clear,
 				storeOp    = .Store,
-				clearValue = { r = 0, g = 1, b = 0, a = 1 },
+				clearValue = { 0, 1, 0, 1 },
 			},
 		},
 	)
