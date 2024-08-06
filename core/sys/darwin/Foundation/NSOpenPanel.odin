@@ -29,3 +29,7 @@ OpenPanel_setResolvesAliases :: proc "c" (self: ^OpenPanel, setting: BOOL) {
 OpenPanel_setAllowsMultipleSelection :: proc "c" (self: ^OpenPanel, setting: BOOL) {
 	msgSend(nil, self, "setAllowsMultipleSelection:", setting)
 }
+@(objc_type=OpenPanel, objc_name="setAllowedFileTypes")
+OpenPanel_setAllowedFileTypes :: proc "c" (self: ^OpenPanel, types: ^Array) {
+	msgSend(nil, self, "setAllowedFileTypes:", types)
+}
