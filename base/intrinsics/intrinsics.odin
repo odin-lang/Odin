@@ -303,11 +303,11 @@ simd_nearest :: proc(a: #simd[N]any_float) -> #simd[N]any_float ---
 
 simd_to_bits :: proc(v: #simd[N]T) -> #simd[N]Integer where size_of(T) == size_of(Integer), type_is_unsigned(Integer) ---
 
-// equivalent a swizzle with descending indices, e.g. reserve(a, 3, 2, 1, 0)
-simd_reverse :: proc(a: #simd[N]T) -> #simd[N]T ---
+// equivalent to a swizzle with descending indices, e.g. reserve(a, 3, 2, 1, 0)
+simd_lanes_reverse :: proc(a: #simd[N]T) -> #simd[N]T ---
 
-simd_rotate_left  :: proc(a: #simd[N]T, $offset: int) -> #simd[N]T ---
-simd_rotate_right :: proc(a: #simd[N]T, $offset: int) -> #simd[N]T ---
+simd_lanes_rotate_left  :: proc(a: #simd[N]T, $offset: int) -> #simd[N]T ---
+simd_lanes_rotate_right :: proc(a: #simd[N]T, $offset: int) -> #simd[N]T ---
 
 // Checks if the current target supports the given target features.
 //
