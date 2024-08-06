@@ -1532,8 +1532,8 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 		{
 			char const *name = nullptr;
 			switch (builtin_id) {
-			case BuiltinProc_simd_reduce_any: name = "llvm.vector.reduce.and"; break;
-			case BuiltinProc_simd_reduce_all: name = "llvm.vector.reduce.or";  break;
+			case BuiltinProc_simd_reduce_any: name = "llvm.vector.reduce.or";  break;
+			case BuiltinProc_simd_reduce_all: name = "llvm.vector.reduce.and"; break;
 			}
 
 			LLVMTypeRef types[1] = { lb_type(p->module, arg0.type) };
