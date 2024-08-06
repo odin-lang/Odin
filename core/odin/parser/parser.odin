@@ -2845,7 +2845,7 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 
 		close := expect_closing_brace_of_field_list(p)
 
-		bf := ast.new(ast.Bit_Field_Type, tok.pos, close.pos)
+		bf := ast.new(ast.Bit_Field_Type, tok.pos, end_pos(close))
 
 		bf.tok_pos      = tok.pos
 		bf.backing_type = backing_type
