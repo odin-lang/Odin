@@ -2020,9 +2020,11 @@ gb_internal bool init_build_paths(String init_filename) {
 		return false;
 	}
 
-	gbFile output_file_test;
-	gbFileError output_test_err = gb_file_open_mode(&output_file_test, gbFileMode_Append | gbFileMode_Rw, (const char*)output_file.text);
-	defer (gb_file_close(&output_file_test));
+	gbFile      output_file_test;
+	const char* output_file_name = (const char*)output_file.text;
+	gbFileError output_test_err = gb_file_open_mode(&output_file_test, gbFileMode_Append | gbFileMode_Rw, output_file_name);
+	gb_file_close(&output_file_test);
+	gb_file_remove(output_file_name);
 
 	if (output_test_err != 0) {
 		String output_file = path_to_string(ha, bc->build_paths[BuildPath_Output]);
