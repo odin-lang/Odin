@@ -116,6 +116,9 @@ if %errorlevel% neq 0 goto end_of_build
 rem If the demo doesn't run for you and your CPU is more than a decade old, try -microarch:native
 if %release_mode% EQU 0 odin run examples/demo -vet -strict-style -- Hellope World
 
+rem Many non-compiler devs seem to run debug build but don't realize.
+if %release_mode% EQU 0 echo: & echo Debug compiler built. Note: run "build.bat release" if you want a faster, release mode compiler.
+
 del *.obj > NUL 2> NUL
 
 :end_of_build
