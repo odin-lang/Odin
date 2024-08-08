@@ -144,12 +144,17 @@ build_odin() {
 }
 
 run_demo() {
-	./odin run examples/demo -vet -strict-style -- Hellope World
+	if [ $# -eq 0 ] || [ "$1" = "debug" ]; then
+		./odin run examples/demo -vet -strict-style -- Hellope World
+	fi
 }
 
 if [ $# -eq 0 ]; then
 	build_odin debug
 	run_demo
+
+	: ${PROGRAM:=$0}
+	echo "\nDebug compiler built. Note: run \"$PROGRAM release\" or \"$PROGRAM release-native\" if you want a faster, release mode compiler."
 elif [ $# -eq 1 ]; then
 	case $1 in
 	report)
