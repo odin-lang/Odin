@@ -2781,7 +2781,7 @@ CONTEXT :: struct {
 PCONTEXT :: ^CONTEXT
 LPCONTEXT :: ^CONTEXT
 
-when size_of(uintptr) == 32 { 
+when size_of(uintptr) == 32 {
 	XSAVE_FORMAT :: struct #align(16) {
 		ControlWord: WORD,
 		StatusWord: WORD,
