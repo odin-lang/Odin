@@ -288,7 +288,7 @@ _process_open :: proc(pid: int, _: Process_Open_Flags) -> (process: Process, err
 	if errno == .ENOSYS {
 		return process, .Unsupported
 	}
-	if errno != nil {
+	if errno != .NONE {
 		return process, _get_platform_error(errno)
 	}
 	process.handle = uintptr(pidfd)
@@ -300,7 +300,7 @@ _Sys_Process_Attributes :: struct {}
 
 @(private="package")
 _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
-	_has_executable_permissions :: proc(fd: linux.Fd) -> bool {
+	has_executable_permissions :: proc(fd: linux.Fd) -> bool {
 		backing: [48]u8
 		_ = fmt.bprintf(backing[:], "/proc/self/fd/%d", fd)
 		return linux.access(cstring(&backing[0]), linux.X_OK) == .NONE
@@ -337,7 +337,7 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 			if exe_fd, errno = linux.openat(dir_fd, exe_path, {.PATH, .CLOEXEC}); errno != .NONE {
 				continue
 			}
-			if !_has_executable_permissions(exe_fd) {
+			if !has_executable_permissions(exe_fd) {
 				linux.close(exe_fd)
 				continue
 			}
@@ -350,7 +350,7 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 			if exe_fd, errno = linux.openat(dir_fd, exe_path, {.PATH, .CLOEXEC}); errno != .NONE {
 				return process, .Not_Exist
 			}
-			if !_has_executable_permissions(exe_fd) {
+			if !has_executable_permissions(exe_fd) {
 				linux.close(exe_fd)
 				return process, .Permission_Denied
 			}
@@ -360,7 +360,7 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 		if exe_fd, errno = linux.openat(dir_fd, exe_path, {.PATH, .CLOEXEC}); errno != .NONE {
 			return process, _get_platform_error(errno)
 		}
-		if !_has_executable_permissions(exe_fd) {
+		if !has_executable_permissions(exe_fd) {
 			linux.close(exe_fd)
 			return process, .Permission_Denied
 		}
@@ -410,8 +410,22 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 	STDOUT :: linux.Fd(1)
 	STDERR :: linux.Fd(2)
 
+	READ :: 0
+	WRITE :: 1
+
+	child_pipe_fds: [2]linux.Fd
+	if errno = linux.pipe2(&child_pipe_fds, {.CLOEXEC}); errno != .NONE {
+		return process, _get_platform_error(errno)
+	}
+
 	if pid == 0 {
 		// in child process now
+		write_errno_to_parent_and_abort :: proc(parent_fd: linux.Fd, errno: linux.Errno) -> ! {
+			error_byte: [1]u8 = { u8(i32(errno) * -1) }
+			linux.write(parent_fd, error_byte[:])
+			intrinsics.trap()
+		}
+
 		stdin_fd: linux.Fd
 		stdout_fd: linux.Fd
 		stderr_fd: linux.Fd
@@ -420,8 +434,8 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 			stdin_fd = linux.Fd(fd(desc.stdin))
 		} else {
 			stdin_fd, errno = linux.open("/dev/null", {})
-			if errno != nil {
-				intrinsics.trap()  // TODO: our own special pipe
+			if errno != .NONE {
+				write_errno_to_parent_and_abort(child_pipe_fds[WRITE], errno)
 			}
 		}
 
@@ -431,8 +445,8 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 			stdout_fd = linux.Fd(fd(desc.stdout))
 		} else {
 			write_devnull, errno = linux.open("/dev/null", {.WRONLY})
-			if errno != nil {
-				intrinsics.trap()  // TODO
+			if errno != .NONE {
+				write_errno_to_parent_and_abort(child_pipe_fds[WRITE], errno)
 			}
 			stdout_fd = write_devnull
 		}
@@ -442,33 +456,51 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 		} else {
 			if write_devnull == -1 {
 				write_devnull, errno = linux.open("/dev/null", {.WRONLY})
-				if errno != nil {
-					intrinsics.trap()  // TODO
+				if errno != .NONE {
+					write_errno_to_parent_and_abort(child_pipe_fds[WRITE], errno)
 				}
 			}
 			stderr_fd = write_devnull
 		}
 
 		if _, errno = linux.dup2(stdin_fd, STDIN); errno != .NONE {
-			intrinsics.trap()
+			write_errno_to_parent_and_abort(child_pipe_fds[WRITE], errno)
 		}
 		if _, errno = linux.dup2(stdout_fd, STDOUT); errno != .NONE {
-			intrinsics.trap()
+			write_errno_to_parent_and_abort(child_pipe_fds[WRITE], errno)
 		}
 		if _, errno = linux.dup2(stderr_fd, STDERR); errno != .NONE {
-			intrinsics.trap()
+			write_errno_to_parent_and_abort(child_pipe_fds[WRITE], errno)
 		}
 
+		success_byte: [1]u8
+		linux.write(child_pipe_fds[WRITE], success_byte[:])
+
 		if errno = linux.execveat(exe_fd, "", &cargs[0], env, {.AT_EMPTY_PATH}); errno != .NONE {
-			intrinsics.trap()
+			write_errno_to_parent_and_abort(child_pipe_fds[WRITE], errno)
 		}
 		unreachable()
+	}
+
+	linux.close(child_pipe_fds[WRITE])
+	defer linux.close(child_pipe_fds[WRITE])
+
+	n: int
+	child_byte: [1]u8
+	n, errno = linux.read(child_pipe_fds[READ], child_byte[:])
+	if errno != .NONE {
+		return process, _get_platform_error(errno)
+	}
+	child_errno := linux.Errno(child_byte[0])
+	if child_errno != .NONE {
+		return process, _get_platform_error(child_errno)
 	}
 
 	process, err = process_open(int(pid))
 	if err == .Unsupported {
 		return process, nil
 	}
+
 	return
 }
 
@@ -529,7 +561,7 @@ _process_wait :: proc(process: Process, timeout: time.Duration) -> (process_stat
 			time_nsec = uint(timeout % time.Second),
 		}
 
-		if process.handle != PIDFD_UNASSIGNED {
+		if false {//process.handle != PIDFD_UNASSIGNED {
 			pollfd: [1]linux.Poll_Fd = {
 				{
 					fd = linux.Fd(process.handle),
