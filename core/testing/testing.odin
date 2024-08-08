@@ -4,8 +4,10 @@ import "base:intrinsics"
 import "base:runtime"
 import pkg_log "core:log"
 import "core:reflect"
+import "core:sync"
 import "core:sync/chan"
 import "core:time"
+import "core:mem"
 
 _ :: reflect // alias reflect to nothing to force visibility for -vet
 
@@ -136,6 +138,24 @@ expect_value :: proc(t: ^T, value, expected: $T, loc := #caller_location) -> boo
 	return ok
 }
 
+Memory_Verifier_Proc :: #type proc(t: ^T, ta: ^mem.Tracking_Allocator)
+
+expect_leaks :: proc(t: ^T, client_test: proc(t: ^T), verifier: Memory_Verifier_Proc) {
+	{
+		ta: mem.Tracking_Allocator
+		mem.tracking_allocator_init(&ta, context.allocator)
+		defer mem.tracking_allocator_destroy(&ta)
+		context.allocator = mem.tracking_allocator(&ta)
+
+		client_test(t)
+		sync.mutex_lock(&ta.mutex)
+		// The verifier can inspect this local tracking allocator.
+		// And then call `testing.expect_*` as makes sense for the client test.
+		verifier(t, &ta)
+		sync.mutex_unlock(&ta.mutex)
+	}
+	free_all(context.allocator)
+}
 
 set_fail_timeout :: proc(t: ^T, duration: time.Duration, loc := #caller_location) {
 	chan.send(t.channel, Event_Set_Fail_Timeout {
