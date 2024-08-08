@@ -27,6 +27,8 @@ import "base:intrinsics"
 
 when ODIN_OS == .Windows {
 	foreign import lib "SDL2.lib"
+} else when ODIN_OS == .Darwin {
+    foreign import lib "system:SDL2.framework"
 } else {
 	foreign import lib "system:SDL2"
 }
