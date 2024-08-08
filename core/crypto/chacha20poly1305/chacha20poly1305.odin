@@ -149,6 +149,7 @@ seal :: proc(ctx: ^Context, dst, tag, iv, aad, plaintext: []byte) {
 // fails, the destination buffer will be zeroed.
 //
 // dst and plaintext MUST alias exactly or not at all.
+@(require_results)
 open :: proc(ctx: ^Context, dst, iv, aad, ciphertext, tag: []byte) -> bool {
 	plaintext := dst
 	_validate_common_slice_sizes(tag, iv, aad, ciphertext, ctx._is_xchacha)
