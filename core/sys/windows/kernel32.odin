@@ -85,6 +85,10 @@ foreign kernel32 {
 	                        lpTargetFileName: LPCWSTR,
 	                        lpSecurityAttributes: LPSECURITY_ATTRIBUTES) -> BOOL ---
 
+	CreateSymbolicLinkW :: proc(lpSymlinkFileName: LPCWSTR,
+	                            lpTargetFileName:  LPCWSTR,
+	                            dwFlags:           SYMBOLIC_LINK_FLAGS) -> BOOLEAN ---
+
 	GetFileInformationByHandleEx :: proc(hFile: HANDLE,
 	                                     fileInfoClass: FILE_INFO_BY_HANDLE_CLASS,
 	                                     lpFileInformation: LPVOID,
