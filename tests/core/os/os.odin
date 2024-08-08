@@ -1,4 +1,4 @@
-package tests_core_os
+package test_core_os
 
 import "core:c/libc"
 import win32 "core:sys/windows"
