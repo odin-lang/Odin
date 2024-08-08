@@ -10,6 +10,7 @@ import "core:time"
 import "core:mem"
 
 _ :: reflect // alias reflect to nothing to force visibility for -vet
+_ :: mem     // in case TRACKING_MEMORY is not enabled
 
 // IMPORTANT NOTE: Compiler requires this layout
 Test_Signature :: proc(^T)
