@@ -61,7 +61,6 @@ jobs:
           mkdir dist
           cp odin dist
           cp LICENSE dist
-          cp libLLVM* dist
           cp -r shared dist
           cp -r base dist
           cp -r core dist

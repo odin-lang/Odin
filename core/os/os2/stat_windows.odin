@@ -6,25 +6,22 @@ import "core:time"
 import "core:strings"
 import win32 "core:sys/windows"
 
-_fstat :: proc(f: ^File, allocator: runtime.Allocator) -> (File_Info, Error) {
+_fstat :: proc(f: ^File, allocator: runtime.Allocator) -> (fi: File_Info, err: Error) {
 	if f == nil || (^File_Impl)(f.impl).fd == nil {
-		return {}, nil
+		return
 	}
 
-	path, err := _cleanpath_from_handle(f, allocator)
-	if err != nil {
-		return {}, err
-	}
+	path := _cleanpath_from_handle(f, allocator) or_return
 
 	h := _handle(f)
 	switch win32.GetFileType(h) {
 	case win32.FILE_TYPE_PIPE, win32.FILE_TYPE_CHAR:
-		fi := File_Info {
+		fi = File_Info {
 			fullpath = path,
 			name = basename(path),
 			type = file_type(h),
 		}
-		return fi, nil
+		return
 	}
 
 	return _file_info_from_get_file_information_by_handle(path, h, allocator)
@@ -67,8 +64,9 @@ internal_stat :: proc(name: string, create_file_attributes: u32, allocator: runt
 	if len(name) == 0 {
 		return {}, .Not_Exist
 	}
+	TEMP_ALLOCATOR_GUARD()
 
-	wname := _fix_long_path(name) or_return
+	wname := _fix_long_path(name, temp_allocator()) or_return
 	fa: win32.WIN32_FILE_ATTRIBUTE_DATA
 	ok := win32.GetFileAttributesExW(wname, win32.GetFileExInfoStandard, &fa)
 	if ok && fa.dwFileAttributes & win32.FILE_ATTRIBUTE_REPARSE_POINT == 0 {

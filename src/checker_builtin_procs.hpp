@@ -70,8 +70,8 @@ enum BuiltinProcId {
 	BuiltinProc_overflow_sub,
 	BuiltinProc_overflow_mul,
 
-	BuiltinProc_add_sat,
-	BuiltinProc_sub_sat,
+	BuiltinProc_saturating_add,
+	BuiltinProc_saturating_sub,
 
 	BuiltinProc_sqrt,
 	BuiltinProc_fused_mul_add,
@@ -141,8 +141,8 @@ BuiltinProc__simd_begin,
 	BuiltinProc_simd_shl_masked, // C logic
 	BuiltinProc_simd_shr_masked, // C logic
 
-	BuiltinProc_simd_add_sat, // saturation arithmetic
-	BuiltinProc_simd_sub_sat, // saturation arithmetic
+	BuiltinProc_simd_saturating_add, // saturation arithmetic
+	BuiltinProc_simd_saturating_sub, // saturation arithmetic
 
 	BuiltinProc_simd_bit_and,
 	BuiltinProc_simd_bit_or,
@@ -174,6 +174,9 @@ BuiltinProc__simd_begin,
 	BuiltinProc_simd_reduce_or,
 	BuiltinProc_simd_reduce_xor,
 
+	BuiltinProc_simd_reduce_any,
+	BuiltinProc_simd_reduce_all,
+
 	BuiltinProc_simd_shuffle,
 	BuiltinProc_simd_select,
 
@@ -188,6 +191,12 @@ BuiltinProc__simd_begin,
 	BuiltinProc_simd_lanes_rotate_left,
 	BuiltinProc_simd_lanes_rotate_right,
 
+	BuiltinProc_simd_gather,
+	BuiltinProc_simd_scatter,
+	BuiltinProc_simd_masked_load,
+	BuiltinProc_simd_masked_store,
+	BuiltinProc_simd_masked_expand_load,
+	BuiltinProc_simd_masked_compress_store,
 
 	// Platform specific SIMD intrinsics
 	BuiltinProc_simd_x86__MM_SHUFFLE,
@@ -396,8 +405,8 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("overflow_sub"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("overflow_mul"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
-	{STR_LIT("add_sat"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
-	{STR_LIT("sub_sat"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("saturating_add"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("saturating_sub"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("sqrt"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("fused_mul_add"), 3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
@@ -467,8 +476,8 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("simd_shl_masked"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("simd_shr_masked"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
-	{STR_LIT("simd_add_sat"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
-	{STR_LIT("simd_sub_sat"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_saturating_add"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_saturating_sub"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("simd_bit_and"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("simd_bit_or"),  2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
@@ -501,6 +510,10 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("simd_reduce_or"),          1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("simd_reduce_xor"),         1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
+	{STR_LIT("simd_reduce_any"),          1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_reduce_all"),         1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+
+
 	{STR_LIT("simd_shuffle"), 2, true,  Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("simd_select"),  3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
@@ -514,6 +527,13 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("simd_lanes_reverse"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("simd_lanes_rotate_left"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("simd_lanes_rotate_right"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+
+	{STR_LIT("simd_gather"),       3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_scatter"),      3, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_masked_load"),  3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_masked_store"), 3, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_masked_expand_load"),    3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_masked_compress_store"), 3, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("simd_x86__MM_SHUFFLE"), 4, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 

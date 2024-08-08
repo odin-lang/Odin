@@ -95,7 +95,7 @@ Linux)
 	LDFLAGS="$LDFLAGS -ldl $($LLVM_CONFIG --libs core native --system-libs --libfiles)"
 	# Copy libLLVM*.so into current directory for linking
 	# NOTE: This is needed by the Linux release pipeline!
-	cp $(readlink -f $($LLVM_CONFIG --libfiles)) ./
+	# cp $(readlink -f $($LLVM_CONFIG --libfiles)) ./
 	LDFLAGS="$LDFLAGS -Wl,-rpath=\$ORIGIN"
 	;;
 OpenBSD)

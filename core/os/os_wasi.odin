@@ -4,11 +4,9 @@ import "core:sys/wasm/wasi"
 import "base:runtime"
 
 Handle :: distinct i32
-Errno :: distinct i32
+_Platform_Error :: wasi.errno_t
 
 INVALID_HANDLE :: -1
-
-ERROR_NONE :: Errno(wasi.errno_t.SUCCESS)
 
 O_RDONLY   :: 0x00000
 O_WRONLY   :: 0x00001
@@ -29,6 +27,7 @@ stderr: Handle = 2
 
 args := _alloc_command_line_arguments()
 
+@(require_results)
 _alloc_command_line_arguments :: proc() -> (args: []string) {
 	args = make([]string, len(runtime.args__))
 	for &arg, i in args {
@@ -93,8 +92,9 @@ init_preopens :: proc() {
 	preopens = dyn_preopens[:]
 }
 
+@(require_results)
 wasi_match_preopen :: proc(path: string) -> (wasi.fd_t, string, bool) {
-
+	@(require_results)
 	prefix_matches :: proc(prefix, path: string) -> bool {
 		// Empty is valid for any relative path.
 		if len(prefix) == 0 && len(path) > 0 && path[0] != '/' {
@@ -148,23 +148,24 @@ wasi_match_preopen :: proc(path: string) -> (wasi.fd_t, string, bool) {
 write :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 	iovs := wasi.ciovec_t(data)
 	n, err := wasi.fd_write(wasi.fd_t(fd), {iovs})
-	return int(n), Errno(err)
+	return int(n), Platform_Error(err)
 }
 read :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 	iovs := wasi.iovec_t(data)
 	n, err := wasi.fd_read(wasi.fd_t(fd), {iovs})
-	return int(n), Errno(err)
+	return int(n), Platform_Error(err)
 }
 write_at :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Errno) {
 	iovs := wasi.ciovec_t(data)
 	n, err := wasi.fd_pwrite(wasi.fd_t(fd), {iovs}, wasi.filesize_t(offset))
-	return int(n), Errno(err)
+	return int(n), Platform_Error(err)
 }
 read_at :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Errno) {
 	iovs := wasi.iovec_t(data)
 	n, err := wasi.fd_pread(wasi.fd_t(fd), {iovs}, wasi.filesize_t(offset))
-	return int(n), Errno(err)
+	return int(n), Platform_Error(err)
 }
+@(require_results)
 open :: proc(path: string, mode: int = O_RDONLY, perm: int = 0) -> (Handle, Errno) {
 	oflags: wasi.oflags_t
 	if mode & O_CREATE == O_CREATE {
@@ -201,30 +202,36 @@ open :: proc(path: string, mode: int = O_RDONLY, perm: int = 0) -> (Handle, Errn
 	}
 
 	fd, err := wasi.path_open(dir_fd, {.SYMLINK_FOLLOW}, relative, oflags, rights, {}, fdflags)
-	return Handle(fd), Errno(err)
+	return Handle(fd), Platform_Error(err)
 }
 close :: proc(fd: Handle) -> Errno {
 	err := wasi.fd_close(wasi.fd_t(fd))
-	return Errno(err)
+	return Platform_Error(err)
 }
+
+flush :: proc(fd: Handle) -> Error {
+	// do nothing
+	return nil
+}
+
 seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
 	n, err := wasi.fd_seek(wasi.fd_t(fd), wasi.filedelta_t(offset), wasi.whence_t(whence))
-	return i64(n), Errno(err)
+	return i64(n), Platform_Error(err)
 }
+@(require_results)
 current_thread_id :: proc "contextless" () -> int {
 	return 0
 }
-@(private)
+@(private, require_results)
 _processor_core_count :: proc() -> int {
 	return 1
 }
 
-file_size :: proc(fd: Handle) -> (i64, Errno) {
-	stat, err := wasi.fd_filestat_get(wasi.fd_t(fd))
-	if err != nil {
-		return 0, Errno(err)
-	}
-	return i64(stat.size), 0
+@(require_results)
+file_size :: proc(fd: Handle) -> (size: i64, err: Errno) {
+	stat := wasi.fd_filestat_get(wasi.fd_t(fd)) or_return
+	size = i64(stat.size)
+	return
 }
 
 

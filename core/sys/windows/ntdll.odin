@@ -23,7 +23,23 @@ foreign ntdll_lib {
 		Length:               ULONG,
 		FileInformationClass: FILE_INFORMATION_CLASS,
 	) -> NTSTATUS ---
+
+	NtQueryDirectoryFileEx :: proc(
+		FileHandle:           HANDLE,
+		Event:                HANDLE,
+		ApcRoutine:           PIO_APC_ROUTINE,
+		ApcContext:           PVOID,
+		IoStatusBlock:        PIO_STATUS_BLOCK,
+		FileInformation:      PVOID,
+		Length:               ULONG,
+		FileInformationClass: FILE_INFORMATION_CLASS,
+		QueryFlags:           ULONG,
+		FileName   :          PUNICODE_STRING,
+	) -> NTSTATUS ---
 }
+
+
+PIO_APC_ROUTINE :: #type proc "system" (ApcContext: rawptr, IoStatusBlock: PIO_STATUS_BLOCK, Reserved: ULONG)
 
 PIO_STATUS_BLOCK :: ^IO_STATUS_BLOCK
 IO_STATUS_BLOCK :: struct {
@@ -44,6 +60,12 @@ PROCESS_INFO_CLASS :: enum c_int {
 	ProcessTelemetryIdInformation = 64,
 	ProcessSubsystemInformation   = 75,
 }
+
+SL_RESTART_SCAN                :: 0x00000001 // The scan will start at the first entry in the directory. If this flag is not set, the scan will resume from where the last query ended.
+SL_RETURN_SINGLE_ENTRY         :: 0x00000002 // Normally the return buffer is packed with as many matching directory entries that fit. If this flag is set, the file system will return only one directory entry at a time. This does make the operation less efficient.
+SL_INDEX_SPECIFIED             :: 0x00000004 // The scan should start at a specified indexed position in the directory. This flag can only be set if you generate your own IRP_MJ_DIRECTORY_CONTROL IRP; the index is specified in the IRP. How the position is specified varies from file system to file system.
+SL_RETURN_ON_DISK_ENTRIES_ONLY :: 0x00000008 // Any file system filters that perform directory virtualization or just-in-time expansion should simply pass the request through to the file system and return entries that are currently on disk. Not all file systems support this flag.
+SL_NO_CURSOR_UPDATE_QUERY      :: 0x00000010 // File systems maintain per-FileObject directory cursor information. When multiple threads do queries using the same FileObject, access to the per-FileObject structure is single threaded to prevent corruption of the cursor state. This flag tells the file system to not update per-FileObject cursor state information thus allowing multiple threads to query in parallel using the same handle. It behaves as if SL_RESTART_SCAN is specified on each call. If a wild card pattern is given on the next call, the operation will not pick up where the last query ended. This allows for true asynchronous directory query support. If this flag is used inside a TxF transaction the operation will be failed. Not all file systems support this flag.
 
 
 PFILE_INFORMATION_CLASS :: ^FILE_INFORMATION_CLASS
@@ -134,6 +156,22 @@ FILE_INFORMATION_CLASS :: enum c_int {
 	FileMaximumInformation,
 }
 
+PFILE_ID_FULL_DIR_INFORMATION :: ^FILE_ID_FULL_DIR_INFORMATION
+FILE_ID_FULL_DIR_INFORMATION :: struct {
+	NextEntryOffset: ULONG,
+	FileIndex:       ULONG,
+	CreationTime:    LARGE_INTEGER,
+	LastAccessTime:  LARGE_INTEGER,
+	LastWriteTime:   LARGE_INTEGER,
+	ChangeTime:      LARGE_INTEGER,
+	EndOfFile:       LARGE_INTEGER,
+	AllocationSize:  LARGE_INTEGER,
+	FileAttributes:  ULONG,
+	FileNameLength:  ULONG,
+	EaSize:          ULONG,
+	FileId:          LARGE_INTEGER,
+	FileName:        [1]WCHAR,
+}
 
 
 PROCESS_BASIC_INFORMATION :: struct {

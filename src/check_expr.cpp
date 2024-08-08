@@ -127,6 +127,8 @@ gb_internal bool complete_soa_type(Checker *checker, Type *t, bool wait_to_finis
 
 gb_internal bool check_is_castable_to(CheckerContext *c, Operand *operand, Type *y);
 
+gb_internal bool is_exact_value_zero(ExactValue const &v);
+
 enum LoadDirectiveResult {
 	LoadDirective_Success  = 0,
 	LoadDirective_Error    = 1,
@@ -4457,6 +4459,27 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 		
 
 	case Type_Union:
+		// IMPORTANT NOTE HACK(bill): This is just to allow for comparisons against `0` with the `os.Error` type
+		// as a kind of transition period
+		if (!build_context.strict_style &&
+		    operand->mode == Addressing_Constant &&
+		    target_type->kind == Type_Named &&
+		    (c->pkg == nullptr || c->pkg->name != "os") &&
+		    target_type->Named.name == "Error") {
+			Entity *e = target_type->Named.type_name;
+			if (e->pkg && e->pkg->name == "os") {
+				if (is_exact_value_zero(operand->value) &&
+				    (operand->value.kind == ExactValue_Integer ||
+				     operand->value.kind == ExactValue_Float)) {
+					operand->mode = Addressing_Value;
+					target_type = t_untyped_nil;
+				     	operand->value = empty_exact_value;
+					update_untyped_expr_value(c, operand->expr, operand->value);
+					break;
+				}
+			}
+		}
+		// "fallthrough"
 		if (!is_operand_nil(*operand) && !is_operand_uninit(*operand)) {
 			TEMPORARY_ALLOCATOR_GUARD();
 
@@ -5134,6 +5157,14 @@ gb_internal Entity *check_selector(CheckerContext *c, Operand *operand, Ast *nod
 			String import_name = op_name;
 			Scope *import_scope = e->ImportName.scope;
 			String entity_name = selector->Ident.token.string;
+
+			if (import_scope == nullptr) {
+				ERROR_BLOCK();
+				error(node, "'%.*s' is not imported in this file, '%.*s' is unavailable", LIT(import_name), LIT(entity_name));
+				operand->mode = Addressing_Invalid;
+				operand->expr = node;
+				return nullptr;
+			}
 
 			check_op_expr = false;
 			entity = scope_lookup_current(import_scope, entity_name);

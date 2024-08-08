@@ -4,8 +4,8 @@ package os2
 import "core:sys/linux"
 
 @(rodata)
-_errno_strings : [linux.Errno]string = {
-	.NONE            = "Success",
+_errno_strings := [linux.Errno]string{
+	.NONE            = "",
 	.EPERM           = "Operation not permitted",
 	.ENOENT          = "No such file or directory",
 	.ESRCH           = "No such process",

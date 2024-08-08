@@ -470,8 +470,8 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 		}
 
 	// Integer only
-	case BuiltinProc_simd_add_sat:
-	case BuiltinProc_simd_sub_sat:
+	case BuiltinProc_simd_saturating_add:
+	case BuiltinProc_simd_saturating_sub:
 	case BuiltinProc_simd_bit_and:
 	case BuiltinProc_simd_bit_or:
 	case BuiltinProc_simd_bit_xor:
@@ -501,8 +501,8 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 			Type *elem = base_array_type(x.type);
 
 			switch (id) {
-			case BuiltinProc_simd_add_sat:
-			case BuiltinProc_simd_sub_sat:
+			case BuiltinProc_simd_saturating_add:
+			case BuiltinProc_simd_saturating_sub:
 				if (!is_type_integer(elem)) {
 					gbString xs = type_to_string(x.type);
 					error(x.expr, "'%.*s' expected a #simd type with an integer element, got '%s'", LIT(builtin_name), xs);
@@ -663,6 +663,91 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 			return true;
 		}
 
+	case BuiltinProc_simd_gather:
+	case BuiltinProc_simd_scatter:
+	case BuiltinProc_simd_masked_load:
+	case BuiltinProc_simd_masked_store:
+	case BuiltinProc_simd_masked_expand_load:
+	case BuiltinProc_simd_masked_compress_store:
+		{
+			// gather (ptr: #simd[N]rawptr, values: #simd[N]T, mask: #simd[N]int_or_bool) -> #simd[N]T
+			// scatter(ptr: #simd[N]rawptr, values: #simd[N]T, mask: #simd[N]int_or_bool)
+
+			// masked_load (ptr: rawptr, values: #simd[N]T, mask: #simd[N]int_or_bool) -> #simd[N]T
+			// masked_store(ptr: rawptr, values: #simd[N]T, mask: #simd[N]int_or_bool)
+			// masked_expand_load (ptr: rawptr, values: #simd[N]T, mask: #simd[N]int_or_bool) -> #simd[N]T
+			// masked_compress_store(ptr: rawptr, values: #simd[N]T, mask: #simd[N]int_or_bool)
+
+			Operand ptr    = {};
+			Operand values = {};
+			Operand mask   = {};
+			check_expr(c, &ptr,    ce->args[0]); if (ptr.mode    == Addressing_Invalid) return false;
+			check_expr(c, &values, ce->args[1]); if (values.mode == Addressing_Invalid) return false;
+			check_expr(c, &mask,   ce->args[2]); if (mask.mode   == Addressing_Invalid) return false;
+			if (!is_type_simd_vector(values.type)) { error(values.expr, "'%.*s' expected a simd vector type", LIT(builtin_name)); return false; }
+			if (!is_type_simd_vector(mask.type))   { error(mask.expr,   "'%.*s' expected a simd vector type", LIT(builtin_name)); return false; }
+
+			if (id == BuiltinProc_simd_gather || id == BuiltinProc_simd_scatter) {
+				if (!is_type_simd_vector(ptr.type))    { error(ptr.expr,    "'%.*s' expected a simd vector type", LIT(builtin_name)); return false; }
+				Type *ptr_elem = base_array_type(ptr.type);
+				if (!is_type_rawptr(ptr_elem)) {
+					gbString s = type_to_string(ptr.type);
+					error(ptr.expr, "Expected a simd vector of 'rawptr' for the addresses, got %s", s);
+					gb_string_free(s);
+					return false;
+				}
+			} else {
+				if (!is_type_pointer(ptr.type)) {
+					gbString s = type_to_string(ptr.type);
+					error(ptr.expr, "Expected a pointer type for the address, got %s", s);
+					gb_string_free(s);
+					return false;
+				}
+			}
+			Type *mask_elem = base_array_type(mask.type);
+
+			if (!is_type_integer(mask_elem) && !is_type_boolean(mask_elem)) {
+				gbString s = type_to_string(mask.type);
+				error(mask.expr, "Expected a simd vector of integers or booleans for the mask, got %s", s);
+				gb_string_free(s);
+				return false;
+			}
+
+			if (id == BuiltinProc_simd_gather || id == BuiltinProc_simd_scatter) {
+				i64 ptr_count    = get_array_type_count(ptr.type);
+				i64 values_count = get_array_type_count(values.type);
+				i64 mask_count   = get_array_type_count(mask.type);
+				if (ptr_count != values_count ||
+				    values_count != mask_count ||
+				    mask_count != ptr_count) {
+					gbString s = type_to_string(mask.type);
+					error(mask.expr, "All simd vectors must be of the same length, got %lld vs %lld vs %lld", cast(long long)ptr_count, cast(long long)values_count, cast(long long)mask_count);
+					gb_string_free(s);
+					return false;
+				}
+			} else {
+				i64 values_count = get_array_type_count(values.type);
+				i64 mask_count   = get_array_type_count(mask.type);
+				if (values_count != mask_count) {
+					gbString s = type_to_string(mask.type);
+					error(mask.expr, "All simd vectors must be of the same length, got %lld vs %lld", cast(long long)values_count, cast(long long)mask_count);
+					gb_string_free(s);
+					return false;
+				}
+			}
+
+			if (id == BuiltinProc_simd_gather ||
+			    id == BuiltinProc_simd_masked_load ||
+			    id == BuiltinProc_simd_masked_expand_load) {
+				operand->mode = Addressing_Value;
+				operand->type = values.type;
+			} else {
+				operand->mode = Addressing_NoValue;
+				operand->type = nullptr;
+			}
+			return true;
+		}
+
 	case BuiltinProc_simd_extract:
 		{
 			Operand x = {};
@@ -772,6 +857,29 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 
 			operand->mode = Addressing_Value;
 			operand->type = base_array_type(x.type);
+			return true;
+		}
+
+	case BuiltinProc_simd_reduce_any:
+	case BuiltinProc_simd_reduce_all:
+		{
+			Operand x = {};
+			check_expr(c, &x, ce->args[0]); if (x.mode == Addressing_Invalid) return false;
+
+			if (!is_type_simd_vector(x.type)) {
+				error(x.expr, "'%.*s' expected a simd vector type", LIT(builtin_name));
+				return false;
+			}
+			Type *elem = base_array_type(x.type);
+			if (!is_type_boolean(elem)) {
+				gbString xs = type_to_string(x.type);
+				error(x.expr, "'%.*s' expected a #simd type with a boolean element, got '%s'", LIT(builtin_name), xs);
+				gb_string_free(xs);
+				return false;
+			}
+
+			operand->mode = Addressing_Value;
+			operand->type = t_untyped_bool;
 			return true;
 		}
 
@@ -2460,7 +2568,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			arg_count++;
 		}
 
-		if (arg_count > max_count) {
+		if (false && arg_count > max_count) {
 			error(call, "Too many 'swizzle' indices, %td > %td", arg_count, max_count);
 			return false;
 		} else if (arg_count < 2) {
@@ -4302,8 +4410,8 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		}
 		break;
 
-	case BuiltinProc_add_sat:
-	case BuiltinProc_sub_sat:
+	case BuiltinProc_saturating_add:
+	case BuiltinProc_saturating_sub:
 		{
 			Operand x = {};
 			Operand y = {};

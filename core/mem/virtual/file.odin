@@ -24,7 +24,7 @@ map_file :: proc{
 
 map_file_from_path :: proc(filename: string, flags: Map_File_Flags) -> (data: []byte, error: Map_File_Error) {
 	fd, err := os.open(filename, os.O_RDWR)
-	if err != 0 {
+	if err != nil {
 		return nil, .Open_Failure
 	}
 	defer os.close(fd)
@@ -34,7 +34,7 @@ map_file_from_path :: proc(filename: string, flags: Map_File_Flags) -> (data: []
 
 map_file_from_file_descriptor :: proc(fd: uintptr, flags: Map_File_Flags) -> (data: []byte, error: Map_File_Error) {
 	size, os_err := os.file_size(os.Handle(fd))
-	if os_err != 0 {
+	if os_err != nil {
 		return nil, .Stat_Failure
 	}
 	if size < 0 {

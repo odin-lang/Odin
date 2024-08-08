@@ -5,13 +5,15 @@ import "base:intrinsics"
 import "base:runtime"
 import "core:unicode/utf16"
 
+@(require_results)
 is_path_separator :: proc(c: byte) -> bool {
 	return c == '/' || c == '\\'
 }
 
-open :: proc(path: string, mode: int = O_RDONLY, perm: int = 0) -> (Handle, Errno) {
+@(require_results)
+open :: proc(path: string, mode: int = O_RDONLY, perm: int = 0) -> (Handle, Error) {
 	if len(path) == 0 {
-		return INVALID_HANDLE, ERROR_FILE_NOT_FOUND
+		return INVALID_HANDLE, General_Error.Not_Exist
 	}
 
 	access: u32
@@ -52,32 +54,31 @@ open :: proc(path: string, mode: int = O_RDONLY, perm: int = 0) -> (Handle, Errn
 	wide_path := win32.utf8_to_wstring(path)
 	handle := Handle(win32.CreateFileW(wide_path, access, share_mode, sa, create_mode, win32.FILE_ATTRIBUTE_NORMAL|win32.FILE_FLAG_BACKUP_SEMANTICS, nil))
 	if handle != INVALID_HANDLE {
-		return handle, ERROR_NONE
+		return handle, nil
 	}
 
-	err := Errno(win32.GetLastError())
-	return INVALID_HANDLE, err
+	return INVALID_HANDLE, get_last_error()
 }
 
-close :: proc(fd: Handle) -> Errno {
+close :: proc(fd: Handle) -> Error {
 	if !win32.CloseHandle(win32.HANDLE(fd)) {
-		return Errno(win32.GetLastError())
+		return get_last_error()
 	}
-	return ERROR_NONE
+	return nil
 }
 
-flush :: proc(fd: Handle) -> (err: Errno) {
+flush :: proc(fd: Handle) -> (err: Error) {
 	if !win32.FlushFileBuffers(win32.HANDLE(fd)) {
-		err = Errno(win32.GetLastError())
+		err = get_last_error()
 	}
 	return
 }
 
 
 
-write :: proc(fd: Handle, data: []byte) -> (int, Errno) {
+write :: proc(fd: Handle, data: []byte) -> (int, Error) {
 	if len(data) == 0 {
-		return 0, ERROR_NONE
+		return 0, nil
 	}
 
 	single_write_length: win32.DWORD
@@ -90,25 +91,24 @@ write :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 
 		e := win32.WriteFile(win32.HANDLE(fd), &data[total_write], to_write, &single_write_length, nil)
 		if single_write_length <= 0 || !e {
-			err := Errno(win32.GetLastError())
-			return int(total_write), err
+			return int(total_write), get_last_error()
 		}
 		total_write += i64(single_write_length)
 	}
-	return int(total_write), ERROR_NONE
+	return int(total_write), nil
 }
 
-@(private="file")
-read_console :: proc(handle: win32.HANDLE, b: []byte) -> (n: int, err: Errno) {
+@(private="file", require_results)
+read_console :: proc(handle: win32.HANDLE, b: []byte) -> (n: int, err: Error) {
 	if len(b) == 0 {
-		return 0, 0
+		return 0, nil
 	}
 	
 	BUF_SIZE :: 386
 	buf16: [BUF_SIZE]u16
 	buf8: [4*BUF_SIZE]u8
 
-	for n < len(b) && err == 0 {
+	for n < len(b) && err == nil {
 		min_read := max(len(b)/4, 1 if len(b) > 0 else 0)
 		max_read := u32(min(BUF_SIZE, min_read))
 		if max_read == 0 {
@@ -118,7 +118,7 @@ read_console :: proc(handle: win32.HANDLE, b: []byte) -> (n: int, err: Errno) {
 		single_read_length: u32
 		ok := win32.ReadConsoleW(handle, &buf16[0], max_read, &single_read_length, nil)
 		if !ok {
-			err = Errno(win32.GetLastError())
+			err = get_last_error()
 		}
 
 		buf8_len := utf16.decode_to_utf8(buf8[:], buf16[:single_read_length])
@@ -149,9 +149,9 @@ read_console :: proc(handle: win32.HANDLE, b: []byte) -> (n: int, err: Errno) {
 	return
 }
 
-read :: proc(fd: Handle, data: []byte) -> (total_read: int, err: Errno) {
+read :: proc(fd: Handle, data: []byte) -> (total_read: int, err: Error) {
 	if len(data) == 0 {
-		return 0, ERROR_NONE
+		return 0, nil
 	}
 	
 	handle := win32.HANDLE(fd)
@@ -165,7 +165,7 @@ read :: proc(fd: Handle, data: []byte) -> (total_read: int, err: Errno) {
 
 	if is_console {
 		total_read, err = read_console(handle, data[total_read:][:to_read])
-		if err != 0 {
+		if err != nil {
 			return total_read, err
 		}
 	} else {
@@ -175,18 +175,18 @@ read :: proc(fd: Handle, data: []byte) -> (total_read: int, err: Errno) {
 			// Successful read can mean two things, including EOF, see:
 			// https://learn.microsoft.com/en-us/windows/win32/fileio/testing-for-the-end-of-a-file
 			if bytes_read == 0 {
-				return 0, ERROR_HANDLE_EOF
+				return 0, .EOF
 			} else {
-				return int(bytes_read), ERROR_NONE
+				return int(bytes_read), nil
 			}
 		} else {
-			return 0, Errno(win32.GetLastError())
+			return 0, get_last_error()
 		}
 	}
-	return total_read, ERROR_NONE
+	return total_read, nil
 }
 
-seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
+seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Error) {
 	w: u32
 	switch whence {
 	case 0: w = win32.FILE_BEGIN
@@ -197,22 +197,23 @@ seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
 	lo := i32(offset)
 	ft := win32.GetFileType(win32.HANDLE(fd))
 	if ft == win32.FILE_TYPE_PIPE {
-		return 0, ERROR_FILE_IS_PIPE
+		return 0, .File_Is_Pipe
 	}
 
 	dw_ptr := win32.SetFilePointer(win32.HANDLE(fd), lo, &hi, w)
 	if dw_ptr == win32.INVALID_SET_FILE_POINTER {
-		err := Errno(win32.GetLastError())
+		err := get_last_error()
 		return 0, err
 	}
-	return i64(hi)<<32 + i64(dw_ptr), ERROR_NONE
+	return i64(hi)<<32 + i64(dw_ptr), nil
 }
 
-file_size :: proc(fd: Handle) -> (i64, Errno) {
+@(require_results)
+file_size :: proc(fd: Handle) -> (i64, Error) {
 	length: win32.LARGE_INTEGER
-	err: Errno
+	err: Error
 	if !win32.GetFileSizeEx(win32.HANDLE(fd), &length) {
-		err = Errno(win32.GetLastError())
+		err = get_last_error()
 	}
 	return i64(length), err
 }
@@ -220,10 +221,9 @@ file_size :: proc(fd: Handle) -> (i64, Errno) {
 
 @(private)
 MAX_RW :: 1<<30
-ERROR_EOF :: 38
 
 @(private)
-pread :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Errno) {
+pread :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Error) {
 	buf := data
 	if len(buf) > MAX_RW {
 		buf = buf[:MAX_RW]
@@ -239,15 +239,15 @@ pread :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Errno) {
 
 	h := win32.HANDLE(fd)
 	done: win32.DWORD
-	e: Errno
+	e: Error
 	if !win32.ReadFile(h, raw_data(buf), u32(len(buf)), &done, &o) {
-		e = Errno(win32.GetLastError())
+		e = get_last_error()
 		done = 0
 	}
 	return int(done), e
 }
 @(private)
-pwrite :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Errno) {
+pwrite :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Error) {
 	buf := data
 	if len(buf) > MAX_RW {
 		buf = buf[:MAX_RW]
@@ -261,9 +261,9 @@ pwrite :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Errno) {
 
 	h := win32.HANDLE(fd)
 	done: win32.DWORD
-	e: Errno
+	e: Error
 	if !win32.WriteFile(h, raw_data(buf), u32(len(buf)), &done, &o) {
-		e = Errno(win32.GetLastError())
+		e = get_last_error()
 		done = 0
 	}
 	return int(done), e
@@ -279,19 +279,19 @@ on Windows, read_at changes the position of the file cursor, on *nix, it does no
 
 will read from the location twice on *nix, and from two different locations on Windows
 */
-read_at :: proc(fd: Handle, data: []byte, offset: i64) -> (n: int, err: Errno) {
+read_at :: proc(fd: Handle, data: []byte, offset: i64) -> (n: int, err: Error) {
 	if offset < 0 {
-		return 0, ERROR_NEGATIVE_OFFSET
+		return 0, .Invalid_Offset
 	}
 
 	b, offset := data, offset
 	for len(b) > 0 {
 		m, e := pread(fd, b, offset)
 		if e == ERROR_EOF {
-			err = 0
+			err = nil
 			break
 		}
-		if e != 0 {
+		if e != nil {
 			err = e
 			break
 		}
@@ -311,18 +311,14 @@ on Windows, write_at changes the position of the file cursor, on *nix, it does n
 
 will write to the location twice on *nix, and to two different locations on Windows
 */
-write_at :: proc(fd: Handle, data: []byte, offset: i64) -> (n: int, err: Errno) {
+write_at :: proc(fd: Handle, data: []byte, offset: i64) -> (n: int, err: Error) {
 	if offset < 0 {
-		return 0, ERROR_NEGATIVE_OFFSET
+		return 0, .Invalid_Offset
 	}
 
 	b, offset := data, offset
 	for len(b) > 0 {
-		m, e := pwrite(fd, b, offset)
-		if e != 0 {
-			err = e
-			break
-		}
+		m := pwrite(fd, b, offset) or_return
 		n += m
 		b = b[m:]
 		offset += i64(m)
@@ -338,6 +334,7 @@ stdout := get_std_handle(uint(win32.STD_OUTPUT_HANDLE))
 stderr := get_std_handle(uint(win32.STD_ERROR_HANDLE))
 
 
+@(require_results)
 get_std_handle :: proc "contextless" (h: uint) -> Handle {
 	fd := win32.GetStdHandle(win32.DWORD(h))
 	return Handle(fd)
@@ -352,6 +349,7 @@ exists :: proc(path: string) -> bool {
 	return attribs != win32.INVALID_FILE_ATTRIBUTES
 }
 
+@(require_results)
 is_file :: proc(path: string) -> bool {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	wpath := win32.utf8_to_wstring(path, context.temp_allocator)
@@ -363,6 +361,7 @@ is_file :: proc(path: string) -> bool {
 	return false
 }
 
+@(require_results)
 is_dir :: proc(path: string) -> bool {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	wpath := win32.utf8_to_wstring(path, context.temp_allocator)
@@ -377,13 +376,14 @@ is_dir :: proc(path: string) -> bool {
 // NOTE(tetra): GetCurrentDirectory is not thread safe with SetCurrentDirectory and GetFullPathName
 @private cwd_lock := win32.SRWLOCK{} // zero is initialized
 
+@(require_results)
 get_current_directory :: proc(allocator := context.allocator) -> string {
 	win32.AcquireSRWLockExclusive(&cwd_lock)
 
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD(ignore = context.temp_allocator == allocator)
 
 	sz_utf16 := win32.GetCurrentDirectoryW(0, nil)
-	dir_buf_wstr := make([]u16, sz_utf16, context.temp_allocator) // the first time, it _includes_ the NUL.
+	dir_buf_wstr, _ := make([]u16, sz_utf16, context.temp_allocator) // the first time, it _includes_ the NUL.
 
 	sz_utf16 = win32.GetCurrentDirectoryW(win32.DWORD(len(dir_buf_wstr)), raw_data(dir_buf_wstr))
 	assert(int(sz_utf16)+1 == len(dir_buf_wstr)) // the second time, it _excludes_ the NUL.
@@ -393,14 +393,14 @@ get_current_directory :: proc(allocator := context.allocator) -> string {
 	return win32.utf16_to_utf8(dir_buf_wstr, allocator) or_else ""
 }
 
-set_current_directory :: proc(path: string) -> (err: Errno) {
+set_current_directory :: proc(path: string) -> (err: Error) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	wstr := win32.utf8_to_wstring(path, context.temp_allocator)
 
 	win32.AcquireSRWLockExclusive(&cwd_lock)
 
 	if !win32.SetCurrentDirectoryW(wstr) {
-		err = Errno(win32.GetLastError())
+		err = get_last_error()
 	}
 
 	win32.ReleaseSRWLockExclusive(&cwd_lock)
@@ -409,31 +409,31 @@ set_current_directory :: proc(path: string) -> (err: Errno) {
 }
 change_directory :: set_current_directory
 
-make_directory :: proc(path: string, mode: u32 = 0) -> (err: Errno) {
+make_directory :: proc(path: string, mode: u32 = 0) -> (err: Error) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	// Mode is unused on Windows, but is needed on *nix
 	wpath := win32.utf8_to_wstring(path, context.temp_allocator)
 
 	if !win32.CreateDirectoryW(wpath, nil) {
-		err = Errno(win32.GetLastError())
+		err = get_last_error()
 	}
 	return
 }
 
 
-remove_directory :: proc(path: string) -> (err: Errno) {
+remove_directory :: proc(path: string) -> (err: Error) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	wpath := win32.utf8_to_wstring(path, context.temp_allocator)
 
 	if !win32.RemoveDirectoryW(wpath) {
-		err = Errno(win32.GetLastError())
+		err = get_last_error()
 	}
 	return
 }
 
 
 
-@(private)
+@(private, require_results)
 is_abs :: proc(path: string) -> bool {
 	if len(path) > 0 && path[0] == '/' {
 		return true
@@ -449,7 +449,7 @@ is_abs :: proc(path: string) -> bool {
 	return false
 }
 
-@(private)
+@(private, require_results)
 fix_long_path :: proc(path: string) -> string {
 	if len(path) < 248 {
 		return path
@@ -464,7 +464,7 @@ fix_long_path :: proc(path: string) -> string {
 
 	prefix :: `\\?`
 
-	path_buf := make([]byte, len(prefix)+len(path)+len(`\`), context.temp_allocator)
+	path_buf, _ := make([]byte, len(prefix)+len(path)+len(`\`), context.temp_allocator)
 	copy(path_buf, prefix)
 	n := len(path)
 	r, w := 0, len(prefix)
@@ -494,80 +494,69 @@ fix_long_path :: proc(path: string) -> string {
 }
 
 
-link :: proc(old_name, new_name: string) -> (err: Errno) {
+link :: proc(old_name, new_name: string) -> (err: Error) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	n := win32.utf8_to_wstring(fix_long_path(new_name))
 	o := win32.utf8_to_wstring(fix_long_path(old_name))
-	return Errno(win32.CreateHardLinkW(n, o, nil))
+	return Platform_Error(win32.CreateHardLinkW(n, o, nil))
 }
 
-unlink :: proc(path: string) -> (err: Errno) {
+unlink :: proc(path: string) -> (err: Error) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	wpath := win32.utf8_to_wstring(path, context.temp_allocator)
 
 	if !win32.DeleteFileW(wpath) {
-		err = Errno(win32.GetLastError())
+		err = get_last_error()
 	}
 	return
 }
 
 
 
-rename :: proc(old_path, new_path: string) -> (err: Errno) {
+rename :: proc(old_path, new_path: string) -> (err: Error) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	from := win32.utf8_to_wstring(old_path, context.temp_allocator)
 	to := win32.utf8_to_wstring(new_path, context.temp_allocator)
 
 	if !win32.MoveFileExW(from, to, win32.MOVEFILE_REPLACE_EXISTING) {
-		err = Errno(win32.GetLastError())
+		err = get_last_error()
 	}
 	return
 }
 
 
-ftruncate :: proc(fd: Handle, length: i64) -> (err: Errno) {
-	curr_off, e := seek(fd, 0, 1)
-	if e != 0 {
-		return e
-	}
+ftruncate :: proc(fd: Handle, length: i64) -> (err: Error) {
+	curr_off := seek(fd, 0, 1) or_return
 	defer seek(fd, curr_off, 0)
-	_, e = seek(fd, length, 0)
-	if e != 0 {
-		return e
-	}
+	_= seek(fd, length, 0) or_return
 	ok := win32.SetEndOfFile(win32.HANDLE(fd))
 	if !ok {
-		return Errno(win32.GetLastError())
+		return get_last_error()
 	}
-	return ERROR_NONE
+	return nil
 }
 
-truncate :: proc(path: string, length: i64) -> (err: Errno) {
-	fd: Handle
-	fd, err = open(path, O_WRONLY|O_CREATE, 0o666)
-	if err != 0 {
-		return
-	}
+truncate :: proc(path: string, length: i64) -> (err: Error) {
+	fd := open(path, O_WRONLY|O_CREATE, 0o666) or_return
 	defer close(fd)
-	err = ftruncate(fd, length)
-	return
+	return ftruncate(fd, length)
 }
 
 
-remove :: proc(name: string) -> Errno {
+remove :: proc(name: string) -> Error {
 	p := win32.utf8_to_wstring(fix_long_path(name))
 	err, err1: win32.DWORD
 	if !win32.DeleteFileW(p) {
 		err = win32.GetLastError()
 	}
 	if err == 0 {
-		return 0
+		return nil
 	}
 	if !win32.RemoveDirectoryW(p) {
 		err1 = win32.GetLastError()
 	}
 	if err1 == 0 {
-		return 0
+		return nil
 	}
 
 	if err != err1 {
@@ -588,16 +577,17 @@ remove :: proc(name: string) -> Errno {
 		}
 	}
 
-	return Errno(err)
+	return Platform_Error(err)
 }
 
 
-pipe :: proc() -> (r, w: Handle, err: Errno) {
+@(require_results)
+pipe :: proc() -> (r, w: Handle, err: Error) {
 	sa: win32.SECURITY_ATTRIBUTES
 	sa.nLength = size_of(win32.SECURITY_ATTRIBUTES)
 	sa.bInheritHandle = true
 	if !win32.CreatePipe((^win32.HANDLE)(&r), (^win32.HANDLE)(&w), &sa, 0) {
-		err = Errno(win32.GetLastError())
+		err = get_last_error()
 	}
 	return
 }

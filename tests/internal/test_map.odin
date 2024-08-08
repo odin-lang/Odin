@@ -317,3 +317,23 @@ set_delete_random_key_value :: proc(t: ^testing.T) {
 		seed_incr += 1
 	}
 }
+
+@test
+test_union_key_should_not_be_hashing_specifc_variant :: proc(t: ^testing.T) {
+	Vec2 :: [2]f32
+	BoneId :: distinct int
+	VertexId :: distinct int
+	Id :: union {
+		BoneId,
+		VertexId,
+	}
+
+	m: map[Id]Vec2
+	defer delete(m)
+
+	bone_1: BoneId = 69
+	m[bone_1] = {4, 20}
+
+	testing.expect_value(t, bone_1 in m, true)
+	testing.expect_value(t, Id(bone_1) in m, true)
+}

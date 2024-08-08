@@ -247,7 +247,7 @@ BufferDataSlice :: proc "contextless" (target: Enum, slice: $S/[]$E, usage: Enum
 	BufferData(target, len(slice)*size_of(E), raw_data(slice), usage)
 }
 BufferSubDataSlice :: proc "contextless" (target: Enum, offset: uintptr, slice: $S/[]$E) {
-	BufferSubData(target, offset, len(slice)*size_of(E), raw_data(slice), usage)
+	BufferSubData(target, offset, len(slice)*size_of(E), raw_data(slice))
 }
 
 CompressedTexImage2DSlice :: proc "contextless" (target: Enum, level: i32, internalformat: Enum, width, height: i32, border: i32, slice: $S/[]$E) {

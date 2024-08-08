@@ -14,7 +14,7 @@ import "core:slice"
 // The sole exception is if 'skip_dir' is returned as true:
 // 	when 'skip_dir' is invoked on a directory. 'walk' skips directory contents
 // 	when 'skip_dir' is invoked on a non-directory. 'walk' skips the remaining files in the containing directory
-Walk_Proc :: #type proc(info: os.File_Info, in_err: os.Errno, user_data: rawptr) -> (err: os.Errno, skip_dir: bool)
+Walk_Proc :: #type proc(info: os.File_Info, in_err: os.Error, user_data: rawptr) -> (err: os.Error, skip_dir: bool)
 
 // walk walks the file tree rooted at 'root', calling 'walk_proc' for each file or directory in the tree, including 'root'
 // All errors that happen visiting files and directories are filtered by walk_proc
@@ -22,44 +22,44 @@ Walk_Proc :: #type proc(info: os.File_Info, in_err: os.Errno, user_data: rawptr)
 // NOTE: Walking large directories can be inefficient due to the lexical sort
 // NOTE: walk does not follow symbolic links
 // NOTE: os.File_Info uses the 'context.temp_allocator' to allocate, and will delete when it is done
-walk :: proc(root: string, walk_proc: Walk_Proc, user_data: rawptr) -> os.Errno {
+walk :: proc(root: string, walk_proc: Walk_Proc, user_data: rawptr) -> os.Error {
 	info, err := os.lstat(root, context.temp_allocator)
 	defer os.file_info_delete(info, context.temp_allocator)
 
 	skip_dir: bool
-	if err != 0 {
+	if err != nil {
 		err, skip_dir = walk_proc(info, err, user_data)
 	} else {
 		err, skip_dir = _walk(info, walk_proc, user_data)
 	}
-	return 0 if skip_dir else err
+	return nil if skip_dir else err
 }
 
 
 @(private)
-_walk :: proc(info: os.File_Info, walk_proc: Walk_Proc, user_data: rawptr) -> (err: os.Errno, skip_dir: bool) {
+_walk :: proc(info: os.File_Info, walk_proc: Walk_Proc, user_data: rawptr) -> (err: os.Error, skip_dir: bool) {
 	if !info.is_dir {
 		if info.fullpath == "" && info.name == "" {
 			// ignore empty things
 			return
 		}
-		return walk_proc(info, 0, user_data)
+		return walk_proc(info, nil, user_data)
 	}
 
 	fis: []os.File_Info
-	err1: os.Errno
+	err1: os.Error
 	fis, err = read_dir(info.fullpath, context.temp_allocator)
 	defer os.file_info_slice_delete(fis, context.temp_allocator)
 
 	err1, skip_dir = walk_proc(info, err, user_data)
-	if err != 0 || err1 != 0 || skip_dir {
+	if err != nil || err1 != nil || skip_dir {
 		err = err1
 		return
 	}
 
 	for fi in fis {
 		err, skip_dir = _walk(fi, walk_proc, user_data)
-		if err != 0 || skip_dir {
+		if err != nil || skip_dir {
 			if !fi.is_dir || !skip_dir {
 				return
 			}
@@ -70,19 +70,12 @@ _walk :: proc(info: os.File_Info, walk_proc: Walk_Proc, user_data: rawptr) -> (e
 }
 
 @(private)
-read_dir :: proc(dir_name: string, allocator := context.temp_allocator) -> ([]os.File_Info, os.Errno) {
-	f, err := os.open(dir_name, os.O_RDONLY)
-	if err != 0 {
-		return nil, err
-	}
-	fis: []os.File_Info
-	fis, err = os.read_dir(f, -1, allocator)
-	os.close(f)
-	if err != 0 {
-		return nil, err
-	}
+read_dir :: proc(dir_name: string, allocator := context.temp_allocator) -> (fis: []os.File_Info, err: os.Error) {
+	f := os.open(dir_name, os.O_RDONLY) or_return
+	defer os.close(f)
+	fis = os.read_dir(f, -1, allocator) or_return
 	slice.sort_by(fis, proc(a, b: os.File_Info) -> bool {
 		return a.name < b.name
 	})
-	return fis, 0
+	return
 }

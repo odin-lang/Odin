@@ -2,7 +2,6 @@
 package sync
 
 import "core:c"
-import "base:runtime"
 import "core:sys/haiku"
 import "core:sys/unix"
 import "core:time"
@@ -86,10 +85,10 @@ _futex_wait :: proc "contextless" (f: ^Futex, expect: u32) -> (ok: bool) {
 	waiter.prev.next = waiter.next
 	waiter.next.prev = waiter.prev
 
- 	unix.pthread_sigmask(haiku.SIG_SETMASK, &old_mask, nil)
+	_ = unix.pthread_sigmask(haiku.SIG_SETMASK, &old_mask, nil)
 
  	// FIXME: Add error handling!
- 	return
+	return
 }
 
 _futex_wait_with_timeout :: proc "contextless" (f: ^Futex, expect: u32, duration: time.Duration) -> (ok: bool) {
@@ -133,10 +132,10 @@ _futex_wait_with_timeout :: proc "contextless" (f: ^Futex, expect: u32, duration
 	waiter.prev.next = waiter.next
 	waiter.next.prev = waiter.prev
 
- 	unix.pthread_sigmask(haiku.SIG_SETMASK, &old_mask, nil)
+	unix.pthread_sigmask(haiku.SIG_SETMASK, &old_mask, nil)
 
- 	// FIXME: Add error handling!
- 	return 
+	// FIXME: Add error handling!
+	return
 }
 
 _futex_signal :: proc "contextless" (f: ^Futex) {

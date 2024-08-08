@@ -10,21 +10,12 @@ import "core:sys/linux"
 MAX_RW :: 0x7fffffff
 
 @(no_instrumentation)
-_write :: proc "contextless" (fd: os.Handle, data: []byte) -> (n: int, err: os.Errno) #no_bounds_check /* bounds check would segfault instrumentation */ {
-	if len(data) == 0 {
-		return 0, os.ERROR_NONE
-	}
-	
+_write :: proc "contextless" (fd: os.Handle, data: []byte) -> (n: int, err: os.Error) #no_bounds_check /* bounds check would segfault instrumentation */ {
 	for n < len(data) {
 		chunk := data[:min(len(data), MAX_RW)]
-		written, errno := linux.write(linux.Fd(fd), chunk)
-		if errno != .NONE {
-			return n, os.Errno(errno)
-		}
-		n += written
+		n += linux.write(linux.Fd(fd), chunk) or_return
 	}
-
-	return n, os.ERROR_NONE
+	return
 }
 
 CLOCK_MONOTONIC_RAW :: 4 // NOTE(tetra): "RAW" means: Not adjusted by NTP.

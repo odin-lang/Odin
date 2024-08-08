@@ -2028,7 +2028,11 @@ gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 			} else if (is_type_integer(src_elem) && is_type_boolean(dst_elem)) {
 				LLVMValueRef i1vector = LLVMBuildICmp(p->builder, LLVMIntNE, value.value, LLVMConstNull(LLVMTypeOf(value.value)), "");
 				res.value = LLVMBuildIntCast2(p->builder, i1vector, lb_type(m, t), !is_type_unsigned(src_elem), "");
-			} else {
+			} else if (is_type_pointer(src_elem) && is_type_integer(dst_elem)) {
+				res.value = LLVMBuildPtrToInt(p->builder, value.value, lb_type(m, t), "");
+			} else if (is_type_integer(src_elem) && is_type_pointer(dst_elem)) {
+				res.value = LLVMBuildIntToPtr(p->builder, value.value, lb_type(m, t), "");
+			}else {
 				GB_PANIC("Unhandled simd vector conversion: %s -> %s", type_to_string(src), type_to_string(dst));
 			}
 			return res;
@@ -2524,9 +2528,16 @@ gb_internal lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left
 	if (are_types_identical(a, b)) {
 		// NOTE(bill): No need for a conversion
 	} else if (lb_is_const(left) || lb_is_const_nil(left)) {
+		if (lb_is_const_nil(left)) {
+			return lb_emit_comp_against_nil(p, op_kind, right);
+		}
 		left = lb_emit_conv(p, left, right.type);
 	} else if (lb_is_const(right) || lb_is_const_nil(right)) {
+		if (lb_is_const_nil(right)) {
+			return lb_emit_comp_against_nil(p, op_kind, left);
+		}
 		right = lb_emit_conv(p, right, left.type);
+
 	} else {
 		Type *lt = left.type;
 		Type *rt = right.type;
@@ -3807,7 +3818,7 @@ gb_internal lbAddr lb_build_array_swizzle_addr(lbProcedure *p, AstCallExpr *ce, 
 	Type *type = base_type(lb_addr_type(addr));
 	GB_ASSERT(type->kind == Type_Array);
 	i64 count = type->Array.count;
-	if (count <= 4) {
+	if (count <= 4 && index_count <= 4) {
 		u8 indices[4] = {};
 		u8 index_count = 0;
 		for (i32 i = 1; i < ce->args.count; i++) {

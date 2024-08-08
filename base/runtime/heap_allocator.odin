@@ -19,12 +19,15 @@ heap_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 	// the pointer we return to the user.
 	//
 
-	aligned_alloc :: proc(size, alignment: int, old_ptr: rawptr = nil, zero_memory := true) -> ([]byte, Allocator_Error) {
+	aligned_alloc :: proc(size, alignment: int, old_ptr: rawptr, old_size: int, zero_memory := true) -> ([]byte, Allocator_Error) {
 		a := max(alignment, align_of(rawptr))
 		space := size + a - 1
 
 		allocated_mem: rawptr
-		if old_ptr != nil {
+
+		force_copy := old_ptr != nil && a > align_of(rawptr)
+
+		if !force_copy && old_ptr != nil {
 			original_old_ptr := ([^]rawptr)(old_ptr)[-1]
 			allocated_mem = heap_resize(original_old_ptr, space+size_of(rawptr))
 		} else {
@@ -36,11 +39,18 @@ heap_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 		aligned_ptr := (ptr - 1 + uintptr(a)) & -uintptr(a)
 		diff := int(aligned_ptr - ptr)
 		if (size + diff) > space || allocated_mem == nil {
+			aligned_free(old_ptr)
+			aligned_free(allocated_mem)
 			return nil, .Out_Of_Memory
 		}
 
 		aligned_mem = rawptr(aligned_ptr)
 		([^]rawptr)(aligned_mem)[-1] = allocated_mem
+
+		if force_copy {
+			mem_copy_non_overlapping(aligned_mem, old_ptr, old_size)
+			aligned_free(old_ptr)
+		}
 
 		return byte_slice(aligned_mem, size), nil
 	}
@@ -53,10 +63,10 @@ heap_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 
 	aligned_resize :: proc(p: rawptr, old_size: int, new_size: int, new_alignment: int, zero_memory := true) -> (new_memory: []byte, err: Allocator_Error) {
 		if p == nil {
-			return nil, nil
+			return aligned_alloc(new_size, new_alignment, nil, old_size, zero_memory)
 		}
 
-		new_memory = aligned_alloc(new_size, new_alignment, p, zero_memory) or_return
+		new_memory = aligned_alloc(new_size, new_alignment, p, old_size, zero_memory) or_return
 
 		// NOTE: heap_resize does not zero the new memory, so we do it
 		if zero_memory && new_size > old_size {
@@ -68,7 +78,7 @@ heap_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 
 	switch mode {
 	case .Alloc, .Alloc_Non_Zeroed:
-		return aligned_alloc(size, alignment, nil, mode == .Alloc)
+		return aligned_alloc(size, alignment, nil, 0, mode == .Alloc)
 
 	case .Free:
 		aligned_free(old_memory)
@@ -77,9 +87,6 @@ heap_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 		return nil, .Mode_Not_Implemented
 
 	case .Resize, .Resize_Non_Zeroed:
-		if old_memory == nil {
-			return aligned_alloc(size, alignment, nil, mode == .Resize)
-		}
 		return aligned_resize(old_memory, old_size, size, alignment, mode == .Resize)
 
 	case .Query_Features:

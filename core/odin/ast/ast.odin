@@ -757,7 +757,7 @@ Array_Type :: struct {
 	using node: Expr,
 	open:  tokenizer.Pos,
 	tag:   ^Expr,
-	len:   ^Expr, // Ellipsis node for [?]T array types, nil for slice types
+	len:   ^Expr, // Unary_Expr node for [?]T array types, nil for slice types
 	close: tokenizer.Pos,
 	elem:  ^Expr,
 }

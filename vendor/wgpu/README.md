@@ -37,12 +37,19 @@ The bindings work on both `-target:js_wasm32` and `-target:js_wasm64p32`.
 ## GLFW Glue
 
 There is an inner package `glfwglue` that can be used to glue together WGPU and GLFW.
-It exports one procedure `GetSurface(wgpu.Instance, glfw.WindowHandle) -> glfw.Surface`.
+It exports one procedure `GetSurface(wgpu.Instance, glfw.WindowHandle) -> wgpu.Surface`.
 The procedure will call the needed target specific procedures and return a surface configured
 for the given window.
 
 Do note that wgpu does not require GLFW, you can use native windows or another windowing library too.
 For that you can take inspiration from `glfwglue` on glueing them together.
+
+## SDL2 Glue
+
+There is an inner package `sdl2glue` that can be used to glue together WGPU and SDL2.
+It exports one procedure `GetSurface(wgpu.Instance, ^sdl2.Window) -> wgpu.Surface`.
+The procedure will call the needed target specific procedures and return a surface configured
+for the given window.
 
 ### Wayland
 

@@ -30,8 +30,10 @@ HICON :: distinct HANDLE
 HCURSOR :: distinct HANDLE
 HMENU :: distinct HANDLE
 HBRUSH :: distinct HANDLE
+HPEN :: distinct HANDLE
 HGDIOBJ :: distinct HANDLE
 HBITMAP :: distinct HANDLE
+HPALETTE :: distinct HANDLE
 HGLOBAL :: distinct HANDLE
 HHOOK :: distinct HANDLE
 HWINEVENTHOOK :: distinct HANDLE
@@ -39,6 +41,9 @@ HKEY :: distinct HANDLE
 HDESK :: distinct HANDLE
 HFONT :: distinct HANDLE
 HRGN :: distinct HANDLE
+HRSRC :: distinct HANDLE
+HWINSTA :: distinct HANDLE
+HACCEL :: distinct HANDLE
 BOOL :: distinct b32
 BYTE :: distinct u8
 BOOLEAN :: distinct b8
@@ -139,11 +144,14 @@ LPSTR :: ^CHAR
 LPWSTR :: ^WCHAR
 OLECHAR :: WCHAR
 LPOLESTR :: ^OLECHAR
+LPCOLESTR :: LPCSTR
 LPFILETIME :: ^FILETIME
 LPWSABUF :: ^WSABUF
 LPWSAOVERLAPPED :: distinct rawptr
 LPWSAOVERLAPPED_COMPLETION_ROUTINE :: distinct rawptr
 LPCVOID :: rawptr
+SCODE :: LONG
+PSCODE :: ^SCODE
 
 PACCESS_TOKEN :: PVOID
 PSECURITY_DESCRIPTOR :: PVOID
@@ -699,6 +707,92 @@ FW_BLACK      :: FW_HEAVY
 
 PTIMERAPCROUTINE :: #type proc "system" (lpArgToCompletionRoutine: LPVOID, dwTimerLowValue, dwTimerHighValue: DWORD)
 
+// Character Sets
+ANSI_CHARSET        :: 0
+DEFAULT_CHARSET     :: 1
+SYMBOL_CHARSET      :: 2
+SHIFTJIS_CHARSET    :: 128
+HANGEUL_CHARSET     :: 129
+HANGUL_CHARSET      :: 129
+GB2312_CHARSET      :: 134
+CHINESEBIG5_CHARSET :: 136
+OEM_CHARSET         :: 255
+JOHAB_CHARSET       :: 130
+HEBREW_CHARSET      :: 177
+ARABIC_CHARSET      :: 178
+GREEK_CHARSET       :: 161
+TURKISH_CHARSET     :: 162
+VIETNAMESE_CHARSET  :: 163
+THAI_CHARSET        :: 222
+EASTEUROPE_CHARSET  :: 238
+RUSSIAN_CHARSET     :: 204
+MAC_CHARSET         :: 77
+BALTIC_CHARSET      :: 186
+
+// Font Signature Bitmaps
+FS_LATIN1      :: 0x00000001
+FS_LATIN2      :: 0x00000002
+FS_CYRILLIC    :: 0x00000004
+FS_GREEK       :: 0x00000008
+FS_TURKISH     :: 0x00000010
+FS_HEBREW      :: 0x00000020
+FS_ARABIC      :: 0x00000040
+FS_BALTIC      :: 0x00000080
+FS_VIETNAMESE  :: 0x00000100
+FS_THAI        :: 0x00010000
+FS_JISJAPAN    :: 0x00020000
+FS_CHINESESIMP :: 0x00040000
+FS_WANSUNG     :: 0x00080000
+FS_CHINESETRAD :: 0x00100000
+FS_JOHAB       :: 0x00200000
+FS_SYMBOL      :: 0x80000000
+
+// Output Precisions
+OUT_DEFAULT_PRECIS        :: 0
+OUT_STRING_PRECIS         :: 1
+OUT_CHARACTER_PRECIS      :: 2
+OUT_STROKE_PRECIS         :: 3
+OUT_TT_PRECIS             :: 4
+OUT_DEVICE_PRECIS         :: 5
+OUT_RASTER_PRECIS         :: 6
+OUT_TT_ONLY_PRECIS        :: 7
+OUT_OUTLINE_PRECIS        :: 8
+OUT_SCREEN_OUTLINE_PRECIS :: 9
+OUT_PS_ONLY_PRECIS        :: 10
+
+// Clipping Precisions
+CLIP_DEFAULT_PRECIS   :: 0
+CLIP_CHARACTER_PRECIS :: 1
+CLIP_STROKE_PRECIS    :: 2
+CLIP_MASK             :: 0xf
+CLIP_LH_ANGLES        :: 1 << 4
+CLIP_TT_ALWAYS        :: 2 << 4
+CLIP_DFA_DISABLE      :: 4 << 4
+CLIP_EMBEDDED         :: 8 << 4
+
+// Output Qualities
+DEFAULT_QUALITY           :: 0
+DRAFT_QUALITY             :: 1
+PROOF_QUALITY             :: 2
+NONANTIALIASED_QUALITY    :: 3
+ANTIALIASED_QUALITY       :: 4
+CLEARTYPE_QUALITY         :: 5
+CLEARTYPE_NATURAL_QUALITY :: 6
+
+// Font Pitches
+DEFAULT_PITCH  :: 0
+FIXED_PITCH    :: 1
+VARIABLE_PITCH :: 2
+MONO_FONT      :: 8
+
+// Font Families
+FF_DONTCARE   :: 0 << 4
+FF_ROMAN      :: 1 << 4
+FF_SWISS      :: 2 << 4
+FF_MODERN     :: 3 << 4
+FF_SCRIPT     :: 4 << 4
+FF_DECORATIVE :: 5 << 4
+
 TIMERPROC :: #type proc "system" (HWND, UINT, UINT_PTR, DWORD)
 
 WNDPROC :: #type proc "system" (HWND, UINT, WPARAM, LPARAM) -> LRESULT
@@ -932,6 +1026,16 @@ MF_RIGHTJUSTIFY :: 0x00004000
 MF_MOUSESELECT :: 0x00008000
 MF_END :: 0x00000080  // Obsolete -- only used by old RES files
 
+// Menu flags for Add/Check/EnableMenuItem()
+MFS_GRAYED    :: 0x00000003
+MFS_DISABLED  :: MFS_GRAYED
+MFS_CHECKED   :: MF_CHECKED
+MFS_HILITE    :: MF_HILITE
+MFS_ENABLED   :: MF_ENABLED
+MFS_UNCHECKED :: MF_UNCHECKED
+MFS_UNHILITE  :: MF_UNHILITE
+MFS_DEFAULT   :: MF_DEFAULT
+
 // Flags for TrackPopupMenu
 TPM_LEFTBUTTON :: 0x0000
 TPM_RIGHTBUTTON :: 0x0002
@@ -1037,9 +1141,6 @@ WIN32_FIND_DATAW :: struct {
 	dwReserved1:        DWORD,
 	cFileName:          [MAX_PATH]WCHAR,
 	cAlternateFileName: [14]WCHAR,
-	_OBSOLETE_dwFileType:    DWORD, // Obsolete. Do not use.
-	_OBSOLETE_dwCreatorType: DWORD, // Obsolete. Do not use
-	_OBSOLETE_wFinderFlags:  WORD,  // Obsolete. Do not use
 }
 
 FILE_ID_128 :: struct {
@@ -2207,6 +2308,14 @@ CP_SYMBOL     :: 42    // SYMBOL translations
 CP_UTF7       :: 65000 // UTF-7 translation
 CP_UTF8       :: 65001 // UTF-8 translation
 
+LCID :: DWORD
+LANGID :: WORD
+
+LANG_NEUTRAL :: 0x00
+LANG_INVARIANT :: 0x7f
+SUBLANG_NEUTRAL :: 0x00 // language neutral
+SUBLANG_DEFAULT :: 0x01 // user default
+
 MB_ERR_INVALID_CHARS :: 8
 WC_ERR_INVALID_CHARS :: 128
 
@@ -2422,8 +2531,10 @@ REFIID  :: ^GUID
 
 REFGUID :: GUID
 IID :: GUID
+LPIID :: ^IID
 CLSID :: GUID
 REFCLSID :: ^CLSID
+LPCLSID :: ^CLSID
 
 CLSCTX_INPROC_SERVER                  :: 0x1
 CLSCTX_INPROC_HANDLER                 :: 0x2
@@ -2453,6 +2564,7 @@ CLSCTX_RESERVED6                      :: 0x1000000
 CLSCTX_ACTIVATE_ARM32_SERVER          :: 0x2000000
 CLSCTX_ALLOW_LOWER_TRUST_REGISTRATION :: 0x4000000
 CLSCTX_PS_DLL                         :: 0x80000000
+CLSCTX_ALL                            :: CLSCTX_INPROC_SERVER | CLSCTX_INPROC_HANDLER | CLSCTX_LOCAL_SERVER | CLSCTX_REMOTE_SERVER
 
 WSAPROTOCOLCHAIN :: struct {
 	ChainLen: c_int,
@@ -2512,6 +2624,7 @@ OBJECT_ATTRIBUTES :: struct {
 	SecurityQualityOfService: rawptr,
 }
 
+PUNICODE_STRING :: ^UNICODE_STRING
 UNICODE_STRING :: struct {
 	Length:        u16    `fmt:"-"`,
 	MaximumLength: u16    `fmt:"-"`,
@@ -4389,7 +4502,7 @@ DNS_STATUS :: distinct DWORD // zero is success
 DNS_INFO_NO_RECORDS :: 9501
 DNS_QUERY_NO_RECURSION :: 0x00000004
 
-DNS_RECORD :: struct {
+DNS_RECORD :: struct { // aka DNS_RECORDA
     pNext: ^DNS_RECORD,
     pName: cstring,
     wType: WORD,
@@ -4432,6 +4545,10 @@ SOCKADDR :: struct {
 	sa_family: ADDRESS_FAMILY,
 	sa_data:   [14]CHAR,
 }
+
+ENUMRESNAMEPROCW :: #type proc (hModule: HMODULE, lpType: LPCWSTR, lpName: LPWSTR, lParam: LONG_PTR)-> BOOL
+ENUMRESTYPEPROCW :: #type proc (hModule: HMODULE, lpType: LPCWSTR, lParam: LONG_PTR)-> BOOL
+ENUMRESLANGPROCW :: #type proc (hModule: HMODULE, lpType: LPCWSTR, lpName: LPWSTR, wIDLanguage: LANGID, lParam: LONG_PTR)-> BOOL
 
 DTR_Control :: enum byte {
 	Disable = 0,

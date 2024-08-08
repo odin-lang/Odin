@@ -42,8 +42,8 @@ overflow_add :: proc(lhs, rhs: $T) -> (T, bool) where type_is_integer(T) #option
 overflow_sub :: proc(lhs, rhs: $T) -> (T, bool) where type_is_integer(T) #optional_ok ---
 overflow_mul :: proc(lhs, rhs: $T) -> (T, bool) where type_is_integer(T) #optional_ok ---
 
-add_sat :: proc(lhs, rhs: $T) -> T where type_is_integer(T) ---
-sub_sat :: proc(lhs, rhs: $T) -> T where type_is_integer(T) ---
+saturating_add :: proc(lhs, rhs: $T) -> T where type_is_integer(T) ---
+saturating_sub :: proc(lhs, rhs: $T) -> T where type_is_integer(T) ---
 
 sqrt :: proc(x: $T) -> T where type_is_float(T) || (type_is_simd_vector(T) && type_is_float(type_elem_type(T))) ---
 
@@ -227,6 +227,9 @@ simd_sub  :: proc(a, b: #simd[N]T) -> #simd[N]T ---
 simd_mul  :: proc(a, b: #simd[N]T) -> #simd[N]T ---
 simd_div  :: proc(a, b: #simd[N]T) -> #simd[N]T where type_is_float(T) ---
 
+simd_saturating_add  :: proc(a, b: #simd[N]T) -> #simd[N]T where type_is_integer(T) ---
+simd_saturating_sub  :: proc(a, b: #simd[N]T) -> #simd[N]T where type_is_integer(T) ---
+
 // Keeps Odin's Behaviour
 // (x << y) if y <= mask else 0
 simd_shl :: proc(a: #simd[N]T, b: #simd[N]Unsigned_Integer) -> #simd[N]T ---
@@ -236,9 +239,6 @@ simd_shr :: proc(a: #simd[N]T, b: #simd[N]Unsigned_Integer) -> #simd[N]T ---
 // x << (y & mask)
 simd_shl_masked :: proc(a: #simd[N]T, b: #simd[N]Unsigned_Integer) -> #simd[N]T ---
 simd_shr_masked :: proc(a: #simd[N]T, b: #simd[N]Unsigned_Integer) -> #simd[N]T ---
-
-simd_add_sat :: proc(a, b: #simd[N]T) -> #simd[N]T ---
-simd_sub_sat :: proc(a, b: #simd[N]T) -> #simd[N]T ---
 
 simd_bit_and     :: proc(a, b: #simd[N]T) -> #simd[N]T ---
 simd_bit_or      :: proc(a, b: #simd[N]T) -> #simd[N]T ---
@@ -268,13 +268,28 @@ simd_lanes_ge :: proc(a, b: #simd[N]T) -> #simd[N]Integer ---
 simd_extract :: proc(a: #simd[N]T, idx: uint) -> T ---
 simd_replace :: proc(a: #simd[N]T, idx: uint, elem: T) -> #simd[N]T ---
 
-simd_reduce_add_ordered :: proc(a: #simd[N]T) -> T ---
-simd_reduce_mul_ordered :: proc(a: #simd[N]T) -> T ---
-simd_reduce_min         :: proc(a: #simd[N]T) -> T ---
-simd_reduce_max         :: proc(a: #simd[N]T) -> T ---
-simd_reduce_and         :: proc(a: #simd[N]T) -> T ---
-simd_reduce_or          :: proc(a: #simd[N]T) -> T ---
-simd_reduce_xor         :: proc(a: #simd[N]T) -> T ---
+simd_reduce_add_ordered :: proc(a: #simd[N]T) -> T where type_is_integer(T) || type_is_float(T)---
+simd_reduce_mul_ordered :: proc(a: #simd[N]T) -> T where type_is_integer(T) || type_is_float(T)---
+simd_reduce_min         :: proc(a: #simd[N]T) -> T where type_is_integer(T) || type_is_float(T)---
+simd_reduce_max         :: proc(a: #simd[N]T) -> T where type_is_integer(T) || type_is_float(T)---
+simd_reduce_and         :: proc(a: #simd[N]T) -> T where type_is_integer(T) || type_is_float(T)---
+simd_reduce_or          :: proc(a: #simd[N]T) -> T where type_is_integer(T) || type_is_float(T)---
+simd_reduce_xor         :: proc(a: #simd[N]T) -> T where type_is_integer(T) || type_is_float(T)---
+
+simd_reduce_any         :: proc(a: #simd[N]T) -> T where type_is_boolean(T) ---
+simd_reduce_all         :: proc(a: #simd[N]T) -> T where type_is_boolean(T) ---
+
+
+simd_gather       :: proc(ptr: #simd[N]rawptr, val: #simd[N]T, mask: #simd[N]U) -> #simd[N]T where type_is_integer(U) || type_is_boolean(U) ---
+simd_scatter      :: proc(ptr: #simd[N]rawptr, val: #simd[N]T, mask: #simd[N]U)              where type_is_integer(U) || type_is_boolean(U) ---
+
+simd_masked_load  :: proc(ptr: rawptr, val: #simd[N]T, mask: #simd[N]U) -> #simd[N]T where type_is_integer(U) || type_is_boolean(U) ---
+simd_masked_store :: proc(ptr: rawptr, val: #simd[N]T, mask: #simd[N]U)              where type_is_integer(U) || type_is_boolean(U) ---
+
+simd_masked_expand_load    :: proc(ptr: rawptr, val: #simd[N]T, mask: #simd[N]U) -> #simd[N]T where type_is_integer(U) || type_is_boolean(U) ---
+simd_masked_compress_store :: proc(ptr: rawptr, val: #simd[N]T, mask: #simd[N]U)              where type_is_integer(U) || type_is_boolean(U) ---
+
+
 
 simd_shuffle :: proc(a, b: #simd[N]T, indices: ..int) -> #simd[len(indices)]T ---
 simd_select  :: proc(cond: #simd[N]boolean_or_integer, true, false: #simd[N]T) -> #simd[N]T ---
@@ -288,11 +303,11 @@ simd_nearest :: proc(a: #simd[N]any_float) -> #simd[N]any_float ---
 
 simd_to_bits :: proc(v: #simd[N]T) -> #simd[N]Integer where size_of(T) == size_of(Integer), type_is_unsigned(Integer) ---
 
-// equivalent a swizzle with descending indices, e.g. reserve(a, 3, 2, 1, 0)
-simd_reverse :: proc(a: #simd[N]T) -> #simd[N]T ---
+// equivalent to a swizzle with descending indices, e.g. reserve(a, 3, 2, 1, 0)
+simd_lanes_reverse :: proc(a: #simd[N]T) -> #simd[N]T ---
 
-simd_rotate_left  :: proc(a: #simd[N]T, $offset: int) -> #simd[N]T ---
-simd_rotate_right :: proc(a: #simd[N]T, $offset: int) -> #simd[N]T ---
+simd_lanes_rotate_left  :: proc(a: #simd[N]T, $offset: int) -> #simd[N]T ---
+simd_lanes_rotate_right :: proc(a: #simd[N]T, $offset: int) -> #simd[N]T ---
 
 // Checks if the current target supports the given target features.
 //

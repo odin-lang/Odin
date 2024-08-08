@@ -42,13 +42,14 @@ Error :: union #shared_nil {
 ERROR_NONE :: Error{}
 
 
-
+@(require_results)
 is_platform_error :: proc(ferr: Error) -> (err: i32, ok: bool) {
 	v := ferr.(Platform_Error) or_else {}
 	return i32(v), i32(v) != 0
 }
 
 
+@(require_results)
 error_string :: proc(ferr: Error) -> string {
 	if ferr == nil {
 		return ""

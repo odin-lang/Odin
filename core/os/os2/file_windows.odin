@@ -33,6 +33,11 @@ File_Impl :: struct {
 
 	allocator: runtime.Allocator,
 
+	r_buf: []byte,
+	w_buf: []byte,
+	w_n:   int,
+	max_consecutive_empty_writes: int,
+
 	rw_mutex: sync.RW_Mutex, // read write calls
 	p_mutex:  sync.Mutex, // pread pwrite calls
 }
@@ -60,8 +65,9 @@ _open_internal :: proc(name: string, flags: File_Flags, perm: int) -> (handle: u
 		err = .Not_Exist
 		return
 	}
+	TEMP_ALLOCATOR_GUARD()
 
-	path := _fix_long_path(name) or_return
+	path := _fix_long_path(name, temp_allocator()) or_return
 	access: u32
 	switch flags & {.Read, .Write} {
 	case {.Read}:         access = win32.FILE_GENERIC_READ
@@ -164,6 +170,26 @@ _new_file :: proc(handle: uintptr, name: string) -> (f: ^File, err: Error) {
 	return &impl.file, nil
 }
 
+
+@(require_results)
+_open_buffered :: proc(name: string, buffer_size: uint, flags := File_Flags{.Read}, perm := 0o777) -> (f: ^File, err: Error) {
+	assert(buffer_size > 0)
+	flags := flags if flags != nil else {.Read}
+	handle := _open_internal(name, flags, perm) or_return
+	return _new_file_buffered(handle, name, buffer_size)
+}
+
+_new_file_buffered :: proc(handle: uintptr, name: string, buffer_size: uint) -> (f: ^File, err: Error) {
+	f, err = _new_file(handle, name)
+	if f != nil && err == nil {
+		impl := (^File_Impl)(f.impl)
+		impl.r_buf = make([]byte, buffer_size, file_allocator())
+		impl.w_buf = make([]byte, buffer_size, file_allocator())
+	}
+	return
+}
+
+
 _fd :: proc(f: ^File) -> uintptr {
 	if f == nil || f.impl == nil {
 		return INVALID_HANDLE
@@ -180,9 +206,13 @@ _destroy :: proc(f: ^File_Impl) -> Error {
 	err0 := free(f.wname, a)
 	err1 := delete(f.name, a)
 	err2 := free(f, a)
+	err3 := delete(f.r_buf, a)
+	err4 := delete(f.w_buf, a)
 	err0 or_return
 	err1 or_return
 	err2 or_return
+	err3 or_return
+	err4 or_return
 	return nil
 }
 
@@ -230,6 +260,10 @@ _seek :: proc(f: ^File_Impl, offset: i64, whence: io.Seek_From) -> (ret: i64, er
 }
 
 _read :: proc(f: ^File_Impl, p: []byte) -> (n: i64, err: Error) {
+	return _read_internal(f, p)
+}
+
+_read_internal :: proc(f: ^File_Impl, p: []byte) -> (n: i64, err: Error) {
 	read_console :: proc(handle: win32.HANDLE, b: []byte) -> (n: int, err: Error) {
 		if len(b) == 0 {
 			return 0, nil
@@ -351,6 +385,9 @@ _read_at :: proc(f: ^File_Impl, p: []byte, offset: i64) -> (n: i64, err: Error) 
 }
 
 _write :: proc(f: ^File_Impl, p: []byte) -> (n: i64, err: Error) {
+	return _write_internal(f, p)
+}
+_write_internal :: proc(f: ^File_Impl, p: []byte) -> (n: i64, err: Error) {
 	if len(p) == 0 {
 		return
 	}
@@ -435,6 +472,9 @@ _sync :: proc(f: ^File) -> Error {
 }
 
 _flush :: proc(f: ^File_Impl) -> Error {
+	return _flush(f)
+}
+_flush_internal :: proc(f: ^File_Impl) -> Error {
 	handle := _handle(&f.file)
 	if !win32.FlushFileBuffers(handle) {
 		return _get_platform_error()
@@ -457,7 +497,8 @@ _truncate :: proc(f: ^File, size: i64) -> Error {
 }
 
 _remove :: proc(name: string) -> Error {
-	p := _fix_long_path(name) or_return
+	TEMP_ALLOCATOR_GUARD()
+	p := _fix_long_path(name, temp_allocator()) or_return
 	err, err1: Error
 	if !win32.DeleteFileW(p) {
 		err = _get_platform_error()
@@ -494,8 +535,9 @@ _remove :: proc(name: string) -> Error {
 }
 
 _rename :: proc(old_path, new_path: string) -> Error {
-	from := _fix_long_path(old_path) or_return
-	to   := _fix_long_path(new_path) or_return
+	TEMP_ALLOCATOR_GUARD()
+	from := _fix_long_path(old_path, temp_allocator()) or_return
+	to   := _fix_long_path(new_path, temp_allocator()) or_return
 	if win32.MoveFileExW(from, to, win32.MOVEFILE_REPLACE_EXISTING) {
 		return nil
 	}
@@ -504,8 +546,9 @@ _rename :: proc(old_path, new_path: string) -> Error {
 }
 
 _link :: proc(old_name, new_name: string) -> Error {
-	o := _fix_long_path(old_name) or_return
-	n := _fix_long_path(new_name) or_return
+	TEMP_ALLOCATOR_GUARD()
+	o := _fix_long_path(old_name, temp_allocator()) or_return
+	n := _fix_long_path(new_name, temp_allocator()) or_return
 	if win32.CreateHardLinkW(n, o, nil) {
 		return nil
 	}
@@ -592,8 +635,10 @@ _read_link :: proc(name: string, allocator: runtime.Allocator) -> (s: string, er
 	@thread_local
 	rdb_buf: [MAXIMUM_REPARSE_DATA_BUFFER_SIZE]byte
 
-	p      := _fix_long_path(name) or_return
-	handle := _open_sym_link(p)    or_return
+	TEMP_ALLOCATOR_GUARD()
+
+	p      := _fix_long_path(name, temp_allocator()) or_return
+	handle := _open_sym_link(p) or_return
 	defer win32.CloseHandle(handle)
 
 	bytes_returned: u32
@@ -667,7 +712,8 @@ _fchown :: proc(f: ^File, uid, gid: int) -> Error {
 }
 
 _chdir :: proc(name: string) -> Error {
-	p := _fix_long_path(name) or_return
+	TEMP_ALLOCATOR_GUARD()
+	p := _fix_long_path(name, temp_allocator()) or_return
 	if !win32.SetCurrentDirectoryW(p) {
 		return _get_platform_error()
 	}
@@ -723,7 +769,8 @@ _fchtimes :: proc(f: ^File, atime, mtime: time.Time) -> Error {
 }
 
 _exists :: proc(path: string) -> bool {
-	wpath, _ := _fix_long_path(path)
+	TEMP_ALLOCATOR_GUARD()
+	wpath, _ := _fix_long_path(path, temp_allocator())
 	attribs := win32.GetFileAttributesW(wpath)
 	return attribs != win32.INVALID_FILE_ATTRIBUTES
 }
@@ -770,6 +817,7 @@ _file_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, 
 	}
 	return 0, .Empty
 }
+
 
 
 

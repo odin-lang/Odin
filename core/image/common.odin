@@ -112,7 +112,8 @@ Image_Option:
 
 	`.alpha_drop_if_present`
 		If the image has an alpha channel, drop it.
-		You may want to use `.alpha_premultiply` in this case.
+		You may want to use `.alpha_
+		tiply` in this case.
 
 		NOTE: For PNG, this also skips handling of the tRNS chunk, if present,
 		unless you select `alpha_premultiply`.
@@ -585,6 +586,32 @@ Channel :: enum u8 {
 	G = 2,
 	B = 3,
 	A = 4,
+}
+
+// Take a slice of pixels (`[]RGBA_Pixel`, etc), and return an `Image`
+// Don't call `destroy` on the resulting `Image`. Instead, delete the original `pixels` slice.
+pixels_to_image :: proc(pixels: [][$N]$E, width: int, height: int) -> (img: Image, ok: bool) where E == u8 || E == u16, N >= 1, N <= 4 {
+	if len(pixels) != width * height {
+		return {}, false
+	}
+
+	img.height   = height
+	img.width    = width
+	img.depth    = 8 when E == u8 else 16
+	img.channels = N
+
+	s := transmute(runtime.Raw_Slice)pixels
+	d := runtime.Raw_Dynamic_Array{
+		data = s.data,
+		len  = s.len * size_of(E) * N,
+		cap  = s.len * size_of(E) * N,
+		allocator = runtime.nil_allocator(),
+	}
+	img.pixels = bytes.Buffer{
+		buf = transmute([dynamic]u8)d,
+	}
+
+	return img, true
 }
 
 // When you have an RGB(A) image, but want a particular channel.
@@ -1266,7 +1293,7 @@ blend_single_channel :: #force_inline proc(fg, alpha, bg: $T) -> (res: T) where 
 	return T(c & (MAX - 1))
 }
 
-blend_pixel :: #force_inline proc(fg: [$N]$T, alpha: T, bg: [N]T) -> (res: [N]T) where (T == u8 || T == u16), N >= 1 && N <= 4 {
+blend_pixel :: #force_inline proc(fg: [$N]$T, alpha: T, bg: [N]T) -> (res: [N]T) where (T == u8 || T == u16), N >= 1, N <= 4 {
 	MAX :: 256 when T == u8 else 65536
 
 	when N == 1 {
@@ -1293,6 +1320,42 @@ blend_pixel :: #force_inline proc(fg: [$N]$T, alpha: T, bg: [N]T) -> (res: [N]T)
 }
 blend :: proc{blend_single_channel, blend_pixel}
 
+// For all pixels of the image, multiplies R, G and B by Alpha. This is useful mainly for games rendering anti-aliased transparent sprites.
+// Grayscale with alpha images are supported as well.
+// Note that some image formats like QOI explicitly do NOT support premultiplied alpha, so you will end up with a non-standard file.
+premultiply_alpha :: proc(img: ^Image) -> (ok: bool) {
+	switch {
+	case img.channels == 2 && img.depth == 8:
+		pixels := mem.slice_data_cast([]GA_Pixel, img.pixels.buf[:])
+		for &pixel in pixels {
+			pixel.r = u8(u32(pixel.r) * u32(pixel.g) / 0xFF)
+		}
+		return true
+	case img.channels == 2 && img.depth == 16:
+		pixels := mem.slice_data_cast([]GA_Pixel_16, img.pixels.buf[:])
+		for &pixel in pixels {
+			pixel.r = u16(u32(pixel.r) * u32(pixel.g) / 0xFFFF)
+		}
+		return true
+	case img.channels == 4 && img.depth == 8:
+		pixels := mem.slice_data_cast([]RGBA_Pixel, img.pixels.buf[:])
+		for &pixel in pixels {
+			pixel.r = u8(u32(pixel.r) * u32(pixel.a) / 0xFF)
+			pixel.g = u8(u32(pixel.g) * u32(pixel.a) / 0xFF)
+			pixel.b = u8(u32(pixel.b) * u32(pixel.a) / 0xFF)
+		}
+		return true
+	case img.channels == 4 && img.depth == 16:
+		pixels := mem.slice_data_cast([]RGBA_Pixel_16, img.pixels.buf[:])
+		for &pixel in pixels {
+			pixel.r = u16(u32(pixel.r) * u32(pixel.a) / 0xFFFF)
+			pixel.g = u16(u32(pixel.g) * u32(pixel.a) / 0xFFFF)
+			pixel.b = u16(u32(pixel.b) * u32(pixel.a) / 0xFFFF)
+		}
+		return true
+	case: return false
+	}
+}
 
 // Replicates grayscale values into RGB(A) 8- or 16-bit images as appropriate.
 // Returns early with `false` if already an RGB(A) image.

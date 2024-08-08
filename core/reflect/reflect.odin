@@ -496,6 +496,64 @@ struct_field_offsets :: proc(T: typeid) -> []uintptr {
 	return nil
 }
 
+Struct_Field_Count_Method :: enum {
+	Top_Level,
+	Using,
+	Recursive,
+}
+
+/*
+Counts the number of fields in a struct
+
+This procedure returns the number of fields in a struct, counting in one of three ways:
+- .Top_Level: Only counts the top-level fields
+- .Using:     Same count as .Top_Level, and adds the field count of any `using s: Struct` it encounters (in addition to itself)
+- .Recursive: The count of all top-level fields, plus the count of any child struct's fields, recursively
+
+Inputs:
+- T:      The struct type
+- method: The counting method
+
+Returns:
+- The `count`, enumerated using the `method`, which will be `0` if the type is not a struct
+
+Example:
+	symbols_loaded, ok := dynlib.initialize_symbols(&game_api, "game.dll")
+	symbols_expected   := reflect.struct_field_count(Game_Api) - API_PRIVATE_COUNT
+
+	if symbols_loaded != symbols_expected {
+		fmt.eprintf("Expected %v symbols, got %v", symbols_expected, symbols_loaded)
+		return
+	}
+*/
+@(require_results)
+struct_field_count :: proc(T: typeid, method := Struct_Field_Count_Method.Top_Level) -> (count: int) {
+	ti := runtime.type_info_base(type_info_of(T))
+	if s, ok := ti.variant.(runtime.Type_Info_Struct); ok {
+		switch method {
+		case .Top_Level:
+			return int(s.field_count)
+
+		case .Using:
+			count = int(s.field_count)
+			for type, i in s.types[:s.field_count] {
+				if s.usings[i] {
+					count += struct_field_count(type.id)
+				}
+			}
+
+		case .Recursive:
+			count = int(s.field_count)
+			for type in s.types[:s.field_count] {
+				count += struct_field_count(type.id)
+			}
+
+		case: return 0
+		}
+	}
+	return
+}
+
 @(require_results)
 struct_fields_zipped :: proc(T: typeid) -> (fields: #soa[]Struct_Field) {
 	ti := runtime.type_info_base(type_info_of(T))

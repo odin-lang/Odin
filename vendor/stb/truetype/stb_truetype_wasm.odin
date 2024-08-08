@@ -7,7 +7,6 @@ import "base:runtime"
 
 import "core:c"
 import "core:math"
-import "core:mem"
 import "core:slice"
 import "core:sort"
 
@@ -69,7 +68,7 @@ pow :: proc "c" (x, y: f64) -> f64 { return math.pow(x, y) }
 
 @(require, linkage="strong", link_name="stbtt_fmod")
 fmod :: proc "c" (x, y: f64) -> f64 {
-	context = runtime.default_context();
+	context = runtime.default_context()
 	// NOTE: only called in the `stbtt_GetGlyphSDF` code path.
 	panic("`math.round` is broken on 32 bit targets, see #3856")
 }

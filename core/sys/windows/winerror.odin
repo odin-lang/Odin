@@ -1,6 +1,189 @@
 // +build windows
 package sys_windows
 
+// https://learn.microsoft.com/en-us/windows/win32/api/winerror/
+
+//  Values are 32 bit values laid out as follows:
+//
+//   3 3 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1
+//   1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0
+//  +---+-+-+-----------------------+-------------------------------+
+//  |Sev|C|R|     Facility          |               Code            |
+//  +---+-+-+-----------------------+-------------------------------+
+//
+//  where
+//
+//      Sev - is the severity code
+//
+//          00 - Success
+//          01 - Informational
+//          10 - Warning
+//          11 - Error
+//
+//      C - is the Customer code flag
+//
+//      R - is a reserved bit
+//
+//      Facility - is the facility code
+//
+//      Code - is the facility's status code
+
+// Define the facility codes
+FACILITY :: enum DWORD {
+	NULL                                     = 0,
+	RPC                                      = 1,
+	DISPATCH                                 = 2,
+	STORAGE                                  = 3,
+	ITF                                      = 4,
+	WIN32                                    = 7,
+	WINDOWS                                  = 8,
+	SSPI                                     = 9,
+	SECURITY                                 = 9,
+	CONTROL                                  = 10,
+	CERT                                     = 11,
+	INTERNET                                 = 12,
+	MEDIASERVER                              = 13,
+	MSMQ                                     = 14,
+	SETUPAPI                                 = 15,
+	SCARD                                    = 16,
+	COMPLUS                                  = 17,
+	AAF                                      = 18,
+	URT                                      = 19,
+	ACS                                      = 20,
+	DPLAY                                    = 21,
+	UMI                                      = 22,
+	SXS                                      = 23,
+	WINDOWS_CE                               = 24,
+	HTTP                                     = 25,
+	USERMODE_COMMONLOG                       = 26,
+	WER                                      = 27,
+	USERMODE_FILTER_MANAGER                  = 31,
+	BACKGROUNDCOPY                           = 32,
+	CONFIGURATION                            = 33,
+	WIA                                      = 33,
+	STATE_MANAGEMENT                         = 34,
+	METADIRECTORY                            = 35,
+	WINDOWSUPDATE                            = 36,
+	DIRECTORYSERVICE                         = 37,
+	GRAPHICS                                 = 38,
+	SHELL                                    = 39,
+	NAP                                      = 39,
+	TPM_SERVICES                             = 40,
+	TPM_SOFTWARE                             = 41,
+	UI                                       = 42,
+	XAML                                     = 43,
+	ACTION_QUEUE                             = 44,
+	PLA                                      = 48,
+	WINDOWS_SETUP                            = 48,
+	FVE                                      = 49,
+	FWP                                      = 50,
+	WINRM                                    = 51,
+	NDIS                                     = 52,
+	USERMODE_HYPERVISOR                      = 53,
+	CMI                                      = 54,
+	USERMODE_VIRTUALIZATION                  = 55,
+	USERMODE_VOLMGR                          = 56,
+	BCD                                      = 57,
+	USERMODE_VHD                             = 58,
+	USERMODE_HNS                             = 59,
+	SDIAG                                    = 60,
+	WEBSERVICES                              = 61,
+	WINPE                                    = 61,
+	WPN                                      = 62,
+	WINDOWS_STORE                            = 63,
+	INPUT                                    = 64,
+	QUIC                                     = 65,
+	EAP                                      = 66,
+	IORING                                   = 70,
+	WINDOWS_DEFENDER                         = 80,
+	OPC                                      = 81,
+	XPS                                      = 82,
+	MBN                                      = 84,
+	POWERSHELL                               = 84,
+	RAS                                      = 83,
+	P2P_INT                                  = 98,
+	P2P                                      = 99,
+	DAF                                      = 100,
+	BLUETOOTH_ATT                            = 101,
+	AUDIO                                    = 102,
+	STATEREPOSITORY                          = 103,
+	VISUALCPP                                = 109,
+	SCRIPT                                   = 112,
+	PARSE                                    = 113,
+	BLB                                      = 120,
+	BLB_CLI                                  = 121,
+	WSBAPP                                   = 122,
+	BLBUI                                    = 128,
+	USN                                      = 129,
+	USERMODE_VOLSNAP                         = 130,
+	TIERING                                  = 131,
+	WSB_ONLINE                               = 133,
+	ONLINE_ID                                = 134,
+	DEVICE_UPDATE_AGENT                      = 135,
+	DRVSERVICING                             = 136,
+	DLS                                      = 153,
+	DELIVERY_OPTIMIZATION                    = 208,
+	USERMODE_SPACES                          = 231,
+	USER_MODE_SECURITY_CORE                  = 232,
+	USERMODE_LICENSING                       = 234,
+	SOS                                      = 160,
+	OCP_UPDATE_AGENT                         = 173,
+	DEBUGGERS                                = 176,
+	SPP                                      = 256,
+	RESTORE                                  = 256,
+	DMSERVER                                 = 256,
+	DEPLOYMENT_SERVICES_SERVER               = 257,
+	DEPLOYMENT_SERVICES_IMAGING              = 258,
+	DEPLOYMENT_SERVICES_MANAGEMENT           = 259,
+	DEPLOYMENT_SERVICES_UTIL                 = 260,
+	DEPLOYMENT_SERVICES_BINLSVC              = 261,
+	DEPLOYMENT_SERVICES_PXE                  = 263,
+	DEPLOYMENT_SERVICES_TFTP                 = 264,
+	DEPLOYMENT_SERVICES_TRANSPORT_MANAGEMENT = 272,
+	DEPLOYMENT_SERVICES_DRIVER_PROVISIONING  = 278,
+	DEPLOYMENT_SERVICES_MULTICAST_SERVER     = 289,
+	DEPLOYMENT_SERVICES_MULTICAST_CLIENT     = 290,
+	DEPLOYMENT_SERVICES_CONTENT_PROVIDER     = 293,
+	HSP_SERVICES                             = 296,
+	HSP_SOFTWARE                             = 297,
+	LINGUISTIC_SERVICES                      = 305,
+	AUDIOSTREAMING                           = 1094,
+	TTD                                      = 1490,
+	ACCELERATOR                              = 1536,
+	WMAAECMA                                 = 1996,
+	DIRECTMUSIC                              = 2168,
+	DIRECT3D10                               = 2169,
+	DXGI                                     = 2170,
+	DXGI_DDI                                 = 2171,
+	DIRECT3D11                               = 2172,
+	DIRECT3D11_DEBUG                         = 2173,
+	DIRECT3D12                               = 2174,
+	DIRECT3D12_DEBUG                         = 2175,
+	DXCORE                                   = 2176,
+	PRESENTATION                             = 2177,
+	LEAP                                     = 2184,
+	AUDCLNT                                  = 2185,
+	WINCODEC_DWRITE_DWM                      = 2200,
+	WINML                                    = 2192,
+	DIRECT2D                                 = 2201,
+	DEFRAG                                   = 2304,
+	USERMODE_SDBUS                           = 2305,
+	JSCRIPT                                  = 2306,
+	PIDGENX                                  = 2561,
+	EAS                                      = 85,
+	WEB                                      = 885,
+	WEB_SOCKET                               = 886,
+	MOBILE                                   = 1793,
+	SQLITE                                   = 1967,
+	SERVICE_FABRIC                           = 1968,
+	UTC                                      = 1989,
+	WEP                                      = 2049,
+	SYNCENGINE                               = 2050,
+	XBOX                                     = 2339,
+	GAME                                     = 2340,
+	PIX                                      = 2748,
+}
+
 ERROR_SUCCESS : DWORD : 0
 NO_ERROR :: 0
 SEC_E_OK : HRESULT : 0x00000000
@@ -42,14 +225,55 @@ ERROR_TIMEOUT                : DWORD : 1460
 ERROR_DATATYPE_MISMATCH      : DWORD : 1629
 ERROR_UNSUPPORTED_TYPE       : DWORD : 1630
 ERROR_NOT_SAME_OBJECT        : DWORD : 1656
-ERROR_PIPE_CONNECTED         : DWORD : 0x80070217
+ERROR_PIPE_CONNECTED         : DWORD : 535
 ERROR_PIPE_BUSY              : DWORD : 231
 
-E_NOTIMPL :: HRESULT(-0x7fff_bfff) // 0x8000_4001
+// https://learn.microsoft.com/en-us/windows/win32/seccrypto/common-hresult-values
+S_OK           :: 0x00000000 // Operation successful
+E_NOTIMPL      :: 0x80004001 // Not implemented
+E_NOINTERFACE  :: 0x80004002 // No such interface supported
+E_POINTER      :: 0x80004003 // Pointer that is not valid
+E_ABORT        :: 0x80004004 // Operation aborted
+E_FAIL         :: 0x80004005 // Unspecified failure
+E_UNEXPECTED   :: 0x8000FFFF // Unexpected failure
+E_ACCESSDENIED :: 0x80070005 // General access denied error
+E_HANDLE       :: 0x80070006 // Handle that is not valid
+E_OUTOFMEMORY  :: 0x8007000E // Failed to allocate necessary memory
+E_INVALIDARG   :: 0x80070057 // One or more arguments are not valid
 
-SUCCEEDED :: #force_inline proc "contextless" (#any_int result: int) -> bool { return result >= 0 }
+// Severity values
+SEVERITY :: enum DWORD {
+	SUCCESS = 0,
+	ERROR   = 1,
+}
 
+// Generic test for success on any status value (non-negative numbers indicate success).
+SUCCEEDED :: #force_inline proc "contextless" (#any_int result: int) -> bool { return result >= S_OK }
+// and the inverse
+FAILED :: #force_inline proc(#any_int result: int) -> bool { return result < S_OK }
 
+// Generic test for error on any status value.
+IS_ERROR :: #force_inline proc(#any_int status: int) -> bool { return u32(status) >> 31 == u32(SEVERITY.ERROR) }
+
+// Return the code
+HRESULT_CODE :: #force_inline proc(#any_int hr: int) -> int { return int(u32(hr) & 0xFFFF) }
+
+//  Return the facility
+HRESULT_FACILITY :: #force_inline proc(#any_int hr: int) -> FACILITY { return FACILITY((u32(hr) >> 16) & 0x1FFF) }
+
+//  Return the severity
+HRESULT_SEVERITY :: #force_inline proc(#any_int hr: int) -> SEVERITY { return SEVERITY((u32(hr) >> 31) & 0x1) }
+
+// Create an HRESULT value from component pieces
+MAKE_HRESULT :: #force_inline proc(#any_int sev: int, #any_int fac: int, #any_int code: int) -> HRESULT {
+	return HRESULT((uint(sev)<<31) | (uint(fac)<<16) | (uint(code)))
+}
+
+DECODE_HRESULT :: #force_inline proc(#any_int hr: int) -> (SEVERITY, FACILITY, int) {
+	return HRESULT_SEVERITY(hr), HRESULT_FACILITY(hr), HRESULT_CODE(hr)
+}
+
+// aka ERROR or WIN32_ERROR to hint the WIN32 facility
 System_Error :: enum DWORD {
 	// The operation completed successfully.
 	SUCCESS = 0x0,

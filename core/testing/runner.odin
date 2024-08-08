@@ -868,8 +868,8 @@ To partly mitigate this, redirect STDERR to a file or use the -define:ODIN_TEST_
 		when ODIN_OS != .Windows {
 			mode = os.S_IRUSR|os.S_IWUSR|os.S_IRGRP|os.S_IROTH
 		}
-		json_fd, errno := os.open(JSON_REPORT, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, mode)
-		fmt.assertf(errno == os.ERROR_NONE, "unable to open file %q for writing of JSON report, error: %v", JSON_REPORT, errno)
+		json_fd, err := os.open(JSON_REPORT, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, mode)
+		fmt.assertf(err == nil, "unable to open file %q for writing of JSON report, error: %v", JSON_REPORT, err)
 		defer os.close(json_fd)
 
 		for test, i in report.all_tests {

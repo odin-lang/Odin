@@ -7,7 +7,6 @@ import "base:intrinsics"
 
 Handle    :: distinct uintptr
 File_Time :: distinct u64
-Errno     :: distinct int
 
 
 INVALID_HANDLE :: ~Handle(0)
@@ -27,70 +26,119 @@ O_SYNC     :: 0x01000
 O_ASYNC    :: 0x02000
 O_CLOEXEC  :: 0x80000
 
+_Platform_Error :: win32.System_Error
 
-ERROR_NONE:                   Errno : 0
-ERROR_FILE_NOT_FOUND:         Errno : 2
-ERROR_PATH_NOT_FOUND:         Errno : 3
-ERROR_ACCESS_DENIED:          Errno : 5
-ERROR_INVALID_HANDLE:         Errno : 6
-ERROR_NOT_ENOUGH_MEMORY:      Errno : 8
-ERROR_NO_MORE_FILES:          Errno : 18
-ERROR_HANDLE_EOF:             Errno : 38
-ERROR_NETNAME_DELETED:        Errno : 64
-ERROR_FILE_EXISTS:            Errno : 80
-ERROR_INVALID_PARAMETER:      Errno : 87
-ERROR_BROKEN_PIPE:            Errno : 109
-ERROR_BUFFER_OVERFLOW:        Errno : 111
-ERROR_INSUFFICIENT_BUFFER:    Errno : 122
-ERROR_MOD_NOT_FOUND:          Errno : 126
-ERROR_PROC_NOT_FOUND:         Errno : 127
-ERROR_DIR_NOT_EMPTY:          Errno : 145
-ERROR_ALREADY_EXISTS:         Errno : 183
-ERROR_ENVVAR_NOT_FOUND:       Errno : 203
-ERROR_MORE_DATA:              Errno : 234
-ERROR_OPERATION_ABORTED:      Errno : 995
-ERROR_IO_PENDING:             Errno : 997
-ERROR_NOT_FOUND:              Errno : 1168
-ERROR_PRIVILEGE_NOT_HELD:     Errno : 1314
-WSAEACCES:                    Errno : 10013
-WSAECONNRESET:                Errno : 10054
+ERROR_FILE_NOT_FOUND      :: _Platform_Error(2)
+ERROR_PATH_NOT_FOUND      :: _Platform_Error(3)
+ERROR_ACCESS_DENIED       :: _Platform_Error(5)
+ERROR_INVALID_HANDLE      :: _Platform_Error(6)
+ERROR_NOT_ENOUGH_MEMORY   :: _Platform_Error(8)
+ERROR_NO_MORE_FILES       :: _Platform_Error(18)
+ERROR_HANDLE_EOF          :: _Platform_Error(38)
+ERROR_NETNAME_DELETED     :: _Platform_Error(64)
+ERROR_FILE_EXISTS         :: _Platform_Error(80)
+ERROR_INVALID_PARAMETER   :: _Platform_Error(87)
+ERROR_BROKEN_PIPE         :: _Platform_Error(109)
+ERROR_BUFFER_OVERFLOW     :: _Platform_Error(111)
+ERROR_INSUFFICIENT_BUFFER :: _Platform_Error(122)
+ERROR_MOD_NOT_FOUND       :: _Platform_Error(126)
+ERROR_PROC_NOT_FOUND      :: _Platform_Error(127)
+ERROR_DIR_NOT_EMPTY       :: _Platform_Error(145)
+ERROR_ALREADY_EXISTS      :: _Platform_Error(183)
+ERROR_ENVVAR_NOT_FOUND    :: _Platform_Error(203)
+ERROR_MORE_DATA           :: _Platform_Error(234)
+ERROR_OPERATION_ABORTED   :: _Platform_Error(995)
+ERROR_IO_PENDING          :: _Platform_Error(997)
+ERROR_NOT_FOUND           :: _Platform_Error(1168)
+ERROR_PRIVILEGE_NOT_HELD  :: _Platform_Error(1314)
+WSAEACCES                 :: _Platform_Error(10013)
+WSAECONNRESET             :: _Platform_Error(10054)
 
-// Windows reserves errors >= 1<<29 for application use
-ERROR_FILE_IS_PIPE:           Errno : 1<<29 + 0
-ERROR_FILE_IS_NOT_DIR:        Errno : 1<<29 + 1
-ERROR_NEGATIVE_OFFSET:        Errno : 1<<29 + 2
+ERROR_FILE_IS_PIPE        :: General_Error.File_Is_Pipe
+ERROR_FILE_IS_NOT_DIR     :: General_Error.Not_Dir
 
 // "Argv" arguments converted to Odin strings
 args := _alloc_command_line_arguments()
 
+@(require_results, no_instrumentation)
+get_last_error :: proc "contextless" () -> Error {
+	err := win32.GetLastError()
+	if err == 0 {
+		return nil
+	}
+	switch err {
+	case win32.ERROR_ACCESS_DENIED, win32.ERROR_SHARING_VIOLATION:
+		return .Permission_Denied
+
+	case win32.ERROR_FILE_EXISTS, win32.ERROR_ALREADY_EXISTS:
+		return .Exist
+
+	case win32.ERROR_FILE_NOT_FOUND, win32.ERROR_PATH_NOT_FOUND:
+		return .Not_Exist
+
+	case win32.ERROR_NO_DATA:
+		return .Closed
+
+	case win32.ERROR_TIMEOUT, win32.WAIT_TIMEOUT:
+		return .Timeout
+
+	case win32.ERROR_NOT_SUPPORTED:
+		return .Unsupported
+
+	case win32.ERROR_HANDLE_EOF:
+		return .EOF
+
+	case win32.ERROR_INVALID_HANDLE:
+		return .Invalid_File
+
+	case
+		win32.ERROR_BAD_ARGUMENTS,
+		win32.ERROR_INVALID_PARAMETER,
+		win32.ERROR_NOT_ENOUGH_MEMORY,
+		win32.ERROR_NO_MORE_FILES,
+		win32.ERROR_LOCK_VIOLATION,
+		win32.ERROR_BROKEN_PIPE,
+		win32.ERROR_CALL_NOT_IMPLEMENTED,
+		win32.ERROR_INSUFFICIENT_BUFFER,
+		win32.ERROR_INVALID_NAME,
+		win32.ERROR_LOCK_FAILED,
+		win32.ERROR_ENVVAR_NOT_FOUND,
+		win32.ERROR_OPERATION_ABORTED,
+		win32.ERROR_IO_PENDING,
+		win32.ERROR_NO_UNICODE_TRANSLATION:
+		// fallthrough
+	}
+	return Platform_Error(err)
+}
 
 
-
-
-last_write_time :: proc(fd: Handle) -> (File_Time, Errno) {
+@(require_results)
+last_write_time :: proc(fd: Handle) -> (File_Time, Error) {
 	file_info: win32.BY_HANDLE_FILE_INFORMATION
 	if !win32.GetFileInformationByHandle(win32.HANDLE(fd), &file_info) {
-		return 0, Errno(win32.GetLastError())
+		return 0, get_last_error()
 	}
 	lo := File_Time(file_info.ftLastWriteTime.dwLowDateTime)
 	hi := File_Time(file_info.ftLastWriteTime.dwHighDateTime)
-	return lo | hi << 32, ERROR_NONE
+	return lo | hi << 32, nil
 }
 
-last_write_time_by_name :: proc(name: string) -> (File_Time, Errno) {
+@(require_results)
+last_write_time_by_name :: proc(name: string) -> (File_Time, Error) {
 	data: win32.WIN32_FILE_ATTRIBUTE_DATA
 
 	wide_path := win32.utf8_to_wstring(name)
 	if !win32.GetFileAttributesExW(wide_path, win32.GetFileExInfoStandard, &data) {
-		return 0, Errno(win32.GetLastError())
+		return 0, get_last_error()
 	}
 
 	l := File_Time(data.ftLastWriteTime.dwLowDateTime)
 	h := File_Time(data.ftLastWriteTime.dwHighDateTime)
-	return l | h << 32, ERROR_NONE
+	return l | h << 32, nil
 }
 
 
+@(require_results)
 get_page_size :: proc() -> int {
 	// NOTE(tetra): The page size never changes, so why do anything complicated
 	// if we don't have to.
@@ -105,7 +153,7 @@ get_page_size :: proc() -> int {
 	return page_size
 }
 
-@(private)
+@(private, require_results)
 _processor_core_count :: proc() -> int {
 	length : win32.DWORD = 0
 	result := win32.GetLogicalProcessorInformation(nil, &length)
@@ -136,12 +184,14 @@ exit :: proc "contextless" (code: int) -> ! {
 
 
 
+@(require_results)
 current_thread_id :: proc "contextless" () -> int {
 	return int(win32.GetCurrentThreadId())
 }
 
 
 
+@(require_results)
 _alloc_command_line_arguments :: proc() -> []string {
 	arg_count: i32
 	arg_list_ptr := win32.CommandLineToArgvW(win32.GetCommandLineW(), &arg_count)
@@ -175,44 +225,52 @@ _alloc_command_line_arguments :: proc() -> []string {
 */
 WINDOWS_11_BUILD_CUTOFF :: 22_000
 
-get_windows_version_w :: proc() -> win32.OSVERSIONINFOEXW {
+@(require_results)
+get_windows_version_w :: proc "contextless" () -> win32.OSVERSIONINFOEXW {
 	osvi : win32.OSVERSIONINFOEXW
 	osvi.dwOSVersionInfoSize = size_of(win32.OSVERSIONINFOEXW)
 	win32.RtlGetVersion(&osvi)
 	return osvi
 }
 
-is_windows_xp :: proc() -> bool {
+@(require_results)
+is_windows_xp :: proc "contextless" () -> bool {
 	osvi := get_windows_version_w()
 	return (osvi.dwMajorVersion == 5 && osvi.dwMinorVersion == 1)
 }
 
-is_windows_vista :: proc() -> bool {
+@(require_results)
+is_windows_vista :: proc "contextless" () -> bool {
 	osvi := get_windows_version_w()
 	return (osvi.dwMajorVersion == 6 && osvi.dwMinorVersion == 0)
 }
 
-is_windows_7 :: proc() -> bool {
+@(require_results)
+is_windows_7 :: proc "contextless" () -> bool {
 	osvi := get_windows_version_w()
 	return (osvi.dwMajorVersion == 6 && osvi.dwMinorVersion == 1)
 }
 
-is_windows_8 :: proc() -> bool {
+@(require_results)
+is_windows_8 :: proc "contextless" () -> bool {
 	osvi := get_windows_version_w()
 	return (osvi.dwMajorVersion == 6 && osvi.dwMinorVersion == 2)
 }
 
-is_windows_8_1 :: proc() -> bool {
+@(require_results)
+is_windows_8_1 :: proc "contextless" () -> bool {
 	osvi := get_windows_version_w()
 	return (osvi.dwMajorVersion == 6 && osvi.dwMinorVersion == 3)
 }
 
-is_windows_10 :: proc() -> bool {
+@(require_results)
+is_windows_10 :: proc "contextless" () -> bool {
 	osvi := get_windows_version_w()
 	return (osvi.dwMajorVersion == 10 && osvi.dwMinorVersion == 0 && osvi.dwBuildNumber <  WINDOWS_11_BUILD_CUTOFF)
 }
 
-is_windows_11 :: proc() -> bool {
+@(require_results)
+is_windows_11 :: proc "contextless" () -> bool {
 	osvi := get_windows_version_w()
 	return (osvi.dwMajorVersion == 10 && osvi.dwMinorVersion == 0 && osvi.dwBuildNumber >= WINDOWS_11_BUILD_CUTOFF)
 }

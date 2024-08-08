@@ -52,7 +52,7 @@ is_abs :: proc(path: string) -> bool {
 
 
 @(private)
-temp_full_path :: proc(name: string) -> (path: string, err: os.Errno) {
+temp_full_path :: proc(name: string) -> (path: string, err: os.Error) {
 	ta := context.temp_allocator
 
 	name := name
@@ -63,17 +63,17 @@ temp_full_path :: proc(name: string) -> (path: string, err: os.Errno) {
 	p := win32.utf8_to_utf16(name, ta)
 	n := win32.GetFullPathNameW(raw_data(p), 0, nil, nil)
 	if n == 0 {
-		return "", os.Errno(win32.GetLastError())
+		return "", os.get_last_error()
 	}
 
 	buf := make([]u16, n, ta)
 	n = win32.GetFullPathNameW(raw_data(p), u32(len(buf)), raw_data(buf), nil)
 	if n == 0 {
 		delete(buf)
-		return "", os.Errno(win32.GetLastError())
+		return "", os.get_last_error()
 	}
 
-	return win32.utf16_to_utf8(buf[:n], ta) or_else "", os.ERROR_NONE
+	return win32.utf16_to_utf8(buf[:n], ta)
 }
 
 
@@ -81,7 +81,7 @@ temp_full_path :: proc(name: string) -> (path: string, err: os.Errno) {
 abs :: proc(path: string, allocator := context.allocator) -> (string, bool) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD(ignore = allocator == context.temp_allocator)
 	full_path, err := temp_full_path(path)
-	if err != 0 {
+	if err != nil {
 		return "", false
 	}
 	p := clean(full_path, allocator)

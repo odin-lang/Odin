@@ -1651,9 +1651,9 @@ gb_internal void add_type_and_value(CheckerContext *ctx, Ast *expr, AddressingMo
 
 		if (mode == Addressing_Constant || mode == Addressing_Invalid) {
 			expr->tav.value = value;
-		} else if (mode == Addressing_Value && is_type_typeid(type)) {
+		} else if (mode == Addressing_Value && type != nullptr && is_type_typeid(type)) {
 			expr->tav.value = value;
-		} else if (mode == Addressing_Value && is_type_proc(type)) {
+		} else if (mode == Addressing_Value && type != nullptr && is_type_proc(type)) {
 			expr->tav.value = value;
 		}
 

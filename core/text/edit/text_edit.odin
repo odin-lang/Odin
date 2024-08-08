@@ -137,7 +137,7 @@ clear_all :: proc(s: ^State) -> (cleared: bool) {
 
 // push current text state to the wanted undo|redo stack
 undo_state_push :: proc(s: ^State, undo: ^[dynamic]^Undo_State) -> mem.Allocator_Error {
-	if s.builder != nil {
+	if s.builder == nil {
 		return nil
 	}
 	text := string(s.builder.buf[:])

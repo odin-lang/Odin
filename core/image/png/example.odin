@@ -213,7 +213,7 @@ write_image_as_ppm :: proc(filename: string, image: ^image.Image) -> (success: b
 	}
 
 	fd, err := open(filename, flags, mode)
-	if err != 0 {
+	if err != nil {
 		return false
 	}
 	defer close(fd)

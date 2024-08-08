@@ -359,7 +359,7 @@ control_flow :: proc() {
 
 		if false {
 			f, err := os.open("my_file.txt")
-			if err != os.ERROR_NONE {
+			if err != nil {
 				// handle error
 			}
 			defer os.close(f)

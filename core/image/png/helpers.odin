@@ -450,7 +450,7 @@ when false {
 		}
 
 		fd, fderr := open(filename, flags, mode)
-		if fderr != 0 {
+		if fderr != nil {
 			return .Cannot_Open_File
 		}
 		defer close(fd)

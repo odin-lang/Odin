@@ -9,150 +9,289 @@ import "core:c"
 
 Handle :: distinct i32
 File_Time :: distinct u64
-Errno :: distinct i32
 
 INVALID_HANDLE :: ~Handle(0)
 
-ERROR_NONE:     Errno : 0 		/* No error */
-EPERM:          Errno : 1		/* Operation not permitted */
-ENOENT:         Errno : 2		/* No such file or directory */
-EINTR:          Errno : 4		/* Interrupted system call */
-ESRCH:          Errno : 3		/* No such process */
-EIO:            Errno : 5		/* Input/output error */
-ENXIO:          Errno : 6		/* Device not configured */
-E2BIG:          Errno : 7		/* Argument list too long */
-ENOEXEC:        Errno : 8		/* Exec format error */
-EBADF:          Errno : 9		/* Bad file descriptor */
-ECHILD:         Errno : 10		/* No child processes */
-EDEADLK:        Errno : 11		/* Resource deadlock avoided. 11 was EAGAIN */
-ENOMEM:         Errno : 12		/* Cannot allocate memory */
-EACCES:         Errno : 13		/* Permission denied */
-EFAULT:         Errno : 14		/* Bad address */
-ENOTBLK:        Errno : 15		/* Block device required */
-EBUSY:          Errno : 16		/* Device busy */
-EEXIST:         Errno : 17		/* File exists */
-EXDEV:          Errno : 18		/* Cross-device link */
-ENODEV:         Errno : 19		/* Operation not supported by device */
-ENOTDIR:        Errno : 20		/* Not a directory */
-EISDIR:         Errno : 21		/* Is a directory */
-EINVAL:         Errno : 22		/* Invalid argument */
-ENFILE:         Errno : 23		/* Too many open files in system */
-EMFILE:         Errno : 24		/* Too many open files */
-ENOTTY:         Errno : 25		/* Inappropriate ioctl for device */
-ETXTBSY:        Errno : 26		/* Text file busy */
-EFBIG:          Errno : 27		/* File too large */
-ENOSPC:         Errno : 28		/* No space left on device */
-ESPIPE:         Errno : 29		/* Illegal seek */
-EROFS:          Errno : 30		/* Read-only file system */
-EMLINK:         Errno : 31		/* Too many links */
-EPIPE:          Errno : 32		/* Broken pipe */
+_Platform_Error :: enum i32 {
+	NONE            = 0,
+	EPERM           = 1,          /* Operation not permitted */
+	ENOENT          = 2,          /* No such file or directory */
+	EINTR           = 4,          /* Interrupted system call */
+	ESRCH           = 3,          /* No such process */
+	EIO             = 5,          /* Input/output error */
+	ENXIO           = 6,          /* Device not configured */
+	E2BIG           = 7,          /* Argument list too long */
+	ENOEXEC         = 8,          /* Exec format error */
+	EBADF           = 9,          /* Bad file descriptor */
+	ECHILD          = 10,         /* No child processes */
+	EDEADLK         = 11,         /* Resource deadlock avoided. 11 was EAGAIN */
+	ENOMEM          = 12,         /* Cannot allocate memory */
+	EACCES          = 13,         /* Permission denied */
+	EFAULT          = 14,         /* Bad address */
+	ENOTBLK         = 15,         /* Block device required */
+	EBUSY           = 16,         /* Device busy */
+	EEXIST          = 17,         /* File exists */
+	EXDEV           = 18,         /* Cross-device link */
+	ENODEV          = 19,         /* Operation not supported by device */
+	ENOTDIR         = 20,         /* Not a directory */
+	EISDIR          = 21,         /* Is a directory */
+	EINVAL          = 22,         /* Invalid argument */
+	ENFILE          = 23,         /* Too many open files in system */
+	EMFILE          = 24,         /* Too many open files */
+	ENOTTY          = 25,         /* Inappropriate ioctl for device */
+	ETXTBSY         = 26,         /* Text file busy */
+	EFBIG           = 27,         /* File too large */
+	ENOSPC          = 28,         /* No space left on device */
+	ESPIPE          = 29,         /* Illegal seek */
+	EROFS           = 30,         /* Read-only file system */
+	EMLINK          = 31,         /* Too many links */
+	EPIPE           = 32,         /* Broken pipe */
+
+	/* math software */
+	EDOM            = 33,         /* Numerical argument out of domain */
+	ERANGE          = 34,         /* Result too large or too small */
+
+	/* non-blocking and interrupt i/o */
+	EAGAIN          = 35,         /* Resource temporarily unavailable */
+	EWOULDBLOCK     = EAGAIN,     /*  Operation would block */
+	EINPROGRESS     = 36,         /* Operation now in progress */
+	EALREADY        = 37,         /* Operation already in progress */
+
+	/* ipc/network software -- argument errors */
+	ENOTSOCK        = 38,         /* Socket operation on non-socket */
+	EDESTADDRREQ    = 39,         /* Destination address required */
+	EMSGSIZE        = 40,         /* Message too long */
+	EPROTOTYPE      = 41,         /* Protocol wrong type for socket */
+	ENOPROTOOPT     = 42,         /* Protocol option not available */
+	EPROTONOSUPPORT = 43,         /* Protocol not supported */
+	ESOCKTNOSUPPORT = 44,         /* Socket type not supported */
+	EOPNOTSUPP      = 45,         /* Operation not supported */
+	EPFNOSUPPORT    = 46,         /* Protocol family not supported */
+	EAFNOSUPPORT    = 47,         /* Address family not supported by protocol family */
+	EADDRINUSE      = 48,         /* Address already in use */
+	EADDRNOTAVAIL   = 49,         /* Can't assign requested address */
+
+	/* ipc/network software -- operational errors */
+	ENETDOWN        = 50,         /* Network is down */
+	ENETUNREACH     = 51,         /* Network is unreachable */
+	ENETRESET       = 52,         /* Network dropped connection on reset */
+	ECONNABORTED    = 53,         /* Software caused connection abort */
+	ECONNRESET      = 54,         /* Connection reset by peer */
+	ENOBUFS         = 55,         /* No buffer space available */
+	EISCONN         = 56,         /* Socket is already connected */
+	ENOTCONN        = 57,         /* Socket is not connected */
+	ESHUTDOWN       = 58,         /* Can't send after socket shutdown */
+	ETOOMANYREFS    = 59,         /* Too many references: can't splice */
+	ETIMEDOUT       = 60,         /* Operation timed out */
+	ECONNREFUSED    = 61,         /* Connection refused */
+
+	ELOOP           = 62,         /* Too many levels of symbolic links */
+	ENAMETOOLONG    = 63,         /* File name too long */
+
+	/* should be rearranged */
+	EHOSTDOWN       = 64,         /* Host is down */
+	EHOSTUNREACH    = 65,         /* No route to host */
+	ENOTEMPTY       = 66,         /* Directory not empty */
+
+	/* quotas & mush */
+	EPROCLIM        = 67,         /* Too many processes */
+	EUSERS          = 68,         /* Too many users */
+	EDQUOT          = 69,         /* Disc quota exceeded */
+
+	/* Network File System */
+	ESTALE          = 70,         /* Stale NFS file handle */
+	EREMOTE         = 71,         /* Too many levels of remote in path */
+	EBADRPC         = 72,         /* RPC struct is bad */
+	ERPCMISMATCH    = 73,         /* RPC version wrong */
+	EPROGUNAVAIL    = 74,         /* RPC prog. not avail */
+	EPROGMISMATCH   = 75,         /* Program version wrong */
+	EPROCUNAVAIL    = 76,         /* Bad procedure for program */
+
+	ENOLCK          = 77,         /* No locks available */
+	ENOSYS          = 78,         /* Function not implemented */
+
+	EFTYPE          = 79,         /* Inappropriate file type or format */
+	EAUTH           = 80,         /* Authentication error */
+	ENEEDAUTH       = 81,         /* Need authenticator */
+
+	/* SystemV IPC */
+	EIDRM           = 82,         /* Identifier removed */
+	ENOMSG          = 83,         /* No message of desired type */
+	EOVERFLOW       = 84,         /* Value too large to be stored in data type */
+
+	/* Wide/multibyte-character handling, ISO/IEC 9899/AMD1:1995 */
+	EILSEQ          = 85,         /* Illegal byte sequence */
+
+	/* From IEEE Std 1003.1-2001 */
+	/* Base, Realtime, Threads or Thread Priority Scheduling option errors */
+	ENOTSUP         = 86,         /* Not supported */
+
+	/* Realtime option errors */
+	ECANCELED       = 87,         /* Operation canceled */
+
+	/* Realtime, XSI STREAMS option errors */
+	EBADMSG         = 88,         /* Bad or Corrupt message */
+
+	/* XSI STREAMS option errors  */
+	ENODATA         = 89,         /* No message available */
+	ENOSR           = 90,         /* No STREAM resources */
+	ENOSTR          = 91,         /* Not a STREAM */
+	ETIME           = 92,         /* STREAM ioctl timeout */
+
+	/* File system extended attribute errors */
+	ENOATTR         = 93,         /* Attribute not found */
+
+	/* Realtime, XSI STREAMS option errors */
+	EMULTIHOP       = 94,         /* Multihop attempted */
+	ENOLINK         = 95,         /* Link has been severed */
+	EPROTO          = 96,         /* Protocol error */
+
+	/* Robust mutexes */
+	EOWNERDEAD      = 97,         /* Previous owner died */
+	ENOTRECOVERABLE = 98,         /* State not recoverable */
+
+	ELAST           = 98,         /* Must equal largest Error */
+}
+
+EPERM           :: Platform_Error.EPERM           /* Operation not permitted */
+ENOENT          :: Platform_Error.ENOENT          /* No such file or directory */
+EINTR           :: Platform_Error.EINTR           /* Interrupted system call */
+ESRCH           :: Platform_Error.ESRCH           /* No such process */
+EIO             :: Platform_Error.EIO             /* Input/output error */
+ENXIO           :: Platform_Error.ENXIO           /* Device not configured */
+E2BIG           :: Platform_Error.E2BIG           /* Argument list too long */
+ENOEXEC         :: Platform_Error.ENOEXEC         /* Exec format error */
+EBADF           :: Platform_Error.EBADF           /* Bad file descriptor */
+ECHILD          :: Platform_Error.ECHILD          /* No child processes */
+EDEADLK         :: Platform_Error.EDEADLK         /* Resource deadlock avoided. 11 was EAGAIN */
+ENOMEM          :: Platform_Error.ENOMEM          /* Cannot allocate memory */
+EACCES          :: Platform_Error.EACCES          /* Permission denied */
+EFAULT          :: Platform_Error.EFAULT          /* Bad address */
+ENOTBLK         :: Platform_Error.ENOTBLK         /* Block device required */
+EBUSY           :: Platform_Error.EBUSY           /* Device busy */
+EEXIST          :: Platform_Error.EEXIST          /* File exists */
+EXDEV           :: Platform_Error.EXDEV           /* Cross-device link */
+ENODEV          :: Platform_Error.ENODEV          /* Operation not supported by device */
+ENOTDIR         :: Platform_Error.ENOTDIR         /* Not a directory */
+EISDIR          :: Platform_Error.EISDIR          /* Is a directory */
+EINVAL          :: Platform_Error.EINVAL          /* Invalid argument */
+ENFILE          :: Platform_Error.ENFILE          /* Too many open files in system */
+EMFILE          :: Platform_Error.EMFILE          /* Too many open files */
+ENOTTY          :: Platform_Error.ENOTTY          /* Inappropriate ioctl for device */
+ETXTBSY         :: Platform_Error.ETXTBSY         /* Text file busy */
+EFBIG           :: Platform_Error.EFBIG           /* File too large */
+ENOSPC          :: Platform_Error.ENOSPC          /* No space left on device */
+ESPIPE          :: Platform_Error.ESPIPE          /* Illegal seek */
+EROFS           :: Platform_Error.EROFS           /* Read-only file system */
+EMLINK          :: Platform_Error.EMLINK          /* Too many links */
+EPIPE           :: Platform_Error.EPIPE           /* Broken pipe */
 
 /* math software */
-EDOM:           Errno : 33		/* Numerical argument out of domain */
-ERANGE:         Errno : 34		/* Result too large or too small */
+EDOM            :: Platform_Error.EDOM            /* Numerical argument out of domain */
+ERANGE          :: Platform_Error.ERANGE          /* Result too large or too small */
 
 /* non-blocking and interrupt i/o */
-EAGAIN:         Errno : 35		/* Resource temporarily unavailable */
-EWOULDBLOCK:    Errno : EAGAIN	/* Operation would block */
-EINPROGRESS:    Errno : 36		/* Operation now in progress */
-EALREADY:       Errno : 37		/* Operation already in progress */
+EAGAIN          :: Platform_Error.EAGAIN          /* Resource temporarily unavailable */
+EWOULDBLOCK     :: EAGAIN        /*  Operation would block */
+EINPROGRESS     :: Platform_Error.EINPROGRESS     /* Operation now in progress */
+EALREADY        :: Platform_Error.EALREADY        /* Operation already in progress */
 
 /* ipc/network software -- argument errors */
-ENOTSOCK:       Errno : 38		/* Socket operation on non-socket */
-EDESTADDRREQ:   Errno : 39		/* Destination address required */
-EMSGSIZE:       Errno : 40		/* Message too long */
-EPROTOTYPE:     Errno : 41		/* Protocol wrong type for socket */
-ENOPROTOOPT:    Errno : 42		/* Protocol option not available */
-EPROTONOSUPPORT:    Errno : 43		/* Protocol not supported */
-ESOCKTNOSUPPORT:    Errno : 44		/* Socket type not supported */
-EOPNOTSUPP:     Errno : 45		/* Operation not supported */
-EPFNOSUPPORT:   Errno : 46		/* Protocol family not supported */
-EAFNOSUPPORT:   Errno : 47		/* Address family not supported by protocol family */
-EADDRINUSE:     Errno : 48		/* Address already in use */
-EADDRNOTAVAIL:  Errno : 49		/* Can't assign requested address */
+ENOTSOCK        :: Platform_Error.ENOTSOCK        /* Socket operation on non-socket */
+EDESTADDRREQ    :: Platform_Error.EDESTADDRREQ    /* Destination address required */
+EMSGSIZE        :: Platform_Error.EMSGSIZE        /* Message too long */
+EPROTOTYPE      :: Platform_Error.EPROTOTYPE      /* Protocol wrong type for socket */
+ENOPROTOOPT     :: Platform_Error.ENOPROTOOPT     /* Protocol option not available */
+EPROTONOSUPPORT :: Platform_Error.EPROTONOSUPPORT /* Protocol not supported */
+ESOCKTNOSUPPORT :: Platform_Error.ESOCKTNOSUPPORT /* Socket type not supported */
+EOPNOTSUPP      :: Platform_Error.EOPNOTSUPP      /* Operation not supported */
+EPFNOSUPPORT    :: Platform_Error.EPFNOSUPPORT    /* Protocol family not supported */
+EAFNOSUPPORT    :: Platform_Error.EAFNOSUPPORT    /* Address family not supported by protocol family */
+EADDRINUSE      :: Platform_Error.EADDRINUSE      /* Address already in use */
+EADDRNOTAVAIL   :: Platform_Error.EADDRNOTAVAIL   /* Can't assign requested address */
 
 /* ipc/network software -- operational errors */
-ENETDOWN:       Errno : 50		/* Network is down */
-ENETUNREACH:    Errno : 51		/* Network is unreachable */
-ENETRESET:      Errno : 52		/* Network dropped connection on reset */
-ECONNABORTED:   Errno : 53		/* Software caused connection abort */
-ECONNRESET:     Errno : 54		/* Connection reset by peer */
-ENOBUFS:        Errno : 55		/* No buffer space available */
-EISCONN:        Errno : 56		/* Socket is already connected */
-ENOTCONN:       Errno : 57		/* Socket is not connected */
-ESHUTDOWN:      Errno : 58		/* Can't send after socket shutdown */
-ETOOMANYREFS:   Errno : 59		/* Too many references: can't splice */
-ETIMEDOUT:      Errno : 60		/* Operation timed out */
-ECONNREFUSED:   Errno : 61		/* Connection refused */
+ENETDOWN        :: Platform_Error.ENETDOWN        /* Network is down */
+ENETUNREACH     :: Platform_Error.ENETUNREACH     /* Network is unreachable */
+ENETRESET       :: Platform_Error.ENETRESET       /* Network dropped connection on reset */
+ECONNABORTED    :: Platform_Error.ECONNABORTED    /* Software caused connection abort */
+ECONNRESET      :: Platform_Error.ECONNRESET      /* Connection reset by peer */
+ENOBUFS         :: Platform_Error.ENOBUFS         /* No buffer space available */
+EISCONN         :: Platform_Error.EISCONN         /* Socket is already connected */
+ENOTCONN        :: Platform_Error.ENOTCONN        /* Socket is not connected */
+ESHUTDOWN       :: Platform_Error.ESHUTDOWN       /* Can't send after socket shutdown */
+ETOOMANYREFS    :: Platform_Error.ETOOMANYREFS    /* Too many references: can't splice */
+ETIMEDOUT       :: Platform_Error.ETIMEDOUT       /* Operation timed out */
+ECONNREFUSED    :: Platform_Error.ECONNREFUSED    /* Connection refused */
 
-ELOOP:          Errno : 62		/* Too many levels of symbolic links */
-ENAMETOOLONG:   Errno : 63		/* File name too long */
+ELOOP           :: Platform_Error.ELOOP           /* Too many levels of symbolic links */
+ENAMETOOLONG    :: Platform_Error.ENAMETOOLONG    /* File name too long */
 
 /* should be rearranged */
-EHOSTDOWN:      Errno : 64		/* Host is down */
-EHOSTUNREACH:   Errno : 65		/* No route to host */
-ENOTEMPTY:      Errno : 66		/* Directory not empty */
+EHOSTDOWN       :: Platform_Error.EHOSTDOWN       /* Host is down */
+EHOSTUNREACH    :: Platform_Error.EHOSTUNREACH    /* No route to host */
+ENOTEMPTY       :: Platform_Error.ENOTEMPTY       /* Directory not empty */
 
 /* quotas & mush */
-EPROCLIM:       Errno : 67		/* Too many processes */
-EUSERS:         Errno : 68		/* Too many users */
-EDQUOT:         Errno : 69		/* Disc quota exceeded */
+EPROCLIM        :: Platform_Error.EPROCLIM        /* Too many processes */
+EUSERS          :: Platform_Error.EUSERS          /* Too many users */
+EDQUOT          :: Platform_Error.EDQUOT          /* Disc quota exceeded */
 
 /* Network File System */
-ESTALE:         Errno : 70		/* Stale NFS file handle */
-EREMOTE:        Errno : 71		/* Too many levels of remote in path */
-EBADRPC:        Errno : 72		/* RPC struct is bad */
-ERPCMISMATCH:   Errno : 73		/* RPC version wrong */
-EPROGUNAVAIL:   Errno : 74		/* RPC prog. not avail */
-EPROGMISMATCH:  Errno : 75		/* Program version wrong */
-EPROCUNAVAIL:   Errno : 76		/* Bad procedure for program */
+ESTALE          :: Platform_Error.ESTALE          /* Stale NFS file handle */
+EREMOTE         :: Platform_Error.EREMOTE         /* Too many levels of remote in path */
+EBADRPC         :: Platform_Error.EBADRPC         /* RPC struct is bad */
+ERPCMISMATCH    :: Platform_Error.ERPCMISMATCH    /* RPC version wrong */
+EPROGUNAVAIL    :: Platform_Error.EPROGUNAVAIL    /* RPC prog. not avail */
+EPROGMISMATCH   :: Platform_Error.EPROGMISMATCH   /* Program version wrong */
+EPROCUNAVAIL    :: Platform_Error.EPROCUNAVAIL    /* Bad procedure for program */
 
-ENOLCK:         Errno : 77		/* No locks available */
-ENOSYS:         Errno : 78		/* Function not implemented */
+ENOLCK          :: Platform_Error.ENOLCK          /* No locks available */
+ENOSYS          :: Platform_Error.ENOSYS          /* Function not implemented */
 
-EFTYPE:         Errno : 79		/* Inappropriate file type or format */
-EAUTH:          Errno : 80		/* Authentication error */
-ENEEDAUTH:      Errno : 81		/* Need authenticator */
+EFTYPE          :: Platform_Error.EFTYPE          /* Inappropriate file type or format */
+EAUTH           :: Platform_Error.EAUTH           /* Authentication error */
+ENEEDAUTH       :: Platform_Error.ENEEDAUTH       /* Need authenticator */
 
 /* SystemV IPC */
-EIDRM:          Errno : 82		/* Identifier removed */
-ENOMSG:         Errno : 83		/* No message of desired type */
-EOVERFLOW:      Errno : 84		/* Value too large to be stored in data type */
+EIDRM           :: Platform_Error.EIDRM           /* Identifier removed */
+ENOMSG          :: Platform_Error.ENOMSG          /* No message of desired type */
+EOVERFLOW       :: Platform_Error.EOVERFLOW       /* Value too large to be stored in data type */
 
 /* Wide/multibyte-character handling, ISO/IEC 9899/AMD1:1995 */
-EILSEQ:         Errno : 85		/* Illegal byte sequence */
+EILSEQ          :: Platform_Error.EILSEQ          /* Illegal byte sequence */
 
 /* From IEEE Std 1003.1-2001 */
 /* Base, Realtime, Threads or Thread Priority Scheduling option errors */
-ENOTSUP:        Errno : 86		/* Not supported */
+ENOTSUP         :: Platform_Error.ENOTSUP         /* Not supported */
 
 /* Realtime option errors */
-ECANCELED:      Errno : 87		/* Operation canceled */
+ECANCELED       :: Platform_Error.ECANCELED       /* Operation canceled */
 
 /* Realtime, XSI STREAMS option errors */
-EBADMSG:        Errno : 88		/* Bad or Corrupt message */
+EBADMSG         :: Platform_Error.EBADMSG         /* Bad or Corrupt message */
 
 /* XSI STREAMS option errors  */
-ENODATA:        Errno : 89		/* No message available */
-ENOSR:          Errno : 90		/* No STREAM resources */
-ENOSTR:         Errno : 91		/* Not a STREAM */
-ETIME:          Errno : 92		/* STREAM ioctl timeout */
+ENODATA         :: Platform_Error.ENODATA         /* No message available */
+ENOSR           :: Platform_Error.ENOSR           /* No STREAM resources */
+ENOSTR          :: Platform_Error.ENOSTR          /* Not a STREAM */
+ETIME           :: Platform_Error.ETIME           /* STREAM ioctl timeout */
 
 /* File system extended attribute errors */
-ENOATTR:        Errno : 93		/* Attribute not found */
+ENOATTR         :: Platform_Error.ENOATTR         /* Attribute not found */
 
 /* Realtime, XSI STREAMS option errors */
-EMULTIHOP:      Errno : 94		/* Multihop attempted */
-ENOLINK:        Errno : 95		/* Link has been severed */
-EPROTO:         Errno : 96		/* Protocol error */
+EMULTIHOP       :: Platform_Error.EMULTIHOP       /* Multihop attempted */
+ENOLINK         :: Platform_Error.ENOLINK         /* Link has been severed */
+EPROTO          :: Platform_Error.EPROTO          /* Protocol error */
 
 /* Robust mutexes */
-EOWNERDEAD:     Errno : 97		/* Previous owner died */
-ENOTRECOVERABLE:    Errno : 98		/* State not recoverable */
+EOWNERDEAD      :: Platform_Error.EOWNERDEAD      /* Previous owner died */
+ENOTRECOVERABLE :: Platform_Error.ENOTRECOVERABLE /* State not recoverable */
 
-ELAST:          Errno : 98		/* Must equal largest errno */
+ELAST           :: Platform_Error.ELAST           /* Must equal largest Error */
 
-/* end of errno */
+/* end of Error */
 
 O_RDONLY   :: 0x000000000
 O_WRONLY   :: 0x000000001
@@ -268,13 +407,13 @@ S_ISUID :: 0o4000 // Set user id on execution
 S_ISGID :: 0o2000 // Set group id on execution
 S_ISVTX :: 0o1000 // Directory restrcted delete
 
-S_ISLNK  :: #force_inline proc "contextless" (m: mode_t) -> bool { return (m & S_IFMT) == S_IFLNK  }
-S_ISREG  :: #force_inline proc "contextless" (m: mode_t) -> bool { return (m & S_IFMT) == S_IFREG  }
-S_ISDIR  :: #force_inline proc "contextless" (m: mode_t) -> bool { return (m & S_IFMT) == S_IFDIR  }
-S_ISCHR  :: #force_inline proc "contextless" (m: mode_t) -> bool { return (m & S_IFMT) == S_IFCHR  }
-S_ISBLK  :: #force_inline proc "contextless" (m: mode_t) -> bool { return (m & S_IFMT) == S_IFBLK  }
-S_ISFIFO :: #force_inline proc "contextless" (m: mode_t) -> bool { return (m & S_IFMT) == S_IFIFO  }
-S_ISSOCK :: #force_inline proc "contextless" (m: mode_t) -> bool { return (m & S_IFMT) == S_IFSOCK }
+@(require_results) S_ISLNK  :: #force_inline proc "contextless" (m: mode_t) -> bool { return (m & S_IFMT) == S_IFLNK  }
+@(require_results) S_ISREG  :: #force_inline proc "contextless" (m: mode_t) -> bool { return (m & S_IFMT) == S_IFREG  }
+@(require_results) S_ISDIR  :: #force_inline proc "contextless" (m: mode_t) -> bool { return (m & S_IFMT) == S_IFDIR  }
+@(require_results) S_ISCHR  :: #force_inline proc "contextless" (m: mode_t) -> bool { return (m & S_IFMT) == S_IFCHR  }
+@(require_results) S_ISBLK  :: #force_inline proc "contextless" (m: mode_t) -> bool { return (m & S_IFMT) == S_IFBLK  }
+@(require_results) S_ISFIFO :: #force_inline proc "contextless" (m: mode_t) -> bool { return (m & S_IFMT) == S_IFIFO  }
+@(require_results) S_ISSOCK :: #force_inline proc "contextless" (m: mode_t) -> bool { return (m & S_IFMT) == S_IFSOCK }
 
 F_OK :: 0 // Test for file existance
 X_OK :: 1 // Test for execute permission
@@ -306,7 +445,7 @@ foreign libc {
 	@(link_name="fdopendir")        _unix_fdopendir     :: proc(fd: Handle) -> Dir ---
 	@(link_name="closedir")         _unix_closedir      :: proc(dirp: Dir) -> c.int ---
 	@(link_name="rewinddir")        _unix_rewinddir     :: proc(dirp: Dir) ---
-	@(link_name="readdir_r")        _unix_readdir_r     :: proc(dirp: Dir, entry: ^Dirent, result: ^^Dirent) -> c.int ---
+	@(link_name="__readdir_r30")    _unix_readdir_r     :: proc(dirp: Dir, entry: ^Dirent, result: ^^Dirent) -> c.int ---
 
 	@(link_name="malloc")           _unix_malloc        :: proc(size: c.size_t) -> rawptr ---
 	@(link_name="calloc")           _unix_calloc        :: proc(num, size: c.size_t) -> rawptr ---
@@ -334,154 +473,186 @@ foreign libc {
 
 // NOTE(phix): Perhaps share the following functions with FreeBSD if they turn out to be the same in the end.
 
+@(require_results)
 is_path_separator :: proc(r: rune) -> bool {
 	return r == '/'
 }
 
-get_last_error :: proc "contextless" () -> int {
-	return int(__errno_location()^)
+@(require_results, no_instrumentation)
+get_last_error :: proc "contextless" () -> Error {
+	return Platform_Error(__errno_location()^)
 }
 
-open :: proc(path: string, flags: int = O_RDONLY, mode: int = 0) -> (Handle, Errno) {
+@(require_results)
+open :: proc(path: string, flags: int = O_RDONLY, mode: int = 0) -> (Handle, Error) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	cstr := strings.clone_to_cstring(path, context.temp_allocator)
 	handle := _unix_open(cstr, c.int(flags), c.int(mode))
 	if handle == -1 {
-		return INVALID_HANDLE, Errno(get_last_error())
+		return INVALID_HANDLE, get_last_error()
 	}
-	return handle, ERROR_NONE
+	return handle, nil
 }
 
-close :: proc(fd: Handle) -> Errno {
+close :: proc(fd: Handle) -> Error {
 	result := _unix_close(fd)
 	if result == -1 {
-		return Errno(get_last_error())
+		return get_last_error()
 	}
-	return ERROR_NONE
+	return nil
+}
+
+flush :: proc(fd: Handle) -> Error {
+	// do nothing
+	return nil
 }
 
 // We set a max of 1GB to keep alignment and to be safe.
 @(private)
 MAX_RW :: 1 << 30
 
-read :: proc(fd: Handle, data: []byte) -> (int, Errno) {
+read :: proc(fd: Handle, data: []byte) -> (int, Error) {
 	to_read    := min(c.size_t(len(data)), MAX_RW)
 	bytes_read := _unix_read(fd, &data[0], to_read)
 	if bytes_read == -1 {
-		return -1, Errno(get_last_error())
+		return -1, get_last_error()
 	}
-	return int(bytes_read), ERROR_NONE
+	return int(bytes_read), nil
 }
 
-write :: proc(fd: Handle, data: []byte) -> (int, Errno) {
+write :: proc(fd: Handle, data: []byte) -> (int, Error) {
 	if len(data) == 0 {
-		return 0, ERROR_NONE
+		return 0, nil
 	}
 
 	to_write      := min(c.size_t(len(data)), MAX_RW)
 	bytes_written := _unix_write(fd, &data[0], to_write)
 	if bytes_written == -1 {
-		return -1, Errno(get_last_error())
+		return -1, get_last_error()
 	}
-	return int(bytes_written), ERROR_NONE
+	return int(bytes_written), nil
 }
 
-seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
+read_at :: proc(fd: Handle, data: []byte, offset: i64) -> (n: int, err: Error) {
+	curr := seek(fd, offset, SEEK_CUR) or_return
+	n, err = read(fd, data)
+	_, err1 := seek(fd, curr, SEEK_SET)
+	if err1 != nil && err == nil {
+		err = err1
+	}
+	return
+}
+
+write_at :: proc(fd: Handle, data: []byte, offset: i64) -> (n: int, err: Error) {
+	curr := seek(fd, offset, SEEK_CUR) or_return
+	n, err = write(fd, data)
+	_, err1 := seek(fd, curr, SEEK_SET)
+	if err1 != nil && err == nil {
+		err = err1
+	}
+	return
+}
+
+seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Error) {
 	res := _unix_seek(fd, offset, c.int(whence))
 	if res == -1 {
-		return -1, Errno(get_last_error())
+		return -1, get_last_error()
 	}
-	return res, ERROR_NONE
+	return res, nil
 }
 
-file_size :: proc(fd: Handle) -> (i64, Errno) {
-	s, err := _fstat(fd)
-	if err != ERROR_NONE {
-		return -1, err
-	}
-	return s.size, ERROR_NONE
+@(require_results)
+file_size :: proc(fd: Handle) -> (size: i64, err: Error) {
+	size = -1
+	s := _fstat(fd) or_return
+	size = s.size
+	return
 }
 
-rename :: proc(old_path, new_path: string) -> Errno {
+rename :: proc(old_path, new_path: string) -> Error {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	old_path_cstr := strings.clone_to_cstring(old_path, context.temp_allocator)
 	new_path_cstr := strings.clone_to_cstring(new_path, context.temp_allocator)
 	res := _unix_rename(old_path_cstr, new_path_cstr)
 	if res == -1 {
-		return Errno(get_last_error())
+		return get_last_error()
 	}
-	return ERROR_NONE
+	return nil
 }
 
-remove :: proc(path: string) -> Errno {
+remove :: proc(path: string) -> Error {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	path_cstr := strings.clone_to_cstring(path, context.temp_allocator)
 	res := _unix_unlink(path_cstr)
 	if res == -1 {
-		return Errno(get_last_error())
+		return get_last_error()
 	}
-	return ERROR_NONE
+	return nil
 }
 
-make_directory :: proc(path: string, mode: mode_t = 0o775) -> Errno {
+make_directory :: proc(path: string, mode: mode_t = 0o775) -> Error {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	path_cstr := strings.clone_to_cstring(path, context.temp_allocator)
 	res := _unix_mkdir(path_cstr, mode)
 	if res == -1 {
-		return Errno(get_last_error())
+		return get_last_error()
 	}
-	return ERROR_NONE
+	return nil
 }
 
-remove_directory :: proc(path: string) -> Errno {
+remove_directory :: proc(path: string) -> Error {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	path_cstr := strings.clone_to_cstring(path, context.temp_allocator)
 	res := _unix_rmdir(path_cstr)
 	if res == -1 {
-		return Errno(get_last_error())
+		return get_last_error()
 	}
-	return ERROR_NONE
+	return nil
 }
 
+@(require_results)
 is_file_handle :: proc(fd: Handle) -> bool {
 	s, err := _fstat(fd)
-	if err != ERROR_NONE {
+	if err != nil {
 		return false
 	}
 	return S_ISREG(s.mode)
 }
 
+@(require_results)
 is_file_path :: proc(path: string, follow_links: bool = true) -> bool {
 	s: OS_Stat
-	err: Errno
+	err: Error
 	if follow_links {
 		s, err = _stat(path)
 	} else {
 		s, err = _lstat(path)
 	}
-	if err != ERROR_NONE {
+	if err != nil {
 		return false
 	}
 	return S_ISREG(s.mode)
 }
 
+@(require_results)
 is_dir_handle :: proc(fd: Handle) -> bool {
 	s, err := _fstat(fd)
-	if err != ERROR_NONE {
+	if err != nil {
 		return false
 	}
 	return S_ISDIR(s.mode)
 }
 
+@(require_results)
 is_dir_path :: proc(path: string, follow_links: bool = true) -> bool {
 	s: OS_Stat
-	err: Errno
+	err: Error
 	if follow_links {
 		s, err = _stat(path)
 	} else {
 		s, err = _lstat(path)
 	}
-	if err != ERROR_NONE {
+	if err != nil {
 		return false
 	}
 	return S_ISDIR(s.mode)
@@ -490,6 +661,7 @@ is_dir_path :: proc(path: string, follow_links: bool = true) -> bool {
 is_file :: proc {is_file_path, is_file_handle}
 is_dir :: proc {is_dir_path, is_dir_handle}
 
+@(require_results)
 exists :: proc(path: string) -> bool {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	cpath := strings.clone_to_cstring(path, context.temp_allocator)
@@ -497,12 +669,13 @@ exists :: proc(path: string) -> bool {
 	return res == 0
 }
 
-fcntl :: proc(fd: int, cmd: int, arg: int) -> (int, Errno) {
+@(require_results)
+fcntl :: proc(fd: int, cmd: int, arg: int) -> (int, Error) {
 	result := _unix_fcntl(Handle(fd), c.int(cmd), uintptr(arg))
 	if result < 0 {
-		return 0, Errno(get_last_error())
+		return 0, get_last_error()
 	}
-	return int(result), ERROR_NONE
+	return int(result), nil
 }
 
 // NOTE(bill): Uses startup to initialize it
@@ -511,38 +684,34 @@ stdin: Handle  = 0
 stdout: Handle = 1
 stderr: Handle = 2
 
-last_write_time :: proc(fd: Handle) -> (File_Time, Errno) {
-	s, err := _fstat(fd)
-	if err != ERROR_NONE {
-		return 0, err
-	}
+@(require_results)
+last_write_time :: proc(fd: Handle) -> (time: File_Time, err: Error) {
+	s := _fstat(fd) or_return
 	modified := s.modified.seconds * 1_000_000_000 + s.modified.nanoseconds
-	return File_Time(modified), ERROR_NONE
+	return File_Time(modified), nil
 }
 
-last_write_time_by_name :: proc(name: string) -> (File_Time, Errno) {
-	s, err := _stat(name)
-	if err != ERROR_NONE {
-		return 0, err
-	}
+@(require_results)
+last_write_time_by_name :: proc(name: string) -> (time: File_Time, err: Error) {
+	s := _stat(name) or_return
 	modified := s.modified.seconds * 1_000_000_000 + s.modified.nanoseconds
-	return File_Time(modified), ERROR_NONE
+	return File_Time(modified), nil
 }
 
-@private
-_stat :: proc(path: string) -> (OS_Stat, Errno) {
+@(private, require_results)
+_stat :: proc(path: string) -> (OS_Stat, Error) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	cstr := strings.clone_to_cstring(path, context.temp_allocator)
 	s: OS_Stat = ---
 	result := _unix_lstat(cstr, &s)
 	if result == -1 {
-		return s, Errno(get_last_error())
+		return s, get_last_error()
 	}
-	return s, ERROR_NONE
+	return s, nil
 }
 
-@private
-_lstat :: proc(path: string) -> (OS_Stat, Errno) {
+@(private, require_results)
+_lstat :: proc(path: string) -> (OS_Stat, Error) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	cstr := strings.clone_to_cstring(path, context.temp_allocator)
 	
@@ -550,54 +719,54 @@ _lstat :: proc(path: string) -> (OS_Stat, Errno) {
 	s: OS_Stat = ---
 	res := _unix_lstat(cstr, &s)
 	if res == -1 {
-		return s, Errno(get_last_error())
+		return s, get_last_error()
 	}
-	return s, ERROR_NONE
+	return s, nil
 }
 
-@private
-_fstat :: proc(fd: Handle) -> (OS_Stat, Errno) {
+@(private, require_results)
+_fstat :: proc(fd: Handle) -> (OS_Stat, Error) {
 	s: OS_Stat = ---
 	result := _unix_fstat(fd, &s)
 	if result == -1 {
-		return s, Errno(get_last_error())
+		return s, get_last_error()
 	}
-	return s, ERROR_NONE
+	return s, nil
 }
 
-@private
-_fdopendir :: proc(fd: Handle) -> (Dir, Errno) {
+@(private, require_results)
+_fdopendir :: proc(fd: Handle) -> (Dir, Error) {
 	dirp := _unix_fdopendir(fd)
 	if dirp == cast(Dir)nil {
-		return nil, Errno(get_last_error())
+		return nil, get_last_error()
 	}
-	return dirp, ERROR_NONE
+	return dirp, nil
 }
 
-@private
-_closedir :: proc(dirp: Dir) -> Errno {
+@(private)
+_closedir :: proc(dirp: Dir) -> Error {
 	rc := _unix_closedir(dirp)
 	if rc != 0 {
-		return Errno(get_last_error())
+		return get_last_error()
 	}
-	return ERROR_NONE
+	return nil
 }
 
-@private
+@(private)
 _rewinddir :: proc(dirp: Dir) {
 	_unix_rewinddir(dirp)
 }
 
-@private
-_readdir :: proc(dirp: Dir) -> (entry: Dirent, err: Errno, end_of_stream: bool) {
+@(private, require_results)
+_readdir :: proc(dirp: Dir) -> (entry: Dirent, err: Error, end_of_stream: bool) {
 	result: ^Dirent
 	rc := _unix_readdir_r(dirp, &entry, &result)
 
 	if rc != 0 {
-		err = Errno(get_last_error())
+		err = get_last_error()
 		return
 	}
-	err = ERROR_NONE
+	err = nil
 
 	if result == nil {
 		end_of_stream = true
@@ -607,8 +776,8 @@ _readdir :: proc(dirp: Dir) -> (entry: Dirent, err: Errno, end_of_stream: bool) 
 	return
 }
 
-@private
-_readlink :: proc(path: string) -> (string, Errno) {
+@(private, require_results)
+_readlink :: proc(path: string) -> (string, Error) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD(ignore = context.temp_allocator == context.allocator)
 
 	path_cstr := strings.clone_to_cstring(path, context.temp_allocator)
@@ -619,31 +788,28 @@ _readlink :: proc(path: string) -> (string, Errno) {
 		rc := _unix_readlink(path_cstr, &(buf[0]), bufsz)
 		if rc == -1 {
 			delete(buf)
-			return "", Errno(get_last_error())
+			return "", get_last_error()
 		} else if rc == int(bufsz) {
 			bufsz += MAX_PATH
 			delete(buf)
 			buf = make([]byte, bufsz)
 		} else {
-			return strings.string_from_ptr(&buf[0], rc), ERROR_NONE
+			return strings.string_from_ptr(&buf[0], rc), nil
 		}	
 	}
 
-	return "", Errno{}
+	return "", Error{}
 }
 
-absolute_path_from_handle :: proc(fd: Handle) -> (string, Errno) {
+@(require_results)
+absolute_path_from_handle :: proc(fd: Handle) -> (path: string, err: Error) {
 	buf: [MAX_PATH]byte
-	_, err := fcntl(int(fd), F_GETPATH, int(uintptr(&buf[0])))
-	if err != ERROR_NONE {
-		return "", err
-	}
-
-	path := strings.clone_from_cstring(cstring(&buf[0]))
-	return path, err
+	_ = fcntl(int(fd), F_GETPATH, int(uintptr(&buf[0]))) or_return
+	return strings.clone_from_cstring(cstring(&buf[0]))
 }
 
-absolute_path_from_relative :: proc(rel: string) -> (path: string, err: Errno) {
+@(require_results)
+absolute_path_from_relative :: proc(rel: string) -> (path: string, err: Error) {
 	rel := rel
 	if rel == "" {
 		rel = "."
@@ -654,26 +820,27 @@ absolute_path_from_relative :: proc(rel: string) -> (path: string, err: Errno) {
 
 	path_ptr := _unix_realpath(rel_cstr, nil)
 	if path_ptr == nil {
-		return "", Errno(get_last_error())
+		return "", get_last_error()
 	}
 	defer _unix_free(path_ptr)
 
 	path = strings.clone(string(cstring(path_ptr)))
 
-	return path, ERROR_NONE
+	return path, nil
 }
 
-access :: proc(path: string, mask: int) -> (bool, Errno) {
+access :: proc(path: string, mask: int) -> (bool, Error) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 
 	cstr := strings.clone_to_cstring(path, context.temp_allocator)
 	result := _unix_access(cstr, c.int(mask))
 	if result == -1 {
-		return false, Errno(get_last_error())
+		return false, get_last_error()
 	}
-	return true, ERROR_NONE
+	return true, nil
 }
 
+@(require_results)
 lookup_env :: proc(key: string, allocator := context.allocator) -> (value: string, found: bool) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD(ignore = context.temp_allocator == allocator)
 
@@ -685,11 +852,13 @@ lookup_env :: proc(key: string, allocator := context.allocator) -> (value: strin
 	return strings.clone(string(cstr), allocator), true
 }
 
+@(require_results)
 get_env :: proc(key: string, allocator := context.allocator) -> (value: string) {
 	value, _ = lookup_env(key, allocator)
 	return
 }
 
+@(require_results)
 get_current_directory :: proc() -> string {
 	// NOTE(tetra): I would use PATH_MAX here, but I was not able to find
 	// an authoritative value for it across all systems.
@@ -701,7 +870,7 @@ get_current_directory :: proc() -> string {
 		if cwd != nil {
 			return string(cwd)
 		}
-		if Errno(get_last_error()) != ERANGE {
+		if get_last_error() != ERANGE {
 			delete(buf)
 			return ""
 		}
@@ -710,14 +879,14 @@ get_current_directory :: proc() -> string {
 	unreachable()
 }
 
-set_current_directory :: proc(path: string) -> (err: Errno) {
+set_current_directory :: proc(path: string) -> (err: Error) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	cstr := strings.clone_to_cstring(path, context.temp_allocator)
 	res := _unix_chdir(cstr)
 	if res == -1 {
-		return Errno(get_last_error())
+		return get_last_error()
 	}
-	return ERROR_NONE
+	return nil
 }
 
 exit :: proc "contextless" (code: int) -> ! {
@@ -725,10 +894,12 @@ exit :: proc "contextless" (code: int) -> ! {
 	_unix_exit(c.int(code))
 }
 
+@(require_results)
 current_thread_id :: proc "contextless" () -> int {
 	return int(_lwp_self())
 }
 
+@(require_results)
 dlopen :: proc(filename: string, flags: int) -> rawptr {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	cstr := strings.clone_to_cstring(filename, context.temp_allocator)
@@ -736,6 +907,7 @@ dlopen :: proc(filename: string, flags: int) -> rawptr {
 	return handle
 }
 
+@(require_results)
 dlsym :: proc(handle: rawptr, symbol: string) -> rawptr {
 	assert(handle != nil)
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
@@ -749,10 +921,12 @@ dlclose :: proc(handle: rawptr) -> bool {
 	return _unix_dlclose(handle) == 0
 }
 
+@(require_results)
 dlerror :: proc() -> string {
 	return string(_unix_dlerror())
 }
 
+@(require_results)
 get_page_size :: proc() -> int {
 	// NOTE(tetra): The page size never changes, so why do anything complicated
 	// if we don't have to.
@@ -765,7 +939,7 @@ get_page_size :: proc() -> int {
 	return page_size
 }
 
-@(private)
+@(private, require_results)
 _processor_core_count :: proc() -> int {
 	count : int = 0
 	count_size := size_of(count)
@@ -778,6 +952,7 @@ _processor_core_count :: proc() -> int {
 	return 1
 }
 
+@(require_results)
 _alloc_command_line_arguments :: proc() -> []string {
 	res := make([]string, len(runtime.args__))
 	for arg, i in runtime.args__ {

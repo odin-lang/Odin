@@ -1778,6 +1778,7 @@ parse_var_type :: proc(p: ^Parser, flags: ast.Field_Flags) -> ^ast.Expr {
 			type = ast.new(ast.Bad_Expr, tok.pos, end_pos(tok))
 		}
 		e := ast.new(ast.Ellipsis, type.pos, type)
+		e.tok = tok.kind
 		e.expr = type
 		return e
 	}
@@ -2844,7 +2845,7 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 
 		close := expect_closing_brace_of_field_list(p)
 
-		bf := ast.new(ast.Bit_Field_Type, tok.pos, close.pos)
+		bf := ast.new(ast.Bit_Field_Type, tok.pos, end_pos(close))
 
 		bf.tok_pos      = tok.pos
 		bf.backing_type = backing_type
