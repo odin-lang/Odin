@@ -91,6 +91,29 @@ _sys_permission_mode :: #force_inline proc (mode: Permission) -> u32 {
 	return cflags
 }
 
+_sys_open_mode :: #force_inline proc(mode: Open_Flags) -> u32 {
+	cflags : u32 = 0
+
+	cflags |= OPEN_FLAG_RDONLY       * u32(Open_Flags.RDONLY in mode)
+	cflags |= OPEN_FLAG_WRONLY       * u32(Open_Flags.WRONLY in mode)
+	cflags |= OPEN_FLAG_RDWR         * u32(Open_Flags.RDWR in mode)
+	cflags |= OPEN_FLAG_NONBLOCK     * u32(Open_Flags.NONBLOCK in mode)
+	cflags |= OPEN_FLAG_CREAT        * u32(Open_Flags.CREAT in mode)
+	cflags |= OPEN_FLAG_APPEND       * u32(Open_Flags.APPEND in mode)
+	cflags |= OPEN_FLAG_TRUNC        * u32(Open_Flags.TRUNC in mode)
+	cflags |= OPEN_FLAG_EXCL         * u32(Open_Flags.EXCL in mode)
+	cflags |= OPEN_FLAG_SHLOCK       * u32(Open_Flags.SHLOCK in mode)
+	cflags |= OPEN_FLAG_EXLOCK       * u32(Open_Flags.EXLOCK in mode)
+	cflags |= OPEN_FLAG_DIRECTORY    * u32(Open_Flags.DIRECTORY in mode)
+	cflags |= OPEN_FLAG_NOFOLLOW     * u32(Open_Flags.NOFOLLOW in mode)
+	cflags |= OPEN_FLAG_SYMLINK      * u32(Open_Flags.SYMLINK in mode)
+	cflags |= OPEN_FLAG_EVTONLY      * u32(Open_Flags.EVTONLY in mode)
+	cflags |= OPEN_FLAG_CLOEXEC      * u32(Open_Flags.CLOEXEC in mode)
+	cflags |= OPEN_FLAG_NOFOLLOW_ANY * u32(Open_Flags.NOFOLLOW_ANY in mode)
+
+	return cflags
+}
+
 @(private)
 clone_to_cstring :: proc(s: string, allocator: runtime.Allocator, loc := #caller_location) -> cstring {
 	c := make([]byte, len(s)+1, allocator, loc)
@@ -109,22 +132,7 @@ sys_open :: proc(path: string, oflag: Open_Flags, mode: Permission) -> (c.int, b
 
 	cflags = _sys_permission_mode(mode)
 
-	cmode |= OPEN_FLAG_RDONLY       * u32(Open_Flags.RDONLY in oflag)
-	cmode |= OPEN_FLAG_WRONLY       * u32(Open_Flags.WRONLY in oflag)
-	cmode |= OPEN_FLAG_RDWR         * u32(Open_Flags.RDWR in oflag)
-	cmode |= OPEN_FLAG_NONBLOCK     * u32(Open_Flags.NONBLOCK in oflag)
-	cmode |= OPEN_FLAG_CREAT        * u32(Open_Flags.CREAT in oflag)
-	cmode |= OPEN_FLAG_APPEND       * u32(Open_Flags.APPEND in oflag)
-	cmode |= OPEN_FLAG_TRUNC        * u32(Open_Flags.TRUNC in oflag)
-	cmode |= OPEN_FLAG_EXCL         * u32(Open_Flags.EXCL in oflag)
-	cmode |= OPEN_FLAG_SHLOCK       * u32(Open_Flags.SHLOCK in oflag)
-	cmode |= OPEN_FLAG_EXLOCK       * u32(Open_Flags.EXLOCK in oflag)
-	cmode |= OPEN_FLAG_DIRECTORY    * u32(Open_Flags.DIRECTORY in oflag)
-	cmode |= OPEN_FLAG_NOFOLLOW     * u32(Open_Flags.NOFOLLOW in oflag)
-	cmode |= OPEN_FLAG_SYMLINK      * u32(Open_Flags.SYMLINK in oflag)
-	cmode |= OPEN_FLAG_EVTONLY      * u32(Open_Flags.EVTONLY in oflag)
-	cmode |= OPEN_FLAG_CLOEXEC      * u32(Open_Flags.CLOEXEC in oflag)
-	cmode |= OPEN_FLAG_NOFOLLOW_ANY * u32(Open_Flags.NOFOLLOW_ANY in oflag)
+	cmode = _sys_open_mode(oflag)
 	
 	result := syscall_open(cpath, cmode, cflags)
 	state  := result != -1
@@ -186,4 +194,30 @@ sys_lstat :: proc(path: string, status: ^stat) -> bool {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	cpath: cstring = clone_to_cstring(path, context.temp_allocator)
 	return syscall_lstat(cpath, status) != -1
+}
+
+sys_shm_open :: proc(name: string, oflag: Open_Flags, mode: Permission) -> (c.int, bool) {
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
+
+	cmode: u32 = 0
+	cflags: u32 = 0
+	cname: cstring = clone_to_cstring(name, context.temp_allocator)
+
+	cflags = _sys_permission_mode(mode)
+
+	cmode = _sys_open_mode(oflag)
+
+	result := syscall_shm_open(cname, cmode, cflags)
+	state  := result != -1
+
+	// NOTE(beau): Presently fstat doesn't report any changed permissions
+	// on the file descriptor even with this fchmod (which fails with a
+	// non-zero return). I can also reproduce this with the syscalls in c
+	// so I suspect it's not odin's bug. I've left the fchmod in case the
+	// underlying issue is fixed.
+	if state && cflags != 0 {
+		state = (syscall_fchmod(result, cflags) != -1)
+	}
+
+	return result * cast(c.int)state, state
 }
