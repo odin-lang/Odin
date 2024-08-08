@@ -1276,12 +1276,6 @@ FOF_NO_UI                 :: (FOF_SILENT | FOF_NOCONFIRMATION | FOF_NOERRORUI | 
 
 FILEOP_FLAGS :: WORD
 
-SYMBOLIC_LINK_FLAG :: enum DWORD {
-	DIRECTORY                = 0,
-	ALLOW_UNPRIVILGED_CREATE = 1,
-}
-SYMBOLIC_LINK_FLAGS :: bit_set[SYMBOLIC_LINK_FLAG; DWORD]
-
 DEVMODEW :: struct {
 	dmDeviceName:   [32]wchar_t,
 	dmSpecVersion:   WORD,

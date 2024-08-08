@@ -15,7 +15,7 @@ read_dir :: proc(t: ^testing.T) {
 	when ODIN_OS == .Windows {
 		link    := win32.utf8_to_wstring(#directory + "dir/alink.txt")
 		target  := win32.utf8_to_wstring(#directory + "dir/a.txt")
-		sym_err := win32.CreateSymbolicLinkW(link, target, {.ALLOW_UNPRIVILGED_CREATE})
+		sym_err := win32.CreateSymbolicLinkW(link, target, win32.SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE)
 
 		if !sym_err {
 			log.infof("Unable to create symlink, skipping test. Error: %v", win32.GetLastError())
