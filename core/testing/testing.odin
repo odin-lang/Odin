@@ -141,20 +141,19 @@ expect_value :: proc(t: ^T, value, expected: $T, loc := #caller_location) -> boo
 Memory_Verifier_Proc :: #type proc(t: ^T, ta: ^mem.Tracking_Allocator)
 
 expect_leaks :: proc(t: ^T, client_test: proc(t: ^T), verifier: Memory_Verifier_Proc) {
-	{
-		ta: mem.Tracking_Allocator
-		mem.tracking_allocator_init(&ta, context.allocator)
-		defer mem.tracking_allocator_destroy(&ta)
-		context.allocator = mem.tracking_allocator(&ta)
-
+	when TRACKING_MEMORY {
 		client_test(t)
+		ta := (^mem.Tracking_Allocator)(context.allocator.data)
+
 		sync.mutex_lock(&ta.mutex)
 		// The verifier can inspect this local tracking allocator.
 		// And then call `testing.expect_*` as makes sense for the client test.
-		verifier(t, &ta)
+		verifier(t, ta)
 		sync.mutex_unlock(&ta.mutex)
+
+		clear(&ta.bad_free_array)
+		free_all(context.allocator)
 	}
-	free_all(context.allocator)
 }
 
 set_fail_timeout :: proc(t: ^T, duration: time.Duration, loc := #caller_location) {

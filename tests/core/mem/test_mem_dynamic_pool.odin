@@ -87,9 +87,15 @@ test_intentional_leaks :: proc(t: ^testing.T) {
 // Not tagged with @(test) because it's run through `test_intentional_leaks`
 intentionally_leaky_test :: proc(t: ^testing.T) {
 	a: [dynamic]int
+	// Intentional leak
 	append(&a, 42)
+
+	// Intentional bad free
+	b := uintptr(&a[0]) + 42
+	free(rawptr(b))
 }
 
 leak_verifier :: proc(t: ^testing.T, ta: ^mem.Tracking_Allocator) {
 	testing.expect_value(t, len(ta.allocation_map), 1)
+	testing.expect_value(t, len(ta.bad_free_array), 1)
 }
