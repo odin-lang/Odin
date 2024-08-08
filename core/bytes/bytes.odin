@@ -1,6 +1,7 @@
 package bytes
 
 import "core:mem"
+import "core:slice"
 import "core:unicode"
 import "core:unicode/utf8"
 
@@ -762,37 +763,28 @@ trim_suffix :: proc(s, suffix: []byte) -> []byte {
 	return s
 }
 
-split_multi :: proc(s: []byte, substrs: [][]byte, skip_empty := false, allocator := context.allocator) -> [][]byte #no_bounds_check {
+split_multi :: proc(s: []byte, substrs: [][]byte, skip_empty := false, allocator := context.allocator) -> (result: [][]byte, err: mem.Allocator_Error) #no_bounds_check #optional_allocator_error {
 	if s == nil || len(substrs) <= 0 {
-		return nil
-	}
-
-	sublen := len(substrs[0])
-
-	for substr in substrs[1:] {
-		sublen = min(sublen, len(substr))
-	}
-
-	shared := len(s) - sublen
-
-	if shared <= 0 {
-		return nil
+		return nil, nil
 	}
 
 	// number, index, last
 	n, i, l := 0, 0, 0
+    temp_substrs := slice.clone(substrs, context.temp_allocator)
+    slice.sort_by(temp_substrs, proc(a, b: []byte) -> bool {
+        return len(a) > len(b)
+    })
 
 	// count results
-	first_pass: for i <= shared {
-		for substr in substrs {
-			if string(s[i:i+sublen]) == string(substr) {
+	first_pass: for i < len(s) {
+		for substr in temp_substrs {
+			if len(s) >= i + len(substr) && equal(s[i:i+len(substr)], substr) {
 				if !skip_empty || i - l > 0 {
 					n += 1
 				}
 
-				i += sublen
-				l  = i
-
+				i += len(substr)
+				l = i
 				continue first_pass
 			}
 		}
@@ -807,23 +799,23 @@ split_multi :: proc(s: []byte, substrs: [][]byte, skip_empty := false, allocator
 
 	if n < 1 {
 		// no results
-		return nil
+		return nil, nil
 	}
 
-	buf := make([][]byte, n, allocator)
+	buf := make([][]byte, n, allocator) or_return
 
 	n, i, l = 0, 0, 0
 
 	// slice results
-	second_pass: for i <= shared {
-		for substr in substrs {
-			if string(s[i:i+sublen]) == string(substr) {
+	second_pass: for i < len(s) {
+		for substr in temp_substrs {
+			if len(s) >= i + len(substr) && equal(s[i:i+len(substr)], substr) {
 				if !skip_empty || i - l > 0 {
 					buf[n] = s[l:i]
 					n += 1
 				}
 
-				i += sublen
+				i += len(substr)
 				l  = i
 
 				continue second_pass
@@ -838,7 +830,7 @@ split_multi :: proc(s: []byte, substrs: [][]byte, skip_empty := false, allocator
 		buf[n] = s[l:]
 	}
 
-	return buf
+	return buf, nil
 }
 
 
