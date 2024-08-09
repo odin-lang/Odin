@@ -154,7 +154,7 @@ if [ $# -eq 0 ]; then
 	run_demo
 
 	: ${PROGRAM:=$0}
-	echo "\nDebug compiler built. Note: run \"$PROGRAM release\" or \"$PROGRAM release-native\" if you want a faster, release mode compiler."
+	printf "\nDebug compiler built. Note: run \"$PROGRAM release\" or \"$PROGRAM release-native\" if you want a faster, release mode compiler."
 elif [ $# -eq 1 ]; then
 	case $1 in
 	report)
