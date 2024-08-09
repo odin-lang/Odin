@@ -34,11 +34,11 @@ ctr_blocks_hw :: proc(ctx: ^Context_CTR, dst, src: []byte, nr_blocks: int) {
 }
 
 @(private)
-gcm_seal_hw :: proc(ctx: ^Context_Impl_Hardware, dst, tag, nonce, aad, plaintext: []byte) {
+gcm_seal_hw :: proc(ctx: ^Context_Impl_Hardware, dst, tag, iv, aad, plaintext: []byte) {
 	panic(ERR_HW_NOT_SUPPORTED)
 }
 
 @(private)
-gcm_open_hw :: proc(ctx: ^Context_Impl_Hardware, dst, nonce, aad, ciphertext, tag: []byte) -> bool {
+gcm_open_hw :: proc(ctx: ^Context_Impl_Hardware, dst, iv, aad, ciphertext, tag: []byte) -> bool {
 	panic(ERR_HW_NOT_SUPPORTED)
 }
