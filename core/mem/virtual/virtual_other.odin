@@ -1,5 +1,8 @@
 //+private
 //+build !darwin
+//+build !freebsd
+//+build !openbsd
+//+build !netbsd
 //+build !linux
 //+build !windows
 package mem_virtual

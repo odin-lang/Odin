@@ -30,8 +30,8 @@ file_info_clone :: proc(fi: File_Info, allocator: runtime.Allocator) -> (cloned:
 }
 
 file_info_slice_delete :: proc(infos: []File_Info, allocator: runtime.Allocator) {
-	for i := len(infos)-1; i >= 0; i -= 1 {
-		file_info_delete(infos[i], allocator)
+	#reverse for info in infos {
+		file_info_delete(info, allocator)
 	}
 	delete(infos, allocator)
 }

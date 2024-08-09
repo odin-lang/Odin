@@ -32,10 +32,9 @@ abs :: proc(path: string, allocator := context.allocator) -> (string, bool) {
 	if path_ptr == nil {
 		return "", __error()^ == 0
 	}
-	defer _unix_free(path_ptr)
+	defer _unix_free(rawptr(path_ptr))
 
-	path_cstr := cstring(path_ptr)
-	path_str := strings.clone(string(path_cstr), allocator)
+	path_str := strings.clone(string(path_ptr), allocator)
 	return path_str, true
 }
 
@@ -52,7 +51,7 @@ join :: proc(elems: []string, allocator := context.allocator) -> string {
 
 @(private)
 foreign libc {
-	realpath :: proc(path: cstring, resolved_path: rawptr) -> rawptr ---
+	realpath :: proc(path: cstring, resolved_path: [^]byte = nil) -> cstring ---
 	@(link_name="free") _unix_free :: proc(ptr: rawptr) ---
 
 }

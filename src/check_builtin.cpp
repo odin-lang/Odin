@@ -3979,6 +3979,23 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		break;
 	}
 
+	case BuiltinProc_constant_log2: {
+		Operand o = {};
+		check_expr(c, &o, ce->args[0]);
+
+		if (!is_type_integer(o.type) && (o.mode != Addressing_Constant)) {
+			error(ce->args[0], "Expected a constant integer for '%.*s'", LIT(builtin_name));
+			return false;
+		}
+
+		int log2 = big_int_log2(&o.value.value_integer);
+
+		operand->mode = Addressing_Constant;
+		operand->value = exact_value_i64(cast(i64)log2);
+		operand->type = t_untyped_integer;
+		break;
+	}
+
 	case BuiltinProc_soa_struct: {
 		Operand x = {};
 		Operand y = {};

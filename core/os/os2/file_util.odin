@@ -119,23 +119,20 @@ read_entire_file_from_path :: proc(name: string, allocator: runtime.Allocator) -
 @(require_results)
 read_entire_file_from_file :: proc(f: ^File, allocator: runtime.Allocator) -> (data: []byte, err: Error) {
 	size: int
-	has_size := true
+	has_size := false
 	if size64, serr := file_size(f); serr == nil {
-		if i64(int(size64)) != size64 {
+		if i64(int(size64)) == size64 {
+			has_size = true
 			size = int(size64)
 		}
-	} else if serr == .No_Size {
-		has_size = false
-	} else {
+	} else if serr != .No_Size {
 		return
 	}
-	size += 1 // for EOF
 
-	// TODO(bill): Is this correct logic?
 	if has_size {
 		total: int
 		data = make([]byte, size, allocator) or_return
-		for {
+		for total < len(data) {
 			n: int
 			n, err = read(f, data[total:])
 			total += n
@@ -144,15 +141,16 @@ read_entire_file_from_file :: proc(f: ^File, allocator: runtime.Allocator) -> (d
 					err = nil
 				}
 				data = data[:total]
-				return
+				break
 			}
 		}
+		return
 	} else {
 		buffer: [1024]u8
 		out_buffer := make([dynamic]u8, 0, 0, allocator)
 		total := 0
 		for {
-			n: int = ---
+			n: int
 			n, err = read(f, buffer[:])
 			total += n
 			append_elems(&out_buffer, ..buffer[:total])
