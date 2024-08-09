@@ -6,7 +6,6 @@ import "base:runtime"
 import "base:intrinsics"
 
 import "core:fmt"
-import "core:mem"
 import "core:time"
 import "core:slice"
 import "core:strings"
@@ -504,11 +503,11 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 	return
 }
 
-_process_state_update_times :: proc(p: Process, state: ^Process_State) -> (err: Error) {
+_process_state_update_times :: proc(state: ^Process_State) -> (err: Error) {
 	TEMP_ALLOCATOR_GUARD()
 
 	stat_path_buf: [32]u8
-	_ = fmt.bprintf(stat_path_buf[:], "/proc/%d/stat", p.pid)
+	_ = fmt.bprintf(stat_path_buf[:], "/proc/%d/stat", state.pid)
 	stat_buf: []u8
 	stat_buf, err = _read_entire_pseudo_file(cstring(&stat_path_buf[0]), temp_allocator())
 	if err != nil {
@@ -547,115 +546,179 @@ _process_state_update_times :: proc(p: Process, state: ^Process_State) -> (err: 
 	return
 }
 
-@(private="package")
-_process_wait :: proc(process: Process, timeout: time.Duration) -> (process_state: Process_State, err: Error) {
-	process_state.pid = process.pid
+_reap_terminated :: proc(process: Process) -> (state: Process_State, err: Error) {
+	state.pid = process.pid
+	_process_state_update_times(&state)
 
-	errno: linux.Errno
-	options: linux.Wait_Options
-	big_if: if timeout == 0 {
-		options += {.WNOHANG}
-	} else if timeout > 0 {
+	info: linux.Sig_Info
+	errno := linux.Errno.EINTR
+	for errno == .EINTR {
+		errno = linux.waitid(.PID, linux.Id(process.pid), &info, {.WEXITED}, nil)
+	}
+	err = _get_platform_error(errno)
+
+	switch linux.Sig_Child_Code(info.code) {
+	case .NONE, .CONTINUED, .STOPPED:
+	case .EXITED:
+		state.exited = true
+		state.exit_code = int(info.status)
+		state.success = state.exit_code == 0
+	case .KILLED, .DUMPED, .TRAPPED:
+		state.exited = true
+		state.exit_code = int(info.status)
+		state.success = false
+	}
+	return
+}
+
+_timed_wait_on_handle :: proc(process: Process, timeout: time.Duration) -> (process_state: Process_State, err: Error) {
+	timeout := timeout
+
+	process_state.pid = process.pid
+	pidfd := linux.Fd(process.handle)
+	pollfd: [1]linux.Poll_Fd = {
+		{
+			fd = pidfd,
+			events = {.IN},
+		},
+	}
+
+	start_tick := time.tick_now()
+
+	mask: bit_set[0..<64; u64]
+	mask += { int(linux.Signal.SIGCHLD) - 1 }
+	sigchld_set := transmute(linux.Sig_Set)(mask)
+
+	info: linux.Sig_Info
+	for {
+		if timeout <= 0 {
+			_process_state_update_times(&process_state)
+			return
+		}
+
 		ts: linux.Time_Spec = {
 			time_sec  = uint(timeout / time.Second),
 			time_nsec = uint(timeout % time.Second),
 		}
 
-		if false {//process.handle != PIDFD_UNASSIGNED {
-			pollfd: [1]linux.Poll_Fd = {
-				{
-					fd = linux.Fd(process.handle),
-					events = {.IN},
-				},
+		n, errno := linux.ppoll(pollfd[:], &ts, &sigchld_set)
+		if errno != .NONE {
+			if errno == .EINTR {
+				new_tick := time.tick_now()
+				timeout -= time.tick_diff(start_tick, new_tick)
+				start_tick = new_tick
+				continue
 			}
-
-			for {
-				n, e := linux.ppoll(pollfd[:], &ts, nil)
-				if e == .EINTR {
-					continue
-				}
-				if e != .NONE {
-					return process_state, _get_platform_error(errno)
-				}
-				if n == 0 {
-					_process_state_update_times(process, &process_state)
-					return
-				}
-				break
-			}
-		} else {
-			mask: bit_set[0..<64; u64]
-			mask += { int(linux.Signal.SIGCHLD) - 1 }
-
-			org_sigset: linux.Sig_Set
-			sigset: linux.Sig_Set
-			mem.copy(&sigset, &mask, size_of(mask))
-			errno = linux.rt_sigprocmask(.SIG_BLOCK, &sigset, &org_sigset)
-			if errno != .NONE {
-				return process_state, _get_platform_error(errno)
-			}
-			defer linux.rt_sigprocmask(.SIG_SETMASK, &org_sigset, nil)
-
-			// In case there was a signal handler on SIGCHLD, avoid race
-			// condition by checking wait first.
-			options += {.WNOHANG}
-			waitid_options := options + {.WNOWAIT, .WEXITED}
-			info: linux.Sig_Info
-			errno = linux.waitid(.PID, linux.Id(process.pid), &info, waitid_options, nil)
-			if errno == .NONE && info.code != 0 {
-				break big_if
-			}
-
-			loop: for {
-				sigset = {}
-				mem.copy(&sigset, &mask, size_of(mask))
-
-				_, errno = linux.rt_sigtimedwait(&sigset, &info, &ts)
-				#partial switch errno {
-				case .EAGAIN: // timeout
-					_process_state_update_times(process, &process_state)
-					return
-				case .EINVAL:
-					return process_state, _get_platform_error(errno)
-				case .EINTR:
-					continue
-				case:
-					if info.pid == linux.Pid(process.pid) {
-						break loop
-					}
-				}
-			}
+			return process_state, _get_platform_error(errno)
 		}
+
+		if n == 0 {  // timeout with no events
+			_process_state_update_times(&process_state)
+			return
+		}
+
+		// This throws EBADF with pidfd
+		if errno = linux.waitid(.PID, linux.Id(process.pid), &info, {.WEXITED, .WNOHANG, .WNOWAIT}, nil); errno != .NONE {
+			return process_state, _get_platform_error(errno)
+		}
+
+		if info.signo == .SIGCHLD {
+			break
+		}
+
+		new_tick := time.tick_now()
+		timeout -= time.tick_diff(start_tick, new_tick)
+		start_tick = new_tick
 	}
 
-	status: u32
-	errno = .EINTR
-	for errno == .EINTR {
-		_, errno = linux.wait4(linux.Pid(process.pid), &status, options, nil)
-		if errno != .NONE {
-			_process_state_update_times(process, &process_state)
+	return _reap_terminated(process)
+}
+
+_timed_wait_on_pid :: proc(process: Process, timeout: time.Duration) -> (process_state: Process_State, err: Error) {
+	timeout := timeout
+	process_state.pid = process.pid
+
+	mask: bit_set[0..<64; u64]
+	mask += { int(linux.Signal.SIGCHLD) - 1 }
+	sigchld_set := transmute(linux.Sig_Set)(mask)
+
+	start_tick := time.tick_now()
+
+	org_sigset: linux.Sig_Set
+	errno := linux.rt_sigprocmask(.SIG_BLOCK, &sigchld_set, &org_sigset)
+	if errno != .NONE {
+		return process_state, _get_platform_error(errno)
+	}
+	defer linux.rt_sigprocmask(.SIG_SETMASK, &org_sigset, nil)
+
+	// In case there was a signal handler on SIGCHLD, avoid race
+	// condition by checking wait first.
+	info: linux.Sig_Info
+	errno = linux.waitid(.PID, linux.Id(process.pid), &info, {.WNOWAIT, .WEXITED, .WNOHANG}, nil)
+
+	for errno != .NONE || info.code == 0 || info.pid != linux.Pid(process.pid) {
+		if timeout <= 0 {
+			_process_state_update_times(&process_state)
+			return
+		}
+
+		ts: linux.Time_Spec = {
+			time_sec  = uint(timeout / time.Second),
+			time_nsec = uint(timeout % time.Second),
+		}
+
+		_, errno = linux.rt_sigtimedwait(&sigchld_set, &info, &ts)
+		#partial switch errno {
+		case .EAGAIN:   // timeout
+			_process_state_update_times(&process_state)
+			return
+		case .EINTR:
+			new_tick := time.tick_now()
+			timeout -= time.tick_diff(start_tick, new_tick)
+			start_tick = new_tick
+		case .EINVAL:
 			return process_state, _get_platform_error(errno)
 		}
 	}
 
-	_process_state_update_times(process, &process_state)
+	return _reap_terminated(process)
+}
 
-	// terminated by exit
-	if linux.WIFEXITED(status) {
-		process_state.exited = true
-		process_state.exit_code = int(linux.WEXITSTATUS(status))
-		process_state.success = process_state.exit_code == 0
-		return
+@(private="package")
+_process_wait :: proc(process: Process, timeout: time.Duration) -> (Process_State, Error) {
+	if timeout > 0 {
+		if process.handle == PIDFD_UNASSIGNED {
+			return _timed_wait_on_pid(process, timeout)
+		} else {
+			return _timed_wait_on_handle(process, timeout)
+		}
 	}
 
-	// terminated by signal
-	if linux.WIFSIGNALED(status) {
-		process_state.exited = false
-		process_state.exit_code = int(linux.WTERMSIG(status))
-		process_state.success = false
-		return
+	process_state: Process_State = {
+		pid = process.pid,
 	}
-	return
+
+	errno: linux.Errno
+	options: linux.Wait_Options = {.WEXITED}
+	if timeout == 0 {
+		options += {.WNOHANG}
+	}
+
+	info: linux.Sig_Info
+
+	errno = .EINTR
+	for errno == .EINTR {
+		errno = linux.waitid(.PID, linux.Id(process.pid), &info, options + {.WNOWAIT}, nil)
+	}
+	if errno == .EAGAIN || (errno == .NONE && info.signo != .SIGCHLD) {
+		_process_state_update_times(&process_state)
+		return process_state, nil
+	}
+	if errno != .NONE {
+		return process_state, _get_platform_error(errno)
+	}
+
+	return _reap_terminated(process)
 }
 
 @(private="package")

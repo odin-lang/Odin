@@ -984,6 +984,20 @@ Sig_Action_Flag :: enum u32 {
 }
 
 /*
+	Translation of code in Sig_Info for when signo is SIGCHLD
+*/
+Sig_Child_Code :: enum {
+	NONE,
+	EXITED,
+	KILLED,
+	DUMPED,
+	TRAPPED,
+	STOPPED,
+	CONTINUED,
+}
+
+
+/*
 	Type of socket to create
 	- For TCP you want to use SOCK_STREAM
 	- For UDP you want to use SOCK_DGRAM
