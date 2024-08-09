@@ -7,7 +7,6 @@ import "base:runtime"
 import "core:strings"
 import "core:c"
 import "core:strconv"
-import "base:intrinsics"
 
 // NOTE(flysand): For compatibility we'll make core:os package
 // depend on the old (scheduled for removal) linux package.
