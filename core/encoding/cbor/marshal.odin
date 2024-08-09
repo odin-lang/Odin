@@ -481,9 +481,7 @@ _marshal_into_encoder :: proc(e: Encoder, v: any, ti: ^runtime.Type_Info) -> (er
 			}
 		}
 
-		marshal_entry :: #force_inline proc(e: Encoder, info: runtime.Type_Info_Struct, v: any, name: string, i: int) -> Marshal_Error {
-			err_conv(_encode_text(e, name)) or_return
-
+		marshal_entry :: #force_inline proc(e: Encoder, info: runtime.Type_Info_Struct, v: any, i: int) -> Marshal_Error {
 			id := info.types[i].id
 			data := rawptr(uintptr(v.data) + info.offsets[i])
 			field_any := any{data, id}
@@ -517,7 +515,7 @@ _marshal_into_encoder :: proc(e: Encoder, v: any, ti: ^runtime.Type_Info) -> (er
 
 		if .Deterministic_Map_Sorting in e.flags {
 			Name :: struct {
-				name:  string,
+				name:  []byte,
 				field: int,
 			}
 			entries := make([dynamic]Name, 0, n, e.temp_allocator) or_return
@@ -529,16 +527,19 @@ _marshal_into_encoder :: proc(e: Encoder, v: any, ti: ^runtime.Type_Info) -> (er
 					continue
 				}
 
-				append(&entries, Name{fname, i}) or_return
+				key_builder := strings.builder_make(e.temp_allocator) or_return
+				err_conv(_encode_text(Encoder{e.flags, strings.to_stream(&key_builder), e.temp_allocator}, fname)) or_return
+				append(&entries, Name{key_builder.buf[:], i}) or_return
 			}
 
 			// Sort lexicographic on the bytes of the key.
 			slice.sort_by_cmp(entries[:], proc(a, b: Name) -> slice.Ordering {
-				return slice.Ordering(bytes.compare(transmute([]byte)a.name, transmute([]byte)b.name))
+				return slice.Ordering(bytes.compare(a.name, b.name))
 			})
 
 			for entry in entries {
-				marshal_entry(e, info, v, entry.name, entry.field) or_return
+				io.write_full(e.writer, entry.name) or_return
+				marshal_entry(e, info, v, entry.field) or_return
 			}
 		} else {
 			for _, i in info.names[:info.field_count] {
@@ -547,7 +548,8 @@ _marshal_into_encoder :: proc(e: Encoder, v: any, ti: ^runtime.Type_Info) -> (er
 					continue
 				}
 
-				marshal_entry(e, info, v, fname, i) or_return
+				err_conv(_encode_text(e, fname)) or_return
+				marshal_entry(e, info, v, i) or_return
 			}
 		}
 		return
