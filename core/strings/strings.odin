@@ -1438,14 +1438,8 @@ index_byte :: proc(s: string, c: byte) -> (res: int) {
 	// NOTE(Feoramund): On my Alder Lake CPU, I have only witnessed a
 	// significant speedup when compiling in either Size or Speed mode.
 	// The SIMD version is usually 2-3x slower without optimizations on.
-	when ODIN_OPTIMIZATION_MODE > .Minimal && intrinsics.has_target_feature("sse2") {
-		// SIMD's benefits are noticeable only past a certain threshold of data.
-		// For small data, use the plain old algorithm.
-		if len(s) >= simd_util.RECOMMENDED_SCAN_SIZE {
-			return simd_util.index_byte(transmute([]u8)s, c)
-		} else {
-			return _index_byte(s, c)
-		}
+	when ODIN_OPTIMIZATION_MODE > .Minimal {
+		return #force_inline simd_util.index_byte(transmute([]u8)s, c)
 	} else {
 		return _index_byte(s, c)
 	}
@@ -1492,12 +1486,8 @@ last_index_byte :: proc(s: string, c: byte) -> (res: int) {
 		return -1
 	}
 
-	when ODIN_OPTIMIZATION_MODE > .Minimal && intrinsics.has_target_feature("sse2") {
-		if len(s) >= simd_util.RECOMMENDED_SCAN_SIZE {
-			return simd_util.last_index_byte(transmute([]u8)s, c)
-		} else {
-			return _last_index_byte(s, c)
-		}
+	when ODIN_OPTIMIZATION_MODE > .Minimal {
+		return #force_inline simd_util.last_index_byte(transmute([]u8)s, c)
 	} else {
 		return _last_index_byte(s, c)
 	}

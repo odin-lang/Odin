@@ -1,4 +1,3 @@
-//+build i386, amd64
 package benchmark_simd_util
 
 import "core:fmt"

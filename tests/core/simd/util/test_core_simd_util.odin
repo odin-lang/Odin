@@ -1,4 +1,3 @@
-//+build i386, amd64
 package test_core_simd_util
 
 import simd_util "core:simd/util"
