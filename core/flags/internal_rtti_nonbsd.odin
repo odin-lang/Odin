@@ -1,5 +1,5 @@
 //+private
-//+build !freebsd !netbsd !openbsd
+//+build !netbsd !openbsd
 package flags
 
 import "core:net"
