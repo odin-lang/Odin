@@ -388,6 +388,11 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 		env = &cenv[0]
 	}
 
+	child_pipe_fds: [2]linux.Fd
+	if errno = linux.pipe2(&child_pipe_fds, {.CLOEXEC}); errno != .NONE {
+		return process, _get_platform_error(errno)
+	}
+
 	// TODO: This is the traditional textbook implementation with fork.
 	//       A more efficient implementation with vfork:
 	//
@@ -412,15 +417,10 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 	READ :: 0
 	WRITE :: 1
 
-	child_pipe_fds: [2]linux.Fd
-	if errno = linux.pipe2(&child_pipe_fds, {.CLOEXEC}); errno != .NONE {
-		return process, _get_platform_error(errno)
-	}
-
 	if pid == 0 {
 		// in child process now
 		write_errno_to_parent_and_abort :: proc(parent_fd: linux.Fd, errno: linux.Errno) -> ! {
-			error_byte: [1]u8 = { u8(i32(errno) * -1) }
+			error_byte: [1]u8 = { u8(errno) }
 			linux.write(parent_fd, error_byte[:])
 			intrinsics.trap()
 		}
