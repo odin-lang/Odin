@@ -3,45 +3,51 @@ package os
 
 import "base:runtime"
 
+
+@(require_results, no_instrumentation)
+_get_last_error :: proc "contextless" () -> Error {
+	return nil
+}
+
 @(require_results)
-is_path_separator :: proc(c: byte) -> bool {
+_is_path_separator :: proc "contextless" (c: rune) -> bool {
 	return c == '/' || c == '\\'
 }
 
 @(require_results)
-open :: proc(path: string, mode: int = O_RDONLY, perm: int = 0) -> (Handle, Error) {
+_open :: proc(path: string, mode: int = O_RDONLY, perm: int = 0) -> (Handle, Error) {
 	unimplemented("core:os procedure not supported on JS target")
 }
 
-close :: proc(fd: Handle) -> Error {
+_close :: proc(fd: Handle) -> Error {
 	unimplemented("core:os procedure not supported on JS target")
 }
 
-flush :: proc(fd: Handle) -> (err: Error) {
+_flush :: proc(fd: Handle) -> (err: Error) {
 	unimplemented("core:os procedure not supported on JS target")
 }
 
 
 
-write :: proc(fd: Handle, data: []byte) -> (int, Error) {
+_write :: proc(fd: Handle, data: []byte) -> (int, Error) {
 	unimplemented("core:os procedure not supported on JS target")
 }
 
 @(private="file")
-read_console :: proc(handle: Handle, b: []byte) -> (n: int, err: Error) {
+_read_console :: proc(handle: Handle, b: []byte) -> (n: int, err: Error) {
 	unimplemented("core:os procedure not supported on JS target")
 }
 
-read :: proc(fd: Handle, data: []byte) -> (int, Error) {
+_read :: proc(fd: Handle, data: []byte) -> (int, Error) {
 	unimplemented("core:os procedure not supported on JS target")
 }
 
-seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Error) {
+_seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Error) {
 	unimplemented("core:os procedure not supported on JS target")
 }
 
 @(require_results)
-file_size :: proc(fd: Handle) -> (i64, Error) {
+_file_size :: proc(fd: Handle) -> (i64, Error) {
 	unimplemented("core:os procedure not supported on JS target")
 }
 
@@ -58,10 +64,10 @@ pwrite :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Error) {
 	unimplemented("core:os procedure not supported on JS target")
 }
 
-read_at :: proc(fd: Handle, data: []byte, offset: i64) -> (n: int, err: Error) {
+_read_at :: proc(fd: Handle, data: []byte, offset: i64) -> (n: int, err: Error) {
 	unimplemented("core:os procedure not supported on JS target")
 }
-write_at :: proc(fd: Handle, data: []byte, offset: i64) -> (n: int, err: Error) {
+_write_at :: proc(fd: Handle, data: []byte, offset: i64) -> (n: int, err: Error) {
 	unimplemented("core:os procedure not supported on JS target")
 }
 
@@ -76,17 +82,27 @@ get_std_handle :: proc "contextless" (h: uint) -> Handle {
 
 
 @(require_results)
-exists :: proc(path: string) -> bool {
+_exists :: proc(path: string) -> bool {
 	unimplemented("core:os procedure not supported on JS target")
 }
 
 @(require_results)
-is_file :: proc(path: string) -> bool {
+_is_file_path :: proc(path: string, _: bool) -> bool {
 	unimplemented("core:os procedure not supported on JS target")
 }
 
 @(require_results)
-is_dir :: proc(path: string) -> bool {
+_is_dir_path :: proc(path: string, _: bool) -> bool {
+	unimplemented("core:os procedure not supported on JS target")
+}
+
+@(require_results)
+_is_file_handle :: proc(handle: Handle) -> bool {
+	unimplemented("core:os procedure not supported on JS target")
+}
+
+@(require_results)
+_is_dir_handle :: proc(handle: Handle) -> bool {
 	unimplemented("core:os procedure not supported on JS target")
 }
 
@@ -94,26 +110,26 @@ is_dir :: proc(path: string) -> bool {
 //@private cwd_lock := win32.SRWLOCK{} // zero is initialized
 
 @(require_results)
-get_current_directory :: proc(allocator := context.allocator) -> string {
+_get_current_directory :: proc(allocator := context.allocator) -> string {
 	unimplemented("core:os procedure not supported on JS target")
 }
 
-set_current_directory :: proc(path: string) -> (err: Error) {
-	unimplemented("core:os procedure not supported on JS target")
-}
-
-
-
-change_directory :: proc(path: string) -> (err: Error) {
-	unimplemented("core:os procedure not supported on JS target")
-}
-
-make_directory :: proc(path: string, mode: u32 = 0) -> (err: Error) {
+_set_current_directory :: proc(path: string) -> (err: Error) {
 	unimplemented("core:os procedure not supported on JS target")
 }
 
 
-remove_directory :: proc(path: string) -> (err: Error) {
+
+_change_directory :: proc(path: string) -> (err: Error) {
+	unimplemented("core:os procedure not supported on JS target")
+}
+
+_make_directory :: proc(path: string, mode: u32 = 0) -> (err: Error) {
+	unimplemented("core:os procedure not supported on JS target")
+}
+
+
+_remove_directory :: proc(path: string) -> (err: Error) {
 	unimplemented("core:os procedure not supported on JS target")
 }
 
@@ -130,42 +146,42 @@ fix_long_path :: proc(path: string) -> string {
 }
 
 
-link :: proc(old_name, new_name: string) -> (err: Error) {
+_link :: proc(old_name, new_name: string) -> (err: Error) {
 	unimplemented("core:os procedure not supported on JS target")
 }
 
-unlink :: proc(path: string) -> (err: Error) {
-	unimplemented("core:os procedure not supported on JS target")
-}
-
-
-
-rename :: proc(old_path, new_path: string) -> (err: Error) {
+_unlink :: proc(path: string) -> (err: Error) {
 	unimplemented("core:os procedure not supported on JS target")
 }
 
 
-ftruncate :: proc(fd: Handle, length: i64) -> (err: Error) {
+
+_rename :: proc(old_path, new_path: string) -> (err: Error) {
 	unimplemented("core:os procedure not supported on JS target")
 }
 
-truncate :: proc(path: string, length: i64) -> (err: Error) {
+
+_ftruncate :: proc(fd: Handle, length: i64) -> (err: Error) {
+	unimplemented("core:os procedure not supported on JS target")
+}
+
+_truncate :: proc(path: string, length: i64) -> (err: Error) {
 	unimplemented("core:os procedure not supported on JS target")
 }
 
 
-remove :: proc(name: string) -> Error {
+_remove :: proc(name: string) -> Error {
 	unimplemented("core:os procedure not supported on JS target")
 }
 
 
 @(require_results)
-pipe :: proc() -> (r, w: Handle, err: Error) {
+_pipe :: proc() -> (r, w: Handle, err: Error) {
 	unimplemented("core:os procedure not supported on JS target")
 }
 
 @(require_results)
-read_dir :: proc(fd: Handle, n: int, allocator := context.allocator) -> (fi: []File_Info, err: Error) {
+_read_dir :: proc(fd: Handle, n: int, allocator := context.allocator) -> (fi: []File_Info, err: Error) {
 	unimplemented("core:os procedure not supported on JS target")
 }
 
@@ -262,19 +278,19 @@ args := _alloc_command_line_arguments()
 
 
 @(require_results)
-last_write_time :: proc(fd: Handle) -> (File_Time, Error) {
+_last_write_time :: proc(fd: Handle) -> (File_Time, Error) {
 	unimplemented("core:os procedure not supported on JS target")
 }
 
 @(require_results)
-last_write_time_by_name :: proc(name: string) -> (File_Time, Error) {
+_last_write_time_by_name :: proc(name: string) -> (File_Time, Error) {
 	unimplemented("core:os procedure not supported on JS target")
 }
 
 
 @(require_results)
-get_page_size :: proc() -> int {
-	unimplemented("core:os procedure not supported on JS target")
+_get_page_size :: proc() -> int {
+	return 1<<16
 }
 
 @(private, require_results)
@@ -282,7 +298,7 @@ _processor_core_count :: proc() -> int {
 	unimplemented("core:os procedure not supported on JS target")
 }
 
-exit :: proc "contextless" (code: int) -> ! {
+_exit :: proc "contextless" (code: int) -> ! {
 	context = runtime.default_context()
 	unimplemented("core:os procedure not supported on JS target")
 }
@@ -290,7 +306,7 @@ exit :: proc "contextless" (code: int) -> ! {
 
 
 @(require_results)
-current_thread_id :: proc "contextless" () -> int {
+_current_thread_id :: proc "contextless" () -> int {
 	context = runtime.default_context()
 	unimplemented("core:os procedure not supported on JS target")
 }
@@ -302,3 +318,41 @@ _alloc_command_line_arguments :: proc() -> []string {
 	return nil
 }
 
+@(require_results)
+_absolute_path_from_handle :: proc(fd: Handle) -> (path: string, err: Error) {
+	unimplemented("TODO: _absolute_path_from_handle")
+}
+@(require_results)
+_absolute_path_from_relative :: proc(rel: string) -> (path: string, err: Error) {
+	unimplemented("TODO: _absolute_path_from_relative")
+}
+
+_access :: proc(path: string, mask: int) -> (bool, Error) {
+	unimplemented("TODO: _access")
+}
+
+
+@(require_results)
+_environ :: proc(allocator := context.allocator) -> []string {
+	unimplemented("TODO: _environ")
+}
+@(require_results)
+_lookup_env :: proc(key: string, allocator := context.allocator) -> (value: string, found: bool) {
+	unimplemented("TODO: _lookup_env")
+}
+
+@(require_results)
+_get_env :: proc(key: string, allocator := context.allocator) -> (value: string) {
+	unimplemented("TODO: _get_env")
+}
+
+_set_env :: proc(key, value: string) -> Error {
+	unimplemented("TODO: _set_env")
+}
+_unset_env :: proc(key: string) -> Error {
+	unimplemented("TODO: _unset_env")
+}
+
+_clear_env :: proc() {
+	unimplemented("TODO: _clear_env")
+}
