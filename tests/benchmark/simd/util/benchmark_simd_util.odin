@@ -9,7 +9,7 @@ import "core:time"
 
 // These are the normal, unoptimized algorithms.
 
-plain_index_byte :: proc(s: []u8, c: byte) -> (res: int) #no_bounds_check {
+plain_index_byte :: proc "contextless" (s: []u8, c: byte) -> (res: int) #no_bounds_check {
 	for i := 0; i < len(s); i += 1 {
 		if s[i] == c {
 			return i
@@ -18,7 +18,7 @@ plain_index_byte :: proc(s: []u8, c: byte) -> (res: int) #no_bounds_check {
 	return -1
 }
 
-plain_last_index_byte :: proc(s: []u8, c: byte) -> (res: int) #no_bounds_check {
+plain_last_index_byte :: proc "contextless" (s: []u8, c: byte) -> (res: int) #no_bounds_check {
 	for i := len(s)-1; i >= 0; i -= 1 {
 		if s[i] == c {
 			return i
@@ -37,7 +37,7 @@ sizes := [?]int {
 	1024 * 1024 * 1024,
 }
 
-run_trial_size :: proc(p: proc([]u8, byte) -> int, size: int, idx: int, warmup: int, runs: int) -> (timing: time.Duration) {
+run_trial_size :: proc(p: proc "contextless" ([]u8, byte) -> int, size: int, idx: int, warmup: int, runs: int) -> (timing: time.Duration) {
 	data := make([]u8, size)
 	defer delete(data)
 

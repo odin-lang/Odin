@@ -297,7 +297,7 @@ split_after_iterator :: proc(s: ^[]byte, sep: []byte) -> ([]byte, bool) {
 
 
 index_byte :: proc(s: []byte, c: byte) -> int {
-	_index_byte :: #force_inline proc(s: []byte, c: byte) -> int {
+	_index_byte :: #force_inline proc "contextless" (s: []byte, c: byte) -> int {
 		for i := 0; i < len(s); i += 1 {
 			if s[i] == c {
 				return i
@@ -318,7 +318,7 @@ index_byte :: proc(s: []byte, c: byte) -> int {
 
 // Returns -1 if c is not present
 last_index_byte :: proc(s: []byte, c: byte) -> int {
-	_last_index_byte :: #force_inline proc(s: []byte, c: byte) -> int {
+	_last_index_byte :: #force_inline proc "contextless" (s: []byte, c: byte) -> int {
 		for i := len(s)-1; i >= 0; i -= 1 {
 			if s[i] == c {
 				return i

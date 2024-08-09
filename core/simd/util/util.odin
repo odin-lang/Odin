@@ -34,7 +34,7 @@ Inputs:
 Returns:
 - index: The index of the byte `c`, or -1 if it was not found.
 */
-index_byte :: proc(data: []u8, c: byte) -> (index: int) #no_bounds_check {
+index_byte :: proc "contextless" (data: []u8, c: byte) -> (index: int) #no_bounds_check {
 	length := len(data)
 	i := 0
 
@@ -101,7 +101,7 @@ Inputs:
 Returns:
 - index: The index of the byte `c`, or -1 if it was not found.
 */
-last_index_byte :: proc(data: []u8, c: byte) -> int #no_bounds_check {
+last_index_byte :: proc "contextless" (data: []u8, c: byte) -> int #no_bounds_check {
 	length := len(data)
 	i := length - 1
 

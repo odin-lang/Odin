@@ -1426,7 +1426,7 @@ Output:
 
 */
 index_byte :: proc(s: string, c: byte) -> (res: int) {
-	_index_byte :: #force_inline proc(s: string, c: byte) -> int {
+	_index_byte :: #force_inline proc "contextless" (s: string, c: byte) -> int {
 		for i := 0; i < len(s); i += 1 {
 			if s[i] == c {
 				return i
@@ -1477,7 +1477,7 @@ Output:
 
 */
 last_index_byte :: proc(s: string, c: byte) -> (res: int) {
-	_last_index_byte :: #force_inline proc(s: string, c: byte) -> int {
+	_last_index_byte :: #force_inline proc "contextless" (s: string, c: byte) -> int {
 		for i := len(s)-1; i >= 0; i -= 1 {
 			if s[i] == c {
 				return i
