@@ -1,6 +1,8 @@
 package bytes
 
+import "base:intrinsics"
 import "core:mem"
+@require import simd_util "core:simd/util"
 import "core:unicode"
 import "core:unicode/utf8"
 
@@ -295,22 +297,51 @@ split_after_iterator :: proc(s: ^[]byte, sep: []byte) -> ([]byte, bool) {
 
 
 index_byte :: proc(s: []byte, c: byte) -> int {
-	for i := 0; i < len(s); i += 1 {
-		if s[i] == c {
-			return i
+	_index_byte :: #force_inline proc(s: []byte, c: byte) -> int {
+		for i := 0; i < len(s); i += 1 {
+			if s[i] == c {
+				return i
+			}
 		}
+		return -1
 	}
-	return -1
+
+	// NOTE(Feoramund): On my Alder Lake CPU, I have only witnessed a
+	// significant speedup when compiling in either Size or Speed mode.
+	// The SIMD version is usually 2-3x slower without optimizations on.
+	when ODIN_OPTIMIZATION_MODE > .Minimal && intrinsics.has_target_feature("sse2") {
+		// SIMD's benefits are noticeable only past a certain threshold of data.
+		// For small data, use the plain old algorithm.
+		if len(s) >= simd_util.RECOMMENDED_SCAN_SIZE {
+			return simd_util.index_byte(s, c)
+		} else {
+			return _index_byte(s, c)
+		}
+	} else {
+		return _index_byte(s, c)
+	}
 }
 
 // Returns -1 if c is not present
 last_index_byte :: proc(s: []byte, c: byte) -> int {
-	for i := len(s)-1; i >= 0; i -= 1 {
-		if s[i] == c {
-			return i
+	_last_index_byte :: #force_inline proc(s: []byte, c: byte) -> int {
+		for i := len(s)-1; i >= 0; i -= 1 {
+			if s[i] == c {
+				return i
+			}
 		}
+		return -1
 	}
-	return -1
+
+	when ODIN_OPTIMIZATION_MODE > .Minimal && intrinsics.has_target_feature("sse2") {
+		if len(s) >= simd_util.RECOMMENDED_SCAN_SIZE {
+			return simd_util.last_index_byte(s, c)
+		} else {
+			return _last_index_byte(s, c)
+		}
+	} else {
+		return _last_index_byte(s, c)
+	}
 }
 
 
