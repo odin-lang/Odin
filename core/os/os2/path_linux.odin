@@ -1,6 +1,7 @@
 //+private
 package os2
 
+import "core:strings"
 import "core:strconv"
 import "base:runtime"
 import "core:sys/linux"
@@ -75,14 +76,6 @@ _mkdir_all :: proc(path: string, perm: int) -> Error {
 	return nil if has_created else .Exist
 }
 
-dirent64 :: struct {
-	d_ino: u64,
-	d_off: u64,
-	d_reclen: u16,
-	d_type: u8,
-	d_name: [1]u8,
-}
-
 _remove_all :: proc(path: string) -> Error {
 	DT_DIR :: 4
 
@@ -105,26 +98,18 @@ _remove_all :: proc(path: string) -> Error {
 				return _get_platform_error(errno)
 			}
 
-			d: ^dirent64
+			offset: int
+			for d in linux.dirent_iterate_buf(buf[:buflen], &offset) {
+				d_name_str := linux.dirent_name(d)
+				d_name_cstr := strings.unsafe_string_to_cstring(d_name_str)
 
-			for i := 0; i < buflen; i += int(d.d_reclen) {
-				d = (^dirent64)(rawptr(&buf[i]))
-				d_name_cstr := cstring(&d.d_name[0])
-
-				buf_len := uintptr(d.d_reclen) - offset_of(d.d_name)
-
-				/* check for current directory (.) */
-				#no_bounds_check if buf_len > 1 && d.d_name[0] == '.' && d.d_name[1] == 0 {
+				/* check for current or parent directory (. or ..) */
+				if d_name_str == "." || d_name_str == ".." {
 					continue
 				}
 
-				/* check for parent directory (..) */
-				#no_bounds_check if buf_len > 2 && d.d_name[0] == '.' && d.d_name[1] == '.' && d.d_name[2] == 0 {
-					continue
-				}
-
-				switch d.d_type {
-				case DT_DIR:
+				#partial switch d.type {
+				case .DIR:
 					new_dfd: linux.Fd
 					new_dfd, errno = linux.openat(dfd, d_name_cstr, _OPENDIR_FLAGS)
 					if errno != .NONE {

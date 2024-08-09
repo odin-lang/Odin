@@ -126,5 +126,3 @@ random_string :: proc(buf: []byte) -> string {
 	buf[i] = digits[u % b]
 	return string(buf[i:])
 }
-
-
