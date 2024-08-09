@@ -105,3 +105,37 @@ test_index_byte_zero :: proc(t: ^testing.T) {
 		}
 	}
 }
+
+@test
+test_misaligned_data :: proc(t: ^testing.T) {
+	for n in 2..<256 {
+		data := make([]u8, n)
+		defer delete(data)
+		for i in 0..<n-1 {
+			data[i] = '-'
+		}
+
+		for m in 1..<n {
+			data[n-1] = 'o'
+			if !testing.expect_value(t, simd_util.index_byte(data[m:n], 'o'), n-1-m) {
+				return
+			}
+			data[n-1] = '-'
+
+			data[m+(n-m)/2] = 'o'
+			if !testing.expect_value(t, simd_util.index_byte(data[m:n], 'o'), (n-m)/2) {
+				return
+			}
+			if !testing.expect_value(t, simd_util.last_index_byte(data[m:n], 'o'), (n-m)/2) {
+				return
+			}
+			data[m+(n-m)/2] = '-'
+
+			data[m]   = 'o'
+			if !testing.expect_value(t, simd_util.last_index_byte(data[m:n], 'o'), 0) {
+				return
+			}
+			data[m]   = '-'
+		}
+	}
+}
