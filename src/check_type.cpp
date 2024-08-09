@@ -2309,8 +2309,28 @@ gb_internal Type *check_get_results(CheckerContext *ctx, Scope *scope, Ast *_res
 	return tuple;
 }
 
+gb_internal void check_procedure_param_polymorphic_type(CheckerContext *ctx, Type *type, Ast *type_expr) {
+	GB_ASSERT_NOT_NULL(type_expr);
+	if (type == nullptr || ctx->in_polymorphic_specialization) { return; }
+	if (!is_type_polymorphic_record_unspecialized(type)) { return; }
 
+	bool invalid_polymorpic_type_use = false;
+	switch (type_expr->kind) {
+	case_ast_node(pt, Ident, type_expr);
+		invalid_polymorpic_type_use = true;
+	case_end;
 
+	case_ast_node(pt, SelectorExpr, type_expr);
+		invalid_polymorpic_type_use = true;
+	case_end;
+	}
+
+	if (invalid_polymorpic_type_use) {
+		gbString expr_str = expr_to_string(type_expr);
+		defer (gb_string_free(expr_str));
+		error(type_expr, "Invalid use of a non-specialized polymorphic type '%s'", expr_str);
+	}
+}
 
 // NOTE(bill): 'operands' is for generating non generic procedure type
 gb_internal bool check_procedure_type(CheckerContext *ctx, Type *type, Ast *proc_type_node, Array<Operand> const *operands) {
@@ -2433,6 +2453,7 @@ gb_internal bool check_procedure_type(CheckerContext *ctx, Type *type, Ast *proc
 		if (e->kind != Entity_Variable) {
 			is_polymorphic = true;
 		} else if (is_type_polymorphic(e->type)) {
+			check_procedure_param_polymorphic_type(c, e->type, e->Variable.type_expr);
 			is_polymorphic = true;
 		}
 
