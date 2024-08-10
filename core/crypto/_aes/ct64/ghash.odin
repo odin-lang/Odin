@@ -80,8 +80,8 @@ ghash :: proc "contextless" (dst, key, data: []byte) {
 	h2 := h0 ~ h1
 	h2r := h0r ~ h1r
 
-	src: []byte
 	for l > 0 {
+		src: []byte = ---
 		if l >= _aes.GHASH_BLOCK_SIZE {
 			src = buf
 			buf = buf[_aes.GHASH_BLOCK_SIZE:]
