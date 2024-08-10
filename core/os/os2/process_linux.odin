@@ -513,11 +513,7 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 		return process, _get_platform_error(child_errno)
 	}
 
-	process, err = process_open(int(pid))
-	if err == .Unsupported {
-		return process, nil
-	}
-
+	process, _ = process_open(int(pid))
 	return
 }
 
