@@ -10,9 +10,9 @@ filesize_t :: distinct u64
 timestamp_t :: distinct u64
 
 clockid_t :: distinct u32
-CLOCK_MONOTONIC          :: clockid_t(0)
-CLOCK_PROCESS_CPUTIME_ID :: clockid_t(1)
-CLOCK_REALTIME           :: clockid_t(2)
+CLOCK_REALTIME           :: clockid_t(0)
+CLOCK_MONOTONIC          :: clockid_t(1)
+CLOCK_PROCESS_CPUTIME_ID :: clockid_t(2)
 CLOCK_THREAD_CPUTIME_ID  :: clockid_t(3)
 
 errno_t :: enum u16 {
@@ -715,7 +715,7 @@ subscription_t :: struct {
 	 * The type of the event to which to subscribe, and its contents
 	 */
 	using contents: struct {
-		tag: u8,
+		tag: eventtype_t,
 		using u: struct #raw_union {
 			clock: subscription_clock_t,
 			fd_read: subscription_fd_readwrite_t,
