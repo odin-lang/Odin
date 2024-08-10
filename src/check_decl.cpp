@@ -180,6 +180,8 @@ gb_internal void override_entity_in_scope(Entity *original_entity, Entity *new_e
 
 	original_entity->flags |= EntityFlag_Overridden;
 	original_entity->type = new_entity->type;
+	original_entity->kind = new_entity->kind;
+	original_entity->decl_info = new_entity->decl_info;
 	original_entity->aliased_of = new_entity;
 
 	original_entity->identifier.store(new_entity->identifier);
@@ -193,7 +195,7 @@ gb_internal void override_entity_in_scope(Entity *original_entity, Entity *new_e
 	// This is most likely NEVER required, but it does not at all hurt to keep
 	isize offset = cast(u8 *)&original_entity->Dummy.start - cast(u8 *)original_entity;
 	isize size = gb_size_of(*original_entity) - offset;
-	gb_memmove(cast(u8 *)original_entity, cast(u8 *)new_entity, size);
+	gb_memmove(cast(u8 *)original_entity + offset, cast(u8 *)new_entity + offset, size);
 }
 
 gb_internal bool check_override_as_type_due_to_aliasing(CheckerContext *ctx, Entity *e, Entity *entity, Ast *init, Type *named_type) {
