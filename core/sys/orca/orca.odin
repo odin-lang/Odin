@@ -1607,7 +1607,7 @@ mouse_state :: struct {
 	wheel: vec2,
 	using _: struct #raw_union {
 		buttons: [5]key_state,
-		_: struct {
+		using _: struct {
 			left: key_state,
 			right: key_state,
 			middle: key_state,
