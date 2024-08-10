@@ -362,13 +362,14 @@ Obtain the time components from a time, including nanoseconds.
 */
 precise_clock_from_time :: proc "contextless" (t: Time) -> (hour, min, sec, nanos: int) {
 	// Time in nanoseconds since 1-1-1970 00:00
-	sec, nanos = int(t._nsec) / 1e9, int(t._nsec) % 1e9
-	sec += int(INTERNAL_TO_ABSOLUTE)
-	sec  = sec  % SECONDS_PER_DAY
-	hour = sec  / SECONDS_PER_HOUR
-	sec -= hour * SECONDS_PER_HOUR
-	min  = sec  / SECONDS_PER_MINUTE
-	sec -= min  * SECONDS_PER_MINUTE
+	_sec, _nanos := t._nsec / 1e9, t._nsec % 1e9
+	_sec += INTERNAL_TO_ABSOLUTE
+	nanos = int(_nanos)
+	sec   = int(_sec  % SECONDS_PER_DAY)
+	hour  = sec  / SECONDS_PER_HOUR
+	sec  -= hour * SECONDS_PER_HOUR
+	min   = sec  / SECONDS_PER_MINUTE
+	sec  -= min  * SECONDS_PER_MINUTE
 	return
 }
 
