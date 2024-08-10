@@ -1,6 +1,8 @@
 // Procedures to manipulate UTF-8 encoded strings
 package strings
 
+import "base:intrinsics"
+import "core:bytes"
 import "core:io"
 import "core:mem"
 import "core:unicode"
@@ -1424,12 +1426,7 @@ Output:
 
 */
 index_byte :: proc(s: string, c: byte) -> (res: int) {
-	for i := 0; i < len(s); i += 1 {
-		if s[i] == c {
-			return i
-		}
-	}
-	return -1
+	return #force_inline bytes.index_byte(transmute([]u8)s, c)
 }
 /*
 Returns the byte offset of the last byte `c` in the string `s`, -1 when not found.
@@ -1464,12 +1461,7 @@ Output:
 
 */
 last_index_byte :: proc(s: string, c: byte) -> (res: int) {
-	for i := len(s)-1; i >= 0; i -= 1 {
-		if s[i] == c {
-			return i
-		}
-	}
-	return -1
+	return #force_inline bytes.last_index_byte(transmute([]u8)s, c)
 }
 /*
 Returns the byte offset of the first rune `r` in the string `s` it finds, -1 when not found.

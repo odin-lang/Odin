@@ -1,8 +1,37 @@
 package bytes
 
+import "base:intrinsics"
 import "core:mem"
 import "core:unicode"
 import "core:unicode/utf8"
+
+
+@private SIMD_SCAN_WIDTH :: 8 * size_of(uintptr)
+
+when SIMD_SCAN_WIDTH == 32 {
+	@(private, rodata)
+	simd_scanner_indices := #simd[SIMD_SCAN_WIDTH]u8 {
+		 0,  1,  2,  3,  4,  5,  6,  7,
+		 8,  9, 10, 11, 12, 13, 14, 15,
+		16, 17, 18, 19, 20, 21, 22, 23,
+		24, 25, 26, 27, 28, 29, 30, 31,
+	}
+} else when SIMD_SCAN_WIDTH == 64 {
+	@(private, rodata)
+	simd_scanner_indices := #simd[SIMD_SCAN_WIDTH]u8 {
+		 0,  1,  2,  3,  4,  5,  6,  7,
+		 8,  9, 10, 11, 12, 13, 14, 15,
+		16, 17, 18, 19, 20, 21, 22, 23,
+		24, 25, 26, 27, 28, 29, 30, 31,
+		32, 33, 34, 35, 36, 37, 38, 39,
+		40, 41, 42, 43, 44, 45, 46, 47,
+		48, 49, 50, 51, 52, 53, 54, 55,
+		56, 57, 58, 59, 60, 61, 62, 63,
+	}
+} else {
+	#panic("Invalid SIMD_SCAN_WIDTH. Must be 32 or 64.")
+}
+
 
 clone :: proc(s: []byte, allocator := context.allocator, loc := #caller_location) -> []byte {
 	c := make([]byte, len(s), allocator, loc)
@@ -293,23 +322,140 @@ split_after_iterator :: proc(s: ^[]byte, sep: []byte) -> ([]byte, bool) {
 	return _split_iterator(s, sep, len(sep))
 }
 
+/*
+Scan a slice of bytes for a specific byte.
 
-index_byte :: proc(s: []byte, c: byte) -> int {
-	for i := 0; i < len(s); i += 1 {
+This procedure safely handles slices of any length, including empty slices.
+
+Inputs:
+- data: A slice of bytes.
+- c: The byte to search for.
+
+Returns:
+- index: The index of the byte `c`, or -1 if it was not found.
+*/
+index_byte :: proc(s: []byte, c: byte) -> (index: int) #no_bounds_check {
+	length := len(s)
+	i := 0
+
+	// Guard against small strings.
+	if length < SIMD_SCAN_WIDTH {
+		for /**/; i < length; i += 1 {
+			if s[i] == c {
+				return i
+			}
+		}
+		return -1
+	}
+
+	ptr := cast(int)cast(uintptr)raw_data(s)
+
+	alignment_start := (SIMD_SCAN_WIDTH - ptr % SIMD_SCAN_WIDTH) % SIMD_SCAN_WIDTH
+
+	// Iterate as a scalar until the data is aligned on a `SIMD_SCAN_WIDTH` boundary.
+	//
+	// This way, every load in the vector loop will be aligned, which should be
+	// the fastest possible scenario.
+	for /**/; i < alignment_start; i += 1 {
 		if s[i] == c {
 			return i
 		}
 	}
+
+	// Iterate as a vector over every aligned chunk, evaluating each byte simultaneously at the CPU level.
+	scanner: #simd[SIMD_SCAN_WIDTH]u8 = c
+	tail := length - (length - alignment_start) % SIMD_SCAN_WIDTH
+
+	for /**/; i < tail; i += SIMD_SCAN_WIDTH {
+		load := (cast(^#simd[SIMD_SCAN_WIDTH]u8)(&s[i]))^
+		comparison := intrinsics.simd_lanes_eq(load, scanner)
+		match := intrinsics.simd_reduce_or(comparison)
+		if match > 0 {
+			sentinel: #simd[SIMD_SCAN_WIDTH]u8 = u8(0xFF)
+			index_select := intrinsics.simd_select(comparison, simd_scanner_indices, sentinel)
+			index_reduce := intrinsics.simd_reduce_min(index_select)
+			return i + cast(int)index_reduce
+		}
+	}
+
+	// Iterate as a scalar over the remaining unaligned portion.
+	for /**/; i < length; i += 1 {
+		if s[i] == c {
+			return i
+		}
+	}
+
 	return -1
 }
 
-// Returns -1 if c is not present
-last_index_byte :: proc(s: []byte, c: byte) -> int {
-	for i := len(s)-1; i >= 0; i -= 1 {
+/*
+Scan a slice of bytes for a specific byte, starting from the end and working
+backwards to the start.
+
+This procedure safely handles slices of any length, including empty slices.
+
+Inputs:
+- data: A slice of bytes.
+- c: The byte to search for.
+
+Returns:
+- index: The index of the byte `c`, or -1 if it was not found.
+*/
+last_index_byte :: proc(s: []byte, c: byte) -> int #no_bounds_check {
+	length := len(s)
+	i := length - 1
+
+	// Guard against small strings.
+	if length < SIMD_SCAN_WIDTH {
+		for /**/; i >= 0; i -= 1 {
+			if s[i] == c {
+				return i
+			}
+		}
+		return -1
+	}
+
+	ptr := cast(int)cast(uintptr)raw_data(s)
+
+	tail := length - (ptr + length) % SIMD_SCAN_WIDTH
+
+	// Iterate as a scalar until the data is aligned on a `SIMD_SCAN_WIDTH` boundary.
+	//
+	// This way, every load in the vector loop will be aligned, which should be
+	// the fastest possible scenario.
+	for /**/; i >= tail; i -= 1 {
 		if s[i] == c {
 			return i
 		}
 	}
+
+	// Iterate as a vector over every aligned chunk, evaluating each byte simultaneously at the CPU level.
+	scanner: #simd[SIMD_SCAN_WIDTH]u8 = c
+	alignment_start := (SIMD_SCAN_WIDTH - ptr % SIMD_SCAN_WIDTH) % SIMD_SCAN_WIDTH
+
+	i -= SIMD_SCAN_WIDTH - 1
+
+	for /**/; i >= alignment_start; i -= SIMD_SCAN_WIDTH {
+		load := (cast(^#simd[SIMD_SCAN_WIDTH]u8)(&s[i]))^
+		comparison := intrinsics.simd_lanes_eq(load, scanner)
+		match := intrinsics.simd_reduce_or(comparison)
+		if match > 0 {
+			sentinel: #simd[SIMD_SCAN_WIDTH]u8
+			index_select := intrinsics.simd_select(comparison, simd_scanner_indices, sentinel)
+			index_reduce := intrinsics.simd_reduce_max(index_select)
+			return i + cast(int)index_reduce
+		}
+	}
+
+	// Iterate as a scalar over the remaining unaligned portion.
+	i += SIMD_SCAN_WIDTH - 1
+
+	for /**/; i >= 0; i -= 1 {
+		if s[i] == c {
+			return i
+		}
+	}
+
 	return -1
 }
 

@@ -9,6 +9,7 @@ download_assets :: proc() {
 	}
 }
 
+@(require) import "bytes"
 @(require) import "c/libc"
 @(require) import "compress"
 @(require) import "container"
