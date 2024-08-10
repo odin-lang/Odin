@@ -4,15 +4,19 @@ import "core:bytes"
 import "core:slice"
 import "core:testing"
 
+@private SIMD_SCAN_WIDTH :: 8 * size_of(uintptr)
+
 @test
 test_index_byte_sanity :: proc(t: ^testing.T) {
 	// We must be able to find the byte at the correct index.
-	data := make([]u8, 64)
+	data := make([]u8, 2 * SIMD_SCAN_WIDTH)
 	defer delete(data)
 	slice.fill(data, '-')
 
-	for offset in 0..<31 {
-		for idx in 0..<31 {
+	INDEX_MAX :: SIMD_SCAN_WIDTH - 1
+
+	for offset in 0..<INDEX_MAX {
+		for idx in 0..<INDEX_MAX {
 			sub := data[offset:]
 			sub[idx] = 'o'
 			if !testing.expect_value(t, bytes.index_byte(sub, 'o'), idx) {
