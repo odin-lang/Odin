@@ -1,6 +1,6 @@
-package test_core_simd_util
+package test_core_bytes
 
-import simd_util "core:simd/util"
+import "core:bytes"
 import "core:testing"
 
 @test
@@ -15,30 +15,30 @@ test_index_byte_sanity :: proc(t: ^testing.T) {
 
 		// Find it at the end.
 		data[n-1] = 'o'
-		if !testing.expect_value(t, simd_util.index_byte(data, 'o'), n-1) {
+		if !testing.expect_value(t, bytes.index_byte(data, 'o'), n-1) {
 			return
 		}
-		if !testing.expect_value(t, simd_util.last_index_byte(data, 'o'), n-1) {
+		if !testing.expect_value(t, bytes.last_index_byte(data, 'o'), n-1) {
 			return
 		}
 		data[n-1] = '-'
 
 		// Find it in the middle.
 		data[n/2] = 'o'
-		if !testing.expect_value(t, simd_util.index_byte(data, 'o'), n/2) {
+		if !testing.expect_value(t, bytes.index_byte(data, 'o'), n/2) {
 			return
 		}
-		if !testing.expect_value(t, simd_util.last_index_byte(data, 'o'), n/2) {
+		if !testing.expect_value(t, bytes.last_index_byte(data, 'o'), n/2) {
 			return
 		}
 		data[n/2] = '-'
 
 		// Find it at the start.
 		data[0] = 'o'
-		if !testing.expect_value(t, simd_util.index_byte(data, 'o'), 0) {
+		if !testing.expect_value(t, bytes.index_byte(data, 'o'), 0) {
 			return
 		}
-		if !testing.expect_value(t, simd_util.last_index_byte(data, 'o'), 0) {
+		if !testing.expect_value(t, bytes.last_index_byte(data, 'o'), 0) {
 			return
 		}
 	}
@@ -47,8 +47,8 @@ test_index_byte_sanity :: proc(t: ^testing.T) {
 @test
 test_index_byte_empty :: proc(t: ^testing.T) {
 	a: [1]u8
-	testing.expect_value(t, simd_util.index_byte(a[0:0], 'o'), -1)
-	testing.expect_value(t, simd_util.last_index_byte(a[0:0], 'o'), -1)
+	testing.expect_value(t, bytes.index_byte(a[0:0], 'o'), -1)
+	testing.expect_value(t, bytes.last_index_byte(a[0:0], 'o'), -1)
 }
 
 @test
@@ -65,12 +65,12 @@ test_index_byte_multiple_hits :: proc(t: ^testing.T) {
 		data[n-5] = 'o'
 
 		// Find the first one.
-		if !testing.expect_value(t, simd_util.index_byte(data, 'o'), n-5) {
+		if !testing.expect_value(t, bytes.index_byte(data, 'o'), n-5) {
 			return
 		}
 
 		// Find the last one.
-		if !testing.expect_value(t, simd_util.last_index_byte(data, 'o'), n-1) {
+		if !testing.expect_value(t, bytes.last_index_byte(data, 'o'), n-1) {
 			return
 		}
 	}
@@ -88,19 +88,19 @@ test_index_byte_zero :: proc(t: ^testing.T) {
 
 		// Positive hit.
 		data[n-1] = 0
-		if !testing.expect_value(t, simd_util.index_byte(data[:n], 0), n-1) {
+		if !testing.expect_value(t, bytes.index_byte(data[:n], 0), n-1) {
 			return
 		}
-		if !testing.expect_value(t, simd_util.last_index_byte(data[:n], 0), n-1) {
+		if !testing.expect_value(t, bytes.last_index_byte(data[:n], 0), n-1) {
 			return
 		}
 
 		// Test for false positives.
 		data[n-1] = '-'
-		if !testing.expect_value(t, simd_util.index_byte(data[:n], 0), -1) {
+		if !testing.expect_value(t, bytes.index_byte(data[:n], 0), -1) {
 			return
 		}
-		if !testing.expect_value(t, simd_util.last_index_byte(data[:n], 0), -1) {
+		if !testing.expect_value(t, bytes.last_index_byte(data[:n], 0), -1) {
 			return
 		}
 	}
@@ -117,22 +117,22 @@ test_misaligned_data :: proc(t: ^testing.T) {
 
 		for m in 1..<n {
 			data[n-1] = 'o'
-			if !testing.expect_value(t, simd_util.index_byte(data[m:n], 'o'), n-1-m) {
+			if !testing.expect_value(t, bytes.index_byte(data[m:n], 'o'), n-1-m) {
 				return
 			}
 			data[n-1] = '-'
 
 			data[m+(n-m)/2] = 'o'
-			if !testing.expect_value(t, simd_util.index_byte(data[m:n], 'o'), (n-m)/2) {
+			if !testing.expect_value(t, bytes.index_byte(data[m:n], 'o'), (n-m)/2) {
 				return
 			}
-			if !testing.expect_value(t, simd_util.last_index_byte(data[m:n], 'o'), (n-m)/2) {
+			if !testing.expect_value(t, bytes.last_index_byte(data[m:n], 'o'), (n-m)/2) {
 				return
 			}
 			data[m+(n-m)/2] = '-'
 
 			data[m]   = 'o'
-			if !testing.expect_value(t, simd_util.last_index_byte(data[m:n], 'o'), 0) {
+			if !testing.expect_value(t, bytes.last_index_byte(data[m:n], 'o'), 0) {
 				return
 			}
 			data[m]   = '-'

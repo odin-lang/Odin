@@ -9,6 +9,7 @@ download_assets :: proc() {
 	}
 }
 
+@(require) import "bytes"
 @(require) import "c/libc"
 @(require) import "compress"
 @(require) import "container"
@@ -34,7 +35,6 @@ download_assets :: proc() {
 @(require) import "path/filepath"
 @(require) import "reflect"
 @(require) import "runtime"
-@(require) import "simd/util"
 @(require) import "slice"
 @(require) import "strconv"
 @(require) import "strings"
