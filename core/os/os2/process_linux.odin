@@ -495,22 +495,17 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 	for errno == .EINTR {
 		n, errno = linux.read(child_pipe_fds[READ], child_byte[:])
 	}
-	if errno != .NONE {
-		child_state, _ := process_wait(process, 0)
-		if child_state.exited {
-			process.pid = 0  // If the child exited, we reaped it.
-			return process, _get_platform_error(errno)
-		}
-		// else.. something weird happened, but there IS a running process.
-		// Do not return the read error so the user knows to wait on it.
-	}
 
-	child_errno := linux.Errno(child_byte[0])
-	if child_errno != .NONE {
-		// We can assume it trapped here.
-		_reap_terminated(process)
-		process.pid = 0
-		return process, _get_platform_error(child_errno)
+	// If the read failed, something weird happened. Do not return the read
+	// error so the user knows to wait on it.
+	if errno == .NONE {
+		child_errno := linux.Errno(child_byte[0])
+		if child_errno != .NONE {
+			// We can assume it trapped here.
+			_reap_terminated(process)
+			process.pid = 0
+			return process, _get_platform_error(child_errno)
+		}
 	}
 
 	process, _ = process_open(int(pid))
