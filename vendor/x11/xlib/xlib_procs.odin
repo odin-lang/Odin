@@ -9,12 +9,48 @@ foreign xlib {
 foreign import xcursor "system:Xcursor"
 @(default_calling_convention="c", link_prefix="X")
 foreign xcursor {
-	cursorGetTheme         :: proc(display: ^Display) -> cstring ---
-	cursorGetDefaultSize   :: proc(display: ^Display) -> i32 ---
-	cursorLibraryLoadImage :: proc(name: cstring, theme: cstring, size: i32) -> rawptr ---
-	cursorImageLoadCursor  :: proc(display: ^Display, img: rawptr) -> Cursor ---
-	cursorImageDestroy     :: proc(img: rawptr) ---
+	cursorGetTheme          :: proc(display: ^Display) -> cstring ---
+	cursorGetDefaultSize    :: proc(display: ^Display) -> i32 ---
+	cursorLibraryLoadCursor :: proc(display: ^Display, name: cstring) -> Cursor ---
+	cursorLibraryLoadImage  :: proc(name: cstring, theme: cstring, size: i32) -> rawptr ---
+	cursorImageLoadCursor   :: proc(display: ^Display, img: rawptr) -> Cursor ---
+	cursorImageDestroy      :: proc(img: rawptr) ---
 }
+
+foreign import xfixes "system:Xfixes"
+@(default_calling_convention="c", link_prefix="XFixes")
+foreign xfixes {
+	HideCursor :: proc(display: ^Display, window: Window) ---
+	ShowCursor :: proc(display: ^Display, window: Window) ---
+}
+
+foreign import xrandr "system:Xrandr"
+@(default_calling_convention="c")
+foreign xrandr {
+	XRRSizes :: proc(display: ^Display, screen: i32, nsizes: ^i32) -> [^]XRRScreenSize ---
+	XRRGetScreenResources :: proc(display: ^Display, window: Window) -> ^XRRScreenResources ---
+	XRRFreeScreenResources :: proc(resources: ^XRRScreenResources) ---
+	XRRGetOutputInfo :: proc(display: ^Display, resources: ^XRRScreenResources, output: RROutput) -> ^XRROutputInfo ---
+	XRRFreeOutputInfo :: proc(output_info: ^XRROutputInfo) ---
+	XRRGetCrtcInfo :: proc(display: ^Display, resources: ^XRRScreenResources, crtc: RRCrtc) -> ^XRRCrtcInfo ---
+	XRRFreeCrtcInfo :: proc(crtc_info: ^XRRCrtcInfo) ---
+	XRRGetMonitors :: proc(dpy: ^Display, window: Window, get_active: b32, nmonitors: ^i32) -> [^]XRRMonitorInfo ---
+}
+
+foreign import xinput "system:Xi"
+foreign xinput {
+	XISelectEvents :: proc(display: ^Display, window: Window, masks: [^]XIEventMask, num_masks: i32) -> i32 ---
+	XIQueryVersion :: proc(display: ^Display, major: ^i32, minor: ^i32) -> Status ---
+}
+
+XISetMask :: proc(ptr: [^]u8, event: XIEventType) {
+	ptr[cast(i32)event >> 3] |= (1 << cast(uint)((cast(i32)event) & 7))
+}
+
+XIMaskIsSet :: proc(ptr: [^]u8, event: i32) -> bool {
+	return (ptr[event >> 3] & (1 << cast(uint)((event) & 7))) != 0
+}
+
 
 /* ----  X11/Xlib.h ---------------------------------------------------------*/
 

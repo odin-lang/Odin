@@ -72,6 +72,11 @@ XkbAllEventsMask :: XkbEventMask {
 	.ExtensionDeviceNotify,
 }
 
+/* ----  X11/extensions/XI2.h ---------------------------------------------------------*/
+
+XIAllDevices :: 0
+XIAllMasterDevices :: 1
+
 
 /* ----  X11/Xlib.h ---------------------------------------------------------*/
 
