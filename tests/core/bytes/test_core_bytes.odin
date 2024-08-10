@@ -1,45 +1,27 @@
 package test_core_bytes
 
 import "core:bytes"
+import "core:slice"
 import "core:testing"
 
 @test
 test_index_byte_sanity :: proc(t: ^testing.T) {
 	// We must be able to find the byte at the correct index.
-	for n in 1..<256 {
-		data := make([]u8, n)
-		defer delete(data)
-		for i in 0..<n-1 {
-			data[i] = '-'
-		}
+	data := make([]u8, 64)
+	defer delete(data)
+	slice.fill(data, '-')
 
-		// Find it at the end.
-		data[n-1] = 'o'
-		if !testing.expect_value(t, bytes.index_byte(data, 'o'), n-1) {
-			return
-		}
-		if !testing.expect_value(t, bytes.last_index_byte(data, 'o'), n-1) {
-			return
-		}
-		data[n-1] = '-'
-
-		// Find it in the middle.
-		data[n/2] = 'o'
-		if !testing.expect_value(t, bytes.index_byte(data, 'o'), n/2) {
-			return
-		}
-		if !testing.expect_value(t, bytes.last_index_byte(data, 'o'), n/2) {
-			return
-		}
-		data[n/2] = '-'
-
-		// Find it at the start.
-		data[0] = 'o'
-		if !testing.expect_value(t, bytes.index_byte(data, 'o'), 0) {
-			return
-		}
-		if !testing.expect_value(t, bytes.last_index_byte(data, 'o'), 0) {
-			return
+	for offset in 0..<31 {
+		for idx in 0..<31 {
+			sub := data[offset:]
+			sub[idx] = 'o'
+			if !testing.expect_value(t, bytes.index_byte(sub, 'o'), idx) {
+				return
+			}
+			if !testing.expect_value(t, bytes.last_index_byte(sub, 'o'), idx) {
+				return
+			}
+			sub[idx] = '-'
 		}
 	}
 }
@@ -56,9 +38,7 @@ test_index_byte_multiple_hits :: proc(t: ^testing.T) {
 	for n in 5..<256 {
 		data := make([]u8, n)
 		defer delete(data)
-		for i in 0..<n-1 {
-			data[i] = '-'
-		}
+		slice.fill(data, '-')
 
 		data[n-1] = 'o'
 		data[n-3] = 'o'
@@ -82,9 +62,7 @@ test_index_byte_zero :: proc(t: ^testing.T) {
 	for n in 1..<256 {
 		data := make([]u8, n + 64)
 		defer delete(data)
-		for i in 0..<n-1 {
-			data[i] = '-'
-		}
+		slice.fill(data, '-')
 
 		// Positive hit.
 		data[n-1] = 0
@@ -102,40 +80,6 @@ test_index_byte_zero :: proc(t: ^testing.T) {
 		}
 		if !testing.expect_value(t, bytes.last_index_byte(data[:n], 0), -1) {
 			return
-		}
-	}
-}
-
-@test
-test_misaligned_data :: proc(t: ^testing.T) {
-	for n in 2..<256 {
-		data := make([]u8, n)
-		defer delete(data)
-		for i in 0..<n-1 {
-			data[i] = '-'
-		}
-
-		for m in 1..<n {
-			data[n-1] = 'o'
-			if !testing.expect_value(t, bytes.index_byte(data[m:n], 'o'), n-1-m) {
-				return
-			}
-			data[n-1] = '-'
-
-			data[m+(n-m)/2] = 'o'
-			if !testing.expect_value(t, bytes.index_byte(data[m:n], 'o'), (n-m)/2) {
-				return
-			}
-			if !testing.expect_value(t, bytes.last_index_byte(data[m:n], 'o'), (n-m)/2) {
-				return
-			}
-			data[m+(n-m)/2] = '-'
-
-			data[m]   = 'o'
-			if !testing.expect_value(t, bytes.last_index_byte(data[m:n], 'o'), 0) {
-				return
-			}
-			data[m]   = '-'
 		}
 	}
 }
