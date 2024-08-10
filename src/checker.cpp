@@ -2991,6 +2991,9 @@ gb_internal void init_core_type_info(Checker *c) {
 	}
 	Entity *type_info_entity = find_core_entity(c, str_lit("Type_Info"));
 	GB_ASSERT(type_info_entity != nullptr);
+	if (type_info_entity->type == nullptr) {
+		check_single_global_entity(c, type_info_entity, type_info_entity->decl_info);
+	}
 	GB_ASSERT(type_info_entity->type != nullptr);
 
 	t_type_info = type_info_entity->type;
