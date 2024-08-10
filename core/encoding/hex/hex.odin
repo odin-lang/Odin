@@ -1,5 +1,6 @@
 package encoding_hex
 
+import "core:io"
 import "core:strings"
 
 encode :: proc(src: []byte, allocator := context.allocator, loc := #caller_location) -> []byte #no_bounds_check {
@@ -14,6 +15,12 @@ encode :: proc(src: []byte, allocator := context.allocator, loc := #caller_locat
 	return dst
 }
 
+encode_into_writer :: proc(dst: io.Writer, src: []byte) -> io.Error {
+	for v in src {
+		io.write(dst, {HEXTABLE[v>>4], HEXTABLE[v&0x0f]}) or_return
+	}
+	return nil
+}
 
 decode :: proc(src: []byte, allocator := context.allocator, loc := #caller_location) -> (dst: []byte, ok: bool) #no_bounds_check {
 	if len(src) % 2 == 1 {
