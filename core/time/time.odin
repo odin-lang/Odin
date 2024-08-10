@@ -348,33 +348,7 @@ clock :: proc { clock_from_time, clock_from_duration, clock_from_stopwatch }
 Obtain the time components from a time.
 */
 clock_from_time :: proc "contextless" (t: Time) -> (hour, min, sec: int) {
-	hour, min, sec, _ = precise_clock_from_time(t)
-	return
-}
-
-/*
-Obtain the time components from a time, including nanoseconds.
-*/
-precise_clock_from_time :: proc "contextless" (t: Time) -> (hour, min, sec, nanos: int) {
-	// Time in nanoseconds since 1-1-1970 00:00
-	nanos  = int(t._nsec)
-	// Time in seconds
-	sec    = nanos / 1e9
-	// Remaining nanoseconds after whole seconds subtracted
-	nanos -= sec * 1e9
-	// Add offset to seconds
-	sec   += int(UNIX_TO_ABSOLUTE)
-	// Divide out the days and just keep the seconds within the day
-	sec   %= 86_400
-	// How many hours in those seconds?
-	hour   = sec  / 3_600
-	// Remove those hourly seconds
-	sec   -= hour * 3_600
-	// How many minutes left?
-	min    = sec  / 60
-	// Subtract minutely seconds
-	sec   -= min  * 60
-	return
+	return clock_from_seconds(_time_abs(t))
 }
 
 /*
@@ -382,13 +356,6 @@ Obtain the time components from a duration.
 */
 clock_from_duration :: proc "contextless" (d: Duration) -> (hour, min, sec: int) {
 	return clock_from_seconds(u64(d/1e9))
-}
-
-/*
-Obtain the time components from a duration, including nanoseconds.
-*/
-precise_clock_from_duration :: proc "contextless" (d: Duration) -> (hour, min, sec, nanos: int) {
-	return precise_clock_from_time({_nsec=i64(d)})
 }
 
 /*
