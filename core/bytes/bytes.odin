@@ -6,14 +6,30 @@ import "core:unicode"
 import "core:unicode/utf8"
 
 
-@private SIMD_SCAN_WIDTH :: 32
+@private SIMD_SCAN_WIDTH :: 8 * size_of(uintptr)
 
-@(private, rodata)
-simd_scanner_indices := #simd[SIMD_SCAN_WIDTH]u8 {
-	 0,  1,  2,  3,  4,  5,  6,  7,
-	 8,  9, 10, 11, 12, 13, 14, 15,
-	16, 17, 18, 19, 20, 21, 22, 23,
-	24, 25, 26, 27, 28, 29, 30, 31,
+when SIMD_SCAN_WIDTH == 32 {
+	@(private, rodata)
+	simd_scanner_indices := #simd[SIMD_SCAN_WIDTH]u8 {
+		 0,  1,  2,  3,  4,  5,  6,  7,
+		 8,  9, 10, 11, 12, 13, 14, 15,
+		16, 17, 18, 19, 20, 21, 22, 23,
+		24, 25, 26, 27, 28, 29, 30, 31,
+	}
+} else when SIMD_SCAN_WIDTH == 64 {
+	@(private, rodata)
+	simd_scanner_indices := #simd[SIMD_SCAN_WIDTH]u8 {
+		 0,  1,  2,  3,  4,  5,  6,  7,
+		 8,  9, 10, 11, 12, 13, 14, 15,
+		16, 17, 18, 19, 20, 21, 22, 23,
+		24, 25, 26, 27, 28, 29, 30, 31,
+		32, 33, 34, 35, 36, 37, 38, 39,
+		40, 41, 42, 43, 44, 45, 46, 47,
+		48, 49, 50, 51, 52, 53, 54, 55,
+		56, 57, 58, 59, 60, 61, 62, 63,
+	}
+} else {
+	#panic("Invalid SIMD_SCAN_WIDTH. Must be 32 or 64.")
 }
 
 
