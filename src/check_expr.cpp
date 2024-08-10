@@ -1237,6 +1237,24 @@ gb_internal void check_assignment(CheckerContext *c, Operand *operand, Type *typ
 						error_line("\t      Got:      %s\n", s_got);
 						gb_string_free(s_got);
 						gb_string_free(s_expected);
+					} else if (same_inputs && same_outputs &&
+						x->Proc.diverging != y->Proc.diverging) {
+
+						gbString s_expected = type_to_string(y);
+						if (y->Proc.diverging) {
+							s_expected = gb_string_appendc(s_expected, " -> !");
+						}
+
+						gbString s_got = type_to_string(x);
+						if (x->Proc.diverging) {
+							s_got = gb_string_appendc(s_got, " -> !");
+						}
+
+						error_line("\tNote: One of the procedures is diverging while the other isn't\n");
+						error_line("\t      Expected: %s\n", s_expected);
+						error_line("\t      Got:      %s\n", s_got);
+						gb_string_free(s_got);
+						gb_string_free(s_expected);
 					} else if (same_inputs && !same_outputs) {
 						gbString s_expected = type_to_string(y->Proc.results);
 						gbString s_got = type_to_string(x->Proc.results);
