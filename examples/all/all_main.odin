@@ -135,6 +135,7 @@ import time             "core:time"
 import datetime         "core:time/datetime"
 import flags            "core:flags"
 
+import orca             "core:sys/orca"
 import sysinfo          "core:sys/info"
 
 import unicode          "core:unicode"
@@ -254,6 +255,7 @@ _ :: thread
 _ :: time
 _ :: datetime
 _ :: flags
+_ :: orca
 _ :: sysinfo
 _ :: unicode
 _ :: uuid
