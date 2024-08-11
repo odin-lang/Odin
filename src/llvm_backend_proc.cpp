@@ -3569,9 +3569,9 @@ gb_internal lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr) {
 							if (is_type_untyped_nil(arg.type)) {
 								arg = lb_const_nil(p->module, t_rawptr);
 							}
-							array_add(&args, lb_emit_conv(p, arg, c_vararg_promote_type(default_type(arg.type))));
+							array_add(&args, lb_emit_c_vararg(p, arg, arg.type));
 						} else {
-							array_add(&args, lb_emit_conv(p, arg, c_vararg_promote_type(elem_type)));
+							array_add(&args, lb_emit_c_vararg(p, arg, elem_type));
 						}
 					}
 					break;
@@ -3697,15 +3697,15 @@ gb_internal lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr) {
 						if (is_type_untyped_nil(arg.type)) {
 							arg = lb_const_nil(p->module, t_rawptr);
 						}
-						array_add(&args, lb_emit_conv(p, arg, c_vararg_promote_type(default_type(arg.type))));
+						array_add(&args, lb_emit_c_vararg(p, arg, arg.type));
 					} else {
-						array_add(&args, lb_emit_conv(p, arg, c_vararg_promote_type(elem_type)));
+						array_add(&args, lb_emit_c_vararg(p, arg, elem_type));
 					}
 				}
 			} else {
 				lbValue value = lb_build_expr(p, fv->value);
 				GB_ASSERT(!is_type_tuple(value.type));
-				array_add(&args, lb_emit_conv(p, value, c_vararg_promote_type(value.type)));
+				array_add(&args, lb_emit_c_vararg(p, value, value.type));
 			}
 		} else {
 			lbValue value = lb_build_expr(p, fv->value);

@@ -2469,6 +2469,17 @@ gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 	return {};
 }
 
+gb_internal lbValue lb_emit_c_vararg(lbProcedure *p, lbValue arg, Type *type) {
+	Type *core = core_type(type);
+	if (core->kind == Type_BitSet) {
+		core = core_type(bit_set_to_int(core));
+		arg  = lb_emit_transmute(p, arg, core);
+	}
+
+	Type *promoted = c_vararg_promote_type(core);
+	return lb_emit_conv(p, arg, promoted);
+}
+
 gb_internal lbValue lb_compare_records(lbProcedure *p, TokenKind op_kind, lbValue left, lbValue right, Type *type) {
 	GB_ASSERT((is_type_struct(type) || is_type_union(type)) && is_type_comparable(type));
 	lbValue left_ptr  = lb_address_from_load_or_generate_local(p, left);
