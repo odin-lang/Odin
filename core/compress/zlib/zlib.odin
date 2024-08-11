@@ -12,6 +12,7 @@ package compress_zlib
 
 import "core:compress"
 
+import "base:intrinsics"
 import "core:mem"
 import "core:io"
 import "core:hash"
@@ -123,13 +124,7 @@ Huffman_Table :: struct {
 @(optimization_mode="favor_size")
 z_bit_reverse :: #force_inline proc(n: u16, bits: u8) -> (r: u16) {
 	assert(bits <= 16)
-	// NOTE: Can optimize with llvm.bitreverse.i64 or some bit twiddling
-	// by reversing all of the bits and masking out the unneeded ones.
-	r = n
-	r = ((r & 0xAAAA) >>  1) | ((r & 0x5555) << 1)
-	r = ((r & 0xCCCC) >>  2) | ((r & 0x3333) << 2)
-	r = ((r & 0xF0F0) >>  4) | ((r & 0x0F0F) << 4)
-	r = ((r & 0xFF00) >>  8) | ((r & 0x00FF) << 8)
+	r = intrinsics.reverse_bits(n)
 
 	r >>= (16 - bits)
 	return
