@@ -129,7 +129,7 @@ arena_alloc :: proc(arena: ^Arena, size, alignment: uint, loc := #caller_locatio
 	return
 }
 
-// `arena_init` will initialize the arena with a usuable block.
+// `arena_init` will initialize the arena with a usable block.
 // This procedure is not necessary to use the Arena as the default zero as `arena_alloc` will set things up if necessary
 @(require_results)
 arena_init :: proc(arena: ^Arena, size: uint, backing_allocator: Allocator, loc := #caller_location) -> Allocator_Error {
