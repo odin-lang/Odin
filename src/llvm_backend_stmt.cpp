@@ -1646,7 +1646,7 @@ gb_internal void lb_build_type_switch_stmt(lbProcedure *p, AstTypeSwitchStmt *ss
 		union_data = lb_emit_conv(p, parent_ptr, t_rawptr);
 		Type *union_type = type_deref(parent_ptr.type);
 		if (is_type_union_maybe_pointer(union_type)) {
-			tag = lb_emit_conv(p, lb_emit_comp_against_nil(p, Token_NotEq, union_data), t_int);
+			tag = lb_emit_conv(p, lb_emit_comp_against_nil(p, Token_NotEq, parent_value), t_int);
 		} else if (union_tag_size(union_type) == 0) {
 			tag = {}; // there is no tag for a zero sized union
 		} else {
