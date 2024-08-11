@@ -350,7 +350,7 @@ _make_dynamic_array_len_cap :: proc(array: ^Raw_Dynamic_Array, size_of_elem, ali
 	return
 }
 
-// `make_map` allocates and initializes a dynamic array. Like `new`, the first argument is a type, not a value.
+// `make_map` allocates and initializes a map. Like `new`, the first argument is a type, not a value.
 // Unlike `new`, `make`'s return value is the same as the type of its argument, not a pointer to it.
 //
 // Note: Prefer using the procedure group `make`.
@@ -362,7 +362,7 @@ make_map :: proc($T: typeid/map[$K]$E, #any_int capacity: int = 1<<MAP_MIN_LOG2_
 	err = reserve_map(&m, capacity, loc)
 	return
 }
-// `make_multi_pointer` allocates and initializes a dynamic array. Like `new`, the first argument is a type, not a value.
+// `make_multi_pointer` allocates and initializes a multi-pointer. Like `new`, the first argument is a type, not a value.
 // Unlike `new`, `make`'s return value is the same as the type of its argument, not a pointer to it.
 //
 // This is "similar" to doing `raw_data(make([]E, len, allocator))`.
