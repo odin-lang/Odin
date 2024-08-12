@@ -2,6 +2,14 @@
 //+build windows, linux, darwin, freebsd, openbsd, netbsd, haiku
 package testing
 
+/*
+	(c) Copyright 2024 Feoramund <rune@swevencraft.org>.
+	Made available under Odin's BSD-3 license.
+
+	List of contributors:
+		Feoramund:   Total rewrite.
+*/
+
 import "base:intrinsics"
 import "core:c/libc"
 import "core:encoding/ansi"

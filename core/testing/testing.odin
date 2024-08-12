@@ -1,5 +1,14 @@
 package testing
 
+/*
+	(c) Copyright 2024 Feoramund <rune@swevencraft.org>.
+	Made available under Odin's BSD-3 license.
+
+	List of contributors:
+		Ginger Bill: Initial implementation.
+		Feoramund:   Total rewrite.
+*/
+
 import "base:intrinsics"
 import "base:runtime"
 import pkg_log "core:log"
