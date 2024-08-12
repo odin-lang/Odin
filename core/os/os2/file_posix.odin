@@ -115,7 +115,7 @@ _close :: proc(f: ^File_Impl) -> (err: Error) {
 	}
 
 	delete(f.cname, file_allocator())
-	posix.free(f.cname)
+	free(f, file_allocator())
 	return
 }
 
