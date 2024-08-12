@@ -3038,7 +3038,7 @@ gb_internal void check_shift(CheckerContext *c, Operand *x, Operand *y, Ast *nod
 			x->mode = Addressing_Value;
 			if (type_hint) {
 				if (is_type_integer(type_hint)) {
-					x->type = type_hint;
+					convert_to_typed(c, x, type_hint);
 				} else {
 					gbString x_str = expr_to_string(x->expr);
 					gbString to_type = type_to_string(type_hint);
