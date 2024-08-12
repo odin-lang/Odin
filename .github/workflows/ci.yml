@@ -3,9 +3,10 @@ on: [push, pull_request, workflow_dispatch]
 
 jobs:
   build_netbsd:
-    if: false
     name: NetBSD Build, Check, and Test
     runs-on: ubuntu-latest
+    env:
+      PKGSRC_BRANCH: 2024Q2
     steps:
     - uses: actions/checkout@v4
     - name: Build, Check, and Test
@@ -13,10 +14,11 @@ jobs:
       uses: vmactions/netbsd-vm@v1
       with:
         release: "10.0"
+        envs: PKGSRC_BRANCH
         usesh: true
         copyback: false
         prepare: |
-          PKG_PATH="https://cdn.NetBSD.org/pub/pkgsrc/packages/NetBSD/x86_64/10.0/All" /usr/sbin/pkg_add pkgin
+          PKG_PATH="https://cdn.NetBSD.org/pub/pkgsrc/packages/NetBSD/amd64/$(uname -r | cut -d_ -f1)_${PKGSRC_BRANCH}/All" /usr/sbin/pkg_add pkgin
           pkgin -y in gmake git bash python311 llvm clang
           ln -s /usr/pkg/bin/python3.11 /usr/bin/python3
         run: |
