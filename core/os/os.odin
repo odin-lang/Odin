@@ -15,6 +15,210 @@ SEEK_SET :: 0
 SEEK_CUR :: 1
 SEEK_END :: 2
 
+
+@(require_results, no_instrumentation)
+get_last_error :: proc "contextless" () -> Error {
+	return _get_last_error()
+}
+
+@(require_results)
+open :: proc(path: string, flags: int = O_RDWR, mode: int = 0) -> (handle: Handle, err: Error) {
+	return _open(path, flags, mode)
+}
+
+close :: proc(fd: Handle) -> Error {
+	return _close(fd)
+}
+
+flush :: proc(fd: Handle) -> Error {
+	return _flush(fd)
+}
+
+write :: proc(fd: Handle, data: []byte) -> (int, Error) {
+	return _write(fd, data)
+}
+read :: proc(fd: Handle, data: []byte) -> (int, Error) {
+	return _read(fd, data)
+}
+read_at :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Error) {
+	return _read_at(fd, data, offset)
+}
+write_at :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Error) {
+	return _write_at(fd, data, offset)
+}
+seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Error) {
+	return _seek(fd, offset, whence)
+}
+
+@(require_results)
+last_write_time :: proc(fd: Handle) -> (time: File_Time, err: Error) {
+	return _last_write_time(fd)
+}
+
+@(require_results)
+last_write_time_by_name :: proc(name: string) -> (time: File_Time, err: Error) {
+	return _last_write_time_by_name(name)
+}
+
+@(require_results)
+is_path_separator_rune :: proc "contextless" (r: rune) -> bool {
+	return _is_path_separator(r)
+}
+@(require_results)
+is_path_separator_byte :: proc "contextless" (b: byte) -> bool {
+	return _is_path_separator(rune(b))
+}
+
+is_path_separator :: proc{
+	is_path_separator_rune,
+	is_path_separator_byte,
+}
+
+@(require_results)
+is_file_handle :: proc(fd: Handle) -> bool {
+	return _is_file_handle(fd)
+}
+
+@(require_results)
+is_file_path :: proc(path: string, follow_links: bool = true) -> bool {
+	return _is_file_path(path, follow_links)
+}
+
+@(require_results)
+is_dir_handle :: proc(fd: Handle) -> bool {
+	return _is_dir_handle(fd)
+}
+
+@(require_results)
+is_dir_path :: proc(path: string, follow_links: bool = true) -> bool {
+	return _is_dir_path(path, follow_links)
+}
+
+is_file :: proc {is_file_path, is_file_handle}
+is_dir :: proc {is_dir_path, is_dir_handle}
+
+
+@(require_results)
+file_size :: proc(fd: Handle) -> (i64, Error) {
+	return _file_size(fd)
+}
+
+@(require_results)
+exists :: proc(path: string) -> bool {
+	return _exists(path)
+}
+
+rename :: proc(old, new: string) -> Error {
+	return _rename(old, new)
+}
+
+remove :: proc(path: string) -> Error {
+	return _remove(path)
+}
+
+link :: proc(old_name, new_name: string) -> (err: Error) {
+	return _link(old_name, new_name)
+}
+unlink :: proc(path: string) -> (err: Error) {
+	return _unlink(path)
+}
+ftruncate :: proc(fd: Handle, length: i64) -> (err: Error) {
+	return _ftruncate(fd, length)
+}
+
+truncate :: proc(path: string, length: i64) -> (err: Error) {
+	return _truncate(path, length)
+}
+
+
+@(require_results)
+pipe :: proc() -> (r, w: Handle, err: Error) {
+	return _pipe()
+}
+
+@(require_results)
+read_dir :: proc(fd: Handle, n: int, allocator := context.allocator) -> (fi: []File_Info, err: Error) {
+	return _read_dir(fd, n, allocator)
+}
+
+
+
+@(require_results)
+absolute_path_from_handle :: proc(fd: Handle) -> (path: string, err: Error) {
+	return _absolute_path_from_handle(fd)
+}
+@(require_results)
+absolute_path_from_relative :: proc(rel: string) -> (path: string, err: Error) {
+	return _absolute_path_from_relative(rel)
+}
+
+access :: proc(path: string, mask: int) -> (bool, Error) {
+	return _access(path, mask)
+}
+
+
+@(require_results)
+environ :: proc(allocator := context.allocator) -> []string {
+	return _environ(allocator)
+}
+@(require_results)
+lookup_env :: proc(key: string, allocator := context.allocator) -> (value: string, found: bool) {
+	return _lookup_env(key, allocator)
+}
+
+@(require_results)
+get_env :: proc(key: string, allocator := context.allocator) -> (value: string) {
+	return _get_env(key, allocator)
+}
+
+set_env :: proc(key, value: string) -> Error {
+	return _set_env(key, value)
+}
+unset_env :: proc(key: string) -> Error {
+	return _unset_env(key)
+}
+
+clear_env :: proc() {
+	_clear_env()
+}
+
+
+@(require_results)
+get_current_directory :: proc() -> string {
+	return _get_current_directory()
+}
+
+
+set_current_directory :: proc(path: string) -> (err: Error) {
+	return _set_current_directory(path)
+}
+
+change_directory :: set_current_directory
+
+
+make_directory :: proc(path: string, mode: u32 = 0o775) -> Error {
+	return _make_directory(path, mode)
+}
+
+remove_directory :: proc(path: string) -> Error {
+	return _remove_directory(path)
+}
+
+exit :: proc "contextless" (code: int) -> ! {
+	_exit(code)
+}
+
+@(require_results)
+current_thread_id :: proc "contextless" () -> int {
+	return _current_thread_id()
+}
+
+@(require_results)
+get_page_size :: proc() -> int {
+	return _get_page_size()
+}
+
+
 write_string :: proc(fd: Handle, str: string) -> (int, Error) {
 	return write(fd, transmute([]byte)str)
 }

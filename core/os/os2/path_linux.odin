@@ -11,7 +11,7 @@ _Path_List_Separator   :: ':'
 
 _OPENDIR_FLAGS : linux.Open_Flags : {.NONBLOCK, .DIRECTORY, .LARGEFILE, .CLOEXEC}
 
-_is_path_separator :: proc(c: byte) -> bool {
+_is_path_separator :: proc(c: rune) -> bool {
 	return c == '/'
 }
 
