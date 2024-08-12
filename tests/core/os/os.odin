@@ -32,7 +32,9 @@ read_dir :: proc(t: ^testing.T) {
 
 	fd, err := os.open(#directory + "/dir")
 	testing.expect_value(t, err, nil)
-	defer os.close(fd)
+	defer {
+		testing.expect_value(t, os.close(fd), nil)
+	}
 
 	dir, err2 := os.read_dir(fd, -1)
 	testing.expect_value(t, err2, nil)

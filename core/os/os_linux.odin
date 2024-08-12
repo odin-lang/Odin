@@ -886,6 +886,12 @@ _readlink :: proc(path: string) -> (string, Error) {
 	}
 }
 
+@(private, require_results)
+_dup :: proc(fd: Handle) -> (Handle, Error) {
+	dup, err := linux.dup(linux.Fd(fd))
+	return Handle(dup), err
+}
+
 @(require_results)
 absolute_path_from_handle :: proc(fd: Handle) -> (string, Error) {
 	buf : [256]byte

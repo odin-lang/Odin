@@ -5,10 +5,12 @@ import "core:strings"
 
 @(require_results)
 read_dir :: proc(fd: Handle, n: int, allocator := context.allocator) -> (fi: []File_Info, err: Error) {
-	dirp := _fdopendir(fd) or_return
+	dupfd := _dup(fd) or_return
+
+	dirp := _fdopendir(dupfd) or_return
 	defer _closedir(dirp)
 
-	dirpath := absolute_path_from_handle(fd) or_return
+	dirpath := absolute_path_from_handle(dupfd) or_return
 	defer delete(dirpath)
 
 	n := n
