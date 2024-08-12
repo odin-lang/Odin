@@ -63,8 +63,17 @@ _read_directory_iterator_create :: proc(f: ^File) -> (iter: Read_Directory_Itera
 	iter.impl.fullpath.allocator = file_allocator()
 	append(&iter.impl.fullpath, impl.name)
 	append(&iter.impl.fullpath, "/")
+	defer if err != nil { delete(iter.impl.fullpath) }
 
-	iter.impl.dir = posix.fdopendir(impl.fd)
+	// `fdopendir` consumes the file descriptor so we need to `dup` it.
+	dupfd := posix.dup(impl.fd)
+	if dupfd == -1 {
+		err = _get_platform_error()
+		return
+	}
+	defer if err != nil { posix.close(dupfd) }
+
+	iter.impl.dir = posix.fdopendir(dupfd)
 	if iter.impl.dir == nil {
 		err = _get_platform_error()
 		return
