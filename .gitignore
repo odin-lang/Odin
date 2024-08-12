@@ -23,8 +23,6 @@ bld/
 [Oo]bj/
 [Ll]og/
 ![Cc]ore/[Ll]og/
-tests/documentation/verify/
-tests/documentation/all.odin-doc
 # Visual Studio 2015 cache/options directory
 .vs/
 # Visual Studio Code options directory
