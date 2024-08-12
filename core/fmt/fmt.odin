@@ -2728,7 +2728,8 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 						}
 
 					case runtime.Type_Info_Struct,
-					     runtime.Type_Info_Union:
+					     runtime.Type_Info_Union,
+					     runtime.Type_Info_Bit_Field:
 						if ptr == nil {
 							io.write_string(fi.writer, "<nil>", &fi.n)
 							return
