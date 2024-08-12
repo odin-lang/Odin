@@ -441,6 +441,7 @@ foreign libc {
 	@(link_name="rmdir")            _unix_rmdir         :: proc(path: cstring) -> c.int ---
 	@(link_name="mkdir")            _unix_mkdir         :: proc(path: cstring, mode: mode_t) -> c.int ---
 	@(link_name="fcntl")            _unix_fcntl         :: proc(fd: Handle, cmd: c.int, arg: uintptr) -> c.int ---
+	@(link_name="dup")              _unix_dup           :: proc(fd: Handle) -> Handle ---
 	
 	@(link_name="fdopendir")        _unix_fdopendir     :: proc(fd: Handle) -> Dir ---
 	@(link_name="closedir")         _unix_closedir      :: proc(dirp: Dir) -> c.int ---
@@ -799,6 +800,15 @@ _readlink :: proc(path: string) -> (string, Error) {
 	}
 
 	return "", Error{}
+}
+
+@(private, require_results)
+_dup :: proc(fd: Handle) -> (Handle, Error) {
+	dup := _unix_dup(fd)
+	if dup == -1 {
+		return INVALID_HANDLE, get_last_error()
+	}
+	return dup, nil
 }
 
 @(require_results)
