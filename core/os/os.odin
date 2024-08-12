@@ -185,7 +185,9 @@ write_entire_file_or_err :: proc(name: string, data: []byte, truncate := true) -
 	fd := open(name, flags, mode) or_return
 	defer close(fd)
 
-	_ = write(fd, data) or_return
+	for n := 0; n < len(data); {
+		n += write(fd, data[n:]) or_return
+	}
 	return nil
 }
 
