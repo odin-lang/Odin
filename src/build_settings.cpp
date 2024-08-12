@@ -518,113 +518,118 @@ gb_internal isize MAX_ERROR_COLLECTOR_COUNT(void) {
 	#define AMD64_MAX_ALIGNMENT 8
 #endif
 
+#if LLVM_VERSION_MAJOR >= 18
+	#define I386_MAX_ALIGNMENT 16
+#else
+	#define I386_MAX_ALIGNMENT 4
+#endif
+
 gb_global TargetMetrics target_windows_i386 = {
 	TargetOs_windows,
 	TargetArch_i386,
-	4, 4, 4, 8,
+	4, 4, I386_MAX_ALIGNMENT, 16,
 	str_lit("i386-pc-windows-msvc"),
 };
 gb_global TargetMetrics target_windows_amd64 = {
 	TargetOs_windows,
 	TargetArch_amd64,
-	8, 8, AMD64_MAX_ALIGNMENT, 16,
+	8, 8, AMD64_MAX_ALIGNMENT, 32,
 	str_lit("x86_64-pc-windows-msvc"),
 };
 
 gb_global TargetMetrics target_linux_i386 = {
 	TargetOs_linux,
 	TargetArch_i386,
-	4, 4, 4, 8,
+	4, 4, I386_MAX_ALIGNMENT, 16,
 	str_lit("i386-pc-linux-gnu"),
-
 };
 gb_global TargetMetrics target_linux_amd64 = {
 	TargetOs_linux,
 	TargetArch_amd64,
-	8, 8, AMD64_MAX_ALIGNMENT, 16,
+	8, 8, AMD64_MAX_ALIGNMENT, 32,
 	str_lit("x86_64-pc-linux-gnu"),
 };
 gb_global TargetMetrics target_linux_arm64 = {
 	TargetOs_linux,
 	TargetArch_arm64,
-	8, 8, 16, 16,
+	8, 8, 16, 32,
 	str_lit("aarch64-linux-elf"),
 };
 
 gb_global TargetMetrics target_linux_arm32 = {
 	TargetOs_linux,
 	TargetArch_arm32,
-	4, 4, 4, 8,
+	4, 4, 8, 16,
 	str_lit("arm-unknown-linux-gnueabihf"),
 };
 
 gb_global TargetMetrics target_darwin_amd64 = {
 	TargetOs_darwin,
 	TargetArch_amd64,
-	8, 8, AMD64_MAX_ALIGNMENT, 16,
+	8, 8, AMD64_MAX_ALIGNMENT, 32,
 	str_lit("x86_64-apple-macosx"), // NOTE: Changes during initialization based on build flags.
 };
 
 gb_global TargetMetrics target_darwin_arm64 = {
 	TargetOs_darwin,
 	TargetArch_arm64,
-	8, 8, 16, 16,
+	8, 8, 16, 32,
 	str_lit("arm64-apple-macosx"), // NOTE: Changes during initialization based on build flags.
 };
 
 gb_global TargetMetrics target_freebsd_i386 = {
 	TargetOs_freebsd,
 	TargetArch_i386,
-	4, 4, 4, 8,
+	4, 4, I386_MAX_ALIGNMENT, 16,
 	str_lit("i386-unknown-freebsd-elf"),
 };
 
 gb_global TargetMetrics target_freebsd_amd64 = {
 	TargetOs_freebsd,
 	TargetArch_amd64,
-	8, 8, AMD64_MAX_ALIGNMENT, 16,
+	8, 8, AMD64_MAX_ALIGNMENT, 32,
 	str_lit("x86_64-unknown-freebsd-elf"),
 };
 
 gb_global TargetMetrics target_freebsd_arm64 = {
 	TargetOs_freebsd,
 	TargetArch_arm64,
-	8, 8, 16, 16,
+	8, 8, 16, 32,
 	str_lit("aarch64-unknown-freebsd-elf"),
 };
 
 gb_global TargetMetrics target_openbsd_amd64 = {
 	TargetOs_openbsd,
 	TargetArch_amd64,
-	8, 8, AMD64_MAX_ALIGNMENT, 16,
+	8, 8, AMD64_MAX_ALIGNMENT, 32,
 	str_lit("x86_64-unknown-openbsd-elf"),
 };
 
 gb_global TargetMetrics target_netbsd_amd64 = {
 	TargetOs_netbsd,
 	TargetArch_amd64,
-	8, 8, AMD64_MAX_ALIGNMENT, 16,
+	8, 8, AMD64_MAX_ALIGNMENT, 32,
 	str_lit("x86_64-unknown-netbsd-elf"),
 };
 
 gb_global TargetMetrics target_netbsd_arm64 = {
 	TargetOs_netbsd,
 	TargetArch_arm64,
-	8, 8, 16, 16,
+	8, 8, 16, 32,
 	str_lit("aarch64-unknown-netbsd-elf"),
 };
 
 gb_global TargetMetrics target_haiku_amd64 = {
 	TargetOs_haiku,
 	TargetArch_amd64,
-	8, 8, AMD64_MAX_ALIGNMENT, 16,
+	8, 8, AMD64_MAX_ALIGNMENT, 32,
 	str_lit("x86_64-unknown-haiku"),
 };
 
 gb_global TargetMetrics target_essence_amd64 = {
 	TargetOs_essence,
 	TargetArch_amd64,
-	8, 8, AMD64_MAX_ALIGNMENT, 16,
+	8, 8, AMD64_MAX_ALIGNMENT, 32,
 	str_lit("x86_64-pc-none-elf"),
 };
 
@@ -685,7 +690,7 @@ gb_global TargetMetrics target_wasi_wasm64p32 = {
 gb_global TargetMetrics target_freestanding_amd64_sysv = {
 	TargetOs_freestanding,
 	TargetArch_amd64,
-	8, 8, AMD64_MAX_ALIGNMENT, 16,
+	8, 8, AMD64_MAX_ALIGNMENT, 32,
 	str_lit("x86_64-pc-none-gnu"),
 	TargetABI_SysV,
 };
@@ -693,7 +698,7 @@ gb_global TargetMetrics target_freestanding_amd64_sysv = {
 gb_global TargetMetrics target_freestanding_amd64_win64 = {
 	TargetOs_freestanding,
 	TargetArch_amd64,
-	8, 8, AMD64_MAX_ALIGNMENT, 16,
+	8, 8, AMD64_MAX_ALIGNMENT, 32,
 	str_lit("x86_64-pc-none-msvc"),
 	TargetABI_Win64,
 };
@@ -701,14 +706,14 @@ gb_global TargetMetrics target_freestanding_amd64_win64 = {
 gb_global TargetMetrics target_freestanding_arm64 = {
 	TargetOs_freestanding,
 	TargetArch_arm64,
-	8, 8, 16, 16,
+	8, 8, 16, 32,
 	str_lit("aarch64-none-elf"),
 };
 
 gb_global TargetMetrics target_freestanding_arm32 = {
 	TargetOs_freestanding,
 	TargetArch_arm32,
-	4, 4, 4, 8,
+	4, 4, 8, 16,
 	str_lit("arm-unknown-unknown-gnueabihf"),
 };
 
