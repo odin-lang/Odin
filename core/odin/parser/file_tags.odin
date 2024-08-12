@@ -99,6 +99,7 @@ get_build_arch_from_string :: proc(str: string) -> Odin_Arch_Type {
 	return .Unknown
 }
 
+@require_results
 parse_file_tags :: proc(file: ast.File) -> (tags: File_Tags) {
 	if file.docs == nil {
 		return
