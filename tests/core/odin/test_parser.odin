@@ -1,8 +1,12 @@
 package test_core_odin_parser
 
+import "base:runtime"
+
+import "core:fmt"
+import "core:log"
 import "core:odin/ast"
 import "core:odin/parser"
-import "base:runtime"
+import "core:odin/tokenizer"
 import "core:testing"
 
 @test
@@ -34,7 +38,7 @@ Foo :: bit_field uint {}
 Foo :: bit_field uint {hello: bool | 1}
 
 Foo :: bit_field uint {
-	hello: bool | 1,
+	hello: bool | 1 ` + "`fmt:\"-\"`" + `,
 	hello: bool | 5,
 }
 
@@ -48,6 +52,17 @@ Foo :: bit_field uint {
 	}
 
 	p := parser.default_parser()
+
+	p.err = proc(pos: tokenizer.Pos, format: string, args: ..any) {
+		message := fmt.tprintf(format, ..args)
+		log.errorf("%s(%d:%d): %s", pos.file, pos.line, pos.column, message)
+	}
+
+	p.warn = proc(pos: tokenizer.Pos, format: string, args: ..any) {
+		message := fmt.tprintf(format, ..args)
+		log.warnf("%s(%d:%d): %s", pos.file, pos.line, pos.column, message)
+	}
+
 	ok := parser.parse_file(&p, &file)
 	testing.expect(t, ok, "bad parse")
 }

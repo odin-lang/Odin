@@ -2832,11 +2832,17 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 			expect_token(p, .Or)
 			bit_size := parse_expr(p, true)
 
+			tag: tokenizer.Token
+			if p.curr_tok.kind == .String {
+				tag = expect_token(p, .String)
+			}
+
 			field := ast.new(ast.Bit_Field_Field, name.pos, bit_size)
 
 			field.name     = name
 			field.type     = type
 			field.bit_size = bit_size
+			field.tag      = tag
 
 			append(&fields, field)
 

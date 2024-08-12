@@ -861,6 +861,7 @@ Bit_Field_Field :: struct {
 	name:       ^Expr,
 	type:       ^Expr,
 	bit_size:   ^Expr,
+	tag:        tokenizer.Token,
 	comments:   ^Comment_Group,
 }
 
