@@ -65,14 +65,8 @@ ceil :: proc "c" (x: f64) -> f64 { return math.ceil(x) }
 sqrt :: proc "c" (x: f64) -> f64 { return math.sqrt(x) }
 @(require, linkage="strong", link_name="stbtt_pow")
 pow :: proc "c" (x, y: f64) -> f64 { return math.pow(x, y) }
-
 @(require, linkage="strong", link_name="stbtt_fmod")
-fmod :: proc "c" (x, y: f64) -> f64 {
-	context = runtime.default_context()
-	// NOTE: only called in the `stbtt_GetGlyphSDF` code path.
-	panic("`math.round` is broken on 32 bit targets, see #3856")
-}
-
+fmod :: proc "c" (x, y: f64) -> f64 { return math.mod(x, y) }
 @(require, linkage="strong", link_name="stbtt_cos")
 cos :: proc "c" (x: f64) -> f64 { return math.cos(x) }
 @(require, linkage="strong", link_name="stbtt_acos")
