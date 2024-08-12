@@ -505,10 +505,10 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 		pkg_log.info("< Final Mem/ Total Mem> <  Peak Mem> (#Free/Alloc) :: [package.test_name]")
 	} else {
 		when ALWAYS_REPORT_MEMORY {
-			pkg_log.warn("ODIN_TEST_ALWAYS_REPORT_MEMORY is true, but ODIN_TRACK_MEMORY is false.")
+			pkg_log.warn("ODIN_TEST_ALWAYS_REPORT_MEMORY is true, but ODIN_TEST_TRACK_MEMORY is false.")
 		}
 		when FAIL_ON_BAD_MEMORY {
-			pkg_log.warn("ODIN_TEST_FAIL_ON_BAD_MEMORY is true, but ODIN_TRACK_MEMORY is false.")
+			pkg_log.warn("ODIN_TEST_FAIL_ON_BAD_MEMORY is true, but ODIN_TEST_TRACK_MEMORY is false.")
 		}
 	}
 
