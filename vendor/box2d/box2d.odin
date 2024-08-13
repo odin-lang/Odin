@@ -1,7 +1,10 @@
 package vendor_box2d
 
+import "base:intrinsics"
+import "core:c"
+
 when ODIN_OS == .Windows {
-	@(private) VECTOR_EXT :: "avx2" when #config(VENDOR_BOX2D_ENABLE_AVX2, false) else "sse2"
+	@(private) VECTOR_EXT :: "avx2" when #config(VENDOR_BOX2D_ENABLE_AVX2, intrinsics.has_target_feature("avx2")) else "sse2"
 	@(private) LIB_PATH   :: "lib/box2d_windows_amd64_" + VECTOR_EXT + ".lib"
 
 	foreign import lib {
@@ -14,7 +17,6 @@ when ODIN_OS == .Windows {
 }
 
 
-import "core:c"
 
 
 // Prototype for user allocation function
