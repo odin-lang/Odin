@@ -1,6 +1,21 @@
 package linux
 
 /*
+	Standard input file descriptor
+*/
+STDIN_FILENO :: Fd(0)
+
+/*
+	Standard output file descriptor
+*/
+STDOUT_FILENO :: Fd(1)
+
+/*
+	Standard error file descriptor
+*/
+STDERR_FILENO :: Fd(2)
+
+/*
 	Special file descriptor to pass to `*at` functions to specify
 	that relative paths are relative to current directory.
 */
