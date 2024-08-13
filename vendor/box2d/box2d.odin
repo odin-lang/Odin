@@ -1288,7 +1288,7 @@ foreign lib {
 	PrismaticJoint_GetUpperLimit :: proc(jointId: JointId) -> f32 ---
 
 	// Set the prismatic joint limits
-	PrismaticJoint_SetLimits :: proc(jointId: JointId, lower: f32, upper: f32) ---
+	PrismaticJoint_SetLimits :: proc(jointId: JointId, lower, upper: f32) ---
 
 	// Enable/disable a prismatic joint motor
 	PrismaticJoint_EnableMotor :: proc(jointId: JointId, enableMotor: bool) ---
@@ -1355,7 +1355,7 @@ foreign lib {
 	RevoluteJoint_GetUpperLimit :: proc(jointId: JointId) -> f32 ---
 
 	// Set the revolute joint limits in radians
-	RevoluteJoint_SetLimits :: proc(jointId: JointId, lower: f32, upper: f32) ---
+	RevoluteJoint_SetLimits :: proc(jointId: JointId, lower, upper: f32) ---
 
 	// Enable/disable a revolute joint motor
 	RevoluteJoint_EnableMotor :: proc(jointId: JointId, enableMotor: bool) ---
@@ -1462,7 +1462,7 @@ foreign lib {
 	WheelJoint_GetUpperLimit :: proc(jointId: JointId) -> f32 ---
 
 	// Set the wheel joint limits
-	WheelJoint_SetLimits :: proc(jointId: JointId, lower: f32, upper: f32) ---
+	WheelJoint_SetLimits :: proc(jointId: JointId, lower, upper: f32) ---
 
 	// Enable/disable the wheel joint motor
 	WheelJoint_EnableMotor :: proc(jointId: JointId, enableMotor: bool) ---
