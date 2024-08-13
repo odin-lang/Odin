@@ -3725,10 +3725,7 @@ gb_internal lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr) {
 		GB_ASSERT(args.count >= min_count);
 		for_array(arg_index, pt->params->Tuple.variables) {
 			Entity *e = pt->params->Tuple.variables[arg_index];
-			if (pt->variadic && arg_index == pt->variadic_index) {
-				if (!is_c_vararg && args[arg_index].value == 0) {
-					args[arg_index] = lb_const_nil(p->module, e->type);
-				}
+			if (pt->variadic && arg_index == pt->variadic_index && is_c_vararg) {
 				continue;
 			}
 
