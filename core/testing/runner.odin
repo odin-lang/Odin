@@ -1,6 +1,15 @@
 //+private
 package testing
 
+/*
+	(c) Copyright 2024 Feoramund <rune@swevencraft.org>.
+	Made available under Odin's BSD-3 license.
+
+	List of contributors:
+		Ginger Bill: Initial implementation.
+		Feoramund:   Total rewrite.
+*/
+
 import "base:intrinsics"
 import "base:runtime"
 import "core:bytes"
@@ -25,8 +34,8 @@ TEST_THREADS          : int    : #config(ODIN_TEST_THREADS, 0)
 TRACKING_MEMORY       : bool   : #config(ODIN_TEST_TRACK_MEMORY, true)
 // Always report how much memory is used, even when there are no leaks or bad frees.
 ALWAYS_REPORT_MEMORY  : bool   : #config(ODIN_TEST_ALWAYS_REPORT_MEMORY, false)
-// Log level for memory leaks and bad frees: debug, info, warning, error, fatal
-LOG_LEVEL_MEMORY      : string : #config(ODIN_TEST_LOG_LEVEL_MEMORY, "warning")
+// Treat memory leaks and bad frees as errors.
+FAIL_ON_BAD_MEMORY    : bool   : #config(ODIN_TEST_FAIL_ON_BAD_MEMORY, false)
 // Specify how much memory each thread allocator starts with.
 PER_THREAD_MEMORY     : int    : #config(ODIN_TEST_THREAD_MEMORY, mem.ROLLBACK_STACK_DEFAULT_BLOCK_SIZE)
 // Select a specific set of tests to run by name.
@@ -65,21 +74,6 @@ get_log_level :: #force_inline proc() -> runtime.Logger_Level {
 	}
 }
 
-get_memory_log_level :: #force_inline proc() -> runtime.Logger_Level {
-	when ODIN_DEBUG {
-		// Always use .Debug in `-debug` mode.
-		return .Debug
-	} else {
-		when LOG_LEVEL_MEMORY == "debug"   { return .Debug   } else
-		when LOG_LEVEL_MEMORY == "info"    { return .Info    } else
-		when LOG_LEVEL_MEMORY == "warning" { return .Warning } else
-		when LOG_LEVEL_MEMORY == "error"   { return .Error   } else
-		when LOG_LEVEL_MEMORY == "fatal"   { return .Fatal   } else {
-			#panic("Unknown `ODIN_TEST_LOG_LEVEL_MEMORY`: \"" + LOG_LEVEL_MEMORY + "\", possible levels are: \"debug\", \"info\", \"warning\", \"error\", or \"fatal\".")
-		}
-	}
-}
-
 JSON :: struct {
 	total:    int,
 	success:  int,
@@ -103,10 +97,19 @@ end_t :: proc(t: ^T) {
 	t.cleanups = {}
 }
 
-Task_Data :: struct {
-	it: Internal_Test,
-	t: T,
-	allocator_index: int,
+when TRACKING_MEMORY && FAIL_ON_BAD_MEMORY {
+	Task_Data :: struct {
+		it: Internal_Test,
+		t: T,
+		allocator_index: int,
+		tracking_allocator: ^mem.Tracking_Allocator,
+	}
+} else {
+	Task_Data :: struct {
+		it: Internal_Test,
+		t: T,
+		allocator_index: int,
+	}
 }
 
 Task_Timeout :: struct {
@@ -149,6 +152,31 @@ run_test_task :: proc(task: thread.Task) {
 	data.it.p(&data.t)
 
 	end_t(&data.t)
+
+	when TRACKING_MEMORY && FAIL_ON_BAD_MEMORY {
+		// NOTE(Feoramund): The simplest way to handle treating memory failures
+		// as errors is to allow the test task runner to access the tracking
+		// allocator itself.
+		//
+		// This way, it's still able to send up a log message, which will be
+		// used in the end summary, and it can set the test state to `Failed`
+		// under the usual conditions.
+		//
+		// No outside intervention needed.
+		memory_leaks := len(data.tracking_allocator.allocation_map)
+		bad_frees    := len(data.tracking_allocator.bad_free_array)
+
+		memory_is_in_bad_state := memory_leaks + bad_frees > 0
+
+		data.t.error_count += memory_leaks + bad_frees
+
+		if memory_is_in_bad_state {
+			pkg_log.errorf("Memory failure in `%s.%s` with %i leak%s and %i bad free%s.",
+				data.it.pkg, data.it.name,
+				memory_leaks, "" if memory_leaks == 1 else "s",
+				bad_frees, "" if bad_frees == 1 else "s")
+		}
+	}
 
 	new_state : Test_State = .Failed if failed(&data.t) else .Successful
 
@@ -239,10 +267,6 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 	total_success_count := 0
 	total_done_count    := 0
 	total_test_count    := len(internal_tests)
-	when TRACKING_MEMORY {
-		memory_leak_count   := 0
-		bad_free_count      := 0
-	}
 
 	when !FANCY_OUTPUT {
 		// This is strictly for updating the window title when the progress
@@ -439,6 +463,9 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 
 			#no_bounds_check when TRACKING_MEMORY {
 				task_allocator := mem.tracking_allocator(&task_memory_trackers[task_index])
+				when FAIL_ON_BAD_MEMORY {
+					data.tracking_allocator = &task_memory_trackers[task_index]
+				}
 			} else {
 				task_allocator := mem.rollback_stack_allocator(&task_allocators[task_index])
 			}
@@ -485,8 +512,13 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 			pkg_log.info("Memory tracking is enabled. Tests will log their memory usage if there's an issue.")
 		}
 		pkg_log.info("< Final Mem/ Total Mem> <  Peak Mem> (#Free/Alloc) :: [package.test_name]")
-	} else when ALWAYS_REPORT_MEMORY {
-		pkg_log.warn("ODIN_TEST_ALWAYS_REPORT_MEMORY is true, but ODIN_TRACK_MEMORY is false.")
+	} else {
+		when ALWAYS_REPORT_MEMORY {
+			pkg_log.warn("ODIN_TEST_ALWAYS_REPORT_MEMORY is true, but ODIN_TEST_TRACK_MEMORY is false.")
+		}
+		when FAIL_ON_BAD_MEMORY {
+			pkg_log.warn("ODIN_TEST_FAIL_ON_BAD_MEMORY is true, but ODIN_TEST_TRACK_MEMORY is false.")
+		}
 	}
 
 	start_time := time.now()
@@ -519,9 +551,6 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 
 				memory_is_in_bad_state := len(tracker.allocation_map) + len(tracker.bad_free_array) > 0
 
-				memory_leak_count += len(tracker.allocation_map)
-				bad_free_count    += len(tracker.bad_free_array)
-
 				when ALWAYS_REPORT_MEMORY {
 					should_report := true
 				} else {
@@ -531,9 +560,11 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 				if should_report {
 					write_memory_report(batch_writer, tracker, data.it.pkg, data.it.name)
 
-					memory_log_level := get_memory_log_level() if memory_is_in_bad_state else .Info
-
-					pkg_log.log(memory_log_level, bytes.buffer_to_string(&batch_buffer))
+					when FAIL_ON_BAD_MEMORY {
+						pkg_log.log(.Error if memory_is_in_bad_state else .Info, bytes.buffer_to_string(&batch_buffer))
+					} else {
+						pkg_log.log(.Warning if memory_is_in_bad_state else .Info, bytes.buffer_to_string(&batch_buffer))
+					}
 					bytes.buffer_reset(&batch_buffer)
 				}
 
@@ -917,11 +948,5 @@ To partly mitigate this, redirect STDERR to a file or use the -define:ODIN_TEST_
 		fmt.assertf(err == nil, "Error writing JSON report: %v", err)
 	}
 
-	fatal_memory_failures := false
-	when TRACKING_MEMORY {
-		if get_memory_log_level() >= .Error {
-			fatal_memory_failures = (memory_leak_count + bad_free_count) > 0
-		}
-	}
-	return total_success_count == total_test_count && !fatal_memory_failures
+	return total_success_count == total_test_count
 }

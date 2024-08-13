@@ -1,6 +1,14 @@
 //+private
 package testing
 
+/*
+	(c) Copyright 2024 Feoramund <rune@swevencraft.org>.
+	Made available under Odin's BSD-3 license.
+
+	List of contributors:
+		Feoramund:   Total rewrite.
+*/
+
 import "base:runtime"
 import "core:encoding/ansi"
 import "core:fmt"
