@@ -1,8 +1,18 @@
 package vendor_box2d
 
-foreign import lib {
-	"box2d.lib", // dummy
+when ODIN_OS == .Windows {
+	@(private) VECTOR_EXT :: "avx2" when #config(VENDOR_BOX2D_ENABLE_AVX2, false) else "sse2"
+	@(private) LIB_PATH   :: "lib/box2d_windows_amd64_" + VECTOR_EXT + ".lib"
+
+	foreign import lib {
+		LIB_PATH,
+	}
+} else {
+	foreign import lib {
+		"box2d",
+	}
 }
+
 
 import "core:c"
 
@@ -132,6 +142,292 @@ foreign lib {
 	// Use this to initialize your joint definition
 	// @ingroup wheel_joint
 	DefaultWheelJointDef :: proc() -> WheelJointDef ---
+}
+
+
+
+@(link_prefix="b2", default_calling_convention="c")
+foreign lib {
+	// Validate ray cast input data (NaN, etc)
+	IsValidRay :: proc(#by_ptr input: RayCastInput) -> bool ---
+
+	// Make a convex polygon from a convex hull. This will assert if the hull is not valid.
+	// @warning Do not manually fill in the hull data, it must come directly from b2ComputeHull
+	MakePolygon :: proc(#by_ptr hull: Hull, radius: f32) -> Polygon ---
+
+	// Make an offset convex polygon from a convex hull. This will assert if the hull is not valid.
+	// @warning Do not manually fill in the hull data, it must come directly from b2ComputeHull
+	MakeOffsetPolygon :: proc(#by_ptr hull: Hull, radius: f32, transform: Transform) -> Polygon ---
+
+	// Make a square polygon, bypassing the need for a convex hull.
+	MakeSquare :: proc(h: f32) -> Polygon ---
+
+	// Make a box (rectangle) polygon, bypassing the need for a convex hull.
+	MakeBox :: proc(hx, hy: f32) -> Polygon ---
+
+	// Make a rounded box, bypassing the need for a convex hull.
+	MakeRoundedBox :: proc(hx, hy: f32, radius: f32) -> Polygon ---
+
+	// Make an offset box, bypassing the need for a convex hull.
+	MakeOffsetBox :: proc(hx, hy: f32, center: Vec2, angle: f32) -> Polygon ---
+
+	// Transform a polygon. This is useful for transferring a shape from one body to another.
+	TransformPolygon :: proc(transform: Transform, #by_ptr polygon: Polygon) -> Polygon ---
+
+	// Compute mass properties of a circle
+	ComputeCircleMass :: proc(#by_ptr shape: Circle, density: f32) -> MassData ---
+
+	// Compute mass properties of a capsule
+	ComputeCapsuleMass :: proc(#by_ptr shape: Capsule, density: f32) -> MassData ---
+
+	// Compute mass properties of a polygon
+	ComputePolygonMass :: proc(#by_ptr shape: Polygon, density: f32) -> MassData ---
+
+	// Compute the bounding box of a transformed circle
+	ComputeCircleAABB :: proc(#by_ptr shape: Circle, transform: Transform) -> AABB ---
+
+	// Compute the bounding box of a transformed capsule
+	ComputeCapsuleAABB :: proc(#by_ptr shape: Capsule, transform: Transform) -> AABB ---
+
+	// Compute the bounding box of a transformed polygon
+	ComputePolygonAABB :: proc(#by_ptr shape: Polygon, transform: Transform) -> AABB ---
+
+	// Compute the bounding box of a transformed line segment
+	ComputeSegmentAABB :: proc(#by_ptr shape: Segment, transform: Transform) -> AABB ---
+
+	// Test a point for overlap with a circle in local space
+	PointInCircle :: proc(point: Vec2, #by_ptr shape: Circle) -> bool ---
+
+	// Test a point for overlap with a capsule in local space
+	PointInCapsule :: proc(point: Vec2, #by_ptr shape: Capsule) -> bool ---
+
+	// Test a point for overlap with a convex polygon in local space
+	PointInPolygon :: proc(point: Vec2, #by_ptr shape: Polygon) -> bool ---
+
+	// Ray cast versus circle in shape local space. Initial overlap is treated as a miss.
+	RayCastCircle :: proc(#by_ptr input: RayCastInput, #by_ptr shape: Circle) -> CastOutput ---
+
+	// Ray cast versus capsule in shape local space. Initial overlap is treated as a miss.
+	RayCastCapsule :: proc(#by_ptr input: RayCastInput, #by_ptr shape: Capsule) -> CastOutput ---
+
+	// Ray cast versus segment in shape local space. Optionally treat the segment as one-sided with hits from
+	// the left side being treated as a miss.
+	RayCastSegment :: proc(#by_ptr input: RayCastInput, #by_ptr shape: Segment, oneSided: bool) -> CastOutput ---
+
+	// Ray cast versus polygon in shape local space. Initial overlap is treated as a miss.
+	RayCastPolygon :: proc(#by_ptr input: RayCastInput, #by_ptr shape: Polygon) -> CastOutput ---
+
+	// Shape cast versus a circle. Initial overlap is treated as a miss.
+	ShapeCastCircle :: proc(#by_ptr input: ShapeCastInput, #by_ptr shape: Circle) -> CastOutput ---
+
+	// Shape cast versus a capsule. Initial overlap is treated as a miss.
+	ShapeCastCapsule :: proc(#by_ptr input: ShapeCastInput, #by_ptr shape: Capsule) -> CastOutput ---
+
+	// Shape cast versus a line segment. Initial overlap is treated as a miss.
+	ShapeCastSegment :: proc(#by_ptr input: ShapeCastInput, #by_ptr shape: Segment) -> CastOutput ---
+
+	// Shape cast versus a convex polygon. Initial overlap is treated as a miss.
+	ShapeCastPolygon :: proc(#by_ptr input: ShapeCastInput, #by_ptr shape: Polygon) -> CastOutput ---
+}
+
+
+// Compute the convex hull of a set of points. Returns an empty hull if it fails.
+// Some failure cases:
+// - all points very close together
+// - all points on a line
+// - less than 3 points
+// - more than maxPolygonVertices points
+// This welds close points and removes collinear points.
+//	@warning Do not modify a hull once it has been computed
+ComputeHull :: proc "c" (points: []Vec2) -> Hull {
+	foreign lib {
+		b2ComputeHull :: proc "c" (points: [^]Vec2, count: i32) -> Hull ---
+	}
+	return b2ComputeHull(raw_data(points), i32(len(points)))
+}
+
+
+@(link_prefix="b2", default_calling_convention="c")
+foreign lib {
+	// This determines if a hull is valid. Checks for:
+	// - convexity
+	// - collinear points
+	// This is expensive and should not be called at runtime.
+	ValidateHull :: proc(#by_ptr hull: Hull) -> bool ---
+}
+
+@(link_prefix="b2", default_calling_convention="c")
+foreign lib {
+	// Compute the distance between two line segments, clamping at the end points if needed.
+	SegmentDistance :: proc(p1, q1: Vec2, p2, q2: Vec2) -> SegmentDistanceResult ---
+}
+
+// Compute the closest points between two shapes represented as point clouds.
+// DistanceCache cache is input/output. On the first call set DistanceCache.count to zero.
+//	The underlying GJK algorithm may be debugged by passing in debug simplexes and capacity. You may pass in NULL and 0 for these.
+ShapeDistance :: proc "c" (cache: ^DistanceCache, #by_ptr input: DistanceInput, simplexes: []Simplex) -> DistanceOutput {
+	foreign lib {
+		b2ShapeDistance :: proc "c" (cache: ^DistanceCache, #by_ptr input: DistanceInput, simplexes: [^]Simplex, simplexCapacity: c.int) -> DistanceOutput ---
+	}
+	return b2ShapeDistance(cache, input, raw_data(simplexes), i32(len(simplexes)))
+}
+
+
+// Make a proxy for use in GJK and related functions.
+MakeProxy :: proc "c" (vertices: []Vec2, radius: f32) -> DistanceProxy {
+	foreign lib {
+		b2MakeProxy :: proc "c" (vertices: [^]Vec2, count: i32, radius: f32) -> DistanceProxy ---
+	}
+	return b2MakeProxy(raw_data(vertices), i32(len(vertices)), radius)
+}
+
+
+@(link_prefix="b2", default_calling_convention="c")
+foreign lib {
+	// Perform a linear shape cast of shape B moving and shape A fixed. Determines the hit point, normal, and translation fraction.
+	ShapeCast :: proc(#by_ptr input: ShapeCastPairInput) -> CastOutput ---
+
+	// Evaluate the transform sweep at a specific time.
+	GetSweepTransform :: proc(#by_ptr sweep: Sweep, time: f32) -> Transform ---
+
+	// Compute the upper bound on time before two shapes penetrate. Time is represented as
+	// a fraction between [0,tMax]. This uses a swept separating axis and may miss some intermediate,
+	// non-tunneling collisions. If you change the time interval, you should call this function
+	// again.
+	TimeOfImpact :: proc(#by_ptr input: TOIInput) -> TOIOutput ---
+}
+
+@(link_prefix="b2", default_calling_convention="c")
+foreign lib {
+	// Compute the contact manifold between two circles
+	CollideCircles :: proc(#by_ptr circleA: Circle, xfA: Transform, #by_ptr circleB: Circle, xfB: Transform) -> Manifold ---
+
+	// Compute the contact manifold between a capsule and circle
+	CollideCapsuleAndCircle :: proc(#by_ptr capsuleA: Capsule, xfA: Transform, #by_ptr circleB: Circle, xfB: Transform) -> Manifold ---
+
+	// Compute the contact manifold between an segment and a circle
+	CollideSegmentAndCircle :: proc(#by_ptr segmentA: Segment, xfA: Transform, #by_ptr circleB: Circle, xfB: Transform) -> Manifold ---
+
+	// Compute the contact manifold between a polygon and a circle
+	CollidePolygonAndCircle :: proc(#by_ptr polygonA: Polygon, xfA: Transform, #by_ptr circleB: Circle, xfB: Transform) -> Manifold ---
+
+	// Compute the contact manifold between a capsule and circle
+	CollideCapsules :: proc(#by_ptr capsuleA: Capsule, xfA: Transform, #by_ptr capsuleB: Capsule, xfB: Transform) -> Manifold ---
+
+	// Compute the contact manifold between an segment and a capsule
+	CollideSegmentAndCapsule :: proc(#by_ptr segmentA: Segment, xfA: Transform, #by_ptr capsuleB: Capsule, xfB: Transform) -> Manifold ---
+
+	// Compute the contact manifold between a polygon and capsule
+	CollidePolygonAndCapsule :: proc(#by_ptr polygonA: Polygon, xfA: Transform, #by_ptr capsuleB: Capsule, xfB: Transform) -> Manifold ---
+
+	// Compute the contact manifold between two polygons
+	CollidePolygons :: proc(#by_ptr polygonA: Polygon, xfA: Transform, #by_ptr polygonB: Polygon, xfB: Transform) -> Manifold ---
+
+	// Compute the contact manifold between an segment and a polygon
+	CollideSegmentAndPolygon :: proc(#by_ptr segmentA: Segment, xfA: Transform, #by_ptr polygonB: Polygon, xfB: Transform) -> Manifold ---
+
+	// Compute the contact manifold between a smooth segment and a circle
+	CollideSmoothSegmentAndCircle :: proc(#by_ptr smoothSegmentA: SmoothSegment, xfA: Transform, #by_ptr circleB: Circle, xfB: Transform) -> Manifold ---
+
+	// Compute the contact manifold between an segment and a capsule
+	CollideSmoothSegmentAndCapsule :: proc(#by_ptr smoothSegmentA: SmoothSegment, xfA: Transform, #by_ptr capsuleB: Capsule, xfB: Transform, cache: ^DistanceCache) -> Manifold ---
+
+	// Compute the contact manifold between a smooth segment and a rounded polygon
+	CollideSmoothSegmentAndPolygon :: proc(#by_ptr smoothSegmentA: SmoothSegment, xfA: Transform, #by_ptr polygonB: Polygon, xfB: Transform, cache: ^DistanceCache) -> Manifold ---
+}
+
+
+
+@(link_prefix="b2", default_calling_convention="c")
+foreign lib {
+	// Constructing the tree initializes the node pool.
+	DynamicTree_Create :: proc() -> DynamicTree ---
+
+	// Destroy the tree, freeing the node pool.
+	DynamicTree_Destroy :: proc(tree: ^DynamicTree) ---
+
+	// Create a proxy. Provide an AABB and a userData value.
+	DynamicTree_CreateProxy :: proc(tree: ^DynamicTree, aabb: AABB, categoryBits: u32, userData: i32) -> i32 ---
+
+	// Destroy a proxy. This asserts if the id is invalid.
+	DynamicTree_DestroyProxy :: proc(tree: ^DynamicTree, proxyId: i32) ---
+
+	// Move a proxy to a new AABB by removing and reinserting into the tree.
+	DynamicTree_MoveProxy :: proc(tree: ^DynamicTree, proxyId: i32, aabb: AABB) ---
+
+	// Enlarge a proxy and enlarge ancestors as necessary.
+	DynamicTree_EnlargeProxy :: proc(tree: ^DynamicTree, proxyId: i32, aabb: AABB) ---
+
+	// Query an AABB for overlapping proxies. The callback class
+	// is called for each proxy that overlaps the supplied AABB.
+	DynamicTree_Query :: proc(#by_ptr tree: DynamicTree, aabb: AABB, maskBits: u32, callback: TreeQueryCallbackFcn, ctx: rawptr) ---
+
+	// Ray-cast against the proxies in the tree. This relies on the callback
+	// to perform a exact ray-cast in the case were the proxy contains a shape.
+	// The callback also performs the any collision filtering. This has performance
+	// roughly equal to k * log(n), where k is the number of collisions and n is the
+	// number of proxies in the tree.
+	//	Bit-wise filtering using mask bits can greatly improve performance in some scenarios.
+	//	@param tree the dynamic tree to ray cast
+	// @param input the ray-cast input data. The ray extends from p1 to p1 + maxFraction * (p2 - p1)
+	//	@param maskBits filter bits: `bool accept = (maskBits & node->categoryBits) != 0 ---`
+	// @param callback a callback class that is called for each proxy that is hit by the ray
+	//	@param context user context that is passed to the callback
+	DynamicTree_RayCast :: proc(#by_ptr tree: DynamicTree, #by_ptr input: RayCastInput, maskBits: u32, callback: TreeRayCastCallbackFcn, ctx: rawptr) ---
+
+	// Ray-cast against the proxies in the tree. This relies on the callback
+	// to perform a exact ray-cast in the case were the proxy contains a shape.
+	// The callback also performs the any collision filtering. This has performance
+	// roughly equal to k * log(n), where k is the number of collisions and n is the
+	// number of proxies in the tree.
+	//	@param tree the dynamic tree to ray cast
+	// @param input the ray-cast input data. The ray extends from p1 to p1 + maxFraction * (p2 - p1).
+	//	@param maskBits filter bits: `bool accept = (maskBits & node->categoryBits) != 0 ---`
+	// @param callback a callback class that is called for each proxy that is hit by the shape
+	//	@param context user context that is passed to the callback
+	DynamicTree_ShapeCast :: proc(#by_ptr tree: DynamicTree, #by_ptr input: ShapeCastInput, maskBits: u32, callback: TreeShapeCastCallbackFcn, ctx: rawptr) ---
+
+	// Validate this tree. For testing.
+	DynamicTree_Validate :: proc(#by_ptr tree: DynamicTree) ---
+
+	// Compute the height of the binary tree in O(N) time. Should not be
+	// called often.
+	DynamicTree_GetHeight :: proc(#by_ptr tree: DynamicTree) -> c.int ---
+
+	// Get the maximum balance of the tree. The balance is the difference in height of the two children of a node.
+	DynamicTree_GetMaxBalance :: proc(#by_ptr tree: DynamicTree) -> c.int ---
+
+	// Get the ratio of the sum of the node areas to the root area.
+	DynamicTree_GetAreaRatio :: proc(#by_ptr tree: DynamicTree) -> f32 ---
+
+	// Build an optimal tree. Very expensive. For testing.
+	DynamicTree_RebuildBottomUp :: proc(tree: ^DynamicTree) ---
+
+	// Get the number of proxies created
+	DynamicTree_GetProxyCount :: proc(#by_ptr tree: DynamicTree) -> c.int ---
+
+	// Rebuild the tree while retaining subtrees that haven't changed. Returns the number of boxes sorted.
+	DynamicTree_Rebuild :: proc(tree: ^DynamicTree, fullBuild: bool) -> c.int ---
+
+	// Shift the world origin. Useful for large worlds.
+	// The shift formula is: position -= newOrigin
+	// @param tree the tree to shift
+	// @param newOrigin the new origin with respect to the old origin
+	DynamicTree_ShiftOrigin :: proc(tree: ^DynamicTree, newOrigin: Vec2) ---
+
+	// Get the number of bytes used by this tree
+	DynamicTree_GetByteCount :: proc(#by_ptr tree: DynamicTree) -> c.int ---
+}
+
+// Get proxy user data
+// @return the proxy user data or 0 if the id is invalid
+DynamicTree_GetUserData :: proc "contextless" (tree: DynamicTree, proxyId: i32) -> i32 {
+	return tree.nodes[proxyId].userData
+}
+
+// Get the AABB of a proxy
+DynamicTree_GetAABB :: proc "contextless" (tree: DynamicTree, proxyId: i32) -> AABB {
+	return tree.nodes[proxyId].aabb
 }
 
 
