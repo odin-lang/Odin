@@ -5679,6 +5679,18 @@ gb_internal void check_procedure_later_from_entity(Checker *c, Entity *e, char c
 	if ((e->flags & EntityFlag_ProcBodyChecked) != 0) {
 		return;
 	}
+	if ((e->flags & EntityFlag_Overridden) != 0) {
+		// NOTE (zen3ger) Delay checking of a proc alias until the underlying proc is checked.
+		GB_ASSERT(e->aliased_of != nullptr);
+		GB_ASSERT(e->aliased_of->kind == Entity_Procedure);
+		if ((e->aliased_of->flags & EntityFlag_ProcBodyChecked) != 0) {
+			e->flags |= EntityFlag_ProcBodyChecked;
+			return;
+		}
+		// NOTE (zen3ger) A proc alias *does not* have a body and tags!
+		check_procedure_later(c, e->file, e->token, e->decl_info, e->type, nullptr, 0);
+		return;
+	}
 	Type *type = base_type(e->type);
 	if (type == t_invalid) {
 		return;
