@@ -225,7 +225,7 @@ rt_sigprocmask :: proc "contextless" (mask_kind: Sig_Mask_Kind, new_set: ^Sig_Se
 	code value instead of a memory address depending on the request type.
 	Available since Linux 1.0.
 */
-ioctl :: proc "contextless" (fd: Fd, request: i32, arg: uintptr) -> (uintptr) {
+ioctl :: proc "contextless" (fd: Fd, request: u32, arg: uintptr) -> (uintptr) {
 	ret := syscall(SYS_ioctl, fd, request, arg)
 	return uintptr(ret)
 }
