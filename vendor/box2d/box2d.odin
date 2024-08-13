@@ -3,16 +3,30 @@ package vendor_box2d
 import "base:intrinsics"
 import "core:c"
 
+@(private) VECTOR_EXT :: "avx2" when #config(VENDOR_BOX2D_ENABLE_AVX2, intrinsics.has_target_feature("avx2")) else "sse2"
+
 when ODIN_OS == .Windows {
-	@(private) VECTOR_EXT :: "avx2" when #config(VENDOR_BOX2D_ENABLE_AVX2, intrinsics.has_target_feature("avx2")) else "sse2"
-	@(private) LIB_PATH   :: "lib/box2d_windows_amd64_" + VECTOR_EXT + ".lib"
+	@(private) LIB_PATH :: "lib/box2d_windows_amd64_" + VECTOR_EXT + ".lib"
 
 	foreign import lib {
 		LIB_PATH,
 	}
 } else {
+	when ODIN_ARCH == .amd64 {
+		@(private) OS       :: "darwin" when ODIN_OS == .Darwin else "other"
+		@(private) LIB_PATH :: "lib/box2d_" + OS + "_amd64_" + VECTOR_EXT + ".a"
+	} else when ODIN_OS == .Darwin && ODIN_ARCH == .arm64 {
+		@(private) LIB_PATH :: "lib/box2d_darwin_arm64.a"
+	} else {
+		@(private) LIB_PATH :: "lib/box2d_other.a"
+	}
+
+	when !#exists(LIB_PATH) {
+		#panic("Could not find the compiled box2d libraries at \"" + LIB_PATH + "\", they can be compiled by running the `build.sh` script at `" + ODIN_ROOT + "vendor/box2d/build_box2d.sh\"`")
+	}
+
 	foreign import lib {
-		"box2d",
+		LIB_PATH,
 	}
 }
 
