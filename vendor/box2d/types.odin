@@ -116,9 +116,9 @@ BodyType :: enum c.int {
 	// positive mass, velocity determined by forces, moved by solver
 	dynamicBody = 2,
 
-	// number of body types
 }
 
+// number of body types
 bodyTypeCount :: len(BodyType)
 
 // A body definition holds all the data needed to construct a rigid body.
