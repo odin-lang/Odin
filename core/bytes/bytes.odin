@@ -348,7 +348,7 @@ index_byte :: proc(s: []byte, c: byte) -> (index: int) #no_bounds_check {
 		return -1
 	}
 
-	ptr := cast(int)cast(uintptr)raw_data(s)
+	ptr := int(uintptr(raw_data(s)))
 
 	alignment_start := (SIMD_SCAN_WIDTH - ptr % SIMD_SCAN_WIDTH) % SIMD_SCAN_WIDTH
 
@@ -367,14 +367,14 @@ index_byte :: proc(s: []byte, c: byte) -> (index: int) #no_bounds_check {
 	tail := length - (length - alignment_start) % SIMD_SCAN_WIDTH
 
 	for /**/; i < tail; i += SIMD_SCAN_WIDTH {
-		load := (cast(^#simd[SIMD_SCAN_WIDTH]u8)(&s[i]))^
+		load := (^#simd[SIMD_SCAN_WIDTH]u8)(&s[i])^
 		comparison := intrinsics.simd_lanes_eq(load, scanner)
 		match := intrinsics.simd_reduce_or(comparison)
 		if match > 0 {
 			sentinel: #simd[SIMD_SCAN_WIDTH]u8 = u8(0xFF)
 			index_select := intrinsics.simd_select(comparison, simd_scanner_indices, sentinel)
 			index_reduce := intrinsics.simd_reduce_min(index_select)
-			return i + cast(int)index_reduce
+			return i + int(index_reduce)
 		}
 	}
 
@@ -415,7 +415,7 @@ last_index_byte :: proc(s: []byte, c: byte) -> int #no_bounds_check {
 		return -1
 	}
 
-	ptr := cast(int)cast(uintptr)raw_data(s)
+	ptr := int(uintptr(raw_data(s)))
 
 	tail := length - (ptr + length) % SIMD_SCAN_WIDTH
 
@@ -436,14 +436,14 @@ last_index_byte :: proc(s: []byte, c: byte) -> int #no_bounds_check {
 	i -= SIMD_SCAN_WIDTH - 1
 
 	for /**/; i >= alignment_start; i -= SIMD_SCAN_WIDTH {
-		load := (cast(^#simd[SIMD_SCAN_WIDTH]u8)(&s[i]))^
+		load := (^#simd[SIMD_SCAN_WIDTH]u8)(&s[i])^
 		comparison := intrinsics.simd_lanes_eq(load, scanner)
 		match := intrinsics.simd_reduce_or(comparison)
 		if match > 0 {
 			sentinel: #simd[SIMD_SCAN_WIDTH]u8
 			index_select := intrinsics.simd_select(comparison, simd_scanner_indices, sentinel)
 			index_reduce := intrinsics.simd_reduce_max(index_select)
-			return i + cast(int)index_reduce
+			return i + int(index_reduce)
 		}
 	}
 
