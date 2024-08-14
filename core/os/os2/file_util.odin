@@ -136,8 +136,7 @@ read_entire_file_from_file :: proc(f: ^File, allocator: runtime.Allocator) -> (d
 
 	if has_size {
 		data = make([]byte, size, allocator) or_return
-		n: int = ---
-		n, err = read(f, data[:])
+		_, err = read(f, data[:])
 		if err != nil {
 			if err == .EOF {
 				err = nil
