@@ -1,5 +1,7 @@
 package vendor_box2d
 
+import "base:intrinsics"
+
 /**
  * @defgroup id Ids
  * These ids serve as handles to internal Box2D objects.
@@ -7,19 +9,13 @@ package vendor_box2d
  * Include this header if you need the id types and not the whole Box2D API.
  * All ids are considered null if initialized to zero.
  *
- * For example in C++:
+ * For example in Odin:
  *
- * @code{.cxx}
- * b2WorldId worldId = {};
+ * @code{.odin}
+ * worldId := b2.WorldId{}
  * @endcode
  *
- * Or in C:
- *
- * @code{.c}
- * b2WorldId worldId = {0};
- * @endcode
- *
- * These are both considered null.
+ * This is considered null.
  *
  * @warning Do not use the internals of these ids. They are subject to change. Ids should be treated as opaque objects.
  * @warning You should use ids to access objects in Box2D. Do not access files within the src folder. Such usage is unsupported.
@@ -68,10 +64,24 @@ nullJointId :: JointId{}
 nullChainId :: ChainId{}
 
 /// Macro to determine if any id is null.
-IS_NULL :: proc "c" (id: $T) -> bool { return id.index1 == 0 }
+IS_NULL :: #force_inline proc "c" (id: $T) -> bool
+	where intrinsics.type_is_struct(T),
+	      intrinsics.type_has_field(T, "index1") {
+	return id.index1 == 0
+}
 
 /// Macro to determine if any id is non-null.
-IS_NON_NULL :: proc "c" (id: $T) -> bool { return id.index1 != 0 }
+IS_NON_NULL :: #force_inline proc "c" (id: $T) -> bool
+	where intrinsics.type_is_struct(T),
+	      intrinsics.type_has_field(T, "index1") {
+	return id.index1 != 0
+}
 
 /// Compare two ids for equality. Doesn't work for b2WorldId.
-ID_EQUALS :: proc "c" (id1, id2: $T) -> bool { return id1.index1 == id2.index1 && id1.world0 == id2.world0 && id1.revision == id2.revision }
+ID_EQUALS :: #force_inline proc "c" (id1, id2: $T) -> bool
+	where intrinsics.type_is_struct(T),
+	      intrinsics.type_has_field(T, "index1"),
+	      intrinsics.type_has_field(T, "world0"),
+	      intrinsics.type_has_field(T, "revision") {
+	return id1.index1 == id2.index1 && id1.world0 == id2.world0 && id1.revision == id2.revision
+}

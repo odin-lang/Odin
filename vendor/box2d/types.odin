@@ -199,24 +199,24 @@ BodyDef :: struct {
 Filter :: struct {
 	// The collision category bits. Normally you would just set one bit. The category bits should
 	//	represent your application object types. For example:
-	//	@code{.cpp}
-	//	enum MyCategories
-	//	{
-	//	   Static  = 0x00000001,
-	//	   Dynamic = 0x00000002,
-	//	   Debris  = 0x00000004,
-	//	   Player  = 0x00000008,
-	//	   // etc
-	// };
+	//	@code{.odin}
+	//	My_Categories :: enum u32 {
+	//		Static  = 0x00000001,
+	//		Dynamic = 0x00000002,
+	//		Debris  = 0x00000004,
+	//		Player  = 0x00000008,
+	//		// etc
+	//	};
 	//	@endcode
+	//      Or use a bit_set.
 	categoryBits: u32,
 
 	// The collision mask bits. This states the categories that this
 	// shape would accept for collision.
 	//	For example, you may want your player to only collide with static objects
 	//	and other players.
-	//	@code{.c}
-	//	maskBits = Static | Player;
+	//	@code{.odin}
+	//	maskBits = u32(My_Categories.Static | My_Categories.Player);
 	//	@endcode
 	maskBits: u32,
 

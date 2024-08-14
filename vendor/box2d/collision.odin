@@ -10,7 +10,7 @@ maxPolygonVertices :: 8
 // Low level ray-cast input data
 RayCastInput :: struct {
 	// Start point of the ray cast
-	origin: Vec2,
+	origin:      Vec2,
 
 	// Translation of the ray cast
 	translation: Vec2,
@@ -24,13 +24,13 @@ RayCastInput :: struct {
 //	A capsule is two points with a non-zero radius. A box is four points with a zero radius.
 ShapeCastInput :: struct {
 	// A point cloud to cast
-	points: [maxPolygonVertices]Vec2 `fmt:"v,count"`,
+	points:      [maxPolygonVertices]Vec2 `fmt:"v,count"`,
 
 	// The number of points
-	count: i32,
+	count:       i32,
 
 	// The radius around the point cloud
-	radius: f32,
+	radius:      f32,
 
 	// The translation of the shape cast
 	translation: Vec2,
@@ -42,28 +42,28 @@ ShapeCastInput :: struct {
 // Low level ray-cast or shape-cast output data
 CastOutput :: struct {
 	// The surface normal at the hit point
-	normal: Vec2,
+	normal:     Vec2,
 
 	// The surface hit point
-	point: Vec2,
+	point:      Vec2,
 
 	// The fraction of the input translation at collision
-	fraction: f32,
+	fraction:   f32,
 
 	// The number of iterations used
 	iterations: i32,
 
 	// Did the cast hit?
-	hit: bool,
+	hit:        bool,
 }
 
 // This holds the mass data computed for a shape.
 MassData :: struct {
 	// The mass of the shape, usually in kilograms.
-	mass: f32,
+	mass:              f32,
 
 	// The position of the shape's centroid relative to the shape's origin.
-	center: Vec2,
+	center:            Vec2,
 
 	// The rotational inertia of the shape about the local origin.
 	rotationalInertia: f32,
@@ -88,7 +88,7 @@ Capsule :: struct {
 	center2: Vec2,
 
 	// The radius of the semicircles
-	radius: f32,
+	radius:  f32,
 }
 
 // A solid convex polygon. It is assumed that the interior of the polygon is to
@@ -102,16 +102,16 @@ Polygon :: struct {
 	vertices: [maxPolygonVertices]Vec2 `fmt:"v,count"`,
 
 	// The outward normal vectors of the polygon sides
-	normals: [maxPolygonVertices]Vec2 `fmt:"v,count"`,
+	normals:  [maxPolygonVertices]Vec2 `fmt:"v,count"`,
 
 	// The centroid of the polygon
 	centroid: Vec2,
 
 	// The external radius for rounded polygons
-	radius: f32,
+	radius:   f32,
 
 	// The number of polygon vertices
-	count: i32,
+	count:    i32,
 }
 
 // A line segment with two-sided collision.
@@ -128,13 +128,13 @@ Segment :: struct {
 // ghost1 -> point1 -> point2 -> ghost2
 SmoothSegment :: struct {
 	// The tail ghost vertex
-	ghost1: Vec2,
+	ghost1:  Vec2,
 
 	// The line segment
 	segment: Segment,
 
 	// The head ghost vertex
-	ghost2: Vec2,
+	ghost2:  Vec2,
 
 	// The owning chain shape index (internal usage only)
 	chainId: i32,
@@ -148,7 +148,7 @@ Hull :: struct {
 	points: [maxPolygonVertices]Vec2 `fmt:"v,count"`,
 
 	// The number of points
-	count: i32,
+	count:  i32,
 }
 
 /**
@@ -163,16 +163,16 @@ Hull :: struct {
 // Result of computing the distance between two line segments
 SegmentDistanceResult :: struct {
 	// The closest point on the first segment
-	closest1: Vec2,
+	closest1:        Vec2,
 
 	// The closest point on the second segment
-	closest2: Vec2,
+	closest2:        Vec2,
 
 	// The barycentric coordinate on the first segment
-	fraction1: f32,
+	fraction1:       f32,
 
 	// The barycentric coordinate on the second segment
-	fraction2: f32,
+	fraction2:       f32,
 
 	// The squared distance between the closest points
 	distanceSquared: f32,
@@ -184,7 +184,7 @@ DistanceProxy :: struct {
 	points: [maxPolygonVertices]Vec2 `fmt:"v,count"`,
 
 	// The number of points
-	count: i32,
+	count:  i32,
 
 	// The external radius of the point cloud
 	radius: f32,
@@ -291,7 +291,7 @@ TOIState :: enum c.int {
 // Output parameters for b2TimeOfImpact.
 TOIOutput :: struct {
 	state: TOIState, // The type of result
-	t: f32,          // The time of the collision
+	t:     f32,      // The time of the collision
 }
 
 
@@ -307,23 +307,23 @@ TOIOutput :: struct {
 ManifoldPoint :: struct {
 	// Location of the contact point in world space. Subject to precision loss at large coordinates.
 	//	@note Should only be used for debugging.
-	point: Vec2,
+	point:            Vec2,
 
 	// Location of the contact point relative to bodyA's origin in world space
 	//	@note When used internally to the Box2D solver, these are relative to the center of mass.
-	anchorA: Vec2,
+	anchorA:          Vec2,
 
 	// Location of the contact point relative to bodyB's origin in world space
-	anchorB: Vec2,
+	anchorB:          Vec2,
 
 	// The separation of the contact point, negative if penetrating
-	separation: f32,
+	separation:       f32,
 
 	// The impulse along the manifold normal vector.
-	normalImpulse: f32,
+	normalImpulse:    f32,
 
 	// The friction impulse
-	tangentImpulse: f32,
+	tangentImpulse:   f32,
 
 	// The maximum normal impulse applied during sub-stepping
 	//	todo not sure this is needed
@@ -331,22 +331,22 @@ ManifoldPoint :: struct {
 
 	// Relative normal velocity pre-solve. Used for hit events. If the normal impulse is
 	// zero then there was no hit. Negative means shapes are approaching.
-	normalVelocity: f32,
+	normalVelocity:   f32,
 
 	// Uniquely identifies a contact point between two shapes
-	id: u16,
+	id:               u16,
 
 	// Did this contact point exist the previous step?
-	persisted: bool,
+	persisted:        bool,
 }
 
 // A contact manifold describes the contact points between colliding shapes
 Manifold :: struct {
 	// The manifold points, up to two are possible in 2D
-	points: [2]ManifoldPoint,
+	points:     [2]ManifoldPoint,
 
 	// The unit normal vector in world space, points from shape A to bodyB
-	normal: Vec2,
+	normal:     Vec2,
 
 	// The number of contacts points, will be 0, 1, or 2
 	pointCount: i32,
@@ -393,7 +393,7 @@ TreeNode :: struct {
 		parent: i32,
 
 		// The node freelist next index
-		next: i32,
+		next:   i32,
 	}, // 4
 
 	// Child 1 index
@@ -413,41 +413,41 @@ TreeNode :: struct {
 	enlarged: bool, // 1
 
 	// Padding for clarity
-	pad: [9]byte,
+	_: [9]byte,
 }
 
 // The dynamic tree structure. This should be considered private data.
 // It is placed here for performance reasons.
 DynamicTree :: struct {
 	// The tree nodes
-	nodes: [^]TreeNode `fmt"v,nodeCount"`,
+	nodes:           [^]TreeNode `fmt"v,nodeCount"`,
 
 	// The root index
-	root: i32,
+	root:            i32,
 
 	// The number of nodes
-	nodeCount: i32,
+	nodeCount:       i32,
 
 	// The allocated node space
-	nodeCapacity: i32,
+	nodeCapacity:    i32,
 
 	// Node free list
-	freeList: i32,
+	freeList:        i32,
 
 	// Number of proxies created
-	proxyCount: i32,
+	proxyCount:      i32,
 
 	// Leaf indices for rebuild
-	leafIndices: [^]i32,
+	leafIndices:     [^]i32,
 
 	// Leaf bounding boxes for rebuild
-	leafBoxes: [^]AABB,
+	leafBoxes:       [^]AABB,
 
 	// Leaf bounding box centers for rebuild
-	leafCenters: [^]Vec2,
+	leafCenters:     [^]Vec2,
 
 	// Bins for sorting during rebuild
-	binIndices: [^]i32,
+	binIndices:      [^]i32,
 
 	// Allocated space for rebuilding
 	rebuildCapacity: i32,
@@ -455,7 +455,7 @@ DynamicTree :: struct {
 
 // This function receives proxies found in the AABB query.
 // @return true if the query should continue
-TreeQueryCallbackFcn :: #type proc "c" (proxyId: i32, userData: i32, ctx: rawptr) -> bool
+TreeQueryCallbackFcn     :: #type proc "c" (proxyId: i32, userData: i32, ctx: rawptr) -> bool
 
 // This function receives clipped ray-cast input for a proxy. The function
 // returns the new ray fraction.
@@ -470,4 +470,4 @@ TreeShapeCastCallbackFcn :: #type proc "c" (#by_ptr input: ShapeCastInput, proxy
 // - return a value of 0 to terminate the ray cast
 // - return a value less than input->maxFraction to clip the ray
 // - return a value of input->maxFraction to continue the ray cast without clipping
-TreeRayCastCallbackFcn :: #type proc "c" (#by_ptr input: RayCastInput, proxyId: i32, userData: i32, ctx: rawptr) -> f32
+TreeRayCastCallbackFcn   :: #type proc "c" (#by_ptr input: RayCastInput, proxyId: i32, userData: i32, ctx: rawptr) -> f32
