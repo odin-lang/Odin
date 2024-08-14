@@ -133,22 +133,14 @@ read_entire_file_from_file :: proc(f: ^File, allocator: runtime.Allocator) -> (d
 		err = serr
 		return
 	}
-	size += 1 // for EOF
 
-	// TODO(bill): Is this correct logic?
 	if has_size {
-		total: int
 		data = make([]byte, size, allocator) or_return
-		for {
-			n: int
-			n, err = read(f, data[total:])
-			total += n
-			if err != nil {
-				if err == .EOF {
-					err = nil
-				}
-				data = data[:total]
-				return
+		n: int = ---
+		n, err = read(f, data[:])
+		if err != nil {
+			if err == .EOF {
+				err = nil
 			}
 		}
 	} else {
@@ -165,10 +157,11 @@ read_entire_file_from_file :: proc(f: ^File, allocator: runtime.Allocator) -> (d
 					err = nil
 				}
 				data = out_buffer[:total]
-				return
+				break
 			}
 		}
 	}
+	return
 }
 
 @(require_results)
