@@ -53,24 +53,20 @@ PROGRESS_WIDTH        : int    : #config(ODIN_TEST_PROGRESS_WIDTH, 24)
 // If it is unspecified, it will be set to the system cycle counter at startup.
 SHARED_RANDOM_SEED    : u64    : #config(ODIN_TEST_RANDOM_SEED, 0)
 // Set the lowest log level for this test run.
-LOG_LEVEL             : string : #config(ODIN_TEST_LOG_LEVEL, "info")
+LOG_LEVEL_DEFAULT     : string : "debug" when ODIN_DEBUG else "info"
+LOG_LEVEL             : string : #config(ODIN_TEST_LOG_LEVEL, LOG_LEVEL_DEFAULT)
 // Show only the most necessary logging information.
 USING_SHORT_LOGS      : bool   : #config(ODIN_TEST_SHORT_LOGS, false)
 // Output a report of the tests to the given path.
 JSON_REPORT           : string : #config(ODIN_TEST_JSON_REPORT, "")
 
 get_log_level :: #force_inline proc() -> runtime.Logger_Level {
-	when ODIN_DEBUG {
-		// Always use .Debug in `-debug` mode.
-		return .Debug
-	} else {
-		when LOG_LEVEL == "debug"   { return .Debug   } else
-		when LOG_LEVEL == "info"    { return .Info    } else
-		when LOG_LEVEL == "warning" { return .Warning } else
-		when LOG_LEVEL == "error"   { return .Error   } else
-		when LOG_LEVEL == "fatal"   { return .Fatal   } else {
-			#panic("Unknown `ODIN_TEST_LOG_LEVEL`: \"" + LOG_LEVEL + "\", possible levels are: \"debug\", \"info\", \"warning\", \"error\", or \"fatal\".")
-		}
+	when LOG_LEVEL == "debug"   { return .Debug   } else
+	when LOG_LEVEL == "info"    { return .Info    } else
+	when LOG_LEVEL == "warning" { return .Warning } else
+	when LOG_LEVEL == "error"   { return .Error   } else
+	when LOG_LEVEL == "fatal"   { return .Fatal   } else {
+		#panic("Unknown `ODIN_TEST_LOG_LEVEL`: \"" + LOG_LEVEL + "\", possible levels are: \"debug\", \"info\", \"warning\", \"error\", or \"fatal\".")
 	}
 }
 

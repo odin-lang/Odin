@@ -13,6 +13,9 @@
 # But remember to ignore executables with an extension.
 *.exe
 *.bin
+*.bat
+*.pdb
+*.sh
 
 # Ignore documentation-related files.
 /documentation/verify/
