@@ -371,7 +371,7 @@ F_KINFO :: 22
 foreign libc {
 	@(link_name="__error")		__Error_location :: proc() -> ^c.int ---
 
-	@(link_name="open")             _unix_open          :: proc(path: cstring, flags: c.int, mode: c.int) -> Handle ---
+	@(link_name="open")             _unix_open          :: proc(path: cstring, flags: c.int, mode: c.uint16_t) -> Handle ---
 	@(link_name="close")            _unix_close         :: proc(fd: Handle) -> c.int ---
 	@(link_name="read")             _unix_read          :: proc(fd: Handle, buf: rawptr, size: c.size_t) -> c.ssize_t ---
 	@(link_name="write")            _unix_write         :: proc(fd: Handle, buf: rawptr, size: c.size_t) -> c.ssize_t ---
@@ -388,7 +388,7 @@ foreign libc {
 	@(link_name="unlink")           _unix_unlink        :: proc(path: cstring) -> c.int ---
 	@(link_name="rmdir")            _unix_rmdir         :: proc(path: cstring) -> c.int ---
 	@(link_name="mkdir")            _unix_mkdir         :: proc(path: cstring, mode: mode_t) -> c.int ---
-	@(link_name="fcntl")            _unix_fcntl         :: proc(fd: Handle, cmd: c.int, arg: uintptr) -> c.int ---
+	@(link_name="fcntl")            _unix_fcntl         :: proc(fd: Handle, cmd: c.int, #c_vararg args: ..any) -> c.int ---
 	@(link_name="dup")              _unix_dup           :: proc(fd: Handle) -> Handle ---
 	
 	@(link_name="fdopendir")        _unix_fdopendir     :: proc(fd: Handle) -> Dir ---
@@ -402,7 +402,7 @@ foreign libc {
 	@(link_name="realloc")          _unix_realloc       :: proc(ptr: rawptr, size: c.size_t) -> rawptr ---
 	
 	@(link_name="getenv")           _unix_getenv        :: proc(cstring) -> cstring ---
-	@(link_name="realpath")         _unix_realpath      :: proc(path: cstring, resolved_path: rawptr) -> rawptr ---
+	@(link_name="realpath")         _unix_realpath      :: proc(path: cstring, resolved_path: [^]byte = nil) -> cstring ---
 	@(link_name="sysctlbyname")     _sysctlbyname       :: proc(path: cstring, oldp: rawptr, oldlenp: rawptr, newp: rawptr, newlen: int) -> c.int ---
 
 	@(link_name="exit")             _unix_exit          :: proc(status: c.int) -> ! ---
@@ -430,7 +430,7 @@ get_last_error :: proc "contextless" () -> Error {
 open :: proc(path: string, flags: int = O_RDONLY, mode: int = 0) -> (Handle, Error) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	cstr := strings.clone_to_cstring(path, context.temp_allocator)
-	handle := _unix_open(cstr, c.int(flags), c.int(mode))
+	handle := _unix_open(cstr, c.int(flags), u16(mode))
 	if handle == -1 {
 		return INVALID_HANDLE, get_last_error()
 	}
@@ -786,10 +786,10 @@ absolute_path_from_relative :: proc(rel: string) -> (path: string, err: Error) {
 	if path_ptr == nil {
 		return "", get_last_error()
 	}
-	defer _unix_free(path_ptr)
+	defer _unix_free(rawptr(path_ptr))
 
 
-	path = strings.clone(string(cstring(path_ptr)))
+	path = strings.clone(string(path_ptr))
 
 	return path, nil
 }

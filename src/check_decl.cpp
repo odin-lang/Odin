@@ -756,13 +756,29 @@ gb_internal bool are_signatures_similar_enough(Type *a_, Type *b_) {
 	for (isize i = 0; i < a->param_count; i++) {
 		Type *x = core_type(a->params->Tuple.variables[i]->type);
 		Type *y = core_type(b->params->Tuple.variables[i]->type);
+
+		if (x->kind == Type_BitSet && x->BitSet.underlying) {
+			x = core_type(x->BitSet.underlying);
+		}
+		if (y->kind == Type_BitSet && y->BitSet.underlying) {
+			y = core_type(y->BitSet.underlying);
+		}
+
 		if (!signature_parameter_similar_enough(x, y)) {
 			return false;
 		}
 	}
 	for (isize i = 0; i < a->result_count; i++) {
-		Type *x = base_type(a->results->Tuple.variables[i]->type);
-		Type *y = base_type(b->results->Tuple.variables[i]->type);
+		Type *x = core_type(a->results->Tuple.variables[i]->type);
+		Type *y = core_type(b->results->Tuple.variables[i]->type);
+
+		if (x->kind == Type_BitSet && x->BitSet.underlying) {
+			x = core_type(x->BitSet.underlying);
+		}
+		if (y->kind == Type_BitSet && y->BitSet.underlying) {
+			y = core_type(y->BitSet.underlying);
+		}
+
 		if (!signature_parameter_similar_enough(x, y)) {
 			return false;
 		}

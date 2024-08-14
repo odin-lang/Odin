@@ -13,13 +13,13 @@ is_path_separator :: proc(c: byte) -> bool {
 
 mkdir :: make_directory
 
-make_directory :: proc(name: string, perm: int) -> Error {
+make_directory :: proc(name: string, perm: int = 0o755) -> Error {
 	return _mkdir(name, perm)
 }
 
 mkdir_all :: make_directory_all
 
-make_directory_all :: proc(path: string, perm: int) -> Error {
+make_directory_all :: proc(path: string, perm: int = 0o755) -> Error {
 	return _mkdir_all(path, perm)
 }
 

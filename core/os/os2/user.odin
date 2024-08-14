@@ -42,7 +42,7 @@ user_config_dir :: proc(allocator: runtime.Allocator) -> (dir: string, err: Erro
 	case .Darwin:
 		dir = get_env("HOME", allocator)
 		if dir != "" {
-			dir = concatenate({dir, "/Library/Application Support"}, allocator) or_return
+			dir = concatenate({dir, "/.config"}, allocator) or_return
 		}
 	case: // All other UNIX systems
 		dir = get_env("XDG_CACHE_HOME", allocator)

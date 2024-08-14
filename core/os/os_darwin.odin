@@ -584,7 +584,7 @@ F_GETPATH :: 50 // return the full path of the fd
 foreign libc {
 	@(link_name="__error") __error :: proc() -> ^c.int ---
 
-	@(link_name="open")             _unix_open          :: proc(path: cstring, flags: i32, #c_vararg args: ..any) -> Handle ---
+	@(link_name="open")             _unix_open          :: proc(path: cstring, flags: i32, mode: u16) -> Handle ---
 	@(link_name="close")            _unix_close         :: proc(handle: Handle) -> c.int ---
 	@(link_name="read")             _unix_read          :: proc(handle: Handle, buffer: rawptr, count: c.size_t) -> int ---
 	@(link_name="write")            _unix_write         :: proc(handle: Handle, buffer: rawptr, count: c.size_t) -> int ---
@@ -628,23 +628,23 @@ foreign libc {
 	@(link_name="getcwd")   _unix_getcwd   :: proc(buf: cstring, len: c.size_t) -> cstring ---
 	@(link_name="chdir")    _unix_chdir    :: proc(buf: cstring) -> c.int ---
 	@(link_name="mkdir")    _unix_mkdir    :: proc(buf: cstring, mode: u16) -> c.int ---
-	@(link_name="realpath") _unix_realpath :: proc(path: cstring, resolved_path: rawptr) -> rawptr ---
+	@(link_name="realpath") _unix_realpath :: proc(path: cstring, resolved_path: [^]byte = nil) -> cstring ---
 
 	@(link_name="strerror") _darwin_string_error :: proc(num : c.int) -> cstring ---
 	@(link_name="sysctlbyname") _sysctlbyname    :: proc(path: cstring, oldp: rawptr, oldlenp: rawptr, newp: rawptr, newlen: int) -> c.int ---
 
-	@(link_name="socket")           _unix_socket        :: proc(domain: int, type: int, protocol: int) -> int ---
-	@(link_name="listen")           _unix_listen        :: proc(socket: int, backlog: int) -> int ---
-	@(link_name="accept")           _unix_accept        :: proc(socket: int, addr: rawptr, addr_len: rawptr) -> int ---
-	@(link_name="connect")          _unix_connect       :: proc(socket: int, addr: rawptr, addr_len: socklen_t) -> int ---
-	@(link_name="bind")             _unix_bind          :: proc(socket: int, addr: rawptr, addr_len: socklen_t) -> int ---
-	@(link_name="setsockopt")       _unix_setsockopt    :: proc(socket: int, level: int, opt_name: int, opt_val: rawptr, opt_len: socklen_t) -> int ---
-	@(link_name="getsockopt")       _unix_getsockopt    :: proc(socket: int, level: int, opt_name: int, opt_val: rawptr, opt_len: socklen_t) -> int ---
-	@(link_name="recvfrom")         _unix_recvfrom      :: proc(socket: int, buffer: rawptr, buffer_len: c.size_t, flags: int, addr: rawptr, addr_len: ^socklen_t) -> c.ssize_t ---
-	@(link_name="recv")             _unix_recv          :: proc(socket: int, buffer: rawptr, buffer_len: c.size_t, flags: int) -> c.ssize_t ---
-	@(link_name="sendto")           _unix_sendto        :: proc(socket: int, buffer: rawptr, buffer_len: c.size_t, flags: int, addr: rawptr, addr_len: socklen_t) -> c.ssize_t ---
-	@(link_name="send")             _unix_send          :: proc(socket: int, buffer: rawptr, buffer_len: c.size_t, flags: int) -> c.ssize_t ---
-	@(link_name="shutdown")         _unix_shutdown      :: proc(socket: int, how: int) -> int ---
+	@(link_name="socket")           _unix_socket        :: proc(domain: c.int, type: c.int, protocol: c.int) -> c.int ---
+	@(link_name="listen")           _unix_listen        :: proc(socket: c.int, backlog: c.int) -> c.int ---
+	@(link_name="accept")           _unix_accept        :: proc(socket: c.int, addr: rawptr, addr_len: rawptr) -> c.int ---
+	@(link_name="connect")          _unix_connect       :: proc(socket: c.int, addr: rawptr, addr_len: socklen_t) -> c.int ---
+	@(link_name="bind")             _unix_bind          :: proc(socket: c.int, addr: rawptr, addr_len: socklen_t) -> c.int ---
+	@(link_name="setsockopt")       _unix_setsockopt    :: proc(socket: c.int, level: c.int, opt_name: c.int, opt_val: rawptr, opt_len: socklen_t) -> c.int ---
+	@(link_name="getsockopt")       _unix_getsockopt    :: proc(socket: c.int, level: c.int, opt_name: c.int, opt_val: rawptr, opt_len: ^socklen_t) -> c.int ---
+	@(link_name="recvfrom")         _unix_recvfrom      :: proc(socket: c.int, buffer: rawptr, buffer_len: c.size_t, flags: c.int, addr: rawptr, addr_len: ^socklen_t) -> c.ssize_t ---
+	@(link_name="recv")             _unix_recv          :: proc(socket: c.int, buffer: rawptr, buffer_len: c.size_t, flags: c.int) -> c.ssize_t ---
+	@(link_name="sendto")           _unix_sendto        :: proc(socket: c.int, buffer: rawptr, buffer_len: c.size_t, flags: c.int, addr: rawptr, addr_len: socklen_t) -> c.ssize_t ---
+	@(link_name="send")             _unix_send          :: proc(socket: c.int, buffer: rawptr, buffer_len: c.size_t, flags: c.int) -> c.ssize_t ---
+	@(link_name="shutdown")         _unix_shutdown      :: proc(socket: c.int, how: c.int) -> c.int ---
 
 	@(link_name="getifaddrs")       _getifaddrs         :: proc(ifap: ^^ifaddrs) -> (c.int) ---
 	@(link_name="freeifaddrs")      _freeifaddrs        :: proc(ifa: ^ifaddrs) ---
@@ -661,9 +661,9 @@ when ODIN_ARCH != .arm64 {
 }
 
 foreign dl {
-	@(link_name="dlopen")  _unix_dlopen  :: proc(filename: cstring, flags: int) -> rawptr ---
+	@(link_name="dlopen")  _unix_dlopen  :: proc(filename: cstring, flags: c.int) -> rawptr ---
 	@(link_name="dlsym")   _unix_dlsym   :: proc(handle: rawptr, symbol: cstring) -> rawptr ---
-	@(link_name="dlclose") _unix_dlclose :: proc(handle: rawptr) -> int ---
+	@(link_name="dlclose") _unix_dlclose :: proc(handle: rawptr) -> c.int ---
 	@(link_name="dlerror") _unix_dlerror :: proc() -> cstring ---
 }
 
@@ -1040,10 +1040,9 @@ absolute_path_from_relative :: proc(rel: string) -> (path: string, err: Error) {
 	if path_ptr == nil {
 		return "", get_last_error()
 	}
-	defer _unix_free(path_ptr)
+	defer _unix_free(rawptr(path_ptr))
 
-	path_cstr := cast(cstring)path_ptr
-	path = strings.clone(string(path_cstr))
+	path = strings.clone(string(path_ptr))
 
 	return path, nil
 }
@@ -1154,7 +1153,7 @@ current_thread_id :: proc "contextless" () -> int {
 dlopen :: proc(filename: string, flags: int) -> rawptr {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	cstr := strings.clone_to_cstring(filename, context.temp_allocator)
-	handle := _unix_dlopen(cstr, flags)
+	handle := _unix_dlopen(cstr, c.int(flags))
 	return handle
 }
 @(require_results)
@@ -1208,26 +1207,24 @@ _alloc_command_line_arguments :: proc() -> []string {
 	return res
 }
 
-@(require_results)
 socket :: proc(domain: int, type: int, protocol: int) -> (Socket, Error) {
-	result := _unix_socket(domain, type, protocol)
+	result := _unix_socket(c.int(domain), c.int(type), c.int(protocol))
 	if result < 0 {
 		return 0, get_last_error()
 	}
 	return Socket(result), nil
 }
 
-@(require_results)
 connect :: proc(sd: Socket, addr: ^SOCKADDR, len: socklen_t) -> Error {
-	result := _unix_connect(int(sd), addr, len)
+	result := _unix_connect(c.int(sd), addr, len)
 	if result < 0 {
 		return get_last_error()
 	}
 	return nil
 }
 
-bind :: proc(sd: Socket, addr: ^SOCKADDR, len: socklen_t) -> Error {
-	result := _unix_bind(int(sd), addr, len)
+bind :: proc(sd: Socket, addr: ^SOCKADDR, len: socklen_t) -> (Error) {
+	result := _unix_bind(c.int(sd), addr, len)
 	if result < 0 {
 		return get_last_error()
 	}
@@ -1235,15 +1232,15 @@ bind :: proc(sd: Socket, addr: ^SOCKADDR, len: socklen_t) -> Error {
 }
 
 accept :: proc(sd: Socket, addr: ^SOCKADDR, len: rawptr) -> (Socket, Error) {
-	result := _unix_accept(int(sd), rawptr(addr), len)
+	result := _unix_accept(c.int(sd), rawptr(addr), len)
 	if result < 0 {
 		return 0, get_last_error()
 	}
 	return Socket(result), nil
 }
 
-listen :: proc(sd: Socket, backlog: int) -> Error {
-	result := _unix_listen(int(sd), backlog)
+listen :: proc(sd: Socket, backlog: int) -> (Error) {
+	result := _unix_listen(c.int(sd), c.int(backlog))
 	if result < 0 {
 		return get_last_error()
 	}
@@ -1251,7 +1248,7 @@ listen :: proc(sd: Socket, backlog: int) -> Error {
 }
 
 setsockopt :: proc(sd: Socket, level: int, optname: int, optval: rawptr, optlen: socklen_t) -> Error {
-	result := _unix_setsockopt(int(sd), level, optname, optval, optlen)
+	result := _unix_setsockopt(c.int(sd), c.int(level), c.int(optname), optval, optlen)
 	if result < 0 {
 		return get_last_error()
 	}
@@ -1259,7 +1256,8 @@ setsockopt :: proc(sd: Socket, level: int, optname: int, optval: rawptr, optlen:
 }
 
 getsockopt :: proc(sd: Socket, level: int, optname: int, optval: rawptr, optlen: socklen_t) -> Error {
-	result := _unix_getsockopt(int(sd), level, optname, optval, optlen)
+	optlen := optlen
+	result := _unix_getsockopt(c.int(sd), c.int(level), c.int(optname), optval, &optlen)
 	if result < 0 {
 		return get_last_error()
 	}
@@ -1267,7 +1265,7 @@ getsockopt :: proc(sd: Socket, level: int, optname: int, optval: rawptr, optlen:
 }
 
 recvfrom :: proc(sd: Socket, data: []byte, flags: int, addr: ^SOCKADDR, addr_size: ^socklen_t) -> (u32, Error) {
-	result := _unix_recvfrom(int(sd), raw_data(data), len(data), flags, addr, addr_size)
+	result := _unix_recvfrom(c.int(sd), raw_data(data), len(data), c.int(flags), addr, addr_size)
 	if result < 0 {
 		return 0, get_last_error()
 	}
@@ -1275,7 +1273,7 @@ recvfrom :: proc(sd: Socket, data: []byte, flags: int, addr: ^SOCKADDR, addr_siz
 }
 
 recv :: proc(sd: Socket, data: []byte, flags: int) -> (u32, Error) {
-	result := _unix_recv(int(sd), raw_data(data), len(data), flags)
+	result := _unix_recv(c.int(sd), raw_data(data), len(data), c.int(flags))
 	if result < 0 {
 		return 0, get_last_error()
 	}
@@ -1283,7 +1281,7 @@ recv :: proc(sd: Socket, data: []byte, flags: int) -> (u32, Error) {
 }
 
 sendto :: proc(sd: Socket, data: []u8, flags: int, addr: ^SOCKADDR, addrlen: socklen_t) -> (u32, Error) {
-	result := _unix_sendto(int(sd), raw_data(data), len(data), flags, addr, addrlen)
+	result := _unix_sendto(c.int(sd), raw_data(data), len(data), c.int(flags), addr, addrlen)
 	if result < 0 {
 		return 0, get_last_error()
 	}
@@ -1291,15 +1289,15 @@ sendto :: proc(sd: Socket, data: []u8, flags: int, addr: ^SOCKADDR, addrlen: soc
 }
 
 send :: proc(sd: Socket, data: []byte, flags: int) -> (u32, Error) {
-	result := _unix_send(int(sd), raw_data(data), len(data), 0)
+	result := _unix_send(c.int(sd), raw_data(data), len(data), 0)
 	if result < 0 {
 		return 0, get_last_error()
 	}
 	return u32(result), nil
 }
 
-shutdown :: proc(sd: Socket, how: int) -> Error {
-	result := _unix_shutdown(int(sd), how)
+shutdown :: proc(sd: Socket, how: int) -> (Error) {
+	result := _unix_shutdown(c.int(sd), c.int(how))
 	if result < 0 {
 		return get_last_error()
 	}

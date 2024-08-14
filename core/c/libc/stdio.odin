@@ -17,6 +17,12 @@ when ODIN_OS == .Windows {
 
 FILE :: struct {}
 
+Whence :: enum int {
+	SET = SEEK_SET,
+	CUR = SEEK_CUR,
+	END = SEEK_END,
+}
+
 // MSVCRT compatible.
 when ODIN_OS == .Windows {
 	_IOFBF       :: 0x0000
@@ -101,6 +107,8 @@ when ODIN_OS == .OpenBSD || ODIN_OS == .NetBSD {
 	SEEK_CUR :: 1
 	SEEK_END :: 2
 
+	TMP_MAX :: 308915776
+
 	foreign libc {
 		__sF: [3]FILE
 	}
@@ -127,6 +135,8 @@ when ODIN_OS == .FreeBSD {
 	SEEK_SET :: 0
 	SEEK_CUR :: 1
 	SEEK_END :: 2
+
+	TMP_MAX :: 308915776
 
 	foreign libc {
 		@(link_name="__stderrp") stderr: ^FILE
@@ -195,10 +205,21 @@ when ODIN_OS == .Haiku {
 	}
 }
 
+when ODIN_OS == .NetBSD {
+	@(private) LRENAME  :: "__posix_rename"
+	@(private) LFGETPOS :: "__fgetpos50"
+	@(private) LFSETPOS :: "__fsetpos50"
+} else {
+	@(private) LRENAME  :: "rename"
+	@(private) LFGETPOS :: "fgetpos"
+	@(private) LFSETPOS :: "fsetpos"
+}
+
 @(default_calling_convention="c")
 foreign libc {
 	// 7.21.4 Operations on files
 	remove    :: proc(filename: cstring) -> int ---
+	@(link_name=LRENAME)
 	rename    :: proc(old, new: cstring) -> int ---
 	tmpfile   :: proc() -> ^FILE ---
 	tmpnam    :: proc(s: [^]char) -> [^]char ---
@@ -240,8 +261,10 @@ foreign libc {
 	fwrite    :: proc(ptr: rawptr, size: size_t, nmemb: size_t, stream: ^FILE) -> size_t ---
 
 	// 7.21.9 File positioning functions
+	@(link_name=LFGETPOS)
 	fgetpos   :: proc(stream: ^FILE, pos: ^fpos_t) -> int ---
-	fseek     :: proc(stream: ^FILE, offset: long, whence: int) -> int ---
+	fseek     :: proc(stream: ^FILE, offset: long, whence: Whence) -> int ---
+	@(link_name=LFSETPOS)
 	fsetpos   :: proc(stream: ^FILE, pos: ^fpos_t) -> int ---
 	ftell     :: proc(stream: ^FILE) -> long ---
 	rewind    :: proc(stream: ^FILE) ---
@@ -288,11 +311,11 @@ to_stream :: proc(file: ^FILE) -> io.Stream {
 				return 0, unknown_or_eof(file)
 			}
 
-			if fseek(file, long(offset), SEEK_SET) != 0 {
+			if fseek(file, long(offset), .SET) != 0 {
 				return 0, unknown_or_eof(file)
 			}
 
-			defer fseek(file, long(curr), SEEK_SET)
+			defer fseek(file, long(curr), .SET)
 
 			n = i64(fread(raw_data(p), size_of(byte), len(p), file))
 			if n == 0 { err = unknown_or_eof(file) }
@@ -307,17 +330,21 @@ to_stream :: proc(file: ^FILE) -> io.Stream {
 				return 0, unknown_or_eof(file)
 			}
 
-			if fseek(file, long(offset), SEEK_SET) != 0 {
+			if fseek(file, long(offset), .SET) != 0 {
 				return 0, unknown_or_eof(file)
 			}
 
-			defer fseek(file, long(curr), SEEK_SET)
+			defer fseek(file, long(curr), .SET)
 
 			n = i64(fwrite(raw_data(p), size_of(byte), len(p), file))
 			if n == 0 { err = unknown_or_eof(file) }
 
 		case .Seek:
-			if fseek(file, long(offset), int(whence)) != 0 {
+			#assert(int(Whence.SET) == int(io.Seek_From.Start))
+			#assert(int(Whence.CUR) == int(io.Seek_From.Current))
+			#assert(int(Whence.END) == int(io.Seek_From.End))
+
+			if fseek(file, long(offset), Whence(whence)) != 0 {
 				return 0, unknown_or_eof(file)
 			}
 		
@@ -326,9 +353,9 @@ to_stream :: proc(file: ^FILE) -> io.Stream {
 			if curr == -1 {
 				return 0, unknown_or_eof(file)
 			}
-			defer fseek(file, curr, SEEK_SET)
+			defer fseek(file, curr, .SET)
 
-			if fseek(file, 0, SEEK_END) != 0 {
+			if fseek(file, 0, .END) != 0 {
 				return 0, unknown_or_eof(file)
 			}
 
