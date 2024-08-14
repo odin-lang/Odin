@@ -1124,7 +1124,7 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 
 	e->deprecated_message = ac.deprecated_message;
 	e->warning_message = ac.warning_message;
-	ac.link_name = handle_link_name(ctx, e->token, ac.link_name, ac.link_prefix,ac.link_suffix);
+	ac.link_name = handle_link_name(ctx, e->token, ac.link_name, ac.link_prefix, ac.link_suffix);
 	if (ac.has_disabled_proc) {
 		if (ac.disabled_proc) {
 			e->flags |= EntityFlag_Disabled;
@@ -1221,6 +1221,8 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 		} else {
 			pt->require_results = true;
 		}
+	} else if (d->foreign_require_results && pt->result_count != 0) {
+		pt->require_results = true;
 	}
 
 	if (ac.link_name.len > 0) {

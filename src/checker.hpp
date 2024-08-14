@@ -204,9 +204,12 @@ struct DeclInfo {
 	Array<Ast *>  attributes;
 	Ast *         proc_lit;      // Ast_ProcLit
 	Type *        gen_proc_type; // Precalculated
+
 	bool          is_using;
 	bool          where_clauses_evaluated;
+	bool          foreign_require_results;
 	std::atomic<ProcCheckedState> proc_checked_state;
+
 	BlockingMutex proc_checked_mutex;
 	isize         defer_used;
 	bool          defer_use_checked;
@@ -322,6 +325,7 @@ struct ForeignContext {
 	String                link_prefix;
 	String                link_suffix;
 	EntityVisiblityKind   visibility_kind;
+	bool                  require_results;
 };
 
 typedef Array<Entity *> CheckerTypePath;
