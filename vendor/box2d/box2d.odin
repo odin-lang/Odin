@@ -68,7 +68,7 @@ when ODIN_OS == .Windows {
 	}
 }
 
-@(link_prefix="b2", default_calling_convention="c")
+@(link_prefix="b2", default_calling_convention="c", require_results)
 foreign lib {
 	// This allows the user to override the allocation functions. These should be
 	//	set during application startup.
@@ -98,7 +98,7 @@ foreign lib {
 	GetLengthUnitsPerMeter :: proc() -> f32 ---
 }
 
-@(link_prefix="b2", default_calling_convention="c")
+@(link_prefix="b2", default_calling_convention="c", require_results)
 foreign lib {
 	// Use this to initialize your world definition
 	// @ingroup world
@@ -155,7 +155,7 @@ foreign lib {
 
 
 
-@(link_prefix="b2", default_calling_convention="c")
+@(link_prefix="b2", default_calling_convention="c", require_results)
 foreign lib {
 	// Validate ray cast input data (NaN, etc)
 	IsValidRay         :: proc(#by_ptr input: RayCastInput) -> bool ---
@@ -248,6 +248,7 @@ foreign lib {
 // - more than maxPolygonVertices points
 // This welds close points and removes collinear points.
 //	@warning Do not modify a hull once it has been computed
+@(require_results)
 ComputeHull :: proc "c" (points: []Vec2) -> Hull {
 	foreign lib {
 		b2ComputeHull :: proc "c" (points: [^]Vec2, count: i32) -> Hull ---
@@ -256,7 +257,7 @@ ComputeHull :: proc "c" (points: []Vec2) -> Hull {
 }
 
 
-@(link_prefix="b2", default_calling_convention="c")
+@(link_prefix="b2", default_calling_convention="c", require_results)
 foreign lib {
 	// This determines if a hull is valid. Checks for:
 	// - convexity
@@ -265,7 +266,7 @@ foreign lib {
 	ValidateHull :: proc(#by_ptr hull: Hull) -> bool ---
 }
 
-@(link_prefix="b2", default_calling_convention="c")
+@(link_prefix="b2", default_calling_convention="c", require_results)
 foreign lib {
 	// Compute the distance between two line segments, clamping at the end points if needed.
 	SegmentDistance :: proc(p1, q1: Vec2, p2, q2: Vec2) -> SegmentDistanceResult ---
@@ -274,6 +275,7 @@ foreign lib {
 // Compute the closest points between two shapes represented as point clouds.
 // DistanceCache cache is input/output. On the first call set DistanceCache.count to zero.
 //	The underlying GJK algorithm may be debugged by passing in debug simplexes and capacity. You may pass in NULL and 0 for these.
+@(require_results)
 ShapeDistance :: proc "c" (cache: ^DistanceCache, #by_ptr input: DistanceInput, simplexes: []Simplex) -> DistanceOutput {
 	foreign lib {
 		b2ShapeDistance :: proc "c" (cache: ^DistanceCache, #by_ptr input: DistanceInput, simplexes: [^]Simplex, simplexCapacity: c.int) -> DistanceOutput ---
@@ -283,6 +285,7 @@ ShapeDistance :: proc "c" (cache: ^DistanceCache, #by_ptr input: DistanceInput, 
 
 
 // Make a proxy for use in GJK and related functions.
+@(require_results)
 MakeProxy :: proc "c" (vertices: []Vec2, radius: f32) -> DistanceProxy {
 	foreign lib {
 		b2MakeProxy :: proc "c" (vertices: [^]Vec2, count: i32, radius: f32) -> DistanceProxy ---
@@ -291,7 +294,7 @@ MakeProxy :: proc "c" (vertices: []Vec2, radius: f32) -> DistanceProxy {
 }
 
 
-@(link_prefix="b2", default_calling_convention="c")
+@(link_prefix="b2", default_calling_convention="c", require_results)
 foreign lib {
 	// Perform a linear shape cast of shape B moving and shape A fixed. Determines the hit point, normal, and translation fraction.
 	ShapeCast :: proc(#by_ptr input: ShapeCastPairInput) -> CastOutput ---
@@ -306,7 +309,7 @@ foreign lib {
 	TimeOfImpact :: proc(#by_ptr input: TOIInput) -> TOIOutput ---
 }
 
-@(link_prefix="b2", default_calling_convention="c")
+@(link_prefix="b2", default_calling_convention="c", require_results)
 foreign lib {
 	// Compute the contact manifold between two circles
 	CollideCircles                 :: proc(#by_ptr circleA: Circle, xfA: Transform, #by_ptr circleB: Circle, xfB: Transform) -> Manifold ---
@@ -347,7 +350,7 @@ foreign lib {
 
 
 
-@(link_prefix="b2", default_calling_convention="c")
+@(link_prefix="b2", default_calling_convention="c", require_results)
 foreign lib {
 	// Constructing the tree initializes the node pool.
 	DynamicTree_Create          :: proc() -> DynamicTree ---
@@ -430,18 +433,20 @@ foreign lib {
 
 // Get proxy user data
 // @return the proxy user data or 0 if the id is invalid
+@(require_results)
 DynamicTree_GetUserData :: #force_inline proc "contextless" (tree: DynamicTree, proxyId: i32) -> i32 {
 	return tree.nodes[proxyId].userData
 }
 
 // Get the AABB of a proxy
+@(require_results)
 DynamicTree_GetAABB :: #force_inline proc "contextless" (tree: DynamicTree, proxyId: i32) -> AABB {
 	return tree.nodes[proxyId].aabb
 }
 
 
 
-@(link_prefix="b2", default_calling_convention="c")
+@(link_prefix="b2", default_calling_convention="c", require_results)
 foreign lib {
 	/**
 	 * @defgroup world World
@@ -584,7 +589,7 @@ foreign lib {
 }
 
 
-@(link_prefix="b2", default_calling_convention="c")
+@(link_prefix="b2", default_calling_convention="c", require_results)
 foreign lib {
 	/**
 	 * @defgroup body Body
@@ -825,35 +830,41 @@ foreign lib {
 }
 
 // Get the shape ids for all shapes on this body, up to the provided capacity.
-//	@returns the number of shape ids stored in the user array
-Body_GetShapes :: proc "c" (bodyId: BodyId, shapeArray: []ShapeId) -> c.int {
+//	@returns the shape ids stored in the user array
+@(require_results)
+Body_GetShapes :: proc "c" (bodyId: BodyId, shapeArray: []ShapeId) -> []ShapeId {
 	foreign lib {
 		b2Body_GetShapes :: proc "c" (bodyId: BodyId, shapeArray: [^]ShapeId, capacity: c.int) -> c.int ---
 	}
-	return b2Body_GetShapes(bodyId, raw_data(shapeArray), c.int(len(shapeArray)))
+	n := b2Body_GetShapes(bodyId, raw_data(shapeArray), c.int(len(shapeArray)))
+	return shapeArray[:n]
 
 }
 
 // Get the joint ids for all joints on this body, up to the provided capacity
-//	@returns the number of joint ids stored in the user array
-Body_GetJoints :: proc "c" (bodyId: BodyId, jointArray: []JointId) -> c.int {
+//	@returns the joint ids stored in the user array
+@(require_results)
+Body_GetJoints :: proc "c" (bodyId: BodyId, jointArray: []JointId) -> []JointId {
 	foreign lib {
 		b2Body_GetJoints :: proc "c" (bodyId: BodyId, jointArray: [^]JointId, capacity: c.int) -> c.int ---
 	}
-	return b2Body_GetJoints(bodyId, raw_data(jointArray), c.int(len(jointArray)))
+	n := b2Body_GetJoints(bodyId, raw_data(jointArray), c.int(len(jointArray)))
+	return jointArray[:n]
 
 }
 
 // Get the touching contact data for a body
-Body_GetContactData :: proc "c" (bodyId: BodyId, contactData: []ContactData) -> c.int {
+@(require_results)
+Body_GetContactData :: proc "c" (bodyId: BodyId, contactData: []ContactData) -> []ContactData {
 	foreign lib {
 		b2Body_GetContactData :: proc "c" (bodyId: BodyId, contactData: [^]ContactData, capacity: c.int) -> c.int ---
 	}
-	return b2Body_GetContactData(bodyId, raw_data(contactData), c.int(len(contactData)))
+	n := b2Body_GetContactData(bodyId, raw_data(contactData), c.int(len(contactData)))
+	return contactData[:n]
 
 }
 
-@(link_prefix="b2", default_calling_convention="c")
+@(link_prefix="b2", default_calling_convention="c", require_results)
 foreign lib {
 	/**
 	 * @defgroup shape Shape
@@ -1016,15 +1027,17 @@ foreign lib {
 }
 
 // Get the touching contact data for a shape. The provided shapeId will be either shapeIdA or shapeIdB on the contact data.
-Shape_GetContactData :: proc "c" (shapeId: ShapeId, contactData: []ContactData) -> c.int {
+@(require_results)
+Shape_GetContactData :: proc "c" (shapeId: ShapeId, contactData: []ContactData) -> []ContactData {
 	foreign lib {
 		b2Shape_GetContactData :: proc "c" (shapeId: ShapeId, contactData: [^]ContactData, capacity: c.int) -> c.int ---
 	}
-	return b2Shape_GetContactData(shapeId, raw_data(contactData), c.int(len(contactData)))
+	n := b2Shape_GetContactData(shapeId, raw_data(contactData), c.int(len(contactData)))
+	return contactData[:n]
 }
 
 
-@(link_prefix="b2", default_calling_convention="c")
+@(link_prefix="b2", default_calling_convention="c", require_results)
 foreign lib {
 	// Chain Shape
 
