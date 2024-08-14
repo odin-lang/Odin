@@ -5,7 +5,6 @@ package os2
 import "base:runtime"
 import "base:intrinsics"
 
-import "core:fmt"
 import "core:time"
 import "core:slice"
 import "core:strings"
@@ -102,29 +101,35 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 	TEMP_ALLOCATOR_GUARD()
 
 	info.pid = pid
-	info.fields = selection
 
-	// Use this so we can use bprintf to make cstrings with less copying.
-	// The path_backing is manually zero terminated as we go.
+	// Use this to make cstrings without copying.
 	path_backing: [48]u8
+	path_builder := strings.builder_from_bytes(path_backing[:])
 
-	path_slice := path_backing[:len(path_backing) - 1]
-	path_cstr  := cstring(&path_slice[0])
-	path_len   := len(fmt.bprintf(path_slice, "/proc/%d", pid))
-	// path_len unused here as path_backing[path_len] = 0 is assumed.
-
-	proc_fd, errno := linux.open(path_cstr, _OPENDIR_FLAGS)
+	strings.write_string(&path_builder, "/proc/")
+	strings.write_int(&path_builder, pid)
+	proc_fd, errno := linux.open(strings.to_cstring(&path_builder), _OPENDIR_FLAGS)
 	if errno != .NONE {
 		err = _get_platform_error(errno)
 		return
 	}
 	defer linux.close(proc_fd)
 
-	if .Username in selection {
+	username_if: if .Username in selection {
 		s: linux.Stat
-		linux.fstat(proc_fd, &s)
+		if errno = linux.fstat(proc_fd, &s); errno != .NONE {
+			err = _get_platform_error(errno)
+			break username_if
+		}
 
-		passwd_bytes := _read_entire_pseudo_file_cstring("/etc/passwd", temp_allocator()) or_return
+		passwd_bytes: []u8
+		passwd_err: Error
+		passwd_bytes, passwd_err = _read_entire_pseudo_file_cstring("/etc/passwd", temp_allocator())
+		if passwd_err != nil {
+			err = passwd_err
+			break username_if
+		}
+
 		passwd := string(passwd_bytes)
 		for len(passwd) > 0 {
 			n := strings.index_byte(passwd, ':')
@@ -142,9 +147,11 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 			ok: bool
 			if uid, ok = strconv.parse_int(passwd[:n]); ok && uid == int(s.uid) {
 				info.username = strings.clone(username, allocator) or_return
+				info.fields += {.Username}
 				break
 			} else if !ok {
-				return info, .Invalid_File
+				err = .Invalid_File
+				break username_if
 			}
 
 			eol := strings.index_byte(passwd, '\n')
@@ -156,16 +163,20 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 	}
 
 	cmdline_if: if selection & {.Working_Dir, .Command_Line, .Command_Args, .Executable_Path} != {} {
-		path_len = len(fmt.bprintf(path_slice, "/proc/%d/cmdline", pid))
-		path_backing[path_len] = 0
+		strings.builder_reset(&path_builder)
+		strings.write_string(&path_builder, "/proc/")
+		strings.write_int(&path_builder, pid)
+		strings.write_string(&path_builder, "/cmdline")
 
-		cmdline_bytes := _read_entire_pseudo_file(path_cstr, temp_allocator()) or_return
-		if len(cmdline_bytes) == 0 {
+		cmdline_bytes, cmdline_err := _read_entire_pseudo_file(strings.to_cstring(&path_builder), temp_allocator())
+		if cmdline_err != nil || len(cmdline_bytes) == 0 {
+			err = cmdline_err
 			break cmdline_if
 		}
 		cmdline := string(cmdline_bytes)
 
 		terminator := strings.index_byte(cmdline, 0)
+		assert(terminator > 0)
 
 		command_line_exec := cmdline[:terminator]
 
@@ -173,85 +184,152 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 		cwd: string
 		cwd_err: Error
 		if .Working_Dir in selection || (.Executable_Path in selection && command_line_exec[0] != '/') {
-			path_len = len(fmt.bprintf(path_slice, "/proc/%d/cwd", pid))
-			path_backing[path_len] = 0
+			strings.builder_reset(&path_builder)
+			strings.write_string(&path_builder, "/proc/")
+			strings.write_int(&path_builder, pid)
+			strings.write_string(&path_builder, "/cwd")
 
-			cwd, cwd_err = _read_link_cstr(path_cstr, temp_allocator()) // allowed to fail
+			cwd, cwd_err = _read_link_cstr(strings.to_cstring(&path_builder), temp_allocator()) // allowed to fail
 			if cwd_err == nil && .Working_Dir in selection {
 				info.working_dir = strings.clone(cwd, allocator) or_return
+				info.fields += {.Working_Dir}
+			} else if cwd_err != nil {
+				err = cwd_err
+				break cmdline_if
 			}
 		}
 
 		if .Executable_Path in selection {
 			if cmdline[0] == '/' {
 				info.executable_path = strings.clone(cmdline[:terminator], allocator) or_return
+				info.fields += {.Executable_Path}
 			} else if cwd_err == nil {
-				join_paths: [2]string = { cwd, cmdline[:terminator] }
-				info.executable_path = filepath.join(join_paths[:], allocator)
+				info.executable_path = filepath.join({ cwd, cmdline[:terminator] }, allocator)
+				info.fields += {.Executable_Path}
+			} else {
+				break cmdline_if
 			}
 		}
-		if .Command_Line in selection {
-			info.command_line = strings.clone(cmdline[:terminator], allocator) or_return
-		}
 
-		if .Command_Args in selection {
+		if selection & {.Command_Line, .Command_Args} != {} {
 			// skip to first arg
-			cmdline = cmdline[terminator + 1:]
+			//cmdline = cmdline[terminator + 1:]
+			command_line_builder: strings.Builder
+			command_args_list: [dynamic]string
 
-			arg_list := make([dynamic]string, allocator) or_return
-			for len(cmdline) > 0 {
-				terminator = strings.index_byte(cmdline, 0)
-				arg := strings.clone(cmdline[:terminator], allocator) or_return
-				append(&arg_list, arg) or_return
+			if .Command_Line in selection {
+				command_line_builder = strings.builder_make(allocator) or_return
+				info.fields += {.Command_Line}
+			}
+
+			for i := 0; len(cmdline) > 0; i += 1 {
+				if terminator = strings.index_byte(cmdline, 0); terminator == -1 {
+					break
+				}
+
+				if .Command_Line in selection {
+					if i > 0 {
+						strings.write_byte(&command_line_builder, ' ')
+					}
+					strings.write_string(&command_line_builder, cmdline[:terminator])
+				}
+				if .Command_Args in selection {
+					if i == 1 {
+						command_args_list = make([dynamic]string, allocator) or_return
+						info.fields += {.Command_Args}
+					}
+					if i > 0 {
+						arg := strings.clone(cmdline[:terminator], allocator) or_return
+						append(&command_args_list, arg) or_return
+					}
+				}
+
 				cmdline = cmdline[terminator + 1:]
 			}
-			info.command_args = arg_list[:]
+			info.command_line = strings.to_string(command_line_builder)
+			info.command_args = command_args_list[:]
 		}
 	}
 
 	stat_if: if selection & {.PPid, .Priority} != {} {
-		path_len = len(fmt.bprintf(path_slice, "/proc/%d/stat", pid))
-		path_backing[path_len] = 0
+		strings.builder_reset(&path_builder)
+		strings.write_string(&path_builder, "/proc/")
+		strings.write_int(&path_builder, pid)
+		strings.write_string(&path_builder, "/stat")
 
-		proc_stat_bytes := _read_entire_pseudo_file(path_cstr, temp_allocator()) or_return
+		proc_stat_bytes, stat_err := _read_entire_pseudo_file(strings.to_cstring(&path_builder), temp_allocator())
+		if stat_err != nil {
+			err = stat_err
+			break stat_if
+		}
 		if len(proc_stat_bytes) <= 0 {
 			break stat_if
 		}
 
-		start := strings.last_index_byte(string(proc_stat_bytes), ')')
-		stats := string(proc_stat_bytes[start + 2:])
+		// Skip to the first field after the executable name
+		stats: string
+		if start := strings.last_index_byte(string(proc_stat_bytes), ')'); start != -1 {
+			stats = string(proc_stat_bytes[start + 2:])
+		} else {
+			break stat_if
+		}
 
-		// We are now on the 3rd field (skip)
-		stats = stats[strings.index_byte(stats, ' ') + 1:]
+		// NOTE: index 0 corresponds to field 3 (state) from `man 5 proc_pid_stat`
+		//       because we skipped passed the executable name above.
+		Fields :: enum {
+			State,
+			PPid,
+			PGrp,
+			Session,
+			Tty_Nr,
+			TpGid,
+			Flags,
+			MinFlt,
+			CMinFlt,
+			MajFlt,
+			CMajFlt,
+			UTime,
+			STime,
+			CUTime,
+			CSTime,
+			Priority,
+			Nice,
+			//... etc,
+		}
+		stat_fields := strings.split(stats, " ", temp_allocator()) or_return
+
+		if len(stat_fields) <= int(Fields.Nice) {
+			break stat_if
+		}
 
 		if .PPid in selection {
-			ppid_str := stats[:strings.index_byte(stats, ' ')]
-			if ppid, ok := strconv.parse_int(ppid_str); ok {
+			if ppid, ok := strconv.parse_int(stat_fields[Fields.PPid]); ok {
 				info.ppid = ppid
+				info.fields += {.PPid}
 			} else {
-				return info, .Invalid_File
+				err = .Invalid_File
+				break stat_if
 			}
 		}
 
 		if .Priority in selection {
-			// On 4th field. Priority is field 18 and niceness is field 19.
-			for _ in 4..<19 {
-				stats = stats[strings.index_byte(stats, ' ') + 1:]
-			}
-			nice_str := stats[:strings.index_byte(stats, ' ')]
-			if nice, ok := strconv.parse_int(nice_str); ok {
+			if nice, ok := strconv.parse_int(stat_fields[Fields.Nice]); ok {
 				info.priority = nice
+				info.fields += {.Priority}
 			} else {
-				return info, .Invalid_File
+				err = .Invalid_File
+				break stat_if
 			}
 		}
 	}
 
 	if .Environment in selection {
-		path_len = len(fmt.bprintf(path_slice, "/proc/%d/environ", pid))
-		path_backing[path_len] = 0
+		strings.builder_reset(&path_builder)
+		strings.write_string(&path_builder, "/proc/")
+		strings.write_int(&path_builder, pid)
+		strings.write_string(&path_builder, "/environ")
 
-		if env_bytes, env_err := _read_entire_pseudo_file(path_cstr, temp_allocator()); env_err == nil {
+		if env_bytes, env_err := _read_entire_pseudo_file(strings.to_cstring(&path_builder), temp_allocator()); env_err == nil {
 			env := string(env_bytes)
 
 			env_list := make([dynamic]string, allocator) or_return
@@ -265,6 +343,9 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 				env = env[terminator + 1:]
 			}
 			info.environment = env_list[:]
+			info.fields += {.Environment}
+		} else if err == nil {
+			err = env_err
 		}
 	}
 
@@ -304,14 +385,16 @@ _Sys_Process_Attributes :: struct {}
 _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 	has_executable_permissions :: proc(fd: linux.Fd) -> bool {
 		backing: [48]u8
-		_ = fmt.bprintf(backing[:], "/proc/self/fd/%d", fd)
-		return linux.access(cstring(&backing[0]), linux.X_OK) == .NONE
+		b := strings.builder_from_bytes(backing[:])
+		strings.write_string(&b, "/proc/self/fd/")
+		strings.write_int(&b, int(fd))
+		return linux.access(strings.to_cstring(&b), linux.X_OK) == .NONE
 	}
 
 	TEMP_ALLOCATOR_GUARD()
 
 	if len(desc.command) == 0 {
-		return process, .Invalid_File
+		return process, .Invalid_Command
 	}
 
 	dir_fd := linux.AT_FDCWD
@@ -333,9 +416,16 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 		path_env := get_env("PATH", temp_allocator())
 		path_dirs := filepath.split_list(path_env, temp_allocator())
 
+		exe_builder := strings.builder_make(temp_allocator())
+
 		found: bool
 		for dir in path_dirs {
-			exe_path := fmt.caprintf("%s/%s", dir, executable_name, allocator=temp_allocator())
+			strings.builder_reset(&exe_builder)
+			strings.write_string(&exe_builder, dir)
+			strings.write_byte(&exe_builder, '/')
+			strings.write_string(&exe_builder, executable_name)
+
+			exe_path := strings.to_cstring(&exe_builder)
 			if exe_fd, errno = linux.openat(dir_fd, exe_path, {.PATH, .CLOEXEC}); errno != .NONE {
 				continue
 			}
@@ -348,7 +438,11 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 		}
 		if !found {
 			// check in cwd to match windows behavior
-			exe_path := fmt.caprintf("./%s", executable_name, allocator=temp_allocator())
+			strings.builder_reset(&exe_builder)
+			strings.write_string(&exe_builder, "./")
+			strings.write_string(&exe_builder, executable_name)
+
+			exe_path := strings.to_cstring(&exe_builder)
 			if exe_fd, errno = linux.openat(dir_fd, exe_path, {.PATH, .CLOEXEC}); errno != .NONE {
 				return process, .Not_Exist
 			}
@@ -395,6 +489,9 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 	if errno = linux.pipe2(&child_pipe_fds, {.CLOEXEC}); errno != .NONE {
 		return process, _get_platform_error(errno)
 	}
+	defer linux.close(child_pipe_fds[WRITE])
+	defer linux.close(child_pipe_fds[READ])
+
 
 	// TODO: This is the traditional textbook implementation with fork.
 	//       A more efficient implementation with vfork:
@@ -484,9 +581,6 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 		unreachable()
 	}
 
-	linux.close(child_pipe_fds[WRITE])
-	defer linux.close(child_pipe_fds[READ])
-
 	process.pid = int(pid)
 
 	n: int
@@ -516,9 +610,13 @@ _process_state_update_times :: proc(state: ^Process_State) -> (err: Error) {
 	TEMP_ALLOCATOR_GUARD()
 
 	stat_path_buf: [32]u8
-	_ = fmt.bprintf(stat_path_buf[:], "/proc/%d/stat", state.pid)
+	path_builder := strings.builder_from_bytes(stat_path_buf[:])
+	strings.write_string(&path_builder, "/proc/")
+	strings.write_int(&path_builder, int(state.pid))
+	strings.write_string(&path_builder, "/stat")
+
 	stat_buf: []u8
-	stat_buf, err = _read_entire_pseudo_file(cstring(&stat_path_buf[0]), temp_allocator())
+	stat_buf, err = _read_entire_pseudo_file(strings.to_cstring(&path_builder), temp_allocator())
 	if err != nil {
 		return
 	}
@@ -603,6 +701,7 @@ _timed_wait_on_handle :: proc(process: Process, timeout: time.Duration) -> (proc
 	for {
 		if timeout <= 0 {
 			_process_state_update_times(&process_state)
+			err = .Timeout
 			return
 		}
 
@@ -614,9 +713,8 @@ _timed_wait_on_handle :: proc(process: Process, timeout: time.Duration) -> (proc
 		n, errno := linux.ppoll(pollfd[:], &ts, &sigchld_set)
 		if errno != .NONE {
 			if errno == .EINTR {
-				new_tick := time.tick_now()
-				timeout -= time.tick_diff(start_tick, new_tick)
-				start_tick = new_tick
+				timeout -= time.tick_since(start_tick)
+				start_tick = time.tick_now()
 				continue
 			}
 			return process_state, _get_platform_error(errno)
@@ -624,11 +722,11 @@ _timed_wait_on_handle :: proc(process: Process, timeout: time.Duration) -> (proc
 
 		if n == 0 {  // timeout with no events
 			_process_state_update_times(&process_state)
+			err = .Timeout
 			return
 		}
 
-		// This throws EBADF with pidfd
-		if errno = linux.waitid(.PID, linux.Id(process.pid), &info, {.WEXITED, .WNOHANG, .WNOWAIT}, nil); errno != .NONE {
+		if errno = linux.waitid(.PIDFD, linux.Id(process.handle), &info, {.WEXITED, .WNOHANG, .WNOWAIT}, nil); errno != .NONE {
 			return process_state, _get_platform_error(errno)
 		}
 
@@ -636,12 +734,34 @@ _timed_wait_on_handle :: proc(process: Process, timeout: time.Duration) -> (proc
 			break
 		}
 
-		new_tick := time.tick_now()
-		timeout -= time.tick_diff(start_tick, new_tick)
-		start_tick = new_tick
+		timeout -= time.tick_since(start_tick)
+		start_tick = time.tick_now()
 	}
 
-	return _reap_terminated(process)
+	// _reap_terminated for pidfd
+	{
+		_process_state_update_times(&process_state)
+
+		errno := linux.Errno.EINTR
+		for errno == .EINTR {
+			errno = linux.waitid(.PIDFD, linux.Id(process.handle), &info, {.WEXITED}, nil)
+		}
+		err = _get_platform_error(errno)
+
+		switch linux.Sig_Child_Code(info.code) {
+		case .NONE, .CONTINUED, .STOPPED:
+			unreachable()
+		case .EXITED:
+			process_state.exited = true
+			process_state.exit_code = int(info.status)
+			process_state.success = process_state.exit_code == 0
+		case .KILLED, .DUMPED, .TRAPPED:
+			process_state.exited = true
+			process_state.exit_code = int(info.status)
+			process_state.success = false
+		}
+	}
+	return
 }
 
 _timed_wait_on_pid :: proc(process: Process, timeout: time.Duration) -> (process_state: Process_State, err: Error) {
@@ -669,6 +789,7 @@ _timed_wait_on_pid :: proc(process: Process, timeout: time.Duration) -> (process
 	for errno != .NONE || info.code == 0 || info.pid != linux.Pid(process.pid) {
 		if timeout <= 0 {
 			_process_state_update_times(&process_state)
+			err = .Timeout
 			return
 		}
 
@@ -681,11 +802,11 @@ _timed_wait_on_pid :: proc(process: Process, timeout: time.Duration) -> (process
 		#partial switch errno {
 		case .EAGAIN:   // timeout
 			_process_state_update_times(&process_state)
+			err = .Timeout
 			return
 		case .EINTR:
-			new_tick := time.tick_now()
-			timeout -= time.tick_diff(start_tick, new_tick)
-			start_tick = new_tick
+			timeout -= time.tick_since(start_tick)
+			start_tick = time.tick_now()
 		case .EINVAL:
 			return process_state, _get_platform_error(errno)
 		}
@@ -722,7 +843,7 @@ _process_wait :: proc(process: Process, timeout: time.Duration) -> (Process_Stat
 	}
 	if errno == .EAGAIN || (errno == .NONE && info.signo != .SIGCHLD) {
 		_process_state_update_times(&process_state)
-		return process_state, nil
+		return process_state, .Timeout
 	}
 	if errno != .NONE {
 		return process_state, _get_platform_error(errno)
@@ -733,10 +854,10 @@ _process_wait :: proc(process: Process, timeout: time.Duration) -> (Process_Stat
 
 @(private="package")
 _process_close :: proc(process: Process) -> Error {
-	pidfd := linux.Fd(process.handle)
-	if pidfd < 0 {
+	if process.handle == 0 || process.handle == PIDFD_UNASSIGNED {
 		return nil
 	}
+	pidfd := linux.Fd(process.handle)
 	return _get_platform_error(linux.close(pidfd))
 }
 
