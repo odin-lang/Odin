@@ -22,17 +22,17 @@ VERSION_MAJOR :: u8(1)
 VERSION_MINOR :: u8(3)
 VERSION_PATCH :: u8(17)
 
-VERSION_CREATE :: #force_inline proc(major, minor, patch: u8) -> u32 {
+VERSION_CREATE :: #force_inline proc "contextless" (major, minor, patch: u8) -> u32 {
 	return (u32(major) << 16) | (u32(minor) << 8) | u32(patch)
 }
 
-VERSION_GET_MAJOR :: #force_inline proc(version: u32) -> u8 {
+VERSION_GET_MAJOR :: #force_inline proc "contextless" (version: u32) -> u8 {
 	return u8((version >> 16) & 0xff)
 }
-VERSION_GET_MINOR :: #force_inline proc(version: u32) -> u8 {
+VERSION_GET_MINOR :: #force_inline proc "contextless" (version: u32) -> u8 {
 	return u8((version >> 8) & 0xff)
 }
-VERSION_GET_PATCH :: #force_inline proc(version: u32) -> u8 {
+VERSION_GET_PATCH :: #force_inline proc "contextless" (version: u32) -> u8 {
 	return u8(version & 0xff)
 }
 
@@ -44,19 +44,19 @@ VERSION :: (u32(VERSION_MAJOR) << 16) | (u32(VERSION_MINOR) << 8) | u32(VERSION_
 // Network byte order is always Big Endian. Instead of using the method ENet
 // uses (leveraging {n,h}to{n,h}{s,l}), we can just use Odin's endianess types
 // to get the correct byte swaps, if any.
-HOST_TO_NET_16 :: #force_inline proc(value: u16) -> u16 {
+HOST_TO_NET_16 :: #force_inline proc "contextless" (value: u16) -> u16 {
 	return transmute(u16)u16be(value)
 }
 
-HOST_TO_NET_32 :: #force_inline proc(value: u32) -> u32 {
+HOST_TO_NET_32 :: #force_inline proc "contextless" (value: u32) -> u32 {
 	return transmute(u32)u32be(value)
 }
 
-NET_TO_HOST_16 :: #force_inline proc(value: u16) -> u16 {
+NET_TO_HOST_16 :: #force_inline proc "contextless" (value: u16) -> u16 {
 	return u16(transmute(u16be)value)
 }
 
-NET_TO_HOST_32 :: #force_inline proc(value: u32) -> u32 {
+NET_TO_HOST_32 :: #force_inline proc "contextless" (value: u32) -> u32 {
 	return u32(transmute(u32be)value)
 }
 
@@ -115,7 +115,7 @@ PacketFreeCallback :: proc "c" (packet: ^Packet)
 Packet :: struct {
 	referenceCount: uint,
 	flags:          u32,
-	data:           [^]u8,
+	data:           [^]u8 `fmt:"v,dataLength"`,
 	dataLength:     uint,
 	freeCallback:   PacketFreeCallback,
 	userData:       rawptr,
@@ -148,7 +148,7 @@ IncomingCommand :: struct {
 	command:                  Protocol,
 	fragmentCount:            u32,
 	fragmentsRemaining:       u32,
-	fragments:                [^]u32,
+	fragments:                [^]u32 `fmt:"v,fragmentCount"`,
 	packet:                   ^Packet,
 }
 
@@ -221,7 +221,7 @@ Peer :: struct {
 	address:                        Address,
 	data:                           rawptr,
 	state:                          PeerState,
-	channels:                       [^]Channel,
+	channels:                       [^]Channel `fmt:"v,channelCount"`,
 	channelCount:                   uint,
 	incomingBandwidth:              u32,
 	outgoingBandwidth:              u32,
@@ -292,7 +292,7 @@ Host :: struct {
 	mtu:                        u32,
 	randomSeed:                 u32,
 	recalculateBandwidthLimits: i32,
-	peers:                      [^]Peer,
+	peers:                      [^]Peer `fmt:"v,peerCount"`,
 	peerCount:                  uint,
 	channelLimit:               uint,
 	serviceTime:                u32,
@@ -308,7 +308,7 @@ Host :: struct {
 	compressor:                 Compressor,
 	packetData:                 [2][PROTOCOL_MAXIMUM_MTU]u8,
 	receivedAddress:            Address,
-	receivedData:               [^]u8,
+	receivedData:               [^]u8 `fmt:"v,receivedDataLength"`,
 	receivedDataLength:         uint,
 	totalSentData:              u32,
 	totalSentPackets:           u32,

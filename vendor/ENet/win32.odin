@@ -20,7 +20,7 @@ foreign WinSock2 {
 	fd_array: [FD_SETSIZE]SOCKET,
 }
 
-@(private="file") FD_CLR :: proc(fd: SOCKET, s: ^fd_set) {
+@(private="file") FD_CLR :: proc "contextless" (fd: SOCKET, s: ^fd_set) {
 	for i := u32(0); i < s.fd_count; i += 1 {
 		if s.fd_array[i] == fd {
 			for i < s.fd_count - 1 {
@@ -33,7 +33,7 @@ foreign WinSock2 {
 	}
 }
 
-@(private="file") FD_SET :: proc(fd: SOCKET, s: ^fd_set) {
+@(private="file") FD_SET :: proc "contextless" (fd: SOCKET, s: ^fd_set) {
 	for i := u32(0); i < s.fd_count; i += 1 {
 		if s.fd_array[i] == fd {
 			return
@@ -46,11 +46,11 @@ foreign WinSock2 {
 	s.fd_count += 1
 }
 
-@(private="file") FD_ZERO :: #force_inline proc (s: ^fd_set) {
+@(private="file") FD_ZERO :: #force_inline proc "contextless" (s: ^fd_set) {
 	s.fd_count = 0
 }
 
-@(private="file") FD_ISSET :: #force_inline proc (fd: SOCKET, s: ^fd_set) -> bool {
+@(private="file") FD_ISSET :: #force_inline proc "contextless" (fd: SOCKET, s: ^fd_set) -> bool {
 	return __WSAFDIsSet(fd, s) != 0
 }
 // }
@@ -66,18 +66,18 @@ Buffer :: struct {
 
 SocketSet :: distinct fd_set
 
-SOCKETSET_EMPTY :: #force_inline proc(sockset: ^SocketSet) {
+SOCKETSET_EMPTY :: #force_inline proc "contextless" (sockset: ^SocketSet) {
 	FD_ZERO(cast(^fd_set)sockset)
 }
 
-SOCKETSET_ADD :: #force_inline proc(sockset: ^SocketSet, socket: Socket) {
+SOCKETSET_ADD :: #force_inline proc "contextless" (sockset: ^SocketSet, socket: Socket) {
 	FD_SET(SOCKET(socket), cast(^fd_set)sockset)
 }
 
-SOCKETSET_REMOVE :: #force_inline proc(sockset: ^SocketSet, socket: Socket) {
+SOCKETSET_REMOVE :: #force_inline proc "contextless" (sockset: ^SocketSet, socket: Socket) {
 	FD_CLR(SOCKET(socket), cast(^fd_set)sockset)
 }
 
-SOCKSET_CHECK :: #force_inline proc(sockset: ^SocketSet, socket: Socket) -> bool {
+SOCKSET_CHECK :: #force_inline proc "contextless" (sockset: ^SocketSet, socket: Socket) -> bool {
 	return FD_ISSET(SOCKET(socket), cast(^fd_set)sockset)
 }
