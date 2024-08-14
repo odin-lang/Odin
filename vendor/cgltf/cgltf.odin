@@ -168,7 +168,7 @@ buffer :: struct {
 	data_free_method: data_free_method,
 	extras:           extras_t,
 	extensions_count: uint,
-	extensions:       [^]extension,
+	extensions:       [^]extension `fmt:"v,extensions_count"`,
 }
 
 meshopt_compression_mode :: enum c.int {
@@ -207,7 +207,7 @@ buffer_view :: struct {
 	meshopt_compression:     meshopt_compression,
 	extras:                  extras_t,
 	extensions_count:        uint,
-	extensions:              [^]extension,
+	extensions:              [^]extension `fmt:"v,extensions_count"`,
 }
 
 accessor_sparse :: struct {
@@ -221,11 +221,11 @@ accessor_sparse :: struct {
 	indices_extras:           extras_t,
 	values_extras:            extras_t,
 	extensions_count:         uint,
-	extensions:               [^]extension,
+	extensions:               [^]extension `fmt:"v,extensions_count"`,
 	indices_extensions_count: uint,
-	indices_extensions:       [^]extension,
+	indices_extensions:       [^]extension `fmt:"v,indices_extensions_count"`,
 	values_extensions_count:  uint,
-	values_extensions:        [^]extension,
+	values_extensions:        [^]extension `fmt:"v,values_extensions_count"`,
 }
 
 accessor :: struct {
@@ -245,7 +245,7 @@ accessor :: struct {
 	sparse:           accessor_sparse,
 	extras:           extras_t,
 	extensions_count: uint,
-	extensions:       [^]extension,
+	extensions:       [^]extension `fmt:"v,extensions_count"`,
 }
 
 attribute :: struct {
@@ -262,7 +262,7 @@ image :: struct {
 	mime_type:        cstring,
 	extras:           extras_t,
 	extensions_count: uint,
-	extensions:       [^]extension,
+	extensions:       [^]extension `fmt:"v,extensions_count"`,
 }
 
 sampler :: struct {
@@ -273,7 +273,7 @@ sampler :: struct {
 	wrap_t:           c.int,
 	extras:           extras_t,
 	extensions_count: uint,
-	extensions:       [^]extension,
+	extensions:       [^]extension `fmt:"v,extensions_count"`,
 }
 
 texture :: struct {
@@ -284,7 +284,7 @@ texture :: struct {
 	basisu_image:     ^image,
 	extras:           extras_t,
 	extensions_count: uint,
-	extensions:       [^]extension,
+	extensions:       [^]extension `fmt:"v,extensions_count"`,
 }
 
 texture_transform :: struct {
@@ -303,7 +303,7 @@ texture_view :: struct {
 	transform:        texture_transform,
 	extras:           extras_t,
 	extensions_count: uint,
-	extensions:       [^]extension,
+	extensions:       [^]extension `fmt:"v,extensions_count"`,
 }
 
 pbr_metallic_roughness :: struct {
@@ -408,7 +408,7 @@ material :: struct {
 	unlit:                       b32,
 	extras:                      extras_t,
 	extensions_count:            uint,
-	extensions:                  [^]extension,
+	extensions:                  [^]extension `fmt:"v,extensions_count"`,
 }
 
 material_mapping :: struct {
@@ -442,7 +442,7 @@ primitive :: struct {
 	draco_mesh_compression:     draco_mesh_compression,
 	mappings:                   []material_mapping,
 	extensions_count:           uint,
-	extensions:                 [^]extension,
+	extensions:                 [^]extension `fmt:"v,extensions_count"`,
 }
 
 mesh :: struct {
@@ -452,7 +452,7 @@ mesh :: struct {
 	target_names:       []cstring,
 	extras:             extras_t,
 	extensions_count:   uint,
-	extensions:         [^]extension,
+	extensions:         [^]extension `fmt:"v,extensions_count"`,
 }
 
 skin :: struct {
@@ -462,7 +462,7 @@ skin :: struct {
 	inverse_bind_matrices: ^accessor,
 	extras:                extras_t,
 	extensions_count:      uint,
-	extensions:            [^]extension,
+	extensions:            [^]extension `fmt:"v,extensions_count"`,
 }
 
 camera_perspective :: struct {
@@ -492,7 +492,7 @@ camera :: struct {
 	},
 	extras:           extras_t,
 	extensions_count: uint,
-	extensions:       [^]extension,
+	extensions:       [^]extension `fmt:"v,extensions_count"`,
 }
 
 light :: struct {
@@ -527,7 +527,7 @@ node :: struct {
 	has_mesh_gpu_instancing: b32,
 	mesh_gpu_instancing:     mesh_gpu_instancing,
 	extensions_count:        uint,
-	extensions:              [^]extension,
+	extensions:              [^]extension `fmt:"v,extensions_count"`,
 }
 
 scene :: struct {
@@ -535,7 +535,7 @@ scene :: struct {
 	nodes:            []^node,
 	extras:           extras_t,
 	extensions_count: uint,
-	extensions:       [^]extension,
+	extensions:       [^]extension `fmt:"v,extensions_count"`,
 }
 
 animation_sampler :: struct {
@@ -544,7 +544,7 @@ animation_sampler :: struct {
 	interpolation:    interpolation_type,
 	extras:           extras_t,
 	extensions_count: uint,
-	extensions:       [^]extension,
+	extensions:       [^]extension `fmt:"v,extensions_count"`,
 }
 
 animation_channel :: struct {
@@ -553,7 +553,7 @@ animation_channel :: struct {
 	target_path:      animation_path_type,
 	extras:           extras_t,
 	extensions_count: uint,
-	extensions:       [^]extension,
+	extensions:       [^]extension `fmt:"v,extensions_count"`,
 }
 
 animation :: struct {
@@ -562,7 +562,7 @@ animation :: struct {
 	channels:         []animation_channel,
 	extras:           extras_t,
 	extensions_count: uint,
-	extensions:       [^]extension,
+	extensions:       [^]extension `fmt:"v,extensions_count"`,
 }
 
 material_variant :: struct {
@@ -577,7 +577,7 @@ asset :: struct {
 	min_version:      cstring,
 	extras:           extras_t,
 	extensions_count: uint,
-	extensions:       [^]extension,
+	extensions:       [^]extension `fmt:"v,extensions_count"`,
 }
 
 data :: struct {
@@ -609,7 +609,7 @@ data :: struct {
 	extras: extras_t,
 
 	data_extensions_count: uint,
-	data_extensions:       [^]extension,
+	data_extensions:       [^]extension `fmt:"v,extensions_count"`,
 
 	extensions_used:     []cstring,
 	extensions_required: []cstring,
