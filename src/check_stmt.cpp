@@ -474,8 +474,15 @@ gb_internal Type *check_assignment_variable(CheckerContext *ctx, Operand *lhs, O
 			rhs->proc_group = nullptr;
 		}
 	} else {
+		Ast *ident_node = nullptr;
+
 		if (node->kind == Ast_Ident) {
-			ast_node(i, Ident, node);
+			ident_node = node;
+		} else if (node->kind == Ast_IndexExpr && node->IndexExpr.expr->kind == Ast_Ident) {
+			ident_node = node->IndexExpr.expr;
+		}
+		if (ident_node != nullptr) {
+			ast_node(i, Ident, ident_node);
 			e = scope_lookup(ctx->scope, i->token.string);
 			if (e != nullptr && e->kind == Entity_Variable) {
 				used = (e->flags & EntityFlag_Used) != 0; // NOTE(bill): Make backup just in case
