@@ -829,7 +829,6 @@ gb_internal OdinDocEntityIndex odin_doc_add_entity(OdinDocWriter *w, Entity *e) 
 	OdinDocEntityIndex doc_entity_index = odin_doc_write_item(w, &w->entities, &doc_entity, &dst);
 	map_set(&w->entity_cache, e, doc_entity_index);
 
-
 	Ast *type_expr = nullptr;
 	Ast *init_expr = nullptr;
 	Ast *decl_node = nullptr;
@@ -997,7 +996,8 @@ gb_internal void odin_doc_update_entities(OdinDocWriter *w) {
 		}
 	}
 
-	for (auto const &entry : w->entity_cache) {
+	for (u32 i = 0; i < w->entity_cache.count; i++) {
+		auto entry = w->entity_cache.entries[i];
 		Entity *e = entry.key;
 		OdinDocEntityIndex entity_index = entry.value;
 		OdinDocTypeIndex type_index = odin_doc_type(w, e->type);
@@ -1007,6 +1007,9 @@ gb_internal void odin_doc_update_entities(OdinDocWriter *w) {
 
 		switch (e->kind) {
 		case Entity_Variable:
+			if (w->state == OdinDocWriterState_Writing) {
+				GB_ASSERT(type_index != 0);
+			}
 			foreign_library = odin_doc_add_entity(w, e->Variable.foreign_library);
 			break;
 		case Entity_Procedure:
@@ -1026,8 +1029,17 @@ gb_internal void odin_doc_update_entities(OdinDocWriter *w) {
 			break;
 		}
 
+		if (w->state == OdinDocWriterState_Preparing) {
+			GB_ASSERT(entity_index == 0);
+		} else {
+			GB_ASSERT(entity_index != 0);
+		}
+
 		OdinDocEntity *dst = odin_doc_get_item(w, &w->entities, entity_index);
 		if (dst) {
+			if (dst->kind == OdinDocEntity_Variable) {
+				GB_ASSERT(type_index != 0);
+			}
 			dst->type = type_index;
 			dst->foreign_library = foreign_library;
 			dst->grouped_entities = grouped_entities;
