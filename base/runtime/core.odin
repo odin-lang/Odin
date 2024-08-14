@@ -750,6 +750,10 @@ __init_context :: proc "contextless" (c: ^Context) {
 }
 
 default_assertion_failure_proc :: proc(prefix, message: string, loc: Source_Code_Location) -> ! {
+	default_assertion_contextless_failure_proc(prefix, message, loc)
+}
+
+default_assertion_contextless_failure_proc :: proc "contextless" (prefix, message: string, loc: Source_Code_Location) -> ! {
 	when ODIN_OS == .Freestanding {
 		// Do nothing
 	} else {

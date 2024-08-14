@@ -948,3 +948,30 @@ unimplemented :: proc(message := "", loc := #caller_location) -> ! {
 	}
 	p("not yet implemented", message, loc)
 }
+
+
+@builtin
+@(disabled=ODIN_DISABLE_ASSERT)
+assert_contextless :: proc "contextless" (condition: bool, message := "", loc := #caller_location) {
+	if !condition {
+		// NOTE(bill): This is wrapped in a procedure call
+		// to improve performance to make the CPU not
+		// execute speculatively, making it about an order of
+		// magnitude faster
+		@(cold)
+		internal :: proc "contextless" (message: string, loc: Source_Code_Location) {
+			default_assertion_contextless_failure_proc("runtime assertion", message, loc)
+		}
+		internal(message, loc)
+	}
+}
+
+@builtin
+panic_contextless :: proc "contextless" (message: string, loc := #caller_location) -> ! {
+	default_assertion_contextless_failure_proc("panic", message, loc)
+}
+
+@builtin
+unimplemented_contextless :: proc "contextless" (message := "", loc := #caller_location) -> ! {
+	default_assertion_contextless_failure_proc("not yet implemented", message, loc)
+}
