@@ -9,6 +9,8 @@ when ODIN_OS == .Windows {
 	@(private) LIB_PATH :: "lib/box2d_windows_amd64_" + VECTOR_EXT + ".lib"
 } else when ODIN_OS == .Darwin {
 	@(private) LIB_PATH :: ("lib/box2d_darwin_amd64_" + VECTOR_EXT + ".a") when ODIN_ARCH == .amd64 else "lib/box2d_darwin_arm64.a"
+} else when ODIN_ARCH == .amd64 {
+	@(private) LIB_PATH :: "lib/box2d_other_" + VECTOR_EXT + ".a"
 } else {
 	@(private) LIB_PATH :: "lib/box2d_other.a"
 }
