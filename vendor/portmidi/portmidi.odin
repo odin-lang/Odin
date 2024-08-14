@@ -80,9 +80,10 @@ foreign lib {
 	HasHostError :: proc(stream: Stream) -> b32 ---	
 }
 
-/**  Translate portmidi error number into human readable message.
-    These strings are constants (set at compile time) so client has 
-    no need to allocate storage
+/**
+	Translate portmidi error number into human readable message.
+	These strings are constants (set at compile time) so client has
+	no need to allocate storage
 */
 GetErrorText :: proc (errnum: Error) -> string {
 	@(default_calling_convention="c")
@@ -92,9 +93,10 @@ GetErrorText :: proc (errnum: Error) -> string {
 	return string(Pm_GetErrorText(errnum))
 }
 
-/**  Translate portmidi host error into human readable message.
-    These strings are computed at run time, so client has to allocate storage.
-    After this routine executes, the host error is cleared. 
+/**
+	Translate portmidi host error into human readable message.
+	These strings are computed at run time, so client has to allocate storage.
+	After this routine executes, the host error is cleared.
 */
 GetHostErrorText :: proc (buf: []byte) -> string {
 	@(default_calling_convention="c")
@@ -133,8 +135,8 @@ foreign lib {
 
 
 /**
-    Timestamp is used to represent a millisecond clock with arbitrary
-    start time. The type is used for all MIDI timestampes and clocks.
+	Timestamp is used to represent a millisecond clock with arbitrary
+	start time. The type is used for all MIDI timestampes and clocks.
 */
 Timestamp :: distinct i32
 TimeProc :: proc "c" (time_info: rawptr) -> Timestamp
@@ -258,47 +260,47 @@ foreign lib {
  	
 /* Filter bit-mask definitions */
 /** filter active sensing messages (0xFE): */
-FILT_ACTIVE :: 1 << 0x0E
+FILT_ACTIVE             :: 1 << 0x0E
 /** filter system exclusive messages (0xF0): */
-FILT_SYSEX :: 1 << 0x00
+FILT_SYSEX              :: 1 << 0x00
 /** filter MIDI clock message (0xF8) */
-FILT_CLOCK :: 1 << 0x08
+FILT_CLOCK              :: 1 << 0x08
 /** filter play messages (start 0xFA, stop 0xFC, continue 0xFB) */
-FILT_PLAY :: (1 << 0x0A) | (1 << 0x0C) | (1 << 0x0B)
+FILT_PLAY               :: (1 << 0x0A) | (1 << 0x0C) | (1 << 0x0B)
 /** filter tick messages (0xF9) */
-FILT_TICK :: 1 << 0x09
+FILT_TICK               :: 1 << 0x09
 /** filter undefined FD messages */
-FILT_FD :: 1 << 0x0D
+FILT_FD                 :: 1 << 0x0D
 /** filter undefined real-time messages */
-FILT_UNDEFINED :: FILT_FD
+FILT_UNDEFINED          :: FILT_FD
 /** filter reset messages (0xFF) */
-FILT_RESET :: 1 << 0x0F
+FILT_RESET              :: 1 << 0x0F
 /** filter all real-time messages */
-FILT_REALTIME :: FILT_ACTIVE | FILT_SYSEX | FILT_CLOCK | FILT_PLAY | FILT_UNDEFINED | FILT_RESET | FILT_TICK
+FILT_REALTIME           :: FILT_ACTIVE | FILT_SYSEX | FILT_CLOCK | FILT_PLAY | FILT_UNDEFINED | FILT_RESET | FILT_TICK
 /** filter note-on and note-off (0x90-0x9F and 0x80-0x8F */
-FILT_NOTE :: (1 << 0x19) | (1 << 0x18)
+FILT_NOTE               :: (1 << 0x19) | (1 << 0x18)
 /** filter channel aftertouch (most midi controllers use this) (0xD0-0xDF)*/
 FILT_CHANNEL_AFTERTOUCH :: 1 << 0x1D
 /** per-note aftertouch (0xA0-0xAF) */
-FILT_POLY_AFTERTOUCH :: 1 << 0x1A
+FILT_POLY_AFTERTOUCH    :: 1 << 0x1A
 /** filter both channel and poly aftertouch */
-FILT_AFTERTOUCH :: FILT_CHANNEL_AFTERTOUCH | FILT_POLY_AFTERTOUCH
+FILT_AFTERTOUCH         :: FILT_CHANNEL_AFTERTOUCH | FILT_POLY_AFTERTOUCH
 /** Program changes (0xC0-0xCF) */
-FILT_PROGRAM :: 1 << 0x1C
+FILT_PROGRAM            :: 1 << 0x1C
 /** Control Changes (CC's) (0xB0-0xBF)*/
-FILT_CONTROL :: 1 << 0x1B
+FILT_CONTROL            :: 1 << 0x1B
 /** Pitch Bender (0xE0-0xEF*/
-FILT_PITCHBEND :: 1 << 0x1E
+FILT_PITCHBEND          :: 1 << 0x1E
 /** MIDI Time Code (0xF1)*/
-FILT_MTC :: 1 << 0x01
+FILT_MTC                :: 1 << 0x01
 /** Song Position (0xF2) */
-FILT_SONG_POSITION :: 1 << 0x02
+FILT_SONG_POSITION      :: 1 << 0x02
 /** Song Select (0xF3)*/
-FILT_SONG_SELECT :: 1 << 0x03
+FILT_SONG_SELECT        :: 1 << 0x03
 /** Tuning request (0xF6)*/
-FILT_TUNE :: 1 << 0x06
+FILT_TUNE               :: 1 << 0x06
 /** All System Common messages (mtc, song position, song select, tune request) */
-FILT_SYSTEMCOMMON :: FILT_MTC | FILT_SONG_POSITION | FILT_SONG_SELECT | FILT_TUNE
+FILT_SYSTEMCOMMON       :: FILT_MTC | FILT_SONG_POSITION | FILT_SONG_SELECT | FILT_TUNE
 
 Channel :: #force_inline proc "c" (channel: c.int) -> c.int {
 	return 1<<c.uint(channel)
@@ -367,11 +369,11 @@ foreign lib {
 }
 
 /**
-    MessageMake() encodes a short Midi message into a 32-bit word. If data1
-    and/or data2 are not present, use zero.
+	MessageMake() encodes a short Midi message into a 32-bit word. If data1
+	and/or data2 are not present, use zero.
 
-    MessageStatus(), MessageData1(), and 
-    MessageData2() extract fields from a 32-bit midi message.
+	MessageStatus(), MessageData1(), and
+	MessageData2() extract fields from a 32-bit midi message.
 */
 MessageMake :: #force_inline proc "c" (status: c.int, data1, data2: c.int) -> Message {
 	return Message(((data2 << 16) & 0xFF0000) | ((data1 << 8) & 0xFF00) | (status & 0xFF))
