@@ -40,7 +40,10 @@ String get_default_microarchitecture() {
 				default_march = str_lit("x86-64-v2");
 			}
 		}
+	} else if (build_context.metrics.arch == TargetArch_riscv64) {
+		default_march = str_lit("generic-rv64");
 	}
+
 	return default_march;
 }
 
@@ -65,13 +68,33 @@ gb_internal String get_default_features() {
 	}
 
 	String microarch = get_final_microarchitecture();
+
+	// NOTE(laytan): for riscv64 to work properly with Odin, we need to enforce some features.
+	// and we also overwrite the generic target to include more features so we don't default to
+	// a potato feature set.
+	if (bc->metrics.arch == TargetArch_riscv64) {
+		if (microarch == str_lit("generic-rv64")) {
+			// This is what clang does by default (on -march=rv64gc for General Computing), seems good to also default to.
+			String features = str_lit("64bit,a,c,d,f,m,relax,zicsr,zifencei");
+
+			// Update the features string so LLVM uses it later.
+			if (bc->target_features_string.len > 0) {
+				bc->target_features_string = concatenate3_strings(permanent_allocator(), features, str_lit(","), bc->target_features_string);
+			} else {
+				bc->target_features_string = features;
+			}
+
+			return features;
+		}
+	}
+
 	for (int i = off; i < off+target_microarch_counts[bc->metrics.arch]; i += 1) {
 		if (microarch_features_list[i].microarch == microarch) {
 			return microarch_features_list[i].features;
 		}
 	}
 
-	GB_PANIC("unknown microarch");
+	GB_PANIC("unknown microarch: %.*s", LIT(microarch));
 	return {};
 }
 
@@ -3030,6 +3053,12 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 			// Always use PIC for OpenBSD and Haiku: they default to PIE
 			reloc_mode = LLVMRelocPIC;
 		}
+
+		if (build_context.metrics.arch == TargetArch_riscv64) {
+			// NOTE(laytan): didn't seem to work without this.
+			reloc_mode = LLVMRelocPIC;
+		}
+
 		break;
 	case RelocMode_Static:
 		reloc_mode = LLVMRelocStatic;

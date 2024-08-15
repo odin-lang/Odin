@@ -5,7 +5,7 @@ for features regarding microarchitecture and target features of the compiler.
 
 It is not pretty! But LLVM has no way to query this information with their C API.
 
-It generates these globals (intended for `src/build_settings.cpp`:
+It generates these globals (intended for `src/build_settings_microarch.cpp`:
 
 - `target_microarch_list`: an array of strings indexed by the architecture, each string is a comma-seperated list of microarchitectures available on that architecture
 - `target_features_list`: an array of strings indexed by the architecture, each string is a comma-seperated list of target features available on that architecture
@@ -23,6 +23,6 @@ does not impact much at all, the only thing it will do is make LLVM print a mess
 ## Usage
 
 1. Make sure the table of architectures at the top of the python script is up-to-date (the triple can be any valid triple for the architecture)
-1. `./build.sh`
+1. `./build_featuregen.sh`
 1. `python3 featuregen.py`
 1. Copy the output into `src/build_settings.cpp`

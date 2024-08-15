@@ -284,6 +284,25 @@ when ODIN_ARCH == .arm64 {
 		_reserved:     [2]i32,
 	}
 	#assert(size_of(OS_Stat) == 128)
+} else when ODIN_ARCH == .riscv64 {
+	OS_Stat :: struct {
+		device_id:     u64,
+		serial:        u64,
+		mode:          u32,
+		nlink:         u32,
+		uid:           u32,
+		gid:           u32,
+		rdev:          u64,
+		_:             u64,
+		size:          i64,
+		block_size:    i32,
+		_:             i32,
+		blocks:        i64,
+		last_access:   Unix_File_Time,
+		modified:      Unix_File_Time,
+		status_change: Unix_File_Time,
+		_:             [3]uint,
+	}
 } else {
 	OS_Stat :: struct {
 		device_id:     u64, // ID of device containing file

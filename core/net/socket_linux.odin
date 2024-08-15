@@ -33,8 +33,8 @@ Socket_Option :: enum c.int {
 	Linger                    = c.int(linux.Socket_Option.LINGER),
 	Receive_Buffer_Size       = c.int(linux.Socket_Option.RCVBUF),
 	Send_Buffer_Size          = c.int(linux.Socket_Option.SNDBUF),
-	Receive_Timeout           = c.int(linux.Socket_Option.RCVTIMEO_NEW),
-	Send_Timeout              = c.int(linux.Socket_Option.SNDTIMEO_NEW),
+	Receive_Timeout           = c.int(linux.Socket_Option.RCVTIMEO),
+	Send_Timeout              = c.int(linux.Socket_Option.SNDTIMEO),
 }
 
 // Wrappers and unwrappers for system-native types

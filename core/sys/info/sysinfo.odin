@@ -1,6 +1,6 @@
 package sysinfo
 
-when !(ODIN_ARCH == .amd64 || ODIN_ARCH == .i386 || ODIN_ARCH == .arm32 || ODIN_ARCH == .arm64) {
+when !(ODIN_ARCH == .amd64 || ODIN_ARCH == .i386 || ODIN_ARCH == .arm32 || ODIN_ARCH == .arm64 || ODIN_ARCH == .riscv64) {
 	#assert(false, "This package is unsupported on this architecture.")
 }
 

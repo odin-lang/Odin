@@ -155,6 +155,11 @@ gb_internal bool does_require_msgSend_stret(Type *return_type) {
 		return false;
 	}
 
+	// No objc here so this doesn't matter, right?
+	if (build_context.metrics.arch == TargetArch_riscv64) {
+		return false;
+	}
+
 	// if (build_context.metrics.arch == TargetArch_arm32) {
 	// 	i64 struct_limit = type_size_of(t_uintptr);
 	// 	// NOTE(bill): This is technically wrong

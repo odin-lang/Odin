@@ -136,6 +136,25 @@ when ODIN_ARCH == .amd64 {
 		atime:      Time_Spec,
 		mtime:      Time_Spec,
 		ctime:      Time_Spec,
+		_:          [2]u32,
+	}
+} else when ODIN_ARCH == .riscv64 {
+	_Arch_Stat :: struct {
+		dev:        Dev,
+		ino:        Inode,
+		mode:       Mode,
+		nlink:      u32,
+		uid:        Uid,
+		gid:        Gid,
+		rdev:       Dev,
+		_:          u64,
+		size:       int,
+		blksize:    i32,
+		_:          i32,
+		blocks:     int,
+		atime:      Time_Spec,
+		mtime:      Time_Spec,
+		ctime:      Time_Spec,
 		_:          [3]uint,
 	}
 } else {
@@ -927,7 +946,7 @@ when ODIN_ARCH == .i386 {
 		nsems:      uint,
 		_:          [2]uint,
 	}
-} else when ODIN_ARCH == .arm64 {
+} else when ODIN_ARCH == .arm64 || ODIN_ARCH == .riscv64 {
 	_Arch_Semid_DS :: struct {
 		perm:       IPC_Perm,
 		otime:      int,
@@ -1167,6 +1186,33 @@ when ODIN_ARCH == .arm32 {
 		xmm_space:        [32]uint,
 		padding:          [56]uint,
 	}
+} else when ODIN_ARCH == .riscv64 {
+	_Arch_User_Regs :: struct {
+		pc, ra, sp, gp, tp,
+		t0, t1, t2,
+		s0, s1,
+		a0, a1, a2, a3, a4, a5, a6, a7,
+		s2, s3, s4, s5, s6, s7, s8, s9, s10, s11,
+		t3, t4, t5, t6: uint,
+	}
+	_Arch_User_FP_Regs :: struct #raw_union {
+		f_ext: struct {
+			f:    [32]u32,
+			fcsr: u32,
+		},
+		d_ext: struct {
+			f:    [32]u64,
+			fcsr: u32,
+		},
+		q_ext: struct {
+			using _: struct #align(16) {
+				f:    [64]u64,
+			},
+			fcsr:     u32,
+			reserved: [3]u32,
+		},
+	}
+	_Arch_User_FPX_Regs :: struct {}
 }
 
 /*

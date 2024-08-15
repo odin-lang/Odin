@@ -34,6 +34,9 @@ when ODIN_BUILD_MODE == .Dynamic {
 		} else when ODIN_OS == .Darwin && ODIN_ARCH == .arm64 {
 			@require foreign import entry "entry_unix_no_crt_darwin_arm64.asm"
 			SYS_exit :: 1
+		} else when ODIN_ARCH == .riscv64 {
+			@require foreign import entry "entry_unix_no_crt_riscv64.asm"
+			SYS_exit :: 93
 		}
 		@(link_name="_start_odin", linkage="strong", require)
 		_start_odin :: proc "c" (argc: i32, argv: [^]cstring) -> ! {
