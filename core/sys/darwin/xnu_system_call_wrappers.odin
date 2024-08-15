@@ -425,3 +425,11 @@ syscall_fchdir :: #force_inline proc "contextless" (fd: c.int, path: cstring) ->
 syscall_getrusage :: #force_inline proc "contextless" (who: c.int, rusage: ^RUsage) -> c.int {
 	return cast(c.int) intrinsics.syscall(unix_offset_syscall(.getrusage), uintptr(who), uintptr(rusage))
 }
+
+syscall_shm_open :: #force_inline proc "contextless" (name: cstring, oflag: u32, mode: u32) -> c.int {
+	return cast(c.int)intrinsics.syscall(unix_offset_syscall(.shm_open), transmute(uintptr)name, uintptr(oflag), uintptr(mode))
+}
+
+syscall_shm_unlink :: #force_inline proc "contextless" (name: cstring) -> c.int {
+	return cast(c.int)intrinsics.syscall(unix_offset_syscall(.shm_unlink), transmute(uintptr)name)
+}
