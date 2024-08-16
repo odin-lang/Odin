@@ -392,7 +392,7 @@ _benchmark_aes256_gcm :: proc(
 	iv: [aes.GCM_IV_SIZE]byte
 	tag: [aes.GCM_TAG_SIZE]byte = ---
 
-	ctx := transmute(^aes.Context_GCM)context.user_ptr
+	ctx := (^aes.Context_GCM)(context.user_ptr)
 
 	for _ in 0 ..= options.rounds {
 		aes.seal_gcm(ctx, buf, tag[:], iv[:], nil, buf)
