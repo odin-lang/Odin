@@ -627,18 +627,7 @@ Window_alloc :: proc "c" () -> ^Window {
 
 @(objc_type=Window, objc_name="initWithContentRect")
 Window_initWithContentRect :: proc (self: ^Window, contentRect: Rect, styleMask: WindowStyleMask, backing: BackingStoreType, doDefer: BOOL) -> ^Window {
-	self := self
-	// HACK: due to a compiler bug, the generated calling code does not
-	// currently work for this message. Has to do with passing a struct along
-	// with other parameters, so we don't send the rect here.
-	// Omiting the rect argument here actually works, because of how the C
-	// calling conventions are defined.
-	self = msgSend(^Window, self, "initWithContentRect:styleMask:backing:defer:", styleMask, backing, doDefer)
-
-	// apply the contentRect now, since we did not pass it to the init call
-	msgSend(nil, self, "setContentSize:", contentRect.size)
-	msgSend(nil, self, "setFrameOrigin:", contentRect.origin)
-	return self
+	return msgSend(^Window, self, "initWithContentRect:styleMask:backing:defer:", contentRect, styleMask, backing, doDefer)
 }
 @(objc_type=Window, objc_name="contentView")
 Window_contentView :: proc "c" (self: ^Window) -> ^View {
@@ -715,4 +704,48 @@ Window_backingScaleFactor :: proc "c" (self: ^Window) -> Float {
 @(objc_type=Window, objc_name="setWantsLayer")
 Window_setWantsLayer :: proc "c" (self: ^Window, ok: BOOL) {
 	msgSend(nil, self, "setWantsLayer:", ok)
+}
+@(objc_type=Window, objc_name="setIsMiniaturized")
+Window_setIsMiniaturized :: proc "c" (self: ^Window, ok: BOOL) {
+	msgSend(nil, self, "setIsMiniaturized:", ok)
+}
+@(objc_type=Window, objc_name="setIsVisible")
+Window_setIsVisible :: proc "c" (self: ^Window, ok: BOOL) {
+	msgSend(nil, self, "setIsVisible:", ok)
+}
+@(objc_type=Window, objc_name="setIsZoomed")
+Window_setIsZoomed :: proc "c" (self: ^Window, ok: BOOL) {
+	msgSend(nil, self, "setIsZoomed:", ok)
+}
+@(objc_type=Window, objc_name="isZoomable")
+Window_isZoomable :: proc "c" (self: ^Window) -> BOOL {
+	return msgSend(BOOL, self, "isZoomable")
+}
+@(objc_type=Window, objc_name="isResizable")
+Window_isResizable :: proc "c" (self: ^Window) -> BOOL {
+	return msgSend(BOOL, self, "isResizable")
+}
+@(objc_type=Window, objc_name="isModalPanel")
+Window_isModalPanel :: proc "c" (self: ^Window) -> BOOL {
+	return msgSend(BOOL, self, "isModalPanel")
+}
+@(objc_type=Window, objc_name="isMiniaturizable")
+Window_isMiniaturizable :: proc "c" (self: ^Window) -> BOOL {
+	return msgSend(BOOL, self, "isMiniaturizable")
+}
+@(objc_type=Window, objc_name="isFloatingPanel")
+Window_isFloatingPanel :: proc "c" (self: ^Window) -> BOOL {
+	return msgSend(BOOL, self, "isFloatingPanel")
+}
+@(objc_type=Window, objc_name="hasCloseBox")
+Window_hasCloseBox :: proc "c" (self: ^Window) -> BOOL {
+	return msgSend(BOOL, self, "hasCloseBox")
+}
+@(objc_type=Window, objc_name="hasTitleBar")
+Window_hasTitleBar :: proc "c" (self: ^Window) -> BOOL {
+	return msgSend(BOOL, self, "hasTitleBar")
+}
+@(objc_type=Window, objc_name="orderedIndex")
+Window_orderedIndex :: proc "c" (self: ^Window) -> Integer {
+	return msgSend(Integer, self, "orderedIndex")
 }

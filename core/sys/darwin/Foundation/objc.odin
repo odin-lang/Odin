@@ -10,17 +10,23 @@ import "core:c"
 IMP :: proc "c" (object: id, sel: SEL, #c_vararg args: ..any) -> id
 
 foreign Foundation {
-	objc_lookUpClass       :: proc "c" (name: cstring) -> Class ---
-	sel_registerName       :: proc "c" (name: cstring) -> SEL ---
-	objc_allocateClassPair :: proc "c" (superclass : Class, name : cstring, extraBytes : c.size_t) -> Class ---
-	objc_registerClassPair :: proc "c" (cls : Class) ---
+	objc_getMetaClass        :: proc "c" (name: cstring) -> id ---
+	objc_lookUpClass         :: proc "c" (name: cstring) -> Class ---
+	objc_allocateClassPair   :: proc "c" (superclass : Class, name : cstring, extraBytes : c.size_t) -> Class ---
+	objc_registerClassPair   :: proc "c" (cls : Class) ---
 
-	class_addMethod         :: proc "c" (cls: Class, name: SEL, imp: IMP, types: cstring) -> BOOL ---
-	class_getInstanceMethod :: proc "c" (cls: Class, name: SEL) -> Method ---
-	class_createInstance    :: proc "c" (cls: Class, extraBytes: c.size_t) -> id ---
+	sel_registerName         :: proc "c" (name: cstring) -> SEL ---
+
+	class_addMethod          :: proc "c" (cls: Class, name: SEL, imp: IMP, types: cstring) -> BOOL ---
+	class_getInstanceMethod  :: proc "c" (cls: Class, name: SEL) -> Method ---
+	class_createInstance     :: proc "c" (cls: Class, extraBytes: c.size_t) -> id ---
 
 	method_setImplementation :: proc "c" (method: Method, imp: IMP) ---
-	object_getIndexedIvars   :: proc(obj: id) -> rawptr ---
+
+	object_getClass          :: proc "c" (obj: id) -> Class ---
+	object_setClass          :: proc "c" (obj: id, cls: Class) -> Class ---
+	object_getClassName      :: proc "c" (obj: id) -> cstring ---
+	object_getIndexedIvars   :: proc "c" (obj: id) -> rawptr ---
 }
 
 
@@ -72,7 +78,7 @@ objc_class_internals :: struct {
 	info:          c.long,
 	instance_size: c.long,
 	ivars:         ^objc_ivar_list,
-	
+
 	methodLists:   ^^objc_method_list,
 
 	cache:         rawptr,
