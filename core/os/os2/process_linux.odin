@@ -53,16 +53,19 @@ _get_ppid :: proc() -> int {
 _process_list :: proc(allocator: runtime.Allocator) -> (list: []int, err: Error) {
 	TEMP_ALLOCATOR_GUARD()
 
-	dir_fd: linux.Fd
-	errno:  linux.Errno
-	#partial switch dir_fd, errno = linux.open("/proc/", _OPENDIR_FLAGS); errno {
-	case .ENOTDIR:
-		return {}, .Invalid_Dir
-	case .ENOENT:
-		return {}, .Not_Exist
+	dir_fd, errno := linux.open("/proc/", _OPENDIR_FLAGS)
+	#partial switch errno {
 	case .NONE:
+		// okay
+	case .ENOTDIR:
+		err = .Invalid_Dir
+		return
+	case .ENOENT:
+		err = .Not_Exist
+		return
 	case:
-		return {}, _get_platform_error(errno)
+		err = _get_platform_error(errno)
+		return
 	}
 	defer linux.close(dir_fd)
 
@@ -133,7 +136,7 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 		passwd := string(passwd_bytes)
 		for len(passwd) > 0 {
 			n := strings.index_byte(passwd, ':')
-			if n == -1 {
+			if n < 0 {
 				break
 			}
 			username := passwd[:n]
@@ -143,9 +146,7 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 			passwd = passwd[strings.index_byte(passwd, ':') + 1:]
 
 			n = strings.index_byte(passwd, ':')
-			uid: int
-			ok: bool
-			if uid, ok = strconv.parse_int(passwd[:n]); ok && uid == int(s.uid) {
+			if uid, ok := strconv.parse_int(passwd[:n]); ok && uid == int(s.uid) {
 				info.username = strings.clone(username, allocator) or_return
 				info.fields += {.Username}
 				break
@@ -155,7 +156,7 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 			}
 
 			eol := strings.index_byte(passwd, '\n')
-			if eol == -1 {
+			if eol < 0 {
 				break
 			}
 			passwd = passwd[eol + 1:]
@@ -223,7 +224,7 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 			}
 
 			for i := 0; len(cmdline) > 0; i += 1 {
-				if terminator = strings.index_byte(cmdline, 0); terminator == -1 {
+				if terminator = strings.index_byte(cmdline, 0); terminator < 0 {
 					break
 				}
 
@@ -335,7 +336,7 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 			env_list := make([dynamic]string, allocator) or_return
 			for len(env) > 0 {
 				terminator := strings.index_byte(env, 0)
-				if terminator == -1 || terminator == 0 {
+				if terminator <= 0 {
 					break
 				}
 				e := strings.clone(env[:terminator], allocator) or_return
@@ -412,7 +413,7 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 	// search PATH if just a plain name is provided
 	exe_fd: linux.Fd
 	executable_name := desc.command[0]
-	if strings.index_byte(executable_name, '/') == -1 {
+	if strings.index_byte(executable_name, '/') < 0 {
 		path_env := get_env("PATH", temp_allocator())
 		path_dirs := filepath.split_list(path_env, temp_allocator()) or_return
 
@@ -553,7 +554,7 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 		if desc.stderr != nil {
 			stderr_fd = linux.Fd(fd(desc.stderr))
 		} else {
-			if write_devnull == -1 {
+			if write_devnull < 0 {
 				write_devnull, errno = linux.open("/dev/null", {.WRONLY})
 				if errno != .NONE {
 					write_errno_to_parent_and_abort(child_pipe_fds[WRITE], errno)

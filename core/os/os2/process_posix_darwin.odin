@@ -20,8 +20,6 @@ foreign lib {
 }
 
 _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator: runtime.Allocator) -> (info: Process_Info, err: Error) {
-	info.pid = pid
-
 	get_pidinfo :: proc(pid: int, selection: Process_Info_Fields) -> (ppid: u32, prio: Maybe(i32), uid: posix.uid_t, ok: bool) {
 		// Short info is enough and requires less permissions if the priority isn't requested.
 		if .Priority in selection {
@@ -49,6 +47,9 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 
 		return
 	}
+
+
+	info.pid = pid
 
 	// Thought on errors is: allocation failures return immediately (also why the non-allocation stuff is done first),
 	// other errors usually mean other parts of the info could be retrieved though, so in those cases we keep trying to get the other information.
@@ -125,7 +126,7 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 			break args
 		}
 
-		buf := make([]byte, length, temp_allocator())
+		buf := runtime.make_aligned([]byte, length, 4, temp_allocator())
 		if sysctl(raw_data(mib), 3, raw_data(buf), &length, nil, 0) != .OK {
 			if err == nil {
 				err = _get_platform_error()
