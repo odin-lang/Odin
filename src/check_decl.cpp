@@ -691,6 +691,13 @@ gb_internal bool sig_compare(TypeCheckSig *a, TypeCheckSig *b, Type *x, Type *y)
 }
 
 gb_internal bool signature_parameter_similar_enough(Type *x, Type *y) {
+	if (is_type_bit_set(x)) {
+		x = bit_set_to_int(x);
+	}
+	if (is_type_bit_set(y)) {
+		y = bit_set_to_int(y);
+	}
+
 	if (sig_compare(is_type_pointer, x, y)) {
 		return true;
 	}
@@ -735,6 +742,14 @@ gb_internal bool signature_parameter_similar_enough(Type *x, Type *y) {
 	}
 	if (sig_compare(is_type_proc, is_type_multi_pointer, x, y)) {
 		return true;
+	}
+
+	if (sig_compare(is_type_slice, x, y)) {
+		Type *s1 = core_type(x);
+		Type *s2 = core_type(y);
+		if (signature_parameter_similar_enough(s1->Slice.elem, s2->Slice.elem)) {
+			return true;
+		}
 	}
 
 	return are_types_identical(x, y);

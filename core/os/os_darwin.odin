@@ -584,7 +584,7 @@ F_GETPATH :: 50 // return the full path of the fd
 foreign libc {
 	@(link_name="__error") __error :: proc() -> ^c.int ---
 
-	@(link_name="open")             _unix_open          :: proc(path: cstring, flags: i32, mode: u16) -> Handle ---
+	@(link_name="open")             _unix_open          :: proc(path: cstring, flags: i32, #c_vararg mode: ..u16) -> Handle ---
 	@(link_name="close")            _unix_close         :: proc(handle: Handle) -> c.int ---
 	@(link_name="read")             _unix_read          :: proc(handle: Handle, buffer: rawptr, count: c.size_t) -> int ---
 	@(link_name="write")            _unix_write         :: proc(handle: Handle, buffer: rawptr, count: c.size_t) -> int ---
@@ -696,18 +696,6 @@ open :: proc(path: string, flags: int = O_RDWR, mode: int = 0) -> (handle: Handl
 	if handle == INVALID_HANDLE {
 		err = get_last_error()
 		return
-	}
-
-	/*
-		@INFO(Platin): this is only done because O_CREATE for some reason fails to apply mode
-		               should not happen if the handle is a directory
-	*/
-	if flags & O_CREATE != 0 && mode != 0 && !isDir {
-		err = fchmod(handle, cast(u16)mode)
-		if err != nil {
-			_unix_close(handle)
-			handle = INVALID_HANDLE
-		}
 	}
 
 	return
