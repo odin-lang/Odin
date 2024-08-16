@@ -9,9 +9,8 @@ import "core:testing"
 @test
 test_index_byte_sanity :: proc(t: ^testing.T) {
 	// We must be able to find the byte at the correct index.
-	data := make([]u8, 2 * SIMD_SCAN_WIDTH)
-	defer delete(data)
-	slice.fill(data, '-')
+	data: [2 * SIMD_SCAN_WIDTH]u8
+	slice.fill(data[:], '-')
 
 	INDEX_MAX :: SIMD_SCAN_WIDTH - 1
 

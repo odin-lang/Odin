@@ -30,6 +30,7 @@ plain_last_index_byte :: proc(s: []u8, c: byte) -> (res: int) #no_bounds_check {
 sizes := [?]int {
 	15, 16, 17,
 	31, 32, 33,
+	63, 64, 65,
 	256,
 	512,
 	1024,
@@ -53,9 +54,9 @@ run_trial_size :: proc(p: proc([]u8, byte) -> int, size: int, idx: int, warmup: 
 	}
 
 	for _ in 0..<runs {
-		start := time.now()
+		start := time.tick_now()
 		accumulator += p(data, 'z')
-		done := time.since(start)
+		done := time.tick_since(start)
 		timing += done
 	}
 

@@ -16,6 +16,32 @@ RUNTIME_REQUIRE :: false // !ODIN_TILDE
 @(private)
 __float16 :: f16 when __ODIN_LLVM_F16_SUPPORTED else u16
 
+@(private)
+SIMD_SCAN_WIDTH :: 8 * size_of(uintptr)
+
+when SIMD_SCAN_WIDTH == 32 {
+	@(private, rodata)
+	simd_scanner_indices := #simd[SIMD_SCAN_WIDTH]u8 {
+		 0,  1,  2,  3,  4,  5,  6,  7,
+		 8,  9, 10, 11, 12, 13, 14, 15,
+		16, 17, 18, 19, 20, 21, 22, 23,
+		24, 25, 26, 27, 28, 29, 30, 31,
+	}
+} else when SIMD_SCAN_WIDTH == 64 {
+	@(private, rodata)
+	simd_scanner_indices := #simd[SIMD_SCAN_WIDTH]u8 {
+		 0,  1,  2,  3,  4,  5,  6,  7,
+		 8,  9, 10, 11, 12, 13, 14, 15,
+		16, 17, 18, 19, 20, 21, 22, 23,
+		24, 25, 26, 27, 28, 29, 30, 31,
+		32, 33, 34, 35, 36, 37, 38, 39,
+		40, 41, 42, 43, 44, 45, 46, 47,
+		48, 49, 50, 51, 52, 53, 54, 55,
+		56, 57, 58, 59, 60, 61, 62, 63,
+	}
+} else {
+	#panic("Invalid SIMD_SCAN_WIDTH. Must be 32 or 64.")
+}
 
 @(private)
 byte_slice :: #force_inline proc "contextless" (data: rawptr, len: int) -> []byte #no_bounds_check {
@@ -226,147 +252,120 @@ memory_equal :: proc "contextless" (x, y: rawptr, n: int) -> bool {
 	case n == 0: return true
 	case x == y: return true
 	}
-	a, b := ([^]byte)(x), ([^]byte)(y)
-	length := uint(n)
+	a, b := cast([^]u8)x, cast([^]u8)y
+	i := 0
 
-	for i := uint(0); i < length; i += 1 {
+	// NOTE: Because we cannot guarantee simultaneous alignment of two separate
+	// pointers with a single iterator, we only align by length and not by the
+	// actual data layout.
+	//
+	// Therefore, in the vector loop, all loads must be unaligned.
+	//
+	// This at least lets us iterate freely without regard for a tail portion.
+	alignment_start := n % SIMD_SCAN_WIDTH
+
+	// Iterate as a scalar until the remaining length is aligned.
+	for /**/; i < alignment_start; i += 1 {
 		if a[i] != b[i] {
 			return false
 		}
 	}
+
+	// Iterate as a vector over the remaining data.
+	for /**/; i < n; i += SIMD_SCAN_WIDTH {
+		load_a := intrinsics.unaligned_load(cast(^#simd[SIMD_SCAN_WIDTH]u8)(&a[i]))
+		load_b := intrinsics.unaligned_load(cast(^#simd[SIMD_SCAN_WIDTH]u8)(&b[i]))
+		comparison := intrinsics.simd_lanes_ne(load_a, load_b)
+		match := intrinsics.simd_reduce_or(comparison)
+		if match != 0 {
+			return false
+		}
+	}
+
 	return true
-	
-/*
-
-	when size_of(uint) == 8 {
-		if word_length := length >> 3; word_length != 0 {
-			for _ in 0..<word_length {
-				if intrinsics.unaligned_load((^u64)(a)) != intrinsics.unaligned_load((^u64)(b)) {
-					return false
-				}
-				a = a[size_of(u64):]
-				b = b[size_of(u64):]
-			}
-		}
-		
-		if length & 4 != 0 {
-			if intrinsics.unaligned_load((^u32)(a)) != intrinsics.unaligned_load((^u32)(b)) {
-				return false
-			}
-			a = a[size_of(u32):]
-			b = b[size_of(u32):]
-		}
-		
-		if length & 2 != 0 {
-			if intrinsics.unaligned_load((^u16)(a)) != intrinsics.unaligned_load((^u16)(b)) {
-				return false
-			}
-			a = a[size_of(u16):]
-			b = b[size_of(u16):]
-		}
-		
-		if length & 1 != 0 && a[0] != b[0] {
-			return false	
-		}
-		return true
-	} else {
-		if word_length := length >> 2; word_length != 0 {
-			for _ in 0..<word_length {
-				if intrinsics.unaligned_load((^u32)(a)) != intrinsics.unaligned_load((^u32)(b)) {
-					return false
-				}
-				a = a[size_of(u32):]
-				b = b[size_of(u32):]
-			}
-		}
-		
-		length &= 3
-		
-		if length != 0 {
-			for i in 0..<length {
-				if a[i] != b[i] {
-					return false
-				}
-			}
-		}
-
-		return true
-	}
-*/
-
 }
-memory_compare :: proc "contextless" (a, b: rawptr, n: int) -> int #no_bounds_check {
+memory_compare :: proc "contextless" (x, y: rawptr, n: int) -> int #no_bounds_check {
 	switch {
-	case a == b:   return 0
-	case a == nil: return -1
-	case b == nil: return +1
+	case x == y:   return 0
+	case x == nil: return -1
+	case y == nil: return +1
 	}
+	a, b := cast([^]u8)x, cast([^]u8)y
+	i := 0
 
-	x := uintptr(a)
-	y := uintptr(b)
-	n := uintptr(n)
+	// NOTE: Because we cannot guarantee simultaneous alignment of two separate
+	// pointers with a single iterator, we only align by length and not by the
+	// actual data layout.
+	//
+	// Therefore, in the vector loop, all loads must be unaligned.
+	//
+	// This at least lets us iterate freely without regard for a tail portion.
+	alignment_start := n % SIMD_SCAN_WIDTH
 
-	SU :: size_of(uintptr)
-	fast := n/SU + 1
-	offset := (fast-1)*SU
-	curr_block := uintptr(0)
-	if n < SU {
-		fast = 0
-	}
-
-	for /**/; curr_block < fast; curr_block += 1 {
-		va := (^uintptr)(x + curr_block * size_of(uintptr))^
-		vb := (^uintptr)(y + curr_block * size_of(uintptr))^
-		if va ~ vb != 0 {
-			for pos := curr_block*SU; pos < n; pos += 1 {
-				a := (^byte)(x+pos)^
-				b := (^byte)(y+pos)^
-				if a ~ b != 0 {
-					return -1 if (int(a) - int(b)) < 0 else +1
-				}
-			}
+	// Iterate as a scalar until the remaining length is aligned.
+	for /**/; i < alignment_start; i += 1 {
+		if a[i] ~ b[i] != 0 {
+			return -1 if a[i] < b[i] else +1
 		}
 	}
 
-	for /**/; offset < n; offset += 1 {
-		a := (^byte)(x+offset)^
-		b := (^byte)(y+offset)^
-		if a ~ b != 0 {
-			return -1 if (int(a) - int(b)) < 0 else +1
+	// Iterate as a vector over the remaining data.
+	for /**/; i < n; i += SIMD_SCAN_WIDTH {
+		load_a := intrinsics.unaligned_load(cast(^#simd[SIMD_SCAN_WIDTH]u8)(&a[i]))
+		load_b := intrinsics.unaligned_load(cast(^#simd[SIMD_SCAN_WIDTH]u8)(&b[i]))
+		comparison := intrinsics.simd_lanes_ne(load_a, load_b)
+		match := intrinsics.simd_reduce_or(comparison)
+		if match != 0 {
+			sentinel: #simd[SIMD_SCAN_WIDTH]u8 = u8(0xFF)
+			index_select := intrinsics.simd_select(comparison, simd_scanner_indices, sentinel)
+			index_reduce := cast(int)intrinsics.simd_reduce_min(index_select)
+			return -1 if a[i+index_reduce] < b[i+index_reduce] else +1
 		}
 	}
 
 	return 0
 }
 
-memory_compare_zero :: proc "contextless" (a: rawptr, n: int) -> int #no_bounds_check {
-	x := uintptr(a)
-	n := uintptr(n)
+memory_compare_zero :: proc "contextless" (x: rawptr, n: int) -> int #no_bounds_check {
+	a := cast([^]u8)x
+	i := 0
 
-	SU :: size_of(uintptr)
-	fast := n/SU + 1
-	offset := (fast-1)*SU
-	curr_block := uintptr(0)
-	if n < SU {
-		fast = 0
+	// NOTE: Because we're comparing against zero, we can never return -1.
+
+	// Guard against small data.
+	if n < SIMD_SCAN_WIDTH {
+		for /**/; i < n; i += 1 {
+			if a[i] != 0 {
+				return 1
+			}
+		}
+		return 0
 	}
 
-	for /**/; curr_block < fast; curr_block += 1 {
-		va := (^uintptr)(x + curr_block * size_of(uintptr))^
-		if va ~ 0 != 0 {
-			for pos := curr_block*SU; pos < n; pos += 1 {
-				a := (^byte)(x+pos)^
-				if a ~ 0 != 0 {
-					return -1 if int(a) < 0 else +1
-				}
-			}
+	alignment_start := (SIMD_SCAN_WIDTH - cast(int)cast(uintptr)a % SIMD_SCAN_WIDTH) % SIMD_SCAN_WIDTH
+
+	// Iterate as a scalar until the data is aligned.
+	for /**/; i < alignment_start; i += 1 {
+		if a[i] != 0 {
+			return 1
 		}
 	}
 
-	for /**/; offset < n; offset += 1 {
-		a := (^byte)(x+offset)^
-		if a ~ 0 != 0 {
-			return -1 if int(a) < 0 else +1
+	// Iterate as a vector over the memory-aligned portion.
+	tail := n - (n - alignment_start) % SIMD_SCAN_WIDTH
+
+	for /**/; i < tail; i += SIMD_SCAN_WIDTH {
+		load := (cast(^#simd[SIMD_SCAN_WIDTH]u8)(&a[i]))^
+		match := intrinsics.simd_reduce_or(load)
+		if match != 0 {
+			return 1
+		}
+	}
+
+	// Iterate as a scalar over the remaining unaligned portion.
+	for /**/; i < n; i += 1 {
+		if a[i] != 0 {
+			return 1
 		}
 	}
 
