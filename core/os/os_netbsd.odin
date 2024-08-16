@@ -423,7 +423,7 @@ R_OK :: 4 // Test for read permission
 foreign libc {
 	@(link_name="__errno")          __errno_location    :: proc() -> ^c.int ---
 
-	@(link_name="open")             _unix_open          :: proc(path: cstring, flags: c.int, mode: c.int) -> Handle ---
+	@(link_name="open")             _unix_open          :: proc(path: cstring, flags: c.int, #c_vararg mode: ..u32) -> Handle ---
 	@(link_name="close")            _unix_close         :: proc(fd: Handle) -> c.int ---
 	@(link_name="read")             _unix_read          :: proc(fd: Handle, buf: rawptr, size: c.size_t) -> c.ssize_t ---
 	@(link_name="write")            _unix_write         :: proc(fd: Handle, buf: rawptr, size: c.size_t) -> c.ssize_t ---
@@ -488,7 +488,7 @@ get_last_error :: proc "contextless" () -> Error {
 open :: proc(path: string, flags: int = O_RDONLY, mode: int = 0) -> (Handle, Error) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	cstr := strings.clone_to_cstring(path, context.temp_allocator)
-	handle := _unix_open(cstr, c.int(flags), c.int(mode))
+	handle := _unix_open(cstr, c.int(flags), c.uint(mode))
 	if handle == -1 {
 		return INVALID_HANDLE, get_last_error()
 	}

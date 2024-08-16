@@ -58,7 +58,7 @@ foreign lib {
 
 	[[ More; https://pubs.opengroup.org/onlinepubs/9699919799/functions/open.html ]]
 	*/
-	open :: proc(path: cstring, flags: O_Flags, mode: mode_t = {}) -> FD ---
+	open :: proc(path: cstring, flags: O_Flags, #c_vararg mode: ..mode_t) -> FD ---
 
 	/*
 	Equivalent to the open() function except in the case where path specifies a relative path.

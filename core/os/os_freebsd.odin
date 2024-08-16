@@ -371,7 +371,7 @@ F_KINFO :: 22
 foreign libc {
 	@(link_name="__error")		__Error_location :: proc() -> ^c.int ---
 
-	@(link_name="open")             _unix_open          :: proc(path: cstring, flags: c.int, mode: c.uint16_t) -> Handle ---
+	@(link_name="open")             _unix_open          :: proc(path: cstring, flags: c.int, #c_vararg mode: ..u16) -> Handle ---
 	@(link_name="close")            _unix_close         :: proc(fd: Handle) -> c.int ---
 	@(link_name="read")             _unix_read          :: proc(fd: Handle, buf: rawptr, size: c.size_t) -> c.ssize_t ---
 	@(link_name="write")            _unix_write         :: proc(fd: Handle, buf: rawptr, size: c.size_t) -> c.ssize_t ---

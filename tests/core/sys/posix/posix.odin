@@ -287,3 +287,24 @@ test_pthreads :: proc(t: ^testing.T) {
 		return nil
 	}
 }
+
+@(test)
+open_permissions :: proc(t: ^testing.T) {
+	in_mode := posix.mode_t{.IRUSR, .IWUSR, .IROTH, .IRGRP}
+	fd := posix.open("test_posix_permissions.txt", {.CREAT, .RDWR}, in_mode)
+	testing.expectf(t, fd != -1, "failed to open: %v", posix.strerror())
+
+	defer {
+		ret := posix.close(fd)
+		testing.expectf(t, ret == .OK, "failed to close: %v", posix.strerror())
+		ret2 := posix.remove("test_posix_permissions.txt")
+		testing.expectf(t, ret2 == 0, "failed to remove: %v", posix.strerror())
+	}
+
+	stat: posix.stat_t
+	res := posix.fstat(fd, &stat)
+	testing.expectf(t, res == .OK, "failed to stat: %v", posix.strerror())
+
+	stat.st_mode -= posix.S_IFMT
+	testing.expect_value(t, stat.st_mode, in_mode)
+}
