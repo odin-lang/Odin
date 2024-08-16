@@ -2063,7 +2063,10 @@ replace :: proc(s, old, new: string, n: int, allocator := context.allocator, loc
 	}
 
 
-	t := make([]byte, len(s) + byte_count*(len(new) - len(old)), allocator, loc)
+	t, err := make([]byte, len(s) + byte_count*(len(new) - len(old)), allocator, loc)
+	if err != nil {
+		return
+	}
 	was_allocation = true
 
 	w := 0

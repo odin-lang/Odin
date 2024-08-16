@@ -38,15 +38,15 @@ abs :: proc(path: string, allocator := context.allocator) -> (string, bool) {
 	return path_str, true
 }
 
-join :: proc(elems: []string, allocator := context.allocator) -> string {
+join :: proc(elems: []string, allocator := context.allocator) -> (joined: string, err: runtime.Allocator_Error) #optional_allocator_error {
 	for e, i in elems {
 		if e != "" {
 			runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD(ignore = context.temp_allocator == allocator)
-			p := strings.join(elems[i:], SEPARATOR_STRING, context.temp_allocator)
+			p := strings.join(elems[i:], SEPARATOR_STRING, context.temp_allocator) or_return
 			return clean(p, allocator)
 		}
 	}
-	return ""
+	return "", nil
 }
 
 @(private)

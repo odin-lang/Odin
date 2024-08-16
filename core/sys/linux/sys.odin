@@ -290,13 +290,13 @@ writev :: proc "contextless" (fd: Fd, iov: []IO_Vec) -> (int, Errno) {
 	Available since Linux 1.0.
 	For ARM64 available since Linux 2.6.16.
 */
-access :: proc "contextless" (name: cstring, mode: Mode = F_OK) -> (bool, Errno) {
+access :: proc "contextless" (name: cstring, mode: Mode = F_OK) -> (Errno) {
 	when ODIN_ARCH == .arm64 {
 		ret := syscall(SYS_faccessat, AT_FDCWD, cast(rawptr) name, transmute(u32) mode)
-		return errno_unwrap(ret, bool)
+		return Errno(-ret)
 	} else {
 		ret := syscall(SYS_access, cast(rawptr) name, transmute(u32) mode)
-		return errno_unwrap(ret, bool)
+		return Errno(-ret)
 	}
 }
 
@@ -2627,9 +2627,9 @@ fchmodat :: proc "contextless" (dirfd: Fd, name: cstring, mode: Mode, flags: FD_
 	Checks the user permissions for a file at specified dirfd.
 	Available since Linux 2.6.16.
 */
-faccessat :: proc "contextless" (dirfd: Fd, name: cstring, mode: Mode = F_OK) -> (bool, Errno) {
+faccessat :: proc "contextless" (dirfd: Fd, name: cstring, mode: Mode = F_OK) -> (Errno) {
 	ret := syscall(SYS_faccessat, dirfd, cast(rawptr) name, transmute(u32) mode)
-	return errno_unwrap(ret, bool)
+	return Errno(-ret)
 }
 
 /*
@@ -2927,9 +2927,9 @@ pidfd_getfd :: proc "contextless" (pidfd: Pid_FD, fd: Fd, flags: i32 = 0) -> (Fd
 	Checks the user permissions for a file at specified dirfd (with flags).
 	Available since Linux 5.8.
 */
-faccessat2 :: proc "contextless" (dirfd: Fd, name: cstring, mode: Mode = F_OK, flags: FD_Flags = FD_Flags{}) -> (bool, Errno) {
+faccessat2 :: proc "contextless" (dirfd: Fd, name: cstring, mode: Mode = F_OK, flags: FD_Flags = FD_Flags{}) -> (Errno) {
 	ret := syscall(SYS_faccessat2, dirfd, cast(rawptr) name, transmute(u32) mode, transmute(i32) flags)
-	return errno_unwrap(ret, bool)
+	return Errno(-ret)
 }
 
 // TODO(flysand): process_madvise

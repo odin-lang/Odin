@@ -19,33 +19,18 @@ File_Impl :: struct {
 }
 
 _stdin := File{
-	impl = &File_Impl{
-		name = "/proc/self/fd/0",
-		fd = 0,
-		allocator = file_allocator(),
-	},
 	stream = {
 		procedure = _file_stream_proc,
 	},
 	fstat = _fstat,
 }
 _stdout := File{
-	impl = &File_Impl{
-		name = "/proc/self/fd/1",
-		fd = 1,
-		allocator = file_allocator(),
-	},
 	stream = {
 		procedure = _file_stream_proc,
 	},
 	fstat = _fstat,
 }
 _stderr := File{
-	impl = &File_Impl{
-		name = "/proc/self/fd/2",
-		fd = 2,
-		allocator = file_allocator(),
-	},
 	stream = {
 		procedure = _file_stream_proc,
 	},
@@ -54,10 +39,33 @@ _stderr := File{
 
 @init
 _standard_stream_init :: proc() {
-	// cannot define these manually because cyclic reference
-	_stdin.stream.data = &_stdin
-	_stdout.stream.data = &_stdout
-	_stderr.stream.data = &_stderr
+	@static stdin_impl := File_Impl {
+		name = "/proc/self/fd/0",
+		fd = 0,
+	}
+
+	@static stdout_impl := File_Impl {
+		name = "/proc/self/fd/1",
+		fd = 1,
+	}
+
+	@static stderr_impl := File_Impl {
+		name = "/proc/self/fd/2",
+		fd = 2,
+	}
+
+	stdin_impl.allocator  = file_allocator()
+	stdout_impl.allocator = file_allocator()
+	stderr_impl.allocator = file_allocator()
+
+	_stdin.impl  = &stdin_impl
+	_stdout.impl = &stdout_impl
+	_stderr.impl = &stderr_impl
+
+	// cannot define these initially because cyclic reference
+	_stdin.stream.data  = &stdin_impl
+	_stdout.stream.data = &stdout_impl
+	_stderr.stream.data = &stderr_impl
 
 	stdin  = &_stdin
 	stdout = &_stdout
@@ -72,7 +80,7 @@ _open :: proc(name: string, flags: File_Flags, perm: int) -> (f: ^File, err: Err
 	// terminal would be incredibly rare. This has no effect on files while
 	// allowing us to open serial devices.
 	sys_flags: linux.Open_Flags = {.NOCTTY, .CLOEXEC}
-	switch flags & O_RDONLY|O_WRONLY|O_RDWR {
+	switch flags & (O_RDONLY|O_WRONLY|O_RDWR) {
 	case O_RDONLY:
 	case O_WRONLY: sys_flags += {.WRONLY}
 	case O_RDWR:   sys_flags += {.RDWR}
@@ -217,12 +225,18 @@ _write_at :: proc(f: ^File_Impl, p: []byte, offset: i64) -> (i64, Error) {
 }
 
 _file_size :: proc(f: ^File_Impl) -> (n: i64, err: Error) {
+	// TODO: Identify 0-sized "pseudo" files and return No_Size. This would
+	//       eliminate the need for the _read_entire_pseudo_file procs.
 	s: linux.Stat = ---
 	errno := linux.fstat(f.fd, &s)
 	if errno != .NONE {
 		return -1, _get_platform_error(errno)
 	}
-	return i64(s.size), nil
+
+	if s.mode & linux.S_IFMT == linux.S_IFREG {
+		return i64(s.size), nil
+	}
+	return 0, .No_Size
 }
 
 _sync :: proc(f: ^File) -> Error {
@@ -390,21 +404,15 @@ _fchtimes :: proc(f: ^File, atime, mtime: time.Time) -> Error {
 _exists :: proc(name: string) -> bool {
 	TEMP_ALLOCATOR_GUARD()
 	name_cstr, _ := temp_cstring(name)
-	res, errno := linux.access(name_cstr, linux.F_OK)
-	return !res && errno == .NONE
+	return linux.access(name_cstr, linux.F_OK) == .NONE
 }
 
-/* Certain files in the Linux file system are not actual
- * files (e.g. everything in /proc/). Therefore, the
- * read_entire_file procs fail to actually read anything
- * since these "files" stat to a size of 0.  Here, we just
- * read until there is nothing left.
- */
+/* For reading Linux system files that stat to size 0 */
 _read_entire_pseudo_file :: proc { _read_entire_pseudo_file_string, _read_entire_pseudo_file_cstring }
 
 _read_entire_pseudo_file_string :: proc(name: string, allocator: runtime.Allocator) -> (b: []u8, e: Error) {
-	name_cstr := clone_to_cstring(name, allocator) or_return
-	defer delete(name, allocator)
+	TEMP_ALLOCATOR_GUARD()
+	name_cstr := clone_to_cstring(name, temp_allocator()) or_return
 	return _read_entire_pseudo_file_cstring(name_cstr, allocator)
 }
 
@@ -434,7 +442,6 @@ _read_entire_pseudo_file_cstring :: proc(name: cstring, allocator: runtime.Alloc
 	}
 
 	resize(&contents, i + n)
-
 	return contents[:], nil
 }
 
