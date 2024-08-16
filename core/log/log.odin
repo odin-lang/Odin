@@ -67,9 +67,7 @@ Logger :: struct {
 */
 Logger :: runtime.Logger
 
-nil_logger_proc :: proc(data: rawptr, level: Level, text: string, options: Options, location := #caller_location) {
-	// Do nothing
-}
+nil_logger_proc :: runtime.default_logger_proc
 
 nil_logger :: proc() -> Logger {
 	return Logger{nil_logger_proc, nil, Level.Debug, nil}
@@ -157,24 +155,26 @@ assertf :: proc(condition: bool, fmt_str: string, args: ..any, loc := #caller_lo
 
 log :: proc(level: Level, args: ..any, sep := " ", location := #caller_location) {
 	logger := context.logger
-	if logger.procedure == nil {
+	if logger.procedure == nil || logger.procedure == nil_logger_proc {
 		return
 	}
 	if level < logger.lowest_level {
 		return
 	}
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	str := fmt.tprint(..args, sep=sep) //NOTE(Hoej): While tprint isn't thread-safe, no logging is.
 	logger.procedure(logger.data, level, str, logger.options, location)
 }
 
 logf :: proc(level: Level, fmt_str: string, args: ..any, location := #caller_location) {
 	logger := context.logger
-	if logger.procedure == nil {
+	if logger.procedure == nil || logger.procedure == nil_logger_proc {
 		return
 	}
 	if level < logger.lowest_level {
 		return
 	}
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	str := fmt.tprintf(fmt_str, ..args)
 	logger.procedure(logger.data, level, str, logger.options, location)
 }
