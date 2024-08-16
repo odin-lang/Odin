@@ -66,9 +66,9 @@ _process_list :: proc(allocator: runtime.Allocator) -> (list: []int, err: Error)
 	}
 	defer linux.close(dir_fd)
 
-	dynamic_list := make([dynamic]int, temp_allocator())
+	dynamic_list := make([dynamic]int, temp_allocator()) or_return
 
-	buf := make([dynamic]u8, 128, 128, temp_allocator())
+	buf := make([dynamic]u8, 128, 128, temp_allocator()) or_return
 	loop: for {
 		buflen: int
 		buflen, errno = linux.getdents(dir_fd, buf[:])
@@ -204,7 +204,7 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 				info.executable_path = strings.clone(cmdline[:terminator], allocator) or_return
 				info.fields += {.Executable_Path}
 			} else if cwd_err == nil {
-				info.executable_path = filepath.join({ cwd, cmdline[:terminator] }, allocator)
+				info.executable_path = filepath.join({ cwd, cmdline[:terminator] }, allocator) or_return
 				info.fields += {.Executable_Path}
 			} else {
 				break cmdline_if
@@ -414,9 +414,9 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 	executable_name := desc.command[0]
 	if strings.index_byte(executable_name, '/') == -1 {
 		path_env := get_env("PATH", temp_allocator())
-		path_dirs := filepath.split_list(path_env, temp_allocator())
+		path_dirs := filepath.split_list(path_env, temp_allocator()) or_return
 
-		exe_builder := strings.builder_make(temp_allocator())
+		exe_builder := strings.builder_make(temp_allocator()) or_return
 
 		found: bool
 		for dir in path_dirs {
@@ -467,7 +467,7 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 
 	// args and environment need to be a list of cstrings
 	// that are terminated by a nil pointer.
-	cargs := make([]cstring, len(desc.command) + 1, temp_allocator())
+	cargs := make([]cstring, len(desc.command) + 1, temp_allocator()) or_return
 	for command, i in desc.command {
 		cargs[i] = temp_cstring(command) or_return
 	}
@@ -478,7 +478,7 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 		// take this process's current environment
 		env = raw_data(export_cstring_environment(temp_allocator()))
 	} else {
-		cenv := make([]cstring, len(desc.env) + 1, temp_allocator())
+		cenv := make([]cstring, len(desc.env) + 1, temp_allocator()) or_return
 		for env, i in desc.env {
 			cenv[i] = temp_cstring(env) or_return
 		}
@@ -609,7 +609,7 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 _process_state_update_times :: proc(state: ^Process_State) -> (err: Error) {
 	TEMP_ALLOCATOR_GUARD()
 
-	stat_path_buf: [32]u8
+	stat_path_buf: [48]u8
 	path_builder := strings.builder_from_bytes(stat_path_buf[:])
 	strings.write_string(&path_builder, "/proc/")
 	strings.write_int(&path_builder, int(state.pid))
