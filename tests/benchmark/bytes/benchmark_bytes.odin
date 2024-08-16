@@ -4,8 +4,21 @@ import "core:bytes"
 import "core:fmt"
 import "core:log"
 import "core:testing"
+import "core:strings"
+import "core:text/table"
 import "core:time"
 
+RUNS_PER_SIZE :: 2500
+
+sizes := [?]int {
+	15, 16, 17,
+	31, 32, 33,
+	256,
+	512,
+	1024,
+	1024 * 1024,
+	// 1024 * 1024 * 1024,
+}
 
 // These are the normal, unoptimized algorithms.
 
@@ -27,17 +40,7 @@ plain_last_index_byte :: proc(s: []u8, c: byte) -> (res: int) #no_bounds_check {
 	return -1
 }
 
-sizes := [?]int {
-	15, 16, 17,
-	31, 32, 33,
-	256,
-	512,
-	1024,
-	1024 * 1024,
-	1024 * 1024 * 1024,
-}
-
-run_trial_size :: proc(p: proc([]u8, byte) -> int, size: int, idx: int, warmup: int, runs: int) -> (timing: time.Duration) {
+run_trial_size :: proc(p: proc([]u8, byte) -> int, size: int, idx: int, runs: int) -> (timing: time.Duration) {
 	data := make([]u8, size)
 	defer delete(data)
 
@@ -47,10 +50,6 @@ run_trial_size :: proc(p: proc([]u8, byte) -> int, size: int, idx: int, warmup: 
 	data[idx] = 'z'
 
 	accumulator: int
-
-	for _ in 0..<warmup {
-		accumulator += p(data, 'z')
-	}
 
 	for _ in 0..<runs {
 		start := time.now()
@@ -65,44 +64,51 @@ run_trial_size :: proc(p: proc([]u8, byte) -> int, size: int, idx: int, warmup: 
 	return
 }
 
-HOT :: 3
+bench_table :: proc(algo_name: string, forward: bool, plain: proc([]u8, byte) -> int, simd: proc([]u8, byte) -> int) {
+	string_buffer := strings.builder_make()
+	defer strings.builder_destroy(&string_buffer)
 
-@test
-benchmark_plain_index_cold :: proc(t: ^testing.T) {
-	report: string
+	tbl: table.Table
+	table.init(&tbl)
+	defer table.destroy(&tbl)
+
+	// table.caption(&tbl, "index_byte benchmark")
+	table.aligned_header_of_values(&tbl, .Right, "Algorithm", "Size", "Iterations", "Scalar", "SIMD", "SIMD Relative (%)", "SIMD Relative (x)")
+
 	for size in sizes {
-		timing := run_trial_size(plain_index_byte, size, size - 1, 0, 1)
-		report = fmt.tprintf("%s\n        +++ % 8M | %v", report, size, timing)
-		timing = run_trial_size(plain_last_index_byte, size, 0, 0, 1)
-		report = fmt.tprintf("%s\n (last) +++ % 8M | %v", report, size, timing)
+		needle_index := size - 1 if forward else 0
+
+		plain_timing := run_trial_size(plain, size, needle_index, RUNS_PER_SIZE)
+		simd_timing  := run_trial_size(simd,  size, needle_index, RUNS_PER_SIZE)
+
+		_plain := fmt.tprintf("%8M",  plain_timing)
+		_simd  := fmt.tprintf("%8M",  simd_timing)
+		_relp  := fmt.tprintf("%.3f %%", f64(simd_timing) / f64(plain_timing) * 100.0)
+		_relx  := fmt.tprintf("%.3f x",  1 / (f64(simd_timing) / f64(plain_timing)))
+
+		table.aligned_row_of_values(
+			&tbl,
+			.Right,
+			algo_name,
+			size, RUNS_PER_SIZE, _plain, _simd, _relp, _relx)
 	}
-	log.info(report)
+
+	builder_writer := strings.to_writer(&string_buffer)
+
+	fmt.sbprintln(&string_buffer)
+	table.write_plain_table(builder_writer, &tbl)
+
+	my_table_string := strings.to_string(string_buffer)
+	log.info(my_table_string)
 }
 
 @test
-benchmark_plain_index_hot :: proc(t: ^testing.T) {
-	report: string
-	for size in sizes {
-		timing := run_trial_size(plain_index_byte, size, size - 1, HOT, HOT)
-		report = fmt.tprintf("%s\n        +++ % 8M | %v", report, size, timing)
-		timing = run_trial_size(plain_last_index_byte, size, 0, HOT, HOT)
-		report = fmt.tprintf("%s\n (last) +++ % 8M | %v", report, size, timing)
-	}
-	log.info(report)
+benchmark_index_byte :: proc(t: ^testing.T) {
+	bench_table("index_byte",      true,  plain_index_byte,      bytes.index_byte)
+	// bench_table("last_index_byte", false, plain_last_index_byte, bytes.last_index_byte)
 }
 
-@test
-benchmark_simd_index_cold :: proc(t: ^testing.T) {
-	report: string
-	for size in sizes {
-		timing := run_trial_size(bytes.index_byte, size, size - 1, 0, 1)
-		report = fmt.tprintf("%s\n        +++ % 8M | %v", report, size, timing)
-		timing = run_trial_size(bytes.last_index_byte, size, 0, 0, 1)
-		report = fmt.tprintf("%s\n (last) +++ % 8M | %v", report, size, timing)
-	}
-	log.info(report)
-}
-
+/*
 @test
 benchmark_simd_index_hot :: proc(t: ^testing.T) {
 	report: string
@@ -114,3 +120,4 @@ benchmark_simd_index_hot :: proc(t: ^testing.T) {
 	}
 	log.info(report)
 }
+*/

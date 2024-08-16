@@ -35,7 +35,6 @@ jobs:
           ./odin test tests/core/normal.odin -file -all-packages -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
           ./odin test tests/core/speed.odin -file -all-packages -o:speed -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
           ./odin test tests/vendor -all-packages -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
-          ./odin test tests/benchmark -all-packages -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
           (cd tests/issues; ./run.sh)
   build_freebsd:
     name: FreeBSD Build, Check, and Test
@@ -64,7 +63,6 @@ jobs:
           ./odin test tests/core/normal.odin -file -all-packages -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
           ./odin test tests/core/speed.odin -file -all-packages -o:speed -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
           ./odin test tests/vendor -all-packages -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
-          ./odin test tests/benchmark -all-packages -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
           (cd tests/issues; ./run.sh)
   ci:
     strategy:
@@ -125,8 +123,6 @@ jobs:
         run: ./odin test tests/vendor -all-packages -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
       - name: Internals tests
         run: ./odin test tests/internal -all-packages -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
-      - name: Core library benchmarks
-        run: ./odin test tests/benchmark -all-packages -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
       - name: GitHub Issue tests
         run: |
           cd tests/issues
@@ -196,11 +192,6 @@ jobs:
         run: |
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat
           odin test tests/core/speed.odin -o:speed -file -all-packages -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
-      - name: Core library benchmarks
-        shell: cmd
-        run: |
-          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat
-          odin test tests/benchmark -all-packages -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
       - name: Vendor library tests
         shell: cmd
         run: |
