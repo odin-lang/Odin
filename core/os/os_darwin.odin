@@ -702,7 +702,7 @@ open :: proc(path: string, flags: int = O_RDWR, mode: int = 0) -> (handle: Handl
 		@INFO(Platin): this is only done because O_CREATE for some reason fails to apply mode
 		               should not happen if the handle is a directory
 	*/
-	if mode != 0 && !isDir {
+	if flags & O_CREATE != 0 && mode != 0 && !isDir {
 		err = fchmod(handle, cast(u16)mode)
 		if err != nil {
 			_unix_close(handle)
