@@ -2741,6 +2741,18 @@ gb_internal void check_map_type(CheckerContext *ctx, Type *type, Ast *node) {
 	GB_ASSERT(type->kind == Type_Map);
 	ast_node(mt, MapType, node);
 
+	if (mt->key == NULL) {
+		if (mt->value != NULL) {
+			Type *value = check_type(ctx, mt->value);
+			gbString str = type_to_string(value);
+			error(node, "Missing map key type, got 'map[]%s'", str);
+			gb_string_free(str);
+			return;
+		}
+		error(node, "Missing map key type, got 'map[]T'");
+		return;
+	}
+
 	Type *key   = check_type(ctx, mt->key);
 	Type *value = check_type(ctx, mt->value);
 
