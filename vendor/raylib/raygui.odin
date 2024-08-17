@@ -110,6 +110,8 @@ GuiDefaultProperty :: enum c.int {
 	LINE_COLOR,                 // Line control color
 	BACKGROUND_COLOR,           // Background color
 	TEXT_LINE_SPACING,          // Text spacing between lines
+	TEXT_ALIGNMENT_VERTICAL,    // Text vertical alignment inside text bounds (after border and padding)
+	TEXT_WRAP_MODE,             // Text wrap-mode inside text bounds
 }
 
 // Label
@@ -163,11 +165,7 @@ GuiDropdownBoxProperty :: enum c.int {
 
 // TextBox/TextBoxMulti/ValueBox/Spinner
 GuiTextBoxProperty :: enum c.int {
-	TEXT_INNER_PADDING = 16,    // TextBox/TextBoxMulti/ValueBox/Spinner inner text padding
-	TEXT_LINES_SPACING,         // TextBoxMulti lines separation
-	TEXT_ALIGNMENT_VERTICAL,    // TextBoxMulti vertical alignment: 0-CENTERED, 1-UP, 2-DOWN
-	TEXT_MULTILINE,             // TextBox supports multiple lines
-	TEXT_WRAP_MODE,             // TextBox wrap mode for multiline: 0-NO_WRAP, 1-CHAR_WRAP, 2-WORD_WRAP
+	TEXT_READONLY = 16,         // TextBox in read-only mode: 0-text editable, 1-text no-editable
 }
 
 // Spinner
@@ -229,8 +227,8 @@ foreign lib {
 	
 	// Style set/get functions
 	
-	GuiSetStyle         :: proc(control: GuiControl, property: GuiControlProperty, value: c.int) ---          // Set one style property
-	GuiGetStyle         :: proc(control: GuiControl, property: GuiControlProperty) -> c.int ---               // Get one style property
+	GuiSetStyle         :: proc(control: GuiControl, property: c.int, value: c.int) ---          // Set one style property
+	GuiGetStyle         :: proc(control: GuiControl, property: c.int) -> c.int ---               // Get one style property
 	
 	// Styles loading functions
 	
