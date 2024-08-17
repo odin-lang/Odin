@@ -8,6 +8,7 @@
 //+build !darwin
 //+build !wasi
 //+build !windows
+//+build !orca
 package time
 
 _IS_SUPPORTED :: false
