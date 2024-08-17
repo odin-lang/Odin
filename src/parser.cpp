@@ -3560,7 +3560,12 @@ gb_internal Ast *parse_type(AstFile *f) {
 		} else {
 			token = advance_token(f);
 		}
-		syntax_error(token, "Expected a type, got '%.*s'", LIT(prev_token.string));
+		String prev_token_str = prev_token.string;
+		if (prev_token_str == str_lit("\n")) {
+			syntax_error(token, "Expected a type, got newline");
+		} else {
+			syntax_error(token, "Expected a type, got '%.*s'", LIT(prev_token_str));
+		}
 		return ast_bad_expr(f, token, f->curr_token);
 	} else if (type->kind == Ast_ParenExpr &&
 	           unparen_expr(type) == nullptr) {
