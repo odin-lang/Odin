@@ -111,7 +111,7 @@ GuiDefaultProperty :: enum c.int {
 	BACKGROUND_COLOR,           // Background color
 	TEXT_LINE_SPACING,          // Text spacing between lines
 	TEXT_ALIGNMENT_VERTICAL,    // Text vertical alignment inside text bounds (after border and padding)
-	TEXT_WRAP_MODE              // Text wrap-mode inside text bounds
+	TEXT_WRAP_MODE,             // Text wrap-mode inside text bounds
 }
 
 // Label
