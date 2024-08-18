@@ -2496,6 +2496,16 @@ gb_internal void check_return_stmt(CheckerContext *ctx, Ast *node) {
 			continue;
 		}
 		Ast *expr = unparen_expr(o.expr);
+		while (expr->kind == Ast_CallExpr && expr->CallExpr.proc->tav.mode == Addressing_Type) {
+			if (expr->CallExpr.args.count != 1) {
+				break;
+			}
+			Ast *arg = expr->CallExpr.args[0];
+			if (arg->kind == Ast_FieldValue || !are_types_identical(arg->tav.type, expr->tav.type)) {
+				break;
+			}
+			expr = unparen_expr(arg);
+		}
 
 		auto unsafe_return_error = [](Operand const &o, char const *msg, Type *extra_type=nullptr) {
 			gbString s = expr_to_string(o.expr);
