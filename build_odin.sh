@@ -23,6 +23,14 @@ error() {
 	exit 1
 }
 
+# Brew advises people not to add llvm to their $PATH, so try and use brew to find it.
+if [ -z "$LLVM_CONFIG" ] &&  [ -n "$(command -v brew)" ]; then
+    if   [ -n "$(command -v $(brew --prefix llvm@18)/bin/llvm-config)" ]; then LLVM_CONFIG="$(brew --prefix llvm@18)/bin/llvm-config"
+    elif [ -n "$(command -v $(brew --prefix llvm@17)/bin/llvm-config)" ]; then LLVM_CONFIG="$(brew --prefix llvm@17)/bin/llvm-config"
+    elif [ -n "$(command -v $(brew --prefix llvm@14)/bin/llvm-config)" ]; then LLVM_CONFIG="$(brew --prefix llvm@14)/bin/llvm-config"
+    fi
+fi
+
 if [ -z "$LLVM_CONFIG" ]; then
 	# darwin, linux, openbsd
 	if   [ -n "$(command -v llvm-config-18)" ]; then LLVM_CONFIG="llvm-config-18"
