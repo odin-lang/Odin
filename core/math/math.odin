@@ -2443,6 +2443,36 @@ hypot :: proc{
 	hypot_f64, hypot_f64le, hypot_f64be,
 }
 
+@(require_results)
+count_digits_of_base :: proc "contextless" (value: $T, $base: int) -> (digits: int) where intrinsics.type_is_integer(T) {
+	#assert(base >= 2, "base must be 2 or greater.")
+
+	value := value
+	when !intrinsics.type_is_unsigned(T) {
+		value = abs(value)
+	}
+
+	when base == 2 {
+		digits = max(1, 8 * size_of(T) - int(intrinsics.count_leading_zeros(value)))
+	} else when intrinsics.count_ones(base) == 1 {
+		free_bits := 8 * size_of(T) - int(intrinsics.count_leading_zeros(value))
+		digits, free_bits = divmod(free_bits, intrinsics.constant_log2(base))
+		if free_bits > 0 {
+			digits += 1
+		}
+		digits = max(1, digits)
+	} else {
+		digits = 1
+		base := cast(T)base
+		for value >= base {
+			value /= base
+			digits += 1
+		}
+	}
+
+	return
+}
+
 F16_DIG        :: 3
 F16_EPSILON    :: 0.00097656
 F16_GUARD      :: 0
