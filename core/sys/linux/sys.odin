@@ -2404,17 +2404,43 @@ timer_delete :: proc "contextless" (timer: Timer) -> (Errno) {
 	return Errno(-ret)
 }
 
-// TODO(flysand): clock_settime
+/*
+	Set the time of the specified clock.
+	Available since Linux 2.6.
+*/
+clock_settime :: proc "contextless" (clock: Clock_Id, ts: ^Time_Spec) -> (Errno) {
+	ret := syscall(SYS_clock_settime, clock, ts)
+	return Errno(-ret)
+}
 
+/*
+	Retrieve the time of the specified clock.
+	Available since Linux 2.6.
+*/
 clock_gettime :: proc "contextless" (clock: Clock_Id) -> (ts: Time_Spec, err: Errno) {
 	ret := syscall(SYS_clock_gettime, clock, &ts)
 	err = Errno(-ret)
 	return
 }
 
-// TODO(flysand): clock_getres
 
-// TODO(flysand): clock_nanosleep
+/*
+	Finds the resolution of the specified clock.
+	Available since Linux 2.6.
+*/
+clock_getres :: proc "contextless" (clock: Clock_Id, res: ^Time_Spec) -> (Errno) {
+	ret := syscall(SYS_clock_getres, clock, res)
+	return Errno(-ret)
+}
+
+/*
+	Sleep for an interval specified with nanosecond precision.
+	Available since Linux 2.6.
+*/
+clock_nanosleep :: proc "contextless" (clock: Clock_Id, flags: ITimer_Flags, request: ^Time_Spec, remain: ^Time_Spec) -> (Errno) {
+	ret := syscall(SYS_clock_nanosleep, clock, transmute(u32) flags, request, remain)
+	return Errno(-ret)
+}
 
 /*
 	Exit the thread group.
