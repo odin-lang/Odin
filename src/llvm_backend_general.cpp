@@ -91,6 +91,9 @@ gb_internal void lb_init_module(lbModule *m, Checker *c) {
 	map_init(&m->map_cell_info_map, 0);
 	map_init(&m->exact_value_compound_literal_addr_map, 1024);
 
+	array_init(&m->pad_types, heap_allocator());
+
+
 	m->const_dummy_builder = LLVMCreateBuilderInContext(m->ctx);
 
 }

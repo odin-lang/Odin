@@ -1003,6 +1003,21 @@ gb_internal i32 lb_convert_struct_index(lbModule *m, Type *t, i32 index) {
 }
 
 gb_internal LLVMTypeRef lb_type_padding_filler(lbModule *m, i64 padding, i64 padding_align) {
+	MUTEX_GUARD(&m->pad_types_mutex);
+	if (padding % padding_align == 0) {
+		for (auto pd : m->pad_types) {
+			if (pd.padding == padding && pd.padding_align == padding_align) {
+				return pd.type;
+			}
+		}
+	} else {
+		for (auto pd : m->pad_types) {
+			if (pd.padding == padding && pd.padding_align == 1) {
+				return pd.type;
+			}
+		}
+	}
+
 	// NOTE(bill): limit to `[N x u64]` to prevent ABI issues
 	padding_align = gb_clamp(padding_align, 1, 8);
 	if (padding % padding_align == 0) {
@@ -1016,13 +1031,19 @@ gb_internal LLVMTypeRef lb_type_padding_filler(lbModule *m, i64 padding, i64 pad
 		}
 		
 		GB_ASSERT_MSG(elem != nullptr, "Invalid lb_type_padding_filler padding and padding_align: %lld", padding_align);
+
+		LLVMTypeRef type = nullptr;
 		if (len != 1) {
-			return llvm_array_type(elem, len);
+			type = llvm_array_type(elem, len);
 		} else {
-			return elem;
+			type = elem;
 		}
+		array_add(&m->pad_types, lbPadType{padding, padding_align, type});
+		return type;
 	} else {
-		return llvm_array_type(lb_type(m, t_u8), padding);
+		LLVMTypeRef type = llvm_array_type(lb_type(m, t_u8), padding);
+		array_add(&m->pad_types, lbPadType{padding, 1, type});
+		return type;
 	}
 }
 
