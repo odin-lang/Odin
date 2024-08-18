@@ -1637,6 +1637,7 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 
 	Ast *expr = unparen_expr(rs->expr);
 
+	bool is_range = false;
 	bool is_possibly_addressable = true;
 	isize max_val_count = 2;
 	if (is_ast_range(expr)) {
@@ -1645,6 +1646,7 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 		Operand y = {};
 
 		is_possibly_addressable = false;
+		is_range = true;
 
 		bool ok = check_range(ctx, expr, true, &x, &y, nullptr);
 		if (!ok) {
@@ -1889,7 +1891,9 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 			}
 			if (found == nullptr) {
 				entity = alloc_entity_variable(ctx->scope, token, type, EntityState_Resolved);
-				entity->flags |= EntityFlag_ForValue;
+				if (!is_range) {
+					entity->flags |= EntityFlag_ForValue;
+				}
 				entity->flags |= EntityFlag_Value;
 				entity->identifier = name;
 				entity->Variable.for_loop_parent_type = type_of_expr(expr);
