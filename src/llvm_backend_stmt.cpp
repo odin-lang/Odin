@@ -1574,9 +1574,14 @@ gb_internal void lb_store_type_case_implicit(lbProcedure *p, Ast *clause, lbValu
 	GB_ASSERT(e != nullptr);
 	if (e->flags & EntityFlag_Value) {
 		// by value
-		GB_ASSERT(are_types_identical(e->type, value.type));
-		lbAddr x = lb_add_local(p, e->type, e, false);
-		lb_addr_store(p, x, value);
+		if (are_types_identical(e->type, value.type)) {
+			lbAddr x = lb_add_local(p, e->type, e, false);
+			lb_addr_store(p, x, value);
+		} else {
+			GB_ASSERT(are_types_identical(type_deref(e->type), value.type));
+			lbAddr x = lb_add_local(p, type_deref(e->type), e, false);
+			lb_addr_store(p, x, value);
+		}
 	} else {
 		if (!is_default_case) {
 			Type *clause_type = e->type;
