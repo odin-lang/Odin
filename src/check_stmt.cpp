@@ -824,7 +824,8 @@ gb_internal bool check_using_stmt_entity(CheckerContext *ctx, AstUsingStmt *us, 
 				if (f->kind == Entity_Variable) {
 					Entity *uvar = alloc_entity_using_variable(e, f->token, f->type, expr);
 					if (!is_ptr && e->flags & EntityFlag_Value) uvar->flags |= EntityFlag_Value;
-					if (e->flags & EntityFlag_Param) uvar->flags |= EntityFlag_Param;
+					if (e->flags & EntityFlag_Param)            uvar->flags |= EntityFlag_Param;
+					if (e->flags & EntityFlag_SoaPtrField)      uvar->flags |= EntityFlag_SoaPtrField;
 					Entity *prev = scope_insert(ctx->scope, uvar);
 					if (prev != nullptr) {
 						gbString expr_str = expr_to_string(expr);

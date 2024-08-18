@@ -3754,10 +3754,13 @@ gb_internal lbValue lb_get_using_variable(lbProcedure *p, Entity *e) {
 
 	lbValue v = {};
 
+	bool is_soa = false;
 	if (pv == nullptr && parent->flags & EntityFlag_SoaPtrField) {
+		is_soa = true;
 		// NOTE(bill): using SOA value (probably from for-in statement)
 		lbAddr parent_addr = lb_get_soa_variable_addr(p, parent);
-		v = lb_addr_get_ptr(p, parent_addr);
+		Type *soa_ptr_type = alloc_type_soa_pointer(lb_addr_type(parent_addr));
+		v = lb_address_from_load_or_generate_local(p, lb_make_soa_pointer(p, soa_ptr_type, parent_addr.addr, parent_addr.soa.index));
 	} else if (pv != nullptr) {
 		v = *pv;
 	} else {
@@ -3765,7 +3768,7 @@ gb_internal lbValue lb_get_using_variable(lbProcedure *p, Entity *e) {
 		v = lb_build_addr_ptr(p, e->using_expr);
 	}
 	GB_ASSERT(v.value != nullptr);
-	GB_ASSERT_MSG(parent->type == type_deref(v.type), "%s %s", type_to_string(parent->type), type_to_string(v.type));
+	GB_ASSERT_MSG(is_soa || parent->type == type_deref(v.type), "%s %s", type_to_string(parent->type), type_to_string(v.type));
 	lbValue ptr = lb_emit_deep_field_gep(p, v, sel);
 	if (parent->scope) {
 		if ((parent->scope->flags & (ScopeFlag_File|ScopeFlag_Pkg)) == 0) {
