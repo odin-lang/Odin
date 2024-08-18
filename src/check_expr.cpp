@@ -2332,14 +2332,24 @@ gb_internal bool check_integer_exceed_suggestion(CheckerContext *c, Operand *o, 
 		}
 		BigInt *bi = &o->value.value_integer;
 		if (is_type_unsigned(type)) {
+			BigInt one = big_int_make_u64(1);
+			BigInt max_size = big_int_make_u64(1);
+			BigInt bits = big_int_make_i64(bit_size);
+			big_int_shl_eq(&max_size, &bits);
+			big_int_sub_eq(&max_size, &one);
+
 			if (big_int_is_neg(bi)) {
 				error_line("\tA negative value cannot be represented by the unsigned integer type '%s'\n", b);
+				BigInt dst = {};
+				big_int_neg(&dst, bi);
+				if (big_int_cmp(&dst, &max_size) < 0) {
+					big_int_sub_eq(&dst, &one);
+					String dst_str = big_int_to_string(temporary_allocator(), &dst);
+					gbString t = type_to_string(type);
+					error_line("\tSuggestion: ~%s(%.*s)\n", t, LIT(dst_str));
+					gb_string_free(t);
+				}
 			} else {
-				BigInt one = big_int_make_u64(1);
-				BigInt max_size = big_int_make_u64(1);
-				BigInt bits = big_int_make_i64(bit_size);
-				big_int_shl_eq(&max_size, &bits);
-				big_int_sub_eq(&max_size, &one);
 				String max_size_str = big_int_to_string(temporary_allocator(), &max_size);
 
 				if (size_changed) {
