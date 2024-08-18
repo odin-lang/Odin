@@ -3140,15 +3140,6 @@ gb_internal lbValue lb_emit_comp_against_nil(lbProcedure *p, TokenKind op_kind, 
 	return {};
 }
 
-gb_internal lbValue lb_make_soa_pointer(lbProcedure *p, Type *type, lbValue const &addr, lbValue const &index) {
-	lbAddr v = lb_add_local_generated(p, type, false);
-	lbValue ptr = lb_emit_struct_ep(p, v.addr, 0);
-	lbValue idx = lb_emit_struct_ep(p, v.addr, 1);
-	lb_emit_store(p, ptr, addr);
-	lb_emit_store(p, idx, lb_emit_conv(p, index, t_int));
-
-	return lb_addr_load(p, v);
-}
 
 gb_internal lbValue lb_build_unary_and(lbProcedure *p, Ast *expr) {
 	ast_node(ue, UnaryExpr, expr);
@@ -3759,8 +3750,7 @@ gb_internal lbValue lb_get_using_variable(lbProcedure *p, Entity *e) {
 		is_soa = true;
 		// NOTE(bill): using SOA value (probably from for-in statement)
 		lbAddr parent_addr = lb_get_soa_variable_addr(p, parent);
-		Type *soa_ptr_type = alloc_type_soa_pointer(lb_addr_type(parent_addr));
-		v = lb_address_from_load_or_generate_local(p, lb_make_soa_pointer(p, soa_ptr_type, parent_addr.addr, parent_addr.soa.index));
+		v = lb_addr_get_ptr(p, parent_addr);
 	} else if (pv != nullptr) {
 		v = *pv;
 	} else {

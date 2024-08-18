@@ -534,6 +534,15 @@ gb_internal lbValue lb_relative_pointer_to_pointer(lbProcedure *p, lbAddr const 
 	return final_ptr;
 }
 
+gb_internal lbValue lb_make_soa_pointer(lbProcedure *p, Type *type, lbValue const &addr, lbValue const &index) {
+	lbAddr v = lb_add_local_generated(p, type, false);
+	lbValue ptr = lb_emit_struct_ep(p, v.addr, 0);
+	lbValue idx = lb_emit_struct_ep(p, v.addr, 1);
+	lb_emit_store(p, ptr, addr);
+	lb_emit_store(p, idx, lb_emit_conv(p, index, t_int));
+
+	return lb_addr_load(p, v);
+}
 
 gb_internal lbValue lb_addr_get_ptr(lbProcedure *p, lbAddr const &addr) {
 	if (addr.addr.value == nullptr) {
@@ -549,8 +558,12 @@ gb_internal lbValue lb_addr_get_ptr(lbProcedure *p, lbAddr const &addr) {
 		return lb_relative_pointer_to_pointer(p, addr);
 
 	case lbAddr_SoaVariable:
-		// TODO(bill): FIX THIS HACK
-		return lb_address_from_load(p, lb_addr_load(p, addr));
+		{
+			Type *soa_ptr_type = alloc_type_soa_pointer(lb_addr_type(addr));
+			return lb_address_from_load_or_generate_local(p, lb_make_soa_pointer(p, soa_ptr_type, addr.addr, addr.soa.index));
+			// TODO(bill): FIX THIS HACK
+			// return lb_address_from_load(p, lb_addr_load(p, addr));
+		}
 
 	case lbAddr_Context:
 		GB_PANIC("lbAddr_Context should be handled elsewhere");
