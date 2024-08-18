@@ -5168,7 +5168,14 @@ gb_internal Entity *check_selector(CheckerContext *c, Operand *operand, Ast *nod
 		add_entity_use(c, op_expr, e);
 		expr_entity = e;
 
-		if (e != nullptr && e->kind == Entity_ImportName && selector->kind == Ast_Ident) {
+		if (e != nullptr && (e->kind == Entity_Procedure || e->kind == Entity_ProcGroup) && selector->kind == Ast_Ident) {
+			gbString sel_str = expr_to_string(selector);
+			error(node, "'%s' is not declared by by '%.*s'", sel_str, LIT(e->token.string));
+			gb_string_free(sel_str);
+			operand->mode = Addressing_Invalid;
+			operand->expr = node;
+			return nullptr;
+		} else if (e != nullptr && e->kind == Entity_ImportName && selector->kind == Ast_Ident) {
 			// IMPORTANT NOTE(bill): This is very sloppy code but it's also very fragile
 			// It pretty much needs to be in this order and this way
 			// If you can clean this up, please do but be really careful
