@@ -6253,7 +6253,9 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 			}
 
 			if (param_is_variadic) {
-				continue;
+				if (!named_variadic_param) {
+					continue;
+				}
 			}
 			score += eval_param_and_score(c, o, e->type, err, false, e, show_error);
 		}
