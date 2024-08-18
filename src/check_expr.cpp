@@ -3935,6 +3935,60 @@ gb_internal void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Typ
 		return;
 	}
 
+	bool REQUIRE = true;
+	Type *bt = base_type(x->type);
+	if (op.kind == Token_Mod    || op.kind == Token_ModEq ||
+	    op.kind == Token_ModMod || op.kind == Token_ModModEq) {
+		if (bt->kind == Type_Basic) switch (bt->Basic.kind) {
+		case Basic_u128: add_package_dependency(c, "runtime", "umodti3", REQUIRE); break;
+		case Basic_i128: add_package_dependency(c, "runtime", "modti3",  REQUIRE); break;
+		}
+	} else if (op.kind == Token_Quo || op.kind == Token_QuoEq) {
+		if (bt->kind == Type_Basic) switch (bt->Basic.kind) {
+		case Basic_complex32:     add_package_dependency(c, "runtime", "quo_complex32");     break;
+		case Basic_complex64:     add_package_dependency(c, "runtime", "quo_complex64");     break;
+		case Basic_complex128:    add_package_dependency(c, "runtime", "quo_complex128");    break;
+		case Basic_quaternion64:  add_package_dependency(c, "runtime", "quo_quaternion64");  break;
+		case Basic_quaternion128: add_package_dependency(c, "runtime", "quo_quaternion128"); break;
+		case Basic_quaternion256: add_package_dependency(c, "runtime", "quo_quaternion256"); break;
+
+		case Basic_u128: add_package_dependency(c, "runtime", "udivti3", REQUIRE); break;
+		case Basic_i128: add_package_dependency(c, "runtime", "divti3",  REQUIRE); break;
+		}
+	} else if (op.kind == Token_Mul || op.kind == Token_MulEq) {
+		if (bt->kind == Type_Basic) switch (bt->Basic.kind) {
+		case Basic_quaternion64:  add_package_dependency(c, "runtime", "mul_quaternion64");  break;
+		case Basic_quaternion128: add_package_dependency(c, "runtime", "mul_quaternion128"); break;
+		case Basic_quaternion256: add_package_dependency(c, "runtime", "mul_quaternion256"); break;
+
+
+		case Basic_u128:
+		case Basic_i128:
+			if (is_arch_wasm()) {
+				add_package_dependency(c, "runtime", "__multi3", REQUIRE);
+			}
+			break;
+		}
+	} else if (op.kind == Token_Shl || op.kind == Token_ShlEq) {
+		if (bt->kind == Type_Basic) switch (bt->Basic.kind) {
+		case Basic_u128:
+		case Basic_i128:
+			if (is_arch_wasm()) {
+				add_package_dependency(c, "runtime", "__ashlti3", REQUIRE);
+			}
+			break;
+		}
+	} else if (op.kind == Token_Shr || op.kind == Token_ShrEq) {
+		if (bt->kind == Type_Basic) switch (bt->Basic.kind) {
+		case Basic_u128:
+		case Basic_i128:
+			if (is_arch_wasm()) {
+				add_package_dependency(c, "runtime", "__lshrti3", REQUIRE);
+			}
+			break;
+		}
+	}
+
 	if (token_is_shift(op.kind)) {
 		check_shift(c, x, y, node, type_hint);
 		return;
@@ -4101,52 +4155,6 @@ gb_internal void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Typ
 		error(node, "String concatenation is only allowed with constant strings");
 		x->mode = Addressing_Invalid;
 		return;
-	}
-
-	bool REQUIRE = true;
-
-	Type *bt = base_type(x->type);
-	if (op.kind == Token_Mod    || op.kind == Token_ModEq ||
-	    op.kind == Token_ModMod || op.kind == Token_ModModEq) {
-		if (bt->kind == Type_Basic) switch (bt->Basic.kind) {
-		case Basic_u128: add_package_dependency(c, "runtime", "umodti3", REQUIRE); break;
-		case Basic_i128: add_package_dependency(c, "runtime", "modti3",  REQUIRE); break;
-		}
-	} else if (op.kind == Token_Quo || op.kind == Token_QuoEq) {
-		if (bt->kind == Type_Basic) switch (bt->Basic.kind) {
-		case Basic_complex32:     add_package_dependency(c, "runtime", "quo_complex32");     break;
-		case Basic_complex64:     add_package_dependency(c, "runtime", "quo_complex64");     break;
-		case Basic_complex128:    add_package_dependency(c, "runtime", "quo_complex128");    break;
-		case Basic_quaternion64:  add_package_dependency(c, "runtime", "quo_quaternion64");  break;
-		case Basic_quaternion128: add_package_dependency(c, "runtime", "quo_quaternion128"); break;
-		case Basic_quaternion256: add_package_dependency(c, "runtime", "quo_quaternion256"); break;
-
-		case Basic_u128: add_package_dependency(c, "runtime", "udivti3", REQUIRE); break;
-		case Basic_i128: add_package_dependency(c, "runtime", "divti3",  REQUIRE); break;
-		}
-	} else if (op.kind == Token_Mul || op.kind == Token_MulEq) {
-		if (bt->kind == Type_Basic) switch (bt->Basic.kind) {
-		case Basic_quaternion64:  add_package_dependency(c, "runtime", "mul_quaternion64");  break;
-		case Basic_quaternion128: add_package_dependency(c, "runtime", "mul_quaternion128"); break;
-		case Basic_quaternion256: add_package_dependency(c, "runtime", "mul_quaternion256"); break;
-
-
-		case Basic_u128:
-		case Basic_i128:
-			if (is_arch_wasm()) {
-				add_package_dependency(c, "runtime", "__multi3", REQUIRE);
-			}
-			break;
-		}
-	} else if (op.kind == Token_Shl || op.kind == Token_ShlEq) {
-		if (bt->kind == Type_Basic) switch (bt->Basic.kind) {
-		case Basic_u128:
-		case Basic_i128:
-			if (is_arch_wasm()) {
-				add_package_dependency(c, "runtime", "__ashlti3", REQUIRE);
-			}
-			break;
-		}
 	}
 
 	x->mode = Addressing_Value;

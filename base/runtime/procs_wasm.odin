@@ -52,3 +52,24 @@ udivti3 :: proc "c" (la, ha, lb, hb: u64) -> u128 {
 	b.lo, b.hi = lb, hb
 	return udivmodti4(a.all, b.all, nil)
 }
+
+@(link_name="__lshrti3", linkage="strong")
+__lshrti3 :: proc "c" (la, ha: u64, b: u32) -> i128 {
+	bits :: size_of(u32)*8
+
+	input, result: ti_int
+	input.lo = la
+	input.hi = ha
+
+	if b & bits != 0 {
+		result.hi = 0
+		result.lo = input.hi >> (b - bits)
+	} else if b == 0 {
+		return input.all
+	} else {
+		result.hi = input.hi >> b
+		result.lo = (input.hi << (bits - b)) | (input.lo >> b)
+	}
+
+	return result.all
+}
