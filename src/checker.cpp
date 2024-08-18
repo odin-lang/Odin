@@ -2723,6 +2723,7 @@ gb_internal void generate_minimum_dependency_set(Checker *c, Entity *start) {
 		// WASM Specific
 		str_lit("__ashlti3"),
 		str_lit("__multi3"),
+		str_lit("__lshrti3"),
 	);
 
 	FORCE_ADD_RUNTIME_ENTITIES(!build_context.no_rtti,
