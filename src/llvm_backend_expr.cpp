@@ -5116,8 +5116,9 @@ gb_internal lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 					a = lb_addr_get_ptr(p, addr);
 				}
 
-				GB_ASSERT(is_type_array(expr->tav.type) || is_type_simd_vector(expr->tav.type));
-				return lb_addr_swizzle(a, expr->tav.type, swizzle_count, swizzle_indices);
+				Type *type = type_deref(expr->tav.type);
+				GB_ASSERT(is_type_array(type) || is_type_simd_vector(type));
+				return lb_addr_swizzle(a, type, swizzle_count, swizzle_indices);
 			}
 
 			Selection sel = lookup_field(type, selector, false);
