@@ -61,7 +61,7 @@ walk :: proc(v: ^Visitor, node: ^Node) {
 		return
 	}
 
-	switch n in &node.derived {
+	switch n in node.derived {
 	case ^File:
 		if n.docs != nil {
 			walk(v, n.docs)
