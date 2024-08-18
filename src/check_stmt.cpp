@@ -1478,7 +1478,7 @@ gb_internal void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_
 			case_type = nullptr;
 		}
 		if (case_type == nullptr) {
-			case_type = x.type;
+			case_type = type_deref(x.type);
 		}
 		if (switch_kind == TypeSwitch_Any) {
 			if (!is_type_untyped(case_type)) {
