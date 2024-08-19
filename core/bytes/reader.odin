@@ -9,10 +9,11 @@ Reader :: struct {
 	prev_rune: int,    // previous reading index of rune or < 0
 }
 
-reader_init :: proc(r: ^Reader, s: []byte) {
+reader_init :: proc(r: ^Reader, s: []byte) -> io.Stream {
 	r.s = s
 	r.i = 0
 	r.prev_rune = -1
+	return reader_to_stream(r)
 }
 
 reader_to_stream :: proc(r: ^Reader) -> (s: io.Stream) {
