@@ -88,7 +88,7 @@ foreign lib {
 
 	[[ More; https://pubs.opengroup.org/onlinepubs/9699919799/functions/tcsetattr.html ]]
 	*/
-	tcsetattr :: proc(fildes: FD, optional_actions: c.int, termios_p: ^termios) -> result ---
+	tcsetattr :: proc(fildes: FD, optional_actions: TC_Optional_Action, termios_p: ^termios) -> result ---
 }
 
 Control_Char :: enum c.int {
@@ -219,6 +219,12 @@ TC_Action :: enum c.int {
 	TCOON  = TCOON,
 }
 
+TC_Optional_Action :: enum c.int {
+	TCSANOW,
+	TCSADRAIN,
+	TCSAFLUSH,
+}
+
 TC_Queue :: enum c.int {
 	TCIFLUSH  = TCIFLUSH,
 	TCOFLUSH  = TCOFLUSH,
@@ -268,34 +274,34 @@ when ODIN_OS == .Darwin {
 	IXOFF  :: 0x00000400
 	IXANY  :: 0x00000800
 
-	OPOST    :: 0x00000001
-	ONLCR    :: 0x00000002
-	OCRNL    :: 0x00000010
-	ONOCR    :: 0x00000020
-	ONLRET   :: 0x00000040
-	OFDEL    :: 0x00020000
-	OFILL    :: 0x00000080
-	_NLDLY   :: 0x00000300
-		NL0  :: 0x00000000
-		NL1  :: 0x00000100
-	_CRDLY   :: 0x00003000
-		CR0  :: 0x00000000
-		CR1  :: 0x00001000
-		CR2  :: 0x00002000
-		CR3  :: 0x00003000
-	_TABDLY  :: 0x00000c04
-		TAB0 :: 0x00000000
-		TAB1 :: 0x00000400
-		TAB3 :: 0x00000800
-	_BSDLY   :: 0x00008000
-		BS0  :: 0x00000000
-		BS1  :: 0x00008000
-	_VTDLY   :: 0x00010000
-		VT0  :: 0x00000000
-		VT1  :: 0x00010000
-	_FFDLY   :: 0x00004000
-		FF0  :: 0x00000000
-		FF1  :: 0x00004000
+	OPOST   :: 0x00000001
+	ONLCR   :: 0x00000002
+	OCRNL   :: 0x00000010
+	ONOCR   :: 0x00000020
+	ONLRET  :: 0x00000040
+	OFDEL   :: 0x00020000
+	OFILL   :: 0x00000080
+	_NLDLY  :: 0x00000300
+	NL0     :: 0x00000000
+	NL1     :: 0x00000100
+	_CRDLY  :: 0x00003000
+	CR0     :: 0x00000000
+	CR1     :: 0x00001000
+	CR2     :: 0x00002000
+	CR3     :: 0x00003000
+	_TABDLY :: 0x00000c04
+	TAB0    :: 0x00000000
+	TAB1    :: 0x00000400
+	TAB3    :: 0x00000800
+	_BSDLY  :: 0x00008000
+	BS0     :: 0x00000000
+	BS1     :: 0x00008000
+	_VTDLY  :: 0x00010000
+	VT0     :: 0x00000000
+	VT1     :: 0x00010000
+	_FFDLY  :: 0x00004000
+	FF0     :: 0x00000000
+	FF1     :: 0x00004000
 
 	B0     :: 0
 	B50    :: 50
@@ -398,29 +404,29 @@ when ODIN_OS == .Darwin {
 		ONOCR  :: 0x00000020
 		ONLRET :: 0x00000040
 	}
-	OFDEL    :: 0x00020000 // NOTE: not in headers
-	OFILL    :: 0x00000080 // NOTE: not in headers
-	_NLDLY   :: 0x00000300 // NOTE: not in headers
-		NL0  :: 0x00000000 // NOTE: not in headers
-		NL1  :: 0x00000100 // NOTE: not in headers
-	_CRDLY   :: 0x00003000 // NOTE: not in headers
-		CR0  :: 0x00000000 // NOTE: not in headers
-		CR1  :: 0x00001000 // NOTE: not in headers
-		CR2  :: 0x00002000 // NOTE: not in headers
-		CR3  :: 0x00003000 // NOTE: not in headers
-	_TABDLY  :: 0x00000004 // NOTE: not in headers (netbsd)
-		TAB0 :: 0x00000000 // NOTE: not in headers (netbsd)
-		TAB1 :: 0x00000004 // NOTE: not in headers
-		TAB3 :: 0x00000004 // NOTE: not in headers (netbsd)
-	_BSDLY   :: 0x00008000 // NOTE: not in headers
-		BS0  :: 0x00000000 // NOTE: not in headers
-		BS1  :: 0x00008000 // NOTE: not in headers
-	_VTDLY   :: 0x00010000 // NOTE: not in headers
-		VT0  :: 0x00000000 // NOTE: not in headers
-		VT1  :: 0x00010000 // NOTE: not in headers
-	_FFDLY   :: 0x00004000 // NOTE: not in headers
-		FF0  :: 0x00000000 // NOTE: not in headers
-		FF1  :: 0x00004000 // NOTE: not in headers
+	OFDEL   :: 0x00020000 // NOTE: not in headers
+	OFILL   :: 0x00000080 // NOTE: not in headers
+	_NLDLY  :: 0x00000300 // NOTE: not in headers
+	NL0     :: 0x00000000 // NOTE: not in headers
+	NL1     :: 0x00000100 // NOTE: not in headers
+	_CRDLY  :: 0x00003000 // NOTE: not in headers
+	CR0     :: 0x00000000 // NOTE: not in headers
+	CR1     :: 0x00001000 // NOTE: not in headers
+	CR2     :: 0x00002000 // NOTE: not in headers
+	CR3     :: 0x00003000 // NOTE: not in headers
+	_TABDLY :: 0x00000004 // NOTE: not in headers (netbsd)
+	TAB0    :: 0x00000000 // NOTE: not in headers (netbsd)
+	TAB1    :: 0x00000004 // NOTE: not in headers
+	TAB3    :: 0x00000004 // NOTE: not in headers (netbsd)
+	_BSDLY  :: 0x00008000 // NOTE: not in headers
+	BS0     :: 0x00000000 // NOTE: not in headers
+	BS1     :: 0x00008000 // NOTE: not in headers
+	_VTDLY  :: 0x00010000 // NOTE: not in headers
+	VT0     :: 0x00000000 // NOTE: not in headers
+	VT1     :: 0x00010000 // NOTE: not in headers
+	_FFDLY  :: 0x00004000 // NOTE: not in headers
+	FF0     :: 0x00000000 // NOTE: not in headers
+	FF1     :: 0x00004000 // NOTE: not in headers
 
 	B0     :: 0
 	B50    :: 50
@@ -469,6 +475,126 @@ when ODIN_OS == .Darwin {
 	TCION  :: 4
 	TCOOFF :: 1
 	TCOON  :: 2
+
+} else when ODIN_OS == .Linux {
+	cc_t      :: distinct c.uchar
+	_speed_t  :: distinct c.uint
+	tcflag_t  :: distinct c.uint
+
+	termios :: struct {
+		c_iflag:  CInput_Flags,               /* [XBD] input flags */
+		c_oflag:  COutput_Flags,              /* [XBD] output flags */
+		c_cflag:  CControl_Flags,             /* [XBD] control flags */
+		c_lflag:  CLocal_Flags,               /* [XBD] local flag */
+		c_line:   cc_t,                       /* control characters */
+		c_cc:     #sparse [Control_Char]cc_t, /* [XBD] control chars */
+		c_ispeed: speed_t,                    /* input speed */
+		c_ospeed: speed_t,                    /* output speed */
+	}
+
+	NCCS :: 20
+
+	VINTR  :: 0
+	VQUIT  :: 1
+	VERASE :: 2
+	VKILL  :: 3
+	VEOF   :: 4
+	VTIME  :: 5
+	VMIN   :: 6
+	VSTART :: 8
+	VSTOP  :: 9
+	VSUSP  :: 10
+	VEOL   :: 11
+
+	IGNBRK :: 0x00000001
+	BRKINT :: 0x00000002
+	IGNPAR :: 0x00000004
+	PARMRK :: 0x00000008
+	INPCK  :: 0x00000010
+	ISTRIP :: 0x00000020
+	INLCR  :: 0x00000040
+	IGNCR  :: 0x00000080
+	ICRNL  :: 0x00000100
+	IXON   :: 0x00000400
+	IXOFF  :: 0x00001000
+	IXANY  :: 0x00000800
+
+	OPOST   :: 0x00000001
+	ONLCR   :: 0x00000004
+	OCRNL   :: 0x00000008
+	ONOCR   :: 0x00000010
+	ONLRET  :: 0x00000020
+	OFDEL   :: 0x00000080
+	OFILL   :: 0x00000040
+	_NLDLY  :: 0x00000100
+	NL0     :: 0x00000000
+	NL1     :: 0x00000100
+	_CRDLY  :: 0x00000600
+	CR0     :: 0x00000000
+	CR1     :: 0x00000200
+	CR2     :: 0x00000400
+	CR3     :: 0x00000600
+	_TABDLY :: 0x00001800
+	TAB0    :: 0x00000000
+	TAB1    :: 0x00000800
+	TAB3    :: 0x00001800
+	_BSDLY  :: 0x00002000
+	BS0     :: 0x00000000
+	BS1     :: 0x00002000
+	_VTDLY  :: 0x00004000
+	VT0     :: 0x00000000
+	VT1     :: 0x00004000
+	_FFDLY  :: 0x00008000
+	FF0     :: 0x00000000
+	FF1     :: 0x00008000
+
+  B0     :: 0x00000000
+  B50    :: 0x00000001
+  B75    :: 0x00000002
+  B110   :: 0x00000003
+  B134   :: 0x00000004
+  B150   :: 0x00000005
+  B200   :: 0x00000006
+  B300   :: 0x00000007
+  B600   :: 0x00000008
+  B1200  :: 0x00000009
+  B1800  :: 0x0000000a
+  B2400  :: 0x0000000b
+  B4800  :: 0x0000000c
+  B9600  :: 0x0000000d
+  B19200 :: 0x0000000e
+  B38400 :: 0x0000000f
+
+	_CSIZE :: 0x00000030
+	CS5    :: 0x00000000
+	CS6    :: 0x00000010
+	CS7    :: 0x00000020
+	CS8    :: 0x00000030
+	CSTOPB :: 0x00000040
+	CREAD  :: 0x00000080
+	PARENB :: 0x00000100
+	PARODD :: 0x00000200
+	HUPCL  :: 0x00000400
+	CLOCAL :: 0x00000800
+
+	ECHO   :: 0x00000008
+	ECHOE  :: 0x00000010
+	ECHOK  :: 0x00000020
+	ECHONL :: 0x00000040
+	ICANON :: 0x00000002
+	IEXTEN :: 0x00008000
+	ISIG   :: 0x00000001
+	NOFLSH :: 0x80000080
+	TOSTOP :: 0x00000100
+
+	TCIFLUSH  :: 0
+	TCOFLUSH  :: 1
+	TCIOFLUSH :: 2
+
+	TCIOFF :: 2
+	TCION  :: 3
+	TCOOFF :: 0
+	TCOON  :: 1
 
 } else {
 	#panic("posix is unimplemented for the current target")
