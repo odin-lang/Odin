@@ -47,6 +47,14 @@ _file_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, 
 		}
 	case .Seek:
 		n, os_err = seek(fd, offset, int(whence))
+		if os_err != nil {
+			switch whence {
+			case .Start, .Current, .End:
+				return 0, .Invalid_Offset
+			case:
+				return 0, .Invalid_Whence
+			}
+		}
 	case .Size:
 		n, os_err = file_size(fd)
 	case .Destroy:

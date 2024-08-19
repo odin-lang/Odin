@@ -192,6 +192,8 @@ seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Error) {
 	case 0: w = win32.FILE_BEGIN
 	case 1: w = win32.FILE_CURRENT
 	case 2: w = win32.FILE_END
+	case:
+		return 0, .Invalid_Whence
 	}
 	hi := i32(offset>>32)
 	lo := i32(offset)
