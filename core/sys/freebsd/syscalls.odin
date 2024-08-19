@@ -14,6 +14,8 @@ import "core:c"
 // FreeBSD 15 syscall numbers
 // See: https://alfonsosiciliano.gitlab.io/posts/2023-08-28-freebsd-15-system-calls.html
 
+SYS_read       : uintptr : 3
+SYS_write      : uintptr : 4
 SYS_open       : uintptr : 5
 SYS_close      : uintptr : 6
 SYS_getpid     : uintptr : 20
@@ -29,11 +31,45 @@ SYS_shutdown   : uintptr : 134
 SYS_setsockopt : uintptr : 105
 SYS_sysctl     : uintptr : 202
 SYS__umtx_op   : uintptr : 454
+SYS_pread      : uintptr : 475
+SYS_pwrite     : uintptr : 476
 SYS_accept4    : uintptr : 541
 
 //
 // Odin syscall wrappers
 //
+
+// Read input.
+//
+// The read() function appeared in Version 1 AT&T UNIX.
+read :: proc "contextless" (fd: Fd, buf: []u8) -> (int, Errno) {
+	result, ok := intrinsics.syscall_bsd(SYS_read,
+		cast(uintptr)fd,
+		cast(uintptr)raw_data(buf),
+		cast(uintptr)len(buf))
+
+	if !ok {
+		return 0, cast(Errno)result
+	}
+
+	return cast(int)result, nil
+}
+
+// Write output.
+//
+// The write() function appeared in Version 1 AT&T UNIX.
+write :: proc "contextless" (fd: Fd, buf: []u8) -> (int, Errno) {
+	result, ok := intrinsics.syscall_bsd(SYS_pwrite,
+		cast(uintptr)fd,
+		cast(uintptr)raw_data(buf),
+		cast(uintptr)len(buf))
+
+	if !ok {
+		return 0, cast(Errno)result
+	}
+
+	return cast(int)result, nil
+}
 
 // Open or create a file for reading, writing or executing.
 //
@@ -467,6 +503,46 @@ _umtx_op :: proc "contextless" (obj: rawptr, op: Userland_Mutex_Operation, val: 
 		cast(uintptr)uaddr2)
 
 	return cast(Errno)result
+}
+
+// Read input without modifying the file pointer.
+//
+// The pread() function appeared in AT&T System V Release 4 UNIX.
+pread :: proc "contextless" (fd: Fd, buf: []u8, offset: off_t) -> (int, Errno) {
+	result, ok := intrinsics.syscall_bsd(SYS_pread,
+		cast(uintptr)fd,
+		cast(uintptr)raw_data(buf),
+		cast(uintptr)len(buf),
+		cast(uintptr)offset)
+
+	if !ok {
+		return 0, cast(Errno)result
+	}
+
+	return cast(int)result, nil
+}
+
+// Write output without modifying the file pointer.
+//
+// The pwrite() function appeared in AT&T System V Release 4 UNIX.
+//
+// BUGS
+//
+// The pwrite() system call appends the file without changing the file
+// offset if O_APPEND is set, contrary to IEEE Std 1003.1-2008 (“POSIX.1”)
+// where pwrite() writes into offset regardless of whether O_APPEND is set.
+pwrite :: proc "contextless" (fd: Fd, buf: []u8, offset: off_t) -> (int, Errno) {
+	result, ok := intrinsics.syscall_bsd(SYS_pwrite,
+		cast(uintptr)fd,
+		cast(uintptr)raw_data(buf),
+		cast(uintptr)len(buf),
+		cast(uintptr)offset)
+
+	if !ok {
+		return 0, cast(Errno)result
+	}
+
+	return cast(int)result, nil
 }
 
 // Accept a connection on a socket.
