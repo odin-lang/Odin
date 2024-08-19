@@ -350,7 +350,7 @@ contains_any :: proc(s, chars: string) -> (res: bool) {
 
 contains_space :: proc(s: string) -> (res: bool) {
 	for c in s {
-		if is_space(r) {
+		if is_space(c) {
 			return true
 		}
 	}
