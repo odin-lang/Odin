@@ -402,7 +402,7 @@ _buffer_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, offse
 		buffer_destroy(b)
 		return
 	case .Query:
-		return io.query_utility({.Read, .Read_At, .Write, .Write_At, .Size, .Destroy})
+		return io.query_utility({.Read, .Read_At, .Write, .Write_At, .Size, .Destroy, .Query})
 	}
 	return 0, .Empty
 }
