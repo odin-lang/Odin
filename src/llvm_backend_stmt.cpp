@@ -1578,9 +1578,9 @@ gb_internal void lb_store_type_case_implicit(lbProcedure *p, Ast *clause, lbValu
 			lbAddr x = lb_add_local(p, e->type, e, false);
 			lb_addr_store(p, x, value);
 		} else {
-			GB_ASSERT(are_types_identical(type_deref(e->type), value.type));
-			lbAddr x = lb_add_local(p, type_deref(e->type), e, false);
-			lb_addr_store(p, x, value);
+			GB_ASSERT_MSG(are_types_identical(e->type, type_deref(value.type)), "%s", type_to_string(value.type));
+			lbAddr x = lb_add_local(p, e->type, e, false);
+			lb_addr_store(p, x, lb_emit_load(p, value));
 		}
 	} else {
 		if (!is_default_case) {
