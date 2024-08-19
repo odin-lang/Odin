@@ -492,7 +492,7 @@ when ODIN_OS == .Darwin {
 		c_ospeed: speed_t,                    /* output speed */
 	}
 
-	NCCS :: 20
+	NCCS :: 32
 
 	VINTR  :: 0
 	VQUIT  :: 1
