@@ -66,5 +66,8 @@ _file_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, 
 	if err == nil && os_err != nil {
 		err = error_to_io_error(os_err)
 	}
+	if err != nil {
+		n = 0
+	}
 	return
 }
