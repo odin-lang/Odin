@@ -2,6 +2,7 @@
 package test_core_math
 
 import "core:math"
+import "core:strconv"
 import "core:testing"
 
 @test
@@ -1229,4 +1230,37 @@ test_large_tan :: proc(t: ^testing.T) {
 		f2 := math.tan(vf[i] + large)
 		testing.expectf(t, close(t, f1, f2), "math.tan(%.15g) = %.15g, want %.15g", vf[i]+large, f2, f1)
 	}
+}
+
+@test
+test_count_digits :: proc(t: ^testing.T) {
+	_run_test :: proc(t: ^testing.T, $base: int) {
+		buf: [64]u8
+		for n in 0..<i64(base*base*base) {
+			count := math.count_digits_of_base(n, base)
+			str := strconv.append_int(buf[:], n, base)
+			if !testing.expectf(t,
+				len(str) == count,
+				"decimal %i in base-%i digit count is %i, does not match length %i of %q",
+				n, base, count, len(str), str) {
+				break
+			}
+		}
+	}
+
+	_run_test(t, 2)
+	_run_test(t, 3)
+	_run_test(t, 4)
+	_run_test(t, 5)
+	_run_test(t, 6)
+	_run_test(t, 7)
+	_run_test(t, 8)
+	_run_test(t, 9)
+	_run_test(t, 10)
+	_run_test(t, 11)
+	_run_test(t, 12)
+	_run_test(t, 13)
+	_run_test(t, 14)
+	_run_test(t, 15)
+	_run_test(t, 16)
 }
