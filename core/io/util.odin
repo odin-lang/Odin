@@ -376,11 +376,12 @@ Section_Reader :: struct {
 	limit: i64,
 }
 
-section_reader_init :: proc(s: ^Section_Reader, r: Reader_At, off: i64, n: i64) {
+section_reader_init :: proc(s: ^Section_Reader, r: Reader_At, off: i64, n: i64) -> Reader {
 	s.r = r
+	s.base = off
 	s.off = off
 	s.limit = off + n
-	return
+	return section_reader_to_stream(s)
 }
 section_reader_to_stream :: proc(s: ^Section_Reader) -> (out: Stream) {
 	out.data = s
