@@ -98,7 +98,6 @@ reader_unread_rune :: proc(r: ^Reader) -> io.Error {
 	return nil
 }
 reader_seek :: proc(r: ^Reader, offset: i64, whence: io.Seek_From) -> (i64, io.Error) {
-	r.prev_rune = -1
 	abs: i64
 	switch whence {
 	case .Start:
@@ -115,6 +114,7 @@ reader_seek :: proc(r: ^Reader, offset: i64, whence: io.Seek_From) -> (i64, io.E
 		return 0, .Invalid_Offset
 	}
 	r.i = abs
+	r.prev_rune = -1
 	return abs, nil
 }
 reader_write_to :: proc(r: ^Reader, w: io.Writer) -> (n: i64, err: io.Error) {
