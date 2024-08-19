@@ -356,7 +356,7 @@ index_byte :: proc(s: []byte, c: byte) -> (index: int) #no_bounds_check {
 		// consumption related woes make premature to have a dedicated
 		// code path.
 		when ODIN_ARCH == .amd64 && intrinsics.has_target_feature("avx2") {
-			c_vec_256: sind.u8x32 = c
+			c_vec_256: simd.u8x32 = c
 
 			s_vecs: [4]simd.u8x32 = ---
 			c_vecs: [4]simd.u8x32 = ---
