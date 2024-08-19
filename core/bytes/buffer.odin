@@ -249,7 +249,7 @@ buffer_read_at :: proc(b: ^Buffer, p: []byte, offset: int) -> (n: int, err: io.E
 	b.last_read = .Invalid
 
 	if uint(offset) >= len(b.buf) {
-		err = .Invalid_Offset
+		err = .EOF
 		return
 	}
 	n = copy(p, b.buf[offset:])
