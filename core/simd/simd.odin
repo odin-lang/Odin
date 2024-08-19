@@ -3,6 +3,13 @@ package simd
 import "base:builtin"
 import "base:intrinsics"
 
+// IS_EMULATED is true iff the compile-time target lacks hardware support
+// for at least 128-bit SIMD.
+IS_EMULATED :: true when (ODIN_ARCH == .amd64 || ODIN_ARCH == .i386) && !intrinsics.has_target_feature("sse2") else
+	true when (ODIN_ARCH == .arm64 || ODIN_ARCH == .arm32) && !intrinsics.has_target_feature("neon") else
+	true when (ODIN_ARCH == .wasm64p32 || ODIN_ARCH == .wasm32) && !intrinsics.has_target_feature("simd128") else
+	false
+
 // 128-bit vector aliases
 u8x16 :: #simd[16]u8
 i8x16 :: #simd[16]i8
