@@ -310,6 +310,26 @@ buffer_unread_rune :: proc(b: ^Buffer) -> io.Error {
 	return nil
 }
 
+buffer_seek :: proc(b: ^Buffer, offset: i64, whence: io.Seek_From) -> (i64, io.Error) {
+	abs: i64
+	switch whence {
+	case .Start:
+		abs = offset
+	case .Current:
+		abs = i64(b.off) + offset
+	case .End:
+		abs = i64(len(b.buf)) + offset
+	case:
+		return 0, .Invalid_Whence
+	}
+
+	if abs < 0 {
+		return 0, .Invalid_Offset
+	}
+	b.last_read = .Invalid
+	b.off = int(abs)
+	return abs, nil
+}
 
 buffer_read_bytes :: proc(b: ^Buffer, delim: byte) -> (line: []byte, err: io.Error) {
 	i := index_byte(b.buf[b.off:], delim)
@@ -395,6 +415,9 @@ _buffer_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, offse
 		return io._i64_err(buffer_write(b, p))
 	case .Write_At:
 		return io._i64_err(buffer_write_at(b, p, int(offset)))
+	case .Seek:
+		n, err = buffer_seek(b, offset, whence)
+		return
 	case .Size:
 		n = i64(buffer_capacity(b))
 		return
@@ -402,7 +425,7 @@ _buffer_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, offse
 		buffer_destroy(b)
 		return
 	case .Query:
-		return io.query_utility({.Read, .Read_At, .Write, .Write_At, .Size, .Destroy, .Query})
+		return io.query_utility({.Read, .Read_At, .Write, .Write_At, .Seek, .Size, .Destroy, .Query})
 	}
 	return 0, .Empty
 }
