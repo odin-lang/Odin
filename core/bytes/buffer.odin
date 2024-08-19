@@ -419,7 +419,7 @@ _buffer_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, offse
 		n, err = buffer_seek(b, offset, whence)
 		return
 	case .Size:
-		n = i64(buffer_capacity(b))
+		n = i64(buffer_length(b))
 		return
 	case .Destroy:
 		buffer_destroy(b)
