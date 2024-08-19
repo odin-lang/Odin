@@ -225,11 +225,13 @@ file_size :: proc(fd: Handle) -> (i64, Error) {
 MAX_RW :: 1<<30
 
 @(private)
-pread :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Error) {
+pread :: proc(fd: Handle, data: []byte, offset: i64) -> (n: int, err: Error) {
+	curr_off := seek(fd, 0, 1) or_return
+	defer seek(fd, curr_off, 0)
+
 	buf := data
 	if len(buf) > MAX_RW {
 		buf = buf[:MAX_RW]
-
 	}
 
 	o := win32.OVERLAPPED{
@@ -249,11 +251,13 @@ pread :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Error) {
 	return int(done), e
 }
 @(private)
-pwrite :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Error) {
+pwrite :: proc(fd: Handle, data: []byte, offset: i64) -> (n: int, err: Error) {
+	curr_off := seek(fd, 0, 1) or_return
+	defer seek(fd, curr_off, 0)
+
 	buf := data
 	if len(buf) > MAX_RW {
 		buf = buf[:MAX_RW]
-
 	}
 
 	o := win32.OVERLAPPED{
@@ -273,13 +277,6 @@ pwrite :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Error) {
 
 /*
 read_at returns n: 0, err: 0 on EOF
-on Windows, read_at changes the position of the file cursor, on *nix, it does not.
-
-	bytes: [8]u8{}
-	read_at(fd, bytes, 0)
-	read(fd, bytes)
-
-will read from the location twice on *nix, and from two different locations on Windows
 */
 read_at :: proc(fd: Handle, data: []byte, offset: i64) -> (n: int, err: Error) {
 	if offset < 0 {
@@ -304,15 +301,6 @@ read_at :: proc(fd: Handle, data: []byte, offset: i64) -> (n: int, err: Error) {
 	return
 }
 
-/*
-on Windows, write_at changes the position of the file cursor, on *nix, it does not.
-
-	bytes: [8]u8{}
-	write_at(fd, bytes, 0)
-	write(fd, bytes)
-
-will write to the location twice on *nix, and to two different locations on Windows
-*/
 write_at :: proc(fd: Handle, data: []byte, offset: i64) -> (n: int, err: Error) {
 	if offset < 0 {
 		return 0, .Invalid_Offset
