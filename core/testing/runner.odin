@@ -18,7 +18,7 @@ import "core:encoding/ansi"
 @require import "core:encoding/json"
 import "core:fmt"
 import "core:io"
-@require import pkg_log "core:log"
+@require import "core:log"
 import "core:math/rand"
 import "core:mem"
 import "core:os"
@@ -167,7 +167,7 @@ run_test_task :: proc(task: thread.Task) {
 		data.t.error_count += memory_leaks + bad_frees
 
 		if memory_is_in_bad_state {
-			pkg_log.errorf("Memory failure in `%s.%s` with %i leak%s and %i bad free%s.",
+			log.errorf("Memory failure in `%s.%s` with %i leak%s and %i bad free%s.",
 				data.it.pkg, data.it.name,
 				memory_leaks, "" if memory_leaks == 1 else "s",
 				bad_frees, "" if bad_frees == 1 else "s")
@@ -486,34 +486,34 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 	}
 
 	when TEST_THREADS == 0 {
-		pkg_log.infof("Starting test runner with %i thread%s. Set with -define:ODIN_TEST_THREADS=n.",
+		log.infof("Starting test runner with %i thread%s. Set with -define:ODIN_TEST_THREADS=n.",
 			thread_count,
 			"" if thread_count == 1 else "s")
 	} else {
-		pkg_log.infof("Starting test runner with %i thread%s.",
+		log.infof("Starting test runner with %i thread%s.",
 			thread_count,
 			"" if thread_count == 1 else "s")
 	}
 
 	when SHARED_RANDOM_SEED == 0 {
-		pkg_log.infof("The random seed sent to every test is: %v. Set with -define:ODIN_TEST_RANDOM_SEED=n.", shared_random_seed)
+		log.infof("The random seed sent to every test is: %v. Set with -define:ODIN_TEST_RANDOM_SEED=n.", shared_random_seed)
 	} else {
-		pkg_log.infof("The random seed sent to every test is: %v.", shared_random_seed)
+		log.infof("The random seed sent to every test is: %v.", shared_random_seed)
 	}
 
 	when TRACKING_MEMORY {
 		when ALWAYS_REPORT_MEMORY {
-			pkg_log.info("Memory tracking is enabled. Tests will log their memory usage when complete.")
+			log.info("Memory tracking is enabled. Tests will log their memory usage when complete.")
 		} else {
-			pkg_log.info("Memory tracking is enabled. Tests will log their memory usage if there's an issue.")
+			log.info("Memory tracking is enabled. Tests will log their memory usage if there's an issue.")
 		}
-		pkg_log.info("< Final Mem/ Total Mem> <  Peak Mem> (#Free/Alloc) :: [package.test_name]")
+		log.info("< Final Mem/ Total Mem> <  Peak Mem> (#Free/Alloc) :: [package.test_name]")
 	} else {
 		when ALWAYS_REPORT_MEMORY {
-			pkg_log.warn("ODIN_TEST_ALWAYS_REPORT_MEMORY is true, but ODIN_TEST_TRACK_MEMORY is false.")
+			log.warn("ODIN_TEST_ALWAYS_REPORT_MEMORY is true, but ODIN_TEST_TRACK_MEMORY is false.")
 		}
 		when FAIL_ON_BAD_MEMORY {
-			pkg_log.warn("ODIN_TEST_FAIL_ON_BAD_MEMORY is true, but ODIN_TEST_TRACK_MEMORY is false.")
+			log.warn("ODIN_TEST_FAIL_ON_BAD_MEMORY is true, but ODIN_TEST_TRACK_MEMORY is false.")
 		}
 	}
 
@@ -557,9 +557,9 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 					write_memory_report(batch_writer, tracker, data.it.pkg, data.it.name)
 
 					when FAIL_ON_BAD_MEMORY {
-						pkg_log.log(.Error if memory_is_in_bad_state else .Info, bytes.buffer_to_string(&batch_buffer))
+						log.log(.Error if memory_is_in_bad_state else .Info, bytes.buffer_to_string(&batch_buffer))
 					} else {
-						pkg_log.log(.Warning if memory_is_in_bad_state else .Info, bytes.buffer_to_string(&batch_buffer))
+						log.log(.Warning if memory_is_in_bad_state else .Info, bytes.buffer_to_string(&batch_buffer))
 					}
 					bytes.buffer_reset(&batch_buffer)
 				}
@@ -607,7 +607,7 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 					}
 
 					when ODIN_DEBUG {
-						pkg_log.debugf("Test #%i %s.%s changed state to %v.", task_channel.test_index, it.pkg, it.name, event.new_state)
+						log.debugf("Test #%i %s.%s changed state to %v.", task_channel.test_index, it.pkg, it.name, event.new_state)
 					}
 
 					pkg.last_change_state = event.new_state
@@ -744,7 +744,7 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 					// the signal won't be very useful, whereas asserts and panics
 					// will provide a user-written error message.
 					failed_test_reason_map[test_index] = fmt.aprintf("Signal caught: %v", reason, allocator = shared_log_allocator)
-					pkg_log.fatalf("Caught signal to stop test #%i %s.%s for: %v.", test_index, it.pkg, it.name, reason)
+					log.fatalf("Caught signal to stop test #%i %s.%s for: %v.", test_index, it.pkg, it.name, reason)
 				}
 
 				when FANCY_OUTPUT {

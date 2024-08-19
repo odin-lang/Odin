@@ -11,7 +11,7 @@ package testing
 
 import "base:intrinsics"
 import "base:runtime"
-import pkg_log "core:log"
+import "core:log"
 import "core:reflect"
 import "core:sync"
 import "core:sync/chan"
@@ -64,18 +64,8 @@ T :: struct {
 }
 
 
-@(deprecated="prefer `log.error`")
-error :: proc(t: ^T, args: ..any, loc := #caller_location) {
-	pkg_log.error(..args, location = loc)
-}
-
-@(deprecated="prefer `log.errorf`")
-errorf :: proc(t: ^T, format: string, args: ..any, loc := #caller_location) {
-	pkg_log.errorf(format, ..args, location = loc)
-}
-
 fail :: proc(t: ^T, loc := #caller_location) {
-	pkg_log.error("FAIL", location=loc)
+	log.error("FAIL", location=loc)
 }
 
 // fail_now will cause a test to immediately fail and abort, much in the same
@@ -87,9 +77,9 @@ fail :: proc(t: ^T, loc := #caller_location) {
 fail_now :: proc(t: ^T, msg := "", loc := #caller_location) -> ! {
 	t._fail_now_called = true
 	if msg != "" {
-		pkg_log.error("FAIL:", msg, location=loc)
+		log.error("FAIL:", msg, location=loc)
 	} else {
-		pkg_log.error("FAIL", location=loc)
+		log.error("FAIL", location=loc)
 	}
 	runtime.trap()
 }
@@ -97,17 +87,6 @@ fail_now :: proc(t: ^T, msg := "", loc := #caller_location) -> ! {
 failed :: proc(t: ^T) -> bool {
 	return t.error_count != 0
 }
-
-@(deprecated="prefer `log.info`")
-log :: proc(t: ^T, args: ..any, loc := #caller_location) {
-	pkg_log.info(..args, location = loc)
-}
-
-@(deprecated="prefer `log.infof`")
-logf :: proc(t: ^T, format: string, args: ..any, loc := #caller_location) {
-	pkg_log.infof(format, ..args, location = loc)
-}
-
 
 // cleanup registers a procedure and user_data, which will be called when the test, and all its subtests, complete.
 // Cleanup procedures will be called in LIFO (last added, first called) order.
@@ -128,14 +107,14 @@ cleanup :: proc(t: ^T, procedure: proc(rawptr), user_data: rawptr) {
 
 expect :: proc(t: ^T, ok: bool, msg: string = "", loc := #caller_location) -> bool {
 	if !ok {
-		pkg_log.error(msg, location=loc)
+		log.error(msg, location=loc)
 	}
 	return ok
 }
 
 expectf :: proc(t: ^T, ok: bool, format: string, args: ..any, loc := #caller_location) -> bool {
 	if !ok {
-		pkg_log.errorf(format, ..args, location=loc)
+		log.errorf(format, ..args, location=loc)
 	}
 	return ok
 }
@@ -143,7 +122,7 @@ expectf :: proc(t: ^T, ok: bool, format: string, args: ..any, loc := #caller_loc
 expect_value :: proc(t: ^T, value, expected: $T, loc := #caller_location) -> bool where intrinsics.type_is_comparable(T) {
 	ok := value == expected || reflect.is_nil(value) && reflect.is_nil(expected)
 	if !ok {
-		pkg_log.errorf("expected %v, got %v", expected, value, location=loc)
+		log.errorf("expected %v, got %v", expected, value, location=loc)
 	}
 	return ok
 }

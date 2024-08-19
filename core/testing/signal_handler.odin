@@ -10,7 +10,7 @@ package testing
 */
 
 import "base:runtime"
-import pkg_log "core:log"
+import "core:log"
 
 Stop_Reason :: enum {
 	Unknown,
@@ -21,7 +21,7 @@ Stop_Reason :: enum {
 }
 
 test_assertion_failure_proc :: proc(prefix, message: string, loc: runtime.Source_Code_Location) -> ! {
-	pkg_log.fatalf("%s: %s", prefix, message, location = loc)
+	log.fatalf("%s: %s", prefix, message, location = loc)
 	runtime.trap()
 }
 
