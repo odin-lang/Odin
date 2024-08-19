@@ -346,6 +346,17 @@ Output:
 contains_any :: proc(s, chars: string) -> (res: bool) {
 	return index_any(s, chars) >= 0
 }
+
+
+contains_space :: proc(s: string) -> (res: bool) {
+	for c in s {
+		if is_space(r) {
+			return true
+		}
+	}
+	return false
+}
+
 /*
 Returns the UTF-8 rune count of the string `s`
 
