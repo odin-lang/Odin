@@ -48,6 +48,7 @@ import shake            "core:crypto/shake"
 import sm3              "core:crypto/sm3"
 import tuplehash        "core:crypto/tuplehash"
 import x25519           "core:crypto/x25519"
+import x448             "core:crypto/x448"
 
 import pe               "core:debug/pe"
 import trace            "core:debug/trace"
@@ -190,6 +191,7 @@ _ :: shake
 _ :: sm3
 _ :: tuplehash
 _ :: x25519
+_ :: x448
 _ :: pe
 _ :: trace
 _ :: dynlib
