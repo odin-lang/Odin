@@ -95,6 +95,11 @@ Application_setTitle :: proc "c" (self: ^Application, title: ^String) {
 	msgSend(nil, self, "setTitle", title)
 }
 
+@(objc_type=Application, objc_name="mainMenu")
+Window_mainMenu :: proc "c" (self: ^Application) -> ^Menu {
+	return msgSend(^Menu, self, "mainMenu")
+}
+
 @(objc_type=Application, objc_name="setMainMenu")
 Application_setMainMenu :: proc "c" (self: ^Application, menu: ^Menu) {
 	msgSend(nil, self, "setMainMenu:", menu)

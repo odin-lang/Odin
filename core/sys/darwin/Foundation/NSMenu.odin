@@ -24,7 +24,7 @@ MenuItemCallback :: proc "c" (unused: rawptr, name: SEL, sender: ^Object)
 
 
 @(objc_class="NSMenuItem")
-MenuItem :: struct {using _: Object} 
+MenuItem :: struct {using _: Object}
 
 @(objc_type=MenuItem, objc_name="alloc", objc_is_class_method=true)
 MenuItem_alloc :: proc "c" () -> ^MenuItem {
@@ -70,11 +70,15 @@ MenuItem_setSubmenu :: proc "c" (self: ^MenuItem, submenu: ^Menu) {
 	msgSend(nil, self, "setSubmenu:", submenu)
 }
 
+@(objc_type=MenuItem, objc_name="title")
+MenuItem_title :: proc "c" (self: ^MenuItem) -> ^String {
+	return msgSend(^String, self, "title")
+}
 
 
 
 @(objc_class="NSMenu")
-Menu :: struct {using _: Object} 
+Menu :: struct {using _: Object}
 
 @(objc_type=Menu, objc_name="alloc", objc_is_class_method=true)
 Menu_alloc :: proc "c" () -> ^Menu {
@@ -100,4 +104,9 @@ Menu_addItem :: proc "c" (self: ^Menu, item: ^MenuItem) {
 @(objc_type=Menu, objc_name="addItemWithTitle")
 Menu_addItemWithTitle :: proc "c" (self: ^Menu, title: ^String, selector: SEL, keyEquivalent: ^String) -> ^MenuItem {
 	return msgSend(^MenuItem, self, "addItemWithTitle:action:keyEquivalent:", title, selector, keyEquivalent)
+}
+
+@(objc_type=Menu, objc_name="itemArray")
+Menu_itemArray :: proc "c" (self: ^Menu) -> ^Array {
+	return msgSend(^Array, self, "itemArray")
 }
