@@ -820,6 +820,35 @@ gb_internal int error_value_cmp(void const *a, void const *b) {
 	return token_pos_cmp(x->pos, y->pos);
 }
 
+gb_global String error_article_table[][2] = {
+	{str_lit("a "),  str_lit("bit_set literal")},
+	{str_lit("a "),  str_lit("constant declaration")},
+	{str_lit("a "),  str_lit("dynamiic array literal")},
+	{str_lit("a "),  str_lit("map index")},
+	{str_lit("a "),  str_lit("map literal")},
+	{str_lit("a "),  str_lit("matrix literal")},
+	{str_lit("a "),  str_lit("polymorphic type argument")},
+	{str_lit("a "),  str_lit("procedure argument")},
+	{str_lit("a "),  str_lit("simd vector literal")},
+	{str_lit("a "),  str_lit("slice literal")},
+	{str_lit("a "),  str_lit("structure literal")},
+	{str_lit("a "),  str_lit("variable declaration")},
+	{str_lit("an "), str_lit("'any' literal")},
+	{str_lit("an "), str_lit("array literal")},
+	{str_lit("an "), str_lit("enumerated array literal")},
+
+};
+
+// Returns definite or indefinite article matching `context_name`, or "" if not found.
+gb_internal String error_article(String context_name) {
+	for (int i = 0; i < gb_count_of(error_article_table); i += 1) {
+		if (context_name == error_article_table[i][1]) {
+			return error_article_table[i][0];
+		}
+	}
+	return str_lit("");
+}
+
 gb_internal bool errors_already_printed = false;
 
 gb_internal void print_all_errors(void) {

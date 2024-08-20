@@ -1071,16 +1071,19 @@ gb_internal void check_assignment(CheckerContext *c, Operand *operand, Type *typ
 		return;
 	}
 
+	// Grab definite or indefinite article matching `context_name`, or "" if not found.
+	String article = error_article(context_name);
+
 	if (is_type_untyped(operand->type)) {
 		Type *target_type = type;
 		if (type == nullptr || is_type_any(type)) {
 			if (type == nullptr && is_type_untyped_uninit(operand->type)) {
-				error(operand->expr, "Use of --- in %.*s", LIT(context_name));
+				error(operand->expr, "Use of --- in %.*s%.*s", LIT(article), LIT(context_name));
 				operand->mode = Addressing_Invalid;
 				return;
 			}
 			if (type == nullptr && is_type_untyped_nil(operand->type)) {
-				error(operand->expr, "Use of untyped nil in %.*s", LIT(context_name));
+				error(operand->expr, "Use of untyped nil in %.*s%.*s", LIT(article), LIT(context_name));
 				operand->mode = Addressing_Invalid;
 				return;
 			}
@@ -1135,9 +1138,10 @@ gb_internal void check_assignment(CheckerContext *c, Operand *operand, Type *typ
 
 			// TODO(bill): is this a good enough error message?
 			error(operand->expr,
-			      "Cannot assign overloaded procedure group '%s' to '%s' in %.*s",
+			      "Cannot assign overloaded procedure group '%s' to '%s' in %.*s%.*s",
 			      expr_str,
 			      op_type_str,
+			      LIT(article),
 			      LIT(context_name));
 			operand->mode = Addressing_Invalid;
 		}
@@ -1163,20 +1167,23 @@ gb_internal void check_assignment(CheckerContext *c, Operand *operand, Type *typ
 		switch (operand->mode) {
 		case Addressing_Builtin:
 			error(operand->expr,
-			      "Cannot assign built-in procedure '%s' in %.*s",
+			      "Cannot assign built-in procedure '%s' to %.*s%.*s",
 			      expr_str,
+			      LIT(article),
 			      LIT(context_name));
 			break;
 		case Addressing_Type:
 			if (is_type_polymorphic(operand->type)) {
 				error(operand->expr,
-				      "Cannot assign '%s' which is a polymorphic type in %.*s",
+				      "Cannot assign '%s' — a polymorphic type — to %.*s%.*s",
 				      op_type_str,
+				      LIT(article),
 				      LIT(context_name));
 			} else {
 				error(operand->expr,
-				      "Cannot assign '%s' which is a type in %.*s",
+				      "Cannot assign '%s' — a type — to %.*s%.*s",
 				      op_type_str,
+				      LIT(article),
 				      LIT(context_name));
 			}
 			break;
@@ -1203,10 +1210,11 @@ gb_internal void check_assignment(CheckerContext *c, Operand *operand, Type *typ
 
 				ERROR_BLOCK();
 				error(operand->expr,
-				      "Cannot assign value '%s' of type '%s%s' to '%s%s' in %.*s",
+				      "Cannot assign value '%s' of type '%s%s' to '%s%s' in %.*s%.*s",
 				      expr_str,
 				      op_type_str, op_type_extra,
 				      type_str, type_extra,
+				      LIT(article),
 				      LIT(context_name));
 				check_assignment_error_suggestion(c, operand, type);
 
