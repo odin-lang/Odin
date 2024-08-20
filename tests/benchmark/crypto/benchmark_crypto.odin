@@ -14,6 +14,7 @@ import "core:crypto/chacha20poly1305"
 import "core:crypto/ed25519"
 import "core:crypto/poly1305"
 import "core:crypto/x25519"
+import "core:crypto/x448"
 
 // Cryptographic primitive benchmarks.
 
@@ -234,6 +235,26 @@ benchmark_crypto :: proc(t: ^testing.T) {
 
 		fmt.sbprintfln(&str,
 			"x25519.scalarmult: ~%f us/op",
+			time.duration_microseconds(elapsed) / iters,
+		)
+	}
+	{
+		point_str := "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
+		scalar_str := "cafebabecafebabecafebabecafebabecafebabecafebabecafebabecafebabecafebabecafebabecafebabecafebabecafebabecafebabe"
+
+		point, _ := hex.decode(transmute([]byte)(point_str), context.temp_allocator)
+		scalar, _ := hex.decode(transmute([]byte)(scalar_str), context.temp_allocator)
+		out: [x448.POINT_SIZE]byte = ---
+
+		iters :: 10000
+		start := time.now()
+		for i := 0; i < iters; i = i + 1 {
+			x448.scalarmult(out[:], scalar[:], point[:])
+		}
+		elapsed := time.since(start)
+
+		fmt.sbprintfln(&str,
+			"x448.scalarmult: ~%f us/op",
 			time.duration_microseconds(elapsed) / iters,
 		)
 	}
