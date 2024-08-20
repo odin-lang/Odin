@@ -1366,7 +1366,7 @@ foreign lib {
 	// Color/pixel related functions
 
 	Fade                :: proc(color: Color, alpha: f32) -> Color ---                  // Get color with alpha applied, alpha goes from 0.0f to 1.0f
-	ColorToInt          :: proc(color: Color) -> c.uint ---                             // Get hexadecimal value for a Color
+	ColorToInt          :: proc(color: Color) -> c.int ---                              // Get hexadecimal value for a Color
 	ColorNormalize      :: proc(color: Color) -> Vector4 ---                            // Get Color normalized as float [0..1]
 	ColorFromNormalized :: proc(normalized: Vector4) -> Color ---                       // Get Color from normalized values [0..1]
 	ColorToHSV          :: proc(color: Color) -> Vector3 ---                            // Get HSV values for a Color, hue [0..360], saturation/value [0..1]
