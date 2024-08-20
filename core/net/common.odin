@@ -72,6 +72,8 @@ Network_Error :: union #shared_nil {
 	DNS_Error,
 }
 
+#assert(size_of(Network_Error) == 8)
+
 General_Error :: enum u32 {
 	None = 0,
 	Unable_To_Enumerate_Network_Interfaces = 1,
@@ -80,7 +82,7 @@ General_Error :: enum u32 {
 // `Platform_Error` is used to wrap errors returned by the different platforms that don't fit a common error.
 Platform_Error :: enum u32 {}
 
-Parse_Endpoint_Error :: enum {
+Parse_Endpoint_Error :: enum u32 {
 	None          = 0,
 	Bad_Port      = 1,
 	Bad_Address,
