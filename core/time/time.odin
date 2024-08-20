@@ -932,18 +932,21 @@ as the second return value. See `Time` for the representable range.
 compound_to_time :: proc "contextless" (datetime: dt.DateTime) -> (t: Time, ok: bool) {
 	unix_epoch := dt.DateTime{{1970, 1, 1}, {0, 0, 0, 0}}
 	delta, err := dt.sub(datetime, unix_epoch)
-	ok = err == .None
+	if err != .None {
+		return
+	}
 
-	seconds     := delta.days    * 86_400 + delta.seconds
-	nanoseconds := i128(seconds) * 1e9    + i128(delta.nanos)
-
+	seconds := delta.days * 86_400 + delta.seconds
 	// Can this moment be represented in i64 worth of nanoseconds?
 	// min(Time): 1677-09-21 00:12:44.145224192 +0000 UTC
 	// max(Time): 2262-04-11 23:47:16.854775807 +0000 UTC
-	if nanoseconds < i128(min(i64)) || nanoseconds > i128(max(i64)) {
+	if seconds < -9223372036 || (seconds == -9223372036 && delta.nanos < -854775808) {
 		return {}, false
 	}
-	return Time{_nsec=i64(nanoseconds)}, true
+	if seconds > 9223372036 || (seconds == 9223372036 && delta.nanos > 854775807) {
+		return {}, false
+	}
+	return Time{_nsec=seconds * 1e9 + delta.nanos}, true
 }
 
 /*
