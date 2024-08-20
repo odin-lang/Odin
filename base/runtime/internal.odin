@@ -1014,14 +1014,32 @@ modti3 :: proc "c" (a, b: i128) -> i128 {
 
 @(link_name="__divmodti4", linkage=RUNTIME_LINKAGE, require=RUNTIME_REQUIRE)
 divmodti4 :: proc "c" (a, b: i128, rem: ^i128) -> i128 {
-	u := udivmod128(u128(a), u128(b), (^u128)(rem))
-	return i128(u)
+	s_a := a >> (128 - 1) // -1 if negative or 0
+	s_b := b >> (128 - 1)
+	an := (a ~ s_a) - s_a // absolute
+	bn := (b ~ s_b) - s_b
+
+	s_b   ~= s_a // quotient sign
+	u_s_b := u128(s_b)
+	u_s_a := u128(s_a)
+
+	r: u128 = ---
+	u := i128((udivmodti4(u128(an), u128(bn), &r) ~ u_s_b) - u_s_b) // negate if negative
+	rem^ = i128((r ~ u_s_a) - u_s_a)
+	return u
 }
 
 @(link_name="__divti3", linkage=RUNTIME_LINKAGE, require=RUNTIME_REQUIRE)
 divti3 :: proc "c" (a, b: i128) -> i128 {
-	u := udivmodti4(u128(a), u128(b), nil)
-	return i128(u)
+	s_a := a >> (128 - 1) // -1 if negative or 0
+	s_b := b >> (128 - 1)
+	an := (a ~ s_a) - s_a // absolute
+	bn := (b ~ s_b) - s_b
+
+	s_a   ~= s_b // quotient sign
+	u_s_a := u128(s_a)
+
+	return i128((udivmodti4(u128(an), u128(bn), nil) ~ u_s_a) - u_s_a) // negate if negative
 }
 
 
