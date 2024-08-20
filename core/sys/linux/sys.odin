@@ -2428,9 +2428,10 @@ clock_gettime :: proc "contextless" (clock: Clock_Id) -> (ts: Time_Spec, err: Er
 	Finds the resolution of the specified clock.
 	Available since Linux 2.6.
 */
-clock_getres :: proc "contextless" (clock: Clock_Id, res: ^Time_Spec) -> (Errno) {
-	ret := syscall(SYS_clock_getres, clock, res)
-	return Errno(-ret)
+clock_getres :: proc "contextless" (clock: Clock_Id) -> (res: Time_Spec, err: Errno) {
+	ret := syscall(SYS_clock_getres, clock, &res)
+	err = Errno(-ret)
+	return
 }
 
 /*
