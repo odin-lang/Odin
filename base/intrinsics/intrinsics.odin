@@ -221,6 +221,8 @@ type_merge :: proc($U, $V: typeid) -> typeid where type_is_union(U), type_is_uni
 
 constant_utf16_cstring :: proc($literal: string) -> [^]u16 ---
 
+constant_log2 :: proc($v: $T) -> T where type_is_integer(T) ---
+
 // SIMD related
 simd_add  :: proc(a, b: #simd[N]T) -> #simd[N]T ---
 simd_sub  :: proc(a, b: #simd[N]T) -> #simd[N]T ---
