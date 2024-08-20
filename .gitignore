@@ -266,6 +266,9 @@ bin/
 *.exe
 *.obj
 *.pdb
+*.res
+desktop.ini
+Thumbs.db
 
 # - Linux/MacOS
 odin
