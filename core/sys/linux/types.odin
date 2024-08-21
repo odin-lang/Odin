@@ -119,7 +119,7 @@ when ODIN_ARCH == .amd64 {
 		ctime:     Time_Spec,
 		_:         [3]uint,
 	}
-} else when ODIN_ARCH == .arm64 {
+} else when ODIN_ARCH == .arm64 || ODIN_ARCH == .riscv64 {
 	_Arch_Stat :: struct {
 		dev:        Dev,
 		ino:        Inode,
@@ -137,25 +137,6 @@ when ODIN_ARCH == .amd64 {
 		mtime:      Time_Spec,
 		ctime:      Time_Spec,
 		_:          [2]u32,
-	}
-} else when ODIN_ARCH == .riscv64 {
-	_Arch_Stat :: struct {
-		dev:        Dev,
-		ino:        Inode,
-		mode:       Mode,
-		nlink:      u32,
-		uid:        Uid,
-		gid:        Gid,
-		rdev:       Dev,
-		_:          u64,
-		size:       int,
-		blksize:    i32,
-		_:          i32,
-		blocks:     int,
-		atime:      Time_Spec,
-		mtime:      Time_Spec,
-		ctime:      Time_Spec,
-		_:          [3]uint,
 	}
 } else {
 	_Arch_Stat :: struct {
