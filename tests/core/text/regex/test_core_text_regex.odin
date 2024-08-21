@@ -50,7 +50,7 @@ check_expression_with_flags :: proc(t: ^testing.T, pattern: string, flags: regex
 	}
 }
 
-check_expression :: proc(t: ^testing.T, pattern, haystack: string, needles: ..string, extra_flags: regex.Flags = {}, loc := #caller_location) {
+check_expression :: proc(t: ^testing.T, pattern, haystack: string, needles: ..string, extra_flags := regex.Flags{}, loc := #caller_location) {
 	check_expression_with_flags(t, pattern, { .Global } + extra_flags,
 		haystack, ..needles, loc = loc)
 	check_expression_with_flags(t, pattern, { .Global, .No_Optimization } + extra_flags,
@@ -61,7 +61,7 @@ check_expression :: proc(t: ^testing.T, pattern, haystack: string, needles: ..st
 		haystack, ..needles, loc = loc)
 }
 
-expect_error :: proc(t: ^testing.T, pattern: string, expected_error: typeid, flags: regex.Flags = {}, loc := #caller_location) {
+expect_error :: proc(t: ^testing.T, pattern: string, expected_error: typeid, flags := regex.Flags{}, loc := #caller_location) {
 	rex, err := regex.create(pattern, flags)
 	regex.destroy(rex)
 
