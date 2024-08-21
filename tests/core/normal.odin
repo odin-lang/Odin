@@ -42,6 +42,7 @@ download_assets :: proc() {
 @(require) import "sys/windows"
 @(require) import "text/i18n"
 @(require) import "text/match"
+@(require) import "text/regex"
 @(require) import "thread"
 @(require) import "time"
 @(require) import "unicode"
