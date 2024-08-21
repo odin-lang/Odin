@@ -193,11 +193,21 @@ when ODIN_OS == .Darwin {
 } else when ODIN_OS == .NetBSD {
 
 	dirent :: struct {
-		d_ino:     ino_t,                    /* [PSX] file number of entry */
-		d_reclen:  c.uint16_t,               /* length of this record */
-		d_namelen: c.uint16_t,               /* length of string in d_name */
-		d_type:    D_Type,                   /* file type  */
-		d_name:    [512]c.char `fmt:"s,0"`,  /* [PSX] entry name */
+		d_ino:     ino_t,                   /* [PSX] file number of entry */
+		d_reclen:  c.uint16_t,              /* length of this record */
+		d_namelen: c.uint16_t,              /* length of string in d_name */
+		d_type:    D_Type,                  /* file type  */
+		d_name:    [512]c.char `fmt:"s,0"`, /* [PSX] entry name */
+	}
+
+} else when ODIN_OS == .Linux {
+
+	dirent :: struct {
+		d_ino: ino_t,                   /* [PSX] file number of entry */
+		d_off: off_t,                   /* directory offset of the next entry */
+		d_reclen: c.uint16_t,           /* length of this record */
+		d_type: D_Type,                 /* file type  */
+		d_name: [256]c.char `fmt:"s,0"` /* [PSX] entry name */
 	}
 
 } else {
