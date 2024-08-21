@@ -1175,13 +1175,13 @@ gb_internal void check_assignment(CheckerContext *c, Operand *operand, Type *typ
 		case Addressing_Type:
 			if (is_type_polymorphic(operand->type)) {
 				error(operand->expr,
-				      "Cannot assign '%s' — a polymorphic type — to %.*s%.*s",
+				      "Cannot assign '%s' - a polymorphic type - to %.*s%.*s",
 				      op_type_str,
 				      LIT(article),
 				      LIT(context_name));
 			} else {
 				error(operand->expr,
-				      "Cannot assign '%s' — a type — to %.*s%.*s",
+				      "Cannot assign '%s' - a type - to %.*s%.*s",
 				      op_type_str,
 				      LIT(article),
 				      LIT(context_name));
