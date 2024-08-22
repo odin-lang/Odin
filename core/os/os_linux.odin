@@ -262,7 +262,7 @@ Unix_File_Time :: struct {
 	nanoseconds: i64,
 }
 
-when ODIN_ARCH == .arm64 {
+when ODIN_ARCH == .arm64 || ODIN_ARCH == .riscv64 {
 	OS_Stat :: struct {
 		device_id:     u64, // ID of device containing file
 		serial:        u64, // File serial number

@@ -4,12 +4,13 @@ import os
 import sys
 
 archs = [
-	("amd64",     "linux_amd64", "x86_64-pc-linux-gnu", [], []),
-	("i386",      "linux_i386",  "i386-pc-linux-gnu",   [], []),
-	("arm32",     "linux_arm32", "arm-linux-gnu",       [], []),
-	("arm64",     "linux_arm64", "aarch64-linux-elf",   [], []),
-	("wasm32",    "js_wasm32",   "wasm32-js-js",        [], []),
-	("wasm64p32", "js_wasm64p32","wasm32-js-js",        [], []),
+	("amd64",     "linux_amd64",   "x86_64-pc-linux-gnu", [], []),
+	("i386",      "linux_i386",    "i386-pc-linux-gnu",   [], []),
+	("arm32",     "linux_arm32",   "arm-linux-gnu",       [], []),
+	("arm64",     "linux_arm64",   "aarch64-linux-elf",   [], []),
+	("wasm32",    "js_wasm32",     "wasm32-js-js",        [], []),
+	("wasm64p32", "js_wasm64p32",  "wasm32-js-js",        [], []),
+	("riscv64",   "linux_riscv64", "riscv64-linux-gnu",   [], []),
 ];
 
 SEEKING_CPUS     = 0
@@ -78,7 +79,8 @@ print("\t// TargetArch_Invalid:")
 print('\tstr_lit(""),')
 for arch, target, triple, cpus, features in archs:
 	print(f"\t// TargetArch_{arch}:")
-	print(f'\tstr_lit("{','.join(cpus)}"),')
+	cpus_str = ','.join(cpus)
+	print(f'\tstr_lit("{cpus_str}"),')
 print("};")
 
 print("")
@@ -89,7 +91,8 @@ print("\t// TargetArch_Invalid:")
 print('\tstr_lit(""),')
 for arch, target, triple, cpus, features in archs:
 	print(f"\t// TargetArch_{arch}:")
-	print(f'\tstr_lit("{','.join(features)}"),')
+	features_str = ','.join(features)
+	print(f'\tstr_lit("{features_str}"),')
 print("};")
 
 print("")

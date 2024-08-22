@@ -1787,7 +1787,7 @@ gb_internal LLVMTypeRef lb_type_internal_for_procedures_raw(lbModule *m, Type *t
 		}
 	}
 	GB_ASSERT(param_index == param_count);
-	lbFunctionType *ft = lb_get_abi_info(m->ctx, params, param_count, ret, ret != nullptr, return_is_tuple, type->Proc.calling_convention, type);
+	lbFunctionType *ft = lb_get_abi_info(m, params, param_count, ret, ret != nullptr, return_is_tuple, type->Proc.calling_convention, type);
 	{
 		for_array(j, ft->args) {
 			auto arg = ft->args[j];
@@ -2114,6 +2114,12 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 					llvm_type = LLVMStructCreateNamed(ctx, name);
 					map_set(&m->types, type, llvm_type);
 					lb_clone_struct_type(llvm_type, lb_type(m, base));
+
+					if (base->kind == Type_Struct) {
+						map_set(&m->struct_field_remapping, cast(void *)llvm_type, lb_get_struct_remapping(m, base));
+						map_set(&m->struct_field_remapping, cast(void *)type, lb_get_struct_remapping(m, base));
+					}
+
 					return llvm_type;
 				}
 			}

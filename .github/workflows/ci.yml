@@ -220,3 +220,53 @@ jobs:
         run: |
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat
           odin check examples/all -strict-style -target:windows_i386
+
+  build_linux_riscv64:
+    runs-on: ubuntu-latest
+    name: Linux riscv64 (emulated) Build, Check and Test
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download LLVM (Linux)
+        run: |
+          wget https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh 18
+          echo "/usr/lib/llvm-18/bin" >> $GITHUB_PATH
+
+      - name: Build Odin
+        run: ./build_odin.sh release
+
+      - name: Odin version
+        run: ./odin version
+
+      - name: Odin report
+        run: ./odin report
+
+      - name: Compile needed Vendor
+        run: |
+          make -C vendor/stb/src
+          make -C vendor/cgltf/src
+          make -C vendor/miniaudio/src
+
+      - name: Odin check
+        run: ./odin check examples/all -target:linux_riscv64 -vet -strict-style -disallow-do
+
+      - name: Install riscv64 toolchain and qemu
+        run: sudo apt-get install -y qemu-user qemu-user-static gcc-12-riscv64-linux-gnu libc6-riscv64-cross
+
+      - name: Odin run
+        run: ./odin run examples/demo -target:linux_riscv64 -extra-linker-flags:"-fuse-ld=/usr/bin/riscv64-linux-gnu-gcc-12 -static -Wl,-static"
+
+      - name: Odin run -debug
+        run: ./odin run examples/demo -debug -target:linux_riscv64 -extra-linker-flags:"-fuse-ld=/usr/bin/riscv64-linux-gnu-gcc-12 -static -Wl,-static"
+
+      - name: Normal Core library tests
+        run: ./odin test tests/core/normal.odin -file -all-packages -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -target:linux_riscv64 -extra-linker-flags:"-fuse-ld=/usr/bin/riscv64-linux-gnu-gcc-12 -static -Wl,-static"
+
+      - name: Optimized Core library tests
+        run: ./odin test tests/core/speed.odin -o:speed -file -all-packages -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -target:linux_riscv64 -extra-linker-flags:"-fuse-ld=/usr/bin/riscv64-linux-gnu-gcc-12 -static -Wl,-static"
+
+      - name: Internals tests
+        run: ./odin test tests/internal -all-packages -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -target:linux_riscv64 -extra-linker-flags:"-fuse-ld=/usr/bin/riscv64-linux-gnu-gcc-12 -static -Wl,-static"
