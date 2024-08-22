@@ -8,6 +8,7 @@ import "core:bytes"
 import "core:sys/darwin"
 import "core:sys/posix"
 import "core:sys/unix"
+import "core:time"
 
 foreign import lib "system:System.framework"
 
@@ -251,6 +252,61 @@ _process_list :: proc(allocator: runtime.Allocator) -> (list: []int, err: Error)
 	#no_bounds_check for &entry, i in list {
 		entry = int(buffer[i])
 	}
+
+	return
+}
+
+_process_open :: proc(pid: int, flags: Process_Open_Flags) -> (process: Process, err: Error) {
+	rusage: darwin.rusage_info_v0
+	if ret := darwin.proc_pid_rusage(posix.pid_t(pid), .V0, &rusage); ret != 0 {
+		err = _get_platform_error()
+		return
+	}
+
+	// XOR fold the UUID so it fits the handle, I think this is enough to verify pid uniqueness.
+	#assert(size_of(uintptr) == size_of(u64))
+	a := intrinsics.unaligned_load((^u64)(&rusage.ri_uuid))
+	b := intrinsics.unaligned_load((^u64)(&rusage.ri_uuid[8]))
+	process.handle = uintptr(a ~ b)
+
+	process.pid = int(pid)
+	return
+}
+
+_process_handle_still_valid :: proc(p: Process) -> Error {
+	rusage: darwin.rusage_info_v0
+	if ret := darwin.proc_pid_rusage(posix.pid_t(p.pid), .V0, &rusage); ret != 0 {
+		return _get_platform_error()
+	}
+
+	// XOR fold the UUID so it fits the handle, I think this is enough to verify pid uniqueness.
+	#assert(size_of(uintptr) == size_of(u64))
+	a := intrinsics.unaligned_load((^u64)(&rusage.ri_uuid))
+	b := intrinsics.unaligned_load((^u64)(&rusage.ri_uuid[8]))
+	handle := uintptr(a ~ b)
+
+	if p.handle != handle {
+		return posix.Errno.ESRCH
+	}
+
+	return nil
+}
+
+_process_state_update_times :: proc(p: Process, state: ^Process_State) {
+	rusage: darwin.rusage_info_v0
+	if ret := darwin.proc_pid_rusage(posix.pid_t(p.pid), .V0, &rusage); ret != 0 {
+		return
+	}
+
+	// NOTE(laytan): I have no clue if this is correct, the output seems correct comparing it with `time`'s output.
+	HZ :: 20000000
+
+	state.user_time   = (
+		(time.Duration(rusage.ri_user_time) / HZ * time.Second) +
+		 time.Duration(rusage.ri_user_time  % HZ))
+	state.system_time = (
+		(time.Duration(rusage.ri_system_time) / HZ * time.Second) +
+		 time.Duration(rusage.ri_system_time % HZ))
 
 	return
 }

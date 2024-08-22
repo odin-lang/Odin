@@ -12,6 +12,7 @@ foreign lib {
 	proc_pidinfo     :: proc(pid: posix.pid_t, flavor: PID_Info_Flavor, arg: i64, buffer: rawptr, buffersize: i32) -> i32 ---
 	proc_pidpath     :: proc(pid: posix.pid_t, buffer: [^]byte, buffersize: u32) -> i32 ---
 	proc_listallpids :: proc(buffer: [^]i32, buffersize: i32) -> i32 ---
+	proc_pid_rusage  :: proc(pid: posix.pid_t, flavor: Pid_Rusage_Flavor, buffer: rawptr) -> i32 ---
 }
 
 MAXCOMLEN :: 16
@@ -166,3 +167,26 @@ PID_Info_Flavor :: enum i32 {
 }
 
 PIDPATHINFO_MAXSIZE :: 4*posix.PATH_MAX
+
+Pid_Rusage_Flavor :: enum i32 {
+	V0,
+	V1,
+	V2,
+	V3,
+	V4,
+	V5,
+}
+
+rusage_info_v0 :: struct {
+	ri_uuid:               [16]u8,
+	ri_user_time:          u64,
+	ri_system_time:        u64,
+	ri_pkg_idle_wkups:     u64,
+	ri_interrupt_wkups:    u64,
+	ri_pageins:            u64,
+	ri_wired_size:         u64,
+	ri_resident_size:      u64,
+	ri_phys_footprint:     u64,
+	ri_proc_start_abstime: u64,
+	ri_proc_exit_abstime:  u64,
+}

@@ -4,6 +4,8 @@ package os2
 
 import "core:sys/posix"
 
+_Platform_Error :: posix.Errno
+
 _error_string :: proc(errno: i32) -> string {
 	return string(posix.strerror(posix.Errno(errno)))
 }
