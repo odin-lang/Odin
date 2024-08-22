@@ -323,11 +323,12 @@ buffer_seek :: proc(b: ^Buffer, offset: i64, whence: io.Seek_From) -> (i64, io.E
 		return 0, .Invalid_Whence
 	}
 
-	if abs < 0 {
+	abs_int := int(abs)
+	if abs_int < 0 {
 		return 0, .Invalid_Offset
 	}
 	b.last_read = .Invalid
-	b.off = int(abs)
+	b.off = abs_int
 	return abs, nil
 }
 
