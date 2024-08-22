@@ -170,11 +170,23 @@ _name :: proc(f: ^File) -> string {
 }
 
 _seek :: proc(f: ^File_Impl, offset: i64, whence: io.Seek_From) -> (ret: i64, err: Error) {
+	// We have to handle this here, because Linux returns EINVAL for both
+	// invalid offsets and invalid whences.
+	switch whence {
+	case .Start, .Current, .End:
+		break
+	case:
+		return 0, .Invalid_Whence
+	}
 	n, errno := linux.lseek(f.fd, offset, linux.Seek_Whence(whence))
-	if errno != .NONE {
+	#partial switch errno {
+	case .EINVAL:
+		return 0, .Invalid_Offset
+	case .NONE:
+		return n, nil
+	case:
 		return -1, _get_platform_error(errno)
 	}
-	return n, nil
 }
 
 _read :: proc(f: ^File_Impl, p: []byte) -> (i64, Error) {
