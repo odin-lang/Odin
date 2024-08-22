@@ -154,6 +154,14 @@ _get_platform_error :: proc(errno: linux.Errno) -> Error {
 		return .Exist
 	case .ENOENT:
 		return .Not_Exist
+	case .ETIMEDOUT:
+		return .Timeout
+	case .EPIPE:
+		return .Broken_Pipe
+	case .EBADF:
+		return .Invalid_File
+	case .ENOMEM:
+		return .Out_Of_Memory
 	}
 
 	return Platform_Error(i32(errno))
