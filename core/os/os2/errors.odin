@@ -30,7 +30,7 @@ General_Error :: enum u32 {
 	Unsupported,
 }
 
-Platform_Error :: enum i32 {None=0}
+Platform_Error :: _Platform_Error
 
 Error :: union #shared_nil {
 	General_Error,

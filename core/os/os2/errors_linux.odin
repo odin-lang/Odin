@@ -3,6 +3,8 @@ package os2
 
 import "core:sys/linux"
 
+_Platform_Error :: linux.Errno
+
 @(rodata)
 _errno_strings := [linux.Errno]string{
 	.NONE            = "",
