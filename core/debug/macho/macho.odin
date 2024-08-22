@@ -1,8 +1,5 @@
 package main
 
-import "core:fmt"
-import "core:strings"
-
 MACH_MAGIC_64 :: 0xfeedfacf
 
 MACH_CMD_SYMTAB      :: 0x2
