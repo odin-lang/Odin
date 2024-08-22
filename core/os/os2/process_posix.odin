@@ -3,9 +3,13 @@
 package os2
 
 import "base:runtime"
-import "core:time"
 
-import "core:sys/posix"
+import "core:time"
+import "core:strings"
+import "core:path/filepath"
+
+import kq "core:sys/kqueue"
+import    "core:sys/posix"
 
 _exit :: proc "contextless" (code: int) -> ! {
 	posix.exit(i32(code))
@@ -51,13 +55,100 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 		return
 	}
 
+	TEMP_ALLOCATOR_GUARD()
+
+	// search PATH if just a plain name is provided.
+	exe_builder := strings.builder_make(temp_allocator())
+	exe_name    := desc.command[0]
+	if strings.index_byte(exe_name, '/') < 0 {
+		path_env  := get_env("PATH", temp_allocator())
+		path_dirs := filepath.split_list(path_env, temp_allocator())
+
+		found: bool
+		for dir in path_dirs {
+			strings.builder_reset(&exe_builder)
+			strings.write_string(&exe_builder, dir)
+			strings.write_byte(&exe_builder, '/')
+			strings.write_string(&exe_builder, exe_name)
+
+			if exe_fd := posix.open(strings.to_cstring(&exe_builder), {.CLOEXEC, .EXEC}); exe_fd == -1 {
+				continue
+			} else {
+				posix.close(exe_fd)
+				found = true
+				break
+			}
+		}
+		if !found {
+			// check in cwd to match windows behavior
+			strings.builder_reset(&exe_builder)
+			strings.write_string(&exe_builder, desc.working_dir)
+			if len(desc.working_dir) > 0 && desc.working_dir[len(desc.working_dir)-1] != '/' {
+			strings.write_byte(&exe_builder, '/')
+			}
+			strings.write_string(&exe_builder, "./")
+			strings.write_string(&exe_builder, exe_name)
+
+			// "hello/./world" is fine right?
+
+			if exe_fd := posix.open(strings.to_cstring(&exe_builder), {.CLOEXEC, .EXEC}); exe_fd == -1 {
+				err = .Not_Exist
+				return
+			} else {
+				posix.close(exe_fd)
+			}
+		}
+	} else {
+		strings.builder_reset(&exe_builder)
+		strings.write_string(&exe_builder, exe_name)
+
+		if exe_fd := posix.open(strings.to_cstring(&exe_builder), {.CLOEXEC, .EXEC}); exe_fd == -1 {
+			err = .Not_Exist
+			return
+		} else {
+			posix.close(exe_fd)
+		}
+	}
+
 	cwd: cstring; if desc.working_dir != "" {
 		cwd = temp_cstring(desc.working_dir)
 	}
 
-	cmd := make([]cstring, len(desc.command)+1, temp_allocator())
+	cmd := make([]cstring, len(desc.command) + 1, temp_allocator())
 	for part, i in desc.command {
 		cmd[i] = temp_cstring(part)
+	}
+
+	env: [^]cstring
+	if desc.env == nil {
+		// take this process's current environment
+		env = posix.environ
+	} else {
+		cenv := make([]cstring, len(desc.env) + 1, temp_allocator())
+		for env, i in desc.env {
+			cenv[i] = temp_cstring(env)
+		}
+		env = raw_data(cenv)
+	}
+
+	READ  :: 0
+	WRITE :: 1
+
+	pipe: [2]posix.FD
+	if posix.pipe(&pipe) != .OK {
+		err = _get_platform_error()
+		return
+	}
+	defer posix.close(pipe[WRITE])
+	defer posix.close(pipe[READ])
+
+	if posix.fcntl(pipe[READ], .SETFD, i32(posix.FD_CLOEXEC)) == -1 {
+		err = _get_platform_error()
+		return
+	}
+	if posix.fcntl(pipe[WRITE], .SETFD, i32(posix.FD_CLOEXEC)) == -1 {
+		err = _get_platform_error()
+		return
 	}
 
 	switch pid := posix.fork(); pid {
@@ -66,126 +157,184 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 		return
 
 	case 0:
-		// NOTE(laytan): would need to use execvp and look up the command in the PATH.
-		assert(len(desc.env) == 0, "unimplemented: process_start with env")
+		abort :: proc(parent_fd: posix.FD) -> ! {
+			#assert(len(posix.Errno) < max(u8))
+			errno := u8(posix.errno())
+			posix.write(parent_fd, &errno, 1)
+			runtime.trap()
+		}
 
-		null := posix.open("/dev/null", { .RDWR, .CLOEXEC })
-		assert(null != -1) // TODO: Does this happen/need to be handled?
+		null := posix.open("/dev/null", {.RDWR})
+		if null == -1 { abort(pipe[WRITE]) }
 
 		stderr := (^File_Impl)(desc.stderr.impl).fd if desc.stderr != nil else null
 		stdout := (^File_Impl)(desc.stdout.impl).fd if desc.stdout != nil else null
 		stdin  := (^File_Impl)(desc.stdin.impl).fd  if desc.stdin  != nil else null
 
-		posix.dup2(stderr, posix.STDERR_FILENO)
-		posix.dup2(stdout, posix.STDOUT_FILENO)
-		posix.dup2(stdin,  posix.STDIN_FILENO )
-
-		// NOTE(laytan): is this how we should handle these?
-		// Maybe we can try to `stat` the cwd in the parent before forking?
-		// Does that mean no other errors could happen in chdir?
-		// How about execvp?
+		if posix.dup2(stderr, posix.STDERR_FILENO) == -1 { abort(pipe[WRITE]) }
+		if posix.dup2(stdout, posix.STDOUT_FILENO) == -1 { abort(pipe[WRITE]) }
+		if posix.dup2(stdin,  posix.STDIN_FILENO ) == -1 { abort(pipe[WRITE]) }
 
 		if cwd != nil {
-			if posix.chdir(cwd) != .OK {
-				posix.exit(i32(posix.errno())) // TODO: handle, or is it fine this way?
-			}
+			if posix.chdir(cwd) != .OK { abort(pipe[WRITE]) }
 		}
 
-		posix.execvp(cmd[0], raw_data(cmd))
-		posix.exit(i32(posix.errno())) // TODO: handle, or is it fine this way?
+		ok := u8(0)
+		posix.write(pipe[WRITE], &ok, 1)
+
+		res := posix.execve(strings.to_cstring(&exe_builder), raw_data(cmd), env)
+
+		// NOTE: we can't tell the parent about this failure because we already wrote the success byte.
+		// So if this happens the user will just see the process failed when they call process_wait.
+
+		assert(res == -1)
+		runtime.trap()
 
 	case:
-		fmt.println("returning")
-		process, _ = _process_open(int(pid), {})
+		errno: posix.Errno
+		for {
+			errno_byte: u8
+			switch posix.read(pipe[READ], &errno_byte, 1) {
+			case 1:
+				errno = posix.Errno(errno_byte)
+			case:
+				errno = posix.errno()
+				if errno == .EINTR {
+					continue
+				} else {
+					// If the read failed, something weird happened. Do not return the read
+					// error so the user knows to wait on it.
+					errno = nil
+				}
+			}
+			break
+		}
+
+		if errno != nil {
+			// We can assume it trapped here.
+
+			for {
+				info: posix.siginfo_t
+				wpid := posix.waitid(.P_PID, posix.id_t(process.pid), &info, {.EXITED})
+				if wpid == -1 && posix.errno() == .EINTR {
+					continue
+				}
+				break
+			}
+
+			err = errno
+			return
+		}
+
 		process.pid = int(pid)
+		process, _ = _process_open(int(pid), {})
 		return
 	}
 }
 
-import "core:fmt"
-import "core:nbio/kqueue"
-
 _process_wait :: proc(process: Process, timeout: time.Duration) -> (process_state: Process_State, err: Error) {
 	process_state.pid = process.pid
 
-	if !process_posix_handle_still_valid(process) {
-		err = Platform_Error(posix.Errno.ESRCH)
-		return
-	}
+	_process_handle_still_valid(process) or_return
 
-	// prev := posix.signal(.SIGALRM, proc "c" (_: posix.Signal) {
-	// 	context = runtime.default_context()
-	// 	fmt.println("alarm")
-	// })
-	// defer posix.signal(.SIGALRM, prev)
+	// timeout >  0 = use kqueue to wait (with a timeout) on process exit
+	// timeout == 0 = use waitid with WNOHANG so it returns immediately
+	// timeout >  0 = use waitid without WNOHANG so it waits indefinitely
 	//
-	// posix.alarm(u32(time.duration_seconds(timeout)))
-	// defer posix.alarm(0)
+	// at the end use waitid to actually reap the process and get it's status
 
-	// TODO: if there's no timeout, don't set up a kqueue.
+	if timeout > 0 {
+		timeout := timeout
 
-	// TODO: if timeout is 0, don't set up a kqueue and use NO_HANG.
+		queue := kq.kqueue() or_return
+		defer posix.close(queue)
 
-	kq, qerr := kqueue.kqueue()
-	if qerr != nil {
-		err = Platform_Error(qerr)
-		return
+		changelist, eventlist: [1]kq.KEvent
+
+		changelist[0] = {
+			ident  = uintptr(process.pid),
+			filter = .Proc,
+			flags  = { .Add },
+			fflags = {
+				fproc = { .Exit },
+			},
+		}
+
+		for {
+			start := time.tick_now()
+			n, kerr := kq.kevent(queue, changelist[:], eventlist[:], &{
+				tv_sec  = posix.time_t(timeout / time.Second),
+				tv_nsec = i64(timeout % time.Second),
+			})
+			if kerr == .EINTR {
+				timeout -= time.tick_since(start)
+				continue
+			} else if kerr != nil {
+				err = kerr
+				return
+			} else if n == 0 {
+				err = .Timeout
+				_process_state_update_times(process, &process_state)
+				return
+			} else {
+				_process_state_update_times(process, &process_state)
+				break
+			}
+		}
+	} else {
+		flags := posix.Wait_Flags{.EXITED, .NOWAIT}
+		if timeout == 0 {
+			flags += {.NOHANG}
+		}
+
+		info: posix.siginfo_t
+		for {
+			wpid := posix.waitid(.P_PID, posix.id_t(process.pid), &info, flags)
+			if wpid == -1 {
+				if errno := posix.errno(); errno == .EINTR {
+					continue
+				} else {
+					err = _get_platform_error()
+					return
+				}
+			}
+			break
+		}
+
+		_process_state_update_times(process, &process_state)
+
+		if info.si_signo == nil {
+			assert(timeout == 0)
+			err = .Timeout
+			return
+		}
 	}
 
-	changelist, eventlist: [1]kqueue.KEvent
-
-	changelist[0] = {
-		ident  = uintptr(process.pid),
-		filter = .Proc,
-		flags  = { .Add },
-		fflags = {
-			fproc = 0x80000000,
-		},
+	info: posix.siginfo_t
+	for {
+		wpid := posix.waitid(.P_PID, posix.id_t(process.pid), &info, {.EXITED})
+		if wpid == -1 {
+			if errno := posix.errno(); errno == .EINTR {
+				continue
+			} else {
+				err = _get_platform_error()
+				return
+			}
+		}
+		break
 	}
 
-	// NOTE: could this be interrupted which means it should be looped and subtracting the timeout on EINTR.
-
-	n, eerr := kqueue.kevent(kq, changelist[:], eventlist[:], &{
-		seconds     = i64(timeout / time.Second),
-		nanoseconds = i64(timeout % time.Second),
-	})
-	if eerr != nil {
-		err = Platform_Error(eerr)
-		return
-	}
-
-	if n == 0 {
-		err = .Timeout
-
-		// TODO: populate the time fields.
-
-		return
-	}
-
-	// NOTE(laytan): should this be looped untill WIFEXITED/WIFSIGNALED?
-
-	status: i32
-	wpid := posix.waitpid(posix.pid_t(process.pid), &status, {})
-	if wpid == -1 {
-		err = _get_platform_error()
-		return
-	}
-
-	process_state.exited = true
-
-	// TODO: populate times
-
-	switch {
-	case posix.WIFEXITED(status):
-		fmt.printfln("child exited, status=%v", posix.WEXITSTATUS(status))
-		process_state.exit_code = int(posix.WEXITSTATUS(status))
-		process_state.success   = true
-	case posix.WIFSIGNALED(status):
-		fmt.printfln("child killed (signal %v)", posix.WTERMSIG(status))
-		process_state.exit_code = int(posix.WTERMSIG(status))
+	switch info.si_code.chld {
+	case:                      unreachable()
+	case .CONTINUED, .STOPPED: unreachable()
+	case .EXITED:
+		process_state.exited    = true
+		process_state.exit_code = int(info.si_status)
+		process_state.success   = process_state.exit_code == 0
+	case .KILLED, .DUMPED, .TRAPPED:
+		process_state.exited    = true
+		process_state.exit_code = int(info.si_status)
 		process_state.success   = false
-	case:
-		fmt.panicf("unexpected status (%x)", status)
 	}
 
 	return
@@ -196,10 +345,7 @@ _process_close :: proc(process: Process) -> Error {
 }
 
 _process_kill :: proc(process: Process) -> (err: Error) {
-	if !process_posix_handle_still_valid(process) {
-		err = Platform_Error(posix.Errno.ESRCH)
-		return
-	}
+	_process_handle_still_valid(process) or_return
 
 	if posix.kill(posix.pid_t(process.pid), .SIGKILL) != .OK {
 		err = _get_platform_error()
