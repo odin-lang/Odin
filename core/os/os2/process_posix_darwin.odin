@@ -263,13 +263,10 @@ _process_open :: proc(pid: int, flags: Process_Open_Flags) -> (process: Process,
 		return
 	}
 
-	// XOR fold the UUID so it fits the handle, I think this is enough to verify pid uniqueness.
-	#assert(size_of(uintptr) == size_of(u64))
-	a := intrinsics.unaligned_load((^u64)(&rusage.ri_uuid))
-	b := intrinsics.unaligned_load((^u64)(&rusage.ri_uuid[8]))
-	process.handle = uintptr(a ~ b)
-
-	process.pid = int(pid)
+	// Using the start time as the handle, there is no pidfd or anything on Darwin.
+	// There is a uuid, but once a process becomes a zombie it changes...
+	process.handle = uintptr(rusage.ri_proc_start_abstime)
+	process.pid    = int(pid)
 	return
 }
 
@@ -279,12 +276,7 @@ _process_handle_still_valid :: proc(p: Process) -> Error {
 		return _get_platform_error()
 	}
 
-	// XOR fold the UUID so it fits the handle, I think this is enough to verify pid uniqueness.
-	#assert(size_of(uintptr) == size_of(u64))
-	a := intrinsics.unaligned_load((^u64)(&rusage.ri_uuid))
-	b := intrinsics.unaligned_load((^u64)(&rusage.ri_uuid[8]))
-	handle := uintptr(a ~ b)
-
+	handle := uintptr(rusage.ri_proc_start_abstime)
 	if p.handle != handle {
 		return posix.Errno.ESRCH
 	}
