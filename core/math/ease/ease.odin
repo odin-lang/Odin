@@ -451,7 +451,6 @@ flux_update :: proc(flux: ^Flux_Map($T), dt: f64) where intrinsics.type_is_float
 	clear(&flux.keys_to_be_deleted)
 
 	for key, &tween in flux.values {
-		delay_remainder := f64(0)
 
 		// Update delay if necessary.
 		if tween.delay > 0 {
@@ -459,8 +458,8 @@ flux_update :: proc(flux: ^Flux_Map($T), dt: f64) where intrinsics.type_is_float
 
 			if tween.delay < 0 {
 				// We finished the delay, but in doing so consumed part of this frame's `dt` budget.
-				// Keep track of it so we can apply it to this tween without affecting others.
-				delay_remainder = tween.delay
+				// Correct dt to what's left.
+				dt = -tween.delay 
 				// We're done with this delay.
 				tween.delay = 0
 			}
@@ -476,10 +475,7 @@ flux_update :: proc(flux: ^Flux_Map($T), dt: f64) where intrinsics.type_is_float
 				}
 			} 
 
-			// If part of the `dt` budget was consumed this frame, then `delay_remainder` will be
-			// that remainder, a negative value. Adding it to `dt` applies what's left of the `dt`
-			// to the tween so it advances properly, instead of too much or little.
-			tween.progress += tween.rate * (dt + delay_remainder)
+			tween.progress += tween.rate * dt
 			x := tween.progress >= 1 ? 1 : ease(tween.type, tween.progress)
 			tween.value^ = tween.start + tween.diff * T(x)
 
