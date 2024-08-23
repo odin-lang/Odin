@@ -2,8 +2,6 @@
 
 package orca
 
-import "core:fmt"
-
 ////////////////////////////////////////////////////////////////////////////////
 // Helpers for logging, asserting and aborting.
 ////////////////////////////////////////////////////////////////////////////////
@@ -18,16 +16,6 @@ log_error :: proc "contextless" (msg: cstring, loc := #caller_location) {
 	)
 }
 
-log_errorf :: proc(format: string, args: ..any, loc := #caller_location) {
-	log_ext(
-		.ERROR,
-		cstring(raw_data(loc.procedure)),
-		cstring(raw_data(loc.file_path)),
-		loc.line,
-		fmt.ctprintf(format, ..args),
-	)
-}
-
 log_warning :: proc "contextless" (msg: cstring, loc := #caller_location) {
 	log_ext(
 		.WARNING,
@@ -35,16 +23,6 @@ log_warning :: proc "contextless" (msg: cstring, loc := #caller_location) {
 		cstring(raw_data(loc.file_path)),
 		loc.line,
 		msg,
-	)
-}
-
-log_warningf :: proc(format: string, args: ..any, loc := #caller_location) {
-	log_ext(
-		.WARNING,
-		cstring(raw_data(loc.procedure)),
-		cstring(raw_data(loc.file_path)),
-		loc.line,
-		fmt.ctprintf(format, ..args),
 	)
 }
 
@@ -58,31 +36,12 @@ log_info :: proc "contextless" (msg: cstring, loc := #caller_location) {
 	)
 }
 
-log_infof :: proc(format: string, args: ..any, loc := #caller_location) {
-	log_ext(
-		.INFO,
-		cstring(raw_data(loc.procedure)),
-		cstring(raw_data(loc.file_path)),
-		loc.line,
-		fmt.ctprintf(format, ..args),
-	)
-}
-
 abort :: proc "contextless" (msg: cstring, loc := #caller_location) {
 	abort_ext(
 		cstring(raw_data(loc.procedure)),
 		cstring(raw_data(loc.file_path)),
 		loc.line,
 		msg,
-	)
-}
-
-abortf :: proc(format: string, args: ..any, loc := #caller_location) {
-	abort_ext(
-		cstring(raw_data(loc.procedure)),
-		cstring(raw_data(loc.file_path)),
-		loc.line,
-		fmt.ctprintf(format, ..args),
 	)
 }
 
