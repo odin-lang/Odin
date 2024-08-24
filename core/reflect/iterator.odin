@@ -39,6 +39,8 @@ iterate_array :: proc(val: any, it: ^int) -> (elem: any, index: int, ok: bool) {
 		}
 	}
 
+	index = it^
+
 	return
 }
 
@@ -69,6 +71,7 @@ iterate_map :: proc(val: any, it: ^int) -> (key, value: any, ok: bool) {
 				key.id     = info.key.id
 				value.id   = info.value.id
 				ok = true
+				it^ += 1
 				break
 			}
 
