@@ -2877,6 +2877,31 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 			LLVMValueRef inline_asm = nullptr;
 
 			switch (build_context.metrics.arch) {
+			case TargetArch_riscv64:
+				{
+					GB_ASSERT(arg_count <= 7);
+
+					char asm_string[] = "ecall";
+					gbString constraints = gb_string_make(heap_allocator(), "={a0}");
+					for (unsigned i = 0; i < arg_count; i++) {
+						constraints = gb_string_appendc(constraints, ",{");
+						static char const *regs[] = {
+							"a7",
+							"a0",
+							"a1",
+							"a2",
+							"a3",
+							"a4",
+							"a5",
+							"a6"
+						};
+						constraints = gb_string_appendc(constraints, regs[i]);
+						constraints = gb_string_appendc(constraints, "}");
+					}
+
+					inline_asm = llvm_get_inline_asm(func_type, make_string_c(asm_string), make_string_c(constraints));
+				}
+				break;
 			case TargetArch_amd64:
 				{
 					GB_ASSERT(arg_count <= 7);

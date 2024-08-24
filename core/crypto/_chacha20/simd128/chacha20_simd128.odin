@@ -3,7 +3,7 @@ package chacha20_simd128
 import "base:intrinsics"
 import "core:crypto/_chacha20"
 import "core:simd"
-import "core:sys/info"
+@(require) import "core:sys/info"
 
 // Portable 128-bit `core:simd` implementation.
 //

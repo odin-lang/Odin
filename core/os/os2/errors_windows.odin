@@ -5,6 +5,8 @@ import "base:runtime"
 import "core:slice"
 import win32 "core:sys/windows"
 
+_Platform_Error :: win32.System_Error
+
 _error_string :: proc(errno: i32) -> string {
 	e := win32.DWORD(errno)
 	if e == 0 {

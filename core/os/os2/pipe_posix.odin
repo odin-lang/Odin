@@ -12,6 +12,15 @@ _pipe :: proc() -> (r, w: ^File, err: Error) {
 		return
 	}
 
+	if posix.fcntl(fds[0], .SETFD, i32(posix.FD_CLOEXEC)) == -1 {
+		err = _get_platform_error()
+		return
+	}
+	if posix.fcntl(fds[1], .SETFD, i32(posix.FD_CLOEXEC)) == -1 {
+		err = _get_platform_error()
+		return
+	}
+
 	r = __new_file(fds[0])
 	ri := (^File_Impl)(r.impl)
 

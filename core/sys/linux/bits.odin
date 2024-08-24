@@ -1343,13 +1343,15 @@ Socket_Option :: enum {
 	RESERVE_MEM                   = 73,
 	TXREHASH                      = 74,
 	RCVMARK                       = 75,
-	// Hardcoded 64-bit Time. It's time to move on.
-	TIMESTAMP                     = TIMESTAMP_NEW,
-	TIMESTAMPNS                   = TIMESTAMPNS_NEW,
-	TIMESTAMPING                  = TIMESTAMPING_NEW,
-	RCVTIMEO                      = RCVTIMEO_NEW,
-	SNDTIMEO                      = SNDTIMEO_NEW,
+	TIMESTAMP                     = TIMESTAMP_OLD    when _SOCKET_OPTION_OLD else TIMESTAMP_NEW,
+	TIMESTAMPNS                   = TIMESTAMPNS_OLD  when _SOCKET_OPTION_OLD else TIMESTAMPNS_NEW,
+	TIMESTAMPING                  = TIMESTAMPING_OLD when _SOCKET_OPTION_OLD else TIMESTAMPING_NEW,
+	RCVTIMEO                      = RCVTIMEO_OLD     when _SOCKET_OPTION_OLD else RCVTIMEO_NEW,
+	SNDTIMEO                      = SNDTIMEO_OLD     when _SOCKET_OPTION_OLD else SNDTIMEO_NEW,
 }
+
+@(private)
+_SOCKET_OPTION_OLD :: size_of(rawptr) == 8 /* || size_of(time_t) == size_of(__kernel_long_t) */
 
 Socket_UDP_Option :: enum {
 	CORK                   = 1,

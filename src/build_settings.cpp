@@ -39,6 +39,7 @@ enum TargetArchKind : u16 {
 	TargetArch_arm64,
 	TargetArch_wasm32,
 	TargetArch_wasm64p32,
+	TargetArch_riscv64,
 
 	TargetArch_COUNT,
 };
@@ -104,6 +105,7 @@ gb_global String target_arch_names[TargetArch_COUNT] = {
 	str_lit("arm64"),
 	str_lit("wasm32"),
 	str_lit("wasm64p32"),
+	str_lit("riscv64"),
 };
 
 #include "build_settings_microarch.cpp"
@@ -555,12 +557,17 @@ gb_global TargetMetrics target_linux_arm64 = {
 	8, 8, 16, 32,
 	str_lit("aarch64-linux-elf"),
 };
-
 gb_global TargetMetrics target_linux_arm32 = {
 	TargetOs_linux,
 	TargetArch_arm32,
 	4, 4, 8, 16,
 	str_lit("arm-unknown-linux-gnueabihf"),
+};
+gb_global TargetMetrics target_linux_riscv64 = {
+	TargetOs_linux,
+	TargetArch_riscv64,
+	8, 8, 16, 32,
+	str_lit("riscv64-linux-gnu"),
 };
 
 gb_global TargetMetrics target_darwin_amd64 = {
@@ -716,6 +723,12 @@ gb_global TargetMetrics target_freestanding_arm32 = {
 	4, 4, 8, 16,
 	str_lit("arm-unknown-unknown-gnueabihf"),
 };
+gb_global TargetMetrics target_freestanding_riscv64 = {
+	TargetOs_freestanding,
+	TargetArch_riscv64,
+	8, 8, 16, 32,
+	str_lit("riscv64-unknown-gnu"),
+};
 
 
 struct NamedTargetMetrics {
@@ -733,6 +746,7 @@ gb_global NamedTargetMetrics named_targets[] = {
 	{ str_lit("linux_amd64"),         &target_linux_amd64    },
 	{ str_lit("linux_arm64"),         &target_linux_arm64    },
 	{ str_lit("linux_arm32"),         &target_linux_arm32    },
+	{ str_lit("linux_riscv64"),       &target_linux_riscv64  },
 
 	{ str_lit("windows_i386"),        &target_windows_i386   },
 	{ str_lit("windows_amd64"),       &target_windows_amd64  },
@@ -761,6 +775,8 @@ gb_global NamedTargetMetrics named_targets[] = {
 
 	{ str_lit("freestanding_arm64"), &target_freestanding_arm64 },
 	{ str_lit("freestanding_arm32"), &target_freestanding_arm32 },
+
+	{ str_lit("freestanding_riscv64"), &target_freestanding_riscv64 },
 };
 
 gb_global NamedTargetMetrics *selected_target_metrics;
@@ -1631,6 +1647,8 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 
 		// Disallow on wasm
 		bc->use_separate_modules = false;
+	} if(bc->metrics.arch == TargetArch_riscv64) {
+		bc->link_flags = str_lit("-target riscv64 ");
 	} else {
 		// NOTE: for targets other than darwin, we don't specify a `-target` link flag.
 		// This is because we don't support cross-linking and clang is better at figuring

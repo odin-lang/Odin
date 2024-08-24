@@ -576,10 +576,13 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 		success_byte: [1]u8
 		linux.write(child_pipe_fds[WRITE], success_byte[:])
 
-		if errno = linux.execveat(exe_fd, "", &cargs[0], env, {.AT_EMPTY_PATH}); errno != .NONE {
-			write_errno_to_parent_and_abort(child_pipe_fds[WRITE], errno)
-		}
-		unreachable()
+		errno = linux.execveat(exe_fd, "", &cargs[0], env, {.AT_EMPTY_PATH})
+
+		// NOTE: we can't tell the parent about this failure because we already wrote the success byte.
+		// So if this happens the user will just see the process failed when they call process_wait.
+
+		assert(errno != nil)
+		intrinsics.trap()
 	}
 
 	process.pid = int(pid)
