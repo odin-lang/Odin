@@ -19,6 +19,7 @@ iterate_array :: proc(val: any, it: ^int) -> (elem: any, index: int, ok: bool) {
 			elem.data = rawptr(uintptr(val.data) + uintptr(it^ * info.elem_size))
 			elem.id = info.elem.id
 			ok = true
+			index = it^
 			it^ += 1
 		}
 	case Type_Info_Slice:
@@ -27,6 +28,7 @@ iterate_array :: proc(val: any, it: ^int) -> (elem: any, index: int, ok: bool) {
 			elem.data = rawptr(uintptr(array.data) + uintptr(it^ * info.elem_size))
 			elem.id = info.elem.id
 			ok = true
+			index = it^
 			it^ += 1
 		}
 	case Type_Info_Dynamic_Array:
@@ -35,6 +37,7 @@ iterate_array :: proc(val: any, it: ^int) -> (elem: any, index: int, ok: bool) {
 			elem.data = rawptr(uintptr(array.data) + uintptr(it^ * info.elem_size))
 			elem.id = info.elem.id
 			ok = true
+			index = it^
 			it^ += 1
 		}
 	}
@@ -69,6 +72,7 @@ iterate_map :: proc(val: any, it: ^int) -> (key, value: any, ok: bool) {
 				key.id     = info.key.id
 				value.id   = info.value.id
 				ok = true
+				it^ += 1
 				break
 			}
 
@@ -76,3 +80,4 @@ iterate_map :: proc(val: any, it: ^int) -> (key, value: any, ok: bool) {
 	}
 	return
 }
+
