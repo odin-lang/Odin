@@ -10055,6 +10055,22 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 					is_constant = o->mode == Addressing_Constant;
 				}
 
+				if (elem->kind == Ast_BinaryExpr) {
+					switch (elem->BinaryExpr.op.kind) {
+					case Token_Or:
+						{
+							gbString x = expr_to_string(elem->BinaryExpr.left);
+							gbString y = expr_to_string(elem->BinaryExpr.right);
+							gbString e = expr_to_string(elem);
+							error(elem, "Was the following intended? '%s, %s'; if not, surround the expression with parentheses '(%s)'", x, y, e);
+							gb_string_free(e);
+							gb_string_free(y);
+							gb_string_free(x);
+						}
+						break;
+					}
+				}
+
 				check_assignment(c, o, t->BitSet.elem, str_lit("bit_set literal"));
 				if (o->mode == Addressing_Constant) {
 					i64 lower = t->BitSet.lower;
