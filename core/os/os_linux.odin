@@ -26,6 +26,9 @@ Pid       :: distinct i32
 File_Time :: distinct u64
 Socket    :: distinct int
 
+ino_t :: u64
+ino_t32 :: u32
+
 INVALID_HANDLE :: ~Handle(0)
 
 _Platform_Error :: linux.Errno

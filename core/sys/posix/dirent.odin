@@ -202,7 +202,27 @@ when ODIN_OS == .Darwin {
 
 } else when ODIN_OS == .Linux {
 
-	dirent :: struct {
+	when ODIN_ARCH == .i386 || ODIN_ARCH == .wasm32 || ODIN_ARCH == .arm32 {
+
+		dirent :: struct {
+			d_ino: ino_t32,                   /* [PSX] file number of entry */
+			d_off: off_t32,                   /* directory offset of the next entry */
+			d_reclen: c.uint16_t,           /* length of this record */
+			d_type: D_Type,                 /* file type  */
+			d_name: [256]c.char `fmt:"s,0"` /* [PSX] entry name */
+		}
+	} else when ODIN_ARCH == .amd64 || ODIN_ARCH == .wasm64p32 || ODIN_ARCH == .arm64 {
+
+		dirent :: struct {
+			d_ino: ino_t,                   /* [PSX] file number of entry */
+			d_off: off_t,                   /* directory offset of the next entry */
+			d_reclen: c.uint16_t,           /* length of this record */
+			d_type: D_Type,                 /* file type  */
+			d_name: [256]c.char `fmt:"s,0"` /* [PSX] entry name */
+		}
+	}
+
+	dirent64 :: struct {
 		d_ino: ino_t,                   /* [PSX] file number of entry */
 		d_off: off_t,                   /* directory offset of the next entry */
 		d_reclen: c.uint16_t,           /* length of this record */
