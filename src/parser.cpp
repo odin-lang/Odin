@@ -1921,6 +1921,9 @@ gb_internal Array<Ast *> parse_enum_field_list(AstFile *f) {
 	       f->curr_token.kind != Token_EOF) {
 		CommentGroup *docs = f->lead_comment;
 		CommentGroup *comment = nullptr;
+
+		parse_enforce_tabs(f);
+
 		Ast *name = parse_value(f);
 		Ast *value = nullptr;
 		if (f->curr_token.kind == Token_Eq) {
@@ -2259,6 +2262,7 @@ gb_internal Array<Ast *> parse_union_variant_list(AstFile *f) {
 	auto variants = array_make<Ast *>(ast_allocator(f));
 	while (f->curr_token.kind != Token_CloseBrace &&
 	       f->curr_token.kind != Token_EOF) {
+		parse_enforce_tabs(f);
 		Ast *type = parse_type(f);
 		if (type->kind != Ast_BadExpr) {
 			array_add(&variants, type);
@@ -4274,6 +4278,7 @@ gb_internal Ast *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_fl
 	while (f->curr_token.kind != follow &&
 	       f->curr_token.kind != Token_Colon &&
 	       f->curr_token.kind != Token_EOF) {
+		if (!is_signature) parse_enforce_tabs(f);
 		u32 flags = parse_field_prefixes(f);
 		Ast *param = parse_var_type(f, allow_ellipsis, allow_typeid_token);
 		if (param->kind == Ast_Ellipsis) {
@@ -4363,6 +4368,8 @@ gb_internal Ast *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_fl
 		       f->curr_token.kind != Token_EOF &&
 		       f->curr_token.kind != Token_Semicolon) {
 			CommentGroup *docs = f->lead_comment;
+
+			if (!is_signature) parse_enforce_tabs(f);
 			u32 set_flags = parse_field_prefixes(f);
 			Token tag = {};
 			Array<Ast *> names = parse_ident_list(f, allow_poly_names);
@@ -5375,6 +5382,11 @@ gb_internal u64 check_vet_flags(AstFile *file) {
 
 
 gb_internal void parse_enforce_tabs(AstFile *f) {
+	// Checks to see if tabs have been used for indentation
+	if ((check_vet_flags(f) & VetFlag_Tabs) == 0) {
+		return;
+	}
+
        	Token prev = f->prev_token;
 	Token curr = f->curr_token;
 	if (prev.pos.line < curr.pos.line) {
@@ -5391,6 +5403,10 @@ gb_internal void parse_enforce_tabs(AstFile *f) {
 
 		isize len = end-it;
 		for (isize i = 0; i < len; i++) {
+			if (it[i] == '/') {
+				// ignore comments
+				break;
+			}
 			if (it[i] == ' ') {
 				syntax_error(curr, "With '-vet-tabs', tabs must be used for indentation");
 				break;
@@ -5405,11 +5421,7 @@ gb_internal Array<Ast *> parse_stmt_list(AstFile *f) {
 	while (f->curr_token.kind != Token_case &&
 	       f->curr_token.kind != Token_CloseBrace &&
 	       f->curr_token.kind != Token_EOF) {
-
-		// Checks to see if tabs have been used for indentation
-	       	if (check_vet_flags(f) & VetFlag_Tabs) {
-		       parse_enforce_tabs(f);
-		}
+		parse_enforce_tabs(f);
 
 		Ast *stmt = parse_stmt(f);
 		if (stmt && stmt->kind != Ast_EmptyStmt) {
