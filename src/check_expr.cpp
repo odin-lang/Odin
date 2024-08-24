@@ -1180,11 +1180,15 @@ gb_internal void check_assignment(CheckerContext *c, Operand *operand, Type *typ
 				      LIT(article),
 				      LIT(context_name));
 			} else {
+				ERROR_BLOCK();
 				error(operand->expr,
 				      "Cannot assign '%s', a type, to %.*s%.*s",
 				      op_type_str,
 				      LIT(article),
 				      LIT(context_name));
+				if (type && are_types_identical(type, t_any)) {
+					error_line("\tSuggestion: 'typeid_of(%s)'", expr_str);
+				}
 			}
 			break;
 		default:
