@@ -4662,7 +4662,8 @@ gb_internal bool check_index_value(CheckerContext *c, Type *main_type, bool open
 	check_expr_with_type_hint(c, &operand, index_value, type_hint);
 	if (operand.mode == Addressing_Invalid) {
 		if (value) *value = 0;
-		return false;
+		// NOTE(bill): return true here to propagate the errors better
+		return true;
 	}
 
 	Type *index_type = t_int;
@@ -4883,7 +4884,7 @@ gb_internal ExactValue get_constant_field_single(CheckerContext *c, ExactValue v
 							TypeAndValue tav = fv->value->tav;
 							if (success_) *success_ = true;
 							if (finish_) *finish_ = false;
-							return tav.value;;
+							return tav.value;
 						}
 					}
 
@@ -4958,7 +4959,6 @@ gb_internal ExactValue get_constant_field(CheckerContext *c, Operand const *oper
 				return value;
 			}
 		}
-
 		if (success_) *success_ = true;
 		return value;
 	} else if (value.kind == ExactValue_Quaternion) {
@@ -10566,7 +10566,8 @@ gb_internal ExprKind check_index_expr(CheckerContext *c, Operand *o, Ast *node, 
 			o->expr = node;
 			return kind;
 		} else if (ok && !is_type_matrix(t)) {
-			ExactValue value = type_and_value_of_expr(ie->expr).value;
+			TypeAndValue tav = type_and_value_of_expr(ie->expr);
+			ExactValue value = tav.value;
 			o->mode = Addressing_Constant;
 			bool success = false;
 			bool finish = false;
