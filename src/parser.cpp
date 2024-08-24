@@ -4532,6 +4532,12 @@ gb_internal Ast *parse_if_stmt(AstFile *f) {
 		return ast_bad_stmt(f, f->curr_token, f->curr_token);
 	}
 
+	if (f->recursion_depth_else_if > 256) {
+		syntax_error(f->curr_token, "if-else chain recursion depth limit hit. Consider using a 'switch' statement instead or refactor the code to not require a large if-else chain");
+		f->recursion_depth_else_if = 0;
+		return ast_bad_stmt(f, f->curr_token, f->curr_token);
+	}
+
 	Token token = expect_token(f, Token_if);
 	Ast *init = nullptr;
 	Ast *cond = nullptr;
@@ -4577,7 +4583,9 @@ gb_internal Ast *parse_if_stmt(AstFile *f) {
 		Token else_token = expect_token(f, Token_else);
 		switch (f->curr_token.kind) {
 		case Token_if:
+			f->recursion_depth_else_if += 1;
 			else_stmt = parse_if_stmt(f);
+			f->recursion_depth_else_if -= 1;
 			break;
 		case Token_OpenBrace:
 			else_stmt = parse_block_stmt(f, false);
