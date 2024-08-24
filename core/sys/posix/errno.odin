@@ -151,7 +151,7 @@ when ODIN_OS == .Darwin {
 	ENOPROTOOPT     :: 42
 	EPROTONOSUPPORT :: 43
 	ENOTSUP         :: 45
-	EOPNOTSUPP      :: 45
+	EOPNOTSUPP      :: ENOTSUP
 	EAFNOSUPPORT    :: 47
 	EADDRINUSE      :: 48
 	EADDRNOTAVAIL   :: 49
@@ -230,7 +230,7 @@ when ODIN_OS == .Darwin {
 	ENOPROTOOPT     :: 42
 	EPROTONOSUPPORT :: 43
 	ENOTSUP         :: 45
-	EOPNOTSUPP      :: 45
+	EOPNOTSUPP      :: ENOTSUP
 	EAFNOSUPPORT    :: 47
 	EADDRINUSE      :: 48
 	EADDRNOTAVAIL   :: 49
@@ -311,7 +311,7 @@ when ODIN_OS == .Darwin {
 	ENOPROTOOPT     :: 42
 	EPROTONOSUPPORT :: 43
 	ENOTSUP         :: 45
-	EOPNOTSUPP      :: 45
+	EOPNOTSUPP      :: ENOTSUP
 	EAFNOSUPPORT    :: 47
 	EADDRINUSE      :: 48
 	EADDRNOTAVAIL   :: 49
@@ -430,6 +430,7 @@ when ODIN_OS == .Darwin {
 	EPROTONOSUPPORT :: 93
 
 	EOPNOTSUPP      :: 95
+	ENOTSUP         :: EOPNOTSUPP
 	EAFNOSUPPORT    :: 97
 	EADDRINUSE      :: 98
 	EADDRNOTAVAIL   :: 99
@@ -455,9 +456,6 @@ when ODIN_OS == .Darwin {
 
 	EOWNERDEAD      :: 130
 	ENOTRECOVERABLE :: 131
-
-	// NOTE: Not defined for Linux
-	ENOTSUP         :: -1
 } else {
 	#panic("posix is unimplemented for the current target")
 }
