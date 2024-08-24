@@ -456,7 +456,7 @@ when ODIN_OS == .Darwin {
 	EOWNERDEAD      :: 130
 	ENOTRECOVERABLE :: 131
 
-	// NOTE: Note defined for linux
+	// NOTE: Not defined for Linux
 	ENOTSUP         :: -1
 } else {
 	#panic("posix is unimplemented for the current target")
