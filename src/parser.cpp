@@ -4532,12 +4532,10 @@ gb_internal Ast *parse_if_stmt(AstFile *f) {
 		return ast_bad_stmt(f, f->curr_token, f->curr_token);
 	}
 
-	if (f->recursion_depth_else_if > 256) {
-		syntax_error(f->curr_token, "if-else chain recursion depth limit hit. Consider using a 'switch' statement instead or refactor the code to not require a large if-else chain");
-		f->recursion_depth_else_if = 0;
-		return ast_bad_stmt(f, f->curr_token, f->curr_token);
-	}
+	Ast *top_if_stmt = nullptr;
 
+	Ast *prev_if_stmt = nullptr;
+if_else_chain:;
 	Token token = expect_token(f, Token_if);
 	Ast *init = nullptr;
 	Ast *cond = nullptr;
@@ -4579,14 +4577,24 @@ gb_internal Ast *parse_if_stmt(AstFile *f) {
 		ignore_strict_style = true;
 	}
 	skip_possible_newline_for_literal(f, ignore_strict_style);
+
+	Ast *curr_if_stmt = ast_if_stmt(f, token, init, cond, body, nullptr);
+	if (top_if_stmt == nullptr) {
+		top_if_stmt = curr_if_stmt;
+	}
+	if (prev_if_stmt != nullptr) {
+		prev_if_stmt->IfStmt.else_stmt = curr_if_stmt;
+	}
+
 	if (f->curr_token.kind == Token_else) {
 		Token else_token = expect_token(f, Token_else);
 		switch (f->curr_token.kind) {
 		case Token_if:
-			f->recursion_depth_else_if += 1;
-			else_stmt = parse_if_stmt(f);
-			f->recursion_depth_else_if -= 1;
-			break;
+			// NOTE(bill): Instead of relying on recursive descent for an if-else chain
+			// we can just inline the tail-recursion manually with a simple loop like
+			// construct using a `goto`
+			prev_if_stmt = curr_if_stmt;
+			goto if_else_chain;
 		case Token_OpenBrace:
 			else_stmt = parse_block_stmt(f, false);
 			break;
@@ -4601,7 +4609,9 @@ gb_internal Ast *parse_if_stmt(AstFile *f) {
 		}
 	}
 
-	return ast_if_stmt(f, token, init, cond, body, else_stmt);
+	curr_if_stmt->IfStmt.else_stmt = else_stmt;
+
+	return top_if_stmt;
 }
 
 gb_internal Ast *parse_when_stmt(AstFile *f) {
