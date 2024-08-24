@@ -1029,7 +1029,6 @@ foreign lib {
 	SetTraceLogLevel :: proc(logLevel: TraceLogLevel) ---                                       // Set the current threshold (minimum) log level
 	MemAlloc         :: proc(size: c.uint) -> rawptr ---                                        // Internal memory allocator
 	MemRealloc       :: proc(ptr: rawptr, size: c.uint) -> rawptr ---                           // Internal memory reallocator
-	MemFree          :: proc(ptr: rawptr) ---                                                   // Internal memory free
 
 	// Set custom callbacks
 	// WARNING: Callbacks setup is intended for advance users
@@ -1685,6 +1684,24 @@ TextFormat :: proc(text: cstring, args: ..any) -> cstring {
 // Text formatting with variables (sprintf style) and allocates (must be freed with 'MemFree')
 TextFormatAlloc :: proc(text: cstring, args: ..any) -> cstring {
 	return fmt.caprintf(string(text), ..args, allocator=MemAllocator())
+}
+
+
+// Internal memory free
+MemFree :: proc{
+	MemFreePtr,
+	MemFreeCstring,
+}
+
+
+@(default_calling_convention="c")
+foreign lib {
+	@(link_name="MemFree")
+	MemFreePtr :: proc(ptr: rawptr) ---
+}
+
+MemFreeCstring :: proc "c" (s: cstring) {
+	MemFreePtr(rawptr(s))
 }
 
 
