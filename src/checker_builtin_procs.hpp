@@ -313,6 +313,8 @@ BuiltinProc__type_simple_boolean_end,
 	BuiltinProc_type_map_info,
 	BuiltinProc_type_map_cell_info,
 
+	BuiltinProc_type_has_shared_fields,
+
 BuiltinProc__type_end,
 
 	BuiltinProc_procedure_of,
@@ -647,6 +649,7 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("type_map_info"),      1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_map_cell_info"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
+	{STR_LIT("type_has_shared_fields"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT(""), 0, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
 
