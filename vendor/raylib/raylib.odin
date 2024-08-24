@@ -84,7 +84,6 @@ package raylib
 import "core:c"
 import "core:fmt"
 import "core:mem"
-import "core:strings"
 
 import "core:math/linalg"
 _ :: linalg
