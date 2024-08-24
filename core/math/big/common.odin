@@ -195,7 +195,7 @@ Error_String :: #sparse[Error]string{
 }
 
 Primality_Flag :: enum u8 {
- 	Blum_Blum_Shub = 0,  // Make prime congruent to 3 mod 4
+	Blum_Blum_Shub = 0,  // Make prime congruent to 3 mod 4
 	Safe           = 1,  // Make sure (p-1)/2 is prime as well (implies .Blum_Blum_Shub)
 	Second_MSB_On  = 3,  // Make the 2nd highest bit one
 }

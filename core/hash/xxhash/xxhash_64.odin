@@ -19,15 +19,15 @@ xxh_u64    :: u64
 XXH64_DEFAULT_SEED :: XXH64_hash(0)
 
 XXH64_state :: struct {
-   total_len:    XXH64_hash,    /*!< Total length hashed. This is always 64-bit. */
-   v1:           XXH64_hash,    /*!< First accumulator lane */
-   v2:           XXH64_hash,    /*!< Second accumulator lane */
-   v3:           XXH64_hash,    /*!< Third accumulator lane */
-   v4:           XXH64_hash,    /*!< Fourth accumulator lane */
-   mem64:        [4]XXH64_hash, /*!< Internal buffer for partial reads. Treated as unsigned char[32]. */
-   memsize:      XXH32_hash,    /*!< Amount of data in @ref mem64 */
-   reserved32:   XXH32_hash,    /*!< Reserved field, needed for padding anyways*/
-   reserved64:   XXH64_hash,    /*!< Reserved field. Do not read or write to it, it may be removed. */
+	total_len:    XXH64_hash,    /*!< Total length hashed. This is always 64-bit. */
+	v1:           XXH64_hash,    /*!< First accumulator lane */
+	v2:           XXH64_hash,    /*!< Second accumulator lane */
+	v3:           XXH64_hash,    /*!< Third accumulator lane */
+	v4:           XXH64_hash,    /*!< Fourth accumulator lane */
+	mem64:        [4]XXH64_hash, /*!< Internal buffer for partial reads. Treated as unsigned char[32]. */
+	memsize:      XXH32_hash,    /*!< Amount of data in @ref mem64 */
+	reserved32:   XXH32_hash,    /*!< Reserved field, needed for padding anyways*/
+	reserved64:   XXH64_hash,    /*!< Reserved field. Do not read or write to it, it may be removed. */
 }
 
 XXH64_canonical :: struct {

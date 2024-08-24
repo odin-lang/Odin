@@ -3546,11 +3546,11 @@ SIGDN :: enum c_int {
 }
 
 SIATTRIBFLAGS :: enum c_int {
-  AND	= 0x1,
-  OR	= 0x2,
-  APPCOMPAT	= 0x3,
-  MASK	= 0x3,
-  ALLITEMS	= 0x4000,
+	AND       = 0x1,
+	OR        = 0x2,
+	APPCOMPAT = 0x3,
+	MASK      = 0x3,
+	ALLITEMS  = 0x4000,
 }
 
 FDAP :: enum c_int {
@@ -4503,35 +4503,35 @@ DNS_INFO_NO_RECORDS :: 9501
 DNS_QUERY_NO_RECURSION :: 0x00000004
 
 DNS_RECORD :: struct { // aka DNS_RECORDA
-    pNext: ^DNS_RECORD,
-    pName: cstring,
-    wType: WORD,
-    wDataLength: USHORT,
-    Flags: DWORD,
-    dwTtl: DWORD,
-    _: DWORD,
-    Data: struct #raw_union {
-        CNAME: DNS_PTR_DATAA,
-        A:     u32be,  // Ipv4 Address
-        AAAA:  u128be, // Ipv6 Address
-        TXT:   DNS_TXT_DATAA,
-        NS:    DNS_PTR_DATAA,
-        MX:    DNS_MX_DATAA,
-        SRV:   DNS_SRV_DATAA,
-    },
+	pNext: ^DNS_RECORD,
+	pName: cstring,
+	wType: WORD,
+	wDataLength: USHORT,
+	Flags: DWORD,
+	dwTtl: DWORD,
+	_: DWORD,
+	Data: struct #raw_union {
+		CNAME: DNS_PTR_DATAA,
+		A:     u32be,  // Ipv4 Address
+		AAAA:  u128be, // Ipv6 Address
+		TXT:   DNS_TXT_DATAA,
+		NS:    DNS_PTR_DATAA,
+		MX:    DNS_MX_DATAA,
+		SRV:   DNS_SRV_DATAA,
+	},
 }
 
 DNS_TXT_DATAA :: struct {
-    dwStringCount: DWORD,
-    pStringArray:  cstring,
+	dwStringCount: DWORD,
+	pStringArray:  cstring,
 }
 
 DNS_PTR_DATAA :: cstring
 
 DNS_MX_DATAA :: struct {
-    pNameExchange: cstring, // the hostname
-    wPreference: WORD,      // lower values preferred
-    _: WORD,                // padding.
+	pNameExchange: cstring, // the hostname
+	wPreference: WORD,      // lower values preferred
+	_: WORD,                // padding.
 }
 DNS_SRV_DATAA :: struct {
 	pNameTarget: cstring,

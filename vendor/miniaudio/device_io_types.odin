@@ -381,7 +381,7 @@ device_config :: struct {
 	noPreSilencedOutputBuffer:  b8,   /* When set to true, the contents of the output buffer passed into the data callback will be left undefined rather than initialized to zero. */
 	noClip:                     b8,   /* When set to true, the contents of the output buffer passed into the data callback will not be clipped after returning. Only applies when the playback sample format is f32. */
 	noDisableDenormals:         b8,   /* Do not disable denormals when firing the data callback. */
-  	noFixedSizedCallback:       b8,   /* Disables strict fixed-sized data callbacks. Setting this to true will result in the period size being treated only as a hint to the backend. This is an optimization for those who don't need fixed sized callbacks. */
+	noFixedSizedCallback:       b8,   /* Disables strict fixed-sized data callbacks. Setting this to true will result in the period size being treated only as a hint to the backend. This is an optimization for those who don't need fixed sized callbacks. */
 	dataCallback:               device_data_proc,
 	notificationCallback:       device_notification_proc,
 	stopCallback:               stop_proc,
@@ -813,7 +813,7 @@ context_type :: struct {
 			/*pa_mainloop**/ pMainLoop:     rawptr,
 			/*pa_context**/  pPulseContext: rawptr,
 			pApplicationName:               cstring, /* Set when the context is initialized. Used by devices for their local pa_context objects. */
-      pServerName:                    cstring, /* Set when the context is initialized. Used by devices for their local pa_context objects. */
+			pServerName:                    cstring, /* Set when the context is initialized. Used by devices for their local pa_context objects. */
 		} when SUPPORT_PULSEAUDIO else struct {}),
 		
 		jack: (struct {
@@ -1140,7 +1140,7 @@ device :: struct {
 
 		pulse: (struct {
 			/*pa_mainloop**/ pMainLoop: rawptr,
-    	/*pa_context**/ pPulseContext: rawptr,
+			/*pa_context**/ pPulseContext: rawptr,
 			/*pa_stream**/ pStreamPlayback: rawptr,
 			/*pa_stream**/ pStreamCapture: rawptr,
 		} when SUPPORT_PULSEAUDIO else struct {}),

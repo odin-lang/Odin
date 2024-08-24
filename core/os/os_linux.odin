@@ -395,9 +395,9 @@ SIOCGIFFLAG :: enum c.int {
 	PORTSEL        = 13, /* Can set media type.  */
 	AUTOMEDIA      = 14, /* Auto media select active.  */
 	DYNAMIC        = 15, /* Dialup device with changing addresses.  */
-        LOWER_UP       = 16,
-        DORMANT        = 17,
-        ECHO           = 18,
+	LOWER_UP       = 16,
+	DORMANT        = 17,
+	ECHO           = 18,
 }
 SIOCGIFFLAGS :: bit_set[SIOCGIFFLAG; c.int]
 

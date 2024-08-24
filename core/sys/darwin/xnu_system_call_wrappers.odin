@@ -192,43 +192,43 @@ _STRUCT_TIMEVAL :: struct {
 
 /* pwd.h */
 _Password_Entry :: struct {
-    pw_name: cstring, /* username */
-    pw_passwd: cstring, /* user password */
-    pw_uid: i32,   /* user ID */
-    pw_gid: i32,   /* group ID */
+	pw_name: cstring, /* username */
+	pw_passwd: cstring, /* user password */
+	pw_uid: i32,   /* user ID */
+	pw_gid: i32,   /* group ID */
 	pw_change: u64,     /* password change time */
 	pw_class: cstring, /* user access class */
-    pw_gecos: cstring, /* full user name */
-    pw_dir: cstring, /* home directory */
-    pw_shell: cstring, /* shell program */
+	pw_gecos: cstring, /* full user name */
+	pw_dir: cstring, /* home directory */
+	pw_shell: cstring, /* shell program */
 	pw_expire: u64,     /* account expiration */
 	pw_fields: i32,     /* filled fields */
 }
 
 /* processinfo.h */
 _Proc_Bsdinfo :: struct {
-  pbi_flags: u32, /* if is 64bit; emulated etc */
-  pbi_status: u32,
-  pbi_xstatus: u32,
-  pbi_pid: u32,
-  pbi_ppid: u32,
-  pbi_uid: u32,
-  pbi_gid: u32,
-  pbi_ruid: u32,
-  pbi_rgid: u32,
-  pbi_svuid: u32,
-  pbi_svgid: u32,
-  res: u32,
-  pbi_comm: [DARWIN_MAXCOMLEN]u8,
-  pbi_name: [2 * DARWIN_MAXCOMLEN]u8,	/* empty if no name is registered */
-  pbi_nfiles: u32,
-  pbi_pgid: u32,
-  pbi_pjobc: u32,
-  e_tdev: u32, /* controlling tty dev */
-  e_tpgid: u32,	/* tty process group id */
-  pbi_nice: i32,
-  pbi_start_tvsec: u64,
-  pbi_start_tvusec: u64,
+	pbi_flags: u32, /* if is 64bit; emulated etc */
+	pbi_status: u32,
+	pbi_xstatus: u32,
+	pbi_pid: u32,
+	pbi_ppid: u32,
+	pbi_uid: u32,
+	pbi_gid: u32,
+	pbi_ruid: u32,
+	pbi_rgid: u32,
+	pbi_svuid: u32,
+	pbi_svgid: u32,
+	res: u32,
+	pbi_comm: [DARWIN_MAXCOMLEN]u8,
+	pbi_name: [2 * DARWIN_MAXCOMLEN]u8,	/* empty if no name is registered */
+	pbi_nfiles: u32,
+	pbi_pgid: u32,
+	pbi_pjobc: u32,
+	e_tdev: u32, /* controlling tty dev */
+	e_tpgid: u32,	/* tty process group id */
+	pbi_nice: i32,
+	pbi_start_tvsec: u64,
+	pbi_start_tvusec: u64,
 }
 
 /*--==========================================================================--*/

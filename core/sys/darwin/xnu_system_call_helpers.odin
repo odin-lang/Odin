@@ -15,9 +15,9 @@ sys_write_string ::  proc (fd: c.int, message: string) -> bool {
 Offset_From :: enum c.int {
 	SEEK_SET  = 0,  // the offset is set to offset bytes.
 	SEEK_CUR  = 1,  // the offset is set to its current location plus offset bytes.
-   	SEEK_END  = 2,  // the offset is set to the size of the file plus offset bytes.
-   	SEEK_HOLE = 3,  //  the offset is set to the start of the next hole greater than or equal to the supplied offset.
- 	SEEK_DATA = 4,  //  the offset is set to the start of the next non-hole file region greater than or equal to the supplied offset.
+	SEEK_END  = 2,  // the offset is set to the size of the file plus offset bytes.
+	SEEK_HOLE = 3,  //  the offset is set to the start of the next hole greater than or equal to the supplied offset.
+	SEEK_DATA = 4,  //  the offset is set to the start of the next non-hole file region greater than or equal to the supplied offset.
 }
 
 Open_Flags_Enum :: enum u8 {
