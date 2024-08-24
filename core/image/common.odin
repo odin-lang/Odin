@@ -1393,6 +1393,7 @@ expand_grayscale :: proc(img: ^Image, allocator := context.allocator) -> (ok: bo
 			for p in inp {
 				out[0].rgb = p.r // Gray component.
 				out[0].a   = p.g // Alpha component.
+				out    = out[1:]
 			}
 
 		case:
@@ -1417,6 +1418,7 @@ expand_grayscale :: proc(img: ^Image, allocator := context.allocator) -> (ok: bo
 			for p in inp {
 				out[0].rgb = p.r // Gray component.
 				out[0].a   = p.g // Alpha component.
+				out    = out[1:]
 			}
 
 		case:
