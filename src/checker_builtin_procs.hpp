@@ -99,6 +99,7 @@ enum BuiltinProcId {
 	BuiltinProc_prefetch_write_instruction,
 	BuiltinProc_prefetch_write_data,
 
+BuiltinProc__atomic_begin,
 	BuiltinProc_atomic_type_is_lock_free,
 	BuiltinProc_atomic_thread_fence,
 	BuiltinProc_atomic_signal_fence,
@@ -124,6 +125,7 @@ enum BuiltinProcId {
 	BuiltinProc_atomic_compare_exchange_strong_explicit,
 	BuiltinProc_atomic_compare_exchange_weak,
 	BuiltinProc_atomic_compare_exchange_weak_explicit,
+BuiltinProc__atomic_end,
 
 	BuiltinProc_fixed_point_mul,
 	BuiltinProc_fixed_point_div,
@@ -438,6 +440,7 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("prefetch_write_instruction"), 2, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
 	{STR_LIT("prefetch_write_data"),        2, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
 
+	{STR_LIT(""), 0, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
 	{STR_LIT("atomic_type_is_lock_free"),                1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("atomic_thread_fence"),                     1, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
 	{STR_LIT("atomic_signal_fence"),                     1, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
@@ -463,6 +466,7 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("atomic_compare_exchange_strong_explicit"), 5, false, Expr_Expr, BuiltinProcPkg_intrinsics, false, true},
 	{STR_LIT("atomic_compare_exchange_weak"),            3, false, Expr_Expr, BuiltinProcPkg_intrinsics, false, true},
 	{STR_LIT("atomic_compare_exchange_weak_explicit"),   5, false, Expr_Expr, BuiltinProcPkg_intrinsics, false, true},
+	{STR_LIT(""), 0, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("fixed_point_mul"), 3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("fixed_point_div"), 3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
