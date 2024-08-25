@@ -2006,8 +2006,7 @@ gb_internal bool check_binary_op(CheckerContext *c, Operand *o, Token op) {
 		switch (op.kind) {
 		case Token_Mul:
 		case Token_MulEq:
-			if (ct == t_f32) {
-				// TODO: only if target does not support f32.
+			if (ct == t_f32 && !target_supports_f32()) {
 				add_package_dependency(c, "runtime", "mulsf3", true);
 			}
 		}
@@ -2983,8 +2982,7 @@ gb_internal void check_comparison(CheckerContext *c, Ast *node, Operand *x, Oper
 					}
 					break;
 				}
-			} else if (xcore == t_f32 || ycore == t_f32) {
-				// TODO: only if target doesn't support f32.
+			} else if ((xcore == t_f32 || ycore == t_f32) && !target_supports_f32()) {
 				switch (op) {
 				case Token_GtEq: add_package_dependency(c, "runtime", "gesf2", true); break;
 				}
@@ -3463,8 +3461,7 @@ gb_internal void check_cast(CheckerContext *c, Operand *x, Type *type, bool forb
 				add_package_dependency(c, "runtime", "truncsfhf2",         REQUIRE);
 				add_package_dependency(c, "runtime", "truncdfhf2",         REQUIRE);
 				add_package_dependency(c, "runtime", "gnu_f2h_ieee",       REQUIRE);
-			} else if (src == t_f64 && dst == t_f32) {
-				// TODO: only if target doesn't have f64 floats hardware (riscv without the "d").
+			} else if (src == t_f64 && dst == t_f32 && !target_supports_f64()) {
 				add_package_dependency(c, "runtime", "truncdfsf2",         REQUIRE);
 			}
 		}
