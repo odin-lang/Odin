@@ -375,7 +375,7 @@ _current_process_info :: proc(selection: Process_Info_Fields, allocator: runtime
 	read_username: if .Username in selection {
 		process_handle := win32.GetCurrentProcess()
 		username: string
-		username, err := _get_process_user(process_handle, allocator)
+		username, err = _get_process_user(process_handle, allocator)
 		if _, ok := err.(runtime.Allocator_Error); ok {
 			return
 		} else if err != nil {
