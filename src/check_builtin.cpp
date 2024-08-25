@@ -2048,6 +2048,14 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		return ok;
 	}
 
+	if (BuiltinProc__atomic_begin < id && id < BuiltinProc__atomic_end) {
+		if (build_context.metrics.arch == TargetArch_riscv64) {
+			if (!check_target_feature_is_enabled(str_lit("a"), nullptr)) {
+				error(call, "missing required target feature \"a\" for atomics, enable it by setting a different -microarch or explicitly adding it through -target-features");
+			}
+		}
+	}
+
 	switch (id) {
 	default:
 		GB_PANIC("Implement built-in procedure: %.*s", LIT(builtin_name));
