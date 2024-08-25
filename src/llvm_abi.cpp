@@ -1573,14 +1573,12 @@ namespace lbAbiRiscv64 {
 
 		int xlen = 8; // 8 byte int register size for riscv64.
 
-		// NOTE: we are requiring both of these to be enabled so we can just hard-code 8.
-		// int flen = 0;
-		// if (check_target_feature_is_enabled(str_lit("d"), nullptr)) {
-		// 	flen = 8; // Double precision floats are enabled.
-		// } else if (check_target_feature_is_enabled(str_lit("f"), nullptr)) {
-		// 	flen = 4; // Single precision floats are enabled.
-		// }
-		int flen = 8;
+		int flen = 0;
+		if (check_target_feature_is_enabled(str_lit("d"), nullptr)) {
+			flen = 8; // Double precision floats are enabled.
+		} else if (check_target_feature_is_enabled(str_lit("f"), nullptr)) {
+			flen = 4; // Single precision floats are enabled.
+		}
 
 		LLVMTypeKind kind = LLVMGetTypeKind(type);
 		i64 size = lb_sizeof(type);
