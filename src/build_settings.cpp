@@ -1808,7 +1808,7 @@ gb_internal bool target_supports_f32() {
 	case TargetArch_riscv64:
 		return check_target_feature_is_enabled(str_lit("f"), nullptr);
 	}
-	return false;
+	return true;
 }
 
 gb_internal bool target_supports_f64() {
@@ -1816,7 +1816,7 @@ gb_internal bool target_supports_f64() {
 	case TargetArch_riscv64:
 		return check_target_feature_is_enabled(str_lit("d"), nullptr);
 	}
-	return false;
+	return true;
 }
 
 // NOTE(Jeroen): Set/create the output and other paths and report an error as appropriate.
