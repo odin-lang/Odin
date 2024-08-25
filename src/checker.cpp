@@ -3175,7 +3175,7 @@ gb_internal DECL_ATTRIBUTE_PROC(foreign_block_decl_attribute) {
 	} else if (name == "link_prefix") {
 		if (ev.kind == ExactValue_String) {
 			String link_prefix = ev.value_string;
-			if (!is_foreign_name_valid(link_prefix)) {
+			if (link_prefix.len != 0 && !is_foreign_name_valid(link_prefix)) {
 				error(elem, "Invalid link prefix: '%.*s'", LIT(link_prefix));
 			} else {
 				c->foreign_context.link_prefix = link_prefix;
@@ -3187,7 +3187,7 @@ gb_internal DECL_ATTRIBUTE_PROC(foreign_block_decl_attribute) {
 	} else if (name == "link_suffix") {
 		if (ev.kind == ExactValue_String) {
 			String link_suffix = ev.value_string;
-			if (!is_foreign_name_valid(link_suffix)) {
+			if (link_suffix.len != 0 && !is_foreign_name_valid(link_suffix)) {
 				error(elem, "Invalid link suffix: '%.*s'", LIT(link_suffix));
 			} else {
 				c->foreign_context.link_suffix = link_suffix;
@@ -3489,7 +3489,7 @@ gb_internal DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 
 		if (ev.kind == ExactValue_String) {
 			ac->link_prefix = ev.value_string;
-			if (!is_foreign_name_valid(ac->link_prefix)) {
+			if (ac->link_prefix.len != 0 && !is_foreign_name_valid(ac->link_prefix)) {
 				error(elem, "Invalid link prefix: %.*s", LIT(ac->link_prefix));
 			}
 		} else {
@@ -3501,7 +3501,7 @@ gb_internal DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 
 		if (ev.kind == ExactValue_String) {
 			ac->link_suffix = ev.value_string;
-			if (!is_foreign_name_valid(ac->link_suffix)) {
+			if (ac->link_suffix.len != 0 && !is_foreign_name_valid(ac->link_suffix)) {
 				error(elem, "Invalid link suffix: %.*s", LIT(ac->link_suffix));
 			}
 		} else {
@@ -3774,7 +3774,7 @@ gb_internal DECL_ATTRIBUTE_PROC(var_decl_attribute) {
 		ExactValue ev = check_decl_attribute_value(c, value);
 		if (ev.kind == ExactValue_String) {
 			ac->link_prefix = ev.value_string;
-			if (!is_foreign_name_valid(ac->link_prefix)) {
+			if (ac->link_prefix.len != 0 && !is_foreign_name_valid(ac->link_prefix)) {
 				error(elem, "Invalid link prefix: %.*s", LIT(ac->link_prefix));
 			}
 		} else {
@@ -3785,7 +3785,7 @@ gb_internal DECL_ATTRIBUTE_PROC(var_decl_attribute) {
 		ExactValue ev = check_decl_attribute_value(c, value);
 		if (ev.kind == ExactValue_String) {
 			ac->link_suffix = ev.value_string;
-			if (!is_foreign_name_valid(ac->link_suffix)) {
+			if (ac->link_suffix.len != 0 && !is_foreign_name_valid(ac->link_suffix)) {
 				error(elem, "Invalid link suffix: %.*s", LIT(ac->link_suffix));
 			}
 		} else {
