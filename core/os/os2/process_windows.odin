@@ -94,7 +94,7 @@ read_memory_as_slice :: proc(h: win32.HANDLE, addr: rawptr, dest: []$T) -> (byte
 _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator: runtime.Allocator) -> (info: Process_Info, err: Error) {
 	info.pid = pid
 	// Data obtained from process snapshots
-	if selection >= {.PPid, .Priority} {
+	snapshot_process: if selection >= {.PPid, .Priority} {
 		entry, entry_err := _process_entry_by_pid(info.pid)
 		if entry_err != nil {
 			err = General_Error.Not_Exist
@@ -109,13 +109,12 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 			info.priority = int(entry.pcPriClassBase)
 		}
 	}
-	if .Executable_Path in selection { // snap module
-		info.executable_path = _process_exe_by_pid(pid, allocator) or_return
+	snapshot_modules: if .Executable_Path in selection {
+		info.executable_path = _process_exe_by_pid(pid, allocator) or_break snapshot_modules
 		info.fields += {.Executable_Path}
 	}
-
 	ph := win32.INVALID_HANDLE_VALUE
-	if selection >= {.Command_Line, .Environment, .Working_Dir, .Username} { // need process handle
+	if selection >= {.Command_Line, .Environment, .Working_Dir, .Username} {
 		ph = win32.OpenProcess(
 			win32.PROCESS_QUERY_LIMITED_INFORMATION | win32.PROCESS_VM_READ,
 			false,
@@ -129,7 +128,7 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 	defer if ph != win32.INVALID_HANDLE_VALUE {
 		win32.CloseHandle(ph)
 	}
-	if selection >= {.Command_Line, .Environment, .Working_Dir} { // need peb
+	read_peb: if selection >= {.Command_Line, .Environment, .Working_Dir} {
 		process_info_size: u32
 		process_info: win32.PROCESS_BASIC_INFORMATION
 		status := win32.NtQueryInformationProcess(ph, .ProcessBasicInformation, &process_info, size_of(process_info), &process_info_size)
@@ -141,41 +140,40 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 		}
 		assert(process_info.PebBaseAddress != nil)
 		process_peb: win32.PEB
-		_ = read_memory_as_struct(ph, process_info.PebBaseAddress, &process_peb) or_return
+		_ = read_memory_as_struct(ph, process_info.PebBaseAddress, &process_peb) or_break read_peb
 		process_params: win32.RTL_USER_PROCESS_PARAMETERS
-		_ = read_memory_as_struct(ph, process_peb.ProcessParameters, &process_params) or_return
+		_ = read_memory_as_struct(ph, process_peb.ProcessParameters, &process_params) or_break read_peb
 		if selection >= {.Command_Line, .Command_Args} {
 			TEMP_ALLOCATOR_GUARD()
-			cmdline_w := make([]u16, process_params.CommandLine.Length, temp_allocator()) or_return
-			_ = read_memory_as_slice(ph, process_params.CommandLine.Buffer, cmdline_w) or_return
+			cmdline_w := make([]u16, process_params.CommandLine.Length, temp_allocator()) or_break read_peb
+			_ = read_memory_as_slice(ph, process_params.CommandLine.Buffer, cmdline_w) or_break read_peb
 			if .Command_Line in selection {
-				info.command_line = win32_utf16_to_utf8(cmdline_w, allocator) or_return
+				info.command_line = win32_utf16_to_utf8(cmdline_w, allocator) or_break read_peb
 				info.fields += {.Command_Line}
 			}
 			if .Command_Args in selection {
-				info.command_args = _parse_command_line(raw_data(cmdline_w), allocator) or_return
+				info.command_args = _parse_command_line(raw_data(cmdline_w), allocator) or_break read_peb
 				info.fields += {.Command_Args}
 			}
 		}
 		if .Environment in selection {
 			TEMP_ALLOCATOR_GUARD()
 			env_len := process_params.EnvironmentSize / 2
-			envs_w := make([]u16, env_len, temp_allocator()) or_return
-			_ = read_memory_as_slice(ph, process_params.Environment, envs_w) or_return
-			info.environment = _parse_environment_block(raw_data(envs_w), allocator) or_return
+			envs_w := make([]u16, env_len, temp_allocator()) or_break read_peb
+			_ = read_memory_as_slice(ph, process_params.Environment, envs_w) or_break read_peb
+			info.environment = _parse_environment_block(raw_data(envs_w), allocator) or_break read_peb
 			info.fields += {.Environment}
 		}
 		if .Working_Dir in selection {
 			TEMP_ALLOCATOR_GUARD()
-			cwd_w := make([]u16, process_params.CurrentDirectoryPath.Length, temp_allocator()) or_return
-			_ = read_memory_as_slice(ph, process_params.CurrentDirectoryPath.Buffer, cwd_w) or_return
-			info.working_dir = win32_utf16_to_utf8(cwd_w, allocator) or_return
+			cwd_w := make([]u16, process_params.CurrentDirectoryPath.Length, temp_allocator()) or_break read_peb
+			_ = read_memory_as_slice(ph, process_params.CurrentDirectoryPath.Buffer, cwd_w) or_break read_peb
+			info.working_dir = win32_utf16_to_utf8(cwd_w, allocator) or_break read_peb
 			info.fields += {.Working_Dir}
 		}
 	}
-
-	if .Username in selection {
-		info.username = _get_process_user(ph, allocator) or_return
+	read_username: if .Username in selection {
+		info.username = _get_process_user(ph, allocator) or_break read_username
 		info.fields += {.Username}
 	}
 	err = nil
@@ -187,7 +185,7 @@ _process_info_by_handle :: proc(process: Process, selection: Process_Info_Fields
 	pid := process.pid
 	info.pid = pid
 	// Data obtained from process snapshots
-	if selection >= {.PPid, .Priority} { // snap process
+	snapshot_process: if selection >= {.PPid, .Priority} {
 		entry, entry_err := _process_entry_by_pid(info.pid)
 		if entry_err != nil {
 			err = General_Error.Not_Exist
@@ -202,12 +200,12 @@ _process_info_by_handle :: proc(process: Process, selection: Process_Info_Fields
 			info.priority = int(entry.pcPriClassBase)
 		}
 	}
-	if .Executable_Path in selection { // snap module
-		info.executable_path = _process_exe_by_pid(pid, allocator) or_return
+	snapshot_module: if .Executable_Path in selection {
+		info.executable_path = _process_exe_by_pid(pid, allocator) or_break snapshot_module
 		info.fields += {.Executable_Path}
 	}
 	ph := win32.HANDLE(process.handle)
-	if selection >= {.Command_Line, .Environment, .Working_Dir} { // need peb
+	read_peb: if selection >= {.Command_Line, .Environment, .Working_Dir} {
 		process_info_size: u32
 		process_info: win32.PROCESS_BASIC_INFORMATION
 		status := win32.NtQueryInformationProcess(ph, .ProcessBasicInformation, &process_info, size_of(process_info), &process_info_size)
@@ -219,42 +217,40 @@ _process_info_by_handle :: proc(process: Process, selection: Process_Info_Fields
 		}
 		assert(process_info.PebBaseAddress != nil)
 		process_peb: win32.PEB
-		_ = read_memory_as_struct(ph, process_info.PebBaseAddress, &process_peb) or_return
+		_ = read_memory_as_struct(ph, process_info.PebBaseAddress, &process_peb) or_break read_peb
 		process_params: win32.RTL_USER_PROCESS_PARAMETERS
-		_ = read_memory_as_struct(ph, process_peb.ProcessParameters, &process_params) or_return
+		_ = read_memory_as_struct(ph, process_peb.ProcessParameters, &process_params) or_break read_peb
 		if selection >= {.Command_Line, .Command_Args} {
 			TEMP_ALLOCATOR_GUARD()
-			cmdline_w := make([]u16, process_params.CommandLine.Length, temp_allocator()) or_return
-			_ = read_memory_as_slice(ph, process_params.CommandLine.Buffer, cmdline_w) or_return
+			cmdline_w := make([]u16, process_params.CommandLine.Length, temp_allocator()) or_break read_peb
+			_ = read_memory_as_slice(ph, process_params.CommandLine.Buffer, cmdline_w) or_break read_peb
 			if .Command_Line in selection {
-				info.command_line = win32_utf16_to_utf8(cmdline_w, allocator) or_return
+				info.command_line = win32_utf16_to_utf8(cmdline_w, allocator) or_break read_peb
 				info.fields += {.Command_Line}
 			}
 			if .Command_Args in selection {
-				info.command_args = _parse_command_line(raw_data(cmdline_w), allocator) or_return
+				info.command_args = _parse_command_line(raw_data(cmdline_w), allocator) or_break read_peb
 				info.fields += {.Command_Args}
 			}
 		}
-
 		if .Environment in selection {
 			TEMP_ALLOCATOR_GUARD()
 			env_len := process_params.EnvironmentSize / 2
-			envs_w := make([]u16, env_len, temp_allocator()) or_return
-			_ = read_memory_as_slice(ph, process_params.Environment, envs_w) or_return
-			info.environment =  _parse_environment_block(raw_data(envs_w), allocator) or_return
+			envs_w := make([]u16, env_len, temp_allocator()) or_break read_peb
+			_ = read_memory_as_slice(ph, process_params.Environment, envs_w) or_break read_peb
+			info.environment =  _parse_environment_block(raw_data(envs_w), allocator) or_break read_peb
 			info.fields += {.Environment}
 		}
-
 		if .Working_Dir in selection {
 			TEMP_ALLOCATOR_GUARD()
-			cwd_w := make([]u16, process_params.CurrentDirectoryPath.Length, temp_allocator()) or_return
-			_ = read_memory_as_slice(ph, process_params.CurrentDirectoryPath.Buffer, cwd_w) or_return
-			info.working_dir = win32_utf16_to_utf8(cwd_w, allocator) or_return
+			cwd_w := make([]u16, process_params.CurrentDirectoryPath.Length, temp_allocator()) or_break read_peb
+			_ = read_memory_as_slice(ph, process_params.CurrentDirectoryPath.Buffer, cwd_w) or_break read_peb
+			info.working_dir = win32_utf16_to_utf8(cwd_w, allocator) or_break read_peb
 			info.fields += {.Working_Dir}
 		}
 	}
-	if .Username in selection {
-		info.username = _get_process_user(ph, allocator) or_return
+	read_username: if .Username in selection {
+		info.username = _get_process_user(ph, allocator) or_break read_username
 		info.fields += {.Username}
 	}
 	err = nil
@@ -264,7 +260,7 @@ _process_info_by_handle :: proc(process: Process, selection: Process_Info_Fields
 @(private="package")
 _current_process_info :: proc(selection: Process_Info_Fields, allocator: runtime.Allocator) -> (info: Process_Info, err: Error) {
 	info.pid = get_pid()
-	if selection >= {.PPid, .Priority} { // snap process
+	snapshot_process: if selection >= {.PPid, .Priority} {
 		entry, entry_err := _process_entry_by_pid(info.pid)
 		if entry_err != nil {
 			err = General_Error.Not_Exist
@@ -279,31 +275,31 @@ _current_process_info :: proc(selection: Process_Info_Fields, allocator: runtime
 			info.priority = int(entry.pcPriClassBase)
 		}
 	}
-	if .Executable_Path in selection {
+	module_filename: if .Executable_Path in selection {
 		exe_filename_w: [256]u16
 		path_len := win32.GetModuleFileNameW(nil, raw_data(exe_filename_w[:]), len(exe_filename_w))
-		info.executable_path = win32_utf16_to_utf8(exe_filename_w[:path_len], allocator) or_return
+		info.executable_path = win32_utf16_to_utf8(exe_filename_w[:path_len], allocator) or_break module_filename
 		info.fields += {.Executable_Path}
 	}
-	if selection >= {.Command_Line,  .Command_Args} {
+	command_line: if selection >= {.Command_Line,  .Command_Args} {
 		command_line_w := win32.GetCommandLineW()
 		if .Command_Line in selection {
-			info.command_line = win32_wstring_to_utf8(command_line_w, allocator) or_return
+			info.command_line = win32_wstring_to_utf8(command_line_w, allocator) or_break command_line
 			info.fields += {.Command_Line}
 		}
 		if .Command_Args in selection {
-			info.command_args = _parse_command_line(command_line_w, allocator) or_return
+			info.command_args = _parse_command_line(command_line_w, allocator) or_break command_line
 			info.fields += {.Command_Args}
 		}
 	}
-	if .Environment in selection {
+	environment: if .Environment in selection {
 		env_block := win32.GetEnvironmentStringsW()
-		info.environment = _parse_environment_block(env_block, allocator) or_return
+		info.environment = _parse_environment_block(env_block, allocator) or_break environment
 		info.fields += {.Environment}
 	}
-	if .Username in selection {
+	username: if .Username in selection {
 		process_handle := win32.GetCurrentProcess()
-		info.username = _get_process_user(process_handle, allocator) or_return
+		info.username = _get_process_user(process_handle, allocator) or_break username
 		info.fields += {.Username}
 	}
 	if .Working_Dir in selection {
