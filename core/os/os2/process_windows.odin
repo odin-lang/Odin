@@ -93,10 +93,6 @@ read_memory_as_slice :: proc(h: win32.HANDLE, addr: rawptr, dest: []$T) -> (byte
 @(private="package")
 _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator: runtime.Allocator) -> (info: Process_Info, err: Error) {
 	info.pid = pid
-	defer if err != nil {
-		free_process_info(info, allocator)
-	}
-
 	// Data obtained from process snapshots
 	if selection >= {.PPid, .Priority} {
 		entry, entry_err := _process_entry_by_pid(info.pid)
@@ -119,7 +115,6 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 	}
 
 	ph := win32.INVALID_HANDLE_VALUE
-
 	if selection >= {.Command_Line, .Environment, .Working_Dir, .Username} { // need process handle
 		ph = win32.OpenProcess(
 			win32.PROCESS_QUERY_LIMITED_INFORMATION | win32.PROCESS_VM_READ,
@@ -134,7 +129,6 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 	defer if ph != win32.INVALID_HANDLE_VALUE {
 		win32.CloseHandle(ph)
 	}
-
 	if selection >= {.Command_Line, .Environment, .Working_Dir} { // need peb
 		process_info_size: u32
 		process_info: win32.PROCESS_BASIC_INFORMATION
@@ -145,23 +139,15 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 			err = Platform_Error(status)
 			return
 		}
-		if process_info.PebBaseAddress == nil {
-			// Not sure what the error is
-			err = General_Error.Unsupported
-			return
-		}
+		assert(process_info.PebBaseAddress != nil)
 		process_peb: win32.PEB
-
 		_ = read_memory_as_struct(ph, process_info.PebBaseAddress, &process_peb) or_return
-
 		process_params: win32.RTL_USER_PROCESS_PARAMETERS
 		_ = read_memory_as_struct(ph, process_peb.ProcessParameters, &process_params) or_return
-
 		if selection >= {.Command_Line, .Command_Args} {
 			TEMP_ALLOCATOR_GUARD()
 			cmdline_w := make([]u16, process_params.CommandLine.Length, temp_allocator()) or_return
 			_ = read_memory_as_slice(ph, process_params.CommandLine.Buffer, cmdline_w) or_return
-
 			if .Command_Line in selection {
 				info.command_line = win32_utf16_to_utf8(cmdline_w, allocator) or_return
 				info.fields += {.Command_Line}
@@ -176,7 +162,6 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 			env_len := process_params.EnvironmentSize / 2
 			envs_w := make([]u16, env_len, temp_allocator()) or_return
 			_ = read_memory_as_slice(ph, process_params.Environment, envs_w) or_return
-
 			info.environment = _parse_environment_block(raw_data(envs_w), allocator) or_return
 			info.fields += {.Environment}
 		}
@@ -184,7 +169,6 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 			TEMP_ALLOCATOR_GUARD()
 			cwd_w := make([]u16, process_params.CurrentDirectoryPath.Length, temp_allocator()) or_return
 			_ = read_memory_as_slice(ph, process_params.CurrentDirectoryPath.Buffer, cwd_w) or_return
-
 			info.working_dir = win32_utf16_to_utf8(cwd_w, allocator) or_return
 			info.fields += {.Working_Dir}
 		}
@@ -202,10 +186,6 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 _process_info_by_handle :: proc(process: Process, selection: Process_Info_Fields, allocator: runtime.Allocator) -> (info: Process_Info, err: Error) {
 	pid := process.pid
 	info.pid = pid
-	defer if err != nil {
-		free_process_info(info, allocator)
-	}
-
 	// Data obtained from process snapshots
 	if selection >= {.PPid, .Priority} { // snap process
 		entry, entry_err := _process_entry_by_pid(info.pid)
@@ -237,23 +217,15 @@ _process_info_by_handle :: proc(process: Process, selection: Process_Info_Fields
 			err = Platform_Error(status)
 			return
 		}
-		if process_info.PebBaseAddress == nil {
-			// Not sure what the error is
-			err = General_Error.Unsupported
-			return
-		}
-
+		assert(process_info.PebBaseAddress != nil)
 		process_peb: win32.PEB
 		_ = read_memory_as_struct(ph, process_info.PebBaseAddress, &process_peb) or_return
-
 		process_params: win32.RTL_USER_PROCESS_PARAMETERS
 		_ = read_memory_as_struct(ph, process_peb.ProcessParameters, &process_params) or_return
-
 		if selection >= {.Command_Line, .Command_Args} {
 			TEMP_ALLOCATOR_GUARD()
 			cmdline_w := make([]u16, process_params.CommandLine.Length, temp_allocator()) or_return
 			_ = read_memory_as_slice(ph, process_params.CommandLine.Buffer, cmdline_w) or_return
-
 			if .Command_Line in selection {
 				info.command_line = win32_utf16_to_utf8(cmdline_w, allocator) or_return
 				info.fields += {.Command_Line}
@@ -269,7 +241,6 @@ _process_info_by_handle :: proc(process: Process, selection: Process_Info_Fields
 			env_len := process_params.EnvironmentSize / 2
 			envs_w := make([]u16, env_len, temp_allocator()) or_return
 			_ = read_memory_as_slice(ph, process_params.Environment, envs_w) or_return
-
 			info.environment =  _parse_environment_block(raw_data(envs_w), allocator) or_return
 			info.fields += {.Environment}
 		}
@@ -278,7 +249,6 @@ _process_info_by_handle :: proc(process: Process, selection: Process_Info_Fields
 			TEMP_ALLOCATOR_GUARD()
 			cwd_w := make([]u16, process_params.CurrentDirectoryPath.Length, temp_allocator()) or_return
 			_ = read_memory_as_slice(ph, process_params.CurrentDirectoryPath.Buffer, cwd_w) or_return
-
 			info.working_dir = win32_utf16_to_utf8(cwd_w, allocator) or_return
 			info.fields += {.Working_Dir}
 		}
@@ -294,10 +264,6 @@ _process_info_by_handle :: proc(process: Process, selection: Process_Info_Fields
 @(private="package")
 _current_process_info :: proc(selection: Process_Info_Fields, allocator: runtime.Allocator) -> (info: Process_Info, err: Error) {
 	info.pid = get_pid()
-	defer if err != nil {
-		free_process_info(info, allocator)
-	}
-
 	if selection >= {.PPid, .Priority} { // snap process
 		entry, entry_err := _process_entry_by_pid(info.pid)
 		if entry_err != nil {
