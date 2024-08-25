@@ -9,6 +9,7 @@ import "core:strings"
 import "core:c"
 
 Handle    :: distinct i32
+Pid       :: distinct i32
 File_Time :: distinct u64
 
 INVALID_HANDLE :: ~Handle(0)
@@ -584,6 +585,8 @@ F_GETPATH :: 50 // return the full path of the fd
 foreign libc {
 	@(link_name="__error") __error :: proc() -> ^c.int ---
 
+	@(link_name="posix_spawn")      _unix_posix_spawn   :: proc(pid: ^Pid, path: cstring, file_actions: rawptr, attrp: rawptr, argv: [^]cstring, envp: [^]cstring) -> c.int ---
+
 	@(link_name="open")             _unix_open          :: proc(path: cstring, flags: i32, #c_vararg mode: ..u16) -> Handle ---
 	@(link_name="close")            _unix_close         :: proc(handle: Handle) -> c.int ---
 	@(link_name="read")             _unix_read          :: proc(handle: Handle, buffer: rawptr, count: c.size_t) -> int ---
@@ -677,6 +680,28 @@ get_last_error_string :: proc() -> string {
 	return string(_darwin_string_error(__error()^))
 }
 
+posix_spawn :: proc(path: string, args: []string, envs: []string, file_actions: rawptr, attributes: rawptr) -> (Pid, Error) {
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
+	path_cstr := strings.clone_to_cstring(path, context.temp_allocator)
+
+	args_cstrs := make([]cstring, len(args) + 2, context.temp_allocator)
+	args_cstrs[0] = strings.clone_to_cstring(path, context.temp_allocator)
+	for i := 0; i < len(args); i += 1 {
+		args_cstrs[i+1] = strings.clone_to_cstring(args[i], context.temp_allocator)
+	}
+
+	envs_cstrs := make([]cstring, len(envs) + 1, context.temp_allocator)
+	for i := 0; i < len(envs); i += 1 {
+		envs_cstrs[i] = strings.clone_to_cstring(envs[i], context.temp_allocator)
+	}
+
+	child_pid: Pid
+	status := _unix_posix_spawn(&child_pid, path_cstr, file_actions, attributes, raw_data(args_cstrs), raw_data(envs_cstrs))
+	if status != 0 {
+		return 0, get_last_error()
+	}
+	return child_pid, nil
+}
 
 @(require_results)
 open :: proc(path: string, flags: int = O_RDWR, mode: int = 0) -> (handle: Handle, err: Error) {
