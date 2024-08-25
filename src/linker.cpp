@@ -465,10 +465,11 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 					#endif // GB_ARCH_*_BIT
 
 						if (build_context.metrics.arch == TargetArch_riscv64) {
+							// TODO: create -march based on -enable-target-feature and -microarch.
 							result = system_exec_command_line_app("clang",
 								"%s \"%.*s\" "
 								"-c -o \"%.*s\" "
-								"-target %.*s -march=rv64gc "
+								"-target %.*s -march=rv64imac "
 								"%.*s "
 								"",
 								clang_path,

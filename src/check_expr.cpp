@@ -2003,6 +2003,15 @@ gb_internal bool check_binary_op(CheckerContext *c, Operand *o, Token op) {
 	case Token_Mul:
 	case Token_MulEq:
 	case Token_AddEq:
+		switch (op.kind) {
+		case Token_Mul:
+		case Token_MulEq:
+			if (ct == t_f32) {
+				// TODO: only if target does not support f32.
+				add_package_dependency(c, "runtime", "mulsf3", true);
+			}
+		}
+
 		if (is_type_bit_set(type)) {
 			return true;
 		} else if (!is_type_numeric(type)) {
@@ -2923,6 +2932,9 @@ gb_internal void check_comparison(CheckerContext *c, Ast *node, Operand *x, Oper
 			if (!is_type_untyped(x->type)) size = gb_max(size, type_size_of(x->type));
 			if (!is_type_untyped(y->type)) size = gb_max(size, type_size_of(y->type));
 
+			Type *xcore = core_type(x->type);
+			Type *ycore = core_type(y->type);
+
 			if (is_type_cstring(x->type) && is_type_cstring(y->type)) {
 				switch (op) {
 				case Token_CmpEq: add_package_dependency(c, "runtime", "cstring_eq"); break;
@@ -2970,6 +2982,11 @@ gb_internal void check_comparison(CheckerContext *c, Ast *node, Operand *x, Oper
 					case 256: add_package_dependency(c, "runtime", "quaternion256_ne"); break;
 					}
 					break;
+				}
+			} else if (xcore == t_f32 || ycore == t_f32) {
+				// TODO: only if target doesn't support f32.
+				switch (op) {
+				case Token_GtEq: add_package_dependency(c, "runtime", "gesf2", true); break;
 				}
 			}
 		}
@@ -3446,6 +3463,9 @@ gb_internal void check_cast(CheckerContext *c, Operand *x, Type *type, bool forb
 				add_package_dependency(c, "runtime", "truncsfhf2",         REQUIRE);
 				add_package_dependency(c, "runtime", "truncdfhf2",         REQUIRE);
 				add_package_dependency(c, "runtime", "gnu_f2h_ieee",       REQUIRE);
+			} else if (src == t_f64 && dst == t_f32) {
+				// TODO: only if target doesn't have f64 floats hardware (riscv without the "d").
+				add_package_dependency(c, "runtime", "truncdfsf2",         REQUIRE);
 			}
 		}
 		// If we check polymorphic procedures, we risk erring on
