@@ -125,9 +125,6 @@ read_entire_file_from_file :: proc(f: ^File, allocator: runtime.Allocator) -> (d
 			has_size = true
 			size = int(size64)
 		}
-	} else if serr != .No_Size {
-		err = serr
-		return
 	}
 
 	if has_size && size > 0 {
