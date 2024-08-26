@@ -466,13 +466,13 @@ _file_size :: proc(f: ^File_Impl) -> (n: i64, err: Error) {
 
 _sync :: proc(f: ^File) -> Error {
 	if f != nil && f.impl != nil {
-		return _flush((^File_Impl)(f.impl))
+		return _flush_internal((^File_Impl)(f.impl))
 	}
 	return nil
 }
 
 _flush :: proc(f: ^File_Impl) -> Error {
-	return _flush(f)
+	return _flush_internal(f)
 }
 _flush_internal :: proc(f: ^File_Impl) -> Error {
 	handle := _handle(&f.file)
