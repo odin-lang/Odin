@@ -166,15 +166,15 @@ Process_Info :: struct {
 
 	This procedure obtains an information, specified by `selection` parameter of
 	a process given by `pid`.
-	
-	Use `free_process_info` to free the memory allocated by this procedure. In
-	case the function returns an error it may only have been an error for one part
-	of the information and you would still need to call it to free the other parts.
+
+	Use `free_process_info` to free the memory allocated by this procedure. The
+	`free_process_info` procedure needs to be called, even if this procedure
+	returned an error, as some of the fields may have been allocated.
 
 	**Note**: The resulting information may or may contain the fields specified
 	by the `selection` parameter. Always check whether the returned
 	`Process_Info` struct has the required fields before checking the error code
-	returned by this function.
+	returned by this procedure.
 */
 @(require_results)
 process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator: runtime.Allocator) -> (Process_Info, Error) {
@@ -188,14 +188,14 @@ process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator:
 	about a process that has been opened by the application, specified in
 	the `process` parameter.
 
-	Use `free_process_info` to free the memory allocated by this procedure. In
-	case the function returns an error it may only have been an error for one part
-	of the information and you would still need to call it to free the other parts.
+	Use `free_process_info` to free the memory allocated by this procedure. The
+	`free_process_info` procedure needs to be called, even if this procedure
+	returned an error, as some of the fields may have been allocated.
 
 	**Note**: The resulting information may or may contain the fields specified
 	by the `selection` parameter. Always check whether the returned
 	`Process_Info` struct has the required fields before checking the error code
-	returned by this function.
+	returned by this procedure.
 */
 @(require_results)
 process_info_by_handle :: proc(process: Process, selection: Process_Info_Fields, allocator: runtime.Allocator) -> (Process_Info, Error) {
@@ -208,14 +208,14 @@ process_info_by_handle :: proc(process: Process, selection: Process_Info_Fields,
 	This procedure obtains the information, specified by `selection` parameter
 	about the currently running process.
 
-	Use `free_process_info` to free the memory allocated by this procedure. In
-	case the function returns an error it may only have been an error for one part
-	of the information and you would still need to call it to free the other parts.
+	Use `free_process_info` to free the memory allocated by this procedure. The
+	`free_process_info` procedure needs to be called, even if this procedure
+	returned an error, as some of the fields may have been allocated.
 
 	**Note**: The resulting information may or may contain the fields specified
 	by the `selection` parameter. Always check whether the returned
 	`Process_Info` struct has the required fields before checking the error code
-	returned by this function.
+	returned by this procedure.
 */
 @(require_results)
 current_process_info :: proc(selection: Process_Info_Fields, allocator: runtime.Allocator) -> (Process_Info, Error) {
