@@ -69,18 +69,18 @@ test_libc_pow_binding :: proc(t: ^testing.T, $LIBC_COMPLEX:typeid, $F:typeid, po
 			complex_power := LIBC_COMPLEX(complex(F(n), F(0.)))
 			result := pow(complex_base, complex_power) 
 			switch n%%4 {
-				case 0:
-					expected_real = value
-					expected_imag = 0.
-				case 1:
-					expected_real = 0.
-					expected_imag = value
-				case 2:
-					expected_real = -value
-					expected_imag = 0.
-				case 3:
-					expected_real = 0.
-					expected_imag = -value
+			case 0:
+				expected_real = value
+				expected_imag = 0.
+			case 1:
+				expected_real = 0.
+				expected_imag = value
+			case 2:
+				expected_real = -value
+				expected_imag = 0.
+			case 3:
+				expected_real = 0.
+				expected_imag = -value
 			}
 			testing.expectf(t, isclose(t, expected_real, F(real(result)), rtol, atol), "ftype:%T, n:%v reldiff(%v, re(%v)) is greater than specified rtol:%e", F{}, n, expected_real, result, rtol)
 			testing.expectf(t, isclose(t, expected_imag, F(imag(result)), rtol, atol), "ftype:%T, n:%v reldiff(%v, im(%v)) is greater than specified rtol:%e", F{}, n, expected_imag, result, rtol)
