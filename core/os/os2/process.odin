@@ -169,7 +169,7 @@ Process_Info :: struct {
 
 	Use `free_process_info` to free the memory allocated by this procedure. The
 	`free_process_info` procedure needs to be called, even if this procedure
-	returned an error, as some of the fields have been allocated.
+	returned an error, as some of the fields may have been allocated.
 
 	**Note**: The resulting information may or may contain the fields specified
 	by the `selection` parameter. Always check whether the returned
@@ -190,7 +190,7 @@ process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator:
 
 	Use `free_process_info` to free the memory allocated by this procedure. The
 	`free_process_info` procedure needs to be called, even if this procedure
-	returned an error, as some of the fields have been allocated.
+	returned an error, as some of the fields may have been allocated.
 
 	**Note**: The resulting information may or may contain the fields specified
 	by the `selection` parameter. Always check whether the returned
@@ -210,7 +210,7 @@ process_info_by_handle :: proc(process: Process, selection: Process_Info_Fields,
 
 	Use `free_process_info` to free the memory allocated by this procedure. The
 	`free_process_info` procedure needs to be called, even if this procedure
-	returned an error, as some of the fields have been allocated.
+	returned an error, as some of the fields may have been allocated.
 
 	**Note**: The resulting information may or may contain the fields specified
 	by the `selection` parameter. Always check whether the returned
