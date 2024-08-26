@@ -85,6 +85,15 @@ _test_stream :: proc(
 		testing.expectf(t, size_err == nil,
 			"Size expected no error: %v", size_err, loc = loc) or_return
 
+		// Ensure Size does not move the underlying pointer from the start.
+		//
+		// Some implementations may use seeking to determine file sizes.
+		if .Seek in mode_set {
+			pos, seek_err := io.seek(stream, 0, .Current)
+			testing.expectf(t, pos == 0 && seek_err == nil,
+				"Size+Seek Current isn't 0 after getting size: %v, %v", pos, seek_err, loc = loc) or_return
+		}
+
 		passed += { .Size }
 	}
 
@@ -118,6 +127,13 @@ _test_stream :: proc(
 				"Read_At+Size reports %v for its size after Read_At tests; expected %v", api_size, size, loc = loc) or_return
 			testing.expectf(t, size_err == nil,
 				"Read_At+Size expected no error: %v", size_err, loc = loc) or_return
+		}
+
+		// Ensure Read_At does not move the underlying pointer from the start.
+		if .Seek in mode_set {
+			pos, seek_err := io.seek(stream, 0, .Current)
+			testing.expectf(t, pos == 0 && seek_err == nil,
+				"Read_At+Seek Current isn't 0 after reading: %v, %v", pos, seek_err, loc = loc) or_return
 		}
 
 		passed += { .Read_At }
@@ -190,6 +206,15 @@ _test_stream :: proc(
 
 	// Test Write_At.
 	if .Write_At in mode_set {
+		// Ensure Write_At does not move the underlying pointer from the start.
+		starting_offset : i64 = -1
+		if .Seek in mode_set {
+			pos, seek_err := io.seek(stream, 0, .Current)
+			testing.expectf(t, pos >= 0 && seek_err == nil,
+				"Write_At+Seek Current failed: %v, %v", pos, seek_err, loc = loc) or_return
+			starting_offset = pos
+		}
+
 		if size > 0 {
 			write_buf, write_buf_alloc_err := make([]u8, size)
 			testing.expectf(t, write_buf_alloc_err == nil, "allocation failed", loc = loc) or_return
@@ -229,6 +254,13 @@ _test_stream :: proc(
 				testing.expectf(t, i64(bytes_read) == 1 && read_err == nil,
 					"Write_At(0)+Read_At(0) failed expectation: bytes_read<%v> != 1, %q != 'Z', %v", bytes_read, x_buf[0], read_err, loc = loc) or_return
 			}
+		}
+
+		// Ensure Write_At does not move the underlying pointer from the start.
+		if starting_offset != -1 && .Seek in mode_set {
+			pos, seek_err := io.seek(stream, 0, .Current)
+			testing.expectf(t, pos == starting_offset && seek_err == nil,
+				"Write_At+Seek Current isn't %v after writing: %v, %v", starting_offset, pos, seek_err, loc = loc) or_return
 		}
 
 		passed += { .Write_At }
