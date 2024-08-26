@@ -6446,7 +6446,7 @@ gb_internal bool parse_file(Parser *p, AstFile *f) {
 				}
 
 				f->total_file_decl_count += calc_decl_count(stmt);
-				if (stmt->kind == Ast_WhenStmt || stmt->kind == Ast_ExprStmt || stmt->kind == Ast_ImportDecl) {
+				if (stmt->kind == Ast_WhenStmt || stmt->kind == Ast_ExprStmt || stmt->kind == Ast_ImportDecl || stmt->kind == Ast_ForeignBlockDecl) {
 					f->delayed_decl_count += 1;
 				}
 			}

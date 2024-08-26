@@ -3174,7 +3174,7 @@ gb_internal DECL_ATTRIBUTE_PROC(foreign_block_decl_attribute) {
 		return true;
 	} else if (name == "link_prefix") {
 		if (ev.kind == ExactValue_String) {
-			String link_prefix = ev.value_string;
+			String link_prefix = string_trim_whitespace(ev.value_string);
 			if (link_prefix.len != 0 && !is_foreign_name_valid(link_prefix)) {
 				error(elem, "Invalid link prefix: '%.*s'", LIT(link_prefix));
 			} else {
@@ -3186,7 +3186,7 @@ gb_internal DECL_ATTRIBUTE_PROC(foreign_block_decl_attribute) {
 		return true;
 	} else if (name == "link_suffix") {
 		if (ev.kind == ExactValue_String) {
-			String link_suffix = ev.value_string;
+			String link_suffix = string_trim_whitespace(ev.value_string);
 			if (link_suffix.len != 0 && !is_foreign_name_valid(link_suffix)) {
 				error(elem, "Invalid link suffix: '%.*s'", LIT(link_suffix));
 			} else {
@@ -4532,7 +4532,9 @@ gb_internal void check_collect_entities(CheckerContext *c, Slice<Ast *> const &n
 		case_end;
 
 		case_ast_node(fb, ForeignBlockDecl, decl);
-			check_add_foreign_block_decl(c, decl);
+			if (curr_file != nullptr) {
+				array_add(&curr_file->delayed_decls_queues[AstDelayQueue_ForeignBlock], decl);
+			}
 		case_end;
 
 		default:
@@ -4548,6 +4550,14 @@ gb_internal void check_collect_entities(CheckerContext *c, Slice<Ast *> const &n
 	// NOTE(bill): 'when' stmts need to be handled after the other as the condition may refer to something
 	// declared after this stmt in source
 	if (curr_file == nullptr) {
+		// For 'foreign' block statements that are not in file scope.
+		for_array(decl_index, nodes) {
+			Ast *decl = nodes[decl_index];
+			if (decl->kind == Ast_ForeignBlockDecl) {
+				check_add_foreign_block_decl(c, decl);
+			}
+		}
+
 		for_array(decl_index, nodes) {
 			Ast *decl = nodes[decl_index];
 			if (decl->kind == Ast_WhenStmt) {
@@ -5506,6 +5516,16 @@ gb_internal void check_import_entities(Checker *c) {
 			ctx.collect_delayed_decls = false;
 
 			correct_type_aliases_in_scope(&ctx, pkg->scope);
+		}
+
+		for_array(i, pkg->files) {
+			AstFile *f = pkg->files[i];
+			reset_checker_context(&ctx, f, &untyped);
+
+			for (Ast *decl : f->delayed_decls_queues[AstDelayQueue_ForeignBlock]) {
+				check_add_foreign_block_decl(&ctx, decl);
+			}
+			array_clear(&f->delayed_decls_queues[AstDelayQueue_ForeignBlock]);
 		}
 
 		for_array(i, pkg->files) {
