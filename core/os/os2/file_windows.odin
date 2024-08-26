@@ -248,6 +248,8 @@ _seek :: proc(f: ^File_Impl, offset: i64, whence: io.Seek_From) -> (ret: i64, er
 	case .Start:   w = win32.FILE_BEGIN
 	case .Current: w = win32.FILE_CURRENT
 	case .End:     w = win32.FILE_END
+	case:
+		return 0, .Invalid_Whence
 	}
 	hi := i32(offset>>32)
 	lo := i32(offset)

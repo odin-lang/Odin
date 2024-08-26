@@ -52,6 +52,9 @@ _get_platform_error :: proc() -> Error {
 	case win32.ERROR_INVALID_HANDLE:
 		return .Invalid_File
 
+	case win32.ERROR_NEGATIVE_SEEK:
+		return .Invalid_Offset
+
 	case
 		win32.ERROR_BAD_ARGUMENTS,
 		win32.ERROR_INVALID_PARAMETER,
