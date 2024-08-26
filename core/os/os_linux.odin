@@ -653,9 +653,20 @@ write_at :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Error) {
 }
 
 seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Error) {
+	switch whence {
+	case SEEK_SET, SEEK_CUR, SEEK_END:
+		break
+	case:
+		return 0, .Invalid_Whence
+	}
 	res := unix.sys_lseek(int(fd), offset, whence)
 	if res < 0 {
-		return -1, _get_errno(int(res))
+		errno := _get_errno(int(res))
+		switch errno {
+		case .EINVAL:
+			return 0, .Invalid_Offset
+		}
+		return 0, errno
 	}
 	return i64(res), nil
 }
