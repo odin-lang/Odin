@@ -354,7 +354,7 @@ _read_at :: proc(f: ^File_Impl, p: []byte, offset: i64) -> (n: i64, err: Error) 
 			buf = buf[:MAX_RW]
 
 		}
-		curr_offset := _seek(f, offset, .Current) or_return
+		curr_offset := _seek(f, 0, .Current) or_return
 		defer _seek(f, curr_offset, .Start)
 
 		o := win32.OVERLAPPED{
@@ -423,7 +423,7 @@ _write_at :: proc(f: ^File_Impl, p: []byte, offset: i64) -> (n: i64, err: Error)
 			buf = buf[:MAX_RW]
 
 		}
-		curr_offset := _seek(f, offset, .Current) or_return
+		curr_offset := _seek(f, 0, .Current) or_return
 		defer _seek(f, curr_offset, .Start)
 
 		o := win32.OVERLAPPED{
