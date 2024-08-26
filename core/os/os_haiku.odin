@@ -142,6 +142,7 @@ foreign libc {
 	@(link_name="unlink")         _unix_unlink         :: proc(path: cstring) -> c.int ---
 	@(link_name="rmdir")          _unix_rmdir          :: proc(path: cstring) -> c.int ---
 	@(link_name="mkdir")          _unix_mkdir          :: proc(path: cstring, mode: mode_t) -> c.int ---
+	@(link_name="fsync")          _unix_fsync          :: proc(fd: Handle) -> c.int ---
 
 	@(link_name="getpagesize")    _unix_getpagesize    :: proc() -> c.int ---
 	@(link_name="sysconf")        _sysconf             :: proc(name: c.int) -> c.long ---
@@ -218,7 +219,10 @@ close :: proc(fd: Handle) -> Error {
 }
 
 flush :: proc(fd: Handle) -> Error {
-	// do nothing
+	result := _unix_fsync(fd)
+	if result == -1 {
+		return get_last_error()
+	}
 	return nil
 }
 

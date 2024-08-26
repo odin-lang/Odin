@@ -22,6 +22,7 @@ SYS_getpid     : uintptr : 20
 SYS_recvfrom   : uintptr : 29
 SYS_accept     : uintptr : 30
 SYS_fcntl      : uintptr : 92
+SYS_fsync      : uintptr : 95
 SYS_socket     : uintptr : 97
 SYS_connect    : uintptr : 98
 SYS_bind       : uintptr : 104
@@ -199,6 +200,16 @@ accept_nil :: proc "contextless" (s: Fd) -> (Fd, Errno) {
 }
 
 accept :: proc { accept_T, accept_nil }
+
+// Synchronize changes to a file.
+//
+// The fsync() system call appeared in 4.2BSD.
+fsync :: proc "contextless" (fd: Fd) -> Errno {
+	result, _ := intrinsics.syscall_bsd(SYS_fsync,
+		cast(uintptr)fd)
+
+	return cast(Errno)result
+}
 
 // File control.
 //

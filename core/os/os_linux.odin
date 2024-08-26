@@ -584,8 +584,7 @@ close :: proc(fd: Handle) -> Error {
 }
 
 flush :: proc(fd: Handle) -> Error {
-	// do nothing
-	return nil
+	return _get_errno(unix.sys_fsync(int(fd)))
 }
 
 // If you read or write more than `SSIZE_MAX` bytes, result is implementation defined (probably an error).

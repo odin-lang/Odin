@@ -447,8 +447,7 @@ close :: proc(fd: Handle) -> Error {
 }
 
 flush :: proc(fd: Handle) -> Error {
-	// do nothing
-	return nil
+	return cast(_Platform_Error)freebsd.fsync(cast(freebsd.Fd)fd)
 }
 
 // If you read or write more than `INT_MAX` bytes, FreeBSD returns `EINVAL`.
