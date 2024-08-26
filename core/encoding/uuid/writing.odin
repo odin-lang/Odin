@@ -11,7 +11,7 @@ Write a UUID in the 8-4-4-4-12 format.
 This procedure performs error checking with every byte written.
 
 If you can guarantee beforehand that your stream has enough space to hold the
-UUID (32 bytes), then it is better to use `unsafe_write` instead as that will
+UUID (36 bytes), then it is better to use `unsafe_write` instead as that will
 be faster.
 
 Inputs:
@@ -22,7 +22,7 @@ Returns:
 - error: An `io` error, if one occurred, otherwise `nil`.
 */
 write :: proc(w: io.Writer, id: Identifier) -> (error: io.Error) #no_bounds_check {
-	write_octet :: proc (w: io.Writer, octet: u8) -> io.Error #no_bounds_check {
+	write_octet :: proc(w: io.Writer, octet: u8) -> io.Error #no_bounds_check {
 		high_nibble := octet >> 4
 		low_nibble := octet & 0xF
 
@@ -31,15 +31,15 @@ write :: proc(w: io.Writer, id: Identifier) -> (error: io.Error) #no_bounds_chec
 		return nil
 	}
 
-	for index in  0 ..<  4 { write_octet(w, id[index]) or_return }
+	for index in 0 ..< 4 {write_octet(w, id[index]) or_return}
 	io.write_byte(w, '-') or_return
-	for index in  4 ..<  6 { write_octet(w, id[index]) or_return }
+	for index in 4 ..< 6 {write_octet(w, id[index]) or_return}
 	io.write_byte(w, '-') or_return
-	for index in  6 ..<  8 { write_octet(w, id[index]) or_return }
+	for index in 6 ..< 8 {write_octet(w, id[index]) or_return}
 	io.write_byte(w, '-') or_return
-	for index in  8 ..< 10 { write_octet(w, id[index]) or_return }
+	for index in 8 ..< 10 {write_octet(w, id[index]) or_return}
 	io.write_byte(w, '-') or_return
-	for index in 10 ..< 16 { write_octet(w, id[index]) or_return }
+	for index in 10 ..< 16 {write_octet(w, id[index]) or_return}
 
 	return nil
 }
@@ -54,7 +54,7 @@ Inputs:
 - id: The identifier to convert.
 */
 unsafe_write :: proc(w: io.Writer, id: Identifier) #no_bounds_check {
-	write_octet :: proc (w: io.Writer, octet: u8) #no_bounds_check {
+	write_octet :: proc(w: io.Writer, octet: u8) #no_bounds_check {
 		high_nibble := octet >> 4
 		low_nibble := octet & 0xF
 
@@ -62,15 +62,15 @@ unsafe_write :: proc(w: io.Writer, id: Identifier) #no_bounds_check {
 		io.write_byte(w, strconv.digits[low_nibble])
 	}
 
-	for index in  0 ..<  4 { write_octet(w, id[index]) }
+	for index in 0 ..< 4 {write_octet(w, id[index])}
 	io.write_byte(w, '-')
-	for index in  4 ..<  6 { write_octet(w, id[index]) }
+	for index in 4 ..< 6 {write_octet(w, id[index])}
 	io.write_byte(w, '-')
-	for index in  6 ..<  8 { write_octet(w, id[index]) }
+	for index in 6 ..< 8 {write_octet(w, id[index])}
 	io.write_byte(w, '-')
-	for index in  8 ..< 10 { write_octet(w, id[index]) }
+	for index in 8 ..< 10 {write_octet(w, id[index])}
 	io.write_byte(w, '-')
-	for index in 10 ..< 16 { write_octet(w, id[index]) }
+	for index in 10 ..< 16 {write_octet(w, id[index])}
 }
 
 /*
@@ -106,7 +106,7 @@ Convert a UUID to a string in the 8-4-4-4-12 format.
 
 Inputs:
 - id: The identifier to convert.
-- buffer: A byte buffer to store the result. Must be at least 32 bytes large.
+- buffer: A byte buffer to store the result. Must be at least 36 bytes large.
 - loc: The caller location for debugging purposes (default: #caller_location)
 
 Returns:
@@ -119,7 +119,11 @@ to_string_buffer :: proc(
 ) -> (
 	str: string,
 ) {
-	assert(len(buffer) >= EXPECTED_LENGTH, "The buffer provided is not at least 32 bytes large.", loc)
+	assert(
+		len(buffer) >= EXPECTED_LENGTH,
+		"The buffer provided is not at least 36 bytes large.",
+		loc,
+	)
 	builder := strings.builder_from_bytes(buffer)
 	unsafe_write(strings.to_writer(&builder), id)
 	return strings.to_string(builder)
@@ -129,3 +133,4 @@ to_string :: proc {
 	to_string_allocated,
 	to_string_buffer,
 }
+
