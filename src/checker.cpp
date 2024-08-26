@@ -3174,7 +3174,7 @@ gb_internal DECL_ATTRIBUTE_PROC(foreign_block_decl_attribute) {
 		return true;
 	} else if (name == "link_prefix") {
 		if (ev.kind == ExactValue_String) {
-			String link_prefix = ev.value_string;
+			String link_prefix = string_trim_whitespace(ev.value_string);
 			if (link_prefix.len != 0 && !is_foreign_name_valid(link_prefix)) {
 				error(elem, "Invalid link prefix: '%.*s'", LIT(link_prefix));
 			} else {
@@ -3186,7 +3186,7 @@ gb_internal DECL_ATTRIBUTE_PROC(foreign_block_decl_attribute) {
 		return true;
 	} else if (name == "link_suffix") {
 		if (ev.kind == ExactValue_String) {
-			String link_suffix = ev.value_string;
+			String link_suffix = string_trim_whitespace(ev.value_string);
 			if (link_suffix.len != 0 && !is_foreign_name_valid(link_suffix)) {
 				error(elem, "Invalid link suffix: '%.*s'", LIT(link_suffix));
 			} else {
@@ -4474,6 +4474,8 @@ gb_internal void correct_type_aliases_in_scope(CheckerContext *c, Scope *s) {
 	}
 }
 
+bool is_collect_entities_post = false;
+
 // NOTE(bill): If file_scopes == nullptr, this will act like a local scope
 gb_internal void check_collect_entities(CheckerContext *c, Slice<Ast *> const &nodes) {
 	AstFile *curr_file = nullptr;
@@ -4532,7 +4534,9 @@ gb_internal void check_collect_entities(CheckerContext *c, Slice<Ast *> const &n
 		case_end;
 
 		case_ast_node(fb, ForeignBlockDecl, decl);
-			check_add_foreign_block_decl(c, decl);
+			if (is_collect_entities_post) {
+				check_add_foreign_block_decl(c, decl);
+			}
 		case_end;
 
 		default:
@@ -6436,6 +6440,10 @@ gb_internal void check_parsed_files(Checker *c) {
 
 	TIME_SECTION("export entities - post");
 	check_export_entities(c);
+
+	TIME_SECTION("collect entities - post");
+	is_collect_entities_post = true;
+	check_collect_entities_all(c);
 
 	TIME_SECTION("add entities from packages");
 	check_merge_queues_into_arrays(c);
