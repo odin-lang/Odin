@@ -158,15 +158,17 @@ frame :: proc "c" (dt: f32) {
 				view       = frame,
 				loadOp     = .Clear,
 				storeOp    = .Store,
+				depthSlice = wgpu.DEPTH_SLICE_UNDEFINED,
 				clearValue = { 0, 1, 0, 1 },
 			},
 		},
 	)
-	defer wgpu.RenderPassEncoderRelease(render_pass_encoder)
 
 	wgpu.RenderPassEncoderSetPipeline(render_pass_encoder, state.pipeline)
 	wgpu.RenderPassEncoderDraw(render_pass_encoder, vertexCount=3, instanceCount=1, firstVertex=0, firstInstance=0)
+
 	wgpu.RenderPassEncoderEnd(render_pass_encoder)
+	wgpu.RenderPassEncoderRelease(render_pass_encoder)
 
 	command_buffer := wgpu.CommandEncoderFinish(command_encoder, nil)
 	defer wgpu.CommandBufferRelease(command_buffer)
