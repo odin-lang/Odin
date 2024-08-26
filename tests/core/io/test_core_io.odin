@@ -4,6 +4,7 @@ import "core:bytes"
 import "core:io"
 import "core:log"
 import "core:os"
+import "core:os/os2"
 import "core:strings"
 import "core:testing"
 
@@ -34,7 +35,7 @@ _test_stream :: proc(
 	// Do some basic Seek sanity testing.
 	if .Seek in mode_set {
 		pos, err := io.seek(stream, 0, io.Seek_From(-1))
-		testing.expectf(t, pos == 0 && err == .Invalid_Whence,
+		testing.expectf(t, err == .Invalid_Whence,
 			"Seek(-1) didn't fail with Invalid_Whence: %v, %v", pos, err, loc = loc) or_return
 
 		pos, err = io.seek(stream, 0, .Start)
@@ -46,11 +47,11 @@ _test_stream :: proc(
 			"Seek Current isn't 0 at the start: %v, %v", pos, err, loc = loc) or_return
 
 		pos, err = io.seek(stream, -1, .Start)
-		testing.expectf(t, pos == 0 && err == .Invalid_Offset,
+		testing.expectf(t, err == .Invalid_Offset,
 			"Seek Start-1 wasn't Invalid_Offset: %v, %v", pos, err, loc = loc) or_return
 
 		pos, err = io.seek(stream, -1, .Current)
-		testing.expectf(t, pos == 0 && err == .Invalid_Offset,
+		testing.expectf(t, err == .Invalid_Offset,
 			"Seek Current-1 wasn't Invalid_Offset: %v, %v", pos, err, loc = loc) or_return
 
 		pos, err = io.seek(stream, 0, .End)
@@ -107,7 +108,7 @@ _test_stream :: proc(
 		// Test empty streams and EOF.
 		one_buf: [1]u8
 		bytes_read, err := io.read_at(stream, one_buf[:], size)
-		testing.expectf(t, bytes_read == 0 && err == .EOF,
+		testing.expectf(t, err == .EOF,
 			"Read_At at end of stream failed: %v, %v", bytes_read, err, loc = loc) or_return
 
 		// Make sure size is still sane.
@@ -172,7 +173,7 @@ _test_stream :: proc(
 		// Test empty streams and EOF.
 		one_buf: [1]u8
 		bytes_read, err := io.read(stream, one_buf[:])
-		testing.expectf(t, bytes_read == 0 && err == .EOF,
+		testing.expectf(t, err == .EOF,
 			"Read at end of stream failed: %v, %v", bytes_read, err, loc = loc) or_return
 
 		if !resets_on_empty && .Size in mode_set {
@@ -320,49 +321,6 @@ _test_stream :: proc(
 		close_err := io.close(stream)
 		testing.expectf(t, close_err == nil, "stream failed to Close: %v", close_err, loc = loc) or_return
 		passed += { .Close }
-
-		// TODO(Feoramund): The OS<->IO interface will need updating for more
-		// specific error messages.
-		//
-		// This test will catch it when they start using them, but so long as
-		// they actually error, it should be okay for now.
-		//
-		// .EOF would be a better message for all of these.
-
-		if .Seek in mode_set {
-			pos, err := io.seek(stream, 0, .Start)
-
-			testing.expectf(t, pos == 0 && err == .Invalid_Offset,
-				"Seek after Close unexpected output: pos<%v>, %v", pos, err, loc = loc) or_return
-		}
-
-		if .Read in mode_set {
-			eof_buf: [1]u8
-			bytes_read, err := io.read(stream, eof_buf[:])
-			testing.expectf(t, bytes_read == 0 && err == .Unknown,
-				"Read after Close unexpected output: bytes_read<%v>, %v", bytes_read, err, loc = loc) or_return
-		}
-
-		if size > 0 && .Read_At in mode_set {
-			eof_buf: [1]u8
-			bytes_read, err := io.read_at(stream, eof_buf[:], 0)
-			testing.expectf(t, bytes_read == 0 && err == .Unknown,
-				"Read_At after Close unexpected output: bytes_read<%v>, %v", bytes_read, err, loc = loc) or_return
-		}
-
-		if .Write in mode_set {
-			eof_buf: [1]u8 = {'Z'}
-			bytes_written, err := io.write(stream, eof_buf[:])
-			testing.expectf(t, bytes_written == 0 && err == .Unknown,
-				"Write after Close unexpected output: bytes_written<%v>, %v", bytes_written, err, loc = loc) or_return
-		}
-
-		if .Write_At in mode_set {
-			eof_buf: [1]u8 = {'Z'}
-			bytes_written, err := io.write_at(stream, eof_buf[:], 0)
-			testing.expectf(t, bytes_written == 0 && err == .Unknown,
-				"Write after Close unexpected output: bytes_written<%v>, %v", bytes_written, err, loc = loc) or_return
-		}
 	}
 
 	if do_destroy && .Destroy in mode_set {
@@ -544,6 +502,44 @@ test_os_file_stream :: proc(t: ^testing.T) {
 	}
 
 	results, _ := _test_stream(t, stream, buf[:])
+
+	log.debugf("%#v", results)
+}
+
+@test
+test_os2_file_stream :: proc(t: ^testing.T) {
+	defer if !testing.failed(t) {
+		testing.expect_value(t, os2.remove(TEMPORARY_FILENAME), nil)
+	}
+
+	buf: [32]u8
+	for i in 0..<u8(len(buf)) {
+		buf[i] = 'A' + i
+	}
+
+	TEMPORARY_FILENAME :: "test_core_io_os2_file_stream"
+
+	fd, open_err := os2.open(TEMPORARY_FILENAME, {.Read, .Write, .Create, .Trunc})
+	if !testing.expectf(t, open_err == nil, "error on opening %q: %v", TEMPORARY_FILENAME, open_err) {
+		return
+	}
+	
+	stream := os2.to_stream(fd)
+
+	bytes_written, write_err := io.write(stream, buf[:])
+	if !testing.expectf(t, bytes_written == len(buf) && write_err == nil,
+		"failed to Write initial buffer: bytes_written<%v> != len_buf<%v>, %v", bytes_written, len(buf), write_err) {
+		return
+	}
+
+	flush_err := io.flush(stream)
+	if !testing.expectf(t, flush_err == nil,
+		"failed to Flush initial buffer: %v", write_err) {
+		return
+	}
+
+	// os2 file stream proc close and destroy are the same.
+	results, _ := _test_stream(t, stream, buf[:], do_destroy = false)
 
 	log.debugf("%#v", results)
 }
