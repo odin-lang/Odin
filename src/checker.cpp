@@ -4474,8 +4474,6 @@ gb_internal void correct_type_aliases_in_scope(CheckerContext *c, Scope *s) {
 	}
 }
 
-bool is_collect_entities_post = false;
-
 // NOTE(bill): If file_scopes == nullptr, this will act like a local scope
 gb_internal void check_collect_entities(CheckerContext *c, Slice<Ast *> const &nodes) {
 	AstFile *curr_file = nullptr;
@@ -4534,8 +4532,8 @@ gb_internal void check_collect_entities(CheckerContext *c, Slice<Ast *> const &n
 		case_end;
 
 		case_ast_node(fb, ForeignBlockDecl, decl);
-			if (is_collect_entities_post) {
-				check_add_foreign_block_decl(c, decl);
+			if (curr_file != nullptr) {
+				array_add(&curr_file->delayed_decls_queues[AstDelayQueue_ForeignBlock], decl);
 			}
 		case_end;
 
@@ -4552,6 +4550,14 @@ gb_internal void check_collect_entities(CheckerContext *c, Slice<Ast *> const &n
 	// NOTE(bill): 'when' stmts need to be handled after the other as the condition may refer to something
 	// declared after this stmt in source
 	if (curr_file == nullptr) {
+		// For 'foreign' block statements that are not in file scope.
+		for_array(decl_index, nodes) {
+			Ast *decl = nodes[decl_index];
+			if (decl->kind == Ast_ForeignBlockDecl) {
+				check_add_foreign_block_decl(c, decl);
+			}
+		}
+
 		for_array(decl_index, nodes) {
 			Ast *decl = nodes[decl_index];
 			if (decl->kind == Ast_WhenStmt) {
@@ -5516,6 +5522,16 @@ gb_internal void check_import_entities(Checker *c) {
 			AstFile *f = pkg->files[i];
 			reset_checker_context(&ctx, f, &untyped);
 
+			for (Ast *decl : f->delayed_decls_queues[AstDelayQueue_ForeignBlock]) {
+				check_add_foreign_block_decl(&ctx, decl);
+			}
+			array_clear(&f->delayed_decls_queues[AstDelayQueue_ForeignBlock]);
+		}
+
+		for_array(i, pkg->files) {
+			AstFile *f = pkg->files[i];
+			reset_checker_context(&ctx, f, &untyped);
+
 			for (Ast *expr : f->delayed_decls_queues[AstDelayQueue_Expr]) {
 				Operand o = {};
 				check_expr(&ctx, &o, expr);
@@ -6440,10 +6456,6 @@ gb_internal void check_parsed_files(Checker *c) {
 
 	TIME_SECTION("export entities - post");
 	check_export_entities(c);
-
-	TIME_SECTION("collect entities - post");
-	is_collect_entities_post = true;
-	check_collect_entities_all(c);
 
 	TIME_SECTION("add entities from packages");
 	check_merge_queues_into_arrays(c);
