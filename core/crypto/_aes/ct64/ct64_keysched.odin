@@ -22,7 +22,6 @@
 
 package aes_ct64
 
-import "base:intrinsics"
 import "core:crypto/_aes"
 import "core:encoding/endian"
 import "core:mem"
@@ -126,7 +125,7 @@ skey_expand :: proc "contextless" (skey, comp_skey: []u64, num_rounds: int) {
 
 orthogonalize_roundkey :: proc "contextless" (qq: []u64, key: []byte) {
 	if len(qq) < 8 || len(key) != 16 {
-		intrinsics.trap()
+		panic_contextless("aes/ct64: invalid round key size")
 	}
 
 	skey: [4]u32 = ---
