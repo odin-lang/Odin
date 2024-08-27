@@ -619,11 +619,11 @@ VertexStepMode :: enum i32 {
 }
 
 WGSLFeatureName :: enum i32 {
-    Undefined = 0x00000000,
-    ReadonlyAndReadwriteStorageTextures = 0x00000001,
-    Packed4x8IntegerDotProduct = 0x00000002,
-    UnrestrictedPointerParameters = 0x00000003,
-    PointerCompositeAccess = 0x00000004,
+	Undefined = 0x00000000,
+	ReadonlyAndReadwriteStorageTextures = 0x00000001,
+	Packed4x8IntegerDotProduct = 0x00000002,
+	UnrestrictedPointerParameters = 0x00000003,
+	PointerCompositeAccess = 0x00000004,
 }
 
 BufferUsage :: enum i32 {
