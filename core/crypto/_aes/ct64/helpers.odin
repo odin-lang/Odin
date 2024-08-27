@@ -1,12 +1,11 @@
 package aes_ct64
 
-import "base:intrinsics"
 import "core:crypto/_aes"
 import "core:encoding/endian"
 
 load_blockx1 :: proc "contextless" (q: ^[8]u64, src: []byte) {
 	if len(src) != _aes.BLOCK_SIZE {
-		intrinsics.trap()
+		panic_contextless("aes/ct64: invalid block size")
 	}
 
 	w: [4]u32 = ---
@@ -20,7 +19,7 @@ load_blockx1 :: proc "contextless" (q: ^[8]u64, src: []byte) {
 
 store_blockx1 :: proc "contextless" (dst: []byte, q: ^[8]u64) {
 	if len(dst) != _aes.BLOCK_SIZE {
-		intrinsics.trap()
+		panic_contextless("aes/ct64: invalid block size")
 	}
 
 	orthogonalize(q)
@@ -33,13 +32,13 @@ store_blockx1 :: proc "contextless" (dst: []byte, q: ^[8]u64) {
 
 load_blocks :: proc "contextless" (q: ^[8]u64, src: [][]byte) {
 	if n := len(src); n > STRIDE || n == 0 {
-		intrinsics.trap()
+		panic_contextless("aes/ct64: invalid block(s) size")
 	}
 
 	w: [4]u32 = ---
 	for s, i in src {
 		if len(s) != _aes.BLOCK_SIZE {
-			intrinsics.trap()
+			panic_contextless("aes/ct64: invalid block size")
 		}
 
 		w[0] = endian.unchecked_get_u32le(s[0:])
@@ -53,7 +52,7 @@ load_blocks :: proc "contextless" (q: ^[8]u64, src: [][]byte) {
 
 store_blocks :: proc "contextless" (dst: [][]byte, q: ^[8]u64) {
 	if n := len(dst); n > STRIDE || n == 0 {
-		intrinsics.trap()
+		panic_contextless("aes/ct64: invalid block(s) size")
 	}
 
 	orthogonalize(q)
@@ -63,7 +62,7 @@ store_blocks :: proc "contextless" (dst: [][]byte, q: ^[8]u64) {
 			break
 		}
 		if len(d) != _aes.BLOCK_SIZE {
-			intrinsics.trap()
+			panic_contextless("aes/ct64: invalid block size")
 		}
 
 		w0, w1, w2, w3 := interleave_out(q[i], q[i + 4])
