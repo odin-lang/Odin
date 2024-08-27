@@ -11,7 +11,6 @@ See:
 - https://www.hyperelliptic.org/EFD/g1p/auto-twisted-extended-1.html
 */
 
-import "base:intrinsics"
 import "core:crypto"
 import field "core:crypto/_fiat/field_curve25519"
 import "core:mem"
@@ -108,7 +107,7 @@ ge_set :: proc "contextless" (ge, a: ^Group_Element) {
 @(require_results)
 ge_set_bytes :: proc "contextless" (ge: ^Group_Element, b: []byte) -> bool {
 	if len(b) != 32 {
-		intrinsics.trap()
+		panic_contextless("edwards25519: invalid group element size")
 	}
 	b_ := (^[32]byte)(raw_data(b))
 
@@ -167,7 +166,7 @@ ge_set_bytes :: proc "contextless" (ge: ^Group_Element, b: []byte) -> bool {
 
 ge_bytes :: proc "contextless" (ge: ^Group_Element, dst: []byte) {
 	if len(dst) != 32 {
-		intrinsics.trap()
+		panic_contextless("edwards25519: invalid group element size")
 	}
 	dst_ := (^[32]byte)(raw_data(dst))
 
