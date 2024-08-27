@@ -1,5 +1,6 @@
 package test_core_io
 
+import "core:bufio"
 import "core:bytes"
 import "core:io"
 import "core:log"
@@ -609,6 +610,125 @@ test_os2_file_stream :: proc(t: ^testing.T) {
 
 	// os2 file stream proc close and destroy are the same.
 	results, _ := _test_stream(t, stream, buf[:], do_destroy = false)
+
+	log.debugf("%#v", results)
+}
+
+@test
+test_bufio_buffered_writer :: proc(t: ^testing.T) {
+	// Using a strings.Builder as the backing stream.
+
+	sb := strings.builder_make()
+	defer strings.builder_destroy(&sb)
+
+	buf: [32]u8
+	expected_buf: [64]u8
+	for i in 0..<u8(len(buf)) {
+		buf[i] = 'A' + i
+		expected_buf[i] = 'A' + i
+		strings.write_byte(&sb, 'A' + i)
+	}
+	for i in 32..<u8(len(expected_buf)) {
+		expected_buf[i] = ('A' + i-len(buf)) ~ 0xAA
+	}
+
+	writer: bufio.Writer
+	bufio.writer_init(&writer, strings.to_stream(&sb))
+	defer bufio.writer_destroy(&writer)
+
+	results, _ := _test_stream(t, bufio.writer_to_stream(&writer), buf[:],
+		do_destroy = false)
+
+	testing.expectf(t, bytes.compare(sb.buf[:], expected_buf[:]) == 0, "bufio buffered string builder stream failed:\nbuilder<%q>\n!=\nbuffer <%q>", sb.buf[:], expected_buf[:])
+
+	log.debugf("%#v", results)
+}
+
+@test
+test_bufio_buffered_reader :: proc(t: ^testing.T) {
+	// Using a bytes.Reader as the backing stream.
+
+	buf: [32]u8
+	for i in 0..<u8(len(buf)) {
+		buf[i] = 'A' + i
+	}
+
+	results: Passed_Tests
+	ok: bool
+
+	for end in 0..<i64(len(buf)) {
+		br: bytes.Reader
+		bs := bytes.reader_init(&br, buf[:end])
+
+		reader: bufio.Reader
+		bufio.reader_init(&reader, bs)
+		defer bufio.reader_destroy(&reader)
+
+		results, ok = _test_stream(t, bufio.reader_to_stream(&reader), buf[:end])
+		if !ok {
+			log.debugf("buffer[:%i] := %v", end, buf[:end])
+			return
+		}
+	}
+
+	log.debugf("%#v", results)
+}
+
+@test
+test_bufio_buffered_read_writer :: proc(t: ^testing.T) {
+	// Using an os2.File as the backing stream for both reader & writer.
+
+	defer if !testing.failed(t) {
+		testing.expect_value(t, os2.remove(TEMPORARY_FILENAME), nil)
+	}
+
+	buf: [32]u8
+	for i in 0..<u8(len(buf)) {
+		buf[i] = 'A' + i
+	}
+
+	TEMPORARY_FILENAME :: "test_core_io_bufio_read_writer_os2_file_stream"
+
+	fd, open_err := os2.open(TEMPORARY_FILENAME, {.Read, .Write, .Create, .Trunc})
+	if !testing.expectf(t, open_err == nil, "error on opening %q: %v", TEMPORARY_FILENAME, open_err) {
+		return
+	}
+	
+	stream := os2.to_stream(fd)
+
+	bytes_written, write_err := io.write(stream, buf[:])
+	if !testing.expectf(t, bytes_written == len(buf) && write_err == nil,
+		"failed to Write initial buffer: bytes_written<%v> != len_buf<%v>, %v", bytes_written, len(buf), write_err) {
+		return
+	}
+
+	flush_err := io.flush(stream)
+	if !testing.expectf(t, flush_err == nil,
+		"failed to Flush initial buffer: %v", write_err) {
+		return
+	}
+
+	// bufio.Read_Writer isn't capable of seeking, so we have to reset the os2
+	// stream back to the start here.
+	pos, seek_err := io.seek(stream, 0, .Start)
+	if !testing.expectf(t, pos == 0 && seek_err == nil,
+		"Pre-test Seek reset failed: pos<%v>, %v", pos, seek_err) {
+		return
+	}
+
+	reader: bufio.Reader
+	writer: bufio.Writer
+	read_writer: bufio.Read_Writer
+
+	bufio.reader_init(&reader, stream)
+	defer bufio.reader_destroy(&reader)
+	bufio.writer_init(&writer, stream)
+	defer bufio.writer_destroy(&writer)
+
+	bufio.read_writer_init(&read_writer, &reader, &writer)
+
+	// os2 file stream proc close and destroy are the same.
+	results, _ := _test_stream(t, bufio.read_writer_to_stream(&read_writer), buf[:], do_destroy = false)
 
 	log.debugf("%#v", results)
 }
