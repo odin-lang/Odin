@@ -34,6 +34,9 @@ reader_size :: proc(r: ^Reader) -> i64 {
 }
 
 reader_read :: proc(r: ^Reader, p: []byte) -> (n: int, err: io.Error) {
+	if len(p) == 0 {
+		return 0, nil
+	}
 	if r.i >= i64(len(r.s)) {
 		return 0, .EOF
 	}
@@ -43,6 +46,9 @@ reader_read :: proc(r: ^Reader, p: []byte) -> (n: int, err: io.Error) {
 	return
 }
 reader_read_at :: proc(r: ^Reader, p: []byte, off: i64) -> (n: int, err: io.Error) {
+	if len(p) == 0 {
+		return 0, nil
+	}
 	if off < 0 {
 		return 0, .Invalid_Offset
 	}

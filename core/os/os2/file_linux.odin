@@ -201,6 +201,9 @@ _read :: proc(f: ^File_Impl, p: []byte) -> (i64, Error) {
 }
 
 _read_at :: proc(f: ^File_Impl, p: []byte, offset: i64) -> (i64, Error) {
+	if len(p) == 0 {
+		return 0, nil
+	}
 	if offset < 0 {
 		return 0, .Invalid_Offset
 	}
@@ -226,6 +229,9 @@ _write :: proc(f: ^File_Impl, p: []byte) -> (i64, Error) {
 }
 
 _write_at :: proc(f: ^File_Impl, p: []byte, offset: i64) -> (i64, Error) {
+	if len(p) == 0 {
+		return 0, nil
+	}
 	if offset < 0 {
 		return 0, .Invalid_Offset
 	}

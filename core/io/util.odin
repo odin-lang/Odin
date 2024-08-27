@@ -340,6 +340,9 @@ _limited_reader_proc :: proc(stream_data: rawptr, mode: Stream_Mode, p: []byte, 
 	l := (^Limited_Reader)(stream_data)
 	#partial switch mode {
 	case .Read:
+		if len(p) == 0 {
+			return 0, nil
+		}
 		if l.n <= 0 {
 			return 0, .EOF
 		}
@@ -394,6 +397,9 @@ _section_reader_proc :: proc(stream_data: rawptr, mode: Stream_Mode, p: []byte, 
 	s := (^Section_Reader)(stream_data)
 	#partial switch mode {
 	case .Read:
+		if len(p) == 0 {
+			return 0, nil
+		}
 		if s.off >= s.limit {
 			return 0, .EOF
 		}
@@ -405,6 +411,9 @@ _section_reader_proc :: proc(stream_data: rawptr, mode: Stream_Mode, p: []byte, 
 		s.off += i64(n)
 		return
 	case .Read_At:
+		if len(p) == 0 {
+			return 0, nil
+		}
 		p, off := p, offset
 
 		if off < 0 || off >= s.limit - s.base {

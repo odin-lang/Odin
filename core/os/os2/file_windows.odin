@@ -266,6 +266,11 @@ _read :: proc(f: ^File_Impl, p: []byte) -> (n: i64, err: Error) {
 }
 
 _read_internal :: proc(f: ^File_Impl, p: []byte) -> (n: i64, err: Error) {
+	length := len(p)
+	if length == 0 {
+		return
+	}
+
 	read_console :: proc(handle: win32.HANDLE, b: []byte) -> (n: int, err: Error) {
 		if len(b) == 0 {
 			return 0, nil
@@ -320,7 +325,6 @@ _read_internal :: proc(f: ^File_Impl, p: []byte) -> (n: i64, err: Error) {
 
 	single_read_length: win32.DWORD
 	total_read: int
-	length := len(p)
 
 	sync.shared_guard(&f.rw_mutex) // multiple readers
 

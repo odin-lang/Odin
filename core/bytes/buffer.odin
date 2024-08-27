@@ -144,6 +144,9 @@ buffer_grow :: proc(b: ^Buffer, n: int, loc := #caller_location) {
 }
 
 buffer_write_at :: proc(b: ^Buffer, p: []byte, offset: int, loc := #caller_location) -> (n: int, err: io.Error) {
+	if len(p) == 0 {
+		return 0, nil
+	}
 	b.last_read = .Invalid
 	if offset < 0 {
 		err = .Invalid_Offset
@@ -246,6 +249,9 @@ buffer_read_ptr :: proc(b: ^Buffer, ptr: rawptr, size: int) -> (n: int, err: io.
 }
 
 buffer_read_at :: proc(b: ^Buffer, p: []byte, offset: int) -> (n: int, err: io.Error) {
+	if len(p) == 0 {
+		return 0, nil
+	}
 	b.last_read = .Invalid
 
 	if uint(offset) >= len(b.buf) {
