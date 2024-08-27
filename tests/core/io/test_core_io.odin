@@ -99,6 +99,14 @@ _test_stream :: proc(
 
 	// Test Read_At.
 	if .Read_At in mode_set {
+		// Test reading into an empty buffer.
+		{
+			nil_slice: []u8
+			bytes_read, err := io.read_at(stream, nil_slice, 0)
+			testing.expectf(t, bytes_read == 0 && err == nil,
+				"Read_At into empty slice failed: bytes_read<%v>, %v", bytes_read, err, loc = loc) or_return
+		}
+
 		read_buf, alloc_err := make([]u8, size)
 		testing.expect_value(t, alloc_err, nil, loc = loc) or_return
 		defer delete(read_buf)
@@ -141,6 +149,14 @@ _test_stream :: proc(
 
 	// Test Read.
 	if .Read in mode_set {
+		// Test reading into an empty buffer.
+		{
+			nil_slice: []u8
+			bytes_read, err := io.read(stream, nil_slice)
+			testing.expectf(t, bytes_read == 0 && err == nil,
+				"Read into empty slice failed: bytes_read<%v>, %v", bytes_read, err, loc = loc) or_return
+		}
+
 		if size > 0 {
 			read_buf, alloc_err := make([]u8, size)
 			testing.expectf(t, alloc_err == nil, "allocation failed", loc = loc) or_return
@@ -206,6 +222,14 @@ _test_stream :: proc(
 
 	// Test Write_At.
 	if .Write_At in mode_set {
+		// Test writing from an empty buffer.
+		{
+			nil_slice: []u8
+			bytes_written, err := io.write_at(stream, nil_slice, 0)
+			testing.expectf(t, bytes_written == 0 && err == nil,
+				"Write_At from empty slice failed: bytes_written<%v>, %v", bytes_written, err, loc = loc) or_return
+		}
+
 		// Ensure Write_At does not move the underlying pointer from the start.
 		starting_offset : i64 = -1
 		if .Seek in mode_set {
@@ -268,6 +292,14 @@ _test_stream :: proc(
 
 	// Test Write.
 	if .Write in mode_set {
+		// Test writing from an empty buffer.
+		{
+			nil_slice: []u8
+			bytes_written, err := io.write(stream, nil_slice)
+			testing.expectf(t, bytes_written == 0 && err == nil,
+				"Write from empty slice failed: bytes_written<%v>, %v", bytes_written, err, loc = loc) or_return
+		}
+
 		write_buf, write_buf_alloc_err := make([]u8, size)
 		testing.expectf(t, write_buf_alloc_err == nil, "allocation failed", loc = loc) or_return
 		defer delete(write_buf)
