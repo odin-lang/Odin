@@ -467,7 +467,12 @@ test_limited_reader :: proc(t: ^testing.T) {
 	ok: bool
 
 	for end in 0..<i64(len(buf)) {
-		io.seek(bs, 0, .Start)
+		pos, seek_err := io.seek(bs, 0, .Start)
+		if !testing.expectf(t, pos == 0 && seek_err == nil,
+			"Pre-test Seek reset failed: pos<%v>, %v", pos, seek_err) {
+			return
+		}
+
 		results, ok = _test_stream(t, io.limited_reader_init(&lr, bs, end), buf[:end])
 		if !ok {
 			log.debugf("buffer[:%i] := %v", end, buf[:end])
