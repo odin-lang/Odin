@@ -29,10 +29,23 @@ when ODIN_ARCH == .arm64 || ODIN_ARCH == .arm32 {
 	// explicitly using simd.u8x16 shuffles.
 	@(private = "file")
 	TARGET_SIMD_FEATURES :: "sse2,ssse3"
+} else when ODIN_ARCH == .riscv64 {
+	@(private = "file")
+	TARGET_SIMD_FEATURES :: "v"
 } else {
 	@(private = "file")
 	TARGET_SIMD_FEATURES :: ""
 }
+
+// Some targets lack runtime feature detection, and will flat out refuse
+// to load binaries that have unknown instructions.  This is distinct from
+// `simd.IS_EMULATED` as actually good designs support runtime feature
+// detection and that constant establishes a baseline.
+//
+// See:
+// - https://github.com/WebAssembly/design/issues/1161
+@(private = "file")
+TARGET_IS_DESIGNED_BY_IDIOTS :: (ODIN_ARCH == .wasm64p32 || ODIN_ARCH == .wasm32) && !intrinsics.has_target_feature("simd128")
 
 @(private = "file")
 _ROT_7L: simd.u32x4 : {7, 7, 7, 7}
@@ -205,11 +218,13 @@ _store_simd128 :: #force_inline proc "contextless" (
 // is_performant returns true iff the target and current host both support
 // "enough" 128-bit SIMD to make this implementation performant.
 is_performant :: proc "contextless" () -> bool {
-	when ODIN_ARCH == .arm64 || ODIN_ARCH == .arm32 || ODIN_ARCH == .amd64 || ODIN_ARCH == .i386 {
+	when ODIN_ARCH == .arm64 || ODIN_ARCH == .arm32 || ODIN_ARCH == .amd64 || ODIN_ARCH == .i386 || ODIN_ARCH == .riscv64 {
 		when ODIN_ARCH == .arm64 || ODIN_ARCH == .arm32 {
 			req_features :: info.CPU_Features{.asimd}
 		} else when ODIN_ARCH == .amd64 || ODIN_ARCH == .i386 {
 			req_features :: info.CPU_Features{.sse2, .ssse3}
+		} else when ODIN_ARCH == .riscv64 {
+			req_features :: info.CPU_Features{.V}
 		}
 
 		features, ok := info.cpu_features.?
@@ -245,8 +260,17 @@ stream_blocks :: proc(ctx: ^_chacha20.Context, dst, src: []byte, nr_blocks: int)
 
 	// 8 blocks at a time.
 	//
-	// Note: This is only worth it on Aarch64.
-	when ODIN_ARCH == .arm64 {
+	// Note:
+	// This uses a ton of registers so it is only worth it on targets
+	// that have something like 32 128-bit registers.  This is currently
+	// all ARMv8 targets, and RISC-V Zvl128b (`V` application profile)
+	// targets.
+	//
+	// While our current definition of `.arm32` is 32-bit ARMv8, this
+	// may change in the future (ARMv7 is still relevant), and things
+	// like Cortex-A8/A9 does "pretend" 128-bit SIMD 64-bits at a time
+	// thus needs bemchmarking.
+	when ODIN_ARCH == .arm64 || ODIN_ARCH == .riscv64 {
 		for ; n >= 8; n = n - 8 {
 			v0, v1, v2, v3 := s0, s1, s2, s3
 
@@ -354,9 +378,11 @@ stream_blocks :: proc(ctx: ^_chacha20.Context, dst, src: []byte, nr_blocks: int)
 
 	// 4 blocks at a time.
 	//
-	// Note: The i386 target lacks the required number of registers
-	// for this to be performant, so it is skipped.
-	when ODIN_ARCH != .i386 {
+	// Note: This is skipped on several targets for various reasons.
+	// - i386 lacks the required number of registers
+	// - Generating code when runtime "hardware" SIMD support is impossible
+	//   to detect is pointless, since this will be emulated using GP regs.
+	when ODIN_ARCH != .i386 && !TARGET_IS_DESIGNED_BY_IDIOTS {
 		for ; n >= 4; n = n - 4 {
 			v0, v1, v2, v3 := s0, s1, s2, s3
 
