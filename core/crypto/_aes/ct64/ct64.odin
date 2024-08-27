@@ -22,8 +22,6 @@
 
 package aes_ct64
 
-import "base:intrinsics"
-
 // Bitsliced AES for 64-bit general purpose (integer) registers.  Each
 // invocation will process up to 4 blocks at a time.  This implementation
 // is derived from the BearSSL ct64 code, and distributed under a 1-clause
@@ -214,7 +212,7 @@ orthogonalize :: proc "contextless" (q: ^[8]u64) {
 @(require_results)
 interleave_in :: proc "contextless" (w: []u32) -> (q0, q1: u64) #no_bounds_check {
 	if len(w) < 4 {
-		intrinsics.trap()
+		panic_contextless("aes/ct64: invalid input size")
 	}
 	x0, x1, x2, x3 := u64(w[0]), u64(w[1]), u64(w[2]), u64(w[3])
 	x0 |= (x0 << 16)
