@@ -343,6 +343,10 @@ _read_internal :: proc(f: ^File_Impl, p: []byte) -> (n: i64, err: Error) {
 
 		if single_read_length > 0 && ok {
 			total_read += int(single_read_length)
+		} else if single_read_length == 0 && ok {
+			// ok and 0 bytes means EOF:
+			// https://learn.microsoft.com/en-us/windows/win32/fileio/testing-for-the-end-of-a-file
+			err = .EOF
 		} else {
 			err = _get_platform_error()
 		}
