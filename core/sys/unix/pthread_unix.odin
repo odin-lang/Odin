@@ -27,6 +27,8 @@ foreign pthread {
 
 	pthread_equal :: proc(a, b: pthread_t) -> b32 ---
 
+	pthread_detach :: proc(t: pthread_t) -> c.int ---
+
 	sched_get_priority_min :: proc(policy: c.int) -> c.int ---
 	sched_get_priority_max :: proc(policy: c.int) -> c.int ---
 

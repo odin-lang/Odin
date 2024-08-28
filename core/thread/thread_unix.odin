@@ -69,6 +69,9 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 		sync.unlock(&t.mutex)
 
 		if .Self_Cleanup in sync.atomic_load(&t.flags) {
+			res := unix.pthread_detach(t.unix_thread)
+			assert_contextless(res == 0)
+
 			t.unix_thread = {}
 			// NOTE(ftphikari): It doesn't matter which context 'free' received, right?
 			context = {}
