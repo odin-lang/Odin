@@ -66,7 +66,7 @@ foreign user32 {
 	RemovePropW :: proc(hWnd: HWND, lpString: LPCWSTR) -> HANDLE ---
 	EnumPropsW :: proc(hWnd: HWND, lpEnumFunc: PROPENUMPROCW) -> INT ---
 	EnumPropsExW :: proc(hWnd: HWND, lpEnumFunc: PROPENUMPROCW, lParam: LPARAM) -> INT ---
-	GetMessageW :: proc(lpMsg: ^MSG, hWnd: HWND, wMsgFilterMin: UINT, wMsgFilterMax: UINT) -> BOOL ---
+	GetMessageW :: proc(lpMsg: ^MSG, hWnd: HWND, wMsgFilterMin: UINT, wMsgFilterMax: UINT) -> INT ---
 
 	TranslateMessage :: proc(lpMsg: ^MSG) -> BOOL ---
 	DispatchMessageW :: proc(lpMsg: ^MSG) -> LRESULT ---
@@ -142,7 +142,7 @@ foreign user32 {
 	AppendMenuW :: proc(hMenu: HMENU, uFlags: UINT, uIDNewItem: UINT_PTR, lpNewItem: LPCWSTR) -> BOOL ---
 	GetMenu :: proc(hWnd: HWND) -> HMENU ---
 	SetMenu :: proc(hWnd: HWND, hMenu: HMENU) -> BOOL ---
-	TrackPopupMenu :: proc(hMenu: HMENU, uFlags: UINT, x, y: INT, nReserved: INT, hWnd: HWND, prcRect: ^RECT) -> BOOL ---
+	TrackPopupMenu :: proc(hMenu: HMENU, uFlags: UINT, x, y: INT, nReserved: INT, hWnd: HWND, prcRect: ^RECT) -> INT ---
 	RegisterWindowMessageW :: proc(lpString: LPCWSTR) -> UINT ---
 
 	CreateAcceleratorTableW :: proc(paccel: LPACCEL, cAccel: INT) -> HACCEL ---
