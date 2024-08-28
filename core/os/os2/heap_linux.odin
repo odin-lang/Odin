@@ -1,9 +1,16 @@
 //+private
 package os2
 
+import "base:runtime"
+
 import "core:sys/linux"
 import "core:sync"
 import "core:mem"
+
+// Use the experimental custom heap allocator (over calling `malloc` etc.).
+// This is a switch because there are thread-safety problems that need to be fixed.
+// See: https://github.com/odin-lang/Odin/issues/4161
+USE_EXPERIMENTAL_ALLOCATOR :: #config(OS2_LINUX_USE_EXPERIMENTAL_ALLOCATOR, false)
 
 // NOTEs
 //
@@ -139,6 +146,8 @@ Region :: struct {
 	memory: [BLOCKS_PER_REGION]Allocation_Header,
 }
 
+when USE_EXPERIMENTAL_ALLOCATOR {
+
 _heap_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
                             size, alignment: int,
                             old_memory: rawptr, old_size: int, loc := #caller_location) -> ([]byte, mem.Allocator_Error) {
@@ -217,6 +226,10 @@ _heap_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
 	}
 
 	return nil, nil
+}
+
+} else {
+	_heap_allocator_proc :: runtime.heap_allocator_proc
 }
 
 heap_alloc :: proc(size: int) -> rawptr {
