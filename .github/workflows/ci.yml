@@ -251,7 +251,7 @@ jobs:
           make -C vendor/miniaudio/src
 
       - name: Odin check
-        run: ./odin check examples/all -target:linux_riscv64 -vet -strict-style -vet -strict-style -disallow-do
+        run: ./odin check examples/all -target:linux_riscv64 -vet -strict-style -disallow-do
 
       - name: Install riscv64 toolchain and qemu
         run: sudo apt-get install -y qemu-user qemu-user-static gcc-12-riscv64-linux-gnu libc6-riscv64-cross
