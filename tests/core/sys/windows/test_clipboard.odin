@@ -9,19 +9,19 @@ import "core:mem"
 
 read_from_clipboard :: proc(wnd_handle: win32.HWND, allocator: runtime.Allocator) -> (result: string, ok: win32.BOOL)
 {
-	 win32.IsClipboardFormatAvailable(win32.CF_TEXT) or_return;
+	win32.IsClipboardFormatAvailable(win32.CF_TEXT) or_return;
 	
-		win32.OpenClipboard(wnd_handle) or_return;
-		defer win32.CloseClipboard();
-		
-		clipboard_data := win32.GetClipboardData(win32.CF_TEXT); 
-		if clipboard_data != nil {
-			if cstr := cstring(win32.GlobalLock(win32.HGLOBAL(clipboard_data))); cstr != nil {
-				result = strings.clone_from_cstring(cstr, allocator);
-			ok = true;
-			}
-			win32.GlobalUnlock(win32.HGLOBAL(clipboard_data));
+	win32.OpenClipboard(wnd_handle) or_return;
+	defer win32.CloseClipboard();
+	
+	clipboard_data := win32.GetClipboardData(win32.CF_TEXT); 
+	if clipboard_data != nil {
+		if cstr := cstring(win32.GlobalLock(win32.HGLOBAL(clipboard_data))); cstr != nil {
+			result = strings.clone_from_cstring(cstr, allocator);
+		ok = true;
 		}
+		win32.GlobalUnlock(win32.HGLOBAL(clipboard_data));
+	}
 	return;
 }
 
