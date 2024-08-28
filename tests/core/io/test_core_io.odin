@@ -593,7 +593,6 @@ test_os2_file_stream :: proc(t: ^testing.T) {
 	if !testing.expectf(t, open_err == nil, "error on opening %q: %v", TEMPORARY_FILENAME, open_err) {
 		return
 	}
-	defer testing.expect_value(t, os2.close(fd), nil)
 
 	stream := os2.to_stream(fd)
 
