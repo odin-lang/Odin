@@ -166,7 +166,7 @@ datatype :: enum c.int {
 	UINT32,
 	FLOAT,
 
-    	MAX_TYPES,
+	MAX_TYPES,
 }
 
 @(default_calling_convention="c", link_prefix="stbir_")

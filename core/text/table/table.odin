@@ -56,7 +56,7 @@ Decorations :: struct {
 
 	// Connecting decorations:
 	nw, n, ne,
-	 w, x,  e,
+	w,  x,  e,
 	sw, s, se: string,
 
 	// Straight lines:

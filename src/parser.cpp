@@ -1921,6 +1921,9 @@ gb_internal Array<Ast *> parse_enum_field_list(AstFile *f) {
 	       f->curr_token.kind != Token_EOF) {
 		CommentGroup *docs = f->lead_comment;
 		CommentGroup *comment = nullptr;
+
+		parse_enforce_tabs(f);
+
 		Ast *name = parse_value(f);
 		Ast *value = nullptr;
 		if (f->curr_token.kind == Token_Eq) {
@@ -2259,6 +2262,7 @@ gb_internal Array<Ast *> parse_union_variant_list(AstFile *f) {
 	auto variants = array_make<Ast *>(ast_allocator(f));
 	while (f->curr_token.kind != Token_CloseBrace &&
 	       f->curr_token.kind != Token_EOF) {
+		parse_enforce_tabs(f);
 		Ast *type = parse_type(f);
 		if (type->kind != Ast_BadExpr) {
 			array_add(&variants, type);
@@ -4274,6 +4278,7 @@ gb_internal Ast *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_fl
 	while (f->curr_token.kind != follow &&
 	       f->curr_token.kind != Token_Colon &&
 	       f->curr_token.kind != Token_EOF) {
+		if (!is_signature) parse_enforce_tabs(f);
 		u32 flags = parse_field_prefixes(f);
 		Ast *param = parse_var_type(f, allow_ellipsis, allow_typeid_token);
 		if (param->kind == Ast_Ellipsis) {
@@ -4363,6 +4368,8 @@ gb_internal Ast *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_fl
 		       f->curr_token.kind != Token_EOF &&
 		       f->curr_token.kind != Token_Semicolon) {
 			CommentGroup *docs = f->lead_comment;
+
+			if (!is_signature) parse_enforce_tabs(f);
 			u32 set_flags = parse_field_prefixes(f);
 			Token tag = {};
 			Array<Ast *> names = parse_ident_list(f, allow_poly_names);
@@ -4532,6 +4539,10 @@ gb_internal Ast *parse_if_stmt(AstFile *f) {
 		return ast_bad_stmt(f, f->curr_token, f->curr_token);
 	}
 
+	Ast *top_if_stmt = nullptr;
+
+	Ast *prev_if_stmt = nullptr;
+if_else_chain:;
 	Token token = expect_token(f, Token_if);
 	Ast *init = nullptr;
 	Ast *cond = nullptr;
@@ -4573,12 +4584,24 @@ gb_internal Ast *parse_if_stmt(AstFile *f) {
 		ignore_strict_style = true;
 	}
 	skip_possible_newline_for_literal(f, ignore_strict_style);
+
+	Ast *curr_if_stmt = ast_if_stmt(f, token, init, cond, body, nullptr);
+	if (top_if_stmt == nullptr) {
+		top_if_stmt = curr_if_stmt;
+	}
+	if (prev_if_stmt != nullptr) {
+		prev_if_stmt->IfStmt.else_stmt = curr_if_stmt;
+	}
+
 	if (f->curr_token.kind == Token_else) {
 		Token else_token = expect_token(f, Token_else);
 		switch (f->curr_token.kind) {
 		case Token_if:
-			else_stmt = parse_if_stmt(f);
-			break;
+			// NOTE(bill): Instead of relying on recursive descent for an if-else chain
+			// we can just inline the tail-recursion manually with a simple loop like
+			// construct using a `goto`
+			prev_if_stmt = curr_if_stmt;
+			goto if_else_chain;
 		case Token_OpenBrace:
 			else_stmt = parse_block_stmt(f, false);
 			break;
@@ -4593,7 +4616,9 @@ gb_internal Ast *parse_if_stmt(AstFile *f) {
 		}
 	}
 
-	return ast_if_stmt(f, token, init, cond, body, else_stmt);
+	curr_if_stmt->IfStmt.else_stmt = else_stmt;
+
+	return top_if_stmt;
 }
 
 gb_internal Ast *parse_when_stmt(AstFile *f) {
@@ -5357,6 +5382,11 @@ gb_internal u64 check_vet_flags(AstFile *file) {
 
 
 gb_internal void parse_enforce_tabs(AstFile *f) {
+	// Checks to see if tabs have been used for indentation
+	if ((check_vet_flags(f) & VetFlag_Tabs) == 0) {
+		return;
+	}
+
        	Token prev = f->prev_token;
 	Token curr = f->curr_token;
 	if (prev.pos.line < curr.pos.line) {
@@ -5373,6 +5403,10 @@ gb_internal void parse_enforce_tabs(AstFile *f) {
 
 		isize len = end-it;
 		for (isize i = 0; i < len; i++) {
+			if (it[i] == '/') {
+				// ignore comments
+				break;
+			}
 			if (it[i] == ' ') {
 				syntax_error(curr, "With '-vet-tabs', tabs must be used for indentation");
 				break;
@@ -5387,11 +5421,7 @@ gb_internal Array<Ast *> parse_stmt_list(AstFile *f) {
 	while (f->curr_token.kind != Token_case &&
 	       f->curr_token.kind != Token_CloseBrace &&
 	       f->curr_token.kind != Token_EOF) {
-
-		// Checks to see if tabs have been used for indentation
-	       	if (check_vet_flags(f) & VetFlag_Tabs) {
-		       parse_enforce_tabs(f);
-		}
+		parse_enforce_tabs(f);
 
 		Ast *stmt = parse_stmt(f);
 		if (stmt && stmt->kind != Ast_EmptyStmt) {
@@ -6416,7 +6446,7 @@ gb_internal bool parse_file(Parser *p, AstFile *f) {
 				}
 
 				f->total_file_decl_count += calc_decl_count(stmt);
-				if (stmt->kind == Ast_WhenStmt || stmt->kind == Ast_ExprStmt || stmt->kind == Ast_ImportDecl) {
+				if (stmt->kind == Ast_WhenStmt || stmt->kind == Ast_ExprStmt || stmt->kind == Ast_ImportDecl || stmt->kind == Ast_ForeignBlockDecl) {
 					f->delayed_decl_count += 1;
 				}
 			}

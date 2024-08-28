@@ -178,11 +178,11 @@ make_dynamic_array :: proc($T: typeid/[dynamic]$E, allocator := context.allocato
 }
 @(require_results)
 make_dynamic_array_len :: proc($T: typeid/[dynamic]$E, #any_int len: int, allocator := context.allocator, loc := #caller_location) -> (T, Allocator_Error) {
-	return runtime.make_dynamic_array(T, len, allocator, loc)
+	return runtime.make_dynamic_array_len_cap(T, len, len, allocator, loc)
 }
 @(require_results)
 make_dynamic_array_len_cap :: proc($T: typeid/[dynamic]$E, #any_int len: int, #any_int cap: int, allocator := context.allocator, loc := #caller_location) -> (array: T, err: Allocator_Error) {
-	return runtime.make_dynamic_array(T, len, cap, allocator, loc)
+	return runtime.make_dynamic_array_len_cap(T, len, cap, allocator, loc)
 }
 @(require_results)
 make_map :: proc($T: typeid/map[$K]$E, #any_int cap: int = 1<<runtime.MAP_MIN_LOG2_CAPACITY, allocator := context.allocator, loc := #caller_location) -> (m: T, err: Allocator_Error) {

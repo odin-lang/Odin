@@ -2048,6 +2048,14 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		return ok;
 	}
 
+	if (BuiltinProc__atomic_begin < id && id < BuiltinProc__atomic_end) {
+		if (build_context.metrics.arch == TargetArch_riscv64) {
+			if (!check_target_feature_is_enabled(str_lit("a"), nullptr)) {
+				error(call, "missing required target feature \"a\" for atomics, enable it by setting a different -microarch or explicitly adding it through -target-features");
+			}
+		}
+	}
+
 	switch (id) {
 	default:
 		GB_PANIC("Implement built-in procedure: %.*s", LIT(builtin_name));
@@ -5665,6 +5673,59 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			break;
 		}
 		break;
+
+	case BuiltinProc_type_has_shared_fields:
+		{
+			Type *u = check_type(c, ce->args[0]);
+			Type *ut = base_type(u);
+			if (ut == nullptr || ut == t_invalid) {
+				error(ce->args[0], "Expected a type for '%.*s'", LIT(builtin_name));
+				return false;
+			}
+			if (ut->kind != Type_Struct || ut->Struct.soa_kind != StructSoa_None) {
+				gbString t = type_to_string(ut);
+				error(ce->args[0], "Expected a struct type for '%.*s', got %s", LIT(builtin_name), t);
+				gb_string_free(t);
+				return false;
+			}
+
+			Type *v = check_type(c, ce->args[1]);
+			Type *vt = base_type(v);
+			if (vt == nullptr || vt == t_invalid) {
+				error(ce->args[1], "Expected a type for '%.*s'", LIT(builtin_name));
+				return false;
+			}
+			if (vt->kind != Type_Struct || vt->Struct.soa_kind != StructSoa_None) {
+				gbString t = type_to_string(vt);
+				error(ce->args[1], "Expected a struct type for '%.*s', got %s", LIT(builtin_name), t);
+				gb_string_free(t);
+				return false;
+			}
+
+			bool is_shared = true;
+
+			for (Entity *v_field : vt->Struct.fields) {
+				bool found = false;
+				for (Entity *u_field : ut->Struct.fields) {
+					if (v_field->token.string == u_field->token.string &&
+					    are_types_identical(v_field->type, u_field->type)) {
+						found = true;
+						break;
+					}
+				}
+
+				if (!found) {
+					is_shared = false;
+					break;
+				}
+			}
+
+			operand->mode = Addressing_Constant;
+			operand->value = exact_value_bool(is_shared);
+			operand->type = t_untyped_bool;
+			break;
+		}
+
 	case BuiltinProc_type_field_type:
 		{
 			Operand op = {};

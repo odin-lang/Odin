@@ -199,6 +199,9 @@ gb_internal bool check_has_break(Ast *stmt, String const &label, bool implicit) 
 		}
 		break;
 
+	case Ast_DeferStmt:
+		return check_has_break(stmt->DeferStmt.stmt, label, implicit);
+
 	case Ast_BlockStmt:
 		return check_has_break_list(stmt->BlockStmt.stmts, label, implicit);
 
@@ -1695,7 +1698,7 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 					}
 				}
 			}
-			bool is_ptr = type_deref(operand.type);
+			bool is_ptr = is_type_pointer(type_deref(operand.type));
 			Type *t = base_type(type_deref(operand.type));
 
 			switch (t->kind) {
@@ -1735,6 +1738,7 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 				break;
 
 			case Type_EnumeratedArray:
+				is_possibly_addressable = operand.mode == Addressing_Variable || is_ptr;
 				array_add(&vals, t->EnumeratedArray.elem);
 				array_add(&vals, t->EnumeratedArray.index);
 				break;
@@ -2706,6 +2710,7 @@ gb_internal void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) 
 				error(bs->label, "A branch statement's label name must be an identifier");
 				return;
 			}
+
 			Ast *ident = bs->label;
 			String name = ident->Ident.token.string;
 			Operand o = {};
@@ -2736,6 +2741,10 @@ gb_internal void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) 
 				}
 				break;
 
+			}
+
+			if (ctx->in_defer) {
+				error(bs->label, "A labelled '%.*s' cannot be used within a 'defer'", LIT(token.string));
 			}
 		}
 

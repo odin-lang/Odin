@@ -263,7 +263,7 @@ gb_internal lbValue lb_emit_transmute(lbProcedure *p, lbValue value, Type *t) {
 	if (is_type_simd_vector(src) && is_type_simd_vector(dst)) {
 		res.value = LLVMBuildBitCast(p->builder, value.value, lb_type(p->module, t), "");
 		return res;
-	} else if (is_type_array_like(src) && is_type_simd_vector(dst)) {
+	} else if (is_type_array_like(src) && (is_type_simd_vector(dst) || is_type_integer_128bit(dst))) {
 		unsigned align = cast(unsigned)gb_max(type_align_of(src), type_align_of(dst));
 		lbValue ptr = lb_address_from_load_or_generate_local(p, value);
 		if (lb_try_update_alignment(ptr, align)) {

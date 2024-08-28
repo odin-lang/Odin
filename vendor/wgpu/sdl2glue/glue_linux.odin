@@ -5,7 +5,9 @@ import "vendor:wgpu"
 
 GetSurface :: proc(instance: wgpu.Instance, window: ^sdl2.Window) -> wgpu.Surface {
 	window_info: sdl2.SysWMinfo 
+	sdl2.VERSION(&window_info.version)
 	sdl2.GetWindowWMInfo(window, &window_info)
+
 	if window_info.subsystem == .WAYLAND {
 		display := window_info.info.wl.display
 		surface := window_info.info.wl.surface

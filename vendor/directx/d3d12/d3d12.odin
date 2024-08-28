@@ -3459,10 +3459,10 @@ DRED_DEVICE_STATE :: enum i32 {
 }
 
 DRED_PAGE_FAULT_OUTPUT2 :: struct {
-    PageFaultVA:                    GPU_VIRTUAL_ADDRESS,
-    pHeadExistingAllocationNode:    ^DRED_ALLOCATION_NODE1,
-    pHeadRecentFreedAllocationNode: ^DRED_ALLOCATION_NODE1,
-    PageFaultFlags:                 DRED_PAGE_FAULT_FLAGS,
+	PageFaultVA:                    GPU_VIRTUAL_ADDRESS,
+	pHeadExistingAllocationNode:    ^DRED_ALLOCATION_NODE1,
+	pHeadRecentFreedAllocationNode: ^DRED_ALLOCATION_NODE1,
+	PageFaultFlags:                 DRED_PAGE_FAULT_FLAGS,
 }
 
 DEVICE_REMOVED_EXTENDED_DATA1 :: struct {

@@ -1175,17 +1175,17 @@ SYSTEM_POWER_STATUS :: struct {
 }
 
 AC_Line_Status :: enum BYTE {
-   Offline = 0,
-   Online  = 1,
-   Unknown = 255,
+	Offline = 0,
+	Online  = 1,
+	Unknown = 255,
 }
 
 Battery_Flag :: enum BYTE {
-    High     = 0,
-    Low      = 1,
-    Critical = 2,
-    Charging = 3,
-    No_Battery = 7,
+	High     = 0,
+	Low      = 1,
+	Critical = 2,
+	Charging = 3,
+	No_Battery = 7,
 }
 Battery_Flags :: bit_set[Battery_Flag; BYTE]
 

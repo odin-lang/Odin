@@ -55,6 +55,16 @@ gb_internal void lb_debug_file_line(lbModule *m, Ast *node, LLVMMetadataRef *fil
 	}
 }
 
+gb_internal LLVMMetadataRef lb_debug_procedure_parameters(lbModule *m, Type *type) {
+	if (is_type_proc(type)) {
+		return lb_debug_type(m, t_rawptr);
+	}
+	if (type->kind == Type_Tuple && type->Tuple.variables.count == 1) {
+		return lb_debug_procedure_parameters(m, type->Tuple.variables[0]->type);
+	}
+	return lb_debug_type(m, type);
+}
+
 gb_internal LLVMMetadataRef lb_debug_type_internal_proc(lbModule *m, Type *type) {
 	i64 size = type_size_of(type); // Check size
 	gb_unused(size);
@@ -78,7 +88,7 @@ gb_internal LLVMMetadataRef lb_debug_type_internal_proc(lbModule *m, Type *type)
 	if (type->Proc.result_count == 0) {
 		parameters[param_index++] = nullptr;
 	} else {
-		parameters[param_index++] = lb_debug_type(m, type->Proc.results);
+		parameters[param_index++] = lb_debug_procedure_parameters(m, type->Proc.results);
 	}
 
 	LLVMMetadataRef file = nullptr;
@@ -88,7 +98,7 @@ gb_internal LLVMMetadataRef lb_debug_type_internal_proc(lbModule *m, Type *type)
 		if (e->kind != Entity_Variable) {
 			continue;
 		}
-		parameters[param_index] = lb_debug_type(m, e->type);
+		parameters[param_index] = lb_debug_procedure_parameters(m, e->type);
 		param_index += 1;
 	}
 
@@ -969,7 +979,7 @@ gb_internal LLVMMetadataRef lb_debug_type(lbModule *m, Type *type) {
 			return lb_debug_struct(m, type, bt, name, scope, file, line);
 		}
 
-		case Type_Struct:       return lb_debug_struct(m, type, base_type(type), name, scope, file, line);
+		case Type_Struct:       return lb_debug_struct(m, type, bt, name, scope, file, line);
 		case Type_Slice:        return lb_debug_slice(m, type, name, scope, file, line);
 		case Type_DynamicArray: return lb_debug_dynamic_array(m, type, name, scope, file, line);
 		case Type_Union:        return lb_debug_union(m, type, name, scope, file, line);

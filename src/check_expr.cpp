@@ -1180,11 +1180,15 @@ gb_internal void check_assignment(CheckerContext *c, Operand *operand, Type *typ
 				      LIT(article),
 				      LIT(context_name));
 			} else {
+				ERROR_BLOCK();
 				error(operand->expr,
 				      "Cannot assign '%s', a type, to %.*s%.*s",
 				      op_type_str,
 				      LIT(article),
 				      LIT(context_name));
+				if (type && are_types_identical(type, t_any)) {
+					error_line("\tSuggestion: 'typeid_of(%s)'", expr_str);
+				}
 			}
 			break;
 		default:
@@ -3782,10 +3786,10 @@ gb_internal void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Typ
 		// NOTE(bill): Allow comparisons between types
 		if (is_ise_expr(be->left)) {
 			// Evalute the right before the left for an '.X' expression
-			check_expr_or_type(c, y, be->right, type_hint);
+			check_expr_or_type(c, y, be->right, nullptr /* ignore type hint */);
 			check_expr_or_type(c, x, be->left, y->type);
 		} else {
-			check_expr_or_type(c, x, be->left, type_hint);
+			check_expr_or_type(c, x, be->left, nullptr /* ignore type hint */);
 			check_expr_or_type(c, y, be->right, x->type);
 		}
 		bool xt = x->mode == Addressing_Type;
@@ -4658,7 +4662,8 @@ gb_internal bool check_index_value(CheckerContext *c, Type *main_type, bool open
 	check_expr_with_type_hint(c, &operand, index_value, type_hint);
 	if (operand.mode == Addressing_Invalid) {
 		if (value) *value = 0;
-		return false;
+		// NOTE(bill): return true here to propagate the errors better
+		return true;
 	}
 
 	Type *index_type = t_int;
@@ -4879,7 +4884,7 @@ gb_internal ExactValue get_constant_field_single(CheckerContext *c, ExactValue v
 							TypeAndValue tav = fv->value->tav;
 							if (success_) *success_ = true;
 							if (finish_) *finish_ = false;
-							return tav.value;;
+							return tav.value;
 						}
 					}
 
@@ -4954,7 +4959,6 @@ gb_internal ExactValue get_constant_field(CheckerContext *c, Operand const *oper
 				return value;
 			}
 		}
-
 		if (success_) *success_ = true;
 		return value;
 	} else if (value.kind == ExactValue_Quaternion) {
@@ -7625,7 +7629,7 @@ gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, O
 			gbString s = gb_string_make_reserve(heap_allocator(), e->token.string.len+3);
 			s = gb_string_append_fmt(s, "%.*s(", LIT(e->token.string));
 
-			TypeTuple *tuple = get_record_polymorphic_params(e->type);
+			TypeTuple *tuple = get_record_polymorphic_params(bt);
 			if (tuple != nullptr) for_array(i, tuple->variables) {
 				Entity *v = tuple->variables[i];
 				String name = v->token.string;
@@ -7640,8 +7644,10 @@ gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, O
 						s = write_type_to_string(s, v->type, false);
 					}
 				} else if (v->kind == Entity_Constant) {
-					s = gb_string_append_fmt(s, "=");
-					s = write_exact_value_to_string(s, v->Constant.value);
+					if (v->Constant.value.kind != ExactValue_Invalid) {
+						s = gb_string_append_fmt(s, "=");
+						s = write_exact_value_to_string(s, v->Constant.value);
+					}
 				}
 			}
 			s = gb_string_append_fmt(s, ")");
@@ -10055,6 +10061,22 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 					is_constant = o->mode == Addressing_Constant;
 				}
 
+				if (elem->kind == Ast_BinaryExpr) {
+					switch (elem->BinaryExpr.op.kind) {
+					case Token_Or:
+						{
+							gbString x = expr_to_string(elem->BinaryExpr.left);
+							gbString y = expr_to_string(elem->BinaryExpr.right);
+							gbString e = expr_to_string(elem);
+							error(elem, "Was the following intended? '%s, %s'; if not, surround the expression with parentheses '(%s)'", x, y, e);
+							gb_string_free(e);
+							gb_string_free(y);
+							gb_string_free(x);
+						}
+						break;
+					}
+				}
+
 				check_assignment(c, o, t->BitSet.elem, str_lit("bit_set literal"));
 				if (o->mode == Addressing_Constant) {
 					i64 lower = t->BitSet.lower;
@@ -10544,7 +10566,8 @@ gb_internal ExprKind check_index_expr(CheckerContext *c, Operand *o, Ast *node, 
 			o->expr = node;
 			return kind;
 		} else if (ok && !is_type_matrix(t)) {
-			ExactValue value = type_and_value_of_expr(ie->expr).value;
+			TypeAndValue tav = type_and_value_of_expr(ie->expr);
+			ExactValue value = tav.value;
 			o->mode = Addressing_Constant;
 			bool success = false;
 			bool finish = false;

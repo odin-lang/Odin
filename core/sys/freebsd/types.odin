@@ -695,12 +695,12 @@ Record_Lock_Flag :: enum c.int {
 
 // struct flock
 File_Lock :: struct {
-	 start:  off_t,            /* starting offset */
-	 len:    off_t,            /* len = 0 means until end of file */
-	 pid:    pid_t,            /* lock owner */
-	 type:   Record_Lock_Flag, /* lock type: read/write, etc. */
-	 whence: c.short,          /* type of l_start */
-	 sysid:  c.int,            /* remote system id or zero for local */
+	start:  off_t,            /* starting offset */
+	len:    off_t,            /* len = 0 means until end of file */
+	pid:    pid_t,            /* lock owner */
+	type:   Record_Lock_Flag, /* lock type: read/write, etc. */
+	whence: c.short,          /* type of l_start */
+	sysid:  c.int,            /* remote system id or zero for local */
 }
 
 /*

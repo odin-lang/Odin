@@ -16,8 +16,7 @@ run_test_cases :: proc(t: ^testing.T, test_cases: []Test_Case, loc := #caller_lo
 		result, _, _ := utf8.grapheme_count(c.str)
 		if !testing.expectf(t, result == c.expected_clusters,
 			"(#% 4i) graphemes: %i != %i, %q %s", i, result, c.expected_clusters, c.str, c.str,
-			loc = loc)
-		{
+			loc = loc) {
 			failed += 1
 		}
 	}
