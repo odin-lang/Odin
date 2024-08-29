@@ -44,6 +44,7 @@ class WebGPUInterface {
 			BlendFactor: ["zero", "one", "src", "one-minus-src", "src-alpha", "one-minus-src-alpha", "dst", "one-minus-dst", "dst-alpha", "one-minus-dst-alpha", "src-alpha-saturated", "constant", "one-minus-constant", ],
 			PresentMode: ["fifo", "fifo-relaxed", "immediate", "mailbox", ],
 			TextureAspect: ["all", "stencil-only", "depth-only"],
+			DeviceLostReason: [undefined, "unknown", "destroyed"],
 		};
 
 		/** @type {WebGPUObjectManager<{}>} */
@@ -382,13 +383,19 @@ class WebGPUInterface {
 	 */
 	RenderPassColorAttachment(start) {
 		const viewIdx = this.mem.loadPtr(start + 4);
-		const resolveTargetIdx = this.mem.loadPtr(start + 8);
+		const resolveTargetIdx = this.mem.loadPtr(start + 12);
+
+		let depthSlice = this.mem.loadU32(start + 8);
+		if (depthSlice == 0xFFFFFFFF) { // DEPTH_SLICE_UNDEFINED.
+			depthSlice = undefined;
+		}
 
 		return {
 			view: viewIdx > 0 ? this.textureViews.get(viewIdx) : undefined,
 			resolveTarget: resolveTargetIdx > 0 ? this.textureViews.get(resolveTargetIdx) : undefined,
-			loadOp: this.enumeration("LoadOp", start + 12),
-			storeOp: this.enumeration("StoreOp", start + 16),
+			depthSlice: depthSlice,
+			loadOp: this.enumeration("LoadOp", start + 16),
+			storeOp: this.enumeration("StoreOp", start + 20),
 			clearValue: this.Color(start + 24),
 		};
 	}
@@ -950,14 +957,25 @@ class WebGPUInterface {
 
 			/**
 			 * @param {number} adapterIdx
-			 * @param {number} propertiesPtr
+			 * @param {number} infoPtr
 			 */
-			wgpuAdapterGetProperties: (adapterIdx, propertiesPtr) => {
-				this.assert(propertiesPtr != 0);
- 				// Unknown adapter.
-				this.mem.storeI32(propertiesPtr + 28, 3);
+			wgpuAdapterGetInfo: (adapterIdx, infoPtr) => {
+				this.assert(infoPtr != 0);
+
 				// WebGPU backend.
-				this.mem.storeI32(propertiesPtr + 32, 2);
+				this.mem.storeI32(infoPtr + 20, 2);
+ 				// Unknown adapter.
+				this.mem.storeI32(infoPtr + 24, 3);
+
+				// NOTE: I don't think getting the other fields in this struct is possible.
+				// `adapter.requestAdapterInfo` is deprecated.
+			},
+
+			/**
+			 * @param {number} infoPtr
+			 */
+			wgpuAdapterInfoFreeMembers: (infoPtr) => {
+				// NOTE: nothing to free.
 			},
 
 			/**
@@ -968,50 +986,6 @@ class WebGPUInterface {
 			wgpuAdapterHasFeature: (adapterIdx, featureInt) => {
 				const adapter = this.adapters.get(adapterIdx);
 				return adapter.features.has(this.enums.FeatureName[featureInt]);
-			},
-
-			/**
-			 * @param {number} adapterIdx
-			 * @param {number} callbackPtr
-			 * @param {0|number} userdata
-			 */
-			wgpuAdapterRequestAdapterInfo: async (adapterIdx, callbackPtr, userdata) => {
-				const adapter  = this.adapters.get(adapterIdx);
-				const callback = this.mem.exports.__indirect_function_table.get(callbackPtr);
-
-				const info = await adapter.requestAdapterInfo();
-
-				const addr = this.mem.exports.wgpu_alloc(16);
-
-				const vendorLength = new TextEncoder().encode(info.vendor).length;
-				const vendorAddr = this.mem.exports.wgpu_alloc(vendorLength);
-				this.mem.storeString(vendorAddr, info.vendor);
-				this.mem.storeI32(addr + 0, vendorAddr);
-
-				const architectureLength = new TextEncoder().encode(info.architecture).length;
-				const architectureAddr = this.mem.exports.wgpu_alloc(architectureLength);
-				this.mem.storeString(architectureAddr, info.architecture);
-				this.mem.storeI32(addr + 4, architectureAddr);
-
-
-				const deviceLength = new TextEncoder().encode(info.device).length;
-				const deviceAddr = this.mem.exports.wgpu_alloc(deviceLength);
-				this.mem.storeString(deviceAddr, info.device);
-				this.mem.storeI32(addr + 8, deviceAddr);
-
-
-				const descriptionLength = new TextEncoder().encode(info.description).length;
-				const descriptionAddr = this.mem.exports.wgpu_alloc(descriptionLength);
-				this.mem.storeString(descriptionAddr, info.description);
-				this.mem.storeI32(addr + 12, descriptionAddr);
-
-				callback(addr, userdata);
-
-				this.mem.exports.wgpu_free(descriptionAddr);
-				this.mem.exports.wgpu_free(deviceAddr);
-				this.mem.exports.wgpu_free(architectureAddr);
-				this.mem.exports.wgpu_free(vendorAddr);
-				this.mem.exports.wgpu_free(addr);
 			},
 
 			/**
@@ -1040,14 +1014,69 @@ class WebGPUInterface {
 					};
 				}
 
+				let device;
 				let deviceIdx;
 				try {
-					const device = await adapter.requestDevice(descriptor);
+					device = await adapter.requestDevice(descriptor);
 					deviceIdx = this.devices.create(device);
 					// NOTE: don't callback here, any errors that happen later will then be caught by the catch here.
 				} catch (e) {
-					console.warn(e);
-					callback(1, null, null, userdata);
+					const messageLength = new TextEncoder().encode(e.message).length;
+					const messageAddr = this.mem.exports.wgpu_alloc(messageLength + 1);
+					this.mem.storeString(messageAddr, e.message);
+
+					callback(1, null, messageAddr, userdata);
+
+					this.mem.exports.wgpu_free(messageAddr);
+				}
+
+				let callbacksPtr = descriptorPtr + 24 + this.mem.intSize;
+
+				const deviceLostCallbackPtr = this.mem.loadPtr(callbacksPtr);
+				if (deviceLostCallbackPtr != 0) {
+					const deviceLostUserData = this.mem.loadPtr(callbacksPtr) + 4;
+					const deviceLostCallback = this.mem.exports.__indirect_function_table.get(deviceLostCallbackPtr);
+
+					device.lost.then((info) => {
+						const reason = this.enums.DeviceLostReason.indexOf(info.reason);
+
+						const messageLength = new TextEncoder().encode(info.message).length;
+						const messageAddr = this.mem.exports.wgpu_alloc(messageLength + 1);
+						this.mem.storeString(messageAddr, info.message);
+
+						deviceLostCallback(reason, messageAddr, deviceLostUserData);
+
+						this.mem.exports.wgpu_free(messageAddr);
+					});
+				}
+				callbacksPtr += 8;
+
+				// Skip over `nextInChain`.
+				callbacksPtr += 4;
+
+				const uncapturedErrorCallbackPtr = this.mem.loadPtr(callbacksPtr);
+				if (uncapturedErrorCallbackPtr != 0) {
+					const uncapturedErrorUserData = this.mem.loadPtr(callbacksPtr + 4);
+					const uncapturedErrorCallback = this.mem.exports.__indirect_function_table.get(uncapturedErrorCallbackPtr);
+
+					device.onuncapturederror = (ev) => {
+						let status = 4; // Unknown
+						if (ev.error instanceof GPUValidationError) {
+							status = 1; // Validation
+						} else if (ev.error instanceof GPUOutOfMemoryError) {
+							status = 2; // OutOfMemory
+						} else if (ev.error instanceof GPUInternalError) {
+							status = 3; // Internal
+						}
+
+						const messageLength = new TextEncoder().encode(ev.error.message).length;
+						const messageAddr = this.mem.exports.wgpu_alloc(messageLength + 1);
+						this.mem.storeString(messageAddr, ev.error.message);
+
+						uncapturedErrorCallback(status, messageAddr, uncapturedErrorUserData);
+
+						this.mem.exports.wgpu_free(messageAddr);
+					};
 				}
 
 				callback(0, deviceIdx, null, userdata);
@@ -1918,29 +1947,6 @@ class WebGPUInterface {
 				device.pushErrorScope(this.enums.ErrorFilter[filterInt]);
 			},
 
-			/**
-			 * @param {number} deviceIdx
-			 * @param {number} callbackPtr
-			 * @param {number} userdata
-			 */
-			wgpuDeviceSetUncapturedErrorCallback: (deviceIdx, callbackPtr, userdata) => {
-				const device = this.devices.get(deviceIdx);
-				const callback = this.mem.exports.__indirect_function_table.get(callbackPtr);
-
-				device.onuncapturederror = (ev) => {
-					console.warn(ev.error);
-					let status = 4;
-					if (error instanceof GPUValidationError) {
-						status = 1;
-					} else if (error instanceof GPUOutOfMemoryError) {
-						status = 2;
-					} else if (error instanceof GPUInternalError) {
-						status = 3;
-					}
-					callback(status, null, userdata);
-				};
-			},
-
 			...this.devices.interface(true),
 
 			/* ---------------------- Instance ---------------------- */
@@ -2646,23 +2652,23 @@ class WebGPUInterface {
 				const formatStr = navigator.gpu.getPreferredCanvasFormat();
 				const format = this.enums.TextureFormat.indexOf(formatStr);
 
-				this.mem.storeUint(capabilitiesPtr + this.mem.intSize, 1);
+				this.mem.storeUint(capabilitiesPtr + 8, 1);
 				const formatAddr = this.mem.exports.wgpu_alloc(4);
 				this.mem.storeI32(formatAddr, format);
-				this.mem.storeI32(capabilitiesPtr + this.mem.intSize*2, formatAddr);
+				this.mem.storeI32(capabilitiesPtr + 8 + this.mem.intSize, formatAddr);
 
 				// NOTE: present modes don't seem to actually do anything in JS, we can just give back a default FIFO though.
-				this.mem.storeUint(capabilitiesPtr + this.mem.intSize*3, 1);
+				this.mem.storeUint(capabilitiesPtr + 8 + this.mem.intSize*2, 1);
 				const presentModesAddr = this.mem.exports.wgpu_alloc(4);
 				this.mem.storeI32(presentModesAddr, 0);
-				this.mem.storeI32(capabilitiesPtr + this.mem.intSize*4, presentModesAddr);
+				this.mem.storeI32(capabilitiesPtr + 8 + this.mem.intSize*3, presentModesAddr);
 
 				// Browser seems to support opaque (1) and premultiplied (2).
-				this.mem.storeUint(capabilitiesPtr + this.mem.intSize*5, 2);
+				this.mem.storeUint(capabilitiesPtr + 8 + this.mem.intSize*4, 2);
 				const alphaModesAddr = this.mem.exports.wgpu_alloc(8);
 				this.mem.storeI32(alphaModesAddr + 0, 1); // Opaque.
 				this.mem.storeI32(alphaModesAddr + 4, 2); // premultiplied.
-				this.mem.storeI32(capabilitiesPtr + this.mem.intSize*6, alphaModesAddr);
+				this.mem.storeI32(capabilitiesPtr + 8 + this.mem.intSize*5, alphaModesAddr);
 			},
 
 			/**
@@ -2678,17 +2684,6 @@ class WebGPUInterface {
 				this.mem.storeI32(texturePtr, textureIdx);
 
 				// TODO: determine suboptimal and/or status.
-			},
-
-			/**
-			 * @param {number} surfaceIdx
-			 * @param {number} texturePtr
-			 * @returns {number}
-			 */
-			wgpuSurfaceGetPreferredFormat: (surfaceIdx, adapterIdx) => {
-				const formatStr = navigator.gpu.getPreferredCanvasFormat();
-				const format = this.enums.TextureFormat.indexOf(formatStr);
-				return format;
 			},
 
 			/**

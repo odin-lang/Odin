@@ -187,7 +187,7 @@ validate_rbtree :: proc(t: ^testing.T, tree: ^$T/rb.Tree($Key, $Value)) {
 }
 
 verify_rbtree_propery_1 :: proc(t: ^testing.T, n: ^$N/rb.Node($Key, $Value)) {
-        testing.expect(t, rb.node_color(n) == .Black || rb.node_color(n) == .Red, "Property #1: Each node is either red or black.")
+	testing.expect(t, rb.node_color(n) == .Black || rb.node_color(n) == .Red, "Property #1: Each node is either red or black.")
 	if n == nil {
 		return
 	}

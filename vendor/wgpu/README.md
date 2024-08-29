@@ -11,8 +11,8 @@ Have a look at the `example/` directory for the rendering of a basic triangle.
 ## Getting the wgpu-native libraries
 
 For native support (not the browser), some libraries are required. Fortunately this is
-extremely easy, just download them from the [releases on GitHub](https://github.com/gfx-rs/wgpu-native/releases/tag/v0.19.4.1),
-the bindings are for v0.19.4.1 at the moment.
+extremely easy, just download them from the [releases on GitHub](https://github.com/gfx-rs/wgpu-native/releases/tag/v22.1.0.1),
+the bindings are for v22.1.0.1 at the moment.
 
 These are expected in the `lib` folder under the same name as they are released (just unzipped).
 By default it will look for a static release version (`wgpu-OS-ARCH-release.a|lib`),

@@ -66,7 +66,7 @@ foreign user32 {
 	RemovePropW :: proc(hWnd: HWND, lpString: LPCWSTR) -> HANDLE ---
 	EnumPropsW :: proc(hWnd: HWND, lpEnumFunc: PROPENUMPROCW) -> INT ---
 	EnumPropsExW :: proc(hWnd: HWND, lpEnumFunc: PROPENUMPROCW, lParam: LPARAM) -> INT ---
-	GetMessageW :: proc(lpMsg: ^MSG, hWnd: HWND, wMsgFilterMin: UINT, wMsgFilterMax: UINT) -> BOOL ---
+	GetMessageW :: proc(lpMsg: ^MSG, hWnd: HWND, wMsgFilterMin: UINT, wMsgFilterMax: UINT) -> INT ---
 
 	TranslateMessage :: proc(lpMsg: ^MSG) -> BOOL ---
 	DispatchMessageW :: proc(lpMsg: ^MSG) -> LRESULT ---
@@ -142,7 +142,7 @@ foreign user32 {
 	AppendMenuW :: proc(hMenu: HMENU, uFlags: UINT, uIDNewItem: UINT_PTR, lpNewItem: LPCWSTR) -> BOOL ---
 	GetMenu :: proc(hWnd: HWND) -> HMENU ---
 	SetMenu :: proc(hWnd: HWND, hMenu: HMENU) -> BOOL ---
-	TrackPopupMenu :: proc(hMenu: HMENU, uFlags: UINT, x, y: INT, nReserved: INT, hWnd: HWND, prcRect: ^RECT) -> BOOL ---
+	TrackPopupMenu :: proc(hMenu: HMENU, uFlags: UINT, x, y: INT, nReserved: INT, hWnd: HWND, prcRect: ^RECT) -> INT ---
 	RegisterWindowMessageW :: proc(lpString: LPCWSTR) -> UINT ---
 
 	CreateAcceleratorTableW :: proc(paccel: LPACCEL, cAccel: INT) -> HACCEL ---
@@ -305,6 +305,13 @@ foreign user32 {
 
 	GetProcessWindowStation :: proc() -> HWINSTA ---
 	GetUserObjectInformationW :: proc(hObj: HANDLE, nIndex: GetUserObjectInformationFlags, pvInfo: PVOID, nLength: DWORD, lpnLengthNeeded: LPDWORD) -> BOOL ---
+	
+	OpenClipboard :: proc(hWndNewOwner: HWND) -> BOOL ---
+	CloseClipboard :: proc() -> BOOL ---
+	GetClipboardData :: proc(uFormat: UINT) -> HANDLE ---
+	SetClipboardData :: proc(uFormat: UINT, hMem: HANDLE) -> HANDLE ---
+	IsClipboardFormatAvailable :: proc(format: UINT) -> BOOL ---
+	EmptyClipboard :: proc() -> BOOL ---
 }
 
 CreateWindowW :: #force_inline proc "system" (
@@ -746,3 +753,31 @@ WinEventFlag :: enum DWORD {
 	SKIPOWNPROCESS = 1,
 	INCONTEXT      = 2,
 }
+
+// Standard Clipboard Formats
+CF_TEXT            :: 1
+CF_BITMAP          :: 2
+CF_METAFILEPICT    :: 3
+CF_SYLK            :: 4
+CF_DIF             :: 5
+CF_TIFF            :: 6
+CF_OEMTEXT         :: 7
+CF_DIB             :: 8
+CF_PALETTE         :: 9
+CF_PENDATA         :: 10
+CF_RIFF            :: 11
+CF_WAVE            :: 12
+CF_UNICODETEXT     :: 13
+CF_ENHMETAFILE     :: 14
+CF_HDROP           :: 15
+CF_LOCALE          :: 16
+CF_DIBV5           :: 17
+CF_DSPBITMAP       :: 0x0082
+CF_DSPENHMETAFILE  :: 0x008E
+CF_DSPMETAFILEPICT :: 0x0083
+CF_DSPTEXT         :: 0x0081
+CF_GDIOBJFIRST     :: 0x0300
+CF_GDIOBJLAST      :: 0x03FF
+CF_OWNERDISPLAY    :: 0x0080
+CF_PRIVATEFIRST    :: 0x0200
+CF_PRIVATELAST     :: 0x02FF

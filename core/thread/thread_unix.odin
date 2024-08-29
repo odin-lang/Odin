@@ -2,6 +2,7 @@
 // +private
 package thread
 
+import "base:runtime"
 import "core:sync"
 import "core:sys/unix"
 import "core:time"
@@ -55,7 +56,10 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 			// Here on Unix, we start the OS thread in a running state, and so we manually have it wait on a condition
 			// variable above. We must perform that waiting BEFORE we select the context!
 			context = _select_context_for_thread(init_context)
-			defer _maybe_destroy_default_temp_allocator(init_context)
+			defer {
+				_maybe_destroy_default_temp_allocator(init_context)
+				runtime.run_thread_local_cleaners()
+			}
 
 			t.procedure(t)
 		}
@@ -65,6 +69,9 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 		sync.unlock(&t.mutex)
 
 		if .Self_Cleanup in sync.atomic_load(&t.flags) {
+			res := unix.pthread_detach(t.unix_thread)
+			assert_contextless(res == 0)
+
 			t.unix_thread = {}
 			// NOTE(ftphikari): It doesn't matter which context 'free' received, right?
 			context = {}
