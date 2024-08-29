@@ -18,6 +18,7 @@ thread_act_t   :: distinct u64
 thread_state_t :: distinct ^u32
 thread_list_t  :: [^]thread_act_t
 vm_region_recurse_info_t :: distinct ^i32
+task_info_t :: distinct ^i32
 
 MACH_PORT_NULL :: 0
 MACH_PORT_DEAD :: ~mach_port_t(0)
@@ -54,6 +55,7 @@ X86_THREAD_STATE32 :: 1
 X86_THREAD_STATE64 :: 4
 ARM_THREAD_STATE64 :: 6
 
+TASK_DYLD_INFO :: 17
 
 mach_msg_option_t :: distinct i32
 name_t :: distinct cstring
@@ -172,6 +174,14 @@ vm_region_submap_info_64 :: struct {
 }
 VM_REGION_SUBMAP_INFO_COUNT_64 :: size_of(vm_region_submap_info_64) / size_of(u32)
 
+TASK_DYLD_INFO :: 17
+task_dyld_info :: struct {
+	all_image_info_addr: u64,
+	all_image_info_size: u64,
+	all_image_info_format: i32,
+}
+TASK_DYLD_INFO_COUNT :: size_of(task_dyld_info) / size_of(u32)
+
 @(default_calling_convention="c")
 foreign mach {
 	mach_task_self     :: proc() -> task_t ---
@@ -190,6 +200,7 @@ foreign mach {
 	task_suspend   :: proc(task: task_t) -> kern_return_t ---
 	task_resume    :: proc(task: task_t) -> kern_return_t ---
 	task_threads   :: proc(task: task_t, thread_list: ^thread_list_t, list_count: ^u32) -> kern_return_t ---
+	task_info      :: proc(task: task_t, flavor: i32, info: task_info_t, count: ^u32) -> kern_return_t ---
 
 	thread_get_state :: proc(thread: thread_act_t, flavor: i32, thread_state: thread_state_t, old_state_count: ^u32) -> kern_return_t ---
 	thread_info :: proc(thread: thread_act_t, flavor: u32, thread_info: ^thread_identifier_info, info_count: ^u32) -> kern_return_t ---
