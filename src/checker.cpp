@@ -5228,9 +5228,9 @@ gb_internal bool collect_file_decl(CheckerContext *ctx, Ast *decl) {
 	case_end;
 
 	case_ast_node(fb, ForeignBlockDecl, decl);
-		if (check_add_foreign_block_decl(ctx, decl)) {
-			return true;
-		}
+		GB_ASSERT(ctx->collect_delayed_decls);
+		decl->state_flags |= StateFlag_BeenHandled;
+		array_add(&curr_file->delayed_decls_queues[AstDelayQueue_ForeignBlock], decl);
 	case_end;
 
 	case_ast_node(ws, WhenStmt, decl);
