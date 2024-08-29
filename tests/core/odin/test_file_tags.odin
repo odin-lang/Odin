@@ -13,8 +13,12 @@ test_parse_file_tags :: proc(t: ^testing.T) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 
 	Test_Case :: struct {
-		src:  string,
-		tags: parser.File_Tags,
+		src:              string,
+		tags:             parser.File_Tags,
+		matching_targets: []struct{
+			target: parser.Build_Target,
+			result: bool,
+		},
 	}
 
 	test_cases := []Test_Case{
@@ -26,6 +30,9 @@ test_parse_file_tags :: proc(t: ^testing.T) {
 package main
 			`,
 			tags = {},
+			matching_targets = {
+				{{.Windows, .amd64, "foo"}, true},
+			},
 		}, {// [2]
 			src = `
 //+build linux, darwin, freebsd, openbsd, netbsd, haiku
@@ -44,6 +51,11 @@ package main
 					{os = runtime.ALL_ODIN_OS_TYPES, arch = {.arm64}},
 				},
 			},
+			matching_targets = {
+				{{.Linux, .amd64, "foo"}, true},
+				{{.Windows, .arm64, "foo"}, true},
+				{{.Windows, .amd64, "foo"}, false},
+			},
 		}, {// [3]
 			src = `
 // +private
@@ -58,6 +70,9 @@ package main
 				no_instrumentation = true,
 				lazy               = true,
 				ignore             = true,
+			},
+			matching_targets = {
+				{{.Linux, .amd64, "foo"}, false},
 			},
 		}, {// [4]
 			src = `
@@ -77,12 +92,12 @@ package main
 					},
 				},
 			},
+			matching_targets = {
+				{{.JS, .wasm32, "foo"}, true},
+				{{.JS, .wasm64p32, "baz"}, true},
+				{{.JS, .wasm64p32, "bar"}, false},
+			},
 		},
-	}
-
-	error_expected :: proc(name: string, i: int, expected, actual: $T, loc := #caller_location) {
-		log.errorf("[%d] expected %s:\n\e[0;32m%#v\e[0m, actual:\n\e[0;31m%#v\e[0m",
-		           i, name, expected, actual, location=loc)
 	}
 
 	for test_case, i in test_cases {
@@ -107,28 +122,35 @@ package main
 			}
 			build_project_name_the_same = true
 		}
-		if !build_project_name_the_same {
-			error_expected("build_project_name", i, test_case.tags.build_project_name, tags.build_project_name)
-		}
+		testing.expectf(t, build_project_name_the_same,
+			"[%d] file_tags.build_project_name expected:\n%#v, got:\n%#v",
+			i, test_case.tags.build_project_name, tags.build_project_name)
 
-		if !slice.equal(test_case.tags.build, tags.build) {
-			error_expected("build", i, test_case.tags.build, tags.build,)
-		}
+		testing.expectf(t, slice.equal(test_case.tags.build, tags.build),
+			"[%d] file_tags.build expected:\n%#v, got:\n%#v",
+			i, test_case.tags.build, tags.build)
 
-		if test_case.tags.private != tags.private {
-			error_expected("private", i, test_case.tags.private, tags.private)
-		}
+		testing.expectf(t, test_case.tags.private == tags.private,
+			"[%d] file_tags.private expected:\n%v, got:\n%v",
+			i, test_case.tags.private, tags.private)
 
-		if test_case.tags.ignore != tags.ignore {
-			error_expected("ignore", i, test_case.tags.ignore, tags.ignore)
-		}
+		testing.expectf(t, test_case.tags.ignore == tags.ignore,
+			"[%d] file_tags.ignore expected:\n%v, got:\n%v",
+			i, test_case.tags.ignore, tags.ignore)
 
-		if test_case.tags.lazy != tags.lazy {
-			error_expected("lazy", i, test_case.tags.lazy, tags.lazy)
-		}
+		testing.expectf(t, test_case.tags.lazy == tags.lazy,
+			"[%d] file_tags.lazy expected:\n%v, got:\n%v",
+			i, test_case.tags.lazy, tags.lazy)
 
-		if test_case.tags.no_instrumentation != tags.no_instrumentation {
-			error_expected("no_instrumentation", i, test_case.tags.no_instrumentation, tags.no_instrumentation)
+		testing.expectf(t, test_case.tags.no_instrumentation == tags.no_instrumentation,
+			"[%d] file_tags.no_instrumentation expected:\n%v, got:\n%v",
+			i, test_case.tags.no_instrumentation, tags.no_instrumentation)
+
+		for target in test_case.matching_targets {
+			matches := parser.match_build_tags(test_case.tags, target.target)
+			testing.expectf(t, matches == target.result,
+				"[%d] Expected parser.match_build_tags(%#v) == %v, got %v",
+				i, target.target, target.result, matches)
 		}
 	}
 }

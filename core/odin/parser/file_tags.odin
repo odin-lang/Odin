@@ -205,3 +205,35 @@ parse_file_tags :: proc(file: ast.File, allocator := context.allocator) -> (tags
 
 	return
 }
+
+Build_Target :: struct {
+	os:           runtime.Odin_OS_Type,
+	arch:         runtime.Odin_Arch_Type,
+	project_name: string,
+}
+
+@require_results
+match_build_tags :: proc(file_tags: File_Tags, target: Build_Target) -> bool {
+
+	project_name_correct := len(target.project_name) == 0 || len(file_tags.build_project_name) == 0
+
+	for group in file_tags.build_project_name {
+		group_correct := true
+		for name in group {
+			if name[0] == '!' {
+				group_correct &&= target.project_name != name[1:]
+			} else {
+				group_correct &&= target.project_name == name
+			}
+		}
+		project_name_correct ||= group_correct
+	}
+
+	os_and_arch_correct := len(file_tags.build) == 0
+
+	for kind in file_tags.build {
+		os_and_arch_correct ||= target.os in kind.os && target.arch in kind.arch
+	}
+
+	return !file_tags.ignore && project_name_correct && os_and_arch_correct
+}
