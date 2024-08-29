@@ -18,7 +18,7 @@ Build_Kind :: struct {
 }
 
 File_Tags :: struct {
-	build_project_name: []string,
+	build_project_name: [][]string,
 	build:              []Build_Kind,
 	private:            Private_Flag,
 	ignore:             bool,
@@ -48,7 +48,9 @@ get_build_arch_from_string :: proc(str: string) -> runtime.Odin_Arch_Type {
 }
 
 @require_results
-parse_file_tags :: proc(file: ast.File) -> (tags: File_Tags) {
+parse_file_tags :: proc(file: ast.File, allocator := context.allocator) -> (tags: File_Tags) {
+	context.allocator = allocator
+
 	if file.docs == nil {
 		return
 	}
@@ -87,7 +89,10 @@ parse_file_tags :: proc(file: ast.File) -> (tags: File_Tags) {
 	build_kinds: [dynamic]Build_Kind
 	defer shrink(&build_kinds)
 
-	build_project_names: [dynamic]string
+	build_project_name_strings: [dynamic]string
+	defer shrink(&build_project_name_strings)
+
+	build_project_names: [dynamic][]string
 	defer shrink(&build_project_names)
 
 	for comment in file.docs.list {
@@ -116,23 +121,32 @@ parse_file_tags :: proc(file: ast.File) -> (tags: File_Tags) {
 					tags.private = .Package
 				}
 			case "build-project-name":
-				values_loop: for {
-					skip_whitespace(text, &i)
+				groups_loop: for {
+					index_start := len(build_project_name_strings)
 
-					name_start := i
+					defer append(&build_project_names, build_project_name_strings[index_start:])
 
-					switch next_char(text, &i) {
-					case 0, '\n':
-						i -= 1
-						break values_loop
-					case '!':
-						// include ! in the name
-					case:
-						i -= 1
+					for {
+						skip_whitespace(text, &i)
+						name_start := i
+	
+						switch next_char(text, &i) {
+						case 0, '\n':
+							i -= 1
+							break groups_loop
+						case ',':
+							continue groups_loop
+						case '!':
+							// include ! in the name
+						case:
+							i -= 1
+						}
+	
+						scan_value(text, &i)
+						append(&build_project_name_strings, text[name_start:i])
 					}
 
-					scan_value(text, &i)
-					append(&build_project_names, text[name_start:i])
+					append(&build_project_names, build_project_name_strings[index_start:])
 				}
 			case "build":
 				kinds_loop: for {

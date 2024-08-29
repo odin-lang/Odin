@@ -3,6 +3,7 @@ package test_core_odin_parser
 import "base:runtime"
 import "core:testing"
 import "core:slice"
+import "core:log"
 import "core:odin/ast"
 import "core:odin/parser"
 
@@ -60,12 +61,12 @@ package main
 			},
 		}, {// [4]
 			src = `
-//+build-project-name foo !bar
+//+build-project-name foo !bar, baz
 //+build js wasm32, js wasm64p32
 package main
 			`,
 			tags = {
-				build_project_name = {"foo", "!bar"},
+				build_project_name = {{"foo", "!bar"}, {"baz"}},
 				build = {
 					{
 						os = {.JS},
@@ -79,11 +80,9 @@ package main
 		},
 	}
 
-	expect :: proc(t: ^testing.T, ok: bool, name: string, i: int, expected, actual: $T, loc := #caller_location) {
-		testing.expectf(t, ok,
-			"[%d] expected %s:\n\e[0;32m%#v\e[0m, actual:\n\e[0;31m%#v\e[0m",
-			i, name, expected, actual, loc=loc
-		)
+	error_expected :: proc(name: string, i: int, expected, actual: $T, loc := #caller_location) {
+		log.errorf("[%d] expected %s:\n\e[0;32m%#v\e[0m, actual:\n\e[0;31m%#v\e[0m",
+		           i, name, expected, actual, location=loc)
 	}
 
 	for test_case, i in test_cases {
@@ -100,34 +99,36 @@ package main
 
 		tags := parser.parse_file_tags(file)
 
-		expect(t,
-			slice.equal(test_case.tags.build_project_name, tags.build_project_name),
-			"build_project_name", i, test_case.tags.build_project_name, tags.build_project_name,
-		)
 
-		expect(t,
-			slice.equal(test_case.tags.build, tags.build),
-			"build", i, test_case.tags.build, tags.build,
-		)
+		build_project_name_the_same: bool
+		check: if len(test_case.tags.build_project_name) == len(tags.build_project_name) {
+			for tag, i in test_case.tags.build_project_name {
+				slice.equal(tag, tags.build_project_name[i]) or_break check
+			}
+			build_project_name_the_same = true
+		}
+		if !build_project_name_the_same {
+			error_expected("build_project_name", i, test_case.tags.build_project_name, tags.build_project_name)
+		}
 
-		expect(t,
-			test_case.tags.private == tags.private,
-			"private", i, test_case.tags.private, tags.private,
-		)
+		if !slice.equal(test_case.tags.build, tags.build) {
+			error_expected("build", i, test_case.tags.build, tags.build,)
+		}
 
-		expect(t,
-			test_case.tags.ignore == tags.ignore,
-			"ignore", i, test_case.tags.ignore, tags.ignore,
-		)
+		if test_case.tags.private != tags.private {
+			error_expected("private", i, test_case.tags.private, tags.private)
+		}
 
-		expect(t,
-			test_case.tags.lazy == tags.lazy,
-			"lazy", i, test_case.tags.lazy, tags.lazy,
-		)
+		if test_case.tags.ignore != tags.ignore {
+			error_expected("ignore", i, test_case.tags.ignore, tags.ignore)
+		}
 
-		expect(t,
-			test_case.tags.no_instrumentation == tags.no_instrumentation,
-			"no_instrumentation", i, test_case.tags.no_instrumentation, tags.no_instrumentation,
-		)
+		if test_case.tags.lazy != tags.lazy {
+			error_expected("lazy", i, test_case.tags.lazy, tags.lazy)
+		}
+
+		if test_case.tags.no_instrumentation != tags.no_instrumentation {
+			error_expected("no_instrumentation", i, test_case.tags.no_instrumentation, tags.no_instrumentation)
+		}
 	}
 }
