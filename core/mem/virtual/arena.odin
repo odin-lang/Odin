@@ -49,6 +49,10 @@ arena_init_growing :: proc(arena: ^Arena, reserved: uint = DEFAULT_ARENA_GROWING
 	arena.curr_block     = memory_block_alloc(0, reserved, {}) or_return
 	arena.total_used     = 0
 	arena.total_reserved = arena.curr_block.reserved
+
+	if arena.minimum_block_size == 0 {
+		arena.minimum_block_size = reserved
+	}
 	return
 }
 
