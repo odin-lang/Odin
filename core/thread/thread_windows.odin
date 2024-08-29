@@ -3,6 +3,7 @@
 package thread
 
 import "base:intrinsics"
+import "base:runtime"
 import "core:sync"
 import win32 "core:sys/windows"
 
@@ -39,7 +40,10 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 			// Here on Windows, the thread is created in a suspended state, and so we can select the context anywhere before the call
 			// to t.procedure().
 			context = _select_context_for_thread(init_context)
-			defer _maybe_destroy_default_temp_allocator(init_context)
+			defer {
+				_maybe_destroy_default_temp_allocator(init_context)
+				runtime.run_thread_local_cleaners()
+			}
 
 			t.procedure(t)
 		}

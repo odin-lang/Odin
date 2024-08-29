@@ -429,7 +429,7 @@ map_with_integer_keys :: proc(t: ^testing.T) {
 	defer delete_map(my_map2)
 
 	unmarshal_err := json.unmarshal(marshaled_data, &my_map2)
-	defer for key, item in my_map2 {
+	defer for _, item in my_map2 {
 		runtime.delete_string(item)
 	}
 	testing.expectf(t, unmarshal_err == nil, "Expected `json.unmarshal` to return nil, got %v", unmarshal_err)
