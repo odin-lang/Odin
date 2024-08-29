@@ -3,7 +3,6 @@ package test_core_odin_parser
 import "base:runtime"
 import "core:testing"
 import "core:slice"
-import "core:log"
 import "core:odin/ast"
 import "core:odin/parser"
 
@@ -100,14 +99,14 @@ package main
 		},
 	}
 
-	for test_case, i in test_cases {
+	for test_case, test_case_i in test_cases {
 
 		file := ast.File{
 			fullpath = "test.odin",
 			src = test_case.src,
 		}
 
-		p := parser.default_parser()
+		p  := parser.default_parser()
 		ok := parser.parse_file(&p, &file)
 
 		testing.expect(t, ok, "bad parse")
@@ -124,33 +123,33 @@ package main
 		}
 		testing.expectf(t, build_project_name_the_same,
 			"[%d] file_tags.build_project_name expected:\n%#v, got:\n%#v",
-			i, test_case.tags.build_project_name, tags.build_project_name)
+			test_case_i, test_case.tags.build_project_name, tags.build_project_name)
 
 		testing.expectf(t, slice.equal(test_case.tags.build, tags.build),
 			"[%d] file_tags.build expected:\n%#v, got:\n%#v",
-			i, test_case.tags.build, tags.build)
+			test_case_i, test_case.tags.build, tags.build)
 
 		testing.expectf(t, test_case.tags.private == tags.private,
 			"[%d] file_tags.private expected:\n%v, got:\n%v",
-			i, test_case.tags.private, tags.private)
+			test_case_i, test_case.tags.private, tags.private)
 
 		testing.expectf(t, test_case.tags.ignore == tags.ignore,
 			"[%d] file_tags.ignore expected:\n%v, got:\n%v",
-			i, test_case.tags.ignore, tags.ignore)
+			test_case_i, test_case.tags.ignore, tags.ignore)
 
 		testing.expectf(t, test_case.tags.lazy == tags.lazy,
 			"[%d] file_tags.lazy expected:\n%v, got:\n%v",
-			i, test_case.tags.lazy, tags.lazy)
+			test_case_i, test_case.tags.lazy, tags.lazy)
 
 		testing.expectf(t, test_case.tags.no_instrumentation == tags.no_instrumentation,
 			"[%d] file_tags.no_instrumentation expected:\n%v, got:\n%v",
-			i, test_case.tags.no_instrumentation, tags.no_instrumentation)
+			test_case_i, test_case.tags.no_instrumentation, tags.no_instrumentation)
 
 		for target in test_case.matching_targets {
 			matches := parser.match_build_tags(test_case.tags, target.target)
 			testing.expectf(t, matches == target.result,
 				"[%d] Expected parser.match_build_tags(%#v) == %v, got %v",
-				i, target.target, target.result, matches)
+				test_case_i, target.target, target.result, matches)
 		}
 	}
 }
