@@ -5513,8 +5513,6 @@ gb_internal void check_import_entities(Checker *c) {
 		for_array(i, pkg->files) {
 			AstFile *f = pkg->files[i];
 			reset_checker_context(&ctx, f, &untyped);
-			ctx.collect_delayed_decls = false;
-
 			correct_type_aliases_in_scope(&ctx, pkg->scope);
 		}
 
@@ -5522,6 +5520,7 @@ gb_internal void check_import_entities(Checker *c) {
 			AstFile *f = pkg->files[i];
 			reset_checker_context(&ctx, f, &untyped);
 
+			ctx.collect_delayed_decls = true;
 			for (Ast *decl : f->delayed_decls_queues[AstDelayQueue_ForeignBlock]) {
 				check_add_foreign_block_decl(&ctx, decl);
 			}
