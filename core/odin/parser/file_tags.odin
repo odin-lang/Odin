@@ -2,6 +2,7 @@ package odin_parser
 
 import "base:runtime"
 import "core:strings"
+import "core:reflect"
 
 import "../ast"
 
@@ -11,15 +12,9 @@ Private_Flag :: enum {
 	File,
 }
 
-Odin_OS_Type   :: runtime.Odin_OS_Type
-Odin_Arch_Type :: runtime.Odin_Arch_Type
-
-Odin_OS_Types   :: bit_set[Odin_OS_Type]
-Odin_Arch_Types :: bit_set[Odin_Arch_Type]
-
 Build_Kind :: struct {
-	os:   Odin_OS_Types,
-	arch: Odin_Arch_Types,
+	os:   runtime.Odin_OS_Types,
+	arch: runtime.Odin_Arch_Types,
 }
 
 File_Tags :: struct {
@@ -31,69 +26,22 @@ File_Tags :: struct {
 	no_instrumentation: bool,
 }
 
-ALL_ODIN_OS_TYPES :: Odin_OS_Types{
-	.Windows,
-	.Darwin,
-	.Linux,
-	.Essence,
-	.FreeBSD,
-	.OpenBSD,
-	.NetBSD,
-	.Haiku,
-	.WASI,
-	.JS,
-	.Orca,
-	.Freestanding,
-}
-ALL_ODIN_ARCH_TYPES :: Odin_Arch_Types{
-	.amd64,
-	.i386,
-	.arm32,
-	.arm64,
-	.wasm32,
-	.wasm64p32,
-}
-
-ODIN_OS_NAMES :: [Odin_OS_Type]string{
-	.Unknown      = "",
-	.Windows      = "windows",
-	.Darwin       = "darwin",
-	.Linux        = "linux",
-	.Essence      = "essence",
-	.FreeBSD      = "freebsd",
-	.OpenBSD      = "openbsd",
-	.NetBSD       = "netbsd",
-	.Haiku        = "haiku",
-	.WASI         = "wasi",
-	.JS           = "js",
-	.Orca         = "orca",
-	.Freestanding = "freestanding",
-}
-
-ODIN_ARCH_NAMES :: [Odin_Arch_Type]string{
-	.Unknown   = "",
-	.amd64     = "amd64",
-	.i386      = "i386",
-	.arm32     = "arm32",
-	.arm64     = "arm64",
-	.wasm32    = "wasm32",
-	.wasm64p32 = "wasm64p32",
-}
-
 @require_results
-get_build_os_from_string :: proc(str: string) -> Odin_OS_Type {
-	for os_name, os in ODIN_OS_NAMES {
-		if strings.equal_fold(os_name, str) {
-			return os
+get_build_os_from_string :: proc(str: string) -> runtime.Odin_OS_Type {
+	fields := reflect.enum_fields_zipped(runtime.Odin_OS_Type)
+	for os in fields {
+		if strings.equal_fold(os.name, str) {
+			return runtime.Odin_OS_Type(os.value)
 		}
 	}
 	return .Unknown
 }
 @require_results
-get_build_arch_from_string :: proc(str: string) -> Odin_Arch_Type {
-	for arch_name, arch in ODIN_ARCH_NAMES {
-		if strings.equal_fold(arch_name, str) {
-			return arch
+get_build_arch_from_string :: proc(str: string) -> runtime.Odin_Arch_Type {
+	fields := reflect.enum_fields_zipped(runtime.Odin_Arch_Type)
+	for os in fields {
+		if strings.equal_fold(os.name, str) {
+			return runtime.Odin_Arch_Type(os.value)
 		}
 	}
 	return .Unknown
@@ -188,15 +136,15 @@ parse_file_tags :: proc(file: ast.File) -> (tags: File_Tags) {
 				}
 			case "build":
 				kinds_loop: for {
-					os_positive: Odin_OS_Types
-					os_negative: Odin_OS_Types
+					os_positive: runtime.Odin_OS_Types
+					os_negative: runtime.Odin_OS_Types
 
-					arch_positive: Odin_Arch_Types
-					arch_negative: Odin_Arch_Types
+					arch_positive: runtime.Odin_Arch_Types
+					arch_negative: runtime.Odin_Arch_Types
 
 					defer append(&build_kinds, Build_Kind{
-						os   = (os_positive   == {} ? ALL_ODIN_OS_TYPES   : os_positive)  -os_negative,
-						arch = (arch_positive == {} ? ALL_ODIN_ARCH_TYPES : arch_positive)-arch_negative,
+						os   = (os_positive   == {} ? runtime.ALL_ODIN_OS_TYPES   : os_positive)  -os_negative,
+						arch = (arch_positive == {} ? runtime.ALL_ODIN_ARCH_TYPES : arch_positive)-arch_negative,
 					})
 
 					for {

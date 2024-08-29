@@ -33,14 +33,14 @@ package main
 			`,
 			tags = {
 				build = {
-					{os = {.Linux},   arch = parser.ALL_ODIN_ARCH_TYPES},
-					{os = {.Darwin},  arch = parser.ALL_ODIN_ARCH_TYPES},
-					{os = {.FreeBSD}, arch = parser.ALL_ODIN_ARCH_TYPES},
-					{os = {.OpenBSD}, arch = parser.ALL_ODIN_ARCH_TYPES},
-					{os = {.NetBSD},  arch = parser.ALL_ODIN_ARCH_TYPES},
-					{os = {.Haiku},   arch = parser.ALL_ODIN_ARCH_TYPES},
-					{os = parser.ALL_ODIN_OS_TYPES, arch = {.arm32}},
-					{os = parser.ALL_ODIN_OS_TYPES, arch = {.arm64}},
+					{os = {.Linux},   arch = runtime.ALL_ODIN_ARCH_TYPES},
+					{os = {.Darwin},  arch = runtime.ALL_ODIN_ARCH_TYPES},
+					{os = {.FreeBSD}, arch = runtime.ALL_ODIN_ARCH_TYPES},
+					{os = {.OpenBSD}, arch = runtime.ALL_ODIN_ARCH_TYPES},
+					{os = {.NetBSD},  arch = runtime.ALL_ODIN_ARCH_TYPES},
+					{os = {.Haiku},   arch = runtime.ALL_ODIN_ARCH_TYPES},
+					{os = runtime.ALL_ODIN_OS_TYPES, arch = {.arm32}},
+					{os = runtime.ALL_ODIN_OS_TYPES, arch = {.arm64}},
 				},
 			},
 		}, {// [3]
