@@ -17,6 +17,7 @@ kern_return_t  :: distinct u64
 thread_act_t   :: distinct u64
 thread_state_t :: distinct ^u32
 thread_list_t  :: [^]thread_act_t
+vm_region_recurse_info_t :: distinct ^i32
 
 MACH_PORT_NULL :: 0
 MACH_PORT_DEAD :: ~mach_port_t(0)
@@ -141,6 +142,36 @@ arm_thread_state64_t :: struct {
 }
 ARM_THREAD_STATE64_COUNT :: size_of(arm_thread_state64_t) / size_of(u32)
 
+THREAD_IDENTIFIER_INFO :: 4
+thread_identifier_info :: struct {
+	thread_id: u64,
+	thread_handler: u64,
+	dispatch_qaddr: u64,
+}
+THREAD_IDENTIFIER_INFO_COUNT :: size_of(thread_identifier_info) / size_of(u32)
+
+vm_region_submap_info_64 :: struct {
+	protection:               u32,
+	max_protection:           u32,
+	inheritance:              u32,
+	offset:                   u64,
+	user_tag:                 u32,
+	pages_residept:           u32,
+	pages_shared_now_private: u32,
+	pages_swapped_out:        u32,
+	pages_dirtied:            u32,
+	ref_count:                u32,
+	shadow_depth:             u16,
+	external_pager:           u8,
+	share_mode:               u8,
+	is_submap:                b32,
+	behavior:                 i32,
+	object_id:                u32,
+	user_wired_count:         u16,
+	pages_reusable:           u32,
+}
+VM_REGION_SUBMAP_INFO_COUNT_64 :: size_of(vm_region_submap_info_64) / size_of(u32)
+
 @(default_calling_convention="c")
 foreign mach {
 	mach_task_self     :: proc() -> task_t ---
@@ -149,6 +180,7 @@ foreign mach {
 	mach_vm_allocate   :: proc(target_task: task_t, adddress: u64, size: u64, flags: i32) -> kern_return_t ---
 	mach_vm_deallocate :: proc(target_task: task_t, adddress: ^u64, size: u64) -> kern_return_t ---
 	mach_vm_remap      :: proc(target_task: task_t, page: rawptr, size: u64, mask: u64, flags: i32, src_task: task_t, src_address: u64, copy: b32, cur_protection: ^i32, max_protection: ^i32, inheritance: i32) -> kern_return_t ---
+	mach_vm_region_recurse :: proc(target_task: task_t, address: ^u64, size: ^u64, depth: ^u32, info: vm_region_recurse_info_t, count: ^u32) -> kern_return_t ---
 
 	mach_port_allocate   :: proc(task: task_t, right: u32, name: rawptr) -> kern_return_t ---
 	mach_port_deallocate :: proc(task: task_t, name: u32) -> kern_return_t ---
@@ -158,7 +190,9 @@ foreign mach {
 	task_suspend   :: proc(task: task_t) -> kern_return_t ---
 	task_resume    :: proc(task: task_t) -> kern_return_t ---
 	task_threads   :: proc(task: task_t, thread_list: ^thread_list_t, list_count: ^u32) -> kern_return_t ---
+
 	thread_get_state :: proc(thread: thread_act_t, flavor: i32, thread_state: thread_state_t, old_state_count: ^u32) -> kern_return_t ---
+	thread_info :: proc(thread: thread_act_t, flavor: u32, thread_info: ^thread_identifier_info, info_count: ^u32) -> kern_return_t ---
 
 	bootstrap_register2 :: proc(bp: mach_port_t, service_name: name_t, sp: mach_port_t, flags: u64) -> kern_return_t ---
 	bootstrap_look_up :: proc(bp: mach_port_t, service_name: name_t, sp: ^mach_port_t) -> kern_return_t ---
