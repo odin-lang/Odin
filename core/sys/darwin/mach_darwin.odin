@@ -55,8 +55,6 @@ X86_THREAD_STATE32 :: 1
 X86_THREAD_STATE64 :: 4
 ARM_THREAD_STATE64 :: 6
 
-TASK_DYLD_INFO :: 17
-
 mach_msg_option_t :: distinct i32
 name_t :: distinct cstring
 
