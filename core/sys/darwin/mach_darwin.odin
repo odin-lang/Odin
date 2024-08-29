@@ -18,6 +18,9 @@ thread_act_t   :: distinct u64
 thread_state_t :: distinct ^u32
 thread_list_t  :: [^]thread_act_t
 
+MACH_PORT_NULL :: 0
+MACH_PORT_DEAD :: ~mach_port_t(0)
+
 MACH_MSG_PORT_DESCRIPTOR :: 0
 
 MACH_SEND_MSG     :: 0x00000001
@@ -44,10 +47,12 @@ VM_INHERIT_DONATE_COPY  :: 3
 
 TASK_BOOTSTRAP_PORT :: 4
 
+BOOTSTRAP_NAME_IN_USE :: 1101
+
 X86_THREAD_STATE32 :: 1
 X86_THREAD_STATE64 :: 4
-X86_THREAD_STATE32_COUNT :: size_of(x86_thread_state32_t) / size_of(u32)
-X86_THREAD_STATE64_COUNT :: size_of(x86_thread_state64_t) / size_of(u32)
+ARM_THREAD_STATE64 :: 6
+
 
 mach_msg_option_t :: distinct i32
 name_t :: distinct cstring
@@ -98,6 +103,7 @@ x86_thread_state32_t :: struct {
 	fs:  u32,
 	gs:  u32,
 }
+X86_THREAD_STATE32_COUNT :: size_of(x86_thread_state32_t) / size_of(u32)
 
 x86_thread_state64_t :: struct {
 	rax: u64,
@@ -122,6 +128,18 @@ x86_thread_state64_t :: struct {
 	fs: u64,
 	gs: u64,
 }
+X86_THREAD_STATE64_COUNT :: size_of(x86_thread_state64_t) / size_of(u32)
+
+arm_thread_state64_t :: struct {
+	x: [29]u64,
+	fp: u64,
+	lr: u64,
+	sp: u64,
+	pc: u64,
+	cpsr: u32,
+	pad:  u32,
+}
+ARM_THREAD_STATE64_COUNT :: size_of(arm_thread_state64_t) / size_of(u32)
 
 @(default_calling_convention="c")
 foreign mach {
