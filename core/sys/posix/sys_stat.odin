@@ -427,9 +427,6 @@ when ODIN_OS == .Darwin {
 	UTIME_NOW  :: -2
 	UTIME_OMIT :: -1
 
-} else when ODIN_OS == .Linux {
-	ino_t   :: distinct u64
-	ino_t32 :: distinct u32
 } else {
 	#panic("posix is unimplemented for the current target")
 }

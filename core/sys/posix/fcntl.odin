@@ -410,9 +410,6 @@ when ODIN_OS == .Darwin {
 		l_whence: c.short,   /* [PSX] flag (Whence) of starting offset */
 	}
 
-} else when ODIN_OS == .Linux {
-	off_t :: distinct c.uint64_t
-	off_t32 :: distinct c.uint32_t
 } else {
 	#panic("posix is unimplemented for the current target")
 }
