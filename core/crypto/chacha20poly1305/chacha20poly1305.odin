@@ -96,6 +96,8 @@ init_xchacha :: proc(ctx: ^Context, key: []byte, impl := chacha20.DEFAULT_IMPLEM
 //
 // dst and plaintext MUST alias exactly or not at all.
 seal :: proc(ctx: ^Context, dst, tag, iv, aad, plaintext: []byte) {
+	assert(ctx._is_initialized)
+
 	ciphertext := dst
 	_validate_common_slice_sizes(tag, iv, aad, plaintext, ctx._is_xchacha)
 	if len(ciphertext) != len(plaintext) {
@@ -151,6 +153,8 @@ seal :: proc(ctx: ^Context, dst, tag, iv, aad, plaintext: []byte) {
 // dst and plaintext MUST alias exactly or not at all.
 @(require_results)
 open :: proc(ctx: ^Context, dst, iv, aad, ciphertext, tag: []byte) -> bool {
+	assert(ctx._is_initialized)
+
 	plaintext := dst
 	_validate_common_slice_sizes(tag, iv, aad, ciphertext, ctx._is_xchacha)
 	if len(ciphertext) != len(plaintext) {
