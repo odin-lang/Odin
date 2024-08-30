@@ -7,7 +7,7 @@ Scalar :: field.Montgomery_Domain_Field_Element
 
 // WARNING: This is non-canonical and only to be used when checking if
 // a group element is on the prime-order subgroup.
-@(private)
+@(private, rodata)
 SC_ELL := field.Non_Montgomery_Domain_Field_Element {
 	field.ELL[0],
 	field.ELL[1],

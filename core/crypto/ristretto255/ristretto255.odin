@@ -16,7 +16,7 @@ ELEMENT_SIZE :: 32
 // group element.
 WIDE_ELEMENT_SIZE :: 64
 
-@(private)
+@(private, rodata)
 FE_NEG_ONE := field.Tight_Field_Element {
 	2251799813685228,
 	2251799813685247,
@@ -24,7 +24,7 @@ FE_NEG_ONE := field.Tight_Field_Element {
 	2251799813685247,
 	2251799813685247,
 }
-@(private)
+@(private, rodata)
 FE_INVSQRT_A_MINUS_D := field.Tight_Field_Element {
 	278908739862762,
 	821645201101625,
@@ -32,7 +32,7 @@ FE_INVSQRT_A_MINUS_D := field.Tight_Field_Element {
 	1777959178193151,
 	2118520810568447,
 }
-@(private)
+@(private, rodata)
 FE_ONE_MINUS_D_SQ := field.Tight_Field_Element {
 	1136626929484150,
 	1998550399581263,
@@ -40,7 +40,7 @@ FE_ONE_MINUS_D_SQ := field.Tight_Field_Element {
 	118527312129759,
 	45110755273534,
 }
-@(private)
+@(private, rodata)
 FE_D_MINUS_ONE_SQUARED := field.Tight_Field_Element {
 	1507062230895904,
 	1572317787530805,
@@ -48,7 +48,7 @@ FE_D_MINUS_ONE_SQUARED := field.Tight_Field_Element {
 	317374165784489,
 	1572899562415810,
 }
-@(private)
+@(private, rodata)
 FE_SQRT_AD_MINUS_ONE := field.Tight_Field_Element {
 	2241493124984347,
 	425987919032274,
