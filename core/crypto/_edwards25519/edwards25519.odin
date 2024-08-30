@@ -31,6 +31,7 @@ import "core:mem"
 // - The group element decoding routine takes the opinionated stance of
 //   rejecting non-canonical encodings.
 
+@(rodata)
 FE_D := field.Tight_Field_Element {
 	929955233495203,
 	466365720129213,
@@ -38,7 +39,7 @@ FE_D := field.Tight_Field_Element {
 	2033849074728123,
 	1442794654840575,
 }
-@(private)
+@(private, rodata)
 FE_A := field.Tight_Field_Element {
 	2251799813685228,
 	2251799813685247,
@@ -46,7 +47,7 @@ FE_A := field.Tight_Field_Element {
 	2251799813685247,
 	2251799813685247,
 }
-@(private)
+@(private, rodata)
 FE_D2 := field.Tight_Field_Element {
 	1859910466990425,
 	932731440258426,
@@ -54,7 +55,7 @@ FE_D2 := field.Tight_Field_Element {
 	1815898335770999,
 	633789495995903,
 }
-@(private)
+@(private, rodata)
 GE_BASEPOINT := Group_Element {
 	field.Tight_Field_Element {
 		1738742601995546,
@@ -79,6 +80,7 @@ GE_BASEPOINT := Group_Element {
 		1821297809914039,
 	},
 }
+@(rodata)
 GE_IDENTITY := Group_Element {
 	field.Tight_Field_Element{0, 0, 0, 0, 0},
 	field.Tight_Field_Element{1, 0, 0, 0, 0},
