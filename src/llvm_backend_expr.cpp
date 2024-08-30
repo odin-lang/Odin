@@ -182,11 +182,12 @@ gb_internal lbValue lb_emit_unary_arith(lbProcedure *p, TokenKind op, lbValue x,
 	if (op == Token_Xor) {
 		lbValue cmp = {};
 		cmp.type = x.type;
-		cmp.value = LLVMBuildNot(p->builder, x.value, "");
 		if (is_type_bit_set(x.type)) {
 			ExactValue ev_mask = exact_bit_set_all_set_mask(x.type);
 			lbValue mask = lb_const_value(p->module, x.type, ev_mask);
-			cmp.value = LLVMBuildAnd(p->builder, cmp.value, mask.value, "");
+			cmp.value = LLVMBuildXor(p->builder, x.value, mask.value, "");
+		} else {
+			cmp.value = LLVMBuildNot(p->builder, x.value, "");
 		}
 		return lb_emit_conv(p, cmp, type);
 	}
