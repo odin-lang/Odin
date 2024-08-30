@@ -684,8 +684,14 @@ gb_internal void find_visual_studio_paths_from_env_vars(Find_Result *result) {
 			? str_lit("lib\\x64\\")
 			: str_lit("lib\\x86\\");
 
-		result->vs_exe_path     = mc_concat(vctid, exe);
-		result->vs_library_path = mc_concat(vctid, lib);
+		if (string_ends_with(vctid, str_lit("\\"))) {
+			result->vs_exe_path     = mc_concat(vctid, exe);
+			result->vs_library_path = mc_concat(vctid, lib);
+		} else {
+			result->vs_exe_path     = mc_concat(vctid, str_lit("\\"), exe);
+			result->vs_library_path = mc_concat(vctid, str_lit("\\"), lib);
+		}
+
 		vs_found = true;
 	}
 
