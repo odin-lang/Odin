@@ -210,11 +210,8 @@ orthogonalize :: proc "contextless" (q: ^[8]u64) {
 }
 
 @(require_results)
-interleave_in :: proc "contextless" (w: []u32) -> (q0, q1: u64) #no_bounds_check {
-	if len(w) < 4 {
-		panic_contextless("aes/ct64: invalid input size")
-	}
-	x0, x1, x2, x3 := u64(w[0]), u64(w[1]), u64(w[2]), u64(w[3])
+interleave_in :: proc "contextless" (w0, w1, w2, w3: u32) -> (q0, q1: u64) #no_bounds_check {
+	x0, x1, x2, x3 := u64(w0), u64(w1), u64(w2), u64(w3)
 	x0 |= (x0 << 16)
 	x1 |= (x1 << 16)
 	x2 |= (x2 << 16)
