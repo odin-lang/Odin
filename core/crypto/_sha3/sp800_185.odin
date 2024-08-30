@@ -52,7 +52,7 @@ rate_cshake :: #force_inline proc(sec_strength: int) -> int {
 //
 // Thus we support 0 <= x < 2^128.
 
-@(private)
+@(private, rodata)
 _PAD: [RATE_128]byte // Biggest possible value of w per spec.
 
 bytepad :: proc(ctx: ^Context, x_strings: [][]byte, w: int) {

@@ -112,5 +112,5 @@ _init_kmac :: proc(ctx: ^Context, key, s: []byte, sec_strength: int) {
 	_sha3.bytepad(ctx_, [][]byte{key}, _sha3.rate_cshake(sec_strength))
 }
 
-@(private)
+@(private, rodata)
 N_KMAC := []byte{'K', 'M', 'A', 'C'}

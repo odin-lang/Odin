@@ -270,7 +270,7 @@ reset :: proc(ctx: ^$T) {
     SHA2 implementation
 */
 
-@(private)
+@(private, rodata)
 sha256_k := [64]u32 {
 	0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5,
 	0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
@@ -290,7 +290,7 @@ sha256_k := [64]u32 {
 	0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2,
 }
 
-@(private)
+@(private, rodata)
 sha512_k := [80]u64 {
 	0x428a2f98d728ae22, 0x7137449123ef65cd,
 	0xb5c0fbcfec4d3b2f, 0xe9b5dba58189dbbc,

@@ -51,7 +51,7 @@ _validate_common_slice_sizes :: proc (tag, iv, aad, text: []byte, is_xchacha: bo
 	}
 }
 
-@(private)
+@(private, rodata)
 _PAD: [16]byte
 
 @(private)
