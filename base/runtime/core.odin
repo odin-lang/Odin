@@ -546,9 +546,22 @@ Odin_OS_Type :: type_of(ODIN_OS)
 		arm64,
 		wasm32,
 		wasm64p32,
+		riscv64,
 	}
 */
 Odin_Arch_Type :: type_of(ODIN_ARCH)
+
+Odin_Arch_Types :: bit_set[Odin_Arch_Type]
+
+ALL_ODIN_ARCH_TYPES :: Odin_Arch_Types{
+	.amd64,
+	.i386,
+	.arm32,
+	.arm64,
+	.wasm32,
+	.wasm64p32,
+	.riscv64,
+}
 
 /*
 	// Defined internally by the compiler
@@ -573,6 +586,22 @@ Odin_Build_Mode_Type :: type_of(ODIN_BUILD_MODE)
 */
 Odin_Endian_Type :: type_of(ODIN_ENDIAN)
 
+Odin_OS_Types :: bit_set[Odin_OS_Type]
+
+ALL_ODIN_OS_TYPES :: Odin_OS_Types{
+	.Windows,
+	.Darwin,
+	.Linux,
+	.Essence,
+	.FreeBSD,
+	.OpenBSD,
+	.NetBSD,
+	.Haiku,
+	.WASI,
+	.JS,
+	.Orca,
+	.Freestanding,
+}
 
 /*
 	// Defined internally by the compiler
