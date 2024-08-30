@@ -1699,3 +1699,26 @@ equal :: proc(a, b: any, including_indirect_array_recursion := false, recursion_
 	runtime.print_string("\n")
 	return true
 }
+
+Bit_Field :: struct {
+	name:   string,
+	type:   ^Type_Info,
+	size:   uintptr,
+	offset: uintptr,
+	tag:    Struct_Tag,
+}
+
+@(require_results)
+bit_fields_zipped :: proc(T: typeid) -> (fields: #soa[]Bit_Field) {
+	ti := runtime.type_info_base(type_info_of(T))
+	if s, ok := ti.variant.(runtime.Type_Info_Bit_Field); ok {
+		return soa_zip(
+			name   = s.names[:s.field_count],
+			type   = s.types[:s.field_count],
+			size   = s.bit_sizes[:s.field_count],
+			offset = s.bit_offsets[:s.field_count],
+			tag      = ([^]Struct_Tag)(s.tags)[:s.field_count],
+		)
+	}
+	return nil
+}
