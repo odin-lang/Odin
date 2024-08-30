@@ -1786,7 +1786,9 @@ gb_internal void add_entity_use(CheckerContext *c, Ast *identifier, Entity *enti
 	entity->flags |= EntityFlag_Used;
 	if (entity_has_deferred_procedure(entity)) {
 		Entity *deferred = entity->Procedure.deferred_procedure.entity;
-		add_entity_use(c, nullptr, deferred);
+		if (deferred != entity) {
+			add_entity_use(c, nullptr, deferred);
+		}
 	}
 	if (identifier == nullptr || identifier->kind != Ast_Ident) {
 		return;
@@ -6112,6 +6114,11 @@ gb_internal void check_deferred_procedures(Checker *c) {
 		case DeferredProcedure_in_by_ptr:     attribute = "deferred_in_by_ptr";     break;
 		case DeferredProcedure_out_by_ptr:    attribute = "deferred_out_by_ptr";    break;
 		case DeferredProcedure_in_out_by_ptr: attribute = "deferred_in_out_by_ptr"; break;
+		}
+
+		if (src == dst) {
+			error(src->token, "'%.*s' cannot be used as its own %s", LIT(dst->token.string), attribute);
+			continue;
 		}
 
 		if (is_type_polymorphic(src->type) || is_type_polymorphic(dst->type)) {
