@@ -1438,6 +1438,15 @@ parse_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 				stmt.state_flags += {.No_Bounds_Check}
 			}
 			return stmt
+		case "type_assert", "no_type_assert":
+			stmt := parse_stmt(p)
+			switch name {
+			case "type_assert":
+				stmt.state_flags += {.Type_Assert}
+			case "no_type_assert":
+				stmt.state_flags += {.No_Type_Assert}
+			}
+			return stmt
 		case "partial":
 			stmt := parse_stmt(p)
 			#partial switch s in stmt.derived_stmt {
