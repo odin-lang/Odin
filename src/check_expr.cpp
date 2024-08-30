@@ -2575,6 +2575,84 @@ gb_internal bool check_is_not_addressable(CheckerContext *c, Operand *o) {
 	return o->mode != Addressing_Variable && o->mode != Addressing_SoaVariable;
 }
 
+gb_internal ExactValue exact_bit_set_all_set_mask(Type *type) {
+	type = base_type(type);
+	GB_ASSERT(type->kind == Type_BitSet);
+
+	i64 lower = type->BitSet.lower;
+	i64 upper = type->BitSet.upper;
+	Type *elem = type->BitSet.elem;
+	Type *underlying = type->BitSet.underlying;
+	bool is_backed = underlying != nullptr;
+	gb_unused(is_backed);
+
+	BigInt b_lower = {};
+	BigInt b_upper = {};
+	big_int_from_i64(&b_lower, lower);
+	big_int_from_i64(&b_upper, upper);
+
+
+	BigInt one = {};
+	big_int_from_u64(&one, 1);
+
+	BigInt mask = {};
+
+	if (elem == nullptr) {
+		big_int_from_i64(&mask, -1);
+	} else if (is_type_enum(elem)) {
+		Type *e = base_type(elem);
+		GB_ASSERT(e->kind == Type_Enum);
+		gb_unused(e);
+
+		if ((big_int_cmp(&e->Enum.min_value->value_integer, &b_lower) == 0 || is_backed) &&
+		    big_int_cmp(&e->Enum.max_value->value_integer, &b_upper) == 0) {
+
+			i64 lower_base = is_backed ? gb_min(0, lower) : lower;
+			BigInt b_lower_base = {};
+			big_int_from_i64(&b_lower_base, lower_base);
+
+			for (Entity *f : e->Enum.fields) {
+				if (f->kind != Entity_Constant) {
+					continue;
+				}
+				if (f->Constant.value.kind != ExactValue_Integer) {
+					continue;
+				}
+
+				BigInt shift_amount = f->Constant.value.value_integer;
+				big_int_sub_eq(&shift_amount, &b_lower_base);
+
+
+				BigInt value = {};
+				big_int_shl(&value, &one, &shift_amount);
+
+				big_int_or(&mask, &mask, &value);
+			}
+
+		} else {
+			// TODO(bill): enum range based
+			big_int_from_i64(&mask, -1);
+		}
+	} else {
+		i64 lower_base = lower;
+		for (i64 x = lower; x <= upper; x++) {
+			BigInt shift_amount = {};
+			big_int_from_i64(&shift_amount, x - lower_base);
+
+			BigInt value = {};
+			big_int_shl(&value, &one, &shift_amount);
+
+			big_int_or(&mask, &mask, &value);
+		}
+	}
+
+
+	ExactValue res = {};
+	res.kind = ExactValue_Integer;
+	res.value_integer = mask;
+	return res;
+}
+
 gb_internal void check_unary_expr(CheckerContext *c, Operand *o, Token op, Ast *node) {
 	switch (op.kind) {
 	case Token_And: { // Pointer address
@@ -2714,6 +2792,10 @@ gb_internal void check_unary_expr(CheckerContext *c, Operand *o, Token op, Ast *
 		}
 
 		o->value = exact_unary_operator_value(op.kind, o->value, precision, is_unsigned);
+		if (op.kind == Token_Xor && is_type_bit_set(type)) {
+			ExactValue mask = exact_bit_set_all_set_mask(type);
+			o->value = exact_binary_operator_value(Token_And, o->value, mask);
+		}
 
 		if (is_type_typed(type)) {
 			if (node != nullptr) {
@@ -10085,7 +10167,9 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 					if (lower <= v && v <= upper) {
 						// okay
 					} else {
-						error(elem, "Bit field value out of bounds, %lld not in the range %lld .. %lld", v, lower, upper);
+						gbString s = expr_to_string(o->expr);
+						error(elem, "Bit field value out of bounds, %s (%lld) not in the range %lld .. %lld", s, v, lower, upper);
+						gb_string_free(s);
 						continue;
 					}
 				}

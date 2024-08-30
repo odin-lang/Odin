@@ -136,6 +136,11 @@ gb_internal lbValue lb_emit_unary_arith(lbProcedure *p, TokenKind op, lbValue x,
 			switch (op) {
 			case Token_Xor:
 				opv = LLVMBuildNot(p->builder, v, "");
+				if (is_type_bit_set(elem_type)) {
+					ExactValue ev_mask = exact_bit_set_all_set_mask(elem_type);
+					lbValue mask = lb_const_value(p->module, elem_type, ev_mask);
+					opv = LLVMBuildAnd(p->builder, opv, mask.value, "");
+				}
 				break;
 			case Token_Sub:
 				if (is_type_float(elem_type)) {
@@ -176,8 +181,13 @@ gb_internal lbValue lb_emit_unary_arith(lbProcedure *p, TokenKind op, lbValue x,
 
 	if (op == Token_Xor) {
 		lbValue cmp = {};
-		cmp.value = LLVMBuildNot(p->builder, x.value, "");
 		cmp.type = x.type;
+		cmp.value = LLVMBuildNot(p->builder, x.value, "");
+		if (is_type_bit_set(x.type)) {
+			ExactValue ev_mask = exact_bit_set_all_set_mask(x.type);
+			lbValue mask = lb_const_value(p->module, x.type, ev_mask);
+			cmp.value = LLVMBuildAnd(p->builder, cmp.value, mask.value, "");
+		}
 		return lb_emit_conv(p, cmp, type);
 	}
 
