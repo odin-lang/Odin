@@ -8,12 +8,11 @@ load_blockx1 :: proc "contextless" (q: ^[8]u64, src: []byte) {
 		panic_contextless("aes/ct64: invalid block size")
 	}
 
-	w: [4]u32 = ---
-	w[0] = endian.unchecked_get_u32le(src[0:])
-	w[1] = endian.unchecked_get_u32le(src[4:])
-	w[2] = endian.unchecked_get_u32le(src[8:])
-	w[3] = endian.unchecked_get_u32le(src[12:])
-	q[0], q[4] = interleave_in(w[:])
+	w0 := endian.unchecked_get_u32le(src[0:])
+	w1 := endian.unchecked_get_u32le(src[4:])
+	w2 := endian.unchecked_get_u32le(src[8:])
+	w3 := endian.unchecked_get_u32le(src[12:])
+	q[0], q[4] = interleave_in(w0, w1, w2, w3)
 	orthogonalize(q)
 }
 
@@ -35,17 +34,16 @@ load_blocks :: proc "contextless" (q: ^[8]u64, src: [][]byte) {
 		panic_contextless("aes/ct64: invalid block(s) size")
 	}
 
-	w: [4]u32 = ---
 	for s, i in src {
 		if len(s) != _aes.BLOCK_SIZE {
 			panic_contextless("aes/ct64: invalid block size")
 		}
 
-		w[0] = endian.unchecked_get_u32le(s[0:])
-		w[1] = endian.unchecked_get_u32le(s[4:])
-		w[2] = endian.unchecked_get_u32le(s[8:])
-		w[3] = endian.unchecked_get_u32le(s[12:])
-		q[i], q[i + 4] = interleave_in(w[:])
+		w0 := endian.unchecked_get_u32le(s[0:])
+		w1 := endian.unchecked_get_u32le(s[4:])
+		w2 := endian.unchecked_get_u32le(s[8:])
+		w3 := endian.unchecked_get_u32le(s[12:])
+		q[i], q[i + 4] = interleave_in(w0, w1, w2, w3)
 	}
 	orthogonalize(q)
 }

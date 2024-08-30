@@ -77,7 +77,7 @@ keysched :: proc(comp_skey: []u64, key: []byte) -> int {
 
 	q: [8]u64 = ---
 	for i, j := 0, 0; i < nkf; i, j = i + 4, j + 2 {
-		q[0], q[4] = interleave_in(skey[i:])
+		q[0], q[4] = interleave_in(skey[i], skey[i+1], skey[i+2], skey[i+3])
 		q[1] = q[0]
 		q[2] = q[0]
 		q[3] = q[0]
@@ -121,58 +121,4 @@ skey_expand :: proc "contextless" (skey, comp_skey: []u64, num_rounds: int) {
 		skey[v + 2] = (x2 << 4) - x2
 		skey[v + 3] = (x3 << 4) - x3
 	}
-}
-
-orthogonalize_roundkey :: proc "contextless" (qq: []u64, key: []byte) {
-	if len(qq) < 8 || len(key) != 16 {
-		panic_contextless("aes/ct64: invalid round key size")
-	}
-
-	skey: [4]u32 = ---
-	skey[0] = endian.unchecked_get_u32le(key[0:])
-	skey[1] = endian.unchecked_get_u32le(key[4:])
-	skey[2] = endian.unchecked_get_u32le(key[8:])
-	skey[3] = endian.unchecked_get_u32le(key[12:])
-
-	q: [8]u64 = ---
-	q[0], q[4] = interleave_in(skey[:])
-	q[1] = q[0]
-	q[2] = q[0]
-	q[3] = q[0]
-	q[5] = q[4]
-	q[6] = q[4]
-	q[7] = q[4]
-	orthogonalize(&q)
-
-	comp_skey: [2]u64 = ---
-	comp_skey[0] =
-		(q[0] & 0x1111111111111111) |
-		(q[1] & 0x2222222222222222) |
-		(q[2] & 0x4444444444444444) |
-		(q[3] & 0x8888888888888888)
-	comp_skey[1] =
-		(q[4] & 0x1111111111111111) |
-		(q[5] & 0x2222222222222222) |
-		(q[6] & 0x4444444444444444) |
-		(q[7] & 0x8888888888888888)
-
-	for x, u in comp_skey {
-		x0 := x
-		x1, x2, x3 := x0, x0, x0
-		x0 &= 0x1111111111111111
-		x1 &= 0x2222222222222222
-		x2 &= 0x4444444444444444
-		x3 &= 0x8888888888888888
-		x1 >>= 1
-		x2 >>= 2
-		x3 >>= 3
-		qq[u * 4 + 0] = (x0 << 4) - x0
-		qq[u * 4 + 1] = (x1 << 4) - x1
-		qq[u * 4 + 2] = (x2 << 4) - x2
-		qq[u * 4 + 3] = (x3 << 4) - x3
-	}
-
-	mem.zero_explicit(&skey, size_of(skey))
-	mem.zero_explicit(&q, size_of(q))
-	mem.zero_explicit(&comp_skey, size_of(comp_skey))
 }
