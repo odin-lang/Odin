@@ -203,11 +203,11 @@ when ODIN_OS == .Darwin {
 } else when ODIN_OS == .Linux {
 
 		dirent :: struct {
-			d_ino: u64,                  /* [PSX] file number of entry */
-			d_off: i64,                  /* directory offset of the next entry */
-			d_reclen: u16,            /* length of this record */
-			d_type: D_Type,                  /* file type  */
-			d_name: [256]c.char `fmt:"s,0"`, /* [PSX] entry name */
+			d_ino:    u64,                     /* [PSX] file number of entry */
+			d_off:    i64,                     /* directory offset of the next entry */
+			d_reclen: u16,                     /* length of this record */
+			d_type:   D_Type,                  /* file type  */
+			d_name:   [256]c.char `fmt:"s,0"`, /* [PSX] entry name */
 		}
 
 } else {
