@@ -180,6 +180,59 @@ task_dyld_info :: struct {
 }
 TASK_DYLD_INFO_COUNT :: size_of(task_dyld_info) / size_of(u32)
 
+dyld_image_info :: struct {
+	image_load_addr: u64,
+	image_file_path: cstring,
+	image_file_mod_date: u64,
+}
+
+dyld_uuid_info :: struct {
+	image_load_addr: u64,
+	image_uuid:   [16]u8,
+}
+
+dyld_all_image_infos :: struct {
+	version:                             u32,
+	info_array_count:                    u32,
+	info_array:             		  rawptr,
+	notification:                     rawptr,
+	process_detached_from_shared_region: b32,
+	libSystem_initialized:               b32,
+	dyld_image_load_addr:                u64,
+	jit_info:                         rawptr,
+	dyld_version:                    cstring,
+	error_message:                   cstring,
+	termination_flags:                   u64,
+	core_symbolication_shm_page:      rawptr,
+	system_order_flag:                   u64,
+	uuid_array_count:                    u64,
+	uuid_array:                       rawptr,
+	dyld_all_image_infos_addr:           u64,
+	initial_image_count:                 u64,
+	error_kind:                          u64,
+	error_client_of_dylib_path:      cstring,
+	error_target_dylib_path:         cstring,
+	error_symbol:                    cstring,
+	shared_cache_slide:                  u64,
+	shared_cache_uuid:                [16]u8,
+	shared_cache_base_addr:              u64,
+	info_array_change_timestamp:         u64,
+	dyld_path:                       cstring,
+	notify_ports:             [8]mach_port_t,
+	reserved:                         [7]u64,
+	shared_cache_fsid:                   u64,
+	shared_cache_fsobjid:                u64,
+	compact_dyld_image_info_addr:        u64,
+	compact_dyld_image_info_size:        u64,
+	platform:                            u32,
+	aot_info_count:                      u32,
+	aot_info_array:                   rawptr,
+	aot_info_array_change_timestamp:     u64,
+	aot_shared_cache_base_address:       u64,
+	aot_shared_cache_uuid:            [16]u8,
+}
+
+
 @(default_calling_convention="c")
 foreign mach {
 	mach_task_self     :: proc() -> task_t ---
@@ -189,6 +242,9 @@ foreign mach {
 	mach_vm_deallocate :: proc(target_task: task_t, adddress: ^u64, size: u64) -> kern_return_t ---
 	mach_vm_remap      :: proc(target_task: task_t, page: rawptr, size: u64, mask: u64, flags: i32, src_task: task_t, src_address: u64, copy: b32, cur_protection: ^i32, max_protection: ^i32, inheritance: i32) -> kern_return_t ---
 	mach_vm_region_recurse :: proc(target_task: task_t, address: ^u64, size: ^u64, depth: ^u32, info: vm_region_recurse_info_t, count: ^u32) -> kern_return_t ---
+	vm_page_size:  u64
+	vm_page_mask:  u64
+	vm_page_shift: i32
 
 	mach_port_allocate   :: proc(task: task_t, right: u32, name: rawptr) -> kern_return_t ---
 	mach_port_deallocate :: proc(task: task_t, name: u32) -> kern_return_t ---
@@ -214,4 +270,8 @@ foreign mach {
 	semaphore_signal_thread :: proc(semaphore: semaphore_t, thread: thread_act_t) -> kern_return_t ---
 	
 	semaphore_wait :: proc(semaphore: semaphore_t) -> kern_return_t ---
+}
+
+mach_vm_trunc_page :: proc(v: u64) -> u64 {
+	return v & ~vm_page_mask
 }
