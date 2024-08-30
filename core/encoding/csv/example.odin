@@ -13,13 +13,14 @@ iterate_csv_from_string :: proc(filename: string) {
 	r.reuse_record_buffer = true // Without it you have to each of the fields within it
 	defer csv.reader_destroy(&r)
 
-	if csv_data, ok := os.read_entire_file(filename); ok {
+	csv_data, ok := os.read_entire_file(filename)
+	if ok {
 		csv.reader_init_with_string(&r, string(csv_data))
-		defer delete(csv_data)
 	} else {
 		fmt.printfln("Unable to open file: %v", filename)
 		return
 	}
+	defer delete(csv_data)
 
 	for r, i, err in csv.iterator_next(&r) {
 		if err != nil { /* Do something with error */ }
@@ -62,13 +63,14 @@ read_csv_from_string :: proc(filename: string) {
 	r.reuse_record_buffer = true // Without it you have to each of the fields within it
 	defer csv.reader_destroy(&r)
 
-	if csv_data, ok := os.read_entire_file(filename); ok {
+	csv_data, ok := os.read_entire_file(filename)
+	if ok {
 		csv.reader_init_with_string(&r, string(csv_data))
-		defer delete(csv_data)
 	} else {
 		fmt.printfln("Unable to open file: %v", filename)
 		return
 	}
+	defer delete(csv_data)
 
 	records, err := csv.read_all(&r)
 	if err != nil { /* Do something with CSV parse error */ }
