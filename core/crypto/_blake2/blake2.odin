@@ -68,13 +68,13 @@ Blake2_Tree :: struct {
 	is_last_node:    bool,
 }
 
-@(private)
+@(private, rodata)
 BLAKE2S_IV := [8]u32 {
 	0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
 	0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19,
 }
 
-@(private)
+@(private, rodata)
 BLAKE2B_IV := [8]u64 {
 	0x6a09e667f3bcc908, 0xbb67ae8584caa73b,
 	0x3c6ef372fe94f82b, 0xa54ff53a5f1d36f1,

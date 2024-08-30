@@ -4,14 +4,14 @@ import "core:encoding/endian"
 import "core:math/bits"
 import "core:mem"
 
-@(private)
+@(private, rodata)
 _TWO_168 := Montgomery_Domain_Field_Element {
 	0x5b8ab432eac74798,
 	0x38afddd6de59d5d7,
 	0xa2c131b399411b7c,
 	0x6329a7ed9ce5a30,
 }
-@(private)
+@(private, rodata)
 _TWO_336 := Montgomery_Domain_Field_Element {
 	0xbd3d108e2b35ecc5,
 	0x5c3a3718bdf9c90b,
