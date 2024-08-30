@@ -21,6 +21,9 @@ _file_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, 
 	case .Flush:
 		os_err = flush(fd)
 	case .Read:
+		if len(p) == 0 {
+			return 0, nil
+		}
 		n_int, os_err = read(fd, p)
 		n = i64(n_int)
 		if n == 0 && os_err == nil {
@@ -28,18 +31,27 @@ _file_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, 
 		}
 
 	case .Read_At:
+		if len(p) == 0 {
+			return 0, nil
+		}
 		n_int, os_err = read_at(fd, p, offset)
 		n = i64(n_int)
 		if n == 0 && os_err == nil {
 			err = .EOF
 		}
 	case .Write:
+		if len(p) == 0 {
+			return 0, nil
+		}
 		n_int, os_err = write(fd, p)
 		n = i64(n_int)
 		if n == 0 && os_err == nil {
 			err = .EOF
 		}
 	case .Write_At:
+		if len(p) == 0 {
+			return 0, nil
+		}
 		n_int, os_err = write_at(fd, p, offset)
 		n = i64(n_int)
 		if n == 0 && os_err == nil {
@@ -57,6 +69,9 @@ _file_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, 
 
 	if err == nil && os_err != nil {
 		err = error_to_io_error(os_err)
+	}
+	if err != nil {
+		n = 0
 	}
 	return
 }

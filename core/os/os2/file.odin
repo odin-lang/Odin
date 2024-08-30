@@ -132,6 +132,12 @@ name :: proc(f: ^File) -> string {
 	return _name(f)
 }
 
+/*
+	Close a file and its stream.
+
+	Any further use of the file or its stream should be considered to be in the
+	same class of bugs as a use-after-free.
+*/
 close :: proc(f: ^File) -> Error {
 	if f != nil {
 		return io.close(f.stream)

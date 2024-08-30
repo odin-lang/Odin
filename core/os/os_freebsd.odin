@@ -6,6 +6,7 @@ foreign import libc "system:c"
 import "base:runtime"
 import "core:strings"
 import "core:c"
+import "core:sys/freebsd"
 
 Handle :: distinct i32
 File_Time :: distinct u64
@@ -446,8 +447,7 @@ close :: proc(fd: Handle) -> Error {
 }
 
 flush :: proc(fd: Handle) -> Error {
-	// do nothing
-	return nil
+	return cast(_Platform_Error)freebsd.fsync(cast(freebsd.Fd)fd)
 }
 
 // If you read or write more than `INT_MAX` bytes, FreeBSD returns `EINVAL`.
@@ -481,29 +481,45 @@ write :: proc(fd: Handle, data: []byte) -> (int, Error) {
 }
 
 read_at :: proc(fd: Handle, data: []byte, offset: i64) -> (n: int, err: Error) {
-	curr := seek(fd, offset, SEEK_CUR) or_return
-	n, err = read(fd, data)
-	_, err1 := seek(fd, curr, SEEK_SET)
-	if err1 != nil && err == nil {
-		err = err1
+	if len(data) == 0 {
+		return 0, nil
 	}
-	return
+
+	to_read := min(uint(len(data)), MAX_RW)
+
+	bytes_read, errno := freebsd.pread(cast(freebsd.Fd)fd, data[:to_read], cast(freebsd.off_t)offset)
+
+	return bytes_read, cast(_Platform_Error)errno
 }
 
 write_at :: proc(fd: Handle, data: []byte, offset: i64) -> (n: int, err: Error) {
-	curr := seek(fd, offset, SEEK_CUR) or_return
-	n, err = write(fd, data)
-	_, err1 := seek(fd, curr, SEEK_SET)
-	if err1 != nil && err == nil {
-		err = err1
+	if len(data) == 0 {
+		return 0, nil
 	}
-	return
+
+	to_write := min(uint(len(data)), MAX_RW)
+
+	bytes_written, errno := freebsd.pwrite(cast(freebsd.Fd)fd, data[:to_write], cast(freebsd.off_t)offset)
+
+	return bytes_written, cast(_Platform_Error)errno
 }
 
 seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Error) {
+	switch whence {
+	case SEEK_SET, SEEK_CUR, SEEK_END:
+		break
+	case:
+		return 0, .Invalid_Whence
+	}
 	res := _unix_seek(fd, offset, c.int(whence))
 	if res == -1 {
-		return -1, get_last_error()
+		errno := get_last_error()
+		switch errno {
+		case .EINVAL:
+			return 0, .Invalid_Offset
+		case:
+			return 0, errno
+		}
 	}
 	return res, nil
 }

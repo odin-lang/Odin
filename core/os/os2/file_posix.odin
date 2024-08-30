@@ -419,9 +419,22 @@ _file_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, 
 		#assert(int(posix.Whence.CUR) == int(io.Seek_From.Current))
 		#assert(int(posix.Whence.END) == int(io.Seek_From.End))
 
+		switch whence {
+		case .Start, .Current, .End:
+			break
+		case:
+			err = .Invalid_Whence
+			return
+		}
+
 		n = i64(posix.lseek(fd, posix.off_t(offset), posix.Whence(whence)))
 		if n < 0 {
-			err = .Unknown
+			#partial switch posix.get_errno() {
+			case .EINVAL:
+				err = .Invalid_Offset
+			case:
+				err = .Unknown
+			}
 		}
 		return
 
@@ -446,7 +459,7 @@ _file_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, 
 		return
 
 	case .Query:
-		return io.query_utility({.Read, .Read_At, .Write, .Write_At, .Seek, .Size, .Flush, .Close, .Query})
+		return io.query_utility({.Read, .Read_At, .Write, .Write_At, .Seek, .Size, .Flush, .Close, .Destroy, .Query})
 
 	case:
 		return 0, .Empty

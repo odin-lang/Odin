@@ -777,10 +777,21 @@ write_at :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Error) {
 
 seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Error) {
 	assert(fd != -1)
+	switch whence {
+	case SEEK_SET, SEEK_CUR, SEEK_END:
+		break
+	case:
+		return 0, .Invalid_Whence
+	}
 
 	final_offset := i64(_unix_lseek(fd, int(offset), c.int(whence)))
 	if final_offset == -1 {
-		return 0, get_last_error()
+		errno := get_last_error()
+		switch errno {
+		case .EINVAL:
+			return 0, .Invalid_Offset
+		}
+		return 0, errno
 	}
 	return final_offset, nil
 }

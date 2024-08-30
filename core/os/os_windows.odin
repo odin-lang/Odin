@@ -43,6 +43,7 @@ ERROR_BUFFER_OVERFLOW     :: _Platform_Error(111)
 ERROR_INSUFFICIENT_BUFFER :: _Platform_Error(122)
 ERROR_MOD_NOT_FOUND       :: _Platform_Error(126)
 ERROR_PROC_NOT_FOUND      :: _Platform_Error(127)
+ERROR_NEGATIVE_SEEK       :: _Platform_Error(131)
 ERROR_DIR_NOT_EMPTY       :: _Platform_Error(145)
 ERROR_ALREADY_EXISTS      :: _Platform_Error(183)
 ERROR_ENVVAR_NOT_FOUND    :: _Platform_Error(203)
@@ -90,6 +91,9 @@ get_last_error :: proc "contextless" () -> Error {
 
 	case win32.ERROR_INVALID_HANDLE:
 		return .Invalid_File
+
+	case win32.ERROR_NEGATIVE_SEEK:
+		return .Invalid_Offset
 
 	case
 		win32.ERROR_BAD_ARGUMENTS,

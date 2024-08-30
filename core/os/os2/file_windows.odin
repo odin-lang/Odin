@@ -248,6 +248,8 @@ _seek :: proc(f: ^File_Impl, offset: i64, whence: io.Seek_From) -> (ret: i64, er
 	case .Start:   w = win32.FILE_BEGIN
 	case .Current: w = win32.FILE_CURRENT
 	case .End:     w = win32.FILE_END
+	case:
+		return 0, .Invalid_Whence
 	}
 	hi := i32(offset>>32)
 	lo := i32(offset)
@@ -264,6 +266,11 @@ _read :: proc(f: ^File_Impl, p: []byte) -> (n: i64, err: Error) {
 }
 
 _read_internal :: proc(f: ^File_Impl, p: []byte) -> (n: i64, err: Error) {
+	length := len(p)
+	if length == 0 {
+		return
+	}
+
 	read_console :: proc(handle: win32.HANDLE, b: []byte) -> (n: int, err: Error) {
 		if len(b) == 0 {
 			return 0, nil
@@ -318,7 +325,6 @@ _read_internal :: proc(f: ^File_Impl, p: []byte) -> (n: i64, err: Error) {
 
 	single_read_length: win32.DWORD
 	total_read: int
-	length := len(p)
 
 	sync.shared_guard(&f.rw_mutex) // multiple readers
 
@@ -337,6 +343,10 @@ _read_internal :: proc(f: ^File_Impl, p: []byte) -> (n: i64, err: Error) {
 
 		if single_read_length > 0 && ok {
 			total_read += int(single_read_length)
+		} else if single_read_length == 0 && ok {
+			// ok and 0 bytes means EOF:
+			// https://learn.microsoft.com/en-us/windows/win32/fileio/testing-for-the-end-of-a-file
+			err = .EOF
 		} else {
 			err = _get_platform_error()
 		}
@@ -352,7 +362,7 @@ _read_at :: proc(f: ^File_Impl, p: []byte, offset: i64) -> (n: i64, err: Error) 
 			buf = buf[:MAX_RW]
 
 		}
-		curr_offset := _seek(f, offset, .Current) or_return
+		curr_offset := _seek(f, 0, .Current) or_return
 		defer _seek(f, curr_offset, .Start)
 
 		o := win32.OVERLAPPED{
@@ -421,7 +431,7 @@ _write_at :: proc(f: ^File_Impl, p: []byte, offset: i64) -> (n: i64, err: Error)
 			buf = buf[:MAX_RW]
 
 		}
-		curr_offset := _seek(f, offset, .Current) or_return
+		curr_offset := _seek(f, 0, .Current) or_return
 		defer _seek(f, curr_offset, .Start)
 
 		o := win32.OVERLAPPED{
@@ -466,13 +476,13 @@ _file_size :: proc(f: ^File_Impl) -> (n: i64, err: Error) {
 
 _sync :: proc(f: ^File) -> Error {
 	if f != nil && f.impl != nil {
-		return _flush((^File_Impl)(f.impl))
+		return _flush_internal((^File_Impl)(f.impl))
 	}
 	return nil
 }
 
 _flush :: proc(f: ^File_Impl) -> Error {
-	return _flush(f)
+	return _flush_internal(f)
 }
 _flush_internal :: proc(f: ^File_Impl) -> Error {
 	handle := _handle(&f.file)
@@ -813,7 +823,7 @@ _file_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, 
 		err = error_to_io_error(ferr)
 		return
 	case .Query:
-		return io.query_utility({.Read, .Read_At, .Write, .Write_At, .Seek, .Size, .Flush, .Close, .Query})
+		return io.query_utility({.Read, .Read_At, .Write, .Write_At, .Seek, .Size, .Flush, .Close, .Destroy, .Query})
 	}
 	return 0, .Empty
 }

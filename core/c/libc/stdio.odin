@@ -368,7 +368,7 @@ to_stream :: proc(file: ^FILE) -> io.Stream {
 			return 0, .Empty
 		
 		case .Query:
-			return io.query_utility({ .Close, .Flush, .Read, .Read_At, .Write, .Write_At, .Seek, .Size })
+			return io.query_utility({ .Close, .Flush, .Read, .Read_At, .Write, .Write_At, .Seek, .Size, .Query })
 		}
 		return
 	}

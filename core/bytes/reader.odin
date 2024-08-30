@@ -9,10 +9,11 @@ Reader :: struct {
 	prev_rune: int,    // previous reading index of rune or < 0
 }
 
-reader_init :: proc(r: ^Reader, s: []byte) {
+reader_init :: proc(r: ^Reader, s: []byte) -> io.Stream {
 	r.s = s
 	r.i = 0
 	r.prev_rune = -1
+	return reader_to_stream(r)
 }
 
 reader_to_stream :: proc(r: ^Reader) -> (s: io.Stream) {
@@ -33,6 +34,9 @@ reader_size :: proc(r: ^Reader) -> i64 {
 }
 
 reader_read :: proc(r: ^Reader, p: []byte) -> (n: int, err: io.Error) {
+	if len(p) == 0 {
+		return 0, nil
+	}
 	if r.i >= i64(len(r.s)) {
 		return 0, .EOF
 	}
@@ -42,6 +46,9 @@ reader_read :: proc(r: ^Reader, p: []byte) -> (n: int, err: io.Error) {
 	return
 }
 reader_read_at :: proc(r: ^Reader, p: []byte, off: i64) -> (n: int, err: io.Error) {
+	if len(p) == 0 {
+		return 0, nil
+	}
 	if off < 0 {
 		return 0, .Invalid_Offset
 	}
@@ -97,7 +104,6 @@ reader_unread_rune :: proc(r: ^Reader) -> io.Error {
 	return nil
 }
 reader_seek :: proc(r: ^Reader, offset: i64, whence: io.Seek_From) -> (i64, io.Error) {
-	r.prev_rune = -1
 	abs: i64
 	switch whence {
 	case .Start:
@@ -114,6 +120,7 @@ reader_seek :: proc(r: ^Reader, offset: i64, whence: io.Seek_From) -> (i64, io.E
 		return 0, .Invalid_Offset
 	}
 	r.i = abs
+	r.prev_rune = -1
 	return abs, nil
 }
 reader_write_to :: proc(r: ^Reader, w: io.Writer) -> (n: i64, err: io.Error) {
