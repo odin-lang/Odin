@@ -4946,12 +4946,18 @@ gb_internal void check_add_import_decl(CheckerContext *ctx, Ast *decl) {
 	}
 
 
-	if (import_name.len == 0) {
+	if (is_blank_ident(import_name) && !is_blank_ident(id->import_name.string)) {
 		String invalid_name = id->fullpath;
 		invalid_name = get_invalid_import_name(invalid_name);
 
-		error(id->token, "Import name %.*s, is not a valid identifier. Perhaps you want to reference the package by a different name like this: import <new_name> \"%.*s\" ", LIT(invalid_name), LIT(invalid_name));
-		error(token, "Import name, %.*s, cannot be use as an import name as it is not a valid identifier", LIT(id->import_name.string));
+		ERROR_BLOCK();
+
+		if (id->import_name.string.len > 0) {
+			error(token, "Import name, '%.*s' cannot be use as an import name as it is not a valid identifier", LIT(id->import_name.string));
+		} else {
+			error(id->token, "Import name '%.*s' is not a valid identifier", LIT(invalid_name));
+			error_line("\tSuggestion: Rename the directory or explicitly set an import name like this 'import <new_name> %.*s'", LIT(id->relpath.string));
+		}
 	} else {
 		GB_ASSERT(id->import_name.pos.line != 0);
 		id->import_name.string = import_name;
