@@ -88,6 +88,44 @@ when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD  || ODIN_OS
 	LC_NUMERIC  :: 4
 	LC_TIME     :: 5
 
+} else when ODIN_OS == .Linux {
+
+	// NOTE: All of these fields are standard ([PSX]).
+	lconv :: struct {
+		decimal_point:      cstring,
+		thousand_sep:       cstring,
+		grouping:           cstring,
+		int_curr_symbol:    cstring,
+		currency_symbol:    cstring,
+		mon_decimal_points: cstring,
+		mon_thousands_sep:  cstring,
+		mon_grouping:       cstring,
+		positive_sign:      cstring,
+		negative_sign:      cstring,
+		int_frac_digits:    c.char,
+		frac_digits:        c.char,
+		p_cs_precedes:      c.char,
+		p_sep_by_space:     c.char,
+		n_cs_precedes:      c.char,
+		n_sep_by_space:     c.char,
+		p_sign_posn:        c.char,
+		n_sign_posn:        c.char,
+		int_p_cs_precedes:  c.char,
+		int_n_cs_precedes:  c.char,
+		int_p_sep_by_space: c.char,
+		int_n_sep_by_space: c.char,
+		int_p_sign_posn:    c.char,
+		int_n_sign_posn:    c.char,
+	}
+
+	LC_CTYPE    :: 0
+	LC_NUMERIC  :: 1
+	LC_TIME     :: 2
+	LC_COLLATE  :: 3
+	LC_MONETARY :: 4
+	LC_MESSAGES :: 5
+	LC_ALL      :: 6
+
 } else {
 	#panic("posix is unimplemented for the current target")
 }

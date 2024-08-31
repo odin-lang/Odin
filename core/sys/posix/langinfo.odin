@@ -238,7 +238,7 @@ when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD {
 	ABDAY_4 :: 16
 	ABDAY_5 :: 17
 	ABDAY_6 :: 18
-	ABDAY_7 :: 19
+	ABDAY_7 :: 19	
 
 	MON_1  :: 20
 	MON_2  :: 21
@@ -278,7 +278,184 @@ when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD {
 	YESEXPR :: 47
 	NOEXPR  :: 49
 
-	CRNCYSTR :: 50
+	CRNCYSTR :: 50	
+
+} else when ODIN_OS == .Linux {
+
+	@(private="file")
+	nl_item :: proc(flag: int) -> int {
+		return flag << 16
+	}
+
+	@(private="file")
+	_langinfo_values :: enum {
+		ABDAY_1 = nl_item(LC_TIME),
+		ABDAY_2,
+		ABDAY_3,
+		ABDAY_4,
+		ABDAY_5,
+		ABDAY_6,
+		ABDAY_7,
+
+		DAY_1,
+		DAY_2,
+		DAY_3,
+		DAY_4,
+		DAY_5,
+		DAY_6,
+		DAY_7,
+
+		ABMON_1,
+		ABMON_2,
+		ABMON_3,
+		ABMON_4,
+		ABMON_5,
+		ABMON_6,
+		ABMON_7,
+		ABMON_8,
+		ABMON_9,
+		ABMON_10,
+		ABMON_11,
+		ABMON_12,
+
+		MON_1,
+		MON_2,
+		MON_3,
+		MON_4,
+		MON_5,
+		MON_6,
+		MON_7,
+		MON_8,
+		MON_9,
+		MON_10,
+		MON_11,
+		MON_12,
+
+		AM_STR,
+		PM_STR,
+
+		D_T_FMT,
+		D_FMT,
+		T_FMT,
+		T_FMT_AMPM,
+
+		ERA,
+		_,
+		ERA_D_FMT,
+		ALT_DIGITS,
+		ERA_D_T_FMT,
+		ERA_T_FMT,
+
+		// These values are defined only to make sure CODESET below gets the correct value.
+		_NL_CTYPE_CLASS = nl_item(LC_CTYPE),
+		_NL_CTYPE_TOUPPER,
+		_NL_CTYPE_GAP1,
+		_NL_CTYPE_TOLOWER,
+		_NL_CTYPE_GAP2,
+		_NL_CTYPE_CLASS32,
+		_NL_CTYPE_GAP3,
+		_NL_CTYPE_GAP4,
+		_NL_CTYPE_GAP5,
+		_NL_CTYPE_GAP6,
+		_NL_CTYPE_CLASS_NAMES,
+		_NL_CTYPE_MAP_NAMES,
+		_NL_CTYPE_WIDTH,
+		_NL_CTYPE_MB_CUR_MAX,
+		CODESET,
+
+		// These values are defined only to make sure CRNCYSTR below gets the correct value.
+		__INT_CURR_SYMBOL = nl_item(LC_MONETARY),
+		__CURRENCY_SYMBOL,
+		__MON_DECIMAL_POINT,
+		__MON_THOUSANDS_SEP,
+		__MON_GROUPING,
+		__POSITIVE_SIGN,
+		__NEGATIVE_SIGN,
+		__INT_FRAC_DIGITS,
+		__FRAC_DIGITS,
+		__P_CS_PRECEDES,
+		__P_SEP_BY_SPACE,
+		__N_CS_PRECEDES,
+		__N_SEP_BY_SPACE,
+		__P_SIGN_POSN,
+		__N_SIGN_POSN,
+		CRNCYSTR,
+
+		RADIXCHAR = nl_item(LC_NUMERIC),
+		THOUSEP,
+
+		YESEXPR = nl_item(LC_MESSAGES),
+		NOEXPR,
+	}
+
+// NOTE: declared with `_t` so we can enumerate the real `nl_info`.
+	nl_item_t :: distinct c.int
+
+	ABDAY_1 :: _langinfo_values.ABDAY_1
+	ABDAY_2 :: _langinfo_values.ABDAY_2
+	ABDAY_3 :: _langinfo_values.ABDAY_3
+	ABDAY_4 :: _langinfo_values.ABDAY_4
+	ABDAY_5 :: _langinfo_values.ABDAY_5
+	ABDAY_6 :: _langinfo_values.ABDAY_6
+	ABDAY_7 :: _langinfo_values.ABDAY_7
+
+	DAY_1 :: _langinfo_values.DAY_1
+	DAY_2 :: _langinfo_values.DAY_2
+	DAY_3 :: _langinfo_values.DAY_3
+	DAY_4 :: _langinfo_values.DAY_4
+	DAY_5 :: _langinfo_values.DAY_5
+	DAY_6 :: _langinfo_values.DAY_6
+	DAY_7 :: _langinfo_values.DAY_7
+
+	ABMON_1 :: _langinfo_values.ABMON_1
+	ABMON_2 :: _langinfo_values.ABMON_2
+	ABMON_3 :: _langinfo_values.ABMON_3
+	ABMON_4 :: _langinfo_values.ABMON_4
+	ABMON_5 :: _langinfo_values.ABMON_5
+	ABMON_6 :: _langinfo_values.ABMON_6
+	ABMON_7 :: _langinfo_values.ABMON_7
+	ABMON_8 :: _langinfo_values.ABMON_8
+	ABMON_9 :: _langinfo_values.ABMON_9
+	ABMON_10 :: _langinfo_values.ABMON_10
+	ABMON_11 :: _langinfo_values.ABMON_11
+	ABMON_12 :: _langinfo_values.ABMON_12
+
+	MON_1 :: _langinfo_values.MON_1
+	MON_2 :: _langinfo_values.MON_2
+	MON_3 :: _langinfo_values.MON_3
+	MON_4 :: _langinfo_values.MON_4
+	MON_5 :: _langinfo_values.MON_5
+	MON_6 :: _langinfo_values.MON_6
+	MON_7 :: _langinfo_values.MON_7
+	MON_8 :: _langinfo_values.MON_8
+	MON_9 :: _langinfo_values.MON_9
+	MON_10 :: _langinfo_values.MON_10
+	MON_11 :: _langinfo_values.MON_11
+	MON_12 :: _langinfo_values.MON_12
+
+	AM_STR :: _langinfo_values.AM_STR
+	PM_STR :: _langinfo_values.PM_STR
+
+	D_T_FMT :: _langinfo_values.D_T_FMT
+	D_FMT :: _langinfo_values.D_FMT
+	T_FMT :: _langinfo_values.T_FMT
+	T_FMT_AMPM :: _langinfo_values.T_FMT_AMPM
+
+	ERA :: _langinfo_values.ERA
+	ERA_D_FMT :: _langinfo_values.ERA_D_FMT
+	ALT_DIGITS :: _langinfo_values.ALT_DIGITS
+	ERA_D_T_FMT :: _langinfo_values.ERA_D_T_FMT
+	ERA_T_FMT :: _langinfo_values.ERA_T_FMT
+
+	CODESET :: _langinfo_values.CODESET
+
+	CRNCYSTR :: _langinfo_values.CRNCYSTR
+
+	RADIXCHAR :: _langinfo_values.RADIXCHAR
+	THOUSEP :: _langinfo_values.THOUSEP
+
+	YESEXP :: _langinfo_values.YESEXP
+	NOEXPR :: _langinfo_values.NOEXPR
 
 } else {
 	#panic("posix is unimplemented for the current target")
