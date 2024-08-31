@@ -58,7 +58,10 @@ MakeConstantString :: proc "c" (#const c: cstring) -> ^String {
 
 @(link_prefix="NS", default_calling_convention="c")
 foreign Foundation {
-	StringFromClass :: proc(cls: Class) -> ^String ---
+	StringFromClass    :: proc(cls: Class) -> ^String ---
+	ClassFromString    :: proc(str: ^String) -> Class ---
+	StringFromSelector :: proc(selector: SEL) -> ^String ---
+	SelectorFromString :: proc(str: ^String) -> SEL ---
 }
 
 @(objc_type=String, objc_name="alloc", objc_is_class_method=true)
