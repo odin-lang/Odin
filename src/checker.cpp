@@ -4953,7 +4953,7 @@ gb_internal void check_add_import_decl(CheckerContext *ctx, Ast *decl) {
 		ERROR_BLOCK();
 
 		if (id->import_name.string.len > 0) {
-			error(token, "Import name, '%.*s' cannot be use as an import name as it is not a valid identifier", LIT(id->import_name.string));
+			error(token, "Import name '%.*s' cannot be use as an import name as it is not a valid identifier", LIT(id->import_name.string));
 		} else {
 			error(id->token, "Import name '%.*s' is not a valid identifier", LIT(invalid_name));
 			error_line("\tSuggestion: Rename the directory or explicitly set an import name like this 'import <new_name> %.*s'", LIT(id->relpath.string));
