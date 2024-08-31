@@ -2630,7 +2630,7 @@ gb_internal ExactValue exact_bit_set_all_set_mask(Type *type) {
 			}
 
 		} else {
-			// TODO(bill): enum range based
+			// TODO(bill): enum range based");
 			big_int_from_i64(&mask, -1);
 		}
 	} else {

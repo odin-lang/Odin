@@ -1404,6 +1404,10 @@ gb_internal bool lb_switch_stmt_can_be_trivial_jump_table(AstSwitchStmt *ss, boo
 
 	}
 
+	if (is_typeid) {
+		return false;
+	}
+
 	return true;
 }
 
