@@ -5738,7 +5738,7 @@ gb_internal bool check_identifier_exists(Scope *s, Ast *node, bool nested = fals
 gb_internal bool check_no_copy_assignment(Operand const &o, String const &context) {
 	if (o.type && is_type_no_copy(o.type)) {
 		Ast *expr = unparen_expr(o.expr);
-		if (expr && o.mode != Addressing_Constant) {
+		if (expr && o.mode != Addressing_Constant && o.mode != Addressing_Type) {
 			if (expr->kind == Ast_CallExpr) {
 				// Okay
 			} else {
