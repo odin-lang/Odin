@@ -282,180 +282,87 @@ when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD {
 
 } else when ODIN_OS == .Linux {
 
-	@(private="file")
-	nl_item :: proc(flag: int) -> int {
-		return flag << 16
-	}
-
-	@(private="file")
-	_langinfo_values :: enum {
-		ABDAY_1 = nl_item(LC_TIME),
-		ABDAY_2,
-		ABDAY_3,
-		ABDAY_4,
-		ABDAY_5,
-		ABDAY_6,
-		ABDAY_7,
-
-		DAY_1,
-		DAY_2,
-		DAY_3,
-		DAY_4,
-		DAY_5,
-		DAY_6,
-		DAY_7,
-
-		ABMON_1,
-		ABMON_2,
-		ABMON_3,
-		ABMON_4,
-		ABMON_5,
-		ABMON_6,
-		ABMON_7,
-		ABMON_8,
-		ABMON_9,
-		ABMON_10,
-		ABMON_11,
-		ABMON_12,
-
-		MON_1,
-		MON_2,
-		MON_3,
-		MON_4,
-		MON_5,
-		MON_6,
-		MON_7,
-		MON_8,
-		MON_9,
-		MON_10,
-		MON_11,
-		MON_12,
-
-		AM_STR,
-		PM_STR,
-
-		D_T_FMT,
-		D_FMT,
-		T_FMT,
-		T_FMT_AMPM,
-
-		ERA,
-		_,
-		ERA_D_FMT,
-		ALT_DIGITS,
-		ERA_D_T_FMT,
-		ERA_T_FMT,
-
-		// These values are defined only to make sure CODESET below gets the correct value.
-		_NL_CTYPE_CLASS = nl_item(LC_CTYPE),
-		_NL_CTYPE_TOUPPER,
-		_NL_CTYPE_GAP1,
-		_NL_CTYPE_TOLOWER,
-		_NL_CTYPE_GAP2,
-		_NL_CTYPE_CLASS32,
-		_NL_CTYPE_GAP3,
-		_NL_CTYPE_GAP4,
-		_NL_CTYPE_GAP5,
-		_NL_CTYPE_GAP6,
-		_NL_CTYPE_CLASS_NAMES,
-		_NL_CTYPE_MAP_NAMES,
-		_NL_CTYPE_WIDTH,
-		_NL_CTYPE_MB_CUR_MAX,
-		CODESET,
-
-		// These values are defined only to make sure CRNCYSTR below gets the correct value.
-		__INT_CURR_SYMBOL = nl_item(LC_MONETARY),
-		__CURRENCY_SYMBOL,
-		__MON_DECIMAL_POINT,
-		__MON_THOUSANDS_SEP,
-		__MON_GROUPING,
-		__POSITIVE_SIGN,
-		__NEGATIVE_SIGN,
-		__INT_FRAC_DIGITS,
-		__FRAC_DIGITS,
-		__P_CS_PRECEDES,
-		__P_SEP_BY_SPACE,
-		__N_CS_PRECEDES,
-		__N_SEP_BY_SPACE,
-		__P_SIGN_POSN,
-		__N_SIGN_POSN,
-		CRNCYSTR,
-
-		RADIXCHAR = nl_item(LC_NUMERIC),
-		THOUSEP,
-
-		YESEXPR = nl_item(LC_MESSAGES),
-		NOEXPR,
-	}
-
-// NOTE: declared with `_t` so we can enumerate the real `nl_info`.
+	// NOTE: declared with `_t` so we can enumerate the real `nl_info`.
 	nl_item_t :: distinct c.int
 
-	ABDAY_1 :: _langinfo_values.ABDAY_1
-	ABDAY_2 :: _langinfo_values.ABDAY_2
-	ABDAY_3 :: _langinfo_values.ABDAY_3
-	ABDAY_4 :: _langinfo_values.ABDAY_4
-	ABDAY_5 :: _langinfo_values.ABDAY_5
-	ABDAY_6 :: _langinfo_values.ABDAY_6
-	ABDAY_7 :: _langinfo_values.ABDAY_7
+	// NOTE: All these values are set in an enum on the Linux implementation.
+	// Some depend on locale.h contants (bits/locale.h to be precise).
 
-	DAY_1 :: _langinfo_values.DAY_1
-	DAY_2 :: _langinfo_values.DAY_2
-	DAY_3 :: _langinfo_values.DAY_3
-	DAY_4 :: _langinfo_values.DAY_4
-	DAY_5 :: _langinfo_values.DAY_5
-	DAY_6 :: _langinfo_values.DAY_6
-	DAY_7 :: _langinfo_values.DAY_7
+	// NOTE: ABDAY_1 is set to LC_TIME << 16 (LC_TIME is 2) on the enum group of
+	// the Linux implementation.
+	ABDAY_1 :: 0x20_000
+	ABDAY_2 :: 0x20_001
+	ABDAY_3 :: 0x20_002
+	ABDAY_4 :: 0x20_003
+	ABDAY_5 :: 0x20_004
+	ABDAY_6 :: 0x20_005
+	ABDAY_7 :: 0x20_006
 
-	ABMON_1 :: _langinfo_values.ABMON_1
-	ABMON_2 :: _langinfo_values.ABMON_2
-	ABMON_3 :: _langinfo_values.ABMON_3
-	ABMON_4 :: _langinfo_values.ABMON_4
-	ABMON_5 :: _langinfo_values.ABMON_5
-	ABMON_6 :: _langinfo_values.ABMON_6
-	ABMON_7 :: _langinfo_values.ABMON_7
-	ABMON_8 :: _langinfo_values.ABMON_8
-	ABMON_9 :: _langinfo_values.ABMON_9
-	ABMON_10 :: _langinfo_values.ABMON_10
-	ABMON_11 :: _langinfo_values.ABMON_11
-	ABMON_12 :: _langinfo_values.ABMON_12
+	DAY_1 :: 0x20_007
+	DAY_2 :: 0x20_008
+	DAY_3 :: 0x20_009
+	DAY_4 :: 0x20_010
+	DAY_5 :: 0x20_011
+	DAY_6 :: 0x20_012
+	DAY_7 :: 0x20_013
 
-	MON_1 :: _langinfo_values.MON_1
-	MON_2 :: _langinfo_values.MON_2
-	MON_3 :: _langinfo_values.MON_3
-	MON_4 :: _langinfo_values.MON_4
-	MON_5 :: _langinfo_values.MON_5
-	MON_6 :: _langinfo_values.MON_6
-	MON_7 :: _langinfo_values.MON_7
-	MON_8 :: _langinfo_values.MON_8
-	MON_9 :: _langinfo_values.MON_9
-	MON_10 :: _langinfo_values.MON_10
-	MON_11 :: _langinfo_values.MON_11
-	MON_12 :: _langinfo_values.MON_12
+	ABMON_1  :: 0x20_014
+	ABMON_2  :: 0x20_015
+	ABMON_3  :: 0x20_016
+	ABMON_4  :: 0x20_017
+	ABMON_5  :: 0x20_018
+	ABMON_6  :: 0x20_019
+	ABMON_7  :: 0x20_020
+	ABMON_8  :: 0x20_021
+	ABMON_9  :: 0x20_022
+	ABMON_10 :: 0x20_023
+	ABMON_11 :: 0x20_024
+	ABMON_12 :: 0x20_025
 
-	AM_STR :: _langinfo_values.AM_STR
-	PM_STR :: _langinfo_values.PM_STR
+	MON_1  :: 0x20_026
+	MON_2  :: 0x20_027
+	MON_3  :: 0x20_028
+	MON_4  :: 0x20_029
+	MON_5  :: 0x20_030
+	MON_6  :: 0x20_031
+	MON_7  :: 0x20_032
+	MON_8  :: 0x20_033
+	MON_9  :: 0x20_034
+	MON_10 :: 0x20_035
+	MON_11 :: 0x20_036
+	MON_12 :: 0x20_037
 
-	D_T_FMT :: _langinfo_values.D_T_FMT
-	D_FMT :: _langinfo_values.D_FMT
-	T_FMT :: _langinfo_values.T_FMT
-	T_FMT_AMPM :: _langinfo_values.T_FMT_AMPM
+	AM_STR :: 0x20_038
+	PM_STR :: 0x20_039
 
-	ERA :: _langinfo_values.ERA
-	ERA_D_FMT :: _langinfo_values.ERA_D_FMT
-	ALT_DIGITS :: _langinfo_values.ALT_DIGITS
-	ERA_D_T_FMT :: _langinfo_values.ERA_D_T_FMT
-	ERA_T_FMT :: _langinfo_values.ERA_T_FMT
+	D_T_FMT    :: 0x20_040
+	D_FMT      :: 0x20_041
+	T_FMT      :: 0x20_042
+	T_FMT_AMPM :: 0x20_043
 
-	CODESET :: _langinfo_values.CODESET
+	ERA         :: 0x20_044
+	ERA_D_FMT   :: 0x20_045
+	ALT_DIGITS  :: 0x20_046
+	ERA_D_T_FMT :: 0x20_047
+	ERA_T_FMT   :: 0x20_048
 
-	CRNCYSTR :: _langinfo_values.CRNCYSTR
+	// NOTE: CODESET is the 16th member of the enum group starting with value
+	// LC_CTYPE << 16, LC_CTYPE is 0.
+	CODESET :: 0x15
 
-	RADIXCHAR :: _langinfo_values.RADIXCHAR
-	THOUSEP :: _langinfo_values.THOUSEP
+	// NOTE: CRNCYSTR is the 16th member of the enum group starting with value
+	// LC_MONETARY << 16, LC_MONETARY is 4.
+	CRNCYSTR :: 0x40_000
 
-	YESEXP :: _langinfo_values.YESEXP
-	NOEXPR :: _langinfo_values.NOEXPR
+	// NOTE: RADIXCHAR is the 1st member of the enum group starting with value
+	// LC_NUMERIC << 16, LC_NUMERIC is 1.
+	RADIXCHAR :: 0x10_000
+	THOUSEP   :: 0x10_001
+
+	// NOTE: YESEXPR is the 1st member of the enum group starting with value
+	// LC_MESSAGES << 16, LC_MESSAGES is 5.
+	YESEXPR :: 0x50_000
+	NOEXPR  :: 0x50_001
 
 } else {
 	#panic("posix is unimplemented for the current target")
