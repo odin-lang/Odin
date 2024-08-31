@@ -79,7 +79,7 @@ when ODIN_OS == .Linux || ODIN_OS == .FreeBSD || ODIN_OS == .Darwin || ODIN_OS =
 	} else {
 		@(private) LDIFFTIME  :: "difftime"
 		@(private) LMKTIME    :: "mktime"
-		@(private) LTIME      :: "ltime"
+		@(private) LTIME      :: "time"
 		@(private) LCTIME     :: "ctime"
 		@(private) LGMTIME    :: "gmtime"
 		@(private) LLOCALTIME :: "localtime"
