@@ -1525,6 +1525,8 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 			metrics = &target_haiku_amd64;
 		#elif defined(GB_CPU_ARM)
 			metrics = &target_linux_arm64;
+		#elif defined(GB_CPU_RISCV)
+			metrics = &target_linux_riscv64;
 		#else
 			metrics = &target_linux_amd64;
 		#endif
@@ -1647,7 +1649,7 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 
 		// Disallow on wasm
 		bc->use_separate_modules = false;
-	} if(bc->metrics.arch == TargetArch_riscv64) {
+	} if(bc->metrics.arch == TargetArch_riscv64 && bc->cross_compiling) {
 		bc->link_flags = str_lit("-target riscv64 ");
 	} else {
 		// NOTE: for targets other than darwin, we don't specify a `-target` link flag.
