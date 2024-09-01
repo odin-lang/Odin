@@ -402,7 +402,12 @@ remap :: proc "contextless" (old_value, old_min, old_max, new_min, new_max: $T) 
 	if old_range == 0 {
 		return new_range / 2
 	}
-	remapped := ((old_value - old_min) / old_range) * new_range + new_min
+	return ((old_value - old_min) / old_range) * new_range + new_min
+}
+
+@(require_results)
+remap_clamped :: proc "contextless" (old_value, old_min, old_max, new_min, new_max: $T) -> (x: T) where intrinsics.type_is_numeric(T), !intrinsics.type_is_array(T) {
+	remapped := #force_inline remap(old_value, old_min, old_max, new_min, new_max)
 	return clamp(remapped, new_min, new_max)
 }
 
