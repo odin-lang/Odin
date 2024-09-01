@@ -10928,7 +10928,7 @@ gb_internal ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast
 		case Token_context:
 			{
 				if (c->proc_name.len == 0 && c->curr_proc_sig == nullptr) {
-					error(node, "'context' is only allowed within procedures %p", c->curr_proc_decl);
+					error(node, "'context' is only allowed within procedures");
 					return kind;
 				}
 				if (unparen_expr(c->assignment_lhs_hint) == node) {
