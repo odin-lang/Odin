@@ -3252,6 +3252,12 @@ int main(int arg_count, char const **arg_ptr) {
 			gb_printf_err("missing required target feature: \"%.*s\", enable it by setting a different -microarch or explicitly adding it through -target-features\n", LIT(disabled));
 			gb_exit(1);
 		}
+
+		// NOTE(laytan): some weird errors on LLVM 14 that LLVM 17 fixes.
+		if (LLVM_VERSION_MAJOR < 17) {
+			gb_printf_err("Invalid LLVM version %s, RISC-V targets require at least LLVM 17\n", LLVM_VERSION_STRING);
+			gb_exit(1);
+		} 
 	}
 
 	if (build_context.show_debug_messages) {
