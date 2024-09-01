@@ -402,7 +402,8 @@ remap :: proc "contextless" (old_value, old_min, old_max, new_min, new_max: $T) 
 	if old_range == 0 {
 		return new_range / 2
 	}
-	return ((old_value - old_min) / old_range) * new_range + new_min
+	remapped := ((old_value - old_min) / old_range) * new_range + new_min
+	return clamp(remapped, new_min, new_max)
 }
 
 @(require_results)
