@@ -2268,6 +2268,7 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 		print_usage_line(2, "Sets the build mode.");
 		print_usage_line(2, "Available options:");
 		print_usage_line(3, "-build-mode:exe         Builds as an executable.");
+		print_usage_line(3, "-build-mode:test        Builds as an executable that executes tests.");
 		print_usage_line(3, "-build-mode:dll         Builds as a dynamically linked library.");
 		print_usage_line(3, "-build-mode:shared      Builds as a dynamically linked library.");
 		print_usage_line(3, "-build-mode:lib         Builds as a statically linked library.");
