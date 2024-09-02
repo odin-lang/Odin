@@ -42,7 +42,7 @@ XML_NAME_TO_RUNE_MAX_LENGTH :: 31
 	Input:
 		entity_name - a string, like "copy" that describes a user-encoded Unicode entity as used in XML.
 
-	Output:
+	Returns:
 		"decoded" - The decoded rune if found by name, or -1 otherwise.
 		"ok"      - true if found, false if not.
 

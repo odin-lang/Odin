@@ -13,7 +13,7 @@ when ODIN_OS == .Darwin {
 
 foreign lib {
 	/*
-	Convert the broken down time in the structure to a string form: Sun Sep 16 01:03:52 1973\n\0
+	Convert the broken down time in the structure to a string form: Sun Sep 16 01:03:52 1973.
 
 	[[ More; https://pubs.opengroup.org/onlinepubs/9699919799/functions/asctime_r.html ]]
 	*/
