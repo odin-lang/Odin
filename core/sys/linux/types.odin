@@ -1335,3 +1335,20 @@ EPoll_Event :: struct #packed {
 	Flags for execveat(2) syscall.
 */
 Execveat_Flags :: bit_set[Execveat_Flags_Bits; i32]
+
+RISCV_HWProbe_Flags         :: bit_set[RISCV_HWProbe_Flags_Bits; u32]
+RISCV_HWProbe_CPU_Perf_0    :: bit_set[RISCV_HWProbe_Misaligned_Scalar_Perf; u64]
+RISCV_HWProbe_Base_Behavior :: bit_set[RISCV_HWProbe_Base_Behavior_Bits; u64]
+RISCV_HWProbe_IMA_Ext_0     :: bit_set[RISCV_HWProbe_IMA_Ext_0_Bits; u64]
+
+RISCV_HWProbe :: struct {
+ 	// set to `.UNSUPPORTED` by the kernel if that is the case.
+	key:   RISCV_HWProbe_Key,
+	value: struct #raw_union {
+		base_behavior:          RISCV_HWProbe_Base_Behavior,
+		ima_ext_0:              RISCV_HWProbe_IMA_Ext_0,
+		cpu_perf_0:             RISCV_HWProbe_CPU_Perf_0,
+		misaligned_scalar_perf: RISCV_HWProbe_Misaligned_Scalar_Perf,
+		raw:                    u64,
+	},
+}

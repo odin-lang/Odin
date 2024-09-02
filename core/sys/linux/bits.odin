@@ -1839,3 +1839,87 @@ Execveat_Flags_Bits :: enum {
 	AT_SYMLINK_NOFOLLOW = 8,
 	AT_EMPTY_PATH       = 12,
 }
+
+RISCV_HWProbe_Key :: enum i64 {
+	UNSUPPORTED            = -1,
+	MVENDORID              = 0,
+	MARCHID                = 1,
+	MIMPID                 = 2,
+	BASE_BEHAVIOR          = 3,
+	IMA_EXT_0              = 4,
+ 	// Deprecated, try `.MISALIGNED_SCALAR_PERF` first, if that is `.UNSUPPORTED`, use this.
+	CPUPERF_0              = 5,
+	ZICBOZ_BLOCK_SIZE      = 6,
+	HIGHEST_VIRT_ADDRESS   = 7,
+	TIME_CSR_FREQ          = 8,
+	MISALIGNED_SCALAR_PERF = 9,
+}
+
+RISCV_HWProbe_Flags_Bits :: enum {
+	WHICH_CPUS,
+}
+
+RISCV_HWProbe_Base_Behavior_Bits :: enum {
+	IMA,
+}
+
+RISCV_HWProbe_IMA_Ext_0_Bits :: enum {
+	FD,
+	C,
+	V,
+	EXT_ZBA,
+	EXT_ZBB,
+	EXT_ZBS,
+	EXT_ZICBOZ,
+	EXT_ZBC,
+	EXT_ZBKB,
+	EXT_ZBKC,
+	EXT_ZBKX,
+	EXT_ZKND,
+	EXT_ZKNE,
+	EXT_ZKNH,
+	EXT_ZKSED,
+	EXT_ZKSH,
+	EXT_ZKT,
+	EXT_ZVBB,
+	EXT_ZVBC,
+	EXT_ZVKB,
+	EXT_ZVKG,
+	EXT_ZVKNED,
+	EXT_ZVKNHA,
+	EXT_ZVKNHB,
+	EXT_ZVKSED,
+	EXT_ZVKSH,
+	EXT_ZVKT,
+	EXT_ZFH,
+	EXT_ZFHMIN,
+	EXT_ZIHINTNTL,
+	EXT_ZVFH,
+	EXT_ZVFHMIN,
+	EXT_ZFA,
+	EXT_ZTSO,
+	EXT_ZACAS,
+	EXT_ZICOND,
+	EXT_ZIHINTPAUSE,
+	EXT_ZVE32X,
+	EXT_ZVE32F,
+	EXT_ZVE64X,
+	EXT_ZVE64F,
+	EXT_ZVE64D,
+	EXT_ZIMOP,
+	EXT_ZCA,
+	EXT_ZCB,
+	EXT_ZCD,
+	EXT_ZCF,
+	EXT_ZCMOP,
+	EXT_ZAWRS,
+}
+
+RISCV_HWProbe_Misaligned_Scalar_Perf :: enum {
+	UNKNOWN,
+	EMULATED,
+	SLOW,
+	FAST,
+	UNSUPPORTED,
+}
+

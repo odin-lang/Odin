@@ -2993,3 +2993,18 @@ epoll_pwait2 :: proc(epfd: Fd, events: [^]EPoll_Event, count: i32, timeout: ^Tim
 // TODO(flysand): fchmodat2
 
 // TODO(flysand): map_shadow_stack
+
+when ODIN_ARCH == .riscv64 {
+	/*
+		Probe for RISC-V Hardware Support.
+		Available since Linux 6.4.
+
+		TODO: cpu_set_t
+
+		See: https://docs.kernel.org/arch/riscv/hwprobe.html
+	*/
+	riscv_hwprobe :: proc "contextless" (pairs: [^]RISCV_HWProbe, pair_count: uint, cpu_count: uint, cpus: rawptr /* cpu_set_t */, flags: RISCV_HWProbe_Flags) -> Errno {
+		ret := syscall(SYS_riscv_hwprobe, pairs, pair_count, cpu_count, cpus, transmute(u32)flags)
+		return Errno(-ret)
+	}
+}
