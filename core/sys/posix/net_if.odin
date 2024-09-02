@@ -44,7 +44,7 @@ foreign lib {
 	if_freenameindex :: proc(ptr: ^if_nameindex_t) ---
 }
 
-when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS == .OpenBSD {
+when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS == .OpenBSD || ODIN_OS == .Linux {
 
 	// NOTE: `_t` suffix added due to name conflict.
 
