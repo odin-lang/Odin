@@ -39,12 +39,12 @@ _mkdir_all :: proc(path: string, perm: int) -> Error {
 	return internal_mkdir_all(clean_path, perm)
 
 	internal_mkdir_all :: proc(path: string, perm: int) -> Error {
-		a, _ := filepath.split(path)
-		if a != path {
-			if len(a) > 1 && a[len(a)-1] == '/' {
-				a = a[:len(a)-1]
+		dir, file := filepath.split(path)
+		if file != path {
+			if len(dir) > 1 && dir[len(dir) - 1] == '/' {
+				dir = dir[:len(dir) - 1]
 			}
-			internal_mkdir_all(a, perm) or_return
+			internal_mkdir_all(dir, perm) or_return
 		}
 
 		err := _mkdir(path, perm)
