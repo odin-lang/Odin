@@ -21,10 +21,16 @@ foreign lib {
 
 	[[ More; https://pubs.opengroup.org/onlinepubs/9699919799/functions/poll.html ]]
 	*/
-	poll :: proc(fds: [^]pollfd, nfds: nfds_t, timeout: c.int) -> c.int ---
+	poll :: proc(fds: [^]pollfd, nfds: nfds_t, timeout: c.int) -> Poll_Error ---
 }
 
 nfds_t :: c.uint
+
+Poll_Error :: enum c.int {
+	EAGAIN = Errno.EAGAIN,
+	EINTR  = Errno.EINTR,
+	EINVAL = Errno.EINVAL,
+}
 
 Poll_Event_Bits :: enum c.short {
 	// Data other than high-priority data may be read without blocking.
@@ -67,6 +73,26 @@ when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS 
 	POLLOUT    :: 0x0004
 	POLLWRNORM :: POLLOUT
 	POLLWRBAND :: 0x0100
+
+	POLLERR    :: 0x0008
+	POLLHUP    :: 0x0010
+	POLLNVAL   :: 0x0020
+
+} else when ODIN_OS == .Linux {
+
+	pollfd :: struct {
+		fd:      FD,         /* [PSX] the following descriptor being polled */
+		events:  Poll_Event, /* [PSX] the input event flags */
+		revents: Poll_Event, /* [PSX] the output event flags */
+	}
+
+	POLLIN     :: 0x0001
+	POLLRDNORM :: 0x0040
+	POLLRDBAND :: 0x0080
+	POLLPRI    :: 0x0002
+	POLLOUT    :: 0x0004
+	POLLWRNORM :: 0x0100
+	POLLWRBAND :: 0x0200
 
 	POLLERR    :: 0x0008
 	POLLHUP    :: 0x0010
