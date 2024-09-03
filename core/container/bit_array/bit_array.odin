@@ -275,7 +275,7 @@ create :: proc(max_index: int, min_index: int = 0, allocator := context.allocato
 	context.allocator = allocator
 	size_in_bits := max_index - min_index
 
-	if size_in_bits < 1 { return {}, false }
+	if size_in_bits < 0 { return {}, false }
 
 	legs := size_in_bits >> INDEX_SHIFT
 	if size_in_bits & INDEX_MASK > 0 {legs+=1}
