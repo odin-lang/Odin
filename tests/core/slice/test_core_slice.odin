@@ -276,3 +276,33 @@ test_unique :: proc(t: ^testing.T) {
 		delete(expected)
 	}
 }
+
+@test
+test_compare_empty :: proc(t: ^testing.T) {
+	a := []int{}
+	b := []int{}
+	c: [dynamic]int = { 0 }
+	d: [dynamic]int = { 1 }
+	clear(&c)
+	clear(&d)
+	defer {
+		delete(c)
+		delete(d)
+	}
+
+	testing.expectf(t, len(a) == 0,
+		"Expected length of slice `a` to be zero")
+	testing.expectf(t, len(c) == 0,
+		"Expected length of dynamic array `c` to be zero")
+	testing.expectf(t, len(d) == 0,
+		"Expected length of dynamic array `d` to be zero")
+
+	testing.expectf(t, slice.equal(a, a),
+		"Expected empty slice to be equal to itself")
+	testing.expectf(t, slice.equal(a, b),
+		"Expected two different but empty stack-based slices to be equivalent")
+	testing.expectf(t, slice.equal(a, c[:]),
+		"Expected empty slice to be equal to slice of empty dynamic array")
+	testing.expectf(t, slice.equal(c[:], d[:]),
+		"Expected two separate empty slices of two dynamic arrays to be equal")
+}
