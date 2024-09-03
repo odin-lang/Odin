@@ -122,9 +122,10 @@ pool_join :: proc(pool: ^Pool) {
 	for started_count < len(pool.threads) {
 		started_count = 0
 		for t in pool.threads {
-			if .Started in t.flags {
+			flags := intrinsics.atomic_load(&t.flags)
+			if .Started in flags {
 				started_count += 1
-				if .Joined not_in t.flags {
+				if .Joined not_in flags {
 					join(t)
 				}
 			}
