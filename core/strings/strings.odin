@@ -3316,3 +3316,106 @@ levenshtein_distance :: proc(a, b: string, allocator := context.allocator, loc :
 
 	return costs[n], nil
 }
+
+@(private)
+internal_substring :: proc(s: string, rune_start: int, rune_end: int) -> (sub: string, ok: bool) {
+	sub = s
+	ok  = true
+
+	rune_i: int
+
+	if rune_start > 0 {
+		ok = false
+		for _, i in sub {
+			if rune_start == rune_i {
+				ok = true
+				sub = sub[i:]
+				break
+			}
+			rune_i += 1
+		}
+		if !ok { return }
+	}
+
+	if rune_end >= rune_start {
+		ok = false
+		for _, i in sub {
+			if rune_end == rune_i {
+				ok = true
+				sub = sub[:i]
+				break
+			}
+			rune_i += 1
+		}
+
+		if rune_end == rune_i {
+			ok = true
+		}
+	}
+
+	return
+}
+
+/*
+Returns a substring of `s` that starts at rune index `rune_start` and goes up to `rune_end`.
+
+Think of it as slicing `s[rune_start:rune_end]` but rune-wise.
+
+Inputs:
+- s: the string to substring
+- rune_start: the start (inclusive) rune
+- rune_end: the end (exclusive) rune
+
+Returns:
+- sub: the substring
+- ok: whether the rune indexes where in bounds of the original string
+*/
+substring :: proc(s: string, rune_start: int, rune_end: int) -> (sub: string, ok: bool) {
+	if rune_start < 0 || rune_end < 0 || rune_end < rune_start {
+		return
+	}
+
+	return internal_substring(s, rune_start, rune_end)
+}
+
+/*
+Returns a substring of `s` that starts at rune index `rune_start` and goes up to the end of the string.
+
+Think of it as slicing `s[rune_start:]` but rune-wise.
+
+Inputs:
+- s: the string to substring
+- rune_start: the start (inclusive) rune
+
+Returns:
+- sub: the substring
+- ok: whether the rune indexes where in bounds of the original string
+*/
+substring_from :: proc(s: string, rune_start: int) -> (sub: string, ok: bool) {
+	if rune_start < 0 {
+		return
+	}
+
+	return internal_substring(s, rune_start, -1)
+}
+
+/*
+Returns a substring of `s` that goes up to rune index `rune_end`.
+
+Think of it as slicing `s[:rune_end]` but rune-wise.
+
+Inputs:
+- s: the string to substring
+- rune_end: the end (exclusive) rune
+
+Returns:
+- sub: the substring
+- ok: whether the rune indexes where in bounds of the original string
+*/
+substring_to :: proc(s: string, rune_end: int) -> (sub: string, ok: bool) {
+	if rune_end < 0 {
+		return
+	}
+
+	return internal_substring(s, -1, rune_end)
+}

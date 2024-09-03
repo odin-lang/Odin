@@ -124,3 +124,34 @@ test_case_conversion :: proc(t: ^testing.T) {
 		}
 	}
 }
+
+@(test)
+test_substring :: proc(t: ^testing.T) {
+	Case :: struct {
+		s:     string,
+		start: int,
+		end:   int,
+		sub:   string,
+		ok:    bool,
+	}
+	cases := []Case {
+		{ok = true},
+		{s = "", start = -1, ok = false},
+		{s = "", end = -1, ok = false},
+		{s = "", end = +1, ok = false},
+		{s = "Hello", end = len("Hello"), sub = "Hello", ok = true},
+		{s = "Hello", start = 1, end = len("Hello"), sub = "ello", ok = true},
+		{s = "Hello", start = 1, end = len("Hello") - 1, sub = "ell", ok = true},
+		{s = "Hello", end = len("Hello") + 1, sub = "Hello", ok = false},
+		{s = "小猫咪", start = 0, end = 3, sub = "小猫咪", ok = true},
+		{s = "小猫咪", start = 1, end = 3, sub = "猫咪", ok = true},
+		{s = "小猫咪", start = 1, end = 5, sub = "猫咪", ok = false},
+		{s = "小猫咪", start = 1, end = 1, sub = "", ok = true},
+	}
+
+	for tc in cases {
+		sub, ok := strings.substring(tc.s, tc.start, tc.end)
+		testing.expectf(t, ok == tc.ok, "expected %v[%v:%v] to return ok: %v", tc.s, tc.start, tc.end, tc.ok)
+		testing.expectf(t, sub == tc.sub, "expected %v[%v:%v] to return sub: %v, got: %v", tc.s, tc.start, tc.end, tc.sub, sub)
+	}
+}
