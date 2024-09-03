@@ -318,7 +318,7 @@ Info_Errno :: enum c.int {
 	OVERFLOW = EAI_OVERFLOW,
 }
 
-when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS == .OpenBSD || ODIN_OS == .OpenBSD {
+when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS == .OpenBSD || ODIN_OS == .OpenBSD || ODIN_OS == .Linux {
 
 	hostent :: struct {
 		h_name:      cstring,                /* [PSX] official name of host */

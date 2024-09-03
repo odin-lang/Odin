@@ -30,7 +30,7 @@ Protocol :: enum c.int {
 	UDP  = IPPROTO_UDP,
 }
 
-when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS == .OpenBSD {
+when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS == .OpenBSD || ODIN_OS == .Linux {
 
 	in_addr :: struct {
 		s_addr: in_addr_t, /* [PSX] big endian address */
