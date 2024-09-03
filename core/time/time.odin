@@ -955,6 +955,24 @@ Convert datetime components into time.
 datetime_to_time :: proc{components_to_time, compound_to_time}
 
 /*
+Convert time into datetime.
+*/
+time_to_datetime :: proc "contextless" (t: Time) -> (dt.DateTime, bool) {
+	unix_epoch := dt.DateTime{{1970, 1, 1}, {0, 0, 0, 0}}
+
+	datetime, err := dt.add(unix_epoch, dt.Delta{ nanos = t._nsec })
+	if err != .None {
+		return {}, false
+	}
+	return datetime, true
+}
+
+/*
+Alias for `time_to_datetime`.
+*/
+time_to_compound :: time_to_datetime
+
+/*
 Check if a year is a leap year.
 */
 is_leap_year :: proc "contextless" (year: int) -> (leap: bool) {
