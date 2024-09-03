@@ -76,7 +76,7 @@ raw_soa_footer :: proc{
 
 
 @(builtin, require_results)
-make_soa_aligned :: proc($T: typeid/#soa[]$E, length: int, alignment: int, allocator := context.allocator, loc := #caller_location) -> (array: T, err: Allocator_Error) #optional_allocator_error {
+make_soa_aligned :: proc($T: typeid/#soa[]$E, #any_int length, alignment: int, allocator := context.allocator, loc := #caller_location) -> (array: T, err: Allocator_Error) #optional_allocator_error {
 	if length <= 0 {
 		return
 	}
@@ -484,7 +484,7 @@ into_dynamic_soa :: proc(array: $T/#soa[]$E) -> #soa[dynamic]E {
 // Note: If you the elements to remain in their order, use `ordered_remove_soa`.
 // Note: If the index is out of bounds, this procedure will panic.
 @builtin
-unordered_remove_soa :: proc(array: ^$T/#soa[dynamic]$E, index: int, loc := #caller_location) #no_bounds_check {
+unordered_remove_soa :: proc(array: ^$T/#soa[dynamic]$E, #any_int index: int, loc := #caller_location) #no_bounds_check {
 	bounds_check_error_loc(loc, index, len(array))
 	if index+1 < len(array) {
 		ti := type_info_of(typeid_of(T))
@@ -512,7 +512,7 @@ unordered_remove_soa :: proc(array: ^$T/#soa[dynamic]$E, index: int, loc := #cal
 // Note: If you the elements do not have to remain in their order, prefer `unordered_remove_soa`.
 // Note: If the index is out of bounds, this procedure will panic.
 @builtin
-ordered_remove_soa :: proc(array: ^$T/#soa[dynamic]$E, index: int, loc := #caller_location) #no_bounds_check {
+ordered_remove_soa :: proc(array: ^$T/#soa[dynamic]$E, #any_int index: int, loc := #caller_location) #no_bounds_check {
 	bounds_check_error_loc(loc, index, len(array))
 	if index+1 < len(array) {
 		ti := type_info_of(typeid_of(T))
