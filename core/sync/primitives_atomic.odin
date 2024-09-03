@@ -338,7 +338,7 @@ atomic_sema_wait :: proc "contextless" (s: ^Atomic_Sema) {
 		original_count := atomic_load_explicit(&s.count, .Relaxed)
 		for original_count == 0 {
 			futex_wait(&s.count, u32(original_count))
-			original_count = s.count
+			original_count = atomic_load_explicit(&s.count, .Relaxed)
 		}
 		if original_count == atomic_compare_exchange_strong_explicit(&s.count, original_count, original_count-1, .Acquire, .Acquire) {
 			return
