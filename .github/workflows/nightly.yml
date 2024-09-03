@@ -160,22 +160,22 @@ jobs:
         run: python -c "import sys; print(sys.version)"
 
       - name: Download Windows artifacts
-        uses: actions/download-artifact@v1
+        uses: actions/download-artifact@v4.1.7
         with:
           name: windows_artifacts
 
       - name: Download Ubuntu artifacts
-        uses: actions/download-artifact@v1
+        uses: actions/download-artifact@v4.1.7
         with:
           name: ubuntu_artifacts
 
       - name: Download macOS artifacts
-        uses: actions/download-artifact@v1
+        uses: actions/download-artifact@v4.1.7
         with:
           name: macos_artifacts
 
       - name: Download macOS arm artifacts
-        uses: actions/download-artifact@v1
+        uses: actions/download-artifact@v4.1.7
         with:
           name: macos_arm_artifacts
 
