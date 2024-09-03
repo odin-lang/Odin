@@ -17,46 +17,44 @@ accomplish common tasks.
   A third optional boolean parameter controls if the file is streamed
   (default), or or read at once.
 
-```odin
-package hash_example
+Example:
+	package hash_example
 
-import "core:crypto/hash"
+	import "core:crypto/hash"
 
-main :: proc() {
-	input := "Feed the fire."
+	main :: proc() {
+		input := "Feed the fire."
 
-	// Compute the digest, using the high level API.
-	returned_digest := hash.hash(hash.Algorithm.SHA512_256, input)
-	defer delete(returned_digest)
+		// Compute the digest, using the high level API.
+		returned_digest := hash.hash(hash.Algorithm.SHA512_256, input)
+		defer delete(returned_digest)
 
-	// Variant that takes a destination buffer, instead of returning
-	// the digest.
-	digest := make([]byte, hash.DIGEST_SIZES[hash.Algorithm.BLAKE2B]) // @note: Destination buffer has to be at least as big as the digest size of the hash.
-	defer delete(digest)
-	hash.hash(hash.Algorithm.BLAKE2B, input, digest)
-}
-```
+		// Variant that takes a destination buffer, instead of returning
+		// the digest.
+		digest := make([]byte, hash.DIGEST_SIZES[hash.Algorithm.BLAKE2B]) // @note: Destination buffer has to be at least as big as the digest size of the hash.
+		defer delete(digest)
+		hash.hash(hash.Algorithm.BLAKE2B, input, digest)
+	}
 
 A generic low level API is provided supporting the init/update/final interface
 that is typical with cryptographic hash function implementations.
 
-```odin
-package hash_example
+Example:
+	package hash_example
 
-import "core:crypto/hash"
+	import "core:crypto/hash"
 
-main :: proc() {
-    input := "Let the cinders burn."
+	main :: proc() {
+		input := "Let the cinders burn."
 
-    // Compute the digest, using the low level API.
-    ctx: hash.Context
-    digest := make([]byte, hash.DIGEST_SIZES[hash.Algorithm.SHA3_512])
-    defer delete(digest)
+		// Compute the digest, using the low level API.
+		ctx: hash.Context
+		digest := make([]byte, hash.DIGEST_SIZES[hash.Algorithm.SHA3_512])
+		defer delete(digest)
 
-    hash.init(&ctx, hash.Algorithm.SHA3_512)
-    hash.update(&ctx, transmute([]byte)input)
-    hash.final(&ctx, digest)
-}
-```
+		hash.init(&ctx, hash.Algorithm.SHA3_512)
+		hash.update(&ctx, transmute([]byte)input)
+		hash.final(&ctx, digest)
+	}
 */
 package crypto_hash

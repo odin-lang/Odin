@@ -1,8 +1,8 @@
 /*
 	OpenSimplex2 noise implementation.
 
-	Ported from https://github.com/KdotJPG/OpenSimplex2.
-	Copyright 2022 Yuki2 (https://github.com/NoahR02)
+	Ported from [[ https://github.com/KdotJPG/OpenSimplex2 }].
+	Copyright 2022 Yuki2 [[ https://github.com/NoahR02 ]]
 */
 package math_noise
 

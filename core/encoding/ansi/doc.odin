@@ -13,8 +13,8 @@ If your terminal supports 24-bit true color mode, you can also do this:
 	fmt.println(ansi.CSI + ansi.FG_COLOR_24_BIT + ";0;255;255" + ansi.SGR + "Hellope!" + ansi.CSI + ansi.RESET + ansi.SGR)
 
 For more information, see:
-	1. https://en.wikipedia.org/wiki/ANSI_escape_code
-	2. https://www.vt100.net/docs/vt102-ug/chapter5.html
-	3. https://invisible-island.net/xterm/ctlseqs/ctlseqs.html
+- [[ https://en.wikipedia.org/wiki/ANSI_escape_code ]]
+- [[ https://www.vt100.net/docs/vt102-ug/chapter5.html ]]
+- [[ https://invisible-island.net/xterm/ctlseqs/ctlseqs.html ]]
 */
 package ansi

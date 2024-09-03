@@ -1,10 +1,9 @@
-package text_edit
-
 /*
-	Based off the articles by rxi:
-		* https://rxi.github.io/textbox_behaviour.html
-		* https://rxi.github.io/a_simple_undo_system.html
+Based off the articles by rxi:
+- [[ https://rxi.github.io/textbox_behaviour.html ]]
+- [[ https://rxi.github.io/a_simple_undo_system.html ]]
 */
+package text_edit
 
 import "base:runtime"
 import "core:time"

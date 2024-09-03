@@ -8,9 +8,6 @@
 */
 
 
-// package png implements a PNG image reader
-//
-// The PNG specification is at https://www.w3.org/TR/PNG/.
 //+vet !using-stmt
 package png
 
