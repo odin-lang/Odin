@@ -14,10 +14,10 @@ import "core:reflect"
 // positionals first before adding it to a fallback field.
 @(optimization_mode="favor_size")
 push_positional :: #force_no_inline proc (model: ^$T, parser: ^Parser, arg: string) -> (error: Error) {
-	if bit_array.get(&parser.filled_pos, parser.filled_pos.max_index) {
-		// The max index is set, which means we're out of space.
+	if set, valid_index := bit_array.get(&parser.filled_pos, parser.filled_pos.length - 1); set || !valid_index {
+		// The index below the last one is either set or invalid, which means we're out of space.
 		// Add one free bit by setting the index above to false.
-		bit_array.set(&parser.filled_pos, 1 + parser.filled_pos.max_index, false)
+		bit_array.set(&parser.filled_pos, parser.filled_pos.length, false)
 	}
 
 	pos: int = ---
