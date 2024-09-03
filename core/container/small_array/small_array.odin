@@ -139,9 +139,13 @@ clear :: proc "contextless" (a: ^$A/Small_Array($N, $T)) {
 	resize(a, 0)
 }
 
-push_back_elems :: proc "contextless" (a: ^$A/Small_Array($N, $T), items: ..T) {
-	n := copy(a.data[a.len:], items[:])
-	a.len += n
+push_back_elems :: proc "contextless" (a: ^$A/Small_Array($N, $T), items: ..T) -> bool {
+	if a.len + builtin.len(items) <= cap(a^) {
+		n := copy(a.data[a.len:], items[:])
+		a.len += n
+		return true
+	}
+	return false
 }
 
 inject_at :: proc "contextless" (a: ^$A/Small_Array($N, $T), item: T, index: int) -> bool #no_bounds_check {
