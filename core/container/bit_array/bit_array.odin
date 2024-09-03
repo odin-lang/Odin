@@ -1,5 +1,6 @@
 package container_dynamic_bit_array
 
+import "base:builtin"
 import "base:intrinsics"
 import "core:mem"
 
@@ -297,6 +298,35 @@ Inputs:
 clear :: proc(ba: ^Bit_Array) {
 	if ba == nil { return }
 	mem.zero_slice(ba.bits[:])
+}
+/*
+Shrinks the Bit_Array's backing storage to the smallest possible size.
+
+Inputs:
+- ba: The target Bit_Array
+*/
+shrink :: proc(ba: ^Bit_Array) #no_bounds_check {
+	if ba == nil { return }
+	legs_needed := len(ba.bits)
+	for i := legs_needed - 1; i >= 0; i -= 1 {
+		if ba.bits[i] == 0 {
+			legs_needed -= 1
+		} else {
+			break
+		}
+	}
+	if legs_needed == len(ba.bits) {
+		return
+	}
+	ba.max_index = 0
+	if legs_needed > 0 {
+		if legs_needed > 1 {
+			ba.max_index = (legs_needed - 1) * NUM_BITS
+		}
+		ba.max_index += NUM_BITS - 1 - int(intrinsics.count_leading_zeros(ba.bits[legs_needed - 1]))
+	}
+	resize(&ba.bits, legs_needed)
+	builtin.shrink(&ba.bits)
 }
 /*
 Deallocates the Bit_Array and its backing storage
