@@ -253,6 +253,31 @@ test_parse_iso8601_string :: proc(t: ^testing.T) {
 	}
 }
 
+@test
+test_time_to_datetime_roundtrip :: proc(t: ^testing.T) {
+	// Roundtrip a time through `time_to_datetime` to `DateTime` and back.
+	// Select `N` evenly-distributed points throughout the positive signed 64-bit number line.
+	N :: 1024
+	for i in 0..=i64(N) {
+		n := i * (max(i64) / N)
+		x := time.unix(0, n)
+
+		y, ttd_err := time.time_to_datetime(x)
+		testing.expectf(t, ttd_err,
+			"Time<%i> failed to convert to DateTime",
+			n) or_continue
+
+		z, dtt_err := time.datetime_to_time(y)
+		testing.expectf(t, dtt_err,
+			"DateTime<%v> failed to convert to Time",
+			y) or_continue
+
+		testing.expectf(t, x == z,
+			"Roundtrip conversion of Time to DateTime and back failed: got %v, expected %v",
+			z, x)
+	}
+}
+
 MONTH_DAYS := []int{31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31}
 YEAR_START :: 1900
 YEAR_END   :: 2024
