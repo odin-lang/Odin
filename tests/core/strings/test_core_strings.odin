@@ -48,18 +48,19 @@ Cut_Test :: struct {
 }
 
 cut_tests :: []Cut_Test{
-	{"some example text", 0, 4, "some"        },
-	{"some example text", 2, 2, "me"          },
-	{"some example text", 5, 7, "example"     },
-	{"some example text", 5, 0, "example text"},
-	{"恥ずべきフクロウ",        4, 0, "フクロウ"       },
+	{"some example text", 0, 0, "some example text" },
+	{"some example text", 0, 4, "some"              },
+	{"some example text", 2, 2, "me"                },
+	{"some example text", 5, 7, "example"           },
+	{"some example text", 5, 0, "example text"      },
+	{"恥ずべきフクロウ",        0, 0, "恥ずべきフクロウ"        },
+	{"恥ずべきフクロウ",        4, 0, "フクロウ"             },
 }
 
 @test
 test_cut :: proc(t: ^testing.T) {
 	for test in cut_tests {
 		res := strings.cut(test.input, test.offset, test.length)
-		defer delete(res)
 
 		testing.expectf(
 			t,

@@ -710,6 +710,63 @@ The concatenated string, and an error if allocation fails
 concatenate_safe :: proc(a: []string, allocator := context.allocator) -> (res: string, err: mem.Allocator_Error) {
 	return concatenate(a, allocator)
 }
+
+/*
+Returns a substring of the input string `s` with the specified rune offset and length
+
+Inputs:
+- s: The input string to cut
+- rune_offset: The starting rune index (default is 0). In runes, not bytes.
+- rune_length: The number of runes to include in the substring (default is 0, which returns the remainder of the string).  In runes, not bytes.
+
+Returns:
+- res: The substring
+
+Example:
+
+	import "core:fmt"
+	import "core:strings"
+
+	cut_example :: proc() {
+		fmt.println(strings.cut("some example text", 0, 4)) // -> "some"
+		fmt.println(strings.cut("some example text", 2, 2)) // -> "me"
+		fmt.println(strings.cut("some example text", 5, 7)) // -> "example"
+	}
+
+Output:
+
+	some
+	me
+	example
+
+*/
+cut :: proc(s: string, rune_offset := int(0), rune_length := int(0)) -> (res: string) {
+	s := s; rune_length := rune_length
+
+	count := 0
+	for _, offset in s {
+		if count == rune_offset {
+			s = s[offset:]
+			break
+		}
+		count += 1
+	}
+
+	if rune_length <= 1 {
+		return s
+	}
+
+	count = 0
+	for _, offset in s {
+		if count == rune_length {
+			s = s[:offset]
+			break
+		}
+		count += 1
+	}
+	return s
+}
+
 /*
 Returns a substring of the input string `s` with the specified rune offset and length
 
@@ -731,9 +788,9 @@ Example:
 	import "core:strings"
 
 	cut_example :: proc() {
-		fmt.println(strings.cut("some example text", 0, 4)) // -> "some"
-		fmt.println(strings.cut("some example text", 2, 2)) // -> "me"
-		fmt.println(strings.cut("some example text", 5, 7)) // -> "example"
+		fmt.println(strings.cut_clone("some example text", 0, 4)) // -> "some"
+		fmt.println(strings.cut_clone("some example text", 2, 2)) // -> "me"
+		fmt.println(strings.cut_clone("some example text", 5, 7)) // -> "example"
 	}
 
 Output:
@@ -743,57 +800,11 @@ Output:
 	example
 
 */
-cut :: proc(s: string, rune_offset := int(0), rune_length := int(0), allocator := context.allocator, loc := #caller_location) -> (res: string, err: mem.Allocator_Error) #optional_allocator_error {
-	s := s; rune_length := rune_length
-	context.allocator = allocator
-
-	// If we signal that we want the entire remainder (length <= 0) *and*
-	// the offset is zero, then we can early out by cloning the input
-	if rune_offset == 0 && rune_length <= 0 {
-		return clone(s)
-	}
-
-	// We need to know if we have enough runes to cover offset + length.
-	rune_count := utf8.rune_count_in_string(s)
-
-	// We're asking for a substring starting after the end of the input string.
-	// That's just an empty string.
-	if rune_offset >= rune_count {
-		return "", nil
-	}
-
-	// If we don't specify the length of the substring, use the remainder.
-	if rune_length <= 0 {
-		rune_length = rune_count - rune_offset
-	}
-
-	// We don't yet know how many bytes we need exactly.
-	// But we do know it's bounded by the number of runes * 4 bytes,
-	// and can be no more than the size of the input string.
-	bytes_needed := min(rune_length * 4, len(s))
-	buf := make([]u8, bytes_needed, allocator, loc) or_return
-
-	byte_offset := 0
-	for i := 0; i < rune_count; i += 1 {
-		_, w := utf8.decode_rune_in_string(s)
-
-		// If the rune is part of the substring, copy it to the output buffer.
-		if i >= rune_offset {
-			for j := 0; j < w; j += 1 {
-				buf[byte_offset+j] = s[j]
-			}
-			byte_offset += w
-		}
-
-		// We're done if we reach the end of the input string, *or*
-		// if we've reached a specified length in runes.
-		if rune_length > 0 {
-			if i == rune_offset + rune_length - 1 { break }
-		}
-		s = s[w:]
-	}
-	return string(buf[:byte_offset]), nil
+cut_clone :: proc(s: string, rune_offset := int(0), rune_length := int(0), allocator := context.allocator, loc := #caller_location) -> (res: string, err: mem.Allocator_Error) #optional_allocator_error {
+	res = cut(s, rune_offset, rune_length)
+	return clone(res, allocator, loc)
 }
+
 /*
 Splits the input string `s` into a slice of substrings separated by the specified `sep` string
 
