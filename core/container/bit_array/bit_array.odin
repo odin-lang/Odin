@@ -53,7 +53,7 @@ Returns:
 */
 iterate_by_all :: proc (it: ^Bit_Array_Iterator) -> (set: bool, index: int, ok: bool) {
 	index = it.word_idx * NUM_BITS + int(it.bit_idx) + it.array.bias
-	if index > it.array.max_index { return false, 0, false }
+	if index > it.array.max_index + it.array.bias { return false, 0, false }
 
 	word := it.array.bits[it.word_idx] if len(it.array.bits) > it.word_idx else 0
 	set = (word >> it.bit_idx & 1) == 1
@@ -136,7 +136,7 @@ iterate_internal_ :: proc (it: ^Bit_Array_Iterator, $ITERATE_SET_BITS: bool) -> 
 		it.bit_idx = 0
 		it.word_idx += 1
 	}
-	return index, index <= it.array.max_index
+	return index, index <= it.array.max_index + it.array.bias
 }
 /*
 Gets the state of a bit in the bit-array
@@ -285,7 +285,7 @@ create :: proc(max_index: int, min_index: int = 0, allocator := context.allocato
 	res = new(Bit_Array)
 	res.bits         = bits
 	res.bias         = min_index
-	res.max_index    = max_index
+	res.max_index    = max_index - min_index
 	res.free_pointer = true
 	return
 }
