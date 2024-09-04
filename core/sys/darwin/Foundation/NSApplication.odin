@@ -79,7 +79,10 @@ Application_setActivationPolicy :: proc "c" (self: ^Application, activationPolic
 	return msgSend(BOOL, self, "setActivationPolicy:", activationPolicy)
 }
 
-@(deprecated="Use NSApplication method activate instead.")
+// NOTE: this is technically deprecated but still actively used (Sokol, glfw, SDL, etc.)
+// and has no clear alternative although `activate` is what Apple tells you to use,
+// that does not work the same way.
+// @(deprecated="Use NSApplication method activate instead.")
 @(objc_type=Application, objc_name="activateIgnoringOtherApps")
 Application_activateIgnoringOtherApps :: proc "c" (self: ^Application, ignoreOtherApps: BOOL) {
 	msgSend(nil, self, "activateIgnoringOtherApps:", ignoreOtherApps)
