@@ -2810,8 +2810,14 @@ gb_internal bool are_types_identical_internal(Type *x, Type *y, bool check_tuple
 
 	case Type_Union:
 		if (x->Union.variants.count == y->Union.variants.count &&
-		    x->Union.custom_align == y->Union.custom_align &&
 		    x->Union.kind == y->Union.kind) {
+
+			if (x->Union.custom_align != y->Union.custom_align) {
+				if (type_align_of(x) != type_align_of(y)) {
+					return false;
+				}
+			}
+
 			// NOTE(bill): zeroth variant is nullptr
 			for_array(i, x->Union.variants) {
 				if (!are_types_identical(x->Union.variants[i], y->Union.variants[i])) {
@@ -2827,10 +2833,16 @@ gb_internal bool are_types_identical_internal(Type *x, Type *y, bool check_tuple
 		    x->Struct.is_no_copy   == y->Struct.is_no_copy &&
 		    x->Struct.fields.count == y->Struct.fields.count &&
 		    x->Struct.is_packed    == y->Struct.is_packed &&
-		    x->Struct.custom_align == y->Struct.custom_align &&
 		    x->Struct.soa_kind == y->Struct.soa_kind &&
 		    x->Struct.soa_count == y->Struct.soa_count &&
 		    are_types_identical(x->Struct.soa_elem, y->Struct.soa_elem)) {
+
+			if (x->Struct.custom_align != y->Struct.custom_align) {
+				if (type_align_of(x) != type_align_of(y)) {
+					return false;
+				}
+			}
+
 			for_array(i, x->Struct.fields) {
 				Entity *xf = x->Struct.fields[i];
 				Entity *yf = y->Struct.fields[i];
