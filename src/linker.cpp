@@ -641,9 +641,11 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 				}
 			}
 
-			// Set the rpath to the $ORIGIN (the path of the executable),
-			// so that dynamic libraries are looked for at that path.
-			gb_string_appendc(link_settings, "-Wl,-rpath,\\$ORIGIN ");
+			if (!build_context.no_rpath) {
+				// Set the rpath to the $ORIGIN (the path of the executable),
+				// so that dynamic libraries are looked for at that path.
+				gb_string_appendc(link_settings, "-Wl,-rpath,\\$ORIGIN ");
+			}
 
 			if (!build_context.no_crt) {
 				platform_lib_str = gb_string_appendc(platform_lib_str, "-lm ");

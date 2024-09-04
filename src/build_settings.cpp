@@ -411,6 +411,7 @@ struct BuildContext {
 	bool   no_dynamic_literals;
 	bool   no_output_files;
 	bool   no_crt;
+	bool   no_rpath;
 	bool   no_entry_point;
 	bool   no_thread_local;
 	bool   use_lld;
