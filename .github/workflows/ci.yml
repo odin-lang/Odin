@@ -257,16 +257,16 @@ jobs:
         run: sudo apt-get install -y qemu-user qemu-user-static gcc-12-riscv64-linux-gnu libc6-riscv64-cross
 
       - name: Odin run
-        run: ./odin run examples/demo -vet -strict-style -disallow-do -target:linux_riscv64 -extra-linker-flags:"-fuse-ld=/usr/bin/riscv64-linux-gnu-gcc-12 -static -Wl,-static"
+        run: ./odin run examples/demo -vet -strict-style -disallow-do -target:linux_riscv64 -extra-linker-flags:"-fuse-ld=/usr/bin/riscv64-linux-gnu-gcc-12 -static -Wl,-static" -no-rpath
 
       - name: Odin run -debug
-        run: ./odin run examples/demo -debug -vet -strict-style -disallow-do -target:linux_riscv64 -extra-linker-flags:"-fuse-ld=/usr/bin/riscv64-linux-gnu-gcc-12 -static -Wl,-static"
+        run: ./odin run examples/demo -debug -vet -strict-style -disallow-do -target:linux_riscv64 -extra-linker-flags:"-fuse-ld=/usr/bin/riscv64-linux-gnu-gcc-12 -static -Wl,-static" -no-rpath
 
       - name: Normal Core library tests
-        run: ./odin test tests/core/normal.odin -file -all-packages -vet -strict-style -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -target:linux_riscv64 -extra-linker-flags:"-fuse-ld=/usr/bin/riscv64-linux-gnu-gcc-12 -static -Wl,-static"
+        run: ./odin test tests/core/normal.odin -file -all-packages -vet -strict-style -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -target:linux_riscv64 -extra-linker-flags:"-fuse-ld=/usr/bin/riscv64-linux-gnu-gcc-12 -static -Wl,-static" -no-rpath
 
       - name: Optimized Core library tests
-        run: ./odin test tests/core/speed.odin -o:speed -file -all-packages -vet -strict-style -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -target:linux_riscv64 -extra-linker-flags:"-fuse-ld=/usr/bin/riscv64-linux-gnu-gcc-12 -static -Wl,-static"
+        run: ./odin test tests/core/speed.odin -o:speed -file -all-packages -vet -strict-style -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -target:linux_riscv64 -extra-linker-flags:"-fuse-ld=/usr/bin/riscv64-linux-gnu-gcc-12 -static -Wl,-static" -no-rpath
 
       - name: Internals tests
-        run: ./odin test tests/internal -all-packages -vet -strict-style -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -target:linux_riscv64 -extra-linker-flags:"-fuse-ld=/usr/bin/riscv64-linux-gnu-gcc-12 -static -Wl,-static"
+        run: ./odin test tests/internal -all-packages -vet -strict-style -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -target:linux_riscv64 -extra-linker-flags:"-fuse-ld=/usr/bin/riscv64-linux-gnu-gcc-12 -static -Wl,-static" -no-rpath
