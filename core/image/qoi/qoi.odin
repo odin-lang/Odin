@@ -9,7 +9,7 @@
 
 // package qoi implements a QOI image reader
 //
-// The QOI specification is at https://qoiformat.org.
+// The QOI specification is at [[ https://qoiformat.org ]].
 package qoi
 
 import "core:image"

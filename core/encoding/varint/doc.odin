@@ -1,10 +1,11 @@
 /*
-	Implementation of the LEB128 variable integer encoding as used by DWARF encoding and DEX files, among others.
+Implementation of the LEB128 variable integer encoding as used by DWARF encoding and DEX files, among others.
 
-	Author of this Odin package: Jeroen van Rijn
+Author of this Odin package: Jeroen van Rijn
 
-	Example:
-	```odin
+Example:
+	package main
+
 	import "core:encoding/varint"
 	import "core:fmt"
 
@@ -22,7 +23,5 @@
 		assert(decoded_val == value && decode_size == encode_size && decode_err == .None)
 		fmt.printf("Decoded as %v, using %v byte%v\n", decoded_val, decode_size, "" if decode_size == 1 else "s")
 	}
-	```
-
 */
 package encoding_varint

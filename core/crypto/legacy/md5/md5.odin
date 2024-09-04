@@ -5,8 +5,8 @@ WARNING: The MD5 algorithm is known to be insecure and should only be
 used for interoperating with legacy applications.
 
 See:
-- https://eprint.iacr.org/2005/075
-- https://datatracker.ietf.org/doc/html/rfc1321
+- [[ https://eprint.iacr.org/2005/075 ]]
+- [[ https://datatracker.ietf.org/doc/html/rfc1321 ]]
 */
 package md5
 

@@ -2,9 +2,9 @@
 package ed25519 implements the Ed25519 EdDSA signature algorithm.
 
 See:
-- https://datatracker.ietf.org/doc/html/rfc8032
-- https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.186-5.pdf
-- https://eprint.iacr.org/2020/1244.pdf
+- [[ https://datatracker.ietf.org/doc/html/rfc8032 ]]
+- [[ https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.186-5.pdf ]]
+- [[ https://eprint.iacr.org/2020/1244.pdf ]]
 */
 package ed25519
 

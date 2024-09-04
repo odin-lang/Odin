@@ -21,8 +21,9 @@ cryptographically-secure, per RFC 9562's suggestion.
 - Version 6 without either a clock or node argument.
 - Version 7 in all cases.
 
-Here's an example of how to set up one:
-	
+Example:	
+	package main
+
 	import "core:crypto"
 	import "core:encoding/uuid"
 
@@ -40,7 +41,7 @@ Here's an example of how to set up one:
 
 
 For more information on the specifications, see here:
-- https://www.rfc-editor.org/rfc/rfc4122.html
-- https://www.rfc-editor.org/rfc/rfc9562.html
+- [[ https://www.rfc-editor.org/rfc/rfc4122.html ]]
+- [[ https://www.rfc-editor.org/rfc/rfc9562.html ]]
 */
 package uuid

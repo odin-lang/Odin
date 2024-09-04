@@ -2,6 +2,12 @@
 Copyright 2022 Jeroen van Rijn <nom@duclavier.com>.
 Made available under Odin's BSD-3 license.
 
+List of contributors:
+	Jeroen van Rijn: Initial implementation.
+	Laytan: ARM and RISC-V CPU feature detection.
+*/
+
+/*
 Package `core:sys/info` gathers system information on:
 Windows, Linux, macOS, FreeBSD & OpenBSD.
 
@@ -11,9 +17,10 @@ and CPU information.
 On Windows, GPUs will also be enumerated using the registry.
 
 CPU feature flags can be tested against `cpu_features`, where applicable, e.g.
-`if .aes in si.aes { ... }`
+`if .aes in info.cpu_features.? { ... }`
 
 Example:
+	package main
 
 	import "core:fmt"
 	import si "core:sys/info"

@@ -1,23 +1,25 @@
-package encoding_unicode_entity
 /*
-	A unicode entity encoder/decoder
-
 	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
 	Made available under Odin's BSD-3 license.
-
-	This code has several procedures to map unicode runes to/from different textual encodings.
-	- SGML/XML/HTML entity
-	-- &#<decimal>;
-	-- &#x<hexadecimal>;
-	-- &<entity name>;   (If the lookup tables are compiled in).
-	Reference: https://www.w3.org/2003/entities/2007xml/unicode.xml	
-
-	- URL encode / decode %hex entity
-	Reference: https://datatracker.ietf.org/doc/html/rfc3986/#section-2.1
 
 	List of contributors:
 		Jeroen van Rijn: Initial implementation.
 */
+
+/*
+	A unicode entity encoder/decoder.
+
+	This code has several procedures to map unicode runes to/from different textual encodings.
+	- SGML/XML/HTML entity
+	- &#<decimal>;
+	- &#x<hexadecimal>;
+	- &<entity name>;   (If the lookup tables are compiled in).
+	Reference: [[ https://www.w3.org/2003/entities/2007xml/unicode.xml ]]
+
+	- URL encode / decode %hex entity
+	Reference: [[ https://datatracker.ietf.org/doc/html/rfc3986/#section-2.1 ]]
+*/
+package encoding_unicode_entity
 
 import "core:unicode/utf8"
 import "core:unicode"

@@ -112,7 +112,7 @@ foreign lib {
 	Return configuration-defined string values.
 	Its use and purpose are similar to sysconf(), but it is used where string values rather than numeric values are returned.
 
-	Returns: 0 (setting errno) if `name` is invalid, need `buf` `len` if buf is `nil`, amount of bytes added to buf otherwise
+	Returns: 0 (setting errno) if `name` is invalid, need `buf` of `len` bytes if `buf` is `nil`, amount of bytes added to buf otherwise
 
 	[[ More; https://pubs.opengroup.org/onlinepubs/9699919799/functions/confstr.html ]]
 	*/

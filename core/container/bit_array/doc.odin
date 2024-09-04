@@ -1,8 +1,8 @@
 /*
 The Bit Array can be used in several ways:
 
-- By default you don't need to instantiate a Bit Array:
-
+By default you don't need to instantiate a Bit Array.
+Example:
 	package test
 
 	import "core:fmt"
@@ -22,8 +22,8 @@ The Bit Array can be used in several ways:
 		destroy(&bits)
 	}
 
-- A Bit Array can optionally allow for negative indices, if the minimum value was given during creation:
-
+A Bit Array can optionally allow for negative indices, if the minimum value was given during creation.
+Example:
 	package test
 
 	import "core:fmt"

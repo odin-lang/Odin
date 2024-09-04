@@ -6,7 +6,7 @@ pre-standardization Keccak algorithm is required, it can be found in
 crypto/legacy/keccak.
 
 See:
-- https://nvlpubs.nist.gov/nistpubs/fips/nist.fips.202.pdf
+- [[ https://nvlpubs.nist.gov/nistpubs/fips/nist.fips.202.pdf ]]
 */
 package sha3
 

@@ -1,4 +1,7 @@
 /*
+Example:
+	package main
+
 	import "base:runtime"
 	import "core:prof/spall"
 	import "core:sync"

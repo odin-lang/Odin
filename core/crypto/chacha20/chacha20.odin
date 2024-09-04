@@ -2,8 +2,8 @@
 package chacha20 implements the ChaCha20 and XChaCha20 stream ciphers.
 
 See:
-- https://datatracker.ietf.org/doc/html/rfc8439
-- https://datatracker.ietf.org/doc/draft-irtf-cfrg-xchacha/03/
+- [[ https://datatracker.ietf.org/doc/html/rfc8439 ]]
+- [[ https://datatracker.ietf.org/doc/draft-irtf-cfrg-xchacha/03/ ]]
 */
 package chacha20
 
