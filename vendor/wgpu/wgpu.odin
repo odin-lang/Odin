@@ -13,7 +13,7 @@ when ODIN_OS == .Windows {
 	@(private) LIB  :: "lib/wgpu-windows-" + ARCH + "-" + TYPE + "/wgpu_native" + EXT
 
 	when !#exists(LIB) {
-		#panic("Could not find the compiled WGPU Native library at '" + #directory + LIB + "', these can be downloaded from https://github.com/gfx-rs/wgpu-native/releases/tag/v22.1.0.1, make sure to read the README at '" + #directory + "vendor/wgpu/README.md'")
+		#panic("Could not find the compiled WGPU Native library at '" + #directory + LIB + "', these can be downloaded from https://github.com/gfx-rs/wgpu-native/releases/tag/v22.1.0.1, make sure to read the README at '" + #directory + "README.md'")
 	}
 
 	foreign import libwgpu {
@@ -34,7 +34,7 @@ when ODIN_OS == .Windows {
 	@(private) LIB  :: "lib/wgpu-macos-" + ARCH + "-" + TYPE + "/libwgpu_native" + EXT
 
 	when !#exists(LIB) {
-		#panic("Could not find the compiled WGPU Native library at '" + #directory + LIB + "', these can be downloaded from https://github.com/gfx-rs/wgpu-native/releases/tag/v22.1.0.1, make sure to read the README at '" + #directory + "vendor/wgpu/README.md'")
+		#panic("Could not find the compiled WGPU Native library at '" + #directory + LIB + "', these can be downloaded from https://github.com/gfx-rs/wgpu-native/releases/tag/v22.1.0.1, make sure to read the README at '" + #directory + "README.md'")
 	}
 
 	foreign import libwgpu {
@@ -49,7 +49,7 @@ when ODIN_OS == .Windows {
 	@(private) LIB  :: "lib/wgpu-linux-" + ARCH + "-" + TYPE + "/libwgpu_native" + EXT
 
 	when !#exists(LIB) {
-		#panic("Could not find the compiled WGPU Native library at '" + #directory + LIB + "', these can be downloaded from https://github.com/gfx-rs/wgpu-native/releases/tag/v22.1.0.1, make sure to read the README at '" + #directory + "vendor/wgpu/README.md'")
+		#panic("Could not find the compiled WGPU Native library at '" + #directory + LIB + "', these can be downloaded from https://github.com/gfx-rs/wgpu-native/releases/tag/v22.1.0.1, make sure to read the README at '" + #directory + "README.md'")
 	}
 
 	foreign import libwgpu {
