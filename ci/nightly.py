@@ -2,7 +2,7 @@ import os
 import sys
 from zipfile  import ZipFile, ZIP_DEFLATED
 from b2sdk.v2 import InMemoryAccountInfo, B2Api
-from datetime import datetime
+from datetime import datetime, UTC
 import json
 
 UPLOAD_FOLDER = "nightly/"
@@ -22,7 +22,7 @@ def auth() -> bool:
 		pass        # Not yet authenticated
 
 	err = b2_api.authorize_account("production", application_key_id, application_key)
-	return err == None
+	return err is None
 
 def get_bucket():
 	if not auth(): sys.exit(1)
@@ -32,30 +32,35 @@ def remove_prefix(text: str, prefix: str) -> str:
 	return text[text.startswith(prefix) and len(prefix):]
 
 def create_and_upload_artifact_zip(platform: str, artifact: str) -> int:
-	now = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
-	destination_zip_name = "odin-{}-nightly+{}.zip".format(platform, now.strftime("%Y-%m-%d"))
+	now = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
 
-	source_zip_name = artifact
-	if not artifact.endswith(".zip"):
-		print(f"Creating archive {destination_zip_name} from {artifact} and uploading to {bucket_name}")
+	source_archive: str
+	destination_name = f'odin-{platform}-nightly+{now.strftime("%Y-%m-%d")}'
 
-		source_zip_name = destination_zip_name
-		with ZipFile(source_zip_name, mode='w', compression=ZIP_DEFLATED, compresslevel=9) as z:
+	if platform.startswith("linux") or platform.startswith("macos"):
+		destination_name += ".tar.gz"
+		source_archive = artifact
+	else:
+		destination_name += ".zip"
+		source_archive = destination_name
+
+		print(f"Creating archive {destination_name} from {artifact} and uploading to {bucket_name}")
+		with ZipFile(source_archive, mode='w', compression=ZIP_DEFLATED, compresslevel=9) as z:
 			for root, directory, filenames in os.walk(artifact):
 				for file in filenames:
 					file_path = os.path.join(root, file)
 					zip_path  = os.path.join("dist", os.path.relpath(file_path, artifact))
 					z.write(file_path, zip_path)
 
-		if not os.path.exists(source_zip_name):
-			print(f"Error: Newly created ZIP archive {source_zip_name} not found.")
+		if not os.path.exists(source_archive):
+			print(f"Error: Newly created ZIP archive {source_archive} not found.")
 			return 1
 
-	print("Uploading {} to {}".format(source_zip_name, UPLOAD_FOLDER + destination_zip_name))
+	print("Uploading {} to {}".format(source_archive, UPLOAD_FOLDER + destination_name))
 	bucket = get_bucket()
 	res = bucket.upload_local_file(
-		source_zip_name,                   # Local file to upload
-		"nightly/" + destination_zip_name, # B2 destination path
+		source_archive,               # Local file to upload
+		"nightly/" + destination_name, # B2 destination path
 	)
 	return 0
 
@@ -66,7 +71,7 @@ def prune_artifacts():
 	for file, _ in bucket.ls(UPLOAD_FOLDER, latest_only=False):
 		# Timestamp is in milliseconds
 		date  = datetime.fromtimestamp(file.upload_timestamp / 1_000.0).replace(hour=0, minute=0, second=0, microsecond=0)
-		now   = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+		now   = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
 		delta = now - date
 
 		if delta.days > int(days_to_keep):
@@ -100,7 +105,7 @@ def update_nightly_json():
 			'sizeInBytes': size,
 		})
 
-	now = datetime.utcnow().isoformat()
+	now = datetime.now(UTC).isoformat()
 
 	nightly = json.dumps({
 		'last_updated' : now,
