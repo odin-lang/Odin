@@ -93,7 +93,7 @@ Inputs:
 Returns:
 - res: A string created from the null-terminated byte pointer and length
 */
-string_from_null_terminated_ptr :: proc(ptr: [^]byte, len: int) -> (res: string) {
+string_from_null_terminated_ptr :: proc "contextless" (ptr: [^]byte, len: int) -> (res: string) {
 	s := string(ptr[:len])
 	s = truncate_to_byte(s, 0)
 	return s
@@ -139,7 +139,7 @@ NOTE: Failure to find the byte results in returning the entire string.
 Returns:
 - res: The truncated string
 */
-truncate_to_byte :: proc(str: string, b: byte) -> (res: string) {
+truncate_to_byte :: proc "contextless" (str: string, b: byte) -> (res: string) {
 	n := index_byte(str, b)
 	if n < 0 {
 		n = len(str)
@@ -261,7 +261,7 @@ Inputs:
 Returns:
 - result: `-1` if `lhs` comes first, `1` if `rhs` comes first, or `0` if they are equal
 */
-compare :: proc(lhs, rhs: string) -> (result: int) {
+compare :: proc "contextless" (lhs, rhs: string) -> (result: int) {
 	return mem.compare(transmute([]byte)lhs, transmute([]byte)rhs)
 }
 /*
@@ -1447,7 +1447,7 @@ Output:
 	-1
 
 */
-index_byte :: proc(s: string, c: byte) -> (res: int) {
+index_byte :: proc "contextless" (s: string, c: byte) -> (res: int) {
 	return #force_inline bytes.index_byte(transmute([]u8)s, c)
 }
 /*
@@ -1482,7 +1482,7 @@ Output:
 	-1
 
 */
-last_index_byte :: proc(s: string, c: byte) -> (res: int) {
+last_index_byte :: proc "contextless" (s: string, c: byte) -> (res: int) {
 	return #force_inline bytes.last_index_byte(transmute([]u8)s, c)
 }
 /*
@@ -1576,8 +1576,8 @@ Output:
 	-1
 
 */
-index :: proc(s, substr: string) -> (res: int) {
-	hash_str_rabin_karp :: proc(s: string) -> (hash: u32 = 0, pow: u32 = 1) {
+index :: proc "contextless" (s, substr: string) -> (res: int) {
+	hash_str_rabin_karp :: proc "contextless" (s: string) -> (hash: u32 = 0, pow: u32 = 1) {
 		for i := 0; i < len(s); i += 1 {
 			hash = hash*PRIME_RABIN_KARP + u32(s[i])
 		}

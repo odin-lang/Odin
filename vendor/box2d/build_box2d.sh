@@ -68,5 +68,7 @@ esac
 
 cd ..
 
+make -f wasm.Makefile
+
 rm -rf v3.0.0.tar.gz
 rm -rf box2d-3.0.0

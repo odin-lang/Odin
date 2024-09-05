@@ -7,6 +7,7 @@ RESIZE_LIB :: (
 	     "../lib/stb_image_resize.lib"      when ODIN_OS == .Windows
 	else "../lib/stb_image_resize.a"        when ODIN_OS == .Linux
 	else "../lib/darwin/stb_image_resize.a" when ODIN_OS == .Darwin
+	else "../lib/stb_image_resize_wasm.o"   when ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32
 	else ""
 )
 
@@ -15,7 +16,11 @@ when RESIZE_LIB != "" {
 		// The STB libraries are shipped with the compiler on Windows so a Windows specific message should not be needed.
 		#panic("Could not find the compiled STB libraries, they can be compiled by running `make -C \"" + ODIN_ROOT + "vendor/stb/src\"`")
 	}
+}
 
+when ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32 {
+	foreign import lib "../lib/stb_image_resize_wasm.o"
+} else when RESIZE_LIB != "" {
 	foreign import lib { RESIZE_LIB }
 } else {
 	foreign import lib "system:stb_image_resize"

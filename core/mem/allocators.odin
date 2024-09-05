@@ -1137,3 +1137,81 @@ buddy_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 
 	return nil, nil
 }
+
+// An allocator that keeps track of allocation sizes and passes it along to resizes.
+// This is useful if you are using a library that needs an equivalent of `realloc` but want to use
+// the Odin allocator interface.
+//
+// You want to wrap your allocator into this one if you are trying to use any allocator that relies
+// on the old size to work.
+//
+// The overhead of this allocator is an extra max(alignment, size_of(Header)) bytes allocated for each allocation, these bytes are
+// used to store the size and original pointer.
+Compat_Allocator :: struct {
+	parent: Allocator,
+}
+
+compat_allocator_init :: proc(rra: ^Compat_Allocator, allocator := context.allocator) {
+	rra.parent = allocator
+}
+
+compat_allocator :: proc(rra: ^Compat_Allocator) -> Allocator {
+	return Allocator{
+		data      = rra,
+		procedure = compat_allocator_proc,
+	}
+}
+
+compat_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
+                             size, alignment: int,
+                             old_memory: rawptr, old_size: int,
+                             location := #caller_location) -> (data: []byte, err: Allocator_Error) {
+	size, old_size := size, old_size
+
+	Header :: struct {
+		size: int,
+		ptr:  rawptr,
+	}
+
+	rra := (^Compat_Allocator)(allocator_data)
+	switch mode {
+	case .Alloc, .Alloc_Non_Zeroed:
+		a    := max(alignment, size_of(Header))
+		size += a
+		assert(size >= 0, "overflow")
+
+		allocation := rra.parent.procedure(rra.parent.data, mode, size, alignment, old_memory, old_size, location) or_return
+		#no_bounds_check data = allocation[a:]
+
+		([^]Header)(raw_data(data))[-1] = {
+			size = size,
+			ptr  = raw_data(allocation),
+		}
+		return
+
+	case .Free:
+		header := ([^]Header)(old_memory)[-1]
+		return rra.parent.procedure(rra.parent.data, mode, size, alignment, header.ptr, header.size, location)
+
+	case .Resize, .Resize_Non_Zeroed:
+		header := ([^]Header)(old_memory)[-1]
+
+		a    := max(alignment, size_of(header))
+		size += a
+		assert(size >= 0, "overflow")
+
+		allocation := rra.parent.procedure(rra.parent.data, mode, size, alignment, header.ptr, header.size, location) or_return
+		#no_bounds_check data = allocation[a:]
+
+		([^]Header)(raw_data(data))[-1] = {
+			size = size,
+			ptr  = raw_data(allocation),
+		}
+		return
+
+	case .Free_All, .Query_Info, .Query_Features:
+		return rra.parent.procedure(rra.parent.data, mode, size, alignment, old_memory, old_size, location)
+
+	case: unreachable()
+	}
+}
