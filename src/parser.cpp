@@ -5337,6 +5337,12 @@ gb_internal Ast *parse_stmt(AstFile *f) {
 		s = ast_empty_stmt(f, token);
 		expect_semicolon(f);
 		return s;
+
+	case Token_FileTag:
+		// This is always an error because all valid file tags will have been processed in `parse_file` already.
+		// Any remaining file tags must be past the package line and thus invalid.
+		syntax_error(token, "Lines starting with #+ (file tags) are only allowed before the package line.");
+		return ast_bad_stmt(f, token, f->curr_token);
 	}
 
 	// Error correction statements
@@ -6091,7 +6097,7 @@ gb_internal String build_tag_get_token(String s, String *out) {
 }
 
 gb_internal bool parse_build_tag(Token token_for_pos, String s) {
-	String const prefix = str_lit("+build");
+	String const prefix = str_lit("build");
 	GB_ASSERT(string_starts_with(s, prefix));
 	s = string_trim_whitespace(substring(s, prefix.len, s.len));
 
@@ -6176,7 +6182,7 @@ gb_internal String vet_tag_get_token(String s, String *out) {
 
 
 gb_internal u64 parse_vet_tag(Token token_for_pos, String s) {
-	String const prefix = str_lit("+vet");
+	String const prefix = str_lit("vet");
 	GB_ASSERT(string_starts_with(s, prefix));
 	s = string_trim_whitespace(substring(s, prefix.len, s.len));
 
@@ -6281,7 +6287,7 @@ gb_internal isize calc_decl_count(Ast *decl) {
 }
 
 gb_internal bool parse_build_project_directory_tag(Token token_for_pos, String s) {
-	String const prefix = str_lit("+build-project-name");
+	String const prefix = str_lit("build-project-name");
 	GB_ASSERT(string_starts_with(s, prefix));
 	s = string_trim_whitespace(substring(s, prefix.len, s.len));
 	if (s.len == 0) {
@@ -6325,6 +6331,48 @@ gb_internal bool parse_build_project_directory_tag(Token token_for_pos, String s
 	return any_correct;
 }
 
+gb_internal bool process_file_tag(const String &lc, const Token &tok, AstFile *f) {
+	if (string_starts_with(lc, str_lit("build-project-name"))) {
+		if (!parse_build_project_directory_tag(tok, lc)) {
+			return false;
+		}
+	} else if (string_starts_with(lc, str_lit("build"))) {
+		if (!parse_build_tag(tok, lc)) {
+			return false;
+		}
+	} else if (string_starts_with(lc, str_lit("vet"))) {
+		f->vet_flags = parse_vet_tag(tok, lc);
+		f->vet_flags_set = true;
+	} else if (string_starts_with(lc, str_lit("ignore"))) {
+		return false;
+	} else if (string_starts_with(lc, str_lit("private"))) {
+		f->flags |= AstFile_IsPrivatePkg;
+		String command = string_trim_starts_with(lc, str_lit("private "));
+		command = string_trim_whitespace(command);
+		if (lc == "private") {
+			f->flags |= AstFile_IsPrivatePkg;
+		} else if (command == "package") {
+			f->flags |= AstFile_IsPrivatePkg;
+		} else if (command == "file") {
+			f->flags |= AstFile_IsPrivateFile;
+		}
+	} else if (lc == "lazy") {
+		if (build_context.ignore_lazy) {
+			// Ignore
+		} else if (f->pkg->kind == Package_Init && build_context.command_kind == Command_doc) {
+			// Ignore
+		} else {
+			f->flags |= AstFile_IsLazy;
+		}
+	} else if (lc == "no-instrumentation") {
+		f->flags |= AstFile_NoInstrumentation;
+	} else {
+		error(tok, "Unknown tag '%.*s'", LIT(lc));
+	}
+
+	return true;
+}
+
 gb_internal bool parse_file(Parser *p, AstFile *f) {
 	if (f->tokens.count == 0) {
 		return true;
@@ -6337,20 +6385,49 @@ gb_internal bool parse_file(Parser *p, AstFile *f) {
 
 	String filepath = f->tokenizer.fullpath;
 	String base_dir = dir_from_path(filepath);
-	if (f->curr_token.kind == Token_Comment) {
-		consume_comment_groups(f, f->prev_token);
+
+	Array<Token> tags = array_make<Token>(ast_allocator(f));
+
+	bool has_first_invalid_pre_package_token = false;
+	Token first_invalid_pre_package_token;
+
+	while (f->curr_token.kind != Token_package && f->curr_token.kind != Token_EOF) {
+		if (f->curr_token.kind == Token_Comment) {
+			consume_comment_groups(f, f->prev_token);
+		} else if (f->curr_token.kind == Token_FileTag) {
+			array_add(&tags, f->curr_token);
+			advance_token(f);
+		} else {
+			if (!has_first_invalid_pre_package_token) {
+				has_first_invalid_pre_package_token = true;
+				first_invalid_pre_package_token = f->curr_token;
+			}
+
+			advance_token(f);
+		}
 	}
 
 	CommentGroup *docs = f->lead_comment;
 
 	if (f->curr_token.kind != Token_package) {
 		ERROR_BLOCK();
-		syntax_error(f->curr_token, "Expected a package declaration at the beginning of the file");
+
+		// The while loop above scanned until it found the package token. If we never
+		// found one, then make this error appear on the first invalid token line.
+		Token t = has_first_invalid_pre_package_token ? first_invalid_pre_package_token : f->curr_token;
+		syntax_error(t, "Expected a package declaration at the beginning of the file");
+
 		// IMPORTANT NOTE(bill): this is technically a race condition with the suggestion, but it's ony a suggession
 		// so in practice is should be "fine"
 		if (f->pkg && f->pkg->name != "") {
 			error_line("\tSuggestion: Add 'package %.*s' to the top of the file\n", LIT(f->pkg->name));
 		}
+		return false;
+	}
+
+	// There was an OK package declaration. But there some invalid token was hit before the package declaration.
+	if (has_first_invalid_pre_package_token) {
+		syntax_error(first_invalid_pre_package_token, "There can only be lines starting with #+ or // before package declaration");
 		return false;
 	}
 
@@ -6379,54 +6456,38 @@ gb_internal bool parse_file(Parser *p, AstFile *f) {
 	}
 	f->package_name = package_name.string;
 
-	if (!f->pkg->is_single_file && docs != nullptr && docs->list.count > 0) {
-		for (Token const &tok : docs->list) {
-			GB_ASSERT(tok.kind == Token_Comment);
-			String str = tok.string;
-			if (string_starts_with(str, str_lit("//"))) {
-				String lc = string_trim_whitespace(substring(str, 2, str.len));
-				if (lc.len > 0 && lc[0] == '+') {
-					 if (string_starts_with(lc, str_lit("+build-project-name"))) {
-						if (!parse_build_project_directory_tag(tok, lc)) {
+	if (!f->pkg->is_single_file) {
+		if (docs != nullptr && docs->list.count > 0) {
+			for (Token const &tok : docs->list) {
+				GB_ASSERT(tok.kind == Token_Comment);
+				String str = tok.string;
+				if (string_starts_with(str, str_lit("//"))) {
+					String lc = string_trim_whitespace(substring(str, 2, str.len));
+					if (string_starts_with(lc, str_lit("+"))) {
+						syntax_warning(tok, "//+ is deprecated: Use #+ instead");
+						String lt = substring(lc, 1, lc.len);
+						if (process_file_tag(lt, tok, f) == false) {
 							return false;
 						}
-					} else if (string_starts_with(lc, str_lit("+build"))) {
-						if (!parse_build_tag(tok, lc)) {
-							return false;
-						}
-					} else if (string_starts_with(lc, str_lit("+vet"))) {
-						f->vet_flags = parse_vet_tag(tok, lc);
-						f->vet_flags_set = true;
-					} else if (string_starts_with(lc, str_lit("+ignore"))) {
-						return false;
-					} else if (string_starts_with(lc, str_lit("+private"))) {
-						f->flags |= AstFile_IsPrivatePkg;
-						String command = string_trim_starts_with(lc, str_lit("+private "));
-						command = string_trim_whitespace(command);
-						if (lc == "+private") {
-							f->flags |= AstFile_IsPrivatePkg;
-						} else if (command == "package") {
-							f->flags |= AstFile_IsPrivatePkg;
-						} else if (command == "file") {
-							f->flags |= AstFile_IsPrivateFile;
-						}
-					} else if (lc == "+lazy") {
-						if (build_context.ignore_lazy) {
-							// Ignore
-						} else if (f->pkg->kind == Package_Init && build_context.command_kind == Command_doc) {
-							// Ignore
-						} else {
-							f->flags |= AstFile_IsLazy;
-						}
-					} else if (lc == "+no-instrumentation") {
-						f->flags |= AstFile_NoInstrumentation;
-					} else {
-						warning(tok, "Ignoring unknown tag '%.*s'", LIT(lc));
 					}
 				}
 			}
 		}
+
+		for (Token const &tok : tags) {
+			GB_ASSERT(tok.kind == Token_FileTag);
+			String str = tok.string;
+
+			if (string_starts_with(str, str_lit("#+"))) {
+				String lt = string_trim_whitespace(substring(str, 2, str.len));
+				if (process_file_tag(lt, tok, f) == false) {
+					return false;
+				}
+			}
+		}
 	}
+
+	array_free(&tags);
 
 	Ast *pd = ast_package_decl(f, f->package_token, package_name, docs, f->line_comment);
 	expect_semicolon(f);
