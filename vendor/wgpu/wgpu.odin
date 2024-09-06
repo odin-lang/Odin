@@ -27,6 +27,8 @@ when ODIN_OS == .Windows {
 		"system:advapi32.lib",
 		"system:user32.lib",
 		"system:gdi32.lib",
+		"system:ole32.lib",
+		"system:oleaut32.lib",
 	}
 } else when ODIN_OS == .Darwin {
 	@(private) ARCH :: "x86_64" when ODIN_ARCH == .amd64 else "aarch64" when ODIN_ARCH == .arm64 else #panic("unsupported WGPU Native architecture")
