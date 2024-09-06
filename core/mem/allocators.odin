@@ -3,6 +3,13 @@ package mem
 import "base:intrinsics"
 import "base:runtime"
 
+nil_allocator :: proc() -> Allocator {
+	return Allocator{
+		procedure = nil_allocator_proc,
+		data = nil,
+	}
+}
+
 nil_allocator_proc :: proc(
 	allocator_data: rawptr,
 	mode: Allocator_Mode,
@@ -12,13 +19,6 @@ nil_allocator_proc :: proc(
 	loc := #caller_location,
 ) -> ([]byte, Allocator_Error) {
 	return nil, nil
-}
-
-nil_allocator :: proc() -> Allocator {
-	return Allocator{
-		procedure = nil_allocator_proc,
-		data = nil,
-	}
 }
 
 Arena :: struct {
@@ -56,6 +56,30 @@ arena_allocator :: proc(arena: ^Arena) -> Allocator {
 	}
 }
 
+arena_alloc_non_zeroed :: proc(a: ^Arena, size: int, alignment := DEFAULT_ALIGNMENT) -> ([]byte, Allocator_Error) {
+	#no_bounds_check end := &a.data[a.offset]
+	ptr := align_forward(end, uintptr(alignment))
+	total_size := size + ptr_sub((^byte)(ptr), (^byte)(end))
+	if a.offset + total_size > len(a.data) {
+		return nil, .Out_Of_Memory
+	}
+	a.offset += total_size
+	a.peak_used = max(a.peak_used, a.offset)
+	return byte_slice(ptr, size), nil
+}
+
+arena_alloc :: proc(a: ^Arena, size: int, alignment := DEFAULT_ALIGNMENT) -> ([]byte, Allocator_Error) {
+	bytes, err := arena_alloc_non_zeroed(a, size, alignment)
+	if bytes != nil {
+		zero(raw_data(bytes), size)
+	}
+	return bytes, err
+}
+
+arena_free_all :: proc(a: ^Arena) {
+	a.offset = 0
+}
+
 arena_allocator_proc :: proc(
 	allocator_data: rawptr,
 	mode: Allocator_Mode,
@@ -66,49 +90,28 @@ arena_allocator_proc :: proc(
 	location := #caller_location,
 ) -> ([]byte, Allocator_Error)  {
 	arena := cast(^Arena)allocator_data
-
 	switch mode {
-	case .Alloc, .Alloc_Non_Zeroed:
-		#no_bounds_check end := &arena.data[arena.offset]
-
-		ptr := align_forward(end, uintptr(alignment))
-
-		total_size := size + ptr_sub((^byte)(ptr), (^byte)(end))
-
-		if arena.offset + total_size > len(arena.data) {
-			return nil, .Out_Of_Memory
-		}
-
-		arena.offset += total_size
-		arena.peak_used = max(arena.peak_used, arena.offset)
-		if mode != .Alloc_Non_Zeroed {
-			zero(ptr, size)
-		}
-		return byte_slice(ptr, size), nil
-
+	case .Alloc:
+		return arena_alloc(arena, size, alignment)
+	case .Alloc_Non_Zeroed:
+		return arena_alloc_non_zeroed(arena, size, alignment)
 	case .Free:
 		return nil, .Mode_Not_Implemented
-
 	case .Free_All:
-		arena.offset = 0
-
+		arena_free_all(arena)
 	case .Resize:
 		return default_resize_bytes_align(byte_slice(old_memory, old_size), size, alignment, arena_allocator(arena))
-
 	case .Resize_Non_Zeroed:
 		return default_resize_bytes_align_non_zeroed(byte_slice(old_memory, old_size), size, alignment, arena_allocator(arena))
-
 	case .Query_Features:
 		set := (^Allocator_Mode_Set)(old_memory)
 		if set != nil {
 			set^ = {.Alloc, .Alloc_Non_Zeroed, .Free_All, .Resize, .Resize_Non_Zeroed, .Query_Features}
 		}
 		return nil, nil
-
 	case .Query_Info:
 		return nil, .Mode_Not_Implemented
 	}
-
 	return nil, nil
 }
 
@@ -127,6 +130,8 @@ end_arena_temp_memory :: proc(tmp: Arena_Temp_Memory) {
 	tmp.arena.offset = tmp.prev_offset
 	tmp.arena.temp_count -= 1
 }
+
+
 
 Scratch_Allocator :: struct {
 	data:               []byte,
