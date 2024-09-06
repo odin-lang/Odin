@@ -63,30 +63,58 @@ DEFAULT_PAGE_SIZE ::
 	4 * 1024
 
 @(require_results)
-alloc :: proc(size: int, alignment: int = DEFAULT_ALIGNMENT, allocator := context.allocator, loc := #caller_location) -> (rawptr, Allocator_Error) {
+alloc :: proc(
+	size: int,
+	alignment: int = DEFAULT_ALIGNMENT,
+	allocator := context.allocator,
+	loc := #caller_location,
+) -> (rawptr, Allocator_Error) {
 	data, err := runtime.mem_alloc(size, alignment, allocator, loc)
 	return raw_data(data), err
 }
 
 @(require_results)
-alloc_bytes :: proc(size: int, alignment: int = DEFAULT_ALIGNMENT, allocator := context.allocator, loc := #caller_location) -> ([]byte, Allocator_Error) {
+alloc_bytes :: proc(
+	size: int,
+	alignment: int = DEFAULT_ALIGNMENT,
+	allocator := context.allocator,
+	loc := #caller_location,
+) -> ([]byte, Allocator_Error) {
 	return runtime.mem_alloc(size, alignment, allocator, loc)
 }
 
 @(require_results)
-alloc_bytes_non_zeroed :: proc(size: int, alignment: int = DEFAULT_ALIGNMENT, allocator := context.allocator, loc := #caller_location) -> ([]byte, Allocator_Error) {
+alloc_bytes_non_zeroed :: proc(
+	size: int,
+	alignment: int = DEFAULT_ALIGNMENT,
+	allocator := context.allocator,
+	loc := #caller_location,
+) -> ([]byte, Allocator_Error) {
 	return runtime.mem_alloc_non_zeroed(size, alignment, allocator, loc)
 }
 
-free :: proc(ptr: rawptr, allocator := context.allocator, loc := #caller_location) -> Allocator_Error {
+free :: proc(
+	ptr: rawptr,
+	allocator := context.allocator,
+	loc := #caller_location,
+) -> Allocator_Error {
 	return runtime.mem_free(ptr, allocator, loc)
 }
 
-free_with_size :: proc(ptr: rawptr, byte_count: int, allocator := context.allocator, loc := #caller_location) -> Allocator_Error {
+free_with_size :: proc(
+	ptr: rawptr,
+	byte_count: int,
+	allocator := context.allocator,
+	loc := #caller_location,
+) -> Allocator_Error {
 	return runtime.mem_free_with_size(ptr, byte_count, allocator, loc)
 }
 
-free_bytes :: proc(bytes: []byte, allocator := context.allocator, loc := #caller_location) -> Allocator_Error {
+free_bytes :: proc(
+	bytes: []byte,
+	allocator := context.allocator,
+	loc := #caller_location,
+) -> Allocator_Error {
 	return runtime.mem_free_bytes(bytes, allocator, loc)
 }
 
@@ -95,13 +123,26 @@ free_all :: proc(allocator := context.allocator, loc := #caller_location) -> All
 }
 
 @(require_results)
-resize :: proc(ptr: rawptr, old_size, new_size: int, alignment: int = DEFAULT_ALIGNMENT, allocator := context.allocator, loc := #caller_location) -> (rawptr, Allocator_Error) {
+resize :: proc(
+	ptr: rawptr,
+	old_size: int,
+	new_size: int,
+	alignment: int = DEFAULT_ALIGNMENT,
+	allocator := context.allocator,
+	loc := #caller_location,
+) -> (rawptr, Allocator_Error) {
 	data, err := runtime.mem_resize(ptr, old_size, new_size, alignment, allocator, loc)
 	return raw_data(data), err
 }
 
 @(require_results)
-resize_bytes :: proc(old_data: []byte, new_size: int, alignment: int = DEFAULT_ALIGNMENT, allocator := context.allocator, loc := #caller_location) -> ([]byte, Allocator_Error) {
+resize_bytes :: proc(
+	old_data: []byte,
+	new_size: int,
+	alignment: int = DEFAULT_ALIGNMENT,
+	allocator := context.allocator,
+	loc := #caller_location,
+) -> ([]byte, Allocator_Error) {
 	return runtime.mem_resize(raw_data(old_data), len(old_data), new_size, alignment, allocator, loc)
 }
 
@@ -115,7 +156,11 @@ query_features :: proc(allocator: Allocator, loc := #caller_location) -> (set: A
 }
 
 @(require_results)
-query_info :: proc(pointer: rawptr, allocator: Allocator, loc := #caller_location) -> (props: Allocator_Query_Info) {
+query_info :: proc(
+	pointer: rawptr,
+	allocator: Allocator,
+	loc := #caller_location,
+) -> (props: Allocator_Query_Info) {
 	props.pointer = pointer
 	if allocator.procedure != nil {
 		allocator.procedure(allocator.data, .Query_Info, 0, 0, &props, 0, loc)
@@ -123,24 +168,43 @@ query_info :: proc(pointer: rawptr, allocator: Allocator, loc := #caller_locatio
 	return
 }
 
-
-
-delete_string :: proc(str: string, allocator := context.allocator, loc := #caller_location) -> Allocator_Error {
+delete_string :: proc(
+	str: string,
+	allocator := context.allocator,
+	loc := #caller_location,
+) -> Allocator_Error {
 	return runtime.delete_string(str, allocator, loc)
 }
-delete_cstring :: proc(str: cstring, allocator := context.allocator, loc := #caller_location) -> Allocator_Error {
+
+delete_cstring :: proc(
+	str: cstring,
+	allocator := context.allocator,
+	loc := #caller_location,
+) -> Allocator_Error {
 	return runtime.delete_cstring(str, allocator, loc)
 }
-delete_dynamic_array :: proc(array: $T/[dynamic]$E, loc := #caller_location) -> Allocator_Error {
+
+delete_dynamic_array :: proc(
+	array: $T/[dynamic]$E,
+	loc := #caller_location,
+) -> Allocator_Error {
 	return runtime.delete_dynamic_array(array, loc)
 }
-delete_slice :: proc(array: $T/[]$E, allocator := context.allocator, loc := #caller_location) -> Allocator_Error {
+
+delete_slice :: proc(
+	array: $T/[]$E,
+	allocator := context.allocator,
+	loc := #caller_location,
+) -> Allocator_Error {
 	return runtime.delete_slice(array, allocator, loc)
 }
-delete_map :: proc(m: $T/map[$K]$V, loc := #caller_location) -> Allocator_Error {
+
+delete_map :: proc(
+	m: $T/map[$K]$V,
+	loc := #caller_location,
+) -> Allocator_Error {
 	return runtime.delete_map(m, loc)
 }
-
 
 delete :: proc{
 	delete_string,
@@ -150,46 +214,102 @@ delete :: proc{
 	delete_map,
 }
 
-
 @(require_results)
-new :: proc($T: typeid, allocator := context.allocator, loc := #caller_location) -> (^T, Allocator_Error) {
+new :: proc(
+	$T: typeid,
+	allocator := context.allocator,
+	loc := #caller_location,
+) -> (^T, Allocator_Error) {
 	return new_aligned(T, align_of(T), allocator, loc)
 }
+
 @(require_results)
-new_aligned :: proc($T: typeid, alignment: int, allocator := context.allocator, loc := #caller_location) -> (t: ^T, err: Allocator_Error) {
+new_aligned :: proc(
+	$T: typeid,
+	alignment: int,
+	allocator := context.allocator,
+	loc := #caller_location,
+) -> (t: ^T, err: Allocator_Error) {
 	return runtime.new_aligned(T, alignment, allocator, loc)
 }
+
 @(require_results)
-new_clone :: proc(data: $T, allocator := context.allocator, loc := #caller_location) -> (t: ^T, err: Allocator_Error) {
+new_clone :: proc(
+	data: $T,
+	allocator := context.allocator,
+	loc := #caller_location,
+) -> (t: ^T, err: Allocator_Error) {
 	return runtime.new_clone(data, allocator, loc)
 }
 
 @(require_results)
-make_aligned :: proc($T: typeid/[]$E, #any_int len: int, alignment: int, allocator := context.allocator, loc := #caller_location) -> (slice: T, err: Allocator_Error) {
+make_aligned :: proc(
+	$T: typeid/[]$E,
+	#any_int len: int,
+	alignment: int,
+	allocator := context.allocator,
+	loc := #caller_location,
+) -> (slice: T, err: Allocator_Error) {
 	return runtime.make_aligned(T, len, alignment, allocator, loc)
 }
+
 @(require_results)
-make_slice :: proc($T: typeid/[]$E, #any_int len: int, allocator := context.allocator, loc := #caller_location) -> (T, Allocator_Error) {
+make_slice :: proc(
+	$T: typeid/[]$E,
+	#any_int len: int,
+	allocator := context.allocator,
+	loc := #caller_location,
+) -> (T, Allocator_Error) {
 	return runtime.make_slice(T, len, allocator, loc)
 }
+
 @(require_results)
-make_dynamic_array :: proc($T: typeid/[dynamic]$E, allocator := context.allocator, loc := #caller_location) -> (T, Allocator_Error) {
+make_dynamic_array :: proc(
+	$T: typeid/[dynamic]$E,
+	allocator := context.allocator,
+	loc := #caller_location,
+) -> (T, Allocator_Error) {
 	return runtime.make_dynamic_array(T, allocator, loc)
 }
+
 @(require_results)
-make_dynamic_array_len :: proc($T: typeid/[dynamic]$E, #any_int len: int, allocator := context.allocator, loc := #caller_location) -> (T, Allocator_Error) {
+make_dynamic_array_len :: proc(
+	$T: typeid/[dynamic]$E,
+	#any_int len: int,
+	allocator := context.allocator,
+	loc := #caller_location,
+) -> (T, Allocator_Error) {
 	return runtime.make_dynamic_array_len_cap(T, len, len, allocator, loc)
 }
+
 @(require_results)
-make_dynamic_array_len_cap :: proc($T: typeid/[dynamic]$E, #any_int len: int, #any_int cap: int, allocator := context.allocator, loc := #caller_location) -> (array: T, err: Allocator_Error) {
+make_dynamic_array_len_cap :: proc(
+	$T: typeid/[dynamic]$E,
+	#any_int len: int,
+	#any_int cap: int,
+	allocator := context.allocator,
+	loc := #caller_location,
+) -> (array: T, err: Allocator_Error) {
 	return runtime.make_dynamic_array_len_cap(T, len, cap, allocator, loc)
 }
+
 @(require_results)
-make_map :: proc($T: typeid/map[$K]$E, #any_int cap: int = 1<<runtime.MAP_MIN_LOG2_CAPACITY, allocator := context.allocator, loc := #caller_location) -> (m: T, err: Allocator_Error) {
+make_map :: proc(
+	$T: typeid/map[$K]$E,
+	#any_int cap: int = 1<<runtime.MAP_MIN_LOG2_CAPACITY,
+	allocator := context.allocator,
+	loc := #caller_location,
+) -> (m: T, err: Allocator_Error) {
 	return runtime.make_map(T, cap, allocator, loc)
 }
+
 @(require_results)
-make_multi_pointer :: proc($T: typeid/[^]$E, #any_int len: int, allocator := context.allocator, loc := #caller_location) -> (mp: T, err: Allocator_Error) {
+make_multi_pointer :: proc(
+	$T: typeid/[^]$E,
+	#any_int len: int,
+	allocator := context.allocator,
+	loc := #caller_location
+) -> (mp: T, err: Allocator_Error) {
 	return runtime.make_multi_pointer(T, len, allocator, loc)
 }
 
@@ -202,26 +322,58 @@ make :: proc{
 	make_multi_pointer,
 }
 
-
 @(require_results)
-default_resize_align :: proc(old_memory: rawptr, old_size, new_size, alignment: int, allocator := context.allocator, loc := #caller_location) -> (res: rawptr, err: Allocator_Error) {
+default_resize_align :: proc(
+	old_memory: rawptr,
+	old_size: int,
+	new_size: int,
+	alignment: int,
+	allocator := context.allocator,
+	loc := #caller_location,
+) -> (res: rawptr, err: Allocator_Error) {
 	data: []byte
-	data, err = default_resize_bytes_align(([^]byte)(old_memory)[:old_size], new_size, alignment, allocator, loc)
+	data, err = default_resize_bytes_align(
+		([^]byte) (old_memory)[:old_size],
+		new_size,
+		alignment,
+		allocator,
+		loc,
+	)
 	res = raw_data(data)
 	return
 }
 
 @(require_results)
-default_resize_bytes_align_non_zeroed :: proc(old_data: []byte, new_size, alignment: int, allocator := context.allocator, loc := #caller_location) -> ([]byte, Allocator_Error) {
+default_resize_bytes_align_non_zeroed :: proc(
+	old_data: []byte,
+	new_size: int,
+	alignment: int,
+	allocator := context.allocator,
+	loc := #caller_location,
+) -> ([]byte, Allocator_Error) {
 	return _default_resize_bytes_align(old_data, new_size, alignment, false, allocator, loc)
 }
+
 @(require_results)
-default_resize_bytes_align :: proc(old_data: []byte, new_size, alignment: int, allocator := context.allocator, loc := #caller_location) -> ([]byte, Allocator_Error) {
+default_resize_bytes_align :: proc(
+	old_data: []byte,
+	new_size: int,
+	alignment: int,
+	allocator := context.allocator,
+	loc := #caller_location,
+) -> ([]byte, Allocator_Error) {
 	return _default_resize_bytes_align(old_data, new_size, alignment, true, allocator, loc)
 }
 
 @(require_results)
-_default_resize_bytes_align :: #force_inline proc(old_data: []byte, new_size, alignment: int, should_zero: bool, allocator := context.allocator, loc := #caller_location) -> ([]byte, Allocator_Error) {
+_default_resize_bytes_align :: #force_inline proc(
+	old_data: []byte,
+	new_size: int,
+	alignment: int,
+	should_zero: bool,
+	allocator := context.allocator,
+	loc := #caller_location,
+) -> ([]byte, Allocator_Error) {
 	old_memory := raw_data(old_data)
 	old_size := len(old_data)
 	if old_memory == nil {

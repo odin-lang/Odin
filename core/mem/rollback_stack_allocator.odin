@@ -1,45 +1,47 @@
 package mem
 
-// The Rollback Stack Allocator was designed for the test runner to be fast,
-// able to grow, and respect the Tracking Allocator's requirement for
-// individual frees. It is not overly concerned with fragmentation, however.
-//
-// It has support for expansion when configured with a block allocator and
-// limited support for out-of-order frees.
-//
-// Allocation has constant-time best and usual case performance.
-// At worst, it is linear according to the number of memory blocks.
-//
-// Allocation follows a first-fit strategy when there are multiple memory
-// blocks.
-//
-// Freeing has constant-time best and usual case performance.
-// At worst, it is linear according to the number of memory blocks and number
-// of freed items preceding the last item in a block.
-//
-// Resizing has constant-time performance, if it's the last item in a block, or
-// the new size is smaller. Naturally, this becomes linear-time if there are
-// multiple blocks to search for the pointer's owning block. Otherwise, the
-// allocator defaults to a combined alloc & free operation internally.
-//
-// Out-of-order freeing is accomplished by collapsing a run of freed items
-// from the last allocation backwards.
-//
-// Each allocation has an overhead of 8 bytes and any extra bytes to satisfy
-// the requested alignment.
+/*
+The Rollback Stack Allocator was designed for the test runner to be fast,
+able to grow, and respect the Tracking Allocator's requirement for
+individual frees. It is not overly concerned with fragmentation, however.
 
+It has support for expansion when configured with a block allocator and
+limited support for out-of-order frees.
+
+Allocation has constant-time best and usual case performance.
+At worst, it is linear according to the number of memory blocks.
+
+Allocation follows a first-fit strategy when there are multiple memory
+blocks.
+
+Freeing has constant-time best and usual case performance.
+At worst, it is linear according to the number of memory blocks and number
+of freed items preceding the last item in a block.
+
+Resizing has constant-time performance, if it's the last item in a block, or
+the new size is smaller. Naturally, this becomes linear-time if there are
+multiple blocks to search for the pointer's owning block. Otherwise, the
+allocator defaults to a combined alloc & free operation internally.
+
+Out-of-order freeing is accomplished by collapsing a run of freed items
+from the last allocation backwards.
+
+Each allocation has an overhead of 8 bytes and any extra bytes to satisfy
+the requested alignment.
+*/
 import "base:runtime"
 
 ROLLBACK_STACK_DEFAULT_BLOCK_SIZE :: 4 * Megabyte
 
-// This limitation is due to the size of `prev_ptr`, but it is only for the
-// head block; any allocation in excess of the allocator's `block_size` is
-// valid, so long as the block allocator can handle it.
-//
-// This is because allocations over the block size are not split up if the item
-// within is freed; they are immediately returned to the block allocator.
-ROLLBACK_STACK_MAX_HEAD_BLOCK_SIZE :: 2 * Gigabyte
+/*
+This limitation is due to the size of `prev_ptr`, but it is only for the
+head block; any allocation in excess of the allocator's `block_size` is
+valid, so long as the block allocator can handle it.
 
+This is because allocations over the block size are not split up if the item
+within is freed; they are immediately returned to the block allocator.
+*/
+ROLLBACK_STACK_MAX_HEAD_BLOCK_SIZE :: 2 * Gigabyte
 
 Rollback_Stack_Header :: bit_field u64 {
 	prev_offset:  uintptr | 32,
@@ -59,7 +61,6 @@ Rollback_Stack :: struct {
 	block_size: int,
 	block_allocator: Allocator,
 }
-
 
 @(private="file", require_results)
 rb_ptr_in_bounds :: proc(block: ^Rollback_Stack_Block, ptr: rawptr) -> bool {
@@ -294,9 +295,13 @@ rollback_stack_allocator :: proc(stack: ^Rollback_Stack) -> Allocator {
 }
 
 @(require_results)
-rollback_stack_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
-                                      size, alignment: int,
-                                      old_memory: rawptr, old_size: int, location := #caller_location,
+rollback_stack_allocator_proc :: proc(
+	allocator_data: rawptr,
+	mode: Allocator_Mode,
+	size, alignment: int,
+	old_memory: rawptr,
+	old_size: int,
+	location := #caller_location,
 ) -> (result: []byte, err: Allocator_Error) {
 	stack := cast(^Rollback_Stack)allocator_data
 

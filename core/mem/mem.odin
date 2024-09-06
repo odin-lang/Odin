@@ -14,10 +14,12 @@ Exabyte  :: runtime.Exabyte
 set :: proc "contextless" (data: rawptr, value: byte, len: int) -> rawptr {
 	return runtime.memset(data, i32(value), len)
 }
+
 zero :: proc "contextless" (data: rawptr, len: int) -> rawptr {
 	intrinsics.mem_zero(data, len)
 	return data
 }
+
 zero_explicit :: proc "contextless" (data: rawptr, len: int) -> rawptr {
 	// This routine tries to avoid the compiler optimizing away the call,
 	// so that it is always executed.  It is intended to provided
@@ -27,20 +29,22 @@ zero_explicit :: proc "contextless" (data: rawptr, len: int) -> rawptr {
 	intrinsics.atomic_thread_fence(.Seq_Cst) // Prevent reordering
 	return data
 }
+
 zero_item :: proc "contextless" (item: $P/^$T) -> P {
 	intrinsics.mem_zero(item, size_of(T))
 	return item
 }
+
 zero_slice :: proc "contextless" (data: $T/[]$E) -> T {
 	zero(raw_data(data), size_of(E)*len(data))
 	return data
 }
 
-
 copy :: proc "contextless" (dst, src: rawptr, len: int) -> rawptr {
 	intrinsics.mem_copy(dst, src, len)
 	return dst
 }
+
 copy_non_overlapping :: proc "contextless" (dst, src: rawptr, len: int) -> rawptr {
 	intrinsics.mem_copy_non_overlapping(dst, src, len)
 	return dst
@@ -120,6 +124,7 @@ compare_ptrs :: proc "contextless" (a, b: rawptr, n: int) -> int {
 }
 
 ptr_offset :: intrinsics.ptr_offset
+
 ptr_sub :: intrinsics.ptr_sub
 
 @(require_results)
@@ -211,6 +216,7 @@ align_forward_uintptr :: proc(ptr, align: uintptr) -> uintptr {
 align_forward_int :: proc(ptr, align: int) -> int {
 	return int(align_forward_uintptr(uintptr(ptr), uintptr(align)))
 }
+
 @(require_results)
 align_forward_uint :: proc(ptr, align: uint) -> uint {
 	return uint(align_forward_uintptr(uintptr(ptr), uintptr(align)))
@@ -230,6 +236,7 @@ align_backward_uintptr :: proc(ptr, align: uintptr) -> uintptr {
 align_backward_int :: proc(ptr, align: int) -> int {
 	return int(align_backward_uintptr(uintptr(ptr), uintptr(align)))
 }
+
 @(require_results)
 align_backward_uint :: proc(ptr, align: uint) -> uint {
 	return uint(align_backward_uintptr(uintptr(ptr), uintptr(align)))
@@ -247,7 +254,6 @@ reinterpret_copy :: proc "contextless" ($T: typeid, ptr: rawptr) -> (value: T) {
 	return
 }
 
-
 Fixed_Byte_Buffer :: distinct [dynamic]byte
 
 @(require_results)
@@ -264,8 +270,6 @@ make_fixed_byte_buffer :: proc "contextless" (backing: []byte) -> Fixed_Byte_Buf
 	return transmute(Fixed_Byte_Buffer)d
 }
 
-
-
 @(require_results)
 align_formula :: proc "contextless" (size, align: int) -> int {
 	result := size + align-1
@@ -276,12 +280,10 @@ align_formula :: proc "contextless" (size, align: int) -> int {
 calc_padding_with_header :: proc "contextless" (ptr: uintptr, align: uintptr, header_size: int) -> int {
 	p, a := ptr, align
 	modulo := p & (a-1)
-
 	padding := uintptr(0)
 	if modulo != 0 {
 		padding = a - modulo
 	}
-
 	needed_space := uintptr(header_size)
 	if padding < needed_space {
 		needed_space -= padding
@@ -295,8 +297,6 @@ calc_padding_with_header :: proc "contextless" (ptr: uintptr, align: uintptr, he
 
 	return int(padding)
 }
-
-
 
 @(require_results, deprecated="prefer 'slice.clone'")
 clone_slice :: proc(slice: $T/[]$E, allocator := context.allocator, loc := #caller_location) -> (new_slice: T) {
