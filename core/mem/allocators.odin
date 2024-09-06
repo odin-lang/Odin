@@ -56,6 +56,14 @@ arena_allocator :: proc(arena: ^Arena) -> Allocator {
 	}
 }
 
+arena_alloc :: proc(a: ^Arena, size: int, alignment := DEFAULT_ALIGNMENT) -> ([]byte, Allocator_Error) {
+	bytes, err := arena_alloc_non_zeroed(a, size, alignment)
+	if bytes != nil {
+		zero_slice(bytes)
+	}
+	return bytes, err
+}
+
 arena_alloc_non_zeroed :: proc(a: ^Arena, size: int, alignment := DEFAULT_ALIGNMENT) -> ([]byte, Allocator_Error) {
 	#no_bounds_check end := &a.data[a.offset]
 	ptr := align_forward(end, uintptr(alignment))
@@ -66,14 +74,6 @@ arena_alloc_non_zeroed :: proc(a: ^Arena, size: int, alignment := DEFAULT_ALIGNM
 	a.offset += total_size
 	a.peak_used = max(a.peak_used, a.offset)
 	return byte_slice(ptr, size), nil
-}
-
-arena_alloc :: proc(a: ^Arena, size: int, alignment := DEFAULT_ALIGNMENT) -> ([]byte, Allocator_Error) {
-	bytes, err := arena_alloc_non_zeroed(a, size, alignment)
-	if bytes != nil {
-		zero(raw_data(bytes), size)
-	}
-	return bytes, err
 }
 
 arena_free_all :: proc(a: ^Arena) {
@@ -162,6 +162,153 @@ scratch_allocator_destroy :: proc(s: ^Scratch_Allocator) {
 	s^ = {}
 }
 
+scratch_allocator_alloc :: proc(
+	s: ^Scratch_Allocator,
+	size: int,
+	alignment := DEFAULT_ALIGNMENT,
+	loc := #caller_location,
+) -> ([]byte, Allocator_Error) {
+	bytes, err := scratch_allocator_alloc_non_zeroed(s, size, alignment, loc)
+	if bytes != nil {
+		zero_slice(bytes)
+	}
+	return bytes, err
+}
+
+scratch_allocator_alloc_non_zeroed :: proc(
+	s: ^Scratch_Allocator,
+	size: int,
+	alignment := DEFAULT_ALIGNMENT,
+	loc := #caller_location,
+) -> ([]byte, Allocator_Error) {
+	if s.data == nil {
+		DEFAULT_BACKING_SIZE :: 4 * Megabyte
+		if !(context.allocator.procedure != scratch_allocator_proc && context.allocator.data != s) {
+			panic("cyclic initialization of the scratch allocator with itself", loc)
+		}
+		scratch_allocator_init(s, DEFAULT_BACKING_SIZE)
+	}
+	size := size
+	size = align_forward_int(size, alignment)
+	switch {
+	case s.curr_offset+size <= len(s.data):
+		start := uintptr(raw_data(s.data))
+		ptr := start + uintptr(s.curr_offset)
+		ptr = align_forward_uintptr(ptr, uintptr(alignment))
+		s.prev_allocation = rawptr(ptr)
+		offset := int(ptr - start)
+		s.curr_offset = offset + size
+		return byte_slice(rawptr(ptr), size), nil
+	case size <= len(s.data):
+		start := uintptr(raw_data(s.data))
+		ptr := align_forward_uintptr(start, uintptr(alignment))
+		s.prev_allocation = rawptr(ptr)
+		offset := int(ptr - start)
+		s.curr_offset = offset + size
+		return byte_slice(rawptr(ptr), size), nil
+	}
+	a := s.backup_allocator
+	if a.procedure == nil {
+		a = context.allocator
+		s.backup_allocator = a
+	}
+	ptr, err := alloc_bytes_non_zeroed(size, alignment, a, loc)
+	if err != nil {
+		return ptr, err
+	}
+	if s.leaked_allocations == nil {
+		s.leaked_allocations, err = make([dynamic][]byte, a)
+	}
+	append(&s.leaked_allocations, ptr)
+	if logger := context.logger; logger.lowest_level <= .Warning {
+		if logger.procedure != nil {
+			logger.procedure(logger.data, .Warning, "mem.Scratch_Allocator resorted to backup_allocator" , logger.options, loc)
+		}
+	}
+	return ptr, err
+}
+
+scratch_allocator_free :: proc(s: ^Scratch_Allocator, ptr: rawptr, loc := #caller_location) -> Allocator_Error {
+	if s.data == nil {
+		panic("Free on an uninitialized scratch allocator", loc)
+	}
+	if ptr == nil {
+		return nil
+	}
+	start := uintptr(raw_data(s.data))
+	end := start + uintptr(len(s.data))
+	old_ptr := uintptr(ptr)
+	if s.prev_allocation == ptr {
+		s.curr_offset = int(uintptr(s.prev_allocation) - start)
+		s.prev_allocation = nil
+		return nil
+	}
+	if start <= old_ptr && old_ptr < end {
+		// NOTE(bill): Cannot free this pointer but it is valid
+		return nil
+	}
+	if len(s.leaked_allocations) != 0 {
+		for data, i in s.leaked_allocations {
+			ptr := raw_data(data)
+			if ptr == ptr {
+				free_bytes(data, s.backup_allocator, loc)
+				ordered_remove(&s.leaked_allocations, i, loc)
+				return nil
+			}
+		}
+	}
+	return .Invalid_Pointer
+}
+
+scratch_allocator_free_all :: proc(s: ^Scratch_Allocator, loc := #caller_location) {
+	s.curr_offset = 0
+	s.prev_allocation = nil
+	for ptr in s.leaked_allocations {
+		free_bytes(ptr, s.backup_allocator, loc)
+	}
+	clear(&s.leaked_allocations)
+}
+
+scratch_allocator_resize_non_zeroed :: proc(
+	s: ^Scratch_Allocator,
+	old_memory: rawptr,
+	old_size: int,
+	size: int,
+	alignment := DEFAULT_ALIGNMENT,
+	loc := #caller_location
+) -> ([]byte, Allocator_Error) {
+	begin := uintptr(raw_data(s.data))
+	end := begin + uintptr(len(s.data))
+	old_ptr := uintptr(old_memory)
+	if begin <= old_ptr && old_ptr < end && old_ptr+uintptr(size) < end {
+		s.curr_offset = int(old_ptr-begin)+size
+		return byte_slice(old_memory, size), nil
+	}
+	data, err := scratch_allocator_alloc_non_zeroed(s, size, alignment, loc)
+	if err != nil {
+		return data, err
+	}
+	// TODO(flysand): OOB access on size < old_size.
+	runtime.copy(data, byte_slice(old_memory, old_size))
+	err = scratch_allocator_free(s, old_memory, loc)
+	return data, err
+}
+
+scratch_allocator_resize :: proc(
+	s: ^Scratch_Allocator,
+	old_memory: rawptr,
+	old_size: int,
+	size: int,
+	alignment := DEFAULT_ALIGNMENT,
+	loc := #caller_location
+) -> ([]byte, Allocator_Error) {
+	bytes, err := scratch_allocator_resize_non_zeroed(s, old_memory, old_size, size, alignment, loc)
+	if bytes != nil && size > old_size {
+		zero_slice(bytes[size:])
+	}
+	return bytes, err
+}
+
 scratch_allocator_proc :: proc(
 	allocator_data: rawptr,
 	mode: Allocator_Mode,
@@ -170,9 +317,7 @@ scratch_allocator_proc :: proc(
 	old_size: int,
 	loc := #caller_location,
 ) -> ([]byte, Allocator_Error) {
-
 	s := (^Scratch_Allocator)(allocator_data)
-
 	if s.data == nil {
 		DEFAULT_BACKING_SIZE :: 4 * Megabyte
 		if !(context.allocator.procedure != scratch_allocator_proc &&
@@ -181,129 +326,29 @@ scratch_allocator_proc :: proc(
 		}
 		scratch_allocator_init(s, DEFAULT_BACKING_SIZE)
 	}
-
 	size := size
-
 	switch mode {
-	case .Alloc, .Alloc_Non_Zeroed:
-		size = align_forward_int(size, alignment)
-
-		switch {
-		case s.curr_offset+size <= len(s.data):
-			start := uintptr(raw_data(s.data))
-			ptr := start + uintptr(s.curr_offset)
-			ptr = align_forward_uintptr(ptr, uintptr(alignment))
-			if mode != .Alloc_Non_Zeroed {
-				zero(rawptr(ptr), size)
-			}
-
-			s.prev_allocation = rawptr(ptr)
-			offset := int(ptr - start)
-			s.curr_offset = offset + size
-			return byte_slice(rawptr(ptr), size), nil
-
-		case size <= len(s.data):
-			start := uintptr(raw_data(s.data))
-			ptr := align_forward_uintptr(start, uintptr(alignment))
-			if mode != .Alloc_Non_Zeroed {
-				zero(rawptr(ptr), size)
-			}
-
-			s.prev_allocation = rawptr(ptr)
-			offset := int(ptr - start)
-			s.curr_offset = offset + size
-			return byte_slice(rawptr(ptr), size), nil
-		}
-		a := s.backup_allocator
-		if a.procedure == nil {
-			a = context.allocator
-			s.backup_allocator = a
-		}
-
-		ptr, err := alloc_bytes(size, alignment, a, loc)
-		if err != nil {
-			return ptr, err
-		}
-		if s.leaked_allocations == nil {
-			s.leaked_allocations, err = make([dynamic][]byte, a)
-		}
-		append(&s.leaked_allocations, ptr)
-
-		if logger := context.logger; logger.lowest_level <= .Warning {
-			if logger.procedure != nil {
-				logger.procedure(logger.data, .Warning, "mem.Scratch_Allocator resorted to backup_allocator" , logger.options, loc)
-			}
-		}
-
-		return ptr, err
-
+	case .Alloc:
+		return scratch_allocator_alloc(s, size, alignment, loc)
+	case .Alloc_Non_Zeroed:
+		return scratch_allocator_alloc_non_zeroed(s, size, alignment, loc)
 	case .Free:
-		if old_memory == nil {
-			return nil, nil
-		}
-		start := uintptr(raw_data(s.data))
-		end := start + uintptr(len(s.data))
-		old_ptr := uintptr(old_memory)
-
-		if s.prev_allocation == old_memory {
-			s.curr_offset = int(uintptr(s.prev_allocation) - start)
-			s.prev_allocation = nil
-			return nil, nil
-		}
-
-		if start <= old_ptr && old_ptr < end {
-			// NOTE(bill): Cannot free this pointer but it is valid
-			return nil, nil
-		}
-
-		if len(s.leaked_allocations) != 0 {
-			for data, i in s.leaked_allocations {
-				ptr := raw_data(data)
-				if ptr == old_memory {
-					free_bytes(data, s.backup_allocator)
-					ordered_remove(&s.leaked_allocations, i)
-					return nil, nil
-				}
-			}
-		}
-		return nil, .Invalid_Pointer
-		// panic("invalid pointer passed to default_temp_allocator");
-
+		return nil, scratch_allocator_free(s, old_memory, loc)
 	case .Free_All:
-		s.curr_offset = 0
-		s.prev_allocation = nil
-		for ptr in s.leaked_allocations {
-			free_bytes(ptr, s.backup_allocator)
-		}
-		clear(&s.leaked_allocations)
-
-	case .Resize, .Resize_Non_Zeroed:
-		begin := uintptr(raw_data(s.data))
-		end := begin + uintptr(len(s.data))
-		old_ptr := uintptr(old_memory)
-		if begin <= old_ptr && old_ptr < end && old_ptr+uintptr(size) < end {
-			s.curr_offset = int(old_ptr-begin)+size
-			return byte_slice(old_memory, size), nil
-		}
-		data, err := scratch_allocator_proc(allocator_data, .Alloc, size, alignment, old_memory, old_size, loc)
-		if err != nil {
-			return data, err
-		}
-		runtime.copy(data, byte_slice(old_memory, old_size))
-		_, err = scratch_allocator_proc(allocator_data, .Free, 0, alignment, old_memory, old_size, loc)
-		return data, err
-
+		scratch_allocator_free_all(s, loc)
+	case .Resize:
+		return scratch_allocator_resize(s, old_memory, old_size, size, alignment, loc)
+	case .Resize_Non_Zeroed:
+		return scratch_allocator_resize_non_zeroed(s, old_memory, old_size, size, alignment, loc)
 	case .Query_Features:
 		set := (^Allocator_Mode_Set)(old_memory)
 		if set != nil {
 			set^ = {.Alloc, .Alloc_Non_Zeroed, .Free, .Free_All, .Resize, .Resize_Non_Zeroed, .Query_Features}
 		}
 		return nil, nil
-
 	case .Query_Info:
 		return nil, .Mode_Not_Implemented
 	}
-
 	return nil, nil
 }
 
