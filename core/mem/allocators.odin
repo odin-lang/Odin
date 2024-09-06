@@ -261,6 +261,9 @@ scratch_allocator_free :: proc(s: ^Scratch_Allocator, ptr: rawptr, loc := #calle
 }
 
 scratch_allocator_free_all :: proc(s: ^Scratch_Allocator, loc := #caller_location) {
+	if s.data == nil {
+		panic("free_all called on an unitialized scratch allocator", loc)
+	}
 	s.curr_offset = 0
 	s.prev_allocation = nil
 	for ptr in s.leaked_allocations {
@@ -277,6 +280,13 @@ scratch_allocator_resize_non_zeroed :: proc(
 	alignment := DEFAULT_ALIGNMENT,
 	loc := #caller_location
 ) -> ([]byte, Allocator_Error) {
+	if s.data == nil {
+		DEFAULT_BACKING_SIZE :: 4 * Megabyte
+		if !(context.allocator.procedure != scratch_allocator_proc && context.allocator.data != s) {
+			panic("cyclic initialization of the scratch allocator with itself", loc)
+		}
+		scratch_allocator_init(s, DEFAULT_BACKING_SIZE)
+	}
 	begin := uintptr(raw_data(s.data))
 	end := begin + uintptr(len(s.data))
 	old_ptr := uintptr(old_memory)
@@ -318,14 +328,6 @@ scratch_allocator_proc :: proc(
 	loc := #caller_location,
 ) -> ([]byte, Allocator_Error) {
 	s := (^Scratch_Allocator)(allocator_data)
-	if s.data == nil {
-		DEFAULT_BACKING_SIZE :: 4 * Megabyte
-		if !(context.allocator.procedure != scratch_allocator_proc &&
-		     context.allocator.data != allocator_data) {
-			panic("cyclic initialization of the scratch allocator with itself")
-		}
-		scratch_allocator_init(s, DEFAULT_BACKING_SIZE)
-	}
 	size := size
 	switch mode {
 	case .Alloc:
