@@ -795,29 +795,157 @@ DYNAMIC_POOL_OUT_OF_BAND_SIZE_DEFAULT :: DYNAMIC_ARENA_OUT_OF_BAND_SIZE_DEFAULT
 dynamic_pool_allocator_proc :: dynamic_arena_allocator_proc
 dynamic_pool_free_all :: dynamic_arena_free_all
 dynamic_pool_reset :: dynamic_arena_reset
-dynamic_pool_alloc_bytes :: dynamic_arena_alloc_bytes
-dynamic_pool_alloc :: dynamic_arena_alloc
+dynamic_pool_alloc_bytes :: dynamic_arena_alloc
+dynamic_pool_alloc :: _dynamic_arena_alloc_ptr
 dynamic_pool_init :: dynamic_arena_init
 dynamic_pool_allocator :: dynamic_arena_allocator
-
-Dynamic_Arena :: struct {
-	block_size:    int,
-	out_band_size: int,
-	alignment:     int,
-
-	unused_blocks:        [dynamic]rawptr,
-	used_blocks:          [dynamic]rawptr,
-	out_band_allocations: [dynamic]rawptr,
-
-	current_block: rawptr,
-	current_pos:   rawptr,
-	bytes_left:    int,
-
-	block_allocator: Allocator,
-}
+dynamic_pool_destroy :: dynamic_arena_destroy
 
 DYNAMIC_ARENA_BLOCK_SIZE_DEFAULT :: 65536
 DYNAMIC_ARENA_OUT_OF_BAND_SIZE_DEFAULT :: 6554
+
+Dynamic_Arena :: struct {
+	block_size: int,
+	out_band_size: int,
+	alignment: int,
+	unused_blocks: [dynamic]rawptr,
+	used_blocks: [dynamic]rawptr,
+	out_band_allocations: [dynamic]rawptr,
+	current_block: rawptr,
+	current_pos: rawptr,
+	bytes_left: int,
+	block_allocator: Allocator,
+}
+
+dynamic_arena_init :: proc(
+	pool: ^Dynamic_Arena,
+	block_allocator := context.allocator,
+	array_allocator := context.allocator,
+	block_size := DYNAMIC_ARENA_BLOCK_SIZE_DEFAULT,
+	out_band_size := DYNAMIC_ARENA_OUT_OF_BAND_SIZE_DEFAULT,
+	alignment := DEFAULT_ALIGNMENT,
+) {
+	pool.block_size = block_size
+	pool.out_band_size = out_band_size
+	pool.alignment = alignment
+	pool.block_allocator = block_allocator
+	pool.out_band_allocations.allocator = array_allocator
+	pool.unused_blocks.allocator = array_allocator
+	pool.used_blocks.allocator = array_allocator
+}
+
+@(require_results)
+dynamic_arena_allocator :: proc(pool: ^Dynamic_Arena) -> Allocator {
+	return Allocator{
+		procedure = dynamic_arena_allocator_proc,
+		data = pool,
+	}
+}
+
+dynamic_arena_destroy :: proc(pool: ^Dynamic_Arena) {
+	dynamic_arena_free_all(pool)
+	delete(pool.unused_blocks)
+	delete(pool.used_blocks)
+	delete(pool.out_band_allocations)
+	zero(pool, size_of(pool^))
+}
+
+@(private="file")
+_dynamic_arena_cycle_new_block :: proc(p: ^Dynamic_Arena, loc := #caller_location) -> (err: Allocator_Error) {
+	if p.block_allocator.procedure == nil {
+		panic("You must call pool_init on a Pool before using it", loc)
+	}
+	if p.current_block != nil {
+		append(&p.used_blocks, p.current_block, loc=loc)
+	}
+	new_block: rawptr
+	if len(p.unused_blocks) > 0 {
+		new_block = pop(&p.unused_blocks)
+	} else {
+		data: []byte
+		data, err = p.block_allocator.procedure(
+			p.block_allocator.data,
+			Allocator_Mode.Alloc,
+			p.block_size,
+			p.alignment,
+			nil,
+			0,
+		)
+		new_block = raw_data(data)
+	}
+	p.bytes_left    = p.block_size
+	p.current_pos   = new_block
+	p.current_block = new_block
+	return
+}
+
+@(private, require_results)
+_dynamic_arena_alloc_ptr :: proc(pool: ^Dynamic_Arena, size: int, loc := #caller_location) -> (rawptr, Allocator_Error) {
+	data, err := dynamic_arena_alloc(pool, size, loc)
+	return raw_data(data), err
+}
+
+@(require_results)
+dynamic_arena_alloc :: proc(p: ^Dynamic_Arena, size: int, loc := #caller_location) -> ([]byte, Allocator_Error) {
+	bytes, err := dynamic_arena_alloc_non_zeroed(p, size, loc)
+	if bytes != nil {
+		zero_slice(bytes)
+	}
+	return bytes, err
+}
+
+@(require_results)
+dynamic_arena_alloc_non_zeroed :: proc(p: ^Dynamic_Arena, size: int, loc := #caller_location) -> ([]byte, Allocator_Error) {
+	n := align_formula(size, p.alignment)
+	if n > p.block_size {
+		return nil, .Invalid_Argument
+	}
+	if n >= p.out_band_size {
+		assert(p.block_allocator.procedure != nil, "Backing block allocator must be initialized", loc=loc)
+		memory, err := alloc_bytes_non_zeroed(p.block_size, p.alignment, p.block_allocator, loc)
+		if memory != nil {
+			append(&p.out_band_allocations, raw_data(memory), loc = loc)
+		}
+		return memory, err
+	}
+	if p.bytes_left < n {
+		err := _dynamic_arena_cycle_new_block(p, loc)
+		if err != nil {
+			return nil, err
+		}
+		if p.current_block == nil {
+			return nil, .Out_Of_Memory
+		}
+	}
+	memory := p.current_pos
+	p.current_pos = ([^]byte)(p.current_pos)[n:]
+	p.bytes_left -= n
+	return ([^]byte)(memory)[:size], nil
+}
+
+dynamic_arena_reset :: proc(p: ^Dynamic_Arena, loc := #caller_location) {
+	if p.current_block != nil {
+		append(&p.unused_blocks, p.current_block, loc=loc)
+		p.current_block = nil
+	}
+	for block in p.used_blocks {
+		append(&p.unused_blocks, block, loc=loc)
+	}
+	clear(&p.used_blocks)
+	for a in p.out_band_allocations {
+		free(a, p.block_allocator, loc=loc)
+	}
+	clear(&p.out_band_allocations)
+	p.bytes_left = 0 // Make new allocations call `_dynamic_arena_cycle_new_block` again.
+}
+
+dynamic_arena_free_all :: proc(p: ^Dynamic_Arena) {
+	dynamic_arena_reset(p)
+	for block in p.unused_blocks {
+		free(block, p.block_allocator)
+	}
+	clear(&p.unused_blocks)
+}
 
 dynamic_arena_allocator_proc :: proc(
 	allocator_data: rawptr,
@@ -831,8 +959,10 @@ dynamic_arena_allocator_proc :: proc(
 	pool := (^Dynamic_Arena)(allocator_data)
 
 	switch mode {
-	case .Alloc, .Alloc_Non_Zeroed:
-		return dynamic_arena_alloc_bytes(pool, size)
+	case .Alloc:
+		return dynamic_arena_alloc(pool, size, loc)
+	case .Alloc_Non_Zeroed:
+		return dynamic_arena_alloc_non_zeroed(pool, size, loc)
 	case .Free:
 		return nil, .Mode_Not_Implemented
 	case .Free_All:
@@ -842,7 +972,7 @@ dynamic_arena_allocator_proc :: proc(
 		if old_size >= size {
 			return byte_slice(old_memory, size), nil
 		}
-		data, err := dynamic_arena_alloc_bytes(pool, size)
+		data, err := dynamic_arena_alloc(pool, size)
 		if err == nil {
 			runtime.copy(data, byte_slice(old_memory, old_size))
 		}
@@ -865,137 +995,6 @@ dynamic_arena_allocator_proc :: proc(
 		return nil, nil
 	}
 	return nil, nil
-}
-
-@(require_results)
-dynamic_arena_allocator :: proc(pool: ^Dynamic_Arena) -> Allocator {
-	return Allocator{
-		procedure = dynamic_arena_allocator_proc,
-		data = pool,
-	}
-}
-
-dynamic_arena_init :: proc(
-	pool: ^Dynamic_Arena,
-	block_allocator := context.allocator,
-	array_allocator := context.allocator,
-	block_size := DYNAMIC_ARENA_BLOCK_SIZE_DEFAULT,
-	out_band_size := DYNAMIC_ARENA_OUT_OF_BAND_SIZE_DEFAULT,
-	alignment := 8,
-) {
-	pool.block_size = block_size
-	pool.out_band_size = out_band_size
-	pool.alignment = alignment
-	pool.block_allocator = block_allocator
-	pool.out_band_allocations.allocator = array_allocator
-	pool.unused_blocks.allocator = array_allocator
-	pool.used_blocks.allocator = array_allocator
-}
-
-dynamic_arena_destroy :: proc(pool: ^Dynamic_Arena) {
-	dynamic_arena_free_all(pool)
-	delete(pool.unused_blocks)
-	delete(pool.used_blocks)
-	delete(pool.out_band_allocations)
-	zero(pool, size_of(pool^))
-}
-
-@(require_results)
-dynamic_arena_alloc :: proc(pool: ^Dynamic_Arena, bytes: int) -> (rawptr, Allocator_Error) {
-	data, err := dynamic_arena_alloc_bytes(pool, bytes)
-	return raw_data(data), err
-}
-
-@(require_results)
-dynamic_arena_alloc_bytes :: proc(p: ^Dynamic_Arena, bytes: int) -> ([]byte, Allocator_Error) {
-	cycle_new_block :: proc(p: ^Dynamic_Arena) -> (err: Allocator_Error) {
-		if p.block_allocator.procedure == nil {
-			panic("You must call pool_init on a Pool before using it")
-		}
-
-		if p.current_block != nil {
-			append(&p.used_blocks, p.current_block)
-		}
-
-		new_block: rawptr
-		if len(p.unused_blocks) > 0 {
-			new_block = pop(&p.unused_blocks)
-		} else {
-			data: []byte
-			data, err = p.block_allocator.procedure(
-				p.block_allocator.data,
-				Allocator_Mode.Alloc,
-				p.block_size,
-				p.alignment,
-				nil,
-				0,
-			)
-			new_block = raw_data(data)
-		}
-
-		p.bytes_left    = p.block_size
-		p.current_pos   = new_block
-		p.current_block = new_block
-		return
-	}
-
-	n := align_formula(bytes, p.alignment)
-	if n > p.block_size {
-		return nil, .Invalid_Argument
-	}
-	if n >= p.out_band_size {
-		assert(p.block_allocator.procedure != nil)
-		memory, err := p.block_allocator.procedure(p.block_allocator.data, Allocator_Mode.Alloc,
-		                                           p.block_size, p.alignment,
-		                                           nil, 0)
-		if memory != nil {
-			append(&p.out_band_allocations, raw_data(memory))
-		}
-		return memory, err
-	}
-
-	if p.bytes_left < n {
-		err := cycle_new_block(p)
-		if err != nil {
-			return nil, err
-		}
-		if p.current_block == nil {
-			return nil, .Out_Of_Memory
-		}
-	}
-
-	memory := p.current_pos
-	p.current_pos = ([^]byte)(p.current_pos)[n:]
-	p.bytes_left -= n
-	return ([^]byte)(memory)[:bytes], nil
-}
-
-dynamic_arena_reset :: proc(p: ^Dynamic_Arena) {
-	if p.current_block != nil {
-		append(&p.unused_blocks, p.current_block)
-		p.current_block = nil
-	}
-
-	for block in p.used_blocks {
-		append(&p.unused_blocks, block)
-	}
-	clear(&p.used_blocks)
-
-	for a in p.out_band_allocations {
-		free(a, p.block_allocator)
-	}
-	clear(&p.out_band_allocations)
-
-	p.bytes_left = 0 // Make new allocations call `cycle_new_block` again.
-}
-
-dynamic_arena_free_all :: proc(p: ^Dynamic_Arena) {
-	dynamic_arena_reset(p)
-
-	for block in p.unused_blocks {
-		free(block, p.block_allocator)
-	}
-	clear(&p.unused_blocks)
 }
 
 
