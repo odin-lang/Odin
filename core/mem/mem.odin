@@ -468,7 +468,7 @@ The specified alignment must be a power of 2.
 @(require_results)
 align_forward_uintptr :: proc(ptr, align: uintptr) -> uintptr {
 	assert(is_power_of_two(align))
-	return (p + align-1) & ~(align-1)
+	return (ptr + align-1) & ~(align-1)
 }
 
 /*
