@@ -1304,6 +1304,14 @@ buddy_allocator_free :: proc(b: ^Buddy_Allocator, ptr: rawptr) -> Allocator_Erro
 	return nil
 }
 
+buddy_allocator_free_all :: proc(b: ^Buddy_Allocator) {
+	alignment := b.alignment
+	head := ([^]byte)(b.head)
+	tail := ([^]byte)(b.tail)
+	data := head[:ptr_sub(tail, head)]
+	buddy_allocator_init(b, data, alignment)	
+}
+
 buddy_allocator_proc :: proc(
 	allocator_data: rawptr,
 	mode: Allocator_Mode,
@@ -1312,7 +1320,6 @@ buddy_allocator_proc :: proc(
 	old_size: int,
 	loc := #caller_location,
 ) -> ([]byte, Allocator_Error) {
-
 	b := (^Buddy_Allocator)(allocator_data)
 	switch mode {
 	case .Alloc:
@@ -1326,18 +1333,13 @@ buddy_allocator_proc :: proc(
 	case .Free:
 		return nil, buddy_allocator_free(b, old_memory)
 	case .Free_All:
-		alignment := b.alignment
-		head := ([^]byte)(b.head)
-		tail := ([^]byte)(b.tail)
-		data := head[:ptr_sub(tail, head)]
-		buddy_allocator_init(b, data, alignment)
+		buddy_allocator_free_all(b)
 	case .Query_Features:
 		set := (^Allocator_Mode_Set)(old_memory)
 		if set != nil {
 			set^ = {.Query_Features, .Alloc, .Alloc_Non_Zeroed, .Resize, .Resize_Non_Zeroed, .Free, .Free_All, .Query_Info}
 		}
 		return nil, nil
-
 	case .Query_Info:
 		info := (^Allocator_Query_Info)(old_memory)
 		if info != nil && info.pointer != nil {
@@ -1345,7 +1347,6 @@ buddy_allocator_proc :: proc(
 			if !(b.head <= ptr && ptr <= b.tail) {
 				return nil, .Invalid_Pointer
 			}
-
 			block := (^Buddy_Block)(([^]byte)(ptr)[-b.alignment:])
 			info.size = int(block.size)
 			info.alignment = int(b.alignment)
@@ -1353,6 +1354,5 @@ buddy_allocator_proc :: proc(
 		}
 		return nil, nil
 	}
-
 	return nil, nil
 }
