@@ -33,6 +33,14 @@ Arena_Temp_Memory :: struct {
 	prev_offset: int,
 }
 
+@(require_results)
+arena_allocator :: proc(arena: ^Arena) -> Allocator {
+	return Allocator{
+		procedure = arena_allocator_proc,
+		data = arena,
+	}
+}
+
 arena_init :: proc(a: ^Arena, data: []byte) {
 	a.data       = data
 	a.offset     = 0
@@ -46,14 +54,6 @@ init_arena :: proc(a: ^Arena, data: []byte) {
 	a.offset     = 0
 	a.peak_used  = 0
 	a.temp_count = 0
-}
-
-@(require_results)
-arena_allocator :: proc(arena: ^Arena) -> Allocator {
-	return Allocator{
-		procedure = arena_allocator_proc,
-		data = arena,
-	}
 }
 
 arena_alloc :: proc(a: ^Arena, size: int, alignment := DEFAULT_ALIGNMENT) -> ([]byte, Allocator_Error) {
@@ -142,6 +142,14 @@ Scratch :: struct {
 	prev_allocation:    rawptr,
 	backup_allocator:   Allocator,
 	leaked_allocations: [dynamic][]byte,
+}
+
+@(require_results)
+scratch_allocator :: proc(allocator: ^Scratch) -> Allocator {
+	return Allocator{
+		procedure = scratch_allocator_proc,
+		data = allocator,
+	}
 }
 
 scratch_init :: proc(s: ^Scratch, size: int, backup_allocator := context.allocator) -> Allocator_Error {
@@ -275,6 +283,21 @@ scratch_free_all :: proc(s: ^Scratch, loc := #caller_location) {
 	clear(&s.leaked_allocations)
 }
 
+scratch_resize :: proc(
+	s: ^Scratch,
+	old_memory: rawptr,
+	old_size: int,
+	size: int,
+	alignment := DEFAULT_ALIGNMENT,
+	loc := #caller_location
+) -> ([]byte, Allocator_Error) {
+	bytes, err := scratch_resize_non_zeroed(s, old_memory, old_size, size, alignment, loc)
+	if bytes != nil && size > old_size {
+		zero_slice(bytes[size:])
+	}
+	return bytes, err
+}
+
 scratch_resize_non_zeroed :: proc(
 	s: ^Scratch,
 	old_memory: rawptr,
@@ -306,21 +329,6 @@ scratch_resize_non_zeroed :: proc(
 	runtime.copy(data, byte_slice(old_memory, old_size))
 	err = scratch_free(s, old_memory, loc)
 	return data, err
-}
-
-scratch_resize :: proc(
-	s: ^Scratch,
-	old_memory: rawptr,
-	old_size: int,
-	size: int,
-	alignment := DEFAULT_ALIGNMENT,
-	loc := #caller_location
-) -> ([]byte, Allocator_Error) {
-	bytes, err := scratch_resize_non_zeroed(s, old_memory, old_size, size, alignment, loc)
-	if bytes != nil && size > old_size {
-		zero_slice(bytes[size:])
-	}
-	return bytes, err
 }
 
 scratch_allocator_proc :: proc(
@@ -358,14 +366,6 @@ scratch_allocator_proc :: proc(
 	return nil, nil
 }
 
-@(require_results)
-scratch_allocator :: proc(allocator: ^Scratch) -> Allocator {
-	return Allocator{
-		procedure = scratch_allocator_proc,
-		data = allocator,
-	}
-}
-
 
 
 // Stack is a stack-like allocator which has a strict memory freeing order
@@ -379,6 +379,14 @@ Stack :: struct {
 Stack_Allocation_Header :: struct {
 	prev_offset: int,
 	padding:     int,
+}
+
+@(require_results)
+stack_allocator :: proc(stack: ^Stack) -> Allocator {
+	return Allocator{
+		procedure = stack_allocator_proc,
+		data = stack,
+	}
 }
 
 stack_init :: proc(s: ^Stack, data: []byte) {
@@ -396,12 +404,17 @@ init_stack :: proc(s: ^Stack, data: []byte) {
 	s.peak_used = 0
 }
 
-@(require_results)
-stack_allocator :: proc(stack: ^Stack) -> Allocator {
-	return Allocator{
-		procedure = stack_allocator_proc,
-		data = stack,
+stack_alloc :: proc(
+	s: ^Stack,
+	size: int,
+	alignment := DEFAULT_ALIGNMENT,
+	loc := #caller_location
+) -> ([]byte, Allocator_Error) {
+	bytes, err := stack_alloc_non_zeroed(s, size, alignment, loc)
+	if bytes != nil {
+		zero_slice(bytes)
 	}
+	return bytes, err
 }
 
 stack_alloc_non_zeroed :: proc(
@@ -431,19 +444,6 @@ stack_alloc_non_zeroed :: proc(
 	s.curr_offset += size
 	s.peak_used = max(s.peak_used, s.curr_offset)
 	return byte_slice(rawptr(next_addr), size), nil
-}
-
-stack_alloc :: proc(
-	s: ^Stack,
-	size: int,
-	alignment := DEFAULT_ALIGNMENT,
-	loc := #caller_location
-) -> ([]byte, Allocator_Error) {
-	bytes, err := stack_alloc_non_zeroed(s, size, alignment, loc)
-	if bytes != nil {
-		zero_slice(bytes)
-	}
-	return bytes, err
 }
 
 stack_free :: proc(
@@ -484,6 +484,25 @@ stack_free_all :: proc(s: ^Stack, loc := #caller_location) {
 	}
 	s.prev_offset = 0
 	s.curr_offset = 0
+}
+
+stack_resize :: proc(
+	s: ^Stack,
+	old_memory: rawptr,
+	old_size: int,
+	size: int,
+	alignment := DEFAULT_ALIGNMENT,
+	loc := #caller_location,
+) -> ([]byte, Allocator_Error) {
+	bytes, err := stack_alloc_non_zeroed(s, size, alignment, loc)
+	if bytes != nil {
+		if old_memory == nil {
+			zero_slice(bytes)
+		} else if size > old_size {
+			zero_slice(bytes[old_size:])
+		}
+	}
+	return bytes, err
 }
 
 stack_resize_non_zeroed :: proc(
@@ -533,25 +552,6 @@ stack_resize_non_zeroed :: proc(
 		zero(rawptr(curr_addr + uintptr(diff)), diff)
 	}
 	return byte_slice(old_memory, size), nil
-}
-
-stack_resize :: proc(
-	s: ^Stack,
-	old_memory: rawptr,
-	old_size: int,
-	size: int,
-	alignment := DEFAULT_ALIGNMENT,
-	loc := #caller_location,
-) -> ([]byte, Allocator_Error) {
-	bytes, err := stack_alloc_non_zeroed(s, size, alignment, loc)
-	if bytes != nil {
-		if old_memory == nil {
-			zero_slice(bytes)
-		} else if size > old_size {
-			zero_slice(bytes[old_size:])
-		}
-	}
-	return bytes, err
 }
 
 stack_allocator_proc :: proc(
@@ -626,6 +626,129 @@ small_stack_allocator :: proc(stack: ^Small_Stack) -> Allocator {
 	}
 }
 
+small_stack_alloc :: proc(
+	s: ^Small_Stack,
+	size: int,
+	alignment := DEFAULT_ALIGNMENT,
+	loc := #caller_location,
+) -> ([]byte, Allocator_Error) {
+	bytes, err := small_stack_alloc_non_zeroed(s, size, alignment, loc)
+	if bytes != nil {
+		zero_slice(bytes)
+	}
+	return bytes, err
+}
+
+small_stack_alloc_non_zeroed :: proc(
+	s: ^Small_Stack,
+	size: int,
+	alignment := DEFAULT_ALIGNMENT,
+	loc := #caller_location,
+) -> ([]byte, Allocator_Error) {
+	if s.data == nil {
+		return nil, .Invalid_Argument
+	}
+	alignment := alignment
+	alignment := clamp(alignment, 1, 8*size_of(Stack_Allocation_Header{}.padding)/2)
+	curr_addr := uintptr(raw_data(s.data)) + uintptr(s.offset)
+	padding := calc_padding_with_header(curr_addr, uintptr(alignment), size_of(Small_Stack_Allocation_Header))
+	if s.offset + padding + size > len(s.data) {
+		return nil, .Out_Of_Memory
+	}
+	s.offset += padding
+	next_addr := curr_addr + uintptr(padding)
+	header := (^Small_Stack_Allocation_Header)(next_addr - size_of(Small_Stack_Allocation_Header))
+	header.padding = auto_cast padding
+	s.offset += size
+	s.peak_used = max(s.peak_used, s.offset)
+	return byte_slice(rawptr(next_addr), size), nil
+}
+
+small_stack_free :: proc(
+	s: ^Small_Stack,
+	old_memory: rawptr,
+	loc := #caller_location,
+) -> Allocator_Error {
+	if old_memory == nil {
+		return nil, nil
+	}
+	start := uintptr(raw_data(s.data))
+	end := start + uintptr(len(s.data))
+	curr_addr := uintptr(old_memory)
+	if !(start <= curr_addr && curr_addr < end) {
+		// panic("Out of bounds memory address passed to stack allocator (free)");
+		return nil, .Invalid_Pointer
+	}
+	if curr_addr >= start+uintptr(s.offset) {
+		// NOTE(bill): Allow double frees
+		return nil, nil
+	}
+	header := (^Small_Stack_Allocation_Header)(curr_addr - size_of(Small_Stack_Allocation_Header))
+	old_offset := int(curr_addr - uintptr(header.padding) - uintptr(raw_data(s.data)))
+	s.offset = old_offset
+}
+
+small_stack_free_all :: proc(s: ^Small_Stack) {
+	s.offset = 0
+}
+
+small_stack_resize :: proc(
+	s: ^Small_Stack,
+	old_memory: rawptr,
+	old_size: int,
+	size: int,
+	alignment := DEFAULT_ALIGNMENT,
+	loc := #caller_location,
+) -> ([]byte, Allocator_Error) {
+	bytes, err := small_stack_resize_non_zeroed(s, old_memory, old_size, size, alignment, loc)
+	if bytes != nil {
+		if old_memory == nil {
+			zero_slice(bytes)
+		} else if size > old_size {
+			zero_slice(bytes[old_size:])
+		}
+	}
+	return bytes, err
+}
+
+small_stack_resize_non_zeroed :: proc(
+	s: ^Small_Stack,
+	old_memory: rawptr,
+	old_size: int,
+	size: int,
+	alignment := DEFAULT_ALIGNMENT,
+	loc := #caller_location,
+) -> ([]byte, Allocator_Error) {
+	if old_memory == nil {
+		return small_stack_alloc_non_zeroed(s, size, align, loc)
+	}
+	if size == 0 {
+		return nil, nil
+	}
+	alignment := alignment
+	alignment := clamp(alignment, 1, 8*size_of(Stack_Allocation_Header{}.padding)/2)
+	start := uintptr(raw_data(s.data))
+	end := start + uintptr(len(s.data))
+	curr_addr := uintptr(old_memory)
+	if !(start <= curr_addr && curr_addr < end) {
+		// panic("Out of bounds memory address passed to stack allocator (resize)");
+		return nil, .Invalid_Pointer
+	}
+	if curr_addr >= start+uintptr(s.offset) {
+		// NOTE(bill): Treat as a double free
+		return nil, nil
+	}
+	if old_size == size {
+		return byte_slice(old_memory, size), nil
+	}
+	data, err := small_stack_alloc_non_zeroed(s, size, alignment, loc)
+	if err == nil {
+		runtime.copy(data, byte_slice(old_memory, old_size))
+	}
+	return data, err
+
+}
+
 small_stack_allocator_proc :: proc(
 	allocator_data: rawptr,
 	mode: Allocator_Mode,
@@ -635,108 +758,35 @@ small_stack_allocator_proc :: proc(
 	location := #caller_location,
 ) -> ([]byte, Allocator_Error) {
 	s := cast(^Small_Stack)allocator_data
-
 	if s.data == nil {
 		return nil, .Invalid_Argument
 	}
-
-	align := clamp(alignment, 1, 8*size_of(Stack_Allocation_Header{}.padding)/2)
-
-	raw_alloc :: proc(s: ^Small_Stack, size, alignment: int, zero_memory: bool) -> ([]byte, Allocator_Error) {
-		curr_addr := uintptr(raw_data(s.data)) + uintptr(s.offset)
-		padding := calc_padding_with_header(curr_addr, uintptr(alignment), size_of(Small_Stack_Allocation_Header))
-		if s.offset + padding + size > len(s.data) {
-			return nil, .Out_Of_Memory
-		}
-		s.offset += padding
-
-		next_addr := curr_addr + uintptr(padding)
-		header := (^Small_Stack_Allocation_Header)(next_addr - size_of(Small_Stack_Allocation_Header))
-		header.padding = auto_cast padding
-
-		s.offset += size
-
-		s.peak_used = max(s.peak_used, s.offset)
-
-		if zero_memory {
-			zero(rawptr(next_addr), size)
-		}
-		return byte_slice(rawptr(next_addr), size), nil
-	}
-
 	switch mode {
-	case .Alloc, .Alloc_Non_Zeroed:
-		return raw_alloc(s, size, align, mode == .Alloc)
+	case .Alloc:
+		return small_stack_alloc(s, size, alignment, loc)
+	case .Alloc_Non_Zeroed:
+		return small_stack_alloc_non_zeroed(s, size, alignment, loc)
 	case .Free:
-		if old_memory == nil {
-			return nil, nil
-		}
-		start := uintptr(raw_data(s.data))
-		end := start + uintptr(len(s.data))
-		curr_addr := uintptr(old_memory)
-
-		if !(start <= curr_addr && curr_addr < end) {
-			// panic("Out of bounds memory address passed to stack allocator (free)");
-			return nil, .Invalid_Pointer
-		}
-
-		if curr_addr >= start+uintptr(s.offset) {
-			// NOTE(bill): Allow double frees
-			return nil, nil
-		}
-
-		header := (^Small_Stack_Allocation_Header)(curr_addr - size_of(Small_Stack_Allocation_Header))
-		old_offset := int(curr_addr - uintptr(header.padding) - uintptr(raw_data(s.data)))
-
-		s.offset = old_offset
-
+		return nil, small_stack_free(s, old_memory, loc)
 	case .Free_All:
-		s.offset = 0
-
-	case .Resize, .Resize_Non_Zeroed:
-		if old_memory == nil {
-			return raw_alloc(s, size, align, mode == .Resize)
-		}
-		if size == 0 {
-			return nil, nil
-		}
-
-		start := uintptr(raw_data(s.data))
-		end := start + uintptr(len(s.data))
-		curr_addr := uintptr(old_memory)
-		if !(start <= curr_addr && curr_addr < end) {
-			// panic("Out of bounds memory address passed to stack allocator (resize)");
-			return nil, .Invalid_Pointer
-		}
-
-		if curr_addr >= start+uintptr(s.offset) {
-			// NOTE(bill): Treat as a double free
-			return nil, nil
-		}
-
-		if old_size == size {
-			return byte_slice(old_memory, size), nil
-		}
-
-		data, err := raw_alloc(s, size, align, mode == .Resize)
-		if err == nil {
-			runtime.copy(data, byte_slice(old_memory, old_size))
-		}
-		return data, err
-
+		small_stack_free_all(s)
+	case .Resize:
+		return small_stack_resize(s, old_memory, old_size, size, alignment, loc)
+	case .Resize_Non_Zeroed:
+		return small_stack_resize_non_zeroed(s, old_memory, old_size, size, alignment, loc)
 	case .Query_Features:
 		set := (^Allocator_Mode_Set)(old_memory)
 		if set != nil {
 			set^ = {.Alloc, .Alloc_Non_Zeroed, .Free, .Free_All, .Resize, .Resize_Non_Zeroed, .Query_Features}
 		}
 		return nil, nil
-
 	case .Query_Info:
 		return nil, .Mode_Not_Implemented
 	}
-
 	return nil, nil
 }
+
+
 
 Dynamic_Pool :: struct {
 	block_size:    int,
