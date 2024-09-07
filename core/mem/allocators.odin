@@ -880,14 +880,14 @@ _dynamic_arena_cycle_new_block :: proc(p: ^Dynamic_Arena, loc := #caller_locatio
 }
 
 @(private, require_results)
-_dynamic_arena_alloc_ptr :: proc(pool: ^Dynamic_Arena, size: int, loc := #caller_location) -> (rawptr, Allocator_Error) {
-	data, err := dynamic_arena_alloc(pool, size, loc)
+_dynamic_arena_alloc_ptr :: proc(a: ^Dynamic_Arena, size: int, loc := #caller_location) -> (rawptr, Allocator_Error) {
+	data, err := dynamic_arena_alloc(a, size, loc)
 	return raw_data(data), err
 }
 
 @(require_results)
-dynamic_arena_alloc :: proc(p: ^Dynamic_Arena, size: int, loc := #caller_location) -> ([]byte, Allocator_Error) {
-	bytes, err := dynamic_arena_alloc_non_zeroed(p, size, loc)
+dynamic_arena_alloc :: proc(a: ^Dynamic_Arena, size: int, loc := #caller_location) -> ([]byte, Allocator_Error) {
+	bytes, err := dynamic_arena_alloc_non_zeroed(a, size, loc)
 	if bytes != nil {
 		zero_slice(bytes)
 	}
@@ -895,56 +895,91 @@ dynamic_arena_alloc :: proc(p: ^Dynamic_Arena, size: int, loc := #caller_locatio
 }
 
 @(require_results)
-dynamic_arena_alloc_non_zeroed :: proc(p: ^Dynamic_Arena, size: int, loc := #caller_location) -> ([]byte, Allocator_Error) {
-	n := align_formula(size, p.alignment)
-	if n > p.block_size {
+dynamic_arena_alloc_non_zeroed :: proc(a: ^Dynamic_Arena, size: int, loc := #caller_location) -> ([]byte, Allocator_Error) {
+	n := align_formula(size, a.alignment)
+	if n > a.block_size {
 		return nil, .Invalid_Argument
 	}
-	if n >= p.out_band_size {
-		assert(p.block_allocator.procedure != nil, "Backing block allocator must be initialized", loc=loc)
-		memory, err := alloc_bytes_non_zeroed(p.block_size, p.alignment, p.block_allocator, loc)
+	if n >= a.out_band_size {
+		assert(a.block_allocator.procedure != nil, "Backing block allocator must be initialized", loc=loc)
+		memory, err := alloc_bytes_non_zeroed(a.block_size, a.alignment, a.block_allocator, loc)
 		if memory != nil {
-			append(&p.out_band_allocations, raw_data(memory), loc = loc)
+			append(&a.out_band_allocations, raw_data(memory), loc = loc)
 		}
 		return memory, err
 	}
-	if p.bytes_left < n {
-		err := _dynamic_arena_cycle_new_block(p, loc)
+	if a.bytes_left < n {
+		err := _dynamic_arena_cycle_new_block(a, loc)
 		if err != nil {
 			return nil, err
 		}
-		if p.current_block == nil {
+		if a.current_block == nil {
 			return nil, .Out_Of_Memory
 		}
 	}
-	memory := p.current_pos
-	p.current_pos = ([^]byte)(p.current_pos)[n:]
-	p.bytes_left -= n
+	memory := a.current_pos
+	a.current_pos = ([^]byte)(a.current_pos)[n:]
+	a.bytes_left -= n
 	return ([^]byte)(memory)[:size], nil
 }
 
-dynamic_arena_reset :: proc(p: ^Dynamic_Arena, loc := #caller_location) {
-	if p.current_block != nil {
-		append(&p.unused_blocks, p.current_block, loc=loc)
-		p.current_block = nil
+dynamic_arena_reset :: proc(a: ^Dynamic_Arena, loc := #caller_location) {
+	if a.current_block != nil {
+		append(&a.unused_blocks, a.current_block, loc=loc)
+		a.current_block = nil
 	}
-	for block in p.used_blocks {
-		append(&p.unused_blocks, block, loc=loc)
+	for block in a.used_blocks {
+		append(&a.unused_blocks, block, loc=loc)
 	}
-	clear(&p.used_blocks)
-	for a in p.out_band_allocations {
-		free(a, p.block_allocator, loc=loc)
+	clear(&a.used_blocks)
+	for a in a.out_band_allocations {
+		free(a, a.block_allocator, loc=loc)
 	}
-	clear(&p.out_band_allocations)
-	p.bytes_left = 0 // Make new allocations call `_dynamic_arena_cycle_new_block` again.
+	clear(&a.out_band_allocations)
+	a.bytes_left = 0 // Make new allocations call `_dynamic_arena_cycle_new_block` again.
 }
 
-dynamic_arena_free_all :: proc(p: ^Dynamic_Arena) {
-	dynamic_arena_reset(p)
-	for block in p.unused_blocks {
-		free(block, p.block_allocator)
+dynamic_arena_free_all :: proc(a: ^Dynamic_Arena, loc := #caller_location) {
+	dynamic_arena_reset(a)
+	for block in a.unused_blocks {
+		free(block, a.block_allocator, loc)
 	}
-	clear(&p.unused_blocks)
+	clear(&a.unused_blocks)
+}
+
+dynamic_arena_resize :: proc(
+	a: ^Dynamic_Arena,
+	old_memory: rawptr,
+	old_size: int,
+	size: int,
+	loc := #caller_location,
+) -> ([]byte, Allocator_Error) {
+	bytes, err := dynamic_arena_resize_non_zeroed(a, old_memory, old_size, size, loc)
+	if bytes != nil {
+		if old_memory == nil {
+			zero_slice(bytes)
+		} else if size > old_size {
+			zero_slice(bytes[old_size:])
+		}
+	}
+	return bytes, err
+}
+
+dynamic_arena_resize_non_zeroed :: proc(
+	a: ^Dynamic_Arena,
+	old_memory: rawptr,
+	old_size: int,
+	size: int,
+	loc := #caller_location,
+) -> ([]byte, Allocator_Error) {
+	if old_size >= size {
+		return byte_slice(old_memory, size), nil
+	}
+	data, err := dynamic_arena_alloc_non_zeroed(a, size, loc)
+	if err == nil {
+		runtime.copy(data, byte_slice(old_memory, old_size))
+	}
+	return data, err
 }
 
 dynamic_arena_allocator_proc :: proc(
@@ -956,35 +991,26 @@ dynamic_arena_allocator_proc :: proc(
 	old_size: int,
 	loc := #caller_location,
 ) -> ([]byte, Allocator_Error) {
-	pool := (^Dynamic_Arena)(allocator_data)
-
+	arena := (^Dynamic_Arena)(allocator_data)
 	switch mode {
 	case .Alloc:
-		return dynamic_arena_alloc(pool, size, loc)
+		return dynamic_arena_alloc(arena, size, loc)
 	case .Alloc_Non_Zeroed:
-		return dynamic_arena_alloc_non_zeroed(pool, size, loc)
+		return dynamic_arena_alloc_non_zeroed(arena, size, loc)
 	case .Free:
 		return nil, .Mode_Not_Implemented
 	case .Free_All:
-		dynamic_arena_free_all(pool)
-		return nil, nil
-	case .Resize, .Resize_Non_Zeroed:
-		if old_size >= size {
-			return byte_slice(old_memory, size), nil
-		}
-		data, err := dynamic_arena_alloc(pool, size)
-		if err == nil {
-			runtime.copy(data, byte_slice(old_memory, old_size))
-		}
-		return data, err
-
+		dynamic_arena_free_all(arena, loc)
+	case .Resize:
+		return dynamic_arena_resize(arena, old_memory, old_size, size, loc)
+	case .Resize_Non_Zeroed:
+		return dynamic_arena_resize_non_zeroed(arena, old_memory, old_size, size, loc)
 	case .Query_Features:
 		set := (^Allocator_Mode_Set)(old_memory)
 		if set != nil {
 			set^ = {.Alloc, .Alloc_Non_Zeroed, .Free_All, .Resize, .Resize_Non_Zeroed, .Query_Features, .Query_Info}
 		}
 		return nil, nil
-
 	case .Query_Info:
 		info := (^Allocator_Query_Info)(old_memory)
 		if info != nil && info.pointer != nil {
