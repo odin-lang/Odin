@@ -131,9 +131,12 @@ end_arena_temp_memory :: proc(tmp: Arena_Temp_Memory) {
 	tmp.arena.temp_count -= 1
 }
 
+/* old procedures */
+Scratch_Allocator :: Scratch
+scratch_allocator_init :: scratch_init
+scratch_allocator_destroy :: scratch_destroy
 
-
-Scratch_Allocator :: struct {
+Scratch :: struct {
 	data:               []byte,
 	curr_offset:        int,
 	prev_allocation:    rawptr,
@@ -141,7 +144,7 @@ Scratch_Allocator :: struct {
 	leaked_allocations: [dynamic][]byte,
 }
 
-scratch_allocator_init :: proc(s: ^Scratch_Allocator, size: int, backup_allocator := context.allocator) -> Allocator_Error {
+scratch_init :: proc(s: ^Scratch, size: int, backup_allocator := context.allocator) -> Allocator_Error {
 	s.data = make_aligned([]byte, size, 2*align_of(rawptr), backup_allocator) or_return
 	s.curr_offset = 0
 	s.prev_allocation = nil
@@ -150,7 +153,7 @@ scratch_allocator_init :: proc(s: ^Scratch_Allocator, size: int, backup_allocato
 	return nil
 }
 
-scratch_allocator_destroy :: proc(s: ^Scratch_Allocator) {
+scratch_destroy :: proc(s: ^Scratch) {
 	if s == nil {
 		return
 	}
@@ -162,21 +165,21 @@ scratch_allocator_destroy :: proc(s: ^Scratch_Allocator) {
 	s^ = {}
 }
 
-scratch_allocator_alloc :: proc(
-	s: ^Scratch_Allocator,
+scratch_alloc :: proc(
+	s: ^Scratch,
 	size: int,
 	alignment := DEFAULT_ALIGNMENT,
 	loc := #caller_location,
 ) -> ([]byte, Allocator_Error) {
-	bytes, err := scratch_allocator_alloc_non_zeroed(s, size, alignment, loc)
+	bytes, err := scratch_alloc_non_zeroed(s, size, alignment, loc)
 	if bytes != nil {
 		zero_slice(bytes)
 	}
 	return bytes, err
 }
 
-scratch_allocator_alloc_non_zeroed :: proc(
-	s: ^Scratch_Allocator,
+scratch_alloc_non_zeroed :: proc(
+	s: ^Scratch,
 	size: int,
 	alignment := DEFAULT_ALIGNMENT,
 	loc := #caller_location,
@@ -186,7 +189,7 @@ scratch_allocator_alloc_non_zeroed :: proc(
 		if !(context.allocator.procedure != scratch_allocator_proc && context.allocator.data != s) {
 			panic("cyclic initialization of the scratch allocator with itself", loc)
 		}
-		scratch_allocator_init(s, DEFAULT_BACKING_SIZE)
+		scratch_init(s, DEFAULT_BACKING_SIZE)
 	}
 	size := size
 	size = align_forward_int(size, alignment)
@@ -222,13 +225,13 @@ scratch_allocator_alloc_non_zeroed :: proc(
 	append(&s.leaked_allocations, ptr)
 	if logger := context.logger; logger.lowest_level <= .Warning {
 		if logger.procedure != nil {
-			logger.procedure(logger.data, .Warning, "mem.Scratch_Allocator resorted to backup_allocator" , logger.options, loc)
+			logger.procedure(logger.data, .Warning, "mem.Scratch resorted to backup_allocator" , logger.options, loc)
 		}
 	}
 	return ptr, err
 }
 
-scratch_allocator_free :: proc(s: ^Scratch_Allocator, ptr: rawptr, loc := #caller_location) -> Allocator_Error {
+scratch_free :: proc(s: ^Scratch, ptr: rawptr, loc := #caller_location) -> Allocator_Error {
 	if s.data == nil {
 		panic("Free on an uninitialized scratch allocator", loc)
 	}
@@ -260,7 +263,7 @@ scratch_allocator_free :: proc(s: ^Scratch_Allocator, ptr: rawptr, loc := #calle
 	return .Invalid_Pointer
 }
 
-scratch_allocator_free_all :: proc(s: ^Scratch_Allocator, loc := #caller_location) {
+scratch_free_all :: proc(s: ^Scratch, loc := #caller_location) {
 	if s.data == nil {
 		panic("free_all called on an unitialized scratch allocator", loc)
 	}
@@ -272,8 +275,8 @@ scratch_allocator_free_all :: proc(s: ^Scratch_Allocator, loc := #caller_locatio
 	clear(&s.leaked_allocations)
 }
 
-scratch_allocator_resize_non_zeroed :: proc(
-	s: ^Scratch_Allocator,
+scratch_resize_non_zeroed :: proc(
+	s: ^Scratch,
 	old_memory: rawptr,
 	old_size: int,
 	size: int,
@@ -285,7 +288,7 @@ scratch_allocator_resize_non_zeroed :: proc(
 		if !(context.allocator.procedure != scratch_allocator_proc && context.allocator.data != s) {
 			panic("cyclic initialization of the scratch allocator with itself", loc)
 		}
-		scratch_allocator_init(s, DEFAULT_BACKING_SIZE)
+		scratch_init(s, DEFAULT_BACKING_SIZE)
 	}
 	begin := uintptr(raw_data(s.data))
 	end := begin + uintptr(len(s.data))
@@ -295,25 +298,25 @@ scratch_allocator_resize_non_zeroed :: proc(
 		s.curr_offset = int(old_ptr-begin)+size
 		return byte_slice(old_memory, size), nil
 	}
-	data, err := scratch_allocator_alloc_non_zeroed(s, size, alignment, loc)
+	data, err := scratch_alloc_non_zeroed(s, size, alignment, loc)
 	if err != nil {
 		return data, err
 	}
 	// TODO(flysand): OOB access on size < old_size.
 	runtime.copy(data, byte_slice(old_memory, old_size))
-	err = scratch_allocator_free(s, old_memory, loc)
+	err = scratch_free(s, old_memory, loc)
 	return data, err
 }
 
-scratch_allocator_resize :: proc(
-	s: ^Scratch_Allocator,
+scratch_resize :: proc(
+	s: ^Scratch,
 	old_memory: rawptr,
 	old_size: int,
 	size: int,
 	alignment := DEFAULT_ALIGNMENT,
 	loc := #caller_location
 ) -> ([]byte, Allocator_Error) {
-	bytes, err := scratch_allocator_resize_non_zeroed(s, old_memory, old_size, size, alignment, loc)
+	bytes, err := scratch_resize_non_zeroed(s, old_memory, old_size, size, alignment, loc)
 	if bytes != nil && size > old_size {
 		zero_slice(bytes[size:])
 	}
@@ -328,21 +331,21 @@ scratch_allocator_proc :: proc(
 	old_size: int,
 	loc := #caller_location,
 ) -> ([]byte, Allocator_Error) {
-	s := (^Scratch_Allocator)(allocator_data)
+	s := (^Scratch)(allocator_data)
 	size := size
 	switch mode {
 	case .Alloc:
-		return scratch_allocator_alloc(s, size, alignment, loc)
+		return scratch_alloc(s, size, alignment, loc)
 	case .Alloc_Non_Zeroed:
-		return scratch_allocator_alloc_non_zeroed(s, size, alignment, loc)
+		return scratch_alloc_non_zeroed(s, size, alignment, loc)
 	case .Free:
-		return nil, scratch_allocator_free(s, old_memory, loc)
+		return nil, scratch_free(s, old_memory, loc)
 	case .Free_All:
-		scratch_allocator_free_all(s, loc)
+		scratch_free_all(s, loc)
 	case .Resize:
-		return scratch_allocator_resize(s, old_memory, old_size, size, alignment, loc)
+		return scratch_resize(s, old_memory, old_size, size, alignment, loc)
 	case .Resize_Non_Zeroed:
-		return scratch_allocator_resize_non_zeroed(s, old_memory, old_size, size, alignment, loc)
+		return scratch_resize_non_zeroed(s, old_memory, old_size, size, alignment, loc)
 	case .Query_Features:
 		set := (^Allocator_Mode_Set)(old_memory)
 		if set != nil {
@@ -356,7 +359,7 @@ scratch_allocator_proc :: proc(
 }
 
 @(require_results)
-scratch_allocator :: proc(allocator: ^Scratch_Allocator) -> Allocator {
+scratch_allocator :: proc(allocator: ^Scratch) -> Allocator {
 	return Allocator{
 		procedure = scratch_allocator_proc,
 		data = allocator,
@@ -401,7 +404,7 @@ stack_allocator :: proc(stack: ^Stack) -> Allocator {
 	}
 }
 
-stack_allocator_alloc_non_zeroed :: proc(
+stack_alloc_non_zeroed :: proc(
 	s: ^Stack,
 	size: int,
 	alignment := DEFAULT_ALIGNMENT,
@@ -430,20 +433,20 @@ stack_allocator_alloc_non_zeroed :: proc(
 	return byte_slice(rawptr(next_addr), size), nil
 }
 
-stack_allocator_alloc :: proc(
+stack_alloc :: proc(
 	s: ^Stack,
 	size: int,
 	alignment := DEFAULT_ALIGNMENT,
 	loc := #caller_location
 ) -> ([]byte, Allocator_Error) {
-	bytes, err := stack_allocator_alloc_non_zeroed(s, size, alignment, loc)
+	bytes, err := stack_alloc_non_zeroed(s, size, alignment, loc)
 	if bytes != nil {
 		zero_slice(bytes)
 	}
 	return bytes, err
 }
 
-stack_allocator_free :: proc(
+stack_free :: proc(
 	s: ^Stack,
 	old_memory: rawptr,
 	loc := #caller_location,
@@ -475,7 +478,7 @@ stack_allocator_free :: proc(
 	return nil
 }
 
-stack_allocator_free_all :: proc(s: ^Stack) {
+stack_free_all :: proc(s: ^Stack, loc := #caller_location) {
 	if s.data == nil {
 		panic("Stack free all on an uninitialized stack allocator", loc)
 	}
@@ -483,7 +486,7 @@ stack_allocator_free_all :: proc(s: ^Stack) {
 	s.curr_offset = 0
 }
 
-stack_allocator_resize_non_zeroed :: proc(
+stack_resize_non_zeroed :: proc(
 	s: ^Stack,
 	old_memory: rawptr,
 	old_size: int,
@@ -495,7 +498,7 @@ stack_allocator_resize_non_zeroed :: proc(
 		panic("Stack free all on an uninitialized stack allocator", loc)
 	}
 	if old_memory == nil {
-		return stack_allocator_alloc_non_zeroed(s, size, alignment, loc)
+		return stack_alloc_non_zeroed(s, size, alignment, loc)
 	}
 	if size == 0 {
 		return nil, nil
@@ -516,7 +519,7 @@ stack_allocator_resize_non_zeroed :: proc(
 	header := (^Stack_Allocation_Header)(curr_addr - size_of(Stack_Allocation_Header))
 	old_offset := int(curr_addr - uintptr(header.padding) - uintptr(raw_data(s.data)))
 	if old_offset != header.prev_offset {
-		data, err := stack_allocator_alloc_non_zeroed(s, size, alignment, loc)
+		data, err := stack_alloc_non_zeroed(s, size, alignment, loc)
 		if err == nil {
 			runtime.copy(data, byte_slice(old_memory, old_size))
 		}
@@ -532,7 +535,7 @@ stack_allocator_resize_non_zeroed :: proc(
 	return byte_slice(old_memory, size), nil
 }
 
-stack_allocator_resize :: proc(
+stack_resize :: proc(
 	s: ^Stack,
 	old_memory: rawptr,
 	old_size: int,
@@ -540,7 +543,7 @@ stack_allocator_resize :: proc(
 	alignment := DEFAULT_ALIGNMENT,
 	loc := #caller_location,
 ) -> ([]byte, Allocator_Error) {
-	bytes, err := stack_allocator_alloc_non_zeroed(s, size, alignment, loc)
+	bytes, err := stack_alloc_non_zeroed(s, size, alignment, loc)
 	if bytes != nil {
 		if old_memory == nil {
 			zero_slice(bytes)
@@ -558,7 +561,7 @@ stack_allocator_proc :: proc(
 	alignment: int,
 	old_memory: rawptr,
 	old_size: int,
-	location := #caller_location,
+	loc := #caller_location,
 ) -> ([]byte, Allocator_Error) {
 	s := cast(^Stack)allocator_data
 	if s.data == nil {
@@ -566,17 +569,17 @@ stack_allocator_proc :: proc(
 	}
 	switch mode {
 	case .Alloc:
-		return stack_allocator_alloc(s, size, alignment, loc)
+		return stack_alloc(s, size, alignment, loc)
 	case .Alloc_Non_Zeroed:
-		return stack_allocator_alloc_non_zeroed(s, size, alignment, loc)
+		return stack_alloc_non_zeroed(s, size, alignment, loc)
 	case .Free:
-		return nil, stack_allocator_free(s, old_memory, loc)
+		return nil, stack_free(s, old_memory, loc)
 	case .Free_All:
-		stack_allocator_free_all(s)
+		stack_free_all(s, loc)
 	case .Resize:
-		return stack_allocator_resize(s, old_memory, old_size, size, alignment, loc)
+		return stack_resize(s, old_memory, old_size, size, alignment, loc)
 	case .Resize_Non_Zeroed:
-		return stack_allocator_resize_non_zeroed(s, old_memory, old_size, size, alignment, loc)
+		return stack_resize_non_zeroed(s, old_memory, old_size, size, alignment, loc)
 	case .Query_Features:
 		set := (^Allocator_Mode_Set)(old_memory)
 		if set != nil {
