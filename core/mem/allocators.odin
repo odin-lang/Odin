@@ -649,7 +649,7 @@ small_stack_alloc_non_zeroed :: proc(
 		return nil, .Invalid_Argument
 	}
 	alignment := alignment
-	alignment := clamp(alignment, 1, 8*size_of(Stack_Allocation_Header{}.padding)/2)
+	alignment = clamp(alignment, 1, 8*size_of(Stack_Allocation_Header{}.padding)/2)
 	curr_addr := uintptr(raw_data(s.data)) + uintptr(s.offset)
 	padding := calc_padding_with_header(curr_addr, uintptr(alignment), size_of(Small_Stack_Allocation_Header))
 	if s.offset + padding + size > len(s.data) {
@@ -670,22 +670,23 @@ small_stack_free :: proc(
 	loc := #caller_location,
 ) -> Allocator_Error {
 	if old_memory == nil {
-		return nil, nil
+		return nil
 	}
 	start := uintptr(raw_data(s.data))
 	end := start + uintptr(len(s.data))
 	curr_addr := uintptr(old_memory)
 	if !(start <= curr_addr && curr_addr < end) {
 		// panic("Out of bounds memory address passed to stack allocator (free)");
-		return nil, .Invalid_Pointer
+		return .Invalid_Pointer
 	}
 	if curr_addr >= start+uintptr(s.offset) {
 		// NOTE(bill): Allow double frees
-		return nil, nil
+		return nil
 	}
 	header := (^Small_Stack_Allocation_Header)(curr_addr - size_of(Small_Stack_Allocation_Header))
 	old_offset := int(curr_addr - uintptr(header.padding) - uintptr(raw_data(s.data)))
 	s.offset = old_offset
+	return nil
 }
 
 small_stack_free_all :: proc(s: ^Small_Stack) {
@@ -719,14 +720,14 @@ small_stack_resize_non_zeroed :: proc(
 	alignment := DEFAULT_ALIGNMENT,
 	loc := #caller_location,
 ) -> ([]byte, Allocator_Error) {
+	alignment := alignment
+	alignment = clamp(alignment, 1, 8*size_of(Stack_Allocation_Header{}.padding)/2)
 	if old_memory == nil {
-		return small_stack_alloc_non_zeroed(s, size, align, loc)
+		return small_stack_alloc_non_zeroed(s, size, alignment, loc)
 	}
 	if size == 0 {
 		return nil, nil
 	}
-	alignment := alignment
-	alignment := clamp(alignment, 1, 8*size_of(Stack_Allocation_Header{}.padding)/2)
 	start := uintptr(raw_data(s.data))
 	end := start + uintptr(len(s.data))
 	curr_addr := uintptr(old_memory)
@@ -755,7 +756,7 @@ small_stack_allocator_proc :: proc(
     size, alignment: int,
     old_memory: rawptr,
 	old_size: int,
-	location := #caller_location,
+	loc := #caller_location,
 ) -> ([]byte, Allocator_Error) {
 	s := cast(^Small_Stack)allocator_data
 	if s.data == nil {
