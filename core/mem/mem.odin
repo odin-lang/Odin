@@ -98,7 +98,7 @@ compiler assumes volatile semantics of the memory.
 */
 zero_explicit :: proc "contextless" (data: rawptr, len: int) -> rawptr {
 	// This routine tries to avoid the compiler optimizing away the call,
-	// so that it is always executed.  It is intended to provided
+	// so that it is always executed.  It is intended to provide
 	// equivalent semantics to those provided by the C11 Annex K 3.7.4.1
 	// memset_s call.
 	intrinsics.mem_zero_volatile(data, len) // Use the volatile mem_zero
