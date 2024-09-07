@@ -56,6 +56,7 @@ init_arena :: proc(a: ^Arena, data: []byte) {
 	a.temp_count = 0
 }
 
+@(require_results)
 arena_alloc :: proc(a: ^Arena, size: int, alignment := DEFAULT_ALIGNMENT) -> ([]byte, Allocator_Error) {
 	bytes, err := arena_alloc_non_zeroed(a, size, alignment)
 	if bytes != nil {
@@ -64,6 +65,7 @@ arena_alloc :: proc(a: ^Arena, size: int, alignment := DEFAULT_ALIGNMENT) -> ([]
 	return bytes, err
 }
 
+@(require_results)
 arena_alloc_non_zeroed :: proc(a: ^Arena, size: int, alignment := DEFAULT_ALIGNMENT) -> ([]byte, Allocator_Error) {
 	#no_bounds_check end := &a.data[a.offset]
 	ptr := align_forward(end, uintptr(alignment))
@@ -173,6 +175,7 @@ scratch_destroy :: proc(s: ^Scratch) {
 	s^ = {}
 }
 
+@(require_results)
 scratch_alloc :: proc(
 	s: ^Scratch,
 	size: int,
@@ -186,6 +189,7 @@ scratch_alloc :: proc(
 	return bytes, err
 }
 
+@(require_results)
 scratch_alloc_non_zeroed :: proc(
 	s: ^Scratch,
 	size: int,
@@ -239,6 +243,7 @@ scratch_alloc_non_zeroed :: proc(
 	return ptr, err
 }
 
+@(require_results)
 scratch_free :: proc(s: ^Scratch, ptr: rawptr, loc := #caller_location) -> Allocator_Error {
 	if s.data == nil {
 		panic("Free on an uninitialized scratch allocator", loc)
@@ -283,6 +288,7 @@ scratch_free_all :: proc(s: ^Scratch, loc := #caller_location) {
 	clear(&s.leaked_allocations)
 }
 
+@(require_results)
 scratch_resize :: proc(
 	s: ^Scratch,
 	old_memory: rawptr,
@@ -298,6 +304,7 @@ scratch_resize :: proc(
 	return bytes, err
 }
 
+@(require_results)
 scratch_resize_non_zeroed :: proc(
 	s: ^Scratch,
 	old_memory: rawptr,
@@ -404,6 +411,7 @@ init_stack :: proc(s: ^Stack, data: []byte) {
 	s.peak_used = 0
 }
 
+@(require_results)
 stack_alloc :: proc(
 	s: ^Stack,
 	size: int,
@@ -417,6 +425,7 @@ stack_alloc :: proc(
 	return bytes, err
 }
 
+@(require_results)
 stack_alloc_non_zeroed :: proc(
 	s: ^Stack,
 	size: int,
@@ -446,6 +455,7 @@ stack_alloc_non_zeroed :: proc(
 	return byte_slice(rawptr(next_addr), size), nil
 }
 
+@(require_results)
 stack_free :: proc(
 	s: ^Stack,
 	old_memory: rawptr,
@@ -486,6 +496,7 @@ stack_free_all :: proc(s: ^Stack, loc := #caller_location) {
 	s.curr_offset = 0
 }
 
+@(require_results)
 stack_resize :: proc(
 	s: ^Stack,
 	old_memory: rawptr,
@@ -505,6 +516,7 @@ stack_resize :: proc(
 	return bytes, err
 }
 
+@(require_results)
 stack_resize_non_zeroed :: proc(
 	s: ^Stack,
 	old_memory: rawptr,
@@ -626,6 +638,7 @@ small_stack_allocator :: proc(stack: ^Small_Stack) -> Allocator {
 	}
 }
 
+@(require_results)
 small_stack_alloc :: proc(
 	s: ^Small_Stack,
 	size: int,
@@ -639,6 +652,7 @@ small_stack_alloc :: proc(
 	return bytes, err
 }
 
+@(require_results)
 small_stack_alloc_non_zeroed :: proc(
 	s: ^Small_Stack,
 	size: int,
@@ -664,6 +678,7 @@ small_stack_alloc_non_zeroed :: proc(
 	return byte_slice(rawptr(next_addr), size), nil
 }
 
+@(require_results)
 small_stack_free :: proc(
 	s: ^Small_Stack,
 	old_memory: rawptr,
@@ -693,6 +708,7 @@ small_stack_free_all :: proc(s: ^Small_Stack) {
 	s.offset = 0
 }
 
+@(require_results)
 small_stack_resize :: proc(
 	s: ^Small_Stack,
 	old_memory: rawptr,
@@ -712,6 +728,7 @@ small_stack_resize :: proc(
 	return bytes, err
 }
 
+@(require_results)
 small_stack_resize_non_zeroed :: proc(
 	s: ^Small_Stack,
 	old_memory: rawptr,
@@ -932,8 +949,8 @@ dynamic_arena_reset :: proc(a: ^Dynamic_Arena, loc := #caller_location) {
 		append(&a.unused_blocks, block, loc=loc)
 	}
 	clear(&a.used_blocks)
-	for a in a.out_band_allocations {
-		free(a, a.block_allocator, loc=loc)
+	for allocation in a.out_band_allocations {
+		free(allocation, a.block_allocator, loc=loc)
 	}
 	clear(&a.out_band_allocations)
 	a.bytes_left = 0 // Make new allocations call `_dynamic_arena_cycle_new_block` again.
@@ -947,6 +964,7 @@ dynamic_arena_free_all :: proc(a: ^Dynamic_Arena, loc := #caller_location) {
 	clear(&a.unused_blocks)
 }
 
+@(require_results)
 dynamic_arena_resize :: proc(
 	a: ^Dynamic_Arena,
 	old_memory: rawptr,
@@ -965,6 +983,7 @@ dynamic_arena_resize :: proc(
 	return bytes, err
 }
 
+@(require_results)
 dynamic_arena_resize_non_zeroed :: proc(
 	a: ^Dynamic_Arena,
 	old_memory: rawptr,
@@ -1014,8 +1033,8 @@ dynamic_arena_allocator_proc :: proc(
 	case .Query_Info:
 		info := (^Allocator_Query_Info)(old_memory)
 		if info != nil && info.pointer != nil {
-			info.size = pool.block_size
-			info.alignment = pool.alignment
+			info.size = arena.block_size
+			info.alignment = arena.alignment
 			return byte_slice(info, size_of(info^)), nil
 		}
 		return nil, nil
@@ -1033,7 +1052,6 @@ panic_allocator_proc :: proc(
 	old_size: int,
 	loc := #caller_location,
 ) -> ([]byte, Allocator_Error) {
-
 	switch mode {
 	case .Alloc:
 		if size > 0 {
@@ -1057,7 +1075,6 @@ panic_allocator_proc :: proc(
 		}
 	case .Free_All:
 		panic("mem: panic allocator, .Free_All called", loc=loc)
-
 	case .Query_Features:
 		set := (^Allocator_Mode_Set)(old_memory)
 		if set != nil {
@@ -1068,7 +1085,6 @@ panic_allocator_proc :: proc(
 	case .Query_Info:
 		panic("mem: panic allocator, .Query_Info called", loc=loc)
 	}
-
 	return nil, nil
 }
 
@@ -1079,6 +1095,8 @@ panic_allocator :: proc() -> Allocator {
 		data = nil,
 	}
 }
+
+
 
 Buddy_Block :: struct #align(align_of(uint)) {
 	size:    uint,
