@@ -1,5 +1,5 @@
 /*
-The `mem` package implements various allocators and provides utility functions
+The `mem` package implements various allocators and provides utility procedures
 for dealing with memory, pointers and slices.
 
 The documentation below describes basic concepts, applicable to the `mem`
@@ -24,7 +24,7 @@ access operation*.
 ## Allocators
 
 In C and C++ memory models, allocations of objects in memory are typically
-treated individually with a generic allocator (The `malloc` function). Which in
+treated individually with a generic allocator (The `malloc` procedure). Which in
 some scenarios can lead to poor cache utilization, slowdowns on individual
 objects' memory management and growing complexity of the code needing to keep
 track of the pointers and their lifetimes.
@@ -45,7 +45,7 @@ allocators on a language level.
 
 Operations such as `new`, `free` and `delete` by default will use
 `context.allocator`, which can be overridden by the user. When an override
-happens all called functions will inherit the new context and use the same
+happens all called procedures will inherit the new context and use the same
 allocator.
 
 ## Alignment
@@ -89,7 +89,17 @@ relatively expensive zero-filling of the buffer.
 The word `size` is used to denote the **size in bytes**. The word `length` is
 used to denote the count of objects.
 
-Higher-level allocation functions follow the following naming scheme:
+The allocation procedures use the following conventions:
+
+- If the name contains `alloc_bytes` or `resize_bytes`, then the procedure takes
+  in slice parameters and returns slices.
+- If the procedure name contains `alloc` or `resize`, then the procedure takes
+  in a raw pointer and returns raw pointers.
+- If the procedure name contains `free_bytes`, then the procedure takes in a
+  slice.
+- If the procedure name contains `free`, then the procedure takes in a pointer.
+
+Higher-level allocation procedures follow the following naming scheme:
 
 - `new`: Allocates a single object
 - `free`: Free a single object (opposite of `new`)
