@@ -705,31 +705,37 @@ gb_internal lbValue lb_emit_matrix_flatten(lbProcedure *p, lbValue m, Type *type
 
 	lbAddr res = lb_add_local_generated(p, type, true);
 
-	i64 row_count = mt->Matrix.row_count;
-	i64 column_count = mt->Matrix.column_count;
-	TEMPORARY_ALLOCATOR_GUARD();
+	GB_ASSERT(type_size_of(type) == type_size_of(m.type));
 
-	auto srcs = array_make<lbValue>(temporary_allocator(), 0, row_count*column_count);
-	auto dsts = array_make<lbValue>(temporary_allocator(), 0, row_count*column_count);
+	lbValue m_ptr = lb_address_from_load_or_generate_local(p, m);
+	lbValue n = lb_const_int(p->module, t_int, type_size_of(type));
+	lb_mem_copy_non_overlapping(p, res.addr, m_ptr, n);
 
-	for (i64 j = 0; j < column_count; j++) {
-		for (i64 i = 0; i < row_count; i++) {
-			lbValue src = lb_emit_matrix_ev(p, m, i, j);
-			array_add(&srcs, src);
-		}
-	}
+	// i64 row_count = mt->Matrix.row_count;
+	// i64 column_count = mt->Matrix.column_count;
+	// TEMPORARY_ALLOCATOR_GUARD();
 
-	for (i64 j = 0; j < column_count; j++) {
-		for (i64 i = 0; i < row_count; i++) {
-			lbValue dst = lb_emit_array_epi(p, res.addr, i + j*row_count);
-			array_add(&dsts, dst);
-		}
-	}
+	// auto srcs = array_make<lbValue>(temporary_allocator(), 0, row_count*column_count);
+	// auto dsts = array_make<lbValue>(temporary_allocator(), 0, row_count*column_count);
 
-	GB_ASSERT(srcs.count == dsts.count);
-	for_array(i, srcs) {
-		lb_emit_store(p, dsts[i], srcs[i]);
-	}
+	// for (i64 j = 0; j < column_count; j++) {
+	// 	for (i64 i = 0; i < row_count; i++) {
+	// 		lbValue src = lb_emit_matrix_ev(p, m, i, j);
+	// 		array_add(&srcs, src);
+	// 	}
+	// }
+
+	// for (i64 j = 0; j < column_count; j++) {
+	// 	for (i64 i = 0; i < row_count; i++) {
+	// 		lbValue dst = lb_emit_array_epi(p, res.addr, i + j*row_count);
+	// 		array_add(&dsts, dst);
+	// 	}
+	// }
+
+	// GB_ASSERT(srcs.count == dsts.count);
+	// for_array(i, srcs) {
+	// 	lb_emit_store(p, dsts[i], srcs[i]);
+	// }
 	return lb_addr_load(p, res);
 }
 
