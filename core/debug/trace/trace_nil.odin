@@ -1,4 +1,6 @@
-//+build !windows !linux !darwin
+//+build !windows
+//+build !linux
+//+build !darwin
 package debug_trace
 
 import "base:runtime"
