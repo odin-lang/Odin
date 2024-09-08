@@ -389,7 +389,7 @@ recursive_mutex_guard :: proc "contextless" (m: ^Recursive_Mutex) -> bool {
 A condition variable.
 
 `Cond` implements a condition variable, a rendezvous point for threads waiting
-for signalling the occurence of an event. Condition variables are used on
+for signalling the occurence of an event. Condition variables are used in
 conjuction with mutexes to provide a shared access to one or more shared
 variable.
 
