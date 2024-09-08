@@ -402,7 +402,6 @@ scratch_resize_bytes_non_zeroed :: proc(
 	}
 	begin := uintptr(raw_data(s.data))
 	end := begin + uintptr(len(s.data))
-	// TODO(flysand): Doesn't handle old_memory == nil
 	old_ptr := uintptr(old_memory)
 	if begin <= old_ptr && old_ptr < end && old_ptr+uintptr(size) < end {
 		s.curr_offset = int(old_ptr-begin)+size
@@ -412,7 +411,6 @@ scratch_resize_bytes_non_zeroed :: proc(
 	if err != nil {
 		return data, err
 	}
-	// TODO(flysand): OOB access on size < old_size.
 	runtime.copy(data, byte_slice(old_memory, old_size))
 	err = scratch_free(s, old_memory, loc)
 	return data, err
