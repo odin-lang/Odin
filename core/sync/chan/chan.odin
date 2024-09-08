@@ -433,7 +433,7 @@ can_recv :: proc "contextless" (c: ^Raw_Chan) -> bool {
 can_send :: proc "contextless" (c: ^Raw_Chan) -> bool {
 	sync.guard(&c.mutex)
 	if is_buffered(c) {
-		return len(c) < cap(c)
+		return c.queue.len < c.queue.cap
 	}
 	return sync.atomic_load(&c.r_waiting) > 0
 }
