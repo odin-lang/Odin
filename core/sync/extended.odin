@@ -355,7 +355,7 @@ from entering any critical sections associated with the same benaphore, until
 until the lock is released.
 */
 benaphore_lock :: proc "contextless" (b: ^Benaphore) {
-	if atomic_add_explicit(&b.counter, 1, .Acquire) > 1 {
+	if atomic_add_explicit(&b.counter, 1, .Acquire) > 0 {
 		sema_wait(&b.sema)
 	}
 }
@@ -384,7 +384,7 @@ are waiting on the lock, exactly one thread is allowed into a critical section
 associated with the same banaphore.
 */
 benaphore_unlock :: proc "contextless" (b: ^Benaphore) {
-	if atomic_sub_explicit(&b.counter, 1, .Release) > 0 {
+	if atomic_sub_explicit(&b.counter, 1, .Release) > 1 {
 		sema_post(&b.sema)
 	}
 }
