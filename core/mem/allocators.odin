@@ -3,6 +3,7 @@ package mem
 import "base:intrinsics"
 import "base:runtime"
 
+@(require_results)
 nil_allocator :: proc() -> Allocator {
 	return Allocator{
 		procedure = nil_allocator_proc,
@@ -20,6 +21,62 @@ nil_allocator_proc :: proc(
 ) -> ([]byte, Allocator_Error) {
 	return nil, nil
 }
+
+
+
+@(require_results)
+panic_allocator :: proc() -> Allocator {
+	return Allocator{
+		procedure = panic_allocator_proc,
+		data = nil,
+	}
+}
+
+panic_allocator_proc :: proc(
+	allocator_data: rawptr,
+	mode: Allocator_Mode,
+    size, alignment: int,
+    old_memory: rawptr,
+	old_size: int,
+	loc := #caller_location,
+) -> ([]byte, Allocator_Error) {
+	switch mode {
+	case .Alloc:
+		if size > 0 {
+			panic("mem: panic allocator, .Alloc called", loc=loc)
+		}
+	case .Alloc_Non_Zeroed:
+		if size > 0 {
+			panic("mem: panic allocator, .Alloc_Non_Zeroed called", loc=loc)
+		}
+	case .Resize:
+		if size > 0 {
+			panic("mem: panic allocator, .Resize called", loc=loc)
+		}
+	case .Resize_Non_Zeroed:
+		if size > 0 {
+			panic("mem: panic allocator, .Resize_Non_Zeroed called", loc=loc)
+		}
+	case .Free:
+		if old_memory != nil {
+			panic("mem: panic allocator, .Free called", loc=loc)
+		}
+	case .Free_All:
+		panic("mem: panic allocator, .Free_All called", loc=loc)
+	case .Query_Features:
+		set := (^Allocator_Mode_Set)(old_memory)
+		if set != nil {
+			set^ = {.Query_Features}
+		}
+		return nil, nil
+
+	case .Query_Info:
+		panic("mem: panic allocator, .Query_Info called", loc=loc)
+	}
+	return nil, nil
+}
+
+
 
 Arena :: struct {
 	data:       []byte,
@@ -300,7 +357,6 @@ scratch_alloc_bytes_non_zeroed :: proc(
 	return ptr, err
 }
 
-@(require_results)
 scratch_free :: proc(s: ^Scratch, ptr: rawptr, loc := #caller_location) -> Allocator_Error {
 	if s.data == nil {
 		panic("Free on an uninitialized scratch allocator", loc)
@@ -555,7 +611,6 @@ stack_alloc_bytes_non_zeroed :: proc(
 	return byte_slice(rawptr(next_addr), size), nil
 }
 
-@(require_results)
 stack_free :: proc(
 	s: ^Stack,
 	old_memory: rawptr,
@@ -824,7 +879,6 @@ small_stack_alloc_bytes_non_zeroed :: proc(
 	return byte_slice(rawptr(next_addr), size), nil
 }
 
-@(require_results)
 small_stack_free :: proc(
 	s: ^Small_Stack,
 	old_memory: rawptr,
@@ -1254,60 +1308,6 @@ dynamic_arena_allocator_proc :: proc(
 
 
 
-panic_allocator_proc :: proc(
-	allocator_data: rawptr,
-	mode: Allocator_Mode,
-    size, alignment: int,
-    old_memory: rawptr,
-	old_size: int,
-	loc := #caller_location,
-) -> ([]byte, Allocator_Error) {
-	switch mode {
-	case .Alloc:
-		if size > 0 {
-			panic("mem: panic allocator, .Alloc called", loc=loc)
-		}
-	case .Alloc_Non_Zeroed:
-		if size > 0 {
-			panic("mem: panic allocator, .Alloc_Non_Zeroed called", loc=loc)
-		}
-	case .Resize:
-		if size > 0 {
-			panic("mem: panic allocator, .Resize called", loc=loc)
-		}
-	case .Resize_Non_Zeroed:
-		if size > 0 {
-			panic("mem: panic allocator, .Resize_Non_Zeroed called", loc=loc)
-		}
-	case .Free:
-		if old_memory != nil {
-			panic("mem: panic allocator, .Free called", loc=loc)
-		}
-	case .Free_All:
-		panic("mem: panic allocator, .Free_All called", loc=loc)
-	case .Query_Features:
-		set := (^Allocator_Mode_Set)(old_memory)
-		if set != nil {
-			set^ = {.Query_Features}
-		}
-		return nil, nil
-
-	case .Query_Info:
-		panic("mem: panic allocator, .Query_Info called", loc=loc)
-	}
-	return nil, nil
-}
-
-@(require_results)
-panic_allocator :: proc() -> Allocator {
-	return Allocator{
-		procedure = panic_allocator_proc,
-		data = nil,
-	}
-}
-
-
-
 Buddy_Block :: struct #align(align_of(uint)) {
 	size:    uint,
 	is_free: bool,
@@ -1513,7 +1513,6 @@ buddy_allocator_alloc_bytes_non_zeroed :: proc(b: ^Buddy_Allocator, size: uint) 
 	return nil, nil
 }
 
-@(require_results)
 buddy_allocator_free :: proc(b: ^Buddy_Allocator, ptr: rawptr) -> Allocator_Error {
 	if ptr != nil {
 		if !(b.head <= ptr && ptr <= b.tail) {
