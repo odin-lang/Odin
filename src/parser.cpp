@@ -6106,9 +6106,12 @@ gb_internal bool parse_build_tag(Token token_for_pos, String s) {
 	}
 
 	bool any_correct = false;
+	bool any_notted_os_seen = false;
+	bool any_os_seen = false;
 
 	while (s.len > 0) {
 		bool this_kind_correct = true;
+		bool this_kind_os_seen = false;
 
 		do {
 			String p = string_trim_whitespace(build_tag_get_token(s, &s));
@@ -6133,12 +6136,30 @@ gb_internal bool parse_build_tag(Token token_for_pos, String s) {
 				continue;
 			}
 
+
 			TargetOsKind   os   = get_target_os_from_string(p);
 			TargetArchKind arch = get_target_arch_from_string(p);
 			if (os != TargetOs_Invalid) {
+				// Catches cases where you have multiple !notted operating systems on a line. This never does what you think since
+				// you need a new build line to get a logical AND.
+				if (any_notted_os_seen && is_notted) {
+					syntax_error(token_for_pos, "Invalid build tag: Use a separate '#+build' line for each platform that has '!' in front.");
+					break;
+				}
+
+				// Catches 'windows linux', which is an impossible combination.
+				if (this_kind_os_seen) {
+					syntax_error(token_for_pos, "Invalid build tag: Missing ',' before '%.*s'. Format: '#+build linux, windows, darwin' or '#+build linux amd64, darwin, windows i386'", LIT(p));
+					break;
+				}
+
+				this_kind_os_seen = true;
+				any_os_seen = true;
+
 				GB_ASSERT(arch == TargetArch_Invalid);
 				if (is_notted) {
 					this_kind_correct = this_kind_correct && (os != build_context.metrics.os);
+					any_notted_os_seen = true;
 				} else {
 					this_kind_correct = this_kind_correct && (os == build_context.metrics.os);
 				}
@@ -6427,7 +6448,7 @@ gb_internal bool parse_file(Parser *p, AstFile *f) {
 
 	// There was an OK package declaration. But there some invalid token was hit before the package declaration.
 	if (has_first_invalid_pre_package_token) {
-		syntax_error(first_invalid_pre_package_token, "There can only be lines starting with #+ or // before package declaration");
+		syntax_error(first_invalid_pre_package_token, "There can only be lines starting with '#+' or '//' before package declaration");
 		return false;
 	}
 
@@ -6464,7 +6485,7 @@ gb_internal bool parse_file(Parser *p, AstFile *f) {
 				if (string_starts_with(str, str_lit("//"))) {
 					String lc = string_trim_whitespace(substring(str, 2, str.len));
 					if (string_starts_with(lc, str_lit("+"))) {
-						syntax_warning(tok, "//+ is deprecated: Use #+ instead");
+						syntax_warning(tok, "'//+' is deprecated: Use '#+' instead");
 						String lt = substring(lc, 1, lc.len);
 						if (process_file_tag(lt, tok, f) == false) {
 							return false;
