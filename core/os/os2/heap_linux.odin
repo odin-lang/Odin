@@ -1,8 +1,6 @@
 //+private
 package os2
 
-import "base:runtime"
-
 import "core:sys/linux"
 import "core:sync"
 import "core:mem"
