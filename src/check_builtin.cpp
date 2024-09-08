@@ -5203,6 +5203,16 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				return false;
 			}
 
+			if (sz >= 64) {
+				if (is_type_unsigned(x.type)) {
+					add_package_dependency(c, "runtime", "umodti3", true);
+					add_package_dependency(c, "runtime", "udivti3", true);
+				} else {
+					add_package_dependency(c, "runtime", "modti3", true);
+					add_package_dependency(c, "runtime", "divti3", true);
+				}
+			}
+
 			operand->type = x.type;
 			operand->mode = Addressing_Value;
 		}

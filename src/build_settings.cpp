@@ -2048,10 +2048,11 @@ gb_internal bool init_build_paths(String init_filename) {
 	gbFile      output_file_test;
 	const char* output_file_name = (const char*)output_file.text;
 	gbFileError output_test_err = gb_file_open_mode(&output_file_test, gbFileMode_Append | gbFileMode_Rw, output_file_name);
-	gb_file_close(&output_file_test);
-	gb_file_remove(output_file_name);
 
-	if (output_test_err != 0) {
+	if (output_test_err == 0) {
+		gb_file_close(&output_file_test);
+		gb_file_remove(output_file_name);
+	} else {
 		String output_file = path_to_string(ha, bc->build_paths[BuildPath_Output]);
 		defer (gb_free(ha, output_file.text));
 		gb_printf_err("No write permissions for output path: %.*s\n", LIT(output_file));

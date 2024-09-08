@@ -10,7 +10,8 @@
 
 	A test suite for `core:net`
 */
-//+build !netbsd !openbsd
+//+build !netbsd
+//+build !openbsd
 package test_core_net
 
 import "core:testing"
