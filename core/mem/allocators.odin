@@ -1564,20 +1564,20 @@ arrays of blocks and out-band blocks. The blocks have the default size of
 will be aligned to a boundary specified by `alignment`.
 */
 dynamic_arena_init :: proc(
-	a: ^Dynamic_Arena,
+	pool: ^Dynamic_Arena,
 	block_allocator := context.allocator,
 	array_allocator := context.allocator,
 	block_size := DYNAMIC_ARENA_BLOCK_SIZE_DEFAULT,
 	out_band_size := DYNAMIC_ARENA_OUT_OF_BAND_SIZE_DEFAULT,
 	alignment := DEFAULT_ALIGNMENT,
 ) {
-	a.block_size = block_size
-	a.out_band_size = out_band_size
-	a.alignment = alignment
-	a.block_allocator = block_allocator
-	a.out_band_allocations.allocator = array_allocator
-	a.unused_blocks.allocator = array_allocator
-	a.used_blocks.allocator = array_allocator
+	pool.block_size = block_size
+	pool.out_band_size = out_band_size
+	pool.alignment = alignment
+	pool.block_allocator = block_allocator
+	pool.out_band_allocations.allocator = array_allocator
+	pool.unused_blocks.allocator = array_allocator
+	pool.used_blocks.allocator = array_allocator
 }
 
 /*
