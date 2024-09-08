@@ -9,8 +9,6 @@ import "core:time"
 
 _IS_SUPPORTED :: true
 
-CAS :: sync.atomic_compare_exchange_strong
-
 // NOTE(tetra): Aligned here because of core/unix/pthread_linux.odin/pthread_t.
 // Also see core/sys/darwin/mach_darwin.odin/semaphore_t.
 Thread_Os_Specific :: struct #align(16) {
@@ -140,24 +138,18 @@ _is_done :: proc(t: ^Thread) -> bool {
 }
 
 _join :: proc(t: ^Thread) {
-	// sync.guard(&t.mutex)
-
 	if unix.pthread_equal(unix.pthread_self(), t.unix_thread) {
 		return
 	}
 
-	// Preserve other flags besides `.Joined`, like `.Started`.
-	unjoined := sync.atomic_load(&t.flags) - {.Joined}
-	joined   := unjoined + {.Joined}
-
-	// Try to set `t.flags` from unjoined to joined. If it returns joined,
-	// it means the previous value had that flag set and we can return.
-	if res, ok := CAS(&t.flags, unjoined, joined); res == joined && !ok {
+	// If the previous value was already `Joined`, then we can return.
+	if .Joined in sync.atomic_or(&t.flags, {.Joined}) {
 		return
 	}
+
 	// Prevent non-started threads from blocking main thread with initial wait
 	// condition.
-	if .Started not_in unjoined {
+	if .Started not_in sync.atomic_load(&t.flags) {
 		_start(t)
 	}
 	unix.pthread_join(t.unix_thread, nil)
