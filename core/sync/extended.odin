@@ -297,7 +297,7 @@ waiting to acquire the lock, exactly one of those threads is unblocked and
 allowed into the critical section.
 */
 ticket_mutex_unlock :: #force_inline proc "contextless" (m: ^Ticket_Mutex) {
-	atomic_add_explicit(&m.serving, 1, .Relaxed)
+	atomic_add_explicit(&m.serving, 1, .Release)
 }
 
 /*
