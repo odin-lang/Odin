@@ -409,10 +409,10 @@ This procedure resizes a memory region, `old_size` bytes in size, located at
 the address specified by `ptr`, such that it has a new size, specified by
 `new_size` and and is aligned on a boundary specified by `alignment`.
 
-If the `ptr` parameter is `nil`, `resize()` acts just like `alloc`, allocating
+If the `ptr` parameter is `nil`, `resize()` acts just like `alloc()`, allocating
 `new_size` bytes, aligned on a boundary specified by `alignment`.
 
-If the `new_size` parameter is `0`, `resize()` acts just like `free`, freeing
+If the `new_size` parameter is `0`, `resize()` acts just like `free()`, freeing
 the memory region `old_size` bytes in length, located at the address specified
 by `ptr`.
 
@@ -445,17 +445,63 @@ resize :: proc(
 }
 
 /*
+Resize a memory region without zero-initialization.
+
+This procedure resizes a memory region, `old_size` bytes in size, located at
+the address specified by `ptr`, such that it has a new size, specified by
+`new_size` and and is aligned on a boundary specified by `alignment`.
+
+If the `ptr` parameter is `nil`, `resize()` acts just like `alloc()`, allocating
+`new_size` bytes, aligned on a boundary specified by `alignment`.
+
+If the `new_size` parameter is `0`, `resize()` acts just like `free()`, freeing
+the memory region `old_size` bytes in length, located at the address specified
+by `ptr`.
+
+Unlike `resize()`, this procedure does not explicitly zero-initialize any new
+memory.
+
+**Inputs**:
+- `ptr`: Pointer to the memory region to resize.
+- `old_size`: Size of the memory region to resize.
+- `new_size`: The desired size of the resized memory region.
+- `alignment`: The desired alignment of the resized memory region.
+- `allocator`: The owner of the memory region to resize.
+
+**Returns**:
+1. The pointer to the resized memory region, if successfull, `nil` otherwise.
+2. Error, if resize failed.
+
+**Note**: The `alignment` parameter is used to preserve the original alignment
+of the allocation, if `resize()` needs to relocate the memory region. Do not
+use `resize()` to change the alignment of the allocated memory region.
+*/
+@(require_results)
+resize_non_zeroed :: proc(
+	ptr: rawptr,
+	old_size: int,
+	new_size: int,
+	alignment: int = DEFAULT_ALIGNMENT,
+	allocator := context.allocator,
+	loc := #caller_location,
+) -> (rawptr, Allocator_Error) {
+	data, err := runtime.non_zero_mem_resize(ptr, old_size, new_size, alignment, allocator, loc)
+	return raw_data(data), err
+}
+
+/*
 Resize a memory region.
 
 This procedure resizes a memory region, specified by `old_data`, such that it
 has a new size, specified by `new_size` and and is aligned on a boundary
 specified by `alignment`.
 
-If the `old_data` parameter is `nil`, `resize()` acts just like `alloc`,
-allocating `new_size` bytes, aligned on a boundary specified by `alignment`.
+If the `old_data` parameter is `nil`, `resize_bytes()` acts just like
+`alloc_bytes()`, allocating `new_size` bytes, aligned on a boundary specified
+by `alignment`.
 
-If the `new_size` parameter is `0`, `resize()` acts just like `free`, freeing
-the memory region specified by `old_data`.
+If the `new_size` parameter is `0`, `resize_bytes()` acts just like
+`free_bytes()`, freeing the memory region specified by `old_data`.
 
 **Inputs**:
 - `old_data`: Pointer to the memory region to resize.
@@ -480,6 +526,48 @@ resize_bytes :: proc(
 	loc := #caller_location,
 ) -> ([]byte, Allocator_Error) {
 	return runtime.mem_resize(raw_data(old_data), len(old_data), new_size, alignment, allocator, loc)
+}
+
+/*
+Resize a memory region.
+
+This procedure resizes a memory region, specified by `old_data`, such that it
+has a new size, specified by `new_size` and and is aligned on a boundary
+specified by `alignment`.
+
+If the `old_data` parameter is `nil`, `resize_bytes()` acts just like
+`alloc_bytes()`, allocating `new_size` bytes, aligned on a boundary specified
+by `alignment`.
+
+If the `new_size` parameter is `0`, `resize_bytes()` acts just like
+`free_bytes()`, freeing the memory region specified by `old_data`.
+
+Unlike `resize_bytes()`, this procedure does not explicitly zero-initialize
+any new memory.
+
+**Inputs**:
+- `old_data`: Pointer to the memory region to resize.
+- `new_size`: The desired size of the resized memory region.
+- `alignment`: The desired alignment of the resized memory region.
+- `allocator`: The owner of the memory region to resize.
+
+**Returns**:
+1. The resized memory region, if successfull, `nil` otherwise.
+2. Error, if resize failed.
+
+**Note**: The `alignment` parameter is used to preserve the original alignment
+of the allocation, if `resize()` needs to relocate the memory region. Do not
+use `resize()` to change the alignment of the allocated memory region.
+*/
+@(require_results)
+resize_bytes_non_zeroed :: proc(
+	old_data: []byte,
+	new_size: int,
+	alignment: int = DEFAULT_ALIGNMENT,
+	allocator := context.allocator,
+	loc := #caller_location,
+) -> ([]byte, Allocator_Error) {
+	return runtime.non_zero_mem_resize(raw_data(old_data), len(old_data), new_size, alignment, allocator, loc)
 }
 
 /*
