@@ -361,7 +361,7 @@ atomic_sema_wait_with_timeout :: proc "contextless" (s: ^Atomic_Sema, duration: 
 			if !futex_wait_with_timeout(&s.count, u32(original_count), remaining) {
 				return false
 			}
-			original_count = s.count
+			original_count = atomic_load_explicit(&s.count, .Relaxed)
 		}
 		if original_count == atomic_compare_exchange_strong_explicit(&s.count, original_count, original_count-1, .Acquire, .Acquire) {
 			return true
