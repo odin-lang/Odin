@@ -260,6 +260,10 @@ try_send_raw :: proc "contextless" (c: ^Raw_Chan, msg_in: rawptr) -> (ok: bool) 
 			return false
 		}
 
+		if sync.atomic_load(&c.closed) {
+			return false
+		}
+
 		ok = raw_queue_push(c.queue, msg_in)
 		if sync.atomic_load(&c.r_waiting) > 0 {
 			sync.signal(&c.r_cond)
