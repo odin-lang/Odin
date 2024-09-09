@@ -48,12 +48,12 @@ wait_group_add :: proc "contextless" (wg: ^Wait_Group, delta: int) {
 
 	atomic_add(&wg.counter, delta)
 	if wg.counter < 0 {
-		_panic("sync.Wait_Group negative counter")
+		panic_contextless("sync.Wait_Group negative counter")
 	}
 	if wg.counter == 0 {
 		cond_broadcast(&wg.cond)
 		if wg.counter != 0 {
-			_panic("sync.Wait_Group misuse: sync.wait_group_add called concurrently with sync.wait_group_wait")
+			panic_contextless("sync.Wait_Group misuse: sync.wait_group_add called concurrently with sync.wait_group_wait")
 		}
 	}
 }
@@ -81,7 +81,7 @@ wait_group_wait :: proc "contextless" (wg: ^Wait_Group) {
 	if wg.counter != 0 {
 		cond_wait(&wg.cond, &wg.mutex)
 		if wg.counter != 0 {
-			_panic("sync.Wait_Group misuse: sync.wait_group_add called concurrently with sync.wait_group_wait")
+			panic_contextless("sync.Wait_Group misuse: sync.wait_group_add called concurrently with sync.wait_group_wait")
 		}
 	}
 }
@@ -105,7 +105,7 @@ wait_group_wait_with_timeout :: proc "contextless" (wg: ^Wait_Group, duration: t
 			return false
 		}
 		if wg.counter != 0 {
-			_panic("sync.Wait_Group misuse: sync.wait_group_add called concurrently with sync.wait_group_wait")
+			panic_contextless("sync.Wait_Group misuse: sync.wait_group_add called concurrently with sync.wait_group_wait")
 		}
 	}
 	return true
@@ -494,7 +494,7 @@ for other threads for entering.
 */
 recursive_benaphore_unlock :: proc "contextless" (b: ^Recursive_Benaphore) {
 	tid := current_thread_id()
-	_assert(tid == b.owner, "tid != b.owner")
+	assert_contextless(tid == b.owner, "tid != b.owner")
 	b.recursion -= 1
 	recursion := b.recursion
 	if recursion == 0 {

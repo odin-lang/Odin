@@ -240,7 +240,7 @@ atomic_recursive_mutex_lock :: proc "contextless" (m: ^Atomic_Recursive_Mutex) {
 
 atomic_recursive_mutex_unlock :: proc "contextless" (m: ^Atomic_Recursive_Mutex) {
 	tid := current_thread_id()
-	_assert(tid == m.owner, "tid != m.owner")
+	assert_contextless(tid == m.owner, "tid != m.owner")
 	m.recursion -= 1
 	recursion := m.recursion
 	if recursion == 0 {
