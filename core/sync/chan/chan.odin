@@ -444,7 +444,7 @@ can_send :: proc "contextless" (c: ^Raw_Chan) -> bool {
 	if is_buffered(c) {
 		return c.queue.len < c.queue.cap
 	}
-	return sync.atomic_load(&c.r_waiting) > 0
+	return sync.atomic_load(&c.w_waiting) == 0
 }
 
 
