@@ -30,6 +30,9 @@ LANGUAGE LANG_ENGLISH, SUBLANG_DEFAULT
 #ifndef GIT_SHA
 #define GIT_SHA 0
 #endif
+#ifndef NIGHTLY
+#define NIGHTLY 0
+#endif
 
 #define Q(x) #x
 #define QUOTE(x) Q(x)
@@ -62,6 +65,7 @@ BEGIN
             VALUE "Comments", QUOTE(git-sha: GIT_SHA)
 			// custom values
             VALUE "GitSha", QUOTE(GIT_SHA)
+            VALUE "NightlyBuild", QUOTE(NIGHTLY)
         END
     END
     BLOCK "VarFileInfo"
