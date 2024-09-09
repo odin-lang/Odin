@@ -6106,12 +6106,13 @@ gb_internal bool parse_build_tag(Token token_for_pos, String s) {
 	}
 
 	bool any_correct = false;
-	bool any_notted_os_seen = false;
-	bool any_os_seen = false;
 
 	while (s.len > 0) {
 		bool this_kind_correct = true;
+
 		bool this_kind_os_seen = false;
+		bool this_kind_arch_seen = false;
+		int num_tokens = 0;
 
 		do {
 			String p = string_trim_whitespace(build_tag_get_token(s, &s));
@@ -6136,34 +6137,29 @@ gb_internal bool parse_build_tag(Token token_for_pos, String s) {
 				continue;
 			}
 
-
 			TargetOsKind   os   = get_target_os_from_string(p);
 			TargetArchKind arch = get_target_arch_from_string(p);
+			num_tokens += 1;
+
+			// Catches 'windows linux', which is an impossible combination.
+			// Also catches usage of more than two things within a comma separated group.
+			if (num_tokens > 2 || (this_kind_os_seen && os != TargetOs_Invalid) || (this_kind_arch_seen && arch != TargetArch_Invalid)) {
+				syntax_error(token_for_pos, "Invalid build tag: Missing ',' before '%.*s'. Format: '#+build linux, windows amd64, darwin'", LIT(p));
+				break;
+			}
+
 			if (os != TargetOs_Invalid) {
-				// Catches cases where you have multiple !notted operating systems on a line. This never does what you think since
-				// you need a new build line to get a logical AND.
-				if (any_notted_os_seen && is_notted) {
-					syntax_error(token_for_pos, "Invalid build tag: Use a separate '#+build' line for each platform that has '!' in front.");
-					break;
-				}
-
-				// Catches 'windows linux', which is an impossible combination.
-				if (this_kind_os_seen) {
-					syntax_error(token_for_pos, "Invalid build tag: Missing ',' before '%.*s'. Format: '#+build linux, windows, darwin' or '#+build linux amd64, darwin, windows i386'", LIT(p));
-					break;
-				}
-
 				this_kind_os_seen = true;
-				any_os_seen = true;
 
 				GB_ASSERT(arch == TargetArch_Invalid);
 				if (is_notted) {
 					this_kind_correct = this_kind_correct && (os != build_context.metrics.os);
-					any_notted_os_seen = true;
 				} else {
 					this_kind_correct = this_kind_correct && (os == build_context.metrics.os);
 				}
 			} else if (arch != TargetArch_Invalid) {
+				this_kind_arch_seen = true;
+
 				if (is_notted) {
 					this_kind_correct = this_kind_correct && (arch != build_context.metrics.arch);
 				} else {
