@@ -423,7 +423,7 @@ raw_queue_pop :: proc "contextless" (q: ^Raw_Queue) -> (data: rawptr) {
 can_recv :: proc "contextless" (c: ^Raw_Chan) -> bool {
 	sync.guard(&c.mutex)
 	if is_buffered(c) {
-		return len(c) > 0
+		return c.queue.len > 0
 	}
 	return sync.atomic_load(&c.w_waiting) > 0
 }
