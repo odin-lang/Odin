@@ -449,13 +449,15 @@ recursive benaphore, until the lock is released.
 */
 recursive_benaphore_lock :: proc "contextless" (b: ^Recursive_Benaphore) {
 	tid := current_thread_id()
-	if atomic_add_explicit(&b.counter, 1, .Acquire) > 1 {
-		if tid != b.owner {
-			sema_wait(&b.sema)
+	check_owner: if tid != atomic_load_explicit(&b.owner, .Acquire) {
+		atomic_add_explicit(&b.counter, 1, .Relaxed)
+		if _, ok := atomic_compare_exchange_strong_explicit(&b.owner, 0, tid, .Release, .Relaxed); ok {
+			break check_owner
 		}
+		sema_wait(&b.sema)
+		atomic_store_explicit(&b.owner, tid, .Release)
 	}
 	// inside the lock
-	b.owner = tid
 	b.recursion += 1
 }
 
@@ -472,15 +474,14 @@ benaphore, until the lock is released.
 */
 recursive_benaphore_try_lock :: proc "contextless" (b: ^Recursive_Benaphore) -> bool {
 	tid := current_thread_id()
-	if b.owner == tid {
-		atomic_add_explicit(&b.counter, 1, .Acquire)
-	} else {
-		if v, _ := atomic_compare_exchange_strong_explicit(&b.counter, 0, 1, .Acquire, .Acquire); v != 0 {
-			return false
+	check_owner: if tid != atomic_load_explicit(&b.owner, .Acquire) {
+		if _, ok := atomic_compare_exchange_strong_explicit(&b.owner, 0, tid, .Release, .Relaxed); ok {
+			atomic_add_explicit(&b.counter, 1, .Relaxed)
+			break check_owner
 		}
+		return false
 	}
 	// inside the lock
-	b.owner = tid
 	b.recursion += 1
 	return true
 }
@@ -494,14 +495,14 @@ for other threads for entering.
 */
 recursive_benaphore_unlock :: proc "contextless" (b: ^Recursive_Benaphore) {
 	tid := current_thread_id()
-	assert_contextless(tid == b.owner, "tid != b.owner")
+	assert_contextless(tid == atomic_load_explicit(&b.owner, .Relaxed), "tid != b.owner")
 	b.recursion -= 1
 	recursion := b.recursion
+
 	if recursion == 0 {
-		b.owner = 0
-	}
-	if atomic_sub_explicit(&b.counter, 1, .Release) > 0 {
-		if recursion == 0 {
+		if atomic_sub_explicit(&b.counter, 1, .Relaxed) == 1 {
+			atomic_store_explicit(&b.owner, 0, .Release)
+		} else {
 			sema_post(&b.sema)
 		}
 	}
