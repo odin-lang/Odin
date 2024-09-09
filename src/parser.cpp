@@ -6348,7 +6348,7 @@ gb_internal bool parse_build_project_directory_tag(Token token_for_pos, String s
 	return any_correct;
 }
 
-gb_internal bool process_file_tag(const String &lc, const Token &tok, AstFile *f) {
+gb_internal bool parse_file_tag(const String &lc, const Token &tok, AstFile *f) {
 	if (string_starts_with(lc, str_lit("build-project-name"))) {
 		if (!parse_build_project_directory_tag(tok, lc)) {
 			return false;
@@ -6483,7 +6483,7 @@ gb_internal bool parse_file(Parser *p, AstFile *f) {
 					if (string_starts_with(lc, str_lit("+"))) {
 						syntax_warning(tok, "'//+' is deprecated: Use '#+' instead");
 						String lt = substring(lc, 1, lc.len);
-						if (process_file_tag(lt, tok, f) == false) {
+						if (parse_file_tag(lt, tok, f) == false) {
 							return false;
 						}
 					}
@@ -6497,7 +6497,7 @@ gb_internal bool parse_file(Parser *p, AstFile *f) {
 
 			if (string_starts_with(str, str_lit("#+"))) {
 				String lt = string_trim_whitespace(substring(str, 2, str.len));
-				if (process_file_tag(lt, tok, f) == false) {
+				if (parse_file_tag(lt, tok, f) == false) {
 					return false;
 				}
 			}
