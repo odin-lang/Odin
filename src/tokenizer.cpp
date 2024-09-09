@@ -943,7 +943,7 @@ gb_internal void tokenizer_get_token(Tokenizer *t, Token *token, int repeat=0) {
 			} else if (t->curr_rune == '+') {
 				token->kind = Token_FileTag;
 				
-				// Skip the line or until it ends or until we hit was is probably a comment.
+				// Skip until end of line or until we hit what is probably a comment.
 				// The parsing of tags happens in `parse_file`.
 				while (t->curr_rune != GB_RUNE_EOF) {
 					if (t->curr_rune == '\n') {
