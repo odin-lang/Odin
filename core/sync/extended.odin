@@ -474,10 +474,10 @@ recursive_benaphore_try_lock :: proc "contextless" (b: ^Recursive_Benaphore) -> 
 	tid := current_thread_id()
 	if b.owner == tid {
 		atomic_add_explicit(&b.counter, 1, .Acquire)
-	}
-
-	if v, _ := atomic_compare_exchange_strong_explicit(&b.counter, 0, 1, .Acquire, .Acquire); v != 0 {
-		return false
+	} else {
+		if v, _ := atomic_compare_exchange_strong_explicit(&b.counter, 0, 1, .Acquire, .Acquire); v != 0 {
+			return false
+		}
 	}
 	// inside the lock
 	b.owner = tid
