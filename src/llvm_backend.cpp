@@ -3081,6 +3081,11 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 		lbModule *m = entry.value;
 		m->target_machine = target_machine;
 		LLVMSetModuleDataLayout(m->mod, LLVMCreateTargetDataLayout(target_machine));
+
+		if (build_context.fast_isel) {
+			LLVMSetTargetMachineFastISel(m->target_machine, true);
+		}
+
 		array_add(&target_machines, target_machine);
 	}
 
