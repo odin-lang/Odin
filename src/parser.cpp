@@ -6452,14 +6452,6 @@ gb_internal bool parse_file(Parser *p, AstFile *f) {
 	if (f->package_token.kind != Token_package) {
 		return false;
 	}
-	if (docs != nullptr) {
-		TokenPos end = token_pos_end(docs->list[docs->list.count-1]);
-		if (end.line == f->package_token.pos.line || end.line+1 == f->package_token.pos.line) {
-			// Okay
-		} else {
-			docs = nullptr;
-		}
-	}
 
 	Token package_name = expect_token_after(f, Token_Ident, "package");
 	if (package_name.kind == Token_Ident) {
@@ -6478,14 +6470,17 @@ gb_internal bool parse_file(Parser *p, AstFile *f) {
 			for (Token const &tok : docs->list) {
 				GB_ASSERT(tok.kind == Token_Comment);
 				String str = tok.string;
-				if (string_starts_with(str, str_lit("//"))) {
-					String lc = string_trim_whitespace(substring(str, 2, str.len));
-					if (string_starts_with(lc, str_lit("+"))) {
-						//syntax_warning(tok, "'//+' is deprecated: Use '#+' instead");
-						String lt = substring(lc, 1, lc.len);
-						if (parse_file_tag(lt, tok, f) == false) {
-							return false;
-						}
+
+				if (!string_starts_with(str, str_lit("//"))) {
+					continue;
+				}
+
+				String lc = string_trim_whitespace(substring(str, 2, str.len));
+				if (string_starts_with(lc, str_lit("+"))) {
+					syntax_warning(tok, "'//+' is deprecated: Use '#+' instead");
+					String lt = substring(lc, 1, lc.len);
+					if (parse_file_tag(lt, tok, f) == false) {
+						return false;
 					}
 				}
 			}
