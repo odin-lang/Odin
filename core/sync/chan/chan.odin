@@ -164,10 +164,15 @@ send_raw :: proc "contextless" (c: ^Raw_Chan, msg_in: rawptr) -> (ok: bool) {
 	}
 	if c.queue != nil { // buffered
 		sync.guard(&c.mutex)
-		for c.queue.len == c.queue.cap {
+		for !sync.atomic_load(&c.closed) &&
+		    c.queue.len == c.queue.cap {
 			sync.atomic_add(&c.w_waiting, 1)
 			sync.wait(&c.w_cond, &c.mutex)
 			sync.atomic_sub(&c.w_waiting, 1)
+		}
+
+		if sync.atomic_load(&c.closed) {
+			return false
 		}
 
 		ok = raw_queue_push(c.queue, msg_in)
