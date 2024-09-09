@@ -68,7 +68,7 @@ set compiler_defines= -DODIN_VERSION_RAW=\"%odin_version_raw%\"
 rem fileversion is defined as {Major,Minor,Build,Private: u16} so a bit limited
 set rc_flags=-nologo ^
 -DV1=%V1% -DV2=%V2% -DV3=%V3% -DV4=%V4% ^
--DVF=%odin_version_full% -Dnightly=%nightly%
+-DVF=%odin_version_full% -DNIGHTLY=%nightly%
 
 if not exist .git\ goto skip_git_hash
 for /f "tokens=1,2" %%i IN ('git show "--pretty=%%cd %%h" "--date=format:%%Y-%%m" --no-patch --no-notes HEAD') do (
