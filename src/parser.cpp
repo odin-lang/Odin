@@ -6405,8 +6405,8 @@ gb_internal bool parse_file(Parser *p, AstFile *f) {
 
 	Array<Token> tags = array_make<Token>(ast_allocator(f));
 
-	bool has_first_invalid_pre_package_token = false;
-	Token first_invalid_pre_package_token;
+	bool first_invalid_token_set = false;
+	Token first_invalid_token = {};
 
 	while (f->curr_token.kind != Token_package && f->curr_token.kind != Token_EOF) {
 		if (f->curr_token.kind == Token_Comment) {
@@ -6415,9 +6415,9 @@ gb_internal bool parse_file(Parser *p, AstFile *f) {
 			array_add(&tags, f->curr_token);
 			advance_token(f);
 		} else {
-			if (!has_first_invalid_pre_package_token) {
-				has_first_invalid_pre_package_token = true;
-				first_invalid_pre_package_token = f->curr_token;
+			if (!first_invalid_token_set) {
+				first_invalid_token_set = true;
+				first_invalid_token = f->curr_token;
 			}
 
 			advance_token(f);
@@ -6431,7 +6431,7 @@ gb_internal bool parse_file(Parser *p, AstFile *f) {
 
 		// The while loop above scanned until it found the package token. If we never
 		// found one, then make this error appear on the first invalid token line.
-		Token t = has_first_invalid_pre_package_token ? first_invalid_pre_package_token : f->curr_token;
+		Token t = first_invalid_token_set ? first_invalid_token : f->curr_token;
 		syntax_error(t, "Expected a package declaration at the beginning of the file");
 
 		// IMPORTANT NOTE(bill): this is technically a race condition with the suggestion, but it's ony a suggession
@@ -6443,8 +6443,8 @@ gb_internal bool parse_file(Parser *p, AstFile *f) {
 	}
 
 	// There was an OK package declaration. But there some invalid token was hit before the package declaration.
-	if (has_first_invalid_pre_package_token) {
-		syntax_error(first_invalid_pre_package_token, "There can only be lines starting with '#+' or '//' before package declaration");
+	if (first_invalid_token_set) {
+		syntax_error(first_invalid_token, "There can only be lines starting with '#+' or '//' before package declaration");
 		return false;
 	}
 
@@ -6481,7 +6481,7 @@ gb_internal bool parse_file(Parser *p, AstFile *f) {
 				if (string_starts_with(str, str_lit("//"))) {
 					String lc = string_trim_whitespace(substring(str, 2, str.len));
 					if (string_starts_with(lc, str_lit("+"))) {
-						syntax_warning(tok, "'//+' is deprecated: Use '#+' instead");
+						//syntax_warning(tok, "'//+' is deprecated: Use '#+' instead");
 						String lt = substring(lc, 1, lc.len);
 						if (parse_file_tag(lt, tok, f) == false) {
 							return false;
