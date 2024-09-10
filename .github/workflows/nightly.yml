@@ -36,7 +36,7 @@ jobs:
           cp -r bin dist
           cp -r examples dist
       - name: Upload artifact
-        uses: actions/upload-artifact@v1
+        uses: actions/upload-artifact@v4
         with:
           name: windows_artifacts
           path: dist
@@ -69,7 +69,7 @@ jobs:
           # Zipping so executable permissions are retained, see https://github.com/actions/upload-artifact/issues/38
           zip -r dist.zip dist
       - name: Upload artifact
-        uses: actions/upload-artifact@v1
+        uses: actions/upload-artifact@v4
         with:
           name: ubuntu_artifacts
           path: dist.zip
@@ -103,7 +103,7 @@ jobs:
       - name: Odin run
         run: ./dist/odin run examples/demo
       - name: Upload artifact
-        uses: actions/upload-artifact@v1
+        uses: actions/upload-artifact@v4
         with:
           name: macos_artifacts
           path: dist.zip
@@ -137,7 +137,7 @@ jobs:
       - name: Odin run
         run: ./dist/odin run examples/demo
       - name: Upload artifact
-        uses: actions/upload-artifact@v1
+        uses: actions/upload-artifact@v4
         with:
           name: macos_arm_artifacts
           path: dist.zip
