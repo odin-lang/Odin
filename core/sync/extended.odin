@@ -233,6 +233,7 @@ auto_reset_event_signal :: proc "contextless" (e: ^Auto_Reset_Event) {
 		if _, ok := atomic_compare_exchange_weak_explicit(&e.status, old_status, new_status, .Release, .Relaxed); ok {
 			break
 		}
+		cpu_relax()
 	}
 	if old_status < 0 {
 		sema_post(&e.sema)
