@@ -457,6 +457,17 @@ is_power_of_two :: proc "contextless" (x: uintptr) -> bool {
 }
 
 /*
+Check if a pointer is aligned.
+
+This procedure checks whether a pointer `x` is aligned to a boundary specified
+by `align`, and returns `true` if the pointer is aligned, and false otherwise.
+*/
+is_aligned :: proc "contextless" (x: rawptr, align: int) -> bool {
+	p := uintptr(x)
+	return (p & (1<<uintptr(align) - 1)) == 0
+}
+
+/*
 Align uintptr forward.
 
 This procedure returns the next address after `ptr`, that is located on the

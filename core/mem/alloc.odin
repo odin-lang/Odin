@@ -1096,7 +1096,7 @@ _default_resize_bytes_align :: #force_inline proc(
 		err := free_bytes(old_data, allocator, loc)
 		return nil, err
 	}
-	if new_size == old_size {
+	if new_size == old_size && is_aligned(old_memory, alignment) {
 		return old_data, .None
 	}
 	new_memory : []byte
