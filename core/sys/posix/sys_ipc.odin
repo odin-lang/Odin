@@ -36,7 +36,7 @@ IPC_Flag_Bits :: enum c.int {
 }
 IPC_Flags :: bit_set[IPC_Flag_Bits; c.int]
 
-when ODIN_OS == .Darwin {
+when ODIN_OS == .Darwin || ODIN_OS == .Linux {
 
 	key_t :: distinct c.int32_t
 

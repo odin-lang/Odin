@@ -163,7 +163,7 @@ when ODIN_OS == .NetBSD {
 	@(private) LMSYNC :: "msync"
 }
 
-when ODIN_OS == .Darwin || ODIN_OS == .NetBSD || ODIN_OS == .OpenBSD {
+when ODIN_OS == .Darwin || ODIN_OS == .NetBSD || ODIN_OS == .OpenBSD || ODIN_OS == .Linux {
 
 	PROT_EXEC   :: 0x04
 	_PROT_NONE  :: 0x00
@@ -174,7 +174,7 @@ when ODIN_OS == .Darwin || ODIN_OS == .NetBSD || ODIN_OS == .OpenBSD {
 	MAP_PRIVATE :: 0x0002
 	MAP_SHARED  :: 0x0001
 
-	when ODIN_OS == .Darwin {
+	when ODIN_OS == .Darwin || ODIN_OS == .Linux {
 		MS_INVALIDATE :: 0x0002
 		_MS_SYNC      :: 0x0010
 	} else when ODIN_OS == .NetBSD {
@@ -184,13 +184,18 @@ when ODIN_OS == .Darwin || ODIN_OS == .NetBSD || ODIN_OS == .OpenBSD {
 		MS_INVALIDATE :: 0x0004
 		_MS_SYNC      :: 0x0002
 	}
+
 	MS_ASYNC :: 0x0001
 	MS_SYNC  :: Sync_Flags{Sync_Flags_Bits(log2(_MS_SYNC))}
 
 	MCL_CURRENT :: 0x0001
 	MCL_FUTURE  :: 0x0002
 
-	MAP_FAILED :: rawptr(~uintptr(0))
+	when ODIN_OS == .Linux {
+		MAP_FAILED :: rawptr(~uintptr(-1))
+	} else {
+		MAP_FAILED :: rawptr(~uintptr(0))
+	}
 
 	POSIX_MADV_DONTNEED   :: 4
 	POSIX_MADV_NORMAL     :: 0
