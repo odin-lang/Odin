@@ -548,14 +548,8 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 							//                available at runtime wherever the executable is run, so we make require those to be
 							//                local to the executable (unless the system collection is used, in which case we search
 							//                the system library paths for the library file).
-							if (string_ends_with(lib, str_lit(".a")) || string_ends_with(lib, str_lit(".o"))) {
-								// static libs and object files, absolute full path relative to the file in which the lib was imported from
+							if (string_ends_with(lib, str_lit(".a")) || string_ends_with(lib, str_lit(".o")) || string_ends_with(lib, str_lit(".so")) || string_contains_string(lib, str_lit(".so."))) {
 								lib_str = gb_string_append_fmt(lib_str, " -l:\"%.*s\" ", LIT(lib));
-							} else if (string_ends_with(lib, str_lit(".so")) || string_contains_string(lib, str_lit(".so."))) {
-								// dynamic lib, relative path to executable
-								// NOTE(vassvik): it is the user's responsibility to make sure the shared library files are visible
-								//                at runtime to the executable
-								lib_str = gb_string_append_fmt(lib_str, " -l:\"%s/%.*s\" ", cwd, LIT(lib));
 							} else {
 								// dynamic or static system lib, just link regularly searching system library paths
 								lib_str = gb_string_append_fmt(lib_str, " -l%.*s ", LIT(lib));
@@ -640,6 +634,16 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 				if (build_context.build_mode != BuildMode_DynamicLibrary) {
 					// This points the linker to where the entry point is
 					link_settings = gb_string_appendc(link_settings, "-e _main ");
+				}
+			}
+
+			if (!build_context.no_rpath) {
+				// Set the rpath to the $ORIGIN/@loader_path (the path of the executable),
+				// so that dynamic libraries are looked for at that path.
+				if (build_context.metrics.os == TargetOs_darwin) {
+					link_settings = gb_string_appendc(link_settings, "-Wl,-rpath,@loader_path ");
+				} else {
+					link_settings = gb_string_appendc(link_settings, "-Wl,-rpath,\\$ORIGIN ");
 				}
 			}
 

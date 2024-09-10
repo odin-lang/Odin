@@ -325,6 +325,7 @@ enum BuildFlagKind {
 	BuildFlag_NoTypeAssert,
 	BuildFlag_NoDynamicLiterals,
 	BuildFlag_NoCRT,
+	BuildFlag_NoRPath,
 	BuildFlag_NoEntryPoint,
 	BuildFlag_UseLLD,
 	BuildFlag_UseSeparateModules,
@@ -533,6 +534,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_NoThreadLocal,           str_lit("no-thread-local"),           BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_NoDynamicLiterals,       str_lit("no-dynamic-literals"),       BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_NoCRT,                   str_lit("no-crt"),                    BuildFlagParam_None,    Command__does_build);
+	add_flag(&build_flags, BuildFlag_NoRPath,                 str_lit("no-rpath"),                  BuildFlagParam_None,    Command__does_build);
 	add_flag(&build_flags, BuildFlag_NoEntryPoint,            str_lit("no-entry-point"),            BuildFlagParam_None,    Command__does_check &~ Command_test);
 	add_flag(&build_flags, BuildFlag_UseLLD,                  str_lit("lld"),                       BuildFlagParam_None,    Command__does_build);
 	add_flag(&build_flags, BuildFlag_UseSeparateModules,      str_lit("use-separate-modules"),      BuildFlagParam_None,    Command__does_build);
@@ -1182,6 +1184,9 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							break;
 						case BuildFlag_NoCRT:
 							build_context.no_crt = true;
+							break;
+						case BuildFlag_NoRPath:
+							build_context.no_rpath = true;
 							break;
 						case BuildFlag_NoEntryPoint:
 							build_context.no_entry_point = true;
@@ -2313,6 +2318,10 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 
 		print_usage_line(1, "-no-crt");
 		print_usage_line(2, "Disables automatic linking with the C Run Time.");
+		print_usage_line(0, "");
+
+		print_usage_line(1, "-no-rpath");
+		print_usage_line(2, "Disables automatic addition of an rpath linked to the executable directory.");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-no-thread-local");

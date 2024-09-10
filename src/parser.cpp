@@ -5932,20 +5932,6 @@ gb_internal bool determine_path_from_string(BlockingMutex *file_mutex, Ast *node
 			do_error(node, "Unknown library collection: '%.*s'", LIT(collection_name));
 			return false;
 		}
-	} else {
-#if !defined(GB_SYSTEM_WINDOWS)
-		// @NOTE(vassvik): foreign imports of shared libraries that are not in the system collection on
-		//                 linux/mac have to be local to the executable for consistency with shared libraries.
-		//                 Unix does not have a concept of "import library" for shared/dynamic libraries,
-		//                 so we need to pass the relative path to the linker, and add the current
-		//                 working directory of the exe to the library search paths.
-		//                 Static libraries can be linked directly with the full pathname
-		//
-		if (node->kind == Ast_ForeignImportDecl && (string_ends_with(file_str, str_lit(".so")) || string_contains_string(file_str, str_lit(".so.")))) {
-			*path = file_str;
-			return true;
-		}
-#endif
 	}
 
 	if (is_package_name_reserved(file_str)) {
