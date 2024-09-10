@@ -1,5 +1,11 @@
 //+private
-//+build !windows !linux !darwin !freebsd !openbsd !netbsd !haiku
+//+build !windows
+//+build !linux
+//+build !darwin
+//+build !freebsd
+//+build !openbsd
+//+build !netbsd
+//+build !haiku
 package testing
 
 /*

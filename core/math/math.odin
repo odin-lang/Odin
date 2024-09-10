@@ -444,11 +444,11 @@ bias :: proc "contextless" (t, b: $T) -> T where intrinsics.type_is_numeric(T) {
 	return t / (((1/b) - 2) * (1 - t) + 1)
 }
 @(require_results)
-gain :: proc "contextless" (t, g: $T) -> T where intrinsics.type_is_numeric(T) {
+gain :: proc "contextless" (t, g: $T) -> T where intrinsics.type_is_float(T) {
 	if t < 0.5 {
-		return bias(t*2, g)*0.5
+		return bias(t*2, g) * 0.5
 	}
-	return bias(t*2 - 1, 1 - g)*0.5 + 0.5
+	return bias(t*2 - 1, 1 - g) * 0.5 + 0.5
 }
 
 

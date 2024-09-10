@@ -476,11 +476,9 @@ last_index_byte :: proc(s: []byte, c: byte) -> int #no_bounds_check {
 	// worth vectorizing assuming there is a hardware vector unit, and
 	// the data size is large enough.
 	if i < SIMD_REG_SIZE_128 {
-		if i > 0 { // Handle s == nil.
-			for /**/; i >= 0; i -= 1 {
-				if s[i] == c {
-					return i
-				}
+		#reverse for ch, j in s {
+			if ch == c {
+				return j
 			}
 		}
 		return -1

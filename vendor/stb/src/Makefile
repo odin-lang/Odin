@@ -8,7 +8,7 @@ endif
 
 wasm:
 	mkdir -p ../lib
-	clang -c -Os --target=wasm32 -nostdlib stb_truetype_wasm.c -o ../lib/stb_truetype_wasm.o
+	$(CC) -c -Os --target=wasm32 -nostdlib stb_truetype_wasm.c -o ../lib/stb_truetype_wasm.o
 
 unix:
 	mkdir -p ../lib

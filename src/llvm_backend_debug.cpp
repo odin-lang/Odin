@@ -82,13 +82,36 @@ gb_internal LLVMMetadataRef lb_debug_type_internal_proc(lbModule *m, Type *type)
 			parameter_count += 1;
 		}
 	}
-	LLVMMetadataRef *parameters = gb_alloc_array(permanent_allocator(), LLVMMetadataRef, parameter_count);
 
-	unsigned param_index = 0;
-	if (type->Proc.result_count == 0) {
-		parameters[param_index++] = nullptr;
-	} else {
-		parameters[param_index++] = lb_debug_procedure_parameters(m, type->Proc.results);
+	auto parameters = array_make<LLVMMetadataRef>(permanent_allocator(), 0, type->Proc.param_count+type->Proc.result_count+2);
+
+	array_add(&parameters, cast(LLVMMetadataRef)nullptr);
+
+	bool return_is_tuple = false;
+	if (type->Proc.result_count != 0) {
+		Type *single_ret = reduce_tuple_to_single_type(type->Proc.results);
+		if (is_type_proc(single_ret)) {
+			single_ret = t_rawptr;
+		}
+		if (is_type_tuple(single_ret) && is_calling_convention_odin(type->Proc.calling_convention)) {
+			LLVMTypeRef actual = lb_type_internal_for_procedures_raw(m, type);
+			actual = LLVMGetReturnType(actual);
+			if (actual == nullptr) {
+				// results were passed as a single pointer
+				parameters[0] = lb_debug_procedure_parameters(m, single_ret);
+			} else {
+				LLVMTypeRef possible = lb_type(m, type->Proc.results);
+				if (possible == actual) {
+					// results were returned directly
+					parameters[0] = lb_debug_procedure_parameters(m, single_ret);
+				} else {
+					// resulsts were returned separately
+					return_is_tuple = true;
+				}
+			}
+		} else {
+			parameters[0] = lb_debug_procedure_parameters(m, single_ret);
+		}
 	}
 
 	LLVMMetadataRef file = nullptr;
@@ -98,8 +121,22 @@ gb_internal LLVMMetadataRef lb_debug_type_internal_proc(lbModule *m, Type *type)
 		if (e->kind != Entity_Variable) {
 			continue;
 		}
-		parameters[param_index] = lb_debug_procedure_parameters(m, e->type);
-		param_index += 1;
+		array_add(&parameters, lb_debug_procedure_parameters(m, e->type));
+	}
+
+
+	if (return_is_tuple) {
+		Type *results = type->Proc.results;
+		GB_ASSERT(results != nullptr && results->kind == Type_Tuple);
+		isize count = results->Tuple.variables.count;
+		parameters[0] = lb_debug_procedure_parameters(m, results->Tuple.variables[count-1]->type);
+		for (isize i = 0; i < count-1; i++) {
+			array_add(&parameters, lb_debug_procedure_parameters(m, results->Tuple.variables[i]->type));
+		}
+	}
+
+	if (type->Proc.calling_convention == ProcCC_Odin) {
+		array_add(&parameters, lb_debug_type(m, t_context_ptr));
 	}
 
 	LLVMDIFlags flags = LLVMDIFlagZero;
@@ -107,7 +144,7 @@ gb_internal LLVMMetadataRef lb_debug_type_internal_proc(lbModule *m, Type *type)
 		flags = LLVMDIFlagNoReturn;
 	}
 
-	return LLVMDIBuilderCreateSubroutineType(m->debug_builder, file, parameters, parameter_count, flags);
+	return LLVMDIBuilderCreateSubroutineType(m->debug_builder, file, parameters.data, cast(unsigned)parameters.count, flags);
 }
 
 gb_internal LLVMMetadataRef lb_debug_struct_field(lbModule *m, String const &name, Type *type, u64 offset_in_bits) {
