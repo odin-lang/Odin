@@ -35,7 +35,6 @@ functions:
 	`old_size` to be `size` bytes in length and have the specified `alignment`,
 	in case a re-alllocation occurs.
 - `Resize_Non_Zeroed`: Same as `Resize`, without explicit zero-initialization.
-
 */
 Allocator_Mode :: runtime.Allocator_Mode
 
@@ -123,7 +122,11 @@ Currently the type is defined as follows:
 	) -> ([]byte, Allocator_Error);
 
 The function of this procedure and the meaning of parameters depends on the
-value of the `mode` parameter.
+value of the `mode` parameter. For any operation the following constraints
+apply:
+
+- The `alignment` must be a power of two.
+- The `size` must be a positive integer.
 
 ## 1. `.Alloc`, `.Alloc_Non_Zeroed`
 
@@ -142,10 +145,11 @@ Allocates a memory region of size `size`, aligned on a boundary specified by
 1. The memory region, if allocated successfully, or `nil` otherwise.
 2. An error, if allocation failed.
 
-**Note**: Some allocators may return `nil`, even if no error is returned.
+**Note**: The nil allocator may return `nil`, even if no error is returned.
 Always check both the error and the allocated buffer.
 
-Same as `.Alloc`.
+**Note**: The `.Alloc` mode is required to be implemented for an allocator
+and can not return a `.Mode_Not_Implemented` error.
 
 ## 2. `Free`
 
@@ -200,6 +204,10 @@ If `new_size` is `nil`, the procedure acts just like `.Free`, freeing the
 memory region `old_size` bytes in length, located at the address specified by
 `old_memory`.
 
+If the `old_memory` pointer is not aligned to the boundary specified by
+`alignment`, the procedure relocates the buffer such that the reallocated
+buffer is aligned to the boundary specified by `alignment`.
+
 **Inputs**:
 - `allocator_data`: Pointer to the allocator data.
 - `mode`: `.Resize` or `.Resize_All`.
@@ -216,6 +224,9 @@ memory region `old_size` bytes in length, located at the address specified by
 
 **Note**: Some allocators may return `nil`, even if no error is returned.
 Always check both the error and the allocated buffer.
+
+**Note**: if `old_size` is `0` and `old_memory` is `nil`, this operation is a
+no-op, and should not return errors.
 */
 Allocator_Proc :: runtime.Allocator_Proc
 
@@ -259,6 +270,8 @@ Allocate memory.
 This function allocates `size` bytes of memory, aligned to a boundary specified
 by `alignment` using the allocator specified by `allocator`.
 
+If the `size` parameter is `0`, the operation is a no-op.
+
 **Inputs**:
 - `size`: The desired size of the allocated memory region.
 - `alignment`: The desired alignment of the allocated memory region.
@@ -267,6 +280,14 @@ by `alignment` using the allocator specified by `allocator`.
 **Returns**:
 1. Pointer to the allocated memory, or `nil` if allocation failed.
 2. Error, if the allocation failed.
+
+**Errors**:
+- `None`: If no error occurred.
+- `Out_Of_Memory`: Occurs when the allocator runs out of space in any of its
+	backing buffers, the backing allocator has ran out of space, or an operating
+	system failure occurred.
+- `Invalid_Argument`: If the supplied `size` is negative, alignment is not a
+	power of two.
 */
 @(require_results)
 alloc :: proc(
@@ -293,6 +314,14 @@ by `alignment` using the allocator specified by `allocator`.
 **Returns**:
 1. Slice of the allocated memory region, or `nil` if allocation failed.
 2. Error, if the allocation failed.
+
+**Errors**:
+- `None`: If no error occurred.
+- `Out_Of_Memory`: Occurs when the allocator runs out of space in any of its
+	backing buffers, the backing allocator has ran out of space, or an operating
+	system failure occurred.
+- `Invalid_Argument`: If the supplied `size` is negative, alignment is not a
+	power of two.
 */
 @(require_results)
 alloc_bytes :: proc(
@@ -319,6 +348,14 @@ does not explicitly zero-initialize allocated memory region.
 **Returns**:
 1. Slice of the allocated memory region, or `nil` if allocation failed.
 2. Error, if the allocation failed.
+
+**Errors**:
+- `None`: If no error occurred.
+- `Out_Of_Memory`: Occurs when the allocator runs out of space in any of its
+	backing buffers, the backing allocator has ran out of space, or an operating
+	system failure occurred.
+- `Invalid_Argument`: If the supplied `size` is negative, alignment is not a
+	power of two.
 */
 @(require_results)
 alloc_bytes_non_zeroed :: proc(
@@ -339,6 +376,16 @@ allocated from the allocator specified by `allocator`.
 **Inputs**:
 - `ptr`: Pointer to the memory region to free.
 - `allocator`: The allocator to free to.
+
+**Returns**:
+- The error, if freeing failed.
+
+**Errors**:
+- `None`: When no error has occurred.
+- `Invalid_Pointer`: The specified pointer is not owned by the specified allocator,
+	or does not point to a valid allocation.
+- `Mode_Not_Implemented`: If the specified allocator does not support the `.Free`
+mode.
 */
 free :: proc(
 	ptr: rawptr,
@@ -354,6 +401,8 @@ Free a memory region.
 This procedure frees `size` bytes of memory region located at the address,
 specified by `ptr`, allocated from the allocator specified by `allocator`.
 
+If the `size` parameter is `0`, this call is equivalent to `free()`.
+
 **Inputs**:
 - `ptr`: Pointer to the memory region to free.
 - `size`: The size of the memory region to free.
@@ -361,6 +410,13 @@ specified by `ptr`, allocated from the allocator specified by `allocator`.
 
 **Returns**:
 - The error, if freeing failed.
+
+**Errors**:
+- `None`: When no error has occurred.
+- `Invalid_Pointer`: The specified pointer is not owned by the specified allocator,
+	or does not point to a valid allocation.
+- `Mode_Not_Implemented`: If the specified allocator does not support the `.Free`
+mode.
 */
 free_with_size :: proc(
 	ptr: rawptr,
@@ -377,12 +433,22 @@ Free a memory region.
 This procedure frees memory region, specified by `bytes`, allocated from the
 allocator specified by `allocator`.
 
+If the length of the specified slice is zero, the `.Invalid_Argument` error
+is returned.
+
 **Inputs**:
 - `bytes`: The memory region to free.
 - `allocator`: The allocator to free to.
 
 **Returns**:
 - The error, if freeing failed.
+
+**Errors**:
+- `None`: When no error has occurred.
+- `Invalid_Pointer`: The specified pointer is not owned by the specified allocator,
+	or does not point to a valid allocation.
+- `Mode_Not_Implemented`: If the specified allocator does not support the `.Free`
+mode.
 */
 free_bytes :: proc(
 	bytes: []byte,
@@ -397,6 +463,14 @@ Free all allocations.
 
 This procedure frees all allocations made on the allocator specified by
 `allocator` to that allocator, making it available for further allocations.
+
+**Inputs**:
+- `allocator`: The allocator to free to.
+
+**Errors**:
+- `None`: When no error has occurred.
+- `Mode_Not_Implemented`: If the specified allocator does not support the `.Free`
+mode.
 */
 free_all :: proc(allocator := context.allocator, loc := #caller_location) -> Allocator_Error {
 	return runtime.mem_free_all(allocator, loc)
@@ -416,6 +490,10 @@ If the `new_size` parameter is `0`, `resize()` acts just like `free()`, freeing
 the memory region `old_size` bytes in length, located at the address specified
 by `ptr`.
 
+If the `old_memory` pointer is not aligned to the boundary specified by
+`alignment`, the procedure relocates the buffer such that the reallocated
+buffer is aligned to the boundary specified by `alignment`.
+
 **Inputs**:
 - `ptr`: Pointer to the memory region to resize.
 - `old_size`: Size of the memory region to resize.
@@ -427,9 +505,20 @@ by `ptr`.
 1. The pointer to the resized memory region, if successfull, `nil` otherwise.
 2. Error, if resize failed.
 
-**Note**: The `alignment` parameter is used to preserve the original alignment
-of the allocation, if `resize()` needs to relocate the memory region. Do not
-use `resize()` to change the alignment of the allocated memory region.
+**Errors**:
+- `None`: No error.
+- `Out_Of_Memory`: When the allocator's backing buffer or it's backing
+	allocator does not have enough space to fit in an allocation with the new
+	size, or an operating system failure occurs.
+- `Invalid_Pointer`: The pointer referring to a memory region does not belong
+	to any of the allocators backing buffers or does not point to a valid start
+	of an allocation made in that allocator.
+- `Invalid_Argument`: When `size` is negative, alignment is not a power of two,
+	or the `old_size` argument is incorrect.
+- `Mode_Not_Implemented`: The allocator does not support the `.Realloc` mode.
+
+**Note**: if `old_size` is `0` and `old_memory` is `nil`, this operation is a
+no-op, and should not return errors.
 */
 @(require_results)
 resize :: proc(
@@ -458,6 +547,10 @@ If the `new_size` parameter is `0`, `resize()` acts just like `free()`, freeing
 the memory region `old_size` bytes in length, located at the address specified
 by `ptr`.
 
+If the `old_memory` pointer is not aligned to the boundary specified by
+`alignment`, the procedure relocates the buffer such that the reallocated
+buffer is aligned to the boundary specified by `alignment`.
+
 Unlike `resize()`, this procedure does not explicitly zero-initialize any new
 memory.
 
@@ -472,9 +565,20 @@ memory.
 1. The pointer to the resized memory region, if successfull, `nil` otherwise.
 2. Error, if resize failed.
 
-**Note**: The `alignment` parameter is used to preserve the original alignment
-of the allocation, if `resize()` needs to relocate the memory region. Do not
-use `resize()` to change the alignment of the allocated memory region.
+**Errors**:
+- `None`: No error.
+- `Out_Of_Memory`: When the allocator's backing buffer or it's backing
+	allocator does not have enough space to fit in an allocation with the new
+	size, or an operating system failure occurs.
+- `Invalid_Pointer`: The pointer referring to a memory region does not belong
+	to any of the allocators backing buffers or does not point to a valid start
+	of an allocation made in that allocator.
+- `Invalid_Argument`: When `size` is negative, alignment is not a power of two,
+	or the `old_size` argument is incorrect.
+- `Mode_Not_Implemented`: The allocator does not support the `.Realloc` mode.
+
+**Note**: if `old_size` is `0` and `old_memory` is `nil`, this operation is a
+no-op, and should not return errors.
 */
 @(require_results)
 resize_non_zeroed :: proc(
@@ -503,6 +607,10 @@ by `alignment`.
 If the `new_size` parameter is `0`, `resize_bytes()` acts just like
 `free_bytes()`, freeing the memory region specified by `old_data`.
 
+If the `old_memory` pointer is not aligned to the boundary specified by
+`alignment`, the procedure relocates the buffer such that the reallocated
+buffer is aligned to the boundary specified by `alignment`.
+
 **Inputs**:
 - `old_data`: Pointer to the memory region to resize.
 - `new_size`: The desired size of the resized memory region.
@@ -513,9 +621,20 @@ If the `new_size` parameter is `0`, `resize_bytes()` acts just like
 1. The resized memory region, if successfull, `nil` otherwise.
 2. Error, if resize failed.
 
-**Note**: The `alignment` parameter is used to preserve the original alignment
-of the allocation, if `resize()` needs to relocate the memory region. Do not
-use `resize()` to change the alignment of the allocated memory region.
+**Errors**:
+- `None`: No error.
+- `Out_Of_Memory`: When the allocator's backing buffer or it's backing
+	allocator does not have enough space to fit in an allocation with the new
+	size, or an operating system failure occurs.
+- `Invalid_Pointer`: The pointer referring to a memory region does not belong
+	to any of the allocators backing buffers or does not point to a valid start
+	of an allocation made in that allocator.
+- `Invalid_Argument`: When `size` is negative, alignment is not a power of two,
+	or the `old_size` argument is incorrect.
+- `Mode_Not_Implemented`: The allocator does not support the `.Realloc` mode.
+
+**Note**: if `old_size` is `0` and `old_memory` is `nil`, this operation is a
+no-op, and should not return errors.
 */
 @(require_results)
 resize_bytes :: proc(
@@ -542,6 +661,10 @@ by `alignment`.
 If the `new_size` parameter is `0`, `resize_bytes()` acts just like
 `free_bytes()`, freeing the memory region specified by `old_data`.
 
+If the `old_memory` pointer is not aligned to the boundary specified by
+`alignment`, the procedure relocates the buffer such that the reallocated
+buffer is aligned to the boundary specified by `alignment`.
+
 Unlike `resize_bytes()`, this procedure does not explicitly zero-initialize
 any new memory.
 
@@ -555,9 +678,20 @@ any new memory.
 1. The resized memory region, if successfull, `nil` otherwise.
 2. Error, if resize failed.
 
-**Note**: The `alignment` parameter is used to preserve the original alignment
-of the allocation, if `resize()` needs to relocate the memory region. Do not
-use `resize()` to change the alignment of the allocated memory region.
+**Errors**:
+- `None`: No error.
+- `Out_Of_Memory`: When the allocator's backing buffer or it's backing
+	allocator does not have enough space to fit in an allocation with the new
+	size, or an operating system failure occurs.
+- `Invalid_Pointer`: The pointer referring to a memory region does not belong
+	to any of the allocators backing buffers or does not point to a valid start
+	of an allocation made in that allocator.
+- `Invalid_Argument`: When `size` is negative, alignment is not a power of two,
+	or the `old_size` argument is incorrect.
+- `Mode_Not_Implemented`: The allocator does not support the `.Realloc` mode.
+
+**Note**: if `old_size` is `0` and `old_memory` is `nil`, this operation is a
+no-op, and should not return errors.
 */
 @(require_results)
 resize_bytes_non_zeroed :: proc(
