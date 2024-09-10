@@ -3615,7 +3615,7 @@ gb_internal bool check_transmute(CheckerContext *c, Ast *node, Operand *o, Type 
 		if (is_type_integer(src_t) && is_type_integer(dst_t)) {
 			if (types_have_same_internal_endian(src_t, dst_t)) {
 				ExactValue src_v = exact_value_to_integer(o->value);
-				GB_ASSERT(src_v.kind == ExactValue_Integer);
+				GB_ASSERT(src_v.kind == ExactValue_Integer || src_v.kind == ExactValue_Invalid);
 				BigInt v = src_v.value_integer;
 
 				BigInt smax = {};
