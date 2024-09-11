@@ -202,7 +202,7 @@ jobs:
 
       - name: Debug
         run: |
-          tree -d -L 2
+          tree -L 2
 
       - uses: actions/checkout@v4
 
