@@ -3612,7 +3612,8 @@ gb_internal bool check_transmute(CheckerContext *c, Ast *node, Operand *o, Type 
 		if (are_types_identical(src_bt, dst_bt)) {
 			return true;
 		}
-		if (is_type_integer(src_t) && is_type_integer(dst_t)) {
+		if ((is_type_integer(src_t) && is_type_integer(dst_t)) ||
+		    is_type_integer(src_t) && is_type_bit_set(dst_t)) {
 			if (types_have_same_internal_endian(src_t, dst_t)) {
 				ExactValue src_v = exact_value_to_integer(o->value);
 				GB_ASSERT(src_v.kind == ExactValue_Integer || src_v.kind == ExactValue_Invalid);
