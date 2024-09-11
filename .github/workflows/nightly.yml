@@ -163,7 +163,7 @@ jobs:
     needs: [build_windows, build_macos, build_macos_arm, build_linux]
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v2
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.8.x'
 
