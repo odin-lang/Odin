@@ -2,7 +2,7 @@ import os
 import sys
 from zipfile  import ZipFile, ZIP_DEFLATED
 from b2sdk.v2 import InMemoryAccountInfo, B2Api
-from datetime import datetime, UTC
+from datetime import datetime, timezone
 import json
 
 UPLOAD_FOLDER = "nightly/"
@@ -32,7 +32,7 @@ def remove_prefix(text: str, prefix: str) -> str:
 	return text[text.startswith(prefix) and len(prefix):]
 
 def create_and_upload_artifact_zip(platform: str, artifact: str) -> int:
-	now = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
+	now = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
 
 	source_archive: str
 	destination_name = f'odin-{platform}-nightly+{now.strftime("%Y-%m-%d")}'
@@ -71,7 +71,7 @@ def prune_artifacts():
 	for file, _ in bucket.ls(UPLOAD_FOLDER, latest_only=False):
 		# Timestamp is in milliseconds
 		date  = datetime.fromtimestamp(file.upload_timestamp / 1_000.0).replace(hour=0, minute=0, second=0, microsecond=0)
-		now   = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
+		now   = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
 		delta = now - date
 
 		if delta.days > int(days_to_keep):
@@ -105,7 +105,7 @@ def update_nightly_json():
 			'sizeInBytes': size,
 		})
 
-	now = datetime.now(UTC).isoformat()
+	now = datetime.now(timezone.utc).isoformat()
 
 	nightly = json.dumps({
 		'last_updated' : now,
