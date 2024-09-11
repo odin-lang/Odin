@@ -5,8 +5,8 @@ Event :: struct {using _: Object}
 
 
 
-EventMask :: distinct bit_set[EventType; UInteger]
-EventMaskAny :: ~EventMask{}
+EventMask    :: distinct bit_set[EventType; UInteger]
+EventMaskAny :: transmute(EventMask)(max(UInteger))
 
 when size_of(UInteger) == 4 {
 	// We don't support a 32-bit darwin system but this is mostly to shut up the type checker for the time being
