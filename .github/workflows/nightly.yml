@@ -162,6 +162,7 @@ jobs:
     runs-on: [ubuntu-latest]
     needs: [build_windows, build_macos, build_macos_arm, build_linux]
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/setup-python@v2
         with:
           python-version: '3.8.x'
@@ -203,8 +204,6 @@ jobs:
       - name: Debug
         run: |
           tree -L 2
-
-      - uses: actions/checkout@v4
 
       - name: Create archives and upload
         shell: bash
