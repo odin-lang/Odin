@@ -826,7 +826,7 @@ gb_internal void lb_setup_type_info_data_giant_array(lbModule *m, i64 global_typ
 
 
 				if (t->Struct.soa_kind != StructSoa_None) {
-					Type *kind_type = get_struct_field_type(tag_type, 10);
+					Type *kind_type = get_struct_field_type(tag_type, 7);
 
 					lbValue soa_kind = lb_const_value(m, kind_type, exact_value_i64(t->Struct.soa_kind));
 					LLVMValueRef soa_type = get_type_info_ptr(m, t->Struct.soa_elem);
