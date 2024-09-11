@@ -52,9 +52,9 @@ def create_and_upload_artifact_zip(platform: str, artifact: str) -> int:
 					zip_path  = os.path.join("dist", os.path.relpath(file_path, artifact))
 					z.write(file_path, zip_path)
 
-		if not os.path.exists(source_archive):
-			print(f"Error: Newly created ZIP archive {source_archive} not found.")
-			return 1
+	if not os.path.exists(source_archive):
+		print(f"Error: archive {source_archive} not found.")
+		return 1
 
 	print("Uploading {} to {}".format(source_archive, UPLOAD_FOLDER + destination_name))
 	bucket = get_bucket()
