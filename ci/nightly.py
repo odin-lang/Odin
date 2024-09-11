@@ -70,7 +70,7 @@ def prune_artifacts():
 	bucket = get_bucket()
 	for file, _ in bucket.ls(UPLOAD_FOLDER, latest_only=False):
 		# Timestamp is in milliseconds
-		date  = datetime.fromtimestamp(file.upload_timestamp / 1_000.0).replace(hour=0, minute=0, second=0, microsecond=0)
+		date  = datetime.fromtimestamp(file.upload_timestamp / 1_000.0, tz=timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
 		now   = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
 		delta = now - date
 
