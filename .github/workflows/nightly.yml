@@ -205,6 +205,7 @@ jobs:
           BUCKET: ${{ secrets.B2_BUCKET }}
           DAYS_TO_KEEP: ${{ secrets.B2_DAYS_TO_KEEP }}
         run: |
+          tree
           python3 ci/nightly.py artifact windows-amd64 windows_artifacts/
           python3 ci/nightly.py artifact linux-amd64 linux_artifacts/dist.tar.gz
           python3 ci/nightly.py artifact macos-amd64 macos_artifacts/dist.tar.gz
