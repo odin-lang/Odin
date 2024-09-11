@@ -3451,8 +3451,14 @@ gb_internal lbValue lb_build_expr_internal(lbProcedure *p, Ast *expr) {
 
 	switch (expr->kind) {
 	case_ast_node(bl, BasicLit, expr);
+		if (type != nullptr && type->Named.name == "Error") {
+			Entity *e = type->Named.type_name;
+			if (e->pkg && e->pkg->name == "os") {
+				return lb_const_nil(p->module, type);
+			}
+		}
 		TokenPos pos = bl->token.pos;
-		GB_PANIC("Non-constant basic literal %s - %.*s", token_pos_to_string(pos), LIT(token_strings[bl->token.kind]));
+		GB_PANIC("Non-constant basic literal %s - %.*s (%s)", token_pos_to_string(pos), LIT(token_strings[bl->token.kind]), type_to_string(type));
 	case_end;
 
 	case_ast_node(bd, BasicDirective, expr);
