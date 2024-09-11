@@ -180,21 +180,31 @@ jobs:
         uses: actions/download-artifact@v4.1.7
         with:
           name: windows_artifacts
+          path: windows_artifacts
 
       - name: Download Ubuntu artifacts
         uses: actions/download-artifact@v4.1.7
         with:
           name: linux_artifacts
+          path: linux_artifacts
 
       - name: Download macOS artifacts
         uses: actions/download-artifact@v4.1.7
         with:
           name: macos_artifacts
+          path: macos_artifacts
 
       - name: Download macOS arm artifacts
         uses: actions/download-artifact@v4.1.7
         with:
           name: macos_arm_artifacts
+          path: macos_arm_artifacts
+
+      - name: Debug
+        run: |
+          tree -d -L 2
+
+      - uses: actions/checkout@v4
 
       - name: Create archives and upload
         shell: bash
@@ -204,7 +214,6 @@ jobs:
           BUCKET: ${{ secrets.B2_BUCKET }}
           DAYS_TO_KEEP: ${{ secrets.B2_DAYS_TO_KEEP }}
         run: |
-          tree -d -L 2
           python3 ci/nightly.py artifact windows-amd64 windows_artifacts/
           python3 ci/nightly.py artifact linux-amd64 linux_artifacts/dist.tar.gz
           python3 ci/nightly.py artifact macos-amd64 macos_artifacts/dist.tar.gz
