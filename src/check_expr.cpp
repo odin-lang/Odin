@@ -6204,22 +6204,6 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 
 					Entity *vt = pt->params->Tuple.variables[pt->variadic_index];
 					o.type = vt->type;
-
-					// NOTE(bill, 2024-07-14): minimize the stack usage for variadic parameters with the backing array
-					if (c->decl) {
-						bool found = false;
-						for (auto &vr : c->decl->variadic_reuses) {
-							if (are_types_identical(vt->type, vr.slice_type)) {
-								vr.max_count = gb_max(vr.max_count, variadic_operands.count);
-								found = true;
-								break;
-							}
-						}
-						if (!found) {
-							array_add(&c->decl->variadic_reuses, VariadicReuseData{vt->type, variadic_operands.count});
-						}
-					}
-
 				} else {
 					dummy_argument_count += 1;
 					o.type = t_untyped_nil;
@@ -6412,6 +6396,23 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 				}
 			}
 			score += eval_param_and_score(c, o, t, err, true, var_entity, show_error);
+		}
+
+		if (!vari_expand && variadic_operands.count != 0) {
+			// NOTE(bill, 2024-07-14): minimize the stack usage for variadic parameters with the backing array
+			if (c->decl) {
+				bool found = false;
+				for (auto &vr : c->decl->variadic_reuses) {
+					if (are_types_identical(slice, vr.slice_type)) {
+						vr.max_count = gb_max(vr.max_count, variadic_operands.count);
+						found = true;
+						break;
+					}
+				}
+				if (!found) {
+					array_add(&c->decl->variadic_reuses, VariadicReuseData{slice, variadic_operands.count});
+				}
+			}
 		}
 	}
 
