@@ -48,6 +48,11 @@ Operations such as `new`, `free` and `delete` by default will use
 happens all called procedures will inherit the new context and use the same
 allocator.
 
+We will define one concept to simplify the description of some allocator-related
+procedures, which is ownership. If the memory was allocated via a specific
+allocator, that allocator is said to be the *owner* of that memory region. To
+note, unlike Rust, in Odin the memory ownership model is not strict.
+
 ## Alignment
 
 An address is said to be *aligned to `N` bytes*, if the addresses's numeric

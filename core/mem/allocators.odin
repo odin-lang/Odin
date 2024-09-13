@@ -112,6 +112,12 @@ allocation occupies the next adjacent region of memory in the buffer. Since
 arena allocator does not keep track of any metadata associated with the
 allocations and their locations, it is impossible to free individual
 allocations.
+
+The arena allocator can be used for temporary allocations in frame-based memory
+management. Games are one example of such applications. A global arena can be
+used for any temporary memory allocations, and at the end of each frame all
+temporary allocations are freed. Since no temporary object is going to live
+longer than a frame, no lifetimes are violated.
 */
 @(require_results)
 arena_allocator :: proc(arena: ^Arena) -> Allocator {
@@ -423,7 +429,7 @@ scratch_alloc_bytes :: proc(
 }
 
 /*
-Allocate memory from scratch allocator.
+Allocate non-initialized memory from scratch allocator.
 
 This procedure allocates `size` bytes of memory aligned on a boundary specified
 by `alignment`. The allocated memory region is not explicitly zero-initialized.
@@ -441,7 +447,7 @@ scratch_alloc_non_zeroed :: proc(
 }
 
 /*
-Allocate memory from scratch allocator.
+Allocate non-initialized memory from scratch allocator.
 
 This procedure allocates `size` bytes of memory aligned on a boundary specified
 by `alignment`. The allocated memory region is not explicitly zero-initialized.
@@ -499,7 +505,7 @@ scratch_alloc_bytes_non_zeroed :: proc(
 }
 
 /*
-Free memory to scratch allocator.
+Free memory to the scratch allocator.
 
 This procedure frees the memory region allocated at pointer `ptr`.
 
@@ -1176,14 +1182,6 @@ Each subsequent allocation will get the next adjacent memory region.
 The metadata is stored in the allocation headers, that are located before the
 start of each allocated memory region. Each header contains the amount of
 padding bytes between that header and end of the previous allocation.
-
-## Properties
-
-**Performance characteristics**: TODO
-
-**Has a backing allocator**: No
-
-**Saves metadata**: Allocation header before each allocation.
 */
 @(require_results)
 small_stack_allocator :: proc(stack: ^Small_Stack) -> Allocator {
@@ -1608,6 +1606,9 @@ dynamic_arena_allocator :: proc(a: ^Dynamic_Arena) -> Allocator {
 
 /*
 Destroy a dynamic arena.
+
+This procedure frees all allocations, made on a dynamic arena, including the
+unused blocks, as well as the arrays for storing blocks.
 */
 dynamic_arena_destroy :: proc(a: ^Dynamic_Arena) {
 	dynamic_arena_free_all(a)
@@ -1646,12 +1647,28 @@ _dynamic_arena_cycle_new_block :: proc(a: ^Dynamic_Arena, loc := #caller_locatio
 	return
 }
 
+/*
+Allocate memory from a dynamic arena.
+
+This procedure allocates `size` bytes of memory aligned on a boundary specified
+by `alignment` from a dynamic arena `a`. The allocated memory is
+zero-initialized. This procedure returns a pointer to the newly allocated memory
+region.
+*/
 @(private, require_results)
 dynamic_arena_alloc :: proc(a: ^Dynamic_Arena, size: int, loc := #caller_location) -> (rawptr, Allocator_Error) {
 	data, err := dynamic_arena_alloc_bytes(a, size, loc)
 	return raw_data(data), err
 }
 
+/*
+Allocate memory from a dynamic arena.
+
+This procedure allocates `size` bytes of memory aligned on a boundary specified
+by `alignment` from a dynamic arena `a`. The allocated memory is
+zero-initialized. This procedure returns a slice of the newly allocated memory
+region.
+*/
 @(require_results)
 dynamic_arena_alloc_bytes :: proc(a: ^Dynamic_Arena, size: int, loc := #caller_location) -> ([]byte, Allocator_Error) {
 	bytes, err := dynamic_arena_alloc_bytes_non_zeroed(a, size, loc)
@@ -1661,12 +1678,28 @@ dynamic_arena_alloc_bytes :: proc(a: ^Dynamic_Arena, size: int, loc := #caller_l
 	return bytes, err
 }
 
+/*
+Allocate non-initialized memory from a dynamic arena.
+
+This procedure allocates `size` bytes of memory aligned on a boundary specified
+by `alignment` from a dynamic arena `a`. The allocated memory is not explicitly
+zero-initialized. This procedure returns a pointer to the newly allocated
+memory region.
+*/
 @(require_results)
 dynamic_arena_alloc_non_zeroed :: proc(a: ^Dynamic_Arena, size: int, loc := #caller_location) -> (rawptr, Allocator_Error) {
 	data, err := dynamic_arena_alloc_bytes_non_zeroed(a, size, loc)
 	return raw_data(data), err
 }
 
+/*
+Allocate non-initialized memory from a dynamic arena.
+
+This procedure allocates `size` bytes of memory aligned on a boundary specified
+by `alignment` from a dynamic arena `a`. The allocated memory is not explicitly
+zero-initialized. This procedure returns a slice of the newly allocated
+memory region.
+*/
 @(require_results)
 dynamic_arena_alloc_bytes_non_zeroed :: proc(a: ^Dynamic_Arena, size: int, loc := #caller_location) -> ([]byte, Allocator_Error) {
 	n := align_formula(size, a.alignment)
@@ -1696,6 +1729,12 @@ dynamic_arena_alloc_bytes_non_zeroed :: proc(a: ^Dynamic_Arena, size: int, loc :
 	return ([^]byte)(memory)[:size], nil
 }
 
+/*
+Reset the dynamic arena.
+
+This procedure frees all the allocations, owned by the dynamic arena, excluding
+the unused blocks.
+*/
 dynamic_arena_reset :: proc(a: ^Dynamic_Arena, loc := #caller_location) {
 	if a.current_block != nil {
 		append(&a.unused_blocks, a.current_block, loc=loc)
@@ -1712,6 +1751,12 @@ dynamic_arena_reset :: proc(a: ^Dynamic_Arena, loc := #caller_location) {
 	a.bytes_left = 0 // Make new allocations call `_dynamic_arena_cycle_new_block` again.
 }
 
+/*
+Free all memory from a dynamic arena.
+
+This procedure frees all the allocations, owned by the dynamic arena, including
+the unused blocks.
+*/
 dynamic_arena_free_all :: proc(a: ^Dynamic_Arena, loc := #caller_location) {
 	dynamic_arena_reset(a)
 	for block in a.unused_blocks {
@@ -1720,6 +1765,22 @@ dynamic_arena_free_all :: proc(a: ^Dynamic_Arena, loc := #caller_location) {
 	clear(&a.unused_blocks)
 }
 
+/*
+Resize an allocation.
+
+This procedure resizes a memory region, defined by its location, `old_memory`,
+and its size, `old_size` to have a size `size` and alignment `alignment`. The
+newly allocated memory, if any is zero-initialized.
+
+If `old_memory` is `nil`, this procedure acts just like `dynamic_arena_alloc()`,
+allocating a memory region `size` bytes in size, aligned on a boundary specified
+by `alignment`.
+
+If `size` is 0, this procedure acts just like `dynamic_arena_free()`, freeing
+the memory region located at an address specified by `old_memory`.
+
+This procedure returns the pointer to the resized memory region.
+*/
 @(require_results)
 dynamic_arena_resize :: proc(
 	a: ^Dynamic_Arena,
@@ -1732,6 +1793,22 @@ dynamic_arena_resize :: proc(
 	return raw_data(bytes), err
 }
 
+/*
+Resize an allocation.
+
+This procedure resizes a memory region, specified by `old_data`, to have a size
+`size` and alignment `alignment`. The newly allocated memory, if any is
+zero-initialized.
+
+If `old_memory` is `nil`, this procedure acts just like `dynamic_arena_alloc()`,
+allocating a memory region `size` bytes in size, aligned on a boundary specified
+by `alignment`.
+
+If `size` is 0, this procedure acts just like `dynamic_arena_free()`, freeing the
+memory region located at an address specified by `old_memory`.
+
+This procedure returns the slice of the resized memory region.
+*/
 @(require_results)
 dynamic_arena_resize_bytes :: proc(
 	a: ^Dynamic_Arena,
@@ -1750,6 +1827,22 @@ dynamic_arena_resize_bytes :: proc(
 	return bytes, err
 }
 
+/*
+Resize an allocation without zero-initialization.
+
+This procedure resizes a memory region, defined by its location, `old_memory`,
+and its size, `old_size` to have a size `size` and alignment `alignment`. The
+newly allocated memory, if any is not explicitly zero-initialized.
+
+If `old_memory` is `nil`, this procedure acts just like `dynamic_arena_alloc()`,
+allocating a memory region `size` bytes in size, aligned on a boundary specified
+by `alignment`.
+
+If `size` is 0, this procedure acts just like `dynamic_arena_free()`, freeing the
+memory region located at an address specified by `old_memory`.
+
+This procedure returns the pointer to the resized memory region.
+*/
 @(require_results)
 dynamic_arena_resize_non_zeroed :: proc(
 	a: ^Dynamic_Arena,
@@ -1762,6 +1855,22 @@ dynamic_arena_resize_non_zeroed :: proc(
 	return raw_data(bytes), err
 }
 
+/*
+Resize an allocation.
+
+This procedure resizes a memory region, specified by `old_data`, to have a size
+`size` and alignment `alignment`. The newly allocated memory, if any is not
+explicitly zero-initialized.
+
+If `old_memory` is `nil`, this procedure acts just like `dynamic_arena_alloc()`,
+allocating a memory region `size` bytes in size, aligned on a boundary specified
+by `alignment`.
+
+If `size` is 0, this procedure acts just like `dynamic_arena_free()`, freeing
+the memory region located at an address specified by `old_memory`.
+
+This procedure returns the slice of the resized memory region.
+*/
 @(require_results)
 dynamic_arena_resize_bytes_non_zeroed :: proc(
 	a: ^Dynamic_Arena,
@@ -1823,17 +1932,25 @@ dynamic_arena_allocator_proc :: proc(
 }
 
 
-
+/*
+Header of the buddy block.
+*/
 Buddy_Block :: struct #align(align_of(uint)) {
 	size:    uint,
 	is_free: bool,
 }
 
+/*
+Obtain the next buddy block.
+*/
 @(require_results)
 buddy_block_next :: proc(block: ^Buddy_Block) -> ^Buddy_Block {
 	return (^Buddy_Block)(([^]byte)(block)[block.size:])
 }
 
+/*
+Split the block into two, by truncating the given block to a given size.
+*/
 @(require_results)
 buddy_block_split :: proc(block: ^Buddy_Block, size: uint) -> ^Buddy_Block {
 	block := block
@@ -1854,6 +1971,9 @@ buddy_block_split :: proc(block: ^Buddy_Block, size: uint) -> ^Buddy_Block {
 	return nil
 }
 
+/*
+Coalesce contiguous blocks in a range of blocks into one.
+*/
 buddy_block_coalescence :: proc(head, tail: ^Buddy_Block) {
 	for {
 		// Keep looping until there are no more buddies to coalesce
@@ -1887,6 +2007,9 @@ buddy_block_coalescence :: proc(head, tail: ^Buddy_Block) {
 	}
 }
 
+/*
+Find the best block for storing a given size in a range of blocks.
+*/
 @(require_results)
 buddy_block_find_best :: proc(head, tail: ^Buddy_Block, size: uint) -> ^Buddy_Block {
 	assert(size != 0)
@@ -1945,6 +2068,9 @@ buddy_block_find_best :: proc(head, tail: ^Buddy_Block, size: uint) -> ^Buddy_Bl
 	return nil
 }
 
+/*
+The buddy allocator data.
+*/
 Buddy_Allocator :: struct {
 	head: ^Buddy_Block,
 	tail: ^Buddy_Block,
@@ -1954,7 +2080,12 @@ Buddy_Allocator :: struct {
 /*
 Buddy allocator.
 
-TODO
+The buddy allocator is a type of allocator that splits the backing buffer into
+multiple regions called buddy blocks. Initially, the allocator only has one
+block with the size of the backing buffer. Upon each allocation, the allocator
+finds the smallest block that can fit the size of requested memory region, and
+splits the block according to the allocation size. If no block can be found,
+the contiguous free blocks are coalesced and the search is performed again.
 */
 @(require_results)
 buddy_allocator :: proc(b: ^Buddy_Allocator) -> Allocator {
@@ -1964,6 +2095,12 @@ buddy_allocator :: proc(b: ^Buddy_Allocator) -> Allocator {
 	}
 }
 
+/*
+Initialize the buddy allocator.
+
+This procedure initializes the buddy allocator `b` with a backing buffer `data`
+and block alignment specified by `alignment`.
+*/
 buddy_allocator_init :: proc(b: ^Buddy_Allocator, data: []byte, alignment: uint, loc := #caller_location) {
 	assert(data != nil)
 	assert(is_power_of_two(uintptr(len(data))), "Size of the backing buffer must be power of two", loc)
@@ -1981,6 +2118,9 @@ buddy_allocator_init :: proc(b: ^Buddy_Allocator, data: []byte, alignment: uint,
 	b.alignment = alignment
 }
 
+/*
+Get required block size to fit in the allocation as well as the alignment padding.
+*/
 @(require_results)
 buddy_block_size_required :: proc(b: ^Buddy_Allocator, size: uint) -> uint {
 	size := size
@@ -1993,12 +2133,26 @@ buddy_block_size_required :: proc(b: ^Buddy_Allocator, size: uint) -> uint {
 	return actual_size
 }
 
+/*
+Allocate memory from a buddy allocator.
+
+This procedure allocates `size` bytes of memory aligned on a boundary specified
+by `alignment`. The allocated memory region is zero-initialized. This procedure
+returns a pointer to the allocated memory region.
+*/
 @(require_results)
 buddy_allocator_alloc :: proc(b: ^Buddy_Allocator, size: uint) -> (rawptr, Allocator_Error) {
 	bytes, err := buddy_allocator_alloc_bytes(b, size)
 	return raw_data(bytes), err
 }
 
+/*
+Allocate memory from a buddy allocator.
+
+This procedure allocates `size` bytes of memory aligned on a boundary specified
+by `alignment`. The allocated memory region is zero-initialized. This procedure
+returns a slice of the allocated memory region.
+*/
 @(require_results)
 buddy_allocator_alloc_bytes :: proc(b: ^Buddy_Allocator, size: uint) -> ([]byte, Allocator_Error) {
 	bytes, err := buddy_allocator_alloc_bytes_non_zeroed(b, size)
@@ -2008,12 +2162,26 @@ buddy_allocator_alloc_bytes :: proc(b: ^Buddy_Allocator, size: uint) -> ([]byte,
 	return bytes, err
 }
 
+/*
+Allocate non-initialized memory from a buddy allocator.
+
+This procedure allocates `size` bytes of memory aligned on a boundary specified
+by `alignment`. The allocated memory region is not explicitly zero-initialized.
+This procedure returns a pointer to the allocated memory region.
+*/
 @(require_results)
 buddy_allocator_alloc_non_zeroed :: proc(b: ^Buddy_Allocator, size: uint) -> (rawptr, Allocator_Error) {
 	bytes, err := buddy_allocator_alloc_bytes_non_zeroed(b, size)
 	return raw_data(bytes), err
 }
 
+/*
+Allocate non-initialized memory from a buddy allocator.
+
+This procedure allocates `size` bytes of memory aligned on a boundary specified
+by `alignment`. The allocated memory region is not explicitly zero-initialized.
+This procedure returns a slice of the allocated memory region.
+*/
 @(require_results)
 buddy_allocator_alloc_bytes_non_zeroed :: proc(b: ^Buddy_Allocator, size: uint) -> ([]byte, Allocator_Error) {
 	if size != 0 {
@@ -2034,6 +2202,14 @@ buddy_allocator_alloc_bytes_non_zeroed :: proc(b: ^Buddy_Allocator, size: uint) 
 	return nil, nil
 }
 
+/*
+Free memory to the buddy allocator.
+
+This procedure frees the memory region allocated at pointer `ptr`.
+
+If `ptr` is not the latest allocation and is not a leaked allocation, this
+operation is a no-op.
+*/
 buddy_allocator_free :: proc(b: ^Buddy_Allocator, ptr: rawptr) -> Allocator_Error {
 	if ptr != nil {
 		if !(b.head <= ptr && ptr <= b.tail) {
@@ -2046,6 +2222,9 @@ buddy_allocator_free :: proc(b: ^Buddy_Allocator, ptr: rawptr) -> Allocator_Erro
 	return nil
 }
 
+/*
+Free all memory to the buddy allocator.
+*/
 buddy_allocator_free_all :: proc(b: ^Buddy_Allocator) {
 	alignment := b.alignment
 	head := ([^]byte)(b.head)
