@@ -4,50 +4,38 @@ package mem
 import "base:runtime"
 import "core:sync"
 
+/*
+Allocation entry for the tracking allocator.
+
+This structure stores the data related to an allocation.
+*/
 Tracking_Allocator_Entry :: struct {
-	memory:    rawptr,
-	size:      int,
+	// Pointer to an allocated region.
+	memory: rawptr,
+	// Size of the allocated memory region.
+	size: int,
+	// Requested alignment.
 	alignment: int,
-	mode:      Allocator_Mode,
-	err:       Allocator_Error,
+	// Mode of the operation.
+	mode: Allocator_Mode,
+	// Error.
+	err: Allocator_Error,
+	// Location of the allocation.
 	location:  runtime.Source_Code_Location,
 }
 
+/*
+Bad free entry for a tracking allocator.
+*/
 Tracking_Allocator_Bad_Free_Entry :: struct {
-	memory:   rawptr,
+	// Pointer, on which free operation was called.
+	memory: rawptr,
+	// The source location of where the operation was called.
 	location: runtime.Source_Code_Location,
 }
 
 /*
-An example of how to use the `Tracking_Allocator` to track subsequent allocations
-in your program and report leaks and bad frees:
-
-Example:
-
-	package foo
-
-	import "core:mem"
-	import "core:fmt"
-
-	_main :: proc() {
-		// do stuff
-	}
-
-	main :: proc() {
-		track: mem.Tracking_Allocator
-		mem.tracking_allocator_init(&track, context.allocator)
-		defer mem.tracking_allocator_destroy(&track)
-		context.allocator = mem.tracking_allocator(&track)
-
-		_main()
-
-		for _, leak in track.allocation_map {
-			fmt.printf("%v leaked %m\n", leak.location, leak.size)
-		}
-		for bad_free in track.bad_free_array {
-			fmt.printf("%v allocation %p was freed badly\n", bad_free.location, bad_free.memory)
-		}
-	}
+Tracking allocator data.
 */
 Tracking_Allocator :: struct {
 	backing: Allocator,
@@ -63,6 +51,13 @@ Tracking_Allocator :: struct {
 	current_memory_allocated: i64,
 }
 
+/*
+Initialize the tracking allocator.
+
+This procedure initializes the tracking allocator `t` with a backing allocator
+specified with `backing_allocator`. The `internals_allocator` will used to
+allocate the tracked data.
+*/
 tracking_allocator_init :: proc(t: ^Tracking_Allocator, backing_allocator: Allocator, internals_allocator := context.allocator) {
 	t.backing = backing_allocator
 	t.allocation_map.allocator = internals_allocator
@@ -72,12 +67,22 @@ tracking_allocator_init :: proc(t: ^Tracking_Allocator, backing_allocator: Alloc
 	}
 }
 
+/*
+Destroy the tracking allocator.
+*/
 tracking_allocator_destroy :: proc(t: ^Tracking_Allocator) {
 	delete(t.allocation_map)
 	delete(t.bad_free_array)
 }
 
-// Clear only the current allocation data while keeping the totals intact.
+/*
+Clear the tracking allocator.
+
+This procedure clears the tracked data from a tracking allocator.
+
+**Note**: This procedure clears only the current allocation data while keeping
+the totals intact.
+*/
 tracking_allocator_clear :: proc(t: ^Tracking_Allocator) {
 	sync.mutex_lock(&t.mutex)
 	clear(&t.allocation_map)
@@ -86,7 +91,11 @@ tracking_allocator_clear :: proc(t: ^Tracking_Allocator) {
 	sync.mutex_unlock(&t.mutex)
 }
 
-// Reset all of a Tracking Allocator's allocation data back to zero.
+/*
+Reset the tracking allocator.
+
+Reset all of a Tracking Allocator's allocation data back to zero.
+*/
 tracking_allocator_reset :: proc(t: ^Tracking_Allocator) {
 	sync.mutex_lock(&t.mutex)
 	clear(&t.allocation_map)
@@ -100,6 +109,39 @@ tracking_allocator_reset :: proc(t: ^Tracking_Allocator) {
 	sync.mutex_unlock(&t.mutex)
 }
 
+/*
+Tracking allocator.
+
+The tracking allocator is an allocator wrapper that tracks memory allocations.
+This allocator stores all the allocations in a map. Whenever a pointer that's
+not inside of the map is freed, the `bad_free_array` entry is added.
+
+An example of how to use the `Tracking_Allocator` to track subsequent allocations
+in your program and report leaks and bad frees:
+
+Example:
+
+	package foo
+
+	import "core:mem"
+	import "core:fmt"
+
+	main :: proc() {
+		track: mem.Tracking_Allocator
+		mem.tracking_allocator_init(&track, context.allocator)
+		defer mem.tracking_allocator_destroy(&track)
+		context.allocator = mem.tracking_allocator(&track)
+
+		do_stuff()
+
+		for _, leak in track.allocation_map {
+			fmt.printf("%v leaked %m\n", leak.location, leak.size)
+		}
+		for bad_free in track.bad_free_array {
+			fmt.printf("%v allocation %p was freed badly\n", bad_free.location, bad_free.memory)
+		}
+	}
+*/
 @(require_results)
 tracking_allocator :: proc(data: ^Tracking_Allocator) -> Allocator {
 	return Allocator{

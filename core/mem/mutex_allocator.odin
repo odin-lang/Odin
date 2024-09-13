@@ -3,16 +3,31 @@ package mem
 
 import "core:sync"
 
+/*
+The data for mutex allocator.
+*/
 Mutex_Allocator :: struct {
 	backing: Allocator,
 	mutex:   sync.Mutex,
 }
 
+/*
+Initialize the mutex allocator.
+
+This procedure initializes the mutex allocator using `backin_allocator` as the
+allocator that will be used to pass all allocation requests through.
+*/
 mutex_allocator_init :: proc(m: ^Mutex_Allocator, backing_allocator: Allocator) {
 	m.backing = backing_allocator
 	m.mutex = {}
 }
 
+/*
+Mutex allocator.
+
+The mutex allocator is a wrapper for allocators that is used to serialize all
+allocator requests across multiple threads.
+*/
 @(require_results)
 mutex_allocator :: proc(m: ^Mutex_Allocator) -> Allocator {
 	return Allocator{
