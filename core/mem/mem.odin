@@ -644,10 +644,26 @@ align_formula :: proc "contextless" (size, align: int) -> int {
 }
 
 /*
-Calculate the padding after the pointer with a header.
+Calculate the padding for header preceding aligned data.
 
-This procedure returns the next address, following `ptr` and `header_size`
-bytes of space that is aligned to a boundary specified by `align`.
+This procedure returns the padding, following the specified pointer `ptr` that
+will be able to fit in a header of the size `header_size`, immediately
+preceding the memory region, aligned on a boundary specified by `align`. See
+the following diagram for a visual representation.
+
+        header size
+	    |<------>|
+	+---+--------+------------- - - -
+	    | HEADER |  DATA...
+	+---+--------+------------- - - -
+	^            ^
+	|<---------->|
+	|  padding   |
+	ptr          aligned ptr
+
+The function takes in `ptr` and `header_size`, as well as the required
+alignment for `DATA`. The return value of the function is the padding between
+`ptr` and `aligned_ptr` that will be able to fit the header.
 */
 @(require_results)
 calc_padding_with_header :: proc "contextless" (ptr: uintptr, align: uintptr, header_size: int) -> int {

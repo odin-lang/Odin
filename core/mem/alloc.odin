@@ -1019,8 +1019,7 @@ Default resize procedure.
 
 When allocator does not support resize operation, but supports
 `.Alloc_Non_Zeroed` and `.Free`, this procedure is used to implement allocator's
-default behavior on
-resize.
+default behavior on resize.
 
 Unlike `default_resize_align` no new memory is being explicitly
 zero-initialized.
