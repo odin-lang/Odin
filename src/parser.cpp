@@ -6432,7 +6432,7 @@ gb_internal bool parse_file(Parser *p, AstFile *f) {
 
 	// There was an OK package declaration. But there some invalid token was hit before the package declaration.
 	if (first_invalid_token_set) {
-		syntax_error(first_invalid_token, "There can only be lines starting with '#+' or '//' before package declaration");
+		syntax_error(first_invalid_token, "Expected only comments or lines starting with '#+' before the package declaration");
 		return false;
 	}
 
