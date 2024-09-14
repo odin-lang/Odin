@@ -1,4 +1,4 @@
-//+build freebsd
+#+build freebsd
 package unix
 
 import "core:c"

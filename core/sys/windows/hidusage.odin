@@ -1,4 +1,4 @@
-// +build windows
+#+build windows
 package sys_windows
 
 USAGE :: distinct USHORT

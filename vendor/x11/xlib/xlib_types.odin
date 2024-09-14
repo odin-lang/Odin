@@ -1,4 +1,4 @@
-//+build linux, freebsd, openbsd
+#+build linux, freebsd, openbsd
 package xlib
 
 // Since this is a unix-only library we make a few simplifying assumptions

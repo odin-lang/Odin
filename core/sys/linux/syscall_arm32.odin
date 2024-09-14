@@ -1,4 +1,4 @@
-//+build arm32
+#+build arm32
 package linux
 
 // This file was taken and transformed from

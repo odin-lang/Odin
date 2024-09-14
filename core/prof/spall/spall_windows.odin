@@ -1,10 +1,10 @@
-//+private
+#+private
 package spall
 
 // Only for types.
 import "core:os"
 
-// Package is `//+no-instrumentation`, safe to use.
+// Package is `#+no-instrumentation`, safe to use.
 import win32 "core:sys/windows"
 
 MAX_RW :: 1<<30

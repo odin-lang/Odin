@@ -1,4 +1,4 @@
-//+build windows
+#+build windows
 package test_core_sys_windows
 
 import "core:testing"

@@ -1,5 +1,5 @@
 package net
-//+build windows
+#+build windows
 
 /*
 	Package net implements cross-platform Berkeley Sockets, DNS resolution and associated procedures.

@@ -1,5 +1,5 @@
-//+build wasi
-//+private
+#+build wasi
+#+private
 package runtime
 
 foreign import wasi "wasi_snapshot_preview1"

@@ -1,4 +1,4 @@
-//+build linux
+#+build linux
 package egl
 
 NativeDisplayType :: distinct rawptr

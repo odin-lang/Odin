@@ -1,4 +1,4 @@
-//+private
+#+private
 package os2
 
 import "core:strings"

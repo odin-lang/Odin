@@ -1,5 +1,5 @@
-//+build freebsd, openbsd, netbsd
-//+private
+#+build freebsd, openbsd, netbsd
+#+private
 package runtime
 
 foreign import libc "system:c"

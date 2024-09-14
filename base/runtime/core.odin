@@ -18,7 +18,7 @@
 // This could change at a later date if the all these data structures are
 // implemented within the compiler rather than in this "preload" file
 //
-//+no-instrumentation
+#+no-instrumentation
 package runtime
 
 import "base:intrinsics"

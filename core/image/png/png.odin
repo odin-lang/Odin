@@ -8,7 +8,7 @@
 */
 
 
-//+vet !using-stmt
+#+vet !using-stmt
 package png
 
 import "core:compress"

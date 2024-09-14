@@ -1,4 +1,4 @@
-//+private file
+#+private file
 package os2
 
 import "base:runtime"

@@ -1,4 +1,4 @@
-//+build js
+#+build js
 package os
 
 import "base:runtime"

@@ -1,4 +1,4 @@
-//+build amd64
+#+build amd64
 package simd_x86
 
 import "base:intrinsics"

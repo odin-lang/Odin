@@ -1,4 +1,4 @@
-//+private
+#+private
 package time
 
 import "core:sys/unix"

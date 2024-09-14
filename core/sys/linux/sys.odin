@@ -1,4 +1,4 @@
-//+no-instrumentation
+#+no-instrumentation
 package linux
 
 import "base:intrinsics"

@@ -10,7 +10,7 @@
 
 	A test suite for `core:net`
 */
-//+build freebsd
+#+build freebsd
 package test_core_net
 
 import "core:net"

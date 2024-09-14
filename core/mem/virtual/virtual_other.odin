@@ -1,10 +1,10 @@
-//+private
-//+build !darwin
-//+build !freebsd
-//+build !openbsd
-//+build !netbsd
-//+build !linux
-//+build !windows
+#+private
+#+build !darwin
+#+build !freebsd
+#+build !openbsd
+#+build !netbsd
+#+build !linux
+#+build !windows
 package mem_virtual
 
 _reserve :: proc "contextless" (size: uint) -> (data: []byte, err: Allocator_Error) {

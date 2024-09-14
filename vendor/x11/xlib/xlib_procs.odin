@@ -1,4 +1,4 @@
-//+build linux, openbsd, freebsd
+#+build linux, openbsd, freebsd
 package xlib
 
 foreign import xlib "system:X11"

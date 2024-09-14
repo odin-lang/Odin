@@ -1,5 +1,5 @@
-//+build linux
-//+private file
+#+build linux
+#+private file
 package os2
 
 import "base:runtime"

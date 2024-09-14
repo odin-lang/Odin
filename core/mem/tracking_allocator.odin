@@ -1,4 +1,4 @@
-//+build !freestanding
+#+build !freestanding
 package mem
 
 import "base:runtime"

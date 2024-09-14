@@ -1,5 +1,5 @@
-//+build windows
-//+private
+#+build windows
+#+private
 package dynlib
 
 import win32 "core:sys/windows"

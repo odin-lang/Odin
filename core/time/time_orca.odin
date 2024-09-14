@@ -1,5 +1,5 @@
-//+private
-//+build orca
+#+private
+#+build orca
 package time
 
 import "base:intrinsics"

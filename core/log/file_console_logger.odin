@@ -1,5 +1,5 @@
-//+build !freestanding
-//+build !orca
+#+build !freestanding
+#+build !orca
 package log
 
 import "core:encoding/ansi"

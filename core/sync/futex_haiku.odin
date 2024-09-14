@@ -1,4 +1,4 @@
-//+private
+#+private
 package sync
 
 import "core:c"

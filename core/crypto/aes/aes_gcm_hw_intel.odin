@@ -1,4 +1,4 @@
-//+build amd64
+#+build amd64
 package aes
 
 import "base:intrinsics"

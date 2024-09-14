@@ -1,4 +1,4 @@
-//+build js wasm32, js wasm64p32
+#+build js wasm32, js wasm64p32
 package wasm_js_interface
 
 foreign import "odin_env"

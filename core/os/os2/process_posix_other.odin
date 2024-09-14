@@ -1,5 +1,5 @@
-//+private
-//+build netbsd, openbsd, freebsd
+#+private
+#+build netbsd, openbsd, freebsd
 package os2
 
 import "base:runtime"

@@ -1,5 +1,5 @@
-//+build haiku
-//+private
+#+build haiku
+#+private
 package runtime
 
 foreign import libc "system:c"

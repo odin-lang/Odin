@@ -1,5 +1,5 @@
-//+build openbsd
-//+private
+#+build openbsd
+#+private
 package sync
 
 foreign import libc "system:c"

@@ -1,4 +1,4 @@
-// +build windows
+#+build windows
 package sys_windows
 
 // https://learn.microsoft.com/en-us/windows/win32/intl/code-page-identifiers

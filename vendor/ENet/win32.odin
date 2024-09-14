@@ -1,4 +1,4 @@
-//+build windows
+#+build windows
 package ENet
 
 // When we implement the appropriate bindings for Windows, the section separated

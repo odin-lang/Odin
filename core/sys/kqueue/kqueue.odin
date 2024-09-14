@@ -1,4 +1,4 @@
-//+build darwin, netbsd, openbsd, freebsd
+#+build darwin, netbsd, openbsd, freebsd
 package kqueue
 
 when ODIN_OS == .Darwin {

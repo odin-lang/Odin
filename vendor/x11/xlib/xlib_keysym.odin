@@ -1,4 +1,4 @@
-//+build linux, freebsd, openbsd
+#+build linux, freebsd, openbsd
 package xlib
 
 KeySym :: enum u32 {

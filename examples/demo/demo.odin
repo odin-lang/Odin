@@ -1,4 +1,4 @@
-//+vet !using-stmt !using-param
+#+vet !using-stmt !using-param
 package main
 
 import "core:fmt"

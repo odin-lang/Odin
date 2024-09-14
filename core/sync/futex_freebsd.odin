@@ -1,5 +1,5 @@
-//+private
-//+build freebsd
+#+private
+#+build freebsd
 package sync
 
 import "core:c"

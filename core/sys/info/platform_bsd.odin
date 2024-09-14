@@ -1,4 +1,4 @@
-//+build openbsd, netbsd
+#+build openbsd, netbsd
 package sysinfo
 
 import sys "core:sys/unix"

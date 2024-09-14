@@ -1,5 +1,5 @@
-//+private
-//+build freebsd
+#+private
+#+build freebsd
 package time
 
 import "core:c"

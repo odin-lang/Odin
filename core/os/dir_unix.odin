@@ -1,4 +1,4 @@
-//+build darwin, linux, netbsd, freebsd, openbsd
+#+build darwin, linux, netbsd, freebsd, openbsd
 package os
 
 import "core:strings"

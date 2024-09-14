@@ -1,5 +1,5 @@
-//+build linux
-//+private
+#+build linux
+#+private
 package mem_virtual
 
 import "core:sys/linux"

@@ -1,4 +1,4 @@
-//+private
+#+private
 package os2
 
 Read_Directory_Iterator_Impl :: struct {
