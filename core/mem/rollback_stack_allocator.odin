@@ -134,36 +134,65 @@ rb_free_all :: proc(stack: ^Rollback_Stack) {
 }
 
 /*
-Resize an allocation made on a rollback stack allocator.
+Allocate memory using the rollback stack allocator.
 */
-@(private="file", require_results)
-rb_resize_non_zeroed :: proc(stack: ^Rollback_Stack, ptr: rawptr, old_size, size, alignment: int) -> (result: []byte, err: Allocator_Error) {
-	if ptr != nil {
-		if block, _, ok := rb_find_last_alloc(stack, ptr); ok {
-			// `block.offset` should never underflow because it is contingent
-			// on `old_size` in the first place, assuming sane arguments.
-			assert(block.offset >= cast(uintptr)old_size, "Rollback Stack Allocator received invalid `old_size`.")
-			if block.offset + cast(uintptr)size - cast(uintptr)old_size < cast(uintptr)len(block.buffer) {
-				// Prevent singleton allocations from fragmenting by forbidding
-				// them to shrink, removing the possibility of overflow bugs.
-				if len(block.buffer) <= stack.block_size {
-					block.offset += cast(uintptr)size - cast(uintptr)old_size
-				}
-				#no_bounds_check return (cast([^]byte)ptr)[:size], nil
-			}
-		}
+@(require_results)
+rb_alloc :: proc(
+	stack: ^Rollback_Stack,
+	size: int,
+	alignment := DEFAULT_ALIGNMENT,
+	loc := #caller_location,
+) -> (rawptr, Allocator_Error) {
+	bytes, err := rb_alloc_bytes_non_zeroed(stack, size, alignment, loc)
+	if bytes != nil {
+		zero_slice(bytes)
 	}
-	result = rb_alloc_non_zeroed(stack, size, alignment) or_return
-	runtime.mem_copy_non_overlapping(raw_data(result), ptr, old_size)
-	err = rb_free(stack, ptr)
-	return
+	return raw_data(bytes), err
 }
 
 /*
 Allocate memory using the rollback stack allocator.
 */
-@(private="file", require_results)
-rb_alloc_non_zeroed :: proc(stack: ^Rollback_Stack, size, alignment: int) -> (result: []byte, err: Allocator_Error) {
+@(require_results)
+rb_alloc_bytes :: proc(
+	stack: ^Rollback_Stack,
+	size: int,
+	alignment := DEFAULT_ALIGNMENT,
+	loc := #caller_location,
+) -> ([]byte, Allocator_Error) {
+	bytes, err := rb_alloc_bytes_non_zeroed(stack, size, alignment, loc)
+	if bytes != nil {
+		zero_slice(bytes)
+	}
+	return bytes, err
+}
+
+/*
+Allocate non-initialized memory using the rollback stack allocator.
+*/
+@(require_results)
+rb_alloc_non_zeroed :: proc(
+	stack: ^Rollback_Stack,
+	size: int,
+	alignment := DEFAULT_ALIGNMENT,
+	loc := #caller_location,
+) -> (rawptr, Allocator_Error) {
+	bytes, err := rb_alloc_bytes_non_zeroed(stack, size, alignment, loc)
+	return raw_data(bytes), err
+}
+
+/*
+Allocate non-initialized memory using the rollback stack allocator.
+*/
+@(require_results)
+rb_alloc_bytes_non_zeroed :: proc(
+	stack: ^Rollback_Stack,
+	size: int,
+	alignment := DEFAULT_ALIGNMENT,
+	loc := #caller_location,
+) -> (result: []byte, err: Allocator_Error) {
+	assert(size >= 0, "Size must be positive or zero.", loc)
+	assert(is_power_of_two(cast(uintptr)alignment), "Alignment must be a power of two.", loc)
 	parent: ^Rollback_Stack_Block
 	for block := stack.head; /**/; block = block.next_block {
 		when !ODIN_DISABLE_ASSERT {
@@ -209,6 +238,106 @@ rb_alloc_non_zeroed :: proc(stack: ^Rollback_Stack, size, alignment: int) -> (re
 		#no_bounds_check return ptr[:size], nil
 	}
 	return nil, .Out_Of_Memory
+}
+
+/*
+Resize an allocation owned by rollback stack allocator.
+*/
+@(require_results)
+rb_resize :: proc(
+	stack: ^Rollback_Stack,
+	old_ptr: rawptr,
+	old_size: int,
+	size: int,
+	alignment := DEFAULT_ALIGNMENT,
+	loc := #caller_location,
+) -> (rawptr, Allocator_Error) {
+	bytes, err := rb_resize_bytes_non_zeroed(stack, byte_slice(old_ptr, old_size), size, alignment, loc)
+	if bytes != nil {
+		if old_ptr == nil {
+			zero_slice(bytes)
+		} else if size > old_size {
+			zero_slice(bytes[old_size:])
+		}
+	}
+	return raw_data(bytes), err
+}
+
+/*
+Resize an allocation owned by rollback stack allocator.
+*/
+@(require_results)
+rb_resize_bytes :: proc(
+	stack: ^Rollback_Stack,
+	old_memory: []byte,
+	size: int,
+	alignment := DEFAULT_ALIGNMENT,
+	loc := #caller_location,
+) -> ([]u8, Allocator_Error) {
+	bytes, err := rb_resize_bytes_non_zeroed(stack, old_memory, size, alignment, loc)
+	if bytes != nil {
+		if old_memory == nil {
+			zero_slice(bytes)
+		} else if size > len(old_memory) {
+			zero_slice(bytes[len(old_memory):])
+		}
+	}
+	return bytes, err
+}
+
+/*
+Resize an allocation owned by rollback stack allocator without explicit
+zero-initialization.
+*/
+@(require_results)
+rb_resize_non_zeroed :: proc(
+	stack: ^Rollback_Stack,
+	old_ptr: rawptr,
+	old_size: int,
+	size: int,
+	alignment := DEFAULT_ALIGNMENT,
+	loc := #caller_location,
+) -> (rawptr, Allocator_Error) {
+	bytes, err := rb_resize_bytes_non_zeroed(stack, byte_slice(old_ptr, old_size), size, alignment, loc)
+	return raw_data(bytes), err
+}
+
+/*
+Resize an allocation owned by rollback stack allocator without explicit
+zero-initialization.
+*/
+@(require_results)
+rb_resize_bytes_non_zeroed :: proc(
+	stack: ^Rollback_Stack,
+	old_memory: []byte,
+	size: int,
+	alignment := DEFAULT_ALIGNMENT,
+	loc := #caller_location,
+) -> (result: []byte, err: Allocator_Error) {
+	old_size := len(old_memory)
+	ptr := raw_data(old_memory)
+	assert(size >= 0, "Size must be positive or zero.", loc)
+	assert(old_size >= 0, "Old size must be positive or zero.", loc)
+	assert(is_power_of_two(cast(uintptr)alignment), "Alignment must be a power of two.", loc)
+	if ptr != nil {
+		if block, _, ok := rb_find_last_alloc(stack, ptr); ok {
+			// `block.offset` should never underflow because it is contingent
+			// on `old_size` in the first place, assuming sane arguments.
+			assert(block.offset >= cast(uintptr)old_size, "Rollback Stack Allocator received invalid `old_size`.")
+			if block.offset + cast(uintptr)size - cast(uintptr)old_size < cast(uintptr)len(block.buffer) {
+				// Prevent singleton allocations from fragmenting by forbidding
+				// them to shrink, removing the possibility of overflow bugs.
+				if len(block.buffer) <= stack.block_size {
+					block.offset += cast(uintptr)size - cast(uintptr)old_size
+				}
+				#no_bounds_check return (ptr)[:size], nil
+			}
+		}
+	}
+	result = rb_alloc_bytes_non_zeroed(stack, size, alignment) or_return
+	runtime.mem_copy_non_overlapping(raw_data(result), ptr, old_size)
+	err = rb_free(stack, ptr)
+	return
 }
 
 @(private="file", require_results)
@@ -321,31 +450,23 @@ rollback_stack_allocator_proc :: proc(
 	size, alignment: int,
 	old_memory: rawptr,
 	old_size: int,
-	location := #caller_location,
+	loc := #caller_location,
 ) -> (result: []byte, err: Allocator_Error) {
 	stack := cast(^Rollback_Stack)allocator_data
-
 	switch mode {
-	case .Alloc, .Alloc_Non_Zeroed:
-		assert(size >= 0, "Size must be positive or zero.", location)
-		assert(is_power_of_two(cast(uintptr)alignment), "Alignment must be a power of two.", location)
-		result = rb_alloc_non_zeroed(stack, size, alignment) or_return
-		if mode == .Alloc {
-			zero_slice(result)
-		}
+	case .Alloc:
+		return rb_alloc_bytes(stack, size, alignment, loc)
+	case .Alloc_Non_Zeroed:
+		return rb_alloc_bytes_non_zeroed(stack, size, alignment, loc)
 	case .Free:
-		err = rb_free(stack, old_memory)
-
+		return nil, rb_free(stack, old_memory)
 	case .Free_All:
 		rb_free_all(stack)
-	case .Resize, .Resize_Non_Zeroed:
-		assert(size >= 0, "Size must be positive or zero.", location)
-		assert(old_size >= 0, "Old size must be positive or zero.", location)
-		assert(is_power_of_two(cast(uintptr)alignment), "Alignment must be a power of two.", location)
-		result = rb_resize_non_zeroed(stack, old_memory, old_size, size, alignment) or_return
-		#no_bounds_check if mode == .Resize && size > old_size {
-			zero_slice(result[old_size:])
-		}
+		return nil, nil
+	case .Resize:
+		return rb_resize_bytes(stack, byte_slice(old_memory, old_size), size, alignment, loc)
+	case .Resize_Non_Zeroed:
+		return rb_resize_bytes_non_zeroed(stack, byte_slice(old_memory, old_size), size, alignment, loc)
 	case .Query_Features:
 		set := (^Allocator_Mode_Set)(old_memory)
 		if set != nil {
