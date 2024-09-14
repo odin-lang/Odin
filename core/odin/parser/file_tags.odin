@@ -51,7 +51,7 @@ get_build_arch_from_string :: proc(str: string) -> runtime.Odin_Arch_Type {
 parse_file_tags :: proc(file: ast.File, allocator := context.allocator) -> (tags: File_Tags) {
 	context.allocator = allocator
 
-	if file.docs == nil {
+	if file.docs == nil && file.tags == nil {
 		return
 	}
 
@@ -95,11 +95,9 @@ parse_file_tags :: proc(file: ast.File, allocator := context.allocator) -> (tags
 	build_project_names: [dynamic][]string
 	defer shrink(&build_project_names)
 
-	for comment in file.docs.list {
-		if len(comment.text) < 3 || comment.text[:2] != "//" {
-			continue
-		}
-		text := comment.text[2:]
+	parse_tag :: proc(text: string, tags: ^File_Tags, build_kinds: ^[dynamic]Build_Kind,
+	                  build_project_name_strings: ^[dynamic]string,
+	                  build_project_names: ^[dynamic][]string) {
 		i := 0
 
 		skip_whitespace(text, &i)
@@ -124,7 +122,7 @@ parse_file_tags :: proc(file: ast.File, allocator := context.allocator) -> (tags
 				groups_loop: for {
 					index_start := len(build_project_name_strings)
 
-					defer append(&build_project_names, build_project_name_strings[index_start:])
+					defer append(build_project_names, build_project_name_strings[index_start:])
 
 					for {
 						skip_whitespace(text, &i)
@@ -143,10 +141,10 @@ parse_file_tags :: proc(file: ast.File, allocator := context.allocator) -> (tags
 						}
 	
 						scan_value(text, &i)
-						append(&build_project_name_strings, text[name_start:i])
+						append(build_project_name_strings, text[name_start:i])
 					}
 
-					append(&build_project_names, build_project_name_strings[index_start:])
+					append(build_project_names, build_project_name_strings[index_start:])
 				}
 			case "build":
 				kinds_loop: for {
@@ -156,7 +154,7 @@ parse_file_tags :: proc(file: ast.File, allocator := context.allocator) -> (tags
 					arch_positive: runtime.Odin_Arch_Types
 					arch_negative: runtime.Odin_Arch_Types
 
-					defer append(&build_kinds, Build_Kind{
+					defer append(build_kinds, Build_Kind{
 						os   = (os_positive   == {} ? runtime.ALL_ODIN_OS_TYPES   : os_positive)  -os_negative,
 						arch = (arch_positive == {} ? runtime.ALL_ODIN_ARCH_TYPES : arch_positive)-arch_negative,
 					})
@@ -198,6 +196,27 @@ parse_file_tags :: proc(file: ast.File, allocator := context.allocator) -> (tags
 				}
 			}
 		}
+	}
+
+	if file.docs != nil {
+		for comment in file.docs.list {
+			if len(comment.text) < 3 || comment.text[:2] != "//" {
+				continue
+			}
+			text := comment.text[2:]
+
+			parse_tag(text, &tags, &build_kinds, &build_project_name_strings, &build_project_names)
+		}
+	}
+
+	for tag in file.tags {
+		if len(tag.text) < 3 || tag.text[:2] != "#+" {
+			continue
+		}
+		// Only skip # because parse_tag skips the plus
+		text := tag.text[1:]
+
+		parse_tag(text, &tags, &build_kinds, &build_project_name_strings, &build_project_names)
 	}
 
 	tags.build = build_kinds[:]

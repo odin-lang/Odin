@@ -161,11 +161,36 @@ parse_file :: proc(p: ^Parser, file: ^ast.File) -> bool {
 
 	docs := p.lead_comment
 
-	p.file.pkg_token = expect_token(p, .Package)
-	if p.file.pkg_token.kind != .Package {
-		return false
+	invalid_pre_package_token: Maybe(tokenizer.Token)
+
+	for p.curr_tok.kind != .Package && p.curr_tok.kind != .EOF {
+		if p.curr_tok.kind == .Comment {
+			consume_comment_groups(p, p.prev_tok)
+		} else if p.curr_tok.kind == .File_Tag {
+			append(&p.file.tags, p.curr_tok)
+			advance_token(p)
+		} else {
+			if invalid_pre_package_token == nil {
+				invalid_pre_package_token = p.curr_tok
+			}
+
+			advance_token(p)
+		}
 	}
 
+	if p.curr_tok.kind != .Package {
+		t := invalid_pre_package_token.? or_else p.curr_tok
+		error(p, t.pos, "Expected a package declaration at the start of the file")
+		return false
+	}
+	
+	p.file.pkg_token = expect_token(p, .Package)
+	
+	if ippt, ok := invalid_pre_package_token.?; ok {
+		error(p, ippt.pos, "Expected only comments or lines starting with '#+' before the package declaration")
+		return false
+	}
+	
 	pkg_name := expect_token_after(p, .Ident, "package")
 	if pkg_name.kind == .Ident {
 		switch name := pkg_name.text; {

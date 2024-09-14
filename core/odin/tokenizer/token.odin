@@ -32,6 +32,7 @@ Token_Kind :: enum u32 {
 	Invalid,
 	EOF,
 	Comment,
+	File_Tag,
 
 	B_Literal_Begin,
 		Ident,   // main
@@ -166,6 +167,7 @@ tokens := [Token_Kind.COUNT]string {
 	"Invalid",
 	"EOF",
 	"Comment",
+	"FileTag",
 
 	"",
 	"identifier",
