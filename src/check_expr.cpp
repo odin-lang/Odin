@@ -129,6 +129,8 @@ gb_internal bool check_is_castable_to(CheckerContext *c, Operand *operand, Type 
 
 gb_internal bool is_exact_value_zero(ExactValue const &v);
 
+gb_internal bool are_signatures_similar_enough(Type *a_, Type *b_);
+
 enum LoadDirectiveResult {
 	LoadDirective_Success  = 0,
 	LoadDirective_Error    = 1,
@@ -2485,6 +2487,8 @@ gb_internal void check_cast_error_suggestion(CheckerContext *c, Operand *o, Type
 		}
 	} else if (are_types_identical(src, t_string) && is_type_u8_slice(dst)) {
 		error_line("\tSuggestion: a string may be transmuted to %s\n", b);
+	} else if (is_type_proc(src) && is_type_proc(dst)) {
+		error_line("\tSuggestion: the procedure types are not similar enough to allow a safe cast, you may use 'transmute' to do an unsafe cast\n");
 	} else if (check_integer_exceed_suggestion(c, o, type)) {
 		return;
 	}
@@ -3380,7 +3384,7 @@ gb_internal bool check_is_castable_to(CheckerContext *c, Operand *operand, Type 
 			}
 			return false;
 		}
-		return true;
+		return are_signatures_similar_enough(src, dst);
 	}
 
 	// proc -> rawptr
@@ -3657,8 +3661,12 @@ gb_internal bool check_transmute(CheckerContext *c, Ast *node, Operand *o, Type 
 				gb_string_free(oper_str);
 				gb_string_free(to_type);
 			} else if (is_type_internally_pointer_like(src_t) &&
-			           is_type_internally_pointer_like(dst_t)) {
+			           is_type_internally_pointer_like(dst_t) &&
+				      !(is_type_proc(src_t) && is_type_proc(dst_t))) {
 				error(o->expr, "Use of 'transmute' where 'cast' would be preferred since the types are pointer-like");
+			} else if (is_type_proc(src_t) && is_type_proc(dst_t) &&
+				       are_signatures_similar_enough(src_t, dst_t)) {
+				error(o->expr, "Use of 'transmute' where 'cast' would be preffered since the procedures are similar enough");
 			} else if (are_types_identical(src_bt, dst_bt)) {
 				gbString oper_str = expr_to_string(o->expr);
 				gbString to_type  = type_to_string(dst_t);

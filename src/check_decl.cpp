@@ -781,6 +781,10 @@ gb_internal bool are_signatures_similar_enough(Type *a_, Type *b_) {
 		return false;
 	}
 
+	if (a->calling_convention != b->calling_convention) {
+		return false;
+	}
+
 	for (isize i = 0; i < a->param_count; i++) {
 		Type *x = core_type(a->params->Tuple.variables[i]->type);
 		Type *y = core_type(b->params->Tuple.variables[i]->type);
