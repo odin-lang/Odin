@@ -571,7 +571,7 @@ gb_internal LLVMMetadataRef lb_debug_bitfield(lbModule *m, Type *type, String na
         GB_ASSERT(f->kind == Entity_Variable);
         String name = f->token.string;
         elements[i] = LLVMDIBuilderCreateBitFieldMemberType(m->debug_builder, scope, cast(char const *)name.text, name.len, file, line,
-            bit_size, offset_in_bits, offset_in_bits,
+            bit_size, offset_in_bits, 0,
             LLVMDIFlagZero, lb_debug_type(m, f->type)
         );
 
