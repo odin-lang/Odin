@@ -1,5 +1,5 @@
-package net
 #+build darwin
+package net
 
 /*
 	Package net implements cross-platform Berkeley Sockets, DNS resolution and associated procedures.
