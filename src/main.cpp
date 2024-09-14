@@ -325,6 +325,7 @@ enum BuildFlagKind {
 	BuildFlag_NoTypeAssert,
 	BuildFlag_NoDynamicLiterals,
 	BuildFlag_NoCRT,
+	BuildFlag_NoRPath,
 	BuildFlag_NoEntryPoint,
 	BuildFlag_UseLLD,
 	BuildFlag_UseSeparateModules,
@@ -389,6 +390,7 @@ enum BuildFlagKind {
 	BuildFlag_PrintLinkerFlags,
 
 	// internal use only
+	BuildFlag_InternalFastISel,
 	BuildFlag_InternalIgnoreLazy,
 	BuildFlag_InternalIgnoreLLVMBuild,
 	BuildFlag_InternalIgnorePanic,
@@ -507,7 +509,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	auto build_flags = array_make<BuildFlag>(heap_allocator(), 0, BuildFlag_COUNT);
 	add_flag(&build_flags, BuildFlag_Help,                    str_lit("help"),                      BuildFlagParam_None,    Command_all);
 	add_flag(&build_flags, BuildFlag_SingleFile,              str_lit("file"),                      BuildFlagParam_None,    Command__does_build | Command__does_check);
-	add_flag(&build_flags, BuildFlag_OutFile,                 str_lit("out"),                       BuildFlagParam_String,  Command__does_build | Command_test);
+	add_flag(&build_flags, BuildFlag_OutFile,                 str_lit("out"),                       BuildFlagParam_String,  Command__does_build | Command_test | Command_doc);
 	add_flag(&build_flags, BuildFlag_OptimizationMode,        str_lit("o"),                         BuildFlagParam_String,  Command__does_build);
 	add_flag(&build_flags, BuildFlag_ShowTimings,             str_lit("show-timings"),              BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_ShowMoreTimings,         str_lit("show-more-timings"),         BuildFlagParam_None,    Command__does_check);
@@ -532,6 +534,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_NoThreadLocal,           str_lit("no-thread-local"),           BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_NoDynamicLiterals,       str_lit("no-dynamic-literals"),       BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_NoCRT,                   str_lit("no-crt"),                    BuildFlagParam_None,    Command__does_build);
+	add_flag(&build_flags, BuildFlag_NoRPath,                 str_lit("no-rpath"),                  BuildFlagParam_None,    Command__does_build);
 	add_flag(&build_flags, BuildFlag_NoEntryPoint,            str_lit("no-entry-point"),            BuildFlagParam_None,    Command__does_check &~ Command_test);
 	add_flag(&build_flags, BuildFlag_UseLLD,                  str_lit("lld"),                       BuildFlagParam_None,    Command__does_build);
 	add_flag(&build_flags, BuildFlag_UseSeparateModules,      str_lit("use-separate-modules"),      BuildFlagParam_None,    Command__does_build);
@@ -594,6 +597,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 
 	add_flag(&build_flags, BuildFlag_PrintLinkerFlags,        str_lit("print-linker-flags"),        BuildFlagParam_None,    Command_build);
 
+	add_flag(&build_flags, BuildFlag_InternalFastISel,        str_lit("internal-fast-isel"),        BuildFlagParam_None,    Command_all);
 	add_flag(&build_flags, BuildFlag_InternalIgnoreLazy,      str_lit("internal-ignore-lazy"),      BuildFlagParam_None,    Command_all);
 	add_flag(&build_flags, BuildFlag_InternalIgnoreLLVMBuild, str_lit("internal-ignore-llvm-build"),BuildFlagParam_None,    Command_all);
 	add_flag(&build_flags, BuildFlag_InternalIgnorePanic,     str_lit("internal-ignore-panic"),     BuildFlagParam_None,    Command_all);
@@ -1181,6 +1185,9 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_NoCRT:
 							build_context.no_crt = true;
 							break;
+						case BuildFlag_NoRPath:
+							build_context.no_rpath = true;
+							break;
 						case BuildFlag_NoEntryPoint:
 							build_context.no_entry_point = true;
 							break;
@@ -1408,6 +1415,9 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							build_context.print_linker_flags = true;
 							break;
 
+						case BuildFlag_InternalFastISel:
+							build_context.fast_isel = true;
+							break;
 						case BuildFlag_InternalIgnoreLazy:
 							build_context.ignore_lazy = true;
 							break;
@@ -2154,6 +2164,12 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 		print_usage_line(1, "-doc-format");
 		print_usage_line(2, "Generates documentation as the .odin-doc format (useful for external tooling).");
 		print_usage_line(0, "");
+
+		print_usage_line(1, "-out:<filepath>");
+		print_usage_line(2, "Sets the base name of the resultig .odin-doc file.");
+		print_usage_line(2, "The extension can be optionally included; the resulting file will always have an extension of '.odin-doc'.");
+		print_usage_line(2, "Example: -out:foo");
+		print_usage_line(0, "");
 	}
 
 	if (run_or_build) {
@@ -2308,6 +2324,10 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 
 		print_usage_line(1, "-no-crt");
 		print_usage_line(2, "Disables automatic linking with the C Run Time.");
+		print_usage_line(0, "");
+
+		print_usage_line(1, "-no-rpath");
+		print_usage_line(2, "Disables automatic addition of an rpath linked to the executable directory.");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-no-thread-local");

@@ -1,16 +1,9 @@
 //+private
 package os2
 
-import "base:runtime"
-
 import "core:sys/linux"
 import "core:sync"
 import "core:mem"
-
-// Use the experimental custom heap allocator (over calling `malloc` etc.).
-// This is a switch because there are thread-safety problems that need to be fixed.
-// See: https://github.com/odin-lang/Odin/issues/4161
-USE_EXPERIMENTAL_ALLOCATOR :: #config(OS2_LINUX_USE_EXPERIMENTAL_ALLOCATOR, false)
 
 // NOTEs
 //
@@ -146,8 +139,6 @@ Region :: struct {
 	memory: [BLOCKS_PER_REGION]Allocation_Header,
 }
 
-when USE_EXPERIMENTAL_ALLOCATOR {
-
 _heap_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
                             size, alignment: int,
                             old_memory: rawptr, old_size: int, loc := #caller_location) -> ([]byte, mem.Allocator_Error) {
@@ -228,10 +219,6 @@ _heap_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
 	return nil, nil
 }
 
-} else {
-	_heap_allocator_proc :: runtime.heap_allocator_proc
-}
-
 heap_alloc :: proc(size: int) -> rawptr {
 	if size >= DIRECT_MMAP_THRESHOLD {
 		return _direct_mmap_alloc(size)
@@ -293,7 +280,8 @@ heap_alloc :: proc(size: int) -> rawptr {
 		_local_region, back_idx = _region_retrieve_with_space(blocks_needed, local_region_idx, back_idx)
 	}
 	user_ptr, used := _region_get_block(_local_region, idx, blocks_needed)
-	_local_region.hdr.free_blocks -= (used + 1)
+
+	sync.atomic_sub_explicit(&_local_region.hdr.free_blocks, used + 1, .Release)
 
 	// If this memory was ever used before, it now needs to be zero'd.
 	if idx < _local_region.hdr.last_used {
@@ -320,7 +308,7 @@ heap_resize :: proc(old_memory: rawptr, new_size: int) -> rawptr #no_bounds_chec
 
 heap_free :: proc(memory: rawptr) {
 	alloc := _get_allocation_header(memory)
-	if alloc.requested & IS_DIRECT_MMAP == IS_DIRECT_MMAP {
+	if sync.atomic_load(&alloc.requested) & IS_DIRECT_MMAP == IS_DIRECT_MMAP {
 		_direct_mmap_free(alloc)
 		return
 	}
@@ -475,25 +463,31 @@ _region_local_free :: proc(alloc: ^Allocation_Header) #no_bounds_check {
 	alloc := alloc
 	add_to_free_list := true
 
-	_local_region.hdr.free_blocks += _get_block_count(alloc^) + 1
+	idx := sync.atomic_load(&alloc.idx)
+	prev := sync.atomic_load(&alloc.prev)
+	next := sync.atomic_load(&alloc.next)
+	block_count := next - idx - 1
+	free_blocks := sync.atomic_load(&_local_region.hdr.free_blocks) + block_count + 1
+	sync.atomic_store_explicit(&_local_region.hdr.free_blocks, free_blocks, .Release)
 
 	// try to merge with prev
-	if alloc.idx > 0 && _local_region.memory[alloc.prev].free_idx != NOT_FREE {
-		_local_region.memory[alloc.prev].next = alloc.next
-		_local_region.memory[alloc.next].prev = alloc.prev
-		alloc = &_local_region.memory[alloc.prev]
+	if idx > 0 && sync.atomic_load(&_local_region.memory[prev].free_idx) != NOT_FREE {
+		sync.atomic_store_explicit(&_local_region.memory[prev].next, next, .Release)
+		_local_region.memory[next].prev = prev
+		alloc = &_local_region.memory[prev]
 		add_to_free_list = false
 	}
 
 	// try to merge with next
-	if alloc.next < BLOCKS_PER_REGION - 1 && _local_region.memory[alloc.next].free_idx != NOT_FREE {
-		old_next := alloc.next
-		alloc.next = _local_region.memory[old_next].next
-		_local_region.memory[alloc.next].prev = alloc.idx
+	if next < BLOCKS_PER_REGION - 1 && sync.atomic_load(&_local_region.memory[next].free_idx) != NOT_FREE {
+		old_next := next
+		sync.atomic_store_explicit(&alloc.next, sync.atomic_load(&_local_region.memory[old_next].next), .Release)
+
+		sync.atomic_store_explicit(&_local_region.memory[next].prev, idx, .Release)
 
 		if add_to_free_list {
-			_local_region.hdr.free_list[_local_region.memory[old_next].free_idx] = alloc.idx
-			alloc.free_idx = _local_region.memory[old_next].free_idx
+		        sync.atomic_store_explicit(&_local_region.hdr.free_list[_local_region.memory[old_next].free_idx], idx, .Release)
+		        sync.atomic_store_explicit(&alloc.free_idx, _local_region.memory[old_next].free_idx, .Release)
 		} else {
 			// NOTE: We have aleady merged with prev, and now merged with next.
 			//       Now, we are actually going to remove from the free_list.
@@ -505,10 +499,11 @@ _region_local_free :: proc(alloc: ^Allocation_Header) #no_bounds_check {
 	// This is the only place where anything is appended to the free list.
 	if add_to_free_list {
 		fl := _local_region.hdr.free_list
-		alloc.free_idx = _local_region.hdr.free_list_len
-		fl[alloc.free_idx] = alloc.idx
-		_local_region.hdr.free_list_len += 1
-		if int(_local_region.hdr.free_list_len) == len(fl) {
+		fl_len := sync.atomic_load(&_local_region.hdr.free_list_len)
+		sync.atomic_store_explicit(&alloc.free_idx, fl_len, .Release)
+		fl[alloc.free_idx] = idx
+		sync.atomic_store_explicit(&_local_region.hdr.free_list_len, fl_len + 1, .Release)
+		if int(fl_len + 1) == len(fl) {
 			free_alloc := _get_allocation_header(mem.raw_data(_local_region.hdr.free_list))
 			_region_resize(free_alloc, len(fl) * 2 * size_of(fl[0]), true)
 		}
@@ -525,8 +520,8 @@ _region_assign_free_list :: proc(region: ^Region, memory: rawptr, blocks: u16) {
 _region_retrieve_with_space :: proc(blocks: u16, local_idx: int = -1, back_idx: int = -1) -> (^Region, int) {
 	r: ^Region
 	idx: int
-	for r = global_regions; r != nil; r = r.hdr.next_region {
-		if idx == local_idx || idx < back_idx || r.hdr.free_blocks < blocks {
+	for r = sync.atomic_load(&global_regions); r != nil; r = r.hdr.next_region {
+		if idx == local_idx || idx < back_idx || sync.atomic_load(&r.hdr.free_blocks) < blocks {
 			idx += 1
 			continue
 		}
@@ -594,7 +589,7 @@ _region_segment :: proc(region: ^Region, alloc: ^Allocation_Header, blocks, new_
 
 _region_get_local_idx :: proc() -> int {
 	idx: int
-	for r := global_regions; r != nil; r = r.hdr.next_region {
+	for r := sync.atomic_load(&global_regions); r != nil; r = r.hdr.next_region {
 		if r == _local_region {
 			return idx
 		}
@@ -610,9 +605,10 @@ _region_find_and_assign_local :: proc(alloc: ^Allocation_Header) {
 		_local_region = _region_retrieve_from_addr(alloc)
 	}
 
-	// At this point, _local_region is set correctly. Spin until acquired
-	res: ^^Region
-	for res != &_local_region {
+	// At this point, _local_region is set correctly. Spin until acquire
+	res := CURRENTLY_ACTIVE
+
+	for res == CURRENTLY_ACTIVE {
 		res = sync.atomic_compare_exchange_strong_explicit(
 			&_local_region.hdr.local_addr,
 			&_local_region,
@@ -634,9 +630,9 @@ _region_contains_mem :: proc(r: ^Region, memory: rawptr) -> bool #no_bounds_chec
 _region_free_list_remove :: proc(region: ^Region, free_idx: u16) #no_bounds_check {
 	// pop, swap and update allocation hdr
 	if n := region.hdr.free_list_len - 1; free_idx != n {
-		region.hdr.free_list[free_idx] = region.hdr.free_list[n]
+		region.hdr.free_list[free_idx] = sync.atomic_load(&region.hdr.free_list[n]) 
 		alloc_idx := region.hdr.free_list[free_idx]
-		region.memory[alloc_idx].free_idx = free_idx
+		sync.atomic_store_explicit(&region.memory[alloc_idx].free_idx, free_idx, .Release)
 	}
 	region.hdr.free_list_len -= 1
 }
@@ -727,3 +723,4 @@ _get_allocation_header :: #force_inline proc(raw_mem: rawptr) -> ^Allocation_Hea
 _round_up_to_nearest :: #force_inline proc(size, round: int) -> int {
 	return (size-1) + round - (size-1) % round
 }
+

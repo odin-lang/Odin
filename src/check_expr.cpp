@@ -3612,10 +3612,11 @@ gb_internal bool check_transmute(CheckerContext *c, Ast *node, Operand *o, Type 
 		if (are_types_identical(src_bt, dst_bt)) {
 			return true;
 		}
-		if (is_type_integer(src_t) && is_type_integer(dst_t)) {
+		if ((is_type_integer(src_t) && is_type_integer(dst_t)) ||
+		    is_type_integer(src_t) && is_type_bit_set(dst_t)) {
 			if (types_have_same_internal_endian(src_t, dst_t)) {
 				ExactValue src_v = exact_value_to_integer(o->value);
-				GB_ASSERT(src_v.kind == ExactValue_Integer);
+				GB_ASSERT(src_v.kind == ExactValue_Integer || src_v.kind == ExactValue_Invalid);
 				BigInt v = src_v.value_integer;
 
 				BigInt smax = {};
@@ -4602,7 +4603,7 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 				    (operand->value.kind == ExactValue_Integer ||
 				     operand->value.kind == ExactValue_Float)) {
 					operand->mode = Addressing_Value;
-					target_type = t_untyped_nil;
+					// target_type = t_untyped_nil;
 				     	operand->value = empty_exact_value;
 					update_untyped_expr_value(c, operand->expr, operand->value);
 					break;
@@ -6203,22 +6204,6 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 
 					Entity *vt = pt->params->Tuple.variables[pt->variadic_index];
 					o.type = vt->type;
-
-					// NOTE(bill, 2024-07-14): minimize the stack usage for variadic parameters with the backing array
-					if (c->decl) {
-						bool found = false;
-						for (auto &vr : c->decl->variadic_reuses) {
-							if (are_types_identical(vt->type, vr.slice_type)) {
-								vr.max_count = gb_max(vr.max_count, variadic_operands.count);
-								found = true;
-								break;
-							}
-						}
-						if (!found) {
-							array_add(&c->decl->variadic_reuses, VariadicReuseData{vt->type, variadic_operands.count});
-						}
-					}
-
 				} else {
 					dummy_argument_count += 1;
 					o.type = t_untyped_nil;
@@ -6411,6 +6396,23 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 				}
 			}
 			score += eval_param_and_score(c, o, t, err, true, var_entity, show_error);
+		}
+
+		if (!vari_expand && variadic_operands.count != 0) {
+			// NOTE(bill, 2024-07-14): minimize the stack usage for variadic parameters with the backing array
+			if (c->decl) {
+				bool found = false;
+				for (auto &vr : c->decl->variadic_reuses) {
+					if (are_types_identical(slice, vr.slice_type)) {
+						vr.max_count = gb_max(vr.max_count, variadic_operands.count);
+						found = true;
+						break;
+					}
+				}
+				if (!found) {
+					array_add(&c->decl->variadic_reuses, VariadicReuseData{slice, variadic_operands.count});
+				}
+			}
 		}
 	}
 
@@ -8085,7 +8087,10 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 					GB_ASSERT(c->curr_proc_decl->entity->type->kind == Type_Proc);
 					String scope_features = c->curr_proc_decl->entity->type->Proc.enable_target_feature;
 					if (!check_target_feature_is_superset_of(scope_features, pt->Proc.enable_target_feature, &invalid)) {
+						ERROR_BLOCK();
 						error(call, "Inlined procedure enables target feature '%.*s', this requires the calling procedure to at least enable the same feature", LIT(invalid));
+
+						error_line("\tSuggested Example: @(enable_target_feature=\"%.*s\")\n", LIT(invalid));
 					}
 				}
 			}
