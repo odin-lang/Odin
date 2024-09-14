@@ -6388,9 +6388,13 @@ gb_internal bool parse_file(Parser *p, AstFile *f) {
 
 	String filepath = f->tokenizer.fullpath;
 	String base_dir = dir_from_path(filepath);
+	if (f->curr_token.kind == Token_Comment) {
+		consume_comment_groups(f, f->prev_token);
+	}
 
-	Array<Token> tags = array_make<Token>(ast_allocator(f));
+	CommentGroup *docs = f->lead_comment;
 
+	Array<Token> tags = array_make<Token>(temporary_allocator());
 	bool first_invalid_token_set = false;
 	Token first_invalid_token = {};
 
@@ -6409,8 +6413,6 @@ gb_internal bool parse_file(Parser *p, AstFile *f) {
 			advance_token(f);
 		}
 	}
-
-	CommentGroup *docs = f->lead_comment;
 
 	if (f->curr_token.kind != Token_package) {
 		ERROR_BLOCK();
@@ -6451,6 +6453,8 @@ gb_internal bool parse_file(Parser *p, AstFile *f) {
 	}
 	f->package_name = package_name.string;
 
+	// TODO: Shouldn't single file only matter for build tags? no-instrumentation for example
+	// should be respected even when in single file mode.
 	if (!f->pkg->is_single_file) {
 		if (docs != nullptr && docs->list.count > 0) {
 			for (Token const &tok : docs->list) {
@@ -6484,8 +6488,6 @@ gb_internal bool parse_file(Parser *p, AstFile *f) {
 			}
 		}
 	}
-
-	array_free(&tags);
 
 	Ast *pd = ast_package_decl(f, f->package_token, package_name, docs, f->line_comment);
 	expect_semicolon(f);
