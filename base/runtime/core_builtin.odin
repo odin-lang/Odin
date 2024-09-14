@@ -913,7 +913,7 @@ card :: proc "contextless" (s: $S/bit_set[$E; $U]) -> int {
 
 @builtin
 @(disabled=ODIN_DISABLE_ASSERT)
-assert :: proc(condition: bool, message := "", loc := #caller_location) {
+assert :: proc(condition: bool, message := #caller_expression(condition), loc := #caller_location) {
 	if !condition {
 		// NOTE(bill): This is wrapped in a procedure call
 		// to improve performance to make the CPU not
@@ -952,7 +952,7 @@ unimplemented :: proc(message := "", loc := #caller_location) -> ! {
 
 @builtin
 @(disabled=ODIN_DISABLE_ASSERT)
-assert_contextless :: proc "contextless" (condition: bool, message := "", loc := #caller_location) {
+assert_contextless :: proc "contextless" (condition: bool, message := #caller_expression(condition), loc := #caller_location) {
 	if !condition {
 		// NOTE(bill): This is wrapped in a procedure call
 		// to improve performance to make the CPU not

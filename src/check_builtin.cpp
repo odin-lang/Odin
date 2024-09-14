@@ -1632,6 +1632,22 @@ gb_internal bool check_builtin_procedure_directive(CheckerContext *c, Operand *o
 
 		operand->type = t_source_code_location;
 		operand->mode = Addressing_Value;
+	} else if (name == "caller_expression") {
+		if (ce->args.count > 1) {
+			error(ce->args[0], "'#caller_expression' expects either 0 or 1 arguments, got %td", ce->args.count);
+		}
+		if (ce->args.count > 0) {
+			Ast *arg = ce->args[0];
+			Operand o = {};
+			Entity *e = check_ident(c, &o, arg, nullptr, nullptr, true);
+			if (e == nullptr || (e->flags & EntityFlag_Param) == 0) {
+				error(ce->args[0], "'#caller_expression' expected a valid earlier parameter name");
+			}
+			arg->Ident.entity = e;
+		}
+
+		operand->type = t_string;
+		operand->mode = Addressing_Value;
 	} else if (name == "exists") {
 		if (ce->args.count != 1) {
 			error(ce->close, "'#exists' expects 1 argument, got %td", ce->args.count);
