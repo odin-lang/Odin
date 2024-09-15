@@ -128,7 +128,7 @@ O_Flag_Bits :: enum c.int {
 	// RSYNC = O_RSYNC,
 
 	// Execute only.
-	EXEC      = log2(O_EXEC),
+	EXEC      = O_EXEC when ODIN_OS == .Linux else log2(O_EXEC),
 	// Reading and writing.
 	RDWR      = log2(O_RDWR),
 	// Writing only.
@@ -177,7 +177,7 @@ when ODIN_OS == .Darwin {
 	O_DIRECTORY :: 0x00100000
 	O_EXCL      :: 0x00000800
 	O_NOCTTY    :: 0x00020000
-	O_NOFOLLOW   :: 0x00000100
+	O_NOFOLLOW  :: 0x00000100
 	O_TRUNC     :: 0x00000400
 
 	_O_TTY_INIT :: 0
@@ -242,7 +242,7 @@ when ODIN_OS == .Darwin {
 	O_DIRECTORY :: 0x00020000
 	O_EXCL      :: 0x0800
 	O_NOCTTY    :: 0x8000
-	O_NOFOLLOW   :: 0x0100
+	O_NOFOLLOW  :: 0x0100
 	O_TRUNC     :: 0x0400
 
 	_O_TTY_INIT :: 0x00080000
@@ -307,7 +307,7 @@ when ODIN_OS == .Darwin {
 	O_DIRECTORY :: 0x0020000
 	O_EXCL      :: 0x0800
 	O_NOCTTY    :: 0x8000
-	O_NOFOLLOW   :: 0x0100
+	O_NOFOLLOW  :: 0x0100
 	O_TRUNC     :: 0x0400
 
 	_O_TTY_INIT :: 0
@@ -372,7 +372,7 @@ when ODIN_OS == .Darwin {
 	O_DIRECTORY :: 0x20000
 	O_EXCL      :: 0x0800
 	O_NOCTTY    :: 0x8000
-	O_NOFOLLOW   :: 0x0100
+	O_NOFOLLOW  :: 0x0100
 	O_TRUNC     :: 0x0400
 
 	_O_TTY_INIT :: 0

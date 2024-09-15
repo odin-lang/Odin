@@ -27,9 +27,9 @@ foreign lib {
 nfds_t :: c.uint
 
 Poll_Error :: enum c.int {
-	EAGAIN = Errno.EAGAIN,
-	EINTR  = Errno.EINTR,
-	EINVAL = Errno.EINVAL,
+	EAGAIN = cast(c.int)Errno.EAGAIN,
+	EINTR  = cast(c.int)Errno.EINTR,
+	EINVAL = cast(c.int)Errno.EINVAL,
 }
 
 Poll_Event_Bits :: enum c.short {
