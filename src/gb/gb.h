@@ -3195,11 +3195,11 @@ void gb_affinity_init(gbAffinity *a) {
 	a->core_count       = 1;
 	a->threads_per_core = 1;
 
-	if (sysctlbyname("hw.logicalcpu", &count, &count_size, NULL, 0) == 0) {
+	if (sysctlbyname("kern.smp.cpus", &count, &count_size, NULL, 0) == 0) {
 		if (count > 0) {
 			a->thread_count = count;
 			// Get # of physical cores
-			if (sysctlbyname("hw.physicalcpu", &count, &count_size, NULL, 0) == 0) {
+			if (sysctlbyname("kern.smp.cores", &count, &count_size, NULL, 0) == 0) {
 				if (count > 0) {
 					a->core_count = count;
 					a->threads_per_core = a->thread_count / count;
@@ -3209,6 +3209,14 @@ void gb_affinity_init(gbAffinity *a) {
 						a->is_accurate = true;
 				}
 			}
+		}
+	} else if (sysctlbyname("hw.ncpu", &count, &count_size, NULL, 0) == 0) {
+		// SMP disabled or unavailable.
+		if (count > 0) {
+			a->is_accurate      = true;
+			a->thread_count     = count;
+			a->core_count       = count;
+			a->threads_per_core = 1;
 		}
 	}
 

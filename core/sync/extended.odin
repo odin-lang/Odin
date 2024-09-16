@@ -8,7 +8,7 @@ _ :: vg
 Wait group.
 
 Wait group is a synchronization primitive used by the waiting thread to wait,
-until a all working threads finish work.
+until all working threads finish work.
 
 The waiting thread first sets the number of working threads it will expect to
 wait for using `wait_group_add` call, and start waiting using `wait_group_wait`
@@ -35,7 +35,7 @@ Wait_Group :: struct #no_copy {
 /*
 Increment an internal counter of a wait group.
 
-This procedure atomicaly increments a number to the specified wait group's
+This procedure atomically increments a number to the specified wait group's
 internal counter by a specified amount. This operation can be done on any
 thread.
 */
@@ -48,12 +48,12 @@ wait_group_add :: proc "contextless" (wg: ^Wait_Group, delta: int) {
 
 	atomic_add(&wg.counter, delta)
 	if wg.counter < 0 {
-		_panic("sync.Wait_Group negative counter")
+		panic_contextless("sync.Wait_Group negative counter")
 	}
 	if wg.counter == 0 {
 		cond_broadcast(&wg.cond)
 		if wg.counter != 0 {
-			_panic("sync.Wait_Group misuse: sync.wait_group_add called concurrently with sync.wait_group_wait")
+			panic_contextless("sync.Wait_Group misuse: sync.wait_group_add called concurrently with sync.wait_group_wait")
 		}
 	}
 }
@@ -81,7 +81,7 @@ wait_group_wait :: proc "contextless" (wg: ^Wait_Group) {
 	if wg.counter != 0 {
 		cond_wait(&wg.cond, &wg.mutex)
 		if wg.counter != 0 {
-			_panic("sync.Wait_Group misuse: sync.wait_group_add called concurrently with sync.wait_group_wait")
+			panic_contextless("sync.Wait_Group misuse: sync.wait_group_add called concurrently with sync.wait_group_wait")
 		}
 	}
 }
@@ -105,7 +105,7 @@ wait_group_wait_with_timeout :: proc "contextless" (wg: ^Wait_Group, duration: t
 			return false
 		}
 		if wg.counter != 0 {
-			_panic("sync.Wait_Group misuse: sync.wait_group_add called concurrently with sync.wait_group_wait")
+			panic_contextless("sync.Wait_Group misuse: sync.wait_group_add called concurrently with sync.wait_group_wait")
 		}
 	}
 	return true
@@ -121,7 +121,7 @@ When `barrier_wait` procedure is called by any thread, that thread will block
 the execution, until all threads associated with the barrier reach the same
 point of execution and also call `barrier_wait`.
 
-when barrier is initialized, a `thread_count` parameter is passed, signifying
+When a barrier is initialized, a `thread_count` parameter is passed, signifying
 the amount of participant threads of the barrier. The barrier also keeps track
 of an internal atomic counter. When a thread calls `barrier_wait`, the internal
 counter is incremented. When the internal counter reaches `thread_count`, it is
@@ -208,7 +208,7 @@ Represents a thread synchronization primitive that, when signalled, releases one
 single waiting thread and then resets automatically to a state where it can be
 signalled again.
 
-When a thread calls `auto_reset_event_wait`, it's execution will be blocked,
+When a thread calls `auto_reset_event_wait`, its execution will be blocked,
 until the event is signalled by another thread. The call to
 `auto_reset_event_signal` wakes up exactly one thread waiting for the event.
 */
@@ -228,15 +228,15 @@ thread.
 */
 auto_reset_event_signal :: proc "contextless" (e: ^Auto_Reset_Event) {
 	old_status := atomic_load_explicit(&e.status, .Relaxed)
+	new_status := old_status + 1 if old_status < 1 else 1
 	for {
-		new_status := old_status + 1 if old_status < 1 else 1
 		if _, ok := atomic_compare_exchange_weak_explicit(&e.status, old_status, new_status, .Release, .Relaxed); ok {
 			break
 		}
-
-		if old_status < 0 {
-			sema_post(&e.sema)
-		}
+		cpu_relax()
+	}
+	if old_status < 0 {
+		sema_post(&e.sema)
 	}
 }
 
@@ -297,7 +297,7 @@ waiting to acquire the lock, exactly one of those threads is unblocked and
 allowed into the critical section.
 */
 ticket_mutex_unlock :: #force_inline proc "contextless" (m: ^Ticket_Mutex) {
-	atomic_add_explicit(&m.serving, 1, .Relaxed)
+	atomic_add_explicit(&m.serving, 1, .Release)
 }
 
 /*
@@ -331,8 +331,8 @@ Benaphore.
 
 A benaphore is a combination of an atomic variable and a semaphore that can
 improve locking efficiency in a no-contention system. Acquiring a benaphore
-lock doesn't call into an internal semaphore, if no other thread in a middle of
-a critical section.
+lock doesn't call into an internal semaphore, if no other thread is in the
+middle of a critical section.
 
 Once a lock on a benaphore is acquired by a thread, no other thread is allowed
 into any critical sections, associted with the same benaphore, until the lock
@@ -355,7 +355,7 @@ from entering any critical sections associated with the same benaphore, until
 until the lock is released.
 */
 benaphore_lock :: proc "contextless" (b: ^Benaphore) {
-	if atomic_add_explicit(&b.counter, 1, .Acquire) > 1 {
+	if atomic_add_explicit(&b.counter, 1, .Acquire) > 0 {
 		sema_wait(&b.sema)
 	}
 }
@@ -381,10 +381,10 @@ Release a lock on a benaphore.
 
 This procedure releases a lock on the specified benaphore. If any of the threads
 are waiting on the lock, exactly one thread is allowed into a critical section
-associated with the same banaphore.
+associated with the same benaphore.
 */
 benaphore_unlock :: proc "contextless" (b: ^Benaphore) {
-	if atomic_sub_explicit(&b.counter, 1, .Release) > 0 {
+	if atomic_sub_explicit(&b.counter, 1, .Release) > 1 {
 		sema_post(&b.sema)
 	}
 }
@@ -418,8 +418,8 @@ benaphore_guard :: proc "contextless" (m: ^Benaphore) -> bool {
 /*
 Recursive benaphore.
 
-Recurisve benaphore is just like a plain benaphore, except it allows reentrancy
-into the critical section.
+A recursive benaphore is just like a plain benaphore, except it allows
+reentrancy into the critical section.
 
 When a lock is acquired on a benaphore, all other threads attempting to
 acquire a lock on the same benaphore will be blocked from any critical sections,
@@ -449,13 +449,15 @@ recursive benaphore, until the lock is released.
 */
 recursive_benaphore_lock :: proc "contextless" (b: ^Recursive_Benaphore) {
 	tid := current_thread_id()
-	if atomic_add_explicit(&b.counter, 1, .Acquire) > 1 {
-		if tid != b.owner {
-			sema_wait(&b.sema)
+	check_owner: if tid != atomic_load_explicit(&b.owner, .Acquire) {
+		atomic_add_explicit(&b.counter, 1, .Relaxed)
+		if _, ok := atomic_compare_exchange_strong_explicit(&b.owner, 0, tid, .Release, .Relaxed); ok {
+			break check_owner
 		}
+		sema_wait(&b.sema)
+		atomic_store_explicit(&b.owner, tid, .Release)
 	}
 	// inside the lock
-	b.owner = tid
 	b.recursion += 1
 }
 
@@ -472,15 +474,14 @@ benaphore, until the lock is released.
 */
 recursive_benaphore_try_lock :: proc "contextless" (b: ^Recursive_Benaphore) -> bool {
 	tid := current_thread_id()
-	if b.owner == tid {
-		atomic_add_explicit(&b.counter, 1, .Acquire)
-	}
-
-	if v, _ := atomic_compare_exchange_strong_explicit(&b.counter, 0, 1, .Acquire, .Acquire); v != 0 {
+	check_owner: if tid != atomic_load_explicit(&b.owner, .Acquire) {
+		if _, ok := atomic_compare_exchange_strong_explicit(&b.owner, 0, tid, .Release, .Relaxed); ok {
+			atomic_add_explicit(&b.counter, 1, .Relaxed)
+			break check_owner
+		}
 		return false
 	}
 	// inside the lock
-	b.owner = tid
 	b.recursion += 1
 	return true
 }
@@ -494,14 +495,14 @@ for other threads for entering.
 */
 recursive_benaphore_unlock :: proc "contextless" (b: ^Recursive_Benaphore) {
 	tid := current_thread_id()
-	_assert(tid == b.owner, "tid != b.owner")
+	assert_contextless(tid == atomic_load_explicit(&b.owner, .Relaxed), "tid != b.owner")
 	b.recursion -= 1
 	recursion := b.recursion
+
 	if recursion == 0 {
-		b.owner = 0
-	}
-	if atomic_sub_explicit(&b.counter, 1, .Release) > 0 {
-		if recursion == 0 {
+		if atomic_sub_explicit(&b.counter, 1, .Relaxed) == 1 {
+			atomic_store_explicit(&b.owner, 0, .Release)
+		} else {
 			sema_post(&b.sema)
 		}
 	}

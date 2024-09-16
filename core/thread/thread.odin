@@ -272,7 +272,7 @@ create_and_start :: proc(fn: proc(), init_context: Maybe(runtime.Context) = nil,
 	t := create(thread_proc, priority)
 	t.data = rawptr(fn)
 	if self_cleanup {
-		t.flags += {.Self_Cleanup}
+		intrinsics.atomic_or(&t.flags, {.Self_Cleanup})
 	}
 	t.init_context = init_context
 	start(t)
@@ -307,7 +307,7 @@ create_and_start_with_data :: proc(data: rawptr, fn: proc(data: rawptr), init_co
 	t.user_index = 1
 	t.user_args[0] = data
 	if self_cleanup {
-		t.flags += {.Self_Cleanup}
+		intrinsics.atomic_or(&t.flags, {.Self_Cleanup})
 	}
 	t.init_context = init_context
 	start(t)
@@ -347,7 +347,7 @@ create_and_start_with_poly_data :: proc(data: $T, fn: proc(data: T), init_contex
 	mem.copy(&t.user_args[0], &data, size_of(T))
 
 	if self_cleanup {
-		t.flags += {.Self_Cleanup}
+		intrinsics.atomic_or(&t.flags, {.Self_Cleanup})
 	}
 
 	t.init_context = init_context
@@ -394,7 +394,7 @@ create_and_start_with_poly_data2 :: proc(arg1: $T1, arg2: $T2, fn: proc(T1, T2),
 	_  = copy(user_args[n:], mem.ptr_to_bytes(&arg2))
 
 	if self_cleanup {
-		t.flags += {.Self_Cleanup}
+		intrinsics.atomic_or(&t.flags, {.Self_Cleanup})
 	}
 
 	t.init_context = init_context
@@ -443,7 +443,7 @@ create_and_start_with_poly_data3 :: proc(arg1: $T1, arg2: $T2, arg3: $T3, fn: pr
 	_  = copy(user_args[n:], mem.ptr_to_bytes(&arg3))
 
 	if self_cleanup {
-		t.flags += {.Self_Cleanup}
+		intrinsics.atomic_or(&t.flags, {.Self_Cleanup})
 	}
 
 	t.init_context = init_context
@@ -494,7 +494,7 @@ create_and_start_with_poly_data4 :: proc(arg1: $T1, arg2: $T2, arg3: $T3, arg4: 
 	_  = copy(user_args[n:], mem.ptr_to_bytes(&arg4))
 
 	if self_cleanup {
-		t.flags += {.Self_Cleanup}
+		intrinsics.atomic_or(&t.flags, {.Self_Cleanup})
 	}
 
 	t.init_context = init_context
