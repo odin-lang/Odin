@@ -123,12 +123,16 @@ O_Flag_Bits :: enum c.int {
 	NONBLOCK  = log2(O_NONBLOCK),
 	// Write I/O shall complete as defined by synchronized I/O file integrity completion.
 	SYNC      = log2(O_SYNC),
+
 	// NOTE: use with `posix.O_RSYNC + { .OTHER_FLAG, .OTHER_FLAG }`, unfortunately can't be in
 	// this bit set enum because it is 0 on some platforms and a value on others.
 	// RSYNC = O_RSYNC,
 
 	// Execute only.
-	EXEC      = O_EXEC when ODIN_OS == .Linux else log2(O_EXEC),
+	// NOTE: use with `posix.O_ENTER + { .OTHER_FLAG, .OTHER_FLAG }`, unfortunately can't be in
+	// this bit set enum because it is 0 on some platforms and a value on others.
+	// EXEC      = O_EXEC
+
 	// Reading and writing.
 	RDWR      = log2(O_RDWR),
 	// Writing only.
@@ -139,7 +143,8 @@ O_Flag_Bits :: enum c.int {
 O_Flags :: bit_set[O_Flag_Bits; c.int]
 
 // A mask of all the access mode bits.
-O_ACCMODE :: O_Flags{ .EXEC, .RDWR, .WRONLY }
+// NOTE: .EXEC and .RDONLY also belong here, but they are 0 on some platforms. 
+O_ACCMODE :: O_Flags{ .RDWR, .WRONLY }
 
 AT_Flag_Bits :: enum c.int {
 	EACCESS          = log2(AT_EACCESS),
