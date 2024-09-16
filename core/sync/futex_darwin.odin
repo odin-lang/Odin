@@ -12,7 +12,7 @@ foreign System {
 	// __ulock_wait is not available on 10.15
 	// See https://github.com/odin-lang/Odin/issues/1959
 	__ulock_wait  :: proc "c" (operation: u32, addr: rawptr, value: u64, timeout_us: u32) -> c.int ---
-	__ulock_wait2  :: proc "c" (operation: u32, addr: rawptr, value: u64, timeout_ns: u64, value2: u64) -> c.int ---
+	__ulock_wait2 :: proc "c" (operation: u32, addr: rawptr, value: u64, timeout_ns: u64, value2: u64) -> c.int ---
 	__ulock_wake  :: proc "c" (operation: u32, addr: rawptr, wake_value: u64) -> c.int ---
 }
 
