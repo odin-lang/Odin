@@ -57,7 +57,7 @@ _futex_wait_with_timeout :: proc "contextless" (f: ^Futex, expected: u32, durati
 		timeout_ns := u64(duration)
 		s := __ulock_wait2(UL_COMPARE_AND_WAIT | ULF_NO_ERRNO, f, u64(expected), timeout_ns, 0)
 	} else {
-		timeout_us := u32(duration)
+		timeout_us := u32(duration) * 1000
 		s := __ulock_wait(UL_COMPARE_AND_WAIT | ULF_NO_ERRNO, f, u64(expected), timeout_us)
 	}
 	if s >= 0 {
