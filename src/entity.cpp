@@ -104,6 +104,7 @@ enum ParameterValueKind {
 	ParameterValue_Constant,
 	ParameterValue_Nil,
 	ParameterValue_Location,
+	ParameterValue_Expression,
 	ParameterValue_Value,
 };
 
