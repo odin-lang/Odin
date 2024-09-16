@@ -4,9 +4,6 @@
 // Keep in mind that running with the debug logs uncommented can result in
 // failures disappearing due to the delay of sending the log message causing
 // different synchronization patterns.
-//
-// These tests are temporarily disabled on Darwin, as there is currently a
-// stall occurring which I cannot debug.
 
 package test_core_sync
 
