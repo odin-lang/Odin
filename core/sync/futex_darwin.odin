@@ -12,6 +12,7 @@ foreign System {
 	// __ulock_wait is not available on 10.15
 	// See https://github.com/odin-lang/Odin/issues/1959
 	__ulock_wait  :: proc "c" (operation: u32, addr: rawptr, value: u64, timeout_us: u32) -> c.int ---
+	__ulock_wait2  :: proc "c" (operation: u32, addr: rawptr, value: u64, timeout_ns: u64, value2: u64) -> c.int ---
 	__ulock_wake  :: proc "c" (operation: u32, addr: rawptr, wake_value: u64) -> c.int ---
 }
 
@@ -52,8 +53,13 @@ _futex_wait_with_timeout :: proc "contextless" (f: ^Futex, expected: u32, durati
 		}
 	} else {
 
-	timeout_ns := u32(duration)
-	s := __ulock_wait(UL_COMPARE_AND_WAIT | ULF_NO_ERRNO, f, u64(expected), timeout_ns)
+	when darwin.ULOCK_WAIT_2_AVAILABLE {
+		timeout_ns := u64(duration)
+		s := __ulock_wait2(UL_COMPARE_AND_WAIT | ULF_NO_ERRNO, f, u64(expected), timeout_ns, 0)
+	} else {
+		timeout_us := u32(duration)
+		s := __ulock_wait(UL_COMPARE_AND_WAIT | ULF_NO_ERRNO, f, u64(expected), timeout_us)
+	}
 	if s >= 0 {
 		return true
 	}

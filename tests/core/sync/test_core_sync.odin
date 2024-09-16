@@ -8,7 +8,6 @@
 // These tests are temporarily disabled on Darwin, as there is currently a
 // stall occurring which I cannot debug.
 
-//+build !darwin
 package test_core_sync
 
 import "base:intrinsics"
