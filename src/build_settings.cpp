@@ -285,6 +285,7 @@ enum VetFlags : u64 {
 	VetFlag_Deprecated      = 1u<<7,
 	VetFlag_Cast            = 1u<<8,
 	VetFlag_Tabs            = 1u<<9,
+	VetFlag_UnusedProcedures = 1u<<10,
 
 	VetFlag_Unused = VetFlag_UnusedVariables|VetFlag_UnusedImports,
 
@@ -316,6 +317,8 @@ u64 get_vet_flag_from_name(String const &name) {
 		return VetFlag_Cast;
 	} else if (name == "tabs") {
 		return VetFlag_Tabs;
+	} else if (name == "unused-procedures") {
+		return VetFlag_UnusedProcedures;
 	}
 	return VetFlag_NONE;
 }
@@ -383,6 +386,7 @@ struct BuildContext {
 
 	u64 vet_flags;
 	u32 sanitizer_flags;
+	StringSet vet_packages;
 
 	bool   has_resource;
 	String link_flags;
@@ -1461,8 +1465,6 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 	if (bc->thread_count == 0) {
 		bc->thread_count = gb_max(bc->affinity.thread_count, 1);
 	}
-
-	string_set_init(&bc->custom_attributes);
 
 	bc->ODIN_VENDOR  = str_lit("odin");
 	bc->ODIN_VERSION = ODIN_VERSION;

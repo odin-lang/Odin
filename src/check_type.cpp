@@ -1605,6 +1605,25 @@ gb_internal bool is_expr_from_a_parameter(CheckerContext *ctx, Ast *expr) {
 	return false;
 }
 
+gb_internal bool is_caller_expression(Ast *expr) {
+	if (expr->kind == Ast_BasicDirective && expr->BasicDirective.name.string == "caller_expression") {
+		return true;
+	}
+
+	Ast *call = unparen_expr(expr);
+	if (call->kind != Ast_CallExpr) {
+		return false;
+	}
+
+	ast_node(ce, CallExpr, call);
+	if (ce->proc->kind != Ast_BasicDirective) {
+		return false;
+	}
+
+	ast_node(bd, BasicDirective, ce->proc);
+	String name = bd->name.string;
+	return name == "caller_expression";
+}
 
 gb_internal ParameterValue handle_parameter_value(CheckerContext *ctx, Type *in_type, Type **out_type_, Ast *expr, bool allow_caller_location) {
 	ParameterValue param_value = {};
@@ -1626,7 +1645,19 @@ gb_internal ParameterValue handle_parameter_value(CheckerContext *ctx, Type *in_
 		if (in_type) {
 			check_assignment(ctx, &o, in_type, str_lit("parameter value"));
 		}
+	} else if (is_caller_expression(expr)) {
+		if (expr->kind != Ast_BasicDirective) {
+			check_builtin_procedure_directive(ctx, &o, expr, t_string);
+		}
 
+		param_value.kind = ParameterValue_Expression;
+		o.type = t_string;
+		o.mode = Addressing_Value;
+		o.expr = expr;
+
+		if (in_type) {
+			check_assignment(ctx, &o, in_type, str_lit("parameter value"));
+		}
 	} else {
 		if (in_type) {
 			check_expr_with_type_hint(ctx, &o, expr, in_type);
@@ -1858,6 +1889,7 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 			case ParameterValue_Nil:
 				break;
 			case ParameterValue_Location:
+			case ParameterValue_Expression:
 			case ParameterValue_Value:
 				gbString str = type_to_string(type);
 				error(params[i], "A default value for a parameter must not be a polymorphic constant type, got %s", str);

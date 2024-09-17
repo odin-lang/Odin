@@ -6,7 +6,7 @@ import "core:mem"
 
 expect_pool_allocation :: proc(t: ^testing.T, expected_used_bytes, num_bytes, alignment: int) {
 	pool: mem.Dynamic_Pool
-	mem.dynamic_pool_init(pool = &pool, alignment = alignment)
+	mem.dynamic_pool_init(&pool, alignment = alignment)
 	pool_allocator := mem.dynamic_pool_allocator(&pool)
 
 	element, err := mem.alloc(num_bytes, alignment, pool_allocator)
@@ -48,7 +48,7 @@ expect_pool_allocation_out_of_band :: proc(t: ^testing.T, num_bytes, out_band_si
 	testing.expect(t, num_bytes >= out_band_size, "Sanity check failed, your test call is flawed! Make sure that num_bytes >= out_band_size!")
 
 	pool: mem.Dynamic_Pool
-	mem.dynamic_pool_init(pool = &pool, out_band_size = out_band_size)
+	mem.dynamic_pool_init(&pool, out_band_size = out_band_size)
 	pool_allocator := mem.dynamic_pool_allocator(&pool)
 
 	element, err := mem.alloc(num_bytes, allocator = pool_allocator)

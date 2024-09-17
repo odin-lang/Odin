@@ -39,6 +39,8 @@ download_assets :: proc() {
 @(require) import "slice"
 @(require) import "strconv"
 @(require) import "strings"
+@(require) import "sync"
+@(require) import "sync/chan"
 @(require) import "sys/posix"
 @(require) import "sys/windows"
 @(require) import "text/i18n"

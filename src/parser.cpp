@@ -1,10 +1,28 @@
 #include "parser_pos.cpp"
 
+gb_internal bool in_vet_packages(AstFile *file) {
+	if (file == nullptr) {
+		return true;
+	}
+	if (file->pkg == nullptr) {
+		return true;
+	}
+	if (build_context.vet_packages.entries.count == 0) {
+		return true;
+	}
+	return string_set_exists(&build_context.vet_packages, file->pkg->name);
+}
+
 gb_internal u64 ast_file_vet_flags(AstFile *f) {
 	if (f != nullptr && f->vet_flags_set) {
 		return f->vet_flags;
 	}
-	return build_context.vet_flags;
+
+	bool found = in_vet_packages(f);
+	if (found) {
+		return build_context.vet_flags;
+	}
+	return 0;
 }
 
 gb_internal bool ast_file_vet_style(AstFile *f) {
@@ -5378,18 +5396,9 @@ gb_internal Ast *parse_stmt(AstFile *f) {
 }
 
 
-
-gb_internal u64 check_vet_flags(AstFile *file) {
-	if (file && file->vet_flags_set) {
-		return file->vet_flags;
-	}
-	return build_context.vet_flags;
-}
-
-
 gb_internal void parse_enforce_tabs(AstFile *f) {
 	// Checks to see if tabs have been used for indentation
-	if ((check_vet_flags(f) & VetFlag_Tabs) == 0) {
+	if ((ast_file_vet_flags(f) & VetFlag_Tabs) == 0) {
 		return;
 	}
 

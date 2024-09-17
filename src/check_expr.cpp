@@ -7807,7 +7807,8 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 		    name == "load" ||
 		    name == "load_directory" ||
 		    name == "load_hash" ||
-		    name == "hash"
+		    name == "hash" ||
+		    name == "caller_expression"
 		) {
 			operand->mode = Addressing_Builtin;
 			operand->builtin_id = BuiltinProc_DIRECTIVE;
@@ -8724,6 +8725,10 @@ gb_internal ExprKind check_basic_directive_expr(CheckerContext *c, Operand *o, A
 		init_core_source_code_location(c->checker);
 		error(node, "#caller_location may only be used as a default argument parameter");
 		o->type = t_source_code_location;
+		o->mode = Addressing_Value;
+	} else if (name == "caller_expression") {
+		error(node, "#caller_expression may only be used as a default argument parameter");
+		o->type = t_string;
 		o->mode = Addressing_Value;
 	} else {
 		if (name == "location") {

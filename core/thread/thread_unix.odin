@@ -5,18 +5,14 @@ package thread
 import "base:runtime"
 import "core:sync"
 import "core:sys/unix"
-import "core:time"
 
 _IS_SUPPORTED :: true
-
-CAS :: sync.atomic_compare_exchange_strong
 
 // NOTE(tetra): Aligned here because of core/unix/pthread_linux.odin/pthread_t.
 // Also see core/sys/darwin/mach_darwin.odin/semaphore_t.
 Thread_Os_Specific :: struct #align(16) {
 	unix_thread: unix.pthread_t, // NOTE: very large on Darwin, small on Linux.
-	cond:        sync.Cond,
-	mutex:       sync.Mutex,
+	start_ok:    sync.Sema,
 }
 //
 // Creates a thread which will run the given procedure.
@@ -29,14 +25,10 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 		// We need to give the thread a moment to start up before we enable cancellation.
 		can_set_thread_cancel_state := unix.pthread_setcancelstate(unix.PTHREAD_CANCEL_ENABLE, nil) == 0
 
-		sync.lock(&t.mutex)
-
 		t.id = sync.current_thread_id()
 
-		for (.Started not_in sync.atomic_load(&t.flags)) {
-			// HACK: use a timeout so in the event that the condition is signalled at THIS comment's exact point
-			// (after checking flags, before starting the wait) it gets itself out of that deadlock after a ms.
-			sync.wait_with_timeout(&t.cond, &t.mutex, time.Millisecond)
+		if .Started not_in sync.atomic_load(&t.flags) {
+			sync.wait(&t.start_ok)
 		}
 
 		if .Joined in sync.atomic_load(&t.flags) {
@@ -65,8 +57,6 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 		}
 
 		sync.atomic_or(&t.flags, { .Done })
-
-		sync.unlock(&t.mutex)
 
 		if .Self_Cleanup in sync.atomic_load(&t.flags) {
 			res := unix.pthread_detach(t.unix_thread)
@@ -132,7 +122,7 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 
 _start :: proc(t: ^Thread) {
 	sync.atomic_or(&t.flags, { .Started })
-	sync.signal(&t.cond)
+	sync.post(&t.start_ok)
 }
 
 _is_done :: proc(t: ^Thread) -> bool {
@@ -140,24 +130,18 @@ _is_done :: proc(t: ^Thread) -> bool {
 }
 
 _join :: proc(t: ^Thread) {
-	// sync.guard(&t.mutex)
-
 	if unix.pthread_equal(unix.pthread_self(), t.unix_thread) {
 		return
 	}
 
-	// Preserve other flags besides `.Joined`, like `.Started`.
-	unjoined := sync.atomic_load(&t.flags) - {.Joined}
-	joined   := unjoined + {.Joined}
-
-	// Try to set `t.flags` from unjoined to joined. If it returns joined,
-	// it means the previous value had that flag set and we can return.
-	if res, ok := CAS(&t.flags, unjoined, joined); res == joined && !ok {
+	// If the previous value was already `Joined`, then we can return.
+	if .Joined in sync.atomic_or(&t.flags, {.Joined}) {
 		return
 	}
+
 	// Prevent non-started threads from blocking main thread with initial wait
 	// condition.
-	if .Started not_in unjoined {
+	if .Started not_in sync.atomic_load(&t.flags) {
 		_start(t)
 	}
 	unix.pthread_join(t.unix_thread, nil)

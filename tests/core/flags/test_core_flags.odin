@@ -12,6 +12,26 @@ import "core:strings"
 import "core:testing"
 import "core:time/datetime"
 
+Custom_Data :: struct {
+	a: int,
+}
+
+@(init)
+init_custom_type_setter :: proc() {
+	// NOTE: This is done here so it can be out of the flow of the
+	// multi-threaded test runner, to prevent any data races that could be
+	// reported by using `-sanitize:thread`.
+	//
+	// Do mind that this means every test here acknowledges the `Custom_Data` type.
+	flags.register_type_setter(proc (data: rawptr, data_type: typeid, _, _: string) -> (string, bool, runtime.Allocator_Error) {
+		if data_type == Custom_Data {
+			(cast(^Custom_Data)data).a = 32
+			return "", true, nil
+		}
+		return "", false, nil
+	})
+}
+
 @(test)
 test_no_args :: proc(t: ^testing.T) {
 	S :: struct {
@@ -1230,9 +1250,6 @@ test_net :: proc(t: ^testing.T) {
 @(test)
 test_custom_type_setter :: proc(t: ^testing.T) {
 	Custom_Bool :: distinct bool
-	Custom_Data :: struct {
-		a: int,
-	}
 
 	S :: struct {
 		a: Custom_Data,
@@ -1240,16 +1257,6 @@ test_custom_type_setter :: proc(t: ^testing.T) {
 	}
 	s: S
 
-	// NOTE: Mind that this setter is global state, and the test runner is multi-threaded.
-	// It should be fine so long as all type setter tests are in this one test proc.
-	flags.register_type_setter(proc (data: rawptr, data_type: typeid, _, _: string) -> (string, bool, runtime.Allocator_Error) {
-		if data_type == Custom_Data {
-			(cast(^Custom_Data)data).a = 32
-			return "", true, nil
-		}
-		return "", false, nil
-	})
-	defer flags.register_type_setter(nil)
 	args := [?]string { "-a:hellope", "-b:true" }
 	result := flags.parse(&s, args[:])
 	testing.expect_value(t, result, nil)

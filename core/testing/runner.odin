@@ -204,6 +204,10 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 		}
 	}
 
+	when ODIN_OS == .Windows {
+		console_ansi_init()
+	}
+
 	stdout := io.to_writer(os.stream_from_handle(os.stdout))
 	stderr := io.to_writer(os.stream_from_handle(os.stderr))
 

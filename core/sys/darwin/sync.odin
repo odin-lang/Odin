@@ -5,6 +5,7 @@ foreign import system "system:System.framework"
 // #define OS_WAIT_ON_ADDR_AVAILABILITY \
 // 	__API_AVAILABLE(macos(14.4), ios(17.4), tvos(17.4), watchos(10.4))
 when ODIN_OS == .Darwin {
+
 	when ODIN_PLATFORM_SUBTARGET == .iOS && ODIN_MINIMUM_OS_VERSION >= 17_04_00 {
 		WAIT_ON_ADDRESS_AVAILABLE :: true
 	} else when ODIN_MINIMUM_OS_VERSION >= 14_04_00 {
@@ -12,8 +13,18 @@ when ODIN_OS == .Darwin {
 	} else {
 		WAIT_ON_ADDRESS_AVAILABLE :: false
 	}
+
+	when ODIN_PLATFORM_SUBTARGET == .iOS && ODIN_MINIMUM_OS_VERSION >= 14_00_00 {
+		ULOCK_WAIT_2_AVAILABLE :: true
+	} else when ODIN_MINIMUM_OS_VERSION >= 11_00_00 {
+		ULOCK_WAIT_2_AVAILABLE :: true
+	} else {
+		ULOCK_WAIT_2_AVAILABLE :: false
+	}
+
 } else {
 	WAIT_ON_ADDRESS_AVAILABLE :: false
+	ULOCK_WAIT_2_AVAILABLE    :: false
 }
 
 os_sync_wait_on_address_flag :: enum u32 {

@@ -699,7 +699,9 @@ gb_internal void lb_begin_procedure_body(lbProcedure *p) {
 					}
 
 					if (e->Variable.param_value.kind != ParameterValue_Invalid) {
-						lbValue c = lb_handle_param_value(p, e->type, e->Variable.param_value, e->token.pos);
+						GB_ASSERT(e->Variable.param_value.kind != ParameterValue_Location);
+						GB_ASSERT(e->Variable.param_value.kind != ParameterValue_Expression);
+						lbValue c = lb_handle_param_value(p, e->type, e->Variable.param_value, nullptr, nullptr);
 						lb_addr_store(p, res, c);
 					}
 
@@ -3420,7 +3422,7 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 }
 
 
-gb_internal lbValue lb_handle_param_value(lbProcedure *p, Type *parameter_type, ParameterValue const &param_value, TokenPos const &pos) {
+gb_internal lbValue lb_handle_param_value(lbProcedure *p, Type *parameter_type, ParameterValue const &param_value, TypeProc *procedure_type, Ast* call_expression) {
 	switch (param_value.kind) {
 	case ParameterValue_Constant:
 		if (is_type_constant_type(parameter_type)) {
@@ -3446,8 +3448,60 @@ gb_internal lbValue lb_handle_param_value(lbProcedure *p, Type *parameter_type, 
 			if (p->entity != nullptr) {
 				proc_name = p->entity->token.string;
 			}
+
+			ast_node(ce, CallExpr, call_expression);
+			TokenPos pos = ast_token(ce->proc).pos;
+
 			return lb_emit_source_code_location_as_global(p, proc_name, pos);
 		}
+	case ParameterValue_Expression:
+		{
+			Ast *orig = param_value.original_ast_expr;
+			if (orig->kind == Ast_BasicDirective) {
+				gbString expr = expr_to_string(call_expression, temporary_allocator());
+				return lb_const_string(p->module, make_string_c(expr));
+			}
+
+			isize param_idx = -1;
+			String param_str = {0};
+			{
+				Ast *call = unparen_expr(orig);
+				GB_ASSERT(call->kind == Ast_CallExpr);
+				ast_node(ce, CallExpr, call);
+				GB_ASSERT(ce->proc->kind == Ast_BasicDirective);
+				GB_ASSERT(ce->args.count == 1);
+				Ast *target = ce->args[0];
+				GB_ASSERT(target->kind == Ast_Ident);
+				String target_str = target->Ident.token.string;
+
+				param_idx = lookup_procedure_parameter(procedure_type, target_str);
+				param_str = target_str;
+			}
+			GB_ASSERT(param_idx >= 0);
+
+
+			Ast *target_expr = nullptr;
+			ast_node(ce, CallExpr, call_expression);
+
+			if (ce->split_args->positional.count > param_idx) {
+				target_expr = ce->split_args->positional[param_idx];
+			}
+
+			for_array(i, ce->split_args->named) {
+				Ast *arg = ce->split_args->named[i];
+				ast_node(fv, FieldValue, arg);
+				GB_ASSERT(fv->field->kind == Ast_Ident);
+				String name = fv->field->Ident.token.string;
+				if (name == param_str) {
+					target_expr = fv->value;
+					break;
+				}
+			}
+
+			gbString expr = expr_to_string(target_expr, temporary_allocator());
+			return lb_const_string(p->module, make_string_c(expr));
+		}
+
 	case ParameterValue_Value:
 		return lb_build_expr(p, param_value.ast_value);
 	}
@@ -3739,8 +3793,6 @@ gb_internal lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr) {
 		}
 	}
 
-	TokenPos pos = ast_token(ce->proc).pos;
-
 
 	if (pt->params != nullptr)  {
 		isize min_count = pt->params->Tuple.variables.count;
@@ -3764,7 +3816,7 @@ gb_internal lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr) {
 					args[arg_index] = lb_const_nil(p->module, e->type);
 					break;
 				case Entity_Variable:
-					args[arg_index] = lb_handle_param_value(p, e->type, e->Variable.param_value, pos);
+					args[arg_index] = lb_handle_param_value(p, e->type, e->Variable.param_value, pt, expr);
 					break;
 
 				case Entity_Constant:

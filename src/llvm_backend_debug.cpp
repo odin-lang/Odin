@@ -552,6 +552,48 @@ gb_internal LLVMMetadataRef lb_debug_bitset(lbModule *m, Type *type, String name
 	return final_decl;
 }
 
+gb_internal LLVMMetadataRef lb_debug_bitfield(lbModule *m, Type *type, String name, LLVMMetadataRef scope, LLVMMetadataRef file, unsigned line) {
+	Type *bt = base_type(type);
+	GB_ASSERT(bt->kind == Type_BitField);
+
+	lb_debug_file_line(m, bt->BitField.node, &file, &line);
+
+	u64 size_in_bits = 8*type_size_of(bt);
+	u32 align_in_bits = 8*cast(u32)type_align_of(bt);
+
+    unsigned element_count = cast(unsigned)bt->BitField.fields.count;
+    LLVMMetadataRef *elements = gb_alloc_array(permanent_allocator(), LLVMMetadataRef, element_count);
+
+    u64 offset_in_bits = 0;
+    for (unsigned i = 0; i < element_count; i++) {
+        Entity *f = bt->BitField.fields[i];
+        u8 bit_size = bt->BitField.bit_sizes[i];
+        GB_ASSERT(f->kind == Entity_Variable);
+        String name = f->token.string;
+        elements[i] = LLVMDIBuilderCreateBitFieldMemberType(m->debug_builder, scope, cast(char const *)name.text, name.len, file, line,
+            bit_size, offset_in_bits, 0,
+            LLVMDIFlagZero, lb_debug_type(m, f->type)
+        );
+
+        offset_in_bits += bit_size;
+    }
+
+	LLVMMetadataRef final_decl = LLVMDIBuilderCreateStructType(
+		m->debug_builder, scope,
+		cast(char const *)name.text, cast(size_t)name.len,
+		file, line,
+		size_in_bits, align_in_bits,
+		LLVMDIFlagZero,
+		nullptr,
+		elements, element_count,
+		0,
+		nullptr,
+		"", 0
+	);
+	lb_set_llvm_metadata(m, type, final_decl);
+	return final_decl;
+}
+
 gb_internal LLVMMetadataRef lb_debug_enum(lbModule *m, Type *type, String name, LLVMMetadataRef scope, LLVMMetadataRef file, unsigned line) {
 	Type *bt = base_type(type);
 	GB_ASSERT(bt->kind == Type_Enum);
@@ -816,6 +858,7 @@ gb_internal LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 	case Type_Union:        return lb_debug_union(        m, type,       make_string_c(type_to_string(type, temporary_allocator())), nullptr, nullptr, 0);
 	case Type_BitSet:       return lb_debug_bitset(       m, type,       make_string_c(type_to_string(type, temporary_allocator())), nullptr, nullptr, 0);
 	case Type_Enum:         return lb_debug_enum(         m, type,       make_string_c(type_to_string(type, temporary_allocator())), nullptr, nullptr, 0);
+	case Type_BitField:     return lb_debug_bitfield(     m, type,       make_string_c(type_to_string(type, temporary_allocator())), nullptr, nullptr, 0);
 
 	case Type_Tuple:
 		if (type->Tuple.variables.count == 1) {
@@ -900,42 +943,6 @@ gb_internal LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 			8*cast(unsigned)type_align_of(type),
 			lb_debug_type(m, type->Matrix.elem),
 			subscripts, gb_count_of(subscripts));
-	}
-
-	case Type_BitField: {
-		LLVMMetadataRef parent_scope = nullptr;
-		LLVMMetadataRef scope = nullptr;
-		LLVMMetadataRef file = nullptr;
-		unsigned line = 0;
-		u64 size_in_bits = 8*cast(u64)type_size_of(type);
-		u32 align_in_bits = 8*cast(u32)type_align_of(type);
-		LLVMDIFlags flags = LLVMDIFlagZero;
-
-		unsigned element_count = cast(unsigned)type->BitField.fields.count;
-		LLVMMetadataRef *elements = gb_alloc_array(permanent_allocator(), LLVMMetadataRef, element_count);
-
-		u64 offset_in_bits = 0;
-		for (unsigned i = 0; i < element_count; i++) {
-			Entity *f = type->BitField.fields[i];
-			u8 bit_size = type->BitField.bit_sizes[i];
-			GB_ASSERT(f->kind == Entity_Variable);
-			String name = f->token.string;
-			unsigned field_line = 0;
-			LLVMDIFlags field_flags = LLVMDIFlagZero;
-			elements[i] = LLVMDIBuilderCreateBitFieldMemberType(m->debug_builder, scope, cast(char const *)name.text, name.len, file, field_line,
-				bit_size, offset_in_bits, offset_in_bits,
-				field_flags, lb_debug_type(m, f->type)
-			);
-
-			offset_in_bits += bit_size;
-		}
-
-
-		return LLVMDIBuilderCreateStructType(m->debug_builder, parent_scope, "", 0, file, line,
-			size_in_bits, align_in_bits, flags,
-			nullptr, elements, element_count, 0, nullptr,
-			"", 0
-		);
 	}
 	}
 
@@ -1022,6 +1029,7 @@ gb_internal LLVMMetadataRef lb_debug_type(lbModule *m, Type *type) {
 		case Type_Union:        return lb_debug_union(m, type, name, scope, file, line);
 		case Type_BitSet:       return lb_debug_bitset(m, type, name, scope, file, line);
 		case Type_Enum:         return lb_debug_enum(m, type, name, scope, file, line);
+		case Type_BitField:     return lb_debug_bitfield(m, type, name, scope, file, line);
 		}
 	}
 

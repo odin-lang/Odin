@@ -8,6 +8,7 @@ LIB :: (
 	     "../lib/stb_truetype.lib"      when ODIN_OS == .Windows
 	else "../lib/stb_truetype.a"        when ODIN_OS == .Linux
 	else "../lib/darwin/stb_truetype.a" when ODIN_OS == .Darwin
+	else "../lib/stb_truetype_wasm.o"   when ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32
 	else ""
 )
 
@@ -15,10 +16,12 @@ when LIB != "" {
 	when !#exists(LIB) {
 		#panic("Could not find the compiled STB libraries, they can be compiled by running `make -C \"" + ODIN_ROOT + "vendor/stb/src\"`")
 	}
+}
 
-	foreign import stbtt { LIB }
-} else when ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32 {
+when ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32 {
 	foreign import stbtt "../lib/stb_truetype_wasm.o"
+} else when LIB != "" {
+	foreign import stbtt { LIB }
 } else {
 	foreign import stbtt "system:stb_truetype"
 }

@@ -340,12 +340,14 @@ enum BuildFlagKind {
 	BuildFlag_VetUnused,
 	BuildFlag_VetUnusedImports,
 	BuildFlag_VetUnusedVariables,
+	BuildFlag_VetUnusedProcedures,
 	BuildFlag_VetUsingStmt,
 	BuildFlag_VetUsingParam,
 	BuildFlag_VetStyle,
 	BuildFlag_VetSemicolon,
 	BuildFlag_VetCast,
 	BuildFlag_VetTabs,
+	BuildFlag_VetPackages,
 
 	BuildFlag_CustomAttribute,
 	BuildFlag_IgnoreUnknownAttributes,
@@ -547,6 +549,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_Vet,                     str_lit("vet"),                       BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_VetUnused,               str_lit("vet-unused"),                BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_VetUnusedVariables,      str_lit("vet-unused-variables"),      BuildFlagParam_None,    Command__does_check);
+	add_flag(&build_flags, BuildFlag_VetUnusedProcedures,     str_lit("vet-unused-procedures"),     BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_VetUnusedImports,        str_lit("vet-unused-imports"),        BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_VetShadowing,            str_lit("vet-shadowing"),             BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_VetUsingStmt,            str_lit("vet-using-stmt"),            BuildFlagParam_None,    Command__does_check);
@@ -555,6 +558,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_VetSemicolon,            str_lit("vet-semicolon"),             BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_VetCast,                 str_lit("vet-cast"),                  BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_VetTabs,                 str_lit("vet-tabs"),                  BuildFlagParam_None,    Command__does_check);
+	add_flag(&build_flags, BuildFlag_VetPackages,             str_lit("vet-packages"),              BuildFlagParam_String,  Command__does_check);
 
 	add_flag(&build_flags, BuildFlag_CustomAttribute,         str_lit("custom-attribute"),          BuildFlagParam_String,  Command__does_check, true);
 	add_flag(&build_flags, BuildFlag_IgnoreUnknownAttributes, str_lit("ignore-unknown-attributes"), BuildFlagParam_None,    Command__does_check);
@@ -1220,6 +1224,36 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_VetSemicolon:       build_context.vet_flags |= VetFlag_Semicolon;       break;
 						case BuildFlag_VetCast:            build_context.vet_flags |= VetFlag_Cast;            break;
 						case BuildFlag_VetTabs:            build_context.vet_flags |= VetFlag_Tabs;            break;
+						case BuildFlag_VetUnusedProcedures:
+							build_context.vet_flags |= VetFlag_UnusedProcedures;
+							if (!set_flags[BuildFlag_VetPackages]) {
+								gb_printf_err("-%.*s must be used with -vet-packages\n", LIT(name));
+								bad_flags = true;
+							}
+							break;
+
+						case BuildFlag_VetPackages:
+							{
+								GB_ASSERT(value.kind == ExactValue_String);
+								String val = value.value_string;
+								String_Iterator it = {val, 0};
+								for (;;) {
+									String pkg = string_split_iterator(&it, ',');
+									if (pkg.len == 0) {
+										break;
+									}
+
+									pkg = string_trim_whitespace(pkg);
+									if (!string_is_valid_identifier(pkg)) {
+										gb_printf_err("-%.*s '%.*s' must be a valid identifier\n", LIT(name), LIT(pkg));
+										bad_flags = true;
+										continue;
+									}
+
+									string_set_add(&build_context.vet_packages, pkg);
+								}
+							}
+							break;
 
 						case BuildFlag_CustomAttribute:
 							{
@@ -1234,7 +1268,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 
 									attr = string_trim_whitespace(attr);
 									if (!string_is_valid_identifier(attr)) {
-										gb_printf_err("-custom-attribute '%.*s' must be a valid identifier\n", LIT(attr));
+										gb_printf_err("-%.*s '%.*s' must be a valid identifier\n", LIT(name), LIT(attr));
 										bad_flags = true;
 										continue;
 									}
@@ -2364,7 +2398,7 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-vet-unused");
-		print_usage_line(2, "Checks for unused declarations.");
+		print_usage_line(2, "Checks for unused declarations (variables and imports).");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-vet-unused-variables");
@@ -2405,6 +2439,16 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 
 		print_usage_line(1, "-vet-tabs");
 		print_usage_line(2, "Errs when the use of tabs has not been used for indentation.");
+		print_usage_line(0, "");
+
+		print_usage_line(1, "-vet-packages:<comma-separated-strings>");
+		print_usage_line(2, "Sets which packages by name will be vetted.");
+		print_usage_line(2, "Files with specific +vet tags will not be ignored if they are not in the packages set.");
+		print_usage_line(0, "");
+
+		print_usage_line(1, "-vet-unused-procedures");
+		print_usage_line(2, "Checks for unused procedures.");
+		print_usage_line(2, "Must be used with -vet-packages or specified on a per file with +vet tags.");
 		print_usage_line(0, "");
 	}
 
@@ -3149,6 +3193,9 @@ int main(int arg_count, char const **arg_ptr) {
 	}
 
 	build_context.command = command;
+
+	string_set_init(&build_context.custom_attributes);
+	string_set_init(&build_context.vet_packages);
 
 	if (!parse_build_flags(args)) {
 		return 1;

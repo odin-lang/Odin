@@ -27,7 +27,7 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 	__windows_thread_entry_proc :: proc "system" (t_: rawptr) -> win32.DWORD {
 		t := (^Thread)(t_)
 
-		if .Joined in t.flags {
+		if .Joined in sync.atomic_load(&t.flags) {
 			return 0
 		}
 
@@ -48,9 +48,9 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 			t.procedure(t)
 		}
 
-		intrinsics.atomic_store(&t.flags, t.flags + {.Done})
+		intrinsics.atomic_or(&t.flags, {.Done})
 
-		if .Self_Cleanup in t.flags {
+		if .Self_Cleanup in sync.atomic_load(&t.flags) {
 			win32.CloseHandle(t.win32_thread)
 			t.win32_thread = win32.INVALID_HANDLE
 			// NOTE(ftphikari): It doesn't matter which context 'free' received, right?

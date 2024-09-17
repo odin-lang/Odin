@@ -60,6 +60,7 @@ pool_thread_runner :: proc(t: ^Thread) {
 		if task, ok := pool_pop_waiting(pool); ok {
 			data.task = task
 			pool_do_work(pool, task)
+			sync.guard(&pool.mutex)
 			data.task = {}
 		}
 	}
