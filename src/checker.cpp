@@ -533,18 +533,13 @@ gb_internal u64 check_vet_flags(CheckerContext *c) {
 	    c->curr_proc_decl->proc_lit) {
 		file = c->curr_proc_decl->proc_lit->file();
 	}
-	if (file && file->vet_flags_set) {
-		return file->vet_flags;
-	}
-	return build_context.vet_flags;
+
+	return ast_file_vet_flags(file);
 }
 
 gb_internal u64 check_vet_flags(Ast *node) {
 	AstFile *file = node->file();
-	if (file && file->vet_flags_set) {
-		return file->vet_flags;
-	}
-	return build_context.vet_flags;
+	return ast_file_vet_flags(file);
 }
 
 enum VettedEntityKind {
@@ -6497,10 +6492,7 @@ gb_internal void check_parsed_files(Checker *c) {
 	TIME_SECTION("check scope usage");
 	for (auto const &entry : c->info.files) {
 		AstFile *f = entry.value;
-		u64 vet_flags = build_context.vet_flags;
-		if (f->vet_flags_set) {
-			vet_flags = f->vet_flags;
-		}
+		u64 vet_flags = ast_file_vet_flags(f);
 		check_scope_usage(c, f->scope, vet_flags);
 	}
 

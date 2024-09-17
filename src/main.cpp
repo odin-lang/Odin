@@ -346,6 +346,7 @@ enum BuildFlagKind {
 	BuildFlag_VetSemicolon,
 	BuildFlag_VetCast,
 	BuildFlag_VetTabs,
+	BuildFlag_VetPackages,
 
 	BuildFlag_CustomAttribute,
 	BuildFlag_IgnoreUnknownAttributes,
@@ -555,6 +556,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_VetSemicolon,            str_lit("vet-semicolon"),             BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_VetCast,                 str_lit("vet-cast"),                  BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_VetTabs,                 str_lit("vet-tabs"),                  BuildFlagParam_None,    Command__does_check);
+	add_flag(&build_flags, BuildFlag_VetPackages,             str_lit("vet-packages"),              BuildFlagParam_String,  Command__does_check);
 
 	add_flag(&build_flags, BuildFlag_CustomAttribute,         str_lit("custom-attribute"),          BuildFlagParam_String,  Command__does_check, true);
 	add_flag(&build_flags, BuildFlag_IgnoreUnknownAttributes, str_lit("ignore-unknown-attributes"), BuildFlagParam_None,    Command__does_check);
@@ -1221,6 +1223,29 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_VetCast:            build_context.vet_flags |= VetFlag_Cast;            break;
 						case BuildFlag_VetTabs:            build_context.vet_flags |= VetFlag_Tabs;            break;
 
+						case BuildFlag_VetPackages:
+							{
+								GB_ASSERT(value.kind == ExactValue_String);
+								String val = value.value_string;
+								String_Iterator it = {val, 0};
+								for (;;) {
+									String pkg = string_split_iterator(&it, ',');
+									if (pkg.len == 0) {
+										break;
+									}
+
+									pkg = string_trim_whitespace(pkg);
+									if (!string_is_valid_identifier(pkg)) {
+										gb_printf_err("-%.*s '%.*s' must be a valid identifier\n", LIT(name), LIT(pkg));
+										bad_flags = true;
+										continue;
+									}
+
+									string_set_add(&build_context.vet_packages, pkg);
+								}
+							}
+							break;
+
 						case BuildFlag_CustomAttribute:
 							{
 								GB_ASSERT(value.kind == ExactValue_String);
@@ -1234,7 +1259,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 
 									attr = string_trim_whitespace(attr);
 									if (!string_is_valid_identifier(attr)) {
-										gb_printf_err("-custom-attribute '%.*s' must be a valid identifier\n", LIT(attr));
+										gb_printf_err("-%.*s '%.*s' must be a valid identifier\n", LIT(name), LIT(attr));
 										bad_flags = true;
 										continue;
 									}
@@ -3149,6 +3174,9 @@ int main(int arg_count, char const **arg_ptr) {
 	}
 
 	build_context.command = command;
+
+	string_set_init(&build_context.custom_attributes);
+	string_set_init(&build_context.vet_packages);
 
 	if (!parse_build_flags(args)) {
 		return 1;

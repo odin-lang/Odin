@@ -383,6 +383,7 @@ struct BuildContext {
 
 	u64 vet_flags;
 	u32 sanitizer_flags;
+	StringSet vet_packages;
 
 	bool   has_resource;
 	String link_flags;
@@ -1461,8 +1462,6 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 	if (bc->thread_count == 0) {
 		bc->thread_count = gb_max(bc->affinity.thread_count, 1);
 	}
-
-	string_set_init(&bc->custom_attributes);
 
 	bc->ODIN_VENDOR  = str_lit("odin");
 	bc->ODIN_VERSION = ODIN_VERSION;
