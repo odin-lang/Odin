@@ -340,6 +340,7 @@ enum BuildFlagKind {
 	BuildFlag_VetUnused,
 	BuildFlag_VetUnusedImports,
 	BuildFlag_VetUnusedVariables,
+	BuildFlag_VetUnusedProcedures,
 	BuildFlag_VetUsingStmt,
 	BuildFlag_VetUsingParam,
 	BuildFlag_VetStyle,
@@ -548,6 +549,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_Vet,                     str_lit("vet"),                       BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_VetUnused,               str_lit("vet-unused"),                BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_VetUnusedVariables,      str_lit("vet-unused-variables"),      BuildFlagParam_None,    Command__does_check);
+	add_flag(&build_flags, BuildFlag_VetUnusedProcedures,     str_lit("vet-unused-procedures"),     BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_VetUnusedImports,        str_lit("vet-unused-imports"),        BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_VetShadowing,            str_lit("vet-shadowing"),             BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_VetUsingStmt,            str_lit("vet-using-stmt"),            BuildFlagParam_None,    Command__does_check);
@@ -1222,6 +1224,13 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_VetSemicolon:       build_context.vet_flags |= VetFlag_Semicolon;       break;
 						case BuildFlag_VetCast:            build_context.vet_flags |= VetFlag_Cast;            break;
 						case BuildFlag_VetTabs:            build_context.vet_flags |= VetFlag_Tabs;            break;
+						case BuildFlag_VetUnusedProcedures:
+							build_context.vet_flags |= VetFlag_UnusedProcedures;
+							if (!set_flags[BuildFlag_VetPackages]) {
+								gb_printf_err("-%.*s must be used with -vet-packages\n", LIT(name));
+								bad_flags = true;
+							}
+							break;
 
 						case BuildFlag_VetPackages:
 							{
@@ -2389,7 +2398,7 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-vet-unused");
-		print_usage_line(2, "Checks for unused declarations.");
+		print_usage_line(2, "Checks for unused declarations (variables and imports).");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-vet-unused-variables");
@@ -2430,6 +2439,16 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 
 		print_usage_line(1, "-vet-tabs");
 		print_usage_line(2, "Errs when the use of tabs has not been used for indentation.");
+		print_usage_line(0, "");
+
+		print_usage_line(1, "-vet-packages:<comma-separated-strings>");
+		print_usage_line(2, "Sets which packages by name will be vetted.");
+		print_usage_line(2, "Files with specific +vet tags will not be ignored if they are not in the packages set.");
+		print_usage_line(0, "");
+
+		print_usage_line(1, "-vet-unused-procedures");
+		print_usage_line(2, "Checks for unused procedures.");
+		print_usage_line(2, "Must be used with -vet-packages or specified on a per file with +vet tags.");
 		print_usage_line(0, "");
 	}
 

@@ -285,6 +285,7 @@ enum VetFlags : u64 {
 	VetFlag_Deprecated      = 1u<<7,
 	VetFlag_Cast            = 1u<<8,
 	VetFlag_Tabs            = 1u<<9,
+	VetFlag_UnusedProcedures = 1u<<10,
 
 	VetFlag_Unused = VetFlag_UnusedVariables|VetFlag_UnusedImports,
 
@@ -316,6 +317,8 @@ u64 get_vet_flag_from_name(String const &name) {
 		return VetFlag_Cast;
 	} else if (name == "tabs") {
 		return VetFlag_Tabs;
+	} else if (name == "unused-procedures") {
+		return VetFlag_UnusedProcedures;
 	}
 	return VetFlag_NONE;
 }
