@@ -1,4 +1,4 @@
-//+private
+#+private
 package testing
 
 import win32 "core:sys/windows"
