@@ -63,7 +63,7 @@ execute_struct_checks :: proc(t: ^testing.T) {
 		waiting: for {
 			status: i32
 			wpid := posix.waitpid(pid, &status, {})
-			if status == posix.EINTR {
+			if status == -1 && posix.errno() == .EINTR {
 				continue
 			}
 			if !testing.expectf(t, wpid != -1, "waitpid() failure: %v", posix.strerror()) {
