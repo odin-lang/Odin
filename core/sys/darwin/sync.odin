@@ -12,8 +12,15 @@ when ODIN_OS == .Darwin {
 	} else {
 		WAIT_ON_ADDRESS_AVAILABLE :: false
 	}
+	when ODIN_MINIMUM_OS_VERSION >= 11_00_00 {
+		ULOCK_WAIT_2_AVAILABLE :: true
+	} else {
+		ULOCK_WAIT_2_AVAILABLE :: false
+	}
+
 } else {
 	WAIT_ON_ADDRESS_AVAILABLE :: false
+	ULOCK_WAIT_2_AVAILABLE :: false
 }
 
 os_sync_wait_on_address_flag :: enum u32 {
