@@ -21,6 +21,7 @@ SYS_close      : uintptr : 6
 SYS_getpid     : uintptr : 20
 SYS_recvfrom   : uintptr : 29
 SYS_accept     : uintptr : 30
+SYS_getsockname: uintptr : 32
 SYS_fcntl      : uintptr : 92
 SYS_fsync      : uintptr : 95
 SYS_socket     : uintptr : 97
@@ -200,6 +201,26 @@ accept_nil :: proc "contextless" (s: Fd) -> (Fd, Errno) {
 }
 
 accept :: proc { accept_T, accept_nil }
+
+// Get socket name.
+//
+// The getsockname() system call appeared in 4.2BSD.
+getsockname :: proc "contextless" (s: Fd, sockaddr: ^$T) -> Errno {
+	// sockaddr must contain a valid pointer, or this will segfault because
+	// we're telling the syscall that there's memory available to write to.
+	addrlen: socklen_t = size_of(T)
+
+	result, ok := intrinsics.syscall_bsd(SYS_getsockname,
+		cast(uintptr)s,
+		cast(uintptr)sockaddr,
+		cast(uintptr)&addrlen)
+
+	if !ok {
+		return cast(Errno)result
+	}
+
+	return nil
+}
 
 // Synchronize changes to a file.
 //

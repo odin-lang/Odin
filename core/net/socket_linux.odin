@@ -203,6 +203,19 @@ _listen_tcp :: proc(endpoint: Endpoint, backlog := 1000) -> (TCP_Socket, Network
 }
 
 @(private)
+_bound_endpoint :: proc(sock: Any_Socket) -> (ep: Endpoint, err: Network_Error) {
+	addr: linux.Sock_Addr_Any
+	errno := linux.getsockname(_unwrap_os_socket(sock), &addr)
+	if errno != .NONE {
+		err = Listen_Error(errno)
+		return
+	}
+
+	ep = _wrap_os_addr(addr)
+	return
+}
+
+@(private)
 _accept_tcp :: proc(sock: TCP_Socket, options := default_tcp_options) -> (tcp_client: TCP_Socket, endpoint: Endpoint, err: Network_Error) {
 	addr: linux.Sock_Addr_Any
 	client_sock, errno := linux.accept(linux.Fd(sock), &addr)

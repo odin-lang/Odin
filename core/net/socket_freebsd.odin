@@ -150,6 +150,20 @@ _listen_tcp :: proc(interface_endpoint: Endpoint, backlog := 1000) -> (socket: T
 }
 
 @(private)
+_bound_endpoint :: proc(sock: Any_Socket) -> (ep: Endpoint, err: Network_Error) {
+	sockaddr: freebsd.Socket_Address_Storage
+
+	errno := freebsd.getsockname(cast(Fd)any_socket_to_socket(sock), &sockaddr)
+	if errno != nil {
+		err = cast(Listen_Error)errno
+		return
+	}
+
+	ep = _sockaddr_to_endpoint(&sockaddr)
+	return
+}
+
+@(private)
 _accept_tcp :: proc(sock: TCP_Socket, options := default_tcp_options) -> (client: TCP_Socket, source: Endpoint, err: Network_Error) {
 	sockaddr: freebsd.Socket_Address_Storage
 

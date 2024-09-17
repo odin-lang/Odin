@@ -121,6 +121,19 @@ _listen_tcp :: proc(interface_endpoint: Endpoint, backlog := 1000) -> (socket: T
 }
 
 @(private)
+_bound_endpoint :: proc(sock: Any_Socket) -> (ep: Endpoint, err: Network_Error) {
+	sockaddr: win.SOCKADDR_STORAGE_LH
+	sockaddrlen := c.int(size_of(sockaddr))
+	if win.getsockname(win.SOCKET(any_socket_to_socket(sock)), &sockaddr, &sockaddrlen) == win.SOCKET_ERROR {
+		err = Listen_Error(win.WSAGetLastError())
+		return
+	}
+
+	ep = _sockaddr_to_endpoint(&sockaddr)
+	return
+}
+
+@(private)
 _accept_tcp :: proc(sock: TCP_Socket, options := default_tcp_options) -> (client: TCP_Socket, source: Endpoint, err: Network_Error) {
 	for {
 		sockaddr: win.SOCKADDR_STORAGE_LH
