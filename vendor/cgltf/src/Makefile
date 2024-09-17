@@ -6,6 +6,10 @@ else
 all: unix
 endif
 
+wasm:
+	mkdir -p ../lib
+	$(CC) -c -Os --target=wasm32 --sysroot=$(shell odin root)/vendor/libc cgltf.c -o ../lib/cgltf_wasm.o
+
 unix:
 	mkdir -p ../lib
 	$(CC) -c -O2 -Os -fPIC cgltf.c 	

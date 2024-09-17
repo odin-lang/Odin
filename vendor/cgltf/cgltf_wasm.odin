@@ -1,4 +1,4 @@
 //+build wasm32, wasm64p32
-package stb_truetype
+package cgltf
 
 @(require) import _ "vendor:libc"

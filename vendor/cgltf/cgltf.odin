@@ -5,6 +5,7 @@ LIB :: (
 	     "lib/cgltf.lib"      when ODIN_OS == .Windows
 	else "lib/cgltf.a"        when ODIN_OS == .Linux
 	else "lib/darwin/cgltf.a" when ODIN_OS == .Darwin
+	else "lib/cgltf_wasm.o"   when ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32
 	else ""
 )
 
@@ -13,7 +14,11 @@ when LIB != "" {
 		// Windows library is shipped with the compiler, so a Windows specific message should not be needed.
 		#panic("Could not find the compiled cgltf library, it can be compiled by running `make -C \"" + ODIN_ROOT + "vendor/cgltf/src\"`")
 	}
+}
 
+when ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32 {
+	foreign import lib "lib/cgltf_wasm.o"
+} else when LIB != "" {
 	foreign import lib { LIB }
 } else {
 	foreign import lib "system:cgltf"
