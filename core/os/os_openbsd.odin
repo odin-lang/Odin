@@ -807,6 +807,7 @@ get_env :: proc(key: string, allocator := context.allocator) -> (value: string) 
 
 @(require_results)
 get_current_directory :: proc(allocator := context.allocator) -> string {
+	context.allocator = allocator
 	buf := make([dynamic]u8, MAX_PATH)
 	for {
 		cwd := _unix_getcwd(cstring(raw_data(buf)), c.size_t(len(buf)))
