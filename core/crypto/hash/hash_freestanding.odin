@@ -1,4 +1,4 @@
-//+build freestanding
+#+build freestanding
 package crypto_hash
 
 hash :: proc {
