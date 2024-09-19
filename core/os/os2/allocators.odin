@@ -22,9 +22,14 @@ global_default_temp_allocator_index: uint
 
 @(require_results)
 temp_allocator :: proc() -> runtime.Allocator {
+	arena := &global_default_temp_allocator_arenas[global_default_temp_allocator_index]
+	if arena.backing_allocator.procedure == nil {
+		arena.backing_allocator = heap_allocator()
+	}
+
 	return runtime.Allocator{
 		procedure = temp_allocator_proc,
-		data      = &global_default_temp_allocator_arenas[global_default_temp_allocator_index],
+		data      = arena,
 	}
 }
 
