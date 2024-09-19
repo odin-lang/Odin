@@ -1,5 +1,5 @@
-//+private
-//+build js
+#+private
+#+build js
 package time
 
 foreign import "odin_env"

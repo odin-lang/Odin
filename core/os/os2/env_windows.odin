@@ -1,4 +1,4 @@
-//+private
+#+private
 package os2
 
 import win32 "core:sys/windows"

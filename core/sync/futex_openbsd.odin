@@ -1,5 +1,5 @@
-//+private
-//+build openbsd
+#+private
+#+build openbsd
 package sync
 
 import "core:c"

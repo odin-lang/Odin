@@ -1,5 +1,5 @@
-//+build darwin, netbsd, freebsd, openbsd
-//+private
+#+build darwin, netbsd, freebsd, openbsd
+#+private
 package mem_virtual
 
 import "core:sys/posix"

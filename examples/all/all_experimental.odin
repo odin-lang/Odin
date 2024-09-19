@@ -1,4 +1,4 @@
-//+build windows
+#+build windows
 package all
 
 import c_tokenizer    "core:c/frontend/tokenizer"

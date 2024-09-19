@@ -1,6 +1,6 @@
-//+private
-//+build windows
-//+no-instrumentation
+#+private
+#+build windows
+#+no-instrumentation
 package runtime
 
 import "base:intrinsics"

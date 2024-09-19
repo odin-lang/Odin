@@ -1,4 +1,4 @@
-// +build windows
+#+build windows
 package sys_windows
 
 // WGL_ARB_buffer_region

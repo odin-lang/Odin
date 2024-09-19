@@ -1,4 +1,4 @@
-//+vet !using-stmt
+#+vet !using-stmt
 package netpbm
 
 import "core:bytes"

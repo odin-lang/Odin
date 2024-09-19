@@ -1,5 +1,5 @@
-//+private
-//+build windows, linux, darwin, freebsd, openbsd, netbsd, haiku
+#+private
+#+build windows, linux, darwin, freebsd, openbsd, netbsd, haiku
 package testing
 
 /*

@@ -1,5 +1,5 @@
-//+private
-//+build linux
+#+private
+#+build linux
 package time
 
 import linux "core:sys/linux"

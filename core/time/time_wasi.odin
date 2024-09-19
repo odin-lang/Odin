@@ -1,5 +1,5 @@
-//+private
-//+build wasi
+#+private
+#+build wasi
 package time
 
 import "base:intrinsics"

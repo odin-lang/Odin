@@ -1,5 +1,5 @@
-//+private
-//+build darwin
+#+private
+#+build darwin
 package sync
 
 import "core:c"

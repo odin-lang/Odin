@@ -1,4 +1,4 @@
-//+build haiku
+#+build haiku
 package sys_haiku
 
 import "core:c"

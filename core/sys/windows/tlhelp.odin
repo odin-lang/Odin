@@ -1,4 +1,4 @@
-//+build windows
+#+build windows
 package sys_windows
 
 foreign import kernel32 "system:Kernel32.lib"

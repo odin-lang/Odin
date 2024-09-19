@@ -1,4 +1,4 @@
-//+build i386, amd64
+#+build i386, amd64
 package sysinfo
 
 import "base:intrinsics"

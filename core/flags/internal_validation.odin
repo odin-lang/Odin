@@ -1,4 +1,4 @@
-//+private
+#+private
 package flags
 
 @require import "base:runtime"

@@ -4,7 +4,7 @@
 	Ported from https://github.com/KdotJPG/OpenSimplex2.
 	Copyright 2022 Yuki2 (https://github.com/NoahR02)
 */
-//+private
+#+private
 package math_noise
 
 /*

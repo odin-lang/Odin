@@ -1,4 +1,4 @@
-// +build windows
+#+build windows
 package sys_windows
 
 // Define flags to be used with the WSAAsyncSelect() call.

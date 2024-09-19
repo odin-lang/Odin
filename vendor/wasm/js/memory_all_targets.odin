@@ -1,4 +1,4 @@
-//+build !js
+#+build !js
 package wasm_js_interface
 
 import "core:mem"

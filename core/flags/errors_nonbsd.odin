@@ -1,5 +1,5 @@
-//+build !netbsd
-//+build !openbsd
+#+build !netbsd
+#+build !openbsd
 package flags
 
 import "base:runtime"

@@ -1,4 +1,4 @@
-// +build windows, linux, darwin, freebsd
+#+build windows, linux, darwin, freebsd
 package net
 
 /*

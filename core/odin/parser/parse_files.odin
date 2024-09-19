@@ -77,9 +77,7 @@ parse_package :: proc(pkg: ^ast.Package, p: ^Parser = nil) -> bool {
 		if !parse_file(p, file) {
 			ok = false
 		}
-		if file.pkg_decl == nil {
-			error(p, p.curr_tok.pos, "Expected a package declaration at the start of the file")
-		} else if pkg.name == "" {
+		if pkg.name == "" {
 			pkg.name = file.pkg_decl.name
 		} else if pkg.name != file.pkg_decl.name {
 			error(p, file.pkg_decl.pos, "different package name, expected '%s', got '%s'", pkg.name, file.pkg_decl.name)

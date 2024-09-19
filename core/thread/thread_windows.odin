@@ -1,5 +1,5 @@
-//+build windows
-//+private
+#+build windows
+#+private
 package thread
 
 import "base:intrinsics"

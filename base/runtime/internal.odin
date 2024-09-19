@@ -1,4 +1,4 @@
-//+vet !cast
+#+vet !cast
 package runtime
 
 import "base:intrinsics"

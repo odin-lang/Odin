@@ -1,4 +1,4 @@
-//+build linux
+#+build linux
 package linux
 
 /// Low 8 bits of the exit code

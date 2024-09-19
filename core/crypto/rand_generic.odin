@@ -1,10 +1,10 @@
-//+build !linux
-//+build !windows
-//+build !openbsd
-//+build !freebsd
-//+build !netbsd
-//+build !darwin
-//+build !js
+#+build !linux
+#+build !windows
+#+build !openbsd
+#+build !freebsd
+#+build !netbsd
+#+build !darwin
+#+build !js
 package crypto
 
 HAS_RAND_BYTES :: false

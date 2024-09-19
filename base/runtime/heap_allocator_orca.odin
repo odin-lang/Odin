@@ -1,5 +1,5 @@
-//+build orca
-//+private
+#+build orca
+#+private
 package runtime
 
 foreign {

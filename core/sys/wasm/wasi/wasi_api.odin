@@ -1,4 +1,4 @@
-//+build wasm32
+#+build wasm32
 package sys_wasi
 
 foreign import wasi "wasi_snapshot_preview1"

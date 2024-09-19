@@ -1,4 +1,4 @@
-//+private
+#+private
 package time
 
 import win32 "core:sys/windows"

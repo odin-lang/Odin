@@ -1,5 +1,5 @@
-// +build linux, darwin, freebsd, openbsd, netbsd, haiku
-// +private
+#+build linux, darwin, freebsd, openbsd, netbsd, haiku
+#+private
 package thread
 
 import "base:runtime"

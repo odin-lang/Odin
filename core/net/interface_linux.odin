@@ -1,5 +1,5 @@
+#+build linux
 package net
-//+build linux
 
 /*
 	Package net implements cross-platform Berkeley Sockets, DNS resolution and associated procedures.

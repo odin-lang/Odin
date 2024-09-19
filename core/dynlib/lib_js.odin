@@ -1,5 +1,5 @@
-//+build js
-//+private
+#+build js
+#+private
 package dynlib
 
 _load_library :: proc(path: string, global_symbols := false) -> (Library, bool) {

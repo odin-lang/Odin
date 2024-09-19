@@ -1,4 +1,4 @@
-// +build windows
+#+build windows
 package os
 
 import win32 "core:sys/windows"

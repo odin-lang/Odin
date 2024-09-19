@@ -1,4 +1,4 @@
-//+build !js
+#+build !js
 package qoi
 
 import "core:os"

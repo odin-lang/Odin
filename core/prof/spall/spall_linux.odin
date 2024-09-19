@@ -1,10 +1,10 @@
-//+private
+#+private
 package spall
 
 // Only for types and constants.
 import "core:os"
 
-// Package is `//+no-instrumentation`, safe to use.
+// Package is `#+no-instrumentation`, safe to use.
 import "core:sys/linux"
 
 MAX_RW :: 0x7fffffff

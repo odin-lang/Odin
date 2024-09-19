@@ -1,5 +1,5 @@
-//+build arm32, arm64
-//+build linux
+#+build arm32, arm64
+#+build linux
 package sysinfo
 
 import "core:sys/linux"

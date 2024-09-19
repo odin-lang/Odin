@@ -34,8 +34,8 @@ package main
 			},
 		}, {// [2]
 			src = `
-//+build linux, darwin, freebsd, openbsd, netbsd, haiku
-//+build arm32, arm64
+#+build linux, darwin, freebsd, openbsd, netbsd, haiku
+#+build arm32, arm64
 package main
 			`,
 			tags = {
@@ -57,10 +57,10 @@ package main
 			},
 		}, {// [3]
 			src = `
-// +private
-//+lazy
-//	+no-instrumentation
-//+ignore
+#+private
+#+lazy
+#+no-instrumentation
+#+ignore
 // some other comment
 package main
 			`,
@@ -75,8 +75,8 @@ package main
 			},
 		}, {// [4]
 			src = `
-//+build-project-name foo !bar, baz
-//+build js wasm32, js wasm64p32
+#+build-project-name foo !bar, baz
+#+build js wasm32, js wasm64p32
 package main
 			`,
 			tags = {

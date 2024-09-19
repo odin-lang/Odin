@@ -1,5 +1,5 @@
-//+build js, wasi, freestanding, essence
-//+private
+#+build js, wasi, freestanding, essence
+#+private
 package runtime
 
 _heap_alloc :: proc "contextless" (size: int, zero_memory := true) -> rawptr {
