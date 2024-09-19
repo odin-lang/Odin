@@ -20,25 +20,27 @@ heap_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 	//
 
 	aligned_alloc :: proc(size, alignment: int, old_ptr: rawptr, old_size: int, zero_memory := true) -> ([]byte, Allocator_Error) {
+		// Not(flysand): We need to reserve enough space for alignment, which
+		// includes the user data itself, the space to store the pointer to
+		// allocation start, as well as the padding required to align both
+		// the user data and the pointer.
 		a := max(alignment, align_of(rawptr))
-		space := size + a - 1
-
+		space := a-1 + size_of(rawptr) + size
 		allocated_mem: rawptr
 
-		force_copy := old_ptr != nil && a > align_of(rawptr)
+		force_copy := old_ptr != nil && alignment > align_of(rawptr)
 
-		if !force_copy && old_ptr != nil {
+		if old_ptr != nil && !force_copy {
 			original_old_ptr := ([^]rawptr)(old_ptr)[-1]
-			allocated_mem = heap_resize(original_old_ptr, space+size_of(rawptr))
+			allocated_mem = heap_resize(original_old_ptr, space)
 		} else {
-			allocated_mem = heap_alloc(space+size_of(rawptr), zero_memory)
+			allocated_mem = heap_alloc(space, zero_memory)
 		}
 		aligned_mem := rawptr(([^]u8)(allocated_mem)[size_of(rawptr):])
 
 		ptr := uintptr(aligned_mem)
-		aligned_ptr := (ptr - 1 + uintptr(a)) & -uintptr(a)
-		diff := int(aligned_ptr - ptr)
-		if (size + diff) > space || allocated_mem == nil {
+		aligned_ptr := (ptr + uintptr(a)-1) & ~(uintptr(a)-1)
+		if allocated_mem == nil {
 			aligned_free(old_ptr)
 			aligned_free(allocated_mem)
 			return nil, .Out_Of_Memory
@@ -48,7 +50,7 @@ heap_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 		([^]rawptr)(aligned_mem)[-1] = allocated_mem
 
 		if force_copy {
-			mem_copy_non_overlapping(aligned_mem, old_ptr, old_size)
+			mem_copy_non_overlapping(aligned_mem, old_ptr, min(old_size, size))
 			aligned_free(old_ptr)
 		}
 
