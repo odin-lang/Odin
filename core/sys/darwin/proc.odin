@@ -1,3 +1,4 @@
+#+build darwin
 package darwin
 
 import "base:intrinsics"

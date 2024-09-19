@@ -1,3 +1,4 @@
+#+build darwin
 package CoreFoundation
 
 foreign import CoreFoundation "system:CoreFoundation.framework"

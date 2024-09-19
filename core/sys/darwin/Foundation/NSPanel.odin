@@ -1,3 +1,4 @@
+#+build darwin
 package objc_Foundation
 
 ModalResponse :: enum UInteger {

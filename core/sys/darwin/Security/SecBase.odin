@@ -1,3 +1,4 @@
+#+build darwin
 package Security
 
 OSStatus :: distinct i32

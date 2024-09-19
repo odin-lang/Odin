@@ -1,3 +1,4 @@
+#+build darwin
 package CoreVideo
 
 DisplayLinkRef :: distinct rawptr

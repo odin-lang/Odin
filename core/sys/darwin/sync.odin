@@ -1,3 +1,4 @@
+#+build darwin
 package darwin
 
 foreign import system "system:System.framework"

@@ -1,3 +1,4 @@
+#+build darwin
 package darwin
 
 foreign import pthread "system:System.framework"

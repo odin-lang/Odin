@@ -1,3 +1,4 @@
+#+build darwin
 package objc_MetalKit
 
 import NS "core:sys/darwin/Foundation"

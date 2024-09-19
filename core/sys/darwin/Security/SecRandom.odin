@@ -1,3 +1,4 @@
+#+build darwin
 package Security
 
 import CF "core:sys/darwin/CoreFoundation"
