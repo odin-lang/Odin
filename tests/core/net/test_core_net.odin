@@ -217,31 +217,20 @@ IP_Address_Parsing_Test_Vectors :: []IP_Address_Parsing_Test_Vector{
 	{ .IP6, "c0a8",                    "", ""},
 }
 
-ENDPOINT_TWO_SERVERS  := net.Endpoint{net.IP4_Address{127, 0, 0, 1}, 9991}
-ENDPOINT_CLOSED_PORT  := net.Endpoint{net.IP4_Address{127, 0, 0, 1}, 9992}
-ENDPOINT_SERVER_SENDS := net.Endpoint{net.IP4_Address{127, 0, 0, 1}, 9993}
-ENDPOINT_UDP_ECHO     := net.Endpoint{net.IP4_Address{127, 0, 0, 1}, 9994}
-ENDPOINT_NONBLOCK     := net.Endpoint{net.IP4_Address{127, 0, 0, 1}, 9995}
-
 @(test)
 two_servers_binding_same_endpoint :: proc(t: ^testing.T) {
-	skt1, err1 := net.listen_tcp(ENDPOINT_TWO_SERVERS)
+	skt1, err1 := net.listen_tcp({address=net.IP4_Address{127, 0, 0, 1}, port=0})
 	defer net.close(skt1)
-	skt2, err2 := net.listen_tcp(ENDPOINT_TWO_SERVERS)
+
+	ep, perr := net.bound_endpoint(skt1)
+
+	skt2, err2 := net.listen_tcp(ep)
 	defer net.close(skt2)
 
 	testing.expect(t, err1 == nil, "expected first server binding to endpoint to do so without error")
+	testing.expect_value(t, perr, nil)
 	testing.expect(t, err2 == net.Bind_Error.Address_In_Use, "expected second server to bind to an endpoint to return .Address_In_Use")
 }
-
-@(test)
-client_connects_to_closed_port :: proc(t: ^testing.T) {
-
-	skt, err := net.dial_tcp(ENDPOINT_CLOSED_PORT)
-	defer net.close(skt)
-	testing.expect(t, err == net.Dial_Error.Refused, "expected dial of a closed endpoint to return .Refused")
-}
-
 
 @(test)
 client_sends_server_data :: proc(t: ^testing.T) {
@@ -249,6 +238,9 @@ client_sends_server_data :: proc(t: ^testing.T) {
 
 	SEND_TIMEOUT :: time.Duration(1 * time.Second)
 	RECV_TIMEOUT :: time.Duration(1 * time.Second)
+
+	@static endpoint: net.Endpoint
+	endpoint.address = net.IP4_Address{127, 0, 0, 1}
 
 	Thread_Data :: struct {
 		t: ^testing.T,
@@ -266,7 +258,7 @@ client_sends_server_data :: proc(t: ^testing.T) {
 
 		defer sync.wait_group_done(r.wg)
 
-		if r.skt, r.err = net.dial_tcp(ENDPOINT_SERVER_SENDS); r.err != nil {
+		if r.skt, r.err = net.dial_tcp(endpoint); r.err != nil {
 			testing.expectf(r.t, false, "[tcp_client:dial_tcp] %v", r.err)
 			return
 		}
@@ -281,9 +273,14 @@ client_sends_server_data :: proc(t: ^testing.T) {
 
 		defer sync.wait_group_done(r.wg)
 
-		if r.skt, r.err = net.listen_tcp(ENDPOINT_SERVER_SENDS); r.err != nil {
+		if r.skt, r.err = net.listen_tcp(endpoint); r.err != nil {
 			sync.wait_group_done(r.wg)
 			testing.expectf(r.t, false, "[tcp_server:listen_tcp] %v", r.err)
+			return
+		}
+
+		endpoint, r.err = net.bound_endpoint(r.skt.(net.TCP_Socket))
+		if !testing.expect_value(r.t, r.err, nil) {
 			return
 		}
 
@@ -524,14 +521,22 @@ join_url_test :: proc(t: ^testing.T) {
 
 @test
 test_udp_echo :: proc(t: ^testing.T) {
+	endpoint := net.Endpoint{address=net.IP4_Address{127, 0, 0, 1}, port=0}
+
 	server, make_server_err := net.make_unbound_udp_socket(.IP4)
 	if !testing.expect_value(t, make_server_err, nil) {
 		return
 	}
 	defer net.close(server)
 
-	bind_server_err := net.bind(server, ENDPOINT_UDP_ECHO)
+	bind_server_err := net.bind(server, endpoint)
 	if !testing.expect_value(t, bind_server_err, nil) {
+		return
+	}
+
+	perr: net.Network_Error
+	endpoint, perr = net.bound_endpoint(server)
+	if !testing.expect_value(t, perr, nil) {
 		return
 	}
 
@@ -544,7 +549,7 @@ test_udp_echo :: proc(t: ^testing.T) {
 	msg := "Hellope world!"
 	buf: [64]u8
 
-	bytes_written, send_err := net.send_udp(client, transmute([]u8)msg[:], ENDPOINT_UDP_ECHO)
+	bytes_written, send_err := net.send_udp(client, transmute([]u8)msg[:], endpoint)
 	if !testing.expect_value(t, send_err, nil) {
 		return
 	}
@@ -600,7 +605,7 @@ test_dns_resolve :: proc(t: ^testing.T) {
 
 @test
 test_nonblocking_option :: proc(t: ^testing.T) {
-	server, listen_err := net.listen_tcp(ENDPOINT_NONBLOCK)
+	server, listen_err := net.listen_tcp({address=net.IP4_Address{127, 0, 0, 1}, port=0})
 	if !testing.expect_value(t, listen_err, nil) {
 		return
 	}

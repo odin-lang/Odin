@@ -22,6 +22,7 @@ package net
 
 import "core:c"
 import "core:os"
+import "core:sys/posix"
 import "core:time"
 
 Socket_Option :: enum c.int {
@@ -135,6 +136,19 @@ _listen_tcp :: proc(interface_endpoint: Endpoint, backlog := 1000) -> (skt: TCP_
 		return
 	}
 
+	return
+}
+
+@(private)
+_bound_endpoint :: proc(sock: Any_Socket) -> (ep: Endpoint, err: Network_Error) {
+	addr: posix.sockaddr_storage
+	addr_len := posix.socklen_t(size_of(addr))
+	res := posix.getsockname(posix.FD(any_socket_to_socket(sock)), (^posix.sockaddr)(&addr), &addr_len)
+	if res != .OK {
+		err = Listen_Error(posix.errno())
+		return
+	}
+	ep = _sockaddr_to_endpoint((^os.SOCKADDR_STORAGE_LH)(&addr))
 	return
 }
 
