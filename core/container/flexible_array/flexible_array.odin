@@ -13,21 +13,20 @@ stack.
 The provided procedures are similar to those you'd use with dynamic arrays, with
 the exception that you have to use the `get` proc instead of index operators.
 
-Usage example:
+Example:
+	import fa "core:container/flexible_array"
 
-import fa "core:container/flexible_array"
+	array: fa.Array(1024, int)
+	fa.push_back(&array, 5)
+	fa.push_back(&array, 2)
+	fa.push_back(&array, 7)
+	fa.unordered_remove(&array, 0)
+	element := fa.get(array, 1)
+	slc := fa.slice(&array)
 
-array: fa.Array(1024, int)
-fa.push_back(&array, 5)
-fa.push_back(&array, 2)
-fa.push_back(&array, 7)
-fa.unordered_remove(&array, 0)
-element := fa.get(array, 1)
-slc := fa.slice(&array)
-
-for e in slc {
-	fmt.println(e)
-}
+	for e in slc {
+		fmt.println(e)
+	}
 */
 package container_flexible_array
 
