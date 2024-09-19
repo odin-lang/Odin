@@ -1,6 +1,6 @@
 /*
-Flexible arrays use a fixed array as backing but also know how many elements of
-that fixed array that have been used.
+Flexible arrays use a fixed array as backing. But in contrast to fixed arrays
+they keep track of how many elements of that have been used.
 
 This means that they work a bit like an array with a dynamic size, without
 requiring any dynamic memory allocations.
