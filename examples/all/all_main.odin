@@ -18,7 +18,7 @@ import avl              "core:container/avl"
 import bit_array        "core:container/bit_array"
 import priority_queue   "core:container/priority_queue"
 import queue            "core:container/queue"
-import small_array      "core:container/small_array"
+import flexible_array   "core:container/flexible_array"
 import lru              "core:container/lru"
 import list             "core:container/intrusive/list"
 import rbtree           "core:container/rbtree"
@@ -160,7 +160,7 @@ _ :: avl
 _ :: bit_array
 _ :: priority_queue
 _ :: queue
-_ :: small_array
+_ :: flexible_array
 _ :: lru
 _ :: list
 _ :: rbtree
