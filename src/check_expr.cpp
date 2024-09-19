@@ -9131,6 +9131,10 @@ gb_internal ExprKind check_or_branch_expr(CheckerContext *c, Operand *o, Ast *no
 	}
 
 	if (label != nullptr) {
+		if (c->in_defer) {
+			error(label, "A labelled '%.*s' cannot be used within a 'defer'", LIT(name));
+			return Expr_Expr;
+		}
 		if (label->kind != Ast_Ident) {
 			error(label, "A branch statement's label name must be an identifier");
 			return Expr_Expr;
