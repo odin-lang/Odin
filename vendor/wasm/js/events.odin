@@ -235,10 +235,10 @@ Event :: struct {
 
 			repeat: bool,
 
-			_key_len:  int,
-			_code_len: int,
-			_key_buf:  [KEYBOARD_MAX_KEY_SIZE]byte,
-			_code_buf: [KEYBOARD_MAX_KEY_SIZE]byte,
+			_key_len:  int                         `fmt:"-"`,
+			_code_len: int                         `fmt:"-"`,
+			_key_buf:  [KEYBOARD_MAX_KEY_SIZE]byte `fmt:"-"`,
+			_code_buf: [KEYBOARD_MAX_KEY_SIZE]byte `fmt:"-"`,
 		},
 
 		mouse: struct {
