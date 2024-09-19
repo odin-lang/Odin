@@ -1095,7 +1095,8 @@ unset_env :: proc(key: string) -> Error {
 }
 
 @(require_results)
-get_current_directory :: proc() -> string {
+get_current_directory :: proc(allocator := context.allocator) -> string {
+	context.allocator = allocator
 	page_size := get_page_size() // NOTE(tetra): See note in os_linux.odin/get_current_directory.
 	buf := make([dynamic]u8, page_size)
 	for {
