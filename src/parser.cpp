@@ -4377,10 +4377,14 @@ gb_internal Ast *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_fl
 			}
 		}
 
-		allow_field_separator(f);
+		bool more_fields = allow_field_separator(f);
 		Ast *param = ast_field(f, names, type, default_value, set_flags, tag, docs, f->line_comment);
 		array_add(&params, param);
 
+		if (!more_fields) {
+			if (name_count_) *name_count_ = total_name_count;
+			return ast_field_list(f, start_token, params);
+		}
 
 		while (f->curr_token.kind != follow &&
 		       f->curr_token.kind != Token_EOF &&
