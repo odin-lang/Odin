@@ -30,6 +30,8 @@ Event_Kind :: enum u32 {
 	Wheel,
 
 	Focus,
+	Focus_In,
+	Focus_Out,
 	Submit,
 	Blur,
 	Change,
@@ -110,6 +112,8 @@ event_kind_string := [Event_Kind]string{
 	.Wheel = "wheel",
 
 	.Focus        = "focus",
+	.Focus_In     = "focusin",
+	.Focus_Out    = "focusout",
 	.Submit       = "submit",
 	.Blur         = "blur",
 	.Change       = "change",
@@ -332,7 +336,7 @@ remove_custom_event_listener :: proc(id: string, name: string, user_data: rawptr
 	return _remove_event_listener(id, name, user_data, callback)
 }
 
-
+import "core:fmt"
 
 
 @(export, link_name="odin_dom_do_event_callback")
