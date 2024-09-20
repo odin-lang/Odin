@@ -129,7 +129,7 @@ parse_file_tags :: proc(file: ast.File, allocator := context.allocator) -> (tags
 						name_start := i
 	
 						switch next_char(text, &i) {
-						case 0, '\n':
+						case 0, '\r', '\n':
 							i -= 1
 							break groups_loop
 						case ',':
@@ -164,7 +164,7 @@ parse_file_tags :: proc(file: ast.File, allocator := context.allocator) -> (tags
 
 						is_notted: bool
 						switch next_char(text, &i) {
-						case 0, '\n':
+						case 0, '\r', '\n':
 							i -= 1
 							break kinds_loop
 						case ',':
