@@ -1844,13 +1844,12 @@ async function runWasm(wasmPath, consoleElement, extraForeignImports, wasmMemory
 			const dt = (currTimeStamp - prevTimeStamp)*0.001;
 			prevTimeStamp = currTimeStamp;
 
-			for (let i = 0; i < eventQueue.length; i++) {
-				let e = eventQueue[i];
+			while (eventQueue.length > 0) {
+				let e = eventQueue.shift()
 				event_temp.data = e.event_data;
 				exports.odin_dom_do_event_callback(e.data, e.callback, odin_ctx);
 			}
 			event_temp.data = null;
-			eventQueue.length = 0;
 
 			if (!exports.step(currTimeStamp*0.001, odin_ctx)) {
 				exports._end();
