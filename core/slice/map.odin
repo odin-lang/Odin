@@ -52,7 +52,7 @@ map_entry_infos :: proc(m: $M/map[$K]$V, allocator := context.allocator) -> (ent
 	m := m
 	rm := (^runtime.Raw_Map)(&m)
 
-	info := type_info_base(type_info_of(M)).variant.(Type_Info_Map)
+	info := runtime.type_info_base(type_info_of(M)).variant.(runtime.Type_Info_Map)
 	if info.map_info != nil {
 		entries = make(type_of(entries), len(m), allocator) or_return
 
