@@ -61,8 +61,8 @@ map_entry_infos :: proc(m: $M/map[$K]$V, allocator := context.allocator) -> (ent
 		entry_index := 0
 		for bucket_index in 0..<map_cap {
 			if hash := hs[bucket_index]; runtime.map_hash_is_valid(hash) {
-				key   := runtime.map_cell_index_dynamic(ks, &info.map_info.ks, bucket_index)
-				value := runtime.map_cell_index_dynamic(vs, &info.map_info.vs, bucket_index)
+				key   := runtime.map_cell_index_dynamic(ks, info.map_info.ks, bucket_index)
+				value := runtime.map_cell_index_dynamic(vs, info.map_info.vs, bucket_index)
 				entries[entry_index].hash  = hash
 				entries[entry_index].key   = (^K)(key)^
 				entries[entry_index].value = (^V)(value)^
