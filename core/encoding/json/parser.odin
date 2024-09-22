@@ -176,7 +176,7 @@ parse_value :: proc(p: ^Parser, loc := #caller_location) -> (value: Value, err: 
 	return
 }
 
-skip_value :: proc(p: ^Parser, loc := #caller_location) -> (err: Error) {
+skip_value :: proc(p: ^Parser) -> (err: Error) {
 	err = .None
 	token := p.curr_token
 	#partial switch token.kind {
