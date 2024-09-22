@@ -199,6 +199,8 @@ The boolean `ok` is false if the `time` is not a valid datetime, or if allocatin
 - `include_nanos`: whether to include nanoseconds in the result.
 */
 time_to_rfc3339 :: proc(time: Time, utc_offset : int = 0, include_nanos := true, allocator := context.allocator) -> (res: string, ok: bool) {
+	utc_offset := utc_offset
+
 	// convert to datetime
 	datetime := time_to_datetime(time) or_return
 
@@ -276,7 +278,7 @@ time_to_rfc3339 :: proc(time: Time, utc_offset : int = 0, include_nanos := true,
 	} else {
 		temp_string[offset] = utc_offset > 0 ? '+' : '-'
 		offset += 1
-		utc_offset := abs(utc_offset)
+		utc_offset = abs(utc_offset)
 		print_as_fixed_int(temp_string[:], &offset, 2, i64(utc_offset / 60))
 		temp_string[offset] = ':'
 		offset += 1

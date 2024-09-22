@@ -202,7 +202,7 @@ test_print_rfc3339 :: proc(t: ^testing.T) {
 		printed: string,
 		time: i64,
 		utc_offset: int,
-	};
+	}
 
 	tests :: [?]TestCase {
 		{"1985-04-12T23:20:50.52Z",      	482196050520000000,  	0},
@@ -210,7 +210,7 @@ test_print_rfc3339 :: proc(t: ^testing.T) {
 		{"1996-12-19T16:39:57-08:00",    	851013597000000000,  	-480},
 		{"1996-12-20T00:39:57Z",         	851042397000000000,  	0},
 		{"1937-01-01T12:00:27.87+00:20", 	-1041335972130000000,	+20},
-	};
+	}
 
 	for test in tests {
 		timestamp := time.Time { _nsec = test.time }
