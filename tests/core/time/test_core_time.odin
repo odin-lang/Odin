@@ -201,7 +201,7 @@ test_print_rfc3339 :: proc(t: ^testing.T) {
 	TestCase :: struct {
 		printed: string,
 		time: i64,
-		utc_offset: int
+		utc_offset: int,
 	};
 
 	tests :: [?]TestCase {
@@ -221,7 +221,8 @@ test_print_rfc3339 :: proc(t: ^testing.T) {
 
 		testing.expectf(
 			t, printed_timestamp == test.printed,
-			"expected is %w, printed is %w", test.printed, printed_timestamp)
+			"expected is %w, printed is %w", test.printed, printed_timestamp,
+		)
 	}
 }
 

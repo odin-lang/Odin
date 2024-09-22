@@ -204,8 +204,8 @@ time_to_rfc3339 :: proc(time: Time, utc_offset : int = 0, include_nanos := true,
 
 	if datetime.year < 0 || datetime.year >= 10_000 { return "", false }
 
-	temp_string := [30]u8{}
-	offset : uint = 0 // offset in temp_string
+	temp_string := [36]u8{}
+	offset : uint = 0
 
 	print_as_fixed_int :: proc(dst: []u8, offset: ^uint, width: i8, i: i64) {
 		i := i
@@ -275,7 +275,7 @@ time_to_rfc3339 :: proc(time: Time, utc_offset : int = 0, include_nanos := true,
 		offset += 1
 	} else {
 		temp_string[offset] = utc_offset > 0 ? '+' : '-'
-		offset += 1;
+		offset += 1
 		utc_offset := abs(utc_offset)
 		print_as_fixed_int(temp_string[:], &offset, 2, i64(utc_offset / 60))
 		temp_string[offset] = ':'
