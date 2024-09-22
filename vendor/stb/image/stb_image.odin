@@ -1,6 +1,6 @@
 package stb_image
 
-import c "core:c/libc"
+import "core:c"
 
 @(private)
 LIB :: (
@@ -20,7 +20,6 @@ when LIB != "" {
 
 when ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32 {
 	foreign import stbi "../lib/stb_image_wasm.o"
-	foreign import stbi { LIB }
 } else when LIB != "" {
 	foreign import stbi { LIB }
 } else {

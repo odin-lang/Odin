@@ -7,7 +7,7 @@ The `js_wasm32` target assumes that the WASM output will be ran within a web bro
 ## Example for `js_wasm32`
 
 ```html
-<!-- Copy `vendor:wasm/js/odin.js` into your web server -->
+<!-- Copy `core:sys/wasm/js/odin.js` into your web server -->
 <script type="text/javascript" src="odin.js"></script>
 <script type="text/javascript">
 	odin.runWasm(pathToWasm, consolePreElement);

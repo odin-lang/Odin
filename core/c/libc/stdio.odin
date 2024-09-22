@@ -59,7 +59,7 @@ when ODIN_OS == .Windows {
 }
 
 // GLIBC and MUSL compatible.
-when ODIN_OS == .Linux {
+when ODIN_OS == .Linux || ODIN_OS == .JS {
 	fpos_t        :: struct #raw_union { _: [16]char, _: longlong, _: double, }
 
 	_IOFBF        :: 0
