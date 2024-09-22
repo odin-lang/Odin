@@ -336,9 +336,6 @@ remove_custom_event_listener :: proc(id: string, name: string, user_data: rawptr
 	return _remove_event_listener(id, name, user_data, callback)
 }
 
-import "core:fmt"
-
-
 @(export, link_name="odin_dom_do_event_callback")
 do_event_callback :: proc(user_data: rawptr, callback: proc(e: Event)) {
 	@(default_calling_convention="contextless")
