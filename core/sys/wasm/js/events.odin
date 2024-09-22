@@ -35,7 +35,7 @@ Event_Kind :: enum u32 {
 	Submit,
 	Blur,
 	Change,
-	HashChange,
+	Hash_Change,
 	Select,
 
 	Animation_Start,
@@ -82,6 +82,9 @@ Event_Kind :: enum u32 {
 
 	Context_Menu,
 
+	Gamepad_Connected,
+	Gamepad_Disconnected,
+
 	Custom,
 
 }
@@ -117,7 +120,7 @@ event_kind_string := [Event_Kind]string{
 	.Submit       = "submit",
 	.Blur         = "blur",
 	.Change       = "change",
-	.HashChange   = "hashchange",
+	.Hash_Change  = "hashchange",
 	.Select       = "select",
 
 	.Animation_Start     = "animationstart",
@@ -163,6 +166,9 @@ event_kind_string := [Event_Kind]string{
 	.Touch_Start  = "touchstart",
 
 	.Context_Menu = "contextmenu",
+
+	.Gamepad_Connected    = "gamepadconnected",
+	.Gamepad_Disconnected = "gamepaddisconnected",
 
 	.Custom = "?custom?",
 }
