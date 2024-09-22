@@ -1533,8 +1533,8 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement, memory, ev
 
 					wmi.storeU8(off(1), !!e.repeat);
 
-					wmi.storeI32(off(W), e.key.length)
-					wmi.storeI32(off(W), e.code.length)
+					wmi.storeInt(off(W), e.key.length)
+					wmi.storeInt(off(W), e.code.length)
 					wmi.storeString(off(16, 1), e.key);
 					wmi.storeString(off(16, 1), e.code);
 				} else if (e.type === 'scroll') {
@@ -1542,6 +1542,21 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement, memory, ev
 					wmi.storeF64(off(8), window.scrollY);
 				} else if (e.type === 'visibilitychange') {
 					wmi.storeU8(off(1), !document.hidden);
+				} else if (e instanceof GamepadEvent) {
+					const idPtr      = off(W*2, W);
+					const mappingPtr = off(W*2, W);
+
+					wmi.storeI32(off(W), e.gamepad.index);
+					wmi.storeU8(off(1), !!e.gamepad.connected);
+					wmi.storeF64(off(8), e.gamepad.timestamp);
+
+					wmi.storeInt(off(W), e.gamepad.buttons.length);
+					wmi.storeInt(off(W), e.gamepad.axes.length);
+
+					wmi.storeInt(off(W), e.gamepad.id.length)
+					wmi.storeInt(off(W), e.gamepad.mapping.length)
+					wmi.storeString(off(64, 1), e.gamepad.id);
+					wmi.storeString(off(64, 1), e.gamepad.mapping);
 				}
 			},
 

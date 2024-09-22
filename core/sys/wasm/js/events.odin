@@ -186,8 +186,17 @@ Key_Location :: enum u8 {
 	Numpad   = 3,
 }
 
-KEYBOARD_MAX_KEY_SIZE :: 16
+KEYBOARD_MAX_KEY_SIZE  :: 16
 KEYBOARD_MAX_CODE_SIZE :: 16
+
+GAMEPAD_MAX_ID_SIZE      :: 64
+GAMEPAD_MAX_MAPPING_SIZE :: 64
+
+Gamepad_Button :: struct {
+	pressed: bool,
+	touched: bool,
+	value:   f64,
+}
 
 Event_Target_Kind :: enum u32 {
 	Element  = 0,
@@ -265,6 +274,21 @@ Event :: struct {
 
 			button:  i16,
 			buttons: bit_set[0..<16; u16],
+		},
+
+		gamepad: struct {
+			id:           string,
+			mapping:      string,
+			index:        int,
+			connected:    bool,
+			timestamp:    f64,
+			button_count: int,
+			axes_count:   int,
+
+			_id_len:      int `fmt:"-"`,
+			_mapping_len: int `fmt:"-"`,
+			_id_buf:      [GAMEPAD_MAX_ID_SIZE]byte      `fmt:"-"`,
+			_mapping_buf: [GAMEPAD_MAX_MAPPING_SIZE]byte `fmt:"-"`,
 		},
 	},
 
@@ -358,9 +382,13 @@ do_event_callback :: proc(user_data: rawptr, callback: proc(e: Event)) {
 
 		init_event_raw(&event)
 
-		if event.kind == .Key_Up || event.kind == .Key_Down || event.kind == .Key_Press {
+		#partial switch event.kind {
+		case .Key_Up, .Key_Down, .Key_Press:
 			event.key.key = string(event.key._key_buf[:event.key._key_len]) 
 			event.key.code = string(event.key._code_buf[:event.key._code_len]) 
+		case .Gamepad_Connected, .Gamepad_Disconnected:
+			event.gamepad.id = string(event.gamepad._id_buf[:event.gamepad._id_len])
+			event.gamepad.mapping = string(event.gamepad._mapping_buf[:event.gamepad._mapping_len])
 		}
 
 		callback(event)
