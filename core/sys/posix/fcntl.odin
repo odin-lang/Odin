@@ -143,6 +143,8 @@ when ODIN_OS == .Linux {
 		// RDONLY = 0, // Default
 	}
 
+	O_Flags :: bit_set[O_Flag_Bits; c.int]
+
 } else {
 
 	O_Flag_Bits :: enum c.int {
@@ -190,8 +192,9 @@ when ODIN_OS == .Linux {
 		// Reading only.
 		// RDONLY = 0, // Default
 	}
+
+	O_Flags :: bit_set[O_Flag_Bits; c.int]
 }
-O_Flags :: bit_set[O_Flag_Bits; c.int]
 
 // A mask of all the access mode bits.
 when ODIN_OS == .Linux {
