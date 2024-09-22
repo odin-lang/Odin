@@ -1172,7 +1172,9 @@ when ODIN_OS == .Darwin {
 	SIGPOLL   :: 29
 	SIGSYS    :: 31
 
-	sigaction :: struct {
+	// NOTE: this is actually defined as `sigaction`, but due to the function with the same name
+	// `_t` has been added.
+	sigaction_t :: struct {
 		sa_handler:   proc "c" (Signal),
 		sa_flags: SA_Flags,
 		sa_mask: sigset_t,
