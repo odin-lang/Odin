@@ -220,6 +220,16 @@ foreign lib {
 	           const struct timespec *restrict);
 	int    sigwaitinfo(const sigset_t *restrict, siginfo_t *restrict);
 	*/
+
+	when ODIN_OS == .Linux {
+		/* Return number of available real-time signal with highest priority.  */
+		@(private)
+		__libc_current_sigrtmin :: proc() -> result ---
+
+		/* Return number of available real-time signal with lowest priority.  */
+		@(private)
+		__libc_current_sigrtmax :: proc() -> result ---
+	}
 }
 
 sigval :: struct #raw_union {
@@ -480,7 +490,7 @@ when ODIN_OS == .Darwin {
 	uid_t :: distinct c.uint32_t
 	sigset_t :: distinct c.uint32_t
 
-	// MOTE: unimplemented on darwin.
+	// NOTE: unimplemented on darwin.
 	//
 	// SIGRTMIN :: 
 	// SIGRTMAX ::
@@ -625,7 +635,7 @@ when ODIN_OS == .Darwin {
 		__bits: [4]c.uint32_t,
 	}
 
-	// MOTE: unimplemented on darwin.
+	// NOTE: unimplemented on FreeBSD.
 	//
 	// SIGRTMIN :: 65
 	// SIGRTMAX :: 126
@@ -794,7 +804,7 @@ when ODIN_OS == .Darwin {
 		__bits: [4]c.uint32_t,
 	}
 
-	// MOTE: unimplemented on darwin.
+	// NOTE: unimplemented on NetBSD.
 	//
 	// SIGRTMIN :: 33
 	// SIGRTMAX :: 63
@@ -1126,6 +1136,141 @@ when ODIN_OS == .Darwin {
 	SI_ASYNCIO :: -4 // NOTE: not implemented
 	SI_MESGQ   :: -5 // NOTE: not implemented
 
+} else when ODIN_OS == .Linux {
+
+	// Request that signal be held
+	SIG_HOLD :: rawptr(uintptr(2))
+
+	uid_t :: distinct c.uint32_t
+	sigset_t :: struct {
+		[1024/(8 * size_of(c.ulong))]val
+	}
+
+	SIGRTMIN :: __libc_current_sigrtmin()
+	SIGRTMAX :: __libc_current_sigrtmax()
+
+	SIGHUP    :: 1
+	SIGQUIT   :: 3
+	SIGTRAP   :: 5
+	SIGBUS    :: 7
+	SIGKILL   :: 9
+	SIGUSR1   :: 10
+	SIGUSR2   :: 12
+	SIGPIPE   :: 13
+	SIGALRM   :: 14
+	SIGCHLD   :: 17
+	SIGCONT   :: 18
+	SIGSTOP   :: 19
+	SIGTSTP   :: 20
+	SIGTTIN   :: 21
+	SIGTTOU   :: 22
+	SIGURG    :: 23
+	SIGXCPU   :: 24
+	SIGXFSZ   :: 25
+	SIGVTALRM :: 26
+	SIGPROF   :: 27
+	SIGPOLL   :: 29
+	SIGSYS    :: 31
+
+	sigaction :: struct {
+		sa_handler:   proc "c" (Signal),
+		sa_flags: SA_Flags,
+		sa_mask: sigset_t,
+	}
+
+	SIG_BLOCK   :: 0
+	SIG_UNBLOCK :: 1
+	SIG_SETMASK :: 2
+
+	SA_NOCLDSTOP :: 1
+	SA_NOCLDWAIT :: 2
+	SA_SIGINFO   :: 4
+	SA_ONSTACK   :: 0x08000000
+	SA_RESTART   :: 0x10000000
+	SA_NODEFER   :: 0x40000000
+	SA_RESETHAND :: 0x80000000
+
+	SS_ONSTACK :: 1
+	SS_DISABLE :: 2
+
+	MINSIGSTKSZ :: 2048
+	SIGSTKSZ    :: 8192
+
+	stack_t :: struct {
+		ss_sp:    rawptr,   /* [PSX] stack base or pointer */
+		ss_flags: SS_Flags, /* [PSX] flags */
+		ss_size:  c.size_t, /* [PSX] stack size */
+	}
+
+	// WARNING: This implementaion might be completely wrong and need to be reviewed and corrected.
+	siginfo_t :: struct {
+		si_signo:  Signal, /* [PSX] signal number */
+		si_code: struct #raw_union { /* [PSX] specific more detailed codes per signal */
+			ill:  ILL_Code,
+			fpe:  FPE_Code,
+			segv: SEGV_Code,
+			bus:  BUS_Code,
+			trap: TRAP_Code,
+			chld: CLD_Code,
+			poll: POLL_Code,
+			any:  Any_Code,
+		},
+		si_errno:  Errno,  /* [PSX] errno value associated with this signal */
+		si_pid:    pid_t,      /* [PSX] sending process ID */
+		si_uid:    uid_t,      /* [PSX] real user ID of sending process */
+		si_addr:   rawptr,     /* [PSX] address of faulting instruction */
+		si_status: c.int,      /* [PSX] exit value or signal */
+		si_band:   c.long,     /* [PSX] band event for SIGPOLL */
+		si_value:  sigval,     /* [PSX] signal value */
+	}
+
+	ILL_ILLOPC :: 1
+	ILL_ILLOPN :: 2
+	ILL_ILLADR :: 3
+	ILL_ILLTRP :: 4
+	ILL_PRVOPC :: 5
+	ILL_PRVREG :: 6
+	ILL_COPROC :: 7
+	ILL_BADSTK :: 8
+
+	FPE_INTDIV :: 1
+	FPE_INTOVF :: 2
+	FPE_FLTDIV :: 3
+	FPE_FLTOVF :: 4
+	FPE_FLTUND :: 5
+	FPE_FLTRES :: 6
+	FPE_FLTINV :: 7
+	FPE_FLTSUB :: 8
+
+	SEGV_MAPERR :: 1
+	SEGV_ACCERR :: 2
+
+	BUS_ADRALN :: 1
+	BUS_ADRERR :: 2
+	BUS_OBJERR :: 3
+
+	TRAP_BRKPT :: 1
+	TRAP_TRACE :: 2
+
+	CLD_EXITED    :: 1
+	CLD_KILLED    :: 2
+	CLD_DUMPED    :: 3
+	CLD_TRAPPED   :: 4
+	CLD_STOPPED   :: 5
+	CLD_CONTINUED :: 6
+
+	POLL_IN  :: 1
+	POLL_OUT :: 2
+	POLL_MSG :: 3
+	POLL_ERR :: 4
+	POLL_PRI :: 5
+	POLL_HUP :: 6
+
+	SI_USER    :: 0
+	SI_QUEUE   :: -1
+	SI_TIMER   :: -2
+	SI_MESGQ   :: -3
+	SI_ASYNCIO :: -4
 } else {
 	#panic("posix is unimplemented for the current target")
 }
