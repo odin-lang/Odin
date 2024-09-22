@@ -1143,7 +1143,7 @@ when ODIN_OS == .Darwin {
 
 	uid_t :: distinct c.uint32_t
 	sigset_t :: struct {
-		[1024/(8 * size_of(c.ulong))]val
+		[1024/(8 * size_of(c.ulong))]val,
 	}
 
 	SIGRTMIN :: __libc_current_sigrtmin()
