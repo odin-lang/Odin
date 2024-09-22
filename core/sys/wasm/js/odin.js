@@ -1533,28 +1533,47 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement, memory, ev
 
 					wmi.storeU8(off(1), !!e.repeat);
 
-					wmi.storeInt(off(W), e.key.length)
-					wmi.storeInt(off(W), e.code.length)
+					wmi.storeInt(off(W, W), e.key.length)
+					wmi.storeInt(off(W, W), e.code.length)
 					wmi.storeString(off(16, 1), e.key);
 					wmi.storeString(off(16, 1), e.code);
 				} else if (e.type === 'scroll') {
-					wmi.storeF64(off(8), window.scrollX);
-					wmi.storeF64(off(8), window.scrollY);
+					wmi.storeF64(off(8, 8), window.scrollX);
+					wmi.storeF64(off(8, 8), window.scrollY);
 				} else if (e.type === 'visibilitychange') {
 					wmi.storeU8(off(1), !document.hidden);
 				} else if (e instanceof GamepadEvent) {
 					const idPtr      = off(W*2, W);
 					const mappingPtr = off(W*2, W);
 
-					wmi.storeI32(off(W), e.gamepad.index);
+					wmi.storeI32(off(W, W), e.gamepad.index);
 					wmi.storeU8(off(1), !!e.gamepad.connected);
-					wmi.storeF64(off(8), e.gamepad.timestamp);
+					wmi.storeF64(off(8, 8), e.gamepad.timestamp);
 
-					wmi.storeInt(off(W), e.gamepad.buttons.length);
-					wmi.storeInt(off(W), e.gamepad.axes.length);
+					wmi.storeInt(off(W, W), e.gamepad.buttons.length);
+					wmi.storeInt(off(W, W), e.gamepad.axes.length);
 
-					wmi.storeInt(off(W), e.gamepad.id.length)
-					wmi.storeInt(off(W), e.gamepad.mapping.length)
+					for (let i = 0; i < 64; i++) {
+						if (i < e.gamepad.buttons.length) {
+							let b = e.gamepad.buttons[i];
+							wmi.storeF64(off(8, 8), b.value);
+							wmi.storeU8(off(1),  !!b.pressed);
+							wmi.storeU8(off(1),  !!b.touched);
+						} else {
+							off(16, 8);
+						}
+					}
+					for (let i = 0; i < 16; i++) {
+						if (i < e.gamepad.axes.length) {
+							let a = e.gamepad.axes[i];
+							wmi.storeF64(off(8, 8), a);
+						} else {
+							off(8, 8);
+						}
+					}
+
+					wmi.storeInt(off(W, W), e.gamepad.id.length)
+					wmi.storeInt(off(W, W), e.gamepad.mapping.length)
 					wmi.storeString(off(64, 1), e.gamepad.id);
 					wmi.storeString(off(64, 1), e.gamepad.mapping);
 				}
@@ -1656,6 +1675,76 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement, memory, ev
 				let element = getElement(id);
 				if (element) {
 					element.dispatchEvent(new Event(name, options));
+					return true;
+				}
+				return false;
+			},
+
+			get_gamepad_state: (gamepad_id, ep) => {
+				let index = gamepad_id;
+				let gps = navigator.getGamepads();
+				if (0 <= index && index < gps.length) {
+					let gamepad = gps[index];
+					if (!gamepad) {
+						return false;
+					}
+
+					const W = wasmMemoryInterface.intSize;
+					let offset = ep;
+					let off = (amount, alignment) => {
+						if (alignment === undefined) {
+							alignment = Math.min(amount, W);
+						}
+						if (offset % alignment != 0) {
+							offset += alignment - (offset%alignment);
+						}
+						let x = offset;
+						offset += amount;
+						return x;
+					};
+
+					let align = (alignment) => {
+						const modulo = offset & (alignment-1);
+						if (modulo != 0) {
+							offset += alignment - modulo
+						}
+					};
+
+					let wmi = wasmMemoryInterface;
+
+					const idPtr      = off(W*2, W);
+					const mappingPtr = off(W*2, W);
+
+					wmi.storeI32(off(W), gamepad.index);
+					wmi.storeU8(off(1), !!gamepad.connected);
+					wmi.storeF64(off(8), gamepad.timestamp);
+
+					wmi.storeInt(off(W), gamepad.buttons.length);
+					wmi.storeInt(off(W), gamepad.axes.length);
+
+					for (let i = 0; i < 64; i++) {
+						if (i < gamepad.buttons.length) {
+							let b = gamepad.buttons[i];
+							wmi.storeF64(off(8, 8), b.value);
+							wmi.storeU8(off(1),  !!b.pressed);
+							wmi.storeU8(off(1),  !!b.touched);
+						} else {
+							off(16, 8);
+						}
+					}
+					for (let i = 0; i < 16; i++) {
+						if (i < gamepad.axes.length) {
+							wmi.storeF64(off(8, 8), gamepad.axes[i]);
+						} else {
+							off(8, 8);
+						}
+					}
+
+					wmi.storeInt(off(W, W), gamepad.id.length)
+					wmi.storeInt(off(W, W), gamepad.mapping.length)
+					wmi.storeString(off(64, 1), gamepad.id);
+					wmi.storeString(off(64, 1), gamepad.mapping);
+
 					return true;
 				}
 				return false;

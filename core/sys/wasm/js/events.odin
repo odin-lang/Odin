@@ -192,11 +192,8 @@ KEYBOARD_MAX_CODE_SIZE :: 16
 GAMEPAD_MAX_ID_SIZE      :: 64
 GAMEPAD_MAX_MAPPING_SIZE :: 64
 
-Gamepad_Button :: struct {
-	pressed: bool,
-	touched: bool,
-	value:   f64,
-}
+GAMEPAD_MAX_BUTTONS :: 64
+GAMEPAD_MAX_AXES    :: 16
 
 Event_Target_Kind :: enum u32 {
 	Element  = 0,
@@ -217,6 +214,30 @@ Event_Option :: enum u8 {
 	Composed   = 2,
 }
 Event_Options :: distinct bit_set[Event_Option; u8]
+
+Gamepad_Button :: struct {
+	value:   f64,
+	pressed: bool,
+	touched: bool,
+}
+
+Gamepad_State :: struct {
+	id:           string,
+	mapping:      string,
+	index:        int,
+	connected:    bool,
+	timestamp:    f64,
+
+	button_count: int,
+	axis_count:   int,
+	buttons: [GAMEPAD_MAX_BUTTONS]Gamepad_Button `fmt:"v,button_count"`,
+	axes:    [GAMEPAD_MAX_AXES]f64               `fmt:"v,axes_count"`,
+
+	_id_len:      int `fmt:"-"`,
+	_mapping_len: int `fmt:"-"`,
+	_id_buf:      [GAMEPAD_MAX_ID_SIZE]byte      `fmt:"-"`,
+	_mapping_buf: [GAMEPAD_MAX_MAPPING_SIZE]byte `fmt:"-"`,
+}
 
 Event :: struct {
 	kind:                 Event_Kind,
@@ -276,20 +297,7 @@ Event :: struct {
 			buttons: bit_set[0..<16; u16],
 		},
 
-		gamepad: struct {
-			id:           string,
-			mapping:      string,
-			index:        int,
-			connected:    bool,
-			timestamp:    f64,
-			button_count: int,
-			axes_count:   int,
-
-			_id_len:      int `fmt:"-"`,
-			_mapping_len: int `fmt:"-"`,
-			_id_buf:      [GAMEPAD_MAX_ID_SIZE]byte      `fmt:"-"`,
-			_mapping_buf: [GAMEPAD_MAX_MAPPING_SIZE]byte `fmt:"-"`,
-		},
+		gamepad: Gamepad_State,
 	},
 
 
@@ -365,6 +373,20 @@ remove_custom_event_listener :: proc(id: string, name: string, user_data: rawptr
 	}
 	return _remove_event_listener(id, name, user_data, callback)
 }
+
+get_gamepad_state :: proc "contextless" (index: int, s: ^Gamepad_State) -> bool {
+	@(default_calling_convention="contextless")
+	foreign dom_lib {
+		@(link_name="get_gamepad_state")
+		_get_gamepad_state :: proc(index: int, s: ^Gamepad_State) -> bool ---
+	}
+
+	if s == nil {
+		return false
+	}
+	return _get_gamepad_state(index, s)
+}
+
 
 @(export, link_name="odin_dom_do_event_callback")
 do_event_callback :: proc(user_data: rawptr, callback: proc(e: Event)) {
