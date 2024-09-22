@@ -60,6 +60,11 @@ Marshal_Options :: struct {
 	indentation: int,
 	mjson_skipped_first_braces_start: bool,
 	mjson_skipped_first_braces_end: bool,
+
+	// Write union variant name and tag into data. Always creates a JSON object
+	// for each union value with a $data and $tag field, plus a $name field if
+	// the variant is a named type.
+	write_union_variant_info: bool,
 }
 
 marshal :: proc(v: any, opt: Marshal_Options = {}, allocator := context.allocator, loc := #caller_location) -> (data: []byte, err: Marshal_Error) {
@@ -458,7 +463,42 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 			tag -= 1
 		}
 		id := info.variants[tag].id
-		return marshal_to_writer(w, any{v.data, id}, opt)
+
+		if opt.write_union_variant_info {
+			opt_write_start(w, opt, '{') or_return
+			opt_write_iteration(w, opt, true) or_return
+
+			opt_write_key(w, opt, "$data") or_return
+			marshal_to_writer(w, any{v.data, id}, opt) or_return
+			opt_write_iteration(w, opt, false) or_return
+
+			/*
+			TODO: Somehow write the name of simple types like f32... But those
+			are hard to match when unmarshalling since they have Type_Info_Named
+
+			opt_write_key(w, opt, "$name") or_return
+
+			io.write_string(w, "\"") or_return
+			reflect.write_typeid(w, info.variants[tag].id) or_return
+			io.write_string(w, "\"") or_return*/
+
+			tin, tin_ok := info.variants[tag].variant.(runtime.Type_Info_Named)
+
+			if tin_ok {
+				opt_write_key(w, opt, "$name") or_return
+				io.write_string(w, "\"") or_return
+				io.write_string(w, tin.name)
+				io.write_string(w, "\"") or_return
+				opt_write_iteration(w, opt, false) or_return
+			}
+
+			opt_write_key(w, opt, "$tag") or_return
+			io.write_i64(w, tag)
+
+			opt_write_end(w, opt, '}') or_return
+		} else {
+			marshal_to_writer(w, any{v.data, id}, opt) or_return
+		}
 
 	case runtime.Type_Info_Enum:
 		if !opt.use_enum_names || len(info.names) == 0 {
