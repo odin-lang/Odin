@@ -95,56 +95,116 @@ Lock_Type :: enum c.short {
 // Assertions made to unify this bit set.
 #assert(O_RDONLY == 0)
 
-O_Flag_Bits :: enum c.int {
-	// Sets FD_CLOEXEC on the file descriptor.
-	CLOEXEC   = log2(O_CLOEXEC),
-	// If not exists, combined with DIRECTORY will cause creation of a directory, otherwise a regular file.
-	CREAT     = log2(O_CREAT),
-	// Fails if the opened descriptor would not be a directory.
-	DIRECTORY = log2(O_DIRECTORY),
-	// If combined with CREAT, causes a failure if the file already exists.
-	EXCL      = log2(O_EXCL),
-	// If terminal device, do not make it the controlling terminal for the process.
-	NOCTTY    = log2(O_NOCTTY),
-	// Don't follow symbolic links, fail with errno ELOOP.
-	NOFOLLOW  = log2(O_NOFOLLOW),
-	// If exists and regular, truncate the length to 0.
-	TRUNC     = log2(O_TRUNC),
+when ODIN_OS == .Linux {
 
-	// NOTE: use with `posix.O_TTY_INIT + { .OTHER_FLAG, .OTHER_FLAG }`, unfortunately can't be in
-	// this bit set enum because it is 0 on some platforms and a value on others.
-	// TTY_INIT = O_TTY_INIT,
+	O_Flag_Bits :: enum c.int {
+		// Sets FD_CLOEXEC on the file descriptor.
+		CLOEXEC   = log2(O_CLOEXEC),
+		// If not exists, combined with DIRECTORY will cause creation of a directory, otherwise a regular file.
+		CREAT     = log2(O_CREAT),
+		// Fails if the opened descriptor would not be a directory.
+		DIRECTORY = log2(O_DIRECTORY),
+		// If combined with CREAT, causes a failure if the file already exists.
+		EXCL      = log2(O_EXCL),
+		// If terminal device, do not make it the controlling terminal for the process.
+		NOCTTY    = log2(O_NOCTTY),
+		// Don't follow symbolic links, fail with errno ELOOP.
+		NOFOLLOW  = log2(O_NOFOLLOW),
+		// If exists and regular, truncate the length to 0.
+		TRUNC     = log2(O_TRUNC),
 
-	// Set file offset to end of file prior to each write.
-	APPEND    = log2(O_APPEND),
-	// Write I/O shall complete as defined by synchronized I/O data integrity completion.
-	DSYNC     = log2(O_DSYNC),
-	// Causes nonblocking behaviour in various situations.
-	NONBLOCK  = log2(O_NONBLOCK),
-	// Write I/O shall complete as defined by synchronized I/O file integrity completion.
-	SYNC      = log2(O_SYNC),
+		// NOTE: use with `posix.O_TTY_INIT + { .OTHER_FLAG, .OTHER_FLAG }`, unfortunately can't be in
+		// this bit set enum because it is 0 on some platforms and a value on others.
+		// TTY_INIT = O_TTY_INIT,
 
-	// NOTE: use with `posix.O_RSYNC + { .OTHER_FLAG, .OTHER_FLAG }`, unfortunately can't be in
-	// this bit set enum because it is 0 on some platforms and a value on others.
-	// RSYNC = O_RSYNC,
+		// Set file offset to end of file prior to each write.
+		APPEND    = log2(O_APPEND),
+		// Write I/O shall complete as defined by synchronized I/O data integrity completion.
+		DSYNC     = log2(O_DSYNC),
+		// Causes nonblocking behaviour in various situations.
+		NONBLOCK  = log2(O_NONBLOCK),
+		// Write I/O shall complete as defined by synchronized I/O file integrity completion.
+		SYNC      = log2(O_SYNC),
 
-	// Execute only.
-	// NOTE: use with `posix.O_ENTER + { .OTHER_FLAG, .OTHER_FLAG }`, unfortunately can't be in
-	// this bit set enum because it is 0 on some platforms and a value on others.
-	// EXEC      = O_EXEC
+		// NOTE: use with `posix.O_RSYNC + { .OTHER_FLAG, .OTHER_FLAG }`, unfortunately can't be in
+		// this bit set enum because it is 0 on some platforms and a value on others.
+		// RSYNC = O_RSYNC,
 
-	// Reading and writing.
-	RDWR      = log2(O_RDWR),
-	// Writing only.
-	WRONLY    = log2(O_WRONLY),
-	// Reading only.
-	// RDONLY = 0, // Default
+		// Execute only.
+		// NOTE: use with `posix.O_ENTER + { .OTHER_FLAG, .OTHER_FLAG }`, unfortunately can't be in
+		// this bit set enum because it is 0 on some platforms and a value on others.
+		// EXEC      = O_EXEC
+
+		// Reading and writing.
+		RDWR      = log2(O_RDWR),
+		// Writing only.
+		WRONLY    = log2(O_WRONLY),
+		// Reading only.
+		// RDONLY = 0, // Default
+	}
+
+} else {
+
+	O_Flag_Bits :: enum c.int {
+		// Sets FD_CLOEXEC on the file descriptor.
+		CLOEXEC   = log2(O_CLOEXEC),
+		// If not exists, combined with DIRECTORY will cause creation of a directory, otherwise a regular file.
+		CREAT     = log2(O_CREAT),
+		// Fails if the opened descriptor would not be a directory.
+		DIRECTORY = log2(O_DIRECTORY),
+		// If combined with CREAT, causes a failure if the file already exists.
+		EXCL      = log2(O_EXCL),
+		// If terminal device, do not make it the controlling terminal for the process.
+		NOCTTY    = log2(O_NOCTTY),
+		// Don't follow symbolic links, fail with errno ELOOP.
+		NOFOLLOW  = log2(O_NOFOLLOW),
+		// If exists and regular, truncate the length to 0.
+		TRUNC     = log2(O_TRUNC),
+
+		// NOTE: use with `posix.O_TTY_INIT + { .OTHER_FLAG, .OTHER_FLAG }`, unfortunately can't be in
+		// this bit set enum because it is 0 on some platforms and a value on others.
+		// TTY_INIT = O_TTY_INIT,
+
+		// Set file offset to end of file prior to each write.
+		APPEND    = log2(O_APPEND),
+		// Write I/O shall complete as defined by synchronized I/O data integrity completion.
+		DSYNC     = log2(O_DSYNC),
+		// Causes nonblocking behaviour in various situations.
+		NONBLOCK  = log2(O_NONBLOCK),
+		// Write I/O shall complete as defined by synchronized I/O file integrity completion.
+		SYNC      = log2(O_SYNC),
+
+		// NOTE: use with `posix.O_RSYNC + { .OTHER_FLAG, .OTHER_FLAG }`, unfortunately can't be in
+		// this bit set enum because it is 0 on some platforms and a value on others.
+		// RSYNC = O_RSYNC,
+
+		// Execute only.
+		// NOTE: use with `posix.O_ENTER + { .OTHER_FLAG, .OTHER_FLAG }`, unfortunately can't be in
+		// this bit set enum because it is 0 on some platforms and a value on others.
+		EXEC      = O_EXEC,
+
+		// Reading and writing.
+		RDWR      = log2(O_RDWR),
+		// Writing only.
+		WRONLY    = log2(O_WRONLY),
+		// Reading only.
+		// RDONLY = 0, // Default
+	}
 }
 O_Flags :: bit_set[O_Flag_Bits; c.int]
 
 // A mask of all the access mode bits.
-// NOTE: .EXEC and .RDONLY also belong here, but they are 0 on some platforms. 
-O_ACCMODE :: O_Flags{ .RDWR, .WRONLY }
+when ODIN_OS == .Linux {
+
+	// NOTE: .EXEC and .RDONLY also belong here, but they are 0 on some platforms. 
+	O_ACCMODE :: O_Flags{ .RDWR, .WRONLY }
+
+} else {
+
+	// NOTE: .RDONLY also belong here, but they are 0 on some platforms. 
+	O_ACCMODE :: O_Flags{ .EXEC, .RDWR, .WRONLY }
+
+}
 
 AT_Flag_Bits :: enum c.int {
 	EACCESS          = log2(AT_EACCESS),
