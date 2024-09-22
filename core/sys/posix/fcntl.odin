@@ -181,9 +181,7 @@ when ODIN_OS == .Linux {
 		// RSYNC = O_RSYNC,
 
 		// Execute only.
-		// NOTE: use with `posix.O_ENTER + { .OTHER_FLAG, .OTHER_FLAG }`, unfortunately can't be in
-		// this bit set enum because it is 0 on some platforms and a value on others.
-		EXEC      = O_EXEC,
+		EXEC      = log2(O_EXEC),
 
 		// Reading and writing.
 		RDWR      = log2(O_RDWR),
