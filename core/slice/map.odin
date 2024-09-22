@@ -48,7 +48,7 @@ map_entries :: proc(m: $M/map[$K]$V, allocator := context.allocator) -> (entries
 	return
 }
 
-map_entry_infos :: proc(m: $M/map[$K]$V, allocator := context.allocator) -> (entries: []Map_Entry_Info(K, V)) #no_bounds_check {
+map_entry_infos :: proc(m: $M/map[$K]$V, allocator := context.allocator) -> (entries: []Map_Entry_Info(K, V), err: runtime.Allocator_Error) #no_bounds_check {
 	m := m
 	rm := (^runtime.Raw_Map)(&m)
 
