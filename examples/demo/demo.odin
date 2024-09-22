@@ -906,7 +906,7 @@ parametric_polymorphism :: proc() {
 
 	// This is how `new` is implemented
 	alloc_type :: proc($T: typeid) -> ^T {
-		t := cast(^T)alloc(size_of(T), align_of(T))
+		t := cast(^T)mem.alloc(size_of(T), align_of(T))
 		t^ = T{} // Use default initialization value
 		return t
 	}
