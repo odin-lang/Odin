@@ -197,6 +197,36 @@ test_parse_rfc3339_string :: proc(t: ^testing.T) {
 }
 
 @test
+test_print_rfc3339 :: proc(t: ^testing.T) {
+	TestCase :: struct {
+		printed: string,
+		time: i64,
+		utc_offset: int,
+	}
+
+	tests :: [?]TestCase {
+		{"1985-04-12T23:20:50.52Z",      	482196050520000000,  	0},
+		{"1985-04-12T23:20:50.52001905Z",	482196050520019050,  	0},
+		{"1996-12-19T16:39:57-08:00",    	851013597000000000,  	-480},
+		{"1996-12-20T00:39:57Z",         	851042397000000000,  	0},
+		{"1937-01-01T12:00:27.87+00:20", 	-1041335972130000000,	+20},
+	}
+
+	for test in tests {
+		timestamp := time.Time { _nsec = test.time }
+		printed_timestamp, ok := time.time_to_rfc3339(time=timestamp, utc_offset=test.utc_offset)
+		defer delete_string(printed_timestamp)
+
+		testing.expect(t, ok, "expected printing to work fine")
+
+		testing.expectf(
+			t, printed_timestamp == test.printed,
+			"expected is %w, printed is %w", test.printed, printed_timestamp,
+		)
+	}
+}
+
+@test
 test_parse_iso8601_string :: proc(t: ^testing.T) {
 	for test in iso8601_tests {
 		is_leap := false
