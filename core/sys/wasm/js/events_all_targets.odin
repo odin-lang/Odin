@@ -285,4 +285,3 @@ add_custom_event_listener :: proc(id: string, name: string, user_data: rawptr, c
 remove_custom_event_listener :: proc(id: string, name: string, user_data: rawptr, callback: proc(e: Event)) -> bool {
 	panic("vendor:wasm/js not supported on non JS targets")
 }
-

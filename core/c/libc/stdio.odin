@@ -89,6 +89,30 @@ when ODIN_OS == .Linux {
 	}
 }
 
+when ODIN_OS == .JS {
+	fpos_t        :: struct #raw_union { _: [16]char, _: longlong, _: double, }
+
+	_IOFBF        :: 0
+	_IOLBF        :: 1
+	_IONBF        :: 2
+
+	BUFSIZ        :: 1024
+
+	EOF           :: int(-1)
+
+	FOPEN_MAX     :: 1000
+
+	FILENAME_MAX  :: 4096
+
+	L_tmpnam      :: 20
+
+	SEEK_SET      :: 0
+	SEEK_CUR      :: 1
+	SEEK_END      :: 2
+
+	TMP_MAX       :: 308915776
+}
+
 when ODIN_OS == .OpenBSD || ODIN_OS == .NetBSD {
 	fpos_t :: distinct i64
 

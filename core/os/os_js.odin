@@ -1,8 +1,6 @@
 #+build js
 package os
 
-import "base:runtime"
-
 foreign import "odin_env"
 
 @(require_results)

@@ -37,7 +37,7 @@ realloc :: proc "c" (ptr: rawptr, new_size: uint) -> rawptr {
 	// Note that realloc does not actually care about alignment and is allowed to just align it to something
 	// else than the original allocation.
 	ptr, err := runtime.non_zero_mem_resize(ptr, -1, int(new_size))
-	assert(err != nil, "realloc failure")
+	assert(err == nil, "realloc failure")
 	return raw_data(ptr)
 }
 

@@ -188,3 +188,109 @@ scan_digits :: proc(s: string, sep: string, count: int) -> (res: int, ok: bool) 
 	}
 	return res, found_sep
 }
+
+/*
+Serialize the timestamp as a RFC 3339 string.
+
+The boolean `ok` is false if the `time` is not a valid datetime, or if allocating the result string fails.
+
+**Inputs**:
+- `utc_offset`: offset in minutes wrt UTC (ie. the timezone)
+- `include_nanos`: whether to include nanoseconds in the result.
+*/
+time_to_rfc3339 :: proc(time: Time, utc_offset : int = 0, include_nanos := true, allocator := context.allocator) -> (res: string, ok: bool) {
+	utc_offset := utc_offset
+
+	// convert to datetime
+	datetime := time_to_datetime(time) or_return
+
+	if datetime.year < 0 || datetime.year >= 10_000 { return "", false }
+
+	temp_string := [36]u8{}
+	offset : uint = 0
+
+	print_as_fixed_int :: proc(dst: []u8, offset: ^uint, width: i8, i: i64) {
+		i := i
+		width := width
+		for digit_idx in 0..<width {
+			last_digit := i % 10
+			dst[offset^ + uint(width) - uint(digit_idx)-1] = '0' + u8(last_digit)
+			i = i / 10
+		}
+
+		offset^ += uint(width)
+	}
+
+	print_as_fixed_int(temp_string[:], &offset, 4, datetime.year)
+	temp_string[offset] = '-'
+	offset += 1
+	print_as_fixed_int(temp_string[:], &offset, 2, i64(datetime.month))
+	temp_string[offset] = '-'
+	offset += 1
+	print_as_fixed_int(temp_string[:], &offset, 2, i64(datetime.day))
+	temp_string[offset] = 'T'
+	offset += 1
+	print_as_fixed_int(temp_string[:], &offset, 2, i64(datetime.hour))
+	temp_string[offset] = ':'
+	offset += 1
+	print_as_fixed_int(temp_string[:], &offset, 2, i64(datetime.minute))
+	temp_string[offset] = ':'
+	offset += 1
+	print_as_fixed_int(temp_string[:], &offset, 2, i64(datetime.second))
+
+	// turn 123_450_000 to 12345, 5
+	strip_trailing_zeroes_nanos :: proc(n: i64) -> (res: i64, n_digits: i8) {
+		res = n
+		n_digits = 9
+		for res % 10 == 0 {
+			res = res / 10
+			n_digits -= 1
+		}
+		return
+	}
+
+	// pre-epoch times: turn, say, -400ms to +600ms for display
+	nanos := time._nsec % 1_000_000_000
+	if nanos < 0 {
+		nanos += 1_000_000_000
+	}
+
+	if nanos != 0 && include_nanos {
+		temp_string[offset] = '.'
+		offset += 1
+
+		// remove trailing zeroes
+		nanos_nonzero, n_digits := strip_trailing_zeroes_nanos(nanos)
+		assert(nanos_nonzero != 0)
+
+		// write digits, right-to-left
+		for digit_idx : i8 = n_digits-1; digit_idx >= 0; digit_idx -= 1 {
+			digit := u8(nanos_nonzero % 10)
+			temp_string[offset + uint(digit_idx)] = '0' + u8(digit)
+			nanos_nonzero /= 10
+		}
+		offset += uint(n_digits)
+	}
+
+	if utc_offset == 0 {
+		temp_string[offset] = 'Z'
+		offset += 1
+	} else {
+		temp_string[offset] = utc_offset > 0 ? '+' : '-'
+		offset += 1
+		utc_offset = abs(utc_offset)
+		print_as_fixed_int(temp_string[:], &offset, 2, i64(utc_offset / 60))
+		temp_string[offset] = ':'
+		offset += 1
+		print_as_fixed_int(temp_string[:], &offset, 2, i64(utc_offset % 60))
+	}
+
+	res_as_slice, res_alloc := make_slice([]u8, len=offset, allocator = allocator)
+	if res_alloc != nil {
+		return "", false
+	}
+
+	copy(res_as_slice, temp_string[:offset])
+
+	return string(res_as_slice), true
+}
