@@ -51,7 +51,7 @@ _ROT_16: simd.u32x4 : {16, 16, 16, 16}
 
 when ODIN_ENDIAN == .Big {
 	@(private = "file")
-	_increment_counter :: #force_inline proc "contextless" (ctx: ^Context) -> simd.u32x4 {
+	_increment_counter :: #force_inline proc "contextless" (ctx: ^_chacha20.Context) -> simd.u32x4 {
 		// In the Big Endian case, the low and high portions in the vector
 		// are flipped, so the 64-bit addition can't be done with a simple
 		// vector add.
