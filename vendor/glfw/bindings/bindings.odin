@@ -3,7 +3,7 @@ package glfw_bindings
 import "core:c"
 import vk "vendor:vulkan"
 
-GLFW_SHARED :: #config(GLFW_SHARED, false)
+GLFW_SHARED :: #config(GLFW_SHARED, ODIN_OS != .Windows && ODIN_OS != .Darwin)
 
 when ODIN_OS == .Windows {
 	when GLFW_SHARED {
@@ -38,7 +38,13 @@ when ODIN_OS == .Windows {
 		}
 	}
 } else {
-	foreign import glfw "system:glfw"
+	when GLFW_SHARED {
+		foreign import glfw "system:glfw"
+	} else {
+		foreign import glfw { 
+			"../lib/libglfw3.a",
+		}
+	}
 }
 
 #assert(size_of(c.int) == size_of(b32))
